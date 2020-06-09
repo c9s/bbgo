@@ -54,14 +54,23 @@ type ExecutionReportEvent struct {
 	OrderType     string `json:"o"`
 	TimeInForce   string `json:"f"`
 
-	Quantity  string `json:"q"`
-	Price     string `json:"p"`
-	StopPrice string `json:"P"`
+	OrderQuantity string `json:"q"`
+	OrderPrice    string `json:"p"`
+	StopPrice     string `json:"P"`
+
+	IsOnBook bool `json:"w"`
+	IsMaker  bool `json:"m"`
+
+	CommissionAmount string `json:"n"`
+	CommissionAsset string `json:"N"`
 
 	CurrentExecutionType string `json:"x"`
 	CurrentOrderStatus   string `json:"X"`
 
 	OrderID int `json:"i"`
+
+	TradeID         int64 `json:"t"`
+	TransactionTime int64 `json:"T"`
 
 	LastExecutedQuantity     string `json:"l"`
 	CumulativeFilledQuantity string `json:"z"`
@@ -193,4 +202,3 @@ func ParseEvent(message string) (interface{}, error) {
 
 	return nil, fmt.Errorf("unsupported message: %s", message)
 }
-
