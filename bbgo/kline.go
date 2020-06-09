@@ -2,6 +2,7 @@ package bbgo
 
 import (
 	"fmt"
+	"math"
 )
 
 type KLineEvent struct {
@@ -80,7 +81,7 @@ func (k KLine) GetMaxChange() float64 {
 }
 
 func (k KLine) GetThickness() float64 {
-	return k.GetChange() / k.GetMaxChange()
+	return math.Abs(k.GetChange()) / math.Abs(k.GetMaxChange())
 }
 
 func (k KLine) GetChange() float64 {
