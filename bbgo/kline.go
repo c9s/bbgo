@@ -29,6 +29,24 @@ type KLine struct {
 	Closed         bool `json:"x"`
 }
 
+func (k KLine) Mid() float64 {
+	return k.GetHigh() - k.GetLow() / 2
+}
+
+// green candle with open and close near high price
+func (k KLine) BounceUp() bool {
+	mid := k.Mid()
+	trend := k.GetTrend()
+	return trend > 0 && k.GetOpen() > mid && k.GetClose() > mid
+}
+
+// red candle with open and close near low price
+func (k KLine) BounceDown() bool {
+	mid := k.Mid()
+	trend := k.GetTrend()
+	return trend > 0 && k.GetOpen() < mid && k.GetClose() < mid
+}
+
 func (k KLine) GetTrend() int {
 	o := k.GetOpen()
 	c := k.GetClose()
@@ -75,22 +93,22 @@ func (k KLine) String() string {
 
 type KLineWindow []KLine
 
-func (w KLineWindow) Len() int {
-	return len(w)
+func (k KLineWindow) Len() int {
+	return len(k)
 }
 
-func (w KLineWindow) GetOpen() float64 {
-	return w[0].GetOpen()
+func (k KLineWindow) GetOpen() float64 {
+	return k[0].GetOpen()
 }
 
-func (w KLineWindow) GetClose() float64 {
-	end := len(w) - 1
-	return w[end].GetClose()
+func (k KLineWindow) GetClose() float64 {
+	end := len(k) - 1
+	return k[end].GetClose()
 }
 
-func (w KLineWindow) GetHigh() float64 {
-	high := w.GetOpen()
-	for _, line := range w {
+func (k KLineWindow) GetHigh() float64 {
+	high := k.GetOpen()
+	for _, line := range k {
 		val := line.GetHigh()
 		if val > high {
 			high = val
@@ -99,9 +117,9 @@ func (w KLineWindow) GetHigh() float64 {
 	return high
 }
 
-func (w KLineWindow) GetLow() float64 {
-	low := w.GetOpen()
-	for _, line := range w {
+func (k KLineWindow) GetLow() float64 {
+	low := k.GetOpen()
+	for _, line := range k {
 		val := line.GetHigh()
 		if val < low {
 			low = val
@@ -110,28 +128,59 @@ func (w KLineWindow) GetLow() float64 {
 	return low
 }
 
-func (w KLineWindow) GetChange() float64 {
-	return w.GetClose() - w.GetOpen()
+func (k KLineWindow) GetChange() float64 {
+	return k.GetClose() - k.GetOpen()
 }
 
-func (w KLineWindow) GetMaxChange() float64 {
-	return w.GetHigh() - w.GetLow()
+func (k KLineWindow) GetMaxChange() float64 {
+	return k.GetHigh() - k.GetLow()
 }
 
-func (w *KLineWindow) Add(line KLine) {
-	*w = append(*w, line)
+func (k KLineWindow) GetTrend() int {
+	o := k.GetOpen()
+	c := k.GetClose()
+
+	if c > o {
+		return 1
+	} else if c < o {
+		return -1
+	}
+	return 0
 }
 
-func (w *KLineWindow) Truncate(size int) {
-	if len(*w) <= size {
+func (k KLineWindow) Mid() float64 {
+	return k.GetHigh() - k.GetLow() / 2
+}
+
+// green candle with open and close near high price
+func (k KLineWindow) BounceUp() bool {
+	mid := k.Mid()
+	trend := k.GetTrend()
+	return trend > 0 && k.GetOpen() > mid && k.GetClose() > mid
+}
+
+// red candle with open and close near low price
+func (k KLineWindow) BounceDown() bool {
+	mid := k.Mid()
+	trend := k.GetTrend()
+	return trend > 0 && k.GetOpen() < mid && k.GetClose() < mid
+}
+
+
+func (k *KLineWindow) Add(line KLine) {
+	*k = append(*k, line)
+}
+
+func (k *KLineWindow) Truncate(size int) {
+	if len(*k) <= size {
 		return
 	}
 
-	end := len(*w) - 1
+	end := len(*k) - 1
 	start := end - size
 	if start < 0 {
 		start = 0
 	}
-	*w = (*w)[end-5 : end]
+	*k = (*k)[end-5 : end]
 }
 
