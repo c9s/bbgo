@@ -38,14 +38,16 @@ func (k KLine) Mid() float64 {
 func (k KLine) BounceUp() bool {
 	mid := k.Mid()
 	trend := k.GetTrend()
-	return trend > 0 && k.GetOpen() > mid && k.GetClose() > mid
+	thickness := k.GetThickness()
+	return trend > 0 && k.GetOpen() > mid && k.GetClose() > mid && thickness < (1.0/4.0)
 }
 
 // red candle with open and close near low price
 func (k KLine) BounceDown() bool {
 	mid := k.Mid()
 	trend := k.GetTrend()
-	return trend > 0 && k.GetOpen() < mid && k.GetClose() < mid
+	thickness := k.GetThickness()
+	return trend > 0 && k.GetOpen() < mid && k.GetClose() < mid && thickness < (1.0/4.0)
 }
 
 func (k KLine) GetTrend() int {
@@ -150,7 +152,7 @@ func (k KLineWindow) GetTrend() int {
 }
 
 func (k KLineWindow) Mid() float64 {
-	return k.GetHigh() - k.GetLow() / 2
+	return k.GetHigh() - k.GetLow()/2
 }
 
 // green candle with open and close near high price
@@ -166,7 +168,6 @@ func (k KLineWindow) BounceDown() bool {
 	trend := k.GetTrend()
 	return trend > 0 && k.GetOpen() < mid && k.GetClose() < mid
 }
-
 
 func (k *KLineWindow) Add(line KLine) {
 	*k = append(*k, line)
@@ -184,4 +185,3 @@ func (k *KLineWindow) Truncate(size int) {
 	}
 	*k = (*k)[end-5 : end]
 }
-
