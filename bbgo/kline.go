@@ -173,6 +173,17 @@ func (k *KLineWindow) Add(line KLine) {
 	*k = append(*k, line)
 }
 
+func (k KLineWindow) Take(size int) KLineWindow {
+	return k[:size]
+}
+
+func (k KLineWindow) Tail(size int) KLineWindow {
+	if len(k) <= size {
+		return k[:]
+	}
+	return k[len(k) - size:]
+}
+
 func (k *KLineWindow) Truncate(size int) {
 	if len(*k) <= size {
 		return
