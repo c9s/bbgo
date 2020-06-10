@@ -31,7 +31,7 @@ type KLine struct {
 }
 
 func (k KLine) Mid() float64 {
-	return k.GetHigh() - k.GetLow() / 2
+	return (k.GetHigh() + k.GetLow()) / 2
 }
 
 // green candle with open and close near high price
