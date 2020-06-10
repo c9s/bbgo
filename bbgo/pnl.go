@@ -23,6 +23,19 @@ func CalculateCostAndProfit(trades []Trade, currentPrice float64) (averageBidPri
 	var bidVolume = 0.0
 	var bidAmount = 0.0
 	var bidFee = 0.0
+
+	// find the first buy trade
+	var firstBidIndex = -1
+	for idx, t := range trades {
+		if t.IsBuyer {
+			firstBidIndex = idx
+			break
+		}
+	}
+	if firstBidIndex > 0 {
+		trades = trades[firstBidIndex:]
+	}
+
 	for _, t := range trades {
 		if t.IsBuyer {
 			bidVolume += t.Volume
