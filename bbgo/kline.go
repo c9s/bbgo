@@ -128,8 +128,16 @@ func (k KLine) String() string {
 
 
 func (k KLine) SlackAttachment() slack.Attachment {
+	var color = ""
+	if k.GetTrend() > 0 {
+		color = "green"
+	} else if k.GetTrend() < 0 {
+		color = "red"
+	}
+
 	return slack.Attachment{
 		Text: "KLine",
+		Color: color,
 		Fields: []slack.AttachmentField{
 			{
 				Title: "Open",
