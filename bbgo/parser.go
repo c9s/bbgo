@@ -90,7 +90,7 @@ func (e *ExecutionReportEvent) Trade() (*Trade, error) {
 	tt := time.Unix(0, e.TransactionTime/1000000)
 	return &Trade{
 		ID:          e.TradeID,
-		Symbol:      e.Symbol,
+		Market:      e.Symbol,
 		Price:       MustParseFloat(e.LastExecutedPrice),
 		Volume:      MustParseFloat(e.LastExecutedQuantity),
 		IsBuyer:     e.Side == "BUY",
