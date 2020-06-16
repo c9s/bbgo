@@ -126,18 +126,19 @@ func (k KLine) String() string {
 	return fmt.Sprintf("%s %s Open: % 14s Close: % 14s High: % 14s Low: % 14s Volume: % 15s Change: % 11f Max Change: % 11f", k.Symbol, k.Interval, k.Open, k.Close, k.High, k.Low, k.Volume, k.GetChange(), k.GetMaxChange())
 }
 
+func (k KLine) Color() string {
+	if k.GetTrend() > 0 {
+		return "#228B22"
+	} else if k.GetTrend() < 0 {
+		return "#800000"
+	}
+	return "#f0f0f0"
+}
 
 func (k KLine) SlackAttachment() slack.Attachment {
-	var color = ""
-	if k.GetTrend() > 0 {
-		color = "green"
-	} else if k.GetTrend() < 0 {
-		color = "red"
-	}
-
 	return slack.Attachment{
 		Text: "KLine",
-		Color: color,
+		Color: k.Color(),
 		Fields: []slack.AttachmentField{
 			{
 				Title: "Open",
