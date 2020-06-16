@@ -2,7 +2,10 @@ package bbgo
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"time"
+
 	"github.com/valyala/fastjson"
 )
 
@@ -62,7 +65,7 @@ type ExecutionReportEvent struct {
 	IsMaker  bool `json:"m"`
 
 	CommissionAmount string `json:"n"`
-	CommissionAsset string `json:"N"`
+	CommissionAsset  string `json:"N"`
 
 	CurrentExecutionType string `json:"x"`
 	CurrentOrderStatus   string `json:"X"`
@@ -77,6 +80,25 @@ type ExecutionReportEvent struct {
 	LastExecutedPrice        string `json:"L"`
 
 	OrderCreationTime int `json:"O"`
+}
+
+func (e *ExecutionReportEvent) Trade() (*Trade, error) {
+	if e.CurrentExecutionType != "TRADE" {
+		return nil, errors.New("execution report is not a trade")
+	}
+
+	tt := time.Unix(0, e.TransactionTime/1000000)
+	return &Trade{
+		ID:          e.TradeID,
+		Symbol:      e.Symbol,
+		Price:       MustParseFloat(e.LastExecutedPrice),
+		Volume:      MustParseFloat(e.LastExecutedQuantity),
+		IsBuyer:     e.Side == "BUY",
+		IsMaker:     e.IsMaker,
+		Time:        tt,
+		Fee:         MustParseFloat(e.CommissionAmount),
+		FeeCurrency: e.CommissionAsset,
+	}, nil
 }
 
 /*
