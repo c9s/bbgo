@@ -82,8 +82,30 @@ func (k KLine) GetMaxChange() float64 {
 	return k.GetHigh() - k.GetLow()
 }
 
+// GetThickness returns the thickness of the kline. 1 => thick, 0.1 => thin
 func (k KLine) GetThickness() float64 {
 	return math.Abs(k.GetChange()) / math.Abs(k.GetMaxChange())
+}
+
+func (k KLine) GetUpperShadowHeight() float64 {
+	high := k.GetHigh()
+	if k.GetOpen() > k.GetClose() {
+		return high - k.GetOpen()
+	}
+	return high - k.GetClose()
+}
+
+func (k KLine) GetLowerShadowHeight() float64 {
+	low := k.GetLow()
+	if k.GetOpen() < k.GetClose() {
+		return k.GetOpen() - low
+	}
+	return k.GetClose() - low
+}
+
+// GetBody returns the height of the candle real body
+func (k KLine) GetBody() float64 {
+	return k.GetChange()
 }
 
 func (k KLine) GetChange() float64 {
