@@ -130,7 +130,7 @@ func (k KLine) Color() string {
 	if k.GetTrend() > 0 {
 		return "#228B22"
 	} else if k.GetTrend() < 0 {
-		return "#800000"
+		return "#DC143C"
 	}
 	return "#f0f0f0"
 }
