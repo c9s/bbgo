@@ -87,12 +87,20 @@ func (k KLine) GetThickness() float64 {
 	return math.Abs(k.GetChange()) / math.Abs(k.GetMaxChange())
 }
 
+func (k KLine) GetUpperShadowRatio() float64 {
+	return k.GetUpperShadowHeight() / math.Abs(k.GetMaxChange())
+}
+
 func (k KLine) GetUpperShadowHeight() float64 {
 	high := k.GetHigh()
 	if k.GetOpen() > k.GetClose() {
 		return high - k.GetOpen()
 	}
 	return high - k.GetClose()
+}
+
+func (k KLine) GetLowerShadowRatio() float64 {
+	return k.GetLowerShadowHeight() / math.Abs(k.GetMaxChange())
 }
 
 func (k KLine) GetLowerShadowHeight() float64 {
@@ -160,6 +168,25 @@ func (k KLineWindow) GetChange() float64 {
 func (k KLineWindow) GetMaxChange() float64 {
 	return k.GetHigh() - k.GetLow()
 }
+
+func (k KLineWindow) AllDrop() bool {
+	for _, n := range k {
+		if n.GetTrend() >= 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func (k KLineWindow) AllRise() bool {
+	for _, n := range k {
+		if n.GetTrend() <= 0 {
+			return false
+		}
+	}
+	return true
+}
+
 
 func (k KLineWindow) GetTrend() int {
 	o := k.GetOpen()
