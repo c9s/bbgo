@@ -2,7 +2,9 @@ package bbgo
 
 import (
 	"fmt"
+	"github.com/slack-go/slack"
 	"math"
+	"strconv"
 )
 
 type KLineEvent struct {
@@ -123,6 +125,49 @@ func (k KLine) GetChange() float64 {
 func (k KLine) String() string {
 	return fmt.Sprintf("%s %s Open: % 14s Close: % 14s High: % 14s Low: % 14s Volume: % 15s Change: % 11f Max Change: % 11f", k.Symbol, k.Interval, k.Open, k.Close, k.High, k.Low, k.Volume, k.GetChange(), k.GetMaxChange())
 }
+
+
+func (k KLine) SlackAttachment() slack.Attachment {
+	return slack.Attachment{
+		Text: "KLine",
+		Fields: []slack.AttachmentField{
+			{
+				Title: "Open",
+				Value: k.Open,
+				Short: true,
+			},
+			{
+				Title: "Close",
+				Value: k.Close,
+				Short: true,
+			},
+			{
+				Title: "High",
+				Value: k.High,
+				Short: true,
+			},
+			{
+				Title: "Low",
+				Value: k.Low,
+				Short: true,
+			},
+			{
+				Title: "Change",
+				Value: formatVolume(k.GetChange()),
+				Short: true,
+			},
+			{
+				Title: "Max Change",
+				Value: formatVolume(k.GetMaxChange()),
+				Short: true,
+			},
+		},
+		Footer:     "",
+		FooterIcon: "",
+	}
+}
+
+
 
 type KLineWindow []KLine
 
@@ -245,3 +290,9 @@ func (k *KLineWindow) Truncate(size int) {
 	}
 	*k = (*k)[end-5 : end]
 }
+
+
+func formatVolume(val float64) string {
+	return strconv.FormatFloat(val, 'f', 6, 64)
+}
+
