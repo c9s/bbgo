@@ -205,7 +205,7 @@ func (k KLineWindow) GetHigh() float64 {
 func (k KLineWindow) GetLow() float64 {
 	low := k.GetOpen()
 	for _, line := range k {
-		val := line.GetHigh()
+		val := line.GetLow()
 		if val < low {
 			low = val
 		}
