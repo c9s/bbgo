@@ -40,16 +40,14 @@ func (k KLine) Mid() float64 {
 func (k KLine) BounceUp() bool {
 	mid := k.Mid()
 	trend := k.GetTrend()
-	thickness := k.GetThickness()
-	return trend > 0 && k.GetOpen() > mid && k.GetClose() > mid && thickness < (1.0/4.0)
+	return trend > 0 && k.GetOpen() > mid && k.GetClose() > mid
 }
 
 // red candle with open and close near low price
 func (k KLine) BounceDown() bool {
 	mid := k.Mid()
 	trend := k.GetTrend()
-	thickness := k.GetThickness()
-	return trend > 0 && k.GetOpen() < mid && k.GetClose() < mid && thickness < (1.0/4.0)
+	return trend > 0 && k.GetOpen() < mid && k.GetClose() < mid
 }
 
 func (k KLine) GetTrend() int {
@@ -298,6 +296,38 @@ func (k *KLineWindow) Truncate(size int) {
 		start = 0
 	}
 	*k = (*k)[end-5 : end]
+}
+
+func (k KLineWindow) GetBody() float64 {
+	return k.GetChange()
+}
+
+func (k KLineWindow) GetThickness() float64 {
+	return math.Abs(k.GetChange()) / math.Abs(k.GetMaxChange())
+}
+
+func (k KLineWindow) GetUpperShadowRatio() float64 {
+	return k.GetUpperShadowHeight() / math.Abs(k.GetMaxChange())
+}
+
+func (k KLineWindow) GetUpperShadowHeight() float64 {
+	high := k.GetHigh()
+	if k.GetOpen() > k.GetClose() {
+		return high - k.GetOpen()
+	}
+	return high - k.GetClose()
+}
+
+func (k KLineWindow) GetLowerShadowRatio() float64 {
+	return k.GetLowerShadowHeight() / math.Abs(k.GetMaxChange())
+}
+
+func (k KLineWindow) GetLowerShadowHeight() float64 {
+	low := k.GetLow()
+	if k.GetOpen() < k.GetClose() {
+		return k.GetOpen() - low
+	}
+	return k.GetClose() - low
 }
 
 
