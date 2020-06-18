@@ -12,6 +12,7 @@ type TradingContext struct {
 	Trades          []Trade
 	TradeStartTime  time.Time
 	Symbol          string
+	Market 			Market
 }
 
 func (c *TradingContext) AddKLine(kline KLine) KLineWindow {
