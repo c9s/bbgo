@@ -25,7 +25,7 @@ func TestVolumeByPriceChange(t *testing.T) {
 				change: 50,
 				side: binance.SideTypeBuy,
 			},
-			want: 0.00106382,
+			want: 0.00444627,
 		},
 		{
 			name: "buy-change-100-at-9200",
@@ -35,7 +35,7 @@ func TestVolumeByPriceChange(t *testing.T) {
 				change: 100,
 				side: binance.SideTypeBuy,
 			},
-			want: 0.00108695,
+			want: 0.00560308,
 		},
 		{
 			name: "sell-change-100-at-9500",
@@ -45,7 +45,7 @@ func TestVolumeByPriceChange(t *testing.T) {
 				change: 100,
 				side: binance.SideTypeSell,
 			},
-			want: 0.00249052,
+			want: 0.00415086,
 		},
 		{
 			name: "sell-change-200-at-9600",
@@ -55,7 +55,7 @@ func TestVolumeByPriceChange(t *testing.T) {
 				change: 200,
 				side: binance.SideTypeSell,
 			},
-			want: 0.00265114,
+			want: 0.00441857,
 		},
 		{
 			name: "sell-change-500-at-9600",
@@ -65,7 +65,7 @@ func TestVolumeByPriceChange(t *testing.T) {
 				change: 500,
 				side: binance.SideTypeSell,
 			},
-			want: 0.00390591,
+			want: 0.00650985,
 		},
 	}
 	for _, tt := range tests {
