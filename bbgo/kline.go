@@ -28,7 +28,7 @@ type KLine struct {
 	QuoteVolume string `json:"Q"` // taker buy quote asset volume (like 1000USDT)
 
 	LastTradeID    int  `json:"L"`
-	NumberOfTrades int  `json:"n"`
+	NumberOfTrades int64  `json:"n"`
 	Closed         bool `json:"x"`
 }
 
