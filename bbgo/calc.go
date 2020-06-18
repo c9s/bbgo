@@ -22,14 +22,27 @@ func SellVolumeModifier(price float64) float64 {
 	return math.Min(2, math.Exp((price-targetPrice)/flatness))
 }
 
-func VolumeByPriceChange(currentPrice float64, change float64, side binance.SideType) float64 {
+func VolumeByPriceChange(market Market, currentPrice float64, change float64, side binance.SideType) float64 {
 	volume := BaseVolumeByPriceChange(change)
 
 	if side == binance.SideTypeSell {
-		return volume * SellVolumeModifier(currentPrice)
+		volume *= SellVolumeModifier(currentPrice)
+	} else {
+		volume *= volume*BuyVolumeModifier(currentPrice)
 	}
 
-	return math.Max(MinQuantity, volume*BuyVolumeModifier(currentPrice))
+	// at least the minimal quantity
+	volume = math.Max(market.MinQuantity, volume)
+
+	// modify volume for the min amount
+	amount := currentPrice * volume
+	if amount < market.MinAmount {
+		ratio := market.MinAmount / amount
+		volume *= ratio
+	}
+
+	volume = math.Trunc(volume * math.Pow10(market.VolumePrecision)) / math.Pow10(market.VolumePrecision)
+	return volume
 }
 
 func BaseVolumeByPriceChange(change float64) float64 {

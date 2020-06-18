@@ -65,7 +65,7 @@ func (d *KLineDetector) NewOrder(e *KLineEvent, tradingCtx *TradingContext) Orde
 		side = binance.SideTypeSell
 	}
 
-	var volume = tradingCtx.Market.FormatVolume(VolumeByPriceChange(kline.GetClose(), kline.GetChange(), side))
+	var volume = tradingCtx.Market.FormatVolume(VolumeByPriceChange(tradingCtx.Market, kline.GetClose(), kline.GetChange(), side))
 	return Order{
 		Symbol:    e.KLine.Symbol,
 		Type:      binance.OrderTypeMarket,
@@ -140,4 +140,3 @@ func (d *KLineDetector) Detect(e *KLineEvent, tradingCtx *TradingContext) (reaso
 
 	return "", true
 }
-
