@@ -159,13 +159,33 @@ func (k KLine) SlackAttachment() slack.Attachment {
 				Short: true,
 			},
 			{
+				Title: "Mid",
+				Value: formatFloat(k.Mid(), 2),
+				Short: true,
+			},
+			{
 				Title: "Change",
-				Value: formatVolume(k.GetChange()),
+				Value: formatFloat(k.GetChange(), 2),
 				Short: true,
 			},
 			{
 				Title: "Max Change",
-				Value: formatVolume(k.GetMaxChange()),
+				Value: formatFloat(k.GetMaxChange(), 2),
+				Short: true,
+			},
+			{
+				Title: "Thickness",
+				Value: formatFloat(k.GetThickness(), 4),
+				Short: true,
+			},
+			{
+				Title: "UpperShadowRatio",
+				Value: formatFloat(k.GetUpperShadowRatio(), 4),
+				Short: true,
+			},
+			{
+				Title: "LowerShadowRatio",
+				Value: formatFloat(k.GetLowerShadowRatio(), 4),
 				Short: true,
 			},
 		},
