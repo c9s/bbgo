@@ -13,6 +13,19 @@ type BinanceExchange struct {
 }
 
 func (e *BinanceExchange) SubmitOrder(ctx context.Context, order Order) error {
+	/*
+		limit order example
+
+			order, err := Client.NewCreateOrderService().
+				Symbol(Symbol).
+				Side(side).
+				Type(binance.OrderTypeLimit).
+				TimeInForce(binance.TimeInForceTypeGTC).
+				Quantity(volumeString).
+				Price(priceString).
+				Do(ctx)
+	*/
+
 	req := e.Client.NewCreateOrderService().
 		Symbol(order.Symbol).
 		Side(order.Side).
