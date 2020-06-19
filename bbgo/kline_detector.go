@@ -9,10 +9,10 @@ import (
 	"strconv"
 )
 
-const epsilon = 0.000001
+const epsilon = 0.0000001
 
 func NotZero(v float64) bool {
-	return math.Abs(v) < epsilon
+	return math.Abs(v) > epsilon
 }
 
 type KLineDetector struct {
