@@ -19,14 +19,21 @@ type Order struct {
 }
 
 func (o *Order) SlackAttachment() slack.Attachment {
+	var fields = []slack.AttachmentField{
+		{Title: "Symbol", Value: o.Symbol, Short: true},
+		{Title: "Side", Value: string(o.Side), Short: true},
+		{Title: "Volume", Value: o.VolumeStr, Short: true},
+	}
+
+	if len(o.PriceStr) > 0 {
+		fields = append(fields, slack.AttachmentField{Title: "Price", Value: o.PriceStr, Short: true})
+	}
+
 	return slack.Attachment{
 		Color: SideToColorName(o.Side),
-		Title: "Market Order " + string(o.Side),
+		Title: string(o.Type) + " Order " + string(o.Side),
 		// Text:   "",
-		Fields: []slack.AttachmentField{
-			{Title: "Side", Value: string(o.Side), Short: true,},
-			{Title: "Volume", Value: o.VolumeStr, Short: true,},
-		},
+		Fields: fields,
 	}
 }
 
@@ -40,5 +47,3 @@ func SideToColorName(side binance.SideType) string {
 
 	return "#f0f0f0"
 }
-
-
