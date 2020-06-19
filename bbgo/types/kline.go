@@ -6,6 +6,7 @@ type KLine interface {
 	GetMaxChange() float64
 	GetThickness() float64
 
+	Mid() float64
 	GetOpen() float64
 	GetClose() float64
 	GetHigh() float64
