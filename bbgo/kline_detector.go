@@ -154,7 +154,7 @@ func (d *KLineDetector) Detect(e *KLineEvent, tradingCtx *TradingContext) (reaso
 	}
 
 	if NotZero(d.MaxPriceChange) && maxChange > d.MaxPriceChange {
-		return fmt.Sprintf("1m lookback window (x %d) max price change %f", d.LookBackFrames, maxChange), false
+		return fmt.Sprintf("1m lookback window (x %d) max price change %f > %f", d.LookBackFrames, maxChange, d.MaxPriceChange), false
 	}
 
 	if d.EnableMinThickness {
