@@ -153,8 +153,8 @@ func (d *KLineDetector) NewOrder(e *KLineEvent, tradingCtx *TradingContext) Orde
 	}
 }
 
-func (d *KLineDetector) Detect(e *KLineEvent, tradingCtx *TradingContext) (reason string, ok bool) {
-	var kline types.KLine = e.KLine
+func (d *KLineDetector) Detect(e *KLineEvent, tradingCtx *TradingContext) (reason string, kline types.KLine, ok bool) {
+	kline = e.KLine
 
 	// if the 3m trend is drop, do not buy, let 5m window handle it.
 	if d.EnableLookBack {
@@ -174,16 +174,16 @@ func (d *KLineDetector) Detect(e *KLineEvent, tradingCtx *TradingContext) (reaso
 	var maxChange = math.Abs(kline.GetMaxChange())
 
 	if maxChange < d.MinPriceChange {
-		return "", false
+		return "", kline, false
 	}
 
 	if NotZero(d.MaxPriceChange) && maxChange > d.MaxPriceChange {
-		return fmt.Sprintf("1m lookback window (x %d) exceeded max price change %f > %f", d.LookBackFrames, maxChange, d.MaxPriceChange), false
+		return fmt.Sprintf("exceeded max price change %f > %f", d.LookBackFrames, maxChange, d.MaxPriceChange), kline, false
 	}
 
 	if d.EnableMinThickness {
 		if kline.GetThickness() < d.MinThickness {
-			return fmt.Sprintf("kline too thin. %f < min kline thickness %f", kline.GetThickness(), d.MinThickness), false
+			return fmt.Sprintf("kline too thin. %f < min kline thickness %f", kline.GetThickness(), d.MinThickness), kline, false
 		}
 	}
 
@@ -191,22 +191,22 @@ func (d *KLineDetector) Detect(e *KLineEvent, tradingCtx *TradingContext) (reaso
 	if d.EnableMaxShadowRatio {
 		if trend > 0 {
 			if kline.GetUpperShadowRatio() > d.MaxShadowRatio {
-				return fmt.Sprintf("kline upper shadow ratio too high. %f > %f (MaxShadowRatio)", kline.GetUpperShadowRatio(), d.MaxShadowRatio), false
+				return fmt.Sprintf("kline upper shadow ratio too high. %f > %f (MaxShadowRatio)", kline.GetUpperShadowRatio(), d.MaxShadowRatio), kline, false
 			}
 		} else if trend < 0 {
 			if kline.GetLowerShadowRatio() > d.MaxShadowRatio {
-				return fmt.Sprintf("kline lower shadow ratio too high. %f > %f (MaxShadowRatio)", kline.GetLowerShadowRatio(), d.MaxShadowRatio), false
+				return fmt.Sprintf("kline lower shadow ratio too high. %f > %f (MaxShadowRatio)", kline.GetLowerShadowRatio(), d.MaxShadowRatio), kline, false
 			}
 		}
 	}
 
 	if trend > 0 && kline.BounceUp() { // trend up, ignore bounce up
 
-		return fmt.Sprintf("bounce up, do not sell, kline mid: %f", kline.Mid()), false
+		return fmt.Sprintf("bounce up, do not sell, kline mid: %f", kline.Mid()), kline, false
 
 	} else if trend < 0 && kline.BounceDown() { // trend down, ignore bounce down
 
-		return fmt.Sprintf("bounce down, do not buy, kline mid: %f", kline.Mid()), false
+		return fmt.Sprintf("bounce down, do not buy, kline mid: %f", kline.Mid()), kline, false
 
 	}
 
@@ -217,5 +217,5 @@ func (d *KLineDetector) Detect(e *KLineEvent, tradingCtx *TradingContext) (reaso
 
 	*/
 
-	return "", true
+	return "", kline, true
 }
