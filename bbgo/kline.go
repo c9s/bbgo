@@ -335,3 +335,7 @@ func formatVolume(val float64) string {
 	return strconv.FormatFloat(val, 'f', 6, 64)
 }
 
+
+func formatFloat(val float64, prec int) string {
+	return strconv.FormatFloat(val, 'f', prec, 64)
+}

@@ -3,7 +3,7 @@ package bbgo
 import (
 	"context"
 	"github.com/adshao/go-binance"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"strconv"
 	"time"
 )
@@ -27,7 +27,7 @@ func (e *BinanceExchange) SubmitOrder(ctx context.Context, order Order) error {
 	}
 
 	retOrder, err := req.Do(ctx)
-	logrus.Infof("order created: %+v", retOrder)
+	log.Infof("order created: %+v", retOrder)
 	return err
 }
 
@@ -67,6 +67,7 @@ func (e *BinanceExchange) QueryTrades(ctx context.Context, market string, startT
 
 			// trade time
 			tt := time.Unix(0, t.Time*1000000)
+
 			log.Infof("trade: %d %4s Price: % 13s Volume: % 13s %s", t.ID, side, t.Price, t.Quantity, tt)
 
 			price, err := strconv.ParseFloat(t.Price, 64)

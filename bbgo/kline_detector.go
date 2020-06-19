@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"github.com/adshao/go-binance"
 	"github.com/c9s/bbgo/pkg/bbgo/types"
+	"github.com/slack-go/slack"
 	"math"
+	"strconv"
 )
 
 const epsilon = 0.00000001
@@ -31,8 +33,61 @@ type KLineDetector struct {
 	Stop              bool `json:"stop"`
 }
 
-func (d *KLineDetector) String() (name string) {
-	name = fmt.Sprintf("Detector %s (%f < x < %f)", d.Interval, d.MinPriceChange, d.MaxPriceChange)
+func (d *KLineDetector) SlackAttachment() slack.Attachment {
+	var name = fmt.Sprintf("Detector %s", d.Interval)
+	if d.EnableLookBack {
+		name = fmt.Sprintf("Detector %s x %d", d.Interval, d.LookBackFrames)
+	}
+
+	if NotZero(d.MaxPriceChange) {
+		name += fmt.Sprintf(" MaxPriceChange %.2f ~ %.2f", d.MinPriceChange, d.MaxPriceChange)
+	} else {
+		name += fmt.Sprintf(" MaxPriceChange %.2f ~ NO LIMIT", d.MinPriceChange)
+	}
+
+	var fields []slack.AttachmentField
+
+	if d.EnableMinThickness {
+		fields = append(fields, slack.AttachmentField{
+			Title: "MinThickness",
+			Value: formatFloat(d.MinThickness, 4),
+			Short: true,
+		})
+	}
+
+	if d.EnableMaxShadowRatio {
+		fields = append(fields, slack.AttachmentField{
+			Title: "MaxShadowRatio",
+			Value: formatFloat(d.MaxShadowRatio, 4),
+			Short: true,
+		})
+	}
+
+	if d.EnableLookBack {
+		fields = append(fields, slack.AttachmentField{
+			Title: "LookBackFrames",
+			Value: strconv.Itoa(d.LookBackFrames),
+			Short: true,
+		})
+	}
+
+	return slack.Attachment{
+		Color:      "",
+		Fallback:   "",
+		ID:         0,
+		Title:      name,
+		Pretext:    "",
+		Text:       "",
+		Fields:     fields,
+		Footer:     "",
+		FooterIcon: "",
+		Ts:         "",
+	}
+
+}
+
+func (d *KLineDetector) String() string {
+	var name = fmt.Sprintf("Detector %s (%f < x < %f)", d.Interval, d.MinPriceChange, d.MaxPriceChange)
 
 	if d.EnableMinThickness {
 		name += fmt.Sprintf(" [MinThickness: %f]", d.MinThickness)
