@@ -16,6 +16,7 @@ func NotZero(v float64) bool {
 }
 
 type KLineDetector struct {
+	Name           string  `json:"name"`
 	Interval       string  `json:"interval"`
 	MinPriceChange float64 `json:"minPriceChange"`
 	MaxPriceChange float64 `json:"maxPriceChange"`
@@ -34,9 +35,16 @@ type KLineDetector struct {
 }
 
 func (d *KLineDetector) SlackAttachment() slack.Attachment {
-	var name = fmt.Sprintf("Detector %s", d.Interval)
+	var name = "Detector "
+
+	if len(d.Name) > 0 {
+		name += " " + d.Name
+	}
+
+	name += fmt.Sprintf(" %s", d.Interval)
+
 	if d.EnableLookBack {
-		name = fmt.Sprintf("Detector %s x %d", d.Interval, d.LookBackFrames)
+		name += fmt.Sprintf(" x %d", d.LookBackFrames)
 	}
 
 	if NotZero(d.MaxPriceChange) {
@@ -45,7 +53,23 @@ func (d *KLineDetector) SlackAttachment() slack.Attachment {
 		name += fmt.Sprintf(" MaxPriceChange %.2f ~ NO LIMIT", d.MinPriceChange)
 	}
 
-	var fields []slack.AttachmentField
+	var fields = []slack.AttachmentField{
+		{
+			Title: "Interval",
+			Value: d.Interval,
+			Short: true,
+		},
+		{
+			Title: "MinMaxPriceChange",
+			Value: formatFloat(d.MinPriceChange, 2),
+			Short: true,
+		},
+		{
+			Title: "MaxMaxPriceChange",
+			Value: formatFloat(d.MaxPriceChange, 2),
+			Short: true,
+		},
+	}
 
 	if d.EnableMinThickness {
 		fields = append(fields, slack.AttachmentField{

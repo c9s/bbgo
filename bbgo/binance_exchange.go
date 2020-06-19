@@ -50,9 +50,9 @@ func (e *BinanceExchange) QueryKLines(ctx context.Context, symbol, interval stri
 		return nil, err
 	}
 
-	var klines []KLine
+	var kLines []KLine
 	for _, kline := range resp {
-		klines = append(klines, KLine{
+		kLines = append(kLines, KLine{
 			Symbol:         symbol,
 			Interval:       interval,
 			StartTime:      kline.OpenTime,
@@ -66,7 +66,7 @@ func (e *BinanceExchange) QueryKLines(ctx context.Context, symbol, interval stri
 			NumberOfTrades: kline.TradeNum,
 		})
 	}
-	return klines, nil
+	return kLines, nil
 }
 
 func (e *BinanceExchange) QueryTrades(ctx context.Context, market string, startTime time.Time) (trades []Trade, err error) {
