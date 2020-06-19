@@ -126,9 +126,9 @@ func (k KLine) String() string {
 
 func (k KLine) Color() string {
 	if k.GetTrend() > 0 {
-		return "#228B22"
+		return Green
 	} else if k.GetTrend() < 0 {
-		return "#DC143C"
+		return Red
 	}
 	return "#f0f0f0"
 }
@@ -272,6 +272,16 @@ func (k KLineWindow) GetTrend() int {
 	return 0
 }
 
+func (k KLineWindow) Color() string {
+	if k.GetTrend() > 0 {
+		return Green
+	} else if k.GetTrend() < 0 {
+		return Red
+	}
+	return "#f0f0f0"
+}
+
+
 func (k KLineWindow) Mid() float64 {
 	return k.GetHigh() - k.GetLow()/2
 }
@@ -350,11 +360,66 @@ func (k KLineWindow) GetLowerShadowHeight() float64 {
 	return k.GetClose() - low
 }
 
-
-func formatVolume(val float64) string {
-	return strconv.FormatFloat(val, 'f', 6, 64)
+func (k KLineWindow) SlackAttachment() slack.Attachment {
+	return slack.Attachment{
+		Text: "KLine",
+		Color: k.Color(),
+		Fields: []slack.AttachmentField{
+			{
+				Title: "Open",
+				Value: formatFloat(k.GetOpen(), 2),
+				Short: true,
+			},
+			{
+				Title: "Close",
+				Value: formatFloat(k.GetClose(), 2),
+				Short: true,
+			},
+			{
+				Title: "High",
+				Value: formatFloat(k.GetHigh(), 2),
+				Short: true,
+			},
+			{
+				Title: "Low",
+				Value: formatFloat(k.GetLow(), 2),
+				Short: true,
+			},
+			{
+				Title: "Mid",
+				Value: formatFloat(k.Mid(), 2),
+				Short: true,
+			},
+			{
+				Title: "Change",
+				Value: formatFloat(k.GetChange(), 2),
+				Short: true,
+			},
+			{
+				Title: "Max Change",
+				Value: formatFloat(k.GetMaxChange(), 2),
+				Short: true,
+			},
+			{
+				Title: "Thickness",
+				Value: formatFloat(k.GetThickness(), 4),
+				Short: true,
+			},
+			{
+				Title: "UpperShadowRatio",
+				Value: formatFloat(k.GetUpperShadowRatio(), 4),
+				Short: true,
+			},
+			{
+				Title: "LowerShadowRatio",
+				Value: formatFloat(k.GetLowerShadowRatio(), 4),
+				Short: true,
+			},
+		},
+		Footer:     "",
+		FooterIcon: "",
+	}
 }
-
 
 func formatFloat(val float64, prec int) string {
 	return strconv.FormatFloat(val, 'f', prec, 64)

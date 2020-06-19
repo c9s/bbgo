@@ -1,5 +1,7 @@
 package types
 
+import "github.com/slack-go/slack"
+
 type KLine interface {
 	GetTrend() int
 	GetChange() float64
@@ -17,6 +19,6 @@ type KLine interface {
 	GetUpperShadowRatio() float64
 	GetLowerShadowRatio() float64
 
-	// SlackAttachment() slack.Attachment
+	SlackAttachment() slack.Attachment
 }
 
