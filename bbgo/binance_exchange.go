@@ -44,6 +44,31 @@ func (e *BinanceExchange) SubmitOrder(ctx context.Context, order Order) error {
 	return err
 }
 
+func (e *BinanceExchange) QueryKLines(ctx context.Context, symbol, interval string, limit int) ([]KLine, error) {
+	resp, err := e.Client.NewKlinesService().Symbol(symbol).Interval(interval).Limit(limit).Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var klines []KLine
+	for _, kline := range resp {
+		klines = append(klines, KLine{
+			Symbol:         symbol,
+			Interval:       interval,
+			StartTime:      kline.OpenTime,
+			EndTime:        kline.CloseTime,
+			Open:           kline.Open,
+			Close:          kline.Close,
+			High:           kline.High,
+			Low:            kline.Low,
+			Volume:         kline.Volume,
+			QuoteVolume:    kline.QuoteAssetVolume,
+			NumberOfTrades: kline.TradeNum,
+		})
+	}
+	return klines, nil
+}
+
 func (e *BinanceExchange) QueryTrades(ctx context.Context, market string, startTime time.Time) (trades []Trade, err error) {
 	var lastTradeID int64 = 0
 	for {
