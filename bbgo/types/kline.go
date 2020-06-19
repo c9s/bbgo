@@ -16,5 +16,7 @@ type KLine interface {
 	BounceDown() bool
 	GetUpperShadowRatio() float64
 	GetLowerShadowRatio() float64
+
+	// SlackAttachment() slack.Attachment
 }
 
