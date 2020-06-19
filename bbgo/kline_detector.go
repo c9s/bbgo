@@ -16,9 +16,13 @@ func NotZero(v float64) bool {
 }
 
 type KLineDetector struct {
-	Name           string  `json:"name"`
-	Interval       string  `json:"interval"`
+	Name     string `json:"name"`
+	Interval string `json:"interval"`
+
+	// MinPriceChange is the minimal max price change trigger
 	MinPriceChange float64 `json:"minPriceChange"`
+
+	// MaxPriceChange is the max - max price change trigger
 	MaxPriceChange float64 `json:"maxPriceChange"`
 
 	EnableMinThickness bool    `json:"enableMinThickness"`
@@ -47,11 +51,11 @@ func (d *KLineDetector) SlackAttachment() slack.Attachment {
 		name += fmt.Sprintf(" x %d", d.LookBackFrames)
 	}
 
+	var maxPriceChangeRange = fmt.Sprintf("%.2f ~ NO LIMIT", d.MinPriceChange)
 	if NotZero(d.MaxPriceChange) {
-		name += fmt.Sprintf(" MaxPriceChange %.2f ~ %.2f", d.MinPriceChange, d.MaxPriceChange)
-	} else {
-		name += fmt.Sprintf(" MaxPriceChange %.2f ~ NO LIMIT", d.MinPriceChange)
+		maxPriceChangeRange = fmt.Sprintf("%.2f ~ %.2f", d.MinPriceChange, d.MaxPriceChange)
 	}
+	name += " MaxPriceChange " + maxPriceChangeRange
 
 	var fields = []slack.AttachmentField{
 		{
@@ -59,19 +63,9 @@ func (d *KLineDetector) SlackAttachment() slack.Attachment {
 			Value: d.Interval,
 			Short: true,
 		},
-		{
-			Title: "MinMaxPriceChange",
-			Value: formatFloat(d.MinPriceChange, 2),
-			Short: true,
-		},
-		{
-			Title: "MaxMaxPriceChange",
-			Value: formatFloat(d.MaxPriceChange, 2),
-			Short: true,
-		},
 	}
 
-	if d.EnableMinThickness {
+	if d.EnableMinThickness && NotZero(d.MinThickness) {
 		fields = append(fields, slack.AttachmentField{
 			Title: "MinThickness",
 			Value: formatFloat(d.MinThickness, 4),
@@ -79,7 +73,7 @@ func (d *KLineDetector) SlackAttachment() slack.Attachment {
 		})
 	}
 
-	if d.EnableMaxShadowRatio {
+	if d.EnableMaxShadowRatio && NotZero(d.MaxShadowRatio) {
 		fields = append(fields, slack.AttachmentField{
 			Title: "MaxShadowRatio",
 			Value: formatFloat(d.MaxShadowRatio, 4),
