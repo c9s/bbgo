@@ -19,11 +19,11 @@ type KLineDetector struct {
 	Name     string `json:"name"`
 	Interval string `json:"interval"`
 
-	// MinPriceChange is the minimal max price change trigger
-	MinPriceChange float64 `json:"minPriceChange"`
+	// MinMaxPriceChange is the minimal max price change trigger
+	MinMaxPriceChange float64 `json:"minPriceChange"`
 
-	// MaxPriceChange is the max - max price change trigger
-	MaxPriceChange float64 `json:"maxPriceChange"`
+	// MaxMaxPriceChange is the max - max price change trigger
+	MaxMaxPriceChange float64 `json:"maxPriceChange"`
 
 	EnableMinThickness bool    `json:"enableMinThickness"`
 	MinThickness       float64 `json:"minThickness"`
@@ -51,11 +51,11 @@ func (d *KLineDetector) SlackAttachment() slack.Attachment {
 		name += fmt.Sprintf(" x %d", d.LookBackFrames)
 	}
 
-	var maxPriceChangeRange = fmt.Sprintf("%.2f ~ NO LIMIT", d.MinPriceChange)
-	if NotZero(d.MaxPriceChange) {
-		maxPriceChangeRange = fmt.Sprintf("%.2f ~ %.2f", d.MinPriceChange, d.MaxPriceChange)
+	var maxPriceChangeRange = fmt.Sprintf("%.2f ~ NO LIMIT", d.MinMaxPriceChange)
+	if NotZero(d.MaxMaxPriceChange) {
+		maxPriceChangeRange = fmt.Sprintf("%.2f ~ %.2f", d.MinMaxPriceChange, d.MaxMaxPriceChange)
 	}
-	name += " MaxPriceChange " + maxPriceChangeRange
+	name += " MaxMaxPriceChange " + maxPriceChangeRange
 
 	var fields = []slack.AttachmentField{
 		{
@@ -105,7 +105,7 @@ func (d *KLineDetector) SlackAttachment() slack.Attachment {
 }
 
 func (d *KLineDetector) String() string {
-	var name = fmt.Sprintf("Detector %s (%f < x < %f)", d.Interval, d.MinPriceChange, d.MaxPriceChange)
+	var name = fmt.Sprintf("Detector %s (%f < x < %f)", d.Interval, d.MinMaxPriceChange, d.MaxMaxPriceChange)
 
 	if d.EnableMinThickness {
 		name += fmt.Sprintf(" [MinThickness: %f]", d.MinThickness)
@@ -167,12 +167,12 @@ func (d *KLineDetector) Detect(e *KLineEvent, tradingCtx *TradingContext) (reaso
 
 	var maxChange = math.Abs(kline.GetMaxChange())
 
-	if maxChange < d.MinPriceChange {
+	if maxChange < d.MinMaxPriceChange {
 		return "", kline, false
 	}
 
-	if NotZero(d.MaxPriceChange) && maxChange > d.MaxPriceChange {
-		return fmt.Sprintf("exceeded max price change %f > %f", d.LookBackFrames, maxChange, d.MaxPriceChange), kline, false
+	if NotZero(d.MaxMaxPriceChange) && maxChange > d.MaxMaxPriceChange {
+		return fmt.Sprintf("exceeded max price change %f > %f", d.LookBackFrames, maxChange, d.MaxMaxPriceChange), kline, false
 	}
 
 	if d.EnableMinThickness {
