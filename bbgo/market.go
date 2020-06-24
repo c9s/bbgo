@@ -23,7 +23,7 @@ func (m Market) FormatVolume(val float64) string {
 var MarketBTCUSDT = Market{
 		Symbol:          "BTCUSDT",
 		PricePrecision:  2,
-		VolumePrecision: 8,
+		VolumePrecision: 6,
 		MinQuantity:     0.00000100,
 		MinAmount:       10.0,
 }
