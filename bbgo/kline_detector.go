@@ -34,6 +34,8 @@ type KLineDetector struct {
 	EnableLookBack bool `json:"enableLookBack"`
 	LookBackFrames int  `json:"lookBackFrames"`
 
+	MinProfitPriceTick float64 `json:"minProfitPriceTick"`
+
 	DelayMilliseconds int  `json:"delayMsec"`
 	Stop              bool `json:"stop"`
 }
@@ -117,10 +119,11 @@ func (d *KLineDetector) String() string {
 	if d.EnableMaxShadowRatio {
 		name += fmt.Sprintf(" [MaxShadowRatio: %f]", d.MaxShadowRatio)
 	}
+
 	return name
 }
 
-func (d *KLineDetector) NewOrder(e *KLineEvent, tradingCtx *TradingContext) Order {
+func (d *KLineDetector) NewOrder(e *KLineEvent, tradingCtx *TradingContext) *Order {
 	var kline types.KLine = e.KLine
 	if d.EnableLookBack {
 		klineWindow := tradingCtx.KLineWindows[e.KLine.Interval]
@@ -139,7 +142,7 @@ func (d *KLineDetector) NewOrder(e *KLineEvent, tradingCtx *TradingContext) Orde
 	}
 
 	var volume = tradingCtx.Market.FormatVolume(VolumeByPriceChange(tradingCtx.Market, kline.GetClose(), kline.GetChange(), side))
-	return Order{
+	return &Order{
 		Symbol:    e.KLine.Symbol,
 		Type:      binance.OrderTypeMarket,
 		Side:      side,
@@ -201,6 +204,20 @@ func (d *KLineDetector) Detect(e *KLineEvent, tradingCtx *TradingContext) (reaso
 	} else if trend < 0 && kline.BounceDown() { // trend down, ignore bounce down
 
 		return fmt.Sprintf("bounce down, do not buy, kline mid: %f", kline.Mid()), kline, false
+
+	}
+
+	if NotZero(d.MinProfitPriceTick) {
+
+		// do not buy too early if it's greater than the average bid price + min profit tick
+		if trend < 0 && kline.GetClose() > (tradingCtx.AverageBidPrice-d.MinProfitPriceTick) {
+			return fmt.Sprintf("price %f is greater than the average price + min profit tick %f", kline.GetClose(), (tradingCtx.AverageBidPrice - d.MinProfitPriceTick)), kline, false
+		}
+
+		// do not sell too early if it's less than the average bid price + min profit tick
+		if trend > 0 && kline.GetClose() < (tradingCtx.AverageBidPrice+d.MinProfitPriceTick) {
+			return fmt.Sprintf("price %f is less than the average price + min profit tick %f", kline.GetClose(), (tradingCtx.AverageBidPrice + d.MinProfitPriceTick)), kline, false
+		}
 
 	}
 

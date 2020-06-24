@@ -21,18 +21,19 @@ func (m Market) FormatVolume(val float64) string {
 //  Binance Markets, this should be defined per exchange
 
 var MarketBTCUSDT = Market{
-		Symbol:          "BTCUSDT",
-		PricePrecision:  2,
-		VolumePrecision: 6,
-		MinQuantity:     0.00000100,
-		MinAmount:       10.0,
+	Symbol:          "BTCUSDT",
+	PricePrecision:  2,
+	VolumePrecision: 6,
+	MinQuantity:     0.00000100,
+	MinAmount:       10.0,
 }
+
 var MarketBNBUSDT = Market{
-		Symbol:          "BNBUSDT",
-		PricePrecision:  4,
-		VolumePrecision: 2,
-		MinQuantity:     0.01,
-		MinAmount:       10.0,
+	Symbol:          "BNBUSDT",
+	PricePrecision:  4,
+	VolumePrecision: 2,
+	MinQuantity:     0.01,
+	MinAmount:       10.0,
 }
 
 var Markets = map[string]Market{

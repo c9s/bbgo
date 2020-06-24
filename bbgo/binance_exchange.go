@@ -12,7 +12,7 @@ type BinanceExchange struct {
 	Client *binance.Client
 }
 
-func (e *BinanceExchange) SubmitOrder(ctx context.Context, order Order) error {
+func (e *BinanceExchange) SubmitOrder(ctx context.Context, order *Order) error {
 	/*
 		limit order example
 
