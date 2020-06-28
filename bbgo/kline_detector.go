@@ -20,10 +20,10 @@ type KLineDetector struct {
 	Interval string `json:"interval"`
 
 	// MinMaxPriceChange is the minimal max price change trigger
-	MinMaxPriceChange float64 `json:"minPriceChange"`
+	MinMaxPriceChange float64 `json:"minMaxPriceChange"`
 
 	// MaxMaxPriceChange is the max - max price change trigger
-	MaxMaxPriceChange float64 `json:"maxPriceChange"`
+	MaxMaxPriceChange float64 `json:"maxMaxPriceChange"`
 
 	EnableMinThickness bool    `json:"enableMinThickness"`
 	MinThickness       float64 `json:"minThickness"`
