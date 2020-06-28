@@ -48,7 +48,7 @@ executionReport
   "Q": "0.00000000"              // Quote Order Qty
 }
 */
-type ExecutionReportEvent struct {
+type BinanceExecutionReportEvent struct {
 	EventBase
 
 	Symbol        string `json:"s"`
@@ -82,7 +82,7 @@ type ExecutionReportEvent struct {
 	OrderCreationTime int `json:"O"`
 }
 
-func (e *ExecutionReportEvent) Trade() (*Trade, error) {
+func (e *BinanceExecutionReportEvent) Trade() (*Trade, error) {
 	if e.CurrentExecutionType != "TRADE" {
 		return nil, errors.New("execution report is not a trade")
 	}
@@ -112,7 +112,7 @@ balanceUpdate
   "T": 1573200697068            //Clear Time
 }
 */
-type BalanceUpdateEvent struct {
+type BinanceBalanceUpdateEvent struct {
 	EventBase
 
 	Asset     string `json:"a"`
@@ -173,6 +173,7 @@ type Balance struct {
 	Free   string `json:"f"`
 	Locked string `json:"l"`
 }
+
 type OutboundAccountInfoEvent struct {
 	EventBase
 
@@ -191,7 +192,7 @@ type OutboundAccountInfoEvent struct {
 	Permissions []string  `json:"P,omitempty"`
 }
 
-func ParseEvent(message string) (interface{}, error) {
+func ParseBinanceEvent(message string) (interface{}, error) {
 	val, err := fastjson.Parse(message)
 	if err != nil {
 		return nil, err
@@ -211,12 +212,12 @@ func ParseEvent(message string) (interface{}, error) {
 		return &event, err
 
 	case "balanceUpdate":
-		var event BalanceUpdateEvent
+		var event BinanceBalanceUpdateEvent
 		err := json.Unmarshal([]byte(message), &event)
 		return &event, err
 
 	case "executionReport":
-		var event ExecutionReportEvent
+		var event BinanceExecutionReportEvent
 		err := json.Unmarshal([]byte(message), &event)
 		return &event, err
 

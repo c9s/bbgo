@@ -2,14 +2,152 @@ package bbgo
 
 import (
 	"context"
+	"fmt"
 	"github.com/adshao/go-binance"
+	"github.com/gorilla/websocket"
 	log "github.com/sirupsen/logrus"
 	"strconv"
 	"time"
 )
 
+type SubscribeOptions struct {
+	Interval string
+	Depth    string
+}
+
+func (o SubscribeOptions) String() string {
+	if len(o.Interval) > 0 {
+		return o.Interval
+	}
+
+	return o.Depth
+}
+
+type Subscription struct {
+	Symbol  string
+	Channel string
+	Options SubscribeOptions
+}
+
+func (s *Subscription) String() string {
+	return fmt.Sprintf("%s@%s_%s", s.Symbol, s.Channel, s.Options.String())
+}
+
+type StreamCommand struct {
+	ID     int      `json:"id,omitempty"`
+	Method string   `json:"method"`
+	Params []string `json:"params"`
+}
+
+type PrivateStream struct {
+	Client        *binance.Client
+	ListenKey     string
+	Conn          *websocket.Conn
+	Subscriptions []Subscription
+}
+
+func (s *PrivateStream) Subscribe(channel string, symbol string, options SubscribeOptions) {
+	s.Subscriptions = append(s.Subscriptions, Subscription{
+		Channel: channel,
+		Symbol:  symbol,
+		Options: options,
+	})
+}
+
+func (s *PrivateStream) Connect(ctx context.Context) error {
+	url := "wss://stream.binance.com:9443/ws/" + s.ListenKey
+	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
+	if err != nil {
+		return err
+	}
+
+	log.Infof("[binance] websocket connected")
+	s.Conn = conn
+
+	var params []string
+	for _, subscription := range s.Subscriptions {
+		params = append(params, subscription.String())
+	}
+
+	log.Infof("[binance] subscribing channels: %+v", params)
+	err = conn.WriteJSON(StreamCommand{
+		Method: "SUBSCRIBE",
+		Params: params,
+		ID:     1,
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *PrivateStream) Read(ctx context.Context, messages chan []byte) {
+	defer close(messages)
+
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+
+		case <-ctx.Done():
+			return
+
+		case <-ticker.C:
+			err := s.Client.NewKeepaliveUserStreamService().ListenKey(s.ListenKey).Do(ctx)
+			if err != nil {
+				log.WithError(err).Error("listen key keep-alive error", err)
+			}
+
+		default:
+			if err := s.Conn.SetReadDeadline(time.Now().Add(time.Minute)); err != nil {
+				log.WithError(err).Errorf("set read deadline error", err)
+			}
+
+			_, message, err := s.Conn.ReadMessage()
+			if err != nil {
+				log.WithError(err).Errorf("read error", err)
+				return
+			}
+
+			log.Debugf("[binance] recv: %s", message)
+			messages <- message
+		}
+	}
+}
+
+func (s *PrivateStream) Close() error {
+	log.Infof("[binance] closing user data stream...")
+
+	defer s.Conn.Close()
+
+	// use background context to close user stream
+	err := s.Client.NewCloseUserStreamService().ListenKey(s.ListenKey).Do(context.Background())
+	if err != nil {
+		log.WithError(err).Error("[binance] error close user data stream")
+		return err
+	}
+
+	return err
+}
+
 type BinanceExchange struct {
 	Client *binance.Client
+}
+
+func (e *BinanceExchange) NewPrivateStream(ctx context.Context) (*PrivateStream, error) {
+	log.Infof("[binance] creating user data stream...")
+	listenKey, err := e.Client.NewStartUserStreamService().Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Infof("[binance] user data stream created. listenKey: %s", listenKey)
+	return &PrivateStream{
+		Client:    e.Client,
+		ListenKey: listenKey,
+	}, nil
 }
 
 func (e *BinanceExchange) SubmitOrder(ctx context.Context, order *Order) error {
@@ -140,4 +278,3 @@ func (e *BinanceExchange) QueryTrades(ctx context.Context, market string, startT
 
 	return trades, nil
 }
-
