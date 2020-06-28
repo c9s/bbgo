@@ -82,8 +82,8 @@ func (s *PrivateStream) Connect(ctx context.Context) error {
 	return nil
 }
 
-func (s *PrivateStream) Read(ctx context.Context, messages chan []byte) {
-	defer close(messages)
+func (s *PrivateStream) Read(ctx context.Context, eventC chan interface{}) {
+	defer close(eventC)
 
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
@@ -112,7 +112,14 @@ func (s *PrivateStream) Read(ctx context.Context, messages chan []byte) {
 			}
 
 			log.Debugf("[binance] recv: %s", message)
-			messages <- message
+
+			e, err := ParseBinanceEvent(string(message))
+			if err != nil {
+				log.WithError(err).Errorf("[binance] event parse error")
+				continue
+			}
+
+			eventC <- e
 		}
 	}
 }
