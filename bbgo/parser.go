@@ -112,7 +112,7 @@ balanceUpdate
   "T": 1573200697068            //Clear Time
 }
 */
-type BinanceBalanceUpdateEvent struct {
+type BalanceUpdateEvent struct {
 	EventBase
 
 	Asset     string `json:"a"`
@@ -192,7 +192,12 @@ type OutboundAccountInfoEvent struct {
 	Permissions []string  `json:"P,omitempty"`
 }
 
-func ParseBinanceEvent(message string) (interface{}, error) {
+type ResultEvent struct {
+	Result interface{} `json:"result,omitempty"`
+	ID     int         `json:"id"`
+}
+
+func parseEvent(message string) (interface{}, error) {
 	val, err := fastjson.Parse(message)
 	if err != nil {
 		return nil, err
@@ -212,7 +217,7 @@ func ParseBinanceEvent(message string) (interface{}, error) {
 		return &event, err
 
 	case "balanceUpdate":
-		var event BinanceBalanceUpdateEvent
+		var event BalanceUpdateEvent
 		err := json.Unmarshal([]byte(message), &event)
 		return &event, err
 
@@ -221,6 +226,11 @@ func ParseBinanceEvent(message string) (interface{}, error) {
 		err := json.Unmarshal([]byte(message), &event)
 		return &event, err
 
+	default:
+		id := val.GetInt("id")
+		if id > 0 {
+			return &ResultEvent{ID: id}, nil
+		}
 	}
 
 	return nil, fmt.Errorf("unsupported message: %s", message)

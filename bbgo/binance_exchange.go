@@ -113,7 +113,7 @@ func (s *PrivateStream) Read(ctx context.Context, eventC chan interface{}) {
 
 			log.Debugf("[binance] recv: %s", message)
 
-			e, err := ParseBinanceEvent(string(message))
+			e, err := parseEvent(string(message))
 			if err != nil {
 				log.WithError(err).Errorf("[binance] event parse error")
 				continue
