@@ -85,7 +85,7 @@ func (s *PrivateStream) Connect(ctx context.Context) error {
 func (s *PrivateStream) Read(ctx context.Context, eventC chan interface{}) {
 	defer close(eventC)
 
-	ticker := time.NewTicker(1 * time.Minute)
+	ticker := time.NewTicker(30 * time.Minute)
 	defer ticker.Stop()
 
 	for {
