@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/adshao/go-binance"
+	"github.com/c9s/bbgo/pkg/types"
 	"github.com/gorilla/websocket"
 	log "github.com/sirupsen/logrus"
 	"strconv"
@@ -228,7 +229,7 @@ func (e *BinanceExchange) QueryKLines(ctx context.Context, symbol, interval stri
 	return kLines, nil
 }
 
-func (e *BinanceExchange) QueryTrades(ctx context.Context, symbol string, startTime time.Time) (trades []Trade, err error) {
+func (e *BinanceExchange) QueryTrades(ctx context.Context, symbol string, startTime time.Time) (trades []types.Trade, err error) {
 	log.Infof("[binance] querying %s trades from %s", symbol, startTime)
 
 	var lastTradeID int64 = 0
@@ -303,7 +304,7 @@ func (e *BinanceExchange) QueryTrades(ctx context.Context, symbol string, startT
 				return nil, err
 			}
 
-			trades = append(trades, Trade{
+			trades = append(trades, types.Trade{
 				ID:          t.ID,
 				Price:       price,
 				Volume:      quantity,

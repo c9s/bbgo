@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/c9s/bbgo/pkg/slack/slackstyle"
+	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 	"github.com/leekchan/accounting"
 	"github.com/sirupsen/logrus"
@@ -74,7 +75,7 @@ func (t *Trader) Errorf(err error, format string, args ...interface{}) {
 	}
 }
 
-func (t *Trader) ReportTrade(e *BinanceExecutionReportEvent, trade *Trade) {
+func (t *Trader) ReportTrade(e *BinanceExecutionReportEvent, trade *types.Trade) {
 	var color = ""
 	if trade.IsBuyer {
 		color = "#228B22"

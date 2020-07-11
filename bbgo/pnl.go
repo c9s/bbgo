@@ -1,12 +1,13 @@
 package bbgo
 
 import (
+	"github.com/c9s/bbgo/pkg/types"
 	log "github.com/sirupsen/logrus"
 	"strings"
 	"time"
 )
 
-func CalculateAverageCost(trades []Trade) (averageCost float64) {
+func CalculateAverageCost(trades []types.Trade) (averageCost float64) {
 	var totalCost = 0.0
 	var totalQuantity = 0.0
 	for _, t := range trades {
@@ -27,12 +28,12 @@ type ProfitAndLossCalculator struct {
 	Symbol       string
 	StartTime    time.Time
 	CurrentPrice float64
-	Trades       []Trade
+	Trades       []types.Trade
 
 	CurrencyPrice map[string]float64
 }
 
-func (c *ProfitAndLossCalculator) AddTrade(trade Trade) {
+func (c *ProfitAndLossCalculator) AddTrade(trade types.Trade) {
 	c.Trades = append(c.Trades, trade)
 }
 
