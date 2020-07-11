@@ -1,7 +1,7 @@
 package bbgo
 
 import (
-	"github.com/c9s/bbgo/pkg/types"
+	types2 "github.com/c9s/bbgo/pkg/bbgo/types"
 	log "github.com/sirupsen/logrus"
 	"strings"
 	"time"
@@ -11,12 +11,12 @@ type ProfitAndLossCalculator struct {
 	Symbol       string
 	StartTime    time.Time
 	CurrentPrice float64
-	Trades       []types.Trade
+	Trades       []types2.Trade
 
 	CurrencyPrice map[string]float64
 }
 
-func (c *ProfitAndLossCalculator) AddTrade(trade types.Trade) {
+func (c *ProfitAndLossCalculator) AddTrade(trade types2.Trade) {
 	c.Trades = append(c.Trades, trade)
 }
 

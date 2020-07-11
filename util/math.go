@@ -1,6 +1,7 @@
 package util
 
 import (
+	"math"
 	"strconv"
 )
 
@@ -27,5 +28,11 @@ func MustParseFloat(s string) float64 {
 		panic(err)
 	}
 	return v
+}
+
+const epsilon = 0.0000001
+
+func NotZero(v float64) bool {
+	return math.Abs(v) > epsilon
 }
 

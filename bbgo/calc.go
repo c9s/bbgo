@@ -1,7 +1,7 @@
 package bbgo
 
 import (
-	"github.com/adshao/go-binance"
+	types2 "github.com/c9s/bbgo/pkg/bbgo/types"
 	"math"
 )
 
@@ -22,10 +22,10 @@ func SellVolumeModifier(price float64) float64 {
 	return math.Min(2, math.Exp((price-targetPrice)/flatness))
 }
 
-func VolumeByPriceChange(market Market, currentPrice float64, change float64, side binance.SideType) float64 {
+func VolumeByPriceChange(market Market, currentPrice float64, change float64, side types2.SideType) float64 {
 	volume := BaseVolumeByPriceChange(change)
 
-	if side == binance.SideTypeSell {
+	if side == types2.SideTypeSell {
 		volume *= SellVolumeModifier(currentPrice)
 	} else {
 		volume *= BuyVolumeModifier(currentPrice)

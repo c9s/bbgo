@@ -1,6 +1,6 @@
 package bbgo
 
-import "github.com/c9s/bbgo/pkg/types"
+import "github.com/c9s/bbgo/pkg/bbgo/types"
 
 type TradingContext struct {
 	KLineWindowSize int

@@ -7,7 +7,7 @@ import (
 
 type Order struct {
 	Symbol    string
-	Side      binance.SideType
+	Side      SideType
 	Type      binance.OrderType
 	VolumeStr string
 	PriceStr  string
@@ -27,7 +27,7 @@ func (o *Order) SlackAttachment() slack.Attachment {
 	}
 
 	return slack.Attachment{
-		Color: SideToColorName(SideType(o.Side)),
+		Color: SideToColorName(o.Side),
 		Title: string(o.Type) + " Order " + string(o.Side),
 		// Text:   "",
 		Fields: fields,

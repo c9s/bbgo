@@ -3,7 +3,8 @@ package binance
 import (
 	"context"
 	"github.com/adshao/go-binance"
-	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/bbgo/types"
+	types2 "github.com/c9s/bbgo/pkg/bbgo/types"
 	"github.com/c9s/bbgo/pkg/util"
 	"github.com/sirupsen/logrus"
 	"strconv"
@@ -44,7 +45,7 @@ func (e *Exchange) NewPrivateStream(ctx context.Context) (*PrivateStream, error)
 	}, nil
 }
 
-func (e *Exchange) SubmitOrder(ctx context.Context, order *types.Order) error {
+func (e *Exchange) SubmitOrder(ctx context.Context, order *types2.Order) error {
 	/*
 		limit order example
 
@@ -60,7 +61,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order *types.Order) error {
 
 	req := e.Client.NewCreateOrderService().
 		Symbol(order.Symbol).
-		Side(order.Side).
+		Side(binance.SideType(order.Side)).
 		Type(order.Type).
 		Quantity(order.VolumeStr)
 
@@ -103,7 +104,7 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol, interval string, lim
 	return kLines, nil
 }
 
-func (e *Exchange) QueryTrades(ctx context.Context, symbol string, startTime time.Time) (trades []types.Trade, err error) {
+func (e *Exchange) QueryTrades(ctx context.Context, symbol string, startTime time.Time) (trades []types2.Trade, err error) {
 	logrus.Infof("[binance] querying %s trades from %s", symbol, startTime)
 
 	var lastTradeID int64 = 0
@@ -159,7 +160,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, startTime tim
 				return nil, err
 			}
 
-			trades = append(trades, types.Trade{
+			trades = append(trades, types2.Trade{
 				ID:          t.ID,
 				Price:       price,
 				Volume:      quantity,

@@ -3,9 +3,9 @@ package bbgo
 import (
 	"context"
 	"fmt"
-	"github.com/c9s/bbgo/pkg/exchange/binance"
+	"github.com/c9s/bbgo/pkg/bbgo/exchange/binance"
+	types2 "github.com/c9s/bbgo/pkg/bbgo/types"
 	"github.com/c9s/bbgo/pkg/slack/slackstyle"
-	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 	"github.com/leekchan/accounting"
 	"github.com/sirupsen/logrus"
@@ -76,7 +76,7 @@ func (t *Trader) Errorf(err error, format string, args ...interface{}) {
 	}
 }
 
-func (t *Trader) ReportTrade(e *binance.ExecutionReportEvent, trade *types.Trade) {
+func (t *Trader) ReportTrade(e *binance.ExecutionReportEvent, trade *types2.Trade) {
 	var color = ""
 	if trade.IsBuyer {
 		color = "#228B22"
@@ -171,7 +171,7 @@ func (t *Trader) ReportPnL() {
 	}
 }
 
-func (t *Trader) SubmitOrder(ctx context.Context, order *types.Order) {
+func (t *Trader) SubmitOrder(ctx context.Context, order *types2.Order) {
 	t.Infof(":memo: Submitting %s order on side %s with volume: %s", order.Type, order.Side, order.VolumeStr, order.SlackAttachment())
 
 	err := t.Exchange.SubmitOrder(ctx, order)
