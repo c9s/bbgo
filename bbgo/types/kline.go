@@ -2,7 +2,7 @@ package types
 
 import "github.com/slack-go/slack"
 
-type KLine interface {
+type KLineOrWindow interface {
 	GetTrend() int
 	GetChange() float64
 	GetMaxChange() float64

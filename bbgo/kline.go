@@ -27,9 +27,9 @@ type KLine struct {
 	Volume      string `json:"V"` // taker buy base asset volume (like 10 BTC)
 	QuoteVolume string `json:"Q"` // taker buy quote asset volume (like 1000USDT)
 
-	LastTradeID    int  `json:"L"`
-	NumberOfTrades int64  `json:"n"`
-	Closed         bool `json:"x"`
+	LastTradeID    int   `json:"L"`
+	NumberOfTrades int64 `json:"n"`
+	Closed         bool  `json:"x"`
 }
 
 func (k KLine) Mid() float64 {
@@ -135,7 +135,7 @@ func (k KLine) Color() string {
 
 func (k KLine) SlackAttachment() slack.Attachment {
 	return slack.Attachment{
-		Text: "KLine",
+		Text:  "KLine",
 		Color: k.Color(),
 		Fields: []slack.AttachmentField{
 			{
@@ -193,8 +193,6 @@ func (k KLine) SlackAttachment() slack.Attachment {
 		FooterIcon: "",
 	}
 }
-
-
 
 type KLineWindow []KLine
 
@@ -259,7 +257,6 @@ func (k KLineWindow) AllRise() bool {
 	return true
 }
 
-
 func (k KLineWindow) GetTrend() int {
 	o := k.GetOpen()
 	c := k.GetClose()
@@ -280,7 +277,6 @@ func (k KLineWindow) Color() string {
 	}
 	return "#f0f0f0"
 }
-
 
 func (k KLineWindow) Mid() float64 {
 	return k.GetHigh() - k.GetLow()/2
@@ -312,7 +308,7 @@ func (k KLineWindow) Tail(size int) KLineWindow {
 	if len(k) <= size {
 		return k[:]
 	}
-	return k[len(k) - size:]
+	return k[len(k)-size:]
 }
 
 func (k *KLineWindow) Truncate(size int) {
@@ -362,7 +358,7 @@ func (k KLineWindow) GetLowerShadowHeight() float64 {
 
 func (k KLineWindow) SlackAttachment() slack.Attachment {
 	return slack.Attachment{
-		Text: "KLine",
+		Text:  "KLine",
 		Color: k.Color(),
 		Fields: []slack.AttachmentField{
 			{

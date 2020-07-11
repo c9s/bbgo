@@ -6,6 +6,8 @@ type Market struct {
 	Symbol          string
 	PricePrecision  int
 	VolumePrecision int
+	QuoteCurrency   string
+	BaseCurrency    string
 	MinQuantity     float64
 	MinAmount       float64
 }
@@ -22,6 +24,8 @@ func (m Market) FormatVolume(val float64) string {
 
 var MarketBTCUSDT = Market{
 	Symbol:          "BTCUSDT",
+	BaseCurrency:    "BTC",
+	QuoteCurrency:   "USDT",
 	PricePrecision:  2,
 	VolumePrecision: 6,
 	MinQuantity:     0.00000100,
@@ -30,6 +34,8 @@ var MarketBTCUSDT = Market{
 
 var MarketBNBUSDT = Market{
 	Symbol:          "BNBUSDT",
+	BaseCurrency:    "BNB",
+	QuoteCurrency:   "USDT",
 	PricePrecision:  4,
 	VolumePrecision: 2,
 	MinQuantity:     0.01,

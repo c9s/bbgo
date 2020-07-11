@@ -124,7 +124,7 @@ func (d *KLineDetector) String() string {
 }
 
 func (d *KLineDetector) NewOrder(e *KLineEvent, tradingCtx *TradingContext) *Order {
-	var kline types.KLine = e.KLine
+	var kline types.KLineOrWindow = e.KLine
 	if d.EnableLookBack {
 		klineWindow := tradingCtx.KLineWindows[e.KLine.Interval]
 		if len(klineWindow) >= d.LookBackFrames {
@@ -150,7 +150,7 @@ func (d *KLineDetector) NewOrder(e *KLineEvent, tradingCtx *TradingContext) *Ord
 	}
 }
 
-func (d *KLineDetector) Detect(e *KLineEvent, tradingCtx *TradingContext) (reason string, kline types.KLine, ok bool) {
+func (d *KLineDetector) Detect(e *KLineEvent, tradingCtx *TradingContext) (reason string, kline types.KLineOrWindow, ok bool) {
 	kline = e.KLine
 
 	// if the 3m trend is drop, do not buy, let 5m window handle it.

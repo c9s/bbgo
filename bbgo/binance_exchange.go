@@ -58,7 +58,7 @@ func (s *PrivateStream) Subscribe(channel string, symbol string, options Subscri
 	})
 }
 
-func (s *PrivateStream) Connect(ctx context.Context) error {
+func (s *PrivateStream) Connect(ctx context.Context, eventC chan interface{}) error {
 	url := "wss://stream.binance.com:9443/ws/" + s.ListenKey
 	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
 	if err != nil {
@@ -80,10 +80,16 @@ func (s *PrivateStream) Connect(ctx context.Context) error {
 		ID:     1,
 	})
 
-	return err
+	if err != nil {
+		return err
+	}
+
+	go s.read(ctx, eventC)
+
+	return nil
 }
 
-func (s *PrivateStream) Read(ctx context.Context, eventC chan interface{}) {
+func (s *PrivateStream) read(ctx context.Context, eventC chan interface{}) {
 	defer close(eventC)
 
 	ticker := time.NewTicker(30 * time.Minute)
@@ -205,6 +211,8 @@ func (e *BinanceExchange) SubmitOrder(ctx context.Context, order *Order) error {
 }
 
 func (e *BinanceExchange) QueryKLines(ctx context.Context, symbol, interval string, limit int) ([]KLine, error) {
+	log.Infof("[binance] querying kline %s %s limit %d", symbol, interval, limit)
+
 	resp, err := e.Client.NewKlinesService().Symbol(symbol).Interval(interval).Limit(limit).Do(ctx)
 	if err != nil {
 		return nil, err
