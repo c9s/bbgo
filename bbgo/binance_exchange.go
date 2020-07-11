@@ -31,6 +31,7 @@ type Subscription struct {
 }
 
 func (s *Subscription) String() string {
+	// binance uses lower case symbol name
 	return fmt.Sprintf("%s@%s_%s", strings.ToLower(s.Symbol), s.Channel, s.Options.String())
 }
 
@@ -147,6 +148,15 @@ type BinanceExchange struct {
 	Client *binance.Client
 }
 
+func (e *BinanceExchange) QueryAveragePrice(ctx context.Context, symbol string) (float64, error) {
+	resp, err := e.Client.NewAveragePriceService().Symbol(symbol).Do(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	return MustParseFloat(resp.Price), nil
+}
+
 func (e *BinanceExchange) NewPrivateStream(ctx context.Context) (*PrivateStream, error) {
 	log.Infof("[binance] creating user data stream...")
 	listenKey, err := e.Client.NewStartUserStreamService().Do(ctx)
@@ -218,12 +228,14 @@ func (e *BinanceExchange) QueryKLines(ctx context.Context, symbol, interval stri
 	return kLines, nil
 }
 
-func (e *BinanceExchange) QueryTrades(ctx context.Context, market string, startTime time.Time) (trades []Trade, err error) {
+func (e *BinanceExchange) QueryTrades(ctx context.Context, symbol string, startTime time.Time) (trades []Trade, err error) {
+	log.Infof("[binance] querying %s trades from %s", symbol, startTime)
+
 	var lastTradeID int64 = 0
 	for {
 		req := e.Client.NewListTradesService().
 			Limit(1000).
-			Symbol(market).
+			Symbol(symbol).
 			StartTime(startTime.UnixNano() / 1000000)
 
 		if lastTradeID > 0 {
