@@ -105,16 +105,12 @@ func (t *Trader) ReportTrade(e *BinanceExecutionReportEvent, trade *Trade) {
 }
 
 func (t *Trader) ReportPnL() {
-	t.Context.UpdatePnL()
-
 	tradingCtx := t.Context
-	logrus.Infof("current price:  %s", USD.FormatMoneyFloat64(tradingCtx.CurrentPrice))
-	logrus.Infof("average bid price:  %s", USD.FormatMoneyFloat64(tradingCtx.AverageBidPrice))
-	logrus.Infof("Stock volume:   %f", tradingCtx.Stock)
-	logrus.Infof("overall Profit:  %s", USD.FormatMoneyFloat64(tradingCtx.Profit))
+	report := tradingCtx.ProfitAndLossCalculator.Calculate()
+	report.Print()
 
 	var color = ""
-	if tradingCtx.Profit > 0 {
+	if report.Profit > 0 {
 		color = slackstyle.Green
 	} else {
 		color = slackstyle.Red
@@ -122,10 +118,10 @@ func (t *Trader) ReportPnL() {
 
 	_, _, err := t.Slack.PostMessageContext(context.Background(), t.TradingChannel,
 		slack.MsgOptionText(util.Render(
-			`:heavy_dollar_sign: Here is your *{{ .Symbol }}* PnL report collected since *{{ .startTime }}*`,
+			`:heavy_dollar_sign: Here is your *{{ .symbol }}* PnL report collected since *{{ .startTime }}*`,
 			map[string]interface{}{
-				"Symbol":    tradingCtx.Symbol,
-				"startTime": tradingCtx.TradeStartTime.Format(time.RFC822),
+				"symbol":    tradingCtx.Symbol,
+				"startTime": report.StartTime.Format(time.RFC822),
 			}), true),
 		slack.MsgOptionAttachments(slack.Attachment{
 			Title: "Profit and Loss report",
@@ -140,31 +136,31 @@ func (t *Trader) ReportPnL() {
 				},
 				{
 					Title: "Profit",
-					Value: USD.FormatMoney(tradingCtx.Profit),
+					Value: USD.FormatMoney(report.Profit),
 					Short: true,
 				},
 				{
 					Title: "Current Price",
-					Value: USD.FormatMoney(tradingCtx.CurrentPrice),
+					Value: USD.FormatMoney(report.CurrentPrice),
 					Short: true,
 				},
 				{
 					Title: "Average Bid Price",
-					Value: USD.FormatMoney(tradingCtx.AverageBidPrice),
+					Value: USD.FormatMoney(report.AverageBidPrice),
 					Short: true,
 				},
 				{
 					Title: "Current Stock",
-					Value: tradingCtx.Market.FormatVolume(tradingCtx.Stock),
+					Value: tradingCtx.Market.FormatVolume(report.Stock),
 					Short: true,
 				},
 				{
 					Title: "Number of Trades",
-					Value: strconv.Itoa(len(tradingCtx.Trades)),
+					Value: strconv.Itoa(report.NumTrades),
 					Short: true,
 				},
 			},
-			Footer:     tradingCtx.TradeStartTime.Format(time.RFC822),
+			Footer:     report.StartTime.Format(time.RFC822),
 			FooterIcon: "",
 		}))
 

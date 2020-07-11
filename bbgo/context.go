@@ -1,18 +1,23 @@
 package bbgo
 
-import "time"
-
 type TradingContext struct {
 	KLineWindowSize int
 	KLineWindows    map[string]KLineWindow
-	AverageBidPrice float64
-	Stock           float64
-	Profit          float64
-	CurrentPrice    float64
-	Trades          []Trade
-	TradeStartTime  time.Time
+
 	Symbol          string
+
+	// Market is the market configuration of a symbol
 	Market 			Market
+
+	AverageBidPrice float64
+	CurrentPrice    float64
+
+	ProfitAndLossCalculator *ProfitAndLossCalculator
+}
+
+func (c *TradingContext) SetCurrentPrice(price float64) {
+	c.CurrentPrice = price
+	c.ProfitAndLossCalculator.SetCurrentPrice(price)
 }
 
 func (c *TradingContext) AddKLine(kline KLine) KLineWindow {
@@ -26,7 +31,4 @@ func (c *TradingContext) AddKLine(kline KLine) KLineWindow {
 	return klineWindow
 }
 
-func (c *TradingContext) UpdatePnL() {
-	c.AverageBidPrice, c.Stock, c.Profit, _ = CalculateCostAndProfit(c.Trades, c.CurrentPrice)
-}
 

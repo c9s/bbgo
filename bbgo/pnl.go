@@ -1,6 +1,9 @@
 package bbgo
 
-import log "github.com/sirupsen/logrus"
+import (
+	log "github.com/sirupsen/logrus"
+	"time"
+)
 
 func CalculateAverageCost(trades []Trade) (averageCost float64) {
 	var totalCost = 0.0
@@ -19,7 +22,25 @@ func CalculateAverageCost(trades []Trade) (averageCost float64) {
 	return
 }
 
-func CalculateCostAndProfit(trades []Trade, currentPrice float64) (averageBidPrice, stock, profit, fee float64) {
+type ProfitAndLossCalculator struct {
+	Symbol       string
+	StartTime    time.Time
+	CurrentPrice float64
+	Trades       []Trade
+}
+
+func (c *ProfitAndLossCalculator) AddTrade(trade Trade) {
+	c.Trades = append(c.Trades, trade)
+}
+
+func (c *ProfitAndLossCalculator) SetCurrentPrice(price float64) {
+	c.CurrentPrice = price
+}
+
+func (c *ProfitAndLossCalculator) Calculate() *ProfitAndLossReport {
+	// copy trades, so that we can truncate it.
+	var trades = c.Trades
+
 	var bidVolume = 0.0
 	var bidAmount = 0.0
 	var bidFee = 0.0
@@ -48,7 +69,8 @@ func CalculateCostAndProfit(trades []Trade, currentPrice float64) (averageBidPri
 	}
 
 	log.Infof("average bid price = (total amount %f + total fee %f) / volume %f", bidAmount, bidFee, bidVolume)
-	averageBidPrice = (bidAmount + bidFee) / bidVolume
+	profit := 0.0
+	averageBidPrice := (bidAmount + bidFee) / bidVolume
 
 	var feeRate = 0.001
 	var askVolume = 0.0
@@ -66,14 +88,46 @@ func CalculateCostAndProfit(trades []Trade, currentPrice float64) (averageBidPri
 
 	profit -= askFee
 
-	stock = bidVolume - askVolume
+	stock := bidVolume - askVolume
 	futureFee := 0.0
 	if stock > 0 {
-		stockfee := currentPrice * feeRate * stock
-		profit += (currentPrice-averageBidPrice)*stock - stockfee
-		futureFee += stockfee
+		stockFee := c.CurrentPrice * feeRate * stock
+		profit += (c.CurrentPrice-averageBidPrice)*stock - stockFee
+		futureFee += stockFee
 	}
 
-	fee = bidFee + askFee + futureFee
-	return
+	fee := bidFee + askFee + futureFee
+
+	return &ProfitAndLossReport{
+		CurrentPrice:    c.CurrentPrice,
+		StartTime:       c.StartTime,
+		NumTrades:       len(trades),
+
+		Profit:          profit,
+		AverageBidPrice: averageBidPrice,
+		Stock:           stock,
+		Fee:             fee,
+	}
+}
+
+type ProfitAndLossReport struct {
+	CurrentPrice float64
+	StartTime    time.Time
+
+	NumTrades       int
+	Profit          float64
+	AverageBidPrice float64
+	Stock           float64
+	Fee             float64
+}
+
+func (report ProfitAndLossReport) Print() {
+	log.Infof("trades since: %v", report.StartTime)
+	log.Infof("average bid price: %s", USD.FormatMoneyFloat64(report.AverageBidPrice))
+	log.Infof("Stock volume: %f", report.Stock)
+	log.Infof("current price: %s", USD.FormatMoneyFloat64(report.CurrentPrice))
+	log.Infof("overall profit: %s", USD.FormatMoneyFloat64(report.Profit))
+}
+
+func CalculateCostAndProfit(trades []Trade, currentPrice float64, startTime time.Time) (report *ProfitAndLossReport) {
 }
