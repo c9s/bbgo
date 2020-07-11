@@ -1,6 +1,9 @@
 package bbgo
 
-import "strconv"
+import (
+	"math"
+	"strconv"
+)
 
 type Market struct {
 	Symbol          string
@@ -18,6 +21,11 @@ func (m Market) FormatPrice(val float64) string {
 
 func (m Market) FormatVolume(val float64) string {
 	return strconv.FormatFloat(val, 'f', m.VolumePrecision, 64)
+}
+
+func (m Market) CanonicalizeVolume(val float64) float64 {
+	p := math.Pow10(m.VolumePrecision)
+	return math.Trunc(p * val) / p
 }
 
 //  Binance Markets, this should be defined per exchange

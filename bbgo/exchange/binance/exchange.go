@@ -97,6 +97,11 @@ func toLocalOrderType(orderType types.OrderType) (binance.OrderType, error) {
 }
 
 func (e *Exchange) QueryKLines(ctx context.Context, symbol, interval string, limit int) ([]types.KLine, error) {
+	if limit == 0 {
+		// default limit == 500
+		limit = 500
+	}
+
 	logrus.Infof("[binance] querying kline %s %s limit %d", symbol, interval, limit)
 
 	resp, err := e.Client.NewKlinesService().Symbol(symbol).Interval(interval).Limit(limit).Do(ctx)
