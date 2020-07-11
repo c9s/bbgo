@@ -206,7 +206,7 @@ func (e *BinanceExchange) SubmitOrder(ctx context.Context, order *Order) error {
 	}
 
 	retOrder, err := req.Do(ctx)
-	log.Infof("order created: %+v", retOrder)
+	log.Infof("[binance] order created: %+v", retOrder)
 	return err
 }
 
