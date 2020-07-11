@@ -2,6 +2,7 @@ package binance
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -60,10 +61,15 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order *types.Order) error {
 				Do(ctx)
 	*/
 
+	orderType, err := toLocalOrderType(order.Type)
+	if err != nil {
+		return err
+	}
+
 	req := e.Client.NewCreateOrderService().
 		Symbol(order.Symbol).
 		Side(binance.SideType(order.Side)).
-		Type(order.Type).
+		Type(orderType).
 		Quantity(order.VolumeStr)
 
 	if len(order.PriceStr) > 0 {
@@ -76,6 +82,18 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order *types.Order) error {
 	retOrder, err := req.Do(ctx)
 	logrus.Infof("[binance] order created: %+v", retOrder)
 	return err
+}
+
+func toLocalOrderType(orderType types.OrderType) (binance.OrderType, error) {
+	switch orderType {
+	case types.OrderTypeLimit:
+		return binance.OrderTypeLimit, nil
+
+	case types.OrderTypeMarket:
+		return binance.OrderTypeMarket, nil
+	}
+
+	return "", fmt.Errorf("order type %s not supported", orderType)
 }
 
 func (e *Exchange) QueryKLines(ctx context.Context, symbol, interval string, limit int) ([]types.KLine, error) {

@@ -5,10 +5,18 @@ import (
 	"github.com/slack-go/slack"
 )
 
+// OrderType define order type
+type OrderType string
+
+const (
+	OrderTypeLimit  OrderType = "LIMIT"
+	OrderTypeMarket OrderType = "MARKET"
+)
+
 type Order struct {
 	Symbol    string
 	Side      SideType
-	Type      binance.OrderType
+	Type      OrderType
 	VolumeStr string
 	PriceStr  string
 
@@ -33,4 +41,3 @@ func (o *Order) SlackAttachment() slack.Attachment {
 		Fields: fields,
 	}
 }
-
