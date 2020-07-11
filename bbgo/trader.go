@@ -90,7 +90,7 @@ func (t *Trader) ReportTrade(e *BinanceExecutionReportEvent, trade *Trade) {
 			// Pretext:       "",
 			// Text:          "",
 			Fields: []slack.AttachmentField{
-				{Title: "Market", Value: trade.Market, Short: true,},
+				{Title: "Symbol", Value: trade.Symbol, Short: true,},
 				{Title: "Side", Value: e.Side, Short: true,},
 				{Title: "Price", Value: USD.FormatMoney(trade.Price), Short: true,},
 				{Title: "Volume", Value: t.Context.Market.FormatVolume(trade.Volume), Short: true,},
@@ -130,7 +130,7 @@ func (t *Trader) ReportPnL() {
 			// Text:          "",
 			Fields: []slack.AttachmentField{
 				{
-					Title: "Market",
+					Title: "Symbol",
 					Value: tradingCtx.Symbol,
 					Short: true,
 				},

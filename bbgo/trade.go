@@ -11,7 +11,7 @@ type Trade struct {
 	IsBuyer     bool
 	IsMaker     bool
 	Time        time.Time
-	Market      string
+	Symbol      string
 	Fee         float64
 	FeeCurrency string
 }
