@@ -94,6 +94,7 @@ func (e *ExecutionReportEvent) Trade() (*types.Trade, error) {
 		Symbol:      e.Symbol,
 		Price:       util.MustParseFloat(e.LastExecutedPrice),
 		Volume:      util.MustParseFloat(e.LastExecutedQuantity),
+		Side:        e.Side,
 		IsBuyer:     e.Side == "BUY",
 		IsMaker:     e.IsMaker,
 		Time:        tt,
@@ -280,4 +281,3 @@ type EventBase struct {
 	Event string `json:"e"` // event
 	Time  int64  `json:"E"`
 }
-
