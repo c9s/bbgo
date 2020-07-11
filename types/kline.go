@@ -59,19 +59,19 @@ func (k KLine) GetTrend() int {
 }
 
 func (k KLine) GetHigh() float64 {
-	return bbgo.MustParseFloat(k.High)
+	return util.MustParseFloat(k.High)
 }
 
 func (k KLine) GetLow() float64 {
-	return bbgo.MustParseFloat(k.Low)
+	return util.MustParseFloat(k.Low)
 }
 
 func (k KLine) GetOpen() float64 {
-	return bbgo.MustParseFloat(k.Open)
+	return util.MustParseFloat(k.Open)
 }
 
 func (k KLine) GetClose() float64 {
-	return bbgo.MustParseFloat(k.Close)
+	return util.MustParseFloat(k.Close)
 }
 
 func (k KLine) GetMaxChange() float64 {

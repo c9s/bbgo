@@ -7,23 +7,6 @@ import (
 	"time"
 )
 
-func CalculateAverageCost(trades []types.Trade) (averageCost float64) {
-	var totalCost = 0.0
-	var totalQuantity = 0.0
-	for _, t := range trades {
-		if t.IsBuyer {
-			totalCost += t.Price * t.Volume
-			totalQuantity += t.Volume
-		} else {
-			totalCost -= t.Price * t.Volume
-			totalQuantity -= t.Volume
-		}
-	}
-
-	averageCost = totalCost / totalQuantity
-	return
-}
-
 type ProfitAndLossCalculator struct {
 	Symbol       string
 	StartTime    time.Time

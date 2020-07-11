@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/adshao/go-binance"
 	"github.com/c9s/bbgo/pkg/bbgo/types"
+	binance2 "github.com/c9s/bbgo/pkg/exchange/binance"
 	"github.com/c9s/bbgo/pkg/util"
 	"github.com/slack-go/slack"
 	"math"
@@ -124,7 +125,7 @@ func (d *KLineDetector) String() string {
 	return name
 }
 
-func (d *KLineDetector) NewOrder(e *KLineEvent, tradingCtx *TradingContext) *Order {
+func (d *KLineDetector) NewOrder(e *binance2.KLineEvent, tradingCtx *TradingContext) *Order {
 	var kline types.KLineOrWindow = e.KLine
 	if d.EnableLookBack {
 		klineWindow := tradingCtx.KLineWindows[e.KLine.Interval]
@@ -151,7 +152,7 @@ func (d *KLineDetector) NewOrder(e *KLineEvent, tradingCtx *TradingContext) *Ord
 	}
 }
 
-func (d *KLineDetector) Detect(e *KLineEvent, tradingCtx *TradingContext) (reason string, kline types.KLineOrWindow, ok bool) {
+func (d *KLineDetector) Detect(e *binance2.KLineEvent, tradingCtx *TradingContext) (reason string, kline types.KLineOrWindow, ok bool) {
 	kline = e.KLine
 
 	// if the 3m trend is drop, do not buy, let 5m window handle it.

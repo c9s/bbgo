@@ -5,6 +5,7 @@ import (
 	"github.com/adshao/go-binance"
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 	"github.com/sirupsen/logrus"
 	"strconv"
 	"time"
@@ -14,13 +15,20 @@ type Exchange struct {
 	Client *binance.Client
 }
 
+func NewExchange(key, secret string) *Exchange {
+	var client = binance.NewClient(key, secret)
+	return &Exchange{
+		Client: client,
+	}
+}
+
 func (e *Exchange) QueryAveragePrice(ctx context.Context, symbol string) (float64, error) {
 	resp, err := e.Client.NewAveragePriceService().Symbol(symbol).Do(ctx)
 	if err != nil {
 		return 0, err
 	}
 
-	return bbgo.MustParseFloat(resp.Price), nil
+	return util.MustParseFloat(resp.Price), nil
 }
 
 func (e *Exchange) NewPrivateStream(ctx context.Context) (*PrivateStream, error) {

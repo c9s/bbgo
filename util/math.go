@@ -20,3 +20,12 @@ func Pow10(n int64) int64 {
 func FormatFloat(val float64, prec int) string {
 	return strconv.FormatFloat(val, 'f', prec, 64)
 }
+
+func MustParseFloat(s string) float64 {
+	v, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		panic(err)
+	}
+	return v
+}
+
