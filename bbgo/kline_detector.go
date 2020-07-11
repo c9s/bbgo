@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/adshao/go-binance"
 	"github.com/c9s/bbgo/pkg/bbgo/types"
+	"github.com/c9s/bbgo/pkg/util"
 	"github.com/slack-go/slack"
 	"math"
 	"strconv"
@@ -70,7 +71,7 @@ func (d *KLineDetector) SlackAttachment() slack.Attachment {
 	if d.EnableMinThickness && NotZero(d.MinThickness) {
 		fields = append(fields, slack.AttachmentField{
 			Title: "MinThickness",
-			Value: formatFloat(d.MinThickness, 4),
+			Value: util.FormatFloat(d.MinThickness, 4),
 			Short: true,
 		})
 	}
@@ -78,7 +79,7 @@ func (d *KLineDetector) SlackAttachment() slack.Attachment {
 	if d.EnableMaxShadowRatio && NotZero(d.MaxShadowRatio) {
 		fields = append(fields, slack.AttachmentField{
 			Title: "MaxShadowRatio",
-			Value: formatFloat(d.MaxShadowRatio, 4),
+			Value: util.FormatFloat(d.MaxShadowRatio, 4),
 			Short: true,
 		})
 	}

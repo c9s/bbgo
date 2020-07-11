@@ -1,8 +1,10 @@
 package bbgo
 
+import "github.com/c9s/bbgo/pkg/types"
+
 type TradingContext struct {
 	KLineWindowSize int
-	KLineWindows    map[string]KLineWindow
+	KLineWindows    map[string]types.KLineWindow
 
 	Symbol          string
 
@@ -20,7 +22,7 @@ func (c *TradingContext) SetCurrentPrice(price float64) {
 	c.ProfitAndLossCalculator.SetCurrentPrice(price)
 }
 
-func (c *TradingContext) AddKLine(kline KLine) KLineWindow {
+func (c *TradingContext) AddKLine(kline types.KLine) types.KLineWindow {
 	var klineWindow = c.KLineWindows[kline.Interval]
 	klineWindow.Add(kline)
 

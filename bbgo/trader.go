@@ -3,6 +3,7 @@ package bbgo
 import (
 	"context"
 	"fmt"
+	"github.com/c9s/bbgo/pkg/exchange/binance"
 	"github.com/c9s/bbgo/pkg/slack/slackstyle"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
@@ -20,7 +21,7 @@ type Trader struct {
 	// Context is trading Context
 	Context *TradingContext
 
-	Exchange *BinanceExchange
+	Exchange *binance.Exchange
 
 	Slack *slack.Client
 
@@ -75,7 +76,7 @@ func (t *Trader) Errorf(err error, format string, args ...interface{}) {
 	}
 }
 
-func (t *Trader) ReportTrade(e *BinanceExecutionReportEvent, trade *types.Trade) {
+func (t *Trader) ReportTrade(e *binance.ExecutionReportEvent, trade *types.Trade) {
 	var color = ""
 	if trade.IsBuyer {
 		color = "#228B22"
