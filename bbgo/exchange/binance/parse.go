@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	types2 "github.com/c9s/bbgo/pkg/bbgo/types"
 	"github.com/c9s/bbgo/pkg/bbgo/types"
 	"github.com/c9s/bbgo/pkg/util"
 	"github.com/valyala/fastjson"
@@ -84,13 +83,13 @@ type ExecutionReportEvent struct {
 	OrderCreationTime int `json:"O"`
 }
 
-func (e *ExecutionReportEvent) Trade() (*types2.Trade, error) {
+func (e *ExecutionReportEvent) Trade() (*types.Trade, error) {
 	if e.CurrentExecutionType != "TRADE" {
 		return nil, errors.New("execution report is not a trade")
 	}
 
 	tt := time.Unix(0, e.TransactionTime/1000000)
-	return &types2.Trade{
+	return &types.Trade{
 		ID:          e.TradeID,
 		Symbol:      e.Symbol,
 		Price:       util.MustParseFloat(e.LastExecutedPrice),

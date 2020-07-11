@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/adshao/go-binance"
+	"github.com/c9s/bbgo/pkg/bbgo/types"
 	"github.com/gorilla/websocket"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"strings"
 	"time"
 )
@@ -41,11 +42,23 @@ type StreamRequest struct {
 	Params []string `json:"params"`
 }
 
+//go:generate callbackgen -type PrivateStream -interface
 type PrivateStream struct {
 	Client        *binance.Client
 	ListenKey     string
 	Conn          *websocket.Conn
 	Subscriptions []Subscription
+
+	connectCallbacks []func(stream *PrivateStream)
+	tradeCallbacks   []func(trade *types.Trade)
+
+	// custom callbacks
+	kLineEventCallbacks       []func(event *KLineEvent)
+	kLineClosedEventCallbacks []func(event *KLineEvent)
+
+	balanceUpdateEventCallbacks       []func(event *BalanceUpdateEvent)
+	outboundAccountInfoEventCallbacks []func(event *OutboundAccountInfoEvent)
+	executionReportEventCallbacks     []func(event *ExecutionReportEvent)
 }
 
 func (s *PrivateStream) Subscribe(channel string, symbol string, options SubscribeOptions) {
@@ -63,15 +76,17 @@ func (s *PrivateStream) Connect(ctx context.Context, eventC chan interface{}) er
 		return err
 	}
 
-	logrus.Infof("[binance] websocket connected")
+	log.Infof("[binance] websocket connected")
 	s.Conn = conn
+
+	s.EmitConnect(s)
 
 	var params []string
 	for _, subscription := range s.Subscriptions {
 		params = append(params, subscription.String())
 	}
 
-	logrus.Infof("[binance] subscribing channels: %+v", params)
+	log.Infof("[binance] subscribing channels: %+v", params)
 	err = conn.WriteJSON(StreamRequest{
 		Method: "SUBSCRIBE",
 		Params: params,
@@ -102,17 +117,17 @@ func (s *PrivateStream) read(ctx context.Context, eventC chan interface{}) {
 		case <-ticker.C:
 			err := s.Client.NewKeepaliveUserStreamService().ListenKey(s.ListenKey).Do(ctx)
 			if err != nil {
-				logrus.WithError(err).Error("listen key keep-alive error", err)
+				log.WithError(err).Error("listen key keep-alive error", err)
 			}
 
 		default:
 			if err := s.Conn.SetReadDeadline(time.Now().Add(15 * time.Second)); err != nil {
-				logrus.WithError(err).Errorf("set read deadline error: %s", err.Error())
+				log.WithError(err).Errorf("set read deadline error: %s", err.Error())
 			}
 
 			mt, message, err := s.Conn.ReadMessage()
 			if err != nil {
-				logrus.WithError(err).Errorf("read error: %s", err.Error())
+				log.WithError(err).Errorf("read error: %s", err.Error())
 				return
 			}
 
@@ -121,12 +136,45 @@ func (s *PrivateStream) read(ctx context.Context, eventC chan interface{}) {
 				continue
 			}
 
-			logrus.Debugf("[binance] recv: %s", message)
+			log.Debugf("[binance] recv: %s", message)
 
 			e, err := ParseEvent(string(message))
 			if err != nil {
-				logrus.WithError(err).Errorf("[binance] event parse error")
+				log.WithError(err).Errorf("[binance] event parse error")
 				continue
+			}
+
+			log.Infof("[binance] event: %+v", e)
+
+			switch e := e.(type) {
+
+			case *OutboundAccountInfoEvent:
+				log.Info(e.Event, " ", e.Balances)
+				s.EmitOutboundAccountInfoEvent(e)
+
+			case *BalanceUpdateEvent:
+				log.Info(e.Event, " ", e.Asset, " ", e.Delta)
+				s.EmitBalanceUpdateEvent(e)
+
+			case *KLineEvent:
+				log.Info(e.Event, " ", e.KLine, " ", e.KLine.Interval)
+				s.EmitKLineEvent(e)
+
+				if e.KLine.Closed {
+					s.EmitKLineClosedEvent(e)
+				}
+
+			case *ExecutionReportEvent:
+				s.EmitExecutionReportEvent(e)
+
+				switch e.CurrentExecutionType {
+				case "TRADE":
+					trade, err := e.Trade()
+					if err != nil {
+						break
+					}
+					s.EmitTrade(trade)
+				}
 			}
 
 			eventC <- e
@@ -135,17 +183,16 @@ func (s *PrivateStream) read(ctx context.Context, eventC chan interface{}) {
 }
 
 func (s *PrivateStream) Close() error {
-	logrus.Infof("[binance] closing user data stream...")
+	log.Infof("[binance] closing user data stream...")
 
 	defer s.Conn.Close()
 
 	// use background context to close user stream
 	err := s.Client.NewCloseUserStreamService().ListenKey(s.ListenKey).Do(context.Background())
 	if err != nil {
-		logrus.WithError(err).Error("[binance] error close user data stream")
+		log.WithError(err).Error("[binance] error close user data stream")
 		return err
 	}
 
 	return err
 }
-
