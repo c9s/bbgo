@@ -196,5 +196,6 @@ func (s *PrivateStream) Close() error {
 		return err
 	}
 
-	return err
+	log.Infof("[binance] user data stream closed")
+	return nil
 }
