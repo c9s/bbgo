@@ -99,9 +99,10 @@ func (c *ProfitAndLossCalculator) Calculate() *ProfitAndLossReport {
 	fee := bidFee + askFee + futureFee
 
 	return &ProfitAndLossReport{
-		CurrentPrice:    c.CurrentPrice,
-		StartTime:       c.StartTime,
-		NumTrades:       len(trades),
+		Symbol:       c.Symbol,
+		StartTime:    c.StartTime,
+		CurrentPrice: c.CurrentPrice,
+		NumTrades:    len(trades),
 
 		Profit:          profit,
 		AverageBidPrice: averageBidPrice,
@@ -113,6 +114,7 @@ func (c *ProfitAndLossCalculator) Calculate() *ProfitAndLossReport {
 type ProfitAndLossReport struct {
 	CurrentPrice float64
 	StartTime    time.Time
+	Symbol       string
 
 	NumTrades       int
 	Profit          float64
@@ -124,10 +126,8 @@ type ProfitAndLossReport struct {
 func (report ProfitAndLossReport) Print() {
 	log.Infof("trades since: %v", report.StartTime)
 	log.Infof("average bid price: %s", USD.FormatMoneyFloat64(report.AverageBidPrice))
-	log.Infof("Stock volume: %f", report.Stock)
+	log.Infof("stock volume: %f", report.Stock)
 	log.Infof("current price: %s", USD.FormatMoneyFloat64(report.CurrentPrice))
 	log.Infof("overall profit: %s", USD.FormatMoneyFloat64(report.Profit))
 }
 
-func CalculateCostAndProfit(trades []Trade, currentPrice float64, startTime time.Time) (report *ProfitAndLossReport) {
-}

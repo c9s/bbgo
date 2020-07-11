@@ -7,6 +7,7 @@ import (
 	"github.com/gorilla/websocket"
 	log "github.com/sirupsen/logrus"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -30,11 +31,12 @@ type Subscription struct {
 }
 
 func (s *Subscription) String() string {
-	return fmt.Sprintf("%s@%s_%s", s.Symbol, s.Channel, s.Options.String())
+	return fmt.Sprintf("%s@%s_%s", strings.ToLower(s.Symbol), s.Channel, s.Options.String())
 }
 
-type StreamCommand struct {
-	ID     int      `json:"id,omitempty"`
+type StreamRequest struct {
+	// request ID is required
+	ID     int      `json:"id"`
 	Method string   `json:"method"`
 	Params []string `json:"params"`
 }
@@ -70,16 +72,13 @@ func (s *PrivateStream) Connect(ctx context.Context) error {
 	}
 
 	log.Infof("[binance] subscribing channels: %+v", params)
-	err = conn.WriteJSON(StreamCommand{
+	err = conn.WriteJSON(StreamRequest{
 		Method: "SUBSCRIBE",
 		Params: params,
 		ID:     1,
 	})
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return err
 }
 
 func (s *PrivateStream) Read(ctx context.Context, eventC chan interface{}) {
@@ -101,14 +100,19 @@ func (s *PrivateStream) Read(ctx context.Context, eventC chan interface{}) {
 			}
 
 		default:
-			if err := s.Conn.SetReadDeadline(time.Now().Add(time.Minute)); err != nil {
-				log.WithError(err).Errorf("set read deadline error", err)
+			if err := s.Conn.SetReadDeadline(time.Now().Add(15 * time.Second)); err != nil {
+				log.WithError(err).Errorf("set read deadline error: %s", err.Error())
 			}
 
-			_, message, err := s.Conn.ReadMessage()
+			mt, message, err := s.Conn.ReadMessage()
 			if err != nil {
-				log.WithError(err).Errorf("read error", err)
+				log.WithError(err).Errorf("read error: %s", err.Error())
 				return
+			}
+
+			// skip non-text messages
+			if mt != websocket.TextMessage {
+				continue
 			}
 
 			log.Debugf("[binance] recv: %s", message)
