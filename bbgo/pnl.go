@@ -2,6 +2,7 @@ package bbgo
 
 import (
 	log "github.com/sirupsen/logrus"
+	"strings"
 	"time"
 )
 
@@ -27,10 +28,20 @@ type ProfitAndLossCalculator struct {
 	StartTime    time.Time
 	CurrentPrice float64
 	Trades       []Trade
+
+	CurrencyPrice map[string]float64
 }
 
 func (c *ProfitAndLossCalculator) AddTrade(trade Trade) {
 	c.Trades = append(c.Trades, trade)
+}
+
+func (c *ProfitAndLossCalculator) SetCurrencyPrice(symbol string, price float64) {
+	if c.CurrencyPrice == nil {
+		c.CurrencyPrice = map[string]float64{}
+	}
+
+	c.CurrencyPrice[symbol] = price
 }
 
 func (c *ProfitAndLossCalculator) SetCurrentPrice(price float64) {
@@ -61,9 +72,12 @@ func (c *ProfitAndLossCalculator) Calculate() *ProfitAndLossReport {
 		if t.IsBuyer {
 			bidVolume += t.Volume
 			bidAmount += t.Price * t.Volume
-			switch t.FeeCurrency {
-			case "BTC":
+
+			// since we use USDT as the quote currency, we simply check if it matches the currency symbol
+			if strings.HasPrefix(t.Symbol, t.FeeCurrency) {
 				bidFee += t.Price * t.Fee
+			} else if t.FeeCurrency == "USDT" {
+				bidFee += t.Fee
 			}
 		}
 	}

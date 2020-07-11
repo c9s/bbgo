@@ -251,8 +251,27 @@ func (e *BinanceExchange) QueryTrades(ctx context.Context, symbol string, startT
 			break
 		}
 
+		buyerOrSellerLabel := func(trade *binance.TradeV3) (o string) {
+			if trade.IsBuyer {
+				o = "BUYER"
+			} else {
+				o = "SELLER"
+			}
+			return o
+		}
+
+		makerOrTakerLabel := func(trade *binance.TradeV3) (o string) {
+			if trade.IsMaker {
+				o += "MAKER"
+			} else {
+				o += "TAKER"
+			}
+
+			return o
+		}
+
 		for _, t := range bnTrades {
-			// skip trade ID that is the same
+			// skip trade ID that is the same. however this should not happen
 			if t.ID == lastTradeID {
 				continue
 			}
@@ -267,7 +286,7 @@ func (e *BinanceExchange) QueryTrades(ctx context.Context, symbol string, startT
 			// trade time
 			tt := time.Unix(0, t.Time*1000000)
 
-			log.Infof("trade: %d %4s Price: % 13s Volume: % 13s %s", t.ID, side, t.Price, t.Quantity, tt)
+			log.Infof("[binance] trade: %d %s % 4s price: % 13s volume: % 11s %6s % 5s %s", t.ID, t.Symbol, side, t.Price, t.Quantity, buyerOrSellerLabel(t), makerOrTakerLabel(t), tt)
 
 			price, err := strconv.ParseFloat(t.Price, 64)
 			if err != nil {
@@ -288,6 +307,7 @@ func (e *BinanceExchange) QueryTrades(ctx context.Context, symbol string, startT
 				ID:          t.ID,
 				Price:       price,
 				Volume:      quantity,
+				Side:        side,
 				IsBuyer:     t.IsBuyer,
 				IsMaker:     t.IsMaker,
 				Fee:         fee,
