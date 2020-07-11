@@ -144,7 +144,7 @@ func (s *PrivateStream) read(ctx context.Context, eventC chan interface{}) {
 				continue
 			}
 
-			log.Infof("[binance] event: %+v", e)
+			// log.Infof("[binance] event: %+v", e)
 
 			switch e := e.(type) {
 
@@ -165,6 +165,8 @@ func (s *PrivateStream) read(ctx context.Context, eventC chan interface{}) {
 				}
 
 			case *ExecutionReportEvent:
+				log.Info(e.Event, " ", e)
+
 				s.EmitExecutionReportEvent(e)
 
 				switch e.CurrentExecutionType {
