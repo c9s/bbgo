@@ -27,7 +27,7 @@ func (o *Order) SlackAttachment() slack.Attachment {
 	}
 
 	return slack.Attachment{
-		Color: SideToColorName(o.Side),
+		Color: SideToColorName(SideType(o.Side)),
 		Title: string(o.Type) + " Order " + string(o.Side),
 		// Text:   "",
 		Fields: fields,
