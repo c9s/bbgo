@@ -3,7 +3,6 @@ package binance
 import (
 	"context"
 	"github.com/adshao/go-binance"
-	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 	"github.com/sirupsen/logrus"
@@ -45,7 +44,7 @@ func (e *Exchange) NewPrivateStream(ctx context.Context) (*PrivateStream, error)
 	}, nil
 }
 
-func (e *Exchange) SubmitOrder(ctx context.Context, order *bbgo.Order) error {
+func (e *Exchange) SubmitOrder(ctx context.Context, order *types.Order) error {
 	/*
 		limit order example
 

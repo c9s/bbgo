@@ -2,7 +2,6 @@ package types
 
 import (
 	"fmt"
-	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/util"
 	"github.com/slack-go/slack"
 	"math"
@@ -122,9 +121,9 @@ func (k KLine) String() string {
 
 func (k KLine) Color() string {
 	if k.GetTrend() > 0 {
-		return bbgo.Green
+		return Green
 	} else if k.GetTrend() < 0 {
-		return bbgo.Red
+		return Red
 	}
 	return "#f0f0f0"
 }
@@ -267,9 +266,9 @@ func (k KLineWindow) GetTrend() int {
 
 func (k KLineWindow) Color() string {
 	if k.GetTrend() > 0 {
-		return bbgo.Green
+		return Green
 	} else if k.GetTrend() < 0 {
-		return bbgo.Red
+		return Red
 	}
 	return "#f0f0f0"
 }

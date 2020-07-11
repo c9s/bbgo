@@ -5,6 +5,7 @@ import (
 	"github.com/adshao/go-binance"
 	"github.com/c9s/bbgo/pkg/bbgo/types"
 	binance2 "github.com/c9s/bbgo/pkg/exchange/binance"
+	types2 "github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 	"github.com/slack-go/slack"
 	"math"
@@ -125,7 +126,7 @@ func (d *KLineDetector) String() string {
 	return name
 }
 
-func (d *KLineDetector) NewOrder(e *binance2.KLineEvent, tradingCtx *TradingContext) *Order {
+func (d *KLineDetector) NewOrder(e *binance2.KLineEvent, tradingCtx *TradingContext) *types2.Order {
 	var kline types.KLineOrWindow = e.KLine
 	if d.EnableLookBack {
 		klineWindow := tradingCtx.KLineWindows[e.KLine.Interval]
@@ -144,7 +145,7 @@ func (d *KLineDetector) NewOrder(e *binance2.KLineEvent, tradingCtx *TradingCont
 	}
 
 	var volume = tradingCtx.Market.FormatVolume(VolumeByPriceChange(tradingCtx.Market, kline.GetClose(), kline.GetChange(), side))
-	return &Order{
+	return &types2.Order{
 		Symbol:    e.KLine.Symbol,
 		Type:      binance.OrderTypeMarket,
 		Side:      side,

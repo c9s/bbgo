@@ -171,7 +171,7 @@ func (t *Trader) ReportPnL() {
 	}
 }
 
-func (t *Trader) SubmitOrder(ctx context.Context, order *Order) {
+func (t *Trader) SubmitOrder(ctx context.Context, order *types.Order) {
 	t.Infof(":memo: Submitting %s order on side %s with volume: %s", order.Type, order.Side, order.VolumeStr, order.SlackAttachment())
 
 	err := t.Exchange.SubmitOrder(ctx, order)
