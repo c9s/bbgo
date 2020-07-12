@@ -18,6 +18,55 @@ import (
 var USD = accounting.Accounting{Symbol: "$ ", Precision: 2}
 var BTC = accounting.Accounting{Symbol: "BTC ", Precision: 8}
 
+type SlackLogHook struct {
+	Slack *slack.Client
+	ErrorChannel   string
+}
+
+func (t *SlackLogHook) Levels() []log.Level {
+	return []log.Level{
+		// log.InfoLevel,
+		log.ErrorLevel,
+		log.PanicLevel,
+		// log.WarnLevel,
+	}
+}
+
+func (t *SlackLogHook) Fire(e *log.Entry) error {
+	var color = "#F0F0F0"
+
+	switch e.Level {
+	case log.DebugLevel:
+		color = "#9B30FF"
+	case log.InfoLevel:
+		color = "good"
+	case log.ErrorLevel, log.FatalLevel, log.PanicLevel:
+		color = "danger"
+	default:
+		color = "warning"
+	}
+
+	var slackAttachments []slack.Attachment = nil
+
+	logerr, ok := e.Data["err"]
+	if ok {
+		slackAttachments = append(slackAttachments, slack.Attachment{
+			Color: color,
+			Title: "Error",
+			Fields: []slack.AttachmentField{
+				{Title: "Error", Value: logerr.(error).Error()},
+			},
+		})
+	}
+
+	_, _, err := t.Slack.PostMessageContext(context.Background(), t.ErrorChannel,
+		slack.MsgOptionText(e.Message, true),
+		slack.MsgOptionAttachments(slackAttachments...))
+
+	return err
+}
+
+
 type SlackNotifier struct {
 	Slack *slack.Client
 
@@ -25,6 +74,7 @@ type SlackNotifier struct {
 	ErrorChannel   string
 	InfoChannel    string
 }
+
 
 func (t *SlackNotifier) Infof(format string, args ...interface{}) {
 	var slackAttachments []slack.Attachment = nil
@@ -99,9 +149,8 @@ func (t *SlackNotifier) ReportPnL(report *ProfitAndLossReport) {
 	}
 }
 
-
 type Trader struct {
-	notifier *SlackNotifier
+	Notifier *SlackNotifier
 
 	// Context is trading Context
 	Context *TradingContext
@@ -116,7 +165,7 @@ type Trader struct {
 }
 
 func (t *Trader) Infof(format string, args ...interface{}) {
-	t.notifier.Infof(format, args...)
+	t.Notifier.Infof(format, args...)
 }
 
 func (t *Trader) Errorf(err error, format string, args ...interface{}) {
@@ -129,27 +178,13 @@ func (t *Trader) Errorf(err error, format string, args ...interface{}) {
 }
 
 func (t *Trader) ReportTrade(trade *types.Trade) {
-	t.notifier.ReportTrade(trade)
+	t.Notifier.ReportTrade(trade)
 }
 
 func (t *Trader) ReportPnL() {
 	report := t.Context.ProfitAndLossCalculator.Calculate()
 	report.Print()
-
-	attachment := report.SlackAttachment()
-
-	_, _, err := t.Slack.PostMessageContext(context.Background(), t.TradingChannel,
-		slack.MsgOptionText(util.Render(
-			`:heavy_dollar_sign: Here is your *{{ .symbol }}* PnL report collected since *{{ .startTime }}*`,
-			map[string]interface{}{
-				"symbol":    report.Symbol,
-				"startTime": report.StartTime.Format(time.RFC822),
-			}), true),
-		slack.MsgOptionAttachments(attachment))
-
-	if err != nil {
-		t.Errorf(err, "slack send error")
-	}
+	t.Notifier.ReportPnL(report)
 }
 
 func (t *Trader) SubmitOrder(ctx context.Context, order *types.Order) {
