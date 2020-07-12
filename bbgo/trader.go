@@ -3,15 +3,17 @@ package bbgo
 import (
 	"context"
 	"fmt"
-	"github.com/c9s/bbgo/pkg/bbgo/exchange/binance"
-	types2 "github.com/c9s/bbgo/pkg/bbgo/types"
-	"github.com/c9s/bbgo/pkg/slack/slackstyle"
-	"github.com/c9s/bbgo/pkg/util"
+	"strconv"
+	"time"
+
 	"github.com/leekchan/accounting"
 	"github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
-	"strconv"
-	"time"
+
+	"github.com/c9s/bbgo/pkg/bbgo/exchange/binance"
+	"github.com/c9s/bbgo/pkg/bbgo/types"
+	"github.com/c9s/bbgo/pkg/slack/slackstyle"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 var USD = accounting.Accounting{Symbol: "$ ", Precision: 2}
@@ -76,7 +78,7 @@ func (t *Trader) Errorf(err error, format string, args ...interface{}) {
 	}
 }
 
-func (t *Trader) ReportTrade(trade *types2.Trade) {
+func (t *Trader) ReportTrade(trade *types.Trade) {
 	var color = ""
 	if trade.IsBuyer {
 		color = "#228B22"
@@ -171,7 +173,7 @@ func (t *Trader) ReportPnL() {
 	}
 }
 
-func (t *Trader) SubmitOrder(ctx context.Context, order *types2.Order) {
+func (t *Trader) SubmitOrder(ctx context.Context, order *types.Order) {
 	t.Infof(":memo: Submitting %s order on side %s with volume: %s", order.Type, order.Side, order.VolumeStr, order.SlackAttachment())
 
 	err := t.Exchange.SubmitOrder(ctx, order)
@@ -180,4 +182,3 @@ func (t *Trader) SubmitOrder(ctx context.Context, order *types2.Order) {
 		return
 	}
 }
-
