@@ -158,6 +158,7 @@ func (s *PrivateStream) read(ctx context.Context, eventC chan interface{}) {
 						return
 
 					default:
+						s.Subscriptions = nil
 						err = s.connect(ctx)
 						time.Sleep(5 * time.Second)
 					}
