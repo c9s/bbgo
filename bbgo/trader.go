@@ -129,33 +129,7 @@ func (t *Trader) Errorf(err error, format string, args ...interface{}) {
 }
 
 func (t *Trader) ReportTrade(trade *types.Trade) {
-	var color = ""
-	if trade.IsBuyer {
-		color = "#228B22"
-	} else {
-		color = "#DC143C"
-	}
-
-	_, _, err := t.Slack.PostMessageContext(context.Background(), t.TradingChannel,
-		slack.MsgOptionText(util.Render(`:handshake: Trade execution @ {{ .Price  }}`, trade), true),
-		slack.MsgOptionAttachments(slack.Attachment{
-			Title: "New Trade",
-			Color: color,
-			// Pretext:       "",
-			// Text:          "",
-			Fields: []slack.AttachmentField{
-				{Title: "Symbol", Value: trade.Symbol, Short: true,},
-				{Title: "Side", Value: trade.Side, Short: true,},
-				{Title: "Price", Value: USD.FormatMoney(trade.Price), Short: true,},
-				{Title: "Volume", Value: t.Context.Market.FormatVolume(trade.Volume), Short: true,},
-			},
-			// Footer:     tradingCtx.TradeStartTime.Format(time.RFC822),
-			// FooterIcon: "",
-		}))
-
-	if err != nil {
-		t.Errorf(err, "slack send error")
-	}
+	t.notifier.ReportTrade(trade)
 }
 
 func (t *Trader) ReportPnL() {
