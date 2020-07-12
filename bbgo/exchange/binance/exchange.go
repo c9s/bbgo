@@ -34,16 +34,9 @@ func (e *Exchange) QueryAveragePrice(ctx context.Context, symbol string) (float6
 }
 
 func (e *Exchange) NewPrivateStream(ctx context.Context) (*PrivateStream, error) {
-	logrus.Infof("[binance] creating user data stream...")
-	listenKey, err := e.Client.NewStartUserStreamService().Do(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	logrus.Infof("[binance] user data stream created. listenKey: %s", listenKey)
 	return &PrivateStream{
 		Client:    e.Client,
-		ListenKey: listenKey,
+		// ListenKey: listenKey,
 	}, nil
 }
 
