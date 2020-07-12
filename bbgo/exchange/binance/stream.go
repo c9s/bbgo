@@ -147,12 +147,20 @@ func (s *PrivateStream) read(ctx context.Context, eventC chan interface{}) {
 
 			mt, message, err := s.Conn.ReadMessage()
 			if err != nil {
-				log.WithError(err).Errorf("read error: %s", err.Error())
+				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway) {
+					log.WithError(err).Errorf("read error: %s", err.Error())
+				}
 
 				// reconnect
 				for err != nil {
-					err = s.connect(ctx)
-					time.Sleep(5 * time.Second)
+					select {
+					case <-ctx.Done():
+						return
+
+					default:
+						err = s.connect(ctx)
+						time.Sleep(5 * time.Second)
+					}
 				}
 
 				continue
