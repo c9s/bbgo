@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/leekchan/accounting"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
 
 	"github.com/c9s/bbgo/pkg/bbgo/exchange/binance"
@@ -59,22 +59,22 @@ func (t *Trader) Infof(format string, args ...interface{}) {
 		nonSlackArgs = args[:slackArgsStartIdx]
 	}
 
-	logrus.Infof(format, nonSlackArgs...)
+	log.Infof(format, nonSlackArgs...)
 
 	_, _, err := t.Slack.PostMessageContext(context.Background(), t.InfoChannel,
 		slack.MsgOptionText(fmt.Sprintf(format, nonSlackArgs...), true),
 		slack.MsgOptionAttachments(slackAttachments...))
 	if err != nil {
-		logrus.WithError(err).Error("Slack error:", err)
+		log.WithError(err).Errorf("slack error: %s", err.Error())
 	}
 }
 
 func (t *Trader) Errorf(err error, format string, args ...interface{}) {
-	logrus.WithError(err).Errorf(format, args...)
+	log.WithError(err).Errorf(format, args...)
 	_, _, err2 := t.Slack.PostMessageContext(context.Background(), t.ErrorChannel,
 		slack.MsgOptionText("ERROR: "+err.Error()+" "+fmt.Sprintf(format, args...), true))
 	if err2 != nil {
-		logrus.WithError(err2).Error("Slack error:", err2)
+		log.WithError(err2).Error("Slack error:", err2)
 	}
 }
 
