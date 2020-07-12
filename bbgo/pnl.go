@@ -1,8 +1,11 @@
 package bbgo
 
 import (
-	types2 "github.com/c9s/bbgo/pkg/bbgo/types"
+	"github.com/c9s/bbgo/pkg/bbgo/types"
+	"github.com/c9s/bbgo/pkg/slack/slackstyle"
 	log "github.com/sirupsen/logrus"
+	"github.com/slack-go/slack"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -11,12 +14,12 @@ type ProfitAndLossCalculator struct {
 	Symbol       string
 	StartTime    time.Time
 	CurrentPrice float64
-	Trades       []types2.Trade
+	Trades       []types.Trade
 
 	CurrencyPrice map[string]float64
 }
 
-func (c *ProfitAndLossCalculator) AddTrade(trade types2.Trade) {
+func (c *ProfitAndLossCalculator) AddTrade(trade types.Trade) {
 	c.Trades = append(c.Trades, trade)
 }
 
@@ -129,3 +132,33 @@ func (report ProfitAndLossReport) Print() {
 	log.Infof("overall profit: %s", USD.FormatMoneyFloat64(report.Profit))
 }
 
+func (report ProfitAndLossReport) SlackAttachment() slack.Attachment {
+	var color = ""
+	if report.Profit > 0 {
+		color = slackstyle.Green
+	} else {
+		color = slackstyle.Red
+	}
+
+	market, ok := types.FindMarket(report.Symbol)
+	if !ok {
+		return slack.Attachment{}
+	}
+
+	return slack.Attachment{
+		Title: "Profit and Loss report of " + report.Symbol,
+		Color: color,
+		// Pretext:       "",
+		// Text:          "",
+		Fields: []slack.AttachmentField{
+			{Title: "Symbol", Value: report.Symbol, Short: true,},
+			{Title: "Profit", Value: USD.FormatMoney(report.Profit), Short: true,},
+			{Title: "Current Price", Value: USD.FormatMoney(report.CurrentPrice), Short: true,},
+			{Title: "Average Bid Price", Value: USD.FormatMoney(report.AverageBidPrice), Short: true,},
+			{Title: "Current Stock", Value: market.FormatVolume(report.Stock), Short: true,},
+			{Title: "Number of Trades", Value: strconv.Itoa(report.NumTrades), Short: true,},
+		},
+		Footer:     report.StartTime.Format(time.RFC822),
+		FooterIcon: "",
+	}
+}

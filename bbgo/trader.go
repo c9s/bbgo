@@ -3,7 +3,6 @@ package bbgo
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/leekchan/accounting"
@@ -18,6 +17,88 @@ import (
 
 var USD = accounting.Accounting{Symbol: "$ ", Precision: 2}
 var BTC = accounting.Accounting{Symbol: "BTC ", Precision: 8}
+
+type SlackReporter struct {
+	Slack *slack.Client
+
+	TradingChannel string
+	ErrorChannel   string
+	InfoChannel    string
+}
+
+func (t *SlackReporter) Infof(format string, args ...interface{}) {
+	var slackAttachments []slack.Attachment = nil
+	var slackArgsStartIdx = -1
+	for idx, arg := range args {
+		switch a := arg.(type) {
+
+		// concrete type assert first
+		case slack.Attachment:
+			if slackArgsStartIdx == -1 {
+				slackArgsStartIdx = idx
+			}
+			slackAttachments = append(slackAttachments, a)
+
+		case slackstyle.SlackAttachmentCreator:
+			if slackArgsStartIdx == -1 {
+				slackArgsStartIdx = idx
+			}
+			slackAttachments = append(slackAttachments, a.SlackAttachment())
+
+		}
+	}
+
+	var nonSlackArgs = []interface{}{}
+	if slackArgsStartIdx > 0 {
+		nonSlackArgs = args[:slackArgsStartIdx]
+	}
+
+	log.Infof(format, nonSlackArgs...)
+
+	_, _, err := t.Slack.PostMessageContext(context.Background(), t.InfoChannel,
+		slack.MsgOptionText(fmt.Sprintf(format, nonSlackArgs...), true),
+		slack.MsgOptionAttachments(slackAttachments...))
+	if err != nil {
+		log.WithError(err).Errorf("slack error: %s", err.Error())
+	}
+}
+
+func (t *SlackReporter) Errorf(err error, format string, args ...interface{}) {
+	log.WithError(err).Errorf(format, args...)
+	_, _, err2 := t.Slack.PostMessageContext(context.Background(), t.ErrorChannel,
+		slack.MsgOptionText("ERROR: "+err.Error()+" "+fmt.Sprintf(format, args...), true))
+	if err2 != nil {
+		log.WithError(err2).Error("slack error:", err2)
+	}
+}
+
+func (t *SlackReporter) ReportTrade(trade *types.Trade) {
+	_, _, err := t.Slack.PostMessageContext(context.Background(), t.TradingChannel,
+		slack.MsgOptionText(util.Render(`:handshake: trade execution @ {{ .Price  }}`, trade), true),
+		slack.MsgOptionAttachments(trade.SlackAttachment()))
+
+	if err != nil {
+		t.Errorf(err, "slack send error")
+	}
+}
+
+func (t *SlackReporter) ReportPnL(report *ProfitAndLossReport) {
+	attachment := report.SlackAttachment()
+
+	_, _, err := t.Slack.PostMessageContext(context.Background(), t.TradingChannel,
+		slack.MsgOptionText(util.Render(
+			`:heavy_dollar_sign: Here is your *{{ .symbol }}* PnL report collected since *{{ .startTime }}*`,
+			map[string]interface{}{
+				"symbol":    report.Symbol,
+				"startTime": report.StartTime.Format(time.RFC822),
+			}), true),
+		slack.MsgOptionAttachments(attachment))
+
+	if err != nil {
+		t.Errorf(err, "slack send error")
+	}
+}
+
 
 type Trader struct {
 	// Context is trading Context
@@ -87,7 +168,7 @@ func (t *Trader) ReportTrade(trade *types.Trade) {
 	}
 
 	_, _, err := t.Slack.PostMessageContext(context.Background(), t.TradingChannel,
-		slack.MsgOptionText(util.Render(`:handshake: trade execution`, trade), true),
+		slack.MsgOptionText(util.Render(`:handshake: Trade execution @ {{ .Price  }}`, trade), true),
 		slack.MsgOptionAttachments(slack.Attachment{
 			Title: "New Trade",
 			Color: color,
@@ -104,72 +185,27 @@ func (t *Trader) ReportTrade(trade *types.Trade) {
 		}))
 
 	if err != nil {
-		t.Errorf(err, "Slack send error")
+		t.Errorf(err, "slack send error")
 	}
 }
 
 func (t *Trader) ReportPnL() {
-	tradingCtx := t.Context
-	report := tradingCtx.ProfitAndLossCalculator.Calculate()
+	report := t.Context.ProfitAndLossCalculator.Calculate()
 	report.Print()
 
-	var color = ""
-	if report.Profit > 0 {
-		color = slackstyle.Green
-	} else {
-		color = slackstyle.Red
-	}
+	attachment := report.SlackAttachment()
 
 	_, _, err := t.Slack.PostMessageContext(context.Background(), t.TradingChannel,
 		slack.MsgOptionText(util.Render(
 			`:heavy_dollar_sign: Here is your *{{ .symbol }}* PnL report collected since *{{ .startTime }}*`,
 			map[string]interface{}{
-				"symbol":    tradingCtx.Symbol,
+				"symbol":    report.Symbol,
 				"startTime": report.StartTime.Format(time.RFC822),
 			}), true),
-		slack.MsgOptionAttachments(slack.Attachment{
-			Title: "Profit and Loss report",
-			Color: color,
-			// Pretext:       "",
-			// Text:          "",
-			Fields: []slack.AttachmentField{
-				{
-					Title: "Symbol",
-					Value: tradingCtx.Symbol,
-					Short: true,
-				},
-				{
-					Title: "Profit",
-					Value: USD.FormatMoney(report.Profit),
-					Short: true,
-				},
-				{
-					Title: "Current Price",
-					Value: USD.FormatMoney(report.CurrentPrice),
-					Short: true,
-				},
-				{
-					Title: "Average Bid Price",
-					Value: USD.FormatMoney(report.AverageBidPrice),
-					Short: true,
-				},
-				{
-					Title: "Current Stock",
-					Value: tradingCtx.Market.FormatVolume(report.Stock),
-					Short: true,
-				},
-				{
-					Title: "Number of Trades",
-					Value: strconv.Itoa(report.NumTrades),
-					Short: true,
-				},
-			},
-			Footer:     report.StartTime.Format(time.RFC822),
-			FooterIcon: "",
-		}))
+		slack.MsgOptionAttachments(attachment))
 
 	if err != nil {
-		t.Errorf(err, "Slack send error")
+		t.Errorf(err, "slack send error")
 	}
 }
 
