@@ -38,22 +38,25 @@ func (c *ProfitAndLossCalculator) SetCurrentPrice(price float64) {
 func (c *ProfitAndLossCalculator) Calculate() *ProfitAndLossReport {
 	// copy trades, so that we can truncate it.
 	var trades = c.Trades
-
 	var bidVolume = 0.0
 	var bidAmount = 0.0
 	var bidFee = 0.0
 
+	var askVolume = 0.0
+	var feeRate = 0.001
+	var askFee = 0.0
+
 	// find the first buy trade
-	var firstBidIndex = -1
-	for idx, t := range trades {
-		if t.IsBuyer {
-			firstBidIndex = idx
-			break
-		}
-	}
-	if firstBidIndex > 0 {
-		trades = trades[firstBidIndex:]
-	}
+	//var firstBidIndex = -1
+	//for idx, t := range trades {
+	//	if t.IsBuyer {
+	//		firstBidIndex = idx
+	//		break
+	//	}
+	//}
+	//if firstBidIndex > 0 {
+	//	trades = trades[firstBidIndex:]
+	//}
 
 	for _, t := range trades {
 		if t.IsBuyer {
@@ -73,15 +76,15 @@ func (c *ProfitAndLossCalculator) Calculate() *ProfitAndLossReport {
 	profit := 0.0
 	averageBidPrice := (bidAmount + bidFee) / bidVolume
 
-	var feeRate = 0.001
-	var askVolume = 0.0
-	var askFee = 0.0
 	for _, t := range trades {
 		if !t.IsBuyer {
 			profit += (t.Price - averageBidPrice) * t.Volume
 			askVolume += t.Volume
-			switch t.FeeCurrency {
-			case "USDT":
+
+			// since we use USDT as the quote currency, we simply check if it matches the currency symbol
+			if strings.HasPrefix(t.Symbol, t.FeeCurrency) {
+				askFee += t.Price * t.Fee
+			} else if t.FeeCurrency == "USDT" {
 				askFee += t.Fee
 			}
 		}
@@ -155,7 +158,7 @@ func (report ProfitAndLossReport) SlackAttachment() slack.Attachment {
 			{Title: "Profit", Value: USD.FormatMoney(report.Profit), Short: true,},
 			{Title: "Current Price", Value: USD.FormatMoney(report.CurrentPrice), Short: true,},
 			{Title: "Average Bid Price", Value: USD.FormatMoney(report.AverageBidPrice), Short: true,},
-			{Title: "Current Stock", Value: market.FormatVolume(report.Stock), Short: true,},
+			{Title: "Inventory", Value: market.FormatVolume(report.Stock), Short: true,},
 			{Title: "Number of Trades", Value: strconv.Itoa(report.NumTrades), Short: true,},
 		},
 		Footer:     report.StartTime.Format(time.RFC822),
