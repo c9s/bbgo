@@ -26,16 +26,16 @@ type Strategy interface {
 	Init(trader *Trader, stream *binance.PrivateStream) error
 }
 
-func (t *Trader) RunStrategy(ctx context.Context, strategy Strategy) error {
+func (t *Trader) RunStrategy(ctx context.Context, strategy Strategy) (chan struct{}, error) {
 	symbol := t.Context.Symbol
 
 	stream, err := t.Exchange.NewPrivateStream()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := strategy.Init(t, stream); err != nil {
-		return err
+		return nil, err
 	}
 
 	t.reportTimer = time.AfterFunc(1*time.Second, func() {
@@ -65,10 +65,13 @@ func (t *Trader) RunStrategy(ctx context.Context, strategy Strategy) error {
 
 	var eventC = make(chan interface{}, 20)
 	if err := stream.Connect(ctx, eventC); err != nil {
-		return err
+		return nil, err
 	}
 
+	done := make(chan struct{})
+
 	go func() {
+		defer close(done)
 		defer stream.Close()
 
 		for {
@@ -84,7 +87,7 @@ func (t *Trader) RunStrategy(ctx context.Context, strategy Strategy) error {
 		}
 	}()
 
-	return nil
+	return done, nil
 }
 
 func (t *Trader) Infof(format string, args ...interface{}) {
