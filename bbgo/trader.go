@@ -128,7 +128,7 @@ func (t *SlackNotifier) ReportTrade(trade *types.Trade) {
 		slack.MsgOptionAttachments(trade.SlackAttachment()))
 
 	if err != nil {
-		t.Errorf(err, "slack send error")
+		log.WithError(err).Error("slack send error")
 	}
 }
 
@@ -145,7 +145,7 @@ func (t *SlackNotifier) ReportPnL(report *ProfitAndLossReport) {
 		slack.MsgOptionAttachments(attachment))
 
 	if err != nil {
-		t.Errorf(err, "slack send error")
+		log.WithError(err).Errorf("slack send error")
 	}
 }
 
@@ -168,15 +168,6 @@ func (t *Trader) Infof(format string, args ...interface{}) {
 	t.Notifier.Infof(format, args...)
 }
 
-func (t *Trader) Errorf(err error, format string, args ...interface{}) {
-	log.WithError(err).Errorf(format, args...)
-	_, _, err2 := t.Slack.PostMessageContext(context.Background(), t.ErrorChannel,
-		slack.MsgOptionText("ERROR: "+err.Error()+" "+fmt.Sprintf(format, args...), true))
-	if err2 != nil {
-		log.WithError(err2).Error("Slack error:", err2)
-	}
-}
-
 func (t *Trader) ReportTrade(trade *types.Trade) {
 	t.Notifier.ReportTrade(trade)
 }
@@ -192,7 +183,7 @@ func (t *Trader) SubmitOrder(ctx context.Context, order *types.Order) {
 
 	err := t.Exchange.SubmitOrder(ctx, order)
 	if err != nil {
-		t.Errorf(err, "order create error: side %s volume: %s", order.Side, order.VolumeStr)
+		log.WithError(err).Errorf("order create error: side %s volume: %s", order.Side, order.VolumeStr)
 		return
 	}
 }
