@@ -37,6 +37,11 @@ func (trader *Trader) RunStrategy(ctx context.Context, strategy Strategy) (chan 
 	}
 
 	trader.Context.Balances = balances
+	for _, balance := range balances {
+		if util.NotZero(balance.Available) {
+			log.Infof("[trader] balance %s %f", balance.Currency, balance.Available)
+		}
+	}
 
 	if err := strategy.Init(trader) ; err != nil {
 		return nil, err
