@@ -113,15 +113,6 @@ func (t *SlackNotifier) Infof(format string, args ...interface{}) {
 	}
 }
 
-func (t *SlackNotifier) Errorf(err error, format string, args ...interface{}) {
-	log.WithError(err).Errorf(format, args...)
-	_, _, err2 := t.Slack.PostMessageContext(context.Background(), t.ErrorChannel,
-		slack.MsgOptionText("ERROR: "+err.Error()+" "+fmt.Sprintf(format, args...), true))
-	if err2 != nil {
-		log.WithError(err2).Error("slack error:", err2)
-	}
-}
-
 func (t *SlackNotifier) ReportTrade(trade *types.Trade) {
 	_, _, err := t.Slack.PostMessageContext(context.Background(), t.TradingChannel,
 		slack.MsgOptionText(util.Render(`:handshake: trade execution @ {{ .Price  }}`, trade), true),
