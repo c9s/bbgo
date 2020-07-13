@@ -3,12 +3,14 @@ package binance
 import (
 	"context"
 	"fmt"
-	"github.com/adshao/go-binance"
-	"github.com/c9s/bbgo/pkg/bbgo/types"
-	"github.com/gorilla/websocket"
-	log "github.com/sirupsen/logrus"
 	"strings"
 	"time"
+
+	"github.com/adshao/go-binance"
+	"github.com/gorilla/websocket"
+	log "github.com/sirupsen/logrus"
+
+	"github.com/c9s/bbgo/pkg/bbgo/types"
 )
 
 type SubscribeOptions struct {
