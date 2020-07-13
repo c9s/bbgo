@@ -2,6 +2,7 @@ package bbgo
 
 import (
 	"context"
+	"github.com/c9s/bbgo/pkg/util"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -23,23 +24,35 @@ type Trader struct {
 
 
 type Strategy interface {
-	Init(trader *Trader, stream *binance.PrivateStream) error
+	Init(trader *Trader) error
+	OnNewStream(stream *binance.PrivateStream) error
 }
 
-func (t *Trader) RunStrategy(ctx context.Context, strategy Strategy) (chan struct{}, error) {
-	symbol := t.Context.Symbol
+func (trader *Trader) RunStrategy(ctx context.Context, strategy Strategy) (chan struct{}, error) {
+	symbol := trader.Context.Symbol
 
-	stream, err := t.Exchange.NewPrivateStream()
+	balances, err := trader.Exchange.QueryAccountBalances(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := strategy.Init(t, stream); err != nil {
+	trader.Context.Balances = balances
+
+	if err := strategy.Init(trader) ; err != nil {
 		return nil, err
 	}
 
-	t.reportTimer = time.AfterFunc(1*time.Second, func() {
-		t.ReportPnL()
+	stream, err := trader.Exchange.NewPrivateStream()
+	if err != nil {
+		return nil, err
+	}
+
+	if err := strategy.OnNewStream(stream); err != nil {
+		return nil, err
+	}
+
+	trader.reportTimer = time.AfterFunc(1*time.Second, func() {
+		trader.ReportPnL()
 	})
 
 	stream.OnTrade(func(trade *types.Trade) {
@@ -47,20 +60,46 @@ func (t *Trader) RunStrategy(ctx context.Context, strategy Strategy) (chan struc
 			return
 		}
 
-		t.ReportTrade(trade)
-		t.Context.ProfitAndLossCalculator.AddTrade(*trade)
+		trader.ReportTrade(trade)
+		trader.Context.ProfitAndLossCalculator.AddTrade(*trade)
 
-		if t.reportTimer != nil {
-			t.reportTimer.Stop()
+		if trader.reportTimer != nil {
+			trader.reportTimer.Stop()
 		}
 
-		t.reportTimer = time.AfterFunc(5*time.Second, func() {
-			t.ReportPnL()
+		trader.reportTimer = time.AfterFunc(5*time.Second, func() {
+			trader.ReportPnL()
 		})
 	})
 
 	stream.OnKLineEvent(func(e *binance.KLineEvent) {
-		t.Context.SetCurrentPrice(e.KLine.GetClose())
+		trader.Context.SetCurrentPrice(e.KLine.GetClose())
+	})
+
+	stream.OnOutboundAccountInfoEvent(func(e *binance.OutboundAccountInfoEvent) {
+		trader.Context.Lock()
+		defer trader.Context.Unlock()
+
+		for _, balance := range e.Balances {
+			available := util.MustParseFloat(balance.Free)
+			locked := util.MustParseFloat(balance.Locked)
+			trader.Context.Balances[balance.Asset] = types.Balance{
+				Currency:  balance.Asset,
+				Available: available,
+				Locked:    locked,
+			}
+		}
+	})
+
+	stream.OnBalanceUpdateEvent(func(e *binance.BalanceUpdateEvent) {
+		trader.Context.Lock()
+		defer trader.Context.Unlock()
+
+		delta := util.MustParseFloat(e.Delta)
+		if balance, ok := trader.Context.Balances[e.Asset] ; ok {
+			balance.Available += delta
+			trader.Context.Balances[e.Asset] = balance
+		}
 	})
 
 	var eventC = make(chan interface{}, 20)
@@ -90,24 +129,20 @@ func (t *Trader) RunStrategy(ctx context.Context, strategy Strategy) (chan struc
 	return done, nil
 }
 
-func (t *Trader) Infof(format string, args ...interface{}) {
-	t.Notifier.Notify(format, args...)
+func (trader *Trader) ReportTrade(trade *types.Trade) {
+	trader.Notifier.ReportTrade(trade)
 }
 
-func (t *Trader) ReportTrade(trade *types.Trade) {
-	t.Notifier.ReportTrade(trade)
-}
-
-func (t *Trader) ReportPnL() {
-	report := t.Context.ProfitAndLossCalculator.Calculate()
+func (trader *Trader) ReportPnL() {
+	report := trader.Context.ProfitAndLossCalculator.Calculate()
 	report.Print()
-	t.Notifier.ReportPnL(report)
+	trader.Notifier.ReportPnL(report)
 }
 
-func (t *Trader) SubmitOrder(ctx context.Context, order *types.Order) {
-	t.Notifier.Notify(":memo: Submitting %s order on side %s with volume: %s", order.Type, order.Side, order.VolumeStr, order.SlackAttachment())
+func (trader *Trader) SubmitOrder(ctx context.Context, order *types.Order) {
+	trader.Notifier.Notify(":memo: Submitting %s order on side %s with volume: %s", order.Type, order.Side, order.VolumeStr, order.SlackAttachment())
 
-	err := t.Exchange.SubmitOrder(ctx, order)
+	err := trader.Exchange.SubmitOrder(ctx, order)
 	if err != nil {
 		log.WithError(err).Errorf("order create error: side %s volume: %s", order.Side, order.VolumeStr)
 		return
