@@ -39,6 +39,37 @@ func (e *Exchange) NewPrivateStream() (*PrivateStream, error) {
 	}, nil
 }
 
+func (e *Exchange) QueryAccountBalances(ctx context.Context) (map[string]types.Balance, error) {
+	account, err := e.QueryAccount(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return account.Balances, nil
+}
+
+func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
+	account, err := e.Client.NewGetAccountService().Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var balances = map[string]types.Balance{}
+	for _, b := range account.Balances  {
+		balances[b.Asset] = types.Balance{
+			Currency:  b.Asset,
+			Available: util.MustParseFloat(b.Free),
+			Locked:    util.MustParseFloat(b.Locked),
+		}
+	}
+
+	return &types.Account{
+		MakerCommission: account.MakerCommission,
+		TakerCommission: account.TakerCommission,
+		Balances:        balances,
+	}, nil
+}
+
 func (e *Exchange) SubmitOrder(ctx context.Context, order *types.Order) error {
 	/*
 		limit order example
