@@ -2,10 +2,12 @@ package bbgo
 
 import (
 	"context"
+
+	log "github.com/sirupsen/logrus"
+
 	"github.com/c9s/bbgo/pkg/bbgo/exchange/binance"
 	"github.com/c9s/bbgo/pkg/bbgo/types"
 	"github.com/c9s/bbgo/pkg/slack"
-	log "github.com/sirupsen/logrus"
 )
 
 type Trader struct {
