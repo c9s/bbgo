@@ -2,27 +2,19 @@ package bbgo
 
 import (
 	"context"
-	slack2 "github.com/c9s/bbgo/pkg/slack"
-	log "github.com/sirupsen/logrus"
-	"github.com/slack-go/slack"
-
 	"github.com/c9s/bbgo/pkg/bbgo/exchange/binance"
 	"github.com/c9s/bbgo/pkg/bbgo/types"
+	"github.com/c9s/bbgo/pkg/slack"
+	log "github.com/sirupsen/logrus"
 )
 
 type Trader struct {
-	Notifier *slack2.SlackNotifier
+	Notifier *slack.SlackNotifier
 
 	// Context is trading Context
 	Context *TradingContext
 
 	Exchange *binance.Exchange
-
-	Slack *slack.Client
-
-	TradingChannel string
-	ErrorChannel   string
-	InfoChannel    string
 }
 
 func (t *Trader) Infof(format string, args ...interface{}) {
