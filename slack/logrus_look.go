@@ -53,5 +53,3 @@ func (t *SlackLogHook) Fire(e *logrus.Entry) error {
 
 	return err
 }
-
-

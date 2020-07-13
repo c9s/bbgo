@@ -141,7 +141,7 @@ func (s *PrivateStream) read(ctx context.Context, eventC chan interface{}) {
 			}
 
 		default:
-			if err := s.Conn.SetReadDeadline(time.Now().Add(6 * time.Second)); err != nil {
+			if err := s.Conn.SetReadDeadline(time.Now().Add(30 * time.Second)); err != nil {
 				log.WithError(err).Errorf("set read deadline error: %s", err.Error())
 			}
 
@@ -158,7 +158,8 @@ func (s *PrivateStream) read(ctx context.Context, eventC chan interface{}) {
 						return
 
 					default:
-						s.Subscriptions = nil
+						_ = s.invalidateListenKey(ctx, s.ListenKey)
+
 						err = s.connect(ctx)
 						time.Sleep(5 * time.Second)
 					}
@@ -180,7 +181,7 @@ func (s *PrivateStream) read(ctx context.Context, eventC chan interface{}) {
 				continue
 			}
 
-			// log.Infof("[binance] event: %+v", e)
+			// log.Notify("[binance] event: %+v", e)
 
 			switch e := e.(type) {
 
