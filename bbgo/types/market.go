@@ -13,6 +13,7 @@ type Market struct {
 	BaseCurrency    string
 	MinQuantity     float64
 	MinAmount       float64
+	MinLot          float64
 }
 
 func (m Market) FormatPrice(val float64) string {
@@ -34,8 +35,9 @@ var MarketBTCUSDT = Market{
 	QuoteCurrency:   "USDT",
 	PricePrecision:  2,
 	VolumePrecision: 6,
-	MinQuantity:     0.00000100,
+	MinQuantity:     0.000001,
 	MinAmount:       10.0,
+	MinLot:          0.000001,
 }
 
 var MarketBNBUSDT = Market{
@@ -46,6 +48,7 @@ var MarketBNBUSDT = Market{
 	VolumePrecision: 2,
 	MinQuantity:     0.01,
 	MinAmount:       10.0,
+	MinLot:          0.01,
 }
 
 var Markets = map[string]Market{
