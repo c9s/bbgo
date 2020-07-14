@@ -11,6 +11,11 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo/types"
 )
 
+type Strategy interface {
+	Init(trader *Trader) error
+	OnNewStream(stream *binance.PrivateStream) error
+}
+
 type Trader struct {
 	Notifier *SlackNotifier
 
@@ -20,12 +25,6 @@ type Trader struct {
 	Exchange *binance.Exchange
 
 	reportTimer *time.Timer
-}
-
-
-type Strategy interface {
-	Init(trader *Trader) error
-	OnNewStream(stream *binance.PrivateStream) error
 }
 
 func (trader *Trader) RunStrategy(ctx context.Context, strategy Strategy) (chan struct{}, error) {
