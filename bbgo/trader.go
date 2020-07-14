@@ -16,6 +16,19 @@ type Strategy interface {
 	OnNewStream(stream *binance.PrivateStream) error
 }
 
+type RegressionTrader struct {
+	// Context is trading Context
+	Context *TradingContext
+
+}
+
+func (trader *RegressionTrader) RunStrategy(ctx context.Context, strategy Strategy) {
+
+
+}
+
+
+
 type Trader struct {
 	Notifier *SlackNotifier
 
