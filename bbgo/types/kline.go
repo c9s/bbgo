@@ -5,6 +5,7 @@ import (
 	"github.com/c9s/bbgo/pkg/util"
 	"github.com/slack-go/slack"
 	"math"
+	"time"
 )
 
 type KLineOrWindow interface {
@@ -25,6 +26,12 @@ type KLineOrWindow interface {
 	GetLowerShadowRatio() float64
 
 	SlackAttachment() slack.Attachment
+}
+
+type KLineQueryOptions struct {
+	Limit     int
+	StartTime *time.Time
+	EndTime   *time.Time
 }
 
 // KLine uses binance's kline as the standard structure

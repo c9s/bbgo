@@ -35,7 +35,7 @@ func (e *Exchange) QueryAveragePrice(ctx context.Context, symbol string) (float6
 
 func (e *Exchange) NewPrivateStream() (*PrivateStream, error) {
 	return &PrivateStream{
-		Client:    e.Client,
+		Client: e.Client,
 	}, nil
 }
 
@@ -55,7 +55,7 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	}
 
 	var balances = map[string]types.Balance{}
-	for _, b := range account.Balances  {
+	for _, b := range account.Balances {
 		balances[b.Asset] = types.Balance{
 			Currency:  b.Asset,
 			Available: util.MustParseFloat(b.Free),
@@ -119,15 +119,28 @@ func toLocalOrderType(orderType types.OrderType) (binance.OrderType, error) {
 	return "", fmt.Errorf("order type %s not supported", orderType)
 }
 
-func (e *Exchange) QueryKLines(ctx context.Context, symbol, interval string, limit int) ([]types.KLine, error) {
-	if limit == 0 {
+func (e *Exchange) QueryKLines(ctx context.Context, symbol, interval string, options types.KLineQueryOptions) ([]types.KLine, error) {
+	var limit = 500
+	if options.Limit > 0 {
 		// default limit == 500
-		limit = 500
+		limit = options.Limit
 	}
 
 	logrus.Infof("[binance] querying kline %s %s limit %d", symbol, interval, limit)
 
-	resp, err := e.Client.NewKlinesService().Symbol(symbol).Interval(interval).Limit(limit).Do(ctx)
+	req := e.Client.NewKlinesService().Symbol(symbol).
+		Interval(interval).
+		Limit(limit)
+
+	if options.StartTime != nil {
+		req.StartTime(options.StartTime.UnixNano() / int64(time.Millisecond))
+	}
+
+	if options.EndTime != nil {
+		req.EndTime(options.EndTime.UnixNano() / int64(time.Millisecond))
+	}
+
+	resp, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
