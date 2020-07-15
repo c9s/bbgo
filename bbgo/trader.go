@@ -12,19 +12,38 @@ import (
 )
 
 type Strategy interface {
-	Init(trader *Trader) error
-	OnNewStream(stream *binance.PrivateStream) error
+	Init(tradingContext *TradingContext, trader types.Trader) error
+	OnNewStream(stream *types.StandardPrivateStream) error
 }
 
-type RegressionTrader struct {
+type KLineRegressionTrader struct {
 	// Context is trading Context
 	Context *TradingContext
+	SourceKLines []types.KLine
+}
+
+func (trader *KLineRegressionTrader) SubmitOrder(cxt context.Context, order *types.Order) {
 
 }
 
-func (trader *RegressionTrader) RunStrategy(ctx context.Context, strategy Strategy) {
+func (trader *KLineRegressionTrader) RunStrategy(ctx context.Context, strategy Strategy) (chan struct{}, error){
+	done := make(chan struct{})
+	defer close(done)
 
+	if err := strategy.Init(trader.Context, trader) ; err != nil {
+		return nil, err
+	}
 
+	standardStream := types.StandardPrivateStream{}
+	if err := strategy.OnNewStream(&standardStream); err != nil {
+		return nil, err
+	}
+
+	for _, kline := range trader.SourceKLines {
+		standardStream.EmitKLineClosed(&kline)
+	}
+
+	return done, nil
 }
 
 
@@ -55,7 +74,7 @@ func (trader *Trader) RunStrategy(ctx context.Context, strategy Strategy) (chan 
 		}
 	}
 
-	if err := strategy.Init(trader) ; err != nil {
+	if err := strategy.Init(trader.Context, trader) ; err != nil {
 		return nil, err
 	}
 
@@ -64,7 +83,7 @@ func (trader *Trader) RunStrategy(ctx context.Context, strategy Strategy) (chan 
 		return nil, err
 	}
 
-	if err := strategy.OnNewStream(stream); err != nil {
+	if err := strategy.OnNewStream(&stream.StandardPrivateStream); err != nil {
 		return nil, err
 	}
 
@@ -93,25 +112,18 @@ func (trader *Trader) RunStrategy(ctx context.Context, strategy Strategy) (chan 
 		trader.Context.SetCurrentPrice(e.KLine.GetClose())
 	})
 
-	stream.OnOutboundAccountInfoEvent(func(e *binance.OutboundAccountInfoEvent) {
+	stream.OnBalanceSnapshot(func(snapshot map[string]types.Balance) {
 		trader.Context.Lock()
 		defer trader.Context.Unlock()
-
-		for _, balance := range e.Balances {
-			available := util.MustParseFloat(balance.Free)
-			locked := util.MustParseFloat(balance.Locked)
-			trader.Context.Balances[balance.Asset] = types.Balance{
-				Currency:  balance.Asset,
-				Available: available,
-				Locked:    locked,
-			}
+		for _ , balance  := range snapshot {
+			trader.Context.Balances[balance.Currency] = balance
 		}
 	})
 
+	// stream.OnOutboundAccountInfoEvent(func(e *binance.OutboundAccountInfoEvent) { })
 	stream.OnBalanceUpdateEvent(func(e *binance.BalanceUpdateEvent) {
 		trader.Context.Lock()
 		defer trader.Context.Unlock()
-
 		delta := util.MustParseFloat(e.Delta)
 		if balance, ok := trader.Context.Balances[e.Asset] ; ok {
 			balance.Available += delta

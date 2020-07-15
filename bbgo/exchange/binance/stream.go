@@ -2,8 +2,7 @@ package binance
 
 import (
 	"context"
-	"fmt"
-	"strings"
+	"github.com/c9s/bbgo/pkg/util"
 	"time"
 
 	"github.com/adshao/go-binance"
@@ -12,30 +11,6 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo/types"
 )
-
-type SubscribeOptions struct {
-	Interval string
-	Depth    string
-}
-
-func (o SubscribeOptions) String() string {
-	if len(o.Interval) > 0 {
-		return o.Interval
-	}
-
-	return o.Depth
-}
-
-type Subscription struct {
-	Symbol  string
-	Channel string
-	Options SubscribeOptions
-}
-
-func (s *Subscription) String() string {
-	// binance uses lower case symbol name
-	return fmt.Sprintf("%s@%s_%s", strings.ToLower(s.Symbol), s.Channel, s.Options.String())
-}
 
 type StreamRequest struct {
 	// request ID is required
@@ -46,13 +21,13 @@ type StreamRequest struct {
 
 //go:generate callbackgen -type PrivateStream -interface
 type PrivateStream struct {
+	types.StandardPrivateStream
+
 	Client        *binance.Client
 	ListenKey     string
 	Conn          *websocket.Conn
-	Subscriptions []Subscription
 
 	connectCallbacks []func(stream *PrivateStream)
-	tradeCallbacks   []func(trade *types.Trade)
 
 	// custom callbacks
 	kLineEventCallbacks       []func(event *KLineEvent)
@@ -63,13 +38,6 @@ type PrivateStream struct {
 	executionReportEventCallbacks     []func(event *ExecutionReportEvent)
 }
 
-func (s *PrivateStream) Subscribe(channel string, symbol string, options SubscribeOptions) {
-	s.Subscriptions = append(s.Subscriptions, Subscription{
-		Channel: channel,
-		Symbol:  symbol,
-		Options: options,
-	})
-}
 
 func (s *PrivateStream) dial(listenKey string) (*websocket.Conn, error) {
 	url := "wss://stream.binance.com:9443/ws/" + listenKey
@@ -191,6 +159,18 @@ func (s *PrivateStream) read(ctx context.Context, eventC chan interface{}) {
 				log.Info(e.Event, " ", e.Balances)
 				s.EmitOutboundAccountInfoEvent(e)
 
+				snapshot := map[string]types.Balance{}
+				for _, balance := range e.Balances {
+					available := util.MustParseFloat(balance.Free)
+					locked := util.MustParseFloat(balance.Locked)
+					snapshot[balance.Asset] = types.Balance{
+						Currency:  balance.Asset,
+						Available: available,
+						Locked:    locked,
+					}
+				}
+				s.EmitBalanceSnapshot(snapshot)
+
 			case *BalanceUpdateEvent:
 				log.Info(e.Event, " ", e.Asset, " ", e.Delta)
 				s.EmitBalanceUpdateEvent(e)
@@ -201,6 +181,7 @@ func (s *PrivateStream) read(ctx context.Context, eventC chan interface{}) {
 
 				if e.KLine.Closed {
 					s.EmitKLineClosedEvent(e)
+					s.EmitKLineClosed(e.KLine)
 				}
 
 			case *ExecutionReportEvent:

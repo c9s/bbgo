@@ -3,7 +3,6 @@
 package binance
 
 import (
-	"github.com/c9s/bbgo/pkg/bbgo/types"
 	"reflect"
 )
 
@@ -31,35 +30,6 @@ func (s *PrivateStream) RemoveOnConnect(needle func(stream *PrivateStream)) (fou
 
 	if found {
 		s.connectCallbacks = newcallbacks
-	}
-
-	return found
-}
-
-func (s *PrivateStream) OnTrade(cb func(trade *types.Trade)) {
-	s.tradeCallbacks = append(s.tradeCallbacks, cb)
-}
-
-func (s *PrivateStream) EmitTrade(trade *types.Trade) {
-	for _, cb := range s.tradeCallbacks {
-		cb(trade)
-	}
-}
-
-func (s *PrivateStream) RemoveOnTrade(needle func(trade *types.Trade)) (found bool) {
-
-	var newcallbacks []func(trade *types.Trade)
-	var fp = reflect.ValueOf(needle).Pointer()
-	for _, cb := range s.tradeCallbacks {
-		if fp == reflect.ValueOf(cb).Pointer() {
-			found = true
-		} else {
-			newcallbacks = append(newcallbacks, cb)
-		}
-	}
-
-	if found {
-		s.tradeCallbacks = newcallbacks
 	}
 
 	return found
@@ -212,8 +182,6 @@ func (s *PrivateStream) RemoveOnExecutionReportEvent(needle func(event *Executio
 
 type PrivateStreamEventHub interface {
 	OnConnect(cb func(stream *PrivateStream))
-
-	OnTrade(cb func(trade *types.Trade))
 
 	OnKLineEvent(cb func(event *KLineEvent))
 
