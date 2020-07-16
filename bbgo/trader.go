@@ -2,6 +2,7 @@ package bbgo
 
 import (
 	"context"
+	"fmt"
 	"github.com/c9s/bbgo/pkg/util"
 	"time"
 
@@ -18,19 +19,26 @@ type Strategy interface {
 
 type KLineRegressionTrader struct {
 	// Context is trading Context
-	Context *TradingContext
-	SourceKLines []types.KLine
+	Context                 *TradingContext
+	SourceKLines            []types.KLine
+	ProfitAndLossCalculator *ProfitAndLossCalculator
+
+	orderC chan *types.Order
 }
 
 func (trader *KLineRegressionTrader) SubmitOrder(cxt context.Context, order *types.Order) {
-
+	trader.orderC <- order
 }
 
-func (trader *KLineRegressionTrader) RunStrategy(ctx context.Context, strategy Strategy) (chan struct{}, error){
+func (trader *KLineRegressionTrader) RunStrategy(ctx context.Context, strategy Strategy) (chan struct{}, error) {
+	log.Infof("[regression] number of kline data: %d", len(trader.SourceKLines))
+
+	trader.orderC = make(chan *types.Order, 12)
+
 	done := make(chan struct{})
 	defer close(done)
 
-	if err := strategy.Init(trader.Context, trader) ; err != nil {
+	if err := strategy.Init(trader.Context, trader); err != nil {
 		return nil, err
 	}
 
@@ -39,14 +47,63 @@ func (trader *KLineRegressionTrader) RunStrategy(ctx context.Context, strategy S
 		return nil, err
 	}
 
+	var tradeID int64 = 0
 	for _, kline := range trader.SourceKLines {
+		log.Debugf("kline %+v", kline)
+
+		fmt.Print(".")
+
 		standardStream.EmitKLineClosed(&kline)
+
+		select {
+
+		case order := <-trader.orderC:
+			fmt.Print("!")
+
+			var price float64
+			if order.Type == types.OrderTypeLimit {
+				price = util.MustParseFloat(order.PriceStr)
+			} else {
+				price = kline.GetClose()
+			}
+
+			volume := util.MustParseFloat(order.VolumeStr)
+			fee := 0.0
+			feeCurrency := ""
+
+			if order.Side == types.SideTypeBuy {
+				fee = price * volume * 0.001
+				feeCurrency = "USDT"
+			} else {
+				fee = volume * 0.001
+				feeCurrency = "BTC"
+			}
+
+			trade := types.Trade{
+				ID:          tradeID,
+				Price:       price,
+				Volume:      volume,
+				Side:        string(order.Side),
+				IsBuyer:     order.Side == types.SideTypeBuy,
+				IsMaker:     false,
+				Time:        time.Unix(0, kline.EndTime*int64(time.Millisecond)),
+				Symbol:      trader.Context.Symbol,
+				Fee:         fee,
+				FeeCurrency: feeCurrency,
+			}
+
+			tradeID++
+			trader.ProfitAndLossCalculator.AddTrade(trade)
+		default:
+		}
 	}
+
+	fmt.Print("\n")
+	report := trader.ProfitAndLossCalculator.Calculate()
+	report.Print()
 
 	return done, nil
 }
-
-
 
 type Trader struct {
 	Notifier *SlackNotifier
@@ -57,6 +114,8 @@ type Trader struct {
 	Exchange *binance.Exchange
 
 	reportTimer *time.Timer
+
+	ProfitAndLossCalculator *ProfitAndLossCalculator
 }
 
 func (trader *Trader) RunStrategy(ctx context.Context, strategy Strategy) (chan struct{}, error) {
@@ -74,7 +133,7 @@ func (trader *Trader) RunStrategy(ctx context.Context, strategy Strategy) (chan 
 		}
 	}
 
-	if err := strategy.Init(trader.Context, trader) ; err != nil {
+	if err := strategy.Init(trader.Context, trader); err != nil {
 		return nil, err
 	}
 
@@ -97,7 +156,7 @@ func (trader *Trader) RunStrategy(ctx context.Context, strategy Strategy) (chan 
 		}
 
 		trader.ReportTrade(trade)
-		trader.Context.ProfitAndLossCalculator.AddTrade(*trade)
+		trader.ProfitAndLossCalculator.AddTrade(*trade)
 
 		if trader.reportTimer != nil {
 			trader.reportTimer.Stop()
@@ -109,13 +168,14 @@ func (trader *Trader) RunStrategy(ctx context.Context, strategy Strategy) (chan 
 	})
 
 	stream.OnKLineEvent(func(e *binance.KLineEvent) {
+		trader.ProfitAndLossCalculator.SetCurrentPrice(e.KLine.GetClose())
 		trader.Context.SetCurrentPrice(e.KLine.GetClose())
 	})
 
 	stream.OnBalanceSnapshot(func(snapshot map[string]types.Balance) {
 		trader.Context.Lock()
 		defer trader.Context.Unlock()
-		for _ , balance  := range snapshot {
+		for _, balance := range snapshot {
 			trader.Context.Balances[balance.Currency] = balance
 		}
 	})
@@ -125,7 +185,7 @@ func (trader *Trader) RunStrategy(ctx context.Context, strategy Strategy) (chan 
 		trader.Context.Lock()
 		defer trader.Context.Unlock()
 		delta := util.MustParseFloat(e.Delta)
-		if balance, ok := trader.Context.Balances[e.Asset] ; ok {
+		if balance, ok := trader.Context.Balances[e.Asset]; ok {
 			balance.Available += delta
 			trader.Context.Balances[e.Asset] = balance
 		}
@@ -163,7 +223,7 @@ func (trader *Trader) ReportTrade(trade *types.Trade) {
 }
 
 func (trader *Trader) ReportPnL() {
-	report := trader.Context.ProfitAndLossCalculator.Calculate()
+	report := trader.ProfitAndLossCalculator.Calculate()
 	report.Print()
 	trader.Notifier.ReportPnL(report)
 }

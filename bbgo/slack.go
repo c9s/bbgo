@@ -11,6 +11,15 @@ import (
 	"time"
 )
 
+type Notifier interface {
+	Notify(format string, args ...interface{})
+}
+
+type NullNotifier struct{}
+
+func (n *NullNotifier) Notify(format string, args ...interface{}) {
+}
+
 type SlackNotifier struct {
 	Slack *slack.Client
 
@@ -82,4 +91,3 @@ func (t *SlackNotifier) ReportPnL(report *ProfitAndLossReport) {
 		logrus.WithError(err).Errorf("slack send error")
 	}
 }
-

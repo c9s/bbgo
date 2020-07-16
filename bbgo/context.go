@@ -22,7 +22,6 @@ type TradingContext struct {
 
 func (c *TradingContext) SetCurrentPrice(price float64) {
 	c.CurrentPrice = price
-	c.ProfitAndLossCalculator.SetCurrentPrice(price)
 }
 
 
