@@ -74,9 +74,26 @@ func (trader *KLineRegressionTrader) RunStrategy(ctx context.Context, strategy S
 			if order.Side == types.SideTypeBuy {
 				fee = price * volume * 0.001
 				feeCurrency = "USDT"
+
+				quote := trader.Context.Balances[trader.Context.Market.QuoteCurrency]
+				quote.Available -= volume * price
+				trader.Context.Balances[trader.Context.Market.QuoteCurrency] = quote
+
+				base := trader.Context.Balances[trader.Context.Market.BaseCurrency]
+				base.Available += volume
+				trader.Context.Balances[trader.Context.Market.BaseCurrency] = base
+
 			} else {
 				fee = volume * 0.001
 				feeCurrency = "BTC"
+
+				quote := trader.Context.Balances[trader.Context.Market.QuoteCurrency]
+				quote.Available += volume * price
+				trader.Context.Balances[trader.Context.Market.QuoteCurrency] = quote
+
+				base := trader.Context.Balances[trader.Context.Market.BaseCurrency]
+				base.Available -= volume
+				trader.Context.Balances[trader.Context.Market.BaseCurrency] = base
 			}
 
 			trade := types.Trade{

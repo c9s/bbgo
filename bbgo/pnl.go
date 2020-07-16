@@ -46,18 +46,6 @@ func (c *ProfitAndLossCalculator) Calculate() *ProfitAndLossReport {
 	var feeRate = 0.001
 	var askFee = 0.0
 
-	// find the first buy trade
-	//var firstBidIndex = -1
-	//for idx, t := range trades {
-	//	if t.IsBuyer {
-	//		firstBidIndex = idx
-	//		break
-	//	}
-	//}
-	//if firstBidIndex > 0 {
-	//	trades = trades[firstBidIndex:]
-	//}
-
 	for _, t := range trades {
 		if t.IsBuyer {
 			bidVolume += t.Volume
@@ -108,6 +96,9 @@ func (c *ProfitAndLossCalculator) Calculate() *ProfitAndLossReport {
 		CurrentPrice: c.CurrentPrice,
 		NumTrades:    len(trades),
 
+		BidVolume: bidVolume,
+		AskVolume: askVolume,
+
 		Profit:          profit,
 		AverageBidPrice: averageBidPrice,
 		Stock:           stock,
@@ -123,6 +114,8 @@ type ProfitAndLossReport struct {
 	NumTrades       int
 	Profit          float64
 	AverageBidPrice float64
+	BidVolume float64
+	AskVolume float64
 	Stock           float64
 	Fee             float64
 }
@@ -130,6 +123,8 @@ type ProfitAndLossReport struct {
 func (report ProfitAndLossReport) Print() {
 	log.Infof("trades since: %v", report.StartTime)
 	log.Infof("average bid price: %s", USD.FormatMoneyFloat64(report.AverageBidPrice))
+	log.Infof("total bid volume: %f", report.BidVolume)
+	log.Infof("total ask volume: %f", report.AskVolume)
 	log.Infof("stock volume: %f", report.Stock)
 	log.Infof("current price: %s", USD.FormatMoneyFloat64(report.CurrentPrice))
 	log.Infof("overall profit: %s", USD.FormatMoneyFloat64(report.Profit))
