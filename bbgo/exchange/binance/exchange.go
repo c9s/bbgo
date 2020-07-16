@@ -126,7 +126,7 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol, interval string, opt
 		limit = options.Limit
 	}
 
-	logrus.Infof("[binance] querying kline %s %s limit %d", symbol, interval, limit)
+	logrus.Infof("[binance] querying kline %s %s %v", symbol, interval, options)
 
 	req := e.Client.NewKlinesService().Symbol(symbol).
 		Interval(interval).
