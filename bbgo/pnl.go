@@ -101,7 +101,6 @@ func (c *ProfitAndLossCalculator) Calculate() *ProfitAndLossReport {
 
 		Profit:          profit,
 		AverageBidPrice: averageBidPrice,
-		Stock:           stock,
 		Fee:             fee,
 	}
 }
@@ -116,7 +115,6 @@ type ProfitAndLossReport struct {
 	AverageBidPrice float64
 	BidVolume float64
 	AskVolume float64
-	Stock           float64
 	Fee             float64
 }
 
@@ -125,7 +123,6 @@ func (report ProfitAndLossReport) Print() {
 	log.Infof("average bid price: %s", USD.FormatMoneyFloat64(report.AverageBidPrice))
 	log.Infof("total bid volume: %f", report.BidVolume)
 	log.Infof("total ask volume: %f", report.AskVolume)
-	log.Infof("stock volume: %f", report.Stock)
 	log.Infof("current price: %s", USD.FormatMoneyFloat64(report.CurrentPrice))
 	log.Infof("overall profit: %s", USD.FormatMoneyFloat64(report.Profit))
 }
@@ -143,6 +140,8 @@ func (report ProfitAndLossReport) SlackAttachment() slack.Attachment {
 		return slack.Attachment{}
 	}
 
+	_ = market
+
 	return slack.Attachment{
 		Title: "Profit and Loss report of " + report.Symbol,
 		Color: color,
@@ -153,7 +152,6 @@ func (report ProfitAndLossReport) SlackAttachment() slack.Attachment {
 			{Title: "Profit", Value: USD.FormatMoney(report.Profit), Short: true,},
 			{Title: "Current Price", Value: USD.FormatMoney(report.CurrentPrice), Short: true,},
 			{Title: "Average Bid Price", Value: USD.FormatMoney(report.AverageBidPrice), Short: true,},
-			{Title: "Inventory", Value: market.FormatVolume(report.Stock), Short: true,},
 			{Title: "Number of Trades", Value: strconv.Itoa(report.NumTrades), Short: true,},
 		},
 		Footer:     report.StartTime.Format(time.RFC822),

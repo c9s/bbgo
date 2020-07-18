@@ -1,9 +1,9 @@
 package types
 
 type Balance struct {
-	Currency string
-	Available float64
-	Locked float64
+	Currency string `json:"currency"`
+	Available float64 `json:"available"`
+	Locked float64 `json:"locked"`
 }
 
 
