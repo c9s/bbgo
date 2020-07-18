@@ -71,11 +71,16 @@ func (trader *KLineRegressionTrader) RunStrategy(ctx context.Context, strategy S
 			fee := 0.0
 			feeCurrency := ""
 
+			trader.Context.Lock()
 			if order.Side == types.SideTypeBuy {
 				fee = price * volume * 0.001
 				feeCurrency = "USDT"
 
 				quote := trader.Context.Balances[trader.Context.Market.QuoteCurrency]
+
+				if quote.Available < volume * price {
+					log.Fatalf("quote balance not enough: %+v", quote)
+				}
 				quote.Available -= volume * price
 				trader.Context.Balances[trader.Context.Market.QuoteCurrency] = quote
 
@@ -87,14 +92,19 @@ func (trader *KLineRegressionTrader) RunStrategy(ctx context.Context, strategy S
 				fee = volume * 0.001
 				feeCurrency = "BTC"
 
+				base := trader.Context.Balances[trader.Context.Market.BaseCurrency]
+				if base.Available < volume {
+					log.Fatalf("base balance not enough: %+v", base)
+				}
+
+				base.Available -= volume
+				trader.Context.Balances[trader.Context.Market.BaseCurrency] = base
+
 				quote := trader.Context.Balances[trader.Context.Market.QuoteCurrency]
 				quote.Available += volume * price
 				trader.Context.Balances[trader.Context.Market.QuoteCurrency] = quote
-
-				base := trader.Context.Balances[trader.Context.Market.BaseCurrency]
-				base.Available -= volume
-				trader.Context.Balances[trader.Context.Market.BaseCurrency] = base
 			}
+			trader.Context.Unlock()
 
 			trade := types.Trade{
 				ID:          tradeID,
@@ -118,6 +128,11 @@ func (trader *KLineRegressionTrader) RunStrategy(ctx context.Context, strategy S
 	fmt.Print("\n")
 	report := trader.ProfitAndLossCalculator.Calculate()
 	report.Print()
+
+	log.Infof("wallet balance:")
+	for _, balance := range trader.Context.Balances {
+		log.Infof(" %s: %f", balance.Currency, balance.Available)
+	}
 
 	return done, nil
 }
