@@ -58,7 +58,7 @@ func (trader *KLineRegressionTrader) RunStrategy(ctx context.Context, strategy S
 		select {
 
 		case order := <-trader.orderC:
-			fmt.Print("!")
+			fmt.Print("o")
 
 			var price float64
 			if order.Type == types.OrderTypeLimit {
