@@ -105,6 +105,10 @@ func (s *PrivateStream) read(ctx context.Context, eventC chan interface{}) {
 			return
 
 		case <-ticker.C:
+			if err := s.Conn.WriteControl(websocket.PingMessage, []byte("hb"), time.Now().Add(1 * time.Second)) ; err != nil {
+				log.WithError(err).Error("ping error", err)
+			}
+
 			err := s.Client.NewKeepaliveUserStreamService().ListenKey(s.ListenKey).Do(ctx)
 			if err != nil {
 				log.WithError(err).Error("listen key keep-alive error", err)
