@@ -43,8 +43,8 @@ func (c *ProfitAndLossCalculator) Calculate() *ProfitAndLossReport {
 	var bidFee = 0.0
 
 	var askVolume = 0.0
-	var feeRate = 0.001
 	var askFee = 0.0
+	var feeRate = 0.001
 
 	for _, t := range trades {
 		if t.IsBuyer {
@@ -83,9 +83,10 @@ func (c *ProfitAndLossCalculator) Calculate() *ProfitAndLossReport {
 	stock := bidVolume - askVolume
 	futureFee := 0.0
 	if stock > 0 {
-		stockFee := c.CurrentPrice * feeRate * stock
-		profit += (c.CurrentPrice-averageBidPrice)*stock - stockFee
-		futureFee += stockFee
+		_ = feeRate
+		// stockFee := c.CurrentPrice * feeRate * stock
+		// profit += (c.CurrentPrice-averageBidPrice)*stock - stockFee
+		// futureFee += stockFee
 	}
 
 	fee := bidFee + askFee + futureFee
