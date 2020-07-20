@@ -23,17 +23,24 @@ type KLineRegressionTrader struct {
 	SourceKLines            []types.KLine
 	ProfitAndLossCalculator *ProfitAndLossCalculator
 
-	orderC chan *types.Order
+	doneOrders    []*types.Order
+	pendingOrders []*types.Order
 }
 
 func (trader *KLineRegressionTrader) SubmitOrder(cxt context.Context, order *types.Order) {
-	trader.orderC <- order
+	trader.pendingOrders = append(trader.pendingOrders, order)
 }
 
 func (trader *KLineRegressionTrader) RunStrategy(ctx context.Context, strategy Strategy) (chan struct{}, error) {
 	log.Infof("[regression] number of kline data: %d", len(trader.SourceKLines))
 
-	trader.orderC = make(chan *types.Order, 12)
+	maxExposure := 0.4
+	trader.Context.Quota = make(map[string]types.Balance)
+	for currency, balance := range trader.Context.Balances {
+		quota := balance
+		quota.Available *= maxExposure
+		trader.Context.Quota[ currency ] = quota
+	}
 
 	done := make(chan struct{})
 	defer close(done)
@@ -55,9 +62,7 @@ func (trader *KLineRegressionTrader) RunStrategy(ctx context.Context, strategy S
 
 		standardStream.EmitKLineClosed(&kline)
 
-		select {
-
-		case order := <-trader.orderC:
+		for _, order := range trader.pendingOrders {
 			switch order.Side {
 			case types.SideTypeBuy:
 				fmt.Print("B")
@@ -83,7 +88,7 @@ func (trader *KLineRegressionTrader) RunStrategy(ctx context.Context, strategy S
 
 				quote := trader.Context.Balances[trader.Context.Market.QuoteCurrency]
 
-				if quote.Available < volume * price {
+				if quote.Available < volume*price {
 					log.Fatalf("quote balance not enough: %+v", quote)
 				}
 				quote.Available -= volume * price
@@ -126,8 +131,12 @@ func (trader *KLineRegressionTrader) RunStrategy(ctx context.Context, strategy S
 
 			tradeID++
 			trader.ProfitAndLossCalculator.AddTrade(trade)
-		default:
+
+			trader.doneOrders = append(trader.doneOrders, order)
 		}
+
+		// clear pending orders
+		trader.pendingOrders = nil
 	}
 
 	fmt.Print("\n")
