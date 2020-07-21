@@ -164,7 +164,7 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol, interval string, opt
 	return kLines, nil
 }
 
-func (e *Exchange) QueryTrades(ctx context.Context, symbol string, startTime time.Time) (trades []types.Trade, err error) {
+func (e *Exchange) BatchQueryTrades(ctx context.Context, symbol string, startTime time.Time) (trades []types.Trade, err error) {
 	logrus.Infof("[binance] querying %s trades from %s", symbol, startTime)
 
 	var lastTradeID int64 = 0
