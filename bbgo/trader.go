@@ -119,7 +119,7 @@ func (trader *KLineRegressionTrader) RunStrategy(ctx context.Context, strategy S
 			trade := types.Trade{
 				ID:          tradeID,
 				Price:       price,
-				Volume:      volume,
+				Quantity:    volume,
 				Side:        string(order.Side),
 				IsBuyer:     order.Side == types.SideTypeBuy,
 				IsMaker:     false,

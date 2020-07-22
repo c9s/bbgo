@@ -164,7 +164,82 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol, interval string, opt
 	return kLines, nil
 }
 
-func (e *Exchange) BatchQueryTrades(ctx context.Context, symbol string, startTime time.Time) (trades []types.Trade, err error) {
+type TradeQueryOptions struct {
+	StartTime   *time.Time
+	EndTime     *time.Time
+	Limit       int
+	LastTradeID int64
+}
+
+func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *TradeQueryOptions) (trades []types.Trade, err error) {
+	req := e.Client.NewListTradesService().
+		Limit(1000).
+		Symbol(symbol)
+
+	if options.Limit > 0 {
+		req.Limit(options.Limit)
+	}
+
+	if options.StartTime != nil {
+		req.StartTime(options.StartTime.UnixNano() / int64(time.Millisecond))
+	}
+	if options.EndTime != nil {
+		req.EndTime(options.EndTime.UnixNano() / int64(time.Millisecond))
+	}
+	if options.LastTradeID > 0 {
+		req.FromID(options.LastTradeID)
+	}
+
+	remoteTrades, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, t := range remoteTrades {
+		// skip trade ID that is the same. however this should not happen
+		var side string
+		if t.IsBuyer {
+			side = "BUY"
+		} else {
+			side = "SELL"
+		}
+
+		// trade time
+		tt := time.Unix(0, t.Time*1000000)
+
+		logrus.Infof("[binance] trade: %d %s % 4s price: % 13s volume: % 11s %6s % 5s %s", t.ID, t.Symbol, side, t.Price, t.Quantity, BuyerOrSellerLabel(t), MakerOrTakerLabel(t), tt)
+
+		price, err := strconv.ParseFloat(t.Price, 64)
+		if err != nil {
+			return nil, err
+		}
+
+		quantity, err := strconv.ParseFloat(t.Quantity, 64)
+		if err != nil {
+			return nil, err
+		}
+
+		fee, err := strconv.ParseFloat(t.Commission, 64)
+		if err != nil {
+			return nil, err
+		}
+
+		trades = append(trades, types.Trade{
+			ID:          t.ID,
+			Price:       price,
+			Quantity:    quantity,
+			Side:        side,
+			IsBuyer:     t.IsBuyer,
+			IsMaker:     t.IsMaker,
+			Fee:         fee,
+			FeeCurrency: t.CommissionAsset,
+			Time:        tt,
+		})
+	}
+
+}
+
+func (e *Exchange) BatchQueryTrades(ctx context.Context, symbol string, startTime time.Time, options *TradeQueryOptions) (trades []types.Trade, err error) {
 	logrus.Infof("[binance] querying %s trades from %s", symbol, startTime)
 
 	var lastTradeID int64 = 0
@@ -223,7 +298,7 @@ func (e *Exchange) BatchQueryTrades(ctx context.Context, symbol string, startTim
 			trades = append(trades, types.Trade{
 				ID:          t.ID,
 				Price:       price,
-				Volume:      quantity,
+				Quantity:    quantity,
 				Side:        side,
 				IsBuyer:     t.IsBuyer,
 				IsMaker:     t.IsMaker,
@@ -237,4 +312,50 @@ func (e *Exchange) BatchQueryTrades(ctx context.Context, symbol string, startTim
 	}
 
 	return trades, nil
+}
+
+func convertRemoteTrade(t binance.TradeV3) (*types.Trade, error) {
+	// skip trade ID that is the same. however this should not happen
+	var side string
+	if t.IsBuyer {
+		side = "BUY"
+	} else {
+		side = "SELL"
+	}
+
+	// trade time
+	mts := time.Unix(0, t.Time*int64(time.Millisecond))
+
+	price, err := strconv.ParseFloat(t.Price, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	quantity, err := strconv.ParseFloat(t.Quantity, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	quoteQuantity, err := strconv.ParseFloat(t.QuoteQuantity, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	fee, err := strconv.ParseFloat(t.Commission, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	return &types.Trade{
+		ID:            t.ID,
+		Price:         price,
+		Quantity:      quantity,
+		Side:          side,
+		IsBuyer:       t.IsBuyer,
+		IsMaker:       t.IsMaker,
+		Fee:           fee,
+		FeeCurrency:   t.CommissionAsset,
+		QuoteQuantity: quoteQuantity,
+		Time:          mts,
+	}, nil
 }

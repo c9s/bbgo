@@ -10,11 +10,13 @@ type Trade struct {
 	GID int64 `json:"gid" db:"gid"`
 
 	// ID is the source trade ID
-	ID          int64     `json:"id" db:"id"`
-	Exchange    string    `json:"exchange" db:"exchange"`
-	Price       float64   `json:"price" db:"price"`
-	Volume      float64   `json:"volume" db:"volume"`
-	Symbol      string    `json:"symbol" db:"symbol"`
+	ID            int64   `json:"id" db:"id"`
+	Exchange      string  `json:"exchange" db:"exchange"`
+	Price         float64 `json:"price" db:"price"`
+	Quantity      float64 `json:"quantity" db:"quantity"`
+	QuoteQuantity float64 `json:"quoteQuantity" db:"quote_quantity"`
+	Symbol        string  `json:"symbol" db:"symbol"`
+
 	Side        string    `json:"side" db:"side"`
 	IsBuyer     bool      `json:"isBuyer" db:"is_buyer"`
 	IsMaker     bool      `json:"isMaker" db:"is_maker"`
@@ -48,7 +50,7 @@ func (trade Trade) SlackAttachment() slack.Attachment {
 			{Title: "Symbol", Value: trade.Symbol, Short: true},
 			{Title: "Side", Value: trade.Side, Short: true},
 			{Title: "Price", Value: market.FormatPrice(trade.Price), Short: true},
-			{Title: "Volume", Value: market.FormatVolume(trade.Volume), Short: true},
+			{Title: "Volume", Value: market.FormatVolume(trade.Quantity), Short: true},
 		},
 		// Footer:     tradingCtx.TradeStartTime.Format(time.RFC822),
 		// FooterIcon: "",

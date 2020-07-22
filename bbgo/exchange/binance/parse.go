@@ -93,7 +93,7 @@ func (e *ExecutionReportEvent) Trade() (*types.Trade, error) {
 		ID:          e.TradeID,
 		Symbol:      e.Symbol,
 		Price:       util.MustParseFloat(e.LastExecutedPrice),
-		Volume:      util.MustParseFloat(e.LastExecutedQuantity),
+		Quantity:    util.MustParseFloat(e.LastExecutedQuantity),
 		Side:        e.Side,
 		IsBuyer:     e.Side == "BUY",
 		IsMaker:     e.IsMaker,

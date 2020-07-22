@@ -48,8 +48,8 @@ func (c *ProfitAndLossCalculator) Calculate() *ProfitAndLossReport {
 
 	for _, t := range trades {
 		if t.IsBuyer {
-			bidVolume += t.Volume
-			bidAmount += t.Price * t.Volume
+			bidVolume += t.Quantity
+			bidAmount += t.Price * t.Quantity
 
 			// since we use USDT as the quote currency, we simply check if it matches the currency symbol
 			if strings.HasPrefix(t.Symbol, t.FeeCurrency) {
@@ -66,8 +66,8 @@ func (c *ProfitAndLossCalculator) Calculate() *ProfitAndLossReport {
 
 	for _, t := range trades {
 		if !t.IsBuyer {
-			profit += (t.Price - averageBidPrice) * t.Volume
-			askVolume += t.Volume
+			profit += (t.Price - averageBidPrice) * t.Quantity
+			askVolume += t.Quantity
 
 			// since we use USDT as the quote currency, we simply check if it matches the currency symbol
 			if strings.HasPrefix(t.Symbol, t.FeeCurrency) {
