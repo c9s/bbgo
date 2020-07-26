@@ -196,54 +196,31 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *Trad
 	}
 
 	for _, t := range remoteTrades {
-		// skip trade ID that is the same. however this should not happen
-		var side string
-		if t.IsBuyer {
-			side = "BUY"
-		} else {
-			side = "SELL"
-		}
-
-		// trade time
-		tt := time.Unix(0, t.Time*1000000)
-
-		logrus.Infof("[binance] trade: %d %s % 4s price: % 13s volume: % 11s %6s % 5s %s", t.ID, t.Symbol, side, t.Price, t.Quantity, BuyerOrSellerLabel(t), MakerOrTakerLabel(t), tt)
-
-		price, err := strconv.ParseFloat(t.Price, 64)
+		localTrade, err := convertRemoteTrade(*t)
 		if err != nil {
-			return nil, err
+			logrus.WithError(err).Errorf("can not convert binance trade: %+v", t)
+			continue
 		}
 
-		quantity, err := strconv.ParseFloat(t.Quantity, 64)
-		if err != nil {
-			return nil, err
-		}
-
-		fee, err := strconv.ParseFloat(t.Commission, 64)
-		if err != nil {
-			return nil, err
-		}
-
-		trades = append(trades, types.Trade{
-			ID:          t.ID,
-			Price:       price,
-			Quantity:    quantity,
-			Side:        side,
-			IsBuyer:     t.IsBuyer,
-			IsMaker:     t.IsMaker,
-			Fee:         fee,
-			FeeCurrency: t.CommissionAsset,
-			Time:        tt,
-		})
+		logrus.Infof("[binance] trade: %d %s % 4s price: % 13s volume: % 11s %6s % 5s %s", t.ID, t.Symbol, localTrade.Side, t.Price, t.Quantity, BuyerOrSellerLabel(t), MakerOrTakerLabel(t), localTrade.Time)
+		trades = append(trades, *localTrade)
 	}
 
+	return trades, nil
 }
 
-func (e *Exchange) BatchQueryTrades(ctx context.Context, symbol string, startTime time.Time, options *TradeQueryOptions) (trades []types.Trade, err error) {
+func (e *Exchange) BatchQueryTrades(ctx context.Context, symbol string, startTime time.Time, options *TradeQueryOptions) (allTrades []types.Trade, err error) {
 	logrus.Infof("[binance] querying %s trades from %s", symbol, startTime)
 
+	var startTime = options.StartTime
 	var lastTradeID int64 = 0
 	for {
+		trades, err := e.QueryTrades(ctx, symbol, &TradeQueryOptions{
+			StartTime: &startTime,
+		})
+
+		allTrades = append(allTrades, trades...)
+
 		req := e.Client.NewListTradesService().
 			Limit(1000).
 			Symbol(symbol).
@@ -268,44 +245,14 @@ func (e *Exchange) BatchQueryTrades(ctx context.Context, symbol string, startTim
 				continue
 			}
 
-			var side string
-			if t.IsBuyer {
-				side = "BUY"
-			} else {
-				side = "SELL"
-			}
-
-			// trade time
-			tt := time.Unix(0, t.Time*1000000)
-
-			logrus.Infof("[binance] trade: %d %s % 4s price: % 13s volume: % 11s %6s % 5s %s", t.ID, t.Symbol, side, t.Price, t.Quantity, BuyerOrSellerLabel(t), MakerOrTakerLabel(t), tt)
-
-			price, err := strconv.ParseFloat(t.Price, 64)
+			localTrade, err := convertRemoteTrade(*t)
 			if err != nil {
-				return nil, err
+				logrus.WithError(err).Errorf("can not convert binance trade: %+v", t)
+				continue
 			}
 
-			quantity, err := strconv.ParseFloat(t.Quantity, 64)
-			if err != nil {
-				return nil, err
-			}
-
-			fee, err := strconv.ParseFloat(t.Commission, 64)
-			if err != nil {
-				return nil, err
-			}
-
-			trades = append(trades, types.Trade{
-				ID:          t.ID,
-				Price:       price,
-				Quantity:    quantity,
-				Side:        side,
-				IsBuyer:     t.IsBuyer,
-				IsMaker:     t.IsMaker,
-				Fee:         fee,
-				FeeCurrency: t.CommissionAsset,
-				Time:        tt,
-			})
+			logrus.Infof("[binance] trade: %d %s % 4s price: % 13s volume: % 11s %6s % 5s %s", t.ID, t.Symbol, localTrade.Side, t.Price, t.Quantity, BuyerOrSellerLabel(t), MakerOrTakerLabel(t), localTrade.Time)
+			trades = append(trades, *localTrade)
 
 			lastTradeID = t.ID
 		}
