@@ -81,7 +81,20 @@ func (s *TradeService) QueryLast(symbol string) (*types.Trade, error) {
 	return nil, rows.Err()
 }
 
-func (s *TradeService) Query(symbol string) (trades []types.Trade, err error) {
+func (s *TradeService) QueryForTradingFeeCurrency(symbol string) ([]types.Trade, error) {
+	rows, err := s.DB.NamedQuery(`SELECT * FROM trades WHERE symbol = :symbol OR fee_currency = :symbol ORDER BY traded_at ASC`, map[string]interface{}{
+		"symbol": symbol,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	return s.scanRows(rows)
+}
+
+func (s *TradeService) Query(symbol string) ([]types.Trade, error) {
 	rows, err := s.DB.NamedQuery(`SELECT * FROM trades WHERE symbol = :symbol ORDER BY gid ASC`, map[string]interface{}{
 		"symbol": symbol,
 	})
@@ -91,6 +104,10 @@ func (s *TradeService) Query(symbol string) (trades []types.Trade, err error) {
 
 	defer rows.Close()
 
+	return s.scanRows(rows)
+}
+
+func (s *TradeService) scanRows(rows *sqlx.Rows)  (trades []types.Trade, err error) {
 	for rows.Next() {
 		var trade types.Trade
 		if err := rows.StructScan(&trade); err != nil {
@@ -102,6 +119,8 @@ func (s *TradeService) Query(symbol string) (trades []types.Trade, err error) {
 
 	return trades, rows.Err()
 }
+
+
 
 func (s *TradeService) Insert(trade types.Trade) error {
 	_, err := s.DB.NamedExec(`

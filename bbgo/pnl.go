@@ -11,12 +11,12 @@ import (
 )
 
 type ProfitAndLossCalculator struct {
-	Symbol       string
-	StartTime    time.Time
-	CurrentPrice float64
-	Trades       []types.Trade
-
-	CurrencyPrice map[string]float64
+	Symbol             string
+	StartTime          time.Time
+	CurrentPrice       float64
+	Trades             []types.Trade
+	TradingFeeCurrency string
+	CurrencyPrice      map[string]float64
 }
 
 func (c *ProfitAndLossCalculator) AddTrade(trade types.Trade) {
@@ -46,18 +46,22 @@ func (c *ProfitAndLossCalculator) Calculate() *ProfitAndLossReport {
 	var askFee = 0.0
 	var feeRate = 0.001
 
-	for _, t := range trades {
-		if t.IsBuyer {
-			bidVolume += t.Quantity
-			bidAmount += t.Price * t.Quantity
+	for _, trade := range trades {
+		if trade.Symbol == c.Symbol {
+			if trade.IsBuyer {
+				bidVolume += trade.Quantity
+				bidAmount += trade.Price * trade.Quantity
 
-			// since we use USDT as the quote currency, we simply check if it matches the currency symbol
-			if strings.HasPrefix(t.Symbol, t.FeeCurrency) {
-				bidVolume -= t.Fee
-				bidFee += t.Price * t.Fee
-			} else if t.FeeCurrency == "USDT" {
-				bidFee += t.Fee
+				// since we use USDT as the quote currency, we simply check if it matches the currency symbol
+				if strings.HasPrefix(trade.Symbol, trade.FeeCurrency) {
+					bidVolume -= trade.Fee
+					bidFee += trade.Price * trade.Fee
+				} else if trade.FeeCurrency == "USDT" {
+					bidFee += trade.Fee
+				}
 			}
+		} else if strings.HasPrefix(c.Symbol, c.TradingFeeCurrency) && trade.FeeCurrency == c.TradingFeeCurrency {
+			bidVolume -= trade.Fee
 		}
 	}
 
@@ -66,6 +70,10 @@ func (c *ProfitAndLossCalculator) Calculate() *ProfitAndLossReport {
 	averageBidPrice := (bidAmount + bidFee) / bidVolume
 
 	for _, t := range trades {
+		if t.Symbol != c.Symbol {
+			continue
+		}
+
 		if !t.IsBuyer {
 			profit += (t.Price - averageBidPrice) * t.Quantity
 			askVolume += t.Quantity

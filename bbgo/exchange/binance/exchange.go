@@ -48,6 +48,11 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (map[string]types.B
 	return account.Balances, nil
 }
 
+// TradingFeeCurrency
+func (e *Exchange) TradingFeeCurrency() string {
+	return "BNB"
+}
+
 func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	account, err := e.Client.NewGetAccountService().Do(ctx)
 	if err != nil {
