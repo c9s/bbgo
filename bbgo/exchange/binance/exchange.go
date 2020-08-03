@@ -3,6 +3,7 @@ package binance
 import (
 	"context"
 	"fmt"
+	"github.com/prometheus/common/log"
 	"strconv"
 	"time"
 
@@ -209,56 +210,41 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *Trad
 	return trades, nil
 }
 
-func (e *Exchange) BatchQueryTrades(ctx context.Context, symbol string, startTime time.Time, options *TradeQueryOptions) (allTrades []types.Trade, err error) {
+func (e *Exchange) BatchQueryTrades(ctx context.Context, symbol string, options *TradeQueryOptions) (allTrades []types.Trade, err error) {
+	var startTime = time.Now().Add(-7 * 24 * time.Hour)
+	if options.StartTime != nil {
+		startTime = *options.StartTime
+	}
+
 	logrus.Infof("[binance] querying %s trades from %s", symbol, startTime)
 
-	var startTime = options.StartTime
 	var lastTradeID int64 = 0
 	for {
 		trades, err := e.QueryTrades(ctx, symbol, &TradeQueryOptions{
 			StartTime: &startTime,
+			Limit: options.Limit,
+			LastTradeID: lastTradeID,
 		})
-
-		allTrades = append(allTrades, trades...)
-
-		req := e.Client.NewListTradesService().
-			Limit(1000).
-			Symbol(symbol).
-			StartTime(startTime.UnixNano() / 1000000)
-
-		if lastTradeID > 0 {
-			req.FromID(lastTradeID)
-		}
-
-		bnTrades, err := req.Do(ctx)
 		if err != nil {
-			return nil, err
+			return allTrades, err
 		}
 
-		if len(bnTrades) <= 1 {
+		if len(trades) <= 1 {
 			break
 		}
 
-		for _, t := range bnTrades {
-			// skip trade ID that is the same. however this should not happen
+		for _, t := range trades {
 			if t.ID == lastTradeID {
+				log.Warn("duplicated trade ID")
 				continue
 			}
 
-			localTrade, err := convertRemoteTrade(*t)
-			if err != nil {
-				logrus.WithError(err).Errorf("can not convert binance trade: %+v", t)
-				continue
-			}
-
-			logrus.Infof("[binance] trade: %d %s % 4s price: % 13s volume: % 11s %6s % 5s %s", t.ID, t.Symbol, localTrade.Side, t.Price, t.Quantity, BuyerOrSellerLabel(t), MakerOrTakerLabel(t), localTrade.Time)
-			trades = append(trades, *localTrade)
-
+			allTrades = append(allTrades, t)
 			lastTradeID = t.ID
 		}
 	}
 
-	return trades, nil
+	return allTrades, nil
 }
 
 func convertRemoteTrade(t binance.TradeV3) (*types.Trade, error) {
