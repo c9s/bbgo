@@ -221,8 +221,8 @@ func (e *Exchange) BatchQueryTrades(ctx context.Context, symbol string, options 
 	var lastTradeID int64 = 0
 	for {
 		trades, err := e.QueryTrades(ctx, symbol, &TradeQueryOptions{
-			StartTime: &startTime,
-			Limit: options.Limit,
+			StartTime:   &startTime,
+			Limit:       options.Limit,
 			LastTradeID: lastTradeID,
 		})
 		if err != nil {
@@ -282,6 +282,8 @@ func convertRemoteTrade(t binance.TradeV3) (*types.Trade, error) {
 	return &types.Trade{
 		ID:            t.ID,
 		Price:         price,
+		Symbol:        t.Symbol,
+		Exchange:      "binance",
 		Quantity:      quantity,
 		Side:          side,
 		IsBuyer:       t.IsBuyer,
