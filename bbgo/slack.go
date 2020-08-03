@@ -51,7 +51,7 @@ func (t *SlackNotifier) Notify(format string, args ...interface{}) {
 	}
 
 	var nonSlackArgs = args
-	if slackArgsStartIdx > 0 {
+	if slackArgsStartIdx > -1 {
 		nonSlackArgs = args[:slackArgsStartIdx]
 	}
 
