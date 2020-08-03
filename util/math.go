@@ -32,6 +32,10 @@ func MustParseFloat(s string) float64 {
 
 const epsilon = 0.0000001
 
+func Zero(v float64) bool {
+	return math.Abs(v) < epsilon
+}
+
 func NotZero(v float64) bool {
 	return math.Abs(v) > epsilon
 }
