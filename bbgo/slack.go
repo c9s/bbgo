@@ -50,7 +50,7 @@ func (t *SlackNotifier) Notify(format string, args ...interface{}) {
 		}
 	}
 
-	var nonSlackArgs = []interface{}{}
+	var nonSlackArgs = args
 	if slackArgsStartIdx > 0 {
 		nonSlackArgs = args[:slackArgsStartIdx]
 	}
