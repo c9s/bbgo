@@ -101,6 +101,7 @@ func (c *ProfitAndLossCalculator) Calculate() *ProfitAndLossReport {
 		BidVolume: bidVolume,
 		AskVolume: askVolume,
 
+		Stock:           stock,
 		Profit:          profit,
 		AverageBidPrice: averageBidPrice,
 		Fee:             fee,
@@ -115,9 +116,10 @@ type ProfitAndLossReport struct {
 	NumTrades       int
 	Profit          float64
 	AverageBidPrice float64
-	BidVolume float64
-	AskVolume float64
+	BidVolume       float64
+	AskVolume       float64
 	Fee             float64
+	Stock           float64
 }
 
 func (report ProfitAndLossReport) Print() {
@@ -150,11 +152,12 @@ func (report ProfitAndLossReport) SlackAttachment() slack.Attachment {
 		// Pretext:       "",
 		// Text:          "",
 		Fields: []slack.AttachmentField{
-			{Title: "Symbol", Value: report.Symbol, Short: true,},
-			{Title: "Profit", Value: USD.FormatMoney(report.Profit), Short: true,},
-			{Title: "Current Price", Value: USD.FormatMoney(report.CurrentPrice), Short: true,},
-			{Title: "Average Bid Price", Value: USD.FormatMoney(report.AverageBidPrice), Short: true,},
-			{Title: "Number of Trades", Value: strconv.Itoa(report.NumTrades), Short: true,},
+			{Title: "Symbol", Value: report.Symbol, Short: true},
+			{Title: "Profit", Value: USD.FormatMoney(report.Profit), Short: true},
+			{Title: "Current Price", Value: USD.FormatMoney(report.CurrentPrice), Short: true},
+			{Title: "Average Bid Price", Value: USD.FormatMoney(report.AverageBidPrice), Short: true},
+			{Title: "Number of Trades", Value: strconv.Itoa(report.NumTrades), Short: true},
+			{Title: "Stock", Value: strconv.FormatFloat(report.Stock, 'f', 8, 64), Short: true},
 		},
 		Footer:     report.StartTime.Format(time.RFC822),
 		FooterIcon: "",
