@@ -40,6 +40,18 @@ var MarketBTCUSDT = Market{
 	MinLot:          0.000001,
 }
 
+var MarketETHUSDT = Market{
+	Symbol:          "ETHUSDT",
+	BaseCurrency:    "ETH",
+	QuoteCurrency:   "USDT",
+	PricePrecision:  2,
+	VolumePrecision: 5,
+	MinQuantity:     0.01,
+	MinAmount:       10.0,
+	MinLot:          0.01,
+}
+
+
 var MarketBNBUSDT = Market{
 	Symbol:          "BNBUSDT",
 	BaseCurrency:    "BNB",
@@ -52,6 +64,7 @@ var MarketBNBUSDT = Market{
 }
 
 var Markets = map[string]Market{
+	"ETHUSDT": MarketETHUSDT,
 	"BNBUSDT": MarketBNBUSDT,
 	"BTCUSDT": MarketBTCUSDT,
 }
