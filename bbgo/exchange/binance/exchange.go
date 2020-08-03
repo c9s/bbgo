@@ -3,7 +3,6 @@ package binance
 import (
 	"context"
 	"fmt"
-	"github.com/prometheus/common/log"
 	"strconv"
 	"time"
 
@@ -218,7 +217,7 @@ func (e *Exchange) BatchQueryTrades(ctx context.Context, symbol string, options 
 
 	logrus.Infof("[binance] querying %s trades from %s", symbol, startTime)
 
-	var lastTradeID int64 = 0
+	var lastTradeID = options.LastTradeID
 	for {
 		trades, err := e.QueryTrades(ctx, symbol, &TradeQueryOptions{
 			StartTime:   &startTime,
@@ -229,13 +228,13 @@ func (e *Exchange) BatchQueryTrades(ctx context.Context, symbol string, options 
 			return allTrades, err
 		}
 
-		if len(trades) <= 1 {
+		if len(trades) == 1 && trades[0].ID == lastTradeID {
 			break
 		}
 
 		for _, t := range trades {
+			// ignore the first trade if last TradeID is given
 			if t.ID == lastTradeID {
-				log.Warn("duplicated trade ID")
 				continue
 			}
 

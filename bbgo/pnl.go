@@ -53,6 +53,7 @@ func (c *ProfitAndLossCalculator) Calculate() *ProfitAndLossReport {
 
 			// since we use USDT as the quote currency, we simply check if it matches the currency symbol
 			if strings.HasPrefix(t.Symbol, t.FeeCurrency) {
+				bidVolume -= t.Fee
 				bidFee += t.Price * t.Fee
 			} else if t.FeeCurrency == "USDT" {
 				bidFee += t.Fee
