@@ -50,6 +50,16 @@ func (m *StockManager) Stock(buy Stock) error {
 	return m.flushPendingSells()
 }
 
+func (m *StockManager) squash() {
+	var squashed StockSlice
+	for _, stock := range m.Stocks {
+		if !zero(stock.Quantity) {
+			squashed = append(squashed, stock)
+		}
+	}
+	m.Stocks = squashed
+}
+
 func (m *StockManager) flushPendingSells() error {
 	if len(m.Stocks) > 0 && len(m.PendingSells) > 0 {
 
@@ -152,6 +162,9 @@ func (m *StockManager) LoadTrades(trades []types.Trade) (checkpoints []int, err 
 	}
 
 	err = m.flushPendingSells()
+
+	m.squash()
+
 	return checkpoints, err
 }
 
