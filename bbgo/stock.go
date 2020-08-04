@@ -69,8 +69,6 @@ func (m *StockManager) Consume(sell Stock) error {
 		}
 
 		sell.Quantity -= stock.Consume(sell.Quantity)
-		log.Infof("sell quantity: %f", sell.Quantity)
-
 		m.Stocks[idx] = stock
 
 		if math.Round(stock.Quantity*1e8) == 0.0 {
