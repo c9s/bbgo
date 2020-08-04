@@ -3,7 +3,6 @@ package bbgo
 import (
 	"fmt"
 	"github.com/c9s/bbgo/pkg/bbgo/types"
-	log "github.com/sirupsen/logrus"
 	"math"
 	"strings"
 )
@@ -29,6 +28,16 @@ func (stock *Stock) Consume(quantity float64) float64 {
 }
 
 type StockSlice []Stock
+
+func (slice StockSlice) QuantityBelowPrice(price float64) (quantity float64) {
+	for _, stock := range slice {
+		if stock.Price < price {
+			quantity += stock.Quantity
+		}
+	}
+
+	return round(quantity)
+}
 
 func (slice StockSlice) Quantity() (total float64) {
 	for _, stock := range slice {
@@ -125,10 +134,9 @@ func (m *StockManager) Consume(sell Stock) error {
 	return nil
 }
 
-func (m *StockManager) LoadTrades(trades []types.Trade) (checkpoints []int, err error) {
+func (m *StockManager) AddTrades(trades []types.Trade) (checkpoints []int, err error) {
 	feeSymbol := strings.HasPrefix(m.Symbol, m.TradingFeeCurrency)
 	for idx, trade := range trades {
-		log.Infof("%s %5s %f %f at %s fee %s %f", trade.Symbol, trade.Side, trade.Price, trade.Quantity, trade.Time, trade.FeeCurrency, trade.Fee)
 		// for other market trades
 		// convert trading fee trades to sell trade
 		if trade.Symbol != m.Symbol {

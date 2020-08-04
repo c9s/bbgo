@@ -203,6 +203,10 @@ func (trader *Trader) RunStrategy(ctx context.Context, strategy Strategy) (chan 
 
 		trader.ReportTrade(trade)
 		trader.ProfitAndLossCalculator.AddTrade(*trade)
+		_ , err := trader.Context.StockManager.AddTrades([]types.Trade{*trade})
+		if err != nil {
+			log.WithError(err).Error("stock manager load trades error")
+		}
 
 		if trader.reportTimer != nil {
 			trader.reportTimer.Stop()

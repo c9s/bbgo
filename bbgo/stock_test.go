@@ -24,7 +24,7 @@ func TestStockManager(t *testing.T) {
 			Symbol:             "BTCUSDT",
 		}
 
-		_, err = stockManager.LoadTrades(trades)
+		_, err = stockManager.AddTrades(trades)
 		assert.NoError(t, err)
 		assert.Equal(t, 0.72970242, stockManager.Stocks.Quantity())
 		assert.NotEmpty(t, stockManager.Stocks)
@@ -45,7 +45,7 @@ func TestStockManager(t *testing.T) {
 			Symbol:             "BTCUSDT",
 		}
 
-		_, err := stockManager.LoadTrades(trades)
+		_, err := stockManager.AddTrades(trades)
 		assert.NoError(t, err)
 		assert.Len(t, stockManager.Stocks, 2)
 		assert.Equal(t, StockSlice{
@@ -78,7 +78,7 @@ func TestStockManager(t *testing.T) {
 			Symbol:             "BTCUSDT",
 		}
 
-		_, err := stockManager.LoadTrades(trades)
+		_, err := stockManager.AddTrades(trades)
 		assert.NoError(t, err)
 		assert.Len(t, stockManager.Stocks, 0)
 		assert.Len(t, stockManager.PendingSells, 0)
@@ -96,7 +96,7 @@ func TestStockManager(t *testing.T) {
 			Symbol:             "BTCUSDT",
 		}
 
-		_, err := stockManager.LoadTrades(trades)
+		_, err := stockManager.AddTrades(trades)
 		assert.NoError(t, err)
 		assert.Len(t, stockManager.Stocks, 0)
 		assert.Len(t, stockManager.PendingSells, 1)
@@ -114,7 +114,7 @@ func TestStockManager(t *testing.T) {
 			Symbol:             "BTCUSDT",
 		}
 
-		_, err := stockManager.LoadTrades(trades)
+		_, err := stockManager.AddTrades(trades)
 		assert.NoError(t, err)
 		assert.Len(t, stockManager.Stocks, 1)
 		assert.Equal(t, StockSlice{
@@ -139,7 +139,7 @@ func TestStockManager(t *testing.T) {
 			Symbol:             "BTCUSDT",
 		}
 
-		_, err := stockManager.LoadTrades(trades)
+		_, err := stockManager.AddTrades(trades)
 		assert.NoError(t, err)
 		assert.Len(t, stockManager.Stocks, 1)
 		assert.Equal(t, StockSlice{
@@ -164,7 +164,7 @@ func TestStockManager(t *testing.T) {
 			Symbol:             "BTCUSDT",
 		}
 
-		_, err := stockManager.LoadTrades(trades)
+		_, err := stockManager.AddTrades(trades)
 		assert.NoError(t, err)
 		assert.Len(t, stockManager.Stocks, 0)
 		assert.Len(t, stockManager.PendingSells, 1)
