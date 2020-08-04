@@ -8,6 +8,14 @@ import (
 	"strings"
 )
 
+func zero(a float64) bool {
+	return int(math.Round(a*1e8)) == 0
+}
+
+func round(a float64) float64 {
+	return math.Round(a*1e8) / 1e8
+}
+
 type Stock types.Trade
 
 func (stock *Stock) String() string {
@@ -15,9 +23,9 @@ func (stock *Stock) String() string {
 }
 
 func (stock *Stock) Consume(quantity float64) float64 {
-	delta := math.Min(stock.Quantity, quantity)
-	stock.Quantity -= delta
-	return delta
+	q := math.Min(stock.Quantity, quantity)
+	stock.Quantity = round(stock.Quantity - q)
+	return q
 }
 
 type StockSlice []Stock
@@ -27,7 +35,7 @@ func (slice StockSlice) Quantity() (total float64) {
 		total += stock.Quantity
 	}
 
-	return total
+	return round(total)
 }
 
 type StockManager struct {
@@ -39,10 +47,15 @@ type StockManager struct {
 
 func (m *StockManager) Stock(buy Stock) error {
 	m.Stocks = append(m.Stocks, buy)
+	return m.flushPendingSells()
+}
 
-	if len(m.PendingSells) > 0 {
+func (m *StockManager) flushPendingSells() error {
+	if len(m.Stocks) > 0 && len(m.PendingSells) > 0 {
+
 		pendingSells := m.PendingSells
 		m.PendingSells = nil
+
 		for _, sell := range pendingSells {
 			if err := m.Consume(sell); err != nil {
 				return err
@@ -68,14 +81,15 @@ func (m *StockManager) Consume(sell Stock) error {
 			continue
 		}
 
-		sell.Quantity -= stock.Consume(sell.Quantity)
-		m.Stocks[idx] = stock
-
-		if math.Round(stock.Quantity*1e8) == 0.0 {
-			m.Stocks = m.Stocks[:idx]
+		if zero(stock.Quantity) {
+			continue
 		}
 
-		if math.Round(sell.Quantity*1e8) == 0.0 {
+		delta := stock.Consume(sell.Quantity)
+		sell.Consume(delta)
+		m.Stocks[idx] = stock
+
+		if zero(sell.Quantity) {
 			return nil
 		}
 	}
@@ -83,16 +97,18 @@ func (m *StockManager) Consume(sell Stock) error {
 	idx = len(m.Stocks) - 1
 	for ; idx >= 0; idx-- {
 		stock := m.Stocks[idx]
-		sell.Quantity -= stock.Consume(sell.Quantity)
-		m.Stocks[idx] = stock
 
-		if math.Round(stock.Quantity*1e8) == 0.0 {
-			// remove the latest stock
-			m.Stocks = m.Stocks[:idx]
+		if zero(stock.Quantity) {
+			continue
 		}
+
+		delta := stock.Consume(sell.Quantity)
+		sell.Consume(delta)
+
+		m.Stocks[idx] = stock
 	}
 
-	if math.Round(sell.Quantity*1e8) > 0.0 {
+	if !zero(sell.Quantity) {
 		m.PendingSells = append(m.PendingSells, sell)
 	}
 
@@ -114,26 +130,29 @@ func (m *StockManager) LoadTrades(trades []types.Trade) (checkpoints []int, err 
 			}
 		}
 
-		if trade.Symbol == m.Symbol {
-			if trade.IsBuyer {
-				if idx > 0 && len(m.Stocks) == 0 {
-					checkpoints = append(checkpoints, idx)
-				}
+		if trade.Symbol != m.Symbol {
+			continue
+		}
 
-				stock := toStock(trade)
-				if err := m.Stock(stock); err != nil {
-					return checkpoints, err
-				}
-			} else {
-				stock := toStock(trade)
-				if err := m.Consume(stock); err != nil {
-					return checkpoints, err
-				}
+		if trade.IsBuyer {
+			if idx > 0 && len(m.Stocks) == 0 {
+				checkpoints = append(checkpoints, idx)
+			}
+
+			stock := toStock(trade)
+			if err := m.Stock(stock); err != nil {
+				return checkpoints, err
+			}
+		} else {
+			stock := toStock(trade)
+			if err := m.Consume(stock); err != nil {
+				return checkpoints, err
 			}
 		}
 	}
 
-	return checkpoints, nil
+	err = m.flushPendingSells()
+	return checkpoints, err
 }
 
 func toStock(trade types.Trade) Stock {
@@ -143,7 +162,7 @@ func toStock(trade types.Trade) Stock {
 		} else {
 			trade.Quantity += trade.Fee
 		}
-		trade.Fee = 0
+		trade.Fee = 0.0
 	}
 	return Stock(trade)
 }
