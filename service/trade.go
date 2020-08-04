@@ -31,7 +31,7 @@ func (s *TradeSync) Sync(ctx context.Context, symbol string, startTime time.Time
 
 	trades, err := s.Exchange.BatchQueryTrades(ctx, symbol, &binance.TradeQueryOptions{
 		StartTime:   &startTime,
-		Limit:       1000,
+		Limit:       200,
 		LastTradeID: lastID,
 	})
 	if err != nil {
