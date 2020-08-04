@@ -44,23 +44,24 @@ func (c *ProfitAndLossCalculator) Calculate() *ProfitAndLossReport {
 
 	var askVolume = 0.0
 	var askFee = 0.0
-	var feeRate = 0.001
+	var feeRate = 0.0015
 
 	for _, trade := range trades {
 		if trade.Symbol == c.Symbol {
 			if trade.IsBuyer {
 				bidVolume += trade.Quantity
 				bidAmount += trade.Price * trade.Quantity
-
-				// since we use USDT as the quote currency, we simply check if it matches the currency symbol
-				if strings.HasPrefix(trade.Symbol, trade.FeeCurrency) {
-					bidVolume -= trade.Fee
-					bidFee += trade.Price * trade.Fee
-				} else if trade.FeeCurrency == "USDT" {
-					bidFee += trade.Fee
-				}
 			}
-		} else if strings.HasPrefix(c.Symbol, c.TradingFeeCurrency) && trade.FeeCurrency == c.TradingFeeCurrency {
+
+			// since we use USDT as the quote currency, we simply check if it matches the currency symbol
+			if strings.HasPrefix(trade.Symbol, trade.FeeCurrency) {
+				bidVolume -= trade.Fee
+				bidFee += trade.Price * trade.Fee
+			} else if trade.FeeCurrency == "USDT" {
+				bidFee += trade.Fee
+			}
+
+		} else if trade.FeeCurrency == c.TradingFeeCurrency {
 			bidVolume -= trade.Fee
 		}
 	}
@@ -74,16 +75,18 @@ func (c *ProfitAndLossCalculator) Calculate() *ProfitAndLossReport {
 			continue
 		}
 
-		if !t.IsBuyer {
-			profit += (t.Price - averageBidPrice) * t.Quantity
-			askVolume += t.Quantity
+		if t.IsBuyer {
+			continue
+		}
 
-			// since we use USDT as the quote currency, we simply check if it matches the currency symbol
-			if strings.HasPrefix(t.Symbol, t.FeeCurrency) {
-				askFee += t.Price * t.Fee
-			} else if t.FeeCurrency == "USDT" {
-				askFee += t.Fee
-			}
+		profit += (t.Price - averageBidPrice) * t.Quantity
+		askVolume += t.Quantity
+
+		// since we use USDT as the quote currency, we simply check if it matches the currency symbol
+		if strings.HasPrefix(t.Symbol, t.FeeCurrency) {
+			askFee += t.Price * t.Fee
+		} else if t.FeeCurrency == "USDT" {
+			askFee += t.Fee
 		}
 	}
 
@@ -135,8 +138,9 @@ func (report ProfitAndLossReport) Print() {
 	log.Infof("average bid price: %s", USD.FormatMoneyFloat64(report.AverageBidPrice))
 	log.Infof("total bid volume: %f", report.BidVolume)
 	log.Infof("total ask volume: %f", report.AskVolume)
+	log.Infof("stock: %f", report.Stock)
 	log.Infof("current price: %s", USD.FormatMoneyFloat64(report.CurrentPrice))
-	log.Infof("overall profit: %s", USD.FormatMoneyFloat64(report.Profit))
+	log.Infof("profit: %s", USD.FormatMoneyFloat64(report.Profit))
 }
 
 func (report ProfitAndLossReport) SlackAttachment() slack.Attachment {

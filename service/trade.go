@@ -81,9 +81,10 @@ func (s *TradeService) QueryLast(symbol string) (*types.Trade, error) {
 	return nil, rows.Err()
 }
 
-func (s *TradeService) QueryForTradingFeeCurrency(symbol string) ([]types.Trade, error) {
-	rows, err := s.DB.NamedQuery(`SELECT * FROM trades WHERE symbol = :symbol OR fee_currency = :symbol ORDER BY traded_at ASC`, map[string]interface{}{
+func (s *TradeService) QueryForTradingFeeCurrency(symbol string, feeCurrency string) ([]types.Trade, error) {
+	rows, err := s.DB.NamedQuery(`SELECT * FROM trades WHERE symbol = :symbol OR fee_currency = :fee_currency ORDER BY traded_at ASC`, map[string]interface{}{
 		"symbol": symbol,
+		"fee_currency": feeCurrency,
 	})
 	if err != nil {
 		return nil, err
