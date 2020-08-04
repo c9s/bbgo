@@ -28,6 +28,7 @@ func TestStockManager(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, 0.72970242, stockManager.Stocks.Quantity())
 		assert.NotEmpty(t, stockManager.Stocks)
+		assert.Equal(t, 20, len(stockManager.Stocks))
 		assert.Equal(t, 0, len(stockManager.PendingSells))
 
 	})
