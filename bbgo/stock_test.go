@@ -82,5 +82,22 @@ func TestStockManager(t *testing.T) {
 		assert.Len(t, stockManager.PendingSells, 0)
 	})
 
+	t.Run("pending sell", func(t *testing.T) {
+		var trades = []types.Trade{
+			{Symbol: "BTCUSDT", Price: 9200.0, Quantity: 0.02, IsBuyer: false},
+			{Symbol: "BTCUSDT", Price: 9100.0, Quantity: 0.05, IsBuyer: true},
+		}
+
+		var stockManager = &StockManager{
+			TradingFeeCurrency: "BNB",
+			Symbol:             "BTCUSDT",
+		}
+
+		_, err := stockManager.LoadTrades(trades)
+		assert.NoError(t, err)
+		assert.Len(t, stockManager.Stocks, 1)
+		assert.Len(t, stockManager.PendingSells, 0)
+	})
+
 
 }
