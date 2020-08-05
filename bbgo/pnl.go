@@ -23,14 +23,6 @@ func (c *ProfitAndLossCalculator) AddTrade(trade types.Trade) {
 	c.Trades = append(c.Trades, trade)
 }
 
-func (c *ProfitAndLossCalculator) SetCurrencyPrice(symbol string, price float64) {
-	if c.CurrencyPrice == nil {
-		c.CurrencyPrice = map[string]float64{}
-	}
-
-	c.CurrencyPrice[symbol] = price
-}
-
 func (c *ProfitAndLossCalculator) SetCurrentPrice(price float64) {
 	c.CurrentPrice = price
 }
