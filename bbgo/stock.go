@@ -98,7 +98,6 @@ func (m *StockManager) consume(sell Stock) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-
 	if len(m.Stocks) == 0 {
 		m.PendingSells = append(m.PendingSells, sell)
 		return nil
