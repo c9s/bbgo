@@ -16,7 +16,6 @@ type ProfitAndLossCalculator struct {
 	CurrentPrice       float64
 	Trades             []types.Trade
 	TradingFeeCurrency string
-	CurrencyPrice      map[string]float64
 }
 
 func (c *ProfitAndLossCalculator) AddTrade(trade types.Trade) {
@@ -38,6 +37,8 @@ func (c *ProfitAndLossCalculator) Calculate() *ProfitAndLossReport {
 	var askFee = 0.0
 	var feeRate = 0.0015
 
+	var currencyFees = map[string]float64{}
+
 	for _, trade := range trades {
 		if trade.Symbol == c.Symbol {
 			if trade.IsBuyer {
@@ -56,6 +57,11 @@ func (c *ProfitAndLossCalculator) Calculate() *ProfitAndLossReport {
 		} else if trade.FeeCurrency == c.TradingFeeCurrency {
 			bidVolume -= trade.Fee
 		}
+
+		if _, ok := currencyFees[trade.FeeCurrency]; !ok {
+			currencyFees[trade.FeeCurrency] = 0.0
+		}
+		currencyFees[trade.FeeCurrency] += trade.Fee
 	}
 
 	log.Infof("average bid price = (total amount %f + total fee %f) / volume %f", bidAmount, bidFee, bidVolume)
@@ -107,7 +113,8 @@ func (c *ProfitAndLossCalculator) Calculate() *ProfitAndLossReport {
 		Stock:           stock,
 		Profit:          profit,
 		AverageBidPrice: averageBidPrice,
-		Fee:             fee,
+		FeeUSD:          fee,
+		CurrencyFees:    currencyFees,
 	}
 }
 
@@ -121,8 +128,9 @@ type ProfitAndLossReport struct {
 	AverageBidPrice float64
 	BidVolume       float64
 	AskVolume       float64
-	Fee             float64
+	FeeUSD          float64
 	Stock           float64
+	CurrencyFees    map[string]float64
 }
 
 func (report ProfitAndLossReport) Print() {
@@ -133,6 +141,10 @@ func (report ProfitAndLossReport) Print() {
 	log.Infof("stock: %f", report.Stock)
 	log.Infof("current price: %s", USD.FormatMoneyFloat64(report.CurrentPrice))
 	log.Infof("profit: %s", USD.FormatMoneyFloat64(report.Profit))
+	log.Infof("currency fees:")
+	for currency, fee := range report.CurrencyFees {
+		log.Infof(" - %s: %f", currency, fee)
+	}
 }
 
 func (report ProfitAndLossReport) SlackAttachment() slack.Attachment {
