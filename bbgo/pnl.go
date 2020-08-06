@@ -151,7 +151,7 @@ func (report ProfitAndLossReport) Print() {
 
 func (report ProfitAndLossReport) SlackAttachment() slack.Attachment {
 	var color = ""
-	if report.Profit > 0 {
+	if report.UnrealizedProfit > 0 {
 		color = slackstyle.Green
 	} else {
 		color = slackstyle.Red
