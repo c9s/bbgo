@@ -1,6 +1,7 @@
 package types
 
 import (
+	"fmt"
 	"github.com/slack-go/slack"
 	"time"
 )
@@ -36,13 +37,13 @@ func (trade Trade) SlackAttachment() slack.Attachment {
 	market, ok := FindMarket(trade.Symbol)
 	if !ok {
 		return slack.Attachment{
-			Title: "New Trade",
+			Title: fmt.Sprintf("%s %s Trade", trade.Symbol, trade.Side),
 			Color: color,
 		}
 	}
 
 	return slack.Attachment{
-		Title: "New Trade",
+		Title: fmt.Sprintf("%s %s Trade", trade.Symbol, trade.Side),
 		Color: color,
 		// Pretext:       "",
 		// Text:          "",
