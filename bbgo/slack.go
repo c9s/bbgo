@@ -32,22 +32,23 @@ type SlackNotifier struct {
 }
 
 func (t *SlackNotifier) Notify(format string, args ...interface{}) {
-	var slackAttachments []slack.Attachment = nil
-	var slackArgsStartIdx = -1
+	var slackAttachments []slack.Attachment
+	var slackArgsOffset = -1
+
 	for idx, arg := range args {
 		switch a := arg.(type) {
 
 		// concrete type assert first
 		case slack.Attachment:
-			if slackArgsStartIdx == -1 {
-				slackArgsStartIdx = idx
+			if slackArgsOffset == -1 {
+				slackArgsOffset = idx
 			}
 
 			slackAttachments = append(slackAttachments, a)
 
 		case SlackAttachmentCreator:
-			if slackArgsStartIdx == -1 {
-				slackArgsStartIdx = idx
+			if slackArgsOffset == -1 {
+				slackArgsOffset = idx
 			}
 
 			slackAttachments = append(slackAttachments, a.SlackAttachment())
@@ -56,8 +57,8 @@ func (t *SlackNotifier) Notify(format string, args ...interface{}) {
 	}
 
 	var nonSlackArgs = args
-	if slackArgsStartIdx > -1 {
-		nonSlackArgs = args[:slackArgsStartIdx]
+	if slackArgsOffset > -1 {
+		nonSlackArgs = args[:slackArgsOffset]
 	}
 
 	logrus.Infof(format, nonSlackArgs...)
@@ -72,7 +73,7 @@ func (t *SlackNotifier) Notify(format string, args ...interface{}) {
 
 func (t *SlackNotifier) ReportTrade(trade *types.Trade) {
 	_, _, err := t.Slack.PostMessageContext(context.Background(), t.TradingChannel,
-		slack.MsgOptionText(util.Render(`:handshake: trade execution @ {{ .Price  }}`, trade), true),
+		slack.MsgOptionText(util.Render(`:handshake: {{ .Symbol }} {{ .Side }} Trade Execution @ {{ .Price  }}`, trade), true),
 		slack.MsgOptionAttachments(trade.SlackAttachment()))
 
 	if err != nil {
