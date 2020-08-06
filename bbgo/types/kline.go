@@ -343,7 +343,7 @@ func (k *KLineWindow) Truncate(size int) {
 	if start < 0 {
 		start = 0
 	}
-	*k = (*k)[end-5 : end]
+	*k = (*k)[start : end]
 }
 
 func (k KLineWindow) GetBody() float64 {
