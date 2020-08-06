@@ -75,7 +75,7 @@ func (c *ProfitAndLossCalculator) Calculate() *ProfitAndLossReport {
 
 	log.Infof("average bid price = (total amount %f + total feeUSD %f) / volume %f", bidAmount, bidFeeUSD, bidVolume)
 	profit := 0.0
-	averageBidPrice := (bidAmount + bidFeeUSD) / bidVolume
+	averageCost := (bidAmount + bidFeeUSD) / bidVolume
 
 	for _, t := range trades {
 		if t.Symbol != c.Symbol {
@@ -86,18 +86,17 @@ func (c *ProfitAndLossCalculator) Calculate() *ProfitAndLossReport {
 			continue
 		}
 
-		profit += (t.Price - averageBidPrice) * t.Quantity
+		profit += (t.Price - averageCost) * t.Quantity
 		askVolume += t.Quantity
 	}
 
 	profit -= feeUSD
+	unrealizedProfit := profit
 
 	stock := bidVolume - askVolume
 	if stock > 0 {
-		_ = feeRate
-		// stockFee := c.CurrentPrice * feeRate * stock
-		// profit += (c.CurrentPrice-averageBidPrice)*stock - stockFee
-		// futureFee += stockFee
+		stockFee := c.CurrentPrice * stock * feeRate
+		unrealizedProfit += (c.CurrentPrice-averageCost)*stock - stockFee
 	}
 
 	return &ProfitAndLossReport{
@@ -111,7 +110,8 @@ func (c *ProfitAndLossCalculator) Calculate() *ProfitAndLossReport {
 
 		Stock:          stock,
 		Profit:         profit,
-		AverageBidCost: averageBidPrice,
+		UnrealizedProfit: unrealizedProfit,
+		AverageBidCost: averageCost,
 		FeeUSD:         feeUSD,
 		CurrencyFees:   currencyFees,
 	}
@@ -124,6 +124,7 @@ type ProfitAndLossReport struct {
 
 	NumTrades      int
 	Profit         float64
+	UnrealizedProfit float64
 	AverageBidCost float64
 	BidVolume      float64
 	AskVolume      float64
@@ -141,6 +142,7 @@ func (report ProfitAndLossReport) Print() {
 	log.Infof("fee (USD): %f", report.FeeUSD)
 	log.Infof("current price: %s", USD.FormatMoneyFloat64(report.CurrentPrice))
 	log.Infof("profit: %s", USD.FormatMoneyFloat64(report.Profit))
+	log.Infof("unrealized profit: %s", USD.FormatMoneyFloat64(report.UnrealizedProfit))
 	log.Infof("currency fees:")
 	for currency, fee := range report.CurrencyFees {
 		log.Infof(" - %s: %f", currency, fee)
@@ -160,8 +162,6 @@ func (report ProfitAndLossReport) SlackAttachment() slack.Attachment {
 		return slack.Attachment{}
 	}
 
-	_ = market
-
 	return slack.Attachment{
 		Title: "Profit and Loss report of " + report.Symbol,
 		Color: color,
@@ -170,11 +170,12 @@ func (report ProfitAndLossReport) SlackAttachment() slack.Attachment {
 		Fields: []slack.AttachmentField{
 			{Title: "Symbol", Value: report.Symbol, Short: true},
 			{Title: "Profit", Value: USD.FormatMoney(report.Profit), Short: true},
+			{Title: "Unrealized Profit", Value: USD.FormatMoney(report.UnrealizedProfit), Short: true},
+			{Title: "Current Price", Value: market.FormatPrice(report.CurrentPrice), Short: true},
+			{Title: "Average Cost", Value: market.FormatPrice(report.AverageBidCost), Short: true},
 			{Title: "Fee (USD)", Value: USD.FormatMoney(report.FeeUSD), Short: true},
-			{Title: "Current Price", Value: USD.FormatMoney(report.CurrentPrice), Short: true},
-			{Title: "Average Bid Cost", Value: USD.FormatMoney(report.AverageBidCost), Short: true},
-			{Title: "Number of Trades", Value: strconv.Itoa(report.NumTrades), Short: true},
 			{Title: "Stock", Value: strconv.FormatFloat(report.Stock, 'f', 8, 64), Short: true},
+			{Title: "Number of Trades", Value: strconv.Itoa(report.NumTrades), Short: true},
 		},
 		Footer:     report.StartTime.Format(time.RFC822),
 		FooterIcon: "",
