@@ -168,9 +168,8 @@ func (report ProfitAndLossReport) SlackAttachment() slack.Attachment {
 		// Pretext:       "",
 		// Text:          "",
 		Fields: []slack.AttachmentField{
-			{Title: "Symbol", Value: report.Symbol, Short: true},
-			{Title: "Profit", Value: USD.FormatMoney(report.Profit), Short: true},
-			{Title: "Unrealized Profit", Value: USD.FormatMoney(report.UnrealizedProfit), Short: true},
+			{Title: "Profit", Value: USD.FormatMoney(report.Profit)},
+			{Title: "Unrealized Profit", Value: USD.FormatMoney(report.UnrealizedProfit)},
 			{Title: "Current Price", Value: market.FormatPrice(report.CurrentPrice), Short: true},
 			{Title: "Average Cost", Value: market.FormatPrice(report.AverageBidCost), Short: true},
 			{Title: "Fee (USD)", Value: USD.FormatMoney(report.FeeUSD), Short: true},
