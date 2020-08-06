@@ -15,8 +15,8 @@ import (
 executionReport
 
 {
-  "e": "executionReport",        // KLineEvent type
-  "E": 1499405658658,            // KLineEvent time
+  "e": "executionReport",        // Event type
+  "E": 1499405658658,            // Event time
   "s": "ETHBTC",                 // Symbol
   "c": "mUvoqJxFIILMdfAW5iGSOW", // Client order ID
   "S": "BUY",                    // Side
@@ -79,6 +79,7 @@ type ExecutionReportEvent struct {
 	LastExecutedQuantity     string `json:"l"`
 	CumulativeFilledQuantity string `json:"z"`
 	LastExecutedPrice        string `json:"L"`
+	LastQuoteAssetTransactedQuantity string `json:"Y"`
 
 	OrderCreationTime int `json:"O"`
 }
@@ -94,6 +95,7 @@ func (e *ExecutionReportEvent) Trade() (*types.Trade, error) {
 		Symbol:      e.Symbol,
 		Price:       util.MustParseFloat(e.LastExecutedPrice),
 		Quantity:    util.MustParseFloat(e.LastExecutedQuantity),
+		QuoteQuantity: util.MustParseFloat(e.LastQuoteAssetTransactedQuantity),
 		Side:        e.Side,
 		IsBuyer:     e.Side == "BUY",
 		IsMaker:     e.IsMaker,
