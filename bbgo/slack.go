@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/c9s/bbgo/pkg/bbgo/types"
-	"github.com/c9s/bbgo/pkg/slack/slackstyle"
 	"github.com/c9s/bbgo/pkg/util"
 	"github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
@@ -18,6 +17,10 @@ type Notifier interface {
 type NullNotifier struct{}
 
 func (n *NullNotifier) Notify(format string, args ...interface{}) {
+}
+
+type SlackAttachmentCreator interface {
+	SlackAttachment() slack.Attachment
 }
 
 type SlackNotifier struct {
@@ -39,12 +42,14 @@ func (t *SlackNotifier) Notify(format string, args ...interface{}) {
 			if slackArgsStartIdx == -1 {
 				slackArgsStartIdx = idx
 			}
+
 			slackAttachments = append(slackAttachments, a)
 
-		case slackstyle.SlackAttachmentCreator:
+		case SlackAttachmentCreator:
 			if slackArgsStartIdx == -1 {
 				slackArgsStartIdx = idx
 			}
+
 			slackAttachments = append(slackAttachments, a.SlackAttachment())
 
 		}

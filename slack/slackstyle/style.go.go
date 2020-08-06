@@ -1,7 +1,5 @@
 package slackstyle
 
-import "github.com/slack-go/slack"
-
 const Green = "#228B22"
 const Red = "#800000"
 
@@ -14,7 +12,4 @@ func TrendIcon(trend int) string {
 	return ""
 }
 
-type SlackAttachmentCreator interface {
-	SlackAttachment() slack.Attachment
-}
 
