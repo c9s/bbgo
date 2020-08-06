@@ -157,7 +157,7 @@ func (k KLine) Color() string {
 
 func (k KLine) SlackAttachment() slack.Attachment {
 	return slack.Attachment{
-		Text:  fmt.Sprintf("KLine *%s* %s", k.Symbol, k.Interval),
+		Text:  fmt.Sprintf("*%s* KLine %s", k.Symbol, k.Interval),
 		Color: k.Color(),
 		Fields: []slack.AttachmentField{
 			{Title: "Open", Value: k.Open, Short: true},
@@ -358,7 +358,7 @@ func (k KLineWindow) SlackAttachment() slack.Attachment {
 	}
 
 	return slack.Attachment{
-		Text:  fmt.Sprintf("KLine *%s* %s x %d", first.Symbol, first.Interval, windowSize),
+		Text:  fmt.Sprintf("*%s* KLineWindow %s x %d", first.Symbol, first.Interval, windowSize),
 		Color: k.Color(),
 		Fields: []slack.AttachmentField{
 			{Title: "Open", Value: util.FormatFloat(k.GetOpen(), 2), Short: true},
