@@ -1,9 +1,14 @@
 package types
 
 import (
+	"github.com/leekchan/accounting"
 	"math"
 	"strconv"
 )
+
+var USD = accounting.Accounting{Symbol: "$ ", Precision: 2}
+var BTC = accounting.Accounting{Symbol: "BTC ", Precision: 2}
+var BNB = accounting.Accounting{Symbol: "BNB ", Precision: 4}
 
 type Market struct {
 	Symbol          string
@@ -17,6 +22,20 @@ type Market struct {
 }
 
 func (m Market) FormatPrice(val float64) string {
+
+	switch m.QuoteCurrency {
+
+	case "USD", "USDT":
+		return USD.FormatMoneyFloat64(val)
+
+	case "BTC":
+		return BTC.FormatMoneyFloat64(val)
+
+	case "BNB":
+		return BNB.FormatMoneyFloat64(val)
+
+	}
+
 	return strconv.FormatFloat(val, 'f', m.PricePrecision, 64)
 }
 
