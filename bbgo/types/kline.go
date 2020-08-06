@@ -157,17 +157,12 @@ func (k KLine) Color() string {
 
 func (k KLine) SlackAttachment() slack.Attachment {
 	return slack.Attachment{
-		Text:  "KLine",
+		Text:  fmt.Sprintf("KLine %s %s", k.Symbol, k.Interval),
 		Color: k.Color(),
 		Fields: []slack.AttachmentField{
 			{
 				Title: "Open",
 				Value: k.Open,
-				Short: true,
-			},
-			{
-				Title: "Close",
-				Value: k.Close,
 				Short: true,
 			},
 			{
@@ -178,6 +173,11 @@ func (k KLine) SlackAttachment() slack.Attachment {
 			{
 				Title: "Low",
 				Value: k.Low,
+				Short: true,
+			},
+			{
+				Title: "Close",
+				Value: k.Close,
 				Short: true,
 			},
 			{
@@ -379,18 +379,19 @@ func (k KLineWindow) GetLowerShadowHeight() float64 {
 }
 
 func (k KLineWindow) SlackAttachment() slack.Attachment {
+	var first KLine
+	var windowSize = len(k)
+	if windowSize > 0 {
+		first = k[0]
+	}
+
 	return slack.Attachment{
-		Text:  "KLine",
+		Text:  fmt.Sprintf("KLine %s %s x %d", first.Symbol, first.Interval, windowSize),
 		Color: k.Color(),
 		Fields: []slack.AttachmentField{
 			{
 				Title: "Open",
 				Value: util.FormatFloat(k.GetOpen(), 2),
-				Short: true,
-			},
-			{
-				Title: "Close",
-				Value: util.FormatFloat(k.GetClose(), 2),
 				Short: true,
 			},
 			{
@@ -401,6 +402,11 @@ func (k KLineWindow) SlackAttachment() slack.Attachment {
 			{
 				Title: "Low",
 				Value: util.FormatFloat(k.GetLow(), 2),
+				Short: true,
+			},
+			{
+				Title: "Close",
+				Value: util.FormatFloat(k.GetClose(), 2),
 				Short: true,
 			},
 			{
