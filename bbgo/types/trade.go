@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	"github.com/c9s/bbgo/pkg/util"
 	"github.com/slack-go/slack"
 	"time"
 )
@@ -52,6 +53,9 @@ func (trade Trade) SlackAttachment() slack.Attachment {
 			{Title: "Side", Value: trade.Side, Short: true},
 			{Title: "Price", Value: market.FormatPrice(trade.Price), Short: true},
 			{Title: "Volume", Value: market.FormatVolume(trade.Quantity), Short: true},
+			{Title: "Amount", Value: market.FormatPrice(trade.QuoteQuantity), Short: true},
+			{Title: "FeeCurrency", Value: trade.FeeCurrency, Short: true},
+			{Title: "Fee", Value: util.FormatFloat(trade.Fee, 4), Short: true},
 		},
 		// Footer:     tradingCtx.TradeStartTime.Format(time.RFC822),
 		// FooterIcon: "",
