@@ -18,6 +18,7 @@ type Market struct {
 	BaseCurrency    string
 	MinQuantity     float64
 	MinAmount       float64
+	MinNotional     float64
 	MinLot          float64
 }
 
@@ -55,8 +56,9 @@ var MarketBTCUSDT = Market{
 	PricePrecision:  2,
 	VolumePrecision: 6,
 	MinQuantity:     0.000001,
-	MinAmount:       10.0,
 	MinLot:          0.000001,
+	MinAmount:       10.0,
+	MinNotional:     10.0,
 }
 
 var MarketETHUSDT = Market{
@@ -66,10 +68,10 @@ var MarketETHUSDT = Market{
 	PricePrecision:  2,
 	VolumePrecision: 5,
 	MinQuantity:     0.01,
-	MinAmount:       10.0,
 	MinLot:          0.01,
+	MinAmount:       10.0,
+	MinNotional:     10.0,
 }
-
 
 var MarketBNBUSDT = Market{
 	Symbol:          "BNBUSDT",
@@ -78,8 +80,9 @@ var MarketBNBUSDT = Market{
 	PricePrecision:  4,
 	VolumePrecision: 2,
 	MinQuantity:     0.01,
-	MinAmount:       10.0,
 	MinLot:          0.01,
+	MinAmount:       10.0,
+	MinNotional:     10.0,
 }
 
 var Markets = map[string]Market{
