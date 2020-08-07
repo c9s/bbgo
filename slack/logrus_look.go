@@ -2,8 +2,10 @@ package slack
 
 import (
 	"context"
+	"fmt"
 	"github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
+	"strings"
 )
 
 type SlackLogHook struct {
@@ -36,19 +38,22 @@ func (t *SlackLogHook) Fire(e *logrus.Entry) error {
 
 	var slackAttachments []slack.Attachment = nil
 
-	logerr, ok := e.Data["err"]
-	if ok {
-		slackAttachments = append(slackAttachments, slack.Attachment{
-			Color: color,
-			Title: "Error",
-			Fields: []slack.AttachmentField{
-				{Title: "Error", Value: logerr.(error).Error()},
-			},
+	// error fields
+	var fields []slack.AttachmentField
+	for k, d := range e.Data {
+		fields = append(fields, slack.AttachmentField{
+			Title: k, Value: fmt.Sprintf("%v", d),
 		})
 	}
 
+	slackAttachments = append(slackAttachments, slack.Attachment{
+		Color: color,
+		Title: strings.ToUpper(e.Level.String()),
+		Fields: fields,
+	})
+
 	_, _, err := t.Slack.PostMessageContext(context.Background(), t.ErrorChannel,
-		slack.MsgOptionText(e.Message, true),
+		slack.MsgOptionText(":balloon: "+e.Message, true),
 		slack.MsgOptionAttachments(slackAttachments...))
 
 	return err

@@ -3,6 +3,7 @@ package binance
 import (
 	"context"
 	"github.com/c9s/bbgo/pkg/util"
+	"strings"
 	"time"
 
 	"github.com/adshao/go-binance"
@@ -23,9 +24,9 @@ type StreamRequest struct {
 type PrivateStream struct {
 	types.StandardPrivateStream
 
-	Client        *binance.Client
-	ListenKey     string
-	Conn          *websocket.Conn
+	Client    *binance.Client
+	ListenKey string
+	Conn      *websocket.Conn
 
 	connectCallbacks []func(stream *PrivateStream)
 
@@ -37,7 +38,6 @@ type PrivateStream struct {
 	outboundAccountInfoEventCallbacks []func(event *OutboundAccountInfoEvent)
 	executionReportEventCallbacks     []func(event *ExecutionReportEvent)
 }
-
 
 func (s *PrivateStream) dial(listenKey string) (*websocket.Conn, error) {
 	url := "wss://stream.binance.com:9443/ws/" + listenKey
@@ -105,13 +105,15 @@ func (s *PrivateStream) read(ctx context.Context, eventC chan interface{}) {
 			return
 
 		case <-ticker.C:
-			if err := s.Conn.WriteControl(websocket.PingMessage, []byte("hb"), time.Now().Add(1 * time.Second)) ; err != nil {
+			if err := s.Conn.WriteControl(websocket.PingMessage, []byte("hb"), time.Now().Add(1*time.Second)); err != nil {
 				log.WithError(err).Error("ping error", err)
 			}
 
 			err := s.Client.NewKeepaliveUserStreamService().ListenKey(s.ListenKey).Do(ctx)
 			if err != nil {
-				log.WithError(err).Error("listen key keep-alive error", err)
+				maskKey := s.ListenKey[0:5]
+				maskKey = maskKey + strings.Repeat("*", len(s.ListenKey)-1-5)
+				log.WithError(err).Errorf("listen key keep-alive error: %v key: %s", err, maskKey)
 			}
 
 		default:
