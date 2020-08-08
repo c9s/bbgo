@@ -163,7 +163,8 @@ func (report ProfitAndLossReport) SlackAttachment() slack.Attachment {
 	}
 
 	return slack.Attachment{
-		Title: "Profit and Loss report of " + report.Symbol,
+		Title: report.Symbol + " Profit and Loss report",
+		Text: "Profit " + USD.FormatMoney(report.Profit),
 		Color: color,
 		// Pretext:       "",
 		// Text:          "",
