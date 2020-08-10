@@ -212,7 +212,7 @@ func (trader *Trader) RunStrategy(ctx context.Context, strategy Strategy) (chan 
 			trader.reportTimer.Stop()
 		}
 
-		trader.reportTimer = time.AfterFunc(5*time.Second, func() {
+		trader.reportTimer = time.AfterFunc(1*time.Minute, func() {
 			trader.ReportPnL()
 		})
 	})
