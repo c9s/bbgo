@@ -3,6 +3,7 @@ package bbgo
 import (
 	"context"
 	"fmt"
+	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/util"
 	"time"
 
@@ -162,6 +163,8 @@ type Trader struct {
 	reportTimer *time.Timer
 
 	ProfitAndLossCalculator *ProfitAndLossCalculator
+
+	TradeService *service.TradeService
 }
 
 func (trader *Trader) RunStrategy(ctx context.Context, strategy Strategy) (chan struct{}, error) {
@@ -199,6 +202,10 @@ func (trader *Trader) RunStrategy(ctx context.Context, strategy Strategy) (chan 
 	stream.OnTrade(func(trade *types.Trade) {
 		if trade.Symbol != symbol {
 			return
+		}
+
+		if err := trader.TradeService.Insert(*trade) ; err != nil {
+			log.WithError(err).Error("trade insert error")
 		}
 
 		trader.ReportTrade(trade)
