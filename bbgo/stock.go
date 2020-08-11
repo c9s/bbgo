@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/c9s/bbgo/pkg/bbgo/types"
 	"math"
+	"sort"
 	"strings"
 	"sync"
 )
@@ -58,6 +59,7 @@ type StockManager struct {
 }
 
 type Distribution struct {
+	PriceLevels []int `json:"priceLevels"`
 	Quantities map[int]float64 `json:"quantities"`
 	Stocks map[int]StockSlice `json:"stocks"`
 }
@@ -77,6 +79,12 @@ func (m *StockManager) Distribution(level int) *Distribution {
 		d.Stocks[priceLevel] = append(d.Stocks[priceLevel], stock)
 		d.Quantities[priceLevel] += stock.Quantity
 	}
+
+	for level := range d.Stocks {
+		d.PriceLevels = append(d.PriceLevels, level)
+	}
+
+	sort.Ints(d.PriceLevels)
 
 	return &d
 }
