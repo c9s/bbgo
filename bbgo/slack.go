@@ -3,11 +3,13 @@ package bbgo
 import (
 	"context"
 	"fmt"
-	"github.com/c9s/bbgo/pkg/bbgo/types"
-	"github.com/c9s/bbgo/pkg/util"
+	"time"
+
 	"github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
-	"time"
+
+	"github.com/c9s/bbgo/pkg/bbgo/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 type Notifier interface {
@@ -31,7 +33,7 @@ type SlackNotifier struct {
 	InfoChannel    string
 }
 
-func (t *SlackNotifier) Notify(format string, args ...interface{}) {
+func (n *SlackNotifier) Notify(format string, args ...interface{}) {
 	var slackAttachments []slack.Attachment
 	var slackArgsOffset = -1
 
@@ -63,7 +65,7 @@ func (t *SlackNotifier) Notify(format string, args ...interface{}) {
 
 	logrus.Infof(format, nonSlackArgs...)
 
-	_, _, err := t.Slack.PostMessageContext(context.Background(), t.InfoChannel,
+	_, _, err := n.Slack.PostMessageContext(context.Background(), n.InfoChannel,
 		slack.MsgOptionText(fmt.Sprintf(format, nonSlackArgs...), true),
 		slack.MsgOptionAttachments(slackAttachments...))
 	if err != nil {
@@ -71,8 +73,8 @@ func (t *SlackNotifier) Notify(format string, args ...interface{}) {
 	}
 }
 
-func (t *SlackNotifier) ReportTrade(trade *types.Trade) {
-	_, _, err := t.Slack.PostMessageContext(context.Background(), t.TradingChannel,
+func (n *SlackNotifier) ReportTrade(trade *types.Trade) {
+	_, _, err := n.Slack.PostMessageContext(context.Background(), n.TradingChannel,
 		slack.MsgOptionText(util.Render(`:handshake: {{ .Symbol }} {{ .Side }} Trade Execution @ {{ .Price  }}`, trade), true),
 		slack.MsgOptionAttachments(trade.SlackAttachment()))
 
@@ -81,10 +83,10 @@ func (t *SlackNotifier) ReportTrade(trade *types.Trade) {
 	}
 }
 
-func (t *SlackNotifier) ReportPnL(report *ProfitAndLossReport) {
+func (n *SlackNotifier) ReportPnL(report *ProfitAndLossReport) {
 	attachment := report.SlackAttachment()
 
-	_, _, err := t.Slack.PostMessageContext(context.Background(), t.TradingChannel,
+	_, _, err := n.Slack.PostMessageContext(context.Background(), n.TradingChannel,
 		slack.MsgOptionText(util.Render(
 			`:heavy_dollar_sign: Here is your *{{ .symbol }}* PnL report collected since *{{ .startTime }}*`,
 			map[string]interface{}{
@@ -96,4 +98,14 @@ func (t *SlackNotifier) ReportPnL(report *ProfitAndLossReport) {
 	if err != nil {
 		logrus.WithError(err).Errorf("slack send error")
 	}
+}
+
+type SlackInteraction struct {
+	Client         *slack.Client
+	Trader         *Trader
+	TradingContext *TradingContext
+}
+
+func (i *SlackInteraction) Connect() {
+
 }
