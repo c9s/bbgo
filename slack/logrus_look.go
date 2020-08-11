@@ -8,12 +8,12 @@ import (
 	"strings"
 )
 
-type SlackLogHook struct {
+type LogHook struct {
 	Slack        *slack.Client
 	ErrorChannel string
 }
 
-func (t *SlackLogHook) Levels() []logrus.Level {
+func (t *LogHook) Levels() []logrus.Level {
 	return []logrus.Level{
 		// log.InfoLevel,
 		logrus.ErrorLevel,
@@ -22,7 +22,7 @@ func (t *SlackLogHook) Levels() []logrus.Level {
 	}
 }
 
-func (t *SlackLogHook) Fire(e *logrus.Entry) error {
+func (t *LogHook) Fire(e *logrus.Entry) error {
 	var color = "#F0F0F0"
 
 	switch e.Level {
