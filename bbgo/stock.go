@@ -169,8 +169,11 @@ func (m *StockManager) consume(sell Stock) error {
 
 		delta := stock.Consume(sell.Quantity)
 		sell.Consume(delta)
-
 		m.Stocks[idx] = stock
+
+		if zero(sell.Quantity) {
+			return nil
+		}
 	}
 
 	if !zero(sell.Quantity) {
