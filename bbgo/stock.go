@@ -60,6 +60,7 @@ type StockManager struct {
 
 type Distribution struct {
 	PriceLevels []int `json:"priceLevels"`
+	TotalQuantity float64 `json:"totalQuantity"`
 	Quantities map[int]float64 `json:"quantities"`
 	Stocks map[int]StockSlice `json:"stocks"`
 }
@@ -76,6 +77,7 @@ func (m *StockManager) Distribution(level int) *Distribution {
 		div := math.Pow10(digits)
 		priceLevel := int(math.Floor(stock.Price / div) * div)
 
+		d.TotalQuantity += stock.Quantity
 		d.Stocks[priceLevel] = append(d.Stocks[priceLevel], stock)
 		d.Quantities[priceLevel] += stock.Quantity
 	}
