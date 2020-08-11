@@ -57,6 +57,30 @@ type StockManager struct {
 	PendingSells       StockSlice
 }
 
+type Distribution struct {
+	Quantities map[int]float64 `json:"quantities"`
+	Stocks map[int]StockSlice `json:"stocks"`
+}
+
+func (m *StockManager) Distribution(level int) *Distribution {
+	var d = Distribution{
+		Quantities: map[int]float64{},
+		Stocks: map[int]StockSlice{},
+	}
+
+	for _, stock := range m.Stocks {
+		n := math.Ceil(math.Log10(stock.Price))
+		digits := int(n - math.Max(float64(level), 1.0))
+		div := math.Pow10(digits)
+		priceLevel := int(math.Floor(stock.Price / div) * div)
+
+		d.Stocks[priceLevel] = append(d.Stocks[priceLevel], stock)
+		d.Quantities[priceLevel] += stock.Quantity
+	}
+
+	return &d
+}
+
 func (m *StockManager) stock(stock Stock) error {
 	m.mu.Lock()
 	m.Stocks = append(m.Stocks, stock)
