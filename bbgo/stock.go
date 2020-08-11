@@ -176,7 +176,7 @@ func (m *StockManager) consume(sell Stock) error {
 		}
 	}
 
-	if !zero(sell.Quantity) {
+	if sell.Quantity > 0.0 {
 		m.PendingSells = append(m.PendingSells, sell)
 	}
 
