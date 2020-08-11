@@ -2,13 +2,13 @@ package binance
 
 import (
 	"context"
-	"github.com/c9s/bbgo/pkg/util"
 	"strings"
 	"time"
 
+	"github.com/c9s/bbgo/pkg/util"
+
 	"github.com/adshao/go-binance"
 	"github.com/gorilla/websocket"
-	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo/types"
 )

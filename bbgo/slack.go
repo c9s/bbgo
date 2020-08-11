@@ -100,12 +100,3 @@ func (n *SlackNotifier) ReportPnL(report *ProfitAndLossReport) {
 	}
 }
 
-type SlackInteraction struct {
-	Client         *slack.Client
-	Trader         *Trader
-	TradingContext *TradingContext
-}
-
-func (i *SlackInteraction) Connect() {
-
-}
