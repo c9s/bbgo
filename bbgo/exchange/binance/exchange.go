@@ -13,6 +13,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+var log = logrus.WithFields(logrus.Fields{
+	"exchange": "binance",
+})
+
 type Exchange struct {
 	Client *binance.Client
 }
@@ -108,7 +112,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order *types.Order) error {
 	}
 
 	retOrder, err := req.Do(ctx)
-	logrus.Infof("[binance] order created: %+v", retOrder)
+	log.Infof("order created: %+v", retOrder)
 	return err
 }
 
@@ -131,7 +135,7 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol, interval string, opt
 		limit = options.Limit
 	}
 
-	logrus.Infof("[binance] querying kline %s %s %v", symbol, interval, options)
+	log.Infof("querying kline %s %s %v", symbol, interval, options)
 
 	req := e.Client.NewKlinesService().Symbol(symbol).
 		Interval(interval).
@@ -203,11 +207,11 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *Trad
 	for _, t := range remoteTrades {
 		localTrade, err := convertRemoteTrade(*t)
 		if err != nil {
-			logrus.WithError(err).Errorf("can not convert binance trade: %+v", t)
+			log.WithError(err).Errorf("can not convert binance trade: %+v", t)
 			continue
 		}
 
-		logrus.Infof("[binance] trade: %d %s % 4s price: % 13s volume: % 11s %6s % 5s %s", t.ID, t.Symbol, localTrade.Side, t.Price, t.Quantity, BuyerOrSellerLabel(t), MakerOrTakerLabel(t), localTrade.Time)
+		log.Infof("trade: %d %s % 4s price: % 13s volume: % 11s %6s % 5s %s", t.ID, t.Symbol, localTrade.Side, t.Price, t.Quantity, BuyerOrSellerLabel(t), MakerOrTakerLabel(t), localTrade.Time)
 		trades = append(trades, *localTrade)
 	}
 
@@ -220,7 +224,7 @@ func (e *Exchange) BatchQueryTrades(ctx context.Context, symbol string, options 
 		startTime = *options.StartTime
 	}
 
-	logrus.Infof("[binance] querying %s trades from %s", symbol, startTime)
+	log.Infof("querying %s trades from %s", symbol, startTime)
 
 	var lastTradeID = options.LastTradeID
 	for {
