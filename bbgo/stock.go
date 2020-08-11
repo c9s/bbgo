@@ -5,6 +5,7 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo/types"
 	"math"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -59,34 +60,43 @@ type StockManager struct {
 }
 
 type Distribution struct {
-	PriceLevels []int `json:"priceLevels"`
+	PriceLevels []string `json:"priceLevels"`
 	TotalQuantity float64 `json:"totalQuantity"`
-	Quantities map[int]float64 `json:"quantities"`
-	Stocks map[int]StockSlice `json:"stocks"`
+	Quantities map[string]float64 `json:"quantities"`
+	Stocks map[string]StockSlice `json:"stocks"`
 }
 
 func (m *StockManager) Distribution(level int) *Distribution {
 	var d = Distribution{
-		Quantities: map[int]float64{},
-		Stocks: map[int]StockSlice{},
+		Quantities: map[string]float64{},
+		Stocks: map[string]StockSlice{},
 	}
 
 	for _, stock := range m.Stocks {
 		n := math.Ceil(math.Log10(stock.Price))
 		digits := int(n - math.Max(float64(level), 1.0))
 		div := math.Pow10(digits)
-		priceLevel := int(math.Floor(stock.Price / div) * div)
+		priceLevel := math.Floor(stock.Price / div) * div
+		key := strconv.FormatFloat(priceLevel, 'f', 2, 64)
 
 		d.TotalQuantity += stock.Quantity
-		d.Stocks[priceLevel] = append(d.Stocks[priceLevel], stock)
-		d.Quantities[priceLevel] += stock.Quantity
+		d.Stocks[key] = append(d.Stocks[key], stock)
+		d.Quantities[key] += stock.Quantity
 	}
 
-	for level := range d.Stocks {
-		d.PriceLevels = append(d.PriceLevels, level)
+	var priceLevels []float64
+	for priceString := range d.Stocks {
+		price, _ := strconv.ParseFloat(priceString, 32)
+		priceLevels = append(priceLevels, price)
+	}
+	sort.Float64s(priceLevels)
+
+	for _, price := range priceLevels {
+		d.PriceLevels = append(d.PriceLevels, strconv.FormatFloat(price, 'f', 2, 64))
 	}
 
-	sort.Ints(d.PriceLevels)
+	sort.Float64s(priceLevels)
+
 
 	return &d
 }
