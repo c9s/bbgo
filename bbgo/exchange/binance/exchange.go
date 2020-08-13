@@ -8,9 +8,10 @@ import (
 
 	"github.com/adshao/go-binance"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/c9s/bbgo/pkg/bbgo/types"
 	"github.com/c9s/bbgo/pkg/util"
-	"github.com/sirupsen/logrus"
 )
 
 var log = logrus.WithFields(logrus.Fields{
@@ -41,6 +42,153 @@ func (e *Exchange) NewPrivateStream() (*PrivateStream, error) {
 	return &PrivateStream{
 		Client: e.Client,
 	}, nil
+}
+
+type Withdraw struct {
+	ID         string  `json:"id"`
+	Asset      string  `json:"asset"`
+	Amount     float64 `json:"amount"`
+	Address    string  `json:"address"`
+	AddressTag string  `json:"addressTag"`
+	Status          string    `json:"status"`
+
+	TransactionID   string    `json:"txId"`
+	TransactionFee  float64   `json:"transactionFee"`
+	WithdrawOrderID string    `json:"withdrawOrderId"`
+	ApplyTime       time.Time `json:"applyTime"`
+	Network         string    `json:"network"`
+}
+
+func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (allWithdraws []Withdraw, err error) {
+
+	startTime := since
+	txIDs := map[string]struct{}{}
+
+	for startTime.Before(until) {
+		// startTime ~ endTime must be in 90 days
+		endTime := startTime.AddDate(0, 0, 60)
+		if endTime.After(until) {
+			endTime = until
+		}
+
+		withdraws, err := e.Client.NewListWithdrawsService().
+			Asset(asset).
+			StartTime(startTime.UnixNano() / int64(time.Millisecond)).
+			EndTime(endTime.UnixNano() / int64(time.Millisecond)).
+			Do(ctx)
+
+		if err != nil {
+			return nil, err
+		}
+
+		for _, d := range withdraws {
+			if _, ok := txIDs[d.TxID]; ok {
+				continue
+			}
+
+			// 0(0:pending,6: credited but cannot withdraw, 1:success)
+			status := ""
+			switch d.Status {
+			case 0:
+				status = "email_sent"
+			case 1:
+				status = "cancelled"
+			case 2:
+				status = "awaiting_approval"
+			case 3:
+				status = "rejected"
+			case 4:
+				status = "processing"
+			case 5:
+				status = "failure"
+			case 6:
+				status = "completed"
+			}
+
+			txIDs[d.TxID] = struct{}{}
+			allWithdraws = append(allWithdraws, Withdraw{
+				ApplyTime:      time.Unix(0, d.ApplyTime*int64(time.Millisecond)),
+				Asset:          d.Asset,
+				Amount:         d.Amount,
+				Address:        d.Address,
+				AddressTag:     d.AddressTag,
+				TransactionID:  d.TxID,
+				TransactionFee: d.TransactionFee,
+				WithdrawOrderID: d.WithdrawOrderID,
+				Network:        d.Network,
+				Status:         status,
+			})
+		}
+
+		startTime = endTime
+	}
+
+	return allWithdraws, nil
+}
+
+type Deposit struct {
+	Time          time.Time `json:"time"`
+	Amount        float64   `json:"amount"`
+	Asset         string    `json:"asset"`
+	Address       string    `json:"address"`
+	AddressTag    string    `json:"addressTag"`
+	TransactionID string    `json:"txId"`
+	Status        string    `json:"status"`
+}
+
+func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since, until time.Time) (allDeposits []Deposit, err error) {
+	startTime := since
+	txIDs := map[string]struct{}{}
+	for startTime.Before(until) {
+
+		// startTime ~ endTime must be in 90 days
+		endTime := startTime.AddDate(0, 0, 60)
+		if endTime.After(until) {
+			endTime = until
+		}
+
+		deposits, err := e.Client.NewListDepositsService().
+			Asset(asset).
+			StartTime(startTime.UnixNano() / int64(time.Millisecond)).
+			EndTime(endTime.UnixNano() / int64(time.Millisecond)).
+			Do(ctx)
+
+		if err != nil {
+			return nil, err
+		}
+
+		for _, d := range deposits {
+			if _, ok := txIDs[d.TxID]; ok {
+				continue
+			}
+
+			// 0(0:pending,6: credited but cannot withdraw, 1:success)
+			status := ""
+			switch d.Status {
+			case 0:
+				status = "pending"
+			case 6:
+				status = "credited"
+			case 1:
+				status = "success"
+			}
+
+			txIDs[d.TxID] = struct{}{}
+			allDeposits = append(allDeposits, Deposit{
+				Time:          time.Unix(0, d.InsertTime*int64(time.Millisecond)),
+				Asset:         d.Asset,
+				Amount:        d.Amount,
+				Address:       d.Address,
+				AddressTag:    d.AddressTag,
+				TransactionID: d.TxID,
+				Status:        status,
+			})
+		}
+
+		startTime = endTime
+	}
+
+	return allDeposits, nil
 }
 
 func (e *Exchange) QueryAccountBalances(ctx context.Context) (map[string]types.Balance, error) {
