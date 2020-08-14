@@ -450,3 +450,34 @@ func convertRemoteTrade(t binance.TradeV3) (*types.Trade, error) {
 		Time:          mts,
 	}, nil
 }
+
+func (e *Exchange) BatchQueryKLines(ctx context.Context, symbol, interval string, startTime, endTime time.Time) ([]types.KLine, error) {
+	var allKLines []types.KLine
+
+	for startTime.Before(endTime) {
+		klines, err := e.QueryKLines(ctx, symbol, interval, types.KLineQueryOptions{
+			StartTime: &startTime,
+			Limit:     1000,
+		})
+
+		if err != nil {
+			return nil, err
+		}
+
+		for _, kline := range klines {
+			t := time.Unix(0, kline.EndTime*int64(time.Millisecond))
+			if t.After(endTime) {
+				return allKLines, nil
+			}
+
+			allKLines = append(allKLines, kline)
+			startTime = t
+		}
+
+		// avoid rate limit
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	return allKLines, nil
+
+}

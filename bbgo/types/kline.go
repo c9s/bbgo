@@ -2,13 +2,16 @@ package types
 
 import (
 	"fmt"
-	"github.com/c9s/bbgo/pkg/util"
-	"github.com/slack-go/slack"
 	"math"
 	"time"
+
+	"github.com/slack-go/slack"
+
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 type KLineOrWindow interface {
+	GetInterval() string
 	GetTrend() int
 	GetChange() float64
 	GetMaxChange() float64
@@ -42,9 +45,9 @@ type KLine struct {
 	Symbol   string `json:"s"`
 	Interval string `json:"i"`
 
-	Open        string `json:"o"`
-	Close       string `json:"c"`
-	High        string `json:"h"`
+	Open  string `json:"o"`
+	Close string `json:"c"`
+	High  string `json:"h"`
 
 	Low         string `json:"l"`
 	Volume      string `json:"V"` // taker buy base asset volume (like 10 BTC)
@@ -53,6 +56,10 @@ type KLine struct {
 	LastTradeID    int   `json:"L"`
 	NumberOfTrades int64 `json:"n"`
 	Closed         bool  `json:"x"`
+}
+
+func (k KLine) GetInterval() string {
+	return k.Interval
 }
 
 func (k KLine) Mid() float64 {
@@ -143,6 +150,14 @@ func (k KLine) GetChange() float64 {
 	return k.GetClose() - k.GetOpen()
 }
 
+func (k KLine) GetStartTime() time.Time {
+	return time.Unix(0, k.StartTime*int64(time.Millisecond))
+}
+
+func (k KLine) GetEndTime() time.Time {
+	return time.Unix(0, k.EndTime*int64(time.Millisecond))
+}
+
 func (k KLine) String() string {
 	return fmt.Sprintf("%s %s Open: % 14s Close: % 14s High: % 14s Low: % 14s Volume: % 15s Change: % 11f Max Change: % 11f", k.Symbol, k.Interval, k.Open, k.Close, k.High, k.Low, k.Volume, k.GetChange(), k.GetMaxChange())
 }
@@ -195,8 +210,16 @@ func (k KLineWindow) Len() int {
 	return len(k)
 }
 
+func (k KLineWindow) First() KLine {
+	return k[0]
+}
+
+func (k KLineWindow) GetInterval() string {
+	return k.First().Interval
+}
+
 func (k KLineWindow) GetOpen() float64 {
-	return k[0].GetOpen()
+	return k.First().GetOpen()
 }
 
 func (k KLineWindow) GetClose() float64 {
@@ -207,22 +230,18 @@ func (k KLineWindow) GetClose() float64 {
 func (k KLineWindow) GetHigh() float64 {
 	high := k.GetOpen()
 	for _, line := range k {
-		val := line.GetHigh()
-		if val > high {
-			high = val
-		}
+		high = math.Max(high, line.GetHigh())
 	}
+
 	return high
 }
 
 func (k KLineWindow) GetLow() float64 {
 	low := k.GetOpen()
 	for _, line := range k {
-		val := line.GetLow()
-		if val < low {
-			low = val
-		}
+		low = math.Min(low, line.GetLow())
 	}
+
 	return low
 }
 
@@ -353,9 +372,11 @@ func (k KLineWindow) GetLowerShadowHeight() float64 {
 
 func (k KLineWindow) SlackAttachment() slack.Attachment {
 	var first KLine
+	var end KLine
 	var windowSize = len(k)
 	if windowSize > 0 {
 		first = k[0]
+		end = k[windowSize-1]
 	}
 
 	return slack.Attachment{
@@ -393,7 +414,7 @@ func (k KLineWindow) SlackAttachment() slack.Attachment {
 				Short: true,
 			},
 		},
-		Footer:     "",
+		Footer:     fmt.Sprintf("Since %s til %s", first.GetStartTime(), end.GetEndTime()),
 		FooterIcon: "",
 	}
 }
