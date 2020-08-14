@@ -13,25 +13,25 @@ const (
 	OrderTypeMarket OrderType = "MARKET"
 )
 
-type Order struct {
-	Symbol    string
-	Side      SideType
-	Type      OrderType
-	VolumeStr string
-	PriceStr  string
+type SubmitOrder struct {
+	Symbol   string
+	Side     SideType
+	Type     OrderType
+	Quantity string
+	Price    string
 
 	TimeInForce binance.TimeInForceType
 }
 
-func (o *Order) SlackAttachment() slack.Attachment {
+func (o *SubmitOrder) SlackAttachment() slack.Attachment {
 	var fields = []slack.AttachmentField{
 		{Title: "Symbol", Value: o.Symbol, Short: true},
 		{Title: "Side", Value: string(o.Side), Short: true},
-		{Title: "Volume", Value: o.VolumeStr, Short: true},
+		{Title: "Volume", Value: o.Quantity, Short: true},
 	}
 
-	if len(o.PriceStr) > 0 {
-		fields = append(fields, slack.AttachmentField{Title: "Price", Value: o.PriceStr, Short: true})
+	if len(o.Price) > 0 {
+		fields = append(fields, slack.AttachmentField{Title: "Price", Value: o.Price, Short: true})
 	}
 
 	return slack.Attachment{

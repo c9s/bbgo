@@ -24,11 +24,11 @@ type KLineRegressionTrader struct {
 	SourceKLines            []types.KLine
 	ProfitAndLossCalculator *ProfitAndLossCalculator
 
-	doneOrders    []*types.Order
-	pendingOrders []*types.Order
+	doneOrders    []*types.SubmitOrder
+	pendingOrders []*types.SubmitOrder
 }
 
-func (trader *KLineRegressionTrader) SubmitOrder(cxt context.Context, order *types.Order) {
+func (trader *KLineRegressionTrader) SubmitOrder(cxt context.Context, order *types.SubmitOrder) {
 	trader.pendingOrders = append(trader.pendingOrders, order)
 }
 
@@ -73,12 +73,12 @@ func (trader *KLineRegressionTrader) RunStrategy(ctx context.Context, strategy S
 
 			var price float64
 			if order.Type == types.OrderTypeLimit {
-				price = util.MustParseFloat(order.PriceStr)
+				price = util.MustParseFloat(order.Price)
 			} else {
 				price = kline.GetClose()
 			}
 
-			volume := util.MustParseFloat(order.VolumeStr)
+			volume := util.MustParseFloat(order.Quantity)
 			fee := 0.0
 			feeCurrency := ""
 
@@ -285,12 +285,12 @@ func (trader *Trader) ReportPnL() {
 	trader.Notifier.ReportPnL(report)
 }
 
-func (trader *Trader) SubmitOrder(ctx context.Context, order *types.Order) {
-	trader.Notifier.Notify(":memo: Submitting %s %s %s order with quantity: %s", order.Symbol, order.Type, order.Side, order.VolumeStr, order)
+func (trader *Trader) SubmitOrder(ctx context.Context, order *types.SubmitOrder) {
+	trader.Notifier.Notify(":memo: Submitting %s %s %s order with quantity: %s", order.Symbol, order.Type, order.Side, order.Quantity, order)
 
 	err := trader.Exchange.SubmitOrder(ctx, order)
 	if err != nil {
-		log.WithError(err).Errorf("order create error: side %s quantity: %s", order.Side, order.VolumeStr)
+		log.WithError(err).Errorf("order create error: side %s quantity: %s", order.Side, order.Quantity)
 		return
 	}
 }

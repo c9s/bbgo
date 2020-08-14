@@ -227,7 +227,7 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	}, nil
 }
 
-func (e *Exchange) SubmitOrder(ctx context.Context, order *types.Order) error {
+func (e *Exchange) SubmitOrder(ctx context.Context, order *types.SubmitOrder) error {
 	/*
 		limit order example
 
@@ -250,10 +250,10 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order *types.Order) error {
 		Symbol(order.Symbol).
 		Side(binance.SideType(order.Side)).
 		Type(orderType).
-		Quantity(order.VolumeStr)
+		Quantity(order.Quantity)
 
-	if len(order.PriceStr) > 0 {
-		req.Price(order.PriceStr)
+	if len(order.Price) > 0 {
+		req.Price(order.Price)
 	}
 	if len(order.TimeInForce) > 0 {
 		req.TimeInForce(order.TimeInForce)
