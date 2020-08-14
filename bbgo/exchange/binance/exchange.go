@@ -479,5 +479,18 @@ func (e *Exchange) BatchQueryKLines(ctx context.Context, symbol, interval string
 	}
 
 	return allKLines, nil
-
 }
+
+func (e *Exchange) BatchQueryKLineWindows(ctx context.Context, symbol string, intervals []string, startTime, endTime time.Time) (map[string]types.KLineWindow, error) {
+	klineWindows := map[string]types.KLineWindow{}
+	for _, interval := range intervals {
+		klines, err := e.BatchQueryKLines(ctx, symbol, interval, startTime, endTime)
+		if err != nil {
+			return klineWindows, err
+		}
+		klineWindows[interval] = klines
+	}
+
+	return klineWindows, nil
+}
+
