@@ -214,6 +214,10 @@ func (k KLineWindow) First() KLine {
 	return k[0]
 }
 
+func (k KLineWindow) Last() KLine {
+	return k[len(k)-1]
+}
+
 func (k KLineWindow) GetInterval() string {
 	return k.First().Interval
 }
@@ -330,17 +334,19 @@ func (k KLineWindow) Tail(size int) KLineWindow {
 	return win
 }
 
+// Truncate removes the old klines from the window
 func (k *KLineWindow) Truncate(size int) {
 	if len(*k) <= size {
 		return
 	}
 
-	end := len(*k) - 1
+	end := len(*k)
 	start := end - size
 	if start < 0 {
 		start = 0
 	}
-	*k = (*k)[start:end]
+	kn := (*k)[start:]
+	*k = kn
 }
 
 func (k KLineWindow) GetBody() float64 {
