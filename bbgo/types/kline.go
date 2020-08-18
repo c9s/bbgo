@@ -320,9 +320,14 @@ func (k KLineWindow) Take(size int) KLineWindow {
 
 func (k KLineWindow) Tail(size int) KLineWindow {
 	if len(k) <= size {
-		return k[:]
+		win := make(KLineWindow, len(k))
+		copy(win, k)
+		return win
 	}
-	return k[len(k)-size:]
+
+	win := make(KLineWindow, size)
+	copy(win, k[len(k)-size:])
+	return win
 }
 
 func (k *KLineWindow) Truncate(size int) {
