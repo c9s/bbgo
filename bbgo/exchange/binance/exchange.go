@@ -50,7 +50,7 @@ type Withdraw struct {
 	Amount     float64 `json:"amount"`
 	Address    string  `json:"address"`
 	AddressTag string  `json:"addressTag"`
-	Status          string    `json:"status"`
+	Status     string  `json:"status"`
 
 	TransactionID   string    `json:"txId"`
 	TransactionFee  float64   `json:"transactionFee"`
@@ -107,16 +107,16 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 
 			txIDs[d.TxID] = struct{}{}
 			allWithdraws = append(allWithdraws, Withdraw{
-				ApplyTime:      time.Unix(0, d.ApplyTime*int64(time.Millisecond)),
-				Asset:          d.Asset,
-				Amount:         d.Amount,
-				Address:        d.Address,
-				AddressTag:     d.AddressTag,
-				TransactionID:  d.TxID,
-				TransactionFee: d.TransactionFee,
+				ApplyTime:       time.Unix(0, d.ApplyTime*int64(time.Millisecond)),
+				Asset:           d.Asset,
+				Amount:          d.Amount,
+				Address:         d.Address,
+				AddressTag:      d.AddressTag,
+				TransactionID:   d.TxID,
+				TransactionFee:  d.TransactionFee,
 				WithdrawOrderID: d.WithdrawOrderID,
-				Network:        d.Network,
-				Status:         status,
+				Network:         d.Network,
+				Status:          status,
 			})
 		}
 
@@ -493,4 +493,3 @@ func (e *Exchange) BatchQueryKLineWindows(ctx context.Context, symbol string, in
 
 	return klineWindows, nil
 }
-
