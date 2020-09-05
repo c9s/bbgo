@@ -3,9 +3,10 @@ package slack
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
-	"strings"
 )
 
 type LogHook struct {

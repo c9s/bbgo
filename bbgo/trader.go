@@ -2,10 +2,10 @@ package bbgo
 
 import (
 	"context"
-	"fmt"
-	"github.com/c9s/bbgo/pkg/service"
-	"github.com/c9s/bbgo/pkg/util"
 	"time"
+
+	"github.com/c9s/bbgo/pkg/bbgo/service"
+	"github.com/c9s/bbgo/pkg/util"
 
 	log "github.com/sirupsen/logrus"
 
@@ -16,140 +16,6 @@ import (
 type Strategy interface {
 	Init(tradingContext *TradingContext, trader types.Trader) error
 	OnNewStream(stream *types.StandardPrivateStream) error
-}
-
-type KLineRegressionTrader struct {
-	// Context is trading Context
-	Context                 *TradingContext
-	SourceKLines            []types.KLine
-	ProfitAndLossCalculator *ProfitAndLossCalculator
-
-	doneOrders    []*types.SubmitOrder
-	pendingOrders []*types.SubmitOrder
-}
-
-func (trader *KLineRegressionTrader) SubmitOrder(cxt context.Context, order *types.SubmitOrder) {
-	trader.pendingOrders = append(trader.pendingOrders, order)
-}
-
-func (trader *KLineRegressionTrader) RunStrategy(ctx context.Context, strategy Strategy) (chan struct{}, error) {
-	log.Infof("[regression] number of kline data: %d", len(trader.SourceKLines))
-
-	maxExposure := 0.4
-	trader.Context.Quota = make(map[string]types.Balance)
-	for currency, balance := range trader.Context.Balances {
-		quota := balance
-		quota.Available *= maxExposure
-		trader.Context.Quota[ currency ] = quota
-	}
-
-	done := make(chan struct{})
-	defer close(done)
-
-	if err := strategy.Init(trader.Context, trader); err != nil {
-		return nil, err
-	}
-
-	standardStream := types.StandardPrivateStream{}
-	if err := strategy.OnNewStream(&standardStream); err != nil {
-		return nil, err
-	}
-
-	var tradeID int64 = 0
-	for _, kline := range trader.SourceKLines {
-		log.Debugf("kline %+v", kline)
-
-		fmt.Print(".")
-
-		standardStream.EmitKLineClosed(&kline)
-
-		for _, order := range trader.pendingOrders {
-			switch order.Side {
-			case types.SideTypeBuy:
-				fmt.Print("B")
-			case types.SideTypeSell:
-				fmt.Print("S")
-			}
-
-			var price float64
-			if order.Type == types.OrderTypeLimit {
-				price = util.MustParseFloat(order.Price)
-			} else {
-				price = kline.GetClose()
-			}
-
-			volume := util.MustParseFloat(order.Quantity)
-			fee := 0.0
-			feeCurrency := ""
-
-			trader.Context.Lock()
-			if order.Side == types.SideTypeBuy {
-				fee = price * volume * 0.001
-				feeCurrency = "USDT"
-
-				quote := trader.Context.Balances[trader.Context.Market.QuoteCurrency]
-
-				if quote.Available < volume*price {
-					log.Fatalf("quote balance not enough: %+v", quote)
-				}
-				quote.Available -= volume * price
-				trader.Context.Balances[trader.Context.Market.QuoteCurrency] = quote
-
-				base := trader.Context.Balances[trader.Context.Market.BaseCurrency]
-				base.Available += volume
-				trader.Context.Balances[trader.Context.Market.BaseCurrency] = base
-
-			} else {
-				fee = volume * 0.001
-				feeCurrency = "BTC"
-
-				base := trader.Context.Balances[trader.Context.Market.BaseCurrency]
-				if base.Available < volume {
-					log.Fatalf("base balance not enough: %+v", base)
-				}
-
-				base.Available -= volume
-				trader.Context.Balances[trader.Context.Market.BaseCurrency] = base
-
-				quote := trader.Context.Balances[trader.Context.Market.QuoteCurrency]
-				quote.Available += volume * price
-				trader.Context.Balances[trader.Context.Market.QuoteCurrency] = quote
-			}
-			trader.Context.Unlock()
-
-			trade := types.Trade{
-				ID:          tradeID,
-				Price:       price,
-				Quantity:    volume,
-				Side:        string(order.Side),
-				IsBuyer:     order.Side == types.SideTypeBuy,
-				IsMaker:     false,
-				Time:        time.Unix(0, kline.EndTime*int64(time.Millisecond)),
-				Symbol:      trader.Context.Symbol,
-				Fee:         fee,
-				FeeCurrency: feeCurrency,
-			}
-
-			tradeID++
-			trader.ProfitAndLossCalculator.AddTrade(trade)
-
-			trader.doneOrders = append(trader.doneOrders, order)
-		}
-
-		// clear pending orders
-		trader.pendingOrders = nil
-	}
-
-	fmt.Print("\n")
-	report := trader.ProfitAndLossCalculator.Calculate()
-	report.Print()
-
-	log.Infof("wallet balance:")
-	for _, balance := range trader.Context.Balances {
-		log.Infof(" %s: %f", balance.Currency, balance.Available)
-	}
-
-	return done, nil
 }
 
 type Trader struct {
@@ -191,6 +57,10 @@ func (trader *Trader) RunStrategy(ctx context.Context, strategy Strategy) (chan 
 		return nil, err
 	}
 
+	// bind kline store to the stream
+	klineStore := NewKLineStore()
+	klineStore.BindPrivateStream(&stream.StandardPrivateStream)
+
 	if err := strategy.OnNewStream(&stream.StandardPrivateStream); err != nil {
 		return nil, err
 	}
@@ -204,13 +74,13 @@ func (trader *Trader) RunStrategy(ctx context.Context, strategy Strategy) (chan 
 			return
 		}
 
-		if err := trader.TradeService.Insert(*trade) ; err != nil {
+		if err := trader.TradeService.Insert(*trade); err != nil {
 			log.WithError(err).Error("trade insert error")
 		}
 
 		trader.ReportTrade(trade)
 		trader.ProfitAndLossCalculator.AddTrade(*trade)
-		_ , err := trader.Context.StockManager.AddTrades([]types.Trade{*trade})
+		_, err := trader.Context.StockManager.AddTrades([]types.Trade{*trade})
 		if err != nil {
 			log.WithError(err).Error("stock manager load trades error")
 		}

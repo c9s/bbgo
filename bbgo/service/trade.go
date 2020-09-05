@@ -2,12 +2,14 @@ package service
 
 import (
 	"context"
-	"github.com/c9s/bbgo/pkg/bbgo/exchange/binance"
-	"github.com/c9s/bbgo/pkg/bbgo/types"
+	"time"
+
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"time"
+
+	"github.com/c9s/bbgo/pkg/bbgo/exchange/binance"
+	"github.com/c9s/bbgo/pkg/bbgo/types"
 )
 
 type TradeSync struct {

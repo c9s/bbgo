@@ -1,13 +1,15 @@
 package bbgo
 
 import (
-	"github.com/c9s/bbgo/pkg/bbgo/types"
-	"github.com/c9s/bbgo/pkg/slack/slackstyle"
-	log "github.com/sirupsen/logrus"
-	"github.com/slack-go/slack"
 	"strconv"
 	"strings"
 	"time"
+
+	log "github.com/sirupsen/logrus"
+	"github.com/slack-go/slack"
+
+	"github.com/c9s/bbgo/pkg/bbgo/slack/slackstyle"
+	"github.com/c9s/bbgo/pkg/bbgo/types"
 )
 
 type ProfitAndLossCalculator struct {
