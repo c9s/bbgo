@@ -1,11 +1,12 @@
 package bbgo
 
 import (
-	"github.com/c9s/bbgo/pkg/bbgo/types"
 	"sync"
+
+	"github.com/c9s/bbgo/pkg/bbgo/types"
 )
 
-type TradingContext struct {
+type Context struct {
 	sync.Mutex
 
 	Symbol string
@@ -22,6 +23,6 @@ type TradingContext struct {
 	StockManager            *StockManager
 }
 
-func (c *TradingContext) SetCurrentPrice(price float64) {
+func (c *Context) SetCurrentPrice(price float64) {
 	c.CurrentPrice = price
 }

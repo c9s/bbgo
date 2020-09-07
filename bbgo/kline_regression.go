@@ -13,7 +13,7 @@ import (
 
 type KLineRegressionTrader struct {
 	// Context is trading Context
-	Context                 *TradingContext
+	Context                 *Context
 	SourceKLines            []types.KLine
 	ProfitAndLossCalculator *ProfitAndLossCalculator
 
@@ -39,7 +39,7 @@ func (trader *KLineRegressionTrader) RunStrategy(ctx context.Context, strategy S
 	done := make(chan struct{})
 	defer close(done)
 
-	if err := strategy.Init(trader.Context, trader); err != nil {
+	if err := strategy.Load(trader.Context, trader); err != nil {
 		return nil, err
 	}
 

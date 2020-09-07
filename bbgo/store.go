@@ -12,19 +12,19 @@ var Interval1h = Interval("1h")
 var Interval1d = Interval("1d")
 
 type KLineStore struct {
-	// MaxKLines stores the max change kline per interval
-	MaxKLines map[Interval]types.KLine `json:"-"`
+	// MaxChanges stores the max change kline per interval
+	MaxChanges map[Interval]types.KLine `json:"-"`
 
-	// KLineWindows stores all loaded klines per interval
-	KLineWindows map[Interval]types.KLineWindow `json:"-"`
+	// Windows stores all loaded klines per interval
+	Windows map[Interval]types.KLineWindow `json:"-"`
 }
 
 func NewKLineStore() *KLineStore {
 	return &KLineStore{
-		MaxKLines: make(map[Interval]types.KLine),
+		MaxChanges: make(map[Interval]types.KLine),
 
-		// KLineWindows stores all loaded klines per interval
-		KLineWindows: make(map[Interval]types.KLineWindow),
+		// Windows stores all loaded klines per interval
+		Windows: make(map[Interval]types.KLineWindow),
 	}
 }
 
@@ -39,10 +39,10 @@ func (store *KLineStore) handleKLineClosed(kline *types.KLine) {
 func (store *KLineStore) AddKLine(kline types.KLine) {
 	var interval = Interval(kline.Interval)
 
-	var window = store.KLineWindows[interval]
+	var window = store.Windows[interval]
 	window.Add(kline)
 
-	if kline.GetMaxChange() > store.MaxKLines[interval].GetMaxChange() {
-		store.MaxKLines[interval] = kline
+	if kline.GetMaxChange() > store.MaxChanges[interval].GetMaxChange() {
+		store.MaxChanges[interval] = kline
 	}
 }
