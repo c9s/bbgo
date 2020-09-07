@@ -42,7 +42,10 @@ func (store *KLineStore) AddKLine(kline types.KLine) {
 	var window = store.Windows[interval]
 	window.Add(kline)
 
-	if kline.GetMaxChange() > store.MaxChanges[interval].GetMaxChange() {
-		store.MaxChanges[interval] = kline
+
+	if _, ok := store.MaxChanges[interval] ; ok {
+		if kline.GetMaxChange() > store.MaxChanges[interval].GetMaxChange() {
+			store.MaxChanges[interval] = kline
+		}
 	}
 }

@@ -41,17 +41,20 @@ type Trader struct {
 
 func NewTrader(db *sqlx.DB, exchange *binance.Exchange, symbol string) *Trader {
 	tradeService := &service.TradeService{DB: db}
-	tradeSync := &service.TradeSync{Service: tradeService, Exchange: exchange}
 	return &Trader{
 		Symbol:       symbol,
+		Exchange:     exchange,
 		TradeService: tradeService,
-		TradeSync:    tradeSync,
+		TradeSync: &service.TradeSync{
+			Service:  tradeService,
+			Exchange: exchange,
+		},
 	}
 }
 
 func (trader *Trader) Initialize(ctx context.Context, startTime time.Time) error {
 
-	log.Info("syncing trades...")
+	log.Info("syncing trades from exchange...")
 	if err := trader.TradeSync.Sync(ctx, trader.Symbol, startTime); err != nil {
 		return err
 	}
@@ -154,7 +157,7 @@ func (trader *Trader) RunStrategy(ctx context.Context, strategy Strategy) (chan 
 	}
 
 	trader.reportTimer = time.AfterFunc(1*time.Second, func() {
-		trader.ReportPnL()
+		trader.reportPnL()
 	})
 
 	stream.OnTrade(func(trade *types.Trade) {
@@ -166,7 +169,7 @@ func (trader *Trader) RunStrategy(ctx context.Context, strategy Strategy) (chan 
 			log.WithError(err).Error("trade insert error")
 		}
 
-		trader.ReportTrade(trade)
+		trader.Notifier.ReportTrade(trade)
 		trader.ProfitAndLossCalculator.AddTrade(*trade)
 		_, err := trader.Context.StockManager.AddTrades([]types.Trade{*trade})
 		if err != nil {
@@ -178,7 +181,7 @@ func (trader *Trader) RunStrategy(ctx context.Context, strategy Strategy) (chan 
 		}
 
 		trader.reportTimer = time.AfterFunc(1*time.Minute, func() {
-			trader.ReportPnL()
+			trader.reportPnL()
 		})
 	})
 
@@ -214,11 +217,7 @@ func (trader *Trader) RunStrategy(ctx context.Context, strategy Strategy) (chan 
 	return done, nil
 }
 
-func (trader *Trader) ReportTrade(trade *types.Trade) {
-	trader.Notifier.ReportTrade(trade)
-}
-
-func (trader *Trader) ReportPnL() {
+func (trader *Trader) reportPnL() {
 	report := trader.ProfitAndLossCalculator.Calculate()
 	report.Print()
 	trader.Notifier.ReportPnL(report)

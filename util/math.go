@@ -23,6 +23,10 @@ func FormatFloat(val float64, prec int) string {
 }
 
 func MustParseFloat(s string) float64 {
+	if len(s) == 0 {
+		return 0.0
+	}
+
 	v, err := strconv.ParseFloat(s, 64)
 	if err != nil {
 		panic(err)
