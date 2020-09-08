@@ -11,41 +11,40 @@ var Interval5m = Interval("5m")
 var Interval1h = Interval("1h")
 var Interval1d = Interval("1d")
 
-type KLineStore struct {
-	// MaxChanges stores the max change kline per interval
-	MaxChanges map[Interval]types.KLine `json:"-"`
+type MarketDataStore struct {
+	// MaxChangeKLines stores the max change kline per interval
+	MaxChangeKLines map[Interval]types.KLine `json:"-"`
 
-	// Windows stores all loaded klines per interval
-	Windows map[Interval]types.KLineWindow `json:"-"`
+	// KLineWindows stores all loaded klines per interval
+	KLineWindows map[Interval]types.KLineWindow `json:"-"`
 }
 
-func NewKLineStore() *KLineStore {
-	return &KLineStore{
-		MaxChanges: make(map[Interval]types.KLine),
+func NewMarketDataStore() *MarketDataStore {
+	return &MarketDataStore{
+		MaxChangeKLines: make(map[Interval]types.KLine),
 
-		// Windows stores all loaded klines per interval
-		Windows: make(map[Interval]types.KLineWindow),
+		// KLineWindows stores all loaded klines per interval
+		KLineWindows: make(map[Interval]types.KLineWindow),
 	}
 }
 
-func (store *KLineStore) BindPrivateStream(stream *types.StandardPrivateStream) {
+func (store *MarketDataStore) BindPrivateStream(stream *types.StandardPrivateStream) {
 	stream.OnKLineClosed(store.handleKLineClosed)
 }
 
-func (store *KLineStore) handleKLineClosed(kline *types.KLine) {
+func (store *MarketDataStore) handleKLineClosed(kline *types.KLine) {
 	store.AddKLine(*kline)
 }
 
-func (store *KLineStore) AddKLine(kline types.KLine) {
+func (store *MarketDataStore) AddKLine(kline types.KLine) {
 	var interval = Interval(kline.Interval)
 
-	var window = store.Windows[interval]
+	var window = store.KLineWindows[interval]
 	window.Add(kline)
 
-
-	if _, ok := store.MaxChanges[interval] ; ok {
-		if kline.GetMaxChange() > store.MaxChanges[interval].GetMaxChange() {
-			store.MaxChanges[interval] = kline
+	if _, ok := store.MaxChangeKLines[interval] ; ok {
+		if kline.GetMaxChange() > store.MaxChangeKLines[interval].GetMaxChange() {
+			store.MaxChangeKLines[interval] = kline
 		}
 	}
 }

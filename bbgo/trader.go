@@ -6,9 +6,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/jmoiron/sqlx"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/bbgo/config"
 	"github.com/c9s/bbgo/pkg/bbgo/service"
 
 	"github.com/c9s/bbgo/pkg/bbgo/exchange/binance"
@@ -136,6 +138,82 @@ func (trader *Trader) Initialize(ctx context.Context, startTime time.Time) error
 	return nil
 }
 
+func (trader *Trader) RunStrategyWithHotReload(ctx context.Context, strategy Strategy, configFile string) (chan struct{}, error) {
+	var done = make(chan struct{})
+	var configWatcherDone = make(chan struct{})
+
+	log.Infof("watching config file: %v", configFile)
+
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return nil, err
+	}
+
+	defer watcher.Close()
+
+	if err := watcher.Add(configFile); err != nil {
+		return nil, err
+	}
+
+	go func() {
+		strategyContext, strategyCancel := context.WithCancel(ctx)
+		defer strategyCancel()
+		defer close(done)
+
+		traderDone, err := trader.RunStrategy(strategyContext, strategy)
+		if err != nil {
+			return
+		}
+
+		var configReloadTimer *time.Timer = nil
+		defer close(configWatcherDone)
+
+		for {
+			select {
+
+			case <-ctx.Done():
+				return
+
+			case <-traderDone:
+				log.Infof("reloading config file %s", configFile)
+				if err := config.LoadConfigFile(configFile, strategy); err != nil {
+					log.WithError(err).Error("error load config file")
+				}
+
+				trader.Notifier.Notify("config reloaded, restarting trader")
+
+				traderDone, err = trader.RunStrategy(strategyContext, strategy)
+				if err != nil {
+					log.WithError(err).Error("[trader] error:", err)
+					return
+				}
+
+			case event := <-watcher.Events:
+				log.Infof("[fsnotify] event: %+v", event)
+
+				if event.Op&fsnotify.Write == fsnotify.Write {
+					log.Info("[fsnotify] modified file:", event.Name)
+				}
+
+				if configReloadTimer != nil {
+					configReloadTimer.Stop()
+				}
+
+				configReloadTimer = time.AfterFunc(3*time.Second, func() {
+					strategyCancel()
+				})
+
+			case err := <-watcher.Errors:
+				log.WithError(err).Error("[fsnotify] error:", err)
+				return
+
+			}
+		}
+	}()
+
+	return done, nil
+}
+
 func (trader *Trader) RunStrategy(ctx context.Context, strategy Strategy) (chan struct{}, error) {
 	if err := strategy.Load(trader.Context, trader); err != nil {
 		return nil, err
@@ -147,7 +225,7 @@ func (trader *Trader) RunStrategy(ctx context.Context, strategy Strategy) (chan 
 	}
 
 	// bind kline store to the stream
-	klineStore := NewKLineStore()
+	klineStore := NewMarketDataStore()
 	klineStore.BindPrivateStream(&stream.StandardPrivateStream)
 
 	trader.Account.BindPrivateStream(stream)
