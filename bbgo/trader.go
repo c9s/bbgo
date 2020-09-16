@@ -302,11 +302,11 @@ func (trader *Trader) reportPnL() {
 }
 
 func (trader *Trader) SubmitOrder(ctx context.Context, order *types.SubmitOrder) {
-	trader.Notifier.Notify(":memo: Submitting %s %s %s order with quantity: %s", order.Symbol, order.Type, order.Side, order.Quantity, order)
+	trader.Notifier.Notify(":memo: Submitting %s %s %s order with quantity: %s", order.Symbol, order.Type, order.Side, order.QuantityString, order)
 
 	err := trader.Exchange.SubmitOrder(ctx, order)
 	if err != nil {
-		log.WithError(err).Errorf("order create error: side %s quantity: %s", order.Side, order.Quantity)
+		log.WithError(err).Errorf("order create error: side %s quantity: %s", order.Side, order.QuantityString)
 		return
 	}
 }

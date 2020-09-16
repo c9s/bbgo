@@ -250,10 +250,10 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order *types.SubmitOrder) er
 		Symbol(order.Symbol).
 		Side(binance.SideType(order.Side)).
 		Type(orderType).
-		Quantity(order.Quantity)
+		Quantity(order.QuantityString)
 
-	if len(order.Price) > 0 {
-		req.Price(order.Price)
+	if len(order.PriceString) > 0 {
+		req.Price(order.PriceString)
 	}
 	if len(order.TimeInForce) > 0 {
 		req.TimeInForce(order.TimeInForce)

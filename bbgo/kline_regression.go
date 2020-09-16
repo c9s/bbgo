@@ -65,12 +65,12 @@ func (trader *KLineRegressionTrader) RunStrategy(ctx context.Context, strategy S
 
 			var price float64
 			if order.Type == types.OrderTypeLimit {
-				price = util.MustParseFloat(order.Price)
+				price = util.MustParseFloat(order.PriceString)
 			} else {
 				price = kline.GetClose()
 			}
 
-			volume := util.MustParseFloat(order.Quantity)
+			volume := util.MustParseFloat(order.QuantityString)
 			fee := 0.0
 			feeCurrency := ""
 
