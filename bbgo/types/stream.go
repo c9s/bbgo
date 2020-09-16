@@ -11,7 +11,7 @@ type StandardPrivateStream struct {
 
 	tradeCallbacks   []func(trade *Trade)
 	balanceSnapshotCallbacks []func(balanceSnapshot map[string]Balance)
-	kLineClosedCallbacks       []func(kline *KLine)
+	kLineClosedCallbacks       []func(kline KLine)
 }
 
 func (stream *StandardPrivateStream) Subscribe(channel string, symbol string, options SubscribeOptions) {

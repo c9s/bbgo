@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
+
+	"github.com/valyala/fastjson"
+
 	"github.com/c9s/bbgo/pkg/bbgo/types"
 	"github.com/c9s/bbgo/pkg/util"
-	"github.com/valyala/fastjson"
-	"time"
 )
 
 /*
@@ -76,9 +78,9 @@ type ExecutionReportEvent struct {
 	TradeID         int64 `json:"t"`
 	TransactionTime int64 `json:"T"`
 
-	LastExecutedQuantity     string `json:"l"`
-	CumulativeFilledQuantity string `json:"z"`
-	LastExecutedPrice        string `json:"L"`
+	LastExecutedQuantity             string `json:"l"`
+	CumulativeFilledQuantity         string `json:"z"`
+	LastExecutedPrice                string `json:"L"`
 	LastQuoteAssetTransactedQuantity string `json:"Y"`
 
 	OrderCreationTime int `json:"O"`
@@ -91,17 +93,17 @@ func (e *ExecutionReportEvent) Trade() (*types.Trade, error) {
 
 	tt := time.Unix(0, e.TransactionTime/1000000)
 	return &types.Trade{
-		ID:          e.TradeID,
-		Symbol:      e.Symbol,
-		Price:       util.MustParseFloat(e.LastExecutedPrice),
-		Quantity:    util.MustParseFloat(e.LastExecutedQuantity),
+		ID:            e.TradeID,
+		Symbol:        e.Symbol,
+		Price:         util.MustParseFloat(e.LastExecutedPrice),
+		Quantity:      util.MustParseFloat(e.LastExecutedQuantity),
 		QuoteQuantity: util.MustParseFloat(e.LastQuoteAssetTransactedQuantity),
-		Side:        e.Side,
-		IsBuyer:     e.Side == "BUY",
-		IsMaker:     e.IsMaker,
-		Time:        tt,
-		Fee:         util.MustParseFloat(e.CommissionAmount),
-		FeeCurrency: e.CommissionAsset,
+		Side:          e.Side,
+		IsBuyer:       e.Side == "BUY",
+		IsMaker:       e.IsMaker,
+		Time:          tt,
+		Fee:           util.MustParseFloat(e.CommissionAmount),
+		FeeCurrency:   e.CommissionAsset,
 	}, nil
 }
 
@@ -240,10 +242,49 @@ func ParseEvent(message string) (interface{}, error) {
 	return nil, fmt.Errorf("unsupported message: %s", message)
 }
 
+// KLine uses binance's kline as the standard structure
+type KLine struct {
+	StartTime int64 `json:"t"`
+	EndTime   int64 `json:"T"`
+
+	Symbol   string `json:"s"`
+	Interval string `json:"i"`
+
+	Open  string `json:"o"`
+	Close string `json:"c"`
+	High  string `json:"h"`
+
+	Low         string `json:"l"`
+	Volume      string `json:"V"` // taker buy base asset volume (like 10 BTC)
+	QuoteVolume string `json:"Q"` // taker buy quote asset volume (like 1000USDT)
+
+	LastTradeID    int   `json:"L"`
+	NumberOfTrades int64 `json:"n"`
+	Closed         bool  `json:"x"`
+}
+
 type KLineEvent struct {
 	EventBase
-	Symbol string       `json:"s"`
-	KLine  *types.KLine `json:"k,omitempty"`
+	Symbol string `json:"s"`
+	KLine  KLine  `json:"k,omitempty"`
+}
+
+func (k *KLine) KLine() types.KLine {
+	return types.KLine{
+		Symbol:         k.Symbol,
+		Interval:       k.Interval,
+		StartTime:      time.Unix(0, k.StartTime*int64(time.Millisecond)),
+		EndTime:        time.Unix(0, k.EndTime*int64(time.Millisecond)),
+		Open:           util.MustParseFloat(k.Open),
+		Close:          util.MustParseFloat(k.Close),
+		High:           util.MustParseFloat(k.High),
+		Low:            util.MustParseFloat(k.Low),
+		Volume:         util.MustParseFloat(k.Volume),
+		QuoteVolume:    util.MustParseFloat(k.QuoteVolume),
+		LastTradeID:    k.LastTradeID,
+		NumberOfTrades: k.NumberOfTrades,
+		Closed:         k.Closed,
+	}
 }
 
 /*

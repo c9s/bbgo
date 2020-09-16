@@ -31,8 +31,8 @@ type PrivateStream struct {
 	connectCallbacks []func(stream *PrivateStream)
 
 	// custom callbacks
-	kLineEventCallbacks       []func(event *KLineEvent)
-	kLineClosedEventCallbacks []func(event *KLineEvent)
+	kLineEventCallbacks       []func(e *KLineEvent)
+	kLineClosedEventCallbacks []func(e *KLineEvent)
 
 	balanceUpdateEventCallbacks       []func(event *BalanceUpdateEvent)
 	outboundAccountInfoEventCallbacks []func(event *OutboundAccountInfoEvent)
@@ -190,7 +190,7 @@ func (s *PrivateStream) read(ctx context.Context, eventC chan interface{}) {
 
 				if e.KLine.Closed {
 					s.EmitKLineClosedEvent(e)
-					s.EmitKLineClosed(e.KLine)
+					s.EmitKLineClosed(e.KLine.KLine())
 				}
 
 			case *ExecutionReportEvent:

@@ -3,7 +3,6 @@ package bbgo
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -54,7 +53,7 @@ func (trader *KLineRegressionTrader) RunStrategy(ctx context.Context, strategy S
 
 		fmt.Print(".")
 
-		standardStream.EmitKLineClosed(&kline)
+		standardStream.EmitKLineClosed(kline)
 
 		for _, order := range trader.pendingOrders {
 			switch order.Side {
@@ -117,7 +116,7 @@ func (trader *KLineRegressionTrader) RunStrategy(ctx context.Context, strategy S
 				Side:        string(order.Side),
 				IsBuyer:     order.Side == types.SideTypeBuy,
 				IsMaker:     false,
-				Time:        time.Unix(0, kline.EndTime*int64(time.Millisecond)),
+				Time:        kline.EndTime,
 				Symbol:      trader.Context.Symbol,
 				Fee:         fee,
 				FeeCurrency: feeCurrency,

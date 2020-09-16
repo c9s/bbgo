@@ -303,19 +303,21 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol, interval string, opt
 	}
 
 	var kLines []types.KLine
-	for _, kline := range resp {
+	for _, k := range resp {
 		kLines = append(kLines, types.KLine{
 			Symbol:         symbol,
 			Interval:       interval,
-			StartTime:      kline.OpenTime,
-			EndTime:        kline.CloseTime,
-			Open:           kline.Open,
-			Close:          kline.Close,
-			High:           kline.High,
-			Low:            kline.Low,
-			Volume:         kline.Volume,
-			QuoteVolume:    kline.QuoteAssetVolume,
-			NumberOfTrades: kline.TradeNum,
+			StartTime:      time.Unix(0, k.OpenTime*int64(time.Millisecond)),
+			EndTime:        time.Unix(0, k.CloseTime*int64(time.Millisecond)),
+			Open:           util.MustParseFloat(k.Open),
+			Close:          util.MustParseFloat(k.Close),
+			High:           util.MustParseFloat(k.High),
+			Low:            util.MustParseFloat(k.Low),
+			Volume:         util.MustParseFloat(k.Volume),
+			QuoteVolume:    util.MustParseFloat(k.QuoteAssetVolume),
+			LastTradeID:    0,
+			NumberOfTrades: k.TradeNum,
+			Closed:         true,
 		})
 	}
 	return kLines, nil
@@ -465,13 +467,12 @@ func (e *Exchange) BatchQueryKLines(ctx context.Context, symbol, interval string
 		}
 
 		for _, kline := range klines {
-			t := time.Unix(0, kline.EndTime*int64(time.Millisecond))
-			if t.After(endTime) {
+			if kline.EndTime.After(endTime) {
 				return allKLines, nil
 			}
 
 			allKLines = append(allKLines, kline)
-			startTime = t
+			startTime = kline.EndTime
 		}
 
 		// avoid rate limit

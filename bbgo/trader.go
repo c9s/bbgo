@@ -263,9 +263,9 @@ func (trader *Trader) RunStrategy(ctx context.Context, strategy Strategy) (chan 
 		})
 	})
 
-	stream.OnKLineEvent(func(e *binance.KLineEvent) {
-		trader.ProfitAndLossCalculator.SetCurrentPrice(e.KLine.GetClose())
-		trader.Context.SetCurrentPrice(e.KLine.GetClose())
+	stream.OnKLineClosed(func(kline types.KLine) {
+		trader.ProfitAndLossCalculator.SetCurrentPrice(kline.Close)
+		trader.Context.SetCurrentPrice(kline.Close)
 	})
 
 	var eventC = make(chan interface{}, 20)

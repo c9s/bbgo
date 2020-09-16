@@ -39,23 +39,30 @@ type KLineQueryOptions struct {
 
 // KLine uses binance's kline as the standard structure
 type KLine struct {
-	StartTime int64 `json:"t"`
-	EndTime   int64 `json:"T"`
+	StartTime time.Time
+	EndTime   time.Time
 
-	Symbol   string `json:"s"`
-	Interval string `json:"i"`
+	Symbol   string
+	Interval string
 
-	Open  string `json:"o"`
-	Close string `json:"c"`
-	High  string `json:"h"`
+	Open        float64
+	Close       float64
+	High        float64
+	Low         float64
+	Volume      float64
+	QuoteVolume float64
 
-	Low         string `json:"l"`
-	Volume      string `json:"V"` // taker buy base asset volume (like 10 BTC)
-	QuoteVolume string `json:"Q"` // taker buy quote asset volume (like 1000USDT)
+	LastTradeID    int
+	NumberOfTrades int64
+	Closed         bool
+}
 
-	LastTradeID    int   `json:"L"`
-	NumberOfTrades int64 `json:"n"`
-	Closed         bool  `json:"x"`
+func (k KLine) GetStartTime() time.Time {
+	return k.StartTime
+}
+
+func (k KLine) GetEndTime() time.Time {
+	return k.EndTime
 }
 
 func (k KLine) GetInterval() string {
@@ -63,21 +70,21 @@ func (k KLine) GetInterval() string {
 }
 
 func (k KLine) Mid() float64 {
-	return (k.GetHigh() + k.GetLow()) / 2
+	return (k.High + k.Low) / 2
 }
 
 // green candle with open and close near high price
 func (k KLine) BounceUp() bool {
 	mid := k.Mid()
 	trend := k.GetTrend()
-	return trend > 0 && k.GetOpen() > mid && k.GetClose() > mid
+	return trend > 0 && k.Open > mid && k.Close > mid
 }
 
 // red candle with open and close near low price
 func (k KLine) BounceDown() bool {
 	mid := k.Mid()
 	trend := k.GetTrend()
-	return trend > 0 && k.GetOpen() < mid && k.GetClose() < mid
+	return trend > 0 && k.Open < mid && k.Close < mid
 }
 
 func (k KLine) GetTrend() int {
@@ -93,19 +100,19 @@ func (k KLine) GetTrend() int {
 }
 
 func (k KLine) GetHigh() float64 {
-	return util.MustParseFloat(k.High)
+	return k.High
 }
 
 func (k KLine) GetLow() float64 {
-	return util.MustParseFloat(k.Low)
+	return k.Low
 }
 
 func (k KLine) GetOpen() float64 {
-	return util.MustParseFloat(k.Open)
+	return k.Open
 }
 
 func (k KLine) GetClose() float64 {
-	return util.MustParseFloat(k.Close)
+	return k.Close
 }
 
 func (k KLine) GetMaxChange() float64 {
@@ -134,11 +141,11 @@ func (k KLine) GetLowerShadowRatio() float64 {
 }
 
 func (k KLine) GetLowerShadowHeight() float64 {
-	low := k.GetLow()
-	if k.GetOpen() < k.GetClose() {
-		return k.GetOpen() - low
+	low := k.Low
+	if k.Open < k.Close {
+		return k.Open - low
 	}
-	return k.GetClose() - low
+	return k.Close - low
 }
 
 // GetBody returns the height of the candle real body
@@ -147,19 +154,11 @@ func (k KLine) GetBody() float64 {
 }
 
 func (k KLine) GetChange() float64 {
-	return k.GetClose() - k.GetOpen()
-}
-
-func (k KLine) GetStartTime() time.Time {
-	return time.Unix(0, k.StartTime*int64(time.Millisecond))
-}
-
-func (k KLine) GetEndTime() time.Time {
-	return time.Unix(0, k.EndTime*int64(time.Millisecond))
+	return k.Close - k.Open
 }
 
 func (k KLine) String() string {
-	return fmt.Sprintf("%s %s Open: % 14s Close: % 14s High: % 14s Low: % 14s Volume: % 15s Change: % 11f Max Change: % 11f", k.Symbol, k.Interval, k.Open, k.Close, k.High, k.Low, k.Volume, k.GetChange(), k.GetMaxChange())
+	return fmt.Sprintf("%s %s Open: %.8f Close: %.8f High: %.8f Low: %.8f Volume: %.8f Change: %.4f Max Change: %.4f", k.Symbol, k.Interval, k.Open, k.Close, k.High, k.Low, k.Volume, k.GetChange(), k.GetMaxChange())
 }
 
 func (k KLine) Color() string {
@@ -176,10 +175,10 @@ func (k KLine) SlackAttachment() slack.Attachment {
 		Text:  fmt.Sprintf("*%s* KLine %s", k.Symbol, k.Interval),
 		Color: k.Color(),
 		Fields: []slack.AttachmentField{
-			{Title: "Open", Value: k.Open, Short: true},
-			{Title: "High", Value: k.High, Short: true},
-			{Title: "Low", Value: k.Low, Short: true},
-			{Title: "Close", Value: k.Close, Short: true},
+			{Title: "Open", Value: util.FormatFloat(k.Open, 2), Short: true},
+			{Title: "High", Value: util.FormatFloat(k.High, 2), Short: true},
+			{Title: "Low", Value: util.FormatFloat(k.Low, 2), Short: true},
+			{Title: "Close", Value: util.FormatFloat(k.Close, 2), Short: true},
 			{Title: "Mid", Value: util.FormatFloat(k.Mid(), 2), Short: true},
 			{Title: "Change", Value: util.FormatFloat(k.GetChange(), 2), Short: true},
 			{Title: "Max Change", Value: util.FormatFloat(k.GetMaxChange(), 2), Short: true},
@@ -205,6 +204,17 @@ func (k KLine) SlackAttachment() slack.Attachment {
 }
 
 type KLineWindow []KLine
+
+// ReduceClose reduces the closed prices
+func (k KLineWindow) ReduceClose() float64 {
+	s := 0.0
+
+	for _, kline := range k {
+		s += kline.GetClose()
+	}
+
+	return s
+}
 
 func (k KLineWindow) Len() int {
 	return len(k)
@@ -425,7 +435,7 @@ func (k KLineWindow) SlackAttachment() slack.Attachment {
 				Short: true,
 			},
 		},
-		Footer:     fmt.Sprintf("Since %s til %s", first.GetStartTime(), end.GetEndTime()),
+		Footer:     fmt.Sprintf("Since %s til %s", first.StartTime, end.EndTime),
 		FooterIcon: "",
 	}
 }
