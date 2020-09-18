@@ -35,9 +35,9 @@ type OrderProcessor struct {
 	MinProfitSpread float64 `json:"minProfitSpread"`
 
 	MaxOrderAmount float64 `json:"maxOrderAmount"`
-	Exchange       types.Exchange
 
-	Trader *Trader
+	Exchange types.Exchange `json:"-"`
+	Trader   *Trader        `json:"-"`
 }
 
 func (p *OrderProcessor) Submit(ctx context.Context, order *types.SubmitOrder) error {
@@ -45,6 +45,9 @@ func (p *OrderProcessor) Submit(ctx context.Context, order *types.SubmitOrder) e
 	currentPrice := tradingCtx.CurrentPrice
 	market := order.Market
 	quantity := order.Quantity
+
+	tradingCtx.Lock()
+	defer tradingCtx.Unlock()
 
 	switch order.Side {
 	case types.SideTypeBuy:

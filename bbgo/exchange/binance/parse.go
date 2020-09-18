@@ -242,7 +242,6 @@ func ParseEvent(message string) (interface{}, error) {
 	return nil, fmt.Errorf("unsupported message: %s", message)
 }
 
-// KLine uses binance's kline as the standard structure
 type KLine struct {
 	StartTime int64 `json:"t"`
 	EndTime   int64 `json:"T"`

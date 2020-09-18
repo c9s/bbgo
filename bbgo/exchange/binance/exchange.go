@@ -323,14 +323,7 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol, interval string, opt
 	return kLines, nil
 }
 
-type TradeQueryOptions struct {
-	StartTime   *time.Time
-	EndTime     *time.Time
-	Limit       int
-	LastTradeID int64
-}
-
-func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *TradeQueryOptions) (trades []types.Trade, err error) {
+func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
 	req := e.Client.NewListTradesService().
 		Limit(1000).
 		Symbol(symbol)
@@ -368,7 +361,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *Trad
 	return trades, nil
 }
 
-func (e *Exchange) BatchQueryTrades(ctx context.Context, symbol string, options *TradeQueryOptions) (allTrades []types.Trade, err error) {
+func (e *Exchange) BatchQueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (allTrades []types.Trade, err error) {
 	var startTime = time.Now().Add(-7 * 24 * time.Hour)
 	if options.StartTime != nil {
 		startTime = *options.StartTime
@@ -378,7 +371,7 @@ func (e *Exchange) BatchQueryTrades(ctx context.Context, symbol string, options 
 
 	var lastTradeID = options.LastTradeID
 	for {
-		trades, err := e.QueryTrades(ctx, symbol, &TradeQueryOptions{
+		trades, err := e.QueryTrades(ctx, symbol, &types.TradeQueryOptions{
 			StartTime:   &startTime,
 			Limit:       options.Limit,
 			LastTradeID: lastTradeID,
