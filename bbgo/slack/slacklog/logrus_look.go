@@ -14,6 +14,14 @@ type LogHook struct {
 	ErrorChannel string
 }
 
+func NewLogHook(token string, channel string) *LogHook {
+	var client = slack.New(token)
+	return &LogHook{
+		Slack: client,
+		ErrorChannel: channel,
+	}
+}
+
 func (t *LogHook) Levels() []logrus.Level {
 	return []logrus.Level{
 		// log.InfoLevel,

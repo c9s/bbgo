@@ -10,7 +10,9 @@ import (
 	"github.com/jmoiron/sqlx"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/bbgo/accounting"
 	"github.com/c9s/bbgo/pkg/bbgo/config"
+	"github.com/c9s/bbgo/pkg/bbgo/notifier/slacknotifier"
 	"github.com/c9s/bbgo/pkg/bbgo/service"
 
 	"github.com/c9s/bbgo/pkg/bbgo/exchange/binance"
@@ -27,7 +29,7 @@ type Trader struct {
 	TradeService *service.TradeService
 	TradeSync    *service.TradeSync
 
-	Notifier *SlackNotifier
+	Notifier *slacknotifier.Notifier
 
 	// Context is trading Context
 	Context *Context
@@ -36,7 +38,7 @@ type Trader struct {
 
 	reportTimer *time.Timer
 
-	ProfitAndLossCalculator *ProfitAndLossCalculator
+	ProfitAndLossCalculator *accounting.ProfitAndLossCalculator
 
 	Account *Account
 }
@@ -118,7 +120,7 @@ func (trader *Trader) Initialize(ctx context.Context, startTime time.Time) error
 		}
 	*/
 
-	trader.ProfitAndLossCalculator = &ProfitAndLossCalculator{
+	trader.ProfitAndLossCalculator = &accounting.ProfitAndLossCalculator{
 		TradingFeeCurrency: tradingFeeCurrency,
 		Symbol:             trader.Symbol,
 		StartTime:          startTime,
@@ -247,7 +249,7 @@ func (trader *Trader) RunStrategy(ctx context.Context, strategy Strategy) (chan 
 			log.WithError(err).Error("trade insert error")
 		}
 
-		trader.Notifier.ReportTrade(trade)
+		trader.Notifier.NotifyTrade(trade)
 		trader.ProfitAndLossCalculator.AddTrade(*trade)
 		_, err := trader.Context.StockManager.AddTrades([]types.Trade{*trade})
 		if err != nil {
@@ -298,7 +300,7 @@ func (trader *Trader) RunStrategy(ctx context.Context, strategy Strategy) (chan 
 func (trader *Trader) reportPnL() {
 	report := trader.ProfitAndLossCalculator.Calculate()
 	report.Print()
-	trader.Notifier.ReportPnL(report)
+	trader.Notifier.NotifyPnL(report)
 }
 
 func (trader *Trader) SubmitOrder(ctx context.Context, order *types.SubmitOrder) {

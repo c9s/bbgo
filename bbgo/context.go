@@ -3,6 +3,7 @@ package bbgo
 import (
 	"sync"
 
+	"github.com/c9s/bbgo/pkg/bbgo/accounting"
 	"github.com/c9s/bbgo/pkg/bbgo/types"
 )
 
@@ -19,7 +20,7 @@ type Context struct {
 
 	Balances                map[string]types.Balance
 	Quota                   map[string]types.Balance
-	ProfitAndLossCalculator *ProfitAndLossCalculator
+	ProfitAndLossCalculator *accounting.ProfitAndLossCalculator
 	StockManager            *StockManager
 }
 

@@ -55,8 +55,8 @@ func (p *OrderProcessor) Submit(ctx context.Context, order *types.SubmitOrder) e
 		if balance, ok := tradingCtx.Balances[market.QuoteCurrency]; ok {
 			if balance.Available < p.MinQuoteBalance {
 				return errors.Wrapf(ErrQuoteBalanceLevelTooLow, "quote balance level is too low: %s < %s",
-					USD.FormatMoneyFloat64(balance.Available),
-					USD.FormatMoneyFloat64(p.MinQuoteBalance))
+					types.USD.FormatMoneyFloat64(balance.Available),
+					types.USD.FormatMoneyFloat64(p.MinQuoteBalance))
 			}
 
 			if baseBalance, ok := tradingCtx.Balances[market.BaseCurrency]; ok {

@@ -6,6 +6,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/bbgo/accounting"
 	"github.com/c9s/bbgo/pkg/bbgo/types"
 	"github.com/c9s/bbgo/pkg/util"
 )
@@ -14,7 +15,7 @@ type KLineRegressionTrader struct {
 	// Context is trading Context
 	Context                 *Context
 	SourceKLines            []types.KLine
-	ProfitAndLossCalculator *ProfitAndLossCalculator
+	ProfitAndLossCalculator *accounting.ProfitAndLossCalculator
 
 	doneOrders    []*types.SubmitOrder
 	pendingOrders []*types.SubmitOrder
