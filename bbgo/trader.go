@@ -82,6 +82,14 @@ func (trader *Trader) Subscribe(exchange string, channel string, symbol string, 
 
 func (trader *Trader) Connect(ctx context.Context) error {
 	for n, ex := range trader.Exchanges {
+		account, err := LoadAccount(ctx, ex)
+		if err != nil {
+			return err
+		}
+
+		trader.ExchangeAccounts[n] = account
+
+
 		stream, err := ex.NewPrivateStream()
 		if err != nil {
 			return err
