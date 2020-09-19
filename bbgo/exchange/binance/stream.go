@@ -82,18 +82,17 @@ func (s *PrivateStream) connect(ctx context.Context) error {
 	})
 }
 
-func (s *PrivateStream) Connect(ctx context.Context, eventC chan interface{}) error {
+func (s *PrivateStream) Connect(ctx context.Context) error {
 	err := s.connect(ctx)
 	if err != nil {
 		return err
 	}
 
-	go s.read(ctx, eventC)
+	go s.read(ctx)
 	return nil
 }
 
-func (s *PrivateStream) read(ctx context.Context, eventC chan interface{}) {
-	defer close(eventC)
+func (s *PrivateStream) read(ctx context.Context) {
 
 	pingTicker := time.NewTicker(1 * time.Minute)
 	defer pingTicker.Stop()
@@ -207,8 +206,6 @@ func (s *PrivateStream) read(ctx context.Context, eventC chan interface{}) {
 					s.EmitTrade(trade)
 				}
 			}
-
-			eventC <- e
 		}
 	}
 }

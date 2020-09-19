@@ -24,7 +24,7 @@ func LoadAccount(ctx context.Context, exchange *binance.Exchange) (*Account, err
 	}, err
 }
 
-func (a *Account) BindPrivateStream(stream *binance.PrivateStream) {
+func (a *Account) BindPrivateStream(stream types.PrivateStream) {
 	stream.OnBalanceSnapshot(func(snapshot map[string]types.Balance) {
 		a.mu.Lock()
 		defer a.mu.Unlock()
@@ -34,20 +34,6 @@ func (a *Account) BindPrivateStream(stream *binance.PrivateStream) {
 		}
 	})
 
-	stream.OnOutboundAccountInfoEvent(func(e *binance.OutboundAccountInfoEvent) {
-
-	})
-
-	stream.OnBalanceUpdateEvent(func(e *binance.BalanceUpdateEvent) {
-		a.mu.Lock()
-		defer a.mu.Unlock()
-
-		delta := util.MustParseFloat(e.Delta)
-		if balance, ok := a.Balances[e.Asset]; ok {
-			balance.Available += delta
-			a.Balances[e.Asset] = balance
-		}
-	})
 }
 
 func (a *Account) Print() {

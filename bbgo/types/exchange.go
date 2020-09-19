@@ -6,6 +6,12 @@ import (
 )
 
 type Exchange interface {
+	PlatformFeeCurrency() string
+
+	NewPrivateStream() (PrivateStream, error)
+
+	QueryAccountBalances(ctx context.Context) (map[string]Balance, error)
+
 	QueryKLines(ctx context.Context, symbol string, interval string, options KLineQueryOptions) ([]KLine, error)
 	QueryTrades(ctx context.Context, symbol string, options *TradeQueryOptions) ([]Trade, error)
 

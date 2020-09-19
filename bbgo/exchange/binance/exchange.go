@@ -18,11 +18,15 @@ var log = logrus.WithFields(logrus.Fields{
 	"exchange": "binance",
 })
 
+func init() {
+	_ = types.Exchange(&Exchange{})
+}
+
 type Exchange struct {
 	Client *binance.Client
 }
 
-func NewExchange(key, secret string) *Exchange {
+func New(key, secret string) *Exchange {
 	var client = binance.NewClient(key, secret)
 	return &Exchange{
 		Client: client,
@@ -38,9 +42,27 @@ func (e *Exchange) QueryAveragePrice(ctx context.Context, symbol string) (float6
 	return util.MustParseFloat(resp.Price), nil
 }
 
-func (e *Exchange) NewPrivateStream() (*PrivateStream, error) {
+func (e *Exchange) NewPrivateStream() (types.PrivateStream, error) {
+	return NewPrivateStream(e.Client)
+}
+
+func NewPrivateStream(client *binance.Client) (*PrivateStream, error) {
+	// binance BalanceUpdate = withdrawal or deposit changes
+	/*
+	stream.OnBalanceUpdateEvent(func(e *binance.BalanceUpdateEvent) {
+		a.mu.Lock()
+		defer a.mu.Unlock()
+
+		delta := util.MustParseFloat(e.Delta)
+		if balance, ok := a.Balances[e.Asset]; ok {
+			balance.Available += delta
+			a.Balances[e.Asset] = balance
+		}
+	})
+	*/
+
 	return &PrivateStream{
-		Client: e.Client,
+		Client: client,
 	}, nil
 }
 
@@ -200,8 +222,8 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (map[string]types.B
 	return account.Balances, nil
 }
 
-// TradingFeeCurrency
-func (e *Exchange) TradingFeeCurrency() string {
+// PlatformFeeCurrency
+func (e *Exchange) PlatformFeeCurrency() string {
 	return "BNB"
 }
 

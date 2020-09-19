@@ -1,9 +1,18 @@
 package types
 
 import (
+	"context"
 	"fmt"
 	"strings"
 )
+
+type PrivateStream interface {
+	StandardPrivateStreamEventHub
+
+	Subscribe(channel string, symbol string, options SubscribeOptions)
+	Connect(ctx context.Context) error
+	Close() error
+}
 
 //go:generate callbackgen -type StandardPrivateStream -interface
 type StandardPrivateStream struct {
@@ -43,7 +52,16 @@ type Subscription struct {
 }
 
 func (s *Subscription) String() string {
-	// binance uses lower case symbol name
-	return fmt.Sprintf("%s@%s_%s", strings.ToLower(s.Symbol), s.Channel, s.Options.String())
+	// binance uses lower case symbol name,
+	// for kline, it's "<symbol>@kline_<interval>"
+	// for depth, it's "<symbol>@depth OR <symbol>@depth@100ms"
+	switch s.Channel {
+	case "kline":
+		return fmt.Sprintf("%s@%s_%s", strings.ToLower(s.Symbol), s.Channel, s.Options.String())
+	case "depth", "book":
+		return fmt.Sprintf("%s@%s", strings.ToLower(s.Symbol), s.Channel)
+	default:
+		return fmt.Sprintf("%s@%s", strings.ToLower(s.Symbol), s.Channel)
+	}
 }
 

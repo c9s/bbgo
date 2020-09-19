@@ -21,7 +21,7 @@ import (
 
 type Strategy interface {
 	Load(tradingContext *Context, trader types.Trader) error
-	OnNewStream(stream *types.StandardPrivateStream) error
+	OnNewStream(stream types.PrivateStream) error
 }
 
 type Trader struct {
@@ -41,9 +41,15 @@ type Trader struct {
 	ProfitAndLossCalculator *accounting.ProfitAndLossCalculator
 
 	Account *Account
+
+	Exchanges map[string]*binance.Exchange
+
+	ExchangeAccounts map[string]*Account
+
+	ExchangeStreams map[string]types.PrivateStream
 }
 
-func NewTrader(db *sqlx.DB, exchange *binance.Exchange, symbol string) *Trader {
+func New(db *sqlx.DB, exchange *binance.Exchange, symbol string) *Trader {
 	tradeService := &service.TradeService{DB: db}
 	return &Trader{
 		Symbol:       symbol,
@@ -56,8 +62,28 @@ func NewTrader(db *sqlx.DB, exchange *binance.Exchange, symbol string) *Trader {
 	}
 }
 
-func (trader *Trader) Initialize(ctx context.Context, startTime time.Time) error {
+func (trader *Trader) AddExchange(name string, exchange *binance.Exchange) {
+	trader.Exchanges[name] = exchange
+}
 
+func (trader *Trader) Connect(ctx context.Context) error {
+	for n, ex := range trader.Exchanges {
+		stream, err := ex.NewPrivateStream()
+		if err != nil {
+			return err
+		}
+
+		trader.ExchangeStreams[n] = stream
+
+		if err := stream.Connect(ctx) ; err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (trader *Trader) Initialize(ctx context.Context, startTime time.Time) error {
 	log.Info("syncing trades from exchange...")
 	if err := trader.TradeSync.Sync(ctx, trader.Symbol, startTime); err != nil {
 		return err
@@ -65,7 +91,7 @@ func (trader *Trader) Initialize(ctx context.Context, startTime time.Time) error
 
 	var err error
 	var trades []types.Trade
-	tradingFeeCurrency := trader.Exchange.TradingFeeCurrency()
+	tradingFeeCurrency := trader.Exchange.PlatformFeeCurrency()
 	if strings.HasPrefix(trader.Symbol, tradingFeeCurrency) {
 		trades, err = trader.TradeService.QueryForTradingFeeCurrency(trader.Symbol, tradingFeeCurrency)
 	} else {
@@ -228,11 +254,11 @@ func (trader *Trader) RunStrategy(ctx context.Context, strategy Strategy) (chan 
 
 	// bind kline store to the stream
 	klineStore := NewMarketDataStore()
-	klineStore.BindPrivateStream(&stream.StandardPrivateStream)
+	klineStore.BindPrivateStream(stream)
 
 	trader.Account.BindPrivateStream(stream)
 
-	if err := strategy.OnNewStream(&stream.StandardPrivateStream); err != nil {
+	if err := strategy.OnNewStream(stream); err != nil {
 		return nil, err
 	}
 
@@ -270,8 +296,7 @@ func (trader *Trader) RunStrategy(ctx context.Context, strategy Strategy) (chan 
 		trader.Context.SetCurrentPrice(kline.Close)
 	})
 
-	var eventC = make(chan interface{}, 20)
-	if err := stream.Connect(ctx, eventC); err != nil {
+	if err := stream.Connect(ctx); err != nil {
 		return nil, err
 	}
 
@@ -281,16 +306,11 @@ func (trader *Trader) RunStrategy(ctx context.Context, strategy Strategy) (chan 
 		defer close(done)
 		defer stream.Close()
 
-		for {
-			select {
+		select {
 
-			case <-ctx.Done():
-				return
+		case <-ctx.Done():
+			return
 
-			// drain the event channel
-			case <-eventC:
-
-			}
 		}
 	}()
 

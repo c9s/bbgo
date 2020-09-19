@@ -11,7 +11,20 @@ import (
 	"github.com/c9s/bbgo/pkg/util"
 )
 
-type KLineRegressionTrader struct {
+type BackTestStream struct {
+	types.StandardPrivateStream
+}
+
+
+func (s *BackTestStream) Connect(ctx context.Context) error {
+	return nil
+}
+
+func (s *BackTestStream) Close() error {
+	return nil
+}
+
+type BackTestTrader struct {
 	// Context is trading Context
 	Context                 *Context
 	SourceKLines            []types.KLine
@@ -21,11 +34,11 @@ type KLineRegressionTrader struct {
 	pendingOrders []*types.SubmitOrder
 }
 
-func (trader *KLineRegressionTrader) SubmitOrder(cxt context.Context, order *types.SubmitOrder) {
+func (trader *BackTestTrader) SubmitOrder(cxt context.Context, order *types.SubmitOrder) {
 	trader.pendingOrders = append(trader.pendingOrders, order)
 }
 
-func (trader *KLineRegressionTrader) RunStrategy(ctx context.Context, strategy Strategy) (chan struct{}, error) {
+func (trader *BackTestTrader) RunStrategy(ctx context.Context, strategy Strategy) (chan struct{}, error) {
 	logrus.Infof("[regression] number of kline data: %d", len(trader.SourceKLines))
 
 	maxExposure := 0.4
@@ -43,8 +56,8 @@ func (trader *KLineRegressionTrader) RunStrategy(ctx context.Context, strategy S
 		return nil, err
 	}
 
-	standardStream := types.StandardPrivateStream{}
-	if err := strategy.OnNewStream(&standardStream); err != nil {
+	stream := &BackTestStream{}
+	if err := strategy.OnNewStream(stream); err != nil {
 		return nil, err
 	}
 
@@ -54,7 +67,7 @@ func (trader *KLineRegressionTrader) RunStrategy(ctx context.Context, strategy S
 
 		fmt.Print(".")
 
-		standardStream.EmitKLineClosed(kline)
+		stream.EmitKLineClosed(kline)
 
 		for _, order := range trader.pendingOrders {
 			switch order.Side {
