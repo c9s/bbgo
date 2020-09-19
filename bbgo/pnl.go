@@ -8,7 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
 
-	"github.com/c9s/bbgo/pkg/bbgo/slack/slackstyle"
+	"github.com/c9s/bbgo/pkg/bbgo/slacklog/slackstyle"
 	"github.com/c9s/bbgo/pkg/bbgo/types"
 )
 

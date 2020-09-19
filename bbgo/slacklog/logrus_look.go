@@ -1,4 +1,4 @@
-package slack
+package slacklog
 
 import (
 	"context"

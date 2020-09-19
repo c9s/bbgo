@@ -28,9 +28,9 @@ type SlackAttachmentCreator interface {
 type SlackNotifier struct {
 	Slack *slack.Client
 
-	TradingChannel string
-	ErrorChannel   string
-	InfoChannel    string
+	TradeChannel string
+	ErrorChannel string
+	InfoChannel  string
 }
 
 func (n *SlackNotifier) Notify(format string, args ...interface{}) {
@@ -74,7 +74,7 @@ func (n *SlackNotifier) Notify(format string, args ...interface{}) {
 }
 
 func (n *SlackNotifier) ReportTrade(trade *types.Trade) {
-	_, _, err := n.Slack.PostMessageContext(context.Background(), n.TradingChannel,
+	_, _, err := n.Slack.PostMessageContext(context.Background(), n.TradeChannel,
 		slack.MsgOptionText(util.Render(`:handshake: {{ .Symbol }} {{ .Side }} Trade Execution @ {{ .Price  }}`, trade), true),
 		slack.MsgOptionAttachments(trade.SlackAttachment()))
 
@@ -86,7 +86,7 @@ func (n *SlackNotifier) ReportTrade(trade *types.Trade) {
 func (n *SlackNotifier) ReportPnL(report *ProfitAndLossReport) {
 	attachment := report.SlackAttachment()
 
-	_, _, err := n.Slack.PostMessageContext(context.Background(), n.TradingChannel,
+	_, _, err := n.Slack.PostMessageContext(context.Background(), n.TradeChannel,
 		slack.MsgOptionText(util.Render(
 			`:heavy_dollar_sign: Here is your *{{ .symbol }}* PnL report collected since *{{ .startTime }}*`,
 			map[string]interface{}{
