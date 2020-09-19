@@ -19,7 +19,6 @@ type Context struct {
 	CurrentPrice    float64
 
 	Balances                map[string]types.Balance
-	Quota                   map[string]types.Balance
 	ProfitAndLossCalculator *accounting.ProfitAndLossCalculator
 	StockManager            *StockManager
 }

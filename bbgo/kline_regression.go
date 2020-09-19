@@ -41,14 +41,6 @@ func (trader *BackTestTrader) SubmitOrder(cxt context.Context, order *types.Subm
 func (trader *BackTestTrader) RunStrategy(ctx context.Context, strategy Strategy) (chan struct{}, error) {
 	logrus.Infof("[regression] number of kline data: %d", len(trader.SourceKLines))
 
-	maxExposure := 0.4
-	trader.Context.Quota = make(map[string]types.Balance)
-	for currency, balance := range trader.Context.Balances {
-		quota := balance
-		quota.Available *= maxExposure
-		trader.Context.Quota[currency] = quota
-	}
-
 	done := make(chan struct{})
 	defer close(done)
 
