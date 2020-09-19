@@ -12,7 +12,6 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo/accounting"
 	"github.com/c9s/bbgo/pkg/bbgo/config"
-	"github.com/c9s/bbgo/pkg/bbgo/notifier/slacknotifier"
 	"github.com/c9s/bbgo/pkg/bbgo/service"
 
 	"github.com/c9s/bbgo/pkg/bbgo/exchange/binance"
@@ -29,8 +28,6 @@ type Trader struct {
 	TradeService *service.TradeService
 	TradeSync    *service.TradeSync
 
-	Notifier *slacknotifier.Notifier
-
 	// Context is trading Context
 	Context *Context
 
@@ -42,11 +39,16 @@ type Trader struct {
 
 	Account *Account
 
+	// new fieldss
 	Exchanges map[string]*binance.Exchange
 
 	ExchangeAccounts map[string]*Account
 
 	ExchangeStreams map[string]types.PrivateStream
+
+	ExchangeSubscriptions map[string][]types.Subscription
+
+	Notifiers []Notifier
 }
 
 func New(db *sqlx.DB, exchange *binance.Exchange, symbol string) *Trader {
@@ -62,8 +64,20 @@ func New(db *sqlx.DB, exchange *binance.Exchange, symbol string) *Trader {
 	}
 }
 
+func (trader *Trader) AddNotifier(notifier Notifier) {
+	trader.Notifiers = append(trader.Notifiers, notifier)
+}
+
 func (trader *Trader) AddExchange(name string, exchange *binance.Exchange) {
 	trader.Exchanges[name] = exchange
+}
+
+func (trader *Trader) Subscribe(exchange string, channel string, symbol string, options types.SubscribeOptions) {
+	trader.ExchangeSubscriptions[exchange] = append(trader.ExchangeSubscriptions[exchange], types.Subscription{
+		Channel: channel,
+		Symbol:  symbol,
+		Options: options,
+	})
 }
 
 func (trader *Trader) Connect(ctx context.Context) error {
@@ -75,7 +89,7 @@ func (trader *Trader) Connect(ctx context.Context) error {
 
 		trader.ExchangeStreams[n] = stream
 
-		if err := stream.Connect(ctx) ; err != nil {
+		if err := stream.Connect(ctx); err != nil {
 			return err
 		}
 	}
@@ -208,7 +222,7 @@ func (trader *Trader) RunStrategyWithHotReload(ctx context.Context, strategy Str
 					log.WithError(err).Error("error load config file")
 				}
 
-				trader.Notifier.Notify("config reloaded, restarting trader")
+				trader.Notify("config reloaded, restarting trader")
 
 				traderDone, err = trader.RunStrategy(strategyContext, strategy)
 				if err != nil {
@@ -275,7 +289,7 @@ func (trader *Trader) RunStrategy(ctx context.Context, strategy Strategy) (chan 
 			log.WithError(err).Error("trade insert error")
 		}
 
-		trader.Notifier.NotifyTrade(trade)
+		trader.NotifyTrade(trade)
 		trader.ProfitAndLossCalculator.AddTrade(*trade)
 		_, err := trader.Context.StockManager.AddTrades([]types.Trade{*trade})
 		if err != nil {
@@ -320,11 +334,29 @@ func (trader *Trader) RunStrategy(ctx context.Context, strategy Strategy) (chan 
 func (trader *Trader) reportPnL() {
 	report := trader.ProfitAndLossCalculator.Calculate()
 	report.Print()
-	trader.Notifier.NotifyPnL(report)
+	trader.NotifyPnL(report)
+}
+
+func (trader *Trader) NotifyPnL(report *accounting.ProfitAndLossReport) {
+	for _, n := range trader.Notifiers {
+		n.NotifyPnL(report)
+	}
+}
+
+func (trader *Trader) NotifyTrade(trade *types.Trade) {
+	for _, n := range trader.Notifiers {
+		n.NotifyTrade(trade)
+	}
+}
+
+func (trader *Trader) Notify(msg string, args ...interface{}) {
+	for _, n := range trader.Notifiers {
+		n.Notify(msg, args...)
+	}
 }
 
 func (trader *Trader) SubmitOrder(ctx context.Context, order *types.SubmitOrder) {
-	trader.Notifier.Notify(":memo: Submitting %s %s %s order with quantity: %s", order.Symbol, order.Type, order.Side, order.QuantityString, order)
+	trader.Notify(":memo: Submitting %s %s %s order with quantity: %s", order.Symbol, order.Type, order.Side, order.QuantityString, order)
 
 	orderProcessor := &OrderProcessor{
 		MinQuoteBalance: 0,
