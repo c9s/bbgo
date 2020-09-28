@@ -38,13 +38,13 @@ func (trader *BackTestTrader) SubmitOrder(cxt context.Context, order *types.Subm
 	trader.pendingOrders = append(trader.pendingOrders, order)
 }
 
-func (trader *BackTestTrader) RunStrategy(ctx context.Context, strategy Strategy) (chan struct{}, error) {
+func (trader *BackTestTrader) RunStrategy(ctx context.Context, strategy MarketStrategy) (chan struct{}, error) {
 	logrus.Infof("[regression] number of kline data: %d", len(trader.SourceKLines))
 
 	done := make(chan struct{})
 	defer close(done)
 
-	if err := strategy.Load(trader.Context, trader); err != nil {
+	if err := strategy.OnLoad(trader.Context, trader); err != nil {
 		return nil, err
 	}
 

@@ -8,16 +8,14 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/c9s/bbgo/pkg/bbgo/exchange/binance"
 	"github.com/c9s/bbgo/pkg/bbgo/types"
 )
 
 type TradeSync struct {
 	Service  *TradeService
-	Exchange *binance.Exchange
 }
 
-func (s *TradeSync) Sync(ctx context.Context, symbol string, startTime time.Time) error {
+func (s *TradeSync) Sync(ctx context.Context, exchange types.Exchange, symbol string, startTime time.Time) error {
 	lastTrade, err := s.Service.QueryLast(symbol)
 	if err != nil {
 		return err
@@ -31,7 +29,7 @@ func (s *TradeSync) Sync(ctx context.Context, symbol string, startTime time.Time
 		log.Infof("found last trade, start from lastID = %d since %s", lastTrade.ID, startTime)
 	}
 
-	trades, err := s.Exchange.BatchQueryTrades(ctx, symbol, &types.TradeQueryOptions{
+	trades, err := exchange.BatchQueryTrades(ctx, symbol, &types.TradeQueryOptions{
 		StartTime:   &startTime,
 		Limit:       200,
 		LastTradeID: lastID,
