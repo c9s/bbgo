@@ -15,7 +15,10 @@ type OrderUpdate struct {
 	ID           uint64 `json:"i"`
 	Side         string `json:"sd"`
 	OrderType    string `json:"ot"`
+
 	Price        string `json:"p"`
+	StopPrice    string `json:"sp"`
+
 	Volume       string `json:"v"`
 	AveragePrice string `json:"ap"`
 	State        string `json:"S"`
@@ -46,6 +49,7 @@ func parserOrderUpdate(v *fastjson.Value) OrderUpdate {
 		OrderType:       string(v.GetStringBytes("ot")),
 		State:           string(v.GetStringBytes("S")),
 		Price:           string(v.GetStringBytes("p")),
+		StopPrice:       string(v.GetStringBytes("sp")),
 		AveragePrice:    string(v.GetStringBytes("ap")),
 		Volume:          string(v.GetStringBytes("v")),
 		RemainingVolume: string(v.GetStringBytes("rv")),
