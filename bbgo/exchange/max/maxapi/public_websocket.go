@@ -2,7 +2,10 @@ package max
 
 import (
 	"context"
+	"fmt"
 	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/gorilla/websocket"
 	"github.com/pkg/errors"
@@ -32,10 +35,10 @@ var SubscribeAction = "subscribe"
 var UnsubscribeAction = "unsubscribe"
 
 //go:generate callbackgen -type PublicWebSocketService
-type PublicWebSocketService struct {
-	BaseURL string
+type WebSocketService struct {
+	baseURL, key, secret string
 
-	Conn *websocket.Conn
+	conn *websocket.Conn
 
 	reconnectC chan struct{}
 
@@ -52,38 +55,53 @@ type PublicWebSocketService struct {
 	subscriptionEventCallbacks []func(e SubscriptionEvent)
 }
 
-func NewPublicWebSocketService(wsURL string) *PublicWebSocketService {
-	return &PublicWebSocketService{
+func NewWebSocketService(wsURL string, key, secret string) *WebSocketService {
+	return &WebSocketService{
+		key:        key,
+		secret:     secret,
 		reconnectC: make(chan struct{}, 1),
-		BaseURL:    wsURL,
+		baseURL:    wsURL,
 	}
 }
 
-func (s *PublicWebSocketService) Connect(ctx context.Context) error {
+func (s *WebSocketService) Connect(ctx context.Context) error {
 	// pre-allocate the websocket client, the websocket client can be used for reconnecting.
 	go s.read(ctx)
 	return s.connect(ctx)
 }
 
-func (s *PublicWebSocketService) connect(ctx context.Context) error {
+func (s *WebSocketService) sendAuthMessage() error {
+	nonce := time.Now().UnixNano() / int64(time.Millisecond)
+
+	auth := &AuthMessage{
+		Action:    "auth",
+		APIKey:    s.key,
+		Nonce:     nonce,
+		Signature: signPayload(fmt.Sprintf("%d", nonce), s.secret),
+		ID:        uuid.New().String(),
+	}
+	return s.conn.WriteJSON(auth)
+}
+
+func (s *WebSocketService) connect(ctx context.Context) error {
 	dialer := websocket.DefaultDialer
-	conn, _, err := dialer.DialContext(ctx, s.BaseURL, nil)
+	conn, _, err := dialer.DialContext(ctx, s.baseURL, nil)
 	if err != nil {
 		return err
 	}
 
-	s.Conn = conn
+	s.conn = conn
 	return nil
 }
 
-func (s *PublicWebSocketService) emitReconnect() {
+func (s *WebSocketService) emitReconnect() {
 	select {
 	case s.reconnectC <- struct{}{}:
 	default:
 	}
 }
 
-func (s *PublicWebSocketService) read(ctx context.Context) {
+func (s *WebSocketService) read(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -96,7 +114,7 @@ func (s *PublicWebSocketService) read(ctx context.Context) {
 			}
 
 		default:
-			mt, msg, err := s.Conn.ReadMessage()
+			mt, msg, err := s.conn.ReadMessage()
 
 			if err != nil {
 				s.emitReconnect()
@@ -120,7 +138,7 @@ func (s *PublicWebSocketService) read(ctx context.Context) {
 	}
 }
 
-func (s *PublicWebSocketService) dispatch(msg interface{}) {
+func (s *WebSocketService) dispatch(msg interface{}) {
 	switch e := msg.(type) {
 	case *BookEvent:
 		s.EmitBookEvent(*e)
@@ -135,18 +153,18 @@ func (s *PublicWebSocketService) dispatch(msg interface{}) {
 	}
 }
 
-func (s *PublicWebSocketService) ClearSubscriptions() {
+func (s *WebSocketService) ClearSubscriptions() {
 	s.Subscriptions = nil
 }
 
-func (s *PublicWebSocketService) Reconnect() {
+func (s *WebSocketService) Reconnect() {
 	logger.Info("reconnecting...")
 	s.emitReconnect()
 }
 
 // Subscribe is a helper method for building subscription request from the internal mapping types.
 // (Internal public method)
-func (s *PublicWebSocketService) Subscribe(channel string, market string) error {
+func (s *WebSocketService) Subscribe(channel string, market string) error {
 	s.AddSubscription(Subscription{
 		Channel: channel,
 		Market:  market,
@@ -155,11 +173,11 @@ func (s *PublicWebSocketService) Subscribe(channel string, market string) error 
 }
 
 // AddSubscription adds the subscription request to the buffer, these requests will be sent to the server right after connecting to the endpoint.
-func (s *PublicWebSocketService) AddSubscription(subscription Subscription) {
+func (s *WebSocketService) AddSubscription(subscription Subscription) {
 	s.Subscriptions = append(s.Subscriptions, subscription)
 }
 
-func (s *PublicWebSocketService) Resubscribe() {
+func (s *WebSocketService) Resubscribe() {
 	// Calling Resubscribe() by websocket is not enough to refresh orderbook.
 	// We still need to get orderbook snapshot by rest client.
 	// Therefore Reconnect() is used to simplify implementation.
@@ -173,7 +191,7 @@ func (s *PublicWebSocketService) Resubscribe() {
 	}
 }
 
-func (s *PublicWebSocketService) SendSubscriptionRequest(action string) error {
+func (s *WebSocketService) SendSubscriptionRequest(action string) error {
 	request := WebsocketCommand{
 		Action:        action,
 		Subscriptions: s.Subscriptions,
@@ -181,7 +199,7 @@ func (s *PublicWebSocketService) SendSubscriptionRequest(action string) error {
 
 	logger.Debugf("sending websocket subscription: %+v", request)
 
-	if err := s.Conn.WriteJSON(request); err != nil {
+	if err := s.conn.WriteJSON(request); err != nil {
 		return errors.Wrap(err, "Failed to send subscribe event")
 	}
 
@@ -189,6 +207,6 @@ func (s *PublicWebSocketService) SendSubscriptionRequest(action string) error {
 }
 
 // Close web socket connection
-func (s *PublicWebSocketService) Close() error {
-	return s.Conn.Close()
+func (s *WebSocketService) Close() error {
+	return s.conn.Close()
 }
