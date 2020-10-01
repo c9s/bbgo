@@ -5,48 +5,10 @@ import (
 	"github.com/valyala/fastjson"
 )
 
-func ParsePrivateEvent(message []byte) (interface{}, error) {
-	var fp fastjson.Parser
-	var v, err = fp.ParseBytes(message)
-	if err != nil {
-		return nil, errors.Wrap(err, "fail to parse account info raw message")
-	}
-
-	eventType := string(v.GetStringBytes("e"))
-	switch eventType {
-	case "order_snapshot":
-		return parserOrderSnapshotEvent(v)
-
-	case "order_update":
-		return parseOrderUpdateEvent(v)
-
-	case "trade_snapshot":
-		return parseTradeSnapshotEvent(v)
-
-	case "trade_update":
-		return parseTradeUpdateEvent(v)
-
-	case "account_snapshot":
-		return parserAccountSnapshotEvent(v)
-
-	case "account_update":
-		return parserAccountUpdateEvent(v)
-
-	case "authenticated":
-		return parserAuthEvent(v)
-
-	case "error":
-		logger.Errorf("error %s", message)
-	}
-
-	return nil, errors.Wrapf(ErrMessageTypeNotSupported, "private message %s", message)
+type BaseEvent struct {
+	Event     string        `json:"e"`
+	Timestamp int64         `json:"T"`
 }
-
-var (
-	errParseOrder   = errors.New("failed parse order")
-	errParseTrade   = errors.New("failed parse trade")
-	errParseAccount = errors.New("failed parse account")
-)
 
 type OrderUpdate struct {
 	Event        string `json:"e"`
@@ -69,7 +31,13 @@ type OrderUpdate struct {
 	CreatedAtMs int64  `json:"T"`
 }
 
-func parserOrderUpdate(v *fastjson.Value) (OrderUpdate, error) {
+type OrderUpdateEvent struct {
+	BaseEvent
+
+	Orders []OrderUpdate `json:"o"`
+}
+
+func parserOrderUpdate(v *fastjson.Value) OrderUpdate {
 	return OrderUpdate{
 		Event:           string(v.GetStringBytes("e")),
 		ID:              v.GetUint64("i"),
@@ -86,39 +54,37 @@ func parserOrderUpdate(v *fastjson.Value) (OrderUpdate, error) {
 		GroupID:         v.GetInt64("gi"),
 		ClientOID:       string(v.GetStringBytes("ci")),
 		CreatedAtMs:     v.GetInt64("T"),
-	}, nil
+	}
 }
 
-func parseOrderUpdateEvent(v *fastjson.Value) (OrderUpdate, error) {
-	rawOrders := v.GetArray("o")
-	if len(rawOrders) == 0 {
-		return OrderUpdate{}, errParseOrder
+func parseOrderUpdateEvent(v *fastjson.Value) (e OrderUpdateEvent) {
+	e.Event = string(v.GetStringBytes("e"))
+	e.Timestamp = v.GetInt64("T")
+
+	for _, ov := range v.GetArray("o") {
+		o := parserOrderUpdate(ov)
+		e.Orders = append(e.Orders, o)
 	}
 
-	return parserOrderUpdate(rawOrders[0])
+	return e
 }
 
-type OrderSnapshot []OrderUpdate
+type OrderSnapshotEvent struct {
+	BaseEvent
 
-func parserOrderSnapshotEvent(v *fastjson.Value) (orderSnapshot OrderSnapshot, err error) {
-	var errCount int
+	Orders    []OrderUpdate `json:"o"`
+}
 
-	rawOrders := v.GetArray("o")
-	for _, ov := range rawOrders {
-		o, e := parserOrderUpdate(ov)
-		if e != nil {
-			errCount++
-			err = e
-		} else {
-			orderSnapshot = append(orderSnapshot, o)
-		}
+func parserOrderSnapshotEvent(v *fastjson.Value) (e OrderSnapshotEvent) {
+	e.Event = string(v.GetStringBytes("e"))
+	e.Timestamp = v.GetInt64("T")
+
+	for _, ov := range v.GetArray("o") {
+		o := parserOrderUpdate(ov)
+		e.Orders = append(e.Orders, o)
 	}
 
-	if errCount > 0 {
-		err = errors.Wrapf(err, "failed to parse order snapshot. %d errors in order snapshot. The last error: ", errCount)
-	}
-
-	return
+	return e
 }
 
 type TradeUpdate struct {
@@ -135,7 +101,7 @@ type TradeUpdate struct {
 	OrderID uint64 `json:"oi"`
 }
 
-func parseTradeUpdate(v *fastjson.Value) (TradeUpdate, error) {
+func parseTradeUpdate(v *fastjson.Value) TradeUpdate {
 	return TradeUpdate{
 		ID:          v.GetUint64("i"),
 		Side:        string(v.GetStringBytes("sd")),
@@ -146,39 +112,43 @@ func parseTradeUpdate(v *fastjson.Value) (TradeUpdate, error) {
 		FeeCurrency: string(v.GetStringBytes("fc")),
 		Timestamp:   v.GetInt64("T"),
 		OrderID:     v.GetUint64("oi"),
-	}, nil
+	}
 }
 
-func parseTradeUpdateEvent(v *fastjson.Value) (TradeUpdate, error) {
-	rawTrades := v.GetArray("t")
-	if len(rawTrades) == 0 {
-		return TradeUpdate{}, errParseTrade
+type TradeUpdateEvent struct {
+	BaseEvent
+
+	Trades []TradeUpdate `json:"t"`
+}
+
+func parseTradeUpdateEvent(v *fastjson.Value) (e TradeUpdateEvent) {
+	e.Event = string(v.GetStringBytes("e"))
+	e.Timestamp = v.GetInt64("T")
+
+	for _, tv := range v.GetArray("t") {
+		e.Trades = append(e.Trades, parseTradeUpdate(tv))
 	}
 
-	return parseTradeUpdate(rawTrades[0])
+	return e
 }
 
 type TradeSnapshot []TradeUpdate
 
-func parseTradeSnapshotEvent(v *fastjson.Value) (tradeSnapshot TradeSnapshot, err error) {
-	var errCount int
+type TradeSnapshotEvent struct {
+	BaseEvent
 
-	rawTrades := v.GetArray("t")
-	for _, tv := range rawTrades {
-		t, e := parseTradeUpdate(tv)
-		if e != nil {
-			errCount++
-			err = e
-		} else {
-			tradeSnapshot = append(tradeSnapshot, t)
-		}
+	Trades []TradeUpdate `json:"t"`
+}
+
+func parseTradeSnapshotEvent(v *fastjson.Value) (e TradeSnapshotEvent) {
+	e.Event = string(v.GetStringBytes("e"))
+	e.Timestamp = v.GetInt64("T")
+
+	for _, tv := range v.GetArray("t") {
+		e.Trades = append(e.Trades, parseTradeUpdate(tv))
 	}
 
-	if errCount > 0 {
-		err = errors.Wrapf(err, "failed to parse trade snapshot. %d errors in trade snapshot. The last error: ", errCount)
-	}
-
-	return
+	return e
 }
 
 type Balance struct {
@@ -187,50 +157,89 @@ type Balance struct {
 	Locked    string `json:"l"`
 }
 
-func parseBalance(v *fastjson.Value) (Balance, error) {
+func parseBalance(v *fastjson.Value) Balance {
 	return Balance{
 		Currency:  string(v.GetStringBytes("cu")),
 		Available: string(v.GetStringBytes("av")),
 		Locked:    string(v.GetStringBytes("l")),
-	}, nil
+	}
 }
 
-func parserAccountUpdateEvent(v *fastjson.Value) (Balance, error) {
-	rawBalances := v.GetArray("B")
-	if len(rawBalances) == 0 {
-		return Balance{}, errParseAccount
-	}
 
-	return parseBalance(rawBalances[0])
+type AccountUpdateEvent struct {
+	BaseEvent
+	Balances []Balance `json:"B"`
 }
 
-type BalanceSnapshot []Balance
+func parserAccountUpdateEvent(v *fastjson.Value) (e AccountUpdateEvent) {
+	e.Event = string(v.GetStringBytes("e"))
+	e.Timestamp = v.GetInt64("T")
 
-func parserAccountSnapshotEvent(v *fastjson.Value) (balanceSnapshot BalanceSnapshot, err error) {
-	var errCount int
-
-	rawBalances := v.GetArray("B")
-	for _, bv := range rawBalances {
-		b, e := parseBalance(bv)
-		if e != nil {
-			errCount++
-			err = e
-		} else {
-			balanceSnapshot = append(balanceSnapshot, b)
-		}
+	for _, bv := range v.GetArray("B") {
+		e.Balances = append(e.Balances, parseBalance(bv))
 	}
 
-	if errCount > 0 {
-		err = errors.Wrapf(err, "failed to parse balance snapshot. %d errors in balance snapshot. The last error: ", errCount)
-	}
-
-	return
+	return e
 }
 
-func parserAuthEvent(v *fastjson.Value) (AuthEvent, error) {
+type AccountSnapshotEvent struct {
+	BaseEvent
+	Balances []Balance `json:"B"`
+}
+
+func parserAccountSnapshotEvent(v *fastjson.Value) (e AccountSnapshotEvent) {
+	e.Event = string(v.GetStringBytes("e"))
+	e.Timestamp = v.GetInt64("T")
+
+	for _, bv := range v.GetArray("B") {
+		e.Balances = append(e.Balances, parseBalance(bv))
+	}
+
+	return e
+}
+
+func parserAuthEvent(v *fastjson.Value) AuthEvent {
 	return AuthEvent{
 		Event:     string(v.GetStringBytes("e")),
 		ID:        string(v.GetStringBytes("i")),
 		Timestamp: v.GetInt64("T"),
-	}, nil
+	}
+}
+
+
+func ParsePrivateEvent(message []byte) (interface{}, error) {
+	var fp fastjson.Parser
+	var v, err = fp.ParseBytes(message)
+	if err != nil {
+		return nil, errors.Wrap(err, "fail to parse account info raw message")
+	}
+
+	eventType := string(v.GetStringBytes("e"))
+	switch eventType {
+	case "order_snapshot":
+		return parserOrderSnapshotEvent(v), nil
+
+	case "order_update":
+		return parseOrderUpdateEvent(v), nil
+
+	case "trade_snapshot":
+		return parseTradeSnapshotEvent(v), nil
+
+	case "trade_update":
+		return parseTradeUpdateEvent(v), nil
+
+	case "account_snapshot":
+		return parserAccountSnapshotEvent(v), nil
+
+	case "account_update":
+		return parserAccountUpdateEvent(v), nil
+
+	case "authenticated":
+		return parserAuthEvent(v), nil
+
+	case "error":
+		logger.Errorf("error %s", message)
+	}
+
+	return nil, errors.Wrapf(ErrMessageTypeNotSupported, "private message %s", message)
 }
