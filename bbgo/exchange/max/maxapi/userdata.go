@@ -202,7 +202,7 @@ func parserAccountSnapshotEvent(v *fastjson.Value) (e AccountSnapshotEvent) {
 	return e
 }
 
-func parserAuthEvent(v *fastjson.Value) AuthEvent {
+func parseAuthEvent(v *fastjson.Value) AuthEvent {
 	return AuthEvent{
 		Event:     string(v.GetStringBytes("e")),
 		ID:        string(v.GetStringBytes("i")),
@@ -211,13 +211,7 @@ func parserAuthEvent(v *fastjson.Value) AuthEvent {
 }
 
 
-func ParsePrivateEvent(message []byte) (interface{}, error) {
-	var fp fastjson.Parser
-	var v, err = fp.ParseBytes(message)
-	if err != nil {
-		return nil, errors.Wrap(err, "fail to parse account info raw message")
-	}
-
+func ParseUserEvent(v *fastjson.Value) (interface{}, error) {
 	eventType := string(v.GetStringBytes("e"))
 	switch eventType {
 	case "order_snapshot":
@@ -239,11 +233,11 @@ func ParsePrivateEvent(message []byte) (interface{}, error) {
 		return parserAccountUpdateEvent(v), nil
 
 	case "authenticated":
-		return parserAuthEvent(v), nil
+		return parseAuthEvent(v), nil
 
 	case "error":
-		logger.Errorf("error %s", message)
+		logger.Errorf("error %s", v.MarshalTo(nil))
 	}
 
-	return nil, errors.Wrapf(ErrMessageTypeNotSupported, "private message %s", message)
+	return nil, errors.Wrapf(ErrMessageTypeNotSupported, "private message %s", v.MarshalTo(nil))
 }

@@ -11,6 +11,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+var WebSocketURL = "wss://max-stream.maicoin.com/ws"
+
 var ErrMessageTypeNotSupported = errors.New("message type currently not supported")
 
 // Subscription is used for presenting the subscription metadata.
@@ -31,7 +33,7 @@ type WebsocketCommand struct {
 var SubscribeAction = "subscribe"
 var UnsubscribeAction = "unsubscribe"
 
-//go:generate callbackgen -type PublicWebSocketService
+//go:generate callbackgen -type WebSocketService
 type WebSocketService struct {
 	baseURL, key, secret string
 
@@ -42,7 +44,8 @@ type WebSocketService struct {
 	// Subscriptions is the subscription request payloads that will be used for sending subscription request
 	Subscriptions []Subscription
 
-	parser PublicParser
+	connectCallbacks []func(conn *websocket.Conn)
+	disconnectCallbacks []func(conn *websocket.Conn)
 
 	errorCallbacks             []func(err error)
 	messageCallbacks           []func(message []byte)
@@ -63,13 +66,15 @@ func NewWebSocketService(wsURL string, key, secret string) *WebSocketService {
 
 func (s *WebSocketService) Connect(ctx context.Context) error {
 	// pre-allocate the websocket client, the websocket client can be used for reconnecting.
+	if err := s.connect(ctx) ; err != nil {
+		return err
+	}
 	go s.read(ctx)
-	return s.connect(ctx)
+	return nil
 }
 
-func (s *WebSocketService) sendAuthMessage() error {
+func (s *WebSocketService) Auth() error {
 	nonce := time.Now().UnixNano() / int64(time.Millisecond)
-
 	auth := &AuthMessage{
 		Action:    "auth",
 		APIKey:    s.key,
@@ -88,6 +93,7 @@ func (s *WebSocketService) connect(ctx context.Context) error {
 	}
 
 	s.conn = conn
+	s.EmitConnect(conn)
 	return nil
 }
 
@@ -124,7 +130,7 @@ func (s *WebSocketService) read(ctx context.Context) {
 
 			s.EmitMessage(msg)
 
-			m, err := s.parser.Parse(msg)
+			m, err := ParseMessage(msg)
 			if err != nil {
 				s.EmitError(errors.Wrapf(err, "failed to parse public message: %s", msg))
 				continue
@@ -161,12 +167,11 @@ func (s *WebSocketService) Reconnect() {
 
 // Subscribe is a helper method for building subscription request from the internal mapping types.
 // (Internal public method)
-func (s *WebSocketService) Subscribe(channel string, market string) error {
+func (s *WebSocketService) Subscribe(channel string, market string) {
 	s.AddSubscription(Subscription{
 		Channel: channel,
 		Market:  market,
 	})
-	return nil
 }
 
 // AddSubscription adds the subscription request to the buffer, these requests will be sent to the server right after connecting to the endpoint.

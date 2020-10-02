@@ -2,7 +2,29 @@
 
 package max
 
-import ()
+import (
+	"github.com/gorilla/websocket"
+)
+
+func (s *WebSocketService) OnConnect(cb func(conn *websocket.Conn)) {
+	s.connectCallbacks = append(s.connectCallbacks, cb)
+}
+
+func (s *WebSocketService) EmitConnect(conn *websocket.Conn) {
+	for _, cb := range s.connectCallbacks {
+		cb(conn)
+	}
+}
+
+func (s *WebSocketService) OnDisconnect(cb func(conn *websocket.Conn)) {
+	s.disconnectCallbacks = append(s.disconnectCallbacks, cb)
+}
+
+func (s *WebSocketService) EmitDisconnect(conn *websocket.Conn) {
+	for _, cb := range s.disconnectCallbacks {
+		cb(conn)
+	}
+}
 
 func (s *WebSocketService) OnError(cb func(err error)) {
 	s.errorCallbacks = append(s.errorCallbacks, cb)

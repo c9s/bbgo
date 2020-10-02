@@ -13,11 +13,9 @@ var ErrIncorrectBookEntryElementLength = errors.New("incorrect book entry elemen
 const Buy = 1
 const Sell = -1
 
-type PublicParser struct{}
-
-// Parse accepts the raw messages from max public websocket channels and parses them into market data
+// ParseMessage accepts the raw messages from max public websocket channels and parses them into market data
 // Return types: *BookEvent, *TradeEvent, *SubscriptionEvent, *ErrorEvent
-func (p *PublicParser) Parse(payload []byte) (interface{}, error) {
+func ParseMessage(payload []byte) (interface{}, error) {
 	parser := fastjson.Parser{}
 	val, err := parser.ParseBytes(payload)
 	if err != nil {
@@ -30,6 +28,8 @@ func (p *PublicParser) Parse(payload []byte) (interface{}, error) {
 			return parseBookEvent(val)
 		case "trade":
 			return parseTradeEvent(val)
+		case "user":
+			return ParseUserEvent(val)
 		}
 	}
 
