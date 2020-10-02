@@ -17,7 +17,7 @@ const Buy = 1
 const Sell = -1
 
 // ParseMessage accepts the raw messages from max public websocket channels and parses them into market data
-// Return types: *BookEvent, *TradeEvent, *SubscriptionEvent, *ErrorEvent
+// Return types: *BookEvent, *PublicTradeEvent, *SubscriptionEvent, *ErrorEvent
 func ParseMessage(payload []byte) (interface{}, error) {
 	parser := fastjson.Parser{}
 	val, err := parser.ParseBytes(payload)
@@ -30,7 +30,7 @@ func ParseMessage(payload []byte) (interface{}, error) {
 		case "book":
 			return parseBookEvent(val)
 		case "trade":
-			return parseTradeEvent(val)
+			return parsePublicTradeEvent(val)
 		case "user":
 			return ParseUserEvent(val)
 		}
@@ -68,7 +68,7 @@ func parseTradeEntry(val *fastjson.Value) TradeEntry {
 	}
 }
 
-type TradeEvent struct {
+type PublicTradeEvent struct {
 	Event     string       `json:"e"`
 	Market    string       `json:"M"`
 	Channel   string       `json:"c"`
@@ -76,12 +76,12 @@ type TradeEvent struct {
 	Timestamp int64        `json:"T"`
 }
 
-func (e *TradeEvent) Time() time.Time {
+func (e *PublicTradeEvent) Time() time.Time {
 	return time.Unix(0, e.Timestamp*int64(time.Millisecond))
 }
 
-func parseTradeEvent(val *fastjson.Value) (*TradeEvent, error) {
-	event := TradeEvent{
+func parsePublicTradeEvent(val *fastjson.Value) (*PublicTradeEvent, error) {
+	event := PublicTradeEvent{
 		Event:     string(val.GetStringBytes("e")),
 		Market:    string(val.GetStringBytes("M")),
 		Channel:   string(val.GetStringBytes("c")),

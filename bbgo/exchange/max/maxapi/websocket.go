@@ -44,15 +44,23 @@ type WebSocketService struct {
 	// Subscriptions is the subscription request payloads that will be used for sending subscription request
 	Subscriptions []Subscription
 
-	connectCallbacks []func(conn *websocket.Conn)
+	connectCallbacks    []func(conn *websocket.Conn)
 	disconnectCallbacks []func(conn *websocket.Conn)
 
 	errorCallbacks             []func(err error)
 	messageCallbacks           []func(message []byte)
 	bookEventCallbacks         []func(e BookEvent)
-	tradeEventCallbacks        []func(e TradeEvent)
+	tradeEventCallbacks        []func(e PublicTradeEvent)
 	errorEventCallbacks        []func(e ErrorEvent)
 	subscriptionEventCallbacks []func(e SubscriptionEvent)
+
+	tradeUpdateEventCallbacks     []func(e TradeUpdateEvent)
+	tradeSnapshotEventCallbacks   []func(e TradeSnapshotEvent)
+	orderUpdateEventCallbacks     []func(e OrderUpdateEvent)
+	orderSnapshotEventCallbacks   []func(e OrderSnapshotEvent)
+
+	accountSnapshotEventCallbacks []func(e AccountSnapshotEvent)
+	accountUpdateEventCallbacks []func(e AccountUpdateEvent)
 }
 
 func NewWebSocketService(wsURL string, key, secret string) *WebSocketService {
@@ -80,7 +88,7 @@ func (s *WebSocketService) Connect(ctx context.Context) error {
 	})
 
 	// pre-allocate the websocket client, the websocket client can be used for reconnecting.
-	if err := s.connect(ctx) ; err != nil {
+	if err := s.connect(ctx); err != nil {
 		return err
 	}
 	go s.read(ctx)
@@ -108,8 +116,6 @@ func (s *WebSocketService) connect(ctx context.Context) error {
 
 	s.conn = conn
 	s.EmitConnect(conn)
-
-
 
 	return nil
 }
@@ -160,14 +166,37 @@ func (s *WebSocketService) read(ctx context.Context) {
 
 func (s *WebSocketService) dispatch(msg interface{}) {
 	switch e := msg.(type) {
+
 	case *BookEvent:
 		s.EmitBookEvent(*e)
-	case *TradeEvent:
+
+	case *PublicTradeEvent:
 		s.EmitTradeEvent(*e)
+
 	case *ErrorEvent:
 		s.EmitErrorEvent(*e)
+
 	case *SubscriptionEvent:
 		s.EmitSubscriptionEvent(*e)
+
+	case *TradeSnapshotEvent:
+		s.EmitTradeSnapshotEvent(*e)
+
+	case *TradeUpdateEvent:
+		s.EmitTradeUpdateEvent(*e)
+
+	case *AccountSnapshotEvent:
+		s.EmitAccountSnapshotEvent(*e)
+
+	case *AccountUpdateEvent:
+		s.EmitAccountUpdateEvent(*e)
+
+	case *OrderSnapshotEvent:
+		s.EmitOrderSnapshotEvent(*e)
+
+	case *OrderUpdateEvent:
+		s.EmitOrderUpdateEvent(*e)
+
 	default:
 		s.EmitError(errors.Errorf("unsupported %T event: %+v", e, e))
 	}

@@ -56,11 +56,11 @@ func (s *WebSocketService) EmitBookEvent(e BookEvent) {
 	}
 }
 
-func (s *WebSocketService) OnTradeEvent(cb func(e TradeEvent)) {
+func (s *WebSocketService) OnTradeEvent(cb func(e PublicTradeEvent)) {
 	s.tradeEventCallbacks = append(s.tradeEventCallbacks, cb)
 }
 
-func (s *WebSocketService) EmitTradeEvent(e TradeEvent) {
+func (s *WebSocketService) EmitTradeEvent(e PublicTradeEvent) {
 	for _, cb := range s.tradeEventCallbacks {
 		cb(e)
 	}
@@ -82,6 +82,66 @@ func (s *WebSocketService) OnSubscriptionEvent(cb func(e SubscriptionEvent)) {
 
 func (s *WebSocketService) EmitSubscriptionEvent(e SubscriptionEvent) {
 	for _, cb := range s.subscriptionEventCallbacks {
+		cb(e)
+	}
+}
+
+func (s *WebSocketService) OnTradeUpdateEvent(cb func(e TradeUpdateEvent)) {
+	s.tradeUpdateEventCallbacks = append(s.tradeUpdateEventCallbacks, cb)
+}
+
+func (s *WebSocketService) EmitTradeUpdateEvent(e TradeUpdateEvent) {
+	for _, cb := range s.tradeUpdateEventCallbacks {
+		cb(e)
+	}
+}
+
+func (s *WebSocketService) OnTradeSnapshotEvent(cb func(e TradeSnapshotEvent)) {
+	s.tradeSnapshotEventCallbacks = append(s.tradeSnapshotEventCallbacks, cb)
+}
+
+func (s *WebSocketService) EmitTradeSnapshotEvent(e TradeSnapshotEvent) {
+	for _, cb := range s.tradeSnapshotEventCallbacks {
+		cb(e)
+	}
+}
+
+func (s *WebSocketService) OnOrderUpdateEvent(cb func(e OrderUpdateEvent)) {
+	s.orderUpdateEventCallbacks = append(s.orderUpdateEventCallbacks, cb)
+}
+
+func (s *WebSocketService) EmitOrderUpdateEvent(e OrderUpdateEvent) {
+	for _, cb := range s.orderUpdateEventCallbacks {
+		cb(e)
+	}
+}
+
+func (s *WebSocketService) OnOrderSnapshotEvent(cb func(e OrderSnapshotEvent)) {
+	s.orderSnapshotEventCallbacks = append(s.orderSnapshotEventCallbacks, cb)
+}
+
+func (s *WebSocketService) EmitOrderSnapshotEvent(e OrderSnapshotEvent) {
+	for _, cb := range s.orderSnapshotEventCallbacks {
+		cb(e)
+	}
+}
+
+func (s *WebSocketService) OnAccountSnapshotEvent(cb func(e AccountSnapshotEvent)) {
+	s.accountSnapshotEventCallbacks = append(s.accountSnapshotEventCallbacks, cb)
+}
+
+func (s *WebSocketService) EmitAccountSnapshotEvent(e AccountSnapshotEvent) {
+	for _, cb := range s.accountSnapshotEventCallbacks {
+		cb(e)
+	}
+}
+
+func (s *WebSocketService) OnAccountUpdateEvent(cb func(e AccountUpdateEvent)) {
+	s.accountUpdateEventCallbacks = append(s.accountUpdateEventCallbacks, cb)
+}
+
+func (s *WebSocketService) EmitAccountUpdateEvent(e AccountUpdateEvent) {
+	for _, cb := range s.accountUpdateEventCallbacks {
 		cb(e)
 	}
 }

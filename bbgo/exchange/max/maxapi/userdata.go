@@ -6,18 +6,18 @@ import (
 )
 
 type BaseEvent struct {
-	Event     string        `json:"e"`
-	Timestamp int64         `json:"T"`
+	Event     string `json:"e"`
+	Timestamp int64  `json:"T"`
 }
 
 type OrderUpdate struct {
-	Event        string `json:"e"`
-	ID           uint64 `json:"i"`
-	Side         string `json:"sd"`
-	OrderType    string `json:"ot"`
+	Event     string `json:"e"`
+	ID        uint64 `json:"i"`
+	Side      string `json:"sd"`
+	OrderType string `json:"ot"`
 
-	Price        string `json:"p"`
-	StopPrice    string `json:"sp"`
+	Price     string `json:"p"`
+	StopPrice string `json:"sp"`
 
 	Volume       string `json:"v"`
 	AveragePrice string `json:"ap"`
@@ -61,7 +61,8 @@ func parserOrderUpdate(v *fastjson.Value) OrderUpdate {
 	}
 }
 
-func parseOrderUpdateEvent(v *fastjson.Value) (e OrderUpdateEvent) {
+func parseOrderUpdateEvent(v *fastjson.Value) *OrderUpdateEvent {
+	var e OrderUpdateEvent
 	e.Event = string(v.GetStringBytes("e"))
 	e.Timestamp = v.GetInt64("T")
 
@@ -70,16 +71,17 @@ func parseOrderUpdateEvent(v *fastjson.Value) (e OrderUpdateEvent) {
 		e.Orders = append(e.Orders, o)
 	}
 
-	return e
+	return &e
 }
 
 type OrderSnapshotEvent struct {
 	BaseEvent
 
-	Orders    []OrderUpdate `json:"o"`
+	Orders []OrderUpdate `json:"o"`
 }
 
-func parserOrderSnapshotEvent(v *fastjson.Value) (e OrderSnapshotEvent) {
+func parserOrderSnapshotEvent(v *fastjson.Value) *OrderSnapshotEvent {
+	var e OrderSnapshotEvent
 	e.Event = string(v.GetStringBytes("e"))
 	e.Timestamp = v.GetInt64("T")
 
@@ -88,7 +90,7 @@ func parserOrderSnapshotEvent(v *fastjson.Value) (e OrderSnapshotEvent) {
 		e.Orders = append(e.Orders, o)
 	}
 
-	return e
+	return &e
 }
 
 type TradeUpdate struct {
@@ -125,7 +127,8 @@ type TradeUpdateEvent struct {
 	Trades []TradeUpdate `json:"t"`
 }
 
-func parseTradeUpdateEvent(v *fastjson.Value) (e TradeUpdateEvent) {
+func parseTradeUpdateEvent(v *fastjson.Value) *TradeUpdateEvent {
+	var e TradeUpdateEvent
 	e.Event = string(v.GetStringBytes("e"))
 	e.Timestamp = v.GetInt64("T")
 
@@ -133,7 +136,7 @@ func parseTradeUpdateEvent(v *fastjson.Value) (e TradeUpdateEvent) {
 		e.Trades = append(e.Trades, parseTradeUpdate(tv))
 	}
 
-	return e
+	return &e
 }
 
 type TradeSnapshot []TradeUpdate
@@ -144,7 +147,8 @@ type TradeSnapshotEvent struct {
 	Trades []TradeUpdate `json:"t"`
 }
 
-func parseTradeSnapshotEvent(v *fastjson.Value) (e TradeSnapshotEvent) {
+func parseTradeSnapshotEvent(v *fastjson.Value) *TradeSnapshotEvent {
+	var e TradeSnapshotEvent
 	e.Event = string(v.GetStringBytes("e"))
 	e.Timestamp = v.GetInt64("T")
 
@@ -152,7 +156,7 @@ func parseTradeSnapshotEvent(v *fastjson.Value) (e TradeSnapshotEvent) {
 		e.Trades = append(e.Trades, parseTradeUpdate(tv))
 	}
 
-	return e
+	return &e
 }
 
 type BalanceMessage struct {
@@ -169,13 +173,13 @@ func parseBalance(v *fastjson.Value) BalanceMessage {
 	}
 }
 
-
 type AccountUpdateEvent struct {
 	BaseEvent
 	Balances []BalanceMessage `json:"B"`
 }
 
-func parserAccountUpdateEvent(v *fastjson.Value) (e AccountUpdateEvent) {
+func parserAccountUpdateEvent(v *fastjson.Value) *AccountUpdateEvent {
+	var e AccountUpdateEvent
 	e.Event = string(v.GetStringBytes("e"))
 	e.Timestamp = v.GetInt64("T")
 
@@ -183,7 +187,7 @@ func parserAccountUpdateEvent(v *fastjson.Value) (e AccountUpdateEvent) {
 		e.Balances = append(e.Balances, parseBalance(bv))
 	}
 
-	return e
+	return &e
 }
 
 type AccountSnapshotEvent struct {
@@ -191,7 +195,8 @@ type AccountSnapshotEvent struct {
 	Balances []BalanceMessage `json:"B"`
 }
 
-func parserAccountSnapshotEvent(v *fastjson.Value) (e AccountSnapshotEvent) {
+func parserAccountSnapshotEvent(v *fastjson.Value) *AccountSnapshotEvent {
+	var e AccountSnapshotEvent
 	e.Event = string(v.GetStringBytes("e"))
 	e.Timestamp = v.GetInt64("T")
 
@@ -199,17 +204,16 @@ func parserAccountSnapshotEvent(v *fastjson.Value) (e AccountSnapshotEvent) {
 		e.Balances = append(e.Balances, parseBalance(bv))
 	}
 
-	return e
+	return &e
 }
 
-func parseAuthEvent(v *fastjson.Value) AuthEvent {
-	return AuthEvent{
+func parseAuthEvent(v *fastjson.Value) *AuthEvent {
+	return &AuthEvent{
 		Event:     string(v.GetStringBytes("e")),
 		ID:        string(v.GetStringBytes("i")),
 		Timestamp: v.GetInt64("T"),
 	}
 }
-
 
 func ParseUserEvent(v *fastjson.Value) (interface{}, error) {
 	eventType := string(v.GetStringBytes("e"))
