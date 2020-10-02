@@ -65,6 +65,20 @@ func NewWebSocketService(wsURL string, key, secret string) *WebSocketService {
 }
 
 func (s *WebSocketService) Connect(ctx context.Context) error {
+	s.OnConnect(func(c *websocket.Conn) {
+		if err := s.SendSubscriptionRequest(SubscribeAction); err != nil {
+			s.EmitError(err)
+			logger.WithError(err).Error("failed to subscribe")
+		}
+	})
+
+	s.OnConnect(func(conn *websocket.Conn) {
+		if err := s.Auth(); err != nil {
+			s.EmitError(err)
+			logger.WithError(err).Error("failed to send auth request")
+		}
+	})
+
 	// pre-allocate the websocket client, the websocket client can be used for reconnecting.
 	if err := s.connect(ctx) ; err != nil {
 		return err
@@ -94,6 +108,9 @@ func (s *WebSocketService) connect(ctx context.Context) error {
 
 	s.conn = conn
 	s.EmitConnect(conn)
+
+
+
 	return nil
 }
 

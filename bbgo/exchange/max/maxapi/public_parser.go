@@ -6,6 +6,9 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/valyala/fastjson"
+
+	"github.com/c9s/bbgo/pkg/bbgo/fixedpoint"
+	"github.com/c9s/bbgo/pkg/bbgo/types"
 )
 
 var ErrIncorrectBookEntryElementLength = errors.New("incorrect book entry element length")
@@ -105,6 +108,28 @@ func (e *BookEvent) Time() time.Time {
 	return time.Unix(0, e.Timestamp*int64(time.Millisecond))
 }
 
+func (e *BookEvent) OrderBook() (snapshot types.OrderBook, err error) {
+	for _, bid := range e.Bids {
+		pv, err := bid.PriceVolumePair()
+		if err != nil {
+			return snapshot, err
+		}
+
+		snapshot.Bids = append(snapshot.Bids, pv)
+	}
+
+	for _, ask := range e.Asks {
+		pv, err := ask.PriceVolumePair()
+		if err != nil {
+			return snapshot, err
+		}
+
+		snapshot.Asks = append(snapshot.Asks, pv)
+	}
+
+	return snapshot, nil
+}
+
 func parseBookEvent(val *fastjson.Value) (*BookEvent, error) {
 	event := BookEvent{
 		Event:     string(val.GetStringBytes("e")),
@@ -136,6 +161,20 @@ type BookEntry struct {
 	Volume string
 }
 
+func (e *BookEntry) PriceVolumePair() (pv types.PriceVolumePair, err error) {
+	pv.Price, err = fixedpoint.NewFromString(e.Price)
+	if err != nil {
+		return pv, err
+	}
+
+	pv.Volume, err = fixedpoint.NewFromString(e.Volume)
+	if err != nil {
+		return pv, err
+	}
+
+	return pv, err
+}
+
 // parseBookEntries parses JSON struct like `[["233330", "0.33"], ....]`
 func parseBookEntries(vals []*fastjson.Value, side int, t time.Time) (entries []BookEntry, err error) {
 	for _, entry := range vals {
@@ -151,8 +190,8 @@ func parseBookEntries(vals []*fastjson.Value, side int, t time.Time) (entries []
 		entries = append(entries, BookEntry{
 			Side:   side,
 			Time:   t,
-			Price:  pv[0].String(),
-			Volume: pv[1].String(),
+			Price:  string(pv[0].GetStringBytes()),
+			Volume: string(pv[1].GetStringBytes()),
 		})
 	}
 
@@ -211,5 +250,3 @@ func parseSubscriptionEvent(val *fastjson.Value) (*SubscriptionEvent, error) {
 
 	return &event, nil
 }
-
-
