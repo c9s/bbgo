@@ -155,14 +155,14 @@ func parseTradeSnapshotEvent(v *fastjson.Value) (e TradeSnapshotEvent) {
 	return e
 }
 
-type Balance struct {
+type BalanceMessage struct {
 	Currency  string `json:"cu"`
 	Available string `json:"av"`
 	Locked    string `json:"l"`
 }
 
-func parseBalance(v *fastjson.Value) Balance {
-	return Balance{
+func parseBalance(v *fastjson.Value) BalanceMessage {
+	return BalanceMessage{
 		Currency:  string(v.GetStringBytes("cu")),
 		Available: string(v.GetStringBytes("av")),
 		Locked:    string(v.GetStringBytes("l")),
@@ -172,7 +172,7 @@ func parseBalance(v *fastjson.Value) Balance {
 
 type AccountUpdateEvent struct {
 	BaseEvent
-	Balances []Balance `json:"B"`
+	Balances []BalanceMessage `json:"B"`
 }
 
 func parserAccountUpdateEvent(v *fastjson.Value) (e AccountUpdateEvent) {
@@ -188,7 +188,7 @@ func parserAccountUpdateEvent(v *fastjson.Value) (e AccountUpdateEvent) {
 
 type AccountSnapshotEvent struct {
 	BaseEvent
-	Balances []Balance `json:"B"`
+	Balances []BalanceMessage `json:"B"`
 }
 
 func parserAccountSnapshotEvent(v *fastjson.Value) (e AccountSnapshotEvent) {

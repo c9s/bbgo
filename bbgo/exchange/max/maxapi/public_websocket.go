@@ -9,12 +9,9 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 )
 
 var ErrMessageTypeNotSupported = errors.New("message type currently not supported")
-
-var logger = log.WithField("exchange", "max")
 
 // Subscription is used for presenting the subscription metadata.
 // This is used for sending subscribe and unsubscribe requests
