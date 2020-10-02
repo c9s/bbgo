@@ -103,13 +103,21 @@ type OrderBook struct {
 
 func (b *OrderBook) UpdateAsks(pvs PriceVolumePairSlice) {
 	for _, pv := range pvs {
-		b.Asks.UpdateOrInsert(pv, false)
+		if pv.Volume == 0 {
+			b.Asks.RemoveByPrice(pv.Price, false)
+		} else {
+			b.Asks.UpdateOrInsert(pv, false)
+		}
 	}
 }
 
 func (b *OrderBook) UpdateBids(pvs PriceVolumePairSlice) {
 	for _, pv := range pvs {
-		b.Bids.UpdateOrInsert(pv, true)
+		if pv.Volume == 0 {
+			b.Bids.RemoveByPrice(pv.Price, true)
+		} else {
+			b.Bids.UpdateOrInsert(pv, true)
+		}
 	}
 }
 
