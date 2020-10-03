@@ -161,7 +161,7 @@ type BookEntry struct {
 	Volume string
 }
 
-func (e *BookEntry) PriceVolumePair() (pv types.PriceVolumePair, err error) {
+func (e *BookEntry) PriceVolumePair() (pv types.PriceVolume, err error) {
 	pv.Price, err = fixedpoint.NewFromString(e.Price)
 	if err != nil {
 		return pv, err

@@ -7,87 +7,45 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo/fixedpoint"
 )
 
-type PriceVolumePair struct {
+type PriceVolume struct {
 	Price  fixedpoint.Value
 	Volume fixedpoint.Value
 }
 
-func (p PriceVolumePair) String() string {
-	return fmt.Sprintf("PriceVolumePair{ price: %f, volume: %f }", p.Price.Float64(), p.Volume.Float64())
+func (p PriceVolume) String() string {
+	return fmt.Sprintf("PriceVolume{ price: %f, volume: %f }", p.Price.Float64(), p.Volume.Float64())
 }
 
-type PriceVolumePairSlice []PriceVolumePair
+type PriceVolumeSlice []PriceVolume
 
-func (ps PriceVolumePairSlice) Len() int           { return len(ps) }
-func (ps PriceVolumePairSlice) Less(i, j int) bool { return ps[i].Price < ps[j].Price }
-func (ps PriceVolumePairSlice) Swap(i, j int)      { ps[i], ps[j] = ps[j], ps[i] }
+func (slice PriceVolumeSlice) Len() int           { return len(slice) }
+func (slice PriceVolumeSlice) Less(i, j int) bool { return slice[i].Price < slice[j].Price }
+func (slice PriceVolumeSlice) Swap(i, j int)      { slice[i], slice[j] = slice[j], slice[i] }
 
 // Trim removes the pairs that volume = 0
-func (ps PriceVolumePairSlice) Trim() (newps PriceVolumePairSlice) {
-	for _, pv := range ps {
+func (slice PriceVolumeSlice) Trim() (pvs PriceVolumeSlice) {
+	for _, pv := range slice {
 		if pv.Volume > 0 {
-			newps = append(newps, pv)
+			pvs = append(pvs, pv)
 		}
 	}
-	return newps
+
+	return pvs
 }
 
-func (ps PriceVolumePairSlice) Copy() PriceVolumePairSlice {
+func (slice PriceVolumeSlice) Copy() PriceVolumeSlice {
 	// this is faster than make
-	return append(ps[:0:0], ps...)
+	return append(slice[:0:0], slice...)
 }
 
-func (ps *PriceVolumePairSlice) UpdateOrInsert(newPair PriceVolumePair, descending bool) {
-	var newps = UpdateOrInsertPriceVolumePair(*ps, newPair, descending)
-	*ps = newps
-}
-
-func (ps *PriceVolumePairSlice) RemoveByPrice(price fixedpoint.Value, descending bool) {
-	var newps = RemovePriceVolumePair(*ps, price, descending)
-	*ps = newps
-}
-
-// FindPriceVolumePair finds the pair by the given price, this function is a read-only
-// operation, so we use the value receiver to avoid copy value from the pointer
-// If the price is not found, it will return the index where the price can be inserted at.
-// true for descending (bid orders), false for ascending (ask orders)
-func FindPriceVolumePair(slice []PriceVolumePair, price fixedpoint.Value, descending bool) (int, PriceVolumePair) {
-	idx := sort.Search(len(slice), func(i int) bool {
-		if descending {
-			return slice[i].Price <= price
-		}
-		return slice[i].Price >= price
-	})
-	if idx >= len(slice) || slice[idx].Price != price {
-		return idx, PriceVolumePair{}
-	}
-	return idx, slice[idx]
-}
-
-//true for descending (bid orders), false for ascending (ask orders)
-func UpdateOrInsertPriceVolumePair(slice []PriceVolumePair, pvPair PriceVolumePair, descending bool) []PriceVolumePair {
-	price := pvPair.Price
-	if len(slice) == 0 {
-		return append(slice, pvPair)
-	}
-
-	idx, _ := FindPriceVolumePair(slice, price, descending)
-	if idx >= len(slice) || slice[idx].Price != price {
-		return InsertPriceVolumePairAt(slice, pvPair, idx)
-	} else {
-		slice[idx].Volume = pvPair.Volume
-		return slice
-	}
-}
-
-func InsertPriceVolumePairAt(slice []PriceVolumePair, pvPair PriceVolumePair, idx int) []PriceVolumePair {
-	rear := append([]PriceVolumePair{}, slice[idx:]...)
-	slice = append(slice[:idx], pvPair)
+func (slice PriceVolumeSlice) InsertAt(idx int, pv PriceVolume) PriceVolumeSlice {
+	rear := append([]PriceVolume{}, slice[idx:]...)
+	slice = append(slice[:idx], pv)
 	return append(slice, rear...)
 }
 
-func RemovePriceVolumePair(slice []PriceVolumePair, price fixedpoint.Value, descending bool) []PriceVolumePair {
-	idx, matched := FindPriceVolumePair(slice, price, descending)
+func (slice PriceVolumeSlice) Remove(price fixedpoint.Value, descending bool) PriceVolumeSlice {
+	matched, idx := slice.Find(price, descending)
 	if matched.Price != price {
 		return slice
 	}
@@ -95,32 +53,67 @@ func RemovePriceVolumePair(slice []PriceVolumePair, price fixedpoint.Value, desc
 	return append(slice[:idx], slice[idx+1:]...)
 }
 
+// FindPriceVolumePair finds the pair by the given price, this function is a read-only
+// operation, so we use the value receiver to avoid copy value from the pointer
+// If the price is not found, it will return the index where the price can be inserted at.
+// true for descending (bid orders), false for ascending (ask orders)
+func (slice PriceVolumeSlice) Find(price fixedpoint.Value, descending bool) (pv PriceVolume, idx int) {
+	idx = sort.Search(len(slice), func(i int) bool {
+		if descending {
+			return slice[i].Price <= price
+		}
+		return slice[i].Price >= price
+	})
+
+	if idx >= len(slice) || slice[idx].Price != price {
+		return pv, idx
+	}
+
+	pv = slice[idx]
+
+	return pv, idx
+}
+
+func (slice PriceVolumeSlice) Upsert(pv PriceVolume, descending bool) PriceVolumeSlice {
+	if len(slice) == 0 {
+		return append(slice, pv)
+	}
+
+	price := pv.Price
+	_, idx := slice.Find(price, descending)
+	if idx >= len(slice) || slice[idx].Price != price {
+		return slice.InsertAt(idx, pv)
+	}
+
+	slice[idx].Volume = pv.Volume
+	return slice
+}
+
 type OrderBook struct {
 	Symbol string
-	Bids PriceVolumePairSlice
-	Asks PriceVolumePairSlice
+	Bids   PriceVolumeSlice
+	Asks   PriceVolumeSlice
 }
 
-func (b *OrderBook) UpdateAsks(pvs PriceVolumePairSlice) {
+func (b *OrderBook) UpdateAsks(pvs PriceVolumeSlice) {
 	for _, pv := range pvs {
 		if pv.Volume == 0 {
-			b.Asks.RemoveByPrice(pv.Price, false)
+			b.Asks = b.Asks.Remove(pv.Price, false)
 		} else {
-			b.Asks.UpdateOrInsert(pv, false)
+			b.Asks = b.Asks.Upsert(pv, false)
 		}
 	}
 }
 
-func (b *OrderBook) UpdateBids(pvs PriceVolumePairSlice) {
+func (b *OrderBook) UpdateBids(pvs PriceVolumeSlice) {
 	for _, pv := range pvs {
 		if pv.Volume == 0 {
-			b.Bids.RemoveByPrice(pv.Price, true)
+			b.Bids = b.Bids.Remove(pv.Price, true)
 		} else {
-			b.Bids.UpdateOrInsert(pv, true)
+			b.Bids = b.Bids.Upsert(pv, true)
 		}
 	}
 }
-
 
 func (b *OrderBook) Load(book OrderBook) {
 	b.Bids = nil
@@ -136,7 +129,7 @@ func (b *OrderBook) Update(book OrderBook) {
 func (b *OrderBook) Print() {
 	fmt.Printf("BOOK %s\n", b.Symbol)
 	fmt.Printf("ASKS:\n")
-	for i := len(b.Asks) - 1 ; i >= 0 ; i-- {
+	for i := len(b.Asks) - 1; i >= 0; i-- {
 		fmt.Printf("- ASK: %s\n", b.Asks[i].String())
 	}
 
@@ -145,4 +138,3 @@ func (b *OrderBook) Print() {
 		fmt.Printf("- BID: %s\n", bid.String())
 	}
 }
-
