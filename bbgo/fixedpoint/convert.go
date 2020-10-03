@@ -23,6 +23,10 @@ func (v Value) Mul(v2 Value) Value {
 	return NewFromFloat(v.Float64() * v2.Float64())
 }
 
+func (v Value) MulFloat64(v2 float64) Value {
+	return NewFromFloat(v.Float64() * v2)
+}
+
 func (v Value) Div(v2 Value) Value {
 	return NewFromFloat(v.Float64() / v2.Float64())
 }
