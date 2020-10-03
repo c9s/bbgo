@@ -14,6 +14,16 @@ func (s *Stream) EmitConnect(stream *Stream) {
 	}
 }
 
+func (s *Stream) OnDepthEvent(cb func(e *DepthEvent)) {
+	s.depthEventCallbacks = append(s.depthEventCallbacks, cb)
+}
+
+func (s *Stream) EmitDepthEvent(e *DepthEvent) {
+	for _, cb := range s.depthEventCallbacks {
+		cb(e)
+	}
+}
+
 func (s *Stream) OnKLineEvent(cb func(e *KLineEvent)) {
 	s.kLineEventCallbacks = append(s.kLineEventCallbacks, cb)
 }
@@ -66,6 +76,8 @@ func (s *Stream) EmitExecutionReportEvent(event *ExecutionReportEvent) {
 
 type StreamEventHub interface {
 	OnConnect(cb func(stream *Stream))
+
+	OnDepthEvent(cb func(e *DepthEvent))
 
 	OnKLineEvent(cb func(e *KLineEvent))
 

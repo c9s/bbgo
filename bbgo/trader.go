@@ -20,7 +20,7 @@ import (
 // MarketStrategy represents the single Exchange strategy
 type MarketStrategy interface {
 	OnLoad(tradingContext *Context, trader types.Trader) error
-	OnNewStream(stream types.PrivateStream) error
+	OnNewStream(stream types.Stream) error
 }
 
 type ExchangeSession struct {
@@ -28,7 +28,7 @@ type ExchangeSession struct {
 
 	Account *Account
 
-	Stream types.PrivateStream
+	Stream types.Stream
 
 	Subscriptions []types.Subscription
 
@@ -181,7 +181,7 @@ func (trader *Trader) Connect(ctx context.Context) (err error) {
 			return err
 		}
 
-		session.Stream, err = session.Exchange.NewPrivateStream()
+		session.Stream = session.Exchange.NewStream()
 		if err != nil {
 			return err
 		}
@@ -354,7 +354,7 @@ func (trader *Trader) RunStrategy(ctx context.Context, strategy MarketStrategy) 
 		return nil, err
 	}
 
-	stream, err := trader.Exchange.NewPrivateStream()
+	stream := trader.Exchange.NewStream()
 	if err != nil {
 		return nil, err
 	}

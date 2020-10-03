@@ -232,6 +232,9 @@ func ParseEvent(message string) (interface{}, error) {
 		err := json.Unmarshal([]byte(message), &event)
 		return &event, err
 
+	case "depthUpdate":
+		return parseDepthEvent(val)
+
 	default:
 		id := val.GetInt("id")
 		if id > 0 {
@@ -240,6 +243,73 @@ func ParseEvent(message string) (interface{}, error) {
 	}
 
 	return nil, fmt.Errorf("unsupported message: %s", message)
+}
+
+type DepthEntry struct {
+	PriceLevel string
+	Quantity string
+}
+
+type DepthEvent struct {
+	EventBase
+
+	Symbol string `json:"s"`
+	FirstUpdateID int64 `json:"U"`
+	FinalUpdateID int64 `json:"u"`
+
+	Bids []DepthEntry
+	Asks []DepthEntry
+}
+
+func parseDepthEntry(val *fastjson.Value) (*DepthEntry, error) {
+	arr, err := val.Array()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(arr) < 2 {
+		return nil, errors.New("incorrect depth entry element length")
+	}
+
+	return &DepthEntry{
+		PriceLevel: string(arr[0].GetStringBytes()),
+		Quantity: string(arr[1].GetStringBytes()),
+	}, nil
+}
+
+func parseDepthEvent(val *fastjson.Value) (*DepthEvent, error) {
+	var err error
+	var depth = &DepthEvent{
+		EventBase: EventBase{
+			Event: string(val.GetStringBytes("e")),
+			Time:  val.GetInt64("E"),
+		},
+		Symbol: string(val.GetStringBytes("s")),
+		FirstUpdateID: val.GetInt64("U"),
+		FinalUpdateID: val.GetInt64("u"),
+	}
+
+	for _, ev := range val.GetArray("b") {
+		entry, err2 := parseDepthEntry(ev)
+		if err2 != nil {
+			err = err2
+			continue
+		}
+
+		depth.Bids = append(depth.Bids, *entry)
+	}
+
+	for _, ev := range val.GetArray("a") {
+		entry, err2 := parseDepthEntry(ev)
+		if err2 != nil {
+			err = err2
+			continue
+		}
+
+		depth.Asks = append(depth.Asks, *entry)
+	}
+
+	return depth, err
 }
 
 type KLine struct {

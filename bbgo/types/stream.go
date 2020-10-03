@@ -4,7 +4,7 @@ import (
 	"context"
 )
 
-type PrivateStream interface {
+type Stream interface {
 	StandardStreamEventHub
 
 	Subscribe(channel Channel, symbol string, options SubscribeOptions)

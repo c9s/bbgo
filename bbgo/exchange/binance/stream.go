@@ -32,6 +32,7 @@ type Stream struct {
 	connectCallbacks []func(stream *Stream)
 
 	// custom callbacks
+	depthEventCallbacks       []func(e *DepthEvent)
 	kLineEventCallbacks       []func(e *KLineEvent)
 	kLineClosedEventCallbacks []func(e *KLineEvent)
 
@@ -40,7 +41,7 @@ type Stream struct {
 	executionReportEventCallbacks     []func(event *ExecutionReportEvent)
 }
 
-func NewStream(client *binance.Client) (*Stream, error) {
+func NewStream(client *binance.Client) *Stream {
 	// binance BalanceUpdate = withdrawal or deposit changes
 	/*
 		stream.OnBalanceUpdateEvent(func(e *binance.BalanceUpdateEvent) {
@@ -91,9 +92,26 @@ func NewStream(client *binance.Client) (*Stream, error) {
 		}
 	})
 
-	return stream, nil
-}
+	stream.OnConnect(func(stream *Stream) {
+		var params []string
+		for _, subscription := range stream.Subscriptions {
+			params = append(params, convertSubscription(subscription))
+		}
 
+		log.Infof("[binance] subscribing channels: %+v", params)
+		err := stream.Conn.WriteJSON(StreamRequest{
+			Method: "SUBSCRIBE",
+			Params: params,
+			ID:     1,
+		})
+
+		if err != nil {
+			log.WithError(err).Error("subscribe error")
+		}
+	})
+
+	return stream
+}
 
 func (s *Stream) dial(listenKey string) (*websocket.Conn, error) {
 	url := "wss://stream.binance.com:9443/ws/" + listenKey
@@ -124,18 +142,7 @@ func (s *Stream) connect(ctx context.Context) error {
 	s.Conn = conn
 
 	s.EmitConnect(s)
-
-	var params []string
-	for _, subscription := range s.Subscriptions {
-		params = append(params, convertSubscription(subscription))
-	}
-
-	log.Infof("[binance] subscribing channels: %+v", params)
-	return conn.WriteJSON(StreamRequest{
-		Method: "SUBSCRIBE",
-		Params: params,
-		ID:     1,
-	})
+	return nil
 }
 
 func convertSubscription(s types.Subscription) string {
@@ -245,6 +252,10 @@ func (s *Stream) read(ctx context.Context) {
 				log.Info(e.Event, " ", e.KLine, " ", e.KLine.Interval)
 				s.EmitKLineEvent(e)
 
+			case *DepthEvent:
+				log.Info(e.Event, " ", "asks:", e.Asks, "bids:", e.Bids)
+				s.EmitDepthEvent(e)
+
 			case *ExecutionReportEvent:
 				log.Info(e.Event, " ", e)
 				s.EmitExecutionReportEvent(e)
@@ -277,5 +288,3 @@ func maskListenKey(listenKey string) string {
 	maskKey := listenKey[0:5]
 	return maskKey + strings.Repeat("*", len(listenKey)-1-5)
 }
-
-

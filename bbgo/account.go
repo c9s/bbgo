@@ -24,7 +24,7 @@ func LoadAccount(ctx context.Context, exchange *binance.Exchange) (*Account, err
 	}, err
 }
 
-func (a *Account) BindPrivateStream(stream types.PrivateStream) {
+func (a *Account) BindPrivateStream(stream types.Stream) {
 	stream.OnBalanceSnapshot(func(snapshot map[string]types.Balance) {
 		a.mu.Lock()
 		defer a.mu.Unlock()

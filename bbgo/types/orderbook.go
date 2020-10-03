@@ -227,7 +227,7 @@ func NewStreamBook(symbol string) *StreamOrderBook {
 	}
 }
 
-func (sb *StreamOrderBook) BindStream(stream PrivateStream) {
+func (sb *StreamOrderBook) BindStream(stream Stream) {
 	stream.OnBookSnapshot(func(book OrderBook) {
 		sb.Load(book)
 		sb.C.Emit()

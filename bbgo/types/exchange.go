@@ -8,7 +8,7 @@ import (
 type Exchange interface {
 	PlatformFeeCurrency() string
 
-	NewPrivateStream() (PrivateStream, error)
+	NewStream() Stream
 
 	QueryAccountBalances(ctx context.Context) (map[string]Balance, error)
 

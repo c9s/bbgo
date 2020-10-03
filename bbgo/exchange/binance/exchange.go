@@ -42,7 +42,7 @@ func (e *Exchange) QueryAveragePrice(ctx context.Context, symbol string) (float6
 	return util.MustParseFloat(resp.Price), nil
 }
 
-func (e *Exchange) NewPrivateStream() (types.PrivateStream, error) {
+func (e *Exchange) NewStream() types.Stream {
 	return NewStream(e.Client)
 }
 
