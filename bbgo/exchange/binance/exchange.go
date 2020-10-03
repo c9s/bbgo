@@ -43,27 +43,7 @@ func (e *Exchange) QueryAveragePrice(ctx context.Context, symbol string) (float6
 }
 
 func (e *Exchange) NewPrivateStream() (types.PrivateStream, error) {
-	return NewPrivateStream(e.Client)
-}
-
-func NewPrivateStream(client *binance.Client) (*Stream, error) {
-	// binance BalanceUpdate = withdrawal or deposit changes
-	/*
-	stream.OnBalanceUpdateEvent(func(e *binance.BalanceUpdateEvent) {
-		a.mu.Lock()
-		defer a.mu.Unlock()
-
-		delta := util.MustParseFloat(e.Delta)
-		if balance, ok := a.Balances[e.Asset]; ok {
-			balance.Available += delta
-			a.Balances[e.Asset] = balance
-		}
-	})
-	*/
-
-	return &Stream{
-		Client: client,
-	}, nil
+	return NewStream(e.Client)
 }
 
 type Withdraw struct {
