@@ -2,6 +2,7 @@ package binance
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -71,7 +72,7 @@ func (s *Stream) connect(ctx context.Context) error {
 
 	var params []string
 	for _, subscription := range s.Subscriptions {
-		params = append(params, subscription.String())
+		params = append(params, convertSubscription(subscription))
 	}
 
 	log.Infof("[binance] subscribing channels: %+v", params)
@@ -80,6 +81,21 @@ func (s *Stream) connect(ctx context.Context) error {
 		Params: params,
 		ID:     1,
 	})
+}
+
+func convertSubscription(s types.Subscription) string {
+	// binance uses lower case symbol name,
+	// for kline, it's "<symbol>@kline_<interval>"
+	// for depth, it's "<symbol>@depth OR <symbol>@depth@100ms"
+	switch s.Channel {
+	case types.KLineChannel:
+		return fmt.Sprintf("%s@%s_%s", strings.ToLower(s.Symbol), s.Channel, s.Options.String())
+
+	case types.BookChannel:
+		return fmt.Sprintf("%s@depth", strings.ToLower(s.Symbol))
+	}
+
+	return fmt.Sprintf("%s@%s", strings.ToLower(s.Symbol), s.Channel)
 }
 
 func (s *Stream) Connect(ctx context.Context) error {

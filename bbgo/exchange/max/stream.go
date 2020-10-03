@@ -19,9 +19,14 @@ type Stream struct {
 
 func NewStream(key, secret string) *Stream {
 	wss := max.NewWebSocketService(max.WebSocketURL, key, secret)
+
 	stream := &Stream{
 		websocketService: wss,
 	}
+
+	wss.OnMessage(func(message []byte) {
+		logger.Infof("M: %s", message)
+	})
 
 	wss.OnBookEvent(func(e max.BookEvent) {
 		newbook, err := e.OrderBook()
@@ -38,11 +43,50 @@ func NewStream(key, secret string) *Stream {
 		}
 	})
 
+	wss.OnAccountSnapshotEvent(func(e max.AccountSnapshotEvent) {
+		snapshot := map[string]types.Balance{}
+		for _, bm := range e.Balances {
+			balance, err := bm.Balance()
+			if err != nil {
+				continue
+			}
+
+			snapshot[balance.Currency] = *balance
+		}
+
+		stream.EmitBalanceSnapshot(snapshot)
+	})
+
+	wss.OnAccountUpdateEvent(func(e max.AccountUpdateEvent) {
+		snapshot := map[string]types.Balance{}
+		for _, bm := range e.Balances {
+			balance, err := bm.Balance()
+			if err != nil {
+				continue
+			}
+
+			snapshot[balance.Currency] = *balance
+		}
+
+		stream.EmitBalanceUpdate(snapshot)
+	})
+
+
 	return stream
 }
 
+func (s *Stream) Subscribe(channel types.Channel, symbol string, options types.SubscribeOptions) {
+	// "book"
+	switch channel {
+	case types.KLineChannel:
+		panic("kline channel is not supported in max")
+	}
+
+	s.websocketService.Subscribe(string(channel), symbol)
+}
+
 func (s *Stream) Connect(ctx context.Context) error {
-	return nil
+	return s.websocketService.Connect(ctx)
 }
 
 func (s *Stream) Close() error {

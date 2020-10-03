@@ -213,7 +213,7 @@ func (s *WebSocketService) Reconnect() {
 
 // Subscribe is a helper method for building subscription request from the internal mapping types.
 // (Internal public method)
-func (s *WebSocketService) Subscribe(channel string, market string) {
+func (s *WebSocketService) Subscribe(channel, market string) {
 	s.AddSubscription(Subscription{
 		Channel: channel,
 		Market:  market,
