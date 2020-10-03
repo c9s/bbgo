@@ -3,6 +3,7 @@ package types
 import (
 	"fmt"
 	"sort"
+	"sync"
 
 	"github.com/c9s/bbgo/pkg/bbgo/fixedpoint"
 )
@@ -34,14 +35,27 @@ func (slice PriceVolumeSlice) Trim() (pvs PriceVolumeSlice) {
 }
 
 func (slice PriceVolumeSlice) Copy() PriceVolumeSlice {
-	// this is faster than make
+	// this is faster than make (however it's only for simple types)
 	return append(slice[:0:0], slice...)
+}
+
+func (slice PriceVolumeSlice) IndexByVolumeDepth(requiredVolume fixedpoint.Value) int {
+	var tv int64 = 0
+	for x, el := range slice {
+		tv += el.Volume.Int64()
+		if tv >= requiredVolume.Int64() {
+			return x
+		}
+	}
+
+	// not deep enough
+	return -1
 }
 
 func (slice PriceVolumeSlice) InsertAt(idx int, pv PriceVolume) PriceVolumeSlice {
 	rear := append([]PriceVolume{}, slice[idx:]...)
-	slice = append(slice[:idx], pv)
-	return append(slice, rear...)
+	newSlice := append(slice[:idx], pv)
+	return append(newSlice, rear...)
 }
 
 func (slice PriceVolumeSlice) Remove(price fixedpoint.Value, descending bool) PriceVolumeSlice {
@@ -89,13 +103,26 @@ func (slice PriceVolumeSlice) Upsert(pv PriceVolume, descending bool) PriceVolum
 	return slice
 }
 
+//go:generate callbackgen -type OrderBook
 type OrderBook struct {
 	Symbol string
 	Bids   PriceVolumeSlice
 	Asks   PriceVolumeSlice
+
+	loadCallbacks       []func(book *OrderBook)
+	updateCallbacks     []func(book *OrderBook)
+	bidsChangeCallbacks []func(pvs PriceVolumeSlice)
+	asksChangeCallbacks []func(pvs PriceVolumeSlice)
 }
 
-func (b *OrderBook) UpdateAsks(pvs PriceVolumeSlice) {
+func (b *OrderBook) Copy() (book OrderBook) {
+	book = *b
+	book.Bids = b.Bids.Copy()
+	book.Asks = b.Asks.Copy()
+	return book
+}
+
+func (b *OrderBook) updateAsks(pvs PriceVolumeSlice) {
 	for _, pv := range pvs {
 		if pv.Volume == 0 {
 			b.Asks = b.Asks.Remove(pv.Price, false)
@@ -103,9 +130,11 @@ func (b *OrderBook) UpdateAsks(pvs PriceVolumeSlice) {
 			b.Asks = b.Asks.Upsert(pv, false)
 		}
 	}
+
+	b.EmitAsksChange(b.Asks)
 }
 
-func (b *OrderBook) UpdateBids(pvs PriceVolumeSlice) {
+func (b *OrderBook) updateBids(pvs PriceVolumeSlice) {
 	for _, pv := range pvs {
 		if pv.Volume == 0 {
 			b.Bids = b.Bids.Remove(pv.Price, true)
@@ -113,17 +142,29 @@ func (b *OrderBook) UpdateBids(pvs PriceVolumeSlice) {
 			b.Bids = b.Bids.Upsert(pv, true)
 		}
 	}
+
+	b.EmitBidsChange(b.Bids)
+}
+
+func (b *OrderBook) update(book OrderBook) {
+	b.updateBids(book.Bids)
+	b.updateAsks(book.Asks)
+}
+
+func (b *OrderBook) Reset() {
+	b.Bids = nil
+	b.Asks = nil
 }
 
 func (b *OrderBook) Load(book OrderBook) {
-	b.Bids = nil
-	b.Asks = nil
-	b.Update(book)
+	b.Reset()
+	b.update(book)
+	b.EmitLoad(b)
 }
 
 func (b *OrderBook) Update(book OrderBook) {
-	b.UpdateBids(book.Bids)
-	b.UpdateAsks(book.Asks)
+	b.update(book)
+	b.EmitUpdate(b)
 }
 
 func (b *OrderBook) Print() {
@@ -137,4 +178,37 @@ func (b *OrderBook) Print() {
 	for _, bid := range b.Bids {
 		fmt.Printf("- BID: %s\n", bid.String())
 	}
+}
+
+type MutexOrderBook struct {
+	sync.Mutex
+
+	*OrderBook
+}
+
+func NewMutexOrderBook(symbol string) *MutexOrderBook {
+	return &MutexOrderBook{
+		OrderBook: &OrderBook{Symbol: symbol},
+	}
+}
+
+func (b *MutexOrderBook) Load(book OrderBook) {
+	b.Lock()
+	defer b.Unlock()
+
+	b.Reset()
+	b.update(book)
+	b.EmitLoad(b.OrderBook)
+}
+
+func (b *MutexOrderBook) Get() OrderBook {
+	return b.OrderBook.Copy()
+}
+
+func (b *MutexOrderBook) Update(book OrderBook) {
+	b.Lock()
+	defer b.Unlock()
+
+	b.update(book)
+	b.EmitUpdate(b.OrderBook)
 }

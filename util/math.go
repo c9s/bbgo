@@ -22,6 +22,15 @@ func FormatFloat(val float64, prec int) string {
 	return strconv.FormatFloat(val, 'f', prec, 64)
 }
 
+func ParseFloat(s string) (float64, error) {
+	if len(s) == 0 {
+		return 0.0, nil
+	}
+
+	return strconv.ParseFloat(s, 64)
+}
+
+
 func MustParseFloat(s string) float64 {
 	if len(s) == 0 {
 		return 0.0

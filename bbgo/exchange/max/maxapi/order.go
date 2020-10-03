@@ -32,20 +32,20 @@ type OrderService struct {
 type Order struct {
 	ID              uint64    `json:"id,omitempty" db:"exchange_id"`
 	Side            string    `json:"side" db:"side"`
-	OrderType       string    `json:"ord_type" db:"order_type"`
+	OrderType       string    `json:"ord_type,omitempty" db:"order_type"`
 	Price           string    `json:"price" db:"price"`
 	AveragePrice    string    `json:"avg_price,omitempty" db:"average_price"`
 	State           string    `json:"state,omitempty" db:"state"`
-	Market          string    `json:"market" db:"market"`
+	Market          string    `json:"market,omitempty" db:"market"`
 	Volume          string    `json:"volume" db:"volume"`
 	RemainingVolume string    `json:"remaining_volume,omitempty" db:"remaining_volume"`
 	ExecutedVolume  string    `json:"executed_volume,omitempty" db:"executed_volume"`
 	TradesCount     int64     `json:"trades_count,omitempty" db:"trades_count"`
 	GroupID         int64     `json:"group_id,omitempty" db:"group_id"`
 	ClientOID       string    `json:"client_oid,omitempty" db:"client_oid"`
-	CreatedAt       time.Time `db:"created_at"`
+	CreatedAt       time.Time `json:"-" db:"created_at"`
 	CreatedAtMs     int64     `json:"created_at_in_ms,omitempty"`
-	InsertedAt      time.Time `db:"inserted_at"`
+	InsertedAt      time.Time `json:"-" db:"inserted_at"`
 }
 
 // All returns all orders for the authenticated account.
@@ -182,20 +182,22 @@ func (s *OrderService) Get(orderID uint64) (*Order, error) {
 // Create multiple order in a single request
 func (s *OrderService) CreateMulti(market string, orders []Order) ([]Order, error) {
 	var returnOrders []Order
-	req, err := s.client.newAuthenticatedRequest("POST", "v2/orders/multi", map[string]interface{}{
+	req, err := s.client.newAuthenticatedRequest("POST", "v2/orders/multi/onebyone", map[string]interface{}{
 		"market": market,
 		"orders": orders,
 	})
 	if err != nil {
 		return returnOrders, errors.Wrapf(err, "failed to create %s orders", market)
 	}
+
 	response, err := s.client.sendRequest(req)
 	if err != nil {
 		return returnOrders, err
 	}
+
 	if errJson := response.DecodeJSON(&returnOrders); errJson != nil {
 		return returnOrders, errJson
 	}
+
 	return returnOrders, err
 }
-

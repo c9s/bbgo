@@ -3,6 +3,9 @@ package max
 import (
 	"github.com/pkg/errors"
 	"github.com/valyala/fastjson"
+
+	"github.com/c9s/bbgo/pkg/bbgo/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 type BaseEvent struct {
@@ -163,6 +166,24 @@ type BalanceMessage struct {
 	Currency  string `json:"cu"`
 	Available string `json:"av"`
 	Locked    string `json:"l"`
+}
+
+func (m *BalanceMessage) Balance() (*types.Balance, error) {
+	available, err := util.ParseFloat(m.Available)
+	if err != nil {
+		return nil, err
+	}
+
+	locked, err := util.ParseFloat(m.Locked)
+	if err != nil {
+		return nil, err
+	}
+
+	return &types.Balance{
+		Currency: m.Currency,
+		Locked: locked,
+		Available: available,
+	}, nil
 }
 
 func parseBalance(v *fastjson.Value) BalanceMessage {

@@ -13,3 +13,13 @@ type Account struct {
 	AccountType string
 	Balances map[string]Balance
 }
+
+func (a *Account) UpdateBalance(b Balance) {
+	a.Balances[b.Currency] = b
+}
+
+func NewAccount() *Account {
+	return &Account{
+		Balances: make(map[string]Balance),
+	}
+}
