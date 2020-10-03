@@ -43,7 +43,7 @@ type ExchangeSession struct {
 	Trades map[string][]types.Trade
 }
 
-func (session *ExchangeSession) Subscribe(channel string, symbol string, options types.SubscribeOptions) *ExchangeSession {
+func (session *ExchangeSession) Subscribe(channel types.Channel, symbol string, options types.SubscribeOptions) *ExchangeSession {
 	session.Symbols(symbol)
 
 	session.Subscriptions = append(session.Subscriptions, types.Subscription{
@@ -56,6 +56,14 @@ func (session *ExchangeSession) Subscribe(channel string, symbol string, options
 }
 
 func (session *ExchangeSession) Symbols(symbols ...string) *ExchangeSession {
+	if session.loadedSymbols == nil {
+		session.loadedSymbols = make(map[string]struct{})
+	}
+
+	if session.Markets == nil {
+		session.Markets = make(map[string]types.Market)
+	}
+
 	for _, symbol := range symbols {
 		session.loadedSymbols[symbol] = struct{}{}
 
@@ -117,6 +125,10 @@ func (trader *Trader) AddExchange(name string, exchange *binance.Exchange) (sess
 		Exchange: exchange,
 	}
 
+	if trader.ExchangeSessions == nil {
+		trader.ExchangeSessions = make(map[string]*ExchangeSession)
+	}
+
 	trader.ExchangeSessions[name] = session
 	return session
 }
@@ -146,6 +158,9 @@ func (trader *Trader) Connect(ctx context.Context) (err error) {
 			}
 
 			log.Infof("symbol %s: %d trades loaded", symbol, len(trades))
+			if session.Trades == nil {
+				session.Trades = make(map[string][]types.Trade)
+			}
 			session.Trades[symbol] = trades
 
 			stockManager := &StockManager{
