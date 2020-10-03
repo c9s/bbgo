@@ -46,7 +46,7 @@ func (e *Exchange) NewPrivateStream() (types.PrivateStream, error) {
 	return NewPrivateStream(e.Client)
 }
 
-func NewPrivateStream(client *binance.Client) (*PrivateStream, error) {
+func NewPrivateStream(client *binance.Client) (*Stream, error) {
 	// binance BalanceUpdate = withdrawal or deposit changes
 	/*
 	stream.OnBalanceUpdateEvent(func(e *binance.BalanceUpdateEvent) {
@@ -61,7 +61,7 @@ func NewPrivateStream(client *binance.Client) (*PrivateStream, error) {
 	})
 	*/
 
-	return &PrivateStream{
+	return &Stream{
 		Client: client,
 	}, nil
 }

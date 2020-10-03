@@ -12,7 +12,7 @@ import (
 )
 
 type BackTestStream struct {
-	types.StandardPrivateStream
+	types.StandardStream
 }
 
 

@@ -20,15 +20,15 @@ type StreamRequest struct {
 	Params []string `json:"params"`
 }
 
-//go:generate callbackgen -type PrivateStream -interface
-type PrivateStream struct {
-	types.StandardPrivateStream
+//go:generate callbackgen -type Stream -interface
+type Stream struct {
+	types.StandardStream
 
 	Client    *binance.Client
 	ListenKey string
 	Conn      *websocket.Conn
 
-	connectCallbacks []func(stream *PrivateStream)
+	connectCallbacks []func(stream *Stream)
 
 	// custom callbacks
 	kLineEventCallbacks       []func(e *KLineEvent)
@@ -39,7 +39,7 @@ type PrivateStream struct {
 	executionReportEventCallbacks     []func(event *ExecutionReportEvent)
 }
 
-func (s *PrivateStream) dial(listenKey string) (*websocket.Conn, error) {
+func (s *Stream) dial(listenKey string) (*websocket.Conn, error) {
 	url := "wss://stream.binance.com:9443/ws/" + listenKey
 	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
 	if err != nil {
@@ -49,7 +49,7 @@ func (s *PrivateStream) dial(listenKey string) (*websocket.Conn, error) {
 	return conn, nil
 }
 
-func (s *PrivateStream) connect(ctx context.Context) error {
+func (s *Stream) connect(ctx context.Context) error {
 	log.Infof("[binance] creating user data stream...")
 	listenKey, err := s.Client.NewStartUserStreamService().Do(ctx)
 	if err != nil {
@@ -82,7 +82,7 @@ func (s *PrivateStream) connect(ctx context.Context) error {
 	})
 }
 
-func (s *PrivateStream) Connect(ctx context.Context) error {
+func (s *Stream) Connect(ctx context.Context) error {
 	err := s.connect(ctx)
 	if err != nil {
 		return err
@@ -92,7 +92,7 @@ func (s *PrivateStream) Connect(ctx context.Context) error {
 	return nil
 }
 
-func (s *PrivateStream) read(ctx context.Context) {
+func (s *Stream) read(ctx context.Context) {
 
 	pingTicker := time.NewTicker(1 * time.Minute)
 	defer pingTicker.Stop()
@@ -210,7 +210,7 @@ func (s *PrivateStream) read(ctx context.Context) {
 	}
 }
 
-func (s *PrivateStream) invalidateListenKey(ctx context.Context, listenKey string) error {
+func (s *Stream) invalidateListenKey(ctx context.Context, listenKey string) error {
 	// use background context to invalidate the user stream
 	err := s.Client.NewCloseUserStreamService().ListenKey(listenKey).Do(ctx)
 	if err != nil {
@@ -221,7 +221,7 @@ func (s *PrivateStream) invalidateListenKey(ctx context.Context, listenKey strin
 	return nil
 }
 
-func (s *PrivateStream) Close() error {
+func (s *Stream) Close() error {
 	log.Infof("[binance] closing user data stream...")
 	defer s.Conn.Close()
 	err := s.invalidateListenKey(context.Background(), s.ListenKey)

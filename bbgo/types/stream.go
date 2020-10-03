@@ -7,30 +7,39 @@ import (
 )
 
 type PrivateStream interface {
-	StandardPrivateStreamEventHub
+	StandardStreamEventHub
 
 	Subscribe(channel string, symbol string, options SubscribeOptions)
 	Connect(ctx context.Context) error
 	Close() error
 }
 
-//go:generate callbackgen -type StandardPrivateStream -interface
-type StandardPrivateStream struct {
+//go:generate callbackgen -type StandardStream -interface
+type StandardStream struct {
 	Subscriptions []Subscription
 
+	// private trade callbacks
 	tradeCallbacks   []func(trade *Trade)
-	balanceSnapshotCallbacks []func(balanceSnapshot map[string]Balance)
+
+	// balance snapshot callbacks
+	balanceSnapshotCallbacks []func(balances map[string]Balance)
+
+	balanceUpdateCallbacks []func(balances map[string]Balance)
+
 	kLineClosedCallbacks       []func(kline KLine)
+
+	bookUpdateCallbacks []func(book OrderBook)
+
+	bookSnapshotCallbacks []func(book OrderBook)
 }
 
-func (stream *StandardPrivateStream) Subscribe(channel string, symbol string, options SubscribeOptions) {
+func (stream *StandardStream) Subscribe(channel string, symbol string, options SubscribeOptions) {
 	stream.Subscriptions = append(stream.Subscriptions, Subscription{
 		Channel: channel,
 		Symbol:  symbol,
 		Options: options,
 	})
 }
-
 
 type SubscribeOptions struct {
 	Interval string
