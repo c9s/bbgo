@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/c9s/bbgo/pkg/bbgo/fixedpoint"
+	"github.com/c9s/bbgo/pkg/bbgo/sigchan"
 )
 
 type PriceVolume struct {
@@ -212,3 +213,30 @@ func (b *MutexOrderBook) Update(book OrderBook) {
 	b.update(book)
 	b.EmitUpdate(b.OrderBook)
 }
+
+type StreamOrderBook struct {
+	*MutexOrderBook
+
+	C sigchan.Chan
+}
+
+func NewStreamBook(symbol string) *StreamOrderBook {
+	return &StreamOrderBook{
+		MutexOrderBook: NewMutexOrderBook(symbol),
+		C:              sigchan.New(60),
+	}
+}
+
+func (sb *StreamOrderBook) BindStream(stream PrivateStream) {
+	stream.OnBookSnapshot(func(book OrderBook) {
+		sb.Load(book)
+		sb.C.Emit()
+	})
+
+	stream.OnBookUpdate(func(book OrderBook) {
+		sb.Update(book)
+		sb.C.Emit()
+	})
+}
+
+
