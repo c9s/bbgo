@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/adshao/go-binance"
 	"github.com/valyala/fastjson"
 
+	"github.com/c9s/bbgo/pkg/bbgo/fixedpoint"
 	"github.com/c9s/bbgo/pkg/bbgo/types"
 	"github.com/c9s/bbgo/pkg/util"
 )
@@ -261,6 +263,50 @@ type DepthEvent struct {
 	Asks []DepthEntry
 }
 
+func (e *DepthEvent) OrderBook() (book types.OrderBook, err error) {
+	book.Symbol = e.Symbol
+
+	for _, entry := range e.Bids {
+		quantity, err := fixedpoint.NewFromString(entry.Quantity)
+		if err != nil {
+			continue
+		}
+
+		price, err := fixedpoint.NewFromString(entry.PriceLevel)
+		if err != nil {
+			continue
+		}
+
+		pv := types.PriceVolume{
+			Price:  price,
+			Volume: quantity,
+		}
+
+		book.Bids = book.Bids.Upsert(pv, true)
+	}
+
+	for _, entry := range e.Asks {
+		quantity, err := fixedpoint.NewFromString(entry.Quantity)
+		if err != nil {
+			continue
+		}
+
+		price, err := fixedpoint.NewFromString(entry.PriceLevel)
+		if err != nil {
+			continue
+		}
+
+		pv := types.PriceVolume{
+			Price:  price,
+			Volume: quantity,
+		}
+
+		book.Asks = book.Asks.Upsert(pv, false)
+	}
+
+	return
+}
+
 func parseDepthEntry(val *fastjson.Value) (*DepthEntry, error) {
 	arr, err := val.Array()
 	if err != nil {
@@ -392,4 +438,7 @@ kline
 type EventBase struct {
 	Event string `json:"e"` // event
 	Time  int64  `json:"E"`
+}
+
+func convertDepthResponseToSnapshot(client *binance.Client) {
 }
