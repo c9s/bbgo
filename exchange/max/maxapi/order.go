@@ -1,6 +1,7 @@
 package max
 
 import (
+	"context"
 	"strconv"
 	"time"
 
@@ -135,30 +136,69 @@ func (s *OrderService) Create(market string, side string, volume float64, price 
 
 // Cancel the order with id `orderID`.
 func (s *OrderService) Cancel(orderID uint64, clientOrderID string) error {
-	payload := map[string]interface{}{
-		"id": orderID,
+	req := s.NewOrderCancelRequest()
+
+	if orderID > 0 {
+		req.ID(orderID)
+	} else if len(clientOrderID) > 0 {
+		req.ClientOrderID(clientOrderID)
 	}
 
-	if len(clientOrderID) > 0 {
-		payload["client_oid"] = clientOrderID
+	return req.Do(context.Background())
+}
+
+type OrderCancelRequestParams struct {
+	ID            int    `json:"id"`
+	ClientOrderID string `json:"client_oid"`
+}
+
+func (p OrderCancelRequestParams) Map() map[string]interface{} {
+	payload := make(map[string]interface{})
+
+	if p.ID > 0 {
+		payload["id"] = p.ID
 	}
 
-	req, err := s.client.newAuthenticatedRequest("POST", "v2/order/delete", payload)
+	if len(p.ClientOrderID) > 0 {
+		payload["client_oid"] = p.ClientOrderID
+	}
+
+	return payload
+}
+
+type OrderCancelRequest struct {
+	client *RestClient
+
+	params OrderCancelRequestParams
+}
+
+func (r *OrderCancelRequest) ID(id int) *OrderCancelRequest {
+	r.params.ID = id
+	return r
+}
+
+func (r *OrderCancelRequest) ClientOrderID(id string) *OrderCancelRequest {
+	r.params.ClientOrderID = id
+	return r
+}
+
+func (r *OrderCancelRequest) Do(ctx context.Context) error {
+	payload := r.params.Map()
+	req, err := r.client.newAuthenticatedRequest("POST", "v2/order/delete", payload)
 	if err != nil {
 		return err
 	}
 
-	_, err = s.client.sendRequest(req)
-	if err != nil {
-		return err
-	}
+	_, err = r.client.sendRequest(req)
+	return err
+}
 
-	return nil
+func (s *OrderService) NewOrderCancelRequest() *OrderCancelRequest {
+	return &OrderCancelRequest{client: s.client}
 }
 
 // Status retrieves the given order from the API.
 func (s *OrderService) Get(orderID uint64) (*Order, error) {
-
 	payload := map[string]interface{}{
 		"id": orderID,
 	}
@@ -183,25 +223,66 @@ func (s *OrderService) Get(orderID uint64) (*Order, error) {
 	return &order, nil
 }
 
+type MultiOrderRequestParams struct {
+	Market string  `json:"market"`
+	Orders []Order `json:"orders"`
+}
+
+func (p *MultiOrderRequestParams) Map() map[string]interface{} {
+	return map[string]interface{}{
+		"market": p.Market,
+		"orders": p.Orders,
+	}
+}
+
+type MultiOrderResponse []struct {
+	Error string `json:"error,omitempty"`
+	Order Order  `json:"order,omitempty"`
+}
+
+type CreateMultiOrderRequest struct {
+	client *RestClient
+
+	params MultiOrderRequestParams
+}
+
+func (r *CreateMultiOrderRequest) Market(market string) *CreateMultiOrderRequest {
+	r.params.Market = market
+	return r
+}
+
+func (r *CreateMultiOrderRequest) AddOrders(orders ...Order) *CreateMultiOrderRequest {
+	r.params.Orders = append(r.params.Orders, orders...)
+	return r
+}
+
+func (r *CreateMultiOrderRequest) Do(ctx context.Context) (multiOrderResponse *MultiOrderResponse, err error) {
+	req, err := r.client.newAuthenticatedRequest("POST", "v2/orders/multi/onebyone", r.params.Map())
+	if err != nil {
+		return multiOrderResponse, errors.Wrapf(err, "order create error")
+	}
+
+	response, err := r.client.sendRequest(req)
+	if err != nil {
+		return multiOrderResponse, err
+	}
+
+	multiOrderResponse = &MultiOrderResponse{}
+	if errJson := response.DecodeJSON(multiOrderResponse); errJson != nil {
+		return multiOrderResponse, errJson
+	}
+
+	return multiOrderResponse, err
+}
+
+func (s *OrderService) NewCreateMultiOrderRequest() *CreateMultiOrderRequest {
+	return &CreateMultiOrderRequest{client: s.client}
+}
+
 // Create multiple order in a single request
-func (s *OrderService) CreateMulti(market string, orders []Order) ([]Order, error) {
-	var returnOrders []Order
-	req, err := s.client.newAuthenticatedRequest("POST", "v2/orders/multi/onebyone", map[string]interface{}{
-		"market": market,
-		"orders": orders,
-	})
-	if err != nil {
-		return returnOrders, errors.Wrapf(err, "failed to create %s orders", market)
-	}
-
-	response, err := s.client.sendRequest(req)
-	if err != nil {
-		return returnOrders, err
-	}
-
-	if errJson := response.DecodeJSON(&returnOrders); errJson != nil {
-		return returnOrders, errJson
-	}
-
-	return returnOrders, err
+func (s *OrderService) CreateMulti(market string, orders []Order) (*MultiOrderResponse, error) {
+	req := s.NewCreateMultiOrderRequest()
+	req.Market(market)
+	req.AddOrders(orders...)
+	return req.Do(context.Background())
 }
