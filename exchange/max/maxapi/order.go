@@ -134,9 +134,13 @@ func (s *OrderService) Create(market string, side string, volume float64, price 
 }
 
 // Cancel the order with id `orderID`.
-func (s *OrderService) Cancel(orderID uint64) error {
+func (s *OrderService) Cancel(orderID uint64, clientOrderID string) error {
 	payload := map[string]interface{}{
 		"id": orderID,
+	}
+
+	if len(clientOrderID) > 0 {
+		payload["client_oid"] = clientOrderID
 	}
 
 	req, err := s.client.newAuthenticatedRequest("POST", "v2/order/delete", payload)

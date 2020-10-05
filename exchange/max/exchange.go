@@ -40,7 +40,6 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order *types.SubmitOrder) er
 		return err
 	}
 
-
 	retOrder, err := e.client.OrderService.Create(
 		order.Symbol,
 		toLocalSideType(order.Side),
