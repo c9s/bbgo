@@ -5,18 +5,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/sirupsen/logrus"
-
 	maxapi "github.com/c9s/bbgo/exchange/max/maxapi"
 	"github.com/c9s/bbgo/types"
 )
 
-var log = logrus.WithFields(logrus.Fields{
-	"exchange": "max",
-})
-
 type Exchange struct {
-	client *maxapi.RestClient
+	client      *maxapi.RestClient
 	key, secret string
 }
 
@@ -25,7 +19,7 @@ func New(key, secret string) *Exchange {
 	client.Auth(key, secret)
 	return &Exchange{
 		client: client,
-		key: key,
+		key:    key,
 		secret: secret,
 	}
 }
@@ -52,7 +46,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order *types.SubmitOrder) er
 		return err
 	}
 
-	log.Infof("order created: %+v", retOrder)
+	logger.Infof("order created: %+v", retOrder)
 	return err
 }
 
@@ -60,9 +54,6 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order *types.SubmitOrder) er
 func (e *Exchange) PlatformFeeCurrency() string {
 	return "max"
 }
-
-
-
 
 func toLocalCurrency(currency string) string {
 	return strings.ToLower(currency)

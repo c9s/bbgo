@@ -134,6 +134,14 @@ func (s *OrderService) Create(market string, side string, volume float64, price 
 	return &order, nil
 }
 
+// Create multiple order in a single request
+func (s *OrderService) CreateMulti(market string, orders []Order) (*MultiOrderResponse, error) {
+	req := s.NewCreateMultiOrderRequest()
+	req.Market(market)
+	req.AddOrders(orders...)
+	return req.Do(context.Background())
+}
+
 // Cancel the order with id `orderID`.
 func (s *OrderService) Cancel(orderID uint64, clientOrderID string) error {
 	req := s.NewOrderCancelRequest()
@@ -148,7 +156,7 @@ func (s *OrderService) Cancel(orderID uint64, clientOrderID string) error {
 }
 
 type OrderCancelRequestParams struct {
-	ID            int    `json:"id"`
+	ID            uint64 `json:"id"`
 	ClientOrderID string `json:"client_oid"`
 }
 
@@ -172,7 +180,7 @@ type OrderCancelRequest struct {
 	params OrderCancelRequestParams
 }
 
-func (r *OrderCancelRequest) ID(id int) *OrderCancelRequest {
+func (r *OrderCancelRequest) ID(id uint64) *OrderCancelRequest {
 	r.params.ID = id
 	return r
 }
@@ -279,10 +287,98 @@ func (s *OrderService) NewCreateMultiOrderRequest() *CreateMultiOrderRequest {
 	return &CreateMultiOrderRequest{client: s.client}
 }
 
-// Create multiple order in a single request
-func (s *OrderService) CreateMulti(market string, orders []Order) (*MultiOrderResponse, error) {
-	req := s.NewCreateMultiOrderRequest()
-	req.Market(market)
-	req.AddOrders(orders...)
-	return req.Do(context.Background())
+// ---
+type CreateOrderRequestParams struct {
+	Market        string `json:"market"`
+	Volume        string `json:"volume"`
+	Price         string `json:"price"`
+	StopPrice     string `json:"stop_price"`
+	Side          string `json:"side"`
+	OrderType     string `json:"ord_type"`
+	ClientOrderID string `json:"client_oid,omitempty"`
+	GroupID       string `json:"group_id,omitempty"`
+}
+
+func (p *CreateOrderRequestParams) Map() map[string]interface{} {
+	payload := map[string]interface{}{
+		"market":   p.Market,
+		"volume":   p.Volume,
+		"price":    p.Price,
+		"side":     p.Side,
+		"ord_type": p.OrderType,
+	}
+
+	if p.ClientOrderID != "" {
+		payload["client_oid"] = p.ClientOrderID
+	}
+
+	if p.GroupID != "" {
+		payload["group_id"] = p.GroupID
+	}
+
+	return payload
+}
+
+type CreateOrderRequest struct {
+	client *RestClient
+
+	params CreateOrderRequestParams
+}
+
+func (r *CreateOrderRequest) Market(market string) *CreateOrderRequest {
+	r.params.Market = market
+	return r
+}
+
+func (r *CreateOrderRequest) Volume(volume string) *CreateOrderRequest {
+	r.params.Volume = volume
+	return r
+}
+
+func (r *CreateOrderRequest) Price(price string) *CreateOrderRequest {
+	r.params.Price = price
+	return r
+}
+
+func (r *CreateOrderRequest) StopPrice(price string) *CreateOrderRequest {
+	r.params.StopPrice = price
+	return r
+}
+
+func (r *CreateOrderRequest) Side(side string) *CreateOrderRequest {
+	r.params.Side = side
+	return r
+}
+
+func (r *CreateOrderRequest) OrderType(orderType string) *CreateOrderRequest {
+	r.params.OrderType = orderType
+	return r
+}
+
+func (r *CreateOrderRequest) ClientOrderID(clientOrderID string) *CreateOrderRequest {
+	r.params.ClientOrderID = clientOrderID
+	return r
+}
+
+func (r *CreateOrderRequest) Do(ctx context.Context) (order *Order, err error) {
+	req, err := r.client.newAuthenticatedRequest("POST", "v2/orders", r.params.Map())
+	if err != nil {
+		return order, errors.Wrapf(err, "order create error")
+	}
+
+	response, err := r.client.sendRequest(req)
+	if err != nil {
+		return order, err
+	}
+
+	order = &Order{}
+	if errJson := response.DecodeJSON(order); errJson != nil {
+		return order, errJson
+	}
+
+	return order, err
+}
+
+func (s *OrderService) NewCreateOrderRequest() *CreateOrderRequest {
+	return &CreateOrderRequest{client: s.client}
 }
