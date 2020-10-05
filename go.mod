@@ -4,8 +4,8 @@ go 1.13
 
 require (
 	github.com/adshao/go-binance v0.0.0-20200604145522-bf563a35f17f
+	github.com/aws/aws-sdk-go v1.35.2 // indirect
 	github.com/fsnotify/fsnotify v1.4.7
-	github.com/go-sql-driver/mysql v1.5.0 // indirect
 	github.com/go-test/deep v1.0.6 // indirect
 	github.com/golang/protobuf v1.3.3 // indirect
 	github.com/google/uuid v1.1.2
