@@ -2,8 +2,6 @@
 
 package types
 
-import ()
-
 func (b *OrderBook) OnLoad(cb func(book *OrderBook)) {
 	b.loadCallbacks = append(b.loadCallbacks, cb)
 }

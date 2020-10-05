@@ -1,6 +1,7 @@
 package types
 
-import ("testing"
+import (
+	"testing"
 
 	"github.com/stretchr/testify/assert"
 )

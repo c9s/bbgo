@@ -2,12 +2,13 @@ package bbgo
 
 import (
 	"fmt"
-	"github.com/c9s/bbgo/pkg/bbgo/types"
 	"math"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/c9s/bbgo/types"
 )
 
 func zero(a float64) bool {

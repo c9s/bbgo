@@ -5,8 +5,8 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/c9s/bbgo/pkg/bbgo/fixedpoint"
-	"github.com/c9s/bbgo/pkg/bbgo/sigchan"
+	"github.com/c9s/bbgo/fixedpoint"
+	"github.com/c9s/bbgo/sigchan"
 )
 
 type PriceVolume struct {

@@ -4,7 +4,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/c9s/bbgo/pkg/bbgo/types"
+	"github.com/c9s/bbgo/types"
 )
 
 type MovingAverageIndicator struct {

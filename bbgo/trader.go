@@ -10,11 +10,11 @@ import (
 	"github.com/jmoiron/sqlx"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/c9s/bbgo/pkg/bbgo/accounting"
-	"github.com/c9s/bbgo/pkg/bbgo/config"
-	"github.com/c9s/bbgo/pkg/bbgo/exchange/binance"
-	"github.com/c9s/bbgo/pkg/bbgo/service"
-	"github.com/c9s/bbgo/pkg/bbgo/types"
+	"github.com/c9s/bbgo/accounting"
+	"github.com/c9s/bbgo/bbgo/config"
+	"github.com/c9s/bbgo/exchange/binance"
+	"github.com/c9s/bbgo/service"
+	"github.com/c9s/bbgo/types"
 )
 
 // MarketStrategy represents the single Exchange strategy

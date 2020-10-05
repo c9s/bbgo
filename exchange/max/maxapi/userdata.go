@@ -4,8 +4,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/valyala/fastjson"
 
-	"github.com/c9s/bbgo/pkg/bbgo/types"
-	"github.com/c9s/bbgo/pkg/util"
+	"github.com/c9s/bbgo/types"
+	"github.com/c9s/bbgo/util"
 )
 
 type BaseEvent struct {

@@ -9,9 +9,9 @@ import (
 	"github.com/adshao/go-binance"
 	"github.com/valyala/fastjson"
 
-	"github.com/c9s/bbgo/pkg/bbgo/fixedpoint"
-	"github.com/c9s/bbgo/pkg/bbgo/types"
-	"github.com/c9s/bbgo/pkg/util"
+	"github.com/c9s/bbgo/fixedpoint"
+	"github.com/c9s/bbgo/types"
+	"github.com/c9s/bbgo/util"
 )
 
 /*

@@ -8,7 +8,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/c9s/bbgo/pkg/bbgo/types"
+	"github.com/c9s/bbgo/types"
 )
 
 type TradeSync struct {

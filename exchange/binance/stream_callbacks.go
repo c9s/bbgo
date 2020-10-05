@@ -2,8 +2,6 @@
 
 package binance
 
-import ()
-
 func (s *Stream) OnConnect(cb func(stream *Stream)) {
 	s.connectCallbacks = append(s.connectCallbacks, cb)
 }

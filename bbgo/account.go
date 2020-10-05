@@ -4,9 +4,9 @@ import (
 	"context"
 	"sync"
 
-	"github.com/c9s/bbgo/pkg/bbgo/exchange/binance"
-	"github.com/c9s/bbgo/pkg/bbgo/types"
-	"github.com/c9s/bbgo/pkg/util"
+	"github.com/c9s/bbgo/exchange/binance"
+	"github.com/c9s/bbgo/types"
+	"github.com/c9s/bbgo/util"
 
 	log "github.com/sirupsen/logrus"
 )

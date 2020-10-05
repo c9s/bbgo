@@ -7,8 +7,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/valyala/fastjson"
 
-	"github.com/c9s/bbgo/pkg/bbgo/fixedpoint"
-	"github.com/c9s/bbgo/pkg/bbgo/types"
+	"github.com/c9s/bbgo/fixedpoint"
+	"github.com/c9s/bbgo/types"
 )
 
 var ErrIncorrectBookEntryElementLength = errors.New("incorrect book entry element length")

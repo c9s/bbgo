@@ -5,8 +5,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	max "github.com/c9s/bbgo/pkg/bbgo/exchange/max/maxapi"
-	"github.com/c9s/bbgo/pkg/bbgo/types"
+	max "github.com/c9s/bbgo/exchange/max/maxapi"
+	"github.com/c9s/bbgo/types"
 )
 
 var logger = log.WithField("exchange", "max")

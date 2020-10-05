@@ -1,7 +1,7 @@
 package bbgo
 
 import (
-	"github.com/c9s/bbgo/pkg/bbgo/types"
+	"github.com/c9s/bbgo/types"
 )
 
 type Interval string

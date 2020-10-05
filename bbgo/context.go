@@ -3,8 +3,8 @@ package bbgo
 import (
 	"sync"
 
-	"github.com/c9s/bbgo/pkg/bbgo/accounting"
-	"github.com/c9s/bbgo/pkg/bbgo/types"
+	"github.com/c9s/bbgo/accounting"
+	"github.com/c9s/bbgo/types"
 )
 
 type Context struct {

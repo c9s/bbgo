@@ -4,7 +4,7 @@ package bbgo
 import (
 	"testing"
 
-	"github.com/c9s/bbgo/pkg/bbgo/types"
+	"github.com/c9s/bbgo/types"
 )
 
 func TestCalculateMovingAverage(t *testing.T) {

@@ -7,12 +7,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/c9s/bbgo/pkg/util"
+	"github.com/c9s/bbgo/util"
 
 	"github.com/adshao/go-binance"
 	"github.com/gorilla/websocket"
 
-	"github.com/c9s/bbgo/pkg/bbgo/types"
+	"github.com/c9s/bbgo/types"
 )
 
 type StreamRequest struct {

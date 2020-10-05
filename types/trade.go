@@ -2,9 +2,11 @@ package types
 
 import (
 	"fmt"
-	"github.com/c9s/bbgo/pkg/util"
-	"github.com/slack-go/slack"
 	"time"
+
+	"github.com/slack-go/slack"
+
+	"github.com/c9s/bbgo/util"
 )
 
 type Trade struct {

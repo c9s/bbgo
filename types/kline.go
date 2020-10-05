@@ -7,7 +7,7 @@ import (
 
 	"github.com/slack-go/slack"
 
-	"github.com/c9s/bbgo/pkg/util"
+	"github.com/c9s/bbgo/util"
 )
 
 type KLineOrWindow interface {

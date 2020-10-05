@@ -7,8 +7,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
 
-	"github.com/c9s/bbgo/pkg/bbgo/slack/slackstyle"
-	"github.com/c9s/bbgo/pkg/bbgo/types"
+	"github.com/c9s/bbgo/slack/slackstyle"
+	"github.com/c9s/bbgo/types"
 )
 
 type ProfitAndLossReport struct {

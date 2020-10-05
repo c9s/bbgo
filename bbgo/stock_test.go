@@ -2,10 +2,12 @@ package bbgo
 
 import (
 	"encoding/json"
-	"github.com/c9s/bbgo/pkg/bbgo/types"
-	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+
+	"github.com/c9s/bbgo/types"
 )
 
 func TestStockManager(t *testing.T) {
