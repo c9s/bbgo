@@ -193,7 +193,7 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 	return allDeposits, nil
 }
 
-func (e *Exchange) QueryAccountBalances(ctx context.Context) (map[string]types.Balance, error) {
+func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
 	account, err := e.QueryAccount(ctx)
 	if err != nil {
 		return nil, err
@@ -287,7 +287,8 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol, interval string, opt
 
 	log.Infof("querying kline %s %s %v", symbol, interval, options)
 
-	req := e.Client.NewKlinesService().Symbol(symbol).
+	req := e.Client.NewKlinesService().
+		Symbol(symbol).
 		Interval(interval).
 		Limit(limit)
 

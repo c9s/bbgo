@@ -11,6 +11,7 @@ type Exchange interface {
 	NewStream() Stream
 
 	QueryAccount(ctx context.Context) (*Account, error)
+
 	QueryAccountBalances(ctx context.Context) (BalanceMap, error)
 
 	QueryKLines(ctx context.Context, symbol string, interval string, options KLineQueryOptions) ([]KLine, error)
