@@ -6,6 +6,7 @@ type Balance struct {
 	Locked float64 `json:"locked"`
 }
 
+type BalanceMap map[string]Balance
 
 type Account struct {
 	MakerCommission int64

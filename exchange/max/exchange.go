@@ -7,6 +7,7 @@ import (
 
 	maxapi "github.com/c9s/bbgo/exchange/max/maxapi"
 	"github.com/c9s/bbgo/types"
+	"github.com/c9s/bbgo/util"
 )
 
 type Exchange struct {
@@ -34,14 +35,14 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order *types.SubmitOrder) er
 		return err
 	}
 
-	retOrder, err := e.client.OrderService.Create(
-		order.Symbol,
-		toLocalSideType(order.Side),
-		order.Quantity,
-		order.Price,
-		string(orderType),
-		maxapi.Options{})
+	req := e.client.OrderService.NewCreateOrderRequest().
+		Market(order.Symbol).
+		OrderType(string(orderType)).
+		Side(toLocalSideType(order.Side)).
+		Volume(order.QuantityString).
+		Price(order.PriceString)
 
+	retOrder, err := req.Do(ctx)
 	if err != nil {
 		return err
 	}
@@ -53,6 +54,51 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order *types.SubmitOrder) er
 // PlatformFeeCurrency
 func (e *Exchange) PlatformFeeCurrency() string {
 	return "max"
+}
+
+func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
+	userInfo, err := e.client.AccountService.Me()
+	if err != nil {
+		return nil, err
+	}
+
+	var balances = make(types.BalanceMap)
+	for _, a := range userInfo.Accounts {
+		balances[toGlobalCurrency(a.Currency)] = types.Balance{
+			Currency:  toGlobalCurrency(a.Currency),
+			Available: util.MustParseFloat(a.Balance),
+			Locked:    util.MustParseFloat(a.Locked),
+		}
+	}
+
+	return &types.Account{
+		MakerCommission: 15, // 0.15%
+		TakerCommission: 15, // 0.15%
+		Balances:        balances,
+	}, nil
+}
+
+func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
+	accounts, err := e.client.AccountService.Accounts()
+	if err != nil {
+		return nil, err
+	}
+
+	var balances = make(types.BalanceMap)
+
+	for _, a := range accounts {
+		balances[toGlobalCurrency(a.Currency)] = types.Balance{
+			Currency:  toGlobalCurrency(a.Currency),
+			Available: util.MustParseFloat(a.Balance),
+			Locked:    util.MustParseFloat(a.Locked),
+		}
+	}
+
+	return balances, nil
+}
+
+func toGlobalCurrency(currency string) string {
+	return strings.ToUpper(currency)
 }
 
 func toLocalCurrency(currency string) string {

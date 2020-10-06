@@ -10,7 +10,8 @@ type Exchange interface {
 
 	NewStream() Stream
 
-	QueryAccountBalances(ctx context.Context) (map[string]Balance, error)
+	QueryAccount(ctx context.Context) (*Account, error)
+	QueryAccountBalances(ctx context.Context) (BalanceMap, error)
 
 	QueryKLines(ctx context.Context, symbol string, interval string, options KLineQueryOptions) ([]KLine, error)
 
@@ -26,4 +27,3 @@ type TradeQueryOptions struct {
 	Limit       int
 	LastTradeID int64
 }
-
