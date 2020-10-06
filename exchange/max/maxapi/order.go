@@ -232,15 +232,10 @@ func (s *OrderService) Get(orderID uint64) (*Order, error) {
 }
 
 type MultiOrderRequestParams struct {
+	PrivateRequestParams
+
 	Market string  `json:"market"`
 	Orders []Order `json:"orders"`
-}
-
-func (p *MultiOrderRequestParams) Map() map[string]interface{} {
-	return map[string]interface{}{
-		"market": p.Market,
-		"orders": p.Orders,
-	}
 }
 
 type MultiOrderResponse []struct {
@@ -265,7 +260,7 @@ func (r *CreateMultiOrderRequest) AddOrders(orders ...Order) *CreateMultiOrderRe
 }
 
 func (r *CreateMultiOrderRequest) Do(ctx context.Context) (multiOrderResponse *MultiOrderResponse, err error) {
-	req, err := r.client.newAuthenticatedRequest("POST", "v2/orders/multi/onebyone", r.params.Map())
+	req, err := r.client.newAuthenticatedRequest("POST", "v2/orders/multi/onebyone", r.params)
 	if err != nil {
 		return multiOrderResponse, errors.Wrapf(err, "order create error")
 	}
@@ -287,8 +282,9 @@ func (s *OrderService) NewCreateMultiOrderRequest() *CreateMultiOrderRequest {
 	return &CreateMultiOrderRequest{client: s.client}
 }
 
-// ---
 type CreateOrderRequestParams struct {
+	PrivateRequestParams
+
 	Market        string `json:"market"`
 	Volume        string `json:"volume"`
 	Price         string `json:"price"`
@@ -297,26 +293,6 @@ type CreateOrderRequestParams struct {
 	OrderType     string `json:"ord_type"`
 	ClientOrderID string `json:"client_oid,omitempty"`
 	GroupID       string `json:"group_id,omitempty"`
-}
-
-func (p *CreateOrderRequestParams) Map() map[string]interface{} {
-	payload := map[string]interface{}{
-		"market":   p.Market,
-		"volume":   p.Volume,
-		"price":    p.Price,
-		"side":     p.Side,
-		"ord_type": p.OrderType,
-	}
-
-	if p.ClientOrderID != "" {
-		payload["client_oid"] = p.ClientOrderID
-	}
-
-	if p.GroupID != "" {
-		payload["group_id"] = p.GroupID
-	}
-
-	return payload
 }
 
 type CreateOrderRequest struct {
@@ -361,7 +337,7 @@ func (r *CreateOrderRequest) ClientOrderID(clientOrderID string) *CreateOrderReq
 }
 
 func (r *CreateOrderRequest) Do(ctx context.Context) (order *Order, err error) {
-	req, err := r.client.newAuthenticatedRequest("POST", "v2/orders", r.params.Map())
+	req, err := r.client.newAuthenticatedRequest("POST", "v2/orders", r.params)
 	if err != nil {
 		return order, errors.Wrapf(err, "order create error")
 	}

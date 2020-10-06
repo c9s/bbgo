@@ -25,6 +25,6 @@ type Exchange interface {
 type TradeQueryOptions struct {
 	StartTime   *time.Time
 	EndTime     *time.Time
-	Limit       int
+	Limit       int64
 	LastTradeID int64
 }

@@ -1,10 +1,23 @@
 package max
 
 import (
+	"context"
 	"net/url"
 	"strconv"
-	"time"
 )
+
+type MarkerInfo struct {
+	Fee string `json:"fee"`
+	FeeCurrency string `json:"fee_currency"`
+	OrderID int `json:"order_id"`
+}
+
+type TradeInfo struct {
+	// Maker tells you the maker trade side
+	Maker string `json:"maker,omitempty"`
+	Bid *MarkerInfo `json:"bid,omitempty"`
+	Ask *MarkerInfo `json:"ask,omitempty"`
+}
 
 // Trade represents one returned trade on the max platform.
 type Trade struct {
@@ -17,11 +30,18 @@ type Trade struct {
 	CreatedAt             int64     `json:"created_at"`
 	CreatedAtMilliSeconds int64     `json:"created_at_in_ms"`
 	Side                  string    `json:"side" db:"side"`
-	OrderID               uint64    `json:"order_id" db:"order_id"`
+	OrderID               uint64    `json:"order_id"`
 	Fee                   string    `json:"fee" db:"fee"` // float number as string
 	FeeCurrency           string    `json:"fee_currency" db:"fee_currency"`
-	CreatedAtInDB         time.Time `db:"created_at"`
-	InsertedAt            time.Time `db:"inserted_at"`
+	Info                  TradeInfo `json:"info,omitempty"`
+}
+
+func (t Trade) IsBuyer() bool {
+	return t.Side == "bid"
+}
+
+func (t Trade) IsMaker() bool {
+	return t.Info.Maker == t.Side
 }
 
 type QueryTradeOptions struct {
@@ -108,6 +128,97 @@ func (s *TradeService) MyTrades(options QueryTradeOptions) ([]Trade, error) {
 	return v, nil
 }
 
+func (s *TradeService) NewPrivateTradeRequest() *PrivateTradeRequest {
+	return &PrivateTradeRequest{client: s.client}
+}
+
+type PrivateRequestParams struct {
+	Nonce int64  `json:"nonce"`
+	Path  string `json:"path"`
+}
+
+type PrivateTradeRequestParams struct {
+	PrivateRequestParams
+
+	Market string `json:"market"`
+
+	// Timestamp is the seconds elapsed since Unix epoch, set to return trades executed before the time only
+	Timestamp int `json:"timestamp,omitempty"`
+
+	// From field is a trade id, set ot return trades created after the trade
+	From int64 `json:"from,omitempty"`
+
+	// To field trade id, set to return trades created before the trade
+	To int64 `json:"to,omitempty"`
+
+	OrderBy string `json:"order_by,omitempty"`
+
+	// default to false
+	Pagination bool `json:"pagination"`
+
+	Limit int64 `json:"limit,omitempty"`
+
+	Offset int64 `json:"offset,omitempty"`
+}
+
+type PrivateTradeRequest struct {
+	client *RestClient
+	params PrivateTradeRequestParams
+}
+
+func (r *PrivateTradeRequest) Market(market string) *PrivateTradeRequest {
+	r.params.Market = market
+	return r
+}
+
+func (r *PrivateTradeRequest) From(from int64) *PrivateTradeRequest {
+	r.params.From = from
+	return r
+}
+
+func (r *PrivateTradeRequest) To(to int64) *PrivateTradeRequest {
+	r.params.To = to
+	return r
+}
+
+func (r *PrivateTradeRequest) Limit(limit int64) *PrivateTradeRequest {
+	r.params.Limit = limit
+	return r
+}
+
+func (r *PrivateTradeRequest) Offset(offset int64) *PrivateTradeRequest {
+	r.params.Offset = offset
+	return r
+}
+
+func (r *PrivateTradeRequest) Pagination(p bool) *PrivateTradeRequest {
+	r.params.Pagination = p
+	return r
+}
+
+func (r *PrivateTradeRequest) OrderBy(orderBy string) *PrivateTradeRequest {
+	r.params.OrderBy = orderBy
+	return r
+}
+
+func (r *PrivateTradeRequest) Do(ctx context.Context) (trades []Trade, err error) {
+	req, err := r.client.newAuthenticatedRequest("GET", "v2/trades/my", r.params)
+	if err != nil {
+		return trades, err
+	}
+
+	response, err := r.client.sendRequest(req)
+	if err != nil {
+		return trades, err
+	}
+
+	if err := response.DecodeJSON(&trades); err != nil {
+		return trades, err
+	}
+
+	return trades, err
+}
+
 func (s *TradeService) Trades(options QueryTradeOptions) ([]Trade, error) {
 	var params = options.Params()
 
@@ -128,4 +239,3 @@ func (s *TradeService) Trades(options QueryTradeOptions) ([]Trade, error) {
 
 	return v, nil
 }
-

@@ -3,7 +3,9 @@ package max
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
+	"time"
 
 	maxapi "github.com/c9s/bbgo/exchange/max/maxapi"
 	"github.com/c9s/bbgo/types"
@@ -97,6 +99,35 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 	return balances, nil
 }
 
+func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
+	req := e.client.TradeService.NewPrivateTradeRequest()
+	req.Market(symbol)
+
+	if options.Limit > 0 {
+		req.Limit(options.Limit)
+	}
+
+	if options.LastTradeID > 0 {
+		req.From(options.LastTradeID)
+	}
+
+	remoteTrades, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, t := range remoteTrades {
+		localTrade, err := convertRemoteTrade(t)
+		if err != nil {
+			logger.WithError(err).Errorf("can not convert binance trade: %+v", t)
+			continue
+		}
+		trades = append(trades, *localTrade)
+	}
+
+	return trades, nil
+}
+
 func toGlobalCurrency(currency string) string {
 	return strings.ToUpper(currency)
 }
@@ -109,6 +140,19 @@ func toLocalSideType(side types.SideType) string {
 	return strings.ToLower(string(side))
 }
 
+func toGlobalSideType(v string) string {
+	switch strings.ToLower(v) {
+	case "bid":
+		return "BUY"
+
+	case "ask":
+		return "SELL"
+
+	}
+
+	return strings.ToUpper(v)
+}
+
 func toLocalOrderType(orderType types.OrderType) (maxapi.OrderType, error) {
 	switch orderType {
 	case types.OrderTypeLimit:
@@ -119,4 +163,47 @@ func toLocalOrderType(orderType types.OrderType) (maxapi.OrderType, error) {
 	}
 
 	return "", fmt.Errorf("order type %s not supported", orderType)
+}
+
+func convertRemoteTrade(t maxapi.Trade) (*types.Trade, error) {
+	// skip trade ID that is the same. however this should not happen
+	var side = toGlobalSideType(t.Side)
+
+	// trade time
+	mts := time.Unix(0, t.CreatedAtMilliSeconds*int64(time.Millisecond))
+
+	price, err := strconv.ParseFloat(t.Price, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	quantity, err := strconv.ParseFloat(t.Volume, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	quoteQuantity, err := strconv.ParseFloat(t.Funds, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	fee, err := strconv.ParseFloat(t.Fee, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	return &types.Trade{
+		ID:            int64(t.ID),
+		Price:         price,
+		Symbol:        t.Market,
+		Exchange:      "max",
+		Quantity:      quantity,
+		Side:          side,
+		IsBuyer:       t.IsBuyer(),
+		IsMaker:       t.IsMaker(),
+		Fee:           fee,
+		FeeCurrency:   t.FeeCurrency,
+		QuoteQuantity: quoteQuantity,
+		Time:          mts,
+	}, nil
 }

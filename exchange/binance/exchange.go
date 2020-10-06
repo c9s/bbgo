@@ -332,7 +332,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		Symbol(symbol)
 
 	if options.Limit > 0 {
-		req.Limit(options.Limit)
+		req.Limit(int(options.Limit))
 	}
 
 	if options.StartTime != nil {

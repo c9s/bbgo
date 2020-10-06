@@ -170,25 +170,40 @@ func (c *RestClient) newRequest(method string, refURL string, params url.Values,
 }
 
 // newAuthenticatedRequest creates new http request for authenticated routes.
-func (c *RestClient) newAuthenticatedRequest(m string, refURL string, data map[string]interface{}) (*http.Request, error) {
+func (c *RestClient) newAuthenticatedRequest(m string, refURL string, data interface{}) (*http.Request, error) {
 	rel, err := url.Parse(refURL)
 	if err != nil {
 		return nil, err
 	}
 
-	payload := map[string]interface{}{
-		"nonce": c.getNonce(),
-		"path":  c.BaseURL.ResolveReference(rel).Path,
+	var p []byte
+
+	switch d := data.(type) {
+	case map[string]interface{}:
+		payload := map[string]interface{}{
+			"nonce": c.getNonce(),
+			"path":  c.BaseURL.ResolveReference(rel).Path,
+		}
+
+		for k, v := range d {
+			payload[k] = v
+		}
+
+		p, err = json.Marshal(payload)
+
+	case PrivateRequestParams:
+		d.Nonce = c.getNonce()
+		d.Path = c.BaseURL.ResolveReference(rel).Path
+
+	default:
+		return nil, errors.New("unsupported payload type")
+
 	}
 
-	for k, v := range data {
-		payload[k] = v
-	}
-
-	p, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err
 	}
+
 
 	req, err := c.newRequest(m, refURL, nil, p)
 	if err != nil {
