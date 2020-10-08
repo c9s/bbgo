@@ -14,6 +14,11 @@ aims to release v1.0 before 11/14
 - Stream integration (user data websocket)
 - PnL calculation.
 
+## Supported Exchanges
+
+- MAX Exchange (located in Taiwan)
+- Binance Exchange
+
 ## Synopsis
 
 _**still under construction**_
@@ -48,6 +53,18 @@ t.AddExchange("max", max.New(viper.Getenv("max-key"), viper.Getenv("max-secret")
 
 t.AddCrossExchangeStrategy(hedgemaker.New(...))
 ```
+
+## Support
+
+You may register your exchange account with my referral ID to support this project.
+
+- For MAX Exchange: <https://max.maicoin.com/signup?r=c7982718> (default commission rate to your account)
+- For Binance Exchange: <https://www.binancezh.com/en/register?ref=VGDGLT80> (5% commission back to your account)
+
+Or support this project by cryptocurrency:
+
+- BTC omni `3J6XQJNWT56amqz9Hz2BEVQ7W4aNmb5kiU`
+- USDT erc20 `0x63E5805e027548A384c57E20141f6778591Bac6F`
 
 ## License
 
