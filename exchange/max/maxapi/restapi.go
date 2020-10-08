@@ -204,6 +204,14 @@ func (c *RestClient) newAuthenticatedRequest(m string, refURL string, data inter
 		return nil, err
 	}
 
+	if len(c.APIKey) == 0 {
+		return nil, errors.New("empty api key")
+	}
+
+	if len(c.APISecret) == 0 {
+		return nil, errors.New("empty api secret")
+	}
+
 
 	req, err := c.newRequest(m, refURL, nil, p)
 	if err != nil {
