@@ -16,6 +16,17 @@ const (
 	Closed
 )
 
+
+type OrderState string
+
+const (
+	OrderStateDone = OrderState("done")
+	OrderStateCancel = OrderState("cancel")
+	OrderStateWait = OrderState("wait")
+	OrderStateConvert = OrderState("convert")
+)
+
+
 type OrderType string
 
 // Order types that the API can return.
@@ -50,19 +61,7 @@ type Order struct {
 }
 
 // All returns all orders for the authenticated account.
-func (s *OrderService) All(market string, limit, page int, state OrderStateToQuery) ([]Order, error) {
-	var states []string
-	switch state {
-	case All:
-		states = []string{"done", "cancel", "wait", "convert"}
-	case Active:
-		states = []string{"wait", "convert"}
-	case Closed:
-		states = []string{"done", "cancel"}
-	default:
-		states = []string{"wait", "convert"}
-	}
-
+func (s *OrderService) All(market string, limit, page int, states ...OrderState) ([]Order, error) {
 	payload := map[string]interface{}{
 		"market":   market,
 		"limit":    limit,
@@ -70,6 +69,7 @@ func (s *OrderService) All(market string, limit, page int, state OrderStateToQue
 		"state":    states,
 		"order_by": "desc",
 	}
+
 	req, err := s.client.newAuthenticatedRequest("GET", "v2/orders", payload)
 	if err != nil {
 		return nil, err
