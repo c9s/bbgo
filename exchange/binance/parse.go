@@ -249,15 +249,15 @@ func ParseEvent(message string) (interface{}, error) {
 
 type DepthEntry struct {
 	PriceLevel string
-	Quantity string
+	Quantity   string
 }
 
 type DepthEvent struct {
 	EventBase
 
-	Symbol string `json:"s"`
-	FirstUpdateID int64 `json:"U"`
-	FinalUpdateID int64 `json:"u"`
+	Symbol        string `json:"s"`
+	FirstUpdateID int64  `json:"U"`
+	FinalUpdateID int64  `json:"u"`
 
 	Bids []DepthEntry
 	Asks []DepthEntry
@@ -319,7 +319,7 @@ func parseDepthEntry(val *fastjson.Value) (*DepthEntry, error) {
 
 	return &DepthEntry{
 		PriceLevel: string(arr[0].GetStringBytes()),
-		Quantity: string(arr[1].GetStringBytes()),
+		Quantity:   string(arr[1].GetStringBytes()),
 	}, nil
 }
 
@@ -330,7 +330,7 @@ func parseDepthEvent(val *fastjson.Value) (*DepthEvent, error) {
 			Event: string(val.GetStringBytes("e")),
 			Time:  val.GetInt64("E"),
 		},
-		Symbol: string(val.GetStringBytes("s")),
+		Symbol:        string(val.GetStringBytes("s")),
 		FirstUpdateID: val.GetInt64("U"),
 		FinalUpdateID: val.GetInt64("u"),
 	}

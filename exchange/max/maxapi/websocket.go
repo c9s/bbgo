@@ -54,13 +54,13 @@ type WebSocketService struct {
 	errorEventCallbacks        []func(e ErrorEvent)
 	subscriptionEventCallbacks []func(e SubscriptionEvent)
 
-	tradeUpdateEventCallbacks     []func(e TradeUpdateEvent)
-	tradeSnapshotEventCallbacks   []func(e TradeSnapshotEvent)
-	orderUpdateEventCallbacks     []func(e OrderUpdateEvent)
-	orderSnapshotEventCallbacks   []func(e OrderSnapshotEvent)
+	tradeUpdateEventCallbacks   []func(e TradeUpdateEvent)
+	tradeSnapshotEventCallbacks []func(e TradeSnapshotEvent)
+	orderUpdateEventCallbacks   []func(e OrderUpdateEvent)
+	orderSnapshotEventCallbacks []func(e OrderSnapshotEvent)
 
 	accountSnapshotEventCallbacks []func(e AccountSnapshotEvent)
-	accountUpdateEventCallbacks []func(e AccountUpdateEvent)
+	accountUpdateEventCallbacks   []func(e AccountUpdateEvent)
 }
 
 func NewWebSocketService(wsURL string, key, secret string) *WebSocketService {

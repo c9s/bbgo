@@ -1,6 +1,5 @@
 package bbgo
 
-
 import (
 	"testing"
 )
@@ -8,6 +7,5 @@ import (
 func TestOrderProcessor(t *testing.T) {
 	processor := &OrderProcessor{}
 	_ = processor
-
 
 }

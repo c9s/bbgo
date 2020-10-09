@@ -18,7 +18,6 @@ var BookChannel = Channel("book")
 
 var KLineChannel = Channel("kline")
 
-
 //go:generate callbackgen -type StandardStream -interface
 type StandardStream struct {
 	Subscriptions []Subscription

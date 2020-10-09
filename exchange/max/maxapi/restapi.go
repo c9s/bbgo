@@ -88,7 +88,7 @@ type RestClient struct {
 	AccountService *AccountService
 	PublicService  *PublicService
 	TradeService   *TradeService
-	OrderService     *OrderService
+	OrderService   *OrderService
 	// OrderBookService *OrderBookService
 	// MaxTokenService  *MaxTokenService
 	// MaxKLineService  *KLineService
@@ -211,7 +211,6 @@ func (c *RestClient) newAuthenticatedRequest(m string, refURL string, data inter
 	if len(c.APISecret) == 0 {
 		return nil, errors.New("empty api secret")
 	}
-
 
 	req, err := c.newRequest(m, refURL, nil, p)
 	if err != nil {

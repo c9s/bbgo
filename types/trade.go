@@ -40,13 +40,13 @@ func (trade Trade) SlackAttachment() slack.Attachment {
 	market, ok := FindMarket(trade.Symbol)
 	if !ok {
 		return slack.Attachment{
-			Text: fmt.Sprintf("*%s* Trade %s", trade.Symbol, trade.Side),
+			Text:  fmt.Sprintf("*%s* Trade %s", trade.Symbol, trade.Side),
 			Color: color,
 		}
 	}
 
 	return slack.Attachment{
-		Text: fmt.Sprintf("*%s* Trade %s", trade.Symbol, trade.Side),
+		Text:  fmt.Sprintf("*%s* Trade %s", trade.Symbol, trade.Side),
 		Color: color,
 		// Pretext:       "",
 		// Text:          "",

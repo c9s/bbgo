@@ -71,7 +71,6 @@ func NewStream(key, secret string) *Stream {
 		stream.EmitBalanceUpdate(snapshot)
 	})
 
-
 	return stream
 }
 
