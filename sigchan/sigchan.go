@@ -26,7 +26,6 @@ func (c Chan) Drain(duration, deadline time.Duration) (cnt int) {
 	}
 }
 
-
 func (c Chan) Emit() {
 	select {
 	case c <- struct{}{}:

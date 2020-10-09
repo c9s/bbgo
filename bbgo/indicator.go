@@ -8,7 +8,7 @@ import (
 )
 
 type MovingAverageIndicator struct {
-	store *MarketDataStore
+	store  *MarketDataStore
 	Period int
 }
 
@@ -19,7 +19,7 @@ func NewMovingAverageIndicator(period int) *MovingAverageIndicator {
 }
 
 func (i *MovingAverageIndicator) handleUpdate(kline types.KLine) {
-	klines, ok := i.store.KLineWindows[ Interval(kline.Interval) ]
+	klines, ok := i.store.KLineWindows[Interval(kline.Interval)]
 	if !ok {
 		return
 	}
@@ -33,13 +33,13 @@ func (i *MovingAverageIndicator) handleUpdate(kline types.KLine) {
 
 type IndicatorValue struct {
 	Value float64
-	Time time.Time
+	Time  time.Time
 }
 
 func calculateMovingAverage(klines types.KLineWindow, period int) (values []IndicatorValue) {
 	for idx := range klines[period:] {
 		offset := idx + period
-		sum := klines[offset - period:offset].ReduceClose()
+		sum := klines[offset-period : offset].ReduceClose()
 		values = append(values, IndicatorValue{
 			Time:  klines[offset].GetEndTime(),
 			Value: math.Round(sum / float64(period)),
@@ -48,16 +48,9 @@ func calculateMovingAverage(klines types.KLineWindow, period int) (values []Indi
 	return values
 }
 
-
-
-
 func (i *MovingAverageIndicator) SubscribeStore(store *MarketDataStore) {
 	i.store = store
 
 	// register kline update callback
 	store.OnUpdate(i.handleUpdate)
 }
-
-
-
-

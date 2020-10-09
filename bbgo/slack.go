@@ -15,4 +15,3 @@ type NullNotifier struct{}
 
 func (n *NullNotifier) Notify(format string, args ...interface{}) {
 }
-

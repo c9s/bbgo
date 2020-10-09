@@ -12,7 +12,7 @@ import (
 )
 
 type TradeSync struct {
-	Service  *TradeService
+	Service *TradeService
 }
 
 func (s *TradeSync) Sync(ctx context.Context, exchange types.Exchange, symbol string, startTime time.Time) error {
@@ -83,7 +83,7 @@ func (s *TradeService) QueryLast(symbol string) (*types.Trade, error) {
 
 func (s *TradeService) QueryForTradingFeeCurrency(symbol string, feeCurrency string) ([]types.Trade, error) {
 	rows, err := s.DB.NamedQuery(`SELECT * FROM trades WHERE symbol = :symbol OR fee_currency = :fee_currency ORDER BY traded_at ASC`, map[string]interface{}{
-		"symbol": symbol,
+		"symbol":       symbol,
 		"fee_currency": feeCurrency,
 	})
 	if err != nil {
@@ -108,7 +108,7 @@ func (s *TradeService) Query(symbol string) ([]types.Trade, error) {
 	return s.scanRows(rows)
 }
 
-func (s *TradeService) scanRows(rows *sqlx.Rows)  (trades []types.Trade, err error) {
+func (s *TradeService) scanRows(rows *sqlx.Rows) (trades []types.Trade, err error) {
 	for rows.Next() {
 		var trade types.Trade
 		if err := rows.StructScan(&trade); err != nil {
@@ -120,8 +120,6 @@ func (s *TradeService) scanRows(rows *sqlx.Rows)  (trades []types.Trade, err err
 
 	return trades, rows.Err()
 }
-
-
 
 func (s *TradeService) Insert(trade types.Trade) error {
 	_, err := s.DB.NamedExec(`
