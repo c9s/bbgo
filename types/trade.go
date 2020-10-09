@@ -30,11 +30,10 @@ type Trade struct {
 }
 
 func (trade Trade) SlackAttachment() slack.Attachment {
-	var color = ""
+	var color = "#DC143C"
+
 	if trade.IsBuyer {
 		color = "#228B22"
-	} else {
-		color = "#DC143C"
 	}
 
 	market, ok := FindMarket(trade.Symbol)
