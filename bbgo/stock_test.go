@@ -52,16 +52,16 @@ func TestStockManager(t *testing.T) {
 		assert.Len(t, stockManager.Stocks, 2)
 		assert.Equal(t, StockSlice{
 			{
-				Symbol: "BTCUSDT",
-				Price: 9100.0,
+				Symbol:   "BTCUSDT",
+				Price:    9100.0,
 				Quantity: 0.05,
-				IsBuyer: true,
+				IsBuyer:  true,
 			},
 			{
-				Symbol: "BTCUSDT",
-				Price: 9100.0,
+				Symbol:   "BTCUSDT",
+				Price:    9100.0,
 				Quantity: 0.04,
-				IsBuyer: true,
+				IsBuyer:  true,
 			},
 		}, stockManager.Stocks)
 		assert.Len(t, stockManager.PendingSells, 0)
@@ -121,10 +121,10 @@ func TestStockManager(t *testing.T) {
 		assert.Len(t, stockManager.Stocks, 1)
 		assert.Equal(t, StockSlice{
 			{
-				Symbol: "BTCUSDT",
-				Price: 9100.0,
+				Symbol:   "BTCUSDT",
+				Price:    9100.0,
 				Quantity: 0.02,
-				IsBuyer: true,
+				IsBuyer:  true,
 			},
 		}, stockManager.Stocks)
 		assert.Len(t, stockManager.PendingSells, 0)
@@ -146,10 +146,10 @@ func TestStockManager(t *testing.T) {
 		assert.Len(t, stockManager.Stocks, 1)
 		assert.Equal(t, StockSlice{
 			{
-				Symbol: "BTCUSDT",
-				Price: 9100.0,
+				Symbol:   "BTCUSDT",
+				Price:    9100.0,
 				Quantity: 0.03,
-				IsBuyer: true,
+				IsBuyer:  true,
 			},
 		}, stockManager.Stocks)
 		assert.Len(t, stockManager.PendingSells, 0)
@@ -172,10 +172,10 @@ func TestStockManager(t *testing.T) {
 		assert.Len(t, stockManager.PendingSells, 1)
 		assert.Equal(t, StockSlice{
 			{
-				Symbol: "BTCUSDT",
-				Price: 9200.0,
+				Symbol:   "BTCUSDT",
+				Price:    9200.0,
 				Quantity: 0.05,
-				IsBuyer: false,
+				IsBuyer:  false,
 			},
 		}, stockManager.PendingSells)
 	})

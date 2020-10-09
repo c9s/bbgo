@@ -30,7 +30,6 @@ func ParseFloat(s string) (float64, error) {
 	return strconv.ParseFloat(s, 64)
 }
 
-
 func MustParseFloat(s string) float64 {
 	if len(s) == 0 {
 		return 0.0
@@ -52,4 +51,3 @@ func Zero(v float64) bool {
 func NotZero(v float64) bool {
 	return math.Abs(v) > epsilon
 }
-

@@ -1,6 +1,5 @@
 package bbgo
 
-
 import (
 	"testing"
 
@@ -9,9 +8,7 @@ import (
 
 func TestCalculateMovingAverage(t *testing.T) {
 	klines := types.KLineWindow{
-		{
-
-		},
+		{},
 	}
 	_ = klines
 }

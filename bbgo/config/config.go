@@ -22,4 +22,3 @@ func SaveConfigFile(filename string, v interface{}) error {
 
 	return ioutil.WriteFile(filename, out, 0644)
 }
-

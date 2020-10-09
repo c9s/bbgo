@@ -15,7 +15,6 @@ type BackTestStream struct {
 	types.StandardStream
 }
 
-
 func (s *BackTestStream) Connect(ctx context.Context) error {
 	return nil
 }

@@ -17,7 +17,7 @@ type LogHook struct {
 func NewLogHook(token string, channel string) *LogHook {
 	var client = slack.New(token)
 	return &LogHook{
-		Slack: client,
+		Slack:        client,
 		ErrorChannel: channel,
 	}
 }
@@ -56,8 +56,8 @@ func (t *LogHook) Fire(e *logrus.Entry) error {
 	}
 
 	slackAttachments = append(slackAttachments, slack.Attachment{
-		Color: color,
-		Title: strings.ToUpper(e.Level.String()),
+		Color:  color,
+		Title:  strings.ToUpper(e.Level.String()),
 		Fields: fields,
 	})
 

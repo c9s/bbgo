@@ -20,4 +20,3 @@ func Render(tpl string, args interface{}) string {
 	}
 	return buf.String()
 }
-
