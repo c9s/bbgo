@@ -238,5 +238,3 @@ func (sb *StreamOrderBook) BindStream(stream Stream) {
 		sb.C.Emit()
 	})
 }
-
-

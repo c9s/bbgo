@@ -180,8 +180,8 @@ func (m *BalanceMessage) Balance() (*types.Balance, error) {
 	}
 
 	return &types.Balance{
-		Currency: m.Currency,
-		Locked: locked,
+		Currency:  m.Currency,
+		Locked:    locked,
 		Available: available,
 	}, nil
 }

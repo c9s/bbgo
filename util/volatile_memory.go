@@ -41,4 +41,3 @@ func (i *VolatileMemory) IsTextFresh(text string, ttl time.Duration) bool {
 	i.textTimes[text] = now
 	return false
 }
-

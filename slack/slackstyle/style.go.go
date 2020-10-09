@@ -11,5 +11,3 @@ func TrendIcon(trend int) string {
 	}
 	return ""
 }
-
-

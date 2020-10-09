@@ -61,23 +61,23 @@ type StockManager struct {
 }
 
 type Distribution struct {
-	PriceLevels []string `json:"priceLevels"`
-	TotalQuantity float64 `json:"totalQuantity"`
-	Quantities map[string]float64 `json:"quantities"`
-	Stocks map[string]StockSlice `json:"stocks"`
+	PriceLevels   []string              `json:"priceLevels"`
+	TotalQuantity float64               `json:"totalQuantity"`
+	Quantities    map[string]float64    `json:"quantities"`
+	Stocks        map[string]StockSlice `json:"stocks"`
 }
 
 func (m *StockManager) Distribution(level int) *Distribution {
 	var d = Distribution{
 		Quantities: map[string]float64{},
-		Stocks: map[string]StockSlice{},
+		Stocks:     map[string]StockSlice{},
 	}
 
 	for _, stock := range m.Stocks {
 		n := math.Ceil(math.Log10(stock.Price))
 		digits := int(n - math.Max(float64(level), 1.0))
 		div := math.Pow10(digits)
-		priceLevel := math.Floor(stock.Price / div) * div
+		priceLevel := math.Floor(stock.Price/div) * div
 		key := strconv.FormatFloat(priceLevel, 'f', 2, 64)
 
 		d.TotalQuantity += stock.Quantity
@@ -97,7 +97,6 @@ func (m *StockManager) Distribution(level int) *Distribution {
 	}
 
 	sort.Float64s(priceLevels)
-
 
 	return &d
 }

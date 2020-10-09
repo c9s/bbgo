@@ -7,16 +7,16 @@ import (
 )
 
 type MarkerInfo struct {
-	Fee string `json:"fee"`
+	Fee         string `json:"fee"`
 	FeeCurrency string `json:"fee_currency"`
-	OrderID int `json:"order_id"`
+	OrderID     int    `json:"order_id"`
 }
 
 type TradeInfo struct {
 	// Maker tells you the maker trade side
-	Maker string `json:"maker,omitempty"`
-	Bid *MarkerInfo `json:"bid,omitempty"`
-	Ask *MarkerInfo `json:"ask,omitempty"`
+	Maker string      `json:"maker,omitempty"`
+	Bid   *MarkerInfo `json:"bid,omitempty"`
+	Ask   *MarkerInfo `json:"ask,omitempty"`
 }
 
 // Trade represents one returned trade on the max platform.
