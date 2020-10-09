@@ -32,7 +32,7 @@ func (t *LogHook) Levels() []logrus.Level {
 }
 
 func (t *LogHook) Fire(e *logrus.Entry) error {
-	var color = "#F0F0F0"
+	var color = ""
 
 	switch e.Level {
 	case logrus.DebugLevel:

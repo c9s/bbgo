@@ -44,11 +44,10 @@ func (report ProfitAndLossReport) Print() {
 }
 
 func (report ProfitAndLossReport) SlackAttachment() slack.Attachment {
-	var color = ""
+	var color = slackstyle.Red
+
 	if report.UnrealizedProfit > 0 {
 		color = slackstyle.Green
-	} else {
-		color = slackstyle.Red
 	}
 
 	market, ok := types.FindMarket(report.Symbol)
