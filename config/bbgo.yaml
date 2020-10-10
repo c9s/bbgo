@@ -1,0 +1,10 @@
+---
+notifier:
+  slack:
+    errorChannel: "bbgo-error"
+
+exchange:
+  binance:
+    target: binance
+  max:
+    target: max
