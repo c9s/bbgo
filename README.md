@@ -19,11 +19,17 @@ aims to release v1.0 before 11/14
 - MAX Exchange (located in Taiwan)
 - Binance Exchange
 
-## Synopsis
+## Examples
+
+Please check out the example directory: [examples]
+
+## New Trading Bot API design
 
 _**still under construction**_
 
 ```go
+package main
+
 import (
     "github.com/c9s/bbgo"
 )
