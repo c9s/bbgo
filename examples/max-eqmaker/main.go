@@ -210,7 +210,7 @@ func generateOrders(symbol, side string, price, priceTick, baseVolume fixedpoint
 
 		// skip order less than 10usd
 		if volume*price.Float64() < 10.0 {
-			log.Warn("amount too small (< 10usd). price=%f volume=%f amount=%f", price, volume, volume*price.Float64())
+			log.Warnf("amount too small (< 10usd). price=%f volume=%f amount=%f", price, volume, volume*price.Float64())
 			continue
 		}
 
