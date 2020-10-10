@@ -192,7 +192,7 @@ func toLocalSymbol(symbol string) string {
 }
 
 func toGlobalSymbol(symbol string) string {
-	return strings.ToLower(symbol)
+	return strings.ToUpper(symbol)
 }
 
 func toLocalSideType(side types.SideType) string {
