@@ -69,7 +69,7 @@ t := bbgo.New(bbgo.Config{
 t.AddNotifier(slacknotifier.New(slackToken))
 t.AddLogHook(slacklog.NewLogHook(slackToken))
 
-t.AddExchange("binance", binance.New(viper.Getenv("bn-key"), viper.Getenv("bn-secret")))).
+t.AddExchange("binance", binance.New(viper.Getenv("binance-api-key"), viper.Getenv("binance-api-secret")))).
     Subscribe("binance", "btcusdt", "kline@5m", "book", "trade").
     AddStrategy(bondtrade.New, bondtrade.New).
     Symbols("btcusdt", "bnbusdt")
