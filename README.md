@@ -29,6 +29,8 @@ Install the builtin commands:
 go get -u github.com/c9s/bbgo/cmd/bbgo
 ```
 
+You will need `goose` to run these migration files: [migrations](migrations)
+
 ## Examples
 
 Please check out the example directory: [examples](examples)
