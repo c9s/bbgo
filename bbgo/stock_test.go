@@ -21,7 +21,7 @@ func TestStockManager(t *testing.T) {
 		err = json.Unmarshal(out, &trades)
 		assert.NoError(t, err)
 
-		var stockManager = &StockManager{
+		var stockManager = &StockDistribution{
 			TradingFeeCurrency: "BNB",
 			Symbol:             "BTCUSDT",
 		}
@@ -42,7 +42,7 @@ func TestStockManager(t *testing.T) {
 			{Symbol: "BTCUSDT", Price: 9200.0, Quantity: 0.01, IsBuyer: false},
 		}
 
-		var stockManager = &StockManager{
+		var stockManager = &StockDistribution{
 			TradingFeeCurrency: "BNB",
 			Symbol:             "BTCUSDT",
 		}
@@ -75,7 +75,7 @@ func TestStockManager(t *testing.T) {
 			{Symbol: "BTCUSDT", Price: 9200.0, Quantity: 0.05, IsBuyer: false},
 		}
 
-		var stockManager = &StockManager{
+		var stockManager = &StockDistribution{
 			TradingFeeCurrency: "BNB",
 			Symbol:             "BTCUSDT",
 		}
@@ -93,7 +93,7 @@ func TestStockManager(t *testing.T) {
 			{Symbol: "BTCUSDT", Price: 9200.0, Quantity: 0.05, IsBuyer: false},
 		}
 
-		var stockManager = &StockManager{
+		var stockManager = &StockDistribution{
 			TradingFeeCurrency: "BNB",
 			Symbol:             "BTCUSDT",
 		}
@@ -111,7 +111,7 @@ func TestStockManager(t *testing.T) {
 			{Symbol: "BTCUSDT", Price: 8000.0, Quantity: 0.01, IsBuyer: false},
 		}
 
-		var stockManager = &StockManager{
+		var stockManager = &StockDistribution{
 			TradingFeeCurrency: "BNB",
 			Symbol:             "BTCUSDT",
 		}
@@ -136,7 +136,7 @@ func TestStockManager(t *testing.T) {
 			{Symbol: "BTCUSDT", Price: 9100.0, Quantity: 0.05, IsBuyer: true},
 		}
 
-		var stockManager = &StockManager{
+		var stockManager = &StockDistribution{
 			TradingFeeCurrency: "BNB",
 			Symbol:             "BTCUSDT",
 		}
@@ -161,7 +161,7 @@ func TestStockManager(t *testing.T) {
 			{Symbol: "BTCUSDT", Price: 9100.0, Quantity: 0.05, IsBuyer: true},
 		}
 
-		var stockManager = &StockManager{
+		var stockManager = &StockDistribution{
 			TradingFeeCurrency: "BNB",
 			Symbol:             "BTCUSDT",
 		}

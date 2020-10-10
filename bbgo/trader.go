@@ -163,7 +163,7 @@ func (trader *Trader) Connect(ctx context.Context) (err error) {
 			}
 			session.Trades[symbol] = trades
 
-			stockManager := &StockManager{
+			stockManager := &StockDistribution{
 				Symbol:             symbol,
 				TradingFeeCurrency: tradingFeeCurrency,
 			}
@@ -211,7 +211,7 @@ func (trader *Trader) Initialize(ctx context.Context, startTime time.Time) error
 
 	log.Infof("%d trades loaded", len(trades))
 
-	stockManager := &StockManager{
+	stockManager := &StockDistribution{
 		Symbol:             trader.Symbol,
 		TradingFeeCurrency: tradingFeeCurrency,
 	}

@@ -20,7 +20,7 @@ type Context struct {
 
 	Balances                map[string]types.Balance
 	ProfitAndLossCalculator *accounting.ProfitAndLossCalculator
-	StockManager            *StockManager
+	StockManager            *StockDistribution
 }
 
 func (c *Context) SetCurrentPrice(price float64) {

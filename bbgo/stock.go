@@ -51,7 +51,7 @@ func (slice StockSlice) Quantity() (total float64) {
 	return round(total)
 }
 
-type StockManager struct {
+type StockDistribution struct {
 	mu sync.Mutex
 
 	Symbol             string
@@ -60,15 +60,15 @@ type StockManager struct {
 	PendingSells       StockSlice
 }
 
-type Distribution struct {
+type DistributionStats struct {
 	PriceLevels   []string              `json:"priceLevels"`
 	TotalQuantity float64               `json:"totalQuantity"`
 	Quantities    map[string]float64    `json:"quantities"`
 	Stocks        map[string]StockSlice `json:"stocks"`
 }
 
-func (m *StockManager) Distribution(level int) *Distribution {
-	var d = Distribution{
+func (m *StockDistribution) DistributionStats(level int) *DistributionStats {
+	var d = DistributionStats{
 		Quantities: map[string]float64{},
 		Stocks:     map[string]StockSlice{},
 	}
@@ -101,14 +101,14 @@ func (m *StockManager) Distribution(level int) *Distribution {
 	return &d
 }
 
-func (m *StockManager) stock(stock Stock) error {
+func (m *StockDistribution) stock(stock Stock) error {
 	m.mu.Lock()
 	m.Stocks = append(m.Stocks, stock)
 	m.mu.Unlock()
 	return m.flushPendingSells()
 }
 
-func (m *StockManager) squash() {
+func (m *StockDistribution) squash() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -121,7 +121,7 @@ func (m *StockManager) squash() {
 	m.Stocks = squashed
 }
 
-func (m *StockManager) flushPendingSells() error {
+func (m *StockDistribution) flushPendingSells() error {
 	if len(m.Stocks) == 0 || len(m.PendingSells) == 0 {
 		return nil
 	}
@@ -138,7 +138,7 @@ func (m *StockManager) flushPendingSells() error {
 	return nil
 }
 
-func (m *StockManager) consume(sell Stock) error {
+func (m *StockDistribution) consume(sell Stock) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -193,7 +193,7 @@ func (m *StockManager) consume(sell Stock) error {
 	return nil
 }
 
-func (m *StockManager) AddTrades(trades []types.Trade) (checkpoints []int, err error) {
+func (m *StockDistribution) AddTrades(trades []types.Trade) (checkpoints []int, err error) {
 	feeSymbol := strings.HasPrefix(m.Symbol, m.TradingFeeCurrency)
 	for idx, trade := range trades {
 		// for other market trades
