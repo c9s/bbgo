@@ -19,6 +19,14 @@ aims to release v1.0 before 11/14
 - MAX Exchange (located in Taiwan)
 - Binance Exchange
 
+## Installation
+
+Install the builtin commands:
+
+```sh
+go get -u github.com/c9s/bbgo/cmd/bbgo
+```
+
 ## Examples
 
 Please check out the example directory: [examples](examples)
