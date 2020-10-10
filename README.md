@@ -21,7 +21,7 @@ aims to release v1.0 before 11/14
 
 ## Examples
 
-Please check out the example directory: [examples]
+Please check out the example directory: [examples](examples)
 
 ## New Trading Bot API design
 
