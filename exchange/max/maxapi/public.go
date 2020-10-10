@@ -1,10 +1,17 @@
 package max
 
 import (
+	"fmt"
+	"io/ioutil"
 	"net/url"
+	"strconv"
+	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/valyala/fastjson"
+
+	"github.com/c9s/bbgo/types"
 )
 
 type PublicService struct {
@@ -139,4 +146,165 @@ func mustParseTicker(v *fastjson.Value) Ticker {
 		High:        string(v.GetStringBytes("high")),
 		Low:         string(v.GetStringBytes("low")),
 	}
+}
+
+type Interval int64
+
+func parseResolution(a string) (Interval, error) {
+	switch strings.ToLower(a) {
+
+	case "1m":
+		return 1, nil
+
+	case "5m":
+		return 5, nil
+
+	case "15m":
+		return 15, nil
+
+	case "30m":
+		return 30, nil
+
+	case "1h":
+		return 60, nil
+
+	case "3h":
+		return 60 * 3, nil
+
+	case "6h":
+		return 60 * 6, nil
+
+	case "12h":
+		return 60 * 12, nil
+
+	case "1d":
+		return 60 * 24, nil
+
+	case "3d":
+		return 60 * 24 * 3, nil
+
+	case "1w":
+		return 60 * 24 * 7, nil
+
+	}
+
+	return 0, errors.New("incorrect resolution")
+}
+
+type KLine struct {
+	Symbol                 string
+	Interval               string
+	StartTime, EndTime     time.Time
+	Open, High, Low, Close float64
+	Volume                 float64
+	Closed                 bool
+}
+
+func (k KLine) KLine() types.KLine {
+	return types.KLine{
+		Symbol:    k.Symbol,
+		Interval:  k.Interval,
+		StartTime: k.StartTime,
+		EndTime:   k.EndTime,
+		Open:      k.Open,
+		Close:     k.Close,
+		High:      k.High,
+		Low:       k.Low,
+		Volume:    k.Volume,
+		// QuoteVolume:    util.MustParseFloat(k.QuoteAssetVolume),
+		// LastTradeID:    0,
+		// NumberOfTrades: k.TradeNum,
+		Closed: k.Closed,
+	}
+}
+
+func (s *PublicService) KLines(symbol string, resolution string, start time.Time, limit int) ([]KLine, error) {
+	queries := url.Values{}
+	queries.Set("market", symbol)
+
+	interval, err := parseResolution(resolution)
+	if err != nil {
+		return nil, err
+	}
+	queries.Set("period", strconv.Itoa(int(interval)))
+
+	nilTime := time.Time{}
+	if start != nilTime {
+		queries.Set("timestamp", strconv.FormatInt(start.Unix(), 64))
+	}
+
+	if limit > 0 {
+		queries.Set("limit", strconv.Itoa(limit)) // default to 30, max limit = 10,000
+	}
+
+	req, err := s.client.newRequest("GET", fmt.Sprintf("%s/k", s.client.BaseURL), queries, nil)
+	if err != nil {
+		return nil, fmt.Errorf("request build error: %s", err.Error())
+	}
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %s", err.Error())
+	}
+
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			logger.WithError(err).Error("failed to close resp body")
+		}
+	}()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return parseKLines(body, symbol, resolution, interval)
+}
+
+func parseKLines(payload []byte, symbol, resolution string, interval Interval) (klines []KLine, err error) {
+	var parser fastjson.Parser
+
+	v, err := parser.ParseBytes(payload)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to parse payload: %s", payload)
+	}
+
+	arr, err := v.Array()
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get array: %s", payload)
+	}
+
+	for _, x := range arr {
+		slice, err := x.Array()
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to get array: %s", payload)
+		}
+
+		if len(slice) < 6 {
+			return nil, fmt.Errorf("unexpected length of ohlc elements: %s", payload)
+		}
+
+		ts, err := slice[0].Int64()
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse timestamp: %s", payload)
+		}
+
+		startTime := time.Unix(ts, 0).UTC()
+		endTime := time.Unix(ts, 0).Add(time.Duration(interval)*time.Minute - time.Millisecond).UTC()
+		isClosed := time.Now().Before(endTime)
+		klines = append(klines, KLine{
+			Symbol:    symbol,
+			Interval:  resolution,
+			StartTime: startTime,
+			EndTime:   endTime,
+			Open:      slice[1].GetFloat64(),
+			High:      slice[2].GetFloat64(),
+			Low:       slice[3].GetFloat64(),
+			Close:     slice[4].GetFloat64(),
+			Volume:    slice[5].GetFloat64(),
+			Closed:    isClosed,
+		})
+	}
+
+	return klines, nil
 }

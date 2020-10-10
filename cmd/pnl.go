@@ -13,15 +13,35 @@ import (
 
 	"github.com/c9s/bbgo/accounting"
 	"github.com/c9s/bbgo/bbgo"
-	binance2 "github.com/c9s/bbgo/exchange/binance"
+	"github.com/c9s/bbgo/exchange/binance"
+	"github.com/c9s/bbgo/exchange/max"
 	"github.com/c9s/bbgo/service"
 	"github.com/c9s/bbgo/types"
 )
 
 func init() {
+	PnLCmd.Flags().String("exchange", "", "target exchange")
 	PnLCmd.Flags().String("symbol", "BTCUSDT", "trading symbol")
 	PnLCmd.Flags().String("since", "", "pnl since time")
 	RootCmd.AddCommand(PnLCmd)
+}
+
+func newExchangeFromViper(n types.ExchangeName) types.Exchange {
+	switch n {
+
+	case types.ExchangeBinance:
+		key := viper.GetString("binance-api-key")
+		secret := viper.GetString("binance-api-secret")
+		return binance.New(key, secret)
+
+	case types.ExchangeMax:
+		key := viper.GetString("max-api-key")
+		secret := viper.GetString("max-api-secret")
+		return max.New(key, secret)
+
+	}
+
+	return nil
 }
 
 var PnLCmd = &cobra.Command{
@@ -31,14 +51,22 @@ var PnLCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 
+		exchangeNameStr, err := cmd.Flags().GetString("exchange")
+		if err != nil {
+			return err
+		}
+
+		exchangeName, err := types.ValidExchangeName(exchangeNameStr)
+		if err != nil {
+			return err
+		}
+
 		symbol, err := cmd.Flags().GetString("symbol")
 		if err != nil {
 			return err
 		}
 
-		binanceKey := viper.GetString("binance-api-key")
-		binanceSecret := viper.GetString("binance-api-secret")
-		binanceExchange := binance2.New(binanceKey, binanceSecret)
+		exchange := newExchangeFromViper(exchangeName)
 
 		mysqlURL := viper.GetString("mysql-url")
 		mysqlURL = fmt.Sprintf("%s?parseTime=true", mysqlURL)
@@ -69,12 +97,12 @@ var PnLCmd = &cobra.Command{
 		tradeSync := &service.TradeSync{Service: tradeService}
 
 		logrus.Info("syncing trades...")
-		if err := tradeSync.Sync(ctx, binanceExchange, symbol, startTime); err != nil {
+		if err := tradeSync.Sync(ctx, exchange, symbol, startTime); err != nil {
 			return err
 		}
 
 		var trades []types.Trade
-		tradingFeeCurrency := binanceExchange.PlatformFeeCurrency()
+		tradingFeeCurrency := exchange.PlatformFeeCurrency()
 		if strings.HasPrefix(symbol, tradingFeeCurrency) {
 			logrus.Infof("loading all trading fee currency related trades: %s", symbol)
 			trades, err = tradeService.QueryForTradingFeeCurrency(symbol, tradingFeeCurrency)
@@ -101,7 +129,7 @@ var PnLCmd = &cobra.Command{
 		logrus.Infof("found checkpoints: %+v", checkpoints)
 		logrus.Infof("stock: %f", stockManager.Stocks.Quantity())
 
-		currentPrice, err := binanceExchange.QueryAveragePrice(ctx, symbol)
+		currentPrice, err := exchange.QueryAveragePrice(ctx, symbol)
 
 		calculator := &accounting.ProfitAndLossCalculator{
 			TradingFeeCurrency: tradingFeeCurrency,
