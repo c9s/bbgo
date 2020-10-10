@@ -23,6 +23,28 @@ aims to release v1.0 before 11/14
 
 Please check out the example directory: [examples](examples)
 
+
+Initialize MAX API:
+
+```go
+
+key := os.Getenv("MAX_API_KEY")
+secret := os.Getenv("MAX_API_SECRET")
+
+maxRest := maxapi.NewRestClient(maxapi.ProductionAPIURL)
+maxRest.Auth(key, secret)
+```
+
+Creating user data stream to get the orderbook (depth):
+
+```go
+stream := max.NewStream(key, secret)
+stream.Subscribe(types.BookChannel, symbol, types.SubscribeOptions{})
+
+streambook := types.NewStreamBook(symbol)
+streambook.BindStream(stream)
+```
+
 ## New Trading Bot API design
 
 _**still under construction**_
