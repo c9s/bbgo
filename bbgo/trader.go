@@ -355,9 +355,6 @@ func (trader *Trader) RunStrategy(ctx context.Context, strategy MarketStrategy) 
 	}
 
 	stream := trader.Exchange.NewStream()
-	if err != nil {
-		return nil, err
-	}
 
 	// bind kline store to the stream
 	klineStore := NewMarketDataStore()
