@@ -264,7 +264,7 @@ func convertRemoteTrade(t maxapi.Trade) (*types.Trade, error) {
 		IsBuyer:       t.IsBuyer(),
 		IsMaker:       t.IsMaker(),
 		Fee:           fee,
-		FeeCurrency:   t.FeeCurrency,
+		FeeCurrency:   toGlobalCurrency(t.FeeCurrency),
 		QuoteQuantity: quoteQuantity,
 		Time:          mts,
 	}, nil
