@@ -19,12 +19,12 @@ import (
 )
 
 func init() {
-	pnlCmd.Flags().String("symbol", "BTCUSDT", "trading symbol")
-	pnlCmd.Flags().String("since", "", "pnl since time")
-	RootCmd.AddCommand(pnlCmd)
+	PnLCmd.Flags().String("symbol", "BTCUSDT", "trading symbol")
+	PnLCmd.Flags().String("since", "", "pnl since time")
+	RootCmd.AddCommand(PnLCmd)
 }
 
-var pnlCmd = &cobra.Command{
+var PnLCmd = &cobra.Command{
 	Use:          "pnl",
 	Short:        "pnl calculator",
 	SilenceUsage: true,
