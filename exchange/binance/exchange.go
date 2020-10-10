@@ -279,6 +279,7 @@ func toLocalOrderType(orderType types.OrderType) (binance.OrderType, error) {
 }
 
 func (e *Exchange) QueryKLines(ctx context.Context, symbol, interval string, options types.KLineQueryOptions) ([]types.KLine, error) {
+
 	var limit = 500
 	if options.Limit > 0 {
 		// default limit == 500
@@ -287,6 +288,8 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol, interval string, opt
 
 	log.Infof("querying kline %s %s %v", symbol, interval, options)
 
+	// avoid rate limit
+	time.Sleep(100 * time.Millisecond)
 	req := e.Client.NewKlinesService().
 		Symbol(symbol).
 		Interval(interval).
@@ -362,43 +365,6 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	}
 
 	return trades, nil
-}
-
-func (e *Exchange) BatchQueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (allTrades []types.Trade, err error) {
-	var startTime = time.Now().Add(-7 * 24 * time.Hour)
-	if options.StartTime != nil {
-		startTime = *options.StartTime
-	}
-
-	log.Infof("querying %s trades from %s", symbol, startTime)
-
-	var lastTradeID = options.LastTradeID
-	for {
-		trades, err := e.QueryTrades(ctx, symbol, &types.TradeQueryOptions{
-			StartTime:   &startTime,
-			Limit:       options.Limit,
-			LastTradeID: lastTradeID,
-		})
-		if err != nil {
-			return allTrades, err
-		}
-
-		if len(trades) == 1 && trades[0].ID == lastTradeID {
-			break
-		}
-
-		for _, t := range trades {
-			// ignore the first trade if last TradeID is given
-			if t.ID == lastTradeID {
-				continue
-			}
-
-			allTrades = append(allTrades, t)
-			lastTradeID = t.ID
-		}
-	}
-
-	return allTrades, nil
 }
 
 func convertRemoteTrade(t binance.TradeV3) (*types.Trade, error) {
@@ -479,9 +445,10 @@ func (e *Exchange) BatchQueryKLines(ctx context.Context, symbol, interval string
 }
 
 func (e *Exchange) BatchQueryKLineWindows(ctx context.Context, symbol string, intervals []string, startTime, endTime time.Time) (map[string]types.KLineWindow, error) {
+	batch := &types.ExchangeBatchProcessor{Exchange: e}
 	klineWindows := map[string]types.KLineWindow{}
 	for _, interval := range intervals {
-		klines, err := e.BatchQueryKLines(ctx, symbol, interval, startTime, endTime)
+		klines, err := batch.BatchQueryKLines(ctx, symbol, interval, startTime, endTime)
 		if err != nil {
 			return klineWindows, err
 		}

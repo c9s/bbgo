@@ -29,7 +29,8 @@ func (s *TradeSync) Sync(ctx context.Context, exchange types.Exchange, symbol st
 		log.Infof("found last trade, start from lastID = %d since %s", lastTrade.ID, startTime)
 	}
 
-	trades, err := exchange.BatchQueryTrades(ctx, symbol, &types.TradeQueryOptions{
+	batch := &types.ExchangeBatchProcessor{Exchange: exchange}
+	trades, err := batch.BatchQueryTrades(ctx, symbol, &types.TradeQueryOptions{
 		StartTime:   &startTime,
 		Limit:       200,
 		LastTradeID: lastID,
