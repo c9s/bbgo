@@ -6,4 +6,4 @@ go:
 before_script:
  - go mod download
 script:
- - go build
+ - go test -v ./...
