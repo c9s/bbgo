@@ -12,6 +12,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"reflect"
 	"regexp"
 	"strconv"
 	"sync/atomic"
@@ -141,6 +142,8 @@ func (c *RestClient) initNonce() {
 
 	// 1 is for the request count mod 0.000 to 0.999
 	timeOffset = serverTimestamp - clientTime.Unix() - 1
+
+	logger.Infof("loaded max server timestamp: %d offset=%d", serverTimestamp, timeOffset)
 }
 
 func (c *RestClient) getNonce() int64 {
@@ -166,6 +169,7 @@ func (c *RestClient) newRequest(method string, refURL string, params url.Values,
 		return nil, err
 	}
 
+	req.Header.Add("User-Agent", UserAgent)
 	return req, nil
 }
 
@@ -191,13 +195,16 @@ func (c *RestClient) newAuthenticatedRequest(m string, refURL string, data inter
 
 		p, err = json.Marshal(payload)
 
-	case PrivateRequestParams:
-		d.Nonce = c.getNonce()
-		d.Path = c.BaseURL.ResolveReference(rel).Path
-
 	default:
-		return nil, errors.New("unsupported payload type")
+		params, err := getPrivateRequestParamsObject(data)
+		if err != nil {
+			return nil, errors.Wrapf(err, "unsupported payload type: %T", d)
+		}
 
+		params.Nonce = c.getNonce()
+		params.Path = c.BaseURL.ResolveReference(rel).Path
+
+		p, err = json.Marshal(d)
 	}
 
 	if err != nil {
@@ -226,6 +233,39 @@ func (c *RestClient) newAuthenticatedRequest(m string, refURL string, data inter
 	req.Header.Add("X-MAX-SIGNATURE", signPayload(encoded, c.APISecret))
 
 	return req, nil
+}
+
+func getPrivateRequestParamsObject(v interface{}) (*PrivateRequestParams, error) {
+	vt := reflect.ValueOf(v)
+
+	if vt.Kind() == reflect.Ptr {
+		vt = vt.Elem()
+	}
+
+
+	if vt.Kind() != reflect.Struct {
+		return nil, errors.New("reflect error: given object is not a struct" + vt.Kind().String())
+	}
+
+	if !vt.CanSet() {
+		return nil, errors.New("reflect error: can not set object")
+	}
+
+	field := vt.FieldByName("PrivateRequestParams")
+	if !field.IsValid() {
+		return nil, errors.New("reflect error: field PrivateRequestParams not found")
+	}
+
+	if field.IsNil() {
+		field.Set(reflect.ValueOf(&PrivateRequestParams{}))
+	}
+
+	params, ok := field.Interface().(*PrivateRequestParams)
+	if !ok {
+		return nil, errors.New("reflect error: failed to cast value to *PrivateRequestParams")
+	}
+
+	return params, nil
 }
 
 func signPayload(payload string, secret string) string {

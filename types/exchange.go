@@ -2,10 +2,30 @@ package types
 
 import (
 	"context"
+	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
+
+type ExchangeName string
+
+const (
+	ExchangeMax     = ExchangeName("max")
+	ExchangeBinance = ExchangeName("binance")
+)
+
+func ValidExchangeName(a string) (ExchangeName, error) {
+	switch strings.ToLower(a) {
+	case "max":
+		return ExchangeMax, nil
+	case "binance", "bn":
+		return ExchangeBinance, nil
+	}
+
+	return "", errors.New("invalid exchange name")
+}
 
 type Exchange interface {
 	PlatformFeeCurrency() string
@@ -19,6 +39,8 @@ type Exchange interface {
 	QueryKLines(ctx context.Context, symbol string, interval string, options KLineQueryOptions) ([]KLine, error)
 
 	QueryTrades(ctx context.Context, symbol string, options *TradeQueryOptions) ([]Trade, error)
+
+	QueryAveragePrice(ctx context.Context, symbol string) (float64, error)
 
 	SubmitOrder(ctx context.Context, order *SubmitOrder) error
 }
@@ -58,17 +80,17 @@ func (e ExchangeBatchProcessor) BatchQueryKLines(ctx context.Context, symbol, in
 	return allKLines, err
 }
 
-
 func (e ExchangeBatchProcessor) BatchQueryTrades(ctx context.Context, symbol string, options *TradeQueryOptions) (allTrades []Trade, err error) {
+	// last 7 days
 	var startTime = time.Now().Add(-7 * 24 * time.Hour)
 	if options.StartTime != nil {
 		startTime = *options.StartTime
 	}
 
-	log.Infof("querying %s trades from %s", symbol, startTime)
-
 	var lastTradeID = options.LastTradeID
 	for {
+		log.Infof("querying %s trades from %s, limit=%d", symbol, startTime, options.Limit)
+
 		trades, err := e.QueryTrades(ctx, symbol, &TradeQueryOptions{
 			StartTime:   &startTime,
 			Limit:       options.Limit,
@@ -78,9 +100,17 @@ func (e ExchangeBatchProcessor) BatchQueryTrades(ctx context.Context, symbol str
 			return allTrades, err
 		}
 
+		if len(trades) == 0 {
+			break
+		}
+
 		if len(trades) == 1 && trades[0].ID == lastTradeID {
 			break
 		}
+
+		log.Infof("returned %d trades", len(trades))
+
+		startTime = trades[len(trades)-1].Time
 
 		for _, t := range trades {
 			// ignore the first trade if last TradeID is given

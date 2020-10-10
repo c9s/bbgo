@@ -7,6 +7,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
+
 	maxapi "github.com/c9s/bbgo/exchange/max/maxapi"
 	"github.com/c9s/bbgo/types"
 	"github.com/c9s/bbgo/util"
@@ -101,7 +104,7 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 
 func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
 	req := e.client.TradeService.NewPrivateTradeRequest()
-	req.Market(symbol)
+	req.Market(toLocalSymbol(symbol))
 
 	if options.Limit > 0 {
 		req.Limit(options.Limit)
@@ -111,6 +114,9 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		req.From(options.LastTradeID)
 	}
 
+	// make it compatible with binance, we need the last trade id for the next page.
+	req.OrderBy("asc")
+
 	remoteTrades, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
@@ -119,13 +125,58 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	for _, t := range remoteTrades {
 		localTrade, err := convertRemoteTrade(t)
 		if err != nil {
-			logger.WithError(err).Errorf("can not convert binance trade: %+v", t)
+			logger.WithError(err).Errorf("can not convert trade: %+v", t)
 			continue
 		}
+
+		logger.Infof("T: id=%d % 4s %s P=%f Q=%f %s", localTrade.ID, localTrade.Symbol, localTrade.Side, localTrade.Price, localTrade.Quantity, localTrade.Time)
+
 		trades = append(trades, *localTrade)
 	}
 
 	return trades, nil
+}
+
+func (e *Exchange) QueryKLines(ctx context.Context, symbol, interval string, options types.KLineQueryOptions) ([]types.KLine, error) {
+	var limit = 5000
+	if options.Limit > 0 {
+		// default limit == 500
+		limit = options.Limit
+	}
+
+	if options.StartTime == nil {
+		return nil, errors.New("start time can not be empty")
+	}
+
+	if options.EndTime != nil {
+		return nil, errors.New("end time is not supported")
+	}
+
+	log.Infof("querying kline %s %s %v", symbol, interval, options)
+
+	// avoid rate limit
+	time.Sleep(100 * time.Millisecond)
+
+	localKlines, err := e.client.PublicService.KLines(toLocalSymbol(symbol), interval, *options.StartTime, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	var kLines []types.KLine
+	for _, k := range localKlines {
+		kLines = append(kLines, k.KLine())
+	}
+
+	return kLines, nil
+}
+
+func (e *Exchange) QueryAveragePrice(ctx context.Context, symbol string) (float64, error) {
+	ticker, err := e.client.PublicService.Ticker(toLocalSymbol(symbol))
+	if err != nil {
+		return 0, err
+	}
+
+	return (util.MustParseFloat(ticker.Sell) + util.MustParseFloat(ticker.Buy)) / 2, nil
 }
 
 func toGlobalCurrency(currency string) string {
@@ -134,6 +185,14 @@ func toGlobalCurrency(currency string) string {
 
 func toLocalCurrency(currency string) string {
 	return strings.ToLower(currency)
+}
+
+func toLocalSymbol(symbol string) string {
+	return strings.ToLower(symbol)
+}
+
+func toGlobalSymbol(symbol string) string {
+	return strings.ToLower(symbol)
 }
 
 func toLocalSideType(side types.SideType) string {
@@ -147,6 +206,9 @@ func toGlobalSideType(v string) string {
 
 	case "ask":
 		return "SELL"
+
+	case "self-trade":
+		return "SELF"
 
 	}
 
@@ -195,7 +257,7 @@ func convertRemoteTrade(t maxapi.Trade) (*types.Trade, error) {
 	return &types.Trade{
 		ID:            int64(t.ID),
 		Price:         price,
-		Symbol:        t.Market,
+		Symbol:        toGlobalSymbol(t.Market),
 		Exchange:      "max",
 		Quantity:      quantity,
 		Side:          side,

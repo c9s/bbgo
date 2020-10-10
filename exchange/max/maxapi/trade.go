@@ -138,7 +138,7 @@ type PrivateRequestParams struct {
 }
 
 type PrivateTradeRequestParams struct {
-	PrivateRequestParams
+	*PrivateRequestParams
 
 	Market string `json:"market"`
 
@@ -202,7 +202,7 @@ func (r *PrivateTradeRequest) OrderBy(orderBy string) *PrivateTradeRequest {
 }
 
 func (r *PrivateTradeRequest) Do(ctx context.Context) (trades []Trade, err error) {
-	req, err := r.client.newAuthenticatedRequest("GET", "v2/trades/my", r.params)
+	req, err := r.client.newAuthenticatedRequest("GET", "v2/trades/my", &r.params)
 	if err != nil {
 		return trades, err
 	}
