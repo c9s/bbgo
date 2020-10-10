@@ -27,7 +27,6 @@ Please check out the example directory: [examples](examples)
 Initialize MAX API:
 
 ```go
-
 key := os.Getenv("MAX_API_KEY")
 secret := os.Getenv("MAX_API_SECRET")
 
