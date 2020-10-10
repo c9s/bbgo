@@ -1,0 +1,6 @@
+---
+language: go
+before_script:
+ - go mod download
+script:
+ - go build
