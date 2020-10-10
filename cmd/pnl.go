@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/adshao/go-binance"
 	"github.com/jmoiron/sqlx"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -17,7 +16,6 @@ import (
 	binance2 "github.com/c9s/bbgo/exchange/binance"
 	"github.com/c9s/bbgo/service"
 	"github.com/c9s/bbgo/types"
-	"github.com/c9s/bbgo/util"
 )
 
 func init() {
@@ -38,11 +36,9 @@ var pnlCmd = &cobra.Command{
 			return err
 		}
 
-		binanceKey := viper.GetString("bn-key")
-		binanceSecret := viper.GetString("bn-secret")
-
-		binanceClient := binance.NewClient(binanceKey, binanceSecret)
-		binanceExchange := &binance2.Exchange{Client: binanceClient}
+		binanceKey := viper.GetString("binance-api-key")
+		binanceSecret := viper.GetString("binance-api-secret")
+		binanceExchange := binance2.New(binanceKey, binanceSecret)
 
 		mysqlURL := viper.GetString("mysql-url")
 		mysqlURL = fmt.Sprintf("%s?parseTime=true", mysqlURL)
@@ -105,12 +101,7 @@ var pnlCmd = &cobra.Command{
 		logrus.Infof("found checkpoints: %+v", checkpoints)
 		logrus.Infof("stock: %f", stockManager.Stocks.Quantity())
 
-		// query the last average price so that we can calculate the pnl
-		resp, err := binanceClient.NewAveragePriceService().Symbol(symbol).Do(ctx)
-		if err != nil {
-			return err
-		}
-		currentPrice := util.MustParseFloat(resp.Price)
+		currentPrice, err := binanceExchange.QueryAveragePrice(ctx, symbol)
 
 		calculator := &accounting.ProfitAndLossCalculator{
 			TradingFeeCurrency: tradingFeeCurrency,
