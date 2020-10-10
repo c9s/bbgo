@@ -6,7 +6,9 @@ A trading bot framework written in Go. The name bbgo comes from the BB8 bot in t
 
 _Working hard in progress_
 
-aims to release v1.0 before 11/14
+[![Build Status](https://travis-ci.org/c9s/bbgo.svg?branch=main)](https://travis-ci.org/c9s/bbgo)
+
+Aim to release v1.0 before 11/14
 
 ## Features
 
