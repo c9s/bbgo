@@ -46,7 +46,7 @@ func Run() {
 
 	// setup the config paths for looking up the config file
 	viper.AddConfigPath("config")
-	viper.AddConfigPath("$HOME/config")
+	viper.AddConfigPath("$HOME/.bbgo")
 	viper.AddConfigPath("/etc/bbgo")
 
 	// set the config file name and format for loading the config file.
