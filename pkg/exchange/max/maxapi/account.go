@@ -118,7 +118,7 @@ type Deposit struct {
 	Fee             string `json:"fee"`
 	TxID            string `json:"txid"`
 	State           string `json:"state"`
-	Confirmations   int    `json:"confirmations"`
+	Confirmations   string    `json:"confirmations"`
 	CreatedAt       int64  `json:"created_at"`
 	UpdatedAt       int64  `json:"updated_at"`
 }
@@ -129,7 +129,7 @@ type GetDepositHistoryRequestParams struct {
 	Currency string `json:"currency"`
 	From     int64  `json:"from,omitempty"`  // seconds
 	To       int64  `json:"to,omitempty"`    // seconds
-	State    string `json:"state,omitempty"` // submitting, submitted, rejected, accepted, checking, refunded, cancelled, suspect
+	State    string `json:"state,omitempty"` // submitting, submitted, rejected, accepted, checking, refunded, canceled, suspect
 	Limit    int    `json:"limit,omitempty"`
 }
 
@@ -183,6 +183,92 @@ func (r *GetDepositHistoryRequest) Do(ctx context.Context) (deposits []Deposit, 
 
 func (s *AccountService) NewGetDepositHistoryRequest() *GetDepositHistoryRequest {
 	return &GetDepositHistoryRequest{
+		client: s.client,
+	}
+}
+
+
+
+type Withdraw struct {
+	UUID string `json:"uuid"`
+	Currency        string `json:"currency"`
+	CurrencyVersion string `json:"currency_version"` // "eth"
+	Amount          string `json:"amount"`
+	Fee             string `json:"fee"`
+	TxID            string `json:"txid"`
+
+	// State can be "submitting", "submitted",
+	//     "rejected", "accepted", "suspect", "approved", "delisted_processing",
+	//     "processing", "retryable", "sent", "canceled",
+	//     "failed", "pending", "confirmed",
+	//     "kgi_manually_processing", "kgi_manually_confirmed", "kgi_possible_failed",
+	//     "sygna_verifying"
+	State           string `json:"state"`
+	Confirmations   int    `json:"confirmations"`
+	CreatedAt       int64  `json:"created_at"`
+	UpdatedAt       int64  `json:"updated_at"`
+}
+
+type GetWithdrawHistoryRequestParams struct {
+	*PrivateRequestParams
+
+	Currency string `json:"currency"`
+	From     int64  `json:"from,omitempty"`  // seconds
+	To       int64  `json:"to,omitempty"`    // seconds
+	State    string `json:"state,omitempty"` // submitting, submitted, rejected, accepted, checking, refunded, canceled, suspect
+	Limit    int    `json:"limit,omitempty"`
+}
+
+type GetWithdrawHistoryRequest struct {
+	client *RestClient
+	params GetWithdrawHistoryRequestParams
+}
+
+func (r *GetWithdrawHistoryRequest) State(state string) *GetWithdrawHistoryRequest {
+	r.params.State = state
+	return r
+}
+
+func (r *GetWithdrawHistoryRequest) Currency(currency string) *GetWithdrawHistoryRequest {
+	r.params.Currency = currency
+	return r
+}
+
+func (r *GetWithdrawHistoryRequest) Limit(limit int) *GetWithdrawHistoryRequest {
+	r.params.Limit = limit
+	return r
+}
+
+func (r *GetWithdrawHistoryRequest) From(from int64) *GetWithdrawHistoryRequest {
+	r.params.From = from
+	return r
+}
+
+func (r *GetWithdrawHistoryRequest) To(to int64) *GetWithdrawHistoryRequest {
+	r.params.To = to
+	return r
+}
+
+func (r *GetWithdrawHistoryRequest) Do(ctx context.Context) (withdraws []Withdraw, err error) {
+	req, err := r.client.newAuthenticatedRequest("GET", "v2/withdrawals", &r.params)
+	if err != nil {
+		return withdraws, err
+	}
+
+	response, err := r.client.sendRequest(req)
+	if err != nil {
+		return withdraws, err
+	}
+
+	if err := response.DecodeJSON(&withdraws); err != nil {
+		return withdraws, err
+	}
+
+	return withdraws, err
+}
+
+func (s *AccountService) NewGetWithdrawalHistoryRequest() *GetWithdrawHistoryRequest {
+	return &GetWithdrawHistoryRequest{
 		client: s.client,
 	}
 }
