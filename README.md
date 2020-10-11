@@ -68,6 +68,20 @@ dotenv -f .env.local -- bbgo migrate redo
 
 (It internally uses `goose` to run these migration files, see [migrations](migrations))
 
+
+To query transfer history:
+
+```sh
+dotenv -f .env.local -- bbgo transfer-history --exchange max --asset USDT --since "2019-01-01"
+```
+
+To calculate pnl:
+
+```sh
+dotenv -f .env.local -- bbgo pnl --exchange binance --asset BTC --since "2019-01-01"
+```
+
+
 ## Examples
 
 Please check out the example directory: [examples](examples)
