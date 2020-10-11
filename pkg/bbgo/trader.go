@@ -90,7 +90,7 @@ type Trader struct {
 	// Context is trading Context
 	Context *Context
 
-	Exchange *binance.Exchange
+	Exchange types.Exchange
 
 	reportTimer *time.Timer
 
@@ -103,7 +103,7 @@ type Trader struct {
 	ExchangeSessions map[string]*ExchangeSession
 }
 
-func New(db *sqlx.DB, exchange *binance.Exchange, symbol string) *Trader {
+func New(db *sqlx.DB, exchange types.Exchange, symbol string) *Trader {
 	tradeService := &service.TradeService{DB: db}
 	return &Trader{
 		Symbol:       symbol,

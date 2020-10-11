@@ -17,7 +17,7 @@ type Account struct {
 	Balances map[string]types.Balance
 }
 
-func LoadAccount(ctx context.Context, exchange *binance.Exchange) (*Account, error) {
+func LoadAccount(ctx context.Context, exchange types.Exchange) (*Account, error) {
 	balances, err := exchange.QueryAccountBalances(ctx)
 	return &Account{
 		Balances: balances,
