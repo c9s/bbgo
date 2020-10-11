@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -24,6 +24,12 @@ func init() {
 	PnLCmd.Flags().String("symbol", "BTCUSDT", "trading symbol")
 	PnLCmd.Flags().String("since", "", "pnl since time")
 	RootCmd.AddCommand(PnLCmd)
+}
+
+func connectMysql() (*sqlx.DB, error) {
+	mysqlURL := viper.GetString("mysql-url")
+	mysqlURL = fmt.Sprintf("%s?parseTime=true", mysqlURL)
+	return sqlx.Connect("mysql", mysqlURL)
 }
 
 func newExchangeFromViper(n types.ExchangeName) types.Exchange {
@@ -68,9 +74,7 @@ var PnLCmd = &cobra.Command{
 
 		exchange := newExchangeFromViper(exchangeName)
 
-		mysqlURL := viper.GetString("mysql-url")
-		mysqlURL = fmt.Sprintf("%s?parseTime=true", mysqlURL)
-		db, err := sqlx.Connect("mysql", mysqlURL)
+		db, err := connectMysql()
 		if err != nil {
 			return err
 		}
@@ -96,7 +100,7 @@ var PnLCmd = &cobra.Command{
 		tradeService := &service.TradeService{DB: db}
 		tradeSync := &service.TradeSync{Service: tradeService}
 
-		logrus.Info("syncing trades...")
+		log.Info("syncing trades from exchange...")
 		if err := tradeSync.Sync(ctx, exchange, symbol, startTime); err != nil {
 			return err
 		}
@@ -104,7 +108,7 @@ var PnLCmd = &cobra.Command{
 		var trades []types.Trade
 		tradingFeeCurrency := exchange.PlatformFeeCurrency()
 		if strings.HasPrefix(symbol, tradingFeeCurrency) {
-			logrus.Infof("loading all trading fee currency related trades: %s", symbol)
+			log.Infof("loading all trading fee currency related trades: %s", symbol)
 			trades, err = tradeService.QueryForTradingFeeCurrency(symbol, tradingFeeCurrency)
 		} else {
 			trades, err = tradeService.Query(symbol)
@@ -114,7 +118,7 @@ var PnLCmd = &cobra.Command{
 			return err
 		}
 
-		logrus.Infof("%d trades loaded", len(trades))
+		log.Infof("%d trades loaded", len(trades))
 
 		stockManager := &bbgo.StockDistribution{
 			Symbol:             symbol,
@@ -126,8 +130,8 @@ var PnLCmd = &cobra.Command{
 			return err
 		}
 
-		logrus.Infof("found checkpoints: %+v", checkpoints)
-		logrus.Infof("stock: %f", stockManager.Stocks.Quantity())
+		log.Infof("found checkpoints: %+v", checkpoints)
+		log.Infof("stock: %f", stockManager.Stocks.Quantity())
 
 		currentPrice, err := exchange.QueryAveragePrice(ctx, symbol)
 
