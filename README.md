@@ -15,6 +15,7 @@ Aim to release v1.0 before 11/14
 - Exchange abstraction interface
 - Stream integration (user data websocket)
 - PnL calculation.
+- Slack notification
 
 ## Supported Exchanges
 
