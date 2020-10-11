@@ -48,6 +48,11 @@ MYSQL_DATABASE=bbgo
 MYSQL_URL=root@tcp(127.0.0.1:3306)/bbgo
 ```
 
+You can get your API key and secret after you register the accounts:
+
+- For MAX: <https://max.maicoin.com/signup?r=c7982718>
+- For Binance: <https://www.binancezh.com/en/register?ref=VGDGLT80>
+
 Then run the `migrate` command to initialize your database:
 
 ```sh
@@ -126,15 +131,23 @@ t.AddCrossExchangeStrategy(hedgemaker.New(...))
 
 ## Support
 
+### Contribute pull requests
+
+Any pull request is welcome, documentation, format fixing, testing, features.
+
+### Register account with referral ID
+
 You may register your exchange account with my referral ID to support this project.
 
 - For MAX Exchange: <https://max.maicoin.com/signup?r=c7982718> (default commission rate to your account)
 - For Binance Exchange: <https://www.binancezh.com/en/register?ref=VGDGLT80> (5% commission back to your account)
 
-Or support this project by cryptocurrency:
+### Some cryptos
 
-- BTC omni `3J6XQJNWT56amqz9Hz2BEVQ7W4aNmb5kiU`
-- USDT erc20 `0x63E5805e027548A384c57E20141f6778591Bac6F`
+To support this project by some small amount cryptos:
+
+- BTC address `3J6XQJNWT56amqz9Hz2BEVQ7W4aNmb5kiU`
+- USDT ERC20 address `0x63E5805e027548A384c57E20141f6778591Bac6F`
 
 ## License
 
