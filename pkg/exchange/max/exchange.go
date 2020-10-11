@@ -83,6 +83,52 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	}, nil
 }
 
+func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since, until time.Time) (allDeposits []types.Deposit, err error) {
+	deposits, err := e.client.AccountService.NewGetDepositHistoryRequest().
+		Currency(asset).
+		From(since.Unix()).
+		To(until.Unix()).Do(ctx)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for _, d := range deposits {
+		allDeposits = append(allDeposits, types.Deposit{
+			Time:          time.Unix(d.CreatedAt, 0),
+			Amount:        util.MustParseFloat(d.Amount),
+			Asset:         d.Currency,
+			Address:       "", // not supported
+			AddressTag:    "", // not supported
+			TransactionID: d.TxID,
+			Status:        convertDepositState(d.State),
+		})
+	}
+
+	return allDeposits, err
+}
+
+func convertDepositState(a string) types.DepositStatus {
+	switch a {
+	case "submitting", "submitted", "checking":
+		return types.DepositPending
+
+	case "accepted":
+		return types.DepositSuccess
+
+	case "rejected":
+		return types.DepositRejected
+
+	case "cancelled":
+		return types.DepositCancelled
+
+	case "suspect", "refunded":
+
+	}
+
+	return types.DepositStatus(a)
+}
+
 func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
 	accounts, err := e.client.AccountService.Accounts()
 	if err != nil {
