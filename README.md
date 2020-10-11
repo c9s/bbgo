@@ -29,12 +29,43 @@ Install the builtin commands:
 go get -u github.com/c9s/bbgo/cmd/bbgo
 ```
 
-You will need `goose` to run these migration files: [migrations](migrations)
+Add your dotenv file:
+
+```
+SLACK_TOKEN=
+
+BINANCE_API_KEY=
+BINANCE_API_SECRET=
+
+MAX_API_KEY=
+MAX_API_SECRET=
+
+MYSQL_HOST=127.0.0.1
+MYSQL_PORT=3306
+MYSQL_USERNAME=root
+MYSQL_PASSWORD=
+MYSQL_DATABASE=bbgo
+MYSQL_URL=root@tcp(127.0.0.1:3306)/bbgo
+```
+
+Then run the `migrate` command to initialize your database:
+
+```sh
+dotenv -f .env.local -- bbgo migrate up
+```
+
+There are some other commands you can run:
+
+```sh
+dotenv -f .env.local -- bbgo migrate status
+dotenv -f .env.local -- bbgo migrate redo
+```
+
+(It internally uses `goose` to run these migration files, see [migrations](migrations))
 
 ## Examples
 
 Please check out the example directory: [examples](examples)
-
 
 Initialize MAX API:
 
