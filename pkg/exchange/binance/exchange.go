@@ -33,6 +33,10 @@ func New(key, secret string) *Exchange {
 	}
 }
 
+func (e *Exchange) Name() types.ExchangeName {
+	return types.ExchangeBinance
+}
+
 func (e *Exchange) QueryAveragePrice(ctx context.Context, symbol string) (float64, error) {
 	resp, err := e.Client.NewAveragePriceService().Symbol(symbol).Do(ctx)
 	if err != nil {
@@ -46,22 +50,7 @@ func (e *Exchange) NewStream() types.Stream {
 	return NewStream(e.Client)
 }
 
-type Withdraw struct {
-	ID         string  `json:"id"`
-	Asset      string  `json:"asset"`
-	Amount     float64 `json:"amount"`
-	Address    string  `json:"address"`
-	AddressTag string  `json:"addressTag"`
-	Status     string  `json:"status"`
-
-	TransactionID   string    `json:"txId"`
-	TransactionFee  float64   `json:"transactionFee"`
-	WithdrawOrderID string    `json:"withdrawOrderId"`
-	ApplyTime       time.Time `json:"applyTime"`
-	Network         string    `json:"network"`
-}
-
-func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (allWithdraws []Withdraw, err error) {
+func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (allWithdraws []types.Withdraw, err error) {
 
 	startTime := since
 	txIDs := map[string]struct{}{}
@@ -80,7 +69,7 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 			Do(ctx)
 
 		if err != nil {
-			return nil, err
+			return allWithdraws, err
 		}
 
 		for _, d := range withdraws {
@@ -88,7 +77,6 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 				continue
 			}
 
-			// 0(0:pending,6: credited but cannot withdraw, 1:success)
 			status := ""
 			switch d.Status {
 			case 0:
@@ -111,7 +99,7 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 			}
 
 			txIDs[d.TxID] = struct{}{}
-			allWithdraws = append(allWithdraws, Withdraw{
+			allWithdraws = append(allWithdraws, types.Withdraw{
 				ApplyTime:       time.Unix(0, d.ApplyTime*int64(time.Millisecond)),
 				Asset:           d.Asset,
 				Amount:          d.Amount,

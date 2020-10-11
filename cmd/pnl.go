@@ -20,10 +20,10 @@ import (
 )
 
 func init() {
-	PnLCmd.Flags().String("exchange", "", "target exchange")
-	PnLCmd.Flags().String("symbol", "BTCUSDT", "trading symbol")
-	PnLCmd.Flags().String("since", "", "pnl since time")
-	RootCmd.AddCommand(PnLCmd)
+	pnlCmd.Flags().String("exchange", "", "target exchange")
+	pnlCmd.Flags().String("symbol", "BTCUSDT", "trading symbol")
+	pnlCmd.Flags().String("since", "", "pnl since time")
+	RootCmd.AddCommand(pnlCmd)
 }
 
 func connectMysql() (*sqlx.DB, error) {
@@ -50,7 +50,7 @@ func newExchange(n types.ExchangeName) types.Exchange {
 	return nil
 }
 
-var PnLCmd = &cobra.Command{
+var pnlCmd = &cobra.Command{
 	Use:          "pnl",
 	Short:        "pnl calculator",
 	SilenceUsage: true,
