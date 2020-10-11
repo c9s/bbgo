@@ -13,11 +13,11 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/c9s/bbgo/cmd/cmdutil"
-	"github.com/c9s/bbgo/exchange/max"
-	maxapi "github.com/c9s/bbgo/exchange/max/maxapi"
-	"github.com/c9s/bbgo/fixedpoint"
-	"github.com/c9s/bbgo/types"
-	"github.com/c9s/bbgo/util"
+	"github.com/c9s/bbgo/pkg/exchange/max"
+	maxapi "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 func init() {

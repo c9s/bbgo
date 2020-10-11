@@ -11,12 +11,12 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/c9s/bbgo/accounting"
-	"github.com/c9s/bbgo/bbgo"
-	"github.com/c9s/bbgo/exchange/binance"
-	"github.com/c9s/bbgo/exchange/max"
-	"github.com/c9s/bbgo/service"
-	"github.com/c9s/bbgo/types"
+	"github.com/c9s/bbgo/pkg/accounting"
+	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/exchange/binance"
+	"github.com/c9s/bbgo/pkg/exchange/max"
+	"github.com/c9s/bbgo/pkg/service"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 func init() {
