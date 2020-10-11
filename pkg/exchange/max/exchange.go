@@ -30,6 +30,10 @@ func New(key, secret string) *Exchange {
 	}
 }
 
+func (e *Exchange) Name() types.ExchangeName {
+	return types.ExchangeMax
+}
+
 func (e *Exchange) NewStream() types.Stream {
 	return NewStream(e.key, e.secret)
 }
@@ -83,26 +87,110 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	}, nil
 }
 
-func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since, until time.Time) (allDeposits []types.Deposit, err error) {
-	deposits, err := e.client.AccountService.NewGetDepositHistoryRequest().
-		Currency(asset).
-		From(since.Unix()).
-		To(until.Unix()).Do(ctx)
+func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (allWithdraws []types.Withdraw, err error) {
+	startTime := since
+	txIDs := map[string]struct{}{}
 
-	if err != nil {
-		return nil, err
+	for startTime.Before(until) {
+		// startTime ~ endTime must be in 90 days
+		endTime := startTime.AddDate(0, 0, 60)
+		if endTime.After(until) {
+			endTime = until
+		}
+
+		log.Infof("querying withdraw %s: %s <=> %s", asset, startTime, endTime)
+		withdraws, err := e.client.AccountService.NewGetWithdrawalHistoryRequest().
+			Currency(toLocalCurrency(asset)).
+			From(startTime.Unix()).
+			To(endTime.Unix()).
+			Do(ctx)
+
+		if err != nil {
+			return allWithdraws, err
+		}
+
+		for _, d := range withdraws {
+			if _, ok := txIDs[d.TxID]; ok {
+				continue
+			}
+
+			// we can convert this later
+			status := d.State
+			switch d.State {
+
+			case "confirmed":
+				status = "completed" // make it compatible with binance
+
+			case "submitting", "submitted", "accepted",
+				"rejected", "suspect", "approved", "delisted_processing",
+				"processing", "retryable", "sent", "canceled",
+				"failed", "pending",
+				"kgi_manually_processing", "kgi_manually_confirmed", "kgi_possible_failed",
+				"sygna_verifying":
+
+			default:
+				status = d.State
+
+			}
+
+			txIDs[d.TxID] = struct{}{}
+			allWithdraws = append(allWithdraws, types.Withdraw{
+				ApplyTime:      time.Unix(d.CreatedAt, 0),
+				Asset:          toGlobalCurrency(d.Currency),
+				Amount:         util.MustParseFloat(d.Amount),
+				Address:        "",
+				AddressTag:     "",
+				TransactionID:  d.TxID,
+				TransactionFee: util.MustParseFloat(d.Fee),
+				// WithdrawOrderID: d.WithdrawOrderID,
+				// Network:         d.Network,
+				Status: status,
+			})
+		}
+
+		startTime = endTime
 	}
 
-	for _, d := range deposits {
-		allDeposits = append(allDeposits, types.Deposit{
-			Time:          time.Unix(d.CreatedAt, 0),
-			Amount:        util.MustParseFloat(d.Amount),
-			Asset:         d.Currency,
-			Address:       "", // not supported
-			AddressTag:    "", // not supported
-			TransactionID: d.TxID,
-			Status:        convertDepositState(d.State),
-		})
+	return allWithdraws, nil
+}
+
+func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since, until time.Time) (allDeposits []types.Deposit, err error) {
+	startTime := since
+	txIDs := map[string]struct{}{}
+	for startTime.Before(until) {
+		// startTime ~ endTime must be in 90 days
+		endTime := startTime.AddDate(0, 0, 60)
+		if endTime.After(until) {
+			endTime = until
+		}
+
+		log.Infof("querying deposit history %s: %s <=> %s", asset, startTime, endTime)
+		deposits, err := e.client.AccountService.NewGetDepositHistoryRequest().
+			Currency(toLocalCurrency(asset)).
+			From(startTime.Unix()).
+			To(endTime.Unix()).Do(ctx)
+
+		if err != nil {
+			return nil, err
+		}
+
+		for _, d := range deposits {
+			if _, ok := txIDs[d.TxID]; ok {
+				continue
+			}
+
+			allDeposits = append(allDeposits, types.Deposit{
+				Time:          time.Unix(d.CreatedAt, 0),
+				Amount:        util.MustParseFloat(d.Amount),
+				Asset:         toGlobalCurrency(d.Currency),
+				Address:       "", // not supported
+				AddressTag:    "", // not supported
+				TransactionID: d.TxID,
+				Status:        convertDepositState(d.State),
+			})
+		}
+
+		startTime = endTime
 	}
 
 	return allDeposits, err
@@ -119,7 +207,7 @@ func convertDepositState(a string) types.DepositStatus {
 	case "rejected":
 		return types.DepositRejected
 
-	case "cancelled":
+	case "canceled":
 		return types.DepositCancelled
 
 	case "suspect", "refunded":
