@@ -32,7 +32,7 @@ func connectMysql() (*sqlx.DB, error) {
 	return sqlx.Connect("mysql", mysqlURL)
 }
 
-func newExchangeFromViper(n types.ExchangeName) types.Exchange {
+func newExchange(n types.ExchangeName) types.Exchange {
 	switch n {
 
 	case types.ExchangeBinance:
@@ -72,7 +72,7 @@ var PnLCmd = &cobra.Command{
 			return err
 		}
 
-		exchange := newExchangeFromViper(exchangeName)
+		exchange := newExchange(exchangeName)
 
 		db, err := connectMysql()
 		if err != nil {
