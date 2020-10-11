@@ -1,5 +1,7 @@
 package max
 
+import "context"
+
 type AccountService struct {
 	client *RestClient
 }
@@ -107,4 +109,80 @@ func (s *AccountService) Me() (*UserInfo, error) {
 	}
 
 	return &m, nil
+}
+
+type Deposit struct {
+	Currency        string `json:"currency"`
+	CurrencyVersion string `json:"currency_version"` // "eth"
+	Amount          string `json:"amount"`
+	Fee             string `json:"fee"`
+	TxID            string `json:"txid"`
+	State           string `json:"state"`
+	Confirmations   int    `json:"confirmations"`
+	CreatedAt       int64  `json:"created_at"`
+	UpdatedAt       int64  `json:"updated_at"`
+}
+
+type GetDepositHistoryRequestParams struct {
+	*PrivateRequestParams
+
+	Currency string `json:"currency"`
+	From     int64  `json:"from,omitempty"`  // seconds
+	To       int64  `json:"to,omitempty"`    // seconds
+	State    string `json:"state,omitempty"` // submitting, submitted, rejected, accepted, checking, refunded, cancelled, suspect
+	Limit    int    `json:"limit,omitempty"`
+}
+
+type GetDepositHistoryRequest struct {
+	client *RestClient
+	params GetDepositHistoryRequestParams
+}
+
+func (r *GetDepositHistoryRequest) State(state string) *GetDepositHistoryRequest {
+	r.params.State = state
+	return r
+}
+
+func (r *GetDepositHistoryRequest) Currency(currency string) *GetDepositHistoryRequest {
+	r.params.Currency = currency
+	return r
+}
+
+func (r *GetDepositHistoryRequest) Limit(limit int) *GetDepositHistoryRequest {
+	r.params.Limit = limit
+	return r
+}
+
+func (r *GetDepositHistoryRequest) From(from int64) *GetDepositHistoryRequest {
+	r.params.From = from
+	return r
+}
+
+func (r *GetDepositHistoryRequest) To(to int64) *GetDepositHistoryRequest {
+	r.params.To = to
+	return r
+}
+
+func (r *GetDepositHistoryRequest) Do(ctx context.Context) (deposits []Deposit, err error) {
+	req, err := r.client.newAuthenticatedRequest("GET", "v2/deposits", &r.params)
+	if err != nil {
+		return deposits, err
+	}
+
+	response, err := r.client.sendRequest(req)
+	if err != nil {
+		return deposits, err
+	}
+
+	if err := response.DecodeJSON(&deposits); err != nil {
+		return deposits, err
+	}
+
+	return deposits, err
+}
+
+func (s *AccountService) NewGetDepositHistoryRequest() *GetDepositHistoryRequest {
+	return &GetDepositHistoryRequest{
+		client: s.client,
+	}
 }

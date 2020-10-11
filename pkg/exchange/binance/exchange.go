@@ -105,6 +105,9 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 				status = "failure"
 			case 6:
 				status = "completed"
+
+			default:
+				status = fmt.Sprintf("unsupported code: %d", d.Status)
 			}
 
 			txIDs[d.TxID] = struct{}{}
@@ -128,17 +131,7 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 	return allWithdraws, nil
 }
 
-type Deposit struct {
-	Time          time.Time `json:"time"`
-	Amount        float64   `json:"amount"`
-	Asset         string    `json:"asset"`
-	Address       string    `json:"address"`
-	AddressTag    string    `json:"addressTag"`
-	TransactionID string    `json:"txId"`
-	Status        string    `json:"status"`
-}
-
-func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since, until time.Time) (allDeposits []Deposit, err error) {
+func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since, until time.Time) (allDeposits []types.Deposit, err error) {
 	startTime := since
 	txIDs := map[string]struct{}{}
 	for startTime.Before(until) {
@@ -165,18 +158,20 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 			}
 
 			// 0(0:pending,6: credited but cannot withdraw, 1:success)
-			status := ""
+			status := types.DepositStatus(fmt.Sprintf("code: %d", d.Status))
+
 			switch d.Status {
 			case 0:
-				status = "pending"
+				status = types.DepositPending
 			case 6:
-				status = "credited"
+				// https://www.binance.com/en/support/faq/115003736451
+				status = types.DepositCredited
 			case 1:
-				status = "success"
+				status = types.DepositSuccess
 			}
 
 			txIDs[d.TxID] = struct{}{}
-			allDeposits = append(allDeposits, Deposit{
+			allDeposits = append(allDeposits, types.Deposit{
 				Time:          time.Unix(0, d.InsertTime*int64(time.Millisecond)),
 				Asset:         d.Asset,
 				Amount:        d.Amount,
