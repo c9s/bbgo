@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 	"testing"
-	time "time"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jmoiron/sqlx"
@@ -14,7 +14,6 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/binance"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
-
 )
 
 func TestTradeService(t *testing.T) {
@@ -59,10 +58,11 @@ func TestEnvironment_Connect(t *testing.T) {
 
 	environment := NewEnvironment(xdb)
 	environment.AddExchange("binance", exchange).
-		Subscribe(types.KLineChannel,"BTCUSDT", types.SubscribeOptions{ })
+		Subscribe(types.KLineChannel,"BTCUSDT", types.SubscribeOptions{})
 
 	err = environment.Connect(ctx)
 	assert.NoError(t, err)
 
 	time.Sleep(5 * time.Second)
 }
+

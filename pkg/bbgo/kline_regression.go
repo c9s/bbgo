@@ -37,7 +37,7 @@ func (trader *BackTestTrader) SubmitOrder(cxt context.Context, order *types.Subm
 	trader.pendingOrders = append(trader.pendingOrders, order)
 }
 
-func (trader *BackTestTrader) RunStrategy(ctx context.Context, strategy MarketStrategy) (chan struct{}, error) {
+func (trader *BackTestTrader) RunStrategy(ctx context.Context, strategy SingleExchangeStrategy) (chan struct{}, error) {
 	logrus.Infof("[regression] number of kline data: %d", len(trader.SourceKLines))
 
 	done := make(chan struct{})

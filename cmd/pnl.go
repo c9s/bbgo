@@ -2,19 +2,15 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
+	"github.com/c9s/bbgo/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/accounting"
 	"github.com/c9s/bbgo/pkg/bbgo"
-	"github.com/c9s/bbgo/pkg/exchange/binance"
-	"github.com/c9s/bbgo/pkg/exchange/max"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -24,30 +20,6 @@ func init() {
 	pnlCmd.Flags().String("symbol", "BTCUSDT", "trading symbol")
 	pnlCmd.Flags().String("since", "", "pnl since time")
 	RootCmd.AddCommand(pnlCmd)
-}
-
-func connectMysql() (*sqlx.DB, error) {
-	mysqlURL := viper.GetString("mysql-url")
-	mysqlURL = fmt.Sprintf("%s?parseTime=true", mysqlURL)
-	return sqlx.Connect("mysql", mysqlURL)
-}
-
-func newExchange(n types.ExchangeName) types.Exchange {
-	switch n {
-
-	case types.ExchangeBinance:
-		key := viper.GetString("binance-api-key")
-		secret := viper.GetString("binance-api-secret")
-		return binance.New(key, secret)
-
-	case types.ExchangeMax:
-		key := viper.GetString("max-api-key")
-		secret := viper.GetString("max-api-secret")
-		return max.New(key, secret)
-
-	}
-
-	return nil
 }
 
 var pnlCmd = &cobra.Command{
@@ -72,9 +44,12 @@ var pnlCmd = &cobra.Command{
 			return err
 		}
 
-		exchange := newExchange(exchangeName)
+		exchange, err := cmdutil.NewExchange(exchangeName)
+		if err != nil {
+			return err
+		}
 
-		db, err := connectMysql()
+		db, err := cmdutil.ConnectMySQL()
 		if err != nil {
 			return err
 		}
