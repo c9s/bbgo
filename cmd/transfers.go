@@ -8,6 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	"github.com/c9s/bbgo/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -83,7 +84,7 @@ var transferHistoryCmd = &cobra.Command{
 			}
 		}
 
-		exchange := newExchange(exchangeName)
+		exchange, _ := cmdutil.NewExchange(exchangeName)
 
 		var records timeSlice
 
