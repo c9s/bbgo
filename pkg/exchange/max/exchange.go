@@ -99,8 +99,12 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 		}
 
 		log.Infof("querying withdraw %s: %s <=> %s", asset, startTime, endTime)
-		withdraws, err := e.client.AccountService.NewGetWithdrawalHistoryRequest().
-			Currency(toLocalCurrency(asset)).
+		req := e.client.AccountService.NewGetWithdrawalHistoryRequest()
+		if len(asset) > 0 {
+			req.Currency(toLocalCurrency(asset))
+		}
+
+		withdraws, err := req.
 			From(startTime.Unix()).
 			To(endTime.Unix()).
 			Do(ctx)
@@ -165,8 +169,12 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 		}
 
 		log.Infof("querying deposit history %s: %s <=> %s", asset, startTime, endTime)
-		deposits, err := e.client.AccountService.NewGetDepositHistoryRequest().
-			Currency(toLocalCurrency(asset)).
+		req := e.client.AccountService.NewGetDepositHistoryRequest()
+		if len(asset) > 0 {
+			req.Currency(toLocalCurrency(asset))
+		}
+
+		deposits, err := req.
 			From(startTime.Unix()).
 			To(endTime.Unix()).Do(ctx)
 
