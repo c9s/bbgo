@@ -62,8 +62,12 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 			endTime = until
 		}
 
-		withdraws, err := e.Client.NewListWithdrawsService().
-			Asset(asset).
+		req := e.Client.NewListWithdrawsService()
+		if len(asset) > 0 {
+			req.Asset(asset)
+		}
+
+		withdraws, err := req.
 			StartTime(startTime.UnixNano() / int64(time.Millisecond)).
 			EndTime(endTime.UnixNano() / int64(time.Millisecond)).
 			Do(ctx)
@@ -130,8 +134,12 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 			endTime = until
 		}
 
-		deposits, err := e.Client.NewListDepositsService().
-			Asset(asset).
+		req := e.Client.NewListDepositsService()
+		if len(asset) > 0 {
+			req.Asset(asset)
+		}
+
+		deposits, err := req.
 			StartTime(startTime.UnixNano() / int64(time.Millisecond)).
 			EndTime(endTime.UnixNano() / int64(time.Millisecond)).
 			Do(ctx)

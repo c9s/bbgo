@@ -2,13 +2,9 @@ package bbgo
 
 import (
 	"context"
-	"fmt"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/accounting"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
 )
 
 type BackTestStream struct {
@@ -37,7 +33,8 @@ func (trader *BackTestTrader) SubmitOrder(cxt context.Context, order *types.Subm
 	trader.pendingOrders = append(trader.pendingOrders, order)
 }
 
-func (trader *BackTestTrader) RunStrategy(ctx context.Context, strategy MarketStrategy) (chan struct{}, error) {
+/*
+func (trader *BackTestTrader) RunStrategy(ctx context.Context, strategy SingleExchangeStrategy) (chan struct{}, error) {
 	logrus.Infof("[regression] number of kline data: %d", len(trader.SourceKLines))
 
 	done := make(chan struct{})
@@ -148,3 +145,4 @@ func (trader *BackTestTrader) RunStrategy(ctx context.Context, strategy MarketSt
 
 	return done, nil
 }
+*/

@@ -28,7 +28,7 @@ func NewMarketDataStore() *MarketDataStore {
 	}
 }
 
-func (store *MarketDataStore) BindPrivateStream(stream types.Stream) {
+func (store *MarketDataStore) BindStream(stream types.Stream) {
 	stream.OnKLineClosed(store.handleKLineClosed)
 }
 

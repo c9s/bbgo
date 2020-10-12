@@ -1,10 +1,8 @@
 package bbgo
 
 import (
-	"context"
 	"sync"
 
-	"github.com/c9s/bbgo/pkg/exchange/binance"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 
@@ -12,31 +10,28 @@ import (
 )
 
 type Account struct {
-	mu sync.Mutex
-
+	sync.Mutex
 	Balances map[string]types.Balance
 }
 
-func LoadAccount(ctx context.Context, exchange types.Exchange) (*Account, error) {
-	balances, err := exchange.QueryAccountBalances(ctx)
-	return &Account{
-		Balances: balances,
-	}, err
+func (a *Account) handleBalanceUpdates(balances map[string]types.Balance) {
+	a.Lock()
+	defer a.Unlock()
+
+	for _, balance := range balances {
+		a.Balances[balance.Currency] = balance
+	}
 }
 
-func (a *Account) BindPrivateStream(stream types.Stream) {
-	stream.OnBalanceSnapshot(func(snapshot map[string]types.Balance) {
-		a.mu.Lock()
-		defer a.mu.Unlock()
-
-		for _, balance := range snapshot {
-			a.Balances[balance.Currency] = balance
-		}
-	})
-
+func (a *Account) BindStream(stream types.Stream) {
+	stream.OnBalanceUpdate(a.handleBalanceUpdates)
+	stream.OnBalanceSnapshot(a.handleBalanceUpdates)
 }
 
 func (a *Account) Print() {
+	a.Lock()
+	defer a.Unlock()
+
 	for _, balance := range a.Balances {
 		if util.NotZero(balance.Available) {
 			log.Infof("[trader] balance %s %f", balance.Currency, balance.Available)
