@@ -2,50 +2,58 @@ package bbgo
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
-	"github.com/fsnotify/fsnotify"
 	"github.com/jmoiron/sqlx"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/accounting"
-	"github.com/c9s/bbgo/pkg/bbgo/config"
-	"github.com/c9s/bbgo/pkg/exchange/binance"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
+
+	_ "github.com/go-sql-driver/mysql"
 )
 
-// MarketStrategy represents the single Exchange strategy
-type MarketStrategy interface {
-	OnLoad(tradingContext *Context, trader types.Trader) error
-	OnNewStream(stream types.Stream) error
+// SingleExchangeStrategy represents the single Exchange strategy
+type SingleExchangeStrategy interface {
+	Run(trader types.Trader, session *ExchangeSession) error
 }
 
+type CrossExchangeStrategy interface {
+	Run(trader types.Trader, sessions map[string]*ExchangeSession) error
+}
+
+// ExchangeSession presents the exchange connection session
+// It also maintains and collects the data returned from the stream.
 type ExchangeSession struct {
+	// Exchange session name
 	Name string
 
+	// The exchange account states
 	Account *Account
 
+	// Stream is the connection stream of the exchange
 	Stream types.Stream
 
 	Subscriptions []types.Subscription
 
-	Exchange *binance.Exchange
+	Exchange types.Exchange
 
-	Strategies []MarketStrategy
-
-	loadedSymbols map[string]struct{}
-
+	// Markets defines market configuration of a symbol
 	Markets map[string]types.Market
 
+	LastPrices map[string]float64
+
+	// Trades collects the executed trades from the exchange
+	// map: symbol -> []trade
 	Trades map[string][]types.Trade
+
+	MarketDataStore *MarketDataStore
 }
 
 func (session *ExchangeSession) Subscribe(channel types.Channel, symbol string, options types.SubscribeOptions) *ExchangeSession {
-	session.Symbols(symbol)
-
 	session.Subscriptions = append(session.Subscriptions, types.Subscription{
 		Channel: channel,
 		Symbol:  symbol,
@@ -55,92 +63,49 @@ func (session *ExchangeSession) Subscribe(channel types.Channel, symbol string, 
 	return session
 }
 
-func (session *ExchangeSession) Symbols(symbols ...string) *ExchangeSession {
-	if session.loadedSymbols == nil {
-		session.loadedSymbols = make(map[string]struct{})
-	}
-
-	if session.Markets == nil {
-		session.Markets = make(map[string]types.Market)
-	}
-
-	for _, symbol := range symbols {
-		session.loadedSymbols[symbol] = struct{}{}
-
-		if market, ok := types.FindMarket(symbol); ok {
-			session.Markets[symbol] = market
-		} else {
-			log.Panicf("market of symbol %s not found", symbol)
-		}
-	}
-
-	return session
-}
-
-func (session *ExchangeSession) AddStrategy(strategy MarketStrategy) *ExchangeSession {
-	session.Strategies = append(session.Strategies, strategy)
-	return session
-}
-
-type Trader struct {
-	Symbol       string
+// Environment presents the real exchange data layer
+type Environment struct {
 	TradeService *service.TradeService
 	TradeSync    *service.TradeSync
 
-	// Context is trading Context
-	Context *Context
-
-	Exchange types.Exchange
-
-	reportTimer *time.Timer
-
-	ProfitAndLossCalculator *accounting.ProfitAndLossCalculator
-
-	Account *Account
-
-	Notifiers []Notifier
-
-	ExchangeSessions map[string]*ExchangeSession
+	sessions map[string]*ExchangeSession
 }
 
-func New(db *sqlx.DB, exchange types.Exchange, symbol string) *Trader {
+func NewEnvironment(db *sqlx.DB) *Environment {
 	tradeService := &service.TradeService{DB: db}
-	return &Trader{
-		Symbol:       symbol,
-		Exchange:     exchange,
+	return &Environment{
 		TradeService: tradeService,
 		TradeSync: &service.TradeSync{
 			Service: tradeService,
 		},
+		sessions: make(map[string]*ExchangeSession),
 	}
 }
 
-func (trader *Trader) AddNotifier(notifier Notifier) {
-	trader.Notifiers = append(trader.Notifiers, notifier)
-}
-
-func (trader *Trader) AddExchange(name string, exchange *binance.Exchange) (session *ExchangeSession) {
+func (environ *Environment) AddExchange(name string, exchange types.Exchange) (session *ExchangeSession) {
 	session = &ExchangeSession{
-		Name:     name,
-		Exchange: exchange,
+		Name:       name,
+		Exchange:   exchange,
+		Markets:    make(map[string]types.Market),
+		Trades:     make(map[string][]types.Trade),
+		LastPrices: make(map[string]float64),
 	}
 
-	if trader.ExchangeSessions == nil {
-		trader.ExchangeSessions = make(map[string]*ExchangeSession)
-	}
-
-	trader.ExchangeSessions[name] = session
+	environ.sessions[name] = session
 	return session
 }
 
-func (trader *Trader) Connect(ctx context.Context) (err error) {
-	log.Info("syncing trades from exchange...")
+func (environ *Environment) Init(ctx context.Context) (err error) {
 	startTime := time.Now().AddDate(0, 0, -7) // sync from 7 days ago
 
-	for _, session := range trader.ExchangeSessions {
+	for _, session := range environ.sessions {
+		loadedSymbols := make(map[string]struct{})
+		for _, sub := range session.Subscriptions {
+			loadedSymbols[sub.Symbol] = struct{}{}
+		}
 
-		for symbol := range session.loadedSymbols {
-			if err := trader.TradeSync.Sync(ctx, session.Exchange, symbol, startTime); err != nil {
+		for symbol := range loadedSymbols {
+			if err := environ.TradeSync.Sync(ctx, session.Exchange, symbol, startTime); err != nil {
 				return err
 			}
 
@@ -148,9 +113,9 @@ func (trader *Trader) Connect(ctx context.Context) (err error) {
 
 			tradingFeeCurrency := session.Exchange.PlatformFeeCurrency()
 			if strings.HasPrefix(symbol, tradingFeeCurrency) {
-				trades, err = trader.TradeService.QueryForTradingFeeCurrency(symbol, tradingFeeCurrency)
+				trades, err = environ.TradeService.QueryForTradingFeeCurrency(symbol, tradingFeeCurrency)
 			} else {
-				trades, err = trader.TradeService.Query(symbol)
+				trades, err = environ.TradeService.Query(symbol)
 			}
 
 			if err != nil {
@@ -158,34 +123,51 @@ func (trader *Trader) Connect(ctx context.Context) (err error) {
 			}
 
 			log.Infof("symbol %s: %d trades loaded", symbol, len(trades))
-			if session.Trades == nil {
-				session.Trades = make(map[string][]types.Trade)
-			}
 			session.Trades[symbol] = trades
 
-			stockManager := &StockDistribution{
-				Symbol:             symbol,
-				TradingFeeCurrency: tradingFeeCurrency,
-			}
-
-			checkpoints, err := stockManager.AddTrades(trades)
+			currentPrice, err := session.Exchange.QueryAveragePrice(ctx, symbol)
 			if err != nil {
 				return err
 			}
 
-			log.Infof("symbol %s: found stock checkpoints: %+v", symbol, checkpoints)
+			session.LastPrices[symbol] = currentPrice
 		}
 
-		session.Account, err = LoadAccount(ctx, session.Exchange)
+		balances, err := session.Exchange.QueryAccountBalances(ctx)
 		if err != nil {
 			return err
 		}
+
+		session.Account = &Account{ Balances: balances }
 
 		session.Stream = session.Exchange.NewStream()
-		if err != nil {
-			return err
-		}
 
+		session.Account.BindStream(session.Stream)
+
+		marketDataStore := NewMarketDataStore()
+		marketDataStore.BindStream(session.Stream)
+
+
+		// update last prices
+		session.Stream.OnKLineClosed(func(kline types.KLine) {
+			session.LastPrices[kline.Symbol] = kline.Close
+		})
+
+		session.Stream.OnTrade(func(trade *types.Trade) {
+			// append trades
+			session.Trades[trade.Symbol] = append(session.Trades[trade.Symbol], *trade)
+
+			if err := environ.TradeService.Insert(*trade); err != nil {
+				log.WithError(err).Errorf("trade insert error: %+v", *trade)
+			}
+		})
+	}
+
+	return nil
+}
+
+func (environ *Environment) Connect(ctx context.Context) error {
+	for _, session := range environ.sessions {
 		if err := session.Stream.Connect(ctx); err != nil {
 			return err
 		}
@@ -194,86 +176,115 @@ func (trader *Trader) Connect(ctx context.Context) (err error) {
 	return nil
 }
 
-func (trader *Trader) Initialize(ctx context.Context, startTime time.Time) error {
-	// query all trades from database so that we can get the correct pnl
-	var err error
-	var trades []types.Trade
-	tradingFeeCurrency := trader.Exchange.PlatformFeeCurrency()
-	if strings.HasPrefix(trader.Symbol, tradingFeeCurrency) {
-		trades, err = trader.TradeService.QueryForTradingFeeCurrency(trader.Symbol, tradingFeeCurrency)
-	} else {
-		trades, err = trader.TradeService.Query(trader.Symbol)
+type Trader struct {
+	reportTimer             *time.Timer
+	ProfitAndLossCalculator *accounting.ProfitAndLossCalculator
+
+	notifiers   []Notifier
+	environment *Environment
+
+	crossExchangeStrategies []CrossExchangeStrategy
+	exchangeStrategies      map[string][]SingleExchangeStrategy
+}
+
+func NewTrader(environ *Environment) *Trader {
+	return &Trader{
+		environment:        environ,
+		exchangeStrategies: make(map[string][]SingleExchangeStrategy),
+	}
+}
+
+func (trader *Trader) AddNotifier(notifier Notifier) {
+	trader.notifiers = append(trader.notifiers, notifier)
+}
+
+// AttachStrategy attaches the single exchange strategy on an exchange session.
+// Single exchange strategy is the default behavior.
+func (trader *Trader) AttachStrategy(session string, strategy SingleExchangeStrategy) error {
+	if _, ok := trader.environment.sessions[session]; !ok {
+		return errors.New("session not defined")
 	}
 
-	if err != nil {
-		return err
-	}
-
-	log.Infof("%d trades loaded", len(trades))
-
-	stockManager := &StockDistribution{
-		Symbol:             trader.Symbol,
-		TradingFeeCurrency: tradingFeeCurrency,
-	}
-
-	checkpoints, err := stockManager.AddTrades(trades)
-	if err != nil {
-		return err
-	}
-
-	log.Infof("found checkpoints: %+v", checkpoints)
-
-	market, ok := types.FindMarket(trader.Symbol)
-	if !ok {
-		return fmt.Errorf("%s market not found", trader.Symbol)
-	}
-
-	currentPrice, err := trader.Exchange.QueryAveragePrice(ctx, trader.Symbol)
-	if err != nil {
-		return err
-	}
-
-	trader.Context = &Context{
-		CurrentPrice: currentPrice,
-		Symbol:       trader.Symbol,
-		Market:       market,
-		StockManager: stockManager,
-	}
-
-	/*
-		if len(checkpoints) > 0 {
-			// get the last checkpoint
-			idx := checkpoints[len(checkpoints)-1]
-			if idx < len(trades)-1 {
-				trades = trades[idx:]
-				firstTrade := trades[0]
-				pnlStartTime = firstTrade.Time
-				notifier.Notify("%s Found the latest trade checkpoint %s", firstTrade.Symbol, firstTrade.Time, firstTrade)
-			}
-		}
-	*/
-
-	trader.ProfitAndLossCalculator = &accounting.ProfitAndLossCalculator{
-		TradingFeeCurrency: tradingFeeCurrency,
-		Symbol:             trader.Symbol,
-		StartTime:          startTime,
-		CurrentPrice:       currentPrice,
-		Trades:             trades,
-	}
-
-	account, err := LoadAccount(ctx, trader.Exchange)
-	if err != nil {
-		return err
-	}
-
-	trader.Account = account
-	trader.Context.Balances = account.Balances
-	account.Print()
-
+	trader.exchangeStrategies[session] = append(trader.exchangeStrategies[session], strategy)
 	return nil
 }
 
-func (trader *Trader) RunStrategyWithHotReload(ctx context.Context, strategy MarketStrategy, configFile string) (chan struct{}, error) {
+// AttachCrossExchangeStrategy attaches the cross exchange strategy
+func (trader *Trader) AttachCrossExchangeStrategy(strategy CrossExchangeStrategy) error {
+	trader.crossExchangeStrategies = append(trader.crossExchangeStrategies, strategy)
+	return nil
+}
+
+func (trader *Trader) Run(ctx context.Context) error {
+	if err := trader.environment.Init(ctx); err != nil {
+		return err
+	}
+
+	// load and run session strategies
+	for session, strategies := range trader.exchangeStrategies {
+		for _, strategy := range strategies {
+			err := strategy.Run(trader, trader.environment.sessions[session])
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	for _, strategy := range trader.crossExchangeStrategies {
+		if err := strategy.Run(trader, trader.environment.sessions) ; err != nil {
+			return err
+		}
+	}
+
+
+	return trader.environment.Connect(ctx)
+	/*
+		stockManager := &StockDistribution{
+			Symbol:             symbol,
+			TradingFeeCurrency: tradingFeeCurrency,
+		}
+
+		checkpoints, err := stockManager.AddTrades(trades)
+		if err != nil {
+			return err
+		}
+
+		log.Infof("symbol %s: found stock checkpoints: %+v", symbol, checkpoints)
+	*/
+}
+
+func (trader *Trader) Initialize(ctx context.Context, startTime time.Time) error {
+	/*
+		currentPrice, err := trader.Exchange.QueryAveragePrice(ctx, trader.Symbol)
+		if err != nil {
+			return err
+		}
+
+		trader.Context = &Context{
+			CurrentPrice: currentPrice,
+			Symbol:       trader.Symbol,
+			Market:       market,
+			StockManager: stockManager,
+		}
+	*/
+
+	/*
+		trader.ProfitAndLossCalculator = &accounting.ProfitAndLossCalculator{
+			TradingFeeCurrency: tradingFeeCurrency,
+			Symbol:             trader.Symbol,
+			StartTime:          startTime,
+			CurrentPrice:       currentPrice,
+			Trades:             trades,
+		}
+	*/
+
+	// trader.Context.Balances = account.Balances
+	// account.Print()
+	return nil
+}
+
+/*
+func (trader *Trader) RunStrategyWithHotReload(ctx context.Context, strategy SingleExchangeStrategy, configFile string) (chan struct{}, error) {
 	var done = make(chan struct{})
 	var configWatcherDone = make(chan struct{})
 
@@ -348,8 +359,10 @@ func (trader *Trader) RunStrategyWithHotReload(ctx context.Context, strategy Mar
 
 	return done, nil
 }
+*/
 
-func (trader *Trader) RunStrategy(ctx context.Context, strategy MarketStrategy) (chan struct{}, error) {
+/*
+func (trader *Trader) RunStrategy(ctx context.Context, strategy SingleExchangeStrategy) (chan struct{}, error) {
 	if err := strategy.OnLoad(trader.Context, trader); err != nil {
 		return nil, err
 	}
@@ -358,9 +371,9 @@ func (trader *Trader) RunStrategy(ctx context.Context, strategy MarketStrategy) 
 
 	// bind kline store to the stream
 	klineStore := NewMarketDataStore()
-	klineStore.BindPrivateStream(stream)
+	klineStore.BindStream(stream)
 
-	trader.Account.BindPrivateStream(stream)
+	trader.Account.BindStream(stream)
 
 	if err := strategy.OnNewStream(stream); err != nil {
 		return nil, err
@@ -371,14 +384,6 @@ func (trader *Trader) RunStrategy(ctx context.Context, strategy MarketStrategy) 
 	})
 
 	stream.OnTrade(func(trade *types.Trade) {
-		if trade.Symbol != trader.Symbol {
-			return
-		}
-
-		if err := trader.TradeService.Insert(*trade); err != nil {
-			log.WithError(err).Error("trade insert error")
-		}
-
 		trader.NotifyTrade(trade)
 		trader.ProfitAndLossCalculator.AddTrade(*trade)
 		_, err := trader.Context.StockManager.AddTrades([]types.Trade{*trade})
@@ -420,6 +425,7 @@ func (trader *Trader) RunStrategy(ctx context.Context, strategy MarketStrategy) 
 
 	return done, nil
 }
+*/
 
 func (trader *Trader) reportPnL() {
 	report := trader.ProfitAndLossCalculator.Calculate()
@@ -428,19 +434,19 @@ func (trader *Trader) reportPnL() {
 }
 
 func (trader *Trader) NotifyPnL(report *accounting.ProfitAndLossReport) {
-	for _, n := range trader.Notifiers {
+	for _, n := range trader.notifiers {
 		n.NotifyPnL(report)
 	}
 }
 
 func (trader *Trader) NotifyTrade(trade *types.Trade) {
-	for _, n := range trader.Notifiers {
+	for _, n := range trader.notifiers {
 		n.NotifyTrade(trade)
 	}
 }
 
 func (trader *Trader) Notify(msg string, args ...interface{}) {
-	for _, n := range trader.Notifiers {
+	for _, n := range trader.notifiers {
 		n.Notify(msg, args...)
 	}
 }
@@ -454,8 +460,9 @@ func (trader *Trader) SubmitOrder(ctx context.Context, order *types.SubmitOrder)
 		MinAssetBalance: 0,
 		MinProfitSpread: 0,
 		MaxOrderAmount:  0,
-		Exchange:        trader.Exchange,
-		Trader:          trader,
+		// FIXME:
+		// Exchange:        trader.Exchange,
+		Trader: trader,
 	}
 
 	err := orderProcessor.Submit(ctx, order)

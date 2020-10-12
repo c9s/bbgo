@@ -126,7 +126,7 @@ type Deposit struct {
 type GetDepositHistoryRequestParams struct {
 	*PrivateRequestParams
 
-	Currency string `json:"currency"`
+	Currency string `json:"currency,omitempty"`
 	From     int64  `json:"from,omitempty"`  // seconds
 	To       int64  `json:"to,omitempty"`    // seconds
 	State    string `json:"state,omitempty"` // submitting, submitted, rejected, accepted, checking, refunded, canceled, suspect
@@ -212,7 +212,7 @@ type Withdraw struct {
 type GetWithdrawHistoryRequestParams struct {
 	*PrivateRequestParams
 
-	Currency string `json:"currency"`
+	Currency string `json:"currency,omitempty"`
 	From     int64  `json:"from,omitempty"`  // seconds
 	To       int64  `json:"to,omitempty"`    // seconds
 	State    string `json:"state,omitempty"` // submitting, submitted, rejected, accepted, checking, refunded, canceled, suspect

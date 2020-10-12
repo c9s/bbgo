@@ -2,13 +2,10 @@ package bbgo
 
 import (
 	"context"
-	"fmt"
-	"math"
 
 	"github.com/pkg/errors"
 
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
 )
 
 var (
@@ -41,6 +38,7 @@ type OrderProcessor struct {
 }
 
 func (p *OrderProcessor) Submit(ctx context.Context, order *types.SubmitOrder) error {
+	/*
 	tradingCtx := p.Trader.Context
 	currentPrice := tradingCtx.CurrentPrice
 	market := order.Market
@@ -126,6 +124,8 @@ func (p *OrderProcessor) Submit(ctx context.Context, order *types.SubmitOrder) e
 
 	order.Quantity = quantity
 	order.QuantityString = market.FormatVolume(quantity)
+	 */
+
 	return p.Exchange.SubmitOrder(ctx, order)
 }
 
