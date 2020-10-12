@@ -133,10 +133,12 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 			session.LastPrices[symbol] = currentPrice
 		}
 
-		session.Account, err = LoadAccount(ctx, session.Exchange)
+		balances, err := session.Exchange.QueryAccountBalances(ctx)
 		if err != nil {
 			return err
 		}
+
+		session.Account = &Account{ Balances: balances }
 
 		session.Stream = session.Exchange.NewStream()
 

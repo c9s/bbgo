@@ -1,7 +1,6 @@
 package bbgo
 
 import (
-	"context"
 	"sync"
 
 	"github.com/c9s/bbgo/pkg/types"
@@ -12,16 +11,7 @@ import (
 
 type Account struct {
 	sync.Mutex
-
 	Balances map[string]types.Balance
-}
-
-// TODO: rewrite this as NewAccount(map balances)
-func LoadAccount(ctx context.Context, exchange types.Exchange) (*Account, error) {
-	balances, err := exchange.QueryAccountBalances(ctx)
-	return &Account{
-		Balances: balances,
-	}, err
 }
 
 func (a *Account) handleBalanceUpdates(balances map[string]types.Balance) {
