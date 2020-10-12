@@ -118,30 +118,43 @@ import (
     "github.com/c9s/bbgo"
 )
 
-mysqlURL := viper.GetString("mysql-url")
-mysqlURL = fmt.Sprintf("%s?parseTime=true", mysqlURL)
-db, err := sqlx.Connect("mysql", mysqlURL)
+func main() {
+    mysqlURL := viper.GetString("mysql-url")
+    mysqlURL = fmt.Sprintf("%s?parseTime=true", mysqlURL)
+    db, err := sqlx.Connect("mysql", mysqlURL)
+    if err != nil {
+        return err
+    }
 
-if err != nil {
-    return err
+    environment := environ.New()
+    environment.AddExchange("binance", binance.New(viper.Getenv("binance-api-key"), viper.Getenv("binance-api-secret"))))
+    environment.AddExchange("max", max.New(viper.Getenv("max-key"), viper.Getenv("max-secret"))))
+
+    trader := bbgo.NewTrader(bbgo.Config{
+        Environment: environment,
+        DB: db,
+    })
+
+    trader.AddNotifier(slacknotifier.New(slackToken))
+    trader.AddLogHook(slacklog.NewLogHook(slackToken))
+
+    // when any trade execution happened
+    trader.OnTrade(func(session string, exchange types.Exchange, trade types.Trade) {
+        notify(trade)
+        
+        notifyPnL()
+    })
+
+    // mount strategy on an exchange
+    trader.AddExchangeStrategy("binance",
+        bondtrade.New("btcusdt", "5m"),
+        bondtrade.New("ethusdt", "5m"))
+
+    // mount cross exchange strategy
+    trader.AddCrossExchangeStrategy(hedgemaker.New("max", "binance"))
+
+    t.Run(ctx)
 }
-
-t := bbgo.New(bbgo.Config{
-    DB: db,
-})
-t.AddNotifier(slacknotifier.New(slackToken))
-t.AddLogHook(slacklog.NewLogHook(slackToken))
-
-t.AddExchange("binance", binance.New(viper.Getenv("binance-api-key"), viper.Getenv("binance-api-secret")))).
-    Subscribe("binance", "btcusdt", "kline@5m", "book", "trade").
-    AddStrategy(bondtrade.New, bondtrade.New).
-    Symbols("btcusdt", "bnbusdt")
-
-t.AddExchange("max", max.New(viper.Getenv("max-key"), viper.Getenv("max-secret")))).
-    Subscribe("max", "btctwd", "kline@5m", "book", "trade").
-    AddStrategy(flashdrop.New, bondtrade.New)
-
-t.AddCrossExchangeStrategy(hedgemaker.New(...))
 ```
 
 ## Support

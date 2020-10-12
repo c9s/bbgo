@@ -8,13 +8,15 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/jmoiron/sqlx"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/accounting"
 	"github.com/c9s/bbgo/pkg/bbgo/config"
-	"github.com/c9s/bbgo/pkg/exchange/binance"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
+
+	_ "github.com/go-sql-driver/mysql"
 )
 
 // MarketStrategy represents the single Exchange strategy
@@ -24,28 +26,30 @@ type MarketStrategy interface {
 }
 
 type ExchangeSession struct {
+	// Session name
 	Name string
 
+	// The exchange account states
 	Account *Account
 
+	// Stream is the connection stream of the exchange
 	Stream types.Stream
 
 	Subscriptions []types.Subscription
 
-	Exchange *binance.Exchange
-
-	Strategies []MarketStrategy
+	Exchange types.Exchange
 
 	loadedSymbols map[string]struct{}
 
+	// Markets defines market configuration of a symbol
 	Markets map[string]types.Market
 
+	// Trades collects the executed trades from the exchange
+	// map: symbol -> []trade
 	Trades map[string][]types.Trade
 }
 
 func (session *ExchangeSession) Subscribe(channel types.Channel, symbol string, options types.SubscribeOptions) *ExchangeSession {
-	session.Symbols(symbol)
-
 	session.Subscriptions = append(session.Subscriptions, types.Subscription{
 		Channel: channel,
 		Symbol:  symbol,
@@ -55,31 +59,89 @@ func (session *ExchangeSession) Subscribe(channel types.Channel, symbol string, 
 	return session
 }
 
-func (session *ExchangeSession) Symbols(symbols ...string) *ExchangeSession {
-	if session.loadedSymbols == nil {
-		session.loadedSymbols = make(map[string]struct{})
+// Environment presents the real exchange data layer
+type Environment struct {
+	TradeService *service.TradeService
+	TradeSync    *service.TradeSync
+
+	ExchangeSessions map[string]*ExchangeSession
+}
+
+func NewEnvironment(db *sqlx.DB) *Environment {
+	tradeService := &service.TradeService{DB: db}
+	return &Environment{
+		TradeService: tradeService,
+		TradeSync: &service.TradeSync{
+			Service: tradeService,
+		},
+		ExchangeSessions: make(map[string]*ExchangeSession),
+	}
+}
+
+func (environ *Environment) AddExchange(name string, exchange types.Exchange) (session *ExchangeSession) {
+	session = &ExchangeSession{
+		Name:     name,
+		Exchange: exchange,
+		Markets:  make(map[string]types.Market),
+		Trades:   make(map[string][]types.Trade),
 	}
 
-	if session.Markets == nil {
-		session.Markets = make(map[string]types.Market)
-	}
-
-	for _, symbol := range symbols {
-		session.loadedSymbols[symbol] = struct{}{}
-
-		if market, ok := types.FindMarket(symbol); ok {
-			session.Markets[symbol] = market
-		} else {
-			log.Panicf("market of symbol %s not found", symbol)
-		}
-	}
-
+	environ.ExchangeSessions[name] = session
 	return session
 }
 
-func (session *ExchangeSession) AddStrategy(strategy MarketStrategy) *ExchangeSession {
-	session.Strategies = append(session.Strategies, strategy)
-	return session
+func (environ *Environment) Connect(ctx context.Context) (err error) {
+	startTime := time.Now().AddDate(0, 0, -7) // sync from 7 days ago
+
+	for _, session := range environ.ExchangeSessions {
+		loadedSymbols := make(map[string]struct{})
+		for _, sub := range session.Subscriptions {
+			loadedSymbols[sub.Symbol] = struct{}{}
+		}
+
+		for symbol := range loadedSymbols {
+			if err := environ.TradeSync.Sync(ctx, session.Exchange, symbol, startTime); err != nil {
+				return err
+			}
+
+			var trades []types.Trade
+
+			tradingFeeCurrency := session.Exchange.PlatformFeeCurrency()
+			if strings.HasPrefix(symbol, tradingFeeCurrency) {
+				trades, err = environ.TradeService.QueryForTradingFeeCurrency(symbol, tradingFeeCurrency)
+			} else {
+				trades, err = environ.TradeService.Query(symbol)
+			}
+
+			if err != nil {
+				return err
+			}
+
+			log.Infof("symbol %s: %d trades loaded", symbol, len(trades))
+			session.Trades[symbol] = trades
+		}
+
+		session.Account, err = LoadAccount(ctx, session.Exchange)
+		if err != nil {
+			return err
+		}
+
+		session.Stream = session.Exchange.NewStream()
+		session.Stream.OnTrade(func(trade *types.Trade) {
+			// append trades
+			session.Trades[trade.Symbol] = append(session.Trades[trade.Symbol], *trade)
+
+			if err := environ.TradeService.Insert(*trade); err != nil {
+				log.WithError(err).Errorf("trade insert error: %+v", *trade)
+			}
+		})
+
+		if err := session.Stream.Connect(ctx); err != nil {
+			return err
+		}
+	}
+
+	return err
 }
 
 type Trader struct {
@@ -103,7 +165,7 @@ type Trader struct {
 	ExchangeSessions map[string]*ExchangeSession
 }
 
-func New(db *sqlx.DB, exchange types.Exchange, symbol string) *Trader {
+func NewTrader(db *sqlx.DB, exchange types.Exchange, symbol string) *Trader {
 	tradeService := &service.TradeService{DB: db}
 	return &Trader{
 		Symbol:       symbol,
@@ -119,27 +181,20 @@ func (trader *Trader) AddNotifier(notifier Notifier) {
 	trader.Notifiers = append(trader.Notifiers, notifier)
 }
 
-func (trader *Trader) AddExchange(name string, exchange *binance.Exchange) (session *ExchangeSession) {
-	session = &ExchangeSession{
-		Name:     name,
-		Exchange: exchange,
-	}
-
-	if trader.ExchangeSessions == nil {
-		trader.ExchangeSessions = make(map[string]*ExchangeSession)
-	}
-
-	trader.ExchangeSessions[name] = session
-	return session
-}
-
 func (trader *Trader) Connect(ctx context.Context) (err error) {
 	log.Info("syncing trades from exchange...")
 	startTime := time.Now().AddDate(0, 0, -7) // sync from 7 days ago
 
 	for _, session := range trader.ExchangeSessions {
-
 		for symbol := range session.loadedSymbols {
+			market, ok := types.FindMarket(symbol)
+			if !ok {
+				return errors.Errorf("market %s is not defined", symbol)
+			}
+
+			session.Markets[symbol] = market
+
+
 			if err := trader.TradeSync.Sync(ctx, session.Exchange, symbol, startTime); err != nil {
 				return err
 			}
@@ -158,9 +213,6 @@ func (trader *Trader) Connect(ctx context.Context) (err error) {
 			}
 
 			log.Infof("symbol %s: %d trades loaded", symbol, len(trades))
-			if session.Trades == nil {
-				session.Trades = make(map[string][]types.Trade)
-			}
 			session.Trades[symbol] = trades
 
 			stockManager := &StockDistribution{

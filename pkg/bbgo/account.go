@@ -4,7 +4,6 @@ import (
 	"context"
 	"sync"
 
-	"github.com/c9s/bbgo/pkg/exchange/binance"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 
