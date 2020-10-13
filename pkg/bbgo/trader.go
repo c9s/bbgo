@@ -138,7 +138,7 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 			return err
 		}
 
-		session.Account = &Account{ Balances: balances }
+		session.Account = &Account{Balances: balances}
 
 		session.Stream = session.Exchange.NewStream()
 
@@ -146,7 +146,6 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 
 		marketDataStore := NewMarketDataStore()
 		marketDataStore.BindStream(session.Stream)
-
 
 		// update last prices
 		session.Stream.OnKLineClosed(func(kline types.KLine) {
@@ -231,56 +230,12 @@ func (trader *Trader) Run(ctx context.Context) error {
 	}
 
 	for _, strategy := range trader.crossExchangeStrategies {
-		if err := strategy.Run(trader, trader.environment.sessions) ; err != nil {
+		if err := strategy.Run(trader, trader.environment.sessions); err != nil {
 			return err
 		}
 	}
 
-
 	return trader.environment.Connect(ctx)
-	/*
-		stockManager := &StockDistribution{
-			Symbol:             symbol,
-			TradingFeeCurrency: tradingFeeCurrency,
-		}
-
-		checkpoints, err := stockManager.AddTrades(trades)
-		if err != nil {
-			return err
-		}
-
-		log.Infof("symbol %s: found stock checkpoints: %+v", symbol, checkpoints)
-	*/
-}
-
-func (trader *Trader) Initialize(ctx context.Context, startTime time.Time) error {
-	/*
-		currentPrice, err := trader.Exchange.QueryAveragePrice(ctx, trader.Symbol)
-		if err != nil {
-			return err
-		}
-
-		trader.Context = &Context{
-			CurrentPrice: currentPrice,
-			Symbol:       trader.Symbol,
-			Market:       market,
-			StockManager: stockManager,
-		}
-	*/
-
-	/*
-		trader.ProfitAndLossCalculator = &accounting.ProfitAndLossCalculator{
-			TradingFeeCurrency: tradingFeeCurrency,
-			Symbol:             trader.Symbol,
-			StartTime:          startTime,
-			CurrentPrice:       currentPrice,
-			Trades:             trades,
-		}
-	*/
-
-	// trader.Context.Balances = account.Balances
-	// account.Print()
-	return nil
 }
 
 /*
@@ -363,22 +318,6 @@ func (trader *Trader) RunStrategyWithHotReload(ctx context.Context, strategy Sin
 
 /*
 func (trader *Trader) RunStrategy(ctx context.Context, strategy SingleExchangeStrategy) (chan struct{}, error) {
-	if err := strategy.OnLoad(trader.Context, trader); err != nil {
-		return nil, err
-	}
-
-	stream := trader.Exchange.NewStream()
-
-	// bind kline store to the stream
-	klineStore := NewMarketDataStore()
-	klineStore.BindStream(stream)
-
-	trader.Account.BindStream(stream)
-
-	if err := strategy.OnNewStream(stream); err != nil {
-		return nil, err
-	}
-
 	trader.reportTimer = time.AfterFunc(1*time.Second, func() {
 		trader.reportPnL()
 	})
@@ -399,31 +338,6 @@ func (trader *Trader) RunStrategy(ctx context.Context, strategy SingleExchangeSt
 			trader.reportPnL()
 		})
 	})
-
-	stream.OnKLineClosed(func(kline types.KLine) {
-		trader.ProfitAndLossCalculator.SetCurrentPrice(kline.Close)
-		trader.Context.SetCurrentPrice(kline.Close)
-	})
-
-	if err := stream.Connect(ctx); err != nil {
-		return nil, err
-	}
-
-	done := make(chan struct{})
-
-	go func() {
-		defer close(done)
-		defer stream.Close()
-
-		select {
-
-		case <-ctx.Done():
-			return
-
-		}
-	}()
-
-	return done, nil
 }
 */
 
