@@ -38,7 +38,7 @@ func (e *Exchange) NewStream() types.Stream {
 	return NewStream(e.key, e.secret)
 }
 
-func (e *Exchange) SubmitOrder(ctx context.Context, order *types.SubmitOrder) error {
+func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) error {
 	orderType, err := toLocalOrderType(order.Type)
 	if err != nil {
 		return err

@@ -17,11 +17,11 @@ import (
 
 // SingleExchangeStrategy represents the single Exchange strategy
 type SingleExchangeStrategy interface {
-	Run(ctx context.Context, trader types.Trader, session *ExchangeSession) error
+	Run(ctx context.Context, trader types.OrderExecutor, session *ExchangeSession) error
 }
 
 type CrossExchangeStrategy interface {
-	Run(ctx context.Context, trader types.Trader, sessions map[string]*ExchangeSession) error
+	Run(ctx context.Context, trader types.OrderExecutor, sessions map[string]*ExchangeSession) error
 }
 
 // ExchangeSession presents the exchange connection session
@@ -237,7 +237,7 @@ func (trader *Trader) Run(ctx context.Context) error {
 }
 
 /*
-func (trader *Trader) RunStrategyWithHotReload(ctx context.Context, strategy SingleExchangeStrategy, configFile string) (chan struct{}, error) {
+func (trader *OrderExecutor) RunStrategyWithHotReload(ctx context.Context, strategy SingleExchangeStrategy, configFile string) (chan struct{}, error) {
 	var done = make(chan struct{})
 	var configWatcherDone = make(chan struct{})
 
@@ -315,7 +315,7 @@ func (trader *Trader) RunStrategyWithHotReload(ctx context.Context, strategy Sin
 */
 
 /*
-func (trader *Trader) RunStrategy(ctx context.Context, strategy SingleExchangeStrategy) (chan struct{}, error) {
+func (trader *OrderExecutor) RunStrategy(ctx context.Context, strategy SingleExchangeStrategy) (chan struct{}, error) {
 	trader.reportTimer = time.AfterFunc(1*time.Second, func() {
 		trader.reportPnL()
 	})
@@ -363,7 +363,7 @@ func (trader *Trader) Notify(msg string, args ...interface{}) {
 	}
 }
 
-func (trader *Trader) SubmitOrder(ctx context.Context, order *types.SubmitOrder) {
+func (trader *Trader) SubmitOrder(ctx context.Context, order types.SubmitOrder) {
 	trader.Notify(":memo: Submitting %s %s %s order with quantity: %s", order.Symbol, order.Type, order.Side, order.QuantityString, order)
 
 	orderProcessor := &OrderProcessor{

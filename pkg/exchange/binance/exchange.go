@@ -220,7 +220,7 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	}, nil
 }
 
-func (e *Exchange) SubmitOrder(ctx context.Context, order *types.SubmitOrder) error {
+func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) error {
 	/*
 		limit order example
 
