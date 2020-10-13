@@ -25,11 +25,11 @@ type BackTestTrader struct {
 	SourceKLines            []types.KLine
 	ProfitAndLossCalculator *accounting.ProfitAndLossCalculator
 
-	doneOrders    []*types.SubmitOrder
-	pendingOrders []*types.SubmitOrder
+	doneOrders    []types.SubmitOrder
+	pendingOrders []types.SubmitOrder
 }
 
-func (trader *BackTestTrader) SubmitOrder(cxt context.Context, order *types.SubmitOrder) {
+func (trader *BackTestTrader) SubmitOrder(ctx context.Context, order types.SubmitOrder) {
 	trader.pendingOrders = append(trader.pendingOrders, order)
 }
 

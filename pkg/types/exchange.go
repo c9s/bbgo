@@ -48,7 +48,7 @@ type Exchange interface {
 
 	QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (allWithdraws []Withdraw, err error)
 
-	SubmitOrder(ctx context.Context, order *SubmitOrder) error
+	SubmitOrder(ctx context.Context, order SubmitOrder) error
 }
 
 type TradeQueryOptions struct {

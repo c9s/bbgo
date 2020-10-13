@@ -37,9 +37,9 @@ type OrderProcessor struct {
 	Trader   *Trader        `json:"-"`
 }
 
-func (p *OrderProcessor) Submit(ctx context.Context, order *types.SubmitOrder) error {
+func (p *OrderProcessor) Submit(ctx context.Context, order types.SubmitOrder) error {
 	/*
-	tradingCtx := p.Trader.Context
+	tradingCtx := p.OrderExecutor.Context
 	currentPrice := tradingCtx.CurrentPrice
 	market := order.Market
 	quantity := order.Quantity

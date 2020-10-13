@@ -2,6 +2,6 @@ package types
 
 import "context"
 
-type Trader interface {
-	SubmitOrder(ctx context.Context, order *SubmitOrder)
+type OrderExecutor interface {
+	SubmitOrder(ctx context.Context, order SubmitOrder)
 }
