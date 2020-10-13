@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/accounting"
@@ -18,11 +17,11 @@ import (
 
 // SingleExchangeStrategy represents the single Exchange strategy
 type SingleExchangeStrategy interface {
-	Run(trader types.Trader, session *ExchangeSession) error
+	Run(ctx context.Context, trader types.Trader, session *ExchangeSession) error
 }
 
 type CrossExchangeStrategy interface {
-	Run(trader types.Trader, sessions map[string]*ExchangeSession) error
+	Run(ctx context.Context, trader types.Trader, sessions map[string]*ExchangeSession) error
 }
 
 // ExchangeSession presents the exchange connection session
@@ -199,13 +198,12 @@ func (trader *Trader) AddNotifier(notifier Notifier) {
 
 // AttachStrategy attaches the single exchange strategy on an exchange session.
 // Single exchange strategy is the default behavior.
-func (trader *Trader) AttachStrategy(session string, strategy SingleExchangeStrategy) error {
+func (trader *Trader) AttachStrategy(session string, strategy SingleExchangeStrategy) {
 	if _, ok := trader.environment.sessions[session]; !ok {
-		return errors.New("session not defined")
+		log.Panicf("session %s is not defined", session)
 	}
 
 	trader.exchangeStrategies[session] = append(trader.exchangeStrategies[session], strategy)
-	return nil
 }
 
 // AttachCrossExchangeStrategy attaches the cross exchange strategy
@@ -222,7 +220,7 @@ func (trader *Trader) Run(ctx context.Context) error {
 	// load and run session strategies
 	for session, strategies := range trader.exchangeStrategies {
 		for _, strategy := range strategies {
-			err := strategy.Run(trader, trader.environment.sessions[session])
+			err := strategy.Run(ctx, trader, trader.environment.sessions[session])
 			if err != nil {
 				return err
 			}
@@ -230,7 +228,7 @@ func (trader *Trader) Run(ctx context.Context) error {
 	}
 
 	for _, strategy := range trader.crossExchangeStrategies {
-		if err := strategy.Run(trader, trader.environment.sessions); err != nil {
+		if err := strategy.Run(ctx, trader, trader.environment.sessions); err != nil {
 			return err
 		}
 	}

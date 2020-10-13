@@ -153,6 +153,7 @@ func (k KLine) GetBody() float64 {
 	return k.GetChange()
 }
 
+// GetChange returns Close price - Open price.
 func (k KLine) GetChange() float64 {
 	return k.Close - k.Open
 }
