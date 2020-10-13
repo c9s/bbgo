@@ -14,6 +14,13 @@ type Account struct {
 	Balances map[string]types.Balance
 }
 
+func (a *Account) Balance(currency string) (balance types.Balance, ok bool) {
+	a.Lock()
+	balance, ok = a.Balances[currency]
+	a.Unlock()
+	return balance, ok
+}
+
 func (a *Account) handleBalanceUpdates(balances map[string]types.Balance) {
 	a.Lock()
 	defer a.Unlock()
@@ -34,7 +41,7 @@ func (a *Account) Print() {
 
 	for _, balance := range a.Balances {
 		if util.NotZero(balance.Available) {
-			log.Infof("[trader] balance %s %f", balance.Currency, balance.Available)
+			log.Infof("account balance %s %f", balance.Currency, balance.Available)
 		}
 	}
 }
