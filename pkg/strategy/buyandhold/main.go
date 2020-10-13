@@ -2,42 +2,82 @@ package buyandhold
 
 import (
 	"context"
+	"encoding/json"
+	"io/ioutil"
+	"math"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 type Strategy struct {
-	symbol string
+	Symbol            string  `json:"symbol"`
+	Interval          string  `json:"interval"`
+	BaseQuantity      float64 `json:"baseQuantity"`
+	MaxAssetQuantity  float64 `json:"maxAssetQuantity"`
+	MinDropPercentage float64 `json:"minDropPercentage"`
 }
 
-func New(symbol string) *Strategy {
+func LoadFile(filepath string) (*Strategy, error) {
+	o, err := ioutil.ReadFile(filepath)
+	if err != nil {
+		return nil, err
+	}
+
+	var strategy Strategy
+	err = json.Unmarshal(o, &strategy)
+	return &strategy, err
+}
+
+func New(symbol string, interval string, baseQuantity float64) *Strategy {
 	return &Strategy{
-		symbol: symbol,
+		Symbol:            symbol,
+		Interval:          interval,
+		BaseQuantity:      baseQuantity,
+		MinDropPercentage: -0.08,
 	}
 }
 
+func (s *Strategy) SetMinDropPercentage(p float64) *Strategy {
+	s.MinDropPercentage = p
+	return s
+}
+
+func (s *Strategy) SetMaxAssetQuantity(q float64) *Strategy {
+	s.MaxAssetQuantity = q
+	return s
+}
+
 func (s *Strategy) Run(ctx context.Context, trader types.Trader, session *bbgo.ExchangeSession) error {
-	session.Subscribe(types.KLineChannel, s.symbol, types.SubscribeOptions{ Interval: "1h" })
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
 
 	session.Stream.OnKLineClosed(func(kline types.KLine) {
 		changePercentage := kline.GetChange() / kline.Open
 
-		// buy when price drops -10%
-		if changePercentage < -0.1 {
+		// buy when price drops -8%
+		if changePercentage < s.MinDropPercentage {
+			market, ok := session.Markets[s.Symbol]
+			if !ok {
+				return
+			}
+
+			baseBalance, ok := session.Account.Balance(market.BaseCurrency)
+			if ok {
+				// we hold too many
+				if util.NotZero(s.MaxAssetQuantity) && baseBalance.Available > s.MaxAssetQuantity {
+					return
+				}
+			}
+
 			trader.SubmitOrder(ctx, &types.SubmitOrder{
-				Symbol:         kline.Symbol,
-				Side:           types.SideTypeBuy,
-				Type:           types.OrderTypeMarket,
-				Quantity:       1.0,
+				Symbol:   kline.Symbol,
+				Side:     types.SideTypeBuy,
+				Type:     types.OrderTypeMarket,
+				Quantity: s.BaseQuantity * math.Abs(changePercentage),
 			})
 		}
 	})
 
 	return nil
 }
-
-
-
-
-

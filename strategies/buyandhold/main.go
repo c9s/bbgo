@@ -69,11 +69,12 @@ var rootCmd = &cobra.Command{
 		environ.AddExchange(sessionID, exchange).Subscribe(types.KLineChannel, symbol, types.SubscribeOptions{})
 
 		trader := bbgo.NewTrader(environ)
-		trader.AttachStrategy(sessionID, buyandhold.New(symbol))
-		trader.Run(ctx)
+		trader.AttachStrategy(sessionID, buyandhold.New(symbol, "1h", 0.1))
+		// trader.AttachCrossExchangeStrategy(...)
+		err = trader.Run(ctx)
 
 		cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
-		return nil
+		return err
 	},
 }
 
