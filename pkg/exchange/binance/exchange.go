@@ -60,6 +60,11 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 			market.MinNotional = util.MustParseFloat(f.MinNotional)
 		}
 
+		// The LOT_SIZE filter defines the quantity (aka "lots" in auction terms) rules for a symbol.
+		// There are 3 parts:
+		// minQty defines the minimum quantity/icebergQty allowed.
+		//	maxQty defines the maximum quantity/icebergQty allowed.
+		//	stepSize defines the intervals that a quantity/icebergQty can be increased/decreased by.
 		if f := symbol.LotSizeFilter() ; f != nil {
 			market.MinLot = util.MustParseFloat(f.MinQuantity)
 			market.MinQuantity = util.MustParseFloat(f.MinQuantity)
@@ -68,9 +73,9 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 		}
 
 		if f := symbol.PriceFilter() ; f != nil {
-			_ = f.MaxPrice
-			_ = f.MinPrice
-			_ = f.TickSize
+			market.MaxPrice = util.MustParseFloat(f.MaxPrice)
+			market.MinPrice = util.MustParseFloat(f.MinPrice)
+			market.TickSize = util.MustParseFloat(f.TickSize)
 		}
 
 		markets[symbol.Symbol] = market
