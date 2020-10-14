@@ -20,6 +20,10 @@ type Market struct {
 	MinAmount       float64
 	MinNotional     float64
 	MinLot          float64
+
+	MinPrice float64
+	MaxPrice float64
+	TickSize float64
 }
 
 func (m Market) FormatPrice(val float64) string {
