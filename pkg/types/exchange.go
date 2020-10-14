@@ -34,6 +34,8 @@ type Exchange interface {
 
 	NewStream() Stream
 
+	QueryMarkets(ctx context.Context) (MarketMap, error)
+
 	QueryAccount(ctx context.Context) (*Account, error)
 
 	QueryAccountBalances(ctx context.Context) (BalanceMap, error)
