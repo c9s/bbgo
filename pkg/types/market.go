@@ -3,6 +3,8 @@ package types
 import (
 	"math"
 	"strconv"
+
+	"github.com/c9s/bbgo/types"
 )
 
 type Market struct {
@@ -11,7 +13,10 @@ type Market struct {
 	VolumePrecision int
 	QuoteCurrency   string
 	BaseCurrency    string
+
 	MinQuantity     float64
+	MaxQuantity     float64
+
 	MinAmount       float64
 	MinNotional     float64
 	MinLot          float64
@@ -79,6 +84,8 @@ var MarketBNBUSDT = Market{
 	MinAmount:       10.0,
 	MinNotional:     10.0,
 }
+
+type MarketMap map[string]Market
 
 var Markets = map[string]Market{
 	"ETHUSDT": MarketETHUSDT,
