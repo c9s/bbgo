@@ -14,12 +14,15 @@ type Market struct {
 	QuoteCurrency   string
 	BaseCurrency    string
 
+
+	// The MIN_NOTIONAL filter defines the minimum notional value allowed for an order on a symbol. An order's notional value is the price * quantity
+	MinNotional     float64
+	MinAmount       float64
+
+	// The LOT_SIZE filter defines the quantity
+	MinLot          float64
 	MinQuantity     float64
 	MaxQuantity     float64
-
-	MinAmount       float64
-	MinNotional     float64
-	MinLot          float64
 
 	MinPrice float64
 	MaxPrice float64
