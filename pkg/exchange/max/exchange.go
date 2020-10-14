@@ -92,7 +92,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) err
 
 // PlatformFeeCurrency
 func (e *Exchange) PlatformFeeCurrency() string {
-	return toGlobalCurrency("MAX")
+	return toGlobalCurrency("max")
 }
 
 func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
