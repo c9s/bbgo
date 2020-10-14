@@ -58,6 +58,7 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 
 		if f := symbol.MinNotionalFilter() ; f != nil {
 			market.MinNotional = util.MustParseFloat(f.MinNotional)
+			market.MinAmount = util.MustParseFloat(f.MinNotional)
 		}
 
 		// The LOT_SIZE filter defines the quantity (aka "lots" in auction terms) rules for a symbol.
