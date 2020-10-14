@@ -34,6 +34,36 @@ func (e *Exchange) Name() types.ExchangeName {
 	return types.ExchangeMax
 }
 
+func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
+	remoteMarkets, err := e.client.PublicService.Markets()
+	if err != nil {
+		return nil, err
+	}
+
+	markets := types.MarketMap{}
+	for _, m := range remoteMarkets {
+		market := types.Market{
+			Symbol:          toGlobalSymbol(m.ID),
+			PricePrecision:  m.QuoteUnitPrecision,
+			VolumePrecision: m.BaseUnitPrecision,
+			QuoteCurrency:   toGlobalCurrency(m.QuoteUnit),
+			BaseCurrency:    toGlobalCurrency(m.BaseUnit),
+			MinNotional:     m.MinQuoteAmount,
+			MinAmount:       m.MinQuoteAmount,
+			MinLot:          m.MinBaseAmount,
+			MinQuantity:     m.MinBaseAmount,
+			MaxQuantity:     10000.0,
+			MinPrice:        0.1,
+			MaxPrice:        10000.0,
+			TickSize:        0.001,
+		}
+
+		markets[m.ID] = market
+	}
+
+	return markets, nil
+}
+
 func (e *Exchange) NewStream() types.Stream {
 	return NewStream(e.key, e.secret)
 }

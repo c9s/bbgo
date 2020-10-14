@@ -51,9 +51,6 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 			VolumePrecision: symbol.BaseAssetPrecision,
 			QuoteCurrency:   symbol.QuoteAsset,
 			BaseCurrency:    symbol.BaseAsset,
-			MinAmount:       0,
-			MinNotional:     0,
-			MinLot:          0,
 		}
 
 		if f := symbol.MinNotionalFilter() ; f != nil {
