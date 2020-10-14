@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/c9s/bbgo/pkg/accounting"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 
@@ -17,11 +17,11 @@ import (
 
 // SingleExchangeStrategy represents the single Exchange strategy
 type SingleExchangeStrategy interface {
-	Run(ctx context.Context, trader types.OrderExecutor, session *ExchangeSession) error
+	Run(ctx context.Context, orderExecutor types.OrderExecutor, session *ExchangeSession) error
 }
 
 type CrossExchangeStrategy interface {
-	Run(ctx context.Context, trader types.OrderExecutor, sessions map[string]*ExchangeSession) error
+	Run(ctx context.Context, orderExecutionRouter types.OrderExecutionRouter, sessions map[string]*ExchangeSession) error
 }
 
 // ExchangeSession presents the exchange connection session
@@ -174,15 +174,31 @@ func (environ *Environment) Connect(ctx context.Context) error {
 	return nil
 }
 
-type Trader struct {
-	reportTimer             *time.Timer
-	ProfitAndLossCalculator *accounting.ProfitAndLossCalculator
 
+type Notifiability struct {
 	notifiers   []Notifier
+}
+
+func (m *Notifiability) AddNotifier(notifier Notifier) {
+	m.notifiers = append(m.notifiers, notifier)
+}
+
+func (m *Notifiability) Notify(msg string, args ...interface{}) {
+	for _, n := range m.notifiers {
+		n.Notify(msg, args...)
+	}
+}
+
+
+type Trader struct {
+	Notifiability
 	environment *Environment
 
 	crossExchangeStrategies []CrossExchangeStrategy
 	exchangeStrategies      map[string][]SingleExchangeStrategy
+
+	// reportTimer             *time.Timer
+	// ProfitAndLossCalculator *accounting.ProfitAndLossCalculator
 }
 
 func NewTrader(environ *Environment) *Trader {
@@ -190,10 +206,6 @@ func NewTrader(environ *Environment) *Trader {
 		environment:        environ,
 		exchangeStrategies: make(map[string][]SingleExchangeStrategy),
 	}
-}
-
-func (trader *Trader) AddNotifier(notifier Notifier) {
-	trader.notifiers = append(trader.notifiers, notifier)
 }
 
 // AttachStrategy attaches the single exchange strategy on an exchange session.
@@ -219,16 +231,29 @@ func (trader *Trader) Run(ctx context.Context) error {
 
 	// load and run session strategies
 	for session, strategies := range trader.exchangeStrategies {
+		// we can move this to the exchange session,
+		// that way we can mount the notification on the exchange with DSL
+		orderExecutor := &ExchangeOrderExecutor{
+			Notifiability: trader.Notifiability,
+			Exchange:      nil,
+		}
+
 		for _, strategy := range strategies {
-			err := strategy.Run(ctx, trader, trader.environment.sessions[session])
+			err := strategy.Run(ctx, orderExecutor, trader.environment.sessions[session])
 			if err != nil {
 				return err
 			}
 		}
 	}
 
+	router := &ExchangeOrderExecutionRouter{
+		// copy the parent notifiers
+		Notifiability: trader.Notifiability,
+		sessions: trader.environment.sessions,
+	}
+
 	for _, strategy := range trader.crossExchangeStrategies {
-		if err := strategy.Run(ctx, trader, trader.environment.sessions); err != nil {
+		if err := strategy.Run(ctx, router, trader.environment.sessions); err != nil {
 			return err
 		}
 	}
@@ -339,27 +364,25 @@ func (trader *OrderExecutor) RunStrategy(ctx context.Context, strategy SingleExc
 }
 */
 
+/*
 func (trader *Trader) reportPnL() {
 	report := trader.ProfitAndLossCalculator.Calculate()
 	report.Print()
 	trader.NotifyPnL(report)
 }
+ */
 
+/*
 func (trader *Trader) NotifyPnL(report *accounting.ProfitAndLossReport) {
 	for _, n := range trader.notifiers {
 		n.NotifyPnL(report)
 	}
 }
+*/
 
 func (trader *Trader) NotifyTrade(trade *types.Trade) {
 	for _, n := range trader.notifiers {
 		n.NotifyTrade(trade)
-	}
-}
-
-func (trader *Trader) Notify(msg string, args ...interface{}) {
-	for _, n := range trader.notifiers {
-		n.Notify(msg, args...)
 	}
 }
 
@@ -383,4 +406,40 @@ func (trader *Trader) SubmitOrder(ctx context.Context, order types.SubmitOrder) 
 		log.WithError(err).Errorf("order create error: side %s quantity: %s", order.Side, order.QuantityString)
 		return
 	}
+}
+
+
+type ExchangeOrderExecutionRouter struct {
+	Notifiability
+
+	sessions map[string]*ExchangeSession
+}
+
+func (e *ExchangeOrderExecutionRouter) SubmitOrderTo(ctx context.Context, session string, order types.SubmitOrder) error {
+	es, ok := e.sessions[session]
+	if !ok {
+		return errors.Errorf("exchange session %s not found", session)
+	}
+
+	e.Notify(":memo: Submitting order to %s %s %s %s with quantity: %s", session, order.Symbol, order.Type, order.Side, order.QuantityString, order)
+
+	order.PriceString = order.Market.FormatVolume(order.Price)
+	order.QuantityString = order.Market.FormatVolume(order.Quantity)
+	return es.Exchange.SubmitOrder(ctx, order)
+}
+
+
+// ExchangeOrderExecutor is an order executor wrapper for single exchange instance.
+type ExchangeOrderExecutor struct {
+	Notifiability
+
+	Exchange types.Exchange
+}
+
+func (e *ExchangeOrderExecutor) SubmitOrder(ctx context.Context, order types.SubmitOrder) error {
+	e.Notify(":memo: Submitting %s %s %s order with quantity: %s", order.Symbol, order.Type, order.Side, order.QuantityString, order)
+
+	order.PriceString = order.Market.FormatVolume(order.Price)
+	order.QuantityString = order.Market.FormatVolume(order.Quantity)
+	return e.Exchange.SubmitOrder(ctx, order)
 }
