@@ -37,6 +37,48 @@ func (e *Exchange) Name() types.ExchangeName {
 	return types.ExchangeBinance
 }
 
+func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
+	exchangeInfo, err := e.Client.NewExchangeInfoService().Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	markets := types.MarketMap{}
+	for _, symbol := range exchangeInfo.Symbols {
+		market := types.Market{
+			Symbol:          symbol.Symbol,
+			PricePrecision:  symbol.QuotePrecision,
+			VolumePrecision: symbol.BaseAssetPrecision,
+			QuoteCurrency:   symbol.QuoteAsset,
+			BaseCurrency:    symbol.BaseAsset,
+			MinAmount:       0,
+			MinNotional:     0,
+			MinLot:          0,
+		}
+
+		if f := symbol.MinNotionalFilter() ; f != nil {
+			market.MinNotional = util.MustParseFloat(f.MinNotional)
+		}
+
+		if f := symbol.LotSizeFilter() ; f != nil {
+			market.MinLot = util.MustParseFloat(f.MinQuantity)
+			market.MinQuantity = util.MustParseFloat(f.MinQuantity)
+			market.MaxQuantity = util.MustParseFloat(f.MaxQuantity)
+			// market.StepSize = util.MustParseFloat(f.StepSize)
+		}
+
+		if f := symbol.PriceFilter() ; f != nil {
+			_ = f.MaxPrice
+			_ = f.MinPrice
+			_ = f.TickSize
+		}
+
+		markets[symbol.Symbol] = market
+	}
+
+	return markets, nil
+}
+
 func (e *Exchange) QueryAveragePrice(ctx context.Context, symbol string) (float64, error) {
 	resp, err := e.Client.NewAveragePriceService().Symbol(symbol).Do(ctx)
 	if err != nil {
