@@ -19,12 +19,14 @@ type PublicService struct {
 }
 
 type Market struct {
-	ID                 string `json:"id"`
-	Name               string `json:"name"`
-	BaseUnit           string `json:"base_unit"`
-	BaseUnitPrecision  int    `json:"base_unit_precision"`
-	QuoteUnit          string `json:"quote_unit"`
-	QuoteUnitPrecision int    `json:"quote_unit_precision"`
+	ID                 string  `json:"id"`
+	Name               string  `json:"name"`
+	BaseUnit           string  `json:"base_unit"`
+	BaseUnitPrecision  int     `json:"base_unit_precision"`
+	QuoteUnit          string  `json:"quote_unit"`
+	QuoteUnitPrecision int     `json:"quote_unit_precision"`
+	MinBaseAmount      float64 `json:"min_base_amount"`
+	MinQuoteAmount     float64 `json:"min_quote_amount"`
 }
 
 type Ticker struct {
