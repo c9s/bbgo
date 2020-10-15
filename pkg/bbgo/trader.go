@@ -149,7 +149,7 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 
 		session.Stream = stream
 
-		session.Account = &Account{Balances: balances}
+		session.Account = &Account{balances: balances}
 		session.Account.BindStream(session.Stream)
 
 		marketDataStore := NewMarketDataStore()
@@ -175,7 +175,6 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 
 func (environ *Environment) Connect(ctx context.Context) error {
 	for _, session := range environ.sessions {
-
 		for _, s := range session.Subscriptions {
 			log.Infof("subscribing %s %s %v", s.Symbol, s.Channel, s.Options)
 			session.Stream.Subscribe(s.Channel, s.Symbol, s.Options)
