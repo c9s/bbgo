@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"math"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
@@ -70,12 +72,15 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor types.OrderExecutor, s
 				}
 			}
 
-			orderExecutor.SubmitOrder(ctx, types.SubmitOrder{
+			err := orderExecutor.SubmitOrder(ctx, types.SubmitOrder{
 				Symbol:   kline.Symbol,
 				Side:     types.SideTypeBuy,
 				Type:     types.OrderTypeMarket,
 				Quantity: s.BaseQuantity * math.Abs(changePercentage),
 			})
+			if err != nil {
+				log.WithError(err).Error("submit order error")
+			}
 		}
 	})
 

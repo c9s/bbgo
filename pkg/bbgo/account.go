@@ -11,12 +11,12 @@ import (
 
 type Account struct {
 	sync.Mutex
-	Balances map[string]types.Balance
+	balances map[string]types.Balance
 }
 
 func (a *Account) Balance(currency string) (balance types.Balance, ok bool) {
 	a.Lock()
-	balance, ok = a.Balances[currency]
+	balance, ok = a.balances[currency]
 	a.Unlock()
 	return balance, ok
 }
@@ -26,7 +26,7 @@ func (a *Account) handleBalanceUpdates(balances map[string]types.Balance) {
 	defer a.Unlock()
 
 	for _, balance := range balances {
-		a.Balances[balance.Currency] = balance
+		a.balances[balance.Currency] = balance
 	}
 }
 
@@ -39,7 +39,7 @@ func (a *Account) Print() {
 	a.Lock()
 	defer a.Unlock()
 
-	for _, balance := range a.Balances {
+	for _, balance := range a.balances {
 		if util.NotZero(balance.Available) {
 			log.Infof("account balance %s %f", balance.Currency, balance.Available)
 		}
