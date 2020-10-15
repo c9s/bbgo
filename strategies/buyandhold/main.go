@@ -1,11 +1,10 @@
-package buyandhold
+package main
 
 import (
 	"context"
-	"fmt"
+	"strings"
 	"syscall"
 
-	"github.com/jmoiron/sqlx"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -17,14 +16,23 @@ import (
 )
 
 func init() {
-	rootCmd.Flags().String("exchange", "", "target exchange")
-	rootCmd.Flags().String("symbol", "", "trading symbol")
-}
+	rootCmd.PersistentFlags().String("binance-api-key", "", "binance api key")
+	rootCmd.PersistentFlags().String("binance-api-secret", "", "binance api secret")
+	rootCmd.PersistentFlags().String("max-api-key", "", "max api key")
+	rootCmd.PersistentFlags().String("max-api-secret", "", "max api secret")
 
-func connectMysql() (*sqlx.DB, error) {
-	mysqlURL := viper.GetString("mysql-url")
-	mysqlURL = fmt.Sprintf("%s?parseTime=true", mysqlURL)
-	return sqlx.Connect("mysql", mysqlURL)
+	rootCmd.Flags().String("exchange", "binance", "target exchange")
+	rootCmd.Flags().String("symbol", "BTCUSDT", "trading symbol")
+	rootCmd.Flags().String("interval", "1h", "kline interval for price change detection")
+
+	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
+
+	// Enable environment variable binding, the env vars are not overloaded yet.
+	viper.AutomaticEnv()
+
+	if err := viper.BindPFlags(rootCmd.PersistentFlags()); err != nil {
+		log.WithError(err).Errorf("failed to bind persistent flags. please check the flag settings.")
+	}
 }
 
 var rootCmd = &cobra.Command{
@@ -54,6 +62,11 @@ var rootCmd = &cobra.Command{
 			return err
 		}
 
+		interval, err := cmd.Flags().GetString("interval")
+		if err != nil {
+			return err
+		}
+
 		exchange, err := cmdutil.NewExchange(exchangeName)
 		if err != nil {
 			return err
@@ -66,10 +79,10 @@ var rootCmd = &cobra.Command{
 
 		sessionID := "main"
 		environ := bbgo.NewEnvironment(db)
-		environ.AddExchange(sessionID, exchange).Subscribe(types.KLineChannel, symbol, types.SubscribeOptions{})
+		environ.AddExchange(sessionID, exchange)
 
 		trader := bbgo.NewTrader(environ)
-		trader.AttachStrategy(sessionID, buyandhold.New(symbol, "1h", 0.1))
+		trader.AttachStrategy(sessionID, buyandhold.New(symbol, interval, 0.1))
 		// trader.AttachCrossExchangeStrategy(...)
 		err = trader.Run(ctx)
 

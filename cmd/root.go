@@ -36,6 +36,12 @@ func init() {
 	RootCmd.PersistentFlags().String("slack-token", "", "slack token")
 	RootCmd.PersistentFlags().String("slack-trading-channel", "dev-bbgo", "slack trading channel")
 	RootCmd.PersistentFlags().String("slack-error-channel", "bbgo-error", "slack error channel")
+
+	RootCmd.PersistentFlags().String("binance-api-key", "", "binance api key")
+	RootCmd.PersistentFlags().String("binance-api-secret", "", "binance api secret")
+
+	RootCmd.PersistentFlags().String("max-api-key", "", "max api key")
+	RootCmd.PersistentFlags().String("max-api-secret", "", "max api secret")
 }
 
 func Run() {

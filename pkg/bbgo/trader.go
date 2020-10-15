@@ -36,7 +36,7 @@ type ExchangeSession struct {
 	// Stream is the connection stream of the exchange
 	Stream types.Stream
 
-	Subscriptions []types.Subscription
+	Subscriptions map[types.Subscription]types.Subscription
 
 	Exchange types.Exchange
 
@@ -53,12 +53,12 @@ type ExchangeSession struct {
 }
 
 func (session *ExchangeSession) Subscribe(channel types.Channel, symbol string, options types.SubscribeOptions) *ExchangeSession {
-	session.Subscriptions = append(session.Subscriptions, types.Subscription{
+	sub := types.Subscription{
 		Channel: channel,
 		Symbol:  symbol,
 		Options: options,
-	})
-
+	}
+	session.Subscriptions[sub] = sub
 	return session
 }
 
@@ -85,6 +85,7 @@ func (environ *Environment) AddExchange(name string, exchange types.Exchange) (s
 	session = &ExchangeSession{
 		Name:       name,
 		Exchange:   exchange,
+		Subscriptions: make(map[types.Subscription]types.Subscription),
 		Markets:    make(map[string]types.Market),
 		Trades:     make(map[string][]types.Trade),
 		LastPrices: make(map[string]float64),
@@ -144,10 +145,11 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 			return err
 		}
 
+		stream := session.Exchange.NewStream()
+
+		session.Stream = stream
+
 		session.Account = &Account{Balances: balances}
-
-		session.Stream = session.Exchange.NewStream()
-
 		session.Account.BindStream(session.Stream)
 
 		marketDataStore := NewMarketDataStore()
@@ -173,6 +175,12 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 
 func (environ *Environment) Connect(ctx context.Context) error {
 	for _, session := range environ.sessions {
+
+		for _, s := range session.Subscriptions {
+			log.Infof("subscribing %s %s %v", s.Symbol, s.Channel, s.Options)
+			session.Stream.Subscribe(s.Channel, s.Symbol, s.Options)
+		}
+
 		if err := session.Stream.Connect(ctx); err != nil {
 			return err
 		}
