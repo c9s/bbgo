@@ -103,6 +103,13 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 			loadedSymbols[sub.Symbol] = struct{}{}
 		}
 
+		markets, err := session.Exchange.QueryMarkets(ctx)
+		if err != nil {
+			return err
+		}
+
+		session.Markets = markets
+
 		for symbol := range loadedSymbols {
 			if err := environ.TradeSync.Sync(ctx, session.Exchange, symbol, startTime); err != nil {
 				return err
