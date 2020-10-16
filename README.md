@@ -107,7 +107,7 @@ streambook := types.NewStreamBook(symbol)
 streambook.BindStream(stream)
 ```
 
-## New Trading Bot API design
+## New API Design
 
 _**still under construction**_
 
@@ -126,7 +126,7 @@ func main() {
         return err
     }
 
-    environment := environ.New()
+    environment := bbgo.NewEnvironment(db)
     environment.AddExchange("binance", binance.New(viper.Getenv("binance-api-key"), viper.Getenv("binance-api-secret"))))
     environment.AddExchange("max", max.New(viper.Getenv("max-key"), viper.Getenv("max-secret"))))
 
@@ -141,7 +141,6 @@ func main() {
     // when any trade execution happened
     trader.OnTrade(func(session string, exchange types.Exchange, trade types.Trade) {
         notify(trade)
-        
         notifyPnL()
     })
 
