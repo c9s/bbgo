@@ -8,7 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
 
-	"github.com/c9s/bbgo/pkg/accounting"
+	"github.com/c9s/bbgo/pkg/accounting/pnl"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 )
@@ -106,7 +106,7 @@ func (n *Notifier) NotifyTrade(trade *types.Trade) {
 	}
 }
 
-func (n *Notifier) NotifyPnL(report *accounting.ProfitAndLossReport) {
+func (n *Notifier) NotifyPnL(report *pnl.AverageCostPnlReport) {
 	attachment := report.SlackAttachment()
 
 	_, _, err := n.client.PostMessageContext(context.Background(), n.PnlChannel,

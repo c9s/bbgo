@@ -1,17 +1,17 @@
-package accounting
+package pnl
 
 import (
 	"strconv"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
 
 	"github.com/c9s/bbgo/pkg/slack/slackstyle"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-type ProfitAndLossReport struct {
+type AverageCostPnlReport struct {
 	CurrentPrice float64
 	StartTime    time.Time
 	Symbol       string
@@ -27,23 +27,23 @@ type ProfitAndLossReport struct {
 	CurrencyFees     map[string]float64
 }
 
-func (report ProfitAndLossReport) Print() {
-	logrus.Infof("trades since: %v", report.StartTime)
-	logrus.Infof("average bid cost: %s", types.USD.FormatMoneyFloat64(report.AverageBidCost))
-	logrus.Infof("total bid volume: %f", report.BidVolume)
-	logrus.Infof("total ask volume: %f", report.AskVolume)
-	logrus.Infof("stock: %f", report.Stock)
-	logrus.Infof("fee (USD): %f", report.FeeUSD)
-	logrus.Infof("current price: %s", types.USD.FormatMoneyFloat64(report.CurrentPrice))
-	logrus.Infof("profit: %s", types.USD.FormatMoneyFloat64(report.Profit))
-	logrus.Infof("unrealized profit: %s", types.USD.FormatMoneyFloat64(report.UnrealizedProfit))
-	logrus.Infof("currency fees:")
+func (report AverageCostPnlReport) Print() {
+	log.Infof("trades since: %v", report.StartTime)
+	log.Infof("average bid cost: %s", types.USD.FormatMoneyFloat64(report.AverageBidCost))
+	log.Infof("total bid volume: %f", report.BidVolume)
+	log.Infof("total ask volume: %f", report.AskVolume)
+	log.Infof("stock: %f", report.Stock)
+	log.Infof("fee (USD): %f", report.FeeUSD)
+	log.Infof("current price: %s", types.USD.FormatMoneyFloat64(report.CurrentPrice))
+	log.Infof("profit: %s", types.USD.FormatMoneyFloat64(report.Profit))
+	log.Infof("unrealized profit: %s", types.USD.FormatMoneyFloat64(report.UnrealizedProfit))
+	log.Infof("currency fees:")
 	for currency, fee := range report.CurrencyFees {
-		logrus.Infof(" - %s: %f", currency, fee)
+		log.Infof(" - %s: %f", currency, fee)
 	}
 }
 
-func (report ProfitAndLossReport) SlackAttachment() slack.Attachment {
+func (report AverageCostPnlReport) SlackAttachment() slack.Attachment {
 	var color = slackstyle.Red
 
 	if report.UnrealizedProfit > 0 {

@@ -6,7 +6,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/c9s/bbgo/pkg/accounting"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -16,7 +15,7 @@ type AverageCostCalculator struct {
 	TradingFeeCurrency string
 }
 
-func (c *AverageCostCalculator) Calculate(trades []types.Trade, currentPrice float64) *accounting.ProfitAndLossReport {
+func (c *AverageCostCalculator) Calculate(trades []types.Trade, currentPrice float64) *AverageCostPnlReport {
 	// copy trades, so that we can truncate it.
 	var bidVolume = 0.0
 	var bidAmount = 0.0
@@ -88,7 +87,7 @@ func (c *AverageCostCalculator) Calculate(trades []types.Trade, currentPrice flo
 		unrealizedProfit += (currentPrice-averageCost)*stock - stockFee
 	}
 
-	return &accounting.ProfitAndLossReport{
+	return &AverageCostPnlReport{
 		Symbol:       c.Symbol,
 		StartTime:    c.StartTime,
 		CurrentPrice: currentPrice,
