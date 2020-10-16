@@ -8,12 +8,25 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 
+	"github.com/c9s/bbgo/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 
 	_ "github.com/go-sql-driver/mysql"
+	flag "github.com/spf13/pflag"
 )
+
+var SupportedExchanges = []types.ExchangeName{"binance", "max"}
+
+// PersistentFlags defines the flags for environments
+func PersistentFlags(flags *flag.FlagSet) {
+	flags.String("binance-api-key", "", "binance api key")
+	flags.String("binance-api-secret", "", "binance api secret")
+	flags.String("max-api-key", "", "max api key")
+	flags.String("max-api-secret", "", "max api secret")
+}
 
 // SingleExchangeStrategy represents the single Exchange strategy
 type SingleExchangeStrategy interface {
@@ -70,6 +83,23 @@ type Environment struct {
 	sessions map[string]*ExchangeSession
 }
 
+func NewDefaultEnvironment(db *sqlx.DB) *Environment {
+	environment := NewEnvironment(db)
+
+	for _, n := range SupportedExchanges {
+		if viper.IsSet(string(n) + "-api-key") {
+			exchange, err := cmdutil.NewExchange(n)
+			if err != nil {
+				panic(err)
+			}
+
+			environment.AddExchange(string(n), exchange)
+		}
+	}
+
+	return environment
+}
+
 func NewEnvironment(db *sqlx.DB) *Environment {
 	tradeService := &service.TradeService{DB: db}
 	return &Environment{
@@ -83,12 +113,12 @@ func NewEnvironment(db *sqlx.DB) *Environment {
 
 func (environ *Environment) AddExchange(name string, exchange types.Exchange) (session *ExchangeSession) {
 	session = &ExchangeSession{
-		Name:       name,
-		Exchange:   exchange,
+		Name:          name,
+		Exchange:      exchange,
 		Subscriptions: make(map[types.Subscription]types.Subscription),
-		Markets:    make(map[string]types.Market),
-		Trades:     make(map[string][]types.Trade),
-		LastPrices: make(map[string]float64),
+		Markets:       make(map[string]types.Market),
+		Trades:        make(map[string][]types.Trade),
+		LastPrices:    make(map[string]float64),
 	}
 
 	environ.sessions[name] = session
@@ -188,9 +218,8 @@ func (environ *Environment) Connect(ctx context.Context) error {
 	return nil
 }
 
-
 type Notifiability struct {
-	notifiers   []Notifier
+	notifiers []Notifier
 }
 
 func (m *Notifiability) AddNotifier(notifier Notifier) {
@@ -202,7 +231,6 @@ func (m *Notifiability) Notify(msg string, args ...interface{}) {
 		n.Notify(msg, args...)
 	}
 }
-
 
 type Trader struct {
 	Notifiability
@@ -263,7 +291,7 @@ func (trader *Trader) Run(ctx context.Context) error {
 	router := &ExchangeOrderExecutionRouter{
 		// copy the parent notifiers
 		Notifiability: trader.Notifiability,
-		sessions: trader.environment.sessions,
+		sessions:      trader.environment.sessions,
 	}
 
 	for _, strategy := range trader.crossExchangeStrategies {
@@ -384,7 +412,7 @@ func (trader *Trader) reportPnL() {
 	report.Print()
 	trader.NotifyPnL(report)
 }
- */
+*/
 
 /*
 func (trader *Trader) NotifyPnL(report *accounting.ProfitAndLossReport) {
@@ -422,7 +450,6 @@ func (trader *Trader) SubmitOrder(ctx context.Context, order types.SubmitOrder) 
 	}
 }
 
-
 type ExchangeOrderExecutionRouter struct {
 	Notifiability
 
@@ -441,7 +468,6 @@ func (e *ExchangeOrderExecutionRouter) SubmitOrderTo(ctx context.Context, sessio
 	order.QuantityString = order.Market.FormatVolume(order.Quantity)
 	return es.Exchange.SubmitOrder(ctx, order)
 }
-
 
 // ExchangeOrderExecutor is an order executor wrapper for single exchange instance.
 type ExchangeOrderExecutor struct {
