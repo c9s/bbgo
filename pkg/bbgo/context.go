@@ -3,7 +3,7 @@ package bbgo
 import (
 	"sync"
 
-	"github.com/c9s/bbgo/pkg/accounting"
+	"github.com/c9s/bbgo/pkg/accounting/pnl"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -19,7 +19,7 @@ type Context struct {
 	CurrentPrice    float64
 
 	Balances                map[string]types.Balance
-	ProfitAndLossCalculator *accounting.ProfitAndLossCalculator
+	ProfitAndLossCalculator *pnl.AverageCostCalculator
 	StockManager            *StockDistribution
 }
 

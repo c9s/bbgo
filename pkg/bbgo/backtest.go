@@ -3,7 +3,7 @@ package bbgo
 import (
 	"context"
 
-	"github.com/c9s/bbgo/pkg/accounting"
+	"github.com/c9s/bbgo/pkg/accounting/pnl"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -23,7 +23,7 @@ type BackTestTrader struct {
 	// Context is trading Context
 	Context                 *Context
 	SourceKLines            []types.KLine
-	ProfitAndLossCalculator *accounting.ProfitAndLossCalculator
+	ProfitAndLossCalculator *pnl.AverageCostCalculator
 
 	doneOrders    []types.SubmitOrder
 	pendingOrders []types.SubmitOrder
@@ -125,7 +125,7 @@ func (trader *BackTestTrader) RunStrategy(ctx context.Context, strategy SingleEx
 			}
 
 			tradeID++
-			trader.ProfitAndLossCalculator.AddTrade(trade)
+			trader.AverageCostCalculator.AddTrade(trade)
 
 			trader.doneOrders = append(trader.doneOrders, order)
 		}
@@ -135,7 +135,7 @@ func (trader *BackTestTrader) RunStrategy(ctx context.Context, strategy SingleEx
 	}
 
 	fmt.Print("\n")
-	report := trader.ProfitAndLossCalculator.Calculate()
+	report := trader.AverageCostCalculator.Calculate()
 	report.Print()
 
 	logrus.Infof("wallet balance:")
