@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/c9s/bbgo/cmd/cmdutil"
-	"github.com/c9s/bbgo/pkg/accounting"
+	"github.com/c9s/bbgo/pkg/accounting/pnl"
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
@@ -110,7 +110,7 @@ var pnlCmd = &cobra.Command{
 
 		currentPrice, err := exchange.QueryAveragePrice(ctx, symbol)
 
-		calculator := &accounting.ProfitAndLossCalculator{
+		calculator := &pnl.AverageCostCalculator{
 			TradingFeeCurrency: tradingFeeCurrency,
 			Symbol:             symbol,
 			StartTime:          startTime,
