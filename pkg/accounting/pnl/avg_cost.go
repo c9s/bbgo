@@ -13,22 +13,11 @@ import (
 type AverageCostCalculator struct {
 	Symbol             string
 	StartTime          time.Time
-	CurrentPrice       float64
-	Trades             []types.Trade
 	TradingFeeCurrency string
 }
 
-func (c *AverageCostCalculator) AddTrade(trade types.Trade) {
-	c.Trades = append(c.Trades, trade)
-}
-
-func (c *AverageCostCalculator) SetCurrentPrice(price float64) {
-	c.CurrentPrice = price
-}
-
-func (c *AverageCostCalculator) Calculate() *accounting.ProfitAndLossReport {
+func (c *AverageCostCalculator) Calculate(trades []types.Trade, currentPrice float64) *accounting.ProfitAndLossReport {
 	// copy trades, so that we can truncate it.
-	var trades = c.Trades
 	var bidVolume = 0.0
 	var bidAmount = 0.0
 
@@ -95,14 +84,14 @@ func (c *AverageCostCalculator) Calculate() *accounting.ProfitAndLossReport {
 
 	stock := bidVolume - askVolume
 	if stock > 0 {
-		stockFee := c.CurrentPrice * stock * feeRate
-		unrealizedProfit += (c.CurrentPrice-averageCost)*stock - stockFee
+		stockFee := currentPrice * stock * feeRate
+		unrealizedProfit += (currentPrice-averageCost)*stock - stockFee
 	}
 
 	return &accounting.ProfitAndLossReport{
 		Symbol:       c.Symbol,
 		StartTime:    c.StartTime,
-		CurrentPrice: c.CurrentPrice,
+		CurrentPrice: currentPrice,
 		NumTrades:    len(trades),
 
 		BidVolume: bidVolume,

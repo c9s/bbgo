@@ -115,9 +115,8 @@ var pnlCmd = &cobra.Command{
 			Symbol:             symbol,
 			StartTime:          startTime,
 			CurrentPrice:       currentPrice,
-			Trades:             trades,
 		}
-		report := calculator.Calculate()
+		report := calculator.Calculate(trades)
 		report.Print()
 		return nil
 	},
