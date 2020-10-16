@@ -65,7 +65,7 @@ func NewTrader(environ *Environment) *Trader {
 
 // AttachStrategy attaches the single exchange strategy on an exchange session.
 // Single exchange strategy is the default behavior.
-func (trader *Trader) AttachStrategy(session string, strategies ...SingleExchangeStrategy) {
+func (trader *Trader) AttachStrategy(session string, strategies ...SingleExchangeStrategy) *Trader {
 	if _, ok := trader.environment.sessions[session]; !ok {
 		log.Panicf("session %s is not defined", session)
 	}
@@ -73,12 +73,15 @@ func (trader *Trader) AttachStrategy(session string, strategies ...SingleExchang
 	for _, s := range strategies {
 		trader.exchangeStrategies[session] = append(trader.exchangeStrategies[session], s)
 	}
+
+	return trader
 }
 
 // AttachCrossExchangeStrategy attaches the cross exchange strategy
-func (trader *Trader) AttachCrossExchangeStrategy(strategy CrossExchangeStrategy) error {
+func (trader *Trader) AttachCrossExchangeStrategy(strategy CrossExchangeStrategy) *Trader {
 	trader.crossExchangeStrategies = append(trader.crossExchangeStrategies, strategy)
-	return nil
+
+	return trader
 }
 
 func (trader *Trader) Run(ctx context.Context) error {
