@@ -35,6 +35,8 @@ func (e *Exchange) Name() types.ExchangeName {
 }
 
 func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
+	log.Info("querying market info...")
+
 	remoteMarkets, err := e.client.PublicService.Markets()
 	if err != nil {
 		return nil, err
