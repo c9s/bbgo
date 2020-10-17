@@ -183,6 +183,14 @@ func (c *RestClient) newAuthenticatedRequest(m string, refURL string, data inter
 	var p []byte
 
 	switch d := data.(type) {
+
+	case nil:
+		payload := map[string]interface{}{
+			"nonce": c.getNonce(),
+			"path":  c.BaseURL.ResolveReference(rel).Path,
+		}
+		p, err = json.Marshal(payload)
+
 	case map[string]interface{}:
 		payload := map[string]interface{}{
 			"nonce": c.getNonce(),
