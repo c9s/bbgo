@@ -21,6 +21,7 @@ type Subscription struct {
 	Channel string `json:"channel"`
 	Market  string `json:"market"`
 	Depth   int    `json:"depth,omitempty"`
+	Resolution string `json:"resolution,omitempty"`
 }
 
 type WebsocketCommand struct {
