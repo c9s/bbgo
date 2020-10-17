@@ -73,12 +73,6 @@ func NewStream(key, secret string) *Stream {
 }
 
 func (s *Stream) Subscribe(channel types.Channel, symbol string, options types.SubscribeOptions) {
-	// "book"
-	switch channel {
-	case types.KLineChannel:
-		panic("kline channel is not supported in max")
-	}
-
 	s.websocketService.Subscribe(string(channel), symbol)
 }
 
