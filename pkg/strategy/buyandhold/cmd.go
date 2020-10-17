@@ -65,6 +65,9 @@ var Cmd = &cobra.Command{
 		trader := bbgo.NewTrader(environ)
 		trader.AttachStrategy(string(exchangeName), New(symbol, interval, baseQuantity))
 		err = trader.Run(ctx)
+		if err != nil {
+			return err
+		}
 
 		cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
 		return err

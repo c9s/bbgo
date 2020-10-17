@@ -15,14 +15,18 @@ type KLineCallback func(kline types.KLine)
 
 //go:generate callbackgen -type MarketDataStore
 type MarketDataStore struct {
+	Symbol string
+
 	// KLineWindows stores all loaded klines per interval
 	KLineWindows map[Interval]types.KLineWindow `json:"-"`
 
 	updateCallbacks []KLineCallback
 }
 
-func NewMarketDataStore() *MarketDataStore {
+func NewMarketDataStore(symbol string) *MarketDataStore {
 	return &MarketDataStore{
+		Symbol: symbol,
+
 		// KLineWindows stores all loaded klines per interval
 		KLineWindows: make(map[Interval]types.KLineWindow),
 	}
@@ -33,7 +37,9 @@ func (store *MarketDataStore) BindStream(stream types.Stream) {
 }
 
 func (store *MarketDataStore) handleKLineClosed(kline types.KLine) {
-	store.AddKLine(kline)
+	if kline.Symbol == store.Symbol {
+		store.AddKLine(kline)
+	}
 }
 
 func (store *MarketDataStore) AddKLine(kline types.KLine) {

@@ -11,6 +11,10 @@ import (
 
 type ExchangeName string
 
+func (n ExchangeName) String() string {
+	return string(n)
+}
+
 const (
 	ExchangeMax     = ExchangeName("max")
 	ExchangeBinance = ExchangeName("binance")
