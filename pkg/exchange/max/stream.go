@@ -3,8 +3,6 @@ package max
 import (
 	"context"
 
-	log "github.com/sirupsen/logrus"
-
 	max "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"github.com/c9s/bbgo/pkg/types"
 )
