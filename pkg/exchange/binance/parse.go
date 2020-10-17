@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/adshao/go-binance"
 	"github.com/valyala/fastjson"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -431,14 +430,8 @@ kline
   }
 }
 
-
-
-
 */
 type EventBase struct {
 	Event string `json:"e"` // event
 	Time  int64  `json:"E"`
-}
-
-func convertDepthResponseToSnapshot(client *binance.Client) {
 }
