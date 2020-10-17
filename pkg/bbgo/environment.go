@@ -51,15 +51,7 @@ func NewEnvironment(db *sqlx.DB) *Environment {
 }
 
 func (environ *Environment) AddExchange(name string, exchange types.Exchange) (session *ExchangeSession) {
-	session = &ExchangeSession{
-		Name:          name,
-		Exchange:      exchange,
-		Subscriptions: make(map[types.Subscription]types.Subscription),
-		Markets:       make(map[string]types.Market),
-		Trades:        make(map[string][]types.Trade),
-		LastPrices:    make(map[string]float64),
-	}
-
+	session = NewExchangeSession(name, exchange)
 	environ.sessions[name] = session
 	return session
 }

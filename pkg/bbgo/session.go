@@ -27,7 +27,19 @@ type ExchangeSession struct {
 	// map: symbol -> []trade
 	Trades map[string][]types.Trade
 
-	MarketDataStore *MarketDataStore
+	MarketDataStores map[string]*MarketDataStore
+}
+
+func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
+	return &ExchangeSession{
+		Name:          name,
+		Exchange:      exchange,
+		Subscriptions: make(map[types.Subscription]types.Subscription),
+		Markets:       make(map[string]types.Market),
+		Trades:        make(map[string][]types.Trade),
+		LastPrices:    make(map[string]float64),
+		MarketDataStores: make(map[string]*MarketDataStore),
+	}
 }
 
 // Subscribe save the subscription info, later it will be assigned to the stream
