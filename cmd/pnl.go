@@ -114,9 +114,9 @@ var pnlCmd = &cobra.Command{
 			TradingFeeCurrency: tradingFeeCurrency,
 			Symbol:             symbol,
 			StartTime:          startTime,
-			CurrentPrice:       currentPrice,
 		}
-		report := calculator.Calculate(trades)
+
+		report := calculator.Calculate(trades, currentPrice)
 		report.Print()
 		return nil
 	},
