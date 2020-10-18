@@ -112,7 +112,8 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 
 		stream := session.Exchange.NewStream()
 
-		account := &Account{balances: balances}
+		account := &types.Account{}
+		account.UpdateBalances(balances)
 		account.BindStream(stream)
 		session.Account = account
 

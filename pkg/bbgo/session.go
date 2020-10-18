@@ -9,7 +9,7 @@ type ExchangeSession struct {
 	Name string
 
 	// The exchange account states
-	Account *Account
+	Account *types.Account
 
 	// Stream is the connection stream of the exchange
 	Stream types.Stream

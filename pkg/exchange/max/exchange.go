@@ -114,11 +114,13 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 		}
 	}
 
-	return &types.Account{
+	a := &types.Account{
 		MakerCommission: 15, // 0.15%
 		TakerCommission: 15, // 0.15%
-		Balances:        balances,
-	}, nil
+	}
+
+	a.UpdateBalances(balances)
+	return a, nil
 }
 
 func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (allWithdraws []types.Withdraw, err error) {
