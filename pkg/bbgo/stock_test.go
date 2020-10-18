@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/c9s/bbgo/pkg/accounting"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -21,7 +22,7 @@ func TestStockManager(t *testing.T) {
 		err = json.Unmarshal(out, &trades)
 		assert.NoError(t, err)
 
-		var stockManager = &StockDistribution{
+		var stockManager = &accounting.StockDistribution{
 			TradingFeeCurrency: "BNB",
 			Symbol:             "BTCUSDT",
 		}
@@ -42,7 +43,7 @@ func TestStockManager(t *testing.T) {
 			{Symbol: "BTCUSDT", Price: 9200.0, Quantity: 0.01, IsBuyer: false},
 		}
 
-		var stockManager = &StockDistribution{
+		var stockManager = &accounting.StockDistribution{
 			TradingFeeCurrency: "BNB",
 			Symbol:             "BTCUSDT",
 		}
@@ -50,7 +51,7 @@ func TestStockManager(t *testing.T) {
 		_, err := stockManager.AddTrades(trades)
 		assert.NoError(t, err)
 		assert.Len(t, stockManager.Stocks, 2)
-		assert.Equal(t, StockSlice{
+		assert.Equal(t, accounting.StockSlice{
 			{
 				Symbol:   "BTCUSDT",
 				Price:    9100.0,
@@ -75,7 +76,7 @@ func TestStockManager(t *testing.T) {
 			{Symbol: "BTCUSDT", Price: 9200.0, Quantity: 0.05, IsBuyer: false},
 		}
 
-		var stockManager = &StockDistribution{
+		var stockManager = &accounting.StockDistribution{
 			TradingFeeCurrency: "BNB",
 			Symbol:             "BTCUSDT",
 		}
@@ -93,7 +94,7 @@ func TestStockManager(t *testing.T) {
 			{Symbol: "BTCUSDT", Price: 9200.0, Quantity: 0.05, IsBuyer: false},
 		}
 
-		var stockManager = &StockDistribution{
+		var stockManager = &accounting.StockDistribution{
 			TradingFeeCurrency: "BNB",
 			Symbol:             "BTCUSDT",
 		}
@@ -111,7 +112,7 @@ func TestStockManager(t *testing.T) {
 			{Symbol: "BTCUSDT", Price: 8000.0, Quantity: 0.01, IsBuyer: false},
 		}
 
-		var stockManager = &StockDistribution{
+		var stockManager = &accounting.StockDistribution{
 			TradingFeeCurrency: "BNB",
 			Symbol:             "BTCUSDT",
 		}
@@ -119,7 +120,7 @@ func TestStockManager(t *testing.T) {
 		_, err := stockManager.AddTrades(trades)
 		assert.NoError(t, err)
 		assert.Len(t, stockManager.Stocks, 1)
-		assert.Equal(t, StockSlice{
+		assert.Equal(t, accounting.StockSlice{
 			{
 				Symbol:   "BTCUSDT",
 				Price:    9100.0,
@@ -136,7 +137,7 @@ func TestStockManager(t *testing.T) {
 			{Symbol: "BTCUSDT", Price: 9100.0, Quantity: 0.05, IsBuyer: true},
 		}
 
-		var stockManager = &StockDistribution{
+		var stockManager = &accounting.StockDistribution{
 			TradingFeeCurrency: "BNB",
 			Symbol:             "BTCUSDT",
 		}
@@ -144,7 +145,7 @@ func TestStockManager(t *testing.T) {
 		_, err := stockManager.AddTrades(trades)
 		assert.NoError(t, err)
 		assert.Len(t, stockManager.Stocks, 1)
-		assert.Equal(t, StockSlice{
+		assert.Equal(t, accounting.StockSlice{
 			{
 				Symbol:   "BTCUSDT",
 				Price:    9100.0,
@@ -161,7 +162,7 @@ func TestStockManager(t *testing.T) {
 			{Symbol: "BTCUSDT", Price: 9100.0, Quantity: 0.05, IsBuyer: true},
 		}
 
-		var stockManager = &StockDistribution{
+		var stockManager = &accounting.StockDistribution{
 			TradingFeeCurrency: "BNB",
 			Symbol:             "BTCUSDT",
 		}
@@ -170,7 +171,7 @@ func TestStockManager(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Len(t, stockManager.Stocks, 0)
 		assert.Len(t, stockManager.PendingSells, 1)
-		assert.Equal(t, StockSlice{
+		assert.Equal(t, accounting.StockSlice{
 			{
 				Symbol:   "BTCUSDT",
 				Price:    9200.0,
