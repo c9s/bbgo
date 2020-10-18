@@ -4,18 +4,20 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-//go:generate callbackgen -type MarketDataStore
-type MarketDataStore struct {
+//go:generate callbackgen -type KLineStore
+type KLineStore struct {
 	Symbol string
 
 	// KLineWindows stores all loaded klines per interval
 	KLineWindows map[types.Interval]types.KLineWindow `json:"-"`
 
+	LastKLine types.KLine
+
 	updateCallbacks []func(kline types.KLine)
 }
 
-func NewMarketDataStore(symbol string) *MarketDataStore {
-	return &MarketDataStore{
+func NewMarketDataStore(symbol string) *KLineStore {
+	return &KLineStore{
 		Symbol: symbol,
 
 		// KLineWindows stores all loaded klines per interval
@@ -23,20 +25,22 @@ func NewMarketDataStore(symbol string) *MarketDataStore {
 	}
 }
 
-func (store *MarketDataStore) BindStream(stream types.Stream) {
+func (store *KLineStore) BindStream(stream types.Stream) {
 	stream.OnKLineClosed(store.handleKLineClosed)
 }
 
-func (store *MarketDataStore) handleKLineClosed(kline types.KLine) {
+func (store *KLineStore) handleKLineClosed(kline types.KLine) {
 	if kline.Symbol == store.Symbol {
 		store.AddKLine(kline)
 	}
 }
 
-func (store *MarketDataStore) AddKLine(kline types.KLine) {
+func (store *KLineStore) AddKLine(kline types.KLine) {
 	var interval = types.Interval(kline.Interval)
 	var window = store.KLineWindows[interval]
 	window.Add(kline)
+
+	store.LastKLine = kline
 
 	store.EmitUpdate(kline)
 }

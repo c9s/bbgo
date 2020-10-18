@@ -102,7 +102,7 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 
 			session.lastPrices[symbol] = currentPrice
 
-			session.marketDataStores[symbol] = store.NewMarketDataStore(symbol)
+			session.klineStores[symbol] = store.NewMarketDataStore(symbol)
 		}
 
 		log.Infof("querying balances...")
@@ -121,7 +121,7 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 		// update last prices
 		stream.OnKLineClosed(func(kline types.KLine) {
 			session.lastPrices[kline.Symbol] = kline.Close
-			session.marketDataStores[kline.Symbol].AddKLine(kline)
+			session.klineStores[kline.Symbol].AddKLine(kline)
 		})
 
 		stream.OnTrade(func(trade *types.Trade) {
