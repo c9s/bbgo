@@ -3,6 +3,7 @@ package bbgo
 import (
 	"sync"
 
+	"github.com/c9s/bbgo/pkg/accounting"
 	"github.com/c9s/bbgo/pkg/accounting/pnl"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -20,7 +21,7 @@ type Context struct {
 
 	Balances                map[string]types.Balance
 	ProfitAndLossCalculator *pnl.AverageCostCalculator
-	StockManager            *StockDistribution
+	StockManager            *accounting.StockDistribution
 }
 
 func (c *Context) SetCurrentPrice(price float64) {
