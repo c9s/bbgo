@@ -440,3 +440,6 @@ func (k KLineWindow) SlackAttachment() slack.Attachment {
 		FooterIcon: "",
 	}
 }
+
+type KLineCallback func(kline KLine)
+

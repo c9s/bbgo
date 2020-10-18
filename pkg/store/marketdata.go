@@ -1,26 +1,17 @@
-package bbgo
+package store
 
 import (
 	"github.com/c9s/bbgo/pkg/types"
 )
-
-type Interval string
-
-var Interval1m = Interval("1m")
-var Interval5m = Interval("5m")
-var Interval1h = Interval("1h")
-var Interval1d = Interval("1d")
-
-type KLineCallback func(kline types.KLine)
 
 //go:generate callbackgen -type MarketDataStore
 type MarketDataStore struct {
 	Symbol string
 
 	// KLineWindows stores all loaded klines per interval
-	KLineWindows map[Interval]types.KLineWindow `json:"-"`
+	KLineWindows map[types.Interval]types.KLineWindow `json:"-"`
 
-	updateCallbacks []KLineCallback
+	updateCallbacks []func(kline types.KLine)
 }
 
 func NewMarketDataStore(symbol string) *MarketDataStore {
@@ -28,7 +19,7 @@ func NewMarketDataStore(symbol string) *MarketDataStore {
 		Symbol: symbol,
 
 		// KLineWindows stores all loaded klines per interval
-		KLineWindows: make(map[Interval]types.KLineWindow),
+		KLineWindows: make(map[types.Interval]types.KLineWindow),
 	}
 }
 
@@ -43,7 +34,7 @@ func (store *MarketDataStore) handleKLineClosed(kline types.KLine) {
 }
 
 func (store *MarketDataStore) AddKLine(kline types.KLine) {
-	var interval = Interval(kline.Interval)
+	var interval = types.Interval(kline.Interval)
 	var window = store.KLineWindows[interval]
 	window.Add(kline)
 

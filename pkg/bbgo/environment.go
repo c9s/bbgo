@@ -11,6 +11,7 @@ import (
 
 	"github.com/c9s/bbgo/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/service"
+	"github.com/c9s/bbgo/pkg/store"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -101,7 +102,7 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 
 			session.LastPrices[symbol] = currentPrice
 
-			session.MarketDataStores[symbol] = NewMarketDataStore(symbol)
+			session.MarketDataStores[symbol] = store.NewMarketDataStore(symbol)
 		}
 
 		log.Infof("querying balances...")

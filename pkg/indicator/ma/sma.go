@@ -1,31 +1,31 @@
-package indicator
+package ma
 
 import (
 	"math"
 	"time"
 
-	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/store"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-type MovingAverageIndicator struct {
-	store  *bbgo.MarketDataStore
-	Period int
+type SMA struct {
+	store  *store.MarketDataStore
+	Window int
 }
 
-func NewMovingAverageIndicator(period int) *MovingAverageIndicator {
-	return &MovingAverageIndicator{
-		Period: period,
+func NewSMA(window int) *SMA {
+	return &SMA{
+		Window: window,
 	}
 }
 
-func (i *MovingAverageIndicator) handleUpdate(kline types.KLine) {
-	klines, ok := i.store.KLineWindows[bbgo.Interval(kline.Interval)]
+func (i *SMA) handleUpdate(kline types.KLine) {
+	klines, ok := i.store.KLineWindows[types.Interval(kline.Interval)]
 	if !ok {
 		return
 	}
 
-	if len(klines) < i.Period {
+	if len(klines) < i.Window {
 		return
 	}
 
@@ -49,7 +49,7 @@ func calculateMovingAverage(klines types.KLineWindow, period int) (values []Indi
 	return values
 }
 
-func (i *MovingAverageIndicator) SubscribeStore(store *bbgo.MarketDataStore) {
+func (i *SMA) SubscribeStore(store *store.MarketDataStore) {
 	i.store = store
 
 	// register kline update callback

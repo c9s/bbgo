@@ -1,6 +1,9 @@
 package bbgo
 
-import "github.com/c9s/bbgo/pkg/types"
+import (
+	"github.com/c9s/bbgo/pkg/store"
+	"github.com/c9s/bbgo/pkg/types"
+)
 
 // ExchangeSession presents the exchange connection session
 // It also maintains and collects the data returned from the stream.
@@ -27,7 +30,7 @@ type ExchangeSession struct {
 	// map: symbol -> []trade
 	Trades map[string][]types.Trade
 
-	MarketDataStores map[string]*MarketDataStore
+	MarketDataStores map[string]*store.MarketDataStore
 }
 
 func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
@@ -38,7 +41,7 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 		Markets:       make(map[string]types.Market),
 		Trades:        make(map[string][]types.Trade),
 		LastPrices:    make(map[string]float64),
-		MarketDataStores: make(map[string]*MarketDataStore),
+		MarketDataStores: make(map[string]*store.MarketDataStore),
 	}
 }
 
