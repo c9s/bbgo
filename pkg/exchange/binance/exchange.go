@@ -237,7 +237,7 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 		return nil, err
 	}
 
-	return account.Balances, nil
+	return account.Balances(), nil
 }
 
 // PlatformFeeCurrency
@@ -260,11 +260,12 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 		}
 	}
 
-	return &types.Account{
+	a := &types.Account{
 		MakerCommission: account.MakerCommission,
 		TakerCommission: account.TakerCommission,
-		Balances:        balances,
-	}, nil
+	}
+	a.UpdateBalances(balances)
+	return a, nil
 }
 
 func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) error {

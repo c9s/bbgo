@@ -1,5 +1,13 @@
 package types
 
+import (
+	"sync"
+
+	"github.com/sirupsen/logrus"
+
+	"github.com/c9s/bbgo/pkg/util"
+)
+
 type Balance struct {
 	Currency  string  `json:"currency"`
 	Available float64 `json:"available"`
@@ -9,18 +17,59 @@ type Balance struct {
 type BalanceMap map[string]Balance
 
 type Account struct {
+	sync.Mutex
+
 	MakerCommission int64
 	TakerCommission int64
 	AccountType     string
-	Balances        map[string]Balance
+
+	balances BalanceMap
 }
 
-func (a *Account) UpdateBalance(b Balance) {
-	a.Balances[b.Currency] = b
+func (a *Account) Balances() BalanceMap {
+	d := make(BalanceMap)
+
+	a.Lock()
+	for c, b := range a.balances {
+		d[c] = b
+	}
+	a.Unlock()
+
+	return d
 }
 
-func NewAccount() *Account {
-	return &Account{
-		Balances: make(map[string]Balance),
+func (a *Account) Balance(currency string) (balance Balance, ok bool) {
+	a.Lock()
+	balance, ok = a.balances[currency]
+	a.Unlock()
+	return balance, ok
+}
+
+func (a *Account) UpdateBalances(balances map[string]Balance) {
+	a.Lock()
+	defer a.Unlock()
+
+	if a.balances == nil {
+		a.balances = make(BalanceMap)
+	}
+
+	for _, balance := range balances {
+		a.balances[balance.Currency] = balance
+	}
+}
+
+func (a *Account) BindStream(stream Stream) {
+	stream.OnBalanceUpdate(a.UpdateBalances)
+	stream.OnBalanceSnapshot(a.UpdateBalances)
+}
+
+func (a *Account) Print() {
+	a.Lock()
+	defer a.Unlock()
+
+	for _, balance := range a.balances {
+		if util.NotZero(balance.Available) {
+			logrus.Infof("account balance %s %f", balance.Currency, balance.Available)
+		}
 	}
 }
