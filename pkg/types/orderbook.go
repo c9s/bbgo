@@ -229,11 +229,19 @@ func NewStreamBook(symbol string) *StreamOrderBook {
 
 func (sb *StreamOrderBook) BindStream(stream Stream) {
 	stream.OnBookSnapshot(func(book OrderBook) {
+		if sb.Symbol != book.Symbol {
+			return
+		}
+
 		sb.Load(book)
 		sb.C.Emit()
 	})
 
 	stream.OnBookUpdate(func(book OrderBook) {
+		if sb.Symbol != book.Symbol {
+			return
+		}
+
 		sb.Update(book)
 		sb.C.Emit()
 	})

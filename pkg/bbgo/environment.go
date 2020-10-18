@@ -73,6 +73,9 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 
 		session.markets = markets
 
+		// allocate stream before anything
+		stream := session.Exchange.NewStream()
+
 		for symbol := range loadedSymbols {
 			log.Infof("syncing trades from %s for symbol %s...", session.Exchange.Name(), symbol)
 			if err := environ.TradeSync.Sync(ctx, session.Exchange, symbol, startTime); err != nil {
@@ -102,7 +105,10 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 
 			session.lastPrices[symbol] = currentPrice
 
-			session.marketDataStores[symbol] = store.NewMarketDataStore(symbol)
+			marketDataStore := store.NewMarketDataStore(symbol)
+			marketDataStore.BindStream(stream)
+
+			session.marketDataStores[symbol] = marketDataStore
 		}
 
 		log.Infof("querying balances...")
@@ -111,7 +117,6 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 			return err
 		}
 
-		stream := session.Exchange.NewStream()
 
 		account := &types.Account{}
 		account.UpdateBalances(balances)
