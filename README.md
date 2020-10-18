@@ -83,7 +83,7 @@ dotenv -f .env.local -- bbgo pnl --exchange binance --asset BTC --since "2019-01
 ```
 
 
-## Examples
+## Exchange API Examples
 
 Please check out the example directory: [examples](examples)
 
@@ -106,6 +106,10 @@ stream.Subscribe(types.BookChannel, symbol, types.SubscribeOptions{})
 streambook := types.NewStreamBook(symbol)
 streambook.BindStream(stream)
 ```
+
+## Strategies
+
+Please check out the directory: [strategies](strategies)
 
 ## New API Design
 
