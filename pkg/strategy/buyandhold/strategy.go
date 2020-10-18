@@ -59,7 +59,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor types.OrderExecutor, s
 
 		// buy when price drops -8%
 		if changePercentage < s.MinDropPercentage {
-			market, ok := session.Markets[s.Symbol]
+			market, ok := session.Market(s.Symbol)
 			if !ok {
 				return
 			}

@@ -100,7 +100,7 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 				return err
 			}
 
-			session.LastPrices[symbol] = currentPrice
+			session.lastPrices[symbol] = currentPrice
 
 			session.marketDataStores[symbol] = store.NewMarketDataStore(symbol)
 		}
@@ -120,7 +120,7 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 
 		// update last prices
 		stream.OnKLineClosed(func(kline types.KLine) {
-			session.LastPrices[kline.Symbol] = kline.Close
+			session.lastPrices[kline.Symbol] = kline.Close
 			session.marketDataStores[kline.Symbol].AddKLine(kline)
 		})
 

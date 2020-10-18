@@ -24,7 +24,7 @@ type ExchangeSession struct {
 	// Markets defines market configuration of a symbol
 	Markets map[string]types.Market
 
-	LastPrices map[string]float64
+	lastPrices map[string]float64
 
 	// Trades collects the executed trades from the exchange
 	// map: symbol -> []trade
@@ -40,7 +40,7 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 		Subscriptions:    make(map[types.Subscription]types.Subscription),
 		Markets:          make(map[string]types.Market),
 		Trades:           make(map[string][]types.Trade),
-		LastPrices:       make(map[string]float64),
+		lastPrices:       make(map[string]float64),
 		marketDataStores: make(map[string]*store.MarketDataStore),
 	}
 }
@@ -48,6 +48,16 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 func (session *ExchangeSession) MarketDataStore(symbol string) (s *store.MarketDataStore, ok bool) {
 	s, ok = session.marketDataStores[symbol]
 	return s, ok
+}
+
+func (session *ExchangeSession) LastPrice(symbol string) (price float64, ok bool) {
+	price, ok = session.lastPrices[symbol]
+	return price, ok
+}
+
+func (session *ExchangeSession) Market(symbol string) (market types.Market, ok bool) {
+	market, ok = session.Markets[symbol]
+	return market, ok
 }
 
 // Subscribe save the subscription info, later it will be assigned to the stream
