@@ -45,6 +45,7 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 	}
 }
 
+// MarketDataStore returns the market data store of a symbol
 func (session *ExchangeSession) MarketDataStore(symbol string) (s *store.MarketDataStore, ok bool) {
 	s, ok = session.marketDataStores[symbol]
 	return s, ok
