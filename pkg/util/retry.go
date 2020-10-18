@@ -13,7 +13,7 @@ const (
 
 type RetryPredicator func(e error) bool
 
-// Retry retrys the passed functin for "attempts" times, if passed function return error. Setting attemps to zero means keep retrying.
+// Retry retrys the passed function for "attempts" times, if passed function return error. Setting attempts to zero means keep retrying.
 func Retry(ctx context.Context, attempts int, duration time.Duration, fnToRetry func() error, errHandler func(error), predicators ...RetryPredicator) (err error) {
 	infinite := false
 	if attempts == InfiniteRetry {
