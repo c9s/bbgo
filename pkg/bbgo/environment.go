@@ -71,7 +71,7 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 			return err
 		}
 
-		session.Markets = markets
+		session.markets = markets
 
 		for symbol := range loadedSymbols {
 			log.Infof("syncing trades from %s for symbol %s...", session.Exchange.Name(), symbol)
