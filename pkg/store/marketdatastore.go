@@ -31,6 +31,12 @@ func NewMarketDataStore(symbol string) *MarketDataStore {
 	}
 }
 
+// KLinesOfInterval returns the kline window of the given interval
+func (store *MarketDataStore) KLinesOfInterval(interval types.Interval) (kLines types.KLineWindow, ok bool) {
+	kLines, ok = store.KLineWindows[interval]
+	return kLines, ok
+}
+
 func (store *MarketDataStore) handleOrderBookUpdate(book types.OrderBook) {
 	if book.Symbol != store.Symbol {
 		return
