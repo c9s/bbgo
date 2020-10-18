@@ -1,38 +1,5 @@
 package bbgo
 
-import (
-	"context"
-
-	"github.com/c9s/bbgo/pkg/accounting/pnl"
-	"github.com/c9s/bbgo/pkg/types"
-)
-
-type BackTestStream struct {
-	types.StandardStream
-}
-
-func (s *BackTestStream) Connect(ctx context.Context) error {
-	return nil
-}
-
-func (s *BackTestStream) Close() error {
-	return nil
-}
-
-type BackTestTrader struct {
-	// Context is trading Context
-	Context                 *Context
-	SourceKLines            []types.KLine
-	ProfitAndLossCalculator *pnl.AverageCostCalculator
-
-	doneOrders    []types.SubmitOrder
-	pendingOrders []types.SubmitOrder
-}
-
-func (trader *BackTestTrader) SubmitOrder(ctx context.Context, order types.SubmitOrder) {
-	trader.pendingOrders = append(trader.pendingOrders, order)
-}
-
 /*
 func (trader *BackTestTrader) RunStrategy(ctx context.Context, strategy SingleExchangeStrategy) (chan struct{}, error) {
 	logrus.Infof("[regression] number of kline data: %d", len(trader.SourceKLines))
