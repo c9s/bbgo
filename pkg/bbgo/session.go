@@ -30,23 +30,23 @@ type ExchangeSession struct {
 	// map: symbol -> []trade
 	Trades map[string][]types.Trade
 
-	marketDataStores map[string]*store.MarketDataStore
+	klineStores map[string]*store.KLineStore
 }
 
 func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 	return &ExchangeSession{
-		Name:             name,
-		Exchange:         exchange,
-		Subscriptions:    make(map[types.Subscription]types.Subscription),
-		markets:          make(map[string]types.Market),
-		Trades:           make(map[string][]types.Trade),
-		lastPrices:       make(map[string]float64),
-		marketDataStores: make(map[string]*store.MarketDataStore),
+		Name:          name,
+		Exchange:      exchange,
+		Subscriptions: make(map[types.Subscription]types.Subscription),
+		markets:       make(map[string]types.Market),
+		Trades:        make(map[string][]types.Trade),
+		lastPrices:    make(map[string]float64),
+		klineStores:   make(map[string]*store.KLineStore),
 	}
 }
 
-func (session *ExchangeSession) MarketDataStore(symbol string) (s *store.MarketDataStore, ok bool) {
-	s, ok = session.marketDataStores[symbol]
+func (session *ExchangeSession) KLineStore(symbol string) (s *store.KLineStore, ok bool) {
+	s, ok = session.klineStores[symbol]
 	return s, ok
 }
 

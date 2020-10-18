@@ -9,7 +9,7 @@ import (
 )
 
 type SMA struct {
-	store  *store.MarketDataStore
+	store  *store.KLineStore
 	Window int
 }
 
@@ -49,7 +49,7 @@ func calculateMovingAverage(klines types.KLineWindow, period int) (values []Indi
 	return values
 }
 
-func (i *SMA) SubscribeStore(store *store.MarketDataStore) {
+func (i *SMA) SubscribeStore(store *store.KLineStore) {
 	i.store = store
 
 	// register kline update callback
