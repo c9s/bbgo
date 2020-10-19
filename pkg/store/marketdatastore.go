@@ -31,8 +31,12 @@ func NewMarketDataStore(symbol string) *MarketDataStore {
 	}
 }
 
+func (store *MarketDataStore) SetKLineWindows(windows map[types.Interval]types.KLineWindow) {
+	store.KLineWindows = windows
+}
+
 func (store *MarketDataStore) OrderBook() types.OrderBook {
-	 return store.orderBook.Copy()
+	return store.orderBook.Copy()
 }
 
 // KLinesOfInterval returns the kline window of the given interval
@@ -76,8 +80,7 @@ func (store *MarketDataStore) handleKLineClosed(kline types.KLine) {
 }
 
 func (store *MarketDataStore) AddKLine(kline types.KLine) {
-	var interval = types.Interval(kline.Interval)
-	var window = store.KLineWindows[interval]
+	window := store.KLineWindows[types.Interval(kline.Interval)]
 	window.Add(kline)
 
 	store.LastKLine = kline
