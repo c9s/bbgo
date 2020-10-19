@@ -66,6 +66,16 @@ func (s *WebSocketService) EmitTradeEvent(e PublicTradeEvent) {
 	}
 }
 
+func (s *WebSocketService) OnKLineEvent(cb func(e KLineEvent)) {
+	s.kLineEventCallbacks = append(s.kLineEventCallbacks, cb)
+}
+
+func (s *WebSocketService) EmitKLineEvent(e KLineEvent) {
+	for _, cb := range s.kLineEventCallbacks {
+		cb(e)
+	}
+}
+
 func (s *WebSocketService) OnErrorEvent(cb func(e ErrorEvent)) {
 	s.errorEventCallbacks = append(s.errorEventCallbacks, cb)
 }

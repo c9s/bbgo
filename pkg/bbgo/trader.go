@@ -63,9 +63,9 @@ func NewTrader(environ *Environment) *Trader {
 	}
 }
 
-// AttachStrategy attaches the single exchange strategy on an exchange session.
+// AttachStrategyOn attaches the single exchange strategy on an exchange session.
 // Single exchange strategy is the default behavior.
-func (trader *Trader) AttachStrategy(session string, strategies ...SingleExchangeStrategy) *Trader {
+func (trader *Trader) AttachStrategyOn(session string, strategies ...SingleExchangeStrategy) *Trader {
 	if _, ok := trader.environment.sessions[session]; !ok {
 		log.Panicf("session %s is not defined", session)
 	}

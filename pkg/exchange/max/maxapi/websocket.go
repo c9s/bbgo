@@ -52,6 +52,7 @@ type WebSocketService struct {
 	messageCallbacks           []func(message []byte)
 	bookEventCallbacks         []func(e BookEvent)
 	tradeEventCallbacks        []func(e PublicTradeEvent)
+	kLineEventCallbacks        []func(e KLineEvent)
 	errorEventCallbacks        []func(e ErrorEvent)
 	subscriptionEventCallbacks []func(e SubscriptionEvent)
 
@@ -173,6 +174,9 @@ func (s *WebSocketService) dispatch(msg interface{}) {
 
 	case *PublicTradeEvent:
 		s.EmitTradeEvent(*e)
+
+	case *KLineEvent:
+		s.EmitKLineEvent(*e)
 
 	case *ErrorEvent:
 		s.EmitErrorEvent(*e)
