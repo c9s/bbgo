@@ -79,7 +79,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) err
 	}
 
 	req := e.client.OrderService.NewCreateOrderRequest().
-		Market(order.Symbol).
+		Market(toLocalSymbol(order.Symbol)).
 		OrderType(string(orderType)).
 		Side(toLocalSideType(order.Side)).
 		Volume(order.QuantityString).

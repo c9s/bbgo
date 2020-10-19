@@ -49,7 +49,7 @@ func NewStream(key, secret string) *Stream {
 				continue
 			}
 
-			snapshot[balance.Currency] = *balance
+			snapshot[toGlobalCurrency(balance.Currency)] = *balance
 		}
 
 		stream.EmitBalanceSnapshot(snapshot)
@@ -63,7 +63,7 @@ func NewStream(key, secret string) *Stream {
 				continue
 			}
 
-			snapshot[balance.Currency] = *balance
+			snapshot[toGlobalCurrency(balance.Currency)] = *balance
 		}
 
 		stream.EmitBalanceUpdate(snapshot)
