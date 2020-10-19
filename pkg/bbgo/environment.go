@@ -85,6 +85,7 @@ func (environ *Environment) Connect(ctx context.Context) error {
 	for n := range environ.sessions {
 		// avoid using the placeholder variable for the session because we use that in the callbacks
 		var session = environ.sessions[n]
+		var log = log.WithField("session", n)
 
 		loadedSymbols := make(map[string]struct{})
 		for _, s := range session.Subscriptions {
@@ -131,8 +132,6 @@ func (environ *Environment) Connect(ctx context.Context) error {
 			session.marketDataStores[symbol] = marketDataStore
 		}
 
-		log.Infof("loaded symbol: %+v", loadedSymbols)
-
 		log.Infof("querying balances...")
 		balances, err := session.Exchange.QueryAccountBalances(ctx)
 		if err != nil {
@@ -157,6 +156,11 @@ func (environ *Environment) Connect(ctx context.Context) error {
 				log.WithError(err).Errorf("trade insert error: %+v", trade)
 			}
 		})
+
+		if len(session.Subscriptions) == 0 {
+			log.Warnf("no subscriptions, exchange session %s will not be connected", session.Name)
+			continue
+		}
 
 		log.Infof("connecting session %s...", session.Name)
 		if err := session.Stream.Connect(ctx); err != nil {
