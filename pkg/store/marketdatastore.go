@@ -17,7 +17,7 @@ type MarketDataStore struct {
 
 	orderBook *types.StreamOrderBook
 
-	orderBookUpdateCallbacks []func()
+	orderBookUpdateCallbacks []func(orderBook *types.StreamOrderBook)
 }
 
 func NewMarketDataStore(symbol string) *MarketDataStore {
@@ -29,6 +29,10 @@ func NewMarketDataStore(symbol string) *MarketDataStore {
 		// KLineWindows stores all loaded klines per interval
 		KLineWindows: make(map[types.Interval]types.KLineWindow, len(types.SupportedIntervals)), // 12 interval, 1m,5m,15m,30m,1h,2h,4h,6h,12h,1d,3d,1w
 	}
+}
+
+func (store *MarketDataStore) OrderBook() types.OrderBook {
+	 return store.orderBook.Copy()
 }
 
 // KLinesOfInterval returns the kline window of the given interval
@@ -43,6 +47,8 @@ func (store *MarketDataStore) handleOrderBookUpdate(book types.OrderBook) {
 	}
 
 	store.orderBook.Update(book)
+
+	store.EmitOrderBookUpdate(store.orderBook)
 }
 
 func (store *MarketDataStore) handleOrderBookSnapshot(book types.OrderBook) {

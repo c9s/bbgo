@@ -15,3 +15,13 @@ func (store *MarketDataStore) EmitKLineUpdate(kline types.KLine) {
 		cb(kline)
 	}
 }
+
+func (store *MarketDataStore) OnOrderBookUpdate(cb func(orderBook *types.StreamOrderBook)) {
+	store.orderBookUpdateCallbacks = append(store.orderBookUpdateCallbacks, cb)
+}
+
+func (store *MarketDataStore) EmitOrderBookUpdate(orderBook *types.StreamOrderBook) {
+	for _, cb := range store.orderBookUpdateCallbacks {
+		cb(orderBook)
+	}
+}
