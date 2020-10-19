@@ -1,6 +1,7 @@
 package max
 
 import (
+	"encoding/json"
 	"strings"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 var ErrIncorrectBookEntryElementLength = errors.New("incorrect book entry element length")
@@ -27,6 +29,8 @@ func ParseMessage(payload []byte) (interface{}, error) {
 
 	if channel := string(val.GetStringBytes("c")); len(channel) > 0 {
 		switch channel {
+		case "kline":
+			return parseKLineEvent(val)
 		case "book":
 			return parseBookEvent(val)
 		case "trade":
@@ -65,6 +69,67 @@ func parseTradeEntry(val *fastjson.Value) TradeEntry {
 		Timestamp: val.GetInt64("T"),
 		Price:     string(val.GetStringBytes("p")),
 		Volume:    string(val.GetStringBytes("v")),
+	}
+}
+
+type KLineEvent struct {
+	Event     string `json:"e"`
+	Market    string `json:"M"`
+	Channel   string `json:"c"`
+	KLine     KLine  `json:"k"`
+	Timestamp int64  `json:"T"`
+}
+
+/*
+{
+  "c": "kline",
+  "M": "btcusdt",
+  "e": "update",
+  "T": 1602999650179,
+  "k": {
+    "ST": 1602999900000,
+    "ET": 1602999900000,
+    "M": "btcusdt",
+    "R": "5m",
+    "O": "11417.21",
+    "H": "11417.21",
+    "L": "11417.21",
+    "C": "11417.21",
+    "v": "0",
+    "ti": 0,
+    "x": false
+  }
+}
+*/
+type KLinePayload struct {
+	StartTime   int64  `json:"ST"`
+	EndTime     int64  `json:"ET"`
+	Market      string `json:"M"`
+	Resolution  string `json:"R"`
+	Open        string `json:"O"`
+	High        string `json:"H"`
+	Low         string `json:"L"`
+	Close       string `json:"C"`
+	Volume      string `json:"v"`
+	LastTradeID int    `json:"ti"`
+	Closed      bool   `json:"x"`
+}
+
+func (k KLinePayload) KLine() types.KLine {
+	return types.KLine{
+		StartTime:   time.Unix(0, k.StartTime*int64(time.Millisecond)),
+		EndTime:     time.Unix(0, k.EndTime*int64(time.Millisecond)),
+		Symbol:      k.Market,
+		Interval:    k.Resolution,
+		Open:        util.MustParseFloat(k.Open),
+		Close:       util.MustParseFloat(k.Close),
+		High:        util.MustParseFloat(k.High),
+		Low:         util.MustParseFloat(k.Low),
+		Volume:      util.MustParseFloat(k.Volume),
+		QuoteVolume: 0,
+		LastTradeID: k.LastTradeID,
+		// NumberOfTrades: 0,
+		Closed: k.Closed,
 	}
 }
 
@@ -128,6 +193,24 @@ func (e *BookEvent) OrderBook() (snapshot types.OrderBook, err error) {
 	}
 
 	return snapshot, nil
+}
+
+func parseKLineEvent(val *fastjson.Value) (*KLineEvent, error) {
+	event := KLineEvent{
+		Event:     string(val.GetStringBytes("e")),
+		Market:    string(val.GetStringBytes("M")),
+		Channel:   string(val.GetStringBytes("c")),
+		Timestamp: val.GetInt64("T"),
+	}
+
+	out := val.MarshalTo(nil)
+
+	err := json.Unmarshal(out, &event.KLine)
+	if err != nil {
+		return nil, err
+	}
+
+	return &event, nil
 }
 
 func parseBookEvent(val *fastjson.Value) (*BookEvent, error) {
