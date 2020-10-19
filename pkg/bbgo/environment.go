@@ -95,6 +95,7 @@ func (environ *Environment) Connect(ctx context.Context) error {
 			session.Stream.Subscribe(s.Channel, s.Symbol, s.Options)
 		}
 
+		// trade sync and market data store depends on subscribed symbols so we have to do this here.
 		for symbol := range loadedSymbols {
 			log.Infof("syncing trades from %s for symbol %s...", session.Exchange.Name(), symbol)
 			if err := environ.TradeSync.Sync(ctx, session.Exchange, symbol, startTime); err != nil {
