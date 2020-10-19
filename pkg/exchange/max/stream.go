@@ -2,6 +2,8 @@ package max
 
 import (
 	"context"
+	"strconv"
+	"time"
 
 	max "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"github.com/c9s/bbgo/pkg/types"
@@ -24,6 +26,20 @@ func NewStream(key, secret string) *Stream {
 
 	wss.OnMessage(func(message []byte) {
 		logger.Infof("M: %s", message)
+	})
+
+	// wss.OnTradeEvent(func(e max.PublicTradeEvent) { })
+
+	wss.OnTradeUpdateEvent(func(e max.TradeUpdateEvent) {
+		for _, tradeUpdate := range e.Trades {
+			trade, err := convertWebSocketTrade(tradeUpdate)
+			if err != nil {
+				log.WithError(err).Error("websocket trade update convert error")
+				return
+			}
+
+			stream.EmitTrade(*trade)
+		}
 	})
 
 	wss.OnBookEvent(func(e max.BookEvent) {
@@ -82,4 +98,44 @@ func (s *Stream) Connect(ctx context.Context) error {
 
 func (s *Stream) Close() error {
 	return s.websocketService.Close()
+}
+
+func convertWebSocketTrade(t max.TradeUpdate) (*types.Trade, error) {
+	// skip trade ID that is the same. however this should not happen
+	var side = toGlobalSideType(t.Side)
+
+	// trade time
+	mts := time.Unix(0, t.Timestamp*int64(time.Millisecond))
+
+	price, err := strconv.ParseFloat(t.Price, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	quantity, err := strconv.ParseFloat(t.Volume, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	quoteQuantity := price * quantity
+
+	fee, err := strconv.ParseFloat(t.Fee, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	return &types.Trade{
+		ID:            int64(t.ID),
+		Price:         price,
+		Symbol:        toGlobalSymbol(t.Market),
+		Exchange:      "max",
+		Quantity:      quantity,
+		Side:          side,
+		IsBuyer:       side == "bid",
+		IsMaker:       t.Maker,
+		Fee:           fee,
+		FeeCurrency:   toGlobalCurrency(t.FeeCurrency),
+		QuoteQuantity: quoteQuantity,
+		Time:          mts,
+	}, nil
 }

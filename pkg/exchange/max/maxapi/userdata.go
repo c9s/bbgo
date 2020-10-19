@@ -108,6 +108,8 @@ type TradeUpdate struct {
 	Timestamp   int64  `json:"T"`
 
 	OrderID uint64 `json:"oi"`
+
+	Maker bool `json:"m"`
 }
 
 func parseTradeUpdate(v *fastjson.Value) TradeUpdate {
@@ -121,6 +123,7 @@ func parseTradeUpdate(v *fastjson.Value) TradeUpdate {
 		FeeCurrency: string(v.GetStringBytes("fc")),
 		Timestamp:   v.GetInt64("T"),
 		OrderID:     v.GetUint64("oi"),
+		Maker:       v.GetBool("m"),
 	}
 }
 
