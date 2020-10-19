@@ -149,12 +149,12 @@ func (environ *Environment) Connect(ctx context.Context) error {
 			session.marketDataStores[kline.Symbol].AddKLine(kline)
 		})
 
-		session.Stream.OnTrade(func(trade *types.Trade) {
+		session.Stream.OnTrade(func(trade types.Trade) {
 			// append trades
-			session.Trades[trade.Symbol] = append(session.Trades[trade.Symbol], *trade)
+			session.Trades[trade.Symbol] = append(session.Trades[trade.Symbol], trade)
 
-			if err := environ.TradeService.Insert(*trade); err != nil {
-				log.WithError(err).Errorf("trade insert error: %+v", *trade)
+			if err := environ.TradeService.Insert(trade); err != nil {
+				log.WithError(err).Errorf("trade insert error: %+v", trade)
 			}
 		})
 
