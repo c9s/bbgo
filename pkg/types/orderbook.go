@@ -214,6 +214,8 @@ func (b *MutexOrderBook) Update(book OrderBook) {
 	b.EmitUpdate(b.OrderBook)
 }
 
+// StreamOrderBook receives streaming data from websocket connection and
+// update the order book with mutex lock, so you can safely access it.
 type StreamOrderBook struct {
 	*MutexOrderBook
 
