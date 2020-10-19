@@ -71,22 +71,8 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 		}
 
 		session.markets = markets
-
-		// allocate stream before anything
-		stream := session.Exchange.NewStream()
-
-		log.Infof("querying balances...")
-		balances, err := session.Exchange.QueryAccountBalances(ctx)
-		if err != nil {
-			return err
-		}
-
-		account := &types.Account{}
-		session.Account = account
-
-		account.UpdateBalances(balances)
-		account.BindStream(stream)
-		session.Stream = stream
+		session.Account = &types.Account{}
+		session.Stream = session.Exchange.NewStream()
 	}
 
 	return nil
@@ -145,6 +131,15 @@ func (environ *Environment) Connect(ctx context.Context) error {
 		}
 
 		log.Infof("loaded symbol: %+v", loadedSymbols)
+
+		log.Infof("querying balances...")
+		balances, err := session.Exchange.QueryAccountBalances(ctx)
+		if err != nil {
+			return err
+		}
+
+		session.Account.UpdateBalances(balances)
+		session.Account.BindStream(session.Stream)
 
 		// update last prices
 		session.Stream.OnKLineClosed(func(kline types.KLine) {
