@@ -23,7 +23,7 @@ type StandardStream struct {
 	Subscriptions []Subscription
 
 	// private trade callbacks
-	tradeCallbacks []func(trade *Trade)
+	tradeCallbacks []func(trade Trade)
 
 	// balance snapshot callbacks
 	balanceSnapshotCallbacks []func(balances map[string]Balance)
