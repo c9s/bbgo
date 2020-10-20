@@ -11,6 +11,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/c9s/bbgo/pkg/bbgo"
 )
 
 func init() {
@@ -38,13 +40,8 @@ var MigrateCmd = &cobra.Command{
 			return err
 		}
 
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			return err
-		}
-
-		dotDir := path.Join(homeDir, ".bbgo")
-		sourceDir := path.Join(dotDir, "source")
+		dotDir := bbgo.HomeDir()
+		sourceDir := bbgo.SourceDir()
 		migrationDir := path.Join(sourceDir, "migrations")
 
 		log.Infof("creating dir: %s", dotDir)
