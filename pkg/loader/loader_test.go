@@ -29,6 +29,7 @@ func TestLoadStrategies(t *testing.T) {
 			length:  1,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			strategies, err := LoadExchangeStrategies(tt.args.configFile)
