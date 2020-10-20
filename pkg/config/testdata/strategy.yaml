@@ -9,8 +9,9 @@ sessions:
     keyVar: BINANCE_API_KEY
     secretVar: BINANCE_API_SECRET
 exchangeStrategies:
-- buyandhold:
-    symbol: "BTCUSDT"
-    interval: "1m"
-    baseQuantity: 0.1
-    minDropPercentage: -0.05
+  binance:
+  - buyandhold:
+      symbol: "BTCUSDT"
+      interval: "1m"
+      baseQuantity: 0.1
+      minDropPercentage: -0.05

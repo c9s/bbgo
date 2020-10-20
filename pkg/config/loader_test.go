@@ -45,8 +45,6 @@ func TestLoadStrategies(t *testing.T) {
 
 			assert.NotNil(t, config)
 			assert.Len(t, config.ExchangeStrategies, tt.length)
-
-			t.Logf("%+v", config.ExchangeStrategies[0])
 		})
 	}
 }
