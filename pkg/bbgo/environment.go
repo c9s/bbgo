@@ -58,13 +58,7 @@ func (environ *Environment) AddExchange(name string, exchange types.Exchange) (s
 }
 
 func (environ *Environment) Init(ctx context.Context) (err error) {
-
 	for _, session := range environ.sessions {
-		loadedSymbols := make(map[string]struct{})
-		for _, sub := range session.Subscriptions {
-			loadedSymbols[sub.Symbol] = struct{}{}
-		}
-
 		markets, err := session.Exchange.QueryMarkets(ctx)
 		if err != nil {
 			return err
