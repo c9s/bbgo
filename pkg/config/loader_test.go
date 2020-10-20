@@ -1,4 +1,4 @@
-package loader
+package config
 
 import (
 	"testing"
@@ -32,18 +32,21 @@ func TestLoadStrategies(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			strategies, err := LoadExchangeStrategies(tt.args.configFile)
+			config, err := Load(tt.args.configFile)
 			if err != nil {
-				t.Errorf("LoadExchangeStrategies() error = %v", err)
+				t.Errorf("Load() error = %v", err)
+				return
 			} else {
 				if tt.wantErr {
-					t.Errorf("LoadExchangeStrategies() error = %v, wantErr %v", err, tt.wantErr)
+					t.Errorf("Load() error = %v, wantErr %v", err, tt.wantErr)
+					return
 				}
 			}
 
-			t.Logf("%+v", strategies[0])
+			assert.NotNil(t, config)
+			assert.Len(t, config.ExchangeStrategies, tt.length)
 
-			assert.Len(t, strategies, tt.length)
+			t.Logf("%+v", config.ExchangeStrategies[0])
 		})
 	}
 }
