@@ -17,6 +17,13 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+var LoadedStrategies = make(map[string]interface{})
+
+func RegisterStrategy(key string, configmap interface{}) {
+	LoadedStrategies[key] = configmap
+}
+
+
 // Environment presents the real exchange data layer
 type Environment struct {
 	TradeService *service.TradeService
