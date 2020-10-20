@@ -63,7 +63,7 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 	for _, session := range environ.sessions {
 		var markets types.MarketMap
 
-		err = WithCache(fmt.Sprintf("%s-markets.json", session.Exchange.Name()), &markets, func() (interface{}, error) {
+		err = WithCache(fmt.Sprintf("%s-markets", session.Exchange.Name()), &markets, func() (interface{}, error) {
 			return session.Exchange.QueryMarkets(ctx)
 		})
 		if err != nil {

@@ -10,9 +10,9 @@ import (
 	"github.com/pkg/errors"
 )
 
-func WithCache(file string, obj interface{}, do func() (interface{}, error)) error {
+func WithCache(key string, obj interface{}, do func() (interface{}, error)) error {
 	cacheDir := CacheDir()
-	cacheFile := path.Join(cacheDir, file)
+	cacheFile := path.Join(cacheDir, key+ ".json")
 
 	if _, err := os.Stat(cacheFile); os.IsNotExist(err) {
 		data, err := do()
