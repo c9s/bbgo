@@ -45,15 +45,15 @@ func LoadExchangeStrategies(configFile string) (strategies []bbgo.SingleExchange
 				val := reflect.New(rt)
 
 				// now we have &(*Strategy) -> **Strategy
-				valinf := val.Interface()
+				valRef := val.Interface()
 
 				plain, err := json.Marshal(conf)
 				if err != nil {
 					return nil, err
 				}
 
-				if err := json.Unmarshal(plain, valinf); err != nil {
-					return nil, err
+				if err := json.Unmarshal(plain, valRef); err != nil {
+					return nil, errors.Wrapf(err, "json parsing error, given payload: %s", plain)
 				}
 
 				strategies = append(strategies, val.Elem().Interface().(bbgo.SingleExchangeStrategy))
