@@ -10,7 +10,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-
 type DataFetcher func() (interface{}, error)
 
 // WithCache let you use the cache with the given cache key, variable reference and your data fetcher,
@@ -19,7 +18,7 @@ type DataFetcher func() (interface{}, error)
 // fetcher is the closure that will fetch your remote data or some slow operation.
 func WithCache(key string, obj interface{}, fetcher DataFetcher) error {
 	cacheDir := CacheDir()
-	cacheFile := path.Join(cacheDir, key+ ".json")
+	cacheFile := path.Join(cacheDir, key+".json")
 
 	if _, err := os.Stat(cacheFile); os.IsNotExist(err) {
 		data, err := fetcher()
