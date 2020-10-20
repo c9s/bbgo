@@ -2,10 +2,12 @@ package bbgo
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
@@ -59,9 +61,17 @@ func (environ *Environment) AddExchange(name string, exchange types.Exchange) (s
 
 func (environ *Environment) Init(ctx context.Context) (err error) {
 	for _, session := range environ.sessions {
-		markets, err := session.Exchange.QueryMarkets(ctx)
+		var markets types.MarketMap
+
+		err = WithCache(fmt.Sprintf("%s-markets.json", session.Exchange.Name()), &markets, func() (interface{}, error) {
+			return session.Exchange.QueryMarkets(ctx)
+		})
 		if err != nil {
 			return err
+		}
+
+		if len(markets) == 0 {
+			return errors.Errorf("market config should not be empty")
 		}
 
 		session.markets = markets
