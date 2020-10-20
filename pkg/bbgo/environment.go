@@ -22,7 +22,8 @@ type Environment struct {
 	TradeService *service.TradeService
 	TradeSync    *service.TradeSync
 
-	sessions map[string]*ExchangeSession
+	tradeScanTime time.Time
+	sessions      map[string]*ExchangeSession
 }
 
 func NewDefaultEnvironment(db *sqlx.DB) *Environment {
@@ -49,7 +50,8 @@ func NewEnvironment(db *sqlx.DB) *Environment {
 		TradeSync: &service.TradeSync{
 			Service: tradeService,
 		},
-		sessions: make(map[string]*ExchangeSession),
+		tradeScanTime: time.Now().AddDate(0, 0, -7), // sync from 7 days ago
+		sessions:      make(map[string]*ExchangeSession),
 	}
 }
 
@@ -82,9 +84,14 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 	return nil
 }
 
+// SetTradeScanTime overrides the default trade scan time (-7 days)
+func (environ *Environment) SetTradeScanTime(t time.Time) *Environment {
+	environ.tradeScanTime = t
+	return environ
+}
+
 func (environ *Environment) Connect(ctx context.Context) error {
 	var err error
-	var startTime = time.Now().AddDate(0, 0, -7) // sync from 7 days ago
 
 	for n := range environ.sessions {
 		// avoid using the placeholder variable for the session because we use that in the callbacks
@@ -103,7 +110,7 @@ func (environ *Environment) Connect(ctx context.Context) error {
 		// trade sync and market data store depends on subscribed symbols so we have to do this here.
 		for symbol := range loadedSymbols {
 			log.Infof("syncing trades from %s for symbol %s...", session.Exchange.Name(), symbol)
-			if err := environ.TradeSync.Sync(ctx, session.Exchange, symbol, startTime); err != nil {
+			if err := environ.TradeSync.Sync(ctx, session.Exchange, symbol, environ.tradeScanTime); err != nil {
 				return err
 			}
 
