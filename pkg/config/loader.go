@@ -12,8 +12,8 @@ import (
 )
 
 type Config struct {
-	ExchangeStrategies      []bbgo.SingleExchangeStrategy
-	CrossExchangeStrategies []bbgo.CrossExchangeStrategy
+	ExchangeStrategies      map[string][]bbgo.SingleExchangeStrategy
+	CrossExchangeStrategies map[string][]bbgo.CrossExchangeStrategy
 }
 
 type Stash map[string]interface{}
@@ -49,32 +49,41 @@ func Load(configFile string) (*Config, error) {
 	return &config, nil
 }
 
-func loadExchangeStrategies(stash Stash) (strategies []bbgo.SingleExchangeStrategy, err error) {
+func loadExchangeStrategies(stash Stash) (strategies map[string][]bbgo.SingleExchangeStrategy, err error) {
 	exchangeStrategiesConf, ok := stash["exchangeStrategies"]
 	if !ok {
 		return nil, errors.New("exchangeStrategies is not defined")
 	}
 
-	list, ok := exchangeStrategiesConf.([]interface{})
+	sessionToConfigList, ok := exchangeStrategiesConf.(Stash)
 	if !ok {
-		return nil, errors.New("exchangeStrategies should be a list")
+		return nil, errors.New("expecting session name at the first level")
 	}
 
-	for _, entry := range list {
-		configStash, ok := entry.(Stash)
+	strategies = make(map[string][]bbgo.SingleExchangeStrategy)
+
+	for sessionName, configList := range sessionToConfigList {
+		list, ok := configList.([]interface{})
 		if !ok {
-			return nil, errors.Errorf("strategy config should be a map, given: %T %+v", entry, entry)
+			return nil, errors.New("exchangeStrategies should be a list")
 		}
 
-		for id, conf := range configStash {
-			// look up the real struct type
-			if st, ok := bbgo.LoadedExchangeStrategies[id]; ok {
-				val, err := reUnmarshal(conf, st)
-				if err != nil {
-					return nil, err
-				}
+		for _, entry := range list {
+			configStash, ok := entry.(Stash)
+			if !ok {
+				return nil, errors.Errorf("strategy config should be a map, given: %T %+v", entry, entry)
+			}
 
-				strategies = append(strategies, val.(bbgo.SingleExchangeStrategy))
+			for id, conf := range configStash {
+				// look up the real struct type
+				if st, ok := bbgo.LoadedExchangeStrategies[id]; ok {
+					val, err := reUnmarshal(conf, st)
+					if err != nil {
+						return nil, err
+					}
+
+					strategies[sessionName] = append(strategies[sessionName], val.(bbgo.SingleExchangeStrategy))
+				}
 			}
 		}
 	}
