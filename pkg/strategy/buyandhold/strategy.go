@@ -13,6 +13,10 @@ import (
 	"github.com/c9s/bbgo/pkg/util"
 )
 
+func init() {
+	bbgo.RegisterStrategy("buyandhold", &Strategy{})
+}
+
 type Strategy struct {
 	Symbol            string  `json:"symbol"`
 	Interval          string  `json:"interval"`
