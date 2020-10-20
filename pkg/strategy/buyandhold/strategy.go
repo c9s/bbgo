@@ -2,8 +2,6 @@ package buyandhold
 
 import (
 	"context"
-	"encoding/json"
-	"io/ioutil"
 	"math"
 
 	log "github.com/sirupsen/logrus"
@@ -14,7 +12,7 @@ import (
 )
 
 func init() {
-	bbgo.RegisterStrategy("buyandhold", &Strategy{})
+	bbgo.RegisterExchangeStrategy("buyandhold", &Strategy{})
 }
 
 type Strategy struct {
@@ -23,17 +21,6 @@ type Strategy struct {
 	BaseQuantity      float64 `json:"baseQuantity"`
 	MaxAssetQuantity  float64 `json:"maxAssetQuantity"`
 	MinDropPercentage float64 `json:"minDropPercentage"`
-}
-
-func LoadFile(filepath string) (*Strategy, error) {
-	o, err := ioutil.ReadFile(filepath)
-	if err != nil {
-		return nil, err
-	}
-
-	var strategy Strategy
-	err = json.Unmarshal(o, &strategy)
-	return &strategy, err
 }
 
 func New(symbol string, interval string, baseQuantity float64) *Strategy {

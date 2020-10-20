@@ -11,18 +11,29 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 )
 
-func LoadExchangeStrategies(configFile string) (strategies []bbgo.SingleExchangeStrategy, err error) {
+type Stash map[string]interface{}
+
+func Load(configFile string) (Stash, error) {
 	config, err := ioutil.ReadFile(configFile)
 	if err != nil {
 		return nil, err
 	}
 
-	conf := make(map[string]interface{})
-	if err := yaml.Unmarshal(config, conf); err != nil {
+	stash := make(Stash)
+	if err := yaml.Unmarshal(config, stash); err != nil {
 		return nil, err
 	}
 
-	exchangeStrategiesConf, ok := conf["exchangeStrategies"]
+	return stash, err
+}
+
+func LoadExchangeStrategies(configFile string) (strategies []bbgo.SingleExchangeStrategy, err error) {
+	stash, err := Load(configFile)
+	if err != nil {
+		return nil, err
+	}
+
+	exchangeStrategiesConf, ok := stash["exchangeStrategies"]
 	if !ok {
 		return nil, errors.New("exchangeStrategies is not defined")
 	}
@@ -39,7 +50,7 @@ func LoadExchangeStrategies(configFile string) (strategies []bbgo.SingleExchange
 		}
 
 		for id, conf := range sConf {
-			if st, ok := bbgo.LoadedStrategies[id]; ok {
+			if st, ok := bbgo.LoadedExchangeStrategies[id]; ok {
 				// get the type "*Strategy"
 				rt := reflect.TypeOf(st)
 				val := reflect.New(rt)

@@ -17,12 +17,17 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-var LoadedStrategies = make(map[string]interface{})
+var LoadedExchangeStrategies = make(map[string]SingleExchangeStrategy)
 
-func RegisterStrategy(key string, configmap interface{}) {
-	LoadedStrategies[key] = configmap
+func RegisterExchangeStrategy(key string, configmap SingleExchangeStrategy) {
+	LoadedExchangeStrategies[key] = configmap
 }
 
+var LoadedCrossExchangeStrategies = make(map[string]CrossExchangeStrategy)
+
+func RegisterCrossExchangeStrategy(key string, configmap CrossExchangeStrategy) {
+	LoadedCrossExchangeStrategies[key] = configmap
+}
 
 // Environment presents the real exchange data layer
 type Environment struct {
