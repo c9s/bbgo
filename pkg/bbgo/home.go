@@ -5,6 +5,21 @@ import (
 	"path"
 )
 
+func prepareDir(p string) string {
+	_, err := os.Stat(p)
+	if err != nil {
+		_ = os.Mkdir(p, 0777)
+	}
+
+	return p
+}
+
+func CacheDir() string {
+	home := HomeDir()
+	dir := path.Join(home, "cache")
+	return prepareDir(dir)
+}
+
 func SourceDir() string {
 	home := HomeDir()
 	return path.Join(home, "source")
@@ -16,12 +31,6 @@ func HomeDir() string {
 		panic(err)
 	}
 
-	dotDir := path.Join(homeDir, ".bbgo")
-
-	_, err = os.Stat(dotDir)
-	if err != nil {
-		_ = os.Mkdir(dotDir, 0777)
-	}
-
-	return dotDir
+	dir := path.Join(homeDir, ".bbgo")
+	return prepareDir(dir)
 }
