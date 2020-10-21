@@ -9,6 +9,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+// NewExchange constructor exchange object from viper config.
 func NewExchange(n types.ExchangeName) (types.Exchange, error) {
 	switch n {
 

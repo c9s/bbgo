@@ -3,14 +3,9 @@ package slacknotifier
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
-
-	"github.com/c9s/bbgo/pkg/accounting/pnl"
-	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
 )
 
 type SlackAttachmentCreator interface {
@@ -19,34 +14,15 @@ type SlackAttachmentCreator interface {
 
 type Notifier struct {
 	client *slack.Client
-
-	Channel string
-
-	TradeChannel string
-	PnlChannel   string
 }
 
 type NotifyOption func(notifier *Notifier)
 
-func TradeChannel(channel string) NotifyOption {
-	return func(notifier *Notifier) {
-		notifier.TradeChannel = channel
-	}
-}
-
-func PnlChannel(channel string) NotifyOption {
-	return func(notifier *Notifier) {
-		notifier.PnlChannel = channel
-	}
-}
-
-func New(token string, channel string, options ...NotifyOption) *Notifier {
+func New(token string, options ...NotifyOption) *Notifier {
 	var client = slack.New(token, slack.OptionDebug(true))
+
 	notifier := &Notifier{
 		client:       client,
-		Channel:      channel,
-		TradeChannel: channel,
-		PnlChannel:   channel,
 	}
 
 	for _, o := range options {
@@ -56,7 +32,7 @@ func New(token string, channel string, options ...NotifyOption) *Notifier {
 	return notifier
 }
 
-func (n *Notifier) Notify(format string, args ...interface{}) {
+func (n *Notifier) Notify(channel, format string, args ...interface{}) {
 	var slackAttachments []slack.Attachment
 	var slackArgsOffset = -1
 
@@ -88,7 +64,7 @@ func (n *Notifier) Notify(format string, args ...interface{}) {
 
 	logrus.Infof(format, nonSlackArgs...)
 
-	_, _, err := n.client.PostMessageContext(context.Background(), n.Channel,
+	_, _, err := n.client.PostMessageContext(context.Background(), channel,
 		slack.MsgOptionText(fmt.Sprintf(format, nonSlackArgs...), true),
 		slack.MsgOptionAttachments(slackAttachments...))
 	if err != nil {
@@ -96,6 +72,7 @@ func (n *Notifier) Notify(format string, args ...interface{}) {
 	}
 }
 
+/*
 func (n *Notifier) NotifyTrade(trade *types.Trade) {
 	_, _, err := n.client.PostMessageContext(context.Background(), n.TradeChannel,
 		slack.MsgOptionText(util.Render(`:handshake: {{ .Symbol }} {{ .Side }} Trade Execution @ {{ .Price  }}`, trade), true),
@@ -105,7 +82,9 @@ func (n *Notifier) NotifyTrade(trade *types.Trade) {
 		logrus.WithError(err).Error("slack send error")
 	}
 }
+ */
 
+/*
 func (n *Notifier) NotifyPnL(report *pnl.AverageCostPnlReport) {
 	attachment := report.SlackAttachment()
 
@@ -122,3 +101,4 @@ func (n *Notifier) NotifyPnL(report *pnl.AverageCostPnlReport) {
 		logrus.WithError(err).Errorf("slack send error")
 	}
 }
+*/
