@@ -37,6 +37,8 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 	return &ExchangeSession{
 		Name:             name,
 		Exchange:         exchange,
+		Stream:           exchange.NewStream(),
+		Account:          &types.Account{},
 		Subscriptions:    make(map[types.Subscription]types.Subscription),
 		markets:          make(map[string]types.Market),
 		Trades:           make(map[string][]types.Trade),

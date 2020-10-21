@@ -38,6 +38,7 @@ type Environment struct {
 	sessions      map[string]*ExchangeSession
 }
 
+// NewDefaultEnvironment prepares the exchange sessions from the viper settings.
 func NewDefaultEnvironment(db *sqlx.DB) *Environment {
 	environment := NewEnvironment(db)
 
@@ -89,8 +90,6 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 		}
 
 		session.markets = markets
-		session.Account = &types.Account{}
-		session.Stream = session.Exchange.NewStream()
 	}
 
 	return nil
