@@ -41,7 +41,7 @@ func (m *Notifiability) AddNotifier(notifier Notifier) {
 
 func (m *Notifiability) Notify(msg string, args ...interface{}) {
 	for _, n := range m.notifiers {
-		n.Notify(msg, args...)
+		n.Notify("", msg, args...)
 	}
 }
 

@@ -12,6 +12,7 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/config"
+	"github.com/c9s/bbgo/pkg/notifier/slacknotifier"
 	"github.com/c9s/bbgo/pkg/slack/slacklog"
 )
 
@@ -54,6 +55,9 @@ var runCmd = &cobra.Command{
 		}
 
 		log.AddHook(slacklog.NewLogHook(slackToken, viper.GetString("slack-error-channel")))
+
+		var notifier = slacknotifier.New(slackToken)
+		_ = notifier
 
 		db, err := cmdutil.ConnectMySQL()
 		if err != nil {

@@ -6,7 +6,7 @@ import (
 )
 
 type Notifier interface {
-	Notify(format string, args ...interface{})
+	Notify(channel, format string, args ...interface{})
 	NotifyTrade(trade *types.Trade)
 	NotifyPnL(report *pnl.AverageCostPnlReport)
 }
