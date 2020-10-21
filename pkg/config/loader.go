@@ -11,9 +11,14 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 )
 
+type SingleExchangeStrategyConfig struct {
+	Mounts   []string
+	Strategy bbgo.SingleExchangeStrategy
+}
+
 type Config struct {
-	ExchangeStrategies      map[string][]bbgo.SingleExchangeStrategy
-	CrossExchangeStrategies map[string][]bbgo.CrossExchangeStrategy
+	ExchangeStrategies      []SingleExchangeStrategyConfig
+	CrossExchangeStrategies []bbgo.CrossExchangeStrategy
 }
 
 type Stash map[string]interface{}
@@ -46,44 +51,89 @@ func Load(configFile string) (*Config, error) {
 	}
 
 	config.ExchangeStrategies = strategies
+
+	crossExchangeStrategies, err := loadCrossExchangeStrategies(stash)
+	if err != nil {
+		return nil, err
+	}
+
+	config.CrossExchangeStrategies = crossExchangeStrategies
+
 	return &config, nil
 }
 
-func loadExchangeStrategies(stash Stash) (strategies map[string][]bbgo.SingleExchangeStrategy, err error) {
-	exchangeStrategiesConf, ok := stash["exchangeStrategies"]
+func loadCrossExchangeStrategies(stash Stash) (strategies []bbgo.CrossExchangeStrategy, err error) {
+	exchangeStrategiesConf, ok := stash["crossExchangeStrategies"]
 	if !ok {
-		return nil, errors.New("exchangeStrategies is not defined")
+		return strategies, nil
 	}
 
-	sessionToConfigList, ok := exchangeStrategiesConf.(Stash)
+	configList, ok := exchangeStrategiesConf.([]interface{})
 	if !ok {
-		return nil, errors.New("expecting session name at the first level")
+		return nil, errors.New("expecting list in crossExchangeStrategies")
 	}
 
-	strategies = make(map[string][]bbgo.SingleExchangeStrategy)
-
-	for sessionName, configList := range sessionToConfigList {
-		list, ok := configList.([]interface{})
+	for _, entry := range configList {
+		configStash, ok := entry.(Stash)
 		if !ok {
-			return nil, errors.New("exchangeStrategies should be a list")
+			return nil, errors.Errorf("strategy config should be a map, given: %T %+v", entry, entry)
 		}
 
-		for _, entry := range list {
-			configStash, ok := entry.(Stash)
-			if !ok {
-				return nil, errors.Errorf("strategy config should be a map, given: %T %+v", entry, entry)
-			}
-
-			for id, conf := range configStash {
-				// look up the real struct type
-				if st, ok := bbgo.LoadedExchangeStrategies[id]; ok {
-					val, err := reUnmarshal(conf, st)
-					if err != nil {
-						return nil, err
-					}
-
-					strategies[sessionName] = append(strategies[sessionName], val.(bbgo.SingleExchangeStrategy))
+		for id, conf := range configStash {
+			// look up the real struct type
+			if st, ok := bbgo.LoadedExchangeStrategies[id]; ok {
+				val, err := reUnmarshal(conf, st)
+				if err != nil {
+					return nil, err
 				}
+
+				strategies = append(strategies, val.(bbgo.CrossExchangeStrategy))
+			}
+		}
+
+	}
+
+	return strategies, nil
+}
+
+func loadExchangeStrategies(stash Stash) (strategies []SingleExchangeStrategyConfig, err error) {
+	exchangeStrategiesConf, ok := stash["exchangeStrategies"]
+	if !ok {
+		return strategies, nil
+	}
+
+	configList, ok := exchangeStrategiesConf.([]interface{})
+	if !ok {
+		return nil, errors.New("expecting list in exchangeStrategies")
+	}
+
+	for _, entry := range configList {
+		configStash, ok := entry.(Stash)
+		if !ok {
+			return nil, errors.Errorf("strategy config should be a map, given: %T %+v", entry, entry)
+		}
+
+		var mounts []string
+		if val, ok := configStash["on"]; ok {
+			if values, ok := val.([]string); ok {
+				mounts = append(mounts, values...)
+			} else if str, ok := val.(string); ok {
+				mounts = append(mounts, str)
+			}
+		}
+
+		for id, conf := range configStash {
+			// look up the real struct type
+			if st, ok := bbgo.LoadedExchangeStrategies[id]; ok {
+				val, err := reUnmarshal(conf, st)
+				if err != nil {
+					return nil, err
+				}
+
+				strategies = append(strategies, SingleExchangeStrategyConfig{
+					Mounts:   mounts,
+					Strategy: val.(bbgo.SingleExchangeStrategy),
+				})
 			}
 		}
 	}
