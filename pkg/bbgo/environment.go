@@ -3,6 +3,7 @@ package bbgo
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/store"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 var LoadedExchangeStrategies = make(map[string]SingleExchangeStrategy)
@@ -27,6 +29,52 @@ var LoadedCrossExchangeStrategies = make(map[string]CrossExchangeStrategy)
 
 func RegisterCrossExchangeStrategy(key string, configmap CrossExchangeStrategy) {
 	LoadedCrossExchangeStrategies[key] = configmap
+}
+
+type TradeReporter struct {
+	notifier Notifier
+
+	channel       string
+	channelRoutes map[*regexp.Regexp]string
+}
+
+func NewTradeReporter(notifier Notifier) *TradeReporter {
+	return &TradeReporter{
+		notifier:      notifier,
+		channelRoutes: make(map[*regexp.Regexp]string),
+	}
+}
+
+func (reporter *TradeReporter) Channel(channel string) *TradeReporter {
+	reporter.channel = channel
+	return reporter
+}
+
+func (reporter *TradeReporter) ChannelBySymbol(routes map[string]string) *TradeReporter {
+	for pattern, channel := range routes {
+		reporter.channelRoutes[regexp.MustCompile(pattern)] = channel
+	}
+
+	return reporter
+}
+
+func (reporter *TradeReporter) getChannel(symbol string) string {
+	for pattern, channel := range reporter.channelRoutes {
+		if pattern.MatchString(symbol) {
+			return channel
+		}
+	}
+
+	return reporter.channel
+}
+
+func (reporter *TradeReporter) Report(trade types.Trade) {
+	var channel = reporter.getChannel(trade.Symbol)
+
+	var text = util.Render(`:handshake: {{ .Symbol }} {{ .Side }} Trade Execution @ {{ .Price  }}`, trade)
+	if err := reporter.notifier.Notify(channel, text, trade); err != nil {
+		log.WithError(err).Error("notifier error")
+	}
 }
 
 // Environment presents the real exchange data layer
