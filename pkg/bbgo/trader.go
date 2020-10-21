@@ -240,11 +240,13 @@ func (trader *Trader) NotifyPnL(report *accounting.ProfitAndLossReport) {
 }
 */
 
+/*
 func (trader *Trader) NotifyTrade(trade *types.Trade) {
 	for _, n := range trader.notifiers {
 		n.NotifyTrade(trade)
 	}
 }
+*/
 
 func (trader *Trader) SubmitOrder(ctx context.Context, order types.SubmitOrder) {
 	trader.Notify(":memo: Submitting %s %s %s order with quantity: %s", order.Symbol, order.Type, order.Side, order.QuantityString, order)
