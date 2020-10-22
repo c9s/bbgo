@@ -1,10 +1,30 @@
 ---
-notifier:
+notifications:
   slack:
+    defaultChannel: "bbgo"
     errorChannel: "bbgo-error"
 
-exchange:
-  binance:
-    target: binance
+reportTrades:
+  channelBySymbol:
+    "btcusdt": "bbgo-btcusdt"
+    "ethusdt": "bbgo-ethusdt"
+    "bnbusdt": "bbgo-bnbusdt"
+    "sxpusdt": "bbgo-sxpusdt"
+
+sessions:
   max:
-    target: max
+    exchange: max
+    keyVar: MAX_API_KEY
+    secretVar: MAX_API_SECRET
+  binance:
+    exchange: binance
+    keyVar: BINANCE_API_KEY
+    secretVar: BINANCE_API_SECRET
+
+exchangeStrategies:
+  - on: binance
+    buyandhold:
+      symbol: "BTCUSDT"
+      interval: "1m"
+      baseQuantity: 0.1
+      minDropPercentage: -0.05

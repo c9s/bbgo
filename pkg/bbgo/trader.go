@@ -31,22 +31,9 @@ type CrossExchangeStrategy interface {
 	Run(ctx context.Context, orderExecutionRouter types.OrderExecutionRouter, sessions map[string]*ExchangeSession) error
 }
 
-type Notifiability struct {
-	notifiers []Notifier
-}
-
-func (m *Notifiability) AddNotifier(notifier Notifier) {
-	m.notifiers = append(m.notifiers, notifier)
-}
-
-func (m *Notifiability) Notify(msg string, args ...interface{}) {
-	for _, n := range m.notifiers {
-		n.NotifyTo("", msg, args...)
-	}
-}
-
 type Trader struct {
 	Notifiability
+
 	environment *Environment
 
 	crossExchangeStrategies []CrossExchangeStrategy
