@@ -81,10 +81,12 @@ func (reporter *AverageCostPnLReporter) Of(sessions ...string) *AverageCostPnLRe
 	return reporter
 }
 
-func (reporter *AverageCostPnLReporter) When(spec string) *AverageCostPnLReporter {
-	_, err := reporter.cron.AddJob(spec, reporter)
-	if err != nil {
-		panic(err)
+func (reporter *AverageCostPnLReporter) When(specs ...string) *AverageCostPnLReporter {
+	for _,spec := range specs {
+		_, err := reporter.cron.AddJob(spec, reporter)
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	return reporter
