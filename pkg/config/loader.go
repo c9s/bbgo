@@ -100,6 +100,7 @@ func loadExchangeStrategies(stash Stash) (strategies []SingleExchangeStrategyCon
 	exchangeStrategiesConf, ok := stash["exchangeStrategies"]
 	if !ok {
 		return strategies, nil
+		// return nil, errors.New("exchangeStrategies is not defined")
 	}
 
 	configList, ok := exchangeStrategiesConf.([]interface{})

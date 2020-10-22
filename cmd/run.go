@@ -14,12 +14,14 @@ import (
 	"github.com/c9s/bbgo/pkg/config"
 	"github.com/c9s/bbgo/pkg/notifier/slacknotifier"
 	"github.com/c9s/bbgo/pkg/slack/slacklog"
+
+	_ "github.com/c9s/bbgo/pkg/strategy/buyandhold"
 )
 
 var errSlackTokenUndefined = errors.New("slack token is not defined.")
 
 func init() {
-	runCmd.Flags().String("config", "", "strategy config file")
+	runCmd.Flags().String("config", "config/bbgo.yaml", "strategy config file")
 	runCmd.Flags().String("since", "", "pnl since time")
 	RootCmd.AddCommand(runCmd)
 }
@@ -56,7 +58,6 @@ var runCmd = &cobra.Command{
 
 		log.AddHook(slacklog.NewLogHook(slackToken, viper.GetString("slack-error-channel")))
 
-		// TODO: load channel from config file
 		var notifier = slacknotifier.New(slackToken, viper.GetString("slack-channel"))
 
 		db, err := cmdutil.ConnectMySQL()
@@ -71,11 +72,13 @@ var runCmd = &cobra.Command{
 
 		for _, entry := range userConfig.ExchangeStrategies {
 			for _, mount := range entry.Mounts {
+				log.Infof("attaching strategy %T on %s...", entry.Strategy, mount)
 				trader.AttachStrategyOn(mount, entry.Strategy)
 			}
 		}
 
 		for _, strategy := range userConfig.CrossExchangeStrategies {
+			log.Infof("attaching strategy %T", strategy)
 			trader.AttachCrossExchangeStrategy(strategy)
 		}
 
