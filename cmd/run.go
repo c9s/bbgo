@@ -56,8 +56,8 @@ var runCmd = &cobra.Command{
 
 		log.AddHook(slacklog.NewLogHook(slackToken, viper.GetString("slack-error-channel")))
 
-		var notifier = slacknotifier.New(slackToken)
-		_ = notifier
+		// TODO: load channel from config file
+		var notifier = slacknotifier.New(slackToken, viper.GetString("slack-channel"))
 
 		db, err := cmdutil.ConnectMySQL()
 		if err != nil {
@@ -65,6 +65,8 @@ var runCmd = &cobra.Command{
 		}
 
 		environ := bbgo.NewDefaultEnvironment(db)
+		environ.ReportTrade(notifier)
+
 		trader := bbgo.NewTrader(environ)
 
 		for _, entry := range userConfig.ExchangeStrategies {

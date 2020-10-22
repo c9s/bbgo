@@ -72,7 +72,7 @@ func (reporter *TradeReporter) Report(trade types.Trade) {
 	var channel = reporter.getChannel(trade.Symbol)
 
 	var text = util.Render(`:handshake: {{ .Symbol }} {{ .Side }} Trade Execution @ {{ .Price  }}`, trade)
-	if err := reporter.notifier.Notify(channel, text, trade); err != nil {
+	if err := reporter.notifier.NotifyTo(channel, text, trade); err != nil {
 		log.WithError(err).Error("notifier error")
 	}
 }
@@ -84,6 +84,8 @@ type Environment struct {
 
 	tradeScanTime time.Time
 	sessions      map[string]*ExchangeSession
+
+	tradeReporter *TradeReporter
 }
 
 // NewDefaultEnvironment prepares the exchange sessions from the viper settings.
@@ -122,6 +124,11 @@ func (environ *Environment) AddExchange(name string, exchange types.Exchange) (s
 	return session
 }
 
+func (environ *Environment) ReportTrade(notifier Notifier) *TradeReporter {
+	environ.tradeReporter = NewTradeReporter(notifier)
+	return environ.tradeReporter
+}
+
 func (environ *Environment) Init(ctx context.Context) (err error) {
 	for _, session := range environ.sessions {
 		var markets types.MarketMap
@@ -138,6 +145,12 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 		}
 
 		session.markets = markets
+
+		if environ.tradeReporter != nil {
+			session.Stream.OnTrade(func(trade types.Trade) {
+				environ.tradeReporter.Report(trade)
+			})
+		}
 	}
 
 	return nil

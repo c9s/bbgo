@@ -41,7 +41,7 @@ func (m *Notifiability) AddNotifier(notifier Notifier) {
 
 func (m *Notifiability) Notify(msg string, args ...interface{}) {
 	for _, n := range m.notifiers {
-		n.Notify("", msg, args...)
+		n.NotifyTo("", msg, args...)
 	}
 }
 
@@ -164,7 +164,7 @@ func (trader *OrderExecutor) RunStrategyWithHotReload(ctx context.Context, strat
 					log.WithError(err).Error("error load config file")
 				}
 
-				trader.Notify("config reloaded, restarting trader")
+				trader.NotifyTo("config reloaded, restarting trader")
 
 				traderDone, err = trader.RunStrategy(strategyContext, strategy)
 				if err != nil {
@@ -229,22 +229,6 @@ func (trader *Trader) reportPnL() {
 	report := trader.ProfitAndLossCalculator.Calculate()
 	report.Print()
 	trader.NotifyPnL(report)
-}
-*/
-
-/*
-func (trader *Trader) NotifyPnL(report *accounting.ProfitAndLossReport) {
-	for _, n := range trader.notifiers {
-		n.NotifyPnL(report)
-	}
-}
-*/
-
-/*
-func (trader *Trader) NotifyTrade(trade *types.Trade) {
-	for _, n := range trader.notifiers {
-		n.NotifyTrade(trade)
-	}
 }
 */
 
