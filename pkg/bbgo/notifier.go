@@ -25,6 +25,12 @@ func (m *Notifiability) AddNotifier(notifier Notifier) {
 
 func (m *Notifiability) Notify(msg string, args ...interface{}) {
 	for _, n := range m.notifiers {
-		n.NotifyTo("", msg, args...)
+		n.Notify(msg, args...)
+	}
+}
+
+func (m *Notifiability) NotifyTo(channel, msg string, args ...interface{}) {
+	for _, n := range m.notifiers {
+		n.NotifyTo(channel, msg, args...)
 	}
 }
