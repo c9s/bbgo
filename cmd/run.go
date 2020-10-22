@@ -79,6 +79,9 @@ var runCmd = &cobra.Command{
 			trader.AttachCrossExchangeStrategy(strategy)
 		}
 
+		trader.ReportPnL(notifier).
+			AverageCostBySymbols("BTCUSDT", "BNBUSDT").Of("max", "binance")
+
 		err = trader.Run(ctx)
 		if err != nil {
 			return err

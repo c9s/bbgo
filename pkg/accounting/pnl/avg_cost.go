@@ -15,7 +15,7 @@ type AverageCostCalculator struct {
 	TradingFeeCurrency string
 }
 
-func (c *AverageCostCalculator) Calculate(trades []types.Trade, currentPrice float64) *AverageCostPnlReport {
+func (c *AverageCostCalculator) Calculate(symbol string, trades []types.Trade, currentPrice float64) *AverageCostPnlReport {
 	// copy trades, so that we can truncate it.
 	var bidVolume = 0.0
 	var bidAmount = 0.0
@@ -29,7 +29,7 @@ func (c *AverageCostCalculator) Calculate(trades []types.Trade, currentPrice flo
 	var currencyFees = map[string]float64{}
 
 	for _, trade := range trades {
-		if trade.Symbol == c.Symbol {
+		if trade.Symbol == symbol {
 			if trade.IsBuyer {
 				bidVolume += trade.Quantity
 				bidAmount += trade.Price * trade.Quantity
@@ -66,7 +66,7 @@ func (c *AverageCostCalculator) Calculate(trades []types.Trade, currentPrice flo
 	averageCost := (bidAmount + bidFeeUSD) / bidVolume
 
 	for _, t := range trades {
-		if t.Symbol != c.Symbol {
+		if t.Symbol != symbol {
 			continue
 		}
 
@@ -88,7 +88,7 @@ func (c *AverageCostCalculator) Calculate(trades []types.Trade, currentPrice flo
 	}
 
 	return &AverageCostPnlReport{
-		Symbol:       c.Symbol,
+		Symbol:       symbol,
 		StartTime:    c.StartTime,
 		CurrentPrice: currentPrice,
 		NumTrades:    len(trades),

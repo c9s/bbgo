@@ -112,11 +112,10 @@ var pnlCmd = &cobra.Command{
 
 		calculator := &pnl.AverageCostCalculator{
 			TradingFeeCurrency: tradingFeeCurrency,
-			Symbol:             symbol,
 			StartTime:          startTime,
 		}
 
-		report := calculator.Calculate(trades, currentPrice)
+		report := calculator.Calculate(symbol, trades, currentPrice)
 		report.Print()
 		return nil
 	},
