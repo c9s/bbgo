@@ -282,7 +282,7 @@ func (s *Stream) read(ctx context.Context) {
 				continue
 			}
 
-			// log.Notify("[binance] event: %+v", e)
+			// log.NotifyTo("[binance] event: %+v", e)
 			switch e := e.(type) {
 
 			case *OutboundAccountInfoEvent:

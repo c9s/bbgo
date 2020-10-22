@@ -13,16 +13,18 @@ type SlackAttachmentCreator interface {
 }
 
 type Notifier struct {
-	client *slack.Client
+	client  *slack.Client
+	channel string
 }
 
 type NotifyOption func(notifier *Notifier)
 
-func New(token string, options ...NotifyOption) *Notifier {
+func New(token, channel string, options ...NotifyOption) *Notifier {
 	var client = slack.New(token, slack.OptionDebug(true))
 
 	notifier := &Notifier{
-		client:       client,
+		channel: channel,
+		client:  client,
 	}
 
 	for _, o := range options {
@@ -32,7 +34,11 @@ func New(token string, options ...NotifyOption) *Notifier {
 	return notifier
 }
 
-func (n *Notifier) Notify(channel, format string, args ...interface{}) error {
+func (n *Notifier) Notify(format string, args ...interface{}) error {
+	return n.NotifyTo(n.channel, format, args...)
+}
+
+func (n *Notifier) NotifyTo(channel, format string, args ...interface{}) error {
 	var slackAttachments []slack.Attachment
 	var slackArgsOffset = -1
 
@@ -84,7 +90,7 @@ func (n *Notifier) NotifyTrade(trade *types.Trade) {
 		logrus.WithError(err).Error("slack send error")
 	}
 }
- */
+*/
 
 /*
 func (n *Notifier) NotifyPnL(report *pnl.AverageCostPnlReport) {
