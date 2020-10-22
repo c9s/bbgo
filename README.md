@@ -162,20 +162,18 @@ func main() {
 
 ## Support
 
-### Contribute pull requests
+### By contributing pull requests
 
 Any pull request is welcome, documentation, format fixing, testing, features.
 
-### Register account with referral ID
+### By registering account with referral ID
 
 You may register your exchange account with my referral ID to support this project.
 
 - For MAX Exchange: <https://max.maicoin.com/signup?r=c7982718> (default commission rate to your account)
 - For Binance Exchange: <https://www.binancezh.com/en/register?ref=VGDGLT80> (5% commission back to your account)
 
-### Some cryptos
-
-To support this project by some small amount cryptos:
+### By small amount cryptos
 
 - BTC address `3J6XQJNWT56amqz9Hz2BEVQ7W4aNmb5kiU`
 - USDT ERC20 address `0x63E5805e027548A384c57E20141f6778591Bac6F`
