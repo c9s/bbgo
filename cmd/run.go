@@ -83,7 +83,8 @@ var runCmd = &cobra.Command{
 		}
 
 		trader.ReportPnL(notifier).
-			AverageCostBySymbols("BTCUSDT", "BNBUSDT").Of("max", "binance")
+			AverageCostBySymbols("BTCUSDT", "BNBUSDT").
+			Of("max", "binance").When("@daily", "@hourly")
 
 		err = trader.Run(ctx)
 		if err != nil {
