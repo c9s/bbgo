@@ -31,6 +31,8 @@ type ExchangeSession struct {
 	Trades map[string][]types.Trade
 
 	marketDataStores map[string]*store.MarketDataStore
+
+	tradeReporter *TradeReporter
 }
 
 func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
@@ -61,6 +63,11 @@ func (session *ExchangeSession) LastPrice(symbol string) (price float64, ok bool
 func (session *ExchangeSession) Market(symbol string) (market types.Market, ok bool) {
 	market, ok = session.markets[symbol]
 	return market, ok
+}
+
+func (session *ExchangeSession) ReportTrade(notifier Notifier) *TradeReporter {
+	session.tradeReporter = NewTradeReporter(notifier)
+	return session.tradeReporter
 }
 
 // Subscribe save the subscription info, later it will be assigned to the stream

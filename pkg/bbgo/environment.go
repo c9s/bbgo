@@ -146,7 +146,11 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 
 		session.markets = markets
 
-		if environ.tradeReporter != nil {
+		if session.tradeReporter != nil {
+			session.Stream.OnTrade(func(trade types.Trade) {
+				session.tradeReporter.Report(trade)
+			})
+		} else if environ.tradeReporter != nil {
 			session.Stream.OnTrade(func(trade types.Trade) {
 				environ.tradeReporter.Report(trade)
 			})
