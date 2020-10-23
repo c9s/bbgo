@@ -8,7 +8,7 @@ import (
 
 	"github.com/lestrrat-go/file-rotatelogs"
 	"github.com/rifflock/lfshook"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/x-cray/logrus-prefixed-formatter"
@@ -46,7 +46,7 @@ func init() {
 	RootCmd.PersistentFlags().String("max-api-secret", "", "max api secret")
 }
 
-func Run() {
+func Execute() {
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 
 	// Enable environment variable binding, the env vars are not overloaded yet.
@@ -63,23 +63,23 @@ func Run() {
 
 	err := viper.ReadInConfig()
 	if err != nil {
-		logrus.WithError(err).Fatal("failed to load config file")
+		log.WithError(err).Fatal("failed to load config file")
 	}
 
 	// Once the flags are defined, we can bind config keys with flags.
 	if err := viper.BindPFlags(RootCmd.PersistentFlags()); err != nil {
-		logrus.WithError(err).Errorf("failed to bind persistent flags. please check the flag settings.")
+		log.WithError(err).Errorf("failed to bind persistent flags. please check the flag settings.")
 	}
 
 	if err := viper.BindPFlags(RootCmd.Flags()); err != nil {
-		logrus.WithError(err).Errorf("failed to bind local flags. please check the flag settings.")
+		log.WithError(err).Errorf("failed to bind local flags. please check the flag settings.")
 	}
 
-	logrus.SetFormatter(&prefixed.TextFormatter{})
+	log.SetFormatter(&prefixed.TextFormatter{})
 
-	logger := logrus.StandardLogger()
+	logger := log.StandardLogger()
 	if viper.GetBool("debug") {
-		logger.SetLevel(logrus.DebugLevel)
+		logger.SetLevel(log.DebugLevel)
 	}
 
 	environment := os.Getenv("BBGO_ENV")
@@ -93,23 +93,23 @@ func Run() {
 			rotatelogs.WithRotationTime(time.Duration(24)*time.Hour),
 		)
 		if err != nil {
-			logrus.Panic(err)
+			log.Panic(err)
 		}
 		logger.AddHook(
 			lfshook.NewHook(
 				lfshook.WriterMap{
-					logrus.DebugLevel: writer,
-					logrus.InfoLevel:  writer,
-					logrus.WarnLevel:  writer,
-					logrus.ErrorLevel: writer,
-					logrus.FatalLevel: writer,
+					log.DebugLevel: writer,
+					log.InfoLevel:  writer,
+					log.WarnLevel:  writer,
+					log.ErrorLevel: writer,
+					log.FatalLevel: writer,
 				},
-				&logrus.JSONFormatter{},
+				&log.JSONFormatter{},
 			),
 		)
 	}
 
 	if err := RootCmd.Execute(); err != nil {
-		logrus.WithError(err).Fatalf("cannot execute command")
+		log.WithError(err).Fatalf("cannot execute command")
 	}
 }
