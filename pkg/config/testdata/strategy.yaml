@@ -15,3 +15,12 @@ exchangeStrategies:
       interval: "1m"
       baseQuantity: 0.1
       minDropPercentage: -0.05
+
+reportPnL:
+  - averageCostBySymbols:
+      - "BTCUSDT"
+      - "BNBUSDT"
+    of: binance
+    when:
+      - "@daily"
+      - "@hourly"
