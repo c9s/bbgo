@@ -67,25 +67,29 @@ type Config struct {
 
 type Stash map[string]interface{}
 
-func loadStash(configFile string) (Stash, error) {
-	config, err := ioutil.ReadFile(configFile)
-	if err != nil {
-		return nil, err
-	}
-
+func loadStash(config []byte) (Stash, error) {
 	stash := make(Stash)
 	if err := yaml.Unmarshal(config, stash); err != nil {
 		return nil, err
 	}
 
-	return stash, err
+	return stash, nil
 }
 
 func Load(configFile string) (*Config, error) {
 	var config Config
 
-	stash, err := loadStash(configFile)
+	content, err := ioutil.ReadFile(configFile)
 	if err != nil {
+		return nil, err
+	}
+
+	stash, err := loadStash(content)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := loadImports(&config, stash); err != nil {
 		return nil, err
 	}
 
@@ -104,6 +108,21 @@ func Load(configFile string) (*Config, error) {
 	return &config, nil
 }
 
+func loadImports(config *Config, stash Stash) error {
+	importStash, ok := stash["imports"]
+	if !ok {
+		return nil
+	}
+
+	imports, err := reUnmarshal(importStash, &config.Imports)
+	if err != nil {
+		return err
+	}
+
+	config.Imports = *imports.(*[]string)
+	return nil
+}
+
 func loadReportPnL(config *Config, stash Stash) error {
 	reporterStash, ok := stash["reportPnL"]
 	if !ok {
@@ -120,15 +139,15 @@ func loadReportPnL(config *Config, stash Stash) error {
 }
 
 func loadCrossExchangeStrategies(config *Config, stash Stash) (err error) {
-	if len(bbgo.LoadedCrossExchangeStrategies) == 0 {
-		return errors.New("no cross exchange strategy is registered")
-	}
-
-
 	exchangeStrategiesConf, ok := stash["crossExchangeStrategies"]
 	if !ok {
 		return nil
 	}
+
+	if len(bbgo.LoadedCrossExchangeStrategies) == 0 {
+		return errors.New("no cross exchange strategy is registered")
+	}
+
 
 	configList, ok := exchangeStrategiesConf.([]interface{})
 	if !ok {
@@ -158,20 +177,19 @@ func loadCrossExchangeStrategies(config *Config, stash Stash) (err error) {
 }
 
 func loadExchangeStrategies(config *Config, stash Stash) (err error) {
-	if len(bbgo.LoadedExchangeStrategies) == 0 {
-		return errors.New("no exchange strategy is registered")
-	}
-
 	exchangeStrategiesConf, ok := stash["exchangeStrategies"]
 	if !ok {
 		return nil
+	}
+
+	if len(bbgo.LoadedExchangeStrategies) == 0 {
+		return errors.New("no exchange strategy is registered")
 	}
 
 	configList, ok := exchangeStrategiesConf.([]interface{})
 	if !ok {
 		return errors.New("expecting list in exchangeStrategies")
 	}
-
 
 	for _, entry := range configList {
 		configStash, ok := entry.(Stash)
@@ -187,7 +205,6 @@ func loadExchangeStrategies(config *Config, stash Stash) (err error) {
 				mounts = append(mounts, str)
 			}
 		}
-
 
 		for id, conf := range configStash {
 			// look up the real struct type
