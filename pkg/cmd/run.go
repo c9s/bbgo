@@ -5,7 +5,7 @@ import (
 	"syscall"
 
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -14,19 +14,17 @@ import (
 	"github.com/c9s/bbgo/pkg/config"
 	"github.com/c9s/bbgo/pkg/notifier/slacknotifier"
 	"github.com/c9s/bbgo/pkg/slack/slacklog"
-
-	_ "github.com/c9s/bbgo/pkg/strategy/buyandhold"
 )
 
 var errSlackTokenUndefined = errors.New("slack token is not defined.")
 
 func init() {
-	runCmd.Flags().String("config", "config/bbgo.yaml", "strategy config file")
-	runCmd.Flags().String("since", "", "pnl since time")
-	RootCmd.AddCommand(runCmd)
+	RunCmd.Flags().String("config", "config/bbgo.yaml", "strategy config file")
+	RunCmd.Flags().String("since", "", "pnl since time")
+	RootCmd.AddCommand(RunCmd)
 }
 
-var runCmd = &cobra.Command{
+var RunCmd = &cobra.Command{
 	Use:   "run",
 	Short: "run strategies",
 
@@ -56,7 +54,7 @@ var runCmd = &cobra.Command{
 			return errSlackTokenUndefined
 		}
 
-		log.AddHook(slacklog.NewLogHook(slackToken, viper.GetString("slack-error-channel")))
+		logrus.AddHook(slacklog.NewLogHook(slackToken, viper.GetString("slack-error-channel")))
 
 		var notifier = slacknotifier.New(slackToken, viper.GetString("slack-channel"))
 
@@ -72,13 +70,13 @@ var runCmd = &cobra.Command{
 
 		for _, entry := range userConfig.ExchangeStrategies {
 			for _, mount := range entry.Mounts {
-				log.Infof("attaching strategy %T on %s...", entry.Strategy, mount)
+				logrus.Infof("attaching strategy %T on %s...", entry.Strategy, mount)
 				trader.AttachStrategyOn(mount, entry.Strategy)
 			}
 		}
 
 		for _, strategy := range userConfig.CrossExchangeStrategies {
-			log.Infof("attaching strategy %T", strategy)
+			logrus.Infof("attaching strategy %T", strategy)
 			trader.AttachCrossExchangeStrategy(strategy)
 		}
 
