@@ -36,7 +36,7 @@ func init() {
 	// the command it's assigned to as well as every command under that command.
 	// For global flags, assign a flag as a persistent flag on the root.
 	RootCmd.PersistentFlags().String("slack-token", "", "slack token")
-	RootCmd.PersistentFlags().String("slack-trading-channel", "dev-bbgo", "slack trading channel")
+	RootCmd.PersistentFlags().String("slack-channel", "dev-bbgo", "slack trading channel")
 	RootCmd.PersistentFlags().String("slack-error-channel", "bbgo-error", "slack error channel")
 
 	RootCmd.PersistentFlags().String("binance-api-key", "", "binance api key")
