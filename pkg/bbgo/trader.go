@@ -2,7 +2,6 @@ package bbgo
 
 import (
 	"context"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/robfig/cron/v3"
@@ -96,7 +95,6 @@ func (reporter *AverageCostPnLReporter) Run() {
 	for _, sessionName := range reporter.Sessions {
 		session := reporter.environment.sessions[sessionName]
 		calculator := &pnl.AverageCostCalculator{
-			StartTime:          time.Time{},
 			TradingFeeCurrency: session.Exchange.PlatformFeeCurrency(),
 		}
 
