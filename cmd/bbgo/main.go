@@ -1,9 +1,8 @@
 package main
 
 import (
-	"github.com/c9s/bbgo/cmd"
+	"github.com/c9s/bbgo/pkg/cmd"
 
-	_ "github.com/go-sql-driver/mysql"
 )
 
 func main() {
