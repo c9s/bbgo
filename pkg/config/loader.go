@@ -18,13 +18,7 @@ type SingleExchangeStrategyConfig struct {
 
 type StringSlice []string
 
-func (s *StringSlice) UnmarshalJSON(b []byte) (err error) {
-	var a interface{}
-	err = json.Unmarshal(b, &a)
-	if err != nil {
-		return err
-	}
-
+func (s *StringSlice) decode(a interface{}) error {
 	switch d := a.(type) {
 	case string:
 		*s = append(*s, d)
@@ -32,11 +26,28 @@ func (s *StringSlice) UnmarshalJSON(b []byte) (err error) {
 	case []string:
 		*s = append(*s, d...)
 
+	case []interface{}:
+		for _, de := range d {
+			if err := s.decode(de); err != nil {
+				return err
+			}
+		}
+
 	default:
-		err = errors.New("unexpected type for StringSlice")
+		return errors.Errorf("unexpected type %T for StringSlice: %+v", d, d)
 	}
 
-	return err
+	return nil
+}
+
+func (s *StringSlice) UnmarshalJSON(b []byte) error {
+	var a interface{}
+	var err = json.Unmarshal(b, &a)
+	if err != nil {
+		return err
+	}
+
+	return s.decode(a)
 }
 
 type PnLReporter struct {

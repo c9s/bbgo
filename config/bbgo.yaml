@@ -17,8 +17,8 @@ reportPnL:
       - "BNBUSDT"
     of: binance
     when:
-      - @daily
-      - @hourly
+      - "@daily"
+      - "@hourly"
 
 sessions:
   max:
