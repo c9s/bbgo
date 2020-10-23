@@ -9,7 +9,7 @@ import (
 	_ "github.com/c9s/bbgo/pkg/strategy/buyandhold"
 )
 
-func TestLoadStrategies(t *testing.T) {
+func TestLoadConfig(t *testing.T) {
 	type args struct {
 		configFile string
 	}
