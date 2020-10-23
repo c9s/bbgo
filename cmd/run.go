@@ -82,14 +82,16 @@ var runCmd = &cobra.Command{
 			trader.AttachCrossExchangeStrategy(strategy)
 		}
 
-		// TODO: load these from config file
-		trader.ReportPnL(notifier).
-			AverageCostBySymbols("BTCUSDT", "BNBUSDT").
-			Of("binance").When("@daily", "@hourly")
-
-		trader.ReportPnL(notifier).
-			AverageCostBySymbols("MAXUSDT").
-			Of("max").When("@daily", "@hourly")
+		for _, report := range userConfig.PnLReporters {
+			if len(report.AverageCostBySymbols) > 0 {
+				trader.ReportPnL(notifier).
+					AverageCostBySymbols(report.AverageCostBySymbols...).
+					Of(report.Of...).
+					When(report.When...)
+			} else {
+				return errors.Errorf("unsupported PnL reporter: %+v", report)
+			}
+		}
 
 		err = trader.Run(ctx)
 		if err != nil {
