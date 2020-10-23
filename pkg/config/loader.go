@@ -57,10 +57,12 @@ type PnLReporter struct {
 }
 
 type Config struct {
+	Imports []string `json:"imports" yaml:"imports"`
+
 	ExchangeStrategies      []SingleExchangeStrategyConfig
 	CrossExchangeStrategies []bbgo.CrossExchangeStrategy
 
-	PnLReporters []PnLReporter `json:"reportPnL"`
+	PnLReporters []PnLReporter `json:"reportPnL" yaml:"reportPnL"`
 }
 
 type Stash map[string]interface{}
@@ -118,6 +120,11 @@ func loadReportPnL(config *Config, stash Stash) error {
 }
 
 func loadCrossExchangeStrategies(config *Config, stash Stash) (err error) {
+	if len(bbgo.LoadedCrossExchangeStrategies) == 0 {
+		return errors.New("no cross exchange strategy is registered")
+	}
+
+
 	exchangeStrategiesConf, ok := stash["crossExchangeStrategies"]
 	if !ok {
 		return nil
@@ -151,6 +158,10 @@ func loadCrossExchangeStrategies(config *Config, stash Stash) (err error) {
 }
 
 func loadExchangeStrategies(config *Config, stash Stash) (err error) {
+	if len(bbgo.LoadedExchangeStrategies) == 0 {
+		return errors.New("no exchange strategy is registered")
+	}
+
 	exchangeStrategiesConf, ok := stash["exchangeStrategies"]
 	if !ok {
 		return nil
@@ -160,6 +171,7 @@ func loadExchangeStrategies(config *Config, stash Stash) (err error) {
 	if !ok {
 		return errors.New("expecting list in exchangeStrategies")
 	}
+
 
 	for _, entry := range configList {
 		configStash, ok := entry.(Stash)
@@ -175,6 +187,7 @@ func loadExchangeStrategies(config *Config, stash Stash) (err error) {
 				mounts = append(mounts, str)
 			}
 		}
+
 
 		for id, conf := range configStash {
 			// look up the real struct type
