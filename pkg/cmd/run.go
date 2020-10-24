@@ -11,7 +11,7 @@ import (
 	"text/template"
 
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -66,7 +66,7 @@ func runConfig(ctx context.Context, config *config.Config) error {
 		return errSlackTokenUndefined
 	}
 
-	logrus.AddHook(slacklog.NewLogHook(slackToken, viper.GetString("slack-error-channel")))
+	log.AddHook(slacklog.NewLogHook(slackToken, viper.GetString("slack-error-channel")))
 
 	var notifier = slacknotifier.New(slackToken, viper.GetString("slack-channel"))
 
@@ -82,13 +82,13 @@ func runConfig(ctx context.Context, config *config.Config) error {
 
 	for _, entry := range config.ExchangeStrategies {
 		for _, mount := range entry.Mounts {
-			logrus.Infof("attaching strategy %T on %s...", entry.Strategy, mount)
+			log.Infof("attaching strategy %T on %s...", entry.Strategy, mount)
 			trader.AttachStrategyOn(mount, entry.Strategy)
 		}
 	}
 
 	for _, strategy := range config.CrossExchangeStrategies {
-		logrus.Infof("attaching strategy %T", strategy)
+		log.Infof("attaching strategy %T", strategy)
 		trader.AttachCrossExchangeStrategy(strategy)
 	}
 
@@ -162,7 +162,7 @@ var RunCmd = &cobra.Command{
 			}
 
 			buildTarget := filepath.Join(cwd, buildDir)
-			logrus.Infof("building binary from %s...", buildTarget)
+			log.Infof("building binary from %s...", buildTarget)
 
 			buildCmd := exec.CommandContext(ctx, "go", "build", "-tags", "wrapper", "-o", "bbgow", buildTarget)
 			buildCmd.Stdout = os.Stdout
