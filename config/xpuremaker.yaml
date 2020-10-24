@@ -1,0 +1,41 @@
+---
+notifications:
+  slack:
+    defaultChannel: "bbgo"
+    errorChannel: "bbgo-error"
+
+reportTrades:
+  channelBySymbol:
+    "btcusdt": "bbgo-btcusdt"
+    "ethusdt": "bbgo-ethusdt"
+    "bnbusdt": "bbgo-bnbusdt"
+    "sxpusdt": "bbgo-sxpusdt"
+
+reportPnL:
+- averageCostBySymbols:
+  - "BTCUSDT"
+  - "BNBUSDT"
+  of: binance
+  when:
+  - "@daily"
+  - "@hourly"
+
+sessions:
+  max:
+    exchange: max
+    keyVar: MAX_API_KEY
+    secretVar: MAX_API_SECRET
+  binance:
+    exchange: binance
+    keyVar: BINANCE_API_KEY
+    secretVar: BINANCE_API_SECRET
+
+exchangeStrategies:
+- on: max
+  xpuremaker:
+    symbol: MAXUSDT
+    numOrders: 2
+    side: both
+    behindVolume: 1000.0
+    priceTick: 0.01
+    baseQuantity: 100.0
