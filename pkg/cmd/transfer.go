@@ -5,7 +5,7 @@ import (
 	"sort"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
@@ -13,10 +13,10 @@ import (
 )
 
 func init() {
-	transferHistoryCmd.Flags().String("exchange", "", "target exchange")
-	transferHistoryCmd.Flags().String("asset", "", "trading symbol")
-	transferHistoryCmd.Flags().String("since", "", "since time")
-	RootCmd.AddCommand(transferHistoryCmd)
+	TransferHistoryCmd.Flags().String("exchange", "", "target exchange")
+	TransferHistoryCmd.Flags().String("asset", "", "trading symbol")
+	TransferHistoryCmd.Flags().String("since", "", "since time")
+	RootCmd.AddCommand(TransferHistoryCmd)
 }
 
 type timeRecord struct {
@@ -38,7 +38,7 @@ func (p timeSlice) Swap(i, j int) {
 	p[i], p[j] = p[j], p[i]
 }
 
-var transferHistoryCmd = &cobra.Command{
+var TransferHistoryCmd = &cobra.Command{
 	Use:   "transfer-history",
 	Short: "show transfer history",
 
@@ -116,28 +116,28 @@ var transferHistoryCmd = &cobra.Command{
 			switch record := record.Record.(type) {
 
 			case types.Deposit:
-				log.Infof("%s: %s <== (deposit) %f [%s]", record.Time, record.Asset, record.Amount, record.Status)
+				logrus.Infof("%s: %s <== (deposit) %f [%s]", record.Time, record.Asset, record.Amount, record.Status)
 
 			case types.Withdraw:
-				log.Infof("%s: %s ==> (withdraw) %f [%s]", record.ApplyTime, record.Asset, record.Amount, record.Status)
+				logrus.Infof("%s: %s ==> (withdraw) %f [%s]", record.ApplyTime, record.Asset, record.Amount, record.Status)
 
 			default:
-				log.Infof("unknown record: %+v", record)
+				logrus.Infof("unknown record: %+v", record)
 
 			}
 		}
 
 		stats := calBaselineStats(asset, deposits, withdraws)
 		for asset, quantity := range stats.TotalDeposit {
-			log.Infof("total %s deposit: %f", asset, quantity)
+			logrus.Infof("total %s deposit: %f", asset, quantity)
 		}
 
 		for asset, quantity := range stats.TotalWithdraw {
-			log.Infof("total %s withdraw: %f", asset, quantity)
+			logrus.Infof("total %s withdraw: %f", asset, quantity)
 		}
 
 		for asset, quantity := range stats.BaselineBalance {
-			log.Infof("baseline %s balance: %f", asset, quantity)
+			logrus.Infof("baseline %s balance: %f", asset, quantity)
 		}
 
 		return nil

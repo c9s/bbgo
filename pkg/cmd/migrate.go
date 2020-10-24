@@ -8,7 +8,7 @@ import (
 	"path"
 
 	"github.com/c9s/goose"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -44,32 +44,32 @@ var MigrateCmd = &cobra.Command{
 		sourceDir := bbgo.SourceDir()
 		migrationDir := path.Join(sourceDir, "migrations")
 
-		log.Infof("creating dir: %s", dotDir)
+		logrus.Infof("creating dir: %s", dotDir)
 		if err := os.Mkdir(dotDir, 0777); err != nil {
 			// return err
 		}
 
-		log.Infof("checking %s", sourceDir)
+		logrus.Infof("checking %s", sourceDir)
 		_, err = os.Stat(sourceDir)
 		if err != nil {
-			log.Infof("cloning bbgo source into %s ...", sourceDir)
+			logrus.Infof("cloning bbgo source into %s ...", sourceDir)
 			cmd := exec.CommandContext(ctx, "git", "clone", "https://github.com/c9s/bbgo", sourceDir)
 			if err := cmd.Run(); err != nil {
 				return err
 			}
 		} else if !noUpdate {
-			log.Infof("updating: %s ...", sourceDir)
+			logrus.Infof("updating: %s ...", sourceDir)
 			cmd := exec.CommandContext(ctx, "git", "--work-tree", sourceDir, "pull")
 			if err := cmd.Run(); err != nil {
 				return err
 			}
 		}
 
-		log.Infof("using migration file dir: %s", migrationDir)
+		logrus.Infof("using migration file dir: %s", migrationDir)
 
 		command := args[0]
 		if err := goose.Run(command, db, migrationDir); err != nil {
-			log.Fatalf("goose run: %v", err)
+			logrus.Fatalf("goose run: %v", err)
 		}
 
 		defer db.Close()

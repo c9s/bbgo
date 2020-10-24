@@ -1,4 +1,6 @@
 ---
+imports:
+- github.com/c9s/bbgo/pkg/strategy/buyandhold
 sessions:
   max:
     exchange: max
@@ -9,9 +11,18 @@ sessions:
     keyVar: BINANCE_API_KEY
     secretVar: BINANCE_API_SECRET
 exchangeStrategies:
-  - on: binance
-    buyandhold:
-      symbol: "BTCUSDT"
-      interval: "1m"
-      baseQuantity: 0.1
-      minDropPercentage: -0.05
+- on: binance
+  buyandhold:
+    symbol: "BTCUSDT"
+    interval: "1m"
+    baseQuantity: 0.1
+    minDropPercentage: -0.05
+
+reportPnL:
+- averageCostBySymbols:
+  - "BTCUSDT"
+  - "BNBUSDT"
+  of: binance
+  when:
+  - "@daily"
+  - "@hourly"

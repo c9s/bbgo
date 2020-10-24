@@ -6,12 +6,14 @@ import (
 	"strings"
 	"time"
 
-	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
+	"github.com/lestrrat-go/file-rotatelogs"
 	"github.com/rifflock/lfshook"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	prefixed "github.com/x-cray/logrus-prefixed-formatter"
+	"github.com/x-cray/logrus-prefixed-formatter"
+
+	_ "github.com/go-sql-driver/mysql"
 )
 
 var RootCmd = &cobra.Command{
@@ -34,7 +36,7 @@ func init() {
 	// the command it's assigned to as well as every command under that command.
 	// For global flags, assign a flag as a persistent flag on the root.
 	RootCmd.PersistentFlags().String("slack-token", "", "slack token")
-	RootCmd.PersistentFlags().String("slack-trading-channel", "dev-bbgo", "slack trading channel")
+	RootCmd.PersistentFlags().String("slack-channel", "dev-bbgo", "slack trading channel")
 	RootCmd.PersistentFlags().String("slack-error-channel", "bbgo-error", "slack error channel")
 
 	RootCmd.PersistentFlags().String("binance-api-key", "", "binance api key")
@@ -44,7 +46,7 @@ func init() {
 	RootCmd.PersistentFlags().String("max-api-secret", "", "max api secret")
 }
 
-func Run() {
+func Execute() {
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 
 	// Enable environment variable binding, the env vars are not overloaded yet.

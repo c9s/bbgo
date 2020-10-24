@@ -2,7 +2,6 @@ package pnl
 
 import (
 	"strings"
-	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -10,8 +9,6 @@ import (
 )
 
 type AverageCostCalculator struct {
-	Symbol             string
-	StartTime          time.Time
 	TradingFeeCurrency string
 }
 
@@ -89,9 +86,9 @@ func (c *AverageCostCalculator) Calculate(symbol string, trades []types.Trade, c
 
 	return &AverageCostPnlReport{
 		Symbol:       symbol,
-		StartTime:    c.StartTime,
 		CurrentPrice: currentPrice,
 		NumTrades:    len(trades),
+		StartTime:    trades[0].Time,
 
 		BidVolume: bidVolume,
 		AskVolume: askVolume,
