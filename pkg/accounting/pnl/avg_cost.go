@@ -23,6 +23,17 @@ func (c *AverageCostCalculator) Calculate(symbol string, trades []types.Trade, c
 	var bidFeeUSD = 0.0
 	var feeRate = 0.0015
 
+	if len(trades) == 0 {
+		return &AverageCostPnlReport{
+			Symbol:       symbol,
+			CurrentPrice: currentPrice,
+			NumTrades:    0,
+			BidVolume: bidVolume,
+			AskVolume: askVolume,
+			FeeUSD:           feeUSD,
+		}
+	}
+
 	var currencyFees = map[string]float64{}
 
 	for _, trade := range trades {
