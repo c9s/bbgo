@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"syscall"
 	"text/template"
 
@@ -30,6 +31,9 @@ var errSlackTokenUndefined = errors.New("slack token is not defined.")
 
 func init() {
 	RunCmd.Flags().Bool("no-compile", false, "do not compile wrapper binary")
+	RunCmd.Flags().String("os", runtime.GOOS, "GOOS")
+	RunCmd.Flags().String("arch", runtime.GOARCH, "GOARCH")
+
 	RunCmd.Flags().String("config", "config/bbgo.yaml", "strategy config file")
 	RunCmd.Flags().String("since", "", "pnl since time")
 	RootCmd.AddCommand(RunCmd)
@@ -136,57 +140,83 @@ var RunCmd = &cobra.Command{
 			return err
 		}
 
-		if noCompile {
+		// if there is no custom imports, we don't have to compile
+		if noCompile || len(userConfig.Imports) == 0 {
 			if err := runConfig(ctx, userConfig); err != nil {
 				return err
 			}
 			cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
 			return nil
-		} else {
-			buildDir := filepath.Join("build", "bbgow")
-			if _, err := os.Stat(buildDir); os.IsNotExist(err) {
-				if err := os.MkdirAll(buildDir, 0777); err != nil {
-					return errors.Wrapf(err, "can not create build directory: %s", buildDir)
-				}
-			}
-
-			mainFile := filepath.Join(buildDir, "main.go")
-			if err := compileRunFile(mainFile, userConfig); err != nil {
-				return errors.Wrap(err, "compile error")
-			}
-
-			// TODO: use "\" for Windows
-			cwd, err := os.Getwd()
-			if err != nil {
-				return err
-			}
-
-			buildTarget := filepath.Join(cwd, buildDir)
-			log.Infof("building binary from %s...", buildTarget)
-
-			buildCmd := exec.CommandContext(ctx, "go", "build", "-tags", "wrapper", "-o", "bbgow", buildTarget)
-			buildCmd.Stdout = os.Stdout
-			buildCmd.Stderr = os.Stderr
-			if err := buildCmd.Run(); err != nil {
-				return err
-			}
-
-			var flagsArgs = []string{"run", "--no-compile"}
-			cmd.Flags().Visit(func(flag *flag.Flag) {
-				flagsArgs = append(flagsArgs, flag.Name, flag.Value.String())
-			})
-			flagsArgs = append(flagsArgs, args...)
-
-			executePath := filepath.Join(cwd, "bbgow")
-			runCmd := exec.CommandContext(ctx, executePath, flagsArgs...)
-			runCmd.Stdout = os.Stdout
-			runCmd.Stderr = os.Stderr
-			if err := runCmd.Run(); err != nil {
-				return err
-			}
-
 		}
 
-		return nil
+		var flagsArgs = []string{"run", "--no-compile"}
+		cmd.Flags().Visit(func(flag *flag.Flag) {
+			flagsArgs = append(flagsArgs, flag.Name, flag.Value.String())
+		})
+		flagsArgs = append(flagsArgs, args...)
+
+		goOS, err := cmd.Flags().GetString("os")
+		if err != nil {
+			return err
+		}
+
+		goArch, err := cmd.Flags().GetString("arch")
+		if err != nil {
+			return err
+		}
+
+		var buildEnvs = []string{"GOOS=" + goOS, "GOARCH=" + goArch}
+		return compileAndRun(ctx, userConfig, buildEnvs, flagsArgs...)
 	},
+}
+
+func compile(buildDir string, userConfig *config.Config) error {
+	if _, err := os.Stat(buildDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(buildDir, 0777); err != nil {
+			return errors.Wrapf(err, "can not create build directory: %s", buildDir)
+		}
+	}
+
+	mainFile := filepath.Join(buildDir, "main.go")
+	if err := compileRunFile(mainFile, userConfig); err != nil {
+		return errors.Wrap(err, "compile error")
+	}
+
+	return nil
+}
+
+func compileAndRun(ctx context.Context, userConfig *config.Config, buildEnvs []string, args ...string) error {
+	buildDir := filepath.Join("build", "bbgow")
+
+	if err := compile(buildDir, userConfig); err != nil {
+		return err
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	buildTarget := filepath.Join(cwd, buildDir)
+	log.Infof("building binary from %s...", buildTarget)
+
+	buildCmd := exec.CommandContext(ctx, "go", "build", "-tags", "wrapper", "-o", "bbgow", buildTarget)
+	buildCmd.Env = append(os.Environ(), buildEnvs...)
+
+	buildCmd.Stdout = os.Stdout
+	buildCmd.Stderr = os.Stderr
+	if err := buildCmd.Run(); err != nil {
+		return err
+	}
+
+	executePath := filepath.Join(cwd, "bbgow")
+
+	log.Infof("running wrapper binary, args: %v", args)
+	runCmd := exec.CommandContext(ctx, executePath, args...)
+	runCmd.Stdout = os.Stdout
+	runCmd.Stderr = os.Stderr
+	if err := runCmd.Run(); err != nil {
+		return err
+	}
+	return nil
 }
