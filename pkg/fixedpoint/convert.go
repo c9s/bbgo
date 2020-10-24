@@ -1,8 +1,11 @@
 package fixedpoint
 
 import (
+	"encoding/json"
 	"math"
 	"strconv"
+
+	"github.com/pkg/errors"
 )
 
 const DefaultPrecision = 8
@@ -39,6 +42,33 @@ func (v Value) Add(v2 Value) Value {
 	return Value(int64(v) + int64(v2))
 }
 
+func (v *Value) UnmarshalJSON(data []byte) error {
+	var a interface{}
+	var err = json.Unmarshal(data, &a)
+	if err != nil {
+		return err
+	}
+
+	switch d := a.(type) {
+	case float64:
+		*v = NewFromFloat(d)
+
+	case float32:
+		*v = NewFromFloat32(d)
+
+	case int:
+		*v = NewFromInt(d)
+	case int64:
+		*v = NewFromInt64(d)
+
+	default:
+		return errors.Errorf("unsupported type: %T %v", d, d)
+
+	}
+
+	return nil
+}
+
 func NewFromString(input string) (Value, error) {
 	v, err := strconv.ParseFloat(input, 64)
 	if err != nil {
@@ -50,6 +80,10 @@ func NewFromString(input string) (Value, error) {
 
 func NewFromFloat(val float64) Value {
 	return Value(int64(math.Round(val * DefaultPow)))
+}
+
+func NewFromFloat32(val float32) Value {
+	return Value(int64(math.Round(float64(val) * DefaultPow)))
 }
 
 func NewFromInt(val int) Value {
