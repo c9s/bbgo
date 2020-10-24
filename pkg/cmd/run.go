@@ -25,6 +25,7 @@ import (
 
 	// import built-in strategies
 	_ "github.com/c9s/bbgo/pkg/strategy/buyandhold"
+	_ "github.com/c9s/bbgo/pkg/strategy/xpuremaker"
 )
 
 var errSlackTokenUndefined = errors.New("slack token is not defined.")
