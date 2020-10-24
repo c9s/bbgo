@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/c9s/bbgo/pkg/accounting"
@@ -16,13 +16,13 @@ import (
 )
 
 func init() {
-	pnlCmd.Flags().String("exchange", "", "target exchange")
-	pnlCmd.Flags().String("symbol", "BTCUSDT", "trading symbol")
-	pnlCmd.Flags().String("since", "", "pnl since time")
-	RootCmd.AddCommand(pnlCmd)
+	PnLCmd.Flags().String("exchange", "", "target exchange")
+	PnLCmd.Flags().String("symbol", "BTCUSDT", "trading symbol")
+	PnLCmd.Flags().String("since", "", "pnl since time")
+	RootCmd.AddCommand(PnLCmd)
 }
 
-var pnlCmd = &cobra.Command{
+var PnLCmd = &cobra.Command{
 	Use:          "pnl",
 	Short:        "pnl calculator",
 	SilenceUsage: true,
@@ -75,7 +75,7 @@ var pnlCmd = &cobra.Command{
 		tradeService := &service.TradeService{DB: db}
 		tradeSync := &service.TradeSync{Service: tradeService}
 
-		log.Info("syncing trades from exchange...")
+		logrus.Info("syncing trades from exchange...")
 		if err := tradeSync.Sync(ctx, exchange, symbol, startTime); err != nil {
 			return err
 		}
@@ -83,7 +83,7 @@ var pnlCmd = &cobra.Command{
 		var trades []types.Trade
 		tradingFeeCurrency := exchange.PlatformFeeCurrency()
 		if strings.HasPrefix(symbol, tradingFeeCurrency) {
-			log.Infof("loading all trading fee currency related trades: %s", symbol)
+			logrus.Infof("loading all trading fee currency related trades: %s", symbol)
 			trades, err = tradeService.QueryForTradingFeeCurrency(symbol, tradingFeeCurrency)
 		} else {
 			trades, err = tradeService.Query(symbol)
@@ -93,7 +93,7 @@ var pnlCmd = &cobra.Command{
 			return err
 		}
 
-		log.Infof("%d trades loaded", len(trades))
+		logrus.Infof("%d trades loaded", len(trades))
 
 		stockManager := &accounting.StockDistribution{
 			Symbol:             symbol,
@@ -105,14 +105,13 @@ var pnlCmd = &cobra.Command{
 			return err
 		}
 
-		log.Infof("found checkpoints: %+v", checkpoints)
-		log.Infof("stock: %f", stockManager.Stocks.Quantity())
+		logrus.Infof("found checkpoints: %+v", checkpoints)
+		logrus.Infof("stock: %f", stockManager.Stocks.Quantity())
 
 		currentPrice, err := exchange.QueryAveragePrice(ctx, symbol)
 
 		calculator := &pnl.AverageCostCalculator{
 			TradingFeeCurrency: tradingFeeCurrency,
-			StartTime:          startTime,
 		}
 
 		report := calculator.Calculate(symbol, trades, currentPrice)

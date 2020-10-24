@@ -16,67 +16,148 @@ type SingleExchangeStrategyConfig struct {
 	Strategy bbgo.SingleExchangeStrategy
 }
 
+type StringSlice []string
+
+func (s *StringSlice) decode(a interface{}) error {
+	switch d := a.(type) {
+	case string:
+		*s = append(*s, d)
+
+	case []string:
+		*s = append(*s, d...)
+
+	case []interface{}:
+		for _, de := range d {
+			if err := s.decode(de); err != nil {
+				return err
+			}
+		}
+
+	default:
+		return errors.Errorf("unexpected type %T for StringSlice: %+v", d, d)
+	}
+
+	return nil
+}
+
+func (s *StringSlice) UnmarshalJSON(b []byte) error {
+	var a interface{}
+	var err = json.Unmarshal(b, &a)
+	if err != nil {
+		return err
+	}
+
+	return s.decode(a)
+}
+
+type PnLReporter struct {
+	AverageCostBySymbols StringSlice `json:"averageCostBySymbols"`
+	Of                   StringSlice `json:"of" yaml:"of"`
+	When                 StringSlice `json:"when" yaml:"when"`
+}
+
 type Config struct {
+	Imports []string `json:"imports" yaml:"imports"`
+
 	ExchangeStrategies      []SingleExchangeStrategyConfig
 	CrossExchangeStrategies []bbgo.CrossExchangeStrategy
+
+	PnLReporters []PnLReporter `json:"reportPnL" yaml:"reportPnL"`
 }
 
 type Stash map[string]interface{}
 
-func loadStash(configFile string) (Stash, error) {
-	config, err := ioutil.ReadFile(configFile)
-	if err != nil {
-		return nil, err
-	}
-
+func loadStash(config []byte) (Stash, error) {
 	stash := make(Stash)
 	if err := yaml.Unmarshal(config, stash); err != nil {
 		return nil, err
 	}
 
-	return stash, err
+	return stash, nil
 }
 
 func Load(configFile string) (*Config, error) {
 	var config Config
 
-	stash, err := loadStash(configFile)
+	content, err := ioutil.ReadFile(configFile)
 	if err != nil {
 		return nil, err
 	}
 
-	strategies, err := loadExchangeStrategies(stash)
+	stash, err := loadStash(content)
 	if err != nil {
 		return nil, err
 	}
 
-	config.ExchangeStrategies = strategies
-
-	crossExchangeStrategies, err := loadCrossExchangeStrategies(stash)
-	if err != nil {
+	if err := loadImports(&config, stash); err != nil {
 		return nil, err
 	}
 
-	config.CrossExchangeStrategies = crossExchangeStrategies
+	if err := loadExchangeStrategies(&config, stash); err != nil {
+		return nil, err
+	}
+
+	if err := loadCrossExchangeStrategies(&config, stash); err != nil {
+		return nil, err
+	}
+
+	if err := loadReportPnL(&config, stash); err != nil {
+		return nil, err
+	}
 
 	return &config, nil
 }
 
-func loadCrossExchangeStrategies(stash Stash) (strategies []bbgo.CrossExchangeStrategy, err error) {
+func loadImports(config *Config, stash Stash) error {
+	importStash, ok := stash["imports"]
+	if !ok {
+		return nil
+	}
+
+	imports, err := reUnmarshal(importStash, &config.Imports)
+	if err != nil {
+		return err
+	}
+
+	config.Imports = *imports.(*[]string)
+	return nil
+}
+
+func loadReportPnL(config *Config, stash Stash) error {
+	reporterStash, ok := stash["reportPnL"]
+	if !ok {
+		return nil
+	}
+
+	reporters, err := reUnmarshal(reporterStash, &config.PnLReporters)
+	if err != nil {
+		return err
+	}
+
+	config.PnLReporters = *(reporters.(*[]PnLReporter))
+	return nil
+}
+
+func loadCrossExchangeStrategies(config *Config, stash Stash) (err error) {
 	exchangeStrategiesConf, ok := stash["crossExchangeStrategies"]
 	if !ok {
-		return strategies, nil
+		return nil
 	}
+
+	if len(bbgo.LoadedCrossExchangeStrategies) == 0 {
+		return errors.New("no cross exchange strategy is registered")
+	}
+
 
 	configList, ok := exchangeStrategiesConf.([]interface{})
 	if !ok {
-		return nil, errors.New("expecting list in crossExchangeStrategies")
+		return errors.New("expecting list in crossExchangeStrategies")
 	}
 
 	for _, entry := range configList {
 		configStash, ok := entry.(Stash)
 		if !ok {
-			return nil, errors.Errorf("strategy config should be a map, given: %T %+v", entry, entry)
+			return errors.Errorf("strategy config should be a map, given: %T %+v", entry, entry)
 		}
 
 		for id, conf := range configStash {
@@ -84,34 +165,36 @@ func loadCrossExchangeStrategies(stash Stash) (strategies []bbgo.CrossExchangeSt
 			if st, ok := bbgo.LoadedExchangeStrategies[id]; ok {
 				val, err := reUnmarshal(conf, st)
 				if err != nil {
-					return nil, err
+					return err
 				}
 
-				strategies = append(strategies, val.(bbgo.CrossExchangeStrategy))
+				config.CrossExchangeStrategies = append(config.CrossExchangeStrategies, val.(bbgo.CrossExchangeStrategy))
 			}
 		}
-
 	}
 
-	return strategies, nil
+	return nil
 }
 
-func loadExchangeStrategies(stash Stash) (strategies []SingleExchangeStrategyConfig, err error) {
+func loadExchangeStrategies(config *Config, stash Stash) (err error) {
 	exchangeStrategiesConf, ok := stash["exchangeStrategies"]
 	if !ok {
-		return strategies, nil
-		// return nil, errors.New("exchangeStrategies is not defined")
+		return nil
+	}
+
+	if len(bbgo.LoadedExchangeStrategies) == 0 {
+		return errors.New("no exchange strategy is registered")
 	}
 
 	configList, ok := exchangeStrategiesConf.([]interface{})
 	if !ok {
-		return nil, errors.New("expecting list in exchangeStrategies")
+		return errors.New("expecting list in exchangeStrategies")
 	}
 
 	for _, entry := range configList {
 		configStash, ok := entry.(Stash)
 		if !ok {
-			return nil, errors.Errorf("strategy config should be a map, given: %T %+v", entry, entry)
+			return errors.Errorf("strategy config should be a map, given: %T %+v", entry, entry)
 		}
 
 		var mounts []string
@@ -128,10 +211,10 @@ func loadExchangeStrategies(stash Stash) (strategies []SingleExchangeStrategyCon
 			if st, ok := bbgo.LoadedExchangeStrategies[id]; ok {
 				val, err := reUnmarshal(conf, st)
 				if err != nil {
-					return nil, err
+					return err
 				}
 
-				strategies = append(strategies, SingleExchangeStrategyConfig{
+				config.ExchangeStrategies = append(config.ExchangeStrategies, SingleExchangeStrategyConfig{
 					Mounts:   mounts,
 					Strategy: val.(bbgo.SingleExchangeStrategy),
 				})
@@ -139,7 +222,7 @@ func loadExchangeStrategies(stash Stash) (strategies []SingleExchangeStrategyCon
 		}
 	}
 
-	return strategies, nil
+	return nil
 }
 
 func reUnmarshal(conf interface{}, tpe interface{}) (interface{}, error) {

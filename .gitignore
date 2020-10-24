@@ -20,3 +20,6 @@
 
 /.env.local
 /.env.*.local
+
+/build
+/bbgow

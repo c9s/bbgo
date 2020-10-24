@@ -1,11 +1,9 @@
 package main
 
 import (
-	"github.com/c9s/bbgo/cmd"
-
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/c9s/bbgo/pkg/cmd"
 )
 
 func main() {
-	cmd.Run()
+	cmd.Execute()
 }
