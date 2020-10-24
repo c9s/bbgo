@@ -1,4 +1,6 @@
 ---
+imports:
+- github.com/c9s/bbgo/pkg/strategy/buyandhold
 notifications:
   slack:
     defaultChannel: "bbgo"
@@ -12,13 +14,13 @@ reportTrades:
     "sxpusdt": "bbgo-sxpusdt"
 
 reportPnL:
-  - averageCostBySymbols:
-      - "BTCUSDT"
-      - "BNBUSDT"
-    of: binance
-    when:
-      - "@daily"
-      - "@hourly"
+- averageCostBySymbols:
+  - "BTCUSDT"
+  - "BNBUSDT"
+  of: binance
+  when:
+  - "@daily"
+  - "@hourly"
 
 sessions:
   max:
@@ -31,9 +33,9 @@ sessions:
     secretVar: BINANCE_API_SECRET
 
 exchangeStrategies:
-  - on: binance
-    buyandhold:
-      symbol: "BTCUSDT"
-      interval: "1m"
-      baseQuantity: 0.01
-      minDropPercentage: -0.02
+- on: binance
+  buyandhold:
+    symbol: "BTCUSDT"
+    interval: "1m"
+    baseQuantity: 0.01
+    minDropPercentage: -0.02
