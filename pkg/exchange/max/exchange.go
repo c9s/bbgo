@@ -98,6 +98,10 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 		}
 
 		clientOrderID := uuid.New().String()
+		if len(order.ClientOrderID) > 0 {
+			clientOrderID = order.ClientOrderID
+		}
+
 		req := e.client.OrderService.NewCreateOrderRequest().
 			Market(toLocalSymbol(order.Symbol)).
 			OrderType(string(orderType)).

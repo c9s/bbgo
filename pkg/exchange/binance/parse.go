@@ -75,7 +75,7 @@ type ExecutionReportEvent struct {
 	CurrentExecutionType string `json:"x"`
 	CurrentOrderStatus   string `json:"X"`
 
-	OrderID int `json:"i"`
+	OrderID uint64 `json:"i"`
 
 	TradeID         int64 `json:"t"`
 	TransactionTime int64 `json:"T"`
@@ -85,7 +85,34 @@ type ExecutionReportEvent struct {
 	LastExecutedPrice                string `json:"L"`
 	LastQuoteAssetTransactedQuantity string `json:"Y"`
 
-	OrderCreationTime int `json:"O"`
+	OrderCreationTime int64 `json:"O"`
+}
+
+func (e *ExecutionReportEvent) Order() (*types.Order, error) {
+
+	switch e.CurrentExecutionType {
+	case "NEW", "CANCELED", "REJECTED", "EXPIRED":
+	case "REPLACED":
+	default:
+		return nil, errors.New("execution report type is not for order")
+	}
+
+	orderCreationTime := time.Unix(0, e.OrderCreationTime*int64(time.Millisecond))
+	return &types.Order{
+		SubmitOrder: types.SubmitOrder{
+			Symbol:        e.Symbol,
+			ClientOrderID: e.ClientOrderID,
+			Side:          toGlobalSideType(binance.SideType(e.Side)),
+			Type:          toGlobalOrderType(binance.OrderType(e.OrderType)),
+			Quantity:      util.MustParseFloat(e.OrderQuantity),
+			Price:         util.MustParseFloat(e.OrderPrice),
+			TimeInForce:   e.TimeInForce,
+		},
+		OrderID:          e.OrderID,
+		Status:           toGlobalOrderStatus(binance.OrderStatusType(e.CurrentOrderStatus)),
+		ExecutedQuantity: util.MustParseFloat(e.CumulativeFilledQuantity),
+		CreationTime:     orderCreationTime,
+	}, nil
 }
 
 func (e *ExecutionReportEvent) Trade() (*types.Trade, error) {
@@ -93,14 +120,14 @@ func (e *ExecutionReportEvent) Trade() (*types.Trade, error) {
 		return nil, errors.New("execution report is not a trade")
 	}
 
-	tt := time.Unix(0, e.TransactionTime * int64(time.Millisecond))
+	tt := time.Unix(0, e.TransactionTime*int64(time.Millisecond))
 	return &types.Trade{
 		ID:            e.TradeID,
 		Symbol:        e.Symbol,
+		Side:          toGlobalSideType(binance.SideType(e.Side)),
 		Price:         util.MustParseFloat(e.LastExecutedPrice),
 		Quantity:      util.MustParseFloat(e.LastExecutedQuantity),
 		QuoteQuantity: util.MustParseFloat(e.LastQuoteAssetTransactedQuantity),
-		Side:          toGlobalSideType(binance.SideType(e.Side)),
 		IsBuyer:       e.Side == "BUY",
 		IsMaker:       e.IsMaker,
 		Time:          tt,

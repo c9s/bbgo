@@ -1,6 +1,8 @@
 package types
 
 import (
+	"time"
+
 	"github.com/slack-go/slack"
 )
 
@@ -30,18 +32,24 @@ type Order struct {
 	OrderID          uint64       `json:"orderID"` // order id
 	Status           OrderStatus `json:"status"`
 	ExecutedQuantity float64     `json:"executedQuantity"`
+	CreationTime time.Time
 }
 
 type SubmitOrder struct {
+	ClientOrderID string `json:"clientOrderID"`
+
 	Symbol string
 	Side   SideType
 	Type   OrderType
 
 	Quantity float64
 	Price    float64
+	StopPrice float64
 
 	Market Market
 
+	// TODO: we can probably remove these field
+	StopPriceString string
 	PriceString    string
 	QuantityString string
 
