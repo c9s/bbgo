@@ -126,7 +126,9 @@ func (p *OrderProcessor) Submit(ctx context.Context, order types.SubmitOrder) er
 	order.QuantityString = market.FormatVolume(quantity)
 	 */
 
-	return p.Exchange.SubmitOrders(ctx, order)
+	createdOrders, err := p.Exchange.SubmitOrders(ctx, order)
+	_ = createdOrders
+	return err
 }
 
 func adjustQuantityByMinAmount(quantity float64, currentPrice float64, minAmount float64) float64 {

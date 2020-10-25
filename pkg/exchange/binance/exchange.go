@@ -7,6 +7,7 @@ import (
 
 	"github.com/adshao/go-binance"
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
 
 	"github.com/sirupsen/logrus"
 
@@ -275,7 +276,7 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 	}
 
 	for _, binanceOrder := range remoteOrders {
-		order , err := toGlobalOrder(binanceOrder)
+		order, err := toGlobalOrder(binanceOrder)
 		if err != nil {
 			return orders, err
 		}
@@ -286,23 +287,11 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 	return orders, err
 }
 
-func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) error {
-	/*
-		limit order example
-
-			order, err := Client.NewCreateOrderService().
-				Symbol(Symbol).
-				Side(side).
-				Type(binance.OrderTypeLimit).
-				TimeInForce(binance.TimeInForceTypeGTC).
-				Quantity(volumeString).
-				Price(priceString).
-				Do(ctx)
-	*/
+func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders []types.Order, err error) {
 	for _, order := range orders {
 		orderType, err := toLocalOrderType(order.Type)
 		if err != nil {
-			return err
+			return createdOrders, err
 		}
 
 		clientOrderID := uuid.New().String()
@@ -327,15 +316,45 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 			req.TimeInForce(binance.TimeInForceType(order.TimeInForce))
 		}
 
-		retOrder, err := req.Do(ctx)
+		response, err := req.Do(ctx)
 		if err != nil {
-			return err
+			return createdOrders, err
 		}
 
-		log.Infof("order created: %+v", retOrder)
+		log.Infof("order creation response: %+v", response)
+
+		retOrder := binance.Order{
+			Symbol:                   response.Symbol,
+			OrderID:                  response.OrderID,
+			ClientOrderID:            response.ClientOrderID,
+			Price:                    response.Price,
+			OrigQuantity:             response.OrigQuantity,
+			ExecutedQuantity:         response.ExecutedQuantity,
+			CummulativeQuoteQuantity: response.CummulativeQuoteQuantity,
+			Status:                   response.Status,
+			TimeInForce:              response.TimeInForce,
+			Type:                     response.Type,
+			Side:                     response.Side,
+			// StopPrice:
+			// IcebergQuantity:
+			Time: response.TransactTime,
+			// UpdateTime:
+			// IsWorking:               ,
+		}
+
+		createdOrder, err := toGlobalOrder(&retOrder)
+		if err != nil {
+			return createdOrders, err
+		}
+
+		if createdOrder == nil {
+			return createdOrders, errors.New("nil converted order")
+		}
+
+		createdOrders = append(createdOrders, *createdOrder)
 	}
 
-	return nil
+	return createdOrders, err
 }
 
 func (e *Exchange) QueryKLines(ctx context.Context, symbol, interval string, options types.KLineQueryOptions) ([]types.KLine, error) {
@@ -469,4 +488,3 @@ func (e *Exchange) BatchQueryKLineWindows(ctx context.Context, symbol string, in
 
 	return klineWindows, nil
 }
-
