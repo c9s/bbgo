@@ -306,6 +306,10 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 		}
 
 		clientOrderID := uuid.New().String()
+		if len(order.ClientOrderID) > 0 {
+			clientOrderID = order.ClientOrderID
+		}
+
 		req := e.Client.NewCreateOrderService().
 			Symbol(order.Symbol).
 			Side(binance.SideType(order.Side)).
