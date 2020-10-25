@@ -26,8 +26,7 @@ type Market struct {
 	TickSize float64
 }
 
-func (m Market) FormatPrice(val float64) string {
-
+func (m Market) FormatPriceCurrency(val float64) string {
 	switch m.QuoteCurrency {
 
 	case "USD", "USDT":
@@ -41,10 +40,19 @@ func (m Market) FormatPrice(val float64) string {
 
 	}
 
+	return m.FormatPrice(val)
+}
+
+func (m Market) FormatPrice(val float64) string {
+
+	p := math.Pow10(m.PricePrecision)
+	val = math.Trunc(val*p) / p
 	return strconv.FormatFloat(val, 'f', m.PricePrecision, 64)
 }
 
 func (m Market) FormatVolume(val float64) string {
+	p := math.Pow10(m.PricePrecision)
+	val = math.Trunc(val*p) / p
 	return strconv.FormatFloat(val, 'f', m.VolumePrecision, 64)
 }
 

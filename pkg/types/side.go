@@ -6,12 +6,14 @@ type SideType string
 const (
 	SideTypeBuy  = SideType("BUY")
 	SideTypeSell = SideType("SELL")
+	SideTypeSelf = SideType("SELF")
 )
 
 func (side SideType) Color() string {
 	if side == SideTypeBuy {
 		return Green
 	}
+
 	if side == SideTypeSell {
 		return Red
 	}

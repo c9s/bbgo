@@ -73,7 +73,7 @@ func (reporter *TradeReporter) Report(trade types.Trade) {
 
 	var text = util.Render(`:handshake: {{ .Symbol }} {{ .Side }} Trade Execution @ {{ .Price  }}`, trade)
 	if err := reporter.notifier.NotifyTo(channel, text, trade); err != nil {
-		log.WithError(err).Error("notifier error")
+		log.WithError(err).Errorf("notifier error, channel=%s", channel)
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/adshao/go-binance"
 	"github.com/valyala/fastjson"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -99,7 +100,7 @@ func (e *ExecutionReportEvent) Trade() (*types.Trade, error) {
 		Price:         util.MustParseFloat(e.LastExecutedPrice),
 		Quantity:      util.MustParseFloat(e.LastExecutedQuantity),
 		QuoteQuantity: util.MustParseFloat(e.LastQuoteAssetTransactedQuantity),
-		Side:          e.Side,
+		Side:          toGlobalSideType(binance.SideType(e.Side)),
 		IsBuyer:       e.Side == "BUY",
 		IsMaker:       e.IsMaker,
 		Time:          tt,

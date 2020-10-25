@@ -3,10 +3,10 @@ package types
 import "context"
 
 type OrderExecutor interface {
-	SubmitOrder(ctx context.Context, order SubmitOrder) error
+	SubmitOrders(ctx context.Context, orders ...SubmitOrder) error
 }
 
 type OrderExecutionRouter interface {
 	// SubmitOrderTo submit order to a specific exchange session
-	SubmitOrderTo(ctx context.Context, session string, order SubmitOrder) error
+	SubmitOrdersTo(ctx context.Context, session string, orders ...SubmitOrder) error
 }

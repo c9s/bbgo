@@ -63,7 +63,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor types.OrderExecutor, s
 				}
 			}
 
-			err := orderExecutor.SubmitOrder(ctx, types.SubmitOrder{
+			err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 				Symbol:   kline.Symbol,
 				Side:     types.SideTypeBuy,
 				Type:     types.OrderTypeMarket,

@@ -10,6 +10,7 @@ reportTrades:
     "ethusdt": "bbgo-ethusdt"
     "bnbusdt": "bbgo-bnbusdt"
     "sxpusdt": "bbgo-sxpusdt"
+    "maxusdt": "max-maxusdt"
 
 reportPnL:
 - averageCostBySymbols:
