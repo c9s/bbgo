@@ -93,7 +93,7 @@ func (e *ExecutionReportEvent) Trade() (*types.Trade, error) {
 		return nil, errors.New("execution report is not a trade")
 	}
 
-	tt := time.Unix(0, e.TransactionTime/1000000)
+	tt := time.Unix(0, e.TransactionTime * int64(time.Millisecond))
 	return &types.Trade{
 		ID:            e.TradeID,
 		Symbol:        e.Symbol,
