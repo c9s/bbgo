@@ -57,6 +57,8 @@ type Exchange interface {
 	SubmitOrders(ctx context.Context, orders ...SubmitOrder) (createdOrders []Order, err error)
 
 	QueryOpenOrders(ctx context.Context, symbol string) (orders []Order, err error)
+
+	CancelOrders(ctx context.Context, orders ...Order) error
 }
 
 type TradeQueryOptions struct {

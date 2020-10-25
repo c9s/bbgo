@@ -287,6 +287,29 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 	return orders, err
 }
 
+func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err2 error) {
+	for _, o := range orders {
+		var req = e.Client.NewCancelOrderService()
+
+		// Mandatory
+		req.Symbol(o.Symbol)
+
+		if o.OrderID > 0 {
+			req.OrderID(int64(o.OrderID))
+		} else if len(o.ClientOrderID) > 0 {
+			req.NewClientOrderID(o.ClientOrderID)
+		}
+
+		_, err := req.Do(ctx)
+		if err != nil {
+			log.WithError(err).Errorf("order cancel error")
+			err2 = err
+		}
+	}
+
+	return err2
+}
+
 func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders []types.Order, err error) {
 	for _, order := range orders {
 		orderType, err := toLocalOrderType(order.Type)

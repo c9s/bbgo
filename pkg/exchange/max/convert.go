@@ -139,6 +139,7 @@ func toGlobalOrder(maxOrder max.Order) (*types.Order, error) {
 
 	return &types.Order{
 		SubmitOrder: types.SubmitOrder{
+			ClientOrderID: maxOrder.ClientOID,
 			Symbol:      toGlobalSymbol(maxOrder.Market),
 			Side:        toGlobalSideType(maxOrder.Side),
 			Type:        toGlobalOrderType(maxOrder.OrderType),

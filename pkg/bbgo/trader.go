@@ -3,7 +3,6 @@ package bbgo
 import (
 	"context"
 
-	"github.com/pkg/errors"
 	"github.com/robfig/cron/v3"
 	log "github.com/sirupsen/logrus"
 
@@ -26,11 +25,11 @@ func PersistentFlags(flags *flag.FlagSet) {
 
 // SingleExchangeStrategy represents the single Exchange strategy
 type SingleExchangeStrategy interface {
-	Run(ctx context.Context, orderExecutor types.OrderExecutor, session *ExchangeSession) error
+	Run(ctx context.Context, orderExecutor OrderExecutor, session *ExchangeSession) error
 }
 
 type CrossExchangeStrategy interface {
-	Run(ctx context.Context, orderExecutionRouter types.OrderExecutionRouter, sessions map[string]*ExchangeSession) error
+	Run(ctx context.Context, orderExecutionRouter OrderExecutionRouter, sessions map[string]*ExchangeSession) error
 }
 
 type PnLReporter interface {
@@ -157,7 +156,7 @@ func (trader *Trader) Run(ctx context.Context) error {
 		// that way we can mount the notification on the exchange with DSL
 		orderExecutor := &ExchangeOrderExecutor{
 			Notifiability: trader.Notifiability,
-			Session:       session,
+			session:       session,
 		}
 
 		for _, strategy := range strategies {
@@ -320,64 +319,12 @@ func (trader *Trader) SubmitOrder(ctx context.Context, order types.SubmitOrder) 
 	}
 }
 
-type ExchangeOrderExecutionRouter struct {
-	Notifiability
-
-	sessions map[string]*ExchangeSession
+type OrderExecutor interface {
+	Session() *ExchangeSession
+	SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders []types.Order, err error)
 }
 
-func (e *ExchangeOrderExecutionRouter) SubmitOrdersTo(ctx context.Context, session string, orders ...types.SubmitOrder) error {
-	es, ok := e.sessions[session]
-	if !ok {
-		return errors.Errorf("exchange session %s not found", session)
-	}
-
-	for _, order := range orders {
-		market, ok := es.Market(order.Symbol)
-		if !ok {
-			return errors.Errorf("market is not defined: %s", order.Symbol)
-		}
-
-		order.PriceString = market.FormatPrice(order.Price)
-		order.QuantityString = market.FormatVolume(order.Quantity)
-		e.Notify(":memo: Submitting order to %s %s %s %s with quantity: %s", session, order.Symbol, order.Type, order.Side, order.QuantityString, order)
-
-		if createdOrders, err := es.Exchange.SubmitOrders(ctx, order); err != nil {
-			_ = createdOrders
-			return err
-		}
-	}
-
-	return nil
-}
-
-// ExchangeOrderExecutor is an order executor wrapper for single exchange instance.
-type ExchangeOrderExecutor struct {
-	Notifiability
-
-	Session *ExchangeSession
-}
-
-func (e *ExchangeOrderExecutor) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) error {
-	for _, order := range orders {
-		market, ok := e.Session.Market(order.Symbol)
-		if !ok {
-			return errors.Errorf("market is not defined: %s", order.Symbol)
-		}
-
-		order.Market = market
-		order.PriceString = market.FormatPrice(order.Price)
-		order.QuantityString = market.FormatVolume(order.Quantity)
-
-		e.Notify(":memo: Submitting %s %s %s order with quantity: %s", order.Symbol, order.Type, order.Side, order.QuantityString, order)
-
-		createdOrders, err := e.Session.Exchange.SubmitOrders(ctx, order)
-		if err != nil {
-			return err
-		}
-
-		_ = createdOrders
-	}
-
-	return nil
+type OrderExecutionRouter interface {
+	// SubmitOrderTo submit order to a specific exchange session
+	SubmitOrdersTo(ctx context.Context, session string, orders ...types.SubmitOrder) (createdOrders []types.Order, err error)
 }
