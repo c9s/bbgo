@@ -90,11 +90,11 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 	return orders, err
 }
 
-func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) error {
+func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders []types.Order, err error) {
 	for _, order := range orders {
 		orderType, err := toLocalOrderType(order.Type)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		clientOrderID := uuid.New().String()
@@ -115,13 +115,22 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 
 		retOrder, err := req.Do(ctx)
 		if err != nil {
-			return err
+			return createdOrders, err
+		}
+		if retOrder == nil {
+			return createdOrders, errors.New("returned nil order")
 		}
 
 		logger.Infof("order created: %+v", retOrder)
+		createdOrder, err := toGlobalOrder(*retOrder)
+		if err != nil {
+			return createdOrders, err
+		}
+
+		createdOrders = append(createdOrders, *createdOrder)
 	}
 
-	return nil
+	return createdOrders, err
 }
 
 // PlatformFeeCurrency

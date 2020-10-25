@@ -342,7 +342,8 @@ func (e *ExchangeOrderExecutionRouter) SubmitOrdersTo(ctx context.Context, sessi
 		order.QuantityString = market.FormatVolume(order.Quantity)
 		e.Notify(":memo: Submitting order to %s %s %s %s with quantity: %s", session, order.Symbol, order.Type, order.Side, order.QuantityString, order)
 
-		if err := es.Exchange.SubmitOrders(ctx, order); err != nil {
+		if createdOrders, err := es.Exchange.SubmitOrders(ctx, order); err != nil {
+			_ = createdOrders
 			return err
 		}
 	}
@@ -370,7 +371,12 @@ func (e *ExchangeOrderExecutor) SubmitOrders(ctx context.Context, orders ...type
 
 		e.Notify(":memo: Submitting %s %s %s order with quantity: %s", order.Symbol, order.Type, order.Side, order.QuantityString, order)
 
-		return e.Session.Exchange.SubmitOrders(ctx, order)
+		createdOrders, err := e.Session.Exchange.SubmitOrders(ctx, order)
+		if err != nil {
+			return err
+		}
+
+		_ = createdOrders
 	}
 
 	return nil

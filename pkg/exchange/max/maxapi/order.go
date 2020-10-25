@@ -384,8 +384,8 @@ func (r *CreateOrderRequest) Do(ctx context.Context) (order *Order, err error) {
 	}
 
 	order = &Order{}
-	if errJson := response.DecodeJSON(order); errJson != nil {
-		return order, errJson
+	if err := response.DecodeJSON(order); err != nil {
+		return nil, err
 	}
 
 	return order, err
