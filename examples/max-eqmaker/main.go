@@ -216,7 +216,7 @@ func generateOrders(symbol, side string, price, priceTick, baseVolume fixedpoint
 
 		orders = append(orders, maxapi.Order{
 			Side:      side,
-			OrderType: string(maxapi.OrderTypeLimit),
+			OrderType: maxapi.OrderTypeLimit,
 			Market:    symbol,
 			Price:     util.FormatFloat(price.Float64(), 3),
 			Volume:    util.FormatFloat(volume, 2),

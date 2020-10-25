@@ -81,7 +81,7 @@ func (reporter *AverageCostPnLReporter) Of(sessions ...string) *AverageCostPnLRe
 }
 
 func (reporter *AverageCostPnLReporter) When(specs ...string) *AverageCostPnLReporter {
-	for _,spec := range specs {
+	for _, spec := range specs {
 		_, err := reporter.cron.AddJob(spec, reporter)
 		if err != nil {
 			panic(err)
@@ -152,15 +152,16 @@ func (trader *Trader) Run(ctx context.Context) error {
 
 	// load and run session strategies
 	for sessionName, strategies := range trader.exchangeStrategies {
+		session := trader.environment.sessions[sessionName]
 		// we can move this to the exchange session,
 		// that way we can mount the notification on the exchange with DSL
 		orderExecutor := &ExchangeOrderExecutor{
 			Notifiability: trader.Notifiability,
-			Exchange:      nil,
+			Session:       session,
 		}
 
 		for _, strategy := range strategies {
-			err := strategy.Run(ctx, orderExecutor, trader.environment.sessions[sessionName])
+			err := strategy.Run(ctx, orderExecutor, session)
 			if err != nil {
 				return err
 			}
@@ -325,30 +326,52 @@ type ExchangeOrderExecutionRouter struct {
 	sessions map[string]*ExchangeSession
 }
 
-func (e *ExchangeOrderExecutionRouter) SubmitOrderTo(ctx context.Context, session string, order types.SubmitOrder) error {
+func (e *ExchangeOrderExecutionRouter) SubmitOrdersTo(ctx context.Context, session string, orders ...types.SubmitOrder) error {
 	es, ok := e.sessions[session]
 	if !ok {
 		return errors.Errorf("exchange session %s not found", session)
 	}
 
-	e.Notify(":memo: Submitting order to %s %s %s %s with quantity: %s", session, order.Symbol, order.Type, order.Side, order.QuantityString, order)
+	for _, order := range orders {
+		market, ok := es.Market(order.Symbol)
+		if !ok {
+			return errors.Errorf("market is not defined: %s", order.Symbol)
+		}
 
-	order.PriceString = order.Market.FormatVolume(order.Price)
-	order.QuantityString = order.Market.FormatVolume(order.Quantity)
-	return es.Exchange.SubmitOrder(ctx, order)
+		order.PriceString = market.FormatPrice(order.Price)
+		order.QuantityString = market.FormatVolume(order.Quantity)
+		e.Notify(":memo: Submitting order to %s %s %s %s with quantity: %s", session, order.Symbol, order.Type, order.Side, order.QuantityString, order)
+
+		if err := es.Exchange.SubmitOrders(ctx, order); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // ExchangeOrderExecutor is an order executor wrapper for single exchange instance.
 type ExchangeOrderExecutor struct {
 	Notifiability
 
-	Exchange types.Exchange
+	Session *ExchangeSession
 }
 
-func (e *ExchangeOrderExecutor) SubmitOrder(ctx context.Context, order types.SubmitOrder) error {
-	e.Notify(":memo: Submitting %s %s %s order with quantity: %s", order.Symbol, order.Type, order.Side, order.QuantityString, order)
+func (e *ExchangeOrderExecutor) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) error {
+	for _, order := range orders {
+		market, ok := e.Session.Market(order.Symbol)
+		if !ok {
+			return errors.Errorf("market is not defined: %s", order.Symbol)
+		}
 
-	order.PriceString = order.Market.FormatVolume(order.Price)
-	order.QuantityString = order.Market.FormatVolume(order.Quantity)
-	return e.Exchange.SubmitOrder(ctx, order)
+		order.Market = market
+		order.PriceString = market.FormatPrice(order.Price)
+		order.QuantityString = market.FormatVolume(order.Quantity)
+
+		e.Notify(":memo: Submitting %s %s %s order with quantity: %s", order.Symbol, order.Type, order.Side, order.QuantityString, order)
+
+		return e.Session.Exchange.SubmitOrders(ctx, order)
+	}
+
+	return nil
 }
