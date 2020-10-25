@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 )
 
 type OrderStateToQuery int
@@ -24,16 +25,16 @@ const (
 	OrderStateWait       = OrderState("wait")
 	OrderStateConvert    = OrderState("convert")
 	OrderStateFinalizing = OrderState("finalizing")
-	OrderStateFailed = OrderState("failed")
+	OrderStateFailed     = OrderState("failed")
 )
 
 type OrderType string
 
 // Order types that the API can return.
 const (
-	OrderTypeMarket    = OrderType("market")
-	OrderTypeLimit     = OrderType("limit")
-	OrderTypeStopLimit = OrderType("stop_limit")
+	OrderTypeMarket     = OrderType("market")
+	OrderTypeLimit      = OrderType("limit")
+	OrderTypeStopLimit  = OrderType("stop_limit")
 	OrderTypeStopMarket = OrderType("stop_market")
 )
 
@@ -192,22 +193,10 @@ func (s *OrderService) Cancel(orderID uint64, clientOrderID string) error {
 }
 
 type OrderCancelRequestParams struct {
-	ID            uint64 `json:"id"`
-	ClientOrderID string `json:"client_oid"`
-}
+	*PrivateRequestParams
 
-func (p OrderCancelRequestParams) Map() map[string]interface{} {
-	payload := make(map[string]interface{})
-
-	if p.ID > 0 {
-		payload["id"] = p.ID
-	}
-
-	if len(p.ClientOrderID) > 0 {
-		payload["client_oid"] = p.ClientOrderID
-	}
-
-	return payload
+	ID            uint64 `json:"id,omitempty"`
+	ClientOrderID string `json:"client_oid,omitempty"`
 }
 
 type OrderCancelRequest struct {
@@ -227,13 +216,13 @@ func (r *OrderCancelRequest) ClientOrderID(id string) *OrderCancelRequest {
 }
 
 func (r *OrderCancelRequest) Do(ctx context.Context) error {
-	payload := r.params.Map()
-	req, err := r.client.newAuthenticatedRequest("POST", "v2/order/delete", payload)
+	req, err := r.client.newAuthenticatedRequest("POST", "v2/order/delete", &r.params)
 	if err != nil {
 		return err
 	}
 
-	_, err = r.client.sendRequest(req)
+	response, err := r.client.sendRequest(req)
+	log.Infof("response: %+v", response)
 	return err
 }
 
@@ -268,7 +257,7 @@ func (s *OrderService) Get(orderID uint64) (*Order, error) {
 }
 
 type MultiOrderRequestParams struct {
-	PrivateRequestParams
+	*PrivateRequestParams
 
 	Market string  `json:"market"`
 	Orders []Order `json:"orders"`
