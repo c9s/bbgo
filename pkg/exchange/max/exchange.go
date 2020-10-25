@@ -90,24 +90,45 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 	return orders, err
 }
 
+func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err2 error) {
+	for _, o := range orders {
+		var req = e.client.OrderService.NewOrderCancelRequest()
+		if o.OrderID > 0 {
+			req.ID(o.OrderID)
+		} else if len(o.ClientOrderID) > 0 {
+			req.ClientOrderID(o.ClientOrderID)
+		} else {
+			return errors.Errorf("order id or client order id is not defined, order=%+v", o)
+		}
+
+		if err := req.Do(ctx); err != nil {
+			log.WithError(err).Errorf("order cancel error")
+			err2 = err
+		}
+	}
+
+	return err2
+}
+
 func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders []types.Order, err error) {
 	for _, order := range orders {
 		orderType, err := toLocalOrderType(order.Type)
 		if err != nil {
-			return nil, err
-		}
-
-		clientOrderID := uuid.New().String()
-		if len(order.ClientOrderID) > 0 {
-			clientOrderID = order.ClientOrderID
+			return createdOrders, err
 		}
 
 		req := e.client.OrderService.NewCreateOrderRequest().
 			Market(toLocalSymbol(order.Symbol)).
 			OrderType(string(orderType)).
 			Side(toLocalSideType(order.Side)).
-			ClientOrderID(clientOrderID).
 			Volume(order.QuantityString)
+
+		if len(order.ClientOrderID) > 0 {
+			req.ClientOrderID(order.ClientOrderID)
+		} else {
+			clientOrderID := uuid.New().String()
+			req.ClientOrderID(clientOrderID)
+		}
 
 		if len(order.PriceString) > 0 {
 			req.Price(order.PriceString)

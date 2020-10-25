@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 )
 
 type OrderStateToQuery int
@@ -222,7 +221,15 @@ func (r *OrderCancelRequest) Do(ctx context.Context) error {
 	}
 
 	response, err := r.client.sendRequest(req)
-	log.Infof("response: %+v", response)
+	if err != nil {
+		return err
+	}
+
+	var order = Order{}
+	if err := response.DecodeJSON(&order); err != nil {
+		return err
+	}
+
 	return err
 }
 

@@ -32,12 +32,13 @@ func toLocalOrderType(orderType types.OrderType) (binance.OrderType, error) {
 func toGlobalOrder(binanceOrder *binance.Order) (*types.Order, error) {
 	return &types.Order{
 		SubmitOrder: types.SubmitOrder{
-			Symbol:      binanceOrder.Symbol,
-			Side:        toGlobalSideType(binanceOrder.Side),
-			Type:        toGlobalOrderType(binanceOrder.Type),
-			Quantity:    util.MustParseFloat(binanceOrder.OrigQuantity),
-			Price:       util.MustParseFloat(binanceOrder.Price),
-			TimeInForce: string(binanceOrder.TimeInForce),
+			ClientOrderID: binanceOrder.ClientOrderID,
+			Symbol:        binanceOrder.Symbol,
+			Side:          toGlobalSideType(binanceOrder.Side),
+			Type:          toGlobalOrderType(binanceOrder.Type),
+			Quantity:      util.MustParseFloat(binanceOrder.OrigQuantity),
+			Price:         util.MustParseFloat(binanceOrder.Price),
+			TimeInForce:   string(binanceOrder.TimeInForce),
 		},
 		OrderID:          uint64(binanceOrder.OrderID),
 		Status:           toGlobalOrderStatus(binanceOrder.Status),

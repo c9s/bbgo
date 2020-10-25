@@ -25,7 +25,8 @@ type Strategy struct {
 	BaseQuantity fixedpoint.Value `json:"baseQuantity"`
 	BuySellRatio float64          `json:"buySellRatio"`
 
-	book *types.StreamOrderBook
+	book         *types.StreamOrderBook
+	activeOrders map[string]types.Order
 }
 
 func New(symbol string) *Strategy {
@@ -34,11 +35,13 @@ func New(symbol string) *Strategy {
 	}
 }
 
-func (s *Strategy) Run(ctx context.Context, orderExecutor types.OrderExecutor, session *bbgo.ExchangeSession) error {
+func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	session.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{})
 
 	s.book = types.NewStreamBook(s.Symbol)
 	s.book.BindStream(session.Stream)
+
+	s.activeOrders = make(map[string]types.Order)
 
 	// We can move the go routine to the parent level.
 	go func() {
@@ -53,7 +56,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor types.OrderExecutor, s
 				return
 
 			case <-s.book.C:
-				s.book.C.Drain(2*time.Second, 5*time.Second)
 				s.update(orderExecutor)
 
 			case <-ticker.C:
@@ -91,7 +93,28 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor types.OrderExecutor, s
 	return nil
 }
 
-func (s *Strategy) update(orderExecutor types.OrderExecutor) {
+func (s *Strategy) cancelOrders(orderExecutor bbgo.OrderExecutor) {
+	var deletedIDs []string
+	for clientOrderID, o := range s.activeOrders {
+		log.Infof("canceling order: %+v", o)
+
+		if err := orderExecutor.Session().Exchange.CancelOrders(context.Background(), o); err != nil {
+			log.WithError(err).Error("cancel order error")
+			continue
+		}
+
+		deletedIDs = append(deletedIDs, clientOrderID)
+	}
+	s.book.C.Drain(1*time.Second, 3*time.Second)
+
+	for _, id := range deletedIDs {
+		delete(s.activeOrders, id)
+	}
+}
+
+func (s *Strategy) update(orderExecutor bbgo.OrderExecutor) {
+	s.cancelOrders(orderExecutor)
+
 	switch s.Side {
 	case "buy":
 		s.updateOrders(orderExecutor, types.SideTypeBuy)
@@ -104,9 +127,11 @@ func (s *Strategy) update(orderExecutor types.OrderExecutor) {
 	default:
 		log.Panicf("undefined side: %s", s.Side)
 	}
+
+	s.book.C.Drain(1*time.Second, 3*time.Second)
 }
 
-func (s *Strategy) updateOrders(orderExecutor types.OrderExecutor, side types.SideType) {
+func (s *Strategy) updateOrders(orderExecutor bbgo.OrderExecutor, side types.SideType) {
 	book := s.book.Copy()
 
 	var pvs types.PriceVolumeSlice
@@ -138,11 +163,21 @@ func (s *Strategy) updateOrders(orderExecutor types.OrderExecutor, side types.Si
 		log.Warn("empty orders")
 		return
 	}
+
 	log.Infof("submitting %d orders", len(orders))
-	if err := orderExecutor.SubmitOrders(context.Background(), orders...); err != nil {
+	createdOrders, err := orderExecutor.SubmitOrders(context.Background(), orders...)
+	if err != nil {
 		log.WithError(err).Errorf("order submit error")
 		return
 	}
+
+	// add created orders to the list
+	for i, o := range createdOrders {
+		log.Infof("adding order: %s => %+v", o.ClientOrderID, o)
+		s.activeOrders[o.ClientOrderID] = createdOrders[i]
+	}
+
+	log.Infof("active orders: %+v", s.activeOrders)
 }
 
 func (s *Strategy) generateOrders(symbol string, side types.SideType, price, priceTick, baseVolume fixedpoint.Value, numOrders int) (orders []types.SubmitOrder) {
