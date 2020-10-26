@@ -50,18 +50,17 @@ func (e *ExchangeOrderExecutor) SubmitOrders(ctx context.Context, orders ...type
 	return e.session.Exchange.SubmitOrders(ctx, formattedOrders...)
 }
 
-type RiskControlOrderExecutor struct {
+type BasicRiskControlOrderExecutor struct {
 	Notifiability `json:"-"`
+	session       *ExchangeSession
 
 	MinQuoteBalance fixedpoint.Value `json:"minQuoteBalance,omitempty"`
 	MaxAssetBalance fixedpoint.Value `json:"maxBaseAssetBalance,omitempty"`
 	MinAssetBalance fixedpoint.Value `json:"minBaseAssetBalance,omitempty"`
 	MaxOrderAmount  fixedpoint.Value `json:"maxOrderAmount,omitempty"`
-
-	session *ExchangeSession
 }
 
-func (e *RiskControlOrderExecutor) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) ([]types.Order, error) {
+func (e *BasicRiskControlOrderExecutor) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) ([]types.Order, error) {
 	var formattedOrders []types.SubmitOrder
 	for _, order := range orders {
 		currentPrice, ok := e.session.lastPrices[order.Symbol]
@@ -86,7 +85,7 @@ func (e *RiskControlOrderExecutor) SubmitOrders(ctx context.Context, orders ...t
 
 				if baseBalance, ok := balances[market.BaseCurrency]; ok {
 					if e.MaxAssetBalance > 0 && baseBalance.Available > e.MaxAssetBalance.Float64() {
-						return nil, errors.Wrapf(ErrAssetBalanceLevelTooHigh, "asset balance level is too high: %f > %f", baseBalance.Available, e.MaxAssetBalance)
+						return nil, errors.Wrapf(ErrAssetBalanceLevelTooHigh, "asset balance level is too high: %f > %f", baseBalance.Available, e.MaxAssetBalance.Float64())
 					}
 				}
 
@@ -107,7 +106,7 @@ func (e *RiskControlOrderExecutor) SubmitOrders(ctx context.Context, orders ...t
 
 			if balance, ok := balances[market.BaseCurrency]; ok {
 				if e.MinAssetBalance > 0 && balance.Available < e.MinAssetBalance.Float64() {
-					return nil, errors.Wrapf(ErrAssetBalanceLevelTooLow, "asset balance level is too low: %f > %f", balance.Available, e.MinAssetBalance)
+					return nil, errors.Wrapf(ErrAssetBalanceLevelTooLow, "asset balance level is too low: %f > %f", balance.Available, e.MinAssetBalance.Float64())
 				}
 
 				quantity = adjustQuantityByMinAmount(quantity, currentPrice, market.MinNotional*1.01)
@@ -134,7 +133,7 @@ func (e *RiskControlOrderExecutor) SubmitOrders(ctx context.Context, orders ...t
 			}
 		}
 
-		// udpate quantity and format the order
+		// update quantity and format the order
 		order.Quantity = quantity
 		o, err := formatOrder(order, e.session)
 		if err != nil {
