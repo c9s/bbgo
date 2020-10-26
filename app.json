@@ -1,0 +1,26 @@
+{
+  "name": "bbgo",
+  "description": "a modern cryptocurrency trading bot",
+  "repository": "https://github.com/c9s/bbgo",
+  "keywords": [
+    "trading",
+    "cryptocurrency",
+    "crypto"
+  ],
+  "env": {
+    "MAX_API_KEY": {
+      "description": "The API key of your MAX Exchange account"
+    },
+    "MAX_API_SECRET": {
+      "description": "The API secret of your MAX Exchange account"
+    }
+  },
+  "buildpacks": [
+    {
+      "url": "heroku/go"
+    }
+  ],
+  "addons": [
+    "jawsdb:kitefin"
+  ]
+}
