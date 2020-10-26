@@ -1,0 +1,37 @@
+---
+notifications:
+  slack:
+    defaultChannel: "bbgo"
+    errorChannel: "bbgo-error"
+
+reportTrades:
+  channelBySymbol:
+    "btcusdt": "bbgo-btcusdt"
+    "ethusdt": "bbgo-ethusdt"
+    "bnbusdt": "bbgo-bnbusdt"
+
+reportPnL:
+- averageCostBySymbols:
+  - "BTCUSDT"
+  - "ETHUSDT"
+  - "BNBUSDT"
+  of: binance
+  when:
+  - "@daily"
+  - "@hourly"
+
+sessions:
+  max:
+    exchange: max
+    envVarPrefix: max
+  binance:
+    exchange: binance
+    envVarPrefix: binance
+
+exchangeStrategies:
+- on: binance
+  buyandhold:
+    symbol: "BTCUSDT"
+    interval: "1m"
+    baseQuantity: 0.01
+    minDropPercentage: -0.02
