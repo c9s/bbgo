@@ -23,6 +23,7 @@ import (
 	"github.com/c9s/bbgo/pkg/config"
 	"github.com/c9s/bbgo/pkg/notifier/slacknotifier"
 	"github.com/c9s/bbgo/pkg/slack/slacklog"
+	"github.com/c9s/bbgo/pkg/types"
 
 	// import built-in strategies
 	_ "github.com/c9s/bbgo/pkg/strategy/buyandhold"
@@ -86,12 +87,38 @@ func runConfig(ctx context.Context, userConfig *config.Config) error {
 		return err
 	}
 
-	environ := bbgo.NewDefaultEnvironment()
+	environ := bbgo.NewEnvironment()
 	environ.SyncTrades(db)
 	environ.ReportTrade(notifierSet)
 
 	trader := bbgo.NewTrader(environ)
 	trader.AddNotifier(notifierSet)
+
+	if len(userConfig.Sessions) == 0 {
+		for _, n := range bbgo.SupportedExchanges {
+			if viper.IsSet(string(n) + "-api-key") {
+				exchange, err := cmdutil.NewExchangeWithEnvVarPrefix(n, "")
+				if err != nil {
+					panic(err)
+				}
+				environ.AddExchange(n.String(), exchange)
+			}
+		}
+	} else {
+		for sessionName, sessionConfig := range userConfig.Sessions {
+			exchangeName, err := types.ValidExchangeName(sessionConfig.ExchangeName)
+			if err != nil {
+				return err
+			}
+
+			exchange, err := cmdutil.NewExchangeWithEnvVarPrefix(exchangeName, sessionConfig.EnvVarPrefix)
+			if err != nil {
+				return err
+			}
+
+			environ.AddExchange(sessionName, exchange)
+		}
+	}
 
 	for _, entry := range userConfig.ExchangeStrategies {
 		for _, mount := range entry.Mounts {
@@ -212,7 +239,6 @@ func build(ctx context.Context, buildDir string, userConfig *config.Config, goOS
 	}
 
 	buildTarget := filepath.Join(cwd, buildDir)
-
 
 	binary := fmt.Sprintf("bbgow-%s-%s", goOS, goArch)
 	if output != nil && len(*output) > 0 {

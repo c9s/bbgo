@@ -9,13 +9,16 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-// NewExchange constructor exchange object from viper config.
-func NewExchange(n types.ExchangeName) (types.Exchange, error) {
+func NewExchangeWithEnvVarPrefix(n types.ExchangeName, varPrefix string) (types.Exchange, error) {
+	if len(varPrefix) == 0 {
+		varPrefix = n.String()
+	}
+
 	switch n {
 
 	case types.ExchangeBinance:
-		key := viper.GetString("binance-api-key")
-		secret := viper.GetString("binance-api-secret")
+		key := viper.GetString(varPrefix + "-api-key")
+		secret := viper.GetString(varPrefix + "-api-secret")
 		if len(key) == 0 || len(secret) == 0 {
 			return nil, errors.New("binance: empty key or secret")
 		}
@@ -23,15 +26,21 @@ func NewExchange(n types.ExchangeName) (types.Exchange, error) {
 		return binance.New(key, secret), nil
 
 	case types.ExchangeMax:
-		key := viper.GetString("max-api-key")
-		secret := viper.GetString("max-api-secret")
+		key := viper.GetString(varPrefix + "-api-key")
+		secret := viper.GetString(varPrefix + "-api-secret")
 		if len(key) == 0 || len(secret) == 0 {
 			return nil, errors.New("max: empty key or secret")
 		}
 
 		return max.New(key, secret), nil
 
-	}
+	default:
+		return nil, errors.Errorf("unsupported exchange: %v", n)
 
-	return nil, nil
+	}
+}
+
+// NewExchange constructor exchange object from viper config.
+func NewExchange(n types.ExchangeName) (types.Exchange, error) {
+	return NewExchangeWithEnvVarPrefix(n, "")
 }

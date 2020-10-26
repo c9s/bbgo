@@ -14,6 +14,7 @@ reportTrades:
     "ethusdt": "bbgo-ethusdt"
     "bnbusdt": "bbgo-bnbusdt"
     "sxpusdt": "bbgo-sxpusdt"
+    "maxusdt": "max-maxusdt"
 
 reportPnL:
 - averageCostBySymbols:
@@ -27,10 +28,10 @@ reportPnL:
 sessions:
   max:
     exchange: max
-    envVarPrefix: "MAX_API_"
+    envVarPrefix: max
   binance:
     exchange: binance
-    envVarPrefix: "BINANCE_API_"
+    envVarPrefix: binance
 
 exchangeStrategies:
 - on: binance
