@@ -174,6 +174,8 @@ func (e *BookEvent) Time() time.Time {
 }
 
 func (e *BookEvent) OrderBook() (snapshot types.OrderBook, err error) {
+	snapshot.Symbol = strings.ToUpper(e.Market)
+
 	for _, bid := range e.Bids {
 		pv, err := bid.PriceVolumePair()
 		if err != nil {

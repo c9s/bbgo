@@ -19,19 +19,27 @@ const (
 type OrderState string
 
 const (
-	OrderStateDone    = OrderState("done")
-	OrderStateCancel  = OrderState("cancel")
-	OrderStateWait    = OrderState("wait")
-	OrderStateConvert = OrderState("convert")
+	OrderStateDone       = OrderState("done")
+	OrderStateCancel     = OrderState("cancel")
+	OrderStateWait       = OrderState("wait")
+	OrderStateConvert    = OrderState("convert")
+	OrderStateFinalizing = OrderState("finalizing")
+	OrderStateFailed     = OrderState("failed")
 )
 
 type OrderType string
 
 // Order types that the API can return.
 const (
-	OrderTypeMarket = OrderType("market")
-	OrderTypeLimit  = OrderType("limit")
+	OrderTypeMarket     = OrderType("market")
+	OrderTypeLimit      = OrderType("limit")
+	OrderTypeStopLimit  = OrderType("stop_limit")
+	OrderTypeStopMarket = OrderType("stop_market")
 )
+
+type QueryOrderOptions struct {
+	GroupID int
+}
 
 // OrderService manages the Order endpoint.
 type OrderService struct {
@@ -40,22 +48,52 @@ type OrderService struct {
 
 // Order represents one returned order (POST order/GET order/GET orders) on the max platform.
 type Order struct {
-	ID              uint64    `json:"id,omitempty" db:"exchange_id"`
-	Side            string    `json:"side" db:"side"`
-	OrderType       string    `json:"ord_type,omitempty" db:"order_type"`
-	Price           string    `json:"price" db:"price"`
-	AveragePrice    string    `json:"avg_price,omitempty" db:"average_price"`
-	State           string    `json:"state,omitempty" db:"state"`
-	Market          string    `json:"market,omitempty" db:"market"`
-	Volume          string    `json:"volume" db:"volume"`
-	RemainingVolume string    `json:"remaining_volume,omitempty" db:"remaining_volume"`
-	ExecutedVolume  string    `json:"executed_volume,omitempty" db:"executed_volume"`
-	TradesCount     int64     `json:"trades_count,omitempty" db:"trades_count"`
-	GroupID         int64     `json:"group_id,omitempty" db:"group_id"`
-	ClientOID       string    `json:"client_oid,omitempty" db:"client_oid"`
-	CreatedAt       time.Time `json:"-" db:"created_at"`
-	CreatedAtMs     int64     `json:"created_at_in_ms,omitempty"`
-	InsertedAt      time.Time `json:"-" db:"inserted_at"`
+	ID              uint64     `json:"id,omitempty" db:"exchange_id"`
+	Side            string     `json:"side" db:"side"`
+	OrderType       OrderType  `json:"ord_type,omitempty" db:"order_type"`
+	Price           string     `json:"price" db:"price"`
+	AveragePrice    string     `json:"avg_price,omitempty" db:"average_price"`
+	State           OrderState `json:"state,omitempty" db:"state"`
+	Market          string     `json:"market,omitempty" db:"market"`
+	Volume          string     `json:"volume" db:"volume"`
+	RemainingVolume string     `json:"remaining_volume,omitempty" db:"remaining_volume"`
+	ExecutedVolume  string     `json:"executed_volume,omitempty" db:"executed_volume"`
+	TradesCount     int64      `json:"trades_count,omitempty" db:"trades_count"`
+	GroupID         int64      `json:"group_id,omitempty" db:"group_id"`
+	ClientOID       string     `json:"client_oid,omitempty" db:"client_oid"`
+	CreatedAt       time.Time  `json:"-" db:"created_at"`
+	CreatedAtMs     int64      `json:"created_at_in_ms,omitempty"`
+	InsertedAt      time.Time  `json:"-" db:"inserted_at"`
+}
+
+// Open returns open orders
+func (s *OrderService) Open(market string, options QueryOrderOptions) ([]Order, error) {
+	payload := map[string]interface{}{
+		"market": market,
+		// "state":    []OrderState{OrderStateWait, OrderStateConvert},
+		"order_by": "desc",
+	}
+
+	if options.GroupID > 0 {
+		payload["group_id"] = options.GroupID
+	}
+
+	req, err := s.client.newAuthenticatedRequest("GET", "v2/orders", payload)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := s.client.sendRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var orders []Order
+	if err := response.DecodeJSON(&orders); err != nil {
+		return nil, err
+	}
+
+	return orders, nil
 }
 
 // All returns all orders for the authenticated account.
@@ -154,22 +192,10 @@ func (s *OrderService) Cancel(orderID uint64, clientOrderID string) error {
 }
 
 type OrderCancelRequestParams struct {
-	ID            uint64 `json:"id"`
-	ClientOrderID string `json:"client_oid"`
-}
+	*PrivateRequestParams
 
-func (p OrderCancelRequestParams) Map() map[string]interface{} {
-	payload := make(map[string]interface{})
-
-	if p.ID > 0 {
-		payload["id"] = p.ID
-	}
-
-	if len(p.ClientOrderID) > 0 {
-		payload["client_oid"] = p.ClientOrderID
-	}
-
-	return payload
+	ID            uint64 `json:"id,omitempty"`
+	ClientOrderID string `json:"client_oid,omitempty"`
 }
 
 type OrderCancelRequest struct {
@@ -189,13 +215,21 @@ func (r *OrderCancelRequest) ClientOrderID(id string) *OrderCancelRequest {
 }
 
 func (r *OrderCancelRequest) Do(ctx context.Context) error {
-	payload := r.params.Map()
-	req, err := r.client.newAuthenticatedRequest("POST", "v2/order/delete", payload)
+	req, err := r.client.newAuthenticatedRequest("POST", "v2/order/delete", &r.params)
 	if err != nil {
 		return err
 	}
 
-	_, err = r.client.sendRequest(req)
+	response, err := r.client.sendRequest(req)
+	if err != nil {
+		return err
+	}
+
+	var order = Order{}
+	if err := response.DecodeJSON(&order); err != nil {
+		return err
+	}
+
 	return err
 }
 
@@ -230,7 +264,7 @@ func (s *OrderService) Get(orderID uint64) (*Order, error) {
 }
 
 type MultiOrderRequestParams struct {
-	PrivateRequestParams
+	*PrivateRequestParams
 
 	Market string  `json:"market"`
 	Orders []Order `json:"orders"`
@@ -281,12 +315,12 @@ func (s *OrderService) NewCreateMultiOrderRequest() *CreateMultiOrderRequest {
 }
 
 type CreateOrderRequestParams struct {
-	PrivateRequestParams
+	*PrivateRequestParams
 
 	Market        string `json:"market"`
 	Volume        string `json:"volume"`
-	Price         string `json:"price"`
-	StopPrice     string `json:"stop_price"`
+	Price         string `json:"price,omitempty"`
+	StopPrice     string `json:"stop_price,omitempty"`
 	Side          string `json:"side"`
 	OrderType     string `json:"ord_type"`
 	ClientOrderID string `json:"client_oid,omitempty"`
@@ -335,7 +369,7 @@ func (r *CreateOrderRequest) ClientOrderID(clientOrderID string) *CreateOrderReq
 }
 
 func (r *CreateOrderRequest) Do(ctx context.Context) (order *Order, err error) {
-	req, err := r.client.newAuthenticatedRequest("POST", "v2/orders", r.params)
+	req, err := r.client.newAuthenticatedRequest("POST", "v2/orders", &r.params)
 	if err != nil {
 		return order, errors.Wrapf(err, "order create error")
 	}
@@ -346,8 +380,8 @@ func (r *CreateOrderRequest) Do(ctx context.Context) (order *Order, err error) {
 	}
 
 	order = &Order{}
-	if errJson := response.DecodeJSON(order); errJson != nil {
-		return order, errJson
+	if err := response.DecodeJSON(order); err != nil {
+		return nil, err
 	}
 
 	return order, err

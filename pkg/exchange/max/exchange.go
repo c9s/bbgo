@@ -2,11 +2,9 @@ package max
 
 import (
 	"context"
-	"fmt"
-	"strconv"
-	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
@@ -46,8 +44,10 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 
 	markets := types.MarketMap{}
 	for _, m := range remoteMarkets {
+		symbol := toGlobalSymbol(m.ID)
+
 		market := types.Market{
-			Symbol:          toGlobalSymbol(m.ID),
+			Symbol:          symbol,
 			PricePrecision:  m.QuoteUnitPrecision,
 			VolumePrecision: m.BaseUnitPrecision,
 			QuoteCurrency:   toGlobalCurrency(m.QuoteUnit),
@@ -62,7 +62,7 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 			TickSize:        0.001,
 		}
 
-		markets[m.ID] = market
+		markets[symbol] = market
 	}
 
 	return markets, nil
@@ -72,26 +72,86 @@ func (e *Exchange) NewStream() types.Stream {
 	return NewStream(e.key, e.secret)
 }
 
-func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) error {
-	orderType, err := toLocalOrderType(order.Type)
+func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
+	maxOrders, err := e.client.OrderService.Open(toLocalSymbol(symbol), maxapi.QueryOrderOptions{})
 	if err != nil {
-		return err
+		return orders, err
 	}
 
-	req := e.client.OrderService.NewCreateOrderRequest().
-		Market(toLocalSymbol(order.Symbol)).
-		OrderType(string(orderType)).
-		Side(toLocalSideType(order.Side)).
-		Volume(order.QuantityString).
-		Price(order.PriceString)
+	for _, maxOrder := range maxOrders {
+		order, err := toGlobalOrder(maxOrder)
+		if err != nil {
+			return orders, err
+		}
 
-	retOrder, err := req.Do(ctx)
-	if err != nil {
-		return err
+		orders = append(orders, *order)
 	}
 
-	logger.Infof("order created: %+v", retOrder)
-	return err
+	return orders, err
+}
+
+func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err2 error) {
+	for _, o := range orders {
+		var req = e.client.OrderService.NewOrderCancelRequest()
+		if o.OrderID > 0 {
+			req.ID(o.OrderID)
+		} else if len(o.ClientOrderID) > 0 {
+			req.ClientOrderID(o.ClientOrderID)
+		} else {
+			return errors.Errorf("order id or client order id is not defined, order=%+v", o)
+		}
+
+		if err := req.Do(ctx); err != nil {
+			log.WithError(err).Errorf("order cancel error")
+			err2 = err
+		}
+	}
+
+	return err2
+}
+
+func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders []types.Order, err error) {
+	for _, order := range orders {
+		orderType, err := toLocalOrderType(order.Type)
+		if err != nil {
+			return createdOrders, err
+		}
+
+		req := e.client.OrderService.NewCreateOrderRequest().
+			Market(toLocalSymbol(order.Symbol)).
+			OrderType(string(orderType)).
+			Side(toLocalSideType(order.Side)).
+			Volume(order.QuantityString)
+
+		if len(order.ClientOrderID) > 0 {
+			req.ClientOrderID(order.ClientOrderID)
+		} else {
+			clientOrderID := uuid.New().String()
+			req.ClientOrderID(clientOrderID)
+		}
+
+		if len(order.PriceString) > 0 {
+			req.Price(order.PriceString)
+		}
+
+		retOrder, err := req.Do(ctx)
+		if err != nil {
+			return createdOrders, err
+		}
+		if retOrder == nil {
+			return createdOrders, errors.New("returned nil order")
+		}
+
+		logger.Infof("order created: %+v", retOrder)
+		createdOrder, err := toGlobalOrder(*retOrder)
+		if err != nil {
+			return createdOrders, err
+		}
+
+		createdOrders = append(createdOrders, *createdOrder)
+	}
+
+	return createdOrders, err
 }
 
 // PlatformFeeCurrency
@@ -230,7 +290,7 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 				Address:       "", // not supported
 				AddressTag:    "", // not supported
 				TransactionID: d.TxID,
-				Status:        convertDepositState(d.State),
+				Status:        toGlobalDepositStatus(d.State),
 			})
 		}
 
@@ -238,27 +298,6 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 	}
 
 	return allDeposits, err
-}
-
-func convertDepositState(a string) types.DepositStatus {
-	switch a {
-	case "submitting", "submitted", "checking":
-		return types.DepositPending
-
-	case "accepted":
-		return types.DepositSuccess
-
-	case "rejected":
-		return types.DepositRejected
-
-	case "canceled":
-		return types.DepositCancelled
-
-	case "suspect", "refunded":
-
-	}
-
-	return types.DepositStatus(a)
 }
 
 func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
@@ -301,7 +340,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	}
 
 	for _, t := range remoteTrades {
-		localTrade, err := convertRemoteTrade(t)
+		localTrade, err := toGlobalTrade(t)
 		if err != nil {
 			logger.WithError(err).Errorf("can not convert trade: %+v", t)
 			continue
@@ -355,95 +394,4 @@ func (e *Exchange) QueryAveragePrice(ctx context.Context, symbol string) (float6
 	}
 
 	return (util.MustParseFloat(ticker.Sell) + util.MustParseFloat(ticker.Buy)) / 2, nil
-}
-
-func toGlobalCurrency(currency string) string {
-	return strings.ToUpper(currency)
-}
-
-func toLocalCurrency(currency string) string {
-	return strings.ToLower(currency)
-}
-
-func toLocalSymbol(symbol string) string {
-	return strings.ToLower(symbol)
-}
-
-func toGlobalSymbol(symbol string) string {
-	return strings.ToUpper(symbol)
-}
-
-func toLocalSideType(side types.SideType) string {
-	return strings.ToLower(string(side))
-}
-
-func toGlobalSideType(v string) string {
-	switch strings.ToLower(v) {
-	case "bid":
-		return "BUY"
-
-	case "ask":
-		return "SELL"
-
-	case "self-trade":
-		return "SELF"
-
-	}
-
-	return strings.ToUpper(v)
-}
-
-func toLocalOrderType(orderType types.OrderType) (maxapi.OrderType, error) {
-	switch orderType {
-	case types.OrderTypeLimit:
-		return maxapi.OrderTypeLimit, nil
-
-	case types.OrderTypeMarket:
-		return maxapi.OrderTypeMarket, nil
-	}
-
-	return "", fmt.Errorf("order type %s not supported", orderType)
-}
-
-func convertRemoteTrade(t maxapi.Trade) (*types.Trade, error) {
-	// skip trade ID that is the same. however this should not happen
-	var side = toGlobalSideType(t.Side)
-
-	// trade time
-	mts := time.Unix(0, t.CreatedAtMilliSeconds*int64(time.Millisecond))
-
-	price, err := strconv.ParseFloat(t.Price, 64)
-	if err != nil {
-		return nil, err
-	}
-
-	quantity, err := strconv.ParseFloat(t.Volume, 64)
-	if err != nil {
-		return nil, err
-	}
-
-	quoteQuantity, err := strconv.ParseFloat(t.Funds, 64)
-	if err != nil {
-		return nil, err
-	}
-
-	fee, err := strconv.ParseFloat(t.Fee, 64)
-	if err != nil {
-		return nil, err
-	}
-
-	return &types.Trade{
-		ID:            int64(t.ID),
-		Price:         price,
-		Symbol:        toGlobalSymbol(t.Market),
-		Exchange:      "max",
-		Quantity:      quantity,
-		Side:          side,
-		IsBuyer:       t.IsBuyer(),
-		IsMaker:       t.IsMaker(),
-		Fee:           fee,
-		FeeCurrency:   toGlobalCurrency(t.FeeCurrency),
-		QuoteQuantity: quoteQuantity,
-		Time:          mts,
-	}, nil
 }
