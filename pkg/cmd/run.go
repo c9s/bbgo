@@ -70,11 +70,13 @@ func runConfig(ctx context.Context, config *config.Config) error {
 	// configure notifiers
 	slackToken := viper.GetString("slack-token")
 	if len(slackToken) > 0 {
+		log.Infof("found slack configured, setting up log hook...")
 		log.AddHook(slacklog.NewLogHook(slackToken, viper.GetString("slack-error-channel")))
 	}
 
 	notifierSet := &bbgo.Notifiability{}
 	if len(slackToken) > 0 {
+		log.Infof("adding slack notifier...")
 		var notifier = slacknotifier.New(slackToken, viper.GetString("slack-channel"))
 		notifierSet.AddNotifier(notifier)
 	}
@@ -104,10 +106,12 @@ func runConfig(ctx context.Context, config *config.Config) error {
 
 	for _, report := range config.PnLReporters {
 		if len(report.AverageCostBySymbols) > 0 {
-			trader.ReportPnL(notifier).
+
+			trader.ReportPnL(notifierSet).
 				AverageCostBySymbols(report.AverageCostBySymbols...).
 				Of(report.Of...).
 				When(report.When...)
+
 		} else {
 			return errors.Errorf("unsupported PnL reporter: %+v", report)
 		}
