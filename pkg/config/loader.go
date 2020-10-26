@@ -40,6 +40,23 @@ func (s *StringSlice) decode(a interface{}) error {
 	return nil
 }
 
+func (s *StringSlice) UnmarshalYAML(unmarshal func(interface{}) error) (err error) {
+	var ss []string
+	err = unmarshal(&ss)
+	if err == nil {
+		*s = ss
+		return
+	}
+
+	var as string
+	err = unmarshal(&as)
+	if err == nil {
+		*s = append(*s, as)
+	}
+
+	return err
+}
+
 func (s *StringSlice) UnmarshalJSON(b []byte) error {
 	var a interface{}
 	var err = json.Unmarshal(b, &a)
@@ -51,18 +68,25 @@ func (s *StringSlice) UnmarshalJSON(b []byte) error {
 }
 
 type PnLReporter struct {
-	AverageCostBySymbols StringSlice `json:"averageCostBySymbols"`
+	AverageCostBySymbols StringSlice `json:"averageCostBySymbols" yaml:"averageCostBySymbols"`
 	Of                   StringSlice `json:"of" yaml:"of"`
 	When                 StringSlice `json:"when" yaml:"when"`
+}
+
+type Session struct {
+	ExchangeName string `json:"exchange" yaml:"exchange"`
+	EnvVarPrefix string `json:"envVarPrefix" yaml:"envVarPrefix"`
 }
 
 type Config struct {
 	Imports []string `json:"imports" yaml:"imports"`
 
+	Sessions map[string]Session `json:"sessions,omitempty" yaml:"sessions,omitempty"`
+
 	ExchangeStrategies      []SingleExchangeStrategyConfig
 	CrossExchangeStrategies []bbgo.CrossExchangeStrategy
 
-	PnLReporters []PnLReporter `json:"reportPnL" yaml:"reportPnL"`
+	PnLReporters []PnLReporter `json:"reportPnL,omitempty" yaml:"reportPnL,omitempty"`
 }
 
 type Stash map[string]interface{}
@@ -84,12 +108,12 @@ func Load(configFile string) (*Config, error) {
 		return nil, err
 	}
 
-	stash, err := loadStash(content)
-	if err != nil {
+	if err := yaml.Unmarshal(content, &config); err != nil {
 		return nil, err
 	}
 
-	if err := loadImports(&config, stash); err != nil {
+	stash, err := loadStash(content)
+	if err != nil {
 		return nil, err
 	}
 
@@ -101,41 +125,7 @@ func Load(configFile string) (*Config, error) {
 		return nil, err
 	}
 
-	if err := loadReportPnL(&config, stash); err != nil {
-		return nil, err
-	}
-
 	return &config, nil
-}
-
-func loadImports(config *Config, stash Stash) error {
-	importStash, ok := stash["imports"]
-	if !ok {
-		return nil
-	}
-
-	imports, err := reUnmarshal(importStash, &config.Imports)
-	if err != nil {
-		return err
-	}
-
-	config.Imports = *imports.(*[]string)
-	return nil
-}
-
-func loadReportPnL(config *Config, stash Stash) error {
-	reporterStash, ok := stash["reportPnL"]
-	if !ok {
-		return nil
-	}
-
-	reporters, err := reUnmarshal(reporterStash, &config.PnLReporters)
-	if err != nil {
-		return err
-	}
-
-	config.PnLReporters = *(reporters.(*[]PnLReporter))
-	return nil
 }
 
 func loadCrossExchangeStrategies(config *Config, stash Stash) (err error) {
@@ -147,7 +137,6 @@ func loadCrossExchangeStrategies(config *Config, stash Stash) (err error) {
 	if len(bbgo.LoadedCrossExchangeStrategies) == 0 {
 		return errors.New("no cross exchange strategy is registered")
 	}
-
 
 	configList, ok := exchangeStrategiesConf.([]interface{})
 	if !ok {

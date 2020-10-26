@@ -27,12 +27,10 @@ reportPnL:
 sessions:
   max:
     exchange: max
-    keyVar: MAX_API_KEY
-    secretVar: MAX_API_SECRET
+    envVarPrefix: "MAX_API_"
   binance:
     exchange: binance
-    keyVar: BINANCE_API_KEY
-    secretVar: BINANCE_API_SECRET
+    envVarPrefix: "BINANCE_API_"
 
 exchangeStrategies:
 - on: binance

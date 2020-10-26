@@ -66,7 +66,7 @@ func compileRunFile(filepath string, config *config.Config) error {
 	return ioutil.WriteFile(filepath, buf.Bytes(), 0644)
 }
 
-func runConfig(ctx context.Context, config *config.Config) error {
+func runConfig(ctx context.Context, userConfig *config.Config) error {
 	// configure notifiers
 	slackToken := viper.GetString("slack-token")
 	if len(slackToken) > 0 {
@@ -93,21 +93,22 @@ func runConfig(ctx context.Context, config *config.Config) error {
 	trader := bbgo.NewTrader(environ)
 	trader.AddNotifier(notifierSet)
 
-	for _, entry := range config.ExchangeStrategies {
+	for _, entry := range userConfig.ExchangeStrategies {
 		for _, mount := range entry.Mounts {
 			log.Infof("attaching strategy %T on %s...", entry.Strategy, mount)
 			trader.AttachStrategyOn(mount, entry.Strategy)
 		}
 	}
 
-	for _, strategy := range config.CrossExchangeStrategies {
+	for _, strategy := range userConfig.CrossExchangeStrategies {
 		log.Infof("attaching strategy %T", strategy)
 		trader.AttachCrossExchangeStrategy(strategy)
 	}
 
-	for _, report := range config.PnLReporters {
+	for _, report := range userConfig.PnLReporters {
 		if len(report.AverageCostBySymbols) > 0 {
 
+			log.Infof("setting up average cost pnl reporter on symbols: %v", report.AverageCostBySymbols)
 			trader.ReportPnL(notifierSet).
 				AverageCostBySymbols(report.AverageCostBySymbols...).
 				Of(report.Of...).
