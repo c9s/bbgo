@@ -21,9 +21,6 @@ reportPnL:
   - "@hourly"
 
 sessions:
-  max:
-    exchange: max
-    envVarPrefix: max
   binance:
     exchange: binance
     envVarPrefix: binance
@@ -50,5 +47,5 @@ exchangeStrategies:
   buyandhold:
     symbol: "BTCUSDT"
     interval: "1m"
-    baseQuantity: 0.01
-    minDropPercentage: -0.02
+    baseQuantity: 0.001
+    minDropPercentage: -0.0001
