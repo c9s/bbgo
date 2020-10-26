@@ -39,10 +39,17 @@ func TestLoadConfig(t *testing.T) {
 				assert.True(t, ok)
 				assert.NotNil(t, session)
 
-				assert.NotNil(t, session.OrderExecutorConfig)
-				assert.NotNil(t, session.OrderExecutorConfig.BySymbol)
+				riskControls := config.RiskControls
+				assert.NotNil(t, riskControls)
+				assert.NotNil(t, riskControls.SessionBasedRiskControl)
 
-				executorConf, ok := session.OrderExecutorConfig.BySymbol["BTCUSDT"]
+				conf, ok := riskControls.SessionBasedRiskControl["max"]
+				assert.True(t, ok)
+				assert.NotNil(t, conf)
+				assert.NotNil(t, conf.OrderExecutor)
+				assert.NotNil(t, conf.OrderExecutor.BySymbol)
+
+				executorConf, ok := conf.OrderExecutor.BySymbol["BTCUSDT"]
 				assert.True(t, ok)
 				assert.NotNil(t, executorConf)
 			},

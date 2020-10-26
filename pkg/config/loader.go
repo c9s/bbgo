@@ -22,25 +22,17 @@ type PnLReporter struct {
 	When                 StringSlice `json:"when" yaml:"when"`
 }
 
-type SymbolBasedOrderExecutor struct {
-	RiskControlOrderExecutor *bbgo.RiskControlOrderExecutor `json:"RiskControlOrderExecutor,omitempty"`
-}
-
-type OrderExecutor struct {
-	// Symbol => Executor config
-	BySymbol map[string]*SymbolBasedOrderExecutor `json:"bySymbol,omitempty" yaml:"bySymbol,omitempty"`
-}
-
 type Session struct {
-	ExchangeName        string         `json:"exchange" yaml:"exchange"`
-	EnvVarPrefix        string         `json:"envVarPrefix" yaml:"envVarPrefix"`
-	OrderExecutorConfig *OrderExecutor `json:"orderExecutor,omitempty" yaml:"orderExecutor"`
+	ExchangeName string `json:"exchange" yaml:"exchange"`
+	EnvVarPrefix string `json:"envVarPrefix" yaml:"envVarPrefix"`
 }
 
 type Config struct {
 	Imports []string `json:"imports" yaml:"imports"`
 
 	Sessions map[string]Session `json:"sessions,omitempty" yaml:"sessions,omitempty"`
+
+	RiskControls *bbgo.RiskControls `json:"riskControls,omitempty" yaml:"riskControls,omitempty"`
 
 	ExchangeStrategies      []SingleExchangeStrategyConfig
 	CrossExchangeStrategies []bbgo.CrossExchangeStrategy
