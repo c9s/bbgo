@@ -13,7 +13,7 @@ sessions:
 
 exchangeStrategies:
 - on: binance
-  buyandhold:
+  test:
     symbol: "BTCUSDT"
     interval: "1m"
     baseQuantity: 0.1
