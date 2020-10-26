@@ -25,13 +25,13 @@ func TestTradeService(t *testing.T) {
 	service.NewTradeService(xdb)
 	/*
 
-		stmt := mock.ExpectQuery(`SELECT \* FROM trades WHERE symbol = \? ORDER BY gid DESC LIMIT 1`)
-		stmt.WithArgs("BTCUSDT")
-		stmt.WillReturnRows(sqlmock.NewRows([]string{"gid", "id", "exchange", "symbol", "price", "quantity"}))
+			stmt := mock.ExpectQuery(`SELECT \* FROM trades WHERE symbol = \? ORDER BY gid DESC LIMIT 1`)
+			stmt.WithArgs("BTCUSDT")
+			stmt.WillReturnRows(sqlmock.NewRows([]string{"gid", "id", "exchange", "symbol", "price", "quantity"}))
 
-		stmt2 := mock.ExpectQuery(`INSERT INTO trades (id, exchange, symbol, price, quantity, quote_quantity, side, is_buyer, is_maker, fee, fee_currency, traded_at)
-	        	            				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-		stmt2.WithArgs()
+			stmt2 := mock.ExpectQuery(`INSERT INTO trades (id, exchange, symbol, price, quantity, quote_quantity, side, is_buyer, is_maker, fee, fee_currency, traded_at)
+		        	            				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+			stmt2.WithArgs()
 	*/
 }
 
@@ -53,16 +53,12 @@ func TestEnvironment_Connect(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	xdb, err := sqlx.Connect("mysql", mysqlURL)
-	assert.NoError(t, err)
-
 	environment := NewEnvironment()
 	environment.AddExchange("binance", exchange).
-		Subscribe(types.KLineChannel,"BTCUSDT", types.SubscribeOptions{})
+		Subscribe(types.KLineChannel, "BTCUSDT", types.SubscribeOptions{})
 
-	err = environment.Connect(ctx)
+	err := environment.Connect(ctx)
 	assert.NoError(t, err)
 
 	time.Sleep(5 * time.Second)
 }
-
