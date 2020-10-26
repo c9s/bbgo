@@ -29,12 +29,6 @@ type Strategy struct {
 	activeOrders map[string]types.Order
 }
 
-func New(symbol string) *Strategy {
-	return &Strategy{
-		Symbol: symbol,
-	}
-}
-
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	session.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{})
 
@@ -48,7 +42,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		ticker := time.NewTicker(1 * time.Minute)
 		defer ticker.Stop()
 
-		s.update(orderExecutor)
+		s.update(orderExecutor, session)
 
 		for {
 			select {
@@ -56,49 +50,23 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				return
 
 			case <-s.book.C:
-				s.update(orderExecutor)
+				s.update(orderExecutor, session)
 
 			case <-ticker.C:
-				s.update(orderExecutor)
+				s.update(orderExecutor, session)
 			}
 		}
 	}()
 
-	/*
-		session.Stream.OnKLineClosed(func(kline types.KLine) {
-			market, ok := session.Market(s.Symbol)
-			if !ok {
-				return
-			}
-
-			quoteBalance, ok := session.Account.Balance(market.QuoteCurrency)
-			if !ok {
-				return
-			}
-			_ = quoteBalance
-
-			err := orderExecutor.SubmitOrder(ctx, types.SubmitOrder{
-				Symbol:   kline.Symbol,
-				Side:     types.SideTypeBuy,
-				Type:     types.OrderTypeMarket,
-				Quantity: 0.01,
-			})
-
-			if err != nil {
-				log.WithError(err).Error("submit order error")
-			}
-		})
-	*/
-
 	return nil
 }
 
-func (s *Strategy) cancelOrders(orderExecutor bbgo.OrderExecutor) {
+func (s *Strategy) cancelOrders(session *bbgo.ExchangeSession) {
 	var deletedIDs []string
 	for clientOrderID, o := range s.activeOrders {
 		log.Infof("canceling order: %+v", o)
 
-		if err := orderExecutor.Session().Exchange.CancelOrders(context.Background(), o); err != nil {
+		if err := session.Exchange.CancelOrders(context.Background(), o); err != nil {
 			log.WithError(err).Error("cancel order error")
 			continue
 		}
@@ -112,8 +80,8 @@ func (s *Strategy) cancelOrders(orderExecutor bbgo.OrderExecutor) {
 	}
 }
 
-func (s *Strategy) update(orderExecutor bbgo.OrderExecutor) {
-	s.cancelOrders(orderExecutor)
+func (s *Strategy) update(orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) {
+	s.cancelOrders(session)
 
 	switch s.Side {
 	case "buy":
@@ -150,21 +118,20 @@ func (s *Strategy) updateOrders(orderExecutor bbgo.OrderExecutor, side types.Sid
 
 	log.Infof("placing order behind volume: %f", s.BehindVolume.Float64())
 
-	index := pvs.IndexByVolumeDepth(s.BehindVolume)
-	if index == -1 {
+	idx := pvs.IndexByVolumeDepth(s.BehindVolume)
+	if idx == -1 {
 		// do not place orders
 		log.Warn("depth is not enough")
 		return
 	}
 
-	var price = pvs[index].Price
-	var orders = s.generateOrders(s.Symbol, side, price, s.PriceTick, s.BaseQuantity, s.NumOrders)
+	var depthPrice = pvs[idx].Price
+	var orders = s.generateOrders(s.Symbol, side, depthPrice, s.PriceTick, s.BaseQuantity, s.NumOrders)
 	if len(orders) == 0 {
 		log.Warn("empty orders")
 		return
 	}
 
-	log.Infof("submitting %d orders", len(orders))
 	createdOrders, err := orderExecutor.SubmitOrders(context.Background(), orders...)
 	if err != nil {
 		log.WithError(err).Errorf("order submit error")
@@ -173,11 +140,8 @@ func (s *Strategy) updateOrders(orderExecutor bbgo.OrderExecutor, side types.Sid
 
 	// add created orders to the list
 	for i, o := range createdOrders {
-		log.Infof("adding order: %s => %+v", o.ClientOrderID, o)
 		s.activeOrders[o.ClientOrderID] = createdOrders[i]
 	}
-
-	log.Infof("active orders: %+v", s.activeOrders)
 }
 
 func (s *Strategy) generateOrders(symbol string, side types.SideType, price, priceTick, baseVolume fixedpoint.Value, numOrders int) (orders []types.SubmitOrder) {
