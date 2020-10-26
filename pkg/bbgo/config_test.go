@@ -1,13 +1,27 @@
-package config
+package bbgo
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	// register the strategies
-	_ "github.com/c9s/bbgo/pkg/strategy/buyandhold"
 )
+
+func init() {
+	RegisterExchangeStrategy("test", &TestStrategy{})
+}
+
+type TestStrategy struct {
+	Symbol            string  `json:"symbol"`
+	Interval          string  `json:"interval"`
+	BaseQuantity      float64 `json:"baseQuantity"`
+	MaxAssetQuantity  float64 `json:"maxAssetQuantity"`
+	MinDropPercentage float64 `json:"minDropPercentage"`
+}
+
+func (s *TestStrategy) Run(ctx context.Context, orderExecutor OrderExecutor, session *ExchangeSession) error {
+	return nil
+}
 
 func TestLoadConfig(t *testing.T) {
 	type args struct {
