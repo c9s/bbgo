@@ -53,6 +53,7 @@ func Execute() {
 	viper.AutomaticEnv()
 
 	// setup the config paths for looking up the config file
+	/*
 	viper.AddConfigPath("config")
 	viper.AddConfigPath("$HOME/.bbgo")
 	viper.AddConfigPath("/etc/bbgo")
@@ -65,6 +66,7 @@ func Execute() {
 	if err != nil {
 		log.WithError(err).Fatal("failed to load config file")
 	}
+	*/
 
 	// Once the flags are defined, we can bind config keys with flags.
 	if err := viper.BindPFlags(RootCmd.PersistentFlags()); err != nil {
