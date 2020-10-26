@@ -44,6 +44,16 @@ func (stream *StandardStream) EmitKLineClosed(kline KLine) {
 	}
 }
 
+func (stream *StandardStream) OnKLine(cb func(kline KLine)) {
+	stream.kLineCallbacks = append(stream.kLineCallbacks, cb)
+}
+
+func (stream *StandardStream) EmitKLine(kline KLine) {
+	for _, cb := range stream.kLineCallbacks {
+		cb(kline)
+	}
+}
+
 func (stream *StandardStream) OnBookUpdate(cb func(book OrderBook)) {
 	stream.bookUpdateCallbacks = append(stream.bookUpdateCallbacks, cb)
 }
@@ -72,6 +82,8 @@ type StandardStreamEventHub interface {
 	OnBalanceUpdate(cb func(balances map[string]Balance))
 
 	OnKLineClosed(cb func(kline KLine))
+
+	OnKLine(cb func(kline KLine))
 
 	OnBookUpdate(cb func(book OrderBook))
 
