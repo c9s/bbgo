@@ -85,12 +85,12 @@ func (s *Strategy) update(orderExecutor bbgo.OrderExecutor, session *bbgo.Exchan
 
 	switch s.Side {
 	case "buy":
-		s.updateOrders(orderExecutor, types.SideTypeBuy)
+		s.updateOrders(orderExecutor, session, types.SideTypeBuy)
 	case "sell":
-		s.updateOrders(orderExecutor, types.SideTypeSell)
+		s.updateOrders(orderExecutor, session, types.SideTypeSell)
 	case "both":
-		s.updateOrders(orderExecutor, types.SideTypeBuy)
-		s.updateOrders(orderExecutor, types.SideTypeSell)
+		s.updateOrders(orderExecutor, session, types.SideTypeBuy)
+		s.updateOrders(orderExecutor, session, types.SideTypeSell)
 
 	default:
 		log.Panicf("undefined side: %s", s.Side)
@@ -99,27 +99,18 @@ func (s *Strategy) update(orderExecutor bbgo.OrderExecutor, session *bbgo.Exchan
 	s.book.C.Drain(1*time.Second, 3*time.Second)
 }
 
-func (s *Strategy) updateOrders(orderExecutor bbgo.OrderExecutor, side types.SideType) {
-	book := s.book.Copy()
-
-	var pvs types.PriceVolumeSlice
-
-	switch side {
-	case types.SideTypeBuy:
-		pvs = book.Bids
-	case types.SideTypeSell:
-		pvs = book.Asks
-	}
-
+func (s *Strategy) updateOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession, side types.SideType) {
+	var book = s.book.Copy()
+	var pvs = book.PriceVolumesBySide(side)
 	if pvs == nil || len(pvs) == 0 {
-		log.Warn("empty bids or asks")
+		log.Warnf("empty side: %s", side)
 		return
 	}
 
 	log.Infof("placing order behind volume: %f", s.BehindVolume.Float64())
 
 	idx := pvs.IndexByVolumeDepth(s.BehindVolume)
-	if idx == -1 {
+	if idx == -1 || idx > len(pvs)-1 {
 		// do not place orders
 		log.Warn("depth is not enough")
 		return
@@ -144,7 +135,7 @@ func (s *Strategy) updateOrders(orderExecutor bbgo.OrderExecutor, side types.Sid
 	}
 }
 
-func (s *Strategy) generateOrders(symbol string, side types.SideType, price, priceTick, baseVolume fixedpoint.Value, numOrders int) (orders []types.SubmitOrder) {
+func (s *Strategy) generateOrders(symbol string, side types.SideType, price, priceTick, baseQuantity fixedpoint.Value, numOrders int) (orders []types.SubmitOrder) {
 	var expBase = fixedpoint.NewFromFloat(0.0)
 
 	switch side {
@@ -160,7 +151,7 @@ func (s *Strategy) generateOrders(symbol string, side types.SideType, price, pri
 	}
 
 	for i := 0; i < numOrders; i++ {
-		volume := math.Exp(expBase.Float64()) * baseVolume.Float64()
+		volume := math.Exp(expBase.Float64()) * baseQuantity.Float64()
 
 		// skip order less than 10usd
 		if volume*price.Float64() < 10.0 {
@@ -185,7 +176,6 @@ func (s *Strategy) generateOrders(symbol string, side types.SideType, price, pri
 		price = price + priceTick
 		declog := math.Log10(math.Abs(priceTick.Float64()))
 		expBase += fixedpoint.NewFromFloat(math.Pow10(-int(declog)) * math.Abs(priceTick.Float64()))
-		// log.Infof("expBase: %f", expBase.Float64())
 	}
 
 	return orders
