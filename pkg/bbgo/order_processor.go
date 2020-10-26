@@ -27,11 +27,11 @@ type OrderProcessor struct {
 	MinQuoteBalance float64 `json:"minQuoteBalance"`
 	MaxAssetBalance float64 `json:"maxBaseAssetBalance"`
 	MinAssetBalance float64 `json:"minBaseAssetBalance"`
+	MaxOrderAmount float64 `json:"maxOrderAmount"`
 
 	// MinProfitSpread is used when submitting sell orders, it check if there the selling can make the profit.
 	MinProfitSpread float64 `json:"minProfitSpread"`
 
-	MaxOrderAmount float64 `json:"maxOrderAmount"`
 
 	Exchange types.Exchange `json:"-"`
 }

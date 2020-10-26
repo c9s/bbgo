@@ -29,6 +29,15 @@ sessions:
   max:
     exchange: max
     envVarPrefix: max
+    orderExecutor:
+      bySymbol:
+        BTCUSDT:
+          RiskControlOrderExecutor:
+            minQuoteBalance: 1000.0
+            maxBaseAssetBalance: 10.0
+            minBaseAssetBalance: 1.0
+            maxOrderAmount: 100.0
+
   binance:
     exchange: binance
     envVarPrefix: binance
