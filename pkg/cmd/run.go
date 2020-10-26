@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -167,7 +168,7 @@ var RunCmd = &cobra.Command{
 		}
 
 		var buildEnvs = []string{"GOOS=" + goOS, "GOARCH=" + goArch}
-		return compileAndRun(ctx, userConfig, buildEnvs, flagsArgs...)
+		return compileAndRun(ctx, userConfig, goOS, goArch, buildEnvs, flagsArgs...)
 	},
 }
 
@@ -186,7 +187,7 @@ func compile(buildDir string, userConfig *config.Config) error {
 	return nil
 }
 
-func compileAndRun(ctx context.Context, userConfig *config.Config, buildEnvs []string, args ...string) error {
+func compileAndRun(ctx context.Context, userConfig *config.Config, goOS, goArch string, buildEnvs []string, args ...string) error {
 	buildDir := filepath.Join("build", "bbgow")
 
 	if err := compile(buildDir, userConfig); err != nil {
@@ -201,7 +202,9 @@ func compileAndRun(ctx context.Context, userConfig *config.Config, buildEnvs []s
 	buildTarget := filepath.Join(cwd, buildDir)
 	log.Infof("building binary from %s...", buildTarget)
 
-	buildCmd := exec.CommandContext(ctx, "go", "build", "-tags", "wrapper", "-o", "bbgow", buildTarget)
+	binary := fmt.Sprintf("bbgow-%s-%s", goOS, goArch)
+
+	buildCmd := exec.CommandContext(ctx, "go", "build", "-tags", "wrapper", "-o", binary, buildTarget)
 	buildCmd.Env = append(os.Environ(), buildEnvs...)
 
 	buildCmd.Stdout = os.Stdout
@@ -210,7 +213,7 @@ func compileAndRun(ctx context.Context, userConfig *config.Config, buildEnvs []s
 		return err
 	}
 
-	executePath := filepath.Join(cwd, "bbgow")
+	executePath := filepath.Join(cwd, binary)
 
 	log.Infof("running wrapper binary, args: %v", args)
 	runCmd := exec.CommandContext(ctx, executePath, args...)
