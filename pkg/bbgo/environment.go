@@ -113,9 +113,20 @@ func NewEnvironment(db *sqlx.DB) *Environment {
 		TradeSync: &service.TradeSync{
 			Service: tradeService,
 		},
+
+		// default trade scan time
 		tradeScanTime: time.Now().AddDate(0, 0, -7), // sync from 7 days ago
 		sessions:      make(map[string]*ExchangeSession),
 	}
+}
+
+func (environ *Environment) SyncTrades(db *sqlx.DB) *Environment {
+	environ.TradeService = &service.TradeService{DB: db}
+	environ.TradeSync = &service.TradeSync{
+		Service: environ.TradeService,
+	}
+
+	return environ
 }
 
 func (environ *Environment) AddExchange(name string, exchange types.Exchange) (session *ExchangeSession) {
@@ -160,9 +171,10 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 	return nil
 }
 
-// SetTradeScanTime overrides the default trade scan time (-7 days)
-func (environ *Environment) SetTradeScanTime(t time.Time) *Environment {
+// SyncTradesFrom overrides the default trade scan time (-7 days)
+func (environ *Environment) SyncTradesFrom(t time.Time) *Environment {
 	environ.tradeScanTime = t
+
 	return environ
 }
 
@@ -185,25 +197,28 @@ func (environ *Environment) Connect(ctx context.Context) error {
 
 		// trade sync and market data store depends on subscribed symbols so we have to do this here.
 		for symbol := range loadedSymbols {
-			log.Infof("syncing trades from %s for symbol %s...", session.Exchange.Name(), symbol)
-			if err := environ.TradeSync.Sync(ctx, session.Exchange, symbol, environ.tradeScanTime); err != nil {
-				return err
-			}
-
 			var trades []types.Trade
 
-			tradingFeeCurrency := session.Exchange.PlatformFeeCurrency()
-			if strings.HasPrefix(symbol, tradingFeeCurrency) {
-				trades, err = environ.TradeService.QueryForTradingFeeCurrency(symbol, tradingFeeCurrency)
-			} else {
-				trades, err = environ.TradeService.Query(symbol)
+			if environ.TradeSync != nil {
+				log.Infof("syncing trades from %s for symbol %s...", session.Exchange.Name(), symbol)
+				if err := environ.TradeSync.Sync(ctx, session.Exchange, symbol, environ.tradeScanTime); err != nil {
+					return err
+				}
+
+				tradingFeeCurrency := session.Exchange.PlatformFeeCurrency()
+				if strings.HasPrefix(symbol, tradingFeeCurrency) {
+					trades, err = environ.TradeService.QueryForTradingFeeCurrency(symbol, tradingFeeCurrency)
+				} else {
+					trades, err = environ.TradeService.Query(symbol)
+				}
+
+				if err != nil {
+					return err
+				}
+
+				log.Infof("symbol %s: %d trades loaded", symbol, len(trades))
 			}
 
-			if err != nil {
-				return err
-			}
-
-			log.Infof("symbol %s: %d trades loaded", symbol, len(trades))
 			session.Trades[symbol] = trades
 
 			currentPrice, err := session.Exchange.QueryAveragePrice(ctx, symbol)
