@@ -67,14 +67,17 @@ func compileRunFile(filepath string, config *config.Config) error {
 }
 
 func runConfig(ctx context.Context, config *config.Config) error {
+	// configure notifiers
 	slackToken := viper.GetString("slack-token")
-	if len(slackToken) == 0 {
-		return errSlackTokenUndefined
+	if len(slackToken) > 0 {
+		log.AddHook(slacklog.NewLogHook(slackToken, viper.GetString("slack-error-channel")))
 	}
 
-	log.AddHook(slacklog.NewLogHook(slackToken, viper.GetString("slack-error-channel")))
-
-	var notifier = slacknotifier.New(slackToken, viper.GetString("slack-channel"))
+	notifierSet := &bbgo.Notifiability{}
+	if len(slackToken) > 0 {
+		var notifier = slacknotifier.New(slackToken, viper.GetString("slack-channel"))
+		notifierSet.AddNotifier(notifier)
+	}
 
 	db, err := cmdutil.ConnectMySQL()
 	if err != nil {
@@ -82,9 +85,10 @@ func runConfig(ctx context.Context, config *config.Config) error {
 	}
 
 	environ := bbgo.NewDefaultEnvironment(db)
-	environ.ReportTrade(notifier)
+	environ.ReportTrade(notifierSet)
 
 	trader := bbgo.NewTrader(environ)
+	trader.AddNotifier(notifierSet)
 
 	for _, entry := range config.ExchangeStrategies {
 		for _, mount := range entry.Mounts {
