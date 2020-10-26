@@ -41,7 +41,7 @@ func init() {
 	RootCmd.AddCommand(RunCmd)
 }
 
-var runTemplate = template.Must(template.New("main").Parse(`package main
+var wrapperTemplate = template.Must(template.New("main").Parse(`package main
 // DO NOT MODIFY THIS FILE. THIS FILE IS GENERATED FOR IMPORTING STRATEGIES
 import (
 	"github.com/c9s/bbgo/pkg/cmd"
@@ -59,7 +59,7 @@ func main() {
 
 func compileRunFile(filepath string, config *config.Config) error {
 	var buf = bytes.NewBuffer(nil)
-	if err := runTemplate.Execute(buf, config); err != nil {
+	if err := wrapperTemplate.Execute(buf, config); err != nil {
 		return err
 	}
 
@@ -151,11 +151,11 @@ var RunCmd = &cobra.Command{
 			return nil
 		}
 
-		var flagsArgs = []string{"run", "--no-compile"}
+		var runArgs = []string{"run", "--no-compile"}
 		cmd.Flags().Visit(func(flag *flag.Flag) {
-			flagsArgs = append(flagsArgs, flag.Name, flag.Value.String())
+			runArgs = append(runArgs, flag.Name, flag.Value.String())
 		})
-		flagsArgs = append(flagsArgs, args...)
+		runArgs = append(runArgs, args...)
 
 		goOS, err := cmd.Flags().GetString("os")
 		if err != nil {
@@ -167,8 +167,7 @@ var RunCmd = &cobra.Command{
 			return err
 		}
 
-		var buildEnvs = []string{"GOOS=" + goOS, "GOARCH=" + goArch}
-		return compileAndRun(ctx, userConfig, goOS, goArch, buildEnvs, flagsArgs...)
+		return buildAndRun(ctx, userConfig, goOS, goArch, runArgs...)
 	},
 }
 
@@ -187,10 +186,42 @@ func compile(buildDir string, userConfig *config.Config) error {
 	return nil
 }
 
-func compileAndRun(ctx context.Context, userConfig *config.Config, goOS, goArch string, buildEnvs []string, args ...string) error {
+func build(ctx context.Context, buildDir string, userConfig *config.Config, goOS, goArch string, output *string) (string, error) {
+	if err := compile(buildDir, userConfig); err != nil {
+		return "", err
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+
+	buildEnvs := []string{"GOOS=" + goOS, "GOARCH=" + goArch}
+	buildTarget := filepath.Join(cwd, buildDir)
+	log.Infof("building binary from %s...", buildTarget)
+
+	binary := fmt.Sprintf("bbgow-%s-%s", goOS, goArch)
+	if output != nil {
+		binary = *output
+	}
+
+	buildCmd := exec.CommandContext(ctx, "go", "build", "-tags", "wrapper", "-o", binary, buildTarget)
+	buildCmd.Env = append(os.Environ(), buildEnvs...)
+
+	buildCmd.Stdout = os.Stdout
+	buildCmd.Stderr = os.Stderr
+	if err := buildCmd.Run(); err != nil {
+		return "", err
+	}
+
+	return binary, nil
+}
+
+func buildAndRun(ctx context.Context, userConfig *config.Config, goOS, goArch string, args ...string) error {
 	buildDir := filepath.Join("build", "bbgow")
 
-	if err := compile(buildDir, userConfig); err != nil {
+	binary, err := build(ctx, buildDir, userConfig, goOS, goArch, nil)
+	if err != nil {
 		return err
 	}
 
@@ -199,28 +230,12 @@ func compileAndRun(ctx context.Context, userConfig *config.Config, goOS, goArch 
 		return err
 	}
 
-	buildTarget := filepath.Join(cwd, buildDir)
-	log.Infof("building binary from %s...", buildTarget)
-
-	binary := fmt.Sprintf("bbgow-%s-%s", goOS, goArch)
-
-	buildCmd := exec.CommandContext(ctx, "go", "build", "-tags", "wrapper", "-o", binary, buildTarget)
-	buildCmd.Env = append(os.Environ(), buildEnvs...)
-
-	buildCmd.Stdout = os.Stdout
-	buildCmd.Stderr = os.Stderr
-	if err := buildCmd.Run(); err != nil {
-		return err
-	}
-
 	executePath := filepath.Join(cwd, binary)
 
 	log.Infof("running wrapper binary, args: %v", args)
+
 	runCmd := exec.CommandContext(ctx, executePath, args...)
 	runCmd.Stdout = os.Stdout
 	runCmd.Stderr = os.Stderr
-	if err := runCmd.Run(); err != nil {
-		return err
-	}
-	return nil
+	return runCmd.Run()
 }
