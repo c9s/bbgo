@@ -10,9 +10,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 
-	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/store"
 	"github.com/c9s/bbgo/pkg/types"
@@ -88,23 +86,6 @@ type Environment struct {
 	tradeReporter *TradeReporter
 }
 
-// NewDefaultEnvironment prepares the exchange sessions from the viper settings.
-func NewDefaultEnvironment() *Environment {
-	environment := NewEnvironment()
-
-	for _, n := range SupportedExchanges {
-		if viper.IsSet(string(n) + "-api-key") {
-			exchange, err := cmdutil.NewExchange(n)
-			if err != nil {
-				panic(err)
-			}
-
-			environment.AddExchange(string(n), exchange)
-		}
-	}
-
-	return environment
-}
 
 func NewEnvironment() *Environment {
 	return &Environment{
