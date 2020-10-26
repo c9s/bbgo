@@ -56,7 +56,7 @@ func TestEnvironment_Connect(t *testing.T) {
 	xdb, err := sqlx.Connect("mysql", mysqlURL)
 	assert.NoError(t, err)
 
-	environment := NewEnvironment(xdb)
+	environment := NewEnvironment()
 	environment.AddExchange("binance", exchange).
 		Subscribe(types.KLineChannel,"BTCUSDT", types.SubscribeOptions{})
 

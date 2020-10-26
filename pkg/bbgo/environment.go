@@ -89,8 +89,8 @@ type Environment struct {
 }
 
 // NewDefaultEnvironment prepares the exchange sessions from the viper settings.
-func NewDefaultEnvironment(db *sqlx.DB) *Environment {
-	environment := NewEnvironment(db)
+func NewDefaultEnvironment() *Environment {
+	environment := NewEnvironment()
 
 	for _, n := range SupportedExchanges {
 		if viper.IsSet(string(n) + "-api-key") {
@@ -106,14 +106,8 @@ func NewDefaultEnvironment(db *sqlx.DB) *Environment {
 	return environment
 }
 
-func NewEnvironment(db *sqlx.DB) *Environment {
-	tradeService := &service.TradeService{DB: db}
+func NewEnvironment() *Environment {
 	return &Environment{
-		TradeService: tradeService,
-		TradeSync: &service.TradeSync{
-			Service: tradeService,
-		},
-
 		// default trade scan time
 		tradeScanTime: time.Now().AddDate(0, 0, -7), // sync from 7 days ago
 		sessions:      make(map[string]*ExchangeSession),

@@ -86,7 +86,8 @@ func runConfig(ctx context.Context, config *config.Config) error {
 		return err
 	}
 
-	environ := bbgo.NewDefaultEnvironment(db)
+	environ := bbgo.NewDefaultEnvironment()
+	environ.SyncTrades(db)
 	environ.ReportTrade(notifierSet)
 
 	trader := bbgo.NewTrader(environ)
