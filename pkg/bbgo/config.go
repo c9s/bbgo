@@ -18,7 +18,7 @@ type PnLReporterConfig struct {
 // ExchangeStrategyMount wraps the SingleExchangeStrategy with the session name for mounting
 type ExchangeStrategyMount struct {
 	// Mounts contains the session name to mount
-	Mounts   []string
+	Mounts []string
 
 	// Strategy is the strategy we loaded from config
 	Strategy SingleExchangeStrategy
@@ -188,4 +188,3 @@ func reUnmarshal(conf interface{}, tpe interface{}) (interface{}, error) {
 
 	return val.Elem().Interface(), nil
 }
-
