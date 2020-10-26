@@ -1,3 +1,5 @@
+// +heroku install ./cmd/...
+
 module github.com/c9s/bbgo
 
 go 1.13
