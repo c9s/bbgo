@@ -30,9 +30,6 @@ type Trader struct {
 	pendingOrders []types.SubmitOrder
 }
 
-func (trader *Trader) SubmitOrder(ctx context.Context, order types.SubmitOrder) {
-	trader.pendingOrders = append(trader.pendingOrders, order)
-}
 /*
 func (trader *BackTestTrader) RunStrategy(ctx context.Context, strategy SingleExchangeStrategy) (chan struct{}, error) {
 	logrus.Infof("[regression] number of kline data: %d", len(trader.SourceKLines))
