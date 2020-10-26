@@ -219,30 +219,9 @@ func (trader *Trader) reportPnL() {
 }
 */
 
+// ReportPnL configure and set the PnLReporter with the given notifier
 func (trader *Trader) ReportPnL(notifier Notifier) *PnLReporterManager {
 	return NewPnLReporter(notifier)
-}
-
-func (trader *Trader) SubmitOrder(ctx context.Context, order types.SubmitOrder) {
-	trader.Notify(":memo: Submitting %s %s %s order with quantity: %s", order.Symbol, order.Type, order.Side, order.QuantityString, order)
-
-	orderProcessor := &OrderProcessor{
-		MinQuoteBalance: 0,
-		MaxAssetBalance: 0,
-		MinAssetBalance: 0,
-		MinProfitSpread: 0,
-		MaxOrderAmount:  0,
-		// FIXME:
-		// Exchange:        trader.Exchange,
-		Trader: trader,
-	}
-
-	err := orderProcessor.Submit(ctx, order)
-
-	if err != nil {
-		log.WithError(err).Errorf("order create error: side %s quantity: %s", order.Side, order.QuantityString)
-		return
-	}
 }
 
 type OrderExecutor interface {
