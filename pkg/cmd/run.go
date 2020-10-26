@@ -204,22 +204,27 @@ func build(ctx context.Context, buildDir string, userConfig *config.Config, goOS
 		return "", err
 	}
 
-	buildEnvs := []string{"GOOS=" + goOS, "GOARCH=" + goArch}
+	buildEnvs := []string{
+		"GOOS=" + goOS,
+		"GOARCH=" + goArch,
+	}
+
 	buildTarget := filepath.Join(cwd, buildDir)
-	log.Infof("building binary from %s...", buildTarget)
+
 
 	binary := fmt.Sprintf("bbgow-%s-%s", goOS, goArch)
-	if output != nil {
+	if output != nil && len(*output) > 0 {
 		binary = *output
 	}
 
+	log.Infof("building binary %s from %s...", binary, buildTarget)
 	buildCmd := exec.CommandContext(ctx, "go", "build", "-tags", "wrapper", "-o", binary, buildTarget)
 	buildCmd.Env = append(os.Environ(), buildEnvs...)
 
 	buildCmd.Stdout = os.Stdout
 	buildCmd.Stderr = os.Stderr
 	if err := buildCmd.Run(); err != nil {
-		return "", err
+		return binary, err
 	}
 
 	return binary, nil
