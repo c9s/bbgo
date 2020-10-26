@@ -61,7 +61,8 @@ var Cmd = &cobra.Command{
 			return err
 		}
 
-		environ := bbgo.NewDefaultEnvironment(db)
+		environ := bbgo.NewDefaultEnvironment()
+		environ.SyncTrades(db)
 		trader := bbgo.NewTrader(environ)
 		trader.AttachStrategyOn(string(exchangeName), New(symbol, interval, baseQuantity))
 
