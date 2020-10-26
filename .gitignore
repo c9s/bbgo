@@ -22,4 +22,4 @@
 /.env.*.local
 
 /build
-/bbgow
+/bbgow*
