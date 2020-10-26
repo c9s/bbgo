@@ -3,7 +3,6 @@ package bbgo
 import (
 	"context"
 
-	"github.com/pkg/errors"
 	"github.com/robfig/cron/v3"
 	log "github.com/sirupsen/logrus"
 
@@ -26,11 +25,11 @@ func PersistentFlags(flags *flag.FlagSet) {
 
 // SingleExchangeStrategy represents the single Exchange strategy
 type SingleExchangeStrategy interface {
-	Run(ctx context.Context, orderExecutor types.OrderExecutor, session *ExchangeSession) error
+	Run(ctx context.Context, orderExecutor OrderExecutor, session *ExchangeSession) error
 }
 
 type CrossExchangeStrategy interface {
-	Run(ctx context.Context, orderExecutionRouter types.OrderExecutionRouter, sessions map[string]*ExchangeSession) error
+	Run(ctx context.Context, orderExecutionRouter OrderExecutionRouter, sessions map[string]*ExchangeSession) error
 }
 
 type PnLReporter interface {
@@ -81,7 +80,7 @@ func (reporter *AverageCostPnLReporter) Of(sessions ...string) *AverageCostPnLRe
 }
 
 func (reporter *AverageCostPnLReporter) When(specs ...string) *AverageCostPnLReporter {
-	for _,spec := range specs {
+	for _, spec := range specs {
 		_, err := reporter.cron.AddJob(spec, reporter)
 		if err != nil {
 			panic(err)
@@ -152,15 +151,16 @@ func (trader *Trader) Run(ctx context.Context) error {
 
 	// load and run session strategies
 	for sessionName, strategies := range trader.exchangeStrategies {
+		session := trader.environment.sessions[sessionName]
 		// we can move this to the exchange session,
 		// that way we can mount the notification on the exchange with DSL
 		orderExecutor := &ExchangeOrderExecutor{
 			Notifiability: trader.Notifiability,
-			Exchange:      nil,
+			session:       session,
 		}
 
 		for _, strategy := range strategies {
-			err := strategy.Run(ctx, orderExecutor, trader.environment.sessions[sessionName])
+			err := strategy.Run(ctx, orderExecutor, session)
 			if err != nil {
 				return err
 			}
@@ -319,36 +319,12 @@ func (trader *Trader) SubmitOrder(ctx context.Context, order types.SubmitOrder) 
 	}
 }
 
-type ExchangeOrderExecutionRouter struct {
-	Notifiability
-
-	sessions map[string]*ExchangeSession
+type OrderExecutor interface {
+	Session() *ExchangeSession
+	SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders []types.Order, err error)
 }
 
-func (e *ExchangeOrderExecutionRouter) SubmitOrderTo(ctx context.Context, session string, order types.SubmitOrder) error {
-	es, ok := e.sessions[session]
-	if !ok {
-		return errors.Errorf("exchange session %s not found", session)
-	}
-
-	e.Notify(":memo: Submitting order to %s %s %s %s with quantity: %s", session, order.Symbol, order.Type, order.Side, order.QuantityString, order)
-
-	order.PriceString = order.Market.FormatVolume(order.Price)
-	order.QuantityString = order.Market.FormatVolume(order.Quantity)
-	return es.Exchange.SubmitOrder(ctx, order)
-}
-
-// ExchangeOrderExecutor is an order executor wrapper for single exchange instance.
-type ExchangeOrderExecutor struct {
-	Notifiability
-
-	Exchange types.Exchange
-}
-
-func (e *ExchangeOrderExecutor) SubmitOrder(ctx context.Context, order types.SubmitOrder) error {
-	e.Notify(":memo: Submitting %s %s %s order with quantity: %s", order.Symbol, order.Type, order.Side, order.QuantityString, order)
-
-	order.PriceString = order.Market.FormatVolume(order.Price)
-	order.QuantityString = order.Market.FormatVolume(order.Quantity)
-	return e.Exchange.SubmitOrder(ctx, order)
+type OrderExecutionRouter interface {
+	// SubmitOrderTo submit order to a specific exchange session
+	SubmitOrdersTo(ctx context.Context, session string, orders ...types.SubmitOrder) (createdOrders []types.Order, err error)
 }

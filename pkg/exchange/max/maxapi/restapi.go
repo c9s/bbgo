@@ -250,7 +250,6 @@ func getPrivateRequestParamsObject(v interface{}) (*PrivateRequestParams, error)
 		vt = vt.Elem()
 	}
 
-
 	if vt.Kind() != reflect.Struct {
 		return nil, errors.New("reflect error: given object is not a struct" + vt.Kind().String())
 	}

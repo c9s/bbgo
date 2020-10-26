@@ -3,10 +3,11 @@ package binance
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/adshao/go-binance"
+	"github.com/google/uuid"
+	"github.com/pkg/errors"
 
 	"github.com/sirupsen/logrus"
 
@@ -55,7 +56,7 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 			BaseCurrency:    symbol.BaseAsset,
 		}
 
-		if f := symbol.MinNotionalFilter() ; f != nil {
+		if f := symbol.MinNotionalFilter(); f != nil {
 			market.MinNotional = util.MustParseFloat(f.MinNotional)
 			market.MinAmount = util.MustParseFloat(f.MinNotional)
 		}
@@ -65,14 +66,14 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 		// minQty defines the minimum quantity/icebergQty allowed.
 		//	maxQty defines the maximum quantity/icebergQty allowed.
 		//	stepSize defines the intervals that a quantity/icebergQty can be increased/decreased by.
-		if f := symbol.LotSizeFilter() ; f != nil {
+		if f := symbol.LotSizeFilter(); f != nil {
 			market.MinLot = util.MustParseFloat(f.MinQuantity)
 			market.MinQuantity = util.MustParseFloat(f.MinQuantity)
 			market.MaxQuantity = util.MustParseFloat(f.MaxQuantity)
 			// market.StepSize = util.MustParseFloat(f.StepSize)
 		}
 
-		if f := symbol.PriceFilter() ; f != nil {
+		if f := symbol.PriceFilter(); f != nil {
 			market.MaxPrice = util.MustParseFloat(f.MaxPrice)
 			market.MinPrice = util.MustParseFloat(f.MinPrice)
 			market.TickSize = util.MustParseFloat(f.TickSize)
@@ -268,53 +269,115 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	return a, nil
 }
 
-func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) error {
-	/*
-		limit order example
-
-			order, err := Client.NewCreateOrderService().
-				Symbol(Symbol).
-				Side(side).
-				Type(binance.OrderTypeLimit).
-				TimeInForce(binance.TimeInForceTypeGTC).
-				Quantity(volumeString).
-				Price(priceString).
-				Do(ctx)
-	*/
-
-	orderType, err := toLocalOrderType(order.Type)
+func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
+	remoteOrders, err := e.Client.NewListOpenOrdersService().Symbol(symbol).Do(ctx)
 	if err != nil {
-		return err
+		return orders, err
 	}
 
-	req := e.Client.NewCreateOrderService().
-		Symbol(order.Symbol).
-		Side(binance.SideType(order.Side)).
-		Type(orderType).
-		Quantity(order.QuantityString)
+	for _, binanceOrder := range remoteOrders {
+		order, err := toGlobalOrder(binanceOrder)
+		if err != nil {
+			return orders, err
+		}
 
-	if len(order.PriceString) > 0 {
-		req.Price(order.PriceString)
-	}
-	if len(order.TimeInForce) > 0 {
-		req.TimeInForce(order.TimeInForce)
+		orders = append(orders, *order)
 	}
 
-	retOrder, err := req.Do(ctx)
-	log.Infof("order created: %+v", retOrder)
-	return err
+	return orders, err
 }
 
-func toLocalOrderType(orderType types.OrderType) (binance.OrderType, error) {
-	switch orderType {
-	case types.OrderTypeLimit:
-		return binance.OrderTypeLimit, nil
+func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err2 error) {
+	for _, o := range orders {
+		var req = e.Client.NewCancelOrderService()
 
-	case types.OrderTypeMarket:
-		return binance.OrderTypeMarket, nil
+		// Mandatory
+		req.Symbol(o.Symbol)
+
+		if o.OrderID > 0 {
+			req.OrderID(int64(o.OrderID))
+		} else if len(o.ClientOrderID) > 0 {
+			req.NewClientOrderID(o.ClientOrderID)
+		}
+
+		_, err := req.Do(ctx)
+		if err != nil {
+			log.WithError(err).Errorf("order cancel error")
+			err2 = err
+		}
 	}
 
-	return "", fmt.Errorf("order type %s not supported", orderType)
+	return err2
+}
+
+func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders []types.Order, err error) {
+	for _, order := range orders {
+		orderType, err := toLocalOrderType(order.Type)
+		if err != nil {
+			return createdOrders, err
+		}
+
+		clientOrderID := uuid.New().String()
+		if len(order.ClientOrderID) > 0 {
+			clientOrderID = order.ClientOrderID
+		}
+
+		req := e.Client.NewCreateOrderService().
+			Symbol(order.Symbol).
+			Side(binance.SideType(order.Side)).
+			NewClientOrderID(clientOrderID).
+			Type(orderType)
+
+		req.Quantity(order.QuantityString)
+
+		if len(order.PriceString) > 0 {
+			req.Price(order.PriceString)
+		}
+
+		if len(order.TimeInForce) > 0 {
+			// TODO: check the TimeInForce value
+			req.TimeInForce(binance.TimeInForceType(order.TimeInForce))
+		}
+
+		response, err := req.Do(ctx)
+		if err != nil {
+			return createdOrders, err
+		}
+
+		log.Infof("order creation response: %+v", response)
+
+		retOrder := binance.Order{
+			Symbol:                   response.Symbol,
+			OrderID:                  response.OrderID,
+			ClientOrderID:            response.ClientOrderID,
+			Price:                    response.Price,
+			OrigQuantity:             response.OrigQuantity,
+			ExecutedQuantity:         response.ExecutedQuantity,
+			CummulativeQuoteQuantity: response.CummulativeQuoteQuantity,
+			Status:                   response.Status,
+			TimeInForce:              response.TimeInForce,
+			Type:                     response.Type,
+			Side:                     response.Side,
+			// StopPrice:
+			// IcebergQuantity:
+			Time: response.TransactTime,
+			// UpdateTime:
+			// IsWorking:               ,
+		}
+
+		createdOrder, err := toGlobalOrder(&retOrder)
+		if err != nil {
+			return createdOrders, err
+		}
+
+		if createdOrder == nil {
+			return createdOrders, errors.New("nil converted order")
+		}
+
+		createdOrders = append(createdOrders, *createdOrder)
+	}
+
+	return createdOrders, err
 }
 
 func (e *Exchange) QueryKLines(ctx context.Context, symbol, interval string, options types.KLineQueryOptions) ([]types.KLine, error) {
@@ -393,7 +456,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	}
 
 	for _, t := range remoteTrades {
-		localTrade, err := convertRemoteTrade(*t)
+		localTrade, err := toGlobalTrade(*t)
 		if err != nil {
 			log.WithError(err).Errorf("can not convert binance trade: %+v", t)
 			continue
@@ -404,54 +467,6 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	}
 
 	return trades, nil
-}
-
-func convertRemoteTrade(t binance.TradeV3) (*types.Trade, error) {
-	// skip trade ID that is the same. however this should not happen
-	var side string
-	if t.IsBuyer {
-		side = "BUY"
-	} else {
-		side = "SELL"
-	}
-
-	// trade time
-	mts := time.Unix(0, t.Time*int64(time.Millisecond))
-
-	price, err := strconv.ParseFloat(t.Price, 64)
-	if err != nil {
-		return nil, err
-	}
-
-	quantity, err := strconv.ParseFloat(t.Quantity, 64)
-	if err != nil {
-		return nil, err
-	}
-
-	quoteQuantity, err := strconv.ParseFloat(t.QuoteQuantity, 64)
-	if err != nil {
-		return nil, err
-	}
-
-	fee, err := strconv.ParseFloat(t.Commission, 64)
-	if err != nil {
-		return nil, err
-	}
-
-	return &types.Trade{
-		ID:            t.ID,
-		Price:         price,
-		Symbol:        t.Symbol,
-		Exchange:      "binance",
-		Quantity:      quantity,
-		Side:          side,
-		IsBuyer:       t.IsBuyer,
-		IsMaker:       t.IsMaker,
-		Fee:           fee,
-		FeeCurrency:   t.CommissionAsset,
-		QuoteQuantity: quoteQuantity,
-		Time:          mts,
-	}, nil
 }
 
 func (e *Exchange) BatchQueryKLines(ctx context.Context, symbol, interval string, startTime, endTime time.Time) ([]types.KLine, error) {

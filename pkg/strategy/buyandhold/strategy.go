@@ -42,7 +42,7 @@ func (s *Strategy) SetMaxAssetQuantity(q float64) *Strategy {
 	return s
 }
 
-func (s *Strategy) Run(ctx context.Context, orderExecutor types.OrderExecutor, session *bbgo.ExchangeSession) error {
+func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
 
 	session.Stream.OnKLineClosed(func(kline types.KLine) {
@@ -63,7 +63,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor types.OrderExecutor, s
 				}
 			}
 
-			err := orderExecutor.SubmitOrder(ctx, types.SubmitOrder{
+			_, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 				Symbol:   kline.Symbol,
 				Side:     types.SideTypeBuy,
 				Type:     types.OrderTypeMarket,

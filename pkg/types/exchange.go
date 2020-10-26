@@ -54,7 +54,11 @@ type Exchange interface {
 
 	QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (allWithdraws []Withdraw, err error)
 
-	SubmitOrder(ctx context.Context, order SubmitOrder) error
+	SubmitOrders(ctx context.Context, orders ...SubmitOrder) (createdOrders []Order, err error)
+
+	QueryOpenOrders(ctx context.Context, symbol string) (orders []Order, err error)
+
+	CancelOrders(ctx context.Context, orders ...Order) error
 }
 
 type TradeQueryOptions struct {

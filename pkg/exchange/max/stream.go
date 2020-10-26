@@ -49,6 +49,8 @@ func NewStream(key, secret string) *Stream {
 			return
 		}
 
+		newbook.Symbol = toGlobalSymbol(e.Market)
+
 		switch e.Event {
 		case "snapshot":
 			stream.EmitBookSnapshot(newbook)
@@ -89,7 +91,7 @@ func NewStream(key, secret string) *Stream {
 }
 
 func (s *Stream) Subscribe(channel types.Channel, symbol string, options types.SubscribeOptions) {
-	s.websocketService.Subscribe(string(channel), symbol)
+	s.websocketService.Subscribe(string(channel), toLocalSymbol(symbol))
 }
 
 func (s *Stream) Connect(ctx context.Context) error {

@@ -21,7 +21,7 @@ type Trade struct {
 	QuoteQuantity float64 `json:"quoteQuantity" db:"quote_quantity"`
 	Symbol        string  `json:"symbol" db:"symbol"`
 
-	Side        string    `json:"side" db:"side"`
+	Side        SideType  `json:"side" db:"side"`
 	IsBuyer     bool      `json:"isBuyer" db:"is_buyer"`
 	IsMaker     bool      `json:"isMaker" db:"is_maker"`
 	Time        time.Time `json:"tradedAt" db:"traded_at"`

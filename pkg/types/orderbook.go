@@ -116,6 +116,19 @@ type OrderBook struct {
 	asksChangeCallbacks []func(pvs PriceVolumeSlice)
 }
 
+func (b *OrderBook) PriceVolumesBySide(side SideType) PriceVolumeSlice {
+	switch side {
+
+	case SideTypeBuy:
+		return b.Bids
+
+	case SideTypeSell:
+		return b.Asks
+	}
+
+	return nil
+}
+
 func (b *OrderBook) Copy() (book OrderBook) {
 	book = *b
 	book.Bids = b.Bids.Copy()

@@ -1,7 +1,8 @@
 package types
 
 import (
-	"github.com/adshao/go-binance"
+	"time"
+
 	"github.com/slack-go/slack"
 )
 
@@ -9,23 +10,50 @@ import (
 type OrderType string
 
 const (
-	OrderTypeLimit  OrderType = "LIMIT"
-	OrderTypeMarket OrderType = "MARKET"
+	OrderTypeLimit     OrderType = "LIMIT"
+	OrderTypeMarket    OrderType = "MARKET"
+	OrderTypeStopLimit OrderType = "STOP_LIMIT"
+	OrderTypeStopMarket    OrderType = "STOP_MARKET"
 )
 
+type OrderStatus string
+
+const (
+	OrderStatusNew             OrderStatus = "NEW"
+	OrderStatusFilled          OrderStatus = "FILLED"
+	OrderStatusPartiallyFilled OrderStatus = "PARTIALLY_FILLED"
+	OrderStatusCanceled        OrderStatus = "CANCELED"
+	OrderStatusRejected        OrderStatus = "REJECTED"
+)
+
+type Order struct {
+	SubmitOrder
+
+	OrderID          uint64       `json:"orderID"` // order id
+	Status           OrderStatus `json:"status"`
+	ExecutedQuantity float64     `json:"executedQuantity"`
+	CreationTime time.Time
+}
+
 type SubmitOrder struct {
-	Symbol   string
-	Side     SideType
-	Type     OrderType
+	ClientOrderID string `json:"clientOrderID"`
+
+	Symbol string
+	Side   SideType
+	Type   OrderType
+
 	Quantity float64
 	Price    float64
+	StopPrice float64
 
 	Market Market
 
+	// TODO: we can probably remove these field
+	StopPriceString string
 	PriceString    string
 	QuantityString string
 
-	TimeInForce binance.TimeInForceType
+	TimeInForce string `json:"timeInForce"` // GTC, IOC, FOK
 }
 
 func (o *SubmitOrder) SlackAttachment() slack.Attachment {
