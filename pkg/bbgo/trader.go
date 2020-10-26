@@ -225,7 +225,6 @@ func (trader *Trader) ReportPnL(notifier Notifier) *PnLReporterManager {
 }
 
 type OrderExecutor interface {
-	Session() *ExchangeSession
 	SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders []types.Order, err error)
 }
 
