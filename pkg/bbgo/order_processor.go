@@ -34,97 +34,96 @@ type OrderProcessor struct {
 	MaxOrderAmount float64 `json:"maxOrderAmount"`
 
 	Exchange types.Exchange `json:"-"`
-	Trader   *Trader        `json:"-"`
 }
 
 func (p *OrderProcessor) Submit(ctx context.Context, order types.SubmitOrder) error {
 	/*
-	tradingCtx := p.OrderExecutor.Context
-	currentPrice := tradingCtx.CurrentPrice
-	market := order.Market
-	quantity := order.Quantity
+		tradingCtx := p.OrderExecutor.Context
+		currentPrice := tradingCtx.CurrentPrice
+		market := order.Market
+		quantity := order.Quantity
 
-	tradingCtx.Lock()
-	defer tradingCtx.Unlock()
+		tradingCtx.Lock()
+		defer tradingCtx.Unlock()
 
-	switch order.Side {
-	case types.SideTypeBuy:
+		switch order.Side {
+		case types.SideTypeBuy:
 
-		if balance, ok := tradingCtx.Balances[market.QuoteCurrency]; ok {
-			if balance.Available < p.MinQuoteBalance {
-				return errors.Wrapf(ErrQuoteBalanceLevelTooLow, "quote balance level is too low: %s < %s",
-					types.USD.FormatMoneyFloat64(balance.Available),
-					types.USD.FormatMoneyFloat64(p.MinQuoteBalance))
-			}
+			if balance, ok := tradingCtx.Balances[market.QuoteCurrency]; ok {
+				if balance.Available < p.MinQuoteBalance {
+					return errors.Wrapf(ErrQuoteBalanceLevelTooLow, "quote balance level is too low: %s < %s",
+						types.USD.FormatMoneyFloat64(balance.Available),
+						types.USD.FormatMoneyFloat64(p.MinQuoteBalance))
+				}
 
-			if baseBalance, ok := tradingCtx.Balances[market.BaseCurrency]; ok {
-				if util.NotZero(p.MaxAssetBalance) && baseBalance.Available > p.MaxAssetBalance {
-					return errors.Wrapf(ErrAssetBalanceLevelTooHigh, "asset balance level is too high: %f > %f", baseBalance.Available, p.MaxAssetBalance)
+				if baseBalance, ok := tradingCtx.Balances[market.BaseCurrency]; ok {
+					if util.NotZero(p.MaxAssetBalance) && baseBalance.Available > p.MaxAssetBalance {
+						return errors.Wrapf(ErrAssetBalanceLevelTooHigh, "asset balance level is too high: %f > %f", baseBalance.Available, p.MaxAssetBalance)
+					}
+				}
+
+				available := math.Max(0.0, balance.Available-p.MinQuoteBalance)
+
+				if available < market.MinAmount {
+					return errors.Wrapf(ErrInsufficientQuoteBalance, "insufficient quote balance: %f < min amount %f", available, market.MinAmount)
+				}
+
+				quantity = adjustQuantityByMinAmount(quantity, currentPrice, market.MinAmount*1.01)
+				quantity = adjustQuantityByMaxAmount(quantity, currentPrice, available)
+				amount := quantity * currentPrice
+				if amount < market.MinAmount {
+					return fmt.Errorf("amount too small: %f < min amount %f", amount, market.MinAmount)
 				}
 			}
 
-			available := math.Max(0.0, balance.Available-p.MinQuoteBalance)
+		case types.SideTypeSell:
 
-			if available < market.MinAmount {
-				return errors.Wrapf(ErrInsufficientQuoteBalance, "insufficient quote balance: %f < min amount %f", available, market.MinAmount)
-			}
+			if balance, ok := tradingCtx.Balances[market.BaseCurrency]; ok {
+				if util.NotZero(p.MinAssetBalance) && balance.Available < p.MinAssetBalance {
+					return errors.Wrapf(ErrAssetBalanceLevelTooLow, "asset balance level is too low: %f > %f", balance.Available, p.MinAssetBalance)
+				}
 
-			quantity = adjustQuantityByMinAmount(quantity, currentPrice, market.MinAmount*1.01)
-			quantity = adjustQuantityByMaxAmount(quantity, currentPrice, available)
-			amount := quantity * currentPrice
-			if amount < market.MinAmount {
-				return fmt.Errorf("amount too small: %f < min amount %f", amount, market.MinAmount)
-			}
-		}
+				quantity = adjustQuantityByMinAmount(quantity, currentPrice, market.MinNotional*1.01)
 
-	case types.SideTypeSell:
+				available := balance.Available
+				quantity = math.Min(quantity, available)
+				if quantity < market.MinQuantity {
+					return errors.Wrapf(ErrInsufficientAssetBalance, "insufficient asset balance: %f > minimal quantity %f", available, market.MinQuantity)
+				}
 
-		if balance, ok := tradingCtx.Balances[market.BaseCurrency]; ok {
-			if util.NotZero(p.MinAssetBalance) && balance.Available < p.MinAssetBalance {
-				return errors.Wrapf(ErrAssetBalanceLevelTooLow, "asset balance level is too low: %f > %f", balance.Available, p.MinAssetBalance)
-			}
+				notional := quantity * currentPrice
+				if notional < tradingCtx.Market.MinNotional {
+					return fmt.Errorf("notional %f < min notional: %f", notional, market.MinNotional)
+				}
 
-			quantity = adjustQuantityByMinAmount(quantity, currentPrice, market.MinNotional*1.01)
+				// price tick10
+				// 2 -> 0.01 -> 0.1
+				// 4 -> 0.0001 -> 0.001
+				tick10 := math.Pow10(-market.PricePrecision + 1)
+				minProfitSpread := math.Max(p.MinProfitSpread, tick10)
+				estimatedFee := currentPrice * 0.0015 * 2 // double the fee
+				targetPrice := currentPrice - estimatedFee - minProfitSpread
 
-			available := balance.Available
-			quantity = math.Min(quantity, available)
-			if quantity < market.MinQuantity {
-				return errors.Wrapf(ErrInsufficientAssetBalance, "insufficient asset balance: %f > minimal quantity %f", available, market.MinQuantity)
-			}
+				stockQuantity := tradingCtx.StockManager.Stocks.QuantityBelowPrice(targetPrice)
+				if math.Round(stockQuantity*1e8) == 0.0 {
+					return fmt.Errorf("profitable stock not found: target price %f, profit spread: %f", targetPrice, minProfitSpread)
+				}
 
-			notional := quantity * currentPrice
-			if notional < tradingCtx.Market.MinNotional {
-				return fmt.Errorf("notional %f < min notional: %f", notional, market.MinNotional)
-			}
+				quantity = math.Min(quantity, stockQuantity)
+				if quantity < market.MinLot {
+					return fmt.Errorf("quantity %f less than min lot %f", quantity, market.MinLot)
+				}
 
-			// price tick10
-			// 2 -> 0.01 -> 0.1
-			// 4 -> 0.0001 -> 0.001
-			tick10 := math.Pow10(-market.PricePrecision + 1)
-			minProfitSpread := math.Max(p.MinProfitSpread, tick10)
-			estimatedFee := currentPrice * 0.0015 * 2 // double the fee
-			targetPrice := currentPrice - estimatedFee - minProfitSpread
-
-			stockQuantity := tradingCtx.StockManager.Stocks.QuantityBelowPrice(targetPrice)
-			if math.Round(stockQuantity*1e8) == 0.0 {
-				return fmt.Errorf("profitable stock not found: target price %f, profit spread: %f", targetPrice, minProfitSpread)
-			}
-
-			quantity = math.Min(quantity, stockQuantity)
-			if quantity < market.MinLot {
-				return fmt.Errorf("quantity %f less than min lot %f", quantity, market.MinLot)
-			}
-
-			notional = quantity * currentPrice
-			if notional < tradingCtx.Market.MinNotional {
-				return fmt.Errorf("notional %f < min notional: %f", notional, market.MinNotional)
+				notional = quantity * currentPrice
+				if notional < tradingCtx.Market.MinNotional {
+					return fmt.Errorf("notional %f < min notional: %f", notional, market.MinNotional)
+				}
 			}
 		}
-	}
 
-	order.Quantity = quantity
-	order.QuantityString = market.FormatVolume(quantity)
-	 */
+		order.Quantity = quantity
+		order.QuantityString = market.FormatVolume(quantity)
+	*/
 
 	createdOrders, err := p.Exchange.SubmitOrders(ctx, order)
 	_ = createdOrders
