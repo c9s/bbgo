@@ -154,7 +154,17 @@ func formatOrder(order types.SubmitOrder, session *ExchangeSession) (types.Submi
 	}
 
 	order.Market = market
-	order.PriceString = market.FormatPrice(order.Price)
+
+	switch order.Type {
+	case types.OrderTypeMarket, types.OrderTypeStopMarket:
+		order.Price = 0.0
+		order.PriceString = ""
+
+	default:
+		order.PriceString = market.FormatPrice(order.Price)
+
+	}
+
 	order.QuantityString = market.FormatVolume(order.Quantity)
 	return order, nil
 }
