@@ -18,15 +18,34 @@ func TestLoadConfig(t *testing.T) {
 		name    string
 		args    args
 		wantErr bool
-		length  int
+		f       func(t *testing.T, config *Config)
 	}{
 		{
-			name: "simple",
-			args: args{
-				configFile: "testdata/strategy.yaml",
-			},
+			name:    "strategy",
+			args:    args{configFile: "testdata/strategy.yaml"},
 			wantErr: false,
-			length:  1,
+			f: func(t *testing.T, config *Config) {
+				assert.Len(t, config.ExchangeStrategies, 1)
+			},
+		},
+		{
+			name:    "order_executor",
+			args:    args{configFile: "testdata/order_executor.yaml"},
+			wantErr: false,
+			f: func(t *testing.T, config *Config) {
+				assert.Len(t, config.Sessions, 2)
+
+				session, ok := config.Sessions["max"]
+				assert.True(t, ok)
+				assert.NotNil(t, session)
+
+				assert.NotNil(t, session.OrderExecutorConfig)
+				assert.NotNil(t, session.OrderExecutorConfig.BySymbol)
+
+				executorConf, ok := session.OrderExecutorConfig.BySymbol["BTCUSDT"]
+				assert.True(t, ok)
+				assert.NotNil(t, executorConf)
+			},
 		},
 	}
 
@@ -44,7 +63,10 @@ func TestLoadConfig(t *testing.T) {
 			}
 
 			assert.NotNil(t, config)
-			assert.Len(t, config.ExchangeStrategies, tt.length)
+
+			if tt.f != nil {
+				tt.f(t, config)
+			}
 		})
 	}
 }

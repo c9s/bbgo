@@ -9,6 +9,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 type SingleExchangeStrategyConfig struct {
@@ -22,9 +23,26 @@ type PnLReporter struct {
 	When                 StringSlice `json:"when" yaml:"when"`
 }
 
+type RiskControlOrderExecutor struct {
+	MinQuoteBalance fixedpoint.Value `json:"minQuoteBalance,omitempty"`
+	MaxAssetBalance fixedpoint.Value `json:"maxBaseAssetBalance,omitempty"`
+	MinAssetBalance fixedpoint.Value `json:"minBaseAssetBalance,omitempty"`
+	MaxOrderAmount  fixedpoint.Value `json:"maxOrderAmount,omitempty"`
+}
+
+type SymbolBasedOrderExecutor struct {
+	RiskControlOrderExecutor *RiskControlOrderExecutor `json:"RiskControlOrderExecutor,omitempty"`
+}
+
+type OrderExecutor struct {
+	// Symbol => Executor config
+	BySymbol map[string]*SymbolBasedOrderExecutor `json:"bySymbol,omitempty" yaml:"bySymbol,omitempty"`
+}
+
 type Session struct {
-	ExchangeName string `json:"exchange" yaml:"exchange"`
-	EnvVarPrefix string `json:"envVarPrefix" yaml:"envVarPrefix"`
+	ExchangeName        string         `json:"exchange" yaml:"exchange"`
+	EnvVarPrefix        string         `json:"envVarPrefix" yaml:"envVarPrefix"`
+	OrderExecutorConfig *OrderExecutor `json:"orderExecutor,omitempty" yaml:"orderExecutor"`
 }
 
 type Config struct {
