@@ -103,11 +103,8 @@ func (trader *Trader) Run(ctx context.Context) error {
 			})
 		}
 
-
-		// We can move this to the exchange session,
-		// that way we can mount the notification on the exchange with DSL
-		// This is the default order executor
 		var baseOrderExecutor = &ExchangeOrderExecutor{
+			// copy the parent notifiers and session
 			Notifiability: trader.Notifiability,
 			session:       session,
 		}
