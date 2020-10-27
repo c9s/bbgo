@@ -1,0 +1,27 @@
+---
+imports:
+- github.com/c9s/bbgo/pkg/strategy/buyandhold
+
+sessions:
+  max:
+    exchange: max
+    envVarPrefix: max
+
+  binance:
+    exchange: binance
+    envVarPrefix: binance
+
+riskControls:
+  # session-based risk controller
+  sessionBased:
+    # max is the session name that you want to configure the risk control
+    max:
+      orderExecutors:
+        bySymbol:
+          BTCUSDT:
+            basic:
+              minQuoteBalance: 1000.0
+              maxBaseAssetBalance: 10.0
+              minBaseAssetBalance: 1.0
+              maxOrderAmount: 100.0
+

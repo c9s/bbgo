@@ -20,7 +20,6 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
-	"github.com/c9s/bbgo/pkg/config"
 	"github.com/c9s/bbgo/pkg/notifier/slacknotifier"
 	"github.com/c9s/bbgo/pkg/slack/slacklog"
 	"github.com/c9s/bbgo/pkg/types"
@@ -58,7 +57,7 @@ func main() {
 
 `))
 
-func compileRunFile(filepath string, config *config.Config) error {
+func compileRunFile(filepath string, config *bbgo.Config) error {
 	var buf = bytes.NewBuffer(nil)
 	if err := wrapperTemplate.Execute(buf, config); err != nil {
 		return err
@@ -67,7 +66,7 @@ func compileRunFile(filepath string, config *config.Config) error {
 	return ioutil.WriteFile(filepath, buf.Bytes(), 0644)
 }
 
-func runConfig(ctx context.Context, userConfig *config.Config) error {
+func runConfig(ctx context.Context, userConfig *bbgo.Config) error {
 	// configure notifiers
 	slackToken := viper.GetString("slack-token")
 	if len(slackToken) > 0 {
@@ -174,7 +173,7 @@ var RunCmd = &cobra.Command{
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		userConfig, err := config.Load(configFile)
+		userConfig, err := bbgo.Load(configFile)
 		if err != nil {
 			return err
 		}
@@ -208,7 +207,7 @@ var RunCmd = &cobra.Command{
 	},
 }
 
-func compile(buildDir string, userConfig *config.Config) error {
+func compile(buildDir string, userConfig *bbgo.Config) error {
 	if _, err := os.Stat(buildDir); os.IsNotExist(err) {
 		if err := os.MkdirAll(buildDir, 0777); err != nil {
 			return errors.Wrapf(err, "can not create build directory: %s", buildDir)
@@ -223,7 +222,7 @@ func compile(buildDir string, userConfig *config.Config) error {
 	return nil
 }
 
-func build(ctx context.Context, buildDir string, userConfig *config.Config, goOS, goArch string, output *string) (string, error) {
+func build(ctx context.Context, buildDir string, userConfig *bbgo.Config, goOS, goArch string, output *string) (string, error) {
 	if err := compile(buildDir, userConfig); err != nil {
 		return "", err
 	}
@@ -258,7 +257,7 @@ func build(ctx context.Context, buildDir string, userConfig *config.Config, goOS
 	return binary, nil
 }
 
-func buildAndRun(ctx context.Context, userConfig *config.Config, goOS, goArch string, args ...string) error {
+func buildAndRun(ctx context.Context, userConfig *bbgo.Config, goOS, goArch string, args ...string) error {
 	buildDir := filepath.Join("build", "bbgow")
 
 	binary, err := build(ctx, buildDir, userConfig, goOS, goArch, nil)

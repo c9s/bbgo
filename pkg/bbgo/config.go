@@ -1,4 +1,4 @@
-package config
+package bbgo
 
 import (
 	"encoding/json"
@@ -7,19 +7,21 @@ import (
 
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
-
-	"github.com/c9s/bbgo/pkg/bbgo"
 )
 
-type SingleExchangeStrategyConfig struct {
-	Mounts   []string
-	Strategy bbgo.SingleExchangeStrategy
-}
-
-type PnLReporter struct {
+type PnLReporterConfig struct {
 	AverageCostBySymbols StringSlice `json:"averageCostBySymbols" yaml:"averageCostBySymbols"`
 	Of                   StringSlice `json:"of" yaml:"of"`
 	When                 StringSlice `json:"when" yaml:"when"`
+}
+
+// ExchangeStrategyMount wraps the SingleExchangeStrategy with the session name for mounting
+type ExchangeStrategyMount struct {
+	// Mounts contains the session name to mount
+	Mounts []string
+
+	// Strategy is the strategy we loaded from config
+	Strategy SingleExchangeStrategy
 }
 
 type Session struct {
@@ -32,10 +34,12 @@ type Config struct {
 
 	Sessions map[string]Session `json:"sessions,omitempty" yaml:"sessions,omitempty"`
 
-	ExchangeStrategies      []SingleExchangeStrategyConfig
-	CrossExchangeStrategies []bbgo.CrossExchangeStrategy
+	RiskControls *RiskControls `json:"riskControls,omitempty" yaml:"riskControls,omitempty"`
 
-	PnLReporters []PnLReporter `json:"reportPnL,omitempty" yaml:"reportPnL,omitempty"`
+	ExchangeStrategies      []ExchangeStrategyMount
+	CrossExchangeStrategies []CrossExchangeStrategy
+
+	PnLReporters []PnLReporterConfig `json:"reportPnL,omitempty" yaml:"reportPnL,omitempty"`
 }
 
 type Stash map[string]interface{}
@@ -83,7 +87,7 @@ func loadCrossExchangeStrategies(config *Config, stash Stash) (err error) {
 		return nil
 	}
 
-	if len(bbgo.LoadedCrossExchangeStrategies) == 0 {
+	if len(LoadedCrossExchangeStrategies) == 0 {
 		return errors.New("no cross exchange strategy is registered")
 	}
 
@@ -100,13 +104,13 @@ func loadCrossExchangeStrategies(config *Config, stash Stash) (err error) {
 
 		for id, conf := range configStash {
 			// look up the real struct type
-			if st, ok := bbgo.LoadedExchangeStrategies[id]; ok {
+			if st, ok := LoadedExchangeStrategies[id]; ok {
 				val, err := reUnmarshal(conf, st)
 				if err != nil {
 					return err
 				}
 
-				config.CrossExchangeStrategies = append(config.CrossExchangeStrategies, val.(bbgo.CrossExchangeStrategy))
+				config.CrossExchangeStrategies = append(config.CrossExchangeStrategies, val.(CrossExchangeStrategy))
 			}
 		}
 	}
@@ -120,7 +124,7 @@ func loadExchangeStrategies(config *Config, stash Stash) (err error) {
 		return nil
 	}
 
-	if len(bbgo.LoadedExchangeStrategies) == 0 {
+	if len(LoadedExchangeStrategies) == 0 {
 		return errors.New("no exchange strategy is registered")
 	}
 
@@ -146,15 +150,15 @@ func loadExchangeStrategies(config *Config, stash Stash) (err error) {
 
 		for id, conf := range configStash {
 			// look up the real struct type
-			if st, ok := bbgo.LoadedExchangeStrategies[id]; ok {
+			if st, ok := LoadedExchangeStrategies[id]; ok {
 				val, err := reUnmarshal(conf, st)
 				if err != nil {
 					return err
 				}
 
-				config.ExchangeStrategies = append(config.ExchangeStrategies, SingleExchangeStrategyConfig{
+				config.ExchangeStrategies = append(config.ExchangeStrategies, ExchangeStrategyMount{
 					Mounts:   mounts,
-					Strategy: val.(bbgo.SingleExchangeStrategy),
+					Strategy: val.(SingleExchangeStrategy),
 				})
 			}
 		}

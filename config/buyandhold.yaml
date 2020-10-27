@@ -21,17 +21,32 @@ reportPnL:
   - "@hourly"
 
 sessions:
-  max:
-    exchange: max
-    envVarPrefix: max
   binance:
     exchange: binance
     envVarPrefix: binance
+
+riskControls:
+  # This is the session-based risk controller, which let you configure different risk controller by session.
+  sessionBased:
+    # "max" is the session name that you want to configure the risk control
+    max:
+      # orderExecutors is one of the risk control
+      orderExecutors:
+        # symbol-routed order executor
+        bySymbol:
+          BTCUSDT:
+            # basic risk control order executor
+            basic:
+              minQuoteBalance: 1000.0
+              maxBaseAssetBalance: 2.0
+              minBaseAssetBalance: 0.1
+              maxOrderAmount: 100.0
 
 exchangeStrategies:
 - on: binance
   buyandhold:
     symbol: "BTCUSDT"
     interval: "1m"
-    baseQuantity: 0.01
-    minDropPercentage: -0.02
+    # quantity = change percentage * baseQuantity
+    baseQuantity: 1.0
+    minDropPercentage: -0.0001

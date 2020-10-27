@@ -105,7 +105,7 @@ func NewStream(client *binance.Client) *Stream {
 	})
 
 	stream.OnOutboundAccountInfoEvent(func(e *OutboundAccountInfoEvent) {
-		snapshot := map[string]types.Balance{}
+		snapshot := types.BalanceMap{}
 		for _, balance := range e.Balances {
 			available := util.MustParseFloat(balance.Free)
 			locked := util.MustParseFloat(balance.Locked)
@@ -119,9 +119,12 @@ func NewStream(client *binance.Client) *Stream {
 	})
 
 	stream.OnKLineEvent(func(e *KLineEvent) {
+		kline := e.KLine.KLine()
 		if e.KLine.Closed {
 			stream.EmitKLineClosedEvent(e)
-			stream.EmitKLineClosed(e.KLine.KLine())
+			stream.EmitKLineClosed(kline)
+		} else {
+			stream.EmitKLine(kline)
 		}
 	})
 

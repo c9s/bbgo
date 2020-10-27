@@ -5,7 +5,7 @@ imports:
 
 notifications:
   slack:
-    defaultChannel: "bbgo"
+    defaultChannel: "dev-bbgo"
     errorChannel: "bbgo-error"
 
 reportTrades:
@@ -29,6 +29,7 @@ sessions:
   max:
     exchange: max
     envVarPrefix: max
+
   binance:
     exchange: binance
     envVarPrefix: binance

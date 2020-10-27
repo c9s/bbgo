@@ -26,6 +26,7 @@ type Account struct {
 	balances BalanceMap
 }
 
+// Balances lock the balances and returned the copied balances
 func (a *Account) Balances() BalanceMap {
 	d := make(BalanceMap)
 
