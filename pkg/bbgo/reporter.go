@@ -97,12 +97,14 @@ func NewPatternChannelRouter(routes map[string]string) *PatternChannelRouter {
 	return router
 }
 
-func (router *PatternChannelRouter) AddRoute(routes map[string]string) *PatternChannelRouter {
+func (router *PatternChannelRouter) AddRoute(routes map[string]string) {
+	if routes == nil {
+		return
+	}
+
 	for pattern, channel := range routes {
 		router.routes[regexp.MustCompile(pattern)] = channel
 	}
-
-	return router
 }
 
 func (router *PatternChannelRouter) Route(text string) (channel string, ok bool) {
@@ -126,9 +128,8 @@ func NewObjectChannelRouter() *ObjectChannelRouter {
 	return &ObjectChannelRouter{}
 }
 
-func (router *ObjectChannelRouter) AddRoute(f ObjectChannelHandler) *ObjectChannelRouter {
+func (router *ObjectChannelRouter) AddRoute(f ObjectChannelHandler) {
 	router.routes = append(router.routes, f)
-	return router
 }
 
 func (router *ObjectChannelRouter) Route(obj interface{}) (channel string, ok bool) {
