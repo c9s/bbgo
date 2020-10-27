@@ -114,7 +114,7 @@ func runConfig(ctx context.Context, userConfig *bbgo.Config) error {
 
 	// for slack
 	slackToken := viper.GetString("slack-token")
-	if len(slackToken) > 0 {
+	if len(slackToken) > 0 && userConfig.Notifications != nil {
 		if conf := userConfig.Notifications.Slack; conf != nil {
 			if conf.ErrorChannel != "" {
 				log.Infof("found slack configured, setting up log hook...")
