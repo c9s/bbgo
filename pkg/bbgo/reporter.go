@@ -4,7 +4,6 @@ import (
 	"regexp"
 
 	"github.com/robfig/cron/v3"
-	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/accounting/pnl"
 	"github.com/c9s/bbgo/pkg/types"
@@ -183,7 +182,5 @@ func (reporter *TradeReporter) Report(trade types.Trade) {
 	var channel = reporter.getChannel(trade.Symbol)
 
 	var text = util.Render(`:handshake: {{ .Symbol }} {{ .Side }} Trade Execution @ {{ .Price  }}`, trade)
-	if err := reporter.notifier.NotifyTo(channel, text, trade); err != nil {
-		logrus.WithError(err).Errorf("notifier error, channel=%s", channel)
-	}
+	reporter.notifier.NotifyTo(channel, text, trade)
 }
