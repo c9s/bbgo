@@ -83,11 +83,11 @@ func (reporter *AverageCostPnLReporter) Run() {
 	}
 }
 
-type SymbolChannelRouter struct {
+type PatternChannelRouter struct {
 	routes map[*regexp.Regexp]string
 }
 
-func (router *SymbolChannelRouter) RouteSymbols(routes map[string]string) *SymbolChannelRouter {
+func (router *PatternChannelRouter) RouteSymbols(routes map[string]string) *PatternChannelRouter {
 	for pattern, channel := range routes {
 		router.routes[regexp.MustCompile(pattern)] = channel
 	}
@@ -95,9 +95,9 @@ func (router *SymbolChannelRouter) RouteSymbols(routes map[string]string) *Symbo
 	return router
 }
 
-func (router *SymbolChannelRouter) Dispatch(symbol string) (channel string, ok bool) {
+func (router *PatternChannelRouter) Dispatch(text string) (channel string, ok bool) {
 	for pattern, channel := range router.routes {
-		if pattern.MatchString(symbol) {
+		if pattern.MatchString(text) {
 			ok = true
 			return channel, ok
 		}

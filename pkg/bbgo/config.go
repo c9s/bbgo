@@ -24,6 +24,27 @@ type ExchangeStrategyMount struct {
 	Strategy SingleExchangeStrategy
 }
 
+type SlackNotification struct {
+	DefaultChannel string `json:"defaultChannel,omitempty"  yaml:"defaultChannel,omitempty"`
+	ErrorChannel   string `json:"errorChannel,omitempty"  yaml:"errorChannel,omitempty"`
+}
+
+type NotificationRouting struct {
+	Trade string `json:"trade,omitempty" yaml:"trade,omitempty"`
+	Order string `json:"order,omitempty" yaml:"order,omitempty"`
+	SubmitOrder string `json:"submitOrder,omitempty" yaml:"submitOrder,omitempty"`
+	PnL string `json:"pnL,omitempty" yaml:"pnL,omitempty"`
+}
+
+type Notifications struct {
+	Slack *SlackNotification `json:"slack,omitempty" yaml:"slack,omitempty"`
+
+	SymbolChannels  map[string]string `json:"symbolChannels,omitempty" yaml:"symbolChannels,omitempty"`
+	SessionChannels map[string]string `json:"sessionChannels,omitempty" yaml:"sessionChannels,omitempty"`
+
+	Routing *NotificationRouting `json:"routing,omitempty" yaml:"routing,omitempty"`
+}
+
 type Session struct {
 	ExchangeName string `json:"exchange" yaml:"exchange"`
 	EnvVarPrefix string `json:"envVarPrefix" yaml:"envVarPrefix"`
@@ -31,6 +52,8 @@ type Session struct {
 
 type Config struct {
 	Imports []string `json:"imports" yaml:"imports"`
+
+	Notifications *Notifications `json:"notifications,omitempty" yaml:"notifications,omitempty"`
 
 	Sessions map[string]Session `json:"sessions,omitempty" yaml:"sessions,omitempty"`
 
