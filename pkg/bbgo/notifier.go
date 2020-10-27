@@ -16,7 +16,22 @@ func (n *NullNotifier) Notify(format string, args ...interface{}) error {
 }
 
 type Notifiability struct {
-	notifiers []Notifier
+	notifiers            []Notifier
+	SessionChannelRouter *PatternChannelRouter
+	SymbolChannelRouter  *PatternChannelRouter
+	ObjectChannelRouter  *ObjectChannelRouter
+}
+
+func (m *Notifiability) RouteSymbol(symbol string) (channel string, ok bool) {
+	return m.SymbolChannelRouter.Route(symbol)
+}
+
+func (m *Notifiability) RouteSession(session string) (channel string, ok bool) {
+	return m.SessionChannelRouter.Route(session)
+}
+
+func (m *Notifiability) RouteObject(obj interface{}) (channel string, ok bool) {
+	return m.ObjectChannelRouter.Route(obj)
 }
 
 func (m *Notifiability) AddNotifier(notifier Notifier) {

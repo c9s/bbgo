@@ -4,14 +4,6 @@ notifications:
     defaultChannel: "bbgo"
     errorChannel: "bbgo-error"
 
-reportTrades:
-  channelBySymbol:
-    "btcusdt": "bbgo-btcusdt"
-    "ethusdt": "bbgo-ethusdt"
-    "bnbusdt": "bbgo-bnbusdt"
-    "sxpusdt": "bbgo-sxpusdt"
-    "maxusdt": "max-maxusdt"
-
 reportPnL:
 - averageCostBySymbols:
   - "BTCUSDT"

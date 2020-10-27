@@ -51,8 +51,7 @@ func (e *ExchangeOrderExecutor) SubmitOrders(ctx context.Context, orders ...type
 }
 
 type BasicRiskControlOrderExecutor struct {
-	Notifiability `json:"-"`
-	session       *ExchangeSession
+	*ExchangeOrderExecutor
 
 	MinQuoteBalance fixedpoint.Value `json:"minQuoteBalance,omitempty"`
 	MaxAssetBalance fixedpoint.Value `json:"maxBaseAssetBalance,omitempty"`
