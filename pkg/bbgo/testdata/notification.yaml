@@ -1,0 +1,40 @@
+---
+notifications:
+  slack:
+    defaultChannel: "#dev-bbgo"
+    errorChannel: "#error"
+
+  # if you want to route channel by symbol
+  symbolChannels:
+    "^BTC": "#btc"
+    "^ETH": "#eth"
+
+  # if you want to route channel by exchange session
+  sessionChannels:
+    max: "#bbgo-max"
+    binance: "#bbgo-binance"
+
+  # routing rules
+  routing:
+    trade: bySymbol
+    order: bySymbol
+    submitOrder: byExchange
+    pnL: "#bbgo-pnl"
+
+sessions:
+  max:
+    exchange: max
+    envVarPrefix: max
+
+  binance:
+    exchange: binance
+    envVarPrefix: binance
+
+exchangeStrategies:
+- on: binance
+  test:
+    symbol: "BTCUSDT"
+    interval: "1m"
+    baseQuantity: 0.1
+    minDropPercentage: -0.05
+
