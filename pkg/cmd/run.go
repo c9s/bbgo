@@ -88,10 +88,11 @@ func runConfig(ctx context.Context, userConfig *bbgo.Config) error {
 
 	environ := bbgo.NewEnvironment()
 	environ.SyncTrades(db)
-	environ.ReportTrade(notifierSet)
 
 	trader := bbgo.NewTrader(environ)
 	trader.AddNotifier(notifierSet)
+
+	trader.ReportTrade()
 
 	if len(userConfig.Sessions) == 0 {
 		for _, n := range bbgo.SupportedExchanges {
