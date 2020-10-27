@@ -120,7 +120,7 @@ Now add your config:
 
 ```
 mkdir config
-(cd config && curl -o bbgo.yaml https://raw.githubusercontent.com/c9s/bbgo/main/config/buyandhold.yaml)
+(cd config && curl -o bbgo.yaml https://raw.githubusercontent.com/c9s/bbgo/main/config/minimal.yaml)
 ```
 
 Add your strategy package path to the config file `config/bbgo.yaml`
