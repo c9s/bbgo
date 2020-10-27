@@ -6,7 +6,7 @@ imports:
 notifications:
   slack:
     defaultChannel: "#dev-bbgo"
-    errorChannel: "#error"
+    errorChannel: "#bbgo-error"
 
   # if you want to route channel by symbol
   symbolChannels:

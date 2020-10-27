@@ -107,9 +107,13 @@ streambook := types.NewStreamBook(symbol)
 streambook.BindStream(stream)
 ```
 
-## Strategies
+## Built-in Strategies
 
-Please check out the directory: [strategies](strategies)
+Check out the strategy directory [strategy](pkg/strategy) for all built-in strategies:
+
+- pricealert strategy demonstrates how to use the notification system [pricealert](pkg/strategy/pricealert)
+- xpuremaker strategy demonstrates how to maintain the orderbook and submit maker orders [xpuremaker](pkg/strategy/xpuremaker)
+- buyandhold strategy demonstrates how to subscribe kline events and submit market order [buyandhold](pkg/strategy/buyandhold)
 
 ## New API Design
 
