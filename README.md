@@ -22,6 +22,13 @@ Aim to release v1.0 before 11/14
 - MAX Exchange (located in Taiwan)
 - Binance Exchange
 
+## Requirements
+
+Get your exchange API key and secret after you register the accounts:
+
+- For MAX: <https://max.maicoin.com/signup?r=c7982718>
+- For Binance: <https://www.binancezh.com/en/register?ref=VGDGLT80>
+
 ## Installation
 
 Install the builtin commands:
@@ -48,11 +55,6 @@ MYSQL_PASSWORD=
 MYSQL_DATABASE=bbgo
 MYSQL_URL=root@tcp(127.0.0.1:3306)/bbgo
 ```
-
-You can get your API key and secret after you register the accounts:
-
-- For MAX: <https://max.maicoin.com/signup?r=c7982718>
-- For Binance: <https://www.binancezh.com/en/register?ref=VGDGLT80>
 
 Then run the `migrate` command to initialize your database:
 
@@ -82,6 +84,11 @@ To calculate pnl:
 dotenv -f .env.local -- bbgo pnl --exchange binance --asset BTC --since "2019-01-01"
 ```
 
+To run strategy:
+
+```sh
+dotenv -f .env.local -- bbgo run --config config/buyandhold.yaml
+```
 
 ## Built-in Strategies
 
