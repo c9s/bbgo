@@ -68,17 +68,21 @@ func compileRunFile(filepath string, config *bbgo.Config) error {
 
 func runConfig(ctx context.Context, userConfig *bbgo.Config) error {
 	// configure notifiers
+	notifierSet := &bbgo.Notifiability{}
+
+	// for slack
 	slackToken := viper.GetString("slack-token")
 	if len(slackToken) > 0 {
-		log.Infof("found slack configured, setting up log hook...")
-		log.AddHook(slacklog.NewLogHook(slackToken, viper.GetString("slack-error-channel")))
-	}
+		if conf := userConfig.Notifications.Slack; conf != nil {
+			if conf.ErrorChannel != "" {
+				log.Infof("found slack configured, setting up log hook...")
+				log.AddHook(slacklog.NewLogHook(slackToken, conf.ErrorChannel))
+			}
 
-	notifierSet := &bbgo.Notifiability{}
-	if len(slackToken) > 0 {
-		log.Infof("adding slack notifier...")
-		var notifier = slacknotifier.New(slackToken, viper.GetString("slack-channel"))
-		notifierSet.AddNotifier(notifier)
+			log.Infof("adding slack notifier...")
+			var notifier = slacknotifier.New(slackToken, conf.DefaultChannel)
+			notifierSet.AddNotifier(notifier)
+		}
 	}
 
 	db, err := cmdutil.ConnectMySQL()
