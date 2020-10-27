@@ -2,6 +2,7 @@ package bbgo
 
 import (
 	"context"
+	"reflect"
 
 	log "github.com/sirupsen/logrus"
 
@@ -56,7 +57,6 @@ func (trader *Trader) ReportTrade() *TradeReporter {
 	trader.tradeReporter = NewTradeReporter(&trader.Notifiability)
 	return trader.tradeReporter
 }
-
 
 // AttachStrategyOn attaches the single exchange strategy on an exchange session.
 // Single exchange strategy is the default behavior.
@@ -113,7 +113,7 @@ func (trader *Trader) Run(ctx context.Context) error {
 		var orderExecutor OrderExecutor = baseOrderExecutor
 
 		// Since the risk controls are loaded from the config file
-		if riskControls := trader.riskControls ; riskControls != nil {
+		if riskControls := trader.riskControls; riskControls != nil {
 			if trader.riskControls.SessionBasedRiskControl != nil {
 				control, ok := trader.riskControls.SessionBasedRiskControl[sessionName]
 				if ok {
@@ -128,6 +128,19 @@ func (trader *Trader) Run(ctx context.Context) error {
 		}
 
 		for _, strategy := range strategies {
+			rs := reflect.ValueOf(strategy)
+			if rs.Elem().Kind() == reflect.Struct {
+				rs = rs.Elem()
+				field := rs.FieldByName("Notifiability")
+				if field.IsValid() {
+					log.Infof("found Notifiability in strategy %T, configuring...", strategy)
+					if !field.CanSet() {
+						log.Panicf("strategy %T field Notifiability can not be set", strategy)
+					}
+					field.Set(reflect.ValueOf(trader.Notifiability))
+				}
+			}
+
 			err := strategy.Run(ctx, orderExecutor, session)
 			if err != nil {
 				return err
@@ -262,8 +275,8 @@ func (trader *Trader) reportPnL() {
 */
 
 // ReportPnL configure and set the PnLReporter with the given notifier
-func (trader *Trader) ReportPnL(notifier Notifier) *PnLReporterManager {
-	return NewPnLReporter(notifier)
+func (trader *Trader) ReportPnL() *PnLReporterManager {
+	return NewPnLReporter(&trader.Notifiability)
 }
 
 type OrderExecutor interface {

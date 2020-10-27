@@ -27,6 +27,7 @@ import (
 
 	// import built-in strategies
 	_ "github.com/c9s/bbgo/pkg/strategy/buyandhold"
+	_ "github.com/c9s/bbgo/pkg/strategy/pricealert"
 	_ "github.com/c9s/bbgo/pkg/strategy/xpuremaker"
 )
 
@@ -105,7 +106,7 @@ func runConfig(ctx context.Context, userConfig *bbgo.Config) error {
 	trader := bbgo.NewTrader(environ)
 
 	// configure notifiers
-	notifierSet := &bbgo.Notifiability{
+	trader.Notifiability = bbgo.Notifiability{
 		SymbolChannelRouter:  bbgo.NewPatternChannelRouter(nil),
 		SessionChannelRouter: bbgo.NewPatternChannelRouter(nil),
 		ObjectChannelRouter:  bbgo.NewObjectChannelRouter(),
@@ -122,7 +123,7 @@ func runConfig(ctx context.Context, userConfig *bbgo.Config) error {
 
 			log.Infof("adding slack notifier...")
 			var notifier = slacknotifier.New(slackToken, conf.DefaultChannel)
-			notifierSet.AddNotifier(notifier)
+			trader.AddNotifier(notifier)
 		}
 	}
 
@@ -130,49 +131,47 @@ func runConfig(ctx context.Context, userConfig *bbgo.Config) error {
 	if conf := userConfig.Notifications; conf != nil {
 		// configure routing here
 		if conf.SymbolChannels != nil {
-			notifierSet.SymbolChannelRouter.AddRoute(conf.SymbolChannels)
+			trader.SymbolChannelRouter.AddRoute(conf.SymbolChannels)
 		}
 		if conf.SessionChannels != nil {
-			notifierSet.SessionChannelRouter.AddRoute(conf.SessionChannels)
+			trader.SessionChannelRouter.AddRoute(conf.SessionChannels)
 		}
 
 		if conf.Routing != nil {
 			if conf.Routing.Trade == "$symbol" {
-				notifierSet.ObjectChannelRouter.Route(func(obj interface{}) (channel string, ok bool) {
+				trader.ObjectChannelRouter.Route(func(obj interface{}) (channel string, ok bool) {
 					trade, matched := obj.(*types.Trade)
 					if !matched {
 						return
 					}
-					channel, ok = notifierSet.SymbolChannelRouter.Route(trade.Symbol)
+					channel, ok = trader.SymbolChannelRouter.Route(trade.Symbol)
 					return
 				})
 			}
 
 			if conf.Routing.Order == "$symbol" {
-				notifierSet.ObjectChannelRouter.Route(func(obj interface{}) (channel string, ok bool) {
+				trader.ObjectChannelRouter.Route(func(obj interface{}) (channel string, ok bool) {
 					order, matched := obj.(*types.Order)
 					if !matched {
 						return
 					}
-					channel, ok = notifierSet.SymbolChannelRouter.Route(order.Symbol)
+					channel, ok = trader.SymbolChannelRouter.Route(order.Symbol)
 					return
 				})
 			}
 
 			if conf.Routing.PnL == "$symbol" {
-				notifierSet.ObjectChannelRouter.Route(func(obj interface{}) (channel string, ok bool) {
+				trader.ObjectChannelRouter.Route(func(obj interface{}) (channel string, ok bool) {
 					report, matched := obj.(*pnl.AverageCostPnlReport)
 					if !matched {
 						return
 					}
-					channel, ok = notifierSet.SymbolChannelRouter.Route(report.Symbol)
+					channel, ok = trader.SymbolChannelRouter.Route(report.Symbol)
 					return
 				})
 			}
 		}
 	}
-
-	trader.AddNotifier(notifierSet)
 
 	trader.ReportTrade()
 
@@ -196,7 +195,7 @@ func runConfig(ctx context.Context, userConfig *bbgo.Config) error {
 		if len(report.AverageCostBySymbols) > 0 {
 
 			log.Infof("setting up average cost pnl reporter on symbols: %v", report.AverageCostBySymbols)
-			trader.ReportPnL(notifierSet).
+			trader.ReportPnL().
 				AverageCostBySymbols(report.AverageCostBySymbols...).
 				Of(report.Of...).
 				When(report.When...)
