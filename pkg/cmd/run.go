@@ -18,6 +18,7 @@ import (
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
+	"github.com/c9s/bbgo/pkg/accounting/pnl"
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/notifier/slacknotifier"
@@ -67,66 +68,13 @@ func compileRunFile(filepath string, config *bbgo.Config) error {
 }
 
 func runConfig(ctx context.Context, userConfig *bbgo.Config) error {
-	// configure notifiers
-	notifierSet := &bbgo.Notifiability{}
-
-	if conf := userConfig.Notifications; conf != nil {
-		// configure routing here
-		var symbolChannelRouter = bbgo.NewPatternChannelRouter(conf.SymbolChannels)
-		var sessionChannelRouter = bbgo.NewPatternChannelRouter(conf.SessionChannels)
-		var objectChannelRouter = bbgo.NewObjectChannelRouter()
-		_ = sessionChannelRouter
-
-		if conf.Routing != nil {
-			switch conf.Routing.Trade {
-
-			case "$session":
-
-			case "$symbol":
-				objectChannelRouter.Route(func(obj interface{}) (channel string, ok bool) {
-					if trade, matched := obj.(*types.Trade); matched {
-						if channel, ok = symbolChannelRouter.Route(trade.Symbol); ok {
-							return
-						}
-					}
-					return
-				})
-
-			default:
-
-			}
-
-		}
-
-	}
-
-	// for slack
-	slackToken := viper.GetString("slack-token")
-	if len(slackToken) > 0 {
-		if conf := userConfig.Notifications.Slack; conf != nil {
-			if conf.ErrorChannel != "" {
-				log.Infof("found slack configured, setting up log hook...")
-				log.AddHook(slacklog.NewLogHook(slackToken, conf.ErrorChannel))
-			}
-
-			log.Infof("adding slack notifier...")
-			var notifier = slacknotifier.New(slackToken, conf.DefaultChannel)
-			notifierSet.AddNotifier(notifier)
-		}
-	}
+	environ := bbgo.NewEnvironment()
 
 	db, err := cmdutil.ConnectMySQL()
 	if err != nil {
 		return err
 	}
-
-	environ := bbgo.NewEnvironment()
 	environ.SyncTrades(db)
-
-	trader := bbgo.NewTrader(environ)
-	trader.AddNotifier(notifierSet)
-
-	trader.ReportTrade()
 
 	if len(userConfig.Sessions) == 0 {
 		for _, n := range bbgo.SupportedExchanges {
@@ -153,6 +101,80 @@ func runConfig(ctx context.Context, userConfig *bbgo.Config) error {
 			environ.AddExchange(sessionName, exchange)
 		}
 	}
+
+	trader := bbgo.NewTrader(environ)
+
+	// configure notifiers
+	notifierSet := &bbgo.Notifiability{
+		SymbolChannelRouter:  bbgo.NewPatternChannelRouter(nil),
+		SessionChannelRouter: bbgo.NewPatternChannelRouter(nil),
+		ObjectChannelRouter:  bbgo.NewObjectChannelRouter(),
+	}
+
+	// for slack
+	slackToken := viper.GetString("slack-token")
+	if len(slackToken) > 0 {
+		if conf := userConfig.Notifications.Slack; conf != nil {
+			if conf.ErrorChannel != "" {
+				log.Infof("found slack configured, setting up log hook...")
+				log.AddHook(slacklog.NewLogHook(slackToken, conf.ErrorChannel))
+			}
+
+			log.Infof("adding slack notifier...")
+			var notifier = slacknotifier.New(slackToken, conf.DefaultChannel)
+			notifierSet.AddNotifier(notifier)
+		}
+	}
+
+	// configure rules
+	if conf := userConfig.Notifications; conf != nil {
+		// configure routing here
+		if conf.SymbolChannels != nil {
+			notifierSet.SymbolChannelRouter.AddRoute(conf.SymbolChannels)
+		}
+		if conf.SessionChannels != nil {
+			notifierSet.SessionChannelRouter.AddRoute(conf.SessionChannels)
+		}
+
+		if conf.Routing != nil {
+			if conf.Routing.Trade == "$symbol" {
+				notifierSet.ObjectChannelRouter.Route(func(obj interface{}) (channel string, ok bool) {
+					trade, matched := obj.(*types.Trade)
+					if !matched {
+						return
+					}
+					channel, ok = notifierSet.SymbolChannelRouter.Route(trade.Symbol)
+					return
+				})
+			}
+
+			if conf.Routing.Order == "$symbol" {
+				notifierSet.ObjectChannelRouter.Route(func(obj interface{}) (channel string, ok bool) {
+					order, matched := obj.(*types.Order)
+					if !matched {
+						return
+					}
+					channel, ok = notifierSet.SymbolChannelRouter.Route(order.Symbol)
+					return
+				})
+			}
+
+			if conf.Routing.PnL == "$symbol" {
+				notifierSet.ObjectChannelRouter.Route(func(obj interface{}) (channel string, ok bool) {
+					report, matched := obj.(*pnl.AverageCostPnlReport)
+					if !matched {
+						return
+					}
+					channel, ok = notifierSet.SymbolChannelRouter.Route(report.Symbol)
+					return
+				})
+			}
+		}
+	}
+
+	trader.AddNotifier(notifierSet)
+
+	trader.ReportTrade()
 
 	for _, entry := range userConfig.ExchangeStrategies {
 		for _, mount := range entry.Mounts {
