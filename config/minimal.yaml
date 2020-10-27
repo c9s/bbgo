@@ -1,0 +1,10 @@
+---
+exchangeStrategies:
+- on: max
+  xpuremaker:
+    symbol: MAXUSDT
+    numOrders: 2
+    side: both
+    behindVolume: 1000.0
+    priceTick: 0.01
+    baseQuantity: 100.0
