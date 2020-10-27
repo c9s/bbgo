@@ -130,14 +130,21 @@ func (trader *Trader) Run(ctx context.Context) error {
 		for _, strategy := range strategies {
 			rs := reflect.ValueOf(strategy)
 			if rs.Elem().Kind() == reflect.Struct {
+				// get the struct element
 				rs = rs.Elem()
+
 				field := rs.FieldByName("Notifiability")
 				if field.IsValid() {
 					log.Infof("found Notifiability in strategy %T, configuring...", strategy)
 					if !field.CanSet() {
 						log.Panicf("strategy %T field Notifiability can not be set", strategy)
 					}
-					field.Set(reflect.ValueOf(trader.Notifiability))
+
+					if field.Type() == reflect.PtrTo(reflect.TypeOf(trader.Notifiability)) {
+						field.Set(reflect.ValueOf(&trader.Notifiability))
+					} else {
+						field.Set(reflect.ValueOf(trader.Notifiability))
+					}
 				}
 			}
 
@@ -263,14 +270,6 @@ func (trader *OrderExecutor) RunStrategy(ctx context.Context, strategy SingleExc
 			trader.reportPnL()
 		})
 	})
-}
-*/
-
-/*
-func (trader *Trader) reportPnL() {
-	report := trader.ProfitAndLossCalculator.Calculate()
-	report.Print()
-	trader.NotifyPnL(report)
 }
 */
 
