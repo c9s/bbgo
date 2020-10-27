@@ -70,6 +70,36 @@ func runConfig(ctx context.Context, userConfig *bbgo.Config) error {
 	// configure notifiers
 	notifierSet := &bbgo.Notifiability{}
 
+	if conf := userConfig.Notifications; conf != nil {
+		// configure routing here
+		var symbolChannelRouter = bbgo.NewPatternChannelRouter(conf.SymbolChannels)
+		var sessionChannelRouter = bbgo.NewPatternChannelRouter(conf.SessionChannels)
+		var objectChannelRouter = bbgo.NewObjectChannelRouter()
+		_ = sessionChannelRouter
+
+		if conf.Routing != nil {
+			switch conf.Routing.Trade {
+
+			case "$session":
+
+			case "$symbol":
+				objectChannelRouter.Route(func(obj interface{}) (channel string, ok bool) {
+					if trade, matched := obj.(*types.Trade); matched {
+						if channel, ok = symbolChannelRouter.Route(trade.Symbol); ok {
+							return
+						}
+					}
+					return
+				})
+
+			default:
+
+			}
+
+		}
+
+	}
+
 	// for slack
 	slackToken := viper.GetString("slack-token")
 	if len(slackToken) > 0 {

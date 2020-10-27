@@ -87,7 +87,17 @@ type PatternChannelRouter struct {
 	routes map[*regexp.Regexp]string
 }
 
-func (router *PatternChannelRouter) RouteSymbols(routes map[string]string) *PatternChannelRouter {
+func NewPatternChannelRouter(routes map[string]string) *PatternChannelRouter {
+	router := &PatternChannelRouter{
+		routes: make(map[*regexp.Regexp]string),
+	}
+	if routes != nil {
+		router.AddRoute(routes)
+	}
+	return router
+}
+
+func (router *PatternChannelRouter) AddRoute(routes map[string]string) *PatternChannelRouter {
 	for pattern, channel := range routes {
 		router.routes[regexp.MustCompile(pattern)] = channel
 	}
@@ -95,7 +105,7 @@ func (router *PatternChannelRouter) RouteSymbols(routes map[string]string) *Patt
 	return router
 }
 
-func (router *PatternChannelRouter) Dispatch(text string) (channel string, ok bool) {
+func (router *PatternChannelRouter) Route(text string) (channel string, ok bool) {
 	for pattern, channel := range router.routes {
 		if pattern.MatchString(text) {
 			ok = true
@@ -112,12 +122,16 @@ type ObjectChannelRouter struct {
 	routes []ObjectChannelHandler
 }
 
-func (router *ObjectChannelRouter) Route(f ObjectChannelHandler) *ObjectChannelRouter {
+func NewObjectChannelRouter() *ObjectChannelRouter {
+	return &ObjectChannelRouter{}
+}
+
+func (router *ObjectChannelRouter) AddRoute(f ObjectChannelHandler) *ObjectChannelRouter {
 	router.routes = append(router.routes, f)
 	return router
 }
 
-func (router *ObjectChannelRouter) Dispatch(obj interface{}) (channel string, ok bool) {
+func (router *ObjectChannelRouter) Route(obj interface{}) (channel string, ok bool) {
 	for _, f := range router.routes {
 		channel, ok = f(obj)
 		if ok {
