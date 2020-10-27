@@ -11,8 +11,7 @@ type SymbolBasedOrderExecutor struct {
 }
 
 type RiskControlOrderExecutors struct {
-	Notifiability `json:"-"`
-	session       *ExchangeSession
+	*ExchangeOrderExecutor
 
 	// Symbol => Executor config
 	BySymbol map[string]*SymbolBasedOrderExecutor `json:"bySymbol,omitempty" yaml:"bySymbol,omitempty"`
@@ -25,15 +24,24 @@ func (e *RiskControlOrderExecutors) SubmitOrders(ctx context.Context, orders ...
 	}
 
 	var retOrders []types.Order
+
 	for symbol, orders := range symbolOrders {
+		var err error
+		var retOrders2 []types.Order
 		if exec, ok := e.BySymbol[symbol]; ok && exec.BasicRiskControlOrderExecutor != nil {
-			retOrders2, err := exec.BasicRiskControlOrderExecutor.SubmitOrders(ctx, orders...)
+			retOrders2, err = exec.BasicRiskControlOrderExecutor.SubmitOrders(ctx, orders...)
 			if err != nil {
 				return retOrders, err
 			}
 
-			retOrders = append(retOrders, retOrders2...)
+		} else {
+			retOrders2, err = e.ExchangeOrderExecutor.SubmitOrders(ctx, orders...)
+			if err != nil {
+				return retOrders, err
+			}
+
 		}
+		retOrders = append(retOrders, retOrders2...)
 	}
 
 	return retOrders, nil
@@ -43,12 +51,12 @@ type SessionBasedRiskControl struct {
 	OrderExecutor *RiskControlOrderExecutors `json:"orderExecutors,omitempty" yaml:"orderExecutors"`
 }
 
-func (control *SessionBasedRiskControl) SetSession(session *ExchangeSession) {
+func (control *SessionBasedRiskControl) SetBaseOrderExecutor(executor *ExchangeOrderExecutor) {
 	if control.OrderExecutor == nil {
 		return
 	}
 
-	control.OrderExecutor.session = session
+	control.OrderExecutor.ExchangeOrderExecutor = executor
 
 	if control.OrderExecutor.BySymbol == nil {
 		return
@@ -56,24 +64,11 @@ func (control *SessionBasedRiskControl) SetSession(session *ExchangeSession) {
 
 	for _, exec := range control.OrderExecutor.BySymbol {
 		if exec.BasicRiskControlOrderExecutor != nil {
-			exec.BasicRiskControlOrderExecutor.session = session
+			exec.BasicRiskControlOrderExecutor.ExchangeOrderExecutor = executor
 		}
 	}
 }
 
 type RiskControls struct {
 	SessionBasedRiskControl map[string]*SessionBasedRiskControl `json:"sessionBased,omitempty" yaml:"sessionBased,omitempty"`
-}
-
-func (controls *RiskControls) SetSession(name string, session *ExchangeSession) {
-	if controls.SessionBasedRiskControl == nil {
-		return
-	}
-
-	control, ok := controls.SessionBasedRiskControl[name]
-	if !ok {
-		return
-	}
-
-	control.SetSession(session)
 }

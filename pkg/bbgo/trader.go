@@ -40,6 +40,7 @@ type Trader struct {
 	crossExchangeStrategies []CrossExchangeStrategy
 	exchangeStrategies      map[string][]SingleExchangeStrategy
 
+	tradeReporter *TradeReporter
 	// reportTimer             *time.Timer
 	// ProfitAndLossCalculator *accounting.ProfitAndLossCalculator
 }
@@ -50,6 +51,12 @@ func NewTrader(environ *Environment) *Trader {
 		exchangeStrategies: make(map[string][]SingleExchangeStrategy),
 	}
 }
+
+func (trader *Trader) ReportTrade() *TradeReporter {
+	trader.tradeReporter = NewTradeReporter(&trader.Notifiability)
+	return trader.tradeReporter
+}
+
 
 // AttachStrategyOn attaches the single exchange strategy on an exchange session.
 // Single exchange strategy is the default behavior.
@@ -72,6 +79,7 @@ func (trader *Trader) AttachCrossExchangeStrategy(strategy CrossExchangeStrategy
 	return trader
 }
 
+// TODO: provide a more DSL way to configure risk controls
 func (trader *Trader) SetRiskControls(riskControls *RiskControls) {
 	trader.riskControls = riskControls
 }
@@ -85,21 +93,36 @@ func (trader *Trader) Run(ctx context.Context) error {
 	for sessionName, strategies := range trader.exchangeStrategies {
 		session := trader.environment.sessions[sessionName]
 
+		if session.tradeReporter != nil {
+			session.Stream.OnTrade(func(trade types.Trade) {
+				session.tradeReporter.Report(trade)
+			})
+		} else if trader.tradeReporter != nil {
+			session.Stream.OnTrade(func(trade types.Trade) {
+				trader.tradeReporter.Report(trade)
+			})
+		}
 
-		// We can move this to the exchange session,
-		// that way we can mount the notification on the exchange with DSL
-		// This is the default order executor
-		var orderExecutor OrderExecutor = &ExchangeOrderExecutor{
+		var baseOrderExecutor = &ExchangeOrderExecutor{
+			// copy the parent notifiers and session
 			Notifiability: trader.Notifiability,
 			session:       session,
 		}
 
+		// default to base order executor
+		var orderExecutor OrderExecutor = baseOrderExecutor
+
 		// Since the risk controls are loaded from the config file
-		if trader.riskControls != nil && trader.riskControls.SessionBasedRiskControl != nil {
-			trader.riskControls.SetSession(sessionName, session)
-			if control, ok := trader.riskControls.SessionBasedRiskControl[sessionName]; ok {
-				if control.OrderExecutor != nil {
-					orderExecutor = control.OrderExecutor
+		if riskControls := trader.riskControls ; riskControls != nil {
+			if trader.riskControls.SessionBasedRiskControl != nil {
+				control, ok := trader.riskControls.SessionBasedRiskControl[sessionName]
+				if ok {
+					control.SetBaseOrderExecutor(baseOrderExecutor)
+
+					// pick the order executor
+					if control.OrderExecutor != nil {
+						orderExecutor = control.OrderExecutor
+					}
 				}
 			}
 		}

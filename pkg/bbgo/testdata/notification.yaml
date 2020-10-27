@@ -1,8 +1,4 @@
 ---
-imports:
-- github.com/c9s/bbgo/pkg/strategy/buyandhold
-- github.com/c9s/bbgo/pkg/strategy/xpuremaker
-
 notifications:
   slack:
     defaultChannel: "#dev-bbgo"
@@ -25,15 +21,6 @@ notifications:
     submitOrder: "$session"
     pnL: "#bbgo-pnl"
 
-reportPnL:
-- averageCostBySymbols:
-  - "BTCUSDT"
-  - "BNBUSDT"
-  of: binance
-  when:
-  - "@daily"
-  - "@hourly"
-
 sessions:
   max:
     exchange: max
@@ -45,16 +32,9 @@ sessions:
 
 exchangeStrategies:
 - on: binance
-  buyandhold:
+  test:
     symbol: "BTCUSDT"
     interval: "1m"
-    baseQuantity: 0.01
-    minDropPercentage: -0.02
-- on: max
-  xpuremaker:
-    symbol: MAXUSDT
-    numOrders: 2
-    side: both
-    behindVolume: 1000.0
-    priceTick: 0.01
-    baseQuantity: 100.0
+    baseQuantity: 0.1
+    minDropPercentage: -0.05
+

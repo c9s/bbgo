@@ -3,20 +3,16 @@ package bbgo
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 
-	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/store"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
 )
 
 var LoadedExchangeStrategies = make(map[string]SingleExchangeStrategy)
@@ -31,52 +27,6 @@ func RegisterCrossExchangeStrategy(key string, configmap CrossExchangeStrategy) 
 	LoadedCrossExchangeStrategies[key] = configmap
 }
 
-type TradeReporter struct {
-	notifier Notifier
-
-	channel       string
-	channelRoutes map[*regexp.Regexp]string
-}
-
-func NewTradeReporter(notifier Notifier) *TradeReporter {
-	return &TradeReporter{
-		notifier:      notifier,
-		channelRoutes: make(map[*regexp.Regexp]string),
-	}
-}
-
-func (reporter *TradeReporter) Channel(channel string) *TradeReporter {
-	reporter.channel = channel
-	return reporter
-}
-
-func (reporter *TradeReporter) ChannelBySymbol(routes map[string]string) *TradeReporter {
-	for pattern, channel := range routes {
-		reporter.channelRoutes[regexp.MustCompile(pattern)] = channel
-	}
-
-	return reporter
-}
-
-func (reporter *TradeReporter) getChannel(symbol string) string {
-	for pattern, channel := range reporter.channelRoutes {
-		if pattern.MatchString(symbol) {
-			return channel
-		}
-	}
-
-	return reporter.channel
-}
-
-func (reporter *TradeReporter) Report(trade types.Trade) {
-	var channel = reporter.getChannel(trade.Symbol)
-
-	var text = util.Render(`:handshake: {{ .Symbol }} {{ .Side }} Trade Execution @ {{ .Price  }}`, trade)
-	if err := reporter.notifier.NotifyTo(channel, text, trade); err != nil {
-		log.WithError(err).Errorf("notifier error, channel=%s", channel)
-	}
-}
-
 // Environment presents the real exchange data layer
 type Environment struct {
 	TradeService *service.TradeService
@@ -84,26 +34,6 @@ type Environment struct {
 
 	tradeScanTime time.Time
 	sessions      map[string]*ExchangeSession
-
-	tradeReporter *TradeReporter
-}
-
-// NewDefaultEnvironment prepares the exchange sessions from the viper settings.
-func NewDefaultEnvironment() *Environment {
-	environment := NewEnvironment()
-
-	for _, n := range SupportedExchanges {
-		if viper.IsSet(string(n) + "-api-key") {
-			exchange, err := cmdutil.NewExchange(n)
-			if err != nil {
-				panic(err)
-			}
-
-			environment.AddExchange(string(n), exchange)
-		}
-	}
-
-	return environment
 }
 
 func NewEnvironment() *Environment {
@@ -129,11 +59,6 @@ func (environ *Environment) AddExchange(name string, exchange types.Exchange) (s
 	return session
 }
 
-func (environ *Environment) ReportTrade(notifier Notifier) *TradeReporter {
-	environ.tradeReporter = NewTradeReporter(notifier)
-	return environ.tradeReporter
-}
-
 func (environ *Environment) Init(ctx context.Context) (err error) {
 	for _, session := range environ.sessions {
 		var markets types.MarketMap
@@ -150,16 +75,6 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 		}
 
 		session.markets = markets
-
-		if session.tradeReporter != nil {
-			session.Stream.OnTrade(func(trade types.Trade) {
-				session.tradeReporter.Report(trade)
-			})
-		} else if environ.tradeReporter != nil {
-			session.Stream.OnTrade(func(trade types.Trade) {
-				environ.tradeReporter.Report(trade)
-			})
-		}
 	}
 
 	return nil
