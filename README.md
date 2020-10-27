@@ -83,6 +83,14 @@ dotenv -f .env.local -- bbgo pnl --exchange binance --asset BTC --since "2019-01
 ```
 
 
+## Built-in Strategies
+
+Check out the strategy directory [strategy](pkg/strategy) for all built-in strategies:
+
+- pricealert strategy demonstrates how to use the notification system [pricealert](pkg/strategy/pricealert)
+- xpuremaker strategy demonstrates how to maintain the orderbook and submit maker orders [xpuremaker](pkg/strategy/xpuremaker)
+- buyandhold strategy demonstrates how to subscribe kline events and submit market order [buyandhold](pkg/strategy/buyandhold)
+
 ## Exchange API Examples
 
 Please check out the example directory: [examples](examples)
@@ -105,63 +113,6 @@ stream.Subscribe(types.BookChannel, symbol, types.SubscribeOptions{})
 
 streambook := types.NewStreamBook(symbol)
 streambook.BindStream(stream)
-```
-
-## Built-in Strategies
-
-Check out the strategy directory [strategy](pkg/strategy) for all built-in strategies:
-
-- pricealert strategy demonstrates how to use the notification system [pricealert](pkg/strategy/pricealert)
-- xpuremaker strategy demonstrates how to maintain the orderbook and submit maker orders [xpuremaker](pkg/strategy/xpuremaker)
-- buyandhold strategy demonstrates how to subscribe kline events and submit market order [buyandhold](pkg/strategy/buyandhold)
-
-## New API Design
-
-_**still under construction**_
-
-```go
-package main
-
-import (
-    "github.com/c9s/bbgo"
-)
-
-func main() {
-    mysqlURL := viper.GetString("mysql-url")
-    mysqlURL = fmt.Sprintf("%s?parseTime=true", mysqlURL)
-    db, err := sqlx.Connect("mysql", mysqlURL)
-    if err != nil {
-        return err
-    }
-
-    environment := bbgo.NewEnvironment(db)
-    environment.AddExchange("binance", binance.New(viper.Getenv("binance-api-key"), viper.Getenv("binance-api-secret"))))
-    environment.AddExchange("max", max.New(viper.Getenv("max-key"), viper.Getenv("max-secret"))))
-
-    trader := bbgo.NewTrader(bbgo.Config{
-        Environment: environment,
-        DB: db,
-    })
-
-    trader.AddNotifier(slacknotifier.New(slackToken))
-    trader.AddLogHook(slacklog.NewLogHook(slackToken))
-
-    // when any trade execution happened
-    trader.OnTrade(func(session string, exchange types.Exchange, trade types.Trade) {
-        notify(trade)
-        notifyPnL()
-    })
-
-    // mount strategy on an exchange
-    trader.AddExchangeStrategy("binance",
-        bondtrade.New("btcusdt", "5m"),
-        bondtrade.New("ethusdt", "5m"))
-
-    // mount cross exchange strategy
-    trader.AddCrossExchangeStrategy(hedgemaker.New("max", "binance"))
-
-    t.Run(ctx)
-}
 ```
 
 ## Support
