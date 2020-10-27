@@ -9,7 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"github.com/c9s/bbgo/pkg/config"
+	"github.com/c9s/bbgo/pkg/bbgo"
 )
 
 func init() {
@@ -45,7 +45,7 @@ var BuildCmd = &cobra.Command{
 			return err
 		}
 
-		userConfig, err := config.Load(configFile)
+		userConfig, err := bbgo.Load(configFile)
 		if err != nil {
 			return err
 		}

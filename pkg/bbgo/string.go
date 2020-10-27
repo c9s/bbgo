@@ -1,4 +1,4 @@
-package config
+package bbgo
 
 import (
 	"encoding/json"

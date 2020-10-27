@@ -42,6 +42,31 @@ func (v Value) Add(v2 Value) Value {
 	return Value(int64(v) + int64(v2))
 }
 
+func (v *Value) UnmarshalYAML(unmarshal func(a interface{}) error) (err error) {
+	var i int64
+	if err = unmarshal(&i); err == nil {
+		*v = NewFromInt64(i)
+		return
+	}
+
+	var f float64
+	if err = unmarshal(&f); err == nil {
+		*v = NewFromFloat(f)
+		return
+	}
+
+	var s string
+	if err = unmarshal(&s); err == nil {
+		nv, err2 := NewFromString(s)
+		if err2 == nil {
+			*v = nv
+			return
+		}
+	}
+
+	return err
+}
+
 func (v *Value) UnmarshalJSON(data []byte) error {
 	var a interface{}
 	var err = json.Unmarshal(data, &a)

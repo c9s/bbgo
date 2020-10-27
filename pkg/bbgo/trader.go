@@ -35,6 +35,8 @@ type Trader struct {
 
 	environment *Environment
 
+	riskControls *RiskControls
+
 	crossExchangeStrategies []CrossExchangeStrategy
 	exchangeStrategies      map[string][]SingleExchangeStrategy
 
@@ -70,6 +72,10 @@ func (trader *Trader) AttachCrossExchangeStrategy(strategy CrossExchangeStrategy
 	return trader
 }
 
+func (trader *Trader) SetRiskControls(riskControls *RiskControls) {
+	trader.riskControls = riskControls
+}
+
 func (trader *Trader) Run(ctx context.Context) error {
 	if err := trader.environment.Init(ctx); err != nil {
 		return err
@@ -78,11 +84,24 @@ func (trader *Trader) Run(ctx context.Context) error {
 	// load and run session strategies
 	for sessionName, strategies := range trader.exchangeStrategies {
 		session := trader.environment.sessions[sessionName]
-		// we can move this to the exchange session,
+
+
+		// We can move this to the exchange session,
 		// that way we can mount the notification on the exchange with DSL
-		orderExecutor := &ExchangeOrderExecutor{
+		// This is the default order executor
+		var orderExecutor OrderExecutor = &ExchangeOrderExecutor{
 			Notifiability: trader.Notifiability,
 			session:       session,
+		}
+
+		// Since the risk controls are loaded from the config file
+		if trader.riskControls != nil && trader.riskControls.SessionBasedRiskControl != nil {
+			trader.riskControls.SetSession(sessionName, session)
+			if control, ok := trader.riskControls.SessionBasedRiskControl[sessionName]; ok {
+				if control.OrderExecutor != nil {
+					orderExecutor = control.OrderExecutor
+				}
+			}
 		}
 
 		for _, strategy := range strategies {
@@ -225,7 +244,6 @@ func (trader *Trader) ReportPnL(notifier Notifier) *PnLReporterManager {
 }
 
 type OrderExecutor interface {
-	Session() *ExchangeSession
 	SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders []types.Order, err error)
 }
 

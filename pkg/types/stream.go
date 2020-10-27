@@ -32,6 +32,8 @@ type StandardStream struct {
 
 	kLineClosedCallbacks []func(kline KLine)
 
+	kLineCallbacks []func(kline KLine)
+
 	bookUpdateCallbacks []func(book OrderBook)
 
 	bookSnapshotCallbacks []func(book OrderBook)
