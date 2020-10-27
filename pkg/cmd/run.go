@@ -176,6 +176,10 @@ func runConfig(ctx context.Context, userConfig *bbgo.Config) error {
 
 	trader.ReportTrade()
 
+	if userConfig.RiskControls != nil {
+		trader.SetRiskControls(userConfig.RiskControls)
+	}
+
 	for _, entry := range userConfig.ExchangeStrategies {
 		for _, mount := range entry.Mounts {
 			log.Infof("attaching strategy %T on %s...", entry.Strategy, mount)

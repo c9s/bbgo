@@ -34,8 +34,6 @@ type Environment struct {
 
 	tradeScanTime time.Time
 	sessions      map[string]*ExchangeSession
-
-	tradeReporter *TradeReporter
 }
 
 func NewEnvironment() *Environment {

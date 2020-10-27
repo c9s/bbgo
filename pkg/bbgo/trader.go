@@ -79,6 +79,7 @@ func (trader *Trader) AttachCrossExchangeStrategy(strategy CrossExchangeStrategy
 	return trader
 }
 
+// TODO: provide a more DSL way to configure risk controls
 func (trader *Trader) SetRiskControls(riskControls *RiskControls) {
 	trader.riskControls = riskControls
 }
@@ -106,17 +107,25 @@ func (trader *Trader) Run(ctx context.Context) error {
 		// We can move this to the exchange session,
 		// that way we can mount the notification on the exchange with DSL
 		// This is the default order executor
-		var orderExecutor OrderExecutor = &ExchangeOrderExecutor{
+		var baseOrderExecutor = &ExchangeOrderExecutor{
 			Notifiability: trader.Notifiability,
 			session:       session,
 		}
 
+		// default to base order executor
+		var orderExecutor OrderExecutor = baseOrderExecutor
+
 		// Since the risk controls are loaded from the config file
-		if trader.riskControls != nil && trader.riskControls.SessionBasedRiskControl != nil {
-			trader.riskControls.SetSession(sessionName, session)
-			if control, ok := trader.riskControls.SessionBasedRiskControl[sessionName]; ok {
-				if control.OrderExecutor != nil {
-					orderExecutor = control.OrderExecutor
+		if riskControls := trader.riskControls ; riskControls != nil {
+			if trader.riskControls.SessionBasedRiskControl != nil {
+				control, ok := trader.riskControls.SessionBasedRiskControl[sessionName]
+				if ok {
+					control.SetBaseOrderExecutor(baseOrderExecutor)
+
+					// pick the order executor
+					if control.OrderExecutor != nil {
+						orderExecutor = control.OrderExecutor
+					}
 				}
 			}
 		}
