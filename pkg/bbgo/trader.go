@@ -133,19 +133,7 @@ func (trader *Trader) Run(ctx context.Context) error {
 				// get the struct element
 				rs = rs.Elem()
 
-				field := rs.FieldByName("Notifiability")
-				if field.IsValid() {
-					log.Infof("found Notifiability in strategy %T, configuring...", strategy)
-					if !field.CanSet() {
-						log.Panicf("strategy %T field Notifiability can not be set", strategy)
-					}
-
-					if field.Type() == reflect.PtrTo(reflect.TypeOf(trader.Notifiability)) {
-						field.Set(reflect.ValueOf(&trader.Notifiability))
-					} else {
-						field.Set(reflect.ValueOf(trader.Notifiability))
-					}
-				}
+				trader.fillStrategyNotifiability(strategy, rs)
 			}
 
 			err := strategy.Run(ctx, orderExecutor, session)
@@ -168,6 +156,24 @@ func (trader *Trader) Run(ctx context.Context) error {
 	}
 
 	return trader.environment.Connect(ctx)
+}
+
+func (trader *Trader) fillStrategyNotifiability(strategy SingleExchangeStrategy, rs reflect.Value) {
+	field := rs.FieldByName("Notifiability")
+	if !field.IsValid() {
+		return
+	}
+
+	log.Infof("found Notifiability in strategy %T, configuring...", strategy)
+	if !field.CanSet() {
+		log.Panicf("strategy %T field Notifiability can not be set", strategy)
+	}
+
+	if field.Type() == reflect.PtrTo(reflect.TypeOf(trader.Notifiability)) {
+		field.Set(reflect.ValueOf(&trader.Notifiability))
+	} else {
+		field.Set(reflect.ValueOf(trader.Notifiability))
+	}
 }
 
 /*
