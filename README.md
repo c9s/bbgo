@@ -22,6 +22,13 @@ Aim to release v1.0 before 11/14
 - MAX Exchange (located in Taiwan)
 - Binance Exchange
 
+## Requirements
+
+Get your exchange API key and secret after you register the accounts:
+
+- For MAX: <https://max.maicoin.com/signup?r=c7982718>
+- For Binance: <https://www.binancezh.com/en/register?ref=VGDGLT80>
+
 ## Installation
 
 Install the builtin commands:
@@ -48,11 +55,6 @@ MYSQL_PASSWORD=
 MYSQL_DATABASE=bbgo
 MYSQL_URL=root@tcp(127.0.0.1:3306)/bbgo
 ```
-
-You can get your API key and secret after you register the accounts:
-
-- For MAX: <https://max.maicoin.com/signup?r=c7982718>
-- For Binance: <https://www.binancezh.com/en/register?ref=VGDGLT80>
 
 Then run the `migrate` command to initialize your database:
 
@@ -82,6 +84,77 @@ To calculate pnl:
 dotenv -f .env.local -- bbgo pnl --exchange binance --asset BTC --since "2019-01-01"
 ```
 
+To run strategy:
+
+```sh
+dotenv -f .env.local -- bbgo run --config config/buyandhold.yaml
+```
+
+## Built-in Strategies
+
+Check out the strategy directory [strategy](pkg/strategy) for all built-in strategies:
+
+- pricealert strategy demonstrates how to use the notification system [pricealert](pkg/strategy/pricealert)
+- xpuremaker strategy demonstrates how to maintain the orderbook and submit maker orders [xpuremaker](pkg/strategy/xpuremaker)
+- buyandhold strategy demonstrates how to subscribe kline events and submit market order [buyandhold](pkg/strategy/buyandhold)
+
+## Write your own strategy
+
+Create your go package, and initialize the repository with `go mod` and add bbgo as a dependency:
+
+```
+go mod init
+go get github.com/c9s/bbgo
+```
+
+Write your own strategy in the strategy directory like `pkg/strategy/mystrategy`:
+
+```
+mkdir pkg/strategy/mystrategy
+vim pkg/strategy/mystrategy/strategy.go
+```
+
+You can grab the skeleton strategy from <https://github.com/c9s/bbgo/blob/main/pkg/strategy/skeleton/strategy.go>
+
+Now add your config:
+
+```
+mkdir config
+(cd config && curl -o bbgo.yaml https://raw.githubusercontent.com/c9s/bbgo/main/config/minimal.yaml)
+```
+
+Add your strategy package path to the config file `config/bbgo.yaml`
+
+```yaml
+imports:
+- github.com/xxx/yyy/pkg/strategy/mystrategy
+```
+
+Run `bbgo run` command, bbgo will compile a wrapper binary that imports your strategy:
+
+```sh
+dotenv -f .env.local -- bbgo run --config config/bbgo.yaml
+```
+
+## Dynamic Injection
+
+In order to minimize the strategy code, bbgo supports dynamic dependency injection.
+
+Before executing your strategy, bbgo injects the components into your strategy object if
+it found the embedded field that is using bbgo component. for example:
+
+```go
+type Strategy struct {
+    *bbgo.Notifiability
+}
+```
+
+And then, in your code, you can call the methods of Notifiability.
+
+Supported components (single exchange strategy only for now):
+
+- `*bbgo.Notifiability`
+- `bbgo.OrderExecutor`
 
 ## Exchange API Examples
 
@@ -105,63 +178,6 @@ stream.Subscribe(types.BookChannel, symbol, types.SubscribeOptions{})
 
 streambook := types.NewStreamBook(symbol)
 streambook.BindStream(stream)
-```
-
-## Built-in Strategies
-
-Check out the strategy directory [strategy](pkg/strategy) for all built-in strategies:
-
-- pricealert strategy demonstrates how to use the notification system [pricealert](pkg/strategy/pricealert)
-- xpuremaker strategy demonstrates how to maintain the orderbook and submit maker orders [xpuremaker](pkg/strategy/xpuremaker)
-- buyandhold strategy demonstrates how to subscribe kline events and submit market order [buyandhold](pkg/strategy/buyandhold)
-
-## New API Design
-
-_**still under construction**_
-
-```go
-package main
-
-import (
-    "github.com/c9s/bbgo"
-)
-
-func main() {
-    mysqlURL := viper.GetString("mysql-url")
-    mysqlURL = fmt.Sprintf("%s?parseTime=true", mysqlURL)
-    db, err := sqlx.Connect("mysql", mysqlURL)
-    if err != nil {
-        return err
-    }
-
-    environment := bbgo.NewEnvironment(db)
-    environment.AddExchange("binance", binance.New(viper.Getenv("binance-api-key"), viper.Getenv("binance-api-secret"))))
-    environment.AddExchange("max", max.New(viper.Getenv("max-key"), viper.Getenv("max-secret"))))
-
-    trader := bbgo.NewTrader(bbgo.Config{
-        Environment: environment,
-        DB: db,
-    })
-
-    trader.AddNotifier(slacknotifier.New(slackToken))
-    trader.AddLogHook(slacklog.NewLogHook(slackToken))
-
-    // when any trade execution happened
-    trader.OnTrade(func(session string, exchange types.Exchange, trade types.Trade) {
-        notify(trade)
-        notifyPnL()
-    })
-
-    // mount strategy on an exchange
-    trader.AddExchangeStrategy("binance",
-        bondtrade.New("btcusdt", "5m"),
-        bondtrade.New("ethusdt", "5m"))
-
-    // mount cross exchange strategy
-    trader.AddCrossExchangeStrategy(hedgemaker.New("max", "binance"))
-
-    t.Run(ctx)
-}
 ```
 
 ## Support

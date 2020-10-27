@@ -4,6 +4,7 @@ import (
 	"context"
 	"reflect"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/types"
@@ -130,14 +131,15 @@ func (trader *Trader) Run(ctx context.Context) error {
 		for _, strategy := range strategies {
 			rs := reflect.ValueOf(strategy)
 			if rs.Elem().Kind() == reflect.Struct {
+				// get the struct element
 				rs = rs.Elem()
-				field := rs.FieldByName("Notifiability")
-				if field.IsValid() {
-					log.Infof("found Notifiability in strategy %T, configuring...", strategy)
-					if !field.CanSet() {
-						log.Panicf("strategy %T field Notifiability can not be set", strategy)
-					}
-					field.Set(reflect.ValueOf(trader.Notifiability))
+
+				if err := injectStrategyField(strategy, rs, "Notifiability", &trader.Notifiability); err != nil {
+					log.WithError(err).Errorf("strategy notifiability injection failed")
+				}
+
+				if err := injectStrategyField(strategy, rs, "OrderExecutor", orderExecutor); err != nil {
+					log.WithError(err).Errorf("strategy orderExecutor injection failed")
 				}
 			}
 
@@ -161,6 +163,35 @@ func (trader *Trader) Run(ctx context.Context) error {
 	}
 
 	return trader.environment.Connect(ctx)
+}
+
+func injectStrategyField(strategy SingleExchangeStrategy, rs reflect.Value, fieldName string, obj interface{}) error {
+	field := rs.FieldByName(fieldName)
+	if !field.IsValid() {
+		return nil
+	}
+
+	log.Infof("found %s in strategy %T, injecting %T...", fieldName, strategy, obj)
+
+	if !field.CanSet() {
+		return errors.Errorf("field %s of strategy %T can not be set", fieldName, strategy)
+	}
+
+	rv := reflect.ValueOf(obj)
+	if field.Kind() == reflect.Ptr {
+		if field.Type() != rv.Type() {
+			return errors.Errorf("field type mismatches: %s != %s", field.Type(), rv.Type())
+		}
+
+		field.Set(rv)
+	} else if field.Kind() == reflect.Interface {
+		field.Set(rv)
+	} else {
+		// set as value
+		field.Set(rv.Elem())
+	}
+
+	return nil
 }
 
 /*
@@ -263,14 +294,6 @@ func (trader *OrderExecutor) RunStrategy(ctx context.Context, strategy SingleExc
 			trader.reportPnL()
 		})
 	})
-}
-*/
-
-/*
-func (trader *Trader) reportPnL() {
-	report := trader.ProfitAndLossCalculator.Calculate()
-	report.Print()
-	trader.NotifyPnL(report)
 }
 */
 

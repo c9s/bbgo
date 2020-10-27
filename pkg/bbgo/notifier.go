@@ -1,19 +1,15 @@
 package bbgo
 
 type Notifier interface {
-	NotifyTo(channel, format string, args ...interface{}) error
-	Notify(format string, args ...interface{}) error
+	NotifyTo(channel, format string, args ...interface{})
+	Notify(format string, args ...interface{})
 }
 
 type NullNotifier struct{}
 
-func (n *NullNotifier) NotifyTo(channel, format string, args ...interface{}) error {
-	return nil
-}
+func (n *NullNotifier) NotifyTo(channel, format string, args ...interface{}) {}
 
-func (n *NullNotifier) Notify(format string, args ...interface{}) error {
-	return nil
-}
+func (n *NullNotifier) Notify(format string, args ...interface{}) {}
 
 type Notifiability struct {
 	notifiers            []Notifier
@@ -38,22 +34,14 @@ func (m *Notifiability) AddNotifier(notifier Notifier) {
 	m.notifiers = append(m.notifiers, notifier)
 }
 
-func (m *Notifiability) Notify(msg string, args ...interface{}) (err error) {
+func (m *Notifiability) Notify(format string, args ...interface{}) {
 	for _, n := range m.notifiers {
-		if err2 := n.Notify(msg, args...); err2 != nil {
-			err = err2
-		}
+		n.Notify(format, args...)
 	}
-
-	return err
 }
 
-func (m *Notifiability) NotifyTo(channel, msg string, args ...interface{}) (err error) {
+func (m *Notifiability) NotifyTo(channel, format string, args ...interface{}) {
 	for _, n := range m.notifiers {
-		if err2 := n.NotifyTo(channel, msg, args...); err2 != nil {
-			err = err2
-		}
+		n.NotifyTo(channel, format, args...)
 	}
-
-	return err
 }
