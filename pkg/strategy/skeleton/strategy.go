@@ -17,12 +17,6 @@ type Strategy struct {
 	Symbol string `json:"symbol"`
 }
 
-func New(symbol string) *Strategy {
-	return &Strategy{
-		Symbol: symbol,
-	}
-}
-
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
 	session.Stream.OnKLineClosed(func(kline types.KLine) {
