@@ -16,9 +16,9 @@ notifications:
 
   # routing rules
   routing:
-    trade: bySymbol
-    order: bySymbol
-    submitOrder: byExchange
+    trade: "$symbol"
+    order: "$symbol"
+    submitOrder: "$session"
     pnL: "#bbgo-pnl"
 
 sessions:
