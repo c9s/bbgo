@@ -14,7 +14,7 @@ func init() {
 
 type Strategy struct {
 	// The notification system will be injected into the strategy automatically.
-	*bbgo.Notifiability
+	bbgo.Notifiability
 
 	// These fields will be filled from the config file (it translates YAML to JSON)
 	Symbol    string `json:"symbol"`
@@ -32,9 +32,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		if math.Abs(kline.GetChange()) > s.MinChange {
 			if channel, ok := s.RouteSymbol(s.Symbol); ok {
-				_ = s.NotifyTo(channel, "%s hit price %s, change %f", s.Symbol, market.FormatPrice(kline.Close), kline.GetChange())
+				s.NotifyTo(channel, "%s hit price %s, change %f", s.Symbol, market.FormatPrice(kline.Close), kline.GetChange())
 			} else {
-				_ = s.Notify("%s hit price %s, change %f", s.Symbol, market.FormatPrice(kline.Close), kline.GetChange())
+				s.Notify("%s hit price %s, change %f", s.Symbol, market.FormatPrice(kline.Close), kline.GetChange())
 			}
 		}
 	})

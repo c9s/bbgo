@@ -34,11 +34,11 @@ func New(token, channel string, options ...NotifyOption) *Notifier {
 	return notifier
 }
 
-func (n *Notifier) Notify(format string, args ...interface{}) error {
-	return n.NotifyTo(n.channel, format, args...)
+func (n *Notifier) Notify(format string, args ...interface{}) {
+	n.NotifyTo(n.channel, format, args...)
 }
 
-func (n *Notifier) NotifyTo(channel, format string, args ...interface{}) error {
+func (n *Notifier) NotifyTo(channel, format string, args ...interface{}) {
 	var slackAttachments []slack.Attachment
 	var slackArgsOffset = -1
 
@@ -77,7 +77,7 @@ func (n *Notifier) NotifyTo(channel, format string, args ...interface{}) error {
 		logrus.WithError(err).Errorf("slack error: %s", err.Error())
 	}
 
-	return err
+	return
 }
 
 /*
