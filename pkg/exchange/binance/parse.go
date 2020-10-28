@@ -414,7 +414,7 @@ type KLineEvent struct {
 func (k *KLine) KLine() types.KLine {
 	return types.KLine{
 		Symbol:         k.Symbol,
-		Interval:       k.Interval,
+		Interval:       types.Interval(k.Interval),
 		StartTime:      time.Unix(0, k.StartTime*int64(time.Millisecond)),
 		EndTime:        time.Unix(0, k.EndTime*int64(time.Millisecond)),
 		Open:           util.MustParseFloat(k.Open),

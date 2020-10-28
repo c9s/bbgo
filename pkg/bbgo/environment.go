@@ -139,8 +139,37 @@ func (environ *Environment) Connect(ctx context.Context) error {
 
 			marketDataStore := store.NewMarketDataStore(symbol)
 			marketDataStore.BindStream(session.Stream)
-
 			session.marketDataStores[symbol] = marketDataStore
+
+			standardIndicatorSet := NewStandardIndicatorSet(symbol)
+			standardIndicatorSet.BindMarketDataStore(marketDataStore)
+			session.standardIndicatorSets[symbol] = standardIndicatorSet
+		}
+
+		// move market data store dispatch to here, use one callback to dispatch the market data
+		// session.Stream.OnKLineClosed(func(kline types.KLine) { })
+
+		now := time.Now()
+		for symbol := range loadedSymbols {
+			marketDataStore, ok := session.marketDataStores[symbol]
+			if !ok {
+				return errors.Errorf("symbol %s is not defined", symbol)
+			}
+
+			for interval := range types.SupportedIntervals {
+				kLines, err := session.Exchange.QueryKLines(ctx, symbol, interval.String(), types.KLineQueryOptions{
+					EndTime: &now,
+					Limit:   100,
+				})
+				if err != nil {
+					return err
+				}
+
+				for _, k := range kLines {
+					// let market data store trigger the update, so that the indicator could be updated too.
+					marketDataStore.AddKLine(k)
+				}
+			}
 		}
 
 		log.Infof("querying balances...")
@@ -180,4 +209,19 @@ func (environ *Environment) Connect(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func BatchQueryKLineWindows(ctx context.Context, e types.Exchange, symbol string, intervals []string, startTime, endTime time.Time) (map[string]types.KLineWindow, error) {
+	batch := &types.ExchangeBatchProcessor{Exchange: e}
+	klineWindows := map[string]types.KLineWindow{}
+	for _, interval := range intervals {
+		kLines, err := batch.BatchQueryKLines(ctx, symbol, interval, startTime, endTime)
+		if err != nil {
+			return klineWindows, err
+		}
+
+		klineWindows[interval] = kLines
+	}
+
+	return klineWindows, nil
 }

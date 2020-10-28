@@ -120,7 +120,7 @@ func (k KLinePayload) KLine() types.KLine {
 		StartTime:   time.Unix(0, k.StartTime*int64(time.Millisecond)),
 		EndTime:     time.Unix(0, k.EndTime*int64(time.Millisecond)),
 		Symbol:      k.Market,
-		Interval:    k.Resolution,
+		Interval:    types.Interval(k.Resolution),
 		Open:        util.MustParseFloat(k.Open),
 		Close:       util.MustParseFloat(k.Close),
 		High:        util.MustParseFloat(k.High),

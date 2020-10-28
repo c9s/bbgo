@@ -205,7 +205,7 @@ type KLine struct {
 func (k KLine) KLine() types.KLine {
 	return types.KLine{
 		Symbol:    k.Symbol,
-		Interval:  k.Interval,
+		Interval:  types.Interval(k.Interval),
 		StartTime: k.StartTime,
 		EndTime:   k.EndTime,
 		Open:      k.Open,
