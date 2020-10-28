@@ -114,8 +114,7 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 			marketDataStore.BindStream(session.Stream)
 			session.marketDataStores[symbol] = marketDataStore
 
-			standardIndicatorSet := NewStandardIndicatorSet(symbol)
-			standardIndicatorSet.BindMarketDataStore(marketDataStore)
+			standardIndicatorSet := NewStandardIndicatorSet(symbol, marketDataStore)
 			session.standardIndicatorSets[symbol] = standardIndicatorSet
 		}
 

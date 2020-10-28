@@ -19,40 +19,42 @@ type StandardIndicatorSet struct {
 	// interval -> window
 	SMA  map[IntervalWindow]*indicator.SMA
 	EWMA map[IntervalWindow]*indicator.EWMA
+
+	store *MarketDataStore
 }
 
-func NewStandardIndicatorSet(symbol string) *StandardIndicatorSet {
+func NewStandardIndicatorSet(symbol string, store *MarketDataStore) *StandardIndicatorSet {
 	set := &StandardIndicatorSet{
 		Symbol: symbol,
 		SMA:    make(map[IntervalWindow]*indicator.SMA),
 		EWMA:   make(map[IntervalWindow]*indicator.EWMA),
+		store:  store,
 	}
 
 	// let us pre-defined commonly used intervals
 	for interval := range types.SupportedIntervals {
 		for _, window := range []int{7, 25, 99} {
-			set.SMA[IntervalWindow{interval, window}] = &indicator.SMA{
-				Interval: interval,
-				Window:   window,
-			}
-			set.EWMA[IntervalWindow{interval, window}] = &indicator.EWMA{
-				Interval: interval,
-				Window:   window,
-			}
+			iw := IntervalWindow{interval, window}
+			set.SMA[iw] = &indicator.SMA{Interval: interval, Window: window}
+			set.SMA[iw].Bind(store)
+
+			set.EWMA[iw] = &indicator.EWMA{Interval: interval, Window: window}
+			set.EWMA[iw].Bind(store)
 		}
 	}
 
 	return set
 }
 
-func (set *StandardIndicatorSet) BindMarketDataStore(store *MarketDataStore) {
-	for _, inc := range set.SMA {
-		inc.BindMarketDataStore(store)
+func (set *StandardIndicatorSet) GetSMA(iw IntervalWindow) *indicator.SMA {
+	inc, ok := set.SMA[iw]
+	if !ok {
+		inc := &indicator.SMA{Interval: iw.Interval, Window: iw.Window}
+		inc.Bind(set.store)
+		set.SMA[iw] = inc
 	}
 
-	for _, inc := range set.EWMA {
-		inc.BindMarketDataStore(store)
-	}
+	return inc
 }
 
 // ExchangeSession presents the exchange connection session

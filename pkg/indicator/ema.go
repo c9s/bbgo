@@ -51,16 +51,18 @@ type KLineWindowUpdater interface {
 	OnKLineWindowUpdate(func(interval types.Interval, window types.KLineWindow))
 }
 
-func (inc *EWMA) BindMarketDataStore(updater KLineWindowUpdater) {
-	updater.OnKLineWindowUpdate(func(interval types.Interval, window types.KLineWindow) {
-		if inc.Interval != interval {
-			return
-		}
+func (inc *EWMA) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
+	if inc.Interval != interval {
+		return
+	}
 
-		if inc.EndTime != zeroTime && inc.EndTime.Before(inc.EndTime) {
-			return
-		}
+	if inc.EndTime != zeroTime && inc.EndTime.Before(inc.EndTime) {
+		return
+	}
 
-		inc.calculateAndUpdate(window)
-	})
+	inc.calculateAndUpdate(window)
+}
+
+func (inc *EWMA) Bind(updater KLineWindowUpdater) {
+	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }

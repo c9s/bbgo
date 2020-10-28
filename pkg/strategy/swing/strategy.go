@@ -70,7 +70,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				Interval: iw.Interval,
 				Window:   iw.Window,
 			}
-			inc.BindMarketDataStore(marketDataStore)
+			inc.Bind(marketDataStore)
 			indicatorSet.SMA[iw] = inc
 		}
 
@@ -81,7 +81,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				Interval: iw.Interval,
 				Window:   iw.Window,
 			}
-			inc.BindMarketDataStore(marketDataStore)
+			inc.Bind(marketDataStore)
 			indicatorSet.EWMA[iw] = inc
 		}
 
