@@ -58,8 +58,13 @@ func (inc *SMA) BindMarketDataStore(updater KLineWindowUpdater) {
 }
 
 func calculateSMA(kLines []types.KLine) float64 {
-	sum := 0.0
 	length := len(kLines)
+
+	if length == 0 {
+		return 0.0
+	}
+
+	sum := 0.0
 	for _, k := range kLines {
 		sum += k.Close
 	}
