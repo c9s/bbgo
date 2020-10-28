@@ -27,6 +27,10 @@ type SingleExchangeStrategy interface {
 	Run(ctx context.Context, orderExecutor OrderExecutor, session *ExchangeSession) error
 }
 
+type ExchangeSessionSubscriber interface {
+	Subscribe(session *ExchangeSession)
+}
+
 type CrossExchangeStrategy interface {
 	Run(ctx context.Context, orderExecutionRouter OrderExecutionRouter, sessions map[string]*ExchangeSession) error
 }
@@ -85,14 +89,24 @@ func (trader *Trader) SetRiskControls(riskControls *RiskControls) {
 }
 
 func (trader *Trader) Run(ctx context.Context) error {
+
+	// pre-subscribe the data
+	for sessionName, strategies := range trader.exchangeStrategies {
+		session := trader.environment.sessions[sessionName]
+		for _, strategy := range strategies {
+			if subscriber, ok := strategy.(ExchangeSessionSubscriber); ok {
+				subscriber.Subscribe(session)
+			}
+		}
+	}
+
 	if err := trader.environment.Init(ctx); err != nil {
 		return err
 	}
 
-	// load and run session strategies
-	for sessionName, strategies := range trader.exchangeStrategies {
-		session := trader.environment.sessions[sessionName]
-
+	// session based trade reporter
+	for sessionName := range trader.environment.sessions {
+		var session = trader.environment.sessions[sessionName]
 		if session.tradeReporter != nil {
 			session.Stream.OnTrade(func(trade types.Trade) {
 				session.tradeReporter.Report(trade)
@@ -102,6 +116,11 @@ func (trader *Trader) Run(ctx context.Context) error {
 				trader.tradeReporter.Report(trade)
 			})
 		}
+	}
+
+	// load and run session strategies
+	for sessionName, strategies := range trader.exchangeStrategies {
+		var session = trader.environment.sessions[sessionName]
 
 		var baseOrderExecutor = &ExchangeOrderExecutor{
 			// copy the parent notifiers and session
@@ -133,12 +152,32 @@ func (trader *Trader) Run(ctx context.Context) error {
 				// get the struct element
 				rs = rs.Elem()
 
-				if err := injectStrategyField(strategy, rs, "Notifiability", &trader.Notifiability); err != nil {
-					log.WithError(err).Errorf("strategy notifiability injection failed")
+				if err := injectField(rs, "Notifiability", &trader.Notifiability); err != nil {
+					log.WithError(err).Errorf("strategy Notifiability injection failed")
 				}
 
-				if err := injectStrategyField(strategy, rs, "OrderExecutor", orderExecutor); err != nil {
-					log.WithError(err).Errorf("strategy orderExecutor injection failed")
+				if err := injectField(rs, "OrderExecutor", orderExecutor); err != nil {
+					log.WithError(err).Errorf("strategy OrderExecutor injection failed")
+				}
+
+				if symbol, ok := isSymbolBasedStrategy(rs); ok {
+					log.Infof("found symbol based strategy from %T", rs.Type())
+					if hasField(rs, "Market") {
+						if market, ok := session.Market(symbol); ok {
+							// let's make the market object passed by pointer
+							if err := injectField(rs, "Market", &market); err != nil {
+								log.WithError(err).Errorf("strategy Market injection failed")
+							}
+						}
+					}
+
+					if hasField(rs, "MarketDataStore") {
+						if store, ok := session.MarketDataStore(symbol); ok {
+							if err := injectField(rs, "MarketDataStore", store); err != nil {
+								log.WithError(err).Errorf("strategy MarketDataStore injection failed")
+							}
+						}
+					}
 				}
 			}
 

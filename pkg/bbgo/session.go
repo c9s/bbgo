@@ -2,7 +2,6 @@ package bbgo
 
 import (
 	"github.com/c9s/bbgo/pkg/indicator"
-	"github.com/c9s/bbgo/pkg/store"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -46,7 +45,7 @@ func NewStandardIndicatorSet(symbol string) *StandardIndicatorSet {
 	return set
 }
 
-func (set *StandardIndicatorSet) BindMarketDataStore(store *store.MarketDataStore) {
+func (set *StandardIndicatorSet) BindMarketDataStore(store *MarketDataStore) {
 	for _, inc := range set.SMA {
 		inc.BindMarketDataStore(store)
 	}
@@ -82,25 +81,31 @@ type ExchangeSession struct {
 	Trades map[string][]types.Trade
 
 	// marketDataStores contains the market data store of each market
-	marketDataStores map[string]*store.MarketDataStore
+	marketDataStores map[string]*MarketDataStore
 
 	// standard indicators of each market
 	standardIndicatorSets map[string]*StandardIndicatorSet
 
 	tradeReporter *TradeReporter
+
+	loadedSymbols map[string]struct{}
 }
 
 func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 	return &ExchangeSession{
-		Name:             name,
-		Exchange:         exchange,
-		Stream:           exchange.NewStream(),
-		Account:          &types.Account{},
-		Subscriptions:    make(map[types.Subscription]types.Subscription),
-		markets:          make(map[string]types.Market),
-		Trades:           make(map[string][]types.Trade),
-		lastPrices:       make(map[string]float64),
-		marketDataStores: make(map[string]*store.MarketDataStore),
+		Name:          name,
+		Exchange:      exchange,
+		Stream:        exchange.NewStream(),
+		Subscriptions: make(map[types.Subscription]types.Subscription),
+		Account:       &types.Account{},
+		Trades:        make(map[string][]types.Trade),
+
+		markets:               make(map[string]types.Market),
+		lastPrices:            make(map[string]float64),
+		marketDataStores:      make(map[string]*MarketDataStore),
+		standardIndicatorSets: make(map[string]*StandardIndicatorSet),
+
+		loadedSymbols: make(map[string]struct{}),
 	}
 }
 
@@ -110,7 +115,7 @@ func (session *ExchangeSession) StandardIndicatorSet(symbol string) (*StandardIn
 }
 
 // MarketDataStore returns the market data store of a symbol
-func (session *ExchangeSession) MarketDataStore(symbol string) (s *store.MarketDataStore, ok bool) {
+func (session *ExchangeSession) MarketDataStore(symbol string) (s *MarketDataStore, ok bool) {
 	s, ok = session.marketDataStores[symbol]
 	return s, ok
 }
@@ -138,6 +143,8 @@ func (session *ExchangeSession) Subscribe(channel types.Channel, symbol string, 
 		Options: options,
 	}
 
+	// add to the loaded symbol table
+	session.loadedSymbols[symbol] = struct{}{}
 	session.Subscriptions[sub] = sub
 	return session
 }

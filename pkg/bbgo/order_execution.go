@@ -62,8 +62,8 @@ type BasicRiskControlOrderExecutor struct {
 func (e *BasicRiskControlOrderExecutor) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) ([]types.Order, error) {
 	var formattedOrders []types.SubmitOrder
 	for _, order := range orders {
-		currentPrice, ok := e.session.lastPrices[order.Symbol]
-		if ok {
+		currentPrice, ok := e.session.LastPrice(order.Symbol)
+		if !ok {
 			return nil, errors.Errorf("the last price of symbol %q is not found", order.Symbol)
 		}
 

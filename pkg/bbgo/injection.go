@@ -7,16 +7,34 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func injectStrategyField(strategy SingleExchangeStrategy, rs reflect.Value, fieldName string, obj interface{}) error {
+func isSymbolBasedStrategy(rs reflect.Value) (string, bool) {
+	field := rs.FieldByName("Symbol")
+	if !field.IsValid() {
+		return "", false
+	}
+
+	if field.Kind() != reflect.String {
+		return "", false
+	}
+
+	return field.String(), true
+}
+
+func hasField(rs reflect.Value, fieldName string) bool {
+	field := rs.FieldByName(fieldName)
+	return field.IsValid()
+}
+
+func injectField(rs reflect.Value, fieldName string, obj interface{}) error {
 	field := rs.FieldByName(fieldName)
 	if !field.IsValid() {
 		return nil
 	}
 
-	logrus.Infof("found %s in strategy %T, injecting %T...", fieldName, strategy, obj)
+	logrus.Infof("found %s in %T, injecting %T...", fieldName, rs.Type(), obj)
 
 	if !field.CanSet() {
-		return errors.Errorf("field %s of strategy %T can not be set", fieldName, strategy)
+		return errors.Errorf("field %s of %T can not be set", fieldName, rs.Type())
 	}
 
 	rv := reflect.ValueOf(obj)
