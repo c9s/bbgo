@@ -22,8 +22,11 @@ type Strategy struct {
 	MinChange float64 `json:"minChange"`
 }
 
-func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
+}
+
+func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	session.Stream.OnKLine(func(kline types.KLine) {
 		market, ok := session.Market(kline.Symbol)
 		if !ok {
