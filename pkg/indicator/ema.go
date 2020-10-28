@@ -7,8 +7,7 @@ import (
 )
 
 type EWMA struct {
-	Interval types.Interval
-	Window   int
+	types.IntervalWindow
 	Values   Float64Slice
 	EndTime  time.Time
 }

@@ -42,7 +42,7 @@ func NewStandardIndicatorSet(symbol string, store *MarketDataStore) *StandardInd
 func (set *StandardIndicatorSet) GetSMA(iw types.IntervalWindow) *indicator.SMA {
 	inc, ok := set.SMA[iw]
 	if !ok {
-		inc := &indicator.SMA{Interval: iw.Interval, Window: iw.Window}
+		inc := &indicator.SMA{IntervalWindow: iw}
 		inc.Bind(set.store)
 		set.SMA[iw] = inc
 	}
@@ -54,7 +54,7 @@ func (set *StandardIndicatorSet) GetSMA(iw types.IntervalWindow) *indicator.SMA 
 func (set *StandardIndicatorSet) GetEWMA(iw types.IntervalWindow) *indicator.EWMA {
 	inc, ok := set.EWMA[iw]
 	if !ok {
-		inc := &indicator.EWMA{Interval: iw.Interval, Window: iw.Window}
+		inc := &indicator.EWMA{IntervalWindow: iw}
 		inc.Bind(set.store)
 		set.EWMA[iw] = inc
 	}
