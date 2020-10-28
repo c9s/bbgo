@@ -414,7 +414,7 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol, interval string, opt
 	for _, k := range resp {
 		kLines = append(kLines, types.KLine{
 			Symbol:         symbol,
-			Interval:       interval,
+			Interval:       types.Interval(interval),
 			StartTime:      time.Unix(0, k.OpenTime*int64(time.Millisecond)),
 			EndTime:        time.Unix(0, k.CloseTime*int64(time.Millisecond)),
 			Open:           util.MustParseFloat(k.Open),

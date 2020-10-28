@@ -43,7 +43,7 @@ type KLine struct {
 	EndTime   time.Time
 
 	Symbol   string
-	Interval string
+	Interval Interval
 
 	Open        float64
 	Close       float64
@@ -65,7 +65,7 @@ func (k KLine) GetEndTime() time.Time {
 	return k.EndTime
 }
 
-func (k KLine) GetInterval() string {
+func (k KLine) GetInterval() Interval {
 	return k.Interval
 }
 
@@ -229,7 +229,7 @@ func (k KLineWindow) Last() KLine {
 	return k[len(k)-1]
 }
 
-func (k KLineWindow) GetInterval() string {
+func (k KLineWindow) GetInterval() Interval {
 	return k.First().Interval
 }
 
