@@ -43,18 +43,20 @@ func (inc *SMA) calculateAndUpdate(kLines []types.KLine) {
 	inc.EndTime = kLines[index].EndTime
 }
 
-func (inc *SMA) BindMarketDataStore(updater KLineWindowUpdater) {
-	updater.OnKLineWindowUpdate(func(interval types.Interval, window types.KLineWindow) {
-		if inc.Interval != interval {
-			return
-		}
+func (inc *SMA) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
+	if inc.Interval != interval {
+		return
+	}
 
-		if inc.EndTime != zeroTime && inc.EndTime.Before(inc.EndTime) {
-			return
-		}
+	if inc.EndTime != zeroTime && inc.EndTime.Before(inc.EndTime) {
+		return
+	}
 
-		inc.calculateAndUpdate(window)
-	})
+	inc.calculateAndUpdate(window)
+}
+
+func (inc *SMA) Bind(updater KLineWindowUpdater) {
+	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }
 
 func calculateSMA(kLines []types.KLine) float64 {
