@@ -63,7 +63,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	}
 
-	session.Stream.OnKLine(func(kline types.KLine) {
+	// session.Stream.OnKLineClosed
+	session.Stream.OnKLineClosed(func(kline types.KLine) {
 		// skip k-lines from other symbols
 		if kline.Symbol != s.Symbol {
 			return

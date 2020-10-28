@@ -148,29 +148,38 @@ func (trader *Trader) Run(ctx context.Context) error {
 				// get the struct element
 				rs = rs.Elem()
 
-				if err := injectField(rs, "Notifiability", &trader.Notifiability); err != nil {
+				if err := injectField(rs, "Notifiability", &trader.Notifiability, false); err != nil {
 					log.WithError(err).Errorf("strategy Notifiability injection failed")
 				}
 
-				if err := injectField(rs, "OrderExecutor", orderExecutor); err != nil {
+				if err := injectField(rs, "OrderExecutor", orderExecutor, false); err != nil {
 					log.WithError(err).Errorf("strategy OrderExecutor injection failed")
 				}
 
 				if symbol, ok := isSymbolBasedStrategy(rs); ok {
-					log.Infof("found symbol based strategy from %T", rs.Type())
+					log.Infof("found symbol based strategy from %s", rs.Type())
 					if hasField(rs, "Market") {
 						if market, ok := session.Market(symbol); ok {
 							// let's make the market object passed by pointer
-							if err := injectField(rs, "Market", &market); err != nil {
-								log.WithError(err).Errorf("strategy Market injection failed")
+							if err := injectField(rs, "Market", &market, false); err != nil {
+								log.WithError(err).Errorf("strategy %T Market injection failed", strategy)
+							}
+						}
+					}
+
+					// StandardIndicatorSet
+					if hasField(rs, "StandardIndicatorSet") {
+						if indicatorSet, ok := session.StandardIndicatorSet(symbol); ok {
+							if err := injectField(rs, "StandardIndicatorSet", indicatorSet, true); err != nil {
+								log.WithError(err).Errorf("strategy %T StandardIndicatorSet injection failed", strategy)
 							}
 						}
 					}
 
 					if hasField(rs, "MarketDataStore") {
 						if store, ok := session.MarketDataStore(symbol); ok {
-							if err := injectField(rs, "MarketDataStore", store); err != nil {
-								log.WithError(err).Errorf("strategy MarketDataStore injection failed")
+							if err := injectField(rs, "MarketDataStore", store, true); err != nil {
+								log.WithError(err).Errorf("strategy %T MarketDataStore injection failed", strategy)
 							}
 						}
 					}
