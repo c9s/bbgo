@@ -24,7 +24,6 @@ import (
 	"github.com/c9s/bbgo/pkg/notifier/slacknotifier"
 	"github.com/c9s/bbgo/pkg/slack/slacklog"
 	"github.com/c9s/bbgo/pkg/types"
-
 )
 
 var errSlackTokenUndefined = errors.New("slack token is not defined.")
@@ -117,7 +116,7 @@ func runConfig(ctx context.Context, userConfig *bbgo.Config) error {
 				log.AddHook(slacklog.NewLogHook(slackToken, conf.ErrorChannel))
 			}
 
-			log.Infof("adding slack notifier...")
+			log.Infof("adding slack notifier with default channel: %s", conf.DefaultChannel)
 			var notifier = slacknotifier.New(slackToken, conf.DefaultChannel)
 			trader.AddNotifier(notifier)
 		}
