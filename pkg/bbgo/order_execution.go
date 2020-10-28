@@ -140,9 +140,11 @@ func (e *BasicRiskControlOrderExecutor) SubmitOrders(ctx context.Context, orders
 		}
 
 		formattedOrders = append(formattedOrders, o)
+
+		e.Notify(":memo: Submitting %s %s %s order with quantity %s @ %s", o.Symbol, o.Side, o.Type, o.QuantityString, o.PriceString, o)
 	}
 
-	// e.Notify(":memo: Submitting %s %s %s order with quantity: %s", order.Symbol, order.Type, order.Side, order.QuantityString, order)
+
 	return e.session.Exchange.SubmitOrders(ctx, formattedOrders...)
 }
 
@@ -164,7 +166,7 @@ func formatOrder(order types.SubmitOrder, session *ExchangeSession) (types.Submi
 
 	}
 
-	order.QuantityString = market.FormatVolume(order.Quantity)
+	order.QuantityString = market.FormatQuantity(order.Quantity)
 	return order, nil
 }
 
