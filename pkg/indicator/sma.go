@@ -16,23 +16,14 @@ func (s *Float64Slice) Push(v float64) {
 var zeroTime time.Time
 
 type SMA struct {
-	Interval string
+	Interval types.Interval
 	Window   int
 	Values   Float64Slice
 	EndTime  time.Time
 }
 
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-
-	return b
-}
-
 func (inc *SMA) calculateAndUpdate(kLines []types.KLine) {
 	if len(kLines) < inc.Window {
-		// we can't calculate
 		return
 	}
 
@@ -44,8 +35,8 @@ func (inc *SMA) calculateAndUpdate(kLines []types.KLine) {
 	}
 
 	var recentK = kLines[index-(inc.Window-1) : index+1]
-	var ma = calculateSMA(recentK)
-	inc.Values.Push(ma)
+	var sma = calculateSMA(recentK)
+	inc.Values.Push(sma)
 	inc.EndTime = kLines[index].EndTime
 }
 
@@ -56,7 +47,7 @@ func (inc *SMA) BindMarketDataStore(store *store.MarketDataStore) {
 			return
 		}
 
-		if kLines, ok := store.KLinesOfInterval(types.Interval(kline.Interval)); ok {
+		if kLines, ok := store.KLinesOfInterval(kline.Interval); ok {
 			inc.calculateAndUpdate(kLines)
 		}
 	})

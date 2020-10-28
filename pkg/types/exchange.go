@@ -74,7 +74,7 @@ type ExchangeBatchProcessor struct {
 
 func (e ExchangeBatchProcessor) BatchQueryKLines(ctx context.Context, symbol, interval string, startTime, endTime time.Time) (allKLines []KLine, err error) {
 	for startTime.Before(endTime) {
-		klines, err := e.QueryKLines(ctx, symbol, interval, KLineQueryOptions{
+		kLines, err := e.QueryKLines(ctx, symbol, interval, KLineQueryOptions{
 			StartTime: &startTime,
 			Limit:     1000,
 		})
@@ -83,7 +83,7 @@ func (e ExchangeBatchProcessor) BatchQueryKLines(ctx context.Context, symbol, in
 			return nil, err
 		}
 
-		for _, kline := range klines {
+		for _, kline := range kLines {
 			if kline.EndTime.After(endTime) {
 				return allKLines, nil
 			}

@@ -2,6 +2,10 @@ package types
 
 type Interval string
 
+func (i Interval) String() string {
+	return string(i)
+}
+
 var Interval1m = Interval("1m")
 var Interval5m = Interval("5m")
 var Interval15m = Interval("15m")

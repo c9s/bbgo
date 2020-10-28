@@ -8,7 +8,7 @@ import (
 
 type IntervalWindow struct {
 	// The interval of kline
-	Interval string
+	Interval types.Interval
 
 	// The windows size of EWMA and SMA
 	Window int
@@ -18,27 +18,27 @@ type StandardIndicatorSet struct {
 	Symbol string
 	// Standard indicators
 	// interval -> window
-	SMA map[IntervalWindow]*indicator.SMA
-	EMA map[IntervalWindow]*indicator.EWMA
+	SMA  map[IntervalWindow]*indicator.SMA
+	EWMA map[IntervalWindow]*indicator.EWMA
 }
 
 func NewStandardIndicatorSet(symbol string) *StandardIndicatorSet {
 	set := &StandardIndicatorSet{
 		Symbol: symbol,
 		SMA:    make(map[IntervalWindow]*indicator.SMA),
-		EMA:    make(map[IntervalWindow]*indicator.EWMA),
+		EWMA:   make(map[IntervalWindow]*indicator.EWMA),
 	}
 
 	// let us pre-defined commonly used intervals
-	for _, interval := range []string{"1m", "5m", "1h", "2h", "4h", "1d"} {
+	for interval := range types.SupportedIntervals {
 		for _, window := range []int{7, 25, 99} {
 			set.SMA[IntervalWindow{interval, window}] = &indicator.SMA{
 				Interval: interval,
-				Window: window,
+				Window:   window,
 			}
-			set.EMA[IntervalWindow{interval, window}] = &indicator.EWMA{
+			set.EWMA[IntervalWindow{interval, window}] = &indicator.EWMA{
 				Interval: interval,
-				Window: window,
+				Window:   window,
 			}
 		}
 	}
@@ -48,14 +48,13 @@ func NewStandardIndicatorSet(symbol string) *StandardIndicatorSet {
 
 func (set *StandardIndicatorSet) BindMarketDataStore(store *store.MarketDataStore) {
 	for _, inc := range set.SMA {
-		_ = inc
+		inc.BindMarketDataStore(store)
 	}
 
-	for _, inc := range set.EMA {
-		_ = inc
+	for _, inc := range set.EWMA {
+		inc.BindMarketDataStore(store)
 	}
 }
-
 
 // ExchangeSession presents the exchange connection session
 // It also maintains and collects the data returned from the stream.

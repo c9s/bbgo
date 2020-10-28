@@ -41,6 +41,5 @@ exchangeStrategies:
   buyandhold:
     symbol: "BTCUSDT"
     interval: "1m"
-    # quantity = change percentage * baseQuantity
-    baseQuantity: 1.0
-    minDropPercentage: -0.0001
+    baseQuantity: 0.001
+    minDropPercentage: -0.001
