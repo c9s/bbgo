@@ -25,7 +25,7 @@ func hasField(rs reflect.Value, fieldName string) bool {
 	return field.IsValid()
 }
 
-func injectField(rs reflect.Value, fieldName string, obj interface{}) error {
+func injectField(rs reflect.Value, fieldName string, obj interface{}, pointerOnly bool) error {
 	field := rs.FieldByName(fieldName)
 	if !field.IsValid() {
 		return nil
@@ -48,6 +48,10 @@ func injectField(rs reflect.Value, fieldName string, obj interface{}) error {
 		field.Set(rv)
 	} else {
 		// set as value
+		if pointerOnly {
+			return errors.Errorf("field %s %s does not allow value assignment (pointer type only)", field.Type(), rv.Type())
+		}
+
 		field.Set(rv.Elem())
 	}
 
