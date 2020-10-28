@@ -140,6 +140,9 @@ func (environ *Environment) Connect(ctx context.Context) error {
 			marketDataStore := store.NewMarketDataStore(symbol)
 			marketDataStore.BindStream(session.Stream)
 
+			standardIndicatorSet := NewStandardIndicatorSet(symbol)
+			standardIndicatorSet.BindMarketDataStore(marketDataStore)
+
 			session.marketDataStores[symbol] = marketDataStore
 		}
 
