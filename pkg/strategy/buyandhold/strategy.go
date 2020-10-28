@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	bbgo.RegisterExchangeStrategy("buyandhold", &Strategy{})
+	bbgo.RegisterStrategy("buyandhold", &Strategy{})
 }
 
 type Strategy struct {
