@@ -13,7 +13,7 @@ import (
 )
 
 func init() {
-	bbgo.RegisterExchangeStrategy("xpuremaker", &Strategy{})
+	bbgo.RegisterStrategy("xpuremaker", &Strategy{})
 }
 
 type Strategy struct {

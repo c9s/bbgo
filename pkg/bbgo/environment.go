@@ -15,15 +15,16 @@ import (
 )
 
 var LoadedExchangeStrategies = make(map[string]SingleExchangeStrategy)
-
-func RegisterExchangeStrategy(key string, configmap SingleExchangeStrategy) {
-	LoadedExchangeStrategies[key] = configmap
-}
-
 var LoadedCrossExchangeStrategies = make(map[string]CrossExchangeStrategy)
 
-func RegisterCrossExchangeStrategy(key string, configmap CrossExchangeStrategy) {
-	LoadedCrossExchangeStrategies[key] = configmap
+func RegisterStrategy(key string, s interface{}) {
+	switch d := s.(type) {
+	case SingleExchangeStrategy:
+		LoadedExchangeStrategies[key] = d
+
+	case CrossExchangeStrategy:
+		LoadedCrossExchangeStrategies[key] = d
+	}
 }
 
 // Environment presents the real exchange data layer

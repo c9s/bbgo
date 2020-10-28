@@ -10,7 +10,7 @@ import (
 )
 
 func init() {
-	bbgo.RegisterExchangeStrategy("skeleton", &Strategy{})
+	bbgo.RegisterStrategy("skeleton", &Strategy{})
 }
 
 type Strategy struct {
