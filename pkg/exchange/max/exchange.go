@@ -2,6 +2,7 @@ package max
 
 import (
 	"context"
+	"math"
 	"time"
 
 	"github.com/google/uuid"
@@ -54,7 +55,7 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 			BaseCurrency:    toGlobalCurrency(m.BaseUnit),
 			MinNotional:     m.MinQuoteAmount,
 			MinAmount:       m.MinQuoteAmount,
-			MinLot:          m.MinBaseAmount,
+			MinLot:          1.0 / math.Pow10(m.BaseUnitPrecision), // make it like 0.0001
 			MinQuantity:     m.MinBaseAmount,
 			MaxQuantity:     10000.0,
 			MinPrice:        0.1,

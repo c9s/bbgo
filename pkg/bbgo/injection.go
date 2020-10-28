@@ -31,10 +31,10 @@ func injectField(rs reflect.Value, fieldName string, obj interface{}) error {
 		return nil
 	}
 
-	logrus.Infof("found %s in %T, injecting %T...", fieldName, rs.Type(), obj)
+	logrus.Infof("found %s in %s, injecting %T...", fieldName, rs.Type(), obj)
 
 	if !field.CanSet() {
-		return errors.Errorf("field %s of %T can not be set", fieldName, rs.Type())
+		return errors.Errorf("field %s of %s can not be set", fieldName, rs.Type())
 	}
 
 	rv := reflect.ValueOf(obj)
