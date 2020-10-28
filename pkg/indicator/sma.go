@@ -15,8 +15,7 @@ func (s *Float64Slice) Push(v float64) {
 var zeroTime time.Time
 
 type SMA struct {
-	Interval types.Interval
-	Window   int
+	types.IntervalWindow
 	Values   Float64Slice
 	EndTime  time.Time
 }
