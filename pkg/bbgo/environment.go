@@ -143,6 +143,7 @@ func (environ *Environment) Connect(ctx context.Context) error {
 
 			standardIndicatorSet := NewStandardIndicatorSet(symbol)
 			standardIndicatorSet.BindMarketDataStore(marketDataStore)
+			session.standardIndicatorSets[symbol] = standardIndicatorSet
 		}
 
 		// move market data store dispatch to here, use one callback to dispatch the market data
@@ -152,7 +153,7 @@ func (environ *Environment) Connect(ctx context.Context) error {
 		for symbol := range loadedSymbols {
 			marketDataStore, ok := session.marketDataStores[symbol]
 			if !ok {
-				return errors.Errorf("symbol is not defined")
+				return errors.Errorf("symbol %s is not defined", symbol)
 			}
 
 			for interval := range types.SupportedIntervals {
