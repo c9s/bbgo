@@ -3,7 +3,6 @@ package indicator
 import (
 	"time"
 
-	"github.com/c9s/bbgo/pkg/store"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -20,6 +19,10 @@ type SMA struct {
 	Window   int
 	Values   Float64Slice
 	EndTime  time.Time
+}
+
+func (inc *SMA) Last() float64 {
+	return inc.Values[len(inc.Values)-1]
 }
 
 func (inc *SMA) calculateAndUpdate(kLines []types.KLine) {
@@ -40,16 +43,17 @@ func (inc *SMA) calculateAndUpdate(kLines []types.KLine) {
 	inc.EndTime = kLines[index].EndTime
 }
 
-func (inc *SMA) BindMarketDataStore(store *store.MarketDataStore) {
-	store.OnKLineUpdate(func(kline types.KLine) {
-		// kline guard
-		if inc.Interval != kline.Interval {
+func (inc *SMA) BindMarketDataStore(updater KLineWindowUpdater) {
+	updater.OnKLineWindowUpdate(func(interval types.Interval, window types.KLineWindow) {
+		if inc.Interval != interval {
 			return
 		}
 
-		if kLines, ok := store.KLinesOfInterval(kline.Interval); ok {
-			inc.calculateAndUpdate(kLines)
+		if inc.EndTime != zeroTime && inc.EndTime.Before(inc.EndTime) {
+			return
 		}
+
+		inc.calculateAndUpdate(window)
 	})
 }
 

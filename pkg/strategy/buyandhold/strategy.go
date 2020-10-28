@@ -25,11 +25,21 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
 
 	session.Stream.OnKLine(func(kline types.KLine) {
+		// skip k-lines from other symbols
+		if kline.Symbol != s.Symbol {
+			return
+		}
+
 		changePercentage := kline.GetChange() / kline.Open
 		log.Infof("change %f <=> %f", changePercentage, s.MinDropPercentage)
 	})
 
 	session.Stream.OnKLineClosed(func(kline types.KLine) {
+		// skip k-lines from other symbols
+		if kline.Symbol != s.Symbol {
+			return
+		}
+
 		changePercentage := kline.GetChange() / kline.Open
 
 		if changePercentage > s.MinDropPercentage {

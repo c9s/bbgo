@@ -3,7 +3,6 @@ package indicator
 import (
 	"time"
 
-	"github.com/c9s/bbgo/pkg/store"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -12,6 +11,10 @@ type EWMA struct {
 	Window   int
 	Values   Float64Slice
 	EndTime  time.Time
+}
+
+func (inc *EWMA) Last() float64 {
+	return inc.Values[len(inc.Values)-1]
 }
 
 func (inc *EWMA) calculateAndUpdate(kLines []types.KLine) {
@@ -31,7 +34,7 @@ func (inc *EWMA) calculateAndUpdate(kLines []types.KLine) {
 	var recentK = kLines[index-(inc.Window-1) : index+1]
 	if len(inc.Values) > 0 {
 		var previousEWMA = inc.Values[len(inc.Values)-1]
-		var ewma = lastK.Close * multiplier + previousEWMA * (1 - multiplier)
+		var ewma = lastK.Close*multiplier + previousEWMA*(1-multiplier)
 		inc.Values.Push(ewma)
 	} else {
 		// The first EWMA is actually SMA
@@ -42,10 +45,13 @@ func (inc *EWMA) calculateAndUpdate(kLines []types.KLine) {
 	inc.EndTime = kLines[index].EndTime
 }
 
-func (inc *EWMA) BindMarketDataStore(store *store.MarketDataStore) {
-	store.OnKLineUpdate(func(kline types.KLine) {
-		// kline guard
-		if inc.Interval != kline.Interval {
+type KLineWindowUpdater interface {
+	OnKLineWindowUpdate(func(interval types.Interval, window types.KLineWindow))
+}
+
+func (inc *EWMA) BindMarketDataStore(updater KLineWindowUpdater) {
+	updater.OnKLineWindowUpdate(func(interval types.Interval, window types.KLineWindow) {
+		if inc.Interval != interval {
 			return
 		}
 
@@ -53,8 +59,6 @@ func (inc *EWMA) BindMarketDataStore(store *store.MarketDataStore) {
 			return
 		}
 
-		if kLines, ok := store.KLinesOfInterval(types.Interval(kline.Interval)); ok {
-			inc.calculateAndUpdate(kLines)
-		}
+		inc.calculateAndUpdate(window)
 	})
 }
