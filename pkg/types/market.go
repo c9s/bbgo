@@ -44,14 +44,20 @@ func (m Market) FormatPriceCurrency(val float64) string {
 }
 
 func (m Market) FormatPrice(val float64) string {
-
 	p := math.Pow10(m.PricePrecision)
 	val = math.Trunc(val*p) / p
 	return strconv.FormatFloat(val, 'f', m.PricePrecision, 64)
 }
 
+func (m Market) FormatQuantity(val float64) string {
+	prec := int(math.Abs(math.Log10(m.MinLot)))
+	p := math.Pow10(prec)
+	val = math.Trunc(val*p) / p
+	return strconv.FormatFloat(val, 'f', prec, 64)
+}
+
 func (m Market) FormatVolume(val float64) string {
-	p := math.Pow10(m.PricePrecision)
+	p := math.Pow10(m.VolumePrecision)
 	val = math.Trunc(val*p) / p
 	return strconv.FormatFloat(val, 'f', m.VolumePrecision, 64)
 }
