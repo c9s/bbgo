@@ -43,12 +43,13 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 
+		quantity := s.BaseQuantity * (1.0 + math.Abs(changePercentage))
 		_, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 			Symbol:   kline.Symbol,
 			Market:   market,
 			Side:     types.SideTypeBuy,
 			Type:     types.OrderTypeMarket,
-			Quantity: s.BaseQuantity * math.Abs(changePercentage),
+			Quantity: quantity,
 		})
 		if err != nil {
 			log.WithError(err).Error("submit order error")
