@@ -22,6 +22,7 @@ type Strategy struct {
 	*bbgo.MarketDataStore
 	*types.Market
 
+	// OrderExecutor is an interface for submitting order
 	bbgo.OrderExecutor
 
 	// These fields will be filled from the config file (it translates YAML to JSON)
@@ -116,7 +117,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		case 1:
 			// if it goes up and it's above the moving average price, then we sell
 			if closePrice > movingAveragePrice {
-				s.notify(":chart_with_upwards_trend: closePrice %f is above movingAveragePrice %f, submitting sell order", closePrice, movingAveragePrice)
+				s.notify(":chart_with_upwards_trend: closePrice %f is above movingAveragePrice %f, submitting SELL order", closePrice, movingAveragePrice)
 
 				_, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 					Symbol:   s.Symbol,
@@ -132,7 +133,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		case -1:
 			// if it goes down and it's below the moving average price, then we buy
 			if closePrice < movingAveragePrice {
-				s.notify(":chart_with_downwards_trend: closePrice %f is below movingAveragePrice %f, submitting buy order", closePrice, movingAveragePrice)
+				s.notify(":chart_with_downwards_trend: closePrice %f is below movingAveragePrice %f, submitting BUY order", closePrice, movingAveragePrice)
 
 				_, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 					Symbol:   s.Symbol,

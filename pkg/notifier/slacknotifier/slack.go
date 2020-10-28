@@ -40,6 +40,10 @@ func (n *Notifier) Notify(format string, args ...interface{}) {
 }
 
 func (n *Notifier) NotifyTo(channel, format string, args ...interface{}) {
+	if len(channel) == 0 {
+		channel = n.channel
+	}
+
 	var slackAttachments []slack.Attachment
 	var slackArgsOffset = -1
 

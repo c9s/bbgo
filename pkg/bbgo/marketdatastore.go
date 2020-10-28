@@ -79,8 +79,12 @@ func (store *MarketDataStore) handleKLineClosed(kline types.KLine) {
 }
 
 func (store *MarketDataStore) AddKLine(kline types.KLine) {
-	window := store.KLineWindows[kline.Interval]
-	window.Add(kline)
+	window, ok := store.KLineWindows[kline.Interval]
+	if !ok {
+		window = types.KLineWindow{kline}
+	} else {
+		window.Add(kline)
+	}
 	store.KLineWindows[kline.Interval] = window
 
 	store.LastKLine = kline

@@ -107,11 +107,7 @@ func (trader *Trader) Run(ctx context.Context) error {
 	// session based trade reporter
 	for sessionName := range trader.environment.sessions {
 		var session = trader.environment.sessions[sessionName]
-		if session.tradeReporter != nil {
-			session.Stream.OnTrade(func(trade types.Trade) {
-				session.tradeReporter.Report(trade)
-			})
-		} else if trader.tradeReporter != nil {
+		if trader.tradeReporter != nil {
 			session.Stream.OnTrade(func(trade types.Trade) {
 				trader.tradeReporter.Report(trade)
 			})
