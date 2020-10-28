@@ -44,3 +44,13 @@ var SupportedIntervals = map[Interval]int{
 	Interval1d:  60 * 24,
 	Interval3d:  60 * 24 * 3,
 }
+
+// IntervalWindow is used by the indicators
+type IntervalWindow struct {
+	// The interval of kline
+	Interval Interval
+
+	// The windows size of the indicator (EWMA and SMA)
+	Window int
+}
+

@@ -141,7 +141,7 @@ func (e *BasicRiskControlOrderExecutor) SubmitOrders(ctx context.Context, orders
 
 		formattedOrders = append(formattedOrders, o)
 
-		e.Notify(":memo: Submitting %s %s %s order with quantity %s @ %s", o.Symbol, o.Side, o.Type, o.QuantityString, o.PriceString, o)
+		e.Notify(":memo: Submitting %s %s %s order with quantity %s @ %s", o.Symbol, o.Side, o.Type, o.QuantityString, o.PriceString, &o)
 	}
 
 	return e.session.Exchange.SubmitOrders(ctx, formattedOrders...)

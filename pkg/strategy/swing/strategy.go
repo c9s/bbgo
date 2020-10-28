@@ -8,7 +8,6 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
-	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -20,7 +19,7 @@ type Strategy struct {
 	// The notification system will be injected into the strategy automatically.
 	*bbgo.Notifiability
 	*bbgo.MarketDataStore
-	*types.Market
+	types.Market
 
 	// OrderExecutor is an interface for submitting order
 	bbgo.OrderExecutor
@@ -44,46 +43,20 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-	market, ok := session.Market(s.Symbol)
-	if !ok {
-		return errors.Errorf("market config of %s is not configured", s.Symbol)
-	}
-
-	marketDataStore, ok := session.MarketDataStore(s.Symbol)
-	if !ok {
-		return errors.Errorf("market data store of %s is not configured", s.Symbol)
-	}
-
 	indicatorSet, ok := session.StandardIndicatorSet(s.Symbol)
 	if !ok {
 		return errors.Errorf("indicatorSet of %s is not configured", s.Symbol)
 	}
 
 	var inc Float64Indicator
-	var iw = bbgo.IntervalWindow{Interval: s.MovingAverageInterval, Window: s.MovingAverageWindow}
+	var iw = types.IntervalWindow{Interval: s.MovingAverageInterval, Window: s.MovingAverageWindow}
 
 	switch s.MovingAverageType {
 	case "SMA":
-		inc, ok = indicatorSet.SMA[iw]
-		if !ok {
-			inc := &indicator.SMA{
-				Interval: iw.Interval,
-				Window:   iw.Window,
-			}
-			inc.Bind(marketDataStore)
-			indicatorSet.SMA[iw] = inc
-		}
+		inc = indicatorSet.GetSMA(iw)
 
 	case "EWMA", "EMA":
-		inc, ok = indicatorSet.EWMA[iw]
-		if !ok {
-			inc := &indicator.EWMA{
-				Interval: iw.Interval,
-				Window:   iw.Window,
-			}
-			inc.Bind(marketDataStore)
-			indicatorSet.EWMA[iw] = inc
-		}
+		inc = indicatorSet.GetEWMA(iw)
 
 	default:
 		return errors.Errorf("unsupported moving average type: %s", s.MovingAverageType)
@@ -121,7 +94,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 				_, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 					Symbol:   s.Symbol,
-					Market:   market,
+					Market:   s.Market,
 					Side:     types.SideTypeSell,
 					Type:     types.OrderTypeMarket,
 					Quantity: quantity,
@@ -137,7 +110,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 				_, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 					Symbol:   s.Symbol,
-					Market:   market,
+					Market:   s.Market,
 					Side:     types.SideTypeBuy,
 					Type:     types.OrderTypeMarket,
 					Quantity: quantity,

@@ -5,20 +5,12 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-type IntervalWindow struct {
-	// The interval of kline
-	Interval types.Interval
-
-	// The windows size of EWMA and SMA
-	Window int
-}
-
 type StandardIndicatorSet struct {
 	Symbol string
 	// Standard indicators
 	// interval -> window
-	SMA  map[IntervalWindow]*indicator.SMA
-	EWMA map[IntervalWindow]*indicator.EWMA
+	SMA  map[types.IntervalWindow]*indicator.SMA
+	EWMA map[types.IntervalWindow]*indicator.EWMA
 
 	store *MarketDataStore
 }
@@ -26,15 +18,15 @@ type StandardIndicatorSet struct {
 func NewStandardIndicatorSet(symbol string, store *MarketDataStore) *StandardIndicatorSet {
 	set := &StandardIndicatorSet{
 		Symbol: symbol,
-		SMA:    make(map[IntervalWindow]*indicator.SMA),
-		EWMA:   make(map[IntervalWindow]*indicator.EWMA),
+		SMA:    make(map[types.IntervalWindow]*indicator.SMA),
+		EWMA:   make(map[types.IntervalWindow]*indicator.EWMA),
 		store:  store,
 	}
 
 	// let us pre-defined commonly used intervals
 	for interval := range types.SupportedIntervals {
 		for _, window := range []int{7, 25, 99} {
-			iw := IntervalWindow{interval, window}
+			iw := types.IntervalWindow{interval, window}
 			set.SMA[iw] = &indicator.SMA{Interval: interval, Window: window}
 			set.SMA[iw].Bind(store)
 
@@ -46,12 +38,25 @@ func NewStandardIndicatorSet(symbol string, store *MarketDataStore) *StandardInd
 	return set
 }
 
-func (set *StandardIndicatorSet) GetSMA(iw IntervalWindow) *indicator.SMA {
+// GetSMA returns the simple moving average indicator of the given interval and the window size.
+func (set *StandardIndicatorSet) GetSMA(iw types.IntervalWindow) *indicator.SMA {
 	inc, ok := set.SMA[iw]
 	if !ok {
 		inc := &indicator.SMA{Interval: iw.Interval, Window: iw.Window}
 		inc.Bind(set.store)
 		set.SMA[iw] = inc
+	}
+
+	return inc
+}
+
+// GetEWMA returns the exponential weighed moving average indicator of the given interval and the window size.
+func (set *StandardIndicatorSet) GetEWMA(iw types.IntervalWindow) *indicator.EWMA {
+	inc, ok := set.EWMA[iw]
+	if !ok {
+		inc := &indicator.EWMA{Interval: iw.Interval, Window: iw.Window}
+		inc.Bind(set.store)
+		set.EWMA[iw] = inc
 	}
 
 	return inc
