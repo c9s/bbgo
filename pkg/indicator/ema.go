@@ -25,6 +25,8 @@ func (inc *EWMA) calculateAndUpdate(kLines []types.KLine) {
 
 	var index = len(kLines) - 1
 	var lastK = kLines[index]
+
+	// see https://www.investopedia.com/ask/answers/122314/what-exponential-moving-average-ema-formula-and-how-ema-calculated.asp
 	var multiplier = 2.0 / float64(inc.Window+1)
 
 	if inc.EndTime != zeroTime && lastK.EndTime.Before(inc.EndTime) {
