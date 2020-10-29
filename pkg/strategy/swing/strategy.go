@@ -121,7 +121,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		trend := kline.GetTrend()
 		switch trend {
-		case 1:
+		case types.TrendUp:
 			// if it goes up and it's above the moving average price, then we sell
 			if closePrice > movingAveragePrice {
 				s.notify(":chart_with_upwards_trend: closePrice %f is above movingAveragePrice %f, submitting SELL order", closePrice, movingAveragePrice)
@@ -137,7 +137,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 					log.WithError(err).Error("submit order error")
 				}
 			}
-		case -1:
+		case types.TrendDown:
 			// if it goes down and it's below the moving average price, then we buy
 			if closePrice < movingAveragePrice {
 				s.notify(":chart_with_downwards_trend: closePrice %f is below movingAveragePrice %f, submitting BUY order", closePrice, movingAveragePrice)
