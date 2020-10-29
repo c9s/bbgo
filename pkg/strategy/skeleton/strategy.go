@@ -15,17 +15,17 @@ func init() {
 
 type Strategy struct {
 	Symbol string `json:"symbol"`
+
+	types.Market
+}
+
+func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
 	session.Stream.OnKLineClosed(func(kline types.KLine) {
-		market, ok := session.Market(s.Symbol)
-		if !ok {
-			return
-		}
-
-		quoteBalance, ok := session.Account.Balance(market.QuoteCurrency)
+		quoteBalance, ok := session.Account.Balance(s.Market.QuoteCurrency)
 		if !ok {
 			return
 		}
