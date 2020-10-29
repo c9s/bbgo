@@ -11,6 +11,7 @@ type StandardIndicatorSet struct {
 	// interval -> window
 	SMA  map[types.IntervalWindow]*indicator.SMA
 	EWMA map[types.IntervalWindow]*indicator.EWMA
+	BOLL map[types.IntervalWindow]*indicator.BOLL
 
 	store *MarketDataStore
 }
@@ -33,6 +34,12 @@ func NewStandardIndicatorSet(symbol string, store *MarketDataStore) *StandardInd
 			set.EWMA[iw] = &indicator.EWMA{IntervalWindow: iw}
 			set.EWMA[iw].Bind(store)
 		}
+
+		// setup BOLL indicator, we may refactor BOLL indicator by subscribing SMA indicator,
+		// however, since general used BOLLINGER band use window 21, which is not in the existing SMA indicator sets.
+		iw := types.IntervalWindow{Interval: interval, Window: 21}
+		set.BOLL[iw] = &indicator.BOLL{IntervalWindow: iw, K: 2.0}
+		set.BOLL[iw].Bind(store)
 	}
 
 	return set
