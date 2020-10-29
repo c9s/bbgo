@@ -22,8 +22,11 @@ var KLineChannel = Channel("kline")
 type StandardStream struct {
 	Subscriptions []Subscription
 
-	// private trade callbacks
-	tradeCallbacks []func(trade Trade)
+	// private trade update callbacks
+	tradeUpdateCallbacks []func(trade Trade)
+
+	// private order update callbacks
+	orderUpdateCallbacks []func(order Order)
 
 	// balance snapshot callbacks
 	balanceSnapshotCallbacks []func(balances map[string]Balance)
