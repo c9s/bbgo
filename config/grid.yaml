@@ -45,6 +45,6 @@ exchangeStrategies:
     symbol: BNBUSDT
     interval: 1m
     baseQuantity: 1.0
-    gridPips: 0.1
-    gridNumber: 3
+    gridPips: 0.02
+    gridNumber: 2
 
