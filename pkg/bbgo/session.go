@@ -26,11 +26,11 @@ func NewStandardIndicatorSet(symbol string, store *MarketDataStore) *StandardInd
 	// let us pre-defined commonly used intervals
 	for interval := range types.SupportedIntervals {
 		for _, window := range []int{7, 25, 99} {
-			iw := types.IntervalWindow{interval, window}
-			set.SMA[iw] = &indicator.SMA{Interval: interval, Window: window}
+			iw := types.IntervalWindow{Interval: interval, Window: window}
+			set.SMA[iw] = &indicator.SMA{IntervalWindow: iw}
 			set.SMA[iw].Bind(store)
 
-			set.EWMA[iw] = &indicator.EWMA{Interval: interval, Window: window}
+			set.EWMA[iw] = &indicator.EWMA{IntervalWindow: iw}
 			set.EWMA[iw].Bind(store)
 		}
 	}
