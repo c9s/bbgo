@@ -1,0 +1,50 @@
+---
+notifications:
+  slack:
+    defaultChannel: "dev-bbgo"
+    errorChannel: "bbgo-error"
+
+  # if you want to route channel by symbol
+  symbolChannels:
+    "^BTC": "btc"
+    "^ETH": "eth"
+    "^BNB": "bnb"
+
+  # object routing rules
+  routing:
+    trade: "$symbol"
+    order: "$symbol"
+    submitOrder: "$session" # not supported yet
+    pnL: "bbgo-pnl"
+
+sessions:
+  binance:
+    exchange: binance
+    envVarPrefix: binance
+
+riskControls:
+  # This is the session-based risk controller, which let you configure different risk controller by session.
+  sessionBased:
+    # "max" is the session name that you want to configure the risk control
+    binance:
+      # orderExecutors is one of the risk control
+      orderExecutors:
+        # symbol-routed order executor
+        bySymbol:
+          BNBUSDT:
+            # basic risk control order executor
+            basic:
+              minQuoteBalance: 100.0
+              maxBaseAssetBalance: 50.0
+              minBaseAssetBalance: 1.0
+              maxOrderAmount: 100.0
+
+exchangeStrategies:
+- on: binance
+  grid:
+    symbol: BNBUSDT
+    interval: 1m
+    baseQuantity: 1.0
+    gridPips: 0.1
+    gridNumber: 3
+
