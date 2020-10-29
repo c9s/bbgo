@@ -40,6 +40,13 @@ func (slice PriceVolumeSlice) Copy() PriceVolumeSlice {
 	return append(slice[:0:0], slice...)
 }
 
+func (slice PriceVolumeSlice) First() (PriceVolume, bool) {
+	if len(slice) > 0 {
+		return slice[0], true
+	}
+	return PriceVolume{}, false
+}
+
 func (slice PriceVolumeSlice) IndexByVolumeDepth(requiredVolume fixedpoint.Value) int {
 	var tv int64 = 0
 	for x, el := range slice {
