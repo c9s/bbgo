@@ -86,6 +86,9 @@ func (set *StandardIndicatorSet) GetEWMA(iw types.IntervalWindow) *indicator.EWM
 // ExchangeSession presents the exchange connection session
 // It also maintains and collects the data returned from the stream.
 type ExchangeSession struct {
+	// exchange session based notification system
+	Notifiability
+
 	// Exchange session name
 	Name string
 
@@ -119,6 +122,12 @@ type ExchangeSession struct {
 
 func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 	return &ExchangeSession{
+		Notifiability: Notifiability{
+			SymbolChannelRouter:  NewPatternChannelRouter(nil),
+			SessionChannelRouter: NewPatternChannelRouter(nil),
+			ObjectChannelRouter:  NewObjectChannelRouter(),
+		},
+
 		Name:          name,
 		Exchange:      exchange,
 		Stream:        exchange.NewStream(),
