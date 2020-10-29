@@ -38,7 +38,7 @@ func NewStream(key, secret string) *Stream {
 				return
 			}
 
-			stream.EmitTrade(*trade)
+			stream.EmitTradeUpdate(*trade)
 		}
 	})
 

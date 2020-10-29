@@ -158,7 +158,7 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 			session.marketDataStores[kline.Symbol].AddKLine(kline)
 		})
 
-		session.Stream.OnTrade(func(trade types.Trade) {
+		session.Stream.OnTradeUpdate(func(trade types.Trade) {
 			// append trades
 			session.Trades[trade.Symbol] = append(session.Trades[trade.Symbol], trade)
 
