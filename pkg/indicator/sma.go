@@ -16,8 +16,8 @@ var zeroTime time.Time
 
 type SMA struct {
 	types.IntervalWindow
-	Values   Float64Slice
-	EndTime  time.Time
+	Values  Float64Slice
+	EndTime time.Time
 }
 
 func (inc *SMA) Last() float64 {
