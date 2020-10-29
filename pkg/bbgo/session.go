@@ -21,6 +21,7 @@ func NewStandardIndicatorSet(symbol string, store *MarketDataStore) *StandardInd
 		Symbol: symbol,
 		SMA:    make(map[types.IntervalWindow]*indicator.SMA),
 		EWMA:   make(map[types.IntervalWindow]*indicator.EWMA),
+		BOLL:   make(map[types.IntervalWindow]*indicator.BOLL),
 		store:  store,
 	}
 
