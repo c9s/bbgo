@@ -74,14 +74,18 @@ func (inc *BOLL) calculateAndUpdate(kLines []types.KLine) {
 	var std = stat.StdDev(prices, nil)
 	inc.StdDev.Push(std)
 
-	var upBand = sma + inc.K*std
+	var band = inc.K * std
+
+	var upBand = sma + band
 	inc.UpBand.Push(upBand)
 
-	var downBand = sma - inc.K*std
+	var downBand = sma - band
 	inc.DownBand.Push(downBand)
 
 	// update end time
 	inc.EndTime = kLines[index].EndTime
+
+	inc.EmitUpdate(sma, upBand, downBand)
 }
 
 func (inc *BOLL) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {

@@ -106,7 +106,7 @@ func (trader *Trader) Run(ctx context.Context) error {
 	for sessionName := range trader.environment.sessions {
 		var session = trader.environment.sessions[sessionName]
 		if trader.tradeReporter != nil {
-			session.Stream.OnTrade(func(trade types.Trade) {
+			session.Stream.OnTradeUpdate(func(trade types.Trade) {
 				trader.tradeReporter.Report(trade)
 			})
 		}
@@ -290,7 +290,7 @@ func (trader *OrderExecutor) RunStrategy(ctx context.Context, strategy SingleExc
 		trader.reportPnL()
 	})
 
-	stream.OnTrade(func(trade *types.Trade) {
+	stream.OnTradeUpdate(func(trade *types.Trade) {
 		trader.NotifyTrade(trade)
 		trader.ProfitAndLossCalculator.AddTrade(*trade)
 		_, err := trader.Context.StockManager.AddTrades([]types.Trade{*trade})

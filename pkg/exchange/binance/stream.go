@@ -137,7 +137,7 @@ func NewStream(client *binance.Client) *Stream {
 				break
 			}
 
-			stream.EmitTrade(*trade)
+			stream.EmitTradeUpdate(*trade)
 		}
 	})
 
