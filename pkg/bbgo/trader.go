@@ -46,8 +46,6 @@ type Trader struct {
 	exchangeStrategies      map[string][]SingleExchangeStrategy
 
 	tradeReporter *TradeReporter
-	// reportTimer             *time.Timer
-	// ProfitAndLossCalculator *accounting.ProfitAndLossCalculator
 }
 
 func NewTrader(environ *Environment) *Trader {
