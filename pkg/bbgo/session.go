@@ -45,6 +45,19 @@ func NewStandardIndicatorSet(symbol string, store *MarketDataStore) *StandardInd
 	return set
 }
 
+// GetBOLL returns the bollinger band indicator of the given interval and the window,
+// Please note that the K for std dev is fixed and defaults to 2.0
+func (set *StandardIndicatorSet) GetBOLL(iw types.IntervalWindow) *indicator.BOLL {
+	inc, ok := set.BOLL[iw]
+	if !ok {
+		inc := &indicator.BOLL{IntervalWindow: iw, K: 2.0}
+		inc.Bind(set.store)
+		set.BOLL[iw] = inc
+	}
+
+	return inc
+}
+
 // GetSMA returns the simple moving average indicator of the given interval and the window size.
 func (set *StandardIndicatorSet) GetSMA(iw types.IntervalWindow) *indicator.SMA {
 	inc, ok := set.SMA[iw]
