@@ -220,7 +220,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		switch order.Status {
 
-		case types.OrderStatusCanceled, types.OrderStatusRejected:
+		case types.OrderStatusCanceled, types.OrderStatusRejected, types.OrderStatusFilled:
 			log.Infof("order status %s, removing %d from the active order pool...", order.Status, order.OrderID)
 
 			switch order.Side {
