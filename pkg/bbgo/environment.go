@@ -10,8 +10,10 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/accounting/pnl"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 var LoadedExchangeStrategies = make(map[string]SingleExchangeStrategy)
@@ -62,7 +64,6 @@ func (environ *Environment) ReportTrade() *TradeReporter {
 	environ.tradeReporter = NewTradeReporter(&environ.Notifiability)
 	return environ.tradeReporter
 }
-
 
 func (environ *Environment) AddExchange(name string, exchange types.Exchange) (session *ExchangeSession) {
 	session = NewExchangeSession(name, exchange)
@@ -170,11 +171,8 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 		})
 
 		// session based trade reporter
-		if environ.tradeReporter != nil {
-			session.Stream.OnTradeUpdate(func(trade types.Trade) {
-				environ.tradeReporter.Report(trade)
-			})
-		}
+		// if environ.tradeReporter != nil {
+		// }
 
 		session.Stream.OnTradeUpdate(func(trade types.Trade) {
 			// append trades
@@ -190,6 +188,146 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 	}
 
 	return nil
+}
+
+// configure notification rules
+// for symbol-based routes, we should register the same symbol rules for each session.
+// for session-based routes, we should set the fixed callbacks for each session
+func (environ *Environment) ConfigureNotification(conf *NotificationConfig) {
+	// configure routing here
+	if conf.SymbolChannels != nil {
+		environ.SymbolChannelRouter.AddRoute(conf.SymbolChannels)
+	}
+	if conf.SessionChannels != nil {
+		environ.SessionChannelRouter.AddRoute(conf.SessionChannels)
+	}
+
+	if conf.Routing != nil {
+		// configure passive object notification routing
+		switch conf.Routing.Trade {
+		case "$session":
+			defaultTradeUpdateHandler := func(trade types.Trade) {
+				text := util.Render(TemplateTradeReport, trade)
+				environ.Notify(text, trade)
+			}
+			for name := range environ.sessions {
+				session := environ.sessions[name]
+
+				// if we can route session name to channel successfully...
+				channel, ok := environ.SessionChannelRouter.Route(name)
+				if ok {
+					session.Stream.OnTradeUpdate(func(trade types.Trade) {
+						text := util.Render(TemplateTradeReport, trade)
+						environ.NotifyTo(channel, text, trade)
+					})
+				} else {
+					session.Stream.OnTradeUpdate(defaultTradeUpdateHandler)
+				}
+			}
+
+		case "$symbol":
+			// configure object routes for Trade
+			environ.ObjectChannelRouter.Route(func(obj interface{}) (channel string, ok bool) {
+				trade, matched := obj.(*types.Trade)
+				if !matched {
+					return
+				}
+				channel, ok = environ.SymbolChannelRouter.Route(trade.Symbol)
+				return
+			})
+
+			// use same handler for each session
+			handler := func(trade types.Trade) {
+				text := util.Render(TemplateTradeReport, trade)
+				channel, ok := environ.RouteObject(trade)
+				if ok {
+					environ.NotifyTo(channel, text, trade)
+				} else {
+					environ.Notify(text, trade)
+				}
+			}
+			for _, session := range environ.sessions {
+				session.Stream.OnTradeUpdate(handler)
+			}
+		}
+
+		switch conf.Routing.Order {
+
+		case "$session":
+			defaultOrderUpdateHandler := func(order types.Order) {
+				text := util.Render(TemplateOrderReport, order)
+				environ.Notify(text, order)
+			}
+			for name := range environ.sessions {
+				session := environ.sessions[name]
+
+				// if we can route session name to channel successfully...
+				channel, ok := environ.SessionChannelRouter.Route(name)
+				if ok {
+					session.Stream.OnOrderUpdate(func(order types.Order) {
+						text := util.Render(TemplateOrderReport, order)
+						environ.NotifyTo(channel, text, order)
+					})
+				} else {
+					session.Stream.OnOrderUpdate(defaultOrderUpdateHandler)
+				}
+			}
+
+		case "$symbol":
+			// add object route
+			environ.ObjectChannelRouter.Route(func(obj interface{}) (channel string, ok bool) {
+				order, matched := obj.(*types.Order)
+				if !matched {
+					return
+				}
+				channel, ok = environ.SymbolChannelRouter.Route(order.Symbol)
+				return
+			})
+
+			// use same handler for each session
+			handler := func(order types.Order) {
+				text := util.Render(TemplateOrderReport, order)
+				channel, ok := environ.RouteObject(order)
+				if ok {
+					environ.NotifyTo(channel, text, order)
+				} else {
+					environ.Notify(text, order)
+				}
+			}
+			for _, session := range environ.sessions {
+				session.Stream.OnOrderUpdate(handler)
+			}
+		}
+
+		switch conf.Routing.SubmitOrder {
+		case "$symbol":
+			// add object route
+			environ.ObjectChannelRouter.Route(func(obj interface{}) (channel string, ok bool) {
+				order, matched := obj.(*types.SubmitOrder)
+				if !matched {
+					return
+				}
+
+				channel, ok = environ.SymbolChannelRouter.Route(order.Symbol)
+				return
+			})
+
+		}
+
+		// currently not used
+		switch conf.Routing.PnL {
+		case "$symbol":
+			environ.ObjectChannelRouter.Route(func(obj interface{}) (channel string, ok bool) {
+				report, matched := obj.(*pnl.AverageCostPnlReport)
+				if !matched {
+					return
+				}
+				channel, ok = environ.SymbolChannelRouter.Route(report.Symbol)
+				return
+			})
+		}
+
+	}
 }
 
 // SyncTradesFrom overrides the default trade scan time (-7 days)

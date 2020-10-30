@@ -101,6 +101,10 @@ func (router *PatternChannelRouter) AddRoute(routes map[string]string) {
 		return
 	}
 
+	if router.routes == nil {
+		router.routes = make(map[*regexp.Regexp]string)
+	}
+
 	for pattern, channel := range routes {
 		router.routes[regexp.MustCompile(pattern)] = channel
 	}
@@ -151,9 +155,8 @@ func NewTradeReporter(notifiability *Notifiability) *TradeReporter {
 	}
 }
 
-func (reporter *TradeReporter) Report(trade types.Trade) {
-	text := util.Render(`:handshake: {{ .Symbol }} {{ .Side }} Trade Execution @ {{ .Price  }}`, trade)
-
+func (reporter *TradeReporter) ReportBySymbol(trade types.Trade) {
+	text := util.Render(TemplateTradeReport, trade)
 	channel, ok := reporter.RouteSymbol(trade.Symbol)
 	if ok {
 		reporter.NotifyTo(channel, text, trade)
@@ -161,3 +164,12 @@ func (reporter *TradeReporter) Report(trade types.Trade) {
 		reporter.Notify(text, trade)
 	}
 }
+
+func (reporter *TradeReporter) Report(trade types.Trade) {
+	text := util.Render(TemplateTradeReport, trade)
+	reporter.Notify(text, trade)
+}
+
+const TemplateTradeReport = `:handshake: {{ .Symbol }} {{ .Side }} Trade Execution @ {{ .Price  }}`
+
+const TemplateOrderReport = `:handshake: {{ .Symbol }} {{ .Side }} Order Update @ {{ .Price  }}`

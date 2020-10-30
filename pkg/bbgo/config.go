@@ -36,7 +36,7 @@ type NotificationRouting struct {
 	PnL string `json:"pnL,omitempty" yaml:"pnL,omitempty"`
 }
 
-type Notifications struct {
+type NotificationConfig struct {
 	Slack *SlackNotification `json:"slack,omitempty" yaml:"slack,omitempty"`
 
 	SymbolChannels  map[string]string `json:"symbolChannels,omitempty" yaml:"symbolChannels,omitempty"`
@@ -53,7 +53,7 @@ type Session struct {
 type Config struct {
 	Imports []string `json:"imports" yaml:"imports"`
 
-	Notifications *Notifications `json:"notifications,omitempty" yaml:"notifications,omitempty"`
+	Notifications *NotificationConfig `json:"notifications,omitempty" yaml:"notifications,omitempty"`
 
 	Sessions map[string]Session `json:"sessions,omitempty" yaml:"sessions,omitempty"`
 
