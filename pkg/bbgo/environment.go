@@ -198,7 +198,7 @@ func (environ *Environment) ConfigureNotification(conf *NotificationConfig) {
 		case "$session":
 			defaultTradeUpdateHandler := func(trade types.Trade) {
 				text := util.Render(TemplateTradeReport, trade)
-				environ.Notify(text, trade)
+				environ.Notify(text, &trade)
 			}
 			for name := range environ.sessions {
 				session := environ.sessions[name]
@@ -208,7 +208,7 @@ func (environ *Environment) ConfigureNotification(conf *NotificationConfig) {
 				if ok {
 					session.Stream.OnTradeUpdate(func(trade types.Trade) {
 						text := util.Render(TemplateTradeReport, trade)
-						environ.NotifyTo(channel, text, trade)
+						environ.NotifyTo(channel, text, &trade)
 					})
 				} else {
 					session.Stream.OnTradeUpdate(defaultTradeUpdateHandler)
@@ -229,11 +229,11 @@ func (environ *Environment) ConfigureNotification(conf *NotificationConfig) {
 			// use same handler for each session
 			handler := func(trade types.Trade) {
 				text := util.Render(TemplateTradeReport, trade)
-				channel, ok := environ.RouteObject(trade)
+				channel, ok := environ.RouteObject(&trade)
 				if ok {
-					environ.NotifyTo(channel, text, trade)
+					environ.NotifyTo(channel, text, &trade)
 				} else {
-					environ.Notify(text, trade)
+					environ.Notify(text, &trade)
 				}
 			}
 			for _, session := range environ.sessions {
@@ -246,7 +246,7 @@ func (environ *Environment) ConfigureNotification(conf *NotificationConfig) {
 		case "$session":
 			defaultOrderUpdateHandler := func(order types.Order) {
 				text := util.Render(TemplateOrderReport, order)
-				environ.Notify(text, order)
+				environ.Notify(text, &order)
 			}
 			for name := range environ.sessions {
 				session := environ.sessions[name]
@@ -256,7 +256,7 @@ func (environ *Environment) ConfigureNotification(conf *NotificationConfig) {
 				if ok {
 					session.Stream.OnOrderUpdate(func(order types.Order) {
 						text := util.Render(TemplateOrderReport, order)
-						environ.NotifyTo(channel, text, order)
+						environ.NotifyTo(channel, text, &order)
 					})
 				} else {
 					session.Stream.OnOrderUpdate(defaultOrderUpdateHandler)
@@ -277,11 +277,11 @@ func (environ *Environment) ConfigureNotification(conf *NotificationConfig) {
 			// use same handler for each session
 			handler := func(order types.Order) {
 				text := util.Render(TemplateOrderReport, order)
-				channel, ok := environ.RouteObject(order)
+				channel, ok := environ.RouteObject(&order)
 				if ok {
-					environ.NotifyTo(channel, text, order)
+					environ.NotifyTo(channel, text, &order)
 				} else {
-					environ.Notify(text, order)
+					environ.Notify(text, &order)
 				}
 			}
 			for _, session := range environ.sessions {

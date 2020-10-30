@@ -44,9 +44,9 @@ func (e *ExchangeOrderExecutor) notifySubmitOrders(orders ...types.SubmitOrder) 
 		// pass submit order as an interface object.
 		channel, ok := e.RouteObject(&order)
 		if ok {
-			e.NotifyTo(channel, ":memo: Submitting %s %s %s order with quantity: %s", order.Symbol, order.Type, order.Side, order.QuantityString, order)
+			e.NotifyTo(channel, ":memo: Submitting %s %s %s order with quantity: %s", order.Symbol, order.Type, order.Side, order.QuantityString, &order)
 		} else {
-			e.Notify(":memo: Submitting %s %s %s order with quantity: %s", order.Symbol, order.Type, order.Side, order.QuantityString, order)
+			e.Notify(":memo: Submitting %s %s %s order with quantity: %s", order.Symbol, order.Type, order.Side, order.QuantityString, &order)
 		}
 	}
 }
