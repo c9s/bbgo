@@ -18,18 +18,22 @@ type Notifiability struct {
 	ObjectChannelRouter  *ObjectChannelRouter
 }
 
+// RouteSession routes symbol name to channel
 func (m *Notifiability) RouteSymbol(symbol string) (channel string, ok bool) {
 	return m.SymbolChannelRouter.Route(symbol)
 }
 
+// RouteSession routes session name to channel
 func (m *Notifiability) RouteSession(session string) (channel string, ok bool) {
 	return m.SessionChannelRouter.Route(session)
 }
 
+// RouteObject routes object to channel
 func (m *Notifiability) RouteObject(obj interface{}) (channel string, ok bool) {
 	return m.ObjectChannelRouter.Route(obj)
 }
 
+// AddNotifier adds the notifier that implements the Notifier interface.
 func (m *Notifiability) AddNotifier(notifier Notifier) {
 	m.notifiers = append(m.notifiers, notifier)
 }
