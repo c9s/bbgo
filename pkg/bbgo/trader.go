@@ -36,8 +36,6 @@ type CrossExchangeStrategy interface {
 }
 
 type Trader struct {
-	Notifiability
-
 	environment *Environment
 
 	riskControls *RiskControls
