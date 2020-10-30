@@ -127,7 +127,6 @@ func runConfig(ctx context.Context, userConfig *bbgo.Config) error {
 
 
 	trader := bbgo.NewTrader(environ)
-	trader.Notifiability = notification
 
 	if userConfig.RiskControls != nil {
 		trader.SetRiskControls(userConfig.RiskControls)
