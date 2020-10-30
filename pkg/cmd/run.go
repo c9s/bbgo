@@ -97,6 +97,8 @@ func runConfig(ctx context.Context, userConfig *bbgo.Config) error {
 			environ.AddExchange(sessionName, exchange)
 		}
 	}
+	environ.ReportTrade()
+
 
 	trader := bbgo.NewTrader(environ)
 
@@ -122,7 +124,9 @@ func runConfig(ctx context.Context, userConfig *bbgo.Config) error {
 		}
 	}
 
-	// configure rules
+	// configure notification rules
+	// for symbol-based routes, we should register the same symbol rules for each session.
+	// for session-based routes, we should set the fixed callbacks for each session
 	if conf := userConfig.Notifications; conf != nil {
 		// configure routing here
 		if conf.SymbolChannels != nil {
@@ -168,7 +172,6 @@ func runConfig(ctx context.Context, userConfig *bbgo.Config) error {
 		}
 	}
 
-	trader.ReportTrade()
 
 	if userConfig.RiskControls != nil {
 		trader.SetRiskControls(userConfig.RiskControls)

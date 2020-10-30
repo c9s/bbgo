@@ -143,44 +143,21 @@ func (router *ObjectChannelRouter) Route(obj interface{}) (channel string, ok bo
 
 type TradeReporter struct {
 	*Notifiability
-
-	channel       string
-	channelRoutes map[*regexp.Regexp]string
 }
 
 func NewTradeReporter(notifiability *Notifiability) *TradeReporter {
 	return &TradeReporter{
-		Notifiability:      notifiability,
-		channelRoutes: make(map[*regexp.Regexp]string),
+		Notifiability: notifiability,
 	}
-}
-
-func (reporter *TradeReporter) Channel(channel string) *TradeReporter {
-	reporter.channel = channel
-	return reporter
-}
-
-func (reporter *TradeReporter) ChannelBySymbol(routes map[string]string) *TradeReporter {
-	for pattern, channel := range routes {
-		reporter.channelRoutes[regexp.MustCompile(pattern)] = channel
-	}
-
-	return reporter
-}
-
-func (reporter *TradeReporter) getChannel(symbol string) string {
-	for pattern, channel := range reporter.channelRoutes {
-		if pattern.MatchString(symbol) {
-			return channel
-		}
-	}
-
-	return reporter.channel
 }
 
 func (reporter *TradeReporter) Report(trade types.Trade) {
-	var channel = reporter.getChannel(trade.Symbol)
+	text := util.Render(`:handshake: {{ .Symbol }} {{ .Side }} Trade Execution @ {{ .Price  }}`, trade)
 
-	var text = util.Render(`:handshake: {{ .Symbol }} {{ .Side }} Trade Execution @ {{ .Price  }}`, trade)
-	reporter.NotifyTo(channel, text, trade)
+	channel, ok := reporter.RouteSymbol(trade.Symbol)
+	if ok {
+		reporter.NotifyTo(channel, text, trade)
+	} else {
+		reporter.Notify(text, trade)
+	}
 }

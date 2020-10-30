@@ -44,8 +44,6 @@ type Trader struct {
 
 	crossExchangeStrategies []CrossExchangeStrategy
 	exchangeStrategies      map[string][]SingleExchangeStrategy
-
-	tradeReporter *TradeReporter
 }
 
 func NewTrader(environ *Environment) *Trader {
@@ -53,11 +51,6 @@ func NewTrader(environ *Environment) *Trader {
 		environment:        environ,
 		exchangeStrategies: make(map[string][]SingleExchangeStrategy),
 	}
-}
-
-func (trader *Trader) ReportTrade() *TradeReporter {
-	trader.tradeReporter = NewTradeReporter(&trader.Notifiability)
-	return trader.tradeReporter
 }
 
 // AttachStrategyOn attaches the single exchange strategy on an exchange session.
@@ -100,16 +93,6 @@ func (trader *Trader) Run(ctx context.Context) error {
 
 	if err := trader.environment.Init(ctx); err != nil {
 		return err
-	}
-
-	// session based trade reporter
-	for sessionName := range trader.environment.sessions {
-		var session = trader.environment.sessions[sessionName]
-		if trader.tradeReporter != nil {
-			session.Stream.OnTradeUpdate(func(trade types.Trade) {
-				trader.tradeReporter.Report(trade)
-			})
-		}
 	}
 
 	// load and run session strategies
