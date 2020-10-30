@@ -39,7 +39,6 @@ type Environment struct {
 	TradeSync    *service.TradeSync
 
 	tradeScanTime time.Time
-	tradeReporter *TradeReporter
 	sessions      map[string]*ExchangeSession
 }
 
@@ -58,11 +57,6 @@ func (environ *Environment) SyncTrades(db *sqlx.DB) *Environment {
 	}
 
 	return environ
-}
-
-func (environ *Environment) ReportTrade() *TradeReporter {
-	environ.tradeReporter = NewTradeReporter(&environ.Notifiability)
-	return environ.tradeReporter
 }
 
 func (environ *Environment) AddExchange(name string, exchange types.Exchange) (session *ExchangeSession) {
@@ -169,10 +163,6 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 			session.lastPrices[kline.Symbol] = kline.Close
 			session.marketDataStores[kline.Symbol].AddKLine(kline)
 		})
-
-		// session based trade reporter
-		// if environ.tradeReporter != nil {
-		// }
 
 		session.Stream.OnTradeUpdate(func(trade types.Trade) {
 			// append trades

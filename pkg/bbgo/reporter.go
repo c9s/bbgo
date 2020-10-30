@@ -6,8 +6,6 @@ import (
 	"github.com/robfig/cron/v3"
 
 	"github.com/c9s/bbgo/pkg/accounting/pnl"
-	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
 )
 
 type PnLReporter interface {
@@ -147,27 +145,6 @@ func (router *ObjectChannelRouter) Route(obj interface{}) (channel string, ok bo
 
 type TradeReporter struct {
 	*Notifiability
-}
-
-func NewTradeReporter(notifiability *Notifiability) *TradeReporter {
-	return &TradeReporter{
-		Notifiability: notifiability,
-	}
-}
-
-func (reporter *TradeReporter) ReportBySymbol(trade types.Trade) {
-	text := util.Render(TemplateTradeReport, trade)
-	channel, ok := reporter.RouteSymbol(trade.Symbol)
-	if ok {
-		reporter.NotifyTo(channel, text, trade)
-	} else {
-		reporter.Notify(text, trade)
-	}
-}
-
-func (reporter *TradeReporter) Report(trade types.Trade) {
-	text := util.Render(TemplateTradeReport, trade)
-	reporter.Notify(text, trade)
 }
 
 const TemplateTradeReport = `:handshake: {{ .Symbol }} {{ .Side }} Trade Execution @ {{ .Price  }}`

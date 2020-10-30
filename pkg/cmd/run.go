@@ -96,7 +96,6 @@ func runConfig(ctx context.Context, userConfig *bbgo.Config) error {
 			environ.AddExchange(sessionName, exchange)
 		}
 	}
-	environ.ReportTrade()
 
 
 	notification := bbgo.Notifiability{
