@@ -39,13 +39,35 @@ type ExchangeOrderExecutor struct {
 	session *ExchangeSession `json:"-"`
 }
 
+func (e *ExchangeOrderExecutor) notifySubmitOrders(orders ...types.SubmitOrder) {
+	for _, order := range orders {
+		// pass submit order as an interface object.
+		channel, ok := e.RouteObject(&order)
+		if ok {
+			e.NotifyTo(channel, ":memo: Submitting %s %s %s order with quantity: %s", order.Symbol, order.Type, order.Side, order.QuantityString, order)
+		} else {
+			e.Notify(":memo: Submitting %s %s %s order with quantity: %s", order.Symbol, order.Type, order.Side, order.QuantityString, order)
+		}
+	}
+}
+
 func (e *ExchangeOrderExecutor) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) ([]types.Order, error) {
 	formattedOrders, err := formatOrders(orders, e.session)
 	if err != nil {
 		return nil, err
 	}
 
-	// e.Notify(":memo: Submitting %s %s %s order with quantity: %s", order.Symbol, order.Type, order.Side, order.QuantityString, order)
+	for _, order := range formattedOrders {
+		// pass submit order as an interface object.
+		channel, ok := e.RouteObject(&order)
+		if ok {
+			e.NotifyTo(channel, ":memo: Submitting %s %s %s order with quantity: %s", order.Symbol, order.Type, order.Side, order.QuantityString, order)
+		} else {
+			e.Notify(":memo: Submitting %s %s %s order with quantity: %s", order.Symbol, order.Type, order.Side, order.QuantityString, order)
+		}
+	}
+
+	e.notifySubmitOrders(formattedOrders...)
 
 	return e.session.Exchange.SubmitOrders(ctx, formattedOrders...)
 }
@@ -69,7 +91,6 @@ func (e *BasicRiskControlOrderExecutor) SubmitOrders(ctx context.Context, orders
 
 		market := order.Market
 		quantity := order.Quantity
-
 		balances := e.session.Account.Balances()
 
 		switch order.Side {
@@ -140,9 +161,9 @@ func (e *BasicRiskControlOrderExecutor) SubmitOrders(ctx context.Context, orders
 		}
 
 		formattedOrders = append(formattedOrders, o)
-
-		e.Notify(":memo: Submitting %s %s %s order with quantity %s @ %s", o.Symbol, o.Side, o.Type, o.QuantityString, o.PriceString, &o)
 	}
+
+	e.notifySubmitOrders(formattedOrders...)
 
 	return e.session.Exchange.SubmitOrders(ctx, formattedOrders...)
 }

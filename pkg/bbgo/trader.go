@@ -100,8 +100,8 @@ func (trader *Trader) Run(ctx context.Context) error {
 		var session = trader.environment.sessions[sessionName]
 
 		var baseOrderExecutor = &ExchangeOrderExecutor{
-			// copy the parent notifiers and session
-			Notifiability: trader.Notifiability,
+			// copy the environment notification system so that we can route
+			Notifiability: trader.environment.Notifiability,
 			session:       session,
 		}
 
@@ -129,7 +129,7 @@ func (trader *Trader) Run(ctx context.Context) error {
 				// get the struct element
 				rs = rs.Elem()
 
-				if err := injectField(rs, "Notifiability", &trader.Notifiability, false); err != nil {
+				if err := injectField(rs, "Notifiability", &trader.environment.Notifiability, false); err != nil {
 					log.WithError(err).Errorf("strategy Notifiability injection failed")
 				}
 
@@ -175,8 +175,7 @@ func (trader *Trader) Run(ctx context.Context) error {
 	}
 
 	router := &ExchangeOrderExecutionRouter{
-		// copy the parent notifiers
-		Notifiability: trader.Notifiability,
+		Notifiability: trader.environment.Notifiability,
 		sessions:      trader.environment.sessions,
 	}
 
@@ -294,7 +293,7 @@ func (trader *OrderExecutor) RunStrategy(ctx context.Context, strategy SingleExc
 
 // ReportPnL configure and set the PnLReporter with the given notifier
 func (trader *Trader) ReportPnL() *PnLReporterManager {
-	return NewPnLReporter(&trader.Notifiability)
+	return NewPnLReporter(&trader.environment.Notifiability)
 }
 
 type OrderExecutor interface {

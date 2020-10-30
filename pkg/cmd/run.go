@@ -18,7 +18,6 @@ import (
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
-	"github.com/c9s/bbgo/pkg/accounting/pnl"
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/notifier/slacknotifier"
@@ -100,10 +99,7 @@ func runConfig(ctx context.Context, userConfig *bbgo.Config) error {
 	environ.ReportTrade()
 
 
-	trader := bbgo.NewTrader(environ)
-
-	// configure notifiers
-	trader.Notifiability = bbgo.Notifiability{
+	notification := bbgo.Notifiability{
 		SymbolChannelRouter:  bbgo.NewPatternChannelRouter(nil),
 		SessionChannelRouter: bbgo.NewPatternChannelRouter(nil),
 		ObjectChannelRouter:  bbgo.NewObjectChannelRouter(),
@@ -120,58 +116,19 @@ func runConfig(ctx context.Context, userConfig *bbgo.Config) error {
 
 			log.Infof("adding slack notifier with default channel: %s", conf.DefaultChannel)
 			var notifier = slacknotifier.New(slackToken, conf.DefaultChannel)
-			trader.AddNotifier(notifier)
+			notification.AddNotifier(notifier)
 		}
 	}
 
-	// configure notification rules
-	// for symbol-based routes, we should register the same symbol rules for each session.
-	// for session-based routes, we should set the fixed callbacks for each session
-	if conf := userConfig.Notifications; conf != nil {
-		// configure routing here
-		if conf.SymbolChannels != nil {
-			trader.SymbolChannelRouter.AddRoute(conf.SymbolChannels)
-		}
-		if conf.SessionChannels != nil {
-			trader.SessionChannelRouter.AddRoute(conf.SessionChannels)
-		}
+	environ.Notifiability = notification
 
-		if conf.Routing != nil {
-			if conf.Routing.Trade == "$symbol" {
-				trader.ObjectChannelRouter.Route(func(obj interface{}) (channel string, ok bool) {
-					trade, matched := obj.(*types.Trade)
-					if !matched {
-						return
-					}
-					channel, ok = trader.SymbolChannelRouter.Route(trade.Symbol)
-					return
-				})
-			}
-
-			if conf.Routing.Order == "$symbol" {
-				trader.ObjectChannelRouter.Route(func(obj interface{}) (channel string, ok bool) {
-					order, matched := obj.(*types.Order)
-					if !matched {
-						return
-					}
-					channel, ok = trader.SymbolChannelRouter.Route(order.Symbol)
-					return
-				})
-			}
-
-			if conf.Routing.PnL == "$symbol" {
-				trader.ObjectChannelRouter.Route(func(obj interface{}) (channel string, ok bool) {
-					report, matched := obj.(*pnl.AverageCostPnlReport)
-					if !matched {
-						return
-					}
-					channel, ok = trader.SymbolChannelRouter.Route(report.Symbol)
-					return
-				})
-			}
-		}
+	if userConfig.Notifications != nil {
+		environ.ConfigureNotification(userConfig.Notifications)
 	}
 
+
+	trader := bbgo.NewTrader(environ)
+	trader.Notifiability = notification
 
 	if userConfig.RiskControls != nil {
 		trader.SetRiskControls(userConfig.RiskControls)
