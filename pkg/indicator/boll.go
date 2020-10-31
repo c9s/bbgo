@@ -20,6 +20,8 @@ Bollinger Bands
 Bollinger Bands Technical indicator guide:
 - https://www.fidelity.com/learning-center/trading-investing/technical-analysis/technical-indicator-guide/bollinger-bands
 */
+
+//go:generate callbackgen -type BOLL
 type BOLL struct {
 	types.IntervalWindow
 
@@ -32,6 +34,16 @@ type BOLL struct {
 	DownBand Float64Slice
 
 	EndTime time.Time
+
+	updateCallbacks []func(sma, upBand, downBand float64)
+}
+
+func (inc *BOLL) LastUpBand() float64 {
+	return inc.UpBand[len(inc.UpBand)-1]
+}
+
+func (inc *BOLL) LastDownBand() float64 {
+	return inc.DownBand[len(inc.DownBand)-1]
 }
 
 func (inc *BOLL) LastSMA() float64 {
@@ -62,14 +74,18 @@ func (inc *BOLL) calculateAndUpdate(kLines []types.KLine) {
 	var std = stat.StdDev(prices, nil)
 	inc.StdDev.Push(std)
 
-	var upBand = sma + inc.K*std
+	var band = inc.K * std
+
+	var upBand = sma + band
 	inc.UpBand.Push(upBand)
 
-	var downBand = sma - inc.K*std
+	var downBand = sma - band
 	inc.DownBand.Push(downBand)
 
 	// update end time
 	inc.EndTime = kLines[index].EndTime
+
+	inc.EmitUpdate(sma, upBand, downBand)
 }
 
 func (inc *BOLL) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
