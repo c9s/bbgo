@@ -220,7 +220,30 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		switch order.Status {
 
-		case types.OrderStatusCanceled, types.OrderStatusRejected, types.OrderStatusFilled:
+		case types.OrderStatusFilled:
+			switch order.Side {
+			case types.SideTypeSell:
+				// find the filled bid to remove
+				for id, o := range s.activeBidOrders {
+					if o.Status == types.OrderStatusFilled {
+						delete(s.activeBidOrders, id)
+						delete(s.activeAskOrders, order.OrderID)
+						break
+					}
+				}
+
+			case types.SideTypeBuy:
+				// find the filled ask order to remove
+				for id, o := range s.activeAskOrders {
+					if o.Status == types.OrderStatusFilled {
+						delete(s.activeAskOrders, id)
+						delete(s.activeBidOrders, order.OrderID)
+						break
+					}
+				}
+			}
+
+		case types.OrderStatusCanceled, types.OrderStatusRejected:
 			log.Infof("order status %s, removing %d from the active order pool...", order.Status, order.OrderID)
 
 			switch order.Side {
@@ -243,7 +266,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 
 	go func() {
-		ticker := time.NewTicker(10 * time.Second)
+		ticker := time.NewTicker(1 * time.Minute)
 		defer ticker.Stop()
 
 		s.updateOrders(orderExecutor, session)
