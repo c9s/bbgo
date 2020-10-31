@@ -2,7 +2,6 @@ package grid
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -12,92 +11,6 @@ import (
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
 )
-
-// OrderMap is used for storing orders by their order id
-type OrderMap map[uint64]types.Order
-
-func (m OrderMap) Delete(orderID uint64) {
-	delete(m, orderID)
-}
-
-func (m OrderMap) Add(o types.Order) {
-	m[o.OrderID] = o
-}
-
-func (m OrderMap) Exists(orderID uint64) bool {
-	_, ok := m[orderID]
-	return ok
-}
-
-func (m OrderMap) FindByStatus(status types.OrderStatus) (orders []types.Order) {
-	for _, o := range m {
-		if o.Status == status {
-			orders = append(orders, o)
-		}
-	}
-
-	return orders
-}
-
-func (m OrderMap) Filled() []types.Order {
-	return m.FindByStatus(types.OrderStatusFilled)
-}
-
-func (m OrderMap) Canceled() []types.Order {
-	return m.FindByStatus(types.OrderStatusCanceled)
-}
-
-type SyncOrderMap struct {
-	orders OrderMap
-	mu     sync.Mutex
-}
-
-func NewSyncOrderMap() *SyncOrderMap {
-	return &SyncOrderMap{
-		orders: make(OrderMap),
-	}
-}
-
-func (m *SyncOrderMap) Delete(orderID uint64) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	m.orders.Delete(orderID)
-}
-
-func (m *SyncOrderMap) Add(o types.Order) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	m.orders.Add(o)
-}
-
-func (m *SyncOrderMap) Exists(orderID uint64) bool {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	return m.orders.Exists(orderID)
-}
-
-func (m *SyncOrderMap) FindByStatus(status types.OrderStatus) (orders []types.Order) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	for _, o := range m.orders {
-		if o.Status == status {
-			orders = append(orders, o)
-		}
-	}
-
-	return orders
-}
-
-func (m *SyncOrderMap) Filled() []types.Order {
-	return m.orders.FindByStatus(types.OrderStatusFilled)
-}
-
-func (m *SyncOrderMap) Canceled() []types.Order {
-	return m.orders.FindByStatus(types.OrderStatusCanceled)
-}
 
 var log = logrus.WithField("strategy", "grid")
 
@@ -151,11 +64,10 @@ type Strategy struct {
 
 	BaseQuantity float64 `json:"baseQuantity"`
 
-	activeBidOrders map[uint64]types.Order
-	activeAskOrders map[uint64]types.Order
+	activeBidOrders *types.SyncOrderMap
+	activeAskOrders *types.SyncOrderMap
 
 	boll *indicator.BOLL
-	mu   sync.Mutex
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
@@ -172,7 +84,7 @@ func (s *Strategy) updateBidOrders(orderExecutor bbgo.OrderExecutor, session *bb
 		return
 	}
 
-	var numOrders = s.GridNum - len(s.activeBidOrders)
+	var numOrders = s.GridNum - s.activeBidOrders.Len()
 	if numOrders <= 0 {
 		return
 	}
@@ -201,13 +113,10 @@ func (s *Strategy) updateBidOrders(orderExecutor bbgo.OrderExecutor, session *bb
 		return
 	}
 
-	s.mu.Lock()
-	for i := range orders {
-		var order = orders[i]
-		log.Infof("adding order %d to the active bid order pool...", order.OrderID)
-		s.activeBidOrders[order.OrderID] = order
+	for _, o := range orders {
+		log.Infof("adding order %d to the active bid order pool...", o.OrderID)
+		s.activeBidOrders.Add(o)
 	}
-	s.mu.Unlock()
 }
 
 func (s *Strategy) updateAskOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) {
@@ -219,7 +128,7 @@ func (s *Strategy) updateAskOrders(orderExecutor bbgo.OrderExecutor, session *bb
 		return
 	}
 
-	var numOrders = s.GridNum - len(s.activeAskOrders)
+	var numOrders = s.GridNum - s.activeAskOrders.Len()
 	if numOrders <= 0 {
 		return
 	}
@@ -248,33 +157,30 @@ func (s *Strategy) updateAskOrders(orderExecutor bbgo.OrderExecutor, session *bb
 		return
 	}
 
-	s.mu.Lock()
-	for i := range orders {
-		var order = orders[i]
-		log.Infof("adding order %d to the active ask order pool...", order.OrderID)
-		s.activeAskOrders[order.OrderID] = order
+	for _, o := range orders {
+		log.Infof("adding order %d to the active ask order pool...", o.OrderID)
+		s.activeAskOrders.Add(o)
 	}
-	s.mu.Unlock()
 }
 
 func (s *Strategy) updateOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) {
-	log.Infof("checking grid orders, bids=%d asks=%d", len(s.activeBidOrders), len(s.activeAskOrders))
+	log.Infof("checking grid orders, bids=%d asks=%d", s.activeBidOrders.Len(), s.activeAskOrders.Len())
 
-	for _, o := range s.activeBidOrders {
+	for _, o := range s.activeBidOrders.Orders() {
 		log.Infof("bid order: %d -> %s", o.OrderID, o.Status)
 	}
 
-	for _, o := range s.activeAskOrders {
+	for _, o := range s.activeAskOrders.Orders() {
 		log.Infof("ask order: %d -> %s", o.OrderID, o.Status)
 	}
 
-	if len(s.activeBidOrders) < s.GridNum {
-		log.Infof("active bid orders not enough: %d < %d, updating...", len(s.activeBidOrders), s.GridNum)
+	if s.activeBidOrders.Len() < s.GridNum {
+		log.Infof("active bid orders not enough: %d < %d, updating...", s.activeBidOrders.Len(), s.GridNum)
 		s.updateBidOrders(orderExecutor, session)
 	}
 
-	if len(s.activeAskOrders) < s.GridNum {
-		log.Infof("active ask orders not enough: %d < %d, updating...", len(s.activeAskOrders), s.GridNum)
+	if s.activeAskOrders.Len() < s.GridNum {
+		log.Infof("active ask orders not enough: %d < %d, updating...", s.activeAskOrders.Len(), s.GridNum)
 		s.updateAskOrders(orderExecutor, session)
 	}
 }
@@ -291,8 +197,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	// we don't persist orders so that we can not clear the previous orders for now. just need time to support this.
 	// TODO: pull this map out and add mutex lock
-	s.activeBidOrders = make(map[uint64]types.Order)
-	s.activeAskOrders = make(map[uint64]types.Order)
+	s.activeBidOrders = types.NewSyncOrderMap()
+	s.activeAskOrders = types.NewSyncOrderMap()
 
 	session.Stream.OnOrderUpdate(func(order types.Order) {
 		log.Infof("received order update: %+v", order)
@@ -301,31 +207,22 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 
-		s.mu.Lock()
-		defer s.mu.Unlock()
-
 		switch order.Status {
 
 		case types.OrderStatusFilled:
 			switch order.Side {
 			case types.SideTypeSell:
 				// find the filled bid to remove
-				for id, o := range s.activeBidOrders {
-					if o.Status == types.OrderStatusFilled {
-						delete(s.activeBidOrders, id)
-						delete(s.activeAskOrders, order.OrderID)
-						break
-					}
+				if filledOrder, ok := s.activeBidOrders.AnyFilled(); ok {
+					s.activeBidOrders.Delete(filledOrder.OrderID)
+					s.activeAskOrders.Delete(order.OrderID)
 				}
 
 			case types.SideTypeBuy:
 				// find the filled ask order to remove
-				for id, o := range s.activeAskOrders {
-					if o.Status == types.OrderStatusFilled {
-						delete(s.activeAskOrders, id)
-						delete(s.activeBidOrders, order.OrderID)
-						break
-					}
+				if filledOrder, ok := s.activeAskOrders.AnyFilled(); ok {
+					s.activeAskOrders.Delete(filledOrder.OrderID)
+					s.activeBidOrders.Delete(order.OrderID)
 				}
 			}
 
@@ -334,9 +231,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 			switch order.Side {
 			case types.SideTypeSell:
-				delete(s.activeAskOrders, order.OrderID)
+				s.activeAskOrders.Delete(order.OrderID)
 			case types.SideTypeBuy:
-				delete(s.activeBidOrders, order.OrderID)
+				s.activeBidOrders.Delete(order.OrderID)
 
 			}
 
@@ -344,9 +241,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			log.Infof("order status %s, updating %d to the active order pool...", order.Status, order.OrderID)
 			switch order.Side {
 			case types.SideTypeSell:
-				s.activeAskOrders[order.OrderID] = order
+				s.activeAskOrders.Add(order)
 			case types.SideTypeBuy:
-				s.activeBidOrders[order.OrderID] = order
+				s.activeBidOrders.Add(order)
 			}
 		}
 	})
@@ -358,11 +255,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.updateOrders(orderExecutor, session)
 
 		defer func() {
-			for _, o := range s.activeBidOrders {
+			for _, o := range s.activeBidOrders.Orders() {
 				_ = session.Exchange.CancelOrders(context.Background(), o)
 			}
 
-			for _, o := range s.activeAskOrders {
+			for _, o := range s.activeAskOrders.Orders() {
 				_ = session.Exchange.CancelOrders(context.Background(), o)
 			}
 		}()
