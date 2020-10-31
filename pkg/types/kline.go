@@ -10,6 +10,12 @@ import (
 	"github.com/c9s/bbgo/pkg/util"
 )
 
+type Trend int
+
+const TrendUp = 1
+const TrendFlat = 0
+const TrendDown = -1
+
 type KLineOrWindow interface {
 	GetInterval() string
 	GetTrend() int
@@ -87,16 +93,16 @@ func (k KLine) BounceDown() bool {
 	return trend > 0 && k.Open < mid && k.Close < mid
 }
 
-func (k KLine) GetTrend() int {
+func (k KLine) GetTrend() Trend {
 	o := k.GetOpen()
 	c := k.GetClose()
 
 	if c > o {
-		return 1
+		return TrendUp
 	} else if c < o {
-		return -1
+		return TrendDown
 	}
-	return 0
+	return TrendFlat
 }
 
 func (k KLine) GetHigh() float64 {
@@ -442,4 +448,3 @@ func (k KLineWindow) SlackAttachment() slack.Attachment {
 }
 
 type KLineCallback func(kline KLine)
-

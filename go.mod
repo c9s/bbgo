@@ -41,6 +41,7 @@ require (
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
 	golang.org/x/net v0.0.0-20201002202402-0a1ea396d57c // indirect
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
+	gonum.org/v1/gonum v0.8.1 // indirect
 	gopkg.in/yaml.v2 v2.3.0 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20200605160147-a5ece683394c
 )
