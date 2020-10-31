@@ -17,7 +17,7 @@ type ExchangeOrderExecutionRouter struct {
 	sessions map[string]*ExchangeSession
 }
 
-func (e *ExchangeOrderExecutionRouter) SubmitOrdersTo(ctx context.Context, session string, orders ...types.SubmitOrder) ([]types.Order, error) {
+func (e *ExchangeOrderExecutionRouter) SubmitOrdersTo(ctx context.Context, session string, orders ...types.SubmitOrder) (types.OrderSlice, error) {
 	es, ok := e.sessions[session]
 	if !ok {
 		return nil, errors.Errorf("exchange session %s not found", session)
@@ -51,7 +51,7 @@ func (e *ExchangeOrderExecutor) notifySubmitOrders(orders ...types.SubmitOrder) 
 	}
 }
 
-func (e *ExchangeOrderExecutor) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) ([]types.Order, error) {
+func (e *ExchangeOrderExecutor) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (types.OrderSlice, error) {
 	formattedOrders, err := formatOrders(orders, e.session)
 	if err != nil {
 		return nil, err
@@ -81,7 +81,7 @@ type BasicRiskControlOrderExecutor struct {
 	MaxOrderAmount  fixedpoint.Value `json:"maxOrderAmount,omitempty"`
 }
 
-func (e *BasicRiskControlOrderExecutor) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) ([]types.Order, error) {
+func (e *BasicRiskControlOrderExecutor) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (types.OrderSlice, error) {
 	var formattedOrders []types.SubmitOrder
 	for _, order := range orders {
 		currentPrice, ok := e.session.LastPrice(order.Symbol)

@@ -17,7 +17,7 @@ type RiskControlOrderExecutors struct {
 	BySymbol map[string]*SymbolBasedOrderExecutor `json:"bySymbol,omitempty" yaml:"bySymbol,omitempty"`
 }
 
-func (e *RiskControlOrderExecutors) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) ([]types.Order, error) {
+func (e *RiskControlOrderExecutors) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (types.OrderSlice, error) {
 	var symbolOrders = make(map[string][]types.SubmitOrder, len(orders))
 	for _, order := range orders {
 		symbolOrders[order.Symbol] = append(symbolOrders[order.Symbol], order)

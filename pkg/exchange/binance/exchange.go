@@ -310,7 +310,7 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 	return err2
 }
 
-func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders []types.Order, err error) {
+func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error) {
 	for _, order := range orders {
 		orderType, err := toLocalOrderType(order.Type)
 		if err != nil {
