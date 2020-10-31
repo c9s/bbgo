@@ -17,14 +17,14 @@ type OrderUpdate struct {
 	Event     string `json:"e"`
 	ID        uint64 `json:"i"`
 	Side      string `json:"sd"`
-	OrderType string `json:"ot"`
+	OrderType OrderType `json:"ot"`
 
 	Price     string `json:"p"`
 	StopPrice string `json:"sp"`
 
 	Volume       string `json:"v"`
 	AveragePrice string `json:"ap"`
-	State        string `json:"S"`
+	State        OrderState `json:"S"`
 	Market       string `json:"M"`
 
 	RemainingVolume string `json:"rv"`
@@ -36,6 +36,7 @@ type OrderUpdate struct {
 	ClientOID   string `json:"ci"`
 	CreatedAtMs int64  `json:"T"`
 }
+
 
 type OrderUpdateEvent struct {
 	BaseEvent
@@ -49,8 +50,8 @@ func parserOrderUpdate(v *fastjson.Value) OrderUpdate {
 		ID:              v.GetUint64("i"),
 		Side:            string(v.GetStringBytes("sd")),
 		Market:          string(v.GetStringBytes("M")),
-		OrderType:       string(v.GetStringBytes("ot")),
-		State:           string(v.GetStringBytes("S")),
+		OrderType:       OrderType(v.GetStringBytes("ot")),
+		State:           OrderState(v.GetStringBytes("S")),
 		Price:           string(v.GetStringBytes("p")),
 		StopPrice:       string(v.GetStringBytes("sp")),
 		AveragePrice:    string(v.GetStringBytes("ap")),

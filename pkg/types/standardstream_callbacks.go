@@ -2,15 +2,23 @@
 
 package types
 
-import ()
-
-func (stream *StandardStream) OnTrade(cb func(trade Trade)) {
-	stream.tradeCallbacks = append(stream.tradeCallbacks, cb)
+func (stream *StandardStream) OnTradeUpdate(cb func(trade Trade)) {
+	stream.tradeUpdateCallbacks = append(stream.tradeUpdateCallbacks, cb)
 }
 
-func (stream *StandardStream) EmitTrade(trade Trade) {
-	for _, cb := range stream.tradeCallbacks {
+func (stream *StandardStream) EmitTradeUpdate(trade Trade) {
+	for _, cb := range stream.tradeUpdateCallbacks {
 		cb(trade)
+	}
+}
+
+func (stream *StandardStream) OnOrderUpdate(cb func(order Order)) {
+	stream.orderUpdateCallbacks = append(stream.orderUpdateCallbacks, cb)
+}
+
+func (stream *StandardStream) EmitOrderUpdate(order Order) {
+	for _, cb := range stream.orderUpdateCallbacks {
+		cb(order)
 	}
 }
 
@@ -75,7 +83,9 @@ func (stream *StandardStream) EmitBookSnapshot(book OrderBook) {
 }
 
 type StandardStreamEventHub interface {
-	OnTrade(cb func(trade Trade))
+	OnTradeUpdate(cb func(trade Trade))
+
+	OnOrderUpdate(cb func(order Order))
 
 	OnBalanceSnapshot(cb func(balances map[string]Balance))
 

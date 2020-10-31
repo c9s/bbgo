@@ -75,7 +75,8 @@ type ExecutionReportEvent struct {
 	CurrentExecutionType string `json:"x"`
 	CurrentOrderStatus   string `json:"X"`
 
-	OrderID uint64 `json:"i"`
+	OrderID int64 `json:"i"`
+	Ignored int64 `json:"I"`
 
 	TradeID         int64 `json:"t"`
 	TransactionTime int64 `json:"T"`
@@ -108,7 +109,7 @@ func (e *ExecutionReportEvent) Order() (*types.Order, error) {
 			Price:         util.MustParseFloat(e.OrderPrice),
 			TimeInForce:   e.TimeInForce,
 		},
-		OrderID:          e.OrderID,
+		OrderID:          uint64(e.OrderID),
 		Status:           toGlobalOrderStatus(binance.OrderStatusType(e.CurrentOrderStatus)),
 		ExecutedQuantity: util.MustParseFloat(e.CumulativeFilledQuantity),
 		CreationTime:     orderCreationTime,

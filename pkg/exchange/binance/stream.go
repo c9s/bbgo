@@ -130,14 +130,24 @@ func NewStream(client *binance.Client) *Stream {
 
 	stream.OnExecutionReportEvent(func(e *ExecutionReportEvent) {
 		switch e.CurrentExecutionType {
+
+		case "NEW", "CANCELED", "REJECTED", "EXPIRED", "REPLACED":
+			order, err := e.Order()
+			if err != nil {
+				log.WithError(err).Error("order convert error")
+				return
+			}
+
+			stream.EmitOrderUpdate(*order)
+
 		case "TRADE":
 			trade, err := e.Trade()
 			if err != nil {
 				log.WithError(err).Error("trade convert error")
-				break
+				return
 			}
 
-			stream.EmitTrade(*trade)
+			stream.EmitTradeUpdate(*trade)
 		}
 	})
 
