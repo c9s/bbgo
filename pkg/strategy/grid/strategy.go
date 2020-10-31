@@ -13,6 +13,92 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+// OrderMap is used for storing orders by their order id
+type OrderMap map[uint64]types.Order
+
+func (m OrderMap) Delete(orderID uint64) {
+	delete(m, orderID)
+}
+
+func (m OrderMap) Add(o types.Order) {
+	m[o.OrderID] = o
+}
+
+func (m OrderMap) Exists(orderID uint64) bool {
+	_, ok := m[orderID]
+	return ok
+}
+
+func (m OrderMap) FindByStatus(status types.OrderStatus) (orders []types.Order) {
+	for _, o := range m {
+		if o.Status == status {
+			orders = append(orders, o)
+		}
+	}
+
+	return orders
+}
+
+func (m OrderMap) Filled() []types.Order {
+	return m.FindByStatus(types.OrderStatusFilled)
+}
+
+func (m OrderMap) Canceled() []types.Order {
+	return m.FindByStatus(types.OrderStatusCanceled)
+}
+
+type SyncOrderMap struct {
+	orders OrderMap
+	mu     sync.Mutex
+}
+
+func NewSyncOrderMap() *SyncOrderMap {
+	return &SyncOrderMap{
+		orders: make(OrderMap),
+	}
+}
+
+func (m *SyncOrderMap) Delete(orderID uint64) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.orders.Delete(orderID)
+}
+
+func (m *SyncOrderMap) Add(o types.Order) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.orders.Add(o)
+}
+
+func (m *SyncOrderMap) Exists(orderID uint64) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	return m.orders.Exists(orderID)
+}
+
+func (m *SyncOrderMap) FindByStatus(status types.OrderStatus) (orders []types.Order) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, o := range m.orders {
+		if o.Status == status {
+			orders = append(orders, o)
+		}
+	}
+
+	return orders
+}
+
+func (m *SyncOrderMap) Filled() []types.Order {
+	return m.orders.FindByStatus(types.OrderStatusFilled)
+}
+
+func (m *SyncOrderMap) Canceled() []types.Order {
+	return m.orders.FindByStatus(types.OrderStatusCanceled)
+}
+
 var log = logrus.WithField("strategy", "grid")
 
 // The indicators (SMA and EWMA) that we want to use are returning float64 data.
