@@ -39,10 +39,18 @@ type BOLL struct {
 }
 
 func (inc *BOLL) LastUpBand() float64 {
+	if len(inc.UpBand) == 0 {
+		return 0.0
+	}
+
 	return inc.UpBand[len(inc.UpBand)-1]
 }
 
 func (inc *BOLL) LastDownBand() float64 {
+	if len(inc.DownBand) == 0 {
+		return 0.0
+	}
+
 	return inc.DownBand[len(inc.DownBand)-1]
 }
 
@@ -84,6 +92,8 @@ func (inc *BOLL) calculateAndUpdate(kLines []types.KLine) {
 
 	// update end time
 	inc.EndTime = kLines[index].EndTime
+
+	// log.Infof("update boll: sma=%f, up=%f, down=%f", sma, upBand, downBand)
 
 	inc.EmitUpdate(sma, upBand, downBand)
 }

@@ -28,7 +28,6 @@ func (e *ExchangeOrderExecutionRouter) SubmitOrdersTo(ctx context.Context, sessi
 		return nil, err
 	}
 
-	// e.Notify(":memo: Submitting order to %s %s %s %s with quantity: %s", session, order.Symbol, order.Type, order.Side, order.QuantityString, order)
 	return es.Exchange.SubmitOrders(ctx, formattedOrders...)
 }
 
@@ -44,9 +43,9 @@ func (e *ExchangeOrderExecutor) notifySubmitOrders(orders ...types.SubmitOrder) 
 		// pass submit order as an interface object.
 		channel, ok := e.RouteObject(&order)
 		if ok {
-			e.NotifyTo(channel, ":memo: Submitting %s %s %s order with quantity: %s", order.Symbol, order.Type, order.Side, order.QuantityString, &order)
+			e.NotifyTo(channel, ":memo: Submitting %s %s %s order with quantity: %s at price: %s", order.Symbol, order.Type, order.Side, order.QuantityString, order.PriceString, &order)
 		} else {
-			e.Notify(":memo: Submitting %s %s %s order with quantity: %s", order.Symbol, order.Type, order.Side, order.QuantityString, &order)
+			e.Notify(":memo: Submitting %s %s %s order with quantity: %s at price: %s", order.Symbol, order.Type, order.Side, order.QuantityString, order.PriceString, &order)
 		}
 	}
 }
