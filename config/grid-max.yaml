@@ -35,20 +35,20 @@ riskControls:
       orderExecutors:
         # symbol-routed order executor
         bySymbol:
-          BNBUSDT:
+          MAXUSDT:
             # basic risk control order executor
             basic:
-              minQuoteBalance: 100.0
-              maxBaseAssetBalance: 50.0
-              minBaseAssetBalance: 1.0
-              maxOrderAmount: 100.0
+              minQuoteBalance: 1000.0
+              maxBaseAssetBalance: 5000.0
+              minBaseAssetBalance: 10.0
+              maxOrderAmount: 200.0
 
 exchangeStrategies:
-- on: binance
+- on: max
   grid:
-    symbol: BNBUSDT
+    symbol: MAXUSDT
     interval: 1m
-    baseQuantity: 1.0
+    baseQuantity: 200.0
     gridPips: 0.02
     gridNumber: 2
 

@@ -89,6 +89,10 @@ func (s *Strategy) updateBidOrders(orderExecutor bbgo.OrderExecutor, session *bb
 	}
 
 	var downBand = s.boll.LastDownBand()
+	if downBand <= 0.0 {
+		return
+	}
+
 	var startPrice = downBand
 
 	var submitOrders []types.SubmitOrder
@@ -130,6 +134,10 @@ func (s *Strategy) updateAskOrders(orderExecutor bbgo.OrderExecutor, session *bb
 	}
 
 	var upBand = s.boll.LastUpBand()
+	if upBand <= 0.0 {
+		return
+	}
+
 	var startPrice = upBand
 
 	var submitOrders []types.SubmitOrder
