@@ -1,9 +1,8 @@
-package store
+package bbgo
 
-import (
-	"github.com/c9s/bbgo/pkg/types"
-)
+import "github.com/c9s/bbgo/pkg/types"
 
+// MarketDataStore receives and maintain the public market data
 //go:generate callbackgen -type MarketDataStore
 type MarketDataStore struct {
 	Symbol string
@@ -13,7 +12,7 @@ type MarketDataStore struct {
 
 	LastKLine types.KLine
 
-	kLineUpdateCallbacks []func(kline types.KLine)
+	kLineWindowUpdateCallbacks []func(interval types.Interval, kline types.KLineWindow)
 
 	orderBook *types.StreamOrderBook
 
@@ -80,11 +79,15 @@ func (store *MarketDataStore) handleKLineClosed(kline types.KLine) {
 }
 
 func (store *MarketDataStore) AddKLine(kline types.KLine) {
-	window := store.KLineWindows[kline.Interval]
-	window.Add(kline)
+	window, ok := store.KLineWindows[kline.Interval]
+	if !ok {
+		window = types.KLineWindow{kline}
+	} else {
+		window.Add(kline)
+	}
 	store.KLineWindows[kline.Interval] = window
 
 	store.LastKLine = kline
 
-	store.EmitKLineUpdate(kline)
+	store.EmitKLineWindowUpdate(kline.Interval, window)
 }

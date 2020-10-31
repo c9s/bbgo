@@ -1,6 +1,19 @@
 package types
 
+import "encoding/json"
+
 type Interval string
+
+func (i *Interval) UnmarshalJSON(b []byte) (err error) {
+	var a string
+	err = json.Unmarshal(b, &a)
+	if err != nil {
+		return err
+	}
+
+	*i = Interval(a)
+	return
+}
 
 func (i Interval) String() string {
 	return string(i)
@@ -19,15 +32,25 @@ var Interval1d = Interval("1d")
 var Interval3d = Interval("3d")
 
 var SupportedIntervals = map[Interval]int{
-	Interval1m: 1,
-	Interval5m: 5,
+	Interval1m:  1,
+	Interval5m:  5,
 	Interval15m: 15,
 	Interval30m: 30,
-	Interval1h: 60,
-	Interval2h: 60 * 2,
-	Interval4h: 60 * 4,
-	Interval6h: 60 * 6,
+	Interval1h:  60,
+	Interval2h:  60 * 2,
+	Interval4h:  60 * 4,
+	Interval6h:  60 * 6,
 	Interval12h: 60 * 12,
-	Interval1d: 60 * 24,
-	Interval3d: 60 * 24 * 3,
+	Interval1d:  60 * 24,
+	Interval3d:  60 * 24 * 3,
 }
+
+// IntervalWindow is used by the indicators
+type IntervalWindow struct {
+	// The interval of kline
+	Interval Interval
+
+	// The windows size of the indicator (EWMA and SMA)
+	Window int
+}
+

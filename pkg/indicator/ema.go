@@ -3,15 +3,17 @@ package indicator
 import (
 	"time"
 
-	"github.com/c9s/bbgo/pkg/store"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
 type EWMA struct {
-	Interval types.Interval
-	Window   int
+	types.IntervalWindow
 	Values   Float64Slice
 	EndTime  time.Time
+}
+
+func (inc *EWMA) Last() float64 {
+	return inc.Values[len(inc.Values)-1]
 }
 
 func (inc *EWMA) calculateAndUpdate(kLines []types.KLine) {
@@ -22,6 +24,8 @@ func (inc *EWMA) calculateAndUpdate(kLines []types.KLine) {
 
 	var index = len(kLines) - 1
 	var lastK = kLines[index]
+
+	// see https://www.investopedia.com/ask/answers/122314/what-exponential-moving-average-ema-formula-and-how-ema-calculated.asp
 	var multiplier = 2.0 / float64(inc.Window+1)
 
 	if inc.EndTime != zeroTime && lastK.EndTime.Before(inc.EndTime) {
@@ -31,7 +35,7 @@ func (inc *EWMA) calculateAndUpdate(kLines []types.KLine) {
 	var recentK = kLines[index-(inc.Window-1) : index+1]
 	if len(inc.Values) > 0 {
 		var previousEWMA = inc.Values[len(inc.Values)-1]
-		var ewma = lastK.Close * multiplier + previousEWMA * (1 - multiplier)
+		var ewma = lastK.Close*multiplier + previousEWMA*(1-multiplier)
 		inc.Values.Push(ewma)
 	} else {
 		// The first EWMA is actually SMA
@@ -42,19 +46,22 @@ func (inc *EWMA) calculateAndUpdate(kLines []types.KLine) {
 	inc.EndTime = kLines[index].EndTime
 }
 
-func (inc *EWMA) BindMarketDataStore(store *store.MarketDataStore) {
-	store.OnKLineUpdate(func(kline types.KLine) {
-		// kline guard
-		if inc.Interval != kline.Interval {
-			return
-		}
+type KLineWindowUpdater interface {
+	OnKLineWindowUpdate(func(interval types.Interval, window types.KLineWindow))
+}
 
-		if inc.EndTime != zeroTime && inc.EndTime.Before(inc.EndTime) {
-			return
-		}
+func (inc *EWMA) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
+	if inc.Interval != interval {
+		return
+	}
 
-		if kLines, ok := store.KLinesOfInterval(types.Interval(kline.Interval)); ok {
-			inc.calculateAndUpdate(kLines)
-		}
-	})
+	if inc.EndTime != zeroTime && inc.EndTime.Before(inc.EndTime) {
+		return
+	}
+
+	inc.calculateAndUpdate(window)
+}
+
+func (inc *EWMA) Bind(updater KLineWindowUpdater) {
+	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }

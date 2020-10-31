@@ -11,20 +11,20 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/service"
-	"github.com/c9s/bbgo/pkg/store"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
 var LoadedExchangeStrategies = make(map[string]SingleExchangeStrategy)
-
-func RegisterExchangeStrategy(key string, configmap SingleExchangeStrategy) {
-	LoadedExchangeStrategies[key] = configmap
-}
-
 var LoadedCrossExchangeStrategies = make(map[string]CrossExchangeStrategy)
 
-func RegisterCrossExchangeStrategy(key string, configmap CrossExchangeStrategy) {
-	LoadedCrossExchangeStrategies[key] = configmap
+func RegisterStrategy(key string, s interface{}) {
+	switch d := s.(type) {
+	case SingleExchangeStrategy:
+		LoadedExchangeStrategies[key] = d
+
+	case CrossExchangeStrategy:
+		LoadedCrossExchangeStrategies[key] = d
+	}
 }
 
 // Environment presents the real exchange data layer
@@ -59,8 +59,10 @@ func (environ *Environment) AddExchange(name string, exchange types.Exchange) (s
 	return session
 }
 
+// Init prepares the data that will be used by the strategies
 func (environ *Environment) Init(ctx context.Context) (err error) {
-	for _, session := range environ.sessions {
+	for n := range environ.sessions {
+		var session = environ.sessions[n]
 		var markets types.MarketMap
 
 		err = WithCache(fmt.Sprintf("%s-markets", session.Exchange.Name()), &markets, func() (interface{}, error) {
@@ -75,37 +77,9 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 		}
 
 		session.markets = markets
-	}
-
-	return nil
-}
-
-// SyncTradesFrom overrides the default trade scan time (-7 days)
-func (environ *Environment) SyncTradesFrom(t time.Time) *Environment {
-	environ.tradeScanTime = t
-
-	return environ
-}
-
-func (environ *Environment) Connect(ctx context.Context) error {
-	var err error
-
-	for n := range environ.sessions {
-		// avoid using the placeholder variable for the session because we use that in the callbacks
-		var session = environ.sessions[n]
-		var log = log.WithField("session", n)
-
-		loadedSymbols := make(map[string]struct{})
-		for _, s := range session.Subscriptions {
-			symbol := strings.ToUpper(s.Symbol)
-			loadedSymbols[symbol] = struct{}{}
-
-			log.Infof("subscribing %s %s %v", s.Symbol, s.Channel, s.Options)
-			session.Stream.Subscribe(s.Channel, s.Symbol, s.Options)
-		}
 
 		// trade sync and market data store depends on subscribed symbols so we have to do this here.
-		for symbol := range loadedSymbols {
+		for symbol := range session.loadedSymbols {
 			var trades []types.Trade
 
 			if environ.TradeSync != nil {
@@ -130,27 +104,23 @@ func (environ *Environment) Connect(ctx context.Context) error {
 
 			session.Trades[symbol] = trades
 
-			currentPrice, err := session.Exchange.QueryAveragePrice(ctx, symbol)
+			averagePrice, err := session.Exchange.QueryAveragePrice(ctx, symbol)
 			if err != nil {
 				return err
 			}
 
-			session.lastPrices[symbol] = currentPrice
+			session.lastPrices[symbol] = averagePrice
 
-			marketDataStore := store.NewMarketDataStore(symbol)
+			marketDataStore := NewMarketDataStore(symbol)
 			marketDataStore.BindStream(session.Stream)
 			session.marketDataStores[symbol] = marketDataStore
 
-			standardIndicatorSet := NewStandardIndicatorSet(symbol)
-			standardIndicatorSet.BindMarketDataStore(marketDataStore)
+			standardIndicatorSet := NewStandardIndicatorSet(symbol, marketDataStore)
 			session.standardIndicatorSets[symbol] = standardIndicatorSet
 		}
 
-		// move market data store dispatch to here, use one callback to dispatch the market data
-		// session.Stream.OnKLineClosed(func(kline types.KLine) { })
-
 		now := time.Now()
-		for symbol := range loadedSymbols {
+		for symbol := range session.loadedSymbols {
 			marketDataStore, ok := session.marketDataStores[symbol]
 			if !ok {
 				return errors.Errorf("symbol %s is not defined", symbol)
@@ -197,12 +167,37 @@ func (environ *Environment) Connect(ctx context.Context) error {
 			}
 		})
 
+		// move market data store dispatch to here, use one callback to dispatch the market data
+		// session.Stream.OnKLineClosed(func(kline types.KLine) { })
+	}
+
+	return nil
+}
+
+// SyncTradesFrom overrides the default trade scan time (-7 days)
+func (environ *Environment) SyncTradesFrom(t time.Time) *Environment {
+	environ.tradeScanTime = t
+	return environ
+}
+
+func (environ *Environment) Connect(ctx context.Context) error {
+	for n := range environ.sessions {
+		// avoid using the placeholder variable for the session because we use that in the callbacks
+		var session = environ.sessions[n]
+		var logger = log.WithField("session", n)
+
 		if len(session.Subscriptions) == 0 {
-			log.Warnf("no subscriptions, exchange session %s will not be connected", session.Name)
+			logger.Warnf("no subscriptions, exchange session %s will not be connected", session.Name)
 			continue
 		}
 
-		log.Infof("connecting session %s...", session.Name)
+		// add the subscribe requests to the stream
+		for _, s := range session.Subscriptions {
+			logger.Infof("subscribing %s %s %v", s.Symbol, s.Channel, s.Options)
+			session.Stream.Subscribe(s.Channel, s.Symbol, s.Options)
+		}
+
+		logger.Infof("connecting session %s...", session.Name)
 		if err := session.Stream.Connect(ctx); err != nil {
 			return err
 		}

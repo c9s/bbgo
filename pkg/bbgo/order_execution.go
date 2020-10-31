@@ -62,8 +62,8 @@ type BasicRiskControlOrderExecutor struct {
 func (e *BasicRiskControlOrderExecutor) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) ([]types.Order, error) {
 	var formattedOrders []types.SubmitOrder
 	for _, order := range orders {
-		currentPrice, ok := e.session.lastPrices[order.Symbol]
-		if ok {
+		currentPrice, ok := e.session.LastPrice(order.Symbol)
+		if !ok {
 			return nil, errors.Errorf("the last price of symbol %q is not found", order.Symbol)
 		}
 
@@ -140,9 +140,10 @@ func (e *BasicRiskControlOrderExecutor) SubmitOrders(ctx context.Context, orders
 		}
 
 		formattedOrders = append(formattedOrders, o)
+
+		e.Notify(":memo: Submitting %s %s %s order with quantity %s @ %s", o.Symbol, o.Side, o.Type, o.QuantityString, o.PriceString, &o)
 	}
 
-	// e.Notify(":memo: Submitting %s %s %s order with quantity: %s", order.Symbol, order.Type, order.Side, order.QuantityString, order)
 	return e.session.Exchange.SubmitOrders(ctx, formattedOrders...)
 }
 
@@ -164,7 +165,7 @@ func formatOrder(order types.SubmitOrder, session *ExchangeSession) (types.Submi
 
 	}
 
-	order.QuantityString = market.FormatVolume(order.Quantity)
+	order.QuantityString = market.FormatQuantity(order.Quantity)
 	return order, nil
 }
 

@@ -3,7 +3,6 @@ package indicator
 import (
 	"time"
 
-	"github.com/c9s/bbgo/pkg/store"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -16,10 +15,13 @@ func (s *Float64Slice) Push(v float64) {
 var zeroTime time.Time
 
 type SMA struct {
-	Interval types.Interval
-	Window   int
+	types.IntervalWindow
 	Values   Float64Slice
 	EndTime  time.Time
+}
+
+func (inc *SMA) Last() float64 {
+	return inc.Values[len(inc.Values)-1]
 }
 
 func (inc *SMA) calculateAndUpdate(kLines []types.KLine) {
@@ -40,22 +42,30 @@ func (inc *SMA) calculateAndUpdate(kLines []types.KLine) {
 	inc.EndTime = kLines[index].EndTime
 }
 
-func (inc *SMA) BindMarketDataStore(store *store.MarketDataStore) {
-	store.OnKLineUpdate(func(kline types.KLine) {
-		// kline guard
-		if inc.Interval != kline.Interval {
-			return
-		}
+func (inc *SMA) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
+	if inc.Interval != interval {
+		return
+	}
 
-		if kLines, ok := store.KLinesOfInterval(kline.Interval); ok {
-			inc.calculateAndUpdate(kLines)
-		}
-	})
+	if inc.EndTime != zeroTime && inc.EndTime.Before(inc.EndTime) {
+		return
+	}
+
+	inc.calculateAndUpdate(window)
+}
+
+func (inc *SMA) Bind(updater KLineWindowUpdater) {
+	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }
 
 func calculateSMA(kLines []types.KLine) float64 {
-	sum := 0.0
 	length := len(kLines)
+
+	if length == 0 {
+		return 0.0
+	}
+
+	sum := 0.0
 	for _, k := range kLines {
 		sum += k.Close
 	}
