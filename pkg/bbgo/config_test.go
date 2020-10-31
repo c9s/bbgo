@@ -8,7 +8,7 @@ import (
 )
 
 func init() {
-	RegisterExchangeStrategy("test", &TestStrategy{})
+	RegisterStrategy("test", &TestStrategy{})
 }
 
 type TestStrategy struct {

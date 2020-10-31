@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
 )
 
@@ -20,7 +20,8 @@ type Notifier struct {
 type NotifyOption func(notifier *Notifier)
 
 func New(token, channel string, options ...NotifyOption) *Notifier {
-	var client = slack.New(token, slack.OptionDebug(true))
+	// var client = slack.New(token, slack.OptionDebug(true))
+	var client = slack.New(token)
 
 	notifier := &Notifier{
 		channel: channel,
@@ -39,6 +40,10 @@ func (n *Notifier) Notify(format string, args ...interface{}) {
 }
 
 func (n *Notifier) NotifyTo(channel, format string, args ...interface{}) {
+	if len(channel) == 0 {
+		channel = n.channel
+	}
+
 	var slackAttachments []slack.Attachment
 	var slackArgsOffset = -1
 
@@ -68,13 +73,15 @@ func (n *Notifier) NotifyTo(channel, format string, args ...interface{}) {
 		nonSlackArgs = args[:slackArgsOffset]
 	}
 
-	logrus.Infof(format, nonSlackArgs...)
+	log.Infof(format, nonSlackArgs...)
 
 	_, _, err := n.client.PostMessageContext(context.Background(), channel,
 		slack.MsgOptionText(fmt.Sprintf(format, nonSlackArgs...), true),
 		slack.MsgOptionAttachments(slackAttachments...))
 	if err != nil {
-		logrus.WithError(err).Errorf("slack error: %s", err.Error())
+		log.WithError(err).
+			WithField("channel", channel).
+			Errorf("slack error: %s", err.Error())
 	}
 
 	return

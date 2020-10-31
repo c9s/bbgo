@@ -2,58 +2,64 @@ package bbgo
 
 import (
 	"github.com/c9s/bbgo/pkg/indicator"
-	"github.com/c9s/bbgo/pkg/store"
 	"github.com/c9s/bbgo/pkg/types"
 )
-
-type IntervalWindow struct {
-	// The interval of kline
-	Interval types.Interval
-
-	// The windows size of EWMA and SMA
-	Window int
-}
 
 type StandardIndicatorSet struct {
 	Symbol string
 	// Standard indicators
 	// interval -> window
-	SMA  map[IntervalWindow]*indicator.SMA
-	EWMA map[IntervalWindow]*indicator.EWMA
+	SMA  map[types.IntervalWindow]*indicator.SMA
+	EWMA map[types.IntervalWindow]*indicator.EWMA
+
+	store *MarketDataStore
 }
 
-func NewStandardIndicatorSet(symbol string) *StandardIndicatorSet {
+func NewStandardIndicatorSet(symbol string, store *MarketDataStore) *StandardIndicatorSet {
 	set := &StandardIndicatorSet{
 		Symbol: symbol,
-		SMA:    make(map[IntervalWindow]*indicator.SMA),
-		EWMA:   make(map[IntervalWindow]*indicator.EWMA),
+		SMA:    make(map[types.IntervalWindow]*indicator.SMA),
+		EWMA:   make(map[types.IntervalWindow]*indicator.EWMA),
+		store:  store,
 	}
 
 	// let us pre-defined commonly used intervals
 	for interval := range types.SupportedIntervals {
 		for _, window := range []int{7, 25, 99} {
-			set.SMA[IntervalWindow{interval, window}] = &indicator.SMA{
-				Interval: interval,
-				Window:   window,
-			}
-			set.EWMA[IntervalWindow{interval, window}] = &indicator.EWMA{
-				Interval: interval,
-				Window:   window,
-			}
+			iw := types.IntervalWindow{Interval: interval, Window: window}
+			set.SMA[iw] = &indicator.SMA{IntervalWindow: iw}
+			set.SMA[iw].Bind(store)
+
+			set.EWMA[iw] = &indicator.EWMA{IntervalWindow: iw}
+			set.EWMA[iw].Bind(store)
 		}
 	}
 
 	return set
 }
 
-func (set *StandardIndicatorSet) BindMarketDataStore(store *store.MarketDataStore) {
-	for _, inc := range set.SMA {
-		inc.BindMarketDataStore(store)
+// GetSMA returns the simple moving average indicator of the given interval and the window size.
+func (set *StandardIndicatorSet) GetSMA(iw types.IntervalWindow) *indicator.SMA {
+	inc, ok := set.SMA[iw]
+	if !ok {
+		inc := &indicator.SMA{IntervalWindow: iw}
+		inc.Bind(set.store)
+		set.SMA[iw] = inc
 	}
 
-	for _, inc := range set.EWMA {
-		inc.BindMarketDataStore(store)
+	return inc
+}
+
+// GetEWMA returns the exponential weighed moving average indicator of the given interval and the window size.
+func (set *StandardIndicatorSet) GetEWMA(iw types.IntervalWindow) *indicator.EWMA {
+	inc, ok := set.EWMA[iw]
+	if !ok {
+		inc := &indicator.EWMA{IntervalWindow: iw}
+		inc.Bind(set.store)
+		set.EWMA[iw] = inc
 	}
+
+	return inc
 }
 
 // ExchangeSession presents the exchange connection session
@@ -82,25 +88,29 @@ type ExchangeSession struct {
 	Trades map[string][]types.Trade
 
 	// marketDataStores contains the market data store of each market
-	marketDataStores map[string]*store.MarketDataStore
+	marketDataStores map[string]*MarketDataStore
 
 	// standard indicators of each market
 	standardIndicatorSets map[string]*StandardIndicatorSet
 
-	tradeReporter *TradeReporter
+	loadedSymbols map[string]struct{}
 }
 
 func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 	return &ExchangeSession{
-		Name:             name,
-		Exchange:         exchange,
-		Stream:           exchange.NewStream(),
-		Account:          &types.Account{},
-		Subscriptions:    make(map[types.Subscription]types.Subscription),
-		markets:          make(map[string]types.Market),
-		Trades:           make(map[string][]types.Trade),
-		lastPrices:       make(map[string]float64),
-		marketDataStores: make(map[string]*store.MarketDataStore),
+		Name:          name,
+		Exchange:      exchange,
+		Stream:        exchange.NewStream(),
+		Subscriptions: make(map[types.Subscription]types.Subscription),
+		Account:       &types.Account{},
+		Trades:        make(map[string][]types.Trade),
+
+		markets:               make(map[string]types.Market),
+		lastPrices:            make(map[string]float64),
+		marketDataStores:      make(map[string]*MarketDataStore),
+		standardIndicatorSets: make(map[string]*StandardIndicatorSet),
+
+		loadedSymbols: make(map[string]struct{}),
 	}
 }
 
@@ -110,7 +120,7 @@ func (session *ExchangeSession) StandardIndicatorSet(symbol string) (*StandardIn
 }
 
 // MarketDataStore returns the market data store of a symbol
-func (session *ExchangeSession) MarketDataStore(symbol string) (s *store.MarketDataStore, ok bool) {
+func (session *ExchangeSession) MarketDataStore(symbol string) (s *MarketDataStore, ok bool) {
 	s, ok = session.marketDataStores[symbol]
 	return s, ok
 }
@@ -125,11 +135,6 @@ func (session *ExchangeSession) Market(symbol string) (market types.Market, ok b
 	return market, ok
 }
 
-func (session *ExchangeSession) ReportTrade(notifier Notifier) *TradeReporter {
-	session.tradeReporter = NewTradeReporter(notifier)
-	return session.tradeReporter
-}
-
 // Subscribe save the subscription info, later it will be assigned to the stream
 func (session *ExchangeSession) Subscribe(channel types.Channel, symbol string, options types.SubscribeOptions) *ExchangeSession {
 	sub := types.Subscription{
@@ -138,6 +143,8 @@ func (session *ExchangeSession) Subscribe(channel types.Channel, symbol string, 
 		Options: options,
 	}
 
+	// add to the loaded symbol table
+	session.loadedSymbols[symbol] = struct{}{}
 	session.Subscriptions[sub] = sub
 	return session
 }

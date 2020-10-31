@@ -5,25 +5,25 @@ imports:
 
 notifications:
   slack:
-    defaultChannel: "#dev-bbgo"
-    errorChannel: "#bbgo-error"
+    defaultChannel: "dev-bbgo"
+    errorChannel: "bbgo-error"
 
   # if you want to route channel by symbol
   symbolChannels:
-    "^BTC": "#btc"
-    "^ETH": "#eth"
+    "^BTC": "btc"
+    "^ETH": "eth"
 
   # if you want to route channel by exchange session
   sessionChannels:
-    max: "#bbgo-max"
-    binance: "#bbgo-binance"
+    max: "bbgo-max"
+    binance: "bbgo-binance"
 
   # routing rules
   routing:
     trade: "$symbol"
     order: "$symbol"
     submitOrder: "$session"
-    pnL: "#bbgo-pnl"
+    pnL: "bbgo-pnl"
 
 reportPnL:
 - averageCostBySymbols:

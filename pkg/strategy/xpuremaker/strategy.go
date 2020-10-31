@@ -13,7 +13,7 @@ import (
 )
 
 func init() {
-	bbgo.RegisterExchangeStrategy("xpuremaker", &Strategy{})
+	bbgo.RegisterStrategy("xpuremaker", &Strategy{})
 }
 
 type Strategy struct {
@@ -29,8 +29,11 @@ type Strategy struct {
 	activeOrders map[string]types.Order
 }
 
-func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{})
+}
+
+func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 
 	s.book = types.NewStreamBook(s.Symbol)
 	s.book.BindStream(session.Stream)
