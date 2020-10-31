@@ -6,8 +6,6 @@ import (
 	"github.com/robfig/cron/v3"
 
 	"github.com/c9s/bbgo/pkg/accounting/pnl"
-	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
 )
 
 type PnLReporter interface {
@@ -101,6 +99,10 @@ func (router *PatternChannelRouter) AddRoute(routes map[string]string) {
 		return
 	}
 
+	if router.routes == nil {
+		router.routes = make(map[*regexp.Regexp]string)
+	}
+
 	for pattern, channel := range routes {
 		router.routes[regexp.MustCompile(pattern)] = channel
 	}
@@ -143,44 +145,8 @@ func (router *ObjectChannelRouter) Route(obj interface{}) (channel string, ok bo
 
 type TradeReporter struct {
 	*Notifiability
-
-	channel       string
-	channelRoutes map[*regexp.Regexp]string
 }
 
-func NewTradeReporter(notifiability *Notifiability) *TradeReporter {
-	return &TradeReporter{
-		Notifiability:      notifiability,
-		channelRoutes: make(map[*regexp.Regexp]string),
-	}
-}
+const TemplateTradeReport = `:handshake: {{ .Symbol }} {{ .Side }} Trade Execution @ {{ .Price  }}`
 
-func (reporter *TradeReporter) Channel(channel string) *TradeReporter {
-	reporter.channel = channel
-	return reporter
-}
-
-func (reporter *TradeReporter) ChannelBySymbol(routes map[string]string) *TradeReporter {
-	for pattern, channel := range routes {
-		reporter.channelRoutes[regexp.MustCompile(pattern)] = channel
-	}
-
-	return reporter
-}
-
-func (reporter *TradeReporter) getChannel(symbol string) string {
-	for pattern, channel := range reporter.channelRoutes {
-		if pattern.MatchString(symbol) {
-			return channel
-		}
-	}
-
-	return reporter.channel
-}
-
-func (reporter *TradeReporter) Report(trade types.Trade) {
-	var channel = reporter.getChannel(trade.Symbol)
-
-	var text = util.Render(`:handshake: {{ .Symbol }} {{ .Side }} Trade Execution @ {{ .Price  }}`, trade)
-	reporter.NotifyTo(channel, text, trade)
-}
+const TemplateOrderReport = `:handshake: {{ .Symbol }} {{ .Side }} Order Update @ {{ .Price  }}`
