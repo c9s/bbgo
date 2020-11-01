@@ -135,7 +135,7 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 			for interval := range types.SupportedIntervals {
 				kLines, err := session.Exchange.QueryKLines(ctx, symbol, interval.String(), types.KLineQueryOptions{
 					EndTime: &now,
-					Limit:   100,
+					Limit:   500, // indicators need at least 100
 				})
 				if err != nil {
 					return err

@@ -295,10 +295,10 @@ func (trader *Trader) ReportPnL() *PnLReporterManager {
 }
 
 type OrderExecutor interface {
-	SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders []types.Order, err error)
+	SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error)
 }
 
 type OrderExecutionRouter interface {
 	// SubmitOrderTo submit order to a specific exchange session
-	SubmitOrdersTo(ctx context.Context, session string, orders ...types.SubmitOrder) (createdOrders []types.Order, err error)
+	SubmitOrdersTo(ctx context.Context, session string, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error)
 }

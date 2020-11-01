@@ -152,7 +152,7 @@ func mustParseTicker(v *fastjson.Value) Ticker {
 
 type Interval int64
 
-func parseResolution(a string) (Interval, error) {
+func ParseInterval(a string) (Interval, error) {
 	switch strings.ToLower(a) {
 
 	case "1m":
@@ -170,11 +170,20 @@ func parseResolution(a string) (Interval, error) {
 	case "1h":
 		return 60, nil
 
+	case "2h":
+		return 60 * 2, nil
+
 	case "3h":
 		return 60 * 3, nil
 
+	case "4h":
+		return 60 * 4, nil
+
 	case "6h":
 		return 60 * 6, nil
+
+	case "8h":
+		return 60 * 8, nil
 
 	case "12h":
 		return 60 * 12, nil
@@ -190,7 +199,7 @@ func parseResolution(a string) (Interval, error) {
 
 	}
 
-	return 0, errors.New("incorrect resolution")
+	return 0, errors.Errorf("incorrect resolution: %q", a)
 }
 
 type KLine struct {
@@ -224,7 +233,7 @@ func (s *PublicService) KLines(symbol string, resolution string, start time.Time
 	queries := url.Values{}
 	queries.Set("market", symbol)
 
-	interval, err := parseResolution(resolution)
+	interval, err := ParseInterval(resolution)
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +241,7 @@ func (s *PublicService) KLines(symbol string, resolution string, start time.Time
 
 	nilTime := time.Time{}
 	if start != nilTime {
-		queries.Set("timestamp", strconv.FormatInt(start.Unix(), 64))
+		queries.Set("timestamp", strconv.FormatInt(start.Unix(), 10))
 	}
 
 	if limit > 0 {
