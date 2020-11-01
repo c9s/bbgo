@@ -111,7 +111,7 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 	return err2
 }
 
-func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders []types.Order, err error) {
+func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error) {
 	for _, order := range orders {
 		orderType, err := toLocalOrderType(order.Type)
 		if err != nil {
@@ -362,26 +362,33 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol, interval string, opt
 		limit = options.Limit
 	}
 
+	i, err := maxapi.ParseInterval(interval)
+	if err != nil {
+		return nil, err
+	}
+
+	// workaround for the kline query
+	if options.EndTime != nil && options.StartTime == nil {
+		startTime := options.EndTime.Add(- time.Duration(limit) * time.Minute * time.Duration(i))
+		options.StartTime = &startTime
+	}
+
 	if options.StartTime == nil {
 		return nil, errors.New("start time can not be empty")
 	}
 
-	if options.EndTime != nil {
-		return nil, errors.New("end time is not supported")
-	}
-
-	log.Infof("querying kline %s %s %v", symbol, interval, options)
+	log.Infof("querying kline %s %s %+v", symbol, interval, options)
 
 	// avoid rate limit
 	time.Sleep(100 * time.Millisecond)
 
-	localKlines, err := e.client.PublicService.KLines(toLocalSymbol(symbol), interval, *options.StartTime, limit)
+	localKLines, err := e.client.PublicService.KLines(toLocalSymbol(symbol), interval, *options.StartTime, limit)
 	if err != nil {
 		return nil, err
 	}
 
 	var kLines []types.KLine
-	for _, k := range localKlines {
+	for _, k := range localKLines {
 		kLines = append(kLines, k.KLine())
 	}
 

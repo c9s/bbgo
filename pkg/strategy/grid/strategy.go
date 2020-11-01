@@ -2,7 +2,6 @@ package grid
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -65,11 +64,9 @@ type Strategy struct {
 
 	BaseQuantity float64 `json:"baseQuantity"`
 
-	activeBidOrders map[uint64]types.Order
-	activeAskOrders map[uint64]types.Order
+	activeOrders *types.LocalActiveOrderBook
 
 	boll *indicator.BOLL
-	mu   sync.Mutex
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
@@ -86,12 +83,16 @@ func (s *Strategy) updateBidOrders(orderExecutor bbgo.OrderExecutor, session *bb
 		return
 	}
 
-	var numOrders = s.GridNum - len(s.activeBidOrders)
+	var numOrders = s.GridNum - s.activeOrders.NumOfBids()
 	if numOrders <= 0 {
 		return
 	}
 
 	var downBand = s.boll.LastDownBand()
+	if downBand <= 0.0 {
+		return
+	}
+
 	var startPrice = downBand
 
 	var submitOrders []types.SubmitOrder
@@ -115,13 +116,7 @@ func (s *Strategy) updateBidOrders(orderExecutor bbgo.OrderExecutor, session *bb
 		return
 	}
 
-	s.mu.Lock()
-	for i := range orders {
-		var order = orders[i]
-		log.Infof("adding order %d to the active bid order pool...", order.OrderID)
-		s.activeBidOrders[order.OrderID] = order
-	}
-	s.mu.Unlock()
+	s.activeOrders.Add(orders...)
 }
 
 func (s *Strategy) updateAskOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) {
@@ -133,12 +128,16 @@ func (s *Strategy) updateAskOrders(orderExecutor bbgo.OrderExecutor, session *bb
 		return
 	}
 
-	var numOrders = s.GridNum - len(s.activeAskOrders)
+	var numOrders = s.GridNum - s.activeOrders.NumOfAsks()
 	if numOrders <= 0 {
 		return
 	}
 
 	var upBand = s.boll.LastUpBand()
+	if upBand <= 0.0 {
+		return
+	}
+
 	var startPrice = upBand
 
 	var submitOrders []types.SubmitOrder
@@ -162,33 +161,22 @@ func (s *Strategy) updateAskOrders(orderExecutor bbgo.OrderExecutor, session *bb
 		return
 	}
 
-	s.mu.Lock()
-	for i := range orders {
-		var order = orders[i]
-		log.Infof("adding order %d to the active ask order pool...", order.OrderID)
-		s.activeAskOrders[order.OrderID] = order
-	}
-	s.mu.Unlock()
+	log.Infof("adding orders to the active ask order pool...")
+	s.activeOrders.Add(orders...)
 }
 
 func (s *Strategy) updateOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) {
-	log.Infof("checking grid orders, bids=%d asks=%d", len(s.activeBidOrders), len(s.activeAskOrders))
+	log.Infof("checking grid orders, bids=%d asks=%d", s.activeOrders.Bids.Len(), s.activeOrders.Asks.Len())
 
-	for _, o := range s.activeBidOrders {
-		log.Infof("bid order: %d -> %s", o.OrderID, o.Status)
-	}
+	s.activeOrders.Print()
 
-	for _, o := range s.activeAskOrders {
-		log.Infof("ask order: %d -> %s", o.OrderID, o.Status)
-	}
-
-	if len(s.activeBidOrders) < s.GridNum {
-		log.Infof("active bid orders not enough: %d < %d, updating...", len(s.activeBidOrders), s.GridNum)
+	if s.activeOrders.Bids.Len() < s.GridNum {
+		log.Infof("active bid orders not enough: %d < %d, updating...", s.activeOrders.Bids.Len(), s.GridNum)
 		s.updateBidOrders(orderExecutor, session)
 	}
 
-	if len(s.activeAskOrders) < s.GridNum {
-		log.Infof("active ask orders not enough: %d < %d, updating...", len(s.activeAskOrders), s.GridNum)
+	if s.activeOrders.Asks.Len() < s.GridNum {
+		log.Infof("active ask orders not enough: %d < %d, updating...", s.activeOrders.Asks.Len(), s.GridNum)
 		s.updateAskOrders(orderExecutor, session)
 	}
 }
@@ -204,9 +192,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 
 	// we don't persist orders so that we can not clear the previous orders for now. just need time to support this.
-	// TODO: pull this map out and add mutex lock
-	s.activeBidOrders = make(map[uint64]types.Order)
-	s.activeAskOrders = make(map[uint64]types.Order)
+	s.activeOrders = types.NewLocalActiveOrderBook()
 
 	session.Stream.OnOrderUpdate(func(order types.Order) {
 		log.Infof("received order update: %+v", order)
@@ -215,53 +201,17 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 
-		s.mu.Lock()
-		defer s.mu.Unlock()
-
 		switch order.Status {
-
 		case types.OrderStatusFilled:
-			switch order.Side {
-			case types.SideTypeSell:
-				// find the filled bid to remove
-				for id, o := range s.activeBidOrders {
-					if o.Status == types.OrderStatusFilled {
-						delete(s.activeBidOrders, id)
-						delete(s.activeAskOrders, order.OrderID)
-						break
-					}
-				}
-
-			case types.SideTypeBuy:
-				// find the filled ask order to remove
-				for id, o := range s.activeAskOrders {
-					if o.Status == types.OrderStatusFilled {
-						delete(s.activeAskOrders, id)
-						delete(s.activeBidOrders, order.OrderID)
-						break
-					}
-				}
-			}
+			s.activeOrders.WriteOff(order)
 
 		case types.OrderStatusCanceled, types.OrderStatusRejected:
 			log.Infof("order status %s, removing %d from the active order pool...", order.Status, order.OrderID)
-
-			switch order.Side {
-			case types.SideTypeSell:
-				delete(s.activeAskOrders, order.OrderID)
-			case types.SideTypeBuy:
-				delete(s.activeBidOrders, order.OrderID)
-
-			}
+			s.activeOrders.Delete(order)
 
 		default:
 			log.Infof("order status %s, updating %d to the active order pool...", order.Status, order.OrderID)
-			switch order.Side {
-			case types.SideTypeSell:
-				s.activeAskOrders[order.OrderID] = order
-			case types.SideTypeBuy:
-				s.activeBidOrders[order.OrderID] = order
-			}
+			s.activeOrders.Add(order)
 		}
 	})
 
@@ -272,13 +222,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.updateOrders(orderExecutor, session)
 
 		defer func() {
-			for _, o := range s.activeBidOrders {
-				_ = session.Exchange.CancelOrders(context.Background(), o)
-			}
-
-			for _, o := range s.activeAskOrders {
-				_ = session.Exchange.CancelOrders(context.Background(), o)
-			}
+			_ = session.Exchange.CancelOrders(context.Background(), s.activeOrders.Orders()...)
 		}()
 
 		for {

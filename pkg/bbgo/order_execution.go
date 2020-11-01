@@ -17,7 +17,7 @@ type ExchangeOrderExecutionRouter struct {
 	sessions map[string]*ExchangeSession
 }
 
-func (e *ExchangeOrderExecutionRouter) SubmitOrdersTo(ctx context.Context, session string, orders ...types.SubmitOrder) ([]types.Order, error) {
+func (e *ExchangeOrderExecutionRouter) SubmitOrdersTo(ctx context.Context, session string, orders ...types.SubmitOrder) (types.OrderSlice, error) {
 	es, ok := e.sessions[session]
 	if !ok {
 		return nil, errors.Errorf("exchange session %s not found", session)
@@ -28,7 +28,6 @@ func (e *ExchangeOrderExecutionRouter) SubmitOrdersTo(ctx context.Context, sessi
 		return nil, err
 	}
 
-	// e.Notify(":memo: Submitting order to %s %s %s %s with quantity: %s", session, order.Symbol, order.Type, order.Side, order.QuantityString, order)
 	return es.Exchange.SubmitOrders(ctx, formattedOrders...)
 }
 
@@ -44,14 +43,14 @@ func (e *ExchangeOrderExecutor) notifySubmitOrders(orders ...types.SubmitOrder) 
 		// pass submit order as an interface object.
 		channel, ok := e.RouteObject(&order)
 		if ok {
-			e.NotifyTo(channel, ":memo: Submitting %s %s %s order with quantity: %s", order.Symbol, order.Type, order.Side, order.QuantityString, &order)
+			e.NotifyTo(channel, ":memo: Submitting %s %s %s order with quantity: %s at price: %s", order.Symbol, order.Type, order.Side, order.QuantityString, order.PriceString, &order)
 		} else {
-			e.Notify(":memo: Submitting %s %s %s order with quantity: %s", order.Symbol, order.Type, order.Side, order.QuantityString, &order)
+			e.Notify(":memo: Submitting %s %s %s order with quantity: %s at price: %s", order.Symbol, order.Type, order.Side, order.QuantityString, order.PriceString, &order)
 		}
 	}
 }
 
-func (e *ExchangeOrderExecutor) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) ([]types.Order, error) {
+func (e *ExchangeOrderExecutor) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (types.OrderSlice, error) {
 	formattedOrders, err := formatOrders(orders, e.session)
 	if err != nil {
 		return nil, err
@@ -81,7 +80,7 @@ type BasicRiskControlOrderExecutor struct {
 	MaxOrderAmount  fixedpoint.Value `json:"maxOrderAmount,omitempty"`
 }
 
-func (e *BasicRiskControlOrderExecutor) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) ([]types.Order, error) {
+func (e *BasicRiskControlOrderExecutor) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (types.OrderSlice, error) {
 	var formattedOrders []types.SubmitOrder
 	for _, order := range orders {
 		currentPrice, ok := e.session.LastPrice(order.Symbol)
