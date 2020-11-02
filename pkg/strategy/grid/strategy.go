@@ -54,19 +54,27 @@ type Strategy struct {
 	// These fields will be filled from the config file (it translates YAML to JSON)
 	Symbol string `json:"symbol"`
 
+	// Interval is the interval used by the BOLLINGER indicator (which uses K-Line as its source price)
 	Interval types.Interval `json:"interval"`
 
-	// GridPips is the pips of grid, e.g., 0.001
+	// RepostInterval is the interval for re-posting maker orders
+	RepostInterval types.Interval `json:"repostInterval"`
+
+	// GridPips is the pips of grid
+	// e.g., 0.001, so that your orders will be submitted at price like 0.127, 0.128, 0.129, 0.130
 	GridPips fixedpoint.Value `json:"gridPips"`
 
-	// GridNum is the grid number (order numbers)
+	// GridNum is the grid number, how many orders you want to post on the orderbook.
 	GridNum int `json:"gridNumber"`
 
+	// BaseQuantity is the quantity you want to submit for each order.
 	BaseQuantity float64 `json:"baseQuantity"`
 
-	activeOrders *types.LocalActiveOrderBook
+	// activeOrders is the locally maintained active order book of the maker orders.
+	activeOrders *bbgo.LocalActiveOrderBook `json:"-"`
 
-	boll *indicator.BOLL
+	// boll is the BOLLINGER indicator we used for predicting the price.
+	boll *indicator.BOLL `json:"-"`
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
@@ -181,6 +189,28 @@ func (s *Strategy) updateOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.
 	}
 }
 
+
+func (s *Strategy) orderUpdateHandler(order types.Order) {
+	log.Infof("received order update: %+v", order)
+
+	if order.Symbol != s.Symbol {
+		return
+	}
+
+	switch order.Status {
+	case types.OrderStatusFilled:
+		s.WriteOff(order)
+
+	case types.OrderStatusCanceled, types.OrderStatusRejected:
+		log.Infof("order status %s, removing %d from the active order pool...", order.Status, order.OrderID)
+		s.activeOrders.Delete(order)
+
+	default:
+		log.Infof("order status %s, updating %d to the active order pool...", order.Status, order.OrderID)
+		s.activeOrders.Add(order)
+	}
+}
+
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	if s.GridNum == 0 {
 		s.GridNum = 2
@@ -192,28 +222,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 
 	// we don't persist orders so that we can not clear the previous orders for now. just need time to support this.
-	s.activeOrders = types.NewLocalActiveOrderBook()
+	s.activeOrders = bbgo.NewLocalActiveOrderBook()
 
-	session.Stream.OnOrderUpdate(func(order types.Order) {
-		log.Infof("received order update: %+v", order)
-
-		if order.Symbol != s.Symbol {
-			return
-		}
-
-		switch order.Status {
-		case types.OrderStatusFilled:
-			s.activeOrders.WriteOff(order)
-
-		case types.OrderStatusCanceled, types.OrderStatusRejected:
-			log.Infof("order status %s, removing %d from the active order pool...", order.Status, order.OrderID)
-			s.activeOrders.Delete(order)
-
-		default:
-			log.Infof("order status %s, updating %d to the active order pool...", order.Status, order.OrderID)
-			s.activeOrders.Add(order)
-		}
-	})
+	session.Stream.OnOrderUpdate(s.orderUpdateHandler)
 
 	go func() {
 		ticker := time.NewTicker(1 * time.Minute)
@@ -238,4 +249,33 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	}()
 
 	return nil
+}
+
+// WriteOff writes off the filled order on the opposite side.
+// This method does not write off order by order amount or order quantity.
+func (s *Strategy) WriteOff(order types.Order) bool {
+	b := s.activeOrders
+	if order.Status != types.OrderStatusFilled {
+		return false
+	}
+
+	switch order.Side {
+	case types.SideTypeSell:
+		// find the filled bid to remove
+		if filledOrder, ok := b.Bids.AnyFilled(); ok {
+			b.Bids.Delete(filledOrder.OrderID)
+			b.Asks.Delete(order.OrderID)
+			return true
+		}
+
+	case types.SideTypeBuy:
+		// find the filled ask order to remove
+		if filledOrder, ok := b.Asks.AnyFilled(); ok {
+			b.Asks.Delete(filledOrder.OrderID)
+			b.Bids.Delete(order.OrderID)
+			return true
+		}
+	}
+
+	return false
 }
