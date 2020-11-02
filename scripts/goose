@@ -1,0 +1,33 @@
+#!/bin/bash
+set -e
+export GOOSE_DRIVER=mysql
+
+if [[ -n $MYSQL_URL ]] ; then
+    export GOOSE_DBSTRING="$MYSQL_URL"
+else
+    GOOSE_DBSTRING=
+    if [[ -n $MYSQL_USERNAME ]] ; then
+        GOOSE_DBSTRING="$MYSQL_USERNAME"
+        if [[ -n $MYSQL_PASSWORD ]] ; then
+            GOOSE_DBSTRING="$MYSQL_USERNAME:$MYSQL_PASSWORD"
+        fi
+    fi
+    if [[ -n $MYSQL_HOST ]] ; then
+        if [[ -n $MYSQL_PORT ]] ; then
+            GOOSE_DBSTRING="$GOOSE_DBSTRING@tcp($MYSQL_HOST:$MYSQL_PORT)"
+        else
+            GOOSE_DBSTRING="$GOOSE_DBSTRING@tcp($MYSQL_HOST)"
+        fi
+    else
+        if [[ -n $MYSQL_PORT ]] ; then
+            GOOSE_DBSTRING="$GOOSE_DBSTRING@tcp(localhost:$MYSQL_PORT)"
+        else
+            GOOSE_DBSTRING="$GOOSE_DBSTRING@localhost"
+        fi
+    fi
+    if [[ -n $MYSQL_DATABASE ]] ; then
+        GOOSE_DBSTRING="$GOOSE_DBSTRING/$MYSQL_DATABASE"
+    fi
+    export GOOSE_DBSTRING
+fi
+goose $*
