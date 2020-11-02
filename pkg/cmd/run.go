@@ -65,11 +65,13 @@ func compileRunFile(filepath string, config *bbgo.Config) error {
 func runConfig(ctx context.Context, userConfig *bbgo.Config) error {
 	environ := bbgo.NewEnvironment()
 
-	db, err := cmdutil.ConnectMySQL()
-	if err != nil {
-		return err
+	if viper.IsSet("mysql-url") {
+		db, err := cmdutil.ConnectMySQL()
+		if err != nil {
+			return err
+		}
+		environ.SyncTrades(db)
 	}
-	environ.SyncTrades(db)
 
 	if len(userConfig.Sessions) == 0 {
 		for _, n := range bbgo.SupportedExchanges {
@@ -97,7 +99,6 @@ func runConfig(ctx context.Context, userConfig *bbgo.Config) error {
 		}
 	}
 
-
 	notification := bbgo.Notifiability{
 		SymbolChannelRouter:  bbgo.NewPatternChannelRouter(nil),
 		SessionChannelRouter: bbgo.NewPatternChannelRouter(nil),
@@ -124,7 +125,6 @@ func runConfig(ctx context.Context, userConfig *bbgo.Config) error {
 	if userConfig.Notifications != nil {
 		environ.ConfigureNotification(userConfig.Notifications)
 	}
-
 
 	trader := bbgo.NewTrader(environ)
 

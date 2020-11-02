@@ -164,13 +164,17 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 			session.marketDataStores[kline.Symbol].AddKLine(kline)
 		})
 
+		if environ.TradeService != nil {
+			session.Stream.OnTradeUpdate(func(trade types.Trade) {
+				if err := environ.TradeService.Insert(trade); err != nil {
+					log.WithError(err).Errorf("trade insert error: %+v", trade)
+				}
+			})
+		}
+
 		session.Stream.OnTradeUpdate(func(trade types.Trade) {
 			// append trades
 			session.Trades[trade.Symbol] = append(session.Trades[trade.Symbol], trade)
-
-			if err := environ.TradeService.Insert(trade); err != nil {
-				log.WithError(err).Errorf("trade insert error: %+v", trade)
-			}
 		})
 
 		// move market data store dispatch to here, use one callback to dispatch the market data
