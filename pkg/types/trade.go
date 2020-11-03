@@ -15,6 +15,7 @@ type Trade struct {
 
 	// ID is the source trade ID
 	ID            int64   `json:"id" db:"id"`
+	OrderID       uint64   `json:"orderID" db:"order_id"`
 	Exchange      string  `json:"exchange" db:"exchange"`
 	Price         float64 `json:"price" db:"price"`
 	Quantity      float64 `json:"quantity" db:"quantity"`
