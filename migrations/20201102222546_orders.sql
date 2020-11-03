@@ -13,8 +13,6 @@ CREATE TABLE `orders`
     `executed_quantity` DECIMAL(16, 8) UNSIGNED NOT NULL,
     `fee`               DECIMAL(16, 8) UNSIGNED NOT NULL,
     `fee_currency`      VARCHAR(4)              NOT NULL,
-    `is_buyer`          BOOLEAN                 NOT NULL DEFAULT FALSE,
-    `is_maker`          BOOLEAN                 NOT NULL DEFAULT FALSE,
     `side`              VARCHAR(4)              NOT NULL DEFAULT '',
     `created_at`        DATETIME(6)             NOT NULL,
 
