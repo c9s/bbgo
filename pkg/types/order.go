@@ -32,6 +32,7 @@ type Order struct {
 	OrderID          uint64      `json:"orderID" db:"order_id"` // order id
 	Status           OrderStatus `json:"status" db:"status"`
 	ExecutedQuantity float64     `json:"executedQuantity" db:"executed_quantity"`
+	IsWorking        bool        `json:"isWorking" db:"is_working"`
 	CreationTime     time.Time   `json:"creationTime" db:"created_at"`
 }
 
