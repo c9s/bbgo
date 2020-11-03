@@ -42,8 +42,8 @@ func (s *OrderService) scanRows(rows *sqlx.Rows) (orders []types.Order, err erro
 
 func (s *OrderService) Insert(order types.Order) error {
 	_, err := s.DB.NamedExec(`
-			INSERT INTO orders (id, exchange, symbol, price, quantity, quote_quantity, side, fee, fee_currency, traded_at)
-			VALUES (:id, :exchange, :symbol, :price, :quantity, :quote_quantity, :side, :fee, :fee_currency, :traded_at)`,
+			INSERT INTO orders (id, exchange, order_type, symbol, price, stop_price, quantity, side, :is_working, time_in_force, created_at)
+			VALUES (:id, :exchange, :order_type, :symbol, :price, :stop_price, :quantity, :side, :is_working, :time_in_force, :created_at)`,
 		order)
 	return err
 }

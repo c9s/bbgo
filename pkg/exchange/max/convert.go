@@ -147,6 +147,7 @@ func toGlobalOrder(maxOrder max.Order) (*types.Order, error) {
 			Price:         util.MustParseFloat(maxOrder.Price),
 			TimeInForce:   "GTC", // MAX only supports GTC
 		},
+		IsWorking:        maxOrder.State == "wait",
 		OrderID:          maxOrder.ID,
 		Status:           toGlobalOrderStatus(maxOrder.State, executedVolume, remainingVolume),
 		ExecutedQuantity: executedVolume.Float64(),
