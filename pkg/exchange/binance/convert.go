@@ -80,6 +80,7 @@ func toGlobalTrade(t binance.TradeV3) (*types.Trade, error) {
 
 	return &types.Trade{
 		ID:            t.ID,
+		OrderID:       uint64(t.OrderID),
 		Price:         price,
 		Symbol:        t.Symbol,
 		Exchange:      "binance",

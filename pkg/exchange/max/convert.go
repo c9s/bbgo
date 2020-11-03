@@ -140,12 +140,12 @@ func toGlobalOrder(maxOrder max.Order) (*types.Order, error) {
 	return &types.Order{
 		SubmitOrder: types.SubmitOrder{
 			ClientOrderID: maxOrder.ClientOID,
-			Symbol:      toGlobalSymbol(maxOrder.Market),
-			Side:        toGlobalSideType(maxOrder.Side),
-			Type:        toGlobalOrderType(maxOrder.OrderType),
-			Quantity:    util.MustParseFloat(maxOrder.Volume),
-			Price:       util.MustParseFloat(maxOrder.Price),
-			TimeInForce: "GTC", // MAX only supports GTC
+			Symbol:        toGlobalSymbol(maxOrder.Market),
+			Side:          toGlobalSideType(maxOrder.Side),
+			Type:          toGlobalOrderType(maxOrder.OrderType),
+			Quantity:      util.MustParseFloat(maxOrder.Volume),
+			Price:         util.MustParseFloat(maxOrder.Price),
+			TimeInForce:   "GTC", // MAX only supports GTC
 		},
 		OrderID:          maxOrder.ID,
 		Status:           toGlobalOrderStatus(maxOrder.State, executedVolume, remainingVolume),
@@ -182,6 +182,7 @@ func toGlobalTrade(t max.Trade) (*types.Trade, error) {
 
 	return &types.Trade{
 		ID:            int64(t.ID),
+		OrderID:       t.OrderID,
 		Price:         price,
 		Symbol:        toGlobalSymbol(t.Market),
 		Exchange:      "max",
