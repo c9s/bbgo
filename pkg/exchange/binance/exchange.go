@@ -270,12 +270,12 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 }
 
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
-	remoteOrders, err := e.Client.NewListOpenOrdersService().Symbol(symbol).Do(ctx)
+	binanceOrders, err := e.Client.NewListOpenOrdersService().Symbol(symbol).Do(ctx)
 	if err != nil {
 		return orders, err
 	}
 
-	for _, binanceOrder := range remoteOrders {
+	for _, binanceOrder := range binanceOrders {
 		order, err := toGlobalOrder(binanceOrder)
 		if err != nil {
 			return orders, err
@@ -286,6 +286,45 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 
 	return orders, err
 }
+
+
+func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time) (orders []types.Order, err error) {
+	var lastOrderID int64 = 0
+	for {
+		req := e.Client.NewListOrdersService().
+			Symbol(symbol).
+			StartTime(since.Unix()).
+			EndTime(until.Unix())
+
+		if lastOrderID > 0 {
+			req.OrderID(lastOrderID)
+		}
+
+		binanceOrders, err := req.Do(ctx)
+		if err != nil {
+			return orders, err
+		}
+
+		if len(binanceOrders) == 0 {
+			break
+		}
+
+		for _, binanceOrder := range binanceOrders {
+			order, err := toGlobalOrder(binanceOrder)
+			if err != nil {
+				return orders, err
+			}
+
+			lastOrderID = binanceOrder.OrderID
+			orders = append(orders, *order)
+		}
+	}
+
+	return orders, err
+}
+
+
+
 
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err2 error) {
 	for _, o := range orders {

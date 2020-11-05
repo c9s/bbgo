@@ -39,6 +39,8 @@ const (
 
 type QueryOrderOptions struct {
 	GroupID int
+	Offset int
+	Limit int
 }
 
 // OrderService manages the Order endpoint.
@@ -66,12 +68,52 @@ type Order struct {
 	InsertedAt      time.Time  `json:"-" db:"inserted_at"`
 }
 
+
+// Open returns open orders
+func (s *OrderService) Closed(market string, options QueryOrderOptions) ([]Order, error) {
+	payload := map[string]interface{}{
+		"market": market,
+		"state":    []OrderState{OrderStateFinalizing, OrderStateDone, OrderStateCancel, OrderStateFailed},
+		"order_by": "desc",
+		"pagination": false,
+	}
+
+	if options.GroupID > 0 {
+		payload["group_id"] = options.GroupID
+	}
+	if options.Offset > 0 {
+		payload["offset"] = options.Offset
+	}
+	if options.Limit > 0 {
+		payload["limit"] = options.Limit
+	}
+
+	req, err := s.client.newAuthenticatedRequest("GET", "v2/orders", payload)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := s.client.sendRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var orders []Order
+	if err := response.DecodeJSON(&orders); err != nil {
+		return nil, err
+	}
+
+	return orders, nil
+}
+
+
 // Open returns open orders
 func (s *OrderService) Open(market string, options QueryOrderOptions) ([]Order, error) {
 	payload := map[string]interface{}{
 		"market": market,
 		// "state":    []OrderState{OrderStateWait, OrderStateConvert},
 		"order_by": "desc",
+		"pagination": false,
 	}
 
 	if options.GroupID > 0 {
