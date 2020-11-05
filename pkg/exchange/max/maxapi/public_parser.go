@@ -1,7 +1,6 @@
 package max
 
 import (
-	"encoding/json"
 	"strings"
 	"time"
 
@@ -205,11 +204,17 @@ func parseKLineEvent(val *fastjson.Value) (*KLineEvent, error) {
 		Timestamp: val.GetInt64("T"),
 	}
 
-	out := val.MarshalTo(nil)
-
-	err := json.Unmarshal(out, &event.KLine)
-	if err != nil {
-		return nil, err
+	event.KLine = KLine{
+		Symbol:    string(val.GetStringBytes("k", "M")),
+		Interval:  string(val.GetStringBytes("k", "R")),
+		StartTime: time.Unix(0, val.GetInt64("k", "ST")*int64(time.Millisecond)),
+		EndTime:   time.Unix(0, val.GetInt64("k", "ET")*int64(time.Millisecond)),
+		Open:      util.MustParseFloat(string(val.GetStringBytes("k", "O"))),
+		High:      util.MustParseFloat(string(val.GetStringBytes("k", "H"))),
+		Low:       util.MustParseFloat(string(val.GetStringBytes("k", "L"))),
+		Close:     util.MustParseFloat(string(val.GetStringBytes("k", "C"))),
+		Volume:    util.MustParseFloat(string(val.GetStringBytes("k", "v"))),
+		Closed:    val.GetBool("k", "x"),
 	}
 
 	return &event, nil
