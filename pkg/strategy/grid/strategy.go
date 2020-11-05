@@ -8,6 +8,7 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
+	"github.com/c9s/bbgo/pkg/sigchan"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -63,6 +64,8 @@ type Strategy struct {
 	// e.g., 0.001, so that your orders will be submitted at price like 0.127, 0.128, 0.129, 0.130
 	GridPips fixedpoint.Value `json:"gridPips"`
 
+	MinProfitSpread fixedpoint.Value `json:"minProfitSpread"`
+
 	// GridNum is the grid number, how many orders you want to post on the orderbook.
 	GridNum int `json:"gridNumber"`
 
@@ -74,6 +77,8 @@ type Strategy struct {
 
 	// boll is the BOLLINGER indicator we used for predicting the price.
 	boll *indicator.BOLL
+
+	updateC sigchan.Chan
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
@@ -173,18 +178,35 @@ func (s *Strategy) updateAskOrders(orderExecutor bbgo.OrderExecutor, session *bb
 }
 
 func (s *Strategy) updateOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) {
-	log.Infof("checking grid orders, bids=%d asks=%d", s.activeOrders.Bids.Len(), s.activeOrders.Asks.Len())
+	// skip order updates if up-band - down-band < min profit spread
+	if (s.boll.LastUpBand() - s.boll.LastDownBand()) <= s.MinProfitSpread.Float64() {
+		log.Infof("boll: down band price == up band price, skipping...")
+		return
+	}
 
+	if err := session.Exchange.CancelOrders(context.Background(), s.activeOrders.Orders()...); err != nil {
+		log.WithError(err).Errorf("cancel order error")
+	}
+
+	log.Infof("checking grid orders, bids=%d asks=%d", s.activeOrders.Bids.Len(), s.activeOrders.Asks.Len())
 	s.activeOrders.Print()
 
 	if s.activeOrders.Bids.Len() < s.GridNum {
-		log.Infof("active bid orders not enough: %d < %d, updating...", s.activeOrders.Bids.Len(), s.GridNum)
-		s.updateBidOrders(orderExecutor, session)
+		_, ok := session.Account.Balance(s.Market.QuoteCurrency)
+		if ok {
+			log.Infof("active bid orders not enough: %d < %d, updating...", s.activeOrders.Bids.Len(), s.GridNum)
+			s.updateBidOrders(orderExecutor, session)
+		}
 	}
 
 	if s.activeOrders.Asks.Len() < s.GridNum {
-		log.Infof("active ask orders not enough: %d < %d, updating...", s.activeOrders.Asks.Len(), s.GridNum)
-		s.updateAskOrders(orderExecutor, session)
+		_, ok := session.Account.Balance(s.Market.BaseCurrency)
+
+		// TODO: add base asset quantity check, think about how to reuse the risk control executor
+		if ok {
+			log.Infof("active ask orders not enough: %d < %d, updating...", s.activeOrders.Asks.Len(), s.GridNum)
+			s.updateAskOrders(orderExecutor, session)
+		}
 	}
 }
 
@@ -214,6 +236,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.GridNum = 2
 	}
 
+	s.updateC = sigchan.New(1)
+
 	s.boll = s.StandardIndicatorSet.GetBOLL(types.IntervalWindow{
 		Interval: s.Interval,
 		Window:   21,
@@ -228,28 +252,33 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	session.Stream.OnKLineClosed(func(kline types.KLine) {
 		// skip kline events that does not belong to this symbol
 		if kline.Symbol != s.Symbol {
+			log.Infof("%s != %s", kline.Symbol, s.Symbol)
 			return
 		}
 
-		// skip order updates if up-band == down-band
-		if s.boll.LastUpBand() == s.boll.LastDownBand() {
-			return
-		}
-
-		if s.RepostInterval != "" {
-			if s.RepostInterval == kline.Interval {
-				// see if we have enough balances and then we create limit orders on the up band and the down band.
-				s.updateOrders(orderExecutor, session)
-			}
-		} else if s.Interval == kline.Interval {
-			s.updateOrders(orderExecutor, session)
+		if (s.RepostInterval != "" && (s.RepostInterval == kline.Interval)) || s.Interval == kline.Interval {
+			// see if we have enough balances and then we create limit orders on the up band and the down band.
+			s.updateC.Emit()
 		}
 	})
 
-	s.updateOrders(orderExecutor, session)
+	// in order to avoid blocking the stream callbacks, we need to spawn a go routine here to listen to the signal
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				// TODO: add and fix graceful shutdown
+				_ = session.Exchange.CancelOrders(context.Background(), s.activeOrders.Orders()...)
+				return
 
-	// TODO: move this into graceful shutdown
-	// _ = session.Exchange.CancelOrders(context.Background(), s.activeOrders.Orders()...)
+			case <-s.updateC:
+				s.updateOrders(orderExecutor, session)
+			}
+		}
+	}()
+
+	// emit to place the first round of orders
+	s.updateC.Emit()
 
 	return nil
 }

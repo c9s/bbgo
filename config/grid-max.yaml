@@ -51,4 +51,5 @@ exchangeStrategies:
     baseQuantity: 0.001
     gridPips: 10.0
     gridNumber: 3
+    minProfitSpread: 30
 

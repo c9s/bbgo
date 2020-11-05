@@ -27,7 +27,18 @@ func NewStream(key, secret string) *Stream {
 	}
 
 	wss.OnMessage(func(message []byte) {
-		logger.Infof("M: %s", message)
+		logger.Debugf("M: %s", message)
+	})
+
+	wss.OnKLineEvent(func(e max.KLineEvent) {
+		kline := e.KLine.KLine()
+
+		logger.Infof("K: %+v", kline)
+
+		stream.EmitKLine(kline)
+		if kline.Closed {
+			stream.EmitKLineClosed(kline)
+		}
 	})
 
 	wss.OnOrderSnapshotEvent(func(e max.OrderSnapshotEvent) {
