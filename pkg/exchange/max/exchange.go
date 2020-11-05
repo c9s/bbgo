@@ -93,11 +93,13 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 
 // lastOrderID is not supported on MAX
 func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []types.Order, err error) {
-	offset := 0
-	limit := 500
-	orderIDs := make(map[uint64]struct{}, limit * 2)
-	for {
-		log.Infof("querying closed orders offset %d ~ %d + %d", offset, offset, limit)
+	numBatches := 5
+	limit := 1000 // max limit = 1000
+	offset := limit * numBatches
+	orderIDs := make(map[uint64]struct{}, limit*2)
+
+	for ; offset > 0; offset -= limit {
+		log.Infof("querying %s closed orders offset %d ~ ", symbol, offset)
 
 		maxOrders, err := e.client.OrderService.Closed(toLocalSymbol(symbol), maxapi.QueryOrderOptions{
 			Offset: offset,
@@ -132,8 +134,6 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 			orderIDs[order.OrderID] = struct{}{}
 			orders = append(orders, *order)
 		}
-
-		offset += len(maxOrders)
 	}
 
 	return orders, err
