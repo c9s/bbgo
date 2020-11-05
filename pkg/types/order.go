@@ -28,7 +28,7 @@ func (t *OrderType) Scan(v interface{}) error {
 	}
 	return nil
 }
- */
+*/
 
 type OrderStatus string
 
@@ -71,6 +71,7 @@ type Order struct {
 	ExecutedQuantity float64     `json:"executedQuantity" db:"executed_quantity"`
 	IsWorking        bool        `json:"isWorking" db:"is_working"`
 	CreationTime     time.Time   `json:"creationTime" db:"created_at"`
+	UpdateTime       time.Time   `json:"updateTime" db:"updated_at"`
 }
 
 func (o *SubmitOrder) SlackAttachment() slack.Attachment {

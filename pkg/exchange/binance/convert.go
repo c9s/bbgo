@@ -45,8 +45,13 @@ func toGlobalOrder(binanceOrder *binance.Order) (*types.Order, error) {
 		OrderID:          uint64(binanceOrder.OrderID),
 		Status:           toGlobalOrderStatus(binanceOrder.Status),
 		ExecutedQuantity: util.MustParseFloat(binanceOrder.ExecutedQuantity),
-		CreationTime:     time.Unix(0, binanceOrder.Time*int64(time.Millisecond)),
+		CreationTime:     millisecondTime(binanceOrder.Time),
+		UpdateTime:       millisecondTime(binanceOrder.UpdateTime),
 	}, nil
+}
+
+func millisecondTime(t int64) time.Time {
+	return time.Unix(0, t*int64(time.Millisecond))
 }
 
 func toGlobalTrade(t binance.TradeV3) (*types.Trade, error) {
@@ -57,9 +62,6 @@ func toGlobalTrade(t binance.TradeV3) (*types.Trade, error) {
 	} else {
 		side = types.SideTypeSell
 	}
-
-	// trade time
-	mts := time.Unix(0, t.Time*int64(time.Millisecond))
 
 	price, err := strconv.ParseFloat(t.Price, 64)
 	if err != nil {
@@ -94,7 +96,7 @@ func toGlobalTrade(t binance.TradeV3) (*types.Trade, error) {
 		Fee:           fee,
 		FeeCurrency:   t.CommissionAsset,
 		QuoteQuantity: quoteQuantity,
-		Time:          mts,
+		Time:          millisecondTime(t.Time),
 	}, nil
 }
 

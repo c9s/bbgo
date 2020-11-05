@@ -83,6 +83,10 @@ func (e ExchangeBatchProcessor) BatchQueryClosedOrders(ctx context.Context, symb
 		defer close(errC)
 
 		orderIDs := make(map[uint64]struct{}, 500)
+		if lastOrderID > 0 {
+			orderIDs[lastOrderID] = struct{}{}
+		}
+
 		for startTime.Before(endTime) {
 			limitedEndTime := startTime.Add(24 * time.Hour)
 			orders, err := e.QueryClosedOrders(ctx, symbol, startTime, limitedEndTime, lastOrderID)
@@ -138,7 +142,10 @@ func (e ExchangeBatchProcessor) BatchQueryKLines(ctx context.Context, symbol, in
 	return allKLines, err
 }
 
-func (e ExchangeBatchProcessor) BatchQueryTrades(ctx context.Context, symbol string, options *TradeQueryOptions) (allTrades []Trade, err error) {
+func (e ExchangeBatchProcessor) BatchQueryTrades(ctx context.Context, symbol string, options *TradeQueryOptions) (c chan Trade, errC chan error) {
+	c = make(chan Trade, 500)
+	errC = make(chan error, 1)
+
 	// last 7 days
 	var startTime = time.Now().Add(-7 * 24 * time.Hour)
 	if options.StartTime != nil {
@@ -146,40 +153,46 @@ func (e ExchangeBatchProcessor) BatchQueryTrades(ctx context.Context, symbol str
 	}
 
 	var lastTradeID = options.LastTradeID
-	for {
-		log.Infof("querying %s trades from %s, limit=%d", symbol, startTime, options.Limit)
 
-		trades, err := e.QueryTrades(ctx, symbol, &TradeQueryOptions{
-			StartTime:   &startTime,
-			Limit:       options.Limit,
-			LastTradeID: lastTradeID,
-		})
-		if err != nil {
-			return allTrades, err
-		}
+	go func() {
+		defer close(c)
+		defer close(errC)
 
-		if len(trades) == 0 {
-			break
-		}
+		for {
+			log.Infof("querying %s trades from %s, limit=%d", symbol, startTime, options.Limit)
 
-		if len(trades) == 1 && trades[0].ID == lastTradeID {
-			break
-		}
-
-		log.Infof("returned %d trades", len(trades))
-
-		startTime = trades[len(trades)-1].Time
-
-		for _, t := range trades {
-			// ignore the first trade if last TradeID is given
-			if t.ID == lastTradeID {
-				continue
+			trades, err := e.QueryTrades(ctx, symbol, &TradeQueryOptions{
+				StartTime:   &startTime,
+				Limit:       options.Limit,
+				LastTradeID: lastTradeID,
+			})
+			if err != nil {
+				errC <- err
+				return
 			}
 
-			allTrades = append(allTrades, t)
-			lastTradeID = t.ID
-		}
-	}
+			if len(trades) == 0 {
+				break
+			}
 
-	return allTrades, nil
+			if len(trades) == 1 && trades[0].ID == lastTradeID {
+				break
+			}
+
+			log.Infof("returned %d trades", len(trades))
+
+			startTime = trades[len(trades)-1].Time
+			for _, t := range trades {
+				// ignore the first trade if last TradeID is given
+				if t.ID == lastTradeID {
+					continue
+				}
+
+				c <- t
+				lastTradeID = t.ID
+			}
+		}
+	}()
+
+	return c, errC
 }
