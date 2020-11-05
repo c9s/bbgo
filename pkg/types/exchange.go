@@ -58,7 +58,7 @@ type Exchange interface {
 
 	QueryOpenOrders(ctx context.Context, symbol string) (orders []Order, err error)
 
-	QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time) (orders []Order, err error)
+	QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []Order, err error)
 
 	CancelOrders(ctx context.Context, orders ...Order) error
 }
@@ -74,6 +74,45 @@ type ExchangeBatchProcessor struct {
 	Exchange
 }
 
+func (e ExchangeBatchProcessor) BatchQueryClosedOrders(ctx context.Context, symbol string, startTime, endTime time.Time, lastOrderID uint64) (c chan Order, errC chan error) {
+	c = make(chan Order, 500)
+	errC = make(chan error, 1)
+
+	go func() {
+		defer close(c)
+		defer close(errC)
+
+		orderIDs := make(map[uint64]struct{}, 500)
+		for startTime.Before(endTime) {
+			limitedEndTime := startTime.Add(24 * time.Hour)
+			orders, err := e.QueryClosedOrders(ctx, symbol, startTime, limitedEndTime, lastOrderID)
+			if err != nil {
+				errC <- err
+				return
+			}
+
+			if len(orders) == 0 {
+				startTime = limitedEndTime
+				continue
+			}
+
+			for _, o := range orders {
+				if _, ok := orderIDs[o.OrderID]; ok {
+					log.Infof("skipping duplicated order id: %d", o.OrderID)
+					continue
+				}
+
+				c <- o
+				startTime = o.CreationTime
+				lastOrderID = o.OrderID
+			}
+		}
+
+	}()
+
+	return c, errC
+}
+
 func (e ExchangeBatchProcessor) BatchQueryKLines(ctx context.Context, symbol, interval string, startTime, endTime time.Time) (allKLines []KLine, err error) {
 	for startTime.Before(endTime) {
 		kLines, err := e.QueryKLines(ctx, symbol, interval, KLineQueryOptions{
@@ -82,7 +121,7 @@ func (e ExchangeBatchProcessor) BatchQueryKLines(ctx context.Context, symbol, in
 		})
 
 		if err != nil {
-			return nil, err
+			return allKLines, err
 		}
 
 		for _, kline := range kLines {
