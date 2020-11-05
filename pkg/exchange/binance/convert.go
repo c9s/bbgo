@@ -40,10 +40,12 @@ func toGlobalOrder(binanceOrder *binance.Order) (*types.Order, error) {
 			Price:         util.MustParseFloat(binanceOrder.Price),
 			TimeInForce:   string(binanceOrder.TimeInForce),
 		},
+		Exchange:         types.ExchangeBinance.String(),
 		IsWorking:        binanceOrder.IsWorking,
 		OrderID:          uint64(binanceOrder.OrderID),
 		Status:           toGlobalOrderStatus(binanceOrder.Status),
 		ExecutedQuantity: util.MustParseFloat(binanceOrder.ExecutedQuantity),
+		CreationTime:     time.Unix(0, binanceOrder.Time*int64(time.Millisecond)),
 	}, nil
 }
 

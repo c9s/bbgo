@@ -36,7 +36,7 @@ type Environment struct {
 	Notifiability
 
 	TradeService *service.TradeService
-	TradeSync    *service.TradeSync
+	TradeSync    *service.SyncService
 
 	tradeScanTime time.Time
 	sessions      map[string]*ExchangeSession
@@ -52,8 +52,8 @@ func NewEnvironment() *Environment {
 
 func (environ *Environment) SyncTrades(db *sqlx.DB) *Environment {
 	environ.TradeService = &service.TradeService{DB: db}
-	environ.TradeSync = &service.TradeSync{
-		Service: environ.TradeService,
+	environ.TradeSync = &service.SyncService{
+		TradeService: environ.TradeService,
 	}
 
 	return environ
@@ -90,15 +90,15 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 
 			if environ.TradeSync != nil {
 				log.Infof("syncing trades from %s for symbol %s...", session.Exchange.Name(), symbol)
-				if err := environ.TradeSync.Sync(ctx, session.Exchange, symbol, environ.tradeScanTime); err != nil {
+				if err := environ.TradeSync.SyncTrades(ctx, session.Exchange, symbol, environ.tradeScanTime); err != nil {
 					return err
 				}
 
 				tradingFeeCurrency := session.Exchange.PlatformFeeCurrency()
 				if strings.HasPrefix(symbol, tradingFeeCurrency) {
-					trades, err = environ.TradeService.QueryForTradingFeeCurrency(symbol, tradingFeeCurrency)
+					trades, err = environ.TradeService.QueryForTradingFeeCurrency(session.Exchange.Name(), symbol, tradingFeeCurrency)
 				} else {
-					trades, err = environ.TradeService.Query(symbol)
+					trades, err = environ.TradeService.Query(session.Exchange.Name(), symbol)
 				}
 
 				if err != nil {

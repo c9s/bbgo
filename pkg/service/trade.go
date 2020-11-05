@@ -1,52 +1,12 @@
 package service
 
 import (
-	"context"
-	"time"
-
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/types"
 )
-
-type TradeSync struct {
-	Service *TradeService
-}
-
-func (s *TradeSync) Sync(ctx context.Context, exchange types.Exchange, symbol string, startTime time.Time) error {
-	lastTrade, err := s.Service.QueryLast(symbol)
-	if err != nil {
-		return err
-	}
-
-	var lastID int64 = 0
-	if lastTrade != nil {
-		lastID = lastTrade.ID
-		startTime = lastTrade.Time
-
-		log.Infof("found last trade, start from lastID = %d since %s", lastTrade.ID, startTime)
-	}
-
-	batch := &types.ExchangeBatchProcessor{Exchange: exchange}
-	trades, err := batch.BatchQueryTrades(ctx, symbol, &types.TradeQueryOptions{
-		StartTime:   &startTime,
-		Limit:       200,
-		LastTradeID: lastID,
-	})
-	if err != nil {
-		return err
-	}
-
-	for _, trade := range trades {
-		if err := s.Service.Insert(trade); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
 
 type TradeService struct {
 	DB *sqlx.DB
@@ -57,11 +17,12 @@ func NewTradeService(db *sqlx.DB) *TradeService {
 }
 
 // QueryLast queries the last trade from the database
-func (s *TradeService) QueryLast(symbol string) (*types.Trade, error) {
-	log.Infof("querying last trade symbol = %s", symbol)
+func (s *TradeService) QueryLast(ex types.ExchangeName, symbol string) (*types.Trade, error) {
+	log.Infof("querying last trade exchange = %s AND symbol = %s", ex, symbol)
 
-	rows, err := s.DB.NamedQuery(`SELECT * FROM trades WHERE symbol = :symbol ORDER BY gid DESC LIMIT 1`, map[string]interface{}{
-		"symbol": symbol,
+	rows, err := s.DB.NamedQuery(`SELECT * FROM trades WHERE exchange = :exchange AND symbol = :symbol ORDER BY gid DESC LIMIT 1`, map[string]interface{}{
+		"symbol":   symbol,
+		"exchange": ex,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "query last trade error")
@@ -82,8 +43,9 @@ func (s *TradeService) QueryLast(symbol string) (*types.Trade, error) {
 	return nil, rows.Err()
 }
 
-func (s *TradeService) QueryForTradingFeeCurrency(symbol string, feeCurrency string) ([]types.Trade, error) {
-	rows, err := s.DB.NamedQuery(`SELECT * FROM trades WHERE symbol = :symbol OR fee_currency = :fee_currency ORDER BY traded_at ASC`, map[string]interface{}{
+func (s *TradeService) QueryForTradingFeeCurrency(ex types.ExchangeName, symbol string, feeCurrency string) ([]types.Trade, error) {
+	rows, err := s.DB.NamedQuery(`SELECT * FROM trades WHERE exchange = :exchange AND (symbol = :symbol OR fee_currency = :fee_currency) ORDER BY traded_at ASC`, map[string]interface{}{
+		"exchange":     ex,
 		"symbol":       symbol,
 		"fee_currency": feeCurrency,
 	})
@@ -96,9 +58,10 @@ func (s *TradeService) QueryForTradingFeeCurrency(symbol string, feeCurrency str
 	return s.scanRows(rows)
 }
 
-func (s *TradeService) Query(symbol string) ([]types.Trade, error) {
-	rows, err := s.DB.NamedQuery(`SELECT * FROM trades WHERE symbol = :symbol ORDER BY gid ASC`, map[string]interface{}{
-		"symbol": symbol,
+func (s *TradeService) Query(ex types.ExchangeName, symbol string) ([]types.Trade, error) {
+	rows, err := s.DB.NamedQuery(`SELECT * FROM trades WHERE exchange = :exchange AND symbol = :symbol ORDER BY gid ASC`, map[string]interface{}{
+		"exchange": ex,
+		"symbol":   symbol,
 	})
 	if err != nil {
 		return nil, err
@@ -113,7 +76,7 @@ func (s *TradeService) scanRows(rows *sqlx.Rows) (trades []types.Trade, err erro
 	for rows.Next() {
 		var trade types.Trade
 		if err := rows.StructScan(&trade); err != nil {
-			return nil, err
+			return trades, err
 		}
 
 		trades = append(trades, trade)

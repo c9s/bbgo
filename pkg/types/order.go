@@ -16,6 +16,20 @@ const (
 	OrderTypeStopMarket OrderType = "STOP_MARKET"
 )
 
+/*
+func (t *OrderType) Scan(v interface{}) error {
+	switch d := v.(type) {
+	case string:
+		*t = OrderType(d)
+
+	default:
+		return errors.New("order type scan error, type unsupported")
+
+	}
+	return nil
+}
+ */
+
 type OrderStatus string
 
 const (
@@ -25,16 +39,6 @@ const (
 	OrderStatusCanceled        OrderStatus = "CANCELED"
 	OrderStatusRejected        OrderStatus = "REJECTED"
 )
-
-type Order struct {
-	SubmitOrder
-
-	OrderID          uint64      `json:"orderID" db:"order_id"` // order id
-	Status           OrderStatus `json:"status" db:"status"`
-	ExecutedQuantity float64     `json:"executedQuantity" db:"executed_quantity"`
-	IsWorking        bool        `json:"isWorking" db:"is_working"`
-	CreationTime     time.Time   `json:"creationTime" db:"created_at"`
-}
 
 type SubmitOrder struct {
 	ClientOrderID string `json:"clientOrderID" db:"client_order_id"`
@@ -55,6 +59,18 @@ type SubmitOrder struct {
 	QuantityString  string `json:"-"`
 
 	TimeInForce string `json:"timeInForce" db:"time_in_force"` // GTC, IOC, FOK
+}
+
+type Order struct {
+	SubmitOrder
+
+	Exchange         string      `json:"exchange" db:"exchange"`
+	GID              uint64      `json:"gid" db:"gid"`
+	OrderID          uint64      `json:"orderID" db:"order_id"` // order id
+	Status           OrderStatus `json:"status" db:"status"`
+	ExecutedQuantity float64     `json:"executedQuantity" db:"executed_quantity"`
+	IsWorking        bool        `json:"isWorking" db:"is_working"`
+	CreationTime     time.Time   `json:"creationTime" db:"created_at"`
 }
 
 func (o *SubmitOrder) SlackAttachment() slack.Attachment {

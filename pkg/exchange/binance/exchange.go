@@ -287,44 +287,43 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 	return orders, err
 }
 
+func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []types.Order, err error) {
+	if until.Sub(since) >= 24*time.Hour {
+		until = since.Add(24*time.Hour - time.Millisecond)
+	}
 
-func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time) (orders []types.Order, err error) {
-	var lastOrderID int64 = 0
-	for {
-		req := e.Client.NewListOrdersService().
-			Symbol(symbol).
-			StartTime(since.Unix()).
-			EndTime(until.Unix())
+	time.Sleep(3 * time.Second)
 
-		if lastOrderID > 0 {
-			req.OrderID(lastOrderID)
-		}
+	log.Infof("querying closed orders %s from %s <=> %s ...", symbol, since, until)
+	req := e.Client.NewListOrdersService().
+		Symbol(symbol)
 
-		binanceOrders, err := req.Do(ctx)
+	if lastOrderID > 0 {
+		req.OrderID(int64(lastOrderID))
+	} else {
+		req.StartTime(since.UnixNano() / int64(time.Millisecond)).
+			EndTime(until.UnixNano() / int64(time.Millisecond))
+	}
+
+	binanceOrders, err := req.Do(ctx)
+	if err != nil {
+		return orders, err
+	}
+
+	if len(binanceOrders) == 0 {
+		return orders, nil
+	}
+
+	for _, binanceOrder := range binanceOrders {
+		order, err := toGlobalOrder(binanceOrder)
 		if err != nil {
 			return orders, err
 		}
-
-		if len(binanceOrders) == 0 {
-			break
-		}
-
-		for _, binanceOrder := range binanceOrders {
-			order, err := toGlobalOrder(binanceOrder)
-			if err != nil {
-				return orders, err
-			}
-
-			lastOrderID = binanceOrder.OrderID
-			orders = append(orders, *order)
-		}
+		orders = append(orders, *order)
 	}
 
-	return orders, err
+	return orders, nil
 }
-
-
-
 
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err2 error) {
 	for _, o := range orders {

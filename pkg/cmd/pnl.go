@@ -59,7 +59,8 @@ var PnLCmd = &cobra.Command{
 			return err
 		}
 
-		var startTime = time.Now().AddDate(-2, 0, 0)
+		// default start time
+		var startTime = time.Now().AddDate(0, -3, 0)
 		if len(since) > 0 {
 			loc, err := time.LoadLocation("Asia/Taipei")
 			if err != nil {
@@ -73,10 +74,19 @@ var PnLCmd = &cobra.Command{
 		}
 
 		tradeService := &service.TradeService{DB: db}
-		tradeSync := &service.TradeSync{Service: tradeService}
+		orderService := &service.OrderService{DB: db}
+		syncService := &service.SyncService{
+			TradeService: tradeService,
+			OrderService: orderService,
+		}
 
 		logrus.Info("syncing trades from exchange...")
-		if err := tradeSync.Sync(ctx, exchange, symbol, startTime); err != nil {
+		if err := syncService.SyncTrades(ctx, exchange, symbol, startTime); err != nil {
+			return err
+		}
+
+		logrus.Info("syncing orders from exchange...")
+		if err := syncService.SyncOrders(ctx, exchange, symbol, startTime); err != nil {
 			return err
 		}
 
@@ -84,9 +94,9 @@ var PnLCmd = &cobra.Command{
 		tradingFeeCurrency := exchange.PlatformFeeCurrency()
 		if strings.HasPrefix(symbol, tradingFeeCurrency) {
 			logrus.Infof("loading all trading fee currency related trades: %s", symbol)
-			trades, err = tradeService.QueryForTradingFeeCurrency(symbol, tradingFeeCurrency)
+			trades, err = tradeService.QueryForTradingFeeCurrency(exchange.Name(), symbol, tradingFeeCurrency)
 		} else {
-			trades, err = tradeService.Query(symbol)
+			trades, err = tradeService.Query(exchange.Name(), symbol)
 		}
 
 		if err != nil {
