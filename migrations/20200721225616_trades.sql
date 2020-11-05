@@ -13,7 +13,7 @@ CREATE TABLE `trades` (
   `is_buyer` BOOLEAN NOT NULL DEFAULT FALSE,
   `is_maker` BOOLEAN NOT NULL DEFAULT FALSE,
   `side` VARCHAR(4) NOT NULL DEFAULT '',
-  `traded_at` DATETIME(6) NOT NULL,
+  `traded_at` DATETIME(3) NOT NULL,
 
   PRIMARY KEY (`gid`),
   UNIQUE KEY `id` (`id`)
