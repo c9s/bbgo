@@ -91,7 +91,7 @@ func (e ExchangeBatchProcessor) BatchQueryClosedOrders(ctx context.Context, symb
 				return
 			}
 
-			if len(orders) == 0 {
+			if len(orders) == 0 || (len(orders) == 1 && orders[0].OrderID == lastOrderID) {
 				startTime = limitedEndTime
 				continue
 			}
@@ -105,6 +105,7 @@ func (e ExchangeBatchProcessor) BatchQueryClosedOrders(ctx context.Context, symb
 				c <- o
 				startTime = o.CreationTime
 				lastOrderID = o.OrderID
+				orderIDs[o.OrderID] = struct{}{}
 			}
 		}
 
