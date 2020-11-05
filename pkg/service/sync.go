@@ -66,19 +66,27 @@ func (s *SyncService) SyncTrades(ctx context.Context, exchange types.Exchange, s
 	}
 
 	batch := &types.ExchangeBatchProcessor{Exchange: exchange}
-	trades, err := batch.BatchQueryTrades(ctx, symbol, &types.TradeQueryOptions{
+	tradeC, errC := batch.BatchQueryTrades(ctx, symbol, &types.TradeQueryOptions{
 		StartTime:   &startTime,
 		Limit:       200,
 		LastTradeID: lastID,
 	})
-	if err != nil {
-		return err
-	}
 
-	for _, trade := range trades {
+	for trade := range tradeC {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+
+		case err := <-errC:
+			return err
+
+		default:
+		}
+
 		if err := s.TradeService.Insert(trade); err != nil {
 			return err
 		}
+
 	}
 
 	return nil

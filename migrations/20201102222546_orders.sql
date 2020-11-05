@@ -17,8 +17,8 @@ CREATE TABLE `orders`
     `executed_quantity` DECIMAL(16, 8) UNSIGNED NOT NULL DEFAULT 0.0,
     `side`              VARCHAR(4)              NOT NULL DEFAULT '',
     `is_working`        BOOL                    NOT NULL DEFAULT FALSE,
-    `created_at`        DATETIME(6)             NOT NULL,
-
+    `created_at`        DATETIME(3)             NOT NULL,
+    `updated_at`        DATETIME(3)             NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     PRIMARY KEY (`gid`)
 
 ) ENGINE = InnoDB;
