@@ -35,20 +35,20 @@ riskControls:
       orderExecutors:
         # symbol-routed order executor
         bySymbol:
-          MAXUSDT:
+          BTCUSDT:
             # basic risk control order executor
             basic:
-              minQuoteBalance: 1000.0
-              maxBaseAssetBalance: 5000.0
-              minBaseAssetBalance: 10.0
+              minQuoteBalance: 2000.0
+              maxBaseAssetBalance: 1.0
+              minBaseAssetBalance: 0.0
               maxOrderAmount: 200.0
 
 exchangeStrategies:
 - on: max
   grid:
-    symbol: MAXUSDT
+    symbol: BTCUSDT
     interval: 1m
-    baseQuantity: 200.0
-    gridPips: 0.02
-    gridNumber: 2
+    baseQuantity: 0.001
+    gridPips: 10.0
+    gridNumber: 3
 

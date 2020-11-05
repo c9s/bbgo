@@ -2,7 +2,6 @@ package grid
 
 import (
 	"context"
-	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -71,10 +70,10 @@ type Strategy struct {
 	BaseQuantity float64 `json:"baseQuantity"`
 
 	// activeOrders is the locally maintained active order book of the maker orders.
-	activeOrders *bbgo.LocalActiveOrderBook `json:"-"`
+	activeOrders *bbgo.LocalActiveOrderBook
 
 	// boll is the BOLLINGER indicator we used for predicting the price.
-	boll *indicator.BOLL `json:"-"`
+	boll *indicator.BOLL
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
@@ -189,13 +188,12 @@ func (s *Strategy) updateOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.
 	}
 }
 
-
 func (s *Strategy) orderUpdateHandler(order types.Order) {
-	log.Infof("received order update: %+v", order)
-
 	if order.Symbol != s.Symbol {
 		return
 	}
+
+	log.Infof("received order update: %+v", order)
 
 	switch order.Status {
 	case types.OrderStatusFilled:
@@ -226,27 +224,32 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	session.Stream.OnOrderUpdate(s.orderUpdateHandler)
 
-	go func() {
-		ticker := time.NewTicker(1 * time.Minute)
-		defer ticker.Stop()
+	// avoid using time ticker since we will need back testing here
+	session.Stream.OnKLineClosed(func(kline types.KLine) {
+		// skip kline events that does not belong to this symbol
+		if kline.Symbol != s.Symbol {
+			return
+		}
 
-		s.updateOrders(orderExecutor, session)
+		// skip order updates if up-band == down-band
+		if s.boll.LastUpBand() == s.boll.LastDownBand() {
+			return
+		}
 
-		defer func() {
-			_ = session.Exchange.CancelOrders(context.Background(), s.activeOrders.Orders()...)
-		}()
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-
-			case <-ticker.C:
+		if s.RepostInterval != "" {
+			if s.RepostInterval == kline.Interval {
 				// see if we have enough balances and then we create limit orders on the up band and the down band.
 				s.updateOrders(orderExecutor, session)
 			}
+		} else if s.Interval == kline.Interval {
+			s.updateOrders(orderExecutor, session)
 		}
-	}()
+	})
+
+	s.updateOrders(orderExecutor, session)
+
+	// TODO: move this into graceful shutdown
+	// _ = session.Exchange.CancelOrders(context.Background(), s.activeOrders.Orders()...)
 
 	return nil
 }
