@@ -88,16 +88,16 @@ func (e ExchangeBatchProcessor) BatchQueryClosedOrders(ctx context.Context, symb
 		}
 
 		for startTime.Before(endTime) {
-			limitedEndTime := startTime.Add(24 * time.Hour)
-			orders, err := e.QueryClosedOrders(ctx, symbol, startTime, limitedEndTime, lastOrderID)
+			log.Infof("batch querying %s closed orders %s <=> %s", symbol, startTime, endTime)
+
+			orders, err := e.QueryClosedOrders(ctx, symbol, startTime, endTime, lastOrderID)
 			if err != nil {
 				errC <- err
 				return
 			}
 
 			if len(orders) == 0 || (len(orders) == 1 && orders[0].OrderID == lastOrderID) {
-				startTime = limitedEndTime
-				continue
+				return
 			}
 
 			for _, o := range orders {
