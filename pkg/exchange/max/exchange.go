@@ -91,6 +91,54 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 	return orders, err
 }
 
+func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time) (orders []types.Order, err error) {
+	offset := 0
+	limit := 500
+	orderIDs := make(map[uint64]struct{}, 500)
+
+	for {
+		log.Infof("querying closed orders from %s <=> %s", since, until)
+
+		maxOrders, err := e.client.OrderService.Closed(toLocalSymbol(symbol), maxapi.QueryOrderOptions{
+			Offset: offset,
+			Limit:  limit,
+		})
+		if err != nil {
+			return orders, err
+		}
+
+		if len(maxOrders) == 0 {
+			break
+		}
+
+		for _, maxOrder := range maxOrders {
+			if maxOrder.CreatedAt.Before(since) {
+				continue
+			}
+
+			if maxOrder.CreatedAt.After(until) {
+				return orders, err
+			}
+
+			order, err := toGlobalOrder(maxOrder)
+			if err != nil {
+				return orders, err
+			}
+
+			if _, ok := orderIDs[order.OrderID]; ok {
+				log.Infof("skipping duplicated order: %d", order.OrderID)
+			}
+
+			orderIDs[order.OrderID] = struct{}{}
+			orders = append(orders, *order)
+		}
+
+		offset += len(maxOrders)
+	}
+
+	return orders, err
+}
+
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err2 error) {
 	for _, o := range orders {
 		var req = e.client.OrderService.NewOrderCancelRequest()

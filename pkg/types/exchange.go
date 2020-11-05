@@ -58,6 +58,8 @@ type Exchange interface {
 
 	QueryOpenOrders(ctx context.Context, symbol string) (orders []Order, err error)
 
+	QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time) (orders []Order, err error)
+
 	CancelOrders(ctx context.Context, orders ...Order) error
 }
 
