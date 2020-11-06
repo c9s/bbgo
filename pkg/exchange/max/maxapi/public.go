@@ -213,6 +213,7 @@ type KLine struct {
 
 func (k KLine) KLine() types.KLine {
 	return types.KLine{
+		Exchange:  "max",
 		Symbol:    strings.ToUpper(k.Symbol), // global symbol
 		Interval:  types.Interval(k.Interval),
 		StartTime: k.StartTime,
