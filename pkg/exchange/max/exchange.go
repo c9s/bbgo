@@ -403,14 +403,14 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	return trades, nil
 }
 
-func (e *Exchange) QueryKLines(ctx context.Context, symbol, interval string, options types.KLineQueryOptions) ([]types.KLine, error) {
+func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
 	var limit = 5000
 	if options.Limit > 0 {
 		// default limit == 500
 		limit = options.Limit
 	}
 
-	i, err := maxapi.ParseInterval(interval)
+	i, err := maxapi.ParseInterval(string(interval))
 	if err != nil {
 		return nil, err
 	}
@@ -430,7 +430,7 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol, interval string, opt
 	// avoid rate limit
 	time.Sleep(100 * time.Millisecond)
 
-	localKLines, err := e.client.PublicService.KLines(toLocalSymbol(symbol), interval, *options.StartTime, limit)
+	localKLines, err := e.client.PublicService.KLines(toLocalSymbol(symbol), string(interval), *options.StartTime, limit)
 	if err != nil {
 		return nil, err
 	}

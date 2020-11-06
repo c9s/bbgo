@@ -20,7 +20,7 @@ CREATE TABLE `klines`
 
 ) ENGINE = InnoDB;
 
-CREATE INDEX `klines_start_time_symbol_interval` ON klines (`start_time`, `symbol`, `interval`);
+CREATE INDEX `klines_end_time_symbol_interval` ON klines (`end_time`, `symbol`, `interval`);
 CREATE TABLE `okex_klines` LIKE `klines`;
 CREATE TABLE `binance_klines` LIKE `klines`;
 CREATE TABLE `max_klines` LIKE `klines`;
