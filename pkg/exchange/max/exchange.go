@@ -410,14 +410,10 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 		limit = options.Limit
 	}
 
-	i, err := maxapi.ParseInterval(string(interval))
-	if err != nil {
-		return nil, err
-	}
-
-	// workaround for the kline query
+	// workaround for the kline query, because MAX does not support query by end time
+	// so we need to use the given end time and the limit number to calculate the start time
 	if options.EndTime != nil && options.StartTime == nil {
-		startTime := options.EndTime.Add(- time.Duration(limit) * time.Minute * time.Duration(i))
+		startTime := options.EndTime.Add(- time.Duration(limit) * interval.Duration())
 		options.StartTime = &startTime
 	}
 

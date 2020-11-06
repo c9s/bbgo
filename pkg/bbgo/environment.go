@@ -29,6 +29,8 @@ func RegisterStrategy(key string, s interface{}) {
 	}
 }
 
+var emptyTime time.Time
+
 // Environment presents the real exchange data layer
 type Environment struct {
 	// Notifiability here for environment is for the streaming data notification
@@ -38,6 +40,8 @@ type Environment struct {
 	TradeService *service.TradeService
 	TradeSync    *service.SyncService
 
+	// startTime is the time of start point (which is used in the backtest)
+	startTime     time.Time
 	tradeScanTime time.Time
 	sessions      map[string]*ExchangeSession
 }
@@ -109,13 +113,7 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 			}
 
 			session.Trades[symbol] = trades
-
-			averagePrice, err := session.Exchange.QueryAveragePrice(ctx, symbol)
-			if err != nil {
-				return err
-			}
-
-			session.lastPrices[symbol] = averagePrice
+			session.lastPrices[symbol] = 0.0
 
 			marketDataStore := NewMarketDataStore(symbol)
 			marketDataStore.BindStream(session.Stream)
@@ -123,29 +121,6 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 
 			standardIndicatorSet := NewStandardIndicatorSet(symbol, marketDataStore)
 			session.standardIndicatorSets[symbol] = standardIndicatorSet
-		}
-
-		now := time.Now()
-		for symbol := range session.loadedSymbols {
-			marketDataStore, ok := session.marketDataStores[symbol]
-			if !ok {
-				return errors.Errorf("symbol %s is not defined", symbol)
-			}
-
-			for interval := range types.SupportedIntervals {
-				kLines, err := session.Exchange.QueryKLines(ctx, symbol, interval, types.KLineQueryOptions{
-					EndTime: &now,
-					Limit:   500, // indicators need at least 100
-				})
-				if err != nil {
-					return err
-				}
-
-				for _, k := range kLines {
-					// let market data store trigger the update, so that the indicator could be updated too.
-					marketDataStore.AddKLine(k)
-				}
-			}
 		}
 
 		log.Infof("querying balances...")
@@ -164,6 +139,53 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 			session.marketDataStores[kline.Symbol].AddKLine(kline)
 		})
 
+		session.Stream.OnTradeUpdate(func(trade types.Trade) {
+			session.Trades[trade.Symbol] = append(session.Trades[trade.Symbol], trade)
+		})
+
+		// feed klines into the market data store
+		if environ.startTime == emptyTime {
+			environ.startTime = time.Now()
+		}
+
+		for symbol := range session.loadedSymbols {
+			marketDataStore, ok := session.marketDataStores[symbol]
+			if !ok {
+				return errors.Errorf("symbol %s is not defined", symbol)
+			}
+
+			var lastPriceTime time.Time
+			for interval := range types.SupportedIntervals {
+				kLines, err := session.Exchange.QueryKLines(ctx, symbol, interval, types.KLineQueryOptions{
+					EndTime: &environ.startTime,
+					Limit:   500, // indicators need at least 100
+				})
+				if err != nil {
+					return err
+				}
+
+				if len(kLines) == 0 {
+					log.Warnf("no kline data for interval %s", interval)
+					continue
+				}
+
+				// update last prices by the given kline
+				lastKLine := kLines[len(kLines) - 1]
+				if lastPriceTime == emptyTime {
+					session.lastPrices[symbol] = lastKLine.Close
+					lastPriceTime = lastKLine.EndTime
+				} else if lastPriceTime.Before(lastKLine.EndTime) {
+					session.lastPrices[symbol] = lastKLine.Close
+					lastPriceTime = lastKLine.EndTime
+				}
+
+				for _, k := range kLines {
+					// let market data store trigger the update, so that the indicator could be updated too.
+					marketDataStore.AddKLine(k)
+				}
+			}
+		}
+
 		if environ.TradeService != nil {
 			session.Stream.OnTradeUpdate(func(trade types.Trade) {
 				if err := environ.TradeService.Insert(trade); err != nil {
@@ -172,12 +194,7 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 			})
 		}
 
-		session.Stream.OnTradeUpdate(func(trade types.Trade) {
-			// append trades
-			session.Trades[trade.Symbol] = append(session.Trades[trade.Symbol], trade)
-		})
-
-		// move market data store dispatch to here, use one callback to dispatch the market data
+		// TODO: move market data store dispatch to here, use one callback to dispatch the market data
 		// session.Stream.OnKLineClosed(func(kline types.KLine) { })
 	}
 
@@ -355,4 +372,3 @@ func (environ *Environment) Connect(ctx context.Context) error {
 
 	return nil
 }
-

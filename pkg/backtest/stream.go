@@ -3,31 +3,62 @@ package backtest
 import (
 	"context"
 
-	"github.com/c9s/bbgo/pkg/accounting/pnl"
-	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/pkg/errors"
+
 	"github.com/c9s/bbgo/pkg/types"
 )
 
 type Stream struct {
 	types.StandardStream
+
+	exchange *Exchange
 }
 
 func (s *Stream) Connect(ctx context.Context) error {
+	loadedSymbols := map[string]struct{}{}
+	loadedIntervals := map[types.Interval]struct{}{}
+	for _, sub := range s.Subscriptions {
+		loadedSymbols[sub.Symbol] = struct{}{}
+
+		switch sub.Channel {
+		case types.KLineChannel:
+			loadedIntervals[types.Interval(sub.Options.Interval)] = struct{}{}
+
+		default:
+			return errors.Errorf("stream channel %s is not supported in backtest", sub.Channel)
+		}
+	}
+
+	var symbols []string
+	for symbol := range loadedSymbols {
+		symbols = append(symbols, symbol)
+	}
+
+	var intervals []types.Interval
+	for interval := range loadedIntervals {
+		intervals = append(intervals, interval)
+	}
+
+	// TODO: we can sync before we connect
+	/*
+		if err := backtestService.Sync(ctx, exchange, symbol, startTime); err != nil {
+			return err
+		}
+	*/
+
+	klineC, errC := s.exchange.srv.QueryKLinesCh(s.exchange.startTime, s.exchange, symbols, intervals)
+	for k := range klineC {
+		s.EmitKLineClosed(k)
+	}
+
+	if err := <-errC; err != nil {
+		return err
+	}
 	return nil
 }
 
 func (s *Stream) Close() error {
 	return nil
-}
-
-type Trader struct {
-	// Context is trading Context
-	Context                 *bbgo.Context
-	SourceKLines            []types.KLine
-	ProfitAndLossCalculator *pnl.AverageCostCalculator
-
-	doneOrders    []types.SubmitOrder
-	pendingOrders []types.SubmitOrder
 }
 
 /*

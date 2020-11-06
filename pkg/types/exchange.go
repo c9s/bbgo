@@ -48,8 +48,6 @@ type Exchange interface {
 
 	QueryTrades(ctx context.Context, symbol string, options *TradeQueryOptions) ([]Trade, error)
 
-	QueryAveragePrice(ctx context.Context, symbol string) (float64, error)
-
 	QueryDepositHistory(ctx context.Context, asset string, since, until time.Time) (allDeposits []Deposit, err error)
 
 	QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (allWithdraws []Withdraw, err error)

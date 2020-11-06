@@ -7,6 +7,8 @@ import (
 
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
+
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 type PnLReporterConfig struct {
@@ -30,10 +32,10 @@ type SlackNotification struct {
 }
 
 type NotificationRouting struct {
-	Trade string `json:"trade,omitempty" yaml:"trade,omitempty"`
-	Order string `json:"order,omitempty" yaml:"order,omitempty"`
+	Trade       string `json:"trade,omitempty" yaml:"trade,omitempty"`
+	Order       string `json:"order,omitempty" yaml:"order,omitempty"`
 	SubmitOrder string `json:"submitOrder,omitempty" yaml:"submitOrder,omitempty"`
-	PnL string `json:"pnL,omitempty" yaml:"pnL,omitempty"`
+	PnL         string `json:"pnL,omitempty" yaml:"pnL,omitempty"`
 }
 
 type NotificationConfig struct {
@@ -50,8 +52,25 @@ type Session struct {
 	EnvVarPrefix string `json:"envVarPrefix" yaml:"envVarPrefix"`
 }
 
+type Backtest struct {
+	StartTime string          `json:"startTime" yaml:"startTime"`
+	Account   BacktestAccount `json:"account" yaml:"account"`
+}
+
+type BacktestAccount struct {
+	MakerCommission  int                       `json:"makerCommission"`
+	TakerCommission  int                       `json:"takerCommission"`
+	BuyerCommission  int                       `json:"buyerCommission"`
+	SellerCommission int                       `json:"sellerCommission"`
+	Balances         BacktestAccountBalanceMap `json:"balances" yaml:"balances"`
+}
+
+type BacktestAccountBalanceMap map[string]fixedpoint.Value
+
 type Config struct {
 	Imports []string `json:"imports" yaml:"imports"`
+
+	Backtest *Backtest `json:"backtest,omitempty" yaml:"backtest,omitempty"`
 
 	Notifications *NotificationConfig `json:"notifications,omitempty" yaml:"notifications,omitempty"`
 
