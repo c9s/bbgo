@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"reflect"
+	"time"
 
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 type PnLReporterConfig struct {
@@ -57,6 +59,14 @@ type Backtest struct {
 	Account   BacktestAccount `json:"account" yaml:"account"`
 }
 
+func (t Backtest) ParseStartTime() (time.Time, error) {
+	if len(t.StartTime) == 0 {
+		return time.Time{}, errors.New("backtest.startTime must be defined")
+	}
+
+	return time.Parse("2006-01-02", t.StartTime)
+}
+
 type BacktestAccount struct {
 	MakerCommission  int                       `json:"makerCommission"`
 	TakerCommission  int                       `json:"takerCommission"`
@@ -66,6 +76,18 @@ type BacktestAccount struct {
 }
 
 type BacktestAccountBalanceMap map[string]fixedpoint.Value
+
+func (m BacktestAccountBalanceMap) BalanceMap() types.BalanceMap {
+	balances := make(types.BalanceMap)
+	for currency, value := range m {
+		balances[currency] = types.Balance{
+			Currency:  currency,
+			Available: value.Float64(),
+			Locked:    0.0,
+		}
+	}
+	return balances
+}
 
 type Config struct {
 	Imports []string `json:"imports" yaml:"imports"`

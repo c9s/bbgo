@@ -58,17 +58,9 @@ backtest:
       USDT: 5000.0
 
 exchangeStrategies:
-- on: binance
+- on: max
   buyandhold:
     symbol: "BTCUSDT"
     interval: "1m"
     baseQuantity: 0.01
     minDropPercentage: -0.02
-- on: max
-  xpuremaker:
-    symbol: MAXUSDT
-    numOrders: 2
-    side: both
-    behindVolume: 1000.0
-    priceTick: 0.01
-    baseQuantity: 100.0

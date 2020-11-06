@@ -19,9 +19,9 @@ type BalanceMap map[string]Balance
 type Account struct {
 	sync.Mutex
 
-	MakerCommission int64
-	TakerCommission int64
-	AccountType     string
+	MakerCommission int `json:"makerCommission"`
+	TakerCommission int `json:"takerCommission"`
+	AccountType     string `json:"accountType"`
 
 	balances BalanceMap
 }
