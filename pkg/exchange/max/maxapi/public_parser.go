@@ -116,19 +116,19 @@ type KLinePayload struct {
 
 func (k KLinePayload) KLine() types.KLine {
 	return types.KLine{
-		StartTime:   time.Unix(0, k.StartTime*int64(time.Millisecond)),
-		EndTime:     time.Unix(0, k.EndTime*int64(time.Millisecond)),
-		Symbol:      k.Market,
-		Interval:    types.Interval(k.Resolution),
-		Open:        util.MustParseFloat(k.Open),
-		Close:       util.MustParseFloat(k.Close),
-		High:        util.MustParseFloat(k.High),
-		Low:         util.MustParseFloat(k.Low),
-		Volume:      util.MustParseFloat(k.Volume),
-		QuoteVolume: 0,
-		LastTradeID: k.LastTradeID,
-		// NumberOfTrades: 0,
-		Closed: k.Closed,
+		StartTime:      time.Unix(0, k.StartTime*int64(time.Millisecond)),
+		EndTime:        time.Unix(0, k.EndTime*int64(time.Millisecond)),
+		Symbol:         k.Market,
+		Interval:       types.Interval(k.Resolution),
+		Open:           util.MustParseFloat(k.Open),
+		Close:          util.MustParseFloat(k.Close),
+		High:           util.MustParseFloat(k.High),
+		Low:            util.MustParseFloat(k.Low),
+		Volume:         util.MustParseFloat(k.Volume),
+		QuoteVolume:    0, // TODO: add this from kingfisher
+		LastTradeID:    uint64(k.LastTradeID),
+		NumberOfTrades: 0, // TODO: add this from kingfisher
+		Closed:         k.Closed,
 	}
 }
 

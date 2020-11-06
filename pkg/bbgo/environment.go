@@ -356,17 +356,3 @@ func (environ *Environment) Connect(ctx context.Context) error {
 	return nil
 }
 
-func BatchQueryKLineWindows(ctx context.Context, e types.Exchange, symbol string, intervals []types.Interval, startTime, endTime time.Time) (map[types.Interval]types.KLineWindow, error) {
-	batch := &types.ExchangeBatchProcessor{Exchange: e}
-	klineWindows := map[types.Interval]types.KLineWindow{}
-	for _, interval := range intervals {
-		kLines, err := batch.BatchQueryKLines(ctx, symbol, interval, startTime, endTime)
-		if err != nil {
-			return klineWindows, err
-		}
-
-		klineWindows[interval] = kLines
-	}
-
-	return klineWindows, nil
-}

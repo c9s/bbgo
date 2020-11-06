@@ -48,7 +48,7 @@ func (s *SyncService) SyncOrders(ctx context.Context, exchange types.Exchange, s
 		}
 	}
 
-	return nil
+	return <-errC
 }
 
 func (s *SyncService) SyncTrades(ctx context.Context, exchange types.Exchange, symbol string, startTime time.Time) error {
@@ -89,5 +89,5 @@ func (s *SyncService) SyncTrades(ctx context.Context, exchange types.Exchange, s
 
 	}
 
-	return nil
+	return <-errC
 }

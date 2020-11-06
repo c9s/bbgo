@@ -13,8 +13,8 @@ CREATE TABLE `klines`
     `close`         DECIMAL(16, 8) UNSIGNED NOT NULL DEFAULT 0.0,
     `volume`        DECIMAL(16, 8) UNSIGNED NOT NULL DEFAULT 0.0,
     `closed`        BOOL                    NOT NULL DEFAULT TRUE,
-    `last_trade_id` INT UNSIGNED            NULL,
-    `num_trades`    INT UNSIGNED            NULL     DEFAULT 0,
+    `last_trade_id` INT UNSIGNED            NOT NULL DEFAULT 0,
+    `num_trades`    INT UNSIGNED            NOT NULL DEFAULT 0,
 
     PRIMARY KEY (`gid`)
 

@@ -425,8 +425,8 @@ func (k *KLine) KLine() types.KLine {
 		Low:            util.MustParseFloat(k.Low),
 		Volume:         util.MustParseFloat(k.Volume),
 		QuoteVolume:    util.MustParseFloat(k.QuoteVolume),
-		LastTradeID:    k.LastTradeID,
-		NumberOfTrades: k.NumberOfTrades,
+		LastTradeID:    uint64(k.LastTradeID),
+		NumberOfTrades: uint64(k.NumberOfTrades),
 		Closed:         k.Closed,
 	}
 }

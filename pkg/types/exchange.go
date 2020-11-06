@@ -118,28 +118,41 @@ func (e ExchangeBatchProcessor) BatchQueryClosedOrders(ctx context.Context, symb
 	return c, errC
 }
 
-func (e ExchangeBatchProcessor) BatchQueryKLines(ctx context.Context, symbol string, interval Interval, startTime, endTime time.Time) (allKLines []KLine, err error) {
-	for startTime.Before(endTime) {
-		kLines, err := e.QueryKLines(ctx, symbol, interval, KLineQueryOptions{
-			StartTime: &startTime,
-			Limit:     1000,
-		})
+func (e ExchangeBatchProcessor) BatchQueryKLines(ctx context.Context, symbol string, interval Interval, startTime, endTime time.Time) (c chan KLine, errC chan error) {
+	c = make(chan KLine, 1000)
+	errC = make(chan error, 1)
 
-		if err != nil {
-			return allKLines, err
-		}
+	go func() {
+		defer close(c)
+		defer close(errC)
 
-		for _, kline := range kLines {
-			if kline.EndTime.After(endTime) {
-				return allKLines, nil
+		for startTime.Before(endTime) {
+			kLines, err := e.QueryKLines(ctx, symbol, interval, KLineQueryOptions{
+				StartTime: &startTime,
+				Limit:     1000,
+			})
+
+			if err != nil {
+				errC <- err
+				return
 			}
 
-			allKLines = append(allKLines, kline)
-			startTime = kline.EndTime
-		}
-	}
+			if len(kLines) == 0 {
+				return
+			}
 
-	return allKLines, err
+			for _, kline := range kLines {
+				if kline.EndTime.After(endTime) {
+					return
+				}
+
+				c <- kline
+				startTime = kline.EndTime
+			}
+		}
+	}()
+
+	return c, errC
 }
 
 func (e ExchangeBatchProcessor) BatchQueryTrades(ctx context.Context, symbol string, options *TradeQueryOptions) (c chan Trade, errC chan error) {

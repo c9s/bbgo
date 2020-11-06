@@ -1,8 +1,19 @@
 package types
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"time"
+)
 
 type Interval string
+
+func (i Interval) Minutes() int {
+	return SupportedIntervals[i]
+}
+
+func (i Interval) Duration() time.Duration {
+	return time.Duration(i.Minutes()) * time.Minute
+}
 
 func (i *Interval) UnmarshalJSON(b []byte) (err error) {
 	var a string
@@ -17,6 +28,15 @@ func (i *Interval) UnmarshalJSON(b []byte) (err error) {
 
 func (i Interval) String() string {
 	return string(i)
+}
+
+type IntervalSlice []Interval
+
+func (s IntervalSlice) StringSlice() (slice []string) {
+	for _, interval := range s {
+		slice = append(slice, `"` + interval.String() + `"`)
+	}
+	return slice
 }
 
 var Interval1m = Interval("1m")
@@ -53,4 +73,3 @@ type IntervalWindow struct {
 	// The windows size of the indicator (EWMA and SMA)
 	Window int
 }
-

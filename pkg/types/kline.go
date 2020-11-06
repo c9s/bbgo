@@ -45,6 +45,7 @@ type KLineQueryOptions struct {
 
 // KLine uses binance's kline as the standard structure
 type KLine struct {
+	GID      uint64 `json:"gid" db:"gid"`
 	Exchange string `json:"exchange"`
 
 	Symbol string `json:"symbol" db:"symbol"`
@@ -61,8 +62,8 @@ type KLine struct {
 	Volume      float64 `json:"volume" db:"volume"`
 	QuoteVolume float64 `json:"quoteVolume" db:"quote_volume"`
 
-	LastTradeID    int   `json:"lastTradeID" db:"last_trade_id"`
-	NumberOfTrades int64 `json:"numberOfTrades" db:"num_trades"`
+	LastTradeID    uint64  `json:"lastTradeID" db:"last_trade_id"`
+	NumberOfTrades uint64 `json:"numberOfTrades" db:"num_trades"`
 	Closed         bool  `json:"closed" db:"closed"`
 }
 
