@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -15,6 +16,8 @@ type Stream struct {
 }
 
 func (s *Stream) Connect(ctx context.Context) error {
+	log.Infof("collecting backtest configurations...")
+
 	loadedSymbols := map[string]struct{}{}
 	loadedIntervals := map[types.Interval]struct{}{}
 	for _, sub := range s.Subscriptions {
@@ -38,6 +41,8 @@ func (s *Stream) Connect(ctx context.Context) error {
 	for interval := range loadedIntervals {
 		intervals = append(intervals, interval)
 	}
+
+	log.Infof("used symbols: %v and intervals: %v", symbols, intervals)
 
 	// TODO: we can sync before we connect
 	/*

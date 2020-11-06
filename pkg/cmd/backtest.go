@@ -18,8 +18,7 @@ import (
 
 func init() {
 	BacktestCmd.Flags().String("exchange", "", "target exchange")
-	BacktestCmd.Flags().String("start", "", "start time")
-	BacktestCmd.Flags().Bool("backtest", true, "sync backtest data")
+	BacktestCmd.Flags().Bool("sync", true, "sync backtest data")
 	BacktestCmd.Flags().String("config", "config/bbgo.yaml", "strategy config file")
 	RootCmd.AddCommand(BacktestCmd)
 }
@@ -61,26 +60,28 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
-		// set default start time to the past 6 months
-		startTime := time.Now().AddDate(0, -6, 0)
-
-		startTimeArg, err := cmd.Flags().GetString("start")
-		if err != nil {
-			return err
+		if userConfig.Backtest == nil {
+			return errors.New("backtest config is not defined")
 		}
 
-		if len(startTimeArg) > 0 {
-			startTime, err = time.Parse("2006-01-02", startTimeArg)
-			if err != nil {
-				return err
-			}
+		// set default start time to the past 6 months
+		startTime := time.Now().AddDate(0, -6, 0)
+		if len(userConfig.Backtest.StartTime) == 0 {
+			userConfig.Backtest.StartTime = startTime.Format("2006-01-02")
 		}
 
 		backtestService := &service.BacktestService{DB: db}
 
-		exchange := backtest.NewExchange(exchangeName, backtestService, startTime)
+		exchange := backtest.NewExchange(exchangeName, backtestService, userConfig.Backtest)
+
 		environ := bbgo.NewEnvironment()
 		environ.AddExchange(exchangeName.String(), exchange)
+
+		environ.Notifiability = bbgo.Notifiability{
+			SymbolChannelRouter:  bbgo.NewPatternChannelRouter(nil),
+			SessionChannelRouter: bbgo.NewPatternChannelRouter(nil),
+			ObjectChannelRouter:  bbgo.NewObjectChannelRouter(),
+		}
 
 		trader := bbgo.NewTrader(environ)
 		if userConfig.RiskControls != nil {
@@ -96,7 +97,7 @@ var BacktestCmd = &cobra.Command{
 			log.Warnf("backtest does not support CrossExchangeStrategy, strategies won't be added.")
 		}
 
-		if err := trader.Run(ctx) ; err != nil {
+		if err := trader.Run(ctx); err != nil {
 			return err
 		}
 

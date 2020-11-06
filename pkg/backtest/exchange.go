@@ -6,6 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/exchange/binance"
 	"github.com/c9s/bbgo/pkg/exchange/max"
 	"github.com/c9s/bbgo/pkg/service"
@@ -18,27 +19,55 @@ type Exchange struct {
 	srv            *service.BacktestService
 	startTime      time.Time
 
+	account *types.Account
+	config       *bbgo.Backtest
 	closedOrders []types.SubmitOrder
 	openOrders   []types.SubmitOrder
+
+	stream *Stream
 }
 
-func NewExchange(sourceExchange types.ExchangeName, srv *service.BacktestService, startTime time.Time) *Exchange {
+func NewExchange(sourceExchange types.ExchangeName, srv *service.BacktestService, config *bbgo.Backtest) *Exchange {
 	ex, err := newPublicExchange(sourceExchange)
 	if err != nil {
 		panic(err)
 	}
 
+	if config == nil {
+		panic(errors.New("backtest config can not be nil"))
+	}
+
+	startTime, err := config.ParseStartTime()
+	if err != nil {
+		panic(err)
+	}
+
+	balances := config.Account.Balances.BalanceMap()
+
+	account := &types.Account{
+		MakerCommission: config.Account.MakerCommission,
+		TakerCommission: config.Account.TakerCommission,
+		AccountType:     "SPOT", // currently not used
+	}
+	account.UpdateBalances(balances)
+
 	return &Exchange{
 		sourceExchange: sourceExchange,
 		publicExchange: ex,
 		srv:            srv,
+		config:         config,
+		account:        account,
 		startTime:      startTime,
 	}
 }
 
 func (e *Exchange) NewStream() types.Stream {
-	// TODO: return the stream and feed the data
-	return &Stream{}
+	if e.stream != nil {
+		panic("backtest stream is already allocated, please check if there are extra NewStream calls")
+	}
+
+	e.stream = &Stream{exchange: e}
+	return e.stream
 }
 
 func (e Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error) {
@@ -58,11 +87,11 @@ func (e Exchange) CancelOrders(ctx context.Context, orders ...types.Order) error
 }
 
 func (e Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
-	panic("implement me")
+	return e.account, nil
 }
 
-func (e Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
-	panic("implement me")
+func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
+	return e.account.Balances(), nil
 }
 
 func (e Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {

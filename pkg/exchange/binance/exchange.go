@@ -262,8 +262,8 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	}
 
 	a := &types.Account{
-		MakerCommission: account.MakerCommission,
-		TakerCommission: account.TakerCommission,
+		MakerCommission: int(account.MakerCommission),
+		TakerCommission: int(account.TakerCommission),
 	}
 	a.UpdateBalances(balances)
 	return a, nil
@@ -537,4 +537,3 @@ func (e *Exchange) BatchQueryKLines(ctx context.Context, symbol string, interval
 
 	return allKLines, nil
 }
-
