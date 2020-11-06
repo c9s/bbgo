@@ -8,7 +8,6 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
-	"github.com/c9s/bbgo/pkg/sigchan"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -77,8 +76,6 @@ type Strategy struct {
 
 	// boll is the BOLLINGER indicator we used for predicting the price.
 	boll *indicator.BOLL
-
-	updateC sigchan.Chan
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
@@ -236,8 +233,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.GridNum = 2
 	}
 
-	s.updateC = sigchan.New(1)
-
 	s.boll = s.StandardIndicatorSet.GetBOLL(types.IntervalWindow{
 		Interval: s.Interval,
 		Window:   21,
@@ -258,7 +253,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		if (s.RepostInterval != "" && (s.RepostInterval == kline.Interval)) || s.Interval == kline.Interval {
 			// see if we have enough balances and then we create limit orders on the up band and the down band.
-			s.updateC.Emit()
+			s.updateOrders(orderExecutor, session)
 		}
 	})
 
@@ -270,15 +265,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				// TODO: add and fix graceful shutdown
 				_ = session.Exchange.CancelOrders(context.Background(), s.activeOrders.Orders()...)
 				return
-
-			case <-s.updateC:
-				s.updateOrders(orderExecutor, session)
 			}
 		}
 	}()
-
-	// emit to place the first round of orders
-	s.updateC.Emit()
 
 	return nil
 }
