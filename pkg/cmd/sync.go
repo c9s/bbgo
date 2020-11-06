@@ -16,12 +16,13 @@ func init() {
 	SyncCmd.Flags().String("exchange", "", "target exchange")
 	SyncCmd.Flags().String("symbol", "BTCUSDT", "trading symbol")
 	SyncCmd.Flags().String("since", "", "sync from time")
+	SyncCmd.Flags().Bool("backtest", true, "sync backtest data")
 	RootCmd.AddCommand(SyncCmd)
 }
 
 var SyncCmd = &cobra.Command{
 	Use:          "sync",
-	Short:        "sync trades and orders",
+	Short:        "sync data. trades, orders and market data",
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
@@ -89,6 +90,18 @@ var SyncCmd = &cobra.Command{
 		if err := syncService.SyncOrders(ctx, exchange, symbol, startTime); err != nil {
 			return err
 		}
+
+		backtest, err := cmd.Flags().GetBool("backtest")
+		if err != nil {
+			return err
+		}
+		if backtest {
+			backtestService := &service.BacktestService{DB: db}
+			if err := backtestService.Sync(ctx, exchange, symbol, startTime) ; err != nil {
+				return err
+			}
+		}
+
 
 		logrus.Info("synchronization done")
 		return nil

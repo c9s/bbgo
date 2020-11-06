@@ -133,7 +133,7 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 			}
 
 			for interval := range types.SupportedIntervals {
-				kLines, err := session.Exchange.QueryKLines(ctx, symbol, interval.String(), types.KLineQueryOptions{
+				kLines, err := session.Exchange.QueryKLines(ctx, symbol, interval, types.KLineQueryOptions{
 					EndTime: &now,
 					Limit:   500, // indicators need at least 100
 				})
@@ -356,9 +356,9 @@ func (environ *Environment) Connect(ctx context.Context) error {
 	return nil
 }
 
-func BatchQueryKLineWindows(ctx context.Context, e types.Exchange, symbol string, intervals []string, startTime, endTime time.Time) (map[string]types.KLineWindow, error) {
+func BatchQueryKLineWindows(ctx context.Context, e types.Exchange, symbol string, intervals []types.Interval, startTime, endTime time.Time) (map[types.Interval]types.KLineWindow, error) {
 	batch := &types.ExchangeBatchProcessor{Exchange: e}
-	klineWindows := map[string]types.KLineWindow{}
+	klineWindows := map[types.Interval]types.KLineWindow{}
 	for _, interval := range intervals {
 		kLines, err := batch.BatchQueryKLines(ctx, symbol, interval, startTime, endTime)
 		if err != nil {

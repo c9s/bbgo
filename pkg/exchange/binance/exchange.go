@@ -418,7 +418,7 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 	return createdOrders, err
 }
 
-func (e *Exchange) QueryKLines(ctx context.Context, symbol, interval string, options types.KLineQueryOptions) ([]types.KLine, error) {
+func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
 
 	var limit = 500
 	if options.Limit > 0 {
@@ -432,7 +432,7 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol, interval string, opt
 	time.Sleep(100 * time.Millisecond)
 	req := e.Client.NewKlinesService().
 		Symbol(symbol).
-		Interval(interval).
+		Interval(string(interval)).
 		Limit(limit)
 
 	if options.StartTime != nil {
@@ -451,8 +451,9 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol, interval string, opt
 	var kLines []types.KLine
 	for _, k := range resp {
 		kLines = append(kLines, types.KLine{
+			Exchange:       "binance",
 			Symbol:         symbol,
-			Interval:       types.Interval(interval),
+			Interval:       interval,
 			StartTime:      time.Unix(0, k.OpenTime*int64(time.Millisecond)),
 			EndTime:        time.Unix(0, k.CloseTime*int64(time.Millisecond)),
 			Open:           util.MustParseFloat(k.Open),
@@ -507,7 +508,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	return trades, nil
 }
 
-func (e *Exchange) BatchQueryKLines(ctx context.Context, symbol, interval string, startTime, endTime time.Time) ([]types.KLine, error) {
+func (e *Exchange) BatchQueryKLines(ctx context.Context, symbol string, interval types.Interval, startTime, endTime time.Time) ([]types.KLine, error) {
 	var allKLines []types.KLine
 
 	for startTime.Before(endTime) {
@@ -536,9 +537,9 @@ func (e *Exchange) BatchQueryKLines(ctx context.Context, symbol, interval string
 	return allKLines, nil
 }
 
-func (e *Exchange) BatchQueryKLineWindows(ctx context.Context, symbol string, intervals []string, startTime, endTime time.Time) (map[string]types.KLineWindow, error) {
+func (e *Exchange) BatchQueryKLineWindows(ctx context.Context, symbol string, intervals []types.Interval, startTime, endTime time.Time) (map[types.Interval]types.KLineWindow, error) {
 	batch := &types.ExchangeBatchProcessor{Exchange: e}
-	klineWindows := map[string]types.KLineWindow{}
+	klineWindows := map[types.Interval]types.KLineWindow{}
 	for _, interval := range intervals {
 		klines, err := batch.BatchQueryKLines(ctx, symbol, interval, startTime, endTime)
 		if err != nil {

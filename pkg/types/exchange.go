@@ -44,7 +44,7 @@ type Exchange interface {
 
 	QueryAccountBalances(ctx context.Context) (BalanceMap, error)
 
-	QueryKLines(ctx context.Context, symbol string, interval string, options KLineQueryOptions) ([]KLine, error)
+	QueryKLines(ctx context.Context, symbol string, interval Interval, options KLineQueryOptions) ([]KLine, error)
 
 	QueryTrades(ctx context.Context, symbol string, options *TradeQueryOptions) ([]Trade, error)
 
@@ -118,7 +118,7 @@ func (e ExchangeBatchProcessor) BatchQueryClosedOrders(ctx context.Context, symb
 	return c, errC
 }
 
-func (e ExchangeBatchProcessor) BatchQueryKLines(ctx context.Context, symbol, interval string, startTime, endTime time.Time) (allKLines []KLine, err error) {
+func (e ExchangeBatchProcessor) BatchQueryKLines(ctx context.Context, symbol string, interval Interval, startTime, endTime time.Time) (allKLines []KLine, err error) {
 	for startTime.Before(endTime) {
 		kLines, err := e.QueryKLines(ctx, symbol, interval, KLineQueryOptions{
 			StartTime: &startTime,
