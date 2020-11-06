@@ -2,9 +2,10 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
@@ -74,36 +75,63 @@ var SyncCmd = &cobra.Command{
 			}
 		}
 
-		tradeService := &service.TradeService{DB: db}
-		orderService := &service.OrderService{DB: db}
-		syncService := &service.SyncService{
-			TradeService: tradeService,
-			OrderService: orderService,
-		}
-
-		logrus.Info("syncing trades from exchange...")
-		if err := syncService.SyncTrades(ctx, exchange, symbol, startTime); err != nil {
-			return err
-		}
-
-		logrus.Info("syncing orders from exchange...")
-		if err := syncService.SyncOrders(ctx, exchange, symbol, startTime); err != nil {
-			return err
-		}
-
 		backtest, err := cmd.Flags().GetBool("backtest")
 		if err != nil {
 			return err
 		}
 		if backtest {
 			backtestService := &service.BacktestService{DB: db}
-			if err := backtestService.Sync(ctx, exchange, symbol, startTime) ; err != nil {
+			if err := backtestService.Sync(ctx, exchange, symbol, startTime); err != nil {
 				return err
 			}
+
+			log.Info("synchronization done")
+			log.Infof("verifying backtesting data...")
+
+			for interval := range types.SupportedIntervals {
+				log.Infof("verifying %s kline data...", interval)
+
+				klineC, errC := backtestService.QueryKLinesCh(startTime, exchange, symbol, interval)
+				var emptyKLine types.KLine
+				var prevKLine types.KLine
+				for k := range klineC {
+					fmt.Print(".")
+					if prevKLine != emptyKLine {
+						if prevKLine.StartTime.Add(interval.Duration()) != k.StartTime {
+							log.Errorf("kline corrupted at %+v", k)
+						}
+					}
+
+					prevKLine = k
+				}
+				fmt.Println()
+
+				if err := <-errC; err != nil {
+					return err
+				}
+			}
+
+		} else {
+			tradeService := &service.TradeService{DB: db}
+			orderService := &service.OrderService{DB: db}
+			syncService := &service.SyncService{
+				TradeService: tradeService,
+				OrderService: orderService,
+			}
+
+			log.Info("syncing trades from exchange...")
+			if err := syncService.SyncTrades(ctx, exchange, symbol, startTime); err != nil {
+				return err
+			}
+
+			log.Info("syncing orders from exchange...")
+			if err := syncService.SyncOrders(ctx, exchange, symbol, startTime); err != nil {
+				return err
+			}
+
+			log.Info("synchronization done")
 		}
 
-
-		logrus.Info("synchronization done")
 		return nil
 	},
 }

@@ -418,6 +418,7 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 	return createdOrders, err
 }
 
+// QueryKLines queries the Kline/candlestick bars for a symbol. Klines are uniquely identified by their open time.
 func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
 
 	var limit = 500
@@ -429,7 +430,7 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 	log.Infof("querying kline %s %s %v", symbol, interval, options)
 
 	// avoid rate limit
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(500 * time.Millisecond)
 	req := e.Client.NewKlinesService().
 		Symbol(symbol).
 		Interval(string(interval)).
@@ -463,7 +464,7 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 			Volume:         util.MustParseFloat(k.Volume),
 			QuoteVolume:    util.MustParseFloat(k.QuoteAssetVolume),
 			LastTradeID:    0,
-			NumberOfTrades: k.TradeNum,
+			NumberOfTrades: uint64(k.TradeNum),
 			Closed:         true,
 		})
 	}
@@ -537,16 +538,3 @@ func (e *Exchange) BatchQueryKLines(ctx context.Context, symbol string, interval
 	return allKLines, nil
 }
 
-func (e *Exchange) BatchQueryKLineWindows(ctx context.Context, symbol string, intervals []types.Interval, startTime, endTime time.Time) (map[types.Interval]types.KLineWindow, error) {
-	batch := &types.ExchangeBatchProcessor{Exchange: e}
-	klineWindows := map[types.Interval]types.KLineWindow{}
-	for _, interval := range intervals {
-		klines, err := batch.BatchQueryKLines(ctx, symbol, interval, startTime, endTime)
-		if err != nil {
-			return klineWindows, err
-		}
-		klineWindows[interval] = klines
-	}
-
-	return klineWindows, nil
-}
