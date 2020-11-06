@@ -9,18 +9,9 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 
 	_ "github.com/go-sql-driver/mysql"
-	flag "github.com/spf13/pflag"
 )
 
 var SupportedExchanges = []types.ExchangeName{"binance", "max"}
-
-// PersistentFlags defines the flags for environments
-func PersistentFlags(flags *flag.FlagSet) {
-	flags.String("binance-api-key", "", "binance api key")
-	flags.String("binance-api-secret", "", "binance api secret")
-	flags.String("max-api-key", "", "max api key")
-	flags.String("max-api-secret", "", "max api secret")
-}
 
 // SingleExchangeStrategy represents the single Exchange strategy
 type SingleExchangeStrategy interface {

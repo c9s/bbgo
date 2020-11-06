@@ -59,6 +59,7 @@ func TestLoadConfig(t *testing.T) {
 				assert.Len(t, config.ExchangeStrategies, 1)
 			},
 		},
+
 		{
 			name:    "order_executor",
 			args:    args{configFile: "testdata/order_executor.yaml"},
@@ -85,6 +86,19 @@ func TestLoadConfig(t *testing.T) {
 				assert.NotNil(t, executorConf)
 			},
 		},
+		{
+			name:    "backtest",
+			args:    args{configFile: "testdata/backtest.yaml"},
+			wantErr: false,
+			f: func(t *testing.T, config *Config) {
+				assert.Len(t, config.ExchangeStrategies, 1)
+				assert.NotNil(t, config.Backtest)
+				assert.NotNil(t, config.Backtest.Account)
+				assert.NotNil(t, config.Backtest.Account.Balances)
+				assert.Len(t, config.Backtest.Account.Balances, 2)
+				assert.NotEmpty(t, config.Backtest.StartTime)
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -107,4 +121,5 @@ func TestLoadConfig(t *testing.T) {
 			}
 		})
 	}
+
 }

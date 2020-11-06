@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
@@ -118,8 +119,17 @@ var PnLCmd = &cobra.Command{
 		logrus.Infof("found checkpoints: %+v", checkpoints)
 		logrus.Infof("stock: %f", stockManager.Stocks.Quantity())
 
-		currentPrice, err := exchange.QueryAveragePrice(ctx, symbol)
+		now := time.Now()
+		kLines, err := exchange.QueryKLines(ctx, symbol, types.Interval1m, types.KLineQueryOptions{
+			Limit:     100,
+			EndTime:   &now,
+		})
 
+		if len(kLines) == 0 {
+			return errors.New("no kline data for current price")
+		}
+
+		currentPrice := kLines[len(kLines) - 1].Close
 		calculator := &pnl.AverageCostCalculator{
 			TradingFeeCurrency: tradingFeeCurrency,
 		}
