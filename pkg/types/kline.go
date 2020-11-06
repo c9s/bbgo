@@ -45,22 +45,25 @@ type KLineQueryOptions struct {
 
 // KLine uses binance's kline as the standard structure
 type KLine struct {
-	StartTime time.Time
-	EndTime   time.Time
+	Exchange string `json:"exchange"`
 
-	Symbol   string
-	Interval Interval
+	Symbol string `json:"symbol" db:"symbol"`
 
-	Open        float64
-	Close       float64
-	High        float64
-	Low         float64
-	Volume      float64
-	QuoteVolume float64
+	StartTime time.Time `json:"startTime" db:"start_time"`
+	EndTime   time.Time `json:"endTime" db:"end_time"`
 
-	LastTradeID    int
-	NumberOfTrades int64
-	Closed         bool
+	Interval Interval `json:"interval" db:"interval"`
+
+	Open        float64 `json:"open" db:"open"`
+	Close       float64 `json:"close" db:"close"`
+	High        float64 `json:"high" db:"high"`
+	Low         float64 `json:"low" db:"low"`
+	Volume      float64 `json:"volume" db:"volume"`
+	QuoteVolume float64 `json:"quoteVolume" db:"quote_volume"`
+
+	LastTradeID    int   `json:"lastTradeID" db:"last_trade_id"`
+	NumberOfTrades int64 `json:"numberOfTrades" db:"num_trades"`
+	Closed         bool  `json:"closed" db:"closed"`
 }
 
 func (k KLine) GetStartTime() time.Time {
