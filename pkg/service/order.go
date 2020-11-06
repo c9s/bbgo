@@ -12,10 +12,6 @@ type OrderService struct {
 	DB *sqlx.DB
 }
 
-func NewOrderService(db *sqlx.DB) *OrderService {
-	return &OrderService{db}
-}
-
 // QueryLast queries the last order from the database
 func (s *OrderService) QueryLast(ex types.ExchangeName, symbol string) (*types.Order, error) {
 	log.Infof("querying last order exchange = %s AND symbol = %s", ex, symbol)

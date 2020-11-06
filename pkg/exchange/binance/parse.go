@@ -414,6 +414,7 @@ type KLineEvent struct {
 
 func (k *KLine) KLine() types.KLine {
 	return types.KLine{
+		Exchange:       "binance",
 		Symbol:         k.Symbol,
 		Interval:       types.Interval(k.Interval),
 		StartTime:      time.Unix(0, k.StartTime*int64(time.Millisecond)),
