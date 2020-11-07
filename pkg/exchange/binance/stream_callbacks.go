@@ -2,15 +2,7 @@
 
 package binance
 
-func (s *Stream) OnConnect(cb func(stream *Stream)) {
-	s.connectCallbacks = append(s.connectCallbacks, cb)
-}
-
-func (s *Stream) EmitConnect(stream *Stream) {
-	for _, cb := range s.connectCallbacks {
-		cb(stream)
-	}
-}
+import ()
 
 func (s *Stream) OnDepthEvent(cb func(e *DepthEvent)) {
 	s.depthEventCallbacks = append(s.depthEventCallbacks, cb)
@@ -73,8 +65,6 @@ func (s *Stream) EmitExecutionReportEvent(event *ExecutionReportEvent) {
 }
 
 type StreamEventHub interface {
-	OnConnect(cb func(stream *Stream))
-
 	OnDepthEvent(cb func(e *DepthEvent))
 
 	OnKLineEvent(cb func(e *KLineEvent))

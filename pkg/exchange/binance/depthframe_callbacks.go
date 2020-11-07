@@ -2,6 +2,8 @@
 
 package binance
 
+import ()
+
 func (f *DepthFrame) OnReady(cb func(snapshotDepth DepthEvent, bufEvents []DepthEvent)) {
 	f.readyCallbacks = append(f.readyCallbacks, cb)
 }
