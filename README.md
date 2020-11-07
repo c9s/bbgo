@@ -94,9 +94,21 @@ dotenv -f .env.local -- bbgo run --config config/buyandhold.yaml
 
 Check out the strategy directory [strategy](pkg/strategy) for all built-in strategies:
 
-- pricealert strategy demonstrates how to use the notification system [pricealert](pkg/strategy/pricealert)
-- xpuremaker strategy demonstrates how to maintain the orderbook and submit maker orders [xpuremaker](pkg/strategy/xpuremaker)
-- buyandhold strategy demonstrates how to subscribe kline events and submit market order [buyandhold](pkg/strategy/buyandhold)
+- `pricealert` strategy demonstrates how to use the notification system [pricealert](pkg/strategy/pricealert)
+- `xpuremaker` strategy demonstrates how to maintain the orderbook and submit maker orders [xpuremaker](pkg/strategy/xpuremaker)
+- `buyandhold` strategy demonstrates how to subscribe kline events and submit market order [buyandhold](pkg/strategy/buyandhold)
+- `grid` strategy implements a basic grid strategy with the built-in bollinger indicator [grid](pkg/strategy/grid)
+- `flashcrash` strategy implements a strategy that catches the flashcrash [flashcrash](pkg/strategy/flashcrash)
+
+To run these built-in strategies:
+
+```sh
+# modify the config file to make the configuration suitable for you.
+vim config/buyandhold.yaml
+
+# run bbgo with the config
+dotenv -f .env.local -- bbgo run --config config/buyandhold.yaml
+```
 
 ## Write your own strategy
 
@@ -155,6 +167,13 @@ Supported components (single exchange strategy only for now):
 
 - `*bbgo.Notifiability`
 - `bbgo.OrderExecutor`
+
+
+If you have `Symbol string` field in your strategy, your strategy will be detected as a symbol-based strategy,
+then the following types could be injected automatically:
+
+- `*bbgo.ExchangeSession`
+- `types.Market`
 
 ## Exchange API Examples
 
