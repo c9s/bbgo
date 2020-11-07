@@ -37,7 +37,6 @@ func (s *Stream) Connect(ctx context.Context) error {
 		symbols = append(symbols, symbol)
 	}
 
-
 	var intervals []types.Interval
 	for interval := range loadedIntervals {
 		intervals = append(intervals, interval)
@@ -52,18 +51,26 @@ func (s *Stream) Connect(ctx context.Context) error {
 		}
 	*/
 
-	klineC, errC := s.exchange.srv.QueryKLinesCh(s.exchange.startTime, s.exchange, symbols, intervals)
-	for k := range klineC {
-		s.EmitKLineClosed(k)
-	}
+	go func() {
+		klineC, errC := s.exchange.srv.QueryKLinesCh(s.exchange.startTime, s.exchange, symbols, intervals)
+		for k := range klineC {
+			s.EmitKLineClosed(k)
+		}
 
-	if err := <-errC; err != nil {
-		return err
-	}
+		if err := <-errC; err != nil {
+			log.WithError(err).Error("backtest data feed error")
+		}
+
+		if err := s.Close() ; err != nil {
+			log.WithError(err).Error("stream close error")
+		}
+	}()
+
 	return nil
 }
 
 func (s *Stream) Close() error {
+	close(s.exchange.doneC)
 	return nil
 }
 

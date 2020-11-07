@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"syscall"
 	"time"
 
 	"github.com/pkg/errors"
@@ -101,7 +100,9 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
-		cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
+		<-exchange.Done()
+		// TODO: calculate PnL here
+
 		return nil
 	},
 }
