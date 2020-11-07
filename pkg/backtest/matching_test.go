@@ -24,7 +24,6 @@ func newLimitOrder(symbol string, side types.SideType, price, quantity float64) 
 func TestSimplePriceMatching(t *testing.T) {
 	engine := &SimplePriceMatching{
 		CurrentTime: time.Now(),
-		OrderID:     1,
 	}
 
 	for i := 0; i < 5; i++ {
