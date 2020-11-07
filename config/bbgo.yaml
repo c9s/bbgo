@@ -48,6 +48,8 @@ backtest:
   # see here for more details
   # https://www.investopedia.com/terms/m/maximum-drawdown-mdd.asp
   startTime: "2020-01-01"
+  symbols:
+  - BTCUSDT
   account:
     makerCommission: 15
     takerCommission: 15

@@ -37,6 +37,7 @@ func (s *Stream) Connect(ctx context.Context) error {
 		symbols = append(symbols, symbol)
 	}
 
+
 	var intervals []types.Interval
 	for interval := range loadedIntervals {
 		intervals = append(intervals, interval)
