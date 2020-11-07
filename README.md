@@ -100,10 +100,11 @@ Check out the strategy directory [strategy](pkg/strategy) for all built-in strat
 - `grid` strategy implements a basic grid strategy with the built-in bollinger indicator [grid](pkg/strategy/grid)
 - `flashcrash` strategy implements a strategy that catches the flashcrash [flashcrash](pkg/strategy/flashcrash)
 
-To run these built-in strategies:
+To run these built-in strategies, just 
+modify the config file to make the configuration suitable for you, for example if you want to run
+`buyandhold` strategy:
 
 ```sh
-# modify the config file to make the configuration suitable for you.
 vim config/buyandhold.yaml
 
 # run bbgo with the config
