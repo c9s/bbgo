@@ -36,10 +36,7 @@ var BacktestCmd = &cobra.Command{
 			return errors.New("--config option is required")
 		}
 
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		userConfig, err := bbgo.Load(configFile)
+		wantSync, err := cmd.Flags().GetBool("sync")
 		if err != nil {
 			return err
 		}
@@ -53,6 +50,15 @@ var BacktestCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		userConfig, err := bbgo.Load(configFile)
+		if err != nil {
+			return err
+		}
+
 
 		db, err := cmdutil.ConnectMySQL()
 		if err != nil {
@@ -72,6 +78,14 @@ var BacktestCmd = &cobra.Command{
 		backtestService := &service.BacktestService{DB: db}
 
 		exchange := backtest.NewExchange(exchangeName, backtestService, userConfig.Backtest)
+
+		if wantSync {
+			for _, symbol := range userConfig.Backtest.Symbols {
+				if err := backtestService.Sync(ctx, exchange, symbol, startTime); err != nil {
+					return err
+				}
+			}
+		}
 
 		environ := bbgo.NewEnvironment()
 		environ.AddExchange(exchangeName.String(), exchange)

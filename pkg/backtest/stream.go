@@ -44,12 +44,6 @@ func (s *Stream) Connect(ctx context.Context) error {
 
 	log.Infof("used symbols: %v and intervals: %v", symbols, intervals)
 
-	// TODO: we can sync before we connect
-	/*
-		if err := backtestService.Sync(ctx, exchange, symbol, startTime); err != nil {
-			return err
-		}
-	*/
 
 	go func() {
 		klineC, errC := s.exchange.srv.QueryKLinesCh(s.exchange.startTime, s.exchange, symbols, intervals)
