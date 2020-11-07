@@ -4,6 +4,16 @@ package types
 
 import ()
 
+func (stream *StandardStream) OnConnect(cb func()) {
+	stream.connectCallbacks = append(stream.connectCallbacks, cb)
+}
+
+func (stream *StandardStream) EmitConnect() {
+	for _, cb := range stream.connectCallbacks {
+		cb()
+	}
+}
+
 func (stream *StandardStream) OnTradeUpdate(cb func(trade Trade)) {
 	stream.tradeUpdateCallbacks = append(stream.tradeUpdateCallbacks, cb)
 }
@@ -85,6 +95,8 @@ func (stream *StandardStream) EmitBookSnapshot(book OrderBook) {
 }
 
 type StandardStreamEventHub interface {
+	OnConnect(cb func())
+
 	OnTradeUpdate(cb func(trade Trade))
 
 	OnOrderUpdate(cb func(order Order))

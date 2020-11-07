@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/gorilla/websocket"
+
 	max "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -92,6 +94,10 @@ func NewStream(key, secret string) *Stream {
 		case "update":
 			stream.EmitBookUpdate(newbook)
 		}
+	})
+
+	wss.OnConnect(func(conn *websocket.Conn) {
+		stream.EmitConnect()
 	})
 
 	wss.OnAccountSnapshotEvent(func(e max.AccountSnapshotEvent) {

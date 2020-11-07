@@ -30,8 +30,6 @@ type Stream struct {
 	ListenKey string
 	Conn      *websocket.Conn
 
-	connectCallbacks []func(stream *Stream)
-
 	// custom callbacks
 	depthEventCallbacks       []func(e *DepthEvent)
 	kLineEventCallbacks       []func(e *KLineEvent)
@@ -151,7 +149,7 @@ func NewStream(client *binance.Client) *Stream {
 		}
 	})
 
-	stream.OnConnect(func(stream *Stream) {
+	stream.OnConnect(func() {
 		var params []string
 		for _, subscription := range stream.Subscriptions {
 			params = append(params, convertSubscription(subscription))
@@ -200,7 +198,7 @@ func (s *Stream) connect(ctx context.Context) error {
 	log.Infof("[binance] websocket connected")
 	s.Conn = conn
 
-	s.EmitConnect(s)
+	s.EmitConnect()
 	return nil
 }
 
