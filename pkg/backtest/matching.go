@@ -1,118 +1,93 @@
 package backtest
 
 import (
-	"sort"
+	"sync/atomic"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-type PriceOrder struct {
-	Price fixedpoint.Value
-	Order types.Order
+var orderID uint64 = 1
+
+func incOrderID() uint64 {
+	return atomic.AddUint64(&orderID, 1)
 }
 
-type PriceOrderSlice []PriceOrder
-
-func (slice PriceOrderSlice) Len() int           { return len(slice) }
-func (slice PriceOrderSlice) Less(i, j int) bool { return slice[i].Price < slice[j].Price }
-func (slice PriceOrderSlice) Swap(i, j int)      { slice[i], slice[j] = slice[j], slice[i] }
-
-func (slice PriceOrderSlice) InsertAt(idx int, po PriceOrder) PriceOrderSlice {
-	rear := append([]PriceOrder{}, slice[idx:]...)
-	newSlice := append(slice[:idx], po)
-	return append(newSlice, rear...)
-}
-
-func (slice PriceOrderSlice) Remove(price fixedpoint.Value, descending bool) PriceOrderSlice {
-	matched, idx := slice.Find(price, descending)
-	if matched.Price != price {
-		return slice
-	}
-
-	return append(slice[:idx], slice[idx+1:]...)
-}
-
-func (slice PriceOrderSlice) First() (PriceOrder, bool) {
-	if len(slice) > 0 {
-		return slice[0], true
-	}
-	return PriceOrder{}, false
-}
-
-// FindPriceVolumePair finds the pair by the given price, this function is a read-only
-// operation, so we use the value receiver to avoid copy value from the pointer
-// If the price is not found, it will return the index where the price can be inserted at.
-// true for descending (bid orders), false for ascending (ask orders)
-func (slice PriceOrderSlice) Find(price fixedpoint.Value, descending bool) (pv PriceOrder, idx int) {
-	idx = sort.Search(len(slice), func(i int) bool {
-		if descending {
-			return slice[i].Price <= price
-		}
-		return slice[i].Price >= price
-	})
-
-	if idx >= len(slice) || slice[idx].Price != price {
-		return pv, idx
-	}
-
-	pv = slice[idx]
-
-	return pv, idx
-}
-
-func (slice PriceOrderSlice) Upsert(po PriceOrder, descending bool) PriceOrderSlice {
-	if len(slice) == 0 {
-		return append(slice, po)
-	}
-
-	price := po.Price
-	_, idx := slice.Find(price, descending)
-	if idx >= len(slice) || slice[idx].Price != price {
-		return slice.InsertAt(idx, po)
-	}
-
-	slice[idx].Order = po.Order
-	return slice
-}
-
+// SimplePriceMatching implements a simple kline data driven matching engine for backtest
 type SimplePriceMatching struct {
+	Symbol string
+
 	bidOrders []types.Order
 	askOrders []types.Order
 
 	LastPrice   fixedpoint.Value
 	CurrentTime time.Time
-	OrderID     uint64
 }
 
-func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (closedOrders []types.Order, trades []types.Trade, err error) {
-	// start from one
-	m.OrderID++
-
-	if o.Type == types.OrderTypeMarket {
-		order := newOrder(o, m.OrderID, m.CurrentTime)
-		order.Status = types.OrderStatusFilled
-		order.ExecutedQuantity = order.Quantity
-		order.Price = m.LastPrice.Float64()
-		closedOrders = append(closedOrders, order)
-
-		trade := m.newTradeFromOrder(order, false)
-		trades = append(trades, trade)
-		return
-	}
+func (m *SimplePriceMatching) CancelOrder(o types.Order) error {
+	found := false
 
 	switch o.Side {
 
 	case types.SideTypeBuy:
-		m.bidOrders = append(m.bidOrders, newOrder(o, m.OrderID, m.CurrentTime))
+		var orders []types.Order
+		for _, order := range m.bidOrders {
+			if o.OrderID == order.OrderID {
+				found = true
+				continue
+			}
+			orders = append(orders, order)
+		}
+		m.bidOrders = orders
 
 	case types.SideTypeSell:
-		m.askOrders = append(m.askOrders, newOrder(o, m.OrderID, m.CurrentTime))
+		var orders []types.Order
+		for _, order := range m.bidOrders {
+			if o.OrderID == order.OrderID {
+				found = true
+				continue
+			}
+			orders = append(orders, order)
+		}
+		m.bidOrders = orders
 
 	}
 
-	return
+	if !found {
+		return errors.Errorf("cancel order failed, order not found")
+	}
+	return nil
+}
+
+func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (closedOrders *types.Order, trades *types.Trade, err error) {
+	// start from one
+	orderID := incOrderID()
+
+	if o.Type == types.OrderTypeMarket {
+		order := newOrder(o, orderID, m.CurrentTime)
+		order.Status = types.OrderStatusFilled
+		order.ExecutedQuantity = order.Quantity
+		order.Price = m.LastPrice.Float64()
+
+		trade := m.newTradeFromOrder(order, false)
+		return &order, &trade, nil
+	}
+
+	order := newOrder(o, orderID, m.CurrentTime)
+	switch o.Side {
+
+	case types.SideTypeBuy:
+		m.bidOrders = append(m.bidOrders, order)
+
+	case types.SideTypeSell:
+		m.askOrders = append(m.askOrders, order)
+
+	}
+
+	return &order, nil, nil
 }
 
 func (m *SimplePriceMatching) newTradeFromOrder(order types.Order, isMaker bool) types.Trade {
@@ -256,6 +231,41 @@ func (m *SimplePriceMatching) SellToPrice(price fixedpoint.Value) (closedOrders 
 	m.LastPrice = price
 
 	return closedOrders, trades
+}
+
+func (m *SimplePriceMatching) BindStream(stream types.Stream) {
+	stream.OnKLineClosed(func(kline types.KLine) {
+		if kline.Interval != types.Interval1m {
+			return
+		}
+		if kline.Symbol != m.Symbol {
+			return
+		}
+
+		m.CurrentTime = kline.EndTime
+
+		switch kline.GetTrend() {
+		case types.TrendDown:
+			if kline.High > kline.Open {
+				m.BuyToPrice(fixedpoint.NewFromFloat(kline.High))
+			}
+
+			if kline.Low > kline.Close {
+				m.SellToPrice(fixedpoint.NewFromFloat(kline.Low))
+			}
+			m.SellToPrice(fixedpoint.NewFromFloat(kline.Close))
+
+		case types.TrendUp:
+			if kline.Low < kline.Open {
+				m.SellToPrice(fixedpoint.NewFromFloat(kline.Low))
+			}
+
+			if kline.High > kline.Close {
+				m.BuyToPrice(fixedpoint.NewFromFloat(kline.High))
+			}
+			m.BuyToPrice(fixedpoint.NewFromFloat(kline.Close))
+		}
+	})
 }
 
 type Matching struct {
