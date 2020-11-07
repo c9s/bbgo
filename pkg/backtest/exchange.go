@@ -26,6 +26,7 @@ type Exchange struct {
 
 	closedOrders map[string][]types.Order
 	matchings    map[string]*SimplePriceMatching
+	doneC        chan struct{}
 }
 
 func NewExchange(sourceExchange types.ExchangeName, srv *service.BacktestService, config *bbgo.Backtest) *Exchange {
@@ -61,9 +62,14 @@ func NewExchange(sourceExchange types.ExchangeName, srv *service.BacktestService
 		startTime:      startTime,
 		matchings:      make(map[string]*SimplePriceMatching),
 		closedOrders:   make(map[string][]types.Order),
+		doneC:          make(chan struct{}),
 	}
 
 	return e
+}
+
+func (e *Exchange) Done() chan struct{} {
+	return e.doneC
 }
 
 func (e *Exchange) NewStream() types.Stream {
