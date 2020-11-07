@@ -77,6 +77,187 @@ func (slice PriceOrderSlice) Upsert(po PriceOrder, descending bool) PriceOrderSl
 	return slice
 }
 
+type SimplePriceMatching struct {
+	bidOrders []types.Order
+	askOrders []types.Order
+
+	LastPrice   fixedpoint.Value
+	CurrentTime time.Time
+	OrderID     uint64
+}
+
+func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (closedOrders []types.Order, trades []types.Trade, err error) {
+	// start from one
+	m.OrderID++
+
+	if o.Type == types.OrderTypeMarket {
+		order := newOrder(o, m.OrderID, m.CurrentTime)
+		order.Status = types.OrderStatusFilled
+		order.ExecutedQuantity = order.Quantity
+		order.Price = m.LastPrice.Float64()
+		closedOrders = append(closedOrders, order)
+
+		trade := m.newTradeFromOrder(order, false)
+		trades = append(trades, trade)
+		return
+	}
+
+	switch o.Side {
+
+	case types.SideTypeBuy:
+		m.bidOrders = append(m.bidOrders, newOrder(o, m.OrderID, m.CurrentTime))
+
+	case types.SideTypeSell:
+		m.askOrders = append(m.askOrders, newOrder(o, m.OrderID, m.CurrentTime))
+
+	}
+
+	return
+}
+
+func (m *SimplePriceMatching) newTradeFromOrder(order types.Order, isMaker bool) types.Trade {
+	return types.Trade{
+		ID:            0,
+		OrderID:       order.OrderID,
+		Exchange:      "backtest",
+		Price:         order.Price,
+		Quantity:      order.Quantity,
+		QuoteQuantity: order.Quantity * order.Price,
+		Symbol:        order.Symbol,
+		Side:          order.Side,
+		IsBuyer:       order.Side == types.SideTypeBuy,
+		IsMaker:       isMaker,
+		Time:          m.CurrentTime,
+		Fee:           order.Quantity * order.Price * 0.0015,
+		FeeCurrency:   "USDT",
+	}
+}
+
+func (m *SimplePriceMatching) BuyToPrice(price fixedpoint.Value) (closedOrders []types.Order, trades []types.Trade) {
+	var priceF = price.Float64()
+	var askOrders []types.Order
+	for _, o := range m.askOrders {
+		switch o.Type {
+
+		case types.OrderTypeStopMarket:
+			// should we trigger the order
+			if priceF >= o.StopPrice {
+				o.ExecutedQuantity = o.Quantity
+				o.Price = priceF
+				o.Status = types.OrderStatusFilled
+				closedOrders = append(closedOrders, o)
+
+				trade := m.newTradeFromOrder(o, false)
+				trades = append(trades, trade)
+			} else {
+				askOrders = append(askOrders, o)
+			}
+
+		case types.OrderTypeStopLimit:
+			// should we trigger the order
+			if priceF >= o.StopPrice {
+				o.Type = types.OrderTypeLimit
+
+				if priceF >= o.Price {
+					o.ExecutedQuantity = o.Quantity
+					o.Status = types.OrderStatusFilled
+					closedOrders = append(closedOrders, o)
+
+					trade := m.newTradeFromOrder(o, false)
+					trades = append(trades, trade)
+				} else {
+					askOrders = append(askOrders, o)
+				}
+			} else {
+				askOrders = append(askOrders, o)
+			}
+
+		case types.OrderTypeLimit:
+			if priceF >= o.Price {
+				o.ExecutedQuantity = o.Quantity
+				o.Status = types.OrderStatusFilled
+				closedOrders = append(closedOrders, o)
+
+				trade := m.newTradeFromOrder(o, true)
+				trades = append(trades, trade)
+			} else {
+				askOrders = append(askOrders, o)
+			}
+
+		default:
+			askOrders = append(askOrders, o)
+		}
+
+	}
+
+	m.askOrders = askOrders
+	m.LastPrice = price
+
+	return closedOrders, trades
+}
+
+func (m *SimplePriceMatching) SellToPrice(price fixedpoint.Value) (closedOrders []types.Order, trades []types.Trade) {
+	var sellPrice = price.Float64()
+	var bidOrders []types.Order
+	for _, o := range m.bidOrders {
+		switch o.Type {
+
+		case types.OrderTypeStopMarket:
+			// should we trigger the order
+			if sellPrice <= o.StopPrice {
+				o.ExecutedQuantity = o.Quantity
+				o.Price = sellPrice
+				o.Status = types.OrderStatusFilled
+				closedOrders = append(closedOrders, o)
+
+				trade := m.newTradeFromOrder(o, false)
+				trades = append(trades, trade)
+			} else {
+				bidOrders = append(bidOrders, o)
+			}
+
+		case types.OrderTypeStopLimit:
+			// should we trigger the order
+			if sellPrice <= o.StopPrice {
+				o.Type = types.OrderTypeLimit
+
+				if sellPrice <= o.Price {
+					o.ExecutedQuantity = o.Quantity
+					o.Status = types.OrderStatusFilled
+					closedOrders = append(closedOrders, o)
+
+					trade := m.newTradeFromOrder(o, false)
+					trades = append(trades, trade)
+				} else {
+					bidOrders = append(bidOrders, o)
+				}
+			} else {
+				bidOrders = append(bidOrders, o)
+			}
+
+		case types.OrderTypeLimit:
+			if sellPrice <= o.Price {
+				o.ExecutedQuantity = o.Quantity
+				o.Status = types.OrderStatusFilled
+				closedOrders = append(closedOrders, o)
+
+				trade := m.newTradeFromOrder(o, true)
+				trades = append(trades, trade)
+			} else {
+				bidOrders = append(bidOrders, o)
+			}
+
+		default:
+			bidOrders = append(bidOrders, o)
+		}
+	}
+
+	m.bidOrders = bidOrders
+	m.LastPrice = price
+
+	return closedOrders, trades
+}
+
 type Matching struct {
 	Symbol string
 	Asks   PriceOrderSlice
