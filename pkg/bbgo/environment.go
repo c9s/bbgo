@@ -54,6 +54,10 @@ func NewEnvironment() *Environment {
 	}
 }
 
+func (environ *Environment) Sessions() map[string]*ExchangeSession {
+	return environ.sessions
+}
+
 func (environ *Environment) SyncTrades(db *sqlx.DB) *Environment {
 	environ.TradeService = &service.TradeService{DB: db}
 	environ.TradeSync = &service.SyncService{

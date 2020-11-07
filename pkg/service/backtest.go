@@ -89,7 +89,7 @@ func (s *BacktestService) QueryKLinesCh(since time.Time, exchange types.Exchange
 
 	sql, args, err := sqlx.Named(sql, map[string]interface{}{
 		"since":     since,
-		"symbols":    symbols,
+		"symbols":   symbols,
 		"intervals": types.IntervalSlice(intervals),
 	})
 	sql, args, err = sqlx.In(sql, args...)
@@ -114,12 +114,12 @@ func (s *BacktestService) QueryKLinesCh(since time.Time, exchange types.Exchange
 
 // scanRowsCh scan rows into channel
 func (s *BacktestService) scanRowsCh(rows *sqlx.Rows) (chan types.KLine, chan error) {
-	ch := make(chan types.KLine, 100)
+	ch := make(chan types.KLine, 500)
 	errC := make(chan error, 1)
 
 	go func() {
-		defer close(ch)
 		defer close(errC)
+		defer close(ch)
 		defer rows.Close()
 
 		for rows.Next() {
@@ -136,6 +136,7 @@ func (s *BacktestService) scanRowsCh(rows *sqlx.Rows) (chan types.KLine, chan er
 			errC <- err
 			return
 		}
+
 	}()
 
 	return ch, errC

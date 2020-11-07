@@ -57,6 +57,7 @@ type Session struct {
 type Backtest struct {
 	StartTime string          `json:"startTime" yaml:"startTime"`
 	Account   BacktestAccount `json:"account" yaml:"account"`
+	Symbols   []string        `json:"symbols" yaml:"symbols"`
 }
 
 func (t Backtest) ParseStartTime() (time.Time, error) {

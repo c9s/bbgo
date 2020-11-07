@@ -48,19 +48,21 @@ backtest:
   # see here for more details
   # https://www.investopedia.com/terms/m/maximum-drawdown-mdd.asp
   startTime: "2020-01-01"
+  symbols:
+  - BTCUSDT
   account:
     makerCommission: 15
     takerCommission: 15
     buyerCommission: 0
     sellerCommission: 0
     balances:
-      BTC: 1.0
-      USDT: 5000.0
+      BTC: 0.0
+      USDT: 10000.0
 
 exchangeStrategies:
 - on: max
   buyandhold:
     symbol: "BTCUSDT"
-    interval: "1m"
+    interval: "1h"
+    minDropPercentage: -0.01
     baseQuantity: 0.01
-    minDropPercentage: -0.02
