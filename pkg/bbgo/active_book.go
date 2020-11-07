@@ -29,6 +29,20 @@ func (b *LocalActiveOrderBook) Print() {
 	}
 }
 
+func (b *LocalActiveOrderBook) Update(orders ...types.Order) {
+	for _, order := range orders {
+		switch order.Side {
+		case types.SideTypeBuy:
+			b.Bids.Update(order)
+
+		case types.SideTypeSell:
+			b.Asks.Update(order)
+
+		}
+	}
+}
+
+
 func (b *LocalActiveOrderBook) Add(orders ...types.Order) {
 	for _, order := range orders {
 		switch order.Side {

@@ -9,6 +9,13 @@ func (m OrderMap) Add(o Order) {
 	m[o.OrderID] = o
 }
 
+// Update only updates the order when the order exists in the map
+func (m OrderMap) Update(o Order) {
+	if _, ok := m[o.OrderID]  ; ok {
+		m[o.OrderID] = o
+	}
+}
+
 func (m OrderMap) Delete(orderID uint64) {
 	delete(m, orderID)
 }
@@ -75,6 +82,13 @@ func (m *SyncOrderMap) Add(o Order) {
 	defer m.Unlock()
 
 	m.orders.Add(o)
+}
+
+func (m *SyncOrderMap) Update(o Order) {
+	m.Lock()
+	defer m.Unlock()
+
+	m.orders.Update(o)
 }
 
 func (m *SyncOrderMap) Iterate(it func(id uint64, order Order) bool) {
