@@ -191,7 +191,6 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 			return createdOrders, errors.New("returned nil order")
 		}
 
-		logger.Infof("order created: %+v", retOrder)
 		createdOrder, err := toGlobalOrder(*retOrder)
 		if err != nil {
 			return createdOrders, err
