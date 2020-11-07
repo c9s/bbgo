@@ -216,15 +216,14 @@ func (s *Strategy) orderUpdateHandler(order types.Order) {
 
 	switch order.Status {
 	case types.OrderStatusFilled:
-		s.WriteOff(order)
+		s.activeOrders.Delete(order)
+
+	case types.OrderStatusPartiallyFilled, types.OrderStatusNew:
+		s.activeOrders.Update(order)
 
 	case types.OrderStatusCanceled, types.OrderStatusRejected:
 		log.Infof("order status %s, removing %d from the active order pool...", order.Status, order.OrderID)
 		s.activeOrders.Delete(order)
-
-	default:
-		log.Infof("order status %s, updating %d to the active order pool...", order.Status, order.OrderID)
-		s.activeOrders.Add(order)
 	}
 }
 
@@ -270,33 +269,4 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	}()
 
 	return nil
-}
-
-// WriteOff writes off the filled order on the opposite side.
-// This method does not write off order by order amount or order quantity.
-func (s *Strategy) WriteOff(order types.Order) bool {
-	b := s.activeOrders
-	if order.Status != types.OrderStatusFilled {
-		return false
-	}
-
-	switch order.Side {
-	case types.SideTypeSell:
-		// find the filled bid to remove
-		if filledOrder, ok := b.Bids.AnyFilled(); ok {
-			b.Bids.Delete(filledOrder.OrderID)
-			b.Asks.Delete(order.OrderID)
-			return true
-		}
-
-	case types.SideTypeBuy:
-		// find the filled ask order to remove
-		if filledOrder, ok := b.Asks.AnyFilled(); ok {
-			b.Asks.Delete(filledOrder.OrderID)
-			b.Bids.Delete(order.OrderID)
-			return true
-		}
-	}
-
-	return false
 }
