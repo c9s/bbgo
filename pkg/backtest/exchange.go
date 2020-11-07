@@ -24,9 +24,10 @@ type Exchange struct {
 
 	stream *Stream
 
-	closedOrders map[string][]types.Order
-	matchings    map[string]*SimplePriceMatching
-	doneC        chan struct{}
+	trades        map[string][]types.Trade
+	closedOrders  map[string][]types.Order
+	matchingBooks map[string]*SimplePriceMatching
+	doneC         chan struct{}
 }
 
 func NewExchange(sourceExchange types.ExchangeName, srv *service.BacktestService, config *bbgo.Backtest) *Exchange {
@@ -60,8 +61,9 @@ func NewExchange(sourceExchange types.ExchangeName, srv *service.BacktestService
 		config:         config,
 		account:        account,
 		startTime:      startTime,
-		matchings:      make(map[string]*SimplePriceMatching),
+		matchingBooks:  make(map[string]*SimplePriceMatching),
 		closedOrders:   make(map[string][]types.Order),
+		trades:         make(map[string][]types.Trade),
 		doneC:          make(chan struct{}),
 	}
 
@@ -79,13 +81,17 @@ func (e *Exchange) NewStream() types.Stream {
 
 	e.stream = &Stream{exchange: e}
 
+	e.stream.OnTradeUpdate(func(trade types.Trade) {
+		e.trades[trade.Symbol] = append(e.trades[trade.Symbol], trade)
+	})
+
 	for _, symbol := range e.config.Symbols {
 		matching := &SimplePriceMatching{
 			Symbol:      symbol,
 			CurrentTime: e.startTime,
 		}
 		matching.BindStream(e.stream)
-		e.matchings[symbol] = matching
+		e.matchingBooks[symbol] = matching
 	}
 
 	return e.stream
@@ -94,7 +100,7 @@ func (e *Exchange) NewStream() types.Stream {
 func (e Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error) {
 	for _, order := range orders {
 		symbol := order.Symbol
-		matching, ok := e.matchings[symbol]
+		matching, ok := e.matchingBooks[symbol]
 		if !ok {
 			return nil, errors.Errorf("matching engine is not initialized for symbol %s", symbol)
 		}
@@ -125,7 +131,7 @@ func (e Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder)
 }
 
 func (e Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
-	matching, ok := e.matchings[symbol]
+	matching, ok := e.matchingBooks[symbol]
 	if !ok {
 		return nil, errors.Errorf("matching engine is not initialized for symbol %s", symbol)
 	}
@@ -144,7 +150,7 @@ func (e Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, u
 
 func (e Exchange) CancelOrders(ctx context.Context, orders ...types.Order) error {
 	for _, order := range orders {
-		matching, ok := e.matchings[order.Symbol]
+		matching, ok := e.matchingBooks[order.Symbol]
 		if !ok {
 			return errors.Errorf("matching engine is not initialized for symbol %s", order.Symbol)
 		}
