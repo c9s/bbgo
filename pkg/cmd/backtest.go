@@ -8,6 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	"github.com/c9s/bbgo/pkg/accounting/pnl"
 	"github.com/c9s/bbgo/pkg/backtest"
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
@@ -17,7 +18,7 @@ import (
 
 func init() {
 	BacktestCmd.Flags().String("exchange", "", "target exchange")
-	BacktestCmd.Flags().Bool("sync", true, "sync backtest data")
+	BacktestCmd.Flags().Bool("sync", false, "sync backtest data")
 	BacktestCmd.Flags().String("config", "config/bbgo.yaml", "strategy config file")
 	RootCmd.AddCommand(BacktestCmd)
 }
@@ -58,7 +59,6 @@ var BacktestCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-
 
 		db, err := cmdutil.ConnectMySQL()
 		if err != nil {
@@ -115,7 +115,21 @@ var BacktestCmd = &cobra.Command{
 		}
 
 		<-exchange.Done()
-		// TODO: calculate PnL here
+
+		for _, session := range environ.Sessions() {
+			calculator := &pnl.AverageCostCalculator{
+				TradingFeeCurrency: exchange.PlatformFeeCurrency(),
+			}
+			for symbol, trades := range session.Trades {
+				lastPrice, ok := session.LastPrice(symbol)
+				if !ok {
+					return errors.Errorf("last price not found: %s", symbol)
+				}
+
+				report := calculator.Calculate(symbol, trades, lastPrice)
+				report.Print()
+			}
+		}
 
 		return nil
 	},

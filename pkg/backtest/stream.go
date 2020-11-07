@@ -19,7 +19,11 @@ func (s *Stream) Connect(ctx context.Context) error {
 	log.Infof("collecting backtest configurations...")
 
 	loadedSymbols := map[string]struct{}{}
-	loadedIntervals := map[types.Interval]struct{}{}
+	loadedIntervals := map[types.Interval]struct{}{
+		// 1m interval is required for the backtest matching engine
+		types.Interval1m: struct{}{},
+	}
+
 	for _, sub := range s.Subscriptions {
 		loadedSymbols[sub.Symbol] = struct{}{}
 
@@ -44,7 +48,6 @@ func (s *Stream) Connect(ctx context.Context) error {
 
 	log.Infof("used symbols: %v and intervals: %v", symbols, intervals)
 
-
 	go func() {
 		klineC, errC := s.exchange.srv.QueryKLinesCh(s.exchange.startTime, s.exchange, symbols, intervals)
 		for k := range klineC {
@@ -55,7 +58,7 @@ func (s *Stream) Connect(ctx context.Context) error {
 			log.WithError(err).Error("backtest data feed error")
 		}
 
-		if err := s.Close() ; err != nil {
+		if err := s.Close(); err != nil {
 			log.WithError(err).Error("stream close error")
 		}
 	}()
