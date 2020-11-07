@@ -50,7 +50,6 @@ type Strategy struct {
 	ewma *indicator.EWMA
 }
 
-
 func (s *Strategy) updateOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) {
 	if err := session.Exchange.CancelOrders(context.Background(), s.activeOrders.Bids.Orders()...); err != nil {
 		log.WithError(err).Errorf("cancel order error")
@@ -65,18 +64,14 @@ func (s *Strategy) updateBidOrders(orderExecutor bbgo.OrderExecutor, session *bb
 
 	balance, ok := balances[quoteCurrency]
 	if !ok || balance.Available <= 0.0 {
-		return
-	}
-
-	var numOrders = s.GridNum - s.activeOrders.NumOfBids()
-	if numOrders <= 0 {
+		log.Infof("insufficient balance of %s: %f", quoteCurrency, balance)
 		return
 	}
 
 	var startPrice = s.ewma.Last() * s.Percentage
 
 	var submitOrders []types.SubmitOrder
-	for i := 0; i < numOrders; i++ {
+	for i := 0; i < s.GridNum; i++ {
 		submitOrders = append(submitOrders, types.SubmitOrder{
 			Symbol:      s.Symbol,
 			Side:        types.SideTypeBuy,
@@ -115,9 +110,6 @@ func (s *Strategy) orderUpdateHandler(order types.Order) {
 		s.activeOrders.Delete(order)
 
 	case types.OrderStatusPartiallyFilled:
-		s.activeOrders.Add(order)
-
-	default:
 		s.activeOrders.Add(order)
 	}
 }

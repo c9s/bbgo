@@ -191,7 +191,7 @@ func toGlobalOrderUpdate(u max.OrderUpdate) (*types.Order, error) {
 	return &types.Order{
 		SubmitOrder: types.SubmitOrder{
 			ClientOrderID: u.ClientOID,
-			Symbol:        u.Market,
+			Symbol:        toGlobalSymbol(u.Market),
 			Side:          toGlobalSideType(u.Side),
 			Type:          toGlobalOrderType(u.OrderType),
 			Quantity:      util.MustParseFloat(u.Volume),
@@ -199,6 +199,7 @@ func toGlobalOrderUpdate(u max.OrderUpdate) (*types.Order, error) {
 			StopPrice:     util.MustParseFloat(u.StopPrice),
 			TimeInForce:   "GTC", // MAX only supports GTC
 		},
+		Exchange:         "max",
 		OrderID:          u.ID,
 		Status:           toGlobalOrderStatus(u.State, executedVolume, remainingVolume),
 		ExecutedQuantity: executedVolume.Float64(),
