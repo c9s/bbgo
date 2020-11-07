@@ -20,11 +20,14 @@ type Exchange struct {
 	startTime      time.Time
 
 	account *types.Account
-	config       *bbgo.Backtest
-	closedOrders []types.SubmitOrder
-	openOrders   []types.SubmitOrder
+	config  *bbgo.Backtest
 
 	stream *Stream
+
+	trades        map[string][]types.Trade
+	closedOrders  map[string][]types.Order
+	matchingBooks map[string]*SimplePriceMatching
+	doneC         chan struct{}
 }
 
 func NewExchange(sourceExchange types.ExchangeName, srv *service.BacktestService, config *bbgo.Backtest) *Exchange {
@@ -51,39 +54,112 @@ func NewExchange(sourceExchange types.ExchangeName, srv *service.BacktestService
 	}
 	account.UpdateBalances(balances)
 
-	return &Exchange{
+	e := &Exchange{
 		sourceExchange: sourceExchange,
 		publicExchange: ex,
 		srv:            srv,
 		config:         config,
 		account:        account,
 		startTime:      startTime,
+		matchingBooks:  make(map[string]*SimplePriceMatching),
+		closedOrders:   make(map[string][]types.Order),
+		trades:         make(map[string][]types.Trade),
+		doneC:          make(chan struct{}),
 	}
+
+	return e
+}
+
+func (e *Exchange) Done() chan struct{} {
+	return e.doneC
 }
 
 func (e *Exchange) NewStream() types.Stream {
 	if e.stream != nil {
-		panic("backtest stream is already allocated, please check if there are extra NewStream calls")
+		panic("backtest stream can not be allocated twice")
 	}
 
 	e.stream = &Stream{exchange: e}
+
+	e.stream.OnTradeUpdate(func(trade types.Trade) {
+		e.trades[trade.Symbol] = append(e.trades[trade.Symbol], trade)
+	})
+
+	for _, symbol := range e.config.Symbols {
+		matching := &SimplePriceMatching{
+			Symbol:      symbol,
+			CurrentTime: e.startTime,
+		}
+		matching.BindStream(e.stream)
+		e.matchingBooks[symbol] = matching
+	}
+
 	return e.stream
 }
 
 func (e Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error) {
-	panic("implement me")
+	for _, order := range orders {
+		symbol := order.Symbol
+		matching, ok := e.matchingBooks[symbol]
+		if !ok {
+			return nil, errors.Errorf("matching engine is not initialized for symbol %s", symbol)
+		}
+
+		createdOrder, trade, err := matching.PlaceOrder(order)
+		if err != nil {
+			return nil, err
+		}
+
+		if createdOrder != nil {
+			createdOrders = append(createdOrders, *createdOrder)
+
+			// market order can be closed immediately.
+			switch createdOrder.Status {
+			case types.OrderStatusFilled, types.OrderStatusCanceled, types.OrderStatusRejected:
+				e.closedOrders[symbol] = append(e.closedOrders[symbol], *createdOrder)
+			}
+
+			e.stream.EmitOrderUpdate(*createdOrder)
+		}
+
+		if trade != nil {
+			e.stream.EmitTradeUpdate(*trade)
+		}
+	}
+
+	return createdOrders, nil
 }
 
 func (e Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
-	panic("implement me")
+	matching, ok := e.matchingBooks[symbol]
+	if !ok {
+		return nil, errors.Errorf("matching engine is not initialized for symbol %s", symbol)
+	}
+
+	return append(matching.bidOrders, matching.askOrders...), nil
 }
 
 func (e Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []types.Order, err error) {
-	panic("implement me")
+	orders, ok := e.closedOrders[symbol]
+	if !ok {
+		return orders, errors.Errorf("matching engine is not initialized for symbol %s", symbol)
+	}
+
+	return orders, nil
 }
 
 func (e Exchange) CancelOrders(ctx context.Context, orders ...types.Order) error {
-	panic("implement me")
+	for _, order := range orders {
+		matching, ok := e.matchingBooks[order.Symbol]
+		if !ok {
+			return errors.Errorf("matching engine is not initialized for symbol %s", order.Symbol)
+		}
+		if err := matching.CancelOrder(order); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (e Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {

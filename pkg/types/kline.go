@@ -169,7 +169,9 @@ func (k KLine) GetChange() float64 {
 }
 
 func (k KLine) String() string {
-	return fmt.Sprintf("%s %s Open: %.8f Close: %.8f High: %.8f Low: %.8f Volume: %.8f Change: %.4f Max Change: %.4f", k.Symbol, k.Interval, k.Open, k.Close, k.High, k.Low, k.Volume, k.GetChange(), k.GetMaxChange())
+	return fmt.Sprintf("%s %s %s Open: %.8f Close: %.8f High: %.8f Low: %.8f Volume: %.8f Change: %.4f Max Change: %.4f",
+		k.StartTime.Format("2006-01-02 15:04"),
+		k.Symbol, k.Interval, k.Open, k.Close, k.High, k.Low, k.Volume, k.GetChange(), k.GetMaxChange())
 }
 
 func (k KLine) Color() string {

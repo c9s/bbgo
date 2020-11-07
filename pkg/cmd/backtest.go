@@ -2,13 +2,13 @@ package cmd
 
 import (
 	"context"
-	"syscall"
 	"time"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	"github.com/c9s/bbgo/pkg/accounting/pnl"
 	"github.com/c9s/bbgo/pkg/backtest"
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
@@ -18,7 +18,7 @@ import (
 
 func init() {
 	BacktestCmd.Flags().String("exchange", "", "target exchange")
-	BacktestCmd.Flags().Bool("sync", true, "sync backtest data")
+	BacktestCmd.Flags().Bool("sync", false, "sync backtest data")
 	BacktestCmd.Flags().String("config", "config/bbgo.yaml", "strategy config file")
 	RootCmd.AddCommand(BacktestCmd)
 }
@@ -37,10 +37,7 @@ var BacktestCmd = &cobra.Command{
 			return errors.New("--config option is required")
 		}
 
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		userConfig, err := bbgo.Load(configFile)
+		wantSync, err := cmd.Flags().GetBool("sync")
 		if err != nil {
 			return err
 		}
@@ -51,6 +48,14 @@ var BacktestCmd = &cobra.Command{
 		}
 
 		exchangeName, err := types.ValidExchangeName(exchangeNameStr)
+		if err != nil {
+			return err
+		}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		userConfig, err := bbgo.Load(configFile)
 		if err != nil {
 			return err
 		}
@@ -73,6 +78,14 @@ var BacktestCmd = &cobra.Command{
 		backtestService := &service.BacktestService{DB: db}
 
 		exchange := backtest.NewExchange(exchangeName, backtestService, userConfig.Backtest)
+
+		if wantSync {
+			for _, symbol := range userConfig.Backtest.Symbols {
+				if err := backtestService.Sync(ctx, exchange, symbol, startTime); err != nil {
+					return err
+				}
+			}
+		}
 
 		environ := bbgo.NewEnvironment()
 		environ.AddExchange(exchangeName.String(), exchange)
@@ -101,7 +114,23 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
-		cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
+		<-exchange.Done()
+
+		for _, session := range environ.Sessions() {
+			calculator := &pnl.AverageCostCalculator{
+				TradingFeeCurrency: exchange.PlatformFeeCurrency(),
+			}
+			for symbol, trades := range session.Trades {
+				lastPrice, ok := session.LastPrice(symbol)
+				if !ok {
+					return errors.Errorf("last price not found: %s", symbol)
+				}
+
+				report := calculator.Calculate(symbol, trades, lastPrice)
+				report.Print()
+			}
+		}
+
 		return nil
 	},
 }
