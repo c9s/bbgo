@@ -1,0 +1,14 @@
+---
+sessions:
+  max:
+    exchange: max
+    envVarPrefix: max
+
+exchangeStrategies:
+- on: max
+  flashcrash:
+    symbol: BTCUSDT
+    interval: 1m
+    baseQuantity: 0.01
+    percentage: 0.6 # 60% of the current price from the moving average
+    gridNumber: 3
