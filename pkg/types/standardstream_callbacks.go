@@ -2,6 +2,8 @@
 
 package types
 
+import ()
+
 func (stream *StandardStream) OnTradeUpdate(cb func(trade Trade)) {
 	stream.tradeUpdateCallbacks = append(stream.tradeUpdateCallbacks, cb)
 }
