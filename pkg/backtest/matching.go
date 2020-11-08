@@ -13,6 +13,7 @@ import (
 
 // DefaultFeeRate set the fee rate for most cases
 // BINANCE uses 0.1% for both maker and taker
+//  for BNB holders, it's 0.075% for both maker and taker
 // MAX uses 0.050% for maker and 0.15% for taker
 const DefaultFeeRate = 0.15 * 0.001
 
