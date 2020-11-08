@@ -237,14 +237,43 @@ func (m *SimplePriceMatching) newTradeFromOrder(order types.Order, isMaker bool)
 func (m *SimplePriceMatching) BuyToPrice(price fixedpoint.Value) (closedOrders []types.Order, trades []types.Trade) {
 	var priceF = price.Float64()
 	var askOrders []types.Order
+
 	for _, o := range m.askOrders {
 		switch o.Type {
 
 		case types.OrderTypeStopMarket:
 			// should we trigger the order
-			if priceF >= o.StopPrice {
+			if priceF <= o.StopPrice {
+				// not triggering it, put it back
+				askOrders = append(askOrders, o)
+				break
+			}
+
+			o.Type = types.OrderTypeMarket
+			o.ExecutedQuantity = o.Quantity
+			o.Price = priceF
+			o.Status = types.OrderStatusFilled
+			closedOrders = append(closedOrders, o)
+
+			trade := m.newTradeFromOrder(o, false)
+			m.executeTrade(trade)
+
+			trades = append(trades, trade)
+
+			m.EmitOrderUpdate(o)
+
+		case types.OrderTypeStopLimit:
+			// should we trigger the order?
+			if priceF <= o.StopPrice {
+				askOrders = append(askOrders, o)
+				break
+			}
+
+			o.Type = types.OrderTypeLimit
+
+			// is it a taker order?
+			if priceF >= o.Price {
 				o.ExecutedQuantity = o.Quantity
-				o.Price = priceF
 				o.Status = types.OrderStatusFilled
 				closedOrders = append(closedOrders, o)
 
@@ -255,29 +284,7 @@ func (m *SimplePriceMatching) BuyToPrice(price fixedpoint.Value) (closedOrders [
 
 				m.EmitOrderUpdate(o)
 			} else {
-				askOrders = append(askOrders, o)
-			}
-
-		case types.OrderTypeStopLimit:
-			// should we trigger the order
-			if priceF >= o.StopPrice {
-				o.Type = types.OrderTypeLimit
-
-				if priceF >= o.Price {
-					o.ExecutedQuantity = o.Quantity
-					o.Status = types.OrderStatusFilled
-					closedOrders = append(closedOrders, o)
-
-					trade := m.newTradeFromOrder(o, false)
-					m.executeTrade(trade)
-
-					trades = append(trades, trade)
-
-					m.EmitOrderUpdate(o)
-				} else {
-					askOrders = append(askOrders, o)
-				}
-			} else {
+				// maker order
 				askOrders = append(askOrders, o)
 			}
 

@@ -21,10 +21,12 @@ func newLimitOrder(symbol string, side types.SideType, price, quantity float64) 
 	}
 }
 
-func TestSimplePriceMatching(t *testing.T) {
-	account := types.NewAccount()
-	account.MakerCommission = 15
-	account.TakerCommission = 15
+func TestSimplePriceMatching_LimitOrder(t *testing.T) {
+	account := &types.Account{
+		MakerCommission: 15,
+		TakerCommission: 15,
+	}
+
 	account.UpdateBalances(types.BalanceMap{
 		"USDT": {Currency: "USDT", Available: 1000000.0},
 		"BTC":  {Currency: "BTC", Available: 100.0},
