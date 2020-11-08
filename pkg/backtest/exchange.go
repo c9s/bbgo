@@ -86,13 +86,10 @@ func (e *Exchange) NewStream() types.Stream {
 	})
 
 	for _, symbol := range e.config.Symbols {
-		matching := &SimplePriceMatching{
-			Symbol:      symbol,
+		e.matchingBooks[symbol] = &SimplePriceMatching{
 			CurrentTime: e.startTime,
 			Account:     e.config.Account,
 		}
-		matching.BindStream(e.stream)
-		e.matchingBooks[symbol] = matching
 	}
 
 	return e.stream
@@ -155,9 +152,12 @@ func (e Exchange) CancelOrders(ctx context.Context, orders ...types.Order) error
 		if !ok {
 			return errors.Errorf("matching engine is not initialized for symbol %s", order.Symbol)
 		}
-		if err := matching.CancelOrder(order); err != nil {
+		canceledOrder, err := matching.CancelOrder(order)
+		if err != nil {
 			return err
 		}
+
+		e.stream.EmitOrderUpdate(canceledOrder)
 	}
 
 	return nil

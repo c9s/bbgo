@@ -1,6 +1,7 @@
 package backtest
 
 import (
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -18,15 +19,21 @@ import (
 const DefaultFeeRate = 0.15 * 0.001
 
 var orderID uint64 = 1
+var tradeID uint64 = 1
 
 func incOrderID() uint64 {
 	return atomic.AddUint64(&orderID, 1)
+}
+
+func incTradeID() uint64 {
+	return atomic.AddUint64(&tradeID, 1)
 }
 
 // SimplePriceMatching implements a simple kline data driven matching engine for backtest
 type SimplePriceMatching struct {
 	Symbol string
 
+	mu        sync.Mutex
 	bidOrders []types.Order
 	askOrders []types.Order
 
@@ -36,12 +43,13 @@ type SimplePriceMatching struct {
 	Account bbgo.BacktestAccount
 }
 
-func (m *SimplePriceMatching) CancelOrder(o types.Order) error {
+func (m *SimplePriceMatching) CancelOrder(o types.Order) (types.Order, error) {
 	found := false
 
 	switch o.Side {
 
 	case types.SideTypeBuy:
+		m.mu.Lock()
 		var orders []types.Order
 		for _, order := range m.bidOrders {
 			if o.OrderID == order.OrderID {
@@ -51,8 +59,10 @@ func (m *SimplePriceMatching) CancelOrder(o types.Order) error {
 			orders = append(orders, order)
 		}
 		m.bidOrders = orders
+		m.mu.Unlock()
 
 	case types.SideTypeSell:
+		m.mu.Lock()
 		var orders []types.Order
 		for _, order := range m.bidOrders {
 			if o.OrderID == order.OrderID {
@@ -62,13 +72,16 @@ func (m *SimplePriceMatching) CancelOrder(o types.Order) error {
 			orders = append(orders, order)
 		}
 		m.bidOrders = orders
+		m.mu.Unlock()
 
 	}
 
 	if !found {
-		return errors.Errorf("cancel order failed, order not found")
+		return o, errors.Errorf("cancel order failed, order not found")
 	}
-	return nil
+
+	o.Status = types.OrderStatusCanceled
+	return o, nil
 }
 
 func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (closedOrders *types.Order, trades *types.Trade, err error) {
@@ -89,11 +102,14 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (closedOrders *typ
 	switch o.Side {
 
 	case types.SideTypeBuy:
+		m.mu.Lock()
 		m.bidOrders = append(m.bidOrders, order)
+		m.mu.Unlock()
 
 	case types.SideTypeSell:
+		m.mu.Lock()
 		m.askOrders = append(m.askOrders, order)
-
+		m.mu.Unlock()
 	}
 
 	return &order, nil, nil
@@ -109,8 +125,9 @@ func (m *SimplePriceMatching) newTradeFromOrder(order types.Order, isMaker bool)
 		commission = 0.0001 * float64(m.Account.TakerCommission) // binance uses 10~15
 	}
 
+	var id = incTradeID()
 	return types.Trade{
-		ID:            0,
+		ID:            int64(id),
 		OrderID:       order.OrderID,
 		Exchange:      "backtest",
 		Price:         order.Price,
@@ -251,39 +268,44 @@ func (m *SimplePriceMatching) SellToPrice(price fixedpoint.Value) (closedOrders 
 	return closedOrders, trades
 }
 
-func (m *SimplePriceMatching) BindStream(stream types.Stream) {
-	stream.OnKLineClosed(func(kline types.KLine) {
-		if kline.Interval != types.Interval1m {
-			return
+func emitTxn(stream *Stream, trades []types.Trade, orders []types.Order) {
+	for _, t := range trades {
+		stream.EmitTradeUpdate(t)
+	}
+	for _, o := range orders {
+		stream.EmitOrderUpdate(o)
+	}
+}
+func (m *SimplePriceMatching) processKLine(stream *Stream, kline types.KLine) {
+	m.CurrentTime = kline.EndTime
+
+	switch kline.GetTrend() {
+	case types.TrendDown:
+		if kline.High > kline.Open {
+			orders, trades := m.BuyToPrice(fixedpoint.NewFromFloat(kline.High))
+			emitTxn(stream, trades, orders)
 		}
-		if kline.Symbol != m.Symbol {
-			return
+
+		if kline.Low > kline.Close {
+			orders, trades := m.SellToPrice(fixedpoint.NewFromFloat(kline.Low))
+			emitTxn(stream, trades, orders)
+		}
+		orders, trades := m.SellToPrice(fixedpoint.NewFromFloat(kline.Close))
+		emitTxn(stream, trades, orders)
+
+	case types.TrendUp:
+		if kline.Low < kline.Open {
+			orders, trades := m.SellToPrice(fixedpoint.NewFromFloat(kline.Low))
+			emitTxn(stream, trades, orders)
 		}
 
-		m.CurrentTime = kline.EndTime
-
-		switch kline.GetTrend() {
-		case types.TrendDown:
-			if kline.High > kline.Open {
-				m.BuyToPrice(fixedpoint.NewFromFloat(kline.High))
-			}
-
-			if kline.Low > kline.Close {
-				m.SellToPrice(fixedpoint.NewFromFloat(kline.Low))
-			}
-			m.SellToPrice(fixedpoint.NewFromFloat(kline.Close))
-
-		case types.TrendUp:
-			if kline.Low < kline.Open {
-				m.SellToPrice(fixedpoint.NewFromFloat(kline.Low))
-			}
-
-			if kline.High > kline.Close {
-				m.BuyToPrice(fixedpoint.NewFromFloat(kline.High))
-			}
-			m.BuyToPrice(fixedpoint.NewFromFloat(kline.Close))
+		if kline.High > kline.Close {
+			orders, trades := m.BuyToPrice(fixedpoint.NewFromFloat(kline.High))
+			emitTxn(stream, trades, orders)
 		}
-	})
+		orders, trades := m.BuyToPrice(fixedpoint.NewFromFloat(kline.Close))
+		emitTxn(stream, trades, orders)
+	}
 }
 
 type Matching struct {
@@ -311,9 +333,9 @@ func (m *Matching) PlaceOrder(o types.SubmitOrder) {
 
 func newOrder(o types.SubmitOrder, orderID uint64, creationTime time.Time) types.Order {
 	return types.Order{
+		OrderID:          orderID,
 		SubmitOrder:      o,
 		Exchange:         "backtest",
-		OrderID:          orderID,
 		Status:           types.OrderStatusNew,
 		ExecutedQuantity: 0,
 		IsWorking:        false,
