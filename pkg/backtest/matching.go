@@ -133,25 +133,27 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (closedOrders *typ
 		}
 	}
 
+	m.EmitAccountUpdate(m.Account.Balances())
+
+	order := m.newOrder(o, orderID)
+
 	if o.Type == types.OrderTypeMarket {
-		order := m.newOrder(o, orderID)
 		m.EmitOrderUpdate(order)
 
 		// emit trade before we publish order
 		trade := m.newTradeFromOrder(order, false)
-		if err := m.executeTrade(trade); err != nil {
-			return nil, nil, err
-		}
+		m.executeTrade(trade)
 
 		// update the order status
 		order.Status = types.OrderStatusFilled
 		order.ExecutedQuantity = order.Quantity
 		order.Price = price
 		m.EmitOrderUpdate(order)
+		m.EmitAccountUpdate(m.Account.Balances())
 		return &order, &trade, nil
 	}
 
-	order := m.newOrder(o, orderID)
+	// for limit maker orders
 	switch o.Side {
 
 	case types.SideTypeBuy:
@@ -170,7 +172,8 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (closedOrders *typ
 	return &order, nil, nil
 }
 
-func (m *SimplePriceMatching) executeTrade(trade types.Trade) (err error) {
+func (m *SimplePriceMatching) executeTrade(trade types.Trade) {
+	var err error
 	// execute trade, update account balances
 	if trade.IsBuyer {
 		quote := trade.Price * trade.Quantity
@@ -179,12 +182,13 @@ func (m *SimplePriceMatching) executeTrade(trade types.Trade) (err error) {
 		err = m.Account.UseLockedBalance(m.Market.BaseCurrency, trade.Quantity)
 	}
 
-	if err == nil {
-		m.EmitTradeUpdate(trade)
-		m.EmitAccountUpdate(m.Account.Balances())
+	if err != nil {
+		panic(errors.Wrapf(err, "executeTrade exception, wanted to use more than the locked balance"))
 	}
 
-	return err
+	m.EmitTradeUpdate(trade)
+	m.EmitAccountUpdate(m.Account.Balances())
+	return
 }
 
 func (m *SimplePriceMatching) newTradeFromOrder(order types.Order, isMaker bool) types.Trade {
@@ -245,9 +249,8 @@ func (m *SimplePriceMatching) BuyToPrice(price fixedpoint.Value) (closedOrders [
 				closedOrders = append(closedOrders, o)
 
 				trade := m.newTradeFromOrder(o, false)
+				m.executeTrade(trade)
 
-				if err := m.executeTrade(trade); err != nil {
-				}
 				trades = append(trades, trade)
 
 				m.EmitOrderUpdate(o)
@@ -266,8 +269,8 @@ func (m *SimplePriceMatching) BuyToPrice(price fixedpoint.Value) (closedOrders [
 					closedOrders = append(closedOrders, o)
 
 					trade := m.newTradeFromOrder(o, false)
-					if err := m.executeTrade(trade); err != nil {
-					}
+					m.executeTrade(trade)
+
 					trades = append(trades, trade)
 
 					m.EmitOrderUpdate(o)
@@ -285,8 +288,8 @@ func (m *SimplePriceMatching) BuyToPrice(price fixedpoint.Value) (closedOrders [
 				closedOrders = append(closedOrders, o)
 
 				trade := m.newTradeFromOrder(o, true)
-				if err := m.executeTrade(trade); err != nil {
-				}
+				m.executeTrade(trade)
+
 				trades = append(trades, trade)
 
 				m.EmitOrderUpdate(o)
@@ -321,9 +324,7 @@ func (m *SimplePriceMatching) SellToPrice(price fixedpoint.Value) (closedOrders 
 				closedOrders = append(closedOrders, o)
 
 				trade := m.newTradeFromOrder(o, false)
-				if err := m.executeTrade(trade); err != nil {
-
-				}
+				m.executeTrade(trade)
 
 				trades = append(trades, trade)
 
@@ -343,9 +344,8 @@ func (m *SimplePriceMatching) SellToPrice(price fixedpoint.Value) (closedOrders 
 					closedOrders = append(closedOrders, o)
 
 					trade := m.newTradeFromOrder(o, false)
-					if err := m.executeTrade(trade); err != nil {
+					m.executeTrade(trade)
 
-					}
 					trades = append(trades, trade)
 					m.EmitOrderUpdate(o)
 
@@ -363,9 +363,8 @@ func (m *SimplePriceMatching) SellToPrice(price fixedpoint.Value) (closedOrders 
 				closedOrders = append(closedOrders, o)
 
 				trade := m.newTradeFromOrder(o, true)
-				if err := m.executeTrade(trade); err != nil {
+				m.executeTrade(trade)
 
-				}
 				trades = append(trades, trade)
 
 				m.EmitOrderUpdate(o)
