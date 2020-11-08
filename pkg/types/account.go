@@ -3,6 +3,7 @@ package types
 import (
 	"sync"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/util"
@@ -52,26 +53,66 @@ func (a *Account) Balance(currency string) (balance Balance, ok bool) {
 	return balance, ok
 }
 
-func (a *Account) UnlockBalance(currency string, unlocked float64) bool {
+func (a *Account) AddBalance(currency string, fund float64) error {
 	a.Lock()
+	defer a.Unlock()
+
 	balance, ok := a.balances[currency]
 	if ok {
-		balance.Locked -= unlocked
-		balance.Available += unlocked
+		balance.Available += fund
+		a.balances[currency] = balance
+		return nil
 	}
-	a.Unlock()
-	return ok
+
+	a.balances[currency] = Balance{
+		Currency:  currency,
+		Available: fund,
+		Locked:    0,
+	}
+	return nil
 }
 
-func (a *Account) LockBalance(currency string, locked float64) bool {
+func (a *Account) UseLockedBalance(currency string, fund float64) error {
 	a.Lock()
+	defer a.Unlock()
+
 	balance, ok := a.balances[currency]
-	if ok {
+	if ok && balance.Locked >= fund {
+		balance.Locked -= fund
+		a.balances[currency] = balance
+		return nil
+	}
+
+	return errors.Errorf("trying to use more than locked: locked %f < want to use %f", balance.Locked, fund)
+}
+
+func (a *Account) UnlockBalance(currency string, unlocked float64) error {
+	a.Lock()
+	defer a.Unlock()
+	balance, ok := a.balances[currency]
+	if ok && balance.Locked >= unlocked {
+		balance.Locked -= unlocked
+		balance.Available += unlocked
+		a.balances[currency] = balance
+		return nil
+	}
+
+	return errors.Errorf("trying to unlocked more than locked: locked %f < want to unlock %f", balance.Locked, unlocked)
+}
+
+func (a *Account) LockBalance(currency string, locked float64) error {
+	a.Lock()
+	defer a.Unlock()
+
+	balance, ok := a.balances[currency]
+	if ok && balance.Available >= locked {
 		balance.Locked += locked
 		balance.Available -= locked
+		a.balances[currency] = balance
+		return nil
 	}
-	a.Unlock()
-	return ok
+
+	return errors.Errorf("insufficient available balance for lock %f", locked)
 }
 
 func (a *Account) UpdateBalances(balances map[string]Balance) {
