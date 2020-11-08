@@ -89,6 +89,7 @@ func (e *Exchange) NewStream() types.Stream {
 		matching := &SimplePriceMatching{
 			Symbol:      symbol,
 			CurrentTime: e.startTime,
+			Account:     e.config.Account,
 		}
 		matching.BindStream(e.stream)
 		e.matchingBooks[symbol] = matching

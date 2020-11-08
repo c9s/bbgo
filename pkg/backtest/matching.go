@@ -6,9 +6,16 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/c9s/bbgo/pkg/bbgo"
+
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
+
+// DefaultFeeRate set the fee rate for most cases
+// BINANCE uses 0.1% for both maker and taker
+// MAX uses 0.050% for maker and 0.15% for taker
+const DefaultFeeRate = 0.15 * 0.001
 
 var orderID uint64 = 1
 
@@ -25,6 +32,8 @@ type SimplePriceMatching struct {
 
 	LastPrice   fixedpoint.Value
 	CurrentTime time.Time
+
+	Account bbgo.BacktestAccount
 }
 
 func (m *SimplePriceMatching) CancelOrder(o types.Order) error {
@@ -91,6 +100,15 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (closedOrders *typ
 }
 
 func (m *SimplePriceMatching) newTradeFromOrder(order types.Order, isMaker bool) types.Trade {
+	// BINANCE uses 0.1% for both maker and taker
+	// MAX uses 0.050% for maker and 0.15% for taker
+	var commission = DefaultFeeRate
+	if isMaker && m.Account.MakerCommission > 0 {
+		commission = 0.0001 * float64(m.Account.MakerCommission) // binance uses 10~15
+	} else if m.Account.TakerCommission > 0 {
+		commission = 0.0001 * float64(m.Account.TakerCommission) // binance uses 10~15
+	}
+
 	return types.Trade{
 		ID:            0,
 		OrderID:       order.OrderID,
@@ -103,7 +121,7 @@ func (m *SimplePriceMatching) newTradeFromOrder(order types.Order, isMaker bool)
 		IsBuyer:       order.Side == types.SideTypeBuy,
 		IsMaker:       isMaker,
 		Time:          m.CurrentTime,
-		Fee:           order.Quantity * order.Price * 0.0015,
+		Fee:           order.Quantity * order.Price * commission,
 		FeeCurrency:   "USDT",
 	}
 }
