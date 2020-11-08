@@ -77,14 +77,7 @@ func (environ *Environment) AddExchange(name string, exchange types.Exchange) (s
 func (environ *Environment) Init(ctx context.Context) (err error) {
 	for n := range environ.sessions {
 		var session = environ.sessions[n]
-		var markets types.MarketMap
-
-		err = WithCache(fmt.Sprintf("%s-markets", session.Exchange.Name()), &markets, func() (interface{}, error) {
-			return session.Exchange.QueryMarkets(ctx)
-		})
-		if err != nil {
-			return err
-		}
+		var markets, err = LoadExchangeMarketsWithCache(ctx, session.Exchange)
 
 		if len(markets) == 0 {
 			return errors.Errorf("market config should not be empty")
@@ -174,7 +167,7 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 				}
 
 				// update last prices by the given kline
-				lastKLine := kLines[len(kLines) - 1]
+				lastKLine := kLines[len(kLines)-1]
 				if lastPriceTime == emptyTime {
 					session.lastPrices[symbol] = lastKLine.Close
 					lastPriceTime = lastKLine.EndTime
@@ -375,4 +368,11 @@ func (environ *Environment) Connect(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func LoadExchangeMarketsWithCache(ctx context.Context, ex types.Exchange) (markets types.MarketMap, err error) {
+	err = WithCache(fmt.Sprintf("%s-markets", ex.Name()), &markets, func() (interface{}, error) {
+		return ex.QueryMarkets(ctx)
+	})
+	return markets, err
 }

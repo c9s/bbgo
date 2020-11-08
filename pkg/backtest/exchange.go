@@ -27,6 +27,7 @@ type Exchange struct {
 	trades        map[string][]types.Trade
 	closedOrders  map[string][]types.Order
 	matchingBooks map[string]*SimplePriceMatching
+	markets       types.MarketMap
 	doneC         chan struct{}
 }
 
@@ -38,6 +39,11 @@ func NewExchange(sourceName types.ExchangeName, srv *service.BacktestService, co
 
 	if config == nil {
 		panic(errors.New("backtest config can not be nil"))
+	}
+
+	markets, err := bbgo.LoadExchangeMarketsWithCache(context.Background(), ex)
+	if err != nil {
+		panic(err)
 	}
 
 	startTime, err := config.ParseStartTime()
@@ -57,6 +63,7 @@ func NewExchange(sourceName types.ExchangeName, srv *service.BacktestService, co
 	e := &Exchange{
 		sourceName:     sourceName,
 		publicExchange: ex,
+		markets:        markets,
 		srv:            srv,
 		config:         config,
 		account:        account,
@@ -86,9 +93,17 @@ func (e *Exchange) NewStream() types.Stream {
 	})
 
 	for _, symbol := range e.config.Symbols {
+		market, ok := e.markets[symbol]
+		if !ok {
+			panic(errors.Errorf("market %s is undefined", symbol))
+		}
+
 		e.matchingBooks[symbol] = &SimplePriceMatching{
-			CurrentTime: e.startTime,
-			Account:     e.config.Account,
+			CurrentTime:     e.startTime,
+			Account:         e.account,
+			Market:          market,
+			MakerCommission: e.config.Account.MakerCommission,
+			TakerCommission: e.config.Account.TakerCommission,
 		}
 	}
 
@@ -102,6 +117,7 @@ func (e Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder)
 		if !ok {
 			return nil, errors.Errorf("matching engine is not initialized for symbol %s", symbol)
 		}
+
 
 		createdOrder, trade, err := matching.PlaceOrder(order)
 		if err != nil {
