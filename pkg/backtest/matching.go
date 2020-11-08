@@ -7,8 +7,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/c9s/bbgo/pkg/bbgo"
-
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -32,6 +30,7 @@ func incTradeID() uint64 {
 // SimplePriceMatching implements a simple kline data driven matching engine for backtest
 type SimplePriceMatching struct {
 	Symbol string
+	Market types.Market
 
 	mu        sync.Mutex
 	bidOrders []types.Order
@@ -40,7 +39,10 @@ type SimplePriceMatching struct {
 	LastPrice   fixedpoint.Value
 	CurrentTime time.Time
 
-	Account bbgo.BacktestAccount
+	Account *types.Account
+
+	MakerCommission  int                       `json:"makerCommission"`
+	TakerCommission  int                       `json:"takerCommission"`
 }
 
 func (m *SimplePriceMatching) CancelOrder(o types.Order) (types.Order, error) {
@@ -88,15 +90,42 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (closedOrders *typ
 	// start from one
 	orderID := incOrderID()
 
+	// price for checking account balance
+	price := o.Price
+	switch o.Type {
+	case types.OrderTypeMarket:
+		price = m.LastPrice.Float64()
+	case types.OrderTypeLimit:
+		price = o.Price
+	}
+
+	switch o.Side {
+	case types.SideTypeBuy:
+		quote := price * o.Quantity
+		quoteBalance, ok := m.Account.Balance(m.Market.QuoteCurrency)
+		if !ok || quote > quoteBalance.Available {
+			return nil, nil, errors.Errorf("insufficient available quote balance")
+		}
+
+	case types.SideTypeSell:
+		baseQuantity := o.Quantity
+		baseBalance, ok := m.Account.Balance(m.Market.BaseCurrency)
+		if !ok || baseQuantity > baseBalance.Available {
+			return nil, nil, errors.Errorf("insufficient available base balance")
+		}
+	}
+
 	if o.Type == types.OrderTypeMarket {
 		order := newOrder(o, orderID, m.CurrentTime)
 		order.Status = types.OrderStatusFilled
 		order.ExecutedQuantity = order.Quantity
-		order.Price = m.LastPrice.Float64()
+		order.Price = price
 
 		trade := m.newTradeFromOrder(order, false)
 		return &order, &trade, nil
 	}
+
+
 
 	order := newOrder(o, orderID, m.CurrentTime)
 	switch o.Side {
@@ -125,6 +154,21 @@ func (m *SimplePriceMatching) newTradeFromOrder(order types.Order, isMaker bool)
 		commission = 0.0001 * float64(m.Account.TakerCommission) // binance uses 10~15
 	}
 
+	var fee float64
+	var feeCurrency string
+
+	switch order.Side {
+
+	case types.SideTypeBuy:
+		fee = order.Quantity * commission
+		feeCurrency = m.Market.BaseCurrency
+
+	case types.SideTypeSell:
+		fee = order.Quantity * order.Price * commission
+		feeCurrency = m.Market.QuoteCurrency
+
+	}
+
 	var id = incTradeID()
 	return types.Trade{
 		ID:            int64(id),
@@ -138,8 +182,8 @@ func (m *SimplePriceMatching) newTradeFromOrder(order types.Order, isMaker bool)
 		IsBuyer:       order.Side == types.SideTypeBuy,
 		IsMaker:       isMaker,
 		Time:          m.CurrentTime,
-		Fee:           order.Quantity * order.Price * commission,
-		FeeCurrency:   "USDT",
+		Fee:           fee,
+		FeeCurrency:   feeCurrency,
 	}
 }
 

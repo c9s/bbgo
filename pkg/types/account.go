@@ -19,11 +19,17 @@ type BalanceMap map[string]Balance
 type Account struct {
 	sync.Mutex
 
-	MakerCommission int `json:"makerCommission"`
-	TakerCommission int `json:"takerCommission"`
+	MakerCommission int    `json:"makerCommission"`
+	TakerCommission int    `json:"takerCommission"`
 	AccountType     string `json:"accountType"`
 
 	balances BalanceMap
+}
+
+func NewAccount() *Account {
+	return &Account{
+		balances: make(BalanceMap),
+	}
 }
 
 // Balances lock the balances and returned the copied balances

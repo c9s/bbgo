@@ -22,8 +22,30 @@ func newLimitOrder(symbol string, side types.SideType, price, quantity float64) 
 }
 
 func TestSimplePriceMatching(t *testing.T) {
+	account := types.NewAccount()
+	account.MakerCommission = 15
+	account.TakerCommission = 15
+	account.UpdateBalances(types.BalanceMap{
+		"USDT": {Currency: "USDT", Available: 1000000.0},
+		"BTC":  {Currency: "BTC", Available: 100.0},
+	})
+
+	market := types.Market{
+		Symbol:          "BTCUSDT",
+		PricePrecision:  8,
+		VolumePrecision: 8,
+		QuoteCurrency:   "USDT",
+		BaseCurrency:    "BTC",
+		MinNotional:     0.001,
+		MinAmount:       10.0,
+		MinLot:          0.001,
+		MinQuantity:     0.001,
+	}
+
 	engine := &SimplePriceMatching{
 		CurrentTime: time.Now(),
+		Account:     account,
+		Market:      market,
 	}
 
 	for i := 0; i < 5; i++ {
