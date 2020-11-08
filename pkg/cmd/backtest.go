@@ -52,6 +52,11 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
+		exchange, err := cmdutil.NewExchange(exchangeName)
+		if err != nil {
+			return err
+		}
+
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
@@ -77,7 +82,7 @@ var BacktestCmd = &cobra.Command{
 
 		backtestService := &service.BacktestService{DB: db}
 
-		exchange := backtest.NewExchange(exchangeName, backtestService, userConfig.Backtest)
+		backtestExchange := backtest.NewExchange(exchangeName, backtestService, userConfig.Backtest)
 
 		if wantSync {
 			for _, symbol := range userConfig.Backtest.Symbols {
@@ -88,7 +93,7 @@ var BacktestCmd = &cobra.Command{
 		}
 
 		environ := bbgo.NewEnvironment()
-		environ.AddExchange(exchangeName.String(), exchange)
+		environ.AddExchange(exchangeName.String(), backtestExchange)
 
 		environ.Notifiability = bbgo.Notifiability{
 			SymbolChannelRouter:  bbgo.NewPatternChannelRouter(nil),
@@ -114,11 +119,11 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
-		<-exchange.Done()
+		<-backtestExchange.Done()
 
 		for _, session := range environ.Sessions() {
 			calculator := &pnl.AverageCostCalculator{
-				TradingFeeCurrency: exchange.PlatformFeeCurrency(),
+				TradingFeeCurrency: backtestExchange.PlatformFeeCurrency(),
 			}
 			for symbol, trades := range session.Trades {
 				lastPrice, ok := session.LastPrice(symbol)
