@@ -51,6 +51,14 @@ func (s *Stream) Connect(ctx context.Context) error {
 	go func() {
 		klineC, errC := s.exchange.srv.QueryKLinesCh(s.exchange.startTime, s.exchange, symbols, intervals)
 		for k := range klineC {
+			if k.Interval == types.Interval1m {
+				matching, ok := s.exchange.matchingBooks[k.Symbol]
+				if !ok {
+					log.Error("matching book of %s is not initialized", k.Symbol)
+				}
+				matching.processKLine(s, k)
+			}
+
 			s.EmitKLineClosed(k)
 		}
 
