@@ -52,6 +52,28 @@ func (a *Account) Balance(currency string) (balance Balance, ok bool) {
 	return balance, ok
 }
 
+func (a *Account) UnlockBalance(currency string, unlocked float64) bool {
+	a.Lock()
+	balance, ok := a.balances[currency]
+	if ok {
+		balance.Locked -= unlocked
+		balance.Available += unlocked
+	}
+	a.Unlock()
+	return ok
+}
+
+func (a *Account) LockBalance(currency string, locked float64) bool {
+	a.Lock()
+	balance, ok := a.balances[currency]
+	if ok {
+		balance.Locked += locked
+		balance.Available -= locked
+	}
+	a.Unlock()
+	return ok
+}
+
 func (a *Account) UpdateBalances(balances map[string]Balance) {
 	a.Lock()
 	defer a.Unlock()
