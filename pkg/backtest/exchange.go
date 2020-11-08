@@ -14,7 +14,7 @@ import (
 )
 
 type Exchange struct {
-	sourceExchange types.ExchangeName
+	sourceName     types.ExchangeName
 	publicExchange types.Exchange
 	srv            *service.BacktestService
 	startTime      time.Time
@@ -30,8 +30,8 @@ type Exchange struct {
 	doneC         chan struct{}
 }
 
-func NewExchange(sourceExchange types.ExchangeName, srv *service.BacktestService, config *bbgo.Backtest) *Exchange {
-	ex, err := newPublicExchange(sourceExchange)
+func NewExchange(sourceName types.ExchangeName, srv *service.BacktestService, config *bbgo.Backtest) *Exchange {
+	ex, err := newPublicExchange(sourceName)
 	if err != nil {
 		panic(err)
 	}
@@ -55,7 +55,7 @@ func NewExchange(sourceExchange types.ExchangeName, srv *service.BacktestService
 	account.UpdateBalances(balances)
 
 	e := &Exchange{
-		sourceExchange: sourceExchange,
+		sourceName:     sourceName,
 		publicExchange: ex,
 		srv:            srv,
 		config:         config,
@@ -171,7 +171,14 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 }
 
 func (e Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
-	return e.publicExchange.QueryKLines(ctx, symbol, interval, options)
+	if options.EndTime != nil {
+		return e.srv.QueryKLinesBackward(e.sourceName, symbol, interval, *options.EndTime)
+	}
+	if options.StartTime != nil {
+		return e.srv.QueryKLinesForward(e.sourceName, symbol, interval, *options.StartTime)
+	}
+
+	return nil, errors.New("endTime or startTime can not be nil")
 }
 
 func (e Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) ([]types.Trade, error) {

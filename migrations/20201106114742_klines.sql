@@ -2,7 +2,7 @@
 CREATE TABLE `klines`
 (
     `gid`           BIGINT UNSIGNED         NOT NULL AUTO_INCREMENT,
-
+    `exchange`      VARCHAR(10)             NOT NULL,
     `start_time`    DATETIME(3)             NOT NULL,
     `end_time`      DATETIME(3)             NOT NULL,
     `interval`      VARCHAR(3)              NOT NULL,
@@ -26,7 +26,7 @@ CREATE TABLE `binance_klines` LIKE `klines`;
 CREATE TABLE `max_klines` LIKE `klines`;
 
 -- +goose Down
-DROP INDEX klines_start_time_symbol_interval ON `klines`;
+DROP INDEX `klines_end_time_symbol_interval` ON `klines`;
 DROP TABLE `binance_klines`;
 DROP TABLE `okex_klines`;
 DROP TABLE `max_klines`;

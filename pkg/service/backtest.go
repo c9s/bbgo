@@ -83,6 +83,38 @@ func (s *BacktestService) QueryLast(ex types.ExchangeName, symbol string, interv
 	return nil, rows.Err()
 }
 
+func (s *BacktestService) QueryKLinesForward(exchange types.ExchangeName, symbol string, interval types.Interval, startTime time.Time) ([]types.KLine, error) {
+	sql := "SELECT * FROM `binance_klines` WHERE `end_time` >= :startTime AND `symbol` = :symbol AND `interval` = :interval ORDER BY end_time ASC"
+	sql = strings.ReplaceAll(sql, "binance_klines", exchange.String()+"_klines")
+
+	rows, err := s.DB.NamedQuery(sql, map[string]interface{}{
+		"startTime": startTime,
+		"symbol":    symbol,
+		"interval":  interval,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return s.scanRows(rows)
+}
+
+func (s *BacktestService) QueryKLinesBackward(exchange types.ExchangeName, symbol string, interval types.Interval, endTime time.Time) ([]types.KLine, error) {
+	sql := "SELECT * FROM `binance_klines` WHERE `end_time` <= :endTime AND `symbol` = :symbol AND `interval` = :interval ORDER BY end_time ASC"
+	sql = strings.ReplaceAll(sql, "binance_klines", exchange.String()+"_klines")
+
+	rows, err := s.DB.NamedQuery(sql, map[string]interface{}{
+		"endTime":  endTime,
+		"symbol":   symbol,
+		"interval": interval,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return s.scanRows(rows)
+}
+
 func (s *BacktestService) QueryKLinesCh(since time.Time, exchange types.Exchange, symbols []string, intervals []types.Interval) (chan types.KLine, chan error) {
 	sql := "SELECT * FROM `binance_klines` WHERE `end_time` >= :since AND `symbol` IN (:symbols) AND `interval` IN (:intervals) ORDER BY end_time ASC"
 	sql = strings.ReplaceAll(sql, "binance_klines", exchange.Name().String()+"_klines")
@@ -160,8 +192,8 @@ func (s *BacktestService) Insert(kline types.KLine) error {
 		return errors.New("kline.Exchange field should not be empty")
 	}
 
-	sql := "INSERT INTO `binance_klines` (`start_time`, `end_time`, `symbol`, `interval`, `open`, `high`, `low`, `close`, `closed`, `volume`)" +
-		"VALUES (:start_time, :end_time, :symbol, :interval, :open, :high, :low, :close, :closed, :volume)"
+	sql := "INSERT INTO `binance_klines` (`exchange`, `start_time`, `end_time`, `symbol`, `interval`, `open`, `high`, `low`, `close`, `closed`, `volume`)" +
+		"VALUES (:exchange, :start_time, :end_time, :symbol, :interval, :open, :high, :low, :close, :closed, :volume)"
 	sql = strings.ReplaceAll(sql, "binance_klines", kline.Exchange+"_klines")
 
 	_, err := s.DB.NamedExec(sql, kline)
