@@ -30,6 +30,18 @@ var BacktestCmd = &cobra.Command{
 	Short:        "backtest your strategies",
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		log.SetLevel(log.ErrorLevel)
+		verboseCnt, err := cmd.Flags().GetCount("verbose")
+		if err != nil {
+			return err
+		}
+
+		if verboseCnt == 2 {
+			log.SetLevel(log.DebugLevel)
+		} else if verboseCnt > 0 {
+			log.SetLevel(log.InfoLevel)
+		}
+
 		configFile, err := cmd.Flags().GetString("config")
 		if err != nil {
 			return err
@@ -38,6 +50,7 @@ var BacktestCmd = &cobra.Command{
 		if len(configFile) == 0 {
 			return errors.New("--config option is required")
 		}
+
 
 		wantSync, err := cmd.Flags().GetBool("sync")
 		if err != nil {
@@ -117,18 +130,6 @@ var BacktestCmd = &cobra.Command{
 
 		if len(userConfig.CrossExchangeStrategies) > 0 {
 			log.Warnf("backtest does not support CrossExchangeStrategy, strategies won't be added.")
-		}
-
-		log.SetLevel(log.ErrorLevel)
-		verboseCnt, err := cmd.Flags().GetCount("verbose")
-		if err != nil {
-			return err
-		}
-
-		if verboseCnt == 2 {
-			log.SetLevel(log.DebugLevel)
-		} else if verboseCnt > 0 {
-			log.SetLevel(log.InfoLevel)
 		}
 
 		if err := trader.Run(ctx); err != nil {
