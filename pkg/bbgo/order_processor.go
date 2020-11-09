@@ -33,8 +33,8 @@ var (
 			}
 
 			if baseBalance, ok := tradingCtx.Balances[market.BaseCurrency]; ok {
-				if util.NotZero(p.MaxAssetBalance) && baseBalance.Available > p.MaxAssetBalance {
-					return errors.Wrapf(ErrAssetBalanceLevelTooHigh, "asset balance level is too high: %f > %f", baseBalance.Available, p.MaxAssetBalance)
+				if util.NotZero(p.MaxBaseAssetBalance) && baseBalance.Available > p.MaxBaseAssetBalance {
+					return errors.Wrapf(ErrAssetBalanceLevelTooHigh, "asset balance level is too high: %f > %f", baseBalance.Available, p.MaxBaseAssetBalance)
 				}
 			}
 
@@ -55,8 +55,8 @@ var (
 	case types.SideTypeSell:
 
 		if balance, ok := tradingCtx.Balances[market.BaseCurrency]; ok {
-			if util.NotZero(p.MinAssetBalance) && balance.Available < p.MinAssetBalance {
-				return errors.Wrapf(ErrAssetBalanceLevelTooLow, "asset balance level is too low: %f > %f", balance.Available, p.MinAssetBalance)
+			if util.NotZero(p.MinBaseAssetBalance) && balance.Available < p.MinBaseAssetBalance {
+				return errors.Wrapf(ErrAssetBalanceLevelTooLow, "asset balance level is too low: %f > %f", balance.Available, p.MinBaseAssetBalance)
 			}
 
 			quantity = adjustQuantityByMinAmount(quantity, currentPrice, market.MinNotional*1.01)
@@ -101,7 +101,8 @@ var (
 	order.QuantityString = market.FormatVolume(quantity)
 */
 
-func adjustQuantityByMinAmount(quantity float64, currentPrice float64, minAmount float64) float64 {
+// adjustQuantityByMinAmount adjusts the quantity to make the amount greater than the given minAmount
+func adjustQuantityByMinAmount(quantity, currentPrice, minAmount float64) float64 {
 	// modify quantity for the min amount
 	amount := currentPrice * quantity
 	if amount < minAmount {
@@ -112,8 +113,8 @@ func adjustQuantityByMinAmount(quantity float64, currentPrice float64, minAmount
 	return quantity
 }
 
-func adjustQuantityByMaxAmount(quantity float64, currentPrice float64, maxAmount float64) float64 {
-	amount := currentPrice * quantity
+func adjustQuantityByMaxAmount(quantity float64, price float64, maxAmount float64) float64 {
+	amount := price * quantity
 	if amount > maxAmount {
 		ratio := maxAmount / amount
 		quantity *= ratio
