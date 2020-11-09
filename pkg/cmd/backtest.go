@@ -20,6 +20,7 @@ import (
 func init() {
 	BacktestCmd.Flags().String("exchange", "", "target exchange")
 	BacktestCmd.Flags().Bool("sync", false, "sync backtest data")
+	BacktestCmd.Flags().CountP("verbose", "v", "verbose level")
 	BacktestCmd.Flags().String("config", "config/bbgo.yaml", "strategy config file")
 	RootCmd.AddCommand(BacktestCmd)
 }
@@ -103,6 +104,8 @@ var BacktestCmd = &cobra.Command{
 		}
 
 		trader := bbgo.NewTrader(environ)
+		trader.DisableLogging()
+
 		if userConfig.RiskControls != nil {
 			trader.SetRiskControls(userConfig.RiskControls)
 		}
@@ -114,6 +117,18 @@ var BacktestCmd = &cobra.Command{
 
 		if len(userConfig.CrossExchangeStrategies) > 0 {
 			log.Warnf("backtest does not support CrossExchangeStrategy, strategies won't be added.")
+		}
+
+		log.SetLevel(log.ErrorLevel)
+		verboseCnt, err := cmd.Flags().GetCount("verbose")
+		if err != nil {
+			return err
+		}
+
+		if verboseCnt == 2 {
+			log.SetLevel(log.DebugLevel)
+		} else if verboseCnt > 0 {
+			log.SetLevel(log.InfoLevel)
 		}
 
 		if err := trader.Run(ctx); err != nil {

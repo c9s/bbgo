@@ -147,6 +147,10 @@ func (trader *Trader) Run(ctx context.Context) error {
 				// get the struct element
 				rs = rs.Elem()
 
+				if err := injectField(rs, "Logger", &trader.logger, false); err != nil {
+					log.WithError(err).Errorf("strategy Logger injection failed")
+				}
+
 				if err := injectField(rs, "Notifiability", &trader.environment.Notifiability, false); err != nil {
 					log.WithError(err).Errorf("strategy Notifiability injection failed")
 				}

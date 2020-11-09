@@ -121,7 +121,6 @@ func (s *Strategy) updateBidOrders(orderExecutor bbgo.OrderExecutor, session *bb
 
 	orders, err := orderExecutor.SubmitOrders(context.Background(), submitOrders...)
 	if err != nil {
-		log.WithError(err).Error("submit bid order error")
 		return
 	}
 
@@ -166,11 +165,9 @@ func (s *Strategy) updateAskOrders(orderExecutor bbgo.OrderExecutor, session *bb
 
 	orders, err := orderExecutor.SubmitOrders(context.Background(), submitOrders...)
 	if err != nil {
-		log.WithError(err).Error("submit ask order error")
 		return
 	}
 
-	log.Infof("adding orders to the active ask order pool...")
 	s.activeOrders.Add(orders...)
 }
 
