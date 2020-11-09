@@ -1,9 +1,9 @@
 package types
 
 import (
+	"fmt"
 	"sync"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/util"
@@ -83,7 +83,7 @@ func (a *Account) UseLockedBalance(currency string, fund float64) error {
 		return nil
 	}
 
-	return errors.Errorf("trying to use more than locked: locked %f < want to use %f", balance.Locked, fund)
+	return fmt.Errorf("trying to use more than locked: locked %f < want to use %f", balance.Locked, fund)
 }
 
 func (a *Account) UnlockBalance(currency string, unlocked float64) error {
@@ -97,7 +97,7 @@ func (a *Account) UnlockBalance(currency string, unlocked float64) error {
 		return nil
 	}
 
-	return errors.Errorf("trying to unlocked more than locked: locked %f < want to unlock %f", balance.Locked, unlocked)
+	return fmt.Errorf("trying to unlocked more than locked: locked %f < want to unlock %f", balance.Locked, unlocked)
 }
 
 func (a *Account) LockBalance(currency string, locked float64) error {
@@ -112,7 +112,7 @@ func (a *Account) LockBalance(currency string, locked float64) error {
 		return nil
 	}
 
-	return errors.Errorf("insufficient available balance for lock %f", locked)
+	return fmt.Errorf("insufficient available balance for lock %f", locked)
 }
 
 func (a *Account) UpdateBalances(balances map[string]Balance) {

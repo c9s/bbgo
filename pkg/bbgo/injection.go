@@ -1,9 +1,9 @@
 package bbgo
 
 import (
+	"fmt"
 	"reflect"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -34,13 +34,13 @@ func injectField(rs reflect.Value, fieldName string, obj interface{}, pointerOnl
 	logrus.Infof("found %s in %s, injecting %T...", fieldName, rs.Type(), obj)
 
 	if !field.CanSet() {
-		return errors.Errorf("field %s of %s can not be set", fieldName, rs.Type())
+		return fmt.Errorf("field %s of %s can not be set", fieldName, rs.Type())
 	}
 
 	rv := reflect.ValueOf(obj)
 	if field.Kind() == reflect.Ptr {
 		if field.Type() != rv.Type() {
-			return errors.Errorf("field type mismatches: %s != %s", field.Type(), rv.Type())
+			return fmt.Errorf("field type mismatches: %s != %s", field.Type(), rv.Type())
 		}
 
 		field.Set(rv)
@@ -49,7 +49,7 @@ func injectField(rs reflect.Value, fieldName string, obj interface{}, pointerOnl
 	} else {
 		// set as value
 		if pointerOnly {
-			return errors.Errorf("field %s %s does not allow value assignment (pointer type only)", field.Type(), rv.Type())
+			return fmt.Errorf("field %s %s does not allow value assignment (pointer type only)", field.Type(), rv.Type())
 		}
 
 		field.Set(rv.Elem())

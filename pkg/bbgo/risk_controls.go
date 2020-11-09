@@ -21,12 +21,18 @@ func (e *RiskControlOrderExecutor) SubmitOrders(ctx context.Context, orders ...t
 	var symbolOrders = groupSubmitOrdersBySymbol(orders)
 	for symbol, orders := range symbolOrders {
 		if controller, ok := e.BySymbol[symbol]; ok && controller != nil {
-			orders, _ = controller.BasicRiskController.ProcessOrders(e.session, orders...)
+			var riskErrs []error
+			orders, riskErrs = controller.BasicRiskController.ProcessOrders(e.session, orders...)
+			for _, riskErr := range riskErrs {
+				// use logger from ExchangeOrderExecutor
+				e.logger.Warnf(riskErr.Error())
+			}
 		}
 
-		formattedOrders, _ := formatOrders(e.session, orders)
-
-		e.notifySubmitOrders(formattedOrders...)
+		formattedOrders, err := formatOrders(e.session, orders)
+		if err != nil {
+			return retOrders, err
+		}
 
 		retOrders2, err := e.ExchangeOrderExecutor.SubmitOrders(ctx, formattedOrders...)
 		if err != nil {

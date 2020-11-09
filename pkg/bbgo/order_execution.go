@@ -2,6 +2,7 @@ package bbgo
 
 import (
 	"context"
+	"fmt"
 	"math"
 
 	"github.com/pkg/errors"
@@ -20,7 +21,7 @@ type ExchangeOrderExecutionRouter struct {
 func (e *ExchangeOrderExecutionRouter) SubmitOrdersTo(ctx context.Context, session string, orders ...types.SubmitOrder) (types.OrderSlice, error) {
 	es, ok := e.sessions[session]
 	if !ok {
-		return nil, errors.Errorf("exchange session %s not found", session)
+		return nil, fmt.Errorf("exchange session %s not found", session)
 	}
 
 	formattedOrders, err := formatOrders(es, orders)
@@ -35,7 +36,12 @@ func (e *ExchangeOrderExecutionRouter) SubmitOrdersTo(ctx context.Context, sessi
 type ExchangeOrderExecutor struct {
 	Notifiability `json:"-"`
 
-	session *ExchangeSession `json:"-"`
+	session *ExchangeSession
+	logger  Logger
+}
+
+func (e *ExchangeOrderExecutor) SetLogger(logger Logger) {
+	e.logger = logger
 }
 
 func (e *ExchangeOrderExecutor) notifySubmitOrders(orders ...types.SubmitOrder) {
@@ -96,13 +102,13 @@ func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...
 	for _, order := range orders {
 		lastPrice, ok := session.LastPrice(order.Symbol)
 		if !ok {
-			addError(errors.Errorf("the last price of symbol %q is not found, order: %s", order.Symbol, order.String()))
+			addError(fmt.Errorf("the last price of symbol %q is not found, order: %s", order.Symbol, order.String()))
 			continue
 		}
 
 		market, ok := session.Market(order.Symbol)
 		if !ok {
-			addError(errors.Errorf("the market config of symbol %q is not found, order: %s", order.Symbol, order.String()))
+			addError(fmt.Errorf("the market config of symbol %q is not found, order: %s", order.Symbol, order.String()))
 			continue
 		}
 
@@ -118,7 +124,7 @@ func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...
 			// Critical conditions for placing buy orders
 			quoteBalance, ok := balances[market.QuoteCurrency]
 			if !ok {
-				addError(errors.Errorf("can not place buy order, quote balance %s not found", market.QuoteCurrency))
+				addError(fmt.Errorf("can not place buy order, quote balance %s not found", market.QuoteCurrency))
 				continue
 			}
 
@@ -172,7 +178,7 @@ func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...
 			notional := quantity * lastPrice
 			if notional < market.MinAmount {
 				addError(
-					errors.Errorf(
+					fmt.Errorf(
 						"can not place buy order, quote amount too small: notional %f < min amount %f, order: %s",
 						notional,
 						market.MinAmount,
@@ -187,7 +193,7 @@ func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...
 			baseAssetBalance, ok := balances[market.BaseCurrency]
 			if !ok {
 				addError(
-					errors.Errorf(
+					fmt.Errorf(
 						"can not place sell order, no base asset balance %s, order: %s",
 						market.BaseCurrency,
 						order.String()))
@@ -228,7 +234,7 @@ func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...
 			notional := quantity * lastPrice
 			if notional < market.MinNotional {
 				addError(
-					errors.Errorf(
+					fmt.Errorf(
 						"can not place sell order, notional %f < min notional: %f, order: %s",
 						notional,
 						market.MinNotional,
@@ -238,7 +244,7 @@ func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...
 
 			if quantity < market.MinLot {
 				addError(
-					errors.Errorf(
+					fmt.Errorf(
 						"can not place sell order, quantity %f is less than the minimal lot %f, order: %s",
 						quantity,
 						market.MinLot,
@@ -260,7 +266,7 @@ func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...
 func formatOrder(session *ExchangeSession, order types.SubmitOrder) (types.SubmitOrder, error) {
 	market, ok := session.Market(order.Symbol)
 	if !ok {
-		return order, errors.Errorf("market is not defined: %s", order.Symbol)
+		return order, fmt.Errorf("market is not defined: %s", order.Symbol)
 	}
 
 	order.Market = market

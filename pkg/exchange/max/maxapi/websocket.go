@@ -203,7 +203,7 @@ func (s *WebSocketService) dispatch(msg interface{}) {
 		s.EmitOrderUpdateEvent(*e)
 
 	default:
-		s.EmitError(errors.Errorf("unsupported %T event: %+v", e, e))
+		s.EmitError(fmt.Errorf("unsupported %T event: %+v", e, e))
 	}
 }
 

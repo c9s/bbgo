@@ -26,6 +26,23 @@ type CrossExchangeStrategy interface {
 	Run(ctx context.Context, orderExecutionRouter OrderExecutionRouter, sessions map[string]*ExchangeSession) error
 }
 
+type Logging interface {
+	EnableLogging()
+	DisableLogging()
+}
+
+type Logger interface {
+	Warnf(message string, args ...interface{})
+	Errorf(message string, args ...interface{})
+	Infof(message string, args ...interface{})
+}
+
+type SilentLogger struct{}
+
+func (logger *SilentLogger) Infof(message string, args ...interface{})  {}
+func (logger *SilentLogger) Warnf(message string, args ...interface{})  {}
+func (logger *SilentLogger) Errorf(message string, args ...interface{}) {}
+
 type Trader struct {
 	environment *Environment
 
@@ -33,13 +50,24 @@ type Trader struct {
 
 	crossExchangeStrategies []CrossExchangeStrategy
 	exchangeStrategies      map[string][]SingleExchangeStrategy
+
+	logger Logger
 }
 
 func NewTrader(environ *Environment) *Trader {
 	return &Trader{
 		environment:        environ,
 		exchangeStrategies: make(map[string][]SingleExchangeStrategy),
+		logger:             log.StandardLogger(),
 	}
+}
+
+func (trader *Trader) EnableLogging() {
+	trader.logger = log.StandardLogger()
+}
+
+func (trader *Trader) DisableLogging() {
+	trader.logger = &SilentLogger{}
 }
 
 // AttachStrategyOn attaches the single exchange strategy on an exchange session.
@@ -92,6 +120,7 @@ func (trader *Trader) Run(ctx context.Context) error {
 			// copy the environment notification system so that we can route
 			Notifiability: trader.environment.Notifiability,
 			session:       session,
+			logger:        trader.logger,
 		}
 
 		// default to base order executor

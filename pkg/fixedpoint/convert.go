@@ -2,10 +2,9 @@ package fixedpoint
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"strconv"
-
-	"github.com/pkg/errors"
 )
 
 const DefaultPrecision = 8
@@ -87,7 +86,7 @@ func (v *Value) UnmarshalJSON(data []byte) error {
 		*v = NewFromInt64(d)
 
 	default:
-		return errors.Errorf("unsupported type: %T %v", d, d)
+		return fmt.Errorf("unsupported type: %T %v", d, d)
 
 	}
 

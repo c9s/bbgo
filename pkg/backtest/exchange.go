@@ -2,6 +2,7 @@ package backtest
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
@@ -95,7 +96,7 @@ func (e *Exchange) NewStream() types.Stream {
 	for _, symbol := range e.config.Symbols {
 		market, ok := e.markets[symbol]
 		if !ok {
-			panic(errors.Errorf("market %s is undefined", symbol))
+			panic(fmt.Errorf("market %s is undefined", symbol))
 		}
 
 		e.matchingBooks[symbol] = &SimplePriceMatching{
@@ -115,7 +116,7 @@ func (e Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder)
 		symbol := order.Symbol
 		matching, ok := e.matchingBooks[symbol]
 		if !ok {
-			return nil, errors.Errorf("matching engine is not initialized for symbol %s", symbol)
+			return nil, fmt.Errorf("matching engine is not initialized for symbol %s", symbol)
 		}
 
 
@@ -147,7 +148,7 @@ func (e Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder)
 func (e Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
 	matching, ok := e.matchingBooks[symbol]
 	if !ok {
-		return nil, errors.Errorf("matching engine is not initialized for symbol %s", symbol)
+		return nil, fmt.Errorf("matching engine is not initialized for symbol %s", symbol)
 	}
 
 	return append(matching.bidOrders, matching.askOrders...), nil
@@ -156,7 +157,7 @@ func (e Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []
 func (e Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []types.Order, err error) {
 	orders, ok := e.closedOrders[symbol]
 	if !ok {
-		return orders, errors.Errorf("matching engine is not initialized for symbol %s", symbol)
+		return orders, fmt.Errorf("matching engine is not initialized for symbol %s", symbol)
 	}
 
 	return orders, nil
@@ -166,7 +167,7 @@ func (e Exchange) CancelOrders(ctx context.Context, orders ...types.Order) error
 	for _, order := range orders {
 		matching, ok := e.matchingBooks[order.Symbol]
 		if !ok {
-			return errors.Errorf("matching engine is not initialized for symbol %s", order.Symbol)
+			return fmt.Errorf("matching engine is not initialized for symbol %s", order.Symbol)
 		}
 		canceledOrder, err := matching.CancelOrder(order)
 		if err != nil {
@@ -231,5 +232,5 @@ func newPublicExchange(sourceExchange types.ExchangeName) (types.Exchange, error
 		return max.New("", ""), nil
 	}
 
-	return nil, errors.Errorf("exchange %s is not supported", sourceExchange)
+	return nil, fmt.Errorf("exchange %s is not supported", sourceExchange)
 }

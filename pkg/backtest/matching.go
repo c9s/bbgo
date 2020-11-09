@@ -1,6 +1,7 @@
 package backtest
 
 import (
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -85,7 +86,7 @@ func (m *SimplePriceMatching) CancelOrder(o types.Order) (types.Order, error) {
 	}
 
 	if !found {
-		return o, errors.Errorf("cancel order failed, order %d not found: %+v", o.OrderID, o)
+		return o, fmt.Errorf("cancel order failed, order %d not found: %+v", o.OrderID, o)
 	}
 
 	switch o.Side {
