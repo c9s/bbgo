@@ -2,6 +2,7 @@ package bbgo
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"reflect"
 	"time"
@@ -164,7 +165,7 @@ func loadCrossExchangeStrategies(config *Config, stash Stash) (err error) {
 	for _, entry := range configList {
 		configStash, ok := entry.(Stash)
 		if !ok {
-			return errors.Errorf("strategy config should be a map, given: %T %+v", entry, entry)
+			return fmt.Errorf("strategy config should be a map, given: %T %+v", entry, entry)
 		}
 
 		for id, conf := range configStash {
@@ -201,7 +202,7 @@ func loadExchangeStrategies(config *Config, stash Stash) (err error) {
 	for _, entry := range configList {
 		configStash, ok := entry.(Stash)
 		if !ok {
-			return errors.Errorf("strategy config should be a map, given: %T %+v", entry, entry)
+			return fmt.Errorf("strategy config should be a map, given: %T %+v", entry, entry)
 		}
 
 		var mounts []string

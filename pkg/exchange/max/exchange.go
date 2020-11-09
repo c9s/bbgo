@@ -2,6 +2,7 @@ package max
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"time"
 
@@ -147,7 +148,7 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 		} else if len(o.ClientOrderID) > 0 {
 			req.ClientOrderID(o.ClientOrderID)
 		} else {
-			return errors.Errorf("order id or client order id is not defined, order=%+v", o)
+			return fmt.Errorf("order id or client order id is not defined, order=%+v", o)
 		}
 
 		if err := req.Do(ctx); err != nil {

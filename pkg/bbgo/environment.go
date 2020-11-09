@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/accounting/pnl"
@@ -80,7 +79,7 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 		var markets, err = LoadExchangeMarketsWithCache(ctx, session.Exchange)
 
 		if len(markets) == 0 {
-			return errors.Errorf("market config should not be empty")
+			return fmt.Errorf("market config should not be empty")
 		}
 
 		session.markets = markets
@@ -148,7 +147,7 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 		for symbol := range session.loadedSymbols {
 			marketDataStore, ok := session.marketDataStores[symbol]
 			if !ok {
-				return errors.Errorf("symbol %s is not defined", symbol)
+				return fmt.Errorf("symbol %s is not defined", symbol)
 			}
 
 			var lastPriceTime time.Time

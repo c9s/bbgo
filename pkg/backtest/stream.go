@@ -2,8 +2,8 @@ package backtest
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/types"
@@ -32,7 +32,7 @@ func (s *Stream) Connect(ctx context.Context) error {
 			loadedIntervals[types.Interval(sub.Options.Interval)] = struct{}{}
 
 		default:
-			return errors.Errorf("stream channel %s is not supported in backtest", sub.Channel)
+			return fmt.Errorf("stream channel %s is not supported in backtest", sub.Channel)
 		}
 	}
 

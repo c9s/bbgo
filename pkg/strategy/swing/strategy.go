@@ -2,9 +2,9 @@ package swing
 
 import (
 	"context"
+	"fmt"
 	"math"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -92,7 +92,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		inc = s.StandardIndicatorSet.GetEWMA(iw)
 
 	default:
-		return errors.Errorf("unsupported moving average type: %s", s.MovingAverageType)
+		return fmt.Errorf("unsupported moving average type: %s", s.MovingAverageType)
 
 	}
 

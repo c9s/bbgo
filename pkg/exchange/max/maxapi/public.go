@@ -199,7 +199,7 @@ func ParseInterval(a string) (Interval, error) {
 
 	}
 
-	return 0, errors.Errorf("incorrect resolution: %q", a)
+	return 0, fmt.Errorf("incorrect resolution: %q", a)
 }
 
 type KLine struct {

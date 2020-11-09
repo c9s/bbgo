@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
@@ -128,7 +129,7 @@ var BacktestCmd = &cobra.Command{
 			for symbol, trades := range session.Trades {
 				lastPrice, ok := session.LastPrice(symbol)
 				if !ok {
-					return errors.Errorf("last price not found: %s", symbol)
+					return fmt.Errorf("last price not found: %s", symbol)
 				}
 
 				report := calculator.Calculate(symbol, trades, lastPrice)

@@ -1,6 +1,8 @@
 package cmdutil
 
 import (
+	"fmt"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 
@@ -35,7 +37,7 @@ func NewExchangeWithEnvVarPrefix(n types.ExchangeName, varPrefix string) (types.
 		return max.New(key, secret), nil
 
 	default:
-		return nil, errors.Errorf("unsupported exchange: %v", n)
+		return nil, fmt.Errorf("unsupported exchange: %v", n)
 
 	}
 }

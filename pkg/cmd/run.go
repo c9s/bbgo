@@ -154,7 +154,7 @@ func runConfig(ctx context.Context, userConfig *bbgo.Config) error {
 				When(report.When...)
 
 		} else {
-			return errors.Errorf("unsupported PnL reporter: %+v", report)
+			return fmt.Errorf("unsupported PnL reporter: %+v", report)
 		}
 	}
 

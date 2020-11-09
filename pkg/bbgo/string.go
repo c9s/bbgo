@@ -2,8 +2,7 @@ package bbgo
 
 import (
 	"encoding/json"
-
-	"github.com/pkg/errors"
+	"fmt"
 )
 
 type StringSlice []string
@@ -24,7 +23,7 @@ func (s *StringSlice) decode(a interface{}) error {
 		}
 
 	default:
-		return errors.Errorf("unexpected type %T for StringSlice: %+v", d, d)
+		return fmt.Errorf("unexpected type %T for StringSlice: %+v", d, d)
 	}
 
 	return nil
