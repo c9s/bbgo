@@ -23,7 +23,7 @@ func (e *ExchangeOrderExecutionRouter) SubmitOrdersTo(ctx context.Context, sessi
 		return nil, errors.Errorf("exchange session %s not found", session)
 	}
 
-	formattedOrders, err := formatOrders(orders, es)
+	formattedOrders, err := formatOrders(es, orders)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +51,7 @@ func (e *ExchangeOrderExecutor) notifySubmitOrders(orders ...types.SubmitOrder) 
 }
 
 func (e *ExchangeOrderExecutor) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (types.OrderSlice, error) {
-	formattedOrders, err := formatOrders(orders, e.session)
+	formattedOrders, err := formatOrders(e.session, orders)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +84,7 @@ type BasicRiskController struct {
 // 1. Increase the quantity by the minimal requirement
 // 2. Decrease the quantity by risk controls
 // 3. If the quantity does not meet minimal requirement, we should ignore the submit order.
-func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...types.SubmitOrder) (outOrders []types.SubmitOrder, err error) {
+func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...types.SubmitOrder) (outOrders []types.SubmitOrder, errs []error) {
 	balances := session.Account.Balances()
 
 	accumulativeQuoteAmount := 0.0
@@ -92,13 +92,13 @@ func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...
 	for _, order := range orders {
 		lastPrice, ok := session.LastPrice(order.Symbol)
 		if !ok {
-			c.Logger.Errorf("the last price of symbol %q is not found", order.Symbol)
+			errs = append(errs, errors.Errorf("the last price of symbol %q is not found", order.Symbol))
 			continue
 		}
 
 		market, ok := session.Market(order.Symbol)
 		if !ok {
-			c.Logger.Errorf("the market config of symbol %q is not found", order.Symbol)
+			errs = append(errs, errors.Errorf("the market config of symbol %q is not found", order.Symbol))
 			continue
 		}
 
@@ -216,22 +216,7 @@ func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...
 	return outOrders, nil
 }
 
-type BasicRiskControlOrderExecutor struct {
-	*ExchangeOrderExecutor
-
-	BasicRiskController
-}
-
-func (e *BasicRiskControlOrderExecutor) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (types.OrderSlice, error) {
-	orders, _ = e.BasicRiskController.ProcessOrders(e.session, orders...)
-	formattedOrders, _ := formatOrders(orders, e.session)
-
-	e.notifySubmitOrders(formattedOrders...)
-
-	return e.session.Exchange.SubmitOrders(ctx, formattedOrders...)
-}
-
-func formatOrder(order types.SubmitOrder, session *ExchangeSession) (types.SubmitOrder, error) {
+func formatOrder(session *ExchangeSession, order types.SubmitOrder) (types.SubmitOrder, error) {
 	market, ok := session.Market(order.Symbol)
 	if !ok {
 		return order, errors.Errorf("market is not defined: %s", order.Symbol)
@@ -253,9 +238,9 @@ func formatOrder(order types.SubmitOrder, session *ExchangeSession) (types.Submi
 	return order, nil
 }
 
-func formatOrders(orders []types.SubmitOrder, session *ExchangeSession) (formattedOrders []types.SubmitOrder, err error) {
+func formatOrders(session *ExchangeSession, orders []types.SubmitOrder) (formattedOrders []types.SubmitOrder, err error) {
 	for _, order := range orders {
-		o, err := formatOrder(order, session)
+		o, err := formatOrder(session, order)
 		if err != nil {
 			return formattedOrders, err
 		}
