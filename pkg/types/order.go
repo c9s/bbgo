@@ -1,6 +1,7 @@
 package types
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/slack-go/slack"
@@ -61,17 +62,8 @@ type SubmitOrder struct {
 	TimeInForce string `json:"timeInForce" db:"time_in_force"` // GTC, IOC, FOK
 }
 
-type Order struct {
-	SubmitOrder
-
-	Exchange         string      `json:"exchange" db:"exchange"`
-	GID              uint64      `json:"gid" db:"gid"`
-	OrderID          uint64      `json:"orderID" db:"order_id"` // order id
-	Status           OrderStatus `json:"status" db:"status"`
-	ExecutedQuantity float64     `json:"executedQuantity" db:"executed_quantity"`
-	IsWorking        bool        `json:"isWorking" db:"is_working"`
-	CreationTime     time.Time   `json:"creationTime" db:"created_at"`
-	UpdateTime       time.Time   `json:"updateTime" db:"updated_at"`
+func (o *SubmitOrder) String() string {
+	return fmt.Sprintf("SubmitOrder %s %s %s %f @ %f", o.Symbol, o.Type, o.Side, o.Quantity, o.Price)
 }
 
 func (o *SubmitOrder) SlackAttachment() slack.Attachment {
@@ -92,3 +84,17 @@ func (o *SubmitOrder) SlackAttachment() slack.Attachment {
 		Fields: fields,
 	}
 }
+
+type Order struct {
+	SubmitOrder
+
+	Exchange         string      `json:"exchange" db:"exchange"`
+	GID              uint64      `json:"gid" db:"gid"`
+	OrderID          uint64      `json:"orderID" db:"order_id"` // order id
+	Status           OrderStatus `json:"status" db:"status"`
+	ExecutedQuantity float64     `json:"executedQuantity" db:"executed_quantity"`
+	IsWorking        bool        `json:"isWorking" db:"is_working"`
+	CreationTime     time.Time   `json:"creationTime" db:"created_at"`
+	UpdateTime       time.Time   `json:"updateTime" db:"updated_at"`
+}
+

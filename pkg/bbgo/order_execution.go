@@ -87,18 +87,22 @@ type BasicRiskController struct {
 func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...types.SubmitOrder) (outOrders []types.SubmitOrder, errs []error) {
 	balances := session.Account.Balances()
 
+	addError := func(err error) {
+		errs = append(errs, err)
+	}
+
 	accumulativeQuoteAmount := 0.0
 	accumulativeBaseSellQuantity := 0.0
 	for _, order := range orders {
 		lastPrice, ok := session.LastPrice(order.Symbol)
 		if !ok {
-			errs = append(errs, errors.Errorf("the last price of symbol %q is not found", order.Symbol))
+			addError(errors.Errorf("the last price of symbol %q is not found, order: %s", order.Symbol, order.String()))
 			continue
 		}
 
 		market, ok := session.Market(order.Symbol)
 		if !ok {
-			errs = append(errs, errors.Errorf("the market config of symbol %q is not found", order.Symbol))
+			addError(errors.Errorf("the market config of symbol %q is not found, order: %s", order.Symbol, order.String()))
 			continue
 		}
 
@@ -114,14 +118,14 @@ func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...
 			// Critical conditions for placing buy orders
 			quoteBalance, ok := balances[market.QuoteCurrency]
 			if !ok {
-				c.Logger.Errorf("can not place buy order, quote balance %s not found", market.QuoteCurrency)
+				addError(errors.Errorf("can not place buy order, quote balance %s not found", market.QuoteCurrency))
 				continue
 			}
 
 			if quoteBalance.Available < c.MinQuoteBalance.Float64() {
-				c.Logger.WithError(ErrQuoteBalanceLevelTooLow).Errorf("can not place buy order, quote balance level is too low: %s < %s",
+				addError(errors.Wrapf(ErrQuoteBalanceLevelTooLow, "can not place buy order, quote balance level is too low: %s < %s, order: %s",
 					types.USD.FormatMoneyFloat64(quoteBalance.Available),
-					types.USD.FormatMoneyFloat64(c.MinQuoteBalance.Float64()))
+					types.USD.FormatMoneyFloat64(c.MinQuoteBalance.Float64()), order.String()))
 				continue
 			}
 
@@ -135,7 +139,11 @@ func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...
 
 			quoteAssetQuota := math.Max(0.0, quoteBalance.Available-c.MinQuoteBalance.Float64())
 			if quoteAssetQuota < market.MinAmount {
-				c.Logger.WithError(ErrInsufficientQuoteBalance).Errorf("can not place buy order, insufficient quote balance: quota %f < min amount %f", quoteAssetQuota, market.MinAmount)
+				addError(
+					errors.Wrapf(
+						ErrInsufficientQuoteBalance,
+						"can not place buy order, insufficient quote balance: quota %f < min amount %f, order: %s",
+						quoteAssetQuota, market.MinAmount, order.String()))
 				continue
 			}
 
@@ -144,7 +152,13 @@ func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...
 			// if MaxBaseAssetBalance is enabled, we should check the current base asset balance
 			if baseBalance, hasBaseAsset := balances[market.BaseCurrency]; hasBaseAsset && c.MaxBaseAssetBalance > 0 {
 				if baseBalance.Available > c.MaxBaseAssetBalance.Float64() {
-					c.Logger.WithError(ErrAssetBalanceLevelTooHigh).Errorf("should not place buy order, asset balance level is too high: %f > %f", baseBalance.Available, c.MaxBaseAssetBalance.Float64())
+					addError(
+						errors.Wrapf(
+							ErrAssetBalanceLevelTooHigh,
+							"should not place buy order, asset balance level is too high: %f > %f, order: %s",
+							baseBalance.Available,
+							c.MaxBaseAssetBalance.Float64(),
+							order.String()))
 					continue
 				}
 
@@ -157,7 +171,12 @@ func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...
 			// if the amount is still too small, we should skip it.
 			notional := quantity * lastPrice
 			if notional < market.MinAmount {
-				c.Logger.Errorf("can not place buy order, quote amount too small: notional %f < min amount %f", notional, market.MinAmount)
+				addError(
+					errors.Errorf(
+						"can not place buy order, quote amount too small: notional %f < min amount %f, order: %s",
+						notional,
+						market.MinAmount,
+						order.String()))
 				continue
 			}
 
@@ -167,7 +186,11 @@ func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...
 			// Critical conditions for placing SELL orders
 			baseAssetBalance, ok := balances[market.BaseCurrency]
 			if !ok {
-				c.Logger.Errorf("can not place sell order, no base asset balance %s", market.BaseCurrency)
+				addError(
+					errors.Errorf(
+						"can not place sell order, no base asset balance %s, order: %s",
+						market.BaseCurrency,
+						order.String()))
 				continue
 			}
 
@@ -179,13 +202,21 @@ func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...
 
 			if c.MinBaseAssetBalance > 0 {
 				if baseAssetBalance.Available < c.MinBaseAssetBalance.Float64() {
-					c.Logger.WithError(ErrAssetBalanceLevelTooLow).Errorf("asset balance level is too low: %f > %f", baseAssetBalance.Available, c.MinBaseAssetBalance.Float64())
+					addError(
+						errors.Wrapf(
+							ErrAssetBalanceLevelTooLow,
+							"asset balance level is too low: %f > %f", baseAssetBalance.Available, c.MinBaseAssetBalance.Float64()))
 					continue
 				}
 
 				quantity = math.Min(quantity, baseAssetBalance.Available-c.MinBaseAssetBalance.Float64())
 				if quantity < market.MinQuantity {
-					c.Logger.WithError(ErrInsufficientAssetBalance).Errorf("insufficient asset balance: %f > minimal quantity %f", baseAssetBalance.Available, market.MinQuantity)
+					addError(
+						errors.Wrapf(
+							ErrInsufficientAssetBalance,
+							"insufficient asset balance: %f > minimal quantity %f",
+							baseAssetBalance.Available,
+							market.MinQuantity))
 					continue
 				}
 			}
@@ -196,12 +227,22 @@ func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...
 
 			notional := quantity * lastPrice
 			if notional < market.MinNotional {
-				c.Logger.Errorf("can not place sell order, notional %f < min notional: %f", notional, market.MinNotional)
+				addError(
+					errors.Errorf(
+						"can not place sell order, notional %f < min notional: %f, order: %s",
+						notional,
+						market.MinNotional,
+						order.String()))
 				continue
 			}
 
 			if quantity < market.MinLot {
-				c.Logger.Errorf("can not place sell order, quantity %f is less than the minimal lot %f", quantity, market.MinLot)
+				addError(
+					errors.Errorf(
+						"can not place sell order, quantity %f is less than the minimal lot %f, order: %s",
+						quantity,
+						market.MinLot,
+						order.String()))
 				continue
 			}
 
