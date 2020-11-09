@@ -6,49 +6,40 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-type SymbolBasedOrderExecutor struct {
-	BasicRiskControlOrderExecutor *BasicRiskControlOrderExecutor `json:"basic,omitempty" yaml:"basic,omitempty"`
+type SymbolBasedRiskController struct {
+	BasicRiskController *BasicRiskController `json:"basic,omitempty" yaml:"basic,omitempty"`
 }
 
-type RiskControlOrderExecutors struct {
+type RiskControlOrderExecutor struct {
 	*ExchangeOrderExecutor
 
 	// Symbol => Executor config
-	BySymbol map[string]*SymbolBasedOrderExecutor `json:"bySymbol,omitempty" yaml:"bySymbol,omitempty"`
+	BySymbol map[string]*SymbolBasedRiskController `json:"bySymbol,omitempty" yaml:"bySymbol,omitempty"`
 }
 
-func (e *RiskControlOrderExecutors) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (types.OrderSlice, error) {
-	var symbolOrders = make(map[string][]types.SubmitOrder, len(orders))
-	for _, order := range orders {
-		symbolOrders[order.Symbol] = append(symbolOrders[order.Symbol], order)
-	}
-
-	var retOrders []types.Order
-
+func (e *RiskControlOrderExecutor) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (retOrders types.OrderSlice, err error) {
+	var symbolOrders = groupSubmitOrdersBySymbol(orders)
 	for symbol, orders := range symbolOrders {
-		var err error
-		var retOrders2 []types.Order
-		if exec, ok := e.BySymbol[symbol]; ok && exec.BasicRiskControlOrderExecutor != nil {
-			retOrders2, err = exec.BasicRiskControlOrderExecutor.SubmitOrders(ctx, orders...)
+		if controller, ok := e.BySymbol[symbol]; ok && controller != nil {
+			orders, err = controller.BasicRiskController.ProcessOrders(e.session, orders...)
 			if err != nil {
-				return retOrders, err
+				return
 			}
-
-		} else {
-			retOrders2, err = e.ExchangeOrderExecutor.SubmitOrders(ctx, orders...)
-			if err != nil {
-				return retOrders, err
-			}
-
 		}
+
+		retOrders2, err := e.ExchangeOrderExecutor.SubmitOrders(ctx, orders...)
+		if err != nil {
+			return retOrders, err
+		}
+
 		retOrders = append(retOrders, retOrders2...)
 	}
 
-	return retOrders, nil
+	return
 }
 
 type SessionBasedRiskControl struct {
-	OrderExecutor *RiskControlOrderExecutors `json:"orderExecutors,omitempty" yaml:"orderExecutors"`
+	OrderExecutor *RiskControlOrderExecutor `json:"orderExecutor,omitempty" yaml:"orderExecutor"`
 }
 
 func (control *SessionBasedRiskControl) SetBaseOrderExecutor(executor *ExchangeOrderExecutor) {
@@ -57,16 +48,15 @@ func (control *SessionBasedRiskControl) SetBaseOrderExecutor(executor *ExchangeO
 	}
 
 	control.OrderExecutor.ExchangeOrderExecutor = executor
+}
 
-	if control.OrderExecutor.BySymbol == nil {
-		return
+func groupSubmitOrdersBySymbol(orders []types.SubmitOrder) map[string][]types.SubmitOrder {
+	var symbolOrders = make(map[string][]types.SubmitOrder, len(orders))
+	for _, order := range orders {
+		symbolOrders[order.Symbol] = append(symbolOrders[order.Symbol], order)
 	}
 
-	for _, exec := range control.OrderExecutor.BySymbol {
-		if exec.BasicRiskControlOrderExecutor != nil {
-			exec.BasicRiskControlOrderExecutor.ExchangeOrderExecutor = executor
-		}
-	}
+	return symbolOrders
 }
 
 type RiskControls struct {

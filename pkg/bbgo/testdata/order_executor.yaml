@@ -16,7 +16,7 @@ riskControls:
   sessionBased:
     # max is the session name that you want to configure the risk control
     max:
-      orderExecutors:
+      orderExecutor:
         bySymbol:
           BTCUSDT:
             basic:
