@@ -54,6 +54,14 @@ func (inc *BOLL) LastDownBand() float64 {
 	return inc.DownBand[len(inc.DownBand)-1]
 }
 
+func (inc *BOLL) LastStdDev() float64 {
+	if len(inc.StdDev) == 0 {
+		return 0.0
+	}
+
+	return inc.StdDev[len(inc.StdDev)-1]
+}
+
 func (inc *BOLL) LastSMA() float64 {
 	return inc.SMA[len(inc.SMA)-1]
 }
