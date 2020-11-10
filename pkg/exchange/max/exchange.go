@@ -11,6 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	maxapi "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 )
@@ -218,8 +219,8 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	for _, a := range userInfo.Accounts {
 		balances[toGlobalCurrency(a.Currency)] = types.Balance{
 			Currency:  toGlobalCurrency(a.Currency),
-			Available: util.MustParseFloat(a.Balance),
-			Locked:    util.MustParseFloat(a.Locked),
+			Available: fixedpoint.Must(fixedpoint.NewFromString(a.Balance)),
+			Locked:    fixedpoint.Must(fixedpoint.NewFromString(a.Locked)),
 		}
 	}
 
@@ -360,8 +361,8 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 	for _, a := range accounts {
 		balances[toGlobalCurrency(a.Currency)] = types.Balance{
 			Currency:  toGlobalCurrency(a.Currency),
-			Available: util.MustParseFloat(a.Balance),
-			Locked:    util.MustParseFloat(a.Locked),
+			Available: fixedpoint.Must(fixedpoint.NewFromString(a.Balance)),
+			Locked:    fixedpoint.Must(fixedpoint.NewFromString(a.Locked)),
 		}
 	}
 

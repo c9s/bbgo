@@ -125,6 +125,9 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 			return err
 		}
 
+		balances.Print()
+
+
 		session.Account.UpdateBalances(balances)
 		session.Account.BindStream(session.Stream)
 
@@ -161,7 +164,7 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 				}
 
 				if len(kLines) == 0 {
-					log.Warnf("no kline data for interval %s", interval)
+					log.Warnf("no kline data for interval %s (end time <= %s)", interval, environ.startTime)
 					continue
 				}
 
@@ -335,6 +338,11 @@ func (environ *Environment) ConfigureNotification(conf *NotificationConfig) {
 		}
 
 	}
+}
+
+func (environ *Environment) SetStartTime(t time.Time) *Environment {
+	environ.startTime = t
+	return environ
 }
 
 // SyncTradesFrom overrides the default trade scan time (-7 days)

@@ -3,6 +3,8 @@ package bbgo
 import (
 	"context"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -22,16 +24,22 @@ func (e *RiskControlOrderExecutor) SubmitOrders(ctx context.Context, orders ...t
 	for symbol, orders := range symbolOrders {
 		if controller, ok := e.BySymbol[symbol]; ok && controller != nil {
 			var riskErrs []error
+
 			orders, riskErrs = controller.BasicRiskController.ProcessOrders(e.session, orders...)
 			for _, riskErr := range riskErrs {
 				// use logger from ExchangeOrderExecutor
 				e.logger.Warnf(riskErr.Error())
+				logrus.Warnf("RISK ERROR: %s", riskErr.Error())
 			}
 		}
 
 		formattedOrders, err := formatOrders(e.session, orders)
 		if err != nil {
 			return retOrders, err
+		}
+
+		for _, fo := range formattedOrders {
+			logrus.Infof("submit order: %s", fo.String())
 		}
 
 		retOrders2, err := e.ExchangeOrderExecutor.SubmitOrders(ctx, formattedOrders...)

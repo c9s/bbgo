@@ -11,6 +11,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 )
@@ -256,8 +257,8 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	for _, b := range account.Balances {
 		balances[b.Asset] = types.Balance{
 			Currency:  b.Asset,
-			Available: util.MustParseFloat(b.Free),
-			Locked:    util.MustParseFloat(b.Locked),
+			Available: fixedpoint.Must(fixedpoint.NewFromString(b.Free)),
+			Locked:    fixedpoint.Must(fixedpoint.NewFromString(b.Locked)),
 		}
 	}
 

@@ -84,8 +84,8 @@ func (m BacktestAccountBalanceMap) BalanceMap() types.BalanceMap {
 	for currency, value := range m {
 		balances[currency] = types.Balance{
 			Currency:  currency,
-			Available: value.Float64(),
-			Locked:    0.0,
+			Available: value,
+			Locked:    0,
 		}
 	}
 	return balances
