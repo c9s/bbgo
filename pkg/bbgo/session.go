@@ -106,6 +106,9 @@ type ExchangeSession struct {
 	// markets defines market configuration of a symbol
 	markets map[string]types.Market
 
+	// startPrices is used for backtest
+	startPrices map[string]float64
+
 	lastPrices map[string]float64
 
 	// Trades collects the executed trades from the exchange
@@ -137,6 +140,7 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 		Trades:        make(map[string][]types.Trade),
 
 		markets:               make(map[string]types.Market),
+		startPrices:           make(map[string]float64),
 		lastPrices:            make(map[string]float64),
 		marketDataStores:      make(map[string]*MarketDataStore),
 		standardIndicatorSets: make(map[string]*StandardIndicatorSet),
@@ -154,6 +158,11 @@ func (session *ExchangeSession) StandardIndicatorSet(symbol string) (*StandardIn
 func (session *ExchangeSession) MarketDataStore(symbol string) (s *MarketDataStore, ok bool) {
 	s, ok = session.marketDataStores[symbol]
 	return s, ok
+}
+
+func (session *ExchangeSession) StartPrice(symbol string) (price float64, ok bool) {
+	price, ok = session.startPrices[symbol]
+	return price, ok
 }
 
 func (session *ExchangeSession) LastPrice(symbol string) (price float64, ok bool) {

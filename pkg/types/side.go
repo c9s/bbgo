@@ -9,6 +9,18 @@ const (
 	SideTypeSelf = SideType("SELF")
 )
 
+func (side SideType) Reverse() SideType {
+	switch side {
+	case SideTypeBuy:
+		return SideTypeSell
+
+	case SideTypeSell:
+		return SideTypeBuy
+	}
+
+	return side
+}
+
 func (side SideType) Color() string {
 	if side == SideTypeBuy {
 		return Green

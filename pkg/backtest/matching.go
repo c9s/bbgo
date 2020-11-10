@@ -408,9 +408,10 @@ func (m *SimplePriceMatching) processKLine(kline types.KLine) {
 
 		if kline.Low > kline.Close {
 			m.SellToPrice(fixedpoint.NewFromFloat(kline.Low))
+			m.BuyToPrice(fixedpoint.NewFromFloat(kline.Close))
+		} else {
+			m.SellToPrice(fixedpoint.NewFromFloat(kline.Close))
 		}
-
-		m.SellToPrice(fixedpoint.NewFromFloat(kline.Close))
 
 	case types.TrendUp:
 		if kline.Low < kline.Open {
@@ -419,9 +420,11 @@ func (m *SimplePriceMatching) processKLine(kline types.KLine) {
 
 		if kline.High > kline.Close {
 			m.BuyToPrice(fixedpoint.NewFromFloat(kline.High))
+			m.SellToPrice(fixedpoint.NewFromFloat(kline.Close))
+		} else {
+			m.BuyToPrice(fixedpoint.NewFromFloat(kline.Close))
 		}
 
-		m.BuyToPrice(fixedpoint.NewFromFloat(kline.Close))
 	}
 }
 

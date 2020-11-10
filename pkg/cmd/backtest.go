@@ -82,13 +82,16 @@ var BacktestCmd = &cobra.Command{
 		}
 
 		// set default start time to the past 6 months
-		startTime := time.Now().AddDate(0, -6, 0)
 		if len(userConfig.Backtest.StartTime) == 0 {
-			userConfig.Backtest.StartTime = startTime.Format("2006-01-02")
+			userConfig.Backtest.StartTime = time.Now().AddDate(0, -6, 0).Format("2006-01-02")
+		}
+
+		startTime, err := userConfig.Backtest.ParseStartTime()
+		if err != nil {
+			return err
 		}
 
 		backtestService := &service.BacktestService{DB: db}
-		backtestExchange := backtest.NewExchange(exchangeName, backtestService, userConfig.Backtest)
 
 		if wantSync {
 			for _, symbol := range userConfig.Backtest.Symbols {
@@ -97,6 +100,8 @@ var BacktestCmd = &cobra.Command{
 				}
 			}
 		}
+
+		backtestExchange := backtest.NewExchange(exchangeName, backtestService, userConfig.Backtest)
 
 		environ := bbgo.NewEnvironment()
 		environ.SetStartTime(startTime)
@@ -153,18 +158,10 @@ var BacktestCmd = &cobra.Command{
 					return fmt.Errorf("market not found: %s", symbol)
 				}
 
-				marketDataStore, ok := session.MarketDataStore(symbol)
+				startPrice, ok := session.StartPrice(symbol)
 				if !ok {
-					return fmt.Errorf("market data store not found: %s", symbol)
+					return fmt.Errorf("start price not found: %s", symbol)
 				}
-
-				klines, ok := marketDataStore.KLinesOfInterval(types.Interval1d)
-				if !ok {
-					return fmt.Errorf("klines not found: %s", types.Interval1d)
-				}
-
-				firstKLine := klines[0]
-				startPrice := firstKLine.Open
 
 				log.Infof("%s PROFIT AND LOSS REPORT", symbol)
 				log.Infof("===============================================")

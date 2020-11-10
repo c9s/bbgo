@@ -38,10 +38,6 @@ func (e *RiskControlOrderExecutor) SubmitOrders(ctx context.Context, orders ...t
 			return retOrders, err
 		}
 
-		for _, fo := range formattedOrders {
-			logrus.Infof("submit order: %s", fo.String())
-		}
-
 		retOrders2, err := e.ExchangeOrderExecutor.SubmitOrders(ctx, formattedOrders...)
 		if err != nil {
 			return retOrders, err

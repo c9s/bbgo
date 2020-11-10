@@ -115,15 +115,17 @@ func (s *BacktestService) QueryKLinesBackward(exchange types.ExchangeName, symbo
 	return s.scanRows(rows)
 }
 
-func (s *BacktestService) QueryKLinesCh(since time.Time, exchange types.Exchange, symbols []string, intervals []types.Interval) (chan types.KLine, chan error) {
-	sql := "SELECT * FROM `binance_klines` WHERE `end_time` >= :since AND `symbol` IN (:symbols) AND `interval` IN (:intervals) ORDER BY end_time ASC"
+func (s *BacktestService) QueryKLinesCh(since, until time.Time, exchange types.Exchange, symbols []string, intervals []types.Interval) (chan types.KLine, chan error) {
+	sql := "SELECT * FROM `binance_klines` WHERE `end_time` BETWEEN :since AND :until AND `symbol` IN (:symbols) AND `interval` IN (:intervals) ORDER BY end_time ASC"
 	sql = strings.ReplaceAll(sql, "binance_klines", exchange.Name().String()+"_klines")
 
 	sql, args, err := sqlx.Named(sql, map[string]interface{}{
 		"since":     since,
+		"until":     until,
 		"symbols":   symbols,
 		"intervals": types.IntervalSlice(intervals),
 	})
+
 	sql, args, err = sqlx.In(sql, args...)
 	sql = s.DB.Rebind(sql)
 
