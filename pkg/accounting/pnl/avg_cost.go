@@ -3,8 +3,6 @@ package pnl
 import (
 	"strings"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -28,9 +26,9 @@ func (c *AverageCostCalculator) Calculate(symbol string, trades []types.Trade, c
 			Symbol:       symbol,
 			CurrentPrice: currentPrice,
 			NumTrades:    0,
-			BidVolume: bidVolume,
-			AskVolume: askVolume,
-			FeeUSD:           feeUSD,
+			BuyVolume:    bidVolume,
+			SellVolume:   askVolume,
+			FeeInUSD:     feeUSD,
 		}
 	}
 
@@ -69,7 +67,6 @@ func (c *AverageCostCalculator) Calculate(symbol string, trades []types.Trade, c
 		currencyFees[trade.FeeCurrency] += trade.Fee
 	}
 
-	logrus.Infof("average bid price = (total amount %f + total feeUSD %f) / volume %f", bidAmount, bidFeeUSD, bidVolume)
 	profit := 0.0
 	averageCost := (bidAmount + bidFeeUSD) / bidVolume
 
@@ -101,14 +98,14 @@ func (c *AverageCostCalculator) Calculate(symbol string, trades []types.Trade, c
 		NumTrades:    len(trades),
 		StartTime:    trades[0].Time,
 
-		BidVolume: bidVolume,
-		AskVolume: askVolume,
+		BuyVolume:  bidVolume,
+		SellVolume: askVolume,
 
 		Stock:            stock,
 		Profit:           profit,
 		UnrealizedProfit: unrealizedProfit,
 		AverageBidCost:   averageCost,
-		FeeUSD:           feeUSD,
+		FeeInUSD:         feeUSD,
 		CurrencyFees:     currencyFees,
 	}
 }
