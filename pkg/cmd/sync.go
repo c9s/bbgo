@@ -91,7 +91,7 @@ var SyncCmd = &cobra.Command{
 			for interval := range types.SupportedIntervals {
 				log.Infof("verifying %s kline data...", interval)
 
-				klineC, errC := backtestService.QueryKLinesCh(startTime, exchange, []string{symbol}, []types.Interval{interval})
+				klineC, errC := backtestService.QueryKLinesCh(startTime, time.Now(), exchange, []string{symbol}, []types.Interval{interval})
 				var emptyKLine types.KLine
 				var prevKLine types.KLine
 				for k := range klineC {

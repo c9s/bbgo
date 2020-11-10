@@ -134,6 +134,12 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 		// update last prices
 		session.Stream.OnKLineClosed(func(kline types.KLine) {
 			log.Infof("kline closed: %+v", kline)
+
+			if _, ok := session.startPrices[kline.Symbol] ; !ok {
+				session.startPrices[kline.Symbol] = kline.Open
+			}
+
+
 			session.lastPrices[kline.Symbol] = kline.Close
 			session.marketDataStores[kline.Symbol].AddKLine(kline)
 		})

@@ -98,3 +98,6 @@ type Order struct {
 	UpdateTime       time.Time   `json:"updateTime" db:"updated_at"`
 }
 
+func (o Order) String() string {
+	return fmt.Sprintf("order %s %f/%f at %f -> %s", o.Side, o.ExecutedQuantity, o.Quantity, o.Price, o.Status)
+}

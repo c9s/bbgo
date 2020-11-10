@@ -56,9 +56,19 @@ type Session struct {
 }
 
 type Backtest struct {
-	StartTime string          `json:"startTime" yaml:"startTime"`
-	Account   BacktestAccount `json:"account" yaml:"account"`
-	Symbols   []string        `json:"symbols" yaml:"symbols"`
+	StartTime string `json:"startTime" yaml:"startTime"`
+	EndTime   string `json:"endTime" yaml:"endTime"`
+
+	Account BacktestAccount `json:"account" yaml:"account"`
+	Symbols []string        `json:"symbols" yaml:"symbols"`
+}
+
+func (t Backtest) ParseEndTime() (time.Time, error) {
+	if len(t.EndTime) == 0 {
+		return time.Time{}, errors.New("backtest.endTime must be defined")
+	}
+
+	return time.Parse("2006-01-02", t.EndTime)
 }
 
 func (t Backtest) ParseStartTime() (time.Time, error) {

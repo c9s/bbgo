@@ -30,25 +30,40 @@ riskControls:
   # This is the session-based risk controller, which let you configure different risk controller by session.
   sessionBased:
     # "max" is the session name that you want to configure the risk control
-    max:
+    binance:
       # orderExecutor is one of the risk control
       orderExecutor:
         # symbol-routed order executor
         bySymbol:
-          BNBUSDT:
+          BTCUSDT:
             # basic risk control order executor
             basic:
               minQuoteBalance: 100.0
-              maxBaseAssetBalance: 50.0
-              minBaseAssetBalance: 1.0
-              maxOrderAmount: 100.0
+              maxBaseAssetBalance: 3.0
+              minBaseAssetBalance: 0.0
+              maxOrderAmount: 1000.0
+
+backtest:
+  # for testing max draw down (MDD) at 03-12
+  # see here for more details
+  # https://www.investopedia.com/terms/m/maximum-drawdown-mdd.asp
+  startTime: "2020-07-01"
+  endTime: "2020-10-01"
+  symbols:
+  - BTCUSDT
+  account:
+    makerCommission: 15
+    takerCommission: 15
+    balances:
+      BTC: 0.1
+      USDT: 10000.0
 
 exchangeStrategies:
 - on: binance
   grid:
-    symbol: BNBUSDT
-    interval: 1m
-    baseQuantity: 1.0
-    gridPips: 0.02
-    gridNumber: 2
-
+    symbol: BTCUSDT
+    baseQuantity: 0.01
+    gridNumber: 100
+    profitSpread: 50.0
+    upperPrice: 11000.0
+    lowerPrice: 9000.0

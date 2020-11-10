@@ -15,10 +15,10 @@ import (
 )
 
 type Exchange struct {
-	sourceName     types.ExchangeName
-	publicExchange types.Exchange
-	srv            *service.BacktestService
-	startTime      time.Time
+	sourceName         types.ExchangeName
+	publicExchange     types.Exchange
+	srv                *service.BacktestService
+	startTime, endTime time.Time
 
 	account *types.Account
 	config  *bbgo.Backtest
@@ -52,6 +52,11 @@ func NewExchange(sourceName types.ExchangeName, srv *service.BacktestService, co
 		panic(err)
 	}
 
+	endTime, err := config.ParseEndTime()
+	if err != nil {
+		panic(err)
+	}
+
 	account := &types.Account{
 		MakerCommission: config.Account.MakerCommission,
 		TakerCommission: config.Account.TakerCommission,
@@ -69,6 +74,7 @@ func NewExchange(sourceName types.ExchangeName, srv *service.BacktestService, co
 		config:         config,
 		account:        account,
 		startTime:      startTime,
+		endTime:        endTime,
 		matchingBooks:  make(map[string]*SimplePriceMatching),
 		closedOrders:   make(map[string][]types.Order),
 		trades:         make(map[string][]types.Trade),
