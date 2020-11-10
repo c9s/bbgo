@@ -26,12 +26,12 @@ func (m *SimplePriceMatching) EmitOrderUpdate(order types.Order) {
 	}
 }
 
-func (m *SimplePriceMatching) OnAccountUpdate(cb func(balances types.BalanceMap)) {
-	m.accountUpdateCallbacks = append(m.accountUpdateCallbacks, cb)
+func (m *SimplePriceMatching) OnBalanceUpdate(cb func(balances types.BalanceMap)) {
+	m.balanceUpdateCallbacks = append(m.balanceUpdateCallbacks, cb)
 }
 
-func (m *SimplePriceMatching) EmitAccountUpdate(balances types.BalanceMap) {
-	for _, cb := range m.accountUpdateCallbacks {
+func (m *SimplePriceMatching) EmitBalanceUpdate(balances types.BalanceMap) {
+	for _, cb := range m.balanceUpdateCallbacks {
 		cb(balances)
 	}
 }

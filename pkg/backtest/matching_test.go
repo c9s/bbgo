@@ -28,8 +28,8 @@ func TestSimplePriceMatching_LimitOrder(t *testing.T) {
 	}
 
 	account.UpdateBalances(types.BalanceMap{
-		"USDT": {Currency: "USDT", Available: 1000000.0},
-		"BTC":  {Currency: "BTC", Available: 100.0},
+		"USDT": {Currency: "USDT", Available: fixedpoint.NewFromFloat(1000000.0)},
+		"BTC":  {Currency: "BTC", Available: fixedpoint.NewFromFloat(100.0)},
 	})
 
 	market := types.Market{
@@ -71,6 +71,10 @@ func TestSimplePriceMatching_LimitOrder(t *testing.T) {
 	closedOrders, trades = engine.SellToPrice(fixedpoint.NewFromFloat(8000.0))
 	assert.Len(t, closedOrders, 1)
 	assert.Len(t, trades, 1)
+	for _, trade := range trades {
+		assert.True(t, trade.IsBuyer)
+	}
+
 	for _, o := range closedOrders {
 		assert.Equal(t, types.SideTypeBuy, o.Side)
 	}
@@ -89,7 +93,6 @@ func TestSimplePriceMatching_LimitOrder(t *testing.T) {
 	for _, o := range closedOrders {
 		assert.Equal(t, types.SideTypeSell, o.Side)
 	}
-
 	for _, trade := range trades {
 		assert.Equal(t, types.SideTypeSell, trade.Side)
 	}

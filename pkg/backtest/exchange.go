@@ -52,13 +52,13 @@ func NewExchange(sourceName types.ExchangeName, srv *service.BacktestService, co
 		panic(err)
 	}
 
-	balances := config.Account.Balances.BalanceMap()
-
 	account := &types.Account{
 		MakerCommission: config.Account.MakerCommission,
 		TakerCommission: config.Account.TakerCommission,
 		AccountType:     "SPOT", // currently not used
 	}
+
+	balances := config.Account.Balances.BalanceMap()
 	account.UpdateBalances(balances)
 
 	e := &Exchange{
@@ -93,19 +93,18 @@ func (e *Exchange) NewStream() types.Stream {
 		e.trades[trade.Symbol] = append(e.trades[trade.Symbol], trade)
 	})
 
-	for _, symbol := range e.config.Symbols {
-		market, ok := e.markets[symbol]
-		if !ok {
-			panic(fmt.Errorf("market %s is undefined", symbol))
-		}
-
-		e.matchingBooks[symbol] = &SimplePriceMatching{
+	for symbol, market := range e.markets {
+		matching := &SimplePriceMatching{
 			CurrentTime:     e.startTime,
 			Account:         e.account,
 			Market:          market,
 			MakerCommission: e.config.Account.MakerCommission,
 			TakerCommission: e.config.Account.TakerCommission,
 		}
+		matching.OnTradeUpdate(e.stream.EmitTradeUpdate)
+		matching.OnOrderUpdate(e.stream.EmitOrderUpdate)
+		matching.OnBalanceUpdate(e.stream.EmitBalanceUpdate)
+		e.matchingBooks[symbol] = matching
 	}
 
 	return e.stream
@@ -118,7 +117,6 @@ func (e Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder)
 		if !ok {
 			return nil, fmt.Errorf("matching engine is not initialized for symbol %s", symbol)
 		}
-
 
 		createdOrder, trade, err := matching.PlaceOrder(order)
 		if err != nil {
