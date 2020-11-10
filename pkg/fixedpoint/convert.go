@@ -42,15 +42,15 @@ func (v Value) Add(v2 Value) Value {
 }
 
 func (v *Value) UnmarshalYAML(unmarshal func(a interface{}) error) (err error) {
-	var i int64
-	if err = unmarshal(&i); err == nil {
-		*v = NewFromInt64(i)
-		return
-	}
-
 	var f float64
 	if err = unmarshal(&f); err == nil {
 		*v = NewFromFloat(f)
+		return
+	}
+
+	var i int64
+	if err = unmarshal(&i); err == nil {
+		*v = NewFromInt64(i)
 		return
 	}
 
@@ -91,6 +91,14 @@ func (v *Value) UnmarshalJSON(data []byte) error {
 	}
 
 	return nil
+}
+
+func Must(v Value, err error) Value {
+	if err != nil {
+		panic(err)
+	}
+
+	return v
 }
 
 func NewFromString(input string) (Value, error) {
