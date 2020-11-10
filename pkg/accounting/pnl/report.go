@@ -20,27 +20,28 @@ type AverageCostPnlReport struct {
 	Profit           float64
 	UnrealizedProfit float64
 	AverageBidCost   float64
-	BidVolume        float64
-	AskVolume        float64
-	FeeUSD           float64
+	BuyVolume        float64
+	SellVolume       float64
+	FeeInUSD         float64
 	Stock            float64
 	CurrencyFees     map[string]float64
 }
 
 func (report AverageCostPnlReport) Print() {
-	log.Infof("trades since: %v", report.StartTime)
-	log.Infof("average bid cost: %s", types.USD.FormatMoneyFloat64(report.AverageBidCost))
-	log.Infof("total bid volume: %f", report.BidVolume)
-	log.Infof("total ask volume: %f", report.AskVolume)
-	log.Infof("stock: %f", report.Stock)
-	log.Infof("fee (USD): %f", report.FeeUSD)
-	log.Infof("current price: %s", types.USD.FormatMoneyFloat64(report.CurrentPrice))
-	log.Infof("profit: %s", types.USD.FormatMoneyFloat64(report.Profit))
-	log.Infof("unrealized profit: %s", types.USD.FormatMoneyFloat64(report.UnrealizedProfit))
-	log.Infof("currency fees:")
+	log.Infof("TRADES SINCE: %v", report.StartTime)
+	log.Infof("NUMBER OF TRADES: %d", report.NumTrades)
+	log.Infof("AVERAGE COST: %s", types.USD.FormatMoneyFloat64(report.AverageBidCost))
+	log.Infof("TOTAL BUY VOLUME: %f", report.BuyVolume)
+	log.Infof("TOTAL SELL VOLUME: %f", report.SellVolume)
+	log.Infof("STOCK: %f", report.Stock)
+	log.Infof("FEE (USD): %f", report.FeeInUSD)
+	log.Infof("CURRENT PRICE: %s", types.USD.FormatMoneyFloat64(report.CurrentPrice))
+	log.Infof("CURRENCY FEES:")
 	for currency, fee := range report.CurrencyFees {
 		log.Infof(" - %s: %f", currency, fee)
 	}
+	log.Infof("PROFIT: %s", types.USD.FormatMoneyFloat64(report.Profit))
+	log.Infof("UNREALIZED PROFIT: %s", types.USD.FormatMoneyFloat64(report.UnrealizedProfit))
 }
 
 func (report AverageCostPnlReport) SlackAttachment() slack.Attachment {
@@ -66,7 +67,7 @@ func (report AverageCostPnlReport) SlackAttachment() slack.Attachment {
 			{Title: "Unrealized Profit", Value: types.USD.FormatMoney(report.UnrealizedProfit)},
 			{Title: "Current Price", Value: market.FormatPrice(report.CurrentPrice), Short: true},
 			{Title: "Average Cost", Value: market.FormatPrice(report.AverageBidCost), Short: true},
-			{Title: "Fee (USD)", Value: types.USD.FormatMoney(report.FeeUSD), Short: true},
+			{Title: "Fee (USD)", Value: types.USD.FormatMoney(report.FeeInUSD), Short: true},
 			{Title: "Stock", Value: strconv.FormatFloat(report.Stock, 'f', 8, 64), Short: true},
 			{Title: "Number of Trades", Value: strconv.Itoa(report.NumTrades), Short: true},
 		},
