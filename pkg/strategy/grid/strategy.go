@@ -88,12 +88,7 @@ func (s *Strategy) updateBidOrders(orderExecutor bbgo.OrderExecutor, session *bb
 	balances := session.Account.Balances()
 
 	balance, ok := balances[quoteCurrency]
-	if !ok || balance.Available <= 0.0 {
-		return
-	}
-
-	var numOrders = s.GridNum - s.activeOrders.NumOfBids()
-	if numOrders <= 0 {
+	if !ok || balance.Available <= 0 {
 		return
 	}
 
@@ -105,7 +100,7 @@ func (s *Strategy) updateBidOrders(orderExecutor bbgo.OrderExecutor, session *bb
 	var startPrice = downBand
 
 	var submitOrders []types.SubmitOrder
-	for i := 0; i < numOrders; i++ {
+	for i := 0; i < s.GridNum; i++ {
 		submitOrders = append(submitOrders, types.SubmitOrder{
 			Symbol:      s.Symbol,
 			Side:        types.SideTypeBuy,
@@ -121,6 +116,7 @@ func (s *Strategy) updateBidOrders(orderExecutor bbgo.OrderExecutor, session *bb
 
 	orders, err := orderExecutor.SubmitOrders(context.Background(), submitOrders...)
 	if err != nil {
+		log.WithError(err).Errorf("can not place orders")
 		return
 	}
 
@@ -132,12 +128,7 @@ func (s *Strategy) updateAskOrders(orderExecutor bbgo.OrderExecutor, session *bb
 	balances := session.Account.Balances()
 
 	balance, ok := balances[baseCurrency]
-	if !ok || balance.Available <= 0.0 {
-		return
-	}
-
-	var numOrders = s.GridNum - s.activeOrders.NumOfAsks()
-	if numOrders <= 0 {
+	if !ok || balance.Available <= 0 {
 		return
 	}
 
@@ -149,7 +140,7 @@ func (s *Strategy) updateAskOrders(orderExecutor bbgo.OrderExecutor, session *bb
 	var startPrice = upBand
 
 	var submitOrders []types.SubmitOrder
-	for i := 0; i < numOrders; i++ {
+	for i := 0; i < s.GridNum; i++ {
 		submitOrders = append(submitOrders, types.SubmitOrder{
 			Symbol:      s.Symbol,
 			Side:        types.SideTypeSell,
@@ -165,6 +156,7 @@ func (s *Strategy) updateAskOrders(orderExecutor bbgo.OrderExecutor, session *bb
 
 	orders, err := orderExecutor.SubmitOrders(context.Background(), submitOrders...)
 	if err != nil {
+		log.WithError(err).Errorf("can not place orders")
 		return
 	}
 
@@ -182,26 +174,20 @@ func (s *Strategy) updateOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.
 		log.WithError(err).Errorf("cancel order error")
 	}
 
-	log.Infof("checking grid orders, bids=%d asks=%d", s.activeOrders.Bids.Len(), s.activeOrders.Asks.Len())
+
+	_, ok := session.Account.Balance(s.Market.QuoteCurrency)
+	if ok {
+		s.updateBidOrders(orderExecutor, session)
+	}
+
+	_, ok = session.Account.Balance(s.Market.BaseCurrency)
+
+	// TODO: add base asset quantity check, think about how to reuse the risk control executor
+	if ok {
+		s.updateAskOrders(orderExecutor, session)
+	}
+
 	s.activeOrders.Print()
-
-	if s.activeOrders.Bids.Len() < s.GridNum {
-		_, ok := session.Account.Balance(s.Market.QuoteCurrency)
-		if ok {
-			log.Infof("active bid orders not enough: %d < %d, updating...", s.activeOrders.Bids.Len(), s.GridNum)
-			s.updateBidOrders(orderExecutor, session)
-		}
-	}
-
-	if s.activeOrders.Asks.Len() < s.GridNum {
-		_, ok := session.Account.Balance(s.Market.BaseCurrency)
-
-		// TODO: add base asset quantity check, think about how to reuse the risk control executor
-		if ok {
-			log.Infof("active ask orders not enough: %d < %d, updating...", s.activeOrders.Asks.Len(), s.GridNum)
-			s.updateAskOrders(orderExecutor, session)
-		}
-	}
 }
 
 func (s *Strategy) orderUpdateHandler(order types.Order) {
