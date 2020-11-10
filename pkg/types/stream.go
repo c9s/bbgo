@@ -31,9 +31,9 @@ type StandardStream struct {
 	orderUpdateCallbacks []func(order Order)
 
 	// balance snapshot callbacks
-	balanceSnapshotCallbacks []func(balances map[string]Balance)
+	balanceSnapshotCallbacks []func(balances BalanceMap)
 
-	balanceUpdateCallbacks []func(balances map[string]Balance)
+	balanceUpdateCallbacks []func(balances BalanceMap)
 
 	kLineClosedCallbacks []func(kline KLine)
 

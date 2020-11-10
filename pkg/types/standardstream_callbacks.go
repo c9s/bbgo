@@ -34,21 +34,21 @@ func (stream *StandardStream) EmitOrderUpdate(order Order) {
 	}
 }
 
-func (stream *StandardStream) OnBalanceSnapshot(cb func(balances map[string]Balance)) {
+func (stream *StandardStream) OnBalanceSnapshot(cb func(balances BalanceMap)) {
 	stream.balanceSnapshotCallbacks = append(stream.balanceSnapshotCallbacks, cb)
 }
 
-func (stream *StandardStream) EmitBalanceSnapshot(balances map[string]Balance) {
+func (stream *StandardStream) EmitBalanceSnapshot(balances BalanceMap) {
 	for _, cb := range stream.balanceSnapshotCallbacks {
 		cb(balances)
 	}
 }
 
-func (stream *StandardStream) OnBalanceUpdate(cb func(balances map[string]Balance)) {
+func (stream *StandardStream) OnBalanceUpdate(cb func(balances BalanceMap)) {
 	stream.balanceUpdateCallbacks = append(stream.balanceUpdateCallbacks, cb)
 }
 
-func (stream *StandardStream) EmitBalanceUpdate(balances map[string]Balance) {
+func (stream *StandardStream) EmitBalanceUpdate(balances BalanceMap) {
 	for _, cb := range stream.balanceUpdateCallbacks {
 		cb(balances)
 	}
@@ -101,9 +101,9 @@ type StandardStreamEventHub interface {
 
 	OnOrderUpdate(cb func(order Order))
 
-	OnBalanceSnapshot(cb func(balances map[string]Balance))
+	OnBalanceSnapshot(cb func(balances BalanceMap))
 
-	OnBalanceUpdate(cb func(balances map[string]Balance))
+	OnBalanceUpdate(cb func(balances BalanceMap))
 
 	OnKLineClosed(cb func(kline KLine))
 

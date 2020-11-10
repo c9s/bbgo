@@ -21,7 +21,8 @@ func (s *Stream) Connect(ctx context.Context) error {
 	loadedSymbols := map[string]struct{}{}
 	loadedIntervals := map[types.Interval]struct{}{
 		// 1m interval is required for the backtest matching engine
-		types.Interval1m: struct{}{},
+		types.Interval1m: {},
+		types.Interval1d: {},
 	}
 
 	for _, sub := range s.Subscriptions {
@@ -56,7 +57,7 @@ func (s *Stream) Connect(ctx context.Context) error {
 				if !ok {
 					log.Errorf("matching book of %s is not initialized", k.Symbol)
 				}
-				matching.processKLine(s, k)
+				matching.processKLine(k)
 			}
 
 			s.EmitKLineClosed(k)

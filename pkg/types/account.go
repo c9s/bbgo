@@ -6,16 +6,26 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/c9s/bbgo/pkg/util"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 type Balance struct {
-	Currency  string  `json:"currency"`
-	Available float64 `json:"available"`
-	Locked    float64 `json:"locked"`
+	Currency  string           `json:"currency"`
+	Available fixedpoint.Value `json:"available"`
+	Locked    fixedpoint.Value `json:"locked"`
 }
 
 type BalanceMap map[string]Balance
+
+func (m BalanceMap) Print() {
+	for _, balance := range m {
+		if balance.Locked > 0 {
+			logrus.Infof(" %s: %f (locked %f)", balance.Currency, balance.Available.Float64(), balance.Locked.Float64())
+		} else {
+			logrus.Infof(" %s: %f", balance.Currency, balance.Available.Float64())
+		}
+	}
+}
 
 type Account struct {
 	sync.Mutex
@@ -53,7 +63,7 @@ func (a *Account) Balance(currency string) (balance Balance, ok bool) {
 	return balance, ok
 }
 
-func (a *Account) AddBalance(currency string, fund float64) error {
+func (a *Account) AddBalance(currency string, fund fixedpoint.Value) error {
 	a.Lock()
 	defer a.Unlock()
 
@@ -72,7 +82,7 @@ func (a *Account) AddBalance(currency string, fund float64) error {
 	return nil
 }
 
-func (a *Account) UseLockedBalance(currency string, fund float64) error {
+func (a *Account) UseLockedBalance(currency string, fund fixedpoint.Value) error {
 	a.Lock()
 	defer a.Unlock()
 
@@ -83,24 +93,29 @@ func (a *Account) UseLockedBalance(currency string, fund float64) error {
 		return nil
 	}
 
-	return fmt.Errorf("trying to use more than locked: locked %f < want to use %f", balance.Locked, fund)
+	return fmt.Errorf("trying to use more than locked: locked %f < want to use %f", balance.Locked.Float64(), fund.Float64())
 }
 
-func (a *Account) UnlockBalance(currency string, unlocked float64) error {
+func (a *Account) UnlockBalance(currency string, unlocked fixedpoint.Value) error {
 	a.Lock()
 	defer a.Unlock()
+
 	balance, ok := a.balances[currency]
-	if ok && balance.Locked >= unlocked {
-		balance.Locked -= unlocked
-		balance.Available += unlocked
-		a.balances[currency] = balance
-		return nil
+	if !ok {
+		return fmt.Errorf("trying to unlocked inexisted balance: %s", currency)
 	}
 
-	return fmt.Errorf("trying to unlocked more than locked: locked %f < want to unlock %f", balance.Locked, unlocked)
+	if unlocked > balance.Locked {
+		return fmt.Errorf("trying to unlocked more than locked %s: locked %f < want to unlock %f", currency, balance.Locked.Float64(), unlocked.Float64())
+	}
+
+	balance.Locked -= unlocked
+	balance.Available += unlocked
+	a.balances[currency] = balance
+	return nil
 }
 
-func (a *Account) LockBalance(currency string, locked float64) error {
+func (a *Account) LockBalance(currency string, locked fixedpoint.Value) error {
 	a.Lock()
 	defer a.Unlock()
 
@@ -112,10 +127,10 @@ func (a *Account) LockBalance(currency string, locked float64) error {
 		return nil
 	}
 
-	return fmt.Errorf("insufficient available balance for lock %f", locked)
+	return fmt.Errorf("insufficient available balance %s for lock: want to lock %f, available %f", currency, locked.Float64(), balance.Available.Float64())
 }
 
-func (a *Account) UpdateBalances(balances map[string]Balance) {
+func (a *Account) UpdateBalances(balances BalanceMap) {
 	a.Lock()
 	defer a.Unlock()
 
@@ -138,8 +153,8 @@ func (a *Account) Print() {
 	defer a.Unlock()
 
 	for _, balance := range a.balances {
-		if util.NotZero(balance.Available) {
-			logrus.Infof("account balance %s %f", balance.Currency, balance.Available)
+		if balance.Available != 0 {
+			logrus.Infof("account balance %s %f", balance.Currency, balance.Available.Float64())
 		}
 	}
 }

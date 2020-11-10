@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -49,7 +50,7 @@ type SimplePriceMatching struct {
 
 	tradeUpdateCallbacks   []func(trade types.Trade)
 	orderUpdateCallbacks   []func(order types.Order)
-	accountUpdateCallbacks []func(balances types.BalanceMap)
+	balanceUpdateCallbacks []func(balances types.BalanceMap)
 }
 
 func (m *SimplePriceMatching) CancelOrder(o types.Order) (types.Order, error) {
@@ -73,43 +74,43 @@ func (m *SimplePriceMatching) CancelOrder(o types.Order) (types.Order, error) {
 	case types.SideTypeSell:
 		m.mu.Lock()
 		var orders []types.Order
-		for _, order := range m.bidOrders {
+		for _, order := range m.askOrders {
 			if o.OrderID == order.OrderID {
 				found = true
 				continue
 			}
 			orders = append(orders, order)
 		}
-		m.bidOrders = orders
+		m.askOrders = orders
 		m.mu.Unlock()
 
 	}
 
 	if !found {
+		logrus.Panicf("cancel order failed, order %d not found: %+v", o.OrderID, o)
+
 		return o, fmt.Errorf("cancel order failed, order %d not found: %+v", o.OrderID, o)
 	}
 
 	switch o.Side {
 	case types.SideTypeBuy:
-		if err := m.Account.UnlockBalance(m.Market.QuoteCurrency, o.Price*o.Quantity); err != nil {
+		if err := m.Account.UnlockBalance(m.Market.QuoteCurrency, fixedpoint.NewFromFloat(o.Price*o.Quantity)); err != nil {
 			return o, err
 		}
 
 	case types.SideTypeSell:
-		if err := m.Account.UnlockBalance(m.Market.BaseCurrency, o.Quantity); err != nil {
+		if err := m.Account.UnlockBalance(m.Market.BaseCurrency, fixedpoint.NewFromFloat(o.Quantity)); err != nil {
 			return o, err
 		}
 	}
 
 	o.Status = types.OrderStatusCanceled
 	m.EmitOrderUpdate(o)
-	m.EmitAccountUpdate(m.Account.Balances())
+	m.EmitBalanceUpdate(m.Account.Balances())
 	return o, nil
 }
 
 func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (closedOrders *types.Order, trades *types.Trade, err error) {
-	// start from one
-	orderID := incOrderID()
 
 	// price for checking account balance
 	price := o.Price
@@ -123,19 +124,21 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (closedOrders *typ
 	switch o.Side {
 	case types.SideTypeBuy:
 		quote := price * o.Quantity
-		if err := m.Account.LockBalance(m.Market.QuoteCurrency, quote); err != nil {
+		if err := m.Account.LockBalance(m.Market.QuoteCurrency, fixedpoint.NewFromFloat(quote)); err != nil {
 			return nil, nil, err
 		}
 
 	case types.SideTypeSell:
 		baseQuantity := o.Quantity
-		if err := m.Account.LockBalance(m.Market.BaseCurrency, baseQuantity); err != nil {
+		if err := m.Account.LockBalance(m.Market.BaseCurrency, fixedpoint.NewFromFloat(baseQuantity)); err != nil {
 			return nil, nil, err
 		}
 	}
 
-	m.EmitAccountUpdate(m.Account.Balances())
+	m.EmitBalanceUpdate(m.Account.Balances())
 
+	// start from one
+	orderID := incOrderID()
 	order := m.newOrder(o, orderID)
 
 	if o.Type == types.OrderTypeMarket {
@@ -150,7 +153,7 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (closedOrders *typ
 		order.ExecutedQuantity = order.Quantity
 		order.Price = price
 		m.EmitOrderUpdate(order)
-		m.EmitAccountUpdate(m.Account.Balances())
+		m.EmitBalanceUpdate(m.Account.Balances())
 		return &order, &trade, nil
 	}
 
@@ -177,10 +180,13 @@ func (m *SimplePriceMatching) executeTrade(trade types.Trade) {
 	var err error
 	// execute trade, update account balances
 	if trade.IsBuyer {
-		quote := trade.Price * trade.Quantity
-		err = m.Account.UseLockedBalance(m.Market.QuoteCurrency, quote)
+		err = m.Account.UseLockedBalance(m.Market.QuoteCurrency, fixedpoint.NewFromFloat(trade.Price*trade.Quantity))
+
+		_ = m.Account.AddBalance(m.Market.BaseCurrency, fixedpoint.NewFromFloat(trade.Quantity))
 	} else {
-		err = m.Account.UseLockedBalance(m.Market.BaseCurrency, trade.Quantity)
+		err = m.Account.UseLockedBalance(m.Market.BaseCurrency, fixedpoint.NewFromFloat(trade.Quantity))
+
+		_ = m.Account.AddBalance(m.Market.QuoteCurrency, fixedpoint.NewFromFloat(trade.Quantity*trade.Price))
 	}
 
 	if err != nil {
@@ -188,7 +194,7 @@ func (m *SimplePriceMatching) executeTrade(trade types.Trade) {
 	}
 
 	m.EmitTradeUpdate(trade)
-	m.EmitAccountUpdate(m.Account.Balances())
+	m.EmitBalanceUpdate(m.Account.Balances())
 	return
 }
 
@@ -391,67 +397,32 @@ func (m *SimplePriceMatching) SellToPrice(price fixedpoint.Value) (closedOrders 
 	return closedOrders, trades
 }
 
-func emitTxn(stream *Stream, trades []types.Trade, orders []types.Order) {
-	for _, t := range trades {
-		stream.EmitTradeUpdate(t)
-	}
-	for _, o := range orders {
-		stream.EmitOrderUpdate(o)
-	}
-}
-func (m *SimplePriceMatching) processKLine(stream *Stream, kline types.KLine) {
+func (m *SimplePriceMatching) processKLine(kline types.KLine) {
 	m.CurrentTime = kline.EndTime
 
 	switch kline.GetTrend() {
 	case types.TrendDown:
 		if kline.High > kline.Open {
-			orders, trades := m.BuyToPrice(fixedpoint.NewFromFloat(kline.High))
-			emitTxn(stream, trades, orders)
+			m.BuyToPrice(fixedpoint.NewFromFloat(kline.High))
 		}
 
 		if kline.Low > kline.Close {
-			orders, trades := m.SellToPrice(fixedpoint.NewFromFloat(kline.Low))
-			emitTxn(stream, trades, orders)
+			m.SellToPrice(fixedpoint.NewFromFloat(kline.Low))
 		}
-		orders, trades := m.SellToPrice(fixedpoint.NewFromFloat(kline.Close))
-		emitTxn(stream, trades, orders)
+
+		m.SellToPrice(fixedpoint.NewFromFloat(kline.Close))
 
 	case types.TrendUp:
 		if kline.Low < kline.Open {
-			orders, trades := m.SellToPrice(fixedpoint.NewFromFloat(kline.Low))
-			emitTxn(stream, trades, orders)
+			m.SellToPrice(fixedpoint.NewFromFloat(kline.Low))
 		}
 
 		if kline.High > kline.Close {
-			orders, trades := m.BuyToPrice(fixedpoint.NewFromFloat(kline.High))
-			emitTxn(stream, trades, orders)
+			m.BuyToPrice(fixedpoint.NewFromFloat(kline.High))
 		}
-		orders, trades := m.BuyToPrice(fixedpoint.NewFromFloat(kline.Close))
-		emitTxn(stream, trades, orders)
+
+		m.BuyToPrice(fixedpoint.NewFromFloat(kline.Close))
 	}
-}
-
-type Matching struct {
-	Symbol string
-	Asks   PriceOrderSlice
-	Bids   PriceOrderSlice
-
-	OrderID     uint64
-	CurrentTime time.Time
-}
-
-func (m *Matching) PlaceOrder(o types.SubmitOrder) {
-	var order = types.Order{
-		SubmitOrder:      o,
-		Exchange:         "backtest",
-		OrderID:          m.OrderID,
-		Status:           types.OrderStatusNew,
-		ExecutedQuantity: 0,
-		IsWorking:        false,
-		CreationTime:     m.CurrentTime,
-		UpdateTime:       m.CurrentTime,
-	}
-	_ = order
 }
 
 func (m *SimplePriceMatching) newOrder(o types.SubmitOrder, orderID uint64) types.Order {
@@ -461,7 +432,7 @@ func (m *SimplePriceMatching) newOrder(o types.SubmitOrder, orderID uint64) type
 		Exchange:         "backtest",
 		Status:           types.OrderStatusNew,
 		ExecutedQuantity: 0,
-		IsWorking:        false,
+		IsWorking:        true,
 		CreationTime:     m.CurrentTime,
 		UpdateTime:       m.CurrentTime,
 	}
