@@ -63,7 +63,7 @@ type Strategy struct {
 	// e.g., 0.001, so that your orders will be submitted at price like 0.127, 0.128, 0.129, 0.130
 	GridPips fixedpoint.Value `json:"gridPips"`
 
-	MinProfitSpread fixedpoint.Value `json:"minProfitSpread"`
+	ProfitSpread fixedpoint.Value `json:"profitSpread"`
 
 	// GridNum is the grid number, how many orders you want to post on the orderbook.
 	GridNum int `json:"gridNumber"`
@@ -165,7 +165,7 @@ func (s *Strategy) updateAskOrders(orderExecutor bbgo.OrderExecutor, session *bb
 
 func (s *Strategy) updateOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) {
 	// skip order updates if up-band - down-band < min profit spread
-	if (s.boll.LastUpBand() - s.boll.LastDownBand()) <= s.MinProfitSpread.Float64() {
+	if (s.boll.LastUpBand() - s.boll.LastDownBand()) <= s.ProfitSpread.Float64() {
 		log.Infof("boll: down band price == up band price, skipping...")
 		return
 	}
