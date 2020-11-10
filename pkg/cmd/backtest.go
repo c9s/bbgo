@@ -30,16 +30,9 @@ var BacktestCmd = &cobra.Command{
 	Short:        "backtest your strategies",
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		log.SetLevel(log.ErrorLevel)
 		verboseCnt, err := cmd.Flags().GetCount("verbose")
 		if err != nil {
 			return err
-		}
-
-		if verboseCnt == 2 {
-			log.SetLevel(log.DebugLevel)
-		} else if verboseCnt > 0 {
-			log.SetLevel(log.InfoLevel)
 		}
 
 		configFile, err := cmd.Flags().GetString("config")
@@ -50,7 +43,6 @@ var BacktestCmd = &cobra.Command{
 		if len(configFile) == 0 {
 			return errors.New("--config option is required")
 		}
-
 
 		wantSync, err := cmd.Flags().GetBool("sync")
 		if err != nil {
@@ -96,7 +88,6 @@ var BacktestCmd = &cobra.Command{
 		}
 
 		backtestService := &service.BacktestService{DB: db}
-
 		backtestExchange := backtest.NewExchange(exchangeName, backtestService, userConfig.Backtest)
 
 		if wantSync {
@@ -108,6 +99,7 @@ var BacktestCmd = &cobra.Command{
 		}
 
 		environ := bbgo.NewEnvironment()
+		environ.SetStartTime(startTime)
 		environ.AddExchange(exchangeName.String(), backtestExchange)
 
 		environ.Notifiability = bbgo.Notifiability{
@@ -117,9 +109,19 @@ var BacktestCmd = &cobra.Command{
 		}
 
 		trader := bbgo.NewTrader(environ)
-		trader.DisableLogging()
+
+		if verboseCnt == 2 {
+			log.SetLevel(log.DebugLevel)
+		} else if verboseCnt > 0 {
+			log.SetLevel(log.InfoLevel)
+		} else {
+			// default mode, disable strategy logging and order executor logging
+			log.SetLevel(log.ErrorLevel)
+			trader.DisableLogging()
+		}
 
 		if userConfig.RiskControls != nil {
+			log.Infof("setting risk controls: %+v", userConfig.RiskControls)
 			trader.SetRiskControls(userConfig.RiskControls)
 		}
 
@@ -138,11 +140,35 @@ var BacktestCmd = &cobra.Command{
 
 		<-backtestExchange.Done()
 
+		// put the logger back to print the pnl
+		log.SetLevel(log.InfoLevel)
 		for _, session := range environ.Sessions() {
+
 			calculator := &pnl.AverageCostCalculator{
 				TradingFeeCurrency: backtestExchange.PlatformFeeCurrency(),
 			}
 			for symbol, trades := range session.Trades {
+				market, ok := session.Market(symbol)
+				if !ok {
+					return fmt.Errorf("market not found: %s", symbol)
+				}
+
+				marketDataStore, ok := session.MarketDataStore(symbol)
+				if !ok {
+					return fmt.Errorf("market data store not found: %s", symbol)
+				}
+
+				klines, ok := marketDataStore.KLinesOfInterval(types.Interval1d)
+				if !ok {
+					return fmt.Errorf("klines not found: %s", types.Interval1d)
+				}
+
+				firstKLine := klines[0]
+				startPrice := firstKLine.Open
+
+				log.Infof("%s PROFIT AND LOSS REPORT", symbol)
+				log.Infof("===============================================")
+
 				lastPrice, ok := session.LastPrice(symbol)
 				if !ok {
 					return fmt.Errorf("last price not found: %s", symbol)
@@ -150,9 +176,32 @@ var BacktestCmd = &cobra.Command{
 
 				report := calculator.Calculate(symbol, trades, lastPrice)
 				report.Print()
+
+				initBalances := userConfig.Backtest.Account.Balances.BalanceMap()
+				finalBalances := session.Account.Balances()
+
+				log.Infof("INITIAL BALANCES:")
+				initBalances.Print()
+
+				log.Infof("FINAL BALANCES:")
+				finalBalances.Print()
+
+				initBaseAsset := InBaseAsset(initBalances, market, startPrice)
+				finalBaseAsset := InBaseAsset(finalBalances, market, lastPrice)
+				log.Infof("INITIAL ASSET ~= %s %s (1 %s = %f)", market.FormatQuantity(initBaseAsset), market.BaseCurrency, market.BaseCurrency, startPrice)
+				log.Infof("FINAL ASSET ~= %s %s (1 %s = %f)", market.FormatQuantity(finalBaseAsset), market.BaseCurrency, market.BaseCurrency, lastPrice)
+
+				log.Infof("%s BASE ASSET PERFORMANCE: %.2f%% (= (%.2f - %.2f) / %.2f)", symbol, (finalBaseAsset-initBaseAsset)/initBaseAsset*100.0, finalBaseAsset, initBaseAsset, initBaseAsset)
+				log.Infof("%s PERFORMANCE: %.2f%% (= (%.2f - %.2f) / %.2f)", symbol, (lastPrice-startPrice)/startPrice*100.0, lastPrice, startPrice, startPrice)
 			}
 		}
 
 		return nil
 	},
+}
+
+func InBaseAsset(balances types.BalanceMap, market types.Market, price float64) float64 {
+	quote := balances[market.QuoteCurrency]
+	base := balances[market.BaseCurrency]
+	return (base.Locked.Float64() + base.Available.Float64()) + ((quote.Locked.Float64() + quote.Available.Float64()) / price)
 }
