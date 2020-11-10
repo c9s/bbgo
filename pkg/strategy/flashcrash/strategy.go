@@ -63,8 +63,8 @@ func (s *Strategy) updateBidOrders(orderExecutor bbgo.OrderExecutor, session *bb
 	balances := session.Account.Balances()
 
 	balance, ok := balances[quoteCurrency]
-	if !ok || balance.Available <= 0.0 {
-		log.Infof("insufficient balance of %s: %f", quoteCurrency, balance.Available)
+	if !ok || balance.Available <= 0 {
+		log.Infof("insufficient balance of %s: %f", quoteCurrency, balance.Available.Float64())
 		return
 	}
 
