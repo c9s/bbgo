@@ -4,8 +4,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/valyala/fastjson"
 
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
 )
 
 type BaseEvent struct {
@@ -14,18 +14,18 @@ type BaseEvent struct {
 }
 
 type OrderUpdate struct {
-	Event     string `json:"e"`
-	ID        uint64 `json:"i"`
-	Side      string `json:"sd"`
+	Event     string    `json:"e"`
+	ID        uint64    `json:"i"`
+	Side      string    `json:"sd"`
 	OrderType OrderType `json:"ot"`
 
 	Price     string `json:"p"`
 	StopPrice string `json:"sp"`
 
-	Volume       string `json:"v"`
-	AveragePrice string `json:"ap"`
+	Volume       string     `json:"v"`
+	AveragePrice string     `json:"ap"`
 	State        OrderState `json:"S"`
-	Market       string `json:"M"`
+	Market       string     `json:"M"`
 
 	RemainingVolume string `json:"rv"`
 	ExecutedVolume  string `json:"ev"`
@@ -36,7 +36,6 @@ type OrderUpdate struct {
 	ClientOID   string `json:"ci"`
 	CreatedAtMs int64  `json:"T"`
 }
-
 
 type OrderUpdateEvent struct {
 	BaseEvent
@@ -173,12 +172,12 @@ type BalanceMessage struct {
 }
 
 func (m *BalanceMessage) Balance() (*types.Balance, error) {
-	available, err := util.ParseFloat(m.Available)
+	available, err := fixedpoint.NewFromString(m.Available)
 	if err != nil {
 		return nil, err
 	}
 
-	locked, err := util.ParseFloat(m.Locked)
+	locked, err := fixedpoint.NewFromString(m.Locked)
 	if err != nil {
 		return nil, err
 	}

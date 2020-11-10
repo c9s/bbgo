@@ -1,7 +1,7 @@
 package bbgo
 
 import (
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -21,11 +21,11 @@ func NewLocalActiveOrderBook() *LocalActiveOrderBook {
 
 func (b *LocalActiveOrderBook) Print() {
 	for _, o := range b.Bids.Orders() {
-		logrus.Infof("bid order: %d -> %s", o.OrderID, o.Status)
+		log.Infof("bid order: %d -> %s", o.OrderID, o.Status)
 	}
 
 	for _, o := range b.Asks.Orders() {
-		logrus.Infof("ask order: %d -> %s", o.OrderID, o.Status)
+		log.Infof("ask order: %d -> %s", o.OrderID, o.Status)
 	}
 }
 

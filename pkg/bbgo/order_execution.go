@@ -128,9 +128,9 @@ func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...
 				continue
 			}
 
-			if quoteBalance.Available < c.MinQuoteBalance.Float64() {
+			if quoteBalance.Available < c.MinQuoteBalance {
 				addError(errors.Wrapf(ErrQuoteBalanceLevelTooLow, "can not place buy order, quote balance level is too low: %s < %s, order: %s",
-					types.USD.FormatMoneyFloat64(quoteBalance.Available),
+					types.USD.FormatMoneyFloat64(quoteBalance.Available.Float64()),
 					types.USD.FormatMoneyFloat64(c.MinQuoteBalance.Float64()), order.String()))
 				continue
 			}
@@ -143,7 +143,7 @@ func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...
 				quantity = adjustQuantityByMaxAmount(quantity, price, c.MaxOrderAmount.Float64())
 			}
 
-			quoteAssetQuota := math.Max(0.0, quoteBalance.Available-c.MinQuoteBalance.Float64())
+			quoteAssetQuota := math.Max(0.0, quoteBalance.Available.Float64()-c.MinQuoteBalance.Float64())
 			if quoteAssetQuota < market.MinAmount {
 				addError(
 					errors.Wrapf(
@@ -157,18 +157,18 @@ func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...
 
 			// if MaxBaseAssetBalance is enabled, we should check the current base asset balance
 			if baseBalance, hasBaseAsset := balances[market.BaseCurrency]; hasBaseAsset && c.MaxBaseAssetBalance > 0 {
-				if baseBalance.Available > c.MaxBaseAssetBalance.Float64() {
+				if baseBalance.Available > c.MaxBaseAssetBalance {
 					addError(
 						errors.Wrapf(
 							ErrAssetBalanceLevelTooHigh,
 							"should not place buy order, asset balance level is too high: %f > %f, order: %s",
-							baseBalance.Available,
+							baseBalance.Available.Float64(),
 							c.MaxBaseAssetBalance.Float64(),
 							order.String()))
 					continue
 				}
 
-				baseAssetQuota := math.Max(0, c.MaxBaseAssetBalance.Float64()-baseBalance.Available)
+				baseAssetQuota := math.Max(0.0, c.MaxBaseAssetBalance.Float64()-baseBalance.Available.Float64())
 				if quantity > baseAssetQuota {
 					quantity = baseAssetQuota
 				}
@@ -204,24 +204,24 @@ func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...
 			quantity = adjustQuantityByMinAmount(quantity, price, market.MinNotional*1.01)
 
 			// we should not SELL too much
-			quantity = math.Min(quantity, baseAssetBalance.Available)
+			quantity = math.Min(quantity, baseAssetBalance.Available.Float64())
 
 			if c.MinBaseAssetBalance > 0 {
-				if baseAssetBalance.Available < c.MinBaseAssetBalance.Float64() {
+				if baseAssetBalance.Available < c.MinBaseAssetBalance {
 					addError(
 						errors.Wrapf(
 							ErrAssetBalanceLevelTooLow,
-							"asset balance level is too low: %f > %f", baseAssetBalance.Available, c.MinBaseAssetBalance.Float64()))
+							"asset balance level is too low: %f > %f", baseAssetBalance.Available.Float64(), c.MinBaseAssetBalance.Float64()))
 					continue
 				}
 
-				quantity = math.Min(quantity, baseAssetBalance.Available-c.MinBaseAssetBalance.Float64())
+				quantity = math.Min(quantity, baseAssetBalance.Available.Float64()-c.MinBaseAssetBalance.Float64())
 				if quantity < market.MinQuantity {
 					addError(
 						errors.Wrapf(
 							ErrInsufficientAssetBalance,
 							"insufficient asset balance: %f > minimal quantity %f",
-							baseAssetBalance.Available,
+							baseAssetBalance.Available.Float64(),
 							market.MinQuantity))
 					continue
 				}
@@ -295,4 +295,11 @@ func formatOrders(session *ExchangeSession, orders []types.SubmitOrder) (formatt
 	}
 
 	return formattedOrders, err
+}
+
+func max(a, b int64) int64 {
+	if a > b {
+		return a
+	}
+	return b
 }
