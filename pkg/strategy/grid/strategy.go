@@ -48,8 +48,8 @@ type Strategy struct {
 
 	LowerPrice fixedpoint.Value `json:"lowerPrice"`
 
-	// BaseQuantity is the quantity you want to submit for each order.
-	BaseQuantity float64 `json:"baseQuantity"`
+	// Quantity is the quantity you want to submit for each order.
+	Quantity float64 `json:"baseQuantity"`
 
 	// activeOrders is the locally maintained active order book of the maker orders.
 	activeOrders *bbgo.LocalActiveOrderBook
@@ -92,7 +92,7 @@ func (s *Strategy) placeGridOrders(orderExecutor bbgo.OrderExecutor, session *bb
 			Side:        side,
 			Type:        types.OrderTypeLimit,
 			Market:      s.Market,
-			Quantity:    s.BaseQuantity,
+			Quantity:    s.Quantity,
 			Price:       price.Float64(),
 			TimeInForce: "GTC",
 		}
