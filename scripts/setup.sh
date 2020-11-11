@@ -7,7 +7,7 @@ if [[ ! -e "bbgo" ]] ; then
     curl -L -o bbgo https://github.com/c9s/bbgo/releases/download/$version/bbgo-$osf
     chmod +x bbgo
 
-    echo "bbgo binary downloaded"
+    echo "Binary downloaded"
 fi
 
 
@@ -45,7 +45,7 @@ exchangeStrategies:
     lowerPrice: 11000.0
 END
 
-echo "BBGO Config file is generated"
+echo "Config file is generated"
 
 if [[ -e ".env.local" ]] ; then
   echo "Found existing .env.local, you will overwrite the existing .env.local file!"
