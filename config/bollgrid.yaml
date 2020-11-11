@@ -1,0 +1,69 @@
+---
+notifications:
+  slack:
+    defaultChannel: "dev-bbgo"
+    errorChannel: "bbgo-error"
+
+  # if you want to route channel by symbol
+  symbolChannels:
+    "^BTC": "btc"
+    "^ETH": "eth"
+    "^BNB": "bnb"
+
+  # object routing rules
+  routing:
+    trade: "$symbol"
+    order: "$symbol"
+    submitOrder: "$session" # not supported yet
+    pnL: "bbgo-pnl"
+
+sessions:
+  binance:
+    exchange: binance
+    envVarPrefix: binance
+
+  max:
+    exchange: max
+    envVarPrefix: max
+
+riskControls:
+  # This is the session-based risk controller, which let you configure different risk controller by session.
+  sessionBased:
+    # "binance" is the session name that you want to configure the risk control
+    binance:
+      # orderExecutor is one of the risk control
+      orderExecutor:
+        # symbol-routed order executor
+        bySymbol:
+          BTCUSDT:
+            # basic risk control order executor
+            basic:
+              minQuoteBalance: 100.0
+              maxBaseAssetBalance: 3.0
+              minBaseAssetBalance: 0.0
+              maxOrderAmount: 1000.0
+
+backtest:
+  # for testing max draw down (MDD) at 03-12
+  # see here for more details
+  # https://www.investopedia.com/terms/m/maximum-drawdown-mdd.asp
+  startTime: "2020-09-01"
+  endTime: "2020-09-07"
+  symbols:
+  - BTCUSDT
+  account:
+    makerCommission: 15
+    takerCommission: 15
+    balances:
+      BTC: 0.1
+      USDT: 10000.0
+
+exchangeStrategies:
+- on: binance
+  bollgrid:
+    symbol: BTCUSDT
+    interval: 5m
+    gridNumber: 2
+    gridPips: 10.0
+    quantity: 0.01
+    profitSpread: 100.0
