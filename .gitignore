@@ -22,4 +22,5 @@
 /.env.*.local
 
 /build
+/dist
 /bbgow*
