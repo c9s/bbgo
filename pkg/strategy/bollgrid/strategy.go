@@ -63,11 +63,13 @@ type Strategy struct {
 	// GridNum is the grid number, how many orders you want to post on the orderbook.
 	GridNum int `json:"gridNumber"`
 
-	// BaseQuantity is the quantity you want to submit for each order.
-	BaseQuantity float64 `json:"baseQuantity"`
+	// Quantity is the quantity you want to submit for each order.
+	Quantity float64 `json:"quantity"`
 
 	// activeOrders is the locally maintained active order book of the maker orders.
 	activeOrders *bbgo.LocalActiveOrderBook
+
+	orders *bbgo.OrderStore
 
 	// boll is the BOLLINGER indicator we used for predicting the price.
 	boll *indicator.BOLL
@@ -101,7 +103,7 @@ func (s *Strategy) updateBidOrders(orderExecutor bbgo.OrderExecutor, session *bb
 			Side:        types.SideTypeBuy,
 			Type:        types.OrderTypeLimit,
 			Market:      s.Market,
-			Quantity:    s.BaseQuantity,
+			Quantity:    s.Quantity,
 			Price:       startPrice,
 			TimeInForce: "GTC",
 		})
@@ -116,6 +118,7 @@ func (s *Strategy) updateBidOrders(orderExecutor bbgo.OrderExecutor, session *bb
 	}
 
 	s.activeOrders.Add(orders...)
+	s.orders.Add(orders...)
 }
 
 func (s *Strategy) updateAskOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) {
@@ -141,7 +144,7 @@ func (s *Strategy) updateAskOrders(orderExecutor bbgo.OrderExecutor, session *bb
 			Side:        types.SideTypeSell,
 			Type:        types.OrderTypeLimit,
 			Market:      s.Market,
-			Quantity:    s.BaseQuantity,
+			Quantity:    s.Quantity,
 			Price:       startPrice,
 			TimeInForce: "GTC",
 		})
@@ -155,6 +158,7 @@ func (s *Strategy) updateAskOrders(orderExecutor bbgo.OrderExecutor, session *bb
 		return
 	}
 
+	s.orders.Add(orders...)
 	s.activeOrders.Add(orders...)
 }
 
@@ -168,7 +172,6 @@ func (s *Strategy) updateOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.
 	if err := session.Exchange.CancelOrders(context.Background(), s.activeOrders.Orders()...); err != nil {
 		log.WithError(err).Errorf("cancel order error")
 	}
-
 
 	_, ok := session.Account.Balance(s.Market.QuoteCurrency)
 	if ok {
@@ -185,24 +188,37 @@ func (s *Strategy) updateOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.
 	s.activeOrders.Print()
 }
 
-func (s *Strategy) orderUpdateHandler(order types.Order) {
-	if order.Symbol != s.Symbol {
+func (s *Strategy) submitReverseOrder(order types.Order) {
+	var side = order.Side.Reverse()
+	var price = order.Price
+
+	switch side {
+	case types.SideTypeSell:
+		price += s.ProfitSpread.Float64()
+
+	case types.SideTypeBuy:
+		price -= s.ProfitSpread.Float64()
+
+	}
+
+	submitOrder := types.SubmitOrder{
+		Symbol:      s.Symbol,
+		Side:        side,
+		Type:        types.OrderTypeLimit,
+		Quantity:    order.Quantity,
+		Price:       price,
+		TimeInForce: "GTC",
+	}
+
+	log.Infof("submitting reverse order: %s against %s", submitOrder.String(), order.String())
+
+	createdOrders, err := s.OrderExecutor.SubmitOrders(context.Background(), submitOrder)
+	if err != nil {
+		log.WithError(err).Errorf("can not place orders")
 		return
 	}
 
-	log.Infof("received order update: %+v", order)
-
-	switch order.Status {
-	case types.OrderStatusFilled:
-		s.activeOrders.Delete(order)
-
-	case types.OrderStatusPartiallyFilled, types.OrderStatusNew:
-		s.activeOrders.Update(order)
-
-	case types.OrderStatusCanceled, types.OrderStatusRejected:
-		log.Infof("order status %s, removing %d from the active order pool...", order.Status, order.OrderID)
-		s.activeOrders.Delete(order)
-	}
+	s.orders.Add(createdOrders...)
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
@@ -213,12 +229,17 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.boll = s.StandardIndicatorSet.GetBOLL(types.IntervalWindow{
 		Interval: s.Interval,
 		Window:   21,
-	})
+	}, 2.0)
+
+	s.orders = bbgo.NewOrderStore()
+	s.orders.BindStream(session.Stream)
 
 	// we don't persist orders so that we can not clear the previous orders for now. just need time to support this.
 	s.activeOrders = bbgo.NewLocalActiveOrderBook()
-
-	session.Stream.OnOrderUpdate(s.orderUpdateHandler)
+	s.activeOrders.BindStream(session.Stream)
+	s.activeOrders.OnFilled(func(o types.Order) {
+		s.submitReverseOrder(o)
+	})
 
 	// avoid using time ticker since we will need back testing here
 	session.Stream.OnKLineClosed(func(kline types.KLine) {
@@ -233,18 +254,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			s.updateOrders(orderExecutor, session)
 		}
 	})
-
-	// in order to avoid blocking the stream callbacks, we need to spawn a go routine here to listen to the signal
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				// TODO: add and fix graceful shutdown
-				_ = session.Exchange.CancelOrders(context.Background(), s.activeOrders.Orders()...)
-				return
-			}
-		}
-	}()
 
 	return nil
 }

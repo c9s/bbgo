@@ -103,11 +103,11 @@ func (s *Strategy) orderUpdateHandler(order types.Order) {
 
 	switch order.Status {
 	case types.OrderStatusFilled:
-		s.activeOrders.Delete(order)
+		s.activeOrders.Remove(order)
 
 	case types.OrderStatusCanceled, types.OrderStatusRejected:
 		log.Infof("order status %s, removing %d from the active order pool...", order.Status, order.OrderID)
-		s.activeOrders.Delete(order)
+		s.activeOrders.Remove(order)
 
 	case types.OrderStatusPartiallyFilled:
 		s.activeOrders.Add(order)

@@ -7,15 +7,41 @@ import (
 )
 
 // LocalActiveOrderBook manages the local active order books.
+//go:generate callbackgen -type LocalActiveOrderBook
 type LocalActiveOrderBook struct {
 	Bids *types.SyncOrderMap
 	Asks *types.SyncOrderMap
+
+	filledCallbacks []func(o types.Order)
 }
 
 func NewLocalActiveOrderBook() *LocalActiveOrderBook {
 	return &LocalActiveOrderBook{
 		Bids: types.NewSyncOrderMap(),
 		Asks: types.NewSyncOrderMap(),
+	}
+}
+
+func (b *LocalActiveOrderBook) BindStream(stream types.Stream) {
+	stream.OnOrderUpdate(b.orderUpdateHandler)
+}
+
+func (b *LocalActiveOrderBook) orderUpdateHandler(order types.Order) {
+	log.Infof("[LocalActiveOrderBook] received order update: %+v", order)
+
+	switch order.Status {
+	case types.OrderStatusFilled:
+		// make sure we have the order and we remove it
+		if b.Remove(order) {
+			b.EmitFilled(order)
+		}
+
+	case types.OrderStatusPartiallyFilled, types.OrderStatusNew:
+		b.Update(order)
+
+	case types.OrderStatusCanceled, types.OrderStatusRejected:
+		log.Infof("[LocalActiveOrderBook] order status %s, removing %d...", order.Status, order.OrderID)
+		b.Remove(order)
 	}
 }
 
@@ -42,7 +68,6 @@ func (b *LocalActiveOrderBook) Update(orders ...types.Order) {
 	}
 }
 
-
 func (b *LocalActiveOrderBook) Add(orders ...types.Order) {
 	for _, order := range orders {
 		switch order.Side {
@@ -64,15 +89,17 @@ func (b *LocalActiveOrderBook) NumOfAsks() int {
 	return b.Asks.Len()
 }
 
-func (b *LocalActiveOrderBook) Delete(order types.Order) {
+func (b *LocalActiveOrderBook) Remove(order types.Order) bool {
 	switch order.Side {
 	case types.SideTypeBuy:
-		b.Bids.Delete(order.OrderID)
+		return b.Bids.Remove(order.OrderID)
 
 	case types.SideTypeSell:
-		b.Asks.Delete(order.OrderID)
+		return b.Asks.Remove(order.OrderID)
 
 	}
+
+	return false
 }
 
 // WriteOff writes off the filled order on the opposite side.
@@ -86,16 +113,16 @@ func (b *LocalActiveOrderBook) WriteOff(order types.Order) bool {
 	case types.SideTypeSell:
 		// find the filled bid to remove
 		if filledOrder, ok := b.Bids.AnyFilled(); ok {
-			b.Bids.Delete(filledOrder.OrderID)
-			b.Asks.Delete(order.OrderID)
+			b.Bids.Remove(filledOrder.OrderID)
+			b.Asks.Remove(order.OrderID)
 			return true
 		}
 
 	case types.SideTypeBuy:
 		// find the filled ask order to remove
 		if filledOrder, ok := b.Asks.AnyFilled(); ok {
-			b.Asks.Delete(filledOrder.OrderID)
-			b.Bids.Delete(order.OrderID)
+			b.Asks.Remove(filledOrder.OrderID)
+			b.Bids.Remove(order.OrderID)
 			return true
 		}
 	}
