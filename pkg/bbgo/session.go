@@ -38,6 +38,7 @@ func NewStandardIndicatorSet(symbol string, store *MarketDataStore) *StandardInd
 
 		// setup BOLL indicator, we may refactor BOLL indicator by subscribing SMA indicator,
 		// however, since general used BOLLINGER band use window 21, which is not in the existing SMA indicator sets.
+		// Pull out the bandwidth configuration as the BOLL Key
 		iw := types.IntervalWindow{Interval: interval, Window: 21}
 		set.BOLL[iw] = &indicator.BOLL{IntervalWindow: iw, K: 2.0}
 		set.BOLL[iw].Bind(store)
@@ -48,10 +49,10 @@ func NewStandardIndicatorSet(symbol string, store *MarketDataStore) *StandardInd
 
 // GetBOLL returns the bollinger band indicator of the given interval and the window,
 // Please note that the K for std dev is fixed and defaults to 2.0
-func (set *StandardIndicatorSet) GetBOLL(iw types.IntervalWindow) *indicator.BOLL {
+func (set *StandardIndicatorSet) GetBOLL(iw types.IntervalWindow, bandWidth float64) *indicator.BOLL {
 	inc, ok := set.BOLL[iw]
 	if !ok {
-		inc := &indicator.BOLL{IntervalWindow: iw, K: 2.0}
+		inc := &indicator.BOLL{IntervalWindow: iw, K: bandWidth}
 		inc.Bind(set.store)
 		set.BOLL[iw] = inc
 	}
