@@ -4,11 +4,7 @@ A trading bot framework written in Go. The name bbgo comes from the BB8 bot in t
 
 ## Current Status
 
-_Working hard in progress_
-
 [![Build Status](https://travis-ci.org/c9s/bbgo.svg?branch=main)](https://travis-ci.org/c9s/bbgo)
-
-Aim to release v1.0 before 11/14
 
 ## Features
 
@@ -16,6 +12,8 @@ Aim to release v1.0 before 11/14
 - Stream integration (user data websocket)
 - PnL calculation.
 - Slack notification
+- KLine-based Backtest
+- Built-in strategies
 
 ## Supported Exchanges
 
