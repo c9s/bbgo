@@ -11,7 +11,13 @@ if [[ ! -e "bbgo" ]] ; then
 fi
 
 
-if [[ ! -e "bbgo.yaml" ]] ; then
+if [[ -e "bbgo.yaml" ]] ; then
+  echo "Found existing bbgo.yaml, you will overwrite the existing bbgo.yaml file!"
+  read -p "Are you sure? (Y/n) " a
+  if [[ $a == "n" ]] ; then
+    exit
+  fi
+fi
 
 cat <<END > bbgo.yaml
 ---
@@ -39,11 +45,18 @@ exchangeStrategies:
     lowerPrice: 11000.0
 END
 
+echo "BBGO Config file is generated"
+
+if [[ -e ".env.local" ]] ; then
+  echo "Found existing .env.local, you will overwrite the existing .env.local file!"
+  read -p "Are you sure? (Y/n) " a
+  if [[ $a == "n" ]] ; then
+    exit
+  fi
 fi
 
-if [[ ! -e ".env.local" ]] ; then
-
 read -p "Enter your MAX API key: " api_key
+
 read -p "Enter your MAX API secret: " api_secret
 
 echo "Generating your .env.local file..."
@@ -52,7 +65,6 @@ export MAX_API_KEY=$api_key
 export MAX_API_SECRET=$api_secret
 END
 
-fi
 echo "Now you can edit your strategy config file bbgo.yaml to run bbgo"
 
 if [[ $osf == "darwin" ]] ; then
