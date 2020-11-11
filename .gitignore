@@ -21,6 +21,8 @@
 /.env.local
 /.env.*.local
 
+.DS_Store
+
 /build
 /dist
 /bbgow*
