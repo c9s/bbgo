@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -17,13 +16,12 @@ func init() {
 	SyncCmd.Flags().String("exchange", "", "target exchange")
 	SyncCmd.Flags().String("symbol", "BTCUSDT", "trading symbol")
 	SyncCmd.Flags().String("since", "", "sync from time")
-	SyncCmd.Flags().Bool("backtest", true, "sync backtest data")
 	RootCmd.AddCommand(SyncCmd)
 }
 
 var SyncCmd = &cobra.Command{
 	Use:          "sync",
-	Short:        "sync data. trades, orders and market data",
+	Short:        "sync trades, orders",
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
@@ -75,62 +73,24 @@ var SyncCmd = &cobra.Command{
 			}
 		}
 
-		backtest, err := cmd.Flags().GetBool("backtest")
-		if err != nil {
+		tradeService := &service.TradeService{DB: db}
+		orderService := &service.OrderService{DB: db}
+		syncService := &service.SyncService{
+			TradeService: tradeService,
+			OrderService: orderService,
+		}
+
+		log.Info("syncing trades from exchange...")
+		if err := syncService.SyncTrades(ctx, exchange, symbol, startTime); err != nil {
 			return err
 		}
-		if backtest {
-			backtestService := &service.BacktestService{DB: db}
-			if err := backtestService.Sync(ctx, exchange, symbol, startTime); err != nil {
-				return err
-			}
 
-			log.Info("synchronization done")
-			log.Infof("verifying backtesting data...")
-
-			for interval := range types.SupportedIntervals {
-				log.Infof("verifying %s kline data...", interval)
-
-				klineC, errC := backtestService.QueryKLinesCh(startTime, time.Now(), exchange, []string{symbol}, []types.Interval{interval})
-				var emptyKLine types.KLine
-				var prevKLine types.KLine
-				for k := range klineC {
-					fmt.Print(".")
-					if prevKLine != emptyKLine {
-						if prevKLine.StartTime.Add(interval.Duration()) != k.StartTime {
-							log.Errorf("kline corrupted at %+v", k)
-						}
-					}
-
-					prevKLine = k
-				}
-				fmt.Println()
-
-				if err := <-errC; err != nil {
-					return err
-				}
-			}
-
-		} else {
-			tradeService := &service.TradeService{DB: db}
-			orderService := &service.OrderService{DB: db}
-			syncService := &service.SyncService{
-				TradeService: tradeService,
-				OrderService: orderService,
-			}
-
-			log.Info("syncing trades from exchange...")
-			if err := syncService.SyncTrades(ctx, exchange, symbol, startTime); err != nil {
-				return err
-			}
-
-			log.Info("syncing orders from exchange...")
-			if err := syncService.SyncOrders(ctx, exchange, symbol, startTime); err != nil {
-				return err
-			}
-
-			log.Info("synchronization done")
+		log.Info("syncing orders from exchange...")
+		if err := syncService.SyncOrders(ctx, exchange, symbol, startTime); err != nil {
+			return err
 		}
+
+		log.Info("synchronization done")
 
 		return nil
 	},
