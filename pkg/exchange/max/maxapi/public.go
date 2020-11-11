@@ -301,8 +301,8 @@ func parseKLines(payload []byte, symbol, resolution string, interval Interval) (
 			return nil, fmt.Errorf("failed to parse timestamp: %s", payload)
 		}
 
-		startTime := time.Unix(ts, 0).UTC()
-		endTime := time.Unix(ts, 0).Add(time.Duration(interval)*time.Minute - time.Millisecond).UTC()
+		startTime := time.Unix(ts, 0)
+		endTime := time.Unix(ts, 0).Add(time.Duration(interval)*time.Minute - time.Millisecond)
 		isClosed := time.Now().Before(endTime)
 		klines = append(klines, KLine{
 			Symbol:    symbol,

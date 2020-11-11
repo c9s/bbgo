@@ -9,6 +9,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const DateFormat = "2006-01-02"
+
 type ExchangeName string
 
 func (n ExchangeName) String() string {
@@ -140,6 +142,11 @@ func (e ExchangeBatchProcessor) BatchQueryKLines(ctx context.Context, symbol str
 			}
 
 			for _, kline := range kLines {
+				// ignore any kline before the given start time
+				if kline.StartTime.Before(startTime) {
+					continue
+				}
+
 				if kline.EndTime.After(endTime) {
 					return
 				}

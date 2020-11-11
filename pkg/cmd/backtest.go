@@ -20,6 +20,8 @@ import (
 func init() {
 	BacktestCmd.Flags().String("exchange", "", "target exchange")
 	BacktestCmd.Flags().Bool("sync", false, "sync backtest data")
+	BacktestCmd.Flags().Bool("sync-only", false, "sync backtest data only, do not run backtest")
+	BacktestCmd.Flags().String("sync-from", time.Now().AddDate(0, -6, 0).Format(types.DateFormat), "sync backtest data from the given time")
 	BacktestCmd.Flags().Bool("base-asset-baseline", false, "use base asset performance as the competitive baseline performance")
 	BacktestCmd.Flags().CountP("verbose", "v", "verbose level")
 	BacktestCmd.Flags().String("config", "config/bbgo.yaml", "strategy config file")
@@ -55,6 +57,21 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
+		syncOnly, err := cmd.Flags().GetBool("sync-only")
+		if err != nil {
+			return err
+		}
+
+		syncFromDateStr, err := cmd.Flags().GetString("sync-from")
+		if err != nil {
+			return err
+		}
+
+		syncFromTime, err := time.Parse(types.DateFormat, syncFromDateStr)
+		if err != nil {
+			return err
+		}
+
 		exchangeNameStr, err := cmd.Flags().GetString("exchange")
 		if err != nil {
 			return err
@@ -65,7 +82,7 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
-		exchange, err := cmdutil.NewExchange(exchangeName)
+		sourceExchange, err := cmdutil.NewExchange(exchangeName)
 		if err != nil {
 			return err
 		}
@@ -100,10 +117,61 @@ var BacktestCmd = &cobra.Command{
 		backtestService := &service.BacktestService{DB: db}
 
 		if wantSync {
+			log.Info("starting synchronization...")
 			for _, symbol := range userConfig.Backtest.Symbols {
-				if err := backtestService.Sync(ctx, exchange, symbol, startTime); err != nil {
+				if err := backtestService.Sync(ctx, sourceExchange, symbol, syncFromTime); err != nil {
 					return err
 				}
+			}
+			log.Info("synchronization done")
+
+			var corruptCnt = 0
+			for _, symbol := range userConfig.Backtest.Symbols {
+				log.Infof("verifying backtesting data...")
+
+				for interval := range types.SupportedIntervals {
+					log.Infof("verifying %s %s kline data...", symbol, interval)
+
+					klineC, errC := backtestService.QueryKLinesCh(startTime, time.Now(), sourceExchange, []string{symbol}, []types.Interval{interval})
+					var emptyKLine types.KLine
+					var prevKLine types.KLine
+					for k := range klineC {
+						if verboseCnt > 1 {
+							fmt.Print(".")
+						}
+
+						if prevKLine != emptyKLine {
+							if prevKLine.StartTime.Add(interval.Duration()) != k.StartTime {
+								corruptCnt++
+								log.Errorf("found kline data corrupted at time: %s kline: %+v", k.StartTime, k)
+								log.Errorf("between %d and %d",
+									prevKLine.StartTime.Unix(),
+									k.StartTime.Unix())
+							}
+						}
+
+						prevKLine = k
+					}
+
+					if verboseCnt > 1 {
+						fmt.Println()
+					}
+
+					if err := <-errC; err != nil {
+						return err
+					}
+				}
+			}
+
+			log.Infof("backtest verification completed")
+			if corruptCnt > 0 {
+				log.Errorf("found %d corruptions", corruptCnt)
+			} else {
+				log.Infof("found %d corruptions", corruptCnt)
+			}
+
+			if syncOnly {
+				return nil
 			}
 		}
 
@@ -195,8 +263,8 @@ var BacktestCmd = &cobra.Command{
 					log.Infof("INITIAL ASSET ~= %s %s (1 %s = %f)", market.FormatQuantity(initBaseAsset), market.BaseCurrency, market.BaseCurrency, startPrice)
 					log.Infof("FINAL ASSET ~= %s %s (1 %s = %f)", market.FormatQuantity(finalBaseAsset), market.BaseCurrency, market.BaseCurrency, lastPrice)
 
-					log.Infof("%s BASE ASSET PERFORMANCE: %.2f%% (= (%.2f - %.2f) / %.2f)", symbol, (finalBaseAsset-initBaseAsset)/initBaseAsset*100.0, finalBaseAsset, initBaseAsset, initBaseAsset)
-					log.Infof("%s PERFORMANCE: %.2f%% (= (%.2f - %.2f) / %.2f)", symbol, (lastPrice-startPrice)/startPrice*100.0, lastPrice, startPrice, startPrice)
+					log.Infof("%s BASE ASSET PERFORMANCE: %.2f%% (= (%.2f - %.2f) / %.2f)", market.BaseCurrency, (finalBaseAsset-initBaseAsset)/initBaseAsset*100.0, finalBaseAsset, initBaseAsset, initBaseAsset)
+					log.Infof("%s PERFORMANCE: %.2f%% (= (%.2f - %.2f) / %.2f)", market.BaseCurrency, (lastPrice-startPrice)/startPrice*100.0, lastPrice, startPrice, startPrice)
 				}
 			}
 		}
