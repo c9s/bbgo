@@ -49,7 +49,7 @@ type Strategy struct {
 	LowerPrice fixedpoint.Value `json:"lowerPrice"`
 
 	// Quantity is the quantity you want to submit for each order.
-	Quantity float64 `json:"baseQuantity"`
+	Quantity float64 `json:"quantity"`
 
 	// activeOrders is the locally maintained active order book of the maker orders.
 	activeOrders *bbgo.LocalActiveOrderBook
