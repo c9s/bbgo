@@ -20,6 +20,7 @@ import (
 func init() {
 	BacktestCmd.Flags().String("exchange", "", "target exchange")
 	BacktestCmd.Flags().Bool("sync", false, "sync backtest data")
+	BacktestCmd.Flags().Bool("base-asset-baseline", false, "use base asset performance as the competitive baseline performance")
 	BacktestCmd.Flags().CountP("verbose", "v", "verbose level")
 	BacktestCmd.Flags().String("config", "config/bbgo.yaml", "strategy config file")
 	RootCmd.AddCommand(BacktestCmd)
@@ -42,6 +43,11 @@ var BacktestCmd = &cobra.Command{
 
 		if len(configFile) == 0 {
 			return errors.New("--config option is required")
+		}
+
+		wantBaseAssetBaseline, err := cmd.Flags().GetBool("base-asset-baseline")
+		if err != nil {
+			return err
 		}
 
 		wantSync, err := cmd.Flags().GetBool("sync")
@@ -183,13 +189,15 @@ var BacktestCmd = &cobra.Command{
 				log.Infof("FINAL BALANCES:")
 				finalBalances.Print()
 
-				initBaseAsset := InBaseAsset(initBalances, market, startPrice)
-				finalBaseAsset := InBaseAsset(finalBalances, market, lastPrice)
-				log.Infof("INITIAL ASSET ~= %s %s (1 %s = %f)", market.FormatQuantity(initBaseAsset), market.BaseCurrency, market.BaseCurrency, startPrice)
-				log.Infof("FINAL ASSET ~= %s %s (1 %s = %f)", market.FormatQuantity(finalBaseAsset), market.BaseCurrency, market.BaseCurrency, lastPrice)
+				if wantBaseAssetBaseline {
+					initBaseAsset := InBaseAsset(initBalances, market, startPrice)
+					finalBaseAsset := InBaseAsset(finalBalances, market, lastPrice)
+					log.Infof("INITIAL ASSET ~= %s %s (1 %s = %f)", market.FormatQuantity(initBaseAsset), market.BaseCurrency, market.BaseCurrency, startPrice)
+					log.Infof("FINAL ASSET ~= %s %s (1 %s = %f)", market.FormatQuantity(finalBaseAsset), market.BaseCurrency, market.BaseCurrency, lastPrice)
 
-				log.Infof("%s BASE ASSET PERFORMANCE: %.2f%% (= (%.2f - %.2f) / %.2f)", symbol, (finalBaseAsset-initBaseAsset)/initBaseAsset*100.0, finalBaseAsset, initBaseAsset, initBaseAsset)
-				log.Infof("%s PERFORMANCE: %.2f%% (= (%.2f - %.2f) / %.2f)", symbol, (lastPrice-startPrice)/startPrice*100.0, lastPrice, startPrice, startPrice)
+					log.Infof("%s BASE ASSET PERFORMANCE: %.2f%% (= (%.2f - %.2f) / %.2f)", symbol, (finalBaseAsset-initBaseAsset)/initBaseAsset*100.0, finalBaseAsset, initBaseAsset, initBaseAsset)
+					log.Infof("%s PERFORMANCE: %.2f%% (= (%.2f - %.2f) / %.2f)", symbol, (lastPrice-startPrice)/startPrice*100.0, lastPrice, startPrice, startPrice)
+				}
 			}
 		}
 
