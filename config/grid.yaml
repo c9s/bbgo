@@ -62,7 +62,7 @@ exchangeStrategies:
 - on: binance
   grid:
     symbol: BTCUSDT
-    baseQuantity: 0.01
+    quantity: 0.01
     gridNumber: 100
     profitSpread: 50.0
     upperPrice: 11000.0
