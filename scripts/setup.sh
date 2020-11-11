@@ -32,7 +32,7 @@ exchangeStrategies:
 - on: max
   grid:
     symbol: BTCUSDT
-    baseQuantity: 0.002
+    quantity: 0.002
     gridNumber: 100
     profitSpread: 50.0
     upperPrice: 14000.0
