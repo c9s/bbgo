@@ -179,19 +179,24 @@ func (s *Strategy) placeGridOrders(orderExecutor bbgo.OrderExecutor, session *bb
 
 	var upBand = s.boll.LastUpBand()
 	if upBand <= 0.0 {
+		log.Warnf("up band == 0")
 		return
 	}
 
 	var downBand = s.boll.LastDownBand()
 	if downBand <= 0.0 {
+		log.Warnf("down band == 0")
 		return
 	}
 
 	currentPrice, ok := session.LastPrice(s.Symbol)
 	if !ok {
+		log.Warnf("last price not found")
 		return
 	}
+
 	if currentPrice > upBand || currentPrice < downBand {
+		log.Warnf("current price exceed the bollinger band")
 		return
 	}
 
@@ -251,7 +256,6 @@ func (s *Strategy) placeGridOrders(orderExecutor bbgo.OrderExecutor, session *bb
 }
 
 func (s *Strategy) updateOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) {
-
 	if err := session.Exchange.CancelOrders(context.Background(), s.activeOrders.Orders()...); err != nil {
 		log.WithError(err).Errorf("cancel order error")
 	}
@@ -342,8 +346,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 	})
 
-	// when the connection is created, we submit the first round of the orders.
 	session.Stream.OnConnect(func() {
+		log.Infof("connected, submitting the first round of the orders")
 		s.updateOrders(orderExecutor, session)
 	})
 
