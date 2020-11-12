@@ -2,14 +2,10 @@
 osf=$(uname | tr '[:upper:]' '[:lower:]')
 version=v1.1.0
 
-
-if [[ ! -e "bbgo" ]] ; then
-    curl -L -o bbgo https://github.com/c9s/bbgo/releases/download/$version/bbgo-$osf
-    chmod +x bbgo
-
-    echo "Binary downloaded"
-fi
-
+echo "Downloading bbgo"
+curl -L -o bbgo https://github.com/c9s/bbgo/releases/download/$version/bbgo-$osf
+chmod +x bbgo
+echo "Binary downloaded"
 
 if [[ -e "bbgo.yaml" ]] ; then
   echo "Found existing bbgo.yaml, you will overwrite the existing bbgo.yaml file!"
