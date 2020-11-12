@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"syscall"
 	"text/template"
+	"time"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -24,8 +25,6 @@ import (
 	"github.com/c9s/bbgo/pkg/slack/slacklog"
 	"github.com/c9s/bbgo/pkg/types"
 )
-
-var errSlackTokenUndefined = errors.New("slack token is not defined.")
 
 func init() {
 	RunCmd.Flags().Bool("no-compile", false, "do not compile wrapper binary")
@@ -158,7 +157,17 @@ func runConfig(ctx context.Context, userConfig *bbgo.Config) error {
 		}
 	}
 
-	return trader.Run(ctx)
+	if err := trader.Run(ctx); err != nil {
+		return err
+	}
+
+	cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
+
+	shutdownCtx, cancel := context.WithDeadline(ctx, time.Now().Add(30*time.Second))
+	defer cancel()
+
+	trader.Graceful.Shutdown(shutdownCtx)
+	return nil
 }
 
 var RunCmd = &cobra.Command{
@@ -196,7 +205,7 @@ var RunCmd = &cobra.Command{
 			if err := runConfig(ctx, userConfig); err != nil {
 				return err
 			}
-			cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
+
 			return nil
 		}
 

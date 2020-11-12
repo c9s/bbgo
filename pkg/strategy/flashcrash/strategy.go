@@ -4,6 +4,7 @@ package flashcrash
 
 import (
 	"context"
+	"sync"
 
 	log "github.com/sirupsen/logrus"
 
@@ -44,6 +45,9 @@ type Strategy struct {
 	// StandardIndicatorSet contains the standard indicators of a market (symbol)
 	// This field will be injected automatically since we defined the Symbol field.
 	*bbgo.StandardIndicatorSet
+
+	// Graceful shutdown function
+	*bbgo.Graceful
 	// --------------------------
 
 	// ewma is the exponential weighted moving average indicator
@@ -94,26 +98,6 @@ func (s *Strategy) updateBidOrders(orderExecutor bbgo.OrderExecutor, session *bb
 	s.activeOrders.Add(orders...)
 }
 
-func (s *Strategy) orderUpdateHandler(order types.Order) {
-	if order.Symbol != s.Symbol {
-		return
-	}
-
-	log.Infof("received order update: %+v", order)
-
-	switch order.Status {
-	case types.OrderStatusFilled:
-		s.activeOrders.Remove(order)
-
-	case types.OrderStatusCanceled, types.OrderStatusRejected:
-		log.Infof("order status %s, removing %d from the active order pool...", order.Status, order.OrderID)
-		s.activeOrders.Remove(order)
-
-	case types.OrderStatusPartiallyFilled:
-		s.activeOrders.Add(order)
-	}
-}
-
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: string(s.Interval)})
 }
@@ -121,12 +105,21 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	// we don't persist orders so that we can not clear the previous orders for now. just need time to support this.
 	s.activeOrders = bbgo.NewLocalActiveOrderBook()
+	s.activeOrders.BindStream(session.Stream)
+
+	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
+		log.Infof("canceling active orders...")
+
+		if err := session.Exchange.CancelOrders(ctx, s.activeOrders.Orders()...); err != nil {
+			log.WithError(err).Errorf("cancel order error")
+		}
+	})
+
 	s.ewma = s.StandardIndicatorSet.GetEWMA(types.IntervalWindow{
 		Interval: s.Interval,
 		Window:   25,
 	})
 
-	session.Stream.OnOrderUpdate(s.orderUpdateHandler)
 	session.Stream.OnKLineClosed(func(kline types.KLine) {
 		s.updateOrders(orderExecutor, session)
 	})
