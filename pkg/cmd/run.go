@@ -164,9 +164,10 @@ func runConfig(ctx context.Context, userConfig *bbgo.Config) error {
 	cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
 
 	shutdownCtx, cancel := context.WithDeadline(ctx, time.Now().Add(30*time.Second))
-	defer cancel()
 
+	log.Infof("shutting down...")
 	trader.Graceful.Shutdown(shutdownCtx)
+	cancel()
 	return nil
 }
 

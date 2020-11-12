@@ -27,7 +27,6 @@ type CrossExchangeStrategy interface {
 	Run(ctx context.Context, orderExecutionRouter OrderExecutionRouter, sessions map[string]*ExchangeSession) error
 }
 
-
 //go:generate callbackgen -type Graceful
 type Graceful struct {
 	shutdownCallbacks []func(ctx context.Context, wg *sync.WaitGroup)
@@ -35,10 +34,12 @@ type Graceful struct {
 
 func (g *Graceful) Shutdown(ctx context.Context) {
 	var wg sync.WaitGroup
-	g.EmitShutdown(ctx, &wg)
+	wg.Add(len(g.shutdownCallbacks))
+
+	go g.EmitShutdown(ctx, &wg)
+
 	wg.Wait()
 }
-
 
 type Logging interface {
 	EnableLogging()
@@ -162,7 +163,7 @@ func (trader *Trader) Run(ctx context.Context) error {
 				// get the struct element
 				rs = rs.Elem()
 
-				if err := injectField(rs, "Graceful", &trader.Graceful, true) ; err != nil {
+				if err := injectField(rs, "Graceful", &trader.Graceful, true); err != nil {
 					log.WithError(err).Errorf("strategy Graceful injection failed")
 				}
 

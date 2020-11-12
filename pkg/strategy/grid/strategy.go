@@ -197,6 +197,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.activeOrders = bbgo.NewLocalActiveOrderBook()
 
 	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
+		defer wg.Done()
+
 		log.Infof("canceling active orders...")
 
 		if err := session.Exchange.CancelOrders(ctx, s.activeOrders.Orders()...); err != nil {
