@@ -2,6 +2,7 @@ package bollgrid
 
 import (
 	"context"
+	"sync"
 
 	"github.com/sirupsen/logrus"
 
@@ -40,6 +41,9 @@ type Strategy struct {
 	// StandardIndicatorSet contains the standard indicators of a market (symbol)
 	// This field will be injected automatically since we defined the Symbol field.
 	*bbgo.StandardIndicatorSet
+
+	// Graceful let you define the graceful shutdown handler
+	*bbgo.Graceful
 
 	// Market stores the configuration of the market, for example, VolumePrecision, PricePrecision, MinLotSize... etc
 	// This field will be injected automatically since we defined the Symbol field.
@@ -313,6 +317,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.activeOrders.BindStream(session.Stream)
 	s.activeOrders.OnFilled(func(o types.Order) {
 		s.submitReverseOrder(o)
+	})
+
+	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
+		log.Infof("canceling active orders...")
+
+		if err := session.Exchange.CancelOrders(ctx, s.activeOrders.Orders()...); err != nil {
+			log.WithError(err).Errorf("cancel order error")
+		}
 	})
 
 	// avoid using time ticker since we will need back testing here

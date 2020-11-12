@@ -2,6 +2,7 @@ package grid
 
 import (
 	"context"
+	"sync"
 	"sync/atomic"
 
 	"github.com/sirupsen/logrus"
@@ -26,6 +27,8 @@ type Strategy struct {
 	// The notification system will be injected into the strategy automatically.
 	// This field will be injected automatically since it's a single exchange strategy.
 	*bbgo.Notifiability
+
+	*bbgo.Graceful
 
 	// OrderExecutor is an interface for submitting order.
 	// This field will be injected automatically since it's a single exchange strategy.
@@ -192,6 +195,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	// we don't persist orders so that we can not clear the previous orders for now. just need time to support this.
 	s.activeOrders = bbgo.NewLocalActiveOrderBook()
+
+	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
+		log.Infof("canceling active orders...")
+
+		if err := session.Exchange.CancelOrders(ctx, s.activeOrders.Orders()...); err != nil {
+			log.WithError(err).Errorf("cancel order error")
+		}
+	})
 
 	session.Stream.OnOrderUpdate(s.orderUpdateHandler)
 	session.Stream.OnTradeUpdate(s.tradeUpdateHandler)

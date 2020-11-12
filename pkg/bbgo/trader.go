@@ -3,6 +3,7 @@ package bbgo
 import (
 	"context"
 	"reflect"
+	"sync"
 
 	log "github.com/sirupsen/logrus"
 
@@ -25,6 +26,19 @@ type ExchangeSessionSubscriber interface {
 type CrossExchangeStrategy interface {
 	Run(ctx context.Context, orderExecutionRouter OrderExecutionRouter, sessions map[string]*ExchangeSession) error
 }
+
+
+//go:generate callbackgen -type Graceful
+type Graceful struct {
+	shutdownCallbacks []func(ctx context.Context, wg *sync.WaitGroup)
+}
+
+func (g *Graceful) Shutdown(ctx context.Context) {
+	var wg sync.WaitGroup
+	g.EmitShutdown(ctx, &wg)
+	wg.Wait()
+}
+
 
 type Logging interface {
 	EnableLogging()
@@ -52,6 +66,8 @@ type Trader struct {
 	exchangeStrategies      map[string][]SingleExchangeStrategy
 
 	logger Logger
+
+	Graceful Graceful
 }
 
 func NewTrader(environ *Environment) *Trader {
@@ -97,7 +113,6 @@ func (trader *Trader) SetRiskControls(riskControls *RiskControls) {
 }
 
 func (trader *Trader) Run(ctx context.Context) error {
-
 	// pre-subscribe the data
 	for sessionName, strategies := range trader.exchangeStrategies {
 		session := trader.environment.sessions[sessionName]
@@ -146,6 +161,10 @@ func (trader *Trader) Run(ctx context.Context) error {
 			if rs.Elem().Kind() == reflect.Struct {
 				// get the struct element
 				rs = rs.Elem()
+
+				if err := injectField(rs, "Graceful", &trader.Graceful, true) ; err != nil {
+					log.WithError(err).Errorf("strategy Graceful injection failed")
+				}
 
 				if err := injectField(rs, "Logger", &trader.logger, false); err != nil {
 					log.WithError(err).Errorf("strategy Logger injection failed")

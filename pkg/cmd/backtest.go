@@ -219,6 +219,11 @@ var BacktestCmd = &cobra.Command{
 
 		<-backtestExchange.Done()
 
+		log.Infof("shutting down trader...")
+		shutdownCtx, cancel := context.WithDeadline(ctx, time.Now().Add(10*time.Second))
+		trader.Graceful.Shutdown(shutdownCtx)
+		cancel()
+
 		// put the logger back to print the pnl
 		log.SetLevel(log.InfoLevel)
 		for _, session := range environ.Sessions() {
