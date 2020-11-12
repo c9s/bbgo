@@ -1,6 +1,6 @@
 #!/bin/bash
 osf=$(uname | tr '[:upper:]' '[:lower:]')
-version=v1.0.0
+version=v1.1.0
 
 
 if [[ ! -e "bbgo" ]] ; then
