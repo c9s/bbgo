@@ -30,7 +30,7 @@ riskControls:
   # This is the session-based risk controller, which let you configure different risk controller by session.
   sessionBased:
     # "max" is the session name that you want to configure the risk control
-    binance:
+    max:
       # orderExecutor is one of the risk control
       orderExecutor:
         # symbol-routed order executor
@@ -59,11 +59,11 @@ backtest:
       USDT: 10000.0
 
 exchangeStrategies:
-- on: binance
+- on: max
   grid:
     symbol: BTCUSDT
     quantity: 0.01
-    gridNumber: 100
+    gridNumber: 10
     profitSpread: 50.0
     upperPrice: 11000.0
     lowerPrice: 9000.0
