@@ -73,6 +73,8 @@ type Strategy struct {
 	// activeOrders is the locally maintained active order book of the maker orders.
 	activeOrders *bbgo.LocalActiveOrderBook
 
+	profitOrders *bbgo.LocalActiveOrderBook
+
 	orders *bbgo.OrderStore
 
 	// boll is the BOLLINGER indicator we used for predicting the price.
@@ -295,7 +297,7 @@ func (s *Strategy) submitReverseOrder(order types.Order) {
 		return
 	}
 
-	s.activeOrders.Add(createdOrders...)
+	s.profitOrders.Add(createdOrders...)
 	s.orders.Add(createdOrders...)
 }
 
@@ -314,20 +316,33 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	// we don't persist orders so that we can not clear the previous orders for now. just need time to support this.
 	s.activeOrders = bbgo.NewLocalActiveOrderBook()
-	s.activeOrders.BindStream(session.Stream)
 	s.activeOrders.OnFilled(func(o types.Order) {
 		s.submitReverseOrder(o)
 	})
+	s.activeOrders.BindStream(session.Stream)
 
+	s.profitOrders = bbgo.NewLocalActiveOrderBook()
+	s.profitOrders.OnFilled(func(o types.Order) {
+		// we made profit here!
+	})
+	s.profitOrders.BindStream(session.Stream)
+
+	// setup graceful shutting down handler
 	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
+		// call Done to notify the main process.
 		defer wg.Done()
 		log.Infof("canceling active orders...")
 
 		if err := session.Exchange.CancelOrders(ctx, s.activeOrders.Orders()...); err != nil {
 			log.WithError(err).Errorf("cancel order error")
 		}
+
+		if err := session.Exchange.CancelOrders(ctx, s.profitOrders.Orders()...); err != nil {
+			log.WithError(err).Errorf("cancel order error")
+		}
 	})
 
+	// when the connection is created, we submit the first round of the orders.
 	session.Stream.OnConnect(func() {
 		s.updateOrders(orderExecutor, session)
 	})
