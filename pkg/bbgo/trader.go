@@ -136,7 +136,6 @@ func (trader *Trader) Run(ctx context.Context) error {
 			// copy the environment notification system so that we can route
 			Notifiability: trader.environment.Notifiability,
 			session:       session,
-			logger:        trader.logger,
 		}
 
 		// default to base order executor
