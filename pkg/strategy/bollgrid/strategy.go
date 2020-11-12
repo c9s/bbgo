@@ -162,28 +162,101 @@ func (s *Strategy) updateAskOrders(orderExecutor bbgo.OrderExecutor, session *bb
 	s.activeOrders.Add(orders...)
 }
 
+func (s *Strategy) placeGridOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) {
+	quoteCurrency := s.Market.QuoteCurrency
+	balances := session.Account.Balances()
+
+	balance, ok := balances[quoteCurrency]
+	if !ok || balance.Available <= 0 {
+		return
+	}
+
+	var upBand = s.boll.LastUpBand()
+	if upBand <= 0.0 {
+		return
+	}
+
+	var downBand = s.boll.LastDownBand()
+	if downBand <= 0.0 {
+		return
+	}
+
+	currentPrice, ok := session.LastPrice(s.Symbol)
+	if !ok {
+		return
+	}
+	if currentPrice > upBand || currentPrice < downBand {
+		return
+	}
+
+	ema99 := s.StandardIndicatorSet.GetEWMA(types.IntervalWindow{Interval: s.Interval, Window: 99})
+	ema25 := s.StandardIndicatorSet.GetEWMA(types.IntervalWindow{Interval: s.Interval, Window: 25})
+	ema7 := s.StandardIndicatorSet.GetEWMA(types.IntervalWindow{Interval: s.Interval, Window: 7})
+
+	priceRange := upBand - downBand
+	gridSize := priceRange / float64(s.GridNum)
+
+	var orders []types.SubmitOrder
+	for price := downBand; price <= upBand; price += gridSize {
+		var side types.SideType
+		if price > currentPrice {
+			side = types.SideTypeSell
+		} else {
+			side = types.SideTypeBuy
+		}
+
+		// trend up
+		switch side {
+
+		case types.SideTypeBuy:
+			if ema7.Last() > ema25.Last()*1.001 && ema25.Last() > ema99.Last()*1.0005 {
+				log.Infof("ema lines trend up, skip buy")
+				continue
+			}
+
+		case types.SideTypeSell:
+			if ema7.Last() < ema25.Last()*(1-0.004) && ema25.Last() < ema99.Last()*(1-0.0005) {
+				log.Infof("ema lines trend down, skip sell")
+				continue
+			}
+		}
+
+		order := types.SubmitOrder{
+			Symbol:      s.Symbol,
+			Side:        side,
+			Type:        types.OrderTypeLimit,
+			Market:      s.Market,
+			Quantity:    s.Quantity,
+			Price:       price,
+			TimeInForce: "GTC",
+		}
+		log.Infof("submitting order: %s", order.String())
+		orders = append(orders, order)
+	}
+
+	createdOrders, err := orderExecutor.SubmitOrders(context.Background(), orders...)
+	if err != nil {
+		log.WithError(err).Errorf("can not place orders")
+		return
+	}
+
+	s.activeOrders.Add(createdOrders...)
+	s.orders.Add(createdOrders...)
+}
+
 func (s *Strategy) updateOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) {
+
+	if err := session.Exchange.CancelOrders(context.Background(), s.activeOrders.Orders()...); err != nil {
+		log.WithError(err).Errorf("cancel order error")
+	}
+
 	// skip order updates if up-band - down-band < min profit spread
 	if (s.boll.LastUpBand() - s.boll.LastDownBand()) <= s.ProfitSpread.Float64() {
 		log.Infof("boll: down band price == up band price, skipping...")
 		return
 	}
 
-	if err := session.Exchange.CancelOrders(context.Background(), s.activeOrders.Orders()...); err != nil {
-		log.WithError(err).Errorf("cancel order error")
-	}
-
-	_, ok := session.Account.Balance(s.Market.QuoteCurrency)
-	if ok {
-		s.updateBidOrders(orderExecutor, session)
-	}
-
-	_, ok = session.Account.Balance(s.Market.BaseCurrency)
-
-	// TODO: add base asset quantity check, think about how to reuse the risk control executor
-	if ok {
-		s.updateAskOrders(orderExecutor, session)
-	}
+	s.placeGridOrders(orderExecutor, session)
 
 	s.activeOrders.Print()
 }
@@ -218,6 +291,7 @@ func (s *Strategy) submitReverseOrder(order types.Order) {
 		return
 	}
 
+	s.activeOrders.Add(createdOrders...)
 	s.orders.Add(createdOrders...)
 }
 
