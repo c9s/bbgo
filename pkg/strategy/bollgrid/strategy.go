@@ -210,13 +210,13 @@ func (s *Strategy) placeGridOrders(orderExecutor bbgo.OrderExecutor, session *bb
 
 		case types.SideTypeBuy:
 			if ema7.Last() > ema25.Last()*1.001 && ema25.Last() > ema99.Last()*1.0005 {
-				log.Infof("ema lines trend up, skip buy")
+				log.Infof("all ema lines trend up, skip buy")
 				continue
 			}
 
 		case types.SideTypeSell:
 			if ema7.Last() < ema25.Last()*(1-0.004) && ema25.Last() < ema99.Last()*(1-0.0005) {
-				log.Infof("ema lines trend down, skip sell")
+				log.Infof("all ema lines trend down, skip sell")
 				continue
 			}
 		}
