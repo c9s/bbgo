@@ -321,12 +321,15 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
-
 		log.Infof("canceling active orders...")
 
 		if err := session.Exchange.CancelOrders(ctx, s.activeOrders.Orders()...); err != nil {
 			log.WithError(err).Errorf("cancel order error")
 		}
+	})
+
+	session.Stream.OnConnect(func() {
+		s.updateOrders(orderExecutor, session)
 	})
 
 	// avoid using time ticker since we will need back testing here
@@ -337,8 +340,13 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 
-		if (s.RepostInterval != "" && (s.RepostInterval == kline.Interval)) || s.Interval == kline.Interval {
+		if s.RepostInterval != "" {
 			// see if we have enough balances and then we create limit orders on the up band and the down band.
+			if s.RepostInterval == kline.Interval {
+				s.updateOrders(orderExecutor, session)
+			}
+
+		} else if s.Interval == kline.Interval {
 			s.updateOrders(orderExecutor, session)
 		}
 	})
