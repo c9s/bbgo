@@ -21,7 +21,7 @@ bbgo:
 	go build -o $(BIN_DIR)/$@ ./cmd/$@
 
 clean:
-	rm -rf $(BUILD_DIR)
+	rm -rf $(BUILD_DIR) $(DIST_DIR)
 
 dist: bin-dir bbgo-linux bbgo-darwin
 	mkdir -p $(DIST_DIR)
