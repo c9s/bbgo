@@ -28,7 +28,6 @@ func (e *RiskControlOrderExecutor) SubmitOrders(ctx context.Context, orders ...t
 			orders, riskErrs = controller.BasicRiskController.ProcessOrders(e.session, orders...)
 			for _, riskErr := range riskErrs {
 				// use logger from ExchangeOrderExecutor
-				e.logger.Warnf(riskErr.Error())
 				logrus.Warnf("RISK ERROR: %s", riskErr.Error())
 			}
 		}

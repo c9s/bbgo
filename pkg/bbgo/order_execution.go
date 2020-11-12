@@ -37,11 +37,6 @@ type ExchangeOrderExecutor struct {
 	Notifiability `json:"-"`
 
 	session *ExchangeSession
-	logger  Logger
-}
-
-func (e *ExchangeOrderExecutor) SetLogger(logger Logger) {
-	e.logger = logger
 }
 
 func (e *ExchangeOrderExecutor) notifySubmitOrders(orders ...types.SubmitOrder) {
