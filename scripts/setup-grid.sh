@@ -65,6 +65,7 @@ exchangeStrategies:
 END
 
 echo "Config file is generated"
+echo "================================================================"
 echo "Now you can edit your strategy config file bbgo.yaml to run bbgo"
 
 if [[ $osf == "darwin" ]] ; then
