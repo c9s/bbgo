@@ -7,24 +7,28 @@ curl -L -o bbgo https://github.com/c9s/bbgo/releases/download/$version/bbgo-$osf
 chmod +x bbgo
 echo "Binary downloaded"
 
-
-if [[ -e ".env.local" ]] ; then
-  echo "Found existing .env.local, you will overwrite the existing .env.local file!"
-  read -p "Are you sure? (Y/n) " a
-  if [[ $a == "n" ]] ; then
-    exit
-  fi
-fi
-
-read -p "Enter your MAX API key: " api_key
-
-read -p "Enter your MAX API secret: " api_secret
-
-echo "Generating your .env.local file..."
+function gen_dotenv()
+{
+    read -p "Enter your MAX API key: " api_key
+    read -p "Enter your MAX API secret: " api_secret
+    echo "Generating your .env.local file..."
 cat <<END > .env.local
 export MAX_API_KEY=$api_key
 export MAX_API_SECRET=$api_secret
 END
+
+}
+
+if [[ -e ".env.local" ]] ; then
+    echo "Found existing .env.local, you will overwrite the existing .env.local file!"
+    read -p "Are you sure? (Y/n) " a
+    if [[ $a != "n" ]] ; then
+        gen_dotenv
+    fi
+else
+    gen_dotenv
+fi
+
 
 if [[ -e "bbgo.yaml" ]] ; then
   echo "Found existing bbgo.yaml, you will overwrite the existing bbgo.yaml file!"
