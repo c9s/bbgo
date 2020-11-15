@@ -155,6 +155,10 @@ func NewStream(client *binance.Client) *Stream {
 			params = append(params, convertSubscription(subscription))
 		}
 
+		if len(params) == 0 {
+			return
+		}
+
 		log.Infof("[binance] subscribing channels: %+v", params)
 		err := stream.Conn.WriteJSON(StreamRequest{
 			Method: "SUBSCRIBE",
