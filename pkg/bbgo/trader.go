@@ -23,6 +23,10 @@ type ExchangeSessionSubscriber interface {
 	Subscribe(session *ExchangeSession)
 }
 
+type CrossExchangeSessionSubscriber interface {
+	Subscribe(sessions map[string]*ExchangeSession)
+}
+
 type CrossExchangeStrategy interface {
 	Run(ctx context.Context, orderExecutionRouter OrderExecutionRouter, sessions map[string]*ExchangeSession) error
 }
@@ -218,6 +222,12 @@ func (trader *Trader) Run(ctx context.Context) error {
 	router := &ExchangeOrderExecutionRouter{
 		Notifiability: trader.environment.Notifiability,
 		sessions:      trader.environment.sessions,
+	}
+
+	for _, strategy := range trader.crossExchangeStrategies {
+		if subscriber, ok := strategy.(CrossExchangeSessionSubscriber); ok {
+			subscriber.Subscribe(trader.environment.sessions)
+		}
 	}
 
 	for _, strategy := range trader.crossExchangeStrategies {

@@ -365,14 +365,13 @@ func (environ *Environment) Connect(ctx context.Context) error {
 		var logger = log.WithField("session", n)
 
 		if len(session.Subscriptions) == 0 {
-			logger.Warnf("no subscriptions, exchange session %s will not be connected", session.Name)
-			continue
-		}
-
-		// add the subscribe requests to the stream
-		for _, s := range session.Subscriptions {
-			logger.Infof("subscribing %s %s %v", s.Symbol, s.Channel, s.Options)
-			session.Stream.Subscribe(s.Channel, s.Symbol, s.Options)
+			logger.Warnf("exchange session %s has no subscriptions", session.Name)
+		} else {
+			// add the subscribe requests to the stream
+			for _, s := range session.Subscriptions {
+				logger.Infof("subscribing %s %s %v", s.Symbol, s.Channel, s.Options)
+				session.Stream.Subscribe(s.Channel, s.Symbol, s.Options)
+			}
 		}
 
 		logger.Infof("connecting session %s...", session.Name)
