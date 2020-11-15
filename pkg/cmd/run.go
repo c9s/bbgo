@@ -31,7 +31,7 @@ func init() {
 	RunCmd.Flags().String("os", runtime.GOOS, "GOOS")
 	RunCmd.Flags().String("arch", runtime.GOARCH, "GOARCH")
 
-	RunCmd.Flags().String("config", "config/bbgo.yaml", "strategy config file")
+	RunCmd.Flags().String("config", "", "config file")
 	RunCmd.Flags().String("since", "", "pnl since time")
 	RootCmd.AddCommand(RunCmd)
 }
@@ -196,13 +196,19 @@ var RunCmd = &cobra.Command{
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		userConfig, err := bbgo.Load(configFile)
+		userConfig, err := bbgo.Preload(configFile)
 		if err != nil {
 			return err
 		}
 
 		// if there is no custom imports, we don't have to compile
-		if noCompile || len(userConfig.Imports) == 0 {
+		if noCompile {
+			userConfig, err = bbgo.Load(configFile)
+			if err != nil {
+				return err
+			}
+
+			log.Infof("running config without wrapper binary...")
 			if err := runConfig(ctx, userConfig); err != nil {
 				return err
 			}
@@ -210,9 +216,14 @@ var RunCmd = &cobra.Command{
 			return nil
 		}
 
+		shouldCompile := len(userConfig.Imports) > 0
+		if shouldCompile {
+			log.Infof("found imports %v, compiling wrapper binary...", userConfig.Imports)
+		}
+
 		var runArgs = []string{"run", "--no-compile"}
 		cmd.Flags().Visit(func(flag *flag.Flag) {
-			runArgs = append(runArgs, flag.Name, flag.Value.String())
+			runArgs = append(runArgs, "--" + flag.Name, flag.Value.String())
 		})
 		runArgs = append(runArgs, args...)
 
@@ -296,7 +307,6 @@ func buildAndRun(ctx context.Context, userConfig *bbgo.Config, goOS, goArch stri
 	executePath := filepath.Join(cwd, binary)
 
 	log.Infof("running wrapper binary, args: %v", args)
-
 	runCmd := exec.CommandContext(ctx, executePath, args...)
 	runCmd.Stdout = os.Stdout
 	runCmd.Stderr = os.Stderr

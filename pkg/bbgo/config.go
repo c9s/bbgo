@@ -129,6 +129,21 @@ func loadStash(config []byte) (Stash, error) {
 	return stash, nil
 }
 
+func Preload(configFile string) (*Config, error) {
+	var config Config
+
+	content, err := ioutil.ReadFile(configFile)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := yaml.Unmarshal(content, &config); err != nil {
+		return nil, err
+	}
+
+	return &config, nil
+}
+
 func Load(configFile string) (*Config, error) {
 	var config Config
 
