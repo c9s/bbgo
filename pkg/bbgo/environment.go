@@ -25,6 +25,9 @@ func RegisterStrategy(key string, s interface{}) {
 
 	case CrossExchangeStrategy:
 		LoadedCrossExchangeStrategies[key] = d
+
+	default:
+		panic(fmt.Errorf("%T does not implement SingleExchangeStrategy or CrossExchangeStrategy", d))
 	}
 }
 
@@ -127,7 +130,6 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 
 		balances.Print()
 
-
 		session.Account.UpdateBalances(balances)
 		session.Account.BindStream(session.Stream)
 
@@ -135,10 +137,9 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 		session.Stream.OnKLineClosed(func(kline types.KLine) {
 			log.Infof("kline closed: %+v", kline)
 
-			if _, ok := session.startPrices[kline.Symbol] ; !ok {
+			if _, ok := session.startPrices[kline.Symbol]; !ok {
 				session.startPrices[kline.Symbol] = kline.Open
 			}
-
 
 			session.lastPrices[kline.Symbol] = kline.Close
 			session.marketDataStores[kline.Symbol].AddKLine(kline)

@@ -16,7 +16,7 @@ func init() {
 	BuildCmd.Flags().StringP("output", "o", "", "binary output")
 	BuildCmd.Flags().String("os", runtime.GOOS, "GOOS")
 	BuildCmd.Flags().String("arch", runtime.GOARCH, "GOARCH")
-	BuildCmd.Flags().String("config", "config/bbgo.yaml", "strategy config file")
+	BuildCmd.Flags().String("config", "", "config file")
 	RootCmd.AddCommand(BuildCmd)
 }
 
