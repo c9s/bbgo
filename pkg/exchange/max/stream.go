@@ -169,6 +169,7 @@ func convertWebSocketTrade(t max.TradeUpdate) (*types.Trade, error) {
 
 	return &types.Trade{
 		ID:            int64(t.ID),
+		OrderID:       t.OrderID,
 		Price:         price,
 		Symbol:        toGlobalSymbol(t.Market),
 		Exchange:      "max",
