@@ -309,15 +309,15 @@ func (s *Stream) read(ctx context.Context) {
 				s.EmitBalanceUpdateEvent(e)
 
 			case *KLineEvent:
-				log.Info(e.Event, " ", e.KLine, " ", e.KLine.Interval)
+				log.Debug(e.Event, " ", e.KLine, " ", e.KLine.Interval)
 				s.EmitKLineEvent(e)
 
 			case *DepthEvent:
-				log.Info(e.Event, " ", "asks:", e.Asks, "bids:", e.Bids)
+				log.Debug(e.Event, " ", "asks:", e.Asks[:2], "bids:", e.Bids[:2])
 				s.EmitDepthEvent(e)
 
 			case *ExecutionReportEvent:
-				log.Info(e.Event, " ", e)
+				log.Debug(e.Event, " ", e)
 				s.EmitExecutionReportEvent(e)
 			}
 		}

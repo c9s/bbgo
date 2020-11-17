@@ -20,17 +20,26 @@ type Notifiability struct {
 
 // RouteSession routes symbol name to channel
 func (m *Notifiability) RouteSymbol(symbol string) (channel string, ok bool) {
-	return m.SymbolChannelRouter.Route(symbol)
+	if m.SymbolChannelRouter != nil {
+		return m.SymbolChannelRouter.Route(symbol)
+	}
+	return "", false
 }
 
-// RouteSession routes session name to channel
+// RouteSession routes Session name to channel
 func (m *Notifiability) RouteSession(session string) (channel string, ok bool) {
-	return m.SessionChannelRouter.Route(session)
+	if m.SessionChannelRouter != nil {
+		return m.SessionChannelRouter.Route(session)
+	}
+	return "", false
 }
 
 // RouteObject routes object to channel
 func (m *Notifiability) RouteObject(obj interface{}) (channel string, ok bool) {
-	return m.ObjectChannelRouter.Route(obj)
+	if m.ObjectChannelRouter != nil {
+		return m.ObjectChannelRouter.Route(obj)
+	}
+	return "", false
 }
 
 // AddNotifier adds the notifier that implements the Notifier interface.

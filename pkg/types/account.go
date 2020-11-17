@@ -19,6 +19,10 @@ type BalanceMap map[string]Balance
 
 func (m BalanceMap) Print() {
 	for _, balance := range m {
+		if balance.Available == 0 && balance.Locked == 0 {
+			continue
+		}
+
 		if balance.Locked > 0 {
 			logrus.Infof(" %s: %f (locked %f)", balance.Currency, balance.Available.Float64(), balance.Locked.Float64())
 		} else {

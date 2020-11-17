@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"sync/atomic"
 )
 
 const DefaultPrecision = 8
@@ -39,6 +40,15 @@ func (v Value) Sub(v2 Value) Value {
 
 func (v Value) Add(v2 Value) Value {
 	return Value(int64(v) + int64(v2))
+}
+
+func (v *Value) AtomicAdd(v2 Value) {
+	atomic.AddInt64((*int64)(v), int64(v2))
+}
+
+func (v *Value) AtomicLoad() Value {
+	i := atomic.LoadInt64((*int64)(v))
+	return Value(i)
 }
 
 func (v *Value) UnmarshalYAML(unmarshal func(a interface{}) error) (err error) {

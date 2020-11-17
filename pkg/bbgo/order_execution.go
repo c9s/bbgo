@@ -21,7 +21,7 @@ type ExchangeOrderExecutionRouter struct {
 func (e *ExchangeOrderExecutionRouter) SubmitOrdersTo(ctx context.Context, session string, orders ...types.SubmitOrder) (types.OrderSlice, error) {
 	es, ok := e.sessions[session]
 	if !ok {
-		return nil, fmt.Errorf("exchange session %s not found", session)
+		return nil, fmt.Errorf("exchange Session %s not found", session)
 	}
 
 	formattedOrders, err := formatOrders(es, orders)
@@ -36,7 +36,7 @@ func (e *ExchangeOrderExecutionRouter) SubmitOrdersTo(ctx context.Context, sessi
 type ExchangeOrderExecutor struct {
 	Notifiability `json:"-"`
 
-	session *ExchangeSession
+	Session *ExchangeSession
 }
 
 func (e *ExchangeOrderExecutor) notifySubmitOrders(orders ...types.SubmitOrder) {
@@ -52,7 +52,7 @@ func (e *ExchangeOrderExecutor) notifySubmitOrders(orders ...types.SubmitOrder) 
 }
 
 func (e *ExchangeOrderExecutor) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (types.OrderSlice, error) {
-	formattedOrders, err := formatOrders(e.session, orders)
+	formattedOrders, err := formatOrders(e.Session, orders)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +69,7 @@ func (e *ExchangeOrderExecutor) SubmitOrders(ctx context.Context, orders ...type
 
 	e.notifySubmitOrders(formattedOrders...)
 
-	return e.session.Exchange.SubmitOrders(ctx, formattedOrders...)
+	return e.Session.Exchange.SubmitOrders(ctx, formattedOrders...)
 }
 
 type BasicRiskController struct {

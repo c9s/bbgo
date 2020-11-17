@@ -91,11 +91,11 @@ func (trader *Trader) DisableLogging() {
 	trader.logger = &SilentLogger{}
 }
 
-// AttachStrategyOn attaches the single exchange strategy on an exchange session.
+// AttachStrategyOn attaches the single exchange strategy on an exchange Session.
 // Single exchange strategy is the default behavior.
 func (trader *Trader) AttachStrategyOn(session string, strategies ...SingleExchangeStrategy) *Trader {
 	if _, ok := trader.environment.sessions[session]; !ok {
-		log.Panicf("session %s is not defined", session)
+		log.Panicf("Session %s is not defined", session)
 	}
 
 	for _, s := range strategies {
@@ -132,14 +132,14 @@ func (trader *Trader) Run(ctx context.Context) error {
 		return err
 	}
 
-	// load and run session strategies
+	// load and run Session strategies
 	for sessionName, strategies := range trader.exchangeStrategies {
 		var session = trader.environment.sessions[sessionName]
 
 		var baseOrderExecutor = &ExchangeOrderExecutor{
 			// copy the environment notification system so that we can route
 			Notifiability: trader.environment.Notifiability,
-			session:       session,
+			Session:       session,
 		}
 
 		// default to base order executor
@@ -231,6 +231,25 @@ func (trader *Trader) Run(ctx context.Context) error {
 	}
 
 	for _, strategy := range trader.crossExchangeStrategies {
+		rs := reflect.ValueOf(strategy)
+		if rs.Elem().Kind() == reflect.Struct {
+			// get the struct element
+			rs = rs.Elem()
+
+			if err := injectField(rs, "Graceful", &trader.Graceful, true); err != nil {
+				log.WithError(err).Errorf("strategy Graceful injection failed")
+			}
+
+			if err := injectField(rs, "Logger", &trader.logger, false); err != nil {
+				log.WithError(err).Errorf("strategy Logger injection failed")
+			}
+
+			if err := injectField(rs, "Notifiability", &trader.environment.Notifiability, false); err != nil {
+				log.WithError(err).Errorf("strategy Notifiability injection failed")
+			}
+
+		}
+
 		if err := strategy.Run(ctx, router, trader.environment.sessions); err != nil {
 			return err
 		}
@@ -238,109 +257,6 @@ func (trader *Trader) Run(ctx context.Context) error {
 
 	return trader.environment.Connect(ctx)
 }
-
-/*
-func (trader *OrderExecutor) RunStrategyWithHotReload(ctx context.Context, strategy SingleExchangeStrategy, configFile string) (chan struct{}, error) {
-	var done = make(chan struct{})
-	var configWatcherDone = make(chan struct{})
-
-	log.Infof("watching config file: %v", configFile)
-
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		return nil, err
-	}
-
-	defer watcher.Close()
-
-	if err := watcher.Add(configFile); err != nil {
-		return nil, err
-	}
-
-	go func() {
-		strategyContext, strategyCancel := context.WithCancel(ctx)
-		defer strategyCancel()
-		defer close(done)
-
-		traderDone, err := trader.RunStrategy(strategyContext, strategy)
-		if err != nil {
-			return
-		}
-
-		var configReloadTimer *time.Timer = nil
-		defer close(configWatcherDone)
-
-		for {
-			select {
-
-			case <-ctx.Done():
-				return
-
-			case <-traderDone:
-				log.Infof("reloading config file %s", configFile)
-				if err := config.LoadConfigFile(configFile, strategy); err != nil {
-					log.WithError(err).Error("error load config file")
-				}
-
-				trader.NotifyTo("config reloaded, restarting trader")
-
-				traderDone, err = trader.RunStrategy(strategyContext, strategy)
-				if err != nil {
-					log.WithError(err).Error("[trader] error:", err)
-					return
-				}
-
-			case event := <-watcher.Events:
-				log.Infof("[fsnotify] event: %+v", event)
-
-				if event.Op&fsnotify.Write == fsnotify.Write {
-					log.Info("[fsnotify] modified file:", event.Name)
-				}
-
-				if configReloadTimer != nil {
-					configReloadTimer.Stop()
-				}
-
-				configReloadTimer = time.AfterFunc(3*time.Second, func() {
-					strategyCancel()
-				})
-
-			case err := <-watcher.Errors:
-				log.WithError(err).Error("[fsnotify] error:", err)
-				return
-
-			}
-		}
-	}()
-
-	return done, nil
-}
-*/
-
-/*
-func (trader *OrderExecutor) RunStrategy(ctx context.Context, strategy SingleExchangeStrategy) (chan struct{}, error) {
-	trader.reportTimer = time.AfterFunc(1*time.Second, func() {
-		trader.reportPnL()
-	})
-
-	stream.OnTradeUpdate(func(trade *types.Trade) {
-		trader.NotifyTrade(trade)
-		trader.ProfitAndLossCalculator.AddTrade(*trade)
-		_, err := trader.Context.StockManager.AddTrades([]types.Trade{*trade})
-		if err != nil {
-			log.WithError(err).Error("stock manager load trades error")
-		}
-
-		if trader.reportTimer != nil {
-			trader.reportTimer.Stop()
-		}
-
-		trader.reportTimer = time.AfterFunc(1*time.Minute, func() {
-			trader.reportPnL()
-		})
-	})
-}
-*/
 
 // ReportPnL configure and set the PnLReporter with the given notifier
 func (trader *Trader) ReportPnL() *PnLReporterManager {
@@ -352,6 +268,6 @@ type OrderExecutor interface {
 }
 
 type OrderExecutionRouter interface {
-	// SubmitOrderTo submit order to a specific exchange session
+	// SubmitOrderTo submit order to a specific exchange Session
 	SubmitOrdersTo(ctx context.Context, session string, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error)
 }

@@ -122,12 +122,13 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 			session.standardIndicatorSets[symbol] = standardIndicatorSet
 		}
 
-		log.Infof("querying balances...")
+		log.Infof("querying balances from session %s...", session.Name)
 		balances, err := session.Exchange.QueryAccountBalances(ctx)
 		if err != nil {
 			return err
 		}
 
+		log.Infof("%s account", session.Name)
 		balances.Print()
 
 		session.Account.UpdateBalances(balances)
@@ -201,7 +202,7 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 		}
 
 		// TODO: move market data store dispatch to here, use one callback to dispatch the market data
-		// session.Stream.OnKLineClosed(func(kline types.KLine) { })
+		// Session.Stream.OnKLineClosed(func(kline types.KLine) { })
 	}
 
 	return nil
@@ -222,6 +223,8 @@ func (environ *Environment) ConfigureNotification(conf *NotificationConfig) {
 	if conf.Routing != nil {
 		// configure passive object notification routing
 		switch conf.Routing.Trade {
+		case "$silent": // silent, do not setup notification
+
 		case "$session":
 			defaultTradeUpdateHandler := func(trade types.Trade) {
 				text := util.Render(TemplateTradeReport, trade)
@@ -270,6 +273,8 @@ func (environ *Environment) ConfigureNotification(conf *NotificationConfig) {
 
 		switch conf.Routing.Order {
 
+		case "$silent": // silent, do not setup notification
+
 		case "$session":
 			defaultOrderUpdateHandler := func(order types.Order) {
 				text := util.Render(TemplateOrderReport, order)
@@ -317,6 +322,9 @@ func (environ *Environment) ConfigureNotification(conf *NotificationConfig) {
 		}
 
 		switch conf.Routing.SubmitOrder {
+
+		case "$silent": // silent, do not setup notification
+
 		case "$symbol":
 			// add object route
 			environ.ObjectChannelRouter.Route(func(obj interface{}) (channel string, ok bool) {
