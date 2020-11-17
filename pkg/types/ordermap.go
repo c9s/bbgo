@@ -159,10 +159,11 @@ func (m *SyncOrderMap) Canceled() OrderSlice {
 	return m.FindByStatus(OrderStatusCanceled)
 }
 
-func (m *SyncOrderMap) Orders() OrderSlice {
+func (m *SyncOrderMap) Orders() (slice OrderSlice) {
 	m.RLock()
-	defer m.RUnlock()
-	return m.orders.Orders()
+	slice = m.orders.Orders()
+	m.RUnlock()
+	return slice
 }
 
 type OrderSlice []Order
