@@ -10,6 +10,8 @@ type OrderStore struct {
 	// any created orders for tracking trades
 	mu     sync.Mutex
 	orders map[uint64]types.Order
+
+	RemoveCancelled bool
 }
 
 func NewOrderStore() *OrderStore {
@@ -62,7 +64,12 @@ func (s *OrderStore) handleOrderUpdate(order types.Order) {
 	case types.OrderStatusPartiallyFilled, types.OrderStatusNew, types.OrderStatusFilled:
 		s.Update(order)
 
-	case types.OrderStatusCanceled, types.OrderStatusRejected:
+	case types.OrderStatusCanceled:
+		if s.RemoveCancelled {
+			s.Remove(order)
+		}
+
+	case types.OrderStatusRejected:
 		s.Remove(order)
 	}
 }
