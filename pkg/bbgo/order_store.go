@@ -18,11 +18,11 @@ func NewOrderStore() *OrderStore {
 	}
 }
 
-func (s *OrderStore) Exists(o types.Order) bool {
+func (s *OrderStore) Exists(oID uint64) (ok bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	_, ok := s.orders[o.OrderID]
+	_, ok = s.orders[oID]
 	return ok
 }
 
