@@ -37,23 +37,15 @@ func (trade Trade) SlackAttachment() slack.Attachment {
 		color = "#228B22"
 	}
 
-	market, ok := FindMarket(trade.Symbol)
-	if !ok {
-		return slack.Attachment{
-			Text:  fmt.Sprintf("*%s* Trade %s", trade.Symbol, trade.Side),
-			Color: color,
-		}
-	}
-
 	return slack.Attachment{
 		Text:  fmt.Sprintf("*%s* Trade %s", trade.Symbol, trade.Side),
 		Color: color,
 		// Pretext:       "",
 		// Text:          "",
 		Fields: []slack.AttachmentField{
-			{Title: "Price", Value: market.FormatPrice(trade.Price), Short: true},
-			{Title: "Volume", Value: market.FormatVolume(trade.Quantity), Short: true},
-			{Title: "Amount", Value: market.FormatPrice(trade.QuoteQuantity)},
+			{Title: "Price", Value: util.FormatFloat(trade.Price, 2), Short: true},
+			{Title: "Volume", Value: util.FormatFloat(trade.Quantity, 4), Short: true},
+			{Title: "Amount", Value: util.FormatFloat(trade.QuoteQuantity, 1)},
 			{Title: "Fee", Value: util.FormatFloat(trade.Fee, 4), Short: true},
 			{Title: "FeeCurrency", Value: trade.FeeCurrency, Short: true},
 		},

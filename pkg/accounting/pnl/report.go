@@ -15,6 +15,7 @@ type AverageCostPnlReport struct {
 	CurrentPrice float64
 	StartTime    time.Time
 	Symbol       string
+	Market       types.Market
 
 	NumTrades        int
 	Profit           float64
@@ -51,11 +52,6 @@ func (report AverageCostPnlReport) SlackAttachment() slack.Attachment {
 		color = slackstyle.Green
 	}
 
-	market, ok := types.FindMarket(report.Symbol)
-	if !ok {
-		return slack.Attachment{}
-	}
-
 	return slack.Attachment{
 		Title: report.Symbol + " Profit and Loss report",
 		Text:  "Profit " + types.USD.FormatMoney(report.Profit),
@@ -65,8 +61,8 @@ func (report AverageCostPnlReport) SlackAttachment() slack.Attachment {
 		Fields: []slack.AttachmentField{
 			{Title: "Profit", Value: types.USD.FormatMoney(report.Profit)},
 			{Title: "Unrealized Profit", Value: types.USD.FormatMoney(report.UnrealizedProfit)},
-			{Title: "Current Price", Value: market.FormatPrice(report.CurrentPrice), Short: true},
-			{Title: "Average Cost", Value: market.FormatPrice(report.AverageBidCost), Short: true},
+			{Title: "Current Price", Value: report.Market.FormatPrice(report.CurrentPrice), Short: true},
+			{Title: "Average Cost", Value: report.Market.FormatPrice(report.AverageBidCost), Short: true},
 			{Title: "Fee (USD)", Value: types.USD.FormatMoney(report.FeeInUSD), Short: true},
 			{Title: "Stock", Value: strconv.FormatFloat(report.Stock, 'f', 8, 64), Short: true},
 			{Title: "Number of Trades", Value: strconv.Itoa(report.NumTrades), Short: true},
