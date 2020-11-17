@@ -134,6 +134,10 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 		session.Account.UpdateBalances(balances)
 		session.Account.BindStream(session.Stream)
 
+		session.Stream.OnBalanceUpdate(func(balances types.BalanceMap) {
+			log.Infof("balance update: %+v", balances)
+		})
+
 		// update last prices
 		session.Stream.OnKLineClosed(func(kline types.KLine) {
 			log.Infof("kline closed: %+v", kline)
