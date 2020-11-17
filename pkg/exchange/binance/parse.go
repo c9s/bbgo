@@ -125,6 +125,7 @@ func (e *ExecutionReportEvent) Trade() (*types.Trade, error) {
 	return &types.Trade{
 		ID:            e.TradeID,
 		Symbol:        e.Symbol,
+		OrderID:       uint64(e.OrderID),
 		Side:          toGlobalSideType(binance.SideType(e.Side)),
 		Price:         util.MustParseFloat(e.LastExecutedPrice),
 		Quantity:      util.MustParseFloat(e.LastExecutedQuantity),
