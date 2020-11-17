@@ -61,7 +61,9 @@ func compileRunFile(filepath string, config *bbgo.Config) error {
 	return ioutil.WriteFile(filepath, buf.Bytes(), 0644)
 }
 
-func runConfig(ctx context.Context, userConfig *bbgo.Config) error {
+func runConfig(basectx context.Context, userConfig *bbgo.Config) error {
+	ctx, cancelTrading := context.WithCancel(basectx)
+
 	environ := bbgo.NewEnvironment()
 
 	if viper.IsSet("mysql-url") {
@@ -139,7 +141,7 @@ func runConfig(ctx context.Context, userConfig *bbgo.Config) error {
 	}
 
 	for _, strategy := range userConfig.CrossExchangeStrategies {
-		log.Infof("attaching strategy %T", strategy)
+		log.Infof("attaching cross exchange strategy %T", strategy)
 		trader.AttachCrossExchangeStrategy(strategy)
 	}
 
@@ -163,11 +165,13 @@ func runConfig(ctx context.Context, userConfig *bbgo.Config) error {
 
 	cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
 
-	shutdownCtx, cancel := context.WithDeadline(ctx, time.Now().Add(30*time.Second))
+	cancelTrading()
+
+	shutdownCtx, cancelShutdown := context.WithDeadline(ctx, time.Now().Add(30*time.Second))
 
 	log.Infof("shutting down...")
 	trader.Graceful.Shutdown(shutdownCtx)
-	cancel()
+	cancelShutdown()
 	return nil
 }
 
@@ -223,7 +227,7 @@ var RunCmd = &cobra.Command{
 
 		var runArgs = []string{"run", "--no-compile"}
 		cmd.Flags().Visit(func(flag *flag.Flag) {
-			runArgs = append(runArgs, "--" + flag.Name, flag.Value.String())
+			runArgs = append(runArgs, "--"+flag.Name, flag.Value.String())
 		})
 		runArgs = append(runArgs, args...)
 

@@ -84,14 +84,14 @@ func (set *StandardIndicatorSet) GetEWMA(iw types.IntervalWindow) *indicator.EWM
 	return inc
 }
 
-// ExchangeSession presents the exchange connection session
+// ExchangeSession presents the exchange connection Session
 // It also maintains and collects the data returned from the stream.
 type ExchangeSession struct {
-	// exchange session based notification system
+	// exchange Session based notification system
 	// we make it as a value field so that we can configure it separately
 	Notifiability
 
-	// Exchange session name
+	// Exchange Session name
 	Name string
 
 	// The exchange account states

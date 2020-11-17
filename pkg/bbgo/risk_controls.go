@@ -25,14 +25,14 @@ func (e *RiskControlOrderExecutor) SubmitOrders(ctx context.Context, orders ...t
 		if controller, ok := e.BySymbol[symbol]; ok && controller != nil {
 			var riskErrs []error
 
-			orders, riskErrs = controller.BasicRiskController.ProcessOrders(e.session, orders...)
+			orders, riskErrs = controller.BasicRiskController.ProcessOrders(e.Session, orders...)
 			for _, riskErr := range riskErrs {
 				// use logger from ExchangeOrderExecutor
 				logrus.Warnf("RISK ERROR: %s", riskErr.Error())
 			}
 		}
 
-		formattedOrders, err := formatOrders(e.session, orders)
+		formattedOrders, err := formatOrders(e.Session, orders)
 		if err != nil {
 			return retOrders, err
 		}

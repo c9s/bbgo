@@ -20,9 +20,9 @@ type PnLReporterConfig struct {
 	When                 StringSlice `json:"when" yaml:"when"`
 }
 
-// ExchangeStrategyMount wraps the SingleExchangeStrategy with the session name for mounting
+// ExchangeStrategyMount wraps the SingleExchangeStrategy with the Session name for mounting
 type ExchangeStrategyMount struct {
-	// Mounts contains the session name to mount
+	// Mounts contains the Session name to mount
 	Mounts []string
 
 	// Strategy is the strategy we loaded from config
@@ -195,7 +195,7 @@ func loadCrossExchangeStrategies(config *Config, stash Stash) (err error) {
 
 		for id, conf := range configStash {
 			// look up the real struct type
-			if st, ok := LoadedExchangeStrategies[id]; ok {
+			if st, ok := LoadedCrossExchangeStrategies[id]; ok {
 				val, err := reUnmarshal(conf, st)
 				if err != nil {
 					return err
