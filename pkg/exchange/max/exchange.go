@@ -62,7 +62,7 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 			MaxQuantity:     10000.0,
 			MinPrice:        1.0 / math.Pow10(m.QuoteUnitPrecision), // used in the price formatter
 			MaxPrice:        10000.0,
-			TickSize:        0.001,
+			TickSize:        1.0 / math.Pow10(m.QuoteUnitPrecision),
 		}
 
 		markets[symbol] = market
