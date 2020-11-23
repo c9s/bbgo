@@ -69,6 +69,18 @@ dotenv -f .env.local -- bbgo migrate redo
 
 (It internally uses `goose` to run these migration files, see [migrations](migrations))
 
+To sync remote exchange klines data for backtesting:
+
+```sh
+dotenv -f .env.local -- bbgo backtest --exchange binance --config config/grid.yaml -v --sync --sync-only --sync-from 2020-01-01
+```
+
+To run backtest:
+
+```sh
+dotenv -f .env.local -- bbgo backtest --exchange binance --config config/bollgrid.yaml --base-asset-baseline
+```
+
 
 To query transfer history:
 
