@@ -8,7 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func WaitForSignal(ctx context.Context, signals ...os.Signal) {
+func WaitForSignal(ctx context.Context, signals ...os.Signal) os.Signal {
 	var sigC = make(chan os.Signal, 1)
 	signal.Notify(sigC, signals...)
 	defer signal.Stop(sigC)
@@ -16,9 +16,12 @@ func WaitForSignal(ctx context.Context, signals ...os.Signal) {
 	select {
 	case sig := <-sigC:
 		logrus.Warnf("%v", sig)
-		signal.Ignore()
+		return sig
 
 	case <-ctx.Done():
+		return nil
 
 	}
+
+	return nil
 }
