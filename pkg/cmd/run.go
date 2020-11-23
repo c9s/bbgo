@@ -241,7 +241,23 @@ var RunCmd = &cobra.Command{
 			return err
 		}
 
-		return buildAndRun(ctx, userConfig, goOS, goArch, runArgs...)
+		runCmd, err := buildAndRun(ctx, userConfig, goOS, goArch, runArgs...)
+		if err != nil {
+			return err
+		}
+
+		if sig := cmdutil.WaitForSignal(ctx, syscall.SIGTERM, syscall.SIGINT); sig != nil {
+			log.Infof("sending signal to the child process...")
+			if err := runCmd.Process.Signal(sig); err != nil {
+				return err
+			}
+
+			if err := runCmd.Wait(); err != nil {
+				return err
+			}
+		}
+
+		return nil
 	},
 }
 
@@ -295,24 +311,24 @@ func build(ctx context.Context, buildDir string, userConfig *bbgo.Config, goOS, 
 	return binary, nil
 }
 
-func buildAndRun(ctx context.Context, userConfig *bbgo.Config, goOS, goArch string, args ...string) error {
+func buildAndRun(ctx context.Context, userConfig *bbgo.Config, goOS, goArch string, args ...string) (*exec.Cmd, error) {
 	buildDir := filepath.Join("build", "bbgow")
 
 	binary, err := build(ctx, buildDir, userConfig, goOS, goArch, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	cwd, err := os.Getwd()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	executePath := filepath.Join(cwd, binary)
 
 	log.Infof("running wrapper binary, args: %v", args)
-	runCmd := exec.CommandContext(ctx, executePath, args...)
+	runCmd := exec.Command(executePath, args...)
 	runCmd.Stdout = os.Stdout
 	runCmd.Stderr = os.Stderr
-	return runCmd.Run()
+	return runCmd, runCmd.Start()
 }
