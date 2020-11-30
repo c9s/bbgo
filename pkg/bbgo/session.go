@@ -9,9 +9,9 @@ type StandardIndicatorSet struct {
 	Symbol string
 	// Standard indicators
 	// interval -> window
-	SMA  map[types.IntervalWindow]*indicator.SMA
-	EWMA map[types.IntervalWindow]*indicator.EWMA
-	BOLL map[types.IntervalWindow]*indicator.BOLL
+	sma  map[types.IntervalWindow]*indicator.SMA
+	ewma map[types.IntervalWindow]*indicator.EWMA
+	boll map[types.IntervalWindow]*indicator.BOLL
 
 	store *MarketDataStore
 }
@@ -19,9 +19,9 @@ type StandardIndicatorSet struct {
 func NewStandardIndicatorSet(symbol string, store *MarketDataStore) *StandardIndicatorSet {
 	set := &StandardIndicatorSet{
 		Symbol: symbol,
-		SMA:    make(map[types.IntervalWindow]*indicator.SMA),
-		EWMA:   make(map[types.IntervalWindow]*indicator.EWMA),
-		BOLL:   make(map[types.IntervalWindow]*indicator.BOLL),
+		sma:    make(map[types.IntervalWindow]*indicator.SMA),
+		ewma:   make(map[types.IntervalWindow]*indicator.EWMA),
+		boll:   make(map[types.IntervalWindow]*indicator.BOLL),
 		store:  store,
 	}
 
@@ -29,56 +29,56 @@ func NewStandardIndicatorSet(symbol string, store *MarketDataStore) *StandardInd
 	for interval := range types.SupportedIntervals {
 		for _, window := range []int{7, 25, 99} {
 			iw := types.IntervalWindow{Interval: interval, Window: window}
-			set.SMA[iw] = &indicator.SMA{IntervalWindow: iw}
-			set.SMA[iw].Bind(store)
+			set.sma[iw] = &indicator.SMA{IntervalWindow: iw}
+			set.sma[iw].Bind(store)
 
-			set.EWMA[iw] = &indicator.EWMA{IntervalWindow: iw}
-			set.EWMA[iw].Bind(store)
+			set.ewma[iw] = &indicator.EWMA{IntervalWindow: iw}
+			set.ewma[iw].Bind(store)
 		}
 
-		// setup BOLL indicator, we may refactor BOLL indicator by subscribing SMA indicator,
+		// setup boll indicator, we may refactor boll indicator by subscribing SMA indicator,
 		// however, since general used BOLLINGER band use window 21, which is not in the existing SMA indicator sets.
-		// Pull out the bandwidth configuration as the BOLL Key
+		// Pull out the bandwidth configuration as the boll Key
 		iw := types.IntervalWindow{Interval: interval, Window: 21}
-		set.BOLL[iw] = &indicator.BOLL{IntervalWindow: iw, K: 2.0}
-		set.BOLL[iw].Bind(store)
+		set.boll[iw] = &indicator.BOLL{IntervalWindow: iw, K: 2.0}
+		set.boll[iw].Bind(store)
 	}
 
 	return set
 }
 
-// GetBOLL returns the bollinger band indicator of the given interval and the window,
+// BOLL returns the bollinger band indicator of the given interval and the window,
 // Please note that the K for std dev is fixed and defaults to 2.0
-func (set *StandardIndicatorSet) GetBOLL(iw types.IntervalWindow, bandWidth float64) *indicator.BOLL {
-	inc, ok := set.BOLL[iw]
+func (set *StandardIndicatorSet) BOLL(iw types.IntervalWindow, bandWidth float64) *indicator.BOLL {
+	inc, ok := set.boll[iw]
 	if !ok {
 		inc := &indicator.BOLL{IntervalWindow: iw, K: bandWidth}
 		inc.Bind(set.store)
-		set.BOLL[iw] = inc
+		set.boll[iw] = inc
 	}
 
 	return inc
 }
 
-// GetSMA returns the simple moving average indicator of the given interval and the window size.
-func (set *StandardIndicatorSet) GetSMA(iw types.IntervalWindow) *indicator.SMA {
-	inc, ok := set.SMA[iw]
+// SMA returns the simple moving average indicator of the given interval and the window size.
+func (set *StandardIndicatorSet) SMA(iw types.IntervalWindow) *indicator.SMA {
+	inc, ok := set.sma[iw]
 	if !ok {
 		inc := &indicator.SMA{IntervalWindow: iw}
 		inc.Bind(set.store)
-		set.SMA[iw] = inc
+		set.sma[iw] = inc
 	}
 
 	return inc
 }
 
 // GetEWMA returns the exponential weighed moving average indicator of the given interval and the window size.
-func (set *StandardIndicatorSet) GetEWMA(iw types.IntervalWindow) *indicator.EWMA {
-	inc, ok := set.EWMA[iw]
+func (set *StandardIndicatorSet) EWMA(iw types.IntervalWindow) *indicator.EWMA {
+	inc, ok := set.ewma[iw]
 	if !ok {
 		inc := &indicator.EWMA{IntervalWindow: iw}
 		inc.Bind(set.store)
-		set.EWMA[iw] = inc
+		set.ewma[iw] = inc
 	}
 
 	return inc

@@ -200,9 +200,9 @@ func (s *Strategy) placeGridOrders(orderExecutor bbgo.OrderExecutor, session *bb
 		return
 	}
 
-	ema99 := s.StandardIndicatorSet.GetEWMA(types.IntervalWindow{Interval: s.Interval, Window: 99})
-	ema25 := s.StandardIndicatorSet.GetEWMA(types.IntervalWindow{Interval: s.Interval, Window: 25})
-	ema7 := s.StandardIndicatorSet.GetEWMA(types.IntervalWindow{Interval: s.Interval, Window: 7})
+	ema99 := s.StandardIndicatorSet.EWMA(types.IntervalWindow{Interval: s.Interval, Window: 99})
+	ema25 := s.StandardIndicatorSet.EWMA(types.IntervalWindow{Interval: s.Interval, Window: 25})
+	ema7 := s.StandardIndicatorSet.EWMA(types.IntervalWindow{Interval: s.Interval, Window: 7})
 
 	priceRange := upBand - downBand
 	gridSize := priceRange / float64(s.GridNum)
@@ -310,7 +310,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.GridNum = 2
 	}
 
-	s.boll = s.StandardIndicatorSet.GetBOLL(types.IntervalWindow{
+	s.boll = s.StandardIndicatorSet.BOLL(types.IntervalWindow{
 		Interval: s.Interval,
 		Window:   21,
 	}, 2.0)

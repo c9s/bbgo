@@ -117,7 +117,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 	})
 
-	s.ewma = s.StandardIndicatorSet.GetEWMA(types.IntervalWindow{
+	s.ewma = s.StandardIndicatorSet.EWMA(types.IntervalWindow{
 		Interval: s.Interval,
 		Window:   25,
 	})

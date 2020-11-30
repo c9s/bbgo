@@ -9,7 +9,7 @@ import (
 )
 
 /*
-BOLL implements the bollinger indicator:
+boll implements the bollinger indicator:
 
 The Basics of Bollinger Bands
 - https://www.investopedia.com/articles/technical/102201.asp
