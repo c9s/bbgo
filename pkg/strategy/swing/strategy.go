@@ -86,10 +86,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	switch s.MovingAverageType {
 	case "SMA":
-		inc = s.StandardIndicatorSet.GetSMA(iw)
+		inc = s.StandardIndicatorSet.SMA(iw)
 
 	case "EWMA", "EMA":
-		inc = s.StandardIndicatorSet.GetEWMA(iw)
+		inc = s.StandardIndicatorSet.EWMA(iw)
 
 	default:
 		return fmt.Errorf("unsupported moving average type: %s", s.MovingAverageType)
