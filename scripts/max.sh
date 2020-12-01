@@ -45,7 +45,7 @@ case "$command" in
         ;;
 
     me)
-        me
+        me | jq -r '.accounts[] | select(.balance | tonumber > 0.0) | "\(.currency)\t\(.balance) \t(\(.locked) locked)"'
         ;;
 
     # open orders
