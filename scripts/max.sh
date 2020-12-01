@@ -29,6 +29,12 @@ case "$command" in
         side=$2
         price=$3
         volume=$4
+
+        if [[ $# < 4 ]] ; then
+            echo "$0 limit [market] [side] [price] [volume]"
+            exit
+        fi
+
         declare -A order_params=()
         order_params[market]=$market
         order_params[side]=$side
@@ -43,6 +49,11 @@ case "$command" in
         ;;
 
     orders)
+        if [[ $# < 1 ]] ; then
+            echo "$0 orders [market]"
+            exit
+        fi
+
         market=$1
         declare -A orders_params=()
         orders_params[market]=$market
@@ -50,6 +61,11 @@ case "$command" in
         ;;
         
     trades)
+        if [[ $# < 1 ]] ; then
+            echo "$0 trades [market]"
+            exit
+        fi
+
         market=$1
         declare -A trades_params=()
         trades_params[market]=$market
