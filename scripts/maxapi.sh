@@ -119,11 +119,11 @@ function myTrades()
 # me
 
 # declare -A order_params=()
-# order_params[market]="maxusdt"
+# order_params[market]="ethusdt"
 # order_params[side]="buy"
-# order_params[volume]="100"
-# order_params[price]="0.124"
-# order_params[ord_type]="limit"
+# order_params[volume]="0.05"
+# # order_params[price]="585"
+# order_params[ord_type]="market"
 # submitOrder order_params
 
 # declare -A my_trades_params=()
