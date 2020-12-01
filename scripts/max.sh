@@ -48,9 +48,10 @@ case "$command" in
         me
         ;;
 
-    orders)
+    # open orders
+    open)
         if [[ $# < 1 ]] ; then
-            echo "$0 orders [market]"
+            echo "$0 open [market]"
             exit
         fi
 
