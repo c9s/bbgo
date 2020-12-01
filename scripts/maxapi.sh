@@ -99,7 +99,14 @@ function submitOrder()
     send_auth_request "POST" "/api/v2/orders" params
 }
 
-function tradesMy()
+function myOrders()
+{
+    local -n params=$1
+    send_auth_request "GET" "/api/v2/orders" params
+}
+
+
+function myTrades()
 {
     local -n params=$1
     send_auth_request "GET" "/api/v2/trades/my" params
@@ -107,16 +114,23 @@ function tradesMy()
 
 
 # me | jq '.accounts[] | select(.currency == "usdt")'
-me
-
-declare -A my_trade_params=()
-my_trade_params[market]="maxusdt"
-tradesMy my_trade_params
+# me | jq '.accounts[] | select(.currency == "btc")'
+# me | jq '.accounts[] | select(.currency == "eth")'
+# me
 
 # declare -A order_params=()
-# order_params[market]="ethusdt"
+# order_params[market]="maxusdt"
 # order_params[side]="buy"
-# order_params[volume]="0.001"
-# order_params[price]=""
+# order_params[volume]="100"
+# order_params[price]="0.124"
 # order_params[ord_type]="limit"
 # submitOrder order_params
+
+# declare -A my_trades_params=()
+# my_trades_params[market]="ethusdt"
+# myTrades my_trades_params
+
+# declare -A my_orders_params=()
+# my_orders_params[market]="ethusdt"
+# myOrders my_orders_params
+
