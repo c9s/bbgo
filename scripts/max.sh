@@ -58,7 +58,7 @@ case "$command" in
         market=$1
         declare -A orders_params=()
         orders_params[market]=$market
-        myOrders orders_params
+        myOrders orders_params | jq -r '.[] | "\(.id) \(.market) \(.side) \(.price) \t \(.volume) \(.state)"'
         ;;
         
     trades)
@@ -70,6 +70,6 @@ case "$command" in
         market=$1
         declare -A trades_params=()
         trades_params[market]=$market
-        myTrades trades_params
+        myTrades trades_params | jq -r '.[] | "\(.id) \(.market) \(.side) \(.price) \t \(.volume) fee = \(.fee) \(.fee_currency)"'
         ;;
 esac
