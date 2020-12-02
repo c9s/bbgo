@@ -277,7 +277,7 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 	}
 
 	for _, binanceOrder := range binanceOrders {
-		order, err := toGlobalOrder(binanceOrder)
+		order, err := ToGlobalOrder(binanceOrder)
 		if err != nil {
 			return orders, err
 		}
@@ -316,7 +316,7 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 	}
 
 	for _, binanceOrder := range binanceOrders {
-		order, err := toGlobalOrder(binanceOrder)
+		order, err := ToGlobalOrder(binanceOrder)
 		if err != nil {
 			return orders, err
 		}
@@ -404,7 +404,7 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 			// IsWorking:               ,
 		}
 
-		createdOrder, err := toGlobalOrder(&retOrder)
+		createdOrder, err := ToGlobalOrder(&retOrder)
 		if err != nil {
 			return createdOrders, err
 		}
@@ -497,7 +497,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	}
 
 	for _, t := range remoteTrades {
-		localTrade, err := toGlobalTrade(*t)
+		localTrade, err := ToGlobalTrade(*t)
 		if err != nil {
 			log.WithError(err).Errorf("can not convert binance trade: %+v", t)
 			continue
