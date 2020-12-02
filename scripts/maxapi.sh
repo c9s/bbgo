@@ -93,6 +93,14 @@ function me()
     send_auth_request "GET" "/api/v2/members/me" params
 }
 
+function depth()
+{
+    local market=$1
+    declare -A params=()
+    params[market]=$market
+    send_auth_request "GET" "/api/v2/depth" params
+}
+
 function submitOrder()
 {
     local -n params=$1
