@@ -26,6 +26,9 @@ func init() {
 
 type Exchange struct {
 	Client *binance.Client
+
+	useMargin         bool
+	useMarginIsolated bool
 }
 
 func New(key, secret string) *Exchange {
@@ -37,6 +40,11 @@ func New(key, secret string) *Exchange {
 
 func (e *Exchange) Name() types.ExchangeName {
 	return types.ExchangeBinance
+}
+
+func (e *Exchange) UseMargin(isolated bool) {
+	e.useMargin = true
+	e.useMarginIsolated = isolated
 }
 
 func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
@@ -96,7 +104,13 @@ func (e *Exchange) QueryAveragePrice(ctx context.Context, symbol string) (float6
 }
 
 func (e *Exchange) NewStream() types.Stream {
-	return NewStream(e.Client)
+	stream := NewStream(e.Client)
+
+	if e.useMargin {
+		stream.UseMargin(e.useMarginIsolated)
+	}
+
+	return stream
 }
 
 func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (allWithdraws []types.Withdraw, err error) {

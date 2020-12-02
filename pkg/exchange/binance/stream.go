@@ -45,29 +45,17 @@ type Stream struct {
 	balanceUpdateEventCallbacks       []func(event *BalanceUpdateEvent)
 	outboundAccountInfoEventCallbacks []func(event *OutboundAccountInfoEvent)
 	executionReportEventCallbacks     []func(event *ExecutionReportEvent)
+
+	useMargin         bool
+	useMarginIsolated bool
 }
 
 func NewStream(client *binance.Client) *Stream {
-	// binance BalanceUpdate = withdrawal or deposit changes
-	/*
-		stream.OnBalanceUpdateEvent(func(e *binance.BalanceUpdateEvent) {
-			a.mu.Lock()
-			defer a.mu.Unlock()
-
-			delta := util.MustParseFloat(e.Delta)
-			if balance, ok := a.Balances[e.Asset]; ok {
-				balance.Available += delta
-				a.Balances[e.Asset] = balance
-			}
-		})
-	*/
-
 	stream := &Stream{
 		Client: client,
 	}
 
-	var depthFrames = make(map[string]*DepthFrame)
-
+	depthFrames := make(map[string]*DepthFrame)
 	stream.OnDepthEvent(func(e *DepthEvent) {
 		f, ok := depthFrames[e.Symbol]
 		if !ok {
@@ -201,12 +189,34 @@ func (s *Stream) dial(listenKey string) (*websocket.Conn, error) {
 	return conn, nil
 }
 
+func (s *Stream) UseMargin(isolated bool) {
+	s.useMargin = true
+	s.useMarginIsolated = isolated
+}
+
+func (s *Stream) fetchListenKey(ctx context.Context) (string, error) {
+	if s.useMargin {
+		return s.Client.NewStartMarginUserStreamService().Do(ctx)
+	}
+
+	return s.Client.NewStartUserStreamService().Do(ctx)
+}
+
+func (s *Stream) keepaliveListenKey(ctx context.Context, listenKey string) error {
+	if s.useMargin {
+		return s.Client.NewKeepaliveMarginUserStreamService().ListenKey(listenKey).Do(ctx)
+	}
+
+	return s.Client.NewKeepaliveUserStreamService().ListenKey(listenKey).Do(ctx)
+}
+
 func (s *Stream) connect(ctx context.Context) error {
 	if s.publicOnly {
 		log.Infof("stream is set to public only mode")
 	} else {
-		log.Infof("creating user data stream...")
-		listenKey, err := s.Client.NewStartUserStreamService().Do(ctx)
+		log.Infof("request listen key for creating user data stream...")
+
+		listenKey, err := s.fetchListenKey(ctx)
 		if err != nil {
 			return err
 		}
@@ -268,7 +278,7 @@ func (s *Stream) read(ctx context.Context) {
 
 		case <-keepAliveTicker.C:
 			if !s.publicOnly {
-				if err := s.Client.NewKeepaliveUserStreamService().ListenKey(s.ListenKey).Do(ctx); err != nil {
+				if err := s.keepaliveListenKey(ctx, s.ListenKey); err != nil {
 					log.WithError(err).Errorf("listen key keep-alive error: %v key: %s", err, maskListenKey(s.ListenKey))
 				}
 			}
@@ -348,9 +358,16 @@ func (s *Stream) read(ctx context.Context) {
 	}
 }
 
-func (s *Stream) invalidateListenKey(ctx context.Context, listenKey string) error {
-	// use background context to invalidate the user stream
-	err := s.Client.NewCloseUserStreamService().ListenKey(listenKey).Do(ctx)
+func (s *Stream) invalidateListenKey(ctx context.Context, listenKey string) (err error) {
+	// should use background context to invalidate the user stream
+	log.Info("[binance] closing listen key")
+
+	if s.useMargin {
+		err = s.Client.NewCloseMarginUserStreamService().ListenKey(listenKey).Do(ctx)
+	} else {
+		err = s.Client.NewCloseUserStreamService().ListenKey(listenKey).Do(ctx)
+	}
+
 	if err != nil {
 		log.WithError(err).Error("[binance] error deleting listen key")
 		return err
