@@ -80,6 +80,6 @@ case "$command" in
         market=$1
         declare -A trades_params=()
         trades_params[market]=$market
-        myTrades trades_params | jq -r '.[] | "\(.id) \(.market) \(.side) \(.price) \t \(.volume) \t fee = \( .fee | tonumber * 1000 | floor / 1000 ) \(.fee_currency)\t\( .created_at | strflocaltime("%Y-%m-%dT%H:%M:%S %Z") )"'
+        myTrades trades_params | jq -r '.[] | "\(.id) \(.market) \(.side) \(.price) \t \(.volume) \t fee = \( .fee | tonumber * 100000 | floor / 100000 ) \(.fee_currency)\t\( .created_at | strflocaltime("%Y-%m-%dT%H:%M:%S %Z") )"'
         ;;
 esac
