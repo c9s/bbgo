@@ -128,6 +128,12 @@ func (trader *Trader) Run(ctx context.Context) error {
 		}
 	}
 
+	for _, strategy := range trader.crossExchangeStrategies {
+		if subscriber, ok := strategy.(CrossExchangeSessionSubscriber); ok {
+			subscriber.Subscribe(trader.environment.sessions)
+		}
+	}
+
 	if err := trader.environment.Init(ctx); err != nil {
 		return err
 	}
@@ -222,12 +228,6 @@ func (trader *Trader) Run(ctx context.Context) error {
 	router := &ExchangeOrderExecutionRouter{
 		Notifiability: trader.environment.Notifiability,
 		sessions:      trader.environment.sessions,
-	}
-
-	for _, strategy := range trader.crossExchangeStrategies {
-		if subscriber, ok := strategy.(CrossExchangeSessionSubscriber); ok {
-			subscriber.Subscribe(trader.environment.sessions)
-		}
 	}
 
 	for _, strategy := range trader.crossExchangeStrategies {
