@@ -60,6 +60,16 @@ case "$command" in
         orders_params[market]=$market
         myOrders orders_params | jq -r '.[] | "\(.id) \(.market) \(.side) \(.price) \t \(.volume) \(.state)"'
         ;;
+
+    cancel)
+        if [[ $# < 1 ]] ; then
+            echo "$0 cancel [oid]"
+            exit
+        fi
+
+        order_id=$1
+        cancelOrder $order_id
+        ;;
         
     trades)
         if [[ $# < 1 ]] ; then
@@ -70,6 +80,6 @@ case "$command" in
         market=$1
         declare -A trades_params=()
         trades_params[market]=$market
-        myTrades trades_params | jq -r '.[] | "\(.id) \(.market) \(.side) \(.price) \t \(.volume) fee = \(.fee) \(.fee_currency)"'
+        myTrades trades_params | jq -r '.[] | "\(.id) \(.market) \(.side) \(.price) \t \(.volume) \t fee = \( .fee | tonumber * 1000 | floor / 1000 ) \(.fee_currency)\t\( .created_at | strflocaltime("%Y-%m-%dT%H:%M:%S %Z") )"'
         ;;
 esac

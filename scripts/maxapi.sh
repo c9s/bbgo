@@ -99,6 +99,13 @@ function submitOrder()
     send_auth_request "POST" "/api/v2/orders" params
 }
 
+function cancelOrder()
+{
+    declare -A params=()
+    params[id]=$1
+    send_auth_request "POST" "/api/v2/order/delete" params
+}
+
 function myOrders()
 {
     local -n params=$1
