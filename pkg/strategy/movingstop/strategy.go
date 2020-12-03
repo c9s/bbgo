@@ -43,6 +43,8 @@ type Strategy struct {
 
 	Quantity fixedpoint.Value `json:"quantity"`
 
+	BalancePercentage fixedpoint.Value `json:"balancePercentage"`
+
 	OrderType string `json:"orderType"`
 
 	PriceRatio fixedpoint.Value `json:"priceRatio"`
@@ -84,12 +86,12 @@ func (s *Strategy) clear(ctx context.Context, session *bbgo.ExchangeSession) {
 	}
 }
 
-func (s *Strategy) place(ctx context.Context, orderExecutor *bbgo.ExchangeOrderExecutor, indicator Float64Indicator, closePrice float64) {
+func (s *Strategy) place(ctx context.Context, orderExecutor *bbgo.ExchangeOrderExecutor, session *bbgo.ExchangeSession, indicator Float64Indicator, closePrice float64) {
 	movingAveragePrice := indicator.Last()
 
 	// skip it if it's near zero because it's not loaded yet
 	if movingAveragePrice < 0.0001 {
-		log.Warn("moving average price is near 0: %f", movingAveragePrice)
+		log.Warnf("moving average price is near 0: %f", movingAveragePrice)
 		return
 	}
 
@@ -113,13 +115,32 @@ func (s *Strategy) place(ctx context.Context, orderExecutor *bbgo.ExchangeOrderE
 		}
 	}
 
+	market, ok := session.Market(s.Symbol)
+	if !ok {
+		log.Errorf("market not found, symbol %s", s.Symbol)
+		return
+	}
+
+	quantity := s.Quantity
+	if s.BalancePercentage > 0 {
+
+		if balance, ok := session.Account.Balance(market.BaseCurrency); ok {
+			quantity = balance.Available.Mul(s.BalancePercentage)
+		}
+	}
+
+	if quantity.Float64()*closePrice < market.MinNotional {
+		log.Errorf("the amount of stop order (%f) is less than min notional %f", quantity.Float64()*closePrice, market.MinNotional)
+		return
+	}
+
 	retOrders, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 		Symbol:    s.Symbol,
 		Side:      types.SideTypeSell,
 		Type:      orderType,
 		Price:     price,
 		StopPrice: movingAveragePrice,
-		Quantity:  s.Quantity.Float64(),
+		Quantity:  quantity.Float64(),
 	})
 	if err != nil {
 		log.WithError(err).Error("submit order error")
@@ -167,7 +188,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	}
 
 	lastPrice, _ := session.LastPrice(s.Symbol)
-	s.place(ctx, &orderExecutor, indicator, lastPrice)
+	s.place(ctx, &orderExecutor, session, indicator, lastPrice)
 
 	session.Stream.OnOrderUpdate(s.handleOrderUpdate)
 
@@ -186,7 +207,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 		// ok, it's our call, we need to cancel the stop limit order first
 		s.clear(ctx, session)
-		s.place(ctx, &orderExecutor, indicator, closePrice)
+		s.place(ctx, &orderExecutor, session, indicator, closePrice)
 	})
 
 	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
