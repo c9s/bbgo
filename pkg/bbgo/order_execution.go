@@ -267,6 +267,12 @@ func formatOrder(session *ExchangeSession, order types.SubmitOrder) (types.Submi
 	order.Market = market
 
 	switch order.Type {
+	case types.OrderTypeStopMarket, types.OrderTypeStopLimit:
+		order.StopPriceString = market.FormatPrice(order.StopPrice)
+
+	}
+
+	switch order.Type {
 	case types.OrderTypeMarket, types.OrderTypeStopMarket:
 		order.Price = 0.0
 		order.PriceString = ""

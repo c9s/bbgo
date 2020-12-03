@@ -181,6 +181,15 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 			req.ClientOrderID(clientOrderID)
 		}
 
+		switch order.Type {
+		case types.OrderTypeStopLimit, types.OrderTypeStopMarket:
+			if len(order.StopPriceString) == 0 {
+				return createdOrders, fmt.Errorf("stop price string can not be empty")
+			}
+
+			req.StopPrice(order.StopPriceString)
+		}
+
 		if len(order.PriceString) > 0 {
 			req.Price(order.PriceString)
 		}
