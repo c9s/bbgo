@@ -141,6 +141,8 @@ func (s *Strategy) place(ctx context.Context, orderExecutor *bbgo.ExchangeOrderE
 		stopPrice = stopPrice * s.StopPriceRatio.Float64()
 	}
 
+	log.Infof("placing movingstop order %s at stop price %f, quantity %f", s.Symbol, stopPrice, quantity.Float64())
+
 	retOrders, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 		Symbol:    s.Symbol,
 		Side:      types.SideTypeSell,
