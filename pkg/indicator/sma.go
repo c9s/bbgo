@@ -53,10 +53,6 @@ func (inc *SMA) handleKLineWindowUpdate(interval types.Interval, window types.KL
 		return
 	}
 
-	if inc.EndTime != zeroTime && inc.EndTime.Before(inc.EndTime) {
-		return
-	}
-
 	inc.calculateAndUpdate(window)
 }
 
