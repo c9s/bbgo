@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/sirupsen/logrus"
@@ -24,6 +25,15 @@ func (b Balance) String() string {
 }
 
 type BalanceMap map[string]Balance
+
+func (m BalanceMap) String() string {
+	var ss []string
+	for _, b := range m {
+		ss = append(ss, b.String())
+	}
+
+	return "BalanceMap[" + strings.Join(ss, ", ") + "]"
+}
 
 func (m BalanceMap) Print() {
 	for _, balance := range m {
