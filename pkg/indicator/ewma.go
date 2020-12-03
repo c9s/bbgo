@@ -60,10 +60,6 @@ func (inc *EWMA) handleKLineWindowUpdate(interval types.Interval, window types.K
 		return
 	}
 
-	if inc.EndTime != zeroTime && inc.EndTime.Before(inc.EndTime) {
-		return
-	}
-
 	inc.calculateAndUpdate(window)
 }
 
