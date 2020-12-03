@@ -49,6 +49,8 @@ type Strategy struct {
 
 	PriceRatio fixedpoint.Value `json:"priceRatio"`
 
+	StopPriceRatio fixedpoint.Value `json:"stopPriceRatio"`
+
 	// MovingAverageType is the moving average indicator type that we want to use,
 	// it could be SMA or EWMA
 	MovingAverageType string `json:"movingAverageType"`
@@ -134,12 +136,17 @@ func (s *Strategy) place(ctx context.Context, orderExecutor *bbgo.ExchangeOrderE
 		return
 	}
 
+	var stopPrice = movingAveragePrice
+	if s.StopPriceRatio > 0 {
+		stopPrice = stopPrice * s.StopPriceRatio.Float64()
+	}
+
 	retOrders, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 		Symbol:    s.Symbol,
 		Side:      types.SideTypeSell,
 		Type:      orderType,
 		Price:     price,
-		StopPrice: movingAveragePrice,
+		StopPrice: stopPrice,
 		Quantity:  quantity.Float64(),
 	})
 	if err != nil {
