@@ -58,7 +58,7 @@ case "$command" in
         market=$1
         declare -A orders_params=()
         orders_params[market]=$market
-        myOrders orders_params | jq -r '.[] | "\(.id) \(.market) \(.side) \(.price) \t \(.volume) \(.state)"'
+        myOrders orders_params | jq -r '.[] | "\(.id) \(.market) \(.ord_type) \(.side) \(.price) \t \(.volume) \(.state)"'
         ;;
 
     cancel)
