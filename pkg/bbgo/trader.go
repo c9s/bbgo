@@ -24,11 +24,11 @@ type ExchangeSessionSubscriber interface {
 }
 
 type CrossExchangeSessionSubscriber interface {
-	Subscribe(sessions map[string]*ExchangeSession)
+	CrossSubscribe(sessions map[string]*ExchangeSession)
 }
 
 type CrossExchangeStrategy interface {
-	Run(ctx context.Context, orderExecutionRouter OrderExecutionRouter, sessions map[string]*ExchangeSession) error
+	CrossRun(ctx context.Context, orderExecutionRouter OrderExecutionRouter, sessions map[string]*ExchangeSession) error
 }
 
 //go:generate callbackgen -type Graceful
@@ -130,7 +130,7 @@ func (trader *Trader) Run(ctx context.Context) error {
 
 	for _, strategy := range trader.crossExchangeStrategies {
 		if subscriber, ok := strategy.(CrossExchangeSessionSubscriber); ok {
-			subscriber.Subscribe(trader.environment.sessions)
+			subscriber.CrossSubscribe(trader.environment.sessions)
 		}
 	}
 
@@ -250,7 +250,7 @@ func (trader *Trader) Run(ctx context.Context) error {
 
 		}
 
-		if err := strategy.Run(ctx, router, trader.environment.sessions); err != nil {
+		if err := strategy.CrossRun(ctx, router, trader.environment.sessions); err != nil {
 			return err
 		}
 	}
