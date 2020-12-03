@@ -6,10 +6,13 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+//go:generate callbackgen -type EWMA
 type EWMA struct {
 	types.IntervalWindow
-	Values   Float64Slice
-	EndTime  time.Time
+	Values  Float64Slice
+	EndTime time.Time
+
+	UpdateCallbacks []func(value float64)
 }
 
 func (inc *EWMA) Last() float64 {
@@ -32,18 +35,20 @@ func (inc *EWMA) calculateAndUpdate(kLines []types.KLine) {
 		return
 	}
 
+	inc.EndTime = kLines[index].EndTime
+
 	var recentK = kLines[index-(inc.Window-1) : index+1]
 	if len(inc.Values) > 0 {
 		var previousEWMA = inc.Values[len(inc.Values)-1]
 		var ewma = lastK.Close*multiplier + previousEWMA*(1-multiplier)
 		inc.Values.Push(ewma)
+		inc.EmitUpdate(ewma)
 	} else {
 		// The first EWMA is actually SMA
 		var sma = calculateSMA(recentK)
 		inc.Values.Push(sma)
+		inc.EmitUpdate(sma)
 	}
-
-	inc.EndTime = kLines[index].EndTime
 }
 
 type KLineWindowUpdater interface {

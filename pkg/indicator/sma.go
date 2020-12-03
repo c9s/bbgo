@@ -14,10 +14,14 @@ func (s *Float64Slice) Push(v float64) {
 
 var zeroTime time.Time
 
+
+//go:generate callbackgen -type SMA
 type SMA struct {
 	types.IntervalWindow
 	Values  Float64Slice
 	EndTime time.Time
+
+	UpdateCallbacks []func(value float64)
 }
 
 func (inc *SMA) Last() float64 {
@@ -40,6 +44,8 @@ func (inc *SMA) calculateAndUpdate(kLines []types.KLine) {
 	var sma = calculateSMA(recentK)
 	inc.Values.Push(sma)
 	inc.EndTime = kLines[index].EndTime
+
+	inc.EmitUpdate(sma)
 }
 
 func (inc *SMA) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
