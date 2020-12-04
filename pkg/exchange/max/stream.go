@@ -34,9 +34,6 @@ func NewStream(key, secret string) *Stream {
 
 	wss.OnKLineEvent(func(e max.KLineEvent) {
 		kline := e.KLine.KLine()
-
-		logger.Infof("K: %+v", kline)
-
 		stream.EmitKLine(kline)
 		if kline.Closed {
 			stream.EmitKLineClosed(kline)
