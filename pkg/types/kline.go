@@ -10,15 +10,15 @@ import (
 	"github.com/c9s/bbgo/pkg/util"
 )
 
-type Trend int
+type Direction int
 
-const TrendUp = 1
-const TrendFlat = 0
-const TrendDown = -1
+const DirectionUp = 1
+const DirectionNone = 0
+const DirectionDown = -1
 
 type KLineOrWindow interface {
 	GetInterval() string
-	GetTrend() int
+	Direction() Direction
 	GetChange() float64
 	GetMaxChange() float64
 	GetThickness() float64
@@ -86,27 +86,27 @@ func (k KLine) Mid() float64 {
 // green candle with open and close near high price
 func (k KLine) BounceUp() bool {
 	mid := k.Mid()
-	trend := k.GetTrend()
+	trend := k.Direction()
 	return trend > 0 && k.Open > mid && k.Close > mid
 }
 
 // red candle with open and close near low price
 func (k KLine) BounceDown() bool {
 	mid := k.Mid()
-	trend := k.GetTrend()
+	trend := k.Direction()
 	return trend > 0 && k.Open < mid && k.Close < mid
 }
 
-func (k KLine) GetTrend() Trend {
+func (k KLine) Direction() Direction {
 	o := k.GetOpen()
 	c := k.GetClose()
 
 	if c > o {
-		return TrendUp
+		return DirectionUp
 	} else if c < o {
-		return TrendDown
+		return DirectionDown
 	}
-	return TrendFlat
+	return DirectionNone
 }
 
 func (k KLine) GetHigh() float64 {
@@ -175,9 +175,9 @@ func (k KLine) String() string {
 }
 
 func (k KLine) Color() string {
-	if k.GetTrend() > 0 {
+	if k.Direction() > 0 {
 		return Green
-	} else if k.GetTrend() < 0 {
+	} else if k.Direction() < 0 {
 		return Red
 	}
 	return "#f0f0f0"
@@ -282,7 +282,7 @@ func (k KLineWindow) GetMaxChange() float64 {
 
 func (k KLineWindow) AllDrop() bool {
 	for _, n := range k {
-		if n.GetTrend() >= 0 {
+		if n.Direction() >= 0 {
 			return false
 		}
 	}
@@ -291,7 +291,7 @@ func (k KLineWindow) AllDrop() bool {
 
 func (k KLineWindow) AllRise() bool {
 	for _, n := range k {
-		if n.GetTrend() <= 0 {
+		if n.Direction() <= 0 {
 			return false
 		}
 	}
