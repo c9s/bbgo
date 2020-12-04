@@ -30,6 +30,10 @@ func init() {
 type Strategy struct {
 	*bbgo.Graceful
 
+	// The notification system will be injected into the strategy automatically.
+	// This field will be injected automatically since it's a single exchange strategy.
+	*bbgo.Notifiability
+
 	SourceExchangeName string `json:"sourceExchange"`
 
 	TargetExchangeName string `json:"targetExchange"`
@@ -196,10 +200,8 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 	}
 
-	lastPrice, _ := session.LastPrice(s.Symbol)
-	s.place(ctx, &orderExecutor, session, indicator, lastPrice)
-
 	session.Stream.OnOrderUpdate(s.handleOrderUpdate)
+
 
 	// session.Stream.OnKLineClosed
 	sourceSession.Stream.OnKLineClosed(func(kline types.KLine) {
@@ -224,6 +226,10 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		log.Infof("canceling movingstop order...")
 		s.clear(ctx, session)
 	})
+
+	if lastPrice, ok := session.LastPrice(s.Symbol) ; ok {
+		s.place(ctx, &orderExecutor, session, indicator, lastPrice)
+	}
 
 	return nil
 }
