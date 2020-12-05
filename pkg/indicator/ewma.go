@@ -38,9 +38,12 @@ func (inc *EWMA) calculateAndUpdate(allKLines []types.KLine) {
 		// for the first value, we should use the close price
 		inc.Values = []float64{priceF(allKLines[0])}
 	} else {
+		// from = len(inc.Values)
+
 		// update ewma with the existing values
 		for i := dataLen - 1; i > 0; i-- {
-			if allKLines[i].StartTime.After(inc.LastOpenTime) {
+			var k = allKLines[i]
+			if k.StartTime.After(inc.LastOpenTime) {
 				from = i
 			} else {
 				break
@@ -57,13 +60,13 @@ func (inc *EWMA) calculateAndUpdate(allKLines []types.KLine) {
 	}
 
 	if len(inc.Values) != dataLen {
-		log.Warnf("EMA %s (%d) value length (%d) != all kline data length (%d)", inc.Interval, inc.Window, len(inc.Values), dataLen)
+		log.Warnf("%s EMA (%d) value length (%d) != all kline data length (%d)", inc.Interval, inc.Window, len(inc.Values), dataLen)
 	}
 
 	v1 := math.Floor(inc.Values[len(inc.Values)-1]*100.0) / 100.0
 	v2 := math.Floor(CalculateKLineEWMA(allKLines, priceF, inc.Window)*100.0) / 100.0
 	if v1 != v2 {
-		log.Warnf("ACCUMULATED EMA %s (%d) %f != EMA %f", inc.Interval, inc.Window, v1, v2)
+		log.Warnf("ACCUMULATED %s EMA (%d) %f != EMA %f", inc.Interval, inc.Window, v1, v2)
 	}
 }
 

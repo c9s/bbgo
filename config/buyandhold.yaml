@@ -59,4 +59,4 @@ exchangeStrategies:
     symbol: "BTCUSDT"
     interval: "1m"
     baseQuantity: 0.001
-    minDropPercentage: -0.001
+    minDropPercentage: -0.01
