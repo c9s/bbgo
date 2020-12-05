@@ -147,7 +147,6 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 			}
 
 			session.lastPrices[kline.Symbol] = kline.Close
-			session.marketDataStores[kline.Symbol].AddKLine(kline)
 		})
 
 		session.Stream.OnTradeUpdate(func(trade types.Trade) {
@@ -167,8 +166,10 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 
 			var lastPriceTime time.Time
 			for interval := range types.SupportedIntervals {
+				// avoid querying the last unclosed kline
+				endTime := environ.startTime.Add(- interval.Duration())
 				kLines, err := session.Exchange.QueryKLines(ctx, symbol, interval, types.KLineQueryOptions{
-					EndTime: &environ.startTime,
+					EndTime: &endTime,
 					Limit:   500, // indicators need at least 100
 				})
 				if err != nil {

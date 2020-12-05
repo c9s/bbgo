@@ -80,7 +80,7 @@ func (inc *BOLL) calculateAndUpdate(kLines []types.KLine) {
 	}
 
 	var recentK = kLines[index-(inc.Window-1) : index+1]
-	sma, err := calculateSMA(recentK, inc.Window)
+	sma, err := calculateSMA(recentK, inc.Window, KLineClosePriceMapper)
 	if err != nil {
 		log.WithError(err).Error("SMA error")
 		return

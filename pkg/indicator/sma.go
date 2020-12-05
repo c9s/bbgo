@@ -44,7 +44,7 @@ func (inc *SMA) calculateAndUpdate(kLines []types.KLine) {
 
 	var recentK = kLines[index-(inc.Window-1) : index+1]
 
-	sma, err := calculateSMA(recentK, inc.Window)
+	sma, err := calculateSMA(recentK, inc.Window, KLineClosePriceMapper)
 	if err != nil {
 		log.WithError(err).Error("SMA error")
 		return
@@ -67,7 +67,7 @@ func (inc *SMA) Bind(updater KLineWindowUpdater) {
 	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }
 
-func calculateSMA(kLines []types.KLine, window int) (float64, error) {
+func calculateSMA(kLines []types.KLine, window int, priceF KLinePriceMapper) (float64, error) {
 	length := len(kLines)
 	if length == 0 || length < window {
 		return 0.0, fmt.Errorf("insufficient elements for calculating SMA with window = %d", window)
@@ -75,7 +75,7 @@ func calculateSMA(kLines []types.KLine, window int) (float64, error) {
 
 	sum := 0.0
 	for _, k := range kLines {
-		sum += k.Close
+		sum += priceF(k)
 	}
 
 	avg := sum / float64(window)
