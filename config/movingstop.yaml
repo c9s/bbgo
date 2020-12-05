@@ -1,0 +1,31 @@
+---
+crossExchangeStrategies:
+- movingstop:
+    sourceExchange: "binance"
+    targetExchange: "max"
+    symbol: ETHUSDT
+
+    # interval is the kline interval we want to update our stop limit order
+    interval: 1m
+
+    # movingAverage* is used for calculating the stop price
+    movingAverageType: EWMA
+    movingAverageInterval: 1h
+    movingAverageWindow: 99
+
+    # stop price adjusts the stop price by a ratio. If defined, stop price = moving average price * ratio
+    stopPriceRatio: 0.975
+
+    # orderType is the stop order type, could be "market" or "limit"
+    orderType: market
+    # orderType: limit
+
+    # priceRatio greater than 1 means we will place the sell order as a maker order
+    # priceRatio less than 1 means we will place the sell order as a taker order (trade with the existing bid orders)
+    # priceRatio: 1.1
+
+    # you can specify "quantity" or "balancePercentage" for the sell order quantity
+    quantity: 0.02
+
+    # balancePercentage 0.25 means 25% of the current base asset
+    # balancePercentage: 0.25
