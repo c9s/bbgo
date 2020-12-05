@@ -47,7 +47,7 @@ func New(botToken, initToken string, options ...NotifyOption) *Notifier {
 		if m.Sender == chatUser {
 			bot.Send(chatUser, "bbgo!")
 		} else {
-			log.Warningf("Incorrect user tried to access bot! sender id: %s", m.Sender)
+			log.Warningf("Incorrect user tried to access bot! sender id: %s", m.Sender.Username)
 		}
 	})
 
