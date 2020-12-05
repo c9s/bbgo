@@ -10,8 +10,6 @@ type MarketDataStore struct {
 	// KLineWindows stores all loaded klines per interval
 	KLineWindows map[types.Interval]types.KLineWindow `json:"-"`
 
-	LastKLine types.KLine
-
 	kLineWindowUpdateCallbacks []func(interval types.Interval, kline types.KLineWindow)
 
 	orderBook *types.StreamOrderBook
@@ -86,8 +84,5 @@ func (store *MarketDataStore) AddKLine(kline types.KLine) {
 		window.Add(kline)
 	}
 	store.KLineWindows[kline.Interval] = window
-
-	store.LastKLine = kline
-
 	store.EmitKLineWindowUpdate(kline.Interval, window)
 }

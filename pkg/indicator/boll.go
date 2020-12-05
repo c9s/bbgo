@@ -3,6 +3,7 @@ package indicator
 import (
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"gonum.org/v1/gonum/stat"
 
 	"github.com/c9s/bbgo/pkg/types"
@@ -79,7 +80,12 @@ func (inc *BOLL) calculateAndUpdate(kLines []types.KLine) {
 	}
 
 	var recentK = kLines[index-(inc.Window-1) : index+1]
-	var sma = calculateSMA(recentK)
+	sma, err := calculateSMA(recentK, inc.Window)
+	if err != nil {
+		log.WithError(err).Error("SMA error")
+		return
+	}
+
 	inc.SMA.Push(sma)
 
 	var prices []float64
