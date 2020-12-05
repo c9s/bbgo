@@ -1,7 +1,10 @@
 package indicator
 
 import (
+	"math"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -9,8 +12,8 @@ import (
 //go:generate callbackgen -type EWMA
 type EWMA struct {
 	types.IntervalWindow
-	Values  Float64Slice
-	EndTime time.Time
+	Values       Float64Slice
+	LastOpenTime time.Time
 
 	UpdateCallbacks []func(value float64)
 }
@@ -19,35 +22,82 @@ func (inc *EWMA) Last() float64 {
 	return inc.Values[len(inc.Values)-1]
 }
 
-func (inc *EWMA) calculateAndUpdate(kLines []types.KLine) {
-	if len(kLines) < inc.Window {
+func (inc *EWMA) calculateAndUpdate(allKLines []types.KLine) {
+	if len(allKLines) < inc.Window {
 		// we can't calculate
 		return
 	}
 
-	var index = len(kLines) - 1
-	var lastK = kLines[index]
-	if inc.EndTime != zeroTime && lastK.EndTime.Before(inc.EndTime) {
-		return
+	var priceF = KLineClosePriceMapper
+	var dataLen = len(allKLines)
+	var multiplier = 2.0 / (float64(inc.Window) + 1)
+
+	// init the values from the kline data
+	var from = 1
+	if len(inc.Values) == 0 {
+		// for the first value, we should use the close price
+		inc.Values = []float64{priceF(allKLines[0])}
+	} else {
+		// update ewma with the existing values
+		for i := dataLen - 1; i > 0; i-- {
+			if allKLines[i].StartTime.After(inc.LastOpenTime) {
+				from = i
+			} else {
+				break
+			}
+		}
 	}
 
-	var recentK = kLines[index-(inc.Window-1) : index+1]
-	var multiplier = 2.0 / float64(inc.Window+1)
-	var val = calculateEWMA(recentK, multiplier)
-	// val = calculateSMA(recentK)
-	inc.Values.Push(val)
-	inc.EndTime = lastK.EndTime
-	inc.EmitUpdate(val)
+	for i := from; i < dataLen; i++ {
+		var k = allKLines[i]
+		var ewma = priceF(k)*multiplier + (1-multiplier)*inc.Values[i-1]
+		inc.Values.Push(ewma)
+		inc.LastOpenTime = k.StartTime
+		inc.EmitUpdate(ewma)
+	}
+
+	if len(inc.Values) != dataLen {
+		log.Warnf("EMA %s (%d) value length (%d) != all kline data length (%d)", inc.Interval, inc.Window, len(inc.Values), dataLen)
+	}
+
+	v1 := math.Floor(inc.Values[len(inc.Values)-1]*100.0) / 100.0
+	v2 := math.Floor(CalculateKLineEWMA(allKLines, priceF, inc.Window)*100.0) / 100.0
+	if v1 != v2 {
+		log.Warnf("ACCUMULATED EMA %s (%d) %f != EMA %f", inc.Interval, inc.Window, v1, v2)
+	}
+}
+
+func CalculateKLineEWMA(allKLines []types.KLine, priceF KLinePriceMapper, window int) float64 {
+	var multiplier = 2.0 / (float64(window) + 1)
+	return ewma(MapKLinePrice(allKLines, priceF), multiplier)
 }
 
 // see https://www.investopedia.com/ask/answers/122314/what-exponential-moving-average-ema-formula-and-how-ema-calculated.asp
-func calculateEWMA(kLines []types.KLine, multiplier float64) float64 {
-	var end = len(kLines) - 1
+func ewma(prices []float64, multiplier float64) float64 {
+	var end = len(prices) - 1
 	if end == 0 {
-		return kLines[0].Close
+		return prices[0]
 	}
 
-	return kLines[end].Close*multiplier + (1-multiplier)*calculateEWMA(kLines[:end-1], multiplier)
+	return prices[end]*multiplier + (1-multiplier)*ewma(prices[:end], multiplier)
+}
+
+type KLinePriceMapper func(k types.KLine) float64
+
+func KLineOpenPriceMapper(k types.KLine) float64 {
+	return k.Open
+}
+
+func KLineClosePriceMapper(k types.KLine) float64 {
+	return k.Close
+}
+
+func MapKLinePrice(kLines []types.KLine, f KLinePriceMapper) (prices []float64) {
+	for _, k := range kLines {
+		prices = append(prices, f(k))
+	}
+
+	return prices
 }
 
 type KLineWindowUpdater interface {

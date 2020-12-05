@@ -1,7 +1,10 @@
 package indicator
 
 import (
+	"fmt"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -13,7 +16,6 @@ func (s *Float64Slice) Push(v float64) {
 }
 
 var zeroTime time.Time
-
 
 //go:generate callbackgen -type SMA
 type SMA struct {
@@ -41,7 +43,12 @@ func (inc *SMA) calculateAndUpdate(kLines []types.KLine) {
 	}
 
 	var recentK = kLines[index-(inc.Window-1) : index+1]
-	var sma = calculateSMA(recentK)
+
+	sma, err := calculateSMA(recentK, inc.Window)
+	if err != nil {
+		log.WithError(err).Error("SMA error")
+		return
+	}
 	inc.Values.Push(sma)
 	inc.EndTime = kLines[index].EndTime
 
@@ -60,11 +67,10 @@ func (inc *SMA) Bind(updater KLineWindowUpdater) {
 	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }
 
-func calculateSMA(kLines []types.KLine) float64 {
+func calculateSMA(kLines []types.KLine, window int) (float64, error) {
 	length := len(kLines)
-
-	if length == 0 {
-		return 0.0
+	if length == 0 || length < window {
+		return 0.0, fmt.Errorf("insufficient elements for calculating SMA with window = %d", window)
 	}
 
 	sum := 0.0
@@ -72,6 +78,6 @@ func calculateSMA(kLines []types.KLine) float64 {
 		sum += k.Close
 	}
 
-	avg := sum / float64(length)
-	return avg
+	avg := sum / float64(window)
+	return avg, nil
 }
