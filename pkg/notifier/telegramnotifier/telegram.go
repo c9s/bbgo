@@ -64,12 +64,12 @@ info	- print information about current chat
 	bot.Handle("/info", func(m *tb.Message) {
 		if m.Sender.ID == notifier.chatUser.ID {
 			bot.Send(notifier.chatUser,
-				fmt.Sprintf("Welcome! your username: %s, user ID: %s",
+				fmt.Sprintf("Welcome! your username: %s, user ID: %d",
 					notifier.chatUser.Username,
 					notifier.chatUser.ID,
 				))
 		} else {
-			log.Warningf("Incorrect user tried to access bot! sender id: %s", m.Sender)
+			log.Warningf("Incorrect user tried to access bot! sender username: %s id: %d", m.Sender.Username, m.Sender.ID)
 		}
 	})
 
