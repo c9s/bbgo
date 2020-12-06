@@ -142,6 +142,10 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config) error {
 		environ.ConfigureNotification(userConfig.Notifications)
 	}
 
+	if userConfig.Persistence != nil {
+		environ.ConfigurePersistence(userConfig.Persistence)
+	}
+
 	trader := bbgo.NewTrader(environ)
 
 	if userConfig.RiskControls != nil {
