@@ -158,6 +158,13 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 			environ.startTime = time.Now()
 		}
 
+		var intervals = map[types.Interval]struct{}{}
+		for _, sub := range session.Subscriptions {
+			if sub.Channel == types.KLineChannel {
+				intervals[types.Interval(sub.Options.Interval)] = struct{}{}
+			}
+		}
+
 		for symbol := range session.loadedSymbols {
 			marketDataStore, ok := session.marketDataStores[symbol]
 			if !ok {
@@ -165,12 +172,12 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 			}
 
 			var lastPriceTime time.Time
-			for interval := range types.SupportedIntervals {
+			for interval := range intervals {
 				// avoid querying the last unclosed kline
 				endTime := environ.startTime.Add(- interval.Duration())
 				kLines, err := session.Exchange.QueryKLines(ctx, symbol, interval, types.KLineQueryOptions{
 					EndTime: &endTime,
-					Limit:   500, // indicators need at least 100
+					Limit:   1000, // indicators need at least 100
 				})
 				if err != nil {
 					return err
