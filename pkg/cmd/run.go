@@ -124,11 +124,11 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config) error {
 
 	// for telegram
 	telegramBotToken := viper.GetString("telegram-bot-token")
-	telegramInitToken := viper.GetString("telegram-init-token")
-	if len(telegramBotToken) > 0 && len(telegramInitToken) > 0 {
+	telegramAuthToken := viper.GetString("telegram-auth-token")
+	if len(telegramBotToken) > 0 && len(telegramAuthToken) > 0 {
 
 		log.Infof("adding telegram notifier")
-		var notifier = telegramnotifier.New(telegramBotToken, telegramInitToken)
+		var notifier = telegramnotifier.New(telegramBotToken, telegramAuthToken)
 
 		// start telegram bot
 		go notifier.Bot.Start()

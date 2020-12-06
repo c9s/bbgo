@@ -17,7 +17,7 @@ type Notifier struct {
 type NotifyOption func(notifier *Notifier)
 
 // start bot daemon
-func New(botToken, initToken string, options ...NotifyOption) *Notifier {
+func New(botToken, authToken string, options ...NotifyOption) *Notifier {
 
 	notifier := &Notifier{
 		chatUser: &tb.User{},
@@ -44,20 +44,20 @@ func New(botToken, initToken string, options ...NotifyOption) *Notifier {
 	bot.Handle("/help", func(m *tb.Message) {
 		helpMsg := `
 help	- print help message
-init	- initialize telegram bot with initToken. ex. /init my-token
+auth	- authorize current telegram user to access telegram bot with authToken. ex. /auth my-token
 info	- print information about current chat
 `
 		bot.Send(m.Sender, helpMsg)
 	})
 
-	// init check initToken and then set sender id
-	bot.Handle("/init", func(m *tb.Message) {
+	// auth check authToken and then set sender id
+	bot.Handle("/auth", func(m *tb.Message) {
 		log.Info("Receive message: ", m) //debug
-		if m.Payload == initToken {
+		if m.Payload == authToken {
 			notifier.chatUser = m.Sender
-			bot.Send(m.Sender, "Bot initialized")
+			bot.Send(m.Sender, "User authorized")
 		} else {
-			bot.Send(m.Sender, "Error: bot intialize failed. Init token not match!")
+			bot.Send(m.Sender, "Error: User authorization failed. Auth token does not match!")
 		}
 	})
 
@@ -84,7 +84,7 @@ func (n *Notifier) Notify(format string, args ...interface{}) {
 
 func (n *Notifier) NotifyTo(channel, format string, args ...interface{}) {
 	if n.chatUser.ID == 0 {
-		log.Warningf("Telegram bot not initialized. Skip notification")
+		log.Warningf("Telegram bot has no authenticated user. Skip notification")
 		return
 	}
 

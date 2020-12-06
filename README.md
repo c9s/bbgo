@@ -41,7 +41,7 @@ Add your dotenv file:
 SLACK_TOKEN=
 
 TELEGRAM_BOT_TOKEN=
-TELEGRAM_INIT_TOKEN=
+TELEGRAM_AUTH_TOKEN=
 
 BINANCE_API_KEY=
 BINANCE_API_SECRET=
@@ -221,11 +221,11 @@ streambook.BindStream(stream)
 - input bot username. This should be global unique. ex. `PeqFqJxP_bbgo_bot`
 - Botfather return bot token. Keep bot token safe
 - Set `TELEGRAM_BOT_TOKEN` in `.env.local`
-- Set `TELEGRAM_INIT_TOKEN` in `.env.local`. Generate your own init token. ex. 92463901, or kx2UX@eM
+- Set `TELEGRAM_AUTH_TOKEN` in `.env.local`. Generate your own auth token. ex. 92463901, or kx2UX@eM
 - Run bbgo
 - In telegram: search your bot `PeqFqJxP_bbgo_bot`
 - /start
-- /init 92463901
+- /auth 92463901
 - done! your session will route to telegram
 
 ## Support
