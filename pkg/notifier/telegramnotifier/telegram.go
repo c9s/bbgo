@@ -33,21 +33,34 @@ func New(botToken, initToken string, options ...NotifyOption) *Notifier {
 
 	chatUser := &tb.User{}
 
+	bot.Handle("/help", func(m *tb.Message) {
+		helpMsg := `
+help	- print help message
+init	- initialize telegram bot with initToken. ex. /init my-token
+hi		- print welcome message to authorized user
+`
+		bot.Send(m.Sender, helpMsg)
+	})
+
 	// init check initToken and then set sender id
 	bot.Handle("/init", func(m *tb.Message) {
-		if m.Text == initToken {
-			bot.Send(m.Sender, "Bot initialized")
+		log.Info("Receive message: ", m) //debug
+		if m.Payload == initToken {
 			chatUser = m.Sender
+			bot.Send(m.Sender, "Bot initialized")
 		} else {
 			bot.Send(m.Sender, "Error: bot intialize failed. Init token not match!")
 		}
 	})
 
-	bot.Handle("/bbgo", func(m *tb.Message) {
-		if m.Sender == chatUser {
-			bot.Send(chatUser, "bbgo!")
+	bot.Handle("/hi", func(m *tb.Message) {
+		if m.Sender.ID == chatUser.ID {
+			bot.Send(chatUser,
+				fmt.Sprintf("Welcome! user: %s, ID: %s"),
+				chatUser.Username,
+				chatUser.ID)
 		} else {
-			log.Warningf("Incorrect user tried to access bot! sender id: %s", m.Sender.Username)
+			log.Warningf("Incorrect user tried to access bot! sender id: %s", m.Sender)
 		}
 	})
 
