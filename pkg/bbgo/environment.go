@@ -3,6 +3,7 @@ package bbgo
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -218,6 +219,23 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 	}
 
 	return nil
+}
+
+func (environ *Environment) ConfigurePersistence(conf *PersistenceConfig) {
+	var facade = &PersistenceServiceFacade{}
+	if conf.Redis != nil {
+		facade.Redis = NewRedisPersistenceService(conf.Redis)
+	}
+
+	if conf.Json != nil {
+		if _, err := os.Stat(conf.Json.Directory) ; os.IsNotExist(err) {
+			if err2 := os.MkdirAll(conf.Json.Directory, 0777) ; err2 != nil {
+				log.WithError(err2).Errorf("can not create directory: %s", conf.Json.Directory)
+			}
+		}
+
+		facade.Json = &JsonPersistenceService{Directory: conf.Json.Directory}
+	}
 }
 
 // configure notification rules
