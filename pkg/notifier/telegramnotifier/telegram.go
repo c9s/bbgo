@@ -18,6 +18,16 @@ type NotifyOption func(notifier *Notifier)
 
 // start bot daemon
 func New(botToken, initToken string, options ...NotifyOption) *Notifier {
+
+	notifier := &Notifier{
+		chatUser: &tb.User{},
+		Bot:      &tb.Bot{},
+	}
+
+	for _, o := range options {
+		o(notifier)
+	}
+
 	bot, err := tb.NewBot(tb.Settings{
 		// You can also set custom API URL.
 		// If field is empty it equals to "https://api.telegram.org".
@@ -30,8 +40,6 @@ func New(botToken, initToken string, options ...NotifyOption) *Notifier {
 	if err != nil {
 		panic(err)
 	}
-
-	chatUser := &tb.User{}
 
 	bot.Handle("/help", func(m *tb.Message) {
 		helpMsg := `
@@ -46,7 +54,7 @@ info	- print information about current chat
 	bot.Handle("/init", func(m *tb.Message) {
 		log.Info("Receive message: ", m) //debug
 		if m.Payload == initToken {
-			chatUser = m.Sender
+			notifier.chatUser = m.Sender
 			bot.Send(m.Sender, "Bot initialized")
 		} else {
 			bot.Send(m.Sender, "Error: bot intialize failed. Init token not match!")
@@ -54,25 +62,18 @@ info	- print information about current chat
 	})
 
 	bot.Handle("/info", func(m *tb.Message) {
-		if m.Sender.ID == chatUser.ID {
-			bot.Send(chatUser,
+		if m.Sender.ID == notifier.chatUser.ID {
+			bot.Send(notifier.chatUser,
 				fmt.Sprintf("Welcome! your username: %s, user ID: %s",
-					chatUser.Username,
-					chatUser.ID,
+					notifier.chatUser.Username,
+					notifier.chatUser.ID,
 				))
 		} else {
 			log.Warningf("Incorrect user tried to access bot! sender id: %s", m.Sender)
 		}
 	})
 
-	notifier := &Notifier{
-		chatUser: chatUser,
-		Bot:      bot,
-	}
-
-	for _, o := range options {
-		o(notifier)
-	}
+	notifier.Bot = bot
 
 	return notifier
 }
