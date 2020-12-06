@@ -213,6 +213,21 @@ streambook := types.NewStreamBook(symbol)
 streambook.BindStream(stream)
 ```
 
+## Telegram Integration
+
+- In telegram: @botFather
+- /newbot
+- input bot display name. ex. `bbgo_bot`
+- input bot username. This should be global unique. ex. `PeqFqJxP_bbgo_bot`
+- Botfather return bot token. Keep bot token safe
+- Set `TELEGRAM_BOT_TOKEN` in `.env.local`
+- Set `TELEGRAM_INIT_TOKEN` in `.env.local`. Generate your own init token. ex. 92463901, or kx2UX@eM
+- Run bbgo
+- In telegram: search your bot `PeqFqJxP_bbgo_bot`
+- /start
+- /init 92463901
+- done! your session will route to telegram
+
 ## Support
 
 ### By contributing pull requests
