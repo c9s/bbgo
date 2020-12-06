@@ -37,7 +37,7 @@ func New(botToken, initToken string, options ...NotifyOption) *Notifier {
 		helpMsg := `
 help	- print help message
 init	- initialize telegram bot with initToken. ex. /init my-token
-hi		- print welcome message to authorized user
+info	- print information about current chat
 `
 		bot.Send(m.Sender, helpMsg)
 	})
@@ -53,12 +53,13 @@ hi		- print welcome message to authorized user
 		}
 	})
 
-	bot.Handle("/hi", func(m *tb.Message) {
+	bot.Handle("/info", func(m *tb.Message) {
 		if m.Sender.ID == chatUser.ID {
 			bot.Send(chatUser,
-				fmt.Sprintf("Welcome! user: %s, ID: %s"),
-				chatUser.Username,
-				chatUser.ID)
+				fmt.Sprintf("Welcome! your username: %s, user ID: %s",
+					chatUser.Username,
+					chatUser.ID,
+				))
 		} else {
 			log.Warningf("Incorrect user tried to access bot! sender id: %s", m.Sender)
 		}
@@ -81,6 +82,11 @@ func (n *Notifier) Notify(format string, args ...interface{}) {
 }
 
 func (n *Notifier) NotifyTo(channel, format string, args ...interface{}) {
+	if n.chatUser.ID == 0 {
+		log.Warningf("Telegram bot not initialized. Skip notification")
+		return
+	}
+
 	var telegramArgsOffset = -1
 
 	var nonTelegramArgs = args
