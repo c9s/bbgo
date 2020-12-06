@@ -40,6 +40,9 @@ Add your dotenv file:
 ```
 SLACK_TOKEN=
 
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_AUTH_TOKEN=
+
 BINANCE_API_KEY=
 BINANCE_API_SECRET=
 
@@ -209,6 +212,21 @@ stream.Subscribe(types.BookChannel, symbol, types.SubscribeOptions{})
 streambook := types.NewStreamBook(symbol)
 streambook.BindStream(stream)
 ```
+
+## Telegram Integration
+
+- In telegram: @botFather
+- /newbot
+- input bot display name. ex. `bbgo_bot`
+- input bot username. This should be global unique. ex. `PeqFqJxP_bbgo_bot`
+- Botfather return bot token. Keep bot token safe
+- Set `TELEGRAM_BOT_TOKEN` in `.env.local`
+- Set `TELEGRAM_AUTH_TOKEN` in `.env.local`. Generate your own auth token. ex. 92463901, or kx2UX@eM
+- Run bbgo
+- In telegram: search your bot `PeqFqJxP_bbgo_bot`
+- /start
+- /auth 92463901
+- done! your session will route to telegram
 
 ## Support
 
