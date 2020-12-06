@@ -101,12 +101,30 @@ func (m BacktestAccountBalanceMap) BalanceMap() types.BalanceMap {
 	return balances
 }
 
+type RedisPersistenceConfig struct {
+	Host     string `json:"host" env:"REDIS_HOST"`
+	Port     string `json:"port" env:"REDIS_PORT"`
+	Password string `json:"password" env:"REDIS_PASSWORD"`
+	DB int    `json:"db" env:"REDIS_DB"`
+}
+
+type JsonPersistenceConfig struct {
+	Directory string `json:"directory"`
+}
+
+type PersistenceConfig struct {
+	Redis *RedisPersistenceConfig `json:"redis,omitempty" yaml:"redis,omitempty"`
+	Json  *JsonPersistenceConfig  `json:"json,omitempty" yaml:"json,omitempty"`
+}
+
 type Config struct {
 	Imports []string `json:"imports" yaml:"imports"`
 
 	Backtest *Backtest `json:"backtest,omitempty" yaml:"backtest,omitempty"`
 
 	Notifications *NotificationConfig `json:"notifications,omitempty" yaml:"notifications,omitempty"`
+
+	Persistence *PersistenceConfig `json:"persistence,omitempty" yaml:"persistence,omitempty"`
 
 	Sessions map[string]Session `json:"sessions,omitempty" yaml:"sessions,omitempty"`
 
