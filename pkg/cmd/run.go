@@ -215,7 +215,7 @@ var RunCmd = &cobra.Command{
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		userConfig, err := bbgo.Preload(configFile)
+		userConfig, err := bbgo.LoadBuildConfig(configFile)
 		if err != nil {
 			return err
 		}

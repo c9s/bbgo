@@ -129,7 +129,7 @@ func loadStash(config []byte) (Stash, error) {
 	return stash, nil
 }
 
-func Preload(configFile string) (*Config, error) {
+func LoadBuildConfig(configFile string) (*Config, error) {
 	var config Config
 
 	content, err := ioutil.ReadFile(configFile)
