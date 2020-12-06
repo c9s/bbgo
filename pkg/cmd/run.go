@@ -22,6 +22,7 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/notifier/slacknotifier"
+	"github.com/c9s/bbgo/pkg/notifier/telegramnotifier"
 	"github.com/c9s/bbgo/pkg/slack/slacklog"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -119,6 +120,20 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config) error {
 			var notifier = slacknotifier.New(slackToken, conf.DefaultChannel)
 			notification.AddNotifier(notifier)
 		}
+	}
+
+	// for telegram
+	telegramBotToken := viper.GetString("telegram-bot-token")
+	telegramAuthToken := viper.GetString("telegram-auth-token")
+	if len(telegramBotToken) > 0 && len(telegramAuthToken) > 0 {
+
+		log.Infof("adding telegram notifier")
+		var notifier = telegramnotifier.New(telegramBotToken, telegramAuthToken)
+
+		// start telegram bot
+		go notifier.Bot.Start()
+
+		notification.AddNotifier(notifier)
 	}
 
 	environ.Notifiability = notification
