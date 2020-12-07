@@ -3,7 +3,9 @@ language: go
 go:
 - 1.14
 - 1.15
+services:
+- redis-server
 before_script:
- - go mod download
+- go mod download
 script:
- - go test -v ./pkg/...
+- go test -v ./pkg/...
