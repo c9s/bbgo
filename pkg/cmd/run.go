@@ -139,7 +139,15 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config) error {
 	environ.Notifiability = notification
 
 	if userConfig.Notifications != nil {
-		environ.ConfigureNotification(userConfig.Notifications)
+		if err := environ.ConfigureNotification(userConfig.Notifications); err != nil {
+			return err
+		}
+	}
+
+	if userConfig.Persistence != nil {
+		if err := environ.ConfigurePersistence(userConfig.Persistence); err != nil {
+			return err
+		}
 	}
 
 	trader := bbgo.NewTrader(environ)
@@ -215,7 +223,7 @@ var RunCmd = &cobra.Command{
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		userConfig, err := bbgo.Preload(configFile)
+		userConfig, err := bbgo.LoadBuildConfig(configFile)
 		if err != nil {
 			return err
 		}

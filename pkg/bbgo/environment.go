@@ -3,9 +3,11 @@ package bbgo
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
+	"github.com/codingconcepts/env"
 	"github.com/jmoiron/sqlx"
 	log "github.com/sirupsen/logrus"
 
@@ -38,6 +40,8 @@ type Environment struct {
 	// Notifiability here for environment is for the streaming data notification
 	// note that, for back tests, we don't need notification.
 	Notifiability
+
+	PersistenceServiceFacade *PersistenceServiceFacade
 
 	TradeService *service.TradeService
 	TradeSync    *service.SyncService
@@ -158,6 +162,13 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 			environ.startTime = time.Now()
 		}
 
+		var intervals = map[types.Interval]struct{}{}
+		for _, sub := range session.Subscriptions {
+			if sub.Channel == types.KLineChannel {
+				intervals[types.Interval(sub.Options.Interval)] = struct{}{}
+			}
+		}
+
 		for symbol := range session.loadedSymbols {
 			marketDataStore, ok := session.marketDataStores[symbol]
 			if !ok {
@@ -165,12 +176,12 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 			}
 
 			var lastPriceTime time.Time
-			for interval := range types.SupportedIntervals {
+			for interval := range intervals {
 				// avoid querying the last unclosed kline
 				endTime := environ.startTime.Add(- interval.Duration())
 				kLines, err := session.Exchange.QueryKLines(ctx, symbol, interval, types.KLineQueryOptions{
 					EndTime: &endTime,
-					Limit:   500, // indicators need at least 100
+					Limit:   1000, // indicators need at least 100
 				})
 				if err != nil {
 					return err
@@ -213,10 +224,38 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 	return nil
 }
 
+func (environ *Environment) ConfigurePersistence(conf *PersistenceConfig) error {
+	var facade = &PersistenceServiceFacade{
+		Memory: NewMemoryService(),
+	}
+
+	if conf.Redis != nil {
+		if err := env.Set(conf.Redis); err != nil {
+			return err
+		}
+
+		facade.Redis = NewRedisPersistenceService(conf.Redis)
+	}
+
+	if conf.Json != nil {
+		if _, err := os.Stat(conf.Json.Directory); os.IsNotExist(err) {
+			if err2 := os.MkdirAll(conf.Json.Directory, 0777); err2 != nil {
+				log.WithError(err2).Errorf("can not create directory: %s", conf.Json.Directory)
+				return err2
+			}
+		}
+
+		facade.Json = &JsonPersistenceService{Directory: conf.Json.Directory}
+	}
+
+	environ.PersistenceServiceFacade = facade
+	return nil
+}
+
 // configure notification rules
 // for symbol-based routes, we should register the same symbol rules for each session.
 // for session-based routes, we should set the fixed callbacks for each session
-func (environ *Environment) ConfigureNotification(conf *NotificationConfig) {
+func (environ *Environment) ConfigureNotification(conf *NotificationConfig) error {
 	// configure routing here
 	if conf.SymbolChannels != nil {
 		environ.SymbolChannelRouter.AddRoute(conf.SymbolChannels)
@@ -358,6 +397,7 @@ func (environ *Environment) ConfigureNotification(conf *NotificationConfig) {
 		}
 
 	}
+	return nil
 }
 
 func (environ *Environment) SetStartTime(t time.Time) *Environment {

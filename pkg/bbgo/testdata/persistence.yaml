@@ -1,0 +1,27 @@
+---
+sessions:
+  max:
+    exchange: max
+    envVarPrefix: max
+
+  binance:
+    exchange: binance
+    envVarPrefix: binance
+
+persistence:
+  json:
+    directory: testdata
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    db: 0
+  mysql:
+    database: "persistence"
+
+strategies:
+  swing:
+    symbolPosition:
+      persistence:
+        type: json
+        json:
+          file: swing.json
