@@ -50,7 +50,6 @@ type Environment struct {
 	startTime     time.Time
 	tradeScanTime time.Time
 	sessions      map[string]*ExchangeSession
-
 }
 
 func NewEnvironment() *Environment {
@@ -226,9 +225,12 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 }
 
 func (environ *Environment) ConfigurePersistence(conf *PersistenceConfig) error {
-	var facade = &PersistenceServiceFacade{}
+	var facade = &PersistenceServiceFacade{
+		Memory: NewMemoryService(),
+	}
+
 	if conf.Redis != nil {
-		if err := env.Set(conf.Redis) ; err != nil {
+		if err := env.Set(conf.Redis); err != nil {
 			return err
 		}
 
