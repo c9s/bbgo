@@ -25,6 +25,9 @@ func (p *Persistence) backendService(t string) (service PersistenceService, err 
 	case "redis":
 		service = p.Facade.Redis
 
+	case "memory":
+		service = p.Facade.Memory
+
 	default:
 		err = fmt.Errorf("unsupported persistent type %s", t)
 	}
@@ -63,4 +66,5 @@ func (p *Persistence) Save(val interface{}, subIDs ...string) error {
 type PersistenceServiceFacade struct {
 	Redis *RedisPersistenceService
 	Json  *JsonPersistenceService
+	Memory *MemoryService
 }
