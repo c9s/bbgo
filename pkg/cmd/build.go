@@ -45,7 +45,7 @@ var BuildCmd = &cobra.Command{
 			return err
 		}
 
-		userConfig, err := bbgo.Preload(configFile)
+		userConfig, err := bbgo.LoadBuildConfig(configFile)
 		if err != nil {
 			return err
 		}

@@ -61,6 +61,17 @@ func TestLoadConfig(t *testing.T) {
 		},
 
 		{
+			name:    "persistence",
+			args:    args{configFile: "testdata/persistence.yaml"},
+			wantErr: false,
+			f: func(t *testing.T, config *Config) {
+				assert.NotNil(t, config.Persistence)
+				assert.NotNil(t, config.Persistence.Redis)
+				assert.NotNil(t, config.Persistence.Json)
+			},
+		},
+
+		{
 			name:    "order_executor",
 			args:    args{configFile: "testdata/order_executor.yaml"},
 			wantErr: false,
