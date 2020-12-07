@@ -5,13 +5,15 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net"
+	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/go-redis/redis/v8"
 )
 
 type PersistenceService interface {
-	NewStore(id string) Store
+	NewStore(id string, subIDs ...string) Store
 }
 
 type Store interface {
@@ -23,34 +25,52 @@ type JsonPersistenceService struct {
 	Directory string
 }
 
-func (s *JsonPersistenceService) NewStore(id string) *JsonStore {
+func (s *JsonPersistenceService) NewStore(id string, subIDs ...string) Store {
 	return &JsonStore{
-		ID:       id,
-		Filepath: filepath.Join(s.Directory, id) + ".json",
+		ID:        id,
+		Directory: filepath.Join(append([]string{s.Directory}, subIDs...)...),
 	}
 }
 
 type JsonStore struct {
-	ID       string
-	Filepath string
+	ID        string
+	Directory string
 }
 
 func (store JsonStore) Load(val interface{}) error {
-	data, err := ioutil.ReadFile(store.Filepath)
+	if _, err := os.Stat(store.Directory); os.IsNotExist(err) {
+		if err2 := os.Mkdir(store.Directory, 0777); err2 != nil {
+			return err2
+		}
+	}
+
+	p := filepath.Join(store.Directory, store.ID) + ".json"
+	data, err := ioutil.ReadFile(p)
 	if err != nil {
 		return err
+	}
+
+	if len(data) == 0 {
+		return nil
 	}
 
 	return json.Unmarshal(data, val)
 }
 
 func (store JsonStore) Save(val interface{}) error {
+	if _, err := os.Stat(store.Directory); os.IsNotExist(err) {
+		if err2 := os.Mkdir(store.Directory, 0777); err2 != nil {
+			return err2
+		}
+	}
+
 	data, err := json.Marshal(val)
 	if err != nil {
 		return err
 	}
 
-	return ioutil.WriteFile(store.Filepath, data, 0666)
+	p := filepath.Join(store.Directory, store.ID) + ".json"
+	return ioutil.WriteFile(p, data, 0666)
 }
 
 type RedisPersistenceService struct {
@@ -70,7 +90,11 @@ func NewRedisPersistenceService(config *RedisPersistenceConfig) *RedisPersistenc
 	}
 }
 
-func (s *RedisPersistenceService) NewStore(id string) *RedisStore {
+func (s *RedisPersistenceService) NewStore(id string, subIDs ...string) Store {
+	if len(subIDs) > 0 {
+		id += ":" + strings.Join(subIDs, ":")
+	}
+
 	return &RedisStore{
 		redis: s.redis,
 		ID:    id,
@@ -87,7 +111,15 @@ func (store *RedisStore) Load(val interface{}) error {
 	cmd := store.redis.Get(context.Background(), store.ID)
 	data, err := cmd.Result()
 	if err != nil {
+		if err == redis.Nil {
+			return nil
+		}
+
 		return err
+	}
+
+	if len(data) == 0 {
+		return nil
 	}
 
 	if err := json.Unmarshal([]byte(data), val); err != nil {
