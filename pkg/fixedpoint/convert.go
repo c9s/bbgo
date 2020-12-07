@@ -76,6 +76,12 @@ func (v *Value) UnmarshalYAML(unmarshal func(a interface{}) error) (err error) {
 	return err
 }
 
+func (v Value) MarshalJSON() ([]byte, error) {
+	f := float64(v) / DefaultPow
+	o := fmt.Sprintf("%f", f)
+	return []byte(o), nil
+}
+
 func (v *Value) UnmarshalJSON(data []byte) error {
 	var a interface{}
 	var err = json.Unmarshal(data, &a)

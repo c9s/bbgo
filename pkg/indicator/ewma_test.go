@@ -1025,7 +1025,7 @@ func buildKLines(prices []float64) (klines []types.KLine) {
 func Test_calculateEWMA(t *testing.T) {
 	type args struct {
 		allKLines []types.KLine
-		priceF KLinePriceMapper
+		priceF    KLinePriceMapper
 		window    int
 	}
 	tests := []struct {
@@ -1034,21 +1034,39 @@ func Test_calculateEWMA(t *testing.T) {
 		want float64
 	}{
 		{
-			name: "ethusdt ewma 7",
+			name: "ETHUSDT EMA 7",
 			args: args{
 				allKLines: buildKLines(ethusdt5m),
-				priceF: KLineClosePriceMapper,
+				priceF:    KLineClosePriceMapper,
 				window:    7,
 			},
-			want: 571.72, // with open price, binance disktop returns 571.45, trading view returns 570.8957, for close price, binance mobile returns 571.72
+			want: 571.72, // with open price, binance desktop returns 571.45, trading view returns 570.8957, for close price, binance mobile returns 571.72
+		},
+		{
+			name: "ETHUSDT EMA 25",
+			args: args{
+				allKLines: buildKLines(ethusdt5m),
+				priceF:    KLineClosePriceMapper,
+				window:    25,
+			},
+			want: 571.30,
+		},
+		{
+			name: "ETHUSDT EMA 99",
+			args: args{
+				allKLines: buildKLines(ethusdt5m),
+				priceF:    KLineClosePriceMapper,
+				window:    99,
+			},
+			want: 577.62, // binance mobile uses 577.58
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := CalculateKLineEWMA(tt.args.allKLines, tt.args.priceF, tt.args.window)
-			got = math.Trunc(got * 100.0) / 100.0
+			got := CalculateKLinesEMA(tt.args.allKLines, tt.args.priceF, tt.args.window)
+			got = math.Trunc(got*100.0) / 100.0
 			if got != tt.want {
-				t.Errorf("CalculateKLineEWMA() = %v, want %v", got, tt.want)
+				t.Errorf("CalculateKLinesEMA() = %v, want %v", got, tt.want)
 			}
 		})
 	}
