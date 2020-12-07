@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/codingconcepts/env"
 	"github.com/jmoiron/sqlx"
 	log "github.com/sirupsen/logrus"
 
@@ -40,6 +41,8 @@ type Environment struct {
 	// note that, for back tests, we don't need notification.
 	Notifiability
 
+	PersistenceServiceFacade *PersistenceServiceFacade
+
 	TradeService *service.TradeService
 	TradeSync    *service.SyncService
 
@@ -47,6 +50,7 @@ type Environment struct {
 	startTime     time.Time
 	tradeScanTime time.Time
 	sessions      map[string]*ExchangeSession
+
 }
 
 func NewEnvironment() *Environment {
@@ -221,27 +225,35 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 	return nil
 }
 
-func (environ *Environment) ConfigurePersistence(conf *PersistenceConfig) {
+func (environ *Environment) ConfigurePersistence(conf *PersistenceConfig) error {
 	var facade = &PersistenceServiceFacade{}
 	if conf.Redis != nil {
+		if err := env.Set(conf.Redis) ; err != nil {
+			return err
+		}
+
 		facade.Redis = NewRedisPersistenceService(conf.Redis)
 	}
 
 	if conf.Json != nil {
-		if _, err := os.Stat(conf.Json.Directory) ; os.IsNotExist(err) {
-			if err2 := os.MkdirAll(conf.Json.Directory, 0777) ; err2 != nil {
+		if _, err := os.Stat(conf.Json.Directory); os.IsNotExist(err) {
+			if err2 := os.MkdirAll(conf.Json.Directory, 0777); err2 != nil {
 				log.WithError(err2).Errorf("can not create directory: %s", conf.Json.Directory)
+				return err2
 			}
 		}
 
 		facade.Json = &JsonPersistenceService{Directory: conf.Json.Directory}
 	}
+
+	environ.PersistenceServiceFacade = facade
+	return nil
 }
 
 // configure notification rules
 // for symbol-based routes, we should register the same symbol rules for each session.
 // for session-based routes, we should set the fixed callbacks for each session
-func (environ *Environment) ConfigureNotification(conf *NotificationConfig) {
+func (environ *Environment) ConfigureNotification(conf *NotificationConfig) error {
 	// configure routing here
 	if conf.SymbolChannels != nil {
 		environ.SymbolChannelRouter.AddRoute(conf.SymbolChannels)
@@ -383,6 +395,7 @@ func (environ *Environment) ConfigureNotification(conf *NotificationConfig) {
 		}
 
 	}
+	return nil
 }
 
 func (environ *Environment) SetStartTime(t time.Time) *Environment {

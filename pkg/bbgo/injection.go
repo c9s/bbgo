@@ -20,9 +20,9 @@ func isSymbolBasedStrategy(rs reflect.Value) (string, bool) {
 	return field.String(), true
 }
 
-func hasField(rs reflect.Value, fieldName string) bool {
-	field := rs.FieldByName(fieldName)
-	return field.IsValid()
+func hasField(rs reflect.Value, fieldName string) (field reflect.Value, ok bool) {
+	field = rs.FieldByName(fieldName)
+	return field, field.IsValid()
 }
 
 func injectField(rs reflect.Value, fieldName string, obj interface{}, pointerOnly bool) error {
