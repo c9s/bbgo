@@ -2,6 +2,7 @@ package telegramnotifier
 
 import (
 	"fmt"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
 	tb "gopkg.in/tucnak/telebot.v2"
@@ -36,7 +37,9 @@ func New(bot *tb.Bot, authToken string, options ...NotifyOption) *Notifier {
 		o(notifier)
 	}
 
-	store := notifier.redis.NewStore("bbgo", "telegram")
+	// use token prefix as the redis namespace
+	tt := strings.Split(bot.Token, ":")
+	store := notifier.redis.NewStore("bbgo", "telegram", tt[0])
 	if err := store.Load(notifier.chatUser) ; err == nil {
 		bot.Send(notifier.chatUser, fmt.Sprintf("Hi %s, I'm back", notifier.chatUser.Username))
 	}
