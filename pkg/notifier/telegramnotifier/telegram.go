@@ -59,7 +59,6 @@ info	- print information about current chat
 	})
 
 	notifier.Bot = bot
-
 	return notifier
 }
 
