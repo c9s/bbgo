@@ -127,6 +127,8 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config) error {
 	telegramBotToken := viper.GetString("telegram-bot-token")
 	telegramAuthToken := viper.GetString("telegram-auth-token")
 	if len(telegramBotToken) > 0 && len(telegramAuthToken) > 0 {
+		log.Infof("setting up telegram notifier...")
+
 		bot, err := tb.NewBot(tb.Settings{
 			// You can also set custom API URL.
 			// If field is empty it equals to "https://api.telegram.org".
@@ -139,12 +141,13 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config) error {
 			return err
 		}
 
-		log.Infof("adding telegram notifier")
+		go bot.Start()
+
+		log.Infof("send the following command to the bbgo bot you created to enable the notification...")
+		log.Infof("+=========================================+")
+		log.Infof("    /auth %s", telegramAuthToken)
+		log.Infof("+=========================================+")
 		var notifier = telegramnotifier.New(bot, telegramAuthToken)
-
-		// start telegram bot
-		go notifier.Bot.Start()
-
 		notification.AddNotifier(notifier)
 	}
 
