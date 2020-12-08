@@ -148,7 +148,10 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config) error {
 		}
 
 		var options []telegramnotifier.NotifyOption
-		options = append(options, telegramnotifier.WithRedisPersistence(environ.PersistenceServiceFacade.Redis))
+
+		if environ.PersistenceServiceFacade != nil && environ.PersistenceServiceFacade.Redis != nil {
+			options = append(options, telegramnotifier.WithRedisPersistence(environ.PersistenceServiceFacade.Redis))
+		}
 
 		log.Infof("send the following command to the bbgo bot you created to enable the notification...")
 		log.Infof("===========================================")
