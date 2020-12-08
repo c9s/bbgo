@@ -5,15 +5,25 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	tb "gopkg.in/tucnak/telebot.v2"
+
+	"github.com/c9s/bbgo/pkg/bbgo"
 )
 
 type Notifier struct {
 	Bot      *tb.Bot
 	chatUser *tb.User
 	channel  string
+
+	redis *bbgo.RedisPersistenceService
 }
 
 type NotifyOption func(notifier *Notifier)
+
+func WithRedisPersistence(redis *bbgo.RedisPersistenceService) NotifyOption {
+	return func(notifier *Notifier) {
+		notifier.redis = redis
+	}
+}
 
 // start bot daemon
 func New(bot *tb.Bot, authToken string, options ...NotifyOption) *Notifier {
@@ -24,6 +34,11 @@ func New(bot *tb.Bot, authToken string, options ...NotifyOption) *Notifier {
 
 	for _, o := range options {
 		o(notifier)
+	}
+
+	store := notifier.redis.NewStore("bbgo", "telegram")
+	if err := store.Load(notifier.chatUser) ; err == nil {
+		bot.Send(notifier.chatUser, fmt.Sprintf("Hi %s, I'm back", notifier.chatUser.Username))
 	}
 
 	bot.Handle("/help", func(m *tb.Message) {
@@ -37,12 +52,20 @@ info	- print information about current chat
 
 	// auth check authToken and then set sender id
 	bot.Handle("/auth", func(m *tb.Message) {
-		log.Info("Receive message: ", m) //debug
+		log.Info("receive message: ", m) //debug
 		if m.Payload == authToken {
 			notifier.chatUser = m.Sender
-			bot.Send(m.Sender, "User authorized")
+			if err := store.Save(notifier.chatUser); err != nil {
+				log.WithError(err).Error("can not persist telegram chat user")
+			}
+
+			if _, err := bot.Send(m.Sender, fmt.Sprintf("Hi %s, I know you, I will send you the notifications!", m.Sender.Username)) ; err != nil {
+				log.WithError(err).Error("telegram send error")
+			}
 		} else {
-			bot.Send(m.Sender, "Error: User authorization failed. Auth token does not match!")
+			if _, err := bot.Send(m.Sender, "Authorization failed. please check your auth token") ; err != nil {
+				log.WithError(err).Error("telegram send error")
+			}
 		}
 	})
 
@@ -57,6 +80,8 @@ info	- print information about current chat
 			log.Warningf("Incorrect user tried to access bot! sender username: %s id: %d", m.Sender.Username, m.Sender.ID)
 		}
 	})
+
+	go bot.Start()
 
 	notifier.Bot = bot
 	return notifier

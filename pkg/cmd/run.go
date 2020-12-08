@@ -102,6 +102,12 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config) error {
 		}
 	}
 
+	if userConfig.Persistence != nil {
+		if err := environ.ConfigurePersistence(userConfig.Persistence); err != nil {
+			return err
+		}
+	}
+
 	notification := bbgo.Notifiability{
 		SymbolChannelRouter:  bbgo.NewPatternChannelRouter(nil),
 		SessionChannelRouter: bbgo.NewPatternChannelRouter(nil),
@@ -141,7 +147,11 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config) error {
 			return err
 		}
 
-		go bot.Start()
+		var options []telegramnotifier.NotifyOption
+
+		if environ.PersistenceServiceFacade != nil && environ.PersistenceServiceFacade.Redis != nil {
+			options = append(options, telegramnotifier.WithRedisPersistence(environ.PersistenceServiceFacade.Redis))
+		}
 
 		log.Infof("send the following command to the bbgo bot you created to enable the notification...")
 		log.Infof("===========================================")
@@ -149,7 +159,7 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config) error {
 		log.Infof("    /auth %s", telegramAuthToken)
 		log.Infof("")
 		log.Infof("===========================================")
-		var notifier = telegramnotifier.New(bot, telegramAuthToken)
+		var notifier = telegramnotifier.New(bot, telegramAuthToken, options...)
 		notification.AddNotifier(notifier)
 	}
 
@@ -161,11 +171,6 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config) error {
 		}
 	}
 
-	if userConfig.Persistence != nil {
-		if err := environ.ConfigurePersistence(userConfig.Persistence); err != nil {
-			return err
-		}
-	}
 
 	trader := bbgo.NewTrader(environ)
 
