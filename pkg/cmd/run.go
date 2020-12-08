@@ -144,9 +144,11 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config) error {
 		go bot.Start()
 
 		log.Infof("send the following command to the bbgo bot you created to enable the notification...")
-		log.Infof("+=========================================+")
+		log.Infof("===========================================")
+		log.Infof("")
 		log.Infof("    /auth %s", telegramAuthToken)
-		log.Infof("+=========================================+")
+		log.Infof("")
+		log.Infof("===========================================")
 		var notifier = telegramnotifier.New(bot, telegramAuthToken)
 		notification.AddNotifier(notifier)
 	}
