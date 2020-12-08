@@ -202,7 +202,6 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 	session.Stream.OnOrderUpdate(s.handleOrderUpdate)
 
-
 	// session.Stream.OnKLineClosed
 	sourceSession.Stream.OnKLineClosed(func(kline types.KLine) {
 		// skip k-lines from other symbols
@@ -227,7 +226,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		s.clear(ctx, session)
 	})
 
-	if lastPrice, ok := session.LastPrice(s.Symbol) ; ok {
+	if lastPrice, ok := session.LastPrice(s.Symbol); ok {
 		s.place(ctx, &orderExecutor, session, indicator, lastPrice)
 	}
 

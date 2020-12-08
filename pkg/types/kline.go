@@ -169,7 +169,8 @@ func (k KLine) GetChange() float64 {
 }
 
 func (k KLine) String() string {
-	return fmt.Sprintf("%s %s %s Open: %.8f Close: %.8f High: %.8f Low: %.8f Volume: %.8f Change: %.4f Max Change: %.4f",
+	return fmt.Sprintf("%s %s %s %s Open: %.8f Close: %.8f High: %.8f Low: %.8f Volume: %.8f Change: %.4f Max Change: %.4f",
+		k.Exchange,
 		k.StartTime.Format("2006-01-02 15:04"),
 		k.Symbol, k.Interval, k.Open, k.Close, k.High, k.Low, k.Volume, k.GetChange(), k.GetMaxChange())
 }
@@ -346,14 +347,15 @@ func (k KLineWindow) Take(size int) KLineWindow {
 }
 
 func (k KLineWindow) Tail(size int) KLineWindow {
-	if len(k) <= size {
-		win := make(KLineWindow, len(k))
+	length := len(k)
+	if length <= size {
+		win := make(KLineWindow, length)
 		copy(win, k)
 		return win
 	}
 
 	win := make(KLineWindow, size)
-	copy(win, k[len(k)-size:])
+	copy(win, k[length-1-size:])
 	return win
 }
 

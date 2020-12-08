@@ -194,6 +194,7 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 
 				// update last prices by the given kline
 				lastKLine := kLines[len(kLines)-1]
+				log.Infof("last kline: %+v", lastKLine)
 				if lastPriceTime == emptyTime {
 					session.lastPrices[symbol] = lastKLine.Close
 					lastPriceTime = lastKLine.EndTime
