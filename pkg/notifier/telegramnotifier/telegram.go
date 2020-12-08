@@ -2,7 +2,6 @@ package telegramnotifier
 
 import (
 	"fmt"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 	tb "gopkg.in/tucnak/telebot.v2"
@@ -17,28 +16,14 @@ type Notifier struct {
 type NotifyOption func(notifier *Notifier)
 
 // start bot daemon
-func New(botToken, authToken string, options ...NotifyOption) *Notifier {
-
+func New(bot *tb.Bot, authToken string, options ...NotifyOption) *Notifier {
 	notifier := &Notifier{
 		chatUser: &tb.User{},
-		Bot:      &tb.Bot{},
+		Bot:      bot,
 	}
 
 	for _, o := range options {
 		o(notifier)
-	}
-
-	bot, err := tb.NewBot(tb.Settings{
-		// You can also set custom API URL.
-		// If field is empty it equals to "https://api.telegram.org".
-		// URL: "http://195.129.111.17:8012",
-
-		Token:  botToken,
-		Poller: &tb.LongPoller{Timeout: 10 * time.Second},
-	})
-
-	if err != nil {
-		panic(err)
 	}
 
 	bot.Handle("/help", func(m *tb.Message) {

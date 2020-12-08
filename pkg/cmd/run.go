@@ -18,6 +18,7 @@ import (
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	tb "gopkg.in/tucnak/telebot.v2"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
@@ -126,9 +127,20 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config) error {
 	telegramBotToken := viper.GetString("telegram-bot-token")
 	telegramAuthToken := viper.GetString("telegram-auth-token")
 	if len(telegramBotToken) > 0 && len(telegramAuthToken) > 0 {
+		bot, err := tb.NewBot(tb.Settings{
+			// You can also set custom API URL.
+			// If field is empty it equals to "https://api.telegram.org".
+			// URL: "http://195.129.111.17:8012",
+			Token:  telegramBotToken,
+			Poller: &tb.LongPoller{Timeout: 10 * time.Second},
+		})
+
+		if err != nil {
+			return err
+		}
 
 		log.Infof("adding telegram notifier")
-		var notifier = telegramnotifier.New(telegramBotToken, telegramAuthToken)
+		var notifier = telegramnotifier.New(bot, telegramAuthToken)
 
 		// start telegram bot
 		go notifier.Bot.Start()
