@@ -64,13 +64,13 @@ func (inc *EWMA) calculateAndUpdate(allKLines []types.KLine) {
 	}
 
 	v1 := math.Floor(inc.Values[len(inc.Values)-1]*100.0) / 100.0
-	v2 := math.Floor(CalculateKLineEWMA(allKLines, priceF, inc.Window)*100.0) / 100.0
+	v2 := math.Floor(CalculateKLinesEMA(allKLines, priceF, inc.Window)*100.0) / 100.0
 	if v1 != v2 {
 		log.Warnf("ACCUMULATED %s EMA (%d) %f != EMA %f", inc.Interval, inc.Window, v1, v2)
 	}
 }
 
-func CalculateKLineEWMA(allKLines []types.KLine, priceF KLinePriceMapper, window int) float64 {
+func CalculateKLinesEMA(allKLines []types.KLine, priceF KLinePriceMapper, window int) float64 {
 	var multiplier = 2.0 / (float64(window) + 1)
 	return ewma(MapKLinePrice(allKLines, priceF), multiplier)
 }
