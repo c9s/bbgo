@@ -24,10 +24,14 @@ func init() {
 }
 
 type Strategy struct {
+	*bbgo.Graceful
+	*bbgo.Persistence
+
 	Symbol         string `json:"symbol"`
 	SourceExchange string `json:"sourceExchange"`
 	MakerExchange  string `json:"makerExchange"`
 
+	UpdateInterval     time.Duration    `json:"updateInterval"`
 	Margin             fixedpoint.Value `json:"margin"`
 	BidMargin          fixedpoint.Value `json:"bidMargin"`
 	AskMargin          fixedpoint.Value `json:"askMargin"`
@@ -52,8 +56,6 @@ type Strategy struct {
 	lastPrice float64
 
 	stopC chan struct{}
-
-	*bbgo.Graceful
 }
 
 func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
@@ -195,28 +197,8 @@ func (s *Strategy) handleTradeUpdate(trade types.Trade) {
 }
 
 func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession) error {
-	sourceSession, ok := sessions[s.SourceExchange]
-	if !ok {
-		return fmt.Errorf("source exchange session %s is not defined", s.SourceExchange)
-	}
-
-	s.sourceSession = sourceSession
-
-	makerSession, ok := sessions[s.MakerExchange]
-	if !ok {
-		return fmt.Errorf("maker exchange session %s is not defined", s.MakerExchange)
-	}
-
-	s.makerSession = makerSession
-
-	s.sourceMarket, ok = s.sourceSession.Market(s.Symbol)
-	if !ok {
-		return fmt.Errorf("source session market %s is not defined", s.Symbol)
-	}
-
-	s.makerMarket, ok = s.makerSession.Market(s.Symbol)
-	if !ok {
-		return fmt.Errorf("maker session market %s is not defined", s.Symbol)
+	if s.UpdateInterval == 0 {
+		s.UpdateInterval = time.Second
 	}
 
 	if s.NumLayers == 0 {
@@ -243,6 +225,30 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		s.Quantity = defaultQuantity
 	}
 
+	sourceSession, ok := sessions[s.SourceExchange]
+	if !ok {
+		return fmt.Errorf("source exchange session %s is not defined", s.SourceExchange)
+	}
+
+	s.sourceSession = sourceSession
+
+	makerSession, ok := sessions[s.MakerExchange]
+	if !ok {
+		return fmt.Errorf("maker exchange session %s is not defined", s.MakerExchange)
+	}
+
+	s.makerSession = makerSession
+
+	s.sourceMarket, ok = s.sourceSession.Market(s.Symbol)
+	if !ok {
+		return fmt.Errorf("source session market %s is not defined", s.Symbol)
+	}
+
+	s.makerMarket, ok = s.makerSession.Market(s.Symbol)
+	if !ok {
+		return fmt.Errorf("maker session market %s is not defined", s.Symbol)
+	}
+
 	s.book = types.NewStreamBook(s.Symbol)
 	s.book.BindStream(s.sourceSession.Stream)
 
@@ -256,8 +262,12 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 	s.stopC = make(chan struct{})
 
+	if err := s.Persistence.Load(&s.Position, "position"); err != nil {
+		log.WithError(err).Warnf("can not load position")
+	}
+
 	go func() {
-		ticker := time.NewTicker(500 * time.Millisecond)
+		ticker := time.NewTicker(s.UpdateInterval)
 		defer ticker.Stop()
 		for {
 			select {
@@ -275,9 +285,13 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	}()
 
 	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
+		defer wg.Done()
+
 		close(s.stopC)
 
-		defer wg.Done()
+		if err := s.Persistence.Save(&s.Position, "position"); err != nil {
+			log.WithError(err).Error("persistence save error")
+		}
 
 		if err := s.makerSession.Exchange.CancelOrders(ctx, s.activeMakerOrders.Orders()...); err != nil {
 			log.WithError(err).Errorf("can not cancel orders")
