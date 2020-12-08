@@ -10,6 +10,10 @@ import (
 
 type Duration time.Duration
 
+func (d Duration) Duration() time.Duration {
+	return time.Duration(d)
+}
+
 func (d *Duration) UnmarshalJSON(data []byte) error {
 	var o interface{}
 
