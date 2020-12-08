@@ -19,6 +19,10 @@ type EWMA struct {
 }
 
 func (inc *EWMA) Last() float64 {
+	if len(inc.Values) == 0 {
+		return 0
+	}
+
 	return inc.Values[len(inc.Values)-1]
 }
 
