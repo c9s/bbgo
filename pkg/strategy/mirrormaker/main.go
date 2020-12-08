@@ -264,6 +264,8 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 	if err := s.Persistence.Load(&s.Position, "position"); err != nil {
 		log.WithError(err).Warnf("can not load position")
+	} else {
+		log.Infof("position is loaded successfully, position=%f", s.Position.Float64())
 	}
 
 	go func() {
