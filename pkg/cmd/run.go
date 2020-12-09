@@ -171,7 +171,6 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config) error {
 		}
 	}
 
-
 	trader := bbgo.NewTrader(environ)
 
 	if userConfig.RiskControls != nil {
@@ -250,8 +249,10 @@ var RunCmd = &cobra.Command{
 			return err
 		}
 
+		shouldCompile := len(userConfig.Imports) > 0
+
 		// if there is no custom imports, we don't have to compile
-		if noCompile {
+		if noCompile || !shouldCompile {
 			userConfig, err = bbgo.Load(configFile)
 			if err != nil {
 				return err
@@ -263,11 +264,6 @@ var RunCmd = &cobra.Command{
 			}
 
 			return nil
-		}
-
-		shouldCompile := len(userConfig.Imports) > 0
-		if shouldCompile {
-			log.Infof("found imports %v, compiling wrapper binary...", userConfig.Imports)
 		}
 
 		var runArgs = []string{"run", "--no-compile"}
