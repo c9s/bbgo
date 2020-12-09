@@ -1,6 +1,6 @@
 #!/bin/bash
 osf=$(uname | tr '[:upper:]' '[:lower:]')
-version=v1.2.1
+version=v1.3.1
 
 echo "Downloading bbgo"
 curl -L -o bbgo https://github.com/c9s/bbgo/releases/download/$version/bbgo-$osf
