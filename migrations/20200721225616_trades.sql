@@ -4,7 +4,7 @@ CREATE TABLE `trades` (
 
   `id` BIGINT UNSIGNED,
   `exchange` VARCHAR(24) NOT NULL DEFAULT '',
-  `symbol` VARCHAR(7) NOT NULL,
+  `symbol` VARCHAR(8) NOT NULL,
   `price` DECIMAL(16, 8) UNSIGNED NOT NULL,
   `quantity` DECIMAL(16, 8) UNSIGNED NOT NULL,
   `quote_quantity` DECIMAL(16, 8) UNSIGNED NOT NULL,
