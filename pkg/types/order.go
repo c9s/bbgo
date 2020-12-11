@@ -5,7 +5,15 @@ import (
 	"time"
 
 	"github.com/slack-go/slack"
+
+	"github.com/c9s/bbgo/pkg/util"
 )
+
+func init() {
+	// make sure we can cast Order to PlainText
+	_ = PlainText(Order{})
+	_ = PlainText(&Order{})
+}
 
 // OrderType define order type
 type OrderType string
@@ -66,6 +74,10 @@ func (o *SubmitOrder) String() string {
 	return fmt.Sprintf("SubmitOrder %s %s %s %f @ %f", o.Symbol, o.Type, o.Side, o.Quantity, o.Price)
 }
 
+func (o *SubmitOrder) PlainText() string {
+	return fmt.Sprintf("SubmitOrder %s %s %s %f @ %f", o.Symbol, o.Type, o.Side, o.Quantity, o.Price)
+}
+
 func (o *SubmitOrder) SlackAttachment() slack.Attachment {
 	var fields = []slack.AttachmentField{
 		{Title: "Symbol", Value: o.Symbol, Short: true},
@@ -100,4 +112,15 @@ type Order struct {
 
 func (o Order) String() string {
 	return fmt.Sprintf("order %s %f/%f at %f -> %s", o.Side, o.ExecutedQuantity, o.Quantity, o.Price, o.Status)
+}
+
+func (o Order) PlainText() string {
+	return fmt.Sprintf("%s %s Order %s %s price %s, quantity %s/%s status %s",
+		o.Exchange,
+		o.Type,
+		o.Symbol,
+		o.Side,
+		util.FormatFloat(o.Price, 2),
+		util.FormatFloat(o.ExecutedQuantity, 2),
+		util.FormatFloat(o.Quantity, 4), o.Status)
 }

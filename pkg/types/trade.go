@@ -9,6 +9,12 @@ import (
 	"github.com/c9s/bbgo/pkg/util"
 )
 
+func init() {
+	// make sure we can cast Trade to PlainText
+	_ = PlainText(Trade{})
+	_ = PlainText(&Trade{})
+}
+
 type Trade struct {
 	// GID is the global ID
 	GID int64 `json:"gid" db:"gid"`
@@ -30,6 +36,16 @@ type Trade struct {
 	FeeCurrency string    `json:"feeCurrency" db:"fee_currency"`
 }
 
+func (trade Trade) PlainText() string {
+	return fmt.Sprintf("%s Trade %s %s price %s, quantity %s, amount %s",
+		trade.Exchange,
+		trade.Symbol,
+		trade.Side,
+		util.FormatFloat(trade.Price, 2),
+		util.FormatFloat(trade.Quantity, 4),
+		util.FormatFloat(trade.QuoteQuantity, 2))
+}
+
 func (trade Trade) SlackAttachment() slack.Attachment {
 	var color = "#DC143C"
 
@@ -43,9 +59,10 @@ func (trade Trade) SlackAttachment() slack.Attachment {
 		// Pretext:       "",
 		// Text:          "",
 		Fields: []slack.AttachmentField{
+			{Title: "Exchange", Value: trade.Exchange, Short: true},
 			{Title: "Price", Value: util.FormatFloat(trade.Price, 2), Short: true},
 			{Title: "Volume", Value: util.FormatFloat(trade.Quantity, 4), Short: true},
-			{Title: "Amount", Value: util.FormatFloat(trade.QuoteQuantity, 1)},
+			{Title: "Amount", Value: util.FormatFloat(trade.QuoteQuantity, 2)},
 			{Title: "Fee", Value: util.FormatFloat(trade.Fee, 4), Short: true},
 			{Title: "FeeCurrency", Value: trade.FeeCurrency, Short: true},
 		},
