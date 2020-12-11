@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"syscall"
 	"text/template"
 	"time"
@@ -24,6 +25,7 @@ import (
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/notifier/slacknotifier"
 	"github.com/c9s/bbgo/pkg/notifier/telegramnotifier"
+	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/slack/slacklog"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -32,6 +34,9 @@ func init() {
 	RunCmd.Flags().Bool("no-compile", false, "do not compile wrapper binary")
 	RunCmd.Flags().String("os", runtime.GOOS, "GOOS")
 	RunCmd.Flags().String("arch", runtime.GOARCH, "GOARCH")
+
+	RunCmd.Flags().String("totp-issuer", "", "")
+	RunCmd.Flags().String("totp-account-name", "", "")
 
 	RunCmd.Flags().String("config", "", "config file")
 	RunCmd.Flags().String("since", "", "pnl since time")
@@ -131,9 +136,15 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config) error {
 
 	// for telegram
 	telegramBotToken := viper.GetString("telegram-bot-token")
-	telegramAuthToken := viper.GetString("telegram-auth-token")
-	if len(telegramBotToken) > 0 && len(telegramAuthToken) > 0 {
+	telegramBotAuthToken := viper.GetString("telegram-bot-auth-token")
+	if len(telegramBotToken) > 0 && len(telegramBotAuthToken) > 0 {
 		log.Infof("setting up telegram notifier...")
+
+		key, err := service.NewDefaultTotpKey()
+		if err != nil {
+			return errors.Wrapf(err, "failed to setup totp (time-based one time password) key")
+		}
+		_ = key
 
 		bot, err := tb.NewBot(tb.Settings{
 			// You can also set custom API URL.
@@ -147,19 +158,25 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config) error {
 			return err
 		}
 
-		var options []telegramnotifier.NotifyOption
-
-		if environ.PersistenceServiceFacade != nil && environ.PersistenceServiceFacade.Redis != nil {
-			options = append(options, telegramnotifier.WithRedisPersistence(environ.PersistenceServiceFacade.Redis))
+		var store = bbgo.NewMemoryService().NewStore("bbgo", "telegram")
+		if environ.PersistenceServiceFacade != nil {
+			tt := strings.Split(bot.Token, ":")
+			telegramID := tt[0]
+			if environ.PersistenceServiceFacade.Redis != nil {
+				store = environ.PersistenceServiceFacade.Redis.NewStore("bbgo", "telegram", telegramID)
+			}
 		}
+
+		interaction := telegramnotifier.NewInteraction(bot, store)
+		go interaction.Start()
 
 		log.Infof("send the following command to the bbgo bot you created to enable the notification...")
 		log.Infof("===========================================")
 		log.Infof("")
-		log.Infof("    /auth %s", telegramAuthToken)
+		log.Infof("    /auth %s", telegramBotAuthToken)
 		log.Infof("")
 		log.Infof("===========================================")
-		var notifier = telegramnotifier.New(bot, telegramAuthToken, options...)
+		var notifier = telegramnotifier.New(interaction)
 		notification.AddNotifier(notifier)
 	}
 
