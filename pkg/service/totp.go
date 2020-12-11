@@ -11,6 +11,10 @@ import (
 )
 
 func NewDefaultTotpKey() (*otp.Key, error) {
+	if keyURL := viper.GetString("totp-key-url"); len(keyURL) > 0 {
+		return otp.NewKeyFromURL(keyURL)
+	}
+
 	// The issuer parameter is a string value indicating the provider or service this account is associated with, URL-encoded according to RFC 3986.
 	// If the issuer parameter is absent, issuer information may be taken from the issuer prefix of the label.
 	// If both issuer parameter and issuer label prefix are present, they should be equal.
