@@ -38,6 +38,10 @@ func NewInteraction(bot *telebot.Bot, store bbgo.Store) *Interaction {
 	return interaction
 }
 
+func (it *Interaction) SetAuthToken(token string) {
+	it.AuthToken = token
+}
+
 func (it *Interaction) HandleInfo(m *telebot.Message) {
 	if it.Owner == nil {
 		return
@@ -58,7 +62,6 @@ func (it *Interaction) HandleInfo(m *telebot.Message) {
 
 func (it *Interaction) SendToOwner(message string) {
 	if it.Owner == nil {
-		log.Warnf("the telegram owner is authorized yet")
 		return
 	}
 

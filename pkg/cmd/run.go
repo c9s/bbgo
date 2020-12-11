@@ -168,6 +168,7 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config) error {
 		}
 
 		interaction := telegramnotifier.NewInteraction(bot, store)
+		interaction.SetAuthToken(telegramBotAuthToken)
 		go interaction.Start()
 
 		log.Infof("send the following command to the bbgo bot you created to enable the notification...")

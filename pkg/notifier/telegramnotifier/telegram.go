@@ -2,6 +2,8 @@ package telegramnotifier
 
 import (
 	"fmt"
+
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 type Notifier struct {
@@ -28,15 +30,31 @@ func (n *Notifier) Notify(format string, args ...interface{}) {
 }
 
 func (n *Notifier) NotifyTo(_, format string, args ...interface{}) {
-	var telegramArgsOffset = -1
-	var nonTelegramArgs = args
+	var textArgsOffset = -1
+	var texts []string
 
-	if telegramArgsOffset > -1 {
-		nonTelegramArgs = args[:telegramArgsOffset]
+	for idx, arg := range args {
+		switch a := arg.(type) {
+
+		case types.PlainText:
+			texts = append(texts, a.PlainText())
+			textArgsOffset = idx
+
+		}
 	}
 
-	log.Infof(format, nonTelegramArgs...)
+	var simpleArgs = args
+	if textArgsOffset > -1 {
+		simpleArgs = args[:textArgsOffset]
+	}
 
-	message := fmt.Sprintf(format, nonTelegramArgs...)
+	log.Infof(format, simpleArgs...)
+
+	message := fmt.Sprintf(format, simpleArgs...)
 	n.interaction.SendToOwner(message)
+
+	for _, text := range texts {
+		n.interaction.SendToOwner(text)
+	}
+
 }
