@@ -456,6 +456,7 @@ func displayOTPKey(key *otp.Key) {
 	log.Infof("Issuer:       %s", key.Issuer())
 	log.Infof("AccountName:  %s", key.AccountName())
 	log.Infof("Secret:       %s", key.Secret())
+	log.Infof("Key URL:      %s", key.URL())
 	log.Infof("")
 	log.Infof("====================================================================")
 	log.Infof("")
