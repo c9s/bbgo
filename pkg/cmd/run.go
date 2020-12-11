@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"image/png"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/pquerna/otp"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
@@ -137,14 +139,8 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config) error {
 	// for telegram
 	telegramBotToken := viper.GetString("telegram-bot-token")
 	telegramBotAuthToken := viper.GetString("telegram-bot-auth-token")
-	if len(telegramBotToken) > 0 && len(telegramBotAuthToken) > 0 {
-		log.Infof("setting up telegram notifier...")
-
-		key, err := service.NewDefaultTotpKey()
-		if err != nil {
-			return errors.Wrapf(err, "failed to setup totp (time-based one time password) key")
-		}
-		_ = key
+	if len(telegramBotToken) > 0 {
+		log.Infof("initializing telegram bot...")
 
 		bot, err := tb.NewBot(tb.Settings{
 			// You can also set custom API URL.
@@ -158,25 +154,67 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config) error {
 			return err
 		}
 
-		var store = bbgo.NewMemoryService().NewStore("bbgo", "telegram")
+		var persistence bbgo.PersistenceService = bbgo.NewMemoryService()
+		var sessionStore = persistence.NewStore("bbgo", "telegram")
+
+		tt := strings.Split(bot.Token, ":")
+		telegramID := tt[0]
+
 		if environ.PersistenceServiceFacade != nil {
-			tt := strings.Split(bot.Token, ":")
-			telegramID := tt[0]
 			if environ.PersistenceServiceFacade.Redis != nil {
-				store = environ.PersistenceServiceFacade.Redis.NewStore("bbgo", "telegram", telegramID)
+				persistence = environ.PersistenceServiceFacade.Redis
+				sessionStore = persistence.NewStore("bbgo", "telegram", telegramID)
 			}
 		}
 
-		interaction := telegramnotifier.NewInteraction(bot, store)
-		interaction.SetAuthToken(telegramBotAuthToken)
-		go interaction.Start()
+		interaction := telegramnotifier.NewInteraction(bot, sessionStore)
 
-		log.Infof("send the following command to the bbgo bot you created to enable the notification...")
-		log.Infof("===========================================")
-		log.Infof("")
-		log.Infof("    /auth %s", telegramBotAuthToken)
-		log.Infof("")
-		log.Infof("===========================================")
+		if len(telegramBotAuthToken) > 0 {
+			log.Infof("telegram bot auth token is set, using fixed token for authorization...")
+			interaction.SetAuthToken(telegramBotAuthToken)
+			log.Infof("send the following command to the bbgo bot you created to enable the notification")
+			log.Infof("")
+			log.Infof("")
+			log.Infof("    /auth %s", telegramBotAuthToken)
+			log.Infof("")
+			log.Infof("")
+		}
+
+		var session telegramnotifier.Session
+		if err := sessionStore.Load(&session); err != nil || session.Owner == nil {
+			log.Warnf("session not found, generating new one-time password key for new session...")
+
+			key, err := service.NewDefaultTotpKey()
+			if err != nil {
+				return errors.Wrapf(err, "failed to setup totp (time-based one time password) key")
+			}
+
+			displayOTPKey(key)
+
+			qrcodeImagePath := fmt.Sprintf("otp-%s.png", telegramID)
+
+			err = writeOTPKeyAsQRCodePNG(key, qrcodeImagePath)
+			log.Infof("To scan your OTP QR code, please run the following command:")
+			log.Infof("")
+			log.Infof("")
+			log.Infof("     open %s", qrcodeImagePath)
+			log.Infof("")
+			log.Infof("")
+			log.Infof("send the auth command with the generated one-time password to the bbgo bot you created to enable the notification")
+			log.Infof("")
+			log.Infof("")
+			log.Infof("     /auth {code}")
+			log.Infof("")
+			log.Infof("")
+
+			session = telegramnotifier.NewSession(key)
+			if err := sessionStore.Save(&session); err != nil {
+				return errors.Wrap(err, "failed to save session")
+			}
+		}
+
+		go interaction.Start(session)
+
 		var notifier = telegramnotifier.New(interaction)
 		notification.AddNotifier(notifier)
 	}
@@ -390,4 +428,35 @@ func buildAndRun(ctx context.Context, userConfig *bbgo.Config, goOS, goArch stri
 	runCmd.Stdout = os.Stdout
 	runCmd.Stderr = os.Stderr
 	return runCmd, runCmd.Start()
+}
+
+func writeOTPKeyAsQRCodePNG(key *otp.Key, imagePath string) error {
+	// Convert TOTP key into a PNG
+	var buf bytes.Buffer
+	img, err := key.Image(512, 512)
+	if err != nil {
+		return err
+	}
+
+	if err := png.Encode(&buf, img); err != nil {
+		return err
+	}
+
+	if err := ioutil.WriteFile(imagePath, buf.Bytes(), 0644); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func displayOTPKey(key *otp.Key) {
+	log.Infof("")
+	log.Infof("====================PLEASE STORE YOUR OTP KEY=======================")
+	log.Infof("")
+	log.Infof("Issuer:       %s", key.Issuer())
+	log.Infof("AccountName:  %s", key.AccountName())
+	log.Infof("Secret:       %s", key.Secret())
+	log.Infof("")
+	log.Infof("====================================================================")
+	log.Infof("")
 }
