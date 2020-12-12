@@ -29,6 +29,8 @@ Get your exchange API key and secret after you register the accounts:
 
 ## Installation
 
+Setup MySQL or [run it in docker](https://hub.docker.com/_/mysql)
+
 Install the builtin commands:
 
 ```sh
@@ -54,10 +56,11 @@ MYSQL_PORT=3306
 MYSQL_USERNAME=root
 MYSQL_PASSWORD=
 MYSQL_DATABASE=bbgo
+# Make sure the following line is correct so you can migrate successfully
 MYSQL_URL=root@tcp(127.0.0.1:3306)/bbgo
 ```
 
-Then run the `migrate` command to initialize your database:
+Make sure you have [dotenv](https://github.com/bkeepers/dotenv). Then run the `migrate` command to initialize your database:
 
 ```sh
 dotenv -f .env.local -- bbgo migrate up
