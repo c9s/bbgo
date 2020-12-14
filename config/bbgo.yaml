@@ -65,5 +65,6 @@ exchangeStrategies:
   buyandhold:
     symbol: "BTCUSDT"
     interval: "1h"
-    minDropPercentage: -0.01
     baseQuantity: 0.01
+    # minDropPercentage: 0.01
+    minDropChange: 100.0
