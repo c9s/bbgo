@@ -51,6 +51,7 @@ backtest:
   endTime: "2020-09-14"
   symbols:
   - BTCUSDT
+  - ETHUSDT
   account:
     makerCommission: 15
     takerCommission: 15
