@@ -2,6 +2,7 @@ package types
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 )
 
@@ -34,7 +35,7 @@ type IntervalSlice []Interval
 
 func (s IntervalSlice) StringSlice() (slice []string) {
 	for _, interval := range s {
-		slice = append(slice, `"` + interval.String() + `"`)
+		slice = append(slice, `"`+interval.String()+`"`)
 	}
 	return slice
 }
@@ -72,4 +73,8 @@ type IntervalWindow struct {
 
 	// The windows size of the indicator (EWMA and SMA)
 	Window int
+}
+
+func (iw IntervalWindow) String() string {
+	return fmt.Sprintf("%s (%d)", iw.Interval, iw.Window)
 }
