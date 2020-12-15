@@ -27,4 +27,7 @@ dist: bin-dir bbgo-linux bbgo-darwin
 	mkdir -p $(DIST_DIR)
 	tar -C $(BUILD_DIR) -cvzf $(DIST_DIR)/bbgo-$$(git describe --tags).tar.gz .
 
+docker:
+	docker build --tag yoanlin/bbgo .
+
 .PHONY: dist
