@@ -4,10 +4,14 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
+	"golang.org/x/time/rate"
 )
+
+var limiter = rate.NewLimiter(rate.Every(time.Minute), 45)
 
 type LogHook struct {
 	Slack        *slack.Client
@@ -32,6 +36,10 @@ func (t *LogHook) Levels() []logrus.Level {
 }
 
 func (t *LogHook) Fire(e *logrus.Entry) error {
+	if !limiter.Allow() {
+		return nil
+	}
+
 	var color = ""
 
 	switch e.Level {
