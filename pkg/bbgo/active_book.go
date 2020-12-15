@@ -27,7 +27,7 @@ func (b *LocalActiveOrderBook) BindStream(stream types.Stream) {
 }
 
 func (b *LocalActiveOrderBook) orderUpdateHandler(order types.Order) {
-	log.Infof("[LocalActiveOrderBook] received order update: %+v", order)
+	log.Debugf("[LocalActiveOrderBook] received order update: %+v", order)
 
 	switch order.Status {
 	case types.OrderStatusFilled:
@@ -40,7 +40,7 @@ func (b *LocalActiveOrderBook) orderUpdateHandler(order types.Order) {
 		b.Update(order)
 
 	case types.OrderStatusCanceled, types.OrderStatusRejected:
-		log.Infof("[LocalActiveOrderBook] order status %s, removing %d...", order.Status, order.OrderID)
+		log.Debugf("[LocalActiveOrderBook] order status %s, removing %d...", order.Status, order.OrderID)
 		b.Remove(order)
 	}
 }
