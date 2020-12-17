@@ -6,7 +6,8 @@ replicaCount: 1
 
 image:
   repository: yoanlin/bbgo
-  pullPolicy: IfNotPresent
+  # pullPolicy: IfNotPresent
+  pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
 
