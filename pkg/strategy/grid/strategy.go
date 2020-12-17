@@ -162,6 +162,7 @@ func (s *Strategy) submitReverseOrder(order types.Order) {
 		return
 	}
 
+	s.orderStore.Add(createdOrders...)
 	s.activeOrders.Add(createdOrders...)
 }
 
