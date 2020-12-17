@@ -30,5 +30,6 @@ dist: bin-dir bbgo-linux bbgo-darwin
 docker:
 	GOPATH=$(PWD)/.mod go mod download
 	docker build --build-arg GO_MOD_CACHE=.mod --tag yoanlin/bbgo .
+	bash -c "[[ -n $(DOCKER_TAG) ]] && docker tag yoanlin/bbgo yoanlin/bbgo:$(DOCKER_TAG)"
 
 .PHONY: dist

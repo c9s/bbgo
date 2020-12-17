@@ -233,6 +233,14 @@ streambook.BindStream(stream)
 
 ## Helm Chart
 
+Prepare your docker image locally (you can also use the docker image from docker hub):
+
+```
+make docker DOCKER_TAG=1.16.0
+```
+
+The docker tag version number is from the file [Chart.yaml](charts/bbgo/Chart.yaml)
+
 Prepare your secret:
 
 ```
