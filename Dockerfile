@@ -5,8 +5,11 @@ RUN apk add --no-cache git ca-certificates gcc libc-dev pkgconfig
 RUN go get -u github.com/c9s/goose/cmd/goose
 ADD . $GOPATH/src/github.com/c9s/bbgo
 WORKDIR $GOPATH/src/github.com/c9s/bbgo
-# RUN GOPATH=$PWD/.mod go install ./cmd/bbgo
-RUN go install ./cmd/bbgo
+ARG GO_MOD_CACHE
+ENV GOPATH_ORIG=$GOPATH
+ENV GOPATH=${GO_MOD_CACHE:+$PWD/$GO_MOD_CACHE}
+ENV GOPATH=${GOPATH:-$GOPATH_ORIG}
+RUN go build -o $GOPATH_ORIG/bin/bbgo ./cmd/bbgo
 
 # Second stage container
 FROM alpine:3.12

@@ -29,6 +29,6 @@ dist: bin-dir bbgo-linux bbgo-darwin
 
 docker:
 	GOPATH=$(PWD)/.mod go mod download
-	docker build --tag yoanlin/bbgo .
+	docker build --build-arg GO_MOD_CACHE=.mod --tag yoanlin/bbgo .
 
 .PHONY: dist
