@@ -166,26 +166,6 @@ func (s *Strategy) submitReverseOrder(order types.Order) {
 	s.activeOrders.Add(createdOrders...)
 }
 
-func (s *Strategy) orderUpdateHandler(order types.Order) {
-	if order.Symbol != s.Symbol {
-		return
-	}
-
-	log.Infof("order update: %s", order.String())
-
-	switch order.Status {
-	case types.OrderStatusFilled:
-		s.activeOrders.Remove(order)
-		s.submitReverseOrder(order)
-
-	case types.OrderStatusPartiallyFilled, types.OrderStatusNew:
-		s.activeOrders.Update(order)
-
-	case types.OrderStatusCanceled, types.OrderStatusRejected:
-		log.Infof("order status %s, removing %d from the active order pool...", order.Status, order.OrderID)
-		s.activeOrders.Remove(order)
-	}
-}
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
@@ -201,6 +181,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	// we don't persist orders so that we can not clear the previous orders for now. just need time to support this.
 	s.activeOrders = bbgo.NewLocalActiveOrderBook()
+	s.activeOrders.OnFilled(s.submitReverseOrder)
+	s.activeOrders.BindStream(session.Stream)
 
 	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
@@ -212,7 +194,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 	})
 
-	session.Stream.OnOrderUpdate(s.orderUpdateHandler)
 	session.Stream.OnTradeUpdate(s.tradeUpdateHandler)
 	session.Stream.OnConnect(func() {
 		s.placeGridOrders(orderExecutor, session)
