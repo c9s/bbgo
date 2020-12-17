@@ -233,8 +233,28 @@ streambook.BindStream(stream)
 
 ## Helm Chart
 
+Prepare your secret:
+
 ```
 kubectl create secret generic bbgo --from-env-file .env.local
+```
+
+Configure your config file:
+
+```
+vim config/bbgo.yaml
+```
+
+Install chart:
+
+```
+helm install bbgo ./charts/bbgo
+```
+
+Delete chart:
+
+```
+helm delete bbgo
 ```
 
 ## Support
