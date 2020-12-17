@@ -1,8 +1,4 @@
 ---
-imports:
-- github.com/c9s/bbgo/pkg/strategy/buyandhold
-- github.com/c9s/bbgo/pkg/strategy/xpuremaker
-
 notifications:
   slack:
     defaultChannel: "dev-bbgo"
@@ -57,10 +53,21 @@ backtest:
       USDT: 10000.0
 
 exchangeStrategies:
+
 - on: max
   buyandhold:
     symbol: "BTCUSDT"
-    interval: "1h"
+    interval: "5m"
     baseQuantity: 0.01
     # minDropPercentage: 0.01
     minDropChange: 100.0
+
+- on: max
+  grid:
+    symbol: BTCUSDT
+    quantity: 0.001
+    gridNumber: 100
+    profitSpread: 50.0
+    upperPrice: 30000.0
+    lowerPrice: 10000.0
+

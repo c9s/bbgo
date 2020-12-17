@@ -15,7 +15,7 @@ nameOverride: ""
 fullnameOverride: ""
 
 configmap:
-  file: "config/bollgrid.yaml"
+  file: "config/bbgo.yaml"
 
 dotenv:
   secret: "bbgo"
