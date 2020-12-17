@@ -33,7 +33,6 @@ type Strategy struct {
 	// This field will be injected automatically since it's a single exchange strategy.
 	bbgo.OrderExecutor
 
-
 	orderStore *bbgo.OrderStore
 
 	// Market stores the configuration of the market, for example, VolumePrecision, PricePrecision, MinLotSize... etc
@@ -83,27 +82,30 @@ func (s *Strategy) placeGridOrders(orderExecutor bbgo.OrderExecutor, session *bb
 	priceRange := s.UpperPrice - s.LowerPrice
 	gridSize := priceRange.Div(fixedpoint.NewFromInt(s.GridNum))
 
-	log.Infof("current price: %f", currentPrice)
-
 	var orders []types.SubmitOrder
-	for price := s.LowerPrice; price <= s.UpperPrice; price += gridSize {
-		var side types.SideType
-		if price > currentPriceF {
-			side = types.SideTypeSell
-		} else {
-			side = types.SideTypeBuy
-		}
-
+	for price := currentPriceF + gridSize; price <= s.UpperPrice; price += gridSize {
 		order := types.SubmitOrder{
 			Symbol:      s.Symbol,
-			Side:        side,
+			Side:        types.SideTypeSell,
 			Type:        types.OrderTypeLimit,
 			Market:      s.Market,
 			Quantity:    s.Quantity,
 			Price:       price.Float64(),
 			TimeInForce: "GTC",
 		}
-		log.Infof("submitting order: %s", order.String())
+		orders = append(orders, order)
+	}
+
+	for price := currentPriceF - gridSize; price <= s.LowerPrice; price -= gridSize {
+		order := types.SubmitOrder{
+			Symbol:      s.Symbol,
+			Side:        types.SideTypeBuy,
+			Type:        types.OrderTypeLimit,
+			Market:      s.Market,
+			Quantity:    s.Quantity,
+			Price:       price.Float64(),
+			TimeInForce: "GTC",
+		}
 		orders = append(orders, order)
 	}
 
@@ -165,7 +167,6 @@ func (s *Strategy) submitReverseOrder(order types.Order) {
 	s.orderStore.Add(createdOrders...)
 	s.activeOrders.Add(createdOrders...)
 }
-
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
