@@ -32,4 +32,8 @@ docker:
 	docker build --build-arg GO_MOD_CACHE=.mod --tag yoanlin/bbgo .
 	bash -c "[[ -n $(DOCKER_TAG) ]] && docker tag yoanlin/bbgo yoanlin/bbgo:$(DOCKER_TAG)"
 
+docker-push:
+	docker push yoanlin/bbgo
+	bash -c "[[ -n $(DOCKER_TAG) ]] && docker push yoanlin/bbgo:$(DOCKER_TAG)"
+
 .PHONY: dist
