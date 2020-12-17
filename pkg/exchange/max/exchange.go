@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"os"
 	"time"
 
 	"github.com/google/uuid"
@@ -24,7 +25,12 @@ type Exchange struct {
 }
 
 func New(key, secret string) *Exchange {
-	client := maxapi.NewRestClient(maxapi.ProductionAPIURL)
+	baseURL := maxapi.ProductionAPIURL
+	if override := os.Getenv("MAX_API_BASE_URL")  ; len(override) > 0 {
+		baseURL = override
+	}
+
+	client := maxapi.NewRestClient(baseURL)
 	client.Auth(key, secret)
 	return &Exchange{
 		client: client,
