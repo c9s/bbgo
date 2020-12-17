@@ -242,6 +242,7 @@ kubectl create secret generic bbgo --from-env-file .env.local
 Configure your config file, the chart defaults to read config/bbgo.yaml:
 
 ```
+cp config/grid.yaml config/bbgo.yaml
 vim config/bbgo.yaml
 ```
 
