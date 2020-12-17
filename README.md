@@ -231,6 +231,12 @@ streambook.BindStream(stream)
 - /auth 92463901
 - done! your session will route to telegram
 
+## Helm Chart
+
+```
+kubectl create secret generic bbgo --from-env-file .env.local
+```
+
 ## Support
 
 ### By contributing pull requests
