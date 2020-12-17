@@ -55,7 +55,7 @@ spec:
           # the "env" entries will override the environment variables from envFrom.
           envFrom:
           - secretRef:
-              name: {{ .Values.dotenv.secret }}
+              name: {{ .Values.dotenv.secret | default .Release.Name }}
           {{- end }}
 
       volumes:

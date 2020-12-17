@@ -18,7 +18,7 @@ configmap:
   file: "config/bbgo.yaml"
 
 dotenv:
-  secret: "bbgo"
+  secret: null
 
 serviceAccount:
   # Specifies whether a service account should be created
