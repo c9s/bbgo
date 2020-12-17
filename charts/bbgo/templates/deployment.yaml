@@ -51,6 +51,13 @@ spec:
           - name: config-volume
             mountPath: /config
 
+          {{- if .Values.dotenv.secret }}
+          # the "env" entries will override the environment variables from envFrom.
+          envFrom:
+          - secretRef:
+              name: {{ .Values.dotenv.secret }}
+          {{- end }}
+
       volumes:
       - name: config-volume
         configMap:

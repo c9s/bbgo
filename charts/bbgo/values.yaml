@@ -15,7 +15,10 @@ nameOverride: ""
 fullnameOverride: ""
 
 configmap:
-  file: "config/bbgo.yaml"
+  file: "config/bollgrid.yaml"
+
+dotenv:
+  secret: "bbgo"
 
 serviceAccount:
   # Specifies whether a service account should be created

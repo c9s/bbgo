@@ -39,10 +39,6 @@ sessions:
     exchange: max
     envVarPrefix: max
 
-  binance:
-    exchange: binance
-    envVarPrefix: binance
-
 backtest:
   # for testing max draw down (MDD) at 03-12
   # see here for more details

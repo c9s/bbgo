@@ -18,9 +18,9 @@ notifications:
     pnL: "bbgo-pnl"
 
 sessions:
-  binance:
-    exchange: binance
-    envVarPrefix: binance
+  # binance:
+  #   exchange: binance
+  #   envVarPrefix: binance
 
   max:
     exchange: max
@@ -38,10 +38,10 @@ riskControls:
           BTCUSDT:
             # basic risk control order executor
             basic:
-              minQuoteBalance: 100.0
-              maxBaseAssetBalance: 3.0
-              minBaseAssetBalance: 0.0
-              maxOrderAmount: 2000.0
+              minQuoteBalance: 1000.0
+              maxBaseAssetBalance: 0
+              minBaseAssetBalance: 1.0
+              maxOrderAmount: 3000.0
 
 backtest:
   # for testing max draw down (MDD) at 03-12
@@ -62,7 +62,7 @@ exchangeStrategies:
 - on: max
   bollgrid:
     symbol: BTCUSDT
-    interval: 5m
-    gridNumber: 20
-    quantity: 0.01
-    profitSpread: 30.0
+    interval: 1h
+    gridNumber: 100
+    quantity: 0.002
+    profitSpread: 10.0
