@@ -3,12 +3,16 @@ FROM golang:1.15-alpine3.12 AS builder
 RUN apk add --no-cache git ca-certificates gcc libc-dev pkgconfig
 # gcc is for github.com/mattn/go-sqlite3
 RUN go get -u github.com/c9s/goose/cmd/goose
-ADD . $GOPATH/src/github.com/c9s/bbgo
+# ADD . $GOPATH/src/github.com/c9s/bbgo
+# WORKDIR $GOPATH/src/github.com/c9s/bbgo
+
 WORKDIR $GOPATH/src/github.com/c9s/bbgo
 ARG GO_MOD_CACHE
+ENV WORKDIR=$GOPATH/src/github.com/c9s/bbgo
 ENV GOPATH_ORIG=$GOPATH
-ENV GOPATH=${GO_MOD_CACHE:+$PWD/$GO_MOD_CACHE}
+ENV GOPATH=${GO_MOD_CACHE:+$WORKDIR/$GO_MOD_CACHE}
 ENV GOPATH=${GOPATH:-$GOPATH_ORIG}
+ADD . .
 RUN go build -o $GOPATH_ORIG/bin/bbgo ./cmd/bbgo
 
 # Second stage container
