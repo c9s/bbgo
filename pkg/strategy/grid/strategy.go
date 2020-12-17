@@ -3,7 +3,6 @@ package grid
 import (
 	"context"
 	"sync"
-	"sync/atomic"
 
 	"github.com/sirupsen/logrus"
 
@@ -34,6 +33,9 @@ type Strategy struct {
 	// This field will be injected automatically since it's a single exchange strategy.
 	bbgo.OrderExecutor
 
+
+	orderStore *bbgo.OrderStore
+
 	// Market stores the configuration of the market, for example, VolumePrecision, PricePrecision, MinLotSize... etc
 	// This field will be injected automatically since we defined the Symbol field.
 	types.Market
@@ -56,6 +58,8 @@ type Strategy struct {
 
 	// activeOrders is the locally maintained active order book of the maker orders.
 	activeOrders *bbgo.LocalActiveOrderBook
+
+	position fixedpoint.Value
 
 	// any created orders for tracking trades
 	orders map[uint64]types.Order
@@ -117,13 +121,13 @@ func (s *Strategy) tradeUpdateHandler(trade types.Trade) {
 		return
 	}
 
-	if _, ok := s.orders[trade.OrderID]; ok {
+	if s.orderStore.Exists(trade.OrderID) {
 		log.Infof("received trade update of order %d: %+v", trade.OrderID, trade)
 		switch trade.Side {
 		case types.SideTypeBuy:
-			atomic.AddInt64(&position, fixedpoint.NewFromFloat(trade.Quantity).Int64())
+			s.position.AtomicAdd(fixedpoint.NewFromFloat(trade.Quantity))
 		case types.SideTypeSell:
-			atomic.AddInt64(&position, -fixedpoint.NewFromFloat(trade.Quantity).Int64())
+			s.position.AtomicAdd(-fixedpoint.NewFromFloat(trade.Quantity))
 		}
 	}
 }
@@ -191,7 +195,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.GridNum = 10
 	}
 
-	s.orders = make(map[uint64]types.Order)
+	s.orderStore = bbgo.NewOrderStore()
+	s.orderStore.BindStream(session.Stream)
 
 	// we don't persist orders so that we can not clear the previous orders for now. just need time to support this.
 	s.activeOrders = bbgo.NewLocalActiveOrderBook()
