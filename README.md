@@ -244,20 +244,22 @@ The docker tag version number is from the file [Chart.yaml](charts/bbgo/Chart.ya
 Prepare your secret:
 
 ```
-kubectl create secret generic bbgo --from-env-file .env.local
+kubectl create secret generic bbgo-grid --from-env-file .env.local
 ```
 
-Configure your config file, the chart defaults to read config/bbgo.yaml:
+Configure your config file, the chart defaults to read config/bbgo.yaml to
+create a configmap:
 
 ```
 cp config/grid.yaml config/bbgo.yaml
 vim config/bbgo.yaml
 ```
 
-Install chart:
+Install chart with the preferred release name, the release name maps to the
+previous secret we just created, that is, `bbgo-grid`:
 
 ```
-helm install bbgo ./charts/bbgo
+helm install bbgo-grid ./charts/bbgo
 ```
 
 Delete chart:
