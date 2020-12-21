@@ -35,6 +35,8 @@ type Stream struct {
 	ListenKey string
 	Conn      *websocket.Conn
 
+	publicOnly bool
+
 	// custom callbacks
 	depthEventCallbacks       []func(e *DepthEvent)
 	kLineEventCallbacks       []func(e *KLineEvent)
@@ -179,6 +181,10 @@ func NewStream(client *binance.Client) *Stream {
 	return stream
 }
 
+func (s *Stream) SetPublicOnly() {
+	s.publicOnly = true
+}
+
 func (s *Stream) dial(listenKey string) (*websocket.Conn, error) {
 	url := "wss://stream.binance.com:9443/ws/" + listenKey
 	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
@@ -190,14 +196,18 @@ func (s *Stream) dial(listenKey string) (*websocket.Conn, error) {
 }
 
 func (s *Stream) connect(ctx context.Context) error {
-	log.Infof("creating user data stream...")
-	listenKey, err := s.Client.NewStartUserStreamService().Do(ctx)
-	if err != nil {
-		return err
-	}
+	if s.publicOnly {
+		log.Infof("stream is set to public only mode")
+	} else {
+		log.Infof("creating user data stream...")
+		listenKey, err := s.Client.NewStartUserStreamService().Do(ctx)
+		if err != nil {
+			return err
+		}
 
-	s.ListenKey = listenKey
-	log.Infof("user data stream created. listenKey: %s", s.ListenKey)
+		s.ListenKey = listenKey
+		log.Infof("user data stream created. listenKey: %s", s.ListenKey)
+	}
 
 	conn, err := s.dial(s.ListenKey)
 	if err != nil {
@@ -251,9 +261,10 @@ func (s *Stream) read(ctx context.Context) {
 			return
 
 		case <-keepAliveTicker.C:
-			err := s.Client.NewKeepaliveUserStreamService().ListenKey(s.ListenKey).Do(ctx)
-			if err != nil {
-				log.WithError(err).Errorf("listen key keep-alive error: %v key: %s", err, maskListenKey(s.ListenKey))
+			if !s.publicOnly {
+				if err := s.Client.NewKeepaliveUserStreamService().ListenKey(s.ListenKey).Do(ctx); err != nil {
+					log.WithError(err).Errorf("listen key keep-alive error: %v key: %s", err, maskListenKey(s.ListenKey))
+				}
 			}
 
 		case <-pingTicker.C:
@@ -279,7 +290,11 @@ func (s *Stream) read(ctx context.Context) {
 						return
 
 					default:
-						_ = s.invalidateListenKey(ctx, s.ListenKey)
+						if !s.publicOnly {
+							if err := s.invalidateListenKey(ctx, s.ListenKey); err != nil {
+								log.WithError(err).Error("invalidate listen key error")
+							}
+						}
 
 						err = s.connect(ctx)
 						time.Sleep(5 * time.Second)
@@ -294,7 +309,7 @@ func (s *Stream) read(ctx context.Context) {
 				continue
 			}
 
-			log.Debugf("[binance] recv: %s", message)
+			log.Debugf("recv: %s", message)
 
 			e, err := ParseEvent(string(message))
 			if err != nil {
@@ -340,11 +355,15 @@ func (s *Stream) invalidateListenKey(ctx context.Context, listenKey string) erro
 
 func (s *Stream) Close() error {
 	log.Infof("closing user data stream...")
-	defer s.Conn.Close()
-	err := s.invalidateListenKey(context.Background(), s.ListenKey)
 
-	log.Infof("user data stream closed")
-	return err
+	if !s.publicOnly {
+		if err := s.invalidateListenKey(context.Background(), s.ListenKey); err != nil {
+			log.WithError(err).Error("invalidate listen key error")
+		}
+		log.Infof("user data stream closed")
+	}
+
+	return s.Conn.Close()
 }
 
 func maskListenKey(listenKey string) string {
