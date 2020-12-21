@@ -3,6 +3,7 @@ package binance
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"strings"
 	"sync"
 	"time"
@@ -14,6 +15,10 @@ import (
 
 	"github.com/c9s/bbgo/pkg/types"
 )
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
 type StreamRequest struct {
 	// request ID is required
@@ -368,46 +373,66 @@ func (f *DepthFrame) Reset() {
 	f.mu.Unlock()
 }
 
+func (f *DepthFrame) loadDepthSnapshot() {
+	depth, err := f.fetch(context.Background())
+	if err != nil {
+		return
+	}
+
+	f.mu.Lock()
+	f.SnapshotDepth = depth
+
+	var events []DepthEvent
+	for _, e := range f.BufEvents {
+		/*
+			if i == 0 {
+				if e.FirstUpdateID > f.SnapshotDepth.FinalUpdateID+1 {
+					// FIXME: we missed some events
+					log.Warn("miss matched final update id for order book")
+					f.SnapshotDepth = nil
+					f.mu.Unlock()
+					return
+				}
+			}
+		*/
+		if e.FirstUpdateID <= f.SnapshotDepth.FinalUpdateID || e.FinalUpdateID <= f.SnapshotDepth.FinalUpdateID {
+			continue
+		}
+
+		events = append(events, e)
+	}
+
+	f.BufEvents = nil
+	f.EmitReady(*depth, events)
+	f.mu.Unlock()
+}
+
 func (f *DepthFrame) PushEvent(e DepthEvent) {
 	f.mu.Lock()
 	if f.SnapshotDepth == nil {
 		f.BufEvents = append(f.BufEvents, e)
 		f.mu.Unlock()
 
-		go f.once.Do(func() {
-			depth, err := f.fetch(context.Background())
-			if err != nil {
-				return
-			}
-
-			f.mu.Lock()
-			f.SnapshotDepth = depth
-
-			var events []DepthEvent
-			for _, e := range f.BufEvents {
-				/*
-					if i == 0 {
-						if e.FirstUpdateID > f.SnapshotDepth.FinalUpdateID+1 {
-							// FIXME: we missed some events
-							log.Warn("miss matched final update id for order book")
-							f.SnapshotDepth = nil
-							f.mu.Unlock()
-							return
-						}
-					}
-				*/
-				if e.FirstUpdateID <= f.SnapshotDepth.FinalUpdateID || e.FinalUpdateID <= f.SnapshotDepth.FinalUpdateID {
-					continue
+		go f.once.Do(f.loadDepthSnapshot)
+		go func() {
+			ctx := context.Background()
+			ticker := time.NewTicker(5 * time.Minute + time.Duration(rand.Intn(10)) * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					f.loadDepthSnapshot()
 				}
-
-				events = append(events, e)
 			}
-			f.BufEvents = nil
-			f.EmitReady(*depth, events)
-			f.mu.Unlock()
-		})
+		}()
 	} else {
 		if e.FirstUpdateID > f.SnapshotDepth.FinalUpdateID || e.FinalUpdateID > f.SnapshotDepth.FinalUpdateID {
+			if e.FinalUpdateID > f.SnapshotDepth.FinalUpdateID {
+				f.SnapshotDepth.FinalUpdateID = e.FinalUpdateID
+			}
+
 			f.EmitPush(e)
 		}
 		f.mu.Unlock()
