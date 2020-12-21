@@ -26,3 +26,5 @@
 /build
 /dist
 /bbgow*
+
+/config/bbgo.yaml
