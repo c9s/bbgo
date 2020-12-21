@@ -45,6 +45,7 @@ var rootCmd = &cobra.Command{
 		var exchange = binance.New(key, secret)
 
 		stream := exchange.NewStream()
+		stream.SetPublicOnly()
 		stream.Subscribe(types.BookChannel, symbol, types.SubscribeOptions{})
 
 		stream.OnBookSnapshot(func(book types.OrderBook) {

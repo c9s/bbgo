@@ -19,6 +19,8 @@ type Stream struct {
 	types.StandardStream
 
 	websocketService *max.WebSocketService
+
+	publicOnly bool
 }
 
 func NewStream(key, secret string) *Stream {
@@ -27,6 +29,17 @@ func NewStream(key, secret string) *Stream {
 	stream := &Stream{
 		websocketService: wss,
 	}
+
+	wss.OnConnect(func(conn *websocket.Conn) {
+		if key == "" || secret == "" {
+			log.Warn("MAX API key or secret is empty, will not send authentication command")
+		} else {
+			if err := wss.Auth(); err != nil {
+				wss.EmitError(err)
+				logger.WithError(err).Error("failed to send auth request")
+			}
+		}
+	})
 
 	wss.OnMessage(func(message []byte) {
 		logger.Debugf("M: %s", message)
@@ -77,19 +90,19 @@ func NewStream(key, secret string) *Stream {
 	})
 
 	wss.OnBookEvent(func(e max.BookEvent) {
-		newbook, err := e.OrderBook()
+		newBook, err := e.OrderBook()
 		if err != nil {
 			logger.WithError(err).Error("book convert error")
 			return
 		}
 
-		newbook.Symbol = toGlobalSymbol(e.Market)
+		newBook.Symbol = toGlobalSymbol(e.Market)
 
 		switch e.Event {
 		case "snapshot":
-			stream.EmitBookSnapshot(newbook)
+			stream.EmitBookSnapshot(newBook)
 		case "update":
-			stream.EmitBookUpdate(newbook)
+			stream.EmitBookUpdate(newBook)
 		}
 	})
 
@@ -126,6 +139,10 @@ func NewStream(key, secret string) *Stream {
 	})
 
 	return stream
+}
+
+func (s *Stream) SetPublicOnly() {
+	s.publicOnly = true
 }
 
 func (s *Stream) Subscribe(channel types.Channel, symbol string, options types.SubscribeOptions) {
