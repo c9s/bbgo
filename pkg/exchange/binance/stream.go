@@ -164,7 +164,7 @@ func NewStream(client *binance.Client) *Stream {
 			return
 		}
 
-		log.Infof("[binance] subscribing channels: %+v", params)
+		log.Infof("subscribing channels: %+v", params)
 		err := stream.Conn.WriteJSON(StreamRequest{
 			Method: "SUBSCRIBE",
 			Params: params,
@@ -190,21 +190,21 @@ func (s *Stream) dial(listenKey string) (*websocket.Conn, error) {
 }
 
 func (s *Stream) connect(ctx context.Context) error {
-	log.Infof("[binance] creating user data stream...")
+	log.Infof("creating user data stream...")
 	listenKey, err := s.Client.NewStartUserStreamService().Do(ctx)
 	if err != nil {
 		return err
 	}
 
 	s.ListenKey = listenKey
-	log.Infof("[binance] user data stream created. listenKey: %s", s.ListenKey)
+	log.Infof("user data stream created. listenKey: %s", s.ListenKey)
 
 	conn, err := s.dial(s.ListenKey)
 	if err != nil {
 		return err
 	}
 
-	log.Infof("[binance] websocket connected")
+	log.Infof("websocket connected")
 	s.Conn = conn
 
 	s.EmitConnect()
@@ -339,11 +339,11 @@ func (s *Stream) invalidateListenKey(ctx context.Context, listenKey string) erro
 }
 
 func (s *Stream) Close() error {
-	log.Infof("[binance] closing user data stream...")
+	log.Infof("closing user data stream...")
 	defer s.Conn.Close()
 	err := s.invalidateListenKey(context.Background(), s.ListenKey)
 
-	log.Infof("[binance] user data stream closed")
+	log.Infof("user data stream closed")
 	return err
 }
 
