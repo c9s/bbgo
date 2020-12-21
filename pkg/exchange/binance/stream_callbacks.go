@@ -54,6 +54,16 @@ func (s *Stream) EmitOutboundAccountInfoEvent(event *OutboundAccountInfoEvent) {
 	}
 }
 
+func (s *Stream) OnOutboundAccountPositionEvent(cb func(event *OutboundAccountPositionEvent)) {
+	s.outboundAccountPositionEventCallbacks = append(s.outboundAccountPositionEventCallbacks, cb)
+}
+
+func (s *Stream) EmitOutboundAccountPositionEvent(event *OutboundAccountPositionEvent) {
+	for _, cb := range s.outboundAccountPositionEventCallbacks {
+		cb(event)
+	}
+}
+
 func (s *Stream) OnExecutionReportEvent(cb func(event *ExecutionReportEvent)) {
 	s.executionReportEventCallbacks = append(s.executionReportEventCallbacks, cb)
 }
@@ -74,6 +84,8 @@ type StreamEventHub interface {
 	OnBalanceUpdateEvent(cb func(event *BalanceUpdateEvent))
 
 	OnOutboundAccountInfoEvent(cb func(event *OutboundAccountInfoEvent))
+
+	OnOutboundAccountPositionEvent(cb func(event *OutboundAccountPositionEvent))
 
 	OnExecutionReportEvent(cb func(event *ExecutionReportEvent))
 }

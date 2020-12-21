@@ -3,6 +3,8 @@ package binance
 import (
 	"context"
 	"fmt"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/adshao/go-binance/v2"
@@ -22,13 +24,32 @@ var log = logrus.WithFields(logrus.Fields{
 
 func init() {
 	_ = types.Exchange(&Exchange{})
+
+	if ok, _ := strconv.ParseBool(os.Getenv("DEBUG_BINANCE_STREAM")); ok {
+		log.Level = logrus.DebugLevel
+	}
+}
+
+type MarginSettings struct {
+	useMargin               bool
+	useMarginIsolated       bool
+	useMarginIsolatedSymbol string
+}
+
+func (e *MarginSettings) UseMargin() {
+	e.useMargin = true
+}
+
+func (e *MarginSettings) UseIsolatedMargin(symbol string) {
+	e.useMargin = true
+	e.useMarginIsolated = true
+	e.useMarginIsolatedSymbol = symbol
 }
 
 type Exchange struct {
-	Client *binance.Client
+	MarginSettings
 
-	useMargin         bool
-	useMarginIsolated bool
+	Client *binance.Client
 }
 
 func New(key, secret string) *Exchange {
@@ -40,11 +61,6 @@ func New(key, secret string) *Exchange {
 
 func (e *Exchange) Name() types.ExchangeName {
 	return types.ExchangeBinance
-}
-
-func (e *Exchange) UseMargin(isolated bool) {
-	e.useMargin = true
-	e.useMarginIsolated = isolated
 }
 
 func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
@@ -105,12 +121,21 @@ func (e *Exchange) QueryAveragePrice(ctx context.Context, symbol string) (float6
 
 func (e *Exchange) NewStream() types.Stream {
 	stream := NewStream(e.Client)
+	stream.MarginSettings = e.MarginSettings
+	return stream
+}
 
-	if e.useMargin {
-		stream.UseMargin(e.useMarginIsolated)
+func (e *Exchange) QueryMarginAccount(ctx context.Context) (*binance.MarginAccount, error) {
+	return e.Client.NewGetMarginAccountService().Do(ctx)
+}
+
+func (e *Exchange) QueryIsolatedMarginAccount(ctx context.Context, symbols ...string) (*binance.IsolatedMarginAccount, error) {
+	req := e.Client.NewGetIsolatedMarginAccountService()
+	if len(symbols) > 0 {
+		req.Symbols(symbols...)
 	}
 
-	return stream
+	return req.Do(ctx)
 }
 
 func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (allWithdraws []types.Withdraw, err error) {

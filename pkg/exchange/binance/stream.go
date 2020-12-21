@@ -17,6 +17,7 @@ import (
 )
 
 func init() {
+	// randomize pulling
 	rand.Seed(time.Now().UnixNano())
 }
 
@@ -29,6 +30,8 @@ type StreamRequest struct {
 
 //go:generate callbackgen -type Stream -interface
 type Stream struct {
+	MarginSettings
+
 	types.StandardStream
 
 	Client    *binance.Client
@@ -42,12 +45,10 @@ type Stream struct {
 	kLineEventCallbacks       []func(e *KLineEvent)
 	kLineClosedEventCallbacks []func(e *KLineEvent)
 
-	balanceUpdateEventCallbacks       []func(event *BalanceUpdateEvent)
-	outboundAccountInfoEventCallbacks []func(event *OutboundAccountInfoEvent)
-	executionReportEventCallbacks     []func(event *ExecutionReportEvent)
-
-	useMargin         bool
-	useMarginIsolated bool
+	balanceUpdateEventCallbacks           []func(event *BalanceUpdateEvent)
+	outboundAccountInfoEventCallbacks     []func(event *OutboundAccountInfoEvent)
+	outboundAccountPositionEventCallbacks []func(event *OutboundAccountPositionEvent)
+	executionReportEventCallbacks         []func(event *ExecutionReportEvent)
 }
 
 func NewStream(client *binance.Client) *Stream {
@@ -97,7 +98,7 @@ func NewStream(client *binance.Client) *Stream {
 		}
 	})
 
-	stream.OnOutboundAccountInfoEvent(func(e *OutboundAccountInfoEvent) {
+	stream.OnOutboundAccountPositionEvent(func(e *OutboundAccountPositionEvent) {
 		snapshot := types.BalanceMap{}
 		for _, balance := range e.Balances {
 			available := fixedpoint.Must(fixedpoint.NewFromString(balance.Free))
@@ -189,14 +190,15 @@ func (s *Stream) dial(listenKey string) (*websocket.Conn, error) {
 	return conn, nil
 }
 
-func (s *Stream) UseMargin(isolated bool) {
-	s.useMargin = true
-	s.useMarginIsolated = isolated
-}
-
 func (s *Stream) fetchListenKey(ctx context.Context) (string, error) {
 	if s.useMargin {
-		return s.Client.NewStartMarginUserStreamService().Do(ctx)
+		log.Infof("margin mode is enabled, requesting margin user stream listen key...")
+		req := s.Client.NewStartMarginUserStreamService()
+		if s.useMarginIsolated {
+			req.Isolated(s.useMarginIsolatedSymbol)
+		}
+
+		return req.Do(ctx)
 	}
 
 	return s.Client.NewStartUserStreamService().Do(ctx)
@@ -204,7 +206,12 @@ func (s *Stream) fetchListenKey(ctx context.Context) (string, error) {
 
 func (s *Stream) keepaliveListenKey(ctx context.Context, listenKey string) error {
 	if s.useMargin {
-		return s.Client.NewKeepaliveMarginUserStreamService().ListenKey(listenKey).Do(ctx)
+		req := s.Client.NewKeepaliveMarginUserStreamService().ListenKey(listenKey)
+		if s.useMarginIsolated {
+			req.Isolated(s.useMarginIsolatedSymbol)
+		}
+
+		return req.Do(ctx)
 	}
 
 	return s.Client.NewKeepaliveUserStreamService().ListenKey(listenKey).Do(ctx)
@@ -222,7 +229,7 @@ func (s *Stream) connect(ctx context.Context) error {
 		}
 
 		s.ListenKey = listenKey
-		log.Infof("user data stream created. listenKey: %s", s.ListenKey)
+		log.Infof("user data stream created. listenKey: %s", maskListenKey(s.ListenKey))
 	}
 
 	conn, err := s.dial(s.ListenKey)
@@ -325,7 +332,7 @@ func (s *Stream) read(ctx context.Context) {
 				continue
 			}
 
-			log.Debugf("recv: %s", message)
+			log.Debug(string(message))
 
 			e, err := ParseEvent(string(message))
 			if err != nil {
@@ -335,6 +342,10 @@ func (s *Stream) read(ctx context.Context) {
 
 			// log.NotifyTo("[binance] event: %+v", e)
 			switch e := e.(type) {
+
+			case *OutboundAccountPositionEvent:
+				log.Info(e.Event, " ", e.Balances)
+				s.EmitOutboundAccountPositionEvent(e)
 
 			case *OutboundAccountInfoEvent:
 				log.Info(e.Event, " ", e.Balances)
@@ -360,16 +371,21 @@ func (s *Stream) read(ctx context.Context) {
 
 func (s *Stream) invalidateListenKey(ctx context.Context, listenKey string) (err error) {
 	// should use background context to invalidate the user stream
-	log.Info("[binance] closing listen key")
+	log.Info("closing listen key")
 
 	if s.useMargin {
-		err = s.Client.NewCloseMarginUserStreamService().ListenKey(listenKey).Do(ctx)
+		req := s.Client.NewCloseMarginUserStreamService().ListenKey(listenKey)
+		if s.useMarginIsolated {
+			req.Isolated(s.useMarginIsolatedSymbol)
+		}
+
+		err = req.Do(ctx)
 	} else {
 		err = s.Client.NewCloseUserStreamService().ListenKey(listenKey).Do(ctx)
 	}
 
 	if err != nil {
-		log.WithError(err).Error("[binance] error deleting listen key")
+		log.WithError(err).Error("error deleting listen key")
 		return err
 	}
 

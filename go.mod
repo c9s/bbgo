@@ -7,8 +7,6 @@ go 1.13
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/adshao/go-binance/v2 v2.2.1-0.20210108025425-9a582c63144e
-	github.com/bitly/go-simplejson v0.5.0 // indirect
-	github.com/c9s/goose v0.0.0-20200415105707-8da682162a5b
 	github.com/c9s/rockhopper v1.2.1-0.20210115022144-cc77e66fc34f
 	github.com/codingconcepts/env v0.0.0-20200821220118-a8fbf8d84482
 	github.com/fastly/go-utils v0.0.0-20180712184237-d95a45783239 // indirect
@@ -56,3 +54,5 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 )
+
+// replace github.com/adshao/go-binance => /Users/c9s/src/github.com/adshao/go-binance
