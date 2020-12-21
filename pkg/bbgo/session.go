@@ -1,6 +1,8 @@
 package bbgo
 
 import (
+	"fmt"
+
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -188,4 +190,32 @@ func (session *ExchangeSession) Subscribe(channel types.Channel, symbol string, 
 	session.loadedSymbols[symbol] = struct{}{}
 	session.Subscriptions[sub] = sub
 	return session
+}
+
+func (session *ExchangeSession) FormatOrder(order types.SubmitOrder) (types.SubmitOrder, error) {
+	market, ok := session.Market(order.Symbol)
+	if !ok {
+		return order, fmt.Errorf("market is not defined: %s", order.Symbol)
+	}
+
+	order.Market = market
+
+	switch order.Type {
+	case types.OrderTypeStopMarket, types.OrderTypeStopLimit:
+		order.StopPriceString = market.FormatPrice(order.StopPrice)
+
+	}
+
+	switch order.Type {
+	case types.OrderTypeMarket, types.OrderTypeStopMarket:
+		order.Price = 0.0
+		order.PriceString = ""
+
+	default:
+		order.PriceString = market.FormatPrice(order.Price)
+
+	}
+
+	order.QuantityString = market.FormatQuantity(order.Quantity)
+	return order, nil
 }

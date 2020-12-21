@@ -12,6 +12,18 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+type OrderExecutor interface {
+	SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error)
+
+	OnTradeUpdate(cb func(trade types.Trade))
+	OnOrderUpdate(cb func(order types.Order))
+}
+
+type OrderExecutionRouter interface {
+	// SubmitOrderTo submit order to a specific exchange Session
+	SubmitOrdersTo(ctx context.Context, session string, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error)
+}
+
 type ExchangeOrderExecutionRouter struct {
 	Notifiability
 
@@ -265,37 +277,9 @@ func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...
 	return outOrders, nil
 }
 
-func formatOrder(session *ExchangeSession, order types.SubmitOrder) (types.SubmitOrder, error) {
-	market, ok := session.Market(order.Symbol)
-	if !ok {
-		return order, fmt.Errorf("market is not defined: %s", order.Symbol)
-	}
-
-	order.Market = market
-
-	switch order.Type {
-	case types.OrderTypeStopMarket, types.OrderTypeStopLimit:
-		order.StopPriceString = market.FormatPrice(order.StopPrice)
-
-	}
-
-	switch order.Type {
-	case types.OrderTypeMarket, types.OrderTypeStopMarket:
-		order.Price = 0.0
-		order.PriceString = ""
-
-	default:
-		order.PriceString = market.FormatPrice(order.Price)
-
-	}
-
-	order.QuantityString = market.FormatQuantity(order.Quantity)
-	return order, nil
-}
-
 func formatOrders(session *ExchangeSession, orders []types.SubmitOrder) (formattedOrders []types.SubmitOrder, err error) {
 	for _, order := range orders {
-		o, err := formatOrder(session, order)
+		o, err := session.FormatOrder(order)
 		if err != nil {
 			return formattedOrders, err
 		}
