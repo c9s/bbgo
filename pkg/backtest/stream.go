@@ -77,6 +77,10 @@ func (s *Stream) Connect(ctx context.Context) error {
 	return nil
 }
 
+func (s *Stream) SetPublicOnly() {
+	return
+}
+
 func (s *Stream) Close() error {
 	close(s.exchange.doneC)
 	return nil
