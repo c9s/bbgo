@@ -149,6 +149,11 @@ func (trader *Trader) Run(ctx context.Context) error {
 			Session:       session,
 		}
 
+		// forward trade updates and order updates to the order executor
+		session.Stream.OnTradeUpdate(baseOrderExecutor.EmitTradeUpdate)
+		session.Stream.OnOrderUpdate(baseOrderExecutor.EmitOrderUpdate)
+
+
 		// default to base order executor
 		var orderExecutor OrderExecutor = baseOrderExecutor
 
@@ -252,7 +257,7 @@ func (trader *Trader) Run(ctx context.Context) error {
 							StoreID: "default",
 							Type:    "memory",
 						},
-						Facade:              trader.environment.PersistenceServiceFacade,
+						Facade: trader.environment.PersistenceServiceFacade,
 					}))
 				} else {
 					elem := field.Elem()
@@ -300,6 +305,9 @@ func (trader *Trader) ReportPnL() *PnLReporterManager {
 
 type OrderExecutor interface {
 	SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error)
+
+	OnTradeUpdate(cb func(trade types.Trade))
+	OnOrderUpdate(cb func(order types.Order))
 }
 
 type OrderExecutionRouter interface {
