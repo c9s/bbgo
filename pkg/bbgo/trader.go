@@ -303,14 +303,3 @@ func (trader *Trader) ReportPnL() *PnLReporterManager {
 	return NewPnLReporter(&trader.environment.Notifiability)
 }
 
-type OrderExecutor interface {
-	SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error)
-
-	OnTradeUpdate(cb func(trade types.Trade))
-	OnOrderUpdate(cb func(order types.Order))
-}
-
-type OrderExecutionRouter interface {
-	// SubmitOrderTo submit order to a specific exchange Session
-	SubmitOrdersTo(ctx context.Context, session string, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error)
-}
