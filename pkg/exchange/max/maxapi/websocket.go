@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-
 	"github.com/gorilla/websocket"
 	"github.com/pkg/errors"
 )
@@ -18,9 +17,9 @@ var ErrMessageTypeNotSupported = errors.New("message type currently not supporte
 // Subscription is used for presenting the subscription metadata.
 // This is used for sending subscribe and unsubscribe requests
 type Subscription struct {
-	Channel string `json:"channel"`
-	Market  string `json:"market"`
-	Depth   int    `json:"depth,omitempty"`
+	Channel    string `json:"channel"`
+	Market     string `json:"market"`
+	Depth      int    `json:"depth,omitempty"`
 	Resolution string `json:"resolution,omitempty"`
 }
 
@@ -79,13 +78,6 @@ func (s *WebSocketService) Connect(ctx context.Context) error {
 		if err := s.SendSubscriptionRequest(SubscribeAction); err != nil {
 			s.EmitError(err)
 			logger.WithError(err).Error("failed to subscribe")
-		}
-	})
-
-	s.OnConnect(func(conn *websocket.Conn) {
-		if err := s.Auth(); err != nil {
-			s.EmitError(err)
-			logger.WithError(err).Error("failed to send auth request")
 		}
 	})
 

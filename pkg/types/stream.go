@@ -8,6 +8,7 @@ type Stream interface {
 	StandardStreamEventHub
 
 	Subscribe(channel Channel, symbol string, options SubscribeOptions)
+	SetPublicOnly()
 	Connect(ctx context.Context) error
 	Close() error
 }

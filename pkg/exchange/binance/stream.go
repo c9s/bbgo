@@ -186,7 +186,13 @@ func (s *Stream) SetPublicOnly() {
 }
 
 func (s *Stream) dial(listenKey string) (*websocket.Conn, error) {
-	url := "wss://stream.binance.com:9443/ws/" + listenKey
+	var url string
+	if s.publicOnly {
+		url = "wss://stream.binance.com:9443/ws"
+	} else {
+		url = "wss://stream.binance.com:9443/ws/" + listenKey
+	}
+
 	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
 	if err != nil {
 		return nil, err
