@@ -73,6 +73,7 @@ func compileRunFile(filepath string, config *bbgo.Config) error {
 
 func runConfig(basectx context.Context, userConfig *bbgo.Config) error {
 	ctx, cancelTrading := context.WithCancel(basectx)
+	defer cancelTrading()
 
 	environ := bbgo.NewEnvironment()
 
