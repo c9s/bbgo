@@ -71,10 +71,14 @@ type Strategy struct {
 	order types.Order
 }
 
+func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval.String()})
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.MovingAverageInterval.String()})
+}
+
 func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 	sourceSession := sessions[s.SourceExchangeName]
-	sourceSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval.String()})
-	sourceSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.MovingAverageInterval.String()})
+	s.Subscribe(sourceSession)
 
 	// make sure we have the connection alive
 	targetSession := sessions[s.TargetExchangeName]
@@ -168,6 +172,10 @@ func (s *Strategy) handleOrderUpdate(order types.Order) {
 	if order.OrderID == s.order.OrderID {
 		s.order = order
 	}
+}
+
+func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+	return nil
 }
 
 func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession) error {

@@ -33,10 +33,17 @@ func (e *ExchangeOrderExecutionRouter) SubmitOrdersTo(ctx context.Context, sessi
 }
 
 // ExchangeOrderExecutor is an order executor wrapper for single exchange instance.
+//go:generate callbackgen -type ExchangeOrderExecutor
 type ExchangeOrderExecutor struct {
 	Notifiability `json:"-"`
 
 	Session *ExchangeSession
+
+	// private trade update callbacks
+	tradeUpdateCallbacks []func(trade types.Trade)
+
+	// private order update callbacks
+	orderUpdateCallbacks []func(order types.Order)
 }
 
 func (e *ExchangeOrderExecutor) notifySubmitOrders(orders ...types.SubmitOrder) {
