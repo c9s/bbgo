@@ -54,6 +54,7 @@ type NotificationConfig struct {
 type Session struct {
 	ExchangeName string `json:"exchange" yaml:"exchange"`
 	EnvVarPrefix string `json:"envVarPrefix" yaml:"envVarPrefix"`
+	PublicOnly   bool   `json:"publicOnly" yaml:"publicOnly"`
 }
 
 type Backtest struct {
