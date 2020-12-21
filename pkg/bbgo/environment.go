@@ -141,6 +141,15 @@ func (environ *Environment) AddExchangesFromSessionConfig(sessions map[string]Se
 			return err
 		}
 
+		if sessionConfig.Margin {
+			marginExchange, ok := exchange.(types.MarginExchange)
+			if !ok {
+				return fmt.Errorf("exchange %s does not support margin", exchangeName)
+			}
+
+			marginExchange.UseMargin(true)
+		}
+
 		environ.AddExchange(sessionName, exchange)
 	}
 

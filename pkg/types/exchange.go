@@ -33,6 +33,7 @@ func ValidExchangeName(a string) (ExchangeName, error) {
 	return "", errors.New("invalid exchange name")
 }
 
+
 type Exchange interface {
 	Name() ExchangeName
 
@@ -61,6 +62,10 @@ type Exchange interface {
 	QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []Order, err error)
 
 	CancelOrders(ctx context.Context, orders ...Order) error
+}
+
+type MarginExchange interface {
+	UseMargin(isolated bool)
 }
 
 type TradeQueryOptions struct {
