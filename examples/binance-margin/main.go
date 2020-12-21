@@ -12,7 +12,6 @@ import (
 
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/exchange/binance"
-	"github.com/c9s/bbgo/pkg/types"
 )
 
 func init() {
@@ -22,8 +21,8 @@ func init() {
 }
 
 var rootCmd = &cobra.Command{
-	Use:   "binance-book",
-	Short: "binance book",
+	Use:   "binance-margin",
+	Short: "binance margin",
 
 	// SilenceUsage is an option to silence usage when an error occurs.
 	SilenceUsage: true,
@@ -32,32 +31,35 @@ var rootCmd = &cobra.Command{
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		symbol := viper.GetString("symbol")
-		if len(symbol) == 0 {
-			return errors.New("empty symbol")
-		}
-
 		key, secret := viper.GetString("binance-api-key"), viper.GetString("binance-api-secret")
 		if len(key) == 0 || len(secret) == 0 {
 			return errors.New("empty key or secret")
 		}
 
+		symbol, err := cmd.Flags().GetString("symbol")
+		if err != nil {
+			return err
+		}
+
 		var exchange = binance.New(key, secret)
 
+		exchange.UseIsolatedMargin(symbol)
+
+		marginAccount, err := exchange.QueryMarginAccount(ctx)
+		if err != nil {
+			return err
+		}
+
+		log.Infof("margin account: %+v", marginAccount)
+
+		isolatedMarginAccount, err := exchange.QueryIsolatedMarginAccount(ctx)
+		if err != nil {
+			return err
+		}
+
+		log.Infof("isolated margin account: %+v", isolatedMarginAccount)
+
 		stream := exchange.NewStream()
-		stream.SetPublicOnly()
-		stream.Subscribe(types.BookChannel, symbol, types.SubscribeOptions{})
-
-		stream.OnBookSnapshot(func(book types.OrderBook) {
-			log.Infof("book snapshot: %+v", book)
-		})
-
-		stream.OnBookUpdate(func(book types.OrderBook) {
-			log.Infof("book update: %+v", book)
-		})
-
-		streambook := types.NewStreamBook(symbol)
-		streambook.BindStream(stream)
 
 		log.Info("connecting websocket...")
 		if err := stream.Connect(ctx); err != nil {

@@ -211,6 +211,13 @@ type Balance struct {
 	Locked string `json:"l"`
 }
 
+type OutboundAccountPositionEvent struct {
+	EventBase
+
+	LastAccountUpdateTime int       `json:"u"`
+	Balances              []Balance `json:"B,omitempty"`
+}
+
 type OutboundAccountInfoEvent struct {
 	EventBase
 
@@ -248,7 +255,12 @@ func ParseEvent(message string) (interface{}, error) {
 		err := json.Unmarshal([]byte(message), &event)
 		return &event, err
 
-	case "outboundAccountInfo", "outboundAccountPosition":
+	case "outboundAccountPosition":
+		var event OutboundAccountPositionEvent
+		err := json.Unmarshal([]byte(message), &event)
+		return &event, err
+
+	case "outboundAccountInfo":
 		var event OutboundAccountInfoEvent
 		err := json.Unmarshal([]byte(message), &event)
 		return &event, err

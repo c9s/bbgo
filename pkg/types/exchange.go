@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/adshao/go-binance/v2"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
@@ -32,7 +33,6 @@ func ValidExchangeName(a string) (ExchangeName, error) {
 
 	return "", errors.New("invalid exchange name")
 }
-
 
 type Exchange interface {
 	Name() ExchangeName
@@ -65,7 +65,9 @@ type Exchange interface {
 }
 
 type MarginExchange interface {
-	UseMargin(isolated bool)
+	UseMargin()
+	UseIsolatedMargin(symbol string)
+	QueryMarginAccount(ctx context.Context) (*binance.MarginAccount, error)
 }
 
 type TradeQueryOptions struct {
