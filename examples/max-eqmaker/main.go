@@ -95,6 +95,14 @@ var rootCmd = &cobra.Command{
 		stream := max.NewStream(key, secret)
 		stream.Subscribe(types.BookChannel, symbol, types.SubscribeOptions{})
 
+		stream.OnOrderUpdate(func(order types.Order) {
+			log.Infof("order: %+v", order)
+		})
+
+		stream.OnBalanceSnapshot(func(balances types.BalanceMap) {
+			log.Infof("balances: %+v",balances)
+		})
+
 		streambook := types.NewStreamBook(symbol)
 		streambook.BindStream(stream)
 
