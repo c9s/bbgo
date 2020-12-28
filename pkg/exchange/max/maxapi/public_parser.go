@@ -41,6 +41,8 @@ func ParseMessage(payload []byte) (interface{}, error) {
 
 	eventType := string(val.GetStringBytes("e"))
 	switch eventType {
+	case "authenticated":
+		return nil, nil
 	case "error":
 		return parseErrorEvent(val)
 	case "subscribed", "unsubscribed":
