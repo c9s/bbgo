@@ -149,7 +149,7 @@ func (s *WebSocketService) read(ctx context.Context) {
 
 			m, err := ParseMessage(msg)
 			if err != nil {
-				s.EmitError(errors.Wrapf(err, "failed to parse public message: %s", msg))
+				s.EmitError(errors.Wrapf(err, "failed to parse message: %s", msg))
 				continue
 			}
 
