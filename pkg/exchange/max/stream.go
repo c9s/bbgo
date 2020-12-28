@@ -138,6 +138,10 @@ func NewStream(key, secret string) *Stream {
 		stream.EmitBalanceUpdate(snapshot)
 	})
 
+	wss.OnError(func(err error) {
+		log.WithError(err).Error("websocket error")
+	})
+
 	return stream
 }
 
