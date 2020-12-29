@@ -26,7 +26,7 @@ type Exchange struct {
 
 func New(key, secret string) *Exchange {
 	baseURL := maxapi.ProductionAPIURL
-	if override := os.Getenv("MAX_API_BASE_URL")  ; len(override) > 0 {
+	if override := os.Getenv("MAX_API_BASE_URL"); len(override) > 0 {
 		baseURL = override
 	}
 
@@ -145,6 +145,40 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 	}
 
 	return orders, err
+}
+
+func (e *Exchange) CancelAllOrders(ctx context.Context) ([]types.Order, error) {
+	var req = e.client.OrderService.NewOrderCancelAllRequest()
+	var maxOrders, err = req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return toGlobalOrders(maxOrders)
+}
+
+func (e *Exchange) CancelOrdersBySymbol(ctx context.Context, symbol string) ([]types.Order, error) {
+	var req = e.client.OrderService.NewOrderCancelAllRequest()
+	req.Market(toLocalSymbol(symbol))
+
+	var maxOrders, err = req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return toGlobalOrders(maxOrders)
+}
+
+func (e *Exchange) CancelOrdersByGroupID(ctx context.Context, groupID string) ([]types.Order, error) {
+	var req = e.client.OrderService.NewOrderCancelAllRequest()
+	req.GroupID(groupID)
+
+	var maxOrders, err = req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return toGlobalOrders(maxOrders)
 }
 
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err2 error) {

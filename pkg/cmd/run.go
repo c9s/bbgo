@@ -29,7 +29,6 @@ import (
 	"github.com/c9s/bbgo/pkg/notifier/telegramnotifier"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/slack/slacklog"
-	"github.com/c9s/bbgo/pkg/types"
 )
 
 func init() {
@@ -41,7 +40,6 @@ func init() {
 	RunCmd.Flags().String("totp-issuer", "", "")
 	RunCmd.Flags().String("totp-account-name", "", "")
 
-	RunCmd.Flags().String("config", "", "config file")
 	RunCmd.Flags().String("since", "", "pnl since time")
 	RootCmd.AddCommand(RunCmd)
 }
@@ -82,33 +80,11 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config) error {
 		if err != nil {
 			return err
 		}
-		environ.SyncTrades(db)
+		environ.SetDB(db)
 	}
 
-	if len(userConfig.Sessions) == 0 {
-		for _, n := range bbgo.SupportedExchanges {
-			if viper.IsSet(string(n) + "-api-key") {
-				exchange, err := cmdutil.NewExchangeWithEnvVarPrefix(n, "")
-				if err != nil {
-					panic(err)
-				}
-				environ.AddExchange(n.String(), exchange)
-			}
-		}
-	} else {
-		for sessionName, sessionConfig := range userConfig.Sessions {
-			exchangeName, err := types.ValidExchangeName(sessionConfig.ExchangeName)
-			if err != nil {
-				return err
-			}
-
-			exchange, err := cmdutil.NewExchangeWithEnvVarPrefix(exchangeName, sessionConfig.EnvVarPrefix)
-			if err != nil {
-				return err
-			}
-
-			environ.AddExchange(sessionName, exchange)
-		}
+	if err := environ.AddExchangesFromConfig(userConfig); err != nil {
+		return err
 	}
 
 	if userConfig.Persistence != nil {
@@ -302,7 +278,7 @@ var RunCmd = &cobra.Command{
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		userConfig, err := bbgo.LoadBuildConfig(configFile)
+		userConfig, err := bbgo.Load(configFile, false)
 		if err != nil {
 			return err
 		}
@@ -311,7 +287,7 @@ var RunCmd = &cobra.Command{
 
 		// if there is no custom imports, we don't have to compile
 		if noCompile || !shouldCompile {
-			userConfig, err = bbgo.Load(configFile)
+			userConfig, err = bbgo.Load(configFile, true)
 			if err != nil {
 				return err
 			}

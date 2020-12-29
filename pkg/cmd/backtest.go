@@ -90,7 +90,7 @@ var BacktestCmd = &cobra.Command{
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		userConfig, err := bbgo.Load(configFile)
+		userConfig, err := bbgo.Load(configFile, true)
 		if err != nil {
 			return err
 		}

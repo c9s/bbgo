@@ -10,8 +10,10 @@ import (
 	"github.com/codingconcepts/env"
 	"github.com/jmoiron/sqlx"
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 
 	"github.com/c9s/bbgo/pkg/accounting/pnl"
+	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
@@ -64,7 +66,7 @@ func (environ *Environment) Sessions() map[string]*ExchangeSession {
 	return environ.sessions
 }
 
-func (environ *Environment) SyncTrades(db *sqlx.DB) *Environment {
+func (environ *Environment) SetDB(db *sqlx.DB) *Environment {
 	environ.TradeService = &service.TradeService{DB: db}
 	environ.TradeSync = &service.SyncService{
 		TradeService: environ.TradeService,
@@ -77,6 +79,47 @@ func (environ *Environment) AddExchange(name string, exchange types.Exchange) (s
 	session = NewExchangeSession(name, exchange)
 	environ.sessions[name] = session
 	return session
+}
+
+func (environ *Environment) AddExchangesFromConfig(userConfig *Config) error {
+	if len(userConfig.Sessions) == 0 {
+		return environ.AddExchangesByViperKeys()
+	}
+
+	return environ.AddExchangesFromSessionConfig(userConfig.Sessions)
+}
+
+func (environ *Environment) AddExchangesByViperKeys() error {
+	for _, n := range SupportedExchanges {
+		if viper.IsSet(string(n) + "-api-key") {
+			exchange, err := cmdutil.NewExchangeWithEnvVarPrefix(n, "")
+			if err != nil {
+				return err
+			}
+
+			environ.AddExchange(n.String(), exchange)
+		}
+	}
+
+	return nil
+}
+
+func (environ *Environment) AddExchangesFromSessionConfig(sessions map[string]Session) error {
+	for sessionName, sessionConfig := range sessions {
+		exchangeName, err := types.ValidExchangeName(sessionConfig.ExchangeName)
+		if err != nil {
+			return err
+		}
+
+		exchange, err := cmdutil.NewExchangeWithEnvVarPrefix(exchangeName, sessionConfig.EnvVarPrefix)
+		if err != nil {
+			return err
+		}
+
+		environ.AddExchange(sessionName, exchange)
+	}
+
+	return nil
 }
 
 // Init prepares the data that will be used by the strategies

@@ -162,7 +162,7 @@ func LoadBuildConfig(configFile string) (*Config, error) {
 	return &config, nil
 }
 
-func Load(configFile string) (*Config, error) {
+func Load(configFile string, loadStrategies bool) (*Config, error) {
 	var config Config
 
 	content, err := ioutil.ReadFile(configFile)
@@ -179,13 +179,16 @@ func Load(configFile string) (*Config, error) {
 		return nil, err
 	}
 
-	if err := loadExchangeStrategies(&config, stash); err != nil {
-		return nil, err
+	if loadStrategies {
+		if err := loadExchangeStrategies(&config, stash); err != nil {
+			return nil, err
+		}
+
+		if err := loadCrossExchangeStrategies(&config, stash); err != nil {
+			return nil, err
+		}
 	}
 
-	if err := loadCrossExchangeStrategies(&config, stash); err != nil {
-		return nil, err
-	}
 
 	return &config, nil
 }
