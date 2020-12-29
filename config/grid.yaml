@@ -1,22 +1,4 @@
 ---
-notifications:
-  slack:
-    defaultChannel: "dev-bbgo"
-    errorChannel: "bbgo-error"
-
-  # if you want to route channel by symbol
-  symbolChannels:
-    "^BTC": "btc"
-    "^ETH": "eth"
-    "^BNB": "bnb"
-
-  # object routing rules
-  routing:
-    trade: "$symbol"
-    order: "$symbol"
-    submitOrder: "$session" # not supported yet
-    pnL: "bbgo-pnl"
-
 sessions:
   binance:
     exchange: binance
@@ -63,7 +45,7 @@ exchangeStrategies:
 - on: max
   grid:
     symbol: BTCUSDT
-    quantity: 0.01
+    quantity: 0.001
     gridNumber: 10
     profitSpread: 50.0
     upperPrice: 11000.0

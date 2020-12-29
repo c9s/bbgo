@@ -153,7 +153,9 @@ func (s *WebSocketService) read(ctx context.Context) {
 				continue
 			}
 
-			s.dispatch(m)
+			if m != nil {
+				s.dispatch(m)
+			}
 		}
 	}
 }

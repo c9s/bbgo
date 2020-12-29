@@ -65,16 +65,14 @@ type Strategy struct {
 }
 
 func (s *Strategy) placeGridOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) {
+	log.Infof("placing grid orders...")
+
 	quoteCurrency := s.Market.QuoteCurrency
 	balances := session.Account.Balances()
 
-	balance, ok := balances[quoteCurrency]
-	if !ok || balance.Available <= 0 {
-		return
-	}
-
 	currentPrice, ok := session.LastPrice(s.Symbol)
 	if !ok {
+		log.Warn("last price not found, skipping")
 		return
 	}
 
@@ -83,30 +81,44 @@ func (s *Strategy) placeGridOrders(orderExecutor bbgo.OrderExecutor, session *bb
 	gridSize := priceRange.Div(fixedpoint.NewFromInt(s.GridNum))
 
 	var orders []types.SubmitOrder
-	for price := currentPriceF + gridSize; price <= s.UpperPrice; price += gridSize {
-		order := types.SubmitOrder{
-			Symbol:      s.Symbol,
-			Side:        types.SideTypeSell,
-			Type:        types.OrderTypeLimit,
-			Market:      s.Market,
-			Quantity:    s.Quantity,
-			Price:       price.Float64(),
-			TimeInForce: "GTC",
+
+	baseBalance, ok := balances[s.Market.BaseCurrency]
+	if ok && baseBalance.Available > 0 {
+		log.Infof("placing sell order from %f ~ %f per grid %f", (currentPriceF + gridSize).Float64(), s.UpperPrice.Float64(), gridSize.Float64())
+		for price := currentPriceF + gridSize; price <= s.UpperPrice; price += gridSize {
+			order := types.SubmitOrder{
+				Symbol:      s.Symbol,
+				Side:        types.SideTypeSell,
+				Type:        types.OrderTypeLimit,
+				Market:      s.Market,
+				Quantity:    s.Quantity,
+				Price:       price.Float64(),
+				TimeInForce: "GTC",
+			}
+			orders = append(orders, order)
 		}
-		orders = append(orders, order)
+	} else {
+		log.Warnf("base balance is not enough, we can't place ask orders")
 	}
 
-	for price := currentPriceF - gridSize; price <= s.LowerPrice; price -= gridSize {
-		order := types.SubmitOrder{
-			Symbol:      s.Symbol,
-			Side:        types.SideTypeBuy,
-			Type:        types.OrderTypeLimit,
-			Market:      s.Market,
-			Quantity:    s.Quantity,
-			Price:       price.Float64(),
-			TimeInForce: "GTC",
+	quoteBalance, ok := balances[quoteCurrency]
+	if ok && quoteBalance.Available > 0 {
+		log.Infof("placing buy order from %f ~ %f per grid %f", (currentPriceF - gridSize).Float64(), s.LowerPrice.Float64(), gridSize.Float64())
+
+		for price := currentPriceF - gridSize; price >= s.LowerPrice; price -= gridSize {
+			order := types.SubmitOrder{
+				Symbol:      s.Symbol,
+				Side:        types.SideTypeBuy,
+				Type:        types.OrderTypeLimit,
+				Market:      s.Market,
+				Quantity:    s.Quantity,
+				Price:       price.Float64(),
+				TimeInForce: "GTC",
+			}
+			orders = append(orders, order)
 		}
-		orders = append(orders, order)
+	} else {
+		log.Warnf("quote balance is not enough, we can't place bid orders")
 	}
 
 	createdOrders, err := orderExecutor.SubmitOrders(context.Background(), orders...)
