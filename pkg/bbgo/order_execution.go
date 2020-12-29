@@ -84,6 +84,8 @@ func (e *ExchangeOrderExecutor) SubmitOrders(ctx context.Context, orders ...type
 		} else {
 			e.Notify(":memo: Submitting %s %s %s order with quantity: %s", order.Symbol, order.Type, order.Side, order.QuantityString, order)
 		}
+
+		logrus.Infof("submitting order: %s", order.String())
 	}
 
 	e.notifySubmitOrders(formattedOrders...)
