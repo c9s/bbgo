@@ -241,7 +241,7 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 				if lastPriceTime == emptyTime {
 					session.lastPrices[symbol] = lastKLine.Close
 					lastPriceTime = lastKLine.EndTime
-				} else if lastPriceTime.Before(lastKLine.EndTime) {
+				} else if lastKLine.EndTime.After(lastPriceTime) {
 					session.lastPrices[symbol] = lastKLine.Close
 					lastPriceTime = lastKLine.EndTime
 				}
@@ -251,6 +251,8 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 					marketDataStore.AddKLine(k)
 				}
 			}
+
+			log.Infof("last price: %f", session.lastPrices[symbol])
 		}
 
 		if environ.TradeService != nil {
