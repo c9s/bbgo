@@ -39,8 +39,8 @@ const (
 
 type QueryOrderOptions struct {
 	GroupID int
-	Offset int
-	Limit int
+	Offset  int
+	Limit   int
 }
 
 // OrderService manages the Order endpoint.
@@ -68,13 +68,12 @@ type Order struct {
 	InsertedAt      time.Time  `json:"-" db:"inserted_at"`
 }
 
-
 // Open returns open orders
 func (s *OrderService) Closed(market string, options QueryOrderOptions) ([]Order, error) {
 	payload := map[string]interface{}{
-		"market": market,
-		"state":    []OrderState{OrderStateFinalizing, OrderStateDone, OrderStateCancel, OrderStateFailed},
-		"order_by": "desc",
+		"market":     market,
+		"state":      []OrderState{OrderStateFinalizing, OrderStateDone, OrderStateCancel, OrderStateFailed},
+		"order_by":   "desc",
 		"pagination": false,
 	}
 
@@ -106,13 +105,12 @@ func (s *OrderService) Closed(market string, options QueryOrderOptions) ([]Order
 	return orders, nil
 }
 
-
 // Open returns open orders
 func (s *OrderService) Open(market string, options QueryOrderOptions) ([]Order, error) {
 	payload := map[string]interface{}{
 		"market": market,
 		// "state":    []OrderState{OrderStateWait, OrderStateConvert},
-		"order_by": "desc",
+		"order_by":   "desc",
 		"pagination": false,
 	}
 
@@ -231,6 +229,54 @@ func (s *OrderService) Cancel(orderID uint64, clientOrderID string) error {
 	}
 
 	return req.Do(context.Background())
+}
+
+type OrderCancelAllRequestParams struct {
+	*PrivateRequestParams
+
+	Side    string `json:"side,omitempty"`
+	Market  string `json:"market,omitempty"`
+	GroupID string `json:"groupID,omitempty"`
+}
+
+type OrderCancelAllRequest struct {
+	client *RestClient
+
+	params OrderCancelAllRequestParams
+}
+
+func (r *OrderCancelAllRequest) Side(side string) *OrderCancelAllRequest {
+	r.params.Side = side
+	return r
+}
+
+func (r *OrderCancelAllRequest) Market(market string) *OrderCancelAllRequest {
+	r.params.Market = market
+	return r
+}
+
+func (r *OrderCancelAllRequest) GroupID(groupID string) *OrderCancelAllRequest {
+	r.params.GroupID = groupID
+	return r
+}
+
+func (r *OrderCancelAllRequest) Do(ctx context.Context) (orders []Order, err error) {
+	req, err := r.client.newAuthenticatedRequest("POST", "v2/orders/clear", &r.params)
+	if err != nil {
+		return
+	}
+
+	response, err := r.client.sendRequest(req)
+	if err != nil {
+		return
+	}
+
+	err = response.DecodeJSON(&orders)
+	return
+}
+
+func (s *OrderService) NewOrderCancelAllRequest() *OrderCancelAllRequest {
+	return &OrderCancelAllRequest{client: s.client}
 }
 
 type OrderCancelRequestParams struct {

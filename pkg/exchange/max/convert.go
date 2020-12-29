@@ -126,6 +126,19 @@ func toLocalOrderType(orderType types.OrderType) (max.OrderType, error) {
 	return "", fmt.Errorf("order type %s not supported", orderType)
 }
 
+func toGlobalOrders(maxOrders []max.Order) (orders []types.Order, err error) {
+	for _, localOrder := range maxOrders {
+		o, err := toGlobalOrder(localOrder)
+		if err != nil {
+			log.WithError(err).Error("order convert error")
+		}
+
+		orders = append(orders, *o)
+	}
+
+	return orders, err
+}
+
 func toGlobalOrder(maxOrder max.Order) (*types.Order, error) {
 	executedVolume, err := fixedpoint.NewFromString(maxOrder.ExecutedVolume)
 	if err != nil {
