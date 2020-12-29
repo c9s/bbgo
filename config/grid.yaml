@@ -46,7 +46,7 @@ exchangeStrategies:
   grid:
     symbol: BTCUSDT
     quantity: 0.001
-    gridNumber: 10
+    gridNumber: 30
     profitSpread: 50.0
-    upperPrice: 11000.0
-    lowerPrice: 9000.0
+    upperPrice: 26800.0
+    lowerPrice: 26500.0
