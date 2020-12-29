@@ -6,6 +6,7 @@ if [[ -n $1 ]] ; then
     version=$1
 fi
 
+echo "downloading bbgo $version"
 curl -L -o bbgo https://github.com/c9s/bbgo/releases/download/$version/bbgo-$osf
 chmod +x bbgo
 
