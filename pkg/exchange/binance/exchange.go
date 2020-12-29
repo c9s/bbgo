@@ -406,11 +406,13 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 			TimeInForce:              response.TimeInForce,
 			Type:                     response.Type,
 			Side:                     response.Side,
+			IsIsolated:               response.IsIsolated,
 			// StopPrice:
 			// IcebergQuantity:
 			Time: response.TransactTime,
 			// UpdateTime:
 			// IsWorking:               ,
+
 		}
 
 		createdOrder, err := ToGlobalOrder(&retOrder)
