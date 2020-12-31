@@ -2,6 +2,7 @@ package grid
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/sirupsen/logrus"
@@ -55,6 +56,8 @@ type Strategy struct {
 	// Quantity is the quantity you want to submit for each order.
 	Quantity float64 `json:"quantity"`
 
+	Long bool `json:"long"`
+
 	// activeOrders is the locally maintained active order book of the maker orders.
 	activeOrders *bbgo.LocalActiveOrderBook
 
@@ -80,7 +83,8 @@ func (s *Strategy) placeGridOrders(orderExecutor bbgo.OrderExecutor, session *bb
 	priceRange := s.UpperPrice - s.LowerPrice
 	gridSize := priceRange.Div(fixedpoint.NewFromInt(s.GridNum))
 
-	var orders []types.SubmitOrder
+	var bidOrders []types.SubmitOrder
+	var askOrders []types.SubmitOrder
 
 	baseBalance, ok := balances[s.Market.BaseCurrency]
 	if ok && baseBalance.Available > 0 {
@@ -95,7 +99,7 @@ func (s *Strategy) placeGridOrders(orderExecutor bbgo.OrderExecutor, session *bb
 				Price:       price.Float64(),
 				TimeInForce: "GTC",
 			}
-			orders = append(orders, order)
+			askOrders = append(askOrders, order)
 		}
 	} else {
 		log.Warnf("base balance is not enough, we can't place ask orders")
@@ -115,13 +119,13 @@ func (s *Strategy) placeGridOrders(orderExecutor bbgo.OrderExecutor, session *bb
 				Price:       price.Float64(),
 				TimeInForce: "GTC",
 			}
-			orders = append(orders, order)
+			bidOrders = append(bidOrders, order)
 		}
 	} else {
 		log.Warnf("quote balance is not enough, we can't place bid orders")
 	}
 
-	createdOrders, err := orderExecutor.SubmitOrders(context.Background(), orders...)
+	createdOrders, err := orderExecutor.SubmitOrders(context.Background(), append(bidOrders, askOrders...)...)
 	if err != nil {
 		log.WithError(err).Errorf("can not place orders")
 		return
@@ -159,11 +163,17 @@ func (s *Strategy) submitReverseOrder(order types.Order) {
 
 	}
 
+	quantity := order.Quantity
+	if s.Long {
+		amount := order.Price * order.Quantity
+		quantity = amount / price
+	}
+
 	submitOrder := types.SubmitOrder{
 		Symbol:      s.Symbol,
 		Side:        side,
 		Type:        types.OrderTypeLimit,
-		Quantity:    order.Quantity,
+		Quantity:    quantity,
 		Price:       price,
 		TimeInForce: "GTC",
 	}
@@ -187,6 +197,10 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	if s.GridNum == 0 {
 		s.GridNum = 10
+	}
+
+	if s.UpperPrice <= s.LowerPrice {
+		return fmt.Errorf("upper price (%f) should not be less than lower price (%f)", s.UpperPrice.Float64(), s.LowerPrice.Float64())
 	}
 
 	s.orderStore = bbgo.NewOrderStore()
