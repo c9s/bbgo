@@ -1,4 +1,4 @@
--- +goose Up
+-- +up
 CREATE TABLE `trades` (
   `gid` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 
