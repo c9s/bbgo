@@ -153,19 +153,20 @@ func (s *Strategy) tradeUpdateHandler(trade types.Trade) {
 func (s *Strategy) submitReverseOrder(order types.Order) {
 	var side = order.Side.Reverse()
 	var price = order.Price
+	var quantity = order.Quantity
+
+	// the original amount
+	var amount = order.Price * order.Quantity
 
 	switch side {
 	case types.SideTypeSell:
 		price += s.ProfitSpread.Float64()
-
 	case types.SideTypeBuy:
 		price -= s.ProfitSpread.Float64()
-
 	}
 
-	quantity := order.Quantity
+	// use the same amount to buy more quantity back
 	if s.Long {
-		amount := order.Price * order.Quantity
 		quantity = amount / price
 	}
 
