@@ -17,6 +17,7 @@
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
+/.mod
 
 /.env.local
 /.env.*.local
