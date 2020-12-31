@@ -1,6 +1,6 @@
 #!/bin/bash
 osf=$(uname | tr '[:upper:]' '[:lower:]')
-version=v1.5.0
+version=v1.6.0
 
 if [[ -n $1 ]] ; then
     version=$1
