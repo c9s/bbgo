@@ -23,15 +23,19 @@ var LoadedExchangeStrategies = make(map[string]SingleExchangeStrategy)
 var LoadedCrossExchangeStrategies = make(map[string]CrossExchangeStrategy)
 
 func RegisterStrategy(key string, s interface{}) {
-	switch d := s.(type) {
-	case SingleExchangeStrategy:
+	loaded := 0
+	if d, ok := s.(SingleExchangeStrategy) ; ok {
 		LoadedExchangeStrategies[key] = d
+		loaded++
+	}
 
-	case CrossExchangeStrategy:
+	if d, ok := s.(CrossExchangeStrategy) ; ok {
 		LoadedCrossExchangeStrategies[key] = d
+		loaded++
+	}
 
-	default:
-		panic(fmt.Errorf("%T does not implement SingleExchangeStrategy or CrossExchangeStrategy", d))
+	if loaded == 0 {
+		panic(fmt.Errorf("%T does not implement SingleExchangeStrategy or CrossExchangeStrategy", s))
 	}
 }
 
