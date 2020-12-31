@@ -42,9 +42,9 @@ exchangeStrategies:
 - on: max
   grid:
     symbol: USDTTWD
-    quantity: 10.0
-    gridNumber: 50
-    profitSpread: 0.1
+    quantity: 10.0 # 10 USDT per grid
+    gridNumber: 50  # 50 GRID, Total Amount will be 10 USDT * 50 GRID = 500 USDT
+    profitSpread: 0.1 # When buying USDT at 28.1, we will sell it at 28.1 + 0.1 = 28.2, When selling USDT at 28.1, we will buy it back at 28.1 - 0.1 = 28.0
     upperPrice: 28.50
     lowerPrice: 27.90
-    long: true
+    long: true # long mode means we don't keep cash when we sell usdt, we will use the same amount of twd to buy more usdt back
