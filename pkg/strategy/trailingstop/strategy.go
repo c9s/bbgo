@@ -96,7 +96,7 @@ func (s *Strategy) clear(ctx context.Context, session *bbgo.ExchangeSession) {
 	}
 }
 
-func (s *Strategy) place(ctx context.Context, orderExecutor *bbgo.ExchangeOrderExecutor, session *bbgo.ExchangeSession, indicator Float64Indicator, closePrice float64) {
+func (s *Strategy) place(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession, indicator Float64Indicator, closePrice float64) {
 	movingAveragePrice := indicator.Last()
 
 	// skip it if it's near zero because it's not loaded yet
@@ -174,7 +174,58 @@ func (s *Strategy) handleOrderUpdate(order types.Order) {
 	}
 }
 
+func (s *Strategy) loadIndicator(sourceSession *bbgo.ExchangeSession) (Float64Indicator, error) {
+	var standardIndicatorSet, ok = sourceSession.StandardIndicatorSet(s.Symbol)
+	if !ok {
+		return nil, fmt.Errorf("standardIndicatorSet is nil, symbol %s", s.Symbol)
+	}
+
+	var iw = types.IntervalWindow{Interval: s.MovingAverageInterval, Window: s.MovingAverageWindow}
+
+	switch strings.ToUpper(s.MovingAverageType) {
+	case "SMA":
+		return standardIndicatorSet.SMA(iw), nil
+
+	case "EWMA", "EMA":
+		return standardIndicatorSet.EWMA(iw), nil
+
+	}
+
+	return nil, fmt.Errorf("unsupported moving average type: %s", s.MovingAverageType)
+}
+
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+	indicator, err := s.loadIndicator(session)
+	if err != nil {
+		return err
+	}
+
+	session.Stream.OnOrderUpdate(s.handleOrderUpdate)
+
+	// session.Stream.OnKLineClosed
+	session.Stream.OnKLineClosed(func(kline types.KLine) {
+		// skip k-lines from other symbols
+		if kline.Symbol != s.Symbol || kline.Interval != s.Interval {
+			return
+		}
+
+		closePrice := kline.Close
+
+		// ok, it's our call, we need to cancel the stop limit order first
+		s.clear(ctx, session)
+		s.place(ctx, orderExecutor, session, indicator, closePrice)
+	})
+
+	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
+		defer wg.Done()
+		log.Infof("canceling trailingstop order...")
+		s.clear(ctx, session)
+	})
+
+	if lastPrice, ok := session.LastPrice(s.Symbol); ok {
+		s.place(ctx, orderExecutor, session, indicator, lastPrice)
+	}
+
 	return nil
 }
 
@@ -188,24 +239,9 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		Session: session,
 	}
 
-	var indicator Float64Indicator
-	var iw = types.IntervalWindow{Interval: s.MovingAverageInterval, Window: s.MovingAverageWindow}
-
-	var standardIndicatorSet, ok = sourceSession.StandardIndicatorSet(s.Symbol)
-	if !ok {
-		return fmt.Errorf("standardIndicatorSet is nil, symbol %s", s.Symbol)
-	}
-
-	switch strings.ToUpper(s.MovingAverageType) {
-	case "SMA":
-		indicator = standardIndicatorSet.SMA(iw)
-
-	case "EWMA", "EMA":
-		indicator = standardIndicatorSet.EWMA(iw)
-
-	default:
-		return fmt.Errorf("unsupported moving average type: %s", s.MovingAverageType)
-
+	indicator, err := s.loadIndicator(sourceSession)
+	if err != nil {
+		return err
 	}
 
 	session.Stream.OnOrderUpdate(s.handleOrderUpdate)
@@ -213,11 +249,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	// session.Stream.OnKLineClosed
 	sourceSession.Stream.OnKLineClosed(func(kline types.KLine) {
 		// skip k-lines from other symbols
-		if kline.Symbol != s.Symbol {
-			return
-		}
-
-		if kline.Interval != s.Interval {
+		if kline.Symbol != s.Symbol || kline.Interval != s.Interval {
 			return
 		}
 
