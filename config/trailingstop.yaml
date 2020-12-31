@@ -1,6 +1,6 @@
 ---
 crossExchangeStrategies:
-- movingstop:
+- trailingstop:
     sourceExchange: "binance"
     targetExchange: "max"
     symbol: ETHUSDT
