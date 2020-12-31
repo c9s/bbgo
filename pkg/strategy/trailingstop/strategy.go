@@ -1,4 +1,4 @@
-package movingstop
+package trailingstop
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-var log = logrus.WithField("strategy", "movingstop")
+var log = logrus.WithField("strategy", "trailingstop")
 
 // The indicators (SMA and EWMA) that we want to use are returning float64 data.
 type Float64Indicator interface {
@@ -24,7 +24,7 @@ func init() {
 	// Register the pointer of the strategy struct,
 	// so that bbgo knows what struct to be used to unmarshal the configs (YAML or JSON)
 	// Note: built-in strategies need to imported manually in the bbgo cmd package.
-	bbgo.RegisterStrategy("movingstop", &Strategy{})
+	bbgo.RegisterStrategy("trailingstop", &Strategy{})
 }
 
 type Strategy struct {
@@ -88,7 +88,7 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 func (s *Strategy) clear(ctx context.Context, session *bbgo.ExchangeSession) {
 	if s.order.OrderID > 0 {
 		if err := session.Exchange.CancelOrders(ctx, s.order); err != nil {
-			log.WithError(err).Errorf("can not cancel movingstop order: %+v", s.order)
+			log.WithError(err).Errorf("can not cancel trailingstop order: %+v", s.order)
 		}
 
 		// clear out the existing order
@@ -149,7 +149,7 @@ func (s *Strategy) place(ctx context.Context, orderExecutor *bbgo.ExchangeOrderE
 		stopPrice = stopPrice * s.StopPriceRatio.Float64()
 	}
 
-	log.Infof("placing movingstop order %s at stop price %f, quantity %f", s.Symbol, stopPrice, quantity.Float64())
+	log.Infof("placing trailingstop order %s at stop price %f, quantity %f", s.Symbol, stopPrice, quantity.Float64())
 
 	retOrders, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 		Symbol:    s.Symbol,
@@ -230,7 +230,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
-		log.Infof("canceling movingstop order...")
+		log.Infof("canceling trailingstop order...")
 		s.clear(ctx, session)
 	})
 
