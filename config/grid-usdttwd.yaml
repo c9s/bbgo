@@ -1,9 +1,5 @@
 ---
 sessions:
-  binance:
-    exchange: binance
-    envVarPrefix: binance
-
   max:
     exchange: max
     envVarPrefix: max
@@ -17,13 +13,13 @@ riskControls:
       orderExecutor:
         # symbol-routed order executor
         bySymbol:
-          BTCUSDT:
+          USDTTWD:
             # basic risk control order executor
             basic:
-              minQuoteBalance: 100.0
-              maxBaseAssetBalance: 3.0
-              minBaseAssetBalance: 0.0
-              maxOrderAmount: 1000.0
+              minQuoteBalance: 100.0  # keep 100 twd
+              maxBaseAssetBalance: 1000.0
+              minBaseAssetBalance: 200.0
+              maxOrderAmount: 2000.0 # 1000 twd
 
 backtest:
   # for testing max draw down (MDD) at 03-12
