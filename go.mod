@@ -21,6 +21,7 @@ require (
 	github.com/leekchan/accounting v0.0.0-20191218023648-17a4ce5f94d4
 	github.com/lestrrat-go/file-rotatelogs v2.2.0+incompatible
 	github.com/lestrrat-go/strftime v1.0.0 // indirect
+	github.com/markbates/pkger v0.17.1 // indirect
 	github.com/mattn/go-colorable v0.1.2 // indirect
 	github.com/mattn/go-isatty v0.0.12 // indirect
 	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b // indirect
