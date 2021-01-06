@@ -14,8 +14,6 @@ import (
 
 var log = logrus.WithField("strategy", "grid")
 
-var position int64 = 0
-
 func init() {
 	// Register the pointer of the strategy struct,
 	// so that bbgo knows what struct to be used to unmarshal the configs (YAML or JSON)
@@ -56,6 +54,10 @@ type Strategy struct {
 	// Quantity is the quantity you want to submit for each order.
 	Quantity float64 `json:"quantity"`
 
+	// OrderAmount is used for fixed amount (dynamic quantity) if you don't want to use fixed quantity.
+	OrderAmount fixedpoint.Value `json:"orderAmount"`
+
+	// Long means you want to hold more base asset than the quote asset.
 	Long bool `json:"long"`
 
 	// activeOrders is the locally maintained active order book of the maker orders.
@@ -155,8 +157,6 @@ func (s *Strategy) submitReverseOrder(order types.Order) {
 	var price = order.Price
 	var quantity = order.Quantity
 
-	// the original amount
-	var amount = order.Price * order.Quantity
 
 	switch side {
 	case types.SideTypeSell:
@@ -165,8 +165,12 @@ func (s *Strategy) submitReverseOrder(order types.Order) {
 		price -= s.ProfitSpread.Float64()
 	}
 
-	// use the same amount to buy more quantity back
-	if s.Long {
+	if s.OrderAmount > 0 {
+		quantity = s.OrderAmount.Float64() / price
+	} else if s.Long {
+		// long = use the same amount to buy more quantity back
+		// the original amount
+		var amount = order.Price * order.Quantity
 		quantity = amount / price
 	}
 
