@@ -6,7 +6,7 @@ go 1.13
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
-	github.com/adshao/go-binance v0.0.0-20201229170102-e2e624dc2c07 // indirect
+	github.com/adshao/go-binance v0.0.0-20201229170102-e2e624dc2c07
 	github.com/bitly/go-simplejson v0.5.0 // indirect
 	github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869 // indirect
 	github.com/c9s/goose v0.0.0-20200415105707-8da682162a5b
