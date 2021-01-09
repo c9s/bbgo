@@ -249,27 +249,30 @@ func (trader *Trader) Run(ctx context.Context) error {
 			rs = rs.Elem()
 
 			if field, ok := hasField(rs, "Persistence"); ok {
-				log.Infof("found Persistence field, injecting...")
-				if field.IsNil() {
-					field.Set(reflect.ValueOf(&Persistence{
-						PersistenceSelector: &PersistenceSelector{
-							StoreID: "default",
-							Type:    "memory",
-						},
-						Facade: trader.environment.PersistenceServiceFacade,
-					}))
+				if trader.environment.PersistenceServiceFacade == nil {
+					log.Warnf("strategy has Persistence field but persistence service is not defined")
 				} else {
-					elem := field.Elem()
-					if elem.Kind() != reflect.Struct {
-						return fmt.Errorf("the field Persistence is not a struct element")
-					}
+					log.Infof("found Persistence field, injecting...")
+					if field.IsNil() {
+						field.Set(reflect.ValueOf(&Persistence{
+							PersistenceSelector: &PersistenceSelector{
+								StoreID: "default",
+								Type:    "memory",
+							},
+							Facade: trader.environment.PersistenceServiceFacade,
+						}))
+					} else {
+						elem := field.Elem()
+						if elem.Kind() != reflect.Struct {
+							return fmt.Errorf("the field Persistence is not a struct element")
+						}
 
-					if err := injectField(elem, "Facade", trader.environment.PersistenceServiceFacade, true); err != nil {
-						log.WithError(err).Errorf("strategy Persistence injection failed")
-						return err
+						if err := injectField(elem, "Facade", trader.environment.PersistenceServiceFacade, true); err != nil {
+							log.WithError(err).Errorf("strategy Persistence injection failed")
+							return err
+						}
 					}
 				}
-
 			}
 
 			if err := injectField(rs, "Graceful", &trader.Graceful, true); err != nil {
