@@ -94,16 +94,25 @@ func (trader *Trader) DisableLogging() {
 
 // AttachStrategyOn attaches the single exchange strategy on an exchange Session.
 // Single exchange strategy is the default behavior.
-func (trader *Trader) AttachStrategyOn(session string, strategies ...SingleExchangeStrategy) *Trader {
+func (trader *Trader) AttachStrategyOn(session string, strategies ...SingleExchangeStrategy) error {
+	if len(trader.environment.sessions) == 0 {
+		return fmt.Errorf("you don't have any session configured, please check your environment variable or config file")
+	}
+
 	if _, ok := trader.environment.sessions[session]; !ok {
-		log.Panicf("session %s is not defined", session)
+		var keys []string
+		for k := range trader.environment.sessions {
+			keys = append(keys, k)
+		}
+
+		return fmt.Errorf("session %s is not defined, valid sessions are: %v", session, keys)
 	}
 
 	for _, s := range strategies {
 		trader.exchangeStrategies[session] = append(trader.exchangeStrategies[session], s)
 	}
 
-	return trader
+	return nil
 }
 
 // AttachCrossExchangeStrategy attaches the cross exchange strategy
