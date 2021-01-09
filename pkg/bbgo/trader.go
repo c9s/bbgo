@@ -96,7 +96,7 @@ func (trader *Trader) DisableLogging() {
 // Single exchange strategy is the default behavior.
 func (trader *Trader) AttachStrategyOn(session string, strategies ...SingleExchangeStrategy) *Trader {
 	if _, ok := trader.environment.sessions[session]; !ok {
-		log.Panicf("Session %s is not defined", session)
+		log.Panicf("session %s is not defined", session)
 	}
 
 	for _, s := range strategies {
@@ -152,7 +152,6 @@ func (trader *Trader) Run(ctx context.Context) error {
 		// forward trade updates and order updates to the order executor
 		session.Stream.OnTradeUpdate(baseOrderExecutor.EmitTradeUpdate)
 		session.Stream.OnOrderUpdate(baseOrderExecutor.EmitOrderUpdate)
-
 
 		// default to base order executor
 		var orderExecutor OrderExecutor = baseOrderExecutor
@@ -302,4 +301,3 @@ func (trader *Trader) Run(ctx context.Context) error {
 func (trader *Trader) ReportPnL() *PnLReporterManager {
 	return NewPnLReporter(&trader.environment.Notifiability)
 }
-
