@@ -52,10 +52,12 @@ type NotificationConfig struct {
 }
 
 type Session struct {
-	ExchangeName string `json:"exchange" yaml:"exchange"`
-	EnvVarPrefix string `json:"envVarPrefix" yaml:"envVarPrefix"`
-	PublicOnly   bool   `json:"publicOnly,omitempty" yaml:"publicOnly"`
-	Margin       bool   `json:"margin,omitempty" yaml:"margin"`
+	ExchangeName   string `json:"exchange" yaml:"exchange"`
+	EnvVarPrefix   string `json:"envVarPrefix" yaml:"envVarPrefix"`
+	PublicOnly     bool   `json:"publicOnly,omitempty" yaml:"publicOnly"`
+	Margin         bool   `json:"margin,omitempty" yaml:"margin"`
+	IsolatedMargin bool   `json:"isolatedMargin,omitempty" yaml:"isolatedMargin,omitempty"`
+	IsolatedMarginSymbol string `json:"isolatedMarginSymbol,omitempty" yaml:"isolatedMarginSymbol,omitempty"`
 }
 
 type Backtest struct {
