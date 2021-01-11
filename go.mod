@@ -1,4 +1,4 @@
-// +heroku install ./cmd/...
+// +heroku install ./cmd/bbgo
 
 module github.com/c9s/bbgo
 
