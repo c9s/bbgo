@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/adshao/go-binance"
+	"github.com/adshao/go-binance/v2"
 	"github.com/gorilla/websocket"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"

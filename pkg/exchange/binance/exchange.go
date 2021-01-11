@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/adshao/go-binance"
+	"github.com/adshao/go-binance/v2"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 
@@ -406,7 +406,7 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 			TimeInForce:              response.TimeInForce,
 			Type:                     response.Type,
 			Side:                     response.Side,
-			IsIsolated:               response.IsIsolated,
+			// IsIsolated:               response.IsIsolated,
 			// StopPrice:
 			// IcebergQuantity:
 			Time: response.TransactTime,
