@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/adshao/go-binance"
+	"github.com/adshao/go-binance/v2"
 	"github.com/pkg/errors"
 
 	"github.com/c9s/bbgo/pkg/types"

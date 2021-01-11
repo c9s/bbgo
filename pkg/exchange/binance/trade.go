@@ -1,6 +1,6 @@
 package binance
 
-import "github.com/adshao/go-binance"
+import "github.com/adshao/go-binance/v2"
 
 func BuyerOrSellerLabel(trade *binance.TradeV3) (o string) {
 	if trade.IsBuyer {

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/adshao/go-binance"
+	"github.com/adshao/go-binance/v2"
 	"github.com/valyala/fastjson"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
