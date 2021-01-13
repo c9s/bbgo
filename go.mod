@@ -7,9 +7,8 @@ go 1.13
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/adshao/go-binance/v2 v2.2.1-0.20210108025425-9a582c63144e
-	github.com/armon/consul-api v0.0.0-20180202201655-eb2c6b5be1b6 // indirect
 	github.com/c9s/goose v0.0.0-20200415105707-8da682162a5b
-	github.com/c9s/rockhopper v1.0.0 // indirect
+	github.com/c9s/rockhopper v1.1.1
 	github.com/codingconcepts/env v0.0.0-20200821220118-a8fbf8d84482
 	github.com/fastly/go-utils v0.0.0-20180712184237-d95a45783239 // indirect
 	github.com/go-redis/redis/v8 v8.4.0
@@ -19,16 +18,13 @@ require (
 	github.com/gorilla/websocket v1.4.2
 	github.com/jehiah/go-strftime v0.0.0-20171201141054-1d33003b3869 // indirect
 	github.com/jmoiron/sqlx v1.2.0
-	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/leekchan/accounting v0.0.0-20191218023648-17a4ce5f94d4
 	github.com/lestrrat-go/file-rotatelogs v2.2.0+incompatible
 	github.com/lestrrat-go/strftime v1.0.0 // indirect
-	github.com/lib/pq v1.9.0
 	github.com/magiconair/properties v1.8.4 // indirect
-	github.com/markbates/pkger v0.17.1 // indirect
 	github.com/mattn/go-colorable v0.1.2 // indirect
 	github.com/mattn/go-isatty v0.0.12 // indirect
-	github.com/mattn/go-sqlite3 v2.0.3+incompatible
+	github.com/mattn/go-sqlite3 v2.0.3+incompatible // indirect
 	github.com/mitchellh/mapstructure v1.4.1 // indirect
 	github.com/pelletier/go-toml v1.8.1 // indirect
 	github.com/pkg/errors v0.9.1
@@ -46,11 +42,8 @@ require (
 	github.com/spf13/viper v1.7.1
 	github.com/stretchr/testify v1.6.1
 	github.com/tebeka/strftime v0.1.3 // indirect
-	github.com/ugorji/go v1.1.4 // indirect
 	github.com/valyala/fastjson v1.5.1
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
-	github.com/xordataexchange/crypt v0.0.3-0.20170626215501-b2862e3d0a77 // indirect
-	github.com/ziutek/mymysql v1.5.4
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad // indirect
 	golang.org/x/sys v0.0.0-20210113131315-ba0562f347e0 // indirect
 	golang.org/x/text v0.3.5 // indirect
