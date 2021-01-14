@@ -10,7 +10,6 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
-	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -66,7 +65,7 @@ var CancelCmd = &cobra.Command{
 		environ := bbgo.NewEnvironment()
 
 		if viper.IsSet("mysql-url") {
-			db, err := cmdutil.ConnectMySQL(viper.GetString("mysql-url"))
+			db, err := bbgo.ConnectMySQL(viper.GetString("mysql-url"))
 			if err != nil {
 				return err
 			}
