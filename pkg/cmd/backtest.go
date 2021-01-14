@@ -96,7 +96,7 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
-		db, err := cmdutil.ConnectMySQL(viper.GetString("mysql-url"))
+		db, err := bbgo.ConnectMySQL(viper.GetString("mysql-url"))
 		if err != nil {
 			return err
 		}

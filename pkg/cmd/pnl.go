@@ -12,6 +12,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/accounting"
 	"github.com/c9s/bbgo/pkg/accounting/pnl"
+	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
@@ -51,7 +52,7 @@ var PnLCmd = &cobra.Command{
 			return err
 		}
 
-		db, err := cmdutil.ConnectMySQL(viper.GetString("mysql-url"))
+		db, err := bbgo.ConnectMySQL(viper.GetString("mysql-url"))
 		if err != nil {
 			return err
 		}

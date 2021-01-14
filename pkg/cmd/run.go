@@ -84,18 +84,8 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config) error {
 
 	environ := bbgo.NewEnvironment()
 
-	if viper.IsSet("mysql-url") {
-		dsn := viper.GetString("mysql-url")
-		db, err := cmdutil.ConnectMySQL(dsn)
-		if err != nil {
-			return err
-		}
-
-		if err := upgradeDB(ctx, "mysql", db.DB); err != nil {
-			return err
-		}
-
-		environ.SetDB(db)
+	if err := environ.ConfigureDatabase(ctx) ; err != nil {
+		return err
 	}
 
 	if err := environ.AddExchangesFromConfig(userConfig); err != nil {
