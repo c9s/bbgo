@@ -8,7 +8,7 @@ require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/adshao/go-binance/v2 v2.2.1-0.20210108025425-9a582c63144e
 	github.com/c9s/goose v0.0.0-20200415105707-8da682162a5b
-	github.com/c9s/rockhopper v1.1.1
+	github.com/c9s/rockhopper v1.2.1-0.20210114064926-84f8d06c527b
 	github.com/codingconcepts/env v0.0.0-20200821220118-a8fbf8d84482
 	github.com/fastly/go-utils v0.0.0-20180712184237-d95a45783239 // indirect
 	github.com/go-redis/redis/v8 v8.4.0
@@ -45,7 +45,7 @@ require (
 	github.com/valyala/fastjson v1.5.1
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad // indirect
-	golang.org/x/sys v0.0.0-20210113131315-ba0562f347e0 // indirect
+	golang.org/x/sys v0.0.0-20210113181707-4bcb84eeeb78 // indirect
 	golang.org/x/text v0.3.5 // indirect
 	golang.org/x/time v0.0.0-20201208040808-7e3f01d25324
 	gonum.org/v1/gonum v0.8.1

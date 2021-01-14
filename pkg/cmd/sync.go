@@ -6,6 +6,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/service"
@@ -46,7 +47,7 @@ var SyncCmd = &cobra.Command{
 			return err
 		}
 
-		db, err := cmdutil.ConnectMySQL()
+		db, err := cmdutil.ConnectMySQL(viper.GetString("mysql-url"))
 		if err != nil {
 			return err
 		}

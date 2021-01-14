@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	"github.com/c9s/bbgo/pkg/accounting/pnl"
 	"github.com/c9s/bbgo/pkg/backtest"
@@ -95,7 +96,7 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
-		db, err := cmdutil.ConnectMySQL()
+		db, err := cmdutil.ConnectMySQL(viper.GetString("mysql-url"))
 		if err != nil {
 			return err
 		}
