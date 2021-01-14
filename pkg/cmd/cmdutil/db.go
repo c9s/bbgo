@@ -1,14 +1,17 @@
 package cmdutil
 
 import (
-	"fmt"
-
+	"github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
-	"github.com/spf13/viper"
 )
 
-func ConnectMySQL() (*sqlx.DB, error) {
-	mysqlURL := viper.GetString("mysql-url")
-	mysqlURL = fmt.Sprintf("%s?parseTime=true", mysqlURL)
-	return sqlx.Connect("mysql", mysqlURL)
+func ConnectMySQL(dsn string) (*sqlx.DB, error) {
+	config, err := mysql.ParseDSN(dsn)
+	if err != nil {
+		return nil, err
+	}
+
+	config.ParseTime = true
+	dsn = config.FormatDSN()
+	return sqlx.Connect("mysql", dsn)
 }
