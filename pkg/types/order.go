@@ -68,6 +68,11 @@ type SubmitOrder struct {
 	QuantityString  string `json:"-"`
 
 	TimeInForce string `json:"timeInForce" db:"time_in_force"` // GTC, IOC, FOK
+
+	Margin               bool   `json:"margin"`
+	IsolatedMargin       bool   `json:"isolatedMargin"`
+	IsolatedMarginSymbol string `json:"isolatedMarginSymbol"`
+	MarginSideEffect     string `json:"marginSideEffect"` // AUTO_REPAY, NO_SIDE_EFFECT, MARGIN_BUY
 }
 
 func (o *SubmitOrder) String() string {
