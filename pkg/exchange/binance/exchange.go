@@ -392,8 +392,8 @@ func (e *Exchange) submitMarginOrder(ctx context.Context, order types.SubmitOrde
 	// use response result format
 	req.NewOrderRespType(binance.NewOrderRespTypeRESULT)
 
-	if order.IsolatedMargin {
-		req.IsIsolated(order.IsolatedMargin)
+	if e.useMarginIsolated {
+		req.IsIsolated(e.useMarginIsolated)
 	}
 
 	if len(order.MarginSideEffect) > 0 {
@@ -518,7 +518,7 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 	for _, order := range orders {
 		var createdOrder *types.Order
 
-		if order.Margin {
+		if e.useMargin {
 			createdOrder, err = e.submitMarginOrder(ctx, order)
 		} else {
 			createdOrder, err = e.submitSpotOrder(ctx, order)
