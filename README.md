@@ -54,20 +54,7 @@ MAX_API_SECRET=
 MYSQL_URL=root@tcp(127.0.0.1:3306)/bbgo?parseTime=true
 ```
 
-Make sure you have [dotenv](https://github.com/bkeepers/dotenv). Then run the `migrate` command to initialize your database:
-
-```sh
-dotenv -f .env.local -- bbgo migrate up
-```
-
-There are some other commands you can run:
-
-```sh
-dotenv -f .env.local -- bbgo migrate status
-dotenv -f .env.local -- bbgo migrate redo
-```
-
-(It internally uses `goose` to run these migration files, see [migrations](migrations))
+Make sure you have [dotenv](https://github.com/bkeepers/dotenv)
 
 To sync remote exchange klines data for backtesting:
 
