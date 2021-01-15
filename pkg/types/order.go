@@ -72,7 +72,7 @@ type SubmitOrder struct {
 	Margin               bool   `json:"margin"`
 	IsolatedMargin       bool   `json:"isolatedMargin"`
 	IsolatedMarginSymbol string `json:"isolatedMarginSymbol"`
-	MarginSideEffect     string `json:"marginSideEffect"` // AUTO_REPAY, NO_SIDE_EFFECT, MARGIN_BUY
+	MarginSideEffect     string `json:"marginSideEffect"` // AUTO_REPAY = repay, MARGIN_BUY = borrow, defaults to  NO_SIDE_EFFECT
 }
 
 func (o *SubmitOrder) String() string {
