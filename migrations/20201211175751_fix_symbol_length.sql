@@ -1,7 +1,7 @@
--- +goose Up
+-- +up
 ALTER TABLE trades MODIFY COLUMN symbol VARCHAR(9);
 ALTER TABLE orders MODIFY COLUMN symbol VARCHAR(9);
 
--- +goose Down
+-- +down
 ALTER TABLE trades MODIFY COLUMN symbol VARCHAR(8);
 ALTER TABLE orders MODIFY COLUMN symbol VARCHAR(8);

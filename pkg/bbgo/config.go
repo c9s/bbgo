@@ -10,14 +10,15 @@ import (
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
 
+	"github.com/c9s/bbgo/pkg/datatype"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
 type PnLReporterConfig struct {
-	AverageCostBySymbols StringSlice `json:"averageCostBySymbols" yaml:"averageCostBySymbols"`
-	Of                   StringSlice `json:"of" yaml:"of"`
-	When                 StringSlice `json:"when" yaml:"when"`
+	AverageCostBySymbols datatype.StringSlice `json:"averageCostBySymbols" yaml:"averageCostBySymbols"`
+	Of                   datatype.StringSlice `json:"of" yaml:"of"`
+	When                 datatype.StringSlice `json:"when" yaml:"when"`
 }
 
 // ExchangeStrategyMount wraps the SingleExchangeStrategy with the Session name for mounting
@@ -105,7 +106,7 @@ type RedisPersistenceConfig struct {
 	Host     string `json:"host" env:"REDIS_HOST"`
 	Port     string `json:"port" env:"REDIS_PORT"`
 	Password string `json:"password" env:"REDIS_PASSWORD"`
-	DB int    `json:"db" env:"REDIS_DB"`
+	DB       int    `json:"db" env:"REDIS_DB"`
 }
 
 type JsonPersistenceConfig struct {
@@ -188,7 +189,6 @@ func Load(configFile string, loadStrategies bool) (*Config, error) {
 			return nil, err
 		}
 	}
-
 
 	return &config, nil
 }

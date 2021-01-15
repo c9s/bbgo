@@ -24,12 +24,12 @@ var LoadedCrossExchangeStrategies = make(map[string]CrossExchangeStrategy)
 
 func RegisterStrategy(key string, s interface{}) {
 	loaded := 0
-	if d, ok := s.(SingleExchangeStrategy) ; ok {
+	if d, ok := s.(SingleExchangeStrategy); ok {
 		LoadedExchangeStrategies[key] = d
 		loaded++
 	}
 
-	if d, ok := s.(CrossExchangeStrategy) ; ok {
+	if d, ok := s.(CrossExchangeStrategy); ok {
 		LoadedCrossExchangeStrategies[key] = d
 		loaded++
 	}
@@ -49,6 +49,7 @@ type Environment struct {
 
 	PersistenceServiceFacade *PersistenceServiceFacade
 
+	OrderService *service.OrderService
 	TradeService *service.TradeService
 	TradeSync    *service.SyncService
 
@@ -70,10 +71,30 @@ func (environ *Environment) Sessions() map[string]*ExchangeSession {
 	return environ.sessions
 }
 
+func (environ *Environment) ConfigureDatabase(ctx context.Context) error {
+	if viper.IsSet("mysql-url") {
+		dsn := viper.GetString("mysql-url")
+		db, err := ConnectMySQL(dsn)
+		if err != nil {
+			return err
+		}
+
+		if err := upgradeDB(ctx, "mysql", db.DB); err != nil {
+			return err
+		}
+
+		environ.SetDB(db)
+	}
+
+	return nil
+}
+
 func (environ *Environment) SetDB(db *sqlx.DB) *Environment {
+	environ.OrderService = &service.OrderService{DB: db}
 	environ.TradeService = &service.TradeService{DB: db}
 	environ.TradeSync = &service.SyncService{
 		TradeService: environ.TradeService,
+		OrderService: environ.OrderService,
 	}
 
 	return environ

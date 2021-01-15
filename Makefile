@@ -27,6 +27,9 @@ dist: bin-dir bbgo-linux bbgo-darwin
 	mkdir -p $(DIST_DIR)
 	tar -C $(BUILD_DIR) -cvzf $(DIST_DIR)/bbgo-$$(git describe --tags).tar.gz .
 
+migrations:
+	rockhopper compile --config rockhopper.yaml --output pkg/migrations
+
 docker:
 	GOPATH=$(PWD)/.mod go mod download
 	docker build --build-arg GO_MOD_CACHE=.mod --tag yoanlin/bbgo .
@@ -36,4 +39,4 @@ docker-push:
 	docker push yoanlin/bbgo
 	bash -c "[[ -n $(DOCKER_TAG) ]] && docker push yoanlin/bbgo:$(DOCKER_TAG)"
 
-.PHONY: dist
+.PHONY: dist migrations

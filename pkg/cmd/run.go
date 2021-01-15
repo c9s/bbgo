@@ -44,6 +44,15 @@ func init() {
 	RootCmd.AddCommand(RunCmd)
 }
 
+var RunCmd = &cobra.Command{
+	Use:   "run",
+	Short: "run strategies from config file",
+
+	// SilenceUsage is an option to silence usage when an error occurs.
+	SilenceUsage: true,
+	RunE:         run,
+}
+
 var wrapperTemplate = template.Must(template.New("main").Parse(`package main
 // DO NOT MODIFY THIS FILE. THIS FILE IS GENERATED FOR IMPORTING STRATEGIES
 import (
@@ -75,12 +84,8 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config) error {
 
 	environ := bbgo.NewEnvironment()
 
-	if viper.IsSet("mysql-url") {
-		db, err := cmdutil.ConnectMySQL()
-		if err != nil {
-			return err
-		}
-		environ.SetDB(db)
+	if err := environ.ConfigureDatabase(ctx) ; err != nil {
+		return err
 	}
 
 	if err := environ.AddExchangesFromConfig(userConfig); err != nil {
@@ -253,87 +258,79 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config) error {
 	return nil
 }
 
-var RunCmd = &cobra.Command{
-	Use:   "run",
-	Short: "run strategies from config file",
+func run(cmd *cobra.Command, args []string) error {
+	configFile, err := cmd.Flags().GetString("config")
+	if err != nil {
+		return err
+	}
 
-	// SilenceUsage is an option to silence usage when an error occurs.
-	SilenceUsage: true,
+	if len(configFile) == 0 {
+		return errors.New("--config option is required")
+	}
 
-	RunE: func(cmd *cobra.Command, args []string) error {
-		configFile, err := cmd.Flags().GetString("config")
+	noCompile, err := cmd.Flags().GetBool("no-compile")
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	userConfig, err := bbgo.Load(configFile, false)
+	if err != nil {
+		return err
+	}
+
+	shouldCompile := len(userConfig.Imports) > 0
+
+	// if there is no custom imports, we don't have to compile
+	if noCompile || !shouldCompile {
+		userConfig, err = bbgo.Load(configFile, true)
 		if err != nil {
 			return err
 		}
 
-		if len(configFile) == 0 {
-			return errors.New("--config option is required")
-		}
-
-		noCompile, err := cmd.Flags().GetBool("no-compile")
-		if err != nil {
+		log.Infof("running config without wrapper binary...")
+		if err := runConfig(ctx, userConfig); err != nil {
 			return err
-		}
-
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		userConfig, err := bbgo.Load(configFile, false)
-		if err != nil {
-			return err
-		}
-
-		shouldCompile := len(userConfig.Imports) > 0
-
-		// if there is no custom imports, we don't have to compile
-		if noCompile || !shouldCompile {
-			userConfig, err = bbgo.Load(configFile, true)
-			if err != nil {
-				return err
-			}
-
-			log.Infof("running config without wrapper binary...")
-			if err := runConfig(ctx, userConfig); err != nil {
-				return err
-			}
-
-			return nil
-		}
-
-		var runArgs = []string{"run", "--no-compile"}
-		cmd.Flags().Visit(func(flag *flag.Flag) {
-			runArgs = append(runArgs, "--"+flag.Name, flag.Value.String())
-		})
-		runArgs = append(runArgs, args...)
-
-		goOS, err := cmd.Flags().GetString("os")
-		if err != nil {
-			return err
-		}
-
-		goArch, err := cmd.Flags().GetString("arch")
-		if err != nil {
-			return err
-		}
-
-		runCmd, err := buildAndRun(ctx, userConfig, goOS, goArch, runArgs...)
-		if err != nil {
-			return err
-		}
-
-		if sig := cmdutil.WaitForSignal(ctx, syscall.SIGTERM, syscall.SIGINT); sig != nil {
-			log.Infof("sending signal to the child process...")
-			if err := runCmd.Process.Signal(sig); err != nil {
-				return err
-			}
-
-			if err := runCmd.Wait(); err != nil {
-				return err
-			}
 		}
 
 		return nil
-	},
+	}
+
+	var runArgs = []string{"run", "--no-compile"}
+	cmd.Flags().Visit(func(flag *flag.Flag) {
+		runArgs = append(runArgs, "--"+flag.Name, flag.Value.String())
+	})
+	runArgs = append(runArgs, args...)
+
+	goOS, err := cmd.Flags().GetString("os")
+	if err != nil {
+		return err
+	}
+
+	goArch, err := cmd.Flags().GetString("arch")
+	if err != nil {
+		return err
+	}
+
+	runCmd, err := buildAndRun(ctx, userConfig, goOS, goArch, runArgs...)
+	if err != nil {
+		return err
+	}
+
+	if sig := cmdutil.WaitForSignal(ctx, syscall.SIGTERM, syscall.SIGINT); sig != nil {
+		log.Infof("sending signal to the child process...")
+		if err := runCmd.Process.Signal(sig); err != nil {
+			return err
+		}
+
+		if err := runCmd.Wait(); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func compile(buildDir string, userConfig *bbgo.Config) error {

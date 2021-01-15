@@ -51,29 +51,10 @@ BINANCE_API_SECRET=
 MAX_API_KEY=
 MAX_API_SECRET=
 
-MYSQL_HOST=127.0.0.1
-MYSQL_PORT=3306
-MYSQL_USERNAME=root
-MYSQL_PASSWORD=
-MYSQL_DATABASE=bbgo
-# Make sure the following line is correct so you can migrate successfully
-MYSQL_URL=root@tcp(127.0.0.1:3306)/bbgo
+MYSQL_URL=root@tcp(127.0.0.1:3306)/bbgo?parseTime=true
 ```
 
-Make sure you have [dotenv](https://github.com/bkeepers/dotenv). Then run the `migrate` command to initialize your database:
-
-```sh
-dotenv -f .env.local -- bbgo migrate up
-```
-
-There are some other commands you can run:
-
-```sh
-dotenv -f .env.local -- bbgo migrate status
-dotenv -f .env.local -- bbgo migrate redo
-```
-
-(It internally uses `goose` to run these migration files, see [migrations](migrations))
+Make sure you have [dotenv](https://github.com/bkeepers/dotenv)
 
 To sync remote exchange klines data for backtesting:
 
