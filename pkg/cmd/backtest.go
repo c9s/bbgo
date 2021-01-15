@@ -115,6 +115,11 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
+		environ := bbgo.NewEnvironment()
+		if err := environ.ConfigureDatabase(ctx); err != nil {
+			return err
+		}
+
 		backtestService := &service.BacktestService{DB: db}
 
 		if wantSync {
@@ -178,7 +183,6 @@ var BacktestCmd = &cobra.Command{
 
 		backtestExchange := backtest.NewExchange(exchangeName, backtestService, userConfig.Backtest)
 
-		environ := bbgo.NewEnvironment()
 		environ.SetStartTime(startTime)
 		environ.AddExchange(exchangeName.String(), backtestExchange)
 
