@@ -119,6 +119,12 @@ function myTrades()
     send_auth_request "GET" "/api/v2/trades/my" params
 }
 
+function rewards()
+{
+    local -n params=$1
+    send_auth_request "GET" "/api/v2/rewards" params
+}
+
 
 # me | jq '.accounts[] | select(.currency == "usdt")'
 # me | jq '.accounts[] | select(.currency == "btc")'
