@@ -400,10 +400,20 @@ func (e *Exchange) submitMarginOrder(ctx context.Context, order types.SubmitOrde
 		req.SideEffectType(binance.SideEffectType(order.MarginSideEffect))
 	}
 
-	req.Quantity(order.QuantityString)
+	if len(order.QuantityString) > 0 {
+		req.Quantity(order.QuantityString)
+	} else if order.Market.Symbol != "" {
+		req.Quantity(order.Market.FormatQuantity(order.Quantity))
+	} else {
+		req.Quantity(strconv.FormatFloat(order.Quantity, 'f', 8, 64))
+	}
 
 	if len(order.PriceString) > 0 {
 		req.Price(order.PriceString)
+	} else if order.Market.Symbol != "" {
+		req.Price(order.Market.FormatPrice(order.Price))
+	} else {
+		req.Price(strconv.FormatFloat(order.Price, 'f', 8, 64))
 	}
 
 	switch order.Type {
@@ -415,6 +425,7 @@ func (e *Exchange) submitMarginOrder(ctx context.Context, order types.SubmitOrde
 		req.StopPrice(order.StopPriceString)
 	}
 
+	// could be IOC or FOK
 	if len(order.TimeInForce) > 0 {
 		// TODO: check the TimeInForce value
 		req.TimeInForce(binance.TimeInForceType(order.TimeInForce))

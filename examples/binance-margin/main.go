@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -12,12 +14,15 @@ import (
 
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/exchange/binance"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 func init() {
 	rootCmd.PersistentFlags().String("binance-api-key", "", "binance api key")
 	rootCmd.PersistentFlags().String("binance-api-secret", "", "binance api secret")
 	rootCmd.PersistentFlags().String("symbol", "BNBUSDT", "symbol")
+	rootCmd.PersistentFlags().Float64("price", 20.0, "order price")
+	rootCmd.PersistentFlags().Float64("quantity", 10.0, "order quantity")
 }
 
 var rootCmd = &cobra.Command{
@@ -41,9 +46,29 @@ var rootCmd = &cobra.Command{
 			return err
 		}
 
+		price, err := cmd.Flags().GetFloat64("price")
+		if err != nil {
+			return err
+		}
+
+		quantity, err := cmd.Flags().GetFloat64("quantity")
+		if err != nil {
+			return err
+		}
+
 		var exchange = binance.New(key, secret)
 
 		exchange.UseIsolatedMargin(symbol)
+
+		markets, err := exchange.QueryMarkets(ctx)
+		if err != nil {
+			return err
+		}
+
+		market, ok := markets[symbol]
+		if !ok {
+			return fmt.Errorf("market %s is not defined", symbol)
+		}
 
 		marginAccount, err := exchange.QueryMarginAccount(ctx)
 		if err != nil {
@@ -65,6 +90,24 @@ var rootCmd = &cobra.Command{
 		if err := stream.Connect(ctx); err != nil {
 			log.Fatal(err)
 		}
+
+		time.Sleep(time.Second)
+
+		createdOrders, err := exchange.SubmitOrders(ctx, types.SubmitOrder{
+			Symbol:           symbol,
+			Market:           market,
+			Side:             types.SideTypeBuy,
+			Type:             types.OrderTypeLimit,
+			Price:            price,
+			Quantity:         quantity,
+			MarginSideEffect: types.SideEffectTypeMarginBuy,
+			TimeInForce:      "GTC",
+		})
+		if err != nil {
+			return err
+		}
+
+		log.Info(createdOrders)
 
 		cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
 		return nil
