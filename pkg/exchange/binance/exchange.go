@@ -373,7 +373,77 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 }
 
 func (e *Exchange) submitMarginOrder(ctx context.Context, order types.SubmitOrder) (*types.Order, error) {
-	return nil, nil
+	orderType, err := toLocalOrderType(order.Type)
+	if err != nil {
+		return nil, err
+	}
+
+	clientOrderID := uuid.New().String()
+	if len(order.ClientOrderID) > 0 {
+		clientOrderID = order.ClientOrderID
+	}
+
+	req := e.Client.NewCreateMarginOrderService().
+		Symbol(order.Symbol).
+		Type(orderType).
+		Side(binance.SideType(order.Side)).
+		NewClientOrderID(clientOrderID)
+
+	// use response result format
+	req.NewOrderRespType(binance.NewOrderRespTypeRESULT)
+
+	if order.IsolatedMargin {
+		req.IsIsolated(order.IsolatedMargin)
+	}
+
+	if len(order.MarginSideEffect) > 0 {
+		req.SideEffectType(binance.SideEffectType(order.MarginSideEffect))
+	}
+
+	req.Quantity(order.QuantityString)
+
+	if len(order.PriceString) > 0 {
+		req.Price(order.PriceString)
+	}
+
+	switch order.Type {
+	case types.OrderTypeStopLimit, types.OrderTypeStopMarket:
+		if len(order.StopPriceString) == 0 {
+			return nil, fmt.Errorf("stop price string can not be empty")
+		}
+
+		req.StopPrice(order.StopPriceString)
+	}
+
+	if len(order.TimeInForce) > 0 {
+		// TODO: check the TimeInForce value
+		req.TimeInForce(binance.TimeInForceType(order.TimeInForce))
+	}
+
+	response, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Infof("margin order creation response: %+v", response)
+
+	createdOrder, err := ToGlobalOrder(&binance.Order{
+		Symbol:                   response.Symbol,
+		OrderID:                  response.OrderID,
+		ClientOrderID:            response.ClientOrderID,
+		Price:                    response.Price,
+		OrigQuantity:             response.OrigQuantity,
+		ExecutedQuantity:         response.ExecutedQuantity,
+		CummulativeQuoteQuantity: response.CummulativeQuoteQuantity,
+		Status:                   response.Status,
+		TimeInForce:              response.TimeInForce,
+		Type:                     response.Type,
+		Side:                     response.Side,
+		UpdateTime:               response.TransactTime,
+		Time:                     response.TransactTime,
+	})
+
+	return createdOrder, err
 }
 
 func (e *Exchange) submitSpotOrder(ctx context.Context, order types.SubmitOrder) (*types.Order, error) {
@@ -446,7 +516,14 @@ func (e *Exchange) submitSpotOrder(ctx context.Context, order types.SubmitOrder)
 
 func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error) {
 	for _, order := range orders {
-		createdOrder, err := e.submitSpotOrder(ctx, order)
+		var createdOrder *types.Order
+
+		if order.Margin {
+			createdOrder, err = e.submitMarginOrder(ctx, order)
+		} else {
+			createdOrder, err = e.submitSpotOrder(ctx, order)
+		}
+
 		if err != nil {
 			return createdOrders, err
 		}
