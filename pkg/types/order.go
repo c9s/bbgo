@@ -15,6 +15,16 @@ func init() {
 	_ = PlainText(&Order{})
 }
 
+// MarginOrderSideEffectType define side effect type for orders
+type MarginOrderSideEffectType string
+
+var (
+	SideEffectTypeNoSideEffect MarginOrderSideEffectType = "NO_SIDE_EFFECT"
+	SideEffectTypeMarginBuy    MarginOrderSideEffectType = "MARGIN_BUY"
+	SideEffectTypeAutoRepay    MarginOrderSideEffectType = "AUTO_REPAY"
+)
+
+
 // OrderType define order type
 type OrderType string
 
@@ -69,7 +79,7 @@ type SubmitOrder struct {
 
 	TimeInForce string `json:"timeInForce" db:"time_in_force"` // GTC, IOC, FOK
 
-	MarginSideEffect string `json:"marginSideEffect"` // AUTO_REPAY = repay, MARGIN_BUY = borrow, defaults to  NO_SIDE_EFFECT
+	MarginSideEffect MarginOrderSideEffectType `json:"marginSideEffect"` // AUTO_REPAY = repay, MARGIN_BUY = borrow, defaults to  NO_SIDE_EFFECT
 }
 
 func (o *SubmitOrder) String() string {
