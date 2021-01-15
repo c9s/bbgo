@@ -1,7 +1,6 @@
 package migrations
 
 import (
-	"database/sql"
 	"context"
 
 	"github.com/c9s/rockhopper"
@@ -11,7 +10,7 @@ func init() {
 	rockhopper.AddMigration(upOrdersAddIndex, downOrdersAddIndex)
 }
 
-func upOrdersAddIndex(ctx context.Context, tx *sql.Tx) (err error) {
+func upOrdersAddIndex(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
 	// This code is executed when the migration is applied.
 
 	_, err = tx.ExecContext(ctx, "CREATE INDEX orders_symbol ON orders (exchange, symbol);")
@@ -27,7 +26,7 @@ func upOrdersAddIndex(ctx context.Context, tx *sql.Tx) (err error) {
 	return err
 }
 
-func downOrdersAddIndex(ctx context.Context, tx *sql.Tx) (err error) {
+func downOrdersAddIndex(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
 	// This code is executed when the migration is rolled back.
 
 	_, err = tx.ExecContext(ctx, "DROP INDEX orders_symbol ON orders;")
