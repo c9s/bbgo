@@ -1,4 +1,4 @@
--- +goose Up
+-- +up
 CREATE TABLE `klines`
 (
     `gid`           BIGINT UNSIGNED         NOT NULL AUTO_INCREMENT,
@@ -18,14 +18,14 @@ CREATE TABLE `klines`
 
     PRIMARY KEY (`gid`)
 
-) ENGINE = InnoDB;
+);
 
 CREATE INDEX `klines_end_time_symbol_interval` ON klines (`end_time`, `symbol`, `interval`);
 CREATE TABLE `okex_klines` LIKE `klines`;
 CREATE TABLE `binance_klines` LIKE `klines`;
 CREATE TABLE `max_klines` LIKE `klines`;
 
--- +goose Down
+-- +down
 DROP INDEX `klines_end_time_symbol_interval` ON `klines`;
 DROP TABLE `binance_klines`;
 DROP TABLE `okex_klines`;

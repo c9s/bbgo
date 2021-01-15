@@ -1,7 +1,6 @@
 package migrations
 
 import (
-	"database/sql"
 	"context"
 
 	"github.com/c9s/rockhopper"
@@ -11,7 +10,7 @@ func init() {
 	rockhopper.AddMigration(upTradesAddOrderId, downTradesAddOrderId)
 }
 
-func upTradesAddOrderId(ctx context.Context, tx *sql.Tx) (err error) {
+func upTradesAddOrderId(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
 	// This code is executed when the migration is applied.
 
 	_, err = tx.ExecContext(ctx, "ALTER TABLE `trades`\n    ADD COLUMN `order_id` BIGINT UNSIGNED NOT NULL;")
@@ -22,7 +21,7 @@ func upTradesAddOrderId(ctx context.Context, tx *sql.Tx) (err error) {
 	return err
 }
 
-func downTradesAddOrderId(ctx context.Context, tx *sql.Tx) (err error) {
+func downTradesAddOrderId(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
 	// This code is executed when the migration is rolled back.
 
 	_, err = tx.ExecContext(ctx, "ALTER TABLE `trades`\n    DROP COLUMN `order_id`;")

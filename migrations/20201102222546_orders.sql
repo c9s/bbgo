@@ -1,4 +1,4 @@
--- +goose Up
+-- +up
 CREATE TABLE `orders`
 (
     `gid`               BIGINT UNSIGNED         NOT NULL AUTO_INCREMENT,
@@ -21,7 +21,6 @@ CREATE TABLE `orders`
     `updated_at`        DATETIME(3)             NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     PRIMARY KEY (`gid`)
 
-) ENGINE = InnoDB;
-
--- +goose Down
+);
+-- +down
 DROP TABLE `orders`;
