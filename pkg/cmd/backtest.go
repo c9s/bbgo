@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	"github.com/c9s/bbgo/pkg/accounting/pnl"
 	"github.com/c9s/bbgo/pkg/backtest"
@@ -95,7 +96,7 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
-		db, err := cmdutil.ConnectMySQL()
+		db, err := bbgo.ConnectMySQL(viper.GetString("mysql-url"))
 		if err != nil {
 			return err
 		}
@@ -111,6 +112,11 @@ var BacktestCmd = &cobra.Command{
 
 		startTime, err := userConfig.Backtest.ParseStartTime()
 		if err != nil {
+			return err
+		}
+
+		environ := bbgo.NewEnvironment()
+		if err := environ.ConfigureDatabase(ctx); err != nil {
 			return err
 		}
 
@@ -177,7 +183,6 @@ var BacktestCmd = &cobra.Command{
 
 		backtestExchange := backtest.NewExchange(exchangeName, backtestService, userConfig.Backtest)
 
-		environ := bbgo.NewEnvironment()
 		environ.SetStartTime(startTime)
 		environ.AddExchange(exchangeName.String(), backtestExchange)
 

@@ -7,8 +7,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
-	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -46,8 +46,8 @@ var SyncCmd = &cobra.Command{
 			return err
 		}
 
-		db, err := cmdutil.ConnectMySQL()
-		if err != nil {
+		environ := bbgo.NewEnvironment()
+		if err := environ.ConfigureDatabase(ctx); err != nil {
 			return err
 		}
 
@@ -73,20 +73,13 @@ var SyncCmd = &cobra.Command{
 			}
 		}
 
-		tradeService := &service.TradeService{DB: db}
-		orderService := &service.OrderService{DB: db}
-		syncService := &service.SyncService{
-			TradeService: tradeService,
-			OrderService: orderService,
-		}
-
 		log.Info("syncing trades from exchange...")
-		if err := syncService.SyncTrades(ctx, exchange, symbol, startTime); err != nil {
+		if err := environ.TradeSync.SyncTrades(ctx, exchange, symbol, startTime); err != nil {
 			return err
 		}
 
 		log.Info("syncing orders from exchange...")
-		if err := syncService.SyncOrders(ctx, exchange, symbol, startTime); err != nil {
+		if err := environ.TradeSync.SyncOrders(ctx, exchange, symbol, startTime); err != nil {
 			return err
 		}
 
