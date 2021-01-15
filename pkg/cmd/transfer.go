@@ -116,10 +116,10 @@ var TransferHistoryCmd = &cobra.Command{
 			switch record := record.Record.(type) {
 
 			case types.Deposit:
-				logrus.Infof("%s: %s <== (deposit) %f [%s]", record.Time, record.Asset, record.Amount, record.Status)
+				logrus.Infof("%s: <--- DEPOSIT %f %s [%s]", record.Time, record.Amount, record.Asset, record.Status)
 
 			case types.Withdraw:
-				logrus.Infof("%s: %s ==> (withdraw) %f [%s]", record.ApplyTime, record.Asset, record.Amount, record.Status)
+				logrus.Infof("%s: ---> WITHDRAW %f %s  [%s]", record.ApplyTime, record.Amount, record.Asset, record.Status)
 
 			default:
 				logrus.Infof("unknown record: %+v", record)
