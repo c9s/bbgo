@@ -30,22 +30,6 @@ func init() {
 	}
 }
 
-type MarginSettings struct {
-	useMargin               bool
-	useMarginIsolated       bool
-	useMarginIsolatedSymbol string
-}
-
-func (e *MarginSettings) UseMargin() {
-	e.useMargin = true
-}
-
-func (e *MarginSettings) UseIsolatedMargin(symbol string) {
-	e.useMargin = true
-	e.useMarginIsolated = true
-	e.useMarginIsolatedSymbol = symbol
-}
-
 type Exchange struct {
 	MarginSettings
 
@@ -388,73 +372,81 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 	return err2
 }
 
+func (e *Exchange) submitMarginOrder(ctx context.Context, order types.SubmitOrder) (*types.Order, error) {
+	return nil, nil
+}
+
+func (e *Exchange) submitSpotOrder(ctx context.Context, order types.SubmitOrder) (*types.Order, error) {
+	orderType, err := toLocalOrderType(order.Type)
+	if err != nil {
+		return nil, err
+	}
+
+	clientOrderID := uuid.New().String()
+	if len(order.ClientOrderID) > 0 {
+		clientOrderID = order.ClientOrderID
+	}
+
+	req := e.Client.NewCreateOrderService().
+		Symbol(order.Symbol).
+		Side(binance.SideType(order.Side)).
+		NewClientOrderID(clientOrderID).
+		Type(orderType)
+
+	req.Quantity(order.QuantityString)
+
+	if len(order.PriceString) > 0 {
+		req.Price(order.PriceString)
+	}
+
+	switch order.Type {
+	case types.OrderTypeStopLimit, types.OrderTypeStopMarket:
+		if len(order.StopPriceString) == 0 {
+			return nil, fmt.Errorf("stop price string can not be empty")
+		}
+
+		req.StopPrice(order.StopPriceString)
+	}
+
+	if len(order.TimeInForce) > 0 {
+		// TODO: check the TimeInForce value
+		req.TimeInForce(binance.TimeInForceType(order.TimeInForce))
+	}
+
+	response, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Infof("order creation response: %+v", response)
+
+	createdOrder, err := ToGlobalOrder(&binance.Order{
+		Symbol:                   response.Symbol,
+		OrderID:                  response.OrderID,
+		ClientOrderID:            response.ClientOrderID,
+		Price:                    response.Price,
+		OrigQuantity:             response.OrigQuantity,
+		ExecutedQuantity:         response.ExecutedQuantity,
+		CummulativeQuoteQuantity: response.CummulativeQuoteQuantity,
+		Status:                   response.Status,
+		TimeInForce:              response.TimeInForce,
+		Type:                     response.Type,
+		Side:                     response.Side,
+		UpdateTime:               response.TransactTime,
+		Time:                     response.TransactTime,
+		// IsIsolated:               response.IsIsolated,
+		// StopPrice:
+		// IcebergQuantity:
+		// UpdateTime:
+		// IsWorking:               ,
+	})
+
+	return createdOrder, err
+}
+
 func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error) {
 	for _, order := range orders {
-		orderType, err := toLocalOrderType(order.Type)
-		if err != nil {
-			return createdOrders, err
-		}
-
-		clientOrderID := uuid.New().String()
-		if len(order.ClientOrderID) > 0 {
-			clientOrderID = order.ClientOrderID
-		}
-
-		req := e.Client.NewCreateOrderService().
-			Symbol(order.Symbol).
-			Side(binance.SideType(order.Side)).
-			NewClientOrderID(clientOrderID).
-			Type(orderType)
-
-		req.Quantity(order.QuantityString)
-
-		if len(order.PriceString) > 0 {
-			req.Price(order.PriceString)
-		}
-
-		switch order.Type {
-		case types.OrderTypeStopLimit, types.OrderTypeStopMarket:
-			if len(order.StopPriceString) == 0 {
-				return createdOrders, fmt.Errorf("stop price string can not be empty")
-			}
-
-			req.StopPrice(order.StopPriceString)
-		}
-
-		if len(order.TimeInForce) > 0 {
-			// TODO: check the TimeInForce value
-			req.TimeInForce(binance.TimeInForceType(order.TimeInForce))
-		}
-
-		response, err := req.Do(ctx)
-		if err != nil {
-			return createdOrders, err
-		}
-
-		log.Infof("order creation response: %+v", response)
-
-		retOrder := binance.Order{
-			Symbol:                   response.Symbol,
-			OrderID:                  response.OrderID,
-			ClientOrderID:            response.ClientOrderID,
-			Price:                    response.Price,
-			OrigQuantity:             response.OrigQuantity,
-			ExecutedQuantity:         response.ExecutedQuantity,
-			CummulativeQuoteQuantity: response.CummulativeQuoteQuantity,
-			Status:                   response.Status,
-			TimeInForce:              response.TimeInForce,
-			Type:                     response.Type,
-			Side:                     response.Side,
-			// IsIsolated:               response.IsIsolated,
-			// StopPrice:
-			// IcebergQuantity:
-			Time: response.TransactTime,
-			// UpdateTime:
-			// IsWorking:               ,
-
-		}
-
-		createdOrder, err := ToGlobalOrder(&retOrder)
+		createdOrder, err := e.submitSpotOrder(ctx, order)
 		if err != nil {
 			return createdOrders, err
 		}
