@@ -78,7 +78,9 @@ func (s *SyncService) SyncTrades(ctx context.Context, exchange types.Exchange, s
 			return ctx.Err()
 
 		case err := <-errC:
-			return err
+			if err != nil {
+				return err
+			}
 
 		default:
 		}
