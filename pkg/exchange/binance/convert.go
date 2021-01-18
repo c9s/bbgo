@@ -30,6 +30,19 @@ func toLocalOrderType(orderType types.OrderType) (binance.OrderType, error) {
 	return "", fmt.Errorf("order type %s not supported", orderType)
 }
 
+func ToGlobalOrders(binanceOrders []*binance.Order) (orders []types.Order, err error) {
+	for _, binanceOrder := range binanceOrders {
+		order, err := ToGlobalOrder(binanceOrder)
+		if err != nil {
+			return orders, err
+		}
+
+		orders = append(orders, *order)
+	}
+
+	return orders, err
+}
+
 func ToGlobalOrder(binanceOrder *binance.Order) (*types.Order, error) {
 	return &types.Order{
 		SubmitOrder: types.SubmitOrder{

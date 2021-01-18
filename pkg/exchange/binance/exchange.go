@@ -294,21 +294,21 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 }
 
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
+	if e.useMargin {
+		binanceOrders, err := e.Client.NewListMarginOpenOrdersService().Symbol(symbol).Do(ctx)
+		if err != nil {
+			return orders, err
+		}
+
+		return ToGlobalOrders(binanceOrders)
+	}
+
 	binanceOrders, err := e.Client.NewListOpenOrdersService().Symbol(symbol).Do(ctx)
 	if err != nil {
 		return orders, err
 	}
 
-	for _, binanceOrder := range binanceOrders {
-		order, err := ToGlobalOrder(binanceOrder)
-		if err != nil {
-			return orders, err
-		}
-
-		orders = append(orders, *order)
-	}
-
-	return orders, err
+	return ToGlobalOrders(binanceOrders)
 }
 
 func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []types.Order, err error) {
