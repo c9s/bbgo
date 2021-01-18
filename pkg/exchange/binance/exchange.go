@@ -295,7 +295,10 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
 	if e.useMargin {
-		binanceOrders, err := e.Client.NewListMarginOpenOrdersService().Symbol(symbol).Do(ctx)
+		req := e.Client.NewListMarginOpenOrdersService().Symbol(symbol)
+		req.IsIsolated(e.useMarginIsolated)
+
+		binanceOrders, err := req.Do(ctx)
 		if err != nil {
 			return orders, err
 		}
@@ -318,6 +321,25 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 
 	time.Sleep(3 * time.Second)
 
+	if e.useMargin {
+		req := e.Client.NewListMarginOrdersService().Symbol(symbol)
+		req.IsIsolated(e.useMarginIsolated)
+
+		if lastOrderID > 0 {
+			req.OrderID(int64(lastOrderID))
+		} else {
+			req.StartTime(since.UnixNano() / int64(time.Millisecond)).
+				EndTime(until.UnixNano() / int64(time.Millisecond))
+		}
+
+		binanceOrders, err := req.Do(ctx)
+		if err != nil {
+			return orders, err
+		}
+
+		return ToGlobalOrders(binanceOrders)
+	}
+
 	log.Infof("querying closed orders %s from %s <=> %s ...", symbol, since, until)
 	req := e.Client.NewListOrdersService().
 		Symbol(symbol)
@@ -334,19 +356,7 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 		return orders, err
 	}
 
-	if len(binanceOrders) == 0 {
-		return orders, nil
-	}
-
-	for _, binanceOrder := range binanceOrders {
-		order, err := ToGlobalOrder(binanceOrder)
-		if err != nil {
-			return orders, err
-		}
-		orders = append(orders, *order)
-	}
-
-	return orders, nil
+	return ToGlobalOrders(binanceOrders)
 }
 
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err2 error) {
