@@ -21,7 +21,6 @@ import (
 func init() {
 	PnLCmd.Flags().String("exchange", "", "target exchange")
 	PnLCmd.Flags().String("symbol", "BTCUSDT", "trading symbol")
-	PnLCmd.Flags().String("since", "", "pnl since time")
 	RootCmd.AddCommand(PnLCmd)
 }
 
@@ -57,41 +56,7 @@ var PnLCmd = &cobra.Command{
 			return err
 		}
 
-		since, err := cmd.Flags().GetString("since")
-		if err != nil {
-			return err
-		}
-
-		// default start time
-		var startTime = time.Now().AddDate(0, -3, 0)
-		if len(since) > 0 {
-			loc, err := time.LoadLocation("Asia/Taipei")
-			if err != nil {
-				return err
-			}
-
-			startTime, err = time.ParseInLocation("2006-01-02", since, loc)
-			if err != nil {
-				return err
-			}
-		}
-
 		tradeService := &service.TradeService{DB: db}
-		orderService := &service.OrderService{DB: db}
-		syncService := &service.SyncService{
-			TradeService: tradeService,
-			OrderService: orderService,
-		}
-
-		logrus.Info("syncing trades from exchange...")
-		if err := syncService.SyncTrades(ctx, exchange, symbol, startTime); err != nil {
-			return err
-		}
-
-		logrus.Info("syncing orders from exchange...")
-		if err := syncService.SyncOrders(ctx, exchange, symbol, startTime); err != nil {
-			return err
-		}
 
 		var trades []types.Trade
 		tradingFeeCurrency := exchange.PlatformFeeCurrency()
@@ -123,15 +88,15 @@ var PnLCmd = &cobra.Command{
 
 		now := time.Now()
 		kLines, err := exchange.QueryKLines(ctx, symbol, types.Interval1m, types.KLineQueryOptions{
-			Limit:     100,
-			EndTime:   &now,
+			Limit:   100,
+			EndTime: &now,
 		})
 
 		if len(kLines) == 0 {
 			return errors.New("no kline data for current price")
 		}
 
-		currentPrice := kLines[len(kLines) - 1].Close
+		currentPrice := kLines[len(kLines)-1].Close
 		calculator := &pnl.AverageCostCalculator{
 			TradingFeeCurrency: tradingFeeCurrency,
 		}
