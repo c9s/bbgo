@@ -614,31 +614,58 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 }
 
 func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
-	req := e.Client.NewListTradesService().
-		Limit(1000).
-		Symbol(symbol)
+	var remoteTrades []*binance.TradeV3
 
-	if options.Limit > 0 {
-		req.Limit(int(options.Limit))
-	}
+	if e.useMargin {
+		req := e.Client.NewListMarginTradesService().
+			IsIsolated(e.useMarginIsolated).
+			Symbol(symbol)
 
-	if options.StartTime != nil {
-		req.StartTime(options.StartTime.UnixNano() / int64(time.Millisecond))
-	}
-	if options.EndTime != nil {
-		req.EndTime(options.EndTime.UnixNano() / int64(time.Millisecond))
-	}
-	if options.LastTradeID > 0 {
-		req.FromID(options.LastTradeID)
-	}
+		if options.Limit > 0 {
+			req.Limit(int(options.Limit))
+		}
 
-	remoteTrades, err := req.Do(ctx)
-	if err != nil {
-		return nil, err
+		if options.StartTime != nil {
+			req.StartTime(options.StartTime.UnixNano() / int64(time.Millisecond))
+		}
+		if options.EndTime != nil {
+			req.EndTime(options.EndTime.UnixNano() / int64(time.Millisecond))
+		}
+		if options.LastTradeID > 0 {
+			req.FromID(options.LastTradeID)
+		}
+
+		remoteTrades, err = req.Do(ctx)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		req := e.Client.NewListTradesService().
+			Limit(1000).
+			Symbol(symbol)
+
+		if options.Limit > 0 {
+			req.Limit(int(options.Limit))
+		}
+
+		if options.StartTime != nil {
+			req.StartTime(options.StartTime.UnixNano() / int64(time.Millisecond))
+		}
+		if options.EndTime != nil {
+			req.EndTime(options.EndTime.UnixNano() / int64(time.Millisecond))
+		}
+		if options.LastTradeID > 0 {
+			req.FromID(options.LastTradeID)
+		}
+
+		remoteTrades, err = req.Do(ctx)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	for _, t := range remoteTrades {
-		localTrade, err := ToGlobalTrade(*t, false)
+		localTrade, err := ToGlobalTrade(*t, e.useMargin)
 		if err != nil {
 			log.WithError(err).Errorf("can not convert binance trade: %+v", t)
 			continue
