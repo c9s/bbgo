@@ -462,7 +462,8 @@ func (e *Exchange) submitMarginOrder(ctx context.Context, order types.SubmitOrde
 		Side:                     response.Side,
 		UpdateTime:               response.TransactTime,
 		Time:                     response.TransactTime,
-	})
+		IsIsolated:               response.IsIsolated,
+	}, true)
 
 	return createdOrder, err
 }
@@ -525,12 +526,12 @@ func (e *Exchange) submitSpotOrder(ctx context.Context, order types.SubmitOrder)
 		Side:                     response.Side,
 		UpdateTime:               response.TransactTime,
 		Time:                     response.TransactTime,
-		// IsIsolated:               response.IsIsolated,
+		IsIsolated:               response.IsIsolated,
 		// StopPrice:
 		// IcebergQuantity:
 		// UpdateTime:
 		// IsWorking:               ,
-	})
+	}, false)
 
 	return createdOrder, err
 }
@@ -637,7 +638,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	}
 
 	for _, t := range remoteTrades {
-		localTrade, err := ToGlobalTrade(*t)
+		localTrade, err := ToGlobalTrade(*t, false)
 		if err != nil {
 			log.WithError(err).Errorf("can not convert binance trade: %+v", t)
 			continue
