@@ -24,6 +24,7 @@ var log = logrus.WithFields(logrus.Fields{
 
 func init() {
 	_ = types.Exchange(&Exchange{})
+	_ = types.MarginExchange(&Exchange{})
 
 	if ok, _ := strconv.ParseBool(os.Getenv("DEBUG_BINANCE_STREAM")); ok {
 		log.Level = logrus.DebugLevel
@@ -31,7 +32,7 @@ func init() {
 }
 
 type Exchange struct {
-	MarginSettings
+	types.MarginSettings
 
 	Client *binance.Client
 }
@@ -294,9 +295,9 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 }
 
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
-	if e.useMargin {
+	if e.IsMargin {
 		req := e.Client.NewListMarginOpenOrdersService().Symbol(symbol)
-		req.IsIsolated(e.useMarginIsolated)
+		req.IsIsolated(e.IsIsolatedMargin)
 
 		binanceOrders, err := req.Do(ctx)
 		if err != nil {
@@ -320,10 +321,11 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 	}
 
 	time.Sleep(3 * time.Second)
+	log.Infof("querying closed orders %s from %s <=> %s ...", symbol, since, until)
 
-	if e.useMargin {
+	if e.IsMargin {
 		req := e.Client.NewListMarginOrdersService().Symbol(symbol)
-		req.IsIsolated(e.useMarginIsolated)
+		req.IsIsolated(e.IsIsolatedMargin)
 
 		if lastOrderID > 0 {
 			req.OrderID(int64(lastOrderID))
@@ -340,7 +342,6 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 		return ToGlobalOrders(binanceOrders)
 	}
 
-	log.Infof("querying closed orders %s from %s <=> %s ...", symbol, since, until)
 	req := e.Client.NewListOrdersService().
 		Symbol(symbol)
 
@@ -402,8 +403,8 @@ func (e *Exchange) submitMarginOrder(ctx context.Context, order types.SubmitOrde
 	// use response result format
 	req.NewOrderRespType(binance.NewOrderRespTypeRESULT)
 
-	if e.useMarginIsolated {
-		req.IsIsolated(e.useMarginIsolated)
+	if e.IsIsolatedMargin {
+		req.IsIsolated(e.IsIsolatedMargin)
 	}
 
 	if len(order.MarginSideEffect) > 0 {
@@ -540,7 +541,7 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 	for _, order := range orders {
 		var createdOrder *types.Order
 
-		if e.useMargin {
+		if e.IsMargin {
 			createdOrder, err = e.submitMarginOrder(ctx, order)
 		} else {
 			createdOrder, err = e.submitSpotOrder(ctx, order)
@@ -616,9 +617,9 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
 	var remoteTrades []*binance.TradeV3
 
-	if e.useMargin {
+	if e.IsMargin {
 		req := e.Client.NewListMarginTradesService().
-			IsIsolated(e.useMarginIsolated).
+			IsIsolated(e.IsIsolatedMargin).
 			Symbol(symbol)
 
 		if options.Limit > 0 {
@@ -665,7 +666,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	}
 
 	for _, t := range remoteTrades {
-		localTrade, err := ToGlobalTrade(*t, e.useMargin)
+		localTrade, err := ToGlobalTrade(*t, e.IsMargin)
 		if err != nil {
 			log.WithError(err).Errorf("can not convert binance trade: %+v", t)
 			continue

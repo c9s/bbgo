@@ -30,7 +30,7 @@ type StreamRequest struct {
 
 //go:generate callbackgen -type Stream -interface
 type Stream struct {
-	MarginSettings
+	types.MarginSettings
 
 	types.StandardStream
 
@@ -191,11 +191,11 @@ func (s *Stream) dial(listenKey string) (*websocket.Conn, error) {
 }
 
 func (s *Stream) fetchListenKey(ctx context.Context) (string, error) {
-	if s.useMargin {
-		if s.useMarginIsolated {
-			log.Infof("isolated margin %s is enabled, requesting margin user stream listen key...", s.useMarginIsolatedSymbol)
+	if s.IsMargin {
+		if s.IsIsolatedMargin {
+			log.Infof("isolated margin %s is enabled, requesting margin user stream listen key...", s.IsolatedMarginSymbol)
 			req := s.Client.NewStartIsolatedMarginUserStreamService()
-			req.Symbol(s.useMarginIsolatedSymbol)
+			req.Symbol(s.IsolatedMarginSymbol)
 			return req.Do(ctx)
 		}
 
@@ -208,10 +208,10 @@ func (s *Stream) fetchListenKey(ctx context.Context) (string, error) {
 }
 
 func (s *Stream) keepaliveListenKey(ctx context.Context, listenKey string) error {
-	if s.useMargin {
-		if s.useMarginIsolated {
+	if s.IsMargin {
+		if s.IsIsolatedMargin {
 			req := s.Client.NewKeepaliveIsolatedMarginUserStreamService().ListenKey(listenKey)
-			req.Symbol(s.useMarginIsolatedSymbol)
+			req.Symbol(s.IsolatedMarginSymbol)
 			return req.Do(ctx)
 		}
 
@@ -389,10 +389,10 @@ func (s *Stream) invalidateListenKey(ctx context.Context, listenKey string) (err
 	// should use background context to invalidate the user stream
 	log.Info("closing listen key")
 
-	if s.useMargin {
-		if s.useMarginIsolated {
+	if s.IsMargin {
+		if s.IsIsolatedMargin {
 			req := s.Client.NewCloseIsolatedMarginUserStreamService().ListenKey(listenKey)
-			req.Symbol(s.useMarginIsolatedSymbol)
+			req.Symbol(s.IsolatedMarginSymbol)
 			err = req.Do(ctx)
 		} else {
 			req := s.Client.NewCloseMarginUserStreamService().ListenKey(listenKey)

@@ -15,7 +15,18 @@ type SyncService struct {
 }
 
 func (s *SyncService) SyncOrders(ctx context.Context, exchange types.Exchange, symbol string, startTime time.Time) error {
-	lastOrder, err := s.OrderService.QueryLast(exchange.Name(), symbol)
+	isMargin := false
+	isIsolated := false
+	if marginExchange, ok := exchange.(types.MarginExchange); ok {
+		marginSettings := marginExchange.GetMarginSettings()
+		isMargin = marginSettings.IsMargin
+		isIsolated = marginSettings.IsIsolatedMargin
+		if marginSettings.IsIsolatedMargin {
+			symbol = marginSettings.IsolatedMarginSymbol
+		}
+	}
+
+	lastOrder, err := s.OrderService.QueryLast(exchange.Name(), symbol, isMargin, isIsolated)
 	if err != nil {
 		return err
 	}
@@ -54,7 +65,18 @@ func (s *SyncService) SyncOrders(ctx context.Context, exchange types.Exchange, s
 }
 
 func (s *SyncService) SyncTrades(ctx context.Context, exchange types.Exchange, symbol string, startTime time.Time) error {
-	lastTrade, err := s.TradeService.QueryLast(exchange.Name(), symbol)
+	isMargin := false
+	isIsolated := false
+	if marginExchange, ok := exchange.(types.MarginExchange); ok {
+		marginSettings := marginExchange.GetMarginSettings()
+		isMargin = marginSettings.IsMargin
+		isIsolated = marginSettings.IsIsolatedMargin
+		if marginSettings.IsIsolatedMargin {
+			symbol = marginSettings.IsolatedMarginSymbol
+		}
+	}
+
+	lastTrade, err := s.TradeService.QueryLast(exchange.Name(), symbol, isMargin, isIsolated)
 	if err != nil {
 		return err
 	}

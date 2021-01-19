@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/adshao/go-binance/v2"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
@@ -67,7 +66,8 @@ type Exchange interface {
 type MarginExchange interface {
 	UseMargin()
 	UseIsolatedMargin(symbol string)
-	QueryMarginAccount(ctx context.Context) (*binance.MarginAccount, error)
+	GetMarginSettings() MarginSettings
+	// QueryMarginAccount(ctx context.Context) (*binance.MarginAccount, error)
 }
 
 type TradeQueryOptions struct {
@@ -220,4 +220,24 @@ func (e ExchangeBatchProcessor) BatchQueryTrades(ctx context.Context, symbol str
 	}()
 
 	return c, errC
+}
+
+type MarginSettings struct {
+	IsMargin             bool
+	IsIsolatedMargin     bool
+	IsolatedMarginSymbol string
+}
+
+func (e MarginSettings) GetMarginSettings() MarginSettings {
+	return e
+}
+
+func (e *MarginSettings) UseMargin() {
+	e.IsMargin = true
+}
+
+func (e *MarginSettings) UseIsolatedMargin(symbol string) {
+	e.IsMargin = true
+	e.IsIsolatedMargin = true
+	e.IsolatedMarginSymbol = symbol
 }
