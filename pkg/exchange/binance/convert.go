@@ -32,7 +32,7 @@ func toLocalOrderType(orderType types.OrderType) (binance.OrderType, error) {
 
 func ToGlobalOrders(binanceOrders []*binance.Order) (orders []types.Order, err error) {
 	for _, binanceOrder := range binanceOrders {
-		order, err := ToGlobalOrder(binanceOrder)
+		order, err := ToGlobalOrder(binanceOrder, false)
 		if err != nil {
 			return orders, err
 		}
@@ -43,7 +43,7 @@ func ToGlobalOrders(binanceOrders []*binance.Order) (orders []types.Order, err e
 	return orders, err
 }
 
-func ToGlobalOrder(binanceOrder *binance.Order) (*types.Order, error) {
+func ToGlobalOrder(binanceOrder *binance.Order, isMargin bool) (*types.Order, error) {
 	return &types.Order{
 		SubmitOrder: types.SubmitOrder{
 			ClientOrderID: binanceOrder.ClientOrderID,
@@ -61,6 +61,8 @@ func ToGlobalOrder(binanceOrder *binance.Order) (*types.Order, error) {
 		ExecutedQuantity: util.MustParseFloat(binanceOrder.ExecutedQuantity),
 		CreationTime:     millisecondTime(binanceOrder.Time),
 		UpdateTime:       millisecondTime(binanceOrder.UpdateTime),
+		IsMargin:         isMargin,
+		IsIsolated:       binanceOrder.IsIsolated,
 	}, nil
 }
 
@@ -68,7 +70,7 @@ func millisecondTime(t int64) time.Time {
 	return time.Unix(0, t*int64(time.Millisecond))
 }
 
-func ToGlobalTrade(t binance.TradeV3) (*types.Trade, error) {
+func ToGlobalTrade(t binance.TradeV3, isMargin bool) (*types.Trade, error) {
 	// skip trade ID that is the same. however this should not happen
 	var side types.SideType
 	if t.IsBuyer {
@@ -114,6 +116,8 @@ func ToGlobalTrade(t binance.TradeV3) (*types.Trade, error) {
 		FeeCurrency:   t.CommissionAsset,
 		QuoteQuantity: quoteQuantity,
 		Time:          millisecondTime(t.Time),
+		IsMargin:      isMargin,
+		IsIsolated:    t.IsIsolated,
 	}, nil
 }
 
@@ -176,7 +180,7 @@ func toGlobalOrderStatus(orderStatus binance.OrderStatusType) types.OrderStatus 
 // ConvertTrades converts the binance v3 trade into the global trade type
 func ConvertTrades(remoteTrades []*binance.TradeV3) (trades []types.Trade, err error) {
 	for _, t := range remoteTrades {
-		trade, err := ToGlobalTrade(*t)
+		trade, err := ToGlobalTrade(*t, false)
 		if err != nil {
 			return nil, errors.Wrapf(err, "binance v3 trade parse error, trade: %+v", *t)
 		}
