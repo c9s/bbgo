@@ -2,18 +2,19 @@ package cmd
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"time"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
-	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
-	"github.com/c9s/bbgo/pkg/types"
 )
 
 func init() {
-	SyncCmd.Flags().String("exchange", "", "target exchange")
+	SyncCmd.Flags().String("session", "", "the exchange session name for sync")
 	SyncCmd.Flags().String("symbol", "BTCUSDT", "trading symbol")
 	SyncCmd.Flags().String("since", "", "sync from time")
 	RootCmd.AddCommand(SyncCmd)
@@ -26,22 +27,30 @@ var SyncCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 
-		exchangeNameStr, err := cmd.Flags().GetString("exchange")
+		configFile, err := cmd.Flags().GetString("config")
 		if err != nil {
 			return err
 		}
 
-		exchangeName, err := types.ValidExchangeName(exchangeNameStr)
+		if len(configFile) == 0 {
+			return errors.New("--config option is required")
+		}
+
+		if _, err := os.Stat(configFile); os.IsNotExist(err) {
+			return err
+		}
+
+		userConfig, err := bbgo.Load(configFile, false)
 		if err != nil {
 			return err
 		}
 
-		symbol, err := cmd.Flags().GetString("symbol")
+		sessionName, err := cmd.Flags().GetString("session")
 		if err != nil {
 			return err
 		}
 
-		exchange, err := cmdutil.NewExchange(exchangeName)
+		since, err := cmd.Flags().GetString("since")
 		if err != nil {
 			return err
 		}
@@ -51,8 +60,7 @@ var SyncCmd = &cobra.Command{
 			return err
 		}
 
-		since, err := cmd.Flags().GetString("since")
-		if err != nil {
+		if err := environ.AddExchangesFromConfig(userConfig); err != nil {
 			return err
 		}
 
@@ -73,13 +81,28 @@ var SyncCmd = &cobra.Command{
 			}
 		}
 
-		log.Info("syncing trades from exchange...")
-		if err := environ.TradeSync.SyncTrades(ctx, exchange, symbol, startTime); err != nil {
+		symbol, err := cmd.Flags().GetString("symbol")
+		if err != nil {
 			return err
 		}
 
-		log.Info("syncing orders from exchange...")
-		if err := environ.TradeSync.SyncOrders(ctx, exchange, symbol, startTime); err != nil {
+		session, ok := environ.Session(sessionName)
+		if !ok {
+			return fmt.Errorf("session %s not found", sessionName)
+		}
+
+		if session.IsIsolatedMargin {
+			log.Infof("session is configured as isolated margin, using isolated margin symbol %s instead", session.IsolatedMarginSymbol)
+			symbol = session.IsolatedMarginSymbol
+		}
+
+		log.Infof("syncing trades from exchange session %s...", sessionName)
+		if err := environ.TradeSync.SyncTrades(ctx, session.Exchange, symbol, startTime); err != nil {
+			return err
+		}
+
+		log.Infof("syncing orders from exchange session %s...", sessionName)
+		if err := environ.TradeSync.SyncOrders(ctx, session.Exchange, symbol, startTime); err != nil {
 			return err
 		}
 

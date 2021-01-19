@@ -125,6 +125,12 @@ type ExchangeSession struct {
 	standardIndicatorSets map[string]*StandardIndicatorSet
 
 	loadedSymbols map[string]struct{}
+
+	IsMargin bool
+
+	IsIsolatedMargin bool
+
+	IsolatedMarginSymbol string
 }
 
 func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
