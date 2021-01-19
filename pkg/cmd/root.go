@@ -31,7 +31,7 @@ var RootCmd = &cobra.Command{
 
 func init() {
 	RootCmd.PersistentFlags().Bool("debug", false, "debug flag")
-	RootCmd.PersistentFlags().String("config", "", "config file")
+	RootCmd.PersistentFlags().String("config", "config/bbgo.yaml", "config file")
 
 	// A flag can be 'persistent' meaning that this flag will be available to
 	// the command it's assigned to as well as every command under that command.

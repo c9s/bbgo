@@ -67,6 +67,11 @@ func NewEnvironment() *Environment {
 	}
 }
 
+func (environ *Environment) Session(name string) (*ExchangeSession, bool) {
+	s, ok := environ.sessions[name]
+	return s, ok
+}
+
 func (environ *Environment) Sessions() map[string]*ExchangeSession {
 	return environ.sessions
 }
@@ -100,10 +105,16 @@ func (environ *Environment) SetDB(db *sqlx.DB) *Environment {
 	return environ
 }
 
-func (environ *Environment) AddExchange(name string, exchange types.Exchange) (session *ExchangeSession) {
-	session = NewExchangeSession(name, exchange)
+// AddExchangeSession adds the existing exchange session or pre-created exchange session
+func (environ *Environment) AddExchangeSession(name string, session *ExchangeSession) *ExchangeSession {
 	environ.sessions[name] = session
 	return session
+}
+
+// AddExchange adds the given exchange with the session name, this is the default
+func (environ *Environment) AddExchange(name string, exchange types.Exchange) (session *ExchangeSession) {
+	session = NewExchangeSession(name, exchange)
+	return environ.AddExchangeSession(name, session)
 }
 
 func (environ *Environment) AddExchangesFromConfig(userConfig *Config) error {
@@ -141,16 +152,25 @@ func (environ *Environment) AddExchangesFromSessionConfig(sessions map[string]Se
 			return err
 		}
 
+		// configure exchange
 		if sessionConfig.Margin {
 			marginExchange, ok := exchange.(types.MarginExchange)
 			if !ok {
 				return fmt.Errorf("exchange %s does not support margin", exchangeName)
 			}
 
-			marginExchange.UseIsolatedMargin(sessionConfig.IsolatedMarginSymbol)
+			if sessionConfig.IsolatedMargin {
+				marginExchange.UseIsolatedMargin(sessionConfig.IsolatedMarginSymbol)
+			} else {
+				marginExchange.UseMargin()
+			}
 		}
 
-		environ.AddExchange(sessionName, exchange)
+		session := NewExchangeSession(sessionName, exchange)
+		session.IsMargin = sessionConfig.Margin
+		session.IsIsolatedMargin = sessionConfig.IsolatedMargin
+		session.IsolatedMarginSymbol = sessionConfig.IsolatedMarginSymbol
+		environ.AddExchangeSession(sessionName, session)
 	}
 
 	return nil
