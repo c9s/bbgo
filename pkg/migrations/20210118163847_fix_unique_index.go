@@ -18,7 +18,7 @@ func upFixUniqueIndex(ctx context.Context, tx rockhopper.SQLExecutor) (err error
 		return err
 	}
 
-	_, err = tx.ExecContext(ctx, "ALTER TABLE `trades` ADD INDEX UNIQUE `id` ON (`exchange`,`symbol`, `side`, `id`);")
+	_, err = tx.ExecContext(ctx, "ALTER TABLE `trades` ADD UNIQUE INDEX `id` (`exchange`,`symbol`, `side`, `id`);")
 	if err != nil {
 		return err
 	}
@@ -34,7 +34,7 @@ func downFixUniqueIndex(ctx context.Context, tx rockhopper.SQLExecutor) (err err
 		return err
 	}
 
-	_, err = tx.ExecContext(ctx, "ALTER TABLE `trades` ADD INDEX UNIQUE `id` ON (`id`);")
+	_, err = tx.ExecContext(ctx, "ALTER TABLE `trades` ADD UNIQUE INDEX `id` (`id`);")
 	if err != nil {
 		return err
 	}
