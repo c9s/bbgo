@@ -24,7 +24,6 @@ var (
 	SideEffectTypeAutoRepay    MarginOrderSideEffectType = "AUTO_REPAY"
 )
 
-
 // OrderType define order type
 type OrderType string
 
@@ -120,6 +119,9 @@ type Order struct {
 	IsWorking        bool        `json:"isWorking" db:"is_working"`
 	CreationTime     time.Time   `json:"creationTime" db:"created_at"`
 	UpdateTime       time.Time   `json:"updateTime" db:"updated_at"`
+
+	IsMargin   bool `json:"isMargin" db:"is_margin"`
+	IsIsolated bool `json:"isIsolated" db:"is_isolated"`
 }
 
 func (o Order) String() string {

@@ -34,6 +34,9 @@ type Trade struct {
 	Time        time.Time `json:"tradedAt" db:"traded_at"`
 	Fee         float64   `json:"fee" db:"fee"`
 	FeeCurrency string    `json:"feeCurrency" db:"fee_currency"`
+
+	IsMargin   bool `json:"isMargin" db:"is_margin"`
+	IsIsolated bool `json:"isIsolated" db:"is_isolated"`
 }
 
 func (trade Trade) PlainText() string {
