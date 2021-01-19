@@ -13,12 +13,14 @@ type OrderService struct {
 }
 
 // QueryLast queries the last order from the database
-func (s *OrderService) QueryLast(ex types.ExchangeName, symbol string) (*types.Order, error) {
-	log.Infof("querying last order exchange = %s AND symbol = %s", ex, symbol)
+func (s *OrderService) QueryLast(ex types.ExchangeName, symbol string, isMargin bool, isIsolated bool) (*types.Order, error) {
+	log.Infof("querying last order exchange = %s AND symbol = %s AND is_margin = %v AND is_isolated = %v", ex, symbol, isMargin, isIsolated)
 
-	rows, err := s.DB.NamedQuery(`SELECT * FROM orders WHERE exchange = :exchange AND symbol = :symbol ORDER BY gid DESC LIMIT 1`, map[string]interface{}{
-		"exchange": ex,
-		"symbol":   symbol,
+	rows, err := s.DB.NamedQuery(`SELECT * FROM orders WHERE exchange = :exchange AND symbol = :symbol AND is_margin = :is_margin AND is_isolated = :is_isolated ORDER BY gid DESC LIMIT 1`, map[string]interface{}{
+		"exchange":    ex,
+		"symbol":      symbol,
+		"is_margin":   isMargin,
+		"is_isolated": isIsolated,
 	})
 
 	if err != nil {
