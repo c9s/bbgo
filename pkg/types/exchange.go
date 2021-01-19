@@ -95,6 +95,8 @@ func (e ExchangeBatchProcessor) BatchQueryClosedOrders(ctx context.Context, symb
 		}
 
 		for startTime.Before(endTime) {
+			time.Sleep(5 * time.Second)
+
 			log.Infof("batch querying %s closed orders %s <=> %s", symbol, startTime, endTime)
 
 			orders, err := e.QueryClosedOrders(ctx, symbol, startTime, endTime, lastOrderID)
@@ -134,6 +136,8 @@ func (e ExchangeBatchProcessor) BatchQueryKLines(ctx context.Context, symbol str
 		defer close(errC)
 
 		for startTime.Before(endTime) {
+			time.Sleep(5 * time.Second)
+
 			kLines, err := e.QueryKLines(ctx, symbol, interval, KLineQueryOptions{
 				StartTime: &startTime,
 				Limit:     1000,
@@ -184,6 +188,7 @@ func (e ExchangeBatchProcessor) BatchQueryTrades(ctx context.Context, symbol str
 		defer close(errC)
 
 		for {
+			time.Sleep(5 * time.Second)
 			log.Infof("querying %s trades from %s, limit=%d", symbol, startTime, options.Limit)
 
 			trades, err := e.QueryTrades(ctx, symbol, &TradeQueryOptions{

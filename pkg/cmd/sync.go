@@ -45,11 +45,6 @@ var SyncCmd = &cobra.Command{
 			return err
 		}
 
-		sessionName, err := cmd.Flags().GetString("session")
-		if err != nil {
-			return err
-		}
-
 		since, err := cmd.Flags().GetString("since")
 		if err != nil {
 			return err
@@ -81,33 +76,54 @@ var SyncCmd = &cobra.Command{
 			}
 		}
 
+		sessionName, err := cmd.Flags().GetString("session")
+		if err != nil {
+			return err
+		}
+
 		symbol, err := cmd.Flags().GetString("symbol")
 		if err != nil {
 			return err
 		}
 
-		session, ok := environ.Session(sessionName)
-		if !ok {
-			return fmt.Errorf("session %s not found", sessionName)
+		if len(sessionName) > 0 {
+			session, ok := environ.Session(sessionName)
+			if !ok {
+				return fmt.Errorf("session %s not found", sessionName)
+			}
+
+			return syncSession(ctx, environ, session, symbol, startTime)
 		}
 
-		if session.IsIsolatedMargin {
-			log.Infof("session is configured as isolated margin, using isolated margin symbol %s instead", session.IsolatedMarginSymbol)
-			symbol = session.IsolatedMarginSymbol
+		for _, session := range environ.Sessions() {
+			if err := syncSession(ctx, environ, session, symbol, startTime); err != nil {
+				return err
+			}
 		}
-
-		log.Infof("syncing trades from exchange session %s...", sessionName)
-		if err := environ.TradeSync.SyncTrades(ctx, session.Exchange, symbol, startTime); err != nil {
-			return err
-		}
-
-		log.Infof("syncing orders from exchange session %s...", sessionName)
-		if err := environ.TradeSync.SyncOrders(ctx, session.Exchange, symbol, startTime); err != nil {
-			return err
-		}
-
-		log.Info("synchronization done")
 
 		return nil
 	},
+}
+
+func syncSession(ctx context.Context, environ *bbgo.Environment, session *bbgo.ExchangeSession, symbol string, startTime time.Time) error {
+	log.Infof("starting syncing exchange session %s", session.Name)
+
+	if session.IsIsolatedMargin {
+		log.Infof("session is configured as isolated margin session, using isolated margin symbol %s instead of %s", session.IsolatedMarginSymbol, symbol)
+		symbol = session.IsolatedMarginSymbol
+	}
+
+	log.Infof("syncing trades from exchange session %s...", session.Name)
+	if err := environ.TradeSync.SyncTrades(ctx, session.Exchange, symbol, startTime); err != nil {
+		return err
+	}
+
+	log.Infof("syncing orders from exchange session %s...", session.Name)
+	if err := environ.TradeSync.SyncOrders(ctx, session.Exchange, symbol, startTime); err != nil {
+		return err
+	}
+
+	log.Infof("exchange session %s synchronization done", session.Name)
+
+	return nil
 }

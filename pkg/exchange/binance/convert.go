@@ -138,7 +138,8 @@ func toGlobalSideType(side binance.SideType) types.SideType {
 func toGlobalOrderType(orderType binance.OrderType) types.OrderType {
 	switch orderType {
 
-	case binance.OrderTypeLimit:
+	case binance.OrderTypeLimit,
+		binance.OrderTypeLimitMaker, binance.OrderTypeTakeProfitLimit:
 		return types.OrderTypeLimit
 
 	case binance.OrderTypeMarket:
