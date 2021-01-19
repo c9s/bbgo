@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -61,7 +61,7 @@ var PnLCmd = &cobra.Command{
 		var trades []types.Trade
 		tradingFeeCurrency := exchange.PlatformFeeCurrency()
 		if strings.HasPrefix(symbol, tradingFeeCurrency) {
-			logrus.Infof("loading all trading fee currency related trades: %s", symbol)
+			log.Infof("loading all trading fee currency related trades: %s", symbol)
 			trades, err = tradeService.QueryForTradingFeeCurrency(exchange.Name(), symbol, tradingFeeCurrency)
 		} else {
 			trades, err = tradeService.Query(exchange.Name(), symbol)
@@ -71,7 +71,7 @@ var PnLCmd = &cobra.Command{
 			return err
 		}
 
-		logrus.Infof("%d trades loaded", len(trades))
+		log.Infof("%d trades loaded", len(trades))
 
 		stockManager := &accounting.StockDistribution{
 			Symbol:             symbol,
@@ -83,8 +83,8 @@ var PnLCmd = &cobra.Command{
 			return err
 		}
 
-		logrus.Infof("found checkpoints: %+v", checkpoints)
-		logrus.Infof("stock: %f", stockManager.Stocks.Quantity())
+		log.Infof("found checkpoints: %+v", checkpoints)
+		log.Infof("stock: %f", stockManager.Stocks.Quantity())
 
 		now := time.Now()
 		kLines, err := exchange.QueryKLines(ctx, symbol, types.Interval1m, types.KLineQueryOptions{
