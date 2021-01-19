@@ -320,7 +320,6 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 		until = since.Add(24*time.Hour - time.Millisecond)
 	}
 
-	time.Sleep(3 * time.Second)
 	log.Infof("querying closed orders %s from %s <=> %s ...", symbol, since, until)
 
 	if e.IsMargin {
@@ -572,8 +571,6 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 
 	log.Infof("querying kline %s %s %v", symbol, interval, options)
 
-	// avoid rate limit
-	time.Sleep(500 * time.Millisecond)
 	req := e.Client.NewKlinesService().
 		Symbol(symbol).
 		Interval(string(interval)).
@@ -700,9 +697,6 @@ func (e *Exchange) BatchQueryKLines(ctx context.Context, symbol string, interval
 			allKLines = append(allKLines, kline)
 			startTime = kline.EndTime
 		}
-
-		// avoid rate limit
-		time.Sleep(100 * time.Millisecond)
 	}
 
 	return allKLines, nil
