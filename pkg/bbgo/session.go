@@ -121,6 +121,8 @@ type ExchangeSession struct {
 	// marketDataStores contains the market data store of each market
 	marketDataStores map[string]*MarketDataStore
 
+	positions map[string]*Position
+
 	// standard indicators of each market
 	standardIndicatorSets map[string]*StandardIndicatorSet
 
@@ -151,6 +153,7 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 		markets:               make(map[string]types.Market),
 		startPrices:           make(map[string]float64),
 		lastPrices:            make(map[string]float64),
+		positions:             make(map[string]*Position),
 		marketDataStores:      make(map[string]*MarketDataStore),
 		standardIndicatorSets: make(map[string]*StandardIndicatorSet),
 
