@@ -61,11 +61,7 @@ func (p *Position) AddTrade(t types.Trade) (fixedpoint.Value, bool) {
 			}
 		}
 
-		if p.AverageCost == 0 {
-			p.AverageCost = price
-		} else {
-			p.AverageCost = (p.AverageCost.Mul(p.Base) + price.Mul(quantity)).Div(p.Base + quantity)
-		}
+		p.AverageCost = (p.AverageCost.Mul(p.Base) + price.Mul(quantity)).Div(p.Base + quantity)
 
 		p.Base += quantity
 		p.Quote -= fixedpoint.NewFromFloat(t.QuoteQuantity)
@@ -88,11 +84,7 @@ func (p *Position) AddTrade(t types.Trade) (fixedpoint.Value, bool) {
 		}
 
 		// handling short position
-		if p.AverageCost == 0 {
-			p.AverageCost = price
-		} else {
-			p.AverageCost = (p.AverageCost.Mul(-p.Base) + price.Mul(quantity)).Div(-p.Base + quantity)
-		}
+		p.AverageCost = (p.AverageCost.Mul(-p.Base) + price.Mul(quantity)).Div(-p.Base + quantity)
 
 		p.Base -= quantity
 		p.Quote += fixedpoint.NewFromFloat(t.QuoteQuantity)
