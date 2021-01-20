@@ -6,7 +6,10 @@ import (
 )
 
 type Position struct {
-	Symbol      string           `json:"symbol"`
+	Symbol        string `json:"symbol"`
+	BaseCurrency  string `json:"baseCurrency"`
+	QuoteCurrency string `json:"quoteCurrency"`
+
 	Base        fixedpoint.Value `json:"base"`
 	Quote       fixedpoint.Value `json:"quote"`
 	AverageCost fixedpoint.Value `json:"averageCost"`
