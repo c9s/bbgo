@@ -30,7 +30,17 @@ func TestPosition(t *testing.T) {
 		pos.AddTrade(trade)
 	}
 
+	expectedAverageCost := (1000.0*0.01 + 2000.0*0.03) / 0.04
 	assert.Equal(t, fixedpoint.NewFromFloat(-70.0), pos.Quote)
 	assert.Equal(t, fixedpoint.NewFromFloat(0.04), pos.Base)
-	assert.Equal(t, fixedpoint.NewFromFloat((1000.0*0.01+2000.0*0.03)/0.04), pos.AverageCost)
+	assert.Equal(t, fixedpoint.NewFromFloat(expectedAverageCost), pos.AverageCost)
+
+	amount, profit := pos.AddTrade(types.Trade{
+		Side:          types.SideTypeSell,
+		Price:         3000.0,
+		Quantity:      0.01,
+		QuoteQuantity: 3000.0 * 0.01,
+	})
+	assert.True(t, profit)
+	assert.Equal(t, fixedpoint.NewFromFloat((3000.0-expectedAverageCost)*0.01), amount)
 }
