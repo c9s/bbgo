@@ -6,9 +6,9 @@ import (
 )
 
 type Position struct {
-	Base        fixedpoint.Value
-	Quote       fixedpoint.Value
-	AverageCost fixedpoint.Value
+	Base        fixedpoint.Value `json:"base"`
+	Quote       fixedpoint.Value `json:"quote"`
+	AverageCost fixedpoint.Value `json:"averageCost"`
 }
 
 func (p *Position) AddTrade(t types.Trade) (fixedpoint.Value, bool) {
