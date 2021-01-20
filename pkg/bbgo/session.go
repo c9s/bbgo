@@ -166,6 +166,11 @@ func (session *ExchangeSession) StandardIndicatorSet(symbol string) (*StandardIn
 	return set, ok
 }
 
+func (session *ExchangeSession) Position(symbol string) (pos *Position, ok bool) {
+	pos, ok = session.positions[symbol]
+	return pos, ok
+}
+
 // MarketDataStore returns the market data store of a symbol
 func (session *ExchangeSession) MarketDataStore(symbol string) (s *MarketDataStore, ok bool) {
 	s, ok = session.marketDataStores[symbol]
