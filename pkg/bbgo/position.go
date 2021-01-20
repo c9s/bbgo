@@ -34,7 +34,7 @@ func (p *Position) AddTrade(t types.Trade) (fixedpoint.Value, bool) {
 		p.Base -= quantity
 		p.Quote += fixedpoint.NewFromFloat(t.QuoteQuantity)
 
-		return price - p.AverageCost, true
+		return (price - p.AverageCost).Mul(quantity), true
 	}
 
 	return 0, false
