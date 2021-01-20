@@ -14,7 +14,9 @@ type Position struct {
 
 func (p *Position) BindStream(stream types.Stream) {
 	stream.OnTradeUpdate(func(trade types.Trade) {
-		p.AddTrade(trade)
+		if p.Symbol == trade.Symbol {
+			p.AddTrade(trade)
+		}
 	})
 }
 

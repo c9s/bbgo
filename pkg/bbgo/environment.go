@@ -217,6 +217,8 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 			}
 
 			session.positions[symbol] = position
+			position.BindStream(session.Stream)
+
 			session.Trades[symbol] = trades
 			session.lastPrices[symbol] = 0.0
 
