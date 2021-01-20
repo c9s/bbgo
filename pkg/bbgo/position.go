@@ -37,6 +37,18 @@ func (p *Position) AddTrades(trades []types.Trade) (fixedpoint.Value, bool) {
 func (p *Position) AddTrade(t types.Trade) (fixedpoint.Value, bool) {
 	price := fixedpoint.NewFromFloat(t.Price)
 	quantity := fixedpoint.NewFromFloat(t.Quantity)
+	quoteQuantity := fixedpoint.NewFromFloat(t.QuoteQuantity)
+	fee := fixedpoint.NewFromFloat(t.Fee)
+
+	switch t.FeeCurrency {
+
+	case p.BaseCurrency:
+		quantity -= fee
+
+	case p.QuoteCurrency:
+		quoteQuantity -= fee
+
+	}
 
 	// Base > 0 means we're in long position
 	// Base < 0  means we're in short position
@@ -47,24 +59,22 @@ func (p *Position) AddTrade(t types.Trade) (fixedpoint.Value, bool) {
 			// handling short-to-long position
 			if p.Base+quantity > 0 {
 				closingProfit := (p.AverageCost - price).Mul(-p.Base)
-
 				p.Base += quantity
-				p.Quote -= quantity.Mul(price)
+				p.Quote -= quoteQuantity
 				p.AverageCost = price
-
 				return closingProfit, true
 			} else {
 				// covering short position
 				p.Base += quantity
-				p.Quote -= fixedpoint.NewFromFloat(t.QuoteQuantity)
+				p.Quote -= quoteQuantity
 				return (p.AverageCost - price).Mul(quantity), true
 			}
 		}
 
-		p.AverageCost = (p.AverageCost.Mul(p.Base) + price.Mul(quantity)).Div(p.Base + quantity)
-
+		p.AverageCost = (p.AverageCost.Mul(p.Base) + quoteQuantity).Div(p.Base + quantity)
 		p.Base += quantity
-		p.Quote -= fixedpoint.NewFromFloat(t.QuoteQuantity)
+		p.Quote -= quoteQuantity
+
 		return 0, false
 
 	case types.SideTypeSell:
@@ -73,21 +83,20 @@ func (p *Position) AddTrade(t types.Trade) (fixedpoint.Value, bool) {
 			if p.Base-quantity < 0 {
 				closingProfit := (price - p.AverageCost).Mul(p.Base)
 				p.Base -= quantity
-				p.Quote += quantity.Mul(price)
+				p.Quote += quoteQuantity
 				p.AverageCost = price
 				return closingProfit, true
 			} else {
 				p.Base -= quantity
-				p.Quote += fixedpoint.NewFromFloat(t.QuoteQuantity)
+				p.Quote += quoteQuantity
 				return (price - p.AverageCost).Mul(quantity), true
 			}
 		}
 
 		// handling short position
-		p.AverageCost = (p.AverageCost.Mul(-p.Base) + price.Mul(quantity)).Div(-p.Base + quantity)
-
+		p.AverageCost = (p.AverageCost.Mul(-p.Base) + quoteQuantity).Div(-p.Base + quantity)
 		p.Base -= quantity
-		p.Quote += fixedpoint.NewFromFloat(t.QuoteQuantity)
+		p.Quote += quoteQuantity
 
 		return 0, false
 	}

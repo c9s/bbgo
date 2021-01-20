@@ -10,7 +10,7 @@ import (
 )
 
 func TestPosition(t *testing.T) {
-
+	var feeRate = 0.05 * 0.01
 	var testcases = []struct {
 		name                string
 		trades              []types.Trade
@@ -19,6 +19,40 @@ func TestPosition(t *testing.T) {
 		expectedQuote       fixedpoint.Value
 		expectedProfit      fixedpoint.Value
 	}{
+		{
+			name: "base fee",
+			trades: []types.Trade{
+				{
+					Side:          types.SideTypeBuy,
+					Price:         1000.0,
+					Quantity:      0.01,
+					QuoteQuantity: 1000.0 * 0.01,
+					Fee:           0.01 * 0.05 * 0.01, // 0.05%
+					FeeCurrency:   "BTC",
+				},
+			},
+			expectedAverageCost: fixedpoint.NewFromFloat((1000.0 * 0.01) / (0.01 * (1.0 - feeRate))),
+			expectedBase:        fixedpoint.NewFromFloat(0.01 - (0.01 * feeRate)),
+			expectedQuote:       fixedpoint.NewFromFloat(0 - 1000.0*0.01),
+			expectedProfit:      fixedpoint.NewFromFloat(0.0),
+		},
+		{
+			name: "quote fee",
+			trades: []types.Trade{
+				{
+					Side:          types.SideTypeSell,
+					Price:         1000.0,
+					Quantity:      0.01,
+					QuoteQuantity: 1000.0 * 0.01,
+					Fee:           (1000.0 * 0.01) * feeRate, // 0.05%
+					FeeCurrency:   "USDT",
+				},
+			},
+			expectedAverageCost: fixedpoint.NewFromFloat((1000.0 * 0.01 * (1.0 - feeRate)) / 0.01),
+			expectedBase:        fixedpoint.NewFromFloat(-0.01),
+			expectedQuote:       fixedpoint.NewFromFloat(0 + 1000.0*0.01*(1.0-feeRate)),
+			expectedProfit:      fixedpoint.NewFromFloat(0.0),
+		},
 		{
 			name: "long",
 			trades: []types.Trade{
@@ -124,7 +158,11 @@ func TestPosition(t *testing.T) {
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			pos := Position{}
+			pos := Position{
+				Symbol:        "BTCUSDT",
+				BaseCurrency:  "BTC",
+				QuoteCurrency: "USDT",
+			}
 			profitAmount, profit := pos.AddTrades(testcase.trades)
 
 			assert.Equal(t, testcase.expectedQuote, pos.Quote, "expectedQuote")
