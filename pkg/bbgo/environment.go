@@ -190,7 +190,7 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 
 		// trade sync and market data store depends on subscribed symbols so we have to do this here.
 		for symbol := range session.loadedSymbols {
-			session.positions[symbol] = &Position{Symbol: symbol}
+			position := &Position{Symbol: symbol}
 
 			var trades []types.Trade
 
@@ -212,8 +212,11 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 				}
 
 				log.Infof("symbol %s: %d trades loaded", symbol, len(trades))
+
+				position.AddTrades(trades)
 			}
 
+			session.positions[symbol] = position
 			session.Trades[symbol] = trades
 			session.lastPrices[symbol] = 0.0
 
