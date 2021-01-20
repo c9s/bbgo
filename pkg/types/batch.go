@@ -17,7 +17,7 @@ func (e ExchangeBatchProcessor) BatchQueryClosedOrders(ctx context.Context, symb
 	errC = make(chan error, 1)
 
 	go func() {
-		limiter := rate.NewLimiter(rate.Every(time.Minute), 45)
+		limiter := rate.NewLimiter(rate.Every(5*time.Second), 2) // from binance (original 1200, use 1000 for safety)
 
 		defer close(c)
 		defer close(errC)
@@ -67,7 +67,7 @@ func (e ExchangeBatchProcessor) BatchQueryKLines(ctx context.Context, symbol str
 	errC = make(chan error, 1)
 
 	go func() {
-		limiter := rate.NewLimiter(rate.Every(time.Minute), 45)
+		limiter := rate.NewLimiter(rate.Every(5*time.Second), 2) // from binance (original 1200, use 1000 for safety)
 
 		defer close(c)
 		defer close(errC)
@@ -123,11 +123,16 @@ func (e ExchangeBatchProcessor) BatchQueryTrades(ctx context.Context, symbol str
 	var lastTradeID = options.LastTradeID
 
 	go func() {
+		limiter := rate.NewLimiter(rate.Every(5*time.Second), 2) // from binance (original 1200, use 1000 for safety)
+
 		defer close(c)
 		defer close(errC)
 
 		for {
-			time.Sleep(5 * time.Second)
+			if err := limiter.Wait(ctx); err != nil {
+				logrus.WithError(err).Error("rate limit error")
+			}
+
 			logrus.Infof("querying %s trades from %s, limit=%d", symbol, startTime, options.Limit)
 
 			trades, err := e.QueryTrades(ctx, symbol, &TradeQueryOptions{
