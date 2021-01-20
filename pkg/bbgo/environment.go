@@ -190,6 +190,8 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 
 		// trade sync and market data store depends on subscribed symbols so we have to do this here.
 		for symbol := range session.loadedSymbols {
+			session.positions[symbol] = &Position{Symbol: symbol}
+
 			var trades []types.Trade
 
 			if environ.TradeSync != nil {
