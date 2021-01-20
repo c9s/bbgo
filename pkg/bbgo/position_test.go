@@ -104,7 +104,7 @@ func TestPosition(t *testing.T) {
 		},
 
 		{
-			name: "long, sell to short",
+			name: "long and sell to short",
 			trades: []types.Trade{
 				{
 					Side:          types.SideTypeBuy,
