@@ -190,6 +190,17 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 
 		// trade sync and market data store depends on subscribed symbols so we have to do this here.
 		for symbol := range session.loadedSymbols {
+			market, ok := markets[symbol]
+			if !ok {
+				return fmt.Errorf("market %s is not defined", symbol)
+			}
+
+			position := &Position{
+				Symbol:        symbol,
+				BaseCurrency:  market.BaseCurrency,
+				QuoteCurrency: market.QuoteCurrency,
+			}
+
 			var trades []types.Trade
 
 			if environ.TradeSync != nil {
@@ -210,7 +221,12 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 				}
 
 				log.Infof("symbol %s: %d trades loaded", symbol, len(trades))
+
+				position.AddTrades(trades)
 			}
+
+			session.positions[symbol] = position
+			position.BindStream(session.Stream)
 
 			session.Trades[symbol] = trades
 			session.lastPrices[symbol] = 0.0
