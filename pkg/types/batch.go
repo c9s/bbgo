@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"golang.org/x/time/rate"
 )
 
 type ExchangeBatchProcessor struct {
@@ -16,6 +17,8 @@ func (e ExchangeBatchProcessor) BatchQueryClosedOrders(ctx context.Context, symb
 	errC = make(chan error, 1)
 
 	go func() {
+		limiter := rate.NewLimiter(rate.Every(time.Minute), 45)
+
 		defer close(c)
 		defer close(errC)
 
@@ -25,7 +28,9 @@ func (e ExchangeBatchProcessor) BatchQueryClosedOrders(ctx context.Context, symb
 		}
 
 		for startTime.Before(endTime) {
-			time.Sleep(5 * time.Second)
+			if err := limiter.Wait(ctx); err != nil {
+				logrus.WithError(err).Error("rate limit error")
+			}
 
 			logrus.Infof("batch querying %s closed orders %s <=> %s", symbol, startTime, endTime)
 
@@ -62,11 +67,15 @@ func (e ExchangeBatchProcessor) BatchQueryKLines(ctx context.Context, symbol str
 	errC = make(chan error, 1)
 
 	go func() {
+		limiter := rate.NewLimiter(rate.Every(time.Minute), 45)
+
 		defer close(c)
 		defer close(errC)
 
 		for startTime.Before(endTime) {
-			time.Sleep(5 * time.Second)
+			if err := limiter.Wait(ctx); err != nil {
+				logrus.WithError(err).Error("rate limit error")
+			}
 
 			kLines, err := e.QueryKLines(ctx, symbol, interval, KLineQueryOptions{
 				StartTime: &startTime,
