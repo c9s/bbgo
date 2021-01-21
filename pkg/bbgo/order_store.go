@@ -11,11 +11,13 @@ type OrderStore struct {
 	mu     sync.Mutex
 	orders map[uint64]types.Order
 
+	Symbol          string
 	RemoveCancelled bool
 }
 
-func NewOrderStore() *OrderStore {
+func NewOrderStore(symbol string) *OrderStore {
 	return &OrderStore{
+		Symbol: symbol,
 		orders: make(map[uint64]types.Order),
 	}
 }
@@ -56,7 +58,17 @@ func (s *OrderStore) Update(o types.Order) bool {
 }
 
 func (s *OrderStore) BindStream(stream types.Stream) {
-	stream.OnOrderUpdate(s.handleOrderUpdate)
+	hasSymbol := s.Symbol != ""
+	stream.OnOrderUpdate(func(order types.Order) {
+		if hasSymbol {
+			if order.Symbol != s.Symbol {
+				return
+			}
+			s.handleOrderUpdate(order)
+		} else {
+			s.handleOrderUpdate(order)
+		}
+	})
 }
 
 func (s *OrderStore) handleOrderUpdate(order types.Order) {

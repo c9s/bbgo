@@ -231,6 +231,10 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 			session.Trades[symbol] = trades
 			session.lastPrices[symbol] = 0.0
 
+			orderStore := NewOrderStore(symbol)
+			orderStore.BindStream(session.Stream)
+			session.orderStores[symbol] = orderStore
+
 			marketDataStore := NewMarketDataStore(symbol)
 			marketDataStore.BindStream(session.Stream)
 			session.marketDataStores[symbol] = marketDataStore

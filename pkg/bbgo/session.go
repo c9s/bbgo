@@ -126,6 +126,8 @@ type ExchangeSession struct {
 	// standard indicators of each market
 	standardIndicatorSets map[string]*StandardIndicatorSet
 
+	orderStores map[string]*OrderStore
+
 	loadedSymbols map[string]struct{}
 
 	IsMargin bool
@@ -156,6 +158,7 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 		positions:             make(map[string]*Position),
 		marketDataStores:      make(map[string]*MarketDataStore),
 		standardIndicatorSets: make(map[string]*StandardIndicatorSet),
+		orderStores:           make(map[string]*OrderStore),
 
 		loadedSymbols: make(map[string]struct{}),
 	}

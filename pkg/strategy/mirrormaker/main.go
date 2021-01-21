@@ -257,7 +257,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	s.activeMakerOrders = bbgo.NewLocalActiveOrderBook()
 	s.activeMakerOrders.BindStream(s.makerSession.Stream)
 
-	s.orderStore = bbgo.NewOrderStore()
+	s.orderStore = bbgo.NewOrderStore(s.Symbol)
 	s.orderStore.BindStream(s.makerSession.Stream)
 
 	s.stopC = make(chan struct{})
