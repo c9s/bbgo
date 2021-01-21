@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -317,8 +316,6 @@ func buildAndRun(ctx context.Context, userConfig *bbgo.Config, args ...string) (
 	}
 
 	executePath := filepath.Join(cwd, binary)
-
-	log.Infof("running wrapper binary, args: %v", args)
 	runCmd := exec.Command(executePath, args...)
 	runCmd.Stdout = os.Stdout
 	runCmd.Stderr = os.Stderr
