@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/slack-go/slack"
@@ -13,6 +14,26 @@ func init() {
 	// make sure we can cast Trade to PlainText
 	_ = PlainText(Trade{})
 	_ = PlainText(&Trade{})
+}
+
+type TradeSlice struct {
+	mu    sync.Mutex
+	Items []Trade
+}
+
+func (s *TradeSlice) Slice() []Trade {
+	s.mu.Lock()
+	slice := make([]Trade, len(s.Items), len(s.Items))
+	copy(slice, s.Items)
+	s.mu.Unlock()
+
+	return slice
+}
+
+func (s *TradeSlice) Append(t Trade) {
+	s.mu.Lock()
+	s.Items = append(s.Items, t)
+	s.mu.Unlock()
 }
 
 type Trade struct {

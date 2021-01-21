@@ -1,7 +1,6 @@
 package bbgo
 
 import (
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -26,7 +25,7 @@ func TestRedisPersistentService(t *testing.T) {
 	var fp fixedpoint.Value
 	err = store.Load(fp)
 	assert.Error(t, err)
-	assert.EqualError(t, os.ErrNotExist, err.Error())
+	assert.EqualError(t, ErrPersistenceNotExists, err.Error())
 
 	fp = fixedpoint.NewFromFloat(3.1415)
 	err = store.Save(&fp)
