@@ -116,7 +116,7 @@ type ExchangeSession struct {
 
 	// Trades collects the executed trades from the exchange
 	// map: symbol -> []trade
-	Trades map[string][]types.Trade
+	Trades map[string]*types.TradeSlice
 
 	// marketDataStores contains the market data store of each market
 	marketDataStores map[string]*MarketDataStore
@@ -150,7 +150,7 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 		Stream:        exchange.NewStream(),
 		Subscriptions: make(map[types.Subscription]types.Subscription),
 		Account:       &types.Account{},
-		Trades:        make(map[string][]types.Trade),
+		Trades:        make(map[string]*types.TradeSlice),
 
 		markets:               make(map[string]types.Market),
 		startPrices:           make(map[string]float64),

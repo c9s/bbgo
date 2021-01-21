@@ -17,14 +17,14 @@ func init() {
 }
 
 type TradeSlice struct {
-	mu    sync.Mutex
-	Items []Trade
+	mu     sync.Mutex
+	Trades []Trade
 }
 
-func (s *TradeSlice) Slice() []Trade {
+func (s *TradeSlice) Copy() []Trade {
 	s.mu.Lock()
-	slice := make([]Trade, len(s.Items), len(s.Items))
-	copy(slice, s.Items)
+	slice := make([]Trade, len(s.Trades), len(s.Trades))
+	copy(slice, s.Trades)
 	s.mu.Unlock()
 
 	return slice
@@ -32,7 +32,7 @@ func (s *TradeSlice) Slice() []Trade {
 
 func (s *TradeSlice) Append(t Trade) {
 	s.mu.Lock()
-	s.Items = append(s.Items, t)
+	s.Trades = append(s.Trades, t)
 	s.mu.Unlock()
 }
 

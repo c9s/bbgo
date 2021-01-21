@@ -10,9 +10,9 @@ import (
 
 func TestRedisPersistentService(t *testing.T) {
 	redisService := NewRedisPersistenceService(&RedisPersistenceConfig{
-		Host:     "127.0.0.1",
-		Port:     "6379",
-		DB:       0,
+		Host: "127.0.0.1",
+		Port: "6379",
+		DB:   0,
 	})
 	assert.NotNil(t, redisService)
 
@@ -65,4 +65,3 @@ func TestMemoryService(t *testing.T) {
 		assert.Equal(t, i, j)
 	})
 }
-

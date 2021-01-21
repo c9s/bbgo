@@ -74,7 +74,7 @@ func (reporter *AverageCostPnLReporter) Run() {
 		}
 
 		for _, symbol := range reporter.Symbols {
-			report := calculator.Calculate(symbol, session.Trades[symbol], session.lastPrices[symbol])
+			report := calculator.Calculate(symbol, session.Trades[symbol].Copy(), session.lastPrices[symbol])
 			report.Print()
 		}
 	}
