@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"reflect"
+	"runtime"
 	"time"
 
 	"github.com/pkg/errors"
@@ -122,7 +123,35 @@ type PersistenceConfig struct {
 	Json  *JsonPersistenceConfig  `json:"json,omitempty" yaml:"json,omitempty"`
 }
 
+type BuildTargetConfig struct {
+	Name    string               `json:"name" yaml:"name"`
+	Arch    string               `json:"arch" yaml:"arch"`
+	OS      string               `json:"os" yaml:"os"`
+	LDFlags datatype.StringSlice `json:"ldflags" yaml:"ldflags"`
+	GCFlags datatype.StringSlice `json:"gcflags" yaml:"gcflags"`
+	Imports []string             `json:"imports" yaml:"imports"`
+}
+
+type BuildConfig struct {
+	BuildDir string              `json:"buildDir" yaml:"buildDir"`
+	Imports  []string            `json:"imports" yaml:"imports"`
+	Targets  []BuildTargetConfig `json:"targets" yaml:"targets"`
+}
+
+func GetNativeBuildTargetConfig() BuildTargetConfig {
+	return BuildTargetConfig{
+		Name: "bbgow",
+		Arch: runtime.GOARCH,
+		OS: runtime.GOOS,
+	}
+}
+
+
 type Config struct {
+	Build *BuildConfig `json:"build" yaml:"build"`
+
+	// Imports is deprecated
+	// Deprecated: use BuildConfig instead
 	Imports []string `json:"imports" yaml:"imports"`
 
 	Backtest *Backtest `json:"backtest,omitempty" yaml:"backtest,omitempty"`
@@ -162,6 +191,22 @@ func LoadBuildConfig(configFile string) (*Config, error) {
 
 	if err := yaml.Unmarshal(content, &config); err != nil {
 		return nil, err
+	}
+
+	// for backward compatible
+	if len(config.Imports) > 0 {
+		if config.Build != nil {
+			return nil, fmt.Errorf("the legacy imports is defined, which conflics with the build configuration")
+		}
+
+		config.Build = &BuildConfig{
+			BuildDir: "build",
+			Imports:  config.Imports,
+			Targets: []BuildTargetConfig{
+				{Name: "bbgow-amd64-darwin", Arch: "amd64", OS: "darwin"},
+				{Name: "bbgow-amd64-linux", Arch: "amd64", OS: "linux"},
+			},
+		}
 	}
 
 	return &config, nil
