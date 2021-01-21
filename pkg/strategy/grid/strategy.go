@@ -208,7 +208,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		return fmt.Errorf("upper price (%f) should not be less than lower price (%f)", s.UpperPrice.Float64(), s.LowerPrice.Float64())
 	}
 
-	s.orderStore = bbgo.NewOrderStore()
+	s.orderStore = bbgo.NewOrderStore(s.Symbol)
 	s.orderStore.BindStream(session.Stream)
 
 	// we don't persist orders so that we can not clear the previous orders for now. just need time to support this.

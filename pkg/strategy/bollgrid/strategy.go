@@ -315,7 +315,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		Window:   21,
 	}, 2.0)
 
-	s.orders = bbgo.NewOrderStore()
+	s.orders = bbgo.NewOrderStore(s.Symbol)
 	s.orders.BindStream(session.Stream)
 
 	// we don't persist orders so that we can not clear the previous orders for now. just need time to support this.
