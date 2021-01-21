@@ -32,8 +32,6 @@ import (
 
 func init() {
 	RunCmd.Flags().Bool("no-compile", false, "do not compile wrapper binary")
-	RunCmd.Flags().String("os", runtime.GOOS, "GOOS")
-	RunCmd.Flags().String("arch", runtime.GOARCH, "GOARCH")
 
 	RunCmd.Flags().String("totp-key-url", "", "time-based one-time password key URL, if defined, it will be used for restoring the otp key")
 	RunCmd.Flags().String("totp-issuer", "", "")
