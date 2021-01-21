@@ -194,18 +194,16 @@ func LoadBuildConfig(configFile string) (*Config, error) {
 	}
 
 	// for backward compatible
-	if len(config.Imports) > 0 {
-		if config.Build != nil {
-			return nil, fmt.Errorf("the legacy imports is defined, which conflics with the build configuration")
-		}
-
-		config.Build = &BuildConfig{
-			BuildDir: "build",
-			Imports:  config.Imports,
-			Targets: []BuildTargetConfig{
-				{Name: "bbgow-amd64-darwin", Arch: "amd64", OS: "darwin"},
-				{Name: "bbgow-amd64-linux", Arch: "amd64", OS: "linux"},
-			},
+	if config.Build == nil {
+		if len(config.Imports) > 0 {
+			config.Build = &BuildConfig{
+				BuildDir: "build",
+				Imports:  config.Imports,
+				Targets: []BuildTargetConfig{
+					{Name: "bbgow-amd64-darwin", Arch: "amd64", OS: "darwin"},
+					{Name: "bbgow-amd64-linux", Arch: "amd64", OS: "linux"},
+				},
+			}
 		}
 	}
 
