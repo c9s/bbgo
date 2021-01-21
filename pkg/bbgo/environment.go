@@ -195,14 +195,7 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 				return fmt.Errorf("market %s is not defined", symbol)
 			}
 
-			position := &Position{
-				Symbol:        symbol,
-				BaseCurrency:  market.BaseCurrency,
-				QuoteCurrency: market.QuoteCurrency,
-			}
-
 			var trades []types.Trade
-
 			if environ.TradeSync != nil {
 				log.Infof("syncing trades from %s for symbol %s...", session.Exchange.Name(), symbol)
 				if err := environ.TradeSync.SyncTrades(ctx, session.Exchange, symbol, environ.tradeScanTime); err != nil {
@@ -221,15 +214,23 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 				}
 
 				log.Infof("symbol %s: %d trades loaded", symbol, len(trades))
-
-				position.AddTrades(trades)
 			}
 
-			session.positions[symbol] = position
-			position.BindStream(session.Stream)
-
 			session.Trades[symbol] = trades
+			session.Stream.OnTradeUpdate(func(trade types.Trade) {
+				session.Trades[trade.Symbol] = append(session.Trades[trade.Symbol], trade)
+			})
+
 			session.lastPrices[symbol] = 0.0
+
+			position := &Position{
+				Symbol:        symbol,
+				BaseCurrency:  market.BaseCurrency,
+				QuoteCurrency: market.QuoteCurrency,
+			}
+			position.AddTrades(trades)
+			position.BindStream(session.Stream)
+			session.positions[symbol] = position
 
 			orderStore := NewOrderStore(symbol)
 			orderStore.BindStream(session.Stream)
@@ -270,9 +271,6 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 			session.lastPrices[kline.Symbol] = kline.Close
 		})
 
-		session.Stream.OnTradeUpdate(func(trade types.Trade) {
-			session.Trades[trade.Symbol] = append(session.Trades[trade.Symbol], trade)
-		})
 
 		// feed klines into the market data store
 		if environ.startTime == emptyTime {
