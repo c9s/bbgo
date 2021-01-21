@@ -114,14 +114,13 @@ Create your go package, and initialize the repository with `go mod` and add bbgo
 
 ```
 go mod init
-go get github.com/c9s/bbgo
+go get github.com/c9s/bbgo@main
 ```
 
-Write your own strategy in the strategy directory like `pkg/strategy/mystrategy`:
+Write your own strategy in the strategy file:
 
 ```
-mkdir pkg/strategy/mystrategy
-vim pkg/strategy/mystrategy/strategy.go
+vim strategy.go
 ```
 
 You can grab the skeleton strategy from <https://github.com/c9s/bbgo/blob/main/pkg/strategy/skeleton/strategy.go>
@@ -136,14 +135,30 @@ mkdir config
 Add your strategy package path to the config file `config/bbgo.yaml`
 
 ```yaml
-imports:
-- github.com/xxx/yyy/pkg/strategy/mystrategy
+---
+build:
+  dir: build
+  imports:
+  - github.com/your_id/your_swing
+  targets:
+  - name: swing-amd64-linux
+    os: linux
+    arch: amd64
+  - name: swing-amd64-darwin
+    os: darwin
+    arch: amd64
 ```
 
 Run `bbgo run` command, bbgo will compile a wrapper binary that imports your strategy:
 
 ```sh
 dotenv -f .env.local -- bbgo run --config config/bbgo.yaml
+```
+
+Or you can build your own wrapper binary via:
+
+```shell
+bbgo build --config config/bbgo.yaml
 ```
 
 ## Dynamic Injection
