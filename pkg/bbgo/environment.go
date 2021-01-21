@@ -216,9 +216,9 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 				log.Infof("symbol %s: %d trades loaded", symbol, len(trades))
 			}
 
-			session.Trades[symbol] = trades
+			session.Trades[symbol] = &types.TradeSlice{Trades: trades}
 			session.Stream.OnTradeUpdate(func(trade types.Trade) {
-				session.Trades[trade.Symbol] = append(session.Trades[trade.Symbol], trade)
+				session.Trades[symbol].Append(trade)
 			})
 
 			session.lastPrices[symbol] = 0.0
@@ -270,7 +270,6 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 
 			session.lastPrices[kline.Symbol] = kline.Close
 		})
-
 
 		// feed klines into the market data store
 		if environ.startTime == emptyTime {

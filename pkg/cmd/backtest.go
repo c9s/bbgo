@@ -255,7 +255,7 @@ var BacktestCmd = &cobra.Command{
 					return fmt.Errorf("last price not found: %s", symbol)
 				}
 
-				report := calculator.Calculate(symbol, trades, lastPrice)
+				report := calculator.Calculate(symbol, trades.Trades, lastPrice)
 				report.Print()
 
 				initBalances := userConfig.Backtest.Account.Balances.BalanceMap()
