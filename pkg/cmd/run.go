@@ -12,7 +12,6 @@ import (
 	"runtime"
 	"strings"
 	"syscall"
-	"text/template"
 	"time"
 
 	"github.com/pkg/errors"
@@ -53,38 +52,13 @@ var RunCmd = &cobra.Command{
 	RunE:         run,
 }
 
-var wrapperTemplate = template.Must(template.New("main").Parse(`package main
-// DO NOT MODIFY THIS FILE. THIS FILE IS GENERATED FOR IMPORTING STRATEGIES
-import (
-	"github.com/c9s/bbgo/pkg/cmd"
-
-{{- range .Imports }}
-	_ "{{ . }}"
-{{- end }}
-)
-
-func main() {
-	cmd.Execute()
-}
-
-`))
-
-func compileRunFile(filepath string, config *bbgo.Config) error {
-	var buf = bytes.NewBuffer(nil)
-	if err := wrapperTemplate.Execute(buf, config); err != nil {
-		return err
-	}
-
-	return ioutil.WriteFile(filepath, buf.Bytes(), 0644)
-}
-
 func runConfig(basectx context.Context, userConfig *bbgo.Config) error {
 	ctx, cancelTrading := context.WithCancel(basectx)
 	defer cancelTrading()
 
 	environ := bbgo.NewEnvironment()
 
-	if err := environ.ConfigureDatabase(ctx) ; err != nil {
+	if err := environ.ConfigureDatabase(ctx); err != nil {
 		return err
 	}
 
@@ -304,17 +278,7 @@ func run(cmd *cobra.Command, args []string) error {
 	})
 	runArgs = append(runArgs, args...)
 
-	goOS, err := cmd.Flags().GetString("os")
-	if err != nil {
-		return err
-	}
-
-	goArch, err := cmd.Flags().GetString("arch")
-	if err != nil {
-		return err
-	}
-
-	runCmd, err := buildAndRun(ctx, userConfig, goOS, goArch, runArgs...)
+	runCmd, err := buildAndRun(ctx, userConfig, runArgs...)
 	if err != nil {
 		return err
 	}
@@ -333,60 +297,17 @@ func run(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func compile(buildDir string, userConfig *bbgo.Config) error {
-	if _, err := os.Stat(buildDir); os.IsNotExist(err) {
-		if err := os.MkdirAll(buildDir, 0777); err != nil {
-			return errors.Wrapf(err, "can not create build directory: %s", buildDir)
-		}
-	}
-
-	mainFile := filepath.Join(buildDir, "main.go")
-	if err := compileRunFile(mainFile, userConfig); err != nil {
-		return errors.Wrap(err, "compile error")
-	}
-
-	return nil
-}
-
-func build(ctx context.Context, buildDir string, userConfig *bbgo.Config, goOS, goArch string, output *string) (string, error) {
-	if err := compile(buildDir, userConfig); err != nil {
-		return "", err
-	}
-
-	cwd, err := os.Getwd()
+// buildAndRun builds the package natively and run the binary with the given args
+func buildAndRun(ctx context.Context, userConfig *bbgo.Config, args ...string) (*exec.Cmd, error) {
+	packageDir, err := ioutil.TempDir("build", "bbgow")
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	buildEnvs := []string{
-		"GOOS=" + goOS,
-		"GOARCH=" + goArch,
-	}
+	defer os.RemoveAll(packageDir)
 
-	buildTarget := filepath.Join(cwd, buildDir)
-
-	binary := fmt.Sprintf("bbgow-%s-%s", goOS, goArch)
-	if output != nil && len(*output) > 0 {
-		binary = *output
-	}
-
-	log.Infof("building binary %s from %s...", binary, buildTarget)
-	buildCmd := exec.CommandContext(ctx, "go", "build", "-tags", "wrapper", "-o", binary, buildTarget)
-	buildCmd.Env = append(os.Environ(), buildEnvs...)
-
-	buildCmd.Stdout = os.Stdout
-	buildCmd.Stderr = os.Stderr
-	if err := buildCmd.Run(); err != nil {
-		return binary, err
-	}
-
-	return binary, nil
-}
-
-func buildAndRun(ctx context.Context, userConfig *bbgo.Config, goOS, goArch string, args ...string) (*exec.Cmd, error) {
-	buildDir := filepath.Join("build", "bbgow")
-
-	binary, err := build(ctx, buildDir, userConfig, goOS, goArch, nil)
+	targetConfig := bbgo.GetNativeBuildTargetConfig()
+	binary, err := bbgo.Build(ctx, userConfig, targetConfig)
 	if err != nil {
 		return nil, err
 	}

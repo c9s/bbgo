@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"path/filepath"
 	"runtime"
 
 	"github.com/pkg/errors"
@@ -40,34 +39,27 @@ var BuildCmd = &cobra.Command{
 			return errors.New("--config option is required")
 		}
 
-		output, err := cmd.Flags().GetString("output")
-		if err != nil {
-			return err
-		}
-
 		userConfig, err := bbgo.LoadBuildConfig(configFile)
 		if err != nil {
 			return err
 		}
 
-		goOS, err := cmd.Flags().GetString("os")
-		if err != nil {
-			return err
+		if userConfig.Build == nil {
+			return errors.New("build config is not defined")
 		}
 
-		goArch, err := cmd.Flags().GetString("arch")
-		if err != nil {
-			return err
+		for _, target := range userConfig.Build.Targets {
+			log.Infof("building %s ...", target.Name)
+
+			binary, err := bbgo.BuildTarget(ctx, userConfig, target)
+			if err != nil {
+				return err
+			}
+
+			log.Infof("build succeeded: %s", binary)
 		}
 
-		buildDir := filepath.Join("build", "bbgow")
-
-		binary, err := build(ctx, buildDir, userConfig, goOS, goArch, &output)
-		if err != nil {
-			return err
-		}
-
-		log.Infof("build succeeded: %s", binary)
 		return nil
 	},
 }
+
