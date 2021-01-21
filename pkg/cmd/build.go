@@ -58,4 +58,3 @@ var BuildCmd = &cobra.Command{
 		return nil
 	},
 }
-

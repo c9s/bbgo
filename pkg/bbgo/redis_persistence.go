@@ -11,7 +11,10 @@ import (
 	"strings"
 
 	"github.com/go-redis/redis/v8"
+	"github.com/pkg/errors"
 )
+
+var ErrPersistenceNotExists = errors.New("persistent data does not exists")
 
 type PersistenceService interface {
 	NewStore(id string, subIDs ...string) Store
@@ -56,8 +59,9 @@ func (store *MemoryStore) Load(val interface{}) error {
 	if data, ok := store.memory.Slots[store.Key]; ok {
 		v.Elem().Set(reflect.ValueOf(data).Elem())
 	} else {
-		return os.ErrNotExist
+		return ErrPersistenceNotExists
 	}
+
 	return nil
 }
 
@@ -105,7 +109,7 @@ func (store JsonStore) Load(val interface{}) error {
 	p := filepath.Join(store.Directory, store.ID) + ".json"
 
 	if _, err := os.Stat(p); os.IsNotExist(err) {
-		return os.ErrNotExist
+		return ErrPersistenceNotExists
 	}
 
 	data, err := ioutil.ReadFile(p)
@@ -114,7 +118,7 @@ func (store JsonStore) Load(val interface{}) error {
 	}
 
 	if len(data) == 0 {
-		return os.ErrNotExist
+		return ErrPersistenceNotExists
 	}
 
 	return json.Unmarshal(data, val)
@@ -175,14 +179,14 @@ func (store *RedisStore) Load(val interface{}) error {
 	data, err := cmd.Result()
 	if err != nil {
 		if err == redis.Nil {
-			return os.ErrNotExist
+			return ErrPersistenceNotExists
 		}
 
 		return err
 	}
 
 	if len(data) == 0 {
-		return os.ErrNotExist
+		return ErrPersistenceNotExists
 	}
 
 	return json.Unmarshal([]byte(data), val)

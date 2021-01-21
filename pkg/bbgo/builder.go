@@ -18,12 +18,17 @@ import (
 var wrapperTemplate = template.Must(template.New("main").Parse(`package main
 // DO NOT MODIFY THIS FILE. THIS FILE IS GENERATED FOR IMPORTING STRATEGIES
 import (
+	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/cmd"
 
 {{- range .Imports }}
 	_ "{{ . }}"
 {{- end }}
 )
+
+func init() {
+	bbgo.SetWrapperBinary()
+}
 
 func main() {
 	cmd.Execute()
@@ -111,10 +116,10 @@ func Build(ctx context.Context, userConfig *Config, targetConfig BuildTargetConf
 	buildCmd.Stdout = os.Stdout
 	buildCmd.Stderr = os.Stderr
 	if err := buildCmd.Run(); err != nil {
-		return binary, err
+		return output, err
 	}
 
-	return binary, nil
+	return output, nil
 }
 
 func BuildTarget(ctx context.Context, userConfig *Config, target BuildTargetConfig) (string, error) {

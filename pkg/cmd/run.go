@@ -255,42 +255,43 @@ func run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	shouldCompile := len(userConfig.Imports) > 0
-
-	// if there is no custom imports, we don't have to compile
-	if noCompile || !shouldCompile {
+	// for wrapper binary, we can just run the strategies
+	if bbgo.IsWrapperBinary || len(userConfig.Build.Imports) == 0 || noCompile {
 		userConfig, err = bbgo.Load(configFile, true)
 		if err != nil {
 			return err
 		}
 
-		log.Infof("running config without wrapper binary...")
+		if bbgo.IsWrapperBinary {
+			log.Infof("running wrapper binary...")
+		}
+
 		if err := runConfig(ctx, userConfig); err != nil {
 			return err
 		}
 
 		return nil
-	}
+	} else {
+		var runArgs = []string{"run"}
+		cmd.Flags().Visit(func(flag *flag.Flag) {
+			runArgs = append(runArgs, "--"+flag.Name, flag.Value.String())
+		})
+		runArgs = append(runArgs, args...)
 
-	var runArgs = []string{"run", "--no-compile"}
-	cmd.Flags().Visit(func(flag *flag.Flag) {
-		runArgs = append(runArgs, "--"+flag.Name, flag.Value.String())
-	})
-	runArgs = append(runArgs, args...)
-
-	runCmd, err := buildAndRun(ctx, userConfig, runArgs...)
-	if err != nil {
-		return err
-	}
-
-	if sig := cmdutil.WaitForSignal(ctx, syscall.SIGTERM, syscall.SIGINT); sig != nil {
-		log.Infof("sending signal to the child process...")
-		if err := runCmd.Process.Signal(sig); err != nil {
+		runCmd, err := buildAndRun(ctx, userConfig, runArgs...)
+		if err != nil {
 			return err
 		}
 
-		if err := runCmd.Wait(); err != nil {
-			return err
+		if sig := cmdutil.WaitForSignal(ctx, syscall.SIGTERM, syscall.SIGINT); sig != nil {
+			log.Infof("sending signal to the child process...")
+			if err := runCmd.Process.Signal(sig); err != nil {
+				return err
+			}
+
+			if err := runCmd.Wait(); err != nil {
+				return err
+			}
 		}
 	}
 
