@@ -209,6 +209,7 @@ func LoadBuildConfig(configFile string) (*Config, error) {
 	return &config, nil
 }
 
+// Load parses the config
 func Load(configFile string, loadStrategies bool) (*Config, error) {
 	var config Config
 
