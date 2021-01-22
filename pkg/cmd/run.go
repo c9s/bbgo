@@ -253,7 +253,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	// for wrapper binary, we can just run the strategies
-	if bbgo.IsWrapperBinary || len(userConfig.Build.Imports) == 0 || noCompile {
+	if bbgo.IsWrapperBinary || (userConfig.Build != nil && len(userConfig.Build.Imports) == 0) || noCompile {
 		userConfig, err = bbgo.Load(configFile, true)
 		if err != nil {
 			return err
