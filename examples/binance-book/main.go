@@ -49,15 +49,36 @@ var rootCmd = &cobra.Command{
 		stream.Subscribe(types.BookChannel, symbol, types.SubscribeOptions{})
 
 		stream.OnBookSnapshot(func(book types.OrderBook) {
-			log.Infof("book snapshot: %+v", book)
+			// log.Infof("book snapshot: %+v", book)
 		})
 
 		stream.OnBookUpdate(func(book types.OrderBook) {
-			log.Infof("book update: %+v", book)
+			// log.Infof("book update: %+v", book)
 		})
 
 		streambook := types.NewStreamBook(symbol)
 		streambook.BindStream(stream)
+		streambook.OnUpdate(func(book *types.OrderBook) {
+			bestBid, hasBid := book.BestBid()
+			bestAsk, hasAsk := book.BestAsk()
+
+			if !book.IsValid() {
+				log.Warnf("order book is invalid")
+				return
+			}
+
+			if hasBid && hasAsk {
+				log.Infof("================================")
+				log.Infof("best ask %f % -12f",
+					bestAsk.Price.Float64(),
+					bestAsk.Volume.Float64(),
+				)
+				log.Infof("best bid %f % -12f",
+					bestBid.Price.Float64(),
+					bestBid.Volume.Float64(),
+				)
+			}
+		})
 
 		log.Info("connecting websocket...")
 		if err := stream.Connect(ctx); err != nil {

@@ -123,6 +123,33 @@ type OrderBook struct {
 	asksChangeCallbacks []func(pvs PriceVolumeSlice)
 }
 
+func (b *OrderBook) BestBid() (PriceVolume, bool) {
+	if len(b.Bids) == 0 {
+		return PriceVolume{}, false
+	}
+
+	return b.Bids[0], true
+}
+
+func (b *OrderBook) BestAsk() (PriceVolume, bool) {
+	if len(b.Asks) == 0 {
+		return PriceVolume{}, false
+	}
+
+	return b.Asks[0], true
+}
+
+func (b *OrderBook) IsValid() bool {
+	bid, hasBid := b.BestBid()
+	ask, hasAsk := b.BestAsk()
+
+	if !hasBid || !hasAsk {
+		return false
+	}
+
+	return bid.Price < ask.Price
+}
+
 func (b *OrderBook) PriceVolumesBySide(side SideType) PriceVolumeSlice {
 	switch side {
 
