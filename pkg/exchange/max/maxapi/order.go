@@ -236,7 +236,7 @@ type OrderCancelAllRequestParams struct {
 
 	Side    string `json:"side,omitempty"`
 	Market  string `json:"market,omitempty"`
-	GroupID string `json:"groupID,omitempty"`
+	GroupID int64 `json:"groupID,omitempty"`
 }
 
 type OrderCancelAllRequest struct {
@@ -255,7 +255,7 @@ func (r *OrderCancelAllRequest) Market(market string) *OrderCancelAllRequest {
 	return r
 }
 
-func (r *OrderCancelAllRequest) GroupID(groupID string) *OrderCancelAllRequest {
+func (r *OrderCancelAllRequest) GroupID(groupID int64) *OrderCancelAllRequest {
 	r.params.GroupID = groupID
 	return r
 }

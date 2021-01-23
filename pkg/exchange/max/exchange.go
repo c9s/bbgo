@@ -182,10 +182,10 @@ func (e *Exchange) CancelOrdersByGroupID(ctx context.Context, groupID string) ([
 }
 
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err2 error) {
-	var groupIDs = make(map[string]struct{})
+	var groupIDs = make(map[int64]struct{})
 	var orphanOrders []types.Order
 	for _, o := range orders {
-		if len(o.GroupID) > 0 {
+		if o.GroupID > 0 {
 			groupIDs[o.GroupID] = struct{}{}
 		} else {
 			orphanOrders = append(orphanOrders, o)
