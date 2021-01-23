@@ -521,7 +521,7 @@ func (f *DepthFrame) PushEvent(e DepthEvent) {
 
 			f.loadDepthSnapshot()
 
-			ticker := time.NewTicker(1*time.Minute + time.Duration(rand.Intn(10))*time.Second)
+			ticker := time.NewTicker(10*time.Minute + time.Duration(rand.Intn(10))*time.Second)
 			defer ticker.Stop()
 			for {
 				select {
