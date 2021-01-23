@@ -16,13 +16,13 @@ import (
 type advancedOrderCancelApi interface {
 	CancelAllOrders(ctx context.Context) ([]types.Order, error)
 	CancelOrdersBySymbol(ctx context.Context, symbol string) ([]types.Order, error)
-	CancelOrdersByGroupID(ctx context.Context, groupID string) ([]types.Order, error)
+	CancelOrdersByGroupID(ctx context.Context, groupID int64) ([]types.Order, error)
 }
 
 func init() {
 	CancelCmd.Flags().String("session", "", "session to execute cancel orders")
 	CancelCmd.Flags().String("symbol", "", "symbol to cancel orders")
-	CancelCmd.Flags().String("groupID", "", "groupID to cancel orders")
+	CancelCmd.Flags().Int64("group-id", 0, "groupID to cancel orders")
 	RootCmd.AddCommand(CancelCmd)
 }
 
@@ -43,7 +43,7 @@ var CancelCmd = &cobra.Command{
 			return err
 		}
 
-		groupID, err := cmd.Flags().GetString("groupID")
+		groupID, err := cmd.Flags().GetInt64("group-id")
 		if err != nil {
 			return err
 		}
@@ -97,8 +97,8 @@ var CancelCmd = &cobra.Command{
 			var log = logrus.WithField("session", sessionID)
 
 			e, ok := session.Exchange.(advancedOrderCancelApi)
-			if ok && len(groupID) > 0 {
-				log.Infof("canceling orders by group id: %s", groupID)
+			if ok && groupID > 0 {
+				log.Infof("canceling orders by group id: %d", groupID)
 
 				orders, err := e.CancelOrdersByGroupID(ctx, groupID)
 				if err != nil {
