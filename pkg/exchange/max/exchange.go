@@ -182,7 +182,29 @@ func (e *Exchange) CancelOrdersByGroupID(ctx context.Context, groupID string) ([
 }
 
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err2 error) {
+	var groupIDs = make(map[string]struct{})
+	var orphanOrders []types.Order
 	for _, o := range orders {
+		if len(o.GroupID) > 0 {
+			groupIDs[o.GroupID] = struct{}{}
+		} else {
+			orphanOrders = append(orphanOrders, o)
+		}
+	}
+
+	if len(groupIDs) > 0 {
+		for groupID := range groupIDs {
+			var req = e.client.OrderService.NewOrderCancelAllRequest()
+			req.GroupID(groupID)
+
+			if _, err := req.Do(ctx); err != nil {
+				log.WithError(err).Errorf("group id order cancel error")
+				err2 = err
+			}
+		}
+	}
+
+	for _, o := range orphanOrders {
 		var req = e.client.OrderService.NewOrderCancelRequest()
 		if o.OrderID > 0 {
 			req.ID(o.OrderID)
