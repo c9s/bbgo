@@ -169,7 +169,7 @@ func (e *Exchange) CancelOrdersBySymbol(ctx context.Context, symbol string) ([]t
 	return toGlobalOrders(maxOrders)
 }
 
-func (e *Exchange) CancelOrdersByGroupID(ctx context.Context, groupID string) ([]types.Order, error) {
+func (e *Exchange) CancelOrdersByGroupID(ctx context.Context, groupID int64) ([]types.Order, error) {
 	var req = e.client.OrderService.NewOrderCancelAllRequest()
 	req.GroupID(groupID)
 
