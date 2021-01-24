@@ -91,50 +91,50 @@ func (set *StandardIndicatorSet) EWMA(iw types.IntervalWindow) *indicator.EWMA {
 type ExchangeSession struct {
 	// exchange Session based notification system
 	// we make it as a value field so that we can configure it separately
-	Notifiability
+	Notifiability `json:"-"`
 
 	// Exchange Session name
-	Name string
+	Name string `json:"name"`
 
 	// The exchange account states
-	Account *types.Account
+	Account *types.Account `json:"account"`
 
 	// Stream is the connection stream of the exchange
-	Stream types.Stream
+	Stream types.Stream `json:"-"`
 
-	Subscriptions map[types.Subscription]types.Subscription
+	Subscriptions map[types.Subscription]types.Subscription `json:"-"`
 
-	Exchange types.Exchange
+	Exchange types.Exchange `json:"-"`
 
 	// markets defines market configuration of a symbol
-	markets map[string]types.Market
+	markets map[string]types.Market `json:"markets"`
 
 	// startPrices is used for backtest
-	startPrices map[string]float64
+	startPrices map[string]float64 `json:"-"`
 
-	lastPrices map[string]float64
+	lastPrices map[string]float64 `json:"lastPrices"`
 
 	// Trades collects the executed trades from the exchange
 	// map: symbol -> []trade
-	Trades map[string]*types.TradeSlice
+	Trades map[string]*types.TradeSlice `json:"-"`
 
 	// marketDataStores contains the market data store of each market
-	marketDataStores map[string]*MarketDataStore
+	marketDataStores map[string]*MarketDataStore `json:"-"`
 
-	positions map[string]*Position
+	positions map[string]*Position `json:"-"`
 
 	// standard indicators of each market
-	standardIndicatorSets map[string]*StandardIndicatorSet
+	standardIndicatorSets map[string]*StandardIndicatorSet `json:"-"`
 
-	orderStores map[string]*OrderStore
+	orderStores map[string]*OrderStore `json:"-"`
 
-	loadedSymbols map[string]struct{}
+	loadedSymbols map[string]struct{} `json:"symbols"`
 
-	IsMargin bool
+	IsMargin bool `json:"isMargin"`
 
-	IsIsolatedMargin bool
+	IsIsolatedMargin bool `json:"isIsolatedMargin,omitempty"`
 
-	IsolatedMarginSymbol string
+	IsolatedMarginSymbol string `json:"isolatedMarginSymbol,omitempty"`
 }
 
 func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
