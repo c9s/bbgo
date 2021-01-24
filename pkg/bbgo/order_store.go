@@ -22,6 +22,17 @@ func NewOrderStore(symbol string) *OrderStore {
 	}
 }
 
+func (s *OrderStore) Orders() (orders []types.Order) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, o := range s.orders {
+		orders = append(orders, o)
+	}
+
+	return orders
+}
+
 func (s *OrderStore) Exists(oID uint64) (ok bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
