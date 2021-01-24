@@ -195,6 +195,11 @@ func (session *ExchangeSession) Market(symbol string) (market types.Market, ok b
 	return market, ok
 }
 
+func (session *ExchangeSession) OrderStore(symbol string) (store *OrderStore, ok bool) {
+	store, ok = session.orderStores[symbol]
+	return store, ok
+}
+
 // Subscribe save the subscription info, later it will be assigned to the stream
 func (session *ExchangeSession) Subscribe(channel types.Channel, symbol string, options types.SubscribeOptions) *ExchangeSession {
 	sub := types.Subscription{
