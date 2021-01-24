@@ -38,6 +38,7 @@ func (f *DepthFrame) loadDepthSnapshot() {
 
 	depth, err := f.fetch(f.context)
 	if err != nil {
+		log.WithError(err).Errorf("depth api error")
 		return
 	}
 
