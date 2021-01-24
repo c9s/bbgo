@@ -61,7 +61,7 @@ func RunServer(ctx context.Context, userConfig *Config, environ *Environment) er
 		c.JSON(http.StatusOK, gin.H{"orders": marketOrders})
 	})
 
-	r.GET("/sessions/:session/loaded-symbols", func(c *gin.Context) {
+	r.GET("/sessions/:session/symbols", func(c *gin.Context) {
 
 		sessionName := c.Param("session")
 		session, ok := environ.Session(sessionName)
