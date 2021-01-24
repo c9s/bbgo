@@ -74,24 +74,28 @@ func NewStream(client *binance.Client) *Stream {
 		depthFrames: make(map[string]*DepthFrame),
 	}
 
-	stream.OnConnect(func() {
-		// clear the previous frames
-		stream.depthFrames = make(map[string]*DepthFrame)
-	})
-
 	stream.OnDepthEvent(func(e *DepthEvent) {
 		f, ok := stream.depthFrames[e.Symbol]
 		if !ok {
 			f = &DepthFrame{
 				client: client,
+				context: context.Background(),
 				Symbol: e.Symbol,
 			}
+
+			stream.depthFrames[e.Symbol] = f
+
 			f.OnReady(func(e DepthEvent, bufEvents []DepthEvent) {
 				snapshot, err := e.OrderBook()
 				if err != nil {
 					log.WithError(err).Error("book convert error")
 					return
 				}
+
+				if !snapshot.IsValid() {
+					log.Warnf("depth snapshot is invalid, event: %+v", e)
+				}
+
 				stream.EmitBookSnapshot(snapshot)
 
 				for _, e := range bufEvents {
@@ -114,7 +118,6 @@ func NewStream(client *binance.Client) *Stream {
 
 				stream.EmitBookUpdate(book)
 			})
-			stream.depthFrames[e.Symbol] = f
 		} else {
 			f.PushEvent(*e)
 		}
@@ -168,6 +171,11 @@ func NewStream(client *binance.Client) *Stream {
 	})
 
 	stream.OnConnect(func() {
+		// reset the previous frames
+		for _, f := range stream.depthFrames {
+			f.Reset()
+		}
+
 		var params []string
 		for _, subscription := range stream.Subscriptions {
 			params = append(params, convertSubscription(subscription))
@@ -452,4 +460,3 @@ func maskListenKey(listenKey string) string {
 }
 
 //go:generate callbackgen -type DepthFrame
-

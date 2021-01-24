@@ -11,7 +11,8 @@ import (
 
 //go:generate callbackgen -type DepthFrame
 type DepthFrame struct {
-	client *binance.Client
+	client  *binance.Client
+	context context.Context
 
 	mu            sync.Mutex
 	once          sync.Once
@@ -26,12 +27,12 @@ type DepthFrame struct {
 func (f *DepthFrame) Reset() {
 	f.mu.Lock()
 	f.SnapshotDepth = nil
-	f.once = sync.Once{}
+	f.BufEvents = nil
 	f.mu.Unlock()
 }
 
 func (f *DepthFrame) loadDepthSnapshot() {
-	depth, err := f.fetch(context.Background())
+	depth, err := f.fetch(f.context)
 	if err != nil {
 		return
 	}
@@ -75,6 +76,7 @@ func (f *DepthFrame) PushEvent(e DepthEvent) {
 
 	// before the snapshot is loaded, we need to buffer the events until we loaded the snapshot.
 	if f.SnapshotDepth == nil {
+		// buffer the events until we loaded the snapshot
 		f.BufEvents = append(f.BufEvents, e)
 		f.mu.Unlock()
 
@@ -84,16 +86,15 @@ func (f *DepthFrame) PushEvent(e DepthEvent) {
 				log.Infof("starting depth snapshot updater for %s market", f.Symbol)
 			}
 
-			ctx := context.Background()
-
 			f.loadDepthSnapshot()
 
 			ticker := time.NewTicker(1*time.Minute + time.Duration(rand.Intn(10))*time.Millisecond)
 			defer ticker.Stop()
 			for {
 				select {
-				case <-ctx.Done():
+				case <-f.context.Done():
 					return
+
 				case <-ticker.C:
 					f.loadDepthSnapshot()
 				}
@@ -110,6 +111,10 @@ func (f *DepthFrame) PushEvent(e DepthEvent) {
 
 		// if the first update ID > final update ID + 1, it means something is missing, we need to reload.
 		if e.FirstUpdateID > f.SnapshotDepth.FinalUpdateID+1 {
+			if debugBinanceDepth {
+				log.Warnf("event first update id %d > final update id + 1 (%d), resetting snapshot", e.FirstUpdateID, f.SnapshotDepth.FirstUpdateID+1)
+			}
+
 			f.SnapshotDepth = nil
 			f.mu.Unlock()
 			return
