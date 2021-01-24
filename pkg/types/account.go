@@ -50,11 +50,11 @@ func (m BalanceMap) Print() {
 }
 
 type Account struct {
-	sync.Mutex
+	sync.Mutex `json:"-"`
 
-	MakerCommission int    `json:"makerCommission"`
-	TakerCommission int    `json:"takerCommission"`
-	AccountType     string `json:"accountType"`
+	MakerCommission int    `json:"makerCommission,omitempty"`
+	TakerCommission int    `json:"takerCommission,omitempty"`
+	AccountType     string `json:"accountType,omitempty"`
 
 	balances BalanceMap
 }
