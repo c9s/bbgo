@@ -233,6 +233,8 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 			session.positions[symbol] = position
 
 			orderStore := NewOrderStore(symbol)
+			orderStore.AddOrderUpdate = true
+
 			orderStore.BindStream(session.Stream)
 			session.orderStores[symbol] = orderStore
 

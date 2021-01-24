@@ -6,6 +6,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 func RunServer(ctx context.Context, userConfig *Config, environ *Environment) error {
@@ -43,22 +45,41 @@ func RunServer(ctx context.Context, userConfig *Config, environ *Environment) er
 	})
 
 	r.GET("/sessions/:session/open-orders", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"orders": []string{}})
-	})
+		sessionName := c.Param("session")
+		session, ok := environ.Session(sessionName)
 
-	r.GET("/sessions/:session/closed-orders", func(c *gin.Context) {
-		c.JSON(200, gin.H{"message": "pong"})
+		if !ok {
+			c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("session %s not found", sessionName)})
+			return
+		}
+
+		marketOrders := make(map[string][]types.Order)
+		for symbol, orderStore := range session.orderStores {
+			marketOrders[symbol] = orderStore.Orders()
+		}
+
+		c.JSON(http.StatusOK, gin.H{"orders": marketOrders})
 	})
 
 	r.GET("/sessions/:session/loaded-symbols", func(c *gin.Context) {
-		c.JSON(200, gin.H{"message": "pong"})
+
+		sessionName := c.Param("session")
+		session, ok := environ.Session(sessionName)
+
+		if !ok {
+			c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("session %s not found", sessionName)})
+			return
+		}
+
+		var symbols []string
+		for s := range session.loadedSymbols {
+			symbols = append(symbols, s)
+		}
+
+		c.JSON(http.StatusOK, gin.H{"symbols": symbols})
 	})
 
 	r.GET("/sessions/:session/pnl", func(c *gin.Context) {
-		c.JSON(200, gin.H{"message": "pong"})
-	})
-
-	r.GET("/sessions/:session/market/:symbol/closed-orders", func(c *gin.Context) {
 		c.JSON(200, gin.H{"message": "pong"})
 	})
 
