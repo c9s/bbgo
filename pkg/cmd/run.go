@@ -35,6 +35,7 @@ func init() {
 	RunCmd.Flags().String("totp-key-url", "", "time-based one-time password key URL, if defined, it will be used for restoring the otp key")
 	RunCmd.Flags().String("totp-issuer", "", "")
 	RunCmd.Flags().String("totp-account-name", "", "")
+	RunCmd.Flags().Count("enable-api-server", "enable api server")
 
 	RunCmd.Flags().String("since", "", "pnl since time")
 	RootCmd.AddCommand(RunCmd)
@@ -49,7 +50,7 @@ var RunCmd = &cobra.Command{
 	RunE:         run,
 }
 
-func runConfig(basectx context.Context, userConfig *bbgo.Config) error {
+func runConfig(basectx context.Context, userConfig *bbgo.Config, enableApiServer bool) error {
 	ctx, cancelTrading := context.WithCancel(basectx)
 	defer cancelTrading()
 
@@ -217,11 +218,13 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config) error {
 		return err
 	}
 
-	go func() {
-		if err := bbgo.RunServer(ctx, userConfig, environ); err != nil {
-			log.WithError(err).Errorf("server error")
-		}
-	}()
+	if enableApiServer {
+		go func() {
+			if err := bbgo.RunServer(ctx, userConfig, environ); err != nil {
+				log.WithError(err).Errorf("server error")
+			}
+		}()
+	}
 
 	cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
 
@@ -258,6 +261,11 @@ func run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	enableApiServer, err := cmd.Flags().GetCount("enable-api-server")
+	if err != nil {
+		return err
+	}
+
 	// for wrapper binary, we can just run the strategies
 	if bbgo.IsWrapperBinary || (userConfig.Build != nil && len(userConfig.Build.Imports) == 0) || noCompile {
 		userConfig, err = bbgo.Load(configFile, true)
@@ -269,7 +277,7 @@ func run(cmd *cobra.Command, args []string) error {
 			log.Infof("running wrapper binary...")
 		}
 
-		if err := runConfig(ctx, userConfig); err != nil {
+		if err := runConfig(ctx, userConfig, enableApiServer > 0); err != nil {
 			return err
 		}
 
