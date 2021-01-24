@@ -217,6 +217,12 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config) error {
 		return err
 	}
 
+	go func() {
+		if err := bbgo.RunServer(ctx, userConfig, environ); err != nil {
+			log.WithError(err).Errorf("server error")
+		}
+	}()
+
 	cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
 
 	cancelTrading()
