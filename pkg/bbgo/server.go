@@ -61,6 +61,35 @@ func RunServer(ctx context.Context, userConfig *Config, environ *Environment) er
 		c.JSON(http.StatusOK, gin.H{"orders": marketOrders})
 	})
 
+	r.GET("/sessions/:session/account", func(c *gin.Context) {
+		sessionName := c.Param("session")
+		session, ok := environ.Session(sessionName)
+
+		if !ok {
+			c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("session %s not found", sessionName)})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"account": session.Account})
+	})
+
+	r.GET("/sessions/:session/account/balances", func(c *gin.Context) {
+		sessionName := c.Param("session")
+		session, ok := environ.Session(sessionName)
+
+		if !ok {
+			c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("session %s not found", sessionName)})
+			return
+		}
+
+		if session.Account == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("the account of session %s is nil", sessionName)})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"balances": session.Account.Balances()})
+	})
+
 	r.GET("/sessions/:session/symbols", func(c *gin.Context) {
 
 		sessionName := c.Param("session")
