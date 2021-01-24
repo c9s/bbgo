@@ -55,8 +55,8 @@ func (stream *StandardStream) Subscribe(channel Channel, symbol string, options 
 
 // SubscribeOptions provides the standard stream options
 type SubscribeOptions struct {
-	Interval string
-	Depth    string
+	Interval string `json:"interval,omitempty"`
+	Depth    string `json:"depth,omitempty"`
 }
 
 func (o SubscribeOptions) String() string {
@@ -68,7 +68,7 @@ func (o SubscribeOptions) String() string {
 }
 
 type Subscription struct {
-	Symbol  string
-	Channel Channel
-	Options SubscribeOptions
+	Symbol  string           `json:"symbol"`
+	Channel Channel          `json:"channel"`
+	Options SubscribeOptions `json:"options"`
 }
