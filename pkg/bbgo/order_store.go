@@ -13,6 +13,7 @@ type OrderStore struct {
 
 	Symbol          string
 	RemoveCancelled bool
+	AddOrderUpdate  bool
 }
 
 func NewOrderStore(symbol string) *OrderStore {
@@ -84,8 +85,13 @@ func (s *OrderStore) BindStream(stream types.Stream) {
 
 func (s *OrderStore) handleOrderUpdate(order types.Order) {
 	switch order.Status {
-	case types.OrderStatusPartiallyFilled, types.OrderStatusNew, types.OrderStatusFilled:
-		s.Update(order)
+
+	case types.OrderStatusNew, types.OrderStatusPartiallyFilled, types.OrderStatusFilled:
+		if s.AddOrderUpdate {
+			s.Add(order)
+		} else {
+			s.Update(order)
+		}
 
 	case types.OrderStatusCanceled:
 		if s.RemoveCancelled {
