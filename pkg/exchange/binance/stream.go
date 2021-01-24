@@ -306,7 +306,7 @@ func (s *Stream) Connect(ctx context.Context) error {
 
 func (s *Stream) read(ctx context.Context) {
 
-	pingTicker := time.NewTicker(20 * time.Second)
+	pingTicker := time.NewTicker(10 * time.Second)
 	defer pingTicker.Stop()
 
 	keepAliveTicker := time.NewTicker(5 * time.Minute)
@@ -320,7 +320,7 @@ func (s *Stream) read(ctx context.Context) {
 				return
 
 			case <-pingTicker.C:
-				if err := s.Conn.WriteControl(websocket.PingMessage, []byte("hb"), time.Now().Add(1*time.Second)); err != nil {
+				if err := s.Conn.WriteControl(websocket.PingMessage, []byte("hb"), time.Now().Add(3*time.Second)); err != nil {
 					log.WithError(err).Error("ping error", err)
 				}
 
@@ -350,6 +350,8 @@ func (s *Stream) read(ctx context.Context) {
 			if err != nil {
 				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway) {
 					log.WithError(err).Errorf("read error: %s", err.Error())
+				} else {
+					log.Info("websocket connection closed, going away")
 				}
 
 				// reconnect
