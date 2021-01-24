@@ -32,6 +32,10 @@ func (f *DepthFrame) Reset() {
 }
 
 func (f *DepthFrame) loadDepthSnapshot() {
+	if debugBinanceDepth {
+		log.Infof("loading %s depth from the restful api", f.Symbol)
+	}
+
 	depth, err := f.fetch(f.context)
 	if err != nil {
 		return
@@ -80,13 +84,13 @@ func (f *DepthFrame) PushEvent(e DepthEvent) {
 		f.BufEvents = append(f.BufEvents, e)
 		f.mu.Unlock()
 
+		f.loadDepthSnapshot()
+
 		// start a worker to update the snapshot periodically.
 		go f.once.Do(func() {
 			if debugBinanceDepth {
 				log.Infof("starting depth snapshot updater for %s market", f.Symbol)
 			}
-
-			f.loadDepthSnapshot()
 
 			ticker := time.NewTicker(1*time.Minute + time.Duration(rand.Intn(10))*time.Millisecond)
 			defer ticker.Stop()

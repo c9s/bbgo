@@ -78,9 +78,9 @@ func NewStream(client *binance.Client) *Stream {
 		f, ok := stream.depthFrames[e.Symbol]
 		if !ok {
 			f = &DepthFrame{
-				client: client,
+				client:  client,
 				context: context.Background(),
-				Symbol: e.Symbol,
+				Symbol:  e.Symbol,
 			}
 
 			stream.depthFrames[e.Symbol] = f
