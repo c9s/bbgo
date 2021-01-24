@@ -2,47 +2,22 @@
   "name": "frontend",
   "version": "0.1.0",
   "private": true,
-  "dependencies": {
-    "@testing-library/jest-dom": "^5.11.9",
-    "@testing-library/react": "^11.2.3",
-    "@testing-library/user-event": "^12.6.2",
-    "@types/jest": "^26.0.20",
-    "@types/node": "^12.19.15",
-    "@types/react": "^16.14.2",
-    "@types/react-dom": "^16.9.10",
-    "classnames": "^2.2.6",
-    "react": "^17.0.1",
-    "react-dom": "^17.0.1",
-    "react-scripts": "4.0.1",
-    "tailwind-react-ui": "^0.8.1",
-    "typescript": "^4.1.3",
-    "web-vitals": "^0.2.4"
-  },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject",
-    "build:tailwind": "tailwindcss build src/index.css -o src/tailwind.output.css",
-    "prestart": "npm run build:tailwind",
-    "prebuild": "npm run build:tailwind"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
   },
-  "eslintConfig": {
-    "extends": [
-      "react-app",
-      "react-app/jest"
-    ]
+  "dependencies": {
+    "@material-ui/core": "^4.11.2",
+    "next": "10.0.5",
+    "react": "17.0.1",
+    "react-dom": "17.0.1"
   },
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
+  "devDependencies": {
+    "@types/node": "^14.14.22",
+    "@types/react": "^17.0.0",
+    "postcss-flexbugs-fixes": "^5.0.2",
+    "postcss-preset-env": "^6.7.0",
+    "typescript": "^4.1.3"
   }
 }
