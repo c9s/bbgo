@@ -24,7 +24,7 @@ type DepthFrame struct {
 	pushCallbacks  []func(e DepthEvent)
 }
 
-func (f *DepthFrame) Reset() {
+func (f *DepthFrame) reset() {
 	f.mu.Lock()
 	f.SnapshotDepth = nil
 	f.BufEvents = nil
