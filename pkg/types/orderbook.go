@@ -38,8 +38,9 @@ func (slice PriceVolumeSlice) Trim() (pvs PriceVolumeSlice) {
 }
 
 func (slice PriceVolumeSlice) Copy() PriceVolumeSlice {
-	// this is faster than make (however it's only for simple types)
-	return append(slice[:0:0], slice...)
+	var s = make(PriceVolumeSlice, len(slice), len(slice))
+	copy(s, slice)
+	return s
 }
 
 func (slice PriceVolumeSlice) First() (PriceVolume, bool) {
