@@ -103,7 +103,7 @@ func (f *DepthFrame) PushEvent(e DepthEvent) {
 				log.Infof("starting depth snapshot updater for %s market", f.Symbol)
 			}
 
-			ticker := time.NewTicker(1*time.Minute + time.Duration(rand.Intn(10))*time.Millisecond)
+			ticker := time.NewTicker(5*time.Minute + time.Duration(rand.Intn(10))*time.Millisecond)
 			defer ticker.Stop()
 			for {
 				select {
