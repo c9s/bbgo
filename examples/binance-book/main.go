@@ -67,13 +67,15 @@ var rootCmd = &cobra.Command{
 					return
 
 				case <-streambook.C:
-					if valid, err := streambook.IsValid(); !valid {
+					book := streambook.Get()
+
+					if valid, err := book.IsValid(); !valid {
 						log.Errorf("order book is invalid, error: %v", err)
 						return
 					}
 
-					bestBid, hasBid := streambook.BestBid()
-					bestAsk, hasAsk := streambook.BestAsk()
+					bestBid, hasBid := book.BestBid()
+					bestAsk, hasAsk := book.BestAsk()
 					if hasBid && hasAsk {
 						log.Infof("================================")
 						log.Infof("best ask %f % -12f",
