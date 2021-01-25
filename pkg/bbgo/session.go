@@ -107,28 +107,28 @@ type ExchangeSession struct {
 	Exchange types.Exchange `json:"-"`
 
 	// markets defines market configuration of a symbol
-	markets map[string]types.Market `json:"markets"`
+	markets map[string]types.Market
 
 	// startPrices is used for backtest
-	startPrices map[string]float64 `json:"-"`
+	startPrices map[string]float64
 
-	lastPrices map[string]float64 `json:"lastPrices"`
+	lastPrices map[string]float64
 
 	// Trades collects the executed trades from the exchange
 	// map: symbol -> []trade
 	Trades map[string]*types.TradeSlice `json:"-"`
 
 	// marketDataStores contains the market data store of each market
-	marketDataStores map[string]*MarketDataStore `json:"-"`
+	marketDataStores map[string]*MarketDataStore
 
-	positions map[string]*Position `json:"-"`
+	positions map[string]*Position
 
 	// standard indicators of each market
-	standardIndicatorSets map[string]*StandardIndicatorSet `json:"-"`
+	standardIndicatorSets map[string]*StandardIndicatorSet
 
-	orderStores map[string]*OrderStore `json:"-"`
+	orderStores map[string]*OrderStore
 
-	loadedSymbols map[string]struct{} `json:"symbols"`
+	loadedSymbols map[string]struct{}
 
 	IsMargin bool `json:"isMargin"`
 
