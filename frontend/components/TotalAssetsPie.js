@@ -2,34 +2,7 @@ import React, {useEffect, useState} from 'react';
 
 import {ResponsivePie} from '@nivo/pie';
 import {queryAssets} from '../api/bbgo';
-
-function currencyColor(currency) {
-    switch (currency) {
-        case "BTC":
-            return "#f69c3d"
-        case "ETH":
-            return "#497493"
-        case "MCO":
-            return "#032144"
-        case "OMG":
-            return "#2159ec"
-        case "LTC":
-            return "#949494"
-        case "USDT":
-            return "#2ea07b"
-        case "SAND":
-            return "#2E9AD0"
-        case "XRP":
-            return "#00AAE4"
-        case "BCH":
-            return "#8DC351"
-        case "MAX":
-            return "#2D4692"
-        case "TWD":
-            return "#4A7DED"
-
-    }
-}
+import {currencyColor} from '../src/utils';
 
 function reduceAssetsBy(assets, field, minimum) {
     let as = []
@@ -56,7 +29,7 @@ function reduceAssetsBy(assets, field, minimum) {
     return as
 }
 
-export default function TotalAssets() {
+export default function TotalAssetsPie() {
     const [assets, setAssets] = useState({})
 
     useEffect(() => {
@@ -83,16 +56,15 @@ export default function TotalAssets() {
         sliceLabelsTextColor="#fff"
         legends={[
             {
-                anchor: 'bottom',
-                direction: 'row',
+                anchor: 'right',
+                direction: 'column',
                 justify: false,
                 translateX: 0,
-                translateY: 56,
-                itemsSpacing: 0,
-                itemWidth: 100,
-                itemHeight: 18,
+                translateY: 0,
+                itemsSpacing: 5,
+                itemWidth: 120,
+                itemHeight: 24,
                 itemTextColor: '#999',
-                itemDirection: 'left-to-right',
                 itemOpacity: 1,
                 symbolSize: 18,
                 symbolShape: 'circle',
