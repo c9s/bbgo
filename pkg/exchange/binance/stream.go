@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/adshao/go-binance/v2"
@@ -52,6 +53,7 @@ type Stream struct {
 	Client    *binance.Client
 	ListenKey string
 	Conn      *websocket.Conn
+	connLock  sync.Mutex
 
 	publicOnly bool
 
@@ -92,8 +94,8 @@ func NewStream(client *binance.Client) *Stream {
 					return
 				}
 
-				if !snapshot.IsValid() {
-					log.Warnf("depth snapshot is invalid, event: %+v", e)
+				if valid, err := snapshot.IsValid(); !valid {
+					log.Warnf("depth snapshot is invalid, event: %+v, error: %v", e, err)
 				}
 
 				stream.EmitBookSnapshot(snapshot)
@@ -174,6 +176,7 @@ func NewStream(client *binance.Client) *Stream {
 		// reset the previous frames
 		for _, f := range stream.depthFrames {
 			f.Reset()
+			f.loadDepthSnapshot()
 		}
 
 		var params []string
@@ -273,7 +276,10 @@ func (s *Stream) connect(ctx context.Context) error {
 	}
 
 	log.Infof("websocket connected")
+
+	s.connLock.Lock()
 	s.Conn = conn
+	s.connLock.Unlock()
 
 	s.EmitConnect()
 	return nil
@@ -320,9 +326,12 @@ func (s *Stream) read(ctx context.Context) {
 				return
 
 			case <-pingTicker.C:
+				s.connLock.Lock()
 				if err := s.Conn.WriteControl(websocket.PingMessage, []byte("hb"), time.Now().Add(3*time.Second)); err != nil {
 					log.WithError(err).Error("ping error", err)
 				}
+
+				s.connLock.Unlock()
 
 			case <-keepAliveTicker.C:
 				if !s.publicOnly {
@@ -452,6 +461,9 @@ func (s *Stream) Close() error {
 		}
 		log.Infof("user data stream closed")
 	}
+
+	s.connLock.Lock()
+	defer s.connLock.Unlock()
 
 	return s.Conn.Close()
 }
