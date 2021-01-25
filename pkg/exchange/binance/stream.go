@@ -90,7 +90,7 @@ func NewStream(client *binance.Client) *Stream {
 			f.OnReady(func(e DepthEvent, bufEvents []DepthEvent) {
 				snapshot, err := e.OrderBook()
 				if err != nil {
-					log.WithError(err).Error("book convert error")
+					log.WithError(err).Error("book snapshot convert error")
 					return
 				}
 
