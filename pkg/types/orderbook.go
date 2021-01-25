@@ -171,8 +171,8 @@ func (b *OrderBook) PriceVolumesBySide(side SideType) PriceVolumeSlice {
 
 func (b *OrderBook) Copy() (book OrderBook) {
 	book = *b
-	book.Bids = b.Bids.Copy()
-	book.Asks = b.Asks.Copy()
+	book.Bids = book.Bids.Copy()
+	book.Asks = book.Asks.Copy()
 	return book
 }
 
@@ -250,20 +250,28 @@ func (b *MutexOrderBook) Load(book OrderBook) {
 	b.Lock()
 	defer b.Unlock()
 
-	b.Reset()
-	b.update(book)
+	b.OrderBook.Reset()
+	b.OrderBook.update(book)
 	b.EmitLoad(b.OrderBook)
 }
 
+func (b *MutexOrderBook) Reset() {
+	b.Lock()
+	b.OrderBook.Reset()
+	b.Unlock()
+}
+
 func (b *MutexOrderBook) Get() OrderBook {
+	b.Lock()
+	defer b.Unlock()
 	return b.OrderBook.Copy()
 }
 
-func (b *MutexOrderBook) Update(book OrderBook) {
+func (b *MutexOrderBook) Update(update OrderBook) {
 	b.Lock()
 	defer b.Unlock()
 
-	b.update(book)
+	b.OrderBook.update(update)
 	b.EmitUpdate(b.OrderBook)
 }
 
