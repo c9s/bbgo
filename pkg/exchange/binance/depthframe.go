@@ -44,6 +44,16 @@ func (f *DepthFrame) loadDepthSnapshot() {
 
 	f.mu.Lock()
 
+	if len(depth.Asks) == 0 {
+		log.Errorf("depth response error: empty asks")
+		return
+	}
+
+	if len(depth.Bids) == 0 {
+		log.Errorf("depth response error: empty bids")
+		return
+	}
+
 	// filter the events by the event IDs
 	var events []DepthEvent
 	for _, e := range f.BufEvents {

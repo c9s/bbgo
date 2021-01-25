@@ -62,8 +62,8 @@ var rootCmd = &cobra.Command{
 			bestBid, hasBid := book.BestBid()
 			bestAsk, hasAsk := book.BestAsk()
 
-			if !book.IsValid() {
-				log.Warnf("order book is invalid")
+			if valid, err := book.IsValid(); !valid {
+				log.Errorf("order book is invalid, error: %v", err)
 				return
 			}
 

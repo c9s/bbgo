@@ -5,6 +5,8 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/pkg/errors"
+
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/sigchan"
 )
@@ -139,15 +141,19 @@ func (b *OrderBook) BestAsk() (PriceVolume, bool) {
 	return b.Asks[0], true
 }
 
-func (b *OrderBook) IsValid() bool {
+func (b *OrderBook) IsValid() (bool, error) {
 	bid, hasBid := b.BestBid()
 	ask, hasAsk := b.BestAsk()
 
-	if !hasBid || !hasAsk {
-		return false
+	if !hasBid {
+		return false, errors.New("empty bids")
 	}
 
-	return bid.Price < ask.Price
+	if !hasAsk {
+		return false, errors.New("empty asks")
+	}
+
+	return bid.Price < ask.Price, fmt.Errorf("bid price %f > ask price %f", bid.Price.Float64(), ask.Price.Float64())
 }
 
 func (b *OrderBook) PriceVolumesBySide(side SideType) PriceVolumeSlice {
