@@ -175,7 +175,7 @@ func NewStream(client *binance.Client) *Stream {
 	stream.OnConnect(func() {
 		// reset the previous frames
 		for _, f := range stream.depthFrames {
-			f.Reset()
+			f.reset()
 			f.loadDepthSnapshot()
 		}
 
