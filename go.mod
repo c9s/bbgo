@@ -10,6 +10,7 @@ require (
 	github.com/c9s/rockhopper v1.2.1-0.20210115022144-cc77e66fc34f
 	github.com/codingconcepts/env v0.0.0-20200821220118-a8fbf8d84482
 	github.com/fastly/go-utils v0.0.0-20180712184237-d95a45783239 // indirect
+	github.com/gin-contrib/cors v1.3.1
 	github.com/gin-gonic/gin v1.6.3
 	github.com/go-playground/validator/v10 v10.4.1 // indirect
 	github.com/go-redis/redis/v8 v8.4.0
