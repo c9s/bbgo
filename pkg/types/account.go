@@ -24,6 +24,15 @@ func (b Balance) String() string {
 	return fmt.Sprintf("%s: %f", b.Currency, b.Available.Float64())
 }
 
+type Asset struct {
+	Currency string           `json:"currency"`
+	Total    fixedpoint.Value `json:"total"`
+	InUSD    fixedpoint.Value `json:"inUSD"`
+	InBTC    fixedpoint.Value `json:"inBTC"`
+}
+
+type AssetMap map[string]Asset
+
 type BalanceMap map[string]Balance
 
 func (m BalanceMap) String() string {
@@ -33,6 +42,43 @@ func (m BalanceMap) String() string {
 	}
 
 	return "BalanceMap[" + strings.Join(ss, ", ") + "]"
+}
+
+func (m BalanceMap) Assets(prices map[string]float64) AssetMap {
+	assets := make(AssetMap)
+
+	for currency, b := range m {
+		if b.Locked == 0 && b.Available == 0 {
+			continue
+		}
+
+		asset := Asset{
+			Currency: currency,
+			Total:    b.Available + b.Locked,
+		}
+
+		btcusdt, hasBtcPrice := prices["BTCUSDT"]
+
+		usdMarkets := []string{currency + "USDT", currency + "USDC", currency + "USD", "USDT" + currency}
+		for _, market := range usdMarkets {
+			if val, ok := prices[market]; ok {
+
+				if strings.HasPrefix(market, "USD") {
+					asset.InUSD = fixedpoint.NewFromFloat(asset.Total.Float64() / val)
+				} else {
+					asset.InUSD = asset.Total.MulFloat64(val)
+				}
+
+				if hasBtcPrice {
+					asset.InBTC = fixedpoint.NewFromFloat(asset.InUSD.Float64() / btcusdt)
+				}
+			}
+		}
+
+		assets[currency] = asset
+	}
+
+	return assets
 }
 
 func (m BalanceMap) Print() {
