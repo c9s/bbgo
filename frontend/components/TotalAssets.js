@@ -1,7 +1,7 @@
 import React, {useEffect, useState} from 'react';
 
-import {ResponsivePie} from '@nivo/pie'
-import axios from 'axios';
+import {ResponsivePie} from '@nivo/pie';
+import {queryAssets} from '../api/bbgo';
 
 function currencyColor(currency) {
     switch (currency) {
@@ -59,13 +59,10 @@ function reduceAssetsBy(assets, field, minimum) {
 export default function TotalAssets() {
     const [assets, setAssets] = useState({})
 
-    useEffect(function loadAssets() {
-        axios.get('http://localhost:8080/api/assets', {})
-            .then(response => {
-                console.log(response.data.assets);
-                setAssets(response.data.assets)
-            });
-
+    useEffect(() => {
+        queryAssets((assets) => {
+            setAssets(assets)
+        })
     }, [])
 
     return <ResponsivePie
