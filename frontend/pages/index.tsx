@@ -7,20 +7,23 @@ import Box from '@material-ui/core/Box';
 import Link from '@material-ui/core/Link';
 import Grid from '@material-ui/core/Grid';
 import Paper from '@material-ui/core/Paper';
+import Tabs from '@material-ui/core/Tabs';
+import Tab from '@material-ui/core/Tab';
 
-import TotalAssets from '../components/TotalAssets';
+import TotalAssetsPie from '../components/TotalAssetsPie';
+import TotalAssetSummary from '../components/TotalAssetsSummary';
+
+import ExchangeSessionTabPanel from '../components/ExchangeSessionTabPanel';
 
 const useStyles = makeStyles((theme) => ({
-    root: {
-        flexGrow: 1,
-    },
     paper: {
         height: 140,
         width: 200,
     },
-    totalAssetsPaper: {
+    totalAssetsBox: {
         height: 300,
     },
+    totalAssetsSummary: {},
     control: {
         padding: theme.spacing(2),
     },
@@ -29,39 +32,30 @@ const useStyles = makeStyles((theme) => ({
 
 export default function Home() {
     const classes = useStyles();
+
     return (
-        <Container maxWidth="lg">
-            <Box my={4}>
-                <Typography variant="h4" component="h1" gutterBottom>
-                    Total Assets
-                </Typography>
+        <Container>
+            <Paper className={classes.totalAssetsSummary}>
+                <Box m={4}>
+                    <Typography variant="h4" component="h2" gutterBottom>
+                        Total Assets
+                    </Typography>
 
-                <Paper className={classes.totalAssetsPaper}>
-                    <TotalAssets/>
-                </Paper>
-            </Box>
+                    <Grid container spacing={3}>
+                        <Grid item xs={12} md={6}>
+                            <TotalAssetSummary/>
+                        </Grid>
 
-            <Box my={4}>
-
-                <Grid container className={classes.root}>
-                    <Grid item xs={12}>
-                        <Grid container justify="center">
-                            <Grid item>
-                                <Paper className={classes.paper}>
-                                </Paper>
-                            </Grid>
-                            <Grid item>
-                                <Paper className={classes.paper}>
-                                </Paper>
-                            </Grid>
+                        <Grid item xs={12} md={6}>
+                            <Box className={classes.totalAssetsBox}>
+                                <TotalAssetsPie/>
+                            </Box>
                         </Grid>
                     </Grid>
-                </Grid>
+                </Box>
+            </Paper>
 
-                <Link href="/about" color="secondary">
-                    Go to the about page
-                </Link>
-            </Box>
+            <ExchangeSessionTabPanel/>
         </Container>
     );
 }
