@@ -1,6 +1,9 @@
 package service
 
 import (
+	"strings"
+	"time"
+
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -8,12 +11,101 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+type TradingVolume struct {
+	Year        int       `db:"year" json:"year"`
+	Month       int       `db:"month" json:"month,omitempty"`
+	Day         int       `db:"day" json:"day,omitempty"`
+	Time        time.Time `json:"time,omitempty"`
+	Exchange    string    `db:"exchange" json:"exchange,omitempty"`
+	Symbol      string    `db:"symbol" json:"symbol,omitempty"`
+	QuoteVolume float64   `db:"quote_volume" json:"quoteVolume"`
+}
+
+type TradingVolumeQueryOptions struct {
+	GroupByExchange bool
+	GroupByPeriod   string
+}
+
 type TradeService struct {
 	DB *sqlx.DB
 }
 
 func NewTradeService(db *sqlx.DB) *TradeService {
 	return &TradeService{db}
+}
+
+func (s *TradeService) QueryTradingVolume(startTime time.Time, options TradingVolumeQueryOptions) ([]TradingVolume, error) {
+	var sel []string
+	var groupBys []string
+	var orderBys []string
+	where := []string{"traded_at > :start_time"}
+	args := map[string]interface{}{
+		// "symbol":      symbol,
+		// "exchange":    ex,
+		// "is_margin":   isMargin,
+		// "is_isolated": isIsolated,
+		"start_time": startTime,
+	}
+
+	switch options.GroupByPeriod {
+
+	case "month":
+		sel = append(sel, "YEAR(traded_at) AS year", "MONTH(traded_at) AS month")
+		groupBys = append([]string{"MONTH(traded_at)", "YEAR(traded_at)"}, groupBys...)
+		orderBys = append(orderBys, "year ASC", "month ASC")
+
+	case "year":
+		sel = append(sel, "YEAR(traded_at) AS year")
+		groupBys = append([]string{"YEAR(traded_at)"}, groupBys...)
+		orderBys = append(orderBys, "year ASC")
+
+	case "day":
+		fallthrough
+
+	default:
+		sel = append(sel, "YEAR(traded_at) AS year", "MONTH(traded_at) AS month", "DAY(traded_at) AS day")
+		groupBys = append([]string{"DAY(traded_at)", "MONTH(traded_at)", "YEAR(traded_at)"}, groupBys...)
+		orderBys = append(orderBys, "year ASC", "month ASC", "day ASC")
+	}
+
+	if options.GroupByExchange {
+		sel = append(sel, "exchange")
+		groupBys = append([]string{"exchange"}, groupBys...)
+		orderBys = append(orderBys, "exchange")
+	}
+
+	sel = append(sel, "SUM(quantity * price) AS quote_volume")
+	sql := `SELECT ` + strings.Join(sel, ", ") + ` FROM trades` +
+		` WHERE ` + strings.Join(where, " AND ") +
+		` GROUP BY ` + strings.Join(groupBys, ", ") +
+		` ORDER BY ` + strings.Join(orderBys, ", ")
+
+	log.Info(sql)
+
+	rows, err := s.DB.NamedQuery(sql, args)
+	if err != nil {
+		return nil, errors.Wrap(err, "query last trade error")
+	}
+
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
+
+	defer rows.Close()
+
+	var records []TradingVolume
+	for rows.Next() {
+		var record TradingVolume
+		err = rows.StructScan(&record)
+		if err != nil {
+			return records, err
+		}
+
+		record.Time = time.Date(record.Year, time.Month(record.Month), record.Day, 0, 0, 0, 0, time.UTC)
+		records = append(records, record)
+	}
+
+	return records, rows.Err()
 }
 
 // QueryLast queries the last trade from the database
