@@ -16,3 +16,11 @@ export function queryAssets(cb) {
         });
 }
 
+export function queryTradingVolume(params, cb) {
+    axios.get(baseURL + '/api/trading-volume', { params: params })
+        .then(response => {
+            cb(response.data.tradingVolumes)
+        });
+}
+
+
