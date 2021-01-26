@@ -114,7 +114,8 @@ type ExchangeSession struct {
 	// startPrices is used for backtest
 	startPrices map[string]float64
 
-	lastPrices map[string]float64
+	lastPrices         map[string]float64
+	lastPriceUpdatedAt time.Time
 
 	// Trades collects the executed trades from the exchange
 	// map: symbol -> []trade
@@ -245,6 +246,10 @@ func (session *ExchangeSession) FormatOrder(order types.SubmitOrder) (types.Subm
 }
 
 func (session *ExchangeSession) UpdatePrices(ctx context.Context) (err error) {
+	if session.lastPriceUpdatedAt.After(time.Now().Add(- time.Hour)) {
+		return nil
+	}
+
 	balances := session.Account.Balances()
 
 	for _, b := range balances {
@@ -262,5 +267,6 @@ func (session *ExchangeSession) UpdatePrices(ctx context.Context) (err error) {
 		session.lastPrices[priceSymbol] = klines[len(klines)-1].Close
 	}
 
+	session.lastPriceUpdatedAt = time.Now()
 	return err
 }
