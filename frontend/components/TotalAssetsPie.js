@@ -44,9 +44,10 @@ export default function TotalAssetsPie() {
         padding={0.2}
         innerRadius={0.8}
         padAngle={1.0}
+        valueFormat=" >-$f"
         colors={{datum: 'data.color'}}
         // colors={{scheme: 'nivo'}}
-        cornerRadius={0.0}
+        cornerRadius={0.1}
         borderWidth={1}
         borderColor={{from: 'color', modifiers: [['darker', 0.2]]}}
         radialLabelsSkipAngle={10}
@@ -59,7 +60,7 @@ export default function TotalAssetsPie() {
                 anchor: 'right',
                 direction: 'column',
                 justify: false,
-                translateX: 0,
+                translateX: 30,
                 translateY: 0,
                 itemsSpacing: 5,
                 itemWidth: 120,
