@@ -1,7 +1,9 @@
 package bbgo
 
 import (
+	"context"
 	"fmt"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
@@ -240,4 +242,25 @@ func (session *ExchangeSession) FormatOrder(order types.SubmitOrder) (types.Subm
 
 	order.QuantityString = market.FormatQuantity(order.Quantity)
 	return order, nil
+}
+
+func (session *ExchangeSession) UpdatePrices(ctx context.Context) (err error) {
+	balances := session.Account.Balances()
+
+	for _, b := range balances {
+		priceSymbol := b.Currency + "USDT"
+		startTime := time.Now().Add(-10 * time.Minute)
+		klines, err := session.Exchange.QueryKLines(ctx, priceSymbol, types.Interval1m, types.KLineQueryOptions{
+			Limit:     100,
+			StartTime: &startTime,
+		})
+
+		if err != nil || len(klines) == 0 {
+			continue
+		}
+
+		session.lastPrices[priceSymbol] = klines[len(klines)-1].Close
+	}
+
+	return err
 }
