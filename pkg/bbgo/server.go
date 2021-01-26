@@ -49,7 +49,7 @@ func RunServer(ctx context.Context, userConfig *Config, environ *Environment) er
 			return
 		}
 
-		c.JSON(http.StatusOK, rows)
+		c.JSON(http.StatusOK, gin.H{"tradingVolumes": rows})
 		return
 	})
 
