@@ -253,21 +253,6 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 		log.Infof("%s account", session.Name)
 		balances.Print()
 
-		for _, b := range balances {
-			priceSymbol := b.Currency + "USDT"
-			startTime := time.Now().Add(-10 * time.Minute)
-			klines, err := session.Exchange.QueryKLines(ctx, priceSymbol, types.Interval1m, types.KLineQueryOptions{
-				Limit:     100,
-				StartTime: &startTime,
-			})
-
-			if err != nil || len(klines) == 0 {
-				continue
-			}
-
-			session.lastPrices[priceSymbol] = klines[len(klines)-1].Close
-		}
-
 		session.Account.UpdateBalances(balances)
 		session.Account.BindStream(session.Stream)
 
@@ -542,6 +527,7 @@ func (environ *Environment) SyncTradesFrom(t time.Time) *Environment {
 	environ.tradeScanTime = t
 	return environ
 }
+
 
 func (environ *Environment) Connect(ctx context.Context) error {
 	for n := range environ.sessions {

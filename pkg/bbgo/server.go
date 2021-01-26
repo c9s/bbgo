@@ -8,7 +8,9 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	log "github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -26,6 +28,31 @@ func RunServer(ctx context.Context, userConfig *Config, environ *Environment) er
 		c.JSON(http.StatusOK, gin.H{"message": "pong"})
 	})
 
+	r.GET("/api/trading-volume", func(c *gin.Context) {
+		period := c.DefaultQuery("period", "day")
+		startTimeString := c.DefaultQuery("start-time", time.Now().AddDate(0, 0, -7).Format(time.RFC3339))
+
+		startTime, err := time.Parse(time.RFC3339, startTimeString)
+		if err != nil {
+			c.Status(http.StatusBadRequest)
+			log.WithError(err).Error("start-time format incorrect")
+			return
+		}
+
+		rows, err := environ.TradeService.QueryTradingVolume(startTime, service.TradingVolumeQueryOptions{
+			GroupByExchange: false,
+			GroupByPeriod:   period,
+		})
+		if err != nil {
+			log.WithError(err).Error("trading volume query error")
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+
+		c.JSON(http.StatusOK, rows)
+		return
+	})
+
 	r.GET("/api/sessions", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"sessions": userConfig.Sessions})
 	})
@@ -35,6 +62,13 @@ func RunServer(ctx context.Context, userConfig *Config, environ *Environment) er
 
 		for _, session := range environ.sessions {
 			balances := session.Account.Balances()
+
+			if err := session.UpdatePrices(ctx); err != nil {
+				log.WithError(err).Error("price update failed")
+				c.Status(http.StatusInternalServerError)
+				return
+			}
+
 			assets := balances.Assets(session.lastPrices)
 
 			for currency, asset := range assets {
