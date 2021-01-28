@@ -30,18 +30,40 @@ func RunServer(ctx context.Context, userConfig *Config, environ *Environment) er
 
 	r.GET("/api/trading-volume", func(c *gin.Context) {
 		period := c.DefaultQuery("period", "day")
-		startTimeString := c.DefaultQuery("start-time", time.Now().AddDate(0, 0, -7).Format(time.RFC3339))
+		segment := c.DefaultQuery("segment", "exchange")
+		startTimeStr := c.Query("start-time")
 
-		startTime, err := time.Parse(time.RFC3339, startTimeString)
-		if err != nil {
-			c.Status(http.StatusBadRequest)
-			log.WithError(err).Error("start-time format incorrect")
-			return
+		var startTime time.Time
+
+		if startTimeStr != "" {
+			v, err := time.Parse(time.RFC3339, startTimeStr)
+			if err != nil {
+				c.Status(http.StatusBadRequest)
+				log.WithError(err).Error("start-time format incorrect")
+				return
+			}
+			startTime = v
+
+		} else {
+			switch period {
+			case "day":
+				startTime = time.Now().AddDate(0, 0, -30)
+
+			case "month":
+				startTime = time.Now().AddDate(0, -6, 0)
+
+			case "year":
+				startTime = time.Now().AddDate(-2, 0, 0)
+
+			default:
+				startTime = time.Now().AddDate(0, 0, -7)
+
+			}
 		}
 
 		rows, err := environ.TradeService.QueryTradingVolume(startTime, service.TradingVolumeQueryOptions{
-			GroupByExchange: false,
-			GroupByPeriod:   period,
+			SegmentBy:     segment,
+			GroupByPeriod: period,
 		})
 		if err != nil {
 			log.WithError(err).Error("trading volume query error")
