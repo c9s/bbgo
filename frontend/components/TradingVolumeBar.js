@@ -2,11 +2,26 @@ import {ResponsiveBar} from '@nivo/bar';
 import {queryTradingVolume} from '../api/bbgo';
 import {useEffect, useState} from "react";
 
+function toPeriodDateString(time, period) {
+    switch (period) {
+        case "day":
+            return time.getFullYear() + "-" + (time.getMonth() + 1) + "-" + time.getDate()
+        case "month":
+            return time.getFullYear() + "-" + (time.getMonth() + 1)
+        case "year":
+            return time.getFullYear()
 
-function groupData(rows) {
+    }
+
+    return time.getFullYear() + "-" + (time.getMonth() + 1) + "-" + time.getDate()
+}
+
+function groupData(rows, period, segment) {
     let dateIndex = {}
     let startTime = null
     let endTime = null
+    let keys = {}
+
     rows.forEach((v) => {
         const time = new Date(v.time)
         if (!startTime) {
@@ -15,8 +30,11 @@ function groupData(rows) {
 
         endTime = time
 
-        const dateStr = time.getFullYear() + "-" + (time.getMonth() + 1) + "-" + time.getDate()
-        const key = v.exchange
+        const dateStr = toPeriodDateString(time, period)
+        const key = v[segment]
+
+        keys[key] = true
+
         const k = key ? key : "total"
         const quoteVolume = Math.round(v.quoteVolume * 100) / 100
 
@@ -35,7 +53,7 @@ function groupData(rows) {
 
     let data = []
     while (startTime < endTime) {
-        const dateStr = startTime.getFullYear() + "-" + (startTime.getMonth() + 1) + "-" + startTime.getDate()
+        const dateStr = toPeriodDateString(startTime, period)
         const groupData = dateIndex[dateStr]
         if (groupData) {
             data.push(groupData)
@@ -49,32 +67,61 @@ function groupData(rows) {
             })
         }
 
-        startTime.setDate(startTime.getDate() + 1)
+        switch (period) {
+            case "day":
+                startTime.setDate(startTime.getDate() + 1)
+                break
+            case "month":
+                startTime.setMonth(startTime.getMonth() + 1)
+                break
+            case "year":
+                startTime.setFullYear(startTime.getFullYear() + 1)
+                break
+        }
     }
 
-    return data
+    console.log(Object.keys(keys))
+    console.log(data)
+    return [data, Object.keys(keys)]
 }
 
-export default function TradingVolumeBar() {
+export default function TradingVolumeBar(props) {
     const [tradingVolumes, setTradingVolumes] = useState([])
+    const [period, setPeriod] = useState(props.period)
+    const [segment, setSegment] = useState(props.segment)
 
     useEffect(() => {
-        queryTradingVolume({}, (tradingVolumes) => {
+        if (props.period !== period) {
+            setPeriod(props.period);
+        }
+
+        if (props.segment !== segment) {
+            setSegment(props.segment);
+        }
+
+        queryTradingVolume({period: props.period, segment: props.segment }, (tradingVolumes) => {
             setTradingVolumes(tradingVolumes)
         })
-    }, [])
+    }, [props.period])
 
-    const data = groupData(tradingVolumes)
+    const [data, keys] = groupData(tradingVolumes, period, segment)
 
-    return <ResponsiveBar keys={["total"]}
+    return <ResponsiveBar keys={keys}
                           data={data}
                           indexBy={"date"}
-                          margin={{ top: 50, right: 160, bottom: 50, left: 60 }}
+                          margin={{top: 50, right: 160, bottom: 100, left: 60}}
                           padding={0.3}
-                          valueScale={{ type: 'linear' }}
-                          indexScale={{ type: 'band', round: true }}
+                          valueScale={{type: 'linear'}}
+                          indexScale={{type: 'band', round: true}}
+                          labelSkipWidth={30}
                           enableGridY={true}
-                          colors={{ scheme: 'paired' }}
+                          colors={{scheme: 'paired'}}
+                          axisBottom={{
+                              tickRotation: -90,
+                              legend: period,
+                              legendPosition: 'middle',
+                              legendOffset: 80
+                          }}
                           legends={[
                               {
                                   dataFrom: 'keys',

@@ -22,8 +22,8 @@ type TradingVolume struct {
 }
 
 type TradingVolumeQueryOptions struct {
-	GroupByExchange bool
 	GroupByPeriod   string
+	SegmentBy       string
 }
 
 type TradeService struct {
@@ -68,7 +68,12 @@ func (s *TradeService) QueryTradingVolume(startTime time.Time, options TradingVo
 		orderBys = append(orderBys, "year ASC", "month ASC", "day ASC")
 	}
 
-	if options.GroupByExchange {
+	switch options.SegmentBy {
+	case "symbol":
+		sel = append(sel, "symbol")
+		groupBys = append([]string{"symbol"}, groupBys...)
+		orderBys = append(orderBys, "symbol")
+	case "exchange":
 		sel = append(sel, "exchange")
 		groupBys = append([]string{"exchange"}, groupBys...)
 		orderBys = append(orderBys, "exchange")

@@ -9,8 +9,8 @@ import Paper from '@material-ui/core/Paper';
 
 import TotalAssetsPie from '../components/TotalAssetsPie';
 import TotalAssetSummary from '../components/TotalAssetsSummary';
-import TradingVolumeBar from '../components/TradingVolumeBar';
 
+import TradingVolumePanel from '../components/TradingVolumePanel';
 import ExchangeSessionTabPanel from '../components/ExchangeSessionTabPanel';
 
 const useStyles = makeStyles((theme) => ({
@@ -56,9 +56,7 @@ export default function Home() {
                 </Box>
             </Paper>
 
-            <Paper className={classes.TradingVolumeBar}>
-                <TradingVolumeBar/>
-            </Paper>
+            <TradingVolumePanel/>
 
             <ExchangeSessionTabPanel/>
         </Container>
