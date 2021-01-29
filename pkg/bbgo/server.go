@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/markbates/pkger"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/service"
@@ -203,6 +204,11 @@ func RunServer(ctx context.Context, userConfig *Config, environ *Environment) er
 
 	r.GET("/api/sessions/:session/market/:symbol/pnl", func(c *gin.Context) {
 		c.JSON(200, gin.H{"message": "pong"})
+	})
+
+	fs := pkger.Dir("/frontend/out")
+	r.NoRoute(func(c *gin.Context) {
+		http.FileServer(fs).ServeHTTP(c.Writer, c.Request)
 	})
 
 	return r.Run() // listen and serve on 0.0.0.0:8080 (for windows "localhost:8080")
