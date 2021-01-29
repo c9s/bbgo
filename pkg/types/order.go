@@ -69,7 +69,7 @@ type SubmitOrder struct {
 	Price     float64 `json:"price" db:"price"`
 	StopPrice float64 `json:"stopPrice" db:"stop_price"`
 
-	Market Market `json:"market" db:"-"`
+	Market Market `json:"-" db:"-"`
 
 	// TODO: we can probably remove these field
 	StopPriceString string `json:"-"`
