@@ -6,7 +6,6 @@ import {makeStyles, ThemeProvider} from '@material-ui/core/styles';
 import AppBar from '@material-ui/core/AppBar';
 import Toolbar from '@material-ui/core/Toolbar';
 import Typography from '@material-ui/core/Typography';
-import Button from '@material-ui/core/Button';
 
 import SideBar from '../components/SideBar';
 
@@ -26,9 +25,6 @@ const useStyles = makeStyles((theme) => ({
         height: '100vh',
         overflow: 'auto',
     },
-    fixedHeight: {
-        height: 240,
-    },
     toolbar: {
         paddingRight: 24, // keep right padding when drawer closed
     },
@@ -38,12 +34,6 @@ const useStyles = makeStyles((theme) => ({
         justifyContent: 'flex-end',
         padding: '0 8px',
         ...theme.mixins.toolbar,
-    },
-    menuButton: {
-        marginRight: 36,
-    },
-    menuButtonHidden: {
-        display: 'none',
     },
     title: {
         flexGrow: 1,
@@ -83,7 +73,7 @@ export default function MyApp(props) {
                             <Typography variant="h6" className={classes.title}>
                                 BBGO
                             </Typography>
-                            <Button color="inherit">Login</Button>
+                            {/* <Button color="inherit">Login</Button> */}
                         </Toolbar>
                     </AppBar>
 
