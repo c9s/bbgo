@@ -45,6 +45,11 @@ func (s *OrderService) QueryLast(ex types.ExchangeName, symbol string, isMargin 
 	return nil, rows.Err()
 }
 
+type AggOrder struct {
+	types.Order
+	AveragePrice *float64 `json:"averagePrice" db:"average_price"`
+}
+
 type OrderQueryOptions struct {
 	Exchange types.ExchangeName
 	Symbol   string
@@ -52,7 +57,7 @@ type OrderQueryOptions struct {
 	Order    string
 }
 
-func (s *OrderService) Query(options OrderQueryOptions) ([]types.Order, error) {
+func (s *OrderService) Query(options OrderQueryOptions) ([]AggOrder, error) {
 	// ascending
 	ordering := "ASC"
 	if len(options.Order) > 0 {
@@ -77,11 +82,13 @@ func (s *OrderService) Query(options OrderQueryOptions) ([]types.Order, error) {
 		where = append(where, "symbol = :symbol")
 	}
 
-	sql := `SELECT * FROM orders`
+	sql := `SELECT orders.*, IFNULL(SUM(t.price * t.quantity)/SUM(t.quantity), orders.price) AS average_price FROM orders` +
+		` LEFT JOIN trades AS t ON (t.order_id = orders.order_id)`
 	if len(where) > 0 {
 		sql += ` WHERE ` + strings.Join(where, " AND ")
 	}
-	sql += ` ORDER BY gid ` + ordering
+	sql += ` GROUP BY orders.gid `
+	sql += ` ORDER BY orders.gid ` + ordering
 	sql += ` LIMIT ` + strconv.Itoa(500)
 
 	rows, err := s.DB.NamedQuery(sql, map[string]interface{}{
@@ -95,7 +102,20 @@ func (s *OrderService) Query(options OrderQueryOptions) ([]types.Order, error) {
 
 	defer rows.Close()
 
-	return s.scanRows(rows)
+	return s.scanAggRows(rows)
+}
+
+func (s *OrderService) scanAggRows(rows *sqlx.Rows) (orders []AggOrder, err error) {
+	for rows.Next() {
+		var order AggOrder
+		if err := rows.StructScan(&order); err != nil {
+			return nil, err
+		}
+
+		orders = append(orders, order)
+	}
+
+	return orders, rows.Err()
 }
 
 func (s *OrderService) scanRows(rows *sqlx.Rows) (orders []types.Order, err error) {
