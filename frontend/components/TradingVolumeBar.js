@@ -102,7 +102,7 @@ export default function TradingVolumeBar(props) {
         queryTradingVolume({period: props.period, segment: props.segment }, (tradingVolumes) => {
             setTradingVolumes(tradingVolumes)
         })
-    }, [props.period])
+    }, [props.period, props.segment])
 
     const [data, keys] = groupData(tradingVolumes, period, segment)
 
@@ -114,6 +114,7 @@ export default function TradingVolumeBar(props) {
                           valueScale={{type: 'linear'}}
                           indexScale={{type: 'band', round: true}}
                           labelSkipWidth={30}
+                          labelSkipHeight={20}
                           enableGridY={true}
                           colors={{scheme: 'paired'}}
                           axisBottom={{
