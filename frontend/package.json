@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@material-ui/core": "^4.11.2",
+    "@material-ui/data-grid": "^4.0.0-alpha.18",
     "@material-ui/icons": "^4.11.2",
     "@nivo/bar": "^0.67.0",
     "@nivo/core": "^0.67.0",

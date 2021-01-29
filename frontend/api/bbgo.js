@@ -9,6 +9,13 @@ export function querySessions(cb) {
         });
 }
 
+export function queryOrders(params, cb) {
+    axios.get(baseURL + '/api/orders', { params: params })
+        .then(response => {
+            cb(response.data.orders)
+        });
+}
+
 export function queryAssets(cb) {
     axios.get(baseURL + '/api/assets', {})
         .then(response => {
