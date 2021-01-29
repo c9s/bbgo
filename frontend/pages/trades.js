@@ -5,23 +5,19 @@ import Container from '@material-ui/core/Container';
 import Typography from '@material-ui/core/Typography';
 import Box from '@material-ui/core/Box';
 import Paper from '@material-ui/core/Paper';
-import {queryClosedOrders} from '../api/bbgo';
+import {queryTrades} from '../api/bbgo';
 import {DataGrid} from '@material-ui/data-grid';
 
 const columns = [
     {field: 'gid', headerName: 'GID', width: 80, type: 'number'},
-    {field: 'clientOrderID', headerName: 'Client Order ID', width: 130 },
     {field: 'exchange', headerName: 'Exchange'},
     {field: 'symbol', headerName: 'Symbol'},
-    {field: 'orderType', headerName: 'Type'},
     {field: 'side', headerName: 'Side', width: 90},
-    {field: 'averagePrice', headerName: 'Average Price', type: 'number', width: 120 },
+    {field: 'price', headerName: 'Price', type: 'number', width: 120 },
     {field: 'quantity', headerName: 'Quantity', type: 'number'},
-    {field: 'executedQuantity', headerName: 'Executed Quantity', type: 'number'},
-    {field: 'status', headerName: 'Status'},
     {field: 'isMargin', headerName: 'Margin'},
     {field: 'isIsolated', headerName: 'Isolated'},
-    {field: 'creationTime', headerName: 'Create Time', width: 200},
+    {field: 'tradedAt', headerName: 'Trade Time', width: 200},
 ];
 
 const useStyles = makeStyles((theme) => ({
@@ -30,14 +26,14 @@ const useStyles = makeStyles((theme) => ({
     },
 }));
 
-export default function Orders() {
+export default function Trades() {
     const classes = useStyles();
 
-    const [orders, setOrders] = useState([])
+    const [trades, setTrades] = useState([])
 
     useEffect(() => {
-        queryClosedOrders({}, (orders) => {
-            setOrders(orders.map((o) => { o.id = o.gid; return o }))
+        queryTrades({}, (trades) => {
+            setTrades(trades.map((o) => { o.id = o.gid; return o }))
         })
     }, [])
 
@@ -46,11 +42,11 @@ export default function Orders() {
             <Box m={4}>
                 <Paper className={classes.paper}>
                     <Typography variant="h4" component="h2" gutterBottom>
-                        Orders
+                        Trades
                     </Typography>
                 </Paper>
                 <DataGrid
-                    rows={orders}
+                    rows={trades}
                     columns={columns}
                     pageSize={50}
                     autoHeight={true}/>
