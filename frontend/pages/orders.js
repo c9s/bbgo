@@ -5,7 +5,7 @@ import Container from '@material-ui/core/Container';
 import Typography from '@material-ui/core/Typography';
 import Box from '@material-ui/core/Box';
 import Paper from '@material-ui/core/Paper';
-import {queryOrders} from '../api/bbgo';
+import {queryClosedOrders} from '../api/bbgo';
 import {DataGrid} from '@material-ui/data-grid';
 
 const columns = [
@@ -36,7 +36,7 @@ export default function Orders() {
     const [orders, setOrders] = useState([])
 
     useEffect(() => {
-        queryOrders({}, (orders) => {
+        queryClosedOrders({}, (orders) => {
             setOrders(orders.map((o) => { o.id = o.gid; return o }))
         })
     }, [])
@@ -53,8 +53,7 @@ export default function Orders() {
                     rows={orders}
                     columns={columns}
                     pageSize={50}
-                    autoHeight={true}
-                    checkboxSelection/>
+                    autoHeight={true}/>
             </Box>
         </Container>
     );

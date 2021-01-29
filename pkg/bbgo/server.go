@@ -30,7 +30,7 @@ func RunServer(ctx context.Context, userConfig *Config, environ *Environment) er
 		c.JSON(http.StatusOK, gin.H{"message": "pong"})
 	})
 
-	r.GET("/api/orders", func(c *gin.Context) {
+	r.GET("/api/orders/closed", func(c *gin.Context) {
 		exchange := c.Query("exchange")
 		symbol := c.Query("symbol")
 		gidStr := c.DefaultQuery("gid", "0")
