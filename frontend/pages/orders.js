@@ -15,7 +15,7 @@ const columns = [
     {field: 'symbol', headerName: 'Symbol'},
     {field: 'orderType', headerName: 'Type'},
     {field: 'side', headerName: 'Side', width: 90},
-    {field: 'price', headerName: 'Price', type: 'number'},
+    {field: 'averagePrice', headerName: 'Average Price', type: 'number'},
     {field: 'quantity', headerName: 'Quantity', type: 'number'},
     {field: 'executedQuantity', headerName: 'Executed Quantity', type: 'number'},
     {field: 'status', headerName: 'Status'},
