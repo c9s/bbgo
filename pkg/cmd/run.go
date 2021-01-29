@@ -35,7 +35,7 @@ func init() {
 	RunCmd.Flags().String("totp-key-url", "", "time-based one-time password key URL, if defined, it will be used for restoring the otp key")
 	RunCmd.Flags().String("totp-issuer", "", "")
 	RunCmd.Flags().String("totp-account-name", "", "")
-	RunCmd.Flags().Count("enable-api-server", "enable api server")
+	RunCmd.Flags().Bool("enable-web-server", false, "enable web server")
 
 	RunCmd.Flags().String("since", "", "pnl since time")
 	RootCmd.AddCommand(RunCmd)
@@ -261,7 +261,7 @@ func run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	enableApiServer, err := cmd.Flags().GetCount("enable-api-server")
+	enableApiServer, err := cmd.Flags().GetBool("enable-web-server")
 	if err != nil {
 		return err
 	}
@@ -277,7 +277,7 @@ func run(cmd *cobra.Command, args []string) error {
 			log.Infof("running wrapper binary...")
 		}
 
-		if err := runConfig(ctx, userConfig, enableApiServer > 0); err != nil {
+		if err := runConfig(ctx, userConfig, enableApiServer); err != nil {
 			return err
 		}
 
