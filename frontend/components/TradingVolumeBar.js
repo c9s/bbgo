@@ -80,8 +80,6 @@ function groupData(rows, period, segment) {
         }
     }
 
-    console.log(Object.keys(keys))
-    console.log(data)
     return [data, Object.keys(keys)]
 }
 

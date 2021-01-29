@@ -53,7 +53,7 @@ export default function TotalAssetsPie() {
         radialLabelsSkipAngle={10}
         radialLabelsTextColor="#333333"
         radialLabelsLinkColor={{from: 'color'}}
-        sliceLabelsSkipAngle={10}
+        sliceLabelsSkipAngle={30}
         sliceLabelsTextColor="#fff"
         legends={[
             {
