@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -27,6 +28,35 @@ func RunServer(ctx context.Context, userConfig *Config, environ *Environment) er
 
 	r.GET("/api/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"message": "pong"})
+	})
+
+	r.GET("/api/orders", func(c *gin.Context) {
+		exchange := c.Query("exchange")
+		symbol := c.Query("symbol")
+		gidStr := c.DefaultQuery("gid", "0")
+
+		lastGID, err := strconv.ParseInt(gidStr, 10, 64)
+		if err != nil {
+			log.WithError(err).Error("last gid parse error")
+			c.Status(http.StatusBadRequest)
+			return
+		}
+
+		orders, err := environ.OrderService.Query(service.OrderQueryOptions{
+			Exchange: types.ExchangeName(exchange),
+			Symbol:   symbol,
+			LastGID:  lastGID,
+			Order:    "DESC",
+		})
+		if err != nil {
+			c.Status(http.StatusBadRequest)
+			log.WithError(err).Error("order query error")
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"orders": orders,
+		})
 	})
 
 	r.GET("/api/trading-volume", func(c *gin.Context) {

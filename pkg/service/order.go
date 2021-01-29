@@ -1,6 +1,9 @@
 package service
 
 import (
+	"strconv"
+	"strings"
+
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -42,10 +45,49 @@ func (s *OrderService) QueryLast(ex types.ExchangeName, symbol string, isMargin 
 	return nil, rows.Err()
 }
 
-func (s *OrderService) Query(ex types.ExchangeName, symbol string) ([]types.Order, error) {
-	rows, err := s.DB.NamedQuery(`SELECT * FROM orders WHERE exchange = :exchange AND symbol = :symbol ORDER BY gid ASC`, map[string]interface{}{
-		"exchange": ex,
-		"symbol":   symbol,
+type OrderQueryOptions struct {
+	Exchange types.ExchangeName
+	Symbol   string
+	LastGID  int64
+	Order    string
+}
+
+func (s *OrderService) Query(options OrderQueryOptions) ([]types.Order, error) {
+	// ascending
+	ordering := "ASC"
+	if len(options.Order) > 0 {
+		ordering = options.Order
+	}
+
+	var where []string
+	if options.LastGID > 0 {
+		switch ordering {
+		case "ASC":
+			where = append(where, "gid > :gid")
+		case "DESC":
+			where = append(where, "gid < :gid")
+
+		}
+	}
+
+	if len(options.Exchange) > 0 {
+		where = append(where, "exchange = :exchange")
+	}
+	if len(options.Symbol) > 0 {
+		where = append(where, "symbol = :symbol")
+	}
+
+	sql := `SELECT * FROM orders`
+	if len(where) > 0 {
+		sql += ` WHERE ` + strings.Join(where, " AND ")
+	}
+	sql += ` ORDER BY gid ` + ordering
+	sql += ` LIMIT ` + strconv.Itoa(500)
+
+	rows, err := s.DB.NamedQuery(sql, map[string]interface{}{
+		"exchange": options.Exchange,
+		"symbol":   options.Symbol,
+		"gid":      options.LastGID,
 	})
 	if err != nil {
 		return nil, err
