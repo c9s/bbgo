@@ -64,7 +64,10 @@ var PnLCmd = &cobra.Command{
 			log.Infof("loading all trading fee currency related trades: %s", symbol)
 			trades, err = tradeService.QueryForTradingFeeCurrency(exchange.Name(), symbol, tradingFeeCurrency)
 		} else {
-			trades, err = tradeService.Query(exchange.Name(), symbol)
+			trades, err = tradeService.Query(service.QueryTradesOptions{
+				Exchange: exchange.Name(),
+				Symbol:   symbol,
+			})
 		}
 
 		if err != nil {

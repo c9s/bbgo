@@ -206,7 +206,10 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 				if strings.HasPrefix(symbol, tradingFeeCurrency) {
 					trades, err = environ.TradeService.QueryForTradingFeeCurrency(session.Exchange.Name(), symbol, tradingFeeCurrency)
 				} else {
-					trades, err = environ.TradeService.Query(session.Exchange.Name(), symbol)
+					trades, err = environ.TradeService.Query(service.QueryTradesOptions{
+						Exchange: session.Exchange.Name(),
+						Symbol:   symbol,
+					})
 				}
 
 				if err != nil {
