@@ -21,9 +21,8 @@ const useStyles = makeStyles((theme) => ({
     totalAssetsBox: {
         height: 300,
     },
-    totalAssetsSummary: {},
-    TradingVolumeBar: {
-        height: 400,
+    totalAssetsSummary: {
+        padding: theme.spacing(2),
     },
     control: {
         padding: theme.spacing(2),
@@ -36,8 +35,8 @@ export default function Home() {
 
     return (
         <Container>
-            <Paper className={classes.totalAssetsSummary}>
-                <Box m={4}>
+            <Box m={4}>
+                <Paper className={classes.totalAssetsSummary}>
                     <Typography variant="h4" component="h2" gutterBottom>
                         Total Assets
                     </Typography>
@@ -53,12 +52,12 @@ export default function Home() {
                             </Box>
                         </Grid>
                     </Grid>
-                </Box>
-            </Paper>
+                </Paper>
 
-            <TradingVolumePanel/>
+                <TradingVolumePanel/>
 
-            <ExchangeSessionTabPanel/>
+                <ExchangeSessionTabPanel/>
+            </Box>
         </Container>
     );
 }

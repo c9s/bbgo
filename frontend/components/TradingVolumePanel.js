@@ -6,11 +6,17 @@ import React from "react";
 import TradingVolumeBar from "./TradingVolumeBar";
 import {makeStyles} from "@material-ui/core/styles";
 import Grid from "@material-ui/core/Grid";
+import Typography from "@material-ui/core/Typography";
 
 const useStyles = makeStyles((theme) => ({
     tradingVolumeBarBox: {
         height: 400,
     },
+    paper: {
+        marginTop: theme.spacing(3),
+        marginBottom: theme.spacing(3),
+        padding: theme.spacing(2),
+    }
 }));
 
 export default function TradingVolumePanel() {
@@ -25,7 +31,11 @@ export default function TradingVolumePanel() {
         setSegment(newValue);
     };
 
-    return <Paper>
+    return <Paper className={classes.paper}>
+        <Typography variant="h4" gutterBottom>
+            Trading Volume
+        </Typography>
+
         <Grid container spacing={0}>
             <Grid item xs={12} md={6}>
                 <Tabs value={period}
