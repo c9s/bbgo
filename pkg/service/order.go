@@ -50,18 +50,19 @@ type AggOrder struct {
 	AveragePrice *float64 `json:"averagePrice" db:"average_price"`
 }
 
-type OrderQueryOptions struct {
+type QueryOrdersOptions struct {
 	Exchange types.ExchangeName
 	Symbol   string
 	LastGID  int64
-	Order    string
+	Ordering string
 }
 
-func (s *OrderService) Query(options OrderQueryOptions) ([]AggOrder, error) {
+func (s *OrderService) Query(options QueryOrdersOptions) ([]AggOrder, error) {
 	// ascending
 	ordering := "ASC"
-	if len(options.Order) > 0 {
-		ordering = options.Order
+	switch v := strings.ToUpper(options.Ordering); v {
+	case "DESC", "ASC":
+		ordering = options.Ordering
 	}
 
 	var where []string

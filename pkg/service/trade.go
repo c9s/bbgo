@@ -1,6 +1,7 @@
 package service
 
 import (
+	"strconv"
 	"strings"
 	"time"
 
@@ -22,8 +23,8 @@ type TradingVolume struct {
 }
 
 type TradingVolumeQueryOptions struct {
-	GroupByPeriod   string
-	SegmentBy       string
+	GroupByPeriod string
+	SegmentBy     string
 }
 
 type TradeService struct {
@@ -157,11 +158,57 @@ func (s *TradeService) QueryForTradingFeeCurrency(ex types.ExchangeName, symbol 
 	return s.scanRows(rows)
 }
 
-func (s *TradeService) Query(ex types.ExchangeName, symbol string) ([]types.Trade, error) {
-	rows, err := s.DB.NamedQuery(`SELECT * FROM trades WHERE exchange = :exchange AND symbol = :symbol ORDER BY gid ASC`, map[string]interface{}{
-		"exchange": ex,
-		"symbol":   symbol,
-	})
+type QueryTradesOptions struct {
+	Exchange types.ExchangeName
+	Symbol   string
+	LastGID  int64
+	Ordering string
+}
+
+func (s *TradeService) Query(options QueryTradesOptions) ([]types.Trade, error) {
+	ordering := "ASC"
+	switch v := strings.ToUpper(options.Ordering); v {
+	case "DESC", "ASC":
+		ordering = v
+	}
+
+	var where []string
+
+	if len(options.Exchange) > 0 {
+		where = append(where, `exchange = :exchange`)
+	}
+
+	if len(options.Symbol) > 0 {
+		where = append(where, `symbol = :symbol`)
+	}
+
+	if options.LastGID > 0 {
+		switch ordering {
+		case "ASC":
+			where = append(where, "gid > :gid")
+		case "DESC":
+			where = append(where, "gid < :gid")
+
+		}
+	}
+
+	sql := `SELECT * FROM trades`
+
+	if len(where) > 0 {
+		sql += ` WHERE ` + strings.Join(where, " AND ")
+	}
+
+	sql += ` ORDER BY gid ` + ordering
+
+	sql += ` LIMIT ` + strconv.Itoa(500)
+
+	log.Info(sql)
+
+	args := map[string]interface{}{
+		"exchange": options.Exchange,
+		"symbol":   options.Symbol,
+	}
+	rows, err := s.DB.NamedQuery(sql, args)
 	if err != nil {
 		return nil, err
 	}

@@ -30,6 +30,34 @@ func RunServer(ctx context.Context, userConfig *Config, environ *Environment) er
 		c.JSON(http.StatusOK, gin.H{"message": "pong"})
 	})
 
+	r.GET("/api/trades", func(c *gin.Context) {
+		exchange := c.Query("exchange")
+		symbol := c.Query("symbol")
+		gidStr := c.DefaultQuery("gid", "0")
+		lastGID, err := strconv.ParseInt(gidStr, 10, 64)
+		if err != nil {
+			log.WithError(err).Error("last gid parse error")
+			c.Status(http.StatusBadRequest)
+			return
+		}
+
+		trades, err := environ.TradeService.Query(service.QueryTradesOptions{
+			Exchange: types.ExchangeName(exchange),
+			Symbol:   symbol,
+			LastGID:  lastGID,
+			Ordering: "DESC",
+		})
+		if err != nil {
+			c.Status(http.StatusBadRequest)
+			log.WithError(err).Error("order query error")
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"trades": trades,
+		})
+	})
+
 	r.GET("/api/orders/closed", func(c *gin.Context) {
 		exchange := c.Query("exchange")
 		symbol := c.Query("symbol")
@@ -42,11 +70,11 @@ func RunServer(ctx context.Context, userConfig *Config, environ *Environment) er
 			return
 		}
 
-		orders, err := environ.OrderService.Query(service.OrderQueryOptions{
+		orders, err := environ.OrderService.Query(service.QueryOrdersOptions{
 			Exchange: types.ExchangeName(exchange),
 			Symbol:   symbol,
 			LastGID:  lastGID,
-			Order:    "DESC",
+			Ordering: "DESC",
 		})
 		if err != nil {
 			c.Status(http.StatusBadRequest)
