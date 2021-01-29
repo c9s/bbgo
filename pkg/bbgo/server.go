@@ -77,7 +77,12 @@ func RunServer(ctx context.Context, userConfig *Config, environ *Environment) er
 	})
 
 	r.GET("/api/sessions", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"sessions": userConfig.Sessions})
+		var sessions []*ExchangeSession
+		for _, session := range environ.Sessions() {
+			sessions = append(sessions, session)
+		}
+
+		c.JSON(http.StatusOK, gin.H{"sessions": sessions})
 	})
 
 	r.GET("/api/assets", func(c *gin.Context) {

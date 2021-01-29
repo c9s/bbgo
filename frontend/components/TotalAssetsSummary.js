@@ -18,7 +18,12 @@ function aggregateAssetsBy(assets, field) {
     return total
 }
 
-const useStyles = makeStyles({
+const useStyles = makeStyles((theme) => ({
+    paper: {
+        marginTop: theme.spacing(3),
+        marginBottom: theme.spacing(3),
+        padding: theme.spacing(2),
+    },
     root: {
         minWidth: 275,
     },
@@ -33,7 +38,7 @@ const useStyles = makeStyles({
     pos: {
         marginTop: 12,
     },
-});
+}));
 
 export default function TotalAssetSummary() {
     const classes = useStyles();
