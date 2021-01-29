@@ -29,6 +29,8 @@ dist: bin-dir bbgo-linux bbgo-darwin
 
 migrations:
 	rockhopper compile --config rockhopper.yaml --output pkg/migrations
+	git add -v pkg/migrations
+	git commit -m "Update migration package" pkg/migrations
 
 docker:
 	GOPATH=$(PWD)/_mod go mod download
