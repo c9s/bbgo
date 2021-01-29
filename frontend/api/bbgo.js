@@ -9,8 +9,8 @@ export function querySessions(cb) {
         });
 }
 
-export function queryOrders(params, cb) {
-    axios.get(baseURL + '/api/orders', { params: params })
+export function queryClosedOrders(params, cb) {
+    axios.get(baseURL + '/api/orders/closed', { params: params })
         .then(response => {
             cb(response.data.orders)
         });

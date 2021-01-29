@@ -91,6 +91,8 @@ func (s *OrderService) Query(options OrderQueryOptions) ([]AggOrder, error) {
 	sql += ` ORDER BY orders.gid ` + ordering
 	sql += ` LIMIT ` + strconv.Itoa(500)
 
+	log.Info(sql)
+
 	rows, err := s.DB.NamedQuery(sql, map[string]interface{}{
 		"exchange": options.Exchange,
 		"symbol":   options.Symbol,
