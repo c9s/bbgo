@@ -31,12 +31,20 @@ migrations:
 	rockhopper compile --config rockhopper.yaml --output pkg/migrations
 
 docker:
-	GOPATH=$(PWD)/.mod go mod download
-	docker build --build-arg GO_MOD_CACHE=.mod --tag yoanlin/bbgo .
+	GOPATH=$(PWD)/_mod go mod download
+	docker build --build-arg GO_MOD_CACHE=_mod --tag yoanlin/bbgo .
 	bash -c "[[ -n $(DOCKER_TAG) ]] && docker tag yoanlin/bbgo yoanlin/bbgo:$(DOCKER_TAG)"
 
 docker-push:
 	docker push yoanlin/bbgo
 	bash -c "[[ -n $(DOCKER_TAG) ]] && docker push yoanlin/bbgo:$(DOCKER_TAG)"
+
+static:
+	(cd frontend && yarn export)
+	pkger
+	git commit pkged.go -m "update pkged static files"
+
+tools:
+	GO111MODULES=off go get github.com/markbates/pkger/cmd/pkger
 
 .PHONY: dist migrations
