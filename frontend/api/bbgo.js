@@ -9,6 +9,13 @@ export function querySessions(cb) {
         });
 }
 
+export function queryTrades(params, cb) {
+    axios.get(baseURL + '/api/trades', { params: params })
+        .then(response => {
+            cb(response.data.trades)
+        });
+}
+
 export function queryClosedOrders(params, cb) {
     axios.get(baseURL + '/api/orders/closed', { params: params })
         .then(response => {
