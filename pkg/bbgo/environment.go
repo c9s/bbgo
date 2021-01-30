@@ -106,6 +106,9 @@ func (environ *Environment) SetDB(db *sqlx.DB) *Environment {
 
 // AddExchangeSession adds the existing exchange session or pre-created exchange session
 func (environ *Environment) AddExchangeSession(name string, session *ExchangeSession) *ExchangeSession {
+	// update Notifiability from the environment
+	session.Notifiability = environ.Notifiability
+
 	environ.sessions[name] = session
 	return session
 }
@@ -184,6 +187,7 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 
 	for n := range environ.sessions {
 		var session = environ.sessions[n]
+
 
 		if err := session.Init(ctx, environ); err != nil {
 			return err

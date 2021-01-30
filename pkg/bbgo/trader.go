@@ -152,25 +152,15 @@ func (trader *Trader) Run(ctx context.Context) error {
 	for sessionName, strategies := range trader.exchangeStrategies {
 		var session = trader.environment.sessions[sessionName]
 
-		var baseOrderExecutor = &ExchangeOrderExecutor{
-			// copy the environment notification system so that we can route
-			Notifiability: trader.environment.Notifiability,
-			Session:       session,
-		}
-
-		// forward trade updates and order updates to the order executor
-		session.Stream.OnTradeUpdate(baseOrderExecutor.EmitTradeUpdate)
-		session.Stream.OnOrderUpdate(baseOrderExecutor.EmitOrderUpdate)
-
 		// default to base order executor
-		var orderExecutor OrderExecutor = baseOrderExecutor
+		var orderExecutor OrderExecutor = session.orderExecutor
 
 		// Since the risk controls are loaded from the config file
 		if riskControls := trader.riskControls; riskControls != nil {
 			if trader.riskControls.SessionBasedRiskControl != nil {
 				control, ok := trader.riskControls.SessionBasedRiskControl[sessionName]
 				if ok {
-					control.SetBaseOrderExecutor(baseOrderExecutor)
+					control.SetBaseOrderExecutor(session.orderExecutor)
 
 					// pick the order executor
 					if control.OrderExecutor != nil {
