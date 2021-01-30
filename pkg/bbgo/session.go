@@ -144,6 +144,8 @@ type ExchangeSession struct {
 
 	orderStores map[string]*OrderStore
 
+	orderExecutor *ExchangeOrderExecutor
+
 	usedSymbols        map[string]struct{}
 	initializedSymbols map[string]struct{}
 }
@@ -170,9 +172,8 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 		marketDataStores:      make(map[string]*MarketDataStore),
 		standardIndicatorSets: make(map[string]*StandardIndicatorSet),
 		orderStores:           make(map[string]*OrderStore),
-
-		usedSymbols:        make(map[string]struct{}),
-		initializedSymbols: make(map[string]struct{}),
+		usedSymbols:           make(map[string]struct{}),
+		initializedSymbols:    make(map[string]struct{}),
 	}
 }
 
@@ -182,6 +183,17 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 	}
 
 	var log = log.WithField("session", session.Name)
+
+	var orderExecutor = &ExchangeOrderExecutor{
+		// copy the notification system so that we can route
+		Notifiability: session.Notifiability,
+		Session:       session,
+	}
+
+	// forward trade updates and order updates to the order executor
+	session.Stream.OnTradeUpdate(orderExecutor.EmitTradeUpdate)
+	session.Stream.OnOrderUpdate(orderExecutor.EmitOrderUpdate)
+	session.orderExecutor = orderExecutor
 
 	var markets, err = LoadExchangeMarketsWithCache(ctx, session.Exchange)
 	if err != nil {
