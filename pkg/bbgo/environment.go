@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/codingconcepts/env"
@@ -178,167 +177,23 @@ func (environ *Environment) AddExchangesFromSessionConfig(sessions map[string]Se
 
 // Init prepares the data that will be used by the strategies
 func (environ *Environment) Init(ctx context.Context) (err error) {
+	// feed klines into the market data store
+	if environ.startTime == emptyTime {
+		environ.startTime = time.Now()
+	}
+
 	for n := range environ.sessions {
 		var session = environ.sessions[n]
-		var markets, err = LoadExchangeMarketsWithCache(ctx, session.Exchange)
 
-		if len(markets) == 0 {
-			return fmt.Errorf("market config should not be empty")
-		}
-
-		session.markets = markets
-
-		// trade sync and market data store depends on subscribed symbols so we have to do this here.
-		for symbol := range session.loadedSymbols {
-			market, ok := markets[symbol]
-			if !ok {
-				return fmt.Errorf("market %s is not defined", symbol)
-			}
-
-			var trades []types.Trade
-			if environ.TradeSync != nil {
-				log.Infof("syncing trades from %s for symbol %s...", session.Exchange.Name(), symbol)
-				if err := environ.TradeSync.SyncTrades(ctx, session.Exchange, symbol, environ.tradeScanTime); err != nil {
-					return err
-				}
-
-				tradingFeeCurrency := session.Exchange.PlatformFeeCurrency()
-				if strings.HasPrefix(symbol, tradingFeeCurrency) {
-					trades, err = environ.TradeService.QueryForTradingFeeCurrency(session.Exchange.Name(), symbol, tradingFeeCurrency)
-				} else {
-					trades, err = environ.TradeService.Query(service.QueryTradesOptions{
-						Exchange: session.Exchange.Name(),
-						Symbol:   symbol,
-					})
-				}
-
-				if err != nil {
-					return err
-				}
-
-				log.Infof("symbol %s: %d trades loaded", symbol, len(trades))
-			}
-
-			session.Trades[symbol] = &types.TradeSlice{Trades: trades}
-			session.Stream.OnTradeUpdate(func(trade types.Trade) {
-				session.Trades[symbol].Append(trade)
-			})
-
-			position := &Position{
-				Symbol:        symbol,
-				BaseCurrency:  market.BaseCurrency,
-				QuoteCurrency: market.QuoteCurrency,
-			}
-			position.AddTrades(trades)
-			position.BindStream(session.Stream)
-			session.positions[symbol] = position
-
-			orderStore := NewOrderStore(symbol)
-			orderStore.AddOrderUpdate = true
-
-			orderStore.BindStream(session.Stream)
-			session.orderStores[symbol] = orderStore
-
-			marketDataStore := NewMarketDataStore(symbol)
-			marketDataStore.BindStream(session.Stream)
-			session.marketDataStores[symbol] = marketDataStore
-
-			standardIndicatorSet := NewStandardIndicatorSet(symbol, marketDataStore)
-			session.standardIndicatorSets[symbol] = standardIndicatorSet
-		}
-
-		log.Infof("querying balances from session %s...", session.Name)
-		balances, err := session.Exchange.QueryAccountBalances(ctx)
-		if err != nil {
+		if err := session.Init(ctx, environ); err != nil {
 			return err
 		}
 
-		log.Infof("%s account", session.Name)
-		balances.Print()
-
-		session.Account.UpdateBalances(balances)
-		session.Account.BindStream(session.Stream)
-
-		session.Stream.OnBalanceUpdate(func(balances types.BalanceMap) {
-			log.Infof("balance update: %+v", balances)
-		})
-
-		// update last prices
-		session.Stream.OnKLineClosed(func(kline types.KLine) {
-			log.Infof("kline closed: %+v", kline)
-
-			if _, ok := session.startPrices[kline.Symbol]; !ok {
-				session.startPrices[kline.Symbol] = kline.Open
-			}
-
-			session.lastPrices[kline.Symbol] = kline.Close
-		})
-
-		// feed klines into the market data store
-		if environ.startTime == emptyTime {
-			environ.startTime = time.Now()
+		if err := session.InitSymbols(ctx, environ); err != nil {
+			return err
 		}
 
-		var intervals = map[types.Interval]struct{}{}
-		for _, sub := range session.Subscriptions {
-			if sub.Channel == types.KLineChannel {
-				intervals[types.Interval(sub.Options.Interval)] = struct{}{}
-			}
-		}
-
-		for symbol := range session.loadedSymbols {
-			marketDataStore, ok := session.marketDataStores[symbol]
-			if !ok {
-				return fmt.Errorf("symbol %s is not defined", symbol)
-			}
-
-			var lastPriceTime time.Time
-			for interval := range intervals {
-				// avoid querying the last unclosed kline
-				endTime := environ.startTime.Add(- interval.Duration())
-				kLines, err := session.Exchange.QueryKLines(ctx, symbol, interval, types.KLineQueryOptions{
-					EndTime: &endTime,
-					Limit:   1000, // indicators need at least 100
-				})
-				if err != nil {
-					return err
-				}
-
-				if len(kLines) == 0 {
-					log.Warnf("no kline data for interval %s (end time <= %s)", interval, environ.startTime)
-					continue
-				}
-
-				// update last prices by the given kline
-				lastKLine := kLines[len(kLines)-1]
-				log.Infof("last kline: %+v", lastKLine)
-				if lastPriceTime == emptyTime {
-					session.lastPrices[symbol] = lastKLine.Close
-					lastPriceTime = lastKLine.EndTime
-				} else if lastKLine.EndTime.After(lastPriceTime) {
-					session.lastPrices[symbol] = lastKLine.Close
-					lastPriceTime = lastKLine.EndTime
-				}
-
-				for _, k := range kLines {
-					// let market data store trigger the update, so that the indicator could be updated too.
-					marketDataStore.AddKLine(k)
-				}
-			}
-
-			log.Infof("last price: %f", session.lastPrices[symbol])
-		}
-
-		if environ.TradeService != nil {
-			session.Stream.OnTradeUpdate(func(trade types.Trade) {
-				if err := environ.TradeService.Insert(trade); err != nil {
-					log.WithError(err).Errorf("trade insert error: %+v", trade)
-				}
-			})
-		}
-
-		// TODO: move market data store dispatch to here, use one callback to dispatch the market data
-		// Session.Stream.OnKLineClosed(func(kline types.KLine) { })
+		session.IsInitialized = true
 	}
 
 	return nil
@@ -530,7 +385,6 @@ func (environ *Environment) SyncTradesFrom(t time.Time) *Environment {
 	environ.tradeScanTime = t
 	return environ
 }
-
 
 func (environ *Environment) Connect(ctx context.Context) error {
 	for n := range environ.sessions {

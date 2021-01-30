@@ -246,7 +246,7 @@ func RunServer(ctx context.Context, userConfig *Config, environ *Environment) er
 		}
 
 		var symbols []string
-		for s := range session.loadedSymbols {
+		for s := range session.usedSymbols {
 			symbols = append(symbols, s)
 		}
 
