@@ -1,7 +1,6 @@
 import React from 'react';
 
 import {makeStyles} from '@material-ui/core/styles';
-import Container from '@material-ui/core/Container';
 import Typography from '@material-ui/core/Typography';
 import Box from '@material-ui/core/Box';
 import Grid from '@material-ui/core/Grid';
@@ -12,6 +11,8 @@ import TotalAssetSummary from '../components/TotalAssetsSummary';
 
 import TradingVolumePanel from '../components/TradingVolumePanel';
 import ExchangeSessionTabPanel from '../components/ExchangeSessionTabPanel';
+
+import DashboardLayout from '../layouts/DashboardLayout';
 
 const useStyles = makeStyles((theme) => ({
     paper: {
@@ -30,11 +31,12 @@ const useStyles = makeStyles((theme) => ({
 }));
 
 
-export default function Home() {
+// props are pageProps passed from _app.tsx
+export default function Home(props) {
     const classes = useStyles();
 
     return (
-        <Container>
+        <DashboardLayout>
             <Box m={4}>
                 <Paper className={classes.totalAssetsSummary}>
                     <Typography variant="h4" component="h2" gutterBottom>
@@ -58,7 +60,7 @@ export default function Home() {
 
                 <ExchangeSessionTabPanel/>
             </Box>
-        </Container>
+        </DashboardLayout>
     );
 }
 
