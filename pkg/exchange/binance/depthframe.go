@@ -32,6 +32,8 @@ func (f *DepthFrame) reset() {
 }
 
 func (f *DepthFrame) loadDepthSnapshot() {
+	f.mu.Lock()
+
 	if debugBinanceDepth {
 		log.Infof("loading %s depth from the restful api", f.Symbol)
 	}
@@ -39,18 +41,19 @@ func (f *DepthFrame) loadDepthSnapshot() {
 	depth, err := f.fetch(f.context)
 	if err != nil {
 		log.WithError(err).Errorf("depth api error")
+		f.mu.Unlock()
 		return
 	}
 
-	f.mu.Lock()
-
 	if len(depth.Asks) == 0 {
 		log.Errorf("depth response error: empty asks")
+		f.mu.Unlock()
 		return
 	}
 
 	if len(depth.Bids) == 0 {
 		log.Errorf("depth response error: empty bids")
+		f.mu.Unlock()
 		return
 	}
 
@@ -103,7 +106,7 @@ func (f *DepthFrame) PushEvent(e DepthEvent) {
 				log.Infof("starting depth snapshot updater for %s market", f.Symbol)
 			}
 
-			ticker := time.NewTicker(5*time.Minute + time.Duration(rand.Intn(10))*time.Millisecond)
+			ticker := time.NewTicker(30*time.Minute + time.Duration(rand.Intn(10))*time.Millisecond)
 			defer ticker.Stop()
 			for {
 				select {
@@ -120,6 +123,10 @@ func (f *DepthFrame) PushEvent(e DepthEvent) {
 
 		// drop any update ID < the final update ID
 		if e.FinalUpdateID < f.SnapshotDepth.FinalUpdateID {
+			if debugBinanceDepth {
+				log.Warnf("event final update id %d < depth final update id %d, skip", e.FinalUpdateID, f.SnapshotDepth.FinalUpdateID)
+			}
+
 			f.mu.Unlock()
 			return
 		}
