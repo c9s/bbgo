@@ -300,32 +300,32 @@ func run(cmd *cobra.Command, args []string) error {
 			log.Infof("running wrapper binary...")
 		}
 
-		if err := runConfig(ctx, userConfig, enableApiServer); err != nil {
+		return runConfig(ctx, userConfig, enableApiServer)
+	}
+
+	return runWrapperBinary(ctx, userConfig, cmd, args)
+}
+
+func runWrapperBinary(ctx context.Context, userConfig *bbgo.Config, cmd *cobra.Command, args []string) error {
+	var runArgs = []string{"run"}
+	cmd.Flags().Visit(func(flag *flag.Flag) {
+		runArgs = append(runArgs, "--"+flag.Name, flag.Value.String())
+	})
+	runArgs = append(runArgs, args...)
+
+	runCmd, err := buildAndRun(ctx, userConfig, runArgs...)
+	if err != nil {
+		return err
+	}
+
+	if sig := cmdutil.WaitForSignal(ctx, syscall.SIGTERM, syscall.SIGINT); sig != nil {
+		log.Infof("sending signal to the child process...")
+		if err := runCmd.Process.Signal(sig); err != nil {
 			return err
 		}
 
-		return nil
-	} else {
-		var runArgs = []string{"run"}
-		cmd.Flags().Visit(func(flag *flag.Flag) {
-			runArgs = append(runArgs, "--"+flag.Name, flag.Value.String())
-		})
-		runArgs = append(runArgs, args...)
-
-		runCmd, err := buildAndRun(ctx, userConfig, runArgs...)
-		if err != nil {
+		if err := runCmd.Wait(); err != nil {
 			return err
-		}
-
-		if sig := cmdutil.WaitForSignal(ctx, syscall.SIGTERM, syscall.SIGINT); sig != nil {
-			log.Infof("sending signal to the child process...")
-			if err := runCmd.Process.Signal(sig); err != nil {
-				return err
-			}
-
-			if err := runCmd.Wait(); err != nil {
-				return err
-			}
 		}
 	}
 
