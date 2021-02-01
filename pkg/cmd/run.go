@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/joho/godotenv"
 	"github.com/pkg/errors"
 	"github.com/pquerna/otp"
 	log "github.com/sirupsen/logrus"
@@ -36,6 +37,8 @@ func init() {
 	RunCmd.Flags().String("totp-issuer", "", "")
 	RunCmd.Flags().String("totp-account-name", "", "")
 	RunCmd.Flags().Bool("enable-web-server", false, "enable web server")
+	RunCmd.Flags().Bool("setup", false, "use setup mode")
+	RunCmd.Flags().Bool("no-dotenv", false, "disable built-in dotenv")
 
 	RunCmd.Flags().String("since", "", "pnl since time")
 	RootCmd.AddCommand(RunCmd)
@@ -241,6 +244,17 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config, enableApiServer
 }
 
 func run(cmd *cobra.Command, args []string) error {
+	disableDotEnv, err := cmd.Flags().GetBool("no-dotenv")
+	if err != nil {
+		return err
+	}
+
+	if !disableDotEnv {
+		if err := godotenv.Load(".env.local", ".env") ; err != nil {
+			return errors.Wrap(err, "error loading .env file")
+		}
+	}
+
 	configFile, err := cmd.Flags().GetString("config")
 	if err != nil {
 		return err
