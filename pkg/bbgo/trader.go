@@ -127,7 +127,7 @@ func (trader *Trader) SetRiskControls(riskControls *RiskControls) {
 	trader.riskControls = riskControls
 }
 
-func (trader *Trader) Run(ctx context.Context) error {
+func (trader *Trader) Subscribe() {
 	// pre-subscribe the data
 	for sessionName, strategies := range trader.exchangeStrategies {
 		session := trader.environment.sessions[sessionName]
@@ -143,7 +143,9 @@ func (trader *Trader) Run(ctx context.Context) error {
 			subscriber.CrossSubscribe(trader.environment.sessions)
 		}
 	}
+}
 
+func (trader *Trader) Run(ctx context.Context) error {
 	if err := trader.environment.Init(ctx); err != nil {
 		return err
 	}
