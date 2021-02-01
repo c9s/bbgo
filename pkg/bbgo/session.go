@@ -148,6 +148,8 @@ type ExchangeSession struct {
 
 	usedSymbols        map[string]struct{}
 	initializedSymbols map[string]struct{}
+
+	logger *log.Entry
 }
 
 func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
@@ -174,6 +176,7 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 		orderStores:           make(map[string]*OrderStore),
 		usedSymbols:           make(map[string]struct{}),
 		initializedSymbols:    make(map[string]struct{}),
+		logger:                log.WithField("session", name),
 	}
 }
 
