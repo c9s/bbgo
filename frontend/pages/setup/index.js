@@ -11,6 +11,7 @@ import StepLabel from '@material-ui/core/StepLabel';
 import ConfigureDatabaseForm from "../../components/ConfigureDatabaseForm";
 import AddExchangeSessionForm from "../../components/AddExchangeSessionForm";
 import ReviewSessions from "../../components/ReviewSessions";
+import ConfigureGridStrategyForm from "../../components/ConfigureGridStrategyForm";
 
 import PlainLayout from '../../layouts/PlainLayout';
 
@@ -20,7 +21,7 @@ const useStyles = makeStyles((theme) => ({
     },
 }));
 
-const steps = ['Configure Database', 'Add Exchange Session', 'Configure Strategy', 'Restart BBGO'];
+const steps = ['Configure Database', 'Add Exchange Session', 'Review Sessions', 'Configure Strategy', 'Save Config and Restart'];
 
 function getStepContent(step, setActiveStep) {
     switch (step) {
@@ -41,6 +42,11 @@ function getStepContent(step, setActiveStep) {
                 setActiveStep(3)
             }}/>
         case 3:
+            return (
+                <ConfigureGridStrategyForm />
+            );
+
+        case 4:
             return;
         default:
             throw new Error('Unknown step');
