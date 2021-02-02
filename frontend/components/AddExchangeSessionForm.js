@@ -113,7 +113,7 @@ export default function AddExchangeSessionForm({onBack, onAdded}) {
 
                 <Grid item xs={12}>
                     <FormControl className={classes.formControl}>
-                        <InputLabel id="exchange-type-select-label">Exchange Type</InputLabel>
+                        <InputLabel id="exchange-type-select-label">Exchange</InputLabel>
                         <Select
                             labelId="exchange-type-select-label"
                             id="exchange-type-select"

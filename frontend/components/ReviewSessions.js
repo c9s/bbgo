@@ -10,7 +10,6 @@ import PowerIcon from '@material-ui/icons/Power';
 
 import {makeStyles} from '@material-ui/core/styles';
 import {querySessions} from "../api/bbgo";
-import {Power} from "@material-ui/icons";
 
 const useStyles = makeStyles((theme) => ({
     formControl: {
