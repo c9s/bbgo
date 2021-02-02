@@ -24,41 +24,41 @@ func init() {
 type Strategy struct {
 	// The notification system will be injected into the strategy automatically.
 	// This field will be injected automatically since it's a single exchange strategy.
-	*bbgo.Notifiability
+	*bbgo.Notifiability `json:"-" yaml:"-"`
 
-	*bbgo.Graceful
+	*bbgo.Graceful `json:"-" yaml:"-"`
 
 	// OrderExecutor is an interface for submitting order.
 	// This field will be injected automatically since it's a single exchange strategy.
-	bbgo.OrderExecutor
-
-	orderStore *bbgo.OrderStore
+	bbgo.OrderExecutor `json:"-" yaml:"-"`
 
 	// Market stores the configuration of the market, for example, VolumePrecision, PricePrecision, MinLotSize... etc
 	// This field will be injected automatically since we defined the Symbol field.
-	types.Market
+	types.Market `json:"-" yaml:"-"`
 
 	// These fields will be filled from the config file (it translates YAML to JSON)
-	Symbol string `json:"symbol"`
+	Symbol string `json:"symbol" yaml:"symbol"`
 
 	// ProfitSpread is the fixed profit spread you want to submit the sell order
-	ProfitSpread fixedpoint.Value `json:"profitSpread"`
+	ProfitSpread fixedpoint.Value `json:"profitSpread" yaml:"profitSpread"`
 
 	// GridNum is the grid number, how many orders you want to post on the orderbook.
-	GridNum int `json:"gridNumber"`
+	GridNum int `json:"gridNumber" yaml:"gridNumber"`
 
-	UpperPrice fixedpoint.Value `json:"upperPrice"`
+	UpperPrice fixedpoint.Value `json:"upperPrice" yaml:"upperPrice"`
 
-	LowerPrice fixedpoint.Value `json:"lowerPrice"`
+	LowerPrice fixedpoint.Value `json:"lowerPrice" yaml:"lowerPrice"`
 
 	// Quantity is the quantity you want to submit for each order.
-	Quantity float64 `json:"quantity"`
+	Quantity float64 `json:"quantity,omitempty"`
 
-	// OrderAmount is used for fixed amount (dynamic quantity) if you don't want to use fixed quantity.
-	OrderAmount fixedpoint.Value `json:"orderAmount"`
+	// FixedAmount is used for fixed amount (dynamic quantity) if you don't want to use fixed quantity.
+	FixedAmount fixedpoint.Value `json:"amount,omitempty" yaml:"amount"`
 
 	// Long means you want to hold more base asset than the quote asset.
-	Long bool `json:"long"`
+	Long bool `json:"long,omitempty" yaml:"long,omitempty"`
+
+	orderStore *bbgo.OrderStore
 
 	// activeOrders is the locally maintained active order book of the maker orders.
 	activeOrders *bbgo.LocalActiveOrderBook
@@ -157,7 +157,6 @@ func (s *Strategy) submitReverseOrder(order types.Order) {
 	var price = order.Price
 	var quantity = order.Quantity
 
-
 	switch side {
 	case types.SideTypeSell:
 		price += s.ProfitSpread.Float64()
@@ -165,8 +164,8 @@ func (s *Strategy) submitReverseOrder(order types.Order) {
 		price -= s.ProfitSpread.Float64()
 	}
 
-	if s.OrderAmount > 0 {
-		quantity = s.OrderAmount.Float64() / price
+	if s.FixedAmount > 0 {
+		quantity = s.FixedAmount.Float64() / price
 	} else if s.Long {
 		// long = use the same amount to buy more quantity back
 		// the original amount

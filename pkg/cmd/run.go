@@ -26,6 +26,7 @@ import (
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/notifier/slacknotifier"
 	"github.com/c9s/bbgo/pkg/notifier/telegramnotifier"
+	"github.com/c9s/bbgo/pkg/server"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/slack/slacklog"
 )
@@ -65,7 +66,7 @@ func runSetup(basectx context.Context, userConfig *bbgo.Config, enableApiServer 
 
 	if enableApiServer {
 		go func() {
-			if err := bbgo.RunServer(ctx, userConfig, environ, trader, true); err != nil {
+			if err := server.Run(ctx, userConfig, environ, trader, true); err != nil {
 				log.WithError(err).Errorf("server error")
 			}
 		}()
@@ -257,7 +258,7 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config, enableApiServer
 
 	if enableApiServer {
 		go func() {
-			if err := bbgo.RunServer(ctx, userConfig, environ, trader, false); err != nil {
+			if err := server.Run(ctx, userConfig, environ, trader, false); err != nil {
 				log.WithError(err).Errorf("server error")
 			}
 		}()

@@ -43,9 +43,12 @@ function getStepContent(step, setActiveStep) {
             }}/>
         case 3:
             return (
-                <ConfigureGridStrategyForm />
-            );
+                <ConfigureGridStrategyForm onBack={() => {
+                    setActiveStep(2)
+                }} onAdded={() => {
 
+                }}/>
+            );
         case 4:
             return;
         default:

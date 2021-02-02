@@ -214,6 +214,10 @@ func (a *Account) UpdateBalances(balances BalanceMap) {
 func (a *Account) BindStream(stream Stream) {
 	stream.OnBalanceUpdate(a.UpdateBalances)
 	stream.OnBalanceSnapshot(a.UpdateBalances)
+	stream.OnBalanceUpdate(func(balances BalanceMap) {
+		logrus.Infof("balance update: %+v", balances)
+	})
+
 }
 
 func (a *Account) Print() {
