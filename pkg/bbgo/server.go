@@ -16,12 +16,14 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func RunServer(ctx context.Context, userConfig *Config, environ *Environment) error {
+func RunServer(ctx context.Context, userConfig *Config, environ *Environment, trader *Trader) error {
 	r := gin.Default()
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"*"},
-		AllowHeaders:     []string{"Origin"},
+		AllowHeaders:     []string{"Origin", "Content-Type"},
 		ExposeHeaders:    []string{"Content-Length"},
+		AllowMethods:     []string{"GET", "POST"},
+		AllowWebSockets:  true,
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
@@ -132,6 +134,42 @@ func RunServer(ctx context.Context, userConfig *Config, environ *Environment) er
 
 		c.JSON(http.StatusOK, gin.H{"tradingVolumes": rows})
 		return
+	})
+
+	r.POST("/api/sessions/test-connection", func(c *gin.Context) {
+		var sessionConfig Session
+		if err := c.BindJSON(&sessionConfig); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": err.Error(),
+			})
+			return
+		}
+
+		session, err := NewExchangeSessionFromConfig(sessionConfig.ExchangeName, sessionConfig)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": err.Error(),
+			})
+			return
+		}
+
+		var anyErr error
+		_, openOrdersErr := session.Exchange.QueryOpenOrders(ctx, "BTCUSDT")
+		if openOrdersErr != nil {
+			anyErr = openOrdersErr
+		}
+
+		_, balanceErr := session.Exchange.QueryAccountBalances(ctx)
+		if balanceErr != nil {
+			anyErr = balanceErr
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"success":    anyErr == nil,
+			"error":      anyErr,
+			"balance":    balanceErr == nil,
+			"openOrders": openOrdersErr == nil,
+		})
 	})
 
 	r.GET("/api/sessions", func(c *gin.Context) {

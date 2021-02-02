@@ -1,14 +1,21 @@
 import React from 'react';
 import Grid from '@material-ui/core/Grid';
+import Box from '@material-ui/core/Box';
+import Button from '@material-ui/core/Button';
 import Typography from '@material-ui/core/Typography';
 import TextField from '@material-ui/core/TextField';
 import FormControlLabel from '@material-ui/core/FormControlLabel';
+import FormHelperText from '@material-ui/core/FormHelperText';
 import InputLabel from '@material-ui/core/InputLabel';
 import FormControl from '@material-ui/core/FormControl';
 
 import Checkbox from '@material-ui/core/Checkbox';
 import Select from '@material-ui/core/Select';
 import MenuItem from '@material-ui/core/MenuItem';
+
+import Alert from '@material-ui/lab/Alert';
+
+import {testSessionConnection} from '../api/bbgo';
 
 import {makeStyles} from '@material-ui/core/styles';
 
@@ -18,28 +25,69 @@ const useStyles = makeStyles((theme) => ({
         marginBottom: theme.spacing(1),
         minWidth: 120,
     },
+    buttons: {
+        display: 'flex',
+        justifyContent: 'flex-end',
+        marginTop: theme.spacing(2),
+        paddingTop: theme.spacing(2),
+        paddingBottom: theme.spacing(2),
+        '& > *': {
+            marginLeft: theme.spacing(1),
+        }
+    },
 }));
 
 export default function ExchangeSessionForm() {
-
     const classes = useStyles();
     const [exchangeType, setExchangeType] = React.useState('max');
+    const [customSessionName, setCustomSessionName] = React.useState(false);
+    const [sessionName, setSessionName] = React.useState(exchangeType);
 
+    const [testing, setTesting] = React.useState(false);
+    const [testResponse, setTestResponse] = React.useState(null);
+
+    const [apiKey, setApiKey] = React.useState('');
+    const [apiSecret, setApiSecret] = React.useState('');
 
     const [isMargin, setIsMargin] = React.useState(false);
     const [isIsolatedMargin, setIsIsolatedMargin] = React.useState(false);
     const [isolatedMarginSymbol, setIsolatedMarginSymbol] = React.useState("");
 
+    const resetTestResponse = () => {
+        setTestResponse(null)
+    }
+
     const handleExchangeTypeChange = (event) => {
         setExchangeType(event.target.value);
+        setSessionName(event.target.value);
+        resetTestResponse()
     };
 
-    const handleIsMarginChange = (event) => {
-        setIsMargin(event.target.checked);
-    };
+    const createSessionConfig = () => {
+        return {
+            name: sessionName,
+            exchange: exchangeType,
+            key: apiKey,
+            secret: apiSecret,
+            margin: isMargin,
+            envVarPrefix: exchangeType.toUpperCase() + "_",
+            isolatedMargin: isIsolatedMargin,
+            isolatedMarginSymbol: isolatedMarginSymbol,
+        }
+    }
 
-    const handleIsIsolatedMarginChange = (event) => {
-        setIsIsolatedMargin(event.target.checked);
+    const handleTestConnection = (event) => {
+        const payload = createSessionConfig()
+        setTesting(true)
+        testSessionConnection(payload, (response) => {
+            console.log(response)
+            setTesting(false)
+            setTestResponse(response)
+        }).catch((reason) => {
+            console.error(reason)
+            setTesting(false)
+            setTestResponse(reason)
+        })
     };
 
     return (
@@ -64,71 +112,125 @@ export default function ExchangeSessionForm() {
                     </FormControl>
                 </Grid>
 
-                <Grid item xs={12} sm={12}>
+                <Grid item xs={12} sm={6}>
                     <TextField
-                        required
                         id="name"
                         name="name"
                         label="Session Name"
                         fullWidth
-                        autoComplete="given-name"
+                        required
+                        disabled={!customSessionName}
+                        onChange={(event) => {
+                            setSessionName(event.target.value)
+                        }}
+                        value={sessionName}
                     />
                 </Grid>
 
                 <Grid item xs={12} sm={6}>
-                    <TextField id="state" name="state" label="State/Province/Region" fullWidth/>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                    <TextField
-                        required
-                        id="zip"
-                        name="zip"
-                        label="Zip / Postal code"
-                        fullWidth
-                        autoComplete="shipping postal-code"
+                    <FormControlLabel
+                        control={<Checkbox color="secondary" name="custom_session_name"
+                                           onChange={(event) => {
+                                               setCustomSessionName(event.target.checked);
+                                           }} value="1"/>}
+                        label="Custom exchange session name"
                     />
+                    <FormHelperText id="session-name-helper-text">
+                        By default, the session name will be the exchange type name,
+                        e.g. <code>binance</code> or <code>max</code>.<br/>
+                        If you're using multiple exchange sessions, you might need to custom the session name. <br/>
+                        This is for advanced users.
+                    </FormHelperText>
                 </Grid>
-                <Grid item xs={12} sm={6}>
-                    <TextField
-                        required
-                        id="country"
-                        name="country"
-                        label="Country"
-                        fullWidth
-                        autoComplete="shipping country"
+
+                <Grid item xs={12}>
+                    <TextField id="key" name="api_key" label="API Key"
+                               fullWidth
+                               required
+                               onChange={(event) => {
+                                   setApiKey(event.target.value)
+                                   resetTestResponse()
+                               }}
                     />
                 </Grid>
 
                 <Grid item xs={12}>
-                    <FormControlLabel
-                        control={<Checkbox color="secondary" name="isMargin" onChange={handleIsMarginChange}
-                                           value="1"/>}
-                        label="Use margin trading. This is only available for Binance"
+                    <TextField id="secret" name="api_secret" label="API Secret"
+                               fullWidth
+                               required
+                               onChange={(event) => {
+                                   setApiSecret(event.target.value)
+                                   resetTestResponse()
+                               }}
                     />
                 </Grid>
 
-                <Grid item xs={12}>
-                    <FormControlLabel
-                        control={<Checkbox color="secondary" name="isIsolatedMargin"
-                                           onChange={handleIsIsolatedMarginChange} value="1"/>}
-                        label="Use isolated margin trading, if this is set, you can only trade one symbol with one session. This is only available for Binance"
-                    />
-                </Grid>
-
-                {isIsolatedMargin ?
+                {exchangeType === "binance" ? (
                     <Grid item xs={12}>
-                        <TextField
-                            required
-                            id="isolatedMarginSymbol"
-                            name="isolatedMarginSymbol"
-                            label="Isolated Margin Symbol"
-                            fullWidth
+                        <FormControlLabel
+                            control={<Checkbox color="secondary" name="isMargin" onChange={(event) => {
+                                setIsMargin(event.target.checked);
+                                resetTestResponse();
+                            }} value="1"/>}
+                            label="Use margin trading."
                         />
+                        <FormHelperText id="isMargin-helper-text">This is only available for Binance. Please use the leverage at your own risk.</FormHelperText>
+
+                        <FormControlLabel
+                            control={<Checkbox color="secondary" name="isIsolatedMargin"
+                                               onChange={(event) => {
+                                                   setIsIsolatedMargin(event.target.checked);
+                                                   resetTestResponse()
+                                               }} value="1"/>}
+                            label="Use isolated margin trading."
+                        />
+                        <FormHelperText id="isIsolatedMargin-helper-text">This is only available for Binance. If this is set, you can only trade one symbol with one session.</FormHelperText>
+
+                        {isIsolatedMargin ?
+                            <TextField
+                                id="isolatedMarginSymbol"
+                                name="isolatedMarginSymbol"
+                                label="Isolated Margin Symbol"
+                                onChange={(event) => {
+                                    setIsolatedMarginSymbol(event.target.value);
+                                    resetTestResponse()
+                                }}
+                                fullWidth
+                                required
+                            />
+                            : null}
                     </Grid>
-                    : null}
-
-
+                ) : null}
             </Grid>
+
+            <div className={classes.buttons}>
+                <Button
+                    color="primary"
+                    onClick={handleTestConnection}
+                    disabled={testing}>
+                    { testing ? "Testing" : "Test Connection"}
+                </Button>
+
+                <Button
+                    variant="contained"
+                    color="primary">
+                    Create
+                </Button>
+            </div>
+
+            {
+                testResponse ? testResponse.error ? (
+                    <Box m={2}>
+                        <Alert severity="error">{testResponse.error}</Alert>
+                    </Box>
+                ) : testResponse.success ? (
+                    <Box m={2}>
+                        <Alert severity="success">Connection Test Succeeded</Alert>
+                    </Box>
+                ) : null : null
+            }
+
+
         </React.Fragment>
     );
 }
