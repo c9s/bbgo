@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 )
@@ -51,8 +52,12 @@ var SyncCmd = &cobra.Command{
 		}
 
 		environ := bbgo.NewEnvironment()
-		if err := environ.ConfigureDatabase(ctx); err != nil {
-			return err
+
+		if viper.IsSet("mysql-url") {
+			dsn := viper.GetString("mysql-url")
+			if err := environ.ConfigureDatabase(ctx, dsn); err != nil {
+				return err
+			}
 		}
 
 		if err := environ.AddExchangesFromConfig(userConfig); err != nil {
@@ -108,7 +113,7 @@ var SyncCmd = &cobra.Command{
 func syncSession(ctx context.Context, environ *bbgo.Environment, session *bbgo.ExchangeSession, symbol string, startTime time.Time) error {
 	log.Infof("starting syncing exchange session %s", session.Name)
 
-	if session.IsIsolatedMargin {
+	if session.IsolatedMargin {
 		log.Infof("session is configured as isolated margin session, using isolated margin symbol %s instead of %s", session.IsolatedMarginSymbol, symbol)
 		symbol = session.IsolatedMarginSymbol
 	}

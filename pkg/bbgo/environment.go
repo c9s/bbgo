@@ -75,21 +75,17 @@ func (environ *Environment) Sessions() map[string]*ExchangeSession {
 	return environ.sessions
 }
 
-func (environ *Environment) ConfigureDatabase(ctx context.Context) error {
-	if viper.IsSet("mysql-url") {
-		dsn := viper.GetString("mysql-url")
-		db, err := ConnectMySQL(dsn)
-		if err != nil {
-			return err
-		}
-
-		if err := upgradeDB(ctx, "mysql", db.DB); err != nil {
-			return err
-		}
-
-		environ.SetDB(db)
+func (environ *Environment) ConfigureDatabase(ctx context.Context, dsn string) error {
+	db, err := ConnectMySQL(dsn)
+	if err != nil {
+		return err
 	}
 
+	if err := upgradeDB(ctx, "mysql", db.DB); err != nil {
+		return err
+	}
+
+	environ.SetDB(db)
 	return nil
 }
 
@@ -142,7 +138,7 @@ func (environ *Environment) AddExchangesByViperKeys() error {
 	return nil
 }
 
-func NewExchangeSessionFromConfig(name string, sessionConfig Session) (*ExchangeSession, error) {
+func NewExchangeSessionFromConfig(name string, sessionConfig *ExchangeSession) (*ExchangeSession, error) {
 	exchangeName, err := types.ValidExchangeName(sessionConfig.ExchangeName)
 	if err != nil {
 		return nil, err
@@ -175,13 +171,13 @@ func NewExchangeSessionFromConfig(name string, sessionConfig Session) (*Exchange
 	}
 
 	session := NewExchangeSession(name, exchange)
-	session.IsMargin = sessionConfig.Margin
-	session.IsIsolatedMargin = sessionConfig.IsolatedMargin
+	session.Margin = sessionConfig.Margin
+	session.IsolatedMargin = sessionConfig.IsolatedMargin
 	session.IsolatedMarginSymbol = sessionConfig.IsolatedMarginSymbol
 	return session, nil
 }
 
-func (environ *Environment) AddExchangesFromSessionConfig(sessions map[string]Session) error {
+func (environ *Environment) AddExchangesFromSessionConfig(sessions map[string]*ExchangeSession) error {
 	for sessionName, sessionConfig := range sessions {
 		session, err := NewExchangeSessionFromConfig(sessionName, sessionConfig)
 		if err != nil {
