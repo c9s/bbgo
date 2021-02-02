@@ -9,8 +9,6 @@ import Step from '@material-ui/core/Step';
 import StepLabel from '@material-ui/core/StepLabel';
 
 import ExchangeSessionForm from "../../components/ExchangeSessionForm";
-import ExchangeSessionReview from "../../components/ExchangeSessionReview";
-import ExchangeSessionTest from "../../components/ExchangeSessionTest";
 
 import PlainLayout from '../../layouts/PlainLayout';
 
@@ -20,16 +18,18 @@ const useStyles = makeStyles((theme) => ({
     },
 }));
 
-const steps = ['Add Exchange Session', 'Configure Strategy', 'Restart'];
+const steps = ['Configure Database', 'Add Exchange Session', 'Configure Strategy', 'Restart BBGO'];
 
 function getStepContent(step) {
     switch (step) {
         case 0:
-            return <ExchangeSessionForm/>;
+            return;
         case 1:
-            return <ExchangeSessionReview/>;
+            return <ExchangeSessionForm/>;
         case 2:
-            return <ExchangeSessionTest/>;
+            return;
+        case 3:
+            return;
         default:
             throw new Error('Unknown step');
     }
