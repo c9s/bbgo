@@ -20,6 +20,12 @@ export function addSession(session, cb) {
     });
 }
 
+export function attachStrategyOn(session, strategyID, strategy, cb) {
+    return axios.post(baseURL + `/api/setup/strategy/single/${strategyID}/session/${session}`, strategy).then(response => {
+        cb(response.data)
+    });
+}
+
 export function testSessionConnection(session, cb) {
     return axios.post(baseURL + '/api/sessions/test', session).then(response => {
         cb(response.data)
