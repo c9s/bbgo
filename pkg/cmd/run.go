@@ -88,8 +88,11 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config, enableApiServer
 
 	environ := bbgo.NewEnvironment()
 
-	if err := environ.ConfigureDatabase(ctx); err != nil {
-		return err
+	if viper.IsSet("mysql-url") {
+		dsn := viper.GetString("mysql-url")
+		if err := environ.ConfigureDatabase(ctx, dsn); err != nil {
+			return err
+		}
 	}
 
 	if err := environ.AddExchangesFromConfig(userConfig); err != nil {

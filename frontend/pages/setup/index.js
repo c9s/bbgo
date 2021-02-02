@@ -8,7 +8,9 @@ import Stepper from '@material-ui/core/Stepper';
 import Step from '@material-ui/core/Step';
 import StepLabel from '@material-ui/core/StepLabel';
 
-import ExchangeSessionForm from "../../components/ExchangeSessionForm";
+import ConfigureDatabaseForm from "../../components/ConfigureDatabaseForm";
+import AddExchangeSessionForm from "../../components/AddExchangeSessionForm";
+import ReviewSessions from "../../components/ReviewSessions";
 
 import PlainLayout from '../../layouts/PlainLayout';
 
@@ -20,14 +22,24 @@ const useStyles = makeStyles((theme) => ({
 
 const steps = ['Configure Database', 'Add Exchange Session', 'Configure Strategy', 'Restart BBGO'];
 
-function getStepContent(step) {
+function getStepContent(step, setActiveStep) {
     switch (step) {
         case 0:
-            return;
+            return <ConfigureDatabaseForm onConfigured={() => {
+                setActiveStep(1)
+            }}/>;
         case 1:
-            return <ExchangeSessionForm/>;
+            return <AddExchangeSessionForm onAdded={() => {
+                setActiveStep(2)
+            }} onBack={() => {
+                setActiveStep(0)
+            }}/>;
         case 2:
-            return;
+            return <ReviewSessions onBack={() => {
+                setActiveStep(1)
+            }} onNext={() => {
+                setActiveStep(3)
+            }}/>
         case 3:
             return;
         default:
@@ -56,7 +68,7 @@ export default function Setup() {
                     </Stepper>
 
                     <React.Fragment>
-                        {getStepContent(activeStep)}
+                        {getStepContent(activeStep, setActiveStep)}
                     </React.Fragment>
                 </Paper>
             </Box>
