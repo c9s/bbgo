@@ -13,10 +13,11 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/service"
+	"github.com/c9s/bbgo/pkg/strategy/grid"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func RunServer(ctx context.Context, userConfig *Config, environ *Environment, trader *Trader) error {
+func RunServer(ctx context.Context, userConfig *Config, environ *Environment, trader *Trader, setup bool) error {
 	r := gin.Default()
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"*"},
@@ -31,6 +32,75 @@ func RunServer(ctx context.Context, userConfig *Config, environ *Environment, tr
 	r.GET("/api/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"message": "pong"})
 	})
+
+	if setup {
+		r.POST("/api/setup/test-db", func(c *gin.Context) {
+			payload := struct {
+				DSN string `json:"dsn"`
+			}{}
+
+			if err := c.BindJSON(&payload); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "missing arguments"})
+				return
+			}
+
+			dsn := payload.DSN
+			if len(dsn) == 0 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "missing dsn argument"})
+				return
+			}
+
+			db, err := ConnectMySQL(dsn)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+
+			if err := db.Close() ; err != nil {
+				log.WithError(err).Error("db connection close error")
+			}
+
+			c.JSON(http.StatusOK, gin.H{"success": true})
+		})
+
+		r.POST("/api/setup/configure-db", func(c *gin.Context) {
+			payload := struct {
+				DSN string `json:"dsn"`
+			}{}
+
+			if err := c.BindJSON(&payload); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "missing arguments"})
+				return
+			}
+
+			dsn := payload.DSN
+			if len(dsn) == 0 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "missing dsn argument"})
+				return
+			}
+
+			if err := environ.ConfigureDatabase(ctx, dsn); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+
+			c.JSON(http.StatusOK, gin.H{"success": true})
+		})
+
+		r.POST("/api/setup/strategy/grid", func(c *gin.Context) {
+			var strategy grid.Strategy
+
+			if err := c.BindJSON(&strategy); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "missing arguments"})
+				return
+			}
+
+			c.JSON(http.StatusOK, gin.H{"success": true})
+		})
+
+
+	}
+
 
 	r.GET("/api/trades", func(c *gin.Context) {
 		exchange := c.Query("exchange")
@@ -136,80 +206,6 @@ func RunServer(ctx context.Context, userConfig *Config, environ *Environment, tr
 		return
 	})
 
-	r.POST("/api/setup/test-db", func(c *gin.Context) {
-		payload := struct {
-			DSN string `json:"dsn"`
-		}{}
-
-		if err := c.BindJSON(&payload); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "missing arguments"})
-			return
-		}
-
-		dsn := payload.DSN
-		if len(dsn) == 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "missing dsn argument"})
-			return
-		}
-
-		db, err := ConnectMySQL(dsn)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-
-		_ = db.Close()
-
-		c.JSON(http.StatusOK, gin.H{"success": true})
-	})
-
-	r.POST("/api/setup/configure-db", func(c *gin.Context) {
-		payload := struct {
-			DSN string `json:"dsn"`
-		}{}
-
-		if err := c.BindJSON(&payload); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "missing arguments"})
-			return
-		}
-
-		dsn := payload.DSN
-		if len(dsn) == 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "missing dsn argument"})
-			return
-		}
-
-		if err := environ.ConfigureDatabase(ctx, dsn); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-
-		c.JSON(http.StatusOK, gin.H{"success": true})
-	})
-
-	r.POST("/api/sessions", func(c *gin.Context) {
-		var sessionConfig ExchangeSession
-		if err := c.BindJSON(&sessionConfig); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": err.Error(),
-			})
-			return
-		}
-
-		session, err := NewExchangeSessionFromConfig(sessionConfig.ExchangeName, &sessionConfig)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": err.Error(),
-			})
-			return
-		}
-
-		environ.AddExchangeSession(sessionConfig.Name, session)
-
-		c.JSON(http.StatusOK, gin.H{
-			"success": true,
-		})
-	})
 
 	r.POST("/api/sessions/test", func(c *gin.Context) {
 		var sessionConfig ExchangeSession
@@ -254,6 +250,30 @@ func RunServer(ctx context.Context, userConfig *Config, environ *Environment, tr
 		}
 
 		c.JSON(http.StatusOK, gin.H{"sessions": sessions})
+	})
+
+	r.POST("/api/sessions", func(c *gin.Context) {
+		var sessionConfig ExchangeSession
+		if err := c.BindJSON(&sessionConfig); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": err.Error(),
+			})
+			return
+		}
+
+		session, err := NewExchangeSessionFromConfig(sessionConfig.ExchangeName, &sessionConfig)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": err.Error(),
+			})
+			return
+		}
+
+		environ.AddExchangeSession(sessionConfig.Name, session)
+
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+		})
 	})
 
 	r.GET("/api/assets", func(c *gin.Context) {
@@ -349,6 +369,23 @@ func RunServer(ctx context.Context, userConfig *Config, environ *Environment, tr
 	})
 
 	r.GET("/api/sessions/:session/symbols", func(c *gin.Context) {
+		sessionName := c.Param("session")
+		session, ok := environ.Session(sessionName)
+
+		if !ok {
+			c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("session %s not found", sessionName)})
+			return
+		}
+
+		var symbols []string
+		for symbol := range session.markets {
+			symbols = append(symbols, symbol)
+		}
+
+		c.JSON(http.StatusOK, gin.H{"symbols": symbols})
+	})
+
+	r.GET("/api/sessions/:session/used-symbols", func(c *gin.Context) {
 
 		sessionName := c.Param("session")
 		session, ok := environ.Session(sessionName)
