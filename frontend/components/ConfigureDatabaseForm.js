@@ -52,10 +52,10 @@ export default function ConfigureDatabaseForm({ onConfigured }) {
                 setTimeout(onConfigured, 3000);
             }
 
-        }).catch((reason) => {
-            console.error(reason);
+        }).catch((err) => {
+            console.error(err);
             setTesting(false);
-            setTestResponse(reason);
+            setTestResponse(err.response.data);
         })
     }
 
@@ -65,10 +65,10 @@ export default function ConfigureDatabaseForm({ onConfigured }) {
             console.log(response)
             setTesting(false)
             setTestResponse(response)
-        }).catch((reason) => {
-            console.error(reason)
+        }).catch((err) => {
+            console.error(err)
             setTesting(false)
-            setTestResponse(reason)
+            setTestResponse(err.response.data)
         })
     };
 

@@ -27,9 +27,16 @@ export function testSessionConnection(session, cb) {
 }
 
 export function querySessions(cb) {
-    axios.get(baseURL + '/api/sessions', {})
+    return axios.get(baseURL + '/api/sessions', {})
         .then(response => {
             cb(response.data.sessions)
+        });
+}
+
+export function querySessionSymbols(sessionName, cb) {
+    return axios.get(baseURL + `/api/sessions/${ sessionName }/symbols`, {})
+        .then(response => {
+            cb(response.data.symbols)
         });
 }
 
