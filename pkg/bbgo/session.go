@@ -100,17 +100,28 @@ type ExchangeSession struct {
 	// we make it as a value field so that we can configure it separately
 	Notifiability `json:"-"`
 
+	// ---------------------------
+	// Session config fields
+	// ---------------------------
+
 	// Exchange Session name
-	Name string `json:"name"`
+	Name         string `json:"name,omitempty" yaml:"name,omitempty"`
+	ExchangeName string `json:"exchange" yaml:"exchange"`
+	EnvVarPrefix string `json:"envVarPrefix" yaml:"envVarPrefix"`
+	Key          string `json:"key,omitempty" yaml:"key,omitempty"`
+	Secret       string `json:"secret,omitempty" yaml:"secret,omitempty"`
+
+	PublicOnly           bool   `json:"publicOnly,omitempty" yaml:"publicOnly"`
+	Margin               bool   `json:"margin,omitempty" yaml:"margin"`
+	IsolatedMargin       bool   `json:"isolatedMargin,omitempty" yaml:"isolatedMargin,omitempty"`
+	IsolatedMarginSymbol string `json:"isolatedMarginSymbol,omitempty" yaml:"isolatedMarginSymbol,omitempty"`
+
+	// ---------------------------
+	// Runtime fields
+	// ---------------------------
 
 	// The exchange account states
 	Account *types.Account `json:"account"`
-
-	IsMargin bool `json:"isMargin"`
-
-	IsIsolatedMargin bool `json:"isIsolatedMargin,omitempty"`
-
-	IsolatedMarginSymbol string `json:"isolatedMarginSymbol,omitempty"`
 
 	IsInitialized bool `json:"isInitialized"`
 

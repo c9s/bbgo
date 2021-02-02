@@ -15,7 +15,7 @@ import MenuItem from '@material-ui/core/MenuItem';
 
 import Alert from '@material-ui/lab/Alert';
 
-import {testSessionConnection} from '../api/bbgo';
+import {addSession, testSessionConnection} from '../api/bbgo';
 
 import {makeStyles} from '@material-ui/core/styles';
 
@@ -37,7 +37,7 @@ const useStyles = makeStyles((theme) => ({
     },
 }));
 
-export default function ExchangeSessionForm() {
+export default function AddExchangeSessionForm({onBack, onAdded}) {
     const classes = useStyles();
     const [exchangeType, setExchangeType] = React.useState('max');
     const [customSessionName, setCustomSessionName] = React.useState(false);
@@ -45,6 +45,7 @@ export default function ExchangeSessionForm() {
 
     const [testing, setTesting] = React.useState(false);
     const [testResponse, setTestResponse] = React.useState(null);
+    const [response, setResponse] = React.useState(null);
 
     const [apiKey, setApiKey] = React.useState('');
     const [apiSecret, setApiSecret] = React.useState('');
@@ -76,6 +77,19 @@ export default function ExchangeSessionForm() {
         }
     }
 
+    const handleAdd = (event) => {
+        const payload = createSessionConfig()
+        addSession(payload, (response) => {
+            setResponse(response)
+            if (onAdded) {
+                setTimeout(onAdded, 3000)
+            }
+        }).catch((error) => {
+            console.error(error)
+            setResponse(error.response)
+        })
+    };
+
     const handleTestConnection = (event) => {
         const payload = createSessionConfig()
         setTesting(true)
@@ -83,10 +97,10 @@ export default function ExchangeSessionForm() {
             console.log(response)
             setTesting(false)
             setTestResponse(response)
-        }).catch((reason) => {
-            console.error(reason)
+        }).catch((error) => {
+            console.error(error)
             setTesting(false)
-            setTestResponse(reason)
+            setTestResponse(error.response)
         })
     };
 
@@ -174,7 +188,8 @@ export default function ExchangeSessionForm() {
                             }} value="1"/>}
                             label="Use margin trading."
                         />
-                        <FormHelperText id="isMargin-helper-text">This is only available for Binance. Please use the leverage at your own risk.</FormHelperText>
+                        <FormHelperText id="isMargin-helper-text">This is only available for Binance. Please use the
+                            leverage at your own risk.</FormHelperText>
 
                         <FormControlLabel
                             control={<Checkbox color="secondary" name="isIsolatedMargin"
@@ -184,7 +199,8 @@ export default function ExchangeSessionForm() {
                                                }} value="1"/>}
                             label="Use isolated margin trading."
                         />
-                        <FormHelperText id="isIsolatedMargin-helper-text">This is only available for Binance. If this is set, you can only trade one symbol with one session.</FormHelperText>
+                        <FormHelperText id="isIsolatedMargin-helper-text">This is only available for Binance. If this is
+                            set, you can only trade one symbol with one session.</FormHelperText>
 
                         {isIsolatedMargin ?
                             <TextField
@@ -205,16 +221,27 @@ export default function ExchangeSessionForm() {
 
             <div className={classes.buttons}>
                 <Button
+                    onClick={() => {
+                        if (onBack) {
+                            onBack();
+                        }
+                    }}>
+                    Back
+                </Button>
+
+                <Button
                     color="primary"
                     onClick={handleTestConnection}
                     disabled={testing}>
-                    { testing ? "Testing" : "Test Connection"}
+                    {testing ? "Testing" : "Test Connection"}
                 </Button>
 
                 <Button
                     variant="contained"
-                    color="primary">
-                    Create
+                    color="primary"
+                    onClick={handleAdd}
+                >
+                    Add
                 </Button>
             </div>
 
@@ -226,6 +253,18 @@ export default function ExchangeSessionForm() {
                 ) : testResponse.success ? (
                     <Box m={2}>
                         <Alert severity="success">Connection Test Succeeded</Alert>
+                    </Box>
+                ) : null : null
+            }
+
+            {
+                response ? response.error ? (
+                    <Box m={2}>
+                        <Alert severity="error">{response.error}</Alert>
+                    </Box>
+                ) : response.success ? (
+                    <Box m={2}>
+                        <Alert severity="success">Exchange Session Added</Alert>
                     </Box>
                 ) : null : null
             }

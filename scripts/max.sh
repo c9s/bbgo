@@ -78,8 +78,9 @@ case "$command" in
         if [[ -n $currency ]] ; then
             rewards_params[currency]=$currency
         fi
+
         # rewards rewards_params | jq -r '.[] | "\(.type)\t\((.amount | tonumber) * 1000 | floor / 1000)\t\(.currency) \(.state) \(.created_at | strflocaltime("%Y-%m-%dT%H:%M:%S %Z"))"'
-        rewards rewards_params | jq -r '.[] | [ .type, ((.amount | tonumber) * 10000 | floor / 10000), .currency, .state, (.created_at | strflocaltime("%Y-%m-%dT%H:%M:%S %Z")) ] | @tsv' \
+        rewards rewards_params | jq -r '.[] | [ .uuid, .type, ((.amount | tonumber) * 10000 | floor / 10000), .currency, .state, (.created_at | strflocaltime("%Y-%m-%dT%H:%M:%S %Z")), .note ] | @tsv' \
             | column -ts $'\t'
         ;;
         

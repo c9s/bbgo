@@ -164,7 +164,7 @@ type Config struct {
 
 	Persistence *PersistenceConfig `json:"persistence,omitempty" yaml:"persistence,omitempty"`
 
-	Sessions map[string]Session `json:"sessions,omitempty" yaml:"sessions,omitempty"`
+	Sessions map[string]*ExchangeSession `json:"sessions,omitempty" yaml:"sessions,omitempty"`
 
 	RiskControls *RiskControls `json:"riskControls,omitempty" yaml:"riskControls,omitempty"`
 

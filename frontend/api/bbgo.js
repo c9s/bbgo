@@ -2,12 +2,26 @@ import axios from "axios";
 
 const baseURL = process.env.NODE_ENV === "development" ? "http://localhost:8080" : ""
 
-export function testSessionConnection(data, cb) {
-    return axios.post(baseURL + '/api/sessions/test-connection', data, {
-        headers: {
-            'Content-Type': 'application/json',
-        }
-    }).then(response => {
+export function testDatabaseConnection(dsn, cb) {
+    return axios.post(baseURL + '/api/setup/test-db', {dsn: dsn}).then(response => {
+        cb(response.data)
+    });
+}
+
+export function configureDatabase(dsn, cb) {
+    return axios.post(baseURL + '/api/setup/configure-db', {dsn: dsn}).then(response => {
+        cb(response.data)
+    });
+}
+
+export function addSession(session, cb) {
+    return axios.post(baseURL + '/api/sessions', session).then(response => {
+        cb(response.data)
+    });
+}
+
+export function testSessionConnection(session, cb) {
+    return axios.post(baseURL + '/api/sessions/test', session).then(response => {
         cb(response.data)
     });
 }

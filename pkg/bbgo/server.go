@@ -136,8 +136,59 @@ func RunServer(ctx context.Context, userConfig *Config, environ *Environment, tr
 		return
 	})
 
-	r.POST("/api/sessions/test-connection", func(c *gin.Context) {
-		var sessionConfig Session
+	r.POST("/api/setup/test-db", func(c *gin.Context) {
+		payload := struct {
+			DSN string `json:"dsn"`
+		}{}
+
+		if err := c.BindJSON(&payload); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "missing arguments"})
+			return
+		}
+
+		dsn := payload.DSN
+		if len(dsn) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "missing dsn argument"})
+			return
+		}
+
+		db, err := ConnectMySQL(dsn)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		_ = db.Close()
+
+		c.JSON(http.StatusOK, gin.H{"success": true})
+	})
+
+	r.POST("/api/setup/configure-db", func(c *gin.Context) {
+		payload := struct {
+			DSN string `json:"dsn"`
+		}{}
+
+		if err := c.BindJSON(&payload); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "missing arguments"})
+			return
+		}
+
+		dsn := payload.DSN
+		if len(dsn) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "missing dsn argument"})
+			return
+		}
+
+		if err := environ.ConfigureDatabase(ctx, dsn); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"success": true})
+	})
+
+	r.POST("/api/sessions", func(c *gin.Context) {
+		var sessionConfig ExchangeSession
 		if err := c.BindJSON(&sessionConfig); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": err.Error(),
@@ -145,7 +196,31 @@ func RunServer(ctx context.Context, userConfig *Config, environ *Environment, tr
 			return
 		}
 
-		session, err := NewExchangeSessionFromConfig(sessionConfig.ExchangeName, sessionConfig)
+		session, err := NewExchangeSessionFromConfig(sessionConfig.ExchangeName, &sessionConfig)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": err.Error(),
+			})
+			return
+		}
+
+		environ.AddExchangeSession(sessionConfig.Name, session)
+
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+		})
+	})
+
+	r.POST("/api/sessions/test", func(c *gin.Context) {
+		var sessionConfig ExchangeSession
+		if err := c.BindJSON(&sessionConfig); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": err.Error(),
+			})
+			return
+		}
+
+		session, err := NewExchangeSessionFromConfig(sessionConfig.ExchangeName, &sessionConfig)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": err.Error(),
@@ -173,7 +248,7 @@ func RunServer(ctx context.Context, userConfig *Config, environ *Environment, tr
 	})
 
 	r.GET("/api/sessions", func(c *gin.Context) {
-		var sessions []*ExchangeSession
+		var sessions = []*ExchangeSession{}
 		for _, session := range environ.Sessions() {
 			sessions = append(sessions, session)
 		}
