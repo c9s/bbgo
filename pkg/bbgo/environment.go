@@ -142,36 +142,52 @@ func (environ *Environment) AddExchangesByViperKeys() error {
 	return nil
 }
 
+func NewExchangeSessionFromConfig(name string, sessionConfig Session) (*ExchangeSession, error) {
+	exchangeName, err := types.ValidExchangeName(sessionConfig.ExchangeName)
+	if err != nil {
+		return nil, err
+	}
+
+	var exchange types.Exchange
+
+	if sessionConfig.Key != "" && sessionConfig.Secret != "" {
+		exchange, err = cmdutil.NewExchangeStandard(exchangeName, sessionConfig.Key, sessionConfig.Secret)
+	} else {
+		exchange, err = cmdutil.NewExchangeWithEnvVarPrefix(exchangeName, sessionConfig.EnvVarPrefix)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	// configure exchange
+	if sessionConfig.Margin {
+		marginExchange, ok := exchange.(types.MarginExchange)
+		if !ok {
+			return nil, fmt.Errorf("exchange %s does not support margin", exchangeName)
+		}
+
+		if sessionConfig.IsolatedMargin {
+			marginExchange.UseIsolatedMargin(sessionConfig.IsolatedMarginSymbol)
+		} else {
+			marginExchange.UseMargin()
+		}
+	}
+
+	session := NewExchangeSession(name, exchange)
+	session.IsMargin = sessionConfig.Margin
+	session.IsIsolatedMargin = sessionConfig.IsolatedMargin
+	session.IsolatedMarginSymbol = sessionConfig.IsolatedMarginSymbol
+	return session, nil
+}
+
 func (environ *Environment) AddExchangesFromSessionConfig(sessions map[string]Session) error {
 	for sessionName, sessionConfig := range sessions {
-		exchangeName, err := types.ValidExchangeName(sessionConfig.ExchangeName)
+		session, err := NewExchangeSessionFromConfig(sessionName, sessionConfig)
 		if err != nil {
 			return err
 		}
 
-		exchange, err := cmdutil.NewExchangeWithEnvVarPrefix(exchangeName, sessionConfig.EnvVarPrefix)
-		if err != nil {
-			return err
-		}
-
-		// configure exchange
-		if sessionConfig.Margin {
-			marginExchange, ok := exchange.(types.MarginExchange)
-			if !ok {
-				return fmt.Errorf("exchange %s does not support margin", exchangeName)
-			}
-
-			if sessionConfig.IsolatedMargin {
-				marginExchange.UseIsolatedMargin(sessionConfig.IsolatedMarginSymbol)
-			} else {
-				marginExchange.UseMargin()
-			}
-		}
-
-		session := NewExchangeSession(sessionName, exchange)
-		session.IsMargin = sessionConfig.Margin
-		session.IsIsolatedMargin = sessionConfig.IsolatedMargin
-		session.IsolatedMarginSymbol = sessionConfig.IsolatedMarginSymbol
 		environ.AddExchangeSession(sessionName, session)
 	}
 
@@ -187,7 +203,6 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 
 	for n := range environ.sessions {
 		var session = environ.sessions[n]
-
 
 		if err := session.Init(ctx, environ); err != nil {
 			return err
