@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/indicator"
@@ -98,7 +97,7 @@ func (set *StandardIndicatorSet) EWMA(iw types.IntervalWindow) *indicator.EWMA {
 type ExchangeSession struct {
 	// exchange Session based notification system
 	// we make it as a value field so that we can configure it separately
-	Notifiability `json:"-"`
+	Notifiability `json:"-" yaml:"-"`
 
 	// ---------------------------
 	// Session config fields
@@ -121,16 +120,16 @@ type ExchangeSession struct {
 	// ---------------------------
 
 	// The exchange account states
-	Account *types.Account `json:"account"`
+	Account *types.Account `json:"account" yaml:"-"`
 
-	IsInitialized bool `json:"isInitialized"`
+	IsInitialized bool `json:"isInitialized" yaml:"-"`
 
 	// Stream is the connection stream of the exchange
-	Stream types.Stream `json:"-"`
+	Stream types.Stream `json:"-" yaml:"-"`
 
-	Subscriptions map[types.Subscription]types.Subscription `json:"-"`
+	Subscriptions map[types.Subscription]types.Subscription `json:"-" yaml:"-"`
 
-	Exchange types.Exchange `json:"-"`
+	Exchange types.Exchange `json:"-" yaml:"-"`
 
 	// markets defines market configuration of a symbol
 	markets map[string]types.Market
@@ -143,7 +142,7 @@ type ExchangeSession struct {
 
 	// Trades collects the executed trades from the exchange
 	// map: symbol -> []trade
-	Trades map[string]*types.TradeSlice `json:"-"`
+	Trades map[string]*types.TradeSlice `json:"-" yaml:"-"`
 
 	// marketDataStores contains the market data store of each market
 	marketDataStores map[string]*MarketDataStore
@@ -193,10 +192,34 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 
 func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) error {
 	if session.IsInitialized {
-		return errors.New("session is already initialized")
+		return ErrSessionAlreadyInitialized
 	}
 
 	var log = log.WithField("session", session.Name)
+
+	// load markets first
+	var markets, err = LoadExchangeMarketsWithCache(ctx, session.Exchange)
+	if err != nil {
+		return err
+	}
+
+	if len(markets) == 0 {
+		return fmt.Errorf("market config should not be empty")
+	}
+
+	session.markets = markets
+
+	// query and initialize the balances
+	log.Infof("querying balances from session %s...", session.Name)
+	balances, err := session.Exchange.QueryAccountBalances(ctx)
+	if err != nil {
+		return err
+	}
+
+	log.Infof("%s account", session.Name)
+	balances.Print()
+
+	session.Account.UpdateBalances(balances)
 
 	var orderExecutor = &ExchangeOrderExecutor{
 		// copy the notification system so that we can route
@@ -209,32 +232,7 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 	session.Stream.OnOrderUpdate(orderExecutor.EmitOrderUpdate)
 	session.orderExecutor = orderExecutor
 
-	var markets, err = LoadExchangeMarketsWithCache(ctx, session.Exchange)
-	if err != nil {
-		return err
-	}
-
-	if len(markets) == 0 {
-		return fmt.Errorf("market config should not be empty")
-	}
-
-	session.markets = markets
-
-	// initialize balance data
-	log.Infof("querying balances from session %s...", session.Name)
-	balances, err := session.Exchange.QueryAccountBalances(ctx)
-	if err != nil {
-		return err
-	}
-
-	log.Infof("%s account", session.Name)
-	balances.Print()
-
-	session.Account.UpdateBalances(balances)
 	session.Account.BindStream(session.Stream)
-	session.Stream.OnBalanceUpdate(func(balances types.BalanceMap) {
-		log.Infof("balance update: %+v", balances)
-	})
 
 	// insert trade into db right before everything
 	if environ.TradeService != nil {
@@ -403,6 +401,10 @@ func (session *ExchangeSession) Position(symbol string) (pos *Position, ok bool)
 	return pos, ok
 }
 
+func (session *ExchangeSession) Positions() map[string]*Position {
+	return session.positions
+}
+
 // MarketDataStore returns the market data store of a symbol
 func (session *ExchangeSession) MarketDataStore(symbol string) (s *MarketDataStore, ok bool) {
 	s, ok = session.marketDataStores[symbol]
@@ -419,14 +421,26 @@ func (session *ExchangeSession) LastPrice(symbol string) (price float64, ok bool
 	return price, ok
 }
 
+func (session *ExchangeSession) LastPrices() map[string]float64 {
+	return session.lastPrices
+}
+
 func (session *ExchangeSession) Market(symbol string) (market types.Market, ok bool) {
 	market, ok = session.markets[symbol]
 	return market, ok
 }
 
+func (session *ExchangeSession) Markets() map[string]types.Market {
+	return session.markets
+}
+
 func (session *ExchangeSession) OrderStore(symbol string) (store *OrderStore, ok bool) {
 	store, ok = session.orderStores[symbol]
 	return store, ok
+}
+
+func (session *ExchangeSession) OrderStores() map[string]*OrderStore {
+	return session.orderStores
 }
 
 // Subscribe save the subscription info, later it will be assigned to the stream

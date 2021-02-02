@@ -6,15 +6,16 @@ import Button from '@material-ui/core/Button';
 import Typography from '@material-ui/core/Typography';
 
 import {makeStyles} from '@material-ui/core/styles';
-import {querySessions, querySessionSymbols} from "../api/bbgo";
+import {attachStrategyOn, querySessions, querySessionSymbols} from "../api/bbgo";
 
 import TextField from '@material-ui/core/TextField';
 import FormControlLabel from '@material-ui/core/FormControlLabel';
 import FormHelperText from '@material-ui/core/FormHelperText';
 import InputLabel from '@material-ui/core/InputLabel';
 import FormControl from '@material-ui/core/FormControl';
-
-import Checkbox from '@material-ui/core/Checkbox';
+import Radio from '@material-ui/core/Radio';
+import RadioGroup from '@material-ui/core/RadioGroup';
+import FormLabel from '@material-ui/core/FormLabel';
 import Select from '@material-ui/core/Select';
 import MenuItem from '@material-ui/core/MenuItem';
 
@@ -23,8 +24,54 @@ import Box from "@material-ui/core/Box";
 
 import NumberFormat from 'react-number-format';
 
-function NumberFormatCustom(props) {
-    const { inputRef, onChange, ...other } = props;
+function parseFloatValid(s) {
+    if (s) {
+        const f = parseFloat(s)
+        if (!isNaN(f)) {
+            return f
+        }
+    }
+
+    return null
+}
+
+function parseFloatCall(s, cb) {
+    if (s) {
+        const f = parseFloat(s)
+        if (!isNaN(f)) {
+            cb(f)
+        }
+    }
+}
+
+function StandardNumberFormat(props) {
+    const {inputRef, onChange, ...other} = props;
+    return (
+        <NumberFormat
+            {...other}
+            getInputRef={inputRef}
+            onValueChange={(values) => {
+                onChange({
+                    target: {
+                        name: props.name,
+                        value: values.value,
+                    },
+                });
+            }}
+            thousandSeparator
+            isNumericString
+        />
+    );
+}
+
+StandardNumberFormat.propTypes = {
+    inputRef: PropTypes.func.isRequired,
+    name: PropTypes.string.isRequired,
+    onChange: PropTypes.func.isRequired,
+};
+
+function PriceNumberFormat(props) {
+    const {inputRef, onChange, ...other} = props;
 
     return (
         <NumberFormat
@@ -45,7 +92,7 @@ function NumberFormatCustom(props) {
     );
 }
 
-NumberFormatCustom.propTypes = {
+PriceNumberFormat.propTypes = {
     inputRef: PropTypes.func.isRequired,
     name: PropTypes.string.isRequired,
     onChange: PropTypes.func.isRequired,
@@ -70,7 +117,7 @@ const useStyles = makeStyles((theme) => ({
 }));
 
 
-export default function ConfigureGridStrategyForm({onBack, onConfigured}) {
+export default function ConfigureGridStrategyForm({onBack, onAdded}) {
     const classes = useStyles();
 
     const [sessions, setSessions] = React.useState([]);
@@ -81,8 +128,15 @@ export default function ConfigureGridStrategyForm({onBack, onConfigured}) {
 
     const [selectedSymbol, setSelectedSymbol] = React.useState('');
 
+    const [quantityBy, setQuantityBy] = React.useState('fixedAmount');
+
     const [upperPrice, setUpperPrice] = React.useState(30000.0);
     const [lowerPrice, setLowerPrice] = React.useState(10000.0);
+
+    const [fixedAmount, setFixedAmount] = React.useState(100.0);
+    const [fixedQuantity, setFixedQuantity] = React.useState(1.234);
+    const [gridNumber, setGridNumber] = React.useState(20);
+    const [profitSpread, setProfitSpread] = React.useState(100.0);
 
     const [response, setResponse] = React.useState({});
 
@@ -93,7 +147,39 @@ export default function ConfigureGridStrategyForm({onBack, onConfigured}) {
     }, [])
 
     const handleAdd = (event) => {
+        const payload = {
+            symbol: selectedSymbol,
+            gridNumber: parseFloatValid(gridNumber),
+            profitSpread: parseFloatValid(profitSpread),
+            upperPrice: parseFloatValid(upperPrice),
+            lowerPrice: parseFloatValid(lowerPrice),
+        }
+        switch (quantityBy) {
+            case "fixedQuantity":
+                payload.quantity = parseFloatValid(fixedQuantity);
+                break;
 
+            case "fixedAmount":
+                payload.orderAmount = parseFloatValid(fixedAmount);
+                break;
+
+        }
+
+        console.log(payload)
+        attachStrategyOn(selectedSessionName, "grid", payload, (response) => {
+            console.log(response)
+            setResponse(response)
+            if (onAdded) {
+                setTimeout(onAdded, 3000)
+            }
+        }).catch((err) => {
+            console.error(err);
+            setResponse(err.response.data)
+        })
+    };
+
+    const handleQuantityBy = (event) => {
+        setQuantityBy(event.target.value);
     };
 
     const handleSessionChange = (event) => {
@@ -143,6 +229,7 @@ export default function ConfigureGridStrategyForm({onBack, onConfigured}) {
                             id="session-select"
                             value={selectedSessionName ? selectedSessionName : ''}
                             onChange={handleSessionChange}
+                            required
                         >
                             {sessionMenuItems}
                         </Select>
@@ -156,6 +243,7 @@ export default function ConfigureGridStrategyForm({onBack, onConfigured}) {
                     <FormControl className={classes.formControl}>
                         <InputLabel id="symbol-select-label">Market</InputLabel>
                         <Select
+                            required
                             labelId="symbol-select-label"
                             id="symbol-select"
                             value={selectedSymbol ? selectedSymbol : ''}
@@ -178,16 +266,11 @@ export default function ConfigureGridStrategyForm({onBack, onConfigured}) {
                         fullWidth
                         required
                         onChange={(event) => {
-                            if (event.target.value) {
-                                const v = parseFloat(event.target.value)
-                                if (!isNaN(v)) {
-                                    setUpperPrice(v);
-                                }
-                            }
+                            parseFloatCall(event.target.value, setUpperPrice)
                         }}
                         value={upperPrice}
                         InputProps={{
-                            inputComponent: NumberFormatCustom,
+                            inputComponent: PriceNumberFormat,
                         }}
                     />
                 </Grid>
@@ -200,51 +283,93 @@ export default function ConfigureGridStrategyForm({onBack, onConfigured}) {
                         fullWidth
                         required
                         onChange={(event) => {
-                            if (event.target.value) {
-                                const v = parseFloat(event.target.value)
-                                if (!isNaN(v)) {
-                                    setLowerPrice(v);
-                                }
-                            }
+                            parseFloatCall(event.target.value, setLowerPrice)
                         }}
                         value={lowerPrice}
                         InputProps={{
-                            inputComponent: NumberFormatCustom,
+                            inputComponent: PriceNumberFormat,
                         }}
                     />
                 </Grid>
 
-                <Grid item xs={12} sm={6}>
-                    <FormControlLabel
-                        control={<Checkbox color="secondary" name="custom_session_name"
-                                           onChange={(event) => {
-
-                                           }} value="1"/>}
-                        label="Custom exchange session name"
-                    />
-                    <FormHelperText id="session-name-helper-text">
-                        By default, the session name will be the exchange type name,
-                        e.g. <code>binance</code> or <code>max</code>.<br/>
-                        If you're using multiple exchange sessions, you might need to custom the session name. <br/>
-                        This is for advanced users.
-                    </FormHelperText>
-                </Grid>
-
                 <Grid item xs={12}>
-                    <TextField id="key" name="api_key" label="API Key"
-                               fullWidth
-                               required
-                               onChange={(event) => {
-                               }}
+                    <TextField
+                        id="profitSpread"
+                        name="profit_spread"
+                        label="Profit Spread"
+                        fullWidth
+                        required
+                        onChange={(event) => {
+                            parseFloatCall(event.target.value, setProfitSpread)
+                        }}
+                        value={profitSpread}
+                        InputProps={{
+                            inputComponent: StandardNumberFormat,
+                        }}
                     />
                 </Grid>
 
+
+                <Grid item xs={12} sm={3}>
+                    <FormControl component="fieldset">
+                        <FormLabel component="legend">Order Quantity By</FormLabel>
+                        <RadioGroup name="quantityBy" value={quantityBy} onChange={handleQuantityBy}>
+                            <FormControlLabel value="fixedAmount" control={<Radio/>} label="Fixed Amount"/>
+                            <FormControlLabel value="fixedQuantity" control={<Radio/>} label="Fixed Quantity"/>
+                        </RadioGroup>
+                    </FormControl>
+                </Grid>
+
+                <Grid item xs={12} sm={9}>
+                    {quantityBy === "fixedQuantity" ? (
+                        <TextField
+                            id="fixedQuantity"
+                            name="order_quantity"
+                            label="Fixed Quantity"
+                            fullWidth
+                            required
+                            onChange={(event) => {
+                                parseFloatCall(event.target.value, setFixedQuantity)
+                            }}
+                            value={fixedQuantity}
+                            InputProps={{
+                                inputComponent: StandardNumberFormat,
+                            }}
+                        />
+                    ) : null}
+
+                    {quantityBy === "fixedAmount" ? (
+                        <TextField
+                            id="orderAmount"
+                            name="order_amount"
+                            label="Fixed Amount"
+                            fullWidth
+                            required
+                            onChange={(event) => {
+                                parseFloatCall(event.target.value, setFixedAmount)
+                            }}
+                            value={fixedAmount}
+                            InputProps={{
+                                inputComponent: PriceNumberFormat,
+                            }}
+                        />
+                    ) : null}
+                </Grid>
+
                 <Grid item xs={12}>
-                    <TextField id="secret" name="api_secret" label="API Secret"
-                               fullWidth
-                               required
-                               onChange={(event) => {
-                               }}
+                    <TextField
+                        id="gridNumber"
+                        name="grid_number"
+                        label="Number of Grid"
+                        fullWidth
+                        required
+                        onChange={(event) => {
+                            parseFloatCall(event.target.value, setGridNumber)
+                        }}
+                        value={gridNumber}
+                        InputProps={{
+                            inputComponent: StandardNumberFormat,
+                        }}
                     />
                 </Grid>
             </Grid>
@@ -264,7 +389,7 @@ export default function ConfigureGridStrategyForm({onBack, onConfigured}) {
                     color="primary"
                     onClick={handleAdd}
                 >
-                    Add
+                    Add Strategy
                 </Button>
             </div>
 
@@ -275,7 +400,7 @@ export default function ConfigureGridStrategyForm({onBack, onConfigured}) {
                     </Box>
                 ) : response.success ? (
                     <Box m={2}>
-                        <Alert severity="success">Exchange Session Added</Alert>
+                        <Alert severity="success">Strategy Added</Alert>
                     </Box>
                 ) : null : null
             }

@@ -63,6 +63,7 @@ func NewEnvironment() *Environment {
 		// default trade scan time
 		tradeScanTime: time.Now().AddDate(0, 0, -7), // sync from 7 days ago
 		sessions:      make(map[string]*ExchangeSession),
+		startTime:     time.Now(),
 	}
 }
 
@@ -171,6 +172,9 @@ func NewExchangeSessionFromConfig(name string, sessionConfig *ExchangeSession) (
 	}
 
 	session := NewExchangeSession(name, exchange)
+	session.ExchangeName = sessionConfig.ExchangeName
+	session.EnvVarPrefix = sessionConfig.EnvVarPrefix
+	session.PublicOnly = sessionConfig.PublicOnly
 	session.Margin = sessionConfig.Margin
 	session.IsolatedMargin = sessionConfig.IsolatedMargin
 	session.IsolatedMarginSymbol = sessionConfig.IsolatedMarginSymbol
@@ -192,23 +196,19 @@ func (environ *Environment) AddExchangesFromSessionConfig(sessions map[string]*E
 
 // Init prepares the data that will be used by the strategies
 func (environ *Environment) Init(ctx context.Context) (err error) {
-	// feed klines into the market data store
-	if environ.startTime == emptyTime {
-		environ.startTime = time.Now()
-	}
-
 	for n := range environ.sessions {
 		var session = environ.sessions[n]
 
 		if err := session.Init(ctx, environ); err != nil {
-			return err
+			// we can skip initialized sessions
+			if err != ErrSessionAlreadyInitialized {
+				return err
+			}
 		}
 
 		if err := session.InitSymbols(ctx, environ); err != nil {
 			return err
 		}
-
-		session.IsInitialized = true
 	}
 
 	return nil

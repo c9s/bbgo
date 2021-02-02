@@ -22,9 +22,9 @@ type PnLReporterConfig struct {
 	When                 datatype.StringSlice `json:"when" yaml:"when"`
 }
 
-// ExchangeStrategyMount wraps the SingleExchangeStrategy with the Session name for mounting
+// ExchangeStrategyMount wraps the SingleExchangeStrategy with the ExchangeSession name for mounting
 type ExchangeStrategyMount struct {
-	// Mounts contains the Session name to mount
+	// Mounts contains the ExchangeSession name to mount
 	Mounts []string
 
 	// Strategy is the strategy we loaded from config
@@ -57,8 +57,8 @@ type Session struct {
 	ExchangeName string `json:"exchange" yaml:"exchange"`
 	EnvVarPrefix string `json:"envVarPrefix" yaml:"envVarPrefix"`
 
-	Key          string `json:"key,omitempty" yaml:"key,omitempty"`
-	Secret       string `json:"secret,omitempty" yaml:"secret,omitempty"`
+	Key    string `json:"key,omitempty" yaml:"key,omitempty"`
+	Secret string `json:"secret,omitempty" yaml:"secret,omitempty"`
 
 	PublicOnly           bool   `json:"publicOnly,omitempty" yaml:"publicOnly"`
 	Margin               bool   `json:"margin,omitempty" yaml:"margin,omitempty"`
@@ -152,11 +152,11 @@ func GetNativeBuildTargetConfig() BuildTargetConfig {
 }
 
 type Config struct {
-	Build *BuildConfig `json:"build" yaml:"build"`
+	Build *BuildConfig `json:"build,omitempty" yaml:"build,omitempty"`
 
 	// Imports is deprecated
 	// Deprecated: use BuildConfig instead
-	Imports []string `json:"imports" yaml:"imports"`
+	Imports []string `json:"imports,omitempty" yaml:"imports,omitempty"`
 
 	Backtest *Backtest `json:"backtest,omitempty" yaml:"backtest,omitempty"`
 
@@ -168,8 +168,8 @@ type Config struct {
 
 	RiskControls *RiskControls `json:"riskControls,omitempty" yaml:"riskControls,omitempty"`
 
-	ExchangeStrategies      []ExchangeStrategyMount
-	CrossExchangeStrategies []CrossExchangeStrategy
+	ExchangeStrategies      []ExchangeStrategyMount `json:"exchangeStrategies,omitempty" yaml:"exchangeStrategies,omitempty"`
+	CrossExchangeStrategies []CrossExchangeStrategy `json:"crossExchangeStrategies,omitempty" yaml:"crossExchangeStrategies,omitempty"`
 
 	PnLReporters []PnLReporterConfig `json:"reportPnL,omitempty" yaml:"reportPnL,omitempty"`
 }
@@ -294,6 +294,18 @@ func loadCrossExchangeStrategies(config *Config, stash Stash) (err error) {
 	return nil
 }
 
+func NewStrategyFromMap(id string, conf interface{}) (SingleExchangeStrategy, error) {
+	if st, ok := LoadedExchangeStrategies[id]; ok {
+		val, err := reUnmarshal(conf, st)
+		if err != nil {
+			return nil, err
+		}
+		return val.(SingleExchangeStrategy), nil
+	}
+
+	return nil, fmt.Errorf("strategy %s not found", id)
+}
+
 func loadExchangeStrategies(config *Config, stash Stash) (err error) {
 	exchangeStrategiesConf, ok := stash["exchangeStrategies"]
 	if !ok {
@@ -325,16 +337,17 @@ func loadExchangeStrategies(config *Config, stash Stash) (err error) {
 		}
 
 		for id, conf := range configStash {
+
 			// look up the real struct type
-			if st, ok := LoadedExchangeStrategies[id]; ok {
-				val, err := reUnmarshal(conf, st)
+			if _, ok := LoadedExchangeStrategies[id]; ok {
+				st, err := NewStrategyFromMap(id, conf)
 				if err != nil {
 					return err
 				}
 
 				config.ExchangeStrategies = append(config.ExchangeStrategies, ExchangeStrategyMount{
 					Mounts:   mounts,
-					Strategy: val.(SingleExchangeStrategy),
+					Strategy: st,
 				})
 			}
 		}
