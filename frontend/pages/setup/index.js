@@ -20,7 +20,7 @@ const useStyles = makeStyles((theme) => ({
     },
 }));
 
-const steps = ['Add Exchange Session', 'Review Settings', 'Test Connection'];
+const steps = ['Add Exchange Session', 'Configure Strategy', 'Restart'];
 
 function getStepContent(step) {
     switch (step) {
@@ -35,7 +35,7 @@ function getStepContent(step) {
     }
 }
 
-export default function SetupSession() {
+export default function Setup() {
     const classes = useStyles();
     const [activeStep, setActiveStep] = React.useState(0);
 

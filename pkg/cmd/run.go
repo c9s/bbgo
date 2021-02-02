@@ -55,6 +55,33 @@ var RunCmd = &cobra.Command{
 	RunE:         run,
 }
 
+func runSetup(basectx context.Context, userConfig *bbgo.Config, enableApiServer bool) error {
+	ctx, cancelTrading := context.WithCancel(basectx)
+	defer cancelTrading()
+
+	environ := bbgo.NewEnvironment()
+
+	trader := bbgo.NewTrader(environ)
+
+	if enableApiServer {
+		go func() {
+			if err := bbgo.RunServer(ctx, userConfig, environ, trader); err != nil {
+				log.WithError(err).Errorf("server error")
+			}
+		}()
+	}
+
+	cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
+	cancelTrading()
+
+	shutdownCtx, cancelShutdown := context.WithDeadline(ctx, time.Now().Add(30*time.Second))
+
+	log.Infof("shutting down...")
+	trader.Graceful.Shutdown(shutdownCtx)
+	cancelShutdown()
+	return nil
+}
+
 func runConfig(basectx context.Context, userConfig *bbgo.Config, enableApiServer bool) error {
 	ctx, cancelTrading := context.WithCancel(basectx)
 	defer cancelTrading()
@@ -227,7 +254,7 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config, enableApiServer
 
 	if enableApiServer {
 		go func() {
-			if err := bbgo.RunServer(ctx, userConfig, environ); err != nil {
+			if err := bbgo.RunServer(ctx, userConfig, environ, trader); err != nil {
 				log.WithError(err).Errorf("server error")
 			}
 		}()
@@ -262,24 +289,7 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	configFile, err := cmd.Flags().GetString("config")
-	if err != nil {
-		return err
-	}
-
-	if len(configFile) == 0 {
-		return errors.New("--config option is required")
-	}
-
-	noCompile, err := cmd.Flags().GetBool("no-compile")
-	if err != nil {
-		return err
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	userConfig, err := bbgo.Load(configFile, false)
+	setup, err := cmd.Flags().GetBool("setup")
 	if err != nil {
 		return err
 	}
@@ -289,15 +299,54 @@ func run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// for wrapper binary, we can just run the strategies
-	if bbgo.IsWrapperBinary || (userConfig.Build != nil && len(userConfig.Build.Imports) == 0) || noCompile {
-		userConfig, err = bbgo.Load(configFile, true)
+	noCompile, err := cmd.Flags().GetBool("no-compile")
+	if err != nil {
+		return err
+	}
+
+	configFile, err := cmd.Flags().GetString("config")
+	if err != nil {
+		return err
+	}
+
+	var userConfig *bbgo.Config
+
+	if setup {
+		log.Infof("running in setup mode, skip reading config file")
+		enableApiServer = true
+		userConfig = &bbgo.Config{
+			Notifications:      nil,
+			Persistence:        nil,
+			Sessions:           nil,
+			ExchangeStrategies: nil,
+		}
+	} else {
+		if len(configFile) == 0 {
+			return errors.New("--config option is required")
+		}
+
+		userConfig, err = bbgo.Load(configFile, false)
 		if err != nil {
 			return err
 		}
+	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// for wrapper binary, we can just run the strategies
+	if bbgo.IsWrapperBinary || (userConfig.Build != nil && len(userConfig.Build.Imports) == 0) || noCompile {
 		if bbgo.IsWrapperBinary {
 			log.Infof("running wrapper binary...")
+		}
+
+		if setup {
+			return runSetup(ctx, userConfig, enableApiServer)
+		}
+
+		userConfig, err = bbgo.Load(configFile, true)
+		if err != nil {
+			return err
 		}
 
 		return runConfig(ctx, userConfig, enableApiServer)
