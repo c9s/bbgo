@@ -13,14 +13,16 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+const ID = "mirrormaker"
+
 var defaultMargin = fixedpoint.NewFromFloat(0.01)
 
 var defaultQuantity = fixedpoint.NewFromFloat(0.001)
 
-var log = logrus.WithField("strategy", "mirrormaker")
+var log = logrus.WithField("strategy", ID)
 
 func init() {
-	bbgo.RegisterStrategy("mirrormaker", &Strategy{})
+	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
 type Strategy struct {
@@ -56,6 +58,10 @@ type Strategy struct {
 	lastPrice float64
 
 	stopC chan struct{}
+}
+
+func (s *Strategy) ID() string {
+	return ID
 }
 
 func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {

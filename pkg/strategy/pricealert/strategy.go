@@ -8,8 +8,10 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+const ID = "pricealert"
+
 func init() {
-	bbgo.RegisterStrategy("pricealert", &Strategy{})
+	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
 type Strategy struct {
@@ -17,9 +19,13 @@ type Strategy struct {
 	bbgo.Notifiability
 
 	// These fields will be filled from the config file (it translates YAML to JSON)
-	Symbol    string `json:"symbol"`
-	Interval  string `json:"interval"`
+	Symbol    string  `json:"symbol"`
+	Interval  string  `json:"interval"`
 	MinChange float64 `json:"minChange"`
+}
+
+func (s *Strategy) ID() string {
+	return ID
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {

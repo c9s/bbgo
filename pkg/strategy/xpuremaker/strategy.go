@@ -12,8 +12,10 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+const ID = "xpuremaker"
+
 func init() {
-	bbgo.RegisterStrategy("xpuremaker", &Strategy{})
+	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
 type Strategy struct {
@@ -27,6 +29,10 @@ type Strategy struct {
 
 	book         *types.StreamOrderBook
 	activeOrders map[string]types.Order
+}
+
+func (s *Strategy) ID() string {
+	return ID
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {

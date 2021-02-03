@@ -12,13 +12,15 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-var log = logrus.WithField("strategy", "bollgrid")
+const ID = "bollgrid"
+
+var log = logrus.WithField("strategy", ID)
 
 func init() {
 	// Register the pointer of the strategy struct,
 	// so that bbgo knows what struct to be used to unmarshal the configs (YAML or JSON)
 	// Note: built-in strategies need to imported manually in the bbgo cmd package.
-	bbgo.RegisterStrategy("bollgrid", &Strategy{})
+	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
 type Strategy struct {
@@ -79,6 +81,10 @@ type Strategy struct {
 
 	// boll is the BOLLINGER indicator we used for predicting the price.
 	boll *indicator.BOLL
+}
+
+func (s *Strategy) ID() string {
+	return ID
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {

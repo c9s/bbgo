@@ -17,6 +17,7 @@ var SupportedExchanges = []types.ExchangeName{"binance", "max"}
 
 // SingleExchangeStrategy represents the single Exchange strategy
 type SingleExchangeStrategy interface {
+	ID() string
 	Run(ctx context.Context, orderExecutor OrderExecutor, session *ExchangeSession) error
 }
 
@@ -29,6 +30,7 @@ type CrossExchangeSessionSubscriber interface {
 }
 
 type CrossExchangeStrategy interface {
+	ID() string
 	CrossRun(ctx context.Context, orderExecutionRouter OrderExecutionRouter, sessions map[string]*ExchangeSession) error
 }
 

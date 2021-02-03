@@ -13,7 +13,9 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-var log = logrus.WithField("strategy", "trailingstop")
+const ID = "trailingstop"
+
+var log = logrus.WithField("strategy", ID)
 
 // The indicators (SMA and EWMA) that we want to use are returning float64 data.
 type Float64Indicator interface {
@@ -24,7 +26,7 @@ func init() {
 	// Register the pointer of the strategy struct,
 	// so that bbgo knows what struct to be used to unmarshal the configs (YAML or JSON)
 	// Note: built-in strategies need to imported manually in the bbgo cmd package.
-	bbgo.RegisterStrategy("trailingstop", &Strategy{})
+	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
 type Strategy struct {
@@ -69,6 +71,10 @@ type Strategy struct {
 	MovingAverageWindow int `json:"movingAverageWindow"`
 
 	order types.Order
+}
+
+func (s *Strategy) ID() string {
+	return ID
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {

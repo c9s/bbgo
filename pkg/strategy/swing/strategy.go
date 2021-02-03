@@ -11,6 +11,8 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+const ID = "swing"
+
 // The indicators (SMA and EWMA) that we want to use are returning float64 data.
 type Float64Indicator interface {
 	Last() float64
@@ -20,7 +22,7 @@ func init() {
 	// Register the pointer of the strategy struct,
 	// so that bbgo knows what struct to be used to unmarshal the configs (YAML or JSON)
 	// Note: built-in strategies need to imported manually in the bbgo cmd package.
-	bbgo.RegisterStrategy("swing", &Strategy{})
+	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
 type Strategy struct {
@@ -74,6 +76,10 @@ type Strategy struct {
 	// MovingAverageWindow is the number of the window size of the moving average indicator.
 	// The number of k-lines in the window. generally used window sizes are 7, 25 and 99 in the TradingView.
 	MovingAverageWindow int `json:"movingAverageWindow"`
+}
+
+func (s *Strategy) ID() string {
+	return ID
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {

@@ -12,13 +12,15 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-var log = logrus.WithField("strategy", "grid")
+const ID = "grid"
+
+var log = logrus.WithField("strategy", ID)
 
 func init() {
 	// Register the pointer of the strategy struct,
 	// so that bbgo knows what struct to be used to unmarshal the configs (YAML or JSON)
 	// Note: built-in strategies need to imported manually in the bbgo cmd package.
-	bbgo.RegisterStrategy("grid", &Strategy{})
+	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
 type Strategy struct {
@@ -67,6 +69,10 @@ type Strategy struct {
 
 	// any created orders for tracking trades
 	orders map[uint64]types.Order
+}
+
+func (s *Strategy) ID() string {
+	return ID
 }
 
 func (s *Strategy) placeGridOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) {

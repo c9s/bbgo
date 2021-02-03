@@ -9,8 +9,10 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+const ID = "skeleton"
+
 func init() {
-	bbgo.RegisterStrategy("skeleton", &Strategy{})
+	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
 type Strategy struct {
@@ -18,6 +20,11 @@ type Strategy struct {
 
 	types.Market
 }
+
+func (s *Strategy) ID() string {
+	return ID
+}
+
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
