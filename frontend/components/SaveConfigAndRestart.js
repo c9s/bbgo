@@ -68,7 +68,8 @@ export default function SaveConfigAndRestart({onBack, onRestarted}) {
             </Typography>
 
             <Typography variant="body1" gutterBottom>
-
+                Click "Save and Restart" to save the configurations to the config file <code>bbgo.yaml</code>,
+                and save the exchange session credentials to the dotenv file <code>.env.local</code>.
             </Typography>
 
             <div className={classes.buttons}>
@@ -84,7 +85,7 @@ export default function SaveConfigAndRestart({onBack, onRestarted}) {
                     variant="contained"
                     color="primary"
                     onClick={handleRestart}>
-                    Restart
+                    Save and Restart
                 </Button>
             </div>
         </React.Fragment>
