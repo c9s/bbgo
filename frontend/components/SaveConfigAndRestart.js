@@ -18,6 +18,8 @@ import TableRow from '@material-ui/core/TableRow';
 import {makeStyles} from '@material-ui/core/styles';
 
 import {saveConfig} from "../api/bbgo";
+import Box from "@material-ui/core/Box";
+import Alert from "@material-ui/lab/Alert";
 
 const useStyles = makeStyles((theme) => ({
     strategyCard: {
@@ -88,6 +90,19 @@ export default function SaveConfigAndRestart({onBack, onRestarted}) {
                     Save and Restart
                 </Button>
             </div>
+
+            {
+                response ? response.error ? (
+                    <Box m={2}>
+                        <Alert severity="error">{response.error}</Alert>
+                    </Box>
+                ) : response.success ? (
+                    <Box m={2}>
+                        <Alert severity="success">Config Saved</Alert>
+                    </Box>
+                ) : null : null
+            }
+
         </React.Fragment>
     );
 }
