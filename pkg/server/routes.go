@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -194,6 +195,11 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 
 	r.GET("/api/trades", func(c *gin.Context) {
+		if environ.TradeService == nil {
+			c.JSON(http.StatusInternalServerError, gin.H{ "error": "database is not configured" })
+			return
+		}
+
 		exchange := c.Query("exchange")
 		symbol := c.Query("symbol")
 		gidStr := c.DefaultQuery("gid", "0")
@@ -222,6 +228,11 @@ func (s *Server) Run(ctx context.Context) error {
 	})
 
 	r.GET("/api/orders/closed", func(c *gin.Context) {
+		if environ.OrderService == nil {
+			c.JSON(http.StatusInternalServerError, gin.H{ "error": "database is not configured" })
+			return
+		}
+
 		exchange := c.Query("exchange")
 		symbol := c.Query("symbol")
 		gidStr := c.DefaultQuery("gid", "0")
@@ -251,6 +262,11 @@ func (s *Server) Run(ctx context.Context) error {
 	})
 
 	r.GET("/api/trading-volume", func(c *gin.Context) {
+		if environ.TradeService == nil {
+			c.JSON(http.StatusInternalServerError, gin.H{ "error": "database is not configured" })
+			return
+		}
+
 		period := c.DefaultQuery("period", "day")
 		segment := c.DefaultQuery("segment", "exchange")
 		startTimeStr := c.Query("start-time")
@@ -531,8 +547,21 @@ func (s *Server) listStrategies(c *gin.Context) {
 	}
 }
 
+
+var pageRoutePattern = regexp.MustCompile("/[a-z]+$")
+
 func (s *Server) pkgerHandler(c *gin.Context) {
 	fs := pkger.Dir("/frontend/out")
+
+	// redirect to .html page if the page exists
+	if pageRoutePattern.MatchString(c.Request.URL.Path) {
+
+		_, err := pkger.Stat("/frontend/out/" + c.Request.URL.Path + ".html")
+		if err == nil {
+			c.Request.URL.Path += ".html"
+		}
+	}
+
 	http.FileServer(fs).ServeHTTP(c.Writer, c.Request)
 }
 
