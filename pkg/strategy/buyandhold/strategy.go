@@ -12,10 +12,12 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-var log = logrus.WithField("strategy", "buyandhold")
+const ID = "buyandhold"
+
+var log = logrus.WithField("strategy", ID)
 
 func init() {
-	bbgo.RegisterStrategy("buyandhold", &Strategy{})
+	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
 type Strategy struct {
@@ -27,6 +29,10 @@ type Strategy struct {
 	MinDropChange     fixedpoint.Value `json:"minDropChange"`
 
 	MovingAverageWindow int `json:"movingAverageWindow"`
+}
+
+func (s *Strategy) ID() string {
+	return ID
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
