@@ -58,6 +58,23 @@ type QueryOrdersOptions struct {
 }
 
 func (s *OrderService) Query(options QueryOrdersOptions) ([]AggOrder, error) {
+	sql := genOrderSQL(options)
+
+	rows, err := s.DB.NamedQuery(sql, map[string]interface{}{
+		"exchange": options.Exchange,
+		"symbol":   options.Symbol,
+		"gid":      options.LastGID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	return s.scanAggRows(rows)
+}
+
+func genOrderSQL(options QueryOrdersOptions) string {
 	// ascending
 	ordering := "ASC"
 	switch v := strings.ToUpper(options.Ordering); v {
@@ -93,19 +110,7 @@ func (s *OrderService) Query(options QueryOrdersOptions) ([]AggOrder, error) {
 	sql += ` LIMIT ` + strconv.Itoa(500)
 
 	log.Info(sql)
-
-	rows, err := s.DB.NamedQuery(sql, map[string]interface{}{
-		"exchange": options.Exchange,
-		"symbol":   options.Symbol,
-		"gid":      options.LastGID,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	defer rows.Close()
-
-	return s.scanAggRows(rows)
+	return sql
 }
 
 func (s *OrderService) scanAggRows(rows *sqlx.Rows) (orders []AggOrder, err error) {
