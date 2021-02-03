@@ -7,10 +7,12 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 	"github.com/markbates/pkger"
 	"github.com/sirupsen/logrus"
 
@@ -90,23 +92,50 @@ func Run(ctx context.Context, userConfig *bbgo.Config, environ *bbgo.Environment
 		})
 
 		r.POST("/api/setup/save", func(c *gin.Context) {
+			if len(userConfig.Sessions) == 0 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "session is not configured"})
+				return
+			}
+
+
+			dotenvFile := ".env.local"
+			if err := moveFileToBackup(dotenvFile); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+
+			envVars, err := collectSessionEnvVars(userConfig.Sessions)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+
+			if len(environ.MysqlURL) > 0 {
+				envVars["MYSQL_URL"] = environ.MysqlURL
+			}
+
+			if err := godotenv.Write(envVars, dotenvFile); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+
+			filename := "bbgo.yaml"
+			if err := moveFileToBackup(filename); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+
 			out, err := userConfig.YAML()
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
 
-			filename := "bbgo.yaml"
-			stat, err := os.Stat(filename)
-			if err == nil && stat != nil {
-				err := os.Rename(filename, filename+"."+time.Now().Format("20060102_150405_07_00"))
-				if err != nil {
-					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-					return
-				}
-			}
-
+			fmt.Println("config file")
+			fmt.Println("=================================================")
 			fmt.Println(string(out))
+			fmt.Println("=================================================")
+
 			if err := ioutil.WriteFile(filename, out, 0666); err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
@@ -147,7 +176,6 @@ func Run(ctx context.Context, userConfig *bbgo.Config, environ *bbgo.Environment
 
 			c.JSON(http.StatusOK, gin.H{"success": true})
 		})
-
 	}
 
 	r.GET("/api/trades", func(c *gin.Context) {
@@ -488,4 +516,46 @@ func Run(ctx context.Context, userConfig *bbgo.Config, environ *bbgo.Environment
 	})
 
 	return r.Run() // listen and serve on 0.0.0.0:8080 (for windows "localhost:8080")
+}
+
+func moveFileToBackup(filename string) error {
+	stat, err := os.Stat(filename)
+
+	if err == nil && stat != nil {
+		err := os.Rename(filename, filename+"."+time.Now().Format("20060102_150405_07_00"))
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func collectSessionEnvVars(sessions map[string]*bbgo.ExchangeSession) (envVars map[string]string, err error) {
+	envVars = make(map[string]string)
+
+	for _, session := range sessions {
+		if len(session.Key) == 0 && len(session.Secret) == 0 {
+			err = fmt.Errorf("session %s key & secret is not empty", session.Name)
+			return
+		}
+
+		if len(session.EnvVarPrefix) > 0 {
+			envVars[session.EnvVarPrefix+"API_KEY"] = session.Key
+			envVars[session.EnvVarPrefix+"API_SECRET"] = session.Secret
+		} else if len(session.Name) > 0 {
+			sn := strings.ToUpper(session.Name)
+			envVars[sn+"API_KEY"] = session.Key
+			envVars[sn+"API_SECRET"] = session.Secret
+		} else {
+			err = fmt.Errorf("session %s name or env var prefix is not defined", session.Name)
+			return
+		}
+
+		// reset key and secret so that we won't marshal them to the config file
+		session.Key = ""
+		session.Secret = ""
+	}
+
+	return
 }

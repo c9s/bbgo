@@ -56,6 +56,8 @@ type Environment struct {
 	startTime     time.Time
 	tradeScanTime time.Time
 	sessions      map[string]*ExchangeSession
+
+	MysqlURL string
 }
 
 func NewEnvironment() *Environment {
@@ -81,6 +83,8 @@ func (environ *Environment) ConfigureDatabase(ctx context.Context, dsn string) e
 	if err != nil {
 		return err
 	}
+
+	environ.MysqlURL = dsn
 
 	if err := upgradeDB(ctx, "mysql", db.DB); err != nil {
 		return err
@@ -174,6 +178,8 @@ func NewExchangeSessionFromConfig(name string, sessionConfig *ExchangeSession) (
 	session := NewExchangeSession(name, exchange)
 	session.ExchangeName = sessionConfig.ExchangeName
 	session.EnvVarPrefix = sessionConfig.EnvVarPrefix
+	session.Key = sessionConfig.Key
+	session.Secret = sessionConfig.Secret
 	session.PublicOnly = sessionConfig.PublicOnly
 	session.Margin = sessionConfig.Margin
 	session.IsolatedMargin = sessionConfig.IsolatedMargin
