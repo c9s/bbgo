@@ -3,16 +3,15 @@ sessions:
   max:
     exchange: max
     envVarPrefix: MAX_
-
   binance:
     exchange: binance
     envVarPrefix: BINANCE_
 
 exchangeStrategies:
-- on: binance
+- on: ["binance"]
   test:
     symbol: "BTCUSDT"
     interval: "1m"
     baseQuantity: 0.1
     minDropPercentage: -0.05
-
+    maxAssetQuantity: 1.1
