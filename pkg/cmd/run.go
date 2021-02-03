@@ -66,7 +66,14 @@ func runSetup(basectx context.Context, userConfig *bbgo.Config, enableApiServer 
 
 	if enableApiServer {
 		go func() {
-			if err := server.Run(ctx, userConfig, environ, trader, true); err != nil {
+			s := &server.Server{
+				Config: userConfig,
+				Environ: environ,
+				Trader: trader,
+				Setup: true,
+			}
+
+			if err := s.Run(ctx); err != nil {
 				log.WithError(err).Errorf("server error")
 			}
 		}()
@@ -258,7 +265,14 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config, enableApiServer
 
 	if enableApiServer {
 		go func() {
-			if err := server.Run(ctx, userConfig, environ, trader, false); err != nil {
+			s := &server.Server{
+				Config: userConfig,
+				Environ: environ,
+				Trader: trader,
+				Setup: false,
+			}
+
+			if err := s.Run(ctx); err != nil {
 				log.WithError(err).Errorf("server error")
 			}
 		}()
