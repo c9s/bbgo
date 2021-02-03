@@ -166,6 +166,25 @@ type QueryTradesOptions struct {
 }
 
 func (s *TradeService) Query(options QueryTradesOptions) ([]types.Trade, error) {
+	sql := queryTradesSQL(options)
+
+	log.Info(sql)
+
+	args := map[string]interface{}{
+		"exchange": options.Exchange,
+		"symbol":   options.Symbol,
+	}
+	rows, err := s.DB.NamedQuery(sql, args)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	return s.scanRows(rows)
+}
+
+func queryTradesSQL(options QueryTradesOptions) string {
 	ordering := "ASC"
 	switch v := strings.ToUpper(options.Ordering); v {
 	case "DESC", "ASC":
@@ -188,7 +207,6 @@ func (s *TradeService) Query(options QueryTradesOptions) ([]types.Trade, error) 
 			where = append(where, "gid > :gid")
 		case "DESC":
 			where = append(where, "gid < :gid")
-
 		}
 	}
 
@@ -201,21 +219,7 @@ func (s *TradeService) Query(options QueryTradesOptions) ([]types.Trade, error) 
 	sql += ` ORDER BY gid ` + ordering
 
 	sql += ` LIMIT ` + strconv.Itoa(500)
-
-	log.Info(sql)
-
-	args := map[string]interface{}{
-		"exchange": options.Exchange,
-		"symbol":   options.Symbol,
-	}
-	rows, err := s.DB.NamedQuery(sql, args)
-	if err != nil {
-		return nil, err
-	}
-
-	defer rows.Close()
-
-	return s.scanRows(rows)
+	return sql
 }
 
 func (s *TradeService) scanRows(rows *sqlx.Rows) (trades []types.Trade, err error) {
