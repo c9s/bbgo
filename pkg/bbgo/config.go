@@ -26,10 +26,30 @@ type PnLReporterConfig struct {
 // ExchangeStrategyMount wraps the SingleExchangeStrategy with the ExchangeSession name for mounting
 type ExchangeStrategyMount struct {
 	// Mounts contains the ExchangeSession name to mount
-	Mounts []string
+	Mounts []string `json:"mounts"`
 
 	// Strategy is the strategy we loaded from config
-	Strategy SingleExchangeStrategy
+	Strategy SingleExchangeStrategy `json:"strategy"`
+}
+
+func (m *ExchangeStrategyMount) Map() (map[string]interface{}, error) {
+	strategyID := m.Strategy.ID()
+
+	var params map[string]interface{}
+
+	out, err := json.Marshal(m.Strategy)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := json.Unmarshal(out, &params); err != nil {
+		return nil, err
+	}
+
+	return map[string]interface{}{
+		"on":       m.Mounts,
+		strategyID: params,
+	}, nil
 }
 
 type SlackNotification struct {
@@ -190,23 +210,12 @@ func (c *Config) Map() (map[string]interface{}, error) {
 	// convert strategy config back to the DSL format
 	var exchangeStrategies []map[string]interface{}
 	for _, m := range c.ExchangeStrategies {
-		strategyID := m.Strategy.ID()
-
-		var params Stash
-
-		out, err := json.Marshal(m.Strategy)
+		params, err := m.Map()
 		if err != nil {
 			return nil, err
 		}
 
-		if err := json.Unmarshal(out, &params); err != nil {
-			return nil, err
-		}
-
-		exchangeStrategies = append(exchangeStrategies, map[string]interface{}{
-			"on":       m.Mounts,
-			strategyID: params,
-		})
+		exchangeStrategies = append(exchangeStrategies, params)
 	}
 
 	if len(exchangeStrategies) > 0 {

@@ -3,7 +3,9 @@ package server
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -11,7 +13,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/markbates/pkger"
 	"github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v3"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/service"
@@ -88,6 +89,32 @@ func Run(ctx context.Context, userConfig *bbgo.Config, environ *bbgo.Environment
 			c.JSON(http.StatusOK, gin.H{"success": true})
 		})
 
+		r.POST("/api/setup/save", func(c *gin.Context) {
+			out, err := userConfig.YAML()
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+
+			filename := "bbgo.yaml"
+			stat, err := os.Stat(filename)
+			if err == nil && stat != nil {
+				err := os.Rename(filename, filename+"."+time.Now().Format("20060102_150405_07_00"))
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+					return
+				}
+			}
+
+			fmt.Println(string(out))
+			if err := ioutil.WriteFile(filename, out, 0666); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+
+			c.JSON(http.StatusOK, gin.H{"success": true})
+		})
+
 		r.POST("/api/setup/strategy/single/:id/session/:session", func(c *gin.Context) {
 			sessionName := c.Param("session")
 			strategyID := c.Param("id")
@@ -117,9 +144,6 @@ func Run(ctx context.Context, userConfig *bbgo.Config, environ *bbgo.Environment
 			}
 
 			userConfig.ExchangeStrategies = append(userConfig.ExchangeStrategies, mount)
-
-			out, _ := yaml.Marshal(userConfig)
-			fmt.Println(string(out))
 
 			c.JSON(http.StatusOK, gin.H{"success": true})
 		})
@@ -434,6 +458,28 @@ func Run(ctx context.Context, userConfig *bbgo.Config, environ *bbgo.Environment
 
 	r.GET("/api/sessions/:session/market/:symbol/pnl", func(c *gin.Context) {
 		c.JSON(200, gin.H{"message": "pong"})
+	})
+
+	r.GET("/api/strategies/single", func(c *gin.Context) {
+		var stashes []map[string]interface{}
+
+		for _, mount := range userConfig.ExchangeStrategies {
+			stash, err := mount.Map()
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+
+			stash["strategy"] = mount.Strategy.ID()
+
+			stashes = append(stashes, stash)
+		}
+
+		if len(stashes) > 0 {
+			c.JSON(http.StatusOK, gin.H{"strategies": stashes})
+		} else {
+			c.JSON(http.StatusOK, gin.H{"strategies": []int{}})
+		}
 	})
 
 	fs := pkger.Dir("/frontend/out")

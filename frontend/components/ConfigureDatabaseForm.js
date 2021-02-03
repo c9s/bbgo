@@ -33,7 +33,7 @@ const useStyles = makeStyles((theme) => ({
 export default function ConfigureDatabaseForm({ onConfigured }) {
     const classes = useStyles();
 
-    const [mysqlURL, setMysqlURL] = React.useState("")
+    const [mysqlURL, setMysqlURL] = React.useState("root@tcp(127.0.0.1:3306)/bbgo")
     const [testing, setTesting] = React.useState(false);
     const [testResponse, setTestResponse] = React.useState(null);
     const [configured, setConfigured] = React.useState(false);
@@ -88,6 +88,7 @@ export default function ConfigureDatabaseForm({ onConfigured }) {
                     <TextField id="mysql_url" name="mysql_url" label="MySQL Data Source Name"
                                fullWidth
                                required
+                               defaultValue={mysqlURL}
                                onChange={(event) => {
                                    setMysqlURL(event.target.value)
                                    resetTestResponse()
