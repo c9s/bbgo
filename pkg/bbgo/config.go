@@ -1,6 +1,7 @@
 package bbgo
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -207,9 +208,49 @@ func (c *Config) Map() (map[string]interface{}, error) {
 			strategyID: params,
 		})
 	}
-	data["exchangeStrategies"] = exchangeStrategies
+
+	if len(exchangeStrategies) > 0 {
+		data["exchangeStrategies"] = exchangeStrategies
+	}
+
+	var crossExchangeStrategies []map[string]interface{}
+	for _, st := range c.CrossExchangeStrategies {
+		strategyID := st.ID()
+
+		var params Stash
+
+		out, err := json.Marshal(st)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := json.Unmarshal(out, &params); err != nil {
+			return nil, err
+		}
+
+		crossExchangeStrategies = append(crossExchangeStrategies, map[string]interface{}{
+			strategyID: params,
+		})
+	}
+
+	if len(crossExchangeStrategies) > 0 {
+		data["crossExchangeStrategies"] = crossExchangeStrategies
+	}
 
 	return data, err
+}
+
+func (c *Config) YAML() ([]byte, error) {
+	m, err := c.Map()
+	if err != nil {
+		return nil, err
+	}
+
+	var buf bytes.Buffer
+	var enc = yaml.NewEncoder(&buf)
+	enc.SetIndent(2)
+	err = enc.Encode(m)
+	return buf.Bytes(), err
 }
 
 type Stash map[string]interface{}
@@ -367,10 +408,26 @@ func loadExchangeStrategies(config *Config, stash Stash) (err error) {
 
 		var mounts []string
 		if val, ok := configStash["on"]; ok {
-			if values, ok := val.([]string); ok {
-				mounts = append(mounts, values...)
-			} else if str, ok := val.(string); ok {
-				mounts = append(mounts, str)
+			switch tv := val.(type) {
+
+			case []string:
+				mounts = append(mounts, tv...)
+
+			case string:
+				mounts = append(mounts, tv)
+
+			case []interface{}:
+				for _, f := range tv {
+					s, ok := f.(string)
+					if !ok {
+						return fmt.Errorf("%+v (%T) is not a string", f, f)
+					}
+
+					mounts = append(mounts, s)
+				}
+
+			default:
+				return fmt.Errorf("unexpected mount type: %T value: %+v", val, val)
 			}
 		}
 

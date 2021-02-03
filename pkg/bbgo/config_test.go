@@ -2,9 +2,11 @@ package bbgo
 
 import (
 	"context"
+	"io/ioutil"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/yaml.v3"
 )
 
 func init() {
@@ -62,16 +64,16 @@ func TestLoadConfig(t *testing.T) {
 			wantErr: false,
 			f: func(t *testing.T, config *Config) {
 				assert.Len(t, config.ExchangeStrategies, 1)
-				assert.Equal(t, config.ExchangeStrategies, []ExchangeStrategyMount{{
+				assert.Equal(t, []ExchangeStrategyMount{{
 					Mounts: []string{"binance"},
 					Strategy: &TestStrategy{
 						Symbol:            "BTCUSDT",
 						Interval:          "1m",
 						BaseQuantity:      0.1,
-						MaxAssetQuantity:  0,
+						MaxAssetQuantity:  1.1,
 						MinDropPercentage: -0.05,
 					},
-				}})
+				}}, config.ExchangeStrategies)
 
 				m, err := config.Map()
 				assert.NoError(t, err)
@@ -108,12 +110,30 @@ func TestLoadConfig(t *testing.T) {
 								"symbol":            "BTCUSDT",
 								"baseQuantity":      0.1,
 								"interval":          "1m",
-								"maxAssetQuantity":  0.0,
+								"maxAssetQuantity":  1.1,
 								"minDropPercentage": -0.05,
 							},
 						},
 					},
 				}, m)
+
+				yamlText, err := config.YAML()
+				assert.NoError(t, err)
+
+				yamlTextSource, err := ioutil.ReadFile("testdata/strategy.yaml")
+				assert.NoError(t, err)
+
+				var sourceMap map[string]interface{}
+				err = yaml.Unmarshal(yamlTextSource, &sourceMap)
+				assert.NoError(t, err)
+				delete(sourceMap, "build")
+
+				var actualMap map[string]interface{}
+				err = yaml.Unmarshal(yamlText, &actualMap)
+				assert.NoError(t, err)
+				delete(actualMap, "build")
+
+				assert.Equal(t, sourceMap, actualMap)
 			},
 		},
 
