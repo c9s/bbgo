@@ -21,7 +21,18 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func Run(ctx context.Context, userConfig *bbgo.Config, environ *bbgo.Environment, trader *bbgo.Trader, setup bool) error {
+type Server struct {
+	Config  *bbgo.Config
+	Environ *bbgo.Environment
+	Trader  *bbgo.Trader
+	Setup   bool
+}
+
+func (s *Server) Run(ctx context.Context) error {
+	userConfig := s.Config
+	environ := s.Environ
+	setup := s.Setup
+
 	r := gin.Default()
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"*"},
@@ -91,13 +102,16 @@ func Run(ctx context.Context, userConfig *bbgo.Config, environ *bbgo.Environment
 			c.JSON(http.StatusOK, gin.H{"success": true})
 		})
 
+		r.POST("/api/setup/restart", func(c *gin.Context) {
+
+			c.JSON(http.StatusOK, gin.H{"success": true})
+		})
+
 		r.POST("/api/setup/save", func(c *gin.Context) {
 			if len(userConfig.Sessions) == 0 {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "session is not configured"})
 				return
 			}
-
-
 
 			envVars, err := collectSessionEnvVars(userConfig.Sessions)
 			if err != nil {
@@ -489,34 +503,37 @@ func Run(ctx context.Context, userConfig *bbgo.Config, environ *bbgo.Environment
 		c.JSON(200, gin.H{"message": "pong"})
 	})
 
-	r.GET("/api/strategies/single", func(c *gin.Context) {
-		var stashes []map[string]interface{}
-
-		for _, mount := range userConfig.ExchangeStrategies {
-			stash, err := mount.Map()
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-				return
-			}
-
-			stash["strategy"] = mount.Strategy.ID()
-
-			stashes = append(stashes, stash)
-		}
-
-		if len(stashes) > 0 {
-			c.JSON(http.StatusOK, gin.H{"strategies": stashes})
-		} else {
-			c.JSON(http.StatusOK, gin.H{"strategies": []int{}})
-		}
-	})
-
-	fs := pkger.Dir("/frontend/out")
-	r.NoRoute(func(c *gin.Context) {
-		http.FileServer(fs).ServeHTTP(c.Writer, c.Request)
-	})
+	r.GET("/api/strategies/single", s.listStrategies)
+	r.NoRoute(s.pkgerHandler)
 
 	return r.Run() // listen and serve on 0.0.0.0:8080 (for windows "localhost:8080")
+}
+
+func (s *Server) listStrategies(c *gin.Context) {
+	var stashes []map[string]interface{}
+
+	for _, mount := range s.Config.ExchangeStrategies {
+		stash, err := mount.Map()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		stash["strategy"] = mount.Strategy.ID()
+
+		stashes = append(stashes, stash)
+	}
+
+	if len(stashes) > 0 {
+		c.JSON(http.StatusOK, gin.H{"strategies": stashes})
+	} else {
+		c.JSON(http.StatusOK, gin.H{"strategies": []int{}})
+	}
+}
+
+func (s *Server) pkgerHandler(c *gin.Context) {
+	fs := pkger.Dir("/frontend/out")
+	http.FileServer(fs).ServeHTTP(c.Writer, c.Request)
 }
 
 func moveFileToBackup(filename string) error {
