@@ -1,15 +1,12 @@
 ---
-imports:
-- github.com/c9s/bbgo/pkg/strategy/buyandhold
-
 sessions:
   max:
     exchange: max
-    envVarPrefix: max
+    envVarPrefix: MAX_
 
   binance:
     exchange: binance
-    envVarPrefix: binance
+    envVarPrefix: BINANCE_
 
 exchangeStrategies:
 - on: binance
@@ -19,11 +16,3 @@ exchangeStrategies:
     baseQuantity: 0.1
     minDropPercentage: -0.05
 
-reportPnL:
-- averageCostBySymbols:
-  - "BTCUSDT"
-  - "BNBUSDT"
-  of: binance
-  when:
-  - "@daily"
-  - "@hourly"

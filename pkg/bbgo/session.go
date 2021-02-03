@@ -120,9 +120,9 @@ type ExchangeSession struct {
 	// ---------------------------
 
 	// The exchange account states
-	Account *types.Account `json:"account" yaml:"-"`
+	Account *types.Account `json:"-" yaml:"-"`
 
-	IsInitialized bool `json:"isInitialized" yaml:"-"`
+	IsInitialized bool `json:"-" yaml:"-"`
 
 	// Stream is the connection stream of the exchange
 	Stream types.Stream `json:"-" yaml:"-"`
