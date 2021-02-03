@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -56,8 +57,8 @@ var RunCmd = &cobra.Command{
 	RunE:         run,
 }
 
-func runSetup(basectx context.Context, userConfig *bbgo.Config, enableApiServer bool) error {
-	ctx, cancelTrading := context.WithCancel(basectx)
+func runSetup(baseCtx context.Context, userConfig *bbgo.Config, enableApiServer bool) error {
+	ctx, cancelTrading := context.WithCancel(baseCtx)
 	defer cancelTrading()
 
 	environ := bbgo.NewEnvironment()
@@ -77,6 +78,14 @@ func runSetup(basectx context.Context, userConfig *bbgo.Config, enableApiServer 
 				log.WithError(err).Errorf("server error")
 			}
 		}()
+
+		if runtime.GOOS == "darwin" {
+			<-time.After(time.Second * 3)
+			cmd := exec.Command("open", "http://localhost:8080/setup")
+			if err := cmd.Start() ; err != nil {
+				log.WithError(err).Errorf("can not call open command to open the web page")
+			}
+		}
 	}
 
 	cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
