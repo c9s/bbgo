@@ -19,6 +19,10 @@ type TestStrategy struct {
 	MinDropPercentage float64 `json:"minDropPercentage"`
 }
 
+func (s *TestStrategy) ID() string {
+	return "test"
+}
+
 func (s *TestStrategy) Run(ctx context.Context, orderExecutor OrderExecutor, session *ExchangeSession) error {
 	return nil
 }
