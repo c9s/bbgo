@@ -168,10 +168,30 @@ type Config struct {
 
 	RiskControls *RiskControls `json:"riskControls,omitempty" yaml:"riskControls,omitempty"`
 
-	ExchangeStrategies      []ExchangeStrategyMount `json:"exchangeStrategies,omitempty" yaml:"exchangeStrategies,omitempty"`
-	CrossExchangeStrategies []CrossExchangeStrategy `json:"crossExchangeStrategies,omitempty" yaml:"crossExchangeStrategies,omitempty"`
+	ExchangeStrategies      []ExchangeStrategyMount `json:"-" yaml:"-"`
+	CrossExchangeStrategies []CrossExchangeStrategy `json:"-" yaml:"-"`
 
 	PnLReporters []PnLReporterConfig `json:"reportPnL,omitempty" yaml:"reportPnL,omitempty"`
+}
+
+func (c *Config) Map() (map[string]interface{}, error) {
+	text, err := json.Marshal(c)
+	if err != nil {
+		return nil, err
+	}
+
+	var data map[string]interface{}
+	err = json.Unmarshal(text, &data)
+	if err != nil {
+		return nil, err
+	}
+
+	// convert strategy config back to the DSL format
+	for _, st := range c.ExchangeStrategies {
+		_ = st.Strategy
+	}
+
+	return data, err
 }
 
 type Stash map[string]interface{}

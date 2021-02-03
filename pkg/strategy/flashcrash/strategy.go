@@ -13,8 +13,10 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+const ID = "flashcrash"
+
 func init() {
-	bbgo.RegisterStrategy("flashcrash", &Strategy{})
+	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
 type Strategy struct {
@@ -52,6 +54,10 @@ type Strategy struct {
 
 	// ewma is the exponential weighted moving average indicator
 	ewma *indicator.EWMA
+}
+
+func (s *Strategy) ID() string {
+	return ID
 }
 
 func (s *Strategy) updateOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) {
