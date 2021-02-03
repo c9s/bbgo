@@ -18,8 +18,7 @@ import (
 
 var RootCmd = &cobra.Command{
 	Use:   "bbgo",
-	Short: "bbgo trade bot",
-	Long:  "bitcoin trader",
+	Short: "bbgo is a crypto trading bot",
 
 	// SilenceUsage is an option to silence usage when an error occurs.
 	SilenceUsage: true,
