@@ -16,7 +16,8 @@ import TableHead from '@material-ui/core/TableHead';
 import TableRow from '@material-ui/core/TableRow';
 
 import {makeStyles} from '@material-ui/core/styles';
-import {queryStrategies} from "../api/bbgo";
+
+import {saveConfig} from "../api/bbgo";
 
 const useStyles = makeStyles((theme) => ({
     strategyCard: {
@@ -44,16 +45,20 @@ export default function SaveConfigAndRestart({onBack, onRestarted}) {
 
     const [strategies, setStrategies] = React.useState([]);
 
+    const [response, setResponse] = React.useState({});
+
     React.useEffect(() => {
-        queryStrategies((strategies) => {
-            setStrategies(strategies || [])
-        }).catch((err) => {
-            console.error(err);
-        });
     }, [])
 
     const handleRestart = () => {
+        saveConfig((resp) => {
+            setResponse(resp);
 
+            // call restart here
+        }).catch((err) => {
+            console.error(err);
+            setResponse(err.response.data);
+        });
     };
 
     return (
