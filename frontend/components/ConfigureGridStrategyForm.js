@@ -120,6 +120,8 @@ const useStyles = makeStyles((theme) => ({
 export default function ConfigureGridStrategyForm({onBack, onAdded}) {
     const classes = useStyles();
 
+    const [errors, setErrors] = React.useState({})
+
     const [sessions, setSessions] = React.useState([]);
 
     const [activeSessionSymbols, setActiveSessionSymbols] = React.useState([]);
@@ -147,6 +149,7 @@ export default function ConfigureGridStrategyForm({onBack, onAdded}) {
     }, [])
 
     const handleAdd = (event) => {
+
         const payload = {
             symbol: selectedSymbol,
             gridNumber: parseFloatValid(gridNumber),
@@ -165,6 +168,17 @@ export default function ConfigureGridStrategyForm({onBack, onAdded}) {
 
         }
 
+
+        if (!selectedSessionName) {
+            setErrors({ session: true })
+            return
+        }
+
+        if (!selectedSymbol) {
+            setErrors({ symbol: true })
+            return
+        }
+
         console.log(payload)
         attachStrategyOn(selectedSessionName, "grid", payload, (response) => {
             console.log(response)
@@ -175,6 +189,8 @@ export default function ConfigureGridStrategyForm({onBack, onAdded}) {
         }).catch((err) => {
             console.error(err);
             setResponse(err.response.data)
+        }).finally(() => {
+            setErrors({})
         })
     };
 
@@ -188,6 +204,9 @@ export default function ConfigureGridStrategyForm({onBack, onAdded}) {
 
         querySessionSymbols(sessionName, (symbols) => {
             setActiveSessionSymbols(symbols);
+        }).catch((err) => {
+            console.error(err);
+            setResponse(err.response.data)
         })
     };
 
@@ -222,14 +241,13 @@ export default function ConfigureGridStrategyForm({onBack, onAdded}) {
 
             <Grid container spacing={3}>
                 <Grid item xs={12}>
-                    <FormControl className={classes.formControl}>
+                    <FormControl required className={classes.formControl} error={errors.session}>
                         <InputLabel id="session-select-label">Session</InputLabel>
                         <Select
                             labelId="session-select-label"
                             id="session-select"
                             value={selectedSessionName ? selectedSessionName : ''}
                             onChange={handleSessionChange}
-                            required
                         >
                             {sessionMenuItems}
                         </Select>
@@ -240,10 +258,9 @@ export default function ConfigureGridStrategyForm({onBack, onAdded}) {
                 </Grid>
 
                 <Grid item xs={12}>
-                    <FormControl className={classes.formControl}>
+                    <FormControl required className={classes.formControl} error={errors.symbol}>
                         <InputLabel id="symbol-select-label">Market</InputLabel>
                         <Select
-                            required
                             labelId="symbol-select-label"
                             id="symbol-select"
                             value={selectedSymbol ? selectedSymbol : ''}

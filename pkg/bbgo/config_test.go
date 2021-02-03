@@ -106,7 +106,7 @@ func TestLoadConfig(t *testing.T) {
 					"exchangeStrategies": []map[string]interface{}{
 						{
 							"on": []string{"binance"},
-							"test": Stash{
+							"test": map[string]interface{}{
 								"symbol":            "BTCUSDT",
 								"baseQuantity":      0.1,
 								"interval":          "1m",

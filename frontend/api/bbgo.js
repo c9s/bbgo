@@ -14,6 +14,12 @@ export function configureDatabase(dsn, cb) {
     });
 }
 
+export function saveConfig(cb) {
+    return axios.post(baseURL + '/api/setup/save').then(response => {
+        cb(response.data)
+    });
+}
+
 export function addSession(session, cb) {
     return axios.post(baseURL + '/api/sessions', session).then(response => {
         cb(response.data)
@@ -31,6 +37,13 @@ export function testSessionConnection(session, cb) {
         cb(response.data)
     });
 }
+
+export function queryStrategies(cb) {
+    return axios.get(baseURL + '/api/strategies/single').then(response => {
+        cb(response.data.strategies)
+    });
+}
+
 
 export function querySessions(cb) {
     return axios.get(baseURL + '/api/sessions', {})

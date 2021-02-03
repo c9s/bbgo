@@ -12,6 +12,7 @@ import ConfigureDatabaseForm from "../../components/ConfigureDatabaseForm";
 import AddExchangeSessionForm from "../../components/AddExchangeSessionForm";
 import ReviewSessions from "../../components/ReviewSessions";
 import ConfigureGridStrategyForm from "../../components/ConfigureGridStrategyForm";
+import ReviewStrategies from "../../components/ReviewStrategies";
 
 import PlainLayout from '../../layouts/PlainLayout';
 
@@ -21,7 +22,7 @@ const useStyles = makeStyles((theme) => ({
     },
 }));
 
-const steps = ['Configure Database', 'Add Exchange Session', 'Review Sessions', 'Configure Strategy', 'Save Config and Restart'];
+const steps = ['Configure Database', 'Add Exchange Session', 'Review Sessions', 'Configure Strategy', 'Review Strategies', 'Save Config and Restart'];
 
 function getStepContent(step, setActiveStep) {
     switch (step) {
@@ -30,27 +31,37 @@ function getStepContent(step, setActiveStep) {
                 setActiveStep(1)
             }}/>;
         case 1:
-            return <AddExchangeSessionForm onAdded={() => {
-                setActiveStep(2)
-            }} onBack={() => {
-                setActiveStep(0)
-            }}/>;
+            return (
+                <AddExchangeSessionForm
+                    onBack={() => { setActiveStep(0) }}
+                    onAdded={() => { setActiveStep(2) }}
+                />
+            );
         case 2:
-            return <ReviewSessions onBack={() => {
-                setActiveStep(1)
-            }} onNext={() => {
-                setActiveStep(3)
-            }}/>
+            return (
+                <ReviewSessions
+                    onBack={() => { setActiveStep(1) }}
+                    onNext={() => { setActiveStep(3) }}
+                />
+            );
         case 3:
             return (
-                <ConfigureGridStrategyForm onBack={() => {
-                    setActiveStep(2)
-                }} onAdded={() => {
-
-                }}/>
+                <ConfigureGridStrategyForm
+                    onBack={() => { setActiveStep(2) }}
+                    onAdded={() => { setActiveStep(4) }}
+                />
             );
         case 4:
-            return;
+            return (
+                <ReviewStrategies
+                    onBack={() => { setActiveStep(3) }}
+                    onNext={() => { setActiveStep(5) }}
+                />
+            );
+
+        case 5:
+            return
+
         default:
             throw new Error('Unknown step');
     }
