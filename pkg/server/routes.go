@@ -98,11 +98,6 @@ func Run(ctx context.Context, userConfig *bbgo.Config, environ *bbgo.Environment
 			}
 
 
-			dotenvFile := ".env.local"
-			if err := moveFileToBackup(dotenvFile); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-				return
-			}
 
 			envVars, err := collectSessionEnvVars(userConfig.Sessions)
 			if err != nil {
@@ -114,13 +109,13 @@ func Run(ctx context.Context, userConfig *bbgo.Config, environ *bbgo.Environment
 				envVars["MYSQL_URL"] = environ.MysqlURL
 			}
 
-			if err := godotenv.Write(envVars, dotenvFile); err != nil {
+			dotenvFile := ".env.local"
+			if err := moveFileToBackup(dotenvFile); err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
 
-			filename := "bbgo.yaml"
-			if err := moveFileToBackup(filename); err != nil {
+			if err := godotenv.Write(envVars, dotenvFile); err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
@@ -135,6 +130,12 @@ func Run(ctx context.Context, userConfig *bbgo.Config, environ *bbgo.Environment
 			fmt.Println("=================================================")
 			fmt.Println(string(out))
 			fmt.Println("=================================================")
+
+			filename := "bbgo.yaml"
+			if err := moveFileToBackup(filename); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
 
 			if err := ioutil.WriteFile(filename, out, 0666); err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
