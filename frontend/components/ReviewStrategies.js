@@ -1,29 +1,22 @@
 import React from 'react';
-import Grid from '@material-ui/core/Grid';
 import Button from '@material-ui/core/Button';
 import Typography from '@material-ui/core/Typography';
 import List from '@material-ui/core/List';
-import ListItem from '@material-ui/core/ListItem';
-import ListItemText from '@material-ui/core/ListItemText';
-import ListItemIcon from '@material-ui/core/ListItemIcon';
-import AndroidIcon from '@material-ui/icons/Android';
 import Card from '@material-ui/core/Card';
 import CardHeader from '@material-ui/core/CardHeader';
 import CardContent from '@material-ui/core/CardContent';
 import Avatar from '@material-ui/core/Avatar';
 import IconButton from '@material-ui/core/IconButton';
 import MoreVertIcon from '@material-ui/icons/MoreVert';
-import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
 import Table from '@material-ui/core/Table';
 import TableBody from '@material-ui/core/TableBody';
 import TableCell from '@material-ui/core/TableCell';
 import TableContainer from '@material-ui/core/TableContainer';
 import TableHead from '@material-ui/core/TableHead';
 import TableRow from '@material-ui/core/TableRow';
-import CardActions from '@material-ui/core/CardActions';
 
 import {makeStyles} from '@material-ui/core/styles';
-import {querySessions, queryStrategies} from "../api/bbgo";
+import {queryStrategies} from "../api/bbgo";
 
 const useStyles = makeStyles((theme) => ({
     strategyCard: {
@@ -112,7 +105,7 @@ export default function ReviewStrategies({onBack, onNext}) {
                     }
                     action={
                         <IconButton aria-label="settings">
-                            <MoreVertIcon />
+                            <MoreVertIcon/>
                         </IconButton>
                     }
                     title={title}
@@ -128,15 +121,6 @@ export default function ReviewStrategies({onBack, onNext}) {
                 </CardContent>
             </Card>
         );
-
-        return (
-            <ListItem key={i}>
-                <ListItemIcon>
-                    <AndroidIcon/>
-                </ListItemIcon>
-                <ListItemText primary={o.strategy + desc} secondary={mounts}/>
-            </ListItem>
-        );
     })
 
     return (
@@ -150,7 +134,11 @@ export default function ReviewStrategies({onBack, onNext}) {
             </List>
 
             <div className={classes.buttons}>
-                <Button onClick={() => { if (onBack) { onBack() } }}>
+                <Button onClick={() => {
+                    if (onBack) {
+                        onBack()
+                    }
+                }}>
                     Add New Strategy
                 </Button>
 

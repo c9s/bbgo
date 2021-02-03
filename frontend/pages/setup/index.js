@@ -13,6 +13,7 @@ import AddExchangeSessionForm from "../../components/AddExchangeSessionForm";
 import ReviewSessions from "../../components/ReviewSessions";
 import ConfigureGridStrategyForm from "../../components/ConfigureGridStrategyForm";
 import ReviewStrategies from "../../components/ReviewStrategies";
+import SaveConfigAndRestart from "../../components/SaveConfigAndRestart";
 
 import PlainLayout from '../../layouts/PlainLayout';
 
@@ -60,7 +61,14 @@ function getStepContent(step, setActiveStep) {
             );
 
         case 5:
-            return
+            return (
+                <SaveConfigAndRestart
+                    onBack={() => {  setActiveStep(4) }}
+                    onRestarted={() => {
+
+                    }}
+                />
+            )
 
         default:
             throw new Error('Unknown step');
