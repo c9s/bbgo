@@ -36,10 +36,6 @@ func NewTradeService(db *sqlx.DB) *TradeService {
 }
 
 func (s *TradeService) QueryTradingVolume(startTime time.Time, options TradingVolumeQueryOptions) ([]TradingVolume, error) {
-	var sel []string
-	var groupBys []string
-	var orderBys []string
-	where := []string{"traded_at > :start_time"}
 	args := map[string]interface{}{
 		// "symbol":      symbol,
 		// "exchange":    ex,
@@ -48,6 +44,39 @@ func (s *TradeService) QueryTradingVolume(startTime time.Time, options TradingVo
 		"start_time": startTime,
 	}
 
+	sql := queryTradingVolumeSQL(options)
+
+	rows, err := s.DB.NamedQuery(sql, args)
+	if err != nil {
+		return nil, errors.Wrap(err, "query last trade error")
+	}
+
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
+
+	defer rows.Close()
+
+	var records []TradingVolume
+	for rows.Next() {
+		var record TradingVolume
+		err = rows.StructScan(&record)
+		if err != nil {
+			return records, err
+		}
+
+		record.Time = time.Date(record.Year, time.Month(record.Month), record.Day, 0, 0, 0, 0, time.UTC)
+		records = append(records, record)
+	}
+
+	return records, rows.Err()
+}
+
+func queryTradingVolumeSQL(options TradingVolumeQueryOptions) string {
+	var sel []string
+	var groupBys []string
+	var orderBys []string
+	where := []string{"traded_at > :start_time"}
 	switch options.GroupByPeriod {
 
 	case "month":
@@ -87,31 +116,7 @@ func (s *TradeService) QueryTradingVolume(startTime time.Time, options TradingVo
 		` ORDER BY ` + strings.Join(orderBys, ", ")
 
 	log.Info(sql)
-
-	rows, err := s.DB.NamedQuery(sql, args)
-	if err != nil {
-		return nil, errors.Wrap(err, "query last trade error")
-	}
-
-	if rows.Err() != nil {
-		return nil, rows.Err()
-	}
-
-	defer rows.Close()
-
-	var records []TradingVolume
-	for rows.Next() {
-		var record TradingVolume
-		err = rows.StructScan(&record)
-		if err != nil {
-			return records, err
-		}
-
-		record.Time = time.Date(record.Year, time.Month(record.Month), record.Day, 0, 0, 0, 0, time.UTC)
-		records = append(records, record)
-	}
-
-	return records, rows.Err()
+	return sql
 }
 
 // QueryLast queries the last trade from the database
@@ -158,14 +163,35 @@ func (s *TradeService) QueryForTradingFeeCurrency(ex types.ExchangeName, symbol 
 	return s.scanRows(rows)
 }
 
+// Only return 500 items.
 type QueryTradesOptions struct {
 	Exchange types.ExchangeName
 	Symbol   string
 	LastGID  int64
+	// ASC or DESC
 	Ordering string
 }
 
 func (s *TradeService) Query(options QueryTradesOptions) ([]types.Trade, error) {
+	sql := queryTradesSQL(options)
+
+	log.Info(sql)
+
+	args := map[string]interface{}{
+		"exchange": options.Exchange,
+		"symbol":   options.Symbol,
+	}
+	rows, err := s.DB.NamedQuery(sql, args)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	return s.scanRows(rows)
+}
+
+func queryTradesSQL(options QueryTradesOptions) string {
 	ordering := "ASC"
 	switch v := strings.ToUpper(options.Ordering); v {
 	case "DESC", "ASC":
@@ -188,7 +214,6 @@ func (s *TradeService) Query(options QueryTradesOptions) ([]types.Trade, error) 
 			where = append(where, "gid > :gid")
 		case "DESC":
 			where = append(where, "gid < :gid")
-
 		}
 	}
 
@@ -201,21 +226,7 @@ func (s *TradeService) Query(options QueryTradesOptions) ([]types.Trade, error) 
 	sql += ` ORDER BY gid ` + ordering
 
 	sql += ` LIMIT ` + strconv.Itoa(500)
-
-	log.Info(sql)
-
-	args := map[string]interface{}{
-		"exchange": options.Exchange,
-		"symbol":   options.Symbol,
-	}
-	rows, err := s.DB.NamedQuery(sql, args)
-	if err != nil {
-		return nil, err
-	}
-
-	defer rows.Close()
-
-	return s.scanRows(rows)
+	return sql
 }
 
 func (s *TradeService) scanRows(rows *sqlx.Rows) (trades []types.Trade, err error) {
