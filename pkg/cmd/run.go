@@ -79,7 +79,7 @@ func runSetup(baseCtx context.Context, userConfig *bbgo.Config, enableApiServer 
 			}
 		}()
 
-		if runtime.GOOS == "darwin" {
+		if false && runtime.GOOS == "darwin" {
 			<-time.After(time.Second * 3)
 			cmd := exec.Command("open", "http://localhost:8080/setup")
 			if err := cmd.Start() ; err != nil {
