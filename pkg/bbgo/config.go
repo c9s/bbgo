@@ -132,15 +132,15 @@ type BuildTargetConfig struct {
 	Name    string               `json:"name" yaml:"name"`
 	Arch    string               `json:"arch" yaml:"arch"`
 	OS      string               `json:"os" yaml:"os"`
-	LDFlags datatype.StringSlice `json:"ldflags" yaml:"ldflags"`
-	GCFlags datatype.StringSlice `json:"gcflags" yaml:"gcflags"`
-	Imports []string             `json:"imports" yaml:"imports"`
+	LDFlags datatype.StringSlice `json:"ldflags,omitempty" yaml:"ldflags,omitempty"`
+	GCFlags datatype.StringSlice `json:"gcflags,omitempty" yaml:"gcflags,omitempty"`
+	Imports []string             `json:"imports,omitempty" yaml:"imports,omitempty"`
 }
 
 type BuildConfig struct {
-	BuildDir string              `json:"buildDir" yaml:"buildDir"`
-	Imports  []string            `json:"imports" yaml:"imports"`
-	Targets  []BuildTargetConfig `json:"targets" yaml:"targets"`
+	BuildDir string              `json:"buildDir,omitempty" yaml:"buildDir,omitempty"`
+	Imports  []string            `json:"imports,omitempty" yaml:"imports,omitempty"`
+	Targets  []BuildTargetConfig `json:"targets,omitempty" yaml:"targets,omitempty"`
 }
 
 func GetNativeBuildTargetConfig() BuildTargetConfig {
@@ -187,9 +187,27 @@ func (c *Config) Map() (map[string]interface{}, error) {
 	}
 
 	// convert strategy config back to the DSL format
-	for _, st := range c.ExchangeStrategies {
-		_ = st.Strategy
+	var exchangeStrategies []map[string]interface{}
+	for _, m := range c.ExchangeStrategies {
+		strategyID := m.Strategy.ID()
+
+		var params Stash
+
+		out, err := json.Marshal(m.Strategy)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := json.Unmarshal(out, &params); err != nil {
+			return nil, err
+		}
+
+		exchangeStrategies = append(exchangeStrategies, map[string]interface{}{
+			"on":       m.Mounts,
+			strategyID: params,
+		})
 	}
+	data["exchangeStrategies"] = exchangeStrategies
 
 	return data, err
 }

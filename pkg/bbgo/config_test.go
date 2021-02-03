@@ -55,12 +55,65 @@ func TestLoadConfig(t *testing.T) {
 				assert.Equal(t, "#error", config.Notifications.Slack.ErrorChannel)
 			},
 		},
+
 		{
 			name:    "strategy",
 			args:    args{configFile: "testdata/strategy.yaml"},
 			wantErr: false,
 			f: func(t *testing.T, config *Config) {
 				assert.Len(t, config.ExchangeStrategies, 1)
+				assert.Equal(t, config.ExchangeStrategies, []ExchangeStrategyMount{{
+					Mounts: []string{"binance"},
+					Strategy: &TestStrategy{
+						Symbol:            "BTCUSDT",
+						Interval:          "1m",
+						BaseQuantity:      0.1,
+						MaxAssetQuantity:  0,
+						MinDropPercentage: -0.05,
+					},
+				}})
+
+				m, err := config.Map()
+				assert.NoError(t, err)
+				assert.Equal(t, map[string]interface{}{
+					"sessions": map[string]interface{}{
+						"max": map[string]interface{}{
+							"exchange":     "max",
+							"envVarPrefix": "MAX_",
+						},
+						"binance": map[string]interface{}{
+							"exchange":     "binance",
+							"envVarPrefix": "BINANCE_",
+						},
+					},
+					"build": map[string]interface{}{
+						"buildDir": "build",
+						"targets": []interface{}{
+							map[string]interface{}{
+								"name": "bbgow-amd64-darwin",
+								"arch": "amd64",
+								"os":   "darwin",
+							},
+							map[string]interface{}{
+								"name": "bbgow-amd64-linux",
+								"arch": "amd64",
+								"os":   "linux",
+							},
+						},
+					},
+					"exchangeStrategies": []map[string]interface{}{
+						{
+							"on": []string{"binance"},
+							"test": Stash{
+								"symbol":            "BTCUSDT",
+								"baseQuantity":      0.1,
+								"interval":          "1m",
+								"maxAssetQuantity":  0.0,
+								"minDropPercentage": -0.05,
+							},
+						},
+					},
+				}, m)
 			},
 		},
 
