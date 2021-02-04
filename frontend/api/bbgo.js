@@ -48,7 +48,7 @@ export function queryStrategies(cb) {
 export function querySessions(cb) {
     return axios.get(baseURL + '/api/sessions', {})
         .then(response => {
-            cb(response.data.sessions)
+            cb(response.data.sessions || [])
         });
 }
 

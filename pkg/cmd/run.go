@@ -95,14 +95,9 @@ func runSetup(baseCtx context.Context, userConfig *bbgo.Config, enableApiServer 
 	return nil
 }
 
-func runConfig(basectx context.Context, userConfig *bbgo.Config, enableApiServer bool) error {
-	ctx, cancelTrading := context.WithCancel(basectx)
-	defer cancelTrading()
 
-	environ := bbgo.NewEnvironment()
-
-	if viper.IsSet("mysql-url") {
-		dsn := viper.GetString("mysql-url")
+func BootstrapEnvironment(ctx context.Context, environ *bbgo.Environment, userConfig *bbgo.Config) error {
+	if dsn, ok := os.LookupEnv("MYSQL_URL") ; ok {
 		if err := environ.ConfigureDatabase(ctx, dsn); err != nil {
 			return err
 		}
@@ -230,8 +225,10 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config, enableApiServer
 		}
 	}
 
-	trader := bbgo.NewTrader(environ)
+	return nil
+}
 
+func ConfigureTrader(trader *bbgo.Trader, userConfig *bbgo.Config) error {
 	if userConfig.RiskControls != nil {
 		trader.SetRiskControls(userConfig.RiskControls)
 	}
@@ -260,6 +257,23 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config, enableApiServer
 		} else {
 			return fmt.Errorf("unsupported PnL reporter: %+v", report)
 		}
+	}
+
+	return nil
+}
+
+func runConfig(basectx context.Context, userConfig *bbgo.Config, enableApiServer bool) error {
+	ctx, cancelTrading := context.WithCancel(basectx)
+	defer cancelTrading()
+
+	environ := bbgo.NewEnvironment()
+	if err := BootstrapEnvironment(ctx, environ, userConfig) ; err != nil {
+		return err
+	}
+
+	trader := bbgo.NewTrader(environ)
+	if err := ConfigureTrader(trader, userConfig) ; err != nil {
+		return err
 	}
 
 	trader.Subscribe()
