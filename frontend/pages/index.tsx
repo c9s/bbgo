@@ -1,4 +1,5 @@
-import React from 'react';
+import React, {useState} from 'react';
+import { useRouter } from 'next/router';
 
 import {makeStyles} from '@material-ui/core/styles';
 import Typography from '@material-ui/core/Typography';
@@ -13,6 +14,8 @@ import TradingVolumePanel from '../components/TradingVolumePanel';
 import ExchangeSessionTabPanel from '../components/ExchangeSessionTabPanel';
 
 import DashboardLayout from '../layouts/DashboardLayout';
+
+import {querySessions} from "../api/bbgo";
 
 const useStyles = makeStyles((theme) => ({
     paper: {
@@ -31,9 +34,37 @@ const useStyles = makeStyles((theme) => ({
 }));
 
 
+
 // props are pageProps passed from _app.tsx
-export default function Home(props) {
+export default function Home() {
     const classes = useStyles();
+    const { push } = useRouter();
+
+    const [sessions, setSessions] = React.useState([])
+
+    React.useEffect(() => {
+        querySessions((sessions) => {
+            if (sessions.length == 0) {
+                push("/setup");
+            } else {
+                setSessions(sessions)
+            }
+        }).catch((err) => {
+            console.error(err);
+        })
+    }, [])
+
+    if (sessions.length == 0) {
+        return (
+            <DashboardLayout>
+                <Box m={4}>
+                    <Typography variant="h4" component="h2" gutterBottom>
+                        Loading
+                    </Typography>
+                </Box>
+            </DashboardLayout>
+        );
+    }
 
     return (
         <DashboardLayout>
