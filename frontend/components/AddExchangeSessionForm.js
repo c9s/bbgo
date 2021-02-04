@@ -161,6 +161,7 @@ export default function AddExchangeSessionForm({onBack, onAdded}) {
                     <TextField id="key" name="api_key" label="API Key"
                                fullWidth
                                required
+                               autoComplete={"off"}
                                onChange={(event) => {
                                    setApiKey(event.target.value)
                                    resetTestResponse()
@@ -171,6 +172,7 @@ export default function AddExchangeSessionForm({onBack, onAdded}) {
                 <Grid item xs={12}>
                     <TextField id="secret" name="api_secret" label="API Secret"
                                fullWidth
+                               autoComplete={"off"}
                                required
                                onChange={(event) => {
                                    setApiSecret(event.target.value)
