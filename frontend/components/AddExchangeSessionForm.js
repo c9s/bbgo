@@ -8,12 +8,17 @@ import FormControlLabel from '@material-ui/core/FormControlLabel';
 import FormHelperText from '@material-ui/core/FormHelperText';
 import InputLabel from '@material-ui/core/InputLabel';
 import FormControl from '@material-ui/core/FormControl';
+import InputAdornment from '@material-ui/core/InputAdornment';
+import IconButton from '@material-ui/core/IconButton';
 
 import Checkbox from '@material-ui/core/Checkbox';
 import Select from '@material-ui/core/Select';
 import MenuItem from '@material-ui/core/MenuItem';
+import FilledInput from '@material-ui/core/FilledInput';
 
 import Alert from '@material-ui/lab/Alert';
+import VisibilityOff from '@material-ui/icons/VisibilityOff';
+import Visibility from '@material-ui/icons/Visibility';
 
 import {addSession, testSessionConnection} from '../api/bbgo';
 
@@ -49,6 +54,9 @@ export default function AddExchangeSessionForm({onBack, onAdded}) {
 
     const [apiKey, setApiKey] = React.useState('');
     const [apiSecret, setApiSecret] = React.useState('');
+
+    const [showApiKey, setShowApiKey] = React.useState(false);
+    const [showApiSecret, setShowApiSecret] = React.useState(false);
 
     const [isMargin, setIsMargin] = React.useState(false);
     const [isIsolatedMargin, setIsIsolatedMargin] = React.useState(false);
@@ -158,27 +166,58 @@ export default function AddExchangeSessionForm({onBack, onAdded}) {
                 </Grid>
 
                 <Grid item xs={12}>
-                    <TextField id="key" name="api_key" label="API Key"
-                               fullWidth
-                               required
-                               autoComplete={"off"}
-                               onChange={(event) => {
-                                   setApiKey(event.target.value)
-                                   resetTestResponse()
-                               }}
-                    />
+                    <FormControl fullWidth variant="filled">
+                        <InputLabel htmlFor="apiKey">API Key</InputLabel>
+                        <FilledInput
+                            id="apiKey"
+                            type={showApiKey ? 'text' : 'password'}
+                            value={apiKey}
+                            endAdornment={
+                                <InputAdornment position="end">
+                                    <IconButton
+                                        aria-label="toggle key visibility"
+                                        onClick={() => { setShowApiKey(!showApiKey) }}
+                                        onMouseDown={(event) => { event.preventDefault() }}
+                                        edge="end"
+                                    >
+                                        {showApiKey ? <Visibility /> : <VisibilityOff />}
+                                    </IconButton>
+                                </InputAdornment>
+                            }
+                            onChange={(event) => {
+                                setApiKey(event.target.value)
+                                resetTestResponse()
+                            }}
+                        />
+                    </FormControl>
                 </Grid>
 
                 <Grid item xs={12}>
-                    <TextField id="secret" name="api_secret" label="API Secret"
-                               fullWidth
-                               autoComplete={"off"}
-                               required
-                               onChange={(event) => {
-                                   setApiSecret(event.target.value)
-                                   resetTestResponse()
-                               }}
-                    />
+
+                    <FormControl fullWidth variant="filled">
+                        <InputLabel htmlFor="apiSecret">API Secret</InputLabel>
+                        <FilledInput
+                            id="apiSecret"
+                            type={showApiSecret ? 'text' : 'password'}
+                            value={apiSecret}
+                            endAdornment={
+                                <InputAdornment position="end">
+                                    <IconButton
+                                        aria-label="toggle key visibility"
+                                        onClick={() => { setShowApiSecret(!showApiSecret) }}
+                                        onMouseDown={(event) => { event.preventDefault() }}
+                                        edge="end"
+                                    >
+                                        {showApiSecret ? <Visibility /> : <VisibilityOff />}
+                                    </IconButton>
+                                </InputAdornment>
+                            }
+                            onChange={(event) => {
+                                setApiSecret(event.target.value)
+                                resetTestResponse()
+                            }}
+                        />
+                    </FormControl>
                 </Grid>
 
                 {exchangeType === "binance" ? (
