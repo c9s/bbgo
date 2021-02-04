@@ -71,39 +71,7 @@ func (s *Server) Run(ctx context.Context) error {
 		r.POST("/api/setup/configure-db", s.setupConfigureDB)
 		r.POST("/api/setup/restart", s.setupRestart)
 		r.POST("/api/setup/save", s.setupSaveConfig)
-
-		r.POST("/api/setup/strategy/single/:id/session/:session", func(c *gin.Context) {
-			sessionName := c.Param("session")
-			strategyID := c.Param("id")
-
-			_, ok := environ.Session(sessionName)
-			if !ok {
-				c.JSON(http.StatusNotFound, "session not found")
-				return
-			}
-
-			var conf map[string]interface{}
-
-			if err := c.BindJSON(&conf); err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "missing arguments"})
-				return
-			}
-
-			strategy, err := bbgo.NewStrategyFromMap(strategyID, conf)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-				return
-			}
-
-			mount := bbgo.ExchangeStrategyMount{
-				Mounts:   []string{sessionName},
-				Strategy: strategy,
-			}
-
-			userConfig.ExchangeStrategies = append(userConfig.ExchangeStrategies, mount)
-
-			c.JSON(http.StatusOK, gin.H{"success": true})
-		})
+		r.POST("/api/setup/strategy/single/:id/session/:session", s.setupAddStrategy)
 	}
 
 	r.GET("/api/trades", func(c *gin.Context) {
@@ -507,6 +475,39 @@ func (s *Server) setupConfigureDB(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
+func (s *Server) setupAddStrategy(c *gin.Context) {
+	sessionName := c.Param("session")
+	strategyID := c.Param("id")
+
+	_, ok := s.Environ.Session(sessionName)
+	if !ok {
+		c.JSON(http.StatusNotFound, "session not found")
+		return
+	}
+
+	var conf map[string]interface{}
+
+	if err := c.BindJSON(&conf); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing arguments"})
+		return
+	}
+
+	strategy, err := bbgo.NewStrategyFromMap(strategyID, conf)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	mount := bbgo.ExchangeStrategyMount{
+		Mounts:   []string{sessionName},
+		Strategy: strategy,
+	}
+
+	s.Config.ExchangeStrategies = append(s.Config.ExchangeStrategies, mount)
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
 func (s *Server) setupRestart(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
@@ -526,11 +527,10 @@ func (s *Server) listStrategies(c *gin.Context) {
 		stashes = append(stashes, stash)
 	}
 
-	if len(stashes) > 0 {
-		c.JSON(http.StatusOK, gin.H{"strategies": stashes})
-	} else {
+	if len(stashes) == 0 {
 		c.JSON(http.StatusOK, gin.H{"strategies": []int{}})
 	}
+	c.JSON(http.StatusOK, gin.H{"strategies": stashes})
 }
 
 func (s *Server) setupSaveConfig(c *gin.Context) {
