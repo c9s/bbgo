@@ -51,7 +51,7 @@ pkged.go: frontend/out/index.html
 
 static: frontend/out/index.html pkged.go
 
-build/BBGO.app/Contents/MacOS/bbgo-desktop:
+build/BBGO.app/Contents/MacOS/bbgo-desktop: .FORCE
 	mkdir -p $(dir $@)
 	go build -o $@ ./cmd/bbgo-desktop
 
