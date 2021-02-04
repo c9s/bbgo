@@ -19,10 +19,14 @@ import (
 
 func main() {
 	dotenvFile := ".env.local"
-	if err := godotenv.Load(dotenvFile); err != nil {
-		log.WithError(err).Error("error loading dotenv file")
-		return
+
+	if _, err := os.Stat(dotenvFile) ; err == nil {
+		if err := godotenv.Load(dotenvFile); err != nil {
+			log.WithError(err).Error("error loading dotenv file")
+			return
+		}
 	}
+
 
 	var args []string
 	if runtime.GOOS == "linux" {
