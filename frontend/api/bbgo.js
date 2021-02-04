@@ -2,6 +2,12 @@ import axios from "axios";
 
 const baseURL = process.env.NODE_ENV === "development" ? "http://localhost:8080" : ""
 
+export function ping(cb) {
+    return axios.get(baseURL + '/api/ping').then(response => {
+        cb(response.data)
+    });
+}
+
 export function testDatabaseConnection(dsn, cb) {
     return axios.post(baseURL + '/api/setup/test-db', {dsn: dsn}).then(response => {
         cb(response.data)
@@ -16,6 +22,12 @@ export function configureDatabase(dsn, cb) {
 
 export function saveConfig(cb) {
     return axios.post(baseURL + '/api/setup/save').then(response => {
+        cb(response.data)
+    });
+}
+
+export function setupRestart(cb) {
+    return axios.post(baseURL + '/api/setup/restart').then(response => {
         cb(response.data)
     });
 }
