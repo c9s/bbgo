@@ -1,4 +1,7 @@
 import React from 'react';
+import { useRouter } from 'next/router';
+
+
 import Button from '@material-ui/core/Button';
 import Typography from '@material-ui/core/Typography';
 import List from '@material-ui/core/List';
@@ -17,7 +20,7 @@ import TableRow from '@material-ui/core/TableRow';
 
 import {makeStyles} from '@material-ui/core/styles';
 
-import {saveConfig} from "../api/bbgo";
+import {ping, saveConfig, setupRestart} from "../api/bbgo";
 import Box from "@material-ui/core/Box";
 import Alert from "@material-ui/lab/Alert";
 
@@ -45,6 +48,7 @@ const useStyles = makeStyles((theme) => ({
 export default function SaveConfigAndRestart({onBack, onRestarted}) {
     const classes = useStyles();
 
+    const { push } = useRouter();
     const [strategies, setStrategies] = React.useState([]);
 
     const [response, setResponse] = React.useState({});
@@ -55,6 +59,17 @@ export default function SaveConfigAndRestart({onBack, onRestarted}) {
     const handleRestart = () => {
         saveConfig((resp) => {
             setResponse(resp);
+
+            setupRestart((resp) => {
+                setInterval(function() {
+                    ping(() => {
+                        push("/");
+                    })
+                }, 1000);
+            }).catch((err) => {
+                console.error(err);
+                setResponse(err.response.data);
+            })
 
             // call restart here
         }).catch((err) => {
