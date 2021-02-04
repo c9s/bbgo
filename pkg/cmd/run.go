@@ -68,10 +68,14 @@ func runSetup(baseCtx context.Context, userConfig *bbgo.Config, enableApiServer 
 	if enableApiServer {
 		go func() {
 			s := &server.Server{
-				Config: userConfig,
+				Config:  userConfig,
 				Environ: environ,
-				Trader: trader,
-				Setup: true,
+				Trader:  trader,
+				Setup: &server.Setup{
+					Context: ctx,
+					Cancel:  cancelTrading,
+					Token:   "",
+				},
 			}
 
 			if err := s.Run(ctx); err != nil {
@@ -82,7 +86,7 @@ func runSetup(baseCtx context.Context, userConfig *bbgo.Config, enableApiServer 
 		if false && runtime.GOOS == "darwin" {
 			<-time.After(time.Second * 3)
 			cmd := exec.Command("open", "http://localhost:8080/setup")
-			if err := cmd.Start() ; err != nil {
+			if err := cmd.Start(); err != nil {
 				log.WithError(err).Errorf("can not call open command to open the web page")
 			}
 		}
@@ -275,10 +279,9 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config, enableApiServer
 	if enableApiServer {
 		go func() {
 			s := &server.Server{
-				Config: userConfig,
+				Config:  userConfig,
 				Environ: environ,
-				Trader: trader,
-				Setup: false,
+				Trader:  trader,
 			}
 
 			if err := s.Run(ctx); err != nil {
