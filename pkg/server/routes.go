@@ -237,78 +237,27 @@ func (s *Server) newEngine() *gin.Engine {
 	return r
 }
 
+func (s *Server) RunWithListener(ctx context.Context, l net.Listener) error {
+	r := s.newEngine()
+	bind := l.Addr().String()
+
+	if s.OpenInBrowser {
+		openBrowser(ctx, bind)
+	}
+
+	s.srv = newServer(r, bind)
+	return serve(s.srv, l)
+}
+
 func (s *Server) Run(ctx context.Context, bindArgs ...string) error {
 	r := s.newEngine()
 	bind := resolveBind(bindArgs)
 	if s.OpenInBrowser {
-		s.openBrowser(ctx, bind)
+		openBrowser(ctx, bind)
 	}
 
 	s.srv = newServer(r, bind)
 	return listenAndServe(s.srv)
-}
-
-func (s *Server) openBrowser(ctx context.Context, bind string) {
-	if runtime.GOOS == "darwin" {
-		baseURL := "http://" + bind
-		go pingAndOpenURL(ctx, baseURL)
-	} else {
-		logrus.Warnf("%s is not supported for opening browser automatically", runtime.GOOS)
-	}
-}
-
-func resolveBind(a []string) string {
-	switch len(a) {
-	case 0:
-		return DefaultBindAddress
-
-	case 1:
-		return a[0]
-
-	default:
-		panic("too many parameters for binding")
-	}
-
-	return ""
-}
-
-func newServer(r http.Handler, bind string) *http.Server {
-	return &http.Server{
-		Addr:    bind,
-		Handler: r,
-	}
-}
-
-func serve(srv *http.Server, l net.Listener) (err error) {
-	defer func() {
-		if err != nil && err != http.ErrServerClosed {
-			logrus.WithError(err).Error("unexpected http server error")
-		}
-	}()
-
-	err = srv.Serve(l)
-	if err != http.ErrServerClosed {
-		return err
-	}
-
-	return nil
-}
-
-func listenAndServe(srv *http.Server) error {
-	var err error
-
-	defer func() {
-		if err != nil && err != http.ErrServerClosed {
-			logrus.WithError(err).Error("unexpected http server error")
-		}
-	}()
-
-	err = srv.ListenAndServe()
-	if err != http.ErrServerClosed {
-		return err
-	}
-
-	return nil
 }
 
 func (s *Server) setupTestDB(c *gin.Context) {
@@ -816,4 +765,67 @@ func filterStrings(slice []string, needle string) (ns []string) {
 	}
 
 	return ns
+}
+
+func openBrowser(ctx context.Context, bind string) {
+	if runtime.GOOS == "darwin" {
+		baseURL := "http://" + bind
+		go pingAndOpenURL(ctx, baseURL)
+	} else {
+		logrus.Warnf("%s is not supported for opening browser automatically", runtime.GOOS)
+	}
+}
+
+func resolveBind(a []string) string {
+	switch len(a) {
+	case 0:
+		return DefaultBindAddress
+
+	case 1:
+		return a[0]
+
+	default:
+		panic("too many parameters for binding")
+	}
+
+	return ""
+}
+
+func newServer(r http.Handler, bind string) *http.Server {
+	return &http.Server{
+		Addr:    bind,
+		Handler: r,
+	}
+}
+
+func serve(srv *http.Server, l net.Listener) (err error) {
+	defer func() {
+		if err != nil && err != http.ErrServerClosed {
+			logrus.WithError(err).Error("unexpected http server error")
+		}
+	}()
+
+	err = srv.Serve(l)
+	if err != http.ErrServerClosed {
+		return err
+	}
+
+	return nil
+}
+
+func listenAndServe(srv *http.Server) error {
+	var err error
+
+	defer func() {
+		if err != nil && err != http.ErrServerClosed {
+			logrus.WithError(err).Error("unexpected http server error")
+		}
+	}()
+
+	err = srv.ListenAndServe()
+	if err != http.ErrServerClosed {
+		return err
+	}
+
+	return nil
 }
