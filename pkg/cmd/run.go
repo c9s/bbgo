@@ -320,8 +320,10 @@ func run(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		if err := godotenv.Load(dotenvFile); err != nil {
-			return errors.Wrap(err, "error loading dotenv file")
+		if _, err := os.Stat(dotenvFile) ; err == nil {
+			if err := godotenv.Load(dotenvFile); err != nil {
+				return errors.Wrap(err, "error loading dotenv file")
+			}
 		}
 	}
 
