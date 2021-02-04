@@ -2,11 +2,14 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
+	"os/exec"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -22,6 +25,8 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+const DefaultBindAddress = "localhost:8080"
+
 type Setup struct {
 	// Context is the trader context
 	Context context.Context
@@ -34,11 +39,12 @@ type Setup struct {
 }
 
 type Server struct {
-	Config  *bbgo.Config
-	Environ *bbgo.Environment
-	Trader  *bbgo.Trader
-	Setup   *Setup
-	Bind    string
+	Config        *bbgo.Config
+	Environ       *bbgo.Environment
+	Trader        *bbgo.Trader
+	Setup         *Setup
+	Bind          string
+	OpenInBrowser bool
 }
 
 func (s *Server) Run(ctx context.Context) error {
@@ -533,6 +539,19 @@ func (s *Server) Run(ctx context.Context) error {
 	r.GET("/api/strategies/single", s.listStrategies)
 	r.NoRoute(s.pkgerHandler)
 
+	if s.OpenInBrowser {
+		if runtime.GOOS == "darwin" {
+			baseURL := "http://" + DefaultBindAddress
+			if len(s.Bind) > 0 {
+				baseURL = "http://" + s.Bind
+			}
+
+			go pingAndOpenURL(ctx, baseURL)
+		} else {
+			logrus.Warnf("%s is not supported for opening browser automatically", runtime.GOOS)
+		}
+	}
+
 	if len(s.Bind) > 0 {
 		return r.Run(s.Bind)
 	}
@@ -619,4 +638,47 @@ func collectSessionEnvVars(sessions map[string]*bbgo.ExchangeSession) (envVars m
 	}
 
 	return
+}
+
+func getJSON(url string, data interface{}) error {
+	var client = &http.Client{Timeout: 500 * time.Millisecond}
+	r, err := client.Get(url)
+	if err != nil {
+		return err
+	}
+
+	defer r.Body.Close()
+
+	return json.NewDecoder(r.Body).Decode(data)
+}
+
+func openURL(url string) error {
+	cmd := exec.Command("open", url)
+	return cmd.Start()
+}
+
+func pingAndOpenURL(ctx context.Context, baseURL string) {
+	pingURL := baseURL + "/api/ping"
+	setupURL := baseURL + "/setup"
+
+	ticker := time.NewTimer(time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+
+		case <-ctx.Done():
+			return
+
+		case <-ticker.C:
+			var response map[string]interface{}
+			var err = getJSON(pingURL, &response)
+			if err == nil {
+				if err := openURL(setupURL); err != nil {
+					logrus.WithError(err).Errorf("can not call open command to open the web page")
+				}
+				return
+			}
+		}
+	}
 }
