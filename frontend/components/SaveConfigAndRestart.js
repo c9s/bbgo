@@ -61,8 +61,10 @@ export default function SaveConfigAndRestart({onBack, onRestarted}) {
             setResponse(resp);
 
             setupRestart((resp) => {
-                setInterval(function() {
+                let t
+                t = setInterval(function() {
                     ping(() => {
+                        clearInterval(t)
                         push("/");
                     })
                 }, 1000);
