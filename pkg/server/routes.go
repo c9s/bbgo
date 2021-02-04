@@ -2,23 +2,18 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"regexp"
-	"runtime"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	"github.com/markbates/pkger"
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -466,21 +461,6 @@ func (s *Server) setupSaveConfig(c *gin.Context) {
 
 var pageRoutePattern = regexp.MustCompile("/[a-z]+$")
 
-func (s *Server) pkgerHandler(c *gin.Context) {
-	fs := pkger.Dir("/frontend/out")
-
-	// redirect to .html page if the page exists
-	if pageRoutePattern.MatchString(c.Request.URL.Path) {
-
-		_, err := pkger.Stat("/frontend/out/" + c.Request.URL.Path + ".html")
-		if err == nil {
-			c.Request.URL.Path += ".html"
-		}
-	}
-
-	http.FileServer(fs).ServeHTTP(c.Writer, c.Request)
-}
-
 func moveFileToBackup(filename string) error {
 	stat, err := os.Stat(filename)
 
@@ -492,35 +472,6 @@ func moveFileToBackup(filename string) error {
 	}
 
 	return nil
-}
-
-func collectSessionEnvVars(sessions map[string]*bbgo.ExchangeSession) (envVars map[string]string, err error) {
-	envVars = make(map[string]string)
-
-	for _, session := range sessions {
-		if len(session.Key) == 0 && len(session.Secret) == 0 {
-			err = fmt.Errorf("session %s key & secret is not empty", session.Name)
-			return
-		}
-
-		if len(session.EnvVarPrefix) > 0 {
-			envVars[session.EnvVarPrefix+"_API_KEY"] = session.Key
-			envVars[session.EnvVarPrefix+"_API_SECRET"] = session.Secret
-		} else if len(session.Name) > 0 {
-			sn := strings.ToUpper(session.Name)
-			envVars[sn+"_API_KEY"] = session.Key
-			envVars[sn+"_API_SECRET"] = session.Secret
-		} else {
-			err = fmt.Errorf("session %s name or env var prefix is not defined", session.Name)
-			return
-		}
-
-		// reset key and secret so that we won't marshal them to the config file
-		session.Key = ""
-		session.Secret = ""
-	}
-
-	return
 }
 
 func (s *Server) tradingVolume(c *gin.Context) {
@@ -573,96 +524,6 @@ func (s *Server) tradingVolume(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"tradingVolumes": rows})
 	return
-}
-
-func getJSON(url string, data interface{}) error {
-	var client = &http.Client{Timeout: 500 * time.Millisecond}
-	r, err := client.Get(url)
-	if err != nil {
-		return err
-	}
-
-	defer r.Body.Close()
-
-	return json.NewDecoder(r.Body).Decode(data)
-}
-
-func openURL(url string) error {
-	cmd := exec.Command("open", url)
-	return cmd.Start()
-}
-
-func pingUntil(ctx context.Context, baseURL string, callback func()) {
-	pingURL := baseURL + "/api/ping"
-	timeout := time.NewTimer(time.Minute)
-
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-
-		case <-timeout.C:
-			logrus.Warnf("ping hits 1 minute timeout")
-			return
-
-		case <-ctx.Done():
-			return
-
-		case <-ticker.C:
-			var response map[string]interface{}
-			var err = getJSON(pingURL, &response)
-			if err == nil {
-				go callback()
-				return
-			}
-		}
-	}
-}
-
-func pingAndOpenURL(ctx context.Context, baseURL string) {
-	setupURL := baseURL + "/setup"
-	go pingUntil(ctx, baseURL, func() {
-		if err := openURL(setupURL); err != nil {
-			logrus.WithError(err).Errorf("can not call open command to open the web page")
-		}
-	})
-}
-
-func filterStrings(slice []string, needle string) (ns []string) {
-	for _, str := range slice {
-		if str == needle {
-			continue
-		}
-
-		ns = append(ns, str)
-	}
-
-	return ns
-}
-
-func openBrowser(ctx context.Context, bind string) {
-	if runtime.GOOS == "darwin" {
-		baseURL := "http://" + bind
-		go pingAndOpenURL(ctx, baseURL)
-	} else {
-		logrus.Warnf("%s is not supported for opening browser automatically", runtime.GOOS)
-	}
-}
-
-func resolveBind(a []string) string {
-	switch len(a) {
-	case 0:
-		return DefaultBindAddress
-
-	case 1:
-		return a[0]
-
-	default:
-		panic("too many parameters for binding")
-	}
-
-	return ""
 }
 
 func newServer(r http.Handler, bind string) *http.Server {
