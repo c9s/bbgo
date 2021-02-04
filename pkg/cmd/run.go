@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -71,6 +70,7 @@ func runSetup(baseCtx context.Context, userConfig *bbgo.Config, enableApiServer 
 				Config:  userConfig,
 				Environ: environ,
 				Trader:  trader,
+				OpenInBrowser: true,
 				Setup: &server.Setup{
 					Context: ctx,
 					Cancel:  cancelTrading,
@@ -82,14 +82,6 @@ func runSetup(baseCtx context.Context, userConfig *bbgo.Config, enableApiServer 
 				log.WithError(err).Errorf("server error")
 			}
 		}()
-
-		if false && runtime.GOOS == "darwin" {
-			<-time.After(time.Second * 3)
-			cmd := exec.Command("open", "http://localhost:8080/setup")
-			if err := cmd.Start(); err != nil {
-				log.WithError(err).Errorf("can not call open command to open the web page")
-			}
-		}
 	}
 
 	cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
