@@ -42,17 +42,23 @@ docker-push:
 	docker push yoanlin/bbgo
 	bash -c "[[ -n $(DOCKER_TAG) ]] && docker push yoanlin/bbgo:$(DOCKER_TAG)"
 
-static: pkged.go
+frontend/out/index.html: .FORCE
 	(cd frontend && yarn export)
+
+pkged.go: frontend/out/index.html
 	pkger
 	git commit pkged.go -m "update pkged static files"
 
-desktop: build/BBGO.app/Contents/MacOS/bbgo-desktop static
-	mkdir -p $(dir $<)
-	go build -o $< ./cmd/bbgo-desktop
+static: frontend/out/index.html pkged.go
+
+build/BBGO.app/Contents/MacOS/bbgo-desktop:
+	mkdir -p $(dir $@)
+	go build -o $@ ./cmd/bbgo-desktop
+
+desktop: static build/BBGO.app/Contents/MacOS/bbgo-desktop
 	# bash desktop/build-darwin.sh
 
 tools:
 	GO111MODULES=off go get github.com/markbates/pkger/cmd/pkger
 
-.PHONY: dist migrations desktop
+.PHONY: dist migrations static desktop .FORCE
