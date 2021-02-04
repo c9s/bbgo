@@ -62,16 +62,14 @@ func (s *Server) Run(ctx context.Context) error {
 		MaxAge:           12 * time.Hour,
 	}))
 
-	r.GET("/api/ping", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"message": "pong"})
-	})
+	r.GET("/api/ping", s.ping)
 
 	if s.Setup != nil {
 		r.POST("/api/setup/test-db", s.setupTestDB)
 		r.POST("/api/setup/configure-db", s.setupConfigureDB)
-		r.POST("/api/setup/restart", s.setupRestart)
-		r.POST("/api/setup/save", s.setupSaveConfig)
 		r.POST("/api/setup/strategy/single/:id/session/:session", s.setupAddStrategy)
+		r.POST("/api/setup/save", s.setupSaveConfig)
+		r.POST("/api/setup/restart", s.setupRestart)
 	}
 
 	r.GET("/api/trades", func(c *gin.Context) {
@@ -473,6 +471,10 @@ func (s *Server) setupConfigureDB(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func (s *Server) ping(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"message": "pong"})
 }
 
 func (s *Server) setupAddStrategy(c *gin.Context) {
