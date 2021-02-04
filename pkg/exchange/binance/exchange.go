@@ -48,6 +48,10 @@ func (e *Exchange) Name() types.ExchangeName {
 	return types.ExchangeBinance
 }
 
+func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (types.Ticker, error) {
+	return types.Ticker{}, nil
+}
+
 func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 	log.Info("querying market info...")
 
