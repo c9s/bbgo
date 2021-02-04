@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -551,6 +552,21 @@ func (s *Server) setupRestart(c *gin.Context) {
 
 		logrus.Info("web server shutdown completed")
 
+
+		bin := os.Args[0]
+		args := os.Args[0:]
+
+		// filter out setup parameters
+		args = filterStrings(args, "--setup")
+
+		envVars := os.Environ()
+
+		logrus.Infof("%s %v %+v", bin, args, envVars)
+
+		if err := syscall.Exec(bin, args, envVars) ; err != nil {
+			logrus.WithError(err).Errorf("failed to restart %s", bin)
+		}
+
 		s.Setup.Cancel()
 	}()
 
@@ -673,12 +689,12 @@ func collectSessionEnvVars(sessions map[string]*bbgo.ExchangeSession) (envVars m
 		}
 
 		if len(session.EnvVarPrefix) > 0 {
-			envVars[session.EnvVarPrefix+"API_KEY"] = session.Key
-			envVars[session.EnvVarPrefix+"API_SECRET"] = session.Secret
+			envVars[session.EnvVarPrefix+"_API_KEY"] = session.Key
+			envVars[session.EnvVarPrefix+"_API_SECRET"] = session.Secret
 		} else if len(session.Name) > 0 {
 			sn := strings.ToUpper(session.Name)
-			envVars[sn+"API_KEY"] = session.Key
-			envVars[sn+"API_SECRET"] = session.Secret
+			envVars[sn+"_API_KEY"] = session.Key
+			envVars[sn+"_API_SECRET"] = session.Secret
 		} else {
 			err = fmt.Errorf("session %s name or env var prefix is not defined", session.Name)
 			return
@@ -745,3 +761,17 @@ func pingAndOpenURL(ctx context.Context, baseURL string) {
 		}
 	})
 }
+
+func filterStrings(slice []string, needle string) (ns []string) {
+	for _, str := range slice {
+		if str == needle {
+			continue
+		}
+
+		ns = append(ns, str)
+	}
+
+	return ns
+}
+
+

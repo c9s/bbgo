@@ -2,10 +2,10 @@
 sessions:
   max:
     exchange: max
-    envVarPrefix: MAX_
+    envVarPrefix: MAX
   binance:
     exchange: binance
-    envVarPrefix: BINANCE_
+    envVarPrefix: BINANCE
 
 exchangeStrategies:
 - on: ["binance"]
