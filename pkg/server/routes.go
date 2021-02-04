@@ -22,17 +22,28 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+type Setup struct {
+	// Context is the trader context
+	Context context.Context
+
+	// Cancel is the trader context cancel function you want to cancel
+	Cancel context.CancelFunc
+
+	// Token is used for setup api authentication
+	Token string
+}
+
 type Server struct {
 	Config  *bbgo.Config
 	Environ *bbgo.Environment
 	Trader  *bbgo.Trader
-	Setup   bool
+	Setup   *Setup
+	Bind    string
 }
 
 func (s *Server) Run(ctx context.Context) error {
 	userConfig := s.Config
 	environ := s.Environ
-	setup := s.Setup
 
 	r := gin.Default()
 	r.Use(cors.New(cors.Config{
@@ -49,7 +60,7 @@ func (s *Server) Run(ctx context.Context) error {
 		c.JSON(http.StatusOK, gin.H{"message": "pong"})
 	})
 
-	if setup {
+	if s.Setup != nil {
 		r.POST("/api/setup/test-db", func(c *gin.Context) {
 			payload := struct {
 				DSN string `json:"dsn"`
@@ -196,7 +207,7 @@ func (s *Server) Run(ctx context.Context) error {
 
 	r.GET("/api/trades", func(c *gin.Context) {
 		if environ.TradeService == nil {
-			c.JSON(http.StatusInternalServerError, gin.H{ "error": "database is not configured" })
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "database is not configured"})
 			return
 		}
 
@@ -229,7 +240,7 @@ func (s *Server) Run(ctx context.Context) error {
 
 	r.GET("/api/orders/closed", func(c *gin.Context) {
 		if environ.OrderService == nil {
-			c.JSON(http.StatusInternalServerError, gin.H{ "error": "database is not configured" })
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "database is not configured"})
 			return
 		}
 
@@ -263,7 +274,7 @@ func (s *Server) Run(ctx context.Context) error {
 
 	r.GET("/api/trading-volume", func(c *gin.Context) {
 		if environ.TradeService == nil {
-			c.JSON(http.StatusInternalServerError, gin.H{ "error": "database is not configured" })
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "database is not configured"})
 			return
 		}
 
@@ -522,6 +533,10 @@ func (s *Server) Run(ctx context.Context) error {
 	r.GET("/api/strategies/single", s.listStrategies)
 	r.NoRoute(s.pkgerHandler)
 
+	if len(s.Bind) > 0 {
+		return r.Run(s.Bind)
+	}
+
 	return r.Run() // listen and serve on 0.0.0.0:8080 (for windows "localhost:8080")
 }
 
@@ -546,7 +561,6 @@ func (s *Server) listStrategies(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"strategies": []int{}})
 	}
 }
-
 
 var pageRoutePattern = regexp.MustCompile("/[a-z]+$")
 
