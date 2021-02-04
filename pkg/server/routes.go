@@ -39,7 +39,7 @@ func (s *Server) Run(ctx context.Context) error {
 		AllowOrigins:     []string{"*"},
 		AllowHeaders:     []string{"Origin", "Content-Type"},
 		ExposeHeaders:    []string{"Content-Length"},
-		AllowMethods:     []string{"GET", "POST"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
 		AllowWebSockets:  true,
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
