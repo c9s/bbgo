@@ -231,9 +231,13 @@ func (s *Server) Run(ctx context.Context) error {
 	})
 
 	r.GET("/api/sessions", func(c *gin.Context) {
-		var sessions = []*bbgo.ExchangeSession{}
+		var sessions []*bbgo.ExchangeSession
 		for _, session := range environ.Sessions() {
 			sessions = append(sessions, session)
+		}
+
+		if len(sessions) == 0 {
+			c.JSON(http.StatusOK, gin.H{"sessions": []int{}})
 		}
 
 		c.JSON(http.StatusOK, gin.H{"sessions": sessions})
@@ -552,7 +556,6 @@ func (s *Server) setupRestart(c *gin.Context) {
 
 		logrus.Info("web server shutdown completed")
 
-
 		bin := os.Args[0]
 		args := os.Args[0:]
 
@@ -563,7 +566,7 @@ func (s *Server) setupRestart(c *gin.Context) {
 
 		logrus.Infof("%s %v %+v", bin, args, envVars)
 
-		if err := syscall.Exec(bin, args, envVars) ; err != nil {
+		if err := syscall.Exec(bin, args, envVars); err != nil {
 			logrus.WithError(err).Errorf("failed to restart %s", bin)
 		}
 
@@ -773,5 +776,3 @@ func filterStrings(slice []string, needle string) (ns []string) {
 
 	return ns
 }
-
-
