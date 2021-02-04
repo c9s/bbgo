@@ -81,11 +81,11 @@ func TestLoadConfig(t *testing.T) {
 					"sessions": map[string]interface{}{
 						"max": map[string]interface{}{
 							"exchange":     "max",
-							"envVarPrefix": "MAX_",
+							"envVarPrefix": "MAX",
 						},
 						"binance": map[string]interface{}{
 							"exchange":     "binance",
-							"envVarPrefix": "BINANCE_",
+							"envVarPrefix": "BINANCE",
 						},
 					},
 					"build": map[string]interface{}{

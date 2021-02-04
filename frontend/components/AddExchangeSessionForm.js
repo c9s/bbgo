@@ -71,7 +71,7 @@ export default function AddExchangeSessionForm({onBack, onAdded}) {
             key: apiKey,
             secret: apiSecret,
             margin: isMargin,
-            envVarPrefix: exchangeType.toUpperCase() + "_",
+            envVarPrefix: exchangeType.toUpperCase(),
             isolatedMargin: isIsolatedMargin,
             isolatedMarginSymbol: isolatedMarginSymbol,
         }

@@ -2,9 +2,10 @@ package cmdutil
 
 import (
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/spf13/viper"
 
 	"github.com/c9s/bbgo/pkg/exchange/binance"
 	"github.com/c9s/bbgo/pkg/exchange/max"
@@ -35,10 +36,12 @@ func NewExchangeWithEnvVarPrefix(n types.ExchangeName, varPrefix string) (types.
 		varPrefix = n.String()
 	}
 
-	key := viper.GetString(varPrefix + "-api-key")
-	secret := viper.GetString(varPrefix + "-api-secret")
+	varPrefix = strings.ToUpper(varPrefix)
+
+	key := os.Getenv(varPrefix + "_API_KEY")
+	secret := os.Getenv(varPrefix + "_API_SECRET")
 	if len(key) == 0 || len(secret) == 0 {
-		return nil, errors.New("max: empty key or secret")
+		return nil, fmt.Errorf("%s: empty key or secret, env var prefix: %s", n, varPrefix)
 	}
 
 	return NewExchangeStandard(n, key, secret)
