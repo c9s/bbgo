@@ -45,6 +45,8 @@ type Exchange interface {
 
 	QueryAccountBalances(ctx context.Context) (BalanceMap, error)
 
+	QueryTicker(ctx context.Context, symbol string) (Ticker, error)
+
 	QueryKLines(ctx context.Context, symbol string, interval Interval, options KLineQueryOptions) ([]KLine, error)
 
 	QueryTrades(ctx context.Context, symbol string, options *TradeQueryOptions) ([]Trade, error)
@@ -68,4 +70,3 @@ type TradeQueryOptions struct {
 	Limit       int64
 	LastTradeID int64
 }
-
