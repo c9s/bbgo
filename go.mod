@@ -51,6 +51,7 @@ require (
 	github.com/ugorji/go v1.2.3 // indirect
 	github.com/valyala/fastjson v1.5.1
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
+	github.com/zserge/lorca v0.1.9
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad // indirect
 	golang.org/x/sys v0.0.0-20210119212857-b64e53b001e4 // indirect
 	golang.org/x/text v0.3.5 // indirect
