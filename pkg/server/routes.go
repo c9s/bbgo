@@ -67,115 +67,10 @@ func (s *Server) Run(ctx context.Context) error {
 	})
 
 	if s.Setup != nil {
-		r.POST("/api/setup/test-db", func(c *gin.Context) {
-			payload := struct {
-				DSN string `json:"dsn"`
-			}{}
-
-			if err := c.BindJSON(&payload); err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "missing arguments"})
-				return
-			}
-
-			dsn := payload.DSN
-			if len(dsn) == 0 {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "missing dsn argument"})
-				return
-			}
-
-			db, err := bbgo.ConnectMySQL(dsn)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-				return
-			}
-
-			if err := db.Close(); err != nil {
-				logrus.WithError(err).Error("db connection close error")
-			}
-
-			c.JSON(http.StatusOK, gin.H{"success": true})
-		})
-
-		r.POST("/api/setup/configure-db", func(c *gin.Context) {
-			payload := struct {
-				DSN string `json:"dsn"`
-			}{}
-
-			if err := c.BindJSON(&payload); err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "missing arguments"})
-				return
-			}
-
-			dsn := payload.DSN
-			if len(dsn) == 0 {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "missing dsn argument"})
-				return
-			}
-
-			if err := environ.ConfigureDatabase(ctx, dsn); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-				return
-			}
-
-			c.JSON(http.StatusOK, gin.H{"success": true})
-		})
-
-		r.POST("/api/setup/restart", func(c *gin.Context) {
-
-			c.JSON(http.StatusOK, gin.H{"success": true})
-		})
-
-		r.POST("/api/setup/save", func(c *gin.Context) {
-			if len(userConfig.Sessions) == 0 {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "session is not configured"})
-				return
-			}
-
-			envVars, err := collectSessionEnvVars(userConfig.Sessions)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-				return
-			}
-
-			if len(environ.MysqlURL) > 0 {
-				envVars["MYSQL_URL"] = environ.MysqlURL
-			}
-
-			dotenvFile := ".env.local"
-			if err := moveFileToBackup(dotenvFile); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-				return
-			}
-
-			if err := godotenv.Write(envVars, dotenvFile); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-				return
-			}
-
-			out, err := userConfig.YAML()
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-				return
-			}
-
-			fmt.Println("config file")
-			fmt.Println("=================================================")
-			fmt.Println(string(out))
-			fmt.Println("=================================================")
-
-			filename := "bbgo.yaml"
-			if err := moveFileToBackup(filename); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-				return
-			}
-
-			if err := ioutil.WriteFile(filename, out, 0666); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-				return
-			}
-
-			c.JSON(http.StatusOK, gin.H{"success": true})
-		})
+		r.POST("/api/setup/test-db", s.setupTestDB)
+		r.POST("/api/setup/configure-db", s.setupConfigureDB)
+		r.POST("/api/setup/restart", s.setupRestart)
+		r.POST("/api/setup/save", s.setupSaveConfig)
 
 		r.POST("/api/setup/strategy/single/:id/session/:session", func(c *gin.Context) {
 			sessionName := c.Param("session")
@@ -559,6 +454,63 @@ func (s *Server) Run(ctx context.Context) error {
 	return r.Run() // listen and serve on 0.0.0.0:8080 (for windows "localhost:8080")
 }
 
+func (s *Server) setupTestDB(c *gin.Context) {
+	payload := struct {
+		DSN string `json:"dsn"`
+	}{}
+
+	if err := c.BindJSON(&payload); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing arguments"})
+		return
+	}
+
+	dsn := payload.DSN
+	if len(dsn) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing dsn argument"})
+		return
+	}
+
+	db, err := bbgo.ConnectMySQL(dsn)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := db.Close(); err != nil {
+		logrus.WithError(err).Error("db connection close error")
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func (s *Server) setupConfigureDB(c *gin.Context) {
+	payload := struct {
+		DSN string `json:"dsn"`
+	}{}
+
+	if err := c.BindJSON(&payload); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing arguments"})
+		return
+	}
+
+	dsn := payload.DSN
+	if len(dsn) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing dsn argument"})
+		return
+	}
+
+	if err := s.Environ.ConfigureDatabase(c, dsn); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func (s *Server) setupRestart(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
 func (s *Server) listStrategies(c *gin.Context) {
 	var stashes []map[string]interface{}
 
@@ -579,6 +531,61 @@ func (s *Server) listStrategies(c *gin.Context) {
 	} else {
 		c.JSON(http.StatusOK, gin.H{"strategies": []int{}})
 	}
+}
+
+func (s *Server) setupSaveConfig(c *gin.Context) {
+	userConfig := s.Config
+	environ := s.Environ
+
+	if len(userConfig.Sessions) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "session is not configured"})
+		return
+	}
+
+	envVars, err := collectSessionEnvVars(userConfig.Sessions)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if len(s.Environ.MysqlURL) > 0 {
+		envVars["MYSQL_URL"] = environ.MysqlURL
+	}
+
+	dotenvFile := ".env.local"
+	if err := moveFileToBackup(dotenvFile); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := godotenv.Write(envVars, dotenvFile); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	out, err := userConfig.YAML()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	fmt.Println("config file")
+	fmt.Println("=================================================")
+	fmt.Println(string(out))
+	fmt.Println("=================================================")
+
+	filename := "bbgo.yaml"
+	if err := moveFileToBackup(filename); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := ioutil.WriteFile(filename, out, 0666); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
 var pageRoutePattern = regexp.MustCompile("/[a-z]+$")
