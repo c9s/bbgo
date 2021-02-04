@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"runtime"
 
+	"github.com/joho/godotenv"
 	"github.com/zserge/lorca"
 
 	log "github.com/sirupsen/logrus"
@@ -17,6 +18,12 @@ import (
 )
 
 func main() {
+	dotenvFile := ".env.local"
+	if err := godotenv.Load(dotenvFile); err != nil {
+		log.WithError(err).Error("error loading dotenv file")
+		return
+	}
+
 	var args []string
 	if runtime.GOOS == "linux" {
 		args = append(args, "--class=bbgo")
@@ -46,7 +53,7 @@ func main() {
 	// TODO: load the loading page html
 
 	// find a free port for binding the server
-	ln, err := net.Listen("tcp", "127.0.0.1:9999")
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		log.WithError(err).Error("can not bind listener")
 		return
