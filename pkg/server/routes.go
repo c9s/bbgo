@@ -197,23 +197,7 @@ func (s *Server) newEngine() *gin.Engine {
 	r.GET("/api/sessions/:session/open-orders", s.listSessionOpenOrders)
 	r.GET("/api/sessions/:session/account", s.getSessionAccount)
 	r.GET("/api/sessions/:session/account/balances", s.getSessionAccountBalance)
-
-	r.GET("/api/sessions/:session/symbols", func(c *gin.Context) {
-		sessionName := c.Param("session")
-		session, ok := s.Environ.Session(sessionName)
-
-		if !ok {
-			c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("session %s not found", sessionName)})
-			return
-		}
-
-		var symbols []string
-		for symbol := range session.Markets() {
-			symbols = append(symbols, symbol)
-		}
-
-		c.JSON(http.StatusOK, gin.H{"symbols": symbols})
-	})
+	r.GET("/api/sessions/:session/symbols", s.listSessionSymbols)
 
 	r.GET("/api/sessions/:session/pnl", func(c *gin.Context) {
 		c.JSON(200, gin.H{"message": "pong"})
@@ -455,6 +439,23 @@ func (s *Server) listSessions(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"session": session})
+}
+
+func (s *Server) listSessionSymbols(c *gin.Context) {
+	sessionName := c.Param("session")
+	session, ok := s.Environ.Session(sessionName)
+
+	if !ok {
+		c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("session %s not found", sessionName)})
+		return
+	}
+
+	var symbols []string
+	for symbol := range session.Markets() {
+		symbols = append(symbols, symbol)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"symbols": symbols})
 }
 
 func (s *Server) listSessionTrades(c *gin.Context) {
