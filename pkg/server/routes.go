@@ -45,6 +45,8 @@ type Server struct {
 	Setup         *Setup
 	Bind          string
 	OpenInBrowser bool
+
+	srv *http.Server
 }
 
 func (s *Server) Run(ctx context.Context) error {
@@ -413,11 +415,30 @@ func (s *Server) Run(ctx context.Context) error {
 		}
 	}
 
+	bind := DefaultBindAddress
 	if len(s.Bind) > 0 {
-		return r.Run(s.Bind)
+		bind = s.Bind
 	}
 
-	return r.Run() // listen and serve on 0.0.0.0:8080 (for windows "localhost:8080")
+	s.srv = &http.Server{
+		Addr:    bind,
+		Handler: r,
+	}
+
+	var err error
+
+	defer func() {
+		if err != nil && err != http.ErrServerClosed {
+			logrus.WithError(err).Error("unexpected http server error")
+		}
+	}()
+
+	err = s.srv.ListenAndServe()
+	if err != http.ErrServerClosed {
+		return err
+	}
+
+	return nil
 }
 
 func (s *Server) setupTestDB(c *gin.Context) {
@@ -511,6 +532,28 @@ func (s *Server) setupAddStrategy(c *gin.Context) {
 }
 
 func (s *Server) setupRestart(c *gin.Context) {
+	if s.srv == nil {
+		logrus.Error("nil srv")
+		return
+	}
+
+	go func() {
+		logrus.Info("shutting down web server...")
+
+		// The context is used to inform the server it has 5 seconds to finish
+		// the request it is currently handling
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := s.srv.Shutdown(ctx); err != nil {
+			logrus.WithError(err).Error("server forced to shutdown")
+		}
+
+		logrus.Info("web server shutdown completed")
+
+		s.Setup.Cancel()
+	}()
+
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
