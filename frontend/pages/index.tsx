@@ -44,10 +44,10 @@ export default function Home() {
 
     React.useEffect(() => {
         querySessions((sessions) => {
-            if (sessions.length == 0) {
-                push("/setup");
-            } else {
+            if (sessions && sessions.length > 0) {
                 setSessions(sessions)
+            } else {
+                push("/setup");
             }
         }).catch((err) => {
             console.error(err);
