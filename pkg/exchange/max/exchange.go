@@ -43,6 +43,10 @@ func (e *Exchange) Name() types.ExchangeName {
 	return types.ExchangeMax
 }
 
+func (e *Exchange) QueryTicker(ctx context.Context) (types.Ticker, error) {
+	return types.Ticker{}, nil
+}
+
 func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 	log.Info("querying market info...")
 
@@ -485,7 +489,7 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 	// workaround for the kline query, because MAX does not support query by end time
 	// so we need to use the given end time and the limit number to calculate the start time
 	if options.EndTime != nil && options.StartTime == nil {
-		startTime := options.EndTime.Add(- time.Duration(limit) * interval.Duration())
+		startTime := options.EndTime.Add(-time.Duration(limit) * interval.Duration())
 		options.StartTime = &startTime
 	}
 
