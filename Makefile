@@ -47,7 +47,7 @@ frontend/out/index.html: .FORCE
 
 pkged.go: frontend/out/index.html
 	pkger
-	git commit pkged.go -m "update pkged static files"
+	git commit pkged.go -m "pkger: update bundled static files"
 
 static: frontend/out/index.html pkged.go
 
