@@ -117,7 +117,7 @@ func (s *Server) setupRestart(c *gin.Context) {
 			logrus.WithError(err).Error("server forced to shutdown")
 		}
 
-		logrus.Info("web server shutdown completed")
+		logrus.Info("server shutdown completed")
 
 		bin := os.Args[0]
 		args := os.Args[0:]

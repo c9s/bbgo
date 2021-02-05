@@ -1,5 +1,5 @@
-import React, {useState} from 'react';
-import { useRouter } from 'next/router';
+import React from 'react';
+import {useRouter} from 'next/router';
 
 import {makeStyles} from '@material-ui/core/styles';
 import Typography from '@material-ui/core/Typography';
@@ -26,6 +26,7 @@ const useStyles = makeStyles((theme) => ({
         height: 300,
     },
     totalAssetsSummary: {
+        margin: theme.spacing(2),
         padding: theme.spacing(2),
     },
     control: {
@@ -34,11 +35,10 @@ const useStyles = makeStyles((theme) => ({
 }));
 
 
-
 // props are pageProps passed from _app.tsx
 export default function Home() {
     const classes = useStyles();
-    const { push } = useRouter();
+    const router = useRouter();
 
     const [sessions, setSessions] = React.useState([])
 
@@ -47,12 +47,12 @@ export default function Home() {
             if (sessions && sessions.length > 0) {
                 setSessions(sessions)
             } else {
-                push("/setup");
+                router.push("/setup");
             }
         }).catch((err) => {
             console.error(err);
         })
-    }, [])
+    }, [router])
 
     if (sessions.length == 0) {
         return (
@@ -68,29 +68,27 @@ export default function Home() {
 
     return (
         <DashboardLayout>
-            <Box m={4}>
-                <Paper className={classes.totalAssetsSummary}>
-                    <Typography variant="h4" component="h2" gutterBottom>
-                        Total Assets
-                    </Typography>
+            <Paper className={classes.totalAssetsSummary}>
+                <Typography variant="h4" component="h2" gutterBottom>
+                    Total Assets
+                </Typography>
 
-                    <Grid container spacing={3}>
-                        <Grid item xs={12} md={6}>
-                            <TotalAssetSummary/>
-                        </Grid>
-
-                        <Grid item xs={12} md={6}>
-                            <Box className={classes.totalAssetsBox}>
-                                <TotalAssetsPie/>
-                            </Box>
-                        </Grid>
+                <Grid container spacing={3}>
+                    <Grid item xs={12} md={6}>
+                        <TotalAssetSummary/>
                     </Grid>
-                </Paper>
 
-                <TradingVolumePanel/>
+                    <Grid item xs={12} md={6}>
+                        <Box className={classes.totalAssetsBox}>
+                            <TotalAssetsPie/>
+                        </Box>
+                    </Grid>
+                </Grid>
+            </Paper>
 
-                <ExchangeSessionTabPanel/>
-            </Box>
+            <TradingVolumePanel/>
+
+            <ExchangeSessionTabPanel/>
         </DashboardLayout>
     );
 }
