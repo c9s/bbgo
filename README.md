@@ -51,6 +51,11 @@ BINANCE_API_SECRET=
 MAX_API_KEY=
 MAX_API_SECRET=
 
+FTX_API_KEY=
+FTX_API_SECRET=
+# specify it if credentials are for subaccount
+FTX_SUBACCOUNT_NAME=
+
 MYSQL_URL=root@tcp(127.0.0.1:3306)/bbgo?parseTime=true
 ```
 
