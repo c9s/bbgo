@@ -78,6 +78,11 @@ func main() {
 			Context: ctx,
 			Cancel:  cancel,
 			Token:   "",
+			BeforeRestart: func() {
+				if err := ui.Close() ; err != nil {
+					log.WithError(err).Errorf("ui close error")
+				}
+			},
 		}
 		userConfig = &bbgo.Config{
 			Notifications:      nil,
