@@ -21,7 +21,7 @@ import (
 func init() {
 	PnLCmd.Flags().String("exchange", "", "target exchange")
 	PnLCmd.Flags().String("symbol", "BTCUSDT", "trading symbol")
-	PnLCmd.Flags().Int("limit", 500, "number of orders")
+	PnLCmd.Flags().Int("limit", 500, "number of trades")
 	RootCmd.AddCommand(PnLCmd)
 }
 
