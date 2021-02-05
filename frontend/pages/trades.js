@@ -2,7 +2,6 @@ import React, {useEffect, useState} from 'react';
 
 import {makeStyles} from '@material-ui/core/styles';
 import Typography from '@material-ui/core/Typography';
-import Box from '@material-ui/core/Box';
 import Paper from '@material-ui/core/Paper';
 import {queryTrades} from '../api/bbgo';
 import {DataGrid} from '@material-ui/data-grid';
@@ -22,8 +21,13 @@ const columns = [
 
 const useStyles = makeStyles((theme) => ({
     paper: {
+        margin: theme.spacing(2),
         padding: theme.spacing(2),
     },
+    dataGridContainer: {
+        display: 'flex',
+        height: 'calc(100vh - 64px - 120px)',
+    }
 }));
 
 export default function Trades() {
@@ -42,18 +46,21 @@ export default function Trades() {
 
     return (
         <DashboardLayout>
-                <Box m={4}>
-                    <Paper className={classes.paper}>
-                        <Typography variant="h4" component="h2" gutterBottom>
-                            Trades
-                        </Typography>
-                    </Paper>
-                    <DataGrid
-                        rows={trades}
-                        columns={columns}
-                        pageSize={50}
-                        autoHeight={true}/>
-                </Box>
+            <Paper className={classes.paper}>
+                <Typography variant="h4" gutterBottom>
+                    Trades
+                </Typography>
+                <div className={classes.dataGridContainer}>
+                    <div style={{ flexGrow: 1 }}>
+                        <DataGrid
+                            rows={trades}
+                            columns={columns}
+                            showToolbar={true}
+                            autoPageSize={true}
+                        />
+                    </div>
+                </div>
+            </Paper>
         </DashboardLayout>
     );
 }
