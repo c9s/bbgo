@@ -35,7 +35,7 @@ func main() {
 	args = append(args, "--class=bbgo")
 
 	// here allocate a chrome window with a blank page.
-	ui, err := lorca.New("", "", 800, 640, args...)
+	ui, err := lorca.New("", "", 1024, 780, args...)
 	if err != nil {
 		log.WithError(err).Error("failed to initialize the window")
 		return

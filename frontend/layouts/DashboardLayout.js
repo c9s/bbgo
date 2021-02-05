@@ -42,7 +42,7 @@ export default function DashboardLayout({children}) {
 
             <main className={classes.content}>
                 <div className={classes.appBarSpacer}/>
-                <Container>
+                <Container maxWidth={false} disableGutters={true}>
                     {children}
                 </Container>
             </main>
