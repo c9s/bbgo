@@ -36,7 +36,7 @@ func (c *AverageCostCalculator) Calculate(symbol string, trades []types.Trade, c
 
 	for _, trade := range trades {
 		if trade.Symbol == symbol {
-			if trade.IsBuyer {
+			if trade.Side == types.SideTypeBuy {
 				bidVolume += trade.Quantity
 				bidAmount += trade.Price * trade.Quantity
 			}
@@ -75,7 +75,7 @@ func (c *AverageCostCalculator) Calculate(symbol string, trades []types.Trade, c
 			continue
 		}
 
-		if t.IsBuyer {
+		if t.Side == types.SideTypeBuy {
 			continue
 		}
 
