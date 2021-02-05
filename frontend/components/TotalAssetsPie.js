@@ -40,7 +40,7 @@ export default function TotalAssetsPie() {
 
     return <ResponsivePie
         data={reduceAssetsBy(assets, "inUSD", 2)}
-        margin={{top: 40, right: 80, bottom: 80, left: 80}}
+        margin={{top: 40, right: 80, bottom: 80, left: 0}}
         padding={0.2}
         innerRadius={0.8}
         padAngle={1.0}
