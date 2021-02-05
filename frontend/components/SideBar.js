@@ -11,20 +11,12 @@ import TrendingUpIcon from "@material-ui/icons/TrendingUp";
 import React from "react";
 import {makeStyles} from "@material-ui/core/styles";
 
-const drawerWidth = 260;
+const drawerWidth = 240;
 
 const useStyles = makeStyles((theme) => ({
     root: {
-        // flexGrow: 1,
-        display: 'flex',
-    },
-    content: {
         flexGrow: 1,
-        height: '100vh',
-        overflow: 'auto',
-    },
-    fixedHeight: {
-        height: 240,
+        display: 'flex',
     },
     toolbar: {
         paddingRight: 24, // keep right padding when drawer closed
@@ -38,13 +30,19 @@ const useStyles = makeStyles((theme) => ({
     },
     appBarSpacer: theme.mixins.toolbar,
     drawerPaper: {
+        [theme.breakpoints.up('sm')]: {
+            width: drawerWidth,
+            flexShrink: 0,
+        },
         position: 'relative',
         whiteSpace: 'nowrap',
-        width: drawerWidth,
         transition: theme.transitions.create('width', {
             easing: theme.transitions.easing.sharp,
             duration: theme.transitions.duration.enteringScreen,
         }),
+    },
+    drawer: {
+        width: drawerWidth,
     },
 }));
 
@@ -54,7 +52,11 @@ export default function SideBar() {
 
     return <Drawer
         variant="permanent"
-        className={classes.drawerPaper}
+        className={classes.drawer}
+        PaperProps={{
+            className: classes.drawerPaper,
+        }}
+        anchor={"left"}
         open={true}>
 
         <div className={classes.appBarSpacer}/>
