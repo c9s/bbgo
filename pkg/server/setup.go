@@ -119,6 +119,10 @@ func (s *Server) setupRestart(c *gin.Context) {
 
 		logrus.Info("server shutdown completed")
 
+		if s.Setup.BeforeRestart != nil {
+			s.Setup.BeforeRestart()
+		}
+
 		bin := os.Args[0]
 		args := os.Args[0:]
 

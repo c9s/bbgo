@@ -32,6 +32,8 @@ type Setup struct {
 
 	// Token is used for setup api authentication
 	Token string
+
+	BeforeRestart func()
 }
 
 type Server struct {
