@@ -58,7 +58,7 @@ export default function Home() {
         return (
             <DashboardLayout>
                 <Box m={4}>
-                    <Typography variant="h4" component="h2" gutterBottom>
+                    <Typography variant="h4" gutterBottom>
                         Loading
                     </Typography>
                 </Box>
@@ -69,7 +69,7 @@ export default function Home() {
     return (
         <DashboardLayout>
             <Paper className={classes.totalAssetsSummary}>
-                <Typography variant="h4" component="h2" gutterBottom>
+                <Typography variant="h4" gutterBottom>
                     Total Assets
                 </Typography>
 
