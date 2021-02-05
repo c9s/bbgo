@@ -163,13 +163,13 @@ func (s *TradeService) QueryForTradingFeeCurrency(ex types.ExchangeName, symbol 
 	return s.scanRows(rows)
 }
 
-// Only return 500 items.
 type QueryTradesOptions struct {
 	Exchange types.ExchangeName
 	Symbol   string
 	LastGID  int64
 	// ASC or DESC
 	Ordering string
+	Limit	 int
 }
 
 func (s *TradeService) Query(options QueryTradesOptions) ([]types.Trade, error) {
@@ -225,7 +225,7 @@ func queryTradesSQL(options QueryTradesOptions) string {
 
 	sql += ` ORDER BY gid ` + ordering
 
-	sql += ` LIMIT ` + strconv.Itoa(500)
+	sql += ` LIMIT ` + strconv.Itoa(options.Limit)
 	return sql
 }
 

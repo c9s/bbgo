@@ -21,6 +21,7 @@ import (
 func init() {
 	PnLCmd.Flags().String("exchange", "", "target exchange")
 	PnLCmd.Flags().String("symbol", "BTCUSDT", "trading symbol")
+	PnLCmd.Flags().Int("limit", 500, "number of trades")
 	RootCmd.AddCommand(PnLCmd)
 }
 
@@ -46,6 +47,11 @@ var PnLCmd = &cobra.Command{
 			return err
 		}
 
+		limit, err := cmd.Flags().GetInt("limit")
+		if err != nil {
+			return err
+		}
+
 		exchange, err := cmdutil.NewExchange(exchangeName)
 		if err != nil {
 			return err
@@ -67,6 +73,7 @@ var PnLCmd = &cobra.Command{
 			trades, err = tradeService.Query(service.QueryTradesOptions{
 				Exchange: exchange.Name(),
 				Symbol:   symbol,
+				Limit:	  limit,
 			})
 		}
 
