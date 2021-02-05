@@ -6,6 +6,7 @@ go:
 services:
 - redis-server
 before_script:
+- go get github.com/c9s/rockhopper
 - go mod download
 script:
 - go test -v ./pkg/...
