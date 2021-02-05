@@ -67,9 +67,9 @@ func runSetup(baseCtx context.Context, userConfig *bbgo.Config, enableApiServer 
 	if enableApiServer {
 		go func() {
 			s := &server.Server{
-				Config:  userConfig,
-				Environ: environ,
-				Trader:  trader,
+				Config:        userConfig,
+				Environ:       environ,
+				Trader:        trader,
 				OpenInBrowser: true,
 				Setup: &server.Setup{
 					Context: ctx,
@@ -95,9 +95,8 @@ func runSetup(baseCtx context.Context, userConfig *bbgo.Config, enableApiServer 
 	return nil
 }
 
-
 func BootstrapEnvironment(ctx context.Context, environ *bbgo.Environment, userConfig *bbgo.Config) error {
-	if dsn, ok := os.LookupEnv("MYSQL_URL") ; ok {
+	if dsn, ok := os.LookupEnv("MYSQL_URL"); ok {
 		if err := environ.ConfigureDatabase(ctx, dsn); err != nil {
 			return err
 		}
@@ -267,12 +266,12 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config, enableApiServer
 	defer cancelTrading()
 
 	environ := bbgo.NewEnvironment()
-	if err := BootstrapEnvironment(ctx, environ, userConfig) ; err != nil {
+	if err := BootstrapEnvironment(ctx, environ, userConfig); err != nil {
 		return err
 	}
 
 	trader := bbgo.NewTrader(environ)
-	if err := ConfigureTrader(trader, userConfig) ; err != nil {
+	if err := ConfigureTrader(trader, userConfig); err != nil {
 		return err
 	}
 
@@ -320,7 +319,7 @@ func run(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		if _, err := os.Stat(dotenvFile) ; err == nil {
+		if _, err := os.Stat(dotenvFile); err == nil {
 			if err := godotenv.Load(dotenvFile); err != nil {
 				return errors.Wrap(err, "error loading dotenv file")
 			}
@@ -347,20 +346,19 @@ func run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	var userConfig *bbgo.Config
+	var userConfig = &bbgo.Config{}
 
 	if setup {
 		log.Infof("running in setup mode, skip reading config file")
 		enableApiServer = true
-		userConfig = &bbgo.Config{
-			Notifications:      nil,
-			Persistence:        nil,
-			Sessions:           nil,
-			ExchangeStrategies: nil,
-		}
 	} else {
+		// if it's not setup, then the config file option is required.
 		if len(configFile) == 0 {
 			return errors.New("--config option is required")
+		}
+
+		if _, err := os.Stat(configFile); err != nil {
+			return err
 		}
 
 		userConfig, err = bbgo.Load(configFile, false)
