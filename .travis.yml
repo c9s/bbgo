@@ -9,4 +9,5 @@ before_script:
 - go get github.com/c9s/rockhopper
 - go mod download
 script:
+- bash scripts/test-sqlite3-migrations.sh
 - go test -v ./pkg/...
