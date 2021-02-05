@@ -13,8 +13,7 @@ const useStyles = makeStyles((theme) => ({
         height: 400,
     },
     paper: {
-        marginTop: theme.spacing(3),
-        marginBottom: theme.spacing(3),
+        margin: theme.spacing(2),
         padding: theme.spacing(2),
     }
 }));
