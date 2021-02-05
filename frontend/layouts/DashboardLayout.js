@@ -10,7 +10,7 @@ import SideBar from "../components/SideBar";
 
 const useStyles = makeStyles((theme) => ({
     root: {
-        // flexGrow: 1,
+        flexGrow: 1,
         display: 'flex',
     },
     content: {
@@ -22,6 +22,7 @@ const useStyles = makeStyles((theme) => ({
         zIndex: theme.zIndex.drawer + 1,
     },
     appBarSpacer: theme.mixins.toolbar,
+    container: { }
 }));
 
 export default function DashboardLayout({children}) {
@@ -42,7 +43,7 @@ export default function DashboardLayout({children}) {
 
             <main className={classes.content}>
                 <div className={classes.appBarSpacer}/>
-                <Container maxWidth={false} disableGutters={true}>
+                <Container className={classes.container} maxWidth={false} disableGutters={true}>
                     {children}
                 </Container>
             </main>
