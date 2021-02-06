@@ -45,7 +45,7 @@ type Exchange interface {
 
 	QueryAccountBalances(ctx context.Context) (BalanceMap, error)
 
-	QueryTicker(ctx context.Context, symbol string) (Ticker, error)
+	QueryTickers(ctx context.Context, symbol ...string) (map[string]Ticker, error)
 
 	QueryKLines(ctx context.Context, symbol string, interval Interval, options KLineQueryOptions) ([]KLine, error)
 
