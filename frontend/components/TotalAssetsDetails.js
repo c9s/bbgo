@@ -28,6 +28,8 @@ const logoCurrencies = {
     "DOT": true,
     "SXP": true,
     "DAI": true,
+    "MAX": true,
+    "TWD": true,
 }
 
 export default function TotalAssetsDetails({assets}) {
