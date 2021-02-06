@@ -37,7 +37,7 @@ type Trade struct {
 }
 
 func (t Trade) IsBuyer() bool {
-	return t.Side == "bid"
+	return t.Side == "bid" || t.Side == "buy"
 }
 
 func (t Trade) IsMaker() bool {
