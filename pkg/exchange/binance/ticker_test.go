@@ -2,7 +2,6 @@ package binance
 
 import (
 	"context"
-	"fmt"
 	"testing"
 )
 
@@ -28,7 +27,6 @@ func TestSomeSymbols(t *testing.T) {
 	}
 
 	if len(got) != 2 {
-		fmt.Println(got)
 		t.Errorf("Binance Exchange: Attempting to get two symbols, but number of tickers do not match")
 
 	}
@@ -42,7 +40,6 @@ func TestSingleSymbol(t *testing.T) {
 	}
 
 	if len(got) != 1 {
-		fmt.Println(got)
 		t.Errorf("Binance Exchange: Attempting to get one symbol, but number of tickers do not match")
 
 	}

@@ -208,6 +208,11 @@ func (e Exchange) QueryTrades(ctx context.Context, symbol string, options *types
 	return nil, nil
 }
 
+func (e Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[string]types.Ticker, error) {
+	// Not using Tickers in back test (yet)
+	return nil, nil
+}
+
 func (e Exchange) Name() types.ExchangeName {
 	return e.publicExchange.Name()
 }
