@@ -36,3 +36,7 @@ func (r *Response) String() string {
 func (r *Response) DecodeJSON(o interface{}) error {
 	return json.Unmarshal(r.Body, o)
 }
+
+func (r *Response) IsError() bool {
+	return r.StatusCode >= 400
+}
