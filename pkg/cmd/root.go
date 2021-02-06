@@ -6,7 +6,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/joho/godotenv"
 	"github.com/lestrrat-go/file-rotatelogs"
+	"github.com/pkg/errors"
 	"github.com/rifflock/lfshook"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -23,6 +25,28 @@ var RootCmd = &cobra.Command{
 	// SilenceUsage is an option to silence usage when an error occurs.
 	SilenceUsage: true,
 
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		disableDotEnv, err := cmd.Flags().GetBool("no-dotenv")
+		if err != nil {
+			return err
+		}
+
+		if !disableDotEnv {
+			dotenvFile, err := cmd.Flags().GetString("dotenv")
+			if err != nil {
+				return err
+			}
+
+			if _, err := os.Stat(dotenvFile); err == nil {
+				if err := godotenv.Load(dotenvFile); err != nil {
+					return errors.Wrap(err, "error loading dotenv file")
+				}
+			}
+		}
+
+		return nil
+	},
+
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return nil
 	},
@@ -31,6 +55,9 @@ var RootCmd = &cobra.Command{
 func init() {
 	RootCmd.PersistentFlags().Bool("debug", false, "debug flag")
 	RootCmd.PersistentFlags().String("config", "bbgo.yaml", "config file")
+
+	RootCmd.PersistentFlags().Bool("no-dotenv", false, "disable built-in dotenv")
+	RootCmd.PersistentFlags().String("dotenv", ".env.local", "the dotenv file you want to load")
 
 	// A flag can be 'persistent' meaning that this flag will be available to
 	// the command it's assigned to as well as every command under that command.
