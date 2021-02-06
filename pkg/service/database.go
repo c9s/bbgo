@@ -48,7 +48,7 @@ func (s *DatabaseService) Upgrade(ctx context.Context) error {
 	}
 
 	loader := &rockhopper.GoMigrationLoader{}
-	migrations, err := loader.Load()
+	migrations, err := loader.LoadByPackageSuffix(s.Driver)
 	if err != nil {
 		return err
 	}
@@ -74,6 +74,7 @@ func ReformatMysqlDSN(dsn string) (string, error) {
 		return "", err
 	}
 
+	// we need timestamp and datetime fields to be parsed into time.Time struct
 	config.ParseTime = true
 	dsn = config.FormatDSN()
 	return dsn, nil

@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -63,12 +62,8 @@ var CancelCmd = &cobra.Command{
 		}
 
 		environ := bbgo.NewEnvironment()
-
-		if dsn, ok := os.LookupEnv("MYSQL_URL"); ok {
-			err := environ.ConfigureDatabase(ctx, "mysql", dsn)
-			if err != nil {
-				return err
-			}
+		if err := configureDB(ctx, environ) ; err != nil {
+			return err
 		}
 
 		if err := environ.AddExchangesFromConfig(userConfig); err != nil {

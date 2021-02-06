@@ -59,7 +59,8 @@ func (s *Server) setupConfigureDB(c *gin.Context) {
 		return
 	}
 
-	if err := s.Environ.ConfigureDatabase(c, "mysql", dsn); err != nil {
+	driver := "mysql"
+	if err := s.Environ.ConfigureDatabase(c, driver, dsn); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
