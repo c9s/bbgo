@@ -74,7 +74,7 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[stri
 		}
 
 		for k, v := range tickers {
-			if _, ok := m[strings.ToUpper(k)]; !ok {
+			if _, ok := m[strings.ToUpper(k)]; len(symbol) != 0 && !ok {
 				continue
 			}
 			ret[strings.ToUpper(k)] = types.Ticker{
