@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/codingconcepts/env"
-	"github.com/jmoiron/sqlx"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
@@ -48,6 +47,7 @@ type Environment struct {
 
 	PersistenceServiceFacade *PersistenceServiceFacade
 
+	DatabaseService *service.DatabaseService
 	OrderService *service.OrderService
 	TradeService *service.TradeService
 	TradeSync    *service.SyncService
@@ -56,8 +56,6 @@ type Environment struct {
 	startTime     time.Time
 	tradeScanTime time.Time
 	sessions      map[string]*ExchangeSession
-
-	MysqlURL string
 }
 
 func NewEnvironment() *Environment {
@@ -78,23 +76,19 @@ func (environ *Environment) Sessions() map[string]*ExchangeSession {
 	return environ.sessions
 }
 
-func (environ *Environment) ConfigureDatabase(ctx context.Context, dsn string) error {
-	db, err := ConnectMySQL(dsn)
+func (environ *Environment) ConfigureDatabase(ctx context.Context, driver string, dsn string) error {
+	environ.DatabaseService = service.NewDatabaseService(driver, dsn)
+	err := environ.DatabaseService.Connect()
 	if err != nil {
 		return err
 	}
 
-	environ.MysqlURL = dsn
-
-	if err := upgradeDB(ctx, "mysql", db.DB); err != nil {
+	if err := environ.DatabaseService.Upgrade(ctx) ; err != nil {
 		return err
 	}
 
-	environ.SetDB(db)
-	return nil
-}
-
-func (environ *Environment) SetDB(db *sqlx.DB) *Environment {
+	// get the db connection pool object to create other services
+	db := environ.DatabaseService.DB
 	environ.OrderService = &service.OrderService{DB: db}
 	environ.TradeService = &service.TradeService{DB: db}
 	environ.TradeSync = &service.SyncService{
@@ -102,7 +96,7 @@ func (environ *Environment) SetDB(db *sqlx.DB) *Environment {
 		OrderService: environ.OrderService,
 	}
 
-	return environ
+	return nil
 }
 
 // AddExchangeSession adds the existing exchange session or pre-created exchange session

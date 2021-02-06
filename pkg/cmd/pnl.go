@@ -8,7 +8,6 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"github.com/c9s/bbgo/pkg/accounting"
 	"github.com/c9s/bbgo/pkg/accounting/pnl"
@@ -57,20 +56,19 @@ var PnLCmd = &cobra.Command{
 			return err
 		}
 
-		db, err := bbgo.ConnectMySQL(viper.GetString("mysql-url"))
-		if err != nil {
+
+		environ := bbgo.NewEnvironment()
+		if err := configureDB(ctx, environ) ; err != nil {
 			return err
 		}
-
-		tradeService := &service.TradeService{DB: db}
 
 		var trades []types.Trade
 		tradingFeeCurrency := exchange.PlatformFeeCurrency()
 		if strings.HasPrefix(symbol, tradingFeeCurrency) {
 			log.Infof("loading all trading fee currency related trades: %s", symbol)
-			trades, err = tradeService.QueryForTradingFeeCurrency(exchange.Name(), symbol, tradingFeeCurrency)
+			trades, err = environ.TradeService.QueryForTradingFeeCurrency(exchange.Name(), symbol, tradingFeeCurrency)
 		} else {
-			trades, err = tradeService.Query(service.QueryTradesOptions{
+			trades, err = environ.TradeService.Query(service.QueryTradesOptions{
 				Exchange: exchange.Name(),
 				Symbol:   symbol,
 				Limit:	  limit,
