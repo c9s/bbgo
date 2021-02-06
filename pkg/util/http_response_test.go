@@ -26,3 +26,19 @@ func TestResponse_DecodeJSON(t *testing.T) {
 	assert.NoError(t, resp.DecodeJSON(&result))
 	assert.Equal(t, "Test Name", result.Name)
 }
+
+func TestResponse_IsError(t *testing.T) {
+	resp := &Response{Response: &http.Response{}}
+	cases := map[int]bool{
+		100: false,
+		200: false,
+		300: false,
+		400: true,
+		500: true,
+	}
+
+	for code, isErr := range cases {
+		resp.StatusCode = code
+		assert.Equal(t, isErr, resp.IsError())
+	}
+}
