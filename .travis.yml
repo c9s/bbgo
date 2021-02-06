@@ -3,8 +3,10 @@ language: go
 go:
 - 1.14
 - 1.15
+
 services:
 - redis-server
+- mysql
 
 install:
 - go get github.com/c9s/rockhopper/cmd/rockhopper
