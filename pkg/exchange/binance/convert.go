@@ -8,6 +8,7 @@ import (
 	"github.com/adshao/go-binance/v2"
 	"github.com/pkg/errors"
 
+	"github.com/c9s/bbgo/pkg/datatype"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 )
@@ -115,7 +116,7 @@ func ToGlobalTrade(t binance.TradeV3, isMargin bool) (*types.Trade, error) {
 		Fee:           fee,
 		FeeCurrency:   t.CommissionAsset,
 		QuoteQuantity: quoteQuantity,
-		Time:          millisecondTime(t.Time),
+		Time:          datatype.Time(millisecondTime(t.Time)),
 		IsMargin:      isMargin,
 		IsIsolated:    t.IsIsolated,
 	}, nil
