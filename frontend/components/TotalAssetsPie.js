@@ -3,6 +3,9 @@ import React, {useEffect, useState} from 'react';
 import {ResponsivePie} from '@nivo/pie';
 import {queryAssets} from '../api/bbgo';
 import {currencyColor} from '../src/utils';
+import CardContent from "@material-ui/core/CardContent";
+import Card from "@material-ui/core/Card";
+import {makeStyles} from "@material-ui/core/styles";
 
 function reduceAssetsBy(assets, field, minimum) {
     let as = []
@@ -29,55 +32,64 @@ function reduceAssetsBy(assets, field, minimum) {
     return as
 }
 
-export default function TotalAssetsPie() {
-    const [assets, setAssets] = useState({})
+const useStyles = makeStyles((theme) => ({
+    root: {
+        margin: theme.spacing(1),
+    },
+    cardContent: {
+        height: 350,
+    }
+}));
 
-    useEffect(() => {
-        queryAssets((assets) => {
-            setAssets(assets)
-        })
-    }, [])
-
-    return <ResponsivePie
-        data={reduceAssetsBy(assets, "inUSD", 2)}
-        margin={{top: 40, right: 80, bottom: 80, left: 0}}
-        padding={0.2}
-        innerRadius={0.8}
-        padAngle={1.0}
-        valueFormat=" >-$f"
-        colors={{datum: 'data.color'}}
-        // colors={{scheme: 'nivo'}}
-        cornerRadius={0.1}
-        borderWidth={1}
-        borderColor={{from: 'color', modifiers: [['darker', 0.2]]}}
-        radialLabelsSkipAngle={10}
-        radialLabelsTextColor="#333333"
-        radialLabelsLinkColor={{from: 'color'}}
-        sliceLabelsSkipAngle={30}
-        sliceLabelsTextColor="#fff"
-        legends={[
-            {
-                anchor: 'right',
-                direction: 'column',
-                justify: false,
-                translateX: 30,
-                translateY: 0,
-                itemsSpacing: 5,
-                itemWidth: 120,
-                itemHeight: 24,
-                itemTextColor: '#999',
-                itemOpacity: 1,
-                symbolSize: 18,
-                symbolShape: 'circle',
-                effects: [
-                    {
-                        on: 'hover',
-                        style: {
-                            itemTextColor: '#000'
+export default function TotalAssetsPie({ assets }) {
+    const classes = useStyles();
+    return (
+        <Card className={classes.root} variant="outlined">
+            <CardContent className={classes.cardContent}>
+                <ResponsivePie
+                    data={reduceAssetsBy(assets, "inUSD", 2)}
+                    margin={{top: 20, right: 80, bottom: 10, left: 0}}
+                    padding={0.1}
+                    innerRadius={0.8}
+                    padAngle={1.0}
+                    valueFormat=" >-$f"
+                    colors={{datum: 'data.color'}}
+                    // colors={{scheme: 'nivo'}}
+                    cornerRadius={0.1}
+                    borderWidth={1}
+                    borderColor={{from: 'color', modifiers: [['darker', 0.2]]}}
+                    radialLabelsSkipAngle={10}
+                    radialLabelsTextColor="#333333"
+                    radialLabelsLinkColor={{from: 'color'}}
+                    sliceLabelsSkipAngle={30}
+                    sliceLabelsTextColor="#fff"
+                    legends={[
+                        {
+                            anchor: 'right',
+                            direction: 'column',
+                            justify: false,
+                            translateX: 70,
+                            translateY: 0,
+                            itemsSpacing: 5,
+                            itemWidth: 80,
+                            itemHeight: 24,
+                            itemTextColor: '#999',
+                            itemOpacity: 1,
+                            symbolSize: 18,
+                            symbolShape: 'circle',
+                            effects: [
+                                {
+                                    on: 'hover',
+                                    style: {
+                                        itemTextColor: '#000'
+                                    }
+                                }
+                            ]
                         }
-                    }
-                ]
-            }
-        ]}
-    />
+                    ]}
+                />
+            </CardContent>
+        </Card>
+    );
+
 }
