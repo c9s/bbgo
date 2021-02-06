@@ -7,6 +7,7 @@ import (
 
 	"github.com/gorilla/websocket"
 
+	"github.com/c9s/bbgo/pkg/datatype"
 	max "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -198,7 +199,7 @@ func convertWebSocketTrade(t max.TradeUpdate) (*types.Trade, error) {
 		Fee:           fee,
 		FeeCurrency:   toGlobalCurrency(t.FeeCurrency),
 		QuoteQuantity: quoteQuantity,
-		Time:          mts,
+		Time:          datatype.Time(mts),
 	}, nil
 }
 
