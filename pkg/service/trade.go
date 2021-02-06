@@ -44,7 +44,15 @@ func (s *TradeService) QueryTradingVolume(startTime time.Time, options TradingVo
 		"start_time": startTime,
 	}
 
-	sql := queryTradingVolumeSQL(options)
+	sql := ""
+	driverName := s.DB.DriverName()
+	if driverName == "mysql" {
+		sql = generateMysqlTradingVolumeQuerySQL(options)
+	} else {
+		sql = generateSqliteTradingVolumeSQL(options)
+	}
+
+	log.Info(sql)
 
 	rows, err := s.DB.NamedQuery(sql, args)
 	if err != nil {
@@ -72,14 +80,65 @@ func (s *TradeService) QueryTradingVolume(startTime time.Time, options TradingVo
 	return records, rows.Err()
 }
 
-func queryTradingVolumeSQL(options TradingVolumeQueryOptions) string {
+
+func generateSqliteTradingVolumeSQL(options TradingVolumeQueryOptions) string {
 	var sel []string
 	var groupBys []string
 	var orderBys []string
 	where := []string{"traded_at > :start_time"}
-	switch options.GroupByPeriod {
 
+	switch options.GroupByPeriod {
 	case "month":
+		sel = append(sel, "strftime('%Y',traded_at) AS year", "strftime('%m',traded_at) AS month")
+		groupBys = append([]string{"month", "year"}, groupBys...)
+		orderBys = append(orderBys, "year ASC", "month ASC")
+
+	case "year":
+		sel = append(sel, "strftime('%Y',traded_at) AS year")
+		groupBys = append([]string{"year"}, groupBys...)
+		orderBys = append(orderBys, "year ASC")
+
+	case "day":
+		fallthrough
+
+	default:
+		sel = append(sel, "strftime('%Y',traded_at) AS year", "strftime('%m',traded_at) AS month", "strftime('%d',traded_at) AS day")
+		groupBys = append([]string{"day", "month", "year"}, groupBys...)
+		orderBys = append(orderBys, "year ASC", "month ASC", "day ASC")
+	}
+
+	switch options.SegmentBy {
+	case "symbol":
+		sel = append(sel, "symbol")
+		groupBys = append([]string{"symbol"}, groupBys...)
+		orderBys = append(orderBys, "symbol")
+	case "exchange":
+		sel = append(sel, "exchange")
+		groupBys = append([]string{"exchange"}, groupBys...)
+		orderBys = append(orderBys, "exchange")
+	}
+
+	sel = append(sel, "SUM(quantity * price) AS quote_volume")
+	sql := `SELECT ` + strings.Join(sel, ", ") + ` FROM trades` +
+		` WHERE ` + strings.Join(where, " AND ") +
+		` GROUP BY ` + strings.Join(groupBys, ", ") +
+		` ORDER BY ` + strings.Join(orderBys, ", ")
+
+	return sql
+}
+
+
+func generateMysqlTradingVolumeQuerySQL(options TradingVolumeQueryOptions) string {
+	var sel []string
+	var groupBys []string
+	var orderBys []string
+	where := []string{"traded_at > :start_time"}
+
+	switch options.GroupByPeriod {
+	case "month":
+
+
+
 		sel = append(sel, "YEAR(traded_at) AS year", "MONTH(traded_at) AS month")
 		groupBys = append([]string{"MONTH(traded_at)", "YEAR(traded_at)"}, groupBys...)
 		orderBys = append(orderBys, "year ASC", "month ASC")
@@ -115,7 +174,6 @@ func queryTradingVolumeSQL(options TradingVolumeQueryOptions) string {
 		` GROUP BY ` + strings.Join(groupBys, ", ") +
 		` ORDER BY ` + strings.Join(orderBys, ", ")
 
-	log.Info(sql)
 	return sql
 }
 
