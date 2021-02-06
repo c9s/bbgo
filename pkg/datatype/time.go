@@ -10,6 +10,14 @@ type Time time.Time
 
 var layout = "2006-01-02 15:04:05.999Z07:00"
 
+func (t *Time) UnmarshalJSON(data []byte) error {
+	return (*time.Time)(t).UnmarshalJSON(data)
+}
+
+func (t Time) MarshalJSON() ([]byte, error) {
+	return time.Time(t).MarshalJSON()
+}
+
 func (t Time) String() string {
 	return time.Time(t).String()
 }
