@@ -11,15 +11,15 @@ func Test_queryTradingVolumeSQL(t *testing.T) {
 		o := TradingVolumeQueryOptions{
 			GroupByPeriod: "month",
 		}
-		assert.Equal(t, "SELECT YEAR(traded_at) AS year, MONTH(traded_at) AS month, SUM(quantity * price) AS quote_volume FROM trades WHERE traded_at > :start_time GROUP BY MONTH(traded_at), YEAR(traded_at) ORDER BY year ASC, month ASC", queryTradingVolumeSQL(o))
+		assert.Equal(t, "SELECT YEAR(traded_at) AS year, MONTH(traded_at) AS month, SUM(quantity * price) AS quote_volume FROM trades WHERE traded_at > :start_time GROUP BY MONTH(traded_at), YEAR(traded_at) ORDER BY year ASC, month ASC", generateMysqlTradingVolumeQuerySQL(o))
 
 		o.GroupByPeriod = "year"
-		assert.Equal(t, "SELECT YEAR(traded_at) AS year, SUM(quantity * price) AS quote_volume FROM trades WHERE traded_at > :start_time GROUP BY YEAR(traded_at) ORDER BY year ASC", queryTradingVolumeSQL(o))
+		assert.Equal(t, "SELECT YEAR(traded_at) AS year, SUM(quantity * price) AS quote_volume FROM trades WHERE traded_at > :start_time GROUP BY YEAR(traded_at) ORDER BY year ASC", generateMysqlTradingVolumeQuerySQL(o))
 
 		expectedDefaultSQL := "SELECT YEAR(traded_at) AS year, MONTH(traded_at) AS month, DAY(traded_at) AS day, SUM(quantity * price) AS quote_volume FROM trades WHERE traded_at > :start_time GROUP BY DAY(traded_at), MONTH(traded_at), YEAR(traded_at) ORDER BY year ASC, month ASC, day ASC"
 		for _, s := range []string{"", "day"} {
 			o.GroupByPeriod = s
-			assert.Equal(t, expectedDefaultSQL, queryTradingVolumeSQL(o))
+			assert.Equal(t, expectedDefaultSQL, generateMysqlTradingVolumeQuerySQL(o))
 		}
 	})
 

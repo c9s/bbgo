@@ -56,35 +56,49 @@ MYSQL_URL=root@tcp(127.0.0.1:3306)/bbgo?parseTime=true
 
 Make sure you have [dotenv](https://github.com/bkeepers/dotenv)
 
+To sync your own trade data:
+
+```
+bbgo sync --config config/grid.yaml --session max
+bbgo sync --config config/grid.yaml --session binance
+```
+
+If you want to switch to other dotenv file, you can add an `--dotenv` option:
+
+```
+bbgo sync --dotenv .env.dev --config config/grid.yaml --session binance
+```
+
+
 To sync remote exchange klines data for backtesting:
 
 ```sh
-dotenv -f .env.local -- bbgo backtest --exchange binance --config config/grid.yaml -v --sync --sync-only --sync-from 2020-01-01
+bbgo backtest --exchange binance --config config/grid.yaml -v --sync --sync-only --sync-from 2020-01-01
 ```
 
 To run backtest:
 
 ```sh
-dotenv -f .env.local -- bbgo backtest --exchange binance --config config/bollgrid.yaml --base-asset-baseline
+bbgo backtest --exchange binance --config config/bollgrid.yaml --base-asset-baseline
 ```
 
 
 To query transfer history:
 
 ```sh
-dotenv -f .env.local -- bbgo transfer-history --exchange max --asset USDT --since "2019-01-01"
+bbgo transfer-history --exchange max --asset USDT --since "2019-01-01"
 ```
 
 To calculate pnl:
 
 ```sh
-dotenv -f .env.local -- bbgo pnl --exchange binance --asset BTC --since "2019-01-01"
+bbgo pnl --exchange binance --asset BTC --since "2019-01-01"
 ```
 
 To run strategy:
 
 ```sh
-dotenv -f .env.local -- bbgo run --config config/buyandhold.yaml
+bbgo run --config config/buyandhold.yaml
 ```
 
 ## Built-in Strategies
@@ -105,7 +119,7 @@ modify the config file to make the configuration suitable for you, for example i
 vim config/buyandhold.yaml
 
 # run bbgo with the config
-dotenv -f .env.local -- bbgo run --config config/buyandhold.yaml
+bbgo run --config config/buyandhold.yaml
 ```
 
 ## Write your own strategy

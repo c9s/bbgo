@@ -13,7 +13,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/joho/godotenv"
 	"github.com/pkg/errors"
 	"github.com/pquerna/otp"
 	log "github.com/sirupsen/logrus"
@@ -33,16 +32,11 @@ import (
 
 func init() {
 	RunCmd.Flags().Bool("no-compile", false, "do not compile wrapper binary")
-
 	RunCmd.Flags().String("totp-key-url", "", "time-based one-time password key URL, if defined, it will be used for restoring the otp key")
 	RunCmd.Flags().String("totp-issuer", "", "")
 	RunCmd.Flags().String("totp-account-name", "", "")
 	RunCmd.Flags().Bool("enable-web-server", false, "enable web server")
 	RunCmd.Flags().Bool("setup", false, "use setup mode")
-
-	RunCmd.Flags().Bool("no-dotenv", false, "disable built-in dotenv")
-	RunCmd.Flags().String("dotenv", ".env.local", "the dotenv file you want to load")
-
 	RunCmd.Flags().String("since", "", "pnl since time")
 	RootCmd.AddCommand(RunCmd)
 }
@@ -306,24 +300,6 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config, enableApiServer
 }
 
 func run(cmd *cobra.Command, args []string) error {
-	disableDotEnv, err := cmd.Flags().GetBool("no-dotenv")
-	if err != nil {
-		return err
-	}
-
-	if !disableDotEnv {
-		dotenvFile, err := cmd.Flags().GetString("dotenv")
-		if err != nil {
-			return err
-		}
-
-		if _, err := os.Stat(dotenvFile); err == nil {
-			if err := godotenv.Load(dotenvFile); err != nil {
-				return errors.Wrap(err, "error loading dotenv file")
-			}
-		}
-	}
-
 	setup, err := cmd.Flags().GetBool("setup")
 	if err != nil {
 		return err
