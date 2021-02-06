@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/c9s/bbgo/pkg/datatype"
 	"github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -166,8 +167,8 @@ func toGlobalOrder(maxOrder max.Order) (*types.Order, error) {
 		OrderID:          maxOrder.ID,
 		Status:           toGlobalOrderStatus(maxOrder.State, executedVolume, remainingVolume),
 		ExecutedQuantity: executedVolume.Float64(),
-		CreationTime:     maxOrder.CreatedAt,
-		UpdateTime:       maxOrder.CreatedAt,
+		CreationTime:     datatype.Time(maxOrder.CreatedAt),
+		UpdateTime:       datatype.Time(maxOrder.CreatedAt),
 	}, nil
 }
 
@@ -211,7 +212,7 @@ func toGlobalTrade(t max.Trade) (*types.Trade, error) {
 		Fee:           fee,
 		FeeCurrency:   toGlobalCurrency(t.FeeCurrency),
 		QuoteQuantity: quoteQuantity,
-		Time:          mts,
+		Time:          datatype.Time(mts),
 	}, nil
 }
 

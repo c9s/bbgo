@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/datatype"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -235,7 +236,7 @@ func (m *SimplePriceMatching) newTradeFromOrder(order types.Order, isMaker bool)
 		Side:          order.Side,
 		IsBuyer:       order.Side == types.SideTypeBuy,
 		IsMaker:       isMaker,
-		Time:          m.CurrentTime,
+		Time:          datatype.Time(m.CurrentTime),
 		Fee:           fee,
 		FeeCurrency:   feeCurrency,
 	}
@@ -436,7 +437,7 @@ func (m *SimplePriceMatching) newOrder(o types.SubmitOrder, orderID uint64) type
 		Status:           types.OrderStatusNew,
 		ExecutedQuantity: 0,
 		IsWorking:        true,
-		CreationTime:     m.CurrentTime,
-		UpdateTime:       m.CurrentTime,
+		CreationTime:     datatype.Time(m.CurrentTime),
+		UpdateTime:       datatype.Time(m.CurrentTime),
 	}
 }
