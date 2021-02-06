@@ -16,6 +16,7 @@ install:
 
 before_script:
 - go mod download
+- make migrations
 
 script:
 - bash scripts/test-sqlite3-migrations.sh
