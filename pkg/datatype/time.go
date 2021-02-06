@@ -22,6 +22,10 @@ func (t Time) String() string {
 	return time.Time(t).String()
 }
 
+func (t Time) Time() time.Time {
+	return time.Time(t)
+}
+
 // driver.Valuer interface
 // see http://jmoiron.net/blog/built-in-interfaces/
 func (t Time) Value() (driver.Value, error) {

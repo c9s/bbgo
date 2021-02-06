@@ -229,6 +229,6 @@ func toGlobalOrderUpdate(u max.OrderUpdate) (*types.Order, error) {
 		OrderID:          u.ID,
 		Status:           toGlobalOrderStatus(u.State, executedVolume, remainingVolume),
 		ExecutedQuantity: executedVolume.Float64(),
-		CreationTime:     time.Unix(0, u.CreatedAtMs*int64(time.Millisecond)),
+		CreationTime:     datatype.Time(time.Unix(0, u.CreatedAtMs*int64(time.Millisecond))),
 	}, nil
 }

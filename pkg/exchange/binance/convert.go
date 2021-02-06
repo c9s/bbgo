@@ -60,8 +60,8 @@ func ToGlobalOrder(binanceOrder *binance.Order, isMargin bool) (*types.Order, er
 		OrderID:          uint64(binanceOrder.OrderID),
 		Status:           toGlobalOrderStatus(binanceOrder.Status),
 		ExecutedQuantity: util.MustParseFloat(binanceOrder.ExecutedQuantity),
-		CreationTime:     millisecondTime(binanceOrder.Time),
-		UpdateTime:       millisecondTime(binanceOrder.UpdateTime),
+		CreationTime:     datatype.Time(millisecondTime(binanceOrder.Time)),
+		UpdateTime:       datatype.Time(millisecondTime(binanceOrder.UpdateTime)),
 		IsMargin:         isMargin,
 		IsIsolated:       binanceOrder.IsIsolated,
 	}, nil

@@ -167,8 +167,8 @@ func toGlobalOrder(maxOrder max.Order) (*types.Order, error) {
 		OrderID:          maxOrder.ID,
 		Status:           toGlobalOrderStatus(maxOrder.State, executedVolume, remainingVolume),
 		ExecutedQuantity: executedVolume.Float64(),
-		CreationTime:     maxOrder.CreatedAt,
-		UpdateTime:       maxOrder.CreatedAt,
+		CreationTime:     datatype.Time(maxOrder.CreatedAt),
+		UpdateTime:       datatype.Time(maxOrder.CreatedAt),
 	}, nil
 }
 
