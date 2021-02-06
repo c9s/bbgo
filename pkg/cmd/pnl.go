@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"os"
 	"strings"
 	"time"
 
@@ -53,11 +52,8 @@ var PnLCmd = &cobra.Command{
 
 
 		environ := bbgo.NewEnvironment()
-		if dsn, ok := os.LookupEnv("MYSQL_URL"); ok {
-			err := environ.ConfigureDatabase(ctx, "mysql", dsn)
-			if err != nil {
-				return err
-			}
+		if err := configureDB(ctx, environ) ; err != nil {
+			return err
 		}
 
 		var trades []types.Trade
