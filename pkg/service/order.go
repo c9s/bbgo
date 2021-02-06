@@ -139,10 +139,19 @@ func (s *OrderService) scanRows(rows *sqlx.Rows) (orders []types.Order, err erro
 	return orders, rows.Err()
 }
 
-func (s *OrderService) Insert(order types.Order) error {
-	_, err := s.DB.NamedExec(`
+func (s *OrderService) Insert(order types.Order) (err error) {
+	if s.DB.DriverName() == "mysql" {
+		_, err = s.DB.NamedExec(`
 			INSERT INTO orders (exchange, order_id, client_order_id, order_type, status, symbol, price, stop_price, quantity, executed_quantity, side, is_working, time_in_force, created_at, updated_at, is_margin, is_isolated)
 			VALUES (:exchange, :order_id, :client_order_id, :order_type, :status, :symbol, :price, :stop_price, :quantity, :executed_quantity, :side, :is_working, :time_in_force, :created_at, :updated_at, :is_margin, :is_isolated)
 			ON DUPLICATE KEY UPDATE status=:status, executed_quantity=:executed_quantity, is_working=:is_working, updated_at=:updated_at`, order)
+		return err
+	}
+
+	_, err = s.DB.NamedExec(`
+			INSERT INTO orders (exchange, order_id, client_order_id, order_type, status, symbol, price, stop_price, quantity, executed_quantity, side, is_working, time_in_force, created_at, updated_at, is_margin, is_isolated)
+			VALUES (:exchange, :order_id, :client_order_id, :order_type, :status, :symbol, :price, :stop_price, :quantity, :executed_quantity, :side, :is_working, :time_in_force, :created_at, :updated_at, :is_margin, :is_isolated)
+	`, order)
+
 	return err
 }
