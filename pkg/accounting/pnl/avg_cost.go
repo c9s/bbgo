@@ -2,6 +2,7 @@ package pnl
 
 import (
 	"strings"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -96,7 +97,7 @@ func (c *AverageCostCalculator) Calculate(symbol string, trades []types.Trade, c
 		Symbol:       symbol,
 		CurrentPrice: currentPrice,
 		NumTrades:    len(trades),
-		StartTime:    trades[0].Time,
+		StartTime:    time.Time(trades[0].Time),
 
 		BuyVolume:  bidVolume,
 		SellVolume: askVolume,

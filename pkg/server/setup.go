@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"database/sql"
 	"net/http"
 	"os"
 	"syscall"
@@ -29,7 +30,7 @@ func (s *Server) setupTestDB(c *gin.Context) {
 		return
 	}
 
-	db, err := bbgo.ConnectMySQL(dsn)
+	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -44,7 +45,8 @@ func (s *Server) setupTestDB(c *gin.Context) {
 
 func (s *Server) setupConfigureDB(c *gin.Context) {
 	payload := struct {
-		DSN string `json:"dsn"`
+		Driver string `json:"driver"`
+		DSN    string `json:"dsn"`
 	}{}
 
 	if err := c.BindJSON(&payload); err != nil {
@@ -52,18 +54,25 @@ func (s *Server) setupConfigureDB(c *gin.Context) {
 		return
 	}
 
-	dsn := payload.DSN
-	if len(dsn) == 0 {
+	if len(payload.DSN) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "missing dsn argument"})
 		return
 	}
 
-	if err := s.Environ.ConfigureDatabase(c, dsn); err != nil {
+	if payload.Driver == "" {
+		payload.Driver = "mysql"
+	}
+
+	if err := s.Environ.ConfigureDatabase(c, payload.Driver, payload.DSN); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"success": true})
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"driver": payload.Driver,
+		"dsn": payload.DSN,
+	})
 }
 
 func (s *Server) setupAddStrategy(c *gin.Context) {
@@ -142,4 +151,3 @@ func (s *Server) setupRestart(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
-

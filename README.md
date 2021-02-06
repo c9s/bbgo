@@ -282,6 +282,21 @@ You may register your exchange account with my referral ID to support this proje
 - BTC address `3J6XQJNWT56amqz9Hz2BEVQ7W4aNmb5kiU`
 - USDT ERC20 address `0x63E5805e027548A384c57E20141f6778591Bac6F`
 
+
+## Community
+
+You can join our telegram channel <https://t.me/bbgocrypto>, it's in Chinese, but English is fine as well.
+
+## Contribution
+
+BBGO has a token BBG for the ecosystem (contract address: <https://etherscan.io/address/0x3afe98235d680e8d7a52e1458a59d60f45f935c0>).
+
+Each issue has its BBG label, by completing the issue with a pull request, you can get correspond amount of BBG.
+
+If you have feature request, you can offer your BBG for contributors.
+
+For further request, please contact us: <https://t.me/c123456789s>
+
 ## License
 
 MIT License
