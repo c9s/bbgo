@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net"
 	"net/http"
 	"os"
@@ -17,6 +18,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -386,9 +388,46 @@ func (s *Server) listSessionOpenOrders(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"orders": marketOrders})
 }
 
-func (s *Server) listAssets(c *gin.Context) {
-	totalAssets := types.AssetMap{}
+func genFakeAssets() types.AssetMap {
 
+	totalAssets := types.AssetMap{}
+	balances := types.BalanceMap{
+		"BTC":  types.Balance{Currency: "BTC", Available: fixedpoint.NewFromFloat(10.0 * rand.Float64())},
+		"BCH":  types.Balance{Currency: "BCH", Available: fixedpoint.NewFromFloat(0.01 * rand.Float64())},
+		"LTC":  types.Balance{Currency: "LTC", Available: fixedpoint.NewFromFloat(200.0 * rand.Float64())},
+		"ETH":  types.Balance{Currency: "ETH", Available: fixedpoint.NewFromFloat(50.0 * rand.Float64())},
+		"SAND": types.Balance{Currency: "SAND", Available: fixedpoint.NewFromFloat(11500.0 * rand.Float64())},
+		"BNB":  types.Balance{Currency: "BNB", Available: fixedpoint.NewFromFloat(1000.0 * rand.Float64())},
+		"GRT":  types.Balance{Currency: "GRT", Available: fixedpoint.NewFromFloat(1000.0 * rand.Float64())},
+		"MAX":  types.Balance{Currency: "MAX", Available: fixedpoint.NewFromFloat(200000.0 * rand.Float64())},
+		"COMP": types.Balance{Currency: "COMP", Available: fixedpoint.NewFromFloat(100.0 * rand.Float64())},
+	}
+	assets := balances.Assets(map[string]float64{
+		"BTCUSDT":  38000.0,
+		"BCHUSDT":  478.0,
+		"LTCUSDT":  150.0,
+		"COMPUSDT": 450.0,
+		"ETHUSDT":  1700.0,
+		"BNBUSDT":  70.0,
+		"GRTUSDT":  0.89,
+		"DOTUSDT":  20.0,
+		"SANDUSDT": 0.13,
+		"MAXUSDT":  0.122,
+	})
+	for currency, asset := range assets {
+		totalAssets[currency] = asset
+	}
+
+	return totalAssets
+}
+
+func (s *Server) listAssets(c *gin.Context) {
+	if ok, err := strconv.ParseBool(os.Getenv("USE_FAKE_ASSETS")); err == nil && ok {
+		c.JSON(http.StatusOK, gin.H{"assets": genFakeAssets()})
+		return
+	}
+
+	totalAssets := types.AssetMap{}
 	for _, session := range s.Environ.Sessions() {
 		balances := session.Account.Balances()
 
@@ -406,7 +445,6 @@ func (s *Server) listAssets(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"assets": totalAssets})
-
 }
 
 func (s *Server) setupSaveConfig(c *gin.Context) {
