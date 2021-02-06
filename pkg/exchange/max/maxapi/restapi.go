@@ -20,6 +20,8 @@ import (
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 const (
@@ -45,37 +47,6 @@ var serverTimestamp = time.Now().Unix()
 
 // reqCount is used for nonce, this variable counts the API request count.
 var reqCount int64 = 0
-
-// Response is wrapper for standard http.Response and provides
-// more methods.
-type Response struct {
-	*http.Response
-
-	// Body overrides the composited Body field.
-	Body []byte
-}
-
-// newResponse is a wrapper of the http.Response instance, it reads the response body and close the file.
-func newResponse(r *http.Response) (response *Response, err error) {
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	err = r.Body.Close()
-	response = &Response{Response: r, Body: body}
-	return response, err
-}
-
-// String converts response body to string.
-// An empty string will be returned if error.
-func (r *Response) String() string {
-	return string(r.Body)
-}
-
-func (r *Response) DecodeJSON(o interface{}) error {
-	return json.Unmarshal(r.Body, o)
-}
 
 type RestClient struct {
 	client *http.Client
@@ -290,14 +261,14 @@ func (c *RestClient) Do(req *http.Request) (resp *http.Response, err error) {
 }
 
 // sendRequest sends the request to the API server and handle the response
-func (c *RestClient) sendRequest(req *http.Request) (*Response, error) {
+func (c *RestClient) sendRequest(req *http.Request) (*util.Response, error) {
 	resp, err := c.Do(req)
 	if err != nil {
 		return nil, err
 	}
 
 	// newResponse reads the response body and return a new Response object
-	response, err := newResponse(resp)
+	response, err := util.NewResponse(resp)
 	if err != nil {
 		return response, err
 	}
@@ -314,7 +285,7 @@ func (c *RestClient) sendRequest(req *http.Request) (*Response, error) {
 	return response, nil
 }
 
-func (c *RestClient) sendAuthenticatedRequest(m string, refURL string, data map[string]interface{}) (*Response, error) {
+func (c *RestClient) sendAuthenticatedRequest(m string, refURL string, data map[string]interface{}) (*util.Response, error) {
 	req, err := c.newAuthenticatedRequest(m, refURL, data)
 	if err != nil {
 		return nil, err
@@ -374,7 +345,7 @@ type ErrorField struct {
 }
 
 type ErrorResponse struct {
-	*Response
+	*util.Response
 	Err ErrorField `json:"error"`
 }
 
@@ -389,13 +360,13 @@ func (r *ErrorResponse) Error() string {
 }
 
 // isError check the response status code so see if a response is an error.
-func isError(response *Response) bool {
+func isError(response *util.Response) bool {
 	var c = response.StatusCode
 	return c < 200 || c > 299
 }
 
 // toErrorResponse tries to convert/parse the server response to the standard Error interface object
-func toErrorResponse(response *Response) (errorResponse *ErrorResponse, err error) {
+func toErrorResponse(response *util.Response) (errorResponse *ErrorResponse, err error) {
 	errorResponse = &ErrorResponse{Response: response}
 
 	contentType := response.Header.Get("content-type")

@@ -34,7 +34,7 @@ func (s *SyncService) SyncOrders(ctx context.Context, exchange types.Exchange, s
 	var lastID uint64 = 0
 	if lastOrder != nil {
 		lastID = lastOrder.OrderID
-		startTime = lastOrder.CreationTime
+		startTime = lastOrder.CreationTime.Time()
 
 		logrus.Infof("found last order, start from lastID = %d since %s", lastID, startTime)
 	}
@@ -84,7 +84,7 @@ func (s *SyncService) SyncTrades(ctx context.Context, exchange types.Exchange, s
 	var lastID int64 = 0
 	if lastTrade != nil {
 		lastID = lastTrade.ID
-		startTime = lastTrade.Time
+		startTime = time.Time(lastTrade.Time)
 
 		logrus.Infof("found last trade, start from lastID = %d since %s", lastID, startTime)
 	}

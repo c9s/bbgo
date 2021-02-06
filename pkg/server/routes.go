@@ -421,8 +421,9 @@ func (s *Server) setupSaveConfig(c *gin.Context) {
 		return
 	}
 
-	if len(s.Environ.MysqlURL) > 0 {
-		envVars["MYSQL_URL"] = s.Environ.MysqlURL
+	if s.Environ.DatabaseService != nil {
+		envVars["DB_DRIVER"] = s.Environ.DatabaseService.Driver
+		envVars["DB_DSN"] = s.Environ.DatabaseService.DSN
 	}
 
 	dotenvFile := ".env.local"

@@ -51,7 +51,7 @@ func (e ExchangeBatchProcessor) BatchQueryClosedOrders(ctx context.Context, symb
 				}
 
 				c <- o
-				startTime = o.CreationTime
+				startTime = o.CreationTime.Time()
 				lastOrderID = o.OrderID
 				orderIDs[o.OrderID] = struct{}{}
 			}
@@ -155,7 +155,7 @@ func (e ExchangeBatchProcessor) BatchQueryTrades(ctx context.Context, symbol str
 
 			logrus.Infof("returned %d trades", len(trades))
 
-			startTime = trades[len(trades)-1].Time
+			startTime = time.Time(trades[len(trades)-1].Time)
 			for _, t := range trades {
 				// ignore the first trade if last TradeID is given
 				if t.ID == lastTradeID {

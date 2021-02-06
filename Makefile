@@ -28,9 +28,9 @@ dist: bin-dir bbgo-linux bbgo-darwin
 	tar -C $(BUILD_DIR) -cvzf $(DIST_DIR)/bbgo-$$(git describe --tags).tar.gz .
 
 migrations:
-	rockhopper compile --config rockhopper.yaml --output pkg/migrations
-	git add -v pkg/migrations
-	git commit -m "Update migration package" pkg/migrations
+	rockhopper compile --config rockhopper_mysql.yaml --output pkg/migrations/mysql
+	rockhopper compile --config rockhopper_sqlite.yaml --output pkg/migrations/sqlite3
+	git add -v pkg/migrations && git commit -m "compile and update migration package" pkg/migrations || true
 
 docker:
 	GOPATH=$(PWD)/_mod go mod download

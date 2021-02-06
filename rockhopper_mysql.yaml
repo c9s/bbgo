@@ -1,0 +1,5 @@
+---
+driver: mysql
+dialect: mysql
+dsn: "root@tcp(localhost:3306)/bbgo?parseTime=true"
+migrationsDir: migrations/mysql
