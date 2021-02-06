@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/adshao/go-binance/v2"
@@ -48,8 +49,45 @@ func (e *Exchange) Name() types.ExchangeName {
 	return types.ExchangeBinance
 }
 
-func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (types.Ticker, error) {
-	return types.Ticker{}, nil
+func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[string]types.Ticker, error) {
+	var ret = make(map[string]types.Ticker)
+	listPriceChangeStatsService := e.Client.NewListPriceChangeStatsService()
+
+	if len(symbol) == 1 {
+		listPriceChangeStatsService.Symbol(symbol[0])
+	}
+
+	changeStats, err := listPriceChangeStatsService.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	m := make(map[string]bool)
+
+	for _, s := range symbol {
+		m[strings.ToUpper(s)] = true
+	}
+
+	for _, retrievedStats := range changeStats {
+		if _, ok := m[retrievedStats.Symbol]; len(symbol) != 0 && !ok {
+			continue
+		}
+
+		tick := types.Ticker{
+			Volume: util.MustParseFloat(retrievedStats.Volume),
+			Last:   util.MustParseFloat(retrievedStats.LastPrice),
+			Open:   util.MustParseFloat(retrievedStats.OpenPrice),
+			High:   util.MustParseFloat(retrievedStats.HighPrice),
+			Low:    util.MustParseFloat(retrievedStats.LowPrice),
+			Buy:    util.MustParseFloat(retrievedStats.BidPrice),
+			Sell:   util.MustParseFloat(retrievedStats.AskPrice),
+			Time:   time.Unix(retrievedStats.CloseTime, 0),
+		}
+
+		ret[retrievedStats.Symbol] = tick
+	}
+
+	return ret, nil
 }
 
 func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
