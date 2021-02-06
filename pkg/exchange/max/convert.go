@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/c9s/bbgo/pkg/datatype"
 	"github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -211,7 +212,7 @@ func toGlobalTrade(t max.Trade) (*types.Trade, error) {
 		Fee:           fee,
 		FeeCurrency:   toGlobalCurrency(t.FeeCurrency),
 		QuoteQuantity: quoteQuantity,
-		Time:          mts,
+		Time:          datatype.Time(mts),
 	}, nil
 }
 
