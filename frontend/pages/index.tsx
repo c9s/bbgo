@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useState} from 'react';
 import {useRouter} from 'next/router';
 
 import {makeStyles} from '@material-ui/core/styles';
@@ -9,25 +9,22 @@ import Paper from '@material-ui/core/Paper';
 
 import TotalAssetsPie from '../components/TotalAssetsPie';
 import TotalAssetSummary from '../components/TotalAssetsSummary';
+import TotalAssetDetails from '../components/TotalAssetsDetails';
 
 import TradingVolumePanel from '../components/TradingVolumePanel';
 import ExchangeSessionTabPanel from '../components/ExchangeSessionTabPanel';
 
 import DashboardLayout from '../layouts/DashboardLayout';
 
-import {querySessions} from "../api/bbgo";
+import {queryAssets, querySessions} from "../api/bbgo";
 
 const useStyles = makeStyles((theme) => ({
-    paper: {
-        height: 140,
-        width: 200,
-    },
-    totalAssetsBox: {
-        height: 300,
-    },
     totalAssetsSummary: {
         margin: theme.spacing(2),
         padding: theme.spacing(2),
+    },
+    grid: {
+        flexGrow: 1,
     },
     control: {
         padding: theme.spacing(2),
@@ -40,12 +37,14 @@ export default function Home() {
     const classes = useStyles();
     const router = useRouter();
 
+    const [assets, setAssets] = useState({})
     const [sessions, setSessions] = React.useState([])
 
     React.useEffect(() => {
         querySessions((sessions) => {
             if (sessions && sessions.length > 0) {
                 setSessions(sessions)
+                queryAssets(setAssets)
             } else {
                 router.push("/setup");
             }
@@ -66,6 +65,8 @@ export default function Home() {
         );
     }
 
+    console.log("index: assets", assets)
+
     return (
         <DashboardLayout>
             <Paper className={classes.totalAssetsSummary}>
@@ -73,17 +74,25 @@ export default function Home() {
                     Total Assets
                 </Typography>
 
-                <Grid container spacing={3}>
-                    <Grid item xs={12} md={3}>
-                        <TotalAssetSummary/>
-                    </Grid>
+                <div className={classes.grid}>
+                    <Grid container
+                          direction="row"
+                          justify="space-around"
+                          alignItems="flex-start"
+                          spacing={1}>
+                        <Grid item xs={12} md={3}>
+                            <TotalAssetSummary assets={assets}/>
+                        </Grid>
 
-                    <Grid item xs={12} md={6}>
-                        <Box className={classes.totalAssetsBox}>
-                            <TotalAssetsPie/>
-                        </Box>
+                        <Grid item xs={12} md={6}>
+                            <TotalAssetsPie assets={assets}/>
+                        </Grid>
+
+                        <Grid item xs={12} md={3}>
+                            <TotalAssetDetails assets={assets}/>
+                        </Grid>
                     </Grid>
-                </Grid>
+                </div>
             </Paper>
 
             <TradingVolumePanel/>

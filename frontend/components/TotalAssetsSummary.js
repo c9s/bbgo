@@ -1,5 +1,4 @@
 import {useEffect, useState} from "react";
-import {queryAssets} from "../api/bbgo";
 import Card from '@material-ui/core/Card';
 import CardContent from '@material-ui/core/CardContent';
 import Typography from '@material-ui/core/Typography';
@@ -19,18 +18,8 @@ function aggregateAssetsBy(assets, field) {
 }
 
 const useStyles = makeStyles((theme) => ({
-    paper: {
-        marginTop: theme.spacing(3),
-        marginBottom: theme.spacing(3),
-        padding: theme.spacing(2),
-    },
     root: {
-        minWidth: 275,
-    },
-    bullet: {
-        display: 'inline-block',
-        margin: '0 2px',
-        transform: 'scale(0.8)',
+        margin: theme.spacing(1),
     },
     title: {
         fontSize: 14,
@@ -40,16 +29,8 @@ const useStyles = makeStyles((theme) => ({
     },
 }));
 
-export default function TotalAssetSummary() {
+export default function TotalAssetSummary({ assets }) {
     const classes = useStyles();
-    const [assets, setAssets] = useState({})
-
-    useEffect(() => {
-        queryAssets((assets) => {
-            setAssets(assets)
-        })
-    }, [])
-
     return <Card className={classes.root} variant="outlined">
         <CardContent>
             <Typography className={classes.title} color="textSecondary" gutterBottom>
