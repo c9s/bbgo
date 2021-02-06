@@ -8,7 +8,6 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"github.com/c9s/bbgo/pkg/accounting/pnl"
 	"github.com/c9s/bbgo/pkg/backtest"
@@ -96,10 +95,6 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
-		db, err := bbgo.ConnectMySQL(viper.GetString("mysql-url"))
-		if err != nil {
-			return err
-		}
 
 		if userConfig.Backtest == nil {
 			return errors.New("backtest config is not defined")
@@ -116,14 +111,12 @@ var BacktestCmd = &cobra.Command{
 		}
 
 		environ := bbgo.NewEnvironment()
-		if viper.IsSet("mysql-url") {
-			dsn := viper.GetString("mysql-url")
-			if err := environ.ConfigureDatabase(ctx, dsn); err != nil {
-				return err
-			}
+
+		if err := configureDB(ctx, environ) ; err != nil {
+			return err
 		}
 
-		backtestService := &service.BacktestService{DB: db}
+		backtestService := &service.BacktestService{DB: environ.DatabaseService.DB}
 
 		if wantSync {
 			log.Info("starting synchronization...")
@@ -273,8 +266,8 @@ var BacktestCmd = &cobra.Command{
 				finalBalances.Print()
 
 				if wantBaseAssetBaseline {
-					initBaseAsset := InBaseAsset(initBalances, market, startPrice)
-					finalBaseAsset := InBaseAsset(finalBalances, market, lastPrice)
+					initBaseAsset := inBaseAsset(initBalances, market, startPrice)
+					finalBaseAsset := inBaseAsset(finalBalances, market, lastPrice)
 					log.Infof("INITIAL ASSET ~= %s %s (1 %s = %f)", market.FormatQuantity(initBaseAsset), market.BaseCurrency, market.BaseCurrency, startPrice)
 					log.Infof("FINAL ASSET ~= %s %s (1 %s = %f)", market.FormatQuantity(finalBaseAsset), market.BaseCurrency, market.BaseCurrency, lastPrice)
 
@@ -288,8 +281,3 @@ var BacktestCmd = &cobra.Command{
 	},
 }
 
-func InBaseAsset(balances types.BalanceMap, market types.Market, price float64) float64 {
-	quote := balances[market.QuoteCurrency]
-	base := balances[market.BaseCurrency]
-	return (base.Locked.Float64() + base.Available.Float64()) + ((quote.Locked.Float64() + quote.Available.Float64()) / price)
-}

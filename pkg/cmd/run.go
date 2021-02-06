@@ -96,10 +96,8 @@ func runSetup(baseCtx context.Context, userConfig *bbgo.Config, enableApiServer 
 }
 
 func BootstrapEnvironment(ctx context.Context, environ *bbgo.Environment, userConfig *bbgo.Config) error {
-	if dsn, ok := os.LookupEnv("MYSQL_URL"); ok {
-		if err := environ.ConfigureDatabase(ctx, dsn); err != nil {
-			return err
-		}
+	if err := configureDB(ctx, environ) ; err != nil {
+		return err
 	}
 
 	if err := environ.AddExchangesFromConfig(userConfig); err != nil {
@@ -331,7 +329,7 @@ func run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	enableApiServer, err := cmd.Flags().GetBool("enable-web-server")
+	enableWebServer, err := cmd.Flags().GetBool("enable-web-server")
 	if err != nil {
 		return err
 	}
@@ -348,10 +346,7 @@ func run(cmd *cobra.Command, args []string) error {
 
 	var userConfig = &bbgo.Config{}
 
-	if setup {
-		log.Infof("running in setup mode, skip reading config file")
-		enableApiServer = true
-	} else {
+	if !setup {
 		// if it's not setup, then the config file option is required.
 		if len(configFile) == 0 {
 			return errors.New("--config option is required")
@@ -377,7 +372,7 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 
 		if setup {
-			return runSetup(ctx, userConfig, enableApiServer)
+			return runSetup(ctx, userConfig, true)
 		}
 
 		userConfig, err = bbgo.Load(configFile, true)
@@ -385,7 +380,7 @@ func run(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		return runConfig(ctx, userConfig, enableApiServer)
+		return runConfig(ctx, userConfig, enableWebServer)
 	}
 
 	return runWrapperBinary(ctx, userConfig, cmd, args)

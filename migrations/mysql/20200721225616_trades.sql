@@ -19,5 +19,6 @@ CREATE TABLE `trades`
     PRIMARY KEY (`gid`),
     UNIQUE KEY `id` (`id`)
 );
+
 -- +down
-DROP TABLE `trades`;
+DROP TABLE IF EXISTS `trades`;
