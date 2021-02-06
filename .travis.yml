@@ -8,11 +8,15 @@ services:
 - redis-server
 - mysql
 
+before_install:
+- mysql -e 'CREATE DATABASE bbgo;'
+
 install:
 - go get github.com/c9s/rockhopper/cmd/rockhopper
 
 before_script:
 - go mod download
+
 script:
 - bash scripts/test-sqlite3-migrations.sh
 - go test -v ./pkg/...
