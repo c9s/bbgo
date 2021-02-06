@@ -113,7 +113,7 @@ func (e *ExecutionReportEvent) Order() (*types.Order, error) {
 		OrderID:          uint64(e.OrderID),
 		Status:           toGlobalOrderStatus(binance.OrderStatusType(e.CurrentOrderStatus)),
 		ExecutedQuantity: util.MustParseFloat(e.CumulativeFilledQuantity),
-		CreationTime:     orderCreationTime,
+		CreationTime:     datatype.Time(orderCreationTime),
 	}, nil
 }
 
