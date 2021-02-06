@@ -7,7 +7,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/types"
@@ -63,13 +62,8 @@ var CancelCmd = &cobra.Command{
 		}
 
 		environ := bbgo.NewEnvironment()
-
-		if viper.IsSet("mysql-url") {
-			db, err := bbgo.ConnectMySQL(viper.GetString("mysql-url"))
-			if err != nil {
-				return err
-			}
-			environ.SetDB(db)
+		if err := configureDB(ctx, environ) ; err != nil {
+			return err
 		}
 
 		if err := environ.AddExchangesFromConfig(userConfig); err != nil {

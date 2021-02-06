@@ -163,13 +163,13 @@ func (s *TradeService) QueryForTradingFeeCurrency(ex types.ExchangeName, symbol 
 	return s.scanRows(rows)
 }
 
-// Only return 500 items.
 type QueryTradesOptions struct {
 	Exchange types.ExchangeName
 	Symbol   string
 	LastGID  int64
 	// ASC or DESC
 	Ordering string
+	Limit	 int
 }
 
 func (s *TradeService) Query(options QueryTradesOptions) ([]types.Trade, error) {
@@ -225,7 +225,7 @@ func queryTradesSQL(options QueryTradesOptions) string {
 
 	sql += ` ORDER BY gid ` + ordering
 
-	sql += ` LIMIT ` + strconv.Itoa(500)
+	sql += ` LIMIT ` + strconv.Itoa(options.Limit)
 	return sql
 }
 
@@ -244,7 +244,7 @@ func (s *TradeService) scanRows(rows *sqlx.Rows) (trades []types.Trade, err erro
 
 func (s *TradeService) Insert(trade types.Trade) error {
 	_, err := s.DB.NamedExec(`
-			INSERT IGNORE INTO trades (id, exchange, order_id, symbol, price, quantity, quote_quantity, side, is_buyer, is_maker, fee, fee_currency, traded_at, is_margin, is_isolated)
+			INSERT INTO trades (id, exchange, order_id, symbol, price, quantity, quote_quantity, side, is_buyer, is_maker, fee, fee_currency, traded_at, is_margin, is_isolated)
 			VALUES (:id, :exchange, :order_id, :symbol, :price, :quantity, :quote_quantity, :side, :is_buyer, :is_maker, :fee, :fee_currency, :traded_at, :is_margin, :is_isolated)`,
 		trade)
 	return err
