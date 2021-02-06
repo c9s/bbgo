@@ -3,12 +3,12 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"github.com/c9s/bbgo/pkg/accounting/pnl"
 	"github.com/c9s/bbgo/pkg/backtest"
@@ -96,10 +96,6 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
-		db, err := bbgo.ConnectMySQL(viper.GetString("mysql-url"))
-		if err != nil {
-			return err
-		}
 
 		if userConfig.Backtest == nil {
 			return errors.New("backtest config is not defined")
@@ -116,14 +112,14 @@ var BacktestCmd = &cobra.Command{
 		}
 
 		environ := bbgo.NewEnvironment()
-		if viper.IsSet("mysql-url") {
-			dsn := viper.GetString("mysql-url")
-			if err := environ.ConfigureDatabase(ctx, "mysql", dsn); err != nil {
+		if dsn, ok := os.LookupEnv("MYSQL_URL"); ok {
+			err := environ.ConfigureDatabase(ctx, "mysql", dsn)
+			if err != nil {
 				return err
 			}
 		}
 
-		backtestService := &service.BacktestService{DB: db}
+		backtestService := &service.BacktestService{DB: environ.DatabaseService.DB}
 
 		if wantSync {
 			log.Info("starting synchronization...")
