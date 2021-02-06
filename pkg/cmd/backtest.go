@@ -118,7 +118,7 @@ var BacktestCmd = &cobra.Command{
 		environ := bbgo.NewEnvironment()
 		if viper.IsSet("mysql-url") {
 			dsn := viper.GetString("mysql-url")
-			if err := environ.ConfigureDatabase(ctx, dsn); err != nil {
+			if err := environ.ConfigureDatabase(ctx, "mysql", dsn); err != nil {
 				return err
 			}
 		}

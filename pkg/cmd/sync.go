@@ -55,7 +55,7 @@ var SyncCmd = &cobra.Command{
 
 		if viper.IsSet("mysql-url") {
 			dsn := viper.GetString("mysql-url")
-			if err := environ.ConfigureDatabase(ctx, dsn); err != nil {
+			if err := environ.ConfigureDatabase(ctx, "mysql", dsn); err != nil {
 				return err
 			}
 		}

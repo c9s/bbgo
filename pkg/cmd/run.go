@@ -97,7 +97,7 @@ func runSetup(baseCtx context.Context, userConfig *bbgo.Config, enableApiServer 
 
 func BootstrapEnvironment(ctx context.Context, environ *bbgo.Environment, userConfig *bbgo.Config) error {
 	if dsn, ok := os.LookupEnv("MYSQL_URL"); ok {
-		if err := environ.ConfigureDatabase(ctx, dsn); err != nil {
+		if err := environ.ConfigureDatabase(ctx, "mysql", dsn); err != nil {
 			return err
 		}
 	}
