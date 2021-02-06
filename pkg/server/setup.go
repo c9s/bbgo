@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"database/sql"
 	"net/http"
 	"os"
 	"syscall"
@@ -29,7 +30,7 @@ func (s *Server) setupTestDB(c *gin.Context) {
 		return
 	}
 
-	db, err := bbgo.ConnectMySQL(dsn)
+	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -142,4 +143,3 @@ func (s *Server) setupRestart(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
-
