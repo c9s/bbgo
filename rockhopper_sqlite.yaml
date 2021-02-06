@@ -1,0 +1,5 @@
+---
+driver: sqlite3
+dialect: sqlite3
+dsn: "bbgo.sqlite3"
+migrationsDir: migrations/sqlite3
