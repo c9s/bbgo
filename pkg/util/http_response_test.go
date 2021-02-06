@@ -42,3 +42,33 @@ func TestResponse_IsError(t *testing.T) {
 		assert.Equal(t, isErr, resp.IsError())
 	}
 }
+
+func TestResponse_IsJSON(t *testing.T) {
+	cases := map[string]bool{
+		"text/json":                       true,
+		"application/json":                true,
+		"application/json; charset=utf-8": true,
+		"text/html":                       false,
+	}
+	for k, v := range cases {
+		resp := &Response{Response: &http.Response{}}
+		resp.Header = http.Header{}
+		resp.Header.Set("content-type", k)
+		assert.Equal(t, v, resp.IsJSON())
+	}
+}
+
+func TestResponse_IsHTML(t *testing.T) {
+	cases := map[string]bool{
+		"text/json":                       false,
+		"application/json":                false,
+		"application/json; charset=utf-8": false,
+		"text/html":                       true,
+	}
+	for k, v := range cases {
+		resp := &Response{Response: &http.Response{}}
+		resp.Header = http.Header{}
+		resp.Header.Set("content-type", k)
+		assert.Equal(t, v, resp.IsHTML())
+	}
+}

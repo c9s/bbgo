@@ -40,3 +40,19 @@ func (r *Response) DecodeJSON(o interface{}) error {
 func (r *Response) IsError() bool {
 	return r.StatusCode >= 400
 }
+
+func (r *Response) IsJSON() bool {
+	switch r.Header.Get("content-type") {
+	case "text/json", "application/json", "application/json; charset=utf-8":
+		return true
+	}
+	return false
+}
+
+func (r *Response) IsHTML() bool {
+	switch r.Header.Get("content-type") {
+	case "text/html":
+		return true
+	}
+	return false
+}
