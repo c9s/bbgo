@@ -5,10 +5,15 @@ import Button from '@material-ui/core/Button';
 import Typography from '@material-ui/core/Typography';
 import TextField from '@material-ui/core/TextField';
 import FormHelperText from '@material-ui/core/FormHelperText';
+import Radio from '@material-ui/core/Radio';
+import RadioGroup from '@material-ui/core/RadioGroup';
+import FormControlLabel from '@material-ui/core/FormControlLabel';
+import FormControl from '@material-ui/core/FormControl';
+import FormLabel from '@material-ui/core/FormLabel';
 
 import Alert from '@material-ui/lab/Alert';
 
-import {testDatabaseConnection, configureDatabase} from '../api/bbgo';
+import {configureDatabase, testDatabaseConnection} from '../api/bbgo';
 
 import {makeStyles} from '@material-ui/core/styles';
 
@@ -30,10 +35,12 @@ const useStyles = makeStyles((theme) => ({
     },
 }));
 
-export default function ConfigureDatabaseForm({ onConfigured }) {
+export default function ConfigureDatabaseForm({onConfigured}) {
     const classes = useStyles();
 
     const [mysqlURL, setMysqlURL] = React.useState("root@tcp(127.0.0.1:3306)/bbgo")
+
+    const [driver, setDriver] = React.useState("sqlite3");
     const [testing, setTesting] = React.useState(false);
     const [testResponse, setTestResponse] = React.useState(null);
     const [configured, setConfigured] = React.useState(false);
@@ -79,43 +86,71 @@ export default function ConfigureDatabaseForm({ onConfigured }) {
             </Typography>
 
             <Typography variant="body1" gutterBottom>
-            If you have database installed on your machine, you can enter the DSN string in the following field.
-            Please note this is optional, you CAN SKIP this step.
+                If you have database installed on your machine, you can enter the DSN string in the following field.
+                Please note this is optional, you CAN SKIP this step.
             </Typography>
 
-            <Grid container spacing={3}>
-                <Grid item xs={12} sm={6}>
-                    <TextField id="mysql_url" name="mysql_url" label="MySQL Data Source Name"
-                               fullWidth
-                               required
-                               defaultValue={mysqlURL}
-                               onChange={(event) => {
-                                   setMysqlURL(event.target.value)
-                                   resetTestResponse()
-                               }}
-                    />
 
-                    <FormHelperText id="session-name-helper-text">
-                        If you have database installed on your machine, you can enter the DSN string like the
+            <Grid container spacing={3}>
+                <Grid item xs={12} sm={4}>
+                    <Box m={6}>
+                        <FormControl component="fieldset" required={true}>
+                            <FormLabel component="legend">Database Driver</FormLabel>
+                            <RadioGroup aria-label="driver" name="driver" value={driver} onChange={(event) => {
+                                setDriver(event.target.value);
+                            }}>
+                                <FormControlLabel value="sqlite3" control={<Radio/>} label="Standard (Default)"/>
+                                <FormControlLabel value="mysql" control={<Radio/>} label="MySQL"/>
+                            </RadioGroup>
+                        </FormControl>
+                        <FormHelperText>
+                        </FormHelperText>
+                    </Box>
+                </Grid>
+
+                {driver === "mysql" ? (
+                    <Grid item xs={12} sm={8}>
+                        <TextField id="mysql_url" name="mysql_url" label="MySQL Data Source Name"
+                                   fullWidth
+                                   required
+                                   defaultValue={mysqlURL}
+                                   onChange={(event) => {
+                                       setMysqlURL(event.target.value)
+                                       resetTestResponse()
+                                   }}
+                        />
+                        <FormHelperText>MySQL DSN</FormHelperText>
+
+                        <Typography variant="body1" gutterBottom>
+                            If you have database installed on your machine, you can enter the DSN string like the
                             following
                             format:
-                        <br/>
-                        <code>
-                            root:password@tcp(127.0.0.1:3306)/bbgo
-                        </code>
+                            <br/>
+                            <pre><code>root:password@tcp(127.0.0.1:3306)/bbgo</code></pre>
 
-                        <br/>
-                        Be sure to create your database before using it. You need to execute the following statement
+                            <br/>
+                            Be sure to create your database before using it. You need to execute the following statement
                             to
                             create a database:
-                        <br/>
-                        <code>
-                            CREATE DATABASE bbgo CHARSET utf8;
-                        </code>
+                            <br/>
+                            <pre><code>CREATE DATABASE bbgo CHARSET utf8;</code></pre>
+                        </Typography>
 
-                    </FormHelperText>
-                </Grid>
+                    </Grid>
+                ) : (
+                    <Grid item xs={12} sm={8}>
+                        <Box m={6}>
+                            <Typography variant="body1" gutterBottom>
+                                If you don't know what to choose, just pick the standard driver (sqlite3).
+                                <br/>
+                                For professionals, you can pick MySQL driver, BBGO works best with MySQL, especially for
+                                larger data scale.
+                            </Typography>
+                        </Box>
+                    </Grid>
+                )}
             </Grid>
+
 
             <div className={classes.buttons}>
                 <Button
