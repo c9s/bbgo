@@ -51,7 +51,7 @@ func (e ExchangeBatchProcessor) BatchQueryClosedOrders(ctx context.Context, symb
 				}
 
 				c <- o
-				startTime = o.CreationTime
+				startTime = o.CreationTime.Time()
 				lastOrderID = o.OrderID
 				orderIDs[o.OrderID] = struct{}{}
 			}

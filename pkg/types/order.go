@@ -2,10 +2,10 @@ package types
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/slack-go/slack"
 
+	"github.com/c9s/bbgo/pkg/datatype"
 	"github.com/c9s/bbgo/pkg/util"
 )
 
@@ -113,14 +113,14 @@ func (o *SubmitOrder) SlackAttachment() slack.Attachment {
 type Order struct {
 	SubmitOrder
 
-	Exchange         string      `json:"exchange" db:"exchange"`
-	GID              uint64      `json:"gid" db:"gid"`
-	OrderID          uint64      `json:"orderID" db:"order_id"` // order id
-	Status           OrderStatus `json:"status" db:"status"`
-	ExecutedQuantity float64     `json:"executedQuantity" db:"executed_quantity"`
-	IsWorking        bool        `json:"isWorking" db:"is_working"`
-	CreationTime     time.Time   `json:"creationTime" db:"created_at"`
-	UpdateTime       time.Time   `json:"updateTime" db:"updated_at"`
+	Exchange         string        `json:"exchange" db:"exchange"`
+	GID              uint64        `json:"gid" db:"gid"`
+	OrderID          uint64        `json:"orderID" db:"order_id"` // order id
+	Status           OrderStatus   `json:"status" db:"status"`
+	ExecutedQuantity float64       `json:"executedQuantity" db:"executed_quantity"`
+	IsWorking        bool          `json:"isWorking" db:"is_working"`
+	CreationTime     datatype.Time `json:"creationTime" db:"created_at"`
+	UpdateTime       datatype.Time `json:"updateTime" db:"updated_at"`
 
 	IsMargin   bool `json:"isMargin" db:"is_margin"`
 	IsIsolated bool `json:"isIsolated" db:"is_isolated"`

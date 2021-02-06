@@ -437,7 +437,7 @@ func (m *SimplePriceMatching) newOrder(o types.SubmitOrder, orderID uint64) type
 		Status:           types.OrderStatusNew,
 		ExecutedQuantity: 0,
 		IsWorking:        true,
-		CreationTime:     m.CurrentTime,
-		UpdateTime:       m.CurrentTime,
+		CreationTime:     datatype.Time(m.CurrentTime),
+		UpdateTime:       datatype.Time(m.CurrentTime),
 	}
 }
