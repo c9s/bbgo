@@ -63,7 +63,7 @@ export default function TotalAssetsDetails({assets}) {
                         </ListItemAvatar>
                     )
                 }
-                <ListItemText dense primary={`${a.currency} ${a.total}`} secondary={`USD =~ ${a.inUSD}`}/>
+                <ListItemText dense primary={`${a.currency} ${a.total}`} secondary={`=~ ${Math.round(a.inUSD)} USD`}/>
             </ListItem>
         )
     })
