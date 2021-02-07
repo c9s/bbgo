@@ -194,7 +194,7 @@ func convertWebSocketTrade(t max.TradeUpdate) (*types.Trade, error) {
 		Price:         price,
 		Quantity:      quantity,
 		Side:          side,
-		IsBuyer:       side == "bid" || side == "buy",
+		IsBuyer:       side == types.SideTypeBuy,
 		IsMaker:       t.Maker,
 		Fee:           fee,
 		FeeCurrency:   toGlobalCurrency(t.FeeCurrency),
