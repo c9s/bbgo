@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/adshao/go-binance/v2"
@@ -62,29 +61,30 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[stri
 		return nil, err
 	}
 
-	m := make(map[string]bool)
+	m := make(map[string]struct{})
+	exists := struct{}{}
 
 	for _, s := range symbol {
-		m[strings.ToUpper(s)] = true
+		m[s] = exists
 	}
 
-	for _, retrievedStats := range changeStats {
-		if _, ok := m[retrievedStats.Symbol]; len(symbol) != 0 && !ok {
+	for _, stats := range changeStats {
+		if _, ok := m[stats.Symbol]; len(symbol) != 0 && !ok {
 			continue
 		}
 
 		tick := types.Ticker{
-			Volume: util.MustParseFloat(retrievedStats.Volume),
-			Last:   util.MustParseFloat(retrievedStats.LastPrice),
-			Open:   util.MustParseFloat(retrievedStats.OpenPrice),
-			High:   util.MustParseFloat(retrievedStats.HighPrice),
-			Low:    util.MustParseFloat(retrievedStats.LowPrice),
-			Buy:    util.MustParseFloat(retrievedStats.BidPrice),
-			Sell:   util.MustParseFloat(retrievedStats.AskPrice),
-			Time:   time.Unix(retrievedStats.CloseTime, 0),
+			Volume: util.MustParseFloat(stats.Volume),
+			Last:   util.MustParseFloat(stats.LastPrice),
+			Open:   util.MustParseFloat(stats.OpenPrice),
+			High:   util.MustParseFloat(stats.HighPrice),
+			Low:    util.MustParseFloat(stats.LowPrice),
+			Buy:    util.MustParseFloat(stats.BidPrice),
+			Sell:   util.MustParseFloat(stats.AskPrice),
+			Time:   time.Unix(0, stats.CloseTime*int64(time.Millisecond)),
 		}
 
-		ret[retrievedStats.Symbol] = tick
+		ret[stats.Symbol] = tick
 	}
 
 	return ret, nil
