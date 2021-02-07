@@ -43,6 +43,56 @@ func (e *Exchange) Name() types.ExchangeName {
 	return types.ExchangeMax
 }
 
+func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[string]types.Ticker, error) {
+	var ret = make(map[string]types.Ticker)
+
+	if len(symbol) == 1 {
+		ticker, err := e.client.PublicService.Ticker(toLocalSymbol(symbol[0]))
+		if err != nil {
+			return nil, err
+		}
+		ret[toGlobalSymbol(symbol[0])] = types.Ticker{
+			Time:   ticker.Time,
+			Volume: util.MustParseFloat(ticker.Volume),
+			Last:   util.MustParseFloat(ticker.Last),
+			Open:   util.MustParseFloat(ticker.Open),
+			High:   util.MustParseFloat(ticker.High),
+			Low:    util.MustParseFloat(ticker.Low),
+			Buy:    util.MustParseFloat(ticker.Buy),
+			Sell:   util.MustParseFloat(ticker.Sell),
+		}
+	} else {
+		tickers, err := e.client.PublicService.Tickers()
+		if err != nil {
+			return nil, err
+		}
+
+		m := make(map[string]struct{})
+		exists := struct{}{}
+		for _, s := range symbol {
+			m[toGlobalSymbol(s)] = exists
+		}
+
+		for k, v := range tickers {
+			if _, ok := m[toGlobalSymbol(k)]; len(symbol) != 0 && !ok {
+				continue
+			}
+			ret[toGlobalSymbol(k)] = types.Ticker{
+				Time:   v.Time,
+				Volume: util.MustParseFloat(v.Volume),
+				Last:   util.MustParseFloat(v.Last),
+				Open:   util.MustParseFloat(v.Open),
+				High:   util.MustParseFloat(v.High),
+				Low:    util.MustParseFloat(v.Low),
+				Buy:    util.MustParseFloat(v.Buy),
+				Sell:   util.MustParseFloat(v.Sell),
+			}
+		}
+	}
+
+	return ret, nil
+}
+
 func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 	log.Info("querying market info...")
 
@@ -485,7 +535,7 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 	// workaround for the kline query, because MAX does not support query by end time
 	// so we need to use the given end time and the limit number to calculate the start time
 	if options.EndTime != nil && options.StartTime == nil {
-		startTime := options.EndTime.Add(- time.Duration(limit) * interval.Duration())
+		startTime := options.EndTime.Add(-time.Duration(limit) * interval.Duration())
 		options.StartTime = &startTime
 	}
 
