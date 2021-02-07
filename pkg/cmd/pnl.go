@@ -100,7 +100,7 @@ var PnLCmd = &cobra.Command{
 			return err
 		}
 
-		currentTick, ok := tickers[strings.ToUpper(symbol)]
+		currentTick, ok := tickers[symbol]
 
 		if !ok {
 			return errors.New("no ticker data for current price")
