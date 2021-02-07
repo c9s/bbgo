@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -48,11 +47,11 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[stri
 	var ret = make(map[string]types.Ticker)
 
 	if len(symbol) == 1 {
-		ticker, err := e.client.PublicService.Ticker(strings.ToLower(symbol[0]))
+		ticker, err := e.client.PublicService.Ticker(toLocalSymbol(symbol[0]))
 		if err != nil {
 			return nil, err
 		}
-		ret[strings.ToUpper(symbol[0])] = types.Ticker{
+		ret[toGlobalSymbol(symbol[0])] = types.Ticker{
 			Time:   ticker.Time,
 			Volume: util.MustParseFloat(ticker.Volume),
 			Last:   util.MustParseFloat(ticker.Last),
@@ -68,16 +67,17 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[stri
 			return nil, err
 		}
 
-		m := make(map[string]bool)
+		m := make(map[string]struct{})
+		exists := struct{}{}
 		for _, s := range symbol {
-			m[strings.ToUpper(s)] = true
+			m[toGlobalSymbol(s)] = exists
 		}
 
 		for k, v := range tickers {
-			if _, ok := m[strings.ToUpper(k)]; len(symbol) != 0 && !ok {
+			if _, ok := m[toGlobalSymbol(k)]; len(symbol) != 0 && !ok {
 				continue
 			}
-			ret[strings.ToUpper(k)] = types.Ticker{
+			ret[toGlobalSymbol(k)] = types.Ticker{
 				Time:   v.Time,
 				Volume: util.MustParseFloat(v.Volume),
 				Last:   util.MustParseFloat(v.Last),
