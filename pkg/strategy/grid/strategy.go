@@ -97,7 +97,7 @@ func (s *Strategy) placeGridOrders(orderExecutor bbgo.OrderExecutor, session *bb
 	baseBalance, ok := balances[s.Market.BaseCurrency]
 	if ok && baseBalance.Available > 0 {
 		log.Infof("placing sell order from %f ~ %f per grid %f", (currentPriceF + gridSize).Float64(), s.UpperPrice.Float64(), gridSize.Float64())
-		for price := currentPriceF + gridSize; price <= s.UpperPrice; price += gridSize {
+		for price := currentPriceF + gridSize; s.LowerPrice <= price && price <= s.UpperPrice; price += gridSize {
 			order := types.SubmitOrder{
 				Symbol:      s.Symbol,
 				Side:        types.SideTypeSell,
@@ -117,7 +117,8 @@ func (s *Strategy) placeGridOrders(orderExecutor bbgo.OrderExecutor, session *bb
 	if ok && quoteBalance.Available > 0 {
 		log.Infof("placing buy order from %f ~ %f per grid %f", (currentPriceF - gridSize).Float64(), s.LowerPrice.Float64(), gridSize.Float64())
 
-		for price := currentPriceF - gridSize; price >= s.LowerPrice; price -= gridSize {
+		// check upper price here
+		for price := currentPriceF - gridSize; s.LowerPrice <= price && price <= s.UpperPrice; price -= gridSize {
 			order := types.SubmitOrder{
 				Symbol:      s.Symbol,
 				Side:        types.SideTypeBuy,
