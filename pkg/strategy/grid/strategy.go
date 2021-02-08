@@ -111,7 +111,7 @@ func (s *Strategy) generateGridSellOrders(session *bbgo.ExchangeSession) ([]type
 	}
 
 	log.Infof("placing grid sell orders from %f ~ %f, grid spread %f",
-		startPrice,
+		startPrice.Float64(),
 		s.UpperPrice.Float64(),
 		gridSpread.Float64())
 
