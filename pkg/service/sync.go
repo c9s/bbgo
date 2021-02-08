@@ -92,7 +92,6 @@ func (s *SyncService) SyncTrades(ctx context.Context, exchange types.Exchange, s
 	batch := &types.ExchangeBatchProcessor{Exchange: exchange}
 	tradeC, errC := batch.BatchQueryTrades(ctx, symbol, &types.TradeQueryOptions{
 		StartTime:   &startTime,
-		Limit:       200,
 		LastTradeID: lastID,
 	})
 
