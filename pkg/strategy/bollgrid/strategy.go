@@ -175,11 +175,11 @@ func (s *Strategy) updateAskOrders(orderExecutor bbgo.OrderExecutor, session *bb
 }
 
 func (s *Strategy) placeGridOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) {
-	quoteCurrency := s.Market.QuoteCurrency
 	balances := session.Account.Balances()
+	quoteBalance := balances[s.Market.QuoteCurrency].Available.Float64()
+	baseBalance := balances[s.Market.BaseCurrency].Available.Float64()
 
-	balance, ok := balances[quoteCurrency]
-	if !ok || balance.Available <= 0 {
+	if quoteBalance <= 0 && baseBalance <= 0 {
 		return
 	}
 
@@ -222,22 +222,6 @@ func (s *Strategy) placeGridOrders(orderExecutor bbgo.OrderExecutor, session *bb
 			side = types.SideTypeBuy
 		}
 
-		// trend up
-		switch side {
-
-		case types.SideTypeBuy:
-			if ema7.Last() > ema25.Last()*1.001 && ema25.Last() > ema99.Last()*1.0005 {
-				log.Infof("all ema lines trend up, skip buy")
-				continue
-			}
-
-		case types.SideTypeSell:
-			if ema7.Last() < ema25.Last()*(1-0.004) && ema25.Last() < ema99.Last()*(1-0.0005) {
-				log.Infof("all ema lines trend down, skip sell")
-				continue
-			}
-		}
-
 		order := types.SubmitOrder{
 			Symbol:      s.Symbol,
 			Side:        side,
@@ -247,6 +231,32 @@ func (s *Strategy) placeGridOrders(orderExecutor bbgo.OrderExecutor, session *bb
 			Price:       price,
 			TimeInForce: "GTC",
 		}
+
+		switch side {
+
+		case types.SideTypeBuy:
+			if ema7.Last() > ema25.Last()*1.001 && ema25.Last() > ema99.Last()*1.0005 {
+				log.Infof("all ema lines trend up, skip buy")
+				continue
+			}
+			if quoteBalance < order.Quantity {
+				log.Infof("quote balance %f is not enough, stop generating buy orders", quoteBalance)
+				continue
+			}
+			quoteBalance -= order.Quantity
+
+		case types.SideTypeSell:
+			if ema7.Last() < ema25.Last()*(1-0.004) && ema25.Last() < ema99.Last()*(1-0.0005) {
+				log.Infof("all ema lines trend down, skip sell")
+				continue
+			}
+			if baseBalance < order.Quantity {
+				log.Infof("base balance %f is not enough, stop generating sell orders", baseBalance)
+				continue
+			}
+			baseBalance -= order.Quantity
+		}
+
 		log.Infof("submitting order: %s", order.String())
 		orders = append(orders, order)
 	}
