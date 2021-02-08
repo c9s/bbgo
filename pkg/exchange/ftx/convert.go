@@ -1,7 +1,7 @@
 package ftx
 
-func toGlobalCurrency(original string) string {
-	// TODO: where's the definition of global currency
+import "strings"
 
-	return original
+func toGlobalCurrency(original string) string {
+	return strings.ToUpper(strings.TrimSpace(original))
 }
