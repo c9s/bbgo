@@ -80,15 +80,12 @@ export default function Home() {
                           justify="space-around"
                           alignItems="flex-start"
                           spacing={1}>
-                        <Grid item xs={12} md={3}>
+                        <Grid item xs={12} md={8}>
                             <TotalAssetSummary assets={assets}/>
-                        </Grid>
-
-                        <Grid item xs={12} md={6}>
                             <TotalAssetsPie assets={assets}/>
                         </Grid>
 
-                        <Grid item xs={12} md={3}>
+                        <Grid item xs={12} md={4}>
                             <TotalAssetDetails assets={assets}/>
                         </Grid>
                     </Grid>
