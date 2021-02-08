@@ -35,7 +35,7 @@ func NewExchange(key, secret string, subAccount string) *Exchange {
 }
 
 func (e *Exchange) Name() types.ExchangeName {
-	panic("implement me")
+	return types.ExchangeFTX
 }
 
 func (e *Exchange) PlatformFeeCurrency() string {
