@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"strings"
-	"time"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -94,17 +93,20 @@ var PnLCmd = &cobra.Command{
 		log.Infof("found checkpoints: %+v", checkpoints)
 		log.Infof("stock: %f", stockManager.Stocks.Quantity())
 
-		now := time.Now()
-		kLines, err := exchange.QueryKLines(ctx, symbol, types.Interval1m, types.KLineQueryOptions{
-			Limit:   100,
-			EndTime: &now,
-		})
+		tickers, err := exchange.QueryTickers(ctx, symbol)
 
-		if len(kLines) == 0 {
-			return errors.New("no kline data for current price")
+		if err != nil {
+			return err
 		}
 
-		currentPrice := kLines[len(kLines)-1].Close
+		currentTick, ok := tickers[symbol]
+
+		if !ok {
+			return errors.New("no ticker data for current price")
+		}
+
+		currentPrice := currentTick.Last
+
 		calculator := &pnl.AverageCostCalculator{
 			TradingFeeCurrency: tradingFeeCurrency,
 		}
