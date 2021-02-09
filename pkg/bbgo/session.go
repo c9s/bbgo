@@ -492,19 +492,19 @@ func (session *ExchangeSession) UpdatePrices(ctx context.Context) (err error) {
 
 	balances := session.Account.Balances()
 
+	symbols := make([]string, len(balances))
 	for _, b := range balances {
-		priceSymbol := b.Currency + "USDT"
-		startTime := time.Now().Add(-10 * time.Minute)
-		klines, err := session.Exchange.QueryKLines(ctx, priceSymbol, types.Interval1m, types.KLineQueryOptions{
-			Limit:     100,
-			StartTime: &startTime,
-		})
+		symbols = append(symbols, b.Currency + "USDT")
+	}
 
-		if err != nil || len(klines) == 0 {
-			continue
-		}
+	tickers, err := session.Exchange.QueryTickers(ctx, symbols...)
 
-		session.lastPrices[priceSymbol] = klines[len(klines)-1].Close
+	if err != nil || len(tickers) == 0 {
+		return err
+	}
+
+	for k, v := range tickers {
+		session.lastPrices[k] = v.Last
 	}
 
 	session.lastPriceUpdatedAt = time.Now()
