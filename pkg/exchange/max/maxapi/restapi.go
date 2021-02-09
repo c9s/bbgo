@@ -274,7 +274,7 @@ func (c *RestClient) sendRequest(req *http.Request) (*util.Response, error) {
 	}
 
 	// Check error, if there is an error, return the ErrorResponse struct type
-	if isError(response) {
+	if response.IsError() {
 		errorResponse, err := toErrorResponse(response)
 		if err != nil {
 			return response, err
@@ -357,12 +357,6 @@ func (r *ErrorResponse) Error() string {
 		r.Err.Code,
 		r.Err.Message,
 	)
-}
-
-// isError check the response status code so see if a response is an error.
-func isError(response *util.Response) bool {
-	var c = response.StatusCode
-	return c < 200 || c > 299
 }
 
 // toErrorResponse tries to convert/parse the server response to the standard Error interface object
