@@ -141,3 +141,19 @@ func NewFromInt(val int) Value {
 func NewFromInt64(val int64) Value {
 	return Value(val * DefaultPow)
 }
+
+func Min(a, b Value) Value {
+	if a < b {
+		return a
+	}
+
+	return b
+}
+
+func Max(a, b Value) Value {
+	if a > b {
+		return a
+	}
+
+	return b
+}
