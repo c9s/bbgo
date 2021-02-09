@@ -3,6 +3,7 @@ package grid
 import (
 	"context"
 	"fmt"
+	"hash/fnv"
 	"sync"
 
 	"github.com/sirupsen/logrus"
@@ -52,7 +53,7 @@ type Strategy struct {
 	LowerPrice fixedpoint.Value `json:"lowerPrice" yaml:"lowerPrice"`
 
 	// Quantity is the quantity you want to submit for each order.
-	Quantity float64 `json:"quantity,omitempty"`
+	Quantity fixedpoint.Value `json:"quantity,omitempty"`
 
 	// FixedAmount is used for fixed amount (dynamic quantity) if you don't want to use fixed quantity.
 	FixedAmount fixedpoint.Value `json:"amount,omitempty" yaml:"amount"`
@@ -69,77 +70,175 @@ type Strategy struct {
 
 	// any created orders for tracking trades
 	orders map[uint64]types.Order
+
+	groupID int64
 }
 
 func (s *Strategy) ID() string {
 	return ID
 }
 
+func (s *Strategy) generateGridSellOrders(session *bbgo.ExchangeSession) ([]types.SubmitOrder, error) {
+	currentPriceFloat, ok := session.LastPrice(s.Symbol)
+	if !ok {
+		return nil, fmt.Errorf("%s last price not found, skipping", s.Symbol)
+	}
+
+	currentPrice := fixedpoint.NewFromFloat(currentPriceFloat)
+	priceRange := s.UpperPrice - s.LowerPrice
+	if priceRange <= 0 {
+		return nil, fmt.Errorf("upper price %f should not be less than or equal to lower price %f", s.UpperPrice.Float64(), s.LowerPrice.Float64())
+	}
+
+	numGrids := fixedpoint.NewFromInt(s.GridNum)
+	gridSpread := priceRange.Div(numGrids)
+	startPrice := fixedpoint.Max(s.LowerPrice, currentPrice+gridSpread)
+
+	if startPrice > s.UpperPrice {
+		return nil, fmt.Errorf("current price %f exceeded the upper price boundary %f",
+			currentPrice.Float64(),
+			s.UpperPrice.Float64())
+	}
+
+	balances := session.Account.Balances()
+	baseBalance, ok := balances[s.Market.BaseCurrency]
+	if !ok {
+		return nil, fmt.Errorf("base balance %s not found", s.Market.BaseCurrency)
+	}
+
+	if baseBalance.Available == 0 {
+		return nil, fmt.Errorf("base balance %s is zero: %+v", s.Market.BaseCurrency, baseBalance)
+	}
+
+	log.Infof("placing grid sell orders from %f ~ %f, grid spread %f",
+		startPrice.Float64(),
+		s.UpperPrice.Float64(),
+		gridSpread.Float64())
+
+	var orders []types.SubmitOrder
+	for price := startPrice; s.LowerPrice <= price && price <= s.UpperPrice; price += gridSpread {
+		quantity := s.Quantity
+		if s.FixedAmount > 0 {
+			quantity = s.FixedAmount.Div(price)
+		}
+
+		// quoteQuantity := price.Mul(quantity)
+		if baseBalance.Available < quantity {
+			return orders, fmt.Errorf("base balance %f is not enough, stop generating orders", baseBalance.Available.Float64())
+		}
+
+		orders = append(orders, types.SubmitOrder{
+			Symbol:      s.Symbol,
+			Side:        types.SideTypeSell,
+			Type:        types.OrderTypeLimit,
+			Market:      s.Market,
+			Quantity:    quantity.Float64(),
+			Price:       price.Float64(),
+			TimeInForce: "GTC",
+			GroupID:     s.groupID,
+		})
+		baseBalance.Available -= quantity
+	}
+
+	return orders, nil
+}
+
+func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types.SubmitOrder, error) {
+	currentPriceFloat, ok := session.LastPrice(s.Symbol)
+	if !ok {
+		return nil, fmt.Errorf("%s last price not found, skipping", s.Symbol)
+	}
+
+	currentPrice := fixedpoint.NewFromFloat(currentPriceFloat)
+	priceRange := s.UpperPrice - s.LowerPrice
+	if priceRange <= 0 {
+		return nil, fmt.Errorf("upper price %f should not be less than or equal to lower price %f", s.UpperPrice.Float64(), s.LowerPrice.Float64())
+	}
+
+	numGrids := fixedpoint.NewFromInt(s.GridNum)
+	gridSpread := priceRange.Div(numGrids)
+	startPrice := fixedpoint.Min(s.UpperPrice, currentPrice-gridSpread)
+
+	if startPrice < s.LowerPrice {
+		return nil, fmt.Errorf("current price %f exceeded the lower price boundary %f",
+			currentPrice.Float64(),
+			s.UpperPrice.Float64())
+	}
+
+	balances := session.Account.Balances()
+	balance, ok := balances[s.Market.QuoteCurrency]
+	if !ok {
+		return nil, fmt.Errorf("quote balance %s not found", s.Market.QuoteCurrency)
+	}
+
+	if balance.Available == 0 {
+		return nil, fmt.Errorf("quote balance %s is zero: %+v", s.Market.QuoteCurrency, balance)
+	}
+
+	log.Infof("placing grid buy orders from %f to %f, grid spread %f",
+		(currentPrice - gridSpread).Float64(),
+		s.LowerPrice.Float64(),
+		gridSpread.Float64())
+
+	var orders []types.SubmitOrder
+	for price := startPrice; s.LowerPrice <= price && price <= s.UpperPrice; price -= gridSpread {
+		quantity := s.Quantity
+		if s.FixedAmount > 0 {
+			quantity = s.FixedAmount.Div(price)
+		}
+
+		quoteQuantity := price.Mul(quantity)
+		if balance.Available < quoteQuantity {
+			return orders, fmt.Errorf("quote balance %f is not enough for %f, stop generating orders",
+				balance.Available.Float64(),
+				quoteQuantity.Float64())
+		}
+
+		orders = append(orders, types.SubmitOrder{
+			Symbol:      s.Symbol,
+			Side:        types.SideTypeBuy,
+			Type:        types.OrderTypeLimit,
+			Market:      s.Market,
+			Quantity:    quantity.Float64(),
+			Price:       price.Float64(),
+			TimeInForce: "GTC",
+			GroupID:     s.groupID,
+		})
+		balance.Available -= quoteQuantity
+	}
+
+	return orders, nil
+}
+
 func (s *Strategy) placeGridOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) {
 	log.Infof("placing grid orders...")
 
-	quoteCurrency := s.Market.QuoteCurrency
-	balances := session.Account.Balances()
-
-	currentPrice, ok := session.LastPrice(s.Symbol)
-	if !ok {
-		log.Warn("last price not found, skipping")
-		return
-	}
-
-	currentPriceF := fixedpoint.NewFromFloat(currentPrice)
-	priceRange := s.UpperPrice - s.LowerPrice
-	gridSize := priceRange.Div(fixedpoint.NewFromInt(s.GridNum))
-
-	var bidOrders []types.SubmitOrder
-	var askOrders []types.SubmitOrder
-
-	baseBalance, ok := balances[s.Market.BaseCurrency]
-	if ok && baseBalance.Available > 0 {
-		log.Infof("placing sell order from %f ~ %f per grid %f", (currentPriceF + gridSize).Float64(), s.UpperPrice.Float64(), gridSize.Float64())
-		for price := currentPriceF + gridSize; price <= s.UpperPrice; price += gridSize {
-			order := types.SubmitOrder{
-				Symbol:      s.Symbol,
-				Side:        types.SideTypeSell,
-				Type:        types.OrderTypeLimit,
-				Market:      s.Market,
-				Quantity:    s.Quantity,
-				Price:       price.Float64(),
-				TimeInForce: "GTC",
-			}
-			askOrders = append(askOrders, order)
-		}
-	} else {
-		log.Warnf("base balance is not enough, we can't place ask orders")
-	}
-
-	quoteBalance, ok := balances[quoteCurrency]
-	if ok && quoteBalance.Available > 0 {
-		log.Infof("placing buy order from %f ~ %f per grid %f", (currentPriceF - gridSize).Float64(), s.LowerPrice.Float64(), gridSize.Float64())
-
-		for price := currentPriceF - gridSize; price >= s.LowerPrice; price -= gridSize {
-			order := types.SubmitOrder{
-				Symbol:      s.Symbol,
-				Side:        types.SideTypeBuy,
-				Type:        types.OrderTypeLimit,
-				Market:      s.Market,
-				Quantity:    s.Quantity,
-				Price:       price.Float64(),
-				TimeInForce: "GTC",
-			}
-			bidOrders = append(bidOrders, order)
-		}
-	} else {
-		log.Warnf("quote balance is not enough, we can't place bid orders")
-	}
-
-	createdOrders, err := orderExecutor.SubmitOrders(context.Background(), append(bidOrders, askOrders...)...)
+	sellOrders, err := s.generateGridSellOrders(session)
 	if err != nil {
-		log.WithError(err).Errorf("can not place orders")
-		return
+		log.Warn(err.Error())
+	}
+	if len(sellOrders) > 0 {
+		createdSellOrders, err := orderExecutor.SubmitOrders(context.Background(), sellOrders...)
+		if err != nil {
+			log.WithError(err).Error(err.Error())
+		} else {
+			s.activeOrders.Add(createdSellOrders...)
+		}
 	}
 
-	s.activeOrders.Add(createdOrders...)
+	buyOrders, err := s.generateGridBuyOrders(session)
+	if err != nil {
+		log.Warn(err.Error())
+	}
+
+	if len(buyOrders) > 0 {
+		createdBuyOrders, err := orderExecutor.SubmitOrders(context.Background(), buyOrders...)
+		if err != nil {
+			log.WithError(err).Error(err.Error())
+		} else {
+			s.activeOrders.Add(createdBuyOrders...)
+		}
+	}
 }
 
 func (s *Strategy) tradeUpdateHandler(trade types.Trade) {
@@ -186,6 +285,7 @@ func (s *Strategy) submitReverseOrder(order types.Order) {
 		Quantity:    quantity,
 		Price:       price,
 		TimeInForce: "GTC",
+		GroupID:     s.groupID,
 	}
 
 	log.Infof("submitting reverse order: %s against %s", submitOrder.String(), order.String())
@@ -213,6 +313,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		return fmt.Errorf("upper price (%f) should not be less than lower price (%f)", s.UpperPrice.Float64(), s.LowerPrice.Float64())
 	}
 
+	instanceID := fmt.Sprintf("grid-%s-%d", s.Symbol, s.GridNum)
+	s.groupID = generateGroupID(instanceID)
+	log.Infof("using group id %d from fnv(%s)", s.groupID, instanceID)
+
 	s.orderStore = bbgo.NewOrderStore(s.Symbol)
 	s.orderStore.BindStream(session.Stream)
 
@@ -237,4 +341,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 
 	return nil
+}
+
+func generateGroupID(s string) int64 {
+	h := fnv.New32a()
+	h.Write([]byte(s))
+	return int64(h.Sum32())
 }
