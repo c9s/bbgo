@@ -53,14 +53,15 @@ type Market struct {
 	QuoteCurrency   string
 	BaseCurrency    string
 
-	// The MIN_NOTIONAL filter defines the minimum notional value allowed for an order on a symbol. An order's notional value is the price * quantity
+	// The MIN_NOTIONAL filter defines the minimum notional value allowed for an order on a symbol.
+	// An order's notional value is the price * quantity
 	MinNotional float64
 	MinAmount   float64
 
 	// The LOT_SIZE filter defines the quantity
-	MinLot      float64
 	MinQuantity float64
 	MaxQuantity float64
+	StepSize    float64
 
 	MinPrice float64
 	MaxPrice float64
@@ -86,17 +87,25 @@ func (m Market) FormatPriceCurrency(val float64) string {
 
 func (m Market) FormatPrice(val float64) string {
 	// p := math.Pow10(m.PricePrecision)
-	prec := int(math.Abs(math.Log10(m.MinPrice)))
+	return formatPrice(val, m.TickSize)
+}
+
+func formatPrice(price float64, tickSize float64) string {
+	prec := int(math.Round(math.Abs(math.Log10(tickSize))))
 	p := math.Pow10(prec)
-	val = math.Trunc(val*p) / p
-	return strconv.FormatFloat(val, 'f', prec, 64)
+	price = math.Trunc(price*p) / p
+	return strconv.FormatFloat(price, 'f', prec, 64)
 }
 
 func (m Market) FormatQuantity(val float64) string {
-	prec := int(math.Abs(math.Log10(m.MinLot)))
+	return formatQuantity(val, m.StepSize)
+}
+
+func formatQuantity(quantity float64, lot float64) string {
+	prec := int(math.Round(math.Abs(math.Log10(lot))))
 	p := math.Pow10(prec)
-	val = math.Trunc(val*p) / p
-	return strconv.FormatFloat(val, 'f', prec, 64)
+	quantity = math.Trunc(quantity*p) / p
+	return strconv.FormatFloat(quantity, 'f', prec, 64)
 }
 
 func (m Market) FormatVolume(val float64) string {

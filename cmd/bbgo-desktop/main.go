@@ -114,7 +114,6 @@ func main() {
 		}
 
 		// for setup mode, we don't start the trader
-		trader.Subscribe()
 		if err := trader.Run(ctx); err != nil {
 			log.WithError(err).Error("failed to start trader")
 			return

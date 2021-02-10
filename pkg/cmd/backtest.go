@@ -214,8 +214,6 @@ var BacktestCmd = &cobra.Command{
 			log.Warnf("backtest does not support CrossExchangeStrategy, strategies won't be added.")
 		}
 
-		trader.Subscribe()
-
 		if err := trader.Run(ctx); err != nil {
 			return err
 		}

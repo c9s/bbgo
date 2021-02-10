@@ -6,7 +6,7 @@ import (
 	"math"
 
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -33,7 +33,7 @@ type ExchangeOrderExecutionRouter struct {
 func (e *ExchangeOrderExecutionRouter) SubmitOrdersTo(ctx context.Context, session string, orders ...types.SubmitOrder) (types.OrderSlice, error) {
 	es, ok := e.sessions[session]
 	if !ok {
-		return nil, fmt.Errorf("exchange Session %s not found", session)
+		return nil, fmt.Errorf("exchange session %s not found", session)
 	}
 
 	formattedOrders, err := formatOrders(es, orders)
@@ -85,7 +85,7 @@ func (e *ExchangeOrderExecutor) SubmitOrders(ctx context.Context, orders ...type
 			e.Notify(":memo: Submitting %s %s %s order with quantity: %s", order.Symbol, order.Type, order.Side, order.QuantityString, order)
 		}
 
-		logrus.Infof("submitting order: %s", order.String())
+		log.Infof("submitting order: %s", order.String())
 	}
 
 	e.notifySubmitOrders(formattedOrders...)
@@ -94,7 +94,7 @@ func (e *ExchangeOrderExecutor) SubmitOrders(ctx context.Context, orders ...type
 }
 
 type BasicRiskController struct {
-	Logger *logrus.Logger
+	Logger *log.Logger
 
 	MaxOrderAmount      fixedpoint.Value `json:"maxOrderAmount,omitempty"`
 	MinQuoteBalance     fixedpoint.Value `json:"minQuoteBalance,omitempty"`
@@ -258,12 +258,12 @@ func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...
 				continue
 			}
 
-			if quantity < market.MinLot {
+			if quantity < market.MinQuantity {
 				addError(
 					fmt.Errorf(
 						"can not place sell order, quantity %f is less than the minimal lot %f, order: %s",
 						quantity,
-						market.MinLot,
+						market.MinQuantity,
 						order.String()))
 				continue
 			}

@@ -267,8 +267,6 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config, enableApiServer
 		return err
 	}
 
-	trader.Subscribe()
-
 	if err := trader.Run(ctx); err != nil {
 		return err
 	}
