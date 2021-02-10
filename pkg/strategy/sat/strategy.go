@@ -66,21 +66,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		return fmt.Errorf("market %s is not defined", s.Symbol)
 	}
 
-	_, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
-		Symbol:           s.Symbol,
-		Market:           market,
-		Type:             types.OrderTypeLimit,
-		Side:             types.SideTypeSell,
-		Price:            27.0,
-		Quantity:         0.5,
-		MarginSideEffect: types.SideEffectTypeAutoRepay,
-		TimeInForce:      "GTC",
-	})
-	if err != nil {
-		log.WithError(err).Error("submit profit target order error")
-		return err
-	}
-
 	standardIndicatorSet, ok := session.StandardIndicatorSet(s.Symbol)
 	if !ok {
 		return fmt.Errorf("standardIndicatorSet is nil, symbol %s", s.Symbol)

@@ -61,4 +61,4 @@ desktop: static build/BBGO.app/Contents/MacOS/bbgo-desktop
 tools:
 	GO111MODULES=off go get github.com/markbates/pkger/cmd/pkger
 
-.PHONY: dist migrations static desktop .FORCE
+.PHONY: bbgo dist migrations static desktop .FORCE
