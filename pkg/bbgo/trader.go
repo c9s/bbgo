@@ -148,6 +148,8 @@ func (trader *Trader) Subscribe() {
 }
 
 func (trader *Trader) Run(ctx context.Context) error {
+	trader.Subscribe()
+
 	if err := trader.environment.Init(ctx); err != nil {
 		return err
 	}

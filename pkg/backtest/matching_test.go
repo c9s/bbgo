@@ -40,7 +40,6 @@ func TestSimplePriceMatching_LimitOrder(t *testing.T) {
 		BaseCurrency:    "BTC",
 		MinNotional:     0.001,
 		MinAmount:       10.0,
-		MinLot:          0.001,
 		MinQuantity:     0.001,
 	}
 
