@@ -113,12 +113,14 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 			BaseCurrency:    toGlobalCurrency(m.BaseUnit),
 			MinNotional:     m.MinQuoteAmount,
 			MinAmount:       m.MinQuoteAmount,
-			MinLot:          1.0 / math.Pow10(m.BaseUnitPrecision), // make it like 0.0001
-			MinQuantity:     m.MinBaseAmount,
-			MaxQuantity:     10000.0,
-			MinPrice:        1.0 / math.Pow10(m.QuoteUnitPrecision), // used in the price formatter
-			MaxPrice:        10000.0,
-			TickSize:        1.0 / math.Pow10(m.QuoteUnitPrecision),
+
+			MinQuantity: m.MinBaseAmount,
+			MaxQuantity: 10000.0,
+			StepSize:    1.0 / math.Pow10(m.BaseUnitPrecision), // make it like 0.0001
+
+			MinPrice: 1.0 / math.Pow10(m.QuoteUnitPrecision), // used in the price formatter
+			MaxPrice: 10000.0,
+			TickSize: 1.0 / math.Pow10(m.QuoteUnitPrecision),
 		}
 
 		markets[symbol] = market

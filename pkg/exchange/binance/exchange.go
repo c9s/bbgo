@@ -119,10 +119,9 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 		//	maxQty defines the maximum quantity/icebergQty allowed.
 		//	stepSize defines the intervals that a quantity/icebergQty can be increased/decreased by.
 		if f := symbol.LotSizeFilter(); f != nil {
-			market.MinLot = util.MustParseFloat(f.MinQuantity)
 			market.MinQuantity = util.MustParseFloat(f.MinQuantity)
 			market.MaxQuantity = util.MustParseFloat(f.MaxQuantity)
-			// market.StepSize = util.MustParseFloat(f.StepSize)
+			market.StepSize = util.MustParseFloat(f.StepSize)
 		}
 
 		if f := symbol.PriceFilter(); f != nil {
@@ -438,8 +437,11 @@ func (e *Exchange) submitMarginOrder(ctx context.Context, order types.SubmitOrde
 	req := e.Client.NewCreateMarginOrderService().
 		Symbol(order.Symbol).
 		Type(orderType).
-		Side(binance.SideType(order.Side)).
-		NewClientOrderID(clientOrderID)
+		Side(binance.SideType(order.Side))
+
+	if len(clientOrderID) > 0 {
+		req.NewClientOrderID(clientOrderID)
+	}
 
 	// use response result format
 	req.NewOrderRespType(binance.NewOrderRespTypeRESULT)
@@ -460,15 +462,19 @@ func (e *Exchange) submitMarginOrder(ctx context.Context, order types.SubmitOrde
 		req.Quantity(strconv.FormatFloat(order.Quantity, 'f', 8, 64))
 	}
 
-	if len(order.PriceString) > 0 {
-		req.Price(order.PriceString)
-	} else if order.Market.Symbol != "" {
-		req.Price(order.Market.FormatPrice(order.Price))
-	} else {
-		req.Price(strconv.FormatFloat(order.Price, 'f', 8, 64))
+	// set price field for limit orders
+	switch order.Type {
+	case types.OrderTypeStopLimit, types.OrderTypeLimit:
+		if len(order.PriceString) > 0 {
+			req.Price(order.PriceString)
+		} else if order.Market.Symbol != "" {
+			req.Price(order.Market.FormatPrice(order.Price))
+		}
 	}
 
+	// set stop price
 	switch order.Type {
+
 	case types.OrderTypeStopLimit, types.OrderTypeStopMarket:
 		if len(order.StopPriceString) == 0 {
 			return nil, fmt.Errorf("stop price string can not be empty")
