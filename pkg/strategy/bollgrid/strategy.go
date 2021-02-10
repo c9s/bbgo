@@ -2,6 +2,7 @@ package bollgrid
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/sirupsen/logrus"
@@ -92,171 +93,145 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval.String()})
 }
 
-func (s *Strategy) updateBidOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) {
-	quoteCurrency := s.Market.QuoteCurrency
+func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types.SubmitOrder, error) {
 	balances := session.Account.Balances()
-
-	balance, ok := balances[quoteCurrency]
-	if !ok || balance.Available <= 0 {
-		return
+	quoteBalance := balances[s.Market.QuoteCurrency].Available
+	if quoteBalance <= 0 {
+		return nil, fmt.Errorf("quote balance %s is zero: %+v", s.Market.QuoteCurrency, quoteBalance.Float64())
 	}
 
-	var downBand = s.boll.LastDownBand()
-	if downBand <= 0.0 {
-		return
-	}
-
-	var startPrice = downBand
-
-	var submitOrders []types.SubmitOrder
-	for i := 0; i < s.GridNum; i++ {
-		submitOrders = append(submitOrders, types.SubmitOrder{
-			Symbol:      s.Symbol,
-			Side:        types.SideTypeBuy,
-			Type:        types.OrderTypeLimit,
-			Market:      s.Market,
-			Quantity:    s.Quantity,
-			Price:       startPrice,
-			TimeInForce: "GTC",
-		})
-
-		startPrice -= s.GridPips.Float64()
-	}
-
-	orders, err := orderExecutor.SubmitOrders(context.Background(), submitOrders...)
-	if err != nil {
-		log.WithError(err).Errorf("can not place orders")
-		return
-	}
-
-	s.activeOrders.Add(orders...)
-	s.orders.Add(orders...)
-}
-
-func (s *Strategy) updateAskOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) {
-	baseCurrency := s.Market.BaseCurrency
-	balances := session.Account.Balances()
-
-	balance, ok := balances[baseCurrency]
-	if !ok || balance.Available <= 0 {
-		return
-	}
-
-	var upBand = s.boll.LastUpBand()
+	upBand, downBand := s.boll.LastUpBand(), s.boll.LastDownBand()
 	if upBand <= 0.0 {
-		return
+		return nil, fmt.Errorf("up band == 0")
 	}
-
-	var startPrice = upBand
-
-	var submitOrders []types.SubmitOrder
-	for i := 0; i < s.GridNum; i++ {
-		submitOrders = append(submitOrders, types.SubmitOrder{
-			Symbol:      s.Symbol,
-			Side:        types.SideTypeSell,
-			Type:        types.OrderTypeLimit,
-			Market:      s.Market,
-			Quantity:    s.Quantity,
-			Price:       startPrice,
-			TimeInForce: "GTC",
-		})
-
-		startPrice += s.GridPips.Float64()
-	}
-
-	orders, err := orderExecutor.SubmitOrders(context.Background(), submitOrders...)
-	if err != nil {
-		log.WithError(err).Errorf("can not place orders")
-		return
-	}
-
-	s.orders.Add(orders...)
-	s.activeOrders.Add(orders...)
-}
-
-func (s *Strategy) placeGridOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) {
-	quoteCurrency := s.Market.QuoteCurrency
-	balances := session.Account.Balances()
-
-	balance, ok := balances[quoteCurrency]
-	if !ok || balance.Available <= 0 {
-		return
-	}
-
-	var upBand = s.boll.LastUpBand()
-	if upBand <= 0.0 {
-		log.Warnf("up band == 0")
-		return
-	}
-
-	var downBand = s.boll.LastDownBand()
 	if downBand <= 0.0 {
-		log.Warnf("down band == 0")
-		return
+		return nil, fmt.Errorf("down band == 0")
 	}
 
 	currentPrice, ok := session.LastPrice(s.Symbol)
 	if !ok {
-		log.Warnf("last price not found")
-		return
+		return nil, fmt.Errorf("last price not found")
 	}
 
 	if currentPrice > upBand || currentPrice < downBand {
-		log.Warnf("current price exceed the bollinger band")
-		return
+		return nil, fmt.Errorf("current price exceed the bollinger band")
 	}
 
 	ema99 := s.StandardIndicatorSet.EWMA(types.IntervalWindow{Interval: s.Interval, Window: 99})
 	ema25 := s.StandardIndicatorSet.EWMA(types.IntervalWindow{Interval: s.Interval, Window: 25})
 	ema7 := s.StandardIndicatorSet.EWMA(types.IntervalWindow{Interval: s.Interval, Window: 7})
+	if ema7.Last() > ema25.Last()*1.001 && ema25.Last() > ema99.Last()*1.0005 {
+		log.Infof("all ema lines trend up, skip buy")
+		return nil, nil
+	}
 
 	priceRange := upBand - downBand
 	gridSize := priceRange / float64(s.GridNum)
 
 	var orders []types.SubmitOrder
-	for price := downBand; price <= upBand; price += gridSize {
-		var side types.SideType
-		if price > currentPrice {
-			side = types.SideTypeSell
-		} else {
-			side = types.SideTypeBuy
+	for price := upBand; price >= downBand; price -= gridSize {
+		if price >= currentPrice {
+			continue
 		}
-
-		// trend up
-		switch side {
-
-		case types.SideTypeBuy:
-			if ema7.Last() > ema25.Last()*1.001 && ema25.Last() > ema99.Last()*1.0005 {
-				log.Infof("all ema lines trend up, skip buy")
-				continue
-			}
-
-		case types.SideTypeSell:
-			if ema7.Last() < ema25.Last()*(1-0.004) && ema25.Last() < ema99.Last()*(1-0.0005) {
-				log.Infof("all ema lines trend down, skip sell")
-				continue
-			}
-		}
-
 		order := types.SubmitOrder{
 			Symbol:      s.Symbol,
-			Side:        side,
+			Side:        types.SideTypeBuy,
 			Type:        types.OrderTypeLimit,
 			Market:      s.Market,
 			Quantity:    s.Quantity,
 			Price:       price,
 			TimeInForce: "GTC",
 		}
+		quotaQuantity := fixedpoint.NewFromFloat(order.Quantity).MulFloat64(price)
+		if quoteBalance < quotaQuantity {
+			log.Infof("quote balance %f is not enough, stop generating buy orders", quoteBalance.Float64())
+			break
+		}
+		quoteBalance = quotaQuantity.Sub(quotaQuantity)
 		log.Infof("submitting order: %s", order.String())
 		orders = append(orders, order)
 	}
+	return orders, nil
+}
+
+func (s *Strategy) generateGridSellOrders(session *bbgo.ExchangeSession) ([]types.SubmitOrder, error) {
+	balances := session.Account.Balances()
+	baseBalance := balances[s.Market.BaseCurrency].Available
+	if baseBalance <= 0 {
+		return nil, fmt.Errorf("base balance %s is zero: %+v", s.Market.BaseCurrency, baseBalance.Float64())
+	}
+
+	upBand, downBand := s.boll.LastUpBand(), s.boll.LastDownBand()
+	if upBand <= 0.0 {
+		return nil, fmt.Errorf("up band == 0")
+	}
+	if downBand <= 0.0 {
+		return nil, fmt.Errorf("down band == 0")
+	}
+
+	currentPrice, ok := session.LastPrice(s.Symbol)
+	if !ok {
+		return nil, fmt.Errorf("last price not found")
+	}
+
+	if currentPrice > upBand || currentPrice < downBand {
+		return nil, fmt.Errorf("current price exceed the bollinger band")
+	}
+
+	ema99 := s.StandardIndicatorSet.EWMA(types.IntervalWindow{Interval: s.Interval, Window: 99})
+	ema25 := s.StandardIndicatorSet.EWMA(types.IntervalWindow{Interval: s.Interval, Window: 25})
+	ema7 := s.StandardIndicatorSet.EWMA(types.IntervalWindow{Interval: s.Interval, Window: 7})
+	if ema7.Last() < ema25.Last()*(1-0.004) && ema25.Last() < ema99.Last()*(1-0.0005) {
+		log.Infof("all ema lines trend down, skip sell")
+		return nil, nil
+	}
+
+	priceRange := upBand - downBand
+	gridSize := priceRange / float64(s.GridNum)
+
+	var orders []types.SubmitOrder
+	for price := downBand; price <= upBand; price += gridSize {
+		if price <= currentPrice {
+			continue
+		}
+		order := types.SubmitOrder{
+			Symbol:      s.Symbol,
+			Side:        types.SideTypeSell,
+			Type:        types.OrderTypeLimit,
+			Market:      s.Market,
+			Quantity:    s.Quantity,
+			Price:       price,
+			TimeInForce: "GTC",
+		}
+		baseQuantity := fixedpoint.NewFromFloat(order.Quantity)
+		if baseBalance < baseQuantity {
+			log.Infof("base balance %f is not enough, stop generating sell orders", baseBalance.Float64())
+			break
+		}
+		baseBalance = baseBalance.Sub(baseQuantity)
+		log.Infof("submitting order: %s", order.String())
+		orders = append(orders, order)
+	}
+	return orders, nil
+}
+
+func (s *Strategy) placeGridOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) {
+	sellOrders, err := s.generateGridSellOrders(session)
+	if err != nil {
+		log.Warn(err.Error())
+	}
+	buyOrders, err := s.generateGridBuyOrders(session)
+	if err != nil {
+		log.Warn(err.Error())
+	}
+
+	orders := append(sellOrders, buyOrders...)
 
 	createdOrders, err := orderExecutor.SubmitOrders(context.Background(), orders...)
 	if err != nil {
 		log.WithError(err).Errorf("can not place orders")
 		return
 	}
-
 	s.activeOrders.Add(createdOrders...)
 	s.orders.Add(createdOrders...)
 }
