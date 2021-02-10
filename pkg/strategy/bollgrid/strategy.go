@@ -95,9 +95,9 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 
 func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types.SubmitOrder, error) {
 	balances := session.Account.Balances()
-	quoteBalance := balances[s.Market.QuoteCurrency].Available.Float64()
+	quoteBalance := balances[s.Market.QuoteCurrency].Available
 	if quoteBalance <= 0 {
-		return nil, fmt.Errorf("quote balance %s is zero: %+v", s.Market.QuoteCurrency, quoteBalance)
+		return nil, fmt.Errorf("quote balance %s is zero: %+v", s.Market.QuoteCurrency, quoteBalance.Float64())
 	}
 
 	upBand, downBand := s.boll.LastUpBand(), s.boll.LastDownBand()
@@ -142,11 +142,12 @@ func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types
 			Price:       price,
 			TimeInForce: "GTC",
 		}
-		if quoteBalance < order.Quantity * price {
-			log.Infof("quote balance %f is not enough, stop generating buy orders", quoteBalance)
+		quotaQuantity := fixedpoint.NewFromFloat(order.Quantity).MulFloat64(price)
+		if quoteBalance < quotaQuantity {
+			log.Infof("quote balance %f is not enough, stop generating buy orders", quoteBalance.Float64())
 			break
 		}
-		quoteBalance -= order.Quantity * price
+		quoteBalance = quotaQuantity.Sub(quotaQuantity)
 		log.Infof("submitting order: %s", order.String())
 		orders = append(orders, order)
 	}
@@ -155,9 +156,9 @@ func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types
 
 func (s *Strategy) generateGridSellOrders(session *bbgo.ExchangeSession) ([]types.SubmitOrder, error) {
 	balances := session.Account.Balances()
-	baseBalance := balances[s.Market.BaseCurrency].Available.Float64()
+	baseBalance := balances[s.Market.BaseCurrency].Available
 	if baseBalance <= 0 {
-		return nil, fmt.Errorf("base balance %s is zero: %+v", s.Market.BaseCurrency, baseBalance)
+		return nil, fmt.Errorf("base balance %s is zero: %+v", s.Market.BaseCurrency, baseBalance.Float64())
 	}
 
 	upBand, downBand := s.boll.LastUpBand(), s.boll.LastDownBand()
@@ -202,11 +203,12 @@ func (s *Strategy) generateGridSellOrders(session *bbgo.ExchangeSession) ([]type
 			Price:       price,
 			TimeInForce: "GTC",
 		}
-		if baseBalance < order.Quantity {
-			log.Infof("base balance %f is not enough, stop generating sell orders", baseBalance)
+		baseQuantity := fixedpoint.NewFromFloat(order.Quantity)
+		if baseBalance < baseQuantity {
+			log.Infof("base balance %f is not enough, stop generating sell orders", baseBalance.Float64())
 			break
 		}
-		baseBalance -= order.Quantity
+		baseBalance = baseBalance.Sub(baseQuantity)
 		log.Infof("submitting order: %s", order.String())
 		orders = append(orders, order)
 	}
