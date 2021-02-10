@@ -244,7 +244,7 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 	}
 
 	session.Stream.OnKLineClosed(func(kline types.KLine) {
-		log.Infof("kline closed: %+v", kline)
+		log.WithField("marketData", "kline").Infof("kline closed: %+v", kline)
 	})
 
 	// update last prices
