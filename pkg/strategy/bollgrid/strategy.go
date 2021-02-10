@@ -97,7 +97,7 @@ func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types
 	balances := session.Account.Balances()
 	quoteBalance := balances[s.Market.QuoteCurrency].Available
 	if quoteBalance <= 0 {
-		return nil, fmt.Errorf("quote balance %s is zero: %+v", s.Market.QuoteCurrency, quoteBalance.Float64())
+		return nil, fmt.Errorf("quote balance %s is zero: %f", s.Market.QuoteCurrency, quoteBalance.Float64())
 	}
 
 	upBand, downBand := s.boll.LastUpBand(), s.boll.LastDownBand()
