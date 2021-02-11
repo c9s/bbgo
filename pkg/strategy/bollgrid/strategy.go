@@ -146,12 +146,12 @@ func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types
 			Price:       price,
 			TimeInForce: "GTC",
 		}
-		quotaQuantity := fixedpoint.NewFromFloat(order.Quantity).MulFloat64(price)
-		if quoteBalance < quotaQuantity {
+		quoteQuantity := fixedpoint.NewFromFloat(order.Quantity).MulFloat64(price)
+		if quoteBalance < quoteQuantity {
 			log.Infof("quote balance %f is not enough, stop generating buy orders", quoteBalance.Float64())
 			break
 		}
-		quoteBalance = quotaQuantity.Sub(quotaQuantity)
+		quoteBalance = quoteBalance.Sub(quoteQuantity)
 		log.Infof("submitting order: %s", order.String())
 		orders = append(orders, order)
 	}
