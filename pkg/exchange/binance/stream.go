@@ -220,6 +220,9 @@ func (s *Stream) dial(listenKey string) (*websocket.Conn, error) {
 		return nil, err
 	}
 
+	// use the default ping handler
+	conn.SetPingHandler(nil)
+
 	return conn, nil
 }
 
