@@ -24,7 +24,7 @@ sessions:
 
   max:
     exchange: max
-    envVarPrefix: max
+    envVarPrefix: MAX
 
 riskControls:
   # This is the session-based risk controller, which let you configure different risk controller by session.
@@ -62,7 +62,7 @@ exchangeStrategies:
 - on: max
   bollgrid:
     symbol: BTCUSDT
-    interval: 1h
-    gridNumber: 100
-    quantity: 0.002
-    profitSpread: 10.0
+    interval: 5m
+    gridNumber: 2
+    quantity: 0.001
+    profitSpread: 100.0
