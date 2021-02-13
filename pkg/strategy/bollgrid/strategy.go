@@ -89,10 +89,14 @@ func (s *Strategy) ID() string {
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
+	if s.Interval == "" {
+		panic("bollgrid interval can not be empty")
+	}
+
 	// currently we need the 1m kline to update the last close price and indicators
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval.String()})
 
-	if s.Interval != s.RepostInterval {
+	if len(s.RepostInterval) > 0 && s.Interval != s.RepostInterval {
 		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.RepostInterval.String()})
 	}
 }
