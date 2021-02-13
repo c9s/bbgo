@@ -347,7 +347,15 @@ func (session *ExchangeSession) InitSymbol(ctx context.Context, environ *Environ
 	usedKLineIntervals[types.Interval1m] = struct{}{}
 
 	for _, sub := range session.Subscriptions {
-		if sub.Symbol == symbol && sub.Channel == types.KLineChannel {
+		if sub.Channel != types.KLineChannel {
+			continue
+		}
+
+		if sub.Options.Interval == "" {
+			continue
+		}
+
+		if sub.Symbol == symbol {
 			usedKLineIntervals[types.Interval(sub.Options.Interval)] = struct{}{}
 		}
 	}
@@ -445,6 +453,10 @@ func (session *ExchangeSession) OrderStores() map[string]*OrderStore {
 
 // Subscribe save the subscription info, later it will be assigned to the stream
 func (session *ExchangeSession) Subscribe(channel types.Channel, symbol string, options types.SubscribeOptions) *ExchangeSession {
+	if channel == types.KLineChannel && len(options.Interval) == 0 {
+		panic("subscription interval for kline can not be empty")
+	}
+
 	sub := types.Subscription{
 		Channel: channel,
 		Symbol:  symbol,
