@@ -1,8 +1,11 @@
 package types
 
 import (
+	"encoding/json"
 	"fmt"
+	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/slack-go/slack"
 
 	"github.com/c9s/bbgo/pkg/datatype"
@@ -23,6 +26,32 @@ var (
 	SideEffectTypeMarginBuy    MarginOrderSideEffectType = "MARGIN_BUY"
 	SideEffectTypeAutoRepay    MarginOrderSideEffectType = "AUTO_REPAY"
 )
+
+func (t *MarginOrderSideEffectType) UnmarshalJSON(data []byte) error {
+	var s string
+	var err = json.Unmarshal(data, &s)
+	if err != nil {
+		return errors.Wrapf(err, "unable to unmarshal side effect type: %s", data)
+	}
+
+	switch strings.ToUpper(s) {
+
+	case string(SideEffectTypeNoSideEffect), "":
+		*t = SideEffectTypeNoSideEffect
+		return nil
+
+	case string(SideEffectTypeMarginBuy):
+		*t = SideEffectTypeMarginBuy
+		return nil
+
+	case string(SideEffectTypeAutoRepay):
+		*t = SideEffectTypeAutoRepay
+		return nil
+
+	}
+
+	return fmt.Errorf("invalid side effect type: %s", data)
+}
 
 // OrderType define order type
 type OrderType string
