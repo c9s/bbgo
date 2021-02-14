@@ -2,7 +2,6 @@
 APP="BBGO.app"
 APP_DIR=build/$APP
 
-mkdir -p $APP_DIR/Contents/{MacOS,Resources}
 go build -o $APP_DIR/Contents/MacOS/bbgo-desktop ./cmd/bbgo-desktop
 
 cat > $APP_DIR/Contents/Info.plist << EOF
