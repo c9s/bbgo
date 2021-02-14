@@ -15,10 +15,10 @@ all: $(BIN_DIR)
 $(BIN_DIR):
 	mkdir -p $@
 
-bbgo.linux: $(BIN_DIR)
+bbgo-linux: $(BIN_DIR)
 	GOOS=linux GOARCH=$(TARGET_ARCH) go build -o $(BIN_DIR)/$@ ./cmd/bbgo
 
-bbgo.darwin: $(BIN_DIR)
+bbgo-darwin: $(BIN_DIR)
 	GOOS=darwin GOARCH=$(TARGET_ARCH) go build -o $(BIN_DIR)/$@ ./cmd/bbgo
 
 clean:
@@ -46,7 +46,7 @@ desktop.osx: $(OSX_APP_CONTENTS_DIR)/MacOS/bbgo-desktop $(OSX_APP_CONTENTS_DIR)/
 
 desktop: desktop.osx
 
-dist: static bbgo.linux bbgo.darwin desktop
+dist: static bbgo-linux bbgo-darwin desktop
 	mkdir -p $(DIST_DIR)
 	tar -C $(BUILD_DIR) -cvzf $(DIST_DIR)/bbgo-$$(git describe --tags).tar.gz .
 
@@ -64,14 +64,14 @@ docker-push:
 	docker push yoanlin/bbgo
 	bash -c "[[ -n $(DOCKER_TAG) ]] && docker push yoanlin/bbgo:$(DOCKER_TAG)"
 
-frontend/out/index.html:
+frontend/out/index.html: .FORCE
 	(cd frontend && yarn export)
 
 pkged.go: frontend/out/index.html .FORCE
 	pkger
 	git commit pkged.go -m "pkger: update bundled static files"
 
-static: frontend/out/index.html pkged.go .FORCE
+static: frontend/out/index.html pkged.go
 
 tools:
 	GO111MODULES=off go get github.com/markbates/pkger/cmd/pkger
