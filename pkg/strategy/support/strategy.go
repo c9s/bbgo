@@ -1,4 +1,4 @@
-package sat
+package support
 
 import (
 	"context"
@@ -11,8 +11,8 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-// sat -- support and targets
-const ID = "supportAndTargets"
+// support -- support and targets
+const ID = "support"
 
 var log = logrus.WithField("strategy", ID)
 
@@ -21,17 +21,19 @@ func init() {
 }
 
 type Target struct {
-	ProfitPercentage   float64 `json:"profitPercentage"`
-	QuantityPercentage float64 `json:"quantityPercentage"`
+	ProfitPercentage      float64                         `json:"profitPercentage"`
+	QuantityPercentage    float64                         `json:"quantityPercentage"`
+	MarginOrderSideEffect types.MarginOrderSideEffectType `json:"marginOrderSideEffect"`
 }
 
 type Strategy struct {
-	Symbol              string           `json:"symbol"`
-	Interval            types.Interval   `json:"interval"`
-	MovingAverageWindow int              `json:"movingAverageWindow"`
-	Quantity            fixedpoint.Value `json:"quantity"`
-	MinVolume           fixedpoint.Value `json:"minVolume"`
-	Targets             []Target         `json:"targets"`
+	Symbol                string                          `json:"symbol"`
+	Interval              types.Interval                  `json:"interval"`
+	MovingAverageWindow   int                             `json:"movingAverageWindow"`
+	Quantity              fixedpoint.Value                `json:"quantity"`
+	MinVolume             fixedpoint.Value                `json:"minVolume"`
+	MarginOrderSideEffect types.MarginOrderSideEffectType `json:"marginOrderSideEffect"`
+	Targets               []Target                        `json:"targets"`
 }
 
 func (s *Strategy) ID() string {
@@ -92,16 +94,17 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		log.Infof("found support: close price %f is under EMA %f, volume %f > minimum volume %f", closePrice, ema.Last(), kline.Volume, s.MinVolume.Float64())
 
 		quantity := s.Quantity.Float64()
-		_, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
-			Symbol:   s.Symbol,
-			Market:   market,
-			Side:     types.SideTypeBuy,
-			Type:     types.OrderTypeMarket,
-			Quantity: quantity,
 
-			// This is for Long position.
-			MarginSideEffect: types.SideEffectTypeMarginBuy,
-		})
+		orderForm := types.SubmitOrder{
+			Symbol:           s.Symbol,
+			Market:           market,
+			Side:             types.SideTypeBuy,
+			Type:             types.OrderTypeMarket,
+			Quantity:         quantity,
+			MarginSideEffect: s.MarginOrderSideEffect,
+		}
+
+		_, err := orderExecutor.SubmitOrders(ctx, orderForm)
 		if err != nil {
 			log.WithError(err).Error("submit order error")
 			return
@@ -120,8 +123,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				Price:    targetPrice,
 				Quantity: targetQuantity,
 
-				// This is for Long position.
-				MarginSideEffect: types.SideEffectTypeAutoRepay,
+				MarginSideEffect: target.MarginOrderSideEffect,
 				TimeInForce:      "GTC",
 			})
 		}
