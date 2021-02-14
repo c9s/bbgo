@@ -46,7 +46,7 @@ desktop.osx: $(OSX_APP_CONTENTS_DIR)/MacOS/bbgo-desktop $(OSX_APP_CONTENTS_DIR)/
 
 desktop: desktop.osx
 
-dist: bbgo.linux bbgo.darwin desktop
+dist: static bbgo.linux bbgo.darwin desktop
 	mkdir -p $(DIST_DIR)
 	tar -C $(BUILD_DIR) -cvzf $(DIST_DIR)/bbgo-$$(git describe --tags).tar.gz .
 
