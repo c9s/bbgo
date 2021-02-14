@@ -4,26 +4,49 @@ BIN_DIR := $(BUILD_DIR)/bbgo
 DIST_DIR ?= dist
 GIT_DESC  = $$(git describe --long --tags)
 
-all: bbgo
+OSX_APP_NAME = BBGO.app
+OSX_APP_DIR = build/$(OSX_APP_NAME)
+OSX_APP_CONTENTS_DIR = $(OSX_APP_DIR)/Contents
+OSX_APP_RESOURCES_DIR = $(OSX_APP_CONTENTS_DIR)/Resources
+
+all: $(BIN_DIR)
+	go build -o $(BIN_DIR)/$@ ./cmd/$@
 
 $(BIN_DIR):
 	mkdir -p $@
 
-bin-dir: $(BIN_DIR)
-
-bbgo-linux: $(BIN_DIR)
+bbgo.linux: $(BIN_DIR)
 	GOOS=linux GOARCH=$(TARGET_ARCH) go build -o $(BIN_DIR)/$@ ./cmd/bbgo
 
-bbgo-darwin:
+bbgo.darwin: $(BIN_DIR)
 	GOOS=darwin GOARCH=$(TARGET_ARCH) go build -o $(BIN_DIR)/$@ ./cmd/bbgo
-
-bbgo:
-	go build -o $(BIN_DIR)/$@ ./cmd/$@
 
 clean:
 	rm -rf $(BUILD_DIR) $(DIST_DIR)
 
-dist: bin-dir bbgo-linux bbgo-darwin
+$(OSX_APP_CONTENTS_DIR):
+	mkdir -p $@
+
+$(OSX_APP_CONTENTS_DIR)/MacOS: $(OSX_APP_CONTENTS_DIR)
+	mkdir -p $@
+
+$(OSX_APP_RESOURCES_DIR): $(OSX_APP_CONTENTS_DIR)
+	mkdir -p $@
+
+$(OSX_APP_RESOURCES_DIR)/icon.icns: $(OSX_APP_RESOURCES_DIR)
+	cp -v desktop/icons/icon.icns $@
+
+$(OSX_APP_CONTENTS_DIR)/Info.plist: $(OSX_APP_CONTENTS_DIR)
+	bash desktop/build-osx-info-plist.sh > $@
+
+$(OSX_APP_CONTENTS_DIR)/MacOS/bbgo-desktop: $(OSX_APP_CONTENTS_DIR)/MacOS .FORCE
+	go build -o $@ ./cmd/bbgo-desktop
+
+desktop.osx: $(OSX_APP_CONTENTS_DIR)/MacOS/bbgo-desktop $(OSX_APP_CONTENTS_DIR)/Info.plist $(OSX_APP_RESOURCES_DIR)/icon.icns
+
+desktop: desktop.osx
+
+dist: bbgo.linux bbgo.darwin desktop
 	mkdir -p $(DIST_DIR)
 	tar -C $(BUILD_DIR) -cvzf $(DIST_DIR)/bbgo-$$(git describe --tags).tar.gz .
 
@@ -37,26 +60,18 @@ docker:
 	docker build --build-arg GO_MOD_CACHE=_mod --tag yoanlin/bbgo .
 	bash -c "[[ -n $(DOCKER_TAG) ]] && docker tag yoanlin/bbgo yoanlin/bbgo:$(DOCKER_TAG)"
 
-
 docker-push:
 	docker push yoanlin/bbgo
 	bash -c "[[ -n $(DOCKER_TAG) ]] && docker push yoanlin/bbgo:$(DOCKER_TAG)"
 
-frontend/out/index.html: .FORCE
+frontend/out/index.html:
 	(cd frontend && yarn export)
 
-pkged.go: frontend/out/index.html
+pkged.go: frontend/out/index.html .FORCE
 	pkger
 	git commit pkged.go -m "pkger: update bundled static files"
 
-static: frontend/out/index.html pkged.go
-
-build/BBGO.app/Contents/MacOS/bbgo-desktop: .FORCE
-	mkdir -p $(dir $@)
-	go build -o $@ ./cmd/bbgo-desktop
-
-desktop: static build/BBGO.app/Contents/MacOS/bbgo-desktop
-	# bash desktop/build-darwin.sh
+static: frontend/out/index.html pkged.go .FORCE
 
 tools:
 	GO111MODULES=off go get github.com/markbates/pkger/cmd/pkger
