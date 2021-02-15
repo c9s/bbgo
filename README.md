@@ -283,6 +283,15 @@ Delete chart:
 helm delete bbgo
 ```
 
+## Development
+
+### Adding new migration
+
+```sh
+rockhopper --config rockhopper_sqlite.yaml create --type sql add_pnl_column
+rockhopper --config rockhopper_mysql.yaml create --type sql add_pnl_column
+```
+
 ## Support
 
 ### By contributing pull requests
