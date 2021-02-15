@@ -1,10 +1,34 @@
 package service
 
 import (
+	"context"
 	"testing"
 
+	"github.com/c9s/rockhopper"
 	"github.com/stretchr/testify/assert"
 )
+
+func Test_tradeService(t *testing.T) {
+	dialect, err := rockhopper.LoadDialect("sqlite3")
+	assert.NoError(t, err)
+	assert.NotNil(t, dialect)
+
+	db, err := rockhopper.Open("sqlite3", dialect, ":memory:")
+	assert.NoError(t, err)
+	assert.NotNil(t, db)
+
+	_, err = db.CurrentVersion()
+	assert.NoError(t, err)
+
+	var loader rockhopper.SqlMigrationLoader
+	migrations, err := loader.Load("../../migrations/sqlite3")
+	assert.NoError(t, err)
+	assert.NotEmpty(t, migrations)
+
+	ctx := context.Background()
+	err = rockhopper.Up(ctx, db, migrations, 0, 0)
+	assert.NoError(t, err)
+}
 
 func Test_queryTradingVolumeSQL(t *testing.T) {
 	t.Run("group by different period", func(t *testing.T) {
@@ -52,7 +76,7 @@ func Test_queryTradesSQL(t *testing.T) {
 			Symbol:   "btc",
 			LastGID:  123,
 			Ordering: "DESC",
-			Limit:	  500,
+			Limit:    500,
 		}))
 	})
 }
