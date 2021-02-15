@@ -248,8 +248,29 @@ func (s *TradeService) Query(options QueryTradesOptions) ([]types.Trade, error) 
 	return s.scanRows(rows)
 }
 
+func (s *TradeService) MarkStrategyID(ctx context.Context, id int64, strategyID string) error {
+	result, err := s.DB.NamedExecContext(ctx, "UPDATE `trades` SET `strategy` = :strategy WHERE `id` = :id LIMIT 1", map[string]interface{}{
+		"id":  id,
+		"strategy": strategyID,
+	})
+	if err != nil {
+		return err
+	}
+
+	cnt, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if cnt == 0 {
+		return fmt.Errorf("trade id:%d not found", id)
+	}
+
+	return nil
+}
+
 func (s *TradeService) UpdatePnL(ctx context.Context, id int64, pnl float64) error {
-	result, err := s.DB.NamedExecContext(ctx, "UPDATE `trades` SET `pnl` = :pnl WHERE `id` = :id", map[string]interface{}{
+	result, err := s.DB.NamedExecContext(ctx, "UPDATE `trades` SET `pnl` = :pnl WHERE `id` = :id LIMIT 1", map[string]interface{}{
 		"id":  id,
 		"pnl": pnl,
 	})
