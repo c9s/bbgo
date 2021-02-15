@@ -18,6 +18,7 @@
 # Dependency directories (remove the comment below to include it)
 # vendor/
 /.mod
+/_mod
 
 /.env.local
 /.env.*.local
@@ -30,4 +31,4 @@
 
 /config/bbgo.yaml
 
-/.mod
+/pkg/server/assets.go
