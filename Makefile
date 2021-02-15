@@ -9,6 +9,8 @@ OSX_APP_DIR = build/$(OSX_APP_NAME)
 OSX_APP_CONTENTS_DIR = $(OSX_APP_DIR)/Contents
 OSX_APP_RESOURCES_DIR = $(OSX_APP_CONTENTS_DIR)/Resources
 
+FRONTEND_EXPORT_DIR = frontend/out
+
 all: $(BIN_DIR)
 	go build -o $(BIN_DIR)/$@ ./cmd/$@
 
@@ -22,7 +24,7 @@ bbgo-darwin: $(BIN_DIR)
 	GOOS=darwin GOARCH=$(TARGET_ARCH) go build -o $(BIN_DIR)/$@ ./cmd/bbgo
 
 clean:
-	rm -rf $(BUILD_DIR) $(DIST_DIR)
+	rm -rf $(BUILD_DIR) $(DIST_DIR) $(FRONTEND_EXPORT_DIR)
 
 $(OSX_APP_CONTENTS_DIR):
 	mkdir -p $@
@@ -40,11 +42,11 @@ $(OSX_APP_CONTENTS_DIR)/Info.plist: $(OSX_APP_CONTENTS_DIR)
 	bash desktop/build-osx-info-plist.sh > $@
 
 $(OSX_APP_CONTENTS_DIR)/MacOS/bbgo-desktop: $(OSX_APP_CONTENTS_DIR)/MacOS .FORCE
-	go build -o $@ ./cmd/bbgo-desktop
+	go build -tags web -o $@ ./cmd/bbgo-desktop
 
-desktop.osx: $(OSX_APP_CONTENTS_DIR)/MacOS/bbgo-desktop $(OSX_APP_CONTENTS_DIR)/Info.plist $(OSX_APP_RESOURCES_DIR)/icon.icns
+desktop-osx: $(OSX_APP_CONTENTS_DIR)/MacOS/bbgo-desktop $(OSX_APP_CONTENTS_DIR)/Info.plist $(OSX_APP_RESOURCES_DIR)/icon.icns
 
-desktop: desktop.osx
+desktop: desktop-osx
 
 dist: static bbgo-linux bbgo-darwin desktop
 	mkdir -p $(DIST_DIR)
@@ -67,13 +69,14 @@ docker-push:
 frontend/out/index.html: .FORCE
 	(cd frontend && yarn export)
 
-pkged.go: frontend/out/index.html .FORCE
-	pkger
-	git commit pkged.go -m "pkger: update bundled static files"
+pkg/server/assets.go: frontend/out/index.html .FORCE
+	go run ./util/embed -package server -output $@ $(FRONTEND_EXPORT_DIR)
+	gofmt -w pkg/server/assets.go
+	git add -v $@
+	git commit $@ -m "assets: update embedded static files"
 
-static: frontend/out/index.html pkged.go
+embed: pkg/server/assets.go
 
-tools:
-	GO111MODULES=off go get github.com/markbates/pkger/cmd/pkger
+static: frontend/out/index.html pkg/server/assets.go
 
-.PHONY: bbgo dist migrations static desktop .FORCE
+.PHONY: bbgo dist migrations static embed desktop .FORCE
