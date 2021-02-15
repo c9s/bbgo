@@ -14,17 +14,20 @@ FRONTEND_EXPORT_DIR = frontend/out
 all: $(BIN_DIR)
 	go build -tags web -o $(BIN_DIR)/$@ ./cmd/$@
 
-slim:
-	go build -o $(BIN_DIR)/bbgo-slim ./cmd/bbgo
-
 $(BIN_DIR):
 	mkdir -p $@
 
 bbgo-linux: $(BIN_DIR)
-	GOOS=linux GOARCH=$(TARGET_ARCH) go build -o $(BIN_DIR)/$@ ./cmd/bbgo
+	GOOS=linux GOARCH=$(TARGET_ARCH) go build -tags web -o $(BIN_DIR)/$@ ./cmd/bbgo
 
 bbgo-darwin: $(BIN_DIR)
+	GOOS=darwin GOARCH=$(TARGET_ARCH) go build -tags web -o $(BIN_DIR)/$@ ./cmd/bbgo
+
+bbog-darwin-slim: $(BIN_DIR)
 	GOOS=darwin GOARCH=$(TARGET_ARCH) go build -o $(BIN_DIR)/$@ ./cmd/bbgo
+
+bbog-linux-slim: $(BIN_DIR)
+	GOOS=linux GOARCH=$(TARGET_ARCH) go build -o $(BIN_DIR)/$@ ./cmd/bbgo
 
 clean:
 	rm -rf $(BUILD_DIR) $(DIST_DIR) $(FRONTEND_EXPORT_DIR)
@@ -51,7 +54,7 @@ desktop-osx: $(OSX_APP_CONTENTS_DIR)/MacOS/bbgo-desktop $(OSX_APP_CONTENTS_DIR)/
 
 desktop: desktop-osx
 
-dist: static bbgo-linux bbgo-darwin desktop
+dist: static bbgo-linux bbgo-linux-slim bbgo-darwin bbgo-darwin-slim desktop
 	mkdir -p $(DIST_DIR)
 	tar -C $(BUILD_DIR) -cvzf $(DIST_DIR)/bbgo-$$(git describe --tags).tar.gz .
 
