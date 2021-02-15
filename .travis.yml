@@ -20,4 +20,5 @@ before_script:
 
 script:
 - bash scripts/test-sqlite3-migrations.sh
+- bash scripts/test-mysql-migrations.sh
 - go test -v ./pkg/...
