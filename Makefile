@@ -23,10 +23,10 @@ bbgo-linux: $(BIN_DIR)
 bbgo-darwin: $(BIN_DIR)
 	GOOS=darwin GOARCH=$(TARGET_ARCH) go build -tags web -o $(BIN_DIR)/$@ ./cmd/bbgo
 
-bbog-darwin-slim: $(BIN_DIR)
+bbgo-darwin-slim: $(BIN_DIR)
 	GOOS=darwin GOARCH=$(TARGET_ARCH) go build -o $(BIN_DIR)/$@ ./cmd/bbgo
 
-bbog-linux-slim: $(BIN_DIR)
+bbgo-linux-slim: $(BIN_DIR)
 	GOOS=linux GOARCH=$(TARGET_ARCH) go build -o $(BIN_DIR)/$@ ./cmd/bbgo
 
 clean:
