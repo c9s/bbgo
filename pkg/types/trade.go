@@ -58,6 +58,9 @@ type Trade struct {
 
 	IsMargin   bool `json:"isMargin" db:"is_margin"`
 	IsIsolated bool `json:"isIsolated" db:"is_isolated"`
+
+	StrategyID string  `json:"strategyID" db:"strategy"`
+	PnL        float64 `json:"pnl" db:"pnl"`
 }
 
 func (trade Trade) PlainText() string {
