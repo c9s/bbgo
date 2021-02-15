@@ -214,8 +214,7 @@ func (s *Server) newEngine() *gin.Engine {
 	})
 
 	r.GET("/api/strategies/single", s.listStrategies)
-	r.NoRoute(s.pkgerHandler)
-
+	r.NoRoute(s.assetsHandler)
 	return r
 }
 
