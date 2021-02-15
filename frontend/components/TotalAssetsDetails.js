@@ -30,6 +30,9 @@ const logoCurrencies = {
     "DAI": true,
     "MAX": true,
     "TWD": true,
+    "SNT": true,
+    "YFI": true,
+    "GRT": true,
 }
 
 export default function TotalAssetsDetails({assets}) {
