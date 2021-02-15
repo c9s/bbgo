@@ -5,29 +5,56 @@ import (
 	"testing"
 
 	"github.com/c9s/rockhopper"
+	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_tradeService(t *testing.T) {
+func prepareDB(t *testing.T) (*rockhopper.DB, error) {
 	dialect, err := rockhopper.LoadDialect("sqlite3")
-	assert.NoError(t, err)
+	if !assert.NoError(t, err) {
+		return nil, err
+	}
+
 	assert.NotNil(t, dialect)
 
 	db, err := rockhopper.Open("sqlite3", dialect, ":memory:")
-	assert.NoError(t, err)
+	if !assert.NoError(t, err) {
+		return nil, err
+	}
+
 	assert.NotNil(t, db)
 
 	_, err = db.CurrentVersion()
-	assert.NoError(t, err)
+	if !assert.NoError(t, err) {
+		return nil, err
+	}
 
 	var loader rockhopper.SqlMigrationLoader
 	migrations, err := loader.Load("../../migrations/sqlite3")
-	assert.NoError(t, err)
+	if !assert.NoError(t, err) {
+		return nil, err
+	}
+
 	assert.NotEmpty(t, migrations)
 
 	ctx := context.Background()
 	err = rockhopper.Up(ctx, db, migrations, 0, 0)
 	assert.NoError(t, err)
+
+	return db, err
+}
+
+func Test_tradeService(t *testing.T) {
+	db, err := prepareDB(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	xdb := sqlx.NewDb(db.DB, "sqlite3")
+	service := &TradeService{DB: xdb}
+	_ = service
+
+	defer db.Close()
 }
 
 func Test_queryTradingVolumeSQL(t *testing.T) {
