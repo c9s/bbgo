@@ -12,7 +12,10 @@ OSX_APP_RESOURCES_DIR = $(OSX_APP_CONTENTS_DIR)/Resources
 FRONTEND_EXPORT_DIR = frontend/out
 
 all: $(BIN_DIR)
-	go build -o $(BIN_DIR)/$@ ./cmd/$@
+	go build -tags web -o $(BIN_DIR)/$@ ./cmd/$@
+
+slim:
+	go build -o $(BIN_DIR)/bbgo-slim ./cmd/bbgo
 
 $(BIN_DIR):
 	mkdir -p $@
