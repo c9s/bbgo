@@ -77,9 +77,6 @@ frontend/out/index.html: .FORCE
 
 pkg/server/assets.go: frontend/out/index.html .FORCE
 	go run ./util/embed -package server -output $@ $(FRONTEND_EXPORT_DIR)
-	gofmt -w pkg/server/assets.go
-	git add -v $@
-	git commit $@ -m "assets: update embedded static files"
 
 embed: pkg/server/assets.go
 
