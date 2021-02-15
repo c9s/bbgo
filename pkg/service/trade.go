@@ -1,6 +1,8 @@
 package service
 
 import (
+	"context"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -11,6 +13,16 @@ import (
 
 	"github.com/c9s/bbgo/pkg/types"
 )
+
+type QueryTradesOptions struct {
+	Exchange types.ExchangeName
+	Symbol   string
+	LastGID  int64
+
+	// ASC or DESC
+	Ordering string
+	Limit    int
+}
 
 type TradingVolume struct {
 	Year        int       `db:"year" json:"year"`
@@ -80,7 +92,6 @@ func (s *TradeService) QueryTradingVolume(startTime time.Time, options TradingVo
 	return records, rows.Err()
 }
 
-
 func generateSqliteTradingVolumeSQL(options TradingVolumeQueryOptions) string {
 	var sel []string
 	var groupBys []string
@@ -127,7 +138,6 @@ func generateSqliteTradingVolumeSQL(options TradingVolumeQueryOptions) string {
 	return sql
 }
 
-
 func generateMysqlTradingVolumeQuerySQL(options TradingVolumeQueryOptions) string {
 	var sel []string
 	var groupBys []string
@@ -136,8 +146,6 @@ func generateMysqlTradingVolumeQuerySQL(options TradingVolumeQueryOptions) strin
 
 	switch options.GroupByPeriod {
 	case "month":
-
-
 
 		sel = append(sel, "YEAR(traded_at) AS year", "MONTH(traded_at) AS month")
 		groupBys = append([]string{"MONTH(traded_at)", "YEAR(traded_at)"}, groupBys...)
@@ -221,15 +229,6 @@ func (s *TradeService) QueryForTradingFeeCurrency(ex types.ExchangeName, symbol 
 	return s.scanRows(rows)
 }
 
-type QueryTradesOptions struct {
-	Exchange types.ExchangeName
-	Symbol   string
-	LastGID  int64
-	// ASC or DESC
-	Ordering string
-	Limit	 int
-}
-
 func (s *TradeService) Query(options QueryTradesOptions) ([]types.Trade, error) {
 	sql := queryTradesSQL(options)
 
@@ -247,6 +246,28 @@ func (s *TradeService) Query(options QueryTradesOptions) ([]types.Trade, error) 
 	defer rows.Close()
 
 	return s.scanRows(rows)
+}
+
+func (s *TradeService) UpdatePnL(ctx context.Context, id int64, pnl float64) error {
+	result, err := s.DB.NamedExecContext(ctx, "UPDATE `trades` SET `pnl` = :pnl WHERE `id` = :id", map[string]interface{}{
+		"id":  id,
+		"pnl": pnl,
+	})
+	if err != nil {
+		return err
+	}
+
+	cnt, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if cnt == 0 {
+		return fmt.Errorf("trade id:%d not found", id)
+	}
+
+	return nil
+
 }
 
 func queryTradesSQL(options QueryTradesOptions) string {
