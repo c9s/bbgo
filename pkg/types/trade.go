@@ -1,6 +1,7 @@
 package types
 
 import (
+	"database/sql"
 	"fmt"
 	"sync"
 
@@ -59,8 +60,8 @@ type Trade struct {
 	IsMargin   bool `json:"isMargin" db:"is_margin"`
 	IsIsolated bool `json:"isIsolated" db:"is_isolated"`
 
-	StrategyID string  `json:"strategyID" db:"strategy"`
-	PnL        float64 `json:"pnl" db:"pnl"`
+	StrategyID string          `json:"strategyID" db:"strategy"`
+	PnL        sql.NullFloat64 `json:"pnl" db:"pnl"`
 }
 
 func (trade Trade) PlainText() string {
