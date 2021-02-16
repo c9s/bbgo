@@ -7,6 +7,8 @@ import (
 	"github.com/c9s/rockhopper"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 func prepareDB(t *testing.T) (*rockhopper.DB, error) {
@@ -50,11 +52,42 @@ func Test_tradeService(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	defer db.Close()
+
+	ctx := context.Background()
+
 	xdb := sqlx.NewDb(db.DB, "sqlite3")
 	service := &TradeService{DB: xdb}
-	_ = service
 
-	defer db.Close()
+	err = service.Insert(types.Trade{
+		ID:            1,
+		OrderID:       1,
+		Exchange:      "binance",
+		Price:         1000.0,
+		Quantity:      0.1,
+		QuoteQuantity: 1000.0 * 0.1,
+		Symbol:        "BTCUSDT",
+		Side:          "BUY",
+		IsBuyer:       true,
+	})
+	assert.NoError(t, err)
+
+	err = service.MarkStrategyID(ctx, 1, "grid")
+	assert.NoError(t, err)
+
+	tradeRecord, err := service.Load(ctx, 1)
+	assert.NoError(t, err)
+	assert.NotNil(t, tradeRecord)
+	assert.Equal(t, "grid", tradeRecord.StrategyID)
+
+	err = service.UpdatePnL(ctx, 1, 10.0)
+	assert.NoError(t, err)
+
+	tradeRecord, err = service.Load(ctx, 1)
+	assert.NoError(t, err)
+	assert.NotNil(t, tradeRecord)
+	assert.True(t, tradeRecord.PnL.Valid)
+	assert.Equal(t, 10.0, tradeRecord.PnL.Float64)
 }
 
 func Test_queryTradingVolumeSQL(t *testing.T) {

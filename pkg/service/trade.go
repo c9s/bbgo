@@ -14,6 +14,8 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+var ErrTradeNotFound = errors.New("trade not found")
+
 type QueryTradesOptions struct {
 	Exchange types.ExchangeName
 	Symbol   string
@@ -248,9 +250,30 @@ func (s *TradeService) Query(options QueryTradesOptions) ([]types.Trade, error) 
 	return s.scanRows(rows)
 }
 
+func (s *TradeService) Load(ctx context.Context, id int64) (*types.Trade, error) {
+	var trade types.Trade
+
+	rows, err := s.DB.NamedQuery("SELECT * FROM trades WHERE id = :id", map[string]interface{}{
+		"id": id,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	if rows.Next() {
+		err = rows.StructScan(&trade)
+		return &trade, err
+	}
+
+	return nil, errors.Wrapf(ErrTradeNotFound,"trade id:%d not found", id)
+}
+
+
 func (s *TradeService) MarkStrategyID(ctx context.Context, id int64, strategyID string) error {
-	result, err := s.DB.NamedExecContext(ctx, "UPDATE `trades` SET `strategy` = :strategy WHERE `id` = :id LIMIT 1", map[string]interface{}{
-		"id":  id,
+	result, err := s.DB.NamedExecContext(ctx, "UPDATE `trades` SET `strategy` = :strategy WHERE `id` = :id", map[string]interface{}{
+		"id":       id,
 		"strategy": strategyID,
 	})
 	if err != nil {
@@ -270,7 +293,7 @@ func (s *TradeService) MarkStrategyID(ctx context.Context, id int64, strategyID 
 }
 
 func (s *TradeService) UpdatePnL(ctx context.Context, id int64, pnl float64) error {
-	result, err := s.DB.NamedExecContext(ctx, "UPDATE `trades` SET `pnl` = :pnl WHERE `id` = :id LIMIT 1", map[string]interface{}{
+	result, err := s.DB.NamedExecContext(ctx, "UPDATE `trades` SET `pnl` = :pnl WHERE `id` = :id", map[string]interface{}{
 		"id":  id,
 		"pnl": pnl,
 	})
