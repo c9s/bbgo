@@ -286,7 +286,7 @@ func (trader *Trader) injectCommonServices(rs reflect.Value) error {
 	}
 
 	if trader.environment.TradeService != nil {
-		if err := injectField(rs, "TradeService", &trader.environment.TradeService, true); err != nil {
+		if err := injectField(rs, "TradeService", trader.environment.TradeService, true); err != nil {
 			return errors.Wrap(err, "failed to inject TradeService")
 		}
 	}
