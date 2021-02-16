@@ -37,7 +37,6 @@ func init() {
 	RunCmd.Flags().String("totp-account-name", "", "")
 	RunCmd.Flags().Bool("enable-web-server", false, "enable web server")
 	RunCmd.Flags().Bool("setup", false, "use setup mode")
-	RunCmd.Flags().String("since", "", "pnl since time")
 	RootCmd.AddCommand(RunCmd)
 }
 
@@ -227,7 +226,9 @@ func ConfigureTrader(trader *bbgo.Trader, userConfig *bbgo.Config) error {
 	for _, entry := range userConfig.ExchangeStrategies {
 		for _, mount := range entry.Mounts {
 			log.Infof("attaching strategy %T on %s...", entry.Strategy, mount)
-			trader.AttachStrategyOn(mount, entry.Strategy)
+			if err := trader.AttachStrategyOn(mount, entry.Strategy) ; err != nil {
+				return err
+			}
 		}
 	}
 
