@@ -206,7 +206,7 @@ func (trader *Trader) getSessionOrderExecutor(sessionName string) OrderExecutor 
 
 	// Since the risk controls are loaded from the config file
 	if trader.riskControls != nil && trader.riskControls.SessionBasedRiskControl != nil {
-		if control, ok := trader.riskControls.SessionBasedRiskControl[sessionName] ; ok {
+		if control, ok := trader.riskControls.SessionBasedRiskControl[sessionName]; ok {
 			control.SetBaseOrderExecutor(session.orderExecutor)
 
 			// pick the wrapped order executor
@@ -260,33 +260,6 @@ func (trader *Trader) Run(ctx context.Context) error {
 			continue
 		}
 
-		if field, ok := hasField(rs, "Persistence"); ok {
-			if trader.environment.PersistenceServiceFacade == nil {
-				log.Warnf("strategy has Persistence field but persistence service is not defined")
-			} else {
-				log.Infof("found Persistence field, injecting...")
-				if field.IsNil() {
-					field.Set(reflect.ValueOf(&Persistence{
-						PersistenceSelector: &PersistenceSelector{
-							StoreID: "default",
-							Type:    "memory",
-						},
-						Facade: trader.environment.PersistenceServiceFacade,
-					}))
-				} else {
-					elem := field.Elem()
-					if elem.Kind() != reflect.Struct {
-						return fmt.Errorf("the field Persistence is not a struct element")
-					}
-
-					if err := injectField(elem, "Facade", trader.environment.PersistenceServiceFacade, true); err != nil {
-						log.WithError(err).Errorf("strategy Persistence injection failed")
-						return err
-					}
-				}
-			}
-		}
-
 		if err := trader.injectCommonServices(rs); err != nil {
 			return err
 		}
@@ -310,6 +283,31 @@ func (trader *Trader) injectCommonServices(rs reflect.Value) error {
 
 	if err := injectField(rs, "Notifiability", &trader.environment.Notifiability, false); err != nil {
 		return errors.Wrap(err, "failed to inject Notifiability")
+	}
+
+	if field, ok := hasField(rs, "Persistence"); ok {
+		if trader.environment.PersistenceServiceFacade == nil {
+			log.Warnf("strategy has Persistence field but persistence service is not defined")
+		} else {
+			if field.IsNil() {
+				field.Set(reflect.ValueOf(&Persistence{
+					PersistenceSelector: &PersistenceSelector{
+						StoreID: "default",
+						Type:    "memory",
+					},
+					Facade: trader.environment.PersistenceServiceFacade,
+				}))
+			} else {
+				elem := field.Elem()
+				if elem.Kind() != reflect.Struct {
+					return fmt.Errorf("field Persistence is not a struct element")
+				}
+
+				if err := injectField(elem, "Facade", trader.environment.PersistenceServiceFacade, true); err != nil {
+					return errors.Wrap(err, "failed to inject Persistence")
+				}
+			}
+		}
 	}
 
 	return nil
