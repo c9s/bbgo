@@ -285,6 +285,12 @@ func (trader *Trader) injectCommonServices(rs reflect.Value) error {
 		return errors.Wrap(err, "failed to inject Notifiability")
 	}
 
+	if trader.environment.TradeService != nil {
+		if err := injectField(rs, "TradeService", &trader.environment.TradeService, true); err != nil {
+			return errors.Wrap(err, "failed to inject TradeService")
+		}
+	}
+
 	if field, ok := hasField(rs, "Persistence"); ok {
 		if trader.environment.PersistenceServiceFacade == nil {
 			log.Warnf("strategy has Persistence field but persistence service is not defined")
