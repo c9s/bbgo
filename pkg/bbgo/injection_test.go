@@ -9,7 +9,6 @@ import (
 	"github.com/c9s/bbgo/pkg/service"
 )
 
-
 func Test_injectField(t *testing.T) {
 	type TT struct {
 		TradeService *service.TradeService
