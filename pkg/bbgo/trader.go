@@ -249,52 +249,54 @@ func (trader *Trader) Run(ctx context.Context) error {
 
 	for _, strategy := range trader.crossExchangeStrategies {
 		rs := reflect.ValueOf(strategy)
-		if rs.Elem().Kind() == reflect.Struct {
-			// get the struct element
-			rs = rs.Elem()
 
-			if field, ok := hasField(rs, "Persistence"); ok {
-				if trader.environment.PersistenceServiceFacade == nil {
-					log.Warnf("strategy has Persistence field but persistence service is not defined")
+		if rs.Elem().Kind() != reflect.Struct {
+			continue
+		}
+
+		// get the struct element from the struct pointer
+		rs = rs.Elem()
+
+		if field, ok := hasField(rs, "Persistence"); ok {
+			if trader.environment.PersistenceServiceFacade == nil {
+				log.Warnf("strategy has Persistence field but persistence service is not defined")
+			} else {
+				log.Infof("found Persistence field, injecting...")
+				if field.IsNil() {
+					field.Set(reflect.ValueOf(&Persistence{
+						PersistenceSelector: &PersistenceSelector{
+							StoreID: "default",
+							Type:    "memory",
+						},
+						Facade: trader.environment.PersistenceServiceFacade,
+					}))
 				} else {
-					log.Infof("found Persistence field, injecting...")
-					if field.IsNil() {
-						field.Set(reflect.ValueOf(&Persistence{
-							PersistenceSelector: &PersistenceSelector{
-								StoreID: "default",
-								Type:    "memory",
-							},
-							Facade: trader.environment.PersistenceServiceFacade,
-						}))
-					} else {
-						elem := field.Elem()
-						if elem.Kind() != reflect.Struct {
-							return fmt.Errorf("the field Persistence is not a struct element")
-						}
+					elem := field.Elem()
+					if elem.Kind() != reflect.Struct {
+						return fmt.Errorf("the field Persistence is not a struct element")
+					}
 
-						if err := injectField(elem, "Facade", trader.environment.PersistenceServiceFacade, true); err != nil {
-							log.WithError(err).Errorf("strategy Persistence injection failed")
-							return err
-						}
+					if err := injectField(elem, "Facade", trader.environment.PersistenceServiceFacade, true); err != nil {
+						log.WithError(err).Errorf("strategy Persistence injection failed")
+						return err
 					}
 				}
 			}
+		}
 
-			if err := injectField(rs, "Graceful", &trader.Graceful, true); err != nil {
-				log.WithError(err).Errorf("strategy Graceful injection failed")
-				return err
-			}
+		if err := injectField(rs, "Graceful", &trader.Graceful, true); err != nil {
+			log.WithError(err).Errorf("strategy Graceful injection failed")
+			return err
+		}
 
-			if err := injectField(rs, "Logger", &trader.logger, false); err != nil {
-				log.WithError(err).Errorf("strategy Logger injection failed")
-				return err
-			}
+		if err := injectField(rs, "Logger", &trader.logger, false); err != nil {
+			log.WithError(err).Errorf("strategy Logger injection failed")
+			return err
+		}
 
-			if err := injectField(rs, "Notifiability", &trader.environment.Notifiability, false); err != nil {
-				log.WithError(err).Errorf("strategy Notifiability injection failed")
-				return err
-			}
-
+		if err := injectField(rs, "Notifiability", &trader.environment.Notifiability, false); err != nil {
+			log.WithError(err).Errorf("strategy Notifiability injection failed")
+			return err
 		}
 
 		if err := strategy.CrossRun(ctx, router, trader.environment.sessions); err != nil {
