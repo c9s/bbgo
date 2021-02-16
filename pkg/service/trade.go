@@ -267,9 +267,8 @@ func (s *TradeService) Load(ctx context.Context, id int64) (*types.Trade, error)
 		return &trade, err
 	}
 
-	return nil, errors.Wrapf(ErrTradeNotFound,"trade id:%d not found", id)
+	return nil, errors.Wrapf(ErrTradeNotFound, "trade id:%d not found", id)
 }
-
 
 func (s *TradeService) MarkStrategyID(ctx context.Context, id int64, strategyID string) error {
 	result, err := s.DB.NamedExecContext(ctx, "UPDATE `trades` SET `strategy` = :strategy WHERE `id` = :id", map[string]interface{}{
@@ -348,7 +347,10 @@ func queryTradesSQL(options QueryTradesOptions) string {
 
 	sql += ` ORDER BY gid ` + ordering
 
-	sql += ` LIMIT ` + strconv.Itoa(options.Limit)
+	if options.Limit > 0 {
+		sql += ` LIMIT ` + strconv.Itoa(options.Limit)
+	}
+
 	return sql
 }
 
