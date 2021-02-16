@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"sync"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/types"
@@ -178,58 +179,46 @@ func (trader *Trader) Run(ctx context.Context) error {
 
 		for _, strategy := range strategies {
 			rs := reflect.ValueOf(strategy)
-			if rs.Elem().Kind() == reflect.Struct {
-				// get the struct element
-				rs = rs.Elem()
 
-				if err := injectField(rs, "Graceful", &trader.Graceful, true); err != nil {
-					log.WithError(err).Errorf("strategy Graceful injection failed")
-					return err
-				}
+			// get the struct element
+			rs = rs.Elem()
 
-				if err := injectField(rs, "Logger", &trader.logger, false); err != nil {
-					log.WithError(err).Errorf("strategy Logger injection failed")
-					return err
-				}
+			if rs.Kind() != reflect.Struct {
+				continue
+			}
 
-				if err := injectField(rs, "Notifiability", &trader.environment.Notifiability, false); err != nil {
-					log.WithError(err).Errorf("strategy Notifiability injection failed")
-					return err
-				}
+			if err := trader.injectCommonServices(rs); err != nil {
+				return err
+			}
 
-				if err := injectField(rs, "OrderExecutor", orderExecutor, false); err != nil {
-					log.WithError(err).Errorf("strategy OrderExecutor injection failed")
-					return err
-				}
+			if err := injectField(rs, "OrderExecutor", orderExecutor, false); err != nil {
+				return errors.Wrapf(err, "failed to inject OrderExecutor on %T", strategy)
+			}
 
-				if symbol, ok := isSymbolBasedStrategy(rs); ok {
-					log.Infof("found symbol based strategy from %s", rs.Type())
-					if _, ok := hasField(rs, "Market"); ok {
-						if market, ok := session.Market(symbol); ok {
-							// let's make the market object passed by pointer
-							if err := injectField(rs, "Market", &market, false); err != nil {
-								log.WithError(err).Errorf("strategy %T Market injection failed", strategy)
-								return err
-							}
+			if symbol, ok := isSymbolBasedStrategy(rs); ok {
+				log.Debugf("found symbol based strategy from %s", rs.Type())
+				if _, ok := hasField(rs, "Market"); ok {
+					if market, ok := session.Market(symbol); ok {
+						// let's make the market object passed by pointer
+						if err := injectField(rs, "Market", &market, false); err != nil {
+							return errors.Wrapf(err, "failed to inject Market on %T", strategy)
 						}
 					}
+				}
 
-					// StandardIndicatorSet
-					if _, ok := hasField(rs, "StandardIndicatorSet"); ok {
-						if indicatorSet, ok := session.StandardIndicatorSet(symbol); ok {
-							if err := injectField(rs, "StandardIndicatorSet", indicatorSet, true); err != nil {
-								log.WithError(err).Errorf("strategy %T StandardIndicatorSet injection failed", strategy)
-								return err
-							}
+				// StandardIndicatorSet
+				if _, ok := hasField(rs, "StandardIndicatorSet"); ok {
+					if indicatorSet, ok := session.StandardIndicatorSet(symbol); ok {
+						if err := injectField(rs, "StandardIndicatorSet", indicatorSet, true); err != nil {
+							return errors.Wrapf(err, "failed to inject StandardIndicatorSet on %T", strategy)
 						}
 					}
+				}
 
-					if _, ok := hasField(rs, "MarketDataStore"); ok {
-						if store, ok := session.MarketDataStore(symbol); ok {
-							if err := injectField(rs, "MarketDataStore", store, true); err != nil {
-								log.WithError(err).Errorf("strategy %T MarketDataStore injection failed", strategy)
-								return err
-							}
+				if _, ok := hasField(rs, "MarketDataStore"); ok {
+					if store, ok := session.MarketDataStore(symbol); ok {
+						if err := injectField(rs, "MarketDataStore", store, true); err != nil {
+							return errors.Wrapf(err, "failed to inject MarketDataStore on %T", strategy)
 						}
 					}
 				}
@@ -250,12 +239,12 @@ func (trader *Trader) Run(ctx context.Context) error {
 	for _, strategy := range trader.crossExchangeStrategies {
 		rs := reflect.ValueOf(strategy)
 
-		if rs.Elem().Kind() != reflect.Struct {
-			continue
-		}
-
 		// get the struct element from the struct pointer
 		rs = rs.Elem()
+
+		if rs.Kind() != reflect.Struct {
+			continue
+		}
 
 		if field, ok := hasField(rs, "Persistence"); ok {
 			if trader.environment.PersistenceServiceFacade == nil {
@@ -284,18 +273,7 @@ func (trader *Trader) Run(ctx context.Context) error {
 			}
 		}
 
-		if err := injectField(rs, "Graceful", &trader.Graceful, true); err != nil {
-			log.WithError(err).Errorf("strategy Graceful injection failed")
-			return err
-		}
-
-		if err := injectField(rs, "Logger", &trader.logger, false); err != nil {
-			log.WithError(err).Errorf("strategy Logger injection failed")
-			return err
-		}
-
-		if err := injectField(rs, "Notifiability", &trader.environment.Notifiability, false); err != nil {
-			log.WithError(err).Errorf("strategy Notifiability injection failed")
+		if err := trader.injectCommonServices(rs); err != nil {
 			return err
 		}
 
@@ -305,6 +283,22 @@ func (trader *Trader) Run(ctx context.Context) error {
 	}
 
 	return trader.environment.Connect(ctx)
+}
+
+func (trader *Trader) injectCommonServices(rs reflect.Value) error {
+	if err := injectField(rs, "Graceful", &trader.Graceful, true); err != nil {
+		return errors.Wrap(err, "failed to inject Graceful")
+	}
+
+	if err := injectField(rs, "Logger", &trader.logger, false); err != nil {
+		return errors.Wrap(err, "failed to inject Logger")
+	}
+
+	if err := injectField(rs, "Notifiability", &trader.environment.Notifiability, false); err != nil {
+		return errors.Wrap(err, "failed to inject Notifiability")
+	}
+
+	return nil
 }
 
 // ReportPnL configure and set the PnLReporter with the given notifier
