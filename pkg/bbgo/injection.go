@@ -3,8 +3,6 @@ package bbgo
 import (
 	"fmt"
 	"reflect"
-
-	"github.com/sirupsen/logrus"
 )
 
 func isSymbolBasedStrategy(rs reflect.Value) (string, bool) {
@@ -30,8 +28,6 @@ func injectField(rs reflect.Value, fieldName string, obj interface{}, pointerOnl
 	if !field.IsValid() {
 		return nil
 	}
-
-	logrus.Infof("found %s in %s, injecting %T...", fieldName, rs.Type(), obj)
 
 	if !field.CanSet() {
 		return fmt.Errorf("field %s of %s can not be set", fieldName, rs.Type())
