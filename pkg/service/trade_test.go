@@ -78,7 +78,8 @@ func Test_tradeService(t *testing.T) {
 	tradeRecord, err := service.Load(ctx, 1)
 	assert.NoError(t, err)
 	assert.NotNil(t, tradeRecord)
-	assert.Equal(t, "grid", tradeRecord.StrategyID)
+	assert.True(t, tradeRecord.StrategyID.Valid)
+	assert.Equal(t, "grid", tradeRecord.StrategyID.String)
 
 	err = service.UpdatePnL(ctx, 1, 10.0)
 	assert.NoError(t, err)
