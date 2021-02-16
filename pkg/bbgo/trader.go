@@ -148,6 +148,92 @@ func (trader *Trader) Subscribe() {
 	}
 }
 
+func (trader *Trader) RunSingleExchangeStrategy(ctx context.Context, strategy SingleExchangeStrategy, session *ExchangeSession, orderExecutor OrderExecutor) error {
+	rs := reflect.ValueOf(strategy)
+
+	// get the struct element
+	rs = rs.Elem()
+
+	if rs.Kind() != reflect.Struct {
+		return errors.New("strategy object is not a struct")
+	}
+
+	if err := trader.injectCommonServices(rs); err != nil {
+		return err
+	}
+
+	if err := injectField(rs, "OrderExecutor", orderExecutor, false); err != nil {
+		return errors.Wrapf(err, "failed to inject OrderExecutor on %T", strategy)
+	}
+
+	if symbol, ok := isSymbolBasedStrategy(rs); ok {
+		log.Debugf("found symbol based strategy from %s", rs.Type())
+		if _, ok := hasField(rs, "Market"); ok {
+			if market, ok := session.Market(symbol); ok {
+				// let's make the market object passed by pointer
+				if err := injectField(rs, "Market", &market, false); err != nil {
+					return errors.Wrapf(err, "failed to inject Market on %T", strategy)
+				}
+			}
+		}
+
+		// StandardIndicatorSet
+		if _, ok := hasField(rs, "StandardIndicatorSet"); ok {
+			if indicatorSet, ok := session.StandardIndicatorSet(symbol); ok {
+				if err := injectField(rs, "StandardIndicatorSet", indicatorSet, true); err != nil {
+					return errors.Wrapf(err, "failed to inject StandardIndicatorSet on %T", strategy)
+				}
+			}
+		}
+
+		if _, ok := hasField(rs, "MarketDataStore"); ok {
+			if store, ok := session.MarketDataStore(symbol); ok {
+				if err := injectField(rs, "MarketDataStore", store, true); err != nil {
+					return errors.Wrapf(err, "failed to inject MarketDataStore on %T", strategy)
+				}
+			}
+		}
+	}
+
+	return strategy.Run(ctx, orderExecutor, session)
+}
+
+func (trader *Trader) getSessionOrderExecutor(sessionName string) OrderExecutor {
+	var session = trader.environment.sessions[sessionName]
+
+	// default to base order executor
+	var orderExecutor OrderExecutor = session.orderExecutor
+
+	// Since the risk controls are loaded from the config file
+	if trader.riskControls != nil && trader.riskControls.SessionBasedRiskControl != nil {
+		if control, ok := trader.riskControls.SessionBasedRiskControl[sessionName] ; ok {
+			control.SetBaseOrderExecutor(session.orderExecutor)
+
+			// pick the wrapped order executor
+			if control.OrderExecutor != nil {
+				return control.OrderExecutor
+			}
+		}
+	}
+
+	return orderExecutor
+}
+
+func (trader *Trader) RunAllSingleExchangeStrategy(ctx context.Context) error {
+	// load and run Session strategies
+	for sessionName, strategies := range trader.exchangeStrategies {
+		var session = trader.environment.sessions[sessionName]
+		var orderExecutor = trader.getSessionOrderExecutor(sessionName)
+		for _, strategy := range strategies {
+			if err := trader.RunSingleExchangeStrategy(ctx, strategy, session, orderExecutor); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
 func (trader *Trader) Run(ctx context.Context) error {
 	trader.Subscribe()
 
@@ -155,80 +241,8 @@ func (trader *Trader) Run(ctx context.Context) error {
 		return err
 	}
 
-	// load and run Session strategies
-	for sessionName, strategies := range trader.exchangeStrategies {
-		var session = trader.environment.sessions[sessionName]
-
-		// default to base order executor
-		var orderExecutor OrderExecutor = session.orderExecutor
-
-		// Since the risk controls are loaded from the config file
-		if riskControls := trader.riskControls; riskControls != nil {
-			if trader.riskControls.SessionBasedRiskControl != nil {
-				control, ok := trader.riskControls.SessionBasedRiskControl[sessionName]
-				if ok {
-					control.SetBaseOrderExecutor(session.orderExecutor)
-
-					// pick the order executor
-					if control.OrderExecutor != nil {
-						orderExecutor = control.OrderExecutor
-					}
-				}
-			}
-		}
-
-		for _, strategy := range strategies {
-			rs := reflect.ValueOf(strategy)
-
-			// get the struct element
-			rs = rs.Elem()
-
-			if rs.Kind() != reflect.Struct {
-				continue
-			}
-
-			if err := trader.injectCommonServices(rs); err != nil {
-				return err
-			}
-
-			if err := injectField(rs, "OrderExecutor", orderExecutor, false); err != nil {
-				return errors.Wrapf(err, "failed to inject OrderExecutor on %T", strategy)
-			}
-
-			if symbol, ok := isSymbolBasedStrategy(rs); ok {
-				log.Debugf("found symbol based strategy from %s", rs.Type())
-				if _, ok := hasField(rs, "Market"); ok {
-					if market, ok := session.Market(symbol); ok {
-						// let's make the market object passed by pointer
-						if err := injectField(rs, "Market", &market, false); err != nil {
-							return errors.Wrapf(err, "failed to inject Market on %T", strategy)
-						}
-					}
-				}
-
-				// StandardIndicatorSet
-				if _, ok := hasField(rs, "StandardIndicatorSet"); ok {
-					if indicatorSet, ok := session.StandardIndicatorSet(symbol); ok {
-						if err := injectField(rs, "StandardIndicatorSet", indicatorSet, true); err != nil {
-							return errors.Wrapf(err, "failed to inject StandardIndicatorSet on %T", strategy)
-						}
-					}
-				}
-
-				if _, ok := hasField(rs, "MarketDataStore"); ok {
-					if store, ok := session.MarketDataStore(symbol); ok {
-						if err := injectField(rs, "MarketDataStore", store, true); err != nil {
-							return errors.Wrapf(err, "failed to inject MarketDataStore on %T", strategy)
-						}
-					}
-				}
-			}
-
-			err := strategy.Run(ctx, orderExecutor, session)
-			if err != nil {
-				return err
-			}
-		}
+	if err := trader.RunAllSingleExchangeStrategy(ctx); err != nil {
+		return err
 	}
 
 	router := &ExchangeOrderExecutionRouter{
