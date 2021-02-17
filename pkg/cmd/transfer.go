@@ -2,18 +2,19 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
+	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
 func init() {
-	TransferHistoryCmd.Flags().String("exchange", "", "target exchange")
+	TransferHistoryCmd.Flags().String("session", "", "target exchange session")
 	TransferHistoryCmd.Flags().String("asset", "", "trading symbol")
 	TransferHistoryCmd.Flags().String("since", "", "since time")
 	RootCmd.AddCommand(TransferHistoryCmd)
@@ -45,14 +46,23 @@ var TransferHistoryCmd = &cobra.Command{
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-		_ = ctx
 
-		exchangeNameStr, err := cmd.Flags().GetString("exchange")
+		configFile, err := cmd.Flags().GetString("config")
 		if err != nil {
 			return err
 		}
 
-		exchangeName, err := types.ValidExchangeName(exchangeNameStr)
+		userConfig, err := bbgo.Load(configFile, false)
+		if err != nil {
+			return err
+		}
+
+		environ := bbgo.NewEnvironment()
+		if err := BootstrapEnvironment(ctx, environ, userConfig); err != nil {
+			return err
+		}
+
+		sessionName, err := cmd.Flags().GetString("session")
 		if err != nil {
 			return err
 		}
@@ -60,6 +70,11 @@ var TransferHistoryCmd = &cobra.Command{
 		asset, err := cmd.Flags().GetString("asset")
 		if err != nil {
 			return err
+		}
+
+		session, ok := environ.Session(sessionName)
+		if !ok {
+			return fmt.Errorf("session %s not found", sessionName)
 		}
 
 		// default
@@ -84,10 +99,9 @@ var TransferHistoryCmd = &cobra.Command{
 			}
 		}
 
-		exchange, _ := cmdutil.NewExchange(exchangeName)
-
 		var records timeSlice
 
+		exchange := session.Exchange
 		deposits, err := exchange.QueryDepositHistory(ctx, asset, since, until)
 		if err != nil {
 			return err
