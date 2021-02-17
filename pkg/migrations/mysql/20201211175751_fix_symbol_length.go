@@ -7,7 +7,8 @@ import (
 )
 
 func init() {
-	rockhopper.AddMigration(upFixSymbolLength, downFixSymbolLength)
+	AddMigration(upFixSymbolLength, downFixSymbolLength)
+
 }
 
 func upFixSymbolLength(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {

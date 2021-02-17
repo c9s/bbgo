@@ -7,7 +7,8 @@ import (
 )
 
 func init() {
-	rockhopper.AddMigration(upFixUniqueIndex, downFixUniqueIndex)
+	AddMigration(upFixUniqueIndex, downFixUniqueIndex)
+
 }
 
 func upFixUniqueIndex(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {

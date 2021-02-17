@@ -7,7 +7,8 @@ import (
 )
 
 func init() {
-	rockhopper.AddMigration(upAddMarginColumns, downAddMarginColumns)
+	AddMigration(upAddMarginColumns, downAddMarginColumns)
+
 }
 
 func upAddMarginColumns(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
