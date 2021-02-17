@@ -29,21 +29,23 @@ func main() {
 		log.Fatalln("chdir error:", err)
 	}
 
-
 	dotenvFile := ".env.local"
-	if _, err := os.Stat(dotenvFile) ; err == nil {
+	if _, err := os.Stat(dotenvFile); err == nil {
 		if err := godotenv.Load(dotenvFile); err != nil {
 			log.WithError(err).Error("error loading dotenv file")
 			return
 		}
 	}
 
-
 	var args []string
 	if runtime.GOOS == "linux" {
 		args = append(args, "--class=bbgo")
 	}
-	args = append(args, "--class=bbgo")
+
+	// args = append(args, "--enable-logging", "--v=99")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	// here allocate a chrome window with a blank page.
 	ui, err := lorca.New("", "", 1024, 780, args...)
@@ -53,31 +55,6 @@ func main() {
 	}
 
 	defer ui.Close()
-
-	// A simple way to know when UI is ready (uses body.onload event in JS)
-	ui.Bind("start", func() {
-		log.Println("lorca is ready")
-	})
-
-	// Create and bind Go object to the UI
-	// ui.Bind("counterAdd", c.Add)
-
-	// Load HTML.
-	// You may also use `data:text/html,<base64>` approach to load initial HTML,
-	// e.g: ui.Load("data:text/html," + url.PathEscape(html))
-	// TODO: load the loading page html
-
-	// find a free port for binding the server
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		log.WithError(err).Error("can not bind listener")
-		return
-	}
-
-	defer ln.Close()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	configFile := "bbgo.yaml"
 	var setup *server.Setup
@@ -90,7 +67,7 @@ func main() {
 			Cancel:  cancel,
 			Token:   "",
 			BeforeRestart: func() {
-				if err := ui.Close() ; err != nil {
+				if err := ui.Close(); err != nil {
 					log.WithError(err).Errorf("ui close error")
 				}
 			},
@@ -114,45 +91,57 @@ func main() {
 
 	// we could initialize the environment from the settings
 	if setup == nil {
-		if err := cmd.BootstrapEnvironment(ctx, environ, userConfig) ; err != nil {
+		if err := cmd.BootstrapEnvironment(ctx, environ, userConfig); err != nil {
 			log.WithError(err).Error("failed to bootstrap environment")
 			return
 		}
 
-		if err := cmd.ConfigureTrader(trader, userConfig) ; err != nil {
+		if err := cmd.ConfigureTrader(trader, userConfig); err != nil {
 			log.WithError(err).Error("failed to configure trader")
 			return
 		}
 
 		// for setup mode, we don't start the trader
-		if err := trader.Run(ctx); err != nil {
-			log.WithError(err).Error("failed to start trader")
-			return
-		}
+		go func() {
+			if err := trader.Run(ctx); err != nil {
+				log.WithError(err).Error("failed to start trader")
+			}
+		}()
+	}
+
+	// find a free port for binding the server
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		log.WithError(err).Error("can not bind listener")
+		return
+	}
+
+	defer ln.Close()
+
+	baseURL := "http://" + ln.Addr().String()
+
+	srv := &server.Server{
+		Config:        userConfig,
+		Environ:       environ,
+		Trader:        trader,
+		OpenInBrowser: false,
+		Setup:         setup,
 	}
 
 	go func() {
-		srv := &server.Server{
-			Config:        userConfig,
-			Environ:       environ,
-			Trader:        trader,
-			OpenInBrowser: false,
-			Setup: setup,
-		}
-
 		if err := srv.RunWithListener(ctx, ln); err != nil {
 			log.WithError(err).Errorf("server error")
 		}
 	}()
 
-	baseURL := "http://" + ln.Addr().String()
+	log.Infof("pinging the server at %s", baseURL)
+	server.PingUntil(ctx, baseURL, func() {
+		log.Infof("got pong, loading base url %s to ui...", baseURL)
 
-	go server.PingUntil(ctx, baseURL, func() {
-		if err := ui.Load(baseURL) ; err != nil {
+		if err := ui.Load(baseURL); err != nil {
 			log.WithError(err).Error("failed to load page")
 		}
 	})
-
 
 	// Wait until the interrupt signal arrives or browser window is closed
 	sigc := make(chan os.Signal)
