@@ -1,14 +1,23 @@
 package mysql
 
 import (
-	"github.com/c9s/rockhopper"
-
 	"fmt"
 	"runtime"
 	"strings"
+
+	"github.com/c9s/rockhopper"
 )
 
 var registeredGoMigrations map[int64]*rockhopper.Migration
+
+func Migrations() rockhopper.MigrationSlice {
+	var migrations = rockhopper.MigrationSlice{}
+	for _, migration := range registeredGoMigrations {
+		migrations = append(migrations, migration)
+	}
+
+	return migrations.SortAndConnect()
+}
 
 // AddMigration adds a migration.
 func AddMigration(up, down rockhopper.TransactionHandler) {
