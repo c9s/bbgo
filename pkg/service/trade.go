@@ -1,6 +1,8 @@
 package service
 
 import (
+	"context"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -11,6 +13,18 @@ import (
 
 	"github.com/c9s/bbgo/pkg/types"
 )
+
+var ErrTradeNotFound = errors.New("trade not found")
+
+type QueryTradesOptions struct {
+	Exchange types.ExchangeName
+	Symbol   string
+	LastGID  int64
+
+	// ASC or DESC
+	Ordering string
+	Limit    int
+}
 
 type TradingVolume struct {
 	Year        int       `db:"year" json:"year"`
@@ -80,7 +94,6 @@ func (s *TradeService) QueryTradingVolume(startTime time.Time, options TradingVo
 	return records, rows.Err()
 }
 
-
 func generateSqliteTradingVolumeSQL(options TradingVolumeQueryOptions) string {
 	var sel []string
 	var groupBys []string
@@ -127,7 +140,6 @@ func generateSqliteTradingVolumeSQL(options TradingVolumeQueryOptions) string {
 	return sql
 }
 
-
 func generateMysqlTradingVolumeQuerySQL(options TradingVolumeQueryOptions) string {
 	var sel []string
 	var groupBys []string
@@ -136,8 +148,6 @@ func generateMysqlTradingVolumeQuerySQL(options TradingVolumeQueryOptions) strin
 
 	switch options.GroupByPeriod {
 	case "month":
-
-
 
 		sel = append(sel, "YEAR(traded_at) AS year", "MONTH(traded_at) AS month")
 		groupBys = append([]string{"MONTH(traded_at)", "YEAR(traded_at)"}, groupBys...)
@@ -221,15 +231,6 @@ func (s *TradeService) QueryForTradingFeeCurrency(ex types.ExchangeName, symbol 
 	return s.scanRows(rows)
 }
 
-type QueryTradesOptions struct {
-	Exchange types.ExchangeName
-	Symbol   string
-	LastGID  int64
-	// ASC or DESC
-	Ordering string
-	Limit	 int
-}
-
 func (s *TradeService) Query(options QueryTradesOptions) ([]types.Trade, error) {
 	sql := queryTradesSQL(options)
 
@@ -247,6 +248,69 @@ func (s *TradeService) Query(options QueryTradesOptions) ([]types.Trade, error) 
 	defer rows.Close()
 
 	return s.scanRows(rows)
+}
+
+func (s *TradeService) Load(ctx context.Context, id int64) (*types.Trade, error) {
+	var trade types.Trade
+
+	rows, err := s.DB.NamedQuery("SELECT * FROM trades WHERE id = :id", map[string]interface{}{
+		"id": id,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	if rows.Next() {
+		err = rows.StructScan(&trade)
+		return &trade, err
+	}
+
+	return nil, errors.Wrapf(ErrTradeNotFound, "trade id:%d not found", id)
+}
+
+func (s *TradeService) MarkStrategyID(ctx context.Context, id int64, strategyID string) error {
+	result, err := s.DB.NamedExecContext(ctx, "UPDATE `trades` SET `strategy` = :strategy WHERE `id` = :id", map[string]interface{}{
+		"id":       id,
+		"strategy": strategyID,
+	})
+	if err != nil {
+		return err
+	}
+
+	cnt, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if cnt == 0 {
+		return fmt.Errorf("trade id:%d not found", id)
+	}
+
+	return nil
+}
+
+func (s *TradeService) UpdatePnL(ctx context.Context, id int64, pnl float64) error {
+	result, err := s.DB.NamedExecContext(ctx, "UPDATE `trades` SET `pnl` = :pnl WHERE `id` = :id", map[string]interface{}{
+		"id":  id,
+		"pnl": pnl,
+	})
+	if err != nil {
+		return err
+	}
+
+	cnt, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if cnt == 0 {
+		return fmt.Errorf("trade id:%d not found", id)
+	}
+
+	return nil
+
 }
 
 func queryTradesSQL(options QueryTradesOptions) string {
@@ -283,7 +347,10 @@ func queryTradesSQL(options QueryTradesOptions) string {
 
 	sql += ` ORDER BY gid ` + ordering
 
-	sql += ` LIMIT ` + strconv.Itoa(options.Limit)
+	if options.Limit > 0 {
+		sql += ` LIMIT ` + strconv.Itoa(options.Limit)
+	}
+
 	return sql
 }
 

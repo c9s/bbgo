@@ -1,10 +1,95 @@
 package service
 
 import (
+	"context"
 	"testing"
 
+	"github.com/c9s/rockhopper"
+	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/c9s/bbgo/pkg/types"
 )
+
+func prepareDB(t *testing.T) (*rockhopper.DB, error) {
+	dialect, err := rockhopper.LoadDialect("sqlite3")
+	if !assert.NoError(t, err) {
+		return nil, err
+	}
+
+	assert.NotNil(t, dialect)
+
+	db, err := rockhopper.Open("sqlite3", dialect, ":memory:")
+	if !assert.NoError(t, err) {
+		return nil, err
+	}
+
+	assert.NotNil(t, db)
+
+	_, err = db.CurrentVersion()
+	if !assert.NoError(t, err) {
+		return nil, err
+	}
+
+	var loader rockhopper.SqlMigrationLoader
+	migrations, err := loader.Load("../../migrations/sqlite3")
+	if !assert.NoError(t, err) {
+		return nil, err
+	}
+
+	assert.NotEmpty(t, migrations)
+
+	ctx := context.Background()
+	err = rockhopper.Up(ctx, db, migrations, 0, 0)
+	assert.NoError(t, err)
+
+	return db, err
+}
+
+func Test_tradeService(t *testing.T) {
+	db, err := prepareDB(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer db.Close()
+
+	ctx := context.Background()
+
+	xdb := sqlx.NewDb(db.DB, "sqlite3")
+	service := &TradeService{DB: xdb}
+
+	err = service.Insert(types.Trade{
+		ID:            1,
+		OrderID:       1,
+		Exchange:      "binance",
+		Price:         1000.0,
+		Quantity:      0.1,
+		QuoteQuantity: 1000.0 * 0.1,
+		Symbol:        "BTCUSDT",
+		Side:          "BUY",
+		IsBuyer:       true,
+	})
+	assert.NoError(t, err)
+
+	err = service.MarkStrategyID(ctx, 1, "grid")
+	assert.NoError(t, err)
+
+	tradeRecord, err := service.Load(ctx, 1)
+	assert.NoError(t, err)
+	assert.NotNil(t, tradeRecord)
+	assert.True(t, tradeRecord.StrategyID.Valid)
+	assert.Equal(t, "grid", tradeRecord.StrategyID.String)
+
+	err = service.UpdatePnL(ctx, 1, 10.0)
+	assert.NoError(t, err)
+
+	tradeRecord, err = service.Load(ctx, 1)
+	assert.NoError(t, err)
+	assert.NotNil(t, tradeRecord)
+	assert.True(t, tradeRecord.PnL.Valid)
+	assert.Equal(t, 10.0, tradeRecord.PnL.Float64)
+}
 
 func Test_queryTradingVolumeSQL(t *testing.T) {
 	t.Run("group by different period", func(t *testing.T) {
@@ -52,7 +137,7 @@ func Test_queryTradesSQL(t *testing.T) {
 			Symbol:   "btc",
 			LastGID:  123,
 			Ordering: "DESC",
-			Limit:	  500,
+			Limit:    500,
 		}))
 	})
 }
