@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 
 	"github.com/joho/godotenv"
@@ -18,8 +19,18 @@ import (
 )
 
 func main() {
-	dotenvFile := ".env.local"
+	ep, err := os.Executable()
+	if err != nil {
+		log.Fatalln("failed to find the current executable:", err)
+	}
 
+	err = os.Chdir(filepath.Join(filepath.Dir(ep), "..", "Resources"))
+	if err != nil {
+		log.Fatalln("chdir error:", err)
+	}
+
+
+	dotenvFile := ".env.local"
 	if _, err := os.Stat(dotenvFile) ; err == nil {
 		if err := godotenv.Load(dotenvFile); err != nil {
 			log.WithError(err).Error("error loading dotenv file")
