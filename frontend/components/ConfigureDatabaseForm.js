@@ -45,7 +45,7 @@ export default function ConfigureDatabaseForm({onConfigured}) {
     const [testResponse, setTestResponse] = React.useState(null);
     const [configured, setConfigured] = React.useState(false);
 
-    const getDSN = () => driver === "sqlite3" ? "bbgo.sqlite3" : mysqlURL
+    const getDSN = () => driver === "sqlite3" ? "file:bbgo.sqlite3" : mysqlURL
 
     const resetTestResponse = () => {
         setTestResponse(null)
