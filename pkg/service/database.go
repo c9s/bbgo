@@ -6,6 +6,9 @@ import (
 	"github.com/c9s/rockhopper"
 	"github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
+
+	mysqlMigrations "github.com/c9s/bbgo/pkg/migrations/mysql"
+	sqlite3Migrations "github.com/c9s/bbgo/pkg/migrations/sqlite3"
 )
 
 type DatabaseService struct {
@@ -47,10 +50,14 @@ func (s *DatabaseService) Upgrade(ctx context.Context) error {
 		return err
 	}
 
-	loader := &rockhopper.GoMigrationLoader{}
-	migrations, err := loader.LoadByPackageSuffix(s.Driver)
-	if err != nil {
-		return err
+	var migrations rockhopper.MigrationSlice
+
+	switch s.Driver {
+	case "sqlite3":
+		migrations = sqlite3Migrations.Migrations()
+	case "mysql":
+		migrations = mysqlMigrations.Migrations()
+
 	}
 
 	// sqlx.DB is different from sql.DB

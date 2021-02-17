@@ -9,7 +9,7 @@ import (
 
 func PingUntil(ctx context.Context, baseURL string, callback func()) {
 	pingURL := baseURL + "/api/ping"
-	timeout := time.NewTimer(time.Minute)
+	timeout := time.NewTimer(3 * time.Minute)
 
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
@@ -28,7 +28,7 @@ func PingUntil(ctx context.Context, baseURL string, callback func()) {
 			var response map[string]interface{}
 			var err = getJSON(pingURL, &response)
 			if err == nil {
-				go callback()
+				callback()
 				return
 			}
 		}
