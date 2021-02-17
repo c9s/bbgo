@@ -16,7 +16,8 @@ import (
 
 func (s *Server) setupTestDB(c *gin.Context) {
 	payload := struct {
-		DSN string `json:"dsn"`
+		Driver string `json:"driver"`
+		DSN    string `json:"dsn"`
 	}{}
 
 	if err := c.BindJSON(&payload); err != nil {
@@ -24,13 +25,17 @@ func (s *Server) setupTestDB(c *gin.Context) {
 		return
 	}
 
-	dsn := payload.DSN
-	if len(dsn) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "missing dsn argument"})
+	if len(payload.Driver) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing driver parameter"})
 		return
 	}
 
-	db, err := sql.Open("mysql", dsn)
+	if len(payload.DSN) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing dsn parameter"})
+		return
+	}
+
+	db, err := sql.Open(payload.Driver, payload.DSN)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -50,17 +55,18 @@ func (s *Server) setupConfigureDB(c *gin.Context) {
 	}{}
 
 	if err := c.BindJSON(&payload); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "missing arguments"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing parameters"})
+		return
+	}
+
+	if len(payload.Driver) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing driver parameter"})
 		return
 	}
 
 	if len(payload.DSN) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "missing dsn argument"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing dsn parameter"})
 		return
-	}
-
-	if payload.Driver == "" {
-		payload.Driver = "mysql"
 	}
 
 	if err := s.Environ.ConfigureDatabase(c, payload.Driver, payload.DSN); err != nil {
@@ -70,8 +76,8 @@ func (s *Server) setupConfigureDB(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"driver": payload.Driver,
-		"dsn": payload.DSN,
+		"driver":  payload.Driver,
+		"dsn":     payload.DSN,
 	})
 }
 
@@ -140,7 +146,7 @@ func (s *Server) setupRestart(c *gin.Context) {
 
 		envVars := os.Environ()
 
-		logrus.Infof("%s %v %+v", bin, args, envVars)
+		logrus.Infof("exec %s %v", bin, args)
 
 		if err := syscall.Exec(bin, args, envVars); err != nil {
 			logrus.WithError(err).Errorf("failed to restart %s", bin)
