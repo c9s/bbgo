@@ -10,6 +10,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -38,6 +39,8 @@ type Strategy struct {
 	// Market stores the configuration of the market, for example, VolumePrecision, PricePrecision, MinLotSize... etc
 	// This field will be injected automatically since we defined the Symbol field.
 	types.Market `json:"-" yaml:"-"`
+
+	TradeService *service.TradeService `json:"-" yaml:"-"`
 
 	// These fields will be filled from the config file (it translates YAML to JSON)
 	Symbol string `json:"symbol" yaml:"symbol"`
@@ -305,6 +308,7 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+	// do some basic validation
 	if s.GridNum == 0 {
 		s.GridNum = 10
 	}
@@ -312,6 +316,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	if s.UpperPrice <= s.LowerPrice {
 		return fmt.Errorf("upper price (%f) should not be less than lower price (%f)", s.UpperPrice.Float64(), s.LowerPrice.Float64())
 	}
+
+	position, ok := session.Position(s.Symbol)
+	if !ok {
+		return fmt.Errorf("position not found")
+	}
+
+	log.Infof("position: %+v", position)
+
 
 	instanceID := fmt.Sprintf("grid-%s-%d", s.Symbol, s.GridNum)
 	s.groupID = generateGroupID(instanceID)

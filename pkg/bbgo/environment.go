@@ -48,9 +48,9 @@ type Environment struct {
 	PersistenceServiceFacade *PersistenceServiceFacade
 
 	DatabaseService *service.DatabaseService
-	OrderService *service.OrderService
-	TradeService *service.TradeService
-	TradeSync    *service.SyncService
+	OrderService    *service.OrderService
+	TradeService    *service.TradeService
+	TradeSync       *service.SyncService
 
 	// startTime is the time of start point (which is used in the backtest)
 	startTime     time.Time
@@ -61,7 +61,7 @@ type Environment struct {
 func NewEnvironment() *Environment {
 	return &Environment{
 		// default trade scan time
-		tradeScanTime: time.Now().AddDate(0, 0, -7), // sync from 7 days ago
+		tradeScanTime: time.Now().AddDate(0, -1, 0), // sync from 1 month ago
 		sessions:      make(map[string]*ExchangeSession),
 		startTime:     time.Now(),
 	}
@@ -83,7 +83,7 @@ func (environ *Environment) ConfigureDatabase(ctx context.Context, driver string
 		return err
 	}
 
-	if err := environ.DatabaseService.Upgrade(ctx) ; err != nil {
+	if err := environ.DatabaseService.Upgrade(ctx); err != nil {
 		return err
 	}
 
