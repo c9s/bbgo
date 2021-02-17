@@ -2,13 +2,13 @@ package server
 
 import (
 	"context"
-	"database/sql"
 	"net/http"
 	"os"
 	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jmoiron/sqlx"
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -35,7 +35,7 @@ func (s *Server) setupTestDB(c *gin.Context) {
 		return
 	}
 
-	db, err := sql.Open(payload.Driver, payload.DSN)
+	db, err := sqlx.Connect(payload.Driver, payload.DSN)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
