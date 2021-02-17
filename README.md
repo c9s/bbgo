@@ -91,7 +91,7 @@ bbgo backtest --exchange binance --config config/bollgrid.yaml --base-asset-base
 To query transfer history:
 
 ```sh
-bbgo transfer-history --exchange max --asset USDT --since "2019-01-01"
+bbgo transfer-history --session max --asset USDT --since "2019-01-01"
 ```
 
 To calculate pnl:
