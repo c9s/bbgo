@@ -12,7 +12,9 @@ import (
 )
 
 func getJSON(url string, data interface{}) error {
-	var client = &http.Client{Timeout: 500 * time.Millisecond}
+	var client = &http.Client{
+		Timeout: 200 * time.Millisecond,
+	}
 	r, err := client.Get(url)
 	if err != nil {
 		return err
