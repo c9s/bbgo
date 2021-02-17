@@ -8,14 +8,14 @@ export function ping(cb) {
     });
 }
 
-export function testDatabaseConnection(dsn, cb) {
-    return axios.post(baseURL + '/api/setup/test-db', {dsn: dsn}).then(response => {
+export function testDatabaseConnection(params, cb) {
+    return axios.post(baseURL + '/api/setup/test-db', params).then(response => {
         cb(response.data)
     });
 }
 
-export function configureDatabase(dsn, cb) {
-    return axios.post(baseURL + '/api/setup/configure-db', {dsn: dsn}).then(response => {
+export function configureDatabase(params, cb) {
+    return axios.post(baseURL + '/api/setup/configure-db', params).then(response => {
         cb(response.data)
     });
 }

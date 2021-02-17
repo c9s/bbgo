@@ -45,12 +45,16 @@ export default function ConfigureDatabaseForm({onConfigured}) {
     const [testResponse, setTestResponse] = React.useState(null);
     const [configured, setConfigured] = React.useState(false);
 
+    const getDSN = () => driver === "sqlite3" ? "bbgo.sqlite3" : mysqlURL
+
     const resetTestResponse = () => {
         setTestResponse(null)
     }
 
     const handleConfigureDatabase = (event) => {
-        configureDatabase(mysqlURL, (response) => {
+        const dsn = getDSN()
+
+        configureDatabase({driver, dsn}, (response) => {
             console.log(response);
             setTesting(false);
             setTestResponse(response);
@@ -67,8 +71,10 @@ export default function ConfigureDatabaseForm({onConfigured}) {
     }
 
     const handleTestConnection = (event) => {
+        const dsn = getDSN()
+
         setTesting(true);
-        testDatabaseConnection(mysqlURL, (response) => {
+        testDatabaseConnection({driver, dsn}, (response) => {
             console.log(response)
             setTesting(false)
             setTestResponse(response)
