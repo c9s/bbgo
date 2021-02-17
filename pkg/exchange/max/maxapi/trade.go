@@ -143,7 +143,7 @@ type PrivateTradeRequestParams struct {
 	Market string `json:"market"`
 
 	// Timestamp is the seconds elapsed since Unix epoch, set to return trades executed before the time only
-	Timestamp int `json:"timestamp,omitempty"`
+	Timestamp int64 `json:"timestamp,omitempty"`
 
 	// From field is a trade id, set ot return trades created after the trade
 	From int64 `json:"from,omitempty"`
@@ -173,6 +173,11 @@ func (r *PrivateTradeRequest) Market(market string) *PrivateTradeRequest {
 
 func (r *PrivateTradeRequest) From(from int64) *PrivateTradeRequest {
 	r.params.From = from
+	return r
+}
+
+func (r *PrivateTradeRequest) Timestamp(t int64) *PrivateTradeRequest {
+	r.params.Timestamp = t
 	return r
 }
 

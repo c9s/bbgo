@@ -1,6 +1,8 @@
 package bbgo
 
 import (
+	"fmt"
+
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -13,6 +15,15 @@ type Position struct {
 	Base        fixedpoint.Value `json:"base"`
 	Quote       fixedpoint.Value `json:"quote"`
 	AverageCost fixedpoint.Value `json:"averageCost"`
+}
+
+func (p Position) String() string {
+	return fmt.Sprintf("%s: average cost = %f, base = %f, quote = %f",
+		p.Symbol,
+		p.AverageCost.Float64(),
+		p.Base.Float64(),
+		p.Quote.Float64(),
+	)
 }
 
 func (p *Position) BindStream(stream types.Stream) {

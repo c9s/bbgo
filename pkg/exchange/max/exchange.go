@@ -498,6 +498,8 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 
 	if options.Limit > 0 {
 		req.Limit(options.Limit)
+	} else {
+		req.Limit(500)
 	}
 
 	if options.LastTradeID > 0 {
@@ -519,7 +521,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 			continue
 		}
 
-		logger.Infof("T: id=%d % 4s %s P=%f Q=%f %s", localTrade.ID, localTrade.Symbol, localTrade.Side, localTrade.Price, localTrade.Quantity, localTrade.Time)
+		logger.Infof("T: %d %7s %4s P=%f Q=%f %s", localTrade.ID, localTrade.Symbol, localTrade.Side, localTrade.Price, localTrade.Quantity, localTrade.Time)
 
 		trades = append(trades, *localTrade)
 	}
