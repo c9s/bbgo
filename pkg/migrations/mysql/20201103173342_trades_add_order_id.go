@@ -7,7 +7,8 @@ import (
 )
 
 func init() {
-	rockhopper.AddMigration(upTradesAddOrderId, downTradesAddOrderId)
+	AddMigration(upTradesAddOrderId, downTradesAddOrderId)
+
 }
 
 func upTradesAddOrderId(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
