@@ -77,16 +77,23 @@ func (s *SyncService) SyncTrades(ctx context.Context, exchange types.Exchange, s
 		}
 	}
 
-	lastTrade, err := s.TradeService.QueryLast(exchange.Name(), symbol, isMargin, isIsolated)
+	lastTrades, err := s.TradeService.QueryLast(exchange.Name(), symbol, isMargin, isIsolated, 10)
 	if err != nil {
 		return err
 	}
 
+	var tradeKeys = map[types.TradeKey]struct{}{}
 	var lastTradeID int64 = 0
-	if lastTrade != nil {
-		startTime = time.Time(lastTrade.Time).Add(time.Millisecond)
+	if len(lastTrades) > 0 {
+		for _, t := range lastTrades {
+			tradeKeys[t.Key()] = struct{}{}
+		}
+
+		lastTrade := lastTrades[len(lastTrades)-1]
 		lastTradeID = lastTrade.ID
-		logrus.Infof("found last trade, start from lastID = %d since %s", lastTrade.ID, startTime)
+
+		startTime = time.Time(lastTrade.Time)
+		logrus.Debugf("found last trade, start from lastID = %d since %s", lastTrade.ID, startTime)
 	}
 
 	batch := &batch2.ExchangeBatchProcessor{Exchange: exchange}
@@ -107,6 +114,15 @@ func (s *SyncService) SyncTrades(ctx context.Context, exchange types.Exchange, s
 
 		default:
 		}
+
+		key := trade.Key()
+		if _, ok := tradeKeys[key]; ok {
+			continue
+		}
+
+		tradeKeys[key] = struct{}{}
+
+		logrus.Infof("inserting trade: %d %s %-4s price: %-13f volume: %-11f %5s %s", trade.ID, trade.Symbol, trade.Side, trade.Price, trade.Quantity, trade.MakerOrTakerLabel(), trade.Time.String())
 
 		if err := s.TradeService.Insert(trade); err != nil {
 			return err

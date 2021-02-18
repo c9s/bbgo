@@ -712,9 +712,9 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 			req.EndTime(options.EndTime.UnixNano() / int64(time.Millisecond))
 		}
 
-		// BINANCE uses inclusive last trade ID, so we need to add by 1
+		// BINANCE uses inclusive last trade ID
 		if options.LastTradeID > 0 {
-			req.FromID(options.LastTradeID + 1)
+			req.FromID(options.LastTradeID)
 		}
 
 		remoteTrades, err = req.Do(ctx)
@@ -738,9 +738,9 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 			req.EndTime(options.EndTime.UnixNano() / int64(time.Millisecond))
 		}
 
-		// BINANCE uses inclusive last trade ID, so we need to add by 1
+		// BINANCE uses inclusive last trade ID
 		if options.LastTradeID > 0 {
-			req.FromID(options.LastTradeID + 1)
+			req.FromID(options.LastTradeID)
 		}
 
 		remoteTrades, err = req.Do(ctx)
@@ -756,7 +756,6 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 			continue
 		}
 
-		log.Infof("trade: %d %s % 4s price: % 13s volume: % 11s %6s % 5s %s", t.ID, t.Symbol, localTrade.Side, t.Price, t.Quantity, BuyerOrSellerLabel(t), MakerOrTakerLabel(t), localTrade.Time)
 		trades = append(trades, *localTrade)
 	}
 

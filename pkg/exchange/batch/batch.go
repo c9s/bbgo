@@ -130,6 +130,8 @@ func (e ExchangeBatchProcessor) BatchQueryTrades(ctx context.Context, symbol str
 		defer close(c)
 		defer close(errC)
 
+		var tradeKeys = map[types.TradeKey]struct{}{}
+
 		for {
 			if err := limiter.Wait(ctx); err != nil {
 				logrus.WithError(err).Error("rate limit error")
@@ -155,12 +157,24 @@ func (e ExchangeBatchProcessor) BatchQueryTrades(ctx context.Context, symbol str
 				break
 			}
 
-			logrus.Infof("returned %d trades", len(trades))
+			end := len(trades) - 1
+			if _, exists := tradeKeys[trades[end].Key()]; exists {
+				break
+			}
+
+			logrus.Debugf("returned %d trades", len(trades))
 
 			// increase the window to the next time frame by adding 1 millisecond
 			startTime = time.Time(trades[len(trades)-1].Time)
 			for _, t := range trades {
+				key := t.Key()
+				if _, ok := tradeKeys[key]; ok {
+					logrus.Debugf("ignore duplicated trade: %+v", key)
+					continue
+				}
+
 				lastTradeID = t.ID
+				tradeKeys[key] = struct{}{}
 
 				// ignore the first trade if last TradeID is given
 				c <- t
