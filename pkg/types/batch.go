@@ -120,8 +120,6 @@ func (e ExchangeBatchProcessor) BatchQueryTrades(ctx context.Context, symbol str
 		startTime = *options.StartTime
 	}
 
-	var lastTradeID = options.LastTradeID
-
 	go func() {
 		limiter := rate.NewLimiter(rate.Every(5*time.Second), 2) // from binance (original 1200, use 1000 for safety)
 
@@ -138,7 +136,7 @@ func (e ExchangeBatchProcessor) BatchQueryTrades(ctx context.Context, symbol str
 			trades, err := e.QueryTrades(ctx, symbol, &TradeQueryOptions{
 				StartTime:   &startTime,
 				Limit:       options.Limit,
-				LastTradeID: lastTradeID,
+				// LastTradeID: lastTradeID,
 			})
 			if err != nil {
 				errC <- err
@@ -149,21 +147,13 @@ func (e ExchangeBatchProcessor) BatchQueryTrades(ctx context.Context, symbol str
 				break
 			}
 
-			if len(trades) == 1 && trades[0].ID == lastTradeID {
-				break
-			}
-
 			logrus.Infof("returned %d trades", len(trades))
 
-			startTime = time.Time(trades[len(trades)-1].Time)
+			// increase the window to the next time frame by adding 1 millisecond
+			startTime = time.Time(trades[len(trades)-1].Time).Add(time.Millisecond)
 			for _, t := range trades {
 				// ignore the first trade if last TradeID is given
-				if t.ID == lastTradeID {
-					continue
-				}
-
 				c <- t
-				lastTradeID = t.ID
 			}
 		}
 	}()
