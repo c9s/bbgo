@@ -14,6 +14,8 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+var ErrUnimplemented = errors.New("unimplemented method")
+
 type Exchange struct {
 	sourceName         types.ExchangeName
 	publicExchange     types.Exchange
@@ -208,9 +210,14 @@ func (e Exchange) QueryTrades(ctx context.Context, symbol string, options *types
 	return nil, nil
 }
 
+func (e Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticker, error) {
+	// Not using Tickers in back test (yet)
+	return nil, ErrUnimplemented
+}
+
 func (e Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[string]types.Ticker, error) {
 	// Not using Tickers in back test (yet)
-	return nil, nil
+	return nil, ErrUnimplemented
 }
 
 func (e Exchange) Name() types.ExchangeName {
