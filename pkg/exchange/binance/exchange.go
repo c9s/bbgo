@@ -703,6 +703,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		if options.EndTime != nil {
 			req.EndTime(options.EndTime.UnixNano() / int64(time.Millisecond))
 		}
+
 		if options.LastTradeID > 0 {
 			req.FromID(options.LastTradeID)
 		}

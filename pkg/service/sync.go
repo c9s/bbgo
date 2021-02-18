@@ -81,18 +81,14 @@ func (s *SyncService) SyncTrades(ctx context.Context, exchange types.Exchange, s
 		return err
 	}
 
-	var lastID int64 = 0
 	if lastTrade != nil {
-		lastID = lastTrade.ID
-		startTime = time.Time(lastTrade.Time)
-
-		logrus.Infof("found last trade, start from lastID = %d since %s", lastID, startTime)
+		startTime = time.Time(lastTrade.Time).Add(time.Millisecond)
+		logrus.Infof("found last trade, start from lastID = %d since %s", lastTrade.ID, startTime)
 	}
 
 	batch := &types.ExchangeBatchProcessor{Exchange: exchange}
 	tradeC, errC := batch.BatchQueryTrades(ctx, symbol, &types.TradeQueryOptions{
 		StartTime:   &startTime,
-		LastTradeID: lastID,
 	})
 
 	for trade := range tradeC {
