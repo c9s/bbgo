@@ -7,7 +7,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 
-	"github.com/c9s/bbgo/pkg/exchange/binance"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -141,26 +140,11 @@ func (e ExchangeBatchProcessor) BatchQueryTrades(ctx context.Context, symbol str
 			var err error
 			var trades []types.Trade
 
-			switch ex := e.Exchange.(type) {
-
-			case *binance.Exchange:
-				trades, err = ex.QueryTrades(ctx, symbol, &types.TradeQueryOptions{
-					StartTime: &startTime,
-					Limit:     options.Limit,
-
-					// only for MAX right now. binance is not using it, since we need to handle self-trade for binance
-					LastTradeID: lastTradeID,
-				})
-
-			default:
-				trades, err = ex.QueryTrades(ctx, symbol, &types.TradeQueryOptions{
-					StartTime: &startTime,
-					Limit:     options.Limit,
-
-					// only for MAX right now. binance is not using it, since we need to handle self-trade for binance
-					LastTradeID: lastTradeID,
-				})
-			}
+			trades, err = e.Exchange.QueryTrades(ctx, symbol, &types.TradeQueryOptions{
+				StartTime:   &startTime,
+				Limit:       options.Limit,
+				LastTradeID: lastTradeID,
+			})
 
 			if err != nil {
 				errC <- err
