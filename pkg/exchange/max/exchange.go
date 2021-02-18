@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -43,24 +44,34 @@ func (e *Exchange) Name() types.ExchangeName {
 	return types.ExchangeMax
 }
 
+func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticker, error) {
+	ticker, err := e.client.PublicService.Ticker(toLocalSymbol(symbol))
+	if err != nil {
+		return nil, err
+	}
+
+	return &types.Ticker{
+		Time:   ticker.Time,
+		Volume: util.MustParseFloat(ticker.Volume),
+		Last:   util.MustParseFloat(ticker.Last),
+		Open:   util.MustParseFloat(ticker.Open),
+		High:   util.MustParseFloat(ticker.High),
+		Low:    util.MustParseFloat(ticker.Low),
+		Buy:    util.MustParseFloat(ticker.Buy),
+		Sell:   util.MustParseFloat(ticker.Sell),
+	}, nil
+}
+
 func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[string]types.Ticker, error) {
 	var ret = make(map[string]types.Ticker)
 
 	if len(symbol) == 1 {
-		ticker, err := e.client.PublicService.Ticker(toLocalSymbol(symbol[0]))
+		ticker, err := e.QueryTicker(ctx, symbol[0])
 		if err != nil {
 			return nil, err
 		}
-		ret[toGlobalSymbol(symbol[0])] = types.Ticker{
-			Time:   ticker.Time,
-			Volume: util.MustParseFloat(ticker.Volume),
-			Last:   util.MustParseFloat(ticker.Last),
-			Open:   util.MustParseFloat(ticker.Open),
-			High:   util.MustParseFloat(ticker.High),
-			Low:    util.MustParseFloat(ticker.Low),
-			Buy:    util.MustParseFloat(ticker.Buy),
-			Sell:   util.MustParseFloat(ticker.Sell),
-		}
+
+		ret[toGlobalSymbol(symbol[0])] = *ticker
 	} else {
 		tickers, err := e.client.PublicService.Tickers()
 		if err != nil {
@@ -285,8 +296,7 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 		req := e.client.OrderService.NewCreateOrderRequest().
 			Market(toLocalSymbol(order.Symbol)).
 			OrderType(string(orderType)).
-			Side(toLocalSideType(order.Side)).
-			Volume(order.QuantityString)
+			Side(toLocalSideType(order.Side))
 
 		if len(order.ClientOrderID) > 0 {
 			req.ClientOrderID(order.ClientOrderID)
@@ -295,6 +305,25 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 			req.ClientOrderID(clientOrderID)
 		}
 
+		if len(order.QuantityString) > 0 {
+			req.Volume(order.QuantityString)
+		} else if order.Market.Symbol != "" {
+			req.Volume(order.Market.FormatQuantity(order.Quantity))
+		} else {
+			req.Volume(strconv.FormatFloat(order.Quantity, 'f', 8, 64))
+		}
+
+		// set price field for limit orders
+		switch order.Type {
+		case types.OrderTypeStopLimit, types.OrderTypeLimit:
+			if len(order.PriceString) > 0 {
+				req.Price(order.PriceString)
+			} else if order.Market.Symbol != "" {
+				req.Price(order.Market.FormatPrice(order.Price))
+			}
+		}
+
+		// set stop price field for limit orders
 		switch order.Type {
 		case types.OrderTypeStopLimit, types.OrderTypeStopMarket:
 			if len(order.StopPriceString) == 0 {
@@ -502,6 +531,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		req.Limit(500)
 	}
 
+	// MAX uses exclusive last trade ID
 	if options.LastTradeID > 0 {
 		req.From(options.LastTradeID)
 	}
@@ -520,8 +550,6 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 			logger.WithError(err).Errorf("can not convert trade: %+v", t)
 			continue
 		}
-
-		logger.Infof("T: %d %7s %4s P=%f Q=%f %s", localTrade.ID, localTrade.Symbol, localTrade.Side, localTrade.Price, localTrade.Quantity, localTrade.Time)
 
 		trades = append(trades, *localTrade)
 	}
