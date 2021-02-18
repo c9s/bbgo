@@ -76,6 +76,21 @@ func (environ *Environment) Sessions() map[string]*ExchangeSession {
 	return environ.sessions
 }
 
+func (environ *Environment) SelectSessions(names ...string) map[string]*ExchangeSession {
+	if len(names) == 0 {
+		return environ.sessions
+	}
+
+	sessions := make(map[string]*ExchangeSession)
+	for _, name := range names {
+		if s, ok := environ.Session(name) ; ok {
+			sessions[name] = s
+		}
+	}
+
+	return sessions
+}
+
 func (environ *Environment) ConfigureDatabase(ctx context.Context, driver string, dsn string) error {
 	environ.DatabaseService = service.NewDatabaseService(driver, dsn)
 	err := environ.DatabaseService.Connect()
