@@ -62,14 +62,20 @@ func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticke
 }
 
 func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[string]types.Ticker, error) {
-	var ret = make(map[string]types.Ticker)
-	listPriceChangeStatsService := e.Client.NewListPriceChangeStatsService()
+	var tickers = make(map[string]types.Ticker)
 
 	if len(symbol) == 1 {
-		listPriceChangeStatsService.Symbol(symbol[0])
+		ticker, err := e.QueryTicker(ctx, symbol[0])
+		if err != nil {
+			return nil, err
+		}
+
+		tickers[strings.ToUpper(symbol[0])] = *ticker
+		return tickers, nil
 	}
 
-	changeStats, err := listPriceChangeStatsService.Do(ctx)
+	var req = e.Client.NewListPriceChangeStatsService()
+	changeStats, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -97,10 +103,10 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[stri
 			Time:   time.Unix(0, stats.CloseTime*int64(time.Millisecond)),
 		}
 
-		ret[stats.Symbol] = tick
+		tickers[stats.Symbol] = tick
 	}
 
-	return ret, nil
+	return tickers, nil
 }
 
 func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
@@ -564,7 +570,6 @@ func (e *Exchange) submitSpotOrder(ctx context.Context, order types.SubmitOrder)
 		}
 	}
 
-
 	switch order.Type {
 	case types.OrderTypeStopLimit, types.OrderTypeStopMarket:
 		if len(order.StopPriceString) == 0 {
@@ -695,17 +700,21 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 
 		if options.Limit > 0 {
 			req.Limit(int(options.Limit))
+		} else {
+			req.Limit(1000)
 		}
 
 		if options.StartTime != nil {
 			req.StartTime(options.StartTime.UnixNano() / int64(time.Millisecond))
 		}
+
 		if options.EndTime != nil {
 			req.EndTime(options.EndTime.UnixNano() / int64(time.Millisecond))
 		}
 
+		// BINANCE uses inclusive last trade ID, so we need to add by 1
 		if options.LastTradeID > 0 {
-			req.FromID(options.LastTradeID)
+			req.FromID(options.LastTradeID + 1)
 		}
 
 		remoteTrades, err = req.Do(ctx)
@@ -714,11 +723,12 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		}
 	} else {
 		req := e.Client.NewListTradesService().
-			Limit(1000).
 			Symbol(symbol)
 
 		if options.Limit > 0 {
 			req.Limit(int(options.Limit))
+		} else {
+			req.Limit(1000)
 		}
 
 		if options.StartTime != nil {
@@ -727,8 +737,10 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		if options.EndTime != nil {
 			req.EndTime(options.EndTime.UnixNano() / int64(time.Millisecond))
 		}
+
+		// BINANCE uses inclusive last trade ID, so we need to add by 1
 		if options.LastTradeID > 0 {
-			req.FromID(options.LastTradeID)
+			req.FromID(options.LastTradeID + 1)
 		}
 
 		remoteTrades, err = req.Do(ctx)
