@@ -292,6 +292,27 @@ rockhopper --config rockhopper_sqlite.yaml create --type sql add_pnl_column
 rockhopper --config rockhopper_mysql.yaml create --type sql add_pnl_column
 ```
 
+### Setup frontend development environment
+
+```
+cd frontend
+yarn install
+```
+
+### Testing Desktop App
+
+for webview
+
+```sh
+make embed && go run -tags web ./cmd/bbgo-webview
+```
+
+for lorca
+
+```sh
+make embed && go run -tags web ./cmd/bbgo-lorca
+```
+
 ## Support
 
 ### By contributing pull requests
