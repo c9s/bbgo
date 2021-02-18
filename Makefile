@@ -9,7 +9,9 @@ OSX_APP_DIR = build/$(OSX_APP_NAME)
 OSX_APP_CONTENTS_DIR = $(OSX_APP_DIR)/Contents
 OSX_APP_RESOURCES_DIR = $(OSX_APP_CONTENTS_DIR)/Resources
 OSX_APP_CODESIGN_IDENTITY ?=
-OSX_APP_GUI ?= lorca
+
+# OSX_APP_GUI ?= lorca
+OSX_APP_GUI ?= webview
 
 FRONTEND_EXPORT_DIR = frontend/out
 
@@ -53,8 +55,8 @@ $(OSX_APP_CONTENTS_DIR)/MacOS/bbgo-desktop: $(OSX_APP_CONTENTS_DIR)/MacOS .FORCE
 	go build -tags web -o $@ ./cmd/bbgo-$(OSX_APP_GUI)
 
 desktop-osx: $(OSX_APP_CONTENTS_DIR)/MacOS/bbgo-desktop $(OSX_APP_CONTENTS_DIR)/Info.plist $(OSX_APP_RESOURCES_DIR)/icon.icns
-	([[ -n "$(OSX_APP_CODESIGN_IDENTITY)" ]] && codesign --deep --force --verbose --sign "$(OSX_APP_CODESIGN_IDENTITY)" $(OSX_APP_DIR) \
-		&& codesign --verify -vvvv $(OSX_APP_DIR)) || true
+	if [[ -n "$(OSX_APP_CODESIGN_IDENTITY)" ]] ; then codesign --deep --force --verbose --sign "$(OSX_APP_CODESIGN_IDENTITY)" $(OSX_APP_DIR) \
+		&& codesign --verify -vvvv $(OSX_APP_DIR) ; fi
 
 desktop: desktop-osx
 
