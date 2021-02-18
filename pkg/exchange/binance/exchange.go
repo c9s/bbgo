@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/adshao/go-binance/v2"
@@ -46,6 +47,18 @@ func New(key, secret string) *Exchange {
 
 func (e *Exchange) Name() types.ExchangeName {
 	return types.ExchangeBinance
+}
+
+func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticker, error) {
+	req := e.Client.NewListPriceChangeStatsService()
+	req.Symbol(strings.ToUpper(symbol))
+	stats, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	ticker := toGlobalTicker(stats[0])
+	return &ticker, nil
 }
 
 func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[string]types.Ticker, error) {
@@ -533,11 +546,24 @@ func (e *Exchange) submitSpotOrder(ctx context.Context, order types.SubmitOrder)
 		NewClientOrderID(clientOrderID).
 		Type(orderType)
 
-	req.Quantity(order.QuantityString)
-
-	if len(order.PriceString) > 0 {
-		req.Price(order.PriceString)
+	if len(order.QuantityString) > 0 {
+		req.Quantity(order.QuantityString)
+	} else if order.Market.Symbol != "" {
+		req.Quantity(order.Market.FormatQuantity(order.Quantity))
+	} else {
+		req.Quantity(strconv.FormatFloat(order.Quantity, 'f', 8, 64))
 	}
+
+	// set price field for limit orders
+	switch order.Type {
+	case types.OrderTypeStopLimit, types.OrderTypeLimit:
+		if len(order.PriceString) > 0 {
+			req.Price(order.PriceString)
+		} else if order.Market.Symbol != "" {
+			req.Price(order.Market.FormatPrice(order.Price))
+		}
+	}
+
 
 	switch order.Type {
 	case types.OrderTypeStopLimit, types.OrderTypeStopMarket:
