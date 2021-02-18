@@ -8,8 +8,8 @@ OSX_APP_NAME = BBGO.app
 OSX_APP_DIR = build/$(OSX_APP_NAME)
 OSX_APP_CONTENTS_DIR = $(OSX_APP_DIR)/Contents
 OSX_APP_RESOURCES_DIR = $(OSX_APP_CONTENTS_DIR)/Resources
-
 OSX_APP_CODESIGN_IDENTITY ?=
+OSX_APP_GUI ?= lorca
 
 FRONTEND_EXPORT_DIR = frontend/out
 
@@ -50,7 +50,7 @@ $(OSX_APP_CONTENTS_DIR)/Info.plist: $(OSX_APP_CONTENTS_DIR)
 	bash desktop/build-osx-info-plist.sh > $@
 
 $(OSX_APP_CONTENTS_DIR)/MacOS/bbgo-desktop: $(OSX_APP_CONTENTS_DIR)/MacOS .FORCE
-	go build -tags web -o $@ ./cmd/bbgo-desktop
+	go build -tags web -o $@ ./cmd/bbgo-$(OSX_APP_GUI)
 
 desktop-osx: $(OSX_APP_CONTENTS_DIR)/MacOS/bbgo-desktop $(OSX_APP_CONTENTS_DIR)/Info.plist $(OSX_APP_RESOURCES_DIR)/icon.icns
 	([[ -n "$(OSX_APP_CODESIGN_IDENTITY)" ]] && codesign --deep --force --verbose --sign "$(OSX_APP_CODESIGN_IDENTITY)" $(OSX_APP_DIR) \
