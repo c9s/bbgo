@@ -6,6 +6,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	batch2 "github.com/c9s/bbgo/pkg/exchange/batch"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -39,7 +40,7 @@ func (s *SyncService) SyncOrders(ctx context.Context, exchange types.Exchange, s
 		logrus.Infof("found last order, start from lastID = %d since %s", lastID, startTime)
 	}
 
-	batch := &types.ExchangeBatchProcessor{Exchange: exchange}
+	batch := &batch2.ExchangeBatchProcessor{Exchange: exchange}
 	ordersC, errC := batch.BatchQueryClosedOrders(ctx, symbol, startTime, time.Now(), lastID)
 	for order := range ordersC {
 		select {
@@ -81,14 +82,17 @@ func (s *SyncService) SyncTrades(ctx context.Context, exchange types.Exchange, s
 		return err
 	}
 
+	var lastTradeID int64 = 0
 	if lastTrade != nil {
 		startTime = time.Time(lastTrade.Time).Add(time.Millisecond)
+		lastTradeID = lastTrade.ID
 		logrus.Infof("found last trade, start from lastID = %d since %s", lastTrade.ID, startTime)
 	}
 
-	batch := &types.ExchangeBatchProcessor{Exchange: exchange}
+	batch := &batch2.ExchangeBatchProcessor{Exchange: exchange}
 	tradeC, errC := batch.BatchQueryTrades(ctx, symbol, &types.TradeQueryOptions{
 		StartTime:   &startTime,
+		LastTradeID: lastTradeID,
 	})
 
 	for trade := range tradeC {
@@ -107,7 +111,6 @@ func (s *SyncService) SyncTrades(ctx context.Context, exchange types.Exchange, s
 		if err := s.TradeService.Insert(trade); err != nil {
 			return err
 		}
-
 	}
 
 	return <-errC

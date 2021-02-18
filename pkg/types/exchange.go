@@ -2,6 +2,8 @@ package types
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -11,6 +13,22 @@ import (
 const DateFormat = "2006-01-02"
 
 type ExchangeName string
+
+func (n *ExchangeName) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s) ; err != nil {
+		return err
+	}
+
+	switch s {
+	case "max", "binance", "ftx":
+		*n = ExchangeName(s)
+		return nil
+
+	}
+
+	return fmt.Errorf("unknown or unsupported exchange name: %s, valid names are: max, binance, ftx", s)
+}
 
 func (n ExchangeName) String() string {
 	return string(n)
@@ -45,6 +63,8 @@ type Exchange interface {
 	QueryAccount(ctx context.Context) (*Account, error)
 
 	QueryAccountBalances(ctx context.Context) (BalanceMap, error)
+
+	QueryTicker(ctx context.Context, symbol string) (*Ticker, error)
 
 	QueryTickers(ctx context.Context, symbol ...string) (map[string]Ticker, error)
 
