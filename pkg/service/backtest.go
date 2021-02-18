@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	batch2 "github.com/c9s/bbgo/pkg/exchange/batch"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -31,7 +32,7 @@ func (s *BacktestService) Sync(ctx context.Context, exchange types.Exchange, sym
 			startTime = lastKLine.StartTime.Add(time.Minute)
 		}
 
-		batch := &types.ExchangeBatchProcessor{Exchange: exchange}
+		batch := &batch2.ExchangeBatchProcessor{Exchange: exchange}
 
 		// should use channel here
 		klineC, errC := batch.BatchQueryKLines(ctx, symbol, interval, startTime, now)

@@ -6,6 +6,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	batch2 "github.com/c9s/bbgo/pkg/exchange/batch"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -39,7 +40,7 @@ func (s *SyncService) SyncOrders(ctx context.Context, exchange types.Exchange, s
 		logrus.Infof("found last order, start from lastID = %d since %s", lastID, startTime)
 	}
 
-	batch := &types.ExchangeBatchProcessor{Exchange: exchange}
+	batch := &batch2.ExchangeBatchProcessor{Exchange: exchange}
 	ordersC, errC := batch.BatchQueryClosedOrders(ctx, symbol, startTime, time.Now(), lastID)
 	for order := range ordersC {
 		select {
@@ -76,23 +77,29 @@ func (s *SyncService) SyncTrades(ctx context.Context, exchange types.Exchange, s
 		}
 	}
 
-	lastTrade, err := s.TradeService.QueryLast(exchange.Name(), symbol, isMargin, isIsolated)
+	lastTrades, err := s.TradeService.QueryLast(exchange.Name(), symbol, isMargin, isIsolated, 10)
 	if err != nil {
 		return err
 	}
 
-	var lastID int64 = 0
-	if lastTrade != nil {
-		lastID = lastTrade.ID
-		startTime = time.Time(lastTrade.Time)
+	var tradeKeys = map[types.TradeKey]struct{}{}
+	var lastTradeID int64 = 0
+	if len(lastTrades) > 0 {
+		for _, t := range lastTrades {
+			tradeKeys[t.Key()] = struct{}{}
+		}
 
-		logrus.Infof("found last trade, start from lastID = %d since %s", lastID, startTime)
+		lastTrade := lastTrades[len(lastTrades)-1]
+		lastTradeID = lastTrade.ID
+
+		startTime = time.Time(lastTrade.Time)
+		logrus.Debugf("found last trade, start from lastID = %d since %s", lastTrade.ID, startTime)
 	}
 
-	batch := &types.ExchangeBatchProcessor{Exchange: exchange}
+	batch := &batch2.ExchangeBatchProcessor{Exchange: exchange}
 	tradeC, errC := batch.BatchQueryTrades(ctx, symbol, &types.TradeQueryOptions{
 		StartTime:   &startTime,
-		LastTradeID: lastID,
+		LastTradeID: lastTradeID,
 	})
 
 	for trade := range tradeC {
@@ -108,10 +115,18 @@ func (s *SyncService) SyncTrades(ctx context.Context, exchange types.Exchange, s
 		default:
 		}
 
+		key := trade.Key()
+		if _, ok := tradeKeys[key]; ok {
+			continue
+		}
+
+		tradeKeys[key] = struct{}{}
+
+		logrus.Infof("inserting trade: %d %s %-4s price: %-13f volume: %-11f %5s %s", trade.ID, trade.Symbol, trade.Side, trade.Price, trade.Quantity, trade.MakerOrTakerLabel(), trade.Time.String())
+
 		if err := s.TradeService.Insert(trade); err != nil {
 			return err
 		}
-
 	}
 
 	return <-errC
