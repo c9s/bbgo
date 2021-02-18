@@ -34,7 +34,7 @@ export function setupRestart(cb) {
 
 export function addSession(session, cb) {
     return axios.post(baseURL + '/api/sessions', session).then(response => {
-        cb(response.data)
+        cb(response.data || [])
     });
 }
 
@@ -52,7 +52,7 @@ export function testSessionConnection(session, cb) {
 
 export function queryStrategies(cb) {
     return axios.get(baseURL + '/api/strategies/single').then(response => {
-        cb(response.data.strategies)
+        cb(response.data.strategies || [])
     });
 }
 
@@ -67,35 +67,35 @@ export function querySessions(cb) {
 export function querySessionSymbols(sessionName, cb) {
     return axios.get(baseURL + `/api/sessions/${ sessionName }/symbols`, {})
         .then(response => {
-            cb(response.data.symbols)
+            cb(response.data.symbols || [])
         });
 }
 
 export function queryTrades(params, cb) {
     axios.get(baseURL + '/api/trades', {params: params})
         .then(response => {
-            cb(response.data.trades)
+            cb(response.data.trades || [])
         });
 }
 
 export function queryClosedOrders(params, cb) {
     axios.get(baseURL + '/api/orders/closed', {params: params})
         .then(response => {
-            cb(response.data.orders)
+            cb(response.data.orders || [])
         });
 }
 
 export function queryAssets(cb) {
     axios.get(baseURL + '/api/assets', {})
         .then(response => {
-            cb(response.data.assets)
+            cb(response.data.assets || [])
         });
 }
 
 export function queryTradingVolume(params, cb) {
     axios.get(baseURL + '/api/trading-volume', {params: params})
         .then(response => {
-            cb(response.data.tradingVolumes)
+            cb(response.data.tradingVolumes || [])
         });
 }
 
