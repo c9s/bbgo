@@ -372,6 +372,8 @@ github.com/ugorji/go/codec v1.2.3 h1:/mVYEV+Jo3IZKeA5gBngN0AvNnQltEDkR+eQikkWQu0
 github.com/ugorji/go/codec v1.2.3/go.mod h1:5FxzDJIgeiWJZslYHPj+LS1dq1ZBQVelZFnjsFGI/Uc=
 github.com/valyala/fastjson v1.5.1 h1:SXaQZVSwLjZOVhDEhjiCcDtnX0Feu7Z7A1+C5atpoHM=
 github.com/valyala/fastjson v1.5.1/go.mod h1:CLCAqky6SMuOcxStkYQvblddUtoRxhYMGLrsQns1aXY=
+github.com/webview/webview v0.0.0-20210216142346-e0bfdf0e5d90 h1:G/O1RFjhc9hgVYjaPQ0Oceqxf3GwRQl/5XEAWYetjmg=
+github.com/webview/webview v0.0.0-20210216142346-e0bfdf0e5d90/go.mod h1:rpXAuuHgyEJb6kXcXldlkOjU6y4x+YcASKKXJNUhh0Y=
 github.com/x-cray/logrus-prefixed-formatter v0.5.2 h1:00txxvfBM9muc0jiLIEAkAcIMJzfthRT6usrui8uGmg=
 github.com/x-cray/logrus-prefixed-formatter v0.5.2/go.mod h1:2duySbKsL6M18s5GU7VPsoEPHyzalCE06qoARUCeBBE=
 github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q53MR2AWcXfiuqkDkRtnGDLqkBTpCHuJHxtU=
