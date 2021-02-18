@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"time"
 
@@ -86,129 +85,31 @@ var SyncCmd = &cobra.Command{
 			return err
 		}
 
-		var symbols []string
+		var defaultSymbols []string
 		if len(symbol) > 0 {
-			symbols = []string{symbol}
+			defaultSymbols = []string{symbol}
 		}
+
+		var selectedSessions []string
 
 		if len(sessionName) > 0 {
-			session, ok := environ.Session(sessionName)
-			if !ok {
-				return fmt.Errorf("session %s not found", sessionName)
-			}
-
-			if len(symbols) == 0 {
-				symbols, err = findPossibleSymbols(ctx, environ, session)
-				if err != nil {
-					return err
-				}
-
-				log.Infof("found possible symbols: %v", symbols)
-			}
-
-			for _, s := range symbols {
-				if err := syncSessionSymbol(ctx, environ, session, s, startTime); err != nil {
-					return err
-				}
-			}
-
-			return nil
+			selectedSessions = []string{sessionName}
 		}
 
-		for _, session := range environ.Sessions() {
-			if len(symbols) == 0 {
-				symbols, err = findPossibleSymbols(ctx, environ, session)
-				if err != nil {
-					return err
-				}
-
-				log.Infof("found possible symbols: %v", symbols)
-			}
-
-			for _, s := range symbols {
-				if err := syncSessionSymbol(ctx, environ, session, s, startTime); err != nil {
-					return err
-				}
-			}
-
-			if err := syncSessionSymbol(ctx, environ, session, symbol, startTime); err != nil {
+		sessions := environ.SelectSessions(selectedSessions...)
+		for _, session := range sessions {
+			if err := session.Init(ctx, environ) ; err != nil {
 				return err
 			}
+
+			if err := bbgo.SyncSession(ctx, environ, session, startTime, defaultSymbols...) ; err != nil {
+				return err
+			}
+
+			log.Infof("exchange session %s synchronization done", session.Name)
 		}
 
 		return nil
 	},
 }
 
-func stringSliceContains(slice []string, needle string) bool {
-	for _, s := range slice {
-		if s == needle {
-			return true
-		}
-	}
-
-	return false
-}
-
-func findPossibleSymbols(ctx context.Context, environ *bbgo.Environment, session *bbgo.ExchangeSession) (symbols []string, err error) {
-	err = session.Init(ctx, environ)
-	if err != nil {
-		return
-	}
-
-	var balances = session.Account.Balances()
-	var fiatCurrencies = []string{"USDC", "USDT", "USD", "TWD", "EUR", "GBP"}
-	var fiatAssets []string
-
-	for _, currency := range fiatCurrencies {
-		if balance, ok := balances[currency] ; ok && balance.Total() > 0 {
-			fiatAssets = append(fiatAssets, currency)
-		}
-	}
-
-	var symbolMap = map[string]struct{}{}
-
-	for _, market := range session.Markets() {
-		// ignore the markets that are not fiat currency markets
-		if !stringSliceContains(fiatAssets, market.QuoteCurrency) {
-			continue
-		}
-
-		// ignore the asset that we don't have in the balance sheet
-		balance, hasAsset := balances[market.BaseCurrency]
-		if !hasAsset || balance.Total() == 0 {
-			continue
-		}
-
-		symbolMap[market.Symbol] = struct{}{}
-	}
-
-	for s := range symbolMap {
-		symbols = append(symbols, s)
-	}
-
-	return symbols, nil
-}
-
-func syncSessionSymbol(ctx context.Context, environ *bbgo.Environment, session *bbgo.ExchangeSession, symbol string, startTime time.Time) error {
-	log.Infof("starting syncing exchange session %s", session.Name)
-
-	if session.IsolatedMargin {
-		log.Infof("session is configured as isolated margin session, using isolated margin symbol %s instead of %s", session.IsolatedMarginSymbol, symbol)
-		symbol = session.IsolatedMarginSymbol
-	}
-
-	log.Infof("syncing trades from exchange session %s...", session.Name)
-	if err := environ.TradeSync.SyncTrades(ctx, session.Exchange, symbol, startTime); err != nil {
-		return err
-	}
-
-	log.Infof("syncing orders from exchange session %s...", session.Name)
-	if err := environ.TradeSync.SyncOrders(ctx, session.Exchange, symbol, startTime); err != nil {
-		return err
-	}
-
-	log.Infof("exchange session %s synchronization done", session.Name)
-
-	return nil
-}
