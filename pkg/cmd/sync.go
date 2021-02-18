@@ -15,7 +15,7 @@ import (
 
 func init() {
 	SyncCmd.Flags().String("session", "", "the exchange session name for sync")
-	SyncCmd.Flags().String("symbol", "BTCUSDT", "trading symbol")
+	SyncCmd.Flags().String("symbol", "", "symbol of market for syncing")
 	SyncCmd.Flags().String("since", "", "sync from time")
 	RootCmd.AddCommand(SyncCmd)
 }
@@ -51,7 +51,7 @@ var SyncCmd = &cobra.Command{
 		}
 
 		environ := bbgo.NewEnvironment()
-		if err := configureDB(ctx, environ) ; err != nil {
+		if err := configureDB(ctx, environ); err != nil {
 			return err
 		}
 
@@ -86,17 +86,52 @@ var SyncCmd = &cobra.Command{
 			return err
 		}
 
+		var symbols []string
+		if len(symbol) > 0 {
+			symbols = []string{symbol}
+		}
+
 		if len(sessionName) > 0 {
 			session, ok := environ.Session(sessionName)
 			if !ok {
 				return fmt.Errorf("session %s not found", sessionName)
 			}
 
-			return syncSession(ctx, environ, session, symbol, startTime)
+			if len(symbols) == 0 {
+				symbols, err = findPossibleSymbols(ctx, environ, session)
+				if err != nil {
+					return err
+				}
+
+				log.Infof("found possible symbols: %v", symbols)
+			}
+
+			for _, s := range symbols {
+				if err := syncSessionSymbol(ctx, environ, session, s, startTime); err != nil {
+					return err
+				}
+			}
+
+			return nil
 		}
 
 		for _, session := range environ.Sessions() {
-			if err := syncSession(ctx, environ, session, symbol, startTime); err != nil {
+			if len(symbols) == 0 {
+				symbols, err = findPossibleSymbols(ctx, environ, session)
+				if err != nil {
+					return err
+				}
+
+				log.Infof("found possible symbols: %v", symbols)
+			}
+
+			for _, s := range symbols {
+				if err := syncSessionSymbol(ctx, environ, session, s, startTime); err != nil {
+					return err
+				}
+			}
+
+			if err := syncSessionSymbol(ctx, environ, session, symbol, startTime); err != nil {
 				return err
 			}
 		}
@@ -105,7 +140,57 @@ var SyncCmd = &cobra.Command{
 	},
 }
 
-func syncSession(ctx context.Context, environ *bbgo.Environment, session *bbgo.ExchangeSession, symbol string, startTime time.Time) error {
+func stringSliceContains(slice []string, needle string) bool {
+	for _, s := range slice {
+		if s == needle {
+			return true
+		}
+	}
+
+	return false
+}
+
+func findPossibleSymbols(ctx context.Context, environ *bbgo.Environment, session *bbgo.ExchangeSession) (symbols []string, err error) {
+	err = session.Init(ctx, environ)
+	if err != nil {
+		return
+	}
+
+	var balances = session.Account.Balances()
+	var fiatCurrencies = []string{"USDC", "USDT", "USD", "TWD", "EUR", "GBP"}
+	var fiatAssets []string
+
+	for _, currency := range fiatCurrencies {
+		if balance, ok := balances[currency] ; ok && balance.Total() > 0 {
+			fiatAssets = append(fiatAssets, currency)
+		}
+	}
+
+	var symbolMap = map[string]struct{}{}
+
+	for _, market := range session.Markets() {
+		// ignore the markets that are not fiat currency markets
+		if !stringSliceContains(fiatAssets, market.QuoteCurrency) {
+			continue
+		}
+
+		// ignore the asset that we don't have in the balance sheet
+		balance, hasAsset := balances[market.BaseCurrency]
+		if !hasAsset || balance.Total() == 0 {
+			continue
+		}
+
+		symbolMap[market.Symbol] = struct{}{}
+	}
+
+	for s := range symbolMap {
+		symbols = append(symbols, s)
+	}
+
+	return symbols, nil
+}
+
+func syncSessionSymbol(ctx context.Context, environ *bbgo.Environment, session *bbgo.ExchangeSession, symbol string, startTime time.Time) error {
 	log.Infof("starting syncing exchange session %s", session.Name)
 
 	if session.IsolatedMargin {
