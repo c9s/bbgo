@@ -13,6 +13,19 @@ import (
 	"github.com/c9s/bbgo/pkg/util"
 )
 
+func toGlobalTicker(stats *binance.PriceChangeStats) types.Ticker {
+	return types.Ticker{
+		Volume: util.MustParseFloat(stats.Volume),
+		Last:   util.MustParseFloat(stats.LastPrice),
+		Open:   util.MustParseFloat(stats.OpenPrice),
+		High:   util.MustParseFloat(stats.HighPrice),
+		Low:    util.MustParseFloat(stats.LowPrice),
+		Buy:    util.MustParseFloat(stats.BidPrice),
+		Sell:   util.MustParseFloat(stats.AskPrice),
+		Time:   time.Unix(0, stats.CloseTime*int64(time.Millisecond)),
+	}
+}
+
 func toLocalOrderType(orderType types.OrderType) (binance.OrderType, error) {
 	switch orderType {
 	case types.OrderTypeLimit:
@@ -96,6 +109,8 @@ func ToGlobalTrade(t binance.TradeV3, isMargin bool) (*types.Trade, error) {
 		if err != nil {
 			return nil, errors.Wrapf(err, "quote quantity parse error, quoteQuantity: %+v", t.QuoteQuantity)
 		}
+	} else {
+		quoteQuantity = price * quantity
 	}
 
 	fee, err := strconv.ParseFloat(t.Commission, 64)
@@ -110,12 +125,12 @@ func ToGlobalTrade(t binance.TradeV3, isMargin bool) (*types.Trade, error) {
 		Symbol:        t.Symbol,
 		Exchange:      "binance",
 		Quantity:      quantity,
+		QuoteQuantity: quoteQuantity,
 		Side:          side,
 		IsBuyer:       t.IsBuyer,
 		IsMaker:       t.IsMaker,
 		Fee:           fee,
 		FeeCurrency:   t.CommissionAsset,
-		QuoteQuantity: quoteQuantity,
 		Time:          datatype.Time(millisecondTime(t.Time)),
 		IsMargin:      isMargin,
 		IsIsolated:    t.IsIsolated,

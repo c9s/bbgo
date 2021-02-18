@@ -1,4 +1,4 @@
-package types
+package batch
 
 import (
 	"context"
@@ -6,14 +6,16 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
+
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 type ExchangeBatchProcessor struct {
-	Exchange
+	types.Exchange
 }
 
-func (e ExchangeBatchProcessor) BatchQueryClosedOrders(ctx context.Context, symbol string, startTime, endTime time.Time, lastOrderID uint64) (c chan Order, errC chan error) {
-	c = make(chan Order, 500)
+func (e ExchangeBatchProcessor) BatchQueryClosedOrders(ctx context.Context, symbol string, startTime, endTime time.Time, lastOrderID uint64) (c chan types.Order, errC chan error) {
+	c = make(chan types.Order, 500)
 	errC = make(chan error, 1)
 
 	go func() {
@@ -62,8 +64,8 @@ func (e ExchangeBatchProcessor) BatchQueryClosedOrders(ctx context.Context, symb
 	return c, errC
 }
 
-func (e ExchangeBatchProcessor) BatchQueryKLines(ctx context.Context, symbol string, interval Interval, startTime, endTime time.Time) (c chan KLine, errC chan error) {
-	c = make(chan KLine, 1000)
+func (e ExchangeBatchProcessor) BatchQueryKLines(ctx context.Context, symbol string, interval types.Interval, startTime, endTime time.Time) (c chan types.KLine, errC chan error) {
+	c = make(chan types.KLine, 1000)
 	errC = make(chan error, 1)
 
 	go func() {
@@ -77,7 +79,7 @@ func (e ExchangeBatchProcessor) BatchQueryKLines(ctx context.Context, symbol str
 				logrus.WithError(err).Error("rate limit error")
 			}
 
-			kLines, err := e.QueryKLines(ctx, symbol, interval, KLineQueryOptions{
+			kLines, err := e.QueryKLines(ctx, symbol, interval, types.KLineQueryOptions{
 				StartTime: &startTime,
 				Limit:     1000,
 			})
@@ -110,9 +112,11 @@ func (e ExchangeBatchProcessor) BatchQueryKLines(ctx context.Context, symbol str
 	return c, errC
 }
 
-func (e ExchangeBatchProcessor) BatchQueryTrades(ctx context.Context, symbol string, options *TradeQueryOptions) (c chan Trade, errC chan error) {
-	c = make(chan Trade, 500)
+func (e ExchangeBatchProcessor) BatchQueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (c chan types.Trade, errC chan error) {
+	c = make(chan types.Trade, 500)
 	errC = make(chan error, 1)
+
+	var lastTradeID = options.LastTradeID
 
 	// last 7 days
 	var startTime = time.Now().Add(-7 * 24 * time.Hour)
@@ -120,13 +124,13 @@ func (e ExchangeBatchProcessor) BatchQueryTrades(ctx context.Context, symbol str
 		startTime = *options.StartTime
 	}
 
-	var lastTradeID = options.LastTradeID
-
 	go func() {
 		limiter := rate.NewLimiter(rate.Every(5*time.Second), 2) // from binance (original 1200, use 1000 for safety)
 
 		defer close(c)
 		defer close(errC)
+
+		var tradeKeys = map[types.TradeKey]struct{}{}
 
 		for {
 			if err := limiter.Wait(ctx); err != nil {
@@ -135,11 +139,15 @@ func (e ExchangeBatchProcessor) BatchQueryTrades(ctx context.Context, symbol str
 
 			logrus.Infof("querying %s trades from %s, limit=%d", symbol, startTime, options.Limit)
 
-			trades, err := e.QueryTrades(ctx, symbol, &TradeQueryOptions{
+			var err error
+			var trades []types.Trade
+
+			trades, err = e.Exchange.QueryTrades(ctx, symbol, &types.TradeQueryOptions{
 				StartTime:   &startTime,
 				Limit:       options.Limit,
 				LastTradeID: lastTradeID,
 			})
+
 			if err != nil {
 				errC <- err
 				return
@@ -149,21 +157,27 @@ func (e ExchangeBatchProcessor) BatchQueryTrades(ctx context.Context, symbol str
 				break
 			}
 
-			if len(trades) == 1 && trades[0].ID == lastTradeID {
+			end := len(trades) - 1
+			if _, exists := tradeKeys[trades[end].Key()]; exists {
 				break
 			}
 
-			logrus.Infof("returned %d trades", len(trades))
+			logrus.Debugf("returned %d trades", len(trades))
 
+			// increase the window to the next time frame by adding 1 millisecond
 			startTime = time.Time(trades[len(trades)-1].Time)
 			for _, t := range trades {
-				// ignore the first trade if last TradeID is given
-				if t.ID == lastTradeID {
+				key := t.Key()
+				if _, ok := tradeKeys[key]; ok {
+					logrus.Debugf("ignore duplicated trade: %+v", key)
 					continue
 				}
 
-				c <- t
 				lastTradeID = t.ID
+				tradeKeys[key] = struct{}{}
+
+				// ignore the first trade if last TradeID is given
+				c <- t
 			}
 		}
 	}()
