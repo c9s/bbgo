@@ -16,6 +16,10 @@ type Balance struct {
 	Locked    fixedpoint.Value `json:"locked"`
 }
 
+func (b Balance) Total() fixedpoint.Value {
+	return b.Available + b.Locked
+}
+
 func (b Balance) String() string {
 	if b.Locked > 0 {
 		return fmt.Sprintf("%s: %f (locked %f)", b.Currency, b.Available.Float64(), b.Locked.Float64())
