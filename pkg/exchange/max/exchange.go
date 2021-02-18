@@ -551,8 +551,6 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 			continue
 		}
 
-		logger.Infof("T: %d %7s %4s P=%f Q=%f %s", localTrade.ID, localTrade.Symbol, localTrade.Side, localTrade.Price, localTrade.Quantity, localTrade.Time)
-
 		trades = append(trades, *localTrade)
 	}
 

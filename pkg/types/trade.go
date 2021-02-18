@@ -98,3 +98,22 @@ func (trade Trade) SlackAttachment() slack.Attachment {
 		// FooterIcon: "",
 	}
 }
+
+func (trade Trade) MakerOrTakerLabel() (o string) {
+	if trade.IsMaker {
+		o += "MAKER"
+	} else {
+		o += "TAKER"
+	}
+
+	return o
+}
+
+func (trade Trade) Key() TradeKey {
+	return TradeKey{ID: trade.ID, Side: trade.Side}
+}
+
+type TradeKey struct {
+	ID   int64
+	Side SideType
+}

@@ -188,32 +188,24 @@ func generateMysqlTradingVolumeQuerySQL(options TradingVolumeQueryOptions) strin
 }
 
 // QueryLast queries the last trade from the database
-func (s *TradeService) QueryLast(ex types.ExchangeName, symbol string, isMargin bool, isIsolated bool) (*types.Trade, error) {
-	log.Infof("querying last trade exchange = %s AND symbol = %s AND is_margin = %v AND is_isolated = %v", ex, symbol, isMargin, isIsolated)
+func (s *TradeService) QueryLast(ex types.ExchangeName, symbol string, isMargin bool, isIsolated bool, limit int) ([]types.Trade, error) {
+	log.Debugf("querying last trade exchange = %s AND symbol = %s AND is_margin = %v AND is_isolated = %v", ex, symbol, isMargin, isIsolated)
 
-	rows, err := s.DB.NamedQuery(`SELECT * FROM trades WHERE exchange = :exchange AND symbol = :symbol AND is_margin = :is_margin AND is_isolated = :is_isolated ORDER BY gid DESC LIMIT 1`, map[string]interface{}{
+	sql := `SELECT * FROM trades WHERE exchange = :exchange AND symbol = :symbol AND is_margin = :is_margin AND is_isolated = :is_isolated ORDER BY gid DESC LIMIT :limit`
+	rows, err := s.DB.NamedQuery(sql, map[string]interface{}{
 		"symbol":      symbol,
 		"exchange":    ex,
 		"is_margin":   isMargin,
 		"is_isolated": isIsolated,
+		"limit":       limit,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "query last trade error")
 	}
 
-	if rows.Err() != nil {
-		return nil, rows.Err()
-	}
-
 	defer rows.Close()
 
-	if rows.Next() {
-		var trade types.Trade
-		err = rows.StructScan(&trade)
-		return &trade, err
-	}
-
-	return nil, rows.Err()
+	return s.scanRows(rows)
 }
 
 func (s *TradeService) QueryForTradingFeeCurrency(ex types.ExchangeName, symbol string, feeCurrency string) ([]types.Trade, error) {
