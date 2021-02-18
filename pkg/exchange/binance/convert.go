@@ -109,6 +109,8 @@ func ToGlobalTrade(t binance.TradeV3, isMargin bool) (*types.Trade, error) {
 		if err != nil {
 			return nil, errors.Wrapf(err, "quote quantity parse error, quoteQuantity: %+v", t.QuoteQuantity)
 		}
+	} else {
+		quoteQuantity = price * quantity
 	}
 
 	fee, err := strconv.ParseFloat(t.Commission, 64)
@@ -123,12 +125,12 @@ func ToGlobalTrade(t binance.TradeV3, isMargin bool) (*types.Trade, error) {
 		Symbol:        t.Symbol,
 		Exchange:      "binance",
 		Quantity:      quantity,
+		QuoteQuantity: quoteQuantity,
 		Side:          side,
 		IsBuyer:       t.IsBuyer,
 		IsMaker:       t.IsMaker,
 		Fee:           fee,
 		FeeCurrency:   t.CommissionAsset,
-		QuoteQuantity: quoteQuantity,
 		Time:          datatype.Time(millisecondTime(t.Time)),
 		IsMargin:      isMargin,
 		IsIsolated:    t.IsIsolated,
