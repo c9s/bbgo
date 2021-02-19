@@ -15,8 +15,7 @@ OSX_APP_GUI ?= webview
 
 FRONTEND_EXPORT_DIR = frontend/out
 
-all: $(BIN_DIR)
-	go build -tags web -o $(BIN_DIR)/$@ ./cmd/$@
+all: bbgo-linux bbgo-darwin
 
 $(BIN_DIR):
 	mkdir -p $@
