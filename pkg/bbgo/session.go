@@ -293,7 +293,7 @@ func (session *ExchangeSession) InitSymbol(ctx context.Context, environ *Environ
 	var trades []types.Trade
 	if environ.TradeSync != nil {
 		log.Infof("syncing trades from %s for symbol %s...", session.Exchange.Name(), symbol)
-		if err := environ.TradeSync.SyncTrades(ctx, session.Exchange, symbol, environ.tradeScanTime); err != nil {
+		if err := environ.TradeSync.SyncTrades(ctx, session.Exchange, symbol); err != nil {
 			return err
 		}
 
