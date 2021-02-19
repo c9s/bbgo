@@ -102,7 +102,7 @@ var SyncCmd = &cobra.Command{
 				return err
 			}
 
-			if err := environ.TradeSync.SyncSession(ctx, session, startTime, defaultSymbols...) ; err != nil {
+			if err := environ.SyncSession(ctx, session, startTime, defaultSymbols...) ; err != nil {
 				return err
 			}
 

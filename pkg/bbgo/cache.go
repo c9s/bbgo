@@ -1,13 +1,17 @@
 package bbgo
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
 	"reflect"
 
 	"github.com/pkg/errors"
+
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 type DataFetcher func() (interface{}, error)
@@ -56,3 +60,11 @@ func WithCache(key string, obj interface{}, fetcher DataFetcher) error {
 
 	return nil
 }
+
+func LoadExchangeMarketsWithCache(ctx context.Context, ex types.Exchange) (markets types.MarketMap, err error) {
+	err = WithCache(fmt.Sprintf("%s-markets", ex.Name()), &markets, func() (interface{}, error) {
+		return ex.QueryMarkets(ctx)
+	})
+	return markets, err
+}
+
