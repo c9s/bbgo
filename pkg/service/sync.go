@@ -6,8 +6,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/c9s/bbgo/pkg/bbgo"
-	batch2 "github.com/c9s/bbgo/pkg/exchange/batch"
+	"github.com/c9s/bbgo/pkg/exchange/batch"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -41,8 +40,8 @@ func (s *SyncService) SyncOrders(ctx context.Context, exchange types.Exchange, s
 		logrus.Infof("found last order, start from lastID = %d since %s", lastID, startTime)
 	}
 
-	batch := &batch2.ExchangeBatchProcessor{Exchange: exchange}
-	ordersC, errC := batch.BatchQueryClosedOrders(ctx, symbol, startTime, time.Now(), lastID)
+	b := &batch.ExchangeBatchProcessor{Exchange: exchange}
+	ordersC, errC := b.BatchQueryClosedOrders(ctx, symbol, startTime, time.Now(), lastID)
 	for order := range ordersC {
 		select {
 
@@ -97,8 +96,8 @@ func (s *SyncService) SyncTrades(ctx context.Context, exchange types.Exchange, s
 		logrus.Debugf("found last trade, start from lastID = %d since %s", lastTrade.ID, startTime)
 	}
 
-	batch := &batch2.ExchangeBatchProcessor{Exchange: exchange}
-	tradeC, errC := batch.BatchQueryTrades(ctx, symbol, &types.TradeQueryOptions{
+	b := &batch.ExchangeBatchProcessor{Exchange: exchange}
+	tradeC, errC := b.BatchQueryTrades(ctx, symbol, &types.TradeQueryOptions{
 		StartTime:   &startTime,
 		LastTradeID: lastTradeID,
 	})
@@ -133,88 +132,17 @@ func (s *SyncService) SyncTrades(ctx context.Context, exchange types.Exchange, s
 	return <-errC
 }
 
-
 // SyncSessionSymbols syncs the trades from the given exchange session
-func (s *SyncService) SyncSessionSymbols(ctx context.Context, session *bbgo.ExchangeSession, startTime time.Time, symbols ...string) error {
+func (s *SyncService) SyncSessionSymbols(ctx context.Context, exchange types.Exchange, startTime time.Time, symbols ...string) error {
 	for _, symbol := range symbols {
-		logrus.Debugf("syncing trades from exchange session %s...", session.Name)
-		if err := s.SyncTrades(ctx, session.Exchange, symbol, startTime); err != nil {
+		if err := s.SyncTrades(ctx, exchange, symbol, startTime); err != nil {
 			return err
 		}
 
-		logrus.Debugf("syncing orders from exchange session %s...", session.Name)
-		if err := s.SyncOrders(ctx, session.Exchange, symbol, startTime); err != nil {
+		if err := s.SyncOrders(ctx, exchange, symbol, startTime); err != nil {
 			return err
 		}
 	}
 
 	return nil
-}
-
-func (s *SyncService) SyncSession(ctx context.Context, session *bbgo.ExchangeSession, startTime time.Time, defaultSymbols ...string) error {
-	symbols, err := getSessionSymbols(session, defaultSymbols...)
-	if err != nil {
-		return err
-	}
-
-	return s.SyncSessionSymbols(ctx, session, startTime, symbols...)
-}
-
-func getSessionSymbols(session *bbgo.ExchangeSession, defaultSymbols ...string) ([]string, error) {
-	if session.IsolatedMargin {
-		return []string{session.IsolatedMarginSymbol}, nil
-	}
-
-	if len(defaultSymbols) > 0 {
-		return defaultSymbols, nil
-	}
-
-	return FindPossibleSymbols(session)
-}
-
-
-func FindPossibleSymbols(session *bbgo.ExchangeSession) (symbols []string, err error) {
-	var balances = session.Account.Balances()
-	var fiatCurrencies = []string{"USDC", "USDT", "USD", "TWD", "EUR", "GBP"}
-	var fiatAssets []string
-
-	for _, currency := range fiatCurrencies {
-		if balance, ok := balances[currency]; ok && balance.Total() > 0 {
-			fiatAssets = append(fiatAssets, currency)
-		}
-	}
-
-	var symbolMap = map[string]struct{}{}
-
-	for _, market := range session.Markets() {
-		// ignore the markets that are not fiat currency markets
-		if !stringSliceContains(fiatAssets, market.QuoteCurrency) {
-			continue
-		}
-
-		// ignore the asset that we don't have in the balance sheet
-		balance, hasAsset := balances[market.BaseCurrency]
-		if !hasAsset || balance.Total() == 0 {
-			continue
-		}
-
-		symbolMap[market.Symbol] = struct{}{}
-	}
-
-	for s := range symbolMap {
-		symbols = append(symbols, s)
-	}
-
-	return symbols, nil
-}
-
-
-func stringSliceContains(slice []string, needle string) bool {
-	for _, s := range slice {
-		if s == needle {
-			return true
-		}
-	}
-
-	return false
 }
