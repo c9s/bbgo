@@ -118,12 +118,6 @@ func (e ExchangeBatchProcessor) BatchQueryTrades(ctx context.Context, symbol str
 
 	var lastTradeID = options.LastTradeID
 
-	// last 7 days
-	var startTime = time.Now().Add(-7 * 24 * time.Hour)
-	if options.StartTime != nil {
-		startTime = *options.StartTime
-	}
-
 	go func() {
 		limiter := rate.NewLimiter(rate.Every(5*time.Second), 2) // from binance (original 1200, use 1000 for safety)
 
@@ -137,13 +131,12 @@ func (e ExchangeBatchProcessor) BatchQueryTrades(ctx context.Context, symbol str
 				logrus.WithError(err).Error("rate limit error")
 			}
 
-			logrus.Infof("querying %s trades from %s, limit=%d", symbol, startTime, options.Limit)
+			logrus.Debugf("querying %s trades from id=%d limit=%d", symbol, lastTradeID, options.Limit)
 
 			var err error
 			var trades []types.Trade
 
 			trades, err = e.Exchange.QueryTrades(ctx, symbol, &types.TradeQueryOptions{
-				StartTime:   &startTime,
 				Limit:       options.Limit,
 				LastTradeID: lastTradeID,
 			})
@@ -164,8 +157,6 @@ func (e ExchangeBatchProcessor) BatchQueryTrades(ctx context.Context, symbol str
 
 			logrus.Debugf("returned %d trades", len(trades))
 
-			// increase the window to the next time frame by adding 1 millisecond
-			startTime = time.Time(trades[len(trades)-1].Time)
 			for _, t := range trades {
 				key := t.Key()
 				if _, ok := tradeKeys[key]; ok {
