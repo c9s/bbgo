@@ -441,9 +441,24 @@ func (environ *Environment) Connect(ctx context.Context) error {
 	return nil
 }
 
-func LoadExchangeMarketsWithCache(ctx context.Context, ex types.Exchange) (markets types.MarketMap, err error) {
-	err = WithCache(fmt.Sprintf("%s-markets", ex.Name()), &markets, func() (interface{}, error) {
-		return ex.QueryMarkets(ctx)
-	})
-	return markets, err
+func (environ *Environment) SyncSession(ctx context.Context, session *ExchangeSession, startTime time.Time, defaultSymbols ...string) error {
+	symbols, err := getSessionSymbols(session, defaultSymbols...)
+	if err != nil {
+		return err
+	}
+
+	return environ.TradeSync.SyncSessionSymbols(ctx, session.Exchange, startTime, symbols...)
 }
+
+func getSessionSymbols(session *ExchangeSession, defaultSymbols ...string) ([]string, error) {
+	if session.IsolatedMargin {
+		return []string{session.IsolatedMarginSymbol}, nil
+	}
+
+	if len(defaultSymbols) > 0 {
+		return defaultSymbols, nil
+	}
+
+	return session.FindPossibleSymbols()
+}
+

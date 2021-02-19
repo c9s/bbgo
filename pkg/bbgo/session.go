@@ -11,6 +11,7 @@ import (
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 type StandardIndicatorSet struct {
@@ -522,3 +523,46 @@ func (session *ExchangeSession) UpdatePrices(ctx context.Context) (err error) {
 	session.lastPriceUpdatedAt = time.Now()
 	return err
 }
+
+func (session *ExchangeSession) FindPossibleSymbols() (symbols []string, err error) {
+	// If the session is an isolated margin session, there will be only the isolated margin symbol
+	if session.IsolatedMargin {
+		return []string{
+			session.IsolatedMarginSymbol,
+		}, nil
+	}
+
+	var balances = session.Account.Balances()
+	var fiatCurrencies = []string{"USDC", "USDT", "USD", "TWD", "EUR", "GBP"}
+	var fiatAssets []string
+
+	for _, currency := range fiatCurrencies {
+		if balance, ok := balances[currency]; ok && balance.Total() > 0 {
+			fiatAssets = append(fiatAssets, currency)
+		}
+	}
+
+	var symbolMap = map[string]struct{}{}
+
+	for _, market := range session.Markets() {
+		// ignore the markets that are not fiat currency markets
+		if !util.StringSliceContains(fiatAssets, market.QuoteCurrency) {
+			continue
+		}
+
+		// ignore the asset that we don't have in the balance sheet
+		balance, hasAsset := balances[market.BaseCurrency]
+		if !hasAsset || balance.Total() == 0 {
+			continue
+		}
+
+		symbolMap[market.Symbol] = struct{}{}
+	}
+
+	for s := range symbolMap {
+		symbols = append(symbols, s)
+	}
+
+	return symbols, nil
+}
+
