@@ -65,7 +65,7 @@ func (s *SyncService) SyncOrders(ctx context.Context, exchange types.Exchange, s
 	return <-errC
 }
 
-func (s *SyncService) SyncTrades(ctx context.Context, exchange types.Exchange, symbol string, startTime time.Time) error {
+func (s *SyncService) SyncTrades(ctx context.Context, exchange types.Exchange, symbol string) error {
 	isMargin := false
 	isIsolated := false
 	if marginExchange, ok := exchange.(types.MarginExchange); ok {
@@ -83,7 +83,7 @@ func (s *SyncService) SyncTrades(ctx context.Context, exchange types.Exchange, s
 	}
 
 	var tradeKeys = map[types.TradeKey]struct{}{}
-	var lastTradeID int64 = 0
+	var lastTradeID int64 = 1
 	if len(lastTrades) > 0 {
 		for _, t := range lastTrades {
 			tradeKeys[t.Key()] = struct{}{}
@@ -91,14 +91,11 @@ func (s *SyncService) SyncTrades(ctx context.Context, exchange types.Exchange, s
 
 		lastTrade := lastTrades[len(lastTrades)-1]
 		lastTradeID = lastTrade.ID
-
-		startTime = time.Time(lastTrade.Time)
-		logrus.Debugf("found last trade, start from lastID = %d since %s", lastTrade.ID, startTime)
+		logrus.Debugf("found last trade, start from lastID = %d", lastTrade.ID)
 	}
 
 	b := &batch.ExchangeBatchProcessor{Exchange: exchange}
 	tradeC, errC := b.BatchQueryTrades(ctx, symbol, &types.TradeQueryOptions{
-		StartTime:   &startTime,
 		LastTradeID: lastTradeID,
 	})
 
@@ -135,7 +132,7 @@ func (s *SyncService) SyncTrades(ctx context.Context, exchange types.Exchange, s
 // SyncSessionSymbols syncs the trades from the given exchange session
 func (s *SyncService) SyncSessionSymbols(ctx context.Context, exchange types.Exchange, startTime time.Time, symbols ...string) error {
 	for _, symbol := range symbols {
-		if err := s.SyncTrades(ctx, exchange, symbol, startTime); err != nil {
+		if err := s.SyncTrades(ctx, exchange, symbol); err != nil {
 			return err
 		}
 
