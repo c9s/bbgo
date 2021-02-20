@@ -42,6 +42,7 @@ backtest:
       USDT: 10000.0
 
 exchangeStrategies:
+
 - on: max
   grid:
     symbol: BTCUSDT
@@ -50,3 +51,5 @@ exchangeStrategies:
     profitSpread: 50.0
     upperPrice: 26800.0
     lowerPrice: 26500.0
+    long: true
+
