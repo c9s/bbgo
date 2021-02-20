@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/codingconcepts/env"
@@ -53,15 +54,20 @@ type Environment struct {
 	TradeSync       *service.SyncService
 
 	// startTime is the time of start point (which is used in the backtest)
-	startTime     time.Time
-	tradeScanTime time.Time
-	sessions      map[string]*ExchangeSession
+	startTime time.Time
+
+	// syncStartTime is the time point we want to start the sync (for trades and orders)
+	syncStartTime time.Time
+	syncing       bool
+	syncMutex     sync.Mutex
+
+	sessions map[string]*ExchangeSession
 }
 
 func NewEnvironment() *Environment {
 	return &Environment{
 		// default trade scan time
-		tradeScanTime: time.Now().AddDate(0, -1, 0), // sync from 1 month ago
+		syncStartTime: time.Now().AddDate(-1, 0, 0), // defaults to sync from 1 year ago
 		sessions:      make(map[string]*ExchangeSession),
 		startTime:     time.Now(),
 	}
@@ -83,7 +89,7 @@ func (environ *Environment) SelectSessions(names ...string) map[string]*Exchange
 
 	sessions := make(map[string]*ExchangeSession)
 	for _, name := range names {
-		if s, ok := environ.Session(name) ; ok {
+		if s, ok := environ.Session(name); ok {
 			sessions[name] = s
 		}
 	}
@@ -410,9 +416,9 @@ func (environ *Environment) SetStartTime(t time.Time) *Environment {
 	return environ
 }
 
-// SyncTradesFrom overrides the default trade scan time (-7 days)
-func (environ *Environment) SyncTradesFrom(t time.Time) *Environment {
-	environ.tradeScanTime = t
+// SetSyncStartTime overrides the default trade scan time (-7 days)
+func (environ *Environment) SetSyncStartTime(t time.Time) *Environment {
+	environ.syncStartTime = t
 	return environ
 }
 
@@ -441,13 +447,48 @@ func (environ *Environment) Connect(ctx context.Context) error {
 	return nil
 }
 
-func (environ *Environment) SyncSession(ctx context.Context, session *ExchangeSession, startTime time.Time, defaultSymbols ...string) error {
+func (environ *Environment) IsSyncing() bool {
+	return environ.syncing
+}
+
+// Sync syncs all registered exchange sessions
+func (environ *Environment) Sync(ctx context.Context) error {
+	environ.syncMutex.Lock()
+	defer environ.syncMutex.Unlock()
+	environ.syncing = true
+
+	defer func() {
+		environ.syncing = false
+	}()
+
+	for _, session := range environ.sessions {
+		if err := environ.syncSession(ctx, session); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (environ *Environment) SyncSession(ctx context.Context, session *ExchangeSession, defaultSymbols ...string) error {
+	environ.syncMutex.Lock()
+	defer environ.syncMutex.Unlock()
+
+	environ.syncing = true
+	defer func() {
+		environ.syncing = false
+	}()
+
+	return environ.syncSession(ctx, session, defaultSymbols...)
+}
+
+func (environ *Environment) syncSession(ctx context.Context, session *ExchangeSession, defaultSymbols ...string) error {
 	symbols, err := getSessionSymbols(session, defaultSymbols...)
 	if err != nil {
 		return err
 	}
 
-	return environ.TradeSync.SyncSessionSymbols(ctx, session.Exchange, startTime, symbols...)
+	return environ.TradeSync.SyncSessionSymbols(ctx, session.Exchange, environ.syncStartTime, symbols...)
 }
 
 func getSessionSymbols(session *ExchangeSession, defaultSymbols ...string) ([]string, error) {
@@ -461,4 +502,3 @@ func getSessionSymbols(session *ExchangeSession, defaultSymbols ...string) ([]st
 
 	return session.FindPossibleSymbols()
 }
-

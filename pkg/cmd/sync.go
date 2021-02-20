@@ -59,8 +59,8 @@ var SyncCmd = &cobra.Command{
 		}
 
 		var (
-			// default start time
-			startTime = time.Now().AddDate(0, -3, 0)
+			// default sync start time
+			startTime = time.Now().AddDate(-1, 0, 0)
 		)
 
 		if len(since) > 0 {
@@ -85,6 +85,8 @@ var SyncCmd = &cobra.Command{
 			return err
 		}
 
+		environ.SetSyncStartTime(startTime)
+
 		var defaultSymbols []string
 		if len(symbol) > 0 {
 			defaultSymbols = []string{symbol}
@@ -102,7 +104,7 @@ var SyncCmd = &cobra.Command{
 				return err
 			}
 
-			if err := environ.SyncSession(ctx, session, startTime, defaultSymbols...) ; err != nil {
+			if err := environ.SyncSession(ctx, session, defaultSymbols...); err != nil {
 				return err
 			}
 
