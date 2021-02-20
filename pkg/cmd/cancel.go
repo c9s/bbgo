@@ -62,7 +62,7 @@ var CancelCmd = &cobra.Command{
 		}
 
 		environ := bbgo.NewEnvironment()
-		if err := configureDB(ctx, environ) ; err != nil {
+		if err := environ.ConfigureDatabase(ctx) ; err != nil {
 			return err
 		}
 

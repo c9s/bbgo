@@ -57,9 +57,10 @@ var PnLCmd = &cobra.Command{
 
 
 		environ := bbgo.NewEnvironment()
-		if err := configureDB(ctx, environ) ; err != nil {
+		if err := environ.ConfigureDatabase(ctx) ; err != nil {
 			return err
 		}
+
 
 		var trades []types.Trade
 		tradingFeeCurrency := exchange.PlatformFeeCurrency()

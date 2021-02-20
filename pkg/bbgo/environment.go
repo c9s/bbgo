@@ -47,10 +47,10 @@ type Environment struct {
 	Notifiability
 
 	PersistenceServiceFacade *service.PersistenceServiceFacade
-	DatabaseService *service.DatabaseService
-	OrderService    *service.OrderService
-	TradeService    *service.TradeService
-	TradeSync       *service.SyncService
+	DatabaseService          *service.DatabaseService
+	OrderService             *service.OrderService
+	TradeService             *service.TradeService
+	TradeSync                *service.SyncService
 
 	// startTime is the time of start point (which is used in the backtest)
 	startTime time.Time
@@ -69,6 +69,10 @@ func NewEnvironment() *Environment {
 		syncStartTime: time.Now().AddDate(-1, 0, 0), // defaults to sync from 1 year ago
 		sessions:      make(map[string]*ExchangeSession),
 		startTime:     time.Now(),
+
+		PersistenceServiceFacade: &service.PersistenceServiceFacade{
+			Memory: service.NewMemoryService(),
+		},
 	}
 }
 
@@ -96,7 +100,28 @@ func (environ *Environment) SelectSessions(names ...string) map[string]*Exchange
 	return sessions
 }
 
-func (environ *Environment) ConfigureDatabase(ctx context.Context, driver string, dsn string) error {
+func (environ *Environment) ConfigureDatabase(ctx context.Context) error {
+	// configureDB configures the database service based on the environment variable
+	if driver, ok := os.LookupEnv("DB_DRIVER"); ok {
+
+		if dsn, ok := os.LookupEnv("DB_DSN"); ok {
+			return environ.ConfigureDatabaseDriver(ctx, driver, dsn)
+		}
+
+	} else if dsn, ok := os.LookupEnv("SQLITE3_DSN"); ok {
+
+		return environ.ConfigureDatabaseDriver(ctx, "sqlite3", dsn)
+
+	} else if dsn, ok := os.LookupEnv("MYSQL_URL"); ok {
+
+		return environ.ConfigureDatabaseDriver(ctx, "mysql", dsn)
+
+	}
+
+	return nil
+}
+
+func (environ *Environment) ConfigureDatabaseDriver(ctx context.Context, driver string, dsn string) error {
 	environ.DatabaseService = service.NewDatabaseService(driver, dsn)
 	err := environ.DatabaseService.Connect()
 	if err != nil {
@@ -235,16 +260,12 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 }
 
 func (environ *Environment) ConfigurePersistence(conf *PersistenceConfig) error {
-	var facade = &service.PersistenceServiceFacade{
-		Memory: service.NewMemoryService(),
-	}
-
 	if conf.Redis != nil {
 		if err := env.Set(conf.Redis); err != nil {
 			return err
 		}
 
-		facade.Redis = service.NewRedisPersistenceService(conf.Redis)
+		environ.PersistenceServiceFacade.Redis = service.NewRedisPersistenceService(conf.Redis)
 	}
 
 	if conf.Json != nil {
@@ -255,10 +276,9 @@ func (environ *Environment) ConfigurePersistence(conf *PersistenceConfig) error 
 			}
 		}
 
-		facade.Json = &service.JsonPersistenceService{Directory: conf.Json.Directory}
+		environ.PersistenceServiceFacade.Json = &service.JsonPersistenceService{Directory: conf.Json.Directory}
 	}
 
-	environ.PersistenceServiceFacade = facade
 	return nil
 }
 
