@@ -70,6 +70,12 @@ func (s *Server) newEngine() *gin.Engine {
 		r.POST("/api/setup/restart", s.setupRestart)
 	}
 
+	r.GET("/api/environment/syncing", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"syncing": s.Environ.IsSyncing(),
+		})
+	})
+
 	r.GET("/api/trades", func(c *gin.Context) {
 		if s.Environ.TradeService == nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "database is not configured"})
