@@ -218,42 +218,6 @@ func BootstrapEnvironment(ctx context.Context, environ *bbgo.Environment, userCo
 	return nil
 }
 
-func ConfigureTrader(trader *bbgo.Trader, userConfig *bbgo.Config) error {
-	if userConfig.RiskControls != nil {
-		trader.SetRiskControls(userConfig.RiskControls)
-	}
-
-	for _, entry := range userConfig.ExchangeStrategies {
-		for _, mount := range entry.Mounts {
-			log.Infof("attaching strategy %T on %s...", entry.Strategy, mount)
-			if err := trader.AttachStrategyOn(mount, entry.Strategy) ; err != nil {
-				return err
-			}
-		}
-	}
-
-	for _, strategy := range userConfig.CrossExchangeStrategies {
-		log.Infof("attaching cross exchange strategy %T", strategy)
-		trader.AttachCrossExchangeStrategy(strategy)
-	}
-
-	for _, report := range userConfig.PnLReporters {
-		if len(report.AverageCostBySymbols) > 0 {
-
-			log.Infof("setting up average cost pnl reporter on symbols: %v", report.AverageCostBySymbols)
-			trader.ReportPnL().
-				AverageCostBySymbols(report.AverageCostBySymbols...).
-				Of(report.Of...).
-				When(report.When...)
-
-		} else {
-			return fmt.Errorf("unsupported PnL reporter: %+v", report)
-		}
-	}
-
-	return nil
-}
-
 func runConfig(basectx context.Context, userConfig *bbgo.Config, enableApiServer bool) error {
 	ctx, cancelTrading := context.WithCancel(basectx)
 	defer cancelTrading()
@@ -264,7 +228,7 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config, enableApiServer
 	}
 
 	trader := bbgo.NewTrader(environ)
-	if err := ConfigureTrader(trader, userConfig); err != nil {
+	if err := trader.Configure(userConfig); err != nil {
 		return err
 	}
 
