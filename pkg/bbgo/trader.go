@@ -95,6 +95,43 @@ func (trader *Trader) DisableLogging() {
 	trader.logger = &SilentLogger{}
 }
 
+func (trader *Trader) Configure(userConfig *Config) error {
+	if userConfig.RiskControls != nil {
+		trader.SetRiskControls(userConfig.RiskControls)
+	}
+
+	for _, entry := range userConfig.ExchangeStrategies {
+		for _, mount := range entry.Mounts {
+			log.Infof("attaching strategy %T on %s...", entry.Strategy, mount)
+			if err := trader.AttachStrategyOn(mount, entry.Strategy) ; err != nil {
+				return err
+			}
+		}
+	}
+
+	for _, strategy := range userConfig.CrossExchangeStrategies {
+		log.Infof("attaching cross exchange strategy %T", strategy)
+		trader.AttachCrossExchangeStrategy(strategy)
+	}
+
+	for _, report := range userConfig.PnLReporters {
+		if len(report.AverageCostBySymbols) > 0 {
+
+			log.Infof("setting up average cost pnl reporter on symbols: %v", report.AverageCostBySymbols)
+			trader.ReportPnL().
+				AverageCostBySymbols(report.AverageCostBySymbols...).
+				Of(report.Of...).
+				When(report.When...)
+
+		} else {
+			return fmt.Errorf("unsupported PnL reporter: %+v", report)
+		}
+	}
+
+	return nil
+}
+
+
 // AttachStrategyOn attaches the single exchange strategy on an exchange Session.
 // Single exchange strategy is the default behavior.
 func (trader *Trader) AttachStrategyOn(session string, strategies ...SingleExchangeStrategy) error {
