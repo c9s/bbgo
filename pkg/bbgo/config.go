@@ -14,6 +14,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/datatype"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -133,20 +134,9 @@ func (m BacktestAccountBalanceMap) BalanceMap() types.BalanceMap {
 	return balances
 }
 
-type RedisPersistenceConfig struct {
-	Host     string `json:"host" env:"REDIS_HOST"`
-	Port     string `json:"port" env:"REDIS_PORT"`
-	Password string `json:"password" env:"REDIS_PASSWORD"`
-	DB       int    `json:"db" env:"REDIS_DB"`
-}
-
-type JsonPersistenceConfig struct {
-	Directory string `json:"directory"`
-}
-
 type PersistenceConfig struct {
-	Redis *RedisPersistenceConfig `json:"redis,omitempty" yaml:"redis,omitempty"`
-	Json  *JsonPersistenceConfig  `json:"json,omitempty" yaml:"json,omitempty"`
+	Redis *service.RedisPersistenceConfig `json:"redis,omitempty" yaml:"redis,omitempty"`
+	Json  *service.JsonPersistenceConfig  `json:"json,omitempty" yaml:"json,omitempty"`
 }
 
 type BuildTargetConfig struct {

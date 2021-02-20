@@ -3,8 +3,6 @@ package service
 import (
 	"reflect"
 	"strings"
-
-	"github.com/c9s/bbgo/pkg/bbgo"
 )
 
 type MemoryService struct {
@@ -17,7 +15,7 @@ func NewMemoryService() *MemoryService {
 	}
 }
 
-func (s *MemoryService) NewStore(id string, subIDs ...string) bbgo.Store {
+func (s *MemoryService) NewStore(id string, subIDs ...string) Store {
 	key := strings.Join(append([]string{id}, subIDs...), ":")
 	return &MemoryStore{
 		Key:    key,

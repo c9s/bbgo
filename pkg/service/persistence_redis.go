@@ -7,15 +7,13 @@ import (
 	"strings"
 
 	"github.com/go-redis/redis/v8"
-
-	"github.com/c9s/bbgo/pkg/bbgo"
 )
 
 type RedisPersistenceService struct {
 	redis *redis.Client
 }
 
-func NewRedisPersistenceService(config *bbgo.RedisPersistenceConfig) *RedisPersistenceService {
+func NewRedisPersistenceService(config *RedisPersistenceConfig) *RedisPersistenceService {
 	client := redis.NewClient(&redis.Options{
 		Addr: net.JoinHostPort(config.Host, config.Port),
 		// Username:           "", // username is only for redis 6.0
@@ -28,7 +26,7 @@ func NewRedisPersistenceService(config *bbgo.RedisPersistenceConfig) *RedisPersi
 	}
 }
 
-func (s *RedisPersistenceService) NewStore(id string, subIDs ...string) bbgo.Store {
+func (s *RedisPersistenceService) NewStore(id string, subIDs ...string) Store {
 	if len(subIDs) > 0 {
 		id += ":" + strings.Join(subIDs, ":")
 	}

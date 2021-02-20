@@ -5,15 +5,13 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-
-	"github.com/c9s/bbgo/pkg/bbgo"
 )
 
 type JsonPersistenceService struct {
 	Directory string
 }
 
-func (s *JsonPersistenceService) NewStore(id string, subIDs ...string) bbgo.Store {
+func (s *JsonPersistenceService) NewStore(id string, subIDs ...string) Store {
 	return &JsonStore{
 		ID:        id,
 		Directory: filepath.Join(append([]string{s.Directory}, subIDs...)...),
