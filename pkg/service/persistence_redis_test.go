@@ -5,12 +5,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 func TestRedisPersistentService(t *testing.T) {
-	redisService := NewRedisPersistenceService(&bbgo.RedisPersistenceConfig{
+	redisService := NewRedisPersistenceService(&RedisPersistenceConfig{
 		Host: "127.0.0.1",
 		Port: "6379",
 		DB:   0,
