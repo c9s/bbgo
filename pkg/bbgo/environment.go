@@ -448,6 +448,9 @@ func (environ *Environment) Connect(ctx context.Context) error {
 }
 
 func (environ *Environment) IsSyncing() bool {
+	environ.syncMutex.Lock()
+	defer environ.syncMutex.Unlock()
+
 	return environ.syncing
 }
 
