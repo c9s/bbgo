@@ -88,8 +88,8 @@ func runSetup(baseCtx context.Context, userConfig *bbgo.Config, enableApiServer 
 	return nil
 }
 
-func newNotificationSystem(userConfig *bbgo.Config) bbgo.Notifiability {
-	notification := bbgo.Notifiability{
+func newNotificationSystem(userConfig *bbgo.Config, persistence bbgo.PersistenceService) (*bbgo.Notifiability, error) {
+	notification := &bbgo.Notifiability{
 		SymbolChannelRouter:  bbgo.NewPatternChannelRouter(nil),
 		SessionChannelRouter: bbgo.NewPatternChannelRouter(nil),
 		ObjectChannelRouter:  bbgo.NewObjectChannelRouter(),
@@ -109,7 +109,59 @@ func newNotificationSystem(userConfig *bbgo.Config) bbgo.Notifiability {
 		}
 	}
 
-	return notification
+	telegramBotToken := viper.GetString("telegram-bot-token")
+	if len(telegramBotToken) > 0 {
+		tt := strings.Split(telegramBotToken, ":")
+		telegramID := tt[0]
+
+		bot, err := tb.NewBot(tb.Settings{
+			// You can also set custom API URL.
+			// If field is empty it equals to "https://api.telegram.org".
+			// URL: "http://195.129.111.17:8012",
+			Token:  telegramBotToken,
+			Poller: &tb.LongPoller{Timeout: 10 * time.Second},
+		})
+
+		if err != nil {
+			return nil, err
+		}
+
+		// allocate a store, so that we can save the chatID for the owner
+		var sessionStore = persistence.NewStore("bbgo", "telegram", telegramID)
+		var interaction = telegramnotifier.NewInteraction(bot, sessionStore)
+
+		authToken := viper.GetString("telegram-bot-auth-token")
+		if len(authToken) > 0 {
+			interaction.SetAuthToken(authToken)
+
+			log.Info("telegram bot auth token is set, using fixed token for authorization...")
+
+			printTelegramAuthTokenGuide(authToken)
+		}
+
+		var session telegramnotifier.Session
+		if err := sessionStore.Load(&session); err != nil || session.Owner == nil {
+			log.Warnf("session not found, generating new one-time password key for new session...")
+
+			qrcodeImagePath := fmt.Sprintf("otp-%s.png", telegramID)
+			key, err := setupNewOTPKey(qrcodeImagePath)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to setup totp (time-based one time password) key")
+			}
+
+			session = telegramnotifier.NewSession(key)
+			if err := sessionStore.Save(&session); err != nil {
+				return nil, errors.Wrap(err, "failed to save session")
+			}
+		}
+
+		go interaction.Start(session)
+
+		var notifier = telegramnotifier.New(interaction)
+		notification.AddNotifier(notifier)
+	}
+
+	return notification, nil
 }
 
 func BootstrapEnvironment(ctx context.Context, environ *bbgo.Environment, userConfig *bbgo.Config) error {
@@ -128,76 +180,19 @@ func BootstrapEnvironment(ctx context.Context, environ *bbgo.Environment, userCo
 	}
 
 	// configure persistence service, by default we will use memory service
-	var persistence bbgo.PersistenceService = bbgo.NewMemoryService()
+	var persistence bbgo.PersistenceService = service.NewMemoryService()
 	if environ.PersistenceServiceFacade != nil {
 		if environ.PersistenceServiceFacade.Redis != nil {
 			persistence = environ.PersistenceServiceFacade.Redis
 		}
 	}
 
-
-	notification := newNotificationSystem(userConfig)
-
-	// for telegram
-	telegramBotToken := viper.GetString("telegram-bot-token")
-	telegramBotAuthToken := viper.GetString("telegram-bot-auth-token")
-	if len(telegramBotToken) > 0 {
-		log.Infof("initializing telegram bot...")
-
-		tt := strings.Split(telegramBotToken, ":")
-		telegramID := tt[0]
-
-		bot, err := tb.NewBot(tb.Settings{
-			// You can also set custom API URL.
-			// If field is empty it equals to "https://api.telegram.org".
-			// URL: "http://195.129.111.17:8012",
-			Token:  telegramBotToken,
-			Poller: &tb.LongPoller{Timeout: 10 * time.Second},
-		})
-
-		if err != nil {
-			return err
-		}
-
-		// allocate a store, so that we can save the chatID for the owner
-		var sessionStore = persistence.NewStore("bbgo", "telegram", telegramID)
-		var interaction = telegramnotifier.NewInteraction(bot, sessionStore)
-
-		if len(telegramBotAuthToken) > 0 {
-			log.Infof("telegram bot auth token is set, using fixed token for authorization...")
-			interaction.SetAuthToken(telegramBotAuthToken)
-
-			log.Infof("send the following command to the bbgo bot you created to enable the notification")
-			log.Infof("")
-			log.Infof("")
-			log.Infof("    /auth %s", telegramBotAuthToken)
-			log.Infof("")
-			log.Infof("")
-		}
-
-		var session telegramnotifier.Session
-		if err := sessionStore.Load(&session); err != nil || session.Owner == nil {
-			log.Warnf("session not found, generating new one-time password key for new session...")
-
-			qrcodeImagePath := fmt.Sprintf("otp-%s.png", telegramID)
-			key, err := setupNewOTPKey(qrcodeImagePath)
-			if err != nil {
-				return errors.Wrapf(err, "failed to setup totp (time-based one time password) key")
-			}
-
-			session = telegramnotifier.NewSession(key)
-			if err := sessionStore.Save(&session); err != nil {
-				return errors.Wrap(err, "failed to save session")
-			}
-		}
-
-		go interaction.Start(session)
-
-		var notifier = telegramnotifier.New(interaction)
-		notification.AddNotifier(notifier)
+	notification, err := newNotificationSystem(userConfig, persistence)
+	if err != nil {
+		return err
 	}
 
-	environ.Notifiability = notification
+	environ.Notifiability = *notification
 
 	if userConfig.Notifications != nil {
 		if err := environ.ConfigureNotification(userConfig.Notifications); err != nil {
@@ -387,29 +382,39 @@ func writeOTPKeyAsQRCodePNG(key *otp.Key, imagePath string) error {
 	return nil
 }
 
-func displayOTPKey(key *otp.Key) {
-	log.Infof("")
-	log.Infof("====================PLEASE STORE YOUR OTP KEY=======================")
-	log.Infof("")
-	log.Infof("Issuer:       %s", key.Issuer())
-	log.Infof("AccountName:  %s", key.AccountName())
-	log.Infof("Secret:       %s", key.Secret())
-	log.Infof("Key URL:      %s", key.URL())
-	log.Infof("")
-	log.Infof("====================================================================")
-	log.Infof("")
-}
 
-
+// setupNewOTPKey generates a new otp key and save the secret as a qrcode image
 func setupNewOTPKey(qrcodeImagePath string) (*otp.Key, error) {
 	key, err := service.NewDefaultTotpKey()
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to setup totp (time-based one time password) key")
 	}
 
-	displayOTPKey(key)
+	printOtpKey(key)
 
-	err = writeOTPKeyAsQRCodePNG(key, qrcodeImagePath)
+	if err := writeOTPKeyAsQRCodePNG(key, qrcodeImagePath) ; err != nil {
+		return nil, err
+	}
+
+	printTelegramOtpAuthGuide(qrcodeImagePath)
+
+	return key, nil
+}
+
+func printOtpKey(key *otp.Key) {
+	fmt.Println("")
+	fmt.Println("====================PLEASE STORE YOUR OTP KEY=======================")
+	fmt.Println("")
+	fmt.Printf("Issuer:       %s\n", key.Issuer())
+	fmt.Printf("AccountName:  %s\n", key.AccountName())
+	fmt.Printf("Secret:       %s\n", key.Secret())
+	fmt.Printf("Key URL:      %s\n", key.URL())
+	fmt.Println("")
+	fmt.Println("====================================================================")
+	fmt.Println("")
+}
+
+func printTelegramOtpAuthGuide(qrcodeImagePath string) {
 	log.Infof("To scan your OTP QR code, please run the following command:")
 	log.Infof("")
 	log.Infof("")
@@ -422,6 +427,13 @@ func setupNewOTPKey(qrcodeImagePath string) (*otp.Key, error) {
 	log.Infof("     /auth {code}")
 	log.Infof("")
 	log.Infof("")
+}
 
-	return key, nil
+func printTelegramAuthTokenGuide(token string) {
+	fmt.Println("send the following command to the bbgo bot you created to enable the notification")
+	fmt.Println("")
+	fmt.Println("")
+	fmt.Printf("    /auth %s\n", token)
+	fmt.Println("")
+	fmt.Println("")
 }
