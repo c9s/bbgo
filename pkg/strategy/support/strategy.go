@@ -27,6 +27,8 @@ type Target struct {
 }
 
 type Strategy struct {
+	*bbgo.Notifiability
+
 	Symbol                string                          `json:"symbol"`
 	Interval              types.Interval                  `json:"interval"`
 	MovingAverageWindow   int                             `json:"movingAverageWindow"`
@@ -91,7 +93,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 
-		log.Infof("found support: close price %f is under EMA %f, volume %f > minimum volume %f", closePrice, ema.Last(), kline.Volume, s.MinVolume.Float64())
+		s.Notify("found support: close price %f is under EMA %f, volume %f > minimum volume %f", closePrice, ema.Last(), kline.Volume, s.MinVolume.Float64())
 
 		quantity := s.Quantity.Float64()
 
