@@ -1,6 +1,10 @@
 package bbgo
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/c9s/bbgo/pkg/service"
+)
 
 type PersistenceSelector struct {
 	// StoreID is the store you want to use.
@@ -14,7 +18,7 @@ type PersistenceSelector struct {
 type Persistence struct {
 	PersistenceSelector *PersistenceSelector `json:"persistence,omitempty" yaml:"persistence,omitempty"`
 
-	Facade *PersistenceServiceFacade `json:"-" yaml:"-"`
+	Facade *service.PersistenceServiceFacade `json:"-" yaml:"-"`
 }
 
 func (p *Persistence) backendService(t string) (service PersistenceService, err error) {
@@ -63,8 +67,13 @@ func (p *Persistence) Save(val interface{}, subIDs ...string) error {
 	return store.Save(val)
 }
 
-type PersistenceServiceFacade struct {
-	Redis *RedisPersistenceService
-	Json  *JsonPersistenceService
-	Memory *MemoryService
+type PersistenceService interface {
+	NewStore(id string, subIDs ...string) Store
 }
+
+type Store interface {
+	Load(val interface{}) error
+	Save(val interface{}) error
+	Reset() error
+}
+

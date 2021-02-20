@@ -46,8 +46,7 @@ type Environment struct {
 	// note that, for back tests, we don't need notification.
 	Notifiability
 
-	PersistenceServiceFacade *PersistenceServiceFacade
-
+	PersistenceServiceFacade *service.PersistenceServiceFacade
 	DatabaseService *service.DatabaseService
 	OrderService    *service.OrderService
 	TradeService    *service.TradeService
@@ -236,8 +235,8 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 }
 
 func (environ *Environment) ConfigurePersistence(conf *PersistenceConfig) error {
-	var facade = &PersistenceServiceFacade{
-		Memory: NewMemoryService(),
+	var facade = &service.PersistenceServiceFacade{
+		Memory: service.NewMemoryService(),
 	}
 
 	if conf.Redis != nil {
@@ -245,7 +244,7 @@ func (environ *Environment) ConfigurePersistence(conf *PersistenceConfig) error 
 			return err
 		}
 
-		facade.Redis = NewRedisPersistenceService(conf.Redis)
+		facade.Redis = service.NewRedisPersistenceService(conf.Redis)
 	}
 
 	if conf.Json != nil {
@@ -256,7 +255,7 @@ func (environ *Environment) ConfigurePersistence(conf *PersistenceConfig) error 
 			}
 		}
 
-		facade.Json = &JsonPersistenceService{Directory: conf.Json.Directory}
+		facade.Json = &service.JsonPersistenceService{Directory: conf.Json.Directory}
 	}
 
 	environ.PersistenceServiceFacade = facade
