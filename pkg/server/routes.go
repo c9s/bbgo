@@ -76,6 +76,18 @@ func (s *Server) newEngine() *gin.Engine {
 		})
 	})
 
+	r.POST("/api/environment/sync", func(c *gin.Context) {
+		go func() {
+			if err := s.Environ.Sync(context.Background()) ; err != nil {
+				logrus.WithError(err).Error("sync error")
+			}
+		}()
+
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+		})
+	})
+
 	r.GET("/api/trades", func(c *gin.Context) {
 		if s.Environ.TradeService == nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "database is not configured"})
