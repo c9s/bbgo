@@ -88,7 +88,7 @@ func runSetup(baseCtx context.Context, userConfig *bbgo.Config, enableApiServer 
 	return nil
 }
 
-func newNotificationSystem(userConfig *bbgo.Config, persistence bbgo.PersistenceService) (*bbgo.Notifiability, error) {
+func newNotificationSystem(userConfig *bbgo.Config, persistence service.PersistenceService) (*bbgo.Notifiability, error) {
 	notification := &bbgo.Notifiability{
 		SymbolChannelRouter:  bbgo.NewPatternChannelRouter(nil),
 		SessionChannelRouter: bbgo.NewPatternChannelRouter(nil),
@@ -180,7 +180,7 @@ func BootstrapEnvironment(ctx context.Context, environ *bbgo.Environment, userCo
 	}
 
 	// configure persistence service, by default we will use memory service
-	var persistence bbgo.PersistenceService = service.NewMemoryService()
+	var persistence service.PersistenceService = service.NewMemoryService()
 	if environ.PersistenceServiceFacade != nil {
 		if environ.PersistenceServiceFacade.Redis != nil {
 			persistence = environ.PersistenceServiceFacade.Redis

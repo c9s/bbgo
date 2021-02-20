@@ -8,7 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"gopkg.in/tucnak/telebot.v2"
 
-	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/service"
 )
 
 var log = logrus.WithField("service", "telegram")
@@ -27,7 +27,7 @@ func NewSession(key *otp.Key) Session {
 
 //go:generate callbackgen -type Interaction
 type Interaction struct {
-	store bbgo.Store
+	store service.Store
 
 	bot *telebot.Bot
 
@@ -39,7 +39,7 @@ type Interaction struct {
 	AuthCallbacks  []func(user *telebot.User)
 }
 
-func NewInteraction(bot *telebot.Bot, store bbgo.Store) *Interaction {
+func NewInteraction(bot *telebot.Bot, store service.Store) *Interaction {
 	interaction := &Interaction{
 		store: store,
 		bot:   bot,

@@ -21,7 +21,7 @@ type Persistence struct {
 	Facade *service.PersistenceServiceFacade `json:"-" yaml:"-"`
 }
 
-func (p *Persistence) backendService(t string) (service PersistenceService, err error) {
+func (p *Persistence) backendService(t string) (service service.PersistenceService, err error) {
 	switch t {
 	case "json":
 		service = p.Facade.Json
@@ -65,15 +65,5 @@ func (p *Persistence) Save(val interface{}, subIDs ...string) error {
 
 	store := service.NewStore(p.PersistenceSelector.StoreID, subIDs...)
 	return store.Save(val)
-}
-
-type PersistenceService interface {
-	NewStore(id string, subIDs ...string) Store
-}
-
-type Store interface {
-	Load(val interface{}) error
-	Save(val interface{}) error
-	Reset() error
 }
 
