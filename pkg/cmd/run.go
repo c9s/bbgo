@@ -88,6 +88,30 @@ func runSetup(baseCtx context.Context, userConfig *bbgo.Config, enableApiServer 
 	return nil
 }
 
+func newNotificationSystem(userConfig *bbgo.Config) bbgo.Notifiability {
+	notification := bbgo.Notifiability{
+		SymbolChannelRouter:  bbgo.NewPatternChannelRouter(nil),
+		SessionChannelRouter: bbgo.NewPatternChannelRouter(nil),
+		ObjectChannelRouter:  bbgo.NewObjectChannelRouter(),
+	}
+
+	slackToken := viper.GetString("slack-token")
+	if len(slackToken) > 0 && userConfig.Notifications != nil {
+		if conf := userConfig.Notifications.Slack; conf != nil {
+			if conf.ErrorChannel != "" {
+				log.Infof("found slack configured, setting up log hook...")
+				log.AddHook(slacklog.NewLogHook(slackToken, conf.ErrorChannel))
+			}
+
+			log.Infof("adding slack notifier with default channel: %s", conf.DefaultChannel)
+			var notifier = slacknotifier.New(slackToken, conf.DefaultChannel)
+			notification.AddNotifier(notifier)
+		}
+	}
+
+	return notification
+}
+
 func BootstrapEnvironment(ctx context.Context, environ *bbgo.Environment, userConfig *bbgo.Config) error {
 	if err := configureDB(ctx, environ) ; err != nil {
 		return err
@@ -103,32 +127,25 @@ func BootstrapEnvironment(ctx context.Context, environ *bbgo.Environment, userCo
 		}
 	}
 
-	notification := bbgo.Notifiability{
-		SymbolChannelRouter:  bbgo.NewPatternChannelRouter(nil),
-		SessionChannelRouter: bbgo.NewPatternChannelRouter(nil),
-		ObjectChannelRouter:  bbgo.NewObjectChannelRouter(),
-	}
-
-	// for slack
-	slackToken := viper.GetString("slack-token")
-	if len(slackToken) > 0 && userConfig.Notifications != nil {
-		if conf := userConfig.Notifications.Slack; conf != nil {
-			if conf.ErrorChannel != "" {
-				log.Infof("found slack configured, setting up log hook...")
-				log.AddHook(slacklog.NewLogHook(slackToken, conf.ErrorChannel))
-			}
-
-			log.Infof("adding slack notifier with default channel: %s", conf.DefaultChannel)
-			var notifier = slacknotifier.New(slackToken, conf.DefaultChannel)
-			notification.AddNotifier(notifier)
+	// configure persistence service, by default we will use memory service
+	var persistence bbgo.PersistenceService = bbgo.NewMemoryService()
+	if environ.PersistenceServiceFacade != nil {
+		if environ.PersistenceServiceFacade.Redis != nil {
+			persistence = environ.PersistenceServiceFacade.Redis
 		}
 	}
+
+
+	notification := newNotificationSystem(userConfig)
 
 	// for telegram
 	telegramBotToken := viper.GetString("telegram-bot-token")
 	telegramBotAuthToken := viper.GetString("telegram-bot-auth-token")
 	if len(telegramBotToken) > 0 {
 		log.Infof("initializing telegram bot...")
+
+		tt := strings.Split(telegramBotToken, ":")
+		telegramID := tt[0]
 
 		bot, err := tb.NewBot(tb.Settings{
 			// You can also set custom API URL.
@@ -142,24 +159,14 @@ func BootstrapEnvironment(ctx context.Context, environ *bbgo.Environment, userCo
 			return err
 		}
 
-		var persistence bbgo.PersistenceService = bbgo.NewMemoryService()
-		var sessionStore = persistence.NewStore("bbgo", "telegram")
-
-		tt := strings.Split(bot.Token, ":")
-		telegramID := tt[0]
-
-		if environ.PersistenceServiceFacade != nil {
-			if environ.PersistenceServiceFacade.Redis != nil {
-				persistence = environ.PersistenceServiceFacade.Redis
-				sessionStore = persistence.NewStore("bbgo", "telegram", telegramID)
-			}
-		}
-
-		interaction := telegramnotifier.NewInteraction(bot, sessionStore)
+		// allocate a store, so that we can save the chatID for the owner
+		var sessionStore = persistence.NewStore("bbgo", "telegram", telegramID)
+		var interaction = telegramnotifier.NewInteraction(bot, sessionStore)
 
 		if len(telegramBotAuthToken) > 0 {
 			log.Infof("telegram bot auth token is set, using fixed token for authorization...")
 			interaction.SetAuthToken(telegramBotAuthToken)
+
 			log.Infof("send the following command to the bbgo bot you created to enable the notification")
 			log.Infof("")
 			log.Infof("")
@@ -172,28 +179,11 @@ func BootstrapEnvironment(ctx context.Context, environ *bbgo.Environment, userCo
 		if err := sessionStore.Load(&session); err != nil || session.Owner == nil {
 			log.Warnf("session not found, generating new one-time password key for new session...")
 
-			key, err := service.NewDefaultTotpKey()
+			qrcodeImagePath := fmt.Sprintf("otp-%s.png", telegramID)
+			key, err := setupNewOTPKey(qrcodeImagePath)
 			if err != nil {
 				return errors.Wrapf(err, "failed to setup totp (time-based one time password) key")
 			}
-
-			displayOTPKey(key)
-
-			qrcodeImagePath := fmt.Sprintf("otp-%s.png", telegramID)
-
-			err = writeOTPKeyAsQRCodePNG(key, qrcodeImagePath)
-			log.Infof("To scan your OTP QR code, please run the following command:")
-			log.Infof("")
-			log.Infof("")
-			log.Infof("     open %s", qrcodeImagePath)
-			log.Infof("")
-			log.Infof("")
-			log.Infof("send the auth command with the generated one-time password to the bbgo bot you created to enable the notification")
-			log.Infof("")
-			log.Infof("")
-			log.Infof("     /auth {code}")
-			log.Infof("")
-			log.Infof("")
 
 			session = telegramnotifier.NewSession(key)
 			if err := sessionStore.Save(&session); err != nil {
@@ -408,4 +398,30 @@ func displayOTPKey(key *otp.Key) {
 	log.Infof("")
 	log.Infof("====================================================================")
 	log.Infof("")
+}
+
+
+func setupNewOTPKey(qrcodeImagePath string) (*otp.Key, error) {
+	key, err := service.NewDefaultTotpKey()
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to setup totp (time-based one time password) key")
+	}
+
+	displayOTPKey(key)
+
+	err = writeOTPKeyAsQRCodePNG(key, qrcodeImagePath)
+	log.Infof("To scan your OTP QR code, please run the following command:")
+	log.Infof("")
+	log.Infof("")
+	log.Infof("     open %s", qrcodeImagePath)
+	log.Infof("")
+	log.Infof("")
+	log.Infof("send the auth command with the generated one-time password to the bbgo bot you created to enable the notification")
+	log.Infof("")
+	log.Infof("")
+	log.Infof("     /auth {code}")
+	log.Infof("")
+	log.Infof("")
+
+	return key, nil
 }
