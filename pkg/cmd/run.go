@@ -141,7 +141,7 @@ func newNotificationSystem(userConfig *bbgo.Config, persistence bbgo.Persistence
 
 		var session telegramnotifier.Session
 		if err := sessionStore.Load(&session); err != nil || session.Owner == nil {
-			log.Warnf("session not found, generating new one-time password key for new session...")
+			log.Warnf("telegram session not found, generating new one-time password key for new telegram session...")
 
 			qrcodeImagePath := fmt.Sprintf("otp-%s.png", telegramID)
 			key, err := setupNewOTPKey(qrcodeImagePath)
