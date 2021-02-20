@@ -69,7 +69,7 @@ func (s *Server) setupConfigureDB(c *gin.Context) {
 		return
 	}
 
-	if err := s.Environ.ConfigureDatabase(c, payload.Driver, payload.DSN); err != nil {
+	if err := s.Environ.ConfigureDatabaseDriver(c, payload.Driver, payload.DSN); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

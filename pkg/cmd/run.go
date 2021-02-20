@@ -165,7 +165,7 @@ func newNotificationSystem(userConfig *bbgo.Config, persistence bbgo.Persistence
 }
 
 func BootstrapEnvironment(ctx context.Context, environ *bbgo.Environment, userConfig *bbgo.Config) error {
-	if err := configureDB(ctx, environ) ; err != nil {
+	if err := environ.ConfigureDatabase(ctx) ; err != nil {
 		return err
 	}
 
