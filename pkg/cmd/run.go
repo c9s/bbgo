@@ -83,17 +83,17 @@ func BootstrapEnvironment(ctx context.Context, environ *bbgo.Environment, userCo
 	}
 
 	if err := environ.ConfigureExchangeSessions(userConfig); err != nil {
-		return err
+		return errors.Wrap(err, "exchange session configure error")
 	}
 
 	if userConfig.Persistence != nil {
 		if err := environ.ConfigurePersistence(userConfig.Persistence); err != nil {
-			return errors.Wrap(err, "persistence configuration error")
+			return errors.Wrap(err, "persistence configure error")
 		}
 	}
 
 	if err := environ.ConfigureNotificationSystem(userConfig) ; err != nil {
-		return errors.Wrap(err,"notification configuration error")
+		return errors.Wrap(err,"notification configure error")
 	}
 
 	return nil
