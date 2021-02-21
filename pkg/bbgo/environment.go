@@ -67,8 +67,10 @@ type Environment struct {
 
 	// syncStartTime is the time point we want to start the sync (for trades and orders)
 	syncStartTime time.Time
-	syncing       bool
 	syncMutex     sync.Mutex
+
+	syncStatusMutex sync.Mutex
+	syncing         bool
 
 	sessions map[string]*ExchangeSession
 }
@@ -476,21 +478,27 @@ func (environ *Environment) Connect(ctx context.Context) error {
 	return nil
 }
 
-func (environ *Environment) IsSyncing() (syncing bool) {
-	environ.syncMutex.Lock()
-	syncing = environ.syncing
-	environ.syncMutex.Unlock()
-	return syncing
+func (environ *Environment) IsSyncing() bool {
+	environ.syncStatusMutex.Lock()
+	defer environ.syncStatusMutex.Unlock()
+	return environ.syncing
+}
+
+func (environ *Environment) setSyncing(syncing bool) {
+	environ.syncStatusMutex.Lock()
+	environ.syncing = syncing
+	environ.syncStatusMutex.Unlock()
 }
 
 // Sync syncs all registered exchange sessions
 func (environ *Environment) Sync(ctx context.Context) error {
 	environ.syncMutex.Lock()
 	defer environ.syncMutex.Unlock()
-	environ.syncing = true
+
+	environ.setSyncing(true)
 
 	defer func() {
-		environ.syncing = false
+		environ.setSyncing(false)
 	}()
 
 	for _, session := range environ.sessions {
@@ -506,9 +514,9 @@ func (environ *Environment) SyncSession(ctx context.Context, session *ExchangeSe
 	environ.syncMutex.Lock()
 	defer environ.syncMutex.Unlock()
 
-	environ.syncing = true
+	environ.setSyncing(true)
 	defer func() {
-		environ.syncing = false
+		environ.setSyncing(false)
 	}()
 
 	return environ.syncSession(ctx, session, defaultSymbols...)
