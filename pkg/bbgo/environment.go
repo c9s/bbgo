@@ -536,12 +536,6 @@ func getSessionSymbols(session *ExchangeSession, defaultSymbols ...string) ([]st
 }
 
 func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) error {
-	// Configure persistence service, by default we will use memory service
-	var persistence service.PersistenceService = environ.PersistenceServiceFacade.Memory
-	if environ.PersistenceServiceFacade.Redis != nil {
-		persistence = environ.PersistenceServiceFacade.Redis
-	}
-
 	environ.Notifiability = Notifiability{
 		SymbolChannelRouter:  NewPatternChannelRouter(nil),
 		SessionChannelRouter: NewPatternChannelRouter(nil),
@@ -562,6 +556,7 @@ func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) erro
 		}
 	}
 
+	persistence := environ.PersistenceServiceFacade.Get()
 	telegramBotToken := viper.GetString("telegram-bot-token")
 	if len(telegramBotToken) > 0 {
 		tt := strings.Split(telegramBotToken, ":")
