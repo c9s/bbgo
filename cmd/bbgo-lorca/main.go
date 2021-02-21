@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	time2 "time"
 
 	"github.com/joho/godotenv"
 	"github.com/zserge/lorca"
@@ -135,7 +136,7 @@ func main() {
 	}()
 
 	log.Infof("pinging the server at %s", baseURL)
-	server.PingUntil(ctx, baseURL, func() {
+	server.PingUntil(ctx, time2.Second, baseURL, func() {
 		log.Infof("got pong, loading base url %s to ui...", baseURL)
 
 		if err := ui.Load(baseURL); err != nil {
