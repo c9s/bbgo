@@ -14,12 +14,13 @@ import Box from '@material-ui/core/Box';
 import CssBaseline from '@material-ui/core/CssBaseline';
 import theme from '../src/theme';
 import '../styles/globals.css'
-import {querySyncStatus} from "../api/bbgo";
+import {querySessions, querySyncStatus} from "../api/bbgo";
 
 export default function MyApp(props) {
     const {Component, pageProps} = props;
 
-    const [syncing, setSyncing] = React.useState(true)
+    const [loading, setLoading] = React.useState(true)
+    const [syncing, setSyncing] = React.useState(false)
 
     React.useEffect(() => {
         // Remove the server-side injected CSS.
@@ -28,19 +29,33 @@ export default function MyApp(props) {
             jssStyles.parentElement.removeChild(jssStyles);
         }
 
-        let poller = null
-        const pollSyncStatus = () => {
-            querySyncStatus((status) => {
-                setSyncing(status)
-                if (!status) {
-                    clearInterval(poller)
-                }
-            }).catch((err) => {
-                console.error(err)
-            })
-        }
-        poller = setInterval(pollSyncStatus, 1000)
+        querySessions((sessions) => {
+            if (sessions.length > 0) {
+                setLoading(false)
+                setSyncing(true)
 
+                // session is configured, check if we're syncing data
+                let poller = null
+                const pollSyncStatus = () => {
+                    querySyncStatus((status) => {
+                        setSyncing(status)
+
+                        if (!status) {
+                            setLoading(false)
+                            clearInterval(poller)
+                        }
+                    }).catch((err) => {
+                        console.error(err)
+                    })
+                }
+
+                poller = setInterval(pollSyncStatus, 1000)
+            } else {
+                setLoading(false)
+            }
+        }).catch((err) => {
+            console.error(err)
+        })
 
     }, []);
 
@@ -56,7 +71,25 @@ export default function MyApp(props) {
                 {/* CssBaseline kickstart an elegant, consistent, and simple baseline to build upon. */}
                 <CssBaseline/>
                 {
-                    syncing ? (
+                    loading ? (
+                        <React.Fragment>
+                            <Dialog
+                                open={loading}
+                                aria-labelledby="alert-dialog-title"
+                                aria-describedby="alert-dialog-description"
+                            >
+                                <DialogTitle id="alert-dialog-title">{"Loading"}</DialogTitle>
+                                <DialogContent>
+                                    <DialogContentText id="alert-dialog-description">
+                                        Loading...
+                                    </DialogContentText>
+                                    <Box m={2}>
+                                        <LinearProgress />
+                                    </Box>
+                                </DialogContent>
+                            </Dialog>
+                        </React.Fragment>
+                    ) : syncing ? (
                         <React.Fragment>
                             <Dialog
                                 open={syncing}
