@@ -8,6 +8,12 @@ export function ping(cb) {
     });
 }
 
+export function querySyncStatus(cb) {
+    return axios.get(baseURL + '/api/environment/syncing').then(response => {
+        cb(response.data.syncing)
+    });
+}
+
 export function testDatabaseConnection(params, cb) {
     return axios.post(baseURL + '/api/setup/test-db', params).then(response => {
         cb(response.data)
