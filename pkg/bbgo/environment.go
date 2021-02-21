@@ -476,11 +476,11 @@ func (environ *Environment) Connect(ctx context.Context) error {
 	return nil
 }
 
-func (environ *Environment) IsSyncing() bool {
+func (environ *Environment) IsSyncing() (syncing bool) {
 	environ.syncMutex.Lock()
-	defer environ.syncMutex.Unlock()
-
-	return environ.syncing
+	syncing = environ.syncing
+	environ.syncMutex.Unlock()
+	return syncing
 }
 
 // Sync syncs all registered exchange sessions
