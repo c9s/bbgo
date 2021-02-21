@@ -37,11 +37,9 @@ export default function MyApp(props) {
                 let poller = null
                 const pollSyncStatus = () => {
                     querySyncStatus((status) => {
-                        setSyncing(status)
-
-                        if (!status) {
-                            // mark it as done
+                        if (status === false) {
                             setLoading(false)
+                            setSyncing(false)
                             clearInterval(poller)
                         }
                     }).catch((err) => {
@@ -51,7 +49,9 @@ export default function MyApp(props) {
 
                 poller = setInterval(pollSyncStatus, 1000)
             } else {
+                // no session found, so we can not sync any data
                 setLoading(false)
+                setSyncing(false)
             }
         }).catch((err) => {
             console.error(err)
