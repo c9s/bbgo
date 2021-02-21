@@ -7,11 +7,11 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func PingUntil(ctx context.Context, baseURL string, callback func()) {
+func PingUntil(ctx context.Context, interval time.Duration, baseURL string, callback func()) {
 	pingURL := baseURL + "/api/ping"
 	timeout := time.NewTimer(3 * time.Minute)
 
-	ticker := time.NewTicker(time.Second)
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	for {
@@ -37,7 +37,7 @@ func PingUntil(ctx context.Context, baseURL string, callback func()) {
 
 func pingAndOpenURL(ctx context.Context, baseURL string) {
 	setupURL := baseURL + "/setup"
-	go PingUntil(ctx, baseURL, func() {
+	go PingUntil(ctx, time.Second, baseURL, func() {
 		if err := openURL(setupURL); err != nil {
 			logrus.WithError(err).Errorf("can not call open command to open the web page")
 		}
