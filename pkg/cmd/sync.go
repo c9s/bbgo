@@ -54,7 +54,7 @@ var SyncCmd = &cobra.Command{
 			return err
 		}
 
-		if err := environ.AddExchangesFromConfig(userConfig); err != nil {
+		if err := environ.ConfigureExchangeSessions(userConfig); err != nil {
 			return err
 		}
 
