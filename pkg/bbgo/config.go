@@ -58,7 +58,7 @@ type SlackNotification struct {
 	ErrorChannel   string `json:"errorChannel,omitempty"  yaml:"errorChannel,omitempty"`
 }
 
-type NotificationRouting struct {
+type SlackNotificationRouting struct {
 	Trade       string `json:"trade,omitempty" yaml:"trade,omitempty"`
 	Order       string `json:"order,omitempty" yaml:"order,omitempty"`
 	SubmitOrder string `json:"submitOrder,omitempty" yaml:"submitOrder,omitempty"`
@@ -71,7 +71,7 @@ type NotificationConfig struct {
 	SymbolChannels  map[string]string `json:"symbolChannels,omitempty" yaml:"symbolChannels,omitempty"`
 	SessionChannels map[string]string `json:"sessionChannels,omitempty" yaml:"sessionChannels,omitempty"`
 
-	Routing *NotificationRouting `json:"routing,omitempty" yaml:"routing,omitempty"`
+	Routing *SlackNotificationRouting `json:"routing,omitempty" yaml:"routing,omitempty"`
 }
 
 type Session struct {
