@@ -59,9 +59,6 @@ export default function MyApp(props) {
 
     }, []);
 
-    const handleClose = (e) => {
-    }
-
     return (
         <React.Fragment>
             <Head>
