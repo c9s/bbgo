@@ -31,7 +31,6 @@ export default function MyApp(props) {
 
         querySessions((sessions) => {
             if (sessions.length > 0) {
-                setLoading(false)
                 setSyncing(true)
 
                 // session is configured, check if we're syncing data
@@ -41,6 +40,7 @@ export default function MyApp(props) {
                         setSyncing(status)
 
                         if (!status) {
+                            // mark it as done
                             setLoading(false)
                             clearInterval(poller)
                         }
@@ -59,7 +59,8 @@ export default function MyApp(props) {
 
     }, []);
 
-    const handleClose = (e) => {}
+    const handleClose = (e) => {
+    }
 
     return (
         <React.Fragment>
@@ -71,25 +72,7 @@ export default function MyApp(props) {
                 {/* CssBaseline kickstart an elegant, consistent, and simple baseline to build upon. */}
                 <CssBaseline/>
                 {
-                    loading ? (
-                        <React.Fragment>
-                            <Dialog
-                                open={loading}
-                                aria-labelledby="alert-dialog-title"
-                                aria-describedby="alert-dialog-description"
-                            >
-                                <DialogTitle id="alert-dialog-title">{"Loading"}</DialogTitle>
-                                <DialogContent>
-                                    <DialogContentText id="alert-dialog-description">
-                                        Loading...
-                                    </DialogContentText>
-                                    <Box m={2}>
-                                        <LinearProgress />
-                                    </Box>
-                                </DialogContent>
-                            </Dialog>
-                        </React.Fragment>
-                    ) : syncing ? (
+                    loading ? (syncing ? (
                         <React.Fragment>
                             <Dialog
                                 open={syncing}
@@ -103,12 +86,30 @@ export default function MyApp(props) {
                                         Please wait a moment...
                                     </DialogContentText>
                                     <Box m={2}>
-                                        <LinearProgress />
+                                        <LinearProgress/>
                                     </Box>
                                 </DialogContent>
                             </Dialog>
                         </React.Fragment>
                     ) : (
+                        <React.Fragment>
+                            <Dialog
+                                open={loading}
+                                aria-labelledby="alert-dialog-title"
+                                aria-describedby="alert-dialog-description"
+                            >
+                                <DialogTitle id="alert-dialog-title">{"Loading"}</DialogTitle>
+                                <DialogContent>
+                                    <DialogContentText id="alert-dialog-description">
+                                        Loading...
+                                    </DialogContentText>
+                                    <Box m={2}>
+                                        <LinearProgress/>
+                                    </Box>
+                                </DialogContent>
+                            </Dialog>
+                        </React.Fragment>
+                    )) : (
                         <Component {...pageProps}/>
                     )
                 }
