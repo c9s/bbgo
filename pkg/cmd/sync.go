@@ -100,10 +100,6 @@ var SyncCmd = &cobra.Command{
 
 		sessions := environ.SelectSessions(selectedSessions...)
 		for _, session := range sessions {
-			if err := session.Init(ctx, environ) ; err != nil {
-				return err
-			}
-
 			if err := environ.SyncSession(ctx, session, defaultSymbols...); err != nil {
 				return err
 			}
