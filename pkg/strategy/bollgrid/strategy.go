@@ -122,7 +122,7 @@ func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types
 	}
 
 	if currentPrice > upBand || currentPrice < downBand {
-		return nil, fmt.Errorf("current price exceed the bollinger band")
+		return nil, fmt.Errorf("current price %f exceed the bollinger band %f <> %f", currentPrice, upBand, downBand)
 	}
 
 	ema99 := s.StandardIndicatorSet.EWMA(types.IntervalWindow{Interval: s.Interval, Window: 99})
