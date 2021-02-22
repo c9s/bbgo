@@ -59,7 +59,7 @@ desktop-osx: $(OSX_APP_CONTENTS_DIR)/MacOS/bbgo-desktop $(OSX_APP_CONTENTS_DIR)/
 
 desktop: desktop-osx
 
-dist: static bbgo-linux bbgo-linux-slim bbgo-darwin bbgo-darwin-slim desktop
+dist: version static bbgo-linux bbgo-linux-slim bbgo-darwin bbgo-darwin-slim desktop
 	mkdir -p $(DIST_DIR)
 	tar -C $(BUILD_DIR) -cvzf $(DIST_DIR)/bbgo-$$(git describe --tags).tar.gz .
 
