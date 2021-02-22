@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/url"
 	"strconv"
+
+	"github.com/pkg/errors"
 )
 
 type MarkerInfo struct {
@@ -109,25 +111,6 @@ func (options *QueryTradeOptions) Params() url.Values {
 	return params
 }
 
-func (s *TradeService) MyTrades(options QueryTradeOptions) ([]Trade, error) {
-	req, err := s.client.newAuthenticatedRequest("GET", "v2/trades/my", options.Map())
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := s.client.sendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var v []Trade
-	if err := response.DecodeJSON(&v); err != nil {
-		return nil, err
-	}
-
-	return v, nil
-}
-
 func (s *TradeService) NewPrivateTradeRequest() *PrivateTradeRequest {
 	return &PrivateTradeRequest{client: s.client}
 }
@@ -137,77 +120,107 @@ type PrivateRequestParams struct {
 	Path  string `json:"path"`
 }
 
-type PrivateTradeRequestParams struct {
-	*PrivateRequestParams
-
-	Market string `json:"market"`
-
-	// Timestamp is the seconds elapsed since Unix epoch, set to return trades executed before the time only
-	Timestamp int64 `json:"timestamp,omitempty"`
-
-	// From field is a trade id, set ot return trades created after the trade
-	From int64 `json:"from,omitempty"`
-
-	// To field trade id, set to return trades created before the trade
-	To int64 `json:"to,omitempty"`
-
-	OrderBy string `json:"order_by,omitempty"`
-
-	// default to false
-	Pagination bool `json:"pagination"`
-
-	Limit int64 `json:"limit,omitempty"`
-
-	Offset int64 `json:"offset,omitempty"`
-}
-
 type PrivateTradeRequest struct {
 	client *RestClient
-	params PrivateTradeRequestParams
+
+	market *string
+
+	// Timestamp is the seconds elapsed since Unix epoch, set to return trades executed before the time only
+	timestamp *int64
+
+	// From field is a trade id, set ot return trades created after the trade
+	from *int64
+
+	// To field trade id, set to return trades created before the trade
+	to *int64
+
+	orderBy *string
+
+	pagination *bool
+
+	limit *int64
+
+	offset *int64
 }
 
 func (r *PrivateTradeRequest) Market(market string) *PrivateTradeRequest {
-	r.params.Market = market
+	r.market = &market
 	return r
 }
 
 func (r *PrivateTradeRequest) From(from int64) *PrivateTradeRequest {
-	r.params.From = from
+	r.from = &from
 	return r
 }
 
 func (r *PrivateTradeRequest) Timestamp(t int64) *PrivateTradeRequest {
-	r.params.Timestamp = t
+	r.timestamp = &t
 	return r
 }
 
 func (r *PrivateTradeRequest) To(to int64) *PrivateTradeRequest {
-	r.params.To = to
+	r.to = &to
 	return r
 }
 
 func (r *PrivateTradeRequest) Limit(limit int64) *PrivateTradeRequest {
-	r.params.Limit = limit
+	r.limit = &limit
 	return r
 }
 
 func (r *PrivateTradeRequest) Offset(offset int64) *PrivateTradeRequest {
-	r.params.Offset = offset
+	r.offset = &offset
 	return r
 }
 
 func (r *PrivateTradeRequest) Pagination(p bool) *PrivateTradeRequest {
-	r.params.Pagination = p
+	r.pagination = &p
 	return r
 }
 
 func (r *PrivateTradeRequest) OrderBy(orderBy string) *PrivateTradeRequest {
-	r.params.OrderBy = orderBy
+	r.orderBy = &orderBy
 	return r
 }
 
 func (r *PrivateTradeRequest) Do(ctx context.Context) (trades []Trade, err error) {
-	req, err := r.client.newAuthenticatedRequest("GET", "v2/trades/my", &r.params)
+	if r.market == nil {
+		return nil, errors.New("parameter market is mandatory")
+	}
+
+	payload := map[string]interface{}{
+		"market": r.market,
+	}
+
+	if r.timestamp != nil {
+		payload["timestamp"] = r.timestamp
+	}
+
+	if r.from != nil {
+		payload["from"] = r.from
+	}
+
+	if r.to != nil {
+		payload["to"] = r.to
+	}
+
+	if r.orderBy != nil {
+		payload["orderBy"] = r.orderBy
+	}
+
+	if r.pagination != nil {
+		payload["pagination"] = r.pagination
+	}
+
+	if r.limit != nil {
+		payload["limit"] = r.limit
+	}
+
+	if r.offset != nil {
+		payload["offset"] = r.offset
+	}
+
+	req, err := r.client.newAuthenticatedRequest("GET", "v2/trades/my", payload)
 	if err != nil {
 		return trades, err
 	}
@@ -224,23 +237,3 @@ func (r *PrivateTradeRequest) Do(ctx context.Context) (trades []Trade, err error
 	return trades, err
 }
 
-func (s *TradeService) Trades(options QueryTradeOptions) ([]Trade, error) {
-	var params = options.Params()
-
-	req, err := s.client.newRequest("GET", "v2/trades", params, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := s.client.sendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var v []Trade
-	if err := response.DecodeJSON(&v); err != nil {
-		return nil, err
-	}
-
-	return v, nil
-}
