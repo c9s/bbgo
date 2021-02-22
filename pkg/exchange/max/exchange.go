@@ -11,12 +11,15 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/time/rate"
 
 	maxapi "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 )
+
+var limiter = rate.NewLimiter(rate.Every(5*time.Second), 2)
 
 var log = logrus.WithField("exchange", "max")
 
@@ -164,6 +167,10 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 
 // lastOrderID is not supported on MAX
 func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []types.Order, err error) {
+	if err := limiter.Wait(ctx) ; err != nil {
+		return nil, err
+	}
+
 	numBatches := 5
 	limit := 1000 // max limit = 1000
 	offset := limit * numBatches
@@ -362,6 +369,10 @@ func (e *Exchange) PlatformFeeCurrency() string {
 }
 
 func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
+	if err := limiter.Wait(ctx) ; err != nil {
+		return nil, err
+	}
+
 	userInfo, err := e.client.AccountService.Me()
 	if err != nil {
 		return nil, err
@@ -503,6 +514,10 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 }
 
 func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
+	if err := limiter.Wait(ctx) ; err != nil {
+		return nil, err
+	}
+
 	accounts, err := e.client.AccountService.Accounts()
 	if err != nil {
 		return nil, err
@@ -522,6 +537,10 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 }
 
 func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
+	if err := limiter.Wait(ctx) ; err != nil {
+		return nil, err
+	}
+
 	req := e.client.TradeService.NewPrivateTradeRequest()
 	req.Market(toLocalSymbol(symbol))
 
@@ -558,6 +577,10 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 }
 
 func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
+	if err := limiter.Wait(ctx) ; err != nil {
+		return nil, err
+	}
+
 	var limit = 5000
 	if options.Limit > 0 {
 		// default limit == 500
@@ -575,11 +598,8 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 		return nil, errors.New("start time can not be empty")
 	}
 
+
 	log.Infof("querying kline %s %s %+v", symbol, interval, options)
-
-	// avoid rate limit
-	time.Sleep(100 * time.Millisecond)
-
 	localKLines, err := e.client.PublicService.KLines(toLocalSymbol(symbol), string(interval), *options.StartTime, limit)
 	if err != nil {
 		return nil, err
