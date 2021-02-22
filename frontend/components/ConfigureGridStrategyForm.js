@@ -163,7 +163,7 @@ export default function ConfigureGridStrategyForm({onBack, onAdded}) {
                 break;
 
             case "fixedAmount":
-                payload.orderAmount = parseFloatValid(fixedAmount);
+                payload.amount = parseFloatValid(fixedAmount);
                 break;
 
         }
