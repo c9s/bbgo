@@ -19,9 +19,9 @@ import (
 	"github.com/c9s/bbgo/pkg/util"
 )
 
-var closedOrderQueryLimiter = rate.NewLimiter(rate.Every(10*time.Second), 1)
-var tradeQuerylimiter = rate.NewLimiter(rate.Every(5*time.Second), 1)
-var accountQuerylimiter = rate.NewLimiter(rate.Every(5*time.Second), 1)
+var closedOrderQueryLimiter = rate.NewLimiter(rate.Every(6*time.Second), 1)
+var tradeQueryLimiter = rate.NewLimiter(rate.Every(4*time.Second), 1)
+var accountQueryLimiter = rate.NewLimiter(rate.Every(5*time.Second), 1)
 var marketDataLimiter = rate.NewLimiter(rate.Every(5*time.Second), 1)
 
 var log = logrus.WithField("exchange", "max")
@@ -376,7 +376,7 @@ func (e *Exchange) PlatformFeeCurrency() string {
 }
 
 func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
-	if err := accountQuerylimiter.Wait(ctx) ; err != nil {
+	if err := accountQueryLimiter.Wait(ctx) ; err != nil {
 		return nil, err
 	}
 
@@ -521,7 +521,7 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 }
 
 func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
-	if err := accountQuerylimiter.Wait(ctx) ; err != nil {
+	if err := accountQueryLimiter.Wait(ctx) ; err != nil {
 		return nil, err
 	}
 
@@ -544,7 +544,7 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 }
 
 func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
-	if err := tradeQuerylimiter.Wait(ctx) ; err != nil {
+	if err := tradeQueryLimiter.Wait(ctx) ; err != nil {
 		return nil, err
 	}
 
