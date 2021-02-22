@@ -21,16 +21,16 @@ $(BIN_DIR):
 	mkdir -p $@
 
 bbgo-linux: $(BIN_DIR)
-	GOOS=linux GOARCH=$(TARGET_ARCH) go build -tags web -o $(BIN_DIR)/$@ ./cmd/bbgo
+	GOOS=linux GOARCH=$(TARGET_ARCH) go build -tags web,release -o $(BIN_DIR)/$@ ./cmd/bbgo
 
 bbgo-darwin: $(BIN_DIR)
-	GOOS=darwin GOARCH=$(TARGET_ARCH) go build -tags web -o $(BIN_DIR)/$@ ./cmd/bbgo
+	GOOS=darwin GOARCH=$(TARGET_ARCH) go build -tags web,release -o $(BIN_DIR)/$@ ./cmd/bbgo
 
 bbgo-darwin-slim: $(BIN_DIR)
-	GOOS=darwin GOARCH=$(TARGET_ARCH) go build -o $(BIN_DIR)/$@ ./cmd/bbgo
+	GOOS=darwin GOARCH=$(TARGET_ARCH) go build -tags release -o $(BIN_DIR)/$@ ./cmd/bbgo
 
 bbgo-linux-slim: $(BIN_DIR)
-	GOOS=linux GOARCH=$(TARGET_ARCH) go build -o $(BIN_DIR)/$@ ./cmd/bbgo
+	GOOS=linux GOARCH=$(TARGET_ARCH) go build -tags release -o $(BIN_DIR)/$@ ./cmd/bbgo
 
 clean:
 	rm -rf $(BUILD_DIR) $(DIST_DIR) $(FRONTEND_EXPORT_DIR)
@@ -63,6 +63,11 @@ dist: static bbgo-linux bbgo-linux-slim bbgo-darwin bbgo-darwin-slim desktop
 	mkdir -p $(DIST_DIR)
 	tar -C $(BUILD_DIR) -cvzf $(DIST_DIR)/bbgo-$$(git describe --tags).tar.gz .
 
+pkg/version/version.go: .git/HEAD
+	bash utils/generate-version-file.sh > $@
+
+version: pkg/version/version.go
+
 migrations:
 	rockhopper compile --config rockhopper_mysql.yaml --output pkg/migrations/mysql
 	rockhopper compile --config rockhopper_sqlite.yaml --output pkg/migrations/sqlite3
@@ -87,4 +92,4 @@ embed: pkg/server/assets.go
 
 static: frontend/out/index.html pkg/server/assets.go
 
-.PHONY: bbgo dist migrations static embed desktop .FORCE
+.PHONY: bbgo version dist migrations static embed desktop .FORCE

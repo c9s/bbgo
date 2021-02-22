@@ -22,15 +22,16 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/util"
+	"github.com/c9s/bbgo/pkg/version"
 )
 
 const (
 	// ProductionAPIURL is the official MAX API v2 Endpoint
 	ProductionAPIURL = "https://max-api.maicoin.com/api/v2"
 
-	UserAgent = "bbgo/1.0"
+	UserAgent = "bbgo/" + version.Version
 
-	defaultHTTPTimeout = time.Second * 15
+	defaultHTTPTimeout = time.Second * 30
 )
 
 var logger = log.WithField("exchange", "max")
