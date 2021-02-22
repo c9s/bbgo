@@ -554,7 +554,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	if options.Limit > 0 {
 		req.Limit(options.Limit)
 	} else {
-		req.Limit(500)
+		req.Limit(1000)
 	}
 
 	// MAX uses exclusive last trade ID
