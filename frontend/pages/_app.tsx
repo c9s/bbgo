@@ -15,6 +15,11 @@ import CssBaseline from '@material-ui/core/CssBaseline';
 import theme from '../src/theme';
 import '../styles/globals.css'
 import {querySessions, querySyncStatus} from "../api/bbgo";
+import {Sync} from "@material-ui/icons";
+
+const SyncNotStarted = 0
+const Syncing = 1
+const SyncDone = 2
 
 export default function MyApp(props) {
     const {Component, pageProps} = props;
@@ -37,10 +42,17 @@ export default function MyApp(props) {
                 let poller = null
                 const pollSyncStatus = () => {
                     querySyncStatus((status) => {
-                        if (status === false) {
-                            setLoading(false)
-                            setSyncing(false)
-                            clearInterval(poller)
+                        switch (status) {
+                            case SyncNotStarted:
+                                break
+                            case Syncing:
+                                setSyncing(true);
+                                break;
+                            case SyncDone:
+                                setLoading(false);
+                                setSyncing(false);
+                                clearInterval(poller);
+                                break;
                         }
                     }).catch((err) => {
                         console.error(err)
