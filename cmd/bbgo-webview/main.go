@@ -22,7 +22,9 @@ import (
 
 func main() {
 	noChangeDir := false
+	portNum := 0
 	flag.BoolVar(&noChangeDir, "no-chdir", false, "do not change directory")
+	flag.IntVar(&portNum, "port", 0, "server port")
 	flag.Parse()
 
 	if !noChangeDir {
@@ -116,7 +118,7 @@ func main() {
 	}
 
 	// find a free port for binding the server
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	ln, err := net.Listen("tcp", "127.0.0.1:" + strconv.Itoa(portNum))
 	if err != nil {
 		log.WithError(err).Error("can not bind listener")
 		return
