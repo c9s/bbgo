@@ -14,6 +14,11 @@ var WebSocketURL = "wss://max-stream.maicoin.com/ws"
 
 var ErrMessageTypeNotSupported = errors.New("message type currently not supported")
 
+type SubscribeOptions struct {
+	Depth      int    `json:"depth,omitempty"`
+	Resolution string `json:"resolution,omitempty"`
+}
+
 // Subscription is used for presenting the subscription metadata.
 // This is used for sending subscribe and unsubscribe requests
 type Subscription struct {
@@ -212,10 +217,12 @@ func (s *WebSocketService) Reconnect() {
 
 // Subscribe is a helper method for building subscription request from the internal mapping types.
 // (Internal public method)
-func (s *WebSocketService) Subscribe(channel, market string) {
+func (s *WebSocketService) Subscribe(channel, market string, options SubscribeOptions) {
 	s.AddSubscription(Subscription{
 		Channel: channel,
 		Market:  market,
+		Depth: options.Depth,
+		Resolution: options.Resolution,
 	})
 }
 
