@@ -521,7 +521,7 @@ func (session *ExchangeSession) UpdatePrices(ctx context.Context) (err error) {
 
 func (session *ExchangeSession) FindPossibleSymbols() (symbols []string, err error) {
 	// If the session is an isolated margin session, there will be only the isolated margin symbol
-	if session.IsolatedMargin {
+	if session.Margin && session.IsolatedMargin {
 		return []string{
 			session.IsolatedMarginSymbol,
 		}, nil

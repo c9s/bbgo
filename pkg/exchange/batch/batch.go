@@ -131,7 +131,7 @@ func (e ExchangeBatchProcessor) BatchQueryTrades(ctx context.Context, symbol str
 				logrus.WithError(err).Error("rate limit error")
 			}
 
-			logrus.Debugf("querying %s trades from id=%d limit=%d", symbol, lastTradeID, options.Limit)
+			logrus.Infof("querying %s trades from id=%d limit=%d", symbol, lastTradeID, options.Limit)
 
 			var err error
 			var trades []types.Trade
