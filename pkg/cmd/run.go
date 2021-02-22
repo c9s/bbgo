@@ -108,6 +108,10 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config, enableApiServer
 		return err
 	}
 
+	if err := environ.Sync(ctx) ; err != nil {
+		return err
+	}
+
 	trader := bbgo.NewTrader(environ)
 	if err := trader.Configure(userConfig); err != nil {
 		return err
