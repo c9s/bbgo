@@ -151,7 +151,21 @@ func (s *Stream) SetPublicOnly() {
 }
 
 func (s *Stream) Subscribe(channel types.Channel, symbol string, options types.SubscribeOptions) {
-	s.websocketService.Subscribe(string(channel), toLocalSymbol(symbol))
+	opt := max.SubscribeOptions{}
+
+	if len(options.Depth) > 0 {
+		depth, err := strconv.Atoi(options.Depth)
+		if err != nil {
+			panic(err)
+		}
+		opt.Depth = depth
+	}
+
+	if len(options.Interval) > 0 {
+		opt.Resolution = options.Interval
+	}
+
+	s.websocketService.Subscribe(string(channel), toLocalSymbol(symbol), opt)
 }
 
 func (s *Stream) Connect(ctx context.Context) error {
