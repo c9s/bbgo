@@ -497,7 +497,6 @@ func (environ *Environment) IsSyncing() (status SyncStatus) {
 func (environ *Environment) setSyncing(status SyncStatus) {
 	environ.syncStatusMutex.Lock()
 	environ.syncStatus = status
-	log.Infof("setting sync status to %d", environ.syncStatus)
 	environ.syncStatusMutex.Unlock()
 }
 
@@ -566,11 +565,11 @@ func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) erro
 	if len(slackToken) > 0 && userConfig.Notifications != nil {
 		if conf := userConfig.Notifications.Slack; conf != nil {
 			if conf.ErrorChannel != "" {
-				log.Infof("found slack configured, setting up log hook...")
+				log.Debugf("found slack configured, setting up log hook...")
 				log.AddHook(slacklog.NewLogHook(slackToken, conf.ErrorChannel))
 			}
 
-			log.Infof("adding slack notifier with default channel: %s", conf.DefaultChannel)
+			log.Debugf("adding slack notifier with default channel: %s", conf.DefaultChannel)
 			var notifier = slacknotifier.New(slackToken, conf.DefaultChannel)
 			environ.AddNotifier(notifier)
 		}
@@ -602,7 +601,7 @@ func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) erro
 		if len(authToken) > 0 {
 			interaction.SetAuthToken(authToken)
 
-			log.Info("telegram bot auth token is set, using fixed token for authorization...")
+			log.Debugf("telegram bot auth token is set, using fixed token for authorization...")
 
 			printTelegramAuthTokenGuide(authToken)
 		}
@@ -689,25 +688,23 @@ func printOtpKey(key *otp.Key) {
 }
 
 func printTelegramOtpAuthGuide(qrcodeImagePath string) {
-	log.Infof("To scan your OTP QR code, please run the following command:")
-	log.Infof("")
-	log.Infof("")
-	log.Infof("     open %s", qrcodeImagePath)
-	log.Infof("")
-	log.Infof("")
-	log.Infof("send the auth command with the generated one-time password to the bbgo bot you created to enable the notification")
-	log.Infof("")
-	log.Infof("")
-	log.Infof("     /auth {code}")
-	log.Infof("")
-	log.Infof("")
+	fmt.Printf(`
+To scan your OTP QR code, please run the following command:
+	
+	open %s
+
+send the auth command with the generated one-time password to the bbgo bot you created to enable the notification:
+
+	/auth {code}
+
+`, qrcodeImagePath)
 }
 
 func printTelegramAuthTokenGuide(token string) {
-	fmt.Println("send the following command to the bbgo bot you created to enable the notification")
-	fmt.Println("")
-	fmt.Println("")
-	fmt.Printf("    /auth %s\n", token)
-	fmt.Println("")
-	fmt.Println("")
+	fmt.Printf(`
+send the following command to the bbgo bot you created to enable the notification:
+
+	/auth %s
+
+`, token)
 }
