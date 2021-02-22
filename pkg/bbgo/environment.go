@@ -496,10 +496,7 @@ func (environ *Environment) Sync(ctx context.Context) error {
 	defer environ.syncMutex.Unlock()
 
 	environ.setSyncing(true)
-
-	defer func() {
-		environ.setSyncing(false)
-	}()
+	defer environ.setSyncing(false)
 
 	for _, session := range environ.sessions {
 		if err := environ.syncSession(ctx, session); err != nil {
@@ -515,9 +512,7 @@ func (environ *Environment) SyncSession(ctx context.Context, session *ExchangeSe
 	defer environ.syncMutex.Unlock()
 
 	environ.setSyncing(true)
-	defer func() {
-		environ.setSyncing(false)
-	}()
+	defer environ.setSyncing(false)
 
 	return environ.syncSession(ctx, session, defaultSymbols...)
 }
