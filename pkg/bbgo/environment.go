@@ -50,7 +50,6 @@ func RegisterStrategy(key string, s interface{}) {
 
 var emptyTime time.Time
 
-
 type SyncStatus int
 
 const (
@@ -91,6 +90,7 @@ func NewEnvironment() *Environment {
 		sessions:      make(map[string]*ExchangeSession),
 		startTime:     time.Now(),
 
+		syncStatus: SyncNotStarted,
 		PersistenceServiceFacade: &service.PersistenceServiceFacade{
 			Memory: service.NewMemoryService(),
 		},
@@ -497,6 +497,7 @@ func (environ *Environment) IsSyncing() (status SyncStatus) {
 func (environ *Environment) setSyncing(status SyncStatus) {
 	environ.syncStatusMutex.Lock()
 	environ.syncStatus = status
+	log.Infof("setting sync status to %d", environ.syncStatus)
 	environ.syncStatusMutex.Unlock()
 }
 
@@ -528,10 +529,16 @@ func (environ *Environment) SyncSession(ctx context.Context, session *ExchangeSe
 }
 
 func (environ *Environment) syncSession(ctx context.Context, session *ExchangeSession, defaultSymbols ...string) error {
+	if err := session.Init(ctx, environ) ; err != nil {
+		return err
+	}
+
 	symbols, err := getSessionSymbols(session, defaultSymbols...)
 	if err != nil {
 		return err
 	}
+
+	log.Infof("syncing symbols %v from session %s", symbols, session.Name)
 
 	return environ.TradeSync.SyncSessionSymbols(ctx, session.Exchange, environ.syncStartTime, symbols...)
 }

@@ -21,6 +21,9 @@ const SyncNotStarted = 0
 const Syncing = 1
 const SyncDone = 2
 
+// session is configured, check if we're syncing data
+let syncStatusPoller = null
+
 export default function MyApp(props) {
     const {Component, pageProps} = props;
 
@@ -38,8 +41,6 @@ export default function MyApp(props) {
             if (sessions.length > 0) {
                 setSyncing(true)
 
-                // session is configured, check if we're syncing data
-                let poller = null
                 const pollSyncStatus = () => {
                     querySyncStatus((status) => {
                         switch (status) {
@@ -49,9 +50,9 @@ export default function MyApp(props) {
                                 setSyncing(true);
                                 break;
                             case SyncDone:
+                                clearInterval(syncStatusPoller);
                                 setLoading(false);
                                 setSyncing(false);
-                                clearInterval(poller);
                                 break;
                         }
                     }).catch((err) => {
@@ -59,7 +60,7 @@ export default function MyApp(props) {
                     })
                 }
 
-                poller = setInterval(pollSyncStatus, 1000)
+                syncStatusPoller = setInterval(pollSyncStatus, 1000)
             } else {
                 // no session found, so we can not sync any data
                 setLoading(false)

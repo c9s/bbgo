@@ -119,7 +119,15 @@ func (s *SyncService) SyncTrades(ctx context.Context, exchange types.Exchange, s
 
 		tradeKeys[key] = struct{}{}
 
-		logrus.Infof("inserting trade: %d %s %-4s price: %-13f volume: %-11f %5s %s", trade.ID, trade.Symbol, trade.Side, trade.Price, trade.Quantity, trade.MakerOrTakerLabel(), trade.Time.String())
+		logrus.Infof("inserting trade: %s %d %s %-4s price: %-13f volume: %-11f %5s %s",
+			trade.Exchange,
+			trade.ID,
+			trade.Symbol,
+			trade.Side,
+			trade.Price,
+			trade.Quantity,
+			trade.MakerOrTakerLabel(),
+			trade.Time.String())
 
 		if err := s.TradeService.Insert(trade); err != nil {
 			return err

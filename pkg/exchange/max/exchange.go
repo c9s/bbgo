@@ -19,7 +19,10 @@ import (
 	"github.com/c9s/bbgo/pkg/util"
 )
 
-var limiter = rate.NewLimiter(rate.Every(5*time.Second), 2)
+var closedOrderQueryLimiter = rate.NewLimiter(rate.Every(10*time.Second), 1)
+var tradeQuerylimiter = rate.NewLimiter(rate.Every(5*time.Second), 1)
+var accountQuerylimiter = rate.NewLimiter(rate.Every(5*time.Second), 1)
+var marketDataLimiter = rate.NewLimiter(rate.Every(5*time.Second), 1)
 
 var log = logrus.WithField("exchange", "max")
 
@@ -66,17 +69,21 @@ func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticke
 }
 
 func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[string]types.Ticker, error) {
-	var ret = make(map[string]types.Ticker)
+	if err := marketDataLimiter.Wait(ctx) ; err != nil {
+		return nil, err
+	}
 
+	var tickers = make(map[string]types.Ticker)
 	if len(symbol) == 1 {
 		ticker, err := e.QueryTicker(ctx, symbol[0])
 		if err != nil {
 			return nil, err
 		}
 
-		ret[toGlobalSymbol(symbol[0])] = *ticker
+		tickers[toGlobalSymbol(symbol[0])] = *ticker
 	} else {
-		tickers, err := e.client.PublicService.Tickers()
+
+		maxTickers, err := e.client.PublicService.Tickers()
 		if err != nil {
 			return nil, err
 		}
@@ -87,11 +94,11 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[stri
 			m[toGlobalSymbol(s)] = exists
 		}
 
-		for k, v := range tickers {
+		for k, v := range maxTickers {
 			if _, ok := m[toGlobalSymbol(k)]; len(symbol) != 0 && !ok {
 				continue
 			}
-			ret[toGlobalSymbol(k)] = types.Ticker{
+			tickers[toGlobalSymbol(k)] = types.Ticker{
 				Time:   v.Time,
 				Volume: util.MustParseFloat(v.Volume),
 				Last:   util.MustParseFloat(v.Last),
@@ -104,7 +111,7 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[stri
 		}
 	}
 
-	return ret, nil
+	return tickers, nil
 }
 
 func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
@@ -167,7 +174,7 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 
 // lastOrderID is not supported on MAX
 func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []types.Order, err error) {
-	if err := limiter.Wait(ctx) ; err != nil {
+	if err := closedOrderQueryLimiter.Wait(ctx) ; err != nil {
 		return nil, err
 	}
 
@@ -369,7 +376,7 @@ func (e *Exchange) PlatformFeeCurrency() string {
 }
 
 func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
-	if err := limiter.Wait(ctx) ; err != nil {
+	if err := accountQuerylimiter.Wait(ctx) ; err != nil {
 		return nil, err
 	}
 
@@ -514,7 +521,7 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 }
 
 func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
-	if err := limiter.Wait(ctx) ; err != nil {
+	if err := accountQuerylimiter.Wait(ctx) ; err != nil {
 		return nil, err
 	}
 
@@ -537,7 +544,7 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 }
 
 func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
-	if err := limiter.Wait(ctx) ; err != nil {
+	if err := tradeQuerylimiter.Wait(ctx) ; err != nil {
 		return nil, err
 	}
 
@@ -577,7 +584,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 }
 
 func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
-	if err := limiter.Wait(ctx) ; err != nil {
+	if err := marketDataLimiter.Wait(ctx) ; err != nil {
 		return nil, err
 	}
 
