@@ -50,6 +50,15 @@ func RegisterStrategy(key string, s interface{}) {
 
 var emptyTime time.Time
 
+
+type SyncStatus int
+
+const (
+	SyncNotStarted SyncStatus = iota
+	Syncing
+	SyncDone
+)
+
 // Environment presents the real exchange data layer
 type Environment struct {
 	// Notifiability here for environment is for the streaming data notification
@@ -70,7 +79,7 @@ type Environment struct {
 	syncMutex     sync.Mutex
 
 	syncStatusMutex sync.Mutex
-	syncing         bool
+	syncStatus      SyncStatus
 
 	sessions map[string]*ExchangeSession
 }
@@ -478,15 +487,16 @@ func (environ *Environment) Connect(ctx context.Context) error {
 	return nil
 }
 
-func (environ *Environment) IsSyncing() bool {
+func (environ *Environment) IsSyncing() (status SyncStatus) {
 	environ.syncStatusMutex.Lock()
-	defer environ.syncStatusMutex.Unlock()
-	return environ.syncing
+	status = environ.syncStatus
+	environ.syncStatusMutex.Unlock()
+	return status
 }
 
-func (environ *Environment) setSyncing(syncing bool) {
+func (environ *Environment) setSyncing(status SyncStatus) {
 	environ.syncStatusMutex.Lock()
-	environ.syncing = syncing
+	environ.syncStatus = status
 	environ.syncStatusMutex.Unlock()
 }
 
@@ -495,8 +505,8 @@ func (environ *Environment) Sync(ctx context.Context) error {
 	environ.syncMutex.Lock()
 	defer environ.syncMutex.Unlock()
 
-	environ.setSyncing(true)
-	defer environ.setSyncing(false)
+	environ.setSyncing(Syncing)
+	defer environ.setSyncing(SyncDone)
 
 	for _, session := range environ.sessions {
 		if err := environ.syncSession(ctx, session); err != nil {
@@ -511,8 +521,8 @@ func (environ *Environment) SyncSession(ctx context.Context, session *ExchangeSe
 	environ.syncMutex.Lock()
 	defer environ.syncMutex.Unlock()
 
-	environ.setSyncing(true)
-	defer environ.setSyncing(false)
+	environ.setSyncing(Syncing)
+	defer environ.setSyncing(SyncDone)
 
 	return environ.syncSession(ctx, session, defaultSymbols...)
 }
