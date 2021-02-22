@@ -156,5 +156,4 @@ func main() {
 	}
 
 	log.Println("exiting...")
-	view.Destroy()
 }
