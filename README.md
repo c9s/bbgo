@@ -292,6 +292,21 @@ rockhopper --config rockhopper_sqlite.yaml create --type sql add_pnl_column
 rockhopper --config rockhopper_mysql.yaml create --type sql add_pnl_column
 ```
 
+or
+
+```
+bash utils/generate-new-migration.sh add_pnl_column
+```
+
+Be sure to edit both sqlite3 and mysql migration files.
+
+To test the drivers, you can do:
+
+```
+rockhopper --config rockhopper_sqlite.yaml up
+rockhopper --config rockhopper_mysql.yaml up
+```
+
 ### Setup frontend development environment
 
 ```
