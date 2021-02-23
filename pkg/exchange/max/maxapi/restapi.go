@@ -20,6 +20,7 @@ import (
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 
 	"github.com/c9s/bbgo/pkg/util"
 	"github.com/c9s/bbgo/pkg/version"
@@ -32,7 +33,15 @@ const (
 	UserAgent = "bbgo/" + version.Version
 
 	defaultHTTPTimeout = time.Second * 30
+
+	TimestampSince = 1535760000
 )
+
+var debugMaxRequestPayload = true
+
+func init() {
+	debugMaxRequestPayload = viper.GetBool("MAX_DEBUG_REQUEST_PAYLOAD")
+}
 
 var logger = log.WithField("exchange", "max")
 
@@ -187,6 +196,10 @@ func (c *RestClient) newAuthenticatedRequest(m string, refURL string, data inter
 		p, err = json.Marshal(d)
 	}
 
+	if debugMaxRequestPayload {
+		log.Infof("request payload: %s", p)
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -203,6 +216,7 @@ func (c *RestClient) newAuthenticatedRequest(m string, refURL string, data inter
 	if err != nil {
 		return nil, err
 	}
+
 
 	encoded := base64.StdEncoding.EncodeToString(p)
 

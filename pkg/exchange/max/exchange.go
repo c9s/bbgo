@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"sort"
 	"strconv"
 	"time"
 
@@ -69,7 +70,7 @@ func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticke
 }
 
 func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[string]types.Ticker, error) {
-	if err := marketDataLimiter.Wait(ctx) ; err != nil {
+	if err := marketDataLimiter.Wait(ctx); err != nil {
 		return nil, err
 	}
 
@@ -174,7 +175,7 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 
 // lastOrderID is not supported on MAX
 func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []types.Order, err error) {
-	if err := closedOrderQueryLimiter.Wait(ctx) ; err != nil {
+	if err := closedOrderQueryLimiter.Wait(ctx); err != nil {
 		return nil, err
 	}
 
@@ -376,7 +377,7 @@ func (e *Exchange) PlatformFeeCurrency() string {
 }
 
 func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
-	if err := accountQueryLimiter.Wait(ctx) ; err != nil {
+	if err := accountQueryLimiter.Wait(ctx); err != nil {
 		return nil, err
 	}
 
@@ -521,7 +522,7 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 }
 
 func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
-	if err := accountQueryLimiter.Wait(ctx) ; err != nil {
+	if err := accountQueryLimiter.Wait(ctx); err != nil {
 		return nil, err
 	}
 
@@ -544,7 +545,7 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 }
 
 func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
-	if err := tradeQueryLimiter.Wait(ctx) ; err != nil {
+	if err := tradeQueryLimiter.Wait(ctx); err != nil {
 		return nil, err
 	}
 
@@ -583,8 +584,56 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	return trades, nil
 }
 
+func (e *Exchange) QueryRewards(ctx context.Context, startTime time.Time) ([]types.Reward, error) {
+	var from = startTime
+	var emptyTime = time.Time{}
+
+	if from == emptyTime {
+		from = time.Unix(maxapi.TimestampSince, 0)
+	}
+
+	var now = time.Now()
+	for {
+		if from.After(now) {
+			break
+		}
+
+		// scan by 30 days
+		// an user might get most 14 commission records by currency per day
+		// limit 1000 / 14 = 71 days
+		to := from.Add(time.Hour * 24 * 30)
+		req := e.client.RewardService.NewRewardsRequest()
+		req.From(from.Unix())
+		req.To(to.Unix())
+		req.Limit(1000)
+
+		maxRewards, err := req.Do(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(maxRewards) == 0 {
+			// next page
+			from = to
+			continue
+		}
+
+		rewards, err := toGlobalRewards(maxRewards)
+		if err != nil {
+			return nil, err
+		}
+
+		// sort them in the ascending order
+		sort.Reverse(types.RewardSliceByCreationTime{rewards})
+
+		return rewards, err
+	}
+
+	return nil, errors.New("unknown error")
+}
+
 func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
-	if err := marketDataLimiter.Wait(ctx) ; err != nil {
+	if err := marketDataLimiter.Wait(ctx); err != nil {
 		return nil, err
 	}
 
@@ -604,7 +653,6 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 	if options.StartTime == nil {
 		return nil, errors.New("start time can not be empty")
 	}
-
 
 	log.Infof("querying kline %s %s %+v", symbol, interval, options)
 	localKLines, err := e.client.PublicService.KLines(toLocalSymbol(symbol), string(interval), *options.StartTime, limit)

@@ -15,11 +15,24 @@ type RewardService struct {
 func NewRewardService(db *sqlx.DB) *RewardService {
 	return &RewardService{db}
 }
-func (s *RewardService) Query(ex types.ExchangeName, rewardType string, from time.Time) ([]types.Trade, error) {
-	rows, err := s.DB.NamedQuery(`SELECT * FROM trades WHERE exchange = :exchange AND (symbol = :symbol OR fee_currency = :fee_currency) ORDER BY traded_at ASC`, map[string]interface{}{
-		"exchange":    ex,
-		"reward_type": rewardType,
-		"from": from.Unix(),
+
+func (s *RewardService) QueryLast(ex types.ExchangeName, limit int) ([]types.Reward, error) {
+	rows, err := s.DB.NamedQuery(`SELECT * FROM rewards WHERE exchange = :exchange ORDER BY created_at DESC LIMIT :limit`, map[string]interface{}{
+		"exchange": ex,
+		"limit":    limit,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+	return s.scanRows(rows)
+}
+
+func (s *RewardService) QueryUnspent(ex types.ExchangeName, from time.Time) ([]types.Reward, error) {
+	rows, err := s.DB.NamedQuery(`SELECT * FROM rewards WHERE exchange = :exchange AND spent IS FALSE ORDER BY created_at ASC`, map[string]interface{}{
+		"exchange": ex,
+		"from":     from,
 	})
 	if err != nil {
 		return nil, err
@@ -30,24 +43,23 @@ func (s *RewardService) Query(ex types.ExchangeName, rewardType string, from tim
 	return s.scanRows(rows)
 }
 
-func (s *RewardService) scanRows(rows *sqlx.Rows) (trades []types.Trade, err error) {
+func (s *RewardService) scanRows(rows *sqlx.Rows) (rewards []types.Reward, err error) {
 	for rows.Next() {
-		var trade types.Trade
-		if err := rows.StructScan(&trade); err != nil {
-			return trades, err
+		var reward types.Reward
+		if err := rows.StructScan(&reward); err != nil {
+			return rewards, err
 		}
 
-		trades = append(trades, trade)
+		rewards = append(rewards, reward)
 	}
 
-	return trades, rows.Err()
+	return rewards, rows.Err()
 }
 
-func (s *RewardService) Insert(trade types.Trade) error {
+func (s *RewardService) Insert(reward types.Reward) error {
 	_, err := s.DB.NamedExec(`
-			INSERT INTO trades (id, exchange, order_id, symbol, price, quantity, quote_quantity, side, is_buyer, is_maker, fee, fee_currency, traded_at, is_margin, is_isolated)
-			VALUES (:id, :exchange, :order_id, :symbol, :price, :quantity, :quote_quantity, :side, :is_buyer, :is_maker, :fee, :fee_currency, :traded_at, :is_margin, :is_isolated)`,
-		trade)
+			INSERT INTO rewards (exchange, uuid, reward_type, quantity, state, created_at)
+			VALUES (:exchange, :uuid, :reward_type, :quantity, :state, :created_at)`,
+		reward)
 	return err
 }
-

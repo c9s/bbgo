@@ -4,8 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
+	"github.com/c9s/bbgo/pkg/datatype"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 type RewardType string
@@ -55,7 +58,34 @@ func (t *RewardType) UnmarshalJSON(o []byte) error {
 	return nil
 }
 
+func (t RewardType) RewardType() (types.RewardType, error) {
+	switch t {
+
+	case RewardAirdrop:
+		return types.RewardAirdrop, nil
+
+	case RewardCommission:
+		return types.RewardCommission, nil
+
+	case RewardHolding:
+		return types.RewardHolding, nil
+
+	case RewardMining:
+		return types.RewardMining, nil
+
+	case RewardTrading:
+		return types.RewardTrading, nil
+
+	case RewardVipRebate:
+		return types.RewardVipRebate, nil
+
+	}
+
+	return types.RewardType(""), fmt.Errorf("unknown reward type: %s", t)
+}
+
 type Reward struct {
+	// UUID here is more like SN, not the real UUID
 	UUID     string           `json:"uuid"`
 	Type     RewardType       `json:"type"`
 	Currency string           `json:"currency"`
@@ -65,6 +95,25 @@ type Reward struct {
 
 	// Unix timestamp in seconds
 	CreatedAt Timestamp `json:"created_at"`
+}
+
+func (reward Reward) Reward() (*types.Reward, error) {
+	rt, err := reward.Type.RewardType()
+	if err != nil {
+		return nil, err
+	}
+
+	return &types.Reward{
+		UUID:      reward.UUID,
+		Exchange:  types.ExchangeMax,
+		Type:      rt,
+		Currency:  strings.ToUpper(reward.Currency),
+		Quantity:  reward.Amount,
+		State:     reward.State,
+		Note:      reward.Note,
+		Used:      false,
+		CreatedAt: datatype.Time(reward.CreatedAt),
+	}, nil
 }
 
 type RewardService struct {
@@ -91,6 +140,8 @@ type RewardsRequest struct {
 
 	// To Unix-timestamp
 	to *int64
+
+	limit *int
 }
 
 func (r *RewardsRequest) Currency(currency string) *RewardsRequest {
@@ -100,6 +151,11 @@ func (r *RewardsRequest) Currency(currency string) *RewardsRequest {
 
 func (r *RewardsRequest) From(from int64) *RewardsRequest {
 	r.from = &from
+	return r
+}
+
+func (r *RewardsRequest) Limit(limit int) *RewardsRequest {
+	r.limit = &limit
 	return r
 }
 
@@ -121,6 +177,10 @@ func (r *RewardsRequest) Do(ctx context.Context) (rewards []Reward, err error) {
 
 	if r.from != nil {
 		payload["from"] = r.from
+	}
+
+	if r.limit != nil {
+		payload["limit"] = r.limit
 	}
 
 	refURL := "v2/rewards"
