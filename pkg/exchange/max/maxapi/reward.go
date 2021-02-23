@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 type RewardType string
@@ -54,12 +56,12 @@ func (t *RewardType) UnmarshalJSON(o []byte) error {
 }
 
 type Reward struct {
-	UUID     string     `json:"uuid"`
-	Type     RewardType `json:"type"`
-	Currency string     `json:"currency"`
-	Amount   string     `json:"amount"`
-	State    string     `json:"state"`
-	Note     string     `json:"note"`
+	UUID     string           `json:"uuid"`
+	Type     RewardType       `json:"type"`
+	Currency string           `json:"currency"`
+	Amount   fixedpoint.Value `json:"amount"`
+	State    string           `json:"state"`
+	Note     string           `json:"note"`
 
 	// Unix timestamp in seconds
 	CreatedAt Timestamp `json:"created_at"`
