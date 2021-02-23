@@ -68,7 +68,8 @@ type Environment struct {
 	DatabaseService          *service.DatabaseService
 	OrderService             *service.OrderService
 	TradeService             *service.TradeService
-	TradeSync                *service.SyncService
+	RewardService            *service.RewardService
+	SyncService              *service.SyncService
 
 	// startTime is the time of start point (which is used in the backtest)
 	startTime time.Time
@@ -157,9 +158,12 @@ func (environ *Environment) ConfigureDatabaseDriver(ctx context.Context, driver 
 	db := environ.DatabaseService.DB
 	environ.OrderService = &service.OrderService{DB: db}
 	environ.TradeService = &service.TradeService{DB: db}
-	environ.TradeSync = &service.SyncService{
-		TradeService: environ.TradeService,
-		OrderService: environ.OrderService,
+	environ.RewardService = &service.RewardService{DB: db}
+
+	environ.SyncService = &service.SyncService{
+		TradeService:  environ.TradeService,
+		OrderService:  environ.OrderService,
+		RewardService: environ.RewardService,
 	}
 
 	return nil
@@ -528,7 +532,7 @@ func (environ *Environment) SyncSession(ctx context.Context, session *ExchangeSe
 }
 
 func (environ *Environment) syncSession(ctx context.Context, session *ExchangeSession, defaultSymbols ...string) error {
-	if err := session.Init(ctx, environ) ; err != nil {
+	if err := session.Init(ctx, environ); err != nil {
 		return err
 	}
 
@@ -539,7 +543,7 @@ func (environ *Environment) syncSession(ctx context.Context, session *ExchangeSe
 
 	log.Infof("syncing symbols %v from session %s", symbols, session.Name)
 
-	return environ.TradeSync.SyncSessionSymbols(ctx, session.Exchange, environ.syncStartTime, symbols...)
+	return environ.SyncService.SyncSessionSymbols(ctx, session.Exchange, environ.syncStartTime, symbols...)
 }
 
 func getSessionSymbols(session *ExchangeSession, defaultSymbols ...string) ([]string, error) {

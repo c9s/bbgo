@@ -49,6 +49,27 @@ func toGlobalSideType(v string) types.SideType {
 	return types.SideType(v)
 }
 
+func toGlobalRewards(maxRewards []max.Reward) ([]types.Reward, error) {
+	// convert to global reward
+	var rewards []types.Reward
+	for _, r := range maxRewards {
+		// ignore "accepted"
+		if r.State != "done" {
+			continue
+		}
+
+
+		reward, err := r.Reward()
+		if err != nil {
+			return nil, err
+		}
+
+		rewards = append(rewards, *reward)
+	}
+
+	return rewards, nil
+}
+
 func toGlobalOrderStatus(orderStatus max.OrderState, executedVolume, remainingVolume fixedpoint.Value) types.OrderStatus {
 
 	switch orderStatus {

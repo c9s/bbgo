@@ -85,6 +85,10 @@ type Exchange interface {
 	CancelOrders(ctx context.Context, orders ...Order) error
 }
 
+type ExchangeRewardService interface {
+	QueryRewards(ctx context.Context, startTime time.Time) ([]Reward, error)
+}
+
 type TradeQueryOptions struct {
 	StartTime   *time.Time
 	EndTime     *time.Time
