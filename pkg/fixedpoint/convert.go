@@ -1,6 +1,7 @@
 package fixedpoint
 
 import (
+	"database/sql/driver"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -13,6 +14,35 @@ const DefaultPrecision = 8
 const DefaultPow = 1e8
 
 type Value int64
+
+func (v Value) Value() (driver.Value, error) {
+	return v.Float64(), nil
+}
+
+func (v *Value) Scan(src interface{}) error {
+	switch d := src.(type) {
+	case int64:
+		*v = Value(d)
+		return nil
+
+	case float64:
+		*v = NewFromFloat(d)
+		return nil
+
+	case []byte:
+		vv, err := NewFromString(string(d))
+		if err != nil {
+			return err
+		}
+		*v = vv
+		return nil
+
+	default:
+
+	}
+
+	return fmt.Errorf("fixedpoint.Value scan error, type: %T is not supported, value; %+v", src, src)
+}
 
 func (v Value) Float64() float64 {
 	return float64(v) / DefaultPow

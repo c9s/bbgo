@@ -34,6 +34,7 @@ const (
 
 	defaultHTTPTimeout = time.Second * 30
 
+	// 2018-09-01 08:00:00 +0800 CST
 	TimestampSince = 1535760000
 )
 

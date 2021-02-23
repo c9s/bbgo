@@ -1,0 +1,75 @@
+package service
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"github.com/jmoiron/sqlx"
+	"github.com/stretchr/testify/assert"
+
+	"github.com/c9s/bbgo/pkg/datatype"
+	"github.com/c9s/bbgo/pkg/types"
+)
+
+func Test_RewardService(t *testing.T) {
+	db, err := prepareDB(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer db.Close()
+
+	ctx := context.Background()
+
+	xdb := sqlx.NewDb(db.DB, "sqlite3")
+	service := &RewardService{DB: xdb}
+
+	err = service.Insert(types.Reward{
+		UUID:      "test01",
+		Exchange:  "max",
+		Type:      "commission",
+		Currency:  "BTC",
+		Quantity:  1,
+		State:     "done",
+		Spent:     false,
+		CreatedAt: datatype.Time(time.Now()),
+	})
+	assert.NoError(t, err)
+
+	rewards, err := service.QueryUnspent(ctx, types.ExchangeMax)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, rewards)
+	assert.Len(t, rewards, 1)
+	assert.Equal(t, types.RewardCommission, rewards[0].Type)
+
+	err = service.Insert(types.Reward{
+		UUID:      "test01",
+		Exchange:  "max",
+		Type:      "airdrop",
+		Currency:  "MAX",
+		Quantity:  1000000,
+		State:     "done",
+		Spent:     false,
+		CreatedAt: datatype.Time(time.Now()),
+	})
+	assert.NoError(t, err)
+
+	rewards, err = service.QueryUnspent(ctx, types.ExchangeMax)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, rewards)
+	assert.Len(t, rewards, 1, "airdrop should not be included")
+	assert.Equal(t, types.RewardCommission, rewards[0].Type)
+
+	rewards, err = service.QueryUnspent(ctx, types.ExchangeMax, types.RewardAirdrop)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, rewards)
+	assert.Len(t, rewards, 1, "airdrop should be included")
+	assert.Equal(t, types.RewardAirdrop, rewards[0].Type)
+
+	rewards, err = service.QueryUnspent(ctx, types.ExchangeMax, types.RewardCommission)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, rewards)
+	assert.Len(t, rewards, 1, "should select 1 reward")
+	assert.Equal(t, types.RewardCommission, rewards[0].Type)
+}
