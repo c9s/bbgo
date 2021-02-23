@@ -6,11 +6,17 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"golang.org/x/time/rate"
+	"github.com/spf13/viper"
 
 	"github.com/c9s/bbgo/pkg/exchange/batch"
 	"github.com/c9s/bbgo/pkg/types"
 )
+
+var debugSync = false
+
+func init() {
+	debugSync = viper.GetBool("DEBUG_SYNC")
+}
 
 var ErrNotImplemented = errors.New("exchange does not implement ExchangeRewardService interface")
 
@@ -26,19 +32,24 @@ func (s *SyncService) SyncRewards(ctx context.Context, exchange types.Exchange) 
 		return ErrNotImplemented
 	}
 
+	var rewardKeys = map[string]struct{}{}
 
 	var startTime time.Time
-	lastRecords, err := s.RewardService.QueryLast(exchange.Name(), 10)
+	lastRecords, err := s.RewardService.QueryLast(exchange.Name(), 50)
 	if err != nil {
 		return err
 	}
 	if len(lastRecords) > 0 {
-		end :=  len(lastRecords) - 1
+		end := len(lastRecords) - 1
 		lastRecord := lastRecords[end]
 		startTime = lastRecord.CreatedAt.Time()
+
+		for _, record := range lastRecords {
+			rewardKeys[record.UUID] = struct{}{}
+		}
 	}
 
-	batchQuery := &RewardBatchQuery{Service: service}
+	batchQuery := &batch.RewardBatchQuery{Service: service}
 	rewardsC, errC := batchQuery.Query(ctx, startTime, time.Now())
 
 	for reward := range rewardsC {
@@ -56,6 +67,12 @@ func (s *SyncService) SyncRewards(ctx context.Context, exchange types.Exchange) 
 
 		}
 
+		if _, ok := rewardKeys[reward.UUID]; ok {
+			continue
+		}
+
+		logrus.Infof("inserting reward: %s %s %s %f %s", reward.Exchange, reward.Type, reward.Currency, reward.Quantity.Float64(), reward.CreatedAt)
+
 		if err := s.RewardService.Insert(reward); err != nil {
 			return err
 		}
@@ -63,62 +80,6 @@ func (s *SyncService) SyncRewards(ctx context.Context, exchange types.Exchange) 
 
 	return <-errC
 }
-
-type RewardBatchQuery struct {
-	Service types.ExchangeRewardService
-}
-
-func (q *RewardBatchQuery) Query(ctx context.Context, startTime, endTime time.Time) (c chan types.Reward, errC chan error) {
-	c = make(chan types.Reward, 500)
-	errC = make(chan error, 1)
-
-	go func() {
-		limiter := rate.NewLimiter(rate.Every(5*time.Second), 2) // from binance (original 1200, use 1000 for safety)
-
-		defer close(c)
-		defer close(errC)
-
-		rewardKeys := make(map[string]struct{}, 500)
-
-		for startTime.Before(endTime) {
-			if err := limiter.Wait(ctx); err != nil {
-				logrus.WithError(err).Error("rate limit error")
-			}
-
-			logrus.Infof("batch querying rewards %s <=> %s", startTime, endTime)
-
-			rewards, err := q.Service.QueryRewards(ctx, startTime)
-			if err != nil {
-				errC <- err
-				return
-			}
-
-			if len(rewards) == 0 {
-				return
-			}
-
-			for _, o := range rewards {
-				if _, ok := rewardKeys[o.UUID]; ok {
-					logrus.Infof("skipping duplicated order id: %s", o.UUID)
-					continue
-				}
-
-				if o.CreatedAt.Time().After(endTime) {
-					// stop batch query
-					return
-				}
-
-				c <- o
-				startTime = o.CreatedAt.Time()
-				rewardKeys[o.UUID] = struct{}{}
-			}
-		}
-
-	}()
-
-	return c, errC
-}
-
 
 func (s *SyncService) SyncOrders(ctx context.Context, exchange types.Exchange, symbol string, startTime time.Time) error {
 	isMargin := false
@@ -142,11 +103,13 @@ func (s *SyncService) SyncOrders(ctx context.Context, exchange types.Exchange, s
 		lastID = lastOrder.OrderID
 		startTime = lastOrder.CreationTime.Time()
 
-		logrus.Infof("found last order, start from lastID = %d since %s", lastID, startTime)
+		if debugSync {
+			logrus.Infof("found last order, start from lastID = %d since %s", lastID, startTime)
+		}
 	}
 
-	b := &batch.ExchangeBatchProcessor{Exchange: exchange}
-	ordersC, errC := b.BatchQueryClosedOrders(ctx, symbol, startTime, time.Now(), lastID)
+	b := &batch.ClosedOrderBatchQuery{Exchange: exchange}
+	ordersC, errC := b.Query(ctx, symbol, startTime, time.Now(), lastID)
 	for order := range ordersC {
 		select {
 
@@ -196,11 +159,13 @@ func (s *SyncService) SyncTrades(ctx context.Context, exchange types.Exchange, s
 
 		lastTrade := lastTrades[len(lastTrades)-1]
 		lastTradeID = lastTrade.ID
-		logrus.Debugf("found last trade, start from lastID = %d", lastTrade.ID)
+		if debugSync {
+			logrus.Infof("found last trade, start from lastID = %d", lastTrade.ID)
+		}
 	}
 
-	b := &batch.ExchangeBatchProcessor{Exchange: exchange}
-	tradeC, errC := b.BatchQueryTrades(ctx, symbol, &types.TradeQueryOptions{
+	b := &batch.TradeBatchQuery{Exchange: exchange}
+	tradeC, errC := b.Query(ctx, symbol, &types.TradeQueryOptions{
 		LastTradeID: lastTradeID,
 	})
 
@@ -253,8 +218,7 @@ func (s *SyncService) SyncSessionSymbols(ctx context.Context, exchange types.Exc
 			return err
 		}
 
-
-		if err := s.SyncRewards(ctx, exchange) ; err != nil {
+		if err := s.SyncRewards(ctx, exchange); err != nil {
 			if err == ErrNotImplemented {
 				continue
 			}

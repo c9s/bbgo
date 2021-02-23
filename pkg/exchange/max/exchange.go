@@ -624,9 +624,8 @@ func (e *Exchange) QueryRewards(ctx context.Context, startTime time.Time) ([]typ
 		}
 
 		// sort them in the ascending order
-		sort.Reverse(types.RewardSliceByCreationTime{rewards})
-
-		return rewards, err
+		sort.Sort(types.RewardSliceByCreationTime(rewards))
+		return rewards, nil
 	}
 
 	return nil, errors.New("unknown error")

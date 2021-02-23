@@ -10,11 +10,11 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-type ExchangeBatchProcessor struct {
+type ClosedOrderBatchQuery struct {
 	types.Exchange
 }
 
-func (e ExchangeBatchProcessor) BatchQueryClosedOrders(ctx context.Context, symbol string, startTime, endTime time.Time, lastOrderID uint64) (c chan types.Order, errC chan error) {
+func (e ClosedOrderBatchQuery) Query(ctx context.Context, symbol string, startTime, endTime time.Time, lastOrderID uint64) (c chan types.Order, errC chan error) {
 	c = make(chan types.Order, 500)
 	errC = make(chan error, 1)
 
@@ -64,7 +64,11 @@ func (e ExchangeBatchProcessor) BatchQueryClosedOrders(ctx context.Context, symb
 	return c, errC
 }
 
-func (e ExchangeBatchProcessor) BatchQueryKLines(ctx context.Context, symbol string, interval types.Interval, startTime, endTime time.Time) (c chan types.KLine, errC chan error) {
+type KLineBatchQuery struct {
+	types.Exchange
+}
+
+func (e KLineBatchQuery) Query(ctx context.Context, symbol string, interval types.Interval, startTime, endTime time.Time) (c chan types.KLine, errC chan error) {
 	c = make(chan types.KLine, 1000)
 	errC = make(chan error, 1)
 
@@ -112,7 +116,11 @@ func (e ExchangeBatchProcessor) BatchQueryKLines(ctx context.Context, symbol str
 	return c, errC
 }
 
-func (e ExchangeBatchProcessor) BatchQueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (c chan types.Trade, errC chan error) {
+type TradeBatchQuery struct {
+	types.Exchange
+}
+
+func (e TradeBatchQuery) Query(ctx context.Context, symbol string, options *types.TradeQueryOptions) (c chan types.Trade, errC chan error) {
 	c = make(chan types.Trade, 500)
 	errC = make(chan error, 1)
 
@@ -171,6 +179,69 @@ func (e ExchangeBatchProcessor) BatchQueryTrades(ctx context.Context, symbol str
 				c <- t
 			}
 		}
+	}()
+
+	return c, errC
+}
+
+type RewardBatchQuery struct {
+	Service types.ExchangeRewardService
+}
+
+func (q *RewardBatchQuery) Query(ctx context.Context, startTime, endTime time.Time) (c chan types.Reward, errC chan error) {
+	c = make(chan types.Reward, 500)
+	errC = make(chan error, 1)
+
+	go func() {
+		limiter := rate.NewLimiter(rate.Every(5*time.Second), 2) // from binance (original 1200, use 1000 for safety)
+
+		defer close(c)
+		defer close(errC)
+
+		lastID := ""
+		rewardKeys := make(map[string]struct{}, 500)
+
+		for startTime.Before(endTime) {
+			if err := limiter.Wait(ctx); err != nil {
+				logrus.WithError(err).Error("rate limit error")
+			}
+
+			logrus.Infof("batch querying rewards %s <=> %s", startTime, endTime)
+
+			rewards, err := q.Service.QueryRewards(ctx, startTime)
+			if err != nil {
+				errC <- err
+				return
+			}
+
+			// empty data
+			if len(rewards) == 0 {
+				return
+			}
+
+			// there is no new data
+			if len(rewards) == 1 && rewards[0].UUID == lastID {
+				return
+			}
+
+			for _, o := range rewards {
+				if _, ok := rewardKeys[o.UUID]; ok {
+					logrus.Debugf("skipping duplicated order id: %s", o.UUID)
+					continue
+				}
+
+				if o.CreatedAt.Time().After(endTime) {
+					// stop batch query
+					return
+				}
+
+				c <- o
+				startTime = o.CreatedAt.Time()
+				lastID = o.UUID
+				rewardKeys[o.UUID] = struct{}{}
+			}
+		}
+
 	}()
 
 	return c, errC

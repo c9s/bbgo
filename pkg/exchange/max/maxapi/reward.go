@@ -111,7 +111,7 @@ func (reward Reward) Reward() (*types.Reward, error) {
 		Quantity:  reward.Amount,
 		State:     reward.State,
 		Note:      reward.Note,
-		Used:      false,
+		Spent:     false,
 		CreatedAt: datatype.Time(reward.CreatedAt),
 	}, nil
 }

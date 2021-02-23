@@ -32,10 +32,10 @@ func (s *BacktestService) Sync(ctx context.Context, exchange types.Exchange, sym
 			startTime = lastKLine.StartTime.Add(time.Minute)
 		}
 
-		batch := &batch2.ExchangeBatchProcessor{Exchange: exchange}
+		batch := &batch2.KLineBatchQuery{Exchange: exchange}
 
 		// should use channel here
-		klineC, errC := batch.BatchQueryKLines(ctx, symbol, interval, startTime, now)
+		klineC, errC := batch.Query(ctx, symbol, interval, startTime, now)
 		// var previousKLine types.KLine
 		for k := range klineC {
 			if err := s.Insert(k); err != nil {
