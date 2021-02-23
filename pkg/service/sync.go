@@ -2,18 +2,123 @@ package service
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/exchange/batch"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+var ErrNotImplemented = errors.New("exchange does not implement ExchangeRewardService interface")
+
 type SyncService struct {
-	TradeService *TradeService
-	OrderService *OrderService
+	TradeService  *TradeService
+	OrderService  *OrderService
+	RewardService *RewardService
 }
+
+func (s *SyncService) SyncRewards(ctx context.Context, exchange types.Exchange) error {
+	service, ok := exchange.(types.ExchangeRewardService)
+	if !ok {
+		return ErrNotImplemented
+	}
+
+
+	var startTime time.Time
+	lastRecords, err := s.RewardService.QueryLast(exchange.Name(), 10)
+	if err != nil {
+		return err
+	}
+	if len(lastRecords) > 0 {
+		end :=  len(lastRecords) - 1
+		lastRecord := lastRecords[end]
+		startTime = lastRecord.CreatedAt.Time()
+	}
+
+	batchQuery := &RewardBatchQuery{Service: service}
+	rewardsC, errC := batchQuery.Query(ctx, startTime, time.Now())
+
+	for reward := range rewardsC {
+		select {
+
+		case <-ctx.Done():
+			return ctx.Err()
+
+		case err := <-errC:
+			if err != nil {
+				return err
+			}
+
+		default:
+
+		}
+
+		if err := s.RewardService.Insert(reward); err != nil {
+			return err
+		}
+	}
+
+	return <-errC
+}
+
+type RewardBatchQuery struct {
+	Service types.ExchangeRewardService
+}
+
+func (q *RewardBatchQuery) Query(ctx context.Context, startTime, endTime time.Time) (c chan types.Reward, errC chan error) {
+	c = make(chan types.Reward, 500)
+	errC = make(chan error, 1)
+
+	go func() {
+		limiter := rate.NewLimiter(rate.Every(5*time.Second), 2) // from binance (original 1200, use 1000 for safety)
+
+		defer close(c)
+		defer close(errC)
+
+		rewardKeys := make(map[string]struct{}, 500)
+
+		for startTime.Before(endTime) {
+			if err := limiter.Wait(ctx); err != nil {
+				logrus.WithError(err).Error("rate limit error")
+			}
+
+			logrus.Infof("batch querying rewards %s <=> %s", startTime, endTime)
+
+			rewards, err := q.Service.QueryRewards(ctx, startTime)
+			if err != nil {
+				errC <- err
+				return
+			}
+
+			if len(rewards) == 0 {
+				return
+			}
+
+			for _, o := range rewards {
+				if _, ok := rewardKeys[o.UUID]; ok {
+					logrus.Infof("skipping duplicated order id: %s", o.UUID)
+					continue
+				}
+
+				if o.CreatedAt.Time().After(endTime) {
+					// stop batch query
+					return
+				}
+
+				c <- o
+				startTime = o.CreatedAt.Time()
+				rewardKeys[o.UUID] = struct{}{}
+			}
+		}
+
+	}()
+
+	return c, errC
+}
+
 
 func (s *SyncService) SyncOrders(ctx context.Context, exchange types.Exchange, symbol string, startTime time.Time) error {
 	isMargin := false
@@ -145,6 +250,15 @@ func (s *SyncService) SyncSessionSymbols(ctx context.Context, exchange types.Exc
 		}
 
 		if err := s.SyncOrders(ctx, exchange, symbol, startTime); err != nil {
+			return err
+		}
+
+
+		if err := s.SyncRewards(ctx, exchange) ; err != nil {
+			if err == ErrNotImplemented {
+				continue
+			}
+
 			return err
 		}
 	}

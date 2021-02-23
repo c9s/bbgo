@@ -20,7 +20,7 @@ CREATE TABLE `rewards`
 
     `created_at`  DATETIME       NOT NULL,
 
-    `used`        BOOLEAN        NOT NULL DEFAULT FALSE,
+    `spent`       BOOLEAN        NOT NULL DEFAULT FALSE,
 
     `note`        TEXT           NULL
 );

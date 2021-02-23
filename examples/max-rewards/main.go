@@ -31,8 +31,12 @@ func main() {
 	} else {
 		req = api.RewardService.NewRewardsRequest()
 	}
+
 	// req.From(1613931192)
 	// req.From(1613240048)
+	// req.From(maxapi.TimestampSince)
+	// req.To(maxapi.TimestampSince + 3600 * 24)
+	req.Limit(100)
 
 	rewards, err := req.Do(ctx)
 	if err != nil {
