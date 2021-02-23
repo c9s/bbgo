@@ -98,8 +98,17 @@ func (v *Value) UnmarshalJSON(data []byte) error {
 
 	case int:
 		*v = NewFromInt(d)
+
 	case int64:
 		*v = NewFromInt64(d)
+
+	case string:
+		v2, err := NewFromString(d)
+		if err != nil {
+			return err
+		}
+
+		*v = v2
 
 	default:
 		return fmt.Errorf("unsupported type: %T %v", d, d)
