@@ -32,10 +32,10 @@ func (s *RewardService) QueryLast(ex types.ExchangeName, limit int) ([]types.Rew
 
 type CurrencyPositionMap map[string]fixedpoint.Value
 
-func (s *RewardService) AggregateUnspentCurrencyPosition(ctx context.Context, ex types.ExchangeName) (CurrencyPositionMap, error) {
+func (s *RewardService) AggregateUnspentCurrencyPosition(ctx context.Context, ex types.ExchangeName, since time.Time) (CurrencyPositionMap, error) {
 	m := make(CurrencyPositionMap)
 
-	rewards, err := s.QueryUnspent(ctx, ex)
+	rewards, err := s.QueryUnspentSince(ctx, ex, since)
 	if err != nil {
 		return nil, err
 	}
@@ -47,10 +47,24 @@ func (s *RewardService) AggregateUnspentCurrencyPosition(ctx context.Context, ex
 	return m, nil
 }
 
-func (s *RewardService) QueryUnspentSince(ex types.ExchangeName, since time.Time) ([]types.Reward, error) {
-	rows, err := s.DB.NamedQuery(`SELECT * FROM rewards WHERE created_at >= :since AND exchange = :exchange AND spent IS FALSE ORDER BY created_at ASC`, map[string]interface{}{
+func (s *RewardService) QueryUnspentSince(ctx context.Context, ex types.ExchangeName, since time.Time, rewardTypes ...types.RewardType) ([]types.Reward, error) {
+	sql := "SELECT * FROM rewards WHERE created_at >= :since AND exchange = :exchange AND spent IS FALSE "
+
+	if len(rewardTypes) == 0 {
+		sql += " AND `reward_type` NOT IN ('airdrop') "
+	} else {
+		var args []string
+		for _, n := range rewardTypes {
+			args = append(args, strconv.Quote(string(n)))
+		}
+		sql += " AND `reward_type` IN (" + strings.Join(args, ", ") + ") "
+	}
+
+	sql += " ORDER BY created_at ASC"
+
+	rows, err := s.DB.NamedQueryContext(ctx, sql, map[string]interface{}{
 		"exchange":   ex,
-		"created_at": since,
+		"since": since,
 	})
 
 	if err != nil {
