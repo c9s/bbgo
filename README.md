@@ -10,10 +10,12 @@ A trading bot framework written in Go. The name bbgo comes from the BB8 bot in t
 
 - Exchange abstraction interface
 - Stream integration (user data websocket)
-- PnL calculation.
+- PnL calculation
 - Slack notification
-- KLine-based Backtest
+- KLine-based backtest
 - Built-in strategies
+- Multi-session support
+- Standard indicators (SMA, EMA, BOLL)
 
 ## Supported Exchanges
 
@@ -59,16 +61,16 @@ FTX_SUBACCOUNT_NAME=
 MYSQL_URL=root@tcp(127.0.0.1:3306)/bbgo?parseTime=true
 ```
 
-Make sure you have [dotenv](https://github.com/bkeepers/dotenv)
+Prepare your dotenv file `.env.local` and BBGO yaml config file `bbgo.yaml`.
 
 To sync your own trade data:
 
 ```
-bbgo sync --config config/grid.yaml --session max
-bbgo sync --config config/grid.yaml --session binance
+bbgo sync --session max
+bbgo sync --session binance
 ```
 
-If you want to switch to other dotenv file, you can add an `--dotenv` option:
+If you want to switch to other dotenv file, you can add an `--dotenv` option or `--config`:
 
 ```
 bbgo sync --dotenv .env.dev --config config/grid.yaml --session binance
@@ -78,13 +80,13 @@ bbgo sync --dotenv .env.dev --config config/grid.yaml --session binance
 To sync remote exchange klines data for backtesting:
 
 ```sh
-bbgo backtest --exchange binance --config config/grid.yaml -v --sync --sync-only --sync-from 2020-01-01
+bbgo backtest --exchange binance -v --sync --sync-only --sync-from 2020-01-01
 ```
 
 To run backtest:
 
 ```sh
-bbgo backtest --exchange binance --config config/bollgrid.yaml --base-asset-baseline
+bbgo backtest --exchange binance --base-asset-baseline
 ```
 
 
@@ -103,7 +105,7 @@ bbgo pnl --exchange binance --asset BTC --since "2019-01-01"
 To run strategy:
 
 ```sh
-bbgo run --config config/buyandhold.yaml
+bbgo run
 ```
 
 ## Built-in Strategies
