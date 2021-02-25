@@ -18,7 +18,8 @@ type RewardService struct {
 }
 
 func (s *RewardService) QueryLast(ex types.ExchangeName, limit int) ([]types.Reward, error) {
-	rows, err := s.DB.NamedQuery(`SELECT * FROM rewards WHERE exchange = :exchange ORDER BY created_at DESC LIMIT :limit`, map[string]interface{}{
+	sql := "SELECT * FROM `rewards` WHERE `exchange` = :exchange ORDER BY `created_at` DESC LIMIT :limit"
+	rows, err := s.DB.NamedQuery(sql, map[string]interface{}{
 		"exchange": ex,
 		"limit":    limit,
 	})

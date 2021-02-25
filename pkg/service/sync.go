@@ -6,17 +6,10 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 
 	"github.com/c9s/bbgo/pkg/exchange/batch"
 	"github.com/c9s/bbgo/pkg/types"
 )
-
-var debugSync = false
-
-func init() {
-	debugSync = viper.GetBool("DEBUG_SYNC")
-}
 
 var ErrNotImplemented = errors.New("exchange does not implement ExchangeRewardService interface")
 
@@ -35,16 +28,17 @@ func (s *SyncService) SyncRewards(ctx context.Context, exchange types.Exchange) 
 	var rewardKeys = map[string]struct{}{}
 
 	var startTime time.Time
-	lastRecords, err := s.RewardService.QueryLast(exchange.Name(), 50)
+
+	records, err := s.RewardService.QueryLast(exchange.Name(), 50)
 	if err != nil {
 		return err
 	}
-	if len(lastRecords) > 0 {
-		end := len(lastRecords) - 1
-		lastRecord := lastRecords[end]
+
+	if len(records) > 0 {
+		lastRecord := records[0]
 		startTime = lastRecord.CreatedAt.Time()
 
-		for _, record := range lastRecords {
+		for _, record := range records {
 			rewardKeys[record.UUID] = struct{}{}
 		}
 	}
@@ -93,19 +87,21 @@ func (s *SyncService) SyncOrders(ctx context.Context, exchange types.Exchange, s
 		}
 	}
 
-	lastOrder, err := s.OrderService.QueryLast(exchange.Name(), symbol, isMargin, isIsolated)
+	records, err := s.OrderService.QueryLast(exchange.Name(), symbol, isMargin, isIsolated, 50)
 	if err != nil {
 		return err
 	}
 
-	var lastID uint64 = 0
-	if lastOrder != nil {
-		lastID = lastOrder.OrderID
-		startTime = lastOrder.CreationTime.Time()
+	orderKeys := make(map[uint64]struct{})
 
-		if debugSync {
-			logrus.Infof("found last order, start from lastID = %d since %s", lastID, startTime)
+	var lastID uint64 = 0
+	if len(records) > 0 {
+		for _, record := range records {
+			orderKeys[record.OrderID] = struct{}{}
 		}
+
+		lastID = records[0].OrderID
+		startTime = records[0].CreationTime.Time()
 	}
 
 	b := &batch.ClosedOrderBatchQuery{Exchange: exchange}
@@ -123,6 +119,10 @@ func (s *SyncService) SyncOrders(ctx context.Context, exchange types.Exchange, s
 
 		default:
 
+		}
+
+		if _, exists := orderKeys[order.OrderID]; exists {
+			continue
 		}
 
 		if err := s.OrderService.Insert(order); err != nil {
@@ -145,23 +145,20 @@ func (s *SyncService) SyncTrades(ctx context.Context, exchange types.Exchange, s
 		}
 	}
 
-	lastTrades, err := s.TradeService.QueryLast(exchange.Name(), symbol, isMargin, isIsolated, 10)
+	// records descending ordered
+	records, err := s.TradeService.QueryLast(exchange.Name(), symbol, isMargin, isIsolated, 50)
 	if err != nil {
 		return err
 	}
 
 	var tradeKeys = map[types.TradeKey]struct{}{}
 	var lastTradeID int64 = 1
-	if len(lastTrades) > 0 {
-		for _, t := range lastTrades {
-			tradeKeys[t.Key()] = struct{}{}
+	if len(records) > 0 {
+		for _, record := range records {
+			tradeKeys[record.Key()] = struct{}{}
 		}
 
-		lastTrade := lastTrades[len(lastTrades)-1]
-		lastTradeID = lastTrade.ID
-		if debugSync {
-			logrus.Infof("found last trade, start from lastID = %d", lastTrade.ID)
-		}
+		lastTradeID = records[0].ID
 	}
 
 	b := &batch.TradeBatchQuery{Exchange: exchange}
@@ -183,7 +180,7 @@ func (s *SyncService) SyncTrades(ctx context.Context, exchange types.Exchange, s
 		}
 
 		key := trade.Key()
-		if _, ok := tradeKeys[key]; ok {
+		if _, exists := tradeKeys[key]; exists {
 			continue
 		}
 
