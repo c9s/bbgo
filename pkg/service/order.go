@@ -16,33 +16,24 @@ type OrderService struct {
 }
 
 // QueryLast queries the last order from the database
-func (s *OrderService) QueryLast(ex types.ExchangeName, symbol string, isMargin bool, isIsolated bool) (*types.Order, error) {
+func (s *OrderService) QueryLast(ex types.ExchangeName, symbol string, isMargin, isIsolated bool, limit int) ([]types.Order, error) {
 	log.Infof("querying last order exchange = %s AND symbol = %s AND is_margin = %v AND is_isolated = %v", ex, symbol, isMargin, isIsolated)
 
-	rows, err := s.DB.NamedQuery(`SELECT * FROM orders WHERE exchange = :exchange AND symbol = :symbol AND is_margin = :is_margin AND is_isolated = :is_isolated ORDER BY gid DESC LIMIT 1`, map[string]interface{}{
+	sql := `SELECT * FROM orders WHERE exchange = :exchange AND symbol = :symbol AND is_margin = :is_margin AND is_isolated = :is_isolated ORDER BY gid DESC LIMIT :limit`
+	rows, err := s.DB.NamedQuery(sql, map[string]interface{}{
 		"exchange":    ex,
 		"symbol":      symbol,
 		"is_margin":   isMargin,
 		"is_isolated": isIsolated,
+		"limit":       limit,
 	})
 
 	if err != nil {
 		return nil, errors.Wrap(err, "query last order error")
 	}
 
-	if rows.Err() != nil {
-		return nil, rows.Err()
-	}
-
 	defer rows.Close()
-
-	if rows.Next() {
-		var order types.Order
-		err = rows.StructScan(&order)
-		return &order, err
-	}
-
-	return nil, rows.Err()
+	return s.scanRows(rows)
 }
 
 type AggOrder struct {

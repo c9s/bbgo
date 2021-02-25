@@ -155,15 +155,13 @@ func (e TradeBatchQuery) Query(ctx context.Context, symbol string, options *type
 			}
 
 			if len(trades) == 0 {
-				break
+				return
+			} else if len(trades) == 1 {
+				k := trades[0].Key()
+				if _, exists := tradeKeys[k]; exists {
+					return
+				}
 			}
-
-			end := len(trades) - 1
-			if _, exists := tradeKeys[trades[end].Key()]; exists {
-				break
-			}
-
-			logrus.Debugf("returned %d trades", len(trades))
 
 			for _, t := range trades {
 				key := t.Key()

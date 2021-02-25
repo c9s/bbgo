@@ -31,6 +31,13 @@ func (s *TradeSlice) Copy() []Trade {
 	return slice
 }
 
+func (s *TradeSlice) Reverse() {
+	slice := s.Trades
+	for i, j := 0, len(slice)-1; i < j; i, j = i+1, j-1 {
+		slice[i], slice[j] = slice[j], slice[i]
+	}
+}
+
 func (s *TradeSlice) Append(t Trade) {
 	s.mu.Lock()
 	s.Trades = append(s.Trades, t)

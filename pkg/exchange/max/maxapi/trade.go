@@ -205,7 +205,7 @@ func (r *PrivateTradeRequest) Do(ctx context.Context) (trades []Trade, err error
 	}
 
 	if r.orderBy != nil {
-		payload["orderBy"] = r.orderBy
+		payload["order_by"] = r.orderBy
 	}
 
 	if r.pagination != nil {
