@@ -95,30 +95,8 @@ func (s *TradeService) QueryTradingVolume(startTime time.Time, options TradingVo
 }
 
 func generateSqliteTradingVolumeSQL(options TradingVolumeQueryOptions) string {
-	var sel []string
-	var groupBys []string
-	var orderBys []string
-	where := []string{"traded_at > :start_time"}
-
-	switch options.GroupByPeriod {
-	case "month":
-		sel = append(sel, "strftime('%Y',traded_at) AS year", "strftime('%m',traded_at) AS month")
-		groupBys = append([]string{"month", "year"}, groupBys...)
-		orderBys = append(orderBys, "year ASC", "month ASC")
-
-	case "year":
-		sel = append(sel, "strftime('%Y',traded_at) AS year")
-		groupBys = append([]string{"year"}, groupBys...)
-		orderBys = append(orderBys, "year ASC")
-
-	case "day":
-		fallthrough
-
-	default:
-		sel = append(sel, "strftime('%Y',traded_at) AS year", "strftime('%m',traded_at) AS month", "strftime('%d',traded_at) AS day")
-		groupBys = append([]string{"day", "month", "year"}, groupBys...)
-		orderBys = append(orderBys, "year ASC", "month ASC", "day ASC")
-	}
+	timeRangeColumn := "traded_at"
+	sel, groupBys, orderBys := generateSqlite3TimeRangeClauses(timeRangeColumn, options.GroupByPeriod)
 
 	switch options.SegmentBy {
 	case "symbol":
@@ -132,6 +110,7 @@ func generateSqliteTradingVolumeSQL(options TradingVolumeQueryOptions) string {
 	}
 
 	sel = append(sel, "SUM(quantity * price) AS quote_volume")
+	where := []string{timeRangeColumn + " > :start_time"}
 	sql := `SELECT ` + strings.Join(sel, ", ") + ` FROM trades` +
 		` WHERE ` + strings.Join(where, " AND ") +
 		` GROUP BY ` + strings.Join(groupBys, ", ") +
@@ -140,22 +119,39 @@ func generateSqliteTradingVolumeSQL(options TradingVolumeQueryOptions) string {
 	return sql
 }
 
-func generateMysqlTradingVolumeQuerySQL(options TradingVolumeQueryOptions) string {
-	var timeRangeColumn = "traded_at"
-	var sel []string
-	var groupBys []string
-	var orderBys []string
-	where := []string{"traded_at > :start_time"}
-
-	switch options.GroupByPeriod {
+func generateSqlite3TimeRangeClauses(timeRangeColumn, period string) (selectors []string, groupBys []string, orderBys []string) {
+	switch period {
 	case "month":
+		selectors = append(selectors, "strftime('%Y',"+timeRangeColumn+") AS year", "strftime('%m',"+timeRangeColumn+") AS month")
+		groupBys = append([]string{"month", "year"}, groupBys...)
+		orderBys = append(orderBys, "year ASC", "month ASC")
 
-		sel = append(sel, "YEAR("+timeRangeColumn+") AS year", "MONTH("+timeRangeColumn+") AS month")
+	case "year":
+		selectors = append(selectors, "strftime('%Y',"+timeRangeColumn+") AS year")
+		groupBys = append([]string{"year"}, groupBys...)
+		orderBys = append(orderBys, "year ASC")
+
+	case "day":
+		fallthrough
+
+	default:
+		selectors = append(selectors, "strftime('%Y',"+timeRangeColumn+") AS year", "strftime('%m',"+timeRangeColumn+") AS month", "strftime('%d',"+timeRangeColumn+") AS day")
+		groupBys = append([]string{"day", "month", "year"}, groupBys...)
+		orderBys = append(orderBys, "year ASC", "month ASC", "day ASC")
+	}
+
+	return
+}
+
+func generateMysqlTimeRangeClauses(timeRangeColumn, period string) (selectors []string, groupBys []string, orderBys []string) {
+	switch period {
+	case "month":
+		selectors = append(selectors, "YEAR("+timeRangeColumn+") AS year", "MONTH("+timeRangeColumn+") AS month")
 		groupBys = append([]string{"MONTH(" + timeRangeColumn + ")", "YEAR(" + timeRangeColumn + ")"}, groupBys...)
 		orderBys = append(orderBys, "year ASC", "month ASC")
 
 	case "year":
-		sel = append(sel, "YEAR("+timeRangeColumn+") AS year")
+		selectors = append(selectors, "YEAR("+timeRangeColumn+") AS year")
 		groupBys = append([]string{"YEAR(" + timeRangeColumn + ")"}, groupBys...)
 		orderBys = append(orderBys, "year ASC")
 
@@ -163,10 +159,17 @@ func generateMysqlTradingVolumeQuerySQL(options TradingVolumeQueryOptions) strin
 		fallthrough
 
 	default:
-		sel = append(sel, "YEAR("+timeRangeColumn+") AS year", "MONTH("+timeRangeColumn+") AS month", "DAY("+timeRangeColumn+") AS day")
-		groupBys = append([]string{"DAY("+timeRangeColumn+")", "MONTH("+timeRangeColumn+")", "YEAR("+timeRangeColumn+")"}, groupBys...)
+		selectors = append(selectors, "YEAR("+timeRangeColumn+") AS year", "MONTH("+timeRangeColumn+") AS month", "DAY("+timeRangeColumn+") AS day")
+		groupBys = append([]string{"DAY(" + timeRangeColumn + ")", "MONTH(" + timeRangeColumn + ")", "YEAR(" + timeRangeColumn + ")"}, groupBys...)
 		orderBys = append(orderBys, "year ASC", "month ASC", "day ASC")
 	}
+
+	return
+}
+
+func generateMysqlTradingVolumeQuerySQL(options TradingVolumeQueryOptions) string {
+	timeRangeColumn := "traded_at"
+	sel, groupBys, orderBys := generateMysqlTimeRangeClauses(timeRangeColumn, options.GroupByPeriod)
 
 	switch options.SegmentBy {
 	case "symbol":
@@ -180,6 +183,7 @@ func generateMysqlTradingVolumeQuerySQL(options TradingVolumeQueryOptions) strin
 	}
 
 	sel = append(sel, "SUM(quantity * price) AS quote_volume")
+	where := []string{timeRangeColumn + " > :start_time"}
 	sql := `SELECT ` + strings.Join(sel, ", ") + ` FROM trades` +
 		` WHERE ` + strings.Join(where, " AND ") +
 		` GROUP BY ` + strings.Join(groupBys, ", ") +
