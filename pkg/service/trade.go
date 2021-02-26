@@ -141,6 +141,7 @@ func generateSqliteTradingVolumeSQL(options TradingVolumeQueryOptions) string {
 }
 
 func generateMysqlTradingVolumeQuerySQL(options TradingVolumeQueryOptions) string {
+	var timeRangeColumn = "traded_at"
 	var sel []string
 	var groupBys []string
 	var orderBys []string
@@ -149,21 +150,21 @@ func generateMysqlTradingVolumeQuerySQL(options TradingVolumeQueryOptions) strin
 	switch options.GroupByPeriod {
 	case "month":
 
-		sel = append(sel, "YEAR(traded_at) AS year", "MONTH(traded_at) AS month")
-		groupBys = append([]string{"MONTH(traded_at)", "YEAR(traded_at)"}, groupBys...)
+		sel = append(sel, "YEAR("+timeRangeColumn+") AS year", "MONTH("+timeRangeColumn+") AS month")
+		groupBys = append([]string{"MONTH(" + timeRangeColumn + ")", "YEAR(" + timeRangeColumn + ")"}, groupBys...)
 		orderBys = append(orderBys, "year ASC", "month ASC")
 
 	case "year":
-		sel = append(sel, "YEAR(traded_at) AS year")
-		groupBys = append([]string{"YEAR(traded_at)"}, groupBys...)
+		sel = append(sel, "YEAR("+timeRangeColumn+") AS year")
+		groupBys = append([]string{"YEAR(" + timeRangeColumn + ")"}, groupBys...)
 		orderBys = append(orderBys, "year ASC")
 
 	case "day":
 		fallthrough
 
 	default:
-		sel = append(sel, "YEAR(traded_at) AS year", "MONTH(traded_at) AS month", "DAY(traded_at) AS day")
-		groupBys = append([]string{"DAY(traded_at)", "MONTH(traded_at)", "YEAR(traded_at)"}, groupBys...)
+		sel = append(sel, "YEAR("+timeRangeColumn+") AS year", "MONTH("+timeRangeColumn+") AS month", "DAY("+timeRangeColumn+") AS day")
+		groupBys = append([]string{"DAY("+timeRangeColumn+")", "MONTH("+timeRangeColumn+")", "YEAR("+timeRangeColumn+")"}, groupBys...)
 		orderBys = append(orderBys, "year ASC", "month ASC", "day ASC")
 	}
 
