@@ -40,14 +40,14 @@ func (s *WebsocketClientBase) Listen(ctx context.Context) {
 		case <-s.reconnectC:
 			time.Sleep(s.reconnectDuration)
 			if err := s.connect(ctx); err != nil {
-				s.reconnect()
+				s.Reconnect()
 			}
 		default:
 			conn := s.Conn()
 			mt, msg, err := conn.ReadMessage()
 
 			if err != nil {
-				s.reconnect()
+				s.Reconnect()
 				continue
 			}
 
@@ -68,7 +68,7 @@ func (s *WebsocketClientBase) Connect(ctx context.Context) error {
 	return nil
 }
 
-func (s *WebsocketClientBase) reconnect() {
+func (s *WebsocketClientBase) Reconnect() {
 	select {
 	case s.reconnectC <- struct{}{}:
 	default:
