@@ -29,6 +29,7 @@ func TestExpScale(t *testing.T) {
 }
 
 func TestLogScale(t *testing.T) {
+	// see https://www.desmos.com/calculator/q1ufxx5gry
 	scale := LogScale{
 		Domain: [2]float64{1000, 2000},
 		Range:  [2]float64{0.001, 0.01},
