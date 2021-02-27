@@ -112,3 +112,11 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) error {
 	panic("implement me")
 }
+
+func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticker, error) {
+	panic("implement me")
+}
+
+func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[string]types.Ticker, error) {
+	panic("implement me")
+}
