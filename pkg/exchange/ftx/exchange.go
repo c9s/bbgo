@@ -7,6 +7,8 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -16,8 +18,11 @@ const (
 	defaultHTTPTimeout = 15 * time.Second
 )
 
+var logger = logrus.WithField("exchange", "ftx")
+
 type Exchange struct {
-	rest *restRequest
+	rest        *restRequest
+	key, secret string
 }
 
 func NewExchange(key, secret string, subAccount string) *Exchange {
@@ -30,7 +35,9 @@ func NewExchange(key, secret string, subAccount string) *Exchange {
 		rest.SubAccount(subAccount)
 	}
 	return &Exchange{
-		rest: rest,
+		rest:   rest,
+		key:    key,
+		secret: secret,
 	}
 }
 
@@ -43,7 +50,7 @@ func (e *Exchange) PlatformFeeCurrency() string {
 }
 
 func (e *Exchange) NewStream() types.Stream {
-	panic("implement me")
+	return NewStream(e.key, e.secret)
 }
 
 func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
