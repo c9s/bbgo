@@ -43,6 +43,12 @@ func (s *ExpScale) FormulaOf(x float64) string {
 }
 
 func (s *ExpScale) Call(x float64) (y float64) {
+	if x < s.Domain[0] {
+		x = s.Domain[0]
+	} else if x > s.Domain[1] {
+		x = s.Domain[1]
+	}
+
 	y = s.a * math.Pow(s.b, x-s.h)
 	return y
 }
@@ -57,6 +63,12 @@ type LogScale struct {
 }
 
 func (s *LogScale) Call(x float64) (y float64) {
+	if x < s.Domain[0] {
+		x = s.Domain[0]
+	} else if x > s.Domain[1] {
+		x = s.Domain[1]
+	}
+
 	// y = a * log(x - h) + s
 	y = s.a*math.Log(x-s.h) + s.s
 	return y
@@ -92,6 +104,55 @@ func (s *LogScale) Solve() error {
 	return nil
 }
 
+type LinearScale struct {
+	Domain [2]float64 `json:"domain"`
+	Range  [2]float64 `json:"range"`
+
+	a, b float64
+}
+
+func (s *LinearScale) Solve() error {
+	xs := s.Domain
+	ys := s.Range
+	// y1 = a * x1 + b
+	// y2 = a * x2 + b
+	// y2 - y1 = (a * x2 + b) - (a * x1 + b)
+	// y2 - y1 = (a * x2) - (a * x1)
+	// y2 - y1 = a * (x2 - x1)
+
+	// a = (y2 - y1) / (x2 - x1)
+	// b = y1 - (a * x1)
+	s.a = (ys[1] - ys[0]) / (xs[1] - xs[0])
+	s.b = ys[0] - (s.a * xs[0])
+	return nil
+}
+
+func (s *LinearScale) Call(x float64) (y float64) {
+	if x < s.Domain[0] {
+		x = s.Domain[0]
+	} else if x > s.Domain[1] {
+		x = s.Domain[1]
+	}
+
+	y = s.a * x + s.b
+	return y
+}
+
+func (s *LinearScale) String() string {
+	return s.Formula()
+}
+
+func (s *LinearScale) Formula() string {
+	return fmt.Sprintf("f(x) = %f * x + %f", s.a, s.b)
+}
+
+func (s *LinearScale) FormulaOf(x float64) string {
+	return fmt.Sprintf("f(%f) = %f * %f + %f", x, s.a, x, s.b)
+}
+
+
+
+// see also: http://www.vb-helper.com/howto_find_quadratic_curve.html
 type QuadraticScale struct {
 	Domain [3]float64 `json:"domain"`
 	Range  [3]float64 `json:"range"`
@@ -111,6 +172,12 @@ func (s *QuadraticScale) Solve() error {
 }
 
 func (s *QuadraticScale) Call(x float64) (y float64) {
+	if x < s.Domain[0] {
+		x = s.Domain[0]
+	} else if x > s.Domain[2] {
+		x = s.Domain[2]
+	}
+
 	// y = a * log(x - h) + s
 	y = s.a * math.Pow(x, 2) + s.b * x + s.c
 	return y
