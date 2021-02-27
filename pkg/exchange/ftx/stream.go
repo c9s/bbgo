@@ -22,6 +22,10 @@ func NewStream(key, secret string) *Stream {
 		StandardStream: types.StandardStream{},
 		wsService:      wss,
 	}
+
+	wss.OnMessage(func(message []byte) {
+		logger.Infof("=> message: %+v", string(message))
+	})
 	return s
 }
 
@@ -37,8 +41,10 @@ func (s *Stream) Close() error {
 	return s.wsService.Close()
 }
 
-func (s *Stream) Subscribe(channel types.Channel, symbol string, options types.SubscribeOptions) {
-	panic("implement me")
+func (s *Stream) Subscribe(channel types.Channel, symbol string, _ types.SubscribeOptions) {
+	if err := s.wsService.Subscribe(channel, symbol); err != nil {
+		logger.WithError(err).Errorf("subscribe failed, should never happen")
+	}
 }
 
 func (s *Stream) OnTradeUpdate(cb func(trade types.Trade)) {
