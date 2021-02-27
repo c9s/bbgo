@@ -45,3 +45,21 @@ func TestLogScale(t *testing.T) {
 		t.Logf("%s = %f", scale.FormulaOf(float64(x)), y)
 	}
 }
+
+func TestQuadraticScale(t *testing.T) {
+	scale := QuadraticScale{
+		Domain: [3]float64{0, 100, 200},
+		Range:  [3]float64{1, 20, 50},
+	}
+
+	err := scale.Solve()
+	assert.NoError(t, err)
+	assert.Equal(t, "f(x) = 0.000550 * x ^ 2 + 0.135000 * x + 1.000000", scale.String())
+	assert.Equal(t, fixedpoint.NewFromFloat(1), fixedpoint.NewFromFloat(scale.Call(0)))
+	assert.Equal(t, fixedpoint.NewFromFloat(20), fixedpoint.NewFromFloat(scale.Call(100.0)))
+	assert.Equal(t, fixedpoint.NewFromFloat(50.0), fixedpoint.NewFromFloat(scale.Call(200.0)))
+	for x := 0; x <= 200; x += 1 {
+		y := scale.Call(float64(x))
+		t.Logf("%s = %f", scale.FormulaOf(float64(x)), y)
+	}
+}
