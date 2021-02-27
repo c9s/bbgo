@@ -47,6 +47,7 @@ func TestLogScale(t *testing.T) {
 }
 
 func TestQuadraticScale(t *testing.T) {
+	// see https://www.desmos.com/calculator/vfqntrxzpr
 	scale := QuadraticScale{
 		Domain: [3]float64{0, 100, 200},
 		Range:  [3]float64{1, 20, 50},
