@@ -18,7 +18,7 @@ const (
 	defaultHTTPTimeout = 15 * time.Second
 )
 
-var Logger = logrus.WithField("exchange", "ftx")
+var logger = logrus.WithField("exchange", "ftx")
 
 type Exchange struct {
 	rest        *restRequest
