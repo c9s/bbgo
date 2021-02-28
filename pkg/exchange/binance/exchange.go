@@ -170,17 +170,27 @@ func (e *Exchange) NewStream() types.Stream {
 	return stream
 }
 
-func (e *Exchange) QueryMarginAccount(ctx context.Context) (*binance.MarginAccount, error) {
-	return e.Client.NewGetMarginAccountService().Do(ctx)
+func (e *Exchange) QueryMarginAccount(ctx context.Context) (*types.MarginAccount, error) {
+	account, err := e.Client.NewGetMarginAccountService().Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return toGlobalMarginAccount(account), nil
 }
 
-func (e *Exchange) QueryIsolatedMarginAccount(ctx context.Context, symbols ...string) (*binance.IsolatedMarginAccount, error) {
+func (e *Exchange) QueryIsolatedMarginAccount(ctx context.Context, symbols ...string) (*types.IsolatedMarginAccount, error) {
 	req := e.Client.NewGetIsolatedMarginAccountService()
 	if len(symbols) > 0 {
 		req.Symbols(symbols...)
 	}
 
-	return req.Do(ctx)
+	account, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return toGlobalIsolatedMarginAccount(account), nil
 }
 
 func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (allWithdraws []types.Withdraw, err error) {
