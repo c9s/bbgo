@@ -40,11 +40,11 @@ func (t *MarginOrderSideEffectType) UnmarshalJSON(data []byte) error {
 		*t = SideEffectTypeNoSideEffect
 		return nil
 
-	case string(SideEffectTypeMarginBuy):
+	case string(SideEffectTypeMarginBuy), "borrow", "marginBuy":
 		*t = SideEffectTypeMarginBuy
 		return nil
 
-	case string(SideEffectTypeAutoRepay):
+	case string(SideEffectTypeAutoRepay), "repay", "autoRepay":
 		*t = SideEffectTypeAutoRepay
 		return nil
 
