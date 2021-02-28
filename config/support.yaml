@@ -60,6 +60,7 @@ exchangeStrategies:
     symbol: LINKUSDT
     interval: 1m
     minVolume: 1_000
+    marginOrderSideEffect: borrow
     scaleQuantity:
       byVolume:
         exp:
