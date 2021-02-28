@@ -46,10 +46,15 @@ exchangeStrategies:
 - on: max
   grid:
     symbol: BTCUSDT
-    quantity: 0.001
+    # quantity: 0.001
+    scaleQuantity:
+      byPrice:
+        exp:
+          domain: [20_000, 30_000]
+          range: [0.2, 0.001]
     gridNumber: 30
     profitSpread: 50.0
-    upperPrice: 26800.0
-    lowerPrice: 26500.0
+    upperPrice: 20_000.0
+    lowerPrice: 30_000.0
     long: true
 
