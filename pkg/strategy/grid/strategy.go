@@ -56,8 +56,8 @@ type Strategy struct {
 	LowerPrice fixedpoint.Value `json:"lowerPrice" yaml:"lowerPrice"`
 
 	// Quantity is the quantity you want to submit for each order.
-	Quantity      fixedpoint.Value    `json:"quantity,omitempty"`
-	ScaleQuantity *bbgo.ScaleQuantity `json:"scaleQuantity,omitempty"`
+	Quantity      fixedpoint.Value       `json:"quantity,omitempty"`
+	ScaleQuantity *bbgo.PriceVolumeScale `json:"scaleQuantity,omitempty"`
 
 	// FixedAmount is used for fixed amount (dynamic quantity) if you don't want to use fixed quantity.
 	FixedAmount fixedpoint.Value `json:"amount,omitempty" yaml:"amount"`
