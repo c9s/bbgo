@@ -62,6 +62,34 @@ func toGlobalIsolatedMarginAccount(account *binance.IsolatedMarginAccount) *type
 	}
 }
 
+func toGlobalMarginUserAssets(userAssets []binance.UserAsset) (retAssets []types.MarginUserAsset) {
+	for _, asset := range userAssets {
+		retAssets = append(retAssets, types.MarginUserAsset{
+			Asset:    asset.Asset,
+			Borrowed: fixedpoint.MustNewFromString(asset.Borrowed),
+			Free:     fixedpoint.MustNewFromString(asset.Free),
+			Interest: fixedpoint.MustNewFromString(asset.Interest),
+			Locked:   fixedpoint.MustNewFromString(asset.Locked),
+			NetAsset: fixedpoint.MustNewFromString(asset.NetAsset),
+		})
+	}
+
+	return retAssets
+}
+
+func toGlobalMarginAccount(account *binance.MarginAccount) *types.MarginAccount {
+	return &types.MarginAccount{
+		BorrowEnabled:       account.BorrowEnabled,
+		MarginLevel:         fixedpoint.MustNewFromString(account.MarginLevel),
+		TotalAssetOfBTC:     fixedpoint.MustNewFromString(account.TotalAssetOfBTC),
+		TotalLiabilityOfBTC: fixedpoint.MustNewFromString(account.TotalLiabilityOfBTC),
+		TotalNetAssetOfBTC:  fixedpoint.MustNewFromString(account.TotalNetAssetOfBTC),
+		TradeEnabled:        account.TradeEnabled,
+		TransferEnabled:     account.TransferEnabled,
+		UserAssets:          toGlobalMarginUserAssets(account.UserAssets),
+	}
+}
+
 func toGlobalTicker(stats *binance.PriceChangeStats) types.Ticker {
 	return types.Ticker{
 		Volume: util.MustParseFloat(stats.Volume),

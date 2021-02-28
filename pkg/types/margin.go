@@ -29,6 +29,28 @@ func (e *MarginSettings) UseIsolatedMargin(symbol string) {
 	e.IsolatedMarginSymbol = symbol
 }
 
+// MarginAccount is for the cross margin account
+type MarginAccount struct {
+	BorrowEnabled       bool              `json:"borrowEnabled"`
+	MarginLevel         fixedpoint.Value  `json:"marginLevel"`
+	TotalAssetOfBTC     fixedpoint.Value  `json:"totalAssetOfBtc"`
+	TotalLiabilityOfBTC fixedpoint.Value  `json:"totalLiabilityOfBtc"`
+	TotalNetAssetOfBTC  fixedpoint.Value  `json:"totalNetAssetOfBtc"`
+	TradeEnabled        bool              `json:"tradeEnabled"`
+	TransferEnabled     bool              `json:"transferEnabled"`
+	UserAssets          []MarginUserAsset `json:"userAssets"./examples/binance-margin`
+}
+
+// MarginUserAsset define user assets of margin account
+type MarginUserAsset struct {
+	Asset    string           `json:"asset"`
+	Borrowed fixedpoint.Value `json:"borrowed"`
+	Free     fixedpoint.Value `json:"free"`
+	Interest fixedpoint.Value `json:"interest"`
+	Locked   fixedpoint.Value `json:"locked"`
+	NetAsset fixedpoint.Value `json:"netAsset"`
+}
+
 // IsolatedMarginAccount defines isolated user assets of margin account
 type IsolatedMarginAccount struct {
 	TotalAssetOfBTC     fixedpoint.Value      `json:"totalAssetOfBtc"`
