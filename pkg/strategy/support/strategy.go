@@ -36,6 +36,8 @@ type Strategy struct {
 	MinVolume             fixedpoint.Value                `json:"minVolume"`
 	MarginOrderSideEffect types.MarginOrderSideEffectType `json:"marginOrderSideEffect"`
 	Targets               []Target                        `json:"targets"`
+
+	ScaleQuantity *bbgo.PriceVolumeScale `json:"scaleQuantity"`
 }
 
 func (s *Strategy) ID() string {
@@ -56,8 +58,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.MovingAverageWindow = 99
 	}
 
-	if s.Quantity == 0 {
-		return fmt.Errorf("quantity can not be zero")
+	if s.Quantity == 0 && s.ScaleQuantity == nil {
+		return fmt.Errorf("quantity or scaleQuantity can not be zero")
 	}
 
 	if s.MinVolume == 0 {
@@ -95,7 +97,17 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		s.Notify("found support: close price %f is under EMA %f, volume %f > minimum volume %f", closePrice, ema.Last(), kline.Volume, s.MinVolume.Float64())
 
-		quantity := s.Quantity.Float64()
+		var quantity float64
+		if s.Quantity > 0 {
+			quantity = s.Quantity.Float64()
+		} else if s.ScaleQuantity != nil {
+			var err error
+			quantity, err = s.ScaleQuantity.Scale(closePrice, kline.Volume)
+			if err != nil {
+				log.WithError(err).Error(err.Error())
+				return
+			}
+		}
 
 		orderForm := types.SubmitOrder{
 			Symbol:           s.Symbol,
