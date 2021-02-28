@@ -170,13 +170,13 @@ func (e *Exchange) NewStream() types.Stream {
 	return stream
 }
 
-func (e *Exchange) QueryMarginAccount(ctx context.Context) (*binance.MarginAccount, error) {
+func (e *Exchange) QueryMarginAccount(ctx context.Context) (*types.MarginAccount, error) {
 	account, err := e.Client.NewGetMarginAccountService().Do(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	return account, nil
+	return toGlobalMarginAccount(account), nil
 }
 
 func (e *Exchange) QueryIsolatedMarginAccount(ctx context.Context, symbols ...string) (*types.IsolatedMarginAccount, error) {
