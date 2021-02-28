@@ -56,7 +56,8 @@ type Strategy struct {
 	LowerPrice fixedpoint.Value `json:"lowerPrice" yaml:"lowerPrice"`
 
 	// Quantity is the quantity you want to submit for each order.
-	Quantity fixedpoint.Value `json:"quantity,omitempty"`
+	Quantity      fixedpoint.Value    `json:"quantity,omitempty"`
+	ScaleQuantity *bbgo.ScaleQuantity `json:"scaleQuantity,omitempty"`
 
 	// FixedAmount is used for fixed amount (dynamic quantity) if you don't want to use fixed quantity.
 	FixedAmount fixedpoint.Value `json:"amount,omitempty" yaml:"amount"`
@@ -120,14 +121,24 @@ func (s *Strategy) generateGridSellOrders(session *bbgo.ExchangeSession) ([]type
 
 	var orders []types.SubmitOrder
 	for price := startPrice; s.LowerPrice <= price && price <= s.UpperPrice; price += gridSpread {
-		quantity := s.Quantity
-		if s.FixedAmount > 0 {
+		var quantity fixedpoint.Value
+		if s.Quantity > 0 {
+			quantity = s.Quantity
+		} else if s.ScaleQuantity != nil {
+			qf, err := s.ScaleQuantity.Scale(price.Float64(), 0)
+			if err != nil {
+				return nil, err
+			}
+			quantity = fixedpoint.NewFromFloat(qf)
+		} else if s.FixedAmount > 0 {
 			quantity = s.FixedAmount.Div(price)
 		}
 
 		// quoteQuantity := price.Mul(quantity)
 		if baseBalance.Available < quantity {
-			return orders, fmt.Errorf("base balance %f is not enough, stop generating orders", baseBalance.Available.Float64())
+			return orders, fmt.Errorf("base balance %s %f is not enough, stop generating sell orders",
+				baseBalance.Currency,
+				baseBalance.Available.Float64())
 		}
 
 		orders = append(orders, types.SubmitOrder{
@@ -185,14 +196,23 @@ func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types
 
 	var orders []types.SubmitOrder
 	for price := startPrice; s.LowerPrice <= price && price <= s.UpperPrice; price -= gridSpread {
-		quantity := s.Quantity
-		if s.FixedAmount > 0 {
+		var quantity fixedpoint.Value
+		if s.Quantity > 0 {
+			quantity = s.Quantity
+		} else if s.ScaleQuantity != nil {
+			qf, err := s.ScaleQuantity.Scale(price.Float64(), 0)
+			if err != nil {
+				return nil, err
+			}
+			quantity = fixedpoint.NewFromFloat(qf)
+		} else if s.FixedAmount > 0 {
 			quantity = s.FixedAmount.Div(price)
 		}
 
 		quoteQuantity := price.Mul(quantity)
 		if balance.Available < quoteQuantity {
-			return orders, fmt.Errorf("quote balance %f is not enough for %f, stop generating orders",
+			return orders, fmt.Errorf("quote balance %s %f is not enough for %f, stop generating buy orders",
+				balance.Currency,
 				balance.Available.Float64(),
 				quoteQuantity.Float64())
 		}
@@ -323,7 +343,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	}
 
 	log.Infof("position: %+v", position)
-
 
 	instanceID := fmt.Sprintf("grid-%s-%d", s.Symbol, s.GridNum)
 	s.groupID = generateGroupID(instanceID)
