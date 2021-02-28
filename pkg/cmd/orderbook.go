@@ -29,6 +29,9 @@ var orderbookCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("can't get the symbol from flags: %w", err)
 		}
+		if symbol == "" {
+			return fmt.Errorf("symbol is not found")
+		}
 
 		s := ex.NewStream()
 		s.Subscribe(types.BookChannel, symbol, types.SubscribeOptions{})
