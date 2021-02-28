@@ -27,5 +27,6 @@ func (h messageHandler) handleMessage(message []byte) {
 
 // {"type": "subscribed", "channel": "orderbook", "market": "BTC/USDT"}
 func (h messageHandler) handleSubscribedMessage(response rawResponse) {
-	logger.Infof("%s orderbook is subscribed", response.toSubscribedResp().Market)
+	r := response.toSubscribedResp()
+	logger.Infof("%s %s is subscribed", r.Market, r.Channel)
 }
