@@ -8,7 +8,7 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
-func TestExpScale(t *testing.T) {
+func TestExponentialScale(t *testing.T) {
 	// graph see: https://www.desmos.com/calculator/ip0ijbcbbf
 	scale := ExponentialScale{
 		Domain: [2]float64{1000, 2000},
@@ -21,6 +21,25 @@ func TestExpScale(t *testing.T) {
 	assert.Equal(t, "f(x) = 0.001000 * 1.002305 ^ (x - 1000.000000)", scale.String())
 	assert.Equal(t, fixedpoint.NewFromFloat(0.001), fixedpoint.NewFromFloat(scale.Call(1000.0)))
 	assert.Equal(t, fixedpoint.NewFromFloat(0.01), fixedpoint.NewFromFloat(scale.Call(2000.0)))
+
+	for x := 1000; x <= 2000; x += 100 {
+		y := scale.Call(float64(x))
+		t.Logf("%s = %f", scale.FormulaOf(float64(x)), y)
+	}
+}
+
+func TestExponentialScale_Reverse(t *testing.T) {
+	scale := ExponentialScale{
+		Domain: [2]float64{1000, 2000},
+		Range:  [2]float64{0.1, 0.001},
+	}
+
+	err := scale.Solve()
+	assert.NoError(t, err)
+
+	assert.Equal(t, "f(x) = 0.100000 * 0.995405 ^ (x - 1000.000000)", scale.String())
+	assert.Equal(t, fixedpoint.NewFromFloat(0.1), fixedpoint.NewFromFloat(scale.Call(1000.0)))
+	assert.Equal(t, fixedpoint.NewFromFloat(0.001), fixedpoint.NewFromFloat(scale.Call(2000.0)))
 
 	for x := 1000; x <= 2000; x += 100 {
 		y := scale.Call(float64(x))
@@ -62,7 +81,6 @@ func TestLinearScale(t *testing.T) {
 		t.Logf("%s = %f", scale.FormulaOf(float64(x)), y)
 	}
 }
-
 
 func TestQuadraticScale(t *testing.T) {
 	// see https://www.desmos.com/calculator/vfqntrxzpr
