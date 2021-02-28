@@ -506,6 +506,10 @@ func (environ *Environment) setSyncing(status SyncStatus) {
 
 // Sync syncs all registered exchange sessions
 func (environ *Environment) Sync(ctx context.Context) error {
+	if environ.SyncService == nil {
+		return nil
+	}
+
 	environ.syncMutex.Lock()
 	defer environ.syncMutex.Unlock()
 
