@@ -37,7 +37,7 @@ type Strategy struct {
 	MarginOrderSideEffect types.MarginOrderSideEffectType `json:"marginOrderSideEffect"`
 	Targets               []Target                        `json:"targets"`
 
-	ScaleQuantity *bbgo.ScaleQuantity `json:"scaleQuantity"`
+	ScaleQuantity *bbgo.PriceVolumeScale `json:"scaleQuantity"`
 }
 
 func (s *Strategy) ID() string {
