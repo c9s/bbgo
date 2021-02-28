@@ -165,6 +165,14 @@ func NewFromString(input string) (Value, error) {
 	return NewFromFloat(v), nil
 }
 
+func MustNewFromString(input string) Value {
+	v, err := NewFromString(input)
+	if err != nil {
+		panic(fmt.Errorf("can not parse %s into fixedpoint, error: %s", input, err.Error()))
+	}
+	return v
+}
+
 func NewFromFloat(val float64) Value {
 	return Value(int64(math.Round(val * DefaultPow)))
 }
