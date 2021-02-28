@@ -9,9 +9,58 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/c9s/bbgo/pkg/datatype"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 )
+
+func toGlobalIsolatedUserAsset(userAsset binance.IsolatedUserAsset) types.IsolatedUserAsset {
+	return types.IsolatedUserAsset{
+		Asset:         userAsset.Asset,
+		Borrowed:      fixedpoint.MustNewFromString(userAsset.Borrowed),
+		Free:          fixedpoint.MustNewFromString(userAsset.Free),
+		Interest:      fixedpoint.MustNewFromString(userAsset.Interest),
+		Locked:        fixedpoint.MustNewFromString(userAsset.Locked),
+		NetAsset:      fixedpoint.MustNewFromString(userAsset.NetAsset),
+		NetAssetOfBtc: fixedpoint.MustNewFromString(userAsset.NetAssetOfBtc),
+		BorrowEnabled: userAsset.BorrowEnabled,
+		RepayEnabled:  userAsset.RepayEnabled,
+		TotalAsset:    fixedpoint.MustNewFromString(userAsset.TotalAsset),
+	}
+}
+
+func toGlobalIsolatedMarginAsset(asset binance.IsolatedMarginAsset) types.IsolatedMarginAsset {
+	return types.IsolatedMarginAsset{
+		Symbol:            asset.Symbol,
+		QuoteAsset:        toGlobalIsolatedUserAsset(asset.QuoteAsset),
+		BaseAsset:         toGlobalIsolatedUserAsset(asset.BaseAsset),
+		IsolatedCreated:   asset.IsolatedCreated,
+		MarginLevel:       fixedpoint.MustNewFromString(asset.MarginLevel),
+		MarginLevelStatus: asset.MarginLevelStatus,
+		MarginRatio:       fixedpoint.MustNewFromString(asset.MarginRatio),
+		IndexPrice:        fixedpoint.MustNewFromString(asset.IndexPrice),
+		LiquidatePrice:    fixedpoint.MustNewFromString(asset.LiquidatePrice),
+		LiquidateRate:     fixedpoint.MustNewFromString(asset.LiquidateRate),
+		TradeEnabled:      false,
+	}
+}
+
+func toGlobalIsolatedMarginAssets(assets []binance.IsolatedMarginAsset) (retAssets []types.IsolatedMarginAsset) {
+	for _, asset := range assets {
+		retAssets = append(retAssets, toGlobalIsolatedMarginAsset(asset))
+	}
+
+	return retAssets
+}
+
+func toGlobalIsolatedMarginAccount(account *binance.IsolatedMarginAccount) *types.IsolatedMarginAccount {
+	return &types.IsolatedMarginAccount{
+		TotalAssetOfBTC:     fixedpoint.MustNewFromString(account.TotalNetAssetOfBTC),
+		TotalLiabilityOfBTC: fixedpoint.MustNewFromString(account.TotalLiabilityOfBTC),
+		TotalNetAssetOfBTC:  fixedpoint.MustNewFromString(account.TotalNetAssetOfBTC),
+		Assets:              toGlobalIsolatedMarginAssets(account.Assets),
+	}
+}
 
 func toGlobalTicker(stats *binance.PriceChangeStats) types.Ticker {
 	return types.Ticker{

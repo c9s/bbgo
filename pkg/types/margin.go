@@ -1,5 +1,7 @@
 package types
 
+import "github.com/c9s/bbgo/pkg/fixedpoint"
+
 type MarginExchange interface {
 	UseMargin()
 	UseIsolatedMargin(symbol string)
@@ -25,4 +27,45 @@ func (e *MarginSettings) UseIsolatedMargin(symbol string) {
 	e.IsMargin = true
 	e.IsIsolatedMargin = true
 	e.IsolatedMarginSymbol = symbol
+}
+
+// IsolatedMarginAccount defines isolated user assets of margin account
+type IsolatedMarginAccount struct {
+	TotalAssetOfBTC     fixedpoint.Value      `json:"totalAssetOfBtc"`
+	TotalLiabilityOfBTC fixedpoint.Value      `json:"totalLiabilityOfBtc"`
+	TotalNetAssetOfBTC  fixedpoint.Value      `json:"totalNetAssetOfBtc"`
+	Assets              []IsolatedMarginAsset `json:"assets"`
+}
+
+// IsolatedMarginAsset defines isolated margin asset information, like margin level, liquidation price... etc
+type IsolatedMarginAsset struct {
+	Symbol     string            `json:"symbol"`
+	QuoteAsset IsolatedUserAsset `json:"quoteAsset"`
+	BaseAsset  IsolatedUserAsset `json:"baseAsset"`
+
+	IsolatedCreated   bool             `json:"isolatedCreated"`
+	MarginLevel       fixedpoint.Value `json:"marginLevel"`
+	MarginLevelStatus string           `json:"marginLevelStatus"`
+
+	MarginRatio    fixedpoint.Value `json:"marginRatio"`
+	IndexPrice     fixedpoint.Value `json:"indexPrice"`
+	LiquidatePrice fixedpoint.Value `json:"liquidatePrice"`
+	LiquidateRate  fixedpoint.Value `json:"liquidateRate"`
+
+	TradeEnabled bool `json:"tradeEnabled"`
+}
+
+// IsolatedUserAsset defines isolated user assets of the margin account
+type IsolatedUserAsset struct {
+	Asset         string           `json:"asset"`
+	Borrowed      fixedpoint.Value `json:"borrowed"`
+	Free          fixedpoint.Value `json:"free"`
+	Interest      fixedpoint.Value `json:"interest"`
+	Locked        fixedpoint.Value `json:"locked"`
+	NetAsset      fixedpoint.Value `json:"netAsset"`
+	NetAssetOfBtc fixedpoint.Value `json:"netAssetOfBtc"`
+
+	BorrowEnabled bool             `json:"borrowEnabled"`
+	RepayEnabled  bool             `json:"repayEnabled"`
+	TotalAsset    fixedpoint.Value `json:"totalAsset"`
 }
