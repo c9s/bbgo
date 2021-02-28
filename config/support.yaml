@@ -59,8 +59,12 @@ exchangeStrategies:
   support:
     symbol: LINKUSDT
     interval: 1m
-    minVolume: 200000
-    quantity: 2.0
+    minVolume: 1_000
+    scaleQuantity:
+      byVolume:
+        exp:
+          domain: [ 1_000, 200_000 ]
+          range: [ 0.5, 1.0 ]
     targets:
     - profitPercentage: 0.02
       quantityPercentage: 0.5

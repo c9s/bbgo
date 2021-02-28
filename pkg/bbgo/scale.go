@@ -3,7 +3,23 @@ package bbgo
 import (
 	"fmt"
 	"math"
+
+	"github.com/pkg/errors"
 )
+
+type Scale interface {
+	Solve() error
+	Formula() string
+	FormulaOf(x float64) string
+	Call(x float64) (y float64)
+}
+
+func init() {
+	_ = Scale(&ExponentialScale{})
+	_ = Scale(&LogarithmicScale{})
+	_ = Scale(&LinearScale{})
+	_ = Scale(&QuadraticScale{})
+}
 
 // y := ab^x
 // shift xs[0] to 0 (x - h)
@@ -14,7 +30,7 @@ import (
 // y2/y1 = b^(x2-h)
 //
 // also posted at https://play.golang.org/p/JlWlwZjoebE
-type ExpScale struct {
+type ExponentialScale struct {
 	Domain [2]float64 `json:"domain"`
 	Range  [2]float64 `json:"range"`
 
@@ -23,26 +39,26 @@ type ExpScale struct {
 	h float64
 }
 
-func (s *ExpScale) Solve() error {
+func (s *ExponentialScale) Solve() error {
 	s.h = s.Domain[0]
 	s.a = s.Range[0]
 	s.b = math.Pow(s.Range[1]/s.Range[0], 1/(s.Domain[1]-s.h))
 	return nil
 }
 
-func (s *ExpScale) String() string {
+func (s *ExponentialScale) String() string {
 	return s.Formula()
 }
 
-func (s *ExpScale) Formula() string {
+func (s *ExponentialScale) Formula() string {
 	return fmt.Sprintf("f(x) = %f * %f ^ (x - %f)", s.a, s.b, s.h)
 }
 
-func (s *ExpScale) FormulaOf(x float64) string {
+func (s *ExponentialScale) FormulaOf(x float64) string {
 	return fmt.Sprintf("f(%f) = %f * %f ^ (%f - %f)", x, s.a, s.b, x, s.h)
 }
 
-func (s *ExpScale) Call(x float64) (y float64) {
+func (s *ExponentialScale) Call(x float64) (y float64) {
 	if x < s.Domain[0] {
 		x = s.Domain[0]
 	} else if x > s.Domain[1] {
@@ -53,7 +69,7 @@ func (s *ExpScale) Call(x float64) (y float64) {
 	return y
 }
 
-type LogScale struct {
+type LogarithmicScale struct {
 	Domain [2]float64 `json:"domain"`
 	Range  [2]float64 `json:"range"`
 
@@ -62,7 +78,7 @@ type LogScale struct {
 	a float64
 }
 
-func (s *LogScale) Call(x float64) (y float64) {
+func (s *LogarithmicScale) Call(x float64) (y float64) {
 	if x < s.Domain[0] {
 		x = s.Domain[0]
 	} else if x > s.Domain[1] {
@@ -74,19 +90,19 @@ func (s *LogScale) Call(x float64) (y float64) {
 	return y
 }
 
-func (s *LogScale) String() string {
+func (s *LogarithmicScale) String() string {
 	return s.Formula()
 }
 
-func (s *LogScale) Formula() string {
+func (s *LogarithmicScale) Formula() string {
 	return fmt.Sprintf("f(x) = %f * log(x - %f) + %f", s.a, s.h, s.s)
 }
 
-func (s *LogScale) FormulaOf(x float64) string {
+func (s *LogarithmicScale) FormulaOf(x float64) string {
 	return fmt.Sprintf("f(%f) = %f * log(%f - %f) + %f", x, s.a, x, s.h, s.s)
 }
 
-func (s *LogScale) Solve() error {
+func (s *LogarithmicScale) Solve() error {
 	// f(x) = a * log2(x - h) + s
 	//
 	// log2(1) = 0
@@ -134,7 +150,7 @@ func (s *LinearScale) Call(x float64) (y float64) {
 		x = s.Domain[1]
 	}
 
-	y = s.a * x + s.b
+	y = s.a*x + s.b
 	return y
 }
 
@@ -149,8 +165,6 @@ func (s *LinearScale) Formula() string {
 func (s *LinearScale) FormulaOf(x float64) string {
 	return fmt.Sprintf("f(%f) = %f * %f + %f", x, s.a, x, s.b)
 }
-
-
 
 // see also: http://www.vb-helper.com/howto_find_quadratic_curve.html
 type QuadraticScale struct {
@@ -179,7 +193,7 @@ func (s *QuadraticScale) Call(x float64) (y float64) {
 	}
 
 	// y = a * log(x - h) + s
-	y = s.a * math.Pow(x, 2) + s.b * x + s.c
+	y = s.a*math.Pow(x, 2) + s.b*x + s.c
 	return y
 }
 
@@ -193,4 +207,101 @@ func (s *QuadraticScale) Formula() string {
 
 func (s *QuadraticScale) FormulaOf(x float64) string {
 	return fmt.Sprintf("f(%f) = %f * %f ^ 2 + %f * %f + %f", x, s.a, x, s.b, x, s.c)
+}
+
+type SlideRule struct {
+	// Scale type could be one of "log", "exp", "linear", "quadratic"
+	// this is similar to the d3.scale
+	LinearScale    *LinearScale      `json:"linear"`
+	LogScale       *LogarithmicScale `json:"log"`
+	ExpScale       *ExponentialScale `json:"exp"`
+	QuadraticScale *QuadraticScale   `json:"quadratic"`
+}
+
+func (rule *SlideRule) Scale() (Scale, error) {
+	if rule.LogScale != nil {
+		return rule.LogScale, nil
+	}
+
+	if rule.ExpScale != nil {
+		return rule.ExpScale, nil
+	}
+
+	if rule.LinearScale != nil {
+		return rule.LinearScale, nil
+	}
+
+	if rule.QuadraticScale != nil {
+		return rule.QuadraticScale, nil
+	}
+
+	return nil, errors.New("no any scale is defined")
+}
+
+// ScaleQuantity defines the scale DSL for strategy, e.g.,
+//
+// scaleQuantity:
+//   byPrice:
+//     exp:
+//       domain: [10_000, 50_000]
+//       range: [0.01, 1.0]
+//
+// and
+//
+// scaleQuantity:
+//   byVolume:
+//     linear:
+//       domain: [10_000, 50_000]
+//       range: [0.01, 1.0]
+type ScaleQuantity struct {
+	ByPrice  *SlideRule `json:"byPrice"`
+	ByVolume *SlideRule `json:"byVolume"`
+}
+
+func (q *ScaleQuantity) Scale(price float64, volume float64) (quantity float64, err error) {
+	if q.ByPrice != nil {
+		quantity, err = q.ScaleByPrice(price)
+		return
+	} else if q.ByVolume != nil {
+		quantity, err = q.ScaleByVolume(volume)
+	} else {
+		err = errors.New("either price or volume scale is not defined")
+	}
+	return
+}
+
+// ScaleByPrice scale quantity by the given price
+func (q *ScaleQuantity) ScaleByPrice(price float64) (float64, error) {
+	if q.ByPrice == nil {
+		return 0, errors.New("byPrice scale is not defined")
+	}
+
+	scale, err := q.ByPrice.Scale()
+	if err != nil {
+		return 0, err
+	}
+
+	if err := scale.Solve() ; err != nil {
+		return 0, err
+	}
+
+	return scale.Call(price), nil
+}
+
+// ScaleByVolume scale quantity by the given volume
+func (q *ScaleQuantity) ScaleByVolume(volume float64) (float64, error) {
+	if q.ByVolume == nil {
+		return 0, errors.New("byVolume scale is not defined")
+	}
+
+	scale, err := q.ByVolume.Scale()
+	if err != nil {
+		return 0, err
+	}
+
+	if err := scale.Solve() ; err != nil {
+		return 0, err
+	}
+
+	return scale.Call(volume), nil
 }

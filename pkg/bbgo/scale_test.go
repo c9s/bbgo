@@ -10,7 +10,7 @@ import (
 
 func TestExpScale(t *testing.T) {
 	// graph see: https://www.desmos.com/calculator/ip0ijbcbbf
-	scale := ExpScale{
+	scale := ExponentialScale{
 		Domain: [2]float64{1000, 2000},
 		Range:  [2]float64{0.001, 0.01},
 	}
@@ -30,7 +30,7 @@ func TestExpScale(t *testing.T) {
 
 func TestLogScale(t *testing.T) {
 	// see https://www.desmos.com/calculator/q1ufxx5gry
-	scale := LogScale{
+	scale := LogarithmicScale{
 		Domain: [2]float64{1000, 2000},
 		Range:  [2]float64{0.001, 0.01},
 	}
