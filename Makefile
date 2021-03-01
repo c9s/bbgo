@@ -2,7 +2,7 @@ TARGET_ARCH ?= amd64
 BUILD_DIR ?= build
 BIN_DIR := $(BUILD_DIR)/bbgo
 DIST_DIR ?= dist
-GIT_DESC  = $$(git describe --tags)
+GIT_DESC := $$(git describe --tags)
 
 OSX_APP_NAME = BBGO.app
 OSX_APP_DIR = build/$(OSX_APP_NAME)
@@ -64,13 +64,15 @@ dist-linux: bbgo-linux bbgo-slim-linux
 dist-darwin: bbgo-darwin bbgo-slim-darwin
 
 dist: version static migrations bbgo-linux bbgo-slim-linux bbgo-darwin bbgo-slim-darwin desktop
-	mkdir -p $(DIST_DIR)/$$(git describe --tags)
-	for platform in linux darwin ; do \
-		echo $$platform ; \
-		tar -C $(BIN_DIR) -cvzf $(DIST_DIR)/$(GIT_DESC)/bbgo-$(GIT_DESC)-$$platform-amd64.tar.gz bbgo-$$platform ; \
-		gpg --sign --armor $(DIST_DIR)/$(GIT_DESC)/bbgo-$(GIT_DESC).tar.gz ; \
-		tar -C $(BIN_DIR) -cvzf $(DIST_DIR)/$(GIT_DESC)/bbgo-$(GIT_DESC)-slim-$$platform-amd64.tar.gz bbgo-slim-$$platform ; \
-		gpg --sign --armor $(DIST_DIR)/$(GIT_DESC)/bbgo-slim-$(GIT_DESC).tar.gz ; \
+	mkdir -p $(DIST_DIR)/$(GIT_DESC)
+	for arch in amd64 ; do \
+		for platform in linux darwin ; do \
+			echo $$platform ; \
+			tar -C $(BIN_DIR) -cvzf $(DIST_DIR)/$(GIT_DESC)/bbgo-$(GIT_DESC)-$$platform-$$arch.tar.gz bbgo-$$platform ; \
+			gpg --sign --armor $(DIST_DIR)/$(GIT_DESC)/bbgo-$(GIT_DESC)-$$platform-$$arch.tar.gz ; \
+			tar -C $(BIN_DIR) -cvzf $(DIST_DIR)/$(GIT_DESC)/bbgo-slim-$(GIT_DESC)-$$platform-$$arch.tar.gz bbgo-slim-$$platform ; \
+			gpg --sign --armor $(DIST_DIR)/$(GIT_DESC)/bbgo-slim-$(GIT_DESC)-$$platform-$$arch.tar.gz ; \
+			done ; \
 		done
 
 pkg/version/version.go: .git/HEAD
