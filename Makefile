@@ -2,7 +2,7 @@ TARGET_ARCH ?= amd64
 BUILD_DIR ?= build
 BIN_DIR := $(BUILD_DIR)/bbgo
 DIST_DIR ?= dist
-GIT_DESC  = $$(git describe --long --tags)
+GIT_DESC  = $$(git describe --tags)
 
 OSX_APP_NAME = BBGO.app
 OSX_APP_DIR = build/$(OSX_APP_NAME)
@@ -26,10 +26,10 @@ bbgo-linux: $(BIN_DIR)
 bbgo-darwin: $(BIN_DIR)
 	GOOS=darwin GOARCH=$(TARGET_ARCH) go build -tags web,release -o $(BIN_DIR)/$@ ./cmd/bbgo
 
-bbgo-darwin-slim: $(BIN_DIR)
+bbgo-slim-darwin: $(BIN_DIR)
 	GOOS=darwin GOARCH=$(TARGET_ARCH) go build -tags release -o $(BIN_DIR)/$@ ./cmd/bbgo
 
-bbgo-linux-slim: $(BIN_DIR)
+bbgo-slim-linux: $(BIN_DIR)
 	GOOS=linux GOARCH=$(TARGET_ARCH) go build -tags release -o $(BIN_DIR)/$@ ./cmd/bbgo
 
 clean:
@@ -59,9 +59,19 @@ desktop-osx: $(OSX_APP_CONTENTS_DIR)/MacOS/bbgo-desktop $(OSX_APP_CONTENTS_DIR)/
 
 desktop: desktop-osx
 
-dist: version static migrations bbgo-linux bbgo-linux-slim bbgo-darwin bbgo-darwin-slim desktop
-	mkdir -p $(DIST_DIR)
-	tar -C $(BUILD_DIR) -cvzf $(DIST_DIR)/bbgo-$$(git describe --tags).tar.gz .
+dist-linux: bbgo-linux bbgo-slim-linux
+
+dist-darwin: bbgo-darwin bbgo-slim-darwin
+
+dist: version static migrations bbgo-linux bbgo-slim-linux bbgo-darwin bbgo-slim-darwin desktop
+	mkdir -p $(DIST_DIR)/$$(git describe --tags)
+	for platform in linux darwin ; do \
+		echo $$platform ; \
+		tar -C $(BIN_DIR) -cvzf $(DIST_DIR)/$(GIT_DESC)/bbgo-$(GIT_DESC)-$$platform-amd64.tar.gz bbgo-$$platform ; \
+		gpg --sign --armor $(DIST_DIR)/$(GIT_DESC)/bbgo-$(GIT_DESC).tar.gz ; \
+		tar -C $(BIN_DIR) -cvzf $(DIST_DIR)/$(GIT_DESC)/bbgo-$(GIT_DESC)-slim-$$platform-amd64.tar.gz bbgo-slim-$$platform ; \
+		gpg --sign --armor $(DIST_DIR)/$(GIT_DESC)/bbgo-slim-$(GIT_DESC).tar.gz ; \
+		done
 
 pkg/version/version.go: .git/HEAD
 	bash utils/generate-version-file.sh > $@
