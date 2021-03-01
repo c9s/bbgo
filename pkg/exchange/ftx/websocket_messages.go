@@ -1,6 +1,11 @@
 package ftx
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"fmt"
+	"math"
+	"time"
+)
 
 type operation string
 
@@ -56,7 +61,54 @@ func (r rawResponse) toSubscribedResp() subscribedResponse {
 	}
 }
 
+func (r rawResponse) toSnapshotResp() (snapshotResponse, error) {
+	o := snapshotResponse{
+		mandatoryFields: r.mandatoryFields,
+	}
+
+	if err := json.Unmarshal(r.Data["action"], &o.Action); err != nil {
+		return snapshotResponse{}, fmt.Errorf("failed to unmarshal data.action field: %w", err)
+	}
+
+	var t float64
+	if err := json.Unmarshal(r.Data["time"], &t); err != nil {
+		return snapshotResponse{}, fmt.Errorf("failed to unmarshal data.time field: %w", err)
+	}
+	sec, dec := math.Modf(t)
+	o.Time = time.Unix(int64(sec), int64(dec*1e9))
+
+	if err := json.Unmarshal(r.Data["checksum"], &o.Checksum); err != nil {
+		return snapshotResponse{}, fmt.Errorf("failed to unmarshal data.checksum field: %w", err)
+	}
+
+	if err := json.Unmarshal(r.Data["bids"], &o.Bids); err != nil {
+		return snapshotResponse{}, fmt.Errorf("failed to unmarshal data.bids field: %w", err)
+	}
+
+	if err := json.Unmarshal(r.Data["asks"], &o.Asks); err != nil {
+		return snapshotResponse{}, fmt.Errorf("failed to unmarshal data.asks field: %w", err)
+	}
+
+	return o, nil
+}
+
 // {"type": "subscribed", "channel": "orderbook", "market": "BTC/USDT"}
 type subscribedResponse struct {
 	mandatoryFields
+}
+
+type snapshotResponse struct {
+	mandatoryFields
+
+	Action string
+
+	Time time.Time
+
+	Checksum int64
+
+	// Best 100 orders
+	Bids [][]float64
+
+	// Best 100 orders
+	Asks [][]float64
 }
