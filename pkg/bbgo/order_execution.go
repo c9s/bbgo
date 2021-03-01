@@ -96,10 +96,10 @@ func (e *ExchangeOrderExecutor) SubmitOrders(ctx context.Context, orders ...type
 type BasicRiskController struct {
 	Logger *log.Logger
 
-	MaxOrderAmount      fixedpoint.Value `json:"maxOrderAmount,omitempty"`
-	MinQuoteBalance     fixedpoint.Value `json:"minQuoteBalance,omitempty"`
-	MaxBaseAssetBalance fixedpoint.Value `json:"maxBaseAssetBalance,omitempty"`
-	MinBaseAssetBalance fixedpoint.Value `json:"minBaseAssetBalance,omitempty"`
+	MaxOrderAmount      fixedpoint.Value `json:"maxOrderAmount,omitempty" yaml:"maxOrderAmount,omitempty"`
+	MinQuoteBalance     fixedpoint.Value `json:"minQuoteBalance,omitempty" yaml:"minQuoteBalance,omitempty"`
+	MaxBaseAssetBalance fixedpoint.Value `json:"maxBaseAssetBalance,omitempty" yaml:"maxBaseAssetBalance,omitempty"`
+	MinBaseAssetBalance fixedpoint.Value `json:"minBaseAssetBalance,omitempty" yaml:"minBaseAssetBalance,omitempty"`
 }
 
 // ProcessOrders filters and modifies the submit order objects by:
