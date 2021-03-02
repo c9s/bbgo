@@ -6,6 +6,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 func Test_rawResponse_toSubscribedResp(t *testing.T) {
@@ -36,4 +39,40 @@ func Test_rawResponse_toSnapshotResp(t *testing.T) {
 	assert.Len(t, r.Asks, 100)
 	assert.Equal(t, []float64{44574.0, 0.4591}, r.Asks[0])
 	assert.Equal(t, []float64{44579.0, 0.15}, r.Asks[1])
+}
+
+func Test_snapshotResponse_toGlobalOrderBook(t *testing.T) {
+	f, err := ioutil.ReadFile("./orderbook_snapshot.json")
+	assert.NoError(t, err)
+	var m rawResponse
+	assert.NoError(t, json.Unmarshal(f, &m))
+	r, err := m.toSnapshotResp()
+	assert.NoError(t, err)
+
+	b := r.toGlobalOrderBook()
+	assert.NoError(t, err)
+	assert.Equal(t, "BTC/USDT", b.Symbol)
+	isValid, err := b.IsValid()
+	assert.True(t, isValid)
+	assert.NoError(t, err)
+
+	assert.Len(t, b.Bids, 100)
+	assert.Equal(t, types.PriceVolume{
+		Price:  fixedpoint.MustNewFromString("44555.0"),
+		Volume: fixedpoint.MustNewFromString("3.3968"),
+	}, b.Bids[0])
+	assert.Equal(t, types.PriceVolume{
+		Price:  fixedpoint.MustNewFromString("44222.0"),
+		Volume: fixedpoint.MustNewFromString("0.0002"),
+	}, b.Bids[99])
+
+	assert.Len(t, b.Asks, 100)
+	assert.Equal(t, types.PriceVolume{
+		Price:  fixedpoint.MustNewFromString("44574.0"),
+		Volume: fixedpoint.MustNewFromString("0.4591"),
+	}, b.Asks[0])
+	assert.Equal(t, types.PriceVolume{
+		Price:  fixedpoint.MustNewFromString("45010.0"),
+		Volume: fixedpoint.MustNewFromString("0.0003"),
+	}, b.Asks[99])
 }
