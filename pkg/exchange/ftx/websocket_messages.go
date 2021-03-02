@@ -4,7 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"strings"
 	"time"
+
+	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 type operation string
@@ -111,4 +115,24 @@ type snapshotResponse struct {
 
 	// Best 100 orders
 	Asks [][]float64
+}
+
+func (r snapshotResponse) toGlobalOrderBook() types.OrderBook {
+	return types.OrderBook{
+		// ex. BTC/USDT
+		Symbol: strings.ToUpper(r.Market),
+		Bids:   toPriceVolumeSlice(r.Bids),
+		Asks:   toPriceVolumeSlice(r.Asks),
+	}
+}
+
+func toPriceVolumeSlice(orders [][]float64) types.PriceVolumeSlice {
+	var pv types.PriceVolumeSlice
+	for _, o := range orders {
+		pv = append(pv, types.PriceVolume{
+			Price:  fixedpoint.NewFromFloat(o[0]),
+			Volume: fixedpoint.NewFromFloat(o[1]),
+		})
+	}
+	return pv
 }

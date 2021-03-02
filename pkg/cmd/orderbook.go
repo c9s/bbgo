@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"syscall"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
@@ -35,10 +36,13 @@ var orderbookCmd = &cobra.Command{
 
 		s := ex.NewStream()
 		s.Subscribe(types.BookChannel, symbol, types.SubscribeOptions{})
+		s.OnBookSnapshot(func(book types.OrderBook) {
+			log.Infof("orderbook snapshot: %+v", book)
+		})
+
 		if err := s.Connect(ctx); err != nil {
 			return fmt.Errorf("failed to connect to %s", session)
 		}
-		// TODO: register callbacks to print orderbook and updates
 
 		cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
 		return nil
