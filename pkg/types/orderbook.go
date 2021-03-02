@@ -154,7 +154,11 @@ func (b *OrderBook) IsValid() (bool, error) {
 		return false, errors.New("empty asks")
 	}
 
-	return bid.Price < ask.Price, fmt.Errorf("bid price %f > ask price %f", bid.Price.Float64(), ask.Price.Float64())
+	if bid.Price > ask.Price {
+		return false, fmt.Errorf("bid price %f > ask price %f", bid.Price.Float64(), ask.Price.Float64())
+	}
+
+	return true, nil
 }
 
 func (b *OrderBook) PriceVolumesBySide(side SideType) PriceVolumeSlice {
