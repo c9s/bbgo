@@ -49,7 +49,7 @@ func Test_snapshotResponse_toGlobalOrderBook(t *testing.T) {
 	r, err := m.toDataResponse()
 	assert.NoError(t, err)
 
-	b, err := r.toGlobalOrderBook()
+	b, err := toGlobalOrderBook(r)
 	assert.NoError(t, err)
 	assert.Equal(t, "BTC/USDT", b.Symbol)
 	isValid, err := b.IsValid()
