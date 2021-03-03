@@ -26,7 +26,7 @@ func Test_rawResponse_toSnapshotResp(t *testing.T) {
 	assert.NoError(t, err)
 	var m rawResponse
 	assert.NoError(t, json.Unmarshal(f, &m))
-	r, err := m.toSnapshotResp()
+	r, err := m.toDataResponse()
 	assert.NoError(t, err)
 	assert.Equal(t, partialRespType, r.Type)
 	assert.Equal(t, orderbook, r.Channel)
@@ -46,10 +46,10 @@ func Test_snapshotResponse_toGlobalOrderBook(t *testing.T) {
 	assert.NoError(t, err)
 	var m rawResponse
 	assert.NoError(t, json.Unmarshal(f, &m))
-	r, err := m.toSnapshotResp()
+	r, err := m.toDataResponse()
 	assert.NoError(t, err)
 
-	b := r.toGlobalOrderBook()
+	b, err := r.toGlobalOrderBook()
 	assert.NoError(t, err)
 	assert.Equal(t, "BTC/USDT", b.Symbol)
 	isValid, err := b.IsValid()
