@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"syscall"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-// go run ./cmd/bbgo orderbook --session=ftx --symbol=btc/usdt
+// go run ./cmd/bbgo orderbook --session=ftx --symbol=BTC/USDT
 var orderbookCmd = &cobra.Command{
 	Use: "orderbook",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -29,13 +30,19 @@ var orderbookCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("can't get the symbol from flags: %w", err)
 		}
+		if symbol == "" {
+			return fmt.Errorf("symbol is not found")
+		}
 
 		s := ex.NewStream()
 		s.Subscribe(types.BookChannel, symbol, types.SubscribeOptions{})
+		s.OnBookSnapshot(func(book types.OrderBook) {
+			log.Infof("orderbook snapshot: %+v", book)
+		})
+
 		if err := s.Connect(ctx); err != nil {
 			return fmt.Errorf("failed to connect to %s", session)
 		}
-		// TODO: register callbacks to print orderbook and updates
 
 		cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
 		return nil

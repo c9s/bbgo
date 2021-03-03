@@ -8,7 +8,7 @@ import (
 )
 
 type Stream struct {
-	types.StandardStream
+	*types.StandardStream
 
 	wsService *WebsocketService
 
@@ -19,11 +19,11 @@ type Stream struct {
 func NewStream(key, secret string) *Stream {
 	wss := NewWebsocketService(key, secret)
 	s := &Stream{
-		StandardStream: types.StandardStream{},
+		StandardStream: &types.StandardStream{},
 		wsService:      wss,
 	}
 
-	wss.OnMessage(messageHandler{s.StandardStream}.handleMessage)
+	wss.OnMessage(messageHandler{StandardStream: s.StandardStream}.handleMessage)
 	return s
 }
 
