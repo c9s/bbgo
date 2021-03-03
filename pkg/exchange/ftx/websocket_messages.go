@@ -101,7 +101,7 @@ type dataResponse struct {
 	Asks [][]json.Number `json:"asks"`
 }
 
-func (r dataResponse) toGlobalOrderBook() (types.OrderBook, error) {
+func toGlobalOrderBook(r dataResponse) (types.OrderBook, error) {
 	bids, err := toPriceVolumeSlice(r.Bids)
 	if err != nil {
 		return types.OrderBook{}, fmt.Errorf("can't convert bids to priceVolumeSlice: %w", err)

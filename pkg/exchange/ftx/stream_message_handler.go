@@ -41,10 +41,10 @@ func (h messageHandler) handleSubscribedMessage(response rawResponse) {
 func (h messageHandler) handleSnapshot(response rawResponse) {
 	r, err := response.toDataResponse()
 	if err != nil {
-		log.WithError(err).Errorf("failed to convert the partial response to snapshot")
+		log.WithError(err).Errorf("failed to convert the partial response to data response")
 		return
 	}
-	ob, err := r.toGlobalOrderBook()
+	ob, err := toGlobalOrderBook(r)
 	if err != nil {
 		log.WithError(err).Errorf("failed to generate orderbook snapshot")
 		return
