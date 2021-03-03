@@ -12,7 +12,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-// go run ./cmd/bbgo orderbook --session=ftx --symbol=btc/usdt
+// go run ./cmd/bbgo orderbook --session=ftx --symbol=BTC/USDT
 var orderbookCmd = &cobra.Command{
 	Use: "orderbook",
 	RunE: func(cmd *cobra.Command, args []string) error {
