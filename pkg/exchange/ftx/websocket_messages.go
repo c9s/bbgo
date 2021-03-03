@@ -2,7 +2,6 @@ package ftx
 
 import (
 	"encoding/json"
-	"fmt"
 	"math"
 	"strings"
 	"time"
@@ -54,9 +53,9 @@ type rawResponse struct {
 
 	// The following fields are optional.
 	// Example 1: {"type": "error", "code": 404, "msg": "No such market: BTCUSDT"}
-	Code    int64                      `json:"code"`
-	Message string                     `json:"msg"`
-	Data    map[string]json.RawMessage `json:"data"`
+	Code    int64           `json:"code"`
+	Message string          `json:"msg"`
+	Data    json.RawMessage `json:"data"`
 }
 
 func (r rawResponse) toSubscribedResp() subscribedResponse {
@@ -70,28 +69,12 @@ func (r rawResponse) toSnapshotResp() (snapshotResponse, error) {
 		mandatoryFields: r.mandatoryFields,
 	}
 
-	if err := json.Unmarshal(r.Data["action"], &o.Action); err != nil {
-		return snapshotResponse{}, fmt.Errorf("failed to unmarshal data.action field: %w", err)
+	if err := json.Unmarshal(r.Data, &o); err != nil {
+		return snapshotResponse{}, err
 	}
 
-	var t float64
-	if err := json.Unmarshal(r.Data["time"], &t); err != nil {
-		return snapshotResponse{}, fmt.Errorf("failed to unmarshal data.time field: %w", err)
-	}
-	sec, dec := math.Modf(t)
-	o.Time = time.Unix(int64(sec), int64(dec*1e9))
-
-	if err := json.Unmarshal(r.Data["checksum"], &o.Checksum); err != nil {
-		return snapshotResponse{}, fmt.Errorf("failed to unmarshal data.checksum field: %w", err)
-	}
-
-	if err := json.Unmarshal(r.Data["bids"], &o.Bids); err != nil {
-		return snapshotResponse{}, fmt.Errorf("failed to unmarshal data.bids field: %w", err)
-	}
-
-	if err := json.Unmarshal(r.Data["asks"], &o.Asks); err != nil {
-		return snapshotResponse{}, fmt.Errorf("failed to unmarshal data.asks field: %w", err)
-	}
+	sec, dec := math.Modf(o.Time)
+	o.Timestamp = time.Unix(int64(sec), int64(dec*1e9))
 
 	return o, nil
 }
@@ -104,17 +87,19 @@ type subscribedResponse struct {
 type snapshotResponse struct {
 	mandatoryFields
 
-	Action string
+	Action string `json:"action"`
 
-	Time time.Time
+	Time float64 `json:"time"`
 
-	Checksum int64
+	Timestamp time.Time
+
+	Checksum int64 `json:"checksum"`
 
 	// Best 100 orders
-	Bids [][]float64
+	Bids [][]float64 `json:"bids"`
 
 	// Best 100 orders
-	Asks [][]float64
+	Asks [][]float64 `json:"asks"`
 }
 
 func (r snapshotResponse) toGlobalOrderBook() types.OrderBook {
