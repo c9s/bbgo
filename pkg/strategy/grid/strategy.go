@@ -120,7 +120,7 @@ func (s *Strategy) generateGridSellOrders(session *bbgo.ExchangeSession) ([]type
 		gridSpread.Float64())
 
 	var orders []types.SubmitOrder
-	for price := startPrice; s.LowerPrice <= price && price <= s.UpperPrice; price += gridSpread {
+	for price := startPrice; price <= s.UpperPrice; price += gridSpread {
 		var quantity fixedpoint.Value
 		if s.Quantity > 0 {
 			quantity = s.Quantity
@@ -195,7 +195,7 @@ func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types
 		gridSpread.Float64())
 
 	var orders []types.SubmitOrder
-	for price := startPrice; s.LowerPrice <= price && price <= s.UpperPrice; price -= gridSpread {
+	for price := startPrice; s.LowerPrice <= price; price -= gridSpread {
 		var quantity fixedpoint.Value
 		if s.Quantity > 0 {
 			quantity = s.Quantity
