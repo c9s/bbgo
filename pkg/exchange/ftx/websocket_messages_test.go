@@ -31,7 +31,7 @@ func Test_rawResponse_toSnapshotResp(t *testing.T) {
 	assert.Equal(t, partialRespType, r.Type)
 	assert.Equal(t, orderbook, r.Channel)
 	assert.Equal(t, "BTC/USDT", r.Market)
-	assert.Equal(t, int64(1614520368), r.Time.Unix())
+	assert.Equal(t, int64(1614520368), r.Timestamp.Unix())
 	assert.Equal(t, int64(2150525410), r.Checksum)
 	assert.Len(t, r.Bids, 100)
 	assert.Equal(t, []float64{44555.0, 3.3968}, r.Bids[0])
