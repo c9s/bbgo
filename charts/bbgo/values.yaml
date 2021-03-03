@@ -16,6 +16,7 @@ nameOverride: ""
 fullnameOverride: ""
 
 configmap:
+  enabled: true
   file: "config/bbgo.yaml"
 
 dotenv:
