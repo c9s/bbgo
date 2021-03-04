@@ -94,7 +94,7 @@ type dataResponse struct {
 
 	Timestamp time.Time
 
-	Checksum int64 `json:"checksum"`
+	Checksum uint32 `json:"checksum"`
 
 	Bids [][]json.Number `json:"bids"`
 
