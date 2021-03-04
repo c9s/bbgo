@@ -3,6 +3,7 @@ package types
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -227,16 +228,30 @@ func (b *OrderBook) Update(book OrderBook) {
 }
 
 func (b *OrderBook) Print() {
-	fmt.Printf("BOOK %s\n", b.Symbol)
-	fmt.Printf("ASKS:\n")
+	fmt.Printf(b.String())
+}
+
+func (b *OrderBook) String() string {
+	sb := strings.Builder{}
+
+	sb.WriteString("BOOK ")
+	sb.WriteString(b.Symbol)
+	sb.WriteString("\n")
+	sb.WriteString("ASKS:\n")
 	for i := len(b.Asks) - 1; i >= 0; i-- {
-		fmt.Printf("- ASK: %s\n", b.Asks[i].String())
+		sb.WriteString("- ASK: ")
+		sb.WriteString(b.Asks[i].String())
+		sb.WriteString("\n")
 	}
 
-	fmt.Printf("BIDS:\n")
+	sb.WriteString("BIDS:\n")
 	for _, bid := range b.Bids {
-		fmt.Printf("- BID: %s\n", bid.String())
+		sb.WriteString("- BID: ")
+		sb.WriteString(bid.String())
+		sb.WriteString("\n")
 	}
+
+	return sb.String()
 }
 
 type MutexOrderBook struct {
