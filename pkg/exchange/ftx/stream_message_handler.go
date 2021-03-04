@@ -22,11 +22,8 @@ func (h messageHandler) handleMessage(message []byte) {
 	switch r.Type {
 	case subscribedRespType:
 		h.handleSubscribedMessage(r)
-	case partialRespType:
-		// snapshot of current market data
-		h.handleSnapshot(r)
-	case updateRespType:
-		//log.Infof("update=> %s", string(message))
+	case partialRespType, updateRespType:
+		h.handleMarketData(r)
 	default:
 		logger.Errorf("unsupported message type: %+v", r.Type)
 	}
@@ -38,17 +35,36 @@ func (h messageHandler) handleSubscribedMessage(response rawResponse) {
 	logger.Infof("%s %s is subscribed", r.Market, r.Channel)
 }
 
-func (h messageHandler) handleSnapshot(response rawResponse) {
+func (h *messageHandler) handleMarketData(response rawResponse) {
 	r, err := response.toDataResponse()
 	if err != nil {
 		log.WithError(err).Errorf("failed to convert the partial response to data response")
 		return
 	}
+
+	switch r.Channel {
+	case orderbook:
+		h.handleOrderBook(r)
+	default:
+		log.Errorf("unsupported market data channel %s", r.Channel)
+		return
+	}
+}
+
+func (h messageHandler) handleOrderBook(r dataResponse) {
 	ob, err := toGlobalOrderBook(r)
 	if err != nil {
 		log.WithError(err).Errorf("failed to generate orderbook snapshot")
 		return
 	}
 
-	h.EmitBookSnapshot(ob)
+	switch r.Type {
+	case partialRespType:
+		h.EmitBookSnapshot(ob)
+	case updateRespType:
+		h.EmitBookUpdate(ob)
+	default:
+		log.Errorf("unsupported order book data type %s", r.Type)
+		return
+	}
 }
