@@ -37,7 +37,10 @@ var orderbookCmd = &cobra.Command{
 		s := ex.NewStream()
 		s.Subscribe(types.BookChannel, symbol, types.SubscribeOptions{})
 		s.OnBookSnapshot(func(book types.OrderBook) {
-			log.Infof("orderbook snapshot: %+v", book)
+			log.Infof("orderbook snapshot: %s", book.String())
+		})
+		s.OnBookUpdate(func(book types.OrderBook) {
+			log.Infof("orderbook update: %s", book.String())
 		})
 
 		if err := s.Connect(ctx); err != nil {

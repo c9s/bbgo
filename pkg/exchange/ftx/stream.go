@@ -23,7 +23,7 @@ func NewStream(key, secret string) *Stream {
 		wsService:      wss,
 	}
 
-	wss.OnMessage(messageHandler{StandardStream: s.StandardStream}.handleMessage)
+	wss.OnMessage((&messageHandler{StandardStream: s.StandardStream}).handleMessage)
 	return s
 }
 
