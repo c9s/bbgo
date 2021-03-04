@@ -2,6 +2,7 @@ package ftx
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"strings"
 	"time"
@@ -64,13 +65,13 @@ func (r rawResponse) toSubscribedResp() subscribedResponse {
 	}
 }
 
-func (r rawResponse) toSnapshotResp() (snapshotResponse, error) {
-	o := snapshotResponse{
+func (r rawResponse) toDataResponse() (dataResponse, error) {
+	o := dataResponse{
 		mandatoryFields: r.mandatoryFields,
 	}
 
 	if err := json.Unmarshal(r.Data, &o); err != nil {
-		return snapshotResponse{}, err
+		return dataResponse{}, err
 	}
 
 	sec, dec := math.Modf(o.Time)
@@ -84,7 +85,7 @@ type subscribedResponse struct {
 	mandatoryFields
 }
 
-type snapshotResponse struct {
+type dataResponse struct {
 	mandatoryFields
 
 	Action string `json:"action"`
@@ -93,31 +94,42 @@ type snapshotResponse struct {
 
 	Timestamp time.Time
 
-	Checksum int64 `json:"checksum"`
+	Checksum uint32 `json:"checksum"`
 
-	// Best 100 orders
-	Bids [][]float64 `json:"bids"`
+	Bids [][]json.Number `json:"bids"`
 
-	// Best 100 orders
-	Asks [][]float64 `json:"asks"`
+	Asks [][]json.Number `json:"asks"`
 }
 
-func (r snapshotResponse) toGlobalOrderBook() types.OrderBook {
+func toGlobalOrderBook(r dataResponse) (types.OrderBook, error) {
+	bids, err := toPriceVolumeSlice(r.Bids)
+	if err != nil {
+		return types.OrderBook{}, fmt.Errorf("can't convert bids to priceVolumeSlice: %w", err)
+	}
+	asks, err := toPriceVolumeSlice(r.Asks)
+	if err != nil {
+		return types.OrderBook{}, fmt.Errorf("can't convert asks to priceVolumeSlice: %w", err)
+	}
 	return types.OrderBook{
 		// ex. BTC/USDT
 		Symbol: strings.ToUpper(r.Market),
-		Bids:   toPriceVolumeSlice(r.Bids),
-		Asks:   toPriceVolumeSlice(r.Asks),
-	}
+		Bids:   bids,
+		Asks:   asks,
+	}, nil
 }
 
-func toPriceVolumeSlice(orders [][]float64) types.PriceVolumeSlice {
+func toPriceVolumeSlice(orders [][]json.Number) (types.PriceVolumeSlice, error) {
 	var pv types.PriceVolumeSlice
 	for _, o := range orders {
-		pv = append(pv, types.PriceVolume{
-			Price:  fixedpoint.NewFromFloat(o[0]),
-			Volume: fixedpoint.NewFromFloat(o[1]),
-		})
+		p, err := fixedpoint.NewFromString(string(o[0]))
+		if err != nil {
+			return nil, fmt.Errorf("can't convert price %+v to fixedpoint: %w", o[0], err)
+		}
+		v, err := fixedpoint.NewFromString(string(o[1]))
+		if err != nil {
+			return nil, fmt.Errorf("can't convert volume %+v to fixedpoint: %w", o[0], err)
+		}
+		pv = append(pv, types.PriceVolume{Price: p, Volume: v})
 	}
-	return pv
+	return pv, nil
 }
