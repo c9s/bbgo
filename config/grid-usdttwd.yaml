@@ -28,8 +28,6 @@ backtest:
   startTime: "2020-09-04"
   endTime: "2020-09-14"
   symbols:
-  - BTCUSDT
-  - ETHUSDT
   - USDTTWD
   account:
     makerCommission: 15
