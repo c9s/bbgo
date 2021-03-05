@@ -243,25 +243,40 @@ type OrderCancelAllRequest struct {
 	client *RestClient
 
 	params OrderCancelAllRequestParams
+
+	side    *string
+	market  *string
+	groupID *int64
 }
 
 func (r *OrderCancelAllRequest) Side(side string) *OrderCancelAllRequest {
-	r.params.Side = side
+	r.side = &side
 	return r
 }
 
 func (r *OrderCancelAllRequest) Market(market string) *OrderCancelAllRequest {
-	r.params.Market = market
+	r.market = &market
 	return r
 }
 
 func (r *OrderCancelAllRequest) GroupID(groupID int64) *OrderCancelAllRequest {
-	r.params.GroupID = groupID
+	r.groupID = &groupID
 	return r
 }
 
 func (r *OrderCancelAllRequest) Do(ctx context.Context) (orders []Order, err error) {
-	req, err := r.client.newAuthenticatedRequest("POST", "v2/orders/clear", &r.params)
+	var payload = map[string]interface{}{}
+	if r.side != nil {
+		payload["side"] = *r.side
+	}
+	if r.market != nil {
+		payload["market"] = *r.market
+	}
+	if r.groupID != nil {
+		payload["groupID"] = *r.groupID
+	}
+
+	req, err := r.client.newAuthenticatedRequest("POST", "v2/orders/clear", payload)
 	if err != nil {
 		return
 	}

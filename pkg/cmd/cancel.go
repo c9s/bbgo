@@ -22,6 +22,7 @@ func init() {
 	CancelCmd.Flags().String("session", "", "session to execute cancel orders")
 	CancelCmd.Flags().String("symbol", "", "symbol to cancel orders")
 	CancelCmd.Flags().Int64("group-id", 0, "groupID to cancel orders")
+	CancelCmd.Flags().Bool("all", false, "cancel all orders")
 	RootCmd.AddCommand(CancelCmd)
 }
 
@@ -47,6 +48,11 @@ var CancelCmd = &cobra.Command{
 			return err
 		}
 
+		all, err := cmd.Flags().GetBool("all")
+		if err != nil {
+			return err
+		}
+
 		configFile, err := cmd.Flags().GetString("config")
 		if err != nil {
 			return err
@@ -62,7 +68,7 @@ var CancelCmd = &cobra.Command{
 		}
 
 		environ := bbgo.NewEnvironment()
-		if err := environ.ConfigureDatabase(ctx) ; err != nil {
+		if err := environ.ConfigureDatabase(ctx); err != nil {
 			return err
 		}
 
@@ -91,30 +97,41 @@ var CancelCmd = &cobra.Command{
 			var log = logrus.WithField("session", sessionID)
 
 			e, ok := session.Exchange.(advancedOrderCancelApi)
-			if ok && groupID > 0 {
-				log.Infof("canceling orders by group id: %d", groupID)
+			if ok {
+				if all {
+					log.Infof("canceling all orders")
 
-				orders, err := e.CancelOrdersByGroupID(ctx, groupID)
-				if err != nil {
-					return err
+					orders, err := e.CancelAllOrders(ctx)
+					if err != nil {
+						return err
+					}
+
+					for _, o := range orders {
+						log.Info("CANCELED ", o.String())
+					}
+				} else if groupID > 0 {
+					log.Infof("canceling orders by group id: %d", groupID)
+
+					orders, err := e.CancelOrdersByGroupID(ctx, groupID)
+					if err != nil {
+						return err
+					}
+
+					for _, o := range orders {
+						log.Info("CANCELED ", o.String())
+					}
+				} else if len(symbol) > 0 {
+					log.Infof("canceling orders by symbol: %s", symbol)
+
+					orders, err := e.CancelOrdersBySymbol(ctx, symbol)
+					if err != nil {
+						return err
+					}
+
+					for _, o := range orders {
+						log.Info("CANCELED ", o.String())
+					}
 				}
-
-				for _, o := range orders {
-					log.Info("CANCELED ", o.String())
-				}
-
-			} else if ok && len(symbol) > 0 {
-				log.Infof("canceling orders by symbol: %s", symbol)
-
-				orders, err := e.CancelOrdersBySymbol(ctx, symbol)
-				if err != nil {
-					return err
-				}
-
-				for _, o := range orders {
-					log.Info("CANCELED ", o.String())
-				}
-
 			} else if len(symbol) > 0 {
 				openOrders, err := session.Exchange.QueryOpenOrders(ctx, symbol)
 				if err != nil {
