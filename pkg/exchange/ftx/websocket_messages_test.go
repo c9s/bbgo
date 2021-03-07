@@ -26,7 +26,7 @@ func Test_rawResponse_toDataResponse(t *testing.T) {
 	assert.NoError(t, err)
 	var m rawResponse
 	assert.NoError(t, json.Unmarshal(f, &m))
-	r, err := m.toDataResponse()
+	r, err := m.toOrderBookResponse()
 	assert.NoError(t, err)
 	assert.Equal(t, partialRespType, r.Type)
 	assert.Equal(t, orderbook, r.Channel)
@@ -41,12 +41,12 @@ func Test_rawResponse_toDataResponse(t *testing.T) {
 	assert.Equal(t, []json.Number{"44579.0", "0.15"}, r.Asks[1])
 }
 
-func Test_DataResponse_toGlobalOrderBook(t *testing.T) {
+func Test_orderBookResponse_toGlobalOrderBook(t *testing.T) {
 	f, err := ioutil.ReadFile("./orderbook_snapshot.json")
 	assert.NoError(t, err)
 	var m rawResponse
 	assert.NoError(t, json.Unmarshal(f, &m))
-	r, err := m.toDataResponse()
+	r, err := m.toOrderBookResponse()
 	assert.NoError(t, err)
 
 	b, err := toGlobalOrderBook(r)
@@ -78,3 +78,95 @@ func Test_DataResponse_toGlobalOrderBook(t *testing.T) {
 
 }
 
+func Test_checksumString(t *testing.T) {
+	type args struct {
+		bids [][]json.Number
+		asks [][]json.Number
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "more bids",
+			args: args{
+				bids: [][]json.Number{{"5000.5", "10"}, {"4995.0", "5"}},
+				asks: [][]json.Number{{"5001.0", "6"}},
+			},
+			want: "5000.5:10:5001.0:6:4995.0:5",
+		},
+		{
+			name: "lengths of bids and asks are the same",
+			args: args{
+				bids: [][]json.Number{{"5000.5", "10"}, {"4995.0", "5"}},
+				asks: [][]json.Number{{"5001.0", "6"}, {"5002.0", "7"}},
+			},
+			want: "5000.5:10:5001.0:6:4995.0:5:5002.0:7",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := checksumString(tt.args.bids, tt.args.asks); got != tt.want {
+				t.Errorf("checksumString() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_orderBookResponse_verifyChecksum(t *testing.T) {
+	for _, file := range []string{"./orderbook_snapshot.json"} {
+		f, err := ioutil.ReadFile(file)
+		assert.NoError(t, err)
+		var m rawResponse
+		assert.NoError(t, json.Unmarshal(f, &m))
+		r, err := m.toOrderBookResponse()
+		assert.NoError(t, err)
+		assert.NoError(t, r.verifyChecksum(), "filename: "+file)
+	}
+}
+
+func Test_removePrice(t *testing.T) {
+	pairs := [][]json.Number{{"123.99", "2.0"}, {"2234.12", "3.1"}}
+	assert.Equal(t, pairs, removePrice(pairs, "99333"))
+
+	pairs = removePrice(pairs, "2234.12")
+	assert.Equal(t, [][]json.Number{{"123.99", "2.0"}}, pairs)
+	assert.Equal(t, [][]json.Number{}, removePrice(pairs, "123.99"))
+}
+
+func Test_orderBookResponse_update(t *testing.T) {
+	ob := &orderBookResponse{Bids: nil, Asks: nil}
+
+	ob.update(orderBookResponse{
+		Bids: [][]json.Number{{"1.0", "0"}, {"10.0", "1"}, {"11.0", "1"}},
+		Asks: [][]json.Number{{"1.0", "1"}},
+	})
+	assert.Equal(t, [][]json.Number{{"11.0", "1"}, {"10.0", "1"}}, ob.Bids)
+	assert.Equal(t, [][]json.Number{{"1.0", "1"}}, ob.Asks)
+	ob.update(orderBookResponse{
+		Bids: [][]json.Number{{"9.0", "1"}, {"12.0", "1"}, {"10.5", "1"}},
+		Asks: [][]json.Number{{"1.0", "0"}},
+	})
+	assert.Equal(t, [][]json.Number{{"12.0", "1"}, {"11.0", "1"}, {"10.5", "1"}, {"10.0", "1"}, {"9.0", "1"}}, ob.Bids)
+	assert.Equal(t, [][]json.Number{}, ob.Asks)
+
+	// remove them
+	ob.update(orderBookResponse{
+		Bids: [][]json.Number{{"9.0", "0"}, {"12.0", "0"}, {"10.5", "0"}},
+		Asks: [][]json.Number{{"9.0", "1"}, {"12.0", "1"}, {"10.5", "1"}},
+	})
+	assert.Equal(t, [][]json.Number{{"11.0", "1"}, {"10.0", "1"}}, ob.Bids)
+	assert.Equal(t, [][]json.Number{{"9.0", "1"}, {"10.5", "1"}, {"12.0", "1"}}, ob.Asks)
+}
+
+func Test_insertAt(t *testing.T) {
+	r := insertAt([][]json.Number{{"1.2", "2"}, {"1.4", "2"}}, 1, []json.Number{"1.3", "2"})
+	assert.Equal(t, [][]json.Number{{"1.2", "2"}, {"1.3", "2"}, {"1.4", "2"}}, r)
+
+	r = insertAt([][]json.Number{{"1.2", "2"}, {"1.4", "2"}}, 0, []json.Number{"1.1", "2"})
+	assert.Equal(t, [][]json.Number{{"1.1", "2"}, {"1.2", "2"}, {"1.4", "2"}}, r)
+
+	r = insertAt([][]json.Number{{"1.2", "2"}, {"1.4", "2"}}, 2, []json.Number{"1.5", "2"})
+	assert.Equal(t, [][]json.Number{{"1.2", "2"}, {"1.4", "2"}, {"1.5", "2"}}, r)
+}
