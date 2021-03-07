@@ -12,7 +12,7 @@ type messageHandler struct {
 	*types.StandardStream
 }
 
-func (h messageHandler) handleMessage(message []byte) {
+func (h *messageHandler) handleMessage(message []byte) {
 	var r rawResponse
 	if err := json.Unmarshal(message, &r); err != nil {
 		logger.WithError(err).Errorf("failed to unmarshal resp: %s", string(message))
@@ -36,7 +36,7 @@ func (h messageHandler) handleSubscribedMessage(response rawResponse) {
 }
 
 func (h *messageHandler) handleMarketData(response rawResponse) {
-	r, err := response.toDataResponse()
+	r, err := response.toOrderBookResponse()
 	if err != nil {
 		log.WithError(err).Errorf("failed to convert the partial response to data response")
 		return
@@ -51,8 +51,8 @@ func (h *messageHandler) handleMarketData(response rawResponse) {
 	}
 }
 
-func (h messageHandler) handleOrderBook(r dataResponse) {
-	ob, err := toGlobalOrderBook(r)
+func (h *messageHandler) handleOrderBook(r orderBookResponse) {
+	globalOrderBook, err := toGlobalOrderBook(r)
 	if err != nil {
 		log.WithError(err).Errorf("failed to generate orderbook snapshot")
 		return
@@ -60,9 +60,14 @@ func (h messageHandler) handleOrderBook(r dataResponse) {
 
 	switch r.Type {
 	case partialRespType:
-		h.EmitBookSnapshot(ob)
+		if err := r.verifyChecksum(); err != nil {
+			log.WithError(err).Errorf("invalid orderbook snapshot")
+			return
+		}
+		h.EmitBookSnapshot(globalOrderBook)
 	case updateRespType:
-		h.EmitBookUpdate(ob)
+		// emit updates, not the whole orderbook
+		h.EmitBookUpdate(globalOrderBook)
 	default:
 		log.Errorf("unsupported order book data type %s", r.Type)
 		return
