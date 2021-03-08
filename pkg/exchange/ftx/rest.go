@@ -20,6 +20,7 @@ import (
 
 type restRequest struct {
 	*balanceRequest
+	*orderRequest
 
 	key, secret string
 	// Optional sub-account name
@@ -42,6 +43,7 @@ func newRestRequest(c *http.Client, baseURL *url.URL) *restRequest {
 	}
 
 	r.balanceRequest = &balanceRequest{restRequest: r}
+	r.orderRequest = &orderRequest{restRequest: r}
 	return r
 }
 
@@ -75,6 +77,7 @@ func (r *restRequest) buildURL() (*url.URL, error) {
 }
 
 func (r *restRequest) Payloads(payloads map[string]interface{}) *restRequest {
+	r.p = make(map[string]interface{})
 	for k, v := range payloads {
 		r.p[k] = v
 	}
