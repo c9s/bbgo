@@ -102,7 +102,22 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 }
 
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
-	panic("implement me")
+	// TODO: invoke open trigger orders
+	resp, err := e.rest.OpenOrders(ctx, symbol)
+	if err != nil {
+		return nil, err
+	}
+	if !resp.Success {
+		return nil, fmt.Errorf("ftx returns querying open orders failure")
+	}
+	for _, r := range resp.Result {
+		o, err := toGlobalOrderFromOpenOrder(r)
+		if err != nil {
+			return nil, err
+		}
+		orders = append(orders, o)
+	}
+	return orders, nil
 }
 
 func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []types.Order, err error) {
