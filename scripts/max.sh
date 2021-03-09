@@ -24,6 +24,18 @@ case "$command" in
         submitOrder order_params
         ;;
 
+    withdrawal-history)
+        declare -A params=()
+        currency=$1
+        if [[ -n $currency ]] ; then
+          params[currency]=$currency
+        fi
+
+        withdrawalHistory params \
+          | jq -r '.[] | [ .uuid, ((.amount | tonumber) * 10000 | floor / 10000), .currency, ((.fee | tonumber) * 10000 | floor / 10000), .fee_currency, .state, (.created_at | strflocaltime("%Y-%m-%dT%H:%M:%S %Z")), .note ] | @tsv' \
+          | column -ts $'\t'
+        ;;
+
     limit)
         market=$1
         side=$2
@@ -83,7 +95,7 @@ case "$command" in
         rewards rewards_params | jq -r '.[] | [ .uuid, .type, ((.amount | tonumber) * 10000 | floor / 10000), .currency, .state, (.created_at | strflocaltime("%Y-%m-%dT%H:%M:%S %Z")), .note ] | @tsv' \
             | column -ts $'\t'
         ;;
-        
+
     trades)
         if [[ $# < 1 ]] ; then
             echo "$0 trades [market]"
