@@ -595,7 +595,7 @@ func (e *Exchange) QueryRewards(ctx context.Context, startTime time.Time) ([]typ
 	var now = time.Now()
 	for {
 		if from.After(now) {
-			break
+			return nil, nil
 		}
 
 		// scan by 30 days
