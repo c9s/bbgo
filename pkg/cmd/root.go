@@ -67,7 +67,7 @@ func init() {
 	RootCmd.PersistentFlags().String("slack-error-channel", "bbgo-error", "slack error channel")
 
 	RootCmd.PersistentFlags().String("telegram-bot-token", "", "telegram bot token from bot father")
-	RootCmd.PersistentFlags().String("telegram-auth-token", "", "telegram auth token")
+	RootCmd.PersistentFlags().String("telegram-bot-auth-token", "", "telegram auth token")
 
 	RootCmd.PersistentFlags().String("binance-api-key", "", "binance api key")
 	RootCmd.PersistentFlags().String("binance-api-secret", "", "binance api secret")
