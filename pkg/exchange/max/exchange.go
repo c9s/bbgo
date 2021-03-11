@@ -503,7 +503,8 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 		if len(withdraws) < limit {
 			startTime = endTime
 		} else {
-			startTime = time.Unix(withdraws[len(withdraws)-1].UpdatedAt, 0)
+			// its in descending order, so we get the first record
+			startTime = time.Unix(withdraws[0].UpdatedAt, 0)
 		}
 	}
 
