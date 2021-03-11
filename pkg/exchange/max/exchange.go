@@ -456,7 +456,7 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 			continue
 		}
 
-		for i := len(withdraws) - 1 ; i >= 0 ; i-- {
+		for i := len(withdraws) - 1; i >= 0; i-- {
 			d := withdraws[i]
 			if _, ok := txIDs[d.TxID]; ok {
 				continue
@@ -483,14 +483,14 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 
 			txIDs[d.TxID] = struct{}{}
 			withdraw := types.Withdraw{
-				Exchange:       types.ExchangeMax,
-				ApplyTime:      datatype.Time(time.Unix(d.CreatedAt, 0)),
-				Asset:          toGlobalCurrency(d.Currency),
-				Amount:         util.MustParseFloat(d.Amount),
-				Address:        "",
-				AddressTag:     "",
-				TransactionID:  d.TxID,
-				TransactionFee: util.MustParseFloat(d.Fee),
+				Exchange:               types.ExchangeMax,
+				ApplyTime:              datatype.Time(time.Unix(d.CreatedAt, 0)),
+				Asset:                  toGlobalCurrency(d.Currency),
+				Amount:                 util.MustParseFloat(d.Amount),
+				Address:                "",
+				AddressTag:             "",
+				TransactionID:          d.TxID,
+				TransactionFee:         util.MustParseFloat(d.Fee),
 				TransactionFeeCurrency: d.FeeCurrency,
 				// WithdrawOrderID: d.WithdrawOrderID,
 				// Network:         d.Network,
@@ -513,6 +513,7 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 
 func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since, until time.Time) (allDeposits []types.Deposit, err error) {
 	startTime := since
+	limit := 1000
 	txIDs := map[string]struct{}{}
 	for startTime.Before(until) {
 		// startTime ~ endTime must be in 90 days
@@ -522,6 +523,7 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 		}
 
 		log.Infof("querying deposit history %s: %s <=> %s", asset, startTime, endTime)
+
 		req := e.client.AccountService.NewGetDepositHistoryRequest()
 		if len(asset) > 0 {
 			req.Currency(toLocalCurrency(asset))
@@ -529,13 +531,16 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 
 		deposits, err := req.
 			From(startTime.Unix()).
-			To(endTime.Unix()).Do(ctx)
+			To(endTime.Unix()).
+			Limit(limit).
+			Do(ctx)
 
 		if err != nil {
 			return nil, err
 		}
 
-		for _, d := range deposits {
+		for i := len(deposits) - 1; i >= 0; i-- {
+			d := deposits[i]
 			if _, ok := txIDs[d.TxID]; ok {
 				continue
 			}
@@ -552,7 +557,11 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 			})
 		}
 
-		startTime = endTime
+		if len(deposits) < limit {
+			startTime = endTime
+		} else {
+			startTime = time.Unix(deposits[0].UpdatedAt, 0)
+		}
 	}
 
 	return allDeposits, err
