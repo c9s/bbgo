@@ -504,7 +504,7 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 			startTime = endTime
 		} else {
 			// its in descending order, so we get the first record
-			startTime = time.Unix(withdraws[0].UpdatedAt, 0)
+			startTime = time.Unix(withdraws[0].CreatedAt, 0)
 		}
 	}
 
@@ -560,7 +560,7 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 		if len(deposits) < limit {
 			startTime = endTime
 		} else {
-			startTime = time.Unix(deposits[0].UpdatedAt, 0)
+			startTime = time.Unix(deposits[0].CreatedAt, 0)
 		}
 	}
 
