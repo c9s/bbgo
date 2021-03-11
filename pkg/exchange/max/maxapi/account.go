@@ -193,6 +193,7 @@ type Withdraw struct {
 	CurrencyVersion string `json:"currency_version"` // "eth"
 	Amount          string `json:"amount"`
 	Fee             string `json:"fee"`
+	FeeCurrency     string `json:"fee_currency"`
 	TxID            string `json:"txid"`
 
 	// State can be "submitting", "submitted",
