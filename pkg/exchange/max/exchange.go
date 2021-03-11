@@ -456,7 +456,8 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 			continue
 		}
 
-		for _, d := range withdraws {
+		for i := len(withdraws) - 1 ; i >= 0 ; i-- {
+			d := withdraws[i]
 			if _, ok := txIDs[d.TxID]; ok {
 				continue
 			}
@@ -490,6 +491,7 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 				AddressTag:     "",
 				TransactionID:  d.TxID,
 				TransactionFee: util.MustParseFloat(d.Fee),
+				TransactionFeeCurrency: d.FeeCurrency,
 				// WithdrawOrderID: d.WithdrawOrderID,
 				// Network:         d.Network,
 				Status: status,
@@ -503,7 +505,6 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 		} else {
 			startTime = time.Unix(withdraws[len(withdraws)-1].UpdatedAt, 0)
 		}
-
 	}
 
 	return allWithdraws, nil
