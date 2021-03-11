@@ -13,10 +13,12 @@ type WithdrawService struct {
 	DB *sqlx.DB
 }
 
+// Sync syncs the withdraw records into db
 func (s *WithdrawService) Sync(ctx context.Context, ex types.Exchange) error {
 	txnIDs := map[string]struct{}{}
 
-	records, err := s.QueryLast(ex.Name(), 10)
+	// query descending
+	records, err := s.QueryLast(ex.Name(), 100)
 	if err != nil {
 		return err
 	}
@@ -30,14 +32,24 @@ func (s *WithdrawService) Sync(ctx context.Context, ex types.Exchange) error {
 		return ErrNotImplemented
 	}
 
-	withdraws, err := transferApi.QueryWithdrawHistory(ctx, "", records[0].ApplyTime.Time(), time.Now())
+	since := time.Time{}
+	if len(records) > 0 {
+		since = records[len(records)-1].ApplyTime.Time()
+	}
+
+	// asset "" means all assets
+	withdraws, err := transferApi.QueryWithdrawHistory(ctx, "", since, time.Now())
 	if err != nil {
 		return err
 	}
 
 	for _, withdraw := range withdraws {
-		if _, exists := txnIDs[withdraw.TransactionID] ; exists {
+		if _, exists := txnIDs[withdraw.TransactionID]; exists {
 			continue
+		}
+
+		if err := s.Insert(withdraw); err != nil {
+			return err
 		}
 	}
 
