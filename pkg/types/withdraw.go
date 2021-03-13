@@ -1,6 +1,7 @@
 package types
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/datatype"
@@ -21,6 +22,10 @@ type Withdraw struct {
 	WithdrawOrderID        string        `json:"withdrawOrderId"`
 	ApplyTime              datatype.Time `json:"applyTime" db:"time"`
 	Network                string        `json:"network" db:"network"`
+}
+
+func (w Withdraw) String() string {
+	return fmt.Sprintf("withdraw %s %f to %s at %s", w.Asset, w.Amount, w.Address, w.ApplyTime.Time())
 }
 
 func (w Withdraw) EffectiveTime() time.Time {
