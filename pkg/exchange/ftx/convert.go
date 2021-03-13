@@ -21,6 +21,10 @@ func TrimUpperString(original string) string {
 	return strings.ToUpper(strings.TrimSpace(original))
 }
 
+func TrimLowerString(original string) string {
+	return strings.ToLower(strings.TrimSpace(original))
+}
+
 var errUnsupportedOrderStatus = fmt.Errorf("unsupported order status")
 
 func toGlobalOrderFromOpenOrder(r order) (types.Order, error) {
