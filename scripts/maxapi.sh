@@ -133,7 +133,13 @@ function rewards()
     send_auth_request "GET" "/api/v2/rewards" _params
 }
 
-function withdrawalHistory()
+function deposits()
+{
+    local -n _params=$1
+    send_auth_request "GET" "/api/v2/deposits" _params
+}
+
+function withdrawals()
 {
     local -n _params=$1
     send_auth_request "GET" "/api/v2/withdrawals" _params
