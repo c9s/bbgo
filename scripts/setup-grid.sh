@@ -92,8 +92,8 @@ exchangeStrategies:
 END
 
 info "config file is generated successfully"
-info "================================================================"
-info "now you can edit your strategy config file bbgo.yaml to run bbgo"
+echo "================================================================"
+echo "now you can edit your strategy config file bbgo.yaml to run bbgo"
 
 if [[ $osf == "darwin" ]] ; then
     echo "we found you're using MacOS, you can type:"
