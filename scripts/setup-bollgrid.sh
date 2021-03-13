@@ -1,12 +1,13 @@
 #!/bin/bash
+set -e
 osf=$(uname | tr '[:upper:]' '[:lower:]')
 version=v1.13.0
 dist_file=bbgo-$version-$osf-amd64.tar.gz
 
 echo "downloading..."
-curl -L https://github.com/c9s/bbgo/releases/download/$version/$dist_file
+curl -O -L https://github.com/c9s/bbgo/releases/download/$version/$dist_file
 tar xzf $dist_file
-mv bbgo-darwin bbgo
+mv bbgo-$osf bbgo
 chmod +x bbgo
 echo "downloaded"
 
