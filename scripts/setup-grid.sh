@@ -4,28 +4,49 @@ osf=$(uname | tr '[:upper:]' '[:lower:]')
 version=v1.13.0
 dist_file=bbgo-$version-$osf-amd64.tar.gz
 
-echo "downloading..."
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+NC='\033[0m' # No Color
+
+function warn()
+{
+    echo -e "${YELLOW}$@${NC}"
+}
+
+function error()
+{
+    echo -e "${RED}$@${NC}"
+}
+
+function info()
+{
+    echo -e "${GREEN}$@${NC}"
+}
+
+info "downloading..."
 curl -O -L https://github.com/c9s/bbgo/releases/download/$version/$dist_file
 tar xzf $dist_file
 mv bbgo-$osf bbgo
 chmod +x bbgo
-echo "downloaded"
+info "downloaded successfully"
 
 function gen_dotenv()
 {
     read -p "Enter your MAX API key: " api_key
     read -p "Enter your MAX API secret: " api_secret
-    echo "Generating your .env.local file..."
+    info "generating your .env.local file..."
 cat <<END > .env.local
 MAX_API_KEY=$api_key
 MAX_API_SECRET=$api_secret
 END
 
+    info "dotenv is configured successfully"
 }
 
 if [[ -e ".env.local" ]] ; then
-    echo "Found existing .env.local, you will overwrite the existing .env.local file!"
-    read -p "Are you sure? (Y/n) " a
+    warn "found an existing .env.local, you will overwrite the existing .env.local file!"
+    read -p "are you sure? (Y/n) " a
     if [[ $a != "n" ]] ; then
         gen_dotenv
     fi
@@ -35,8 +56,8 @@ fi
 
 
 if [[ -e "bbgo.yaml" ]] ; then
-  echo "Found existing bbgo.yaml, you will overwrite the existing bbgo.yaml file!"
-  read -p "Are you sure? (Y/n) " a
+  warn "found existing bbgo.yaml, you will overwrite the existing bbgo.yaml file!"
+  read -p "are you sure? (Y/n) " a
   if [[ $a == "n" ]] ; then
     exit
   fi
@@ -70,14 +91,19 @@ exchangeStrategies:
 
 END
 
-echo "Config file is generated"
-echo "================================================================"
-echo "Now you can edit your strategy config file bbgo.yaml to run bbgo"
+info "config file is generated successfully"
+info "================================================================"
+info "now you can edit your strategy config file bbgo.yaml to run bbgo"
 
 if [[ $osf == "darwin" ]] ; then
-    echo "We found you're using MacOS, you can type:"
+    echo "we found you're using MacOS, you can type:"
     echo ""
     echo "  open -a TextEdit bbgo.yaml"
+    echo ""
+else
+    echo "you look like a pro user, you can edit the config by:"
+    echo ""
+    echo "  vim bbgo.yaml"
     echo ""
 fi
 
