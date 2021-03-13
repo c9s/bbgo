@@ -49,3 +49,50 @@ func Test_toGlobalOrderFromOpenOrder(t *testing.T) {
 	assert.Equal(t, types.OrderStatusPartiallyFilled, o.Status)
 	assert.Equal(t, float64(10), o.ExecutedQuantity)
 }
+
+func TestTrimLowerString(t *testing.T) {
+	type args struct {
+		original string
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "spaces",
+			args: args{
+				original: "  ",
+			},
+			want: "",
+		},
+		{
+			name: "uppercase",
+			args: args{
+				original: " HELLO ",
+			},
+			want: "hello",
+		},
+		{
+			name: "lowercase",
+			args: args{
+				original: " hello",
+			},
+			want: "hello",
+		},
+		{
+			name: "upper/lower cases",
+			args: args{
+				original: " heLLo  ",
+			},
+			want: "hello",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := TrimLowerString(tt.args.original); got != tt.want {
+				t.Errorf("TrimLowerString() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
