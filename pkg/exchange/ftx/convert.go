@@ -21,10 +21,14 @@ func TrimUpperString(original string) string {
 	return strings.ToUpper(strings.TrimSpace(original))
 }
 
+func TrimLowerString(original string) string {
+	return strings.ToLower(strings.TrimSpace(original))
+}
+
 var errUnsupportedOrderStatus = fmt.Errorf("unsupported order status")
 
-func toGlobalOrderFromOpenOrder(r order) (types.Order, error) {
-	// In exchange/max, it only parses these fields.
+func toGlobalOrder(r order) (types.Order, error) {
+	// In exchange/max/convert.go, it only parses these fields.
 	o := types.Order{
 		SubmitOrder: types.SubmitOrder{
 			ClientOrderID: r.ClientId,
