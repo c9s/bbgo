@@ -10,9 +10,9 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-// go run ./cmd/bbgo orders [open|closed] --session=ftx --symbol=BTC/USDT
-var ordersCmd = &cobra.Command{
-	Use:  "orders [status]",
+// go run ./cmd/bbgo listorders [open|closed] --session=ftx --symbol=BTC/USDT
+var listOrdersCmd = &cobra.Command{
+	Use:  "listorders [status]",
 	Args: cobra.OnlyValidArgs,
 	// default is open which means we query open orders if you haven't provided args.
 	ValidArgs:    []string{"", "open", "closed"},
@@ -48,6 +48,7 @@ var ordersCmd = &cobra.Command{
 				return err
 			}
 		case "closed":
+			panic("not implemented")
 		default:
 			return fmt.Errorf("invalid status %s", status)
 		}
@@ -58,8 +59,8 @@ var ordersCmd = &cobra.Command{
 }
 
 func init() {
-	ordersCmd.Flags().String("session", "", "the exchange session name for sync")
-	ordersCmd.Flags().String("symbol", "", "the trading pair, like btcusdt")
+	listOrdersCmd.Flags().String("session", "", "the exchange session name for sync")
+	listOrdersCmd.Flags().String("symbol", "", "the trading pair, like btcusdt")
 
-	RootCmd.AddCommand(ordersCmd)
+	RootCmd.AddCommand(listOrdersCmd)
 }
