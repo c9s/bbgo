@@ -377,6 +377,16 @@ func (e *Exchange) PlatformFeeCurrency() string {
 	return toGlobalCurrency("max")
 }
 
+func (e *Exchange) getLaunchDate() (time.Time, error) {
+	// MAX launch date June 21th, 2018
+	loc, err := time.LoadLocation("Asia/Taipei")
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	return time.Date(2018, time.June, 21, 0, 0, 0, 0, loc), nil
+}
+
 func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	if err := accountQueryLimiter.Wait(ctx); err != nil {
 		return nil, err
@@ -407,10 +417,19 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 
 func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (allWithdraws []types.Withdraw, err error) {
 	startTime := since
+	limit := 1000
 	txIDs := map[string]struct{}{}
 
+	emptyTime := time.Time{}
+	if startTime == emptyTime {
+		startTime, err = e.getLaunchDate()
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	for startTime.Before(until) {
-		// startTime ~ endTime must be in 90 days
+		// startTime ~ endTime must be in 60 days
 		endTime := startTime.AddDate(0, 0, 60)
 		if endTime.After(until) {
 			endTime = until
@@ -425,10 +444,16 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 		withdraws, err := req.
 			From(startTime.Unix()).
 			To(endTime.Unix()).
+			Limit(limit).
 			Do(ctx)
 
 		if err != nil {
 			return allWithdraws, err
+		}
+
+		if len(withdraws) == 0 {
+			startTime = endTime
+			continue
 		}
 
 		for _, d := range withdraws {
@@ -456,7 +481,7 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 			}
 
 			txIDs[d.TxID] = struct{}{}
-			allWithdraws = append(allWithdraws, types.Withdraw{
+			withdraw := types.Withdraw{
 				Exchange:       types.ExchangeMax,
 				ApplyTime:      datatype.Time(time.Unix(d.CreatedAt, 0)),
 				Asset:          toGlobalCurrency(d.Currency),
@@ -468,10 +493,17 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 				// WithdrawOrderID: d.WithdrawOrderID,
 				// Network:         d.Network,
 				Status: status,
-			})
+			}
+			allWithdraws = append(allWithdraws, withdraw)
 		}
 
-		startTime = endTime
+		// go next time frame
+		if len(withdraws) < limit {
+			startTime = endTime
+		} else {
+			startTime = time.Unix(withdraws[len(withdraws)-1].UpdatedAt, 0)
+		}
+
 	}
 
 	return allWithdraws, nil
@@ -507,14 +539,14 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 			}
 
 			allDeposits = append(allDeposits, types.Deposit{
-				Exchange:       types.ExchangeMax,
-				Time:           datatype.Time(time.Unix(d.CreatedAt, 0)),
-				Amount:         util.MustParseFloat(d.Amount),
-				Asset:          toGlobalCurrency(d.Currency),
-				Address:        "", // not supported
-				AddressTag:     "", // not supported
-				TransactionID:  d.TxID,
-				Status:         toGlobalDepositStatus(d.State),
+				Exchange:      types.ExchangeMax,
+				Time:          datatype.Time(time.Unix(d.CreatedAt, 0)),
+				Amount:        util.MustParseFloat(d.Amount),
+				Asset:         toGlobalCurrency(d.Currency),
+				Address:       "", // not supported
+				AddressTag:    "", // not supported
+				TransactionID: d.TxID,
+				Status:        toGlobalDepositStatus(d.State),
 			})
 		}
 

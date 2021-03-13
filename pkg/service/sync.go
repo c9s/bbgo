@@ -8,7 +8,8 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-var ErrNotImplemented = errors.New("exchange does not implement ExchangeRewardService interface")
+var ErrNotImplemented = errors.New("not implemented")
+var ErrExchangeRewardServiceNotImplemented = errors.New("exchange does not implement ExchangeRewardService interface")
 
 type SyncService struct {
 	TradeService    *TradeService
@@ -31,7 +32,7 @@ func (s *SyncService) SyncSessionSymbols(ctx context.Context, exchange types.Exc
 	}
 
 	if err := s.RewardService.Sync(ctx, exchange); err != nil {
-		if err != ErrNotImplemented {
+		if err != ErrExchangeRewardServiceNotImplemented {
 			return err
 		}
 	}

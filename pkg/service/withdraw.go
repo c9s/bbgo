@@ -1,6 +1,9 @@
 package service
 
 import (
+	"context"
+	"time"
+
 	"github.com/jmoiron/sqlx"
 
 	"github.com/c9s/bbgo/pkg/types"
@@ -8,6 +11,37 @@ import (
 
 type WithdrawService struct {
 	DB *sqlx.DB
+}
+
+func (s *WithdrawService) Sync(ctx context.Context, ex types.Exchange) error {
+	txnIDs := map[string]struct{}{}
+
+	records, err := s.QueryLast(ex.Name(), 10)
+	if err != nil {
+		return err
+	}
+
+	for _, record := range records {
+		txnIDs[record.TransactionID] = struct{}{}
+	}
+
+	transferApi, ok := ex.(types.ExchangeTransferService)
+	if !ok {
+		return ErrNotImplemented
+	}
+
+	withdraws, err := transferApi.QueryWithdrawHistory(ctx, "", records[0].ApplyTime.Time(), time.Now())
+	if err != nil {
+		return err
+	}
+
+	for _, withdraw := range withdraws {
+		if _, exists := txnIDs[withdraw.TransactionID] ; exists {
+			continue
+		}
+	}
+
+	return nil
 }
 
 func (s *WithdrawService) QueryLast(ex types.ExchangeName, limit int) ([]types.Withdraw, error) {
