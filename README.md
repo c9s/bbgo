@@ -31,7 +31,18 @@ Get your exchange API key and secret after you register the accounts:
 
 ## Installation
 
-Setup MySQL or [run it in docker](https://hub.docker.com/_/mysql)
+
+### Install from binary
+
+The following script will help you setup a config file, dotenv file:
+
+```
+bash <(curl -s https://raw.githubusercontent.com/c9s/bbgo/main/scripts/setup-grid.sh)
+```
+
+### Install from source
+
+Optional: setup MySQL or [run it in docker](https://hub.docker.com/_/mysql)
 
 Install the builtin commands:
 
