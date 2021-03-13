@@ -34,7 +34,7 @@ func Test_toGlobalOrderFromOpenOrder(t *testing.T) {
 	var r order
 	assert.NoError(t, json.Unmarshal([]byte(input), &r))
 
-	o, err := toGlobalOrderFromOpenOrder(r)
+	o, err := toGlobalOrder(r)
 	assert.NoError(t, err)
 	assert.Equal(t, "client-id-123", o.ClientOrderID)
 	assert.Equal(t, "XRP-PERP", o.Symbol)

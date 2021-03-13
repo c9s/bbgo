@@ -4,10 +4,13 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	"github.com/c9s/bbgo/pkg/exchange/ftx"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 // go run ./cmd/bbgo listorders [open|closed] --session=ftx --symbol=BTC/USDT
@@ -52,8 +55,66 @@ var listOrdersCmd = &cobra.Command{
 		default:
 			return fmt.Errorf("invalid status %s", status)
 		}
-		log.Infof("%s orders: %+v", status, os)
 
+		for _, o := range os {
+			log.Infof("%s orders: %+v", status, o)
+		}
+
+		return nil
+	},
+}
+
+// go run ./cmd/bbgo placeorder --session=ftx --symbol=BTC/USDT --side=buy --price=<price> --quantity=<quantity>
+var placeOrderCmd = &cobra.Command{
+	Use:          "placeorder",
+	SilenceUsage: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
+		session, err := cmd.Flags().GetString("session")
+		if err != nil {
+			return fmt.Errorf("can't get session from flags: %w", err)
+		}
+		ex, err := newExchange(session)
+		if err != nil {
+			return err
+		}
+		symbol, err := cmd.Flags().GetString("symbol")
+		if err != nil {
+			return fmt.Errorf("can't get the symbol from flags: %w", err)
+		}
+		if symbol == "" {
+			return fmt.Errorf("symbol is not found")
+		}
+
+		side, err := cmd.Flags().GetString("side")
+		if err != nil {
+			return fmt.Errorf("can't get side: %w", err)
+		}
+		price, err := cmd.Flags().GetString("price")
+		if err != nil {
+			return fmt.Errorf("can't get price: %w", err)
+		}
+		quantity, err := cmd.Flags().GetString("quantity")
+		if err != nil {
+			return fmt.Errorf("can't get quantity: %w", err)
+		}
+
+		so := types.SubmitOrder{
+			ClientOrderID: uuid.New().String(),
+			Symbol:        symbol,
+			Side:          types.SideType(ftx.TrimUpperString(side)),
+			Type:          types.OrderTypeLimit,
+			Quantity:      util.MustParseFloat(quantity),
+			Price:         util.MustParseFloat(price),
+			Market:        types.Market{Symbol: symbol},
+			TimeInForce:   "GTC",
+		}
+		co, err := ex.SubmitOrders(ctx, so)
+		if err != nil {
+			return err
+		}
+
+		log.Infof("submitted order: %+v\ncreated order: %+v", so, co[0])
 		return nil
 	},
 }
@@ -62,5 +123,12 @@ func init() {
 	listOrdersCmd.Flags().String("session", "", "the exchange session name for sync")
 	listOrdersCmd.Flags().String("symbol", "", "the trading pair, like btcusdt")
 
+	placeOrderCmd.Flags().String("session", "", "the exchange session name for sync")
+	placeOrderCmd.Flags().String("symbol", "", "the trading pair, like btcusdt")
+	placeOrderCmd.Flags().String("side", "", "the trading side: buy or sell")
+	placeOrderCmd.Flags().String("price", "", "the trading price")
+	placeOrderCmd.Flags().String("quantity", "", "the trading quantity")
+
 	RootCmd.AddCommand(listOrdersCmd)
+	RootCmd.AddCommand(placeOrderCmd)
 }

@@ -97,8 +97,38 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 	panic("implement me")
 }
 
-func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error) {
-	panic("implement me")
+func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (types.OrderSlice, error) {
+	var createdOrders types.OrderSlice
+	// TODO: currently only support limit and market order
+	// TODO: support time in force
+	for _, so := range orders {
+		if so.TimeInForce != "GTC" {
+			return createdOrders, fmt.Errorf("unsupported TimeInForce %s. only support GTC", so.TimeInForce)
+		}
+		or, err := e.rest.PlaceOrder(ctx, PlaceOrderPayload{
+			Market:     TrimUpperString(so.Symbol),
+			Side:       TrimLowerString(string(so.Side)),
+			Price:      so.Price,
+			Type:       TrimLowerString(string(so.Type)),
+			Size:       so.Quantity,
+			ReduceOnly: false,
+			IOC:        false,
+			PostOnly:   false,
+			ClientID:   so.ClientOrderID,
+		})
+		if err != nil {
+			return createdOrders, fmt.Errorf("failed to place order %+v: %w", so, err)
+		}
+		if !or.Success {
+			return createdOrders, fmt.Errorf("ftx returns placing order failure")
+		}
+		globalOrder, err := toGlobalOrder(or.Result)
+		if err != nil {
+			return createdOrders, fmt.Errorf("failed to convert response to global order")
+		}
+		createdOrders = append(createdOrders, globalOrder)
+	}
+	return createdOrders, nil
 }
 
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
@@ -111,7 +141,7 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 		return nil, fmt.Errorf("ftx returns querying open orders failure")
 	}
 	for _, r := range resp.Result {
-		o, err := toGlobalOrderFromOpenOrder(r)
+		o, err := toGlobalOrder(r)
 		if err != nil {
 			return nil, err
 		}
