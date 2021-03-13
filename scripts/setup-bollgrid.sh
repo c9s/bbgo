@@ -1,12 +1,14 @@
 #!/bin/bash
 osf=$(uname | tr '[:upper:]' '[:lower:]')
-version=v1.6.0
+version=v1.13.0
+dist_file=bbgo-$version-$osf-amd64.tar.gz
 
-echo "Downloading bbgo"
-curl -L -o bbgo https://github.com/c9s/bbgo/releases/download/$version/bbgo-$osf
+echo "downloading..."
+curl -L https://github.com/c9s/bbgo/releases/download/$version/$dist_file
+tar xzf $dist_file
+mv bbgo-darwin bbgo
 chmod +x bbgo
-echo "Binary downloaded"
-echo "Config file is generated"
+echo "downloaded"
 
 function gen_dotenv()
 {
@@ -14,8 +16,8 @@ function gen_dotenv()
     read -p "Enter your MAX API secret: " api_secret
     echo "Generating your .env.local file..."
 cat <<END > .env.local
-export MAX_API_KEY=$api_key
-export MAX_API_SECRET=$api_secret
+MAX_API_KEY=$api_key
+MAX_API_SECRET=$api_secret
 END
 
 }
@@ -57,10 +59,11 @@ exchangeStrategies:
 - on: max
   bollgrid:
     symbol: BTCUSDT
-    interval: 5m
+    interval: 1h
     gridNumber: 20
     quantity: 0.001
-    profitSpread: 50.0
+    profitSpread: 100.0
+
 END
 
 echo "Config file is generated"
@@ -76,7 +79,7 @@ fi
 
 echo "To run bbgo just type: "
 echo ""
-echo "   source .env.local && ./bbgo run --config bbgo.yaml"
+echo "   ./bbgo run"
 echo ""
 echo "To stop bbgo, just hit CTRL-C"
 
