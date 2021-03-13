@@ -37,3 +37,9 @@ type order struct {
 	PostOnly      bool    `json:"postOnly"`
 	ClientId      string  `json:"clientId"`
 }
+
+type orderResponse struct {
+	Success bool `json:"Success"`
+
+	Result order `json:"result"`
+}
