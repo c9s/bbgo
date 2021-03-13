@@ -36,7 +36,7 @@ func (s *RewardService) QueryLast(ex types.ExchangeName, limit int) ([]types.Rew
 func (s *RewardService) Sync(ctx context.Context, exchange types.Exchange) error {
 	service, ok := exchange.(types.ExchangeRewardService)
 	if !ok {
-		return ErrNotImplemented
+		return ErrExchangeRewardServiceNotImplemented
 	}
 
 	var rewardKeys = map[string]struct{}{}

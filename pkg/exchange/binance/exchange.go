@@ -194,9 +194,27 @@ func (e *Exchange) QueryIsolatedMarginAccount(ctx context.Context, symbols ...st
 	return toGlobalIsolatedMarginAccount(account), nil
 }
 
-func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (allWithdraws []types.Withdraw, err error) {
+func (e *Exchange) getLaunchDate() (time.Time, error) {
+	// binance launch date 12:00 July 14th, 2017
+	loc, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		return time.Time{}, err
+	}
 
+	return time.Date(2017, time.July, 14, 0, 0, 0, 0, loc), nil
+}
+
+func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (allWithdraws []types.Withdraw, err error) {
 	startTime := since
+
+	var emptyTime = time.Time{}
+	if startTime == emptyTime {
+		startTime, err = e.getLaunchDate()
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	txIDs := map[string]struct{}{}
 
 	for startTime.Before(until) {
