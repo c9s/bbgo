@@ -4,12 +4,32 @@ osf=$(uname | tr '[:upper:]' '[:lower:]')
 version=v1.13.0
 dist_file=bbgo-$version-$osf-amd64.tar.gz
 
-echo "downloading..."
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+NC='\033[0m' # No Color
+
+function warn()
+{
+    echo -e "${YELLOW}$@${NC}"
+}
+
+function error()
+{
+    echo -e "${RED}$@${NC}"
+}
+
+function info()
+{
+    echo -e "${GREEN}$@${NC}"
+}
+
+info "downloading..."
 curl -O -L https://github.com/c9s/bbgo/releases/download/$version/$dist_file
 tar xzf $dist_file
 mv bbgo-$osf bbgo
 chmod +x bbgo
-echo "downloaded"
+info "downloaded successfully"
 
 function gen_dotenv()
 {
@@ -67,14 +87,19 @@ exchangeStrategies:
 
 END
 
-echo "Config file is generated"
+info "config file is generated successfully"
 echo "================================================================"
-echo "Now you can edit your strategy config file bbgo.yaml to run bbgo"
+echo "now you can edit your strategy config file bbgo.yaml to run bbgo"
 
 if [[ $osf == "darwin" ]] ; then
-    echo "We found you're using MacOS, you can type:"
+    echo "we found you're using MacOS, you can type:"
     echo ""
     echo "  open -a TextEdit bbgo.yaml"
+    echo ""
+else
+    echo "you look like a pro user, you can edit the config by:"
+    echo ""
+    echo "  vim bbgo.yaml"
     echo ""
 fi
 
