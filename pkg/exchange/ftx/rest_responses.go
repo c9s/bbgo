@@ -12,7 +12,7 @@ type balances struct {
 	} `json:"result"`
 }
 
-type orders struct {
+type ordersResponse struct {
 	Success bool `json:"Success"`
 
 	Result []order `json:"result"`
@@ -36,4 +36,10 @@ type order struct {
 	Ioc           bool    `json:"ioc"`
 	PostOnly      bool    `json:"postOnly"`
 	ClientId      string  `json:"clientId"`
+}
+
+type orderResponse struct {
+	Success bool `json:"Success"`
+
+	Result order `json:"result"`
 }
