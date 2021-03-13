@@ -24,7 +24,31 @@ case "$command" in
         submitOrder order_params
         ;;
 
-    withdrawal-history)
+    deposits)
+        declare -A params=()
+        currency=$1
+        if [[ -n $currency ]] ; then
+          params[currency]=$currency
+        fi
+
+        deposits params \
+          | jq -r '.[] | [ .uuid, ((.amount | tonumber) * 10000 | floor / 10000), .currency, .state, (.created_at | strflocaltime("%Y-%m-%dT%H:%M:%S %Z")), .note ] | @tsv' \
+          | column -ts $'\t'
+        ;;
+
+    withdrawals)
+        declare -A params=()
+        currency=$1
+        if [[ -n $currency ]] ; then
+          params[currency]=$currency
+        fi
+
+        withdrawals params \
+          | jq -r '.[] | [ .uuid, ((.amount | tonumber) * 10000 | floor / 10000), .currency, ((.fee | tonumber) * 10000 | floor / 10000), .fee_currency, .state, (.created_at | strflocaltime("%Y-%m-%dT%H:%M:%S %Z")), .note ] | @tsv' \
+          | column -ts $'\t'
+        ;;
+
+    withdrawals)
         declare -A params=()
         currency=$1
         if [[ -n $currency ]] ; then
