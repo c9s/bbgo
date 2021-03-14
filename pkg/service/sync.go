@@ -31,6 +31,18 @@ func (s *SyncService) SyncSessionSymbols(ctx context.Context, exchange types.Exc
 		}
 	}
 
+	if err := s.DepositService.Sync(ctx, exchange); err != nil {
+		if err != ErrNotImplemented {
+			return err
+		}
+	}
+
+	if err := s.WithdrawService.Sync(ctx, exchange); err != nil {
+		if err != ErrNotImplemented {
+			return err
+		}
+	}
+
 	if err := s.RewardService.Sync(ctx, exchange); err != nil {
 		if err != ErrExchangeRewardServiceNotImplemented {
 			return err
