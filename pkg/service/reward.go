@@ -15,6 +15,10 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+// RewardService collects the reward records from the exchange,
+// currently it's only available for MAX exchange.
+// TODO: add summary query for calculating the reward amounts
+// CREATE VIEW reward_summary_by_years AS SELECT YEAR(created_at) as year, reward_type, currency, SUM(quantity) FROM rewards WHERE reward_type != 'airdrop' GROUP BY YEAR(created_at), reward_type, currency ORDER BY year DESC;
 type RewardService struct {
 	DB *sqlx.DB
 }
