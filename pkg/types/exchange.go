@@ -2,6 +2,7 @@ package types
 
 import (
 	"context"
+	"database/sql/driver"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -14,9 +15,13 @@ const DateFormat = "2006-01-02"
 
 type ExchangeName string
 
+func (n *ExchangeName) Value() (driver.Value, error) {
+	return n.String(), nil
+}
+
 func (n *ExchangeName) UnmarshalJSON(data []byte) error {
 	var s string
-	if err := json.Unmarshal(data, &s) ; err != nil {
+	if err := json.Unmarshal(data, &s); err != nil {
 		return err
 	}
 
