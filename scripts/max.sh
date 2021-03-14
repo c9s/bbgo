@@ -32,7 +32,7 @@ case "$command" in
         fi
 
         deposits params \
-          | jq -r '.[] | [ .uuid, ((.amount | tonumber) * 10000 | floor / 10000), .currency, .state, (.created_at | strflocaltime("%Y-%m-%dT%H:%M:%S %Z")), .note ] | @tsv' \
+          | jq -r '.[] | [ .uuid, .txid, ((.amount | tonumber) * 10000 | floor / 10000), .currency, .state, (.created_at | strflocaltime("%Y-%m-%dT%H:%M:%S %Z")), .note ] | @tsv' \
           | column -ts $'\t'
         ;;
 
@@ -44,19 +44,7 @@ case "$command" in
         fi
 
         withdrawals params \
-          | jq -r '.[] | [ .uuid, ((.amount | tonumber) * 10000 | floor / 10000), .currency, ((.fee | tonumber) * 10000 | floor / 10000), .fee_currency, .state, (.created_at | strflocaltime("%Y-%m-%dT%H:%M:%S %Z")), .note ] | @tsv' \
-          | column -ts $'\t'
-        ;;
-
-    withdrawals)
-        declare -A params=()
-        currency=$1
-        if [[ -n $currency ]] ; then
-          params[currency]=$currency
-        fi
-
-        withdrawalHistory params \
-          | jq -r '.[] | [ .uuid, ((.amount | tonumber) * 10000 | floor / 10000), .currency, ((.fee | tonumber) * 10000 | floor / 10000), .fee_currency, .state, (.created_at | strflocaltime("%Y-%m-%dT%H:%M:%S %Z")), .note ] | @tsv' \
+          | jq -r '.[] | [ .uuid, .txid, ((.amount | tonumber) * 10000 | floor / 10000), .currency, ((.fee | tonumber) * 10000 | floor / 10000), .fee_currency, .state, (.created_at | strflocaltime("%Y-%m-%dT%H:%M:%S %Z")), .note ] | @tsv' \
           | column -ts $'\t'
         ;;
 
