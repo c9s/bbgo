@@ -515,6 +515,15 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 	startTime := since
 	limit := 1000
 	txIDs := map[string]struct{}{}
+
+	emptyTime := time.Time{}
+	if startTime == emptyTime {
+		startTime, err = e.getLaunchDate()
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	for startTime.Before(until) {
 		// startTime ~ endTime must be in 90 days
 		endTime := startTime.AddDate(0, 0, 60)
