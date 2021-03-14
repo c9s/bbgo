@@ -101,7 +101,11 @@ var TransferHistoryCmd = &cobra.Command{
 
 		var records timeSlice
 
-		exchange := session.Exchange
+		exchange, ok := session.Exchange.(types.ExchangeTransferService)
+		if !ok {
+			return fmt.Errorf("exchange session %s does not implement transfer service", sessionName)
+		}
+
 		deposits, err := exchange.QueryDepositHistory(ctx, asset, since, until)
 		if err != nil {
 			return err

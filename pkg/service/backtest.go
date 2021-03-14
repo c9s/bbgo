@@ -17,33 +17,41 @@ type BacktestService struct {
 	DB *sqlx.DB
 }
 
-func (s *BacktestService) Sync(ctx context.Context, exchange types.Exchange, symbol string, startTime time.Time) error {
-	now := time.Now()
-	for interval := range types.SupportedIntervals {
-		log.Infof("synchronizing lastKLine for interval %s from exchange %s", interval, exchange.Name())
+func (s *BacktestService) SyncKLineByInterval(ctx context.Context, exchange types.Exchange, symbol string, interval types.Interval, startTime, endTime time.Time) error {
+	log.Infof("synchronizing lastKLine for interval %s from exchange %s", interval, exchange.Name())
 
-		lastKLine, err := s.QueryLast(exchange.Name(), symbol, interval)
-		if err != nil {
+	lastKLine, err := s.QueryLast(exchange.Name(), symbol, interval)
+	if err != nil {
+		return err
+	}
+
+	if lastKLine != nil {
+		log.Infof("found last checkpoint %s", lastKLine.EndTime)
+		startTime = lastKLine.StartTime.Add(time.Minute)
+	}
+
+	batch := &batch2.KLineBatchQuery{Exchange: exchange}
+
+	// should use channel here
+	klineC, errC := batch.Query(ctx, symbol, interval, startTime, endTime)
+	// var previousKLine types.KLine
+	for k := range klineC {
+		if err := s.Insert(k); err != nil {
 			return err
 		}
+	}
 
-		if lastKLine != nil {
-			log.Infof("found last checkpoint %s", lastKLine.EndTime)
-			startTime = lastKLine.StartTime.Add(time.Minute)
-		}
+	if err := <-errC; err != nil {
+		return err
+	}
 
-		batch := &batch2.KLineBatchQuery{Exchange: exchange}
+	return nil
+}
 
-		// should use channel here
-		klineC, errC := batch.Query(ctx, symbol, interval, startTime, now)
-		// var previousKLine types.KLine
-		for k := range klineC {
-			if err := s.Insert(k); err != nil {
-				return err
-			}
-		}
-
-		if err := <-errC; err != nil {
+func (s *BacktestService) Sync(ctx context.Context, exchange types.Exchange, symbol string, startTime time.Time) error {
+	endTime := time.Now()
+	for interval := range types.SupportedIntervals {
+		if err := s.SyncKLineByInterval(ctx, exchange, symbol, interval, startTime, endTime) ; err != nil {
 			return err
 		}
 	}
