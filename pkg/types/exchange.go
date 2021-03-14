@@ -77,10 +77,6 @@ type Exchange interface {
 
 	QueryTrades(ctx context.Context, symbol string, options *TradeQueryOptions) ([]Trade, error)
 
-	QueryDepositHistory(ctx context.Context, asset string, since, until time.Time) (allDeposits []Deposit, err error)
-
-	QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (allWithdraws []Withdraw, err error)
-
 	SubmitOrders(ctx context.Context, orders ...SubmitOrder) (createdOrders OrderSlice, err error)
 
 	QueryOpenOrders(ctx context.Context, symbol string) (orders []Order, err error)
@@ -88,6 +84,11 @@ type Exchange interface {
 	QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []Order, err error)
 
 	CancelOrders(ctx context.Context, orders ...Order) error
+}
+
+type ExchangeTransferService interface {
+	QueryDepositHistory(ctx context.Context, asset string, since, until time.Time) (allDeposits []Deposit, err error)
+	QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (allWithdraws []Withdraw, err error)
 }
 
 type ExchangeRewardService interface {
