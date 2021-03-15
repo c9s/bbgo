@@ -42,6 +42,8 @@ func NewStream(key, secret string) *Stream {
 		}
 	})
 
+	wss.OnDisconnect(stream.EmitDisconnect)
+
 	wss.OnMessage(func(message []byte) {
 		logger.Debugf("M: %s", message)
 	})

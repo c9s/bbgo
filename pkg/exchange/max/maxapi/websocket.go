@@ -53,7 +53,7 @@ type WebSocketService struct {
 	Subscriptions []Subscription
 
 	connectCallbacks    []func(conn *websocket.Conn)
-	disconnectCallbacks []func(conn *websocket.Conn)
+	disconnectCallbacks []func()
 
 	errorCallbacks             []func(err error)
 	messageCallbacks           []func(message []byte)
@@ -163,6 +163,7 @@ func (s *WebSocketService) read(ctx context.Context) {
 
 			if err != nil {
 				if websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure) {
+					s.EmitDisconnect()
 					// emit reconnect to start a new connection
 					s.emitReconnect()
 					return
