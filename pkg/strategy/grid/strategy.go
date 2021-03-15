@@ -367,7 +367,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 
 	session.Stream.OnTradeUpdate(s.tradeUpdateHandler)
-	session.Stream.OnConnect(func() {
+	session.Stream.OnStart(func() {
 		s.placeGridOrders(orderExecutor, session)
 	})
 
