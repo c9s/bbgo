@@ -232,7 +232,7 @@ then the following types could be injected automatically:
 1. Load config from the config file.
 2. Allocate and initialize exchange sessions.
 3. Add exchange sessions to the environment (the data layer).
-4. Use the given environment to initialize the trader object.
+4. Use the given environment to initialize the trader object (the logic layer).
 5. The trader initializes the environment and start the exchange connections.
 6. Call strategy.Run() method sequentially.
 
