@@ -238,7 +238,6 @@ func (rule *SlideRule) Scale() (Scale, error) {
 	return nil, errors.New("no any scale is defined")
 }
 
-
 // PriceVolumeScale defines the scale DSL for strategy, e.g.,
 //
 // scaleQuantity:
@@ -282,7 +281,7 @@ func (q *PriceVolumeScale) ScaleByPrice(price float64) (float64, error) {
 		return 0, err
 	}
 
-	if err := scale.Solve() ; err != nil {
+	if err := scale.Solve(); err != nil {
 		return 0, err
 	}
 
@@ -300,7 +299,7 @@ func (q *PriceVolumeScale) ScaleByVolume(volume float64) (float64, error) {
 		return 0, err
 	}
 
-	if err := scale.Solve() ; err != nil {
+	if err := scale.Solve(); err != nil {
 		return 0, err
 	}
 
