@@ -110,6 +110,7 @@ type ExchangeSession struct {
 	EnvVarPrefix string `json:"envVarPrefix" yaml:"envVarPrefix"`
 	Key          string `json:"key,omitempty" yaml:"key,omitempty"`
 	Secret       string `json:"secret,omitempty" yaml:"secret,omitempty"`
+	SubAccount   string `json:"subAccount,omitempty" yaml:"subAccount,omitempty"`
 
 	PublicOnly           bool   `json:"publicOnly,omitempty" yaml:"publicOnly"`
 	Margin               bool   `json:"margin,omitempty" yaml:"margin"`
@@ -560,4 +561,3 @@ func (session *ExchangeSession) FindPossibleSymbols() (symbols []string, err err
 
 	return symbols, nil
 }
-

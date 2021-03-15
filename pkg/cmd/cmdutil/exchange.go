@@ -8,16 +8,20 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/c9s/bbgo/pkg/exchange/binance"
+	"github.com/c9s/bbgo/pkg/exchange/ftx"
 	"github.com/c9s/bbgo/pkg/exchange/max"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func NewExchangeStandard(n types.ExchangeName, key, secret string) (types.Exchange, error) {
+func NewExchangeStandard(n types.ExchangeName, key, secret, subAccount string) (types.Exchange, error) {
 	if len(key) == 0 || len(secret) == 0 {
 		return nil, errors.New("binance: empty key or secret")
 	}
 
 	switch n {
+
+	case types.ExchangeFTX:
+		return ftx.NewExchange(key, secret, subAccount), nil
 
 	case types.ExchangeBinance:
 		return binance.New(key, secret), nil
@@ -44,7 +48,8 @@ func NewExchangeWithEnvVarPrefix(n types.ExchangeName, varPrefix string) (types.
 		return nil, fmt.Errorf("%s: empty key or secret, env var prefix: %s", n, varPrefix)
 	}
 
-	return NewExchangeStandard(n, key, secret)
+	subAccount := os.Getenv(varPrefix + "_SUBACCOUNT")
+	return NewExchangeStandard(n, key, secret, subAccount)
 }
 
 // NewExchange constructor exchange object from viper config.
