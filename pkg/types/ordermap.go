@@ -5,6 +5,14 @@ import "sync"
 // OrderMap is used for storing orders by their order id
 type OrderMap map[uint64]Order
 
+func (m OrderMap) Backup() (orderForms []SubmitOrder) {
+	for _, order := range m {
+		orderForms = append(orderForms, order.Backup())
+	}
+
+	return orderForms
+}
+
 func (m OrderMap) Add(o Order) {
 	m[o.OrderID] = o
 }
@@ -68,6 +76,12 @@ func NewSyncOrderMap() *SyncOrderMap {
 	return &SyncOrderMap{
 		orders: make(OrderMap),
 	}
+}
+
+func (m *SyncOrderMap) Backup() []SubmitOrder {
+	m.Lock()
+	defer m.Unlock()
+	return m.orders.Backup()
 }
 
 func (m *SyncOrderMap) Remove(orderID uint64) (exists bool) {
