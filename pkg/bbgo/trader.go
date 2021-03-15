@@ -14,7 +14,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
-var SupportedExchanges = []types.ExchangeName{"binance", "max"}
+var SupportedExchanges = []types.ExchangeName{"binance", "max", "ftx"}
 
 // SingleExchangeStrategy represents the single Exchange strategy
 type SingleExchangeStrategy interface {
@@ -103,7 +103,7 @@ func (trader *Trader) Configure(userConfig *Config) error {
 	for _, entry := range userConfig.ExchangeStrategies {
 		for _, mount := range entry.Mounts {
 			log.Infof("attaching strategy %T on %s...", entry.Strategy, mount)
-			if err := trader.AttachStrategyOn(mount, entry.Strategy) ; err != nil {
+			if err := trader.AttachStrategyOn(mount, entry.Strategy); err != nil {
 				return err
 			}
 		}
@@ -130,7 +130,6 @@ func (trader *Trader) Configure(userConfig *Config) error {
 
 	return nil
 }
-
 
 // AttachStrategyOn attaches the single exchange strategy on an exchange Session.
 // Single exchange strategy is the default behavior.
