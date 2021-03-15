@@ -42,9 +42,8 @@ var balancesCmd = &cobra.Command{
 			return err
 		}
 
-
 		environ := bbgo.NewEnvironment()
-		if err := environ.ConfigureDatabase(ctx) ; err != nil {
+		if err := environ.ConfigureDatabase(ctx); err != nil {
 			return err
 		}
 
@@ -71,4 +70,3 @@ var balancesCmd = &cobra.Command{
 		return nil
 	},
 }
-
