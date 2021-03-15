@@ -155,7 +155,7 @@ func (s *Strategy) generateGridSellOrders(session *bbgo.ExchangeSession) ([]type
 		}
 
 		if _, filled := s.filledSellGrids[price]; filled {
-			log.Infof("sell grid at price %f is already filled, skipping", price.Float64())
+			log.Debugf("sell grid at price %f is already filled, skipping", price.Float64())
 			continue
 		}
 
@@ -239,7 +239,7 @@ func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types
 		}
 
 		if _, filled := s.filledBuyGrids[price]; filled {
-			log.Infof("buy grid at price %f is already filled, skipping", price.Float64())
+			log.Debugf("buy grid at price %f is already filled, skipping", price.Float64())
 			continue
 		}
 
