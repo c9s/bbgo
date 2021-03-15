@@ -237,18 +237,23 @@ func (b *OrderBook) String() string {
 	sb.WriteString("BOOK ")
 	sb.WriteString(b.Symbol)
 	sb.WriteString("\n")
-	sb.WriteString("ASKS:\n")
-	for i := len(b.Asks) - 1; i >= 0; i-- {
-		sb.WriteString("- ASK: ")
-		sb.WriteString(b.Asks[i].String())
-		sb.WriteString("\n")
+
+	if len(b.Asks) > 0 {
+		sb.WriteString("ASKS:\n")
+		for i := len(b.Asks) - 1; i >= 0; i-- {
+			sb.WriteString("- ASK: ")
+			sb.WriteString(b.Asks[i].String())
+			sb.WriteString("\n")
+		}
 	}
 
-	sb.WriteString("BIDS:\n")
-	for _, bid := range b.Bids {
-		sb.WriteString("- BID: ")
-		sb.WriteString(bid.String())
-		sb.WriteString("\n")
+	if len(b.Bids) > 0 {
+		sb.WriteString("BIDS:\n")
+		for _, bid := range b.Bids {
+			sb.WriteString("- BID: ")
+			sb.WriteString(bid.String())
+			sb.WriteString("\n")
+		}
 	}
 
 	return sb.String()

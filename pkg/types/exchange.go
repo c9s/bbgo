@@ -61,19 +61,16 @@ type Exchange interface {
 
 	PlatformFeeCurrency() string
 
-	NewStream() Stream
+	// required implementation
+	ExchangeMarketDataService
 
-	QueryMarkets(ctx context.Context) (MarketMap, error)
+	ExchangeTradingService
+}
 
+type ExchangeTradingService interface {
 	QueryAccount(ctx context.Context) (*Account, error)
 
 	QueryAccountBalances(ctx context.Context) (BalanceMap, error)
-
-	QueryTicker(ctx context.Context, symbol string) (*Ticker, error)
-
-	QueryTickers(ctx context.Context, symbol ...string) (map[string]Ticker, error)
-
-	QueryKLines(ctx context.Context, symbol string, interval Interval, options KLineQueryOptions) ([]KLine, error)
 
 	QueryTrades(ctx context.Context, symbol string, options *TradeQueryOptions) ([]Trade, error)
 
@@ -84,6 +81,18 @@ type Exchange interface {
 	QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []Order, err error)
 
 	CancelOrders(ctx context.Context, orders ...Order) error
+}
+
+type ExchangeMarketDataService interface {
+	NewStream() Stream
+
+	QueryMarkets(ctx context.Context) (MarketMap, error)
+
+	QueryTicker(ctx context.Context, symbol string) (*Ticker, error)
+
+	QueryTickers(ctx context.Context, symbol ...string) (map[string]Ticker, error)
+
+	QueryKLines(ctx context.Context, symbol string, interval Interval, options KLineQueryOptions) ([]KLine, error)
 }
 
 type ExchangeTransferService interface {
