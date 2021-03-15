@@ -218,7 +218,7 @@ func NewExchangeSessionFromConfig(name string, sessionConfig *ExchangeSession) (
 	var exchange types.Exchange
 
 	if sessionConfig.Key != "" && sessionConfig.Secret != "" {
-		exchange, err = cmdutil.NewExchangeStandard(exchangeName, sessionConfig.Key, sessionConfig.Secret)
+		exchange, err = cmdutil.NewExchangeStandard(exchangeName, sessionConfig.Key, sessionConfig.Secret, sessionConfig.SubAccount)
 	} else {
 		exchange, err = cmdutil.NewExchangeWithEnvVarPrefix(exchangeName, sessionConfig.EnvVarPrefix)
 	}
