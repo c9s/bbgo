@@ -48,7 +48,6 @@ func (e ClosedOrderBatchQuery) Query(ctx context.Context, symbol string, startTi
 
 			for _, o := range orders {
 				if _, ok := orderIDs[o.OrderID]; ok {
-					logrus.Infof("skipping duplicated order id: %d", o.OrderID)
 					continue
 				}
 
@@ -224,7 +223,6 @@ func (q *RewardBatchQuery) Query(ctx context.Context, startTime, endTime time.Ti
 
 			for _, o := range rewards {
 				if _, ok := rewardKeys[o.UUID]; ok {
-					logrus.Debugf("skipping duplicated order id: %s", o.UUID)
 					continue
 				}
 

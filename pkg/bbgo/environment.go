@@ -161,9 +161,11 @@ func (environ *Environment) ConfigureDatabaseDriver(ctx context.Context, driver 
 	environ.RewardService = &service.RewardService{DB: db}
 
 	environ.SyncService = &service.SyncService{
-		TradeService:  environ.TradeService,
-		OrderService:  environ.OrderService,
-		RewardService: environ.RewardService,
+		TradeService:    environ.TradeService,
+		OrderService:    environ.OrderService,
+		RewardService:   environ.RewardService,
+		WithdrawService: &service.WithdrawService{DB: db},
+		DepositService:  &service.DepositService{DB: db},
 	}
 
 	return nil

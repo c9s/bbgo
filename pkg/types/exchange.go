@@ -2,6 +2,7 @@ package types
 
 import (
 	"context"
+	"database/sql/driver"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -14,9 +15,13 @@ const DateFormat = "2006-01-02"
 
 type ExchangeName string
 
+func (n *ExchangeName) Value() (driver.Value, error) {
+	return n.String(), nil
+}
+
 func (n *ExchangeName) UnmarshalJSON(data []byte) error {
 	var s string
-	if err := json.Unmarshal(data, &s) ; err != nil {
+	if err := json.Unmarshal(data, &s); err != nil {
 		return err
 	}
 
@@ -72,10 +77,6 @@ type Exchange interface {
 
 	QueryTrades(ctx context.Context, symbol string, options *TradeQueryOptions) ([]Trade, error)
 
-	QueryDepositHistory(ctx context.Context, asset string, since, until time.Time) (allDeposits []Deposit, err error)
-
-	QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (allWithdraws []Withdraw, err error)
-
 	SubmitOrders(ctx context.Context, orders ...SubmitOrder) (createdOrders OrderSlice, err error)
 
 	QueryOpenOrders(ctx context.Context, symbol string) (orders []Order, err error)
@@ -83,6 +84,11 @@ type Exchange interface {
 	QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []Order, err error)
 
 	CancelOrders(ctx context.Context, orders ...Order) error
+}
+
+type ExchangeTransferService interface {
+	QueryDepositHistory(ctx context.Context, asset string, since, until time.Time) (allDeposits []Deposit, err error)
+	QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (allWithdraws []Withdraw, err error)
 }
 
 type ExchangeRewardService interface {

@@ -118,7 +118,7 @@ type Deposit struct {
 	Fee             string `json:"fee"`
 	TxID            string `json:"txid"`
 	State           string `json:"state"`
-	Confirmations   string    `json:"confirmations"`
+	Confirmations   string `json:"confirmations"`
 	CreatedAt       int64  `json:"created_at"`
 	UpdatedAt       int64  `json:"updated_at"`
 }
@@ -187,14 +187,13 @@ func (s *AccountService) NewGetDepositHistoryRequest() *GetDepositHistoryRequest
 	}
 }
 
-
-
 type Withdraw struct {
-	UUID string `json:"uuid"`
+	UUID            string `json:"uuid"`
 	Currency        string `json:"currency"`
 	CurrencyVersion string `json:"currency_version"` // "eth"
 	Amount          string `json:"amount"`
 	Fee             string `json:"fee"`
+	FeeCurrency     string `json:"fee_currency"`
 	TxID            string `json:"txid"`
 
 	// State can be "submitting", "submitted",
@@ -203,10 +202,10 @@ type Withdraw struct {
 	//     "failed", "pending", "confirmed",
 	//     "kgi_manually_processing", "kgi_manually_confirmed", "kgi_possible_failed",
 	//     "sygna_verifying"
-	State           string `json:"state"`
-	Confirmations   int    `json:"confirmations"`
-	CreatedAt       int64  `json:"created_at"`
-	UpdatedAt       int64  `json:"updated_at"`
+	State         string `json:"state"`
+	Confirmations int    `json:"confirmations"`
+	CreatedAt     int64  `json:"created_at"`
+	UpdatedAt     int64  `json:"updated_at"`
 }
 
 type GetWithdrawHistoryRequestParams struct {
