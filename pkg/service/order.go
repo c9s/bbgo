@@ -1,19 +1,81 @@
 package service
 
 import (
+	"context"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/exchange/batch"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
 type OrderService struct {
 	DB *sqlx.DB
 }
+
+func (s *OrderService) Sync(ctx context.Context, exchange types.Exchange, symbol string, startTime time.Time) error {
+	isMargin := false
+	isIsolated := false
+	if marginExchange, ok := exchange.(types.MarginExchange); ok {
+		marginSettings := marginExchange.GetMarginSettings()
+		isMargin = marginSettings.IsMargin
+		isIsolated = marginSettings.IsIsolatedMargin
+		if marginSettings.IsIsolatedMargin {
+			symbol = marginSettings.IsolatedMarginSymbol
+		}
+	}
+
+	records, err := s.QueryLast(exchange.Name(), symbol, isMargin, isIsolated, 50)
+	if err != nil {
+		return err
+	}
+
+	orderKeys := make(map[uint64]struct{})
+
+	var lastID uint64 = 0
+	if len(records) > 0 {
+		for _, record := range records {
+			orderKeys[record.OrderID] = struct{}{}
+		}
+
+		lastID = records[0].OrderID
+		startTime = records[0].CreationTime.Time()
+	}
+
+	b := &batch.ClosedOrderBatchQuery{Exchange: exchange}
+	ordersC, errC := b.Query(ctx, symbol, startTime, time.Now(), lastID)
+	for order := range ordersC {
+		select {
+
+		case <-ctx.Done():
+			return ctx.Err()
+
+		case err := <-errC:
+			if err != nil {
+				return err
+			}
+
+		default:
+
+		}
+
+		if _, exists := orderKeys[order.OrderID]; exists {
+			continue
+		}
+
+		if err := s.Insert(order); err != nil {
+			return err
+		}
+	}
+
+	return <-errC
+}
+
 
 // QueryLast queries the last order from the database
 func (s *OrderService) QueryLast(ex types.ExchangeName, symbol string, isMargin, isIsolated bool, limit int) ([]types.Order, error) {
