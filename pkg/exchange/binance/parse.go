@@ -410,11 +410,10 @@ type KLine struct {
 	Open  string `json:"o"`
 	Close string `json:"c"`
 	High  string `json:"h"`
+	Low   string `json:"l"`
 
-	Low string `json:"l"`
-
-	Volume           string `json:"v"` // base asset volume (like 10 BTC)
-	QuoteVolume      string `json:"q"` // quote asset volume
+	Volume      string `json:"v"` // base asset volume (like 10 BTC)
+	QuoteVolume string `json:"q"` // quote asset volume
 
 	TakerBaseVolume  string `json:"V"` // taker buy base asset volume (like 10 BTC)
 	TakerQuoteVolume string `json:"Q"` // taker buy quote asset volume (like 1000USDT)
