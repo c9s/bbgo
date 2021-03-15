@@ -310,6 +310,8 @@ func (s *Stream) Connect(ctx context.Context) error {
 	}
 
 	go s.read(ctx)
+
+	s.EmitStart()
 	return nil
 }
 
