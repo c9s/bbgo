@@ -260,6 +260,10 @@ streambook := types.NewStreamBook(symbol)
 streambook.BindStream(stream)
 ```
 
+## How To Add A New Exchange
+
+(TBD)
+
 ## Telegram Integration
 
 - In telegram: @botFather
