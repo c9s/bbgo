@@ -21,8 +21,9 @@ const (
 var logger = logrus.WithField("exchange", "ftx")
 
 type Exchange struct {
-	rest        *restRequest
-	key, secret string
+	key, secret  string
+	subAccount   string
+	restEndpoint *url.URL
 }
 
 func NewExchange(key, secret string, subAccount string) *Exchange {
@@ -30,15 +31,20 @@ func NewExchange(key, secret string, subAccount string) *Exchange {
 	if err != nil {
 		panic(err)
 	}
-	rest := newRestRequest(&http.Client{Timeout: defaultHTTPTimeout}, u).Auth(key, secret)
-	if subAccount != "" {
-		rest.SubAccount(subAccount)
-	}
 	return &Exchange{
-		rest:   rest,
-		key:    key,
-		secret: secret,
+		restEndpoint: u,
+		key:          key,
+		secret:       secret,
+		subAccount:   subAccount,
 	}
+}
+
+func (e *Exchange) newRest() *restRequest {
+	r := newRestRequest(&http.Client{Timeout: defaultHTTPTimeout}, e.restEndpoint).Auth(e.key, e.secret)
+	if len(e.subAccount) > 0 {
+		r.SubAccount(e.subAccount)
+	}
+	return r
 }
 
 func (e *Exchange) Name() types.ExchangeName {
@@ -62,7 +68,7 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 }
 
 func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
-	resp, err := e.rest.Balances(ctx)
+	resp, err := e.newRest().Balances(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +111,7 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 		if so.TimeInForce != "GTC" {
 			return createdOrders, fmt.Errorf("unsupported TimeInForce %s. only support GTC", so.TimeInForce)
 		}
-		or, err := e.rest.PlaceOrder(ctx, PlaceOrderPayload{
+		or, err := e.newRest().PlaceOrder(ctx, PlaceOrderPayload{
 			Market:     TrimUpperString(so.Symbol),
 			Side:       TrimLowerString(string(so.Side)),
 			Price:      so.Price,
@@ -133,7 +139,7 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
 	// TODO: invoke open trigger orders
-	resp, err := e.rest.OpenOrders(ctx, symbol)
+	resp, err := e.newRest().OpenOrders(ctx, symbol)
 	if err != nil {
 		return nil, err
 	}
