@@ -489,6 +489,8 @@ func (environ *Environment) Connect(ctx context.Context) error {
 		if err := session.Stream.Connect(ctx); err != nil {
 			return err
 		}
+
+		session.Stream.EmitStart()
 	}
 
 	return nil
