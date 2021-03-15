@@ -116,21 +116,33 @@ function cancelOrder()
 
 function myOrders()
 {
-    local -n params=$1
-    send_auth_request "GET" "/api/v2/orders" params
+    local -n _params=$1
+    send_auth_request "GET" "/api/v2/orders" _params
 }
 
 
 function myTrades()
 {
-    local -n params=$1
-    send_auth_request "GET" "/api/v2/trades/my" params
+    local -n _params=$1
+    send_auth_request "GET" "/api/v2/trades/my" _params
 }
 
 function rewards()
 {
-    local -n params=$1
-    send_auth_request "GET" "/api/v2/rewards" params
+    local -n _params=$1
+    send_auth_request "GET" "/api/v2/rewards" _params
+}
+
+function deposits()
+{
+    local -n _params=$1
+    send_auth_request "GET" "/api/v2/deposits" _params
+}
+
+function withdrawals()
+{
+    local -n _params=$1
+    send_auth_request "GET" "/api/v2/withdrawals" _params
 }
 
 
