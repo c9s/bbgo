@@ -155,6 +155,14 @@ type Order struct {
 	IsIsolated bool `json:"isIsolated" db:"is_isolated"`
 }
 
+// Backup backs up the current order quantity to a SubmitOrder object
+// so that we can post the order later when we want to restore the orders.
+func (o Order) Backup() SubmitOrder {
+	so := o.SubmitOrder
+	so.Quantity = o.Quantity - o.ExecutedQuantity
+	return so
+}
+
 func (o Order) String() string {
 	return fmt.Sprintf("order %s %f/%f at %f -> %s", o.Side, o.ExecutedQuantity, o.Quantity, o.Price, o.Status)
 }

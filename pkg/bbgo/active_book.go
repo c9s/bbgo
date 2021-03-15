@@ -22,6 +22,10 @@ func NewLocalActiveOrderBook() *LocalActiveOrderBook {
 	}
 }
 
+func (b *LocalActiveOrderBook) Backup() []types.SubmitOrder {
+	return append(b.Bids.Backup(), b.Asks.Backup()...)
+}
+
 func (b *LocalActiveOrderBook) BindStream(stream types.Stream) {
 	stream.OnOrderUpdate(b.orderUpdateHandler)
 }
