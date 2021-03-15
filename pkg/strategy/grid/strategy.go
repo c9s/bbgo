@@ -412,13 +412,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		return fmt.Errorf("position not found")
 	}
 
-	log.Infof("position: %+v", position)
+	s.position = *position
 
-	s.position = bbgo.Position{
-		Symbol:        s.Symbol,
-		BaseCurrency:  s.Market.BaseCurrency,
-		QuoteCurrency: s.Market.QuoteCurrency,
-	}
+	s.Notify("current position %+v", position)
 
 	instanceID := fmt.Sprintf("grid-%s-%d", s.Symbol, s.GridNum)
 	s.groupID = generateGroupID(instanceID)
