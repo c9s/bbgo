@@ -411,9 +411,13 @@ type KLine struct {
 	Close string `json:"c"`
 	High  string `json:"h"`
 
-	Low         string `json:"l"`
-	Volume      string `json:"V"` // taker buy base asset volume (like 10 BTC)
-	QuoteVolume string `json:"Q"` // taker buy quote asset volume (like 1000USDT)
+	Low string `json:"l"`
+
+	Volume           string `json:"v"` // base asset volume (like 10 BTC)
+	QuoteVolume      string `json:"q"` // quote asset volume
+
+	TakerBaseVolume  string `json:"V"` // taker buy base asset volume (like 10 BTC)
+	TakerQuoteVolume string `json:"Q"` // taker buy quote asset volume (like 1000USDT)
 
 	LastTradeID    int   `json:"L"`
 	NumberOfTrades int64 `json:"n"`
@@ -438,7 +442,7 @@ func (k *KLine) KLine() types.KLine {
 		High:           util.MustParseFloat(k.High),
 		Low:            util.MustParseFloat(k.Low),
 		Volume:         util.MustParseFloat(k.Volume),
-		QuoteVolume:    util.MustParseFloat(k.QuoteVolume),
+		QuoteVolume:    util.MustParseFloat(k.TakerQuoteVolume),
 		LastTradeID:    uint64(k.LastTradeID),
 		NumberOfTrades: uint64(k.NumberOfTrades),
 		Closed:         k.Closed,
