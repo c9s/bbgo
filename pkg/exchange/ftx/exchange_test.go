@@ -44,7 +44,7 @@ func TestExchange_QueryAccountBalances(t *testing.T) {
 	ex := NewExchange("", "", "")
 	serverURL, err := url.Parse(ts.URL)
 	assert.NoError(t, err)
-	ex.rest = newRestRequest(&http.Client{Timeout: defaultHTTPTimeout}, serverURL)
+	ex.restEndpoint = serverURL
 	resp, err := ex.QueryAccountBalances(context.Background())
 	assert.NoError(t, err)
 
