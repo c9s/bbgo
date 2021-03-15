@@ -18,7 +18,7 @@ func (s *WithdrawService) Sync(ctx context.Context, ex types.Exchange) error {
 	txnIDs := map[string]struct{}{}
 
 	// query descending
-	records, err := s.QueryLast(ex.Name(), 100)
+	records, err := s.QueryLast(ex.Name(), 10)
 	if err != nil {
 		return err
 	}
