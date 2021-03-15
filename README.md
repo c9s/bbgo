@@ -67,7 +67,7 @@ MAX_API_SECRET=
 FTX_API_KEY=
 FTX_API_SECRET=
 # specify it if credentials are for subaccount
-FTX_SUBACCOUNT_NAME=
+FTX_SUBACCOUNT=
 
 MYSQL_URL=root@tcp(127.0.0.1:3306)/bbgo?parseTime=true
 ```
