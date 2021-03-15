@@ -246,6 +246,7 @@ func NewExchangeSessionFromConfig(name string, sessionConfig *ExchangeSession) (
 	session.EnvVarPrefix = sessionConfig.EnvVarPrefix
 	session.Key = sessionConfig.Key
 	session.Secret = sessionConfig.Secret
+	session.SubAccount = sessionConfig.SubAccount
 	session.PublicOnly = sessionConfig.PublicOnly
 	session.Margin = sessionConfig.Margin
 	session.IsolatedMargin = sessionConfig.IsolatedMargin
