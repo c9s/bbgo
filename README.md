@@ -53,22 +53,28 @@ go get -u github.com/c9s/bbgo/cmd/bbgo
 Add your dotenv file:
 
 ```
+# optional
 SLACK_TOKEN=
 
+# optional
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_BOT_AUTH_TOKEN=
 
+# if you have one
 BINANCE_API_KEY=
 BINANCE_API_SECRET=
 
+# if you have one
 MAX_API_KEY=
 MAX_API_SECRET=
 
+# if you have one
 FTX_API_KEY=
 FTX_API_SECRET=
 # specify it if credentials are for subaccount
 FTX_SUBACCOUNT_NAME=
 
+# optional, if you have the db setup
 MYSQL_URL=root@tcp(127.0.0.1:3306)/bbgo?parseTime=true
 ```
 
@@ -219,6 +225,16 @@ then the following types could be injected automatically:
 
 - `*bbgo.ExchangeSession`
 - `types.Market`
+
+
+## Strategy Execution Phases
+
+1. Load config from the config file.
+2. Allocate and initialize exchange sessions.
+3. Add exchange sessions to the environment (the data layer).
+4. Use the given environment to initialize the trader object.
+5. The trader initializes the environment and start the exchange connections.
+6. Call strategy.Run() method sequentially.
 
 ## Exchange API Examples
 
