@@ -14,6 +14,16 @@ func (stream *StandardStream) EmitConnect() {
 	}
 }
 
+func (stream *StandardStream) OnDisconnect(cb func()) {
+	stream.disconnectCallbacks = append(stream.disconnectCallbacks, cb)
+}
+
+func (stream *StandardStream) EmitDisconnect() {
+	for _, cb := range stream.disconnectCallbacks {
+		cb()
+	}
+}
+
 func (stream *StandardStream) OnTradeUpdate(cb func(trade Trade)) {
 	stream.tradeUpdateCallbacks = append(stream.tradeUpdateCallbacks, cb)
 }
@@ -96,6 +106,8 @@ func (stream *StandardStream) EmitBookSnapshot(book OrderBook) {
 
 type StandardStreamEventHub interface {
 	OnConnect(cb func())
+
+	OnDisconnect(cb func())
 
 	OnTradeUpdate(cb func(trade Trade))
 
