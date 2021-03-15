@@ -1,6 +1,10 @@
 package types
 
-import "time"
+import (
+	"time"
+
+	"github.com/c9s/bbgo/pkg/datatype"
+)
 
 type DepositStatus string
 
@@ -20,15 +24,17 @@ const (
 )
 
 type Deposit struct {
-	Time          time.Time     `json:"time"`
-	Amount        float64       `json:"amount"`
-	Asset         string        `json:"asset"`
-	Address       string        `json:"address"`
+	GID           int64         `json:"gid" db:"gid"`
+	Exchange      ExchangeName  `json:"exchange" db:"exchange"`
+	Time          datatype.Time `json:"time" db:"time"`
+	Amount        float64       `json:"amount" db:"amount"`
+	Asset         string        `json:"asset" db:"asset"`
+	Address       string        `json:"address" db:"address"`
 	AddressTag    string        `json:"addressTag"`
-	TransactionID string        `json:"txId"`
+	TransactionID string        `json:"transactionID" db:"txn_id"`
 	Status        DepositStatus `json:"status"`
 }
 
 func (d Deposit) EffectiveTime() time.Time {
-	return d.Time
+	return d.Time.Time()
 }
