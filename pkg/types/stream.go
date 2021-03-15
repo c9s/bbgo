@@ -25,6 +25,8 @@ type StandardStream struct {
 
 	connectCallbacks []func()
 
+	disconnectCallbacks []func()
+
 	// private trade update callbacks
 	tradeUpdateCallbacks []func(trade Trade)
 
