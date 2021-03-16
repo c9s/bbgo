@@ -62,6 +62,39 @@ func (r *orderRequest) PlaceOrder(ctx context.Context, p PlaceOrderPayload) (ord
 
 	return o, nil
 }
+func (r *orderRequest) CancelOrderByOrderID(ctx context.Context, orderID uint64) (cancelOrderResponse, error) {
+	resp, err := r.
+		Method("DELETE").
+		ReferenceURL("api/orders").
+		Payloads(map[string]interface{}{"order_id": orderID}).
+		DoAuthenticatedRequest(ctx)
+	if err != nil {
+		return cancelOrderResponse{}, err
+	}
+
+	var co cancelOrderResponse
+	if err := json.Unmarshal(resp.Body, &r); err != nil {
+		return cancelOrderResponse{}, err
+	}
+	return co, nil
+}
+
+func (r *orderRequest) CancelOrderByClientID(ctx context.Context, clientID string) (cancelOrderResponse, error) {
+	resp, err := r.
+		Method("DELETE").
+		ReferenceURL("api/orders/by_client_id").
+		Payloads(map[string]interface{}{"client_order_id": clientID}).
+		DoAuthenticatedRequest(ctx)
+	if err != nil {
+		return cancelOrderResponse{}, err
+	}
+
+	var co cancelOrderResponse
+	if err := json.Unmarshal(resp.Body, &r); err != nil {
+		return cancelOrderResponse{}, err
+	}
+	return co, nil
+}
 
 func (r *orderRequest) OpenOrders(ctx context.Context, market string) (ordersResponse, error) {
 	resp, err := r.

@@ -3,7 +3,7 @@ package ftx
 import "time"
 
 type balances struct {
-	Success bool `json:"Success"`
+	Success bool `json:"success"`
 
 	Result []struct {
 		Coin  string  `json:"coin"`
@@ -13,9 +13,14 @@ type balances struct {
 }
 
 type ordersResponse struct {
-	Success bool `json:"Success"`
+	Success bool `json:"success"`
 
 	Result []order `json:"result"`
+}
+
+type cancelOrderResponse struct {
+	Success bool   `json:"success"`
+	Result  string `json:"result"`
 }
 
 type order struct {
@@ -39,7 +44,7 @@ type order struct {
 }
 
 type orderResponse struct {
-	Success bool `json:"Success"`
+	Success bool `json:"success"`
 
 	Result order `json:"result"`
 }
