@@ -310,6 +310,8 @@ func (s *Stream) Connect(ctx context.Context) error {
 	}
 
 	go s.read(ctx)
+
+	s.EmitStart()
 	return nil
 }
 
@@ -365,6 +367,8 @@ func (s *Stream) read(ctx context.Context) {
 				} else {
 					log.Info("websocket connection closed, going away")
 				}
+
+				s.EmitDisconnect()
 
 				// reconnect
 				for err != nil {

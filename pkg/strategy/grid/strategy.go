@@ -56,25 +56,38 @@ type Strategy struct {
 	LowerPrice fixedpoint.Value `json:"lowerPrice" yaml:"lowerPrice"`
 
 	// Quantity is the quantity you want to submit for each order.
-	Quantity      fixedpoint.Value       `json:"quantity,omitempty"`
+	Quantity fixedpoint.Value `json:"quantity,omitempty"`
+
+	// ScaleQuantity helps user to define the quantity by price scale or volume scale
 	ScaleQuantity *bbgo.PriceVolumeScale `json:"scaleQuantity,omitempty"`
 
 	// FixedAmount is used for fixed amount (dynamic quantity) if you don't want to use fixed quantity.
 	FixedAmount fixedpoint.Value `json:"amount,omitempty" yaml:"amount"`
 
+	// Side is the initial maker orders side. defaults to "both"
+	Side types.SideType `json:"side" yaml:"side"`
+
+	// CatchUp let the maker grid catch up with the price change.
+	CatchUp bool `json:"catchUp" yaml:"catchUp"`
+
 	// Long means you want to hold more base asset than the quote asset.
 	Long bool `json:"long,omitempty" yaml:"long,omitempty"`
 
+	filledBuyGrids  map[fixedpoint.Value]struct{}
+	filledSellGrids map[fixedpoint.Value]struct{}
+
+	// orderStore is used to store all the created orders, so that we can filter the trades.
 	orderStore *bbgo.OrderStore
 
 	// activeOrders is the locally maintained active order book of the maker orders.
 	activeOrders *bbgo.LocalActiveOrderBook
 
-	position fixedpoint.Value
+	position bbgo.Position
 
 	// any created orders for tracking trades
 	orders map[uint64]types.Order
 
+	// groupID is the group ID used for the strategy instance for canceling orders
 	groupID int64
 }
 
@@ -141,6 +154,11 @@ func (s *Strategy) generateGridSellOrders(session *bbgo.ExchangeSession) ([]type
 				baseBalance.Available.Float64())
 		}
 
+		if _, filled := s.filledSellGrids[price]; filled {
+			log.Debugf("sell grid at price %f is already filled, skipping", price.Float64())
+			continue
+		}
+
 		orders = append(orders, types.SubmitOrder{
 			Symbol:      s.Symbol,
 			Side:        types.SideTypeSell,
@@ -152,12 +170,15 @@ func (s *Strategy) generateGridSellOrders(session *bbgo.ExchangeSession) ([]type
 			GroupID:     s.groupID,
 		})
 		baseBalance.Available -= quantity
+
+		s.filledSellGrids[price] = struct{}{}
 	}
 
 	return orders, nil
 }
 
 func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types.SubmitOrder, error) {
+	// session.Exchange.QueryTicker()
 	currentPriceFloat, ok := session.LastPrice(s.Symbol)
 	if !ok {
 		return nil, fmt.Errorf("%s last price not found, skipping", s.Symbol)
@@ -217,6 +238,11 @@ func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types
 				quoteQuantity.Float64())
 		}
 
+		if _, filled := s.filledBuyGrids[price]; filled {
+			log.Debugf("buy grid at price %f is already filled, skipping", price.Float64())
+			continue
+		}
+
 		orders = append(orders, types.SubmitOrder{
 			Symbol:      s.Symbol,
 			Side:        types.SideTypeBuy,
@@ -228,40 +254,74 @@ func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types
 			GroupID:     s.groupID,
 		})
 		balance.Available -= quoteQuantity
+
+		s.filledBuyGrids[price] = struct{}{}
 	}
 
 	return orders, nil
 }
 
+func (s *Strategy) placeGridSellOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+	orderForms, err := s.generateGridSellOrders(session)
+	if err != nil {
+		return err
+	}
+
+	if len(orderForms) > 0 {
+		createdOrders, err := orderExecutor.SubmitOrders(context.Background(), orderForms...)
+		if err != nil {
+			return err
+		}
+
+		s.activeOrders.Add(createdOrders...)
+	}
+
+	return nil
+}
+
+func (s *Strategy) placeGridBuyOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+	orderForms, err := s.generateGridBuyOrders(session)
+	if err != nil {
+		return err
+	}
+
+	if len(orderForms) > 0 {
+		createdOrders, err := orderExecutor.SubmitOrders(context.Background(), orderForms...)
+		if err != nil {
+			return err
+		} else {
+			s.activeOrders.Add(createdOrders...)
+		}
+	}
+
+	return nil
+}
+
 func (s *Strategy) placeGridOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) {
 	log.Infof("placing grid orders...")
 
-	sellOrders, err := s.generateGridSellOrders(session)
-	if err != nil {
-		log.Warn(err.Error())
-	}
-	if len(sellOrders) > 0 {
-		createdSellOrders, err := orderExecutor.SubmitOrders(context.Background(), sellOrders...)
-		if err != nil {
-			log.WithError(err).Error(err.Error())
-		} else {
-			s.activeOrders.Add(createdSellOrders...)
+	switch s.Side {
+
+	case types.SideTypeBuy:
+		if err := s.placeGridBuyOrders(orderExecutor, session); err != nil {
+			log.Warn(err.Error())
+		}
+
+	case types.SideTypeSell:
+		if err := s.placeGridSellOrders(orderExecutor, session); err != nil {
+			log.Warn(err.Error())
+		}
+
+	case types.SideTypeBoth:
+		if err := s.placeGridSellOrders(orderExecutor, session); err != nil {
+			log.Warn(err.Error())
+		}
+
+		if err := s.placeGridBuyOrders(orderExecutor, session); err != nil {
+			log.Warn(err.Error())
 		}
 	}
 
-	buyOrders, err := s.generateGridBuyOrders(session)
-	if err != nil {
-		log.Warn(err.Error())
-	}
-
-	if len(buyOrders) > 0 {
-		createdBuyOrders, err := orderExecutor.SubmitOrders(context.Background(), buyOrders...)
-		if err != nil {
-			log.WithError(err).Error(err.Error())
-		} else {
-			s.activeOrders.Add(createdBuyOrders...)
-		}
-	}
 }
 
 func (s *Strategy) tradeUpdateHandler(trade types.Trade) {
@@ -271,11 +331,14 @@ func (s *Strategy) tradeUpdateHandler(trade types.Trade) {
 
 	if s.orderStore.Exists(trade.OrderID) {
 		log.Infof("received trade update of order %d: %+v", trade.OrderID, trade)
-		switch trade.Side {
-		case types.SideTypeBuy:
-			s.position.AtomicAdd(fixedpoint.NewFromFloat(trade.Quantity))
-		case types.SideTypeSell:
-			s.position.AtomicAdd(-fixedpoint.NewFromFloat(trade.Quantity))
+
+		if trade.Side == types.SideTypeSelf {
+			return
+		}
+
+		profit, madeProfit := s.position.AddTrade(trade)
+		if madeProfit {
+			s.Notify("profit: %f", profit.Float64())
 		}
 	}
 }
@@ -333,16 +396,25 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.GridNum = 10
 	}
 
+	if s.Side == "" {
+		s.Side = types.SideTypeBoth
+	}
+
 	if s.UpperPrice <= s.LowerPrice {
 		return fmt.Errorf("upper price (%f) should not be less than lower price (%f)", s.UpperPrice.Float64(), s.LowerPrice.Float64())
 	}
+
+	s.filledBuyGrids = make(map[fixedpoint.Value]struct{})
+	s.filledSellGrids = make(map[fixedpoint.Value]struct{})
 
 	position, ok := session.Position(s.Symbol)
 	if !ok {
 		return fmt.Errorf("position not found")
 	}
 
-	log.Infof("position: %+v", position)
+	s.position = *position
+
+	s.Notify("current position %+v", position)
 
 	instanceID := fmt.Sprintf("grid-%s-%d", s.Symbol, s.GridNum)
 	s.groupID = generateGroupID(instanceID)
@@ -360,14 +432,21 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		defer wg.Done()
 
 		log.Infof("canceling active orders...")
-
 		if err := session.Exchange.CancelOrders(ctx, s.activeOrders.Orders()...); err != nil {
 			log.WithError(err).Errorf("cancel order error")
 		}
 	})
 
+	if s.CatchUp {
+		session.Stream.OnKLineClosed(func(kline types.KLine) {
+			log.Infof("catchUp mode is enabled, updating grid orders...")
+			// update grid
+			s.placeGridOrders(orderExecutor, session)
+		})
+	}
+
 	session.Stream.OnTradeUpdate(s.tradeUpdateHandler)
-	session.Stream.OnConnect(func() {
+	session.Stream.OnStart(func() {
 		s.placeGridOrders(orderExecutor, session)
 	})
 

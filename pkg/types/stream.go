@@ -23,6 +23,8 @@ var KLineChannel = Channel("kline")
 type StandardStream struct {
 	Subscriptions []Subscription
 
+	startCallbacks []func()
+
 	connectCallbacks []func()
 
 	disconnectCallbacks []func()

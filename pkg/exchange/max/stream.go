@@ -42,6 +42,8 @@ func NewStream(key, secret string) *Stream {
 		}
 	})
 
+	wss.OnDisconnect(stream.EmitDisconnect)
+
 	wss.OnMessage(func(message []byte) {
 		logger.Debugf("M: %s", message)
 	})
@@ -169,7 +171,13 @@ func (s *Stream) Subscribe(channel types.Channel, symbol string, options types.S
 }
 
 func (s *Stream) Connect(ctx context.Context) error {
-	return s.websocketService.Connect(ctx)
+	err := s.websocketService.Connect(ctx)
+	if err != nil {
+		return err
+	}
+
+	s.EmitStart()
+	return nil
 }
 
 func (s *Stream) Close() error {
