@@ -13,9 +13,9 @@ func (n *NullNotifier) Notify(format string, args ...interface{}) {}
 
 type Notifiability struct {
 	notifiers            []Notifier
-	SessionChannelRouter *PatternChannelRouter
-	SymbolChannelRouter  *PatternChannelRouter
-	ObjectChannelRouter  *ObjectChannelRouter
+	SessionChannelRouter *PatternChannelRouter `json:"-"`
+	SymbolChannelRouter  *PatternChannelRouter `json:"-"`
+	ObjectChannelRouter  *ObjectChannelRouter  `json:"-"`
 }
 
 // RouteSession routes symbol name to channel
