@@ -333,8 +333,8 @@ func (s *Strategy) tradeUpdateHandler(trade types.Trade) {
 		log.Infof("received trade update of order %d: %+v", trade.OrderID, trade)
 
 		if s.TradeService != nil {
-			if err := s.TradeService.MarkStrategyID(context.Background(), trade.ID, ID) ; err != nil {
-				log.WithError(err).Error("mark strategy ID error")
+			if err := s.TradeService.Mark(context.Background(), trade.ID, ID); err != nil {
+				log.WithError(err).Error("trade mark error")
 			}
 		}
 

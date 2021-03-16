@@ -36,7 +36,7 @@ func Test_tradeService(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	err = service.MarkStrategyID(ctx, 1, "grid")
+	err = service.Mark(ctx, 1, "grid")
 	assert.NoError(t, err)
 
 	tradeRecord, err := service.Load(ctx, 1)
