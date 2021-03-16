@@ -92,8 +92,8 @@ func BootstrapEnvironment(ctx context.Context, environ *bbgo.Environment, userCo
 		}
 	}
 
-	if err := environ.ConfigureNotificationSystem(userConfig) ; err != nil {
-		return errors.Wrap(err,"notification configure error")
+	if err := environ.ConfigureNotificationSystem(userConfig); err != nil {
+		return errors.Wrap(err, "notification configure error")
 	}
 
 	return nil
@@ -108,7 +108,7 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config, enableApiServer
 		return err
 	}
 
-	if err := environ.Sync(ctx) ; err != nil {
+	if err := environ.Sync(ctx); err != nil {
 		return err
 	}
 
@@ -262,4 +262,3 @@ func buildAndRun(ctx context.Context, userConfig *bbgo.Config, args ...string) (
 	runCmd.Stderr = os.Stderr
 	return runCmd, runCmd.Start()
 }
-
