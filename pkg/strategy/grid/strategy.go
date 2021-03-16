@@ -31,6 +31,7 @@ type Snapshot struct {
 	Orders          []types.SubmitOrder           `json:"orders,omitempty"`
 	FilledBuyGrids  map[fixedpoint.Value]struct{} `json:"filledBuyGrids"`
 	FilledSellGrids map[fixedpoint.Value]struct{} `json:"filledSellGrids"`
+	Position        *bbgo.Position                 `json:"position,omitempty"`
 }
 
 type Strategy struct {
@@ -465,6 +466,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			submitOrders := s.activeOrders.Backup()
 			snapshot := Snapshot{
 				Orders: submitOrders,
+				Position: &s.position,
 			}
 
 			if err := s.Persistence.Save(&snapshot, ID, s.Symbol, "snapshot"); err != nil {
@@ -502,6 +504,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 			if snapshot.FilledBuyGrids != nil {
 				s.filledBuyGrids = snapshot.FilledBuyGrids
+			}
+			if snapshot.Position != nil {
+				s.position = *snapshot.Position
 			}
 		} else {
 			s.placeGridOrders(orderExecutor, session)
