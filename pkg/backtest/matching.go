@@ -42,6 +42,7 @@ type SimplePriceMatching struct {
 	askOrders []types.Order
 
 	LastPrice   fixedpoint.Value
+	LastKLine   types.KLine
 	CurrentTime time.Time
 
 	Account *types.Account
@@ -400,6 +401,7 @@ func (m *SimplePriceMatching) SellToPrice(price fixedpoint.Value) (closedOrders 
 
 func (m *SimplePriceMatching) processKLine(kline types.KLine) {
 	m.CurrentTime = kline.EndTime
+	m.LastKLine = kline
 
 	switch kline.Direction() {
 	case types.DirectionDown:

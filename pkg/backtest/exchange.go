@@ -211,8 +211,22 @@ func (e Exchange) QueryTrades(ctx context.Context, symbol string, options *types
 }
 
 func (e Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticker, error) {
-	// Not using Tickers in back test (yet)
-	return nil, ErrUnimplemented
+	matching, ok := e.matchingBooks[symbol]
+	if !ok {
+		return nil, fmt.Errorf("matching engine is not initialized for symbol %s", symbol)
+	}
+
+	kline := matching.LastKLine
+	return &types.Ticker{
+		Time:   kline.EndTime,
+		Volume: kline.Volume,
+		Last:   kline.Close,
+		Open:   kline.Open,
+		High:   kline.High,
+		Low:    kline.Low,
+		Buy:    kline.Close,
+		Sell:   kline.Close,
+	}, nil
 }
 
 func (e Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[string]types.Ticker, error) {

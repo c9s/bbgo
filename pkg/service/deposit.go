@@ -18,7 +18,7 @@ func (s *DepositService) Sync(ctx context.Context, ex types.Exchange) error {
 	txnIDs := map[string]struct{}{}
 
 	// query descending
-	records, err := s.QueryLast(ex.Name(), 100)
+	records, err := s.QueryLast(ex.Name(), 10)
 	if err != nil {
 		return err
 	}
@@ -55,7 +55,6 @@ func (s *DepositService) Sync(ctx context.Context, ex types.Exchange) error {
 
 	return nil
 }
-
 
 func (s *DepositService) QueryLast(ex types.ExchangeName, limit int) ([]types.Deposit, error) {
 	sql := "SELECT * FROM `deposits` WHERE `exchange` = :exchange ORDER BY `time` DESC LIMIT :limit"

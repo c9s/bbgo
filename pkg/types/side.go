@@ -1,5 +1,10 @@
 package types
 
+import (
+	"encoding/json"
+	"strings"
+)
+
 // SideType define side type of order
 type SideType string
 
@@ -7,7 +12,32 @@ const (
 	SideTypeBuy  = SideType("BUY")
 	SideTypeSell = SideType("SELL")
 	SideTypeSelf = SideType("SELF")
+
+	// SideTypeBoth is only used for the configuration context
+	SideTypeBoth = SideType("BOTH")
 )
+
+func (side *SideType) UnmarshalJSON(data []byte) (err error) {
+	var s string
+	err = json.Unmarshal(data, &s)
+	if err != nil {
+		return err
+	}
+
+	switch strings.ToLower(s) {
+	case "buy":
+		*side = SideTypeBuy
+
+	case "sell":
+		*side = SideTypeSell
+
+	case "both":
+		*side = SideTypeBoth
+
+	}
+
+	return err
+}
 
 func (side SideType) Reverse() SideType {
 	switch side {
