@@ -180,7 +180,7 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 		return nil, err
 	}
 
-	numBatches := 5
+	numBatches := 3
 	limit := 1000 // max limit = 1000
 	offset := limit * numBatches
 	orderIDs := make(map[uint64]struct{}, limit*2)
