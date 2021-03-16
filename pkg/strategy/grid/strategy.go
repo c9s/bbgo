@@ -497,8 +497,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 			s.activeOrders.Add(createdOrders...)
 			s.orderStore.Add(createdOrders...)
-			s.filledSellGrids = snapshot.FilledSellGrids
-			s.filledBuyGrids = snapshot.FilledBuyGrids
+			if snapshot.FilledSellGrids != nil {
+				s.filledSellGrids = snapshot.FilledSellGrids
+			}
+			if snapshot.FilledBuyGrids != nil {
+				s.filledBuyGrids = snapshot.FilledBuyGrids
+			}
 		} else {
 			s.placeGridOrders(orderExecutor, session)
 		}
