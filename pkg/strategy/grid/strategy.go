@@ -6,6 +6,7 @@ import (
 	"hash/fnv"
 	"sync"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -25,12 +26,22 @@ func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
+// Snapshot is the grid snapshot
+type Snapshot struct {
+	Orders          []types.SubmitOrder           `json:"orders,omitempty"`
+	FilledBuyGrids  map[fixedpoint.Value]struct{} `json:"filledBuyGrids"`
+	FilledSellGrids map[fixedpoint.Value]struct{} `json:"filledSellGrids"`
+	Position        *bbgo.Position                 `json:"position,omitempty"`
+}
+
 type Strategy struct {
 	// The notification system will be injected into the strategy automatically.
 	// This field will be injected automatically since it's a single exchange strategy.
 	*bbgo.Notifiability `json:"-" yaml:"-"`
 
 	*bbgo.Graceful `json:"-" yaml:"-"`
+
+	*bbgo.Persistence
 
 	// OrderExecutor is an interface for submitting order.
 	// This field will be injected automatically since it's a single exchange strategy.
@@ -332,6 +343,12 @@ func (s *Strategy) tradeUpdateHandler(trade types.Trade) {
 	if s.orderStore.Exists(trade.OrderID) {
 		log.Infof("received trade update of order %d: %+v", trade.OrderID, trade)
 
+		if s.TradeService != nil {
+			if err := s.TradeService.Mark(context.Background(), trade.ID, ID); err != nil {
+				log.WithError(err).Error("trade mark error")
+			}
+		}
+
 		if trade.Side == types.SideTypeSelf {
 			return
 		}
@@ -404,6 +421,19 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		return fmt.Errorf("upper price (%f) should not be less than lower price (%f)", s.UpperPrice.Float64(), s.LowerPrice.Float64())
 	}
 
+	var snapshot Snapshot
+	var snapshotLoaded = false
+	if s.Persistence != nil {
+		if err := s.Persistence.Load(&snapshot, ID, s.Symbol, "snapshot"); err != nil {
+			if err != service.ErrPersistenceNotExists {
+				return errors.Wrapf(err, "snapshot load error")
+			}
+		} else {
+			log.Infof("active order snapshot loaded")
+			snapshotLoaded = true
+		}
+	}
+
 	s.filledBuyGrids = make(map[fixedpoint.Value]struct{})
 	s.filledSellGrids = make(map[fixedpoint.Value]struct{})
 
@@ -431,6 +461,21 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 
+		if s.Persistence != nil {
+			log.Infof("backing up active orders...")
+			submitOrders := s.activeOrders.Backup()
+			snapshot := Snapshot{
+				Orders: submitOrders,
+				Position: &s.position,
+			}
+
+			if err := s.Persistence.Save(&snapshot, ID, s.Symbol, "snapshot"); err != nil {
+				log.WithError(err).Error("can not save active order backups")
+			} else {
+				log.Infof("active order snapshot saved")
+			}
+		}
+
 		log.Infof("canceling active orders...")
 		if err := session.Exchange.CancelOrders(ctx, s.activeOrders.Orders()...); err != nil {
 			log.WithError(err).Errorf("cancel order error")
@@ -447,7 +492,25 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	session.Stream.OnTradeUpdate(s.tradeUpdateHandler)
 	session.Stream.OnStart(func() {
-		s.placeGridOrders(orderExecutor, session)
+		if snapshotLoaded && len(snapshot.Orders) > 0 {
+			createdOrders, err := orderExecutor.SubmitOrders(ctx, snapshot.Orders...)
+			if err != nil {
+				log.WithError(err).Error("active orders restore error")
+			}
+			s.activeOrders.Add(createdOrders...)
+			s.orderStore.Add(createdOrders...)
+			if snapshot.FilledSellGrids != nil {
+				s.filledSellGrids = snapshot.FilledSellGrids
+			}
+			if snapshot.FilledBuyGrids != nil {
+				s.filledBuyGrids = snapshot.FilledBuyGrids
+			}
+			if snapshot.Position != nil {
+				s.position = *snapshot.Position
+			}
+		} else {
+			s.placeGridOrders(orderExecutor, session)
+		}
 	})
 
 	return nil

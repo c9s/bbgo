@@ -96,7 +96,7 @@ type SubmitOrder struct {
 
 	Quantity  float64 `json:"quantity" db:"quantity"`
 	Price     float64 `json:"price" db:"price"`
-	StopPrice float64 `json:"stopPrice" db:"stop_price"`
+	StopPrice float64 `json:"stopPrice,omitempty" db:"stop_price"`
 
 	Market Market `json:"-" db:"-"`
 
@@ -105,11 +105,11 @@ type SubmitOrder struct {
 	PriceString     string `json:"-"`
 	QuantityString  string `json:"-"`
 
-	TimeInForce string `json:"timeInForce" db:"time_in_force"` // GTC, IOC, FOK
+	TimeInForce string `json:"timeInForce,omitempty" db:"time_in_force"` // GTC, IOC, FOK
 
-	GroupID int64 `json:"groupID"`
+	GroupID int64 `json:"groupID,omitempty"`
 
-	MarginSideEffect MarginOrderSideEffectType `json:"marginSideEffect"` // AUTO_REPAY = repay, MARGIN_BUY = borrow, defaults to  NO_SIDE_EFFECT
+	MarginSideEffect MarginOrderSideEffectType `json:"marginSideEffect,omitempty"` // AUTO_REPAY = repay, MARGIN_BUY = borrow, defaults to  NO_SIDE_EFFECT
 }
 
 func (o *SubmitOrder) String() string {
@@ -160,6 +160,9 @@ type Order struct {
 func (o Order) Backup() SubmitOrder {
 	so := o.SubmitOrder
 	so.Quantity = o.Quantity - o.ExecutedQuantity
+
+	// ClientOrderID can not be reused
+	so.ClientOrderID = ""
 	return so
 }
 
