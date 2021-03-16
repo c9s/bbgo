@@ -161,7 +161,19 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 }
 
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) error {
-	panic("implement me")
+	for _, o := range orders {
+		rest := e.newRest()
+		if len(o.ClientOrderID) > 0 {
+			if _, err := rest.CancelOrderByClientID(ctx, o.ClientOrderID); err != nil {
+				return err
+			}
+			continue
+		}
+		if _, err := rest.CancelOrderByOrderID(ctx, o.OrderID); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticker, error) {
