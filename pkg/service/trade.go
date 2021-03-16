@@ -341,7 +341,7 @@ func (s *TradeService) Load(ctx context.Context, id int64) (*types.Trade, error)
 	return nil, errors.Wrapf(ErrTradeNotFound, "trade id:%d not found", id)
 }
 
-func (s *TradeService) MarkStrategyID(ctx context.Context, id int64, strategyID string) error {
+func (s *TradeService) Mark(ctx context.Context, id int64, strategyID string) error {
 	result, err := s.DB.NamedExecContext(ctx, "UPDATE `trades` SET `strategy` = :strategy WHERE `id` = :id", map[string]interface{}{
 		"id":       id,
 		"strategy": strategyID,
