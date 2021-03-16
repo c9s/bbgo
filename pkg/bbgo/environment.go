@@ -246,6 +246,7 @@ func NewExchangeSessionFromConfig(name string, sessionConfig *ExchangeSession) (
 	session.EnvVarPrefix = sessionConfig.EnvVarPrefix
 	session.Key = sessionConfig.Key
 	session.Secret = sessionConfig.Secret
+	session.SubAccount = sessionConfig.SubAccount
 	session.PublicOnly = sessionConfig.PublicOnly
 	session.Margin = sessionConfig.Margin
 	session.IsolatedMargin = sessionConfig.IsolatedMargin
@@ -475,7 +476,8 @@ func (environ *Environment) Connect(ctx context.Context) error {
 		var logger = log.WithField("session", n)
 
 		if len(session.Subscriptions) == 0 {
-			logger.Warnf("exchange session %s has no subscriptions", session.Name)
+			logger.Warnf("exchange session %s has no subscriptions, skipping", session.Name)
+			continue
 		} else {
 			// add the subscribe requests to the stream
 			for _, s := range session.Subscriptions {

@@ -16,13 +16,13 @@ func (s *WebSocketService) EmitConnect(conn *websocket.Conn) {
 	}
 }
 
-func (s *WebSocketService) OnDisconnect(cb func(conn *websocket.Conn)) {
+func (s *WebSocketService) OnDisconnect(cb func()) {
 	s.disconnectCallbacks = append(s.disconnectCallbacks, cb)
 }
 
-func (s *WebSocketService) EmitDisconnect(conn *websocket.Conn) {
+func (s *WebSocketService) EmitDisconnect() {
 	for _, cb := range s.disconnectCallbacks {
-		cb(conn)
+		cb()
 	}
 }
 

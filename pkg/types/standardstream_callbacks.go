@@ -4,6 +4,16 @@ package types
 
 import ()
 
+func (stream *StandardStream) OnStart(cb func()) {
+	stream.startCallbacks = append(stream.startCallbacks, cb)
+}
+
+func (stream *StandardStream) EmitStart() {
+	for _, cb := range stream.startCallbacks {
+		cb()
+	}
+}
+
 func (stream *StandardStream) OnConnect(cb func()) {
 	stream.connectCallbacks = append(stream.connectCallbacks, cb)
 }
@@ -105,6 +115,8 @@ func (stream *StandardStream) EmitBookSnapshot(book OrderBook) {
 }
 
 type StandardStreamEventHub interface {
+	OnStart(cb func())
+
 	OnConnect(cb func())
 
 	OnDisconnect(cb func())
