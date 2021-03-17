@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -156,8 +157,53 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 	return orders, nil
 }
 
+// symbol, since and until are all optional. FTX can only query by order created time, not updated time.
+// FTX doesn't support lastOrderID, so we will query by the time range first, and filter by the lastOrderID.
 func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []types.Order, err error) {
-	panic("implement me")
+	if since.After(until) {
+		return nil, fmt.Errorf("since can't be after until")
+	}
+	if lastOrderID > 0 {
+		logger.Warn("FTX doesn't support lastOrderID")
+	}
+	limit := 100
+	hasMoreData := true
+	s := since
+	var lastOrder order
+	for hasMoreData {
+		resp, err := e.newRest().OrdersHistory(ctx, symbol, s, until, limit)
+		if err != nil {
+			return nil, err
+		}
+		if !resp.Success {
+			return nil, fmt.Errorf("ftx returns querying orders history failure")
+		}
+
+		sortByCreatedASC(resp.Result)
+
+		for _, r := range resp.Result {
+			// There may be more than one orders at the same time, so also have to check the ID
+			if r.CreatedAt.Before(lastOrder.CreatedAt) || r.ID == lastOrder.ID || r.Status != "closed" {
+				continue
+			}
+			lastOrder = r
+			o, err := toGlobalOrder(r)
+			if err != nil {
+				return nil, err
+			}
+			orders = append(orders, o)
+		}
+		hasMoreData = resp.HasMoreData
+		// the start_time and end_time precision is second. There might be more than one orders within one second.
+		s = lastOrder.CreatedAt.Add(-1 * time.Second)
+	}
+	return orders, nil
+}
+
+func sortByCreatedASC(orders []order) {
+	sort.Slice(orders, func(i, j int) bool {
+		return orders[i].CreatedAt.Before(orders[j].CreatedAt)
+	})
 }
 
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) error {
