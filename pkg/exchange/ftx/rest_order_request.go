@@ -117,11 +117,14 @@ func (r *orderRequest) OpenOrders(ctx context.Context, market string) (ordersRes
 }
 
 func (r *orderRequest) OrdersHistory(ctx context.Context, market string, start, end time.Time, limit int) (ordersHistoryResponse, error) {
-	p := map[string]interface{}{
-		"market": market,
-		"limit":  limit,
-	}
+	p := make(map[string]interface{})
 
+	if limit > 0 {
+		p["limit"] = limit
+	}
+	if len(market) > 0 {
+		p["market"] = market
+	}
 	if start != (time.Time{}) {
 		p["start_time"] = start.UnixNano() / int64(time.Second)
 	}
