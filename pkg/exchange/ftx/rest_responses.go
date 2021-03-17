@@ -12,6 +12,12 @@ type balances struct {
 	} `json:"result"`
 }
 
+type ordersHistoryResponse struct {
+	Success     bool    `json:"success"`
+	Result      []order `json:"result"`
+	HasMoreData bool    `json:"hasMoreData"`
+}
+
 type ordersResponse struct {
 	Success bool `json:"success"`
 
