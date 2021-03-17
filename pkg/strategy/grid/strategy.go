@@ -31,7 +31,7 @@ type Snapshot struct {
 	Orders          []types.SubmitOrder           `json:"orders,omitempty"`
 	FilledBuyGrids  map[fixedpoint.Value]struct{} `json:"filledBuyGrids"`
 	FilledSellGrids map[fixedpoint.Value]struct{} `json:"filledSellGrids"`
-	Position        *bbgo.Position                 `json:"position,omitempty"`
+	Position        *bbgo.Position                `json:"position,omitempty"`
 }
 
 type Strategy struct {
@@ -113,14 +113,18 @@ func (s *Strategy) generateGridSellOrders(session *bbgo.ExchangeSession) ([]type
 	}
 
 	currentPrice := fixedpoint.NewFromFloat(currentPriceFloat)
-	priceRange := s.UpperPrice - s.LowerPrice
-	if priceRange <= 0 {
-		return nil, fmt.Errorf("upper price %f should not be less than or equal to lower price %f", s.UpperPrice.Float64(), s.LowerPrice.Float64())
+	if currentPrice > s.UpperPrice {
+		return nil, fmt.Errorf("current price %f is higher than upper price %f", currentPrice.Float64(), s.UpperPrice.Float64())
 	}
 
+	priceRange := s.UpperPrice - s.LowerPrice
 	numGrids := fixedpoint.NewFromInt(s.GridNum)
 	gridSpread := priceRange.Div(numGrids)
-	startPrice := fixedpoint.Max(s.LowerPrice, currentPrice+gridSpread)
+
+	// find the nearest grid price from the current price
+	startPrice := fixedpoint.Max(
+		s.LowerPrice,
+		s.UpperPrice-(s.UpperPrice-currentPrice).Div(gridSpread).Floor().Mul(gridSpread))
 
 	if startPrice > s.UpperPrice {
 		return nil, fmt.Errorf("current price %f exceeded the upper price boundary %f",
@@ -196,14 +200,24 @@ func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types
 	}
 
 	currentPrice := fixedpoint.NewFromFloat(currentPriceFloat)
-	priceRange := s.UpperPrice - s.LowerPrice
-	if priceRange <= 0 {
-		return nil, fmt.Errorf("upper price %f should not be less than or equal to lower price %f", s.UpperPrice.Float64(), s.LowerPrice.Float64())
+	if currentPrice < s.LowerPrice {
+		return nil, fmt.Errorf("current price %f is lower than the lower price %f", currentPrice.Float64(), s.LowerPrice.Float64())
 	}
 
+	priceRange := s.UpperPrice - s.LowerPrice
 	numGrids := fixedpoint.NewFromInt(s.GridNum)
 	gridSpread := priceRange.Div(numGrids)
-	startPrice := fixedpoint.Min(s.UpperPrice, currentPrice-gridSpread)
+
+	// Find the nearest grid price for placing buy orders:
+	// buyRange = currentPrice - lowerPrice
+	// numOfBuyGrids = Floor(buyRange / gridSpread)
+	// startPrice = lowerPrice + numOfBuyGrids * gridSpread
+	// priceOfBuyOrder1 = startPrice
+	// priceOfBuyOrder2 = startPrice - gridSpread
+	// priceOfBuyOrder3 = startPrice - gridSpread * 2
+	startPrice := fixedpoint.Min(
+		s.UpperPrice,
+		s.LowerPrice+(currentPrice-s.LowerPrice).Div(gridSpread).Floor().Mul(gridSpread))
 
 	if startPrice < s.LowerPrice {
 		return nil, fmt.Errorf("current price %f exceeded the lower price boundary %f",
@@ -417,8 +431,16 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.Side = types.SideTypeBoth
 	}
 
+	if s.UpperPrice == 0 {
+		return errors.New("upperPrice can not be zero, you forgot to set?")
+	}
+
+	if s.LowerPrice == 0 {
+		return errors.New("lowerPrice can not be zero, you forgot to set?")
+	}
+
 	if s.UpperPrice <= s.LowerPrice {
-		return fmt.Errorf("upper price (%f) should not be less than lower price (%f)", s.UpperPrice.Float64(), s.LowerPrice.Float64())
+		return fmt.Errorf("upperPrice (%f) should not be less than or equal to lowerPrice (%f)", s.UpperPrice.Float64(), s.LowerPrice.Float64())
 	}
 
 	var snapshot Snapshot
@@ -465,7 +487,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			log.Infof("backing up active orders...")
 			submitOrders := s.activeOrders.Backup()
 			snapshot := Snapshot{
-				Orders: submitOrders,
+				Orders:   submitOrders,
 				Position: &s.position,
 			}
 
