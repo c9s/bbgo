@@ -72,7 +72,7 @@ type Order struct {
 func (s *OrderService) Closed(market string, options QueryOrderOptions) ([]Order, error) {
 	payload := map[string]interface{}{
 		"market":     market,
-		"state":      []OrderState{OrderStateFinalizing, OrderStateDone, OrderStateCancel, OrderStateFailed},
+		"state":      []OrderState{OrderStateDone, OrderStateCancel, OrderStateFailed},
 		"order_by":   "desc",
 		"pagination": false,
 	}
