@@ -3,12 +3,14 @@ package fixedpoint
 import (
 	"database/sql/driver"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"strconv"
 	"sync/atomic"
 )
 
+const MaxPrecision = 12
 const DefaultPrecision = 8
 
 const DefaultPow = 1e8
@@ -62,6 +64,10 @@ func (v Value) MulFloat64(v2 float64) Value {
 
 func (v Value) Div(v2 Value) Value {
 	return NewFromFloat(v.Float64() / v2.Float64())
+}
+
+func (v Value) Floor() Value {
+	return NewFromFloat(math.Floor(v.Float64()))
 }
 
 func (v Value) Sub(v2 Value) Value {
@@ -154,6 +160,59 @@ func Must(v Value, err error) Value {
 	}
 
 	return v
+}
+
+var ErrPrecisionLoss = errors.New("precision loss")
+
+func Parse(input string) (num int64, numDecimalPoints int, err error) {
+	var neg int64 = 1
+	var digit int64
+	for i := 0 ; i < len(input) ; i++ {
+		c := input[i]
+		if c == '-' {
+			neg = -1
+		} else if c >= '0' && c <= '9' {
+			digit, err = strconv.ParseInt(string(c), 10, 64)
+			if err != nil {
+				return
+			}
+
+			num = num * 10 + digit
+		} else if c == '.' {
+			i++
+			if i > len(input) - 1 {
+				err = fmt.Errorf("expect fraction numbers after dot")
+				return
+			}
+
+			for j := i ; j < len(input); j++ {
+				fc := input[j]
+				if fc >= '0' && fc <= '9' {
+					digit, err = strconv.ParseInt(string(fc), 10, 64)
+					if err != nil {
+						return
+					}
+
+					numDecimalPoints++
+					num = num * 10 + digit
+
+					if numDecimalPoints >= MaxPrecision {
+						return num, numDecimalPoints,ErrPrecisionLoss
+					}
+				} else {
+					err = fmt.Errorf("expect digit, got %c", fc)
+					return
+				}
+			}
+			break
+		} else {
+			err = fmt.Errorf("unexpected char %c", c)
+			return
+		}
+	}
+
+	num = num * neg
+	return num, numDecimalPoints, nil
 }
 
 func NewFromString(input string) (Value, error) {
