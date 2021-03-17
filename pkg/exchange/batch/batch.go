@@ -232,10 +232,12 @@ func (q *RewardBatchQuery) Query(ctx context.Context, startTime, endTime time.Ti
 				}
 
 				c <- o
-				startTime = o.CreatedAt.Time()
-				lastID = o.UUID
 				rewardKeys[o.UUID] = struct{}{}
 			}
+
+			end := len(rewards)-1
+			startTime = rewards[end].CreatedAt.Time()
+			lastID = rewards[end].UUID
 		}
 
 	}()
