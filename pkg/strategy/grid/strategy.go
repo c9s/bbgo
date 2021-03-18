@@ -422,6 +422,7 @@ func (s *Strategy) handleFilledOrder(filledOrder types.Order) {
 	s.activeOrders.Add(createdOrders...)
 
 	// calculate arbitrage profit
+	// TODO: apply fee rate here
 	if s.Long {
 		switch filledOrder.Side {
 		case types.SideTypeSell:
