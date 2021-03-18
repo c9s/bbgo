@@ -102,9 +102,10 @@ func (m BalanceMap) Print() {
 type Account struct {
 	sync.Mutex `json:"-"`
 
-	MakerCommission int    `json:"makerCommission,omitempty"`
-	TakerCommission int    `json:"takerCommission,omitempty"`
-	AccountType     string `json:"accountType,omitempty"`
+	// bps. 0.15% fee will be 15.
+	MakerCommission float64 `json:"makerCommission,omitempty"`
+	TakerCommission float64 `json:"takerCommission,omitempty"`
+	AccountType     string  `json:"accountType,omitempty"`
 
 	balances BalanceMap
 }
