@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 func TestExchange_QueryAccountBalances(t *testing.T) {
@@ -279,4 +280,91 @@ func TestExchange_QueryClosedOrders(t *testing.T) {
 			assert.Equal(t, expectedOrderID[i], o.OrderID)
 		}
 	})
+}
+
+func TestExchange_QueryAccount(t *testing.T) {
+	balanceResp := `
+{
+  "result": [
+    {
+      "availableWithoutBorrow": 19.47458865,
+      "coin": "USD",
+      "free": 19.48085209,
+      "spotBorrow": 0.0,
+      "total": 1094.66405065,
+      "usdValue": 1094.664050651561
+    }
+  ],
+  "success": true
+}
+`
+
+	accountInfoResp := `
+{
+  "success": true,
+  "result": {
+    "backstopProvider": true,
+    "collateral": 3568181.02691129,
+    "freeCollateral": 1786071.456884368,
+    "initialMarginRequirement": 0.12222384240257728,
+    "leverage": 10,
+    "liquidating": false,
+    "maintenanceMarginRequirement": 0.07177992558058484,
+    "makerFee": 0.0002,
+    "marginFraction": 0.5588433331419503,
+    "openMarginFraction": 0.2447194090423075,
+    "takerFee": 0.0005,
+    "totalAccountValue": 3568180.98341129,
+    "totalPositionSize": 6384939.6992,
+    "username": "user@domain.com",
+    "positions": [
+      {
+        "cost": -31.7906,
+        "entryPrice": 138.22,
+        "future": "ETH-PERP",
+        "initialMarginRequirement": 0.1,
+        "longOrderSize": 1744.55,
+        "maintenanceMarginRequirement": 0.04,
+        "netSize": -0.23,
+        "openSize": 1744.32,
+        "realizedPnl": 3.39441714,
+        "shortOrderSize": 1732.09,
+        "side": "sell",
+        "size": 0.23,
+        "unrealizedPnl": 0
+      }
+    ]
+  }
+}
+`
+	returnBalance := false
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if returnBalance {
+			fmt.Fprintln(w, balanceResp)
+			return
+		}
+		returnBalance = true
+		fmt.Fprintln(w, accountInfoResp)
+	}))
+	defer ts.Close()
+
+	ex := NewExchange("", "", "")
+	serverURL, err := url.Parse(ts.URL)
+	assert.NoError(t, err)
+	ex.restEndpoint = serverURL
+	resp, err := ex.QueryAccount(context.Background())
+	assert.NoError(t, err)
+
+	b, ok := resp.Balance("USD")
+	assert.True(t, ok)
+	expected := types.Balance{
+		Currency:  "USD",
+		Available: fixedpoint.MustNewFromString("19.48085209"),
+		Locked:    fixedpoint.MustNewFromString("1094.66405065"),
+	}
+	expected.Locked = expected.Locked.Sub(expected.Available)
+	assert.Equal(t, expected, b)
+
+	assert.Equal(t, 0.0002*10000, resp.MakerCommission)
+	assert.Equal(t, 0.0005*10000, resp.TakerCommission)
 }
