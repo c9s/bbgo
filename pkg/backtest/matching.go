@@ -47,8 +47,8 @@ type SimplePriceMatching struct {
 
 	Account *types.Account
 
-	MakerCommission int `json:"makerCommission"`
-	TakerCommission int `json:"takerCommission"`
+	MakerCommission float64 `json:"makerCommission"`
+	TakerCommission float64 `json:"takerCommission"`
 
 	tradeUpdateCallbacks   []func(trade types.Trade)
 	orderUpdateCallbacks   []func(order types.Order)
@@ -205,9 +205,9 @@ func (m *SimplePriceMatching) newTradeFromOrder(order types.Order, isMaker bool)
 	// MAX uses 0.050% for maker and 0.15% for taker
 	var commission = DefaultFeeRate
 	if isMaker && m.Account.MakerCommission > 0 {
-		commission = 0.0001 * float64(m.Account.MakerCommission) // binance uses 10~15
+		commission = 0.0001 * m.Account.MakerCommission // binance uses 10~15
 	} else if m.Account.TakerCommission > 0 {
-		commission = 0.0001 * float64(m.Account.TakerCommission) // binance uses 10~15
+		commission = 0.0001 * m.Account.TakerCommission // binance uses 10~15
 	}
 
 	var fee float64
