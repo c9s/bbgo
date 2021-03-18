@@ -73,10 +73,10 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 		return nil, fmt.Errorf("ftx returns querying balances failure")
 	}
 
-	// TODO
+	bps := fixedpoint.NewFromFloat(10000)
 	a := &types.Account{
-		MakerCommission: 0,
-		TakerCommission: 0,
+		MakerCommission: fixedpoint.NewFromFloat(resp.Result.MakerFee).Mul(bps).Float64(),
+		TakerCommission: fixedpoint.NewFromFloat(resp.Result.TakerFee).Mul(bps).Float64(),
 	}
 
 	balances, err := e.QueryAccountBalances(ctx)
