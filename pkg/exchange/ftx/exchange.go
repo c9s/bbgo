@@ -53,7 +53,7 @@ func (e *Exchange) Name() types.ExchangeName {
 }
 
 func (e *Exchange) PlatformFeeCurrency() string {
-	panic("implement me")
+	return toGlobalCurrency("FTT")
 }
 
 func (e *Exchange) NewStream() types.Stream {
