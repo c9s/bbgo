@@ -26,12 +26,12 @@ func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
-// Snapshot is the grid snapshot
-type Snapshot struct {
+// State is the grid snapshot
+type State struct {
 	Orders          []types.SubmitOrder           `json:"orders,omitempty"`
 	FilledBuyGrids  map[fixedpoint.Value]struct{} `json:"filledBuyGrids"`
 	FilledSellGrids map[fixedpoint.Value]struct{} `json:"filledSellGrids"`
-	Position        *bbgo.Position                 `json:"position,omitempty"`
+	Position        *bbgo.Position                `json:"position,omitempty"`
 }
 
 type Strategy struct {
@@ -84,16 +84,13 @@ type Strategy struct {
 	// Long means you want to hold more base asset than the quote asset.
 	Long bool `json:"long,omitempty" yaml:"long,omitempty"`
 
-	filledBuyGrids  map[fixedpoint.Value]struct{}
-	filledSellGrids map[fixedpoint.Value]struct{}
+	state *State
 
 	// orderStore is used to store all the created orders, so that we can filter the trades.
 	orderStore *bbgo.OrderStore
 
 	// activeOrders is the locally maintained active order book of the maker orders.
 	activeOrders *bbgo.LocalActiveOrderBook
-
-	position bbgo.Position
 
 	// any created orders for tracking trades
 	orders map[uint64]types.Order
@@ -113,14 +110,18 @@ func (s *Strategy) generateGridSellOrders(session *bbgo.ExchangeSession) ([]type
 	}
 
 	currentPrice := fixedpoint.NewFromFloat(currentPriceFloat)
-	priceRange := s.UpperPrice - s.LowerPrice
-	if priceRange <= 0 {
-		return nil, fmt.Errorf("upper price %f should not be less than or equal to lower price %f", s.UpperPrice.Float64(), s.LowerPrice.Float64())
+	if currentPrice > s.UpperPrice {
+		return nil, fmt.Errorf("current price %f is higher than upper price %f", currentPrice.Float64(), s.UpperPrice.Float64())
 	}
 
+	priceRange := s.UpperPrice - s.LowerPrice
 	numGrids := fixedpoint.NewFromInt(s.GridNum)
 	gridSpread := priceRange.Div(numGrids)
-	startPrice := fixedpoint.Max(s.LowerPrice, currentPrice+gridSpread)
+
+	// find the nearest grid price from the current price
+	startPrice := fixedpoint.Max(
+		s.LowerPrice,
+		s.UpperPrice-(s.UpperPrice-currentPrice).Div(gridSpread).Floor().Mul(gridSpread))
 
 	if startPrice > s.UpperPrice {
 		return nil, fmt.Errorf("current price %f exceeded the upper price boundary %f",
@@ -165,7 +166,7 @@ func (s *Strategy) generateGridSellOrders(session *bbgo.ExchangeSession) ([]type
 				baseBalance.Available.Float64())
 		}
 
-		if _, filled := s.filledSellGrids[price]; filled {
+		if _, filled := s.state.FilledSellGrids[price]; filled {
 			log.Debugf("sell grid at price %f is already filled, skipping", price.Float64())
 			continue
 		}
@@ -182,7 +183,7 @@ func (s *Strategy) generateGridSellOrders(session *bbgo.ExchangeSession) ([]type
 		})
 		baseBalance.Available -= quantity
 
-		s.filledSellGrids[price] = struct{}{}
+		s.state.FilledSellGrids[price] = struct{}{}
 	}
 
 	return orders, nil
@@ -196,14 +197,24 @@ func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types
 	}
 
 	currentPrice := fixedpoint.NewFromFloat(currentPriceFloat)
-	priceRange := s.UpperPrice - s.LowerPrice
-	if priceRange <= 0 {
-		return nil, fmt.Errorf("upper price %f should not be less than or equal to lower price %f", s.UpperPrice.Float64(), s.LowerPrice.Float64())
+	if currentPrice < s.LowerPrice {
+		return nil, fmt.Errorf("current price %f is lower than the lower price %f", currentPrice.Float64(), s.LowerPrice.Float64())
 	}
 
+	priceRange := s.UpperPrice - s.LowerPrice
 	numGrids := fixedpoint.NewFromInt(s.GridNum)
 	gridSpread := priceRange.Div(numGrids)
-	startPrice := fixedpoint.Min(s.UpperPrice, currentPrice-gridSpread)
+
+	// Find the nearest grid price for placing buy orders:
+	// buyRange = currentPrice - lowerPrice
+	// numOfBuyGrids = Floor(buyRange / gridSpread)
+	// startPrice = lowerPrice + numOfBuyGrids * gridSpread
+	// priceOfBuyOrder1 = startPrice
+	// priceOfBuyOrder2 = startPrice - gridSpread
+	// priceOfBuyOrder3 = startPrice - gridSpread * 2
+	startPrice := fixedpoint.Min(
+		s.UpperPrice,
+		s.LowerPrice+(currentPrice-s.LowerPrice).Div(gridSpread).Floor().Mul(gridSpread))
 
 	if startPrice < s.LowerPrice {
 		return nil, fmt.Errorf("current price %f exceeded the lower price boundary %f",
@@ -222,7 +233,7 @@ func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types
 	}
 
 	log.Infof("placing grid buy orders from %f to %f, grid spread %f",
-		(currentPrice - gridSpread).Float64(),
+		startPrice.Float64(),
 		s.LowerPrice.Float64(),
 		gridSpread.Float64())
 
@@ -249,7 +260,7 @@ func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types
 				quoteQuantity.Float64())
 		}
 
-		if _, filled := s.filledBuyGrids[price]; filled {
+		if _, filled := s.state.FilledBuyGrids[price]; filled {
 			log.Debugf("buy grid at price %f is already filled, skipping", price.Float64())
 			continue
 		}
@@ -266,7 +277,7 @@ func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types
 		})
 		balance.Available -= quoteQuantity
 
-		s.filledBuyGrids[price] = struct{}{}
+		s.state.FilledBuyGrids[price] = struct{}{}
 	}
 
 	return orders, nil
@@ -309,7 +320,7 @@ func (s *Strategy) placeGridBuyOrders(orderExecutor bbgo.OrderExecutor, session 
 }
 
 func (s *Strategy) placeGridOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) {
-	log.Infof("placing grid orders...")
+	log.Infof("placing grid orders on side %s...", s.Side)
 
 	switch s.Side {
 
@@ -353,7 +364,7 @@ func (s *Strategy) tradeUpdateHandler(trade types.Trade) {
 			return
 		}
 
-		profit, madeProfit := s.position.AddTrade(trade)
+		profit, madeProfit := s.state.Position.AddTrade(trade)
 		if madeProfit {
 			s.Notify("profit: %f", profit.Float64())
 		}
@@ -417,34 +428,46 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.Side = types.SideTypeBoth
 	}
 
-	if s.UpperPrice <= s.LowerPrice {
-		return fmt.Errorf("upper price (%f) should not be less than lower price (%f)", s.UpperPrice.Float64(), s.LowerPrice.Float64())
+	if s.UpperPrice == 0 {
+		return errors.New("upperPrice can not be zero, you forgot to set?")
 	}
 
-	var snapshot Snapshot
-	var snapshotLoaded = false
+	if s.LowerPrice == 0 {
+		return errors.New("lowerPrice can not be zero, you forgot to set?")
+	}
+
+	if s.UpperPrice <= s.LowerPrice {
+		return fmt.Errorf("upperPrice (%f) should not be less than or equal to lowerPrice (%f)", s.UpperPrice.Float64(), s.LowerPrice.Float64())
+	}
+
+	var stateLoaded = false
 	if s.Persistence != nil {
-		if err := s.Persistence.Load(&snapshot, ID, s.Symbol, "snapshot"); err != nil {
+		var state State
+		if err := s.Persistence.Load(&state, ID, s.Symbol, "state"); err != nil {
 			if err != service.ErrPersistenceNotExists {
-				return errors.Wrapf(err, "snapshot load error")
+				return errors.Wrapf(err, "state load error")
 			}
 		} else {
-			log.Infof("active order snapshot loaded")
-			snapshotLoaded = true
+			log.Infof("grid state loaded")
+			stateLoaded = true
+			s.state = &state
 		}
 	}
 
-	s.filledBuyGrids = make(map[fixedpoint.Value]struct{})
-	s.filledSellGrids = make(map[fixedpoint.Value]struct{})
+	if s.state == nil {
+		position, ok := session.Position(s.Symbol)
+		if !ok {
+			return fmt.Errorf("position not found")
+		}
 
-	position, ok := session.Position(s.Symbol)
-	if !ok {
-		return fmt.Errorf("position not found")
+		s.state = &State{
+			FilledBuyGrids:  make(map[fixedpoint.Value]struct{}),
+			FilledSellGrids: make(map[fixedpoint.Value]struct{}),
+			Position:        position,
+		}
 	}
 
-	s.position = *position
-
-	s.Notify("current position %+v", position)
+	s.Notify("current position %+v", s.state.Position)
 
 	instanceID := fmt.Sprintf("grid-%s-%d", s.Symbol, s.GridNum)
 	s.groupID = generateGroupID(instanceID)
@@ -462,14 +485,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		defer wg.Done()
 
 		if s.Persistence != nil {
-			log.Infof("backing up active orders...")
+			log.Infof("backing up grid state...")
 			submitOrders := s.activeOrders.Backup()
-			snapshot := Snapshot{
-				Orders: submitOrders,
-				Position: &s.position,
-			}
-
-			if err := s.Persistence.Save(&snapshot, ID, s.Symbol, "snapshot"); err != nil {
+			s.state.Orders = submitOrders
+			if err := s.Persistence.Save(s.state, ID, s.Symbol, "snapshot"); err != nil {
 				log.WithError(err).Error("can not save active order backups")
 			} else {
 				log.Infof("active order snapshot saved")
@@ -492,22 +511,13 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	session.Stream.OnTradeUpdate(s.tradeUpdateHandler)
 	session.Stream.OnStart(func() {
-		if snapshotLoaded && len(snapshot.Orders) > 0 {
-			createdOrders, err := orderExecutor.SubmitOrders(ctx, snapshot.Orders...)
+		if stateLoaded && len(s.state.Orders) > 0 {
+			createdOrders, err := orderExecutor.SubmitOrders(ctx, s.state.Orders...)
 			if err != nil {
 				log.WithError(err).Error("active orders restore error")
 			}
 			s.activeOrders.Add(createdOrders...)
 			s.orderStore.Add(createdOrders...)
-			if snapshot.FilledSellGrids != nil {
-				s.filledSellGrids = snapshot.FilledSellGrids
-			}
-			if snapshot.FilledBuyGrids != nil {
-				s.filledBuyGrids = snapshot.FilledBuyGrids
-			}
-			if snapshot.Position != nil {
-				s.position = *snapshot.Position
-			}
 		} else {
 			s.placeGridOrders(orderExecutor, session)
 		}
