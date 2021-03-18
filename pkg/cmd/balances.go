@@ -33,19 +33,24 @@ var balancesCmd = &cobra.Command{
 			return errors.New("--config option is required")
 		}
 
-		if _, err := os.Stat(configFile); os.IsNotExist(err) {
-			return err
-		}
-
-		userConfig, err := bbgo.Load(configFile, false)
-		if err != nil {
+		// if config file exists, use the config loaded from the config file.
+		// otherwise, use a empty config object
+		var userConfig *bbgo.Config
+		if _, err := os.Stat(configFile); err == nil {
+			// load successfully
+			userConfig, err = bbgo.Load(configFile, false)
+			if err != nil {
+				return err
+			}
+		} else if os.IsNotExist(err) {
+			// config file doesn't exist
+			userConfig = &bbgo.Config{}
+		} else {
+			// other error
 			return err
 		}
 
 		environ := bbgo.NewEnvironment()
-		if err := environ.ConfigureDatabase(ctx); err != nil {
-			return err
-		}
 
 		if err := environ.ConfigureExchangeSessions(userConfig); err != nil {
 			return err
