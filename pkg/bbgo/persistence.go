@@ -21,49 +21,46 @@ type Persistence struct {
 	Facade *service.PersistenceServiceFacade `json:"-" yaml:"-"`
 }
 
-func (p *Persistence) backendService(t string) (service service.PersistenceService, err error) {
+func (p *Persistence) backendService(t string) (service.PersistenceService, error) {
 	switch t {
 	case "json":
-		service = p.Facade.Json
+		return p.Facade.Json, nil
 
 	case "redis":
-		service = p.Facade.Redis
+		return p.Facade.Redis, nil
 
 	case "memory":
-		service = p.Facade.Memory
+		return p.Facade.Memory, nil
 
-	default:
-		err = fmt.Errorf("unsupported persistent type %s", t)
 	}
 
-	return service, err
+	return nil, fmt.Errorf("unsupported persistent type %s", t)
 }
 
 func (p *Persistence) Load(val interface{}, subIDs ...string) error {
-	service, err := p.backendService(p.PersistenceSelector.Type)
+	ps, err := p.backendService(p.PersistenceSelector.Type)
 	if err != nil {
 		return err
 	}
 
 	if p.PersistenceSelector.StoreID == "" {
-		return fmt.Errorf("persistence.store can not be empty")
+		p.PersistenceSelector.StoreID = "default"
 	}
 
-	store := service.NewStore(p.PersistenceSelector.StoreID, subIDs...)
+	store := ps.NewStore(p.PersistenceSelector.StoreID, subIDs...)
 	return store.Load(val)
 }
 
 func (p *Persistence) Save(val interface{}, subIDs ...string) error {
-	service, err := p.backendService(p.PersistenceSelector.Type)
+	ps, err := p.backendService(p.PersistenceSelector.Type)
 	if err != nil {
 		return err
 	}
 
 	if p.PersistenceSelector.StoreID == "" {
-		return fmt.Errorf("persistence.store can not be empty")
+		p.PersistenceSelector.StoreID = "default"
 	}
 
-	store := service.NewStore(p.PersistenceSelector.StoreID, subIDs...)
+	store := ps.NewStore(p.PersistenceSelector.StoreID, subIDs...)
 	return store.Save(val)
 }
-
