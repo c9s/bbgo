@@ -32,6 +32,12 @@ type State struct {
 	FilledBuyGrids  map[fixedpoint.Value]struct{} `json:"filledBuyGrids"`
 	FilledSellGrids map[fixedpoint.Value]struct{} `json:"filledSellGrids"`
 	Position        *bbgo.Position                `json:"position,omitempty"`
+
+	ArbitrageProfit fixedpoint.Value `json:"arbitrageProfit"`
+
+	// any created orders for tracking trades
+	// [source Order ID] -> arbitrage order
+	ArbitrageOrders map[uint64]types.Order `json:"arbitrageOrders"`
 }
 
 type Strategy struct {
@@ -91,9 +97,6 @@ type Strategy struct {
 
 	// activeOrders is the locally maintained active order book of the maker orders.
 	activeOrders *bbgo.LocalActiveOrderBook
-
-	// any created orders for tracking trades
-	orders map[uint64]types.Order
 
 	// groupID is the group ID used for the strategy instance for canceling orders
 	groupID int64
@@ -343,7 +346,6 @@ func (s *Strategy) placeGridOrders(orderExecutor bbgo.OrderExecutor, session *bb
 			log.Warn(err.Error())
 		}
 	}
-
 }
 
 func (s *Strategy) tradeUpdateHandler(trade types.Trade) {
@@ -366,15 +368,16 @@ func (s *Strategy) tradeUpdateHandler(trade types.Trade) {
 
 		profit, madeProfit := s.state.Position.AddTrade(trade)
 		if madeProfit {
-			s.Notify("profit: %f", profit.Float64())
+			s.Notify("average cost profit: %f", profit.Float64())
 		}
 	}
 }
 
-func (s *Strategy) submitReverseOrder(order types.Order) {
-	var side = order.Side.Reverse()
-	var price = order.Price
-	var quantity = order.Quantity
+func (s *Strategy) handleFilledOrder(filledOrder types.Order) {
+	// generate arbitrage order
+	var side = filledOrder.Side.Reverse()
+	var price = filledOrder.Price
+	var quantity = filledOrder.Quantity
 
 	switch side {
 	case types.SideTypeSell:
@@ -388,7 +391,7 @@ func (s *Strategy) submitReverseOrder(order types.Order) {
 	} else if s.Long {
 		// long = use the same amount to buy more quantity back
 		// the original amount
-		var amount = order.Price * order.Quantity
+		var amount = filledOrder.Price * filledOrder.Quantity
 		quantity = amount / price
 	}
 
@@ -402,7 +405,7 @@ func (s *Strategy) submitReverseOrder(order types.Order) {
 		GroupID:     s.groupID,
 	}
 
-	log.Infof("submitting reverse order: %s against %s", submitOrder.String(), order.String())
+	log.Infof("submitting arbitrage order: %s against filled order %s", submitOrder.String(), filledOrder.String())
 
 	createdOrders, err := s.OrderExecutor.SubmitOrders(context.Background(), submitOrder)
 	if err != nil {
@@ -410,8 +413,52 @@ func (s *Strategy) submitReverseOrder(order types.Order) {
 		return
 	}
 
+	// create one-way link from the newly created orders
+	for _, o := range createdOrders {
+		s.state.ArbitrageOrders[o.OrderID] = filledOrder
+	}
+
 	s.orderStore.Add(createdOrders...)
 	s.activeOrders.Add(createdOrders...)
+
+	// calculate arbitrage profit
+	// TODO: apply fee rate here
+	if s.Long {
+		switch filledOrder.Side {
+		case types.SideTypeSell:
+			if buyOrder, ok := s.state.ArbitrageOrders[filledOrder.OrderID]; ok {
+				// use base asset quantity here
+				baseProfit := buyOrder.Quantity - filledOrder.Quantity
+				s.state.ArbitrageProfit += fixedpoint.NewFromFloat(baseProfit)
+				s.Notify("grid arbitrage profit %f %s", baseProfit, s.Market.BaseCurrency)
+			}
+
+		case types.SideTypeBuy:
+			if sellOrder, ok := s.state.ArbitrageOrders[filledOrder.OrderID]; ok {
+				// use base asset quantity here
+				baseProfit := filledOrder.Quantity - sellOrder.Quantity
+				s.state.ArbitrageProfit += fixedpoint.NewFromFloat(baseProfit)
+				s.Notify("grid arbitrage profit %f %s", baseProfit, s.Market.BaseCurrency)
+			}
+		}
+	} else if !s.Long && s.Quantity > 0 {
+		switch filledOrder.Side {
+		case types.SideTypeSell:
+			if buyOrder, ok := s.state.ArbitrageOrders[filledOrder.OrderID]; ok {
+				// use base asset quantity here
+				quoteProfit := (filledOrder.Quantity * filledOrder.Price) - (buyOrder.Quantity * buyOrder.Price)
+				s.state.ArbitrageProfit += fixedpoint.NewFromFloat(quoteProfit)
+				s.Notify("grid arbitrage profit %f %s", quoteProfit, s.Market.BaseCurrency)
+			}
+		case types.SideTypeBuy:
+			if sellOrder, ok := s.state.ArbitrageOrders[filledOrder.OrderID]; ok {
+				// use base asset quantity here
+				quoteProfit := (sellOrder.Quantity * sellOrder.Price) - (filledOrder.Quantity * filledOrder.Price)
+				s.state.ArbitrageProfit += fixedpoint.NewFromFloat(quoteProfit)
+				s.Notify("grid arbitrage profit %f %s", quoteProfit, s.Market.QuoteCurrency)
+			}
+		}
+	}
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
@@ -463,8 +510,13 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.state = &State{
 			FilledBuyGrids:  make(map[fixedpoint.Value]struct{}),
 			FilledSellGrids: make(map[fixedpoint.Value]struct{}),
+			ArbitrageOrders: make(map[uint64]types.Order),
 			Position:        position,
 		}
+	}
+
+	if s.state.ArbitrageOrders == nil {
+		s.state.ArbitrageOrders = make(map[uint64]types.Order)
 	}
 
 	s.Notify("current position %+v", s.state.Position)
@@ -478,7 +530,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	// we don't persist orders so that we can not clear the previous orders for now. just need time to support this.
 	s.activeOrders = bbgo.NewLocalActiveOrderBook()
-	s.activeOrders.OnFilled(s.submitReverseOrder)
+	s.activeOrders.OnFilled(s.handleFilledOrder)
 	s.activeOrders.BindStream(session.Stream)
 
 	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
