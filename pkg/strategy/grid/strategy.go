@@ -32,6 +32,7 @@ type State struct {
 	FilledBuyGrids  map[fixedpoint.Value]struct{} `json:"filledBuyGrids"`
 	FilledSellGrids map[fixedpoint.Value]struct{} `json:"filledSellGrids"`
 	Position        *bbgo.Position                `json:"position,omitempty"`
+	ArbitrageProfit fixedpoint.Value              `json:"totalProfit"`
 }
 
 type Strategy struct {
@@ -366,7 +367,7 @@ func (s *Strategy) tradeUpdateHandler(trade types.Trade) {
 
 		profit, madeProfit := s.state.Position.AddTrade(trade)
 		if madeProfit {
-			s.Notify("profit: %f", profit.Float64())
+			s.Notify("position profit: %f", profit.Float64())
 		}
 	}
 }
@@ -402,7 +403,7 @@ func (s *Strategy) submitReverseOrder(order types.Order) {
 		GroupID:     s.groupID,
 	}
 
-	log.Infof("submitting reverse order: %s against %s", submitOrder.String(), order.String())
+	log.Infof("submitting arbitrage order: %s against %s", submitOrder.String(), order.String())
 
 	createdOrders, err := s.OrderExecutor.SubmitOrders(context.Background(), submitOrder)
 	if err != nil {
