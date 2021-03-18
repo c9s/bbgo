@@ -329,6 +329,16 @@ helm delete bbgo
 
 ## Development
 
+### Setting up your local repository
+
+1. Click the "Fork" button from the GitHub repository.
+2. Clone your forked repository into `$GOPATH/github.com/c9s/bbgo`.
+3. Change directory into `$GOPATH/github.com/c9s/bbgo`.
+4. Create a branch and start your development.
+5. Test your changes.   
+6. Push your changes to your fork.
+7. Send a pull request.
+
 ### Adding new migration
 
 ```sh
