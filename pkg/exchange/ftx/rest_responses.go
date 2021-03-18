@@ -46,6 +46,8 @@ type accountResponse struct {
 }
 
 type account struct {
+	MakerFee float64 `json:"makerFee"`
+	TakerFee float64 `json:"takerFee"`
 }
 
 type positionsResponse struct {
