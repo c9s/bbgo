@@ -34,6 +34,7 @@ type UserInfo struct {
 	Name            string    `json:"name"`
 	Type            string    `json:"member_type"`
 	Level           int       `json:"level"`
+	VipLevel        int       `json:"vip_level"`
 	Email           string    `json:"email"`
 	Accounts        []Account `json:"accounts"`
 	Bank            *UserBank `json:"bank,omitempty"`
