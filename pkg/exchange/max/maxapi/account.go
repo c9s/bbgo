@@ -34,6 +34,7 @@ type UserInfo struct {
 	Name            string    `json:"name"`
 	Type            string    `json:"member_type"`
 	Level           int       `json:"level"`
+	VipLevel        int       `json:"vip_level"`
 	Email           string    `json:"email"`
 	Accounts        []Account `json:"accounts"`
 	Bank            *UserBank `json:"bank,omitempty"`
@@ -48,6 +49,39 @@ type UserInfo struct {
 	IdentityNumber  string    `json:"identity_number"`
 	WithDrawable    bool      `json:"withdrawable"`
 	ReferralCode    string    `json:"referral_code"`
+}
+
+type VipLevelSettings struct {
+	Level                int     `json:"level"`
+	MinimumTradingVolume float64 `json:"minimum_trading_volume"`
+	MinimumStakingVolume float64 `json:"minimum_staking_volume"`
+	MakerFee             float64 `json:"maker_fee"`
+	TakerFee             float64 `json:"taker_fee"`
+}
+
+type VipLevel struct {
+	Current VipLevelSettings `json:"current_vip_level"`
+	Next    VipLevelSettings `json:"next_vip_level"`
+}
+
+func (s *AccountService) VipLevel() (*VipLevel, error) {
+	req, err := s.client.newAuthenticatedRequest("GET", "v2/members/vip_level", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := s.client.sendRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var vipLevel VipLevel
+	err = response.DecodeJSON(&vipLevel)
+	if err != nil {
+		return nil, err
+	}
+
+	return &vipLevel, nil
 }
 
 func (s *AccountService) Account(currency string) (*Account, error) {
