@@ -31,14 +31,18 @@ Get your exchange API key and secret after you register the accounts:
 
 ## Installation
 
-
 ### Install from binary
 
-The following script will help you setup a config file, dotenv file:
+The following script will help you set up a config file, dotenv file:
 
 ```
 bash <(curl -s https://raw.githubusercontent.com/c9s/bbgo/main/scripts/setup-grid.sh)
 ```
+
+### Install and Run from the One-click Linode StackScript:
+
+- BBGO USDT/TWD Market Grid Trading <https://cloud.linode.com/stackscripts/793380>
+- BBGO Standard Grid Trading <https://cloud.linode.com/stackscripts/795788>
 
 ### Install from source
 
@@ -138,7 +142,8 @@ Check out the strategy directory [strategy](pkg/strategy) for all built-in strat
 - `pricealert` strategy demonstrates how to use the notification system [pricealert](pkg/strategy/pricealert)
 - `xpuremaker` strategy demonstrates how to maintain the orderbook and submit maker orders [xpuremaker](pkg/strategy/xpuremaker)
 - `buyandhold` strategy demonstrates how to subscribe kline events and submit market order [buyandhold](pkg/strategy/buyandhold)
-- `grid` strategy implements a basic grid strategy with the built-in bollinger indicator [grid](pkg/strategy/grid)
+- `bollgrid` strategy implements a basic grid strategy with the built-in bollinger indicator [bollgrid](pkg/strategy/bollgrid)
+- `grid` strategy implements the fixed price band grid strategy [grid](pkg/strategy/grid)
 - `flashcrash` strategy implements a strategy that catches the flashcrash [flashcrash](pkg/strategy/flashcrash)
 
 To run these built-in strategies, just 
