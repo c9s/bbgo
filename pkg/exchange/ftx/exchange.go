@@ -65,7 +65,27 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 }
 
 func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
-	panic("implement me")
+	resp, err := e.newRest().Account(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !resp.Success {
+		return nil, fmt.Errorf("ftx returns querying balances failure")
+	}
+
+	// TODO
+	a := &types.Account{
+		MakerCommission: 0,
+		TakerCommission: 0,
+	}
+
+	balances, err := e.QueryAccountBalances(ctx)
+	if err != nil {
+		return nil, err
+	}
+	a.UpdateBalances(balances)
+
+	return a, nil
 }
 
 func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
