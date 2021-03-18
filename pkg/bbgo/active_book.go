@@ -1,6 +1,8 @@
 package bbgo
 
 import (
+	"encoding/json"
+
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/types"
@@ -20,6 +22,11 @@ func NewLocalActiveOrderBook() *LocalActiveOrderBook {
 		Bids: types.NewSyncOrderMap(),
 		Asks: types.NewSyncOrderMap(),
 	}
+}
+
+func (b *LocalActiveOrderBook) MarshalJSON() ([]byte, error) {
+	orders := b.Backup()
+	return json.Marshal(orders)
 }
 
 func (b *LocalActiveOrderBook) Backup() []types.SubmitOrder {
