@@ -29,6 +29,10 @@ Get your exchange API key and secret after you register the accounts:
 
 - For MAX: <https://max.maicoin.com/signup?r=c7982718>
 - For Binance: <https://www.binancezh.com/en/register?ref=VGDGLT80>
+- For FTX: <https://ftx.com/#a=7710474>
+
+Since the exchange implementation and support are done by a small team, if you like the work they've done for you,
+It would be great if you can use their referral code as your support to them. :-D
 
 ## Installation
 
