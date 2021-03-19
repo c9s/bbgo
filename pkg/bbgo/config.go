@@ -113,8 +113,8 @@ func (t Backtest) ParseStartTime() (time.Time, error) {
 }
 
 type BacktestAccount struct {
-	MakerCommission  float64                   `json:"makerCommission"`
-	TakerCommission  float64                   `json:"takerCommission"`
+	MakerCommission  fixedpoint.Value          `json:"makerCommission"`
+	TakerCommission  fixedpoint.Value          `json:"takerCommission"`
 	BuyerCommission  int                       `json:"buyerCommission"`
 	SellerCommission int                       `json:"sellerCommission"`
 	Balances         BacktestAccountBalanceMap `json:"balances" yaml:"balances"`
