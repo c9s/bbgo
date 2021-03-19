@@ -169,6 +169,8 @@ SLACK_TOKEN=xxoox
 
 ### Synchronizing Trading Data
 
+By default, BBGO does not sync your trading data from the exchange sessions, so it's hard to calculate your profit and loss correctly.
+
 By synchronizing trades and orders to the local database, you can earn some benefits like PnL calculations, backtesting
 and asset calculation.
 
