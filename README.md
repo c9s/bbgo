@@ -51,9 +51,7 @@ bash <(curl -s https://raw.githubusercontent.com/c9s/bbgo/main/scripts/setup-gri
 
 ### Install from source
 
-Optional: setup MySQL or [run it in docker](https://hub.docker.com/_/mysql)
-
-Install the builtin commands:
+Install the bbgo command:
 
 ```sh
 go get -u github.com/c9s/bbgo/cmd/bbgo
@@ -187,6 +185,8 @@ To use MySQL database for data syncing, first you need to install your mysql ser
 # For Ubuntu Linux
 sudo apt-get install -y mysql-server
 ```
+
+Or [run it in docker](https://hub.docker.com/_/mysql)
 
 Create your mysql database:
 
