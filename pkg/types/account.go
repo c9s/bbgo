@@ -103,9 +103,9 @@ type Account struct {
 	sync.Mutex `json:"-"`
 
 	// bps. 0.15% fee will be 15.
-	MakerCommission float64 `json:"makerCommission,omitempty"`
-	TakerCommission float64 `json:"takerCommission,omitempty"`
-	AccountType     string  `json:"accountType,omitempty"`
+	MakerCommission fixedpoint.Value `json:"makerCommission,omitempty"`
+	TakerCommission fixedpoint.Value `json:"takerCommission,omitempty"`
+	AccountType     string           `json:"accountType,omitempty"`
 
 	balances BalanceMap
 }
