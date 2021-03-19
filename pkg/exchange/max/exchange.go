@@ -406,9 +406,17 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 		}
 	}
 
+	vipLevel, err := e.client.AccountService.VipLevel()
+	if err != nil {
+		return nil, err
+	}
+
+	// MAX returns the fee rate in the following format:
+	//  "maker_fee": 0.0005 -> 0.05%
+	//  "taker_fee": 0.0015 -> 0.15%
 	a := &types.Account{
-		MakerCommission: 15, // 0.15%
-		TakerCommission: 15, // 0.15%
+		MakerCommission: fixedpoint.NewFromFloat(vipLevel.Current.MakerFee * 10000.0), // 0.15% = 0.0015, 0.0015 * 10000 = 15
+		TakerCommission: fixedpoint.NewFromFloat(vipLevel.Current.TakerFee * 10000.0), // 0.15% = 0.0015, 0.0015 * 10000 = 15
 	}
 
 	a.UpdateBalances(balances)
