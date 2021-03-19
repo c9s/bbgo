@@ -378,8 +378,8 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	}
 
 	a := &types.Account{
-		MakerCommission: float64(account.MakerCommission),
-		TakerCommission: float64(account.TakerCommission),
+		MakerCommission: fixedpoint.NewFromInt64(account.MakerCommission),
+		TakerCommission: fixedpoint.NewFromInt64(account.TakerCommission),
 	}
 	a.UpdateBalances(balances)
 	return a, nil

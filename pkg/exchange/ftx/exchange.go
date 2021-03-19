@@ -75,8 +75,8 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 
 	bps := fixedpoint.NewFromFloat(10000)
 	a := &types.Account{
-		MakerCommission: fixedpoint.NewFromFloat(resp.Result.MakerFee).Mul(bps).Float64(),
-		TakerCommission: fixedpoint.NewFromFloat(resp.Result.TakerFee).Mul(bps).Float64(),
+		MakerCommission: fixedpoint.NewFromFloat(resp.Result.MakerFee).Mul(bps),
+		TakerCommission: fixedpoint.NewFromFloat(resp.Result.TakerFee).Mul(bps),
 	}
 
 	balances, err := e.QueryAccountBalances(ctx)
