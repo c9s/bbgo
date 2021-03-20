@@ -33,7 +33,7 @@ type State struct {
 	FilledSellGrids map[fixedpoint.Value]struct{} `json:"filledSellGrids"`
 	Position        *bbgo.Position                `json:"position,omitempty"`
 
-	ArbitrageProfit fixedpoint.Value `json:"arbitrageProfit"`
+	AccumulativeArbitrageProfit fixedpoint.Value `json:"accumulativeArbitrageProfit"`
 
 	// any created orders for tracking trades
 	// [source Order ID] -> arbitrage order
@@ -429,16 +429,22 @@ func (s *Strategy) handleFilledOrder(filledOrder types.Order) {
 			if buyOrder, ok := s.state.ArbitrageOrders[filledOrder.OrderID]; ok {
 				// use base asset quantity here
 				baseProfit := buyOrder.Quantity - filledOrder.Quantity
-				s.state.ArbitrageProfit += fixedpoint.NewFromFloat(baseProfit)
-				s.Notify("grid arbitrage profit %f %s", baseProfit, s.Market.BaseCurrency)
+				s.state.AccumulativeArbitrageProfit += fixedpoint.NewFromFloat(baseProfit)
+				s.Notify("%s grid arbitrage profit %f %s, accumulative arbitrage profit %f %s", s.Symbol,
+					baseProfit, s.Market.BaseCurrency,
+					s.state.AccumulativeArbitrageProfit, s.Market.BaseCurrency,
+				)
 			}
 
 		case types.SideTypeBuy:
 			if sellOrder, ok := s.state.ArbitrageOrders[filledOrder.OrderID]; ok {
 				// use base asset quantity here
 				baseProfit := filledOrder.Quantity - sellOrder.Quantity
-				s.state.ArbitrageProfit += fixedpoint.NewFromFloat(baseProfit)
-				s.Notify("grid arbitrage profit %f %s", baseProfit, s.Market.BaseCurrency)
+				s.state.AccumulativeArbitrageProfit += fixedpoint.NewFromFloat(baseProfit)
+				s.Notify("%s grid arbitrage profit %f %s, accumulative arbitrage profit %f %s", s.Symbol,
+					baseProfit, s.Market.BaseCurrency,
+					s.state.AccumulativeArbitrageProfit, s.Market.BaseCurrency,
+				)
 			}
 		}
 	} else if !s.Long && s.Quantity > 0 {
@@ -447,15 +453,21 @@ func (s *Strategy) handleFilledOrder(filledOrder types.Order) {
 			if buyOrder, ok := s.state.ArbitrageOrders[filledOrder.OrderID]; ok {
 				// use base asset quantity here
 				quoteProfit := (filledOrder.Quantity * filledOrder.Price) - (buyOrder.Quantity * buyOrder.Price)
-				s.state.ArbitrageProfit += fixedpoint.NewFromFloat(quoteProfit)
-				s.Notify("grid arbitrage profit %f %s", quoteProfit, s.Market.BaseCurrency)
+				s.state.AccumulativeArbitrageProfit += fixedpoint.NewFromFloat(quoteProfit)
+				s.Notify("%s grid arbitrage profit %f %s, accumulative arbitrage profit %f %s", s.Symbol,
+					quoteProfit, s.Market.QuoteCurrency,
+					s.state.AccumulativeArbitrageProfit, s.Market.QuoteCurrency,
+				)
 			}
 		case types.SideTypeBuy:
 			if sellOrder, ok := s.state.ArbitrageOrders[filledOrder.OrderID]; ok {
 				// use base asset quantity here
 				quoteProfit := (sellOrder.Quantity * sellOrder.Price) - (filledOrder.Quantity * filledOrder.Price)
-				s.state.ArbitrageProfit += fixedpoint.NewFromFloat(quoteProfit)
-				s.Notify("grid arbitrage profit %f %s", quoteProfit, s.Market.QuoteCurrency)
+				s.state.AccumulativeArbitrageProfit += fixedpoint.NewFromFloat(quoteProfit)
+				s.Notify("%s grid arbitrage profit %f %s, accumulative arbitrage profit %f %s", s.Symbol,
+					quoteProfit, s.Market.QuoteCurrency,
+					s.state.AccumulativeArbitrageProfit, s.Market.QuoteCurrency,
+				)
 			}
 		}
 	}
