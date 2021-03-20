@@ -25,7 +25,7 @@ A trading bot framework written in Go. The name bbgo comes from the BB8 bot in t
 
 ## Requirements
 
-Get your exchange API key and secret after you register the accounts:
+Get your exchange API key and secret after you register the accounts (you can choose one or more exchanges):
 
 - For MAX: <https://max.maicoin.com/signup?r=c7982718>
 - For Binance: <https://www.binancezh.com/en/register?ref=VGDGLT80>
