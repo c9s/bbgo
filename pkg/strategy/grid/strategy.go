@@ -499,10 +499,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		return fmt.Errorf("upperPrice (%f) should not be less than or equal to lowerPrice (%f)", s.UpperPrice.Float64(), s.LowerPrice.Float64())
 	}
 
+	instanceID := fmt.Sprintf("grid-%s-%d-%d-%d", s.Symbol, s.GridNum, s.UpperPrice, s.LowerPrice)
+	s.groupID = generateGroupID(instanceID)
+	log.Infof("using group id %d from fnv(%s)", s.groupID, instanceID)
+
 	var stateLoaded = false
 	if s.Persistence != nil {
 		var state State
-		if err := s.Persistence.Load(&state, ID, s.Symbol, "state"); err != nil {
+		if err := s.Persistence.Load(&state, ID, instanceID); err != nil {
 			if err != service.ErrPersistenceNotExists {
 				return errors.Wrapf(err, "state load error")
 			}
@@ -533,9 +537,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.Notify("current position %+v", s.state.Position)
 
-	instanceID := fmt.Sprintf("grid-%s-%d", s.Symbol, s.GridNum)
-	s.groupID = generateGroupID(instanceID)
-	log.Infof("using group id %d from fnv(%s)", s.groupID, instanceID)
 
 	s.orderStore = bbgo.NewOrderStore(s.Symbol)
 	s.orderStore.BindStream(session.Stream)
@@ -552,7 +553,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			log.Infof("backing up grid state...")
 			submitOrders := s.activeOrders.Backup()
 			s.state.Orders = submitOrders
-			if err := s.Persistence.Save(s.state, ID, s.Symbol, "snapshot"); err != nil {
+			if err := s.Persistence.Save(s.state, ID, instanceID); err != nil {
 				log.WithError(err).Error("can not save active order backups")
 			} else {
 				log.Infof("active order snapshot saved")
