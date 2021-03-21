@@ -33,6 +33,7 @@ type OrderType string
 const (
 	OrderTypeMarket     = OrderType("market")
 	OrderTypeLimit      = OrderType("limit")
+	OrderTypePostOnly   = OrderType("post_only")
 	OrderTypeStopLimit  = OrderType("stop_limit")
 	OrderTypeStopMarket = OrderType("stop_market")
 )
@@ -236,7 +237,7 @@ type OrderCancelAllRequestParams struct {
 
 	Side    string `json:"side,omitempty"`
 	Market  string `json:"market,omitempty"`
-	GroupID int64 `json:"groupID,omitempty"`
+	GroupID int64  `json:"groupID,omitempty"`
 }
 
 type OrderCancelAllRequest struct {
@@ -417,62 +418,90 @@ func (s *OrderService) NewCreateMultiOrderRequest() *CreateMultiOrderRequest {
 	return &CreateMultiOrderRequest{client: s.client}
 }
 
-type CreateOrderRequestParams struct {
-	*PrivateRequestParams
-
-	Market        string `json:"market"`
-	Volume        string `json:"volume"`
-	Price         string `json:"price,omitempty"`
-	StopPrice     string `json:"stop_price,omitempty"`
-	Side          string `json:"side"`
-	OrderType     string `json:"ord_type"`
-	ClientOrderID string `json:"client_oid,omitempty"`
-	GroupID       string `json:"group_id,omitempty"`
-}
-
 type CreateOrderRequest struct {
 	client *RestClient
 
-	params CreateOrderRequestParams
+	market        *string
+	volume        *string
+	price         *string
+	stopPrice     *string
+	side          *string
+	orderType     *string
+	clientOrderID *string
+	groupID       *string
 }
 
 func (r *CreateOrderRequest) Market(market string) *CreateOrderRequest {
-	r.params.Market = market
+	r.market = &market
 	return r
 }
 
 func (r *CreateOrderRequest) Volume(volume string) *CreateOrderRequest {
-	r.params.Volume = volume
+	r.volume = &volume
 	return r
 }
 
 func (r *CreateOrderRequest) Price(price string) *CreateOrderRequest {
-	r.params.Price = price
+	r.price = &price
 	return r
 }
 
 func (r *CreateOrderRequest) StopPrice(price string) *CreateOrderRequest {
-	r.params.StopPrice = price
+	r.stopPrice = &price
 	return r
 }
 
 func (r *CreateOrderRequest) Side(side string) *CreateOrderRequest {
-	r.params.Side = side
+	r.side = &side
 	return r
 }
 
 func (r *CreateOrderRequest) OrderType(orderType string) *CreateOrderRequest {
-	r.params.OrderType = orderType
+	r.orderType = &orderType
 	return r
 }
 
 func (r *CreateOrderRequest) ClientOrderID(clientOrderID string) *CreateOrderRequest {
-	r.params.ClientOrderID = clientOrderID
+	r.clientOrderID = &clientOrderID
 	return r
 }
 
 func (r *CreateOrderRequest) Do(ctx context.Context) (order *Order, err error) {
-	req, err := r.client.newAuthenticatedRequest("POST", "v2/orders", &r.params)
+	var payload = map[string]interface{}{}
+
+	if r.market != nil {
+		payload["market"] = r.market
+	}
+
+	if r.volume != nil {
+		payload["volume"] = r.volume
+	}
+
+	if r.price != nil {
+		payload["price"] = r.price
+	}
+
+	if r.stopPrice != nil {
+		payload["stop_price"] = r.stopPrice
+	}
+
+	if r.side != nil {
+		payload["side"] = r.side
+	}
+
+	if r.orderType != nil {
+		payload["ord_type"] = r.orderType
+	}
+
+	if r.clientOrderID != nil {
+		payload["client_oid"] = r.clientOrderID
+	}
+
+	if r.groupID != nil {
+		payload["group_id"] = r.groupID
+	}
+
+	req, err := r.client.newAuthenticatedRequest("POST", "v2/orders", &payload)
 	if err != nil {
 		return order, errors.Wrapf(err, "order create error")
 	}
