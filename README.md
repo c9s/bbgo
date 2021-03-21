@@ -234,6 +234,76 @@ vim config/buyandhold.yaml
 bbgo run --config config/buyandhold.yaml
 ```
 
+## Adding New Built-in Strategy
+
+Fork and clone this repository, Create a directory under `pkg/strategy/newstrategy`,
+write your strategy at `pkg/strategy/newstrategy/strategy.go`.
+
+Define a strategy struct:
+
+```go
+package newstrategy
+
+import (
+	"github.com/c9s/bbgo/pkg/fixedpoint"
+)
+
+type Strategy struct {
+	Symbol string `json:"symbol"`
+	Param1 int `json:"param1"`
+    Param2 int `json:"param2"`
+    Param3 fixedpoint.Value `json:"param3"`
+}
+```
+
+Register your strategy:
+
+```go
+const ID = "newstrategy"
+
+const stateKey = "state-v1"
+
+var log = logrus.WithField("strategy", ID)
+
+func init() {
+    bbgo.RegisterStrategy(ID, &Strategy{})
+}
+```
+
+Implement the strategy methods:
+
+```go
+func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
+    session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
+}
+
+func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+	// ....
+	return nil
+}
+```
+
+Edit `pkg/cmd/builtin.go`, and import the package, like this:
+
+```go
+package cmd
+
+// import built-in strategies
+import (
+	_ "github.com/c9s/bbgo/pkg/strategy/bollgrid"
+	_ "github.com/c9s/bbgo/pkg/strategy/buyandhold"
+	_ "github.com/c9s/bbgo/pkg/strategy/flashcrash"
+	_ "github.com/c9s/bbgo/pkg/strategy/grid"
+	_ "github.com/c9s/bbgo/pkg/strategy/mirrormaker"
+	_ "github.com/c9s/bbgo/pkg/strategy/pricealert"
+	_ "github.com/c9s/bbgo/pkg/strategy/support"
+	_ "github.com/c9s/bbgo/pkg/strategy/swing"
+	_ "github.com/c9s/bbgo/pkg/strategy/trailingstop"
+	_ "github.com/c9s/bbgo/pkg/strategy/xmaker"
+	_ "github.com/c9s/bbgo/pkg/strategy/xpuremaker"
+)
+```
+
 ## Write your own strategy
 
 Create your go package, and initialize the repository with `go mod` and add bbgo as a dependency:
