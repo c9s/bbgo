@@ -63,11 +63,11 @@ riskControls:
 
 crossExchangeStrategies:
 
-- mobydick:
+- xmaker:
     symbol: ETHUSDT
     sourceExchange: binance
     makerExchange: max
-    updateInterval: 1s
+    updateInterval: 2s
 
     # disableHedge disables the hedge orders on the source exchange
     # disableHedge: true
@@ -78,7 +78,7 @@ crossExchangeStrategies:
     askMargin: 0.004
     bidMargin: 0.004
 
-    quantity: 0.1
+    quantity: 0.01
     quantityMultiplier: 2
 
     # numLayers means how many order we want to place on each side. 3 means we want 3 bid orders and 3 ask orders

@@ -501,7 +501,7 @@ func (r *CreateOrderRequest) Do(ctx context.Context) (order *Order, err error) {
 		payload["group_id"] = r.groupID
 	}
 
-	req, err := r.client.newAuthenticatedRequest("POST", "v2/orders", &payload)
+	req, err := r.client.newAuthenticatedRequest("POST", "v2/orders", payload)
 	if err != nil {
 		return order, errors.Wrapf(err, "order create error")
 	}
