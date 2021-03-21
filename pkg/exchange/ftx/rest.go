@@ -22,6 +22,7 @@ type restRequest struct {
 	*balanceRequest
 	*orderRequest
 	*accountRequest
+	*marketRequest
 
 	key, secret string
 	// Optional sub-account name
@@ -43,6 +44,7 @@ func newRestRequest(c *http.Client, baseURL *url.URL) *restRequest {
 		baseURL: baseURL,
 	}
 
+	r.marketRequest = &marketRequest{restRequest: r}
 	r.accountRequest = &accountRequest{restRequest: r}
 	r.balanceRequest = &balanceRequest{restRequest: r}
 	r.orderRequest = &orderRequest{restRequest: r}
