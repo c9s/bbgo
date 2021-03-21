@@ -377,9 +377,10 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 		}
 	}
 
+	// binance use 15 -> 0.15%, so we convert it to 0.0015
 	a := &types.Account{
-		MakerCommission: fixedpoint.NewFromInt64(account.MakerCommission),
-		TakerCommission: fixedpoint.NewFromInt64(account.TakerCommission),
+		MakerCommission: fixedpoint.NewFromFloat(float64(account.MakerCommission) * 0.0001),
+		TakerCommission: fixedpoint.NewFromFloat(float64(account.TakerCommission) * 0.0001),
 	}
 	a.UpdateBalances(balances)
 	return a, nil
