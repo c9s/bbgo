@@ -21,15 +21,6 @@ notifications:
     submitOrder: "$silent"
     pnL: "bbgo-pnl"
 
-reportPnL:
-- averageCostBySymbols:
-  - "BTCUSDT"
-  - "BNBUSDT"
-  of: binance
-  when:
-  - "@daily"
-  - "@hourly"
-
 persistence:
   json:
     directory: var/data
@@ -46,6 +37,29 @@ sessions:
   binance:
     exchange: binance
     envVarPrefix: binance
+
+riskControls:
+  # This is the session-based risk controller, which let you configure different risk controller by session.
+  sessionBased:
+    # "max" is the session name that you want to configure the risk control
+    max:
+      # orderExecutor is one of the risk control
+      orderExecutor:
+        # symbol-routed order executor
+        bySymbol:
+          ETHUSDT:
+            # basic risk control order executor
+            basic:
+              # keep at least X USDT (keep cash)
+              minQuoteBalance: 100.0
+
+              # maximum ETH balance (don't buy too much)
+              maxBaseAssetBalance: 10.0
+
+              # minimum ETH balance (don't sell too much)
+              minBaseAssetBalance: 0.0
+
+              maxOrderAmount: 1000.0
 
 crossExchangeStrategies:
 
