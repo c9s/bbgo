@@ -102,6 +102,62 @@ type balances struct {
 	} `json:"result"`
 }
 
+/*
+[
+  {
+    "name": "BTC/USD",
+    "enabled": true,
+    "postOnly": false,
+    "priceIncrement": 1.0,
+    "sizeIncrement": 0.0001,
+    "minProvideSize": 0.0001,
+    "last": 59039.0,
+    "bid": 59038.0,
+    "ask": 59040.0,
+    "price": 59039.0,
+    "type": "spot",
+    "baseCurrency": "BTC",
+    "quoteCurrency": "USD",
+    "underlying": null,
+    "restricted": false,
+    "highLeverageFeeExempt": true,
+    "change1h": 0.0015777151969599294,
+    "change24h": 0.05475756601279165,
+    "changeBod": -0.0035107262814994852,
+    "quoteVolume24h": 316493675.5463,
+    "volumeUsd24h": 316493675.5463
+  }
+]
+*/
+type marketsResponse struct {
+	Success bool     `json:"success"`
+	Result  []market `json:"result"`
+}
+
+type market struct {
+	Name                  string  `json:"name"`
+	Enabled               bool    `json:"enabled"`
+	PostOnly              bool    `json:"postOnly"`
+	PriceIncrement        float64 `json:"priceIncrement"`
+	SizeIncrement         float64 `json:"sizeIncrement"`
+	MinProvideSize        float64 `json:"minProvideSize"`
+	Last                  float64 `json:"last"`
+	Bid                   float64 `json:"bid"`
+	Ask                   float64 `json:"ask"`
+	Price                 float64 `json:"price"`
+	Type                  string  `json:"type"`
+	BaseCurrency          string  `json:"baseCurrency"`
+	QuoteCurrency         string  `json:"quoteCurrency"`
+	Underlying            string  `json:"underlying"`
+	Restricted            bool    `json:"restricted"`
+	HighLeverageFeeExempt bool    `json:"highLeverageFeeExempt"`
+	Change1h              float64 `json:"change1h"`
+	Change24h             float64 `json:"change24h"`
+	ChangeBod             float64 `json:"changeBod"`
+	QuoteVolume24h        float64 `json:"quoteVolume24h"`
+	VolumeUsd24h          float64 `json:"volumeUsd24h"`
+}
+
 type ordersHistoryResponse struct {
 	Success     bool    `json:"success"`
 	Result      []order `json:"result"`
