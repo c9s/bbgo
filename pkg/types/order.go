@@ -58,6 +58,7 @@ type OrderType string
 
 const (
 	OrderTypeLimit      OrderType = "LIMIT"
+	OrderTypeLimitMaker OrderType = "LIMIT_MAKER"
 	OrderTypeMarket     OrderType = "MARKET"
 	OrderTypeStopLimit  OrderType = "STOP_LIMIT"
 	OrderTypeStopMarket OrderType = "STOP_MARKET"
