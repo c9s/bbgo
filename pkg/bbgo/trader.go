@@ -173,6 +173,8 @@ func (trader *Trader) Subscribe() {
 		for _, strategy := range strategies {
 			if subscriber, ok := strategy.(ExchangeSessionSubscriber); ok {
 				subscriber.Subscribe(session)
+			} else {
+				log.Errorf("strategy %s does not implement ExchangeSessionSubscriber", strategy.ID())
 			}
 		}
 	}
@@ -180,6 +182,8 @@ func (trader *Trader) Subscribe() {
 	for _, strategy := range trader.crossExchangeStrategies {
 		if subscriber, ok := strategy.(CrossExchangeSessionSubscriber); ok {
 			subscriber.CrossSubscribe(trader.environment.sessions)
+		} else {
+			log.Errorf("strategy %s does not implement CrossExchangeSessionSubscriber", strategy.ID())
 		}
 	}
 }
