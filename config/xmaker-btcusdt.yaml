@@ -41,16 +41,39 @@ persistence:
 sessions:
   max:
     exchange: max
-    envVarPrefix: max
+    envVarPrefix: MAX
 
   binance:
     exchange: binance
-    envVarPrefix: binance
+    envVarPrefix: BINANCE
+
+riskControls:
+  # This is the session-based risk controller, which let you configure different risk controller by session.
+  sessionBased:
+    # "max" is the session name that you want to configure the risk control
+    max:
+      # orderExecutor is one of the risk control
+      orderExecutor:
+        # symbol-routed order executor
+        bySymbol:
+          BTCUSDT:
+            # basic risk control order executor
+            basic:
+              # keep at least X USDT (keep cash)
+              minQuoteBalance: 100.0
+
+              # maximum BTC balance (don't buy too much)
+              maxBaseAssetBalance: 1.0
+
+              # minimum BTC balance (don't sell too much)
+              minBaseAssetBalance: 0.01
+
+              maxOrderAmount: 1000.0
 
 crossExchangeStrategies:
 
 - mobydick:
-    symbol: "BTCUSDT"
+    symbol: BTCUSDT
     sourceExchange: binance
     makerExchange: max
     updateInterval: 1s
