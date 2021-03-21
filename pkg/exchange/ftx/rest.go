@@ -19,7 +19,7 @@ import (
 )
 
 type restRequest struct {
-	*balanceRequest
+	*walletRequest
 	*orderRequest
 	*accountRequest
 	*marketRequest
@@ -46,7 +46,7 @@ func newRestRequest(c *http.Client, baseURL *url.URL) *restRequest {
 
 	r.marketRequest = &marketRequest{restRequest: r}
 	r.accountRequest = &accountRequest{restRequest: r}
-	r.balanceRequest = &balanceRequest{restRequest: r}
+	r.walletRequest = &walletRequest{restRequest: r}
 	r.orderRequest = &orderRequest{restRequest: r}
 	return r
 }
