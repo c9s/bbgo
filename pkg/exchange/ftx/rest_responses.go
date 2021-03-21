@@ -200,3 +200,57 @@ type orderResponse struct {
 
 	Result order `json:"result"`
 }
+
+/*
+{
+  "success": true,
+  "result": [
+    {
+      "coin": "TUSD",
+      "confirmations": 64,
+      "confirmedTime": "2019-03-05T09:56:55.728933+00:00",
+      "fee": 0,
+      "id": 1,
+      "sentTime": "2019-03-05T09:56:55.735929+00:00",
+      "size": 99.0,
+      "status": "confirmed",
+      "time": "2019-03-05T09:56:55.728933+00:00",
+      "txid": "0x8078356ae4b06a036d64747546c274af19581f1c78c510b60505798a7ffcaf1"
+    }
+  ]
+}
+*/
+type depositHistoryResponse struct {
+	Success bool             `json:"success"`
+	Result  []depositHistory `json:"result"`
+}
+
+type depositHistory struct {
+	ID            int64     `json:"id"`
+	Coin          string    `json:"coin"`
+	TxID          string    `json:"txid"`
+	Address       address   `json:"address"`
+	Confirmations int64     `json:"confirmations"`
+	ConfirmedTime time.Time `json:"confirmedTime"`
+	Fee           float64   `json:"fee"`
+	SentTime      time.Time `json:"sentTime"`
+	Size          float64   `json:"size"`
+	Status        string    `json:"status"`
+	Time          time.Time `json:"time"`
+	Notes         string    `json:"notes"`
+}
+
+/**
+{
+	"address": "test123",
+	"tag": null,
+	"method": "ltc",
+	"coin": null
+}
+*/
+type address struct {
+	Address string `json:"address"`
+	Tag     string `json:"tag"`
+	Method  string `json:"method"`
+	Coin    string `json:"coin"`
+}

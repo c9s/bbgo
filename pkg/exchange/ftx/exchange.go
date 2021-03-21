@@ -149,7 +149,27 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 }
 
 func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since, until time.Time) (allDeposits []types.Deposit, err error) {
-	panic("implement me")
+	if err = verifySinceUntil(since, until); err != nil {
+		return nil, err
+	}
+
+	resp, err := e.newRest().DepositHistory(ctx)
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(resp.Result, func(i, j int) bool {
+		return resp.Result[i].Time.Before(resp.Result[j].Time)
+	})
+	for _, r := range resp.Result {
+		d, err := toGlobalDeposit(r)
+		if err != nil {
+			return nil, err
+		}
+		if d.Asset == asset && !since.After(d.Time.Time()) && !until.Before(d.Time.Time()) {
+			allDeposits = append(allDeposits, d)
+		}
+	}
+	return
 }
 
 func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (allWithdraws []types.Withdraw, err error) {
@@ -212,8 +232,8 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 // symbol, since and until are all optional. FTX can only query by order created time, not updated time.
 // FTX doesn't support lastOrderID, so we will query by the time range first, and filter by the lastOrderID.
 func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []types.Order, err error) {
-	if since.After(until) {
-		return nil, fmt.Errorf("since can't be after until")
+	if err := verifySinceUntil(since, until); err != nil {
+		return nil, err
 	}
 	if lastOrderID > 0 {
 		logger.Warn("FTX doesn't support lastOrderID")
@@ -280,4 +300,17 @@ func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticke
 
 func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[string]types.Ticker, error) {
 	panic("implement me")
+}
+
+func verifySinceUntil(since, until time.Time) error {
+	if since.After(until) {
+		return fmt.Errorf("since can't be greater than until")
+	}
+	if since == (time.Time{}) {
+		return fmt.Errorf("since not found")
+	}
+	if until == (time.Time{}) {
+		return fmt.Errorf("until not found")
+	}
+	return nil
 }
