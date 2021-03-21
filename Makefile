@@ -75,7 +75,7 @@ dist: version static migrations bbgo-linux bbgo-slim-linux bbgo-darwin bbgo-slim
 			done ; \
 		done
 
-pkg/version/version.go: .git/HEAD
+pkg/version/version.go: .FORCE
 	bash utils/generate-version-file.sh > $@
 
 version: pkg/version/version.go
