@@ -120,14 +120,19 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 
 	log.Infof("quote bid price: %f ask price: %f", bidPrice.Float64(), askPrice.Float64())
 
+	var disableMakerBid = false
+	var disableMakerAsk = false
 	var submitOrders []types.SubmitOrder
 
-	balances := s.makerSession.Account.Balances()
+	// we load the balances from the account,
+	// however, while we're generating the orders,
+	// the balance may have a chance to be deducted by other strategies or manual orders submitted by the user
+	makerBalances := s.makerSession.Account.Balances()
 	makerQuota := &bbgo.QuotaTransaction{}
-	if b, ok := balances[s.makerMarket.BaseCurrency]; ok {
+	if b, ok := makerBalances[s.makerMarket.BaseCurrency]; ok {
 		makerQuota.BaseAsset.Add(b.Available)
 	}
-	if b, ok := balances[s.makerMarket.QuoteCurrency]; ok {
+	if b, ok := makerBalances[s.makerMarket.QuoteCurrency]; ok {
 		makerQuota.QuoteAsset.Add(b.Available)
 	}
 
@@ -135,59 +140,69 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 	hedgeQuota := &bbgo.QuotaTransaction{}
 	if b, ok := hedgeBalances[s.sourceMarket.BaseCurrency]; ok {
 		hedgeQuota.BaseAsset.Add(b.Available)
+
+		// if the base asset balance is not enough for selling
+		if b.Available.Float64() <= s.sourceMarket.MinQuantity {
+			disableMakerBid = true
+		}
 	}
+
 	if b, ok := hedgeBalances[s.sourceMarket.QuoteCurrency]; ok {
 		hedgeQuota.QuoteAsset.Add(b.Available)
+
+		// if the quote asset balance is not enough for buying
+		if b.Available.Float64() <= s.sourceMarket.MinNotional {
+			disableMakerAsk = true
+		}
 	}
 
-	log.Infof("maker quota: %+v", makerQuota)
-	log.Infof("hedge quota: %+v", hedgeQuota)
-
 	for i := 0; i < s.NumLayers; i++ {
-		// bid orders
-		if makerQuota.QuoteAsset.Lock(bidQuantity.Mul(bidPrice)) && hedgeQuota.BaseAsset.Lock(bidQuantity) {
-			// if we bought, then we need to sell the base from the hedge session
-			submitOrders = append(submitOrders, types.SubmitOrder{
-				Symbol:      s.Symbol,
-				Type:        types.OrderTypeLimit,
-				Side:        types.SideTypeBuy,
-				Price:       bidPrice.Float64(),
-				Quantity:    bidQuantity.Float64(),
-				TimeInForce: "GTC",
-				GroupID:     s.groupID,
-			})
+		// for maker bid orders
+		if !disableMakerBid {
+			if makerQuota.QuoteAsset.Lock(bidQuantity.Mul(bidPrice)) && hedgeQuota.BaseAsset.Lock(bidQuantity) {
+				// if we bought, then we need to sell the base from the hedge session
+				submitOrders = append(submitOrders, types.SubmitOrder{
+					Symbol:      s.Symbol,
+					Type:        types.OrderTypeLimit,
+					Side:        types.SideTypeBuy,
+					Price:       bidPrice.Float64(),
+					Quantity:    bidQuantity.Float64(),
+					TimeInForce: "GTC",
+					GroupID:     s.groupID,
+				})
 
-			makerQuota.Commit()
-			hedgeQuota.Commit()
-		} else {
-			makerQuota.Rollback()
-			hedgeQuota.Rollback()
+				makerQuota.Commit()
+				hedgeQuota.Commit()
+			} else {
+				makerQuota.Rollback()
+				hedgeQuota.Rollback()
+			}
+			bidPrice -= fixedpoint.NewFromFloat(s.makerMarket.TickSize * float64(s.Pips))
+			bidQuantity.Mul(s.QuantityMultiplier)
 		}
 
-		// ask orders
-		if makerQuota.BaseAsset.Lock(askQuantity) && hedgeQuota.QuoteAsset.Lock(askQuantity.Mul(askPrice)) {
-			// if we bought, then we need to sell the base from the hedge session
-			submitOrders = append(submitOrders, types.SubmitOrder{
-				Symbol:      s.Symbol,
-				Type:        types.OrderTypeLimit,
-				Side:        types.SideTypeSell,
-				Price:       askPrice.Float64(),
-				Quantity:    askQuantity.Float64(),
-				TimeInForce: "GTC",
-				GroupID:     s.groupID,
-			})
-			makerQuota.Commit()
-			hedgeQuota.Commit()
-		} else {
-			makerQuota.Rollback()
-			hedgeQuota.Rollback()
+		// for maker ask orders
+		if !disableMakerAsk {
+			if makerQuota.BaseAsset.Lock(askQuantity) && hedgeQuota.QuoteAsset.Lock(askQuantity.Mul(askPrice)) {
+				// if we bought, then we need to sell the base from the hedge session
+				submitOrders = append(submitOrders, types.SubmitOrder{
+					Symbol:      s.Symbol,
+					Type:        types.OrderTypeLimit,
+					Side:        types.SideTypeSell,
+					Price:       askPrice.Float64(),
+					Quantity:    askQuantity.Float64(),
+					TimeInForce: "GTC",
+					GroupID:     s.groupID,
+				})
+				makerQuota.Commit()
+				hedgeQuota.Commit()
+			} else {
+				makerQuota.Rollback()
+				hedgeQuota.Rollback()
+			}
+			askPrice += fixedpoint.NewFromFloat(s.makerMarket.TickSize * float64(s.Pips))
+			askQuantity.Mul(s.QuantityMultiplier)
 		}
-
-		bidPrice -= fixedpoint.NewFromFloat(s.makerMarket.TickSize * float64(s.Pips))
-		askPrice += fixedpoint.NewFromFloat(s.makerMarket.TickSize * float64(s.Pips))
-
-		askQuantity.Mul(s.QuantityMultiplier)
-		bidQuantity.Mul(s.QuantityMultiplier)
 	}
 
 	if len(submitOrders) == 0 {
@@ -335,7 +350,6 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		s.Quantity = defaultQuantity
 	}
 
-
 	// configure sessions
 	sourceSession, ok := sessions[s.SourceExchange]
 	if !ok {
@@ -360,9 +374,6 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	if !ok {
 		return fmt.Errorf("maker session market %s is not defined", s.Symbol)
 	}
-
-
-
 
 	// restore state
 	instanceID := fmt.Sprintf("%s-%s-%s", ID, s.Symbol)
