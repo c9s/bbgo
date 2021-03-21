@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/c9s/bbgo/pkg/datatype"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -116,7 +117,7 @@ func TestExchange_QueryClosedOrders(t *testing.T) {
 		serverURL, err := url.Parse(ts.URL)
 		assert.NoError(t, err)
 		ex.restEndpoint = serverURL
-		resp, err := ex.QueryClosedOrders(context.Background(), "BTC-PERP", time.Time{}, time.Time{}, 100)
+		resp, err := ex.QueryClosedOrders(context.Background(), "BTC-PERP", time.Now(), time.Now(), 100)
 		assert.NoError(t, err)
 
 		assert.Len(t, resp, 0)
@@ -157,7 +158,7 @@ func TestExchange_QueryClosedOrders(t *testing.T) {
 		serverURL, err := url.Parse(ts.URL)
 		assert.NoError(t, err)
 		ex.restEndpoint = serverURL
-		resp, err := ex.QueryClosedOrders(context.Background(), "BTC-PERP", time.Time{}, time.Time{}, 100)
+		resp, err := ex.QueryClosedOrders(context.Background(), "BTC-PERP", time.Now(), time.Now(), 100)
 		assert.NoError(t, err)
 		assert.Len(t, resp, 1)
 		assert.Equal(t, "BTC-PERP", resp[0].Symbol)
@@ -201,7 +202,7 @@ func TestExchange_QueryClosedOrders(t *testing.T) {
 		serverURL, err := url.Parse(ts.URL)
 		assert.NoError(t, err)
 		ex.restEndpoint = serverURL
-		resp, err := ex.QueryClosedOrders(context.Background(), "BTC-PERP", time.Time{}, time.Time{}, 100)
+		resp, err := ex.QueryClosedOrders(context.Background(), "BTC-PERP", time.Now(), time.Now(), 100)
 		assert.NoError(t, err)
 		assert.Len(t, resp, 3)
 
@@ -272,7 +273,7 @@ func TestExchange_QueryClosedOrders(t *testing.T) {
 		serverURL, err := url.Parse(ts.URL)
 		assert.NoError(t, err)
 		ex.restEndpoint = serverURL
-		resp, err := ex.QueryClosedOrders(context.Background(), "BTC-PERP", time.Time{}, time.Time{}, 100)
+		resp, err := ex.QueryClosedOrders(context.Background(), "BTC-PERP", time.Now(), time.Now(), 100)
 		assert.NoError(t, err)
 		assert.Len(t, resp, 2)
 		expectedOrderID := []uint64{123, 456}
@@ -422,4 +423,64 @@ func TestExchange_QueryMarkets(t *testing.T) {
 		StepSize:        0.0001,
 		TickSize:        1,
 	}, resp["BTC/USD"])
+}
+
+func TestExchange_QueryDepositHistory(t *testing.T) {
+	respJSON := `
+{
+  "success": true,
+  "result": [
+    {
+      "coin": "TUSD",
+      "confirmations": 64,
+      "confirmedTime": "2019-03-05T09:56:55.728933+00:00",
+      "fee": 0,
+      "id": 1,
+      "sentTime": "2019-03-05T09:56:55.735929+00:00",
+      "size": 99.0,
+      "status": "confirmed",
+      "time": "2019-03-05T09:56:55.728933+00:00",
+      "txid": "0x8078356ae4b06a036d64747546c274af19581f1c78c510b60505798a7ffcaf1",
+			"address": {"address": "test-addr", "tag": "test-tag"}
+    }
+  ]
+}
+`
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, respJSON)
+	}))
+	defer ts.Close()
+
+	ex := NewExchange("", "", "")
+	serverURL, err := url.Parse(ts.URL)
+	assert.NoError(t, err)
+	ex.restEndpoint = serverURL
+
+	ctx := context.Background()
+	layout := "2006-01-02T15:04:05.999999Z07:00"
+	actualConfirmedTime, err := time.Parse(layout, "2019-03-05T09:56:55.728933+00:00")
+	assert.NoError(t, err)
+	dh, err := ex.QueryDepositHistory(ctx, "TUSD", actualConfirmedTime.Add(-1*time.Hour), actualConfirmedTime.Add(1*time.Hour))
+	assert.NoError(t, err)
+	assert.Len(t, dh, 1)
+	assert.Equal(t, types.Deposit{
+		Exchange:      types.ExchangeFTX,
+		Time:          datatype.Time(actualConfirmedTime),
+		Amount:        99.0,
+		Asset:         "TUSD",
+		TransactionID: "0x8078356ae4b06a036d64747546c274af19581f1c78c510b60505798a7ffcaf1",
+		Status:        types.DepositSuccess,
+		Address:       "test-addr",
+		AddressTag:    "test-tag",
+	}, dh[0])
+
+	// not in the time range
+	dh, err = ex.QueryDepositHistory(ctx, "TUSD", actualConfirmedTime.Add(1*time.Hour), actualConfirmedTime.Add(2*time.Hour))
+	assert.NoError(t, err)
+	assert.Len(t, dh, 0)
+
+	// exclude by asset
+	dh, err = ex.QueryDepositHistory(ctx, "BTC", actualConfirmedTime.Add(-1*time.Hour), actualConfirmedTime.Add(1*time.Hour))
+	assert.NoError(t, err)
+	assert.Len(t, dh, 0)
 }
