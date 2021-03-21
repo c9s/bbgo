@@ -167,7 +167,7 @@ var ErrPrecisionLoss = errors.New("precision loss")
 func Parse(input string) (num int64, numDecimalPoints int, err error) {
 	var neg int64 = 1
 	var digit int64
-	for i := 0 ; i < len(input) ; i++ {
+	for i := 0; i < len(input); i++ {
 		c := input[i]
 		if c == '-' {
 			neg = -1
@@ -177,15 +177,15 @@ func Parse(input string) (num int64, numDecimalPoints int, err error) {
 				return
 			}
 
-			num = num * 10 + digit
+			num = num*10 + digit
 		} else if c == '.' {
 			i++
-			if i > len(input) - 1 {
+			if i > len(input)-1 {
 				err = fmt.Errorf("expect fraction numbers after dot")
 				return
 			}
 
-			for j := i ; j < len(input); j++ {
+			for j := i; j < len(input); j++ {
 				fc := input[j]
 				if fc >= '0' && fc <= '9' {
 					digit, err = strconv.ParseInt(string(fc), 10, 64)
@@ -194,10 +194,10 @@ func Parse(input string) (num int64, numDecimalPoints int, err error) {
 					}
 
 					numDecimalPoints++
-					num = num * 10 + digit
+					num = num*10 + digit
 
 					if numDecimalPoints >= MaxPrecision {
-						return num, numDecimalPoints,ErrPrecisionLoss
+						return num, numDecimalPoints, ErrPrecisionLoss
 					}
 				} else {
 					err = fmt.Errorf("expect digit, got %c", fc)
@@ -262,4 +262,16 @@ func Max(a, b Value) Value {
 	}
 
 	return b
+}
+
+func NumFractionalDigits(a Value) int {
+	numPow := 0
+	for pow := int64(DefaultPow); pow%10 != 1; pow /= 10 {
+		numPow++
+	}
+	numZeros := 0
+	for v := a.Int64(); v%10 == 0; v /= 10 {
+		numZeros++
+	}
+	return numPow - numZeros
 }
