@@ -1,0 +1,101 @@
+---
+notifications:
+  slack:
+    defaultChannel: "dev-bbgo"
+    errorChannel: "bbgo-error"
+
+  # if you want to route channel by symbol
+  symbolChannels:
+    "^BTC": "btc"
+    "^ETH": "eth"
+
+  # if you want to route channel by exchange session
+  sessionChannels:
+    max: "bbgo-max"
+    binance: "bbgo-binance"
+
+  # routing rules
+  routing:
+    trade: "$symbol"
+    order: "$silent"
+    submitOrder: "$silent"
+    pnL: "bbgo-pnl"
+
+reportPnL:
+- averageCostBySymbols:
+  - "BTCUSDT"
+  - "BNBUSDT"
+  of: binance
+  when:
+  - "@daily"
+  - "@hourly"
+
+persistence:
+  json:
+    directory: var/data
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    db: 0
+
+sessions:
+  max:
+    exchange: max
+    envVarPrefix: MAX
+
+  binance:
+    exchange: binance
+    envVarPrefix: BINANCE
+
+riskControls:
+  # This is the session-based risk controller, which let you configure different risk controller by session.
+  sessionBased:
+    # "max" is the session name that you want to configure the risk control
+    max:
+      # orderExecutor is one of the risk control
+      orderExecutor:
+        # symbol-routed order executor
+        bySymbol:
+          BTCUSDT:
+            # basic risk control order executor
+            basic:
+              # keep at least X USDT (keep cash)
+              minQuoteBalance: 100.0
+
+              # maximum BTC balance (don't buy too much)
+              maxBaseAssetBalance: 1.0
+
+              # minimum BTC balance (don't sell too much)
+              minBaseAssetBalance: 0.01
+
+              maxOrderAmount: 1000.0
+
+crossExchangeStrategies:
+
+- xmaker:
+    symbol: BTCUSDT
+    sourceExchange: binance
+    makerExchange: max
+    updateInterval: 1s
+
+    # disableHedge disables the hedge orders on the source exchange
+    # disableHedge: true
+
+    hedgeInterval: 10s
+
+    margin: 0.004
+    askMargin: 0.004
+    bidMargin: 0.004
+
+    quantity: 0.001
+    quantityMultiplier: 2
+
+    # numLayers means how many order we want to place on each side. 3 means we want 3 bid orders and 3 ask orders
+    numLayers: 1
+    # pips is the fraction numbers between each order. for BTC, 1 pip is 0.1,
+    # 0.1 pip is 0.01, here we use 10, so we will get 18000.00, 18001.00 and
+    # 18002.00
+    pips: 10
+    persistence:
+      type: redis
+
