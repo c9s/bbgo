@@ -72,7 +72,7 @@ riskControls:
 
 crossExchangeStrategies:
 
-- mobydick:
+- xmaker:
     symbol: BTCUSDT
     sourceExchange: binance
     makerExchange: max

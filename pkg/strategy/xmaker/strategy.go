@@ -82,11 +82,16 @@ type Strategy struct {
 func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 	sourceSession, ok := sessions[s.SourceExchange]
 	if !ok {
-		panic(fmt.Errorf("source exchange %s is not defined", s.SourceExchange))
+		panic(fmt.Errorf("source session %s is not defined", s.SourceExchange))
 	}
 
-	log.Infof("subscribing %s from %s", s.Symbol, s.SourceExchange)
 	sourceSession.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{})
+
+	makerSession, ok := sessions[s.MakerExchange]
+	if !ok {
+		panic(fmt.Errorf("maker session %s is not defined", s.MakerExchange))
+	}
+	makerSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
 }
 
 func (s *Strategy) updateQuote(ctx context.Context) {
@@ -104,7 +109,7 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 	}
 
 	if valid, err := sourceBook.IsValid(); !valid {
-		log.WithError(err).Error("invalid order book: %v", err)
+		log.WithError(err).Errorf("invalid order book: %v", err)
 		return
 	}
 
@@ -131,9 +136,18 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 	makerQuota := &bbgo.QuotaTransaction{}
 	if b, ok := makerBalances[s.makerMarket.BaseCurrency]; ok {
 		makerQuota.BaseAsset.Add(b.Available)
+
+		if b.Available.Float64() <= s.makerMarket.MinQuantity {
+			disableMakerAsk = true
+		}
 	}
+
 	if b, ok := makerBalances[s.makerMarket.QuoteCurrency]; ok {
 		makerQuota.QuoteAsset.Add(b.Available)
+
+		if b.Available.Float64() <= s.makerMarket.MinNotional {
+			disableMakerBid = true
+		}
 	}
 
 	hedgeBalances := s.sourceSession.Account.Balances()
@@ -141,6 +155,7 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 	if b, ok := hedgeBalances[s.sourceMarket.BaseCurrency]; ok {
 		hedgeQuota.BaseAsset.Add(b.Available)
 
+		// to make bid orders, we need enough base asset in the foreign exchange,
 		// if the base asset balance is not enough for selling
 		if b.Available.Float64() <= s.sourceMarket.MinQuantity {
 			disableMakerBid = true
@@ -150,10 +165,16 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 	if b, ok := hedgeBalances[s.sourceMarket.QuoteCurrency]; ok {
 		hedgeQuota.QuoteAsset.Add(b.Available)
 
+		// to make ask orders, we need enough quote asset in the foreign exchange,
 		// if the quote asset balance is not enough for buying
 		if b.Available.Float64() <= s.sourceMarket.MinNotional {
 			disableMakerAsk = true
 		}
+	}
+
+	if disableMakerAsk && disableMakerBid {
+		log.Warn("maker is disabled due to insufficient balances")
+		return
 	}
 
 	for i := 0; i < s.NumLayers; i++ {
@@ -376,7 +397,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	}
 
 	// restore state
-	instanceID := fmt.Sprintf("%s-%s-%s", ID, s.Symbol)
+	instanceID := fmt.Sprintf("%s-%s", ID, s.Symbol)
 	s.groupID = generateGroupID(instanceID)
 	log.Infof("using group id %d from fnv(%s)", s.groupID, instanceID)
 
