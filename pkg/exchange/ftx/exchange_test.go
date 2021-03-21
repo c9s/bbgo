@@ -368,3 +368,58 @@ func TestExchange_QueryAccount(t *testing.T) {
 	assert.Equal(t, fixedpoint.NewFromFloat(0.0002), resp.MakerCommission)
 	assert.Equal(t, fixedpoint.NewFromFloat(0.0005), resp.TakerCommission)
 }
+
+func TestExchange_QueryMarkets(t *testing.T) {
+	respJSON := `{
+"success": true,
+"result": [
+  {
+    "name": "BTC/USD",
+    "enabled": true,
+    "postOnly": false,
+    "priceIncrement": 1.0,
+    "sizeIncrement": 0.0001,
+    "minProvideSize": 0.001,
+    "last": 59039.0,
+    "bid": 59038.0,
+    "ask": 59040.0,
+    "price": 59039.0,
+    "type": "spot",
+    "baseCurrency": "BTC",
+    "quoteCurrency": "USD",
+    "underlying": null,
+    "restricted": false,
+    "highLeverageFeeExempt": true,
+    "change1h": 0.0015777151969599294,
+    "change24h": 0.05475756601279165,
+    "changeBod": -0.0035107262814994852,
+    "quoteVolume24h": 316493675.5463,
+    "volumeUsd24h": 316493675.5463
+  }
+]
+}`
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, respJSON)
+	}))
+	defer ts.Close()
+
+	ex := NewExchange("", "", "")
+	serverURL, err := url.Parse(ts.URL)
+	assert.NoError(t, err)
+	ex.restEndpoint = serverURL
+	resp, err := ex.QueryMarkets(context.Background())
+	assert.NoError(t, err)
+
+	assert.Len(t, resp, 1)
+	assert.Equal(t, types.Market{
+		Symbol:          "BTC/USD",
+		PricePrecision:  0,
+		VolumePrecision: 4,
+		QuoteCurrency:   "USD",
+		BaseCurrency:    "BTC",
+		MinQuantity:     0.001,
+		StepSize:        0.0001,
+		TickSize:        1,
+	}, resp["BTC/USD"])
+}

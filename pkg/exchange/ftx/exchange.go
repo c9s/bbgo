@@ -61,7 +61,40 @@ func (e *Exchange) NewStream() types.Stream {
 }
 
 func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
-	panic("implement me")
+	resp, err := e.newRest().Markets(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !resp.Success {
+		return nil, fmt.Errorf("ftx returns querying markets failure")
+	}
+
+	markets := types.MarketMap{}
+	for _, m := range resp.Result {
+		symbol := toGlobalSymbol(m.Name)
+
+		market := types.Market{
+			Symbol: symbol,
+			// The max precision is length(DefaultPow). For example, currently fixedpoint.DefaultPow
+			// is 1e8, so the max precision will be 8.
+			PricePrecision:  fixedpoint.NumFractionalDigits(fixedpoint.NewFromFloat(m.PriceIncrement)),
+			VolumePrecision: fixedpoint.NumFractionalDigits(fixedpoint.NewFromFloat(m.SizeIncrement)),
+			QuoteCurrency:   toGlobalCurrency(m.QuoteCurrency),
+			BaseCurrency:    toGlobalCurrency(m.BaseCurrency),
+			// FTX only limit your order by `MinProvideSize`, so I assign zero value to unsupported fields:
+			// MinNotional, MinAmount, MaxQuantity, MinPrice and MaxPrice.
+			MinNotional: 0,
+			MinAmount:   0,
+			MinQuantity: m.MinProvideSize,
+			MaxQuantity: 0,
+			StepSize:    m.SizeIncrement,
+			MinPrice:    0,
+			MaxPrice:    0,
+			TickSize:    m.PriceIncrement,
+		}
+		markets[symbol] = market
+	}
+	return markets, nil
 }
 
 func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
