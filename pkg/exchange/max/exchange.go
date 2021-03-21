@@ -311,8 +311,14 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 
 		req := e.client.OrderService.NewCreateOrderRequest().
 			Market(toLocalSymbol(order.Symbol)).
-			OrderType(string(orderType)).
 			Side(toLocalSideType(order.Side))
+
+		// convert limit maker to post_only
+		if order.Type == types.OrderTypeLimitMaker {
+			req.OrderType(string(maxapi.OrderTypePostOnly))
+		} else {
+			req.OrderType(string(orderType))
+		}
 
 		if len(order.ClientOrderID) > 0 {
 			req.ClientOrderID(order.ClientOrderID)
@@ -331,13 +337,14 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 
 		// set price field for limit orders
 		switch order.Type {
-		case types.OrderTypeStopLimit, types.OrderTypeLimit:
+		case types.OrderTypeStopLimit, types.OrderTypeLimit, types.OrderTypeLimitMaker:
 			if len(order.PriceString) > 0 {
 				req.Price(order.PriceString)
 			} else if order.Market.Symbol != "" {
 				req.Price(order.Market.FormatPrice(order.Price))
 			}
 		}
+
 
 		// set stop price field for limit orders
 		switch order.Type {
