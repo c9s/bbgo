@@ -9,7 +9,7 @@ import (
 type DepositStatus string
 
 const (
-	DepositOther = DepositStatus("")
+	// EMPTY string means not supported
 
 	DepositPending = DepositStatus("pending")
 

@@ -3,6 +3,9 @@ package ftx
 import (
 	"fmt"
 	"strings"
+	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/datatype"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -72,4 +75,36 @@ func toGlobalOrder(r order) (types.Order, error) {
 	}
 
 	return o, nil
+}
+
+func toGlobalDeposit(input depositHistory) (types.Deposit, error) {
+	s, err := toGlobalDepositStatus(input.Status)
+	if err != nil {
+		log.WithError(err).Warnf("assign empty string to the deposit status")
+	}
+	t := input.Time
+	if input.ConfirmedTime != (time.Time{}) {
+		t = input.ConfirmedTime
+	}
+	d := types.Deposit{
+		GID:           0,
+		Exchange:      types.ExchangeFTX,
+		Time:          datatype.Time(t),
+		Amount:        input.Size,
+		Asset:         toGlobalCurrency(input.Coin),
+		TransactionID: input.TxID,
+		Status:        s,
+		Address:       input.Address.Address,
+		AddressTag:    input.Address.Tag,
+	}
+	return d, nil
+}
+
+func toGlobalDepositStatus(input string) (types.DepositStatus, error) {
+	// The document only list `confirmed` status
+	switch input {
+	case "confirmed", "complete":
+		return types.DepositSuccess, nil
+	}
+	return "", fmt.Errorf("unsupported status %s", input)
 }
