@@ -108,7 +108,7 @@ type SubmitOrder struct {
 
 	TimeInForce string `json:"timeInForce,omitempty" db:"time_in_force"` // GTC, IOC, FOK
 
-	GroupID int64 `json:"groupID,omitempty"`
+	GroupID uint32 `json:"groupID,omitempty"`
 
 	MarginSideEffect MarginOrderSideEffectType `json:"marginSideEffect,omitempty"` // AUTO_REPAY = repay, MARGIN_BUY = borrow, defaults to  NO_SIDE_EFFECT
 }
