@@ -381,7 +381,6 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 		}
 
 		for symbol, orders := range ordersBySymbol {
-			log.Infof("orders: %+v", orders)
 			req := e.client.OrderService.NewCreateMultiOrderRequest()
 			req.Market(symbol)
 			req.AddOrders(orders...)
