@@ -248,7 +248,7 @@ func (e *Exchange) CancelOrdersBySymbol(ctx context.Context, symbol string) ([]t
 	return toGlobalOrders(maxOrders)
 }
 
-func (e *Exchange) CancelOrdersByGroupID(ctx context.Context, groupID int64) ([]types.Order, error) {
+func (e *Exchange) CancelOrdersByGroupID(ctx context.Context, groupID uint32) ([]types.Order, error) {
 	var req = e.client.OrderService.NewOrderCancelAllRequest()
 	req.GroupID(groupID)
 
@@ -261,7 +261,7 @@ func (e *Exchange) CancelOrdersByGroupID(ctx context.Context, groupID int64) ([]
 }
 
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err2 error) {
-	var groupIDs = make(map[int64]struct{})
+	var groupIDs = make(map[uint32]struct{})
 	var orphanOrders []types.Order
 	for _, o := range orders {
 		if o.GroupID > 0 {
@@ -302,62 +302,136 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 	return err2
 }
 
+func toMaxSubmitOrder(o types.SubmitOrder) (*maxapi.Order, error) {
+	symbol := toLocalSymbol(o.Symbol)
+	orderType, err := toLocalOrderType(o.Type)
+	if err != nil {
+		return nil, err
+	}
+
+	clientOrderID := o.ClientOrderID
+	if len(clientOrderID) == 0 {
+		clientOrderID = uuid.New().String()
+	}
+
+	volumeInString := o.QuantityString
+	if len(volumeInString) == 0 {
+		if o.Market.Symbol != "" {
+			volumeInString = o.Market.FormatQuantity(o.Quantity)
+		} else {
+			volumeInString = strconv.FormatFloat(o.Quantity, 'f', 8, 64)
+		}
+	}
+
+	maxOrder := maxapi.Order{
+		Market:    symbol,
+		Side:      toLocalSideType(o.Side),
+		OrderType: orderType,
+		// Price:     priceInString,
+		Volume:    volumeInString,
+		GroupID:   o.GroupID,
+		ClientOID: clientOrderID,
+	}
+
+	switch o.Type {
+	case types.OrderTypeStopLimit, types.OrderTypeLimit, types.OrderTypeLimitMaker:
+		priceInString := o.PriceString
+		if len(priceInString) == 0 {
+			if o.Market.Symbol != "" {
+				priceInString = o.Market.FormatPrice(o.Price)
+			} else {
+				priceInString = strconv.FormatFloat(o.Price, 'f', 8, 64)
+			}
+		}
+		maxOrder.Price = priceInString
+	}
+
+	// set stop price field for limit orders
+	switch o.Type {
+	case types.OrderTypeStopLimit, types.OrderTypeStopMarket:
+		if len(o.StopPriceString) == 0 {
+			return nil, fmt.Errorf("stop price string can not be empty")
+		}
+
+		priceInString := o.StopPriceString
+		if len(priceInString) == 0 {
+			if o.Market.Symbol != "" {
+				priceInString = o.Market.FormatPrice(o.StopPrice)
+			} else {
+				priceInString = strconv.FormatFloat(o.StopPrice, 'f', 8, 64)
+			}
+		}
+
+		maxOrder.StopPrice = priceInString
+	}
+
+	return &maxOrder, nil
+}
+
 func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error) {
+	if len(orders) <= 10 {
+		var ordersBySymbol = map[string][]maxapi.Order{}
+		for _, o := range orders {
+			maxOrder, err := toMaxSubmitOrder(o)
+			if err != nil {
+				return nil, err
+			}
+
+			ordersBySymbol[maxOrder.Market] = append(ordersBySymbol[maxOrder.Market], *maxOrder)
+		}
+
+		for symbol, orders := range ordersBySymbol {
+			log.Infof("orders: %+v", orders)
+			req := e.client.OrderService.NewCreateMultiOrderRequest()
+			req.Market(symbol)
+			req.AddOrders(orders...)
+
+			orderResponses, err := req.Do(ctx)
+			if err != nil {
+				return createdOrders, err
+			}
+
+			for _, resp := range *orderResponses {
+				if len(resp.Error) > 0 {
+					log.Errorf("multi-order submit error: %s", resp.Error)
+					continue
+				}
+
+				o, err := toGlobalOrder(resp.Order)
+				if err != nil {
+					return createdOrders, err
+				}
+
+				createdOrders = append(createdOrders, *o)
+			}
+		}
+
+		return createdOrders, nil
+	}
+
 	for _, order := range orders {
-		orderType, err := toLocalOrderType(order.Type)
+		maxOrder, err := toMaxSubmitOrder(order)
 		if err != nil {
 			return createdOrders, err
 		}
 
+		// TODO: replace OrderType string type
 		req := e.client.OrderService.NewCreateOrderRequest().
-			Market(toLocalSymbol(order.Symbol)).
-			Side(toLocalSideType(order.Side))
+			Market(maxOrder.Market).
+			Side(maxOrder.Side).
+			OrderType(string(maxOrder.OrderType)).
+			ClientOrderID(maxOrder.ClientOID)
 
-		// convert limit maker to post_only
-		if order.Type == types.OrderTypeLimitMaker {
-			req.OrderType(string(maxapi.OrderTypePostOnly))
-		} else {
-			req.OrderType(string(orderType))
+		if len(maxOrder.Volume) > 0 {
+			req.Volume(maxOrder.Volume)
 		}
 
-		if len(order.ClientOrderID) > 0 {
-			req.ClientOrderID(order.ClientOrderID)
-		} else {
-			clientOrderID := uuid.New().String()
-			req.ClientOrderID(clientOrderID)
+		if len(maxOrder.Price) > 0 {
+			req.Price(maxOrder.Price)
 		}
 
-		if len(order.QuantityString) > 0 {
-			req.Volume(order.QuantityString)
-		} else if order.Market.Symbol != "" {
-			req.Volume(order.Market.FormatQuantity(order.Quantity))
-		} else {
-			req.Volume(strconv.FormatFloat(order.Quantity, 'f', 8, 64))
-		}
-
-		// set price field for limit orders
-		switch order.Type {
-		case types.OrderTypeStopLimit, types.OrderTypeLimit, types.OrderTypeLimitMaker:
-			if len(order.PriceString) > 0 {
-				req.Price(order.PriceString)
-			} else if order.Market.Symbol != "" {
-				req.Price(order.Market.FormatPrice(order.Price))
-			}
-		}
-
-
-		// set stop price field for limit orders
-		switch order.Type {
-		case types.OrderTypeStopLimit, types.OrderTypeStopMarket:
-			if len(order.StopPriceString) == 0 {
-				return createdOrders, fmt.Errorf("stop price string can not be empty")
-			}
-
-			req.StopPrice(order.StopPriceString)
-		}
-
-		if len(order.PriceString) > 0 {
-			req.Price(order.PriceString)
+		if len(maxOrder.StopPrice) > 0 {
+			req.StopPrice(maxOrder.StopPrice)
 		}
 
 		retOrder, err := req.Do(ctx)
