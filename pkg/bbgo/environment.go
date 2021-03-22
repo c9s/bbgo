@@ -218,6 +218,12 @@ func NewExchangeSessionFromConfig(name string, sessionConfig *ExchangeSession) (
 	var exchange types.Exchange
 
 	if sessionConfig.Key != "" && sessionConfig.Secret != "" {
+		if !sessionConfig.PublicOnly {
+			if len(sessionConfig.Key) == 0 || len(sessionConfig.Secret) == 0 {
+				return nil, fmt.Errorf("can not create exchange %s: empty key or secret", exchangeName)
+			}
+		}
+
 		exchange, err = cmdutil.NewExchangeStandard(exchangeName, sessionConfig.Key, sessionConfig.Secret, sessionConfig.SubAccount)
 	} else {
 		exchange, err = cmdutil.NewExchangeWithEnvVarPrefix(exchangeName, sessionConfig.EnvVarPrefix)

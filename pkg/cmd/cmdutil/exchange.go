@@ -5,8 +5,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/pkg/errors"
-
 	"github.com/c9s/bbgo/pkg/exchange/binance"
 	"github.com/c9s/bbgo/pkg/exchange/ftx"
 	"github.com/c9s/bbgo/pkg/exchange/max"
@@ -14,10 +12,6 @@ import (
 )
 
 func NewExchangeStandard(n types.ExchangeName, key, secret, subAccount string) (types.Exchange, error) {
-	if len(key) == 0 || len(secret) == 0 {
-		return nil, errors.New("binance: empty key or secret")
-	}
-
 	switch n {
 
 	case types.ExchangeFTX:
@@ -45,7 +39,7 @@ func NewExchangeWithEnvVarPrefix(n types.ExchangeName, varPrefix string) (types.
 	key := os.Getenv(varPrefix + "_API_KEY")
 	secret := os.Getenv(varPrefix + "_API_SECRET")
 	if len(key) == 0 || len(secret) == 0 {
-		return nil, fmt.Errorf("%s: empty key or secret, env var prefix: %s", n, varPrefix)
+		return nil, fmt.Errorf("can not initialize exchange %s: empty key or secret, env var prefix: %s", n, varPrefix)
 	}
 
 	subAccount := os.Getenv(varPrefix + "_SUBACCOUNT")
