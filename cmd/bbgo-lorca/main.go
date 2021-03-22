@@ -97,7 +97,7 @@ func main() {
 			return
 		}
 
-		if err := cmd.ConfigureTrader(trader, userConfig); err != nil {
+		if err := trader.Configure(userConfig); err != nil {
 			log.WithError(err).Error("failed to configure trader")
 			return
 		}
