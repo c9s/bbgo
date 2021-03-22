@@ -34,7 +34,7 @@ type OrderUpdate struct {
 
 	TradesCount int64 `json:"tc"`
 
-	GroupID     int64  `json:"gi"`
+	GroupID     uint32 `json:"gi"`
 	ClientOID   string `json:"ci"`
 	CreatedAtMs int64  `json:"T"`
 }
@@ -60,7 +60,7 @@ func parserOrderUpdate(v *fastjson.Value) OrderUpdate {
 		RemainingVolume: string(v.GetStringBytes("rv")),
 		ExecutedVolume:  string(v.GetStringBytes("ev")),
 		TradesCount:     v.GetInt64("tc"),
-		GroupID:         v.GetInt64("gi"),
+		GroupID:         uint32(v.GetInt("gi")),
 		ClientOID:       string(v.GetStringBytes("ci")),
 		CreatedAtMs:     v.GetInt64("T"),
 	}
