@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
+
 	"github.com/c9s/bbgo/pkg/datatype"
 	"github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -57,7 +59,6 @@ func toGlobalRewards(maxRewards []max.Reward) ([]types.Reward, error) {
 		if r.State != "done" {
 			continue
 		}
-
 
 		reward, err := r.Reward()
 		if err != nil {
@@ -138,6 +139,9 @@ func toLocalOrderType(orderType types.OrderType) (max.OrderType, error) {
 	case types.OrderTypeStopMarket:
 		return max.OrderTypeStopMarket, nil
 
+	case types.OrderTypeLimitMaker:
+		return max.OrderTypePostOnly, nil
+
 	case types.OrderTypeLimit:
 		return max.OrderTypeLimit, nil
 
@@ -164,12 +168,12 @@ func toGlobalOrders(maxOrders []max.Order) (orders []types.Order, err error) {
 func toGlobalOrder(maxOrder max.Order) (*types.Order, error) {
 	executedVolume, err := fixedpoint.NewFromString(maxOrder.ExecutedVolume)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "parse executed_volume failed: %+v", maxOrder)
 	}
 
 	remainingVolume, err := fixedpoint.NewFromString(maxOrder.RemainingVolume)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "parse remaining volume failed: %+v", maxOrder)
 	}
 
 	return &types.Order{
