@@ -3,7 +3,6 @@ package gap
 import (
 	"context"
 	"fmt"
-	"hash/fnv"
 	"math"
 	"sync"
 	"time"
@@ -11,11 +10,13 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/exchange/max"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-const ID = "xkline"
+const ID = "gap"
 
 const stateKey = "state-v1"
 
@@ -53,7 +54,7 @@ type Strategy struct {
 	mu                      sync.Mutex
 	lastKLine               types.KLine
 	sourceBook, tradingBook *types.StreamOrderBook
-	groupID                 int64
+	groupID                 uint32
 
 	stopC chan struct{}
 }
@@ -118,6 +119,36 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		return fmt.Errorf("trading session market %s is not defined", s.Symbol)
 	}
 
+	s.stopC = make(chan struct{})
+
+	var state State
+	// load position
+	if err := s.Persistence.Load(&state, stateKey); err != nil {
+		if err != service.ErrPersistenceNotExists {
+			return err
+		}
+
+		s.state = &State{
+			AccumulativeFees: make(map[string]fixedpoint.Value),
+		}
+	} else {
+		// loaded successfully
+		s.state = &state
+		log.Infof("state is restored: %+v", s.state)
+	}
+
+	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
+		defer wg.Done()
+
+		close(s.stopC)
+
+		if err := s.Persistence.Save(&s.state, stateKey); err != nil {
+			log.WithError(err).Errorf("can not save state: %+v", s.state)
+		} else {
+			log.Infof("state is saved => %+v", s.state)
+		}
+	})
+
 	// from here, set data binding
 	s.sourceSession.Stream.OnKLine(func(kline types.KLine) {
 		log.Infof("source exchange %s price: %f", s.Symbol, kline.Close)
@@ -132,11 +163,11 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	s.tradingBook = types.NewStreamBook(s.Symbol)
 	s.tradingBook.BindStream(s.tradingSession.Stream)
 
-	instanceID := fmt.Sprintf("%s-%s", ID, s.Symbol)
-	s.groupID = generateGroupID(instanceID)
-	log.Infof("using group id %d from fnv32(%s)", s.groupID, instanceID)
-
 	s.tradingSession.Stream.OnTradeUpdate(s.handleTradeUpdate)
+
+	instanceID := fmt.Sprintf("%s-%s", ID, s.Symbol)
+	s.groupID = max.GenerateGroupID(instanceID)
+	log.Infof("using group id %d from fnv32(%s)", s.groupID, instanceID)
 
 	go func() {
 		ticker := time.NewTicker(s.UpdateInterval.Duration())
@@ -145,6 +176,9 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		for {
 			select {
 			case <-ctx.Done():
+				return
+
+			case <-s.stopC:
 				return
 
 			case <-ticker.C:
@@ -233,10 +267,4 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	}()
 
 	return nil
-}
-
-func generateGroupID(s string) int64 {
-	h := fnv.New32a()
-	h.Write([]byte(s))
-	return int64(h.Sum32())
 }
