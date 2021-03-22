@@ -7,6 +7,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/service"
@@ -199,17 +200,25 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 
 	var log = log.WithField("session", session.Name)
 
-	// load markets first
-	var markets, err = LoadExchangeMarketsWithCache(ctx, session.Exchange)
-	if err != nil {
-		return err
-	}
+	if !viper.GetBool("bbgo-markets-cache") {
+		markets, err := session.Exchange.QueryMarkets(ctx)
+		if err != nil {
+			return err
+		}
+		session.markets = markets
+	} else {
+		// load markets first
+		var markets, err = LoadExchangeMarketsWithCache(ctx, session.Exchange)
+		if err != nil {
+			return err
+		}
 
-	if len(markets) == 0 {
-		return fmt.Errorf("market config should not be empty")
-	}
+		if len(markets) == 0 {
+			return fmt.Errorf("market config should not be empty")
+		}
 
-	session.markets = markets
+		session.markets = markets
+	}
 
 	// query and initialize the balances
 	log.Infof("querying balances from session %s...", session.Name)
