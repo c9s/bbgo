@@ -29,7 +29,9 @@ func (s *Strategy) ID() string {
 	return ID
 }
 
-type State struct{}
+type State struct {
+	AccumulativeFees map[string]fixedpoint.Value
+}
 
 type Strategy struct {
 	*bbgo.Graceful
@@ -62,6 +64,14 @@ func (s *Strategy) handleTradeUpdate(trade types.Trade) {
 	if trade.Symbol != s.Symbol {
 		return
 	}
+
+	if s.state.AccumulativeFees == nil {
+		s.state.AccumulativeFees = make(map[string]fixedpoint.Value)
+	}
+
+	s.state.AccumulativeFees[trade.FeeCurrency] += fixedpoint.NewFromFloat(trade.Fee)
+
+	log.Infof("accumulative fee: %f %s", s.state.AccumulativeFees[trade.FeeCurrency].Float64(), trade.FeeCurrency)
 }
 
 func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
