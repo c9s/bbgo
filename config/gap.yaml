@@ -55,7 +55,9 @@ crossExchangeStrategies:
     sourceExchange: binance
     tradingExchange: max
     updateInterval: 5s
-    dailyFeeBudget: 100
+    dailyMaxVolume: 100
+    dailyFeeBudgets:
+      MAX: 100
     persistence:
       type: redis
 
