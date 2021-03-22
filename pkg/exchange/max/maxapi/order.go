@@ -51,19 +51,20 @@ type OrderService struct {
 
 // Order represents one returned order (POST order/GET order/GET orders) on the max platform.
 type Order struct {
-	ID              uint64     `json:"id,omitempty" db:"exchange_id"`
-	Side            string     `json:"side" db:"side"`
-	OrderType       OrderType  `json:"ord_type,omitempty" db:"order_type"`
-	Price           string     `json:"price" db:"price"`
-	AveragePrice    string     `json:"avg_price,omitempty" db:"average_price"`
-	State           OrderState `json:"state,omitempty" db:"state"`
-	Market          string     `json:"market,omitempty" db:"market"`
-	Volume          string     `json:"volume" db:"volume"`
-	RemainingVolume string     `json:"remaining_volume,omitempty" db:"remaining_volume"`
-	ExecutedVolume  string     `json:"executed_volume,omitempty" db:"executed_volume"`
-	TradesCount     int64      `json:"trades_count,omitempty" db:"trades_count"`
-	GroupID         int64      `json:"group_id,omitempty" db:"group_id"`
-	ClientOID       string     `json:"client_oid,omitempty" db:"client_oid"`
+	ID              uint64     `json:"id,omitempty"`
+	Side            string     `json:"side"`
+	OrderType       OrderType  `json:"ord_type"`
+	Price           string     `json:"price,omitempty"`
+	StopPrice       string     `json:"stop_price,omitempty"`
+	AveragePrice    string     `json:"avg_price,omitempty"`
+	State           OrderState `json:"state,omitempty"`
+	Market          string     `json:"market,omitempty"`
+	Volume          string     `json:"volume"`
+	RemainingVolume string     `json:"remaining_volume,omitempty"`
+	ExecutedVolume  string     `json:"executed_volume,omitempty"`
+	TradesCount     int64      `json:"trades_count,omitempty"`
+	GroupID         uint32     `json:"group_id,omitempty"`
+	ClientOID       string     `json:"client_oid,omitempty"`
 	CreatedAt       time.Time  `json:"-" db:"created_at"`
 	CreatedAtMs     int64      `json:"created_at_in_ms,omitempty"`
 	InsertedAt      time.Time  `json:"-" db:"inserted_at"`
@@ -247,7 +248,7 @@ type OrderCancelAllRequest struct {
 
 	side    *string
 	market  *string
-	groupID *int64
+	groupID *uint32
 }
 
 func (r *OrderCancelAllRequest) Side(side string) *OrderCancelAllRequest {
@@ -260,7 +261,7 @@ func (r *OrderCancelAllRequest) Market(market string) *OrderCancelAllRequest {
 	return r
 }
 
-func (r *OrderCancelAllRequest) GroupID(groupID int64) *OrderCancelAllRequest {
+func (r *OrderCancelAllRequest) GroupID(groupID uint32) *OrderCancelAllRequest {
 	r.groupID = &groupID
 	return r
 }
@@ -382,21 +383,51 @@ type MultiOrderResponse []struct {
 type CreateMultiOrderRequest struct {
 	client *RestClient
 
-	params MultiOrderRequestParams
+	market  *string
+	groupID *uint32
+	orders  []Order
+}
+
+func (r *CreateMultiOrderRequest) GroupID(groupID uint32) *CreateMultiOrderRequest {
+	r.groupID = &groupID
+	return r
 }
 
 func (r *CreateMultiOrderRequest) Market(market string) *CreateMultiOrderRequest {
-	r.params.Market = market
+	r.market = &market
 	return r
 }
 
 func (r *CreateMultiOrderRequest) AddOrders(orders ...Order) *CreateMultiOrderRequest {
-	r.params.Orders = append(r.params.Orders, orders...)
+	r.orders = append(r.orders, orders...)
 	return r
 }
 
 func (r *CreateMultiOrderRequest) Do(ctx context.Context) (multiOrderResponse *MultiOrderResponse, err error) {
-	req, err := r.client.newAuthenticatedRequest("POST", "v2/orders/multi/onebyone", r.params)
+	var payload = map[string]interface{}{}
+
+	if r.market != nil {
+		payload["market"] = r.market
+	} else {
+		return nil, errors.New("parameter market is required")
+	}
+
+	if r.groupID != nil {
+		payload["group_id"] = r.groupID
+	}
+
+	if len(r.orders) == 0 {
+		return nil, errors.New("parameter orders can not be empty")
+	}
+
+	// clear group id
+	for i := range r.orders {
+		r.orders[i].GroupID = 0
+	}
+
+	payload["orders"] = r.orders
+
+	req, err := r.client.newAuthenticatedRequest("POST", "v2/orders/multi/onebyone", payload)
 	if err != nil {
 		return multiOrderResponse, errors.Wrapf(err, "order create error")
 	}
