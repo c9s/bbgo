@@ -2,6 +2,7 @@ package max
 
 import (
 	"context"
+	"os"
 	"strconv"
 	"time"
 
@@ -25,8 +26,12 @@ type Stream struct {
 }
 
 func NewStream(key, secret string) *Stream {
-	wss := max.NewWebSocketService(max.WebSocketURL, key, secret)
+	url := os.Getenv("MAX_API_WS_URL")
+	if url == "" {
+		url = max.WebSocketURL
+	}
 
+	wss := max.NewWebSocketService(url, key, secret)
 	stream := &Stream{
 		websocketService: wss,
 	}
