@@ -3,13 +3,13 @@ package grid
 import (
 	"context"
 	"fmt"
-	"hash/fnv"
 	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/exchange/max"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
@@ -99,7 +99,7 @@ type Strategy struct {
 	activeOrders *bbgo.LocalActiveOrderBook
 
 	// groupID is the group ID used for the strategy instance for canceling orders
-	groupID int64
+	groupID uint32
 }
 
 func (s *Strategy) ID() string {
@@ -500,7 +500,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	}
 
 	instanceID := fmt.Sprintf("grid-%s-%d-%d-%d", s.Symbol, s.GridNum, s.UpperPrice, s.LowerPrice)
-	s.groupID = generateGroupID(instanceID)
+	s.groupID = max.GenerateGroupID(instanceID)
 	log.Infof("using group id %d from fnv(%s)", s.groupID, instanceID)
 
 	var stateLoaded = false
@@ -536,7 +536,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	}
 
 	s.Notify("current position %+v", s.state.Position)
-
 
 	s.orderStore = bbgo.NewOrderStore(s.Symbol)
 	s.orderStore.BindStream(session.Stream)
@@ -589,10 +588,4 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 
 	return nil
-}
-
-func generateGroupID(s string) int64 {
-	h := fnv.New32a()
-	h.Write([]byte(s))
-	return int64(h.Sum32())
 }

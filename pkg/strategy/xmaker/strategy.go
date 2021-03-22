@@ -3,7 +3,6 @@ package xmaker
 import (
 	"context"
 	"fmt"
-	"hash/fnv"
 	"math"
 	"sync"
 	"time"
@@ -11,6 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/exchange/max"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
@@ -74,7 +74,7 @@ type Strategy struct {
 	orderStore *bbgo.OrderStore
 
 	lastPrice float64
-	groupID   int64
+	groupID   uint32
 
 	stopC chan struct{}
 }
@@ -398,7 +398,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 	// restore state
 	instanceID := fmt.Sprintf("%s-%s", ID, s.Symbol)
-	s.groupID = generateGroupID(instanceID)
+	s.groupID = max.GenerateGroupID(instanceID)
 	log.Infof("using group id %d from fnv(%s)", s.groupID, instanceID)
 
 	var state State
@@ -482,8 +482,3 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	return nil
 }
 
-func generateGroupID(s string) int64 {
-	h := fnv.New32a()
-	h.Write([]byte(s))
-	return int64(h.Sum32())
-}
