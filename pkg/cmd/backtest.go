@@ -95,7 +95,6 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
-
 		if userConfig.Backtest == nil {
 			return errors.New("backtest config is not defined")
 		}
@@ -111,8 +110,12 @@ var BacktestCmd = &cobra.Command{
 		}
 
 		environ := bbgo.NewEnvironment()
-		if err := environ.ConfigureDatabase(ctx) ; err != nil {
+		if err := environ.ConfigureDatabase(ctx); err != nil {
 			return err
+		}
+
+		if environ.DatabaseService == nil {
+			return errors.New("database service is not enabled, please check your environment variables DB_DRIVER and DB_DSN")
 		}
 
 		backtestService := &service.BacktestService{DB: environ.DatabaseService.DB}
@@ -277,4 +280,3 @@ var BacktestCmd = &cobra.Command{
 		return nil
 	},
 }
-
