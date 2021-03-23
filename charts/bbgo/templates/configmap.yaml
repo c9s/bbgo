@@ -1,4 +1,4 @@
-{{- if .Values.configmap.enabled }}
+{{- if .Values.configmap }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -7,6 +7,12 @@ metadata:
   labels:
     {{- include "bbgo.labels" . | nindent 4 }}
 data:
+  # if configmap is given as a string, we read it as a file
+  {{- if eq "string" (typeOf .Values.configmap) }}
   bbgo.yaml: |-
-    {{- .Files.Get .Values.configmap.file | nindent 4 }}
-{{-end }}
+    {{- .Files.Get .Values.configmap | nindent 4 }}
+  {{- else }}
+  bbgo.yaml:
+    {{- .Values.configmap | nindent 4 }}
+  {{- end }}
+{{- end }}
