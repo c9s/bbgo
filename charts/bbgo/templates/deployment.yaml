@@ -59,7 +59,11 @@ spec:
       volumes:
       - name: config-volume
         configMap:
+        {{- if .Values.existingConfigMap }}
+          name: {{ .Values.existingConfigMap }}
+        {{- else }}
           name: {{ include "bbgo.fullname" . }}
+        {{- end }}
 
       {{- with .Values.nodeSelector }}
       nodeSelector:
