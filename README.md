@@ -31,8 +31,8 @@ Get your exchange API key and secret after you register the accounts (you can ch
 - For Binance: <https://www.binancezh.com/en/register?ref=VGDGLT80>
 - For FTX: <https://ftx.com/#a=7710474>
 
-Since the exchange implementation and support are done by a small team, if you like the work they've done for you,
-It would be great if you can use their referral code as your support to them. :-D
+Since the exchange implementation and support are done by a small team, if you like the work they've done for you, It
+would be great if you can use their referral code as your support to them. :-D
 
 ## Installation
 
@@ -171,7 +171,8 @@ SLACK_TOKEN=xxoox
 
 ### Synchronizing Trading Data
 
-By default, BBGO does not sync your trading data from the exchange sessions, so it's hard to calculate your profit and loss correctly.
+By default, BBGO does not sync your trading data from the exchange sessions, so it's hard to calculate your profit and
+loss correctly.
 
 By synchronizing trades and orders to the local database, you can earn some benefits like PnL calculations, backtesting
 and asset calculation.
@@ -236,8 +237,8 @@ bbgo run --config config/buyandhold.yaml
 
 ## Adding New Built-in Strategy
 
-Fork and clone this repository, Create a directory under `pkg/strategy/newstrategy`,
-write your strategy at `pkg/strategy/newstrategy/strategy.go`.
+Fork and clone this repository, Create a directory under `pkg/strategy/newstrategy`, write your strategy
+at `pkg/strategy/newstrategy/strategy.go`.
 
 Define a strategy struct:
 
@@ -249,16 +250,18 @@ import (
 )
 
 type Strategy struct {
-	Symbol string `json:"symbol"`
-	Param1 int `json:"param1"`
-    Param2 int `json:"param2"`
-    Param3 fixedpoint.Value `json:"param3"`
+	Symbol string           `json:"symbol"`
+	Param1 int              `json:"param1"`
+	Param2 int              `json:"param2"`
+	Param3 fixedpoint.Value `json:"param3"`
 }
 ```
 
 Register your strategy:
 
 ```go
+package newstrategy
+
 const ID = "newstrategy"
 
 const stateKey = "state-v1"
@@ -273,13 +276,15 @@ func init() {
 Implement the strategy methods:
 
 ```go
+package newstrategy
+
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
-    session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
+    session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "2m"})
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-	// ....
-	return nil
+    // ....
+    return nil
 }
 ```
 
@@ -424,7 +429,7 @@ streambook.BindStream(stream)
 
 Prepare your docker image locally (you can also use the docker image from docker hub):
 
-```
+```shell
 make docker DOCKER_TAG=1.16.0
 ```
 
@@ -432,27 +437,33 @@ The docker tag version number is from the file [Chart.yaml](charts/bbgo/Chart.ya
 
 Prepare your secret:
 
-```
+```shell
 kubectl create secret generic bbgo-grid --from-env-file .env.local
 ```
 
 Configure your config file, the chart defaults to read config/bbgo.yaml to create a configmap:
 
+```shell
+cp config/grid.yaml bbgo-grid.yaml
+vim bbgo-grid.yaml
 ```
-cp config/grid.yaml config/bbgo.yaml
-vim config/bbgo.yaml
+
+Prepare your configmap:
+
+```shell
+kubectl create configmap bbgo-grid --from-file=bbgo-grid.yaml
 ```
 
 Install chart with the preferred release name, the release name maps to the previous secret we just created, that
 is, `bbgo-grid`:
 
-```
-helm install bbgo-grid ./charts/bbgo
+```shell
+helm install --set existingConfigmap=bbgo-grid bbgo-grid ./charts/bbgo
 ```
 
 Delete chart:
 
-```
+```shell
 helm delete bbgo
 ```
 
