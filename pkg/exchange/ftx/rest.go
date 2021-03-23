@@ -34,6 +34,9 @@ type restRequest struct {
 	// http method, e.g., GET or POST
 	m string
 
+	// query string
+	q map[string]string
+
 	// payload
 	p map[string]interface{}
 }
@@ -42,6 +45,8 @@ func newRestRequest(c *http.Client, baseURL *url.URL) *restRequest {
 	r := &restRequest{
 		c:       c,
 		baseURL: baseURL,
+		q:       make(map[string]string),
+		p:       make(map[string]interface{}),
 	}
 
 	r.marketRequest = &marketRequest{restRequest: r}
@@ -81,9 +86,15 @@ func (r *restRequest) buildURL() (*url.URL, error) {
 }
 
 func (r *restRequest) Payloads(payloads map[string]interface{}) *restRequest {
-	r.p = make(map[string]interface{})
 	for k, v := range payloads {
 		r.p[k] = v
+	}
+	return r
+}
+
+func (r *restRequest) Query(query map[string]string) *restRequest {
+	for k, v := range query {
+		r.q[k] = v
 	}
 	return r
 }
@@ -112,14 +123,25 @@ func (r *restRequest) newAuthenticatedRequest(ctx context.Context) (*http.Reques
 		}
 	}
 
-	ts := strconv.FormatInt(timestamp(), 10)
-	p := fmt.Sprintf("%s%s%s%s", ts, r.m, u.Path, jsonPayload)
-	signature := sign(r.secret, p)
-
 	req, err := http.NewRequestWithContext(ctx, r.m, u.String(), bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		return nil, err
 	}
+	ts := strconv.FormatInt(timestamp(), 10)
+	p := fmt.Sprintf("%s%s%s", ts, r.m, u.Path)
+	if len(r.q) > 0 {
+		rq := u.Query()
+		for k, v := range r.q {
+			rq.Add(k, v)
+		}
+		req.URL.RawQuery = rq.Encode()
+		p += "?" + req.URL.RawQuery
+	}
+	if len(jsonPayload) > 0 {
+		p += string(jsonPayload)
+	}
+	signature := sign(r.secret, p)
+
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("FTX-KEY", r.key)
 	req.Header.Set("FTX-SIGN", signature)
