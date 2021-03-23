@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -24,13 +25,46 @@ var listOrdersCmd = &cobra.Command{
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-		session, err := cmd.Flags().GetString("session")
-		if err != nil {
-			return fmt.Errorf("can't get session from flags: %w", err)
-		}
-		ex, err := newExchange(session)
+
+		configFile, err := cmd.Flags().GetString("config")
 		if err != nil {
 			return err
+		}
+
+		if len(configFile) == 0 {
+			return fmt.Errorf("--config option is required")
+		}
+
+		// if config file exists, use the config loaded from the config file.
+		// otherwise, use a empty config object
+		var userConfig *bbgo.Config
+		if _, err := os.Stat(configFile); err == nil {
+			// load successfully
+			userConfig, err = bbgo.Load(configFile, false)
+			if err != nil {
+				return err
+			}
+		} else if os.IsNotExist(err) {
+			// config file doesn't exist
+			userConfig = &bbgo.Config{}
+		} else {
+			// other error
+			return err
+		}
+		environ := bbgo.NewEnvironment()
+
+		if err := environ.ConfigureExchangeSessions(userConfig); err != nil {
+			return err
+		}
+
+		sessionName, err := cmd.Flags().GetString("session")
+		if err != nil {
+			return err
+		}
+
+		session, ok := environ.Session(sessionName)
+		if !ok {
+			return fmt.Errorf("session %s not found", sessionName)
 		}
 		symbol, err := cmd.Flags().GetString("symbol")
 		if err != nil {
@@ -48,12 +82,15 @@ var listOrdersCmd = &cobra.Command{
 		var os []types.Order
 		switch status {
 		case "open":
-			os, err = ex.QueryOpenOrders(ctx, symbol)
+			os, err = session.Exchange.QueryOpenOrders(ctx, symbol)
 			if err != nil {
 				return err
 			}
 		case "closed":
-			panic("not implemented")
+			os, err = session.Exchange.QueryClosedOrders(ctx, symbol, time.Now().Add(-3*24*time.Hour), time.Now(), 0)
+			if err != nil {
+				return err
+			}
 		default:
 			return fmt.Errorf("invalid status %s", status)
 		}
