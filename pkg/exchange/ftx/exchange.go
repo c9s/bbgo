@@ -152,8 +152,9 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 	if err = verifySinceUntil(since, until); err != nil {
 		return nil, err
 	}
+	asset = TrimUpperString(asset)
 
-	resp, err := e.newRest().DepositHistory(ctx)
+	resp, err := e.newRest().DepositHistory(ctx, since, until, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -235,10 +236,9 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 	if err := verifySinceUntil(since, until); err != nil {
 		return nil, err
 	}
-	if lastOrderID > 0 {
-		logger.Warn("FTX doesn't support lastOrderID")
-	}
-	limit := 100
+
+	symbol = TrimUpperString(symbol)
+	limit := int64(100)
 	hasMoreData := true
 	s := since
 	var lastOrder order
@@ -255,7 +255,7 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 
 		for _, r := range resp.Result {
 			// There may be more than one orders at the same time, so also have to check the ID
-			if r.CreatedAt.Before(lastOrder.CreatedAt) || r.ID == lastOrder.ID || r.Status != "closed" {
+			if r.CreatedAt.Before(lastOrder.CreatedAt) || r.ID == lastOrder.ID || r.Status != "closed" || r.ID < int64(lastOrderID) {
 				continue
 			}
 			lastOrder = r
