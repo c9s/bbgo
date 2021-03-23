@@ -15,9 +15,12 @@ imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
 
+# existingConfigMap is used for loading the existing configmap
+existingConfigMap:
+
+# configmap could be a string pointing to the local file in the chart
+# or a object with inlined bbgo yaml config
 configmap:
-  enabled: true
-  file: "config/bbgo.yaml"
 
 dotenv:
   secret: null
