@@ -461,6 +461,12 @@ is, `bbgo-grid`:
 helm install --set existingConfigmap=bbgo-grid bbgo-grid ./charts/bbgo
 ```
 
+To use the latest version:
+
+```shell
+helm install --set existingConfigmap=bbgo-grid --set image.tag=latest bbgo-grid ./charts/bbgo
+```
+
 Delete chart:
 
 ```shell
