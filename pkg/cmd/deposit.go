@@ -89,6 +89,7 @@ var depositsCmd = &cobra.Command{
 			return err
 		}
 
+		log.Infof("%d histories", len(histories))
 		for _, h := range histories {
 			log.Infof("deposit history: %+v", h)
 		}

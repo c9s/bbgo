@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 )
 
@@ -101,7 +102,7 @@ func (r *orderRequest) OpenOrders(ctx context.Context, market string) (ordersRes
 	resp, err := r.
 		Method("GET").
 		ReferenceURL("api/orders").
-		Payloads(map[string]interface{}{"market": market}).
+		Query(map[string]string{"market": market}).
 		DoAuthenticatedRequest(ctx)
 
 	if err != nil {
@@ -116,26 +117,26 @@ func (r *orderRequest) OpenOrders(ctx context.Context, market string) (ordersRes
 	return o, nil
 }
 
-func (r *orderRequest) OrdersHistory(ctx context.Context, market string, start, end time.Time, limit int) (ordersHistoryResponse, error) {
-	p := make(map[string]interface{})
+func (r *orderRequest) OrdersHistory(ctx context.Context, market string, start, end time.Time, limit int64) (ordersHistoryResponse, error) {
+	q := make(map[string]string)
 
 	if limit > 0 {
-		p["limit"] = limit
+		q["limit"] = strconv.FormatInt(limit, 10)
 	}
 	if len(market) > 0 {
-		p["market"] = market
+		q["market"] = market
 	}
 	if start != (time.Time{}) {
-		p["start_time"] = start.UnixNano() / int64(time.Second)
+		q["start_time"] = strconv.FormatInt(start.Unix(), 10)
 	}
 	if end != (time.Time{}) {
-		p["end_time"] = start.UnixNano() / int64(time.Second)
+		q["end_time"] = strconv.FormatInt(end.Unix(), 10)
 	}
 
 	resp, err := r.
 		Method("GET").
 		ReferenceURL("api/orders/history").
-		Payloads(p).
+		Query(q).
 		DoAuthenticatedRequest(ctx)
 
 	if err != nil {
