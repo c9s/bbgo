@@ -427,6 +427,14 @@ streambook.BindStream(stream)
 
 ## Helm Chart
 
+If you need redis:
+
+```shell
+helm repo add bitnami https://charts.bitnami.com/bitnami
+helm install redis bitnami/redis
+```
+
+
 Prepare your docker image locally (you can also use the docker image from docker hub):
 
 ```shell
