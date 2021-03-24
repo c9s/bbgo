@@ -101,6 +101,7 @@ func (e *ExecutionReportEvent) Order() (*types.Order, error) {
 
 	orderCreationTime := time.Unix(0, e.OrderCreationTime*int64(time.Millisecond))
 	return &types.Order{
+		Exchange: string(types.ExchangeBinance),
 		SubmitOrder: types.SubmitOrder{
 			Symbol:        e.Symbol,
 			ClientOrderID: e.ClientOrderID,
@@ -125,6 +126,7 @@ func (e *ExecutionReportEvent) Trade() (*types.Trade, error) {
 	tt := time.Unix(0, e.TransactionTime*int64(time.Millisecond))
 	return &types.Trade{
 		ID:            e.TradeID,
+		Exchange:      string(types.ExchangeBinance),
 		Symbol:        e.Symbol,
 		OrderID:       uint64(e.OrderID),
 		Side:          toGlobalSideType(binance.SideType(e.Side)),
