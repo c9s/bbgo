@@ -38,7 +38,7 @@ type MarginAccount struct {
 	TotalNetAssetOfBTC  fixedpoint.Value  `json:"totalNetAssetOfBtc"`
 	TradeEnabled        bool              `json:"tradeEnabled"`
 	TransferEnabled     bool              `json:"transferEnabled"`
-	UserAssets          []MarginUserAsset `json:"userAssets"./examples/binance-margin`
+	UserAssets          []MarginUserAsset `json:"userAssets"`
 }
 
 // MarginUserAsset define user assets of margin account
