@@ -467,7 +467,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 		close(s.stopC)
 
-		if err := s.Persistence.Save(&s.state, stateKey); err != nil {
+		if err := s.Persistence.Save(s.state, stateKey); err != nil {
 			log.WithError(err).Errorf("can not save state: %+v", s.state)
 		} else {
 			log.Infof("state is saved => %+v", s.state)
