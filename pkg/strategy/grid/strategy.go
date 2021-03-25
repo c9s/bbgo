@@ -432,7 +432,7 @@ func (s *Strategy) handleFilledOrder(filledOrder types.Order) {
 				s.state.AccumulativeArbitrageProfit += fixedpoint.NewFromFloat(baseProfit)
 				s.Notify("%s grid arbitrage profit %f %s, accumulative arbitrage profit %f %s", s.Symbol,
 					baseProfit, s.Market.BaseCurrency,
-					s.state.AccumulativeArbitrageProfit, s.Market.BaseCurrency,
+					s.state.AccumulativeArbitrageProfit.Float64(), s.Market.BaseCurrency,
 				)
 			}
 
@@ -443,7 +443,7 @@ func (s *Strategy) handleFilledOrder(filledOrder types.Order) {
 				s.state.AccumulativeArbitrageProfit += fixedpoint.NewFromFloat(baseProfit)
 				s.Notify("%s grid arbitrage profit %f %s, accumulative arbitrage profit %f %s", s.Symbol,
 					baseProfit, s.Market.BaseCurrency,
-					s.state.AccumulativeArbitrageProfit, s.Market.BaseCurrency,
+					s.state.AccumulativeArbitrageProfit.Float64(), s.Market.BaseCurrency,
 				)
 			}
 		}
@@ -456,7 +456,7 @@ func (s *Strategy) handleFilledOrder(filledOrder types.Order) {
 				s.state.AccumulativeArbitrageProfit += fixedpoint.NewFromFloat(quoteProfit)
 				s.Notify("%s grid arbitrage profit %f %s, accumulative arbitrage profit %f %s", s.Symbol,
 					quoteProfit, s.Market.QuoteCurrency,
-					s.state.AccumulativeArbitrageProfit, s.Market.QuoteCurrency,
+					s.state.AccumulativeArbitrageProfit.Float64(), s.Market.QuoteCurrency,
 				)
 			}
 		case types.SideTypeBuy:
@@ -466,7 +466,7 @@ func (s *Strategy) handleFilledOrder(filledOrder types.Order) {
 				s.state.AccumulativeArbitrageProfit += fixedpoint.NewFromFloat(quoteProfit)
 				s.Notify("%s grid arbitrage profit %f %s, accumulative arbitrage profit %f %s", s.Symbol,
 					quoteProfit, s.Market.QuoteCurrency,
-					s.state.AccumulativeArbitrageProfit, s.Market.QuoteCurrency,
+					s.state.AccumulativeArbitrageProfit.Float64(), s.Market.QuoteCurrency,
 				)
 			}
 		}
