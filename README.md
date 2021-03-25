@@ -434,6 +434,11 @@ helm repo add bitnami https://charts.bitnami.com/bitnami
 helm install redis bitnami/redis
 ```
 
+To get the dynamically generated redis password, you can use the following command:
+
+```shell
+export REDIS_PASSWORD=$(kubectl get secret --namespace bbgo redis -o jsonpath="{.data.redis-password}" | base64 --decode)
+```
 
 Prepare your docker image locally (you can also use the docker image from docker hub):
 
@@ -443,42 +448,55 @@ make docker DOCKER_TAG=1.16.0
 
 The docker tag version number is from the file [Chart.yaml](charts/bbgo/Chart.yaml)
 
+Choose your instance name:
+
+```shell
+export INSTANCE=grid
+```
+
 Prepare your secret:
 
 ```shell
-kubectl create secret generic bbgo-grid --from-env-file .env.local
+kubectl create secret generic bbgo-$INSTANCE --from-env-file .env.local
 ```
 
 Configure your config file, the chart defaults to read config/bbgo.yaml to create a configmap:
 
 ```shell
-cp config/grid.yaml bbgo-grid.yaml
-vim bbgo-grid.yaml
+cp config/grid.yaml bbgo-$INSTANCE.yaml
+vim bbgo-$INSTANCE.yaml
 ```
 
 Prepare your configmap:
 
 ```shell
-kubectl create configmap bbgo-grid --from-file=bbgo-grid.yaml
+kubectl create configmap bbgo-$INSTANCE --from-file=bbgo.yaml=bbgo-$INSTANCE.yaml
 ```
 
 Install chart with the preferred release name, the release name maps to the previous secret we just created, that
 is, `bbgo-grid`:
 
 ```shell
-helm install --set existingConfigmap=bbgo-grid bbgo-grid ./charts/bbgo
+helm install --set existingConfigmap=bbgo-$INSTANCE bbgo-$INSTANCE ./charts/bbgo
 ```
 
 To use the latest version:
 
 ```shell
-helm install --set existingConfigmap=bbgo-grid --set image.tag=latest bbgo-grid ./charts/bbgo
+helm install --set existingConfigmap=bbgo-$INSTANCE --set image.tag=latest bbgo-$INSTANCE ./charts/bbgo
+```
+
+To upgrade:
+
+```shell
+helm upgrade bbgo-$INSTANCE ./charts/bbgo
+helm upgrade --set image.tag=1.15.2 bbgo-$INSTANCE ./charts/bbgo
 ```
 
 Delete chart:
 
 ```shell
-helm delete bbgo
+helm delete bbgo-$INSTANCE
 ```
 
 ## Development
