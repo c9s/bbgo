@@ -2,6 +2,8 @@ package ftx
 
 import (
 	"context"
+	"database/sql"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -483,4 +485,138 @@ func TestExchange_QueryDepositHistory(t *testing.T) {
 	dh, err = ex.QueryDepositHistory(ctx, "BTC", actualConfirmedTime.Add(-1*time.Hour), actualConfirmedTime.Add(1*time.Hour))
 	assert.NoError(t, err)
 	assert.Len(t, dh, 0)
+}
+
+func TestExchange_QueryTrades(t *testing.T) {
+	t.Run("empty response", func(t *testing.T) {
+		respJSON := `
+{
+  "success": true,
+  "result": []
+}
+`
+		var f fillsResponse
+		assert.NoError(t, json.Unmarshal([]byte(respJSON), &f))
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			fmt.Fprintln(w, respJSON)
+		}))
+		defer ts.Close()
+
+		ex := NewExchange("", "", "")
+		serverURL, err := url.Parse(ts.URL)
+		assert.NoError(t, err)
+		ex.restEndpoint = serverURL
+
+		ctx := context.Background()
+		actualConfirmedTime, err := parseDatetime("2021-02-23T09:29:08.534000+00:00")
+		assert.NoError(t, err)
+
+		since := actualConfirmedTime.Add(-1 * time.Hour)
+		until := actualConfirmedTime.Add(1 * time.Hour)
+
+		// ignore unavailable market
+		trades, err := ex.QueryTrades(ctx, "TSLA/USD", &types.TradeQueryOptions{
+			StartTime:   &since,
+			EndTime:     &until,
+			Limit:       0,
+			LastTradeID: 0,
+		})
+		assert.NoError(t, err)
+		assert.Len(t, trades, 0)
+	})
+
+	t.Run("duplicated response", func(t *testing.T) {
+		respJSON := `
+{
+  "success": true,
+  "result": [{
+		"id": 123,
+		"market": "TSLA/USD",
+		"future": null,
+		"baseCurrency": "TSLA",
+		"quoteCurrency": "USD",
+		"type": "order",
+		"side": "sell",
+		"price": 672.5,
+		"size": 1.0,
+		"orderId": 456,
+		"time": "2021-02-23T09:29:08.534000+00:00",
+		"tradeId": 789,
+		"feeRate": -5e-6,
+		"fee": -0.0033625,
+		"feeCurrency": "USD",
+		"liquidity": "maker"
+}, {
+		"id": 123,
+		"market": "TSLA/USD",
+		"future": null,
+		"baseCurrency": "TSLA",
+		"quoteCurrency": "USD",
+		"type": "order",
+		"side": "sell",
+		"price": 672.5,
+		"size": 1.0,
+		"orderId": 456,
+		"time": "2021-02-23T09:29:08.534000+00:00",
+		"tradeId": 789,
+		"feeRate": -5e-6,
+		"fee": -0.0033625,
+		"feeCurrency": "USD",
+		"liquidity": "maker"
+}]
+}
+`
+		var f fillsResponse
+		assert.NoError(t, json.Unmarshal([]byte(respJSON), &f))
+		i := 0
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if i == 0 {
+				fmt.Fprintln(w, respJSON)
+				return
+			}
+			fmt.Fprintln(w, `{"success":true, "result":[]}`)
+		}))
+		defer ts.Close()
+
+		ex := NewExchange("", "", "")
+		serverURL, err := url.Parse(ts.URL)
+		assert.NoError(t, err)
+		ex.restEndpoint = serverURL
+
+		ctx := context.Background()
+		actualConfirmedTime, err := parseDatetime("2021-02-23T09:29:08.534000+00:00")
+		assert.NoError(t, err)
+
+		since := actualConfirmedTime.Add(-1 * time.Hour)
+		until := actualConfirmedTime.Add(1 * time.Hour)
+
+		// ignore unavailable market
+		trades, err := ex.QueryTrades(ctx, "TSLA/USD", &types.TradeQueryOptions{
+			StartTime:   &since,
+			EndTime:     &until,
+			Limit:       0,
+			LastTradeID: 0,
+		})
+		assert.NoError(t, err)
+		assert.Len(t, trades, 1)
+		assert.Equal(t, types.Trade{
+			ID:            789,
+			OrderID:       456,
+			Exchange:      types.ExchangeFTX.String(),
+			Price:         672.5,
+			Quantity:      1.0,
+			QuoteQuantity: 672.5 * 1.0,
+			Symbol:        "TSLA/USD",
+			Side:          types.SideTypeSell,
+			IsBuyer:       false,
+			IsMaker:       true,
+			Time:          datatype.Time(actualConfirmedTime),
+			Fee:           -0.0033625,
+			FeeCurrency:   "USD",
+			IsMargin:      false,
+			IsIsolated:    false,
+			StrategyID:    sql.NullString{},
+			PnL:           sql.NullFloat64{},
+		}, trades[0])
+	})
 }

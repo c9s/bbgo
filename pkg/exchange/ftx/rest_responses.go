@@ -1,6 +1,37 @@
 package ftx
 
-import "time"
+import (
+	"strings"
+	"time"
+
+	"github.com/c9s/bbgo/pkg/types"
+)
+
+//ex: 2019-03-05T09:56:55.728933+00:00
+const timeLayout = "2006-01-02T15:04:05.999999Z07:00"
+
+type datetime struct {
+	time.Time
+}
+
+func parseDatetime(s string) (time.Time, error) {
+	return time.Parse(timeLayout, s)
+}
+
+func (d *datetime) UnmarshalJSON(b []byte) error {
+	// remove double quote from json string
+	s := strings.Trim(string(b), "\"")
+	if len(s) == 0 {
+		d.Time = time.Time{}
+		return nil
+	}
+	t, err := parseDatetime(s)
+	if err != nil {
+		return err
+	}
+	d.Time = t
+	return nil
+}
 
 /*
 {
@@ -176,8 +207,8 @@ type cancelOrderResponse struct {
 }
 
 type order struct {
-	CreatedAt  time.Time `json:"createdAt"`
-	FilledSize float64   `json:"filledSize"`
+	CreatedAt  datetime `json:"createdAt"`
+	FilledSize float64  `json:"filledSize"`
 	// Future field is not defined in the response format table but in the response example.
 	Future        string  `json:"future"`
 	ID            int64   `json:"id"`
@@ -226,18 +257,18 @@ type depositHistoryResponse struct {
 }
 
 type depositHistory struct {
-	ID            int64     `json:"id"`
-	Coin          string    `json:"coin"`
-	TxID          string    `json:"txid"`
-	Address       address   `json:"address"`
-	Confirmations int64     `json:"confirmations"`
-	ConfirmedTime time.Time `json:"confirmedTime"`
-	Fee           float64   `json:"fee"`
-	SentTime      time.Time `json:"sentTime"`
-	Size          float64   `json:"size"`
-	Status        string    `json:"status"`
-	Time          time.Time `json:"time"`
-	Notes         string    `json:"notes"`
+	ID            int64    `json:"id"`
+	Coin          string   `json:"coin"`
+	TxID          string   `json:"txid"`
+	Address       address  `json:"address"`
+	Confirmations int64    `json:"confirmations"`
+	ConfirmedTime datetime `json:"confirmedTime"`
+	Fee           float64  `json:"fee"`
+	SentTime      datetime `json:"sentTime"`
+	Size          float64  `json:"size"`
+	Status        string   `json:"status"`
+	Time          datetime `json:"time"`
+	Notes         string   `json:"notes"`
 }
 
 /**
@@ -253,4 +284,48 @@ type address struct {
 	Tag     string `json:"tag"`
 	Method  string `json:"method"`
 	Coin    string `json:"coin"`
+}
+
+type fillsResponse struct {
+	Success bool   `json:"success"`
+	Result  []fill `json:"result"`
+}
+
+/*
+{
+  "id": 123,
+  "market": "TSLA/USD",
+  "future": null,
+  "baseCurrency": "TSLA",
+  "quoteCurrency": "USD",
+  "type": "order",
+  "side": "sell",
+  "price": 672.5,
+  "size": 1.0,
+  "orderId": 456,
+  "time": "2021-02-23T09:29:08.534000+00:00",
+  "tradeId": 789,
+  "feeRate": -5e-6,
+  "fee": -0.0033625,
+  "feeCurrency": "USD",
+  "liquidity": "maker"
+}
+*/
+type fill struct {
+	ID            int64          `json:"id"`
+	Market        string         `json:"market"`
+	Future        string         `json:"future"`
+	BaseCurrency  string         `json:"baseCurrency"`
+	QuoteCurrency string         `json:"quoteCurrency"`
+	Type          string         `json:"type"`
+	Side          types.SideType `json:"side"`
+	Price         float64        `json:"price"`
+	Size          float64        `json:"size"`
+	OrderId       uint64         `json:"orderId"`
+	Time          datetime       `json:"time"`
+	TradeId       int64          `json:"tradeId"`
+	FeeRate       float64        `json:"feeRate"`
+	Fee           float64        `json:"fee"`
+	FeeCurrency   string         `json:"feeCurrency"`
+	Liquidity     string         `json:"liquidity"`
 }

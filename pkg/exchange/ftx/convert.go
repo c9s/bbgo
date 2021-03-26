@@ -48,8 +48,8 @@ func toGlobalOrder(r order) (types.Order, error) {
 		OrderID:          uint64(r.ID),
 		Status:           "",
 		ExecutedQuantity: r.FilledSize,
-		CreationTime:     datatype.Time(r.CreatedAt),
-		UpdateTime:       datatype.Time(r.CreatedAt),
+		CreationTime:     datatype.Time(r.CreatedAt.Time),
+		UpdateTime:       datatype.Time(r.CreatedAt.Time),
 	}
 
 	// `new` (accepted but not processed yet), `open`, or `closed` (filled or cancelled)
@@ -83,13 +83,13 @@ func toGlobalDeposit(input depositHistory) (types.Deposit, error) {
 		log.WithError(err).Warnf("assign empty string to the deposit status")
 	}
 	t := input.Time
-	if input.ConfirmedTime != (time.Time{}) {
+	if input.ConfirmedTime.Time != (time.Time{}) {
 		t = input.ConfirmedTime
 	}
 	d := types.Deposit{
 		GID:           0,
 		Exchange:      types.ExchangeFTX,
-		Time:          datatype.Time(t),
+		Time:          datatype.Time(t.Time),
 		Amount:        input.Size,
 		Asset:         toGlobalCurrency(input.Coin),
 		TransactionID: input.TxID,
@@ -107,4 +107,25 @@ func toGlobalDepositStatus(input string) (types.DepositStatus, error) {
 		return types.DepositSuccess, nil
 	}
 	return "", fmt.Errorf("unsupported status %s", input)
+}
+
+func toGlobalTrade(f fill) (types.Trade, error) {
+	return types.Trade{
+		ID:            f.TradeId,
+		GID:           0,
+		OrderID:       f.OrderId,
+		Exchange:      types.ExchangeFTX.String(),
+		Price:         f.Price,
+		Quantity:      f.Size,
+		QuoteQuantity: f.Price * f.Size,
+		Symbol:        toGlobalSymbol(f.Market),
+		Side:          f.Side,
+		IsBuyer:       f.Side == types.SideTypeBuy,
+		IsMaker:       f.Liquidity == "maker",
+		Time:          datatype.Time(f.Time.Time),
+		Fee:           f.Fee,
+		FeeCurrency:   f.FeeCurrency,
+		IsMargin:      false,
+		IsIsolated:    false,
+	}, nil
 }

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -145,7 +146,70 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 }
 
 func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) ([]types.Trade, error) {
-	panic("implement me")
+	var since, until time.Time
+	if options.StartTime != nil {
+		since = *options.StartTime
+	}
+	if options.EndTime != nil {
+		until = *options.EndTime
+	}
+	if err := verifySinceUntil(since, until); err != nil {
+		return nil, err
+	}
+	if options.Limit == 1 {
+		// FTX doesn't provide pagination api, so we have to split the since/until time range into small slices, and paginate ourselves.
+		// If the limit is 1, we always get the same data from FTX.
+		return nil, fmt.Errorf("limit can't be 1 which can't be used in pagination")
+	}
+	limit := options.Limit
+	if limit == 0 {
+		limit = 200
+	}
+
+	tradeIDs := make(map[int64]struct{})
+
+	var lastTradeID int64
+	var trades []types.Trade
+	symbol = strings.ToUpper(symbol)
+
+	for since.Before(until) {
+		// DO not set limit to `1` since you will always get the same response.
+		resp, err := e.newRest().Fills(ctx, symbol, since, until, limit, true)
+		if err != nil {
+			return nil, err
+		}
+		if !resp.Success {
+			return nil, fmt.Errorf("ftx returns failure")
+		}
+
+		sort.Slice(resp.Result, func(i, j int) bool {
+			return resp.Result[i].TradeId < resp.Result[j].TradeId
+		})
+
+		for _, r := range resp.Result {
+			if _, ok := tradeIDs[r.TradeId]; ok {
+				continue
+			}
+			if r.TradeId <= lastTradeID || r.Time.Before(since) || r.Time.After(until) || r.Market != symbol {
+				continue
+			}
+			tradeIDs[r.TradeId] = struct{}{}
+			lastTradeID = r.TradeId
+			since = r.Time.Time
+
+			t, err := toGlobalTrade(r)
+			if err != nil {
+				return nil, err
+			}
+			trades = append(trades, t)
+		}
+
+		if int64(len(resp.Result)) < limit {
+			return trades, nil
+		}
+	}
+
+	return trades, nil
 }
 
 func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since, until time.Time) (allDeposits []types.Deposit, err error) {
@@ -158,8 +222,11 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 	if err != nil {
 		return nil, err
 	}
+	if !resp.Success {
+		return nil, fmt.Errorf("ftx returns failure")
+	}
 	sort.Slice(resp.Result, func(i, j int) bool {
-		return resp.Result[i].Time.Before(resp.Result[j].Time)
+		return resp.Result[i].Time.Before(resp.Result[j].Time.Time)
 	})
 	for _, r := range resp.Result {
 		d, err := toGlobalDeposit(r)
@@ -255,7 +322,7 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 
 		for _, r := range resp.Result {
 			// There may be more than one orders at the same time, so also have to check the ID
-			if r.CreatedAt.Before(lastOrder.CreatedAt) || r.ID == lastOrder.ID || r.Status != "closed" || r.ID < int64(lastOrderID) {
+			if r.CreatedAt.Before(lastOrder.CreatedAt.Time) || r.ID == lastOrder.ID || r.Status != "closed" || r.ID < int64(lastOrderID) {
 				continue
 			}
 			lastOrder = r
@@ -274,7 +341,7 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 
 func sortByCreatedASC(orders []order) {
 	sort.Slice(orders, func(i, j int) bool {
-		return orders[i].CreatedAt.Before(orders[j].CreatedAt)
+		return orders[i].CreatedAt.Before(orders[j].CreatedAt.Time)
 	})
 }
 

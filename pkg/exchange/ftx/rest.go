@@ -23,6 +23,7 @@ type restRequest struct {
 	*orderRequest
 	*accountRequest
 	*marketRequest
+	*fillsRequest
 
 	key, secret string
 	// Optional sub-account name
@@ -49,6 +50,7 @@ func newRestRequest(c *http.Client, baseURL *url.URL) *restRequest {
 		p:       make(map[string]interface{}),
 	}
 
+	r.fillsRequest = &fillsRequest{restRequest: r}
 	r.marketRequest = &marketRequest{restRequest: r}
 	r.accountRequest = &accountRequest{restRequest: r}
 	r.walletRequest = &walletRequest{restRequest: r}
