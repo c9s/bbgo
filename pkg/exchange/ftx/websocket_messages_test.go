@@ -15,23 +15,28 @@ import (
 
 func Test_rawResponse_toSubscribedResp(t *testing.T) {
 	input := `{"type": "subscribed", "channel": "orderbook", "market": "BTC/USDT"}`
-	var m rawResponse
+	var m websocketResponse
 	assert.NoError(t, json.Unmarshal([]byte(input), &m))
-	r := m.toSubscribedResp()
-	assert.Equal(t, subscribedRespType, r.Type)
-	assert.Equal(t, orderbook, r.Channel)
-	assert.Equal(t, "BTC/USDT", r.Market)
+	r, err := m.toSubscribedResponse()
+	assert.NoError(t, err)
+	assert.Equal(t, subscribedResponse{
+		mandatoryFields: mandatoryFields{
+			Channel: orderBookChannel,
+			Type:    subscribedRespType,
+		},
+		Market: "BTC/USDT",
+	}, r)
 }
 
-func Test_rawResponse_toDataResponse(t *testing.T) {
+func Test_websocketResponse_toPublicOrderBookResponse(t *testing.T) {
 	f, err := ioutil.ReadFile("./orderbook_snapshot.json")
 	assert.NoError(t, err)
-	var m rawResponse
+	var m websocketResponse
 	assert.NoError(t, json.Unmarshal(f, &m))
-	r, err := m.toOrderBookResponse()
+	r, err := m.toPublicOrderBookResponse()
 	assert.NoError(t, err)
 	assert.Equal(t, partialRespType, r.Type)
-	assert.Equal(t, orderbook, r.Channel)
+	assert.Equal(t, orderBookChannel, r.Channel)
 	assert.Equal(t, "BTC/USDT", r.Market)
 	assert.Equal(t, int64(1614520368), r.Timestamp.Unix())
 	assert.Equal(t, uint32(2150525410), r.Checksum)
@@ -46,9 +51,9 @@ func Test_rawResponse_toDataResponse(t *testing.T) {
 func Test_orderBookResponse_toGlobalOrderBook(t *testing.T) {
 	f, err := ioutil.ReadFile("./orderbook_snapshot.json")
 	assert.NoError(t, err)
-	var m rawResponse
+	var m websocketResponse
 	assert.NoError(t, json.Unmarshal(f, &m))
-	r, err := m.toOrderBookResponse()
+	r, err := m.toPublicOrderBookResponse()
 	assert.NoError(t, err)
 
 	b, err := toGlobalOrderBook(r)
@@ -120,9 +125,9 @@ func Test_orderBookResponse_verifyChecksum(t *testing.T) {
 	for _, file := range []string{"./orderbook_snapshot.json"} {
 		f, err := ioutil.ReadFile(file)
 		assert.NoError(t, err)
-		var m rawResponse
+		var m websocketResponse
 		assert.NoError(t, json.Unmarshal(f, &m))
-		r, err := m.toOrderBookResponse()
+		r, err := m.toPublicOrderBookResponse()
 		assert.NoError(t, err)
 		assert.NoError(t, r.verifyChecksum(), "filename: "+file)
 	}
@@ -216,7 +221,7 @@ func Test_websocketResponse_toOrderUpdateResponse(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, orderUpdateResponse{
-		mandatory: mandatory{
+		mandatoryFields: mandatoryFields{
 			Channel: privateOrdersChannel,
 			Type:    updateRespType,
 		},
