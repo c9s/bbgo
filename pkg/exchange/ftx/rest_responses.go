@@ -18,6 +18,15 @@ func parseDatetime(s string) (time.Time, error) {
 	return time.Parse(timeLayout, s)
 }
 
+// used in unit test
+func mustParseDatetime(s string) time.Time {
+	t, err := parseDatetime(s)
+	if err != nil {
+		panic(err)
+	}
+	return t
+}
+
 func (d *datetime) UnmarshalJSON(b []byte) error {
 	// remove double quote from json string
 	s := strings.Trim(string(b), "\"")
@@ -224,6 +233,7 @@ type order struct {
 	Ioc           bool    `json:"ioc"`
 	PostOnly      bool    `json:"postOnly"`
 	ClientId      string  `json:"clientId"`
+	Liquidation   bool    `json:"liquidation"`
 }
 
 type orderResponse struct {

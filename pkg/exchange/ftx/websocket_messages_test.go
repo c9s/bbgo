@@ -182,3 +182,62 @@ func Test_newLoginRequest(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, strings.Contains(string(jsonStr), expectedSignature))
 }
+
+func Test_websocketResponse_toOrderUpdateResponse(t *testing.T) {
+	input := []byte(`
+{
+  "channel": "orders",
+  "type": "update",
+  "data": {
+    "id": 12345,
+    "clientId": "test-client-id",
+    "market": "SOL/USD",
+    "type": "limit",
+    "side": "buy",
+    "price": 0.5,
+    "size": 100.0,
+    "status": "closed",
+    "filledSize": 0.0,
+    "remainingSize": 0.0,
+    "reduceOnly": false,
+    "liquidation": false,
+    "avgFillPrice": null,
+    "postOnly": false,
+    "ioc": false,
+    "createdAt": "2021-03-27T11:00:36.418674+00:00"
+  }
+}
+`)
+
+	var raw websocketResponse
+	assert.NoError(t, json.Unmarshal(input, &raw))
+
+	r, err := raw.toOrderUpdateResponse()
+	assert.NoError(t, err)
+
+	assert.Equal(t, orderUpdateResponse{
+		mandatory: mandatory{
+			Channel: privateOrdersChannel,
+			Type:    updateRespType,
+		},
+		Data: order{
+			ID:            12345,
+			ClientId:      "test-client-id",
+			Market:        "SOL/USD",
+			Type:          "limit",
+			Side:          "buy",
+			Price:         0.5,
+			Size:          100,
+			Status:        "closed",
+			FilledSize:    0.0,
+			RemainingSize: 0.0,
+			ReduceOnly:    false,
+			Liquidation:   false,
+			AvgFillPrice:  0,
+			PostOnly:      false,
+			Ioc:           false,
+			CreatedAt:     datetime{Time: mustParseDatetime("2021-03-27T11:00:36.418674+00:00")},
+			Future:        "",
+		},
+	}, r)
+}
