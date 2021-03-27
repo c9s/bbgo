@@ -2,13 +2,11 @@ package ftx
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
 
 	"github.com/c9s/bbgo/pkg/service"
-	"github.com/c9s/bbgo/pkg/types"
 )
 
 type WebsocketService struct {
@@ -17,7 +15,7 @@ type WebsocketService struct {
 	key    string
 	secret string
 
-	subscriptions []SubscribeRequest
+	subscriptions []websocketRequest
 }
 
 const endpoint = "wss://ftx.com/ws/"
@@ -36,18 +34,8 @@ func NewWebsocketService(key string, secret string) *WebsocketService {
 	return s
 }
 
-func (w *WebsocketService) Subscribe(channel types.Channel, symbol string) error {
-	r := SubscribeRequest{
-		Operation: subscribe,
-	}
-	if channel != types.BookChannel {
-		return fmt.Errorf("unsupported channel %+v", channel)
-	}
-	r.Channel = orderbook
-	r.Market = strings.ToUpper(strings.TrimSpace(symbol))
-
-	w.subscriptions = append(w.subscriptions, r)
-	return nil
+func (w *WebsocketService) Subscribe(request websocketRequest) {
+	w.subscriptions = append(w.subscriptions, request)
 }
 
 var errSubscriptionFailed = fmt.Errorf("failed to subscribe")
@@ -55,6 +43,7 @@ var errSubscriptionFailed = fmt.Errorf("failed to subscribe")
 func (w *WebsocketService) sendSubscriptions() error {
 	conn := w.Conn()
 	for _, s := range w.subscriptions {
+		logger.Infof("s: %+v", s)
 		if err := conn.WriteJSON(s); err != nil {
 			return fmt.Errorf("can't send subscription request %+v: %w", s, errSubscriptionFailed)
 		}
@@ -62,6 +51,11 @@ func (w *WebsocketService) sendSubscriptions() error {
 	return nil
 }
 
+// After closing the websocket connection, you have to subscribe all events again
 func (w *WebsocketService) Close() error {
-	return w.Conn().Close()
+	w.subscriptions = nil
+	if conn := w.Conn(); conn != nil {
+		return conn.Close()
+	}
+	return nil
 }
