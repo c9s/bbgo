@@ -32,9 +32,7 @@ func (s *Stream) Connect(ctx context.Context) error {
 	// If it's not public only, let's do the authentication.
 	if atomic.LoadInt32(&s.publicOnly) == 0 {
 		logger.Infof("subscribe private events")
-		s.wsService.Subscribe(
-			newLoginRequest(s.wsService.key, s.wsService.secret, time.Now()),
-		)
+		s.subscribePrivateEvents()
 	}
 
 	if err := s.wsService.Connect(ctx); err != nil {
@@ -42,6 +40,16 @@ func (s *Stream) Connect(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (s *Stream) subscribePrivateEvents() {
+	s.wsService.Subscribe(
+		newLoginRequest(s.wsService.key, s.wsService.secret, time.Now()),
+	)
+	s.wsService.Subscribe(websocketRequest{
+		Operation: subscribe,
+		Channel:   privateOrdersChannel,
+	})
 }
 
 func (s *Stream) SetPublicOnly() {

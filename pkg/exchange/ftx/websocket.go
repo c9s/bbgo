@@ -43,7 +43,6 @@ var errSubscriptionFailed = fmt.Errorf("failed to subscribe")
 func (w *WebsocketService) sendSubscriptions() error {
 	conn := w.Conn()
 	for _, s := range w.subscriptions {
-		logger.Infof("s: %+v", s)
 		if err := conn.WriteJSON(s); err != nil {
 			return fmt.Errorf("can't send subscription request %+v: %w", s, errSubscriptionFailed)
 		}
