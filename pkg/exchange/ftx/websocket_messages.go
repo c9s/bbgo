@@ -22,9 +22,14 @@ const unsubscribe operation = "unsubscribe"
 type channel string
 
 const orderbook channel = "orderbook"
-const trades channel = "trades"
-const ticker channel = "ticker"
+const privateOrdersChannel channel = "orders"
 
+/*
+Private:
+	order update: `{'op': 'subscribe', 'channel': 'orders'}`
+	login: `{"args": { "key": "<api_key>", "sign": "<signature>", "time": <ts> }, "op": "login" }`
+
+*/
 type websocketRequest struct {
 	Operation operation `json:"op"`
 
