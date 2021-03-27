@@ -15,6 +15,7 @@ import (
 
 type operation string
 
+const login operation = "login"
 const subscribe operation = "subscribe"
 const unsubscribe operation = "unsubscribe"
 
@@ -24,7 +25,48 @@ const orderbook channel = "orderbook"
 const trades channel = "trades"
 const ticker channel = "ticker"
 
-// {'op': 'subscribe', 'channel': 'trades', 'market': 'BTC-PERP'}
+type websocketRequest struct {
+	Operation operation `json:"op"`
+
+	// {'op': 'subscribe', 'channel': 'trades', 'market': 'BTC-PERP'}
+	Channel channel `json:"channel,omitempty"`
+	Market  string  `json:"market,omitempty"`
+
+	Login loginArgs `json:"args,omitempty"`
+}
+
+/*
+{
+  "args": {
+    "key": "<api_key>",
+    "sign": "<signature>",
+    "time": <ts>
+  },
+  "op": "login"
+}
+*/
+type loginArgs struct {
+	Key       string `json:"key"`
+	Signature string `json:"sign"`
+	Time      int64  `json:"time"`
+}
+
+func newLoginRequest(key, secret string, t time.Time) websocketRequest {
+	millis := t.UnixNano() / int64(time.Millisecond)
+	return websocketRequest{
+		Operation: login,
+		Login: loginArgs{
+			Key:       key,
+			Signature: sign(secret, loginBody(millis)),
+			Time:      millis,
+		},
+	}
+}
+
+func loginBody(millis int64) string {
+	return fmt.Sprintf("%dwebsocket_login", millis)
+}
+
 type SubscribeRequest struct {
 	Operation operation `json:"op"`
 	Channel   channel   `json:"channel"`
