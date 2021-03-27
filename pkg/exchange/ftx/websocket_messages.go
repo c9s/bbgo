@@ -24,6 +24,8 @@ type channel string
 const orderbook channel = "orderbook"
 const privateOrdersChannel channel = "orders"
 
+var errInvalidChannel = fmt.Errorf("invalid channel")
+
 /*
 Private:
 	order update: `{'op': 'subscribe', 'channel': 'orders'}`
@@ -70,6 +72,47 @@ func newLoginRequest(key, secret string, t time.Time) websocketRequest {
 
 func loginBody(millis int64) string {
 	return fmt.Sprintf("%dwebsocket_login", millis)
+}
+
+type websocketResponse struct {
+	mandatory
+
+	optionalFields
+}
+
+type mandatory struct {
+	Channel channel `json:"channel"`
+
+	Type respType `json:"type"`
+}
+
+type optionalFields struct {
+	Market string `json:"market"`
+
+	// Example: {"type": "error", "code": 404, "msg": "No such market: BTCUSDT"}
+	Code int64 `json:"code"`
+
+	Message string `json:"msg"`
+
+	Data json.RawMessage `json:"data"`
+}
+
+type orderUpdateResponse struct {
+	mandatory
+
+	Data order `json:"data"`
+}
+
+func (r websocketResponse) toOrderUpdateResponse() (orderUpdateResponse, error) {
+	if r.Channel != privateOrdersChannel {
+		return orderUpdateResponse{}, fmt.Errorf("can't convert %s channel data to %s: %w", r.Channel, privateOrdersChannel, errInvalidChannel)
+	}
+	var o orderUpdateResponse
+	if err := json.Unmarshal(r.Data, &o.Data); err != nil {
+		return orderUpdateResponse{}, err
+	}
+	o.mandatory = r.mandatory
+	return o, nil
 }
 
 type respType string
