@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-
-	"github.com/pkg/errors"
 )
 
 const DateFormat = "2006-01-02"
@@ -51,9 +49,11 @@ func ValidExchangeName(a string) (ExchangeName, error) {
 		return ExchangeMax, nil
 	case "binance", "bn":
 		return ExchangeBinance, nil
+	case "ftx":
+		return ExchangeFTX, nil
 	}
 
-	return "", errors.New("invalid exchange name")
+	return "", fmt.Errorf("invalid exchange name: %s", a)
 }
 
 type Exchange interface {
