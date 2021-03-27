@@ -41,5 +41,8 @@ func (s *Stream) Subscribe(channel types.Channel, symbol string, _ types.Subscri
 	}
 }
 func (s *Stream) Close() error {
-	return s.wsService.Close()
+	if s.wsService != nil {
+		return s.wsService.Close()
+	}
+	return nil
 }
