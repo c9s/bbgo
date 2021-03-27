@@ -28,7 +28,14 @@ func NewStream(key, secret string) *Stream {
 }
 
 func (s *Stream) Connect(ctx context.Context) error {
-	return s.wsService.Connect(ctx)
+	if err := s.wsService.Connect(ctx); err != nil {
+		return err
+	}
+	// If it's not public only, let's do the authentication.
+	if atomic.LoadInt32(&s.publicOnly) == 0 {
+	}
+
+	return nil
 }
 
 func (s *Stream) SetPublicOnly() {
