@@ -3,11 +3,14 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
 	"syscall"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -63,9 +66,76 @@ var orderbookCmd = &cobra.Command{
 	},
 }
 
+// go run ./cmd/bbgo orderupdate
+var orderUpdateCmd = &cobra.Command{
+	Use: "orderupdate",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
+
+		configFile, err := cmd.Flags().GetString("config")
+		if err != nil {
+			return err
+		}
+
+		if len(configFile) == 0 {
+			return errors.New("--config option is required")
+		}
+
+		// if config file exists, use the config loaded from the config file.
+		// otherwise, use a empty config object
+		var userConfig *bbgo.Config
+		if _, err := os.Stat(configFile); err == nil {
+			// load successfully
+			userConfig, err = bbgo.Load(configFile, false)
+			if err != nil {
+				return err
+			}
+		} else if os.IsNotExist(err) {
+			// config file doesn't exist
+			userConfig = &bbgo.Config{}
+		} else {
+			// other error
+			return err
+		}
+
+		environ := bbgo.NewEnvironment()
+
+		if err := environ.ConfigureExchangeSessions(userConfig); err != nil {
+			return err
+		}
+
+		sessionName, err := cmd.Flags().GetString("session")
+		if err != nil {
+			return err
+		}
+
+		session, ok := environ.Session(sessionName)
+		if !ok {
+			return fmt.Errorf("session %s not found", sessionName)
+		}
+
+		s := session.Exchange.NewStream()
+		s.OnOrderUpdate(func(order types.Order) {
+			log.Infof("order update: %+v", order)
+		})
+
+		log.Infof("connecting...")
+		if err := s.Connect(ctx); err != nil {
+			return fmt.Errorf("failed to connect to %s", sessionName)
+		}
+		log.Infof("connected")
+
+		cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
+		return nil
+	},
+}
+
 func init() {
 	// since the public data does not require trading authentication, we use --exchange option here.
 	orderbookCmd.Flags().String("exchange", "", "the exchange name for sync")
 	orderbookCmd.Flags().String("symbol", "", "the trading pair. e.g, BTCUSDT, LTCUSDT...")
+
+	orderUpdateCmd.Flags().String("session", "", "session name")
 	RootCmd.AddCommand(orderbookCmd)
+	RootCmd.AddCommand(orderUpdateCmd)
 }

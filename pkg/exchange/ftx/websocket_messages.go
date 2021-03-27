@@ -67,12 +67,6 @@ func loginBody(millis int64) string {
 	return fmt.Sprintf("%dwebsocket_login", millis)
 }
 
-type SubscribeRequest struct {
-	Operation operation `json:"op"`
-	Channel   channel   `json:"channel"`
-	Market    string    `json:"market"`
-}
-
 type respType string
 
 const errRespType respType = "error"

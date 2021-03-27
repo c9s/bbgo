@@ -13,6 +13,7 @@ type messageHandler struct {
 }
 
 func (h *messageHandler) handleMessage(message []byte) {
+	log.Infof("raw: %s", string(message))
 	var r rawResponse
 	if err := json.Unmarshal(message, &r); err != nil {
 		logger.WithError(err).Errorf("failed to unmarshal resp: %s", string(message))
