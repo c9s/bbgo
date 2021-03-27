@@ -3,6 +3,7 @@ package ftx
 import (
 	"context"
 	"sync/atomic"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -28,11 +29,16 @@ func NewStream(key, secret string) *Stream {
 }
 
 func (s *Stream) Connect(ctx context.Context) error {
-	if err := s.wsService.Connect(ctx); err != nil {
-		return err
-	}
 	// If it's not public only, let's do the authentication.
 	if atomic.LoadInt32(&s.publicOnly) == 0 {
+		logger.Infof("subscribe private events")
+		s.wsService.Subscribe(
+			newLoginRequest(s.wsService.key, s.wsService.secret, time.Now()),
+		)
+	}
+
+	if err := s.wsService.Connect(ctx); err != nil {
+		return err
 	}
 
 	return nil
@@ -43,10 +49,16 @@ func (s *Stream) SetPublicOnly() {
 }
 
 func (s *Stream) Subscribe(channel types.Channel, symbol string, _ types.SubscribeOptions) {
-	if err := s.wsService.Subscribe(channel, symbol); err != nil {
-		logger.WithError(err).Errorf("subscribe failed, should never happen")
+	if channel != types.BookChannel {
+		// TODO: return err
 	}
+	s.wsService.Subscribe(websocketRequest{
+		Operation: subscribe,
+		Channel:   orderbook,
+		Market:    TrimUpperString(symbol),
+	})
 }
+
 func (s *Stream) Close() error {
 	if s.wsService != nil {
 		return s.wsService.Close()
