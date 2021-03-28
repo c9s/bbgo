@@ -2,29 +2,48 @@ package ftx
 
 import (
 	"context"
+	"fmt"
 	"sync/atomic"
 	"time"
 
+	"github.com/gorilla/websocket"
+
+	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 )
+
+const endpoint = "wss://ftx.com/ws/"
 
 type Stream struct {
 	*types.StandardStream
 
-	wsService *WebsocketService
+	ws *service.WebsocketClientBase
 
-	// publicOnly must be accessed atomically
+	// publicOnly can only be configured before connecting
 	publicOnly int32
+
+	key    string
+	secret string
+
+	subscriptions []websocketRequest
 }
 
 func NewStream(key, secret string) *Stream {
-	wss := NewWebsocketService(key, secret)
 	s := &Stream{
+		key:            key,
+		secret:         secret,
 		StandardStream: &types.StandardStream{},
-		wsService:      wss,
+		ws:             service.NewWebsocketClientBase(endpoint, 3*time.Second),
 	}
 
-	wss.OnMessage((&messageHandler{StandardStream: s.StandardStream}).handleMessage)
+	s.ws.OnMessage((&messageHandler{StandardStream: s.StandardStream}).handleMessage)
+	s.ws.OnConnected(func(conn *websocket.Conn) {
+		for _, sub := range s.subscriptions {
+			if err := conn.WriteJSON(sub); err != nil {
+				s.ws.EmitError(fmt.Errorf("failed to send subscription: %+v", sub))
+			}
+		}
+	})
 	return s
 }
 
@@ -35,7 +54,7 @@ func (s *Stream) Connect(ctx context.Context) error {
 		s.subscribePrivateEvents()
 	}
 
-	if err := s.wsService.Connect(ctx); err != nil {
+	if err := s.ws.Connect(ctx); err != nil {
 		return err
 	}
 
@@ -43,17 +62,21 @@ func (s *Stream) Connect(ctx context.Context) error {
 }
 
 func (s *Stream) subscribePrivateEvents() {
-	s.wsService.Subscribe(
-		newLoginRequest(s.wsService.key, s.wsService.secret, time.Now()),
+	s.addSubscription(
+		newLoginRequest(s.key, s.secret, time.Now()),
 	)
-	s.wsService.Subscribe(websocketRequest{
+	s.addSubscription(websocketRequest{
 		Operation: subscribe,
 		Channel:   privateOrdersChannel,
 	})
-	s.wsService.Subscribe(websocketRequest{
+	s.addSubscription(websocketRequest{
 		Operation: subscribe,
 		Channel:   privateTradesChannel,
 	})
+}
+
+func (s *Stream) addSubscription(request websocketRequest) {
+	s.subscriptions = append(s.subscriptions, request)
 }
 
 func (s *Stream) SetPublicOnly() {
@@ -62,9 +85,10 @@ func (s *Stream) SetPublicOnly() {
 
 func (s *Stream) Subscribe(channel types.Channel, symbol string, _ types.SubscribeOptions) {
 	if channel != types.BookChannel {
-		// TODO: return err
+		logger.Errorf("only support orderbook channel")
+		return
 	}
-	s.wsService.Subscribe(websocketRequest{
+	s.addSubscription(websocketRequest{
 		Operation: subscribe,
 		Channel:   orderBookChannel,
 		Market:    TrimUpperString(symbol),
@@ -72,8 +96,9 @@ func (s *Stream) Subscribe(channel types.Channel, symbol string, _ types.Subscri
 }
 
 func (s *Stream) Close() error {
-	if s.wsService != nil {
-		return s.wsService.Close()
+	s.subscriptions = nil
+	if s.ws != nil {
+		return s.ws.Conn().Close()
 	}
 	return nil
 }
