@@ -15,6 +15,7 @@ import (
 
 type operation string
 
+const ping operation = "ping"
 const login operation = "login"
 const subscribe operation = "subscribe"
 const unsubscribe operation = "unsubscribe"
@@ -77,6 +78,7 @@ func loginBody(millis int64) string {
 
 type respType string
 
+const pongRespType respType = "pong"
 const errRespType respType = "error"
 const subscribedRespType respType = "subscribed"
 const unsubscribedRespType respType = "unsubscribed"

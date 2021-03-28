@@ -11,10 +11,18 @@ type messageHandler struct {
 }
 
 func (h *messageHandler) handleMessage(message []byte) {
-	logger.Infof("raw: %+v", string(message))
 	var r websocketResponse
 	if err := json.Unmarshal(message, &r); err != nil {
 		logger.WithError(err).Errorf("failed to unmarshal resp: %s", string(message))
+		return
+	}
+
+	if r.Type == errRespType {
+		logger.Errorf("receives err: %+v", r)
+		return
+	}
+
+	if r.Type == pongRespType {
 		return
 	}
 
@@ -26,11 +34,7 @@ func (h *messageHandler) handleMessage(message []byte) {
 	case privateTradesChannel:
 		h.handleTrades(r)
 	default:
-		if r.Type != errRespType {
-			logger.Errorf("unsupported message type: %+v", r.Type)
-			return
-		}
-		logger.Errorf("received err: %s", r.toErrResponse())
+		logger.Warnf("unsupported message type: %+v", r.Type)
 	}
 }
 
