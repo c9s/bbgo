@@ -11,6 +11,7 @@ type messageHandler struct {
 }
 
 func (h *messageHandler) handleMessage(message []byte) {
+	logger.Infof("raw: %+v", string(message))
 	var r websocketResponse
 	if err := json.Unmarshal(message, &r); err != nil {
 		logger.WithError(err).Errorf("failed to unmarshal resp: %s", string(message))
@@ -22,6 +23,8 @@ func (h *messageHandler) handleMessage(message []byte) {
 		h.handleOrderBook(r)
 	case privateOrdersChannel:
 		h.handlePrivateOrders(r)
+	case privateTradesChannel:
+		h.handleTrades(r)
 	default:
 		if r.Type != errRespType {
 			logger.Errorf("unsupported message type: %+v", r.Type)
@@ -92,4 +95,24 @@ func (h *messageHandler) handlePrivateOrders(response websocketResponse) {
 		return
 	}
 	h.EmitOrderUpdate(globalOrder)
+}
+
+func (h *messageHandler) handleTrades(response websocketResponse) {
+	if response.Type == subscribedRespType {
+		h.handleSubscribedMessage(response)
+		return
+	}
+
+	r, err := response.toTradeUpdateResponse()
+	if err != nil {
+		logger.WithError(err).Errorf("failed to convert the trade update response")
+		return
+	}
+
+	t, err := toGlobalTrade(r.Data)
+	if err != nil {
+		logger.WithError(err).Errorf("failed to convert trade update to global trade ")
+		return
+	}
+	h.EmitTradeUpdate(t)
 }
