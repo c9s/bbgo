@@ -21,6 +21,7 @@ func (h *messageHandler) handleMessage(message []byte) {
 	case orderBookChannel:
 		h.handleOrderBook(r)
 	case privateOrdersChannel:
+		h.handlePrivateOrders(r)
 	default:
 		logger.Errorf("unsupported message type: %+v", r.Type)
 	}
@@ -33,7 +34,7 @@ func (h messageHandler) handleSubscribedMessage(response websocketResponse) {
 		logger.WithError(err).Errorf("failed to convert the subscribed message")
 		return
 	}
-	logger.Infof("%s %s is subscribed", r.Market, r.Channel)
+	logger.Info(r)
 }
 
 func (h *messageHandler) handleOrderBook(response websocketResponse) {
@@ -67,4 +68,24 @@ func (h *messageHandler) handleOrderBook(response websocketResponse) {
 		logger.Errorf("unsupported order book data type %s", r.Type)
 		return
 	}
+}
+
+func (h *messageHandler) handlePrivateOrders(response websocketResponse) {
+	if response.Type == subscribedRespType {
+		h.handleSubscribedMessage(response)
+		return
+	}
+
+	r, err := response.toOrderUpdateResponse()
+	if err != nil {
+		logger.WithError(err).Errorf("failed to convert the order update response")
+		return
+	}
+
+	globalOrder, err := toGlobalOrder(r.Data)
+	if err != nil {
+		logger.WithError(err).Errorf("failed to convert order update to global order")
+		return
+	}
+	h.EmitOrderUpdate(globalOrder)
 }
