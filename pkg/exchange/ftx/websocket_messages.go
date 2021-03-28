@@ -129,7 +129,7 @@ Private:
 	order: {"type": "subscribed", "channel": "orders"}
 
 Public
-	ordeerbook: {"type": "subscribed", "channel": "orderbook", "market": "BTC/USDT"}
+	orderbook: {"type": "subscribed", "channel": "orderbook", "market": "BTC/USDT"}
 
 */
 type subscribedResponse struct {
@@ -152,6 +152,23 @@ func (r websocketResponse) toSubscribedResponse() (subscribedResponse, error) {
 		mandatoryFields: r.mandatoryFields,
 		Market:          r.Market,
 	}, nil
+}
+
+// {"type": "error", "code": 400, "msg": "Already logged in"}
+type errResponse struct {
+	Code    int64  `json:"code"`
+	Message string `json:"msg"`
+}
+
+func (e errResponse) String() string {
+	return fmt.Sprintf("%d: %s", e.Code, e.Message)
+}
+
+func (r websocketResponse) toErrResponse() errResponse {
+	return errResponse{
+		Code:    r.Code,
+		Message: r.Message,
+	}
 }
 
 func (r websocketResponse) toPublicOrderBookResponse() (orderBookResponse, error) {
