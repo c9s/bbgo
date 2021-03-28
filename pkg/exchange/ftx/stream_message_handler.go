@@ -23,7 +23,11 @@ func (h *messageHandler) handleMessage(message []byte) {
 	case privateOrdersChannel:
 		h.handlePrivateOrders(r)
 	default:
-		logger.Errorf("unsupported message type: %+v", r.Type)
+		if r.Type != errRespType {
+			logger.Errorf("unsupported message type: %+v", r.Type)
+			return
+		}
+		logger.Errorf("received err: %s", r.toErrResponse())
 	}
 }
 
