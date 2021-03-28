@@ -50,6 +50,10 @@ func (s *Stream) subscribePrivateEvents() {
 		Operation: subscribe,
 		Channel:   privateOrdersChannel,
 	})
+	s.wsService.Subscribe(websocketRequest{
+		Operation: subscribe,
+		Channel:   privateTradesChannel,
+	})
 }
 
 func (s *Stream) SetPublicOnly() {
