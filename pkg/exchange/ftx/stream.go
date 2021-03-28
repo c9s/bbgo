@@ -25,6 +25,7 @@ type Stream struct {
 	key    string
 	secret string
 
+	// subscriptions are only accessed in single goroutine environment, so I don't use mutex to protect them
 	subscriptions []websocketRequest
 }
 
@@ -38,12 +39,15 @@ func NewStream(key, secret string) *Stream {
 
 	s.ws.OnMessage((&messageHandler{StandardStream: s.StandardStream}).handleMessage)
 	s.ws.OnConnected(func(conn *websocket.Conn) {
-		for _, sub := range s.subscriptions {
+		subs := []websocketRequest{newLoginRequest(s.key, s.secret, time.Now())}
+		subs = append(subs, s.subscriptions...)
+		for _, sub := range subs {
 			if err := conn.WriteJSON(sub); err != nil {
 				s.ws.EmitError(fmt.Errorf("failed to send subscription: %+v", sub))
 			}
 		}
 	})
+
 	return s
 }
 
@@ -58,13 +62,29 @@ func (s *Stream) Connect(ctx context.Context) error {
 		return err
 	}
 
+	go func() {
+		// https://docs.ftx.com/?javascript#request-process
+		tk := time.NewTicker(15 * time.Second)
+		defer tk.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				if err := ctx.Err(); err != nil {
+					logger.WithError(err).Errorf("websocket ping goroutine is terminated")
+				}
+			case <-tk.C:
+				if err := s.ws.Conn().WriteJSON(websocketRequest{
+					Operation: ping,
+				}); err != nil {
+					logger.WithError(err).Warnf("failed to ping, try in next tick")
+				}
+			}
+		}
+	}()
 	return nil
 }
 
 func (s *Stream) subscribePrivateEvents() {
-	s.addSubscription(
-		newLoginRequest(s.key, s.secret, time.Now()),
-	)
 	s.addSubscription(websocketRequest{
 		Operation: subscribe,
 		Channel:   privateOrdersChannel,
