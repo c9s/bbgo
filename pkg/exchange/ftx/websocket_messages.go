@@ -113,7 +113,7 @@ type orderUpdateResponse struct {
 }
 
 func (r websocketResponse) toOrderUpdateResponse() (orderUpdateResponse, error) {
-	if r.Type != subscribedRespType || r.Channel != privateOrdersChannel {
+	if r.Channel != privateOrdersChannel {
 		return orderUpdateResponse{}, fmt.Errorf("type %s, channel %s: %w", r.Type, r.Channel, errUnsupportedConversion)
 	}
 	var o orderUpdateResponse
@@ -136,6 +136,10 @@ type subscribedResponse struct {
 	mandatoryFields
 
 	Market string `json:"market"`
+}
+
+func (s subscribedResponse) String() string {
+	return fmt.Sprintf("`%s` channel is subsribed", strings.TrimSpace(fmt.Sprintf("%s %s", s.Market, s.Channel)))
 }
 
 // {"type": "subscribed", "channel": "orderbook", "market": "BTC/USDT"}
