@@ -66,7 +66,7 @@ var orderbookCmd = &cobra.Command{
 	},
 }
 
-// go run ./cmd/bbgo orderupdate
+// go run ./cmd/bbgo orderupdate --session=ftx
 var orderUpdateCmd = &cobra.Command{
 	Use: "orderupdate",
 	RunE: func(cmd *cobra.Command, args []string) error {

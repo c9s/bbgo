@@ -23,6 +23,7 @@ type channel string
 
 const orderBookChannel channel = "orderbook"
 const privateOrdersChannel channel = "orders"
+const privateTradesChannel channel = "fills"
 
 var errUnsupportedConversion = fmt.Errorf("unsupported conversion")
 
@@ -122,6 +123,24 @@ func (r websocketResponse) toOrderUpdateResponse() (orderUpdateResponse, error) 
 	}
 	o.mandatoryFields = r.mandatoryFields
 	return o, nil
+}
+
+type tradeUpdateResponse struct {
+	mandatoryFields
+
+	Data fill `json:"data"`
+}
+
+func (r websocketResponse) toTradeUpdateResponse() (tradeUpdateResponse, error) {
+	if r.Channel != privateTradesChannel {
+		return tradeUpdateResponse{}, fmt.Errorf("type %s, channel %s: %w", r.Type, r.Channel, errUnsupportedConversion)
+	}
+	var t tradeUpdateResponse
+	if err := json.Unmarshal(r.Data, &t.Data); err != nil {
+		return tradeUpdateResponse{}, err
+	}
+	t.mandatoryFields = r.mandatoryFields
+	return t, nil
 }
 
 /*
