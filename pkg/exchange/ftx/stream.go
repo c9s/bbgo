@@ -54,7 +54,6 @@ func NewStream(key, secret string) *Stream {
 func (s *Stream) Connect(ctx context.Context) error {
 	// If it's not public only, let's do the authentication.
 	if atomic.LoadInt32(&s.publicOnly) == 0 {
-		logger.Infof("subscribe private events")
 		s.subscribePrivateEvents()
 	}
 
@@ -105,8 +104,7 @@ func (s *Stream) SetPublicOnly() {
 
 func (s *Stream) Subscribe(channel types.Channel, symbol string, _ types.SubscribeOptions) {
 	if channel != types.BookChannel {
-		logger.Errorf("only support orderbook channel")
-		return
+		panic("only support book channel now")
 	}
 	s.addSubscription(websocketRequest{
 		Operation: subscribe,
