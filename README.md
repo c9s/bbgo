@@ -47,6 +47,9 @@ bash <(curl -s https://raw.githubusercontent.com/c9s/bbgo/main/scripts/setup-gri
 ### Install and Run from the One-click Linode StackScript:
 
 - BBGO USDT/TWD Market Grid Trading <https://cloud.linode.com/stackscripts/793380>
+- BBGO USDC/TWD Market Grid Trading <https://cloud.linode.com/stackscripts/797776>
+- BBGO LINK/TWD Market Grid Trading <https://cloud.linode.com/stackscripts/797774>
+- BBGO USDC/USDT Market Grid Trading <https://cloud.linode.com/stackscripts/797777>
 - BBGO Standard Grid Trading <https://cloud.linode.com/stackscripts/795788>
 
 ### Install from source
