@@ -350,7 +350,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 	})
 
-	session.Stream.OnConnect(func() {
+	session.Stream.OnStart(func() {
 		log.Infof("connected, submitting the first round of the orders")
 		s.updateOrders(orderExecutor, session)
 	})
