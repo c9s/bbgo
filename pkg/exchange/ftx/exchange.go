@@ -142,7 +142,51 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 }
 
 func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
-	panic("implement me")
+	var since, until time.Time
+	if options.StartTime != nil {
+		since = *options.StartTime
+	}
+	if options.EndTime != nil {
+		until = *options.EndTime
+	} else {
+		until = time.Now()
+	}
+	if since.After(until) {
+		return nil, fmt.Errorf("invalid query klines time range, since: %+v, until: %+v", since, until)
+	}
+	if !isIntervalSupportedInKLine(interval) {
+		return nil, fmt.Errorf("interval %s is not supported", interval.String())
+	}
+	resp, err := e.newRest().HistoricalPrices(ctx, symbol, interval, int64(options.Limit), since, until)
+	if err != nil {
+		return nil, err
+	}
+	if !resp.Success {
+		return nil, fmt.Errorf("ftx returns failure")
+	}
+
+	var kline []types.KLine
+	for _, r := range resp.Result {
+		globalKline, err := toGlobalKLine(symbol, interval, r)
+		if err != nil {
+			return nil, err
+		}
+		kline = append(kline, globalKline)
+	}
+	return kline, nil
+}
+
+func isIntervalSupportedInKLine(interval types.Interval) bool {
+	_, ok := map[int]struct{}{
+		15:    {},
+		60:    {},
+		300:   {},
+		900:   {},
+		3600:  {},
+		14400: {},
+		86400: {},
+	}[interval.Minutes()*60]
+	return ok
 }
 
 func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) ([]types.Trade, error) {
@@ -245,10 +289,6 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 		}
 	}
 	return
-}
-
-func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (allWithdraws []types.Withdraw, err error) {
-	panic("implement me")
 }
 
 func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (types.OrderSlice, error) {
