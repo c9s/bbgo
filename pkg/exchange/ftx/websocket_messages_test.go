@@ -15,23 +15,28 @@ import (
 
 func Test_rawResponse_toSubscribedResp(t *testing.T) {
 	input := `{"type": "subscribed", "channel": "orderbook", "market": "BTC/USDT"}`
-	var m rawResponse
+	var m websocketResponse
 	assert.NoError(t, json.Unmarshal([]byte(input), &m))
-	r := m.toSubscribedResp()
-	assert.Equal(t, subscribedRespType, r.Type)
-	assert.Equal(t, orderbook, r.Channel)
-	assert.Equal(t, "BTC/USDT", r.Market)
+	r, err := m.toSubscribedResponse()
+	assert.NoError(t, err)
+	assert.Equal(t, subscribedResponse{
+		mandatoryFields: mandatoryFields{
+			Channel: orderBookChannel,
+			Type:    subscribedRespType,
+		},
+		Market: "BTC/USDT",
+	}, r)
 }
 
-func Test_rawResponse_toDataResponse(t *testing.T) {
+func Test_websocketResponse_toPublicOrderBookResponse(t *testing.T) {
 	f, err := ioutil.ReadFile("./orderbook_snapshot.json")
 	assert.NoError(t, err)
-	var m rawResponse
+	var m websocketResponse
 	assert.NoError(t, json.Unmarshal(f, &m))
-	r, err := m.toOrderBookResponse()
+	r, err := m.toPublicOrderBookResponse()
 	assert.NoError(t, err)
 	assert.Equal(t, partialRespType, r.Type)
-	assert.Equal(t, orderbook, r.Channel)
+	assert.Equal(t, orderBookChannel, r.Channel)
 	assert.Equal(t, "BTC/USDT", r.Market)
 	assert.Equal(t, int64(1614520368), r.Timestamp.Unix())
 	assert.Equal(t, uint32(2150525410), r.Checksum)
@@ -46,9 +51,9 @@ func Test_rawResponse_toDataResponse(t *testing.T) {
 func Test_orderBookResponse_toGlobalOrderBook(t *testing.T) {
 	f, err := ioutil.ReadFile("./orderbook_snapshot.json")
 	assert.NoError(t, err)
-	var m rawResponse
+	var m websocketResponse
 	assert.NoError(t, json.Unmarshal(f, &m))
-	r, err := m.toOrderBookResponse()
+	r, err := m.toPublicOrderBookResponse()
 	assert.NoError(t, err)
 
 	b, err := toGlobalOrderBook(r)
@@ -120,9 +125,9 @@ func Test_orderBookResponse_verifyChecksum(t *testing.T) {
 	for _, file := range []string{"./orderbook_snapshot.json"} {
 		f, err := ioutil.ReadFile(file)
 		assert.NoError(t, err)
-		var m rawResponse
+		var m websocketResponse
 		assert.NoError(t, json.Unmarshal(f, &m))
-		r, err := m.toOrderBookResponse()
+		r, err := m.toPublicOrderBookResponse()
 		assert.NoError(t, err)
 		assert.NoError(t, r.verifyChecksum(), "filename: "+file)
 	}
@@ -181,4 +186,63 @@ func Test_newLoginRequest(t *testing.T) {
 	jsonStr, err := json.Marshal(r)
 	assert.NoError(t, err)
 	assert.True(t, strings.Contains(string(jsonStr), expectedSignature))
+}
+
+func Test_websocketResponse_toOrderUpdateResponse(t *testing.T) {
+	input := []byte(`
+{
+  "channel": "orders",
+  "type": "update",
+  "data": {
+    "id": 12345,
+    "clientId": "test-client-id",
+    "market": "SOL/USD",
+    "type": "limit",
+    "side": "buy",
+    "price": 0.5,
+    "size": 100.0,
+    "status": "closed",
+    "filledSize": 0.0,
+    "remainingSize": 0.0,
+    "reduceOnly": false,
+    "liquidation": false,
+    "avgFillPrice": null,
+    "postOnly": false,
+    "ioc": false,
+    "createdAt": "2021-03-27T11:00:36.418674+00:00"
+  }
+}
+`)
+
+	var raw websocketResponse
+	assert.NoError(t, json.Unmarshal(input, &raw))
+
+	r, err := raw.toOrderUpdateResponse()
+	assert.NoError(t, err)
+
+	assert.Equal(t, orderUpdateResponse{
+		mandatoryFields: mandatoryFields{
+			Channel: privateOrdersChannel,
+			Type:    updateRespType,
+		},
+		Data: order{
+			ID:            12345,
+			ClientId:      "test-client-id",
+			Market:        "SOL/USD",
+			Type:          "limit",
+			Side:          "buy",
+			Price:         0.5,
+			Size:          100,
+			Status:        "closed",
+			FilledSize:    0.0,
+			RemainingSize: 0.0,
+			ReduceOnly:    false,
+			Liquidation:   false,
+			AvgFillPrice:  0,
+			PostOnly:      false,
+			Ioc:           false,
+			CreatedAt:     datetime{Time: mustParseDatetime("2021-03-27T11:00:36.418674+00:00")},
+			Future:        "",
+		},
+	}, r)
 }

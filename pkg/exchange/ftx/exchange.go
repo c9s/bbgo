@@ -152,10 +152,14 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	}
 	if options.EndTime != nil {
 		until = *options.EndTime
+	} else {
+		until = time.Now()
 	}
-	if err := verifySinceUntil(since, until); err != nil {
-		return nil, err
+
+	if since.After(until) {
+		return nil, fmt.Errorf("invalid query trades time range, since: %+v, until: %+v", since, until)
 	}
+
 	if options.Limit == 1 {
 		// FTX doesn't provide pagination api, so we have to split the since/until time range into small slices, and paginate ourselves.
 		// If the limit is 1, we always get the same data from FTX.
@@ -213,8 +217,11 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 }
 
 func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since, until time.Time) (allDeposits []types.Deposit, err error) {
-	if err = verifySinceUntil(since, until); err != nil {
-		return nil, err
+	if until == (time.Time{}) {
+		until = time.Now()
+	}
+	if since.After(until) {
+		return nil, fmt.Errorf("invalid query deposit history time range, since: %+v, until: %+v", since, until)
 	}
 	asset = TrimUpperString(asset)
 
@@ -300,8 +307,11 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 // symbol, since and until are all optional. FTX can only query by order created time, not updated time.
 // FTX doesn't support lastOrderID, so we will query by the time range first, and filter by the lastOrderID.
 func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []types.Order, err error) {
-	if err := verifySinceUntil(since, until); err != nil {
-		return nil, err
+	if until == (time.Time{}) {
+		until = time.Now()
+	}
+	if since.After(until) {
+		return nil, fmt.Errorf("invalid query closed orders time range, since: %+v, until: %+v", since, until)
 	}
 
 	symbol = TrimUpperString(symbol)
@@ -367,17 +377,4 @@ func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticke
 
 func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[string]types.Ticker, error) {
 	panic("implement me")
-}
-
-func verifySinceUntil(since, until time.Time) error {
-	if since.After(until) {
-		return fmt.Errorf("since can't be greater than until")
-	}
-	if since == (time.Time{}) {
-		return fmt.Errorf("since not found")
-	}
-	if until == (time.Time{}) {
-		return fmt.Errorf("until not found")
-	}
-	return nil
 }
