@@ -15,16 +15,25 @@ import (
 
 type operation string
 
+const ping operation = "ping"
 const login operation = "login"
 const subscribe operation = "subscribe"
 const unsubscribe operation = "unsubscribe"
 
 type channel string
 
-const orderbook channel = "orderbook"
-const trades channel = "trades"
-const ticker channel = "ticker"
+const orderBookChannel channel = "orderbook"
+const privateOrdersChannel channel = "orders"
+const privateTradesChannel channel = "fills"
 
+var errUnsupportedConversion = fmt.Errorf("unsupported conversion")
+
+/*
+Private:
+	order update: `{'op': 'subscribe', 'channel': 'orders'}`
+	login: `{"args": { "key": "<api_key>", "sign": "<signature>", "time": <ts> }, "op": "login" }`
+
+*/
 type websocketRequest struct {
 	Operation operation `json:"op"`
 
@@ -69,6 +78,7 @@ func loginBody(millis int64) string {
 
 type respType string
 
+const pongRespType respType = "pong"
 const errRespType respType = "error"
 const subscribedRespType respType = "subscribed"
 const unsubscribedRespType respType = "unsubscribed"
@@ -76,55 +86,138 @@ const infoRespType respType = "info"
 const partialRespType respType = "partial"
 const updateRespType respType = "update"
 
-type mandatoryFields struct {
-	Type respType `json:"type"`
+type websocketResponse struct {
+	mandatoryFields
 
-	// Channel is mandatory
+	optionalFields
+}
+
+type mandatoryFields struct {
 	Channel channel `json:"channel"`
 
-	// Market is mandatory
+	Type respType `json:"type"`
+}
+
+type optionalFields struct {
+	Market string `json:"market"`
+
+	// Example: {"type": "error", "code": 404, "msg": "No such market: BTCUSDT"}
+	Code int64 `json:"code"`
+
+	Message string `json:"msg"`
+
+	Data json.RawMessage `json:"data"`
+}
+
+type orderUpdateResponse struct {
+	mandatoryFields
+
+	Data order `json:"data"`
+}
+
+func (r websocketResponse) toOrderUpdateResponse() (orderUpdateResponse, error) {
+	if r.Channel != privateOrdersChannel {
+		return orderUpdateResponse{}, fmt.Errorf("type %s, channel %s: %w", r.Type, r.Channel, errUnsupportedConversion)
+	}
+	var o orderUpdateResponse
+	if err := json.Unmarshal(r.Data, &o.Data); err != nil {
+		return orderUpdateResponse{}, err
+	}
+	o.mandatoryFields = r.mandatoryFields
+	return o, nil
+}
+
+type tradeUpdateResponse struct {
+	mandatoryFields
+
+	Data fill `json:"data"`
+}
+
+func (r websocketResponse) toTradeUpdateResponse() (tradeUpdateResponse, error) {
+	if r.Channel != privateTradesChannel {
+		return tradeUpdateResponse{}, fmt.Errorf("type %s, channel %s: %w", r.Type, r.Channel, errUnsupportedConversion)
+	}
+	var t tradeUpdateResponse
+	if err := json.Unmarshal(r.Data, &t.Data); err != nil {
+		return tradeUpdateResponse{}, err
+	}
+	t.mandatoryFields = r.mandatoryFields
+	return t, nil
+}
+
+/*
+Private:
+	order: {"type": "subscribed", "channel": "orders"}
+
+Public
+	orderbook: {"type": "subscribed", "channel": "orderbook", "market": "BTC/USDT"}
+
+*/
+type subscribedResponse struct {
+	mandatoryFields
+
 	Market string `json:"market"`
 }
 
-// doc: https://docs.ftx.com/#response-format
-type rawResponse struct {
-	mandatoryFields
-
-	// The following fields are optional.
-	// Example 1: {"type": "error", "code": 404, "msg": "No such market: BTCUSDT"}
-	Code    int64           `json:"code"`
-	Message string          `json:"msg"`
-	Data    json.RawMessage `json:"data"`
+func (s subscribedResponse) String() string {
+	return fmt.Sprintf("`%s` channel is subsribed", strings.TrimSpace(fmt.Sprintf("%s %s", s.Market, s.Channel)))
 }
 
-func (r rawResponse) toSubscribedResp() subscribedResponse {
+// {"type": "subscribed", "channel": "orderbook", "market": "BTC/USDT"}
+func (r websocketResponse) toSubscribedResponse() (subscribedResponse, error) {
+	if r.Type != subscribedRespType {
+		return subscribedResponse{}, fmt.Errorf("type %s, channel %s: %w", r.Type, r.Channel, errUnsupportedConversion)
+	}
+
 	return subscribedResponse{
 		mandatoryFields: r.mandatoryFields,
+		Market:          r.Market,
+	}, nil
+}
+
+// {"type": "error", "code": 400, "msg": "Already logged in"}
+type errResponse struct {
+	Code    int64  `json:"code"`
+	Message string `json:"msg"`
+}
+
+func (e errResponse) String() string {
+	return fmt.Sprintf("%d: %s", e.Code, e.Message)
+}
+
+func (r websocketResponse) toErrResponse() errResponse {
+	return errResponse{
+		Code:    r.Code,
+		Message: r.Message,
 	}
 }
 
-func (r rawResponse) toOrderBookResponse() (orderBookResponse, error) {
-	o := orderBookResponse{
-		mandatoryFields: r.mandatoryFields,
+func (r websocketResponse) toPublicOrderBookResponse() (orderBookResponse, error) {
+	if r.Channel != orderBookChannel {
+		return orderBookResponse{}, fmt.Errorf("type %s, channel %s: %w", r.Type, r.Channel, errUnsupportedConversion)
 	}
 
+	var o orderBookResponse
 	if err := json.Unmarshal(r.Data, &o); err != nil {
 		return orderBookResponse{}, err
 	}
 
-	sec, dec := math.Modf(o.Time)
-	o.Timestamp = time.Unix(int64(sec), int64(dec*1e9))
+	o.mandatoryFields = r.mandatoryFields
+	o.Market = r.Market
+	o.Timestamp = nanoToTime(o.Time)
 
 	return o, nil
 }
 
-// {"type": "subscribed", "channel": "orderbook", "market": "BTC/USDT"}
-type subscribedResponse struct {
-	mandatoryFields
+func nanoToTime(input float64) time.Time {
+	sec, dec := math.Modf(input)
+	return time.Unix(int64(sec), int64(dec*1e9))
 }
 
 type orderBookResponse struct {
 	mandatoryFields
+
+	Market string `json:"market"`
 
 	Action string `json:"action"`
 

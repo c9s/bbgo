@@ -3,8 +3,6 @@ package ftx
 import (
 	"encoding/json"
 
-	log "github.com/sirupsen/logrus"
-
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -13,56 +11,64 @@ type messageHandler struct {
 }
 
 func (h *messageHandler) handleMessage(message []byte) {
-	log.Infof("raw: %s", string(message))
-	var r rawResponse
+	var r websocketResponse
 	if err := json.Unmarshal(message, &r); err != nil {
 		logger.WithError(err).Errorf("failed to unmarshal resp: %s", string(message))
 		return
 	}
 
-	switch r.Type {
-	case subscribedRespType:
-		h.handleSubscribedMessage(r)
-	case partialRespType, updateRespType:
-		h.handleMarketData(r)
-	default:
-		logger.Errorf("unsupported message type: %+v", r.Type)
+	if r.Type == errRespType {
+		logger.Errorf("receives err: %+v", r)
+		return
 	}
-}
 
-// {"type": "subscribed", "channel": "orderbook", "market": "BTC/USDT"}
-func (h messageHandler) handleSubscribedMessage(response rawResponse) {
-	r := response.toSubscribedResp()
-	logger.Infof("%s %s is subscribed", r.Market, r.Channel)
-}
-
-func (h *messageHandler) handleMarketData(response rawResponse) {
-	r, err := response.toOrderBookResponse()
-	if err != nil {
-		log.WithError(err).Errorf("failed to convert the partial response to data response")
+	if r.Type == pongRespType {
 		return
 	}
 
 	switch r.Channel {
-	case orderbook:
+	case orderBookChannel:
 		h.handleOrderBook(r)
+	case privateOrdersChannel:
+		h.handlePrivateOrders(r)
+	case privateTradesChannel:
+		h.handleTrades(r)
 	default:
-		log.Errorf("unsupported market data channel %s", r.Channel)
-		return
+		logger.Warnf("unsupported message type: %+v", r.Type)
 	}
 }
 
-func (h *messageHandler) handleOrderBook(r orderBookResponse) {
+// {"type": "subscribed", "channel": "orderbook", "market": "BTC/USDT"}
+func (h messageHandler) handleSubscribedMessage(response websocketResponse) {
+	r, err := response.toSubscribedResponse()
+	if err != nil {
+		logger.WithError(err).Errorf("failed to convert the subscribed message")
+		return
+	}
+	logger.Info(r)
+}
+
+func (h *messageHandler) handleOrderBook(response websocketResponse) {
+	if response.Type == subscribedRespType {
+		h.handleSubscribedMessage(response)
+		return
+	}
+	r, err := response.toPublicOrderBookResponse()
+	if err != nil {
+		logger.WithError(err).Errorf("failed to convert the public orderbook")
+		return
+	}
+
 	globalOrderBook, err := toGlobalOrderBook(r)
 	if err != nil {
-		log.WithError(err).Errorf("failed to generate orderbook snapshot")
+		logger.WithError(err).Errorf("failed to generate orderbook snapshot")
 		return
 	}
 
 	switch r.Type {
 	case partialRespType:
 		if err := r.verifyChecksum(); err != nil {
-			log.WithError(err).Errorf("invalid orderbook snapshot")
+			logger.WithError(err).Errorf("invalid orderbook snapshot")
 			return
 		}
 		h.EmitBookSnapshot(globalOrderBook)
@@ -70,7 +76,47 @@ func (h *messageHandler) handleOrderBook(r orderBookResponse) {
 		// emit updates, not the whole orderbook
 		h.EmitBookUpdate(globalOrderBook)
 	default:
-		log.Errorf("unsupported order book data type %s", r.Type)
+		logger.Errorf("unsupported order book data type %s", r.Type)
 		return
 	}
+}
+
+func (h *messageHandler) handlePrivateOrders(response websocketResponse) {
+	if response.Type == subscribedRespType {
+		h.handleSubscribedMessage(response)
+		return
+	}
+
+	r, err := response.toOrderUpdateResponse()
+	if err != nil {
+		logger.WithError(err).Errorf("failed to convert the order update response")
+		return
+	}
+
+	globalOrder, err := toGlobalOrder(r.Data)
+	if err != nil {
+		logger.WithError(err).Errorf("failed to convert order update to global order")
+		return
+	}
+	h.EmitOrderUpdate(globalOrder)
+}
+
+func (h *messageHandler) handleTrades(response websocketResponse) {
+	if response.Type == subscribedRespType {
+		h.handleSubscribedMessage(response)
+		return
+	}
+
+	r, err := response.toTradeUpdateResponse()
+	if err != nil {
+		logger.WithError(err).Errorf("failed to convert the trade update response")
+		return
+	}
+
+	t, err := toGlobalTrade(r.Data)
+	if err != nil {
+		logger.WithError(err).Errorf("failed to convert trade update to global trade ")
+		return
+	}
+	h.EmitTradeUpdate(t)
 }
