@@ -198,6 +198,35 @@ type market struct {
 	VolumeUsd24h          float64 `json:"volumeUsd24h"`
 }
 
+/*
+{
+  "success": true,
+  "result": [
+    {
+      "close": 11055.25,
+      "high": 11089.0,
+      "low": 11043.5,
+      "open": 11059.25,
+      "startTime": "2019-06-24T17:15:00+00:00",
+      "volume": 464193.95725
+    }
+  ]
+}
+*/
+type HistoricalPricesResponse struct {
+	Success bool     `json:"success"`
+	Result  []Candle `json:"result"`
+}
+
+type Candle struct {
+	Close     float64  `json:"close"`
+	High      float64  `json:"high"`
+	Low       float64  `json:"low"`
+	Open      float64  `json:"open"`
+	StartTime datetime `json:"startTime"`
+	Volume    float64  `json:"volume"`
+}
+
 type ordersHistoryResponse struct {
 	Success     bool    `json:"success"`
 	Result      []order `json:"result"`
