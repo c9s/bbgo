@@ -176,16 +176,18 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 	return kline, nil
 }
 
+var supportedInterval = map[int]struct{}{
+	15:    {},
+	60:    {},
+	300:   {},
+	900:   {},
+	3600:  {},
+	14400: {},
+	86400: {},
+}
+
 func isIntervalSupportedInKLine(interval types.Interval) bool {
-	_, ok := map[int]struct{}{
-		15:    {},
-		60:    {},
-		300:   {},
-		900:   {},
-		3600:  {},
-		14400: {},
-		86400: {},
-	}[interval.Minutes()*60]
+	_, ok := supportedInterval[interval.Minutes()*60]
 	return ok
 }
 
