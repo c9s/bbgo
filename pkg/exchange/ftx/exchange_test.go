@@ -416,7 +416,7 @@ func TestExchange_QueryMarkets(t *testing.T) {
 
 	assert.Len(t, resp, 1)
 	assert.Equal(t, types.Market{
-		Symbol:          "BTC/USD",
+		Symbol:          "BTCUSD",
 		PricePrecision:  0,
 		VolumePrecision: 4,
 		QuoteCurrency:   "USD",
@@ -424,7 +424,7 @@ func TestExchange_QueryMarkets(t *testing.T) {
 		MinQuantity:     0.001,
 		StepSize:        0.0001,
 		TickSize:        1,
-	}, resp["BTC/USD"])
+	}, resp["BTCUSD"])
 }
 
 func TestExchange_QueryDepositHistory(t *testing.T) {
@@ -606,7 +606,7 @@ func TestExchange_QueryTrades(t *testing.T) {
 			Price:         672.5,
 			Quantity:      1.0,
 			QuoteQuantity: 672.5 * 1.0,
-			Symbol:        "TSLA/USD",
+			Symbol:        "TSLAUSD",
 			Side:          types.SideTypeSell,
 			IsBuyer:       false,
 			IsMaker:       true,
@@ -619,4 +619,20 @@ func TestExchange_QueryTrades(t *testing.T) {
 			PnL:           sql.NullFloat64{},
 		}, trades[0])
 	})
+}
+
+func Test_isIntervalSupportedInKLine(t *testing.T) {
+	supportedIntervals := []types.Interval{
+		types.Interval1m,
+		types.Interval5m,
+		types.Interval15m,
+		types.Interval1h,
+		types.Interval4h,
+		types.Interval1d,
+	}
+	for _, i := range supportedIntervals {
+		assert.True(t, isIntervalSupportedInKLine(i))
+	}
+	assert.False(t, isIntervalSupportedInKLine(types.Interval30m))
+	assert.False(t, isIntervalSupportedInKLine(types.Interval3d))
 }
