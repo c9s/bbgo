@@ -17,7 +17,7 @@ func toGlobalCurrency(original string) string {
 }
 
 func toGlobalSymbol(original string) string {
-	return TrimUpperString(original)
+	return strings.ReplaceAll(TrimUpperString(original), "/", "")
 }
 
 func TrimUpperString(original string) string {
@@ -127,5 +127,21 @@ func toGlobalTrade(f fill) (types.Trade, error) {
 		FeeCurrency:   f.FeeCurrency,
 		IsMargin:      false,
 		IsIsolated:    false,
+	}, nil
+}
+
+func toGlobalKLine(symbol string, interval types.Interval, h Candle) (types.KLine, error) {
+	return types.KLine{
+		Exchange:  types.ExchangeFTX.String(),
+		Symbol:    toGlobalSymbol(symbol),
+		StartTime: h.StartTime.Time,
+		EndTime:   h.StartTime.Add(interval.Duration()),
+		Interval:  interval,
+		Open:      h.Open,
+		Close:     h.Close,
+		High:      h.High,
+		Low:       h.Low,
+		Volume:    h.Volume,
+		Closed:    true,
 	}, nil
 }
