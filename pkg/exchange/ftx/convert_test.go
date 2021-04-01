@@ -96,3 +96,7 @@ func TestTrimLowerString(t *testing.T) {
 		})
 	}
 }
+
+func Test_toGlobalSymbol(t *testing.T) {
+	assert.Equal(t, "BTCUSDT", toGlobalSymbol("BTC/USDT"))
+}
