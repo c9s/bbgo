@@ -416,7 +416,7 @@ func TestExchange_QueryMarkets(t *testing.T) {
 
 	assert.Len(t, resp, 1)
 	assert.Equal(t, types.Market{
-		Symbol:          "BTC/USD",
+		Symbol:          "BTCUSD",
 		PricePrecision:  0,
 		VolumePrecision: 4,
 		QuoteCurrency:   "USD",
@@ -424,7 +424,7 @@ func TestExchange_QueryMarkets(t *testing.T) {
 		MinQuantity:     0.001,
 		StepSize:        0.0001,
 		TickSize:        1,
-	}, resp["BTC/USD"])
+	}, resp["BTCUSD"])
 }
 
 func TestExchange_QueryDepositHistory(t *testing.T) {
@@ -606,7 +606,7 @@ func TestExchange_QueryTrades(t *testing.T) {
 			Price:         672.5,
 			Quantity:      1.0,
 			QuoteQuantity: 672.5 * 1.0,
-			Symbol:        "TSLA/USD",
+			Symbol:        "TSLAUSD",
 			Side:          types.SideTypeSell,
 			IsBuyer:       false,
 			IsMaker:       true,
