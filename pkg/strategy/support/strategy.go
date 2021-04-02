@@ -44,6 +44,18 @@ func (s *Strategy) ID() string {
 	return ID
 }
 
+func (s *Strategy) Validate() error {
+	if s.Quantity == 0 && s.ScaleQuantity == nil {
+		return fmt.Errorf("quantity or scaleQuantity can not be zero")
+	}
+
+	if s.MinVolume == 0 {
+		return fmt.Errorf("minVolume can not be zero")
+	}
+
+	return nil
+}
+
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: string(s.Interval)})
 }
@@ -56,14 +68,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	if s.MovingAverageWindow == 0 {
 		s.MovingAverageWindow = 99
-	}
-
-	if s.Quantity == 0 && s.ScaleQuantity == nil {
-		return fmt.Errorf("quantity or scaleQuantity can not be zero")
-	}
-
-	if s.MinVolume == 0 {
-		return fmt.Errorf("minVolume can not be zero")
 	}
 
 	// buy when price drops -8%
