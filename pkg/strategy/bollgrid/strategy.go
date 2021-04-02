@@ -88,6 +88,18 @@ func (s *Strategy) ID() string {
 	return ID
 }
 
+func (s *Strategy) Validate() error {
+	if s.ProfitSpread <= 0 {
+		// If profitSpread is empty or its value is negative
+		return fmt.Errorf("profit spread should bigger than 0")
+	}
+	if s.Quantity <= 0 {
+		// If quantity is empty or its value is negative
+		return fmt.Errorf("quantity should bigger than 0")
+	}
+	return nil
+}
+
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	if s.Interval == "" {
 		panic("bollgrid interval can not be empty")
