@@ -106,6 +106,29 @@ func (s *Strategy) ID() string {
 	return ID
 }
 
+func (s *Strategy) Validate() error {
+	if s.UpperPrice == 0 {
+		return errors.New("upperPrice can not be zero, you forgot to set?")
+	}
+	if s.LowerPrice == 0 {
+		return errors.New("lowerPrice can not be zero, you forgot to set?")
+	}
+	if s.UpperPrice <= s.LowerPrice {
+		return fmt.Errorf("upperPrice (%f) should not be less than or equal to lowerPrice (%f)", s.UpperPrice.Float64(), s.LowerPrice.Float64())
+	}
+
+	if s.ProfitSpread <= 0 {
+		// If profitSpread is empty or its value is negative
+		return fmt.Errorf("profit spread should bigger than 0")
+	}
+
+	if s.Quantity == 0 && s.ScaleQuantity == nil {
+		return fmt.Errorf("quantity or scaleQuantity can not be zero")
+	}
+
+	return nil
+}
+
 func (s *Strategy) generateGridSellOrders(session *bbgo.ExchangeSession) ([]types.SubmitOrder, error) {
 	currentPriceFloat, ok := session.LastPrice(s.Symbol)
 	if !ok {
@@ -485,18 +508,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	if s.Side == "" {
 		s.Side = types.SideTypeBoth
-	}
-
-	if s.UpperPrice == 0 {
-		return errors.New("upperPrice can not be zero, you forgot to set?")
-	}
-
-	if s.LowerPrice == 0 {
-		return errors.New("lowerPrice can not be zero, you forgot to set?")
-	}
-
-	if s.UpperPrice <= s.LowerPrice {
-		return fmt.Errorf("upperPrice (%f) should not be less than or equal to lowerPrice (%f)", s.UpperPrice.Float64(), s.LowerPrice.Float64())
 	}
 
 	instanceID := fmt.Sprintf("grid-%s-%d-%d-%d", s.Symbol, s.GridNum, s.UpperPrice, s.LowerPrice)
