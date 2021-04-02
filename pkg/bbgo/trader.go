@@ -35,6 +35,10 @@ type CrossExchangeStrategy interface {
 	CrossRun(ctx context.Context, orderExecutionRouter OrderExecutionRouter, sessions map[string]*ExchangeSession) error
 }
 
+type Validator interface {
+	Validate() error
+}
+
 //go:generate callbackgen -type Graceful
 type Graceful struct {
 	shutdownCallbacks []func(ctx context.Context, wg *sync.WaitGroup)
@@ -232,6 +236,13 @@ func (trader *Trader) RunSingleExchangeStrategy(ctx context.Context, strategy Si
 					return errors.Wrapf(err, "failed to inject MarketDataStore on %T", strategy)
 				}
 			}
+		}
+	}
+
+	// If the strategy has Validate() method, run it and check the error
+	if v, ok := strategy.(Validator); ok {
+		if err := v.Validate(); err != nil {
+			return fmt.Errorf("failed to validate the config: %w", err)
 		}
 	}
 
