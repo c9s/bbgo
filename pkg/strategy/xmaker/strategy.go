@@ -50,12 +50,13 @@ type Strategy struct {
 	UpdateInterval types.Duration `json:"updateInterval"`
 	HedgeInterval  types.Duration `json:"hedgeInterval"`
 
-	Margin             fixedpoint.Value `json:"margin"`
-	BidMargin          fixedpoint.Value `json:"bidMargin"`
-	AskMargin          fixedpoint.Value `json:"askMargin"`
-	Quantity           fixedpoint.Value `json:"quantity"`
-	QuantityMultiplier fixedpoint.Value `json:"quantityMultiplier"`
-	DisableHedge       bool             `json:"disableHedge"`
+	Margin              fixedpoint.Value `json:"margin"`
+	BidMargin           fixedpoint.Value `json:"bidMargin"`
+	AskMargin           fixedpoint.Value `json:"askMargin"`
+	Quantity            fixedpoint.Value `json:"quantity"`
+	QuantityMultiplier  fixedpoint.Value `json:"quantityMultiplier"`
+	MaxExposurePosition fixedpoint.Value `json:"maxExposurePosition"`
+	DisableHedge        bool             `json:"disableHedge"`
 
 	NumLayers int `json:"numLayers"`
 	Pips      int `json:"pips"`
@@ -146,6 +147,18 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 		makerQuota.QuoteAsset.Add(b.Available)
 
 		if b.Available.Float64() <= s.makerMarket.MinNotional {
+			disableMakerBid = true
+		}
+	}
+
+	// if max exposure position is configured, we should not:
+	// 1. place bid orders when we already bought too much
+	// 2. place ask orders when we already sold too much
+	if s.MaxExposurePosition > 0 {
+		pos := s.state.HedgePosition.AtomicLoad()
+		if pos < -s.MaxExposurePosition {
+			disableMakerAsk = true
+		} else if pos > s.MaxExposurePosition {
 			disableMakerBid = true
 		}
 	}
@@ -481,4 +494,3 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 	return nil
 }
-
