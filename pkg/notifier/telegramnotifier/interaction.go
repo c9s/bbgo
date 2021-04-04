@@ -15,12 +15,14 @@ var log = logrus.WithField("service", "telegram")
 
 type Session struct {
 	Owner              *telebot.User `json:"owner"`
+	Chat               *telebot.Chat `json:"chat"`
 	OneTimePasswordKey *otp.Key      `json:"otpKey"`
 }
 
 func NewSession(key *otp.Key) Session {
 	return Session{
 		Owner:              nil,
+		Chat:               nil,
 		OneTimePasswordKey: key,
 	}
 }
@@ -60,14 +62,14 @@ func (it *Interaction) Session() *Session {
 }
 
 func (it *Interaction) HandleInfo(m *telebot.Message) {
-	if it.session.Owner == nil {
+	if it.session.Owner == nil || it.session.Chat == nil {
 		return
 	}
 
 	if m.Sender.ID != it.session.Owner.ID {
 		log.Warningf("incorrect user tried to access bot! sender: %+v", m.Sender)
 	} else {
-		if _, err := it.bot.Send(it.session.Owner,
+		if _, err := it.bot.Send(it.session.Chat,
 			fmt.Sprintf("Welcome! your username: %s, user ID: %d",
 				it.session.Owner.Username,
 				it.session.Owner.ID,
@@ -78,11 +80,11 @@ func (it *Interaction) HandleInfo(m *telebot.Message) {
 }
 
 func (it *Interaction) SendToOwner(message string) {
-	if it.session.Owner == nil {
+	if it.session.Chat == nil {
 		return
 	}
 
-	if _, err := it.bot.Send(it.session.Owner, message); err != nil {
+	if _, err := it.bot.Send(it.session.Chat, message); err != nil {
 		log.WithError(err).Error("failed to send message to the owner")
 	}
 }
@@ -93,7 +95,7 @@ help	- show this help message
 auth	- authorize current telegram user to access telegram bot with authentication token or one-time password. ex. /auth my-token
 info	- show information about current chat
 `
-	if _, err := it.bot.Send(m.Sender, message); err != nil {
+	if _, err := it.bot.Send(m.Chat, message); err != nil {
 		log.WithError(err).Error("failed to send help message")
 	}
 }
@@ -101,7 +103,9 @@ info	- show information about current chat
 func (it *Interaction) HandleAuth(m *telebot.Message) {
 	if len(it.AuthToken) > 0 && m.Payload == it.AuthToken {
 		it.session.Owner = m.Sender
-		if _, err := it.bot.Send(m.Sender, fmt.Sprintf("Hi %s, I know you, I will send you the notifications!", m.Sender.Username)); err != nil {
+		it.session.Chat = m.Chat
+
+		if _, err := it.bot.Send(m.Chat, fmt.Sprintf("Hi %s, I know you, I will send you the notifications!", m.Sender.Username)); err != nil {
 			log.WithError(err).Error("telegram send error")
 		}
 
@@ -115,8 +119,9 @@ func (it *Interaction) HandleAuth(m *telebot.Message) {
 
 		if totp.Validate(m.Payload, it.session.OneTimePasswordKey.Secret()) {
 			it.session.Owner = m.Sender
+			it.session.Chat = m.Chat
 
-			if _, err := it.bot.Send(m.Sender, fmt.Sprintf("Hi %s, I know you, I will send you the notifications!", m.Sender.Username)); err != nil {
+			if _, err := it.bot.Send(m.Chat, fmt.Sprintf("Hi %s, I know you, I will send you the notifications!", m.Sender.Username)); err != nil {
 				log.WithError(err).Error("telegram send error")
 			}
 
@@ -127,13 +132,13 @@ func (it *Interaction) HandleAuth(m *telebot.Message) {
 			it.EmitAuth(m.Sender)
 
 		} else {
-			if _, err := it.bot.Send(m.Sender, "Authorization failed. please check your auth token"); err != nil {
+			if _, err := it.bot.Send(m.Chat, "Authorization failed. please check your auth token"); err != nil {
 				log.WithError(err).Error("telegram send error")
 			}
 		}
 
 	} else {
-		if _, err := it.bot.Send(m.Sender, "Authorization failed. please check your auth token"); err != nil {
+		if _, err := it.bot.Send(m.Chat, "Authorization failed. please check your auth token"); err != nil {
 			log.WithError(err).Error("telegram send error")
 		}
 	}
@@ -142,8 +147,8 @@ func (it *Interaction) HandleAuth(m *telebot.Message) {
 func (it *Interaction) Start(session Session) {
 	it.session = &session
 
-	if it.session.Owner != nil {
-		if _, err := it.bot.Send(it.session.Owner, fmt.Sprintf("Hi %s, I'm back", it.session.Owner.Username)); err != nil {
+	if it.session.Owner != nil && it.session.Chat != nil {
+		if _, err := it.bot.Send(it.session.Chat, fmt.Sprintf("Hi %s, I'm back", it.session.Owner.Username)); err != nil {
 			log.WithError(err).Error("failed to send telegram message")
 		}
 	}
