@@ -72,11 +72,16 @@ var PnLCmd = &cobra.Command{
 		}
 
 		environ := bbgo.NewEnvironment()
+
 		if err := environ.ConfigureDatabase(ctx); err != nil {
 			return err
 		}
 
 		if err := environ.ConfigureExchangeSessions(userConfig); err != nil {
+			return err
+		}
+
+		if err := environ.Init(ctx) ; err != nil {
 			return err
 		}
 
