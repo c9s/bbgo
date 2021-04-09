@@ -533,6 +533,10 @@ func (environ *Environment) Sync(ctx context.Context) error {
 }
 
 func (environ *Environment) SyncSession(ctx context.Context, session *ExchangeSession, defaultSymbols ...string) error {
+	if environ.SyncService == nil {
+		return nil
+	}
+
 	environ.syncMutex.Lock()
 	defer environ.syncMutex.Unlock()
 
