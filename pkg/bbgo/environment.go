@@ -285,9 +285,6 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 			}
 		}
 
-		if err := session.InitSymbols(ctx, environ); err != nil {
-			return err
-		}
 	}
 
 	return nil
