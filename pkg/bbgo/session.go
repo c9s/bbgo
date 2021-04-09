@@ -267,18 +267,17 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 		session.lastPrices[kline.Symbol] = kline.Close
 	})
 
+	if err := session.initUsedSymbols(ctx, environ); err != nil {
+		return err
+	}
+
 	session.IsInitialized = true
 	return nil
 }
 
-// InitSymbols uses usedSymbols to initialize the related data structure
-func (session *ExchangeSession) InitSymbols(ctx context.Context, environ *Environment) error {
+// initUsedSymbols uses usedSymbols to initialize the related data structure
+func (session *ExchangeSession) initUsedSymbols(ctx context.Context, environ *Environment) error {
 	for symbol := range session.usedSymbols {
-		// skip initialized symbols
-		if _, ok := session.initializedSymbols[symbol]; ok {
-			continue
-		}
-
 		if err := session.InitSymbol(ctx, environ, symbol); err != nil {
 			return err
 		}
@@ -291,7 +290,8 @@ func (session *ExchangeSession) InitSymbols(ctx context.Context, environ *Enviro
 // please note, InitSymbol can not be called for the same symbol for twice
 func (session *ExchangeSession) InitSymbol(ctx context.Context, environ *Environment, symbol string) error {
 	if _, ok := session.initializedSymbols[symbol]; ok {
-		return fmt.Errorf("symbol %s is already initialized", symbol)
+		// return fmt.Errorf("symbol %s is already initialized", symbol)
+		return nil
 	}
 
 	market, ok := session.markets[symbol]
