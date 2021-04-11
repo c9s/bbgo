@@ -334,7 +334,7 @@ func toMaxSubmitOrder(o types.SubmitOrder) (*maxapi.Order, error) {
 	}
 
 	switch o.Type {
-	case types.OrderTypeStopLimit, types.OrderTypeLimit, types.OrderTypeLimitMaker:
+	case types.OrderTypeStopLimit, types.OrderTypeLimit, types.OrderTypeLimitMaker, types.OrderTypeIOCLimit:
 		priceInString := o.PriceString
 		if len(priceInString) == 0 {
 			if o.Market.Symbol != "" {
