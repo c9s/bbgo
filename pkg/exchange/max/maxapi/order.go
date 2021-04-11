@@ -36,6 +36,7 @@ const (
 	OrderTypePostOnly   = OrderType("post_only")
 	OrderTypeStopLimit  = OrderType("stop_limit")
 	OrderTypeStopMarket = OrderType("stop_market")
+	OrderTypeIOCLimit   = OrderType("ioc_limit")
 )
 
 type QueryOrderOptions struct {
