@@ -124,6 +124,9 @@ func toGlobalOrderType(orderType max.OrderType) types.OrderType {
 	case max.OrderTypeStopMarket:
 		return types.OrderTypeStopMarket
 
+	case max.OrderTypeIOCLimit:
+		return types.OrderTypeIOCLimit
+
 	}
 
 	logger.Errorf("unknown order type: %v", orderType)
