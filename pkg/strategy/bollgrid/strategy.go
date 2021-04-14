@@ -3,6 +3,7 @@ package bollgrid
 import (
 	"context"
 	"fmt"
+	"math"
 	"sync"
 
 	"github.com/sirupsen/logrus"
@@ -275,24 +276,30 @@ func (s *Strategy) updateOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.
 	s.activeOrders.Print()
 }
 
-func (s *Strategy) submitReverseOrder(order types.Order) {
+func (s *Strategy) submitReverseOrder(order types.Order, session *bbgo.ExchangeSession) {
+	balances := session.Account.Balances()
+
 	var side = order.Side.Reverse()
 	var price = order.Price
+	var quantity = order.Quantity
 
 	switch side {
 	case types.SideTypeSell:
 		price += s.ProfitSpread.Float64()
+		maxQuantity := balances[s.Market.BaseCurrency].Available.Float64()
+		quantity = math.Min(quantity, maxQuantity)
 
 	case types.SideTypeBuy:
 		price -= s.ProfitSpread.Float64()
-
+		maxQuantity := balances[s.Market.QuoteCurrency].Available.Float64() / price
+		quantity = math.Min(quantity, maxQuantity)
 	}
 
 	submitOrder := types.SubmitOrder{
 		Symbol:      s.Symbol,
 		Side:        side,
 		Type:        types.OrderTypeLimit,
-		Quantity:    order.Quantity,
+		Quantity:    quantity,
 		Price:       price,
 		TimeInForce: "GTC",
 	}
@@ -325,7 +332,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	// we don't persist orders so that we can not clear the previous orders for now. just need time to support this.
 	s.activeOrders = bbgo.NewLocalActiveOrderBook()
 	s.activeOrders.OnFilled(func(o types.Order) {
-		s.submitReverseOrder(o)
+		s.submitReverseOrder(o, session)
 	})
 	s.activeOrders.BindStream(session.Stream)
 
