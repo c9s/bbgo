@@ -538,6 +538,11 @@ func (e *Exchange) submitMarginOrder(ctx context.Context, order types.SubmitOrde
 	if len(order.TimeInForce) > 0 {
 		// TODO: check the TimeInForce value
 		req.TimeInForce(binance.TimeInForceType(order.TimeInForce))
+	} else {
+		switch order.Type {
+		case types.OrderTypeLimit, types.OrderTypeStopLimit:
+			req.TimeInForce(binance.TimeInForceTypeGTC)
+		}
 	}
 
 	response, err := req.Do(ctx)
@@ -614,6 +619,11 @@ func (e *Exchange) submitSpotOrder(ctx context.Context, order types.SubmitOrder)
 	if len(order.TimeInForce) > 0 {
 		// TODO: check the TimeInForce value
 		req.TimeInForce(binance.TimeInForceType(order.TimeInForce))
+	} else {
+		switch order.Type {
+		case types.OrderTypeLimit, types.OrderTypeStopLimit:
+			req.TimeInForce(binance.TimeInForceTypeGTC)
+		}
 	}
 
 	response, err := req.Do(ctx)
