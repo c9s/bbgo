@@ -317,11 +317,10 @@ func (s *Strategy) placeGridSellOrders(orderExecutor bbgo.OrderExecutor, session
 
 	if len(orderForms) > 0 {
 		createdOrders, err := orderExecutor.SubmitOrders(context.Background(), orderForms...)
+		s.activeOrders.Add(createdOrders...)
 		if err != nil {
 			return err
 		}
-
-		s.activeOrders.Add(createdOrders...)
 	}
 
 	return nil
@@ -335,10 +334,9 @@ func (s *Strategy) placeGridBuyOrders(orderExecutor bbgo.OrderExecutor, session 
 
 	if len(orderForms) > 0 {
 		createdOrders, err := orderExecutor.SubmitOrders(context.Background(), orderForms...)
+		s.activeOrders.Add(createdOrders...)
 		if err != nil {
 			return err
-		} else {
-			s.activeOrders.Add(createdOrders...)
 		}
 	}
 
@@ -431,10 +429,6 @@ func (s *Strategy) handleFilledOrder(filledOrder types.Order) {
 	log.Infof("submitting arbitrage order: %s against filled order %s", submitOrder.String(), filledOrder.String())
 
 	createdOrders, err := s.OrderExecutor.SubmitOrders(context.Background(), submitOrder)
-	if err != nil {
-		log.WithError(err).Errorf("can not place orders")
-		return
-	}
 
 	// create one-way link from the newly created orders
 	for _, o := range createdOrders {
@@ -443,6 +437,11 @@ func (s *Strategy) handleFilledOrder(filledOrder types.Order) {
 
 	s.orderStore.Add(createdOrders...)
 	s.activeOrders.Add(createdOrders...)
+
+	if err != nil {
+		log.WithError(err).Errorf("can not place orders")
+		return
+	}
 
 	// calculate arbitrage profit
 	// TODO: apply fee rate here
