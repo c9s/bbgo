@@ -240,20 +240,23 @@ func (s *Strategy) placeGridOrders(orderExecutor bbgo.OrderExecutor, session *bb
 	if err != nil {
 		log.Warn(err.Error())
 	}
+	createdSellOrders, err := orderExecutor.SubmitOrders(context.Background(), sellOrders...)
+	if err != nil {
+		log.WithError(err).Errorf("can not place sell orders")
+	}
+
 	buyOrders, err := s.generateGridBuyOrders(session)
 	if err != nil {
 		log.Warn(err.Error())
 	}
+	createdBuyOrders, err := orderExecutor.SubmitOrders(context.Background(), buyOrders...)
+	if err != nil {
+		log.WithError(err).Errorf("can not place buy orders")
+	}
 
-	orders := append(sellOrders, buyOrders...)
-
-	createdOrders, err := orderExecutor.SubmitOrders(context.Background(), orders...)
+	createdOrders := append(createdSellOrders, createdBuyOrders...)
 	s.activeOrders.Add(createdOrders...)
 	s.orders.Add(createdOrders...)
-
-	if err != nil {
-		log.WithError(err).Errorf("can not place orders")
-	}
 }
 
 func (s *Strategy) updateOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) {
