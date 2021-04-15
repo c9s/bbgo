@@ -240,18 +240,21 @@ func (s *Strategy) placeGridOrders(orderExecutor bbgo.OrderExecutor, session *bb
 	if err != nil {
 		log.Warn(err.Error())
 	}
+	createdSellOrders, err := orderExecutor.SubmitOrders(context.Background(), sellOrders...)
+	if err != nil {
+		log.WithError(err).Errorf("can not place sell orders")
+	}
+
 	buyOrders, err := s.generateGridBuyOrders(session)
 	if err != nil {
 		log.Warn(err.Error())
 	}
-
-	orders := append(sellOrders, buyOrders...)
-
-	createdOrders, err := orderExecutor.SubmitOrders(context.Background(), orders...)
+	createdBuyOrders, err := orderExecutor.SubmitOrders(context.Background(), buyOrders...)
 	if err != nil {
-		log.WithError(err).Errorf("can not place orders")
-		return
+		log.WithError(err).Errorf("can not place buy orders")
 	}
+
+	createdOrders := append(createdSellOrders, createdBuyOrders...)
 	s.activeOrders.Add(createdOrders...)
 	s.orders.Add(createdOrders...)
 }
@@ -347,7 +350,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 	})
 
-	session.Stream.OnConnect(func() {
+	session.Stream.OnStart(func() {
 		log.Infof("connected, submitting the first round of the orders")
 		s.updateOrders(orderExecutor, session)
 	})
