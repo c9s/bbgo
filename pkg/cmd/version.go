@@ -21,4 +21,3 @@ var VersionCmd = &cobra.Command{
 		fmt.Println(version.Version)
 	},
 }
-
