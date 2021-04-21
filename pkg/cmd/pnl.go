@@ -51,7 +51,6 @@ var PnLCmd = &cobra.Command{
 			return err
 		}
 
-
 		sessionName, err := cmd.Flags().GetString("session")
 		if err != nil {
 			return err
@@ -86,7 +85,7 @@ var PnLCmd = &cobra.Command{
 			return fmt.Errorf("session %s not found", sessionName)
 		}
 
-		if err := environ.SyncSession(ctx, session) ; err != nil {
+		if err := environ.SyncSession(ctx, session); err != nil {
 			return err
 		}
 
