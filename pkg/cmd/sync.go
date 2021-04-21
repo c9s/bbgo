@@ -50,7 +50,7 @@ var SyncCmd = &cobra.Command{
 		}
 
 		environ := bbgo.NewEnvironment()
-		if err := environ.ConfigureDatabase(ctx) ; err != nil {
+		if err := environ.ConfigureDatabase(ctx); err != nil {
 			return err
 		}
 
@@ -64,7 +64,7 @@ var SyncCmd = &cobra.Command{
 		)
 
 		if len(since) > 0 {
-			loc, err := time.LoadLocation("Asia/Taipei")
+			loc, err := time.LoadLocation("Local")
 			if err != nil {
 				return err
 			}
@@ -110,4 +110,3 @@ var SyncCmd = &cobra.Command{
 		return nil
 	},
 }
-

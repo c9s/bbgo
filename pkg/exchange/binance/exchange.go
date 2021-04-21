@@ -288,6 +288,14 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 
 func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since, until time.Time) (allDeposits []types.Deposit, err error) {
 	startTime := since
+
+	var emptyTime = time.Time{}
+	if startTime == emptyTime {
+		startTime, err = e.getLaunchDate()
+		if err != nil {
+			return nil, err
+		}
+	}
 	txIDs := map[string]struct{}{}
 	for startTime.Before(until) {
 
