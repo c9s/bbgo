@@ -412,6 +412,22 @@ func (session *ExchangeSession) StandardIndicatorSet(symbol string) (*StandardIn
 
 func (session *ExchangeSession) Position(symbol string) (pos *Position, ok bool) {
 	pos, ok = session.positions[symbol]
+	if ok {
+		return pos, ok
+	}
+
+	market, ok := session.markets[symbol]
+	if !ok {
+		return nil, false
+	}
+
+	pos = &Position{
+		Symbol:        symbol,
+		BaseCurrency:  market.BaseCurrency,
+		QuoteCurrency: market.QuoteCurrency,
+	}
+	ok = true
+	session.positions[symbol] = pos
 	return pos, ok
 }
 
