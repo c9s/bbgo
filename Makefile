@@ -63,7 +63,7 @@ dist-linux: bbgo-linux bbgo-slim-linux
 
 dist-darwin: bbgo-darwin bbgo-slim-darwin
 
-dist: version static migrations bbgo-linux bbgo-slim-linux bbgo-darwin bbgo-slim-darwin desktop
+dist: static migrations bbgo-linux bbgo-slim-linux bbgo-darwin bbgo-slim-darwin desktop
 	mkdir -p $(DIST_DIR)/$(GIT_DESC)
 	for arch in amd64 ; do \
 		for platform in linux darwin ; do \
