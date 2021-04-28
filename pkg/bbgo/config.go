@@ -387,7 +387,10 @@ func NewStrategyFromMap(id string, conf interface{}) (SingleExchangeStrategy, er
 func loadExchangeStrategies(config *Config, stash Stash) (err error) {
 	exchangeStrategiesConf, ok := stash["exchangeStrategies"]
 	if !ok {
-		return nil
+		exchangeStrategiesConf, ok = stash["strategies"]
+		if !ok {
+			return nil
+		}
 	}
 
 	if len(LoadedExchangeStrategies) == 0 {
