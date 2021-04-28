@@ -580,17 +580,39 @@ func (e *Exchange) submitMarginOrder(ctx context.Context, order types.SubmitOrde
 	return createdOrder, err
 }
 
+// BBGO is a broker on Binance
+const spotBrokerID = "NSUYEBKM"
+
+func newSpotClientOrderID(originalID string) (clientOrderID string) {
+	prefix := "x-" + spotBrokerID
+	prefixLen := len(prefix)
+
+	if originalID != "" {
+		// try to keep the whole original client order ID if user specifies it.
+		if prefixLen + len(originalID) > 32 {
+			return originalID
+		}
+
+		clientOrderID = prefix + originalID
+		return clientOrderID
+	}
+
+	clientOrderID = uuid.New().String()
+	clientOrderID = prefix + clientOrderID
+	if len(clientOrderID) > 32 {
+		return clientOrderID[0:32]
+	}
+
+	return clientOrderID
+}
+
 func (e *Exchange) submitSpotOrder(ctx context.Context, order types.SubmitOrder) (*types.Order, error) {
 	orderType, err := toLocalOrderType(order.Type)
 	if err != nil {
 		return nil, err
 	}
 
-	clientOrderID := uuid.New().String()
-	if len(order.ClientOrderID) > 0 {
-		clientOrderID = order.ClientOrderID
-	}
-
+	clientOrderID := newSpotClientOrderID(order.ClientOrderID)
 	req := e.Client.NewCreateOrderService().
 		Symbol(order.Symbol).
 		Side(binance.SideType(order.Side)).
