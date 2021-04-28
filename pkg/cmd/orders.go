@@ -163,24 +163,28 @@ var placeOrderCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("can't get side: %w", err)
 		}
+
 		price, err := cmd.Flags().GetString("price")
 		if err != nil {
 			return fmt.Errorf("can't get price: %w", err)
 		}
+
 		quantity, err := cmd.Flags().GetString("quantity")
 		if err != nil {
 			return fmt.Errorf("can't get quantity: %w", err)
 		}
 
 		so := types.SubmitOrder{
-			ClientOrderID: uuid.New().String(),
-			Symbol:        symbol,
-			Side:          types.SideType(ftx.TrimUpperString(side)),
-			Type:          types.OrderTypeLimit,
-			Quantity:      util.MustParseFloat(quantity),
-			Price:         util.MustParseFloat(price),
-			Market:        types.Market{Symbol: symbol},
-			TimeInForce:   "GTC",
+			ClientOrderID:  uuid.New().String(),
+			Symbol:         symbol,
+			Side:           types.SideType(ftx.TrimUpperString(side)),
+			Type:           types.OrderTypeLimit,
+			Quantity:       util.MustParseFloat(quantity),
+			QuantityString: quantity,
+			Price:          util.MustParseFloat(price),
+			PriceString:    price,
+			Market:         types.Market{Symbol: symbol},
+			TimeInForce:    "GTC",
 		}
 		co, err := session.Exchange.SubmitOrders(ctx, so)
 		if err != nil {
