@@ -82,7 +82,7 @@ func (set *StandardIndicatorSet) SMA(iw types.IntervalWindow) *indicator.SMA {
 	return inc
 }
 
-// GetEWMA returns the exponential weighed moving average indicator of the given interval and the window size.
+// EWMA returns the exponential weighed moving average indicator of the given interval and the window size.
 func (set *StandardIndicatorSet) EWMA(iw types.IntervalWindow) *indicator.EWMA {
 	inc, ok := set.ewma[iw]
 	if !ok {
@@ -193,6 +193,8 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 	}
 }
 
+// Init initializes the basic data structure and market information by its exchange.
+// Note that the subscribed symbols are not loaded in this stage.
 func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) error {
 	if session.IsInitialized {
 		return ErrSessionAlreadyInitialized
@@ -267,18 +269,22 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 		session.lastPrices[kline.Symbol] = kline.Close
 	})
 
+	session.IsInitialized = true
+	return nil
+}
+
+func (session *ExchangeSession) InitSymbols(ctx context.Context, environ *Environment) error {
 	if err := session.initUsedSymbols(ctx, environ); err != nil {
 		return err
 	}
 
-	session.IsInitialized = true
 	return nil
 }
 
 // initUsedSymbols uses usedSymbols to initialize the related data structure
 func (session *ExchangeSession) initUsedSymbols(ctx context.Context, environ *Environment) error {
 	for symbol := range session.usedSymbols {
-		if err := session.InitSymbol(ctx, environ, symbol); err != nil {
+		if err := session.initSymbol(ctx, environ, symbol); err != nil {
 			return err
 		}
 	}
@@ -286,9 +292,9 @@ func (session *ExchangeSession) initUsedSymbols(ctx context.Context, environ *En
 	return nil
 }
 
-// InitSymbol loads trades for the symbol, bind stream callbacks, init positions, market data store.
-// please note, InitSymbol can not be called for the same symbol for twice
-func (session *ExchangeSession) InitSymbol(ctx context.Context, environ *Environment, symbol string) error {
+// initSymbol loads trades for the symbol, bind stream callbacks, init positions, market data store.
+// please note, initSymbol can not be called for the same symbol for twice
+func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environment, symbol string) error {
 	if _, ok := session.initializedSymbols[symbol]; ok {
 		// return fmt.Errorf("symbol %s is already initialized", symbol)
 		return nil
@@ -399,7 +405,7 @@ func (session *ExchangeSession) InitSymbol(ctx context.Context, environ *Environ
 		}
 	}
 
-	log.Infof("last price: %f", session.lastPrices[symbol])
+	log.Infof("%s last price: %f", symbol, session.lastPrices[symbol])
 
 	session.initializedSymbols[symbol] = struct{}{}
 	return nil
