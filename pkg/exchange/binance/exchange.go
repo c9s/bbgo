@@ -714,9 +714,9 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 // QueryKLines queries the Kline/candlestick bars for a symbol. Klines are uniquely identified by their open time.
 func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
 
-	var limit = 500
+	var limit = 1000
 	if options.Limit > 0 {
-		// default limit == 500
+		// default limit == 1000
 		limit = options.Limit
 	}
 
