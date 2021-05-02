@@ -72,19 +72,12 @@ func (e KLineBatchQuery) Query(ctx context.Context, symbol string, interval type
 	errC = make(chan error, 1)
 
 	go func() {
-		limiter := rate.NewLimiter(rate.Every(5*time.Second), 2) // from binance (original 1200, use 1000 for safety)
-
 		defer close(c)
 		defer close(errC)
 
 		for startTime.Before(endTime) {
-			if err := limiter.Wait(ctx); err != nil {
-				logrus.WithError(err).Error("rate limit error")
-			}
-
 			kLines, err := e.QueryKLines(ctx, symbol, interval, types.KLineQueryOptions{
 				StartTime: &startTime,
-				Limit:     1000,
 			})
 
 			if err != nil {
