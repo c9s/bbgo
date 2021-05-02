@@ -1,0 +1,39 @@
+---
+riskControls:
+  # This is the session-based risk controller, which let you configure different risk controller by session.
+  sessionBased:
+    # "max" is the session name that you want to configure the risk control
+    max:
+      # orderExecutor is one of the risk control
+      orderExecutor:
+        # symbol-routed order executor
+        bySymbol:
+          BTCUSDT:
+            # basic risk control order executor
+            basic:
+              minQuoteBalance: 100.0
+              maxBaseAssetBalance: 3.0
+              minBaseAssetBalance: 0.0
+              maxOrderAmount: 1000.0
+
+exchangeStrategies:
+
+- on: max
+  schedule:
+    interval: 1m
+    symbol: USDTTWD
+    side: buy
+    quantity: 10
+
+    aboveMovingAverage:
+      type: EWMA
+      interval: 1h
+      window: 99
+      side: sell
+
+    belowMovingAverage:
+      type: EWMA
+      interval: 1h
+      window: 99
+      side: buy
+
