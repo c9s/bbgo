@@ -66,9 +66,9 @@ type Logger interface {
 
 type SilentLogger struct{}
 
-func (logger *SilentLogger) Infof(message string, args ...interface{})  {}
-func (logger *SilentLogger) Warnf(message string, args ...interface{})  {}
-func (logger *SilentLogger) Errorf(message string, args ...interface{}) {}
+func (logger *SilentLogger) Infof(string, ...interface{})  {}
+func (logger *SilentLogger) Warnf(string, ...interface{})  {}
+func (logger *SilentLogger) Errorf(string, ...interface{}) {}
 
 type Trader struct {
 	environment *Environment
