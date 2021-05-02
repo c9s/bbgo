@@ -82,7 +82,7 @@ func (set *StandardIndicatorSet) SMA(iw types.IntervalWindow) *indicator.SMA {
 	return inc
 }
 
-// GetEWMA returns the exponential weighed moving average indicator of the given interval and the window size.
+// EWMA returns the exponential weighed moving average indicator of the given interval and the window size.
 func (set *StandardIndicatorSet) EWMA(iw types.IntervalWindow) *indicator.EWMA {
 	inc, ok := set.ewma[iw]
 	if !ok {
@@ -399,7 +399,7 @@ func (session *ExchangeSession) InitSymbol(ctx context.Context, environ *Environ
 		}
 	}
 
-	log.Infof("last price: %f", session.lastPrices[symbol])
+	log.Infof("%s last price: %f", symbol, session.lastPrices[symbol])
 
 	session.initializedSymbols[symbol] = struct{}{}
 	return nil
