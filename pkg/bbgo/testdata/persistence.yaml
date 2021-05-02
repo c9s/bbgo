@@ -19,6 +19,7 @@ persistence:
     database: "persistence"
 
 strategies:
+- on: max
   swing:
     symbolPosition:
       persistence:
