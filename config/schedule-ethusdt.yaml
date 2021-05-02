@@ -1,0 +1,30 @@
+---
+riskControls:
+  # This is the session-based risk controller, which let you configure different risk controller by session.
+  sessionBased:
+    # "max" is the session name that you want to configure the risk control
+    max:
+      # orderExecutor is one of the risk control
+      orderExecutor:
+        # symbol-routed order executor
+        bySymbol:
+          ETHUSDT:
+            # basic risk control order executor
+            basic:
+              minQuoteBalance: 1000.0
+              maxBaseAssetBalance: 500.0
+              minBaseAssetBalance: 300.0
+              maxOrderAmount: 1000.0
+
+exchangeStrategies:
+
+- on: max
+  schedule:
+    interval: 1h
+    symbol: ETHUSDT
+    side: buy
+    quantity: 0.01
+    belowMovingAverage:
+      type: EWMA
+      interval: 1h
+      window: 99
