@@ -8,13 +8,13 @@ riskControls:
       orderExecutor:
         # symbol-routed order executor
         bySymbol:
-          BTCUSDT:
+          USDTTWD:
             # basic risk control order executor
             basic:
               minQuoteBalance: 100.0
-              maxBaseAssetBalance: 3.0
+              maxBaseAssetBalance: 30_000.0
               minBaseAssetBalance: 0.0
-              maxOrderAmount: 1000.0
+              maxOrderAmount: 1_000.0
 
 exchangeStrategies:
 
