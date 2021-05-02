@@ -165,6 +165,7 @@ func (trader *Trader) AttachCrossExchangeStrategy(strategy CrossExchangeStrategy
 	return trader
 }
 
+// SetRiskControls sets the risk controller
 // TODO: provide a more DSL way to configure risk controls
 func (trader *Trader) SetRiskControls(riskControls *RiskControls) {
 	trader.riskControls = riskControls
