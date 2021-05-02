@@ -13,7 +13,7 @@ import (
 
 const ID = "swing"
 
-// The indicators (SMA and EWMA) that we want to use are returning float64 data.
+// Float64Indicator is the indicators (SMA and EWMA) that we want to use are returning float64 data.
 type Float64Indicator interface {
 	Last() float64
 }
