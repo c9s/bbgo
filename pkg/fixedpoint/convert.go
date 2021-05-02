@@ -66,6 +66,10 @@ func (v Value) Div(v2 Value) Value {
 	return NewFromFloat(v.Float64() / v2.Float64())
 }
 
+func (v Value) DivFloat64(v2 float64) Value {
+	return NewFromFloat(v.Float64() / v2)
+}
+
 func (v Value) Floor() Value {
 	return NewFromFloat(math.Floor(v.Float64()))
 }

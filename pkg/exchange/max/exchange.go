@@ -21,10 +21,10 @@ import (
 	"github.com/c9s/bbgo/pkg/util"
 )
 
-var closedOrderQueryLimiter = rate.NewLimiter(rate.Every(6*time.Second), 1)
-var tradeQueryLimiter = rate.NewLimiter(rate.Every(4*time.Second), 1)
-var accountQueryLimiter = rate.NewLimiter(rate.Every(5*time.Second), 1)
-var marketDataLimiter = rate.NewLimiter(rate.Every(5*time.Second), 1)
+var closedOrderQueryLimiter = rate.NewLimiter(rate.Every(5*time.Second), 1)
+var tradeQueryLimiter = rate.NewLimiter(rate.Every(3*time.Second), 1)
+var accountQueryLimiter = rate.NewLimiter(rate.Every(3*time.Second), 1)
+var marketDataLimiter = rate.NewLimiter(rate.Every(2*time.Second), 10)
 
 var log = logrus.WithField("exchange", "max")
 

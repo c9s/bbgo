@@ -3,6 +3,8 @@ package types
 import (
 	"encoding/json"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 // SideType define side type of order
@@ -16,6 +18,8 @@ const (
 	// SideTypeBoth is only used for the configuration context
 	SideTypeBoth = SideType("BOTH")
 )
+
+var ErrInvalidSideType = errors.New("invalid side type")
 
 func (side *SideType) UnmarshalJSON(data []byte) (err error) {
 	var s string
@@ -33,6 +37,10 @@ func (side *SideType) UnmarshalJSON(data []byte) (err error) {
 
 	case "both":
 		*side = SideTypeBoth
+
+	default:
+		err = ErrInvalidSideType
+		return err
 
 	}
 

@@ -66,9 +66,9 @@ type Logger interface {
 
 type SilentLogger struct{}
 
-func (logger *SilentLogger) Infof(message string, args ...interface{})  {}
-func (logger *SilentLogger) Warnf(message string, args ...interface{})  {}
-func (logger *SilentLogger) Errorf(message string, args ...interface{}) {}
+func (logger *SilentLogger) Infof(string, ...interface{})  {}
+func (logger *SilentLogger) Warnf(string, ...interface{})  {}
+func (logger *SilentLogger) Errorf(string, ...interface{}) {}
 
 type Trader struct {
 	environment *Environment
@@ -165,6 +165,7 @@ func (trader *Trader) AttachCrossExchangeStrategy(strategy CrossExchangeStrategy
 	return trader
 }
 
+// SetRiskControls sets the risk controller
 // TODO: provide a more DSL way to configure risk controls
 func (trader *Trader) SetRiskControls(riskControls *RiskControls) {
 	trader.riskControls = riskControls
@@ -211,7 +212,7 @@ func (trader *Trader) RunSingleExchangeStrategy(ctx context.Context, strategy Si
 	}
 
 	if symbol, ok := isSymbolBasedStrategy(rs); ok {
-		log.Debugf("found symbol based strategy from %s", rs.Type())
+		log.Infof("found symbol based strategy from %s", rs.Type())
 		if _, ok := hasField(rs, "Market"); ok {
 			if market, ok := session.Market(symbol); ok {
 				// let's make the market object passed by pointer
@@ -223,18 +224,24 @@ func (trader *Trader) RunSingleExchangeStrategy(ctx context.Context, strategy Si
 
 		// StandardIndicatorSet
 		if _, ok := hasField(rs, "StandardIndicatorSet"); ok {
-			if indicatorSet, ok := session.StandardIndicatorSet(symbol); ok {
-				if err := injectField(rs, "StandardIndicatorSet", indicatorSet, true); err != nil {
-					return errors.Wrapf(err, "failed to inject StandardIndicatorSet on %T", strategy)
-				}
+			indicatorSet, ok := session.StandardIndicatorSet(symbol)
+			if !ok {
+				return fmt.Errorf("standardIndicatorSet of symbol %s not found", symbol)
+			}
+
+			if err := injectField(rs, "StandardIndicatorSet", indicatorSet, true); err != nil {
+				return errors.Wrapf(err, "failed to inject StandardIndicatorSet on %T", strategy)
 			}
 		}
 
 		if _, ok := hasField(rs, "MarketDataStore"); ok {
-			if store, ok := session.MarketDataStore(symbol); ok {
-				if err := injectField(rs, "MarketDataStore", store, true); err != nil {
-					return errors.Wrapf(err, "failed to inject MarketDataStore on %T", strategy)
-				}
+			store, ok := session.MarketDataStore(symbol)
+			if !ok {
+				return fmt.Errorf("marketDataStore of symbol %s not found", symbol)
+			}
+
+			if err := injectField(rs, "MarketDataStore", store, true); err != nil {
+				return errors.Wrapf(err, "failed to inject MarketDataStore on %T", strategy)
 			}
 		}
 	}
