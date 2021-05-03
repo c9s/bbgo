@@ -577,7 +577,10 @@ You may register your exchange account with my referral ID to support this proje
 
 ## Community
 
-You can join our telegram channel <https://t.me/bbgocrypto>, it's in Chinese, but English is fine as well.
+You can join our telegram channels:
+
+- BBGO International <https://t.me/bbgo_intl>
+- BBGO Taiwan <https://t.me/bbgocrypto>
 
 ## Contribution
 
