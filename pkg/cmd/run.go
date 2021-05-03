@@ -24,7 +24,9 @@ func init() {
 	RunCmd.Flags().String("totp-key-url", "", "time-based one-time password key URL, if defined, it will be used for restoring the otp key")
 	RunCmd.Flags().String("totp-issuer", "", "")
 	RunCmd.Flags().String("totp-account-name", "", "")
-	RunCmd.Flags().Bool("enable-web-server", false, "enable web server")
+	RunCmd.Flags().Bool("enable-webserver", false, "enable webserver")
+	RunCmd.Flags().Bool("enable-web-server", false, "legacy option, this is renamed to --enable-webserver")
+	RunCmd.Flags().String("webserver-bind", ":8080", "webserver binding")
 	RunCmd.Flags().Bool("setup", false, "use setup mode")
 	RootCmd.AddCommand(RunCmd)
 }
@@ -99,7 +101,7 @@ func BootstrapEnvironment(ctx context.Context, environ *bbgo.Environment, userCo
 	return nil
 }
 
-func runConfig(basectx context.Context, userConfig *bbgo.Config, enableApiServer bool) error {
+func runConfig(basectx context.Context, userConfig *bbgo.Config, enableWebServer bool, webServerBind string) error {
 	ctx, cancelTrading := context.WithCancel(basectx)
 	defer cancelTrading()
 
@@ -121,7 +123,7 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config, enableApiServer
 		return err
 	}
 
-	if enableApiServer {
+	if enableWebServer {
 		go func() {
 			s := &server.Server{
 				Config:  userConfig,
@@ -129,7 +131,7 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config, enableApiServer
 				Trader:  trader,
 			}
 
-			if err := s.Run(ctx); err != nil {
+			if err := s.Run(ctx, webServerBind); err != nil {
 				log.WithError(err).Errorf("server error")
 			}
 		}()
@@ -153,9 +155,23 @@ func run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	enableWebServer, err := cmd.Flags().GetBool("enable-web-server")
+	enableWebServer, err := cmd.Flags().GetBool("enable-webserver")
 	if err != nil {
 		return err
+	}
+
+	webServerBind, err := cmd.Flags().GetString("webserver-bind")
+	if err != nil {
+		return err
+	}
+
+	enableWebServerLegacy, err := cmd.Flags().GetBool("enable-web-server")
+	if err != nil {
+		return err
+	}
+	if enableWebServerLegacy {
+		log.Warn("command option --enable-web-server is renamed to --enable-webserver")
+		enableWebServer = true
 	}
 
 	noCompile, err := cmd.Flags().GetBool("no-compile")
@@ -204,7 +220,7 @@ func run(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		return runConfig(ctx, userConfig, enableWebServer)
+		return runConfig(ctx, userConfig, enableWebServer, webServerBind)
 	}
 
 	return runWrapperBinary(ctx, userConfig, cmd, args)
