@@ -20,11 +20,6 @@ func CacheDir() string {
 	return prepareDir(dir)
 }
 
-func SourceDir() string {
-	home := HomeDir()
-	return path.Join(home, "source")
-}
-
 func HomeDir() string {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
