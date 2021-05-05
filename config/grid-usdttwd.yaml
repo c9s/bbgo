@@ -25,8 +25,8 @@ backtest:
   # for testing max draw down (MDD) at 03-12
   # see here for more details
   # https://www.investopedia.com/terms/m/maximum-drawdown-mdd.asp
-  startTime: "2020-09-04"
-  endTime: "2020-09-14"
+  startTime: "2021-01-01"
+  endTime: "2021-01-30"
   symbols:
   - USDTTWD
   account:
