@@ -21,7 +21,7 @@ func init() {
 	BacktestCmd.Flags().String("exchange", "", "target exchange")
 	BacktestCmd.Flags().Bool("sync", false, "sync backtest data")
 	BacktestCmd.Flags().Bool("sync-only", false, "sync backtest data only, do not run backtest")
-	BacktestCmd.Flags().String("sync-from", time.Now().AddDate(0, -6, 0).Format(types.DateFormat), "sync backtest data from the given time")
+	BacktestCmd.Flags().String("sync-from", "", "sync backtest data from the given time, which will override the time range in the backtest config")
 	BacktestCmd.Flags().Bool("base-asset-baseline", false, "use base asset performance as the competitive baseline performance")
 	BacktestCmd.Flags().CountP("verbose", "v", "verbose level")
 	BacktestCmd.Flags().String("config", "config/bbgo.yaml", "strategy config file")
@@ -67,11 +67,6 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
-		syncFromTime, err := time.Parse(types.DateFormat, syncFromDateStr)
-		if err != nil {
-			return err
-		}
-
 		exchangeNameStr, err := cmd.Flags().GetString("exchange")
 		if err != nil {
 			return err
@@ -99,15 +94,21 @@ var BacktestCmd = &cobra.Command{
 			return errors.New("backtest config is not defined")
 		}
 
+		now := time.Now()
 		// set default start time to the past 6 months
 		if len(userConfig.Backtest.StartTime) == 0 {
-			userConfig.Backtest.StartTime = time.Now().AddDate(0, -6, 0).Format("2006-01-02")
+			userConfig.Backtest.StartTime = now.AddDate(0, -6, 0).Format("2006-01-02")
+		}
+		if len(userConfig.Backtest.EndTime) == 0 {
+			userConfig.Backtest.EndTime = now.Format("2006-01-02")
 		}
 
 		startTime, err := userConfig.Backtest.ParseStartTime()
 		if err != nil {
 			return err
 		}
+
+		log.Infof("starting backtest with startTime %s", startTime.Format(time.ANSIC))
 
 		environ := bbgo.NewEnvironment()
 		if err := environ.ConfigureDatabase(ctx); err != nil {
@@ -121,6 +122,16 @@ var BacktestCmd = &cobra.Command{
 		backtestService := &service.BacktestService{DB: environ.DatabaseService.DB}
 
 		if wantSync {
+			var syncFromTime = startTime
+
+			// override the sync from time if the option is given
+			if len(syncFromDateStr) > 0 {
+				syncFromTime, err = time.Parse(types.DateFormat, syncFromDateStr)
+				if err != nil {
+					return err
+				}
+			}
+
 			log.Info("starting synchronization...")
 			for _, symbol := range userConfig.Backtest.Symbols {
 				if err := backtestService.Sync(ctx, sourceExchange, symbol, syncFromTime); err != nil {
