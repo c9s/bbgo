@@ -771,6 +771,12 @@ func (e *Exchange) QueryRewards(ctx context.Context, startTime time.Time) ([]typ
 	return nil, errors.New("unknown error")
 }
 
+// QueryKLines returns the klines from the MAX exchange API.
+// The KLine API of the MAX exchange uses inclusive time range
+//
+// https://max-api.maicoin.com/api/v2/k?market=btctwd&limit=10&period=1&timestamp=1620202440
+// The above query will return a kline that starts with 1620202440 (unix timestamp) without endTime.
+// We need to calculate the endTime by ourself.
 func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
 	if err := marketDataLimiter.Wait(ctx); err != nil {
 		return nil, err
@@ -801,6 +807,10 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 
 	var kLines []types.KLine
 	for _, k := range localKLines {
+		if options.EndTime != nil && k.StartTime.After(*options.EndTime) {
+			break
+		}
+
 		kLines = append(kLines, k.KLine())
 	}
 
