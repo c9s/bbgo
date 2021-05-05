@@ -95,7 +95,7 @@ func (e KLineBatchQuery) Query(ctx context.Context, symbol string, interval type
 					continue
 				}
 
-				if kline.EndTime.After(endTime) {
+				if kline.StartTime.After(endTime) {
 					return
 				}
 
