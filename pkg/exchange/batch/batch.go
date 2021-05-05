@@ -100,7 +100,7 @@ func (e KLineBatchQuery) Query(ctx context.Context, symbol string, interval type
 				}
 
 				c <- kline
-				startTime = kline.EndTime
+				startTime = kline.EndTime.Add(time.Millisecond)
 			}
 		}
 	}()
