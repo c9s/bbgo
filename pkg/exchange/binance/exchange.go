@@ -712,6 +712,15 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 }
 
 // QueryKLines queries the Kline/candlestick bars for a symbol. Klines are uniquely identified by their open time.
+// Binance uses inclusive start time query range, eg:
+// https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1m&startTime=1620172860000
+// the above query will return a kline with startTime = 1620172860000
+// and,
+// https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1m&startTime=1620172860000&endTime=1620172920000
+// the above query will return a kline with startTime = 1620172860000, and a kline with endTime = 1620172860000
+//
+// the endTime of a binance kline, is the (startTime + interval time - 1 millisecond), e.g.,
+// millisecond unix timestamp: 1620172860000 and 1620172919999
 func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
 
 	var limit = 1000
@@ -743,7 +752,7 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 	var kLines []types.KLine
 	for _, k := range resp {
 		kLines = append(kLines, types.KLine{
-			Exchange:       "binance",
+			Exchange:       types.ExchangeBinance.String(),
 			Symbol:         symbol,
 			Interval:       interval,
 			StartTime:      time.Unix(0, k.OpenTime*int64(time.Millisecond)),
