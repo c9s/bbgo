@@ -35,6 +35,7 @@ backtest:
     balances:
       BTC: 0.0
       USDT: 10000.0
+      TWD: 10000.0
 
 exchangeStrategies:
 - on: max
