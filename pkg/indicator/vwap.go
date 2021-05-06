@@ -38,7 +38,7 @@ func (inc *VWAP) calculateAndUpdate(kLines []types.KLine) {
 
 	var recentK = kLines[index-(inc.Window-1) : index+1]
 
-	vwap, err := calculateVWAP(recentK, inc.Window, KLineClosePriceMapper)
+	vwap, err := calculateVWAP(recentK, inc.Window, KLineTypicalPriceMapper)
 	if err != nil {
 		log.WithError(err).Error("VWAP error")
 		return
