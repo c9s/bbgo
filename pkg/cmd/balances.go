@@ -39,9 +39,6 @@ var balancesCmd = &cobra.Command{
 			return err
 		}
 
-		if len(sessionName) == 0 {
-			return errors.New("--session option is required")
-		}
 
 		// if config file exists, use the config loaded from the config file.
 		// otherwise, use a empty config object
@@ -67,17 +64,32 @@ var balancesCmd = &cobra.Command{
 		}
 
 
-		session, ok := environ.Session(sessionName)
-		if !ok {
-			return fmt.Errorf("session %s not found", sessionName)
+		if len(sessionName) > 0 {
+			session, ok := environ.Session(sessionName)
+			if !ok {
+				return fmt.Errorf("session %s not found", sessionName)
+			}
+
+			b, err := session.Exchange.QueryAccountBalances(ctx)
+			if err != nil {
+				return err
+			}
+
+			b.Print()
+		} else {
+			for _, session := range environ.Sessions() {
+
+				b, err := session.Exchange.QueryAccountBalances(ctx)
+				if err != nil {
+					return err
+				}
+
+				log.Infof("SESSION %s", session.Name)
+				b.Print()
+			}
 		}
 
-		b, err := session.Exchange.QueryAccountBalances(ctx)
-		if err != nil {
-			return err
-		}
 
-		log.Infof("balances: %+v", b)
 		return nil
 	},
 }
