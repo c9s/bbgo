@@ -2,6 +2,7 @@ package indicator
 
 import (
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/types"
@@ -18,8 +19,10 @@ The basics of VWAP
 //go:generate callbackgen -type VWAP
 type VWAP struct {
 	types.IntervalWindow
-	Values  Float64Slice
-	EndTime time.Time
+	Values      Float64Slice
+	WeightedSum float64
+	VolumeSum   float64
+	EndTime     time.Time
 
 	UpdateCallbacks []func(value float64)
 }
@@ -29,24 +32,68 @@ func (inc *VWAP) calculateAndUpdate(kLines []types.KLine) {
 		return
 	}
 
-	var index = len(kLines) - 1
-	var kline = kLines[index]
+	var priceF = KLineTypicalPriceMapper
+	var dataLen = len(kLines)
 
-	if inc.EndTime != zeroTime && kline.EndTime.Before(inc.EndTime) {
-		return
+	// init the values from the kline data
+	var from = 1
+	if len(inc.Values) == 0 {
+		// for the first value, we should use the close price
+		price := priceF(kLines[0])
+		volume := kLines[0].Volume
+
+		inc.Values = []float64{price}
+		inc.WeightedSum = price * volume
+		inc.VolumeSum = volume
+	} else {
+		// from = len(inc.Values)
+
+		// update ewma with the existing values
+		for i := dataLen - 1; i > 0; i-- {
+			var k = kLines[i]
+			if k.EndTime.After(inc.EndTime) {
+				from = i
+			} else {
+				break
+			}
+		}
 	}
 
+	for i := from; i < dataLen; i++ {
+		var k = kLines[i]
+
+		// add next
+		inc.WeightedSum += priceF(k) * k.Volume
+		inc.VolumeSum += k.Volume
+
+		// drop first
+		if i >= inc.Window {
+			var dropK = kLines[i-inc.Window]
+			inc.WeightedSum -= priceF(dropK) * dropK.Volume
+			inc.VolumeSum -= dropK.Volume
+		}
+
+		vwap := inc.WeightedSum / inc.VolumeSum
+		inc.Values.Push(vwap)
+		inc.EndTime = k.EndTime
+		inc.EmitUpdate(vwap)
+	}
+
+	// verify the result of accumulated vwap with sliding window method
+	var index = len(kLines) - 1
 	var recentK = kLines[index-inc.Window+1 : index+1]
 
-	vwap, err := calculateVWAP(recentK, KLineTypicalPriceMapper)
+	v2, err := calculateVWAP(recentK, KLineTypicalPriceMapper)
 	if err != nil {
 		log.WithError(err).Error("VWAP error")
 		return
 	}
 
-	inc.Values.Push(vwap)
-	inc.EndTime = kLines[index].EndTime
-	inc.EmitUpdate(vwap)
+	v1 := inc.Values[index]
+	diff := math.Abs(v1 - v2)
+	if diff > 1e-5 {
+		log.Warnf("ACCUMULATED %s VWAP (%d) %f != VWAP %f", inc.Interval, inc.Window, v1, v2)
+	}
 }
 
 func (inc *VWAP) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
