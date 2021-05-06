@@ -68,6 +68,7 @@ type Environment struct {
 	DatabaseService          *service.DatabaseService
 	OrderService             *service.OrderService
 	TradeService             *service.TradeService
+	BacktestService          *service.BacktestService
 	RewardService            *service.RewardService
 	SyncService              *service.SyncService
 
@@ -285,7 +286,7 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 			}
 		}
 
-		if err := session.InitSymbols(ctx, environ) ; err != nil {
+		if err := session.InitSymbols(ctx, environ); err != nil {
 			return err
 		}
 
