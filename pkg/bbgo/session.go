@@ -15,6 +15,8 @@ import (
 	"github.com/c9s/bbgo/pkg/util"
 )
 
+var fiatCurrencies = []string{"USDC", "USDT", "USD", "TWD", "EUR", "GBP"}
+
 type StandardIndicatorSet struct {
 	Symbol string
 	// Standard indicators
@@ -560,7 +562,6 @@ func (session *ExchangeSession) FindPossibleSymbols() (symbols []string, err err
 	}
 
 	var balances = session.Account.Balances()
-	var fiatCurrencies = []string{"USDC", "USDT", "USD", "TWD", "EUR", "GBP"}
 	var fiatAssets []string
 
 	for _, currency := range fiatCurrencies {
