@@ -315,15 +315,14 @@ func (s *Strategy) placeGridSellOrders(orderExecutor bbgo.OrderExecutor, session
 		return err
 	}
 
-	if len(orderForms) > 0 {
-		createdOrders, err := orderExecutor.SubmitOrders(context.Background(), orderForms...)
-		s.activeOrders.Add(createdOrders...)
-		if err != nil {
-			return err
-		}
+	if len(orderForms) == 0 {
+		return errors.New("none of sell order is generated")
 	}
 
-	return nil
+	log.Infof("submitting %d sell orders...", len(orderForms))
+	createdOrders, err := orderExecutor.SubmitOrders(context.Background(), orderForms...)
+	s.activeOrders.Add(createdOrders...)
+	return err
 }
 
 func (s *Strategy) placeGridBuyOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
@@ -332,15 +331,15 @@ func (s *Strategy) placeGridBuyOrders(orderExecutor bbgo.OrderExecutor, session 
 		return err
 	}
 
-	if len(orderForms) > 0 {
-		createdOrders, err := orderExecutor.SubmitOrders(context.Background(), orderForms...)
-		s.activeOrders.Add(createdOrders...)
-		if err != nil {
-			return err
-		}
+	if len(orderForms) == 0 {
+		return errors.New("none of buy order is generated")
 	}
 
-	return nil
+	log.Infof("submitting %d buy orders...", len(orderForms))
+	createdOrders, err := orderExecutor.SubmitOrders(context.Background(), orderForms...)
+	s.activeOrders.Add(createdOrders...)
+
+	return err
 }
 
 func (s *Strategy) placeGridOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) {
@@ -366,6 +365,9 @@ func (s *Strategy) placeGridOrders(orderExecutor bbgo.OrderExecutor, session *bb
 		if err := s.placeGridBuyOrders(orderExecutor, session); err != nil {
 			log.Warn(err.Error())
 		}
+
+	default:
+		log.Errorf("invalid side %s", s.Side)
 	}
 }
 
@@ -575,15 +577,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 	})
 
-	if s.CatchUp {
-		session.Stream.OnKLineClosed(func(kline types.KLine) {
-			log.Infof("catchUp mode is enabled, updating grid orders...")
-			// update grid
-			s.placeGridOrders(orderExecutor, session)
-		})
-	}
-
 	session.Stream.OnTradeUpdate(s.tradeUpdateHandler)
+
 	session.Stream.OnStart(func() {
 		if stateLoaded && len(s.state.Orders) > 0 {
 			createdOrders, err := orderExecutor.SubmitOrders(ctx, s.state.Orders...)
@@ -596,6 +591,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			s.placeGridOrders(orderExecutor, session)
 		}
 	})
+
+	if s.CatchUp {
+		session.Stream.OnKLineClosed(func(kline types.KLine) {
+			log.Infof("catchUp mode is enabled, updating grid orders...")
+			// update grid
+			s.placeGridOrders(orderExecutor, session)
+		})
+	}
 
 	return nil
 }
