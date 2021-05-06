@@ -36,7 +36,7 @@ func (inc *VWAP) calculateAndUpdate(kLines []types.KLine) {
 		return
 	}
 
-	var recentK = kLines[len(kLines)-1-(inc.Window-1) : index+1]
+	var recentK = kLines[index-inc.Window+1 : index+1]
 
 	vwap, err := calculateVWAP(recentK, KLineTypicalPriceMapper)
 	if err != nil {
@@ -70,9 +70,14 @@ func calculateVWAP(kLines []types.KLine, priceF KLinePriceMapper) (float64, erro
 	weightedSum := 0.0
 	volumeSum := 0.0
 
+	// TODO: move the following func to calculateAndUpdate and support sliding window method
+	update := func(price float64, volume float64) {
+		weightedSum += price * volume
+		volumeSum += volume
+	}
+
 	for _, k := range kLines {
-		weightedSum += priceF(k) * k.Volume
-		volumeSum += k.Volume
+		update(priceF(k), k.Volume)
 	}
 
 	avg := weightedSum / volumeSum
