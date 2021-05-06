@@ -24,6 +24,7 @@ var balancesCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 
+
 		configFile, err := cmd.Flags().GetString("config")
 		if err != nil {
 			return err
@@ -31,6 +32,15 @@ var balancesCmd = &cobra.Command{
 
 		if len(configFile) == 0 {
 			return errors.New("--config option is required")
+		}
+
+		sessionName, err := cmd.Flags().GetString("session")
+		if err != nil {
+			return err
+		}
+
+		if len(sessionName) == 0 {
+			return errors.New("--session option is required")
 		}
 
 		// if config file exists, use the config loaded from the config file.
@@ -56,10 +66,6 @@ var balancesCmd = &cobra.Command{
 			return err
 		}
 
-		sessionName, err := cmd.Flags().GetString("session")
-		if err != nil {
-			return err
-		}
 
 		session, ok := environ.Session(sessionName)
 		if !ok {
