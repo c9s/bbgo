@@ -229,9 +229,12 @@ func (a *Account) Print() {
 	a.Lock()
 	defer a.Unlock()
 
-	for _, balance := range a.balances {
-		if balance.Available != 0 {
-			logrus.Infof("account balance %s %f", balance.Currency, balance.Available.Float64())
-		}
+	if a.AccountType != "" {
+		logrus.Infof("account type: %s", a.AccountType)
 	}
+
+	logrus.Infof("maker commission: %f", a.MakerCommission.Float64())
+	logrus.Infof("taker commission: %f", a.TakerCommission.Float64())
+
+	a.balances.Print()
 }
