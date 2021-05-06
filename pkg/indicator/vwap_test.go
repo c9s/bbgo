@@ -23,17 +23,17 @@ func Test_calculateVWAP(t *testing.T) {
 		want   float64
 	}{
 		{
-			name:   "TrivialCase",
+			name:   "trivial_case",
 			kLines: buildKLines([]float64{0}, []float64{1}),
 			want:   0.0,
 		},
 		{
-			name:   "EasyCase",
+			name:   "easy_case",
 			kLines: buildKLines([]float64{1, 2, 3}, []float64{4, 5, 6}),
 			want:   (1*4 + 2*5 + 3*6) / float64(4+5+6),
 		},
 		{
-			name:   "RandomCase",
+			name:   "random_case",
 			kLines: buildKLines(randomPrices, randomVolumes),
 			want:   0.48727133857423566,
 		},
