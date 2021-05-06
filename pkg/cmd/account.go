@@ -38,10 +38,6 @@ var accountCmd = &cobra.Command{
 			return err
 		}
 
-		if len(sessionName) == 0 {
-			return errors.New("--session option is required")
-		}
-
 		var userConfig *bbgo.Config
 		if _, err := os.Stat(configFile); err == nil {
 			// load successfully
@@ -66,17 +62,30 @@ var accountCmd = &cobra.Command{
 			return err
 		}
 
-		session, ok := environ.Session(sessionName)
-		if !ok {
-			return fmt.Errorf("session %s not found", sessionName)
+		if len(sessionName) > 0 {
+			session, ok := environ.Session(sessionName)
+			if !ok {
+				return fmt.Errorf("session %s not found", sessionName)
+			}
+
+			a, err := session.Exchange.QueryAccount(ctx)
+			if err != nil {
+				return err
+			}
+
+			a.Print()
+		} else {
+			for _, session := range environ.Sessions() {
+				a, err := session.Exchange.QueryAccount(ctx)
+				if err != nil {
+					return err
+				}
+
+				log.Infof("SESSION %s", session.Name)
+				a.Print()
+			}
 		}
 
-		a, err := session.Exchange.QueryAccount(ctx)
-		if err != nil {
-			return err
-		}
-
-		log.Infof("account info: %+v", a)
 		return nil
 	},
 }
