@@ -33,6 +33,15 @@ var accountCmd = &cobra.Command{
 			return errors.New("--config option is required")
 		}
 
+		sessionName, err := cmd.Flags().GetString("session")
+		if err != nil {
+			return err
+		}
+
+		if len(sessionName) == 0 {
+			return errors.New("--session option is required")
+		}
+
 		var userConfig *bbgo.Config
 		if _, err := os.Stat(configFile); err == nil {
 			// load successfully
@@ -54,11 +63,6 @@ var accountCmd = &cobra.Command{
 		}
 
 		if err := environ.ConfigureExchangeSessions(userConfig); err != nil {
-			return err
-		}
-
-		sessionName, err := cmd.Flags().GetString("session")
-		if err != nil {
 			return err
 		}
 
