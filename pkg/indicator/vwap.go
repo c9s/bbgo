@@ -36,9 +36,9 @@ func (inc *VWAP) calculateAndUpdate(kLines []types.KLine) {
 		return
 	}
 
-	var recentK = kLines[index-(inc.Window-1) : index+1]
+	var recentK = kLines[len(kLines)-1-(inc.Window-1) : index+1]
 
-	vwap, err := calculateVWAP(recentK, inc.Window, KLineTypicalPriceMapper)
+	vwap, err := calculateVWAP(recentK, KLineTypicalPriceMapper)
 	if err != nil {
 		log.WithError(err).Error("VWAP error")
 		return
@@ -61,12 +61,10 @@ func (inc *VWAP) Bind(updater KLineWindowUpdater) {
 	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }
 
-func calculateVWAP(kLines []types.KLine, window int, priceF KLinePriceMapper) (float64, error) {
+func calculateVWAP(kLines []types.KLine, priceF KLinePriceMapper) (float64, error) {
 	length := len(kLines)
-
-	if length == 0 || length < window {
-		return 0.0, fmt.Errorf("insufficient elements for calculating VWAP with window = %d", window)
-
+	if length == 0 {
+		return 0.0, fmt.Errorf("insufficient elements for calculating VWAP")
 	}
 
 	weightedSum := 0.0
