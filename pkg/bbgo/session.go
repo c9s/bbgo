@@ -250,7 +250,7 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 	session.Account.BindStream(session.Stream)
 
 	// insert trade into db right before everything
-	if environ.TradeService != nil {
+	if environ.TradeService != nil && environ.BacktestService == nil {
 		session.Stream.OnTradeUpdate(func(trade types.Trade) {
 			if err := environ.TradeService.Insert(trade); err != nil {
 				log.WithError(err).Errorf("trade insert error: %+v", trade)

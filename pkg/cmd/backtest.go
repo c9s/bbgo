@@ -120,6 +120,7 @@ var BacktestCmd = &cobra.Command{
 		}
 
 		backtestService := &service.BacktestService{DB: environ.DatabaseService.DB}
+		environ.BacktestService = backtestService
 
 		if wantSync {
 			var syncFromTime = startTime
