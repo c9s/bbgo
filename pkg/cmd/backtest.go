@@ -103,6 +103,10 @@ var BacktestCmd = &cobra.Command{
 			userConfig.Backtest.EndTime = now.Format("2006-01-02")
 		}
 
+		if len(userConfig.CrossExchangeStrategies) > 0 {
+			log.Warnf("backtest does not support CrossExchangeStrategy, strategies won't be added.")
+		}
+
 		startTime, err := userConfig.Backtest.ParseStartTime()
 		if err != nil {
 			return err
@@ -111,7 +115,7 @@ var BacktestCmd = &cobra.Command{
 		log.Infof("starting backtest with startTime %s", startTime.Format(time.ANSIC))
 
 		environ := bbgo.NewEnvironment()
-		if err := environ.ConfigureDatabase(ctx); err != nil {
+		if err := BootstrapBacktestEnvironment(ctx, environ, userConfig) ; err != nil {
 			return err
 		}
 
@@ -131,6 +135,14 @@ var BacktestCmd = &cobra.Command{
 				if err != nil {
 					return err
 				}
+
+				if syncFromTime.After(startTime) {
+					return fmt.Errorf("sync-from time %s can not be latter than the backtest start time %s", syncFromTime, startTime)
+				}
+			} else {
+				// we need at least 1 month backward data for EMA and last prices
+				syncFromTime = syncFromTime.AddDate(0, -1, 0)
+				log.Infof("adjusted sync start time to %s for backward market data", syncFromTime)
 			}
 
 			log.Info("starting synchronization...")
@@ -194,7 +206,8 @@ var BacktestCmd = &cobra.Command{
 		backtestExchange := backtest.NewExchange(exchangeName, backtestService, userConfig.Backtest)
 		environ.SetStartTime(startTime)
 		environ.AddExchange(exchangeName.String(), backtestExchange)
-		if err := BootstrapBacktestEnvironment(ctx, environ, userConfig) ; err != nil {
+
+		if err := environ.Init(ctx) ; err != nil {
 			return err
 		}
 
@@ -214,9 +227,6 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
-		if len(userConfig.CrossExchangeStrategies) > 0 {
-			log.Warnf("backtest does not support CrossExchangeStrategy, strategies won't be added.")
-		}
 
 		if err := trader.Run(ctx); err != nil {
 			return err
