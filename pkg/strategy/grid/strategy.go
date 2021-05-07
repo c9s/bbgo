@@ -311,11 +311,12 @@ func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types
 
 func (s *Strategy) placeGridSellOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	orderForms, err := s.generateGridSellOrders(session)
-	if err != nil {
-		return err
-	}
 
 	if len(orderForms) == 0 {
+		if err != nil {
+			return err
+		}
+
 		return errors.New("none of sell order is generated")
 	}
 
@@ -327,11 +328,12 @@ func (s *Strategy) placeGridSellOrders(orderExecutor bbgo.OrderExecutor, session
 
 func (s *Strategy) placeGridBuyOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	orderForms, err := s.generateGridBuyOrders(session)
-	if err != nil {
-		return err
-	}
 
 	if len(orderForms) == 0 {
+		if err != nil {
+			return err
+		}
+
 		return errors.New("none of buy order is generated")
 	}
 
