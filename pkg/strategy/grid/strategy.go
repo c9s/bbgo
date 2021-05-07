@@ -132,12 +132,12 @@ func (s *Strategy) Validate() error {
 func (s *Strategy) generateGridSellOrders(session *bbgo.ExchangeSession) ([]types.SubmitOrder, error) {
 	currentPriceFloat, ok := session.LastPrice(s.Symbol)
 	if !ok {
-		return nil, fmt.Errorf("%s last price not found, skipping", s.Symbol)
+		return nil, fmt.Errorf("can not generate sell orders, %s last price not found", s.Symbol)
 	}
 
 	currentPrice := fixedpoint.NewFromFloat(currentPriceFloat)
 	if currentPrice > s.UpperPrice {
-		return nil, fmt.Errorf("current price %f is higher than upper price %f", currentPrice.Float64(), s.UpperPrice.Float64())
+		return nil, fmt.Errorf("can not generate sell orders, the current price %f is higher than upper price %f", currentPrice.Float64(), s.UpperPrice.Float64())
 	}
 
 	priceRange := s.UpperPrice - s.LowerPrice
