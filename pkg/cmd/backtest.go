@@ -192,14 +192,10 @@ var BacktestCmd = &cobra.Command{
 		}
 
 		backtestExchange := backtest.NewExchange(exchangeName, backtestService, userConfig.Backtest)
-
 		environ.SetStartTime(startTime)
 		environ.AddExchange(exchangeName.String(), backtestExchange)
-
-		environ.Notifiability = bbgo.Notifiability{
-			SymbolChannelRouter:  bbgo.NewPatternChannelRouter(nil),
-			SessionChannelRouter: bbgo.NewPatternChannelRouter(nil),
-			ObjectChannelRouter:  bbgo.NewObjectChannelRouter(),
+		if err := BootstrapBacktestEnvironment(ctx, environ, userConfig) ; err != nil {
+			return err
 		}
 
 		trader := bbgo.NewTrader(environ)
@@ -214,14 +210,8 @@ var BacktestCmd = &cobra.Command{
 			trader.DisableLogging()
 		}
 
-		if userConfig.RiskControls != nil {
-			log.Infof("setting risk controls: %+v", userConfig.RiskControls)
-			trader.SetRiskControls(userConfig.RiskControls)
-		}
-
-		for _, entry := range userConfig.ExchangeStrategies {
-			log.Infof("attaching strategy %T on %s instead of %v", entry.Strategy, exchangeName.String(), entry.Mounts)
-			trader.AttachStrategyOn(exchangeName.String(), entry.Strategy)
+		if err := trader.Configure(userConfig) ; err != nil {
+			return err
 		}
 
 		if len(userConfig.CrossExchangeStrategies) > 0 {
