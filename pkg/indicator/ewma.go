@@ -99,6 +99,10 @@ func KLineClosePriceMapper(k types.KLine) float64 {
 	return k.Close
 }
 
+func KLineTypicalPriceMapper(k types.KLine) float64 {
+	return (k.High + k.Low + k.Close) / float64(3)
+}
+
 func MapKLinePrice(kLines []types.KLine, f KLinePriceMapper) (prices []float64) {
 	for _, k := range kLines {
 		prices = append(prices, f(k))
