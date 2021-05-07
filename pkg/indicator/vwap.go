@@ -1,7 +1,6 @@
 package indicator
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/types"
@@ -25,6 +24,30 @@ type VWAP struct {
 	UpdateCallbacks []func(value float64)
 }
 
+func (inc *VWAP) calculateVWAP(kLines []types.KLine, priceF KLinePriceMapper) (vwap float64) {
+	for i, k := range kLines {
+		inc.update(k, priceF, 1.0) // add kline
+
+		// if window size is not zero, then we do not apply sliding window method
+		if inc.Window != 0 && len(inc.Values) >= inc.Window {
+			inc.update(kLines[i-inc.Window], priceF, -1.0) // pop kline
+		}
+		vwap := inc.WeightedSum / inc.VolumeSum
+		inc.Values.Push(vwap)
+	}
+
+	return vwap
+}
+
+func (inc *VWAP) update(kLine types.KLine, priceF KLinePriceMapper, multiplier float64) {
+	// multiplier = 1 or -1
+	price := priceF(kLine)
+	volume := kLine.Volume
+
+	inc.WeightedSum += multiplier * price * volume
+	inc.VolumeSum += multiplier * volume
+}
+
 func (inc *VWAP) calculateAndUpdate(kLines []types.KLine) {
 	if len(kLines) < inc.Window {
 		return
@@ -44,9 +67,7 @@ func (inc *VWAP) calculateAndUpdate(kLines []types.KLine) {
 		inc.WeightedSum = price * volume
 		inc.VolumeSum = volume
 	} else {
-		// from = len(inc.Values)
-
-		// update ewma with the existing values
+		// update vwap with the existing values
 		for i := dataLen - 1; i > 0; i-- {
 			var k = kLines[i]
 			if k.EndTime.After(inc.EndTime) {
@@ -57,22 +78,19 @@ func (inc *VWAP) calculateAndUpdate(kLines []types.KLine) {
 		}
 	}
 
+	// update vwap
 	for i := from; i < dataLen; i++ {
-		var k = kLines[i]
-
-		inc.WeightedSum += priceF(k) * k.Volume
-		inc.VolumeSum += k.Volume
+		inc.update(kLines[i], priceF, 1.0) // add kline
 
 		if i >= inc.Window {
-			var dropK = kLines[i-inc.Window]
-			inc.WeightedSum -= priceF(dropK) * dropK.Volume
-			inc.VolumeSum -= dropK.Volume
+			inc.update(kLines[i-inc.Window], priceF, -1.0) // pop kline
 		}
-
 		vwap := inc.WeightedSum / inc.VolumeSum
+
 		inc.Values.Push(vwap)
-		inc.EndTime = k.EndTime
 		inc.EmitUpdate(vwap)
+
+		inc.EndTime = kLines[i].EndTime
 	}
 }
 
@@ -86,26 +104,4 @@ func (inc *VWAP) handleKLineWindowUpdate(interval types.Interval, window types.K
 
 func (inc *VWAP) Bind(updater KLineWindowUpdater) {
 	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
-}
-
-func calculateVWAP(kLines []types.KLine, priceF KLinePriceMapper) (float64, error) {
-	length := len(kLines)
-	if length == 0 {
-		return 0.0, fmt.Errorf("insufficient elements for calculating VWAP")
-	}
-
-	weightedSum := 0.0
-	volumeSum := 0.0
-
-	update := func(price float64, volume float64) {
-		weightedSum += price * volume
-		volumeSum += volume
-	}
-
-	for _, k := range kLines {
-		update(priceF(k), k.Volume)
-	}
-
-	avg := weightedSum / volumeSum
-	return avg, nil
 }

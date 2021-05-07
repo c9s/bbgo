@@ -20,28 +20,40 @@ func Test_calculateVWAP(t *testing.T) {
 	tests := []struct {
 		name   string
 		kLines []types.KLine
+		window int
 		want   float64
 	}{
 		{
 			name:   "trivial_case",
 			kLines: buildKLines([]float64{0}, []float64{1}),
+			window: 0,
 			want:   0.0,
 		},
 		{
 			name:   "easy_case",
 			kLines: buildKLines([]float64{1, 2, 3}, []float64{4, 5, 6}),
+			window: 0,
 			want:   (1*4 + 2*5 + 3*6) / float64(4+5+6),
+		},
+		{
+			name:   "window_case",
+			kLines: buildKLines([]float64{1, 2, 3, 4}, []float64{4, 5, 6, 7}),
+			window: 3,
+			want:   (2*5 + 3*6 + 4*7) / float64(5+6+7),
 		},
 		{
 			name:   "random_case",
 			kLines: buildKLines(randomPrices, randomVolumes),
+			window: 0,
 			want:   0.48727133857423566,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, _ := calculateVWAP(tt.kLines, KLineTypicalPriceMapper)
+			vwap := VWAP{IntervalWindow: types.IntervalWindow{Window: tt.window}}
+			priceF := KLineTypicalPriceMapper
+			got := vwap.calculateVWAP(tt.kLines, priceF)
 			if got != tt.want {
 				t.Errorf("calculateVWAP() = %v, want %v", got, tt.want)
 			}
