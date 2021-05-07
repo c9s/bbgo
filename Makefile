@@ -98,7 +98,7 @@ dist-darwin: bbgo-darwin bbgo-slim-darwin
 
 dist: static bbgo-linux bbgo-slim-linux bbgo-darwin bbgo-slim-darwin desktop
 	mkdir -p $(DIST_DIR)/$(GIT_DESC)
-	for arch in (amd64 arm64) ; do \
+	for arch in amd64 arm64 ; do \
 		for platform in linux darwin ; do \
 			echo $$platform ; \
 			tar -C $(BIN_DIR) -cvzf $(DIST_DIR)/$(GIT_DESC)/bbgo-$(GIT_DESC)-$$platform-$$arch.tar.gz bbgo-$$platform ; \
