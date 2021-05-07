@@ -45,6 +45,7 @@ bbgo-slim-linux-arm64: $(BIN_DIR)
 	GOOS=linux GOARCH=arm64 go build -tags release -o $(BIN_DIR)/$@ ./cmd/bbgo
 
 bbgo-darwin: bbgo-darwin-arm64 bbgo-darwin-amd64
+	GOOS=darwin GOARCH=$(TARGET_ARCH) go build -tags web,release -o $(BIN_DIR)/$@ ./cmd/bbgo
 
 bbgo-darwin-arm64: $(BIN_DIR)
 	GOOS=darwin GOARCH=arm64 go build -tags web,release -o $(BIN_DIR)/$@ ./cmd/bbgo
@@ -111,13 +112,13 @@ pkg/version/version.go: .FORCE
 	bash utils/generate-version-file.sh > $@
 
 version: pkg/version/version.go migrations
-	git commit $< -m "bump version to $(VERSION)"
+	git commit $< -m "bump version to $(VERSION)" || true
 	git tag -f $(VERSION)
 
 migrations:
 	rockhopper compile --config rockhopper_mysql.yaml --output pkg/migrations/mysql
 	rockhopper compile --config rockhopper_sqlite.yaml --output pkg/migrations/sqlite3
-	git add -v pkg/migrations && git commit -m "compile and update migration package" pkg/migrations || true
+	(git add -v pkg/migrations && git commit -m "compile and update migration package" pkg/migrations) || true
 
 docker:
 	GOPATH=$(PWD)/_mod go mod download
