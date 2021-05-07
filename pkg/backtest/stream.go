@@ -52,9 +52,13 @@ func (s *Stream) Connect(ctx context.Context) error {
 	log.Infof("used symbols: %v and intervals: %v", symbols, intervals)
 
 	go func() {
+		log.Infof("emitting connect callbacks...")
 		s.EmitConnect()
+
+		log.Infof("emitting start callbacks...")
 		s.EmitStart()
 
+		log.Infof("querying klines from database...")
 		klineC, errC := s.exchange.srv.QueryKLinesCh(s.exchange.startTime, s.exchange.endTime, s.exchange, symbols, intervals)
 		numKlines := 0
 		for k := range klineC {
