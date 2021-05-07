@@ -53,6 +53,7 @@ func (s *Stream) Connect(ctx context.Context) error {
 
 	go func() {
 		s.EmitConnect()
+		s.EmitStart()
 
 		klineC, errC := s.exchange.srv.QueryKLinesCh(s.exchange.startTime, s.exchange.endTime, s.exchange, symbols, intervals)
 		numKlines := 0
