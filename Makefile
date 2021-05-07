@@ -133,7 +133,7 @@ docker-push:
 	docker push yoanlin/bbgo
 	bash -c "[[ -n $(DOCKER_TAG) ]] && docker push yoanlin/bbgo:$(DOCKER_TAG)"
 
-frontend/out/index.html: .FORCE
+frontend/out/index.html:
 	(cd frontend && yarn export)
 
 pkg/server/assets.go: frontend/out/index.html
