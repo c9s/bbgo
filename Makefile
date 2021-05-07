@@ -50,16 +50,12 @@ bbgo-slim-linux-arm64: $(BIN_DIR)
 	GOOS=linux GOARCH=arm64 go build -tags release -o $(BIN_DIR)/$@ ./cmd/bbgo
 
 bbgo-darwin: bbgo-darwin-arm64 bbgo-darwin-amd64
-	GOOS=darwin GOARCH=$(TARGET_ARCH) go build -tags web,release -o $(BIN_DIR)/$@ ./cmd/bbgo
 
 bbgo-darwin-arm64: $(BIN_DIR)
 	GOOS=darwin GOARCH=arm64 go build -tags web,release -o $(BIN_DIR)/$@ ./cmd/bbgo
 
 bbgo-darwin-amd64: $(BIN_DIR)
 	GOOS=darwin GOARCH=amd64 go build -tags web,release -o $(BIN_DIR)/$@ ./cmd/bbgo
-
-bbgo-darwin: $(BIN_DIR)
-	GOOS=darwin GOARCH=$(TARGET_ARCH) go build -tags web,release -o $(BIN_DIR)/$@ ./cmd/bbgo
 
 bbgo-slim-darwin-arm64: $(BIN_DIR)
 	GOOS=darwin GOARCH=arm64 go build -tags release -o $(BIN_DIR)/$@ ./cmd/bbgo
@@ -100,13 +96,15 @@ desktop: desktop-osx
 $(DIST_DIR)/$(VERSION):
 	mkdir -p $(DIST_DIR)/$(VERSION)
 
-$(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-darwin-amd64.tar.gz $(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-darwin-arm64.tar.gz: $(DIST_DIR)/$(VERSION)
+$(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-linux-amd64.tar.gz $(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-darwin-amd64.tar.gz $(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-linux-arm64.tar.gz $(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-darwin-arm64.tar.gz: $(DIST_DIR)/$(VERSION)
 	$(eval BIN_SUFFIX := $(subst bbgo-$(VERSION)-,,$(basename $(basename $(notdir $@)))))
 	$(eval BIN_NAME := $(subst $(VERSION)-,,$(basename $(basename $(notdir $@)))))
 	$(MAKE) bbgo-$(BIN_SUFFIX)
 	$(MAKE) bbgo-slim-$(BIN_SUFFIX)
 	tar -C $(BIN_DIR) -cvzf $@ $(BIN_NAME)
+ifeq ($(SIGN),1)
 	gpg --yes --detach-sign --armor $@
+endif
 
 dist-bbgo-linux: static $(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-linux-arm64.tar.gz $(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-linux-amd64.tar.gz
 dist-bbgo-darwin: static $(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-darwin-arm64.tar.gz $(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-darwin-amd64.tar.gz
