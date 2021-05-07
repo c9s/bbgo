@@ -2,9 +2,9 @@ TARGET_ARCH ?= amd64
 BUILD_DIR ?= build
 BIN_DIR := $(BUILD_DIR)/bbgo
 DIST_DIR ?= dist
-GIT_DESC := $$(git describe --tags)
+GIT_DESC := $(shell git describe --tags)
 
-VERSION ?= $$(git describe --tags)
+VERSION ?= $(shell git describe --tags)
 
 OSX_APP_NAME = BBGO.app
 OSX_APP_DIR = build/$(OSX_APP_NAME)
@@ -97,23 +97,32 @@ desktop-osx: $(OSX_APP_CONTENTS_DIR)/MacOS/bbgo-desktop $(OSX_APP_CONTENTS_DIR)/
 
 desktop: desktop-osx
 
-dist-bbgo-linux: bbgo-linux bbgo-slim-linux
+$(DIST_DIR)/$(VERSION):
+	mkdir -p $(DIST_DIR)/$(VERSION)
 
-dist-bbgo-darwin: bbgo-darwin bbgo-slim-darwin
 
-pack: static dist-bbgo-linux dist-bbgo-darwin desktop
-	mkdir -p $(DIST_DIR)/$(GIT_DESC)
-	for arch in amd64 arm64 ; do \
-		for platform in linux darwin ; do \
-			echo $$platform ; \
-			tar -C $(BIN_DIR) -cvzf $(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-$$platform-$$arch.tar.gz bbgo-$$platform-$$arch ; \
-			gpg --detach-sign --armor $(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-$$platform-$$arch.tar.gz ; \
-			tar -C $(BIN_DIR) -cvzf $(DIST_DIR)/$(VERSION)/bbgo-slim-$(VERSION)-$$platform-$$arch.tar.gz bbgo-slim-$$platform-$$arch ; \
-			gpg --detach-sign --armor $(DIST_DIR)/$(VERSION)/bbgo-slim-$(VERSION)-$$platform-$$arch.tar.gz ; \
-			done ; \
-		done
+$(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-linux-amd64.tar.gz: $(DIST_DIR)/$(VERSION) bbgo-linux bbgo-slim-linux
+	tar -C $(BIN_DIR) -cvzf $@ bbgo-linux-amd64
+	gpg --detach-sign --armor $@
 
-dist: pack
+$(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-linux-arm64.tar.gz: $(DIST_DIR)/$(VERSION) bbgo-linux bbgo-slim-linux
+	tar -C $(BIN_DIR) -cvzf $@ bbgo-linux-arm64
+	gpg --detach-sign --armor $@
+
+dist-bbgo-linux: static $(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-linux-arm64.tar.gz $(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-linux-amd64.tar.gz
+
+
+$(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-darwin-amd64.tar.gz: $(DIST_DIR)/$(VERSION) bbgo-darwin bbgo-slim-darwin
+	tar -C $(BIN_DIR) -cvzf $@ bbgo-darwin-amd64
+	gpg --detach-sign --armor $@
+
+$(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-darwin-arm64.tar.gz: $(DIST_DIR)/$(VERSION) bbgo-darwin bbgo-slim-darwin
+	tar -C $(BIN_DIR) -cvzf $@ bbgo-darwin-arm64
+	gpg --detach-sign --armor $@
+
+dist-bbgo-darwin: static $(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-darwin-arm64.tar.gz $(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-darwin-amd64.tar.gz
+
+dist: dist-bbgo-linux dist-bbgo-darwin desktop
 
 pkg/version/version.go: .FORCE
 	bash utils/generate-version-file.sh > $@
