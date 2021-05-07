@@ -112,13 +112,11 @@ $(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-linux-arm64.tar.gz: $(DIST_DIR)/$(VERSION
 dist-bbgo-linux: static $(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-linux-arm64.tar.gz $(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-linux-amd64.tar.gz
 
 
-$(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-darwin-amd64.tar.gz: $(DIST_DIR)/$(VERSION) bbgo-darwin bbgo-slim-darwin
-	tar -C $(BIN_DIR) -cvzf $@ bbgo-darwin-amd64
-	gpg --detach-sign --armor $@
-
-$(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-darwin-arm64.tar.gz: $(DIST_DIR)/$(VERSION) bbgo-darwin bbgo-slim-darwin
-	tar -C $(BIN_DIR) -cvzf $@ bbgo-darwin-arm64
-	gpg --detach-sign --armor $@
+$(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-darwin-amd64.tar.gz $(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-darwin-arm64.tar.gz: $(DIST_DIR)/$(VERSION)
+	$(MAKE) bbgo-$(subst bbgo-$(VERSION)-,,$(basename $(basename $(notdir $@))))
+	$(MAKE) bbgo-slim-$(subst bbgo-$(VERSION)-,,$(basename $(basename $(notdir $@))))
+	tar -C $(BIN_DIR) -cvzf $@ $(subst $(VERSION)-,,$(basename $(basename $(notdir $@))))
+	gpg --yes --detach-sign --armor $@
 
 dist-bbgo-darwin: static $(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-darwin-arm64.tar.gz $(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-darwin-amd64.tar.gz
 
