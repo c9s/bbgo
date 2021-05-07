@@ -198,6 +198,7 @@ func (e Exchange) QueryKLines(ctx context.Context, symbol string, interval types
 	if options.EndTime != nil {
 		return e.srv.QueryKLinesBackward(e.sourceName, symbol, interval, *options.EndTime)
 	}
+
 	if options.StartTime != nil {
 		return e.srv.QueryKLinesForward(e.sourceName, symbol, interval, *options.StartTime)
 	}

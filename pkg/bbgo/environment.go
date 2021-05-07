@@ -274,26 +274,32 @@ func (environ *Environment) AddExchangesFromSessionConfig(sessions map[string]*E
 	return nil
 }
 
+
 // Init prepares the data that will be used by the strategies
 func (environ *Environment) Init(ctx context.Context) (err error) {
 	for n := range environ.sessions {
 		var session = environ.sessions[n]
-
-		if err := session.Init(ctx, environ); err != nil {
+		if err = session.Init(ctx, environ); err != nil {
 			// we can skip initialized sessions
 			if err != ErrSessionAlreadyInitialized {
 				return err
 			}
 		}
-
-		if err := session.InitSymbols(ctx, environ); err != nil {
-			return err
-		}
-
 	}
 
-	return nil
+	return
 }
+
+func (environ *Environment) Start(ctx context.Context) (err error) {
+	for n := range environ.sessions {
+		var session = environ.sessions[n]
+		if err = session.InitSymbols(ctx, environ); err != nil {
+			return err
+		}
+	}
+	return
+}
+
 
 func (environ *Environment) ConfigurePersistence(conf *PersistenceConfig) error {
 	if conf.Redis != nil {
@@ -552,10 +558,6 @@ func (environ *Environment) SyncSession(ctx context.Context, session *ExchangeSe
 }
 
 func (environ *Environment) syncSession(ctx context.Context, session *ExchangeSession, defaultSymbols ...string) error {
-	if err := session.Init(ctx, environ); err != nil {
-		return err
-	}
-
 	symbols, err := getSessionSymbols(session, defaultSymbols...)
 	if err != nil {
 		return err
