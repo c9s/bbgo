@@ -32,7 +32,7 @@ func (inc *VWAP) calculateVWAP(kLines []types.KLine, priceF KLinePriceMapper) (v
 		if inc.Window != 0 && len(inc.Values) >= inc.Window {
 			inc.update(kLines[i-inc.Window], priceF, -1.0) // pop kline
 		}
-		vwap := inc.WeightedSum / inc.VolumeSum
+		vwap = inc.WeightedSum / inc.VolumeSum
 		inc.Values.Push(vwap)
 	}
 
