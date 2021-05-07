@@ -96,7 +96,7 @@ dist-linux: bbgo-linux bbgo-slim-linux
 
 dist-darwin: bbgo-darwin bbgo-slim-darwin
 
-dist: static bbgo-linux bbgo-slim-linux bbgo-darwin bbgo-slim-darwin desktop
+pack: static bbgo-linux bbgo-slim-linux bbgo-darwin bbgo-slim-darwin desktop
 	mkdir -p $(DIST_DIR)/$(GIT_DESC)
 	for arch in amd64 arm64 ; do \
 		for platform in linux darwin ; do \
@@ -107,6 +107,8 @@ dist: static bbgo-linux bbgo-slim-linux bbgo-darwin bbgo-slim-darwin desktop
 			gpg --sign --armor $(DIST_DIR)/$(GIT_DESC)/bbgo-slim-$(GIT_DESC)-$$platform-$$arch.tar.gz ; \
 			done ; \
 		done
+
+dist: pack
 
 pkg/version/version.go: .FORCE
 	bash utils/generate-version-file.sh > $@
@@ -139,4 +141,4 @@ embed: pkg/server/assets.go
 
 static: frontend/out/index.html pkg/server/assets.go
 
-.PHONY: bbgo bbgo-slim-darwin bbgo-slim-darwin-amd64 bbgo-slim-darwin-arm64 bbgo-darwin version dist migrations static embed desktop .FORCE
+.PHONY: bbgo bbgo-slim-darwin bbgo-slim-darwin-amd64 bbgo-slim-darwin-arm64 bbgo-darwin version dist pack migrations static embed desktop  .FORCE
