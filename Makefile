@@ -96,19 +96,26 @@ desktop: desktop-osx
 $(DIST_DIR)/$(VERSION):
 	mkdir -p $(DIST_DIR)/$(VERSION)
 
-$(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-linux-amd64.tar.gz $(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-darwin-amd64.tar.gz $(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-linux-arm64.tar.gz $(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-darwin-arm64.tar.gz: $(DIST_DIR)/$(VERSION)
+$(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-%.tar.gz:
 	$(eval BIN_SUFFIX := $(subst bbgo-$(VERSION)-,,$(basename $(basename $(notdir $@)))))
 	$(eval BIN_NAME := $(subst $(VERSION)-,,$(basename $(basename $(notdir $@)))))
-	$(MAKE) bbgo-$(BIN_SUFFIX)
-	$(MAKE) bbgo-slim-$(BIN_SUFFIX)
+	$(MAKE) $(BIN_NAME)
 	tar -C $(BIN_DIR) -cvzf $@ $(BIN_NAME)
 ifeq ($(SIGN),1)
 	gpg --yes --detach-sign --armor $@
 endif
 
-dist-bbgo-linux: $(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-linux-arm64.tar.gz $(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-linux-amd64.tar.gz
+dist-bbgo-linux: \
+	$(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-linux-arm64.tar.gz \
+	$(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-linux-amd64.tar.gz \
+	$(DIST_DIR)/$(VERSION)/bbgo-slim-$(VERSION)-linux-arm64.tar.gz \
+	$(DIST_DIR)/$(VERSION)/bbgo-slim-$(VERSION)-linux-amd64.tar.gz
 
-dist-bbgo-darwin: $(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-darwin-arm64.tar.gz $(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-darwin-amd64.tar.gz
+dist-bbgo-darwin: \
+	$(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-darwin-arm64.tar.gz \
+	$(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-darwin-amd64.tar.gz \
+	$(DIST_DIR)/$(VERSION)/bbgo-slim-$(VERSION)-darwin-arm64.tar.gz \
+	$(DIST_DIR)/$(VERSION)/bbgo-slim-$(VERSION)-darwin-amd64.tar.gz
 
 dist: static dist-bbgo-linux dist-bbgo-darwin desktop
 
