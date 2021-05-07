@@ -4,6 +4,8 @@ BIN_DIR := $(BUILD_DIR)/bbgo
 DIST_DIR ?= dist
 GIT_DESC := $$(git describe --tags)
 
+VERSION ?= $$(git describe --tags)
+
 OSX_APP_NAME = BBGO.app
 OSX_APP_DIR = build/$(OSX_APP_NAME)
 OSX_APP_CONTENTS_DIR = $(OSX_APP_DIR)/Contents
@@ -93,9 +95,9 @@ dist-linux: bbgo-linux bbgo-slim-linux
 
 dist-darwin: bbgo-darwin bbgo-slim-darwin
 
-dist: static migrations bbgo-linux bbgo-slim-linux bbgo-darwin bbgo-slim-darwin desktop
+dist: static bbgo-linux bbgo-slim-linux bbgo-darwin bbgo-slim-darwin desktop
 	mkdir -p $(DIST_DIR)/$(GIT_DESC)
-	for arch in amd64 ; do \
+	for arch in (amd64 arm64) ; do \
 		for platform in linux darwin ; do \
 			echo $$platform ; \
 			tar -C $(BIN_DIR) -cvzf $(DIST_DIR)/$(GIT_DESC)/bbgo-$(GIT_DESC)-$$platform-$$arch.tar.gz bbgo-$$platform ; \
@@ -108,7 +110,9 @@ dist: static migrations bbgo-linux bbgo-slim-linux bbgo-darwin bbgo-slim-darwin 
 pkg/version/version.go: .FORCE
 	bash utils/generate-version-file.sh > $@
 
-version: pkg/version/version.go
+version: pkg/version/version.go migrations
+	git commit $< -m "bump version to $(VERSION)"
+	git tag -f $(VERSION)
 
 migrations:
 	rockhopper compile --config rockhopper_mysql.yaml --output pkg/migrations/mysql
