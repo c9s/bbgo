@@ -32,12 +32,12 @@ bbgo-slim:
 	go build -tags release -o $(BIN_DIR)/$@ ./cmd/bbgo
 
 # build cross-compile linux bbgo
-bbgo-linux:  bbgo-linux-amd64 bbgo-linux-arm64
+bbgo-linux: bbgo-linux-amd64 bbgo-linux-arm64
 
-bbgo-linux-amd64: $(BIN_DIR)
+bbgo-linux-amd64: $(BIN_DIR) pkg/server/assets.go
 	GOOS=linux GOARCH=amd64 go build -tags web,release -o $(BIN_DIR)/$@ ./cmd/bbgo
 
-bbgo-linux-arm64: $(BIN_DIR)
+bbgo-linux-arm64: $(BIN_DIR) pkg/server/assets.go
 	GOOS=linux GOARCH=arm64 go build -tags web,release -o $(BIN_DIR)/$@ ./cmd/bbgo
 
 # build cross-compile linux bbgo (slim version)
@@ -51,10 +51,10 @@ bbgo-slim-linux-arm64: $(BIN_DIR)
 
 bbgo-darwin: bbgo-darwin-arm64 bbgo-darwin-amd64
 
-bbgo-darwin-arm64: $(BIN_DIR)
+bbgo-darwin-arm64: $(BIN_DIR) pkg/server/assets.go
 	GOOS=darwin GOARCH=arm64 go build -tags web,release -o $(BIN_DIR)/$@ ./cmd/bbgo
 
-bbgo-darwin-amd64: $(BIN_DIR)
+bbgo-darwin-amd64: $(BIN_DIR) pkg/server/assets.go
 	GOOS=darwin GOARCH=amd64 go build -tags web,release -o $(BIN_DIR)/$@ ./cmd/bbgo
 
 bbgo-slim-darwin-arm64: $(BIN_DIR)
@@ -106,10 +106,11 @@ ifeq ($(SIGN),1)
 	gpg --yes --detach-sign --armor $@
 endif
 
-dist-bbgo-linux: static $(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-linux-arm64.tar.gz $(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-linux-amd64.tar.gz
-dist-bbgo-darwin: static $(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-darwin-arm64.tar.gz $(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-darwin-amd64.tar.gz
+dist-bbgo-linux: $(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-linux-arm64.tar.gz $(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-linux-amd64.tar.gz
 
-dist: dist-bbgo-linux dist-bbgo-darwin desktop
+dist-bbgo-darwin: $(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-darwin-arm64.tar.gz $(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-darwin-amd64.tar.gz
+
+dist: static dist-bbgo-linux dist-bbgo-darwin desktop
 
 pkg/version/version.go: .FORCE
 	bash utils/generate-version-file.sh > $@
@@ -135,7 +136,7 @@ docker-push:
 frontend/out/index.html: .FORCE
 	(cd frontend && yarn export)
 
-pkg/server/assets.go: frontend/out/index.html .FORCE
+pkg/server/assets.go: frontend/out/index.html
 	go run ./util/embed -package server -output $@ $(FRONTEND_EXPORT_DIR)
 
 embed: pkg/server/assets.go
