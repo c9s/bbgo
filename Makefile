@@ -32,8 +32,13 @@ bbgo-slim:
 	go build -tags release -o $(BIN_DIR)/$@ ./cmd/bbgo
 
 # build cross-compile linux bbgo
-bbgo-linux: $(BIN_DIR)
-	GOOS=linux GOARCH=$(TARGET_ARCH) go build -tags web,release -o $(BIN_DIR)/$@ ./cmd/bbgo
+bbgo-linux:  bbgo-linux-amd64 bbgo-linux-arm64
+
+bbgo-linux-amd64: $(BIN_DIR)
+	GOOS=linux GOARCH=amd64 go build -tags web,release -o $(BIN_DIR)/$@ ./cmd/bbgo
+
+bbgo-linux-arm64: $(BIN_DIR)
+	GOOS=linux GOARCH=arm64 go build -tags web,release -o $(BIN_DIR)/$@ ./cmd/bbgo
 
 # build cross-compile linux bbgo (slim version)
 bbgo-slim-linux: bbgo-slim-linux-amd64 bbgo-slim-linux-arm64
@@ -92,19 +97,19 @@ desktop-osx: $(OSX_APP_CONTENTS_DIR)/MacOS/bbgo-desktop $(OSX_APP_CONTENTS_DIR)/
 
 desktop: desktop-osx
 
-dist-linux: bbgo-linux bbgo-slim-linux
+dist-bbgo-linux: bbgo-linux bbgo-slim-linux
 
-dist-darwin: bbgo-darwin bbgo-slim-darwin
+dist-bbgo-darwin: bbgo-darwin bbgo-slim-darwin
 
-pack: static bbgo-linux bbgo-slim-linux bbgo-darwin bbgo-slim-darwin desktop
+pack: static dist-bbgo-linux dist-bbgo-darwin desktop
 	mkdir -p $(DIST_DIR)/$(GIT_DESC)
 	for arch in amd64 arm64 ; do \
 		for platform in linux darwin ; do \
 			echo $$platform ; \
-			tar -C $(BIN_DIR) -cvzf $(DIST_DIR)/$(GIT_DESC)/bbgo-$(GIT_DESC)-$$platform-$$arch.tar.gz bbgo-$$platform-$$arch ; \
-			gpg --clearsign --armor $(DIST_DIR)/$(GIT_DESC)/bbgo-$(GIT_DESC)-$$platform-$$arch.tar.gz ; \
-			tar -C $(BIN_DIR) -cvzf $(DIST_DIR)/$(GIT_DESC)/bbgo-slim-$(GIT_DESC)-$$platform-$$arch.tar.gz bbgo-slim-$$platform-$$arch ; \
-			gpg --clearsign --armor $(DIST_DIR)/$(GIT_DESC)/bbgo-slim-$(GIT_DESC)-$$platform-$$arch.tar.gz ; \
+			tar -C $(BIN_DIR) -cvzf $(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-$$platform-$$arch.tar.gz bbgo-$$platform-$$arch ; \
+			gpg --clearsign --armor $(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-$$platform-$$arch.tar.gz ; \
+			tar -C $(BIN_DIR) -cvzf $(DIST_DIR)/$(VERSION)/bbgo-slim-$(VERSION)-$$platform-$$arch.tar.gz bbgo-slim-$$platform-$$arch ; \
+			gpg --clearsign --armor $(DIST_DIR)/$(VERSION)/bbgo-slim-$(VERSION)-$$platform-$$arch.tar.gz ; \
 			done ; \
 		done
 
