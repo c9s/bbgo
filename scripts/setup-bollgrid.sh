@@ -1,8 +1,5 @@
 #!/bin/bash
 set -e
-osf=$(uname | tr '[:upper:]' '[:lower:]')
-version=v1.15.3
-dist_file=bbgo-$version-$osf-amd64.tar.gz
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -24,10 +21,15 @@ function info()
     echo -e "${GREEN}$@${NC}"
 }
 
+osf=$(uname | tr '[:upper:]' '[:lower:]')
+arch=amd64
+version=v1.15.4
+dist_file=bbgo-$version-$osf-$arch.tar.gz
+
 info "downloading..."
 curl -O -L https://github.com/c9s/bbgo/releases/download/$version/$dist_file
 tar xzf $dist_file
-mv bbgo-$osf bbgo
+mv bbgo-$osf-$arch bbgo
 chmod +x bbgo
 info "downloaded successfully"
 
