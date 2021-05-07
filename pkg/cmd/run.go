@@ -126,6 +126,10 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config, enableWebServer
 		return err
 	}
 
+	if err := environ.Init(ctx) ; err != nil {
+		return err
+	}
+
 	if err := environ.Sync(ctx); err != nil {
 		return err
 	}
