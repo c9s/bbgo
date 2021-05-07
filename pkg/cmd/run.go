@@ -79,6 +79,22 @@ func runSetup(baseCtx context.Context, userConfig *bbgo.Config, enableApiServer 
 	return nil
 }
 
+
+func BootstrapBacktestEnvironment(ctx context.Context, environ *bbgo.Environment, userConfig *bbgo.Config) error {
+	if err := environ.ConfigureDatabase(ctx); err != nil {
+		return err
+	}
+
+	environ.Notifiability = bbgo.Notifiability{
+		SymbolChannelRouter:  bbgo.NewPatternChannelRouter(nil),
+		SessionChannelRouter: bbgo.NewPatternChannelRouter(nil),
+		ObjectChannelRouter:  bbgo.NewObjectChannelRouter(),
+	}
+
+	return nil
+}
+
+
 func BootstrapEnvironment(ctx context.Context, environ *bbgo.Environment, userConfig *bbgo.Config) error {
 	if err := environ.ConfigureDatabase(ctx); err != nil {
 		return err
