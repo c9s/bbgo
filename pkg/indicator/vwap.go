@@ -2,11 +2,9 @@ package indicator
 
 import (
 	"fmt"
-	"math"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/types"
-	log "github.com/sirupsen/logrus"
 )
 
 /*
@@ -62,11 +60,9 @@ func (inc *VWAP) calculateAndUpdate(kLines []types.KLine) {
 	for i := from; i < dataLen; i++ {
 		var k = kLines[i]
 
-		// add next
 		inc.WeightedSum += priceF(k) * k.Volume
 		inc.VolumeSum += k.Volume
 
-		// drop first
 		if i >= inc.Window {
 			var dropK = kLines[i-inc.Window]
 			inc.WeightedSum -= priceF(dropK) * dropK.Volume
@@ -77,22 +73,6 @@ func (inc *VWAP) calculateAndUpdate(kLines []types.KLine) {
 		inc.Values.Push(vwap)
 		inc.EndTime = k.EndTime
 		inc.EmitUpdate(vwap)
-	}
-
-	// verify the result of accumulated vwap with sliding window method
-	var index = len(kLines) - 1
-	var recentK = kLines[index-inc.Window+1 : index+1]
-
-	v2, err := calculateVWAP(recentK, KLineTypicalPriceMapper)
-	if err != nil {
-		log.WithError(err).Error("VWAP error")
-		return
-	}
-
-	v1 := inc.Values[index]
-	diff := math.Abs(v1 - v2)
-	if diff > 1e-5 {
-		log.Warnf("ACCUMULATED %s VWAP (%d) %f != VWAP %f", inc.Interval, inc.Window, v1, v2)
 	}
 }
 
@@ -117,7 +97,6 @@ func calculateVWAP(kLines []types.KLine, priceF KLinePriceMapper) (float64, erro
 	weightedSum := 0.0
 	volumeSum := 0.0
 
-	// TODO: move the following func to calculateAndUpdate and support sliding window method
 	update := func(price float64, volume float64) {
 		weightedSum += price * volume
 		volumeSum += volume
