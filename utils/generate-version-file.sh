@@ -1,13 +1,16 @@
 #!/bin/bash
 
-packageName=version
-version=$(git describe --tags)
+PACKAGE_NAME=version
+
+if [[ -z $VERSION ]] ; then
+    VERSION=$(git describe --tags)
+fi
 
 cat <<END
 // +build release
 
-package $packageName
+package $PACKAGE_NAME
 
-const Version = "${version}"
+const Version = "${VERSION}"
 
 END
