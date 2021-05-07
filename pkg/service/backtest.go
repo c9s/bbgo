@@ -51,7 +51,7 @@ func (s *BacktestService) SyncKLineByInterval(ctx context.Context, exchange type
 func (s *BacktestService) Sync(ctx context.Context, exchange types.Exchange, symbol string, startTime time.Time) error {
 	endTime := time.Now()
 	for interval := range types.SupportedIntervals {
-		if err := s.SyncKLineByInterval(ctx, exchange, symbol, interval, startTime, endTime) ; err != nil {
+		if err := s.SyncKLineByInterval(ctx, exchange, symbol, interval, startTime, endTime); err != nil {
 			return err
 		}
 	}
@@ -92,12 +92,13 @@ func (s *BacktestService) QueryLast(ex types.ExchangeName, symbol string, interv
 	return nil, rows.Err()
 }
 
-func (s *BacktestService) QueryKLinesForward(exchange types.ExchangeName, symbol string, interval types.Interval, startTime time.Time) ([]types.KLine, error) {
-	sql := "SELECT * FROM `binance_klines` WHERE `end_time` >= :startTime AND `symbol` = :symbol AND `interval` = :interval ORDER BY end_time ASC"
+func (s *BacktestService) QueryKLinesForward(exchange types.ExchangeName, symbol string, interval types.Interval, startTime time.Time, limit int) ([]types.KLine, error) {
+	sql := "SELECT * FROM `binance_klines` WHERE `end_time` >= :start_time AND `symbol` = :symbol AND `interval` = :interval ORDER BY end_time ASC LIMIT :limit"
 	sql = strings.ReplaceAll(sql, "binance_klines", exchange.String()+"_klines")
 
 	rows, err := s.DB.NamedQuery(sql, map[string]interface{}{
-		"startTime": startTime,
+		"start_time": startTime,
+		"limit": limit,
 		"symbol":    symbol,
 		"interval":  interval,
 	})
@@ -108,12 +109,13 @@ func (s *BacktestService) QueryKLinesForward(exchange types.ExchangeName, symbol
 	return s.scanRows(rows)
 }
 
-func (s *BacktestService) QueryKLinesBackward(exchange types.ExchangeName, symbol string, interval types.Interval, endTime time.Time) ([]types.KLine, error) {
-	sql := "SELECT * FROM `binance_klines` WHERE `end_time` <= :endTime AND `symbol` = :symbol AND `interval` = :interval ORDER BY end_time ASC"
+func (s *BacktestService) QueryKLinesBackward(exchange types.ExchangeName, symbol string, interval types.Interval, endTime time.Time, limit int) ([]types.KLine, error) {
+	sql := "SELECT * FROM `binance_klines` WHERE `end_time` <= :end_time AND `symbol` = :symbol AND `interval` = :interval ORDER BY end_time ASC LIMIT :limit"
 	sql = strings.ReplaceAll(sql, "binance_klines", exchange.String()+"_klines")
 
 	rows, err := s.DB.NamedQuery(sql, map[string]interface{}{
-		"endTime":  endTime,
+		"limit":    limit,
+		"end_time":  endTime,
 		"symbol":   symbol,
 		"interval": interval,
 	})
