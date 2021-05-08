@@ -6,8 +6,6 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-var randomPrices = []float64{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
-
 /*
 python:
 
@@ -19,6 +17,7 @@ print(fast - slow)
 */
 
 func Test_calculateMACD(t *testing.T) {
+	var randomPrices = []float64{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
 	tests := []struct {
 		name   string
 		kLines []types.KLine

@@ -6,34 +6,15 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-type EMA struct {
-	Window int
-	Values Float64Slice
-}
-
-func (inc *EMA) Update(value float64) float64 {
-	lambda := 2.0 / float64(1+inc.Window)
-
-	length := len(inc.Values)
-	var ema float64
-	if length == 0 {
-		ema = value
-	} else {
-		ema = (1-lambda)*inc.Values[length-1] + lambda*value
-	}
-	inc.Values.Push(ema)
-	return ema
-}
-
 //go:generate callbackgen -type MACD
 type MACD struct {
 	types.IntervalWindow     // 9
 	ShortPeriod          int // 12
 	LongPeriod           int // 26
 	Values               Float64Slice
-	FastEMA              EMA
-	SlowEMA              EMA
-	SignalLine           EMA
+	FastEWMA             EWMA
+	SlowEWMA             EWMA
+	SignalLine           EWMA
 	Histogram            Float64Slice
 
 	EndTime time.Time
@@ -50,26 +31,26 @@ func (inc *MACD) calculateMACD(kLines []types.KLine, priceF KLinePriceMapper) fl
 
 func (inc *MACD) update(kLine types.KLine, priceF KLinePriceMapper) {
 	if len(inc.Values) == 0 {
-		inc.FastEMA = EMA{Window: inc.ShortPeriod}
-		inc.SlowEMA = EMA{Window: inc.LongPeriod}
-		inc.SignalLine = EMA{Window: inc.Window}
+		inc.FastEWMA = EWMA{IntervalWindow: types.IntervalWindow{Window: inc.ShortPeriod}}
+		inc.SlowEWMA = EWMA{IntervalWindow: types.IntervalWindow{Window: inc.LongPeriod}}
+		inc.SignalLine = EWMA{IntervalWindow: types.IntervalWindow{Window: inc.Window}}
 	}
 
 	price := priceF(kLine)
 
 	// update fast and slow ema
-	fastEMA := inc.FastEMA.Update(price)
-	slowEMA := inc.SlowEMA.Update(price)
+	inc.FastEWMA.Update(price)
+	inc.SlowEWMA.Update(price)
 
 	// update macd
-	macd := fastEMA - slowEMA
+	macd := inc.FastEWMA.Last() - inc.SlowEWMA.Last()
 	inc.Values.Push(macd)
 
 	// update signal line
-	signalValue := inc.SignalLine.Update(macd)
+	inc.SignalLine.Update(macd)
 
 	// update histogram
-	inc.Histogram.Push(macd - signalValue)
+	inc.Histogram.Push(macd - inc.SignalLine.Last())
 }
 
 func (inc *MACD) calculateAndUpdate(kLines []types.KLine) {
