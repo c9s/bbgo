@@ -9,8 +9,10 @@ import (
 /*
 vwap implements the volume weighted average price (VWAP) indicator:
 
-The basics of VWAP
+Volume Weighted Average Price (VWAP) Definition
 - https://www.investopedia.com/terms/v/vwap.asp
+
+Volume-Weighted Average Price (VWAP) Explained
 - https://academy.binance.com/en/articles/volume-weighted-average-price-vwap-explained
 */
 //go:generate callbackgen -type VWAP
