@@ -196,10 +196,11 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 
 func (e Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
 	if options.EndTime != nil {
-		return e.srv.QueryKLinesBackward(e.sourceName, symbol, interval, *options.EndTime)
+		return e.srv.QueryKLinesBackward(e.sourceName, symbol, interval, *options.EndTime, 1000)
 	}
+
 	if options.StartTime != nil {
-		return e.srv.QueryKLinesForward(e.sourceName, symbol, interval, *options.StartTime)
+		return e.srv.QueryKLinesForward(e.sourceName, symbol, interval, *options.StartTime, 1000)
 	}
 
 	return nil, errors.New("endTime or startTime can not be nil")

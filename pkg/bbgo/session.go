@@ -250,6 +250,8 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 	session.Account.BindStream(session.Stream)
 
 	// insert trade into db right before everything
+	// TODO: we should insert the backtest trades into the database,
+	// 		 however we should clean up the trades before we start the next backtesting
 	if environ.TradeService != nil && environ.BacktestService == nil {
 		session.Stream.OnTradeUpdate(func(trade types.Trade) {
 			if err := environ.TradeService.Insert(trade); err != nil {
