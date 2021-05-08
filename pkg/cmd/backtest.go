@@ -103,6 +103,10 @@ var BacktestCmd = &cobra.Command{
 			userConfig.Backtest.EndTime = now.Format("2006-01-02")
 		}
 
+		if len(userConfig.CrossExchangeStrategies) > 0 {
+			log.Warnf("backtest does not support CrossExchangeStrategy, strategies won't be added.")
+		}
+
 		startTime, err := userConfig.Backtest.ParseStartTime()
 		if err != nil {
 			return err
@@ -111,7 +115,7 @@ var BacktestCmd = &cobra.Command{
 		log.Infof("starting backtest with startTime %s", startTime.Format(time.ANSIC))
 
 		environ := bbgo.NewEnvironment()
-		if err := environ.ConfigureDatabase(ctx); err != nil {
+		if err := BootstrapBacktestEnvironment(ctx, environ, userConfig) ; err != nil {
 			return err
 		}
 
@@ -131,6 +135,14 @@ var BacktestCmd = &cobra.Command{
 				if err != nil {
 					return err
 				}
+
+				if syncFromTime.After(startTime) {
+					return fmt.Errorf("sync-from time %s can not be latter than the backtest start time %s", syncFromTime, startTime)
+				}
+			} else {
+				// we need at least 1 month backward data for EMA and last prices
+				syncFromTime = syncFromTime.AddDate(0, -1, 0)
+				log.Infof("adjusted sync start time to %s for backward market data", syncFromTime)
 			}
 
 			log.Info("starting synchronization...")
@@ -192,14 +204,11 @@ var BacktestCmd = &cobra.Command{
 		}
 
 		backtestExchange := backtest.NewExchange(exchangeName, backtestService, userConfig.Backtest)
-
 		environ.SetStartTime(startTime)
 		environ.AddExchange(exchangeName.String(), backtestExchange)
 
-		environ.Notifiability = bbgo.Notifiability{
-			SymbolChannelRouter:  bbgo.NewPatternChannelRouter(nil),
-			SessionChannelRouter: bbgo.NewPatternChannelRouter(nil),
-			ObjectChannelRouter:  bbgo.NewObjectChannelRouter(),
+		if err := environ.Init(ctx) ; err != nil {
+			return err
 		}
 
 		trader := bbgo.NewTrader(environ)
@@ -214,19 +223,10 @@ var BacktestCmd = &cobra.Command{
 			trader.DisableLogging()
 		}
 
-		if userConfig.RiskControls != nil {
-			log.Infof("setting risk controls: %+v", userConfig.RiskControls)
-			trader.SetRiskControls(userConfig.RiskControls)
+		if err := trader.Configure(userConfig) ; err != nil {
+			return err
 		}
 
-		for _, entry := range userConfig.ExchangeStrategies {
-			log.Infof("attaching strategy %T on %s instead of %v", entry.Strategy, exchangeName.String(), entry.Mounts)
-			trader.AttachStrategyOn(exchangeName.String(), entry.Strategy)
-		}
-
-		if len(userConfig.CrossExchangeStrategies) > 0 {
-			log.Warnf("backtest does not support CrossExchangeStrategy, strategies won't be added.")
-		}
 
 		if err := trader.Run(ctx); err != nil {
 			return err

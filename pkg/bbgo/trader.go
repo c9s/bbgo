@@ -295,7 +295,7 @@ func (trader *Trader) RunAllSingleExchangeStrategy(ctx context.Context) error {
 func (trader *Trader) Run(ctx context.Context) error {
 	trader.Subscribe()
 
-	if err := trader.environment.Init(ctx); err != nil {
+	if err := trader.environment.Start(ctx); err != nil {
 		return err
 	}
 
