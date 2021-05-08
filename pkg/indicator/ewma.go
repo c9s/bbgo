@@ -18,6 +18,18 @@ type EWMA struct {
 	UpdateCallbacks []func(value float64)
 }
 
+func (inc *EWMA) Update(value float64) {
+	var multiplier = 2.0 / float64(1+inc.Window)
+
+	if len(inc.Values) == 0 {
+		inc.Values.Push(value)
+		return
+	}
+
+	ema := (1-multiplier)*inc.Last() + multiplier*value
+	inc.Values.Push(ema)
+}
+
 func (inc *EWMA) Last() float64 {
 	if len(inc.Values) == 0 {
 		return 0
