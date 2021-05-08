@@ -132,12 +132,12 @@ func (s *Strategy) Validate() error {
 func (s *Strategy) generateGridSellOrders(session *bbgo.ExchangeSession) ([]types.SubmitOrder, error) {
 	currentPriceFloat, ok := session.LastPrice(s.Symbol)
 	if !ok {
-		return nil, fmt.Errorf("%s last price not found, skipping", s.Symbol)
+		return nil, fmt.Errorf("can not generate sell orders, %s last price not found", s.Symbol)
 	}
 
 	currentPrice := fixedpoint.NewFromFloat(currentPriceFloat)
 	if currentPrice > s.UpperPrice {
-		return nil, fmt.Errorf("current price %f is higher than upper price %f", currentPrice.Float64(), s.UpperPrice.Float64())
+		return nil, fmt.Errorf("can not generate sell orders, the current price %f is higher than upper price %f", currentPrice.Float64(), s.UpperPrice.Float64())
 	}
 
 	priceRange := s.UpperPrice - s.LowerPrice
@@ -311,11 +311,12 @@ func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types
 
 func (s *Strategy) placeGridSellOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	orderForms, err := s.generateGridSellOrders(session)
-	if err != nil {
-		return err
-	}
 
 	if len(orderForms) == 0 {
+		if err != nil {
+			return err
+		}
+
 		return errors.New("none of sell order is generated")
 	}
 
@@ -327,11 +328,12 @@ func (s *Strategy) placeGridSellOrders(orderExecutor bbgo.OrderExecutor, session
 
 func (s *Strategy) placeGridBuyOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	orderForms, err := s.generateGridBuyOrders(session)
-	if err != nil {
-		return err
-	}
 
 	if len(orderForms) == 0 {
+		if err != nil {
+			return err
+		}
+
 		return errors.New("none of buy order is generated")
 	}
 

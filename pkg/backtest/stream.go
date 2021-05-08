@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/types"
 )
+
+var log = logrus.WithField("cmd", "backtest")
 
 type Stream struct {
 	types.StandardStream
@@ -50,16 +52,25 @@ func (s *Stream) Connect(ctx context.Context) error {
 	log.Infof("used symbols: %v and intervals: %v", symbols, intervals)
 
 	go func() {
+		log.Infof("emitting connect callbacks...")
 		s.EmitConnect()
 
+		log.Infof("emitting start callbacks...")
+		s.EmitStart()
+
+		log.Infof("querying klines from database...")
 		klineC, errC := s.exchange.srv.QueryKLinesCh(s.exchange.startTime, s.exchange.endTime, s.exchange, symbols, intervals)
+		numKlines := 0
 		for k := range klineC {
 			if k.Interval == types.Interval1m {
 				matching, ok := s.exchange.matchingBooks[k.Symbol]
 				if !ok {
 					log.Errorf("matching book of %s is not initialized", k.Symbol)
+					continue
 				}
+
 				matching.processKLine(k)
+				numKlines++
 			}
 
 			s.EmitKLineClosed(k)
@@ -67,6 +78,10 @@ func (s *Stream) Connect(ctx context.Context) error {
 
 		if err := <-errC; err != nil {
 			log.WithError(err).Error("backtest data feed error")
+		}
+
+		if numKlines == 0 {
+			log.Error("kline data is empty, make sure you have sync the exchange market data")
 		}
 
 		if err := s.Close(); err != nil {
