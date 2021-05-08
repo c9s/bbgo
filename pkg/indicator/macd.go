@@ -45,7 +45,7 @@ func (inc *MACD) calculateMACD(kLines []types.KLine, priceF KLinePriceMapper) fl
 	for _, kline := range kLines {
 		inc.update(kline, priceF)
 	}
-	return inc.Values.LastValue()
+	return inc.Values[len(inc.Values)-1]
 }
 
 func (inc *MACD) update(kLine types.KLine, priceF KLinePriceMapper) {
@@ -73,7 +73,7 @@ func (inc *MACD) update(kLine types.KLine, priceF KLinePriceMapper) {
 }
 
 func (inc *MACD) calculateAndUpdate(kLines []types.KLine) {
-	if len(kLines) < inc.Window {
+	if len(kLines) == 0 {
 		return
 	}
 
@@ -87,7 +87,7 @@ func (inc *MACD) calculateAndUpdate(kLines []types.KLine) {
 
 	for i, kLine := range kLines {
 		inc.update(kLine, priceF)
-		inc.EmitUpdate(inc.Values.LastValue())
+		inc.EmitUpdate(inc.Values[len(inc.Values)-1])
 		inc.EndTime = kLines[i].EndTime
 	}
 
