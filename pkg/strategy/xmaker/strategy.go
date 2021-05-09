@@ -217,7 +217,7 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 				hedgeQuota.Rollback()
 			}
 			bidPrice -= fixedpoint.NewFromFloat(s.makerMarket.TickSize * float64(s.Pips))
-			bidQuantity.Mul(s.QuantityMultiplier)
+			bidQuantity = bidQuantity.Mul(s.QuantityMultiplier)
 		}
 
 		// for maker ask orders
@@ -240,7 +240,7 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 				hedgeQuota.Rollback()
 			}
 			askPrice += fixedpoint.NewFromFloat(s.makerMarket.TickSize * float64(s.Pips))
-			askQuantity.Mul(s.QuantityMultiplier)
+			askQuantity = askQuantity.Mul(s.QuantityMultiplier)
 		}
 	}
 
