@@ -493,7 +493,6 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 				position := s.state.HedgePosition.AtomicLoad()
 				abspos := math.Abs(position.Float64())
 				if !s.DisableHedge && abspos > s.sourceMarket.MinQuantity {
-					log.Infof("found position: %f", position.Float64())
 					s.Hedge(ctx, -position)
 				}
 			}
@@ -512,14 +511,16 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		}
 
 		for {
+			log.Warnf("waiting for orders to be cancelled...")
+			time.Sleep(1 * time.Second)
+
 			orders := s.activeMakerOrders.Orders()
 			if len(orders) == 0 {
 				log.Info("all orders are cancelled successfully")
 				break
 			}
 
-			log.Warnf("waiting for %d orders to be cancelled...", len(orders))
-			time.Sleep(1 * time.Second)
+			log.Warnf("%d orders are not cancelled yet...", len(orders))
 		}
 
 		if err := s.Persistence.Save(s.state, ID, s.Symbol, stateKey); err != nil {
