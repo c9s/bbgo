@@ -159,13 +159,12 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config, enableWebServer
 
 	cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
 
-	cancelTrading()
-
+	log.Infof("shutting down stratgies...")
 	shutdownCtx, cancelShutdown := context.WithDeadline(ctx, time.Now().Add(30*time.Second))
-
-	log.Infof("shutting down...")
 	trader.Graceful.Shutdown(shutdownCtx)
 	cancelShutdown()
+	cancelTrading()
+
 	return nil
 }
 

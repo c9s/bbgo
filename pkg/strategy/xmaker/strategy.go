@@ -487,9 +487,11 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 			select {
 
 			case <-s.stopC:
+				log.Warnf("%s maker goroutine stopped, due to the stop signal", s.Symbol)
 				return
 
 			case <-ctx.Done():
+				log.Warnf("%s maker goroutine stopped, due to the cancelled context", s.Symbol)
 				return
 
 			case <-quoteTicker.C:
@@ -510,7 +512,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 		close(s.stopC)
 
-		time.Sleep(1 * time.Second)
+		time.Sleep(s.UpdateInterval.Duration())
 
 		for {
 			if err := s.makerSession.Exchange.CancelOrders(ctx, s.activeMakerOrders.Orders()...); err != nil {
@@ -534,7 +536,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 			log.WithError(err).Errorf("can not save state: %+v", s.state)
 		} else {
 			log.Infof("state is saved => %+v", s.state)
-			s.Notify("%s hedge position %f is saved", s.Symbol, s.state.HedgePosition.Float64())
+			s.Notify("%s position is saved: position = %f", s.Symbol, s.state.HedgePosition.Float64())
 		}
 	})
 
