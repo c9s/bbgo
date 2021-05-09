@@ -85,12 +85,12 @@ func (m *SyncOrderMap) Backup() []SubmitOrder {
 }
 
 func (m *SyncOrderMap) Remove(orderID uint64) (exists bool) {
-	m.Lock()
-	defer m.Unlock()
 
-	exists = m.orders.Exists(orderID)
+	exists = m.Exists(orderID)
 	if exists {
+		m.Lock()
 		m.orders.Remove(orderID)
+		m.Unlock()
 	}
 
 	return exists
@@ -98,53 +98,49 @@ func (m *SyncOrderMap) Remove(orderID uint64) (exists bool) {
 
 func (m *SyncOrderMap) Add(o Order) {
 	m.Lock()
-	defer m.Unlock()
-
 	m.orders.Add(o)
+	m.Unlock()
 }
 
 func (m *SyncOrderMap) Update(o Order) {
 	m.Lock()
-	defer m.Unlock()
-
 	m.orders.Update(o)
+	m.Unlock()
 }
 
 func (m *SyncOrderMap) Iterate(it func(id uint64, order Order) bool) {
 	m.Lock()
-	defer m.Unlock()
-
 	for id := range m.orders {
 		if it(id, m.orders[id]) {
 			break
 		}
 	}
+	m.Unlock()
 }
 
-func (m *SyncOrderMap) Exists(orderID uint64) bool {
-	m.RLock()
-	defer m.RUnlock()
-
-	return m.orders.Exists(orderID)
+func (m *SyncOrderMap) Exists(orderID uint64) (exists bool) {
+	m.Lock()
+	exists = m.orders.Exists(orderID)
+	m.Unlock()
+	return exists
 }
 
 func (m *SyncOrderMap) Len() int {
-	m.RLock()
-	defer m.RUnlock()
-
+	m.Lock()
+	defer m.Unlock()
 	return len(m.orders)
 }
 
-func (m *SyncOrderMap) IDs() []uint64 {
-	m.RLock()
-	defer m.RUnlock()
-
-	return m.orders.IDs()
+func (m *SyncOrderMap) IDs() (ids []uint64) {
+	m.Lock()
+	ids = m.orders.IDs()
+	m.Unlock()
+	return ids
 }
 
 func (m *SyncOrderMap) FindByStatus(status OrderStatus) OrderSlice {
-	m.RLock()
-	defer m.RUnlock()
+	m.Lock()
+	defer m.Unlock()
 
 	return m.orders.FindByStatus(status)
 }
@@ -155,8 +151,8 @@ func (m *SyncOrderMap) Filled() OrderSlice {
 
 // AnyFilled find any order is filled and stop iterating the order map
 func (m *SyncOrderMap) AnyFilled() (order Order, ok bool) {
-	m.RLock()
-	defer m.RUnlock()
+	m.Lock()
+	defer m.Unlock()
 
 	for _, o := range m.orders {
 		if o.Status == OrderStatusFilled {
