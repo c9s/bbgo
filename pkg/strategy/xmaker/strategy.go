@@ -352,9 +352,9 @@ func (s *Strategy) handleTradeUpdate(trade types.Trade) {
 	s.Notify("Identified %s trade %d with an existing order: %d", trade.Symbol, trade.ID, trade.OrderID)
 
 	if profit, madeProfit := s.state.Position.AddTrade(trade) ; madeProfit {
-		s.Notify("%s trade just made profit %f %s", profit, s.state.Position.QuoteCurrency)
+		s.Notify("%s trade just made profit %f %s", s.Symbol, profit, s.state.Position.QuoteCurrency)
 	} else {
-		s.Notify("%s trade modified the position average cost to %f %s", s.state.Position.AverageCost.Float64(), s.state.Position.QuoteCurrency)
+		s.Notify("%s trade modified the position average cost to %f %s", s.Symbol, s.state.Position.AverageCost.Float64(), s.state.Position.QuoteCurrency)
 	}
 
 	s.state.HedgePosition.AtomicAdd(q)
