@@ -102,7 +102,12 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 	}
 
 	// avoid unlock issue
-	time.Sleep(800 * time.Millisecond)
+	time.Sleep(500 * time.Millisecond)
+
+	if s.activeMakerOrders.NumOfAsks() > 0 || s.activeMakerOrders.NumOfBids() > 0 {
+		log.Warn("there are orders not canceled, skipping placing maker orders")
+		return
+	}
 
 	sourceBook := s.book.Get()
 	if len(sourceBook.Bids) == 0 || len(sourceBook.Asks) == 0 {
@@ -344,7 +349,7 @@ func (s *Strategy) handleTradeUpdate(trade types.Trade) {
 
 	pos := s.state.HedgePosition.AtomicLoad()
 
-	log.Warnf("position changed: %f", pos.Float64())
+	log.Warnf("%s position changed: %f", s.Symbol, pos.Float64())
 	s.Notifiability.Notify("%s position is changed to %f", s.Symbol, pos.Float64())
 
 	s.lastPrice = trade.Price
