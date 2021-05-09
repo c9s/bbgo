@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -28,10 +29,6 @@ var log = logrus.WithField("strategy", ID)
 
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
-}
-
-func (s *Strategy) ID() string {
-	return ID
 }
 
 type State struct {
@@ -82,6 +79,10 @@ type Strategy struct {
 	stopC chan struct{}
 }
 
+func (s *Strategy) ID() string {
+	return ID
+}
+
 func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 	sourceSession, ok := sessions[s.SourceExchange]
 	if !ok {
@@ -113,6 +114,7 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 
 	if s.activeMakerOrders.NumOfAsks() > 0 || s.activeMakerOrders.NumOfBids() > 0 {
 		log.Warnf("there are some %s orders not canceled, skipping placing maker orders", s.Symbol)
+		s.activeMakerOrders.Print()
 		return
 	}
 
@@ -472,11 +474,12 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	s.stopC = make(chan struct{})
 
 	go func() {
-		posTicker := time.NewTicker(s.HedgeInterval.Duration())
+		posTicker := time.NewTicker(durationJitter(s.HedgeInterval.Duration(), 200))
 		defer posTicker.Stop()
 
-		ticker := time.NewTicker(s.UpdateInterval.Duration())
-		defer ticker.Stop()
+		quoteTicker := time.NewTicker(durationJitter(s.UpdateInterval.Duration(), 200))
+		defer quoteTicker.Stop()
+
 		for {
 			select {
 
@@ -486,7 +489,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 			case <-ctx.Done():
 				return
 
-			case <-ticker.C:
+			case <-quoteTicker.C:
 				s.updateQuote(ctx)
 
 			case <-posTicker.C:
@@ -521,6 +524,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 			}
 
 			log.Warnf("%d orders are not cancelled yet...", len(orders))
+			s.activeMakerOrders.Print()
 		}
 
 		if err := s.Persistence.Save(s.state, ID, s.Symbol, stateKey); err != nil {
@@ -532,4 +536,9 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	})
 
 	return nil
+}
+
+func durationJitter(d time.Duration, jitterInMilliseconds int) time.Duration {
+	n := rand.Intn(jitterInMilliseconds)
+	return d + time.Duration(n) * time.Millisecond
 }
