@@ -505,6 +505,12 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 		close(s.stopC)
 
+		time.Sleep(1 * time.Second)
+
+		if err := s.makerSession.Exchange.CancelOrders(ctx, s.activeMakerOrders.Orders()...); err != nil {
+			log.WithError(err).Errorf("can not cancel %s orders", s.Symbol)
+		}
+
 		for {
 			orders := s.activeMakerOrders.Orders()
 			if len(orders) == 0 {
@@ -512,20 +518,15 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 				break
 			}
 
-			log.Warn("waiting for %d orders to be cancelled...", len(orders))
-			time.Sleep(200 * time.Millisecond)
+			log.Warnf("waiting for %d orders to be cancelled...", len(orders))
+			time.Sleep(1 * time.Second)
 		}
-
 
 		if err := s.Persistence.Save(s.state, ID, s.Symbol, stateKey); err != nil {
 			log.WithError(err).Errorf("can not save state: %+v", s.state)
 		} else {
 			log.Infof("state is saved => %+v", s.state)
-			s.Notify("hedge position %f is saved", s.state.HedgePosition.Float64())
-		}
-
-		if err := s.makerSession.Exchange.CancelOrders(ctx, s.activeMakerOrders.Orders()...); err != nil {
-			log.WithError(err).Errorf("can not cancel orders")
+			s.Notify("%s hedge position %f is saved", s.Symbol, s.state.HedgePosition.Float64())
 		}
 	})
 
