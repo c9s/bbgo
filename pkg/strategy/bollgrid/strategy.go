@@ -83,6 +83,8 @@ type Strategy struct {
 
 	// boll is the BOLLINGER indicator we used for predicting the price.
 	boll *indicator.BOLL
+
+	CancelProfitOrdersOnShutdown bool `json: "shutdownCancelProfitOrders"`
 }
 
 func (s *Strategy) ID() string {
@@ -352,8 +354,13 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			log.WithError(err).Errorf("cancel order error")
 		}
 
-		if err := session.Exchange.CancelOrders(ctx, s.profitOrders.Orders()...); err != nil {
-			log.WithError(err).Errorf("cancel order error")
+		if s.CancelProfitOrdersOnShutdown {
+			log.Infof("canceling profit orders...")
+			err := session.Exchange.CancelOrders(ctx, s.profitOrders.Orders()...)
+
+			if err != nil {
+				log.WithError(err).Errorf("cancel profit order error")
+			}
 		}
 	})
 
