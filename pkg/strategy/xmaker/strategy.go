@@ -50,6 +50,7 @@ type Strategy struct {
 
 	UpdateInterval types.Duration `json:"updateInterval"`
 	HedgeInterval  types.Duration `json:"hedgeInterval"`
+	OrderCancelWaitTime types.Duration `json:"orderCancelWaitTime"`
 
 	Margin              fixedpoint.Value `json:"margin"`
 	BidMargin           fixedpoint.Value `json:"bidMargin"`
@@ -103,10 +104,15 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 	}
 
 	// avoid unlock issue
-	time.Sleep(500 * time.Millisecond)
+	if s.OrderCancelWaitTime > 0 {
+		time.Sleep(s.OrderCancelWaitTime.Duration())
+	} else {
+		// use the default wait time
+		time.Sleep(500 * time.Millisecond)
+	}
 
 	if s.activeMakerOrders.NumOfAsks() > 0 || s.activeMakerOrders.NumOfBids() > 0 {
-		log.Warn("there are orders not canceled, skipping placing maker orders")
+		log.Warnf("there are some %s orders not canceled, skipping placing maker orders", s.Symbol)
 		return
 	}
 
@@ -116,13 +122,13 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 	}
 
 	if valid, err := sourceBook.IsValid(); !valid {
-		log.WithError(err).Errorf("invalid order book: %v", err)
+		log.WithError(err).Errorf("%s invalid order book: %v", s.Symbol, err)
 		return
 	}
 
 	bestBidPrice := sourceBook.Bids[0].Price
 	bestAskPrice := sourceBook.Asks[0].Price
-	log.Infof("best bid price %f, best ask price: %f", bestBidPrice.Float64(), bestAskPrice.Float64())
+	log.Infof("%s best bid price %f, best ask price: %f", s.Symbol, bestBidPrice.Float64(), bestAskPrice.Float64())
 
 	bidQuantity := s.Quantity
 	bidPrice := bestBidPrice.MulFloat64(1.0 - s.BidMargin.Float64())
@@ -130,7 +136,7 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 	askQuantity := s.Quantity
 	askPrice := bestAskPrice.MulFloat64(1.0 + s.AskMargin.Float64())
 
-	log.Infof("quote bid price: %f ask price: %f", bidPrice.Float64(), askPrice.Float64())
+	log.Infof("%s quote bid price: %f ask price: %f", s.Symbol, bidPrice.Float64(), askPrice.Float64())
 
 	var disableMakerBid = false
 	var disableMakerAsk = false
@@ -502,6 +508,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		for {
 			orders := s.activeMakerOrders.Orders()
 			if len(orders) == 0 {
+				log.Info("all orders are cancelled successfully")
 				break
 			}
 
