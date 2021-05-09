@@ -75,8 +75,8 @@ type Strategy struct {
 	// Quantity is the quantity you want to submit for each order.
 	Quantity fixedpoint.Value `json:"quantity,omitempty"`
 
-	// ScaleQuantity helps user to define the quantity by price scale or volume scale
-	ScaleQuantity *bbgo.PriceVolumeScale `json:"scaleQuantity,omitempty"`
+	// QuantityScale helps user to define the quantity by price scale or volume scale
+	QuantityScale *bbgo.PriceVolumeScale `json:"quantityScale,omitempty"`
 
 	// FixedAmount is used for fixed amount (dynamic quantity) if you don't want to use fixed quantity.
 	FixedAmount fixedpoint.Value `json:"amount,omitempty" yaml:"amount"`
@@ -122,7 +122,7 @@ func (s *Strategy) Validate() error {
 		return fmt.Errorf("profit spread should bigger than 0")
 	}
 
-	if s.Quantity == 0 && s.ScaleQuantity == nil {
+	if s.Quantity == 0 && s.QuantityScale == nil {
 		return fmt.Errorf("quantity or scaleQuantity can not be zero")
 	}
 
@@ -175,8 +175,8 @@ func (s *Strategy) generateGridSellOrders(session *bbgo.ExchangeSession) ([]type
 		var quantity fixedpoint.Value
 		if s.Quantity > 0 {
 			quantity = s.Quantity
-		} else if s.ScaleQuantity != nil {
-			qf, err := s.ScaleQuantity.Scale(price.Float64(), 0)
+		} else if s.QuantityScale != nil {
+			qf, err := s.QuantityScale.Scale(price.Float64(), 0)
 			if err != nil {
 				return nil, err
 			}
@@ -268,8 +268,8 @@ func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types
 		var quantity fixedpoint.Value
 		if s.Quantity > 0 {
 			quantity = s.Quantity
-		} else if s.ScaleQuantity != nil {
-			qf, err := s.ScaleQuantity.Scale(price.Float64(), 0)
+		} else if s.QuantityScale != nil {
+			qf, err := s.QuantityScale.Scale(price.Float64(), 0)
 			if err != nil {
 				return nil, err
 			}

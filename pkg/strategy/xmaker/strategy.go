@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -51,11 +52,19 @@ type Strategy struct {
 	HedgeInterval       types.Duration `json:"hedgeInterval"`
 	OrderCancelWaitTime types.Duration `json:"orderCancelWaitTime"`
 
-	Margin              fixedpoint.Value `json:"margin"`
-	BidMargin           fixedpoint.Value `json:"bidMargin"`
-	AskMargin           fixedpoint.Value `json:"askMargin"`
-	Quantity            fixedpoint.Value `json:"quantity"`
-	QuantityMultiplier  fixedpoint.Value `json:"quantityMultiplier"`
+	Margin    fixedpoint.Value `json:"margin"`
+	BidMargin fixedpoint.Value `json:"bidMargin"`
+	AskMargin fixedpoint.Value `json:"askMargin"`
+
+	// Quantity is used for fixed quantity of the first layer
+	Quantity fixedpoint.Value `json:"quantity"`
+
+	// QuantityMultiplier is the factor that multiplies the quantity of the previous layer
+	QuantityMultiplier fixedpoint.Value `json:"quantityMultiplier"`
+
+	// QuantityScale helps user to define the quantity by layer scale
+	QuantityScale *bbgo.LayerScale `json:"quantityScale,omitempty"`
+
 	MaxExposurePosition fixedpoint.Value `json:"maxExposurePosition"`
 	DisableHedge        bool             `json:"disableHedge"`
 
@@ -134,10 +143,8 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 	bestAskPrice := sourceBook.Asks[0].Price
 	log.Infof("%s best bid price %f, best ask price: %f", s.Symbol, bestBidPrice.Float64(), bestAskPrice.Float64())
 
-	bidQuantity := s.Quantity
 	bidPrice := bestBidPrice.MulFloat64(1.0 - s.BidMargin.Float64())
 
-	askQuantity := s.Quantity
 	askPrice := bestAskPrice.MulFloat64(1.0 + s.AskMargin.Float64())
 
 	log.Infof("%s quote bid price: %f ask price: %f", s.Symbol, bidPrice.Float64(), askPrice.Float64())
@@ -206,9 +213,24 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 		return
 	}
 
+	bidQuantity := s.Quantity
+	askQuantity := s.Quantity
 	for i := 0; i < s.NumLayers; i++ {
 		// for maker bid orders
 		if !disableMakerBid {
+			if s.QuantityScale != nil {
+				qf, err := s.QuantityScale.Scale(i + 1)
+				if err != nil {
+					log.WithError(err).Errorf("quantityScale error")
+					return
+				}
+
+				log.Infof("scaling quantity to %f by layer: %d", qf, i+1)
+
+				// override the default bid quantity
+				bidQuantity = fixedpoint.NewFromFloat(qf)
+			}
+
 			if makerQuota.QuoteAsset.Lock(bidQuantity.Mul(bidPrice)) && hedgeQuota.BaseAsset.Lock(bidQuantity) {
 				// if we bought, then we need to sell the base from the hedge session
 				submitOrders = append(submitOrders, types.SubmitOrder{
@@ -227,12 +249,27 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 				makerQuota.Rollback()
 				hedgeQuota.Rollback()
 			}
+
 			bidPrice -= fixedpoint.NewFromFloat(s.makerMarket.TickSize * float64(s.Pips))
-			bidQuantity = bidQuantity.Mul(s.QuantityMultiplier)
+
+			if s.QuantityMultiplier > 0 {
+				bidQuantity = bidQuantity.Mul(s.QuantityMultiplier)
+			}
 		}
 
 		// for maker ask orders
 		if !disableMakerAsk {
+			if s.QuantityScale != nil {
+				qf, err := s.QuantityScale.Scale(i + 1)
+				if err != nil {
+					log.WithError(err).Errorf("quantityScale error")
+					return
+				}
+
+				// override the default bid quantity
+				askQuantity = fixedpoint.NewFromFloat(qf)
+			}
+
 			if makerQuota.BaseAsset.Lock(askQuantity) && hedgeQuota.QuoteAsset.Lock(askQuantity.Mul(askPrice)) {
 				// if we bought, then we need to sell the base from the hedge session
 				submitOrders = append(submitOrders, types.SubmitOrder{
@@ -251,7 +288,10 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 				hedgeQuota.Rollback()
 			}
 			askPrice += fixedpoint.NewFromFloat(s.makerMarket.TickSize * float64(s.Pips))
-			askQuantity = askQuantity.Mul(s.QuantityMultiplier)
+
+			if s.QuantityMultiplier > 0 {
+				askQuantity = askQuantity.Mul(s.QuantityMultiplier)
+			}
 		}
 	}
 
@@ -371,6 +411,22 @@ func (s *Strategy) handleTradeUpdate(trade types.Trade) {
 	s.lastPrice = trade.Price
 }
 
+func (s *Strategy) Validate() error {
+	if s.Quantity == 0 || s.QuantityScale == nil {
+		return errors.New("quantity or quantityScale can not be empty")
+	}
+
+	if s.QuantityMultiplier != 0 && s.QuantityMultiplier < 0 {
+		return errors.New("quantityMultiplier can not be a negative number")
+	}
+
+	if len(s.Symbol) == 0 {
+		return errors.New("symbol is required")
+	}
+
+	return nil
+}
+
 func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession) error {
 	// configure default values
 	if s.UpdateInterval == 0 {
@@ -399,10 +455,6 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		} else {
 			s.AskMargin = defaultMargin
 		}
-	}
-
-	if s.Quantity == 0 {
-		s.Quantity = defaultQuantity
 	}
 
 	// configure sessions

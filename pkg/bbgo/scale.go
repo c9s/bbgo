@@ -238,9 +238,48 @@ func (rule *SlideRule) Scale() (Scale, error) {
 	return nil, errors.New("no any scale is defined")
 }
 
+
+// LayerScale defines the scale DSL for maker layers, e.g.,
+//
+// quantityScale:
+//   byLayer:
+//     exp:
+//       domain: [1, 5]
+//       range: [0.01, 1.0]
+//
+// and
+//
+// quantityScale:
+//   byLayer:
+//     linear:
+//       domain: [1, 3]
+//       range: [0.01, 1.0]
+type LayerScale struct {
+	LayerRule *SlideRule `json:"byLayer"`
+}
+
+func (s *LayerScale) Scale(layer int) (quantity float64, err error) {
+	if s.LayerRule == nil {
+		err = errors.New("either price or volume scale is not defined")
+		return
+	}
+
+	scale, err := s.LayerRule.Scale()
+	if err != nil {
+		return 0, err
+	}
+
+	if err := scale.Solve(); err != nil {
+		return 0, err
+	}
+
+	return scale.Call(float64(layer)), nil
+}
+
+
 // PriceVolumeScale defines the scale DSL for strategy, e.g.,
 //
-// scaleQuantity:
+// quantityScale:
 //   byPrice:
 //     exp:
 //       domain: [10_000, 50_000]
@@ -248,22 +287,22 @@ func (rule *SlideRule) Scale() (Scale, error) {
 //
 // and
 //
-// scaleQuantity:
+// quantityScale:
 //   byVolume:
 //     linear:
 //       domain: [10_000, 50_000]
 //       range: [0.01, 1.0]
 type PriceVolumeScale struct {
-	ByPrice  *SlideRule `json:"byPrice"`
-	ByVolume *SlideRule `json:"byVolume"`
+	ByPriceRule  *SlideRule `json:"byPrice"`
+	ByVolumeRule *SlideRule `json:"byVolume"`
 }
 
-func (q *PriceVolumeScale) Scale(price float64, volume float64) (quantity float64, err error) {
-	if q.ByPrice != nil {
-		quantity, err = q.ScaleByPrice(price)
+func (s *PriceVolumeScale) Scale(price float64, volume float64) (quantity float64, err error) {
+	if s.ByPriceRule != nil {
+		quantity, err = s.ScaleByPrice(price)
 		return
-	} else if q.ByVolume != nil {
-		quantity, err = q.ScaleByVolume(volume)
+	} else if s.ByVolumeRule != nil {
+		quantity, err = s.ScaleByVolume(volume)
 	} else {
 		err = errors.New("either price or volume scale is not defined")
 	}
@@ -271,12 +310,12 @@ func (q *PriceVolumeScale) Scale(price float64, volume float64) (quantity float6
 }
 
 // ScaleByPrice scale quantity by the given price
-func (q *PriceVolumeScale) ScaleByPrice(price float64) (float64, error) {
-	if q.ByPrice == nil {
+func (s *PriceVolumeScale) ScaleByPrice(price float64) (float64, error) {
+	if s.ByPriceRule == nil {
 		return 0, errors.New("byPrice scale is not defined")
 	}
 
-	scale, err := q.ByPrice.Scale()
+	scale, err := s.ByPriceRule.Scale()
 	if err != nil {
 		return 0, err
 	}
@@ -289,12 +328,12 @@ func (q *PriceVolumeScale) ScaleByPrice(price float64) (float64, error) {
 }
 
 // ScaleByVolume scale quantity by the given volume
-func (q *PriceVolumeScale) ScaleByVolume(volume float64) (float64, error) {
-	if q.ByVolume == nil {
+func (s *PriceVolumeScale) ScaleByVolume(volume float64) (float64, error) {
+	if s.ByVolumeRule == nil {
 		return 0, errors.New("byVolume scale is not defined")
 	}
 
-	scale, err := q.ByVolume.Scale()
+	scale, err := s.ByVolumeRule.Scale()
 	if err != nil {
 		return 0, err
 	}
