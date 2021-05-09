@@ -499,6 +499,17 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 		close(s.stopC)
 
+		for {
+			orders := s.activeMakerOrders.Orders()
+			if len(orders) == 0 {
+				break
+			}
+
+			log.Warn("waiting for %d orders to be cancelled...", len(orders))
+			time.Sleep(200 * time.Millisecond)
+		}
+
+
 		if err := s.Persistence.Save(s.state, ID, s.Symbol, stateKey); err != nil {
 			log.WithError(err).Errorf("can not save state: %+v", s.state)
 		} else {
