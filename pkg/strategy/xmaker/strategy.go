@@ -33,7 +33,7 @@ func init() {
 
 type State struct {
 	HedgePosition fixedpoint.Value `json:"hedgePosition"`
-	Position      *bbgo.Position    `json:"position,omitempty"`
+	Position      *bbgo.Position   `json:"position,omitempty"`
 }
 
 type Strategy struct {
@@ -45,8 +45,8 @@ type Strategy struct {
 	SourceExchange string `json:"sourceExchange"`
 	MakerExchange  string `json:"makerExchange"`
 
-	UpdateInterval types.Duration `json:"updateInterval"`
-	HedgeInterval  types.Duration `json:"hedgeInterval"`
+	UpdateInterval      types.Duration `json:"updateInterval"`
+	HedgeInterval       types.Duration `json:"hedgeInterval"`
 	OrderCancelWaitTime types.Duration `json:"orderCancelWaitTime"`
 
 	Margin              fixedpoint.Value `json:"margin"`
@@ -307,7 +307,7 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 		return
 	}
 
-	s.Notifiability.Notify("submitting hedge order: %s %s %f", s.Symbol, side, quantity.Float64())
+	s.Notifiability.Notify("Submitting hedge order: %s %s %f", s.Symbol, side, quantity.Float64())
 	orderExecutor := &bbgo.ExchangeOrderExecutor{Session: s.sourceSession}
 	returnOrders, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 		Symbol:   s.Symbol,
@@ -351,20 +351,15 @@ func (s *Strategy) handleTradeUpdate(trade types.Trade) {
 
 	}
 
-	s.Notify("Identified %s trade %d with an existing order: %d", trade.Symbol, trade.ID, trade.OrderID)
+	log.Infof("identified %s trade %d with an existing order: %d", trade.Symbol, trade.ID, trade.OrderID)
 
-	if profit, madeProfit := s.state.Position.AddTrade(trade) ; madeProfit {
+	if profit, madeProfit := s.state.Position.AddTrade(trade); madeProfit {
 		s.Notify("%s trade just made profit %f %s", s.Symbol, profit.Float64(), s.state.Position.QuoteCurrency)
 	} else {
-		s.Notify("%s trade modified the position average cost to %f %s", s.Symbol, s.state.Position.AverageCost.Float64(), s.state.Position.QuoteCurrency)
+		s.Notify("%s trade modified the position: average cost = %f %s, base = %f", s.Symbol, s.state.Position.AverageCost.Float64(), s.state.Position.QuoteCurrency, s.state.Position.Base.Float64())
 	}
 
 	s.state.HedgePosition.AtomicAdd(q)
-
-	pos := s.state.HedgePosition.AtomicLoad()
-
-	log.Warnf("%s position changed: %f", s.Symbol, pos.Float64())
-	s.Notifiability.Notify("%s position is changed to %f", s.Symbol, pos.Float64())
 	s.lastPrice = trade.Price
 }
 
@@ -446,14 +441,14 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		s.state = &state
 
 		log.Infof("state is restored: %+v", s.state)
-		s.Notify("position is restored => %f", s.state.HedgePosition.Float64())
+		s.Notify("%s position is restored => %f", s.Symbol, s.state.HedgePosition.Float64())
 	}
 
 	// if position is nil, we need to allocate a new position for calculation
 	if s.state.Position == nil {
 		s.state.Position = &bbgo.Position{
-			Symbol: s.Symbol,
-			BaseCurrency: s.makerMarket.BaseCurrency,
+			Symbol:        s.Symbol,
+			BaseCurrency:  s.makerMarket.BaseCurrency,
 			QuoteCurrency: s.makerMarket.QuoteCurrency,
 		}
 	}
@@ -540,5 +535,5 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 func durationJitter(d time.Duration, jitterInMilliseconds int) time.Duration {
 	n := rand.Intn(jitterInMilliseconds)
-	return d + time.Duration(n) * time.Millisecond
+	return d + time.Duration(n)*time.Millisecond
 }
