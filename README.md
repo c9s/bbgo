@@ -54,6 +54,12 @@ bash <(curl -s https://raw.githubusercontent.com/c9s/bbgo/main/scripts/setup-gri
 
 ### Install from source
 
+If you need to use go-sqlite, you will need to enable CGO first:
+
+```
+CGO_ENABLED=1 go get github.com/mattn/go-sqlite3
+```
+
 Install the bbgo command:
 
 ```sh
