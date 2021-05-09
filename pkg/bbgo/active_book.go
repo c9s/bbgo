@@ -53,6 +53,9 @@ func (b *LocalActiveOrderBook) orderUpdateHandler(order types.Order) {
 	case types.OrderStatusCanceled, types.OrderStatusRejected:
 		log.Debugf("[LocalActiveOrderBook] order status %s, removing %d...", order.Status, order.OrderID)
 		b.Remove(order)
+
+	default:
+		log.Warnf("unhandled order status: %s", order.Status)
 	}
 }
 
