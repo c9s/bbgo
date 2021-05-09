@@ -512,13 +512,13 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 		time.Sleep(1 * time.Second)
 
-		if err := s.makerSession.Exchange.CancelOrders(ctx, s.activeMakerOrders.Orders()...); err != nil {
-			log.WithError(err).Errorf("can not cancel %s orders", s.Symbol)
-		}
-
 		for {
+			if err := s.makerSession.Exchange.CancelOrders(ctx, s.activeMakerOrders.Orders()...); err != nil {
+				log.WithError(err).Errorf("can not cancel %s orders", s.Symbol)
+			}
+
 			log.Warnf("waiting for orders to be cancelled...")
-			time.Sleep(1 * time.Second)
+			time.Sleep(3 * time.Second)
 
 			orders := s.activeMakerOrders.Orders()
 			if len(orders) == 0 {
