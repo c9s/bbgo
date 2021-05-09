@@ -82,6 +82,20 @@ func TestLinearScale(t *testing.T) {
 	}
 }
 
+func TestLinearScale2(t *testing.T) {
+	scale := LinearScale{
+		Domain: [2]float64{1, 3},
+		Range:  [2]float64{0.1, 0.4},
+	}
+
+	err := scale.Solve()
+	assert.NoError(t, err)
+	assert.Equal(t, "f(x) = 0.150000 * x + -0.050000", scale.String())
+	assert.Equal(t, fixedpoint.NewFromFloat(0.1), fixedpoint.NewFromFloat(scale.Call(1)))
+	assert.Equal(t, fixedpoint.NewFromFloat(0.4), fixedpoint.NewFromFloat(scale.Call(3)))
+}
+
+
 func TestQuadraticScale(t *testing.T) {
 	// see https://www.desmos.com/calculator/vfqntrxzpr
 	scale := QuadraticScale{
