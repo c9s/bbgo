@@ -73,14 +73,16 @@ func (n *Notifier) NotifyTo(channel, format string, args ...interface{}) {
 		nonSlackArgs = args[:slackArgsOffset]
 	}
 
-	_, _, err := n.client.PostMessageContext(context.Background(), channel,
-		slack.MsgOptionText(fmt.Sprintf(format, nonSlackArgs...), true),
-		slack.MsgOptionAttachments(slackAttachments...))
-	if err != nil {
-		log.WithError(err).
-			WithField("channel", channel).
-			Errorf("slack error: %s", err.Error())
-	}
+	go func() {
+		_, _, err := n.client.PostMessageContext(context.Background(), channel,
+			slack.MsgOptionText(fmt.Sprintf(format, nonSlackArgs...), true),
+			slack.MsgOptionAttachments(slackAttachments...))
+		if err != nil {
+			log.WithError(err).
+				WithField("channel", channel).
+				Errorf("slack error: %s", err.Error())
+		}
+	}()
 
 	return
 }
