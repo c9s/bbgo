@@ -32,8 +32,10 @@ func init() {
 }
 
 type State struct {
-	HedgePosition fixedpoint.Value `json:"hedgePosition"`
-	Position      *bbgo.Position   `json:"position,omitempty"`
+	HedgePosition     fixedpoint.Value `json:"hedgePosition"`
+	Position          *bbgo.Position   `json:"position,omitempty"`
+	AccumulatedVolume fixedpoint.Value `json:"accumulatedVolume,omitempty"`
+	AccumulatedProfit fixedpoint.Value `json:"accumulatedProfit,omitempty"`
 }
 
 type Strategy struct {
@@ -353,13 +355,19 @@ func (s *Strategy) handleTradeUpdate(trade types.Trade) {
 
 	log.Infof("identified %s trade %d with an existing order: %d", trade.Symbol, trade.ID, trade.OrderID)
 
+	s.state.HedgePosition.AtomicAdd(q)
+	s.state.AccumulatedVolume.AtomicAdd(fixedpoint.NewFromFloat(trade.Quantity))
+
 	if profit, madeProfit := s.state.Position.AddTrade(trade); madeProfit {
-		s.Notify("%s trade just made profit %f %s", s.Symbol, profit.Float64(), s.state.Position.QuoteCurrency)
+		s.state.AccumulatedProfit.AtomicAdd(profit)
+
+		s.Notify("%s trade just made profit %f %s, accumulated profit %f %s", s.Symbol,
+			profit.Float64(), s.state.Position.QuoteCurrency,
+			s.state.AccumulatedProfit.Float64(), s.state.Position.QuoteCurrency)
 	} else {
 		s.Notify("%s trade modified the position: average cost = %f %s, base = %f", s.Symbol, s.state.Position.AverageCost.Float64(), s.state.Position.QuoteCurrency, s.state.Position.Base.Float64())
 	}
 
-	s.state.HedgePosition.AtomicAdd(q)
 	s.lastPrice = trade.Price
 }
 
