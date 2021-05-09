@@ -324,7 +324,7 @@ func (environ *Environment) ConfigurePersistence(conf *PersistenceConfig) error 
 	return nil
 }
 
-// configure notification rules
+// ConfigureNotificationRouting configures the notification rules
 // for symbol-based routes, we should register the same symbol rules for each session.
 // for session-based routes, we should set the fixed callbacks for each session
 func (environ *Environment) ConfigureNotificationRouting(conf *NotificationConfig) error {
@@ -633,19 +633,25 @@ func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) erro
 		}
 
 		var session telegramnotifier.Session
+		var qrcodeImagePath = fmt.Sprintf("otp-%s.png", telegramID)
 		if err := sessionStore.Load(&session); err != nil || session.Owner == nil {
 			log.Warnf("telegram session not found, generating new one-time password key for new telegram session...")
 
-			qrcodeImagePath := fmt.Sprintf("otp-%s.png", telegramID)
 			key, err := setupNewOTPKey(qrcodeImagePath)
 			if err != nil {
 				return errors.Wrapf(err, "failed to setup totp (time-based one time password) key")
 			}
 
+			printTelegramOtpAuthGuide(qrcodeImagePath)
+
 			session = telegramnotifier.NewSession(key)
 			if err := sessionStore.Save(&session); err != nil {
 				return errors.Wrap(err, "failed to save session")
 			}
+		} else if session.OneTimePasswordKey != nil {
+			log.Infof("telegram session loaded: %+v", session)
+
+			printTelegramOtpAuthGuide(qrcodeImagePath)
 		}
 
 		go interaction.Start(session)
@@ -694,8 +700,6 @@ func setupNewOTPKey(qrcodeImagePath string) (*otp.Key, error) {
 	if err := writeOTPKeyAsQRCodePNG(key, qrcodeImagePath); err != nil {
 		return nil, err
 	}
-
-	printTelegramOtpAuthGuide(qrcodeImagePath)
 
 	return key, nil
 }
