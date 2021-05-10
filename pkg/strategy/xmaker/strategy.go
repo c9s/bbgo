@@ -20,6 +20,8 @@ import (
 
 var defaultMargin = fixedpoint.NewFromFloat(0.01)
 
+var localTimeZone *time.Location
+
 const ID = "xmaker"
 
 const stateKey = "state-v1"
@@ -28,6 +30,12 @@ var log = logrus.WithField("strategy", ID)
 
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
+
+	var err error
+	localTimeZone, err = time.LoadLocation("Local")
+	if err != nil {
+		panic(err)
+	}
 }
 
 type State struct {
@@ -433,7 +441,7 @@ func (s *Strategy) handleTradeUpdate(trade types.Trade) {
 
 		var since time.Time
 		if s.state.AccumulatedSince > 0 {
-			since = time.Unix(s.state.AccumulatedSince, 0)
+			since = time.Unix(s.state.AccumulatedSince, 0).In(localTimeZone)
 		}
 
 		s.Notify("%s trade just made profit %f %s, accumulated profit %f %s since %s", s.Symbol,
