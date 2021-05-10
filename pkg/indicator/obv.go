@@ -32,15 +32,13 @@ func (inc *OBV) update(kLine types.KLine, priceF KLinePriceMapper) {
 		return
 	}
 
-	preOBV := inc.Values[len(inc.Values)-1]
-
 	var sign float64 = 0.0
 	if volume > inc.PrePrice {
 		sign = 1.0
 	} else if volume < inc.PrePrice {
 		sign = -1.0
 	}
-	obv := preOBV + sign*volume
+	obv := inc.Last() + sign*volume
 	inc.Values.Push(obv)
 }
 
