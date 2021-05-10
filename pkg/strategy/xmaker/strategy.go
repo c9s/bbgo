@@ -356,7 +356,7 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 
 	notional := quantity.MulFloat64(lastPrice)
 	if notional.Float64() <= s.sourceMarket.MinNotional {
-		log.Warnf("less than min notional %f, skipping", notional.Float64())
+		log.Warnf("%s %f less than min notional, skipping", s.Symbol, notional.Float64())
 		return
 	}
 
