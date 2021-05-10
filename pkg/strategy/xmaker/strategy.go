@@ -118,13 +118,18 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 	makerSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
 }
 
+func aggregatePrice(quantity fixedpoint.Value) (price fixedpoint.Value) {
+
+	return
+}
+
 func (s *Strategy) updateQuote(ctx context.Context) {
 	if err := s.makerSession.Exchange.CancelOrders(ctx, s.activeMakerOrders.Orders()...); err != nil {
-		log.WithError(err).Errorf("can not cancel orders")
+		log.WithError(err).Errorf("can not cancel %s orders", s.Symbol)
 		return
 	}
 
-	// avoid unlock issue
+	// avoid unlock issue and wait for the balance update
 	if s.OrderCancelWaitTime > 0 {
 		time.Sleep(s.OrderCancelWaitTime.Duration())
 	} else {
@@ -144,42 +149,53 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 	}
 
 	if valid, err := sourceBook.IsValid(); !valid {
-		log.WithError(err).Errorf("%s invalid order book: %v", s.Symbol, err)
+		log.WithError(err).Errorf("%s invalid order book, skip quoting: %v", s.Symbol, err)
 		return
 	}
 
-	bestBidPrice := sourceBook.Bids[0].Price
-	bestAskPrice := sourceBook.Asks[0].Price
-	log.Infof("%s best bid price %f, best ask price: %f", s.Symbol, bestBidPrice.Float64(), bestAskPrice.Float64())
-
-	bidPrice := bestBidPrice.MulFloat64(1.0 - s.BidMargin.Float64())
-
-	askPrice := bestAskPrice.MulFloat64(1.0 + s.AskMargin.Float64())
-
-	log.Infof("%s quote bid price: %f ask price: %f", s.Symbol, bidPrice.Float64(), askPrice.Float64())
-
 	var disableMakerBid = false
 	var disableMakerAsk = false
-	var submitOrders []types.SubmitOrder
 
-	// we load the balances from the account,
-	// however, while we're generating the orders,
+	// check maker's balance quota
+	// we load the balances from the account while we're generating the orders,
 	// the balance may have a chance to be deducted by other strategies or manual orders submitted by the user
 	makerBalances := s.makerSession.Account.Balances()
 	makerQuota := &bbgo.QuotaTransaction{}
 	if b, ok := makerBalances[s.makerMarket.BaseCurrency]; ok {
-		makerQuota.BaseAsset.Add(b.Available)
-
-		if b.Available.Float64() <= s.makerMarket.MinQuantity {
+		if b.Available.Float64() > s.makerMarket.MinQuantity {
+			makerQuota.BaseAsset.Add(b.Available)
+		} else {
 			disableMakerAsk = true
 		}
 	}
 
 	if b, ok := makerBalances[s.makerMarket.QuoteCurrency]; ok {
-		makerQuota.QuoteAsset.Add(b.Available)
-
-		if b.Available.Float64() <= s.makerMarket.MinNotional {
+		if b.Available.Float64() > s.makerMarket.MinNotional {
+			makerQuota.QuoteAsset.Add(b.Available)
+		} else {
 			disableMakerBid = true
+		}
+	}
+
+	hedgeBalances := s.sourceSession.Account.Balances()
+	hedgeQuota := &bbgo.QuotaTransaction{}
+	if b, ok := hedgeBalances[s.sourceMarket.BaseCurrency]; ok {
+		// to make bid orders, we need enough base asset in the foreign exchange,
+		// if the base asset balance is not enough for selling
+		if b.Available.Float64() > s.sourceMarket.MinQuantity {
+			hedgeQuota.BaseAsset.Add(b.Available)
+		} else {
+			disableMakerBid = true
+		}
+	}
+
+	if b, ok := hedgeBalances[s.sourceMarket.QuoteCurrency]; ok {
+		// to make ask orders, we need enough quote asset in the foreign exchange,
+		// if the quote asset balance is not enough for buying
+		if b.Available.Float64() > s.sourceMarket.MinNotional {
+			hedgeQuota.QuoteAsset.Add(b.Available)
+		} else {
+			disableMakerAsk = true
 		}
 	}
 
@@ -189,31 +205,11 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 	if s.MaxExposurePosition > 0 {
 		pos := s.state.HedgePosition.AtomicLoad()
 		if pos < -s.MaxExposurePosition {
+			// stop sell if we over-sell
 			disableMakerAsk = true
 		} else if pos > s.MaxExposurePosition {
+			// stop buy if we over buy
 			disableMakerBid = true
-		}
-	}
-
-	hedgeBalances := s.sourceSession.Account.Balances()
-	hedgeQuota := &bbgo.QuotaTransaction{}
-	if b, ok := hedgeBalances[s.sourceMarket.BaseCurrency]; ok {
-		hedgeQuota.BaseAsset.Add(b.Available)
-
-		// to make bid orders, we need enough base asset in the foreign exchange,
-		// if the base asset balance is not enough for selling
-		if b.Available.Float64() <= s.sourceMarket.MinQuantity {
-			disableMakerBid = true
-		}
-	}
-
-	if b, ok := hedgeBalances[s.sourceMarket.QuoteCurrency]; ok {
-		hedgeQuota.QuoteAsset.Add(b.Available)
-
-		// to make ask orders, we need enough quote asset in the foreign exchange,
-		// if the quote asset balance is not enough for buying
-		if b.Available.Float64() <= s.sourceMarket.MinNotional {
-			disableMakerAsk = true
 		}
 	}
 
@@ -222,8 +218,57 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 		return
 	}
 
-	bidQuantity := s.Quantity
-	askQuantity := s.Quantity
+	var totalBidQuantity, totalAskQuantity fixedpoint.Value
+
+	// askQuantity and bidQuantity could be different, so we are doing it twice
+	for i := 0; i < s.NumLayers; i++ {
+		askQuantity := s.Quantity
+		bidQuantity := s.Quantity
+
+		if !disableMakerBid {
+			if s.QuantityScale != nil {
+				qf, err := s.QuantityScale.Scale(i + 1)
+				if err != nil {
+					log.WithError(err).Errorf("quantityScale error")
+					return
+				}
+
+				log.Infof("scaling quantity to %f by layer: %d", qf, i+1)
+
+				// override the default bid quantity
+				bidQuantity = fixedpoint.NewFromFloat(qf)
+			}
+		}
+		totalBidQuantity += bidQuantity
+
+		// for maker ask orders
+		if !disableMakerAsk {
+			if s.QuantityScale != nil {
+				qf, err := s.QuantityScale.Scale(i + 1)
+				if err != nil {
+					log.WithError(err).Errorf("quantityScale error")
+					return
+				}
+
+				// override the default bid quantity
+				askQuantity = fixedpoint.NewFromFloat(qf)
+			}
+		}
+		totalAskQuantity += askQuantity
+	}
+
+	bestBidPrice := sourceBook.Bids[0].Price
+	bestAskPrice := sourceBook.Asks[0].Price
+	log.Infof("%s best bid price %f, best ask price: %f", s.Symbol, bestBidPrice.Float64(), bestAskPrice.Float64())
+
+	bidPrice := bestBidPrice.MulFloat64(1.0 - s.BidMargin.Float64())
+	askPrice := bestAskPrice.MulFloat64(1.0 + s.AskMargin.Float64())
+
+	log.Infof("%s quote bid price: %f ask price: %f", s.Symbol, bidPrice.Float64(), askPrice.Float64())
+
+	var submitOrders []types.SubmitOrder
+	var bidQuantity = s.Quantity
+	var askQuantity = s.Quantity
 	for i := 0; i < s.NumLayers; i++ {
 		// for maker bid orders
 		if !disableMakerBid {
@@ -368,8 +413,8 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 		// check quote quantity
 		if quote, ok := account.Balance(s.sourceMarket.QuoteCurrency); ok {
 			if quote.Available < notional {
-				qf := bbgo.AdjustQuantityByMaxAmount(quantity.Float64(), lastPrice, quote.Available.Float64())
-				quantity = fixedpoint.NewFromFloat(qf)
+				// qf := bbgo.AdjustQuantityByMaxAmount(quantity.Float64(), lastPrice, quote.Available.Float64())
+				// quantity = fixedpoint.NewFromFloat(qf)
 			}
 		}
 
