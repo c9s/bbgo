@@ -1,6 +1,11 @@
 package types
 
-import "sync"
+import (
+	"sync"
+	"time"
+
+	log "github.com/sirupsen/logrus"
+)
 
 // OrderMap is used for storing orders by their order id
 type OrderMap map[uint64]Order
@@ -67,14 +72,16 @@ func (m OrderMap) Orders() (orders OrderSlice) {
 }
 
 type SyncOrderMap struct {
-	orders OrderMap
+	orders         OrderMap
+	pendingRemoval map[uint64]time.Time
 
 	sync.RWMutex
 }
 
 func NewSyncOrderMap() *SyncOrderMap {
 	return &SyncOrderMap{
-		orders: make(OrderMap),
+		orders:         make(OrderMap),
+		pendingRemoval: make(map[uint64]time.Time, 10),
 	}
 }
 
@@ -91,6 +98,8 @@ func (m *SyncOrderMap) Remove(orderID uint64) (exists bool) {
 		m.Lock()
 		m.orders.Remove(orderID)
 		m.Unlock()
+	} else {
+		m.pendingRemoval[orderID] = time.Now()
 	}
 
 	return exists
@@ -98,7 +107,31 @@ func (m *SyncOrderMap) Remove(orderID uint64) (exists bool) {
 
 func (m *SyncOrderMap) Add(o Order) {
 	m.Lock()
-	m.orders.Add(o)
+
+	match := false
+	if len(m.pendingRemoval) > 0 {
+		expireTime := time.Now().Add(-10 * time.Second)
+		newPendingRemoval := make(map[uint64]time.Time, 10)
+		for orderID, creationTime := range m.pendingRemoval {
+			if o.OrderID == orderID {
+				log.Warnf("found pending removal orderID = %d, removing order %+v from the store", orderID, o)
+				match = true
+				continue
+			}
+
+			if creationTime.Before(expireTime) {
+				continue
+			}
+
+			newPendingRemoval[orderID] = creationTime
+		}
+		m.pendingRemoval = newPendingRemoval
+	}
+
+	if !match {
+		m.orders.Add(o)
+	}
+
 	m.Unlock()
 }
 
