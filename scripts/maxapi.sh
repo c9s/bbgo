@@ -120,6 +120,11 @@ function myOrders()
     send_auth_request "GET" "/api/v2/orders" _params
 }
 
+function myOrder()
+{
+    local -n _params=$1
+    send_auth_request "GET" "/api/v2/order" _params
+}
 
 function myTrades()
 {
