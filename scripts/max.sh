@@ -86,6 +86,20 @@ case "$command" in
             jq -r '.[] | "\(.id) \(.market) \(.side) \(.ord_type) \(if .ord_type | test("stop") then "stop@" + .stop_price else "" end) price = \(if .ord_type | test("market") then "any" else .price end) \t volume = \(.volume) \(.state)"'
         ;;
 
+    order)
+        if [[ $# < 1 ]] ; then
+            echo "$0 order [id]"
+            exit
+        fi
+
+        id=$1
+        declare -A orders_params=()
+        orders_params[id]=$id
+        myOrder orders_params | \
+            jq -r '.'
+        ;;
+
+
     cancel)
         if [[ $# < 1 ]] ; then
             echo "$0 cancel [oid]"
