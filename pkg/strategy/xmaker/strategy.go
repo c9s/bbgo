@@ -329,6 +329,8 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	quantity := pos
 	if pos < 0 {
 		side = types.SideTypeSell
+
+		// quantity must be a positive number
 		quantity = -pos
 	}
 
@@ -366,7 +368,7 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 		// check quote quantity
 		if quote, ok := account.Balance(s.sourceMarket.QuoteCurrency); ok {
 			if quote.Available < notional {
-				qf := bbgo.AdjustQuantityByMinAmount(quantity.Float64(), lastPrice, quote.Available.Float64()*0.99999)
+				qf := bbgo.AdjustQuantityByMinAmount(quantity.Float64(), lastPrice, quote.Available.Float64())
 				quantity = fixedpoint.NewFromFloat(qf)
 			}
 		}
