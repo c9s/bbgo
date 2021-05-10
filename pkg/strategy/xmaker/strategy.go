@@ -349,6 +349,29 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 		return
 	}
 
+	// adjust quantity according to the balances
+	account := s.sourceSession.Account
+	switch side {
+
+	case types.SideTypeBuy:
+		// check quote quantity
+		if quote, ok := account.Balance(s.sourceMarket.QuoteCurrency) ; ok {
+			if quote.Available < notional {
+				qf := bbgo.AdjustQuantityByMinAmount(quantity.Float64(), lastPrice, quote.Available.Float64() * 0.99999)
+				quantity = fixedpoint.NewFromFloat(qf)
+			}
+		}
+
+	case types.SideTypeSell:
+		// check quote quantity
+		if base, ok := account.Balance(s.sourceMarket.BaseCurrency) ; ok {
+			if base.Available < quantity {
+				quantity = base.Available
+			}
+		}
+
+	}
+
 	s.Notifiability.Notify("Submitting hedge order: %s %s %f", s.Symbol, side, quantity.Float64())
 	orderExecutor := &bbgo.ExchangeOrderExecutor{Session: s.sourceSession}
 	returnOrders, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
