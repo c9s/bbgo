@@ -118,9 +118,30 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 	makerSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
 }
 
-func aggregatePrice(quantity fixedpoint.Value) (price fixedpoint.Value) {
+func aggregatePrice(pvs types.PriceVolumeSlice, requiredQuantity fixedpoint.Value) (price fixedpoint.Value) {
+	q := requiredQuantity
+	totalAmount := fixedpoint.Value(0)
 
-	return
+	if len(pvs) == 0 {
+		price = 0
+		return price
+	} else if pvs[0].Volume >= requiredQuantity {
+		return pvs[0].Price
+	}
+
+	for i := 0; i < len(pvs); i++ {
+		pv := pvs[i]
+		if pv.Volume >= q {
+			totalAmount += q.Mul(pv.Price)
+			break
+		}
+
+		q -= pv.Volume
+		totalAmount += pv.Volume.Mul(pv.Price)
+	}
+
+	price = totalAmount.Div(requiredQuantity)
+	return price
 }
 
 func (s *Strategy) updateQuote(ctx context.Context) {
@@ -218,55 +239,12 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 		return
 	}
 
-	var totalBidQuantity, totalAskQuantity fixedpoint.Value
-
-	// askQuantity and bidQuantity could be different, so we are doing it twice
-	for i := 0; i < s.NumLayers; i++ {
-		askQuantity := s.Quantity
-		bidQuantity := s.Quantity
-
-		if !disableMakerBid {
-			if s.QuantityScale != nil {
-				qf, err := s.QuantityScale.Scale(i + 1)
-				if err != nil {
-					log.WithError(err).Errorf("quantityScale error")
-					return
-				}
-
-				log.Infof("scaling quantity to %f by layer: %d", qf, i+1)
-
-				// override the default bid quantity
-				bidQuantity = fixedpoint.NewFromFloat(qf)
-			}
-		}
-		totalBidQuantity += bidQuantity
-
-		// for maker ask orders
-		if !disableMakerAsk {
-			if s.QuantityScale != nil {
-				qf, err := s.QuantityScale.Scale(i + 1)
-				if err != nil {
-					log.WithError(err).Errorf("quantityScale error")
-					return
-				}
-
-				// override the default bid quantity
-				askQuantity = fixedpoint.NewFromFloat(qf)
-			}
-		}
-		totalAskQuantity += askQuantity
-	}
-
 	bestBidPrice := sourceBook.Bids[0].Price
 	bestAskPrice := sourceBook.Asks[0].Price
 	log.Infof("%s best bid price %f, best ask price: %f", s.Symbol, bestBidPrice.Float64(), bestAskPrice.Float64())
 
-	bidPrice := bestBidPrice.MulFloat64(1.0 - s.BidMargin.Float64())
-	askPrice := bestAskPrice.MulFloat64(1.0 + s.AskMargin.Float64())
-
-	log.Infof("%s quote bid price: %f ask price: %f", s.Symbol, bidPrice.Float64(), askPrice.Float64())
-
 	var submitOrders []types.SubmitOrder
+	var accumulativeBidQuantity, accumulativeAskQuantity fixedpoint.Value
 	var bidQuantity = s.Quantity
 	var askQuantity = s.Quantity
 	for i := 0; i < s.NumLayers; i++ {
@@ -284,6 +262,10 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 				// override the default bid quantity
 				bidQuantity = fixedpoint.NewFromFloat(qf)
 			}
+
+			accumulativeBidQuantity += bidQuantity
+			bidPrice := aggregatePrice(sourceBook.Bids, accumulativeBidQuantity)
+			bidPrice = bidPrice.MulFloat64(1.0 - s.BidMargin.Float64())
 
 			if makerQuota.QuoteAsset.Lock(bidQuantity.Mul(bidPrice)) && hedgeQuota.BaseAsset.Lock(bidQuantity) {
 				// if we bought, then we need to sell the base from the hedge session
@@ -304,8 +286,6 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 				hedgeQuota.Rollback()
 			}
 
-			bidPrice -= fixedpoint.NewFromFloat(s.makerMarket.TickSize * float64(s.Pips))
-
 			if s.QuantityMultiplier > 0 {
 				bidQuantity = bidQuantity.Mul(s.QuantityMultiplier)
 			}
@@ -323,6 +303,10 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 				// override the default bid quantity
 				askQuantity = fixedpoint.NewFromFloat(qf)
 			}
+			accumulativeAskQuantity += askQuantity
+
+			askPrice := aggregatePrice(sourceBook.Asks, accumulativeBidQuantity)
+			askPrice = askPrice.MulFloat64(1.0 + s.AskMargin.Float64())
 
 			if makerQuota.BaseAsset.Lock(askQuantity) && hedgeQuota.QuoteAsset.Lock(askQuantity.Mul(askPrice)) {
 				// if we bought, then we need to sell the base from the hedge session
@@ -341,7 +325,6 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 				makerQuota.Rollback()
 				hedgeQuota.Rollback()
 			}
-			askPrice += fixedpoint.NewFromFloat(s.makerMarket.TickSize * float64(s.Pips))
 
 			if s.QuantityMultiplier > 0 {
 				askQuantity = askQuantity.Mul(s.QuantityMultiplier)
@@ -491,10 +474,11 @@ func (s *Strategy) handleTradeUpdate(trade types.Trade) {
 			since = time.Unix(s.state.AccumulatedSince, 0).In(localTimeZone)
 		}
 
-		s.Notify("%s trade just made profit %f %s, accumulated profit %f %s since %s", s.Symbol,
+		s.Notify("%s trade just made profit %f %s, since %s accumulated net profit %f %s, accumulated loss %f %s", s.Symbol,
 			profit.Float64(), s.state.Position.QuoteCurrency,
+			since.Format(time.RFC822),
 			s.state.AccumulatedPnL.Float64(), s.state.Position.QuoteCurrency,
-			since.Format(time.RFC822))
+			s.state.AccumulatedLoss.Float64(), s.state.Position.QuoteCurrency)
 
 	} else {
 		s.Notify("%s trade modified the position: average cost = %f %s, base = %f", s.Symbol, s.state.Position.AverageCost.Float64(), s.state.Position.QuoteCurrency, s.state.Position.Base.Float64())
