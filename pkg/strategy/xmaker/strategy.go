@@ -266,6 +266,9 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 			accumulativeBidQuantity += bidQuantity
 			bidPrice := aggregatePrice(sourceBook.Bids, accumulativeBidQuantity)
 			bidPrice = bidPrice.MulFloat64(1.0 - s.BidMargin.Float64())
+			if i > 0 && s.Pips > 0 {
+				bidPrice -= fixedpoint.NewFromFloat(s.makerMarket.TickSize * float64(s.Pips))
+			}
 
 			if makerQuota.QuoteAsset.Lock(bidQuantity.Mul(bidPrice)) && hedgeQuota.BaseAsset.Lock(bidQuantity) {
 				// if we bought, then we need to sell the base from the hedge session
@@ -307,6 +310,9 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 
 			askPrice := aggregatePrice(sourceBook.Asks, accumulativeBidQuantity)
 			askPrice = askPrice.MulFloat64(1.0 + s.AskMargin.Float64())
+			if i > 0 && s.Pips > 0 {
+				askPrice += fixedpoint.NewFromFloat(s.makerMarket.TickSize * float64(s.Pips))
+			}
 
 			if makerQuota.BaseAsset.Lock(askQuantity) && hedgeQuota.QuoteAsset.Lock(askQuantity.Mul(askPrice)) {
 				// if we bought, then we need to sell the base from the hedge session
