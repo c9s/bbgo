@@ -7,7 +7,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func Test_calculateAndUpdate(t *testing.T) {
+func Test_calculateOBV(t *testing.T) {
 	buildKLines := func(prices, volumes []float64) (kLines []types.KLine) {
 		for i, p := range prices {
 			kLines = append(kLines, types.KLine{High: p, Low: p, Close: p, Volume: volumes[i]})
