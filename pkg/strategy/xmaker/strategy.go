@@ -20,8 +20,6 @@ import (
 
 var defaultMargin = fixedpoint.NewFromFloat(0.01)
 
-var defaultQuantity = fixedpoint.NewFromFloat(0.001)
-
 const ID = "xmaker"
 
 const stateKey = "state-v1"
@@ -36,7 +34,10 @@ type State struct {
 	HedgePosition     fixedpoint.Value `json:"hedgePosition"`
 	Position          *bbgo.Position   `json:"position,omitempty"`
 	AccumulatedVolume fixedpoint.Value `json:"accumulatedVolume,omitempty"`
+	AccumulatedPnL    fixedpoint.Value `json:"accumulatedPnL,omitempty"`
 	AccumulatedProfit fixedpoint.Value `json:"accumulatedProfit,omitempty"`
+	AccumulatedLoss   fixedpoint.Value `json:"accumulatedLoss,omitempty"`
+	AccumulatedSince  int64            `json:"accumulatedSince,omitempty"`
 }
 
 type Strategy struct {
@@ -355,16 +356,16 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 
 	case types.SideTypeBuy:
 		// check quote quantity
-		if quote, ok := account.Balance(s.sourceMarket.QuoteCurrency) ; ok {
+		if quote, ok := account.Balance(s.sourceMarket.QuoteCurrency); ok {
 			if quote.Available < notional {
-				qf := bbgo.AdjustQuantityByMinAmount(quantity.Float64(), lastPrice, quote.Available.Float64() * 0.99999)
+				qf := bbgo.AdjustQuantityByMinAmount(quantity.Float64(), lastPrice, quote.Available.Float64()*0.99999)
 				quantity = fixedpoint.NewFromFloat(qf)
 			}
 		}
 
 	case types.SideTypeSell:
 		// check quote quantity
-		if base, ok := account.Balance(s.sourceMarket.BaseCurrency) ; ok {
+		if base, ok := account.Balance(s.sourceMarket.BaseCurrency); ok {
 			if base.Available < quantity {
 				quantity = base.Available
 			}
@@ -422,11 +423,24 @@ func (s *Strategy) handleTradeUpdate(trade types.Trade) {
 	s.state.AccumulatedVolume.AtomicAdd(fixedpoint.NewFromFloat(trade.Quantity))
 
 	if profit, madeProfit := s.state.Position.AddTrade(trade); madeProfit {
-		s.state.AccumulatedProfit.AtomicAdd(profit)
+		s.state.AccumulatedPnL.AtomicAdd(profit)
 
-		s.Notify("%s trade just made profit %f %s, accumulated profit %f %s", s.Symbol,
+		if profit < 0 {
+			s.state.AccumulatedLoss.AtomicAdd(profit)
+		} else if profit > 0 {
+			s.state.AccumulatedProfit.AtomicAdd(profit)
+		}
+
+		var since time.Time
+		if s.state.AccumulatedSince > 0 {
+			since = time.Unix(s.state.AccumulatedSince, 0)
+		}
+
+		s.Notify("%s trade just made profit %f %s, accumulated profit %f %s since %s", s.Symbol,
 			profit.Float64(), s.state.Position.QuoteCurrency,
-			s.state.AccumulatedProfit.Float64(), s.state.Position.QuoteCurrency)
+			s.state.AccumulatedPnL.Float64(), s.state.Position.QuoteCurrency,
+			since.Format(time.RFC822))
+
 	} else {
 		s.Notify("%s trade modified the position: average cost = %f %s, base = %f", s.Symbol, s.state.Position.AverageCost.Float64(), s.state.Position.QuoteCurrency, s.state.Position.Base.Float64())
 	}
@@ -534,6 +548,10 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 			BaseCurrency:  s.makerMarket.BaseCurrency,
 			QuoteCurrency: s.makerMarket.QuoteCurrency,
 		}
+	}
+
+	if s.state.AccumulatedSince == 0 {
+		s.state.AccumulatedSince = time.Now().Unix()
 	}
 
 	s.book = types.NewStreamBook(s.Symbol)
