@@ -535,6 +535,12 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		quoteTicker := time.NewTicker(durationJitter(s.UpdateInterval.Duration(), 200))
 		defer quoteTicker.Stop()
 
+		defer func() {
+			if err := s.makerSession.Exchange.CancelOrders(context.Background(), s.activeMakerOrders.Orders()...); err != nil {
+				log.WithError(err).Errorf("can not cancel %s orders", s.Symbol)
+			}
+		}()
+
 		for {
 			select {
 
@@ -567,13 +573,6 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		time.Sleep(s.UpdateInterval.Duration())
 
 		for {
-			if err := s.makerSession.Exchange.CancelOrders(ctx, s.activeMakerOrders.Orders()...); err != nil {
-				log.WithError(err).Errorf("can not cancel %s orders", s.Symbol)
-			}
-
-			log.Warnf("waiting for orders to be cancelled...")
-			time.Sleep(3 * time.Second)
-
 			orders := s.activeMakerOrders.Orders()
 			if len(orders) == 0 {
 				log.Info("all orders are cancelled successfully")
@@ -582,6 +581,13 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 			log.Warnf("%d orders are not cancelled yet...", len(orders))
 			s.activeMakerOrders.Print()
+
+			if err := s.makerSession.Exchange.CancelOrders(ctx, s.activeMakerOrders.Orders()...); err != nil {
+				log.WithError(err).Errorf("can not cancel %s orders", s.Symbol)
+			}
+
+			log.Warnf("waiting for orders to be cancelled...")
+			time.Sleep(3 * time.Second)
 		}
 
 		if err := s.Persistence.Save(s.state, ID, s.Symbol, stateKey); err != nil {
