@@ -365,27 +365,35 @@ func toMaxSubmitOrder(o types.SubmitOrder) (*maxapi.Order, error) {
 	return &maxOrder, nil
 }
 
-func (e *Exchange) Withdrawal(ctx context.Context, asset string, amount fixedpoint.Value, address string) error {
+func (e *Exchange) Withdrawal(ctx context.Context, currency string, amount fixedpoint.Value, address string) error {
+	currency = toLocalCurrency(currency)
+
 	addresses, err := e.client.WithdrawalService.NewGetWithdrawalAddressesRequest().
-		Currency(asset).
+		Currency(currency).
 		Do(ctx)
 
 	if err != nil {
 		return err
 	}
 
-	var whitelistAddress *maxapi.WithdrawalAddress
+	var whitelistAddress maxapi.WithdrawalAddress
 	for _, a := range addresses {
 		if a.Address == address {
-			whitelistAddress = &a
+			whitelistAddress = a
+			break
 		}
 	}
-	if whitelistAddress == nil {
+
+	if whitelistAddress.Address != address {
 		return fmt.Errorf("address %s is not in the whitelist", address)
 	}
 
+	if whitelistAddress.UUID == "" {
+		return errors.New("address UUID can not be empty")
+	}
+
 	response, err := e.client.WithdrawalService.NewWithdrawalRequest().
-		Currency(asset).
+		Currency(currency).
 		Amount(amount.Float64()).
 		AddressUUID(whitelistAddress.UUID).
 		Do(ctx)
