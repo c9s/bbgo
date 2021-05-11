@@ -113,6 +113,21 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 		}
 
+		// for spot, we need to modify the quantity
+		if !session.Margin {
+			minNotional := closePrice * 1.003 * quantity
+			b, ok := session.Account.Balance(market.QuoteCurrency)
+			if !ok {
+				log.Errorf("balance %s not found", market.QuoteCurrency)
+				return
+			}
+
+			if minNotional > b.Available.Float64() {
+				log.Warnf("modifying quantity %f according to the min quote balance %f %s", quantity, b.Available.Float64(), market.QuoteCurrency)
+				quantity = bbgo.AdjustQuantityByMaxAmount(quantity, closePrice, b.Available.Float64())
+			}
+		}
+
 		orderForm := types.SubmitOrder{
 			Symbol:           s.Symbol,
 			Market:           market,
