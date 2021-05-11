@@ -470,6 +470,8 @@ func (s *Strategy) handleTradeUpdate(trade types.Trade) {
 
 	case types.SideTypeSelf:
 		// ignore self trades
+		log.Warnf("ignore self trade")
+		return
 
 	default:
 		log.Infof("ignore non sell/buy side trades, got: %v", trade.Side)
