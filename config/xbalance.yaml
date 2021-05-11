@@ -1,0 +1,50 @@
+---
+notifications:
+  slack:
+    defaultChannel: "dev-bbgo"
+    errorChannel: "bbgo-error"
+
+  # if you want to route channel by symbol
+  symbolChannels:
+    "^BTC": "btc"
+    "^ETH": "eth"
+
+  # if you want to route channel by exchange session
+  sessionChannels:
+    max: "bbgo-max"
+    binance: "bbgo-binance"
+
+  # routing rules
+  routing:
+    trade: "$symbol"
+    order: "$slient"
+    submitOrder: "$slient"
+    pnL: "bbgo-pnl"
+
+sessions:
+  max:
+    exchange: max
+    envVarPrefix: max
+
+  binance:
+    exchange: binance
+    envVarPrefix: binance
+
+#persistence:
+#  json:
+#    directory: var/data
+#  redis:
+#    host: 127.0.0.1
+#    port: 6379
+#    db: 0
+
+crossExchangeStrategies:
+
+- xbalance:
+    asset: USDT
+    addresses:
+      binance: your_whitelisted_address
+      max: your_whitelisted_address
+    low: 5000
+    middle: 6000
+
