@@ -218,6 +218,7 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 		} else if b.Available.Float64() > s.sourceMarket.MinQuantity {
 			hedgeQuota.BaseAsset.Add(b.Available)
 		} else {
+			log.Warnf("%s maker bid disabled: insufficient base balance %s", s.Symbol, b.String())
 			disableMakerBid = true
 		}
 	}
@@ -230,6 +231,7 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 		} else if b.Available.Float64() > s.sourceMarket.MinNotional {
 			hedgeQuota.QuoteAsset.Add(b.Available)
 		} else {
+			log.Warnf("%s maker ask disabled: insufficient quote balance %s", s.Symbol, b.String())
 			disableMakerAsk = true
 		}
 	}
