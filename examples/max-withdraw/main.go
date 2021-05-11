@@ -11,20 +11,24 @@ import (
 )
 
 func waitWithdrawalsComplete(ctx context.Context, client *maxapi.RestClient, currency string, limit int) error {
-	withdrawals, err := client.WithdrawalService.NewGetWithdrawalHistoryRequest().
-		Currency(currency).
-		Limit(limit).
-		Do(ctx)
-	if err != nil {
-		return err
-	}
-
 	var lastState string
 	for {
+		withdrawals, err := client.WithdrawalService.NewGetWithdrawalHistoryRequest().
+			Currency(currency).
+			Limit(limit).
+			Do(ctx)
+		if err != nil {
+			return err
+		}
+
 		pending := false
 		for _, withdrawal := range withdrawals {
-			if withdrawal.State != lastState {
+			if lastState == "" {
+				log.Printf("-> %s", withdrawal.State)
+			} else if withdrawal.State != lastState {
 				log.Printf("%s -> %s", lastState, withdrawal.State)
+				log.Printf("withdrawal %s %s: %s", withdrawal.Amount, withdrawal.Currency, withdrawal.State)
+				log.Printf("\t%+v", withdrawal)
 			}
 			lastState = withdrawal.State
 
@@ -32,12 +36,13 @@ func waitWithdrawalsComplete(ctx context.Context, client *maxapi.RestClient, cur
 			case "submitting", "submitted", "pending", "processing", "approved":
 				pending = true
 
-				log.Printf("there is a pending withdrawal request, waiting\n")
-				log.Printf("%+v", withdrawal)
+				log.Printf("there is a pending withdrawal request, waiting...")
 				break
 
-			case "sent":
+			case "sent", "confirmed":
 				continue
+
+			case "rejected":
 
 			}
 
@@ -84,7 +89,7 @@ func main() {
 	maxRest := maxapi.NewRestClient(maxapi.ProductionAPIURL)
 	maxRest.Auth(key, secret)
 
-	if err := waitWithdrawalsComplete(ctx, maxRest, currency, 1) ; err != nil {
+	if err := waitWithdrawalsComplete(ctx, maxRest, currency, 1); err != nil {
 		log.Fatal(err)
 	}
 	log.Printf("all withdrawals are sent, sending new withdrawal request...")
@@ -113,7 +118,7 @@ func main() {
 		}
 	}
 
-	if err := waitWithdrawalsComplete(ctx, maxRest, currency, 1) ; err != nil {
+	if err := waitWithdrawalsComplete(ctx, maxRest, currency, 1); err != nil {
 		log.Fatal(err)
 	}
 	log.Printf("all withdrawals are sent")
