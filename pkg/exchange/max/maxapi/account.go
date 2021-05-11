@@ -104,6 +104,12 @@ func (s *AccountService) Account(currency string) (*Account, error) {
 	return &account, nil
 }
 
+func (s *AccountService) NewGetWithdrawalHistoryRequest() *GetWithdrawHistoryRequest {
+	return &GetWithdrawHistoryRequest{
+		client: s.client,
+	}
+}
+
 func (s *AccountService) Accounts() ([]Account, error) {
 	req, err := s.client.newAuthenticatedRequest("GET", "v2/members/accounts", nil)
 	if err != nil {
@@ -240,6 +246,7 @@ type Withdraw struct {
 	Confirmations int    `json:"confirmations"`
 	CreatedAt     int64  `json:"created_at"`
 	UpdatedAt     int64  `json:"updated_at"`
+	Notes         string `json:"notes"`
 }
 
 type GetWithdrawHistoryRequestParams struct {
@@ -300,8 +307,3 @@ func (r *GetWithdrawHistoryRequest) Do(ctx context.Context) (withdraws []Withdra
 	return withdraws, err
 }
 
-func (s *AccountService) NewGetWithdrawalHistoryRequest() *GetWithdrawHistoryRequest {
-	return &GetWithdrawHistoryRequest{
-		client: s.client,
-	}
-}
