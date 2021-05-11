@@ -65,6 +65,9 @@ type Strategy struct {
 	BidMargin fixedpoint.Value `json:"bidMargin"`
 	AskMargin fixedpoint.Value `json:"askMargin"`
 
+	StopHedgeQuoteBalance fixedpoint.Value `json:"stopHedgeQuoteBalance"`
+	StopHedgeBaseBalance  fixedpoint.Value `json:"stopHedgeBaseBalance"`
+
 	// Quantity is used for fixed quantity of the first layer
 	Quantity fixedpoint.Value `json:"quantity"`
 
@@ -74,11 +77,18 @@ type Strategy struct {
 	// QuantityScale helps user to define the quantity by layer scale
 	QuantityScale *bbgo.LayerScale `json:"quantityScale,omitempty"`
 
+	// MaxExposurePosition defines the unhedged quantity of stop
 	MaxExposurePosition fixedpoint.Value `json:"maxExposurePosition"`
-	DisableHedge        bool             `json:"disableHedge"`
+
+	DisableHedge bool `json:"disableHedge"`
 
 	NumLayers int `json:"numLayers"`
-	Pips      int `json:"pips"`
+
+	// Pips is the pips of the layer prices
+	Pips int `json:"pips"`
+
+	// --------------------------------
+	// private field
 
 	makerSession  *bbgo.ExchangeSession
 	sourceSession *bbgo.ExchangeSession
@@ -203,7 +213,9 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 	if b, ok := hedgeBalances[s.sourceMarket.BaseCurrency]; ok {
 		// to make bid orders, we need enough base asset in the foreign exchange,
 		// if the base asset balance is not enough for selling
-		if b.Available.Float64() > s.sourceMarket.MinQuantity {
+		if s.StopHedgeBaseBalance > 0 && b.Available > (s.StopHedgeBaseBalance + fixedpoint.NewFromFloat(s.sourceMarket.MinQuantity)) {
+			hedgeQuota.BaseAsset.Add(b.Available - s.StopHedgeBaseBalance - fixedpoint.NewFromFloat(s.sourceMarket.MinQuantity))
+		} else if b.Available.Float64() > s.sourceMarket.MinQuantity {
 			hedgeQuota.BaseAsset.Add(b.Available)
 		} else {
 			disableMakerBid = true
@@ -213,7 +225,9 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 	if b, ok := hedgeBalances[s.sourceMarket.QuoteCurrency]; ok {
 		// to make ask orders, we need enough quote asset in the foreign exchange,
 		// if the quote asset balance is not enough for buying
-		if b.Available.Float64() > s.sourceMarket.MinNotional {
+		if s.StopHedgeQuoteBalance > 0 && b.Available > (s.StopHedgeQuoteBalance + fixedpoint.NewFromFloat(s.sourceMarket.MinNotional)) {
+			hedgeQuota.QuoteAsset.Add(b.Available - s.StopHedgeQuoteBalance - fixedpoint.NewFromFloat(s.sourceMarket.MinNotional))
+		} else if b.Available.Float64() > s.sourceMarket.MinNotional {
 			hedgeQuota.QuoteAsset.Add(b.Available)
 		} else {
 			disableMakerAsk = true
