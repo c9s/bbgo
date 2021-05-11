@@ -365,6 +365,39 @@ func toMaxSubmitOrder(o types.SubmitOrder) (*maxapi.Order, error) {
 	return &maxOrder, nil
 }
 
+func (e *Exchange) Withdrawal(ctx context.Context, asset string, amount fixedpoint.Value, address string) error {
+	addresses, err := e.client.WithdrawalService.NewGetWithdrawalAddressesRequest().
+		Currency(asset).
+		Do(ctx)
+
+	if err != nil {
+		return err
+	}
+
+	var whitelistAddress *maxapi.WithdrawalAddress
+	for _, a := range addresses {
+		if a.Address == address {
+			whitelistAddress = &a
+		}
+	}
+	if whitelistAddress == nil {
+		return fmt.Errorf("address %s is not in the whitelist", address)
+	}
+
+	response, err := e.client.WithdrawalService.NewWithdrawalRequest().
+		Currency(asset).
+		Amount(amount.Float64()).
+		AddressUUID(whitelistAddress.UUID).
+		Do(ctx)
+
+	if err != nil {
+		return err
+	}
+
+	log.Infof("withdrawal request response: %+v", response)
+	return nil
+}
+
 func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error) {
 	if len(orders) <= 10 {
 		var ordersBySymbol = map[string][]maxapi.Order{}
@@ -826,7 +859,6 @@ func (e *Exchange) QueryAveragePrice(ctx context.Context, symbol string) (float6
 	return (util.MustParseFloat(ticker.Sell) + util.MustParseFloat(ticker.Buy)) / 2, nil
 }
 
-
 // BBGO is a broker on MAX
 const spotBrokerID = "bbgo-"
 
@@ -836,7 +868,7 @@ func newSpotClientOrderID(originalID string) (clientOrderID string) {
 
 	if originalID != "" {
 		// try to keep the whole original client order ID if user specifies it.
-		if prefixLen + len(originalID) > 32 {
+		if prefixLen+len(originalID) > 32 {
 			return originalID
 		}
 
