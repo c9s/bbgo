@@ -204,6 +204,21 @@ func (e *Exchange) getLaunchDate() (time.Time, error) {
 	return time.Date(2017, time.July, 14, 0, 0, 0, 0, loc), nil
 }
 
+func (e *Exchange) Withdrawal(ctx context.Context, currency string, amount fixedpoint.Value, address string) error {
+	response, err := e.Client.NewCreateWithdrawService().
+		Asset(currency).
+		Address(address).
+		Amount(fmt.Sprintf("%f", amount.Float64())).
+		Do(ctx)
+
+	if err != nil {
+		return err
+	}
+
+	log.Infof("withdrawal request sent, response: %+v", response)
+	return nil
+}
+
 func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (allWithdraws []types.Withdraw, err error) {
 	startTime := since
 
@@ -589,7 +604,7 @@ func newSpotClientOrderID(originalID string) (clientOrderID string) {
 
 	if originalID != "" {
 		// try to keep the whole original client order ID if user specifies it.
-		if prefixLen + len(originalID) > 32 {
+		if prefixLen+len(originalID) > 32 {
 			return originalID
 		}
 
