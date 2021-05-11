@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 const DateFormat = "2006-01-02"
@@ -98,6 +100,10 @@ type ExchangeMarketDataService interface {
 type ExchangeTransferService interface {
 	QueryDepositHistory(ctx context.Context, asset string, since, until time.Time) (allDeposits []Deposit, err error)
 	QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (allWithdraws []Withdraw, err error)
+}
+
+type ExchangeWithdrawalService interface {
+	Withdrawal(ctx context.Context, asset string, amount fixedpoint.Value, address string) error
 }
 
 type ExchangeRewardService interface {
