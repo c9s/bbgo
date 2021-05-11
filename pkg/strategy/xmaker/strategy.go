@@ -251,7 +251,7 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 	}
 
 	if disableMakerAsk && disableMakerBid {
-		log.Warn("maker is disabled due to insufficient balances")
+		log.Warn("bid/ask maker is disabled due to insufficient balances")
 		return
 	}
 
