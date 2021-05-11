@@ -73,6 +73,7 @@ type RestClient struct {
 	TradeService   *TradeService
 	OrderService   *OrderService
 	RewardService  *RewardService
+	WithdrawalService *WithdrawalService
 	// OrderBookService *OrderBookService
 	// MaxTokenService  *MaxTokenService
 	// MaxKLineService  *KLineService
@@ -95,6 +96,7 @@ func NewRestClientWithHttpClient(baseURL string, httpClient *http.Client) *RestC
 	client.PublicService = &PublicService{client}
 	client.OrderService = &OrderService{client}
 	client.RewardService = &RewardService{client}
+	client.WithdrawalService = &WithdrawalService{client}
 
 	// client.MaxTokenService = &MaxTokenService{client}
 	client.initNonce()
