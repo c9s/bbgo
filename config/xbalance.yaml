@@ -41,6 +41,7 @@ sessions:
 crossExchangeStrategies:
 
 - xbalance:
+    interval: 1h
     asset: USDT
     addresses:
       binance: your_whitelisted_address
