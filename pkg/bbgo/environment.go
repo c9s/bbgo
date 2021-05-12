@@ -210,62 +210,80 @@ func (environ *Environment) AddExchangesByViperKeys() error {
 	return nil
 }
 
-func NewExchangeSessionFromConfig(name string, sessionConfig *ExchangeSession) (*ExchangeSession, error) {
-	exchangeName, err := types.ValidExchangeName(sessionConfig.ExchangeName)
+func InitExchangeSession(name string, session *ExchangeSession) error {
+	session.Name = name
+
+	exchangeName, err := types.ValidExchangeName(session.ExchangeName)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	var exchange types.Exchange
-
-	if sessionConfig.Key != "" && sessionConfig.Secret != "" {
-		if !sessionConfig.PublicOnly {
-			if len(sessionConfig.Key) == 0 || len(sessionConfig.Secret) == 0 {
-				return nil, fmt.Errorf("can not create exchange %s: empty key or secret", exchangeName)
+	if session.Key != "" && session.Secret != "" {
+		if !session.PublicOnly {
+			if len(session.Key) == 0 || len(session.Secret) == 0 {
+				return fmt.Errorf("can not create exchange %s: empty key or secret", exchangeName)
 			}
 		}
 
-		exchange, err = cmdutil.NewExchangeStandard(exchangeName, sessionConfig.Key, sessionConfig.Secret, sessionConfig.SubAccount)
+		exchange, err = cmdutil.NewExchangeStandard(exchangeName, session.Key, session.Secret, session.SubAccount)
 	} else {
-		exchange, err = cmdutil.NewExchangeWithEnvVarPrefix(exchangeName, sessionConfig.EnvVarPrefix)
+		exchange, err = cmdutil.NewExchangeWithEnvVarPrefix(exchangeName, session.EnvVarPrefix)
 	}
 
 	if err != nil {
-		return nil, err
+		return err
 	}
 
+	session.Exchange = exchange
+	session.Notifiability = Notifiability{
+		SymbolChannelRouter:  NewPatternChannelRouter(nil),
+		SessionChannelRouter: NewPatternChannelRouter(nil),
+		ObjectChannelRouter:  NewObjectChannelRouter(),
+	}
+	session.Stream = exchange.NewStream()
+
 	// configure exchange
-	if sessionConfig.Margin {
+	if session.Margin {
 		marginExchange, ok := exchange.(types.MarginExchange)
 		if !ok {
-			return nil, fmt.Errorf("exchange %s does not support margin", exchangeName)
+			return fmt.Errorf("exchange %s does not support margin", exchangeName)
 		}
 
-		if sessionConfig.IsolatedMargin {
-			marginExchange.UseIsolatedMargin(sessionConfig.IsolatedMarginSymbol)
+		if session.IsolatedMargin {
+			marginExchange.UseIsolatedMargin(session.IsolatedMarginSymbol)
 		} else {
 			marginExchange.UseMargin()
 		}
 	}
 
-	session := NewExchangeSession(name, exchange)
-	session.ExchangeName = sessionConfig.ExchangeName
-	session.EnvVarPrefix = sessionConfig.EnvVarPrefix
-	session.Key = sessionConfig.Key
-	session.Secret = sessionConfig.Secret
-	session.SubAccount = sessionConfig.SubAccount
-	session.PublicOnly = sessionConfig.PublicOnly
-	session.Margin = sessionConfig.Margin
-	session.IsolatedMargin = sessionConfig.IsolatedMargin
-	session.IsolatedMarginSymbol = sessionConfig.IsolatedMarginSymbol
-	session.Withdrawal = sessionConfig.Withdrawal
-	return session, nil
+	// pointer fields
+	session.Subscriptions = make(map[types.Subscription]types.Subscription)
+	session.Account = &types.Account{}
+	session.Trades = make(map[string]*types.TradeSlice)
+
+	session.markets = make(map[string]types.Market)
+	session.lastPrices = make(map[string]float64)
+	session.startPrices = make(map[string]float64)
+	session.marketDataStores = make(map[string]*MarketDataStore)
+	session.positions = make(map[string]*Position)
+	session.standardIndicatorSets = make(map[string]*StandardIndicatorSet)
+	session.orderStores = make(map[string]*OrderStore)
+	session.orderExecutor = &ExchangeOrderExecutor{
+		// copy the notification system so that we can route
+		Notifiability: session.Notifiability,
+		Session:       session,
+	}
+
+	session.usedSymbols = make(map[string]struct{})
+	session.initializedSymbols = make(map[string]struct{})
+	session.logger = log.WithField("session", name)
+	return nil
 }
 
 func (environ *Environment) AddExchangesFromSessionConfig(sessions map[string]*ExchangeSession) error {
-	for sessionName, sessionConfig := range sessions {
-		session, err := NewExchangeSessionFromConfig(sessionName, sessionConfig)
-		if err != nil {
+	for sessionName, session := range sessions {
+		if err := InitExchangeSession(sessionName, session); err != nil {
 			return err
 		}
 
@@ -274,7 +292,6 @@ func (environ *Environment) AddExchangesFromSessionConfig(sessions map[string]*E
 
 	return nil
 }
-
 
 // Init prepares the data that will be used by the strategies
 func (environ *Environment) Init(ctx context.Context) (err error) {
@@ -300,7 +317,6 @@ func (environ *Environment) Start(ctx context.Context) (err error) {
 	}
 	return
 }
-
 
 func (environ *Environment) ConfigurePersistence(conf *PersistenceConfig) error {
 	if conf.Redis != nil {
