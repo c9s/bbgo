@@ -47,8 +47,16 @@ func (b *LocalActiveOrderBook) orderUpdateHandler(order types.Order) {
 			b.EmitFilled(order)
 		}
 
-	case types.OrderStatusPartiallyFilled, types.OrderStatusNew:
+	case types.OrderStatusPartiallyFilled:
 		b.Update(order)
+
+	case types.OrderStatusNew:
+		if order.Quantity == 0 {
+			log.Debugf("[LocalActiveOrderBook] order status %s, removing %d...", order.Status, order.OrderID)
+			b.Remove(order)
+		} else {
+			b.Update(order)
+		}
 
 	case types.OrderStatusCanceled, types.OrderStatusRejected:
 		log.Debugf("[LocalActiveOrderBook] order status %s, removing %d...", order.Status, order.OrderID)
