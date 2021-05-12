@@ -50,7 +50,7 @@ executionReport
   "M": false,                    // Ignore
   "O": 1499405658657,            // Order creation time
   "Z": "0.00000000",             // Cumulative quote asset transacted quantity
-  "Y": "0.00000000",              // Last quote asset transacted quantity (i.e. lastPrice * lastQty)
+  "Y": "0.00000000",             // Last quote asset transacted quantity (i.e. lastPrice * lastQty)
   "Q": "0.00000000"              // Quote Order Qty
 }
 */
@@ -58,17 +58,27 @@ type ExecutionReportEvent struct {
 	EventBase
 
 	Symbol        string `json:"s"`
-	ClientOrderID string `json:"c"`
 	Side          string `json:"S"`
-	OrderType     string `json:"o"`
-	TimeInForce   string `json:"f"`
 
-	OrderQuantity string `json:"q"`
+	ClientOrderID         string `json:"c"`
+	OriginalClientOrderID string `json:"C"`
+
+	OrderType         string `json:"o"`
+	OrderCreationTime int64 `json:"O"`
+
+	TimeInForce     string `json:"f"`
+	IcebergQuantity string `json:"F"`
+
+	OrderQuantity      string `json:"q"`
+	QuoteOrderQuantity string `json:"Q"`
+
 	OrderPrice    string `json:"p"`
 	StopPrice     string `json:"P"`
 
 	IsOnBook bool `json:"w"`
+
 	IsMaker  bool `json:"m"`
+	Ignore   bool `json:"M"`
 
 	CommissionAmount string `json:"n"`
 	CommissionAsset  string `json:"N"`
@@ -82,12 +92,13 @@ type ExecutionReportEvent struct {
 	TradeID         int64 `json:"t"`
 	TransactionTime int64 `json:"T"`
 
-	LastExecutedQuantity             string `json:"l"`
-	CumulativeFilledQuantity         string `json:"z"`
-	LastExecutedPrice                string `json:"L"`
-	LastQuoteAssetTransactedQuantity string `json:"Y"`
+	LastExecutedQuantity string `json:"l"`
+	LastExecutedPrice    string `json:"L"`
 
-	OrderCreationTime int64 `json:"O"`
+	CumulativeFilledQuantity               string `json:"z"`
+	CumulativeQuoteAssetTransactedQuantity string `json:"Z"`
+
+	LastQuoteAssetTransactedQuantity string `json:"Y"`
 }
 
 func (e *ExecutionReportEvent) Order() (*types.Order, error) {
@@ -246,6 +257,7 @@ type ResultEvent struct {
 
 func ParseEvent(message string) (interface{}, error) {
 	val, err := fastjson.Parse(message)
+
 	if err != nil {
 		return nil, err
 	}
