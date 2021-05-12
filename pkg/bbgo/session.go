@@ -132,6 +132,8 @@ type ExchangeSession struct {
 
 	IsInitialized bool `json:"-" yaml:"-"`
 
+	OrderExecutor *ExchangeOrderExecutor `json:"orderExecutor,omitempty" yaml:"orderExecutor,omitempty"`
+
 	// Stream is the connection stream of the exchange
 	Stream types.Stream `json:"-" yaml:"-"`
 
@@ -162,7 +164,6 @@ type ExchangeSession struct {
 
 	orderStores map[string]*OrderStore
 
-	orderExecutor *ExchangeOrderExecutor
 
 	usedSymbols        map[string]struct{}
 	initializedSymbols map[string]struct{}
@@ -197,7 +198,7 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 		logger:                log.WithField("session", name),
 	}
 
-	session.orderExecutor = &ExchangeOrderExecutor{
+	session.OrderExecutor = &ExchangeOrderExecutor{
 		// copy the notification system so that we can route
 		Notifiability: session.Notifiability,
 		Session:       session,
@@ -248,8 +249,8 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 	session.Account.UpdateBalances(balances)
 
 	// forward trade updates and order updates to the order executor
-	session.Stream.OnTradeUpdate(session.orderExecutor.EmitTradeUpdate)
-	session.Stream.OnOrderUpdate(session.orderExecutor.EmitOrderUpdate)
+	session.Stream.OnTradeUpdate(session.OrderExecutor.EmitTradeUpdate)
+	session.Stream.OnOrderUpdate(session.OrderExecutor.EmitOrderUpdate)
 	session.Account.BindStream(session.Stream)
 
 	// insert trade into db right before everything

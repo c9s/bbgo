@@ -260,12 +260,12 @@ func (trader *Trader) getSessionOrderExecutor(sessionName string) OrderExecutor 
 	var session = trader.environment.sessions[sessionName]
 
 	// default to base order executor
-	var orderExecutor OrderExecutor = session.orderExecutor
+	var orderExecutor OrderExecutor = session.OrderExecutor
 
 	// Since the risk controls are loaded from the config file
 	if trader.riskControls != nil && trader.riskControls.SessionBasedRiskControl != nil {
 		if control, ok := trader.riskControls.SessionBasedRiskControl[sessionName]; ok {
-			control.SetBaseOrderExecutor(session.orderExecutor)
+			control.SetBaseOrderExecutor(session.OrderExecutor)
 
 			// pick the wrapped order executor
 			if control.OrderExecutor != nil {
@@ -306,6 +306,11 @@ func (trader *Trader) Run(ctx context.Context) error {
 	router := &ExchangeOrderExecutionRouter{
 		Notifiability: trader.environment.Notifiability,
 		sessions:      trader.environment.sessions,
+		executors:     make(map[string]OrderExecutor),
+	}
+	for sessionID := range trader.environment.sessions {
+		var orderExecutor = trader.getSessionOrderExecutor(sessionID)
+		router.executors[sessionID] = orderExecutor
 	}
 
 	for _, strategy := range trader.crossExchangeStrategies {
