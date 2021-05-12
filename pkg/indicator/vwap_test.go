@@ -1,6 +1,7 @@
 package indicator
 
 import (
+	"math"
 	"testing"
 
 	"github.com/c9s/bbgo/pkg/types"
@@ -54,7 +55,8 @@ func Test_calculateVWAP(t *testing.T) {
 			vwap := VWAP{IntervalWindow: types.IntervalWindow{Window: tt.window}}
 			priceF := KLineTypicalPriceMapper
 			got := vwap.calculateVWAP(tt.kLines, priceF)
-			if got != tt.want {
+			diff := math.Trunc((got-tt.want)*100) / 100
+			if diff != 0 {
 				t.Errorf("calculateVWAP() = %v, want %v", got, tt.want)
 			}
 		})

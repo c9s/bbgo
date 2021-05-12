@@ -1,6 +1,7 @@
 package indicator
 
 import (
+	"math"
 	"testing"
 
 	"github.com/c9s/bbgo/pkg/types"
@@ -36,7 +37,8 @@ func Test_calculateMACD(t *testing.T) {
 			macd := MACD{IntervalWindow: iw, ShortPeriod: 12, LongPeriod: 26}
 			priceF := KLineClosePriceMapper
 			got := macd.calculateMACD(tt.kLines, priceF)
-			if got != tt.want {
+			diff := math.Trunc((got-tt.want)*100) / 100
+			if diff != 0 {
 				t.Errorf("calculateMACD() = %v, want %v", got, tt.want)
 			}
 		})
