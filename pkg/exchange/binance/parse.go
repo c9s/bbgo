@@ -106,6 +106,7 @@ func (e *ExecutionReportEvent) Order() (*types.Order, error) {
 	switch e.CurrentExecutionType {
 	case "NEW", "CANCELED", "REJECTED", "EXPIRED":
 	case "REPLACED":
+	case "TRADE": // For Order FILLED status. And the order has been completed.
 	default:
 		return nil, errors.New("execution report type is not for order")
 	}
