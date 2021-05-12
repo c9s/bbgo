@@ -103,9 +103,14 @@ var listOrdersCmd = &cobra.Command{
 	},
 }
 
+
+
+
+
+
 // go run ./cmd/bbgo placeorder --session=ftx --symbol=BTC/USDT --side=buy --price=<price> --quantity=<quantity>
-var placeOrderCmd = &cobra.Command{
-	Use:          "placeorder",
+var submitOrderCmd = &cobra.Command{
+	Use:          "submit-order",
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
@@ -200,12 +205,12 @@ func init() {
 	listOrdersCmd.Flags().String("session", "", "the exchange session name for sync")
 	listOrdersCmd.Flags().String("symbol", "", "the trading pair, like btcusdt")
 
-	placeOrderCmd.Flags().String("session", "", "the exchange session name for sync")
-	placeOrderCmd.Flags().String("symbol", "", "the trading pair, like btcusdt")
-	placeOrderCmd.Flags().String("side", "", "the trading side: buy or sell")
-	placeOrderCmd.Flags().String("price", "", "the trading price")
-	placeOrderCmd.Flags().String("quantity", "", "the trading quantity")
+	submitOrderCmd.Flags().String("session", "", "the exchange session name for sync")
+	submitOrderCmd.Flags().String("symbol", "", "the trading pair, like btcusdt")
+	submitOrderCmd.Flags().String("side", "", "the trading side: buy or sell")
+	submitOrderCmd.Flags().String("price", "", "the trading price")
+	submitOrderCmd.Flags().String("quantity", "", "the trading quantity")
 
 	RootCmd.AddCommand(listOrdersCmd)
-	RootCmd.AddCommand(placeOrderCmd)
+	RootCmd.AddCommand(submitOrderCmd)
 }
