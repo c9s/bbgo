@@ -81,6 +81,8 @@ func (trade Trade) PlainText() string {
 		util.FormatFloat(trade.QuoteQuantity, 2))
 }
 
+var slackTradeTextTemplate = ":handshake: {{ .Symbol }} {{ .Side }} Trade Execution @ {{ .Price  }}"
+
 func (trade Trade) SlackAttachment() slack.Attachment {
 	var color = "#DC143C"
 
@@ -88,25 +90,27 @@ func (trade Trade) SlackAttachment() slack.Attachment {
 		color = "#228B22"
 	}
 
+	liquidity := trade.Liquidity()
+	text := util.Render(slackTradeTextTemplate, trade)
 	return slack.Attachment{
-		Text:  fmt.Sprintf("*%s* Trade %s", trade.Symbol, trade.Side),
-		Color: color,
+		Text: text,
 		// Pretext:       "",
-		// Text:          "",
+		Color: color,
 		Fields: []slack.AttachmentField{
 			{Title: "Exchange", Value: trade.Exchange, Short: true},
 			{Title: "Price", Value: util.FormatFloat(trade.Price, 2), Short: true},
-			{Title: "Quote", Value: util.FormatFloat(trade.Quantity, 4), Short: true},
+			{Title: "Quantity", Value: util.FormatFloat(trade.Quantity, 4), Short: true},
 			{Title: "QuoteQuantity", Value: util.FormatFloat(trade.QuoteQuantity, 2)},
 			{Title: "Fee", Value: util.FormatFloat(trade.Fee, 4), Short: true},
 			{Title: "FeeCurrency", Value: trade.FeeCurrency, Short: true},
+			{Title: "Liquidity", Value: liquidity, Short: true},
 		},
 		// Footer:     tradingCtx.TradeStartTime.Format(time.RFC822),
 		// FooterIcon: "",
 	}
 }
 
-func (trade Trade) MakerOrTakerLabel() (o string) {
+func (trade Trade) Liquidity() (o string) {
 	if trade.IsMaker {
 		o += "MAKER"
 	} else {

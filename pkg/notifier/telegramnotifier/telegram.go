@@ -12,7 +12,9 @@ type Notifier struct {
 
 type NotifyOption func(notifier *Notifier)
 
-// start bot daemon
+
+// New
+// TODO: register interaction with channel, so that we can route message to the specific telegram bot
 func New(interaction *Interaction, options ...NotifyOption) *Notifier {
 	notifier := &Notifier{
 		interaction: interaction,
@@ -25,14 +27,12 @@ func New(interaction *Interaction, options ...NotifyOption) *Notifier {
 	return notifier
 }
 
-func (n *Notifier) Notify(format string, args ...interface{}) {
-	n.NotifyTo("", format, args...)
+func (n *Notifier) Notify(obj interface{}, args ...interface{}) {
+	n.NotifyTo("", obj, args...)
 }
 
-func (n *Notifier) NotifyTo(_, format string, args ...interface{}) {
+func filterPlaintextMessages(args []interface{}) (texts []string, pureArgs []interface{}) {
 	var textArgsOffset = -1
-	var texts []string
-
 	for idx, arg := range args {
 		switch a := arg.(type) {
 
@@ -40,21 +40,44 @@ func (n *Notifier) NotifyTo(_, format string, args ...interface{}) {
 			texts = append(texts, a.PlainText())
 			textArgsOffset = idx
 
+		case types.Stringer:
+			texts = append(texts, a.String())
+			textArgsOffset = idx
+
 		}
 	}
 
-	var simpleArgs = args
+	pureArgs = args
 	if textArgsOffset > -1 {
-		simpleArgs = args[:textArgsOffset]
+		pureArgs = args[:textArgsOffset]
 	}
 
-	log.Infof(format, simpleArgs...)
+	return texts, pureArgs
+}
 
-	message := fmt.Sprintf(format, simpleArgs...)
+func (n *Notifier) NotifyTo(channel string, obj interface{}, args ...interface{}) {
+	var texts, pureArgs = filterPlaintextMessages(args)
+	var message string
+
+	switch a := obj.(type) {
+
+	case string:
+		log.Infof(a, pureArgs...)
+		message = fmt.Sprintf(a, pureArgs...)
+
+	case types.Stringer:
+		message = a.String()
+
+	case types.PlainText:
+		message = a.PlainText()
+
+	default:
+		log.Errorf("unsupported notification format: %T %+v", a, a)
+
+	}
+
 	n.interaction.SendToOwner(message)
-
 	for _, text := range texts {
 		n.interaction.SendToOwner(text)
 	}
-
 }
