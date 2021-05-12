@@ -78,7 +78,7 @@ func (s *Server) newEngine() *gin.Engine {
 
 	r.POST("/api/environment/sync", func(c *gin.Context) {
 		go func() {
-			if err := s.Environ.Sync(context.Background()) ; err != nil {
+			if err := s.Environ.Sync(context.Background()); err != nil {
 				logrus.WithError(err).Error("sync error")
 			}
 		}()
@@ -125,15 +125,15 @@ func (s *Server) newEngine() *gin.Engine {
 	r.GET("/api/trading-volume", s.tradingVolume)
 
 	r.POST("/api/sessions/test", func(c *gin.Context) {
-		var sessionConfig bbgo.ExchangeSession
-		if err := c.BindJSON(&sessionConfig); err != nil {
+		var session bbgo.ExchangeSession
+		if err := c.BindJSON(&session); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": err.Error(),
 			})
 			return
 		}
 
-		session, err := bbgo.NewExchangeSessionFromConfig(sessionConfig.ExchangeName, &sessionConfig)
+		err := bbgo.InitExchangeSession(session.ExchangeName, &session)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": err.Error(),
@@ -174,16 +174,15 @@ func (s *Server) newEngine() *gin.Engine {
 	})
 
 	r.POST("/api/sessions", func(c *gin.Context) {
-		var sessionConfig bbgo.ExchangeSession
-		if err := c.BindJSON(&sessionConfig); err != nil {
+		var session bbgo.ExchangeSession
+		if err := c.BindJSON(&session); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": err.Error(),
 			})
 			return
 		}
 
-		session, err := bbgo.NewExchangeSessionFromConfig(sessionConfig.ExchangeName, &sessionConfig)
-		if err != nil {
+		if err := bbgo.InitExchangeSession(session.ExchangeName, &session); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": err.Error(),
 			})
@@ -193,9 +192,9 @@ func (s *Server) newEngine() *gin.Engine {
 		if s.Config.Sessions == nil {
 			s.Config.Sessions = make(map[string]*bbgo.ExchangeSession)
 		}
-		s.Config.Sessions[sessionConfig.Name] = session
+		s.Config.Sessions[session.Name] = &session
 
-		s.Environ.AddExchangeSession(sessionConfig.Name, session)
+		s.Environ.AddExchangeSession(session.Name, &session)
 
 		if err := session.Init(c, s.Environ); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
