@@ -35,32 +35,26 @@ func New(token, channel string, options ...NotifyOption) *Notifier {
 	return notifier
 }
 
-func (n *Notifier) Notify(format string, args ...interface{}) {
-	n.NotifyTo(n.channel, format, args...)
+func (n *Notifier) Notify(obj interface{}, args ...interface{}) {
+	n.NotifyTo(n.channel, obj, args...)
 }
 
-func (n *Notifier) NotifyTo(channel, format string, args ...interface{}) {
-	if len(channel) == 0 {
-		channel = n.channel
-	}
-
-	var slackAttachments []slack.Attachment
-	var slackArgsOffset = -1
-
+func filterSlackAttachments(args []interface{}) (slackAttachments []slack.Attachment, pureArgs []interface{}) {
+	var firstAttachmentOffset = -1
 	for idx, arg := range args {
 		switch a := arg.(type) {
 
 		// concrete type assert first
 		case slack.Attachment:
-			if slackArgsOffset == -1 {
-				slackArgsOffset = idx
+			if firstAttachmentOffset == -1 {
+				firstAttachmentOffset = idx
 			}
 
 			slackAttachments = append(slackAttachments, a)
 
 		case SlackAttachmentCreator:
-			if slackArgsOffset == -1 {
-				slackArgsOffset = idx
+			if firstAttachmentOffset == -1 {
+				firstAttachmentOffset = idx
 			}
 
 			slackAttachments = append(slackAttachments, a.SlackAttachment())
@@ -68,19 +62,45 @@ func (n *Notifier) NotifyTo(channel, format string, args ...interface{}) {
 		}
 	}
 
-	var nonSlackArgs = args
-	if slackArgsOffset > -1 {
-		nonSlackArgs = args[:slackArgsOffset]
+	pureArgs = args
+	if firstAttachmentOffset > -1 {
+		pureArgs = args[:firstAttachmentOffset]
+	}
+	return
+}
+
+func (n *Notifier) NotifyTo(channel string, obj interface{}, args ...interface{}) {
+	if len(channel) == 0 {
+		channel = n.channel
+	}
+
+	slackAttachments, pureArgs := filterSlackAttachments(args)
+
+	var opts []slack.MsgOption
+
+	switch a := obj.(type) {
+	case string:
+		opts = append(opts, slack.MsgOptionText(fmt.Sprintf(a, pureArgs...), true),
+			slack.MsgOptionAttachments(slackAttachments...))
+
+	case slack.Attachment:
+		opts = append(opts, slack.MsgOptionAttachments(append([]slack.Attachment{a}, slackAttachments...)...))
+
+	case SlackAttachmentCreator:
+		// convert object to slack attachment (if supported)
+		opts = append(opts, slack.MsgOptionAttachments(append([]slack.Attachment{a.SlackAttachment()}, slackAttachments...)...))
+
+	default:
+		log.Errorf("slack notifier error, unsupported object: %T %+v", a, a)
+
 	}
 
 	go func() {
-		_, _, err := n.client.PostMessageContext(context.Background(), channel,
-			slack.MsgOptionText(fmt.Sprintf(format, nonSlackArgs...), true),
-			slack.MsgOptionAttachments(slackAttachments...))
+		_, _, err := n.client.PostMessageContext(context.Background(), channel, opts...)
 		if err != nil {
 			log.WithError(err).
 				WithField("channel", channel).
-				Errorf("slack error: %s", err.Error())
+				Errorf("slack api error: %s", err.Error())
 		}
 	}()
 

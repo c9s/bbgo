@@ -359,8 +359,7 @@ func (environ *Environment) ConfigureNotificationRouting(conf *NotificationConfi
 
 		case "$session":
 			defaultTradeUpdateHandler := func(trade types.Trade) {
-				text := util.Render(TemplateTradeReport, trade)
-				environ.Notify(text, &trade)
+				environ.Notify(&trade)
 			}
 			for name := range environ.sessions {
 				session := environ.sessions[name]
@@ -369,8 +368,7 @@ func (environ *Environment) ConfigureNotificationRouting(conf *NotificationConfi
 				channel, ok := environ.SessionChannelRouter.Route(name)
 				if ok {
 					session.Stream.OnTradeUpdate(func(trade types.Trade) {
-						text := util.Render(TemplateTradeReport, trade)
-						environ.NotifyTo(channel, text, &trade)
+						environ.NotifyTo(channel, &trade)
 					})
 				} else {
 					session.Stream.OnTradeUpdate(defaultTradeUpdateHandler)
@@ -390,12 +388,11 @@ func (environ *Environment) ConfigureNotificationRouting(conf *NotificationConfi
 
 			// use same handler for each session
 			handler := func(trade types.Trade) {
-				text := util.Render(TemplateTradeReport, trade)
 				channel, ok := environ.RouteObject(&trade)
 				if ok {
-					environ.NotifyTo(channel, text, &trade)
+					environ.NotifyTo(channel, &trade)
 				} else {
-					environ.Notify(text, &trade)
+					environ.Notify(&trade)
 				}
 			}
 			for _, session := range environ.sessions {
