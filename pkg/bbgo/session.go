@@ -115,6 +115,9 @@ type ExchangeSession struct {
 	Secret       string `json:"secret,omitempty" yaml:"secret,omitempty"`
 	SubAccount   string `json:"subAccount,omitempty" yaml:"subAccount,omitempty"`
 
+	// Withdrawal is used for enabling withdrawal functions
+	Withdrawal           bool   `json:"withdrawal" yaml:"withdrawal"`
+
 	PublicOnly           bool   `json:"publicOnly,omitempty" yaml:"publicOnly"`
 	Margin               bool   `json:"margin,omitempty" yaml:"margin"`
 	IsolatedMargin       bool   `json:"isolatedMargin,omitempty" yaml:"isolatedMargin,omitempty"`
