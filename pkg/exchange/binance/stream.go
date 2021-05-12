@@ -169,6 +169,17 @@ func NewStream(client *binance.Client) *Stream {
 			}
 
 			stream.EmitTradeUpdate(*trade)
+
+			order, err := e.Order()
+			if err != nil {
+				log.WithError(err).Error("order convert error")
+				return
+			}
+
+			// Update Order with FILLED event
+			if (order.Status == types.OrderStatusFilled) {
+				stream.EmitOrderUpdate(*order)
+			}
 		}
 	})
 
