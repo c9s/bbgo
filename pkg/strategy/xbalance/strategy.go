@@ -85,6 +85,11 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 		return
 	}
 
+	if !fromSession.Withdrawal {
+		log.Errorf("the withdrawal function exchange session %s is not enabled, skipping", fromSession.Name)
+		return
+	}
+
 	toAddress, ok := s.Addresses[lowLevelSession.Name]
 	if !ok {
 		log.Errorf("%s address of session %s not found", s.Asset, lowLevelSession.Name)
