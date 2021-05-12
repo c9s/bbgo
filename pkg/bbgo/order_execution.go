@@ -17,10 +17,12 @@ type OrderExecutor interface {
 
 	OnTradeUpdate(cb func(trade types.Trade))
 	OnOrderUpdate(cb func(order types.Order))
+	EmitTradeUpdate(trade types.Trade)
+	EmitOrderUpdate(order types.Order)
 }
 
 type OrderExecutionRouter interface {
-	// SubmitOrderTo submit order to a specific exchange Session
+	// SubmitOrdersTo submit order to a specific exchange Session
 	SubmitOrdersTo(ctx context.Context, session string, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error)
 }
 
@@ -28,9 +30,14 @@ type ExchangeOrderExecutionRouter struct {
 	Notifiability
 
 	sessions map[string]*ExchangeSession
+	executors map[string]OrderExecutor
 }
 
 func (e *ExchangeOrderExecutionRouter) SubmitOrdersTo(ctx context.Context, session string, orders ...types.SubmitOrder) (types.OrderSlice, error) {
+	if executor, ok := e.executors[session] ; ok {
+		return executor.SubmitOrders(ctx, orders...)
+	}
+
 	es, ok := e.sessions[session]
 	if !ok {
 		return nil, fmt.Errorf("exchange session %s not found", session)
@@ -47,9 +54,11 @@ func (e *ExchangeOrderExecutionRouter) SubmitOrdersTo(ctx context.Context, sessi
 // ExchangeOrderExecutor is an order executor wrapper for single exchange instance.
 //go:generate callbackgen -type ExchangeOrderExecutor
 type ExchangeOrderExecutor struct {
-	Notifiability `json:"-"`
+	// MinQuoteBalance fixedpoint.Value `json:"minQuoteBalance,omitempty" yaml:"minQuoteBalance,omitempty"`
 
-	Session *ExchangeSession
+	Notifiability `json:"-" yaml:"-"`
+
+	Session *ExchangeSession `json:"-" yaml:"-"`
 
 	// private trade update callbacks
 	tradeUpdateCallbacks []func(trade types.Trade)
