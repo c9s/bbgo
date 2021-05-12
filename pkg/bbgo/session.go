@@ -116,7 +116,7 @@ type ExchangeSession struct {
 	SubAccount   string `json:"subAccount,omitempty" yaml:"subAccount,omitempty"`
 
 	// Withdrawal is used for enabling withdrawal functions
-	Withdrawal           bool   `json:"withdrawal" yaml:"withdrawal"`
+	Withdrawal           bool   `json:"withdrawal,omitempty" yaml:"withdrawal,omitempty"`
 
 	PublicOnly           bool   `json:"publicOnly,omitempty" yaml:"publicOnly"`
 	Margin               bool   `json:"margin,omitempty" yaml:"margin"`
@@ -139,6 +139,10 @@ type ExchangeSession struct {
 
 	Exchange types.Exchange `json:"-" yaml:"-"`
 
+	// Trades collects the executed trades from the exchange
+	// map: symbol -> []trade
+	Trades map[string]*types.TradeSlice `json:"-" yaml:"-"`
+
 	// markets defines market configuration of a symbol
 	markets map[string]types.Market
 
@@ -147,10 +151,6 @@ type ExchangeSession struct {
 
 	lastPrices         map[string]float64
 	lastPriceUpdatedAt time.Time
-
-	// Trades collects the executed trades from the exchange
-	// map: symbol -> []trade
-	Trades map[string]*types.TradeSlice `json:"-" yaml:"-"`
 
 	// marketDataStores contains the market data store of each market
 	marketDataStores map[string]*MarketDataStore
@@ -171,7 +171,7 @@ type ExchangeSession struct {
 }
 
 func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
-	return &ExchangeSession{
+	session := &ExchangeSession{
 		Notifiability: Notifiability{
 			SymbolChannelRouter:  NewPatternChannelRouter(nil),
 			SessionChannelRouter: NewPatternChannelRouter(nil),
@@ -196,6 +196,14 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 		initializedSymbols:    make(map[string]struct{}),
 		logger:                log.WithField("session", name),
 	}
+
+	session.orderExecutor = &ExchangeOrderExecutor{
+		// copy the notification system so that we can route
+		Notifiability: session.Notifiability,
+		Session:       session,
+	}
+
+	return session
 }
 
 // Init initializes the basic data structure and market information by its exchange.
@@ -239,17 +247,9 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 
 	session.Account.UpdateBalances(balances)
 
-	var orderExecutor = &ExchangeOrderExecutor{
-		// copy the notification system so that we can route
-		Notifiability: session.Notifiability,
-		Session:       session,
-	}
-
 	// forward trade updates and order updates to the order executor
-	session.Stream.OnTradeUpdate(orderExecutor.EmitTradeUpdate)
-	session.Stream.OnOrderUpdate(orderExecutor.EmitOrderUpdate)
-	session.orderExecutor = orderExecutor
-
+	session.Stream.OnTradeUpdate(session.orderExecutor.EmitTradeUpdate)
+	session.Stream.OnOrderUpdate(session.orderExecutor.EmitOrderUpdate)
 	session.Account.BindStream(session.Stream)
 
 	// insert trade into db right before everything
