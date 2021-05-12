@@ -147,6 +147,4 @@ type TradeReporter struct {
 	*Notifiability
 }
 
-const TemplateTradeReport = `:handshake: {{ .Symbol }} {{ .Side }} Trade Execution @ {{ .Price  }}`
-
 const TemplateOrderReport = `:handshake: {{ .Symbol }} {{ .Side }} Order Update @ {{ .Price  }}`
