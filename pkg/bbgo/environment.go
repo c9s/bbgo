@@ -211,8 +211,6 @@ func (environ *Environment) AddExchangesByViperKeys() error {
 }
 
 func InitExchangeSession(name string, session *ExchangeSession) error {
-	session.Name = name
-
 	exchangeName, err := types.ValidExchangeName(session.ExchangeName)
 	if err != nil {
 		return err
@@ -235,14 +233,6 @@ func InitExchangeSession(name string, session *ExchangeSession) error {
 		return err
 	}
 
-	session.Exchange = exchange
-	session.Notifiability = Notifiability{
-		SymbolChannelRouter:  NewPatternChannelRouter(nil),
-		SessionChannelRouter: NewPatternChannelRouter(nil),
-		ObjectChannelRouter:  NewObjectChannelRouter(),
-	}
-	session.Stream = exchange.NewStream()
-
 	// configure exchange
 	if session.Margin {
 		marginExchange, ok := exchange.(types.MarginExchange)
@@ -256,6 +246,15 @@ func InitExchangeSession(name string, session *ExchangeSession) error {
 			marginExchange.UseMargin()
 		}
 	}
+
+	session.Name = name
+	session.Notifiability = Notifiability{
+		SymbolChannelRouter:  NewPatternChannelRouter(nil),
+		SessionChannelRouter: NewPatternChannelRouter(nil),
+		ObjectChannelRouter:  NewObjectChannelRouter(),
+	}
+	session.Exchange = exchange
+	session.Stream = exchange.NewStream()
 
 	// pointer fields
 	session.Subscriptions = make(map[types.Subscription]types.Subscription)
