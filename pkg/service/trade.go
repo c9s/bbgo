@@ -110,7 +110,7 @@ func (s *TradeService) Sync(ctx context.Context, exchange types.Exchange, symbol
 			trade.Side,
 			trade.Price,
 			trade.Quantity,
-			trade.MakerOrTakerLabel(),
+			trade.Liquidity(),
 			trade.Time.String())
 
 		if err := s.Insert(trade); err != nil {
