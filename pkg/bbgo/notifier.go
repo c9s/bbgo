@@ -1,15 +1,15 @@
 package bbgo
 
 type Notifier interface {
-	NotifyTo(channel, format string, args ...interface{})
-	Notify(format string, args ...interface{})
+	NotifyTo(channel string, obj interface{}, args ...interface{})
+	Notify(obj interface{}, args ...interface{})
 }
 
 type NullNotifier struct{}
 
-func (n *NullNotifier) NotifyTo(channel, format string, args ...interface{}) {}
+func (n *NullNotifier) NotifyTo(channel string, obj interface{}, args ...interface{}) {}
 
-func (n *NullNotifier) Notify(format string, args ...interface{}) {}
+func (n *NullNotifier) Notify(obj interface{}, args ...interface{}) {}
 
 type Notifiability struct {
 	notifiers            []Notifier
@@ -18,7 +18,7 @@ type Notifiability struct {
 	ObjectChannelRouter  *ObjectChannelRouter  `json:"-"`
 }
 
-// RouteSession routes symbol name to channel
+// RouteSymbol routes symbol name to channel
 func (m *Notifiability) RouteSymbol(symbol string) (channel string, ok bool) {
 	if m.SymbolChannelRouter != nil {
 		return m.SymbolChannelRouter.Route(symbol)
@@ -47,14 +47,14 @@ func (m *Notifiability) AddNotifier(notifier Notifier) {
 	m.notifiers = append(m.notifiers, notifier)
 }
 
-func (m *Notifiability) Notify(format string, args ...interface{}) {
+func (m *Notifiability) Notify(obj interface{}, args ...interface{}) {
 	for _, n := range m.notifiers {
-		n.Notify(format, args...)
+		n.Notify(obj, args...)
 	}
 }
 
-func (m *Notifiability) NotifyTo(channel, format string, args ...interface{}) {
+func (m *Notifiability) NotifyTo(channel string, obj interface{}, args ...interface{}) {
 	for _, n := range m.notifiers {
-		n.NotifyTo(channel, format, args...)
+		n.NotifyTo(channel, obj, args...)
 	}
 }
