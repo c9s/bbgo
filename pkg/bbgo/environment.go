@@ -268,7 +268,7 @@ func InitExchangeSession(name string, session *ExchangeSession) error {
 	session.positions = make(map[string]*Position)
 	session.standardIndicatorSets = make(map[string]*StandardIndicatorSet)
 	session.orderStores = make(map[string]*OrderStore)
-	session.orderExecutor = &ExchangeOrderExecutor{
+	session.OrderExecutor = &ExchangeOrderExecutor{
 		// copy the notification system so that we can route
 		Notifiability: session.Notifiability,
 		Session:       session,
