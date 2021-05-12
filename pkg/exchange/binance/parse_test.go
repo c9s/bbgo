@@ -144,7 +144,7 @@ func TestParseOrderUpdate(t *testing.T) {
   "f": "GTC",                    // Time in force
   "q": "1.00000000",             // Order quantity
   "p": "0.10264410",             // Order price
-  "P": "0.00000000",             // Stop price
+  "P": "0.222",                  // Stop price
   "F": "0.00000000",             // Iceberg quantity
   "g": -1,                       // OrderListId
   "C": null,                     // Original client order ID; This is the ID of the order being canceled
@@ -154,7 +154,7 @@ func TestParseOrderUpdate(t *testing.T) {
   "i": 4293153,                  // Order ID
   "l": "0.00000000",             // Last executed quantity
   "z": "0.00000000",             // Cumulative filled quantity
-  "L": "0.00000000",             // Last executed price
+  "L": "0.00000001",             // Last executed price
   "n": "0",                      // Commission amount
   "N": null,                     // Commission asset
   "T": 1499405658657,            // Transaction time
@@ -162,11 +162,11 @@ func TestParseOrderUpdate(t *testing.T) {
   "I": 8641984,                  // Ignore
   "w": true,                     // Is the order on the book?
   "m": false,                    // Is this trade the maker side?
-  "M": false,                    // Ignore
+  "M": true,                     // Ignore
   "O": 1499405658657,            // Order creation time
-  "Z": "0.00000000",             // Cumulative quote asset transacted quantity
-  "Y": "0.00000000",              // Last quote asset transacted quantity (i.e. lastPrice * lastQty)
-  "Q": "0.00000000"              // Quote Order Qty
+  "Z": "0.1",                    // Cumulative quote asset transacted quantity
+  "Y": "0.00000000",             // Last quote asset transacted quantity (i.e. lastPrice * lastQty)
+  "Q": "2.0"                     // Quote Order Qty
 }`
 
 	payload = jsCommentTrimmer.ReplaceAllLiteralString(payload, "")
@@ -178,6 +178,35 @@ func TestParseOrderUpdate(t *testing.T) {
 	executionReport, ok := event.(*ExecutionReportEvent)
 	assert.True(t, ok)
 	assert.NotNil(t, executionReport)
+
+	assert.Equal(t, executionReport.Symbol, "ETHBTC")
+	assert.Equal(t, executionReport.Side, "BUY")
+	assert.Equal(t, executionReport.ClientOrderID, "mUvoqJxFIILMdfAW5iGSOW")
+	assert.Equal(t, executionReport.OriginalClientOrderID, "")
+	assert.Equal(t, executionReport.OrderType, "LIMIT")
+	assert.Equal(t, executionReport.OrderCreationTime, int64(1499405658657))
+	assert.Equal(t, executionReport.TimeInForce, "GTC")
+	assert.Equal(t, executionReport.IcebergQuantity, "0.00000000")
+	assert.Equal(t, executionReport.OrderQuantity, "1.00000000")
+	assert.Equal(t, executionReport.QuoteOrderQuantity, "2.0")
+	assert.Equal(t, executionReport.OrderPrice, "0.10264410")
+	assert.Equal(t, executionReport.StopPrice, "0.222")
+	assert.Equal(t, executionReport.IsOnBook, true)
+	assert.Equal(t, executionReport.IsMaker, false)
+	assert.Equal(t, executionReport.Ignore, true)
+	assert.Equal(t, executionReport.CommissionAmount, "0")
+	assert.Equal(t, executionReport.CommissionAsset, "")
+	assert.Equal(t, executionReport.CurrentExecutionType, "NEW")
+	assert.Equal(t, executionReport.CurrentOrderStatus, "NEW")
+	assert.Equal(t, executionReport.OrderID, int64(4293153))
+	assert.Equal(t, executionReport.Ignored, int64(8641984))
+	assert.Equal(t, executionReport.TradeID, int64(-1))
+	assert.Equal(t, executionReport.TransactionTime, int64(1499405658657))
+	assert.Equal(t, executionReport.LastExecutedQuantity, "0.00000000")
+	assert.Equal(t, executionReport.LastExecutedPrice, "0.00000001")
+	assert.Equal(t, executionReport.CumulativeFilledQuantity, "0.00000000")
+	assert.Equal(t, executionReport.CumulativeQuoteAssetTransactedQuantity, "0.1")
+	assert.Equal(t, executionReport.LastQuoteAssetTransactedQuantity, "0.00000000")
 
 	orderUpdate, err := executionReport.Order()
 	assert.NoError(t, err)
