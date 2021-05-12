@@ -258,6 +258,7 @@ func NewExchangeSessionFromConfig(name string, sessionConfig *ExchangeSession) (
 	session.Margin = sessionConfig.Margin
 	session.IsolatedMargin = sessionConfig.IsolatedMargin
 	session.IsolatedMarginSymbol = sessionConfig.IsolatedMarginSymbol
+	session.Withdrawal = sessionConfig.Withdrawal
 	return session, nil
 }
 
