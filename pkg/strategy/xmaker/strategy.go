@@ -154,7 +154,7 @@ func aggregatePrice(pvs types.PriceVolumeSlice, requiredQuantity fixedpoint.Valu
 	return price
 }
 
-func (s *Strategy) updateQuote(ctx context.Context) {
+func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.OrderExecutionRouter) {
 	if err := s.makerSession.Exchange.CancelOrders(ctx, s.activeMakerOrders.Orders()...); err != nil {
 		log.WithError(err).Errorf("can not cancel %s orders", s.Symbol)
 		return
@@ -358,8 +358,7 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 		return
 	}
 
-	makerOrderExecutor := &bbgo.ExchangeOrderExecutor{Session: s.makerSession}
-	makerOrders, err := makerOrderExecutor.SubmitOrders(ctx, submitOrders...)
+	makerOrders, err := orderExecutionRouter.SubmitOrdersTo(ctx, s.MakerExchange, submitOrders...)
 	if err != nil {
 		log.WithError(err).Errorf("order error: %s", err.Error())
 		return
@@ -527,7 +526,7 @@ func (s *Strategy) Validate() error {
 	return nil
 }
 
-func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession) error {
+func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession) error {
 	// configure default values
 	if s.UpdateInterval == 0 {
 		s.UpdateInterval = types.Duration(time.Second)
@@ -657,7 +656,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 				return
 
 			case <-quoteTicker.C:
-				s.updateQuote(ctx)
+				s.updateQuote(ctx, orderExecutionRouter)
 
 			case <-posTicker.C:
 				position := s.state.HedgePosition.AtomicLoad()
