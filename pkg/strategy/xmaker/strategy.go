@@ -324,7 +324,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 			}
 			accumulativeAskQuantity += askQuantity
 
-			askPrice := aggregatePrice(sourceBook.Asks, accumulativeBidQuantity)
+			askPrice := aggregatePrice(sourceBook.Asks, accumulativeAskQuantity)
 			askPrice = askPrice.MulFloat64(1.0 + s.AskMargin.Float64())
 			if i > 0 && s.Pips > 0 {
 				askPrice += fixedpoint.NewFromFloat(s.makerMarket.TickSize * float64(s.Pips))
