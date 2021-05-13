@@ -152,6 +152,10 @@ func (b *LocalActiveOrderBook) WriteOff(order types.Order) bool {
 	return false
 }
 
+func (b *LocalActiveOrderBook) NumOfOrders() int {
+	return b.Asks.Len() + b.Bids.Len()
+}
+
 func (b *LocalActiveOrderBook) Orders() types.OrderSlice {
 	return append(b.Asks.Orders(), b.Bids.Orders()...)
 }
