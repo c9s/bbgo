@@ -124,7 +124,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 			if minNotional > b.Available.Float64() {
 				log.Warnf("modifying quantity %f according to the min quote balance %f %s", quantity, b.Available.Float64(), market.QuoteCurrency)
-				quantity = bbgo.AdjustQuantityByMaxAmount(quantity, closePrice, b.Available.Float64())
+				quantity = bbgo.AdjustFloatQuantityByMaxAmount(quantity, closePrice, b.Available.Float64())
 			}
 		}
 
