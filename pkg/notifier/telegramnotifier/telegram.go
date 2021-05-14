@@ -12,7 +12,6 @@ type Notifier struct {
 
 type NotifyOption func(notifier *Notifier)
 
-
 // New
 // TODO: register interaction with channel, so that we can route message to the specific telegram bot
 func New(interaction *Interaction, options ...NotifyOption) *Notifier {
@@ -38,12 +37,15 @@ func filterPlaintextMessages(args []interface{}) (texts []string, pureArgs []int
 
 		case types.PlainText:
 			texts = append(texts, a.PlainText())
-			textArgsOffset = idx
+			if textArgsOffset == -1 {
+				textArgsOffset = idx
+			}
 
 		case types.Stringer:
 			texts = append(texts, a.String())
-			textArgsOffset = idx
-
+			if textArgsOffset == -1 {
+				textArgsOffset = idx
+			}
 		}
 	}
 
