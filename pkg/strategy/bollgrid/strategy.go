@@ -157,7 +157,7 @@ func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types
 			continue
 		}
 		// adjust buy quantity using current quote balance
-		quantity := bbgo.AdjustQuantityByMaxAmount(s.Quantity, price, quoteBalance.Float64())
+		quantity := bbgo.AdjustFloatQuantityByMaxAmount(s.Quantity, price, quoteBalance.Float64())
 		order := types.SubmitOrder{
 			Symbol:      s.Symbol,
 			Side:        types.SideTypeBuy,

@@ -169,7 +169,7 @@ func (o Order) Backup() SubmitOrder {
 }
 
 func (o Order) String() string {
-	return fmt.Sprintf("order %s %s %f/%f at %f -> %s", o.Symbol, o.Side, o.ExecutedQuantity, o.Quantity, o.Price, o.Status)
+	return fmt.Sprintf("ORDER %s %s %s %f/%f @ %f -> %s", o.Exchange, o.Symbol, o.Side, o.ExecutedQuantity, o.Quantity, o.Price, o.Status)
 }
 
 func (o Order) PlainText() string {
