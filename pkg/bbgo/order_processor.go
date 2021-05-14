@@ -1,6 +1,7 @@
 package bbgo
 
 import (
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/pkg/errors"
 )
 
@@ -14,7 +15,19 @@ var (
 )
 
 // AdjustQuantityByMinAmount adjusts the quantity to make the amount greater than the given minAmount
-func AdjustQuantityByMinAmount(quantity, currentPrice, minAmount float64) float64 {
+func AdjustQuantityByMinAmount(quantity, currentPrice, minAmount fixedpoint.Value) fixedpoint.Value {
+	// modify quantity for the min amount
+	amount := currentPrice.Mul(quantity)
+	if amount < minAmount {
+		ratio := minAmount.Div(amount)
+		quantity = quantity.Mul(ratio)
+	}
+
+	return quantity
+}
+
+// AdjustFloatQuantityByMinAmount adjusts the quantity to make the amount greater than the given minAmount
+func AdjustFloatQuantityByMinAmount(quantity, currentPrice, minAmount float64) float64 {
 	// modify quantity for the min amount
 	amount := currentPrice * quantity
 	if amount < minAmount {
@@ -25,7 +38,7 @@ func AdjustQuantityByMinAmount(quantity, currentPrice, minAmount float64) float6
 	return quantity
 }
 
-func AdjustQuantityByMaxAmount(quantity float64, price float64, maxAmount float64) float64 {
+func AdjustFloatQuantityByMaxAmount(quantity float64, price float64, maxAmount float64) float64 {
 	amount := price * quantity
 	if amount > maxAmount {
 		ratio := maxAmount / amount

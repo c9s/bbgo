@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/joho/godotenv"
 	"github.com/lestrrat-go/file-rotatelogs"
 	"github.com/pkg/errors"
@@ -17,6 +18,8 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 )
+
+var userConfig *bbgo.Config
 
 var RootCmd = &cobra.Command{
 	Use:   "bbgo",
@@ -41,6 +44,31 @@ var RootCmd = &cobra.Command{
 				if err := godotenv.Load(dotenvFile); err != nil {
 					return errors.Wrap(err, "error loading dotenv file")
 				}
+			}
+		}
+
+		configFile, err := cmd.Flags().GetString("config")
+		if err != nil {
+			return errors.Wrapf(err, "failed to get the config flag")
+		}
+
+		// load config file nicely
+		if len(configFile) > 0 {
+			// if config file exists, use the config loaded from the config file.
+			// otherwise, use a empty config object
+			if _, err := os.Stat(configFile); err == nil {
+				// load successfully
+				userConfig, err = bbgo.Load(configFile, false)
+				if err != nil {
+					return errors.Wrapf(err, "can not load config file: %s", configFile)
+				}
+
+			} else if os.IsNotExist(err) {
+				// config file doesn't exist, we should use the empty config
+				userConfig = &bbgo.Config{}
+			} else {
+				// other error
+				return errors.Wrapf(err, "config file load error: %s", configFile)
 			}
 		}
 
@@ -80,6 +108,7 @@ func init() {
 	RootCmd.PersistentFlags().String("ftx-subaccount-name", "", "subaccount name. Specify it if the credential is for subaccount.")
 }
 
+
 func Execute() {
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 
@@ -105,11 +134,16 @@ func Execute() {
 	// Once the flags are defined, we can bind config keys with flags.
 	if err := viper.BindPFlags(RootCmd.PersistentFlags()); err != nil {
 		log.WithError(err).Errorf("failed to bind persistent flags. please check the flag settings.")
+		return
 	}
 
 	if err := viper.BindPFlags(RootCmd.Flags()); err != nil {
 		log.WithError(err).Errorf("failed to bind local flags. please check the flag settings.")
+		return
 	}
+
+
+
 
 	log.SetFormatter(&prefixed.TextFormatter{})
 

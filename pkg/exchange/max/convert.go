@@ -127,9 +127,12 @@ func toGlobalOrderType(orderType max.OrderType) types.OrderType {
 	case max.OrderTypeIOCLimit:
 		return types.OrderTypeIOCLimit
 
+	case max.OrderTypePostOnly:
+		return types.OrderTypeLimitMaker
+
 	}
 
-	logger.Errorf("unknown order type: %v", orderType)
+	logger.Errorf("order convert error, unknown order type: %v", orderType)
 	return types.OrderType(orderType)
 }
 
