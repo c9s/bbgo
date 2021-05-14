@@ -44,6 +44,13 @@ func (slice PriceVolumeSlice) Copy() PriceVolumeSlice {
 	return s
 }
 
+func (slice PriceVolumeSlice) Second() (PriceVolume, bool) {
+	if len(slice) > 1 {
+		return slice[1], true
+	}
+	return PriceVolume{}, false
+}
+
 func (slice PriceVolumeSlice) First() (PriceVolume, bool) {
 	if len(slice) > 0 {
 		return slice[0], true
@@ -125,6 +132,20 @@ type OrderBook struct {
 	updateCallbacks     []func(book *OrderBook)
 	bidsChangeCallbacks []func(pvs PriceVolumeSlice)
 	asksChangeCallbacks []func(pvs PriceVolumeSlice)
+}
+
+func (b *OrderBook) Spread() (fixedpoint.Value, bool) {
+	bestBid, ok := b.BestBid()
+	if !ok {
+		return 0, false
+	}
+
+	bestAsk, ok := b.BestBid()
+	if !ok {
+		return 0, false
+	}
+
+	return bestAsk.Price - bestBid.Price, true
 }
 
 func (b *OrderBook) BestBid() (PriceVolume, bool) {

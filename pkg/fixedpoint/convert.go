@@ -279,3 +279,11 @@ func NumFractionalDigits(a Value) int {
 	}
 	return numPow - numZeros
 }
+
+
+func Abs(a Value) Value {
+	if a < 0 {
+		return -a
+	}
+	return a
+}

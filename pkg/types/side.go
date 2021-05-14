@@ -21,30 +21,39 @@ const (
 
 var ErrInvalidSideType = errors.New("invalid side type")
 
-func (side *SideType) UnmarshalJSON(data []byte) (err error) {
+func StrToSideType(s string) (side SideType, err error) {
+	switch strings.ToLower(s) {
+	case "buy":
+		side = SideTypeBuy
+
+	case "sell":
+		side = SideTypeSell
+
+	case "both":
+		side = SideTypeBoth
+
+	default:
+		err = ErrInvalidSideType
+		return side, err
+
+	}
+
+	return side, err
+}
+
+func (side *SideType) UnmarshalJSON(data []byte) error {
 	var s string
-	err = json.Unmarshal(data, &s)
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+
+	ss, err := StrToSideType(s)
 	if err != nil {
 		return err
 	}
 
-	switch strings.ToLower(s) {
-	case "buy":
-		*side = SideTypeBuy
-
-	case "sell":
-		*side = SideTypeSell
-
-	case "both":
-		*side = SideTypeBoth
-
-	default:
-		err = ErrInvalidSideType
-		return err
-
-	}
-
-	return err
+	*side = ss
+	return nil
 }
 
 func (side SideType) Reverse() SideType {
@@ -57,6 +66,10 @@ func (side SideType) Reverse() SideType {
 	}
 
 	return side
+}
+
+func (side SideType) String() string {
+	return string(side)
 }
 
 func (side SideType) Color() string {
