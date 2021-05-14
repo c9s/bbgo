@@ -156,17 +156,20 @@ func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types
 		if price >= currentPrice {
 			continue
 		}
+		// adjust buy quantity using current quote balance
+		quantity := bbgo.AdjustQuantityByMaxAmount(s.Quantity, price, quoteBalance.Float64())
 		order := types.SubmitOrder{
 			Symbol:      s.Symbol,
 			Side:        types.SideTypeBuy,
 			Type:        types.OrderTypeLimit,
 			Market:      s.Market,
-			Quantity:    s.Quantity,
+			Quantity:    quantity,
 			Price:       price,
 			TimeInForce: "GTC",
 		}
 		quoteQuantity := fixedpoint.NewFromFloat(order.Quantity).MulFloat64(price)
-		if quoteBalance < quoteQuantity {
+		if quantity < s.MinQuantity {
+			// don't submit this order if buy quantity is too small
 			log.Infof("quote balance %f is not enough, stop generating buy orders", quoteBalance.Float64())
 			break
 		}
@@ -217,17 +220,20 @@ func (s *Strategy) generateGridSellOrders(session *bbgo.ExchangeSession) ([]type
 		if price <= currentPrice {
 			continue
 		}
+		// adjust sell quantity using current base balance
+		quantity := math.Min(s.Quantity, baseBalance.Float64())
 		order := types.SubmitOrder{
 			Symbol:      s.Symbol,
 			Side:        types.SideTypeSell,
 			Type:        types.OrderTypeLimit,
 			Market:      s.Market,
-			Quantity:    s.Quantity,
+			Quantity:    quantity,
 			Price:       price,
 			TimeInForce: "GTC",
 		}
 		baseQuantity := fixedpoint.NewFromFloat(order.Quantity)
-		if baseBalance < baseQuantity {
+		if quantity < s.MinQuantity {
+			// don't submit this order if sell quantity is too small
 			log.Infof("base balance %f is not enough, stop generating sell orders", baseBalance.Float64())
 			break
 		}
