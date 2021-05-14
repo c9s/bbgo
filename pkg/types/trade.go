@@ -71,14 +71,18 @@ type Trade struct {
 	PnL        sql.NullFloat64 `json:"pnl" db:"pnl"`
 }
 
-func (trade Trade) PlainText() string {
-	return fmt.Sprintf("%s Trade %s %s price %s, quantity %s, amount %s",
+func (trade Trade) String() string {
+	return fmt.Sprintf("TRADE %s %s %s %s @ %s, amount %s",
 		trade.Exchange,
 		trade.Symbol,
 		trade.Side,
-		util.FormatFloat(trade.Price, 2),
 		util.FormatFloat(trade.Quantity, 4),
+		util.FormatFloat(trade.Price, 3),
 		util.FormatFloat(trade.QuoteQuantity, 2))
+}
+
+func (trade Trade) PlainText() string {
+	return trade.String()
 }
 
 var slackTradeTextTemplate = ":handshake: {{ .Symbol }} {{ .Side }} Trade Execution @ {{ .Price  }}"
