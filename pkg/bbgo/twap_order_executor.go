@@ -20,6 +20,8 @@ type TwapExecution struct {
 	TargetQuantity fixedpoint.Value
 	SliceQuantity  fixedpoint.Value
 	StopPrice      fixedpoint.Value
+	NumOfTicks     int
+	UpdateInterval time.Duration
 
 	market           types.Market
 	marketDataStream types.Stream
@@ -96,14 +98,30 @@ func (e *TwapExecution) newBestPriceMakerOrder() (orderForm types.SubmitOrder, e
 		return orderForm, errors.New("can not calculate spread, neither bid price or ask price exists")
 	}
 
+	// for example, we have tickSize = 0.01, and spread is 28.02 - 28.00 = 0.02
+	// assign tickSpread = min(spread - tickSize, tickSpread)
+	//
+	// if number of ticks = 0, than the tickSpread is 0
+	// tickSpread = min(0.02 - 0.01, 0)
+	// price = first bid price 28.00 + tickSpread (0.00) = 28.00
+	//
+	// if number of ticks = 1, than the tickSpread is 0.01
+	// tickSpread = min(0.02 - 0.01, 0.01)
+	// price = first bid price 28.00 + tickSpread (0.01) = 28.01
+	//
+	// if number of ticks = 2, than the tickSpread is 0.02
+	// tickSpread = min(0.02 - 0.01, 0.02)
+	// price = first bid price 28.00 + tickSpread (0.01) = 28.01
 	tickSize := fixedpoint.NewFromFloat(e.market.TickSize)
+	tickSpread := tickSize.MulInt(e.NumOfTicks)
 	if spread > tickSize {
-		log.Infof("spread %f is greater than the tick size %f, adding 1 tick to the price...", spread.Float64(), tickSize.Float64())
+		// there is a gap in the spread
+		tickSpread = fixedpoint.Min(tickSpread, spread-tickSize)
 		switch e.Side {
 		case types.SideTypeSell:
-			newPrice -= fixedpoint.NewFromFloat(e.market.TickSize)
+			newPrice -= tickSpread
 		case types.SideTypeBuy:
-			newPrice += fixedpoint.NewFromFloat(e.market.TickSize)
+			newPrice += tickSpread
 		}
 	}
 
@@ -228,7 +246,10 @@ func (e *TwapExecution) updateOrder(ctx context.Context) error {
 			}
 
 			// if there is no gap
-			if fixedpoint.Abs(first.Price-second.Price) == tickSize {
+			gap := fixedpoint.Abs(first.Price - second.Price)
+			if gap > tickSize.MulInt(e.NumOfTicks) {
+				// found gap, we should update our price
+			} else {
 				log.Infof("no gap between the second price %f and the first price %f (tick size = %f), skip updating",
 					first.Price.Float64(),
 					second.Price.Float64(),
@@ -277,7 +298,7 @@ func (e *TwapExecution) cancelActiveOrders(ctx context.Context) {
 
 func (e *TwapExecution) orderUpdater(ctx context.Context) {
 	rateLimiter := rate.NewLimiter(rate.Every(time.Minute), 15)
-	ticker := time.NewTimer(5 * time.Second)
+	ticker := time.NewTimer(e.UpdateInterval)
 	defer ticker.Stop()
 
 	// we should stop updater and clean up our open orders, if
@@ -364,6 +385,10 @@ func (e *TwapExecution) Run(parentCtx context.Context) error {
 	e.userDataStreamCtx, e.cancelUserDataStream = context.WithCancel(context.Background())
 	e.mu.Unlock()
 
+	if e.UpdateInterval == 0 {
+		e.UpdateInterval = 10 * time.Second
+	}
+
 	var ok bool
 	e.market, ok = e.Session.Market(e.Symbol)
 	if !ok {
@@ -444,25 +469,4 @@ func (e *TwapExecution) Shutdown(shutdownCtx context.Context) {
 
 		}
 	}
-}
-
-type TwapOrderExecutor struct {
-	Session *ExchangeSession
-
-	// Execution parameters
-	// DelayTime is the order update delay time
-	DelayTime types.Duration
-}
-
-func (e *TwapOrderExecutor) Execute(ctx context.Context, symbol string, side types.SideType, targetQuantity, sliceQuantity, stopPrice fixedpoint.Value) (*TwapExecution, error) {
-	execution := &TwapExecution{
-		Session:        e.Session,
-		Symbol:         symbol,
-		Side:           side,
-		TargetQuantity: targetQuantity,
-		SliceQuantity:  sliceQuantity,
-		StopPrice:      stopPrice,
-	}
-	err := execution.Run(ctx)
-	return execution, err
 }

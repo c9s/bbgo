@@ -167,6 +167,11 @@ var executeOrderCmd = &cobra.Command{
 			return err
 		}
 
+		numOfPriceTicks, err := cmd.Flags().GetInt("price-ticks")
+		if err != nil {
+			return err
+		}
+
 		stopPriceS, err := cmd.Flags().GetString("stop-price")
 		if err != nil {
 			return err
@@ -191,15 +196,20 @@ var executeOrderCmd = &cobra.Command{
 			return fmt.Errorf("session %s not found", sessionName)
 		}
 
-		executor := &bbgo.TwapOrderExecutor{
-			Session: session,
-		}
-
 		executionCtx, cancelExecution := context.WithCancel(ctx)
 		defer cancelExecution()
 
-		execution, err := executor.Execute(executionCtx, symbol, side, targetQuantity, sliceQuantity, stopPrice)
-		if err != nil {
+		execution := &bbgo.TwapExecution{
+			Session:        session,
+			Symbol:         symbol,
+			Side:           side,
+			TargetQuantity: targetQuantity,
+			SliceQuantity:  sliceQuantity,
+			StopPrice:      stopPrice,
+			NumOfTicks:     numOfPriceTicks,
+		}
+
+		if err := execution.Run(executionCtx); err != nil {
 			return err
 		}
 
@@ -317,6 +327,7 @@ func init() {
 	executeOrderCmd.Flags().String("target-quantity", "", "target quantity")
 	executeOrderCmd.Flags().String("slice-quantity", "", "slice quantity")
 	executeOrderCmd.Flags().String("stop-price", "0", "stop price")
+	executeOrderCmd.Flags().Int("price-ticks", 0, "the number of price tick for the jump spread, default to 0")
 
 	RootCmd.AddCommand(listOrdersCmd)
 	RootCmd.AddCommand(submitOrderCmd)

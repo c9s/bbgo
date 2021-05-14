@@ -58,6 +58,10 @@ func (v Value) Mul(v2 Value) Value {
 	return NewFromFloat(v.Float64() * v2.Float64())
 }
 
+func (v Value) MulInt(v2 int) Value {
+	return NewFromFloat(v.Float64() * float64(v2))
+}
+
 func (v Value) MulFloat64(v2 float64) Value {
 	return NewFromFloat(v.Float64() * v2)
 }
@@ -251,7 +255,6 @@ func NewFromInt(val int) Value {
 func NewFromInt64(val int64) Value {
 	return Value(val * DefaultPow)
 }
-
 
 func NumFractionalDigits(a Value) int {
 	numPow := 0
