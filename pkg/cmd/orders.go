@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"syscall"
 	"time"
 
-	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
@@ -145,6 +145,9 @@ var executeOrderCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		if len(targetQuantityS) == 0 {
+			return errors.New("--target-quantity can not be empty")
+		}
 
 		targetQuantity, err := fixedpoint.NewFromString(targetQuantityS)
 		if err != nil {
@@ -155,8 +158,21 @@ var executeOrderCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		if len(sliceQuantityS) == 0 {
+			return errors.New("--slice-quantity can not be empty")
+		}
 
 		sliceQuantity, err := fixedpoint.NewFromString(sliceQuantityS)
+		if err != nil {
+			return err
+		}
+
+		stopPriceS, err := cmd.Flags().GetString("stop-price")
+		if err != nil {
+			return err
+		}
+
+		stopPrice, err := fixedpoint.NewFromString(stopPriceS)
 		if err != nil {
 			return err
 		}
@@ -179,22 +195,33 @@ var executeOrderCmd = &cobra.Command{
 			Session: session,
 		}
 
-		execCtx, execCancel := context.WithCancel(ctx)
+		executionCtx, cancelExecution := context.WithCancel(ctx)
+		defer cancelExecution()
 
-		execution, err := executor.Execute(execCtx, symbol, side, targetQuantity, sliceQuantity)
+		execution, err := executor.Execute(executionCtx, symbol, side, targetQuantity, sliceQuantity, stopPrice)
 		if err != nil {
-			execCancel()
-			_ = execution
 			return err
 		}
 
-		// report execution here...
-		_ = execution
+		var sigC = make(chan os.Signal, 1)
+		signal.Notify(sigC, syscall.SIGINT, syscall.SIGTERM)
+		defer signal.Stop(sigC)
 
-		cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
+		select {
+		case sig := <-sigC:
+			log.Warnf("signal %v", sig)
+			log.Infof("shutting down order executor...")
+			shutdownCtx, cancelShutdown := context.WithDeadline(ctx, time.Now().Add(10*time.Second))
+			execution.Shutdown(shutdownCtx)
+			cancelShutdown()
 
-		log.Infof("shutting down order executor...")
-		execCancel()
+		case <-execution.Done():
+			log.Infof("the order execution is completed")
+
+		case <-ctx.Done():
+
+		}
+
 		return nil
 	},
 }
@@ -289,6 +316,7 @@ func init() {
 	executeOrderCmd.Flags().String("side", "", "the trading side: buy or sell")
 	executeOrderCmd.Flags().String("target-quantity", "", "target quantity")
 	executeOrderCmd.Flags().String("slice-quantity", "", "slice quantity")
+	executeOrderCmd.Flags().String("stop-price", "0", "stop price")
 
 	RootCmd.AddCommand(listOrdersCmd)
 	RootCmd.AddCommand(submitOrderCmd)
