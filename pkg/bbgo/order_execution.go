@@ -162,10 +162,10 @@ func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...
 
 			// Increase the quantity if the amount is not enough,
 			// this is the only increase op, later we will decrease the quantity if it meets the criteria
-			quantity = AdjustQuantityByMinAmount(quantity, price, market.MinAmount*1.01)
+			quantity = AdjustFloatQuantityByMinAmount(quantity, price, market.MinAmount*1.01)
 
 			if c.MaxOrderAmount > 0 {
-				quantity = AdjustQuantityByMaxAmount(quantity, price, c.MaxOrderAmount.Float64())
+				quantity = AdjustFloatQuantityByMaxAmount(quantity, price, c.MaxOrderAmount.Float64())
 			}
 
 			quoteAssetQuota := math.Max(0.0, quoteBalance.Available.Float64()-c.MinQuoteBalance.Float64())
@@ -178,7 +178,7 @@ func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...
 				continue
 			}
 
-			quantity = AdjustQuantityByMaxAmount(quantity, price, quoteAssetQuota)
+			quantity = AdjustFloatQuantityByMaxAmount(quantity, price, quoteAssetQuota)
 
 			// if MaxBaseAssetBalance is enabled, we should check the current base asset balance
 			if baseBalance, hasBaseAsset := balances[market.BaseCurrency]; hasBaseAsset && c.MaxBaseAssetBalance > 0 {
@@ -226,7 +226,7 @@ func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...
 			}
 
 			// if the amount is too small, we should increase it.
-			quantity = AdjustQuantityByMinAmount(quantity, price, market.MinNotional*1.01)
+			quantity = AdjustFloatQuantityByMinAmount(quantity, price, market.MinNotional*1.01)
 
 			// we should not SELL too much
 			quantity = math.Min(quantity, baseAssetBalance.Available.Float64())
@@ -253,7 +253,7 @@ func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...
 			}
 
 			if c.MaxOrderAmount > 0 {
-				quantity = AdjustQuantityByMaxAmount(quantity, price, c.MaxOrderAmount.Float64())
+				quantity = AdjustFloatQuantityByMaxAmount(quantity, price, c.MaxOrderAmount.Float64())
 			}
 
 			notional := quantity * lastPrice
