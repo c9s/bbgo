@@ -252,6 +252,19 @@ func NewFromInt64(val int64) Value {
 	return Value(val * DefaultPow)
 }
 
+
+func NumFractionalDigits(a Value) int {
+	numPow := 0
+	for pow := int64(DefaultPow); pow%10 != 1; pow /= 10 {
+		numPow++
+	}
+	numZeros := 0
+	for v := a.Int64(); v%10 == 0; v /= 10 {
+		numZeros++
+	}
+	return numPow - numZeros
+}
+
 func Min(a, b Value) Value {
 	if a < b {
 		return a
@@ -267,19 +280,6 @@ func Max(a, b Value) Value {
 
 	return b
 }
-
-func NumFractionalDigits(a Value) int {
-	numPow := 0
-	for pow := int64(DefaultPow); pow%10 != 1; pow /= 10 {
-		numPow++
-	}
-	numZeros := 0
-	for v := a.Int64(); v%10 == 0; v /= 10 {
-		numZeros++
-	}
-	return numPow - numZeros
-}
-
 
 func Abs(a Value) Value {
 	if a < 0 {
