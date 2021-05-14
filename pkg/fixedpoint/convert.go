@@ -58,6 +58,10 @@ func (v Value) Mul(v2 Value) Value {
 	return NewFromFloat(v.Float64() * v2.Float64())
 }
 
+func (v Value) MulInt(v2 int) Value {
+	return NewFromFloat(v.Float64() * float64(v2))
+}
+
 func (v Value) MulFloat64(v2 float64) Value {
 	return NewFromFloat(v.Float64() * v2)
 }
@@ -252,6 +256,18 @@ func NewFromInt64(val int64) Value {
 	return Value(val * DefaultPow)
 }
 
+func NumFractionalDigits(a Value) int {
+	numPow := 0
+	for pow := int64(DefaultPow); pow%10 != 1; pow /= 10 {
+		numPow++
+	}
+	numZeros := 0
+	for v := a.Int64(); v%10 == 0; v /= 10 {
+		numZeros++
+	}
+	return numPow - numZeros
+}
+
 func Min(a, b Value) Value {
 	if a < b {
 		return a
@@ -268,14 +284,9 @@ func Max(a, b Value) Value {
 	return b
 }
 
-func NumFractionalDigits(a Value) int {
-	numPow := 0
-	for pow := int64(DefaultPow); pow%10 != 1; pow /= 10 {
-		numPow++
+func Abs(a Value) Value {
+	if a < 0 {
+		return -a
 	}
-	numZeros := 0
-	for v := a.Int64(); v%10 == 0; v /= 10 {
-		numZeros++
-	}
-	return numPow - numZeros
+	return a
 }

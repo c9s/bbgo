@@ -324,7 +324,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 			}
 			accumulativeAskQuantity += askQuantity
 
-			askPrice := aggregatePrice(sourceBook.Asks, accumulativeBidQuantity)
+			askPrice := aggregatePrice(sourceBook.Asks, accumulativeAskQuantity)
 			askPrice = askPrice.MulFloat64(1.0 + s.AskMargin.Float64())
 			if i > 0 && s.Pips > 0 {
 				askPrice += fixedpoint.NewFromFloat(s.makerMarket.TickSize * float64(s.Pips))
@@ -417,7 +417,7 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 		// check quote quantity
 		if quote, ok := account.Balance(s.sourceMarket.QuoteCurrency); ok {
 			if quote.Available < notional {
-				// qf := bbgo.AdjustQuantityByMaxAmount(quantity.Float64(), lastPrice, quote.Available.Float64())
+				// qf := bbgo.AdjustFloatQuantityByMaxAmount(quantity.Float64(), lastPrice, quote.Available.Float64())
 				// quantity = fixedpoint.NewFromFloat(qf)
 			}
 		}
@@ -675,14 +675,9 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 		time.Sleep(s.UpdateInterval.Duration())
 
-		for {
+		for s.activeMakerOrders.NumOfOrders() > 0  {
 			orders := s.activeMakerOrders.Orders()
-			if len(orders) == 0 {
-				log.Info("all orders are cancelled successfully")
-				break
-			}
-
-			log.Warnf("%d orders are not cancelled yet...", len(orders))
+			log.Warnf("%d orders are not cancelled yet:", len(orders))
 			s.activeMakerOrders.Print()
 
 			if err := s.makerSession.Exchange.CancelOrders(ctx, s.activeMakerOrders.Orders()...); err != nil {
@@ -692,6 +687,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 			log.Warnf("waiting for orders to be cancelled...")
 			time.Sleep(3 * time.Second)
 		}
+		log.Info("all orders are cancelled successfully")
 
 		if err := s.Persistence.Save(s.state, ID, s.Symbol, stateKey); err != nil {
 			log.WithError(err).Errorf("can not save state: %+v", s.state)
