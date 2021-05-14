@@ -140,7 +140,7 @@ func (b *OrderBook) Spread() (fixedpoint.Value, bool) {
 		return 0, false
 	}
 
-	bestAsk, ok := b.BestBid()
+	bestAsk, ok := b.BestAsk()
 	if !ok {
 		return 0, false
 	}
