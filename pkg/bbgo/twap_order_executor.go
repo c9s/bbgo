@@ -152,6 +152,13 @@ func (e *TwapExecution) newBestPriceOrder() (orderForm types.SubmitOrder, err er
 
 	minQuantity := fixedpoint.NewFromFloat(e.market.MinQuantity)
 	restQuantity := e.TargetQuantity - fixedpoint.Abs(e.position.Base)
+
+	if restQuantity == 0 {
+		if e.cancelContextIfTargetQuantityFilled() {
+			return
+		}
+	}
+
 	if restQuantity < minQuantity {
 		return orderForm, fmt.Errorf("can not continue placing orders, rest quantity %f is less than the min quantity %f", restQuantity.Float64(), minQuantity.Float64())
 	}
