@@ -111,8 +111,8 @@ type Strategy struct {
 
 	Addresses map[string]string `json:"addresses"`
 
-	MaxDailyNumberOfTransfer int `json:"maxDailyNumberOfTransfer"`
-	MaxDailyAmountOfTransfer int `json:"maxDailyAmountOfTransfer"`
+	MaxDailyNumberOfTransfer int              `json:"maxDailyNumberOfTransfer"`
+	MaxDailyAmountOfTransfer fixedpoint.Value `json:"maxDailyAmountOfTransfer"`
 
 	Asset string `json:"asset"`
 
@@ -132,6 +132,7 @@ func (s *Strategy) ID() string {
 func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {}
 
 func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.ExchangeSession) {
+
 	s.Notifiability.Notify("Checking %s low balance level exchange session...", s.Asset)
 
 	lowLevelSession, lowLevelBalance, err := s.findLowBalanceLevelSession(sessions)
@@ -173,6 +174,28 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 	if !ok {
 		log.Errorf("%s address of session %s not found", s.Asset, lowLevelSession.Name)
 		return
+	}
+
+	if s.state != nil {
+		if s.MaxDailyNumberOfTransfer > 0 {
+			if s.state.DailyNumberOfTransfers >= s.MaxDailyNumberOfTransfer {
+				s.Notifiability.Notify("Exceeded %s max daily number of transfers %d (current %d), skipping transfer...",
+					s.Asset,
+					s.MaxDailyNumberOfTransfer,
+					s.state.DailyNumberOfTransfers)
+				return
+			}
+		}
+
+		if s.MaxDailyAmountOfTransfer > 0 {
+			if s.state.DailyAmountOfTransfers >= s.MaxDailyAmountOfTransfer {
+				s.Notifiability.Notify("Exceeded %s max daily amount of transfers %f (current %f), skipping transfer...",
+					s.Asset,
+					s.MaxDailyAmountOfTransfer.Float64(),
+					s.state.DailyAmountOfTransfers.Float64())
+				return
+			}
+		}
 	}
 
 	s.Notifiability.Notify(&WithdrawalRequest{
