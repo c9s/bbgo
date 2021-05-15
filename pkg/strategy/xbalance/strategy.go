@@ -227,7 +227,6 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 		s.state.DailyNumberOfTransfers += 1
 		s.state.DailyAmountOfTransfers += requiredAmount
 		s.SaveState()
-		s.Notifiability.Notify(s.state)
 	}
 }
 
