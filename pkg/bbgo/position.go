@@ -3,9 +3,12 @@ package bbgo
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
+	"github.com/slack-go/slack"
 )
 
 type Position struct {
@@ -20,8 +23,43 @@ type Position struct {
 	sync.Mutex
 }
 
+func (p *Position) SlackAttachment() slack.Attachment {
+	var posType = ""
+	var color = ""
+
+	if p.Base == 0 {
+		color = "#cccccc"
+		posType = "Closed"
+	} else if p.Base > 0 {
+		posType = "Long"
+		color = "#228B22"
+	} else if p.Base < 0 {
+		posType = "Short"
+		color = "#DC143C"
+	}
+
+	title := util.Render(posType+` Position {{ .Symbol }} `, p)
+	return slack.Attachment{
+		// Pretext:       "",
+		// Text:  text,
+		Title: title,
+		Color: color,
+		Fields: []slack.AttachmentField{
+			{Title: "Average Cost", Value: util.FormatFloat(p.AverageCost.Float64(), 2), Short: true},
+			{Title: p.BaseCurrency, Value: util.FormatFloat(p.Base.Float64(), 4), Short: true},
+			{Title: p.QuoteCurrency, Value: util.FormatFloat(p.Quote.Float64(), 2)},
+		},
+		Footer: util.Render("update time {{ . }}", time.Now().Format(time.RFC822)),
+		// FooterIcon: "",
+	}
+}
+
+func (p *Position) PlainText() string {
+	return p.String()
+}
+
 func (p *Position) String() string {
-	return fmt.Sprintf("%s: average cost = %f, base = %f, quote = %f",
+	return fmt.Sprintf("POSITION %s: average cost = %f, base = %f, quote = %f",
 		p.Symbol,
 		p.AverageCost.Float64(),
 		p.Base.Float64(),
