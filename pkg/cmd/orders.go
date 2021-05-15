@@ -182,6 +182,11 @@ var executeOrderCmd = &cobra.Command{
 			return err
 		}
 
+		updateInterval, err := cmd.Flags().GetDuration("update-interval")
+		if err != nil {
+			return err
+		}
+
 		environ := bbgo.NewEnvironment()
 		if err := environ.ConfigureExchangeSessions(userConfig); err != nil {
 			return err
@@ -207,6 +212,7 @@ var executeOrderCmd = &cobra.Command{
 			SliceQuantity:  sliceQuantity,
 			StopPrice:      stopPrice,
 			NumOfTicks:     numOfPriceTicks,
+			UpdateInterval: updateInterval,
 		}
 
 		if err := execution.Run(executionCtx); err != nil {
@@ -327,6 +333,7 @@ func init() {
 	executeOrderCmd.Flags().String("target-quantity", "", "target quantity")
 	executeOrderCmd.Flags().String("slice-quantity", "", "slice quantity")
 	executeOrderCmd.Flags().String("stop-price", "0", "stop price")
+	executeOrderCmd.Flags().Duration("update-interval", time.Second*10, "order update time")
 	executeOrderCmd.Flags().Int("price-ticks", 0, "the number of price tick for the jump spread, default to 0")
 
 	RootCmd.AddCommand(listOrdersCmd)
