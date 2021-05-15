@@ -67,11 +67,11 @@ func (n *Notifier) NotifyTo(channel string, obj interface{}, args ...interface{}
 		log.Infof(a, pureArgs...)
 		message = fmt.Sprintf(a, pureArgs...)
 
-	case types.Stringer:
-		message = a.String()
-
 	case types.PlainText:
 		message = a.PlainText()
+
+	case types.Stringer:
+		message = a.String()
 
 	default:
 		log.Errorf("unsupported notification format: %T %+v", a, a)
