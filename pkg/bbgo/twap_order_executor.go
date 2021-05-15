@@ -297,7 +297,7 @@ func (e *TwapExecution) cancelActiveOrders(ctx context.Context) {
 }
 
 func (e *TwapExecution) orderUpdater(ctx context.Context) {
-	rateLimiter := rate.NewLimiter(rate.Every(time.Minute), 15)
+	updateLimiter := rate.NewLimiter(rate.Every(3 * time.Second), 1)
 	ticker := time.NewTimer(e.UpdateInterval)
 	defer ticker.Stop()
 
@@ -316,7 +316,7 @@ func (e *TwapExecution) orderUpdater(ctx context.Context) {
 			return
 
 		case <-e.orderBook.C:
-			if !rateLimiter.Allow() {
+			if !updateLimiter.Allow() {
 				break
 			}
 
@@ -329,7 +329,7 @@ func (e *TwapExecution) orderUpdater(ctx context.Context) {
 			}
 
 		case <-ticker.C:
-			if !rateLimiter.Allow() {
+			if !updateLimiter.Allow() {
 				break
 			}
 
