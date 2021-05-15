@@ -172,13 +172,15 @@ func (o Order) String() string {
 	return fmt.Sprintf("ORDER %s %s %s %f/%f @ %f -> %s", o.Exchange, o.Symbol, o.Side, o.ExecutedQuantity, o.Quantity, o.Price, o.Status)
 }
 
+// PlainText is used for telegram-styled messages
 func (o Order) PlainText() string {
-	return fmt.Sprintf("%s %s Order %s %s price %s, quantity %s/%s status %s",
+	return fmt.Sprintf("Order %s %s %s %s @ %s %s/%s -> %s",
 		o.Exchange,
-		o.Type,
 		o.Symbol,
+		o.Type,
 		o.Side,
 		util.FormatFloat(o.Price, 2),
 		util.FormatFloat(o.ExecutedQuantity, 2),
-		util.FormatFloat(o.Quantity, 4), o.Status)
+		util.FormatFloat(o.Quantity, 4),
+		o.Status)
 }

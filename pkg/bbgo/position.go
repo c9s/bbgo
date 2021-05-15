@@ -55,7 +55,12 @@ func (p *Position) SlackAttachment() slack.Attachment {
 }
 
 func (p *Position) PlainText() string {
-	return p.String()
+	return fmt.Sprintf("Position %s: average cost = %f, base = %f, quote = %f",
+		p.Symbol,
+		p.AverageCost.Float64(),
+		p.Base.Float64(),
+		p.Quote.Float64(),
+	)
 }
 
 func (p *Position) String() string {
