@@ -155,10 +155,13 @@ func (e *TwapExecution) newBestPriceMakerOrder() (orderForm types.SubmitOrder, e
 		return orderForm, fmt.Errorf("can not continue placing orders, rest quantity %f is less than the min quantity %f", restQuantity.Float64(), minQuantity.Float64())
 	}
 
+	// when slice = 1000, if we only have 998, we should adjust our quantity to 998
+	orderQuantity := fixedpoint.Min(e.SliceQuantity, restQuantity)
+
 	// if the rest quantity in the next round is not enough, we should merge the rest quantity into this round
-	orderQuantity := e.SliceQuantity
+	// if there are rest slices
 	nextRestQuantity := restQuantity - e.SliceQuantity
-	if nextRestQuantity < minQuantity {
+	if nextRestQuantity > 0 && nextRestQuantity < minQuantity {
 		orderQuantity = restQuantity
 	}
 
@@ -297,7 +300,7 @@ func (e *TwapExecution) cancelActiveOrders(ctx context.Context) {
 }
 
 func (e *TwapExecution) orderUpdater(ctx context.Context) {
-	updateLimiter := rate.NewLimiter(rate.Every(3 * time.Second), 1)
+	updateLimiter := rate.NewLimiter(rate.Every(3*time.Second), 1)
 	ticker := time.NewTimer(e.UpdateInterval)
 	defer ticker.Stop()
 
