@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"sync"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 	"github.com/pkg/errors"
@@ -17,14 +19,43 @@ import (
 
 const ID = "xbalance"
 
+const stateKey = "state-v1"
+
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
 type State struct {
-	DailyNumberOfTransfers fixedpoint.Value `json:"dailyNumberOfTransfers,omitempty"`
+	Asset                  string           `json:"asset"`
+	DailyNumberOfTransfers int              `json:"dailyNumberOfTransfers,omitempty"`
 	DailyAmountOfTransfers fixedpoint.Value `json:"dailyAmountOfTransfers,omitempty"`
 	Since                  int64            `json:"since"`
+}
+
+func (s *State) IsOver24Hours() bool {
+	return time.Now().Sub(time.Unix(s.Since, 0)) >= 24*time.Hour
+}
+
+func (s *State) SlackAttachment() slack.Attachment {
+	return slack.Attachment{
+		// Pretext:       "",
+		// Text:  text,
+		Title: "Daily Transfer Stats",
+		Fields: []slack.AttachmentField{
+			{Title: "Total Number of Transfers", Value: fmt.Sprintf("%d", s.DailyNumberOfTransfers), Short: true},
+			{Title: "Total Amount of Transfers", Value: util.FormatFloat(s.DailyAmountOfTransfers.Float64(), 4), Short: true},
+		},
+		Footer: util.Render("since {{ . }}", time.Unix(s.Since, 0).Format(time.RFC822)),
+	}
+}
+
+func (s *State) Reset() {
+	var beginningOfTheDay = Bod(time.Now())
+	*s = State{
+		DailyNumberOfTransfers: 0,
+		DailyAmountOfTransfers: 0,
+		Since:                  beginningOfTheDay.Unix(),
+	}
 }
 
 type WithdrawalRequest struct {
@@ -68,6 +99,8 @@ func (r *WithdrawalRequest) SlackAttachment() slack.Attachment {
 
 type Strategy struct {
 	Notifiability *bbgo.Notifiability
+	*bbgo.Graceful
+	*bbgo.Persistence
 
 	Interval types.Duration `json:"interval"`
 
@@ -150,7 +183,17 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 		return
 	}
 
-	s.Notifiability.Notify("%s Withdrawal request sent", s.Asset)
+	s.Notifiability.Notify("%s withdrawal request sent", s.Asset)
+
+	if s.state != nil {
+		if s.state.IsOver24Hours() {
+			s.state.Reset()
+		}
+
+		s.state.DailyNumberOfTransfers += 1
+		s.state.DailyAmountOfTransfers += requiredAmount
+		s.SaveState()
+	}
 }
 
 func (s *Strategy) findHighestBalanceLevelSession(sessions map[string]*bbgo.ExchangeSession, requiredAmount fixedpoint.Value) (*bbgo.ExchangeSession, types.Balance, error) {
@@ -194,10 +237,62 @@ func (s *Strategy) findLowBalanceLevelSession(sessions map[string]*bbgo.Exchange
 	return nil, balance, nil
 }
 
+func Bod(t time.Time) time.Time {
+	year, month, day := t.Date()
+	return time.Date(year, month, day, 0, 0, 0, 0, t.Location())
+}
+
+func (s *Strategy) SaveState() {
+	if err := s.Persistence.Save(s.state, ID, s.Asset, stateKey); err != nil {
+		log.WithError(err).Errorf("can not save state: %+v", s.state)
+	} else {
+		log.Infof("%s %s state is saved: %+v", ID, s.Asset, s.state)
+		s.Notifiability.Notify("%s %s state is saved => %f", ID, s.Asset, s.state)
+	}
+}
+
+func (s *Strategy) newDefaultState() *State {
+	return &State{
+		Asset:                  s.Asset,
+		DailyNumberOfTransfers: 0,
+		DailyAmountOfTransfers: 0,
+	}
+}
+
+func (s *Strategy) LoadState() error {
+	var state State
+	if err := s.Persistence.Load(&state, ID, s.Asset, stateKey); err != nil {
+		if err != service.ErrPersistenceNotExists {
+			return err
+		}
+
+		s.state = s.newDefaultState()
+		s.state.Reset()
+	} else {
+		// we loaded it successfully
+		s.state = &state
+
+		log.Infof("%s %s state is restored: %+v", ID, s.Asset, s.state)
+		s.Notifiability.Notify("%s %s state is restored => %f", ID, s.Asset, s.state)
+	}
+
+	return nil
+}
+
 func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession) error {
 	if s.Interval == 0 {
 		return errors.New("interval can not be zero")
 	}
+
+	if err := s.LoadState(); err != nil {
+		return err
+	}
+
+	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
+		defer wg.Done()
+
+		s.SaveState()
+	})
 
 	s.checkBalance(ctx, sessions)
 
