@@ -432,7 +432,7 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 
 	}
 
-	s.Notifiability.Notify("Submitting hedge order: %s %s %f", s.Symbol, side, quantity.Float64())
+	s.Notifiability.Notify("Submitting hedge order: %s %s %f", s.Symbol, side.String(), quantity.Float64())
 	orderExecutor := &bbgo.ExchangeOrderExecutor{Session: s.sourceSession}
 	returnOrders, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 		Symbol:   s.Symbol,
