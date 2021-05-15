@@ -24,6 +24,12 @@ type Position struct {
 }
 
 func (p *Position) SlackAttachment() slack.Attachment {
+	p.Lock()
+	averageCost := p.AverageCost
+	base := p.Base
+	quote := p.Quote
+	p.Unlock()
+
 	var posType = ""
 	var color = ""
 
@@ -45,9 +51,9 @@ func (p *Position) SlackAttachment() slack.Attachment {
 		Title: title,
 		Color: color,
 		Fields: []slack.AttachmentField{
-			{Title: "Average Cost", Value: util.FormatFloat(p.AverageCost.Float64(), 2), Short: true},
-			{Title: p.BaseCurrency, Value: util.FormatFloat(p.Base.Float64(), 4), Short: true},
-			{Title: p.QuoteCurrency, Value: util.FormatFloat(p.Quote.Float64(), 2)},
+			{Title: "Average Cost", Value: util.FormatFloat(averageCost.Float64(), 2), Short: true},
+			{Title: p.BaseCurrency, Value: util.FormatFloat(base.Float64(), 4), Short: true},
+			{Title: p.QuoteCurrency, Value: util.FormatFloat(quote.Float64(), 2)},
 		},
 		Footer: util.Render("update time {{ . }}", time.Now().Format(time.RFC822)),
 		// FooterIcon: "",
