@@ -11,7 +11,6 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-// support -- support and targets
 const ID = "support"
 
 var log = logrus.WithField("strategy", ID)
@@ -148,6 +147,16 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		for _, target := range s.Targets {
 			targetPrice := closePrice * (1.0 + target.ProfitPercentage)
 			targetQuantity := quantity * target.QuantityPercentage
+			targetQuoteQuantity := targetPrice * targetQuantity
+
+			if targetQuoteQuantity <= market.MinNotional {
+				continue
+			}
+
+			if targetQuantity <= market.MinQuantity {
+				continue
+			}
+
 			targetOrders = append(targetOrders, types.SubmitOrder{
 				Symbol:   kline.Symbol,
 				Market:   market,
