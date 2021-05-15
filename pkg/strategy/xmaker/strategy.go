@@ -213,7 +213,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 	if b, ok := hedgeBalances[s.sourceMarket.BaseCurrency]; ok {
 		// to make bid orders, we need enough base asset in the foreign exchange,
 		// if the base asset balance is not enough for selling
-		if s.StopHedgeBaseBalance > 0 && b.Available > (s.StopHedgeBaseBalance + fixedpoint.NewFromFloat(s.sourceMarket.MinQuantity)) {
+		if s.StopHedgeBaseBalance > 0 && b.Available > (s.StopHedgeBaseBalance+fixedpoint.NewFromFloat(s.sourceMarket.MinQuantity)) {
 			hedgeQuota.BaseAsset.Add(b.Available - s.StopHedgeBaseBalance - fixedpoint.NewFromFloat(s.sourceMarket.MinQuantity))
 		} else if b.Available.Float64() > s.sourceMarket.MinQuantity {
 			hedgeQuota.BaseAsset.Add(b.Available)
@@ -226,7 +226,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 	if b, ok := hedgeBalances[s.sourceMarket.QuoteCurrency]; ok {
 		// to make ask orders, we need enough quote asset in the foreign exchange,
 		// if the quote asset balance is not enough for buying
-		if s.StopHedgeQuoteBalance > 0 && b.Available > (s.StopHedgeQuoteBalance + fixedpoint.NewFromFloat(s.sourceMarket.MinNotional)) {
+		if s.StopHedgeQuoteBalance > 0 && b.Available > (s.StopHedgeQuoteBalance+fixedpoint.NewFromFloat(s.sourceMarket.MinNotional)) {
 			hedgeQuota.QuoteAsset.Add(b.Available - s.StopHedgeQuoteBalance - fixedpoint.NewFromFloat(s.sourceMarket.MinNotional))
 		} else if b.Available.Float64() > s.sourceMarket.MinNotional {
 			hedgeQuota.QuoteAsset.Add(b.Available)
@@ -432,7 +432,7 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 
 	}
 
-	s.Notifiability.Notify("Submitting hedge order: %s %s %f", s.Symbol, side.String(), quantity.Float64())
+	s.Notifiability.Notify("Submitting %s hedge order %s %f", s.Symbol, side.String(), quantity.Float64())
 	orderExecutor := &bbgo.ExchangeOrderExecutor{Session: s.sourceSession}
 	returnOrders, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 		Symbol:   s.Symbol,
@@ -497,14 +497,15 @@ func (s *Strategy) handleTradeUpdate(trade types.Trade) {
 			since = time.Unix(s.state.AccumulatedSince, 0).In(localTimeZone)
 		}
 
-		s.Notify("%s trade just made profit %f %s, since %s accumulated net profit %f %s, accumulated loss %f %s", s.Symbol,
+		s.Notify("%s %s trade profit %f %s, since %s accumulated net profit %f %s, accumulated loss %f %s", s.Symbol,
+			pnlEmoji(profit),
 			profit.Float64(), s.state.Position.QuoteCurrency,
 			since.Format(time.RFC822),
 			s.state.AccumulatedPnL.Float64(), s.state.Position.QuoteCurrency,
 			s.state.AccumulatedLoss.Float64(), s.state.Position.QuoteCurrency)
 
 	} else {
-		s.Notify("%s trade modified the position: average cost = %f %s, base = %f", s.Symbol, s.state.Position.AverageCost.Float64(), s.state.Position.QuoteCurrency, s.state.Position.Base.Float64())
+		s.Notify(s.state.Position)
 	}
 
 	s.lastPrice = trade.Price
@@ -675,7 +676,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 		time.Sleep(s.UpdateInterval.Duration())
 
-		for s.activeMakerOrders.NumOfOrders() > 0  {
+		for s.activeMakerOrders.NumOfOrders() > 0 {
 			orders := s.activeMakerOrders.Orders()
 			log.Warnf("%d orders are not cancelled yet:", len(orders))
 			s.activeMakerOrders.Print()
@@ -703,4 +704,20 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 func durationJitter(d time.Duration, jitterInMilliseconds int) time.Duration {
 	n := rand.Intn(jitterInMilliseconds)
 	return d + time.Duration(n)*time.Millisecond
+}
+
+// lets move this to the fun package
+var lossEmoji = "🔥"
+var profitEmoji = "💰"
+
+func pnlEmoji(pnl fixedpoint.Value) string {
+	if pnl < 0 {
+		return lossEmoji
+	}
+
+	if pnl == 0 {
+		return ""
+	}
+
+	return profitEmoji
 }
