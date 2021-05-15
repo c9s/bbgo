@@ -20,7 +20,7 @@ type Position struct {
 	mu sync.Mutex
 }
 
-func (p Position) String() string {
+func (p *Position) String() string {
 	return fmt.Sprintf("%s: average cost = %f, base = %f, quote = %f",
 		p.Symbol,
 		p.AverageCost.Float64(),
