@@ -36,6 +36,12 @@ func (s *State) IsOver24Hours() bool {
 	return time.Now().Sub(time.Unix(s.Since, 0)) >= 24*time.Hour
 }
 
+func (s *State) PlainText() string {
+	return util.Render(`{{ .Asset }} transfer stats:
+daily number of transfers: {{ .DailyNumberOfTransfers }}
+daily amount of transfers {{ .DailyAmountOfTransfers.Float64 }}`, s)
+}
+
 func (s *State) SlackAttachment() slack.Attachment {
 	return slack.Attachment{
 		// Pretext:       "",
@@ -276,7 +282,7 @@ func (s *Strategy) SaveState() {
 		log.WithError(err).Errorf("can not save state: %+v", s.state)
 	} else {
 		log.Infof("%s %s state is saved: %+v", ID, s.Asset, s.state)
-		s.Notifiability.Notify("%s %s state is saved => %f", ID, s.Asset, s.state)
+		s.Notifiability.Notify("%s %s state is saved", ID, s.Asset, s.state)
 	}
 }
 
