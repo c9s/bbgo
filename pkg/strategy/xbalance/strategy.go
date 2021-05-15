@@ -139,7 +139,7 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {}
 
 func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.ExchangeSession) {
 
-	s.Notifiability.Notify("Checking %s low balance level exchange session...", s.Asset)
+	s.Notifiability.Notify("📝 Checking %s low balance level exchange session...", s.Asset)
 
 	lowLevelSession, lowLevelBalance, err := s.findLowBalanceLevelSession(sessions)
 	if err != nil {
@@ -148,11 +148,11 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 	}
 
 	if lowLevelSession == nil {
-		s.Notifiability.Notify("All %s balances are looking good", s.Asset)
+		s.Notifiability.Notify("✅ All %s balances are looking good", s.Asset)
 		return
 	}
 
-	s.Notifiability.Notify("Found low level %s balance from session %s: %s", s.Asset, lowLevelSession.Name, lowLevelBalance.String())
+	s.Notifiability.Notify("⚠️ Found low level %s balance from session %s: %s", s.Asset, lowLevelSession.Name, lowLevelBalance.String())
 
 	requiredAmount := s.Middle - lowLevelBalance.Available
 
@@ -185,7 +185,7 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 	if s.state != nil {
 		if s.MaxDailyNumberOfTransfer > 0 {
 			if s.state.DailyNumberOfTransfers >= s.MaxDailyNumberOfTransfer {
-				s.Notifiability.Notify("Exceeded %s max daily number of transfers %d (current %d), skipping transfer...",
+				s.Notifiability.Notify("⚠️ Exceeded %s max daily number of transfers %d (current %d), skipping transfer...",
 					s.Asset,
 					s.MaxDailyNumberOfTransfer,
 					s.state.DailyNumberOfTransfers)
@@ -195,7 +195,7 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 
 		if s.MaxDailyAmountOfTransfer > 0 {
 			if s.state.DailyAmountOfTransfers >= s.MaxDailyAmountOfTransfer {
-				s.Notifiability.Notify("Exceeded %s max daily amount of transfers %f (current %f), skipping transfer...",
+				s.Notifiability.Notify("⚠️ Exceeded %s max daily amount of transfers %f (current %f), skipping transfer...",
 					s.Asset,
 					s.MaxDailyAmountOfTransfer.Float64(),
 					s.state.DailyAmountOfTransfers.Float64())
