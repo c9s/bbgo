@@ -14,6 +14,18 @@ var (
 	ErrAssetBalanceLevelTooHigh = errors.New("asset balance level too high")
 )
 
+// AdjustQuantityByMaxAmount adjusts the quantity to make the amount greater than the given minAmount
+func AdjustQuantityByMaxAmount(quantity, currentPrice, maxAmount fixedpoint.Value) fixedpoint.Value {
+	// modify quantity for the min amount
+	amount := currentPrice.Mul(quantity)
+	if amount > maxAmount {
+		ratio := maxAmount.Div(amount)
+		quantity = quantity.Mul(ratio)
+	}
+
+	return quantity
+}
+
 // AdjustQuantityByMinAmount adjusts the quantity to make the amount greater than the given minAmount
 func AdjustQuantityByMinAmount(quantity, currentPrice, minAmount fixedpoint.Value) fixedpoint.Value {
 	// modify quantity for the min amount

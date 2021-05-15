@@ -22,6 +22,7 @@ type TwapExecution struct {
 	StopPrice      fixedpoint.Value
 	NumOfTicks     int
 	UpdateInterval time.Duration
+	DeadlineTime   time.Time
 
 	market           types.Market
 	marketDataStream types.Stream
@@ -79,7 +80,7 @@ func (e *TwapExecution) getSideBook() (pvs types.PriceVolumeSlice, err error) {
 	return pvs, err
 }
 
-func (e *TwapExecution) newBestPriceMakerOrder() (orderForm types.SubmitOrder, err error) {
+func (e *TwapExecution) newBestPriceOrder() (orderForm types.SubmitOrder, err error) {
 	book := e.orderBook.Get()
 
 	sideBook, err := e.getSideBook()
@@ -166,9 +167,34 @@ func (e *TwapExecution) newBestPriceMakerOrder() (orderForm types.SubmitOrder, e
 	}
 
 	minNotional := fixedpoint.NewFromFloat(e.market.MinNotional)
-	orderAmount := newPrice.Mul(orderQuantity)
-	if orderAmount <= minNotional {
-		orderQuantity = AdjustQuantityByMinAmount(orderQuantity, newPrice, minNotional)
+	orderQuantity = AdjustQuantityByMinAmount(orderQuantity, newPrice, minNotional)
+
+	switch e.Side {
+	case types.SideTypeSell:
+		// check base balance for sell, try to sell as more as possible
+		if b, ok := e.Session.Account.Balance(e.market.BaseCurrency); ok {
+			orderQuantity = fixedpoint.Min(b.Available, orderQuantity)
+		}
+
+	case types.SideTypeBuy:
+		// check base balance for sell, try to sell as more as possible
+		if b, ok := e.Session.Account.Balance(e.market.QuoteCurrency); ok {
+			orderQuantity = AdjustQuantityByMaxAmount(orderQuantity, newPrice, b.Available)
+		}
+	}
+
+	if e.DeadlineTime != emptyTime {
+		now := time.Now()
+		if now.After(e.DeadlineTime) {
+			orderForm = types.SubmitOrder{
+				Symbol:   e.Symbol,
+				Side:     e.Side,
+				Type:     types.OrderTypeMarket,
+				Quantity: restQuantity.Float64(),
+				Market:   e.market,
+			}
+			return orderForm, nil
+		}
 	}
 
 	orderForm = types.SubmitOrder{
@@ -264,7 +290,7 @@ func (e *TwapExecution) updateOrder(ctx context.Context) error {
 		e.cancelActiveOrders(ctx)
 	}
 
-	orderForm, err := e.newBestPriceMakerOrder()
+	orderForm, err := e.newBestPriceOrder()
 	if err != nil {
 		return err
 	}
