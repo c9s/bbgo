@@ -151,7 +151,12 @@ func (e *TwapExecution) newBestPriceOrder() (orderForm types.SubmitOrder, err er
 	}
 
 	minQuantity := fixedpoint.NewFromFloat(e.market.MinQuantity)
-	restQuantity := e.TargetQuantity - fixedpoint.Abs(e.position.Base)
+
+	e.position.Lock()
+	base := e.position.Base
+	e.position.Unlock()
+
+	restQuantity := e.TargetQuantity - fixedpoint.Abs(base)
 
 	if restQuantity == 0 {
 		if e.cancelContextIfTargetQuantityFilled() {
@@ -383,7 +388,11 @@ func (e *TwapExecution) orderUpdater(ctx context.Context) {
 }
 
 func (e *TwapExecution) cancelContextIfTargetQuantityFilled() bool {
-	if fixedpoint.Abs(e.position.Base) >= e.TargetQuantity {
+	e.position.Lock()
+	base := e.position.Base
+	e.position.Unlock()
+
+	if fixedpoint.Abs(base) >= e.TargetQuantity {
 		log.Infof("filled target quantity, canceling the order execution context")
 		e.cancelExecution()
 		return true
