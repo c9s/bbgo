@@ -9,8 +9,10 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"github.com/slack-go/slack"
 )
 
 const ID = "xbalance"
@@ -23,6 +25,45 @@ type State struct {
 	DailyNumberOfTransfers fixedpoint.Value `json:"dailyNumberOfTransfers,omitempty"`
 	DailyAmountOfTransfers fixedpoint.Value `json:"dailyAmountOfTransfers,omitempty"`
 	Since                  int64            `json:"since"`
+}
+
+type WithdrawalRequest struct {
+	FromSession string           `json:"fromSession"`
+	ToSession   string           `json:"toSession"`
+	Asset       string           `json:"asset"`
+	Amount      fixedpoint.Value `json:"amount"`
+}
+
+func (r *WithdrawalRequest) String() string {
+	return fmt.Sprintf("WITHDRAWAL REQUEST: sending %s %s from %s -> %s",
+		util.FormatFloat(r.Amount.Float64(), 4),
+		r.Asset,
+		r.FromSession,
+		r.ToSession,
+	)
+}
+
+func (r *WithdrawalRequest) PlainText() string {
+	return r.String()
+}
+
+func (r *WithdrawalRequest) SlackAttachment() slack.Attachment {
+	var color = "#DC143C"
+	title := util.Render(`Withdrawal Request {{ .Asset }}`, r)
+	return slack.Attachment{
+		// Pretext:       "",
+		// Text:  text,
+		Title: title,
+		Color: color,
+		Fields: []slack.AttachmentField{
+			{Title: "Asset", Value: r.Asset, Short: true},
+			{Title: "Amount", Value: util.FormatFloat(r.Amount.Float64(), 4), Short: true},
+			{Title: "From", Value: r.FromSession},
+			{Title: "To", Value: r.ToSession},
+		},
+		Footer: util.Render("time {{ . }}", time.Now().Format(time.RFC822)),
+		// FooterIcon: "",
+	}
 }
 
 type Strategy struct {
@@ -50,7 +91,7 @@ func (s *Strategy) ID() string {
 	return ID
 }
 
-func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) { }
+func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {}
 
 func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.ExchangeSession) {
 	s.Notifiability.Notify("Checking %s low balance level exchange session...", s.Asset)
@@ -66,11 +107,11 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 		return
 	}
 
-	s.Notifiability.Notify("Found %s low balance level %s", s.Asset, lowLevelBalance.String())
+	s.Notifiability.Notify("Found low level %s balance %s", s.Asset, lowLevelBalance.String())
 
 	requiredAmount := s.Middle - lowLevelBalance.Available
 
-	s.Notifiability.Notify("Require %f %s to satisfy the middle balance level %f", requiredAmount.Float64(), s.Asset, s.Middle.Float64())
+	s.Notifiability.Notify("Need %f %s to satisfy the middle balance level %f", requiredAmount.Float64(), s.Asset, s.Middle.Float64())
 
 	fromSession, _, err := s.findHighestBalanceLevelSession(sessions, requiredAmount)
 	if err != nil || fromSession == nil {
@@ -85,7 +126,7 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 	}
 
 	if !fromSession.Withdrawal {
-		s.Notifiability.Notify("the withdrawal function exchange session %s is not enabled", fromSession.Name)
+		s.Notifiability.Notify("The withdrawal function exchange session %s is not enabled", fromSession.Name)
 		log.Errorf("The withdrawal function of exchange session %s is not enabled", fromSession.Name)
 		return
 	}
@@ -96,7 +137,13 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 		return
 	}
 
-	s.Notifiability.Notify("Sending %f %s withdrawal request from session %s to session %s...", requiredAmount.Float64(), s.Asset, fromSession.Name, lowLevelSession.Name)
+	s.Notifiability.Notify(&WithdrawalRequest{
+		FromSession: fromSession.Name,
+		ToSession:   lowLevelSession.Name,
+		Asset:       s.Asset,
+		Amount:      requiredAmount,
+	})
+
 	if err := withdrawalService.Withdrawal(ctx, s.Asset, requiredAmount, toAddress); err != nil {
 		log.WithError(err).Errorf("withdrawal failed")
 		s.Notifiability.Notify("withdrawal request failed, error: %v", err)
