@@ -45,7 +45,7 @@ func (s *State) SlackAttachment() slack.Attachment {
 			{Title: "Total Number of Transfers", Value: fmt.Sprintf("%d", s.DailyNumberOfTransfers), Short: true},
 			{Title: "Total Amount of Transfers", Value: util.FormatFloat(s.DailyAmountOfTransfers.Float64(), 4), Short: true},
 		},
-		Footer: util.Render("since {{ . }}", time.Unix(s.Since, 0).Format(time.RFC822)),
+		Footer: util.Render("Since {{ . }}", time.Unix(s.Since, 0).Format(time.RFC822)),
 	}
 }
 
@@ -97,7 +97,7 @@ func (r *WithdrawalRequest) SlackAttachment() slack.Attachment {
 			{Title: "From", Value: r.FromSession},
 			{Title: "To", Value: r.ToSession},
 		},
-		Footer: util.Render("time {{ . }}", time.Now().Format(time.RFC822)),
+		Footer: util.Render("Time {{ . }}", time.Now().Format(time.RFC822)),
 		// FooterIcon: "",
 	}
 }
@@ -221,6 +221,7 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 		s.state.DailyNumberOfTransfers += 1
 		s.state.DailyAmountOfTransfers += requiredAmount
 		s.SaveState()
+		s.Notifiability.Notify(s.state)
 	}
 }
 
