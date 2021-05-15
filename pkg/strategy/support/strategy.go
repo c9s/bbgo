@@ -98,7 +98,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 
-		s.Notify("found support: close price %f is under EMA %f, volume %f > minimum volume %f", closePrice, ema.Last(), kline.Volume, s.MinVolume.Float64())
+		s.Notify("Found %s support: the close price %f is under EMA %f and volume %f > minimum volume %f", s.Symbol, closePrice, ema.Last(), kline.Volume, s.MinVolume.Float64())
 
 		var quantity float64
 		if s.Quantity > 0 {
@@ -127,6 +127,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 		}
 
+		s.Notify("Submitting %s market order buy with quantity %f according to the support volume %f", s.Symbol, quantity, kline.Volume)
 		orderForm := types.SubmitOrder{
 			Symbol:           s.Symbol,
 			Market:           market,
