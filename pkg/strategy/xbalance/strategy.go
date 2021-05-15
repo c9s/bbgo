@@ -50,9 +50,7 @@ func (s *Strategy) ID() string {
 	return ID
 }
 
-func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
-
-}
+func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) { }
 
 func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.ExchangeSession) {
 	s.Notifiability.Notify("Checking %s low balance level exchange session...", s.Asset)
@@ -68,7 +66,7 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 		return
 	}
 
-	s.Notifiability.Notify("Found %s low balance level %s", s.Asset, lowLevelBalance)
+	s.Notifiability.Notify("Found %s low balance level %s", s.Asset, lowLevelBalance.String())
 
 	requiredAmount := s.Middle - lowLevelBalance.Available
 
