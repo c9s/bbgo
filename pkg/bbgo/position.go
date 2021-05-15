@@ -17,7 +17,7 @@ type Position struct {
 	Quote       fixedpoint.Value `json:"quote"`
 	AverageCost fixedpoint.Value `json:"averageCost"`
 
-	mu sync.Mutex
+	sync.Mutex
 }
 
 func (p *Position) String() string {
@@ -49,8 +49,8 @@ func (p *Position) AddTrades(trades []types.Trade) (fixedpoint.Value, bool) {
 }
 
 func (p *Position) AddTrade(t types.Trade) (fixedpoint.Value, bool) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+	p.Lock()
+	defer p.Unlock()
 
 	price := fixedpoint.NewFromFloat(t.Price)
 	quantity := fixedpoint.NewFromFloat(t.Quantity)
