@@ -75,7 +75,12 @@ func (r *WithdrawalRequest) String() string {
 }
 
 func (r *WithdrawalRequest) PlainText() string {
-	return r.String()
+	return fmt.Sprintf("Withdrawal request: sending %s %s from %s -> %s",
+		util.FormatFloat(r.Amount.Float64(), 4),
+		r.Asset,
+		r.FromSession,
+		r.ToSession,
+	)
 }
 
 func (r *WithdrawalRequest) SlackAttachment() slack.Attachment {
@@ -140,7 +145,7 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 		return
 	}
 
-	s.Notifiability.Notify("Found low level %s balance %s", s.Asset, lowLevelBalance.String())
+	s.Notifiability.Notify("Found low level %s balance from session %s: %s", s.Asset, lowLevelSession.Name, lowLevelBalance.String())
 
 	requiredAmount := s.Middle - lowLevelBalance.Available
 
@@ -273,7 +278,7 @@ func (s *Strategy) LoadState() error {
 		s.state = &state
 
 		log.Infof("%s %s state is restored: %+v", ID, s.Asset, s.state)
-		s.Notifiability.Notify("%s %s state is restored => %f", ID, s.Asset, s.state)
+		s.Notifiability.Notify("%s %s state is restored => ", ID, s.Asset, s.state)
 	}
 
 	return nil
