@@ -327,6 +327,7 @@ func (e *TwapExecution) orderUpdater(ctx context.Context) {
 				return
 			}
 
+			log.Infof("%s order book changed, checking order...", e.Symbol)
 			if err := e.updateOrder(ctx); err != nil {
 				log.WithError(err).Errorf("order update failed")
 			}
