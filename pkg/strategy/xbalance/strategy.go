@@ -306,6 +306,9 @@ func (s *Strategy) LoadState() error {
 		// we loaded it successfully
 		s.state = &state
 
+		// update Asset name for legacy caches
+		s.state.Asset = s.Asset
+
 		log.Infof("%s %s state is restored: %+v", ID, s.Asset, s.state)
 		s.Notifiability.Notify("%s %s state is restored", ID, s.Asset, s.state)
 	}
