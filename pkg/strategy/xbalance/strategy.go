@@ -3,6 +3,7 @@ package xbalance
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -54,7 +55,7 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 }
 
 func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.ExchangeSession) {
-	log.Infof("checking low balance level exchange session...")
+	s.Notifiability.Notify("Checking %s low balance level exchange session...", s.Asset)
 
 	lowLevelSession, lowLevelBalance, err := s.findLowBalanceLevelSession(sessions)
 	if err != nil {
@@ -63,15 +64,15 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 	}
 
 	if lowLevelSession == nil {
-		log.Infof("all balances are looking good")
+		s.Notifiability.Notify("All %s balances are looking good", s.Asset)
 		return
 	}
 
-	s.Notifiability.Notify("found low balance level %s", lowLevelBalance)
+	s.Notifiability.Notify("Found %s low balance level %s", s.Asset, lowLevelBalance)
 
 	requiredAmount := s.Middle - lowLevelBalance.Available
 
-	s.Notifiability.Notify("require %f %s to satisfy the middle balance level %f", requiredAmount.Float64(), s.Asset, s.Middle.Float64())
+	s.Notifiability.Notify("Require %f %s to satisfy the middle balance level %f", requiredAmount.Float64(), s.Asset, s.Middle.Float64())
 
 	fromSession, _, err := s.findHighestBalanceLevelSession(sessions, requiredAmount)
 	if err != nil || fromSession == nil {
@@ -86,7 +87,8 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 	}
 
 	if !fromSession.Withdrawal {
-		log.Errorf("the withdrawal function exchange session %s is not enabled, skipping", fromSession.Name)
+		s.Notifiability.Notify("the withdrawal function exchange session %s is not enabled", fromSession.Name)
+		log.Errorf("The withdrawal function of exchange session %s is not enabled", fromSession.Name)
 		return
 	}
 
@@ -96,12 +98,14 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 		return
 	}
 
-	s.Notifiability.Notify("sending %f %s withdrawal request from session %s to session %s...", requiredAmount.Float64(), s.Asset, fromSession.Name, lowLevelSession.Name)
+	s.Notifiability.Notify("Sending %f %s withdrawal request from session %s to session %s...", requiredAmount.Float64(), s.Asset, fromSession.Name, lowLevelSession.Name)
 	if err := withdrawalService.Withdrawal(ctx, s.Asset, requiredAmount, toAddress); err != nil {
 		log.WithError(err).Errorf("withdrawal failed")
-
-		s.Notifiability.Notify("withdrawal failed, error: %v", err)
+		s.Notifiability.Notify("withdrawal request failed, error: %v", err)
+		return
 	}
+
+	s.Notifiability.Notify("%s Withdrawal request sent", s.Asset)
 }
 
 func (s *Strategy) findHighestBalanceLevelSession(sessions map[string]*bbgo.ExchangeSession, requiredAmount fixedpoint.Value) (*bbgo.ExchangeSession, types.Balance, error) {
@@ -146,7 +150,6 @@ func (s *Strategy) findLowBalanceLevelSession(sessions map[string]*bbgo.Exchange
 }
 
 func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession) error {
-
 	if s.Interval == 0 {
 		return errors.New("interval can not be zero")
 	}
@@ -154,7 +157,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	s.checkBalance(ctx, sessions)
 
 	go func() {
-		ticker := time.NewTimer(s.Interval.Duration())
+		ticker := time.NewTimer(durationJitter(s.Interval.Duration(), 1000))
 		defer ticker.Stop()
 
 		for {
@@ -169,4 +172,9 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	}()
 
 	return nil
+}
+
+func durationJitter(d time.Duration, jitterInMilliseconds int) time.Duration {
+	n := rand.Intn(jitterInMilliseconds)
+	return d + time.Duration(n)*time.Millisecond
 }
