@@ -302,7 +302,7 @@ func (s *Strategy) LoadState() error {
 		s.state = &state
 
 		log.Infof("%s %s state is restored: %+v", ID, s.Asset, s.state)
-		s.Notifiability.Notify("%s %s state is restored => ", ID, s.Asset, s.state)
+		s.Notifiability.Notify("%s %s state is restored", ID, s.Asset, s.state)
 	}
 
 	return nil
