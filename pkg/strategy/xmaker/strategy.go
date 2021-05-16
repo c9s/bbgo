@@ -613,6 +613,20 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		}
 	}
 
+	if s.makerSession.MakerFeeRate > 0 || s.makerSession.TakerFeeRate > 0 {
+		s.state.Position.SetExchangeFeeRate(types.ExchangeName(s.MakerExchange), bbgo.ExchangeFee{
+			MakerFeeRate: s.makerSession.MakerFeeRate,
+			TakerFeeRate: s.makerSession.TakerFeeRate,
+		})
+	}
+
+	if s.sourceSession.MakerFeeRate > 0 || s.sourceSession.TakerFeeRate > 0 {
+		s.state.Position.SetExchangeFeeRate(types.ExchangeName(s.SourceExchange), bbgo.ExchangeFee{
+			MakerFeeRate: s.sourceSession.MakerFeeRate,
+			TakerFeeRate: s.sourceSession.TakerFeeRate,
+		})
+	}
+
 	if s.state.AccumulatedSince == 0 {
 		s.state.AccumulatedSince = time.Now().Unix()
 	}
