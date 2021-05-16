@@ -102,11 +102,12 @@ func (trade Trade) SlackAttachment() slack.Attachment {
 	}
 
 	liquidity := trade.Liquidity()
-	pretext := util.Render(slackTradeTextTemplate, trade)
+	title := util.Render(slackTradeTextTemplate, trade)
 	return slack.Attachment{
+		Title: title,
 		// Text: text,
-		Pretext: pretext,
-		Color:   color,
+		// Pretext: pretext,
+		Color: color,
 		Fields: []slack.AttachmentField{
 			{Title: "Exchange", Value: trade.Exchange.String(), Short: true},
 			{Title: "Price", Value: util.FormatFloat(trade.Price, 2), Short: true},
