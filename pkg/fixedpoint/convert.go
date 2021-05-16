@@ -173,9 +173,16 @@ func Must(v Value, err error) Value {
 var ErrPrecisionLoss = errors.New("precision loss")
 
 func Parse(input string) (num int64, numDecimalPoints int, err error) {
+	length := len(input)
+	isPercentage := input[length-1] == '%'
+	if isPercentage {
+		length -= 1
+		input = input[0 : length]
+	}
+
 	var neg int64 = 1
 	var digit int64
-	for i := 0; i < len(input); i++ {
+	for i := 0; i < length; i++ {
 		c := input[i]
 		if c == '-' {
 			neg = -1
@@ -220,13 +227,27 @@ func Parse(input string) (num int64, numDecimalPoints int, err error) {
 	}
 
 	num = num * neg
+	if isPercentage {
+		numDecimalPoints += 2
+	}
+
 	return num, numDecimalPoints, nil
 }
 
 func NewFromString(input string) (Value, error) {
+	length := len(input)
+	isPercentage := input[length-1] == '%'
+	if isPercentage {
+		input = input[0 : length-2]
+	}
+
 	v, err := strconv.ParseFloat(input, 64)
 	if err != nil {
 		return 0, err
+	}
+
+	if isPercentage {
+		v = v * 0.01
 	}
 
 	return NewFromFloat(v), nil
