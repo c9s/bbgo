@@ -41,6 +41,7 @@ type Exchange struct {
 
 func New(key, secret string) *Exchange {
 	var client = binance.NewClient(key, secret)
+	_, _ = client.NewSetServerTimeService().Do(context.Background())
 	return &Exchange{
 		Client: client,
 	}
