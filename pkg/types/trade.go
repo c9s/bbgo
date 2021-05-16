@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/slack-go/slack"
 
@@ -102,10 +103,10 @@ func (trade Trade) SlackAttachment() slack.Attachment {
 	}
 
 	liquidity := trade.Liquidity()
-	title := util.Render(slackTradeTextTemplate, trade)
+	text := util.Render(slackTradeTextTemplate, trade)
 	return slack.Attachment{
-		Title: title,
-		// Text: text,
+		Text: text,
+		// Title: ...
 		// Pretext: pretext,
 		Color: color,
 		Fields: []slack.AttachmentField{
@@ -117,8 +118,7 @@ func (trade Trade) SlackAttachment() slack.Attachment {
 			{Title: "FeeCurrency", Value: trade.FeeCurrency, Short: true},
 			{Title: "Liquidity", Value: liquidity, Short: true},
 		},
-		// Footer:     tradingCtx.TradeStartTime.Format(time.RFC822),
-		// FooterIcon: "",
+		Footer: util.Render("trade time {{ . }}", trade.Time.Time().Format(time.RFC822)),
 	}
 }
 
