@@ -11,6 +11,11 @@ import (
 	"github.com/slack-go/slack"
 )
 
+type ExchangeFee struct {
+	MakerFeeRate fixedpoint.Value
+	TakerFeeRate fixedpoint.Value
+}
+
 type Position struct {
 	Symbol        string `json:"symbol"`
 	BaseCurrency  string `json:"baseCurrency"`
@@ -20,16 +25,17 @@ type Position struct {
 	Quote       fixedpoint.Value `json:"quote"`
 	AverageCost fixedpoint.Value `json:"averageCost"`
 
-	ExchangeFeeRates map[types.ExchangeName]fixedpoint.Value `json:"exchangeFeeRates"`
+	ExchangeFeeRates map[types.ExchangeName]ExchangeFee `json:"exchangeFeeRates"`
 
 	sync.Mutex
 }
 
-func (p *Position) SetExchangeFeeRate(ex types.ExchangeName, rate fixedpoint.Value) {
+func (p *Position) SetExchangeFeeRate(ex types.ExchangeName, exchangeFee ExchangeFee) {
 	if p.ExchangeFeeRates == nil {
-		p.ExchangeFeeRates = make(map[types.ExchangeName]fixedpoint.Value)
+		p.ExchangeFeeRates = make(map[types.ExchangeName]ExchangeFee)
 	}
-	p.ExchangeFeeRates[ex] = rate
+
+	p.ExchangeFeeRates[ex] = exchangeFee
 }
 
 func (p *Position) SlackAttachment() slack.Attachment {
@@ -112,6 +118,9 @@ func (p *Position) AddTrade(t types.Trade) (fixedpoint.Value, bool) {
 	quoteQuantity := fixedpoint.NewFromFloat(t.QuoteQuantity)
 	fee := fixedpoint.NewFromFloat(t.Fee)
 
+	// calculated fee in quote (some exchange accounts may enable platform currency fee discount, like BNB)
+	var quoteFee fixedpoint.Value = 0
+
 	switch t.FeeCurrency {
 
 	case p.BaseCurrency:
@@ -120,6 +129,16 @@ func (p *Position) AddTrade(t types.Trade) (fixedpoint.Value, bool) {
 	case p.QuoteCurrency:
 		quoteQuantity -= fee
 
+	default:
+		if p.ExchangeFeeRates != nil {
+			if exchangeFee, ok := p.ExchangeFeeRates[t.Exchange]; ok {
+				if t.IsMaker {
+					quoteFee += exchangeFee.MakerFeeRate.Mul(quoteQuantity)
+				} else {
+					quoteFee += exchangeFee.TakerFeeRate.Mul(quoteQuantity)
+				}
+			}
+		}
 	}
 
 	p.Lock()
@@ -133,7 +152,7 @@ func (p *Position) AddTrade(t types.Trade) (fixedpoint.Value, bool) {
 		if p.Base < 0 {
 			// handling short-to-long position
 			if p.Base+quantity > 0 {
-				closingProfit := (p.AverageCost - price).Mul(-p.Base)
+				closingProfit := (p.AverageCost - price).Mul(-p.Base) - quoteFee
 				p.Base += quantity
 				p.Quote -= quoteQuantity
 				p.AverageCost = price
@@ -142,11 +161,11 @@ func (p *Position) AddTrade(t types.Trade) (fixedpoint.Value, bool) {
 				// covering short position
 				p.Base += quantity
 				p.Quote -= quoteQuantity
-				return (p.AverageCost - price).Mul(quantity), true
+				return (p.AverageCost - price).Mul(quantity) - quoteFee, true
 			}
 		}
 
-		p.AverageCost = (p.AverageCost.Mul(p.Base) + quoteQuantity).Div(p.Base + quantity)
+		p.AverageCost = (p.AverageCost.Mul(p.Base) + quoteQuantity + quoteFee).Div(p.Base + quantity)
 		p.Base += quantity
 		p.Quote -= quoteQuantity
 
@@ -156,7 +175,7 @@ func (p *Position) AddTrade(t types.Trade) (fixedpoint.Value, bool) {
 		if p.Base > 0 {
 			// long-to-short
 			if p.Base-quantity < 0 {
-				closingProfit := (price - p.AverageCost).Mul(p.Base)
+				closingProfit := (price - p.AverageCost).Mul(p.Base) - quoteFee
 				p.Base -= quantity
 				p.Quote += quoteQuantity
 				p.AverageCost = price
@@ -164,12 +183,12 @@ func (p *Position) AddTrade(t types.Trade) (fixedpoint.Value, bool) {
 			} else {
 				p.Base -= quantity
 				p.Quote += quoteQuantity
-				return (price - p.AverageCost).Mul(quantity), true
+				return (price - p.AverageCost).Mul(quantity) - quoteFee, true
 			}
 		}
 
-		// handling short position
-		p.AverageCost = (p.AverageCost.Mul(-p.Base) + quoteQuantity).Div(-p.Base + quantity)
+		// handling short position, since Base here is negative we need to reverse the sign
+		p.AverageCost = (p.AverageCost.Mul(-p.Base) + quoteQuantity - quoteFee).Div(-p.Base + quantity)
 		p.Base -= quantity
 		p.Quote += quoteQuantity
 
