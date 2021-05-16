@@ -70,7 +70,7 @@ var accountCmd = &cobra.Command{
 
 			a, err := session.Exchange.QueryAccount(ctx)
 			if err != nil {
-				return err
+				return errors.Wrapf(err, "account query failed")
 			}
 
 			a.Print()
@@ -78,7 +78,7 @@ var accountCmd = &cobra.Command{
 			for _, session := range environ.Sessions() {
 				a, err := session.Exchange.QueryAccount(ctx)
 				if err != nil {
-					return err
+					return errors.Wrapf(err, "account query failed")
 				}
 
 				log.Infof("SESSION %s", session.Name)

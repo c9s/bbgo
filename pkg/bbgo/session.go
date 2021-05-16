@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
@@ -116,7 +117,8 @@ type ExchangeSession struct {
 	SubAccount   string `json:"subAccount,omitempty" yaml:"subAccount,omitempty"`
 
 	// Withdrawal is used for enabling withdrawal functions
-	Withdrawal           bool   `json:"withdrawal,omitempty" yaml:"withdrawal,omitempty"`
+	Withdrawal bool             `json:"withdrawal,omitempty" yaml:"withdrawal,omitempty"`
+	FeeRate    fixedpoint.Value `json:"feeRate" yaml:"feeRate"`
 
 	PublicOnly           bool   `json:"publicOnly,omitempty" yaml:"publicOnly"`
 	Margin               bool   `json:"margin,omitempty" yaml:"margin"`
@@ -163,7 +165,6 @@ type ExchangeSession struct {
 	standardIndicatorSets map[string]*StandardIndicatorSet
 
 	orderStores map[string]*OrderStore
-
 
 	usedSymbols        map[string]struct{}
 	initializedSymbols map[string]struct{}
