@@ -20,6 +20,12 @@ func TestParse(t *testing.T) {
 			wantErr:              false,
 		},
 		{
+			args:                 args{input: "0.75%"},
+			wantNum:              75,
+			wantNumDecimalPoints: 4,
+			wantErr:              false,
+		},
+		{
 			args:                 args{input: "0.12345678"},
 			wantNum:              12345678,
 			wantNumDecimalPoints: 8,
@@ -107,6 +113,11 @@ func TestNumFractionalDigits(t *testing.T) {
 			name: "only fractional part",
 			v:    MustNewFromString(".123456"),
 			want: 6,
+		},
+		{
+			name: "percentage",
+			v:    MustNewFromString("0.075%"),
+			want: 4,
 		},
 	}
 	for _, tt := range tests {
