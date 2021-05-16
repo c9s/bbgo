@@ -49,13 +49,13 @@ type Trade struct {
 	GID int64 `json:"gid" db:"gid"`
 
 	// ID is the source trade ID
-	ID            int64   `json:"id" db:"id"`
-	OrderID       uint64  `json:"orderID" db:"order_id"`
-	Exchange      string  `json:"exchange" db:"exchange"`
-	Price         float64 `json:"price" db:"price"`
-	Quantity      float64 `json:"quantity" db:"quantity"`
-	QuoteQuantity float64 `json:"quoteQuantity" db:"quote_quantity"`
-	Symbol        string  `json:"symbol" db:"symbol"`
+	ID            int64        `json:"id" db:"id"`
+	OrderID       uint64       `json:"orderID" db:"order_id"`
+	Exchange      ExchangeName `json:"exchange" db:"exchange"`
+	Price         float64      `json:"price" db:"price"`
+	Quantity      float64      `json:"quantity" db:"quantity"`
+	QuoteQuantity float64      `json:"quoteQuantity" db:"quote_quantity"`
+	Symbol        string       `json:"symbol" db:"symbol"`
 
 	Side        SideType      `json:"side" db:"side"`
 	IsBuyer     bool          `json:"isBuyer" db:"is_buyer"`
@@ -73,7 +73,7 @@ type Trade struct {
 
 func (trade Trade) String() string {
 	return fmt.Sprintf("TRADE %s %s %s %s @ %s, amount %s",
-		trade.Exchange,
+		trade.Exchange.String(),
 		trade.Symbol,
 		trade.Side,
 		util.FormatFloat(trade.Quantity, 4),
@@ -84,7 +84,7 @@ func (trade Trade) String() string {
 // PlainText is used for telegram-styled messages
 func (trade Trade) PlainText() string {
 	return fmt.Sprintf("Trade %s %s %s %s @ %s, amount %s",
-		trade.Exchange,
+		trade.Exchange.String(),
 		trade.Symbol,
 		trade.Side,
 		util.FormatFloat(trade.Quantity, 4),
@@ -108,7 +108,7 @@ func (trade Trade) SlackAttachment() slack.Attachment {
 		Pretext: pretext,
 		Color:   color,
 		Fields: []slack.AttachmentField{
-			{Title: "Exchange", Value: trade.Exchange, Short: true},
+			{Title: "Exchange", Value: trade.Exchange.String(), Short: true},
 			{Title: "Price", Value: util.FormatFloat(trade.Price, 2), Short: true},
 			{Title: "Quantity", Value: util.FormatFloat(trade.Quantity, 4), Short: true},
 			{Title: "QuoteQuantity", Value: util.FormatFloat(trade.QuoteQuantity, 2)},

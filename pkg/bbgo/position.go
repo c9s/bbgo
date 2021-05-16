@@ -20,7 +20,16 @@ type Position struct {
 	Quote       fixedpoint.Value `json:"quote"`
 	AverageCost fixedpoint.Value `json:"averageCost"`
 
+	ExchangeFeeRates map[types.ExchangeName]fixedpoint.Value `json:"exchangeFeeRates"`
+
 	sync.Mutex
+}
+
+func (p *Position) SetExchangeFeeRate(ex types.ExchangeName, rate fixedpoint.Value) {
+	if p.ExchangeFeeRates == nil {
+		p.ExchangeFeeRates = make(map[types.ExchangeName]fixedpoint.Value)
+	}
+	p.ExchangeFeeRates[ex] = rate
 }
 
 func (p *Position) SlackAttachment() slack.Attachment {
