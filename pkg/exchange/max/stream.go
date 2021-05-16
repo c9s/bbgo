@@ -217,7 +217,7 @@ func convertWebSocketTrade(t max.TradeUpdate) (*types.Trade, error) {
 		ID:            int64(t.ID),
 		OrderID:       t.OrderID,
 		Symbol:        toGlobalSymbol(t.Market),
-		Exchange:      types.ExchangeMax.String(),
+		Exchange:      types.ExchangeMax,
 		Price:         price,
 		Quantity:      quantity,
 		Side:          side,
@@ -253,7 +253,7 @@ func toGlobalOrderUpdate(u max.OrderUpdate) (*types.Order, error) {
 			TimeInForce:   "GTC", // MAX only supports GTC
 			GroupID:       u.GroupID,
 		},
-		Exchange:         types.ExchangeMax.String(),
+		Exchange:         types.ExchangeMax,
 		OrderID:          u.ID,
 		Status:           toGlobalOrderStatus(u.State, executedVolume, remainingVolume),
 		ExecutedQuantity: executedVolume.Float64(),

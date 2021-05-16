@@ -435,7 +435,7 @@ func (m *SimplePriceMatching) newOrder(o types.SubmitOrder, orderID uint64) type
 	return types.Order{
 		OrderID:          orderID,
 		SubmitOrder:      o,
-		Exchange:         "backtest",
+		Exchange:         types.ExchangeBacktest,
 		Status:           types.OrderStatusNew,
 		ExecutedQuantity: 0,
 		IsWorking:        true,

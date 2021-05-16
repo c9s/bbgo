@@ -602,7 +602,7 @@ func TestExchange_QueryTrades(t *testing.T) {
 		assert.Equal(t, types.Trade{
 			ID:            789,
 			OrderID:       456,
-			Exchange:      types.ExchangeFTX.String(),
+			Exchange:      types.ExchangeFTX,
 			Price:         672.5,
 			Quantity:      1.0,
 			QuoteQuantity: 672.5 * 1.0,
