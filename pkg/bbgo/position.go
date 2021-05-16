@@ -107,9 +107,6 @@ func (p *Position) AddTrades(trades []types.Trade) (fixedpoint.Value, bool) {
 }
 
 func (p *Position) AddTrade(t types.Trade) (fixedpoint.Value, bool) {
-	p.Lock()
-	defer p.Unlock()
-
 	price := fixedpoint.NewFromFloat(t.Price)
 	quantity := fixedpoint.NewFromFloat(t.Quantity)
 	quoteQuantity := fixedpoint.NewFromFloat(t.QuoteQuantity)
@@ -124,6 +121,9 @@ func (p *Position) AddTrade(t types.Trade) (fixedpoint.Value, bool) {
 		quoteQuantity -= fee
 
 	}
+
+	p.Lock()
+	defer p.Unlock()
 
 	// Base > 0 means we're in long position
 	// Base < 0  means we're in short position
