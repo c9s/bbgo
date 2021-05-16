@@ -196,7 +196,7 @@ func toGlobalOrder(maxOrder max.Order) (*types.Order, error) {
 			TimeInForce:   "GTC", // MAX only supports GTC
 			GroupID:       maxOrder.GroupID,
 		},
-		Exchange:         types.ExchangeMax.String(),
+		Exchange:         types.ExchangeMax,
 		IsWorking:        maxOrder.State == "wait",
 		OrderID:          maxOrder.ID,
 		Status:           toGlobalOrderStatus(maxOrder.State, executedVolume, remainingVolume),

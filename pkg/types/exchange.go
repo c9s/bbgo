@@ -43,6 +43,7 @@ const (
 	ExchangeMax     = ExchangeName("max")
 	ExchangeBinance = ExchangeName("binance")
 	ExchangeFTX     = ExchangeName("ftx")
+	ExchangeBacktest = ExchangeName("backtest")
 )
 
 func ValidExchangeName(a string) (ExchangeName, error) {

@@ -145,7 +145,7 @@ func ToGlobalOrder(binanceOrder *binance.Order, isMargin bool) (*types.Order, er
 			Price:         util.MustParseFloat(binanceOrder.Price),
 			TimeInForce:   string(binanceOrder.TimeInForce),
 		},
-		Exchange:         types.ExchangeBinance.String(),
+		Exchange:         types.ExchangeBinance,
 		IsWorking:        binanceOrder.IsWorking,
 		OrderID:          uint64(binanceOrder.OrderID),
 		Status:           toGlobalOrderStatus(binanceOrder.Status),

@@ -144,7 +144,7 @@ func (o *SubmitOrder) SlackAttachment() slack.Attachment {
 type Order struct {
 	SubmitOrder
 
-	Exchange         string        `json:"exchange" db:"exchange"`
+	Exchange         ExchangeName  `json:"exchange" db:"exchange"`
 	GID              uint64        `json:"gid" db:"gid"`
 	OrderID          uint64        `json:"orderID" db:"order_id"` // order id
 	Status           OrderStatus   `json:"status" db:"status"`
@@ -169,13 +169,13 @@ func (o Order) Backup() SubmitOrder {
 }
 
 func (o Order) String() string {
-	return fmt.Sprintf("ORDER %s %s %s %f/%f @ %f -> %s", o.Exchange, o.Symbol, o.Side, o.ExecutedQuantity, o.Quantity, o.Price, o.Status)
+	return fmt.Sprintf("ORDER %s %s %s %f/%f @ %f -> %s", o.Exchange.String(), o.Symbol, o.Side, o.ExecutedQuantity, o.Quantity, o.Price, o.Status)
 }
 
 // PlainText is used for telegram-styled messages
 func (o Order) PlainText() string {
 	return fmt.Sprintf("Order %s %s %s %s @ %s %s/%s -> %s",
-		o.Exchange,
+		o.Exchange.String(),
 		o.Symbol,
 		o.Type,
 		o.Side,

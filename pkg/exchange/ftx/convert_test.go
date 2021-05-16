@@ -43,7 +43,7 @@ func Test_toGlobalOrderFromOpenOrder(t *testing.T) {
 	assert.Equal(t, float64(31431), o.Quantity)
 	assert.Equal(t, 0.306525, o.Price)
 	assert.Equal(t, "GTC", o.TimeInForce)
-	assert.Equal(t, types.ExchangeFTX.String(), o.Exchange)
+	assert.Equal(t, types.ExchangeFTX, o.Exchange)
 	assert.True(t, o.IsWorking)
 	assert.Equal(t, uint64(9596912), o.OrderID)
 	assert.Equal(t, types.OrderStatusPartiallyFilled, o.Status)
