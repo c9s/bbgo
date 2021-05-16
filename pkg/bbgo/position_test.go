@@ -9,6 +9,96 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+func TestPosition_ExchangeFeeRate_Short(t *testing.T) {
+	pos := &Position{
+		Symbol:        "BTCUSDT",
+		BaseCurrency:  "BTC",
+		QuoteCurrency: "USDT",
+	}
+
+	feeRate := 0.075 * 0.01
+	pos.SetExchangeFeeRate(types.ExchangeBinance, ExchangeFee{
+		MakerFeeRate: fixedpoint.NewFromFloat(feeRate),
+		TakerFeeRate: fixedpoint.NewFromFloat(feeRate),
+	})
+
+	quantity := 10.0
+	quoteQuantity := 3000.0 * quantity
+	fee := quoteQuantity * feeRate
+	averageCost := (quoteQuantity - fee) / quantity
+	bnbPrice := 570.0
+	pos.AddTrade(types.Trade{
+		Exchange:      types.ExchangeBinance,
+		Price:         3000.0,
+		Quantity:      quantity,
+		QuoteQuantity: quoteQuantity,
+		Symbol:        "BTCUSDT",
+		Side:          types.SideTypeSell,
+		Fee:           fee / bnbPrice,
+		FeeCurrency:   "BNB",
+	})
+
+	profit, madeProfit := pos.AddTrade(types.Trade{
+		Exchange:      types.ExchangeBinance,
+		Price:         2000.0,
+		Quantity:      10.0,
+		QuoteQuantity: 2000.0 * 10.0,
+		Symbol:        "BTCUSDT",
+		Side:          types.SideTypeBuy,
+		Fee:           2000.0 * 10.0 * feeRate / bnbPrice,
+		FeeCurrency:   "BNB",
+	})
+
+	expectedProfit := (averageCost-2000.0)*10.0 - (2000.0 * 10.0 * feeRate)
+	assert.True(t, madeProfit)
+	assert.Equal(t, fixedpoint.NewFromFloat(expectedProfit), profit)
+}
+
+func TestPosition_ExchangeFeeRate_Long(t *testing.T) {
+	pos := &Position{
+		Symbol:        "BTCUSDT",
+		BaseCurrency:  "BTC",
+		QuoteCurrency: "USDT",
+	}
+
+	feeRate := 0.075 * 0.01
+	pos.SetExchangeFeeRate(types.ExchangeBinance, ExchangeFee{
+		MakerFeeRate: fixedpoint.NewFromFloat(feeRate),
+		TakerFeeRate: fixedpoint.NewFromFloat(feeRate),
+	})
+
+	quantity := 10.0
+	quoteQuantity := 3000.0 * quantity
+	fee := quoteQuantity * feeRate
+	averageCost := (quoteQuantity + fee) / quantity
+	bnbPrice := 570.0
+	pos.AddTrade(types.Trade{
+		Exchange:      types.ExchangeBinance,
+		Price:         3000.0,
+		Quantity:      quantity,
+		QuoteQuantity: quoteQuantity,
+		Symbol:        "BTCUSDT",
+		Side:          types.SideTypeBuy,
+		Fee:           fee / bnbPrice,
+		FeeCurrency:   "BNB",
+	})
+
+	profit, madeProfit := pos.AddTrade(types.Trade{
+		Exchange:      types.ExchangeBinance,
+		Price:         4000.0,
+		Quantity:      10.0,
+		QuoteQuantity: 4000.0 * 10.0,
+		Symbol:        "BTCUSDT",
+		Side:          types.SideTypeSell,
+		Fee:           4000.0 * 10.0 * feeRate / bnbPrice,
+		FeeCurrency:   "BNB",
+	})
+
+	expectedProfit := (4000.0-averageCost)*10.0 - (4000.0 * 10.0 * feeRate)
+	assert.True(t, madeProfit)
+	assert.Equal(t, fixedpoint.NewFromFloat(expectedProfit), profit)
+}
+
 func TestPosition(t *testing.T) {
 	var feeRate = 0.05 * 0.01
 	var testcases = []struct {
