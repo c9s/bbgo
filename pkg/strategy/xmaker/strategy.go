@@ -19,7 +19,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-var defaultMargin = fixedpoint.NewFromFloat(0.01)
+var defaultMargin = fixedpoint.NewFromFloat(0.003)
 
 var localTimeZone *time.Location
 
@@ -130,6 +130,12 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 
 	sourceSession.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{})
 	sourceSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
+
+	makerSession, ok := sessions[s.MakerExchange]
+	if !ok {
+		panic(fmt.Errorf("maker session %s is not defined", s.MakerExchange))
+	}
+	makerSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
 }
 
 func aggregatePrice(pvs types.PriceVolumeSlice, requiredQuantity fixedpoint.Value) (price fixedpoint.Value) {
@@ -255,7 +261,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 	}
 
 	if disableMakerAsk && disableMakerBid {
-		log.Warn("bid/ask maker is disabled due to insufficient balances")
+		log.Warnf("%s bid/ask maker is disabled due to insufficient balances", s.Symbol)
 		return
 	}
 
@@ -403,6 +409,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 	}
 
 	if len(submitOrders) == 0 {
+		log.Warnf("no orders generated")
 		return
 	}
 
