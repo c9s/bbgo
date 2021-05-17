@@ -492,14 +492,18 @@ func (s *Strategy) handleTradeUpdate(trade types.Trade) {
 			s.state.AccumulatedProfit.AtomicAdd(profit)
 		}
 
+		profitMargin := profit.DivFloat64(trade.QuoteQuantity)
+
 		var since time.Time
 		if s.state.AccumulatedSince > 0 {
 			since = time.Unix(s.state.AccumulatedSince, 0).In(localTimeZone)
 		}
 
-		s.Notify("%s %s trade profit %f %s, since %s accumulated net profit %f %s, accumulated loss %f %s", s.Symbol,
+		s.Notify("%s trade profit %s %f %s (profit margin %f%%), since %s accumulated net profit %f %s, accumulated loss %f %s",
+			s.Symbol,
 			pnlEmoji(profit),
 			profit.Float64(), s.state.Position.QuoteCurrency,
+			profitMargin.Float64(),
 			since.Format(time.RFC822),
 			s.state.AccumulatedPnL.Float64(), s.state.Position.QuoteCurrency,
 			s.state.AccumulatedLoss.Float64(), s.state.Position.QuoteCurrency)
