@@ -21,6 +21,7 @@ const (
 )
 
 var logger = logrus.WithField("exchange", "ftx")
+var symbolMap map[string]string
 
 type Exchange struct {
 	key, secret  string
@@ -33,6 +34,7 @@ func NewExchange(key, secret string, subAccount string) *Exchange {
 	if err != nil {
 		panic(err)
 	}
+	symbolMap = make(map[string]string)
 	return &Exchange{
 		restEndpoint: u,
 		key:          key,
@@ -73,6 +75,7 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 	markets := types.MarketMap{}
 	for _, m := range resp.Result {
 		symbol := toGlobalSymbol(m.Name)
+		symbolMap[symbol] = m.Name
 
 		market := types.Market{
 			Symbol: symbol,
@@ -157,7 +160,7 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 	if !isIntervalSupportedInKLine(interval) {
 		return nil, fmt.Errorf("interval %s is not supported", interval.String())
 	}
-	resp, err := e.newRest().HistoricalPrices(ctx, symbol, interval, int64(options.Limit), since, until)
+	resp, err := e.newRest().HistoricalPrices(ctx, toLocalSymbol(symbol), interval, int64(options.Limit), since, until)
 	if err != nil {
 		return nil, err
 	}
@@ -224,7 +227,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 
 	for since.Before(until) {
 		// DO not set limit to `1` since you will always get the same response.
-		resp, err := e.newRest().Fills(ctx, symbol, since, until, limit, true)
+		resp, err := e.newRest().Fills(ctx, toLocalSymbol(symbol), since, until, limit, true)
 		if err != nil {
 			return nil, err
 		}
@@ -302,7 +305,7 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 			return createdOrders, fmt.Errorf("unsupported TimeInForce %s. only support GTC", so.TimeInForce)
 		}
 		or, err := e.newRest().PlaceOrder(ctx, PlaceOrderPayload{
-			Market:     TrimUpperString(so.Symbol),
+			Market:     toLocalSymbol(TrimUpperString(so.Symbol)),
 			Side:       TrimLowerString(string(so.Side)),
 			Price:      so.Price,
 			Type:       TrimLowerString(string(so.Type)),
@@ -329,7 +332,7 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
 	// TODO: invoke open trigger orders
-	resp, err := e.newRest().OpenOrders(ctx, symbol)
+	resp, err := e.newRest().OpenOrders(ctx, toLocalSymbol(symbol))
 	if err != nil {
 		return nil, err
 	}
@@ -362,7 +365,7 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 	s := since
 	var lastOrder order
 	for hasMoreData {
-		resp, err := e.newRest().OrdersHistory(ctx, symbol, s, until, limit)
+		resp, err := e.newRest().OrdersHistory(ctx, toLocalSymbol(symbol), s, until, limit)
 		if err != nil {
 			return nil, err
 		}

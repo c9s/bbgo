@@ -55,9 +55,10 @@ type websocketRequest struct {
 }
 */
 type loginArgs struct {
-	Key       string `json:"key"`
-	Signature string `json:"sign"`
-	Time      int64  `json:"time"`
+	Key        string `json:"key"`
+	Signature  string `json:"sign"`
+	Time       int64  `json:"time"`
+	SubAccount string `json:"subaccount"`
 }
 
 func newLoginRequest(key, secret string, t time.Time) websocketRequest {
@@ -361,7 +362,7 @@ func toGlobalOrderBook(r orderBookResponse) (types.OrderBook, error) {
 	}
 	return types.OrderBook{
 		// ex. BTC/USDT
-		Symbol: strings.ToUpper(r.Market),
+		Symbol: toGlobalSymbol(strings.ToUpper(r.Market)),
 		Bids:   bids,
 		Asks:   asks,
 	}, nil
