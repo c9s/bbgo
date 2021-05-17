@@ -120,12 +120,7 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 	}
 
 	sourceSession.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{})
-
-	makerSession, ok := sessions[s.MakerExchange]
-	if !ok {
-		panic(fmt.Errorf("maker session %s is not defined", s.MakerExchange))
-	}
-	makerSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
+	sourceSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
 }
 
 func aggregatePrice(pvs types.PriceVolumeSlice, requiredQuantity fixedpoint.Value) (price fixedpoint.Value) {
