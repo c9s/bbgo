@@ -105,9 +105,8 @@ func init() {
 
 	RootCmd.PersistentFlags().String("ftx-api-key", "", "ftx api key")
 	RootCmd.PersistentFlags().String("ftx-api-secret", "", "ftx api secret")
-	RootCmd.PersistentFlags().String("ftx-subaccount-name", "", "subaccount name. Specify it if the credential is for subaccount.")
+	RootCmd.PersistentFlags().String("ftx-subaccount", "", "subaccount name. Specify it if the credential is for subaccount.")
 }
-
 
 func Execute() {
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))

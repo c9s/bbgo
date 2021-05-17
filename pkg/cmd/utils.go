@@ -21,7 +21,7 @@ func newExchange(session string) (types.Exchange, error) {
 		return ftx.NewExchange(
 			viper.GetString("ftx-api-key"),
 			viper.GetString("ftx-api-secret"),
-			viper.GetString("ftx-subaccount-name"),
+			viper.GetString("ftx-subaccount"),
 		), nil
 
 	}
