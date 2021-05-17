@@ -91,7 +91,7 @@ type Strategy struct {
 	NumLayers int `json:"numLayers"`
 
 	// Pips is the pips of the layer prices
-	Pips int `json:"pips"`
+	Pips fixedpoint.Value `json:"pips"`
 
 	// --------------------------------
 	// private field
@@ -275,6 +275,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 	var askQuantity = s.Quantity
 	var bidMargin = s.BidMargin
 	var askMargin = s.AskMargin
+	var pips = s.Pips
 
 	if s.EnableBollBandMargin {
 		lastDownBand := s.boll.LastDownBand()
@@ -296,6 +297,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 				(askMargin + bollMargin).Float64())
 
 			askMargin = askMargin + bollMargin
+			pips = pips.MulFloat64(ratio)
 		}
 
 		if bestAskPrice.Float64() > lastUpBand {
@@ -312,6 +314,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 				(bidMargin + bollMargin).Float64())
 
 			bidMargin = bidMargin + bollMargin
+			pips = pips.MulFloat64(ratio)
 		}
 	}
 
@@ -334,8 +337,9 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 			accumulativeBidQuantity += bidQuantity
 			bidPrice := aggregatePrice(sourceBook.Bids, accumulativeBidQuantity)
 			bidPrice = bidPrice.MulFloat64(1.0 - bidMargin.Float64())
-			if i > 0 && s.Pips > 0 {
-				bidPrice -= fixedpoint.NewFromFloat(s.makerMarket.TickSize * float64(s.Pips))
+
+			if i > 0 && pips > 0 {
+				bidPrice -= pips.MulFloat64(s.makerMarket.TickSize)
 			}
 
 			if makerQuota.QuoteAsset.Lock(bidQuantity.Mul(bidPrice)) && hedgeQuota.BaseAsset.Lock(bidQuantity) {
@@ -380,8 +384,8 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 
 			askPrice := aggregatePrice(sourceBook.Asks, accumulativeAskQuantity)
 			askPrice = askPrice.MulFloat64(1.0 + askMargin.Float64())
-			if i > 0 && s.Pips > 0 {
-				askPrice += fixedpoint.NewFromFloat(s.makerMarket.TickSize * float64(s.Pips))
+			if i > 0 && pips > 0 {
+				askPrice -= pips.MulFloat64(s.makerMarket.TickSize)
 			}
 
 			if makerQuota.BaseAsset.Lock(askQuantity) && hedgeQuota.QuoteAsset.Lock(askQuantity.Mul(askPrice)) {
