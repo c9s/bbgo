@@ -20,6 +20,10 @@ func toGlobalSymbol(original string) string {
 	return strings.ReplaceAll(TrimUpperString(original), "/", "")
 }
 
+func toLocalSymbol(original string) string {
+	return symbolMap[original]
+}
+
 func TrimUpperString(original string) string {
 	return strings.ToUpper(strings.TrimSpace(original))
 }
