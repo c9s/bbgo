@@ -503,7 +503,7 @@ func (s *Strategy) handleTradeUpdate(trade types.Trade) {
 			s.Symbol,
 			pnlEmoji(profit),
 			profit.Float64(), s.state.Position.QuoteCurrency,
-			profitMargin.Float64(),
+			profitMargin.Float64() * 100.0,
 			since.Format(time.RFC822),
 			s.state.AccumulatedPnL.Float64(), s.state.Position.QuoteCurrency,
 			s.state.AccumulatedLoss.Float64(), s.state.Position.QuoteCurrency)
