@@ -301,7 +301,7 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 	// TODO: currently only support limit and market order
 	// TODO: support time in force
 	for _, so := range orders {
-		if so.TimeInForce != "GTC" {
+		if so.TimeInForce != "GTC" && so.TimeInForce != "" {
 			return createdOrders, fmt.Errorf("unsupported TimeInForce %s. only support GTC", so.TimeInForce)
 		}
 		or, err := e.newRest().PlaceOrder(ctx, PlaceOrderPayload{
