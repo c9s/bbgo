@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
@@ -65,6 +66,11 @@ type Strategy struct {
 	BidMargin fixedpoint.Value `json:"bidMargin"`
 	AskMargin fixedpoint.Value `json:"askMargin"`
 
+	EnableBollBandMargin bool             `json:"enableBollBandMargin"`
+	BollBandInterval     types.Interval   `json:"bollBandInterval"`
+	BollBandMargin       fixedpoint.Value `json:"bollBandMargin"`
+	BollBandMarginFactor fixedpoint.Value `json:"bollBandMarginFactor"`
+
 	StopHedgeQuoteBalance fixedpoint.Value `json:"stopHedgeQuoteBalance"`
 	StopHedgeBaseBalance  fixedpoint.Value `json:"stopHedgeBaseBalance"`
 
@@ -95,6 +101,9 @@ type Strategy struct {
 
 	sourceMarket types.Market
 	makerMarket  types.Market
+
+	// boll is the BOLLINGER indicator we used for predicting the price.
+	boll *indicator.BOLL
 
 	state *State
 
@@ -252,12 +261,54 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 
 	bestBidPrice := sourceBook.Bids[0].Price
 	bestAskPrice := sourceBook.Asks[0].Price
-	log.Infof("%s best bid price %f, best ask price: %f", s.Symbol, bestBidPrice.Float64(), bestAskPrice.Float64())
+	log.Infof("%s book ticker: best ask / best bid = %f / %f", s.Symbol, bestAskPrice.Float64(), bestBidPrice.Float64())
 
 	var submitOrders []types.SubmitOrder
 	var accumulativeBidQuantity, accumulativeAskQuantity fixedpoint.Value
 	var bidQuantity = s.Quantity
 	var askQuantity = s.Quantity
+	var bidMargin = s.BidMargin
+	var askMargin = s.AskMargin
+
+	if s.EnableBollBandMargin {
+		lastDownBand := s.boll.LastDownBand()
+		lastUpBand := s.boll.LastUpBand()
+
+		// when bid price is lower than the down band, then it's in the downtrend
+		// when ask price is higher than the up band, then it's in the uptrend
+		if bestBidPrice.Float64() < lastDownBand {
+			// ratio here should be greater than 1.00
+			ratio := lastDownBand / bestBidPrice.Float64()
+
+			// so that the original bid margin can be multiplied by 1.x
+			bollMargin := s.BollBandMargin.MulFloat64(ratio).Mul(s.BollBandMarginFactor)
+
+			log.Infof("%s bollband downtrend: adjusting ask margin %f + %f = %f",
+				s.Symbol,
+				askMargin.Float64(),
+				bollMargin.Float64(),
+				(askMargin + bollMargin).Float64())
+
+			askMargin = askMargin + bollMargin
+		}
+
+		if bestAskPrice.Float64() > lastUpBand {
+			// ratio here should be greater than 1.00
+			ratio := bestAskPrice.Float64() / lastUpBand
+
+			// so that the original bid margin can be multiplied by 1.x
+			bollMargin := s.BollBandMargin.MulFloat64(ratio).Mul(s.BollBandMarginFactor)
+
+			log.Infof("%s bollband uptrend adjusting bid margin %f + %f = %f",
+				s.Symbol,
+				bidMargin.Float64(),
+				bollMargin.Float64(),
+				(bidMargin + bollMargin).Float64())
+
+			bidMargin = bidMargin + bollMargin
+		}
+	}
+
 	for i := 0; i < s.NumLayers; i++ {
 		// for maker bid orders
 		if !disableMakerBid {
@@ -268,7 +319,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 					return
 				}
 
-				log.Infof("scaling quantity to %f by layer: %d", qf, i+1)
+				log.Infof("%s scaling bid #%d quantity to %f", s.Symbol, i+1, qf)
 
 				// override the default bid quantity
 				bidQuantity = fixedpoint.NewFromFloat(qf)
@@ -276,7 +327,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 
 			accumulativeBidQuantity += bidQuantity
 			bidPrice := aggregatePrice(sourceBook.Bids, accumulativeBidQuantity)
-			bidPrice = bidPrice.MulFloat64(1.0 - s.BidMargin.Float64())
+			bidPrice = bidPrice.MulFloat64(1.0 - bidMargin.Float64())
 			if i > 0 && s.Pips > 0 {
 				bidPrice -= fixedpoint.NewFromFloat(s.makerMarket.TickSize * float64(s.Pips))
 			}
@@ -314,13 +365,15 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 					return
 				}
 
+				log.Infof("%s scaling ask #%d quantity to %f", s.Symbol, i+1, qf)
+
 				// override the default bid quantity
 				askQuantity = fixedpoint.NewFromFloat(qf)
 			}
 			accumulativeAskQuantity += askQuantity
 
 			askPrice := aggregatePrice(sourceBook.Asks, accumulativeAskQuantity)
-			askPrice = askPrice.MulFloat64(1.0 + s.AskMargin.Float64())
+			askPrice = askPrice.MulFloat64(1.0 + askMargin.Float64())
 			if i > 0 && s.Pips > 0 {
 				askPrice += fixedpoint.NewFromFloat(s.makerMarket.TickSize * float64(s.Pips))
 			}
@@ -527,6 +580,17 @@ func (s *Strategy) Validate() error {
 }
 
 func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession) error {
+	if s.BollBandInterval == "" {
+		s.BollBandInterval = types.Interval1m
+	}
+
+	if s.BollBandMarginFactor == 0 {
+		s.BollBandMarginFactor = fixedpoint.NewFromFloat(1.0)
+	}
+	if s.BollBandMargin == 0 {
+		s.BollBandMargin = fixedpoint.NewFromFloat(0.001)
+	}
+
 	// configure default values
 	if s.UpdateInterval == 0 {
 		s.UpdateInterval = types.Duration(time.Second)
@@ -580,6 +644,16 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	if !ok {
 		return fmt.Errorf("maker session market %s is not defined", s.Symbol)
 	}
+
+	standardIndicatorSet, ok := s.sourceSession.StandardIndicatorSet(s.Symbol)
+	if !ok {
+		return fmt.Errorf("%s standard indicator set not found", s.Symbol)
+	}
+
+	s.boll = standardIndicatorSet.BOLL(types.IntervalWindow{
+		Interval: s.BollBandInterval,
+		Window:   21,
+	}, 1.0)
 
 	// restore state
 	instanceID := fmt.Sprintf("%s-%s", ID, s.Symbol)
