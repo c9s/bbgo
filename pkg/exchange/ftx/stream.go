@@ -109,7 +109,7 @@ func (s *Stream) Subscribe(channel types.Channel, symbol string, _ types.Subscri
 	s.addSubscription(websocketRequest{
 		Operation: subscribe,
 		Channel:   orderBookChannel,
-		Market:    TrimUpperString(symbol),
+		Market:    toLocalSymbol(TrimUpperString(symbol)),
 	})
 }
 
