@@ -499,7 +499,7 @@ func (s *Strategy) handleTradeUpdate(trade types.Trade) {
 			since = time.Unix(s.state.AccumulatedSince, 0).In(localTimeZone)
 		}
 
-		s.Notify("%s trade profit %s %f %s (profit margin %.3f%%), since %s accumulated net profit %f %s, accumulated loss %f %s",
+		s.Notify("%s trade profit %s %f %s (%.3f%%), since %s accumulated net profit %f %s, accumulated loss %f %s",
 			s.Symbol,
 			pnlEmoji(profit),
 			profit.Float64(), s.state.Position.QuoteCurrency,
