@@ -417,8 +417,8 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 		// check quote quantity
 		if quote, ok := account.Balance(s.sourceMarket.QuoteCurrency); ok {
 			if quote.Available < notional {
-				// qf := bbgo.AdjustFloatQuantityByMaxAmount(quantity.Float64(), lastPrice, quote.Available.Float64())
-				// quantity = fixedpoint.NewFromFloat(qf)
+				// adjust price to higher 0.1%, so that we can ensure that the order can be executed
+				quantity = bbgo.AdjustQuantityByMaxAmount(quantity, fixedpoint.NewFromFloat(lastPrice*1.001), quote.Available)
 			}
 		}
 
@@ -503,7 +503,7 @@ func (s *Strategy) handleTradeUpdate(trade types.Trade) {
 			s.Symbol,
 			pnlEmoji(profit),
 			profit.Float64(), s.state.Position.QuoteCurrency,
-			profitMargin.Float64() * 100.0,
+			profitMargin.Float64()*100.0,
 			since.Format(time.RFC822),
 			s.state.AccumulatedPnL.Float64(), s.state.Position.QuoteCurrency,
 			s.state.AccumulatedLoss.Float64(), s.state.Position.QuoteCurrency)
