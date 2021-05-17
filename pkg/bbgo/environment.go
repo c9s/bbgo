@@ -503,8 +503,7 @@ func (environ *Environment) Connect(ctx context.Context) error {
 		var logger = log.WithField("session", n)
 
 		if len(session.Subscriptions) == 0 {
-			logger.Warnf("exchange session %s has no subscriptions, skipping", session.Name)
-			continue
+			logger.Warnf("exchange session %s has no subscriptions", session.Name)
 		} else {
 			// add the subscribe requests to the stream
 			for _, s := range session.Subscriptions {
