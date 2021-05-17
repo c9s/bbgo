@@ -6,9 +6,16 @@ import (
 	"sync"
 
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
+
+var debugBalance = false
+
+func init() {
+	debugBalance = viper.GetBool("debug-balance")
+}
 
 type Balance struct {
 	Currency  string           `json:"currency"`
@@ -216,13 +223,16 @@ func (a *Account) UpdateBalances(balances BalanceMap) {
 	}
 }
 
+func printBalanceUpdate(balances BalanceMap) {
+	logrus.Infof("balance update: %+v", balances)
+}
+
 func (a *Account) BindStream(stream Stream) {
 	stream.OnBalanceUpdate(a.UpdateBalances)
 	stream.OnBalanceSnapshot(a.UpdateBalances)
-	stream.OnBalanceUpdate(func(balances BalanceMap) {
-		logrus.Infof("balance update: %+v", balances)
-	})
-
+	if debugBalance {
+		stream.OnBalanceUpdate(printBalanceUpdate)
+	}
 }
 
 func (a *Account) Print() {
