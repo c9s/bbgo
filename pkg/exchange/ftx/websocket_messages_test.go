@@ -58,7 +58,7 @@ func Test_orderBookResponse_toGlobalOrderBook(t *testing.T) {
 
 	b, err := toGlobalOrderBook(r)
 	assert.NoError(t, err)
-	assert.Equal(t, "BTC/USDT", b.Symbol)
+	assert.Equal(t, "BTCUSDT", b.Symbol)
 	isValid, err := b.IsValid()
 	assert.True(t, isValid)
 	assert.NoError(t, err)
