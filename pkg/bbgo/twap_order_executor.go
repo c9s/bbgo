@@ -158,7 +158,7 @@ func (e *TwapExecution) newBestPriceOrder() (orderForm types.SubmitOrder, err er
 
 	restQuantity := e.TargetQuantity - fixedpoint.Abs(base)
 
-	if restQuantity == 0 {
+	if restQuantity <= 0 {
 		if e.cancelContextIfTargetQuantityFilled() {
 			return
 		}
