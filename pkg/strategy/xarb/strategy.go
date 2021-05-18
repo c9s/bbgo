@@ -242,25 +242,71 @@ func (s *Strategy) check(ctx context.Context, _ bbgo.OrderExecutionRouter) {
 		return
 	}
 
-	s.orderChannels[bestAskSession] <- types.SubmitOrder{
-		Symbol:   s.Symbol,
-		Type:     types.OrderTypeMarket,
-		Side:     types.SideTypeBuy,
-		Quantity: quantityF,
-		// Price:       askPrice.Float64(),
-		// TimeInForce: "GTC",
-		GroupID: s.groupID,
-	}
+	var wg sync.WaitGroup
+	wg.Add(2)
 
-	s.orderChannels[bestBidSession] <- types.SubmitOrder{
-		Symbol:   s.Symbol,
-		Type:     types.OrderTypeMarket,
-		Side:     types.SideTypeSell,
-		Quantity: quantityF,
-		// Price:       askPrice.Float64(),
-		// TimeInForce: "GTC",
-		GroupID: s.groupID,
-	}
+	go func() {
+		defer wg.Done()
+
+		createdOrders, err := s.sessions[bestAskSession].Exchange.SubmitOrders(ctx, types.SubmitOrder{
+			Symbol:   s.Symbol,
+			Type:     types.OrderTypeMarket,
+			Side:     types.SideTypeBuy,
+			Quantity: quantityF,
+			// Price:       askPrice.Float64(),
+			// TimeInForce: "GTC",
+			GroupID: s.groupID,
+		})
+		if err != nil {
+			log.WithError(err).Errorf("order error: %s", err.Error())
+			return
+		}
+
+		s.orderStore.Add(createdOrders...)
+	}()
+
+	go func() {
+		defer wg.Done()
+		createdOrders, err := s.sessions[bestBidSession].Exchange.SubmitOrders(ctx, types.SubmitOrder{
+			Symbol:   s.Symbol,
+			Type:     types.OrderTypeMarket,
+			Side:     types.SideTypeSell,
+			Quantity: quantityF,
+			// Price:       askPrice.Float64(),
+			// TimeInForce: "GTC",
+			GroupID: s.groupID,
+		})
+		if err != nil {
+			log.WithError(err).Errorf("order error: %s", err.Error())
+			return
+		}
+		s.orderStore.Add(createdOrders...)
+	}()
+
+	wg.Wait()
+
+	/*
+		s.orderChannels[bestAskSession] <- types.SubmitOrder{
+			Symbol:   s.Symbol,
+			Type:     types.OrderTypeMarket,
+			Side:     types.SideTypeBuy,
+			Quantity: quantityF,
+			// Price:       askPrice.Float64(),
+			// TimeInForce: "GTC",
+			GroupID: s.groupID,
+		}
+
+		s.orderChannels[bestBidSession] <- types.SubmitOrder{
+			Symbol:   s.Symbol,
+			Type:     types.OrderTypeMarket,
+			Side:     types.SideTypeSell,
+			Quantity: quantityF,
+			// Price:       askPrice.Float64(),
+			// TimeInForce: "GTC",
+			GroupID: s.groupID,
+		}
+
+	*/
 
 	s.Notifiability.Notify("Submitted arbitrage orders: %s %f", s.Symbol, quantity.Float64())
 }
@@ -417,7 +463,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		s.orderChannels[sessionID] = c
 
 		log.Infof("spawning order worker %s", sessionID)
-		go s.orderWorker(ctx, session, c)
+		// go s.orderWorker(ctx, session, c)
 	}
 
 	// restore state
