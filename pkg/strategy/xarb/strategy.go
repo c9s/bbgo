@@ -74,6 +74,7 @@ type Strategy struct {
 	sessions      map[string]*bbgo.ExchangeSession
 	books         map[string]*types.StreamOrderBook
 	markets       map[string]types.Market
+	orderChannels map[string]chan types.SubmitOrder
 	generalMarket *types.Market
 
 	state *State
@@ -241,50 +242,27 @@ func (s *Strategy) check(ctx context.Context, orderExecutionRouter bbgo.OrderExe
 		return
 	}
 
-	var wg sync.WaitGroup
-	wg.Add(2)
+	s.orderChannels[bestAskSession] <- types.SubmitOrder{
+		Symbol:   s.Symbol,
+		Type:     types.OrderTypeMarket,
+		Side:     types.SideTypeBuy,
+		Quantity: quantity.Float64(),
+		// Price:       askPrice.Float64(),
+		// TimeInForce: "GTC",
+		GroupID: s.groupID,
+	}
 
-	go func() {
-		defer wg.Done()
-
-		createdOrders, err := s.sessions[bestAskSession].Exchange.SubmitOrders(ctx, types.SubmitOrder{
-			Symbol:   s.Symbol,
-			Type:     types.OrderTypeMarket,
-			Side:     types.SideTypeBuy,
-			Quantity: quantity.Float64(),
-			// Price:       askPrice.Float64(),
-			// TimeInForce: "GTC",
-			GroupID: s.groupID,
-		})
-		if err != nil {
-			log.WithError(err).Errorf("order error: %s", err.Error())
-			return
-		}
-
-		s.orderStore.Add(createdOrders...)
-	}()
-
-	go func() {
-		defer wg.Done()
-		createdOrders, err := s.sessions[bestBidSession].Exchange.SubmitOrders(ctx, types.SubmitOrder{
-			Symbol:   s.Symbol,
-			Type:     types.OrderTypeMarket,
-			Side:     types.SideTypeSell,
-			Quantity: quantity.Float64(),
-			// Price:       askPrice.Float64(),
-			// TimeInForce: "GTC",
-			GroupID: s.groupID,
-		})
-		if err != nil {
-			log.WithError(err).Errorf("order error: %s", err.Error())
-			return
-		}
-
-		s.orderStore.Add(createdOrders...)
-	}()
+	s.orderChannels[bestBidSession] <- types.SubmitOrder{
+		Symbol:   s.Symbol,
+		Type:     types.OrderTypeMarket,
+		Side:     types.SideTypeSell,
+		Quantity: quantity.Float64(),
+		// Price:       askPrice.Float64(),
+		// TimeInForce: "GTC",
+		GroupID: s.groupID,
+	}
 
 	s.Notifiability.Notify("Submitted arbitrage orders: %s %f", s.Symbol, quantity.Float64())
-	wg.Wait()
 }
 
 func (s *Strategy) handleTradeUpdate(trade types.Trade) {
@@ -317,6 +295,8 @@ func (s *Strategy) handleTradeUpdate(trade types.Trade) {
 	}
 
 	log.Infof("identified %s trade %d with an existing order: %d", trade.Symbol, trade.ID, trade.OrderID)
+
+	s.Notify(trade)
 
 	s.state.AccumulatedVolume.AtomicAdd(fixedpoint.NewFromFloat(trade.Quantity))
 
@@ -386,6 +366,18 @@ func (s *Strategy) LoadState() error {
 	return nil
 }
 
+func (s *Strategy) orderWorker(ctx context.Context, session *bbgo.ExchangeSession, in <-chan types.SubmitOrder) {
+	for orderForm := range in {
+		createdOrders, err := session.Exchange.SubmitOrders(ctx, orderForm)
+		if err != nil {
+			log.WithError(err).Errorf("order error: %s", err.Error())
+			return
+		}
+
+		s.orderStore.Add(createdOrders...)
+	}
+}
+
 func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession) error {
 	if s.MinSpreadRatio == 0 {
 		s.MinSpreadRatio = fixedpoint.NewFromFloat(1.03)
@@ -395,6 +387,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	s.books = make(map[string]*types.StreamOrderBook)
 	s.markets = make(map[string]types.Market)
 	s.orderStore = bbgo.NewOrderStore(s.Symbol)
+	s.orderChannels = make(map[string]chan types.SubmitOrder)
 
 	for sessionID := range sessions {
 		session := sessions[sessionID]
@@ -419,6 +412,12 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		session.Stream.OnTradeUpdate(s.handleTradeUpdate)
 
 		s.orderStore.BindStream(session.Stream)
+
+		c := make(chan types.SubmitOrder)
+		s.orderChannels[sessionID] = c
+
+		log.Infof("spawning order worker %s", sessionID)
+		go s.orderWorker(ctx, session, c)
 	}
 
 	// restore state
@@ -489,6 +488,10 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 		close(s.stopC)
+
+		for _, c := range s.orderChannels {
+			close(c)
+		}
 
 		if err := s.SaveState(); err != nil {
 			log.WithError(err).Errorf("can not save state: %+v", s.state)
