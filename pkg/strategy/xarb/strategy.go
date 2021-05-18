@@ -413,7 +413,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 		s.orderStore.BindStream(session.Stream)
 
-		c := make(chan types.SubmitOrder)
+		c := make(chan types.SubmitOrder, 1)
 		s.orderChannels[sessionID] = c
 
 		log.Infof("spawning order worker %s", sessionID)
