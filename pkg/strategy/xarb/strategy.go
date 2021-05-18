@@ -213,14 +213,16 @@ func (s *Strategy) check(ctx context.Context, _ bbgo.OrderExecutionRouter) {
 		return
 	}
 
-	log.Infof("💵 %s spread ratio %f > %f min spread ratio, bid/ask = %f/%f, fee bid/ask = %f/%f",
+	log.Infof("💵 %s spread ratio %f > %f min spread ratio, bid/ask = %f/%f, fee bid/ask = %f/%f, volume bid/ask = %f/%f",
 		s.Symbol,
 		spreadRatio,
 		minSpreadRatio,
 		bestBidPrice.Float64(),
 		bestAskPrice.Float64(),
 		feeBidPrice.Float64(),
-		feeAskPrice.Float64())
+		feeAskPrice.Float64(),
+		bestBidVolume.Float64(),
+		bestAskVolume.Float64())
 
 	// select the minimal volume we can arbitrage
 	quantity := fixedpoint.Min(bestAskVolume, bestBidVolume)

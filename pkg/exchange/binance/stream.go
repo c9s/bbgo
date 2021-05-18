@@ -11,9 +11,8 @@ import (
 	"time"
 
 	"github.com/adshao/go-binance/v2"
-	"github.com/gorilla/websocket"
-
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/gorilla/websocket"
 
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -24,16 +23,9 @@ func init() {
 	// randomize pulling
 	rand.Seed(time.Now().UnixNano())
 
-	if s := os.Getenv("BINANCE_DEBUG_DEPTH"); len(s) > 0 {
-		v, err := strconv.ParseBool(s)
-		if err != nil {
-			log.Error(err)
-		} else {
-			debugBinanceDepth = v
-			if debugBinanceDepth {
-				log.Info("binance depth debugging is enabled")
-			}
-		}
+	debugBinanceDepth, _ = strconv.ParseBool(os.Getenv("DEBUG_BINANCE_DEPTH"))
+	if debugBinanceDepth {
+		log.Info("binance depth debugging is enabled")
 	}
 }
 
@@ -177,7 +169,7 @@ func NewStream(client *binance.Client) *Stream {
 			}
 
 			// Update Order with FILLED event
-			if (order.Status == types.OrderStatusFilled) {
+			if order.Status == types.OrderStatusFilled {
 				stream.EmitOrderUpdate(*order)
 			}
 		}
