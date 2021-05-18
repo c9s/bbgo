@@ -120,6 +120,8 @@ type Strategy struct {
 	MaxDailyNumberOfTransfer int              `json:"maxDailyNumberOfTransfer"`
 	MaxDailyAmountOfTransfer fixedpoint.Value `json:"maxDailyAmountOfTransfer"`
 
+	CheckOnStart bool `json:"checkOnStart"`
+
 	Asset string `json:"asset"`
 
 	// Low is the low balance level for triggering transfer
@@ -331,7 +333,9 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		s.SaveState()
 	})
 
-	s.checkBalance(ctx, sessions)
+	if s.CheckOnStart {
+		s.checkBalance(ctx, sessions)
+	}
 
 	go func() {
 		ticker := time.NewTimer(durationJitter(s.Interval.Duration(), 1000))
