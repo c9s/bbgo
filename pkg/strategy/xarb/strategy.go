@@ -129,6 +129,7 @@ func (s *Strategy) check(ctx context.Context, _ bbgo.OrderExecutionRouter) {
 	var bestBidPrice, bestAskPrice fixedpoint.Value
 	var bestBidVolume, bestAskVolume fixedpoint.Value
 	var bestBidSession, bestAskSession string
+	var feeBidPrice, feeAskPrice fixedpoint.Value
 
 	for sessionName, streamBook := range s.books {
 		book := streamBook.CopyDepth(5)
@@ -170,7 +171,6 @@ func (s *Strategy) check(ctx context.Context, _ bbgo.OrderExecutionRouter) {
 	}
 
 	// adjust price according to the fee
-	var feeBidPrice, feeAskPrice fixedpoint.Value
 	if session, ok := s.sessions[bestBidSession]; ok {
 		if session.TakerFeeRate > 0 {
 			feeBidPrice = bestBidPrice.Mul(fixedpoint.NewFromFloat(1.0) - session.TakerFeeRate)
