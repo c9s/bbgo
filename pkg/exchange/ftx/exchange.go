@@ -29,12 +29,15 @@ type Exchange struct {
 	restEndpoint *url.URL
 }
 
+func init() {
+	symbolMap = make(map[string]string)
+}
+
 func NewExchange(key, secret string, subAccount string) *Exchange {
 	u, err := url.Parse(restEndpoint)
 	if err != nil {
 		panic(err)
 	}
-	symbolMap = make(map[string]string)
 	return &Exchange{
 		restEndpoint: u,
 		key:          key,
