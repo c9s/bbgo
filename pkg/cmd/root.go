@@ -141,9 +141,6 @@ func Execute() {
 		return
 	}
 
-
-
-
 	log.SetFormatter(&prefixed.TextFormatter{})
 
 	logger := log.StandardLogger()
