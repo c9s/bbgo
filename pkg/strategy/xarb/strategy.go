@@ -191,7 +191,7 @@ func (s *Strategy) check(ctx context.Context, orderExecutionRouter bbgo.OrderExe
 
 	minSpreadRatio := s.MinSpreadRatio.Float64()
 	if spreadRatio < minSpreadRatio {
-		log.Infof("%s spread ratio %f < %f min spread ratio, bid/ask = %f/%f, skipping", s.Symbol, spreadRatio, minSpreadRatio, bestBidPrice.Float64(), bestAskPrice.Float64())
+		// log.Infof("%s spread ratio %f < %f min spread ratio, bid/ask = %f/%f, skipping", s.Symbol, spreadRatio, minSpreadRatio, bestBidPrice.Float64(), bestAskPrice.Float64())
 		return
 	}
 
