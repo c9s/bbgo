@@ -38,6 +38,16 @@ func (slice PriceVolumeSlice) Trim() (pvs PriceVolumeSlice) {
 	return pvs
 }
 
+func (slice PriceVolumeSlice) CopyDepth(depth int) PriceVolumeSlice {
+	if depth > len(slice) {
+		return slice.Copy()
+	}
+
+	var s = make(PriceVolumeSlice, depth, depth)
+	copy(s, slice[:depth])
+	return s
+}
+
 func (slice PriceVolumeSlice) Copy() PriceVolumeSlice {
 	var s = make(PriceVolumeSlice, len(slice), len(slice))
 	copy(s, slice)
@@ -196,6 +206,13 @@ func (b *OrderBook) PriceVolumesBySide(side SideType) PriceVolumeSlice {
 	return nil
 }
 
+func (b *OrderBook) CopyDepth(depth int) (book OrderBook) {
+	book = *b
+	book.Bids = book.Bids.CopyDepth(depth)
+	book.Asks = book.Asks.CopyDepth(depth)
+	return book
+}
+
 func (b *OrderBook) Copy() (book OrderBook) {
 	book = *b
 	book.Bids = book.Bids.Copy()
@@ -305,6 +322,12 @@ func (b *MutexOrderBook) Reset() {
 	b.Lock()
 	b.OrderBook.Reset()
 	b.Unlock()
+}
+
+func (b *MutexOrderBook) CopyDepth(depth int) OrderBook {
+	b.Lock()
+	defer b.Unlock()
+	return b.OrderBook.CopyDepth(depth)
 }
 
 func (b *MutexOrderBook) Get() OrderBook {
