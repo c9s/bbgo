@@ -3,6 +3,7 @@ package max
 import (
 	"context"
 	"fmt"
+	"net"
 	"sync"
 	"time"
 
@@ -160,19 +161,37 @@ func (s *WebSocketService) read(ctx context.Context) {
 
 		default:
 			s.mu.Lock()
+			if err := s.conn.SetReadDeadline(time.Now().Add(time.Second * 5)); err != nil {
+				log.WithError(err).Error("can not set read deadline")
+			}
+
 			mt, msg, err := s.conn.ReadMessage()
 			s.mu.Unlock()
 
 			if err != nil {
-				if websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure) {
-					s.EmitDisconnect()
+				// if it's a network timeout error, we should re-connect
+				switch err := err.(type) {
+
+				// if it's a websocket related error
+				case *websocket.CloseError:
+					if err.Code == websocket.CloseNormalClosure {
+						return
+					}
+					// for unexpected close error, we should re-connect
 					// emit reconnect to start a new connection
+					s.EmitDisconnect()
 					s.emitReconnect()
 					return
-				}
 
-				log.WithError(err).Error("websocket error")
-				continue
+				case net.Error:
+					s.EmitDisconnect()
+					s.emitReconnect()
+					return
+
+				default:
+					log.WithError(err).Error("unexpected websocket connection error")
+					continue
+				}
 			}
 
 			if mt != websocket.TextMessage {
