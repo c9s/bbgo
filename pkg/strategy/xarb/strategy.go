@@ -65,10 +65,11 @@ type Strategy struct {
 	*bbgo.Notifiability
 	*bbgo.Persistence
 
-	Symbol         string           `json:"symbol"`
-	MaxQuantity    fixedpoint.Value `json:"maxQuantity"`
-	MinSpreadRatio fixedpoint.Value `json:"minSpreadRatio"`
-	// ExchangeSessions map[string]bool `json:"exchanges"`
+	Symbol          string           `json:"symbol"`
+	MaxQuantity     fixedpoint.Value `json:"maxQuantity"`
+	MinSpreadRatio  fixedpoint.Value `json:"minSpreadRatio"`
+	MinQuoteBalance fixedpoint.Value `json:"minQuoteBalance"`
+	MinBaseBalance  fixedpoint.Value `json:"minBaseBalance"`
 
 	sessions      map[string]*bbgo.ExchangeSession
 	books         map[string]*types.StreamOrderBook
@@ -206,8 +207,13 @@ func (s *Strategy) check(ctx context.Context, orderExecutionRouter bbgo.OrderExe
 	buyMarket := s.markets[bestAskSession]
 	buySession := s.sessions[bestAskSession]
 	if b, ok := buySession.Account.Balance(buyMarket.QuoteCurrency); ok {
-		if b.Available.Float64() < buyMarket.MinNotional {
-			log.Warnf("insufficient quote balance %f < %f", b.Available.Float64(), buyMarket.MinNotional)
+		if s.MinQuoteBalance > 0 {
+			if b.Available <= s.MinQuoteBalance {
+				log.Warnf("insufficient quote balance %f < min quote balance %f", b.Available.Float64(), s.MinQuoteBalance.Float64())
+				return
+			}
+		} else if b.Available.Float64() < buyMarket.MinNotional {
+			log.Warnf("insufficient quote balance %f < min notional %f", b.Available.Float64(), buyMarket.MinNotional)
 			return
 		}
 
@@ -217,8 +223,13 @@ func (s *Strategy) check(ctx context.Context, orderExecutionRouter bbgo.OrderExe
 	sellMarket := s.markets[bestAskSession]
 	sellSession := s.sessions[bestBidSession]
 	if b, ok := sellSession.Account.Balance(sellMarket.BaseCurrency); ok {
-		if b.Available.Float64() < sellMarket.MinQuantity {
-			log.Warnf("insufficient base balance %f < %f", b.Available.Float64(), sellMarket.MinQuantity)
+
+		if s.MinBaseBalance > 0 {
+			if b.Available <= s.MinBaseBalance {
+				log.Warnf("insufficient base balance %f < min base balance %f", b.Available.Float64(), s.MinBaseBalance.Float64())
+			}
+		} else if b.Available.Float64() < sellMarket.MinQuantity {
+			log.Warnf("insufficient base balance %f < min quantity %f", b.Available.Float64(), sellMarket.MinQuantity)
 			return
 		}
 
@@ -236,7 +247,7 @@ func (s *Strategy) check(ctx context.Context, orderExecutionRouter bbgo.OrderExe
 	go func() {
 		defer wg.Done()
 
-		createdOrders, err := orderExecutionRouter.SubmitOrdersTo(ctx, bestAskSession, types.SubmitOrder{
+		createdOrders, err := s.sessions[bestAskSession].Exchange.SubmitOrders(ctx, types.SubmitOrder{
 			Symbol:   s.Symbol,
 			Type:     types.OrderTypeMarket,
 			Side:     types.SideTypeBuy,
@@ -255,8 +266,7 @@ func (s *Strategy) check(ctx context.Context, orderExecutionRouter bbgo.OrderExe
 
 	go func() {
 		defer wg.Done()
-
-		createdOrders, err := orderExecutionRouter.SubmitOrdersTo(ctx, bestBidSession, types.SubmitOrder{
+		createdOrders, err := s.sessions[bestBidSession].Exchange.SubmitOrders(ctx, types.SubmitOrder{
 			Symbol:   s.Symbol,
 			Type:     types.OrderTypeMarket,
 			Side:     types.SideTypeSell,
