@@ -182,14 +182,20 @@ func (s *Strategy) check(ctx context.Context, orderExecutionRouter bbgo.OrderExe
 	}
 
 	// bid price MUST BE GREATER than ask price
-	// the spread ratio must be greater than 1.0
 	spreadRatio := bestBidPrice.Div(bestAskPrice).Float64()
-	if spreadRatio < s.MinSpreadRatio.Float64() {
-		log.Infof("%s spread ratio %f < %f min spread ratio, bid/ask = %f/%f, skipping", s.Symbol, spreadRatio, s.MinSpreadRatio.Float64(), bestBidPrice.Float64(), bestAskPrice.Float64())
+
+	// the spread ratio must be greater than 1.001 because of the high taker fee
+	if spreadRatio <= 1.001 {
 		return
 	}
 
-	log.Infof("💵 %s spread ratio %f > %f min spread ratio, bid/ask = %f/%f", s.Symbol, spreadRatio, s.MinSpreadRatio.Float64(), bestBidPrice.Float64(), bestAskPrice.Float64())
+	minSpreadRatio := s.MinSpreadRatio.Float64()
+	if spreadRatio < minSpreadRatio {
+		log.Infof("%s spread ratio %f < %f min spread ratio, bid/ask = %f/%f, skipping", s.Symbol, spreadRatio, minSpreadRatio, bestBidPrice.Float64(), bestAskPrice.Float64())
+		return
+	}
+
+	log.Infof("💵 %s spread ratio %f > %f min spread ratio, bid/ask = %f/%f", s.Symbol, spreadRatio, minSpreadRatio, bestBidPrice.Float64(), bestAskPrice.Float64())
 
 	quantity := fixedpoint.Min(bestAskVolume, bestBidVolume)
 
