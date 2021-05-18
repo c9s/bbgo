@@ -180,8 +180,8 @@ func (s *Strategy) check(ctx context.Context, orderExecutionRouter bbgo.OrderExe
 		return
 	}
 
-	// if > 0.1% percent profit
-	minProfitMargin := 1.001
+	// if > 0.2% percent profit
+	minProfitMargin := 1.002
 	profitMargin := bestBidPrice.Div(bestAskPrice).Float64()
 	if profitMargin < minProfitMargin {
 		log.Infof("profit margin %f is less than %f min profit margin, %f/%f, skipping", profitMargin, minProfitMargin, bestAskPrice.Float64(), bestBidPrice.Float64())
