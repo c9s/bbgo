@@ -122,7 +122,7 @@ func aggregatePrice(pvs types.PriceVolumeSlice, requiredQuantity fixedpoint.Valu
 	return price
 }
 
-func (s *Strategy) check(ctx context.Context, orderExecutionRouter bbgo.OrderExecutionRouter) {
+func (s *Strategy) check(ctx context.Context, _ bbgo.OrderExecutionRouter) {
 	// find the best price
 	var bestBidPrice, bestAskPrice fixedpoint.Value
 	var bestBidVolume, bestAskVolume fixedpoint.Value
