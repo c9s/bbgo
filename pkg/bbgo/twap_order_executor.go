@@ -262,23 +262,6 @@ func (e *TwapExecution) updateOrder(ctx context.Context) error {
 			return nil
 		}
 
-		if e.StopPrice > 0 {
-			switch e.Side {
-			case types.SideTypeBuy:
-				if first.Price > e.StopPrice {
-					log.Infof("%s first bid price %f is higher than the stop price %f, skip updating order", e.Symbol, first.Price.Float64(), e.StopPrice.Float64())
-					return nil
-				}
-
-			case types.SideTypeSell:
-				if first.Price < e.StopPrice {
-					log.Infof("%s first ask price %f is lower than the stop price %f, skip updating order", e.Symbol, first.Price.Float64(), e.StopPrice.Float64())
-					return nil
-				}
-			}
-
-		}
-
 		// if the first bid price or first ask price is the same to the current active order
 		// we should skip updating the order
 		// DO NOT UPDATE IF:
