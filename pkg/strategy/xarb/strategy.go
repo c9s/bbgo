@@ -65,8 +65,9 @@ type Strategy struct {
 	*bbgo.Notifiability
 	*bbgo.Persistence
 
-	Symbol      string           `json:"symbol"`
-	MaxQuantity fixedpoint.Value `json:"maxQuantity"`
+	Symbol         string           `json:"symbol"`
+	MaxQuantity    fixedpoint.Value `json:"maxQuantity"`
+	MinSpreadRatio fixedpoint.Value `json:"minSpreadRatio"`
 	// ExchangeSessions map[string]bool `json:"exchanges"`
 
 	sessions      map[string]*bbgo.ExchangeSession
@@ -181,14 +182,13 @@ func (s *Strategy) check(ctx context.Context, orderExecutionRouter bbgo.OrderExe
 	}
 
 	// if > 0.2% percent profit
-	minProfitMargin := 1.002
-	profitMargin := bestBidPrice.Div(bestAskPrice).Float64()
-	if profitMargin < minProfitMargin {
-		log.Infof("profit margin %f is less than %f min profit margin, %f/%f, skipping", profitMargin, minProfitMargin, bestAskPrice.Float64(), bestBidPrice.Float64())
+	spreadRatio := bestBidPrice.Div(bestAskPrice).Float64()
+	if spreadRatio < s.MinSpreadRatio.Float64() {
+		log.Infof("spread ratio %f < %f min spread ratio, %f/%f, skipping", spreadRatio, s.MinSpreadRatio.Float64(), bestAskPrice.Float64(), bestBidPrice.Float64())
 		return
 	}
 
-	log.Infof("💵 profit margin %f is greater than %f min profit margin, %f/%f", profitMargin, minProfitMargin, bestAskPrice.Float64(), bestBidPrice.Float64())
+	log.Infof("💵 spread ratio %f > %f min spread ratio, %f/%f", spreadRatio, s.MinSpreadRatio.Float64(), bestAskPrice.Float64(), bestBidPrice.Float64())
 
 	quantity := fixedpoint.Min(bestAskVolume, bestBidVolume)
 
@@ -366,6 +366,10 @@ func (s *Strategy) LoadState() error {
 }
 
 func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession) error {
+	if s.MinSpreadRatio == 0 {
+		s.MinSpreadRatio = fixedpoint.NewFromFloat(1.03)
+	}
+
 	s.sessions = make(map[string]*bbgo.ExchangeSession)
 	s.books = make(map[string]*types.StreamOrderBook)
 	s.markets = make(map[string]types.Market)
