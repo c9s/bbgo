@@ -203,26 +203,26 @@ func (s *Strategy) check(ctx context.Context, orderExecutionRouter bbgo.OrderExe
 		quantity = fixedpoint.Min(s.MaxQuantity, quantity)
 	}
 
-	if buySession, ok := s.sessions[bestAskSession]; ok {
-		if b, ok := buySession.Account.Balance(s.generalMarket.QuoteCurrency); ok {
-			if b.Available.Float64() < s.generalMarket.MinNotional {
-				log.Warnf("insufficient quote balance %f < %f", b.Available.Float64(), s.generalMarket.MinNotional)
-				return
-			}
-
-			quantity = bbgo.AdjustQuantityByMaxAmount(quantity, bestAskPrice, b.Available)
+	buyMarket := s.markets[bestAskSession]
+	buySession := s.sessions[bestAskSession]
+	if b, ok := buySession.Account.Balance(buyMarket.QuoteCurrency); ok {
+		if b.Available.Float64() < buyMarket.MinNotional {
+			log.Warnf("insufficient quote balance %f < %f", b.Available.Float64(), buyMarket.MinNotional)
+			return
 		}
+
+		quantity = bbgo.AdjustQuantityByMaxAmount(quantity, bestAskPrice, b.Available)
 	}
 
-	if sellSession, ok := s.sessions[bestBidSession]; ok {
-		if b, ok := sellSession.Account.Balance(s.generalMarket.BaseCurrency); ok {
-			if b.Available.Float64() < s.generalMarket.MinQuantity {
-				log.Warnf("insufficient base balance %f < %f", b.Available.Float64(), s.generalMarket.MinQuantity)
-				return
-			}
-
-			quantity = fixedpoint.Min(quantity, b.Available)
+	sellMarket := s.markets[bestAskSession]
+	sellSession := s.sessions[bestBidSession]
+	if b, ok := sellSession.Account.Balance(sellMarket.BaseCurrency); ok {
+		if b.Available.Float64() < sellMarket.MinQuantity {
+			log.Warnf("insufficient base balance %f < %f", b.Available.Float64(), sellMarket.MinQuantity)
+			return
 		}
+
+		quantity = fixedpoint.Min(quantity, b.Available)
 	}
 
 	s.Notifiability.Notify("Submitting arbitrage orders: %s %f", s.Symbol, quantity.Float64())
@@ -271,6 +271,7 @@ func (s *Strategy) check(ctx context.Context, orderExecutionRouter bbgo.OrderExe
 	}()
 
 	wg.Wait()
+	time.Sleep(50 * time.Millisecond)
 }
 
 func (s *Strategy) handleTradeUpdate(trade types.Trade) {
