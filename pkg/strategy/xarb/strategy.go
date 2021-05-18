@@ -169,9 +169,9 @@ func (s *Strategy) check(ctx context.Context, orderExecutionRouter bbgo.OrderExe
 
 	if session, ok := s.sessions[bestAskSession]; ok {
 		if session.TakerFeeRate > 0 {
-			bestAskPrice = bestAskPrice.Mul(fixedpoint.NewFromFloat(1.0) + session.TakerFeeRate)
+			bestAskPrice = bestAskPrice.Mul(fixedpoint.NewFromFloat(1.0) - session.TakerFeeRate)
 		} else {
-			bestAskPrice = bestAskPrice.Mul(fixedpoint.NewFromFloat(1.0) + defaultFeeRate)
+			bestAskPrice = bestAskPrice.Mul(fixedpoint.NewFromFloat(1.0) - defaultFeeRate)
 		}
 	}
 
