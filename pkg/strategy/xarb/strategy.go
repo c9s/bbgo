@@ -258,6 +258,7 @@ func (s *Strategy) check(ctx context.Context, _ bbgo.OrderExecutionRouter) {
 		if s.MinBaseBalance > 0 {
 			if b.Available <= s.MinBaseBalance {
 				log.Warnf("insufficient base balance %f < min base balance %f", b.Available.Float64(), s.MinBaseBalance.Float64())
+				return
 			}
 		} else if b.Available.Float64() < sellMarket.MinQuantity {
 			log.Warnf("insufficient base balance %f < min quantity %f", b.Available.Float64(), sellMarket.MinQuantity)
