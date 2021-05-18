@@ -111,8 +111,6 @@ func (s *WebSocketService) Auth() error {
 }
 
 func (s *WebSocketService) connect(ctx context.Context) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 
 	dialer := websocket.DefaultDialer
 	conn, _, err := dialer.DialContext(ctx, s.baseURL, nil)
@@ -120,7 +118,10 @@ func (s *WebSocketService) connect(ctx context.Context) error {
 		return err
 	}
 
+	s.mu.Lock()
 	s.conn = conn
+	s.mu.Unlock()
+
 	s.EmitConnect(conn)
 
 	go s.read(ctx)
@@ -142,6 +143,7 @@ func (s *WebSocketService) reconnector(ctx context.Context) {
 			return
 
 		case <-s.reconnectC:
+			log.Warnf("received reconnect signal, reconnecting...")
 			time.Sleep(3 * time.Second)
 			if err := s.connect(ctx); err != nil {
 				s.emitReconnect()
