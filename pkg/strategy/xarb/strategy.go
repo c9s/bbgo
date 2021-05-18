@@ -198,12 +198,22 @@ func (s *Strategy) check(ctx context.Context, orderExecutionRouter bbgo.OrderExe
 
 	if buySession, ok := s.sessions[bestAskSession]; ok {
 		if b, ok := buySession.Account.Balance(s.generalMarket.QuoteCurrency); ok {
+			if b.Available.Float64() < s.generalMarket.MinNotional {
+				log.Warnf("insufficient quote balance %f < %f", b.Available.Float64(), s.generalMarket.MinNotional)
+				return
+			}
+
 			quantity = bbgo.AdjustQuantityByMaxAmount(quantity, bestAskPrice, b.Available)
 		}
 	}
 
 	if sellSession, ok := s.sessions[bestBidSession]; ok {
 		if b, ok := sellSession.Account.Balance(s.generalMarket.BaseCurrency); ok {
+			if b.Available.Float64() < s.generalMarket.MinQuantity {
+				log.Warnf("insufficient base balance %f < %f", b.Available.Float64(), s.generalMarket.MinQuantity)
+				return
+			}
+
 			quantity = fixedpoint.Min(quantity, b.Available)
 		}
 	}
