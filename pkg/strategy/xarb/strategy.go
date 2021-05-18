@@ -67,6 +67,8 @@ type Strategy struct {
 
 	Symbol          string           `json:"symbol"`
 	MaxQuantity     fixedpoint.Value `json:"maxQuantity"`
+	MinQuantity     fixedpoint.Value `json:"minQuantity"`
+	TakeRatio       fixedpoint.Value `json:"takeRatio"`
 	MinSpreadRatio  fixedpoint.Value `json:"minSpreadRatio"`
 	MinQuoteBalance fixedpoint.Value `json:"minQuoteBalance"`
 	MinBaseBalance  fixedpoint.Value `json:"minBaseBalance"`
@@ -129,7 +131,7 @@ func (s *Strategy) check(ctx context.Context, _ bbgo.OrderExecutionRouter) {
 	var bestBidSession, bestAskSession string
 
 	for sessionName, streamBook := range s.books {
-		book := streamBook.Get()
+		book := streamBook.CopyDepth(5)
 
 		if len(book.Bids) == 0 || len(book.Asks) == 0 {
 			continue
@@ -161,45 +163,71 @@ func (s *Strategy) check(ctx context.Context, _ bbgo.OrderExecutionRouter) {
 		return
 	}
 
+	if s.MinQuantity > 0 {
+		if bestAskVolume < s.MinQuantity || bestBidVolume < s.MinQuantity {
+			return
+		}
+	}
+
 	// adjust price according to the fee
+	var feeBidPrice, feeAskPrice fixedpoint.Value
 	if session, ok := s.sessions[bestBidSession]; ok {
 		if session.TakerFeeRate > 0 {
-			bestBidPrice = bestBidPrice.Mul(fixedpoint.NewFromFloat(1.0) + session.TakerFeeRate)
+			feeBidPrice = bestBidPrice.Mul(fixedpoint.NewFromFloat(1.0) - session.TakerFeeRate)
 		} else {
-			bestBidPrice = bestBidPrice.Mul(fixedpoint.NewFromFloat(1.0) + defaultFeeRate)
+			feeBidPrice = bestBidPrice.Mul(fixedpoint.NewFromFloat(1.0) - defaultFeeRate)
 		}
 	}
 
 	if session, ok := s.sessions[bestAskSession]; ok {
 		if session.TakerFeeRate > 0 {
-			bestAskPrice = bestAskPrice.Mul(fixedpoint.NewFromFloat(1.0) - session.TakerFeeRate)
+			feeAskPrice = bestAskPrice.Mul(fixedpoint.NewFromFloat(1.0) + session.TakerFeeRate)
 		} else {
-			bestAskPrice = bestAskPrice.Mul(fixedpoint.NewFromFloat(1.0) - defaultFeeRate)
+			feeAskPrice = bestAskPrice.Mul(fixedpoint.NewFromFloat(1.0) + defaultFeeRate)
 		}
 	}
 
 	// bid price is for selling, ask price is for buying
-	if bestBidPrice < bestAskPrice {
+	if feeBidPrice < feeAskPrice {
 		return
 	}
 
 	// bid price MUST BE GREATER than ask price
-	spreadRatio := bestBidPrice.Div(bestAskPrice).Float64()
+	spreadRatio := feeBidPrice.Div(feeAskPrice).Float64()
 
 	// the spread ratio must be greater than 1.001 because of the high taker fee
 	if spreadRatio <= 1.001 {
-		return
+		// return
 	}
 
 	minSpreadRatio := s.MinSpreadRatio.Float64()
 	if spreadRatio < minSpreadRatio {
-		// log.Infof("%s spread ratio %f < %f min spread ratio, bid/ask = %f/%f, skipping", s.Symbol, spreadRatio, minSpreadRatio, bestBidPrice.Float64(), bestAskPrice.Float64())
+		log.Infof("%s spread ratio %f < %f min spread ratio, bid/ask = %f/%f, fee bid/ask = %f/%f",
+			s.Symbol,
+			spreadRatio,
+			minSpreadRatio,
+			bestBidPrice.Float64(),
+			bestAskPrice.Float64(),
+			feeBidPrice.Float64(),
+			feeAskPrice.Float64())
 		return
 	}
 
-	log.Infof("💵 %s spread ratio %f > %f min spread ratio, bid/ask = %f/%f", s.Symbol, spreadRatio, minSpreadRatio, bestBidPrice.Float64(), bestAskPrice.Float64())
+	log.Infof("💵 %s spread ratio %f > %f min spread ratio, bid/ask = %f/%f, fee bid/ask = %f/%f",
+		s.Symbol,
+		spreadRatio,
+		minSpreadRatio,
+		bestBidPrice.Float64(),
+		bestAskPrice.Float64(),
+		feeBidPrice.Float64(),
+		feeAskPrice.Float64())
 
+	// select the minimal volume we can arbitrage
 	quantity := fixedpoint.Min(bestAskVolume, bestBidVolume)
+
+	if s.TakeRatio > 0 {
+		quantity = quantity.Mul(s.TakeRatio)
+	}
 
 	if s.MaxQuantity > 0 {
 		quantity = fixedpoint.Min(s.MaxQuantity, quantity)
@@ -218,7 +246,7 @@ func (s *Strategy) check(ctx context.Context, _ bbgo.OrderExecutionRouter) {
 			return
 		}
 
-		quantity = bbgo.AdjustQuantityByMaxAmount(quantity, bestAskPrice, b.Available)
+		quantity = bbgo.AdjustQuantityByMaxAmount(quantity, feeAskPrice, b.Available)
 	}
 
 	sellMarket := s.markets[bestAskSession]
@@ -242,85 +270,44 @@ func (s *Strategy) check(ctx context.Context, _ bbgo.OrderExecutionRouter) {
 		return
 	}
 
-	var wg sync.WaitGroup
-	wg.Add(2)
+	s.orderChannels[bestAskSession] <- types.SubmitOrder{
+		Symbol:   s.Symbol,
+		Type:     types.OrderTypeMarket,
+		Side:     types.SideTypeBuy,
+		Quantity: quantityF,
+		// Price:       askPrice.Float64(),
+		// TimeInForce: "GTC",
+		GroupID: s.groupID,
+	}
 
-	go func() {
-		defer wg.Done()
+	s.orderChannels[bestBidSession] <- types.SubmitOrder{
+		Symbol:   s.Symbol,
+		Type:     types.OrderTypeMarket,
+		Side:     types.SideTypeSell,
+		Quantity: quantityF,
+		// Price:       askPrice.Float64(),
+		// TimeInForce: "GTC",
+		GroupID: s.groupID,
+	}
 
-		createdOrders, err := s.sessions[bestAskSession].Exchange.SubmitOrders(ctx, types.SubmitOrder{
-			Symbol:   s.Symbol,
-			Type:     types.OrderTypeMarket,
-			Side:     types.SideTypeBuy,
-			Quantity: quantityF,
-			// Price:       askPrice.Float64(),
-			// TimeInForce: "GTC",
-			GroupID: s.groupID,
-		})
-		if err != nil {
-			log.WithError(err).Errorf("order error: %s", err.Error())
-			return
-		}
+	s.Notifiability.Notify("Submitted arbitrage orders: %s %f, spreadRatio %f, bid/ask = %f/%f, fee bid/ask = %f/%f",
+		s.Symbol,
+		quantity.Float64(),
+		spreadRatio,
+		bestBidPrice.Float64(),
+		bestAskPrice.Float64(),
+		feeBidPrice.Float64(),
+		feeAskPrice.Float64())
 
-		s.orderStore.Add(createdOrders...)
-	}()
-
-	go func() {
-		defer wg.Done()
-		createdOrders, err := s.sessions[bestBidSession].Exchange.SubmitOrders(ctx, types.SubmitOrder{
-			Symbol:   s.Symbol,
-			Type:     types.OrderTypeMarket,
-			Side:     types.SideTypeSell,
-			Quantity: quantityF,
-			// Price:       askPrice.Float64(),
-			// TimeInForce: "GTC",
-			GroupID: s.groupID,
-		})
-		if err != nil {
-			log.WithError(err).Errorf("order error: %s", err.Error())
-			return
-		}
-		s.orderStore.Add(createdOrders...)
-	}()
-
-	wg.Wait()
-
-	/*
-		s.orderChannels[bestAskSession] <- types.SubmitOrder{
-			Symbol:   s.Symbol,
-			Type:     types.OrderTypeMarket,
-			Side:     types.SideTypeBuy,
-			Quantity: quantityF,
-			// Price:       askPrice.Float64(),
-			// TimeInForce: "GTC",
-			GroupID: s.groupID,
-		}
-
-		s.orderChannels[bestBidSession] <- types.SubmitOrder{
-			Symbol:   s.Symbol,
-			Type:     types.OrderTypeMarket,
-			Side:     types.SideTypeSell,
-			Quantity: quantityF,
-			// Price:       askPrice.Float64(),
-			// TimeInForce: "GTC",
-			GroupID: s.groupID,
-		}
-
-	*/
-
-	s.Notifiability.Notify("Submitted arbitrage orders: %s %f", s.Symbol, quantity.Float64())
+	time.Sleep(3 * time.Second)
 }
 
 func (s *Strategy) handleTradeUpdate(trade types.Trade) {
-	log.Infof("received trade %+v", trade)
-
-	if trade.Symbol != s.Symbol {
-		return
-	}
-
 	if !s.orderStore.Exists(trade.OrderID) {
 		return
 	}
+
+	log.Infof("identified %s trade %d with an existing order: %d", trade.Symbol, trade.ID, trade.OrderID)
 
 	q := fixedpoint.NewFromFloat(trade.Quantity)
 	switch trade.Side {
@@ -339,8 +326,6 @@ func (s *Strategy) handleTradeUpdate(trade types.Trade) {
 		return
 
 	}
-
-	log.Infof("identified %s trade %d with an existing order: %d", trade.Symbol, trade.ID, trade.OrderID)
 
 	s.Notify(trade)
 
@@ -463,7 +448,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		s.orderChannels[sessionID] = c
 
 		log.Infof("spawning order worker %s", sessionID)
-		// go s.orderWorker(ctx, session, c)
+		go s.orderWorker(ctx, session, c)
 	}
 
 	// restore state
