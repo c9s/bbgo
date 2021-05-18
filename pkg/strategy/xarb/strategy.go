@@ -128,12 +128,12 @@ func (s *Strategy) check(ctx context.Context, orderExecutionRouter bbgo.OrderExe
 	for sessionName, streamBook := range s.books {
 		book := streamBook.Get()
 
-		if valid, err := book.IsValid(); !valid {
-			log.WithError(err).Errorf("%s invalid order book, skip: %s", s.Symbol, err.Error())
+		if len(book.Bids) == 0 || len(book.Asks) == 0 {
 			continue
 		}
 
-		if len(book.Bids) == 0 || len(book.Asks) == 0 {
+		if valid, err := book.IsValid(); !valid {
+			log.WithError(err).Errorf("%s invalid order book, skip: %s", s.Symbol, err.Error())
 			continue
 		}
 
