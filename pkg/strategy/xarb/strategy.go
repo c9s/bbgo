@@ -225,6 +225,11 @@ func (s *Strategy) check(ctx context.Context, orderExecutionRouter bbgo.OrderExe
 		quantity = fixedpoint.Min(quantity, b.Available)
 	}
 
+	quantityF := quantity.Float64()
+	if quantityF <= sellMarket.MinQuantity || quantityF <= buyMarket.MinQuantity {
+		return
+	}
+
 	var wg sync.WaitGroup
 	wg.Add(2)
 
@@ -270,7 +275,6 @@ func (s *Strategy) check(ctx context.Context, orderExecutionRouter bbgo.OrderExe
 
 	s.Notifiability.Notify("Submitted arbitrage orders: %s %f", s.Symbol, quantity.Float64())
 	wg.Wait()
-	time.Sleep(50 * time.Millisecond)
 }
 
 func (s *Strategy) handleTradeUpdate(trade types.Trade) {
