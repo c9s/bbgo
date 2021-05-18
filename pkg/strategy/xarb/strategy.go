@@ -23,6 +23,8 @@ const ID = "xarb"
 
 const stateKey = "state-v1"
 
+var defaultFeeRate = fixedpoint.NewFromFloat(0.001)
+
 var log = logrus.WithField("strategy", ID)
 
 func init() {
@@ -160,12 +162,16 @@ func (s *Strategy) check(ctx context.Context, orderExecutionRouter bbgo.OrderExe
 	if session, ok := s.sessions[bestBidSession]; ok {
 		if session.TakerFeeRate > 0 {
 			bestBidPrice = bestBidPrice.Mul(fixedpoint.NewFromFloat(1.0) + session.TakerFeeRate)
+		} else {
+			bestBidPrice = bestBidPrice.Mul(fixedpoint.NewFromFloat(1.0) + defaultFeeRate)
 		}
 	}
 
 	if session, ok := s.sessions[bestAskSession]; ok {
 		if session.TakerFeeRate > 0 {
 			bestAskPrice = bestAskPrice.Mul(fixedpoint.NewFromFloat(1.0) + session.TakerFeeRate)
+		} else {
+			bestAskPrice = bestAskPrice.Mul(fixedpoint.NewFromFloat(1.0) + defaultFeeRate)
 		}
 	}
 
@@ -188,6 +194,18 @@ func (s *Strategy) check(ctx context.Context, orderExecutionRouter bbgo.OrderExe
 
 	if s.MaxQuantity > 0 {
 		quantity = fixedpoint.Min(s.MaxQuantity, quantity)
+	}
+
+	if buySession, ok := s.sessions[bestAskSession]; ok {
+		if b, ok := buySession.Account.Balance(s.generalMarket.QuoteCurrency); ok {
+			quantity = bbgo.AdjustQuantityByMaxAmount(quantity, bestAskPrice, b.Available)
+		}
+	}
+
+	if sellSession, ok := s.sessions[bestBidSession]; ok {
+		if b, ok := sellSession.Account.Balance(s.generalMarket.BaseCurrency); ok {
+			quantity = fixedpoint.Min(quantity, b.Available)
+		}
 	}
 
 	s.Notifiability.Notify("Submitting arbitrage orders: %s %f", s.Symbol, quantity.Float64())
