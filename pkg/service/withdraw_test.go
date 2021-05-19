@@ -7,7 +7,6 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/c9s/bbgo/pkg/datatype"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -30,7 +29,7 @@ func TestWithdrawService(t *testing.T) {
 		TransactionID:  "01",
 		TransactionFee: 0.0001,
 		Network:        "omni",
-		ApplyTime:      datatype.Time(time.Now()),
+		ApplyTime:      types.Time(time.Now()),
 	})
 	assert.NoError(t, err)
 
