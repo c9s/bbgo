@@ -7,6 +7,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/c9s/bbgo/pkg/util"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -73,12 +74,17 @@ var tradesCmd = &cobra.Command{
 			return fmt.Errorf("symbol is not found")
 		}
 
+		limit, err := cmd.Flags().GetInt64("limit")
+		if err != nil {
+			return err
+		}
+
 		until := time.Now()
 		since := until.Add(-3 * 24 * time.Hour)
 		trades, err := session.Exchange.QueryTrades(ctx, symbol, &types.TradeQueryOptions{
 			StartTime:   &since,
 			EndTime:     &until,
-			Limit:       100,
+			Limit:       limit,
 			LastTradeID: 0,
 		})
 		if err != nil {
@@ -86,8 +92,16 @@ var tradesCmd = &cobra.Command{
 		}
 
 		log.Infof("%d trades", len(trades))
-		for _, t := range trades {
-			log.Infof("trade: %+v", t)
+		for _, trade := range trades {
+			log.Infof("TRADE %s %s %4s %s @ %s orderID %d %s amount %f",
+				trade.Exchange.String(),
+				trade.Symbol,
+				trade.Side,
+				util.FormatFloat(trade.Quantity, 4),
+				util.FormatFloat(trade.Price, 3),
+				trade.OrderID,
+				trade.Time.Time().Format(time.StampMilli),
+				trade.QuoteQuantity)
 		}
 		return nil
 	},
@@ -160,6 +174,7 @@ var tradeUpdateCmd = &cobra.Command{
 func init() {
 	tradesCmd.Flags().String("session", "", "the exchange session name for querying balances")
 	tradesCmd.Flags().String("symbol", "", "the trading pair, like btcusdt")
+	tradesCmd.Flags().Int64("limit", 100, "limit")
 
 	tradeUpdateCmd.Flags().String("session", "", "the exchange session name for querying balances")
 
