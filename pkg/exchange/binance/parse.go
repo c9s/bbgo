@@ -9,7 +9,6 @@ import (
 	"github.com/adshao/go-binance/v2"
 	"github.com/valyala/fastjson"
 
-	"github.com/c9s/bbgo/pkg/datatype"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
@@ -126,7 +125,7 @@ func (e *ExecutionReportEvent) Order() (*types.Order, error) {
 		OrderID:          uint64(e.OrderID),
 		Status:           toGlobalOrderStatus(binance.OrderStatusType(e.CurrentOrderStatus)),
 		ExecutedQuantity: util.MustParseFloat(e.CumulativeFilledQuantity),
-		CreationTime:     datatype.Time(orderCreationTime),
+		CreationTime:     types.Time(orderCreationTime),
 	}, nil
 }
 
@@ -147,7 +146,7 @@ func (e *ExecutionReportEvent) Trade() (*types.Trade, error) {
 		QuoteQuantity: util.MustParseFloat(e.LastQuoteAssetTransactedQuantity),
 		IsBuyer:       e.Side == "BUY",
 		IsMaker:       e.IsMaker,
-		Time:          datatype.Time(tt),
+		Time:          types.Time(tt),
 		Fee:           util.MustParseFloat(e.CommissionAmount),
 		FeeCurrency:   e.CommissionAsset,
 	}, nil
