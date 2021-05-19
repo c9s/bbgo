@@ -3,6 +3,7 @@ package types
 import (
 	"database/sql"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -117,6 +118,7 @@ func (trade Trade) SlackAttachment() slack.Attachment {
 			{Title: "Fee", Value: util.FormatFloat(trade.Fee, 4), Short: true},
 			{Title: "FeeCurrency", Value: trade.FeeCurrency, Short: true},
 			{Title: "Liquidity", Value: liquidity, Short: true},
+			{Title: "Order ID", Value: strconv.FormatUint(trade.OrderID, 10), Short: true},
 		},
 		Footer: util.Render("trade time {{ . }}", trade.Time.Time().Format(time.RFC822)),
 	}
