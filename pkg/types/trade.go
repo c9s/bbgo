@@ -74,13 +74,15 @@ type Trade struct {
 }
 
 func (trade Trade) String() string {
-	return fmt.Sprintf("TRADE %s %s %s %s @ %s, amount %s",
+	return fmt.Sprintf("TRADE %s %s %4s %s @ %s orderID %d %s amount %f",
 		trade.Exchange.String(),
 		trade.Symbol,
 		trade.Side,
 		util.FormatFloat(trade.Quantity, 4),
 		util.FormatFloat(trade.Price, 3),
-		util.FormatFloat(trade.QuoteQuantity, 2))
+		trade.OrderID,
+		trade.Time.Time().Format(time.StampMilli),
+		trade.QuoteQuantity)
 }
 
 // PlainText is used for telegram-styled messages
