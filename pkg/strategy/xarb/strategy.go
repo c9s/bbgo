@@ -72,6 +72,7 @@ type Strategy struct {
 	MinSpreadRatio  fixedpoint.Value `json:"minSpreadRatio"`
 	MinQuoteBalance fixedpoint.Value `json:"minQuoteBalance"`
 	MinBaseBalance  fixedpoint.Value `json:"minBaseBalance"`
+	DelayTime       types.Duration   `json:"delayTime"`
 
 	sessions      map[string]*bbgo.ExchangeSession
 	books         map[string]*types.StreamOrderBook
@@ -302,7 +303,9 @@ func (s *Strategy) check(ctx context.Context, _ bbgo.OrderExecutionRouter) {
 		feeBidPrice.Float64(),
 		feeAskPrice.Float64())
 
-	time.Sleep(3 * time.Second)
+	if s.DelayTime > 0 {
+		time.Sleep(s.DelayTime.Duration())
+	}
 }
 
 func (s *Strategy) handleTradeUpdate(trade types.Trade) {
