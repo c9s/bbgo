@@ -404,7 +404,14 @@ func (s *Strategy) orderWorker(ctx context.Context, session *bbgo.ExchangeSessio
 	for orderForm := range in {
 		createdOrders, err := session.Exchange.SubmitOrders(ctx, orderForm)
 		if err != nil {
-			log.WithError(err).Errorf("order error: %s", err.Error())
+			log.WithError(err).Errorf("%s arbitrage order error: %s", s.Symbol, err.Error())
+
+			createdOrders, err = session.Exchange.SubmitOrders(ctx, orderForm)
+			if err != nil {
+				log.WithError(err).Errorf("%s arbitrage order error: %s", s.Symbol, err.Error())
+				return
+			}
+			s.orderStore.Add(createdOrders...)
 			return
 		}
 
