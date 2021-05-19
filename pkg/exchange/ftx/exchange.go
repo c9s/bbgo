@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -27,6 +28,32 @@ type Exchange struct {
 	key, secret  string
 	subAccount   string
 	restEndpoint *url.URL
+}
+
+// FTX does not have broker ID
+const spotBrokerID = "BBGO"
+
+func newSpotClientOrderID(originalID string) (clientOrderID string) {
+	prefix := "x-" + spotBrokerID
+	prefixLen := len(prefix)
+
+	if originalID != "" {
+		// try to keep the whole original client order ID if user specifies it.
+		if prefixLen+len(originalID) > 32 {
+			return originalID
+		}
+
+		clientOrderID = prefix + originalID
+		return clientOrderID
+	}
+
+	clientOrderID = uuid.New().String()
+	clientOrderID = prefix + clientOrderID
+	if len(clientOrderID) > 32 {
+		return clientOrderID[0:32]
+	}
+
+	return clientOrderID
 }
 
 func NewExchange(key, secret string, subAccount string) *Exchange {
@@ -313,7 +340,7 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 			ReduceOnly: false,
 			IOC:        false,
 			PostOnly:   false,
-			ClientID:   so.ClientOrderID,
+			ClientID:   newSpotClientOrderID(so.ClientOrderID),
 		})
 		if err != nil {
 			return createdOrders, fmt.Errorf("failed to place order %+v: %w", so, err)
