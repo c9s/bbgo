@@ -96,7 +96,7 @@ func (slice PriceVolumeSlice) Remove(price fixedpoint.Value, descending bool) Pr
 	return append(slice[:idx], slice[idx+1:]...)
 }
 
-// FindPriceVolumePair finds the pair by the given price, this function is a read-only
+// Find finds the pair by the given price, this function is a read-only
 // operation, so we use the value receiver to avoid copy value from the pointer
 // If the price is not found, it will return the index where the price can be inserted at.
 // true for descending (bid orders), false for ascending (ask orders)
