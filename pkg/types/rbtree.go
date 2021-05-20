@@ -5,11 +5,11 @@ import (
 )
 
 type RBTree struct {
-	Root, Neel *Node
+	Root, Neel *RBNode
 }
 
 func NewRBTree() *RBTree {
-	var neel = &Node{
+	var neel = &RBNode{
 		Color: Black,
 	}
 	var root = neel
@@ -29,7 +29,7 @@ func (tree *RBTree) Delete(key fixedpoint.Value) bool {
 
 	// y = the node to be deleted
 	// x (the child of the deleted node)
-	var x, y *Node
+	var x, y *RBNode
 
 	if del.Left == tree.Neel || del.Right == tree.Neel {
 		y = del
@@ -64,7 +64,7 @@ func (tree *RBTree) Delete(key fixedpoint.Value) bool {
 	return true
 }
 
-func (tree *RBTree) DeleteFixup(current *Node) {
+func (tree *RBTree) DeleteFixup(current *RBNode) {
 	for current != tree.Root && current.Color == Black {
 		if current == current.Parent.Left {
 			sibling := current.Parent.Right
@@ -131,7 +131,7 @@ func (tree *RBTree) DeleteFixup(current *Node) {
 func (tree *RBTree) Insert(key, val fixedpoint.Value) {
 	var y = tree.Neel
 	var x = tree.Root
-	var node = &Node{
+	var node = &RBNode{
 		Key:   key,
 		Value: val,
 		Color: Red,
@@ -164,7 +164,7 @@ func (tree *RBTree) Insert(key, val fixedpoint.Value) {
 	tree.InsertFixup(node)
 }
 
-func (tree *RBTree) Search(key fixedpoint.Value) *Node {
+func (tree *RBTree) Search(key fixedpoint.Value) *RBNode {
 	var current = tree.Root
 	for current != nil && key != current.Key {
 		if key < current.Key {
@@ -176,7 +176,7 @@ func (tree *RBTree) Search(key fixedpoint.Value) *Node {
 	return current
 }
 
-func (tree *RBTree) InsertFixup(current *Node) {
+func (tree *RBTree) InsertFixup(current *RBNode) {
 	// A red node can't have a red parent, we need to fix it up
 	for current.Parent.Color == Red {
 		grandParent := current.Parent.Parent
@@ -227,7 +227,7 @@ func (tree *RBTree) InsertFixup(current *Node) {
 // 1. move y's left child to the x's right child
 // 2. change y's parent to x's parent
 // 3. change x's parent to y
-func (tree *RBTree) RotateLeft(x *Node) {
+func (tree *RBTree) RotateLeft(x *RBNode) {
 	var y = x.Right
 	x.Right = y.Left
 
@@ -249,7 +249,7 @@ func (tree *RBTree) RotateLeft(x *Node) {
 	x.Parent = y
 }
 
-func (tree *RBTree) RotateRight(y *Node) {
+func (tree *RBTree) RotateRight(y *RBNode) {
 	x := y.Left
 	y.Left = x.Right
 
@@ -271,7 +271,7 @@ func (tree *RBTree) RotateRight(y *Node) {
 	y.Parent = x
 }
 
-func (tree *RBTree) LeftMost(current *Node) *Node {
+func (tree *RBTree) LeftMost(current *RBNode) *RBNode {
 	for current.Left != nil {
 		current = current.Left
 	}
@@ -279,7 +279,7 @@ func (tree *RBTree) LeftMost(current *Node) *Node {
 	return current
 }
 
-func (tree *RBTree) Successor(current *Node) *Node {
+func (tree *RBTree) Successor(current *RBNode) *RBNode {
 	if current.Right != nil {
 		return tree.LeftMost(current.Right)
 	}
@@ -291,4 +291,28 @@ func (tree *RBTree) Successor(current *Node) *Node {
 	}
 
 	return newNode
+}
+
+func (tree *RBTree) Preorder(current *RBNode, cb func(n *RBNode)) {
+	if current != nil {
+		cb(current)
+		tree.Preorder(current.Left, cb)
+		tree.Preorder(current.Right, cb)
+	}
+}
+
+func (tree *RBTree) Inorder(current *RBNode, cb func(n *RBNode)) {
+	if current != nil {
+		tree.Preorder(current.Left, cb)
+		cb(current)
+		tree.Preorder(current.Right, cb)
+	}
+}
+
+func (tree *RBTree) Postorder(current *RBNode, cb func(n *RBNode)) {
+	if current != nil {
+		tree.Preorder(current.Left, cb)
+		tree.Preorder(current.Right, cb)
+		cb(current)
+	}
 }
