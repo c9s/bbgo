@@ -1,4 +1,4 @@
-package rbtbook
+package types
 
 import (
 	"testing"
@@ -8,7 +8,7 @@ import (
 )
 
 func TestTree(t *testing.T) {
-	tree := NewTree()
+	tree := NewRBTree()
 	tree.Insert(fixedpoint.NewFromFloat(3000.0), fixedpoint.NewFromFloat(10.0))
 	assert.NotNil(t, tree.Root)
 
