@@ -30,6 +30,12 @@ type Position struct {
 	sync.Mutex
 }
 
+func (p *Position) Reset() {
+	p.Base = 0
+	p.Quote = 0
+	p.AverageCost = 0
+}
+
 func (p *Position) SetExchangeFeeRate(ex types.ExchangeName, exchangeFee ExchangeFee) {
 	if p.ExchangeFeeRates == nil {
 		p.ExchangeFeeRates = make(map[types.ExchangeName]ExchangeFee)
