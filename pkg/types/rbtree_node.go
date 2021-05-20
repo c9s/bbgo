@@ -10,12 +10,12 @@ const (
 )
 
 /*
-Node
+RBNode
 A red node always has black children.
 A black node may have red or black children
 */
-type Node struct {
-	Left, Right, Parent *Node
+type RBNode struct {
+	Left, Right, Parent *RBNode
 	Color               Color
 	Key, Value          fixedpoint.Value
 }
