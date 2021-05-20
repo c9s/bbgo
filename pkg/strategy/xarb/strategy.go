@@ -305,9 +305,22 @@ func (s *Strategy) check(ctx context.Context, _ bbgo.OrderExecutionRouter) {
 		feeBidPrice.Float64(),
 		feeAskPrice.Float64())
 
+	// you will need to wait for the trades back here
 	if s.DelayTime > 0 {
 		time.Sleep(s.DelayTime.Duration())
 	}
+
+	// check if orders are completed
+	var waitFactor time.Duration = 1
+	for s.orderStore.NumOfOrders() > 0 {
+		// waiting orders to be completed
+		log.Infof("%s waiting order updates...", s.Symbol)
+		time.Sleep(100 * time.Millisecond * waitFactor)
+		waitFactor++
+	}
+
+	s.Notifiability.Notify("%s market orders are filled and removed", s.Symbol)
+	s.state.Position.Reset()
 }
 
 func (s *Strategy) handleTradeUpdate(trade types.Trade) {
@@ -433,6 +446,10 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	s.books = make(map[string]*types.StreamOrderBook)
 	s.markets = make(map[string]types.Market)
 	s.orderStore = bbgo.NewOrderStore(s.Symbol)
+
+	// we're using market order, market orders will be finally filled
+	s.orderStore.RemoveFilled = true
+
 	s.orderChannels = make(map[string]chan types.SubmitOrder)
 
 	for sessionID := range sessions {
