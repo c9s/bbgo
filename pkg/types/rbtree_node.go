@@ -1,4 +1,4 @@
-package rbtbook
+package types
 
 import "github.com/c9s/bbgo/pkg/fixedpoint"
 

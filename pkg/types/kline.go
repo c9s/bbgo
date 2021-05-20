@@ -177,11 +177,11 @@ func (k KLine) String() string {
 
 func (k KLine) Color() string {
 	if k.Direction() > 0 {
-		return Green
+		return GreenColor
 	} else if k.Direction() < 0 {
-		return Red
+		return RedColor
 	}
-	return "#f0f0f0"
+	return GrayColor
 }
 
 func (k KLine) SlackAttachment() slack.Attachment {
