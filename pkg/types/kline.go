@@ -313,11 +313,11 @@ func (k KLineWindow) GetTrend() int {
 
 func (k KLineWindow) Color() string {
 	if k.GetTrend() > 0 {
-		return Green
+		return GreenColor
 	} else if k.GetTrend() < 0 {
-		return Red
+		return RedColor
 	}
-	return "#f0f0f0"
+	return GrayColor
 }
 
 func (k KLineWindow) Mid() float64 {
