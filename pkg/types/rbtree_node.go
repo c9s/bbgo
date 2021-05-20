@@ -2,6 +2,7 @@ package types
 
 import "github.com/c9s/bbgo/pkg/fixedpoint"
 
+// Color is the RB Tree color
 type Color bool
 
 const (
