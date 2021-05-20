@@ -244,8 +244,6 @@ func (b *OrderBook) updateAsks(pvs PriceVolumeSlice) {
 			b.Asks = b.Asks.Upsert(pv, false)
 		}
 	}
-
-	b.EmitAsksChange(b.Asks)
 }
 
 func (b *OrderBook) updateBids(pvs PriceVolumeSlice) {
@@ -256,8 +254,6 @@ func (b *OrderBook) updateBids(pvs PriceVolumeSlice) {
 			b.Bids = b.Bids.Upsert(pv, true)
 		}
 	}
-
-	b.EmitBidsChange(b.Bids)
 }
 
 func (b *OrderBook) update(book OrderBook) {
