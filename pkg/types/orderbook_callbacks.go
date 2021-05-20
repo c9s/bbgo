@@ -2,6 +2,8 @@
 
 package types
 
+import ()
+
 func (b *OrderBook) OnLoad(cb func(book *OrderBook)) {
 	b.loadCallbacks = append(b.loadCallbacks, cb)
 }
@@ -19,25 +21,5 @@ func (b *OrderBook) OnUpdate(cb func(book *OrderBook)) {
 func (b *OrderBook) EmitUpdate(book *OrderBook) {
 	for _, cb := range b.updateCallbacks {
 		cb(book)
-	}
-}
-
-func (b *OrderBook) OnBidsChange(cb func(pvs PriceVolumeSlice)) {
-	b.bidsChangeCallbacks = append(b.bidsChangeCallbacks, cb)
-}
-
-func (b *OrderBook) EmitBidsChange(pvs PriceVolumeSlice) {
-	for _, cb := range b.bidsChangeCallbacks {
-		cb(pvs)
-	}
-}
-
-func (b *OrderBook) OnAsksChange(cb func(pvs PriceVolumeSlice)) {
-	b.asksChangeCallbacks = append(b.asksChangeCallbacks, cb)
-}
-
-func (b *OrderBook) EmitAsksChange(pvs PriceVolumeSlice) {
-	for _, cb := range b.asksChangeCallbacks {
-		cb(pvs)
 	}
 }

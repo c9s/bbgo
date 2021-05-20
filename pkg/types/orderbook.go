@@ -132,16 +132,32 @@ func (slice PriceVolumeSlice) Upsert(pv PriceVolume, descending bool) PriceVolum
 	return slice
 }
 
+//go:generate callbackgen -type RBOrderBook
+type RBOrderBook struct {
+	Symbol string
+	Bids   *RBTree
+	Asks   *RBTree
+
+	loadCallbacks   []func(book *RBOrderBook)
+	updateCallbacks []func(book *RBOrderBook)
+}
+
+func (b *RBOrderBook) BestBid() (PriceVolume, bool) {
+	return PriceVolume{}, true
+}
+
+func (b *RBOrderBook) BestAsk() (PriceVolume, bool) {
+	return PriceVolume{}, true
+}
+
 //go:generate callbackgen -type OrderBook
 type OrderBook struct {
 	Symbol string
 	Bids   PriceVolumeSlice
 	Asks   PriceVolumeSlice
 
-	loadCallbacks       []func(book *OrderBook)
-	updateCallbacks     []func(book *OrderBook)
-	bidsChangeCallbacks []func(pvs PriceVolumeSlice)
-	asksChangeCallbacks []func(pvs PriceVolumeSlice)
+	loadCallbacks   []func(book *OrderBook)
+	updateCallbacks []func(book *OrderBook)
 }
 
 func (b *OrderBook) Spread() (fixedpoint.Value, bool) {
