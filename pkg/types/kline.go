@@ -355,7 +355,7 @@ func (k KLineWindow) Tail(size int) KLineWindow {
 	}
 
 	win := make(KLineWindow, size)
-	copy(win, k[length-1-size:])
+	copy(win, k[length-size:])
 	return win
 }
 
