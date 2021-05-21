@@ -48,6 +48,8 @@ func NewStream(key, secret string, subAccount string, e *Exchange) *Stream {
 
 	s.ws.OnMessage((&messageHandler{StandardStream: s.StandardStream}).handleMessage)
 	s.ws.OnConnected(func(conn *websocket.Conn) {
+		s.EmitConnect()
+
 		subs := []websocketRequest{newLoginRequest(s.key, s.secret, time.Now(), s.subAccount)}
 		subs = append(subs, s.subscriptions...)
 		for _, sub := range subs {
