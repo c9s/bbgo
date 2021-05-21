@@ -28,12 +28,13 @@ type Stream struct {
 
 	key        string
 	secret     string
+	subAccount string
 
 	// subscriptions are only accessed in single goroutine environment, so I don't use mutex to protect them
 	subscriptions []websocketRequest
 }
 
-func NewStream(key, secret string, e *Exchange) *Stream {
+func NewStream(key, secret string, subAccount string, e *Exchange) *Stream {
 	s := &Stream{
 		exchange:       e,
 		isConnected:    false,
@@ -47,7 +48,7 @@ func NewStream(key, secret string, e *Exchange) *Stream {
 
 	s.ws.OnMessage((&messageHandler{StandardStream: s.StandardStream}).handleMessage)
 	s.ws.OnConnected(func(conn *websocket.Conn) {
-		subs := []websocketRequest{newLoginRequest(s.key, s.secret, time.Now())}
+		subs := []websocketRequest{newLoginRequest(s.key, s.secret, time.Now(), s.subAccount)}
 		subs = append(subs, s.subscriptions...)
 		for _, sub := range subs {
 			if err := conn.WriteJSON(sub); err != nil {
