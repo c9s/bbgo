@@ -256,7 +256,7 @@ func (k KLineWindow) GetClose() float64 {
 }
 
 func (k KLineWindow) GetHigh() float64 {
-	high := k.GetOpen()
+	high := k.First().GetHigh()
 	for _, line := range k {
 		high = math.Max(high, line.GetHigh())
 	}
@@ -265,7 +265,7 @@ func (k KLineWindow) GetHigh() float64 {
 }
 
 func (k KLineWindow) GetLow() float64 {
-	low := k.GetOpen()
+	low := k.First().GetLow()
 	for _, line := range k {
 		low = math.Min(low, line.GetLow())
 	}
@@ -321,7 +321,7 @@ func (k KLineWindow) Color() string {
 }
 
 func (k KLineWindow) Mid() float64 {
-	return k.GetHigh() - k.GetLow()/2
+	return (k.GetHigh() + k.GetLow()) / 2.0
 }
 
 // green candle with open and close near high price
