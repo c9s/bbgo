@@ -136,7 +136,7 @@ func (s *Stream) handleChannelKlineMessage() {
 
 		if kline.Closed {
 			s.EmitKLineClosed(kline)
-			return
+			continue
 		}
 
 		s.EmitKLine(kline)
