@@ -9,13 +9,13 @@ import (
 const DPeriod int = 3
 
 /*
-kd implements stochastic oscillator indicator
+stoch implements stochastic oscillator indicator
 
 Stochastic Oscillator
 - https://www.investopedia.com/terms/s/stochasticoscillator.asp
 */
-//go:generate callbackgen -type KD
-type KD struct {
+//go:generate callbackgen -type STOCH
+type STOCH struct {
 	types.IntervalWindow
 	K Float64Slice
 	D Float64Slice
@@ -26,7 +26,7 @@ type KD struct {
 	UpdateCallbacks []func(k float64, d float64)
 }
 
-func (inc *KD) update(kLine types.KLine) {
+func (inc *STOCH) update(kLine types.KLine) {
 	inc.KLineWindow.Add(kLine)
 	inc.KLineWindow.Truncate(inc.Window)
 
@@ -40,21 +40,21 @@ func (inc *KD) update(kLine types.KLine) {
 	inc.D.Push(d)
 }
 
-func (inc *KD) LastK() float64 {
+func (inc *STOCH) LastK() float64 {
 	if len(inc.K) == 0 {
 		return 0.0
 	}
 	return inc.K[len(inc.K)-1]
 }
 
-func (inc *KD) LastD() float64 {
+func (inc *STOCH) LastD() float64 {
 	if len(inc.K) == 0 {
 		return 0.0
 	}
 	return inc.D[len(inc.D)-1]
 }
 
-func (inc *KD) calculateAndUpdate(kLines []types.KLine) {
+func (inc *STOCH) calculateAndUpdate(kLines []types.KLine) {
 	if len(kLines) < inc.Window || len(kLines) < DPeriod {
 		return
 	}
@@ -70,7 +70,7 @@ func (inc *KD) calculateAndUpdate(kLines []types.KLine) {
 	}
 }
 
-func (inc *KD) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
+func (inc *STOCH) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
 	if inc.Interval != interval {
 		return
 	}
@@ -78,6 +78,6 @@ func (inc *KD) handleKLineWindowUpdate(interval types.Interval, window types.KLi
 	inc.calculateAndUpdate(window)
 }
 
-func (inc *KD) Bind(updater KLineWindowUpdater) {
+func (inc *STOCH) Bind(updater KLineWindowUpdater) {
 	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }
