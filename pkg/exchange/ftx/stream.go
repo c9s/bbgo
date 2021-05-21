@@ -72,6 +72,7 @@ func (s *Stream) Connect(ctx context.Context) error {
 	}
 	s.ctx = ctx
 	s.isConnected = true
+	s.EmitStart()
 
 	go func() {
 		// https://docs.ftx.com/?javascript#request-process
