@@ -58,7 +58,7 @@ func (s Float64Slice) Tail(size int) Float64Slice {
 	}
 
 	win := make(Float64Slice, size)
-	copy(win, s[length-1-size:])
+	copy(win, s[length-size:])
 	return win
 }
 
