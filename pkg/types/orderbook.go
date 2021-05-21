@@ -142,6 +142,14 @@ type RBOrderBook struct {
 	updateCallbacks []func(book *RBOrderBook)
 }
 
+func NewRBOrderBook(symbol string) *RBOrderBook {
+	return &RBOrderBook{
+		Symbol: symbol,
+		Bids:   NewRBTree(),
+		Asks:   NewRBTree(),
+	}
+}
+
 func (b *RBOrderBook) BestBid() (PriceVolume, bool) {
 	return PriceVolume{}, true
 }
