@@ -128,6 +128,46 @@ func (tree *RBTree) DeleteFixup(current *RBNode) {
 	current.Color = Black
 }
 
+func (tree *RBTree) Upsert(key, val fixedpoint.Value) {
+	var y = tree.Neel
+	var x = tree.Root
+	var node = &RBNode{
+		Key:   key,
+		Value: val,
+		Color: Red,
+	}
+
+	for x != tree.Neel {
+		y = x
+
+		if node.Key == x.Key {
+			// found node, skip insert and fix
+			x.Value = val
+			return
+		} else if node.Key < x.Key {
+			x = x.Left
+		} else {
+			x = x.Right
+		}
+	}
+
+	node.Parent = y
+
+	if y == tree.Neel {
+		tree.Root = node
+	} else if node.Key < y.Key {
+		y.Left = node
+	} else {
+		y.Right = node
+	}
+
+	node.Left = tree.Neel
+	node.Right = tree.Neel
+	node.Color = Red
+
+	tree.InsertFixup(node)
+}
+
 func (tree *RBTree) Insert(key, val fixedpoint.Value) {
 	var y = tree.Neel
 	var x = tree.Root
@@ -271,7 +311,15 @@ func (tree *RBTree) RotateRight(y *RBNode) {
 	y.Parent = x
 }
 
-func (tree *RBTree) LeftMost(current *RBNode) *RBNode {
+func (tree *RBTree) Rightmost(current *RBNode) *RBNode {
+	for current.Right != nil {
+		current = current.Right
+	}
+
+	return current
+}
+
+func (tree *RBTree) Leftmost(current *RBNode) *RBNode {
 	for current.Left != nil {
 		current = current.Left
 	}
@@ -281,7 +329,7 @@ func (tree *RBTree) LeftMost(current *RBNode) *RBNode {
 
 func (tree *RBTree) Successor(current *RBNode) *RBNode {
 	if current.Right != nil {
-		return tree.LeftMost(current.Right)
+		return tree.Leftmost(current.Right)
 	}
 
 	var newNode = current.Parent
