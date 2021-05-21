@@ -87,7 +87,7 @@ func (e *Exchange) PlatformFeeCurrency() string {
 }
 
 func (e *Exchange) NewStream() types.Stream {
-	return NewStream(e.key, e.secret)
+	return NewStream(e.key, e.secret, e)
 }
 
 func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
