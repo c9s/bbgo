@@ -12,7 +12,7 @@ import (
 //go:generate callbackgen -type EWMA
 type EWMA struct {
 	types.IntervalWindow
-	Values       Float64Slice
+	Values       types.Float64Slice
 	LastOpenTime time.Time
 
 	UpdateCallbacks []func(value float64)
