@@ -319,7 +319,7 @@ type DepthEvent struct {
 	Asks []DepthEntry
 }
 
-func (e *DepthEvent) OrderBook() (book types.OrderBook, err error) {
+func (e *DepthEvent) OrderBook() (book types.SliceOrderBook, err error) {
 	book.Symbol = e.Symbol
 
 	for _, entry := range e.Bids {

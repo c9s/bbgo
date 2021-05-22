@@ -48,11 +48,11 @@ var rootCmd = &cobra.Command{
 		stream.SetPublicOnly()
 		stream.Subscribe(types.BookChannel, symbol, types.SubscribeOptions{})
 
-		stream.OnBookSnapshot(func(book types.OrderBook) {
+		stream.OnBookSnapshot(func(book types.SliceOrderBook) {
 			// log.Infof("book snapshot: %+v", book)
 		})
 
-		stream.OnBookUpdate(func(book types.OrderBook) {
+		stream.OnBookUpdate(func(book types.SliceOrderBook) {
 			// log.Infof("book update: %+v", book)
 		})
 
