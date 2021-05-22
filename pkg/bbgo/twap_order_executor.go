@@ -308,7 +308,34 @@ func (e *TwapExecution) cancelActiveOrders(ctx context.Context) {
 		if err := e.Session.Exchange.CancelOrders(ctx, orders...); err != nil {
 			log.WithError(err).Errorf("can not cancel %s orders", e.Symbol)
 		}
-		time.Sleep(3 * time.Second)
+
+		select {
+		case <-ctx.Done():
+			return
+
+		case <-time.After(3 * time.Second):
+
+		}
+
+		// verify the current open orders via the RESTful API
+		if e.activeMakerOrders.NumOfOrders() > 0 {
+			log.Warnf("there are orders not cancelled, using REStful API to verify...")
+			openOrders, err := e.Session.Exchange.QueryOpenOrders(ctx, e.Symbol)
+			if err != nil {
+				log.WithError(err).Errorf("can not query %s open orders", e.Symbol)
+				continue
+			}
+
+			openOrderStore := NewOrderStore(e.Symbol)
+			openOrderStore.Add(openOrders...)
+
+			for _, o := range e.activeMakerOrders.Orders() {
+				// if it does not exist, we should remove it
+				if !openOrderStore.Exists(o.OrderID) {
+					e.activeMakerOrders.Remove(o)
+				}
+			}
+		}
 	}
 
 	if didCancel {
