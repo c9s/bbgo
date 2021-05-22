@@ -20,6 +20,12 @@ type SliceOrderBook struct {
 	updateCallbacks []func(book *SliceOrderBook)
 }
 
+func NewSliceOrderBook(symbol string) *SliceOrderBook {
+	return &SliceOrderBook{
+		Symbol: symbol,
+	}
+}
+
 func (b *SliceOrderBook) Spread() (fixedpoint.Value, bool) {
 	bestBid, ok := b.BestBid()
 	if !ok {
@@ -48,6 +54,20 @@ func (b *SliceOrderBook) BestAsk() (PriceVolume, bool) {
 	}
 
 	return b.Asks[0], true
+}
+
+func (b *SliceOrderBook) SideBook(sideType SideType) PriceVolumeSlice {
+	switch sideType {
+
+	case SideTypeBuy:
+		return b.Bids
+
+	case SideTypeSell:
+		return b.Asks
+
+	default:
+		return nil
+	}
 }
 
 func (b *SliceOrderBook) IsValid() (bool, error) {
@@ -80,20 +100,6 @@ func (b *SliceOrderBook) PriceVolumesBySide(side SideType) PriceVolumeSlice {
 	}
 
 	return nil
-}
-
-func (b *SliceOrderBook) CopyDepth(depth int) (book SliceOrderBook) {
-	book = *b
-	book.Bids = book.Bids.CopyDepth(depth)
-	book.Asks = book.Asks.CopyDepth(depth)
-	return book
-}
-
-func (b *SliceOrderBook) Copy() (book SliceOrderBook) {
-	book = *b
-	book.Bids = book.Bids.Copy()
-	book.Asks = book.Asks.Copy()
-	return book
 }
 
 func (b *SliceOrderBook) updateAsks(pvs PriceVolumeSlice) {
@@ -171,4 +177,20 @@ func (b *SliceOrderBook) String() string {
 	}
 
 	return sb.String()
+}
+
+func (b *SliceOrderBook) CopyDepth(depth int) OrderBook {
+	var book SliceOrderBook
+	book = *b
+	book.Bids = book.Bids.CopyDepth(depth)
+	book.Asks = book.Asks.CopyDepth(depth)
+	return &book
+}
+
+func (b *SliceOrderBook) Copy() OrderBook {
+	var book SliceOrderBook
+	book = *b
+	book.Bids = book.Bids.Copy()
+	book.Asks = book.Asks.Copy()
+	return &book
 }
