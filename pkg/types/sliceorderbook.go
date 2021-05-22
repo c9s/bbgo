@@ -179,17 +179,17 @@ func (b *SliceOrderBook) String() string {
 	return sb.String()
 }
 
-func (b *SliceOrderBook) CopyDepth(depth int) OrderBook {
+func (b *SliceOrderBook) CopyDepth(limit int) OrderBook {
 	var book SliceOrderBook
-	book = *b
-	book.Bids = book.Bids.CopyDepth(depth)
-	book.Asks = book.Asks.CopyDepth(depth)
+	book.Symbol = b.Symbol
+	book.Bids = book.Bids.CopyDepth(limit)
+	book.Asks = book.Asks.CopyDepth(limit)
 	return &book
 }
 
 func (b *SliceOrderBook) Copy() OrderBook {
 	var book SliceOrderBook
-	book = *b
+	book.Symbol = b.Symbol
 	book.Bids = book.Bids.Copy()
 	book.Asks = book.Asks.Copy()
 	return &book
