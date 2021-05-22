@@ -111,6 +111,21 @@ func (b *LocalActiveOrderBook) NumOfAsks() int {
 	return b.Asks.Len()
 }
 
+func (b *LocalActiveOrderBook) Exists(order types.Order) bool {
+
+	switch order.Side {
+
+	case types.SideTypeBuy:
+		return b.Bids.Exists(order.OrderID)
+
+	case types.SideTypeSell:
+		return b.Asks.Exists(order.OrderID)
+
+	}
+
+	return false
+}
+
 func (b *LocalActiveOrderBook) Remove(order types.Order) bool {
 	switch order.Side {
 	case types.SideTypeBuy:
