@@ -8,7 +8,6 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/c9s/bbgo/pkg/datatype"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -34,7 +33,7 @@ func TestRewardService_InsertAndQueryUnspent(t *testing.T) {
 		Quantity:  1,
 		State:     "done",
 		Spent:     false,
-		CreatedAt: datatype.Time(time.Now()),
+		CreatedAt: types.Time(time.Now()),
 	})
 	assert.NoError(t, err)
 
@@ -52,7 +51,7 @@ func TestRewardService_InsertAndQueryUnspent(t *testing.T) {
 		Quantity:  1000000,
 		State:     "done",
 		Spent:     false,
-		CreatedAt: datatype.Time(time.Now()),
+		CreatedAt: types.Time(time.Now()),
 	})
 	assert.NoError(t, err)
 
@@ -99,7 +98,7 @@ func TestRewardService_AggregateUnspentCurrencyPosition(t *testing.T) {
 		Quantity:  1,
 		State:     "done",
 		Spent:     false,
-		CreatedAt: datatype.Time(now),
+		CreatedAt: types.Time(now),
 	})
 	assert.NoError(t, err)
 
@@ -111,7 +110,7 @@ func TestRewardService_AggregateUnspentCurrencyPosition(t *testing.T) {
 		Quantity:  2,
 		State:     "done",
 		Spent:     false,
-		CreatedAt: datatype.Time(now),
+		CreatedAt: types.Time(now),
 	})
 	assert.NoError(t, err)
 
@@ -123,7 +122,7 @@ func TestRewardService_AggregateUnspentCurrencyPosition(t *testing.T) {
 		Quantity:  1000000,
 		State:     "done",
 		Spent:     false,
-		CreatedAt: datatype.Time(now),
+		CreatedAt: types.Time(now),
 	})
 	assert.NoError(t, err)
 

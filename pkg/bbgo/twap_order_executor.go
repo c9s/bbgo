@@ -64,24 +64,13 @@ func (e *TwapExecution) connectUserData(ctx context.Context) {
 }
 
 func (e *TwapExecution) getSideBook() (pvs types.PriceVolumeSlice, err error) {
-	book := e.orderBook.Get()
-
-	switch e.Side {
-	case types.SideTypeSell:
-		pvs = book.Asks
-
-	case types.SideTypeBuy:
-		pvs = book.Bids
-
-	default:
-		err = fmt.Errorf("invalid side type: %+v", e.Side)
-	}
-
+	book := e.orderBook.Copy()
+	pvs = book.SideBook(e.Side)
 	return pvs, err
 }
 
 func (e *TwapExecution) newBestPriceOrder() (orderForm types.SubmitOrder, err error) {
-	book := e.orderBook.Get()
+	book := e.orderBook.Copy()
 
 	sideBook, err := e.getSideBook()
 	if err != nil {

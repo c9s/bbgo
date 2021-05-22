@@ -2,11 +2,9 @@ package types
 
 import (
 	"fmt"
-	"sort"
-	"strings"
+	"os"
+	"strconv"
 	"sync"
-
-	"github.com/pkg/errors"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/sigchan"
@@ -21,301 +19,43 @@ func (p PriceVolume) String() string {
 	return fmt.Sprintf("PriceVolume{ price: %f, volume: %f }", p.Price.Float64(), p.Volume.Float64())
 }
 
-type PriceVolumeSlice []PriceVolume
-
-func (slice PriceVolumeSlice) Len() int           { return len(slice) }
-func (slice PriceVolumeSlice) Less(i, j int) bool { return slice[i].Price < slice[j].Price }
-func (slice PriceVolumeSlice) Swap(i, j int)      { slice[i], slice[j] = slice[j], slice[i] }
-
-// Trim removes the pairs that volume = 0
-func (slice PriceVolumeSlice) Trim() (pvs PriceVolumeSlice) {
-	for _, pv := range slice {
-		if pv.Volume > 0 {
-			pvs = append(pvs, pv)
-		}
-	}
-
-	return pvs
-}
-
-func (slice PriceVolumeSlice) CopyDepth(depth int) PriceVolumeSlice {
-	if depth > len(slice) {
-		return slice.Copy()
-	}
-
-	var s = make(PriceVolumeSlice, depth, depth)
-	copy(s, slice[:depth])
-	return s
-}
-
-func (slice PriceVolumeSlice) Copy() PriceVolumeSlice {
-	var s = make(PriceVolumeSlice, len(slice), len(slice))
-	copy(s, slice)
-	return s
-}
-
-func (slice PriceVolumeSlice) Second() (PriceVolume, bool) {
-	if len(slice) > 1 {
-		return slice[1], true
-	}
-	return PriceVolume{}, false
-}
-
-func (slice PriceVolumeSlice) First() (PriceVolume, bool) {
-	if len(slice) > 0 {
-		return slice[0], true
-	}
-	return PriceVolume{}, false
-}
-
-func (slice PriceVolumeSlice) IndexByVolumeDepth(requiredVolume fixedpoint.Value) int {
-	var tv int64 = 0
-	for x, el := range slice {
-		tv += el.Volume.Int64()
-		if tv >= requiredVolume.Int64() {
-			return x
-		}
-	}
-
-	// not deep enough
-	return -1
-}
-
-func (slice PriceVolumeSlice) InsertAt(idx int, pv PriceVolume) PriceVolumeSlice {
-	rear := append([]PriceVolume{}, slice[idx:]...)
-	newSlice := append(slice[:idx], pv)
-	return append(newSlice, rear...)
-}
-
-func (slice PriceVolumeSlice) Remove(price fixedpoint.Value, descending bool) PriceVolumeSlice {
-	matched, idx := slice.Find(price, descending)
-	if matched.Price != price {
-		return slice
-	}
-
-	return append(slice[:idx], slice[idx+1:]...)
-}
-
-// FindPriceVolumePair finds the pair by the given price, this function is a read-only
-// operation, so we use the value receiver to avoid copy value from the pointer
-// If the price is not found, it will return the index where the price can be inserted at.
-// true for descending (bid orders), false for ascending (ask orders)
-func (slice PriceVolumeSlice) Find(price fixedpoint.Value, descending bool) (pv PriceVolume, idx int) {
-	idx = sort.Search(len(slice), func(i int) bool {
-		if descending {
-			return slice[i].Price <= price
-		}
-		return slice[i].Price >= price
-	})
-
-	if idx >= len(slice) || slice[idx].Price != price {
-		return pv, idx
-	}
-
-	pv = slice[idx]
-
-	return pv, idx
-}
-
-func (slice PriceVolumeSlice) Upsert(pv PriceVolume, descending bool) PriceVolumeSlice {
-	if len(slice) == 0 {
-		return append(slice, pv)
-	}
-
-	price := pv.Price
-	_, idx := slice.Find(price, descending)
-	if idx >= len(slice) || slice[idx].Price != price {
-		return slice.InsertAt(idx, pv)
-	}
-
-	slice[idx].Volume = pv.Volume
-	return slice
-}
-
-//go:generate callbackgen -type OrderBook
-type OrderBook struct {
-	Symbol string
-	Bids   PriceVolumeSlice
-	Asks   PriceVolumeSlice
-
-	loadCallbacks       []func(book *OrderBook)
-	updateCallbacks     []func(book *OrderBook)
-	bidsChangeCallbacks []func(pvs PriceVolumeSlice)
-	asksChangeCallbacks []func(pvs PriceVolumeSlice)
-}
-
-func (b *OrderBook) Spread() (fixedpoint.Value, bool) {
-	bestBid, ok := b.BestBid()
-	if !ok {
-		return 0, false
-	}
-
-	bestAsk, ok := b.BestAsk()
-	if !ok {
-		return 0, false
-	}
-
-	return bestAsk.Price - bestBid.Price, true
-}
-
-func (b *OrderBook) BestBid() (PriceVolume, bool) {
-	if len(b.Bids) == 0 {
-		return PriceVolume{}, false
-	}
-
-	return b.Bids[0], true
-}
-
-func (b *OrderBook) BestAsk() (PriceVolume, bool) {
-	if len(b.Asks) == 0 {
-		return PriceVolume{}, false
-	}
-
-	return b.Asks[0], true
-}
-
-func (b *OrderBook) IsValid() (bool, error) {
-	bid, hasBid := b.BestBid()
-	ask, hasAsk := b.BestAsk()
-
-	if !hasBid {
-		return false, errors.New("empty bids")
-	}
-
-	if !hasAsk {
-		return false, errors.New("empty asks")
-	}
-
-	if bid.Price > ask.Price {
-		return false, fmt.Errorf("bid price %f > ask price %f", bid.Price.Float64(), ask.Price.Float64())
-	}
-
-	return true, nil
-}
-
-func (b *OrderBook) PriceVolumesBySide(side SideType) PriceVolumeSlice {
-	switch side {
-
-	case SideTypeBuy:
-		return b.Bids
-
-	case SideTypeSell:
-		return b.Asks
-	}
-
-	return nil
-}
-
-func (b *OrderBook) CopyDepth(depth int) (book OrderBook) {
-	book = *b
-	book.Bids = book.Bids.CopyDepth(depth)
-	book.Asks = book.Asks.CopyDepth(depth)
-	return book
-}
-
-func (b *OrderBook) Copy() (book OrderBook) {
-	book = *b
-	book.Bids = book.Bids.Copy()
-	book.Asks = book.Asks.Copy()
-	return book
-}
-
-func (b *OrderBook) updateAsks(pvs PriceVolumeSlice) {
-	for _, pv := range pvs {
-		if pv.Volume == 0 {
-			b.Asks = b.Asks.Remove(pv.Price, false)
-		} else {
-			b.Asks = b.Asks.Upsert(pv, false)
-		}
-	}
-
-	b.EmitAsksChange(b.Asks)
-}
-
-func (b *OrderBook) updateBids(pvs PriceVolumeSlice) {
-	for _, pv := range pvs {
-		if pv.Volume == 0 {
-			b.Bids = b.Bids.Remove(pv.Price, true)
-		} else {
-			b.Bids = b.Bids.Upsert(pv, true)
-		}
-	}
-
-	b.EmitBidsChange(b.Bids)
-}
-
-func (b *OrderBook) update(book OrderBook) {
-	b.updateBids(book.Bids)
-	b.updateAsks(book.Asks)
-}
-
-func (b *OrderBook) Reset() {
-	b.Bids = nil
-	b.Asks = nil
-}
-
-func (b *OrderBook) Load(book OrderBook) {
-	b.Reset()
-	b.update(book)
-	b.EmitLoad(b)
-}
-
-func (b *OrderBook) Update(book OrderBook) {
-	b.update(book)
-	b.EmitUpdate(b)
-}
-
-func (b *OrderBook) Print() {
-	fmt.Printf(b.String())
-}
-
-func (b *OrderBook) String() string {
-	sb := strings.Builder{}
-
-	sb.WriteString("BOOK ")
-	sb.WriteString(b.Symbol)
-	sb.WriteString("\n")
-
-	if len(b.Asks) > 0 {
-		sb.WriteString("ASKS:\n")
-		for i := len(b.Asks) - 1; i >= 0; i-- {
-			sb.WriteString("- ASK: ")
-			sb.WriteString(b.Asks[i].String())
-			sb.WriteString("\n")
-		}
-	}
-
-	if len(b.Bids) > 0 {
-		sb.WriteString("BIDS:\n")
-		for _, bid := range b.Bids {
-			sb.WriteString("- BID: ")
-			sb.WriteString(bid.String())
-			sb.WriteString("\n")
-		}
-	}
-
-	return sb.String()
+type OrderBook interface {
+	Spread() (fixedpoint.Value, bool)
+	BestAsk() (PriceVolume, bool)
+	BestBid() (PriceVolume, bool)
+	Reset()
+	Load(book SliceOrderBook)
+	Update(book SliceOrderBook)
+	Copy() OrderBook
+	CopyDepth(depth int) OrderBook
+	SideBook(sideType SideType) PriceVolumeSlice
+	IsValid() (bool, error)
 }
 
 type MutexOrderBook struct {
 	sync.Mutex
 
-	*OrderBook
+	Symbol    string
+	OrderBook OrderBook
 }
 
 func NewMutexOrderBook(symbol string) *MutexOrderBook {
+	var book OrderBook = NewSliceOrderBook(symbol)
+
+	if v, _ := strconv.ParseBool(os.Getenv("ENABLE_RBT_ORDERBOOK")); v {
+		book = NewRBOrderBook(symbol)
+	}
+
 	return &MutexOrderBook{
-		OrderBook: &OrderBook{Symbol: symbol},
+		Symbol:    symbol,
+		OrderBook: book,
 	}
 }
 
-func (b *MutexOrderBook) Load(book OrderBook) {
+func (b *MutexOrderBook) Load(book SliceOrderBook) {
 	b.Lock()
-	defer b.Unlock()
-
-	b.OrderBook.Reset()
-	b.OrderBook.update(book)
-	b.EmitLoad(b.OrderBook)
+	b.OrderBook.Load(book)
+	b.Unlock()
 }
 
 func (b *MutexOrderBook) Reset() {
@@ -330,18 +70,16 @@ func (b *MutexOrderBook) CopyDepth(depth int) OrderBook {
 	return b.OrderBook.CopyDepth(depth)
 }
 
-func (b *MutexOrderBook) Get() OrderBook {
+func (b *MutexOrderBook) Copy() OrderBook {
 	b.Lock()
 	defer b.Unlock()
 	return b.OrderBook.Copy()
 }
 
-func (b *MutexOrderBook) Update(update OrderBook) {
+func (b *MutexOrderBook) Update(update SliceOrderBook) {
 	b.Lock()
-	defer b.Unlock()
-
-	b.OrderBook.update(update)
-	b.EmitUpdate(b.OrderBook)
+	b.OrderBook.Update(update)
+	b.Unlock()
 }
 
 // StreamOrderBook receives streaming data from websocket connection and
@@ -360,8 +98,8 @@ func NewStreamBook(symbol string) *StreamOrderBook {
 }
 
 func (sb *StreamOrderBook) BindStream(stream Stream) {
-	stream.OnBookSnapshot(func(book OrderBook) {
-		if sb.Symbol != book.Symbol {
+	stream.OnBookSnapshot(func(book SliceOrderBook) {
+		if sb.MutexOrderBook.Symbol != book.Symbol {
 			return
 		}
 
@@ -369,8 +107,8 @@ func (sb *StreamOrderBook) BindStream(stream Stream) {
 		sb.C.Emit()
 	})
 
-	stream.OnBookUpdate(func(book OrderBook) {
-		if sb.Symbol != book.Symbol {
+	stream.OnBookUpdate(func(book SliceOrderBook) {
+		if sb.MutexOrderBook.Symbol != book.Symbol {
 			return
 		}
 

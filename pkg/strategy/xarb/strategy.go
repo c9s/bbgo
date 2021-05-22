@@ -135,7 +135,11 @@ func (s *Strategy) check(ctx context.Context, _ bbgo.OrderExecutionRouter) {
 	for sessionName, streamBook := range s.books {
 		book := streamBook.CopyDepth(5)
 
-		if len(book.Bids) == 0 || len(book.Asks) == 0 {
+		// ignore empty bid and ask books
+		if _, ok := book.BestAsk(); !ok {
+			continue
+		}
+		if _, ok := book.BestBid(); !ok {
 			continue
 		}
 

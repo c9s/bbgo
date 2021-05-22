@@ -177,11 +177,11 @@ func (k KLine) String() string {
 
 func (k KLine) Color() string {
 	if k.Direction() > 0 {
-		return Green
+		return GreenColor
 	} else if k.Direction() < 0 {
-		return Red
+		return RedColor
 	}
-	return "#f0f0f0"
+	return GrayColor
 }
 
 func (k KLine) SlackAttachment() slack.Attachment {
@@ -313,25 +313,26 @@ func (k KLineWindow) GetTrend() int {
 
 func (k KLineWindow) Color() string {
 	if k.GetTrend() > 0 {
-		return Green
+		return GreenColor
 	} else if k.GetTrend() < 0 {
-		return Red
+		return RedColor
 	}
-	return "#f0f0f0"
+	return GrayColor
 }
 
+// Mid price
 func (k KLineWindow) Mid() float64 {
 	return k.GetHigh() - k.GetLow()/2
 }
 
-// green candle with open and close near high price
+// BounceUp returns true if it's green candle with open and close near high price
 func (k KLineWindow) BounceUp() bool {
 	mid := k.Mid()
 	trend := k.GetTrend()
 	return trend > 0 && k.GetOpen() > mid && k.GetClose() > mid
 }
 
-// red candle with open and close near low price
+// BounceDown returns true red candle with open and close near low price
 func (k KLineWindow) BounceDown() bool {
 	mid := k.Mid()
 	trend := k.GetTrend()
