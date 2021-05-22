@@ -184,7 +184,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 		return
 	}
 
-	sourceBook := s.book.Get()
+	sourceBook := s.book.Copy()
 	if len(sourceBook.Bids) == 0 || len(sourceBook.Asks) == 0 {
 		return
 	}
@@ -443,7 +443,7 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	}
 
 	lastPrice := s.lastPrice
-	sourceBook := s.book.Get()
+	sourceBook := s.book.Copy()
 	switch side {
 
 	case types.SideTypeBuy:
