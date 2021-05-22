@@ -67,7 +67,7 @@ var rootCmd = &cobra.Command{
 					return
 
 				case <-streambook.C:
-					book := streambook.Get()
+					book := streambook.Copy()
 
 					if valid, err := book.IsValid(); !valid {
 						log.Errorf("order book is invalid, error: %v", err)
