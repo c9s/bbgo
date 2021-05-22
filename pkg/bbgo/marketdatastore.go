@@ -32,7 +32,7 @@ func (store *MarketDataStore) SetKLineWindows(windows map[types.Interval]types.K
 	store.KLineWindows = windows
 }
 
-func (store *MarketDataStore) OrderBook() types.OrderBook {
+func (store *MarketDataStore) OrderBook() types.SliceOrderBook {
 	return store.orderBook.Copy()
 }
 
@@ -42,7 +42,7 @@ func (store *MarketDataStore) KLinesOfInterval(interval types.Interval) (kLines 
 	return kLines, ok
 }
 
-func (store *MarketDataStore) handleOrderBookUpdate(book types.OrderBook) {
+func (store *MarketDataStore) handleOrderBookUpdate(book types.SliceOrderBook) {
 	if book.Symbol != store.Symbol {
 		return
 	}
@@ -52,7 +52,7 @@ func (store *MarketDataStore) handleOrderBookUpdate(book types.OrderBook) {
 	store.EmitOrderBookUpdate(store.orderBook)
 }
 
-func (store *MarketDataStore) handleOrderBookSnapshot(book types.OrderBook) {
+func (store *MarketDataStore) handleOrderBookSnapshot(book types.SliceOrderBook) {
 	if book.Symbol != store.Symbol {
 		return
 	}
