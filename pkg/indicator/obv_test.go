@@ -19,19 +19,19 @@ func Test_calculateOBV(t *testing.T) {
 		name   string
 		kLines []types.KLine
 		window int
-		want   Float64Slice
+		want   types.Float64Slice
 	}{
 		{
 			name:   "trivial_case",
 			kLines: buildKLines([]float64{0}, []float64{1}),
 			window: 0,
-			want:   Float64Slice{1.0},
+			want:   types.Float64Slice{1.0},
 		},
 		{
 			name:   "easy_case",
 			kLines: buildKLines([]float64{3, 2, 1, 4}, []float64{3, 2, 2, 6}),
 			window: 0,
-			want:   Float64Slice{3, 1, -1, 5},
+			want:   types.Float64Slice{3, 1, -1, 5},
 		},
 	}
 
