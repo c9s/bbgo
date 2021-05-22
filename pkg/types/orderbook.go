@@ -2,6 +2,8 @@ package types
 
 import (
 	"fmt"
+	"os"
+	"strconv"
 	"sync"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -24,47 +26,59 @@ type OrderBook interface {
 	Reset()
 	Load(book SliceOrderBook)
 	Update(book SliceOrderBook)
+	Copy() OrderBook
+	CopyDepth(depth int) OrderBook
+	SideBook(sideType SideType) PriceVolumeSlice
+	IsValid() (bool, error)
 }
 
 type MutexOrderBook struct {
 	sync.Mutex
 
-	*SliceOrderBook
+	Symbol    string
+	OrderBook OrderBook
 }
 
 func NewMutexOrderBook(symbol string) *MutexOrderBook {
+	var book OrderBook = NewSliceOrderBook(symbol)
+
+	if v, _ := strconv.ParseBool(os.Getenv("ENABLE_RBT_ORDERBOOK")); v {
+		book = NewRBOrderBook(symbol)
+	}
+
 	return &MutexOrderBook{
-		SliceOrderBook: &SliceOrderBook{Symbol: symbol},
+		Symbol:    symbol,
+		OrderBook: book,
 	}
 }
 
 func (b *MutexOrderBook) Load(book SliceOrderBook) {
 	b.Lock()
-	b.SliceOrderBook.Load(book)
+	b.OrderBook.Load(book)
 	b.Unlock()
 }
 
 func (b *MutexOrderBook) Reset() {
 	b.Lock()
-	b.SliceOrderBook.Reset()
+	b.OrderBook.Reset()
 	b.Unlock()
 }
 
-func (b *MutexOrderBook) CopyDepth(depth int) SliceOrderBook {
+func (b *MutexOrderBook) CopyDepth(depth int) OrderBook {
 	b.Lock()
 	defer b.Unlock()
-	return b.SliceOrderBook.CopyDepth(depth)
+	return b.OrderBook.CopyDepth(depth)
 }
 
-func (b *MutexOrderBook) Copy() SliceOrderBook {
+func (b *MutexOrderBook) Copy() OrderBook {
 	b.Lock()
 	defer b.Unlock()
-	return b.SliceOrderBook.Copy()
+	return b.OrderBook.Copy()
 }
 
 func (b *MutexOrderBook) Update(update SliceOrderBook) {
 	b.Lock()
-	b.SliceOrderBook.Update(update)
+	b.OrderBook.Update(update)
 	b.Unlock()
 }
 
@@ -85,7 +99,7 @@ func NewStreamBook(symbol string) *StreamOrderBook {
 
 func (sb *StreamOrderBook) BindStream(stream Stream) {
 	stream.OnBookSnapshot(func(book SliceOrderBook) {
-		if sb.Symbol != book.Symbol {
+		if sb.MutexOrderBook.Symbol != book.Symbol {
 			return
 		}
 
@@ -94,7 +108,7 @@ func (sb *StreamOrderBook) BindStream(stream Stream) {
 	})
 
 	stream.OnBookUpdate(func(book SliceOrderBook) {
-		if sb.Symbol != book.Symbol {
+		if sb.MutexOrderBook.Symbol != book.Symbol {
 			return
 		}
 
