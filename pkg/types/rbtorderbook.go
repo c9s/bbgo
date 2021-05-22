@@ -137,15 +137,17 @@ func (b *RBTOrderBook) CopyDepth(limit int) OrderBook {
 	return book
 }
 
-func (b *RBTOrderBook) convertTreeToPriceVolumeSlice(tree *RBTree, descending bool) (pvs PriceVolumeSlice) {
+func (b *RBTOrderBook) convertTreeToPriceVolumeSlice(tree *RBTree, limit int, descending bool) (pvs PriceVolumeSlice) {
 	if descending {
 		tree.InorderReverse(func(n *RBNode) bool {
 			pvs = append(pvs, PriceVolume{
 				Price:  n.Key,
 				Volume: n.Value,
 			})
-			return true
+
+			return !(limit > 0 && len(pvs) >= limit)
 		})
+
 		return pvs
 	}
 
@@ -154,7 +156,8 @@ func (b *RBTOrderBook) convertTreeToPriceVolumeSlice(tree *RBTree, descending bo
 			Price:  n.Key,
 			Volume: n.Value,
 		})
-		return true
+
+		return !(limit > 0 && len(pvs) >= limit)
 	})
 	return pvs
 }
@@ -163,10 +166,10 @@ func (b *RBTOrderBook) SideBook(sideType SideType) PriceVolumeSlice {
 	switch sideType {
 
 	case SideTypeBuy:
-		return b.convertTreeToPriceVolumeSlice(b.Bids, false)
+		return b.convertTreeToPriceVolumeSlice(b.Bids, 0, true)
 
 	case SideTypeSell:
-		return b.convertTreeToPriceVolumeSlice(b.Asks, true)
+		return b.convertTreeToPriceVolumeSlice(b.Asks, 0, false)
 
 	default:
 		return nil
