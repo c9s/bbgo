@@ -122,11 +122,13 @@ func (b *RBTOrderBook) load(book SliceOrderBook) {
 }
 
 func (b *RBTOrderBook) Print() {
-	b.Bids.PostorderOf(b.Bids.Root, func(n *RBNode) {
+	b.Bids.PostorderOf(b.Bids.Root, func(n *RBNode) bool {
 		fmt.Printf("bid: %f x %f", n.Key.Float64(), n.Value.Float64())
+		return true
 	})
 
-	b.Asks.PostorderOf(b.Asks.Root, func(n *RBNode) {
+	b.Asks.PostorderOf(b.Asks.Root, func(n *RBNode) bool {
 		fmt.Printf("ask: %f x %f", n.Key.Float64(), n.Value.Float64())
+		return true
 	})
 }
