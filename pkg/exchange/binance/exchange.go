@@ -14,7 +14,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/c9s/bbgo/pkg/datatype"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
@@ -283,7 +282,7 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 			txIDs[d.TxID] = struct{}{}
 			allWithdraws = append(allWithdraws, types.Withdraw{
 				Exchange:        types.ExchangeBinance,
-				ApplyTime:       datatype.Time(time.Unix(0, d.ApplyTime*int64(time.Millisecond))),
+				ApplyTime:       types.Time(time.Unix(0, d.ApplyTime*int64(time.Millisecond))),
 				Asset:           d.Asset,
 				Amount:          d.Amount,
 				Address:         d.Address,
@@ -356,7 +355,7 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 			txIDs[d.TxID] = struct{}{}
 			allDeposits = append(allDeposits, types.Deposit{
 				Exchange:      types.ExchangeBinance,
-				Time:          datatype.Time(time.Unix(0, d.InsertTime*int64(time.Millisecond))),
+				Time:          types.Time(time.Unix(0, d.InsertTime*int64(time.Millisecond))),
 				Asset:         d.Asset,
 				Amount:        d.Amount,
 				Address:       d.Address,

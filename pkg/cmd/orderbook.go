@@ -49,10 +49,10 @@ var orderbookCmd = &cobra.Command{
 		s := ex.NewStream()
 		s.SetPublicOnly()
 		s.Subscribe(types.BookChannel, symbol, types.SubscribeOptions{})
-		s.OnBookSnapshot(func(book types.OrderBook) {
+		s.OnBookSnapshot(func(book types.SliceOrderBook) {
 			log.Infof("orderbook snapshot: %s", book.String())
 		})
-		s.OnBookUpdate(func(book types.OrderBook) {
+		s.OnBookUpdate(func(book types.SliceOrderBook) {
 			log.Infof("orderbook update: %s", book.String())
 		})
 
