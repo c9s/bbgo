@@ -36,7 +36,7 @@ func BenchmarkOrderBook_Load(b *testing.B) {
 		}
 	})
 
-	b.Run("SliceOrderBook", func(b *testing.B) {
+	b.Run("OrderBook", func(b *testing.B) {
 		book := &SliceOrderBook{}
 		for i := 0; i < b.N; i++ {
 			for _, ask := range asks {
@@ -84,7 +84,7 @@ func BenchmarkOrderBook_UpdateAndInsert(b *testing.B) {
 			sliceBook.Bids = sliceBook.Bids.Upsert(bid, true)
 		}
 	}
-	b.Run("SliceOrderBook", func(b *testing.B) {
+	b.Run("OrderBook", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			var price = fixedpoint.NewFromFloat(rand.Float64() * 2000.0)
 			if price >= fixedpoint.NewFromFloat(1000) {

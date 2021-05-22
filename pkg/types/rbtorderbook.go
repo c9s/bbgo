@@ -121,14 +121,64 @@ func (b *RBTOrderBook) load(book SliceOrderBook) {
 	b.updateAsks(book.Asks)
 }
 
+func (b *RBTOrderBook) Copy() OrderBook {
+	var book = NewRBOrderBook(b.Symbol)
+	book.Asks = b.Asks.Copy()
+	book.Bids = b.Bids.Copy()
+	return book
+}
+
+func (b *RBTOrderBook) CopyDepth(depth int) OrderBook {
+	var book = NewRBOrderBook(b.Symbol)
+	book.Asks = b.Asks.CopyInorder(depth)
+	book.Bids = b.Bids.CopyInorder(depth)
+	return book
+}
+
+func (b *RBTOrderBook) convertTreeToPriceVolumeSlice(tree *RBTree, descending bool) (pvs PriceVolumeSlice) {
+	if descending {
+		tree.InorderReverse(func(n *RBNode) bool {
+			pvs = append(pvs, PriceVolume{
+				Price:  n.Key,
+				Volume: n.Value,
+			})
+			return true
+		})
+		return pvs
+	}
+
+	tree.Inorder(func(n *RBNode) bool {
+		pvs = append(pvs, PriceVolume{
+			Price:  n.Key,
+			Volume: n.Value,
+		})
+		return true
+	})
+	return pvs
+}
+
+func (b *RBTOrderBook) SideBook(sideType SideType) PriceVolumeSlice {
+	switch sideType {
+
+	case SideTypeBuy:
+		return b.convertTreeToPriceVolumeSlice(b.Bids, false)
+
+	case SideTypeSell:
+		return b.convertTreeToPriceVolumeSlice(b.Asks, true)
+
+	default:
+		return nil
+	}
+}
+
 func (b *RBTOrderBook) Print() {
-	b.Bids.PostorderOf(b.Bids.Root, func(n *RBNode) bool {
-		fmt.Printf("bid: %f x %f", n.Key.Float64(), n.Value.Float64())
+	b.Asks.Inorder(func(n *RBNode) bool {
+		fmt.Printf("ask: %f x %f", n.Key.Float64(), n.Value.Float64())
 		return true
 	})
 
-	b.Asks.PostorderOf(b.Asks.Root, func(n *RBNode) bool {
-		fmt.Printf("ask: %f x %f", n.Key.Float64(), n.Value.Float64())
+	b.Bids.InorderReverse(func(n *RBNode) bool {
+		fmt.Printf("bid: %f x %f", n.Key.Float64(), n.Value.Float64())
 		return true
 	})
 }

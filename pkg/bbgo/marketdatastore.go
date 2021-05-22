@@ -32,7 +32,7 @@ func (store *MarketDataStore) SetKLineWindows(windows map[types.Interval]types.K
 	store.KLineWindows = windows
 }
 
-func (store *MarketDataStore) OrderBook() types.SliceOrderBook {
+func (store *MarketDataStore) OrderBook() types.OrderBook {
 	return store.orderBook.Copy()
 }
 
