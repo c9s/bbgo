@@ -63,19 +63,9 @@ func (e *TwapExecution) connectUserData(ctx context.Context) {
 	}
 }
 
-func (e *TwapExecution) getSideBook() (pvs types.PriceVolumeSlice, err error) {
-	book := e.orderBook.Copy()
-	pvs = book.SideBook(e.Side)
-	return pvs, err
-}
-
 func (e *TwapExecution) newBestPriceOrder() (orderForm types.SubmitOrder, err error) {
 	book := e.orderBook.Copy()
-
-	sideBook, err := e.getSideBook()
-	if err != nil {
-		return orderForm, err
-	}
+	sideBook := book.SideBook(e.Side)
 
 	first, ok := sideBook.First()
 	if !ok {
@@ -212,11 +202,8 @@ func (e *TwapExecution) newBestPriceOrder() (orderForm types.SubmitOrder, err er
 }
 
 func (e *TwapExecution) updateOrder(ctx context.Context) error {
-
-	sideBook, err := e.getSideBook()
-	if err != nil {
-		return err
-	}
+	book := e.orderBook.Copy()
+	sideBook := book.SideBook(e.Side)
 
 	first, ok := sideBook.First()
 	if !ok {
