@@ -130,10 +130,10 @@ func (b *RBTOrderBook) Copy() OrderBook {
 	return book
 }
 
-func (b *RBTOrderBook) CopyDepth(depth int) OrderBook {
+func (b *RBTOrderBook) CopyDepth(limit int) OrderBook {
 	var book = NewRBOrderBook(b.Symbol)
-	book.Asks = b.Asks.CopyInorder(depth)
-	book.Bids = b.Bids.CopyInorder(depth)
+	book.Asks = b.Asks.CopyInorder(limit)
+	book.Bids = b.Bids.CopyInorderReverse(limit)
 	return book
 }
 
