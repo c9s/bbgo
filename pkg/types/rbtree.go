@@ -336,12 +336,12 @@ func (tree *RBTree) Rightmost() *RBNode {
 }
 
 func (tree *RBTree) RightmostOf(current *RBNode) *RBNode {
-	for current.Right != Neel {
-		current = current.Right
-	}
-
 	if current == Neel {
 		return nil
+	}
+
+	for current.Right != Neel {
+		current = current.Right
 	}
 
 	return current
@@ -352,18 +352,22 @@ func (tree *RBTree) Leftmost() *RBNode {
 }
 
 func (tree *RBTree) LeftmostOf(current *RBNode) *RBNode {
-	for current.Left != Neel {
-		current = current.Left
-	}
-
 	if current == Neel {
 		return nil
+	}
+
+	for current.Left != Neel {
+		current = current.Left
 	}
 
 	return current
 }
 
 func (tree *RBTree) Successor(current *RBNode) *RBNode {
+	if current == Neel {
+		return nil
+	}
+
 	if current.Right != Neel {
 		return tree.LeftmostOf(current.Right)
 	}
