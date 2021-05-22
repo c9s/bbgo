@@ -7,6 +7,30 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestTree_CopyInorder(t *testing.T) {
+	tree := NewRBTree()
+	for i := 1.0; i < 10.0; i += 1.0 {
+		tree.Insert(fixedpoint.NewFromFloat(i*100.0), fixedpoint.NewFromFloat(i))
+	}
+
+	newTree := tree.CopyInorder(3)
+	assert.Equal(t, 3, newTree.Size())
+
+	newTree.Print()
+
+	node1 := newTree.Search(fixedpoint.NewFromFloat(100.0))
+	assert.NotNil(t, node1)
+
+	node2 := newTree.Search(fixedpoint.NewFromFloat(200.0))
+	assert.NotNil(t, node2)
+
+	node3 := newTree.Search(fixedpoint.NewFromFloat(300.0))
+	assert.NotNil(t, node3)
+
+	node4 := newTree.Search(fixedpoint.NewFromFloat(400.0))
+	assert.Nil(t, node4)
+}
+
 func TestTree_Copy(t *testing.T) {
 	tree := NewRBTree()
 	tree.Insert(fixedpoint.NewFromFloat(3000.0), fixedpoint.NewFromFloat(1.0))
