@@ -15,7 +15,7 @@ Accumulation/Distribution Indicator (A/D)
 //go:generate callbackgen -type AD
 type AD struct {
 	types.IntervalWindow
-	Values   Float64Slice
+	Values   types.Float64Slice
 	PrePrice float64
 
 	EndTime         time.Time

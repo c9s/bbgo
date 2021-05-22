@@ -17,8 +17,8 @@ Stochastic Oscillator
 //go:generate callbackgen -type STOCH
 type STOCH struct {
 	types.IntervalWindow
-	K Float64Slice
-	D Float64Slice
+	K types.Float64Slice
+	D types.Float64Slice
 
 	KLineWindow types.KLineWindow
 
