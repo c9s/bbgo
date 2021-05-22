@@ -24,7 +24,7 @@ func BenchmarkOrderBook_Load(b *testing.B) {
 		bids = append(bids, PriceVolume{fixedpoint.NewFromFloat(1000 - 0.1 - p), fixedpoint.NewFromFloat(1)})
 	}
 
-	b.Run("RBOrderBook", func(b *testing.B) {
+	b.Run("RBTOrderBook", func(b *testing.B) {
 		book := NewRBOrderBook("ETHUSDT")
 		for i := 0; i < b.N; i++ {
 			for _, ask := range asks {
@@ -36,8 +36,8 @@ func BenchmarkOrderBook_Load(b *testing.B) {
 		}
 	})
 
-	b.Run("OrderBook", func(b *testing.B) {
-		book := &OrderBook{}
+	b.Run("SliceOrderBook", func(b *testing.B) {
+		book := &SliceOrderBook{}
 		for i := 0; i < b.N; i++ {
 			for _, ask := range asks {
 				book.Asks = book.Asks.Upsert(ask, false)
@@ -64,7 +64,7 @@ func BenchmarkOrderBook_UpdateAndInsert(b *testing.B) {
 		rbBook.Bids.Upsert(bid.Price, bid.Volume)
 	}
 
-	b.Run("RBOrderBook", func(b *testing.B) {
+	b.Run("RBTOrderBook", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			var price = fixedpoint.NewFromFloat(rand.Float64() * 2000.0)
 			if price >= fixedpoint.NewFromFloat(1000) {
@@ -75,7 +75,7 @@ func BenchmarkOrderBook_UpdateAndInsert(b *testing.B) {
 		}
 	})
 
-	sliceBook := &OrderBook{}
+	sliceBook := &SliceOrderBook{}
 	for i := 0; i < b.N; i++ {
 		for _, ask := range asks {
 			sliceBook.Asks = sliceBook.Asks.Upsert(ask, false)
@@ -84,7 +84,7 @@ func BenchmarkOrderBook_UpdateAndInsert(b *testing.B) {
 			sliceBook.Bids = sliceBook.Bids.Upsert(bid, true)
 		}
 	}
-	b.Run("OrderBook", func(b *testing.B) {
+	b.Run("SliceOrderBook", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			var price = fixedpoint.NewFromFloat(rand.Float64() * 2000.0)
 			if price >= fixedpoint.NewFromFloat(1000) {
@@ -97,7 +97,7 @@ func BenchmarkOrderBook_UpdateAndInsert(b *testing.B) {
 }
 
 func TestOrderBook_IsValid(t *testing.T) {
-	ob := OrderBook{
+	ob := SliceOrderBook{
 		Bids: PriceVolumeSlice{
 			{fixedpoint.NewFromFloat(100.0), fixedpoint.NewFromFloat(1.5)},
 			{fixedpoint.NewFromFloat(90.0), fixedpoint.NewFromFloat(2.5)},

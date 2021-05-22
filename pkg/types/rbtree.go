@@ -341,26 +341,38 @@ func (tree *RBTree) Successor(current *RBNode) *RBNode {
 	return newNode
 }
 
-func (tree *RBTree) Preorder(current *RBNode, cb func(n *RBNode)) {
+func (tree *RBTree) Preorder(cb func(n *RBNode)) {
+	tree.PreorderOf(tree.Root, cb)
+}
+
+func (tree *RBTree) PreorderOf(current *RBNode, cb func(n *RBNode)) {
 	if current != nil {
 		cb(current)
-		tree.Preorder(current.Left, cb)
-		tree.Preorder(current.Right, cb)
+		tree.PreorderOf(current.Left, cb)
+		tree.PreorderOf(current.Right, cb)
 	}
 }
 
-func (tree *RBTree) Inorder(current *RBNode, cb func(n *RBNode)) {
+func (tree *RBTree) Inorder(cb func(n *RBNode)) {
+	tree.InorderOf(tree.Root, cb)
+}
+
+func (tree *RBTree) InorderOf(current *RBNode, cb func(n *RBNode)) {
 	if current != nil {
-		tree.Preorder(current.Left, cb)
+		tree.InorderOf(current.Left, cb)
 		cb(current)
-		tree.Preorder(current.Right, cb)
+		tree.InorderOf(current.Right, cb)
 	}
 }
 
-func (tree *RBTree) Postorder(current *RBNode, cb func(n *RBNode)) {
+func (tree *RBTree) Postorder(cb func(n *RBNode)) {
+	tree.PostorderOf(tree.Root, cb)
+}
+
+func (tree *RBTree) PostorderOf(current *RBNode, cb func(n *RBNode)) {
 	if current != nil {
-		tree.Preorder(current.Left, cb)
-		tree.Preorder(current.Right, cb)
+		tree.PostorderOf(current.Left, cb)
+		tree.PostorderOf(current.Right, cb)
 		cb(current)
 	}
 }
