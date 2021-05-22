@@ -94,21 +94,21 @@ func (stream *StandardStream) EmitKLine(kline KLine) {
 	}
 }
 
-func (stream *StandardStream) OnBookUpdate(cb func(book OrderBook)) {
+func (stream *StandardStream) OnBookUpdate(cb func(book SliceOrderBook)) {
 	stream.bookUpdateCallbacks = append(stream.bookUpdateCallbacks, cb)
 }
 
-func (stream *StandardStream) EmitBookUpdate(book OrderBook) {
+func (stream *StandardStream) EmitBookUpdate(book SliceOrderBook) {
 	for _, cb := range stream.bookUpdateCallbacks {
 		cb(book)
 	}
 }
 
-func (stream *StandardStream) OnBookSnapshot(cb func(book OrderBook)) {
+func (stream *StandardStream) OnBookSnapshot(cb func(book SliceOrderBook)) {
 	stream.bookSnapshotCallbacks = append(stream.bookSnapshotCallbacks, cb)
 }
 
-func (stream *StandardStream) EmitBookSnapshot(book OrderBook) {
+func (stream *StandardStream) EmitBookSnapshot(book SliceOrderBook) {
 	for _, cb := range stream.bookSnapshotCallbacks {
 		cb(book)
 	}
@@ -133,7 +133,7 @@ type StandardStreamEventHub interface {
 
 	OnKLine(cb func(kline KLine))
 
-	OnBookUpdate(cb func(book OrderBook))
+	OnBookUpdate(cb func(book SliceOrderBook))
 
-	OnBookSnapshot(cb func(book OrderBook))
+	OnBookSnapshot(cb func(book SliceOrderBook))
 }

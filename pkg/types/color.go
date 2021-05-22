@@ -1,4 +1,5 @@
 package types
 
-const Green = "#228B22"
-const Red = "#800000"
+const GreenColor = "#228B22"
+const RedColor = "#800000"
+const GrayColor = "#f0f0f0"

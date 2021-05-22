@@ -234,8 +234,8 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 					continue
 				}
 
-				sourceBook := s.sourceBook.Get()
-				book := s.tradingBook.Get()
+				sourceBook := s.sourceBook.Copy()
+				book := s.tradingBook.Copy()
 				bestBid, hasBid := book.BestBid()
 				bestAsk, hasAsk := book.BestAsk()
 

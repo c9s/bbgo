@@ -174,7 +174,7 @@ func (e *BookEvent) Time() time.Time {
 	return time.Unix(0, e.Timestamp*int64(time.Millisecond))
 }
 
-func (e *BookEvent) OrderBook() (snapshot types.OrderBook, err error) {
+func (e *BookEvent) OrderBook() (snapshot types.SliceOrderBook, err error) {
 	snapshot.Symbol = strings.ToUpper(e.Market)
 
 	for _, bid := range e.Bids {

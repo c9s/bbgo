@@ -184,11 +184,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 		return
 	}
 
-	sourceBook := s.book.Get()
-	if len(sourceBook.Bids) == 0 || len(sourceBook.Asks) == 0 {
-		return
-	}
-
+	sourceBook := s.book.Copy()
 	if valid, err := sourceBook.IsValid(); !valid {
 		log.WithError(err).Errorf("%s invalid order book, skip quoting: %v", s.Symbol, err)
 		return
@@ -265,8 +261,11 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 		return
 	}
 
-	bestBidPrice := sourceBook.Bids[0].Price
-	bestAskPrice := sourceBook.Asks[0].Price
+	bestBid, _ := sourceBook.BestBid()
+	bestBidPrice := bestBid.Price
+
+	bestAsk, _ := sourceBook.BestAsk()
+	bestAskPrice := bestAsk.Price
 	log.Infof("%s book ticker: best ask / best bid = %f / %f", s.Symbol, bestAskPrice.Float64(), bestBidPrice.Float64())
 
 	var submitOrders []types.SubmitOrder
@@ -335,7 +334,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 			}
 
 			accumulativeBidQuantity += bidQuantity
-			bidPrice := aggregatePrice(sourceBook.Bids, accumulativeBidQuantity)
+			bidPrice := aggregatePrice(sourceBook.SideBook(types.SideTypeBuy), accumulativeBidQuantity)
 			bidPrice = bidPrice.MulFloat64(1.0 - bidMargin.Float64())
 
 			if i > 0 && pips > 0 {
@@ -382,7 +381,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 			}
 			accumulativeAskQuantity += askQuantity
 
-			askPrice := aggregatePrice(sourceBook.Asks, accumulativeAskQuantity)
+			askPrice := aggregatePrice(sourceBook.SideBook(types.SideTypeSell), accumulativeAskQuantity)
 			askPrice = askPrice.MulFloat64(1.0 + askMargin.Float64())
 			if i > 0 && pips > 0 {
 				askPrice -= pips.MulFloat64(s.makerMarket.TickSize)
@@ -443,23 +442,18 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	}
 
 	lastPrice := s.lastPrice
-	sourceBook := s.book.Get()
+	sourceBook := s.book.Copy()
 	switch side {
 
 	case types.SideTypeBuy:
-		if len(sourceBook.Asks) > 0 {
-			if pv, ok := sourceBook.Asks.First(); ok {
-				lastPrice = pv.Price.Float64()
-			}
+		if bestAsk, ok := sourceBook.BestAsk(); ok {
+			lastPrice = bestAsk.Price.Float64()
 		}
 
 	case types.SideTypeSell:
-		if len(sourceBook.Bids) > 0 {
-			if pv, ok := sourceBook.Bids.First(); ok {
-				lastPrice = pv.Price.Float64()
-			}
+		if bestBid, ok := sourceBook.BestBid(); ok {
+			lastPrice = bestBid.Price.Float64()
 		}
-
 	}
 
 	notional := quantity.MulFloat64(lastPrice)
