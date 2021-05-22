@@ -567,6 +567,10 @@ func (s *Strategy) handleTradeUpdate(trade types.Trade) {
 	}
 
 	s.lastPrice = trade.Price
+
+	if err := s.SaveState(); err != nil {
+		log.WithError(err).Error("save state error")
+	}
 }
 
 func (s *Strategy) Validate() error {
@@ -582,6 +586,33 @@ func (s *Strategy) Validate() error {
 		return errors.New("symbol is required")
 	}
 
+	return nil
+}
+
+func (s *Strategy) LoadState() error {
+	var state State
+
+	// load position
+	if err := s.Persistence.Load(&state, ID, s.Symbol, stateKey); err != nil {
+		if err != service.ErrPersistenceNotExists {
+			return err
+		}
+
+		s.state = &State{}
+	} else {
+		s.state = &state
+		log.Infof("state is restored: %+v", s.state)
+	}
+
+	return nil
+}
+
+func (s *Strategy) SaveState() error {
+	if err := s.Persistence.Save(s.state, ID, s.Symbol, stateKey); err != nil {
+		return err
+	} else {
+		log.Infof("state is saved => %+v", s.state)
+	}
 	return nil
 }
 
@@ -666,20 +697,9 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	s.groupID = max.GenerateGroupID(instanceID)
 	log.Infof("using group id %d from fnv(%s)", s.groupID, instanceID)
 
-	var state State
-
-	// load position
-	if err := s.Persistence.Load(&state, ID, s.Symbol, stateKey); err != nil {
-		if err != service.ErrPersistenceNotExists {
-			return err
-		}
-
-		s.state = &State{}
+	if err := s.LoadState(); err != nil {
+		return err
 	} else {
-		// loaded successfully
-		s.state = &state
-
-		log.Infof("state is restored: %+v", s.state)
 		s.Notify("%s position is restored => %f", s.Symbol, s.state.HedgePosition.Float64())
 	}
 
@@ -767,8 +787,10 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 		close(s.stopC)
 
+		// wait for the quoter to stop
 		time.Sleep(s.UpdateInterval.Duration())
 
+		// ensure every order is cancelled
 		for s.activeMakerOrders.NumOfOrders() > 0 {
 			orders := s.activeMakerOrders.Orders()
 			log.Warnf("%d orders are not cancelled yet:", len(orders))
@@ -776,18 +798,45 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 			if err := s.makerSession.Exchange.CancelOrders(ctx, s.activeMakerOrders.Orders()...); err != nil {
 				log.WithError(err).Errorf("can not cancel %s orders", s.Symbol)
+				continue
 			}
 
-			log.Warnf("waiting for orders to be cancelled...")
-			time.Sleep(3 * time.Second)
+			log.Infof("waiting for orders to be cancelled...")
+
+			select {
+			case <-time.After(3 * time.Second):
+
+			case <-ctx.Done():
+				break
+
+			}
+
+			// verify the current open orders via the RESTful API
+			if s.activeMakerOrders.NumOfOrders() > 0 {
+				log.Warnf("there are orders not cancelled, using REStful API to verify...")
+				openOrders, err := s.makerSession.Exchange.QueryOpenOrders(ctx, s.Symbol)
+				if err != nil {
+					log.WithError(err).Errorf("can not query %s open orders", s.Symbol)
+					continue
+				}
+
+				openOrderStore := bbgo.NewOrderStore(s.Symbol)
+				openOrderStore.Add(openOrders...)
+
+				for _, o := range s.activeMakerOrders.Orders() {
+					// if it does not exist, we should remove it
+					if !openOrderStore.Exists(o.OrderID) {
+						s.activeMakerOrders.Remove(o)
+					}
+				}
+			}
 		}
 		log.Info("all orders are cancelled successfully")
 
-		if err := s.Persistence.Save(s.state, ID, s.Symbol, stateKey); err != nil {
+		if err := s.SaveState(); err != nil {
 			log.WithError(err).Errorf("can not save state: %+v", s.state)
 		} else {
-			log.Infof("state is saved => %+v", s.state)
-			s.Notify("%s position is saved: position = %f", s.Symbol, s.state.HedgePosition.Float64())
+			s.Notify("%s position is saved: position = %f", s.Symbol, s.state.HedgePosition.Float64(), s.state.Position)
 		}
 	})
 
