@@ -356,7 +356,7 @@ func (s *Strategy) handleTradeUpdate(trade types.Trade) {
 
 	s.state.AccumulatedVolume.AtomicAdd(fixedpoint.NewFromFloat(trade.Quantity))
 
-	if profit, madeProfit := s.state.Position.AddTrade(trade); madeProfit {
+	if profit, netProfit, madeProfit := s.state.Position.AddTrade(trade); madeProfit {
 		s.state.AccumulatedPnL.AtomicAdd(profit)
 
 		if profit < 0 {
@@ -372,11 +372,12 @@ func (s *Strategy) handleTradeUpdate(trade types.Trade) {
 			since = time.Unix(s.state.AccumulatedSince, 0).In(localTimeZone)
 		}
 
-		s.Notify("%s arbitrage profit %s %f %s (%.3f%%), since %s accumulated net profit %f %s, accumulated loss %f %s",
+		s.Notify("%s arbitrage profit %s %f %s (%.3f%%), net profit =~ %f %s, since %s accumulated net profit %f %s, accumulated loss %f %s",
 			s.Symbol,
 			pnlEmoji(profit),
 			profit.Float64(), s.state.Position.QuoteCurrency,
 			profitMargin.Float64()*100.0,
+			netProfit.Float64(), s.state.Position.QuoteCurrency,
 			since.Format(time.RFC822),
 			s.state.AccumulatedPnL.Float64(), s.state.Position.QuoteCurrency,
 			s.state.AccumulatedLoss.Float64(), s.state.Position.QuoteCurrency)

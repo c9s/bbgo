@@ -107,18 +107,19 @@ func (p *Position) BindStream(stream types.Stream) {
 	})
 }
 
-func (p *Position) AddTrades(trades []types.Trade) (fixedpoint.Value, bool) {
-	var totalProfitAmount fixedpoint.Value
+func (p *Position) AddTrades(trades []types.Trade) (fixedpoint.Value, fixedpoint.Value, bool) {
+	var totalProfitAmount, totalNetProfit fixedpoint.Value
 	for _, trade := range trades {
-		if profitAmount, profit := p.AddTrade(trade); profit {
-			totalProfitAmount += profitAmount
+		if profit, netProfit, madeProfit := p.AddTrade(trade); madeProfit {
+			totalProfitAmount += profit
+			totalNetProfit += netProfit
 		}
 	}
 
-	return totalProfitAmount, totalProfitAmount != 0
+	return totalProfitAmount, totalNetProfit, totalProfitAmount != 0
 }
 
-func (p *Position) AddTrade(t types.Trade) (fixedpoint.Value, bool) {
+func (p *Position) AddTrade(t types.Trade) (profit fixedpoint.Value, netProfit fixedpoint.Value, madeProfit bool) {
 	price := fixedpoint.NewFromFloat(t.Price)
 	quantity := fixedpoint.NewFromFloat(t.Quantity)
 	quoteQuantity := fixedpoint.NewFromFloat(t.QuoteQuantity)
@@ -158,16 +159,19 @@ func (p *Position) AddTrade(t types.Trade) (fixedpoint.Value, bool) {
 		if p.Base < 0 {
 			// handling short-to-long position
 			if p.Base+quantity > 0 {
-				closingProfit := (p.AverageCost - price).Mul(-p.Base) - quoteFee
+				profit = (p.AverageCost - price).Mul(-p.Base)
+				netProfit = profit - quoteFee
 				p.Base += quantity
 				p.Quote -= quoteQuantity
 				p.AverageCost = price
-				return closingProfit, true
+				return profit, netProfit, true
 			} else {
 				// covering short position
 				p.Base += quantity
 				p.Quote -= quoteQuantity
-				return (p.AverageCost - price).Mul(quantity) - quoteFee, true
+				profit = (p.AverageCost - price).Mul(quantity)
+				netProfit = profit - quoteFee
+				return profit, netProfit, true
 			}
 		}
 
@@ -175,21 +179,24 @@ func (p *Position) AddTrade(t types.Trade) (fixedpoint.Value, bool) {
 		p.Base += quantity
 		p.Quote -= quoteQuantity
 
-		return 0, false
+		return 0, 0, false
 
 	case types.SideTypeSell:
 		if p.Base > 0 {
 			// long-to-short
 			if p.Base-quantity < 0 {
-				closingProfit := (price - p.AverageCost).Mul(p.Base) - quoteFee
+				profit = (price - p.AverageCost).Mul(p.Base)
+				netProfit = profit - quoteFee
 				p.Base -= quantity
 				p.Quote += quoteQuantity
 				p.AverageCost = price
-				return closingProfit, true
+				return profit, netProfit, true
 			} else {
 				p.Base -= quantity
 				p.Quote += quoteQuantity
-				return (price - p.AverageCost).Mul(quantity) - quoteFee, true
+				profit = (price - p.AverageCost).Mul(quantity)
+				netProfit = profit - quoteFee
+				return profit, netProfit, true
 			}
 		}
 
@@ -198,8 +205,8 @@ func (p *Position) AddTrade(t types.Trade) (fixedpoint.Value, bool) {
 		p.Base -= quantity
 		p.Quote += quoteQuantity
 
-		return 0, false
+		return 0, 0, false
 	}
 
-	return 0, false
+	return 0, 0, false
 }
