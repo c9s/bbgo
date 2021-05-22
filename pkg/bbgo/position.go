@@ -157,7 +157,7 @@ func (p *Position) AddTrade(t types.Trade) (profit fixedpoint.Value, netProfit f
 
 	case types.SideTypeBuy:
 		if p.Base < 0 {
-			// handling short-to-long position
+			// convert short position to long position
 			if p.Base+quantity > 0 {
 				profit = (p.AverageCost - price).Mul(-p.Base)
 				netProfit = profit - quoteFee
@@ -183,7 +183,7 @@ func (p *Position) AddTrade(t types.Trade) (profit fixedpoint.Value, netProfit f
 
 	case types.SideTypeSell:
 		if p.Base > 0 {
-			// long-to-short
+			// convert long position to short position
 			if p.Base-quantity < 0 {
 				profit = (price - p.AverageCost).Mul(p.Base)
 				netProfit = profit - quoteFee
