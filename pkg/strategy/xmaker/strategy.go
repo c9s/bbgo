@@ -546,18 +546,20 @@ func (s *Strategy) handleTradeUpdate(trade types.Trade) {
 		}
 
 		profitMargin := profit.DivFloat64(trade.QuoteQuantity)
+		netProfitMargin := netProfit.DivFloat64(trade.QuoteQuantity)
 
 		var since time.Time
 		if s.state.AccumulatedSince > 0 {
 			since = time.Unix(s.state.AccumulatedSince, 0).In(localTimeZone)
 		}
 
-		s.Notify("%s trade profit %s %f %s (%.3f%%), net profit =~ %f %s, since %s accumulated net profit %f %s, accumulated loss %f %s",
+		s.Notify("%s trade profit %s %f %s (%.2f%%), net profit =~ %f %s (%.2f%%), since %s accumulated net profit %f %s, accumulated loss %f %s",
 			s.Symbol,
 			pnlEmoji(profit),
 			profit.Float64(), s.state.Position.QuoteCurrency,
 			profitMargin.Float64()*100.0,
 			netProfit.Float64(), s.state.Position.QuoteCurrency,
+			netProfitMargin.Float64()*100.0,
 			since.Format(time.RFC822),
 			s.state.AccumulatedPnL.Float64(), s.state.Position.QuoteCurrency,
 			s.state.AccumulatedLoss.Float64(), s.state.Position.QuoteCurrency)
