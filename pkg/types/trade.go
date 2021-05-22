@@ -73,12 +73,12 @@ type Trade struct {
 }
 
 func (trade Trade) String() string {
-	return fmt.Sprintf("TRADE %s %s %4s %s @ %s orderID %d %s amount %f",
+	return fmt.Sprintf("TRADE %s %s %4s %f @ %f orderID %d %s amount %f",
 		trade.Exchange.String(),
 		trade.Symbol,
 		trade.Side,
-		util.FormatFloat(trade.Quantity, 4),
-		util.FormatFloat(trade.Price, 3),
+		trade.Quantity,
+		trade.Price,
 		trade.OrderID,
 		trade.Time.Time().Format(time.StampMilli),
 		trade.QuoteQuantity)
@@ -86,13 +86,13 @@ func (trade Trade) String() string {
 
 // PlainText is used for telegram-styled messages
 func (trade Trade) PlainText() string {
-	return fmt.Sprintf("Trade %s %s %s %s @ %s, amount %s",
+	return fmt.Sprintf("Trade %s %s %s %f @ %f, amount %f",
 		trade.Exchange.String(),
 		trade.Symbol,
 		trade.Side,
-		util.FormatFloat(trade.Quantity, 4),
-		util.FormatFloat(trade.Price, 3),
-		util.FormatFloat(trade.QuoteQuantity, 2))
+		trade.Quantity,
+		trade.Price,
+		trade.QuoteQuantity)
 }
 
 var slackTradeTextTemplate = ":handshake: {{ .Symbol }} {{ .Side }} Trade Execution @ {{ .Price  }}"
