@@ -26,18 +26,20 @@ func NewRBOrderBook(symbol string) *RBTOrderBook {
 }
 
 func (b *RBTOrderBook) BestBid() (PriceVolume, bool) {
-	right := b.Bids.Rightmost(b.Bids.Root)
+	right := b.Bids.Rightmost()
 	if right != nil {
 		return PriceVolume{Price: right.Key, Volume: right.Value}, true
 	}
+
 	return PriceVolume{}, false
 }
 
 func (b *RBTOrderBook) BestAsk() (PriceVolume, bool) {
-	left := b.Asks.Leftmost(b.Bids.Root)
+	left := b.Asks.Leftmost()
 	if left != nil {
 		return PriceVolume{Price: left.Key, Volume: left.Value}, true
 	}
+
 	return PriceVolume{}, false
 }
 

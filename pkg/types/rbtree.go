@@ -39,6 +39,10 @@ func (tree *RBTree) Delete(key fixedpoint.Value) bool {
 		y = del
 	} else {
 		y = tree.Successor(del)
+		if y == nil {
+			// prevent segmentation fault
+			y = Neel
+		}
 	}
 
 	if y.Left != Neel {
@@ -236,14 +240,13 @@ func (tree *RBTree) Size() int {
 func (tree *RBTree) InsertFixup(current *RBNode) {
 	// A red node can't have a red parent, we need to fix it up
 	for current.Parent.Color == Red {
-		grandParent := current.Parent.Parent
-		if current.Parent == grandParent.Left {
-			uncle := grandParent.Right
+		if current.Parent == current.Parent.Parent.Left {
+			uncle := current.Parent.Parent.Right
 			if uncle.Color == Red {
 				current.Parent.Color = Black
 				uncle.Color = Black
-				grandParent.Color = Red
-				current = grandParent
+				current.Parent.Parent.Color = Red
+				current = current.Parent.Parent
 			} else { // if uncle is black
 				if current == current.Parent.Right {
 					current = current.Parent
@@ -260,8 +263,8 @@ func (tree *RBTree) InsertFixup(current *RBNode) {
 				current.Parent.Color = Black
 				uncle.Color = Black
 				current.Parent.Parent.Color = Red
+				current = current.Parent.Parent
 			} else {
-
 				if current == current.Parent.Left {
 					current = current.Parent
 					tree.RotateRight(current)
@@ -328,17 +331,33 @@ func (tree *RBTree) RotateRight(y *RBNode) {
 	y.Parent = x
 }
 
-func (tree *RBTree) Rightmost(current *RBNode) *RBNode {
+func (tree *RBTree) Rightmost() *RBNode {
+	return tree.RightmostOf(tree.Root)
+}
+
+func (tree *RBTree) RightmostOf(current *RBNode) *RBNode {
 	for current.Right != Neel {
 		current = current.Right
+	}
+
+	if current == Neel {
+		return nil
 	}
 
 	return current
 }
 
-func (tree *RBTree) Leftmost(current *RBNode) *RBNode {
+func (tree *RBTree) Leftmost() *RBNode {
+	return tree.LeftmostOf(tree.Root)
+}
+
+func (tree *RBTree) LeftmostOf(current *RBNode) *RBNode {
 	for current.Left != Neel {
 		current = current.Left
+	}
+
+	if current == Neel {
+		return nil
 	}
 
 	return current
@@ -346,13 +365,17 @@ func (tree *RBTree) Leftmost(current *RBNode) *RBNode {
 
 func (tree *RBTree) Successor(current *RBNode) *RBNode {
 	if current.Right != Neel {
-		return tree.Leftmost(current.Right)
+		return tree.LeftmostOf(current.Right)
 	}
 
 	var newNode = current.Parent
 	for newNode != Neel && current == newNode.Right {
 		current = newNode
 		newNode = newNode.Parent
+	}
+
+	if newNode == Neel {
+		return nil
 	}
 
 	return newNode
@@ -391,7 +414,7 @@ func (tree *RBTree) InorderReverse(cb func(n *RBNode) bool) {
 }
 
 func (tree *RBTree) InorderReverseOf(current *RBNode, cb func(n *RBNode) bool) {
-	if current != nil {
+	if current != Neel {
 		tree.InorderReverseOf(current.Right, cb)
 		if !cb(current) {
 			return
@@ -405,7 +428,7 @@ func (tree *RBTree) Postorder(cb func(n *RBNode) bool) {
 }
 
 func (tree *RBTree) PostorderOf(current *RBNode, cb func(n *RBNode) bool) {
-	if current != nil {
+	if current != Neel {
 		tree.PostorderOf(current.Left, cb)
 		tree.PostorderOf(current.Right, cb)
 		if !cb(current) {
