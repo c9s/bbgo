@@ -4,20 +4,20 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
+var Neel = &RBNode{
+	Color: Black,
+}
+
 type RBTree struct {
-	Root, Neel *RBNode
+	Root *RBNode
 }
 
 func NewRBTree() *RBTree {
-	var neel = &RBNode{
-		Color: Black,
-	}
-	var root = neel
-	root.Parent = neel
+	var root = Neel
+	root.Parent = Neel
 
 	return &RBTree{
 		Root: root,
-		Neel: neel,
 	}
 }
 
@@ -31,13 +31,13 @@ func (tree *RBTree) Delete(key fixedpoint.Value) bool {
 	// x (the child of the deleted node)
 	var x, y *RBNode
 
-	if del.Left == tree.Neel || del.Right == tree.Neel {
+	if del.Left == Neel || del.Right == Neel {
 		y = del
 	} else {
 		y = tree.Successor(del)
 	}
 
-	if y.Left != tree.Neel {
+	if y.Left != Neel {
 		x = y.Left
 	} else {
 		x = y.Right
@@ -45,7 +45,7 @@ func (tree *RBTree) Delete(key fixedpoint.Value) bool {
 
 	x.Parent = y.Parent
 
-	if y.Parent == tree.Neel {
+	if y.Parent == Neel {
 		tree.Root = x
 	} else if y == y.Parent.Left {
 		y.Parent.Left = x
@@ -129,7 +129,7 @@ func (tree *RBTree) DeleteFixup(current *RBNode) {
 }
 
 func (tree *RBTree) Upsert(key, val fixedpoint.Value) {
-	var y = tree.Neel
+	var y = Neel
 	var x = tree.Root
 	var node = &RBNode{
 		Key:   key,
@@ -137,7 +137,7 @@ func (tree *RBTree) Upsert(key, val fixedpoint.Value) {
 		Color: Red,
 	}
 
-	for x != tree.Neel {
+	for x != Neel {
 		y = x
 
 		if node.Key == x.Key {
@@ -153,7 +153,7 @@ func (tree *RBTree) Upsert(key, val fixedpoint.Value) {
 
 	node.Parent = y
 
-	if y == tree.Neel {
+	if y == Neel {
 		tree.Root = node
 	} else if node.Key < y.Key {
 		y.Left = node
@@ -161,15 +161,15 @@ func (tree *RBTree) Upsert(key, val fixedpoint.Value) {
 		y.Right = node
 	}
 
-	node.Left = tree.Neel
-	node.Right = tree.Neel
+	node.Left = Neel
+	node.Right = Neel
 	node.Color = Red
 
 	tree.InsertFixup(node)
 }
 
 func (tree *RBTree) Insert(key, val fixedpoint.Value) {
-	var y = tree.Neel
+	var y = Neel
 	var x = tree.Root
 	var node = &RBNode{
 		Key:   key,
@@ -177,7 +177,7 @@ func (tree *RBTree) Insert(key, val fixedpoint.Value) {
 		Color: Red,
 	}
 
-	for x != tree.Neel {
+	for x != Neel {
 		y = x
 
 		if node.Key < x.Key {
@@ -189,7 +189,7 @@ func (tree *RBTree) Insert(key, val fixedpoint.Value) {
 
 	node.Parent = y
 
-	if y == tree.Neel {
+	if y == Neel {
 		tree.Root = node
 	} else if node.Key < y.Key {
 		y.Left = node
@@ -197,8 +197,8 @@ func (tree *RBTree) Insert(key, val fixedpoint.Value) {
 		y.Right = node
 	}
 
-	node.Left = tree.Neel
-	node.Right = tree.Neel
+	node.Left = Neel
+	node.Right = Neel
 	node.Color = Red
 
 	tree.InsertFixup(node)
@@ -353,6 +353,7 @@ func (tree *RBTree) PreorderOf(current *RBNode, cb func(n *RBNode)) {
 	}
 }
 
+// Inorder traverses the tree in ascending order
 func (tree *RBTree) Inorder(cb func(n *RBNode)) {
 	tree.InorderOf(tree.Root, cb)
 }
@@ -362,6 +363,19 @@ func (tree *RBTree) InorderOf(current *RBNode, cb func(n *RBNode)) {
 		tree.InorderOf(current.Left, cb)
 		cb(current)
 		tree.InorderOf(current.Right, cb)
+	}
+}
+
+// InorderReverse traverses the tree in descending order
+func (tree *RBTree) InorderReverse(cb func(n *RBNode)) {
+	tree.InorderReverseOf(tree.Root, cb)
+}
+
+func (tree *RBTree) InorderReverseOf(current *RBNode, cb func(n *RBNode)) {
+	if current != nil {
+		tree.InorderOf(current.Right, cb)
+		cb(current)
+		tree.InorderOf(current.Left, cb)
 	}
 }
 
@@ -375,4 +389,21 @@ func (tree *RBTree) PostorderOf(current *RBNode, cb func(n *RBNode)) {
 		tree.PostorderOf(current.Right, cb)
 		cb(current)
 	}
+}
+
+func copyNode(node *RBNode) *RBNode {
+	if node == Neel {
+		return Neel
+	}
+
+	newNode := *node
+	newNode.Left = copyNode(node.Left)
+	newNode.Right = copyNode(node.Right)
+	return &newNode
+}
+
+func (tree *RBTree) Copy() *RBTree {
+	newTree := NewRBTree()
+	newTree.Root = copyNode(tree.Root)
+	return newTree
 }

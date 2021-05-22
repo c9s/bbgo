@@ -56,7 +56,7 @@ func (b *MutexOrderBook) CopyDepth(depth int) SliceOrderBook {
 	return b.SliceOrderBook.CopyDepth(depth)
 }
 
-func (b *MutexOrderBook) Get() SliceOrderBook {
+func (b *MutexOrderBook) Copy() SliceOrderBook {
 	b.Lock()
 	defer b.Unlock()
 	return b.SliceOrderBook.Copy()

@@ -83,7 +83,7 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 	// avoid unlock issue
 	time.Sleep(100 * time.Millisecond)
 
-	sourceBook := s.book.Get()
+	sourceBook := s.book.Copy()
 	if len(sourceBook.Bids) == 0 || len(sourceBook.Asks) == 0 {
 		return
 	}
