@@ -2,9 +2,11 @@ package okexapi
 
 import (
 	"bytes"
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -21,6 +23,23 @@ const defaultHTTPTimeout = time.Second * 15
 const RestBaseURL = "https://www.okex.com/"
 const PublicWebSocketURL = "wss://ws.okex.com:8443/ws/v5/public"
 const PrivateWebSocketURL = "wss://ws.okex.com:8443/ws/v5/private"
+
+type SideType string
+
+const (
+	SideTypeBuy  SideType = "buy"
+	SideTypeSell SideType = "sell"
+)
+
+type OrderType string
+
+const (
+	OrderTypeMarket   OrderType = "market"
+	OrderTypeLimit              = "limit"
+	OrderTypePostOnly           = "post_only"
+	OrderTypeFOK                = "fok"
+	OrderTypeIOC                = "ioc"
+)
 
 type RestClient struct {
 	BaseURL *url.URL
@@ -71,8 +90,29 @@ func (c *RestClient) newRequest(method, refURL string, params url.Values, body [
 	return req, nil
 }
 
+// sendRequest sends the request to the API server and handle the response
+func (c *RestClient) sendRequest(req *http.Request) (*util.Response, error) {
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	// newResponse reads the response body and return a new Response object
+	response, err := util.NewResponse(resp)
+	if err != nil {
+		return response, err
+	}
+
+	// Check error, if there is an error, return the ErrorResponse struct type
+	if response.IsError() {
+		return response, errors.New(string(response.Body))
+	}
+
+	return response, nil
+}
+
 // newAuthenticatedRequest creates new http request for authenticated routes.
-func (c *RestClient) newAuthenticatedRequest(method, refURL string, params url.Values) (*http.Request, error) {
+func (c *RestClient) newAuthenticatedRequest(method, refURL string, params url.Values, payload interface{}) (*http.Request, error) {
 	if len(c.Key) == 0 {
 		return nil, errors.New("empty api key")
 	}
@@ -97,10 +137,27 @@ func (c *RestClient) newAuthenticatedRequest(method, refURL string, params url.V
 	t := time.Now().In(time.UTC)
 	timestamp := t.Format("2006-01-02T15:04:05.999Z07:00")
 
-	payload := timestamp + strings.ToUpper(method) + path
-	sign := signPayload(payload, c.Secret)
-
 	var body []byte
+
+	if payload != nil {
+		switch v := payload.(type) {
+		case string:
+			body = []byte(v)
+
+		case []byte:
+			body = v
+
+		default:
+			body, err = json.Marshal(v)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	signKey := timestamp + strings.ToUpper(method) + path + string(body)
+	signature := sign(signKey, c.Secret)
+
 	req, err := http.NewRequest(method, pathURL.String(), bytes.NewReader(body))
 	if err != nil {
 		return nil, err
@@ -109,10 +166,9 @@ func (c *RestClient) newAuthenticatedRequest(method, refURL string, params url.V
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Accept", "application/json")
 	req.Header.Add("OK-ACCESS-KEY", c.Key)
-	req.Header.Add("OK-ACCESS-SIGN", sign)
+	req.Header.Add("OK-ACCESS-SIGN", signature)
 	req.Header.Add("OK-ACCESS-TIMESTAMP", timestamp)
 	req.Header.Add("OK-ACCESS-PASSPHRASE", c.Passphrase)
-
 	return req, nil
 }
 
@@ -137,7 +193,7 @@ type BalanceSummary struct {
 type BalanceSummaryList []BalanceSummary
 
 func (c *RestClient) AccountBalances() (BalanceSummaryList, error) {
-	req, err := c.newAuthenticatedRequest("GET", "/api/v5/account/balance", nil)
+	req, err := c.newAuthenticatedRequest("GET", "/api/v5/account/balance", nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -169,7 +225,7 @@ type AssetBalance struct {
 type AssetBalanceList []AssetBalance
 
 func (c *RestClient) AssetBalances() (AssetBalanceList, error) {
-	req, err := c.newAuthenticatedRequest("GET", "/api/v5/asset/balances", nil)
+	req, err := c.newAuthenticatedRequest("GET", "/api/v5/asset/balances", nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -204,7 +260,7 @@ type AssetCurrency struct {
 }
 
 func (c *RestClient) AssetCurrencies() ([]AssetCurrency, error) {
-	req, err := c.newAuthenticatedRequest("GET", "/api/v5/asset/currencies", nil)
+	req, err := c.newAuthenticatedRequest("GET", "/api/v5/asset/currencies", nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -258,7 +314,7 @@ func (c *RestClient) MarketTicker(instId string) (*MarketTicker, error) {
 	var params = url.Values{}
 	params.Add("instId", instId)
 
-	req, err := c.newAuthenticatedRequest("GET", "/api/v5/market/ticker", params)
+	req, err := c.newAuthenticatedRequest("GET", "/api/v5/market/ticker", params, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -289,7 +345,7 @@ func (c *RestClient) MarketTickers(instType string) ([]MarketTicker, error) {
 	var params = url.Values{}
 	params.Add("instType", instType)
 
-	req, err := c.newAuthenticatedRequest("GET", "/api/v5/market/tickers", params)
+	req, err := c.newAuthenticatedRequest("GET", "/api/v5/market/tickers", params, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -311,28 +367,260 @@ func (c *RestClient) MarketTickers(instType string) ([]MarketTicker, error) {
 	return tickerResponse.Data, nil
 }
 
-// sendRequest sends the request to the API server and handle the response
-func (c *RestClient) sendRequest(req *http.Request) (*util.Response, error) {
-	resp, err := c.client.Do(req)
+type OrderResponse struct {
+	OrderID       string `json:"ordId"`
+	ClientOrderID string `json:"clOrdId"`
+	Tag           string `json:"tag"`
+	Code          string `json:"sCode"`
+	Message       string `json:"sMsg"`
+}
+
+type PlaceOrderRequest struct {
+	client *RestClient
+
+	instId string
+
+	// tdMode
+	// margin mode: "cross", "isolated"
+	// non-margin mode cash
+	tdMode string
+
+	// A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 32 characters.
+	clientOrderID *string
+
+	// A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 8 characters.
+	tag *string
+
+	// "buy" or "sell"
+	side SideType
+
+	ordType OrderType
+
+	// sz Quantity
+	sz string
+
+	// price
+	px *string
+}
+
+func (r *PlaceOrderRequest) InstrumentID(instID string) *PlaceOrderRequest {
+	r.instId = instID
+	return r
+}
+
+func (r *PlaceOrderRequest) TradeMode(mode string) *PlaceOrderRequest {
+	r.tdMode = mode
+	return r
+}
+
+func (r *PlaceOrderRequest) ClientOrderID(clientOrderID string) *PlaceOrderRequest {
+	r.clientOrderID = &clientOrderID
+	return r
+}
+
+func (r *PlaceOrderRequest) Side(side SideType) *PlaceOrderRequest {
+	r.side = side
+	return r
+}
+
+func (r *PlaceOrderRequest) Quantity(quantity string) *PlaceOrderRequest {
+	r.sz = quantity
+	return r
+}
+
+func (r *PlaceOrderRequest) Price(price string) *PlaceOrderRequest {
+	r.px = &price
+	return r
+}
+
+func (r *PlaceOrderRequest) OrderType(orderType OrderType) *PlaceOrderRequest {
+	r.ordType = orderType
+	return r
+}
+
+func (r *PlaceOrderRequest) Parameters() map[string]interface{} {
+	payload := map[string]interface{}{}
+
+	payload["instId"] = r.instId
+
+	if r.tdMode == "" {
+		payload["tdMode"] = "cash"
+	} else {
+		payload["tdMode"] = r.tdMode
+	}
+
+	if r.clientOrderID != nil {
+		payload["clOrdId"] = r.clientOrderID
+	}
+
+	payload["side"] = r.side
+	payload["ordType"] = r.ordType
+	payload["sz"] = r.sz
+	if r.px != nil {
+		payload["px"] = r.px
+	}
+
+	if r.tag != nil {
+		payload["tag"] = r.tag
+	}
+
+	return payload
+}
+
+func (r *PlaceOrderRequest) Do(ctx context.Context) (*OrderResponse, error) {
+	payload := r.Parameters()
+	req, err := r.client.newAuthenticatedRequest("POST", "/api/v5/trade/order", nil, payload)
 	if err != nil {
 		return nil, err
 	}
 
-	// newResponse reads the response body and return a new Response object
-	response, err := util.NewResponse(resp)
+	response, err := r.client.sendRequest(req)
 	if err != nil {
-		return response, err
+		return nil, err
 	}
 
-	// Check error, if there is an error, return the ErrorResponse struct type
-	if response.IsError() {
-		return response, errors.New(string(response.Body))
+	var orderResponse struct {
+		Code    string          `json:"code"`
+		Message string          `json:"msg"`
+		Data    []OrderResponse `json:"data"`
+	}
+	if err := response.DecodeJSON(&orderResponse); err != nil {
+		return nil, err
 	}
 
-	return response, nil
+	if len(orderResponse.Data) == 0 {
+		return nil, errors.New("order create error")
+	}
+
+	return &orderResponse.Data[0], nil
 }
 
-func signPayload(payload string, secret string) string {
+func (c *RestClient) NewPlaceOrderRequest() *PlaceOrderRequest {
+	return &PlaceOrderRequest{
+		client: c,
+	}
+}
+
+type BatchPlaceOrderRequest struct {
+	client *RestClient
+
+	reqs []*PlaceOrderRequest
+}
+
+func (r *BatchPlaceOrderRequest) Add(reqs ...*PlaceOrderRequest) *BatchPlaceOrderRequest {
+	r.reqs = append(r.reqs, reqs...)
+	return r
+}
+
+func (r *BatchPlaceOrderRequest) Do(ctx context.Context) (*OrderResponse, error) {
+	var parameterList []map[string]interface{}
+
+	for _, req := range r.reqs {
+		params := req.Parameters()
+		parameterList = append(parameterList, params)
+	}
+
+	req, err := r.client.newAuthenticatedRequest("POST", "/api/v5/trade/batch-orders", nil, parameterList)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := r.client.sendRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var orderResponse struct {
+		Code    string          `json:"code"`
+		Message string          `json:"msg"`
+		Data    []OrderResponse `json:"data"`
+	}
+	if err := response.DecodeJSON(&orderResponse); err != nil {
+		return nil, err
+	}
+
+	if len(orderResponse.Data) == 0 {
+		return nil, errors.New("order create error")
+	}
+
+	return &orderResponse.Data[0], nil
+}
+
+func (c *RestClient) NewBatchPlaceOrderRequest() *BatchPlaceOrderRequest {
+	return &BatchPlaceOrderRequest{
+		client: c,
+	}
+}
+
+type CancelOrderRequest struct {
+	client *RestClient
+
+	instId string
+	ordId  *string
+	clOrdId *string
+}
+
+func (r *CancelOrderRequest) InstrumentID(instId string) *CancelOrderRequest {
+	r.instId = instId
+	return r
+}
+
+func (r *CancelOrderRequest) OrderID(orderID string) *CancelOrderRequest {
+	r.ordId = &orderID
+	return r
+}
+
+func (r *CancelOrderRequest) ClientOrderID(clientOrderID string) *CancelOrderRequest {
+	r.clOrdId = &clientOrderID
+	return r
+}
+
+func (r *CancelOrderRequest) Do(ctx context.Context) (*OrderResponse, error) {
+	var payload = map[string]interface{}{
+		"instId": r.instId,
+	}
+
+	if r.ordId != nil {
+		payload["ordId"] = r.ordId
+	} else if r.clOrdId != nil {
+		payload["clOrdId"] = r.clOrdId
+	} else {
+		return nil, errors.New("either orderID or clientOrderID is required for canceling order")
+	}
+
+	req, err := r.client.newAuthenticatedRequest("POST", "/api/v5/trade/cancel-order", nil, payload)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := r.client.sendRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var orderResponse struct {
+		Code    string          `json:"code"`
+		Message string          `json:"msg"`
+		Data    []OrderResponse `json:"data"`
+	}
+	if err := response.DecodeJSON(&orderResponse); err != nil {
+		return nil, err
+	}
+
+	if len(orderResponse.Data) == 0 {
+		return nil, errors.New("order create error")
+	}
+
+	return &orderResponse.Data[0], nil
+}
+
+func (c *RestClient) NewCancelOrderRequest() *CancelOrderRequest {
+	return &CancelOrderRequest{
+		client: c,
+	}
+}
+
+func sign(payload string, secret string) string {
 	var sig = hmac.New(sha256.New, []byte(secret))
 	_, err := sig.Write([]byte(payload))
 	if err != nil {

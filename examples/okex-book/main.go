@@ -93,7 +93,30 @@ var rootCmd = &cobra.Command{
 		log.Infof("TICKER:")
 		log.Infof("%T%+v", ticker, ticker)
 
-		_ = ctx
+
+		log.Infof("PLACING ORDER:")
+		response, err := client.NewPlaceOrderRequest().
+			InstrumentID("LTC-USDT").
+			OrderType(okexapi.OrderTypeLimit).
+			Side(okexapi.SideTypeBuy).
+			Price("50.0").
+			Quantity("0.5").
+			Do(ctx)
+		if err != nil {
+			return err
+		}
+
+		log.Infof("place order response: %+v", response)
+
+		response, err = client.NewCancelOrderRequest().
+			InstrumentID("LTC-USDT").
+			OrderID(response.OrderID).
+			Do(ctx)
+		if err != nil {
+			return err
+		}
+		log.Infof("cancel order response: %+v", response)
+
 		// cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
 		return nil
 	},
