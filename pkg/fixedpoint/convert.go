@@ -236,6 +236,11 @@ func Parse(input string) (num int64, numDecimalPoints int, err error) {
 
 func NewFromString(input string) (Value, error) {
 	length := len(input)
+
+	if length == 0 {
+		return 0, nil
+	}
+
 	isPercentage := input[length-1] == '%'
 	if isPercentage {
 		input = input[0 : length-1]
