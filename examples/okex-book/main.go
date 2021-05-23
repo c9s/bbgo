@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
 	"github.com/joho/godotenv"
@@ -93,9 +94,8 @@ var rootCmd = &cobra.Command{
 		log.Infof("TICKER:")
 		log.Infof("%T%+v", ticker, ticker)
 
-
 		log.Infof("PLACING ORDER:")
-		response, err := client.NewPlaceOrderRequest().
+		placeResponse, err := client.NewPlaceOrderRequest().
 			InstrumentID("LTC-USDT").
 			OrderType(okexapi.OrderTypeLimit).
 			Side(okexapi.SideTypeBuy).
@@ -106,16 +106,57 @@ var rootCmd = &cobra.Command{
 			return err
 		}
 
-		log.Infof("place order response: %+v", response)
+		log.Infof("place order response: %+v", placeResponse)
+		time.Sleep(time.Second)
 
-		response, err = client.NewCancelOrderRequest().
+		cancelResponse, err := client.NewCancelOrderRequest().
 			InstrumentID("LTC-USDT").
-			OrderID(response.OrderID).
+			OrderID(placeResponse.OrderID).
 			Do(ctx)
 		if err != nil {
 			return err
 		}
-		log.Infof("cancel order response: %+v", response)
+		log.Infof("cancel order response: %+v", cancelResponse)
+
+		time.Sleep(time.Second)
+
+		log.Infof("BATCH PLACE ORDER:")
+		batchPlaceReq := client.NewBatchPlaceOrderRequest()
+		batchPlaceReq.Add(client.NewPlaceOrderRequest().
+			InstrumentID("LTC-USDT").
+			OrderType(okexapi.OrderTypeLimit).
+			Side(okexapi.SideTypeBuy).
+			Price("50.0").
+			Quantity("0.5"))
+
+		batchPlaceReq.Add(client.NewPlaceOrderRequest().
+			InstrumentID("LTC-USDT").
+			OrderType(okexapi.OrderTypeLimit).
+			Side(okexapi.SideTypeBuy).
+			Price("30.0").
+			Quantity("0.5"))
+
+		batchPlaceResponse, err := batchPlaceReq.Do(ctx)
+		if err != nil {
+			return err
+		}
+
+		log.Infof("batch place order response: %+v", batchPlaceResponse)
+
+		time.Sleep(time.Second)
+
+		cancelReq := client.NewBatchCancelOrderRequest()
+		for _, resp := range batchPlaceResponse {
+			cancelReq.Add(client.NewCancelOrderRequest().
+				InstrumentID("LTC-USDT").
+				OrderID(resp.OrderID))
+		}
+
+		batchCancelResponse, err := cancelReq.Do(ctx)
+		if err != nil {
+			return err
+		}
+		log.Infof("batch cancel order response: %+v", batchCancelResponse)
 
 		// cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
 		return nil
