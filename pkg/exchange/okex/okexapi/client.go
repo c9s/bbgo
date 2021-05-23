@@ -512,7 +512,7 @@ func (r *BatchPlaceOrderRequest) Add(reqs ...*PlaceOrderRequest) *BatchPlaceOrde
 	return r
 }
 
-func (r *BatchPlaceOrderRequest) Do(ctx context.Context) (*OrderResponse, error) {
+func (r *BatchPlaceOrderRequest) Do(ctx context.Context) ([]OrderResponse, error) {
 	var parameterList []map[string]interface{}
 
 	for _, req := range r.reqs {
@@ -539,11 +539,7 @@ func (r *BatchPlaceOrderRequest) Do(ctx context.Context) (*OrderResponse, error)
 		return nil, err
 	}
 
-	if len(orderResponse.Data) == 0 {
-		return nil, errors.New("order create error")
-	}
-
-	return &orderResponse.Data[0], nil
+	return orderResponse.Data, nil
 }
 
 func (c *RestClient) NewBatchPlaceOrderRequest() *BatchPlaceOrderRequest {
@@ -555,8 +551,8 @@ func (c *RestClient) NewBatchPlaceOrderRequest() *BatchPlaceOrderRequest {
 type CancelOrderRequest struct {
 	client *RestClient
 
-	instId string
-	ordId  *string
+	instId  string
+	ordId   *string
 	clOrdId *string
 }
 
@@ -575,7 +571,7 @@ func (r *CancelOrderRequest) ClientOrderID(clientOrderID string) *CancelOrderReq
 	return r
 }
 
-func (r *CancelOrderRequest) Do(ctx context.Context) (*OrderResponse, error) {
+func (r *CancelOrderRequest) Parameters() map[string]interface{} {
 	var payload = map[string]interface{}{
 		"instId": r.instId,
 	}
@@ -584,11 +580,66 @@ func (r *CancelOrderRequest) Do(ctx context.Context) (*OrderResponse, error) {
 		payload["ordId"] = r.ordId
 	} else if r.clOrdId != nil {
 		payload["clOrdId"] = r.clOrdId
-	} else {
+	}
+
+	return payload
+}
+
+func (r *CancelOrderRequest) Do(ctx context.Context) ([]OrderResponse, error) {
+	var payload = r.Parameters()
+
+	if r.ordId == nil && r.clOrdId != nil {
 		return nil, errors.New("either orderID or clientOrderID is required for canceling order")
 	}
 
 	req, err := r.client.newAuthenticatedRequest("POST", "/api/v5/trade/cancel-order", nil, payload)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := r.client.sendRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var orderResponse struct {
+		Code    string          `json:"code"`
+		Message string          `json:"msg"`
+		Data    []OrderResponse `json:"data"`
+	}
+	if err := response.DecodeJSON(&orderResponse); err != nil {
+		return nil, err
+	}
+
+	return orderResponse.Data, nil
+}
+
+func (c *RestClient) NewCancelOrderRequest() *CancelOrderRequest {
+	return &CancelOrderRequest{
+		client: c,
+	}
+}
+
+type BatchCancelOrderRequest struct {
+	client *RestClient
+
+	reqs []*CancelOrderRequest
+}
+
+func (r *BatchCancelOrderRequest) Add(reqs ...*CancelOrderRequest) *BatchCancelOrderRequest {
+	r.reqs = append(r.reqs, reqs...)
+	return r
+}
+
+func (r *BatchCancelOrderRequest) Do(ctx context.Context) (*OrderResponse, error) {
+	var parameterList []map[string]interface{}
+
+	for _, req := range r.reqs {
+		params := req.Parameters()
+		parameterList = append(parameterList, params)
+	}
+
+	req, err := r.client.newAuthenticatedRequest("POST", "/api/v5/trade/cancel-batch-orders", nil, parameterList)
 	if err != nil {
 		return nil, err
 	}
@@ -614,8 +665,8 @@ func (r *CancelOrderRequest) Do(ctx context.Context) (*OrderResponse, error) {
 	return &orderResponse.Data[0], nil
 }
 
-func (c *RestClient) NewCancelOrderRequest() *CancelOrderRequest {
-	return &CancelOrderRequest{
+func (c *RestClient) NewBatchCancelOrderRequest() *BatchCancelOrderRequest {
+	return &BatchCancelOrderRequest{
 		client: c,
 	}
 }
