@@ -186,7 +186,7 @@ outboundAccountInfo
   "W": true,                    // Can withdraw?
   "D": true,                    // Can deposit?
   "u": 1499405658848,           // Time of last account update
-  "B": [                        // Balances array
+  "B": [                        // AccountBalances array
     {
       "a": "LTC",               // Asset
       "f": "17366.18538083",    // Free amount
