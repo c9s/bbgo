@@ -117,21 +117,21 @@ func (c *RestClient) newAuthenticatedRequest(method, refURL string, params url.V
 }
 
 type BalanceDetail struct {
-	Currency                string `json:"ccy"`
-	Available               string `json:"availEq"`
-	CashBalance             string `json:"cashBal"`
-	OrderFrozen             string `json:"ordFrozen"`
-	Frozen                  string `json:"frozenBal"`
-	Equity                  string `json:"eq"`
-	EquityInUSD             string `json:"eqUsd"`
-	UpdateTime              string `json:"uTime"`
-	UnrealizedProfitAndLoss string `json:"upl"`
+	Currency                string                     `json:"ccy"`
+	Available               fixedpoint.Value           `json:"availEq"`
+	CashBalance             fixedpoint.Value           `json:"cashBal"`
+	OrderFrozen             fixedpoint.Value           `json:"ordFrozen"`
+	Frozen                  fixedpoint.Value           `json:"frozenBal"`
+	Equity                  fixedpoint.Value           `json:"eq"`
+	EquityInUSD             fixedpoint.Value           `json:"eqUsd"`
+	UpdateTime              types.MillisecondTimestamp `json:"uTime"`
+	UnrealizedProfitAndLoss fixedpoint.Value           `json:"upl"`
 }
 
 type BalanceSummary struct {
-	TotalEquityInUSD string          `json:"totalEq"`
-	UpdateTime       string          `json:"uTime"`
-	Details          []BalanceDetail `json:"details"`
+	TotalEquityInUSD fixedpoint.Value `json:"totalEq"`
+	UpdateTime       string           `json:"uTime"`
+	Details          []BalanceDetail  `json:"details"`
 }
 
 type BalanceSummaryList []BalanceSummary
@@ -160,10 +160,10 @@ func (c *RestClient) AccountBalances() (BalanceSummaryList, error) {
 }
 
 type AssetBalance struct {
-	Currency  string `json:"ccy"`
-	Balance   string `json:"bal"`
-	Frozen    string `json:"frozenBal,omitempty"`
-	Available string `json:"availBal,omitempty"`
+	Currency  string           `json:"ccy"`
+	Balance   fixedpoint.Value `json:"bal"`
+	Frozen    fixedpoint.Value `json:"frozenBal,omitempty"`
+	Available fixedpoint.Value `json:"availBal,omitempty"`
 }
 
 type AssetBalanceList []AssetBalance
@@ -192,15 +192,15 @@ func (c *RestClient) AssetBalances() (AssetBalanceList, error) {
 }
 
 type AssetCurrency struct {
-	Currency               string `json:"ccy"`
-	Name                   string `json:"name"`
-	Chain                  string `json:"chain"`
-	CanDeposit             bool   `json:"canDep"`
-	CanWithdraw            bool   `json:"canWd"`
-	CanInternal            bool   `json:"canInternal"`
-	MinWithdrawalFee       string `json:"minFee"`
-	MaxWithdrawalFee       string `json:"maxFee"`
-	MinWithdrawalThreshold string `json:"minWd"`
+	Currency               string           `json:"ccy"`
+	Name                   string           `json:"name"`
+	Chain                  string           `json:"chain"`
+	CanDeposit             bool             `json:"canDep"`
+	CanWithdraw            bool             `json:"canWd"`
+	CanInternal            bool             `json:"canInternal"`
+	MinWithdrawalFee       fixedpoint.Value `json:"minFee"`
+	MaxWithdrawalFee       fixedpoint.Value `json:"maxFee"`
+	MinWithdrawalThreshold fixedpoint.Value `json:"minWd"`
 }
 
 func (c *RestClient) AssetCurrencies() ([]AssetCurrency, error) {
