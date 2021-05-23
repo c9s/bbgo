@@ -5,14 +5,16 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
+	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 )
 
 const defaultHTTPTimeout = time.Second * 15
@@ -94,7 +96,6 @@ func (c *RestClient) newAuthenticatedRequest(method, refURL string, params url.V
 	// set location to UTC so that it outputs "2020-12-08T09:08:57.715Z"
 	t := time.Now().In(time.UTC)
 	timestamp := t.Format("2006-01-02T15:04:05.999Z07:00")
-	log.Info(timestamp)
 
 	payload := timestamp + strings.ToUpper(method) + path
 	sign := signPayload(payload, c.Secret)
@@ -135,7 +136,7 @@ type BalanceSummary struct {
 
 type BalanceSummaryList []BalanceSummary
 
-func (c *RestClient) Balances() (BalanceSummaryList, error) {
+func (c *RestClient) AccountBalances() (BalanceSummaryList, error) {
 	req, err := c.newAuthenticatedRequest("GET", "/api/v5/account/balance", nil)
 	if err != nil {
 		return nil, err
@@ -156,6 +157,158 @@ func (c *RestClient) Balances() (BalanceSummaryList, error) {
 	}
 
 	return balanceResponse.Data, nil
+}
+
+type AssetBalance struct {
+	Currency  string `json:"ccy"`
+	Balance   string `json:"bal"`
+	Frozen    string `json:"frozenBal,omitempty"`
+	Available string `json:"availBal,omitempty"`
+}
+
+type AssetBalanceList []AssetBalance
+
+func (c *RestClient) AssetBalances() (AssetBalanceList, error) {
+	req, err := c.newAuthenticatedRequest("GET", "/api/v5/asset/balances", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := c.sendRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var balanceResponse struct {
+		Code    string           `json:"code"`
+		Message string           `json:"msg"`
+		Data    AssetBalanceList `json:"data"`
+	}
+	if err := response.DecodeJSON(&balanceResponse); err != nil {
+		return nil, err
+	}
+
+	return balanceResponse.Data, nil
+}
+
+type AssetCurrency struct {
+	Currency               string `json:"ccy"`
+	Name                   string `json:"name"`
+	Chain                  string `json:"chain"`
+	CanDeposit             bool   `json:"canDep"`
+	CanWithdraw            bool   `json:"canWd"`
+	CanInternal            bool   `json:"canInternal"`
+	MinWithdrawalFee       string `json:"minFee"`
+	MaxWithdrawalFee       string `json:"maxFee"`
+	MinWithdrawalThreshold string `json:"minWd"`
+}
+
+func (c *RestClient) AssetCurrencies() ([]AssetCurrency, error) {
+	req, err := c.newAuthenticatedRequest("GET", "/api/v5/asset/currencies", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := c.sendRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var currencyResponse struct {
+		Code    string          `json:"code"`
+		Message string          `json:"msg"`
+		Data    []AssetCurrency `json:"data"`
+	}
+
+	if err := response.DecodeJSON(&currencyResponse); err != nil {
+		return nil, err
+	}
+
+	return currencyResponse.Data, nil
+}
+
+type MarketTicker struct {
+	InstrumentType string `json:"instType"`
+	InstrumentID   string `json:"instId"`
+
+	// last traded price
+	Last fixedpoint.Value `json:"last"`
+
+	// last traded size
+	LastSize fixedpoint.Value `json:"lastSz"`
+
+	AskPrice fixedpoint.Value `json:"askPx"`
+	AskSize  fixedpoint.Value `json:"askSz"`
+
+	BidPrice fixedpoint.Value `json:"bidPx"`
+	BidSize  fixedpoint.Value `json:"bidSz"`
+
+	Open24H           fixedpoint.Value `json:"open24h"`
+	High24H           fixedpoint.Value `json:"high24H"`
+	Low24H            fixedpoint.Value `json:"low24H"`
+	Volume24H         fixedpoint.Value `json:"vol24h"`
+	VolumeCurrency24H fixedpoint.Value `json:"volCcy24h"`
+
+	// Millisecond timestamp
+	Timestamp types.MillisecondTimestamp `json:"ts"`
+}
+
+func (c *RestClient) MarketTicker(instId string) (*MarketTicker, error) {
+	// SPOT, SWAP, FUTURES, OPTION
+	var params = url.Values{}
+	params.Add("instId", instId)
+
+	req, err := c.newAuthenticatedRequest("GET", "/api/v5/market/ticker", params)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := c.sendRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var tickerResponse struct {
+		Code    string         `json:"code"`
+		Message string         `json:"msg"`
+		Data    []MarketTicker `json:"data"`
+	}
+	if err := response.DecodeJSON(&tickerResponse); err != nil {
+		return nil, err
+	}
+
+	if len(tickerResponse.Data) == 0 {
+		return nil, fmt.Errorf("ticker of %s not found", instId)
+	}
+
+	return &tickerResponse.Data[0], nil
+}
+
+func (c *RestClient) MarketTickers(instType string) ([]MarketTicker, error) {
+	// SPOT, SWAP, FUTURES, OPTION
+	var params = url.Values{}
+	params.Add("instType", instType)
+
+	req, err := c.newAuthenticatedRequest("GET", "/api/v5/market/tickers", params)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := c.sendRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var tickerResponse struct {
+		Code    string         `json:"code"`
+		Message string         `json:"msg"`
+		Data    []MarketTicker `json:"data"`
+	}
+	if err := response.DecodeJSON(&tickerResponse); err != nil {
+		return nil, err
+	}
+
+	return tickerResponse.Data, nil
 }
 
 // sendRequest sends the request to the API server and handle the response

@@ -46,15 +46,52 @@ var rootCmd = &cobra.Command{
 		client := okexapi.NewClient()
 		client.Auth(key, secret, passphrase)
 
-		log.Infof("balances:")
-		balanceSummaryList, err := client.Balances()
+		log.Infof("ACCOUNT BALANCES:")
+		balanceSummaries, err := client.AccountBalances()
 		if err != nil {
 			return err
 		}
 
-		for _, balanceSummary := range balanceSummaryList {
+		for _, balanceSummary := range balanceSummaries {
 			log.Infof("%+v", balanceSummary)
 		}
+
+		log.Infof("ASSET BALANCES:")
+		assetBalances, err := client.AssetBalances()
+		if err != nil {
+			return err
+		}
+
+		for _, balance := range assetBalances {
+			log.Infof("%T%+v", balance, balance)
+		}
+
+		log.Infof("ASSET CURRENCIES:")
+		currencies, err := client.AssetCurrencies()
+		if err != nil {
+			return err
+		}
+
+		for _, currency := range currencies {
+			log.Infof("%T%+v", currency, currency)
+		}
+
+		log.Infof("MARKET TICKERS:")
+		tickers, err := client.MarketTickers("SPOT")
+		if err != nil {
+			return err
+		}
+
+		for _, ticker := range tickers {
+			log.Infof("%T%+v", ticker, ticker)
+		}
+
+		ticker, err := client.MarketTicker("ETH-USDT")
+		if err != nil {
+			return err
+		}
+		log.Infof("TICKER:")
+		log.Infof("%T%+v", ticker, ticker)
 
 		_ = ctx
 		// cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
