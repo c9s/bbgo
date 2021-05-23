@@ -15,7 +15,7 @@ type Response struct {
 	Body []byte
 }
 
-// newResponse is a wrapper of the http.Response instance, it reads the response body and close the file.
+// NewResponse is a wrapper of the http.Response instance, it reads the response body and close the file.
 func NewResponse(r *http.Response) (response *Response, err error) {
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
