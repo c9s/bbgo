@@ -391,9 +391,9 @@ func (s *Strategy) tradeUpdateHandler(trade types.Trade) {
 			return
 		}
 
-		profit, madeProfit := s.state.Position.AddTrade(trade)
+		profit, netProfit, madeProfit := s.state.Position.AddTrade(trade)
 		if madeProfit {
-			s.Notify("average cost profit: %f", profit.Float64())
+			s.Notify("%s average cost profit: %f, net profit =~ %f", s.Symbol, profit.Float64(), netProfit.Float64())
 		}
 	}
 }

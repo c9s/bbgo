@@ -352,16 +352,16 @@ func checksumString(bids, asks [][]json.Number) string {
 
 var errUnmatchedChecksum = fmt.Errorf("unmatched checksum")
 
-func toGlobalOrderBook(r orderBookResponse) (types.OrderBook, error) {
+func toGlobalOrderBook(r orderBookResponse) (types.SliceOrderBook, error) {
 	bids, err := toPriceVolumeSlice(r.Bids)
 	if err != nil {
-		return types.OrderBook{}, fmt.Errorf("can't convert bids to priceVolumeSlice: %w", err)
+		return types.SliceOrderBook{}, fmt.Errorf("can't convert bids to priceVolumeSlice: %w", err)
 	}
 	asks, err := toPriceVolumeSlice(r.Asks)
 	if err != nil {
-		return types.OrderBook{}, fmt.Errorf("can't convert asks to priceVolumeSlice: %w", err)
+		return types.SliceOrderBook{}, fmt.Errorf("can't convert asks to priceVolumeSlice: %w", err)
 	}
-	return types.OrderBook{
+	return types.SliceOrderBook{
 		// ex. BTC/USDT
 		Symbol: toGlobalSymbol(strings.ToUpper(r.Market)),
 		Bids:   bids,

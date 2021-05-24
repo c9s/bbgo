@@ -13,7 +13,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 
-	"github.com/c9s/bbgo/pkg/datatype"
 	maxapi "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -610,7 +609,7 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 			txIDs[d.TxID] = struct{}{}
 			withdraw := types.Withdraw{
 				Exchange:               types.ExchangeMax,
-				ApplyTime:              datatype.Time(time.Unix(d.CreatedAt, 0)),
+				ApplyTime:              types.Time(time.Unix(d.CreatedAt, 0)),
 				Asset:                  toGlobalCurrency(d.Currency),
 				Amount:                 util.MustParseFloat(d.Amount),
 				Address:                "",
@@ -682,7 +681,7 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 
 			allDeposits = append(allDeposits, types.Deposit{
 				Exchange:      types.ExchangeMax,
-				Time:          datatype.Time(time.Unix(d.CreatedAt, 0)),
+				Time:          types.Time(time.Unix(d.CreatedAt, 0)),
 				Amount:        util.MustParseFloat(d.Amount),
 				Asset:         toGlobalCurrency(d.Currency),
 				Address:       "", // not supported
