@@ -109,6 +109,9 @@ var rootCmd = &cobra.Command{
 		log.Infof("place order response: %+v", placeResponse)
 		time.Sleep(time.Second)
 
+
+		client.NewOrderDetailsRequest()
+
 		cancelResponse, err := client.NewCancelOrderRequest().
 			InstrumentID("LTC-USDT").
 			OrderID(placeResponse.OrderID).
