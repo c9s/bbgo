@@ -25,6 +25,10 @@ type Position struct {
 	Quote       fixedpoint.Value `json:"quote"`
 	AverageCost fixedpoint.Value `json:"averageCost"`
 
+	// ApproximateAverageCost adds the computed fee in quote in the average cost
+	// This is used for calculating net profit
+	ApproximateAverageCost fixedpoint.Value `json:"approximateAverageCost"`
+
 	ExchangeFeeRates map[types.ExchangeName]ExchangeFee `json:"exchangeFeeRates"`
 
 	sync.Mutex
@@ -107,25 +111,26 @@ func (p *Position) BindStream(stream types.Stream) {
 	})
 }
 
-func (p *Position) AddTrades(trades []types.Trade) (fixedpoint.Value, bool) {
-	var totalProfitAmount fixedpoint.Value
+func (p *Position) AddTrades(trades []types.Trade) (fixedpoint.Value, fixedpoint.Value, bool) {
+	var totalProfitAmount, totalNetProfit fixedpoint.Value
 	for _, trade := range trades {
-		if profitAmount, profit := p.AddTrade(trade); profit {
-			totalProfitAmount += profitAmount
+		if profit, netProfit, madeProfit := p.AddTrade(trade); madeProfit {
+			totalProfitAmount += profit
+			totalNetProfit += netProfit
 		}
 	}
 
-	return totalProfitAmount, totalProfitAmount != 0
+	return totalProfitAmount, totalNetProfit, totalProfitAmount != 0
 }
 
-func (p *Position) AddTrade(t types.Trade) (fixedpoint.Value, bool) {
+func (p *Position) AddTrade(t types.Trade) (profit fixedpoint.Value, netProfit fixedpoint.Value, madeProfit bool) {
 	price := fixedpoint.NewFromFloat(t.Price)
 	quantity := fixedpoint.NewFromFloat(t.Quantity)
 	quoteQuantity := fixedpoint.NewFromFloat(t.QuoteQuantity)
 	fee := fixedpoint.NewFromFloat(t.Fee)
 
 	// calculated fee in quote (some exchange accounts may enable platform currency fee discount, like BNB)
-	var quoteFee fixedpoint.Value = 0
+	var feeInQuote fixedpoint.Value = 0
 
 	switch t.FeeCurrency {
 
@@ -139,9 +144,9 @@ func (p *Position) AddTrade(t types.Trade) (fixedpoint.Value, bool) {
 		if p.ExchangeFeeRates != nil {
 			if exchangeFee, ok := p.ExchangeFeeRates[t.Exchange]; ok {
 				if t.IsMaker {
-					quoteFee += exchangeFee.MakerFeeRate.Mul(quoteQuantity)
+					feeInQuote += exchangeFee.MakerFeeRate.Mul(quoteQuantity)
 				} else {
-					quoteFee += exchangeFee.TakerFeeRate.Mul(quoteQuantity)
+					feeInQuote += exchangeFee.TakerFeeRate.Mul(quoteQuantity)
 				}
 			}
 		}
@@ -156,50 +161,60 @@ func (p *Position) AddTrade(t types.Trade) (fixedpoint.Value, bool) {
 
 	case types.SideTypeBuy:
 		if p.Base < 0 {
-			// handling short-to-long position
+			// convert short position to long position
 			if p.Base+quantity > 0 {
-				closingProfit := (p.AverageCost - price).Mul(-p.Base) - quoteFee
+				profit = (p.AverageCost - price).Mul(-p.Base)
+				netProfit = (p.ApproximateAverageCost - price).Mul(-p.Base) - feeInQuote
 				p.Base += quantity
 				p.Quote -= quoteQuantity
 				p.AverageCost = price
-				return closingProfit, true
+				p.ApproximateAverageCost = price
+				return profit, netProfit, true
 			} else {
 				// covering short position
 				p.Base += quantity
 				p.Quote -= quoteQuantity
-				return (p.AverageCost - price).Mul(quantity) - quoteFee, true
+				profit = (p.AverageCost - price).Mul(quantity)
+				netProfit = (p.ApproximateAverageCost - price).Mul(quantity) - feeInQuote
+				return profit, netProfit, true
 			}
 		}
 
-		p.AverageCost = (p.AverageCost.Mul(p.Base) + quoteQuantity + quoteFee).Div(p.Base + quantity)
+		p.ApproximateAverageCost = (p.ApproximateAverageCost.Mul(p.Base) + quoteQuantity + feeInQuote).Div(p.Base + quantity)
+		p.AverageCost = (p.AverageCost.Mul(p.Base) + quoteQuantity).Div(p.Base + quantity)
 		p.Base += quantity
 		p.Quote -= quoteQuantity
 
-		return 0, false
+		return 0, 0, false
 
 	case types.SideTypeSell:
 		if p.Base > 0 {
-			// long-to-short
+			// convert long position to short position
 			if p.Base-quantity < 0 {
-				closingProfit := (price - p.AverageCost).Mul(p.Base) - quoteFee
+				profit = (price - p.AverageCost).Mul(p.Base)
+				netProfit = (price - p.ApproximateAverageCost).Mul(p.Base) - feeInQuote
 				p.Base -= quantity
 				p.Quote += quoteQuantity
 				p.AverageCost = price
-				return closingProfit, true
+				p.ApproximateAverageCost = price
+				return profit, netProfit, true
 			} else {
 				p.Base -= quantity
 				p.Quote += quoteQuantity
-				return (price - p.AverageCost).Mul(quantity) - quoteFee, true
+				profit = (price - p.AverageCost).Mul(quantity)
+				netProfit = (price - p.ApproximateAverageCost).Mul(quantity) - feeInQuote
+				return profit, netProfit, true
 			}
 		}
 
 		// handling short position, since Base here is negative we need to reverse the sign
-		p.AverageCost = (p.AverageCost.Mul(-p.Base) + quoteQuantity - quoteFee).Div(-p.Base + quantity)
+		p.ApproximateAverageCost = (p.ApproximateAverageCost.Mul(-p.Base) + quoteQuantity - feeInQuote).Div(-p.Base + quantity)
+		p.AverageCost = (p.AverageCost.Mul(-p.Base) + quoteQuantity).Div(-p.Base + quantity)
 		p.Base -= quantity
 		p.Quote += quoteQuantity
 
-		return 0, false
+		return 0, 0, false
 	}
 
-	return 0, false
+	return 0, 0, false
 }

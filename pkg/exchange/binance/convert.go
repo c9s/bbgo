@@ -8,7 +8,6 @@ import (
 	"github.com/adshao/go-binance/v2"
 	"github.com/pkg/errors"
 
-	"github.com/c9s/bbgo/pkg/datatype"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
@@ -150,8 +149,8 @@ func ToGlobalOrder(binanceOrder *binance.Order, isMargin bool) (*types.Order, er
 		OrderID:          uint64(binanceOrder.OrderID),
 		Status:           toGlobalOrderStatus(binanceOrder.Status),
 		ExecutedQuantity: util.MustParseFloat(binanceOrder.ExecutedQuantity),
-		CreationTime:     datatype.Time(millisecondTime(binanceOrder.Time)),
-		UpdateTime:       datatype.Time(millisecondTime(binanceOrder.UpdateTime)),
+		CreationTime:     types.Time(millisecondTime(binanceOrder.Time)),
+		UpdateTime:       types.Time(millisecondTime(binanceOrder.UpdateTime)),
 		IsMargin:         isMargin,
 		IsIsolated:       binanceOrder.IsIsolated,
 	}, nil
@@ -208,7 +207,7 @@ func ToGlobalTrade(t binance.TradeV3, isMargin bool) (*types.Trade, error) {
 		IsMaker:       t.IsMaker,
 		Fee:           fee,
 		FeeCurrency:   t.CommissionAsset,
-		Time:          datatype.Time(millisecondTime(t.Time)),
+		Time:          types.Time(millisecondTime(t.Time)),
 		IsMargin:      isMargin,
 		IsIsolated:    t.IsIsolated,
 	}, nil

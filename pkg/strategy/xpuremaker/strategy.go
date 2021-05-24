@@ -110,7 +110,7 @@ func (s *Strategy) update(orderExecutor bbgo.OrderExecutor, session *bbgo.Exchan
 
 func (s *Strategy) updateOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession, side types.SideType) {
 	var book = s.book.Copy()
-	var pvs = book.PriceVolumesBySide(side)
+	var pvs = book.SideBook(side)
 	if pvs == nil || len(pvs) == 0 {
 		log.Warnf("empty side: %s", side)
 		return

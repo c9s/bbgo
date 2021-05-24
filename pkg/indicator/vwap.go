@@ -18,7 +18,7 @@ Volume-Weighted Average Price (VWAP) Explained
 //go:generate callbackgen -type VWAP
 type VWAP struct {
 	types.IntervalWindow
-	Values      Float64Slice
+	Values      types.Float64Slice
 	WeightedSum float64
 	VolumeSum   float64
 	EndTime     time.Time

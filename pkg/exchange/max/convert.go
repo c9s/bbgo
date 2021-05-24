@@ -8,7 +8,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/c9s/bbgo/pkg/datatype"
 	"github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -201,8 +200,8 @@ func toGlobalOrder(maxOrder max.Order) (*types.Order, error) {
 		OrderID:          maxOrder.ID,
 		Status:           toGlobalOrderStatus(maxOrder.State, executedVolume, remainingVolume),
 		ExecutedQuantity: executedVolume.Float64(),
-		CreationTime:     datatype.Time(maxOrder.CreatedAt),
-		UpdateTime:       datatype.Time(maxOrder.CreatedAt),
+		CreationTime:     types.Time(maxOrder.CreatedAt),
+		UpdateTime:       types.Time(maxOrder.CreatedAt),
 	}, nil
 }
 
@@ -246,7 +245,7 @@ func toGlobalTrade(t max.Trade) (*types.Trade, error) {
 		Fee:           fee,
 		FeeCurrency:   toGlobalCurrency(t.FeeCurrency),
 		QuoteQuantity: quoteQuantity,
-		Time:          datatype.Time(mts),
+		Time:          types.Time(mts),
 	}, nil
 }
 

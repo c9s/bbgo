@@ -7,7 +7,6 @@ import (
 	_ "github.com/c9s/bbgo/pkg/strategy/flashcrash"
 	_ "github.com/c9s/bbgo/pkg/strategy/gap"
 	_ "github.com/c9s/bbgo/pkg/strategy/grid"
-	_ "github.com/c9s/bbgo/pkg/strategy/mirrormaker"
 	_ "github.com/c9s/bbgo/pkg/strategy/pricealert"
 	_ "github.com/c9s/bbgo/pkg/strategy/schedule"
 	_ "github.com/c9s/bbgo/pkg/strategy/support"

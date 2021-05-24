@@ -74,14 +74,14 @@ func (side SideType) String() string {
 
 func (side SideType) Color() string {
 	if side == SideTypeBuy {
-		return Green
+		return GreenColor
 	}
 
 	if side == SideTypeSell {
-		return Red
+		return RedColor
 	}
 
-	return "#f0f0f0"
+	return GrayColor
 }
 
 func SideToColorName(side SideType) string {
