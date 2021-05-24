@@ -177,7 +177,7 @@ func Parse(input string) (num int64, numDecimalPoints int, err error) {
 	isPercentage := input[length-1] == '%'
 	if isPercentage {
 		length -= 1
-		input = input[0 : length]
+		input = input[0:length]
 	}
 
 	var neg int64 = 1
