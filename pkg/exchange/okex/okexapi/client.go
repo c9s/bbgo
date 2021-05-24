@@ -40,6 +40,15 @@ const (
 	OrderTypeIOC      OrderType = "ioc"
 )
 
+type InstrumentType string
+
+const (
+	InstrumentTypeSpot    InstrumentType = "SPOT"
+	InstrumentTypeSwap    InstrumentType = "SWAP"
+	InstrumentTypeFutures InstrumentType = "FUTURES"
+	InstrumentTypeOption  InstrumentType = "OPTION"
+)
+
 type OrderState string
 
 const (
@@ -56,7 +65,8 @@ type RestClient struct {
 
 	Key, Secret, Passphrase string
 
-	TradeService *TradeService
+	TradeService      *TradeService
+	PublicDataService *PublicDataService
 }
 
 func NewClient() *RestClient {
@@ -73,6 +83,7 @@ func NewClient() *RestClient {
 	}
 
 	client.TradeService = &TradeService{client: client}
+	client.PublicDataService = &PublicDataService{client: client}
 	return client
 }
 
@@ -94,13 +105,7 @@ func (c *RestClient) newRequest(method, refURL string, params url.Values, body [
 	}
 
 	pathURL := c.BaseURL.ResolveReference(rel)
-
-	req, err := http.NewRequest(method, pathURL.String(), bytes.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
+	return http.NewRequest(method, pathURL.String(), bytes.NewReader(body))
 }
 
 // sendRequest sends the request to the API server and handle the response
