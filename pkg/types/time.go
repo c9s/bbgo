@@ -24,6 +24,12 @@ func (t *MillisecondTimestamp) UnmarshalJSON(data []byte) error {
 
 	switch vt := v.(type) {
 	case string:
+		if vt == "" {
+			// treat empty string as 0
+			*t = MillisecondTimestamp(time.Time{})
+			return nil
+		}
+
 		i, err := strconv.ParseInt(vt, 10, 64)
 		if err == nil {
 			*t = MillisecondTimestamp(time.Unix(0, i*int64(time.Millisecond)))
