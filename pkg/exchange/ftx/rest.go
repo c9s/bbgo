@@ -40,6 +40,9 @@ type restRequest struct {
 
 	// payload
 	p map[string]interface{}
+
+	// object id
+	id string
 }
 
 func newRestRequest(c *http.Client, baseURL *url.URL) *restRequest {
@@ -80,11 +83,21 @@ func (r *restRequest) ReferenceURL(refURL string) *restRequest {
 }
 
 func (r *restRequest) buildURL() (*url.URL, error) {
-	refURL, err := url.Parse(r.refURL)
+	u := r.refURL
+	if len(r.id) > 0 {
+		u = u + "/" + r.id
+	}
+	refURL, err := url.Parse(u)
 	if err != nil {
 		return nil, err
 	}
+
 	return r.baseURL.ResolveReference(refURL), nil
+}
+
+func (r *restRequest) Id(id string) *restRequest {
+	r.id = id
+	return r
 }
 
 func (r *restRequest) Payloads(payloads map[string]interface{}) *restRequest {
