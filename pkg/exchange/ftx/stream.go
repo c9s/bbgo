@@ -154,6 +154,9 @@ func (s *Stream) subscribeKLine(symbol string, option types.SubscribeOptions) {
 		return
 	}
 
+	// get current kline candle
+	s.km <- klineMessage{symbol: symbol, interval: interval}
+
 	ticker := time.NewTicker(interval.Duration())
 	defer ticker.Stop()
 
