@@ -132,14 +132,11 @@ func (s *Stream) Subscribe(channel types.Channel, symbol string, option types.Su
 
 func (s *Stream) handleChannelKlineMessage() {
 	for {
-		kline := <-s.klineMessage
-
-		if kline.Closed {
+		select {
+		case kline := <-s.klineMessage:
+			// FTX only returns closed kline
 			s.EmitKLineClosed(kline)
-			continue
 		}
-
-		s.EmitKLine(kline)
 	}
 }
 
