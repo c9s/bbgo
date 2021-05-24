@@ -9,7 +9,6 @@ import (
 
 	"github.com/slack-go/slack"
 
-	"github.com/c9s/bbgo/pkg/datatype"
 	"github.com/c9s/bbgo/pkg/util"
 )
 
@@ -59,12 +58,12 @@ type Trade struct {
 	QuoteQuantity float64      `json:"quoteQuantity" db:"quote_quantity"`
 	Symbol        string       `json:"symbol" db:"symbol"`
 
-	Side        SideType      `json:"side" db:"side"`
-	IsBuyer     bool          `json:"isBuyer" db:"is_buyer"`
-	IsMaker     bool          `json:"isMaker" db:"is_maker"`
-	Time        datatype.Time `json:"tradedAt" db:"traded_at"`
-	Fee         float64       `json:"fee" db:"fee"`
-	FeeCurrency string        `json:"feeCurrency" db:"fee_currency"`
+	Side        SideType `json:"side" db:"side"`
+	IsBuyer     bool     `json:"isBuyer" db:"is_buyer"`
+	IsMaker     bool     `json:"isMaker" db:"is_maker"`
+	Time        Time     `json:"tradedAt" db:"traded_at"`
+	Fee         float64  `json:"fee" db:"fee"`
+	FeeCurrency string   `json:"feeCurrency" db:"fee_currency"`
 
 	IsMargin   bool `json:"isMargin" db:"is_margin"`
 	IsIsolated bool `json:"isIsolated" db:"is_isolated"`
@@ -74,12 +73,12 @@ type Trade struct {
 }
 
 func (trade Trade) String() string {
-	return fmt.Sprintf("TRADE %s %s %4s %s @ %s orderID %d %s amount %f",
+	return fmt.Sprintf("TRADE %s %s %4s %f @ %f orderID %d %s amount %f",
 		trade.Exchange.String(),
 		trade.Symbol,
 		trade.Side,
-		util.FormatFloat(trade.Quantity, 4),
-		util.FormatFloat(trade.Price, 3),
+		trade.Quantity,
+		trade.Price,
 		trade.OrderID,
 		trade.Time.Time().Format(time.StampMilli),
 		trade.QuoteQuantity)
@@ -87,13 +86,13 @@ func (trade Trade) String() string {
 
 // PlainText is used for telegram-styled messages
 func (trade Trade) PlainText() string {
-	return fmt.Sprintf("Trade %s %s %s %s @ %s, amount %s",
+	return fmt.Sprintf("Trade %s %s %s %f @ %f, amount %f",
 		trade.Exchange.String(),
 		trade.Symbol,
 		trade.Side,
-		util.FormatFloat(trade.Quantity, 4),
-		util.FormatFloat(trade.Price, 3),
-		util.FormatFloat(trade.QuoteQuantity, 2))
+		trade.Quantity,
+		trade.Price,
+		trade.QuoteQuantity)
 }
 
 var slackTradeTextTemplate = ":handshake: {{ .Symbol }} {{ .Side }} Trade Execution @ {{ .Price  }}"
@@ -122,7 +121,7 @@ func (trade Trade) SlackAttachment() slack.Attachment {
 			{Title: "Liquidity", Value: liquidity, Short: true},
 			{Title: "Order ID", Value: strconv.FormatUint(trade.OrderID, 10), Short: true},
 		},
-		Footer: util.Render("trade time {{ . }}", trade.Time.Time().Format(time.RFC822)),
+		Footer: util.Render("trade time {{ . }}", trade.Time.Time().Format(time.StampMilli)),
 	}
 }
 

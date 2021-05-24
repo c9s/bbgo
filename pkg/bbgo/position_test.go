@@ -38,7 +38,7 @@ func TestPosition_ExchangeFeeRate_Short(t *testing.T) {
 		FeeCurrency:   "BNB",
 	})
 
-	profit, madeProfit := pos.AddTrade(types.Trade{
+	_, netProfit, madeProfit := pos.AddTrade(types.Trade{
 		Exchange:      types.ExchangeBinance,
 		Price:         2000.0,
 		Quantity:      10.0,
@@ -51,7 +51,7 @@ func TestPosition_ExchangeFeeRate_Short(t *testing.T) {
 
 	expectedProfit := (averageCost-2000.0)*10.0 - (2000.0 * 10.0 * feeRate)
 	assert.True(t, madeProfit)
-	assert.Equal(t, fixedpoint.NewFromFloat(expectedProfit), profit)
+	assert.Equal(t, fixedpoint.NewFromFloat(expectedProfit), netProfit)
 }
 
 func TestPosition_ExchangeFeeRate_Long(t *testing.T) {
@@ -83,7 +83,7 @@ func TestPosition_ExchangeFeeRate_Long(t *testing.T) {
 		FeeCurrency:   "BNB",
 	})
 
-	profit, madeProfit := pos.AddTrade(types.Trade{
+	_, netProfit, madeProfit := pos.AddTrade(types.Trade{
 		Exchange:      types.ExchangeBinance,
 		Price:         4000.0,
 		Quantity:      10.0,
@@ -96,7 +96,7 @@ func TestPosition_ExchangeFeeRate_Long(t *testing.T) {
 
 	expectedProfit := (4000.0-averageCost)*10.0 - (4000.0 * 10.0 * feeRate)
 	assert.True(t, madeProfit)
-	assert.Equal(t, fixedpoint.NewFromFloat(expectedProfit), profit)
+	assert.Equal(t, fixedpoint.NewFromFloat(expectedProfit), netProfit)
 }
 
 func TestPosition(t *testing.T) {
@@ -253,7 +253,7 @@ func TestPosition(t *testing.T) {
 				BaseCurrency:  "BTC",
 				QuoteCurrency: "USDT",
 			}
-			profitAmount, profit := pos.AddTrades(testcase.trades)
+			profitAmount, _, profit := pos.AddTrades(testcase.trades)
 
 			assert.Equal(t, testcase.expectedQuote, pos.Quote, "expectedQuote")
 			assert.Equal(t, testcase.expectedBase, pos.Base, "expectedBase")

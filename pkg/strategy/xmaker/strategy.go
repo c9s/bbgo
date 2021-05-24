@@ -184,11 +184,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 		return
 	}
 
-	sourceBook := s.book.Get()
-	if len(sourceBook.Bids) == 0 || len(sourceBook.Asks) == 0 {
-		return
-	}
-
+	sourceBook := s.book.Copy()
 	if valid, err := sourceBook.IsValid(); !valid {
 		log.WithError(err).Errorf("%s invalid order book, skip quoting: %v", s.Symbol, err)
 		return
@@ -265,8 +261,11 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 		return
 	}
 
-	bestBidPrice := sourceBook.Bids[0].Price
-	bestAskPrice := sourceBook.Asks[0].Price
+	bestBid, _ := sourceBook.BestBid()
+	bestBidPrice := bestBid.Price
+
+	bestAsk, _ := sourceBook.BestAsk()
+	bestAskPrice := bestAsk.Price
 	log.Infof("%s book ticker: best ask / best bid = %f / %f", s.Symbol, bestAskPrice.Float64(), bestBidPrice.Float64())
 
 	var submitOrders []types.SubmitOrder
@@ -335,7 +334,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 			}
 
 			accumulativeBidQuantity += bidQuantity
-			bidPrice := aggregatePrice(sourceBook.Bids, accumulativeBidQuantity)
+			bidPrice := aggregatePrice(sourceBook.SideBook(types.SideTypeBuy), accumulativeBidQuantity)
 			bidPrice = bidPrice.MulFloat64(1.0 - bidMargin.Float64())
 
 			if i > 0 && pips > 0 {
@@ -382,7 +381,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 			}
 			accumulativeAskQuantity += askQuantity
 
-			askPrice := aggregatePrice(sourceBook.Asks, accumulativeAskQuantity)
+			askPrice := aggregatePrice(sourceBook.SideBook(types.SideTypeSell), accumulativeAskQuantity)
 			askPrice = askPrice.MulFloat64(1.0 + askMargin.Float64())
 			if i > 0 && pips > 0 {
 				askPrice -= pips.MulFloat64(s.makerMarket.TickSize)
@@ -443,23 +442,18 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	}
 
 	lastPrice := s.lastPrice
-	sourceBook := s.book.Get()
+	sourceBook := s.book.Copy()
 	switch side {
 
 	case types.SideTypeBuy:
-		if len(sourceBook.Asks) > 0 {
-			if pv, ok := sourceBook.Asks.First(); ok {
-				lastPrice = pv.Price.Float64()
-			}
+		if bestAsk, ok := sourceBook.BestAsk(); ok {
+			lastPrice = bestAsk.Price.Float64()
 		}
 
 	case types.SideTypeSell:
-		if len(sourceBook.Bids) > 0 {
-			if pv, ok := sourceBook.Bids.First(); ok {
-				lastPrice = pv.Price.Float64()
-			}
+		if bestBid, ok := sourceBook.BestBid(); ok {
+			lastPrice = bestBid.Price.Float64()
 		}
-
 	}
 
 	notional := quantity.MulFloat64(lastPrice)
@@ -542,7 +536,7 @@ func (s *Strategy) handleTradeUpdate(trade types.Trade) {
 	s.state.HedgePosition.AtomicAdd(q)
 	s.state.AccumulatedVolume.AtomicAdd(fixedpoint.NewFromFloat(trade.Quantity))
 
-	if profit, madeProfit := s.state.Position.AddTrade(trade); madeProfit {
+	if profit, netProfit, madeProfit := s.state.Position.AddTrade(trade); madeProfit {
 		s.state.AccumulatedPnL.AtomicAdd(profit)
 
 		if profit < 0 {
@@ -552,17 +546,20 @@ func (s *Strategy) handleTradeUpdate(trade types.Trade) {
 		}
 
 		profitMargin := profit.DivFloat64(trade.QuoteQuantity)
+		netProfitMargin := netProfit.DivFloat64(trade.QuoteQuantity)
 
 		var since time.Time
 		if s.state.AccumulatedSince > 0 {
 			since = time.Unix(s.state.AccumulatedSince, 0).In(localTimeZone)
 		}
 
-		s.Notify("%s trade profit %s %f %s (%.3f%%), since %s accumulated net profit %f %s, accumulated loss %f %s",
+		s.Notify("%s trade profit %s %f %s (%.2f%%), net profit =~ %f %s (%.2f%%), since %s accumulated net profit %f %s, accumulated loss %f %s",
 			s.Symbol,
 			pnlEmoji(profit),
 			profit.Float64(), s.state.Position.QuoteCurrency,
 			profitMargin.Float64()*100.0,
+			netProfit.Float64(), s.state.Position.QuoteCurrency,
+			netProfitMargin.Float64()*100.0,
 			since.Format(time.RFC822),
 			s.state.AccumulatedPnL.Float64(), s.state.Position.QuoteCurrency,
 			s.state.AccumulatedLoss.Float64(), s.state.Position.QuoteCurrency)
@@ -572,6 +569,10 @@ func (s *Strategy) handleTradeUpdate(trade types.Trade) {
 	}
 
 	s.lastPrice = trade.Price
+
+	if err := s.SaveState(); err != nil {
+		log.WithError(err).Error("save state error")
+	}
 }
 
 func (s *Strategy) Validate() error {
@@ -587,6 +588,33 @@ func (s *Strategy) Validate() error {
 		return errors.New("symbol is required")
 	}
 
+	return nil
+}
+
+func (s *Strategy) LoadState() error {
+	var state State
+
+	// load position
+	if err := s.Persistence.Load(&state, ID, s.Symbol, stateKey); err != nil {
+		if err != service.ErrPersistenceNotExists {
+			return err
+		}
+
+		s.state = &State{}
+	} else {
+		s.state = &state
+		log.Infof("state is restored: %+v", s.state)
+	}
+
+	return nil
+}
+
+func (s *Strategy) SaveState() error {
+	if err := s.Persistence.Save(s.state, ID, s.Symbol, stateKey); err != nil {
+		return err
+	} else {
+		log.Infof("state is saved => %+v", s.state)
+	}
 	return nil
 }
 
@@ -671,20 +699,9 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	s.groupID = max.GenerateGroupID(instanceID)
 	log.Infof("using group id %d from fnv(%s)", s.groupID, instanceID)
 
-	var state State
-
-	// load position
-	if err := s.Persistence.Load(&state, ID, s.Symbol, stateKey); err != nil {
-		if err != service.ErrPersistenceNotExists {
-			return err
-		}
-
-		s.state = &State{}
+	if err := s.LoadState(); err != nil {
+		return err
 	} else {
-		// loaded successfully
-		s.state = &state
-
-		log.Infof("state is restored: %+v", s.state)
 		s.Notify("%s position is restored => %f", s.Symbol, s.state.HedgePosition.Float64())
 	}
 
@@ -772,8 +789,10 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 		close(s.stopC)
 
+		// wait for the quoter to stop
 		time.Sleep(s.UpdateInterval.Duration())
 
+		// ensure every order is cancelled
 		for s.activeMakerOrders.NumOfOrders() > 0 {
 			orders := s.activeMakerOrders.Orders()
 			log.Warnf("%d orders are not cancelled yet:", len(orders))
@@ -781,18 +800,45 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 			if err := s.makerSession.Exchange.CancelOrders(ctx, s.activeMakerOrders.Orders()...); err != nil {
 				log.WithError(err).Errorf("can not cancel %s orders", s.Symbol)
+				continue
 			}
 
-			log.Warnf("waiting for orders to be cancelled...")
-			time.Sleep(3 * time.Second)
+			log.Infof("waiting for orders to be cancelled...")
+
+			select {
+			case <-time.After(3 * time.Second):
+
+			case <-ctx.Done():
+				break
+
+			}
+
+			// verify the current open orders via the RESTful API
+			if s.activeMakerOrders.NumOfOrders() > 0 {
+				log.Warnf("there are orders not cancelled, using REStful API to verify...")
+				openOrders, err := s.makerSession.Exchange.QueryOpenOrders(ctx, s.Symbol)
+				if err != nil {
+					log.WithError(err).Errorf("can not query %s open orders", s.Symbol)
+					continue
+				}
+
+				openOrderStore := bbgo.NewOrderStore(s.Symbol)
+				openOrderStore.Add(openOrders...)
+
+				for _, o := range s.activeMakerOrders.Orders() {
+					// if it does not exist, we should remove it
+					if !openOrderStore.Exists(o.OrderID) {
+						s.activeMakerOrders.Remove(o)
+					}
+				}
+			}
 		}
 		log.Info("all orders are cancelled successfully")
 
-		if err := s.Persistence.Save(s.state, ID, s.Symbol, stateKey); err != nil {
+		if err := s.SaveState(); err != nil {
 			log.WithError(err).Errorf("can not save state: %+v", s.state)
 		} else {
-			log.Infof("state is saved => %+v", s.state)
-			s.Notify("%s position is saved: position = %f", s.Symbol, s.state.HedgePosition.Float64())
+			s.Notify("%s position is saved: position = %f", s.Symbol, s.state.HedgePosition.Float64(), s.state.Position)
 		}
 	})
 

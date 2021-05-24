@@ -3,7 +3,6 @@ package types
 import (
 	"time"
 
-	"github.com/c9s/bbgo/pkg/datatype"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
@@ -30,7 +29,7 @@ type Reward struct {
 	Spent    bool             `json:"spent" db:"spent"`
 
 	// Unix timestamp in seconds
-	CreatedAt datatype.Time `json:"created_at" db:"created_at"`
+	CreatedAt Time `json:"created_at" db:"created_at"`
 }
 
 type RewardSlice []Reward

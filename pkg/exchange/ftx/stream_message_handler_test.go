@@ -6,7 +6,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/c9s/bbgo/pkg/datatype"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -55,8 +54,8 @@ func Test_messageHandler_handleMessage(t *testing.T) {
 				OrderID:          36379,
 				Status:           types.OrderStatusFilled,
 				ExecutedQuantity: 1.0,
-				CreationTime:     datatype.Time(mustParseDatetime("2021-03-28T06:12:50.991447+00:00")),
-				UpdateTime:       datatype.Time(mustParseDatetime("2021-03-28T06:12:50.991447+00:00")),
+				CreationTime:     types.Time(mustParseDatetime("2021-03-28T06:12:50.991447+00:00")),
+				UpdateTime:       types.Time(mustParseDatetime("2021-03-28T06:12:50.991447+00:00")),
 			}, order)
 		})
 		h.handleMessage(input)
@@ -104,7 +103,7 @@ func Test_messageHandler_handleMessage(t *testing.T) {
 				Side:          types.SideTypeBuy,
 				IsBuyer:       true,
 				IsMaker:       false,
-				Time:          datatype.Time(mustParseDatetime("2021-03-28T06:12:34.702926+00:00")),
+				Time:          types.Time(mustParseDatetime("2021-03-28T06:12:34.702926+00:00")),
 				Fee:           0.00153917575,
 				FeeCurrency:   "USD",
 				IsMargin:      false,

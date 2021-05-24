@@ -63,30 +63,9 @@ func (e *TwapExecution) connectUserData(ctx context.Context) {
 	}
 }
 
-func (e *TwapExecution) getSideBook() (pvs types.PriceVolumeSlice, err error) {
-	book := e.orderBook.Get()
-
-	switch e.Side {
-	case types.SideTypeSell:
-		pvs = book.Asks
-
-	case types.SideTypeBuy:
-		pvs = book.Bids
-
-	default:
-		err = fmt.Errorf("invalid side type: %+v", e.Side)
-	}
-
-	return pvs, err
-}
-
 func (e *TwapExecution) newBestPriceOrder() (orderForm types.SubmitOrder, err error) {
-	book := e.orderBook.Get()
-
-	sideBook, err := e.getSideBook()
-	if err != nil {
-		return orderForm, err
-	}
+	book := e.orderBook.Copy()
+	sideBook := book.SideBook(e.Side)
 
 	first, ok := sideBook.First()
 	if !ok {
@@ -223,11 +202,8 @@ func (e *TwapExecution) newBestPriceOrder() (orderForm types.SubmitOrder, err er
 }
 
 func (e *TwapExecution) updateOrder(ctx context.Context) error {
-
-	sideBook, err := e.getSideBook()
-	if err != nil {
-		return err
-	}
+	book := e.orderBook.Copy()
+	sideBook := book.SideBook(e.Side)
 
 	first, ok := sideBook.First()
 	if !ok {
@@ -319,7 +295,34 @@ func (e *TwapExecution) cancelActiveOrders(ctx context.Context) {
 		if err := e.Session.Exchange.CancelOrders(ctx, orders...); err != nil {
 			log.WithError(err).Errorf("can not cancel %s orders", e.Symbol)
 		}
-		time.Sleep(3 * time.Second)
+
+		select {
+		case <-ctx.Done():
+			return
+
+		case <-time.After(3 * time.Second):
+
+		}
+
+		// verify the current open orders via the RESTful API
+		if e.activeMakerOrders.NumOfOrders() > 0 {
+			log.Warnf("there are orders not cancelled, using REStful API to verify...")
+			openOrders, err := e.Session.Exchange.QueryOpenOrders(ctx, e.Symbol)
+			if err != nil {
+				log.WithError(err).Errorf("can not query %s open orders", e.Symbol)
+				continue
+			}
+
+			openOrderStore := NewOrderStore(e.Symbol)
+			openOrderStore.Add(openOrders...)
+
+			for _, o := range e.activeMakerOrders.Orders() {
+				// if it does not exist, we should remove it
+				if !openOrderStore.Exists(o.OrderID) {
+					e.activeMakerOrders.Remove(o)
+				}
+			}
+		}
 	}
 
 	if didCancel {

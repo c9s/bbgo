@@ -44,9 +44,9 @@ type StandardStream struct {
 
 	kLineCallbacks []func(kline KLine)
 
-	bookUpdateCallbacks []func(book OrderBook)
+	bookUpdateCallbacks []func(book SliceOrderBook)
 
-	bookSnapshotCallbacks []func(book OrderBook)
+	bookSnapshotCallbacks []func(book SliceOrderBook)
 }
 
 func (stream *StandardStream) Subscribe(channel Channel, symbol string, options SubscribeOptions) {
