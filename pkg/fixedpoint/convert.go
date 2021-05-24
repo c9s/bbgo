@@ -238,7 +238,7 @@ func NewFromString(input string) (Value, error) {
 	length := len(input)
 	isPercentage := input[length-1] == '%'
 	if isPercentage {
-		input = input[0 : length-2]
+		input = input[0 : length-1]
 	}
 
 	v, err := strconv.ParseFloat(input, 64)

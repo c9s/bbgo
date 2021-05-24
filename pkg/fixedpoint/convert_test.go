@@ -116,8 +116,8 @@ func TestNumFractionalDigits(t *testing.T) {
 		},
 		{
 			name: "percentage",
-			v:    MustNewFromString("0.075%"),
-			want: 4,
+			v:    MustNewFromString("0.075%"), // 0.075 * 0.01
+			want: 5,
 		},
 	}
 	for _, tt := range tests {
