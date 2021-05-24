@@ -54,7 +54,12 @@ var rootCmd = &cobra.Command{
 		}
 
 		log.Infof("instruments: %+v", instruments)
-		return nil
+
+		fundingRate, err := client.PublicDataService.NewGetFundingRate().InstrumentID("BTC-USDT-SWAP").Do(ctx)
+		if err != nil {
+			return err
+		}
+		log.Infof("funding rate: %+v", fundingRate)
 
 		log.Infof("ACCOUNT BALANCES:")
 		balanceSummaries, err := client.AccountBalances()
