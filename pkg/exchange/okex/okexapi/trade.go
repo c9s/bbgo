@@ -2,11 +2,132 @@ package okexapi
 
 import (
 	"context"
+	"strings"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/pkg/errors"
 )
+
+type PlaceOrderRequest struct {
+	client *RestClient
+
+	instId string
+
+	// tdMode
+	// margin mode: "cross", "isolated"
+	// non-margin mode cash
+	tdMode string
+
+	// A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 32 characters.
+	clientOrderID *string
+
+	// A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 8 characters.
+	tag *string
+
+	// "buy" or "sell"
+	side SideType
+
+	ordType OrderType
+
+	// sz Quantity
+	sz string
+
+	// price
+	px *string
+}
+
+func (r *PlaceOrderRequest) InstrumentID(instID string) *PlaceOrderRequest {
+	r.instId = instID
+	return r
+}
+
+func (r *PlaceOrderRequest) TradeMode(mode string) *PlaceOrderRequest {
+	r.tdMode = mode
+	return r
+}
+
+func (r *PlaceOrderRequest) ClientOrderID(clientOrderID string) *PlaceOrderRequest {
+	r.clientOrderID = &clientOrderID
+	return r
+}
+
+func (r *PlaceOrderRequest) Side(side SideType) *PlaceOrderRequest {
+	r.side = side
+	return r
+}
+
+func (r *PlaceOrderRequest) Quantity(quantity string) *PlaceOrderRequest {
+	r.sz = quantity
+	return r
+}
+
+func (r *PlaceOrderRequest) Price(price string) *PlaceOrderRequest {
+	r.px = &price
+	return r
+}
+
+func (r *PlaceOrderRequest) OrderType(orderType OrderType) *PlaceOrderRequest {
+	r.ordType = orderType
+	return r
+}
+
+func (r *PlaceOrderRequest) Parameters() map[string]interface{} {
+	payload := map[string]interface{}{}
+
+	payload["instId"] = r.instId
+
+	if r.tdMode == "" {
+		payload["tdMode"] = "cash"
+	} else {
+		payload["tdMode"] = r.tdMode
+	}
+
+	if r.clientOrderID != nil {
+		payload["clOrdId"] = r.clientOrderID
+	}
+
+	payload["side"] = r.side
+	payload["ordType"] = r.ordType
+	payload["sz"] = r.sz
+	if r.px != nil {
+		payload["px"] = r.px
+	}
+
+	if r.tag != nil {
+		payload["tag"] = r.tag
+	}
+
+	return payload
+}
+
+func (r *PlaceOrderRequest) Do(ctx context.Context) (*OrderResponse, error) {
+	payload := r.Parameters()
+	req, err := r.client.newAuthenticatedRequest("POST", "/api/v5/trade/order", nil, payload)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := r.client.sendRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var orderResponse struct {
+		Code    string          `json:"code"`
+		Message string          `json:"msg"`
+		Data    []OrderResponse `json:"data"`
+	}
+	if err := response.DecodeJSON(&orderResponse); err != nil {
+		return nil, err
+	}
+
+	if len(orderResponse.Data) == 0 {
+		return nil, errors.New("order create error")
+	}
+
+	return &orderResponse.Data[0], nil
+}
 
 type CancelOrderRequest struct {
 	client *RestClient
@@ -160,148 +281,6 @@ func (r *BatchPlaceOrderRequest) Do(ctx context.Context) ([]OrderResponse, error
 	return orderResponse.Data, nil
 }
 
-type PlaceOrderRequest struct {
-	client *RestClient
-
-	instId string
-
-	// tdMode
-	// margin mode: "cross", "isolated"
-	// non-margin mode cash
-	tdMode string
-
-	// A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 32 characters.
-	clientOrderID *string
-
-	// A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 8 characters.
-	tag *string
-
-	// "buy" or "sell"
-	side SideType
-
-	ordType OrderType
-
-	// sz Quantity
-	sz string
-
-	// price
-	px *string
-}
-
-func (r *PlaceOrderRequest) InstrumentID(instID string) *PlaceOrderRequest {
-	r.instId = instID
-	return r
-}
-
-func (r *PlaceOrderRequest) TradeMode(mode string) *PlaceOrderRequest {
-	r.tdMode = mode
-	return r
-}
-
-func (r *PlaceOrderRequest) ClientOrderID(clientOrderID string) *PlaceOrderRequest {
-	r.clientOrderID = &clientOrderID
-	return r
-}
-
-func (r *PlaceOrderRequest) Side(side SideType) *PlaceOrderRequest {
-	r.side = side
-	return r
-}
-
-func (r *PlaceOrderRequest) Quantity(quantity string) *PlaceOrderRequest {
-	r.sz = quantity
-	return r
-}
-
-func (r *PlaceOrderRequest) Price(price string) *PlaceOrderRequest {
-	r.px = &price
-	return r
-}
-
-func (r *PlaceOrderRequest) OrderType(orderType OrderType) *PlaceOrderRequest {
-	r.ordType = orderType
-	return r
-}
-
-func (r *PlaceOrderRequest) Parameters() map[string]interface{} {
-	payload := map[string]interface{}{}
-
-	payload["instId"] = r.instId
-
-	if r.tdMode == "" {
-		payload["tdMode"] = "cash"
-	} else {
-		payload["tdMode"] = r.tdMode
-	}
-
-	if r.clientOrderID != nil {
-		payload["clOrdId"] = r.clientOrderID
-	}
-
-	payload["side"] = r.side
-	payload["ordType"] = r.ordType
-	payload["sz"] = r.sz
-	if r.px != nil {
-		payload["px"] = r.px
-	}
-
-	if r.tag != nil {
-		payload["tag"] = r.tag
-	}
-
-	return payload
-}
-
-func (r *PlaceOrderRequest) Do(ctx context.Context) (*OrderResponse, error) {
-	payload := r.Parameters()
-	req, err := r.client.newAuthenticatedRequest("POST", "/api/v5/trade/order", nil, payload)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := r.client.sendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var orderResponse struct {
-		Code    string          `json:"code"`
-		Message string          `json:"msg"`
-		Data    []OrderResponse `json:"data"`
-	}
-	if err := response.DecodeJSON(&orderResponse); err != nil {
-		return nil, err
-	}
-
-	if len(orderResponse.Data) == 0 {
-		return nil, errors.New("order create error")
-	}
-
-	return &orderResponse.Data[0], nil
-}
-
-type OrderDetailsRequest struct {
-	client *RestClient
-
-	instId  string
-	ordId   *string
-	clOrdId *string
-}
-
-func (r *OrderDetailsRequest) Parameters() map[string]interface{} {
-	var payload = map[string]interface{}{
-		"instId": r.instId,
-	}
-
-	if r.ordId != nil {
-		payload["ordId"] = r.ordId
-	} else if r.clOrdId != nil {
-		payload["clOrdId"] = r.clOrdId
-	}
-
-	return payload
-}
-
 type OrderDetails struct {
 	InstrumentType string           `json:"instType"`
 	InstrumentID   string           `json:"instId"`
@@ -337,22 +316,44 @@ type OrderDetails struct {
 	State string `json:"state"`
 }
 
-func (r *OrderDetailsRequest) InstrumentID(instId string) *OrderDetailsRequest {
+type GetOrderDetailsRequest struct {
+	client *RestClient
+
+	instId  string
+	ordId   *string
+	clOrdId *string
+}
+
+func (r *GetOrderDetailsRequest) Parameters() map[string]interface{} {
+	var payload = map[string]interface{}{
+		"instId": r.instId,
+	}
+
+	if r.ordId != nil {
+		payload["ordId"] = r.ordId
+	} else if r.clOrdId != nil {
+		payload["clOrdId"] = r.clOrdId
+	}
+
+	return payload
+}
+
+func (r *GetOrderDetailsRequest) InstrumentID(instId string) *GetOrderDetailsRequest {
 	r.instId = instId
 	return r
 }
 
-func (r *OrderDetailsRequest) OrderID(orderID string) *OrderDetailsRequest {
+func (r *GetOrderDetailsRequest) OrderID(orderID string) *GetOrderDetailsRequest {
 	r.ordId = &orderID
 	return r
 }
 
-func (r *OrderDetailsRequest) ClientOrderID(clientOrderID string) *OrderDetailsRequest {
+func (r *GetOrderDetailsRequest) ClientOrderID(clientOrderID string) *GetOrderDetailsRequest {
 	r.clOrdId = &clientOrderID
 	return r
 }
 
-func (r *OrderDetailsRequest) Do(ctx context.Context) (*OrderDetails, error) {
+func (r *GetOrderDetailsRequest) Do(ctx context.Context) (*OrderDetails, error) {
 	payload := r.Parameters()
 	req, err := r.client.newAuthenticatedRequest("GET", "/api/v5/trade/order", nil, payload)
 	if err != nil {
@@ -378,4 +379,76 @@ func (r *OrderDetailsRequest) Do(ctx context.Context) (*OrderDetails, error) {
 	}
 
 	return &orderResponse.Data[0], nil
+}
+
+type GetPendingOrderRequest struct {
+	client *RestClient
+
+	instType *string
+
+	orderTypes []string
+
+	state *OrderState
+}
+
+func (r *GetPendingOrderRequest) InstrumentType(instType string) *GetPendingOrderRequest {
+	r.instType = &instType
+	return r
+}
+
+func (r *GetPendingOrderRequest) State(state OrderState) *GetPendingOrderRequest {
+	r.state = &state
+	return r
+}
+
+func (r *GetPendingOrderRequest) OrderTypes(orderTypes []string) *GetPendingOrderRequest {
+	r.orderTypes = orderTypes
+	return r
+}
+
+func (r *GetPendingOrderRequest) AddOrderTypes(orderTypes ...string) *GetPendingOrderRequest {
+	r.orderTypes = append(r.orderTypes, orderTypes...)
+	return r
+}
+
+func (r *GetPendingOrderRequest) Parameters() map[string]interface{} {
+	var payload = map[string]interface{}{}
+
+	if r.instType != nil {
+		payload["instType"] = r.instType
+	}
+
+	if r.state != nil {
+		payload["state"] = r.state
+	}
+
+	if len(r.orderTypes) > 0 {
+		payload["ordType"] = strings.Join(r.orderTypes, ",")
+	}
+
+	return payload
+}
+
+func (r *GetPendingOrderRequest) Do(ctx context.Context) ([]OrderDetails, error) {
+	payload := r.Parameters()
+	req, err := r.client.newAuthenticatedRequest("GET", "/api/v5/trade/orders-pending", nil, payload)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := r.client.sendRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var orderResponse struct {
+		Code    string         `json:"code"`
+		Message string         `json:"msg"`
+		Data    []OrderDetails `json:"data"`
+	}
+	if err := response.DecodeJSON(&orderResponse); err != nil {
+		return nil, err
+	}
+
+	return orderResponse.Data, nil
 }

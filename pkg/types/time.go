@@ -10,6 +10,10 @@ import (
 
 type MillisecondTimestamp time.Time
 
+func (t MillisecondTimestamp) String() string {
+	return time.Time(t).String()
+}
+
 func (t *MillisecondTimestamp) UnmarshalJSON(data []byte) error {
 	var v interface{}
 
