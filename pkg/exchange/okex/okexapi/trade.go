@@ -439,14 +439,14 @@ func (r *GetOrderDetailsRequest) Do(ctx context.Context) (*OrderDetails, error) 
 type GetPendingOrderRequest struct {
 	client *RestClient
 
-	instType *string
+	instType *InstrumentType
 
 	orderTypes []string
 
 	state *OrderState
 }
 
-func (r *GetPendingOrderRequest) InstrumentType(instType string) *GetPendingOrderRequest {
+func (r *GetPendingOrderRequest) InstrumentType(instType InstrumentType) *GetPendingOrderRequest {
 	r.instType = &instType
 	return r
 }
@@ -511,14 +511,14 @@ func (r *GetPendingOrderRequest) Do(ctx context.Context) ([]OrderDetails, error)
 type GetTransactionDetailsRequest struct {
 	client *RestClient
 
-	instType *string
+	instType *InstrumentType
 
 	instId *string
 
 	ordId *string
 }
 
-func (r *GetTransactionDetailsRequest) InstrumentType(instType string) *GetTransactionDetailsRequest {
+func (r *GetTransactionDetailsRequest) InstrumentType(instType InstrumentType) *GetTransactionDetailsRequest {
 	r.instType = &instType
 	return r
 }

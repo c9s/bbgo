@@ -47,6 +47,15 @@ var rootCmd = &cobra.Command{
 		client := okexapi.NewClient()
 		client.Auth(key, secret, passphrase)
 
+		instruments, err := client.PublicDataService.NewGetInstrumentsRequest().
+			InstrumentType("SPOT").Do(ctx)
+		if err != nil {
+			return err
+		}
+
+		log.Infof("instruments: %+v", instruments)
+		return nil
+
 		log.Infof("ACCOUNT BALANCES:")
 		balanceSummaries, err := client.AccountBalances()
 		if err != nil {
