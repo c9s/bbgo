@@ -58,7 +58,6 @@ func NewStream(key, secret string, subAccount string, e *Exchange) *Stream {
 
 		s.EmitConnect()
 	})
-	go s.handleChannelKlineMessage()
 
 	return s
 }
@@ -75,6 +74,7 @@ func (s *Stream) Connect(ctx context.Context) error {
 	s.ctx = ctx
 	s.isConnected = true
 	s.EmitStart()
+	go s.handleChannelKlineMessage()
 
 	go func() {
 		// https://docs.ftx.com/?javascript#request-process
