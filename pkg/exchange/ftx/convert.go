@@ -21,8 +21,8 @@ func toGlobalSymbol(original string) string {
 }
 
 func toLocalSymbol(original string) string {
-	if "" == symbolMap[original] {
-		panic(errors.New("Fatal Error: Can not find FTX's symbol mapping table"))
+	if symbolMap[original] == "" {
+		panic(errors.New("can not find FTX's symbol mapping table"))
 	}
 	return symbolMap[original]
 }
