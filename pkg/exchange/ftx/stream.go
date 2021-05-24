@@ -21,7 +21,6 @@ type Stream struct {
 	klineMessage chan types.KLine
 	exchange     *Exchange
 	ctx          context.Context
-	isConnected  bool
 
 	// publicOnly can only be configured before connecting
 	publicOnly int32
@@ -37,7 +36,6 @@ type Stream struct {
 func NewStream(key, secret string, subAccount string, e *Exchange) *Stream {
 	s := &Stream{
 		exchange:       e,
-		isConnected:    false,
 		key:            key,
 		klineMessage:   make(chan types.KLine),
 		secret:         secret,
@@ -72,7 +70,6 @@ func (s *Stream) Connect(ctx context.Context) error {
 		return err
 	}
 	s.ctx = ctx
-	s.isConnected = true
 	s.EmitStart()
 	go s.handleChannelKlineMessage()
 
