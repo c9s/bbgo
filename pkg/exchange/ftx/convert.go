@@ -1,7 +1,6 @@
 package ftx
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -22,7 +21,8 @@ func toGlobalSymbol(original string) string {
 
 func toLocalSymbol(original string) string {
 	if symbolMap[original] == "" {
-		panic(errors.New("can not find FTX's symbol mapping table"))
+		// BTC-PERP do not have the local symbol
+		return original
 	}
 	return symbolMap[original]
 }
