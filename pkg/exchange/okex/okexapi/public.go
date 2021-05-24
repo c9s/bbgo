@@ -6,6 +6,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/pkg/errors"
 )
 
 type PublicDataService struct {
@@ -16,6 +17,62 @@ func (s *PublicDataService) NewGetInstrumentsRequest() *GetInstrumentsRequest {
 	return &GetInstrumentsRequest{
 		client: s.client,
 	}
+}
+
+func (s *PublicDataService) NewGetFundingRate() *GetFundingRateRequest {
+	return &GetFundingRateRequest{
+		client: s.client,
+	}
+}
+
+type FundingRate struct {
+	InstrumentType  string                     `json:"instType"`
+	InstrumentID    string                     `json:"instId"`
+	FundingRate     fixedpoint.Value           `json:"fundingRate"`
+	NextFundingRate fixedpoint.Value           `json:"nextFundingRate"`
+	FundingTime     types.MillisecondTimestamp `json:"fundingTime"`
+}
+
+type GetFundingRateRequest struct {
+	client *RestClient
+
+	instId string
+}
+
+func (r *GetFundingRateRequest) InstrumentID(instId string) *GetFundingRateRequest {
+	r.instId = instId
+	return r
+}
+
+func (r *GetFundingRateRequest) Do(ctx context.Context) (*FundingRate, error) {
+	// SPOT, SWAP, FUTURES, OPTION
+	var params = url.Values{}
+	params.Add("instId", string(r.instId))
+
+	req, err := r.client.newRequest("GET", "/api/v5/public/funding-rate", params, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := r.client.sendRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var apiResponse struct {
+		Code    string        `json:"code"`
+		Message string        `json:"msg"`
+		Data    []FundingRate `json:"data"`
+	}
+	if err := response.DecodeJSON(&apiResponse); err != nil {
+		return nil, err
+	}
+
+	if len(apiResponse.Data) == 0 {
+		return nil, errors.New("empty funding rate data")
+	}
+
+	return &apiResponse.Data[0], nil
 }
 
 type Instrument struct {
