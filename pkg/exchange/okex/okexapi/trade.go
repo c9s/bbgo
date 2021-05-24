@@ -2,12 +2,67 @@ package okexapi
 
 import (
 	"context"
+	"net/url"
 	"strings"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/pkg/errors"
 )
+
+type TradeService struct {
+	client *RestClient
+}
+
+type OrderResponse struct {
+	OrderID       string `json:"ordId"`
+	ClientOrderID string `json:"clOrdId"`
+	Tag           string `json:"tag"`
+	Code          string `json:"sCode"`
+	Message       string `json:"sMsg"`
+}
+
+func (c *TradeService) NewPlaceOrderRequest() *PlaceOrderRequest {
+	return &PlaceOrderRequest{
+		client: c.client,
+	}
+}
+
+func (c *TradeService) NewBatchPlaceOrderRequest() *BatchPlaceOrderRequest {
+	return &BatchPlaceOrderRequest{
+		client: c.client,
+	}
+}
+
+func (c *TradeService) NewCancelOrderRequest() *CancelOrderRequest {
+	return &CancelOrderRequest{
+		client: c.client,
+	}
+}
+
+func (c *TradeService) NewBatchCancelOrderRequest() *BatchCancelOrderRequest {
+	return &BatchCancelOrderRequest{
+		client: c.client,
+	}
+}
+
+func (c *TradeService) NewGetOrderDetailsRequest() *GetOrderDetailsRequest {
+	return &GetOrderDetailsRequest{
+		client: c.client,
+	}
+}
+
+func (c *TradeService) NewGetPendingOrderRequest() *GetPendingOrderRequest {
+	return &GetPendingOrderRequest{
+		client: c.client,
+	}
+}
+
+func (c *TradeService) NewGetTransactionDetailsRequest() *GetTransactionDetailsRequest {
+	return &GetTransactionDetailsRequest{
+		client: c.client,
+	}
+}
 
 type PlaceOrderRequest struct {
 	client *RestClient
@@ -324,20 +379,6 @@ type GetOrderDetailsRequest struct {
 	clOrdId *string
 }
 
-func (r *GetOrderDetailsRequest) Parameters() map[string]interface{} {
-	var payload = map[string]interface{}{
-		"instId": r.instId,
-	}
-
-	if r.ordId != nil {
-		payload["ordId"] = r.ordId
-	} else if r.clOrdId != nil {
-		payload["clOrdId"] = r.clOrdId
-	}
-
-	return payload
-}
-
 func (r *GetOrderDetailsRequest) InstrumentID(instId string) *GetOrderDetailsRequest {
 	r.instId = instId
 	return r
@@ -353,9 +394,23 @@ func (r *GetOrderDetailsRequest) ClientOrderID(clientOrderID string) *GetOrderDe
 	return r
 }
 
+func (r *GetOrderDetailsRequest) QueryParameters() url.Values {
+	var values = url.Values{}
+
+	values.Add("instId", r.instId)
+
+	if r.ordId != nil {
+		values.Add("ordId", *r.ordId)
+	} else if r.clOrdId != nil {
+		values.Add("clOrdId", *r.clOrdId)
+	}
+
+	return values
+}
+
 func (r *GetOrderDetailsRequest) Do(ctx context.Context) (*OrderDetails, error) {
-	payload := r.Parameters()
-	req, err := r.client.newAuthenticatedRequest("GET", "/api/v5/trade/order", nil, payload)
+	params := r.QueryParameters()
+	req, err := r.client.newAuthenticatedRequest("GET", "/api/v5/trade/order", params, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -432,6 +487,73 @@ func (r *GetPendingOrderRequest) Parameters() map[string]interface{} {
 func (r *GetPendingOrderRequest) Do(ctx context.Context) ([]OrderDetails, error) {
 	payload := r.Parameters()
 	req, err := r.client.newAuthenticatedRequest("GET", "/api/v5/trade/orders-pending", nil, payload)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := r.client.sendRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var orderResponse struct {
+		Code    string         `json:"code"`
+		Message string         `json:"msg"`
+		Data    []OrderDetails `json:"data"`
+	}
+	if err := response.DecodeJSON(&orderResponse); err != nil {
+		return nil, err
+	}
+
+	return orderResponse.Data, nil
+}
+
+type GetTransactionDetailsRequest struct {
+	client *RestClient
+
+	instType *string
+
+	instId *string
+
+	ordId *string
+}
+
+func (r *GetTransactionDetailsRequest) InstrumentType(instType string) *GetTransactionDetailsRequest {
+	r.instType = &instType
+	return r
+}
+
+func (r *GetTransactionDetailsRequest) InstrumentID(instId string) *GetTransactionDetailsRequest {
+	r.instId = &instId
+	return r
+}
+
+func (r *GetTransactionDetailsRequest) OrderID(orderID string) *GetTransactionDetailsRequest {
+	r.ordId = &orderID
+	return r
+}
+
+func (r *GetTransactionDetailsRequest) Parameters() map[string]interface{} {
+	var payload = map[string]interface{}{}
+
+	if r.instType != nil {
+		payload["instType"] = r.instType
+	}
+
+	if r.instId != nil {
+		payload["instId"] = r.instId
+	}
+
+	if r.ordId != nil {
+		payload["ordId"] = r.ordId
+	}
+
+	return payload
+}
+
+func (r *GetTransactionDetailsRequest) Do(ctx context.Context) ([]OrderDetails, error) {
+	payload := r.Parameters()
+	req, err := r.client.newAuthenticatedRequest("GET", "/api/v5/trade/fills", nil, payload)
 	if err != nil {
 		return nil, err
 	}

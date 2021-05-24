@@ -95,7 +95,7 @@ var rootCmd = &cobra.Command{
 		log.Infof("%T%+v", ticker, ticker)
 
 		log.Infof("PLACING ORDER:")
-		placeResponse, err := client.NewPlaceOrderRequest().
+		placeResponse, err := client.TradeService.NewPlaceOrderRequest().
 			InstrumentID("LTC-USDT").
 			OrderType(okexapi.OrderTypeLimit).
 			Side(okexapi.SideTypeBuy).
@@ -109,9 +109,18 @@ var rootCmd = &cobra.Command{
 		log.Infof("place order response: %+v", placeResponse)
 		time.Sleep(time.Second)
 
-		client.NewGetOrderDetailsRequest()
+		log.Infof("getting order detail...")
+		orderDetail, err := client.TradeService.NewGetOrderDetailsRequest().
+			InstrumentID("LTC-USDT").
+			OrderID(placeResponse.OrderID).
+			Do(ctx)
+		if err != nil {
+			return err
+		}
 
-		cancelResponse, err := client.NewCancelOrderRequest().
+		log.Infof("order detail: %+v", orderDetail)
+
+		cancelResponse, err := client.TradeService.NewCancelOrderRequest().
 			InstrumentID("LTC-USDT").
 			OrderID(placeResponse.OrderID).
 			Do(ctx)
@@ -123,15 +132,15 @@ var rootCmd = &cobra.Command{
 		time.Sleep(time.Second)
 
 		log.Infof("BATCH PLACE ORDER:")
-		batchPlaceReq := client.NewBatchPlaceOrderRequest()
-		batchPlaceReq.Add(client.NewPlaceOrderRequest().
+		batchPlaceReq := client.TradeService.NewBatchPlaceOrderRequest()
+		batchPlaceReq.Add(client.TradeService.NewPlaceOrderRequest().
 			InstrumentID("LTC-USDT").
 			OrderType(okexapi.OrderTypeLimit).
 			Side(okexapi.SideTypeBuy).
 			Price("50.0").
 			Quantity("0.5"))
 
-		batchPlaceReq.Add(client.NewPlaceOrderRequest().
+		batchPlaceReq.Add(client.TradeService.NewPlaceOrderRequest().
 			InstrumentID("LTC-USDT").
 			OrderType(okexapi.OrderTypeLimit).
 			Side(okexapi.SideTypeBuy).
@@ -147,7 +156,7 @@ var rootCmd = &cobra.Command{
 		time.Sleep(time.Second)
 
 		log.Infof("getting pending orders...")
-		pendingOrders, err := client.NewGetPendingOrderRequest().Do(ctx)
+		pendingOrders, err := client.TradeService.NewGetPendingOrderRequest().Do(ctx)
 		if err != nil {
 			return err
 		}
@@ -155,9 +164,9 @@ var rootCmd = &cobra.Command{
 			log.Infof("pending order: %+v", pendingOrder)
 		}
 
-		cancelReq := client.NewBatchCancelOrderRequest()
+		cancelReq := client.TradeService.NewBatchCancelOrderRequest()
 		for _, resp := range batchPlaceResponse {
-			cancelReq.Add(client.NewCancelOrderRequest().
+			cancelReq.Add(client.TradeService.NewCancelOrderRequest().
 				InstrumentID("LTC-USDT").
 				OrderID(resp.OrderID))
 		}
