@@ -55,6 +55,8 @@ type RestClient struct {
 	client *http.Client
 
 	Key, Secret, Passphrase string
+
+	TradeService *TradeService
 }
 
 func NewClient() *RestClient {
@@ -63,12 +65,15 @@ func NewClient() *RestClient {
 		panic(err)
 	}
 
-	return &RestClient{
+	client := &RestClient{
 		BaseURL: u,
 		client: &http.Client{
 			Timeout: defaultHTTPTimeout,
 		},
 	}
+
+	client.TradeService = &TradeService{client: client}
+	return client
 }
 
 func (c *RestClient) Auth(key, secret, passphrase string) {
@@ -140,6 +145,9 @@ func (c *RestClient) newAuthenticatedRequest(method, refURL string, params url.V
 
 	pathURL := c.BaseURL.ResolveReference(rel)
 	path := pathURL.Path
+	if rel.RawQuery != "" {
+		path += "?" + rel.RawQuery
+	}
 
 	// set location to UTC so that it outputs "2020-12-08T09:08:57.715Z"
 	t := time.Now().In(time.UTC)
@@ -373,50 +381,6 @@ func (c *RestClient) MarketTickers(instType string) ([]MarketTicker, error) {
 	}
 
 	return tickerResponse.Data, nil
-}
-
-type OrderResponse struct {
-	OrderID       string `json:"ordId"`
-	ClientOrderID string `json:"clOrdId"`
-	Tag           string `json:"tag"`
-	Code          string `json:"sCode"`
-	Message       string `json:"sMsg"`
-}
-
-func (c *RestClient) NewPlaceOrderRequest() *PlaceOrderRequest {
-	return &PlaceOrderRequest{
-		client: c,
-	}
-}
-
-func (c *RestClient) NewBatchPlaceOrderRequest() *BatchPlaceOrderRequest {
-	return &BatchPlaceOrderRequest{
-		client: c,
-	}
-}
-
-func (c *RestClient) NewCancelOrderRequest() *CancelOrderRequest {
-	return &CancelOrderRequest{
-		client: c,
-	}
-}
-
-func (c *RestClient) NewBatchCancelOrderRequest() *BatchCancelOrderRequest {
-	return &BatchCancelOrderRequest{
-		client: c,
-	}
-}
-
-func (c *RestClient) NewGetOrderDetailsRequest() *GetOrderDetailsRequest {
-	return &GetOrderDetailsRequest{
-		client: c,
-	}
-}
-
-func (c *RestClient) NewGetPendingOrderRequest() *GetPendingOrderRequest {
-	return &GetPendingOrderRequest{
-		client: c,
-	}
 }
 
 func sign(payload string, secret string) string {
