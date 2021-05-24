@@ -95,7 +95,7 @@ func (r *restRequest) buildURL() (*url.URL, error) {
 	return r.baseURL.ResolveReference(refURL), nil
 }
 
-func (r *restRequest) Id(id string) *restRequest {
+func (r *restRequest) ID(id string) *restRequest {
 	r.id = id
 	return r
 }
