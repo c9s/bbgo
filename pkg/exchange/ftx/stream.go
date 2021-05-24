@@ -127,7 +127,7 @@ func (s *Stream) Subscribe(channel types.Channel, symbol string, option types.Su
 
 	} else if channel == types.KLineChannel {
 		// FTX does not support kline channel, do polling
-		go s.subscribeKLine(symbol, option)
+		go s.pollKLines(symbol, option)
 	} else {
 		panic("only support book/kline channel now")
 	}
@@ -147,7 +147,7 @@ func (s *Stream) handleChannelKlineMessage(ctx context.Context) {
 	}
 }
 
-func (s *Stream) subscribeKLine(symbol string, option types.SubscribeOptions) {
+func (s *Stream) pollKLines(symbol string, option types.SubscribeOptions) {
 	interval := types.Interval(option.Interval)
 	if !isIntervalSupportedInKLine(interval) {
 		logger.Errorf("not supported kline interval %s", option.Interval)
