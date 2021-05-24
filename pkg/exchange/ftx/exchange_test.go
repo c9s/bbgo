@@ -13,7 +13,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/c9s/bbgo/pkg/datatype"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -467,7 +466,7 @@ func TestExchange_QueryDepositHistory(t *testing.T) {
 	assert.Len(t, dh, 1)
 	assert.Equal(t, types.Deposit{
 		Exchange:      types.ExchangeFTX,
-		Time:          datatype.Time(actualConfirmedTime),
+		Time:          types.Time(actualConfirmedTime),
 		Amount:        99.0,
 		Asset:         "TUSD",
 		TransactionID: "0x8078356ae4b06a036d64747546c274af19581f1c78c510b60505798a7ffcaf1",
@@ -610,7 +609,7 @@ func TestExchange_QueryTrades(t *testing.T) {
 			Side:          types.SideTypeSell,
 			IsBuyer:       false,
 			IsMaker:       true,
-			Time:          datatype.Time(actualConfirmedTime),
+			Time:          types.Time(actualConfirmedTime),
 			Fee:           -0.0033625,
 			FeeCurrency:   "USD",
 			IsMargin:      false,

@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
@@ -18,7 +19,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-var defaultMargin = fixedpoint.NewFromFloat(0.01)
+var defaultMargin = fixedpoint.NewFromFloat(0.003)
 
 var localTimeZone *time.Location
 
@@ -65,6 +66,11 @@ type Strategy struct {
 	BidMargin fixedpoint.Value `json:"bidMargin"`
 	AskMargin fixedpoint.Value `json:"askMargin"`
 
+	EnableBollBandMargin bool             `json:"enableBollBandMargin"`
+	BollBandInterval     types.Interval   `json:"bollBandInterval"`
+	BollBandMargin       fixedpoint.Value `json:"bollBandMargin"`
+	BollBandMarginFactor fixedpoint.Value `json:"bollBandMarginFactor"`
+
 	StopHedgeQuoteBalance fixedpoint.Value `json:"stopHedgeQuoteBalance"`
 	StopHedgeBaseBalance  fixedpoint.Value `json:"stopHedgeBaseBalance"`
 
@@ -85,7 +91,7 @@ type Strategy struct {
 	NumLayers int `json:"numLayers"`
 
 	// Pips is the pips of the layer prices
-	Pips int `json:"pips"`
+	Pips fixedpoint.Value `json:"pips"`
 
 	// --------------------------------
 	// private field
@@ -95,6 +101,9 @@ type Strategy struct {
 
 	sourceMarket types.Market
 	makerMarket  types.Market
+
+	// boll is the BOLLINGER indicator we used for predicting the price.
+	boll *indicator.BOLL
 
 	state *State
 
@@ -120,6 +129,7 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 	}
 
 	sourceSession.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{})
+	sourceSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
 
 	makerSession, ok := sessions[s.MakerExchange]
 	if !ok {
@@ -174,11 +184,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 		return
 	}
 
-	sourceBook := s.book.Get()
-	if len(sourceBook.Bids) == 0 || len(sourceBook.Asks) == 0 {
-		return
-	}
-
+	sourceBook := s.book.Copy()
 	if valid, err := sourceBook.IsValid(); !valid {
 		log.WithError(err).Errorf("%s invalid order book, skip quoting: %v", s.Symbol, err)
 		return
@@ -251,18 +257,66 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 	}
 
 	if disableMakerAsk && disableMakerBid {
-		log.Warn("bid/ask maker is disabled due to insufficient balances")
+		log.Warnf("%s bid/ask maker is disabled due to insufficient balances", s.Symbol)
 		return
 	}
 
-	bestBidPrice := sourceBook.Bids[0].Price
-	bestAskPrice := sourceBook.Asks[0].Price
-	log.Infof("%s best bid price %f, best ask price: %f", s.Symbol, bestBidPrice.Float64(), bestAskPrice.Float64())
+	bestBid, _ := sourceBook.BestBid()
+	bestBidPrice := bestBid.Price
+
+	bestAsk, _ := sourceBook.BestAsk()
+	bestAskPrice := bestAsk.Price
+	log.Infof("%s book ticker: best ask / best bid = %f / %f", s.Symbol, bestAskPrice.Float64(), bestBidPrice.Float64())
 
 	var submitOrders []types.SubmitOrder
 	var accumulativeBidQuantity, accumulativeAskQuantity fixedpoint.Value
 	var bidQuantity = s.Quantity
 	var askQuantity = s.Quantity
+	var bidMargin = s.BidMargin
+	var askMargin = s.AskMargin
+	var pips = s.Pips
+
+	if s.EnableBollBandMargin {
+		lastDownBand := s.boll.LastDownBand()
+		lastUpBand := s.boll.LastUpBand()
+
+		// when bid price is lower than the down band, then it's in the downtrend
+		// when ask price is higher than the up band, then it's in the uptrend
+		if bestBidPrice.Float64() < lastDownBand {
+			// ratio here should be greater than 1.00
+			ratio := lastDownBand / bestBidPrice.Float64()
+
+			// so that the original bid margin can be multiplied by 1.x
+			bollMargin := s.BollBandMargin.MulFloat64(ratio).Mul(s.BollBandMarginFactor)
+
+			log.Infof("%s bollband downtrend: adjusting ask margin %f + %f = %f",
+				s.Symbol,
+				askMargin.Float64(),
+				bollMargin.Float64(),
+				(askMargin + bollMargin).Float64())
+
+			askMargin = askMargin + bollMargin
+			pips = pips.MulFloat64(ratio)
+		}
+
+		if bestAskPrice.Float64() > lastUpBand {
+			// ratio here should be greater than 1.00
+			ratio := bestAskPrice.Float64() / lastUpBand
+
+			// so that the original bid margin can be multiplied by 1.x
+			bollMargin := s.BollBandMargin.MulFloat64(ratio).Mul(s.BollBandMarginFactor)
+
+			log.Infof("%s bollband uptrend adjusting bid margin %f + %f = %f",
+				s.Symbol,
+				bidMargin.Float64(),
+				bollMargin.Float64(),
+				(bidMargin + bollMargin).Float64())
+
+			bidMargin = bidMargin + bollMargin
+			pips = pips.MulFloat64(ratio)
+		}
+	}
+
 	for i := 0; i < s.NumLayers; i++ {
 		// for maker bid orders
 		if !disableMakerBid {
@@ -273,17 +327,18 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 					return
 				}
 
-				log.Infof("scaling quantity to %f by layer: %d", qf, i+1)
+				log.Infof("%s scaling bid #%d quantity to %f", s.Symbol, i+1, qf)
 
 				// override the default bid quantity
 				bidQuantity = fixedpoint.NewFromFloat(qf)
 			}
 
 			accumulativeBidQuantity += bidQuantity
-			bidPrice := aggregatePrice(sourceBook.Bids, accumulativeBidQuantity)
-			bidPrice = bidPrice.MulFloat64(1.0 - s.BidMargin.Float64())
-			if i > 0 && s.Pips > 0 {
-				bidPrice -= fixedpoint.NewFromFloat(s.makerMarket.TickSize * float64(s.Pips))
+			bidPrice := aggregatePrice(sourceBook.SideBook(types.SideTypeBuy), accumulativeBidQuantity)
+			bidPrice = bidPrice.MulFloat64(1.0 - bidMargin.Float64())
+
+			if i > 0 && pips > 0 {
+				bidPrice -= pips.MulFloat64(s.makerMarket.TickSize)
 			}
 
 			if makerQuota.QuoteAsset.Lock(bidQuantity.Mul(bidPrice)) && hedgeQuota.BaseAsset.Lock(bidQuantity) {
@@ -319,15 +374,17 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 					return
 				}
 
+				log.Infof("%s scaling ask #%d quantity to %f", s.Symbol, i+1, qf)
+
 				// override the default bid quantity
 				askQuantity = fixedpoint.NewFromFloat(qf)
 			}
 			accumulativeAskQuantity += askQuantity
 
-			askPrice := aggregatePrice(sourceBook.Asks, accumulativeAskQuantity)
-			askPrice = askPrice.MulFloat64(1.0 + s.AskMargin.Float64())
-			if i > 0 && s.Pips > 0 {
-				askPrice += fixedpoint.NewFromFloat(s.makerMarket.TickSize * float64(s.Pips))
+			askPrice := aggregatePrice(sourceBook.SideBook(types.SideTypeSell), accumulativeAskQuantity)
+			askPrice = askPrice.MulFloat64(1.0 + askMargin.Float64())
+			if i > 0 && pips > 0 {
+				askPrice -= pips.MulFloat64(s.makerMarket.TickSize)
 			}
 
 			if makerQuota.BaseAsset.Lock(askQuantity) && hedgeQuota.QuoteAsset.Lock(askQuantity.Mul(askPrice)) {
@@ -355,6 +412,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 	}
 
 	if len(submitOrders) == 0 {
+		log.Warnf("no orders generated")
 		return
 	}
 
@@ -384,23 +442,18 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	}
 
 	lastPrice := s.lastPrice
-	sourceBook := s.book.Get()
+	sourceBook := s.book.Copy()
 	switch side {
 
 	case types.SideTypeBuy:
-		if len(sourceBook.Asks) > 0 {
-			if pv, ok := sourceBook.Asks.First(); ok {
-				lastPrice = pv.Price.Float64()
-			}
+		if bestAsk, ok := sourceBook.BestAsk(); ok {
+			lastPrice = bestAsk.Price.Float64()
 		}
 
 	case types.SideTypeSell:
-		if len(sourceBook.Bids) > 0 {
-			if pv, ok := sourceBook.Bids.First(); ok {
-				lastPrice = pv.Price.Float64()
-			}
+		if bestBid, ok := sourceBook.BestBid(); ok {
+			lastPrice = bestBid.Price.Float64()
 		}
-
 	}
 
 	notional := quantity.MulFloat64(lastPrice)
@@ -417,8 +470,8 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 		// check quote quantity
 		if quote, ok := account.Balance(s.sourceMarket.QuoteCurrency); ok {
 			if quote.Available < notional {
-				// qf := bbgo.AdjustFloatQuantityByMaxAmount(quantity.Float64(), lastPrice, quote.Available.Float64())
-				// quantity = fixedpoint.NewFromFloat(qf)
+				// adjust price to higher 0.1%, so that we can ensure that the order can be executed
+				quantity = bbgo.AdjustQuantityByMaxAmount(quantity, fixedpoint.NewFromFloat(lastPrice*1.001), quote.Available)
 			}
 		}
 
@@ -483,7 +536,7 @@ func (s *Strategy) handleTradeUpdate(trade types.Trade) {
 	s.state.HedgePosition.AtomicAdd(q)
 	s.state.AccumulatedVolume.AtomicAdd(fixedpoint.NewFromFloat(trade.Quantity))
 
-	if profit, madeProfit := s.state.Position.AddTrade(trade); madeProfit {
+	if profit, netProfit, madeProfit := s.state.Position.AddTrade(trade); madeProfit {
 		s.state.AccumulatedPnL.AtomicAdd(profit)
 
 		if profit < 0 {
@@ -493,17 +546,20 @@ func (s *Strategy) handleTradeUpdate(trade types.Trade) {
 		}
 
 		profitMargin := profit.DivFloat64(trade.QuoteQuantity)
+		netProfitMargin := netProfit.DivFloat64(trade.QuoteQuantity)
 
 		var since time.Time
 		if s.state.AccumulatedSince > 0 {
 			since = time.Unix(s.state.AccumulatedSince, 0).In(localTimeZone)
 		}
 
-		s.Notify("%s trade profit %s %f %s (profit margin %f%%), since %s accumulated net profit %f %s, accumulated loss %f %s",
+		s.Notify("%s trade profit %s %f %s (%.2f%%), net profit =~ %f %s (%.2f%%), since %s accumulated net profit %f %s, accumulated loss %f %s",
 			s.Symbol,
 			pnlEmoji(profit),
 			profit.Float64(), s.state.Position.QuoteCurrency,
-			profitMargin.Float64() * 100.0,
+			profitMargin.Float64()*100.0,
+			netProfit.Float64(), s.state.Position.QuoteCurrency,
+			netProfitMargin.Float64()*100.0,
 			since.Format(time.RFC822),
 			s.state.AccumulatedPnL.Float64(), s.state.Position.QuoteCurrency,
 			s.state.AccumulatedLoss.Float64(), s.state.Position.QuoteCurrency)
@@ -513,6 +569,10 @@ func (s *Strategy) handleTradeUpdate(trade types.Trade) {
 	}
 
 	s.lastPrice = trade.Price
+
+	if err := s.SaveState(); err != nil {
+		log.WithError(err).Error("save state error")
+	}
 }
 
 func (s *Strategy) Validate() error {
@@ -531,7 +591,45 @@ func (s *Strategy) Validate() error {
 	return nil
 }
 
+func (s *Strategy) LoadState() error {
+	var state State
+
+	// load position
+	if err := s.Persistence.Load(&state, ID, s.Symbol, stateKey); err != nil {
+		if err != service.ErrPersistenceNotExists {
+			return err
+		}
+
+		s.state = &State{}
+	} else {
+		s.state = &state
+		log.Infof("state is restored: %+v", s.state)
+	}
+
+	return nil
+}
+
+func (s *Strategy) SaveState() error {
+	if err := s.Persistence.Save(s.state, ID, s.Symbol, stateKey); err != nil {
+		return err
+	} else {
+		log.Infof("state is saved => %+v", s.state)
+	}
+	return nil
+}
+
 func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession) error {
+	if s.BollBandInterval == "" {
+		s.BollBandInterval = types.Interval1m
+	}
+
+	if s.BollBandMarginFactor == 0 {
+		s.BollBandMarginFactor = fixedpoint.NewFromFloat(1.0)
+	}
+	if s.BollBandMargin == 0 {
+		s.BollBandMargin = fixedpoint.NewFromFloat(0.001)
+	}
+
 	// configure default values
 	if s.UpdateInterval == 0 {
 		s.UpdateInterval = types.Duration(time.Second)
@@ -586,25 +684,24 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		return fmt.Errorf("maker session market %s is not defined", s.Symbol)
 	}
 
+	standardIndicatorSet, ok := s.sourceSession.StandardIndicatorSet(s.Symbol)
+	if !ok {
+		return fmt.Errorf("%s standard indicator set not found", s.Symbol)
+	}
+
+	s.boll = standardIndicatorSet.BOLL(types.IntervalWindow{
+		Interval: s.BollBandInterval,
+		Window:   21,
+	}, 1.0)
+
 	// restore state
 	instanceID := fmt.Sprintf("%s-%s", ID, s.Symbol)
 	s.groupID = max.GenerateGroupID(instanceID)
 	log.Infof("using group id %d from fnv(%s)", s.groupID, instanceID)
 
-	var state State
-
-	// load position
-	if err := s.Persistence.Load(&state, ID, s.Symbol, stateKey); err != nil {
-		if err != service.ErrPersistenceNotExists {
-			return err
-		}
-
-		s.state = &State{}
+	if err := s.LoadState(); err != nil {
+		return err
 	} else {
-		// loaded successfully
-		s.state = &state
-
-		log.Infof("state is restored: %+v", s.state)
 		s.Notify("%s position is restored => %f", s.Symbol, s.state.HedgePosition.Float64())
 	}
 
@@ -692,8 +789,10 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 		close(s.stopC)
 
+		// wait for the quoter to stop
 		time.Sleep(s.UpdateInterval.Duration())
 
+		// ensure every order is cancelled
 		for s.activeMakerOrders.NumOfOrders() > 0 {
 			orders := s.activeMakerOrders.Orders()
 			log.Warnf("%d orders are not cancelled yet:", len(orders))
@@ -701,18 +800,45 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 			if err := s.makerSession.Exchange.CancelOrders(ctx, s.activeMakerOrders.Orders()...); err != nil {
 				log.WithError(err).Errorf("can not cancel %s orders", s.Symbol)
+				continue
 			}
 
-			log.Warnf("waiting for orders to be cancelled...")
-			time.Sleep(3 * time.Second)
+			log.Infof("waiting for orders to be cancelled...")
+
+			select {
+			case <-time.After(3 * time.Second):
+
+			case <-ctx.Done():
+				break
+
+			}
+
+			// verify the current open orders via the RESTful API
+			if s.activeMakerOrders.NumOfOrders() > 0 {
+				log.Warnf("there are orders not cancelled, using REStful API to verify...")
+				openOrders, err := s.makerSession.Exchange.QueryOpenOrders(ctx, s.Symbol)
+				if err != nil {
+					log.WithError(err).Errorf("can not query %s open orders", s.Symbol)
+					continue
+				}
+
+				openOrderStore := bbgo.NewOrderStore(s.Symbol)
+				openOrderStore.Add(openOrders...)
+
+				for _, o := range s.activeMakerOrders.Orders() {
+					// if it does not exist, we should remove it
+					if !openOrderStore.Exists(o.OrderID) {
+						s.activeMakerOrders.Remove(o)
+					}
+				}
+			}
 		}
 		log.Info("all orders are cancelled successfully")
 
-		if err := s.Persistence.Save(s.state, ID, s.Symbol, stateKey); err != nil {
+		if err := s.SaveState(); err != nil {
 			log.WithError(err).Errorf("can not save state: %+v", s.state)
 		} else {
-			log.Infof("state is saved => %+v", s.state)
-			s.Notify("%s position is saved: position = %f", s.Symbol, s.state.HedgePosition.Float64())
+			s.Notify("%s position is saved: position = %f", s.Symbol, s.state.HedgePosition.Float64(), s.state.Position)
 		}
 	})
 

@@ -9,12 +9,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 
-	"github.com/c9s/bbgo/pkg/datatype"
 	maxapi "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -309,7 +307,7 @@ func toMaxSubmitOrder(o types.SubmitOrder) (*maxapi.Order, error) {
 		return nil, err
 	}
 
-	clientOrderID := newSpotClientOrderID(o.ClientOrderID)
+	clientOrderID := NewClientOrderID(o.ClientOrderID)
 
 	volumeInString := o.QuantityString
 	if len(volumeInString) == 0 {
@@ -611,7 +609,7 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 			txIDs[d.TxID] = struct{}{}
 			withdraw := types.Withdraw{
 				Exchange:               types.ExchangeMax,
-				ApplyTime:              datatype.Time(time.Unix(d.CreatedAt, 0)),
+				ApplyTime:              types.Time(time.Unix(d.CreatedAt, 0)),
 				Asset:                  toGlobalCurrency(d.Currency),
 				Amount:                 util.MustParseFloat(d.Amount),
 				Address:                "",
@@ -683,7 +681,7 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 
 			allDeposits = append(allDeposits, types.Deposit{
 				Exchange:      types.ExchangeMax,
-				Time:          datatype.Time(time.Unix(d.CreatedAt, 0)),
+				Time:          types.Time(time.Unix(d.CreatedAt, 0)),
 				Amount:        util.MustParseFloat(d.Amount),
 				Asset:         toGlobalCurrency(d.Currency),
 				Address:       "", // not supported
@@ -868,28 +866,3 @@ func (e *Exchange) QueryAveragePrice(ctx context.Context, symbol string) (float6
 	return (util.MustParseFloat(ticker.Sell) + util.MustParseFloat(ticker.Buy)) / 2, nil
 }
 
-// BBGO is a broker on MAX
-const spotBrokerID = "bbgo-"
-
-func newSpotClientOrderID(originalID string) (clientOrderID string) {
-	prefix := "x-" + spotBrokerID
-	prefixLen := len(prefix)
-
-	if originalID != "" {
-		// try to keep the whole original client order ID if user specifies it.
-		if prefixLen+len(originalID) > 32 {
-			return originalID
-		}
-
-		clientOrderID = prefix + originalID
-		return clientOrderID
-	}
-
-	clientOrderID = uuid.New().String()
-	clientOrderID = prefix + clientOrderID
-	if len(clientOrderID) > 32 {
-		return clientOrderID[0:32]
-	}
-
-	return clientOrderID
-}

@@ -13,6 +13,7 @@ type OrderStore struct {
 
 	Symbol          string
 	RemoveCancelled bool
+	RemoveFilled    bool
 	AddOrderUpdate  bool
 }
 
@@ -21,6 +22,13 @@ func NewOrderStore(symbol string) *OrderStore {
 		Symbol: symbol,
 		orders: make(map[uint64]types.Order),
 	}
+}
+
+func (s *OrderStore) NumOfOrders() (num int) {
+	s.mu.Lock()
+	num = len(s.orders)
+	s.mu.Unlock()
+	return num
 }
 
 func (s *OrderStore) Orders() (orders []types.Order) {
@@ -91,6 +99,10 @@ func (s *OrderStore) handleOrderUpdate(order types.Order) {
 			s.Add(order)
 		} else {
 			s.Update(order)
+		}
+
+		if s.RemoveFilled && order.Status == types.OrderStatusFilled {
+			s.Remove(order)
 		}
 
 	case types.OrderStatusCanceled:

@@ -3,12 +3,12 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/slack-go/slack"
 
-	"github.com/c9s/bbgo/pkg/datatype"
 	"github.com/c9s/bbgo/pkg/util"
 )
 
@@ -126,7 +126,7 @@ func (o *SubmitOrder) SlackAttachment() slack.Attachment {
 	var fields = []slack.AttachmentField{
 		{Title: "Symbol", Value: o.Symbol, Short: true},
 		{Title: "Side", Value: string(o.Side), Short: true},
-		{Title: "Volume", Value: o.QuantityString, Short: true},
+		{Title: "Quantity", Value: o.QuantityString, Short: true},
 	}
 
 	if len(o.PriceString) > 0 {
@@ -144,14 +144,14 @@ func (o *SubmitOrder) SlackAttachment() slack.Attachment {
 type Order struct {
 	SubmitOrder
 
-	Exchange         ExchangeName  `json:"exchange" db:"exchange"`
-	GID              uint64        `json:"gid" db:"gid"`
-	OrderID          uint64        `json:"orderID" db:"order_id"` // order id
-	Status           OrderStatus   `json:"status" db:"status"`
-	ExecutedQuantity float64       `json:"executedQuantity" db:"executed_quantity"`
-	IsWorking        bool          `json:"isWorking" db:"is_working"`
-	CreationTime     datatype.Time `json:"creationTime" db:"created_at"`
-	UpdateTime       datatype.Time `json:"updateTime" db:"updated_at"`
+	Exchange         ExchangeName `json:"exchange" db:"exchange"`
+	GID              uint64       `json:"gid" db:"gid"`
+	OrderID          uint64       `json:"orderID" db:"order_id"` // order id
+	Status           OrderStatus  `json:"status" db:"status"`
+	ExecutedQuantity float64      `json:"executedQuantity" db:"executed_quantity"`
+	IsWorking        bool         `json:"isWorking" db:"is_working"`
+	CreationTime     Time         `json:"creationTime" db:"created_at"`
+	UpdateTime       Time         `json:"updateTime" db:"updated_at"`
 
 	IsMargin   bool `json:"isMargin" db:"is_margin"`
 	IsIsolated bool `json:"isIsolated" db:"is_isolated"`
@@ -183,4 +183,29 @@ func (o Order) PlainText() string {
 		util.FormatFloat(o.ExecutedQuantity, 2),
 		util.FormatFloat(o.Quantity, 4),
 		o.Status)
+}
+
+func (o Order) SlackAttachment() slack.Attachment {
+	var fields = []slack.AttachmentField{
+		{Title: "Exchange", Value: o.Exchange.String(), Short: true},
+		{Title: "Symbol", Value: o.Symbol, Short: true},
+		{Title: "Side", Value: string(o.Side), Short: true},
+		{Title: "Quantity", Value: o.QuantityString, Short: true},
+		{Title: "Executed Quantity", Value: util.FormatFloat(o.ExecutedQuantity, 4), Short: true},
+	}
+
+	if len(o.PriceString) > 0 {
+		fields = append(fields, slack.AttachmentField{Title: "Price", Value: o.PriceString, Short: true})
+	}
+
+	fields = append(fields, slack.AttachmentField{
+		Title: "Order ID", Value: strconv.FormatUint(o.OrderID, 10), Short: true,
+	})
+
+	return slack.Attachment{
+		Color: SideToColorName(o.Side),
+		Title: string(o.Type) + " Order " + string(o.Side),
+		// Text:   "",
+		Fields: fields,
+	}
 }

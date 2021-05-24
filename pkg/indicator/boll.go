@@ -29,10 +29,10 @@ type BOLL struct {
 	// times of Std, generally it's 2
 	K float64
 
-	SMA      Float64Slice
-	StdDev   Float64Slice
-	UpBand   Float64Slice
-	DownBand Float64Slice
+	SMA      types.Float64Slice
+	StdDev   types.Float64Slice
+	UpBand   types.Float64Slice
+	DownBand types.Float64Slice
 
 	EndTime time.Time
 

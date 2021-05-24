@@ -7,7 +7,6 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/c9s/bbgo/pkg/datatype"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -24,7 +23,7 @@ func TestDepositService(t *testing.T) {
 
 	err = service.Insert(types.Deposit{
 		Exchange:      types.ExchangeMax,
-		Time:          datatype.Time(time.Now()),
+		Time:          types.Time(time.Now()),
 		Amount:        0.001,
 		Asset:         "BTC",
 		Address:       "test",

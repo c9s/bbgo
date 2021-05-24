@@ -8,7 +8,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/c9s/bbgo/pkg/datatype"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -56,8 +55,8 @@ func toGlobalOrder(r order) (types.Order, error) {
 		OrderID:          uint64(r.ID),
 		Status:           "",
 		ExecutedQuantity: r.FilledSize,
-		CreationTime:     datatype.Time(r.CreatedAt.Time),
-		UpdateTime:       datatype.Time(r.CreatedAt.Time),
+		CreationTime:     types.Time(r.CreatedAt.Time),
+		UpdateTime:       types.Time(r.CreatedAt.Time),
 	}
 
 	// `new` (accepted but not processed yet), `open`, or `closed` (filled or cancelled)
@@ -97,7 +96,7 @@ func toGlobalDeposit(input depositHistory) (types.Deposit, error) {
 	d := types.Deposit{
 		GID:           0,
 		Exchange:      types.ExchangeFTX,
-		Time:          datatype.Time(t.Time),
+		Time:          types.Time(t.Time),
 		Amount:        input.Size,
 		Asset:         toGlobalCurrency(input.Coin),
 		TransactionID: input.TxID,
@@ -130,7 +129,7 @@ func toGlobalTrade(f fill) (types.Trade, error) {
 		Side:          f.Side,
 		IsBuyer:       f.Side == types.SideTypeBuy,
 		IsMaker:       f.Liquidity == "maker",
-		Time:          datatype.Time(f.Time.Time),
+		Time:          types.Time(f.Time.Time),
 		Fee:           f.Fee,
 		FeeCurrency:   f.FeeCurrency,
 		IsMargin:      false,

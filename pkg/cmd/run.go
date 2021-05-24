@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime/pprof"
 	"syscall"
 	"time"
 
@@ -26,6 +27,7 @@ func init() {
 	RunCmd.Flags().String("totp-account-name", "", "")
 	RunCmd.Flags().Bool("enable-webserver", false, "enable webserver")
 	RunCmd.Flags().Bool("enable-web-server", false, "legacy option, this is renamed to --enable-webserver")
+	RunCmd.Flags().String("cpu-profile", "", "cpu profile")
 	RunCmd.Flags().String("webserver-bind", ":8080", "webserver binding")
 	RunCmd.Flags().Bool("setup", false, "use setup mode")
 	RootCmd.AddCommand(RunCmd)
@@ -71,14 +73,14 @@ func runSetup(baseCtx context.Context, userConfig *bbgo.Config, enableApiServer 
 	cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
 	cancelTrading()
 
-	shutdownCtx, cancelShutdown := context.WithDeadline(ctx, time.Now().Add(30*time.Second))
+	// graceful period = 15 second
+	shutdownCtx, cancelShutdown := context.WithDeadline(ctx, time.Now().Add(15*time.Second))
 
 	log.Infof("shutting down...")
 	trader.Graceful.Shutdown(shutdownCtx)
 	cancelShutdown()
 	return nil
 }
-
 
 func BootstrapBacktestEnvironment(ctx context.Context, environ *bbgo.Environment, userConfig *bbgo.Config) error {
 	if err := environ.ConfigureDatabase(ctx); err != nil {
@@ -93,7 +95,6 @@ func BootstrapBacktestEnvironment(ctx context.Context, environ *bbgo.Environment
 
 	return nil
 }
-
 
 func BootstrapEnvironment(ctx context.Context, environ *bbgo.Environment, userConfig *bbgo.Config) error {
 	if err := environ.ConfigureDatabase(ctx); err != nil {
@@ -126,7 +127,7 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config, enableWebServer
 		return err
 	}
 
-	if err := environ.Init(ctx) ; err != nil {
+	if err := environ.Init(ctx); err != nil {
 		return err
 	}
 
@@ -203,6 +204,11 @@ func run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	cpuProfile, err := cmd.Flags().GetString("cpu-profile")
+	if err != nil {
+		return err
+	}
+
 	var userConfig = &bbgo.Config{}
 
 	if !setup {
@@ -237,6 +243,20 @@ func run(cmd *cobra.Command, args []string) error {
 		userConfig, err = bbgo.Load(configFile, true)
 		if err != nil {
 			return err
+		}
+
+		if cpuProfile != "" {
+			f, err := os.Create(cpuProfile)
+			if err != nil {
+				log.Fatal("could not create CPU profile: ", err)
+			}
+			defer f.Close() // error handling omitted for example
+
+			if err := pprof.StartCPUProfile(f); err != nil {
+				log.Fatal("could not start CPU profile: ", err)
+			}
+
+			defer pprof.StopCPUProfile()
 		}
 
 		return runConfig(ctx, userConfig, enableWebServer, webServerBind)

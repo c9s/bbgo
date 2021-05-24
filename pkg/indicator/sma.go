@@ -9,18 +9,12 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-type Float64Slice []float64
-
-func (s *Float64Slice) Push(v float64) {
-	*s = append(*s, v)
-}
-
 var zeroTime time.Time
 
 //go:generate callbackgen -type SMA
 type SMA struct {
 	types.IntervalWindow
-	Values  Float64Slice
+	Values  types.Float64Slice
 	EndTime time.Time
 
 	UpdateCallbacks []func(value float64)

@@ -72,9 +72,9 @@ func (f *DepthFrame) loadDepthSnapshot() {
 	// if the head event is newer than the depth we got,
 	// then there are something missed, we need to restart the process.
 	if len(events) > 0 {
-		e := events[0]
-		if e.FirstUpdateID > depth.FinalUpdateID+1 {
-			log.Warn("miss matched final update id for order book")
+		firstEvent := events[0]
+		if firstEvent.FirstUpdateID > depth.FinalUpdateID+1 {
+			log.Warn("miss matched final update id for order book, resetting depth...")
 			f.SnapshotDepth = nil
 			f.BufEvents = nil
 			f.mu.Unlock()
@@ -121,7 +121,7 @@ func (f *DepthFrame) PushEvent(e DepthEvent) {
 	} else {
 		// if we have the snapshot, we could use that final update ID filter the events
 
-		// drop any update ID < the final update ID
+		// too old: drop any update ID < the final update ID
 		if e.FinalUpdateID < f.SnapshotDepth.FinalUpdateID {
 			if debugBinanceDepth {
 				log.Warnf("event final update id %d < depth final update id %d, skip", e.FinalUpdateID, f.SnapshotDepth.FinalUpdateID)
@@ -131,13 +131,16 @@ func (f *DepthFrame) PushEvent(e DepthEvent) {
 			return
 		}
 
-		// if the first update ID > final update ID + 1, it means something is missing, we need to reload.
+		// too new: if the first update ID > final update ID + 1, it means something is missing, we need to reload.
 		if e.FirstUpdateID > f.SnapshotDepth.FinalUpdateID+1 {
 			if debugBinanceDepth {
 				log.Warnf("event first update id %d > final update id + 1 (%d), resetting snapshot", e.FirstUpdateID, f.SnapshotDepth.FirstUpdateID+1)
 			}
 
 			f.SnapshotDepth = nil
+
+			// save the new event for later
+			f.BufEvents = append(f.BufEvents, e)
 			f.mu.Unlock()
 			return
 		}

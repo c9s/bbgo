@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/c9s/bbgo/pkg/datatype"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -112,7 +111,7 @@ func (reward Reward) Reward() (*types.Reward, error) {
 		State:     reward.State,
 		Note:      reward.Note,
 		Spent:     false,
-		CreatedAt: datatype.Time(reward.CreatedAt),
+		CreatedAt: types.Time(reward.CreatedAt),
 	}, nil
 }
 

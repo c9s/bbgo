@@ -15,7 +15,7 @@ On-Balance Volume (OBV) Definition
 //go:generate callbackgen -type OBV
 type OBV struct {
 	types.IntervalWindow
-	Values   Float64Slice
+	Values   types.Float64Slice
 	PrePrice float64
 
 	EndTime         time.Time

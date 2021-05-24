@@ -18,11 +18,11 @@ type MACD struct {
 	types.IntervalWindow     // 9
 	ShortPeriod          int // 12
 	LongPeriod           int // 26
-	Values               Float64Slice
+	Values               types.Float64Slice
 	FastEWMA             EWMA
 	SlowEWMA             EWMA
 	SignalLine           EWMA
-	Histogram            Float64Slice
+	Histogram            types.Float64Slice
 
 	EndTime time.Time
 

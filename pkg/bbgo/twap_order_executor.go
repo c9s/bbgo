@@ -63,30 +63,9 @@ func (e *TwapExecution) connectUserData(ctx context.Context) {
 	}
 }
 
-func (e *TwapExecution) getSideBook() (pvs types.PriceVolumeSlice, err error) {
-	book := e.orderBook.Get()
-
-	switch e.Side {
-	case types.SideTypeSell:
-		pvs = book.Asks
-
-	case types.SideTypeBuy:
-		pvs = book.Bids
-
-	default:
-		err = fmt.Errorf("invalid side type: %+v", e.Side)
-	}
-
-	return pvs, err
-}
-
 func (e *TwapExecution) newBestPriceOrder() (orderForm types.SubmitOrder, err error) {
-	book := e.orderBook.Get()
-
-	sideBook, err := e.getSideBook()
-	if err != nil {
-		return orderForm, err
-	}
+	book := e.orderBook.Copy()
+	sideBook := book.SideBook(e.Side)
 
 	first, ok := sideBook.First()
 	if !ok {
@@ -158,7 +137,7 @@ func (e *TwapExecution) newBestPriceOrder() (orderForm types.SubmitOrder, err er
 
 	restQuantity := e.TargetQuantity - fixedpoint.Abs(base)
 
-	if restQuantity == 0 {
+	if restQuantity <= 0 {
 		if e.cancelContextIfTargetQuantityFilled() {
 			return
 		}
@@ -223,18 +202,22 @@ func (e *TwapExecution) newBestPriceOrder() (orderForm types.SubmitOrder, err er
 }
 
 func (e *TwapExecution) updateOrder(ctx context.Context) error {
-
-	sideBook, err := e.getSideBook()
-	if err != nil {
-		return err
-	}
+	book := e.orderBook.Copy()
+	sideBook := book.SideBook(e.Side)
 
 	first, ok := sideBook.First()
 	if !ok {
 		return fmt.Errorf("empty %s %s side book", e.Symbol, e.Side)
 	}
 
+	// if there is no gap between the first price entry and the second price entry
+	second, ok := sideBook.Second()
+	if !ok {
+		return fmt.Errorf("no secoond price on the %s order book %s, can not update", e.Symbol, e.Side)
+	}
+
 	tickSize := fixedpoint.NewFromFloat(e.market.TickSize)
+	tickSpread := tickSize.MulInt(e.NumOfTicks)
 
 	// check and see if we need to cancel the existing active orders
 	for e.activeMakerOrders.NumOfOrders() > 0 {
@@ -246,8 +229,8 @@ func (e *TwapExecution) updateOrder(ctx context.Context) error {
 
 		// get the first order
 		order := orders[0]
-		price := fixedpoint.NewFromFloat(order.Price)
-		quantity := fixedpoint.NewFromFloat(order.Quantity)
+		orderPrice := fixedpoint.NewFromFloat(order.Price)
+		// quantity := fixedpoint.NewFromFloat(order.Quantity)
 
 		remainingQuantity := order.Quantity - order.ExecutedQuantity
 		if remainingQuantity <= e.market.MinQuantity {
@@ -255,46 +238,29 @@ func (e *TwapExecution) updateOrder(ctx context.Context) error {
 			return nil
 		}
 
-		if e.StopPrice > 0 {
-			switch e.Side {
-			case types.SideTypeBuy:
-				if first.Price > e.StopPrice {
-					log.Infof("%s first bid price %f is higher than the stop price %f, skip updating order", e.Symbol, first.Price.Float64(), e.StopPrice.Float64())
-					return nil
-				}
-
-			case types.SideTypeSell:
-				if first.Price < e.StopPrice {
-					log.Infof("%s first ask price %f is lower than the stop price %f, skip updating order", e.Symbol, first.Price.Float64(), e.StopPrice.Float64())
-					return nil
-				}
-			}
-
-		}
-
 		// if the first bid price or first ask price is the same to the current active order
 		// we should skip updating the order
-		if first.Price == price {
-			// there are other orders in the same price, it means if we cancel ours, the price is still the best price.
-			if first.Volume > quantity {
+		// DO NOT UPDATE IF:
+		//   tickSpread > 0 AND current order price == second price + tickSpread
+		//   current order price == first price
+		log.Infof("orderPrice = %f first.Price = %f second.Price = %f tickSpread = %f", orderPrice.Float64(), first.Price.Float64(), second.Price.Float64(), tickSpread.Float64())
+
+		switch e.Side {
+		case types.SideTypeBuy:
+			if tickSpread > 0 && orderPrice == second.Price+tickSpread {
+				log.Infof("the current order is already on the best ask price %f", orderPrice.Float64())
+				return nil
+			} else if orderPrice == first.Price {
+				log.Infof("the current order is already on the best bid price %f", orderPrice.Float64())
 				return nil
 			}
 
-			// if there is no gap between the first price entry and the second price entry
-			second, ok := sideBook.Second()
-			if !ok {
-				return fmt.Errorf("no secoond price on the %s order book %s, can not update", e.Symbol, e.Side)
-			}
-
-			// if there is no gap
-			gap := fixedpoint.Abs(first.Price - second.Price)
-			if gap > tickSize.MulInt(e.NumOfTicks) {
-				// found gap, we should update our price
-			} else {
-				log.Infof("no gap between the second price %f and the first price %f (tick size = %f), skip updating",
-					first.Price.Float64(),
-					second.Price.Float64(),
-					tickSize.Float64())
+		case types.SideTypeSell:
+			if tickSpread > 0 && orderPrice == second.Price-tickSpread {
+				log.Infof("the current order is already on the best ask price %f", orderPrice.Float64())
+				return nil
+			} else if orderPrice == first.Price {
+				log.Infof("the current order is already on the best ask price %f", orderPrice.Float64())
 				return nil
 			}
 		}
@@ -329,7 +295,34 @@ func (e *TwapExecution) cancelActiveOrders(ctx context.Context) {
 		if err := e.Session.Exchange.CancelOrders(ctx, orders...); err != nil {
 			log.WithError(err).Errorf("can not cancel %s orders", e.Symbol)
 		}
-		time.Sleep(3 * time.Second)
+
+		select {
+		case <-ctx.Done():
+			return
+
+		case <-time.After(3 * time.Second):
+
+		}
+
+		// verify the current open orders via the RESTful API
+		if e.activeMakerOrders.NumOfOrders() > 0 {
+			log.Warnf("there are orders not cancelled, using REStful API to verify...")
+			openOrders, err := e.Session.Exchange.QueryOpenOrders(ctx, e.Symbol)
+			if err != nil {
+				log.WithError(err).Errorf("can not query %s open orders", e.Symbol)
+				continue
+			}
+
+			openOrderStore := NewOrderStore(e.Symbol)
+			openOrderStore.Add(openOrders...)
+
+			for _, o := range e.activeMakerOrders.Orders() {
+				// if it does not exist, we should remove it
+				if !openOrderStore.Exists(o.OrderID) {
+					e.activeMakerOrders.Remove(o)
+				}
+			}
+		}
 	}
 
 	if didCancel {
