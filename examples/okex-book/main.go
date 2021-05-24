@@ -109,8 +109,7 @@ var rootCmd = &cobra.Command{
 		log.Infof("place order response: %+v", placeResponse)
 		time.Sleep(time.Second)
 
-
-		client.NewOrderDetailsRequest()
+		client.NewGetOrderDetailsRequest()
 
 		cancelResponse, err := client.NewCancelOrderRequest().
 			InstrumentID("LTC-USDT").
@@ -145,8 +144,16 @@ var rootCmd = &cobra.Command{
 		}
 
 		log.Infof("batch place order response: %+v", batchPlaceResponse)
-
 		time.Sleep(time.Second)
+
+		log.Infof("getting pending orders...")
+		pendingOrders, err := client.NewGetPendingOrderRequest().Do(ctx)
+		if err != nil {
+			return err
+		}
+		for _, pendingOrder := range pendingOrders {
+			log.Infof("pending order: %+v", pendingOrder)
+		}
 
 		cancelReq := client.NewBatchCancelOrderRequest()
 		for _, resp := range batchPlaceResponse {

@@ -34,10 +34,19 @@ type OrderType string
 
 const (
 	OrderTypeMarket   OrderType = "market"
-	OrderTypeLimit              = "limit"
-	OrderTypePostOnly           = "post_only"
-	OrderTypeFOK                = "fok"
-	OrderTypeIOC                = "ioc"
+	OrderTypeLimit    OrderType = "limit"
+	OrderTypePostOnly OrderType = "post_only"
+	OrderTypeFOK      OrderType = "fok"
+	OrderTypeIOC      OrderType = "ioc"
+)
+
+type OrderState string
+
+const (
+	OrderStateCanceled        OrderState = "canceled"
+	OrderStateLive            OrderState = "live"
+	OrderStatePartiallyFilled OrderState = "partially_filled"
+	OrderStateFilled          OrderState = "filled"
 )
 
 type RestClient struct {
@@ -398,8 +407,14 @@ func (c *RestClient) NewBatchCancelOrderRequest() *BatchCancelOrderRequest {
 	}
 }
 
-func (c *RestClient) NewOrderDetailsRequest() *OrderDetailsRequest {
-	return &OrderDetailsRequest{
+func (c *RestClient) NewGetOrderDetailsRequest() *GetOrderDetailsRequest {
+	return &GetOrderDetailsRequest{
+		client: c,
+	}
+}
+
+func (c *RestClient) NewGetPendingOrderRequest() *GetPendingOrderRequest {
+	return &GetPendingOrderRequest{
 		client: c,
 	}
 }
