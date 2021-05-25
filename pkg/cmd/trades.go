@@ -81,7 +81,15 @@ var tradesCmd = &cobra.Command{
 
 		until := time.Now()
 		since := until.Add(-3 * 24 * time.Hour)
-		trades, err := session.Exchange.QueryTrades(ctx, symbol, &types.TradeQueryOptions{
+
+		tradeHistoryService, ok := session.Exchange.(types.ExchangeTradeHistoryService)
+		if !ok {
+			// skip exchanges that does not support trading history services
+			log.Warnf("exchange %s does not implement ExchangeTradeHistoryService, skip syncing closed orders", session.Exchange.Name())
+			return nil
+		}
+
+		trades, err := tradeHistoryService.QueryTrades(ctx, symbol, &types.TradeQueryOptions{
 			StartTime:   &since,
 			EndTime:     &until,
 			Limit:       limit,
