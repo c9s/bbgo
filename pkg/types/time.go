@@ -14,6 +14,10 @@ func (t MillisecondTimestamp) String() string {
 	return time.Time(t).String()
 }
 
+func (t MillisecondTimestamp) Time() time.Time {
+	return time.Time(t)
+}
+
 func (t *MillisecondTimestamp) UnmarshalJSON(data []byte) error {
 	var v interface{}
 
