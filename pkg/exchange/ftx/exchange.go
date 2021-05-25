@@ -87,7 +87,7 @@ func (e *Exchange) PlatformFeeCurrency() string {
 }
 
 func (e *Exchange) NewStream() types.Stream {
-	return NewStream(e.key, e.secret)
+	return NewStream(e.key, e.secret, e.subAccount, e)
 }
 
 func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
@@ -248,7 +248,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 
 	tradeIDs := make(map[int64]struct{})
 
-	var lastTradeID int64
+	lastTradeID := options.LastTradeID
 	var trades []types.Trade
 	symbol = strings.ToUpper(symbol)
 
@@ -267,15 +267,18 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		})
 
 		for _, r := range resp.Result {
+			// always update since to avoid infinite loop
+			since = r.Time.Time
+
 			if _, ok := tradeIDs[r.TradeId]; ok {
 				continue
 			}
-			if r.TradeId <= lastTradeID || r.Time.Before(since) || r.Time.After(until) || r.Market != symbol {
+
+			if r.TradeId <= lastTradeID || r.Time.Before(since) || r.Time.After(until) || r.Market != toLocalSymbol(symbol) {
 				continue
 			}
 			tradeIDs[r.TradeId] = struct{}{}
 			lastTradeID = r.TradeId
-			since = r.Time.Time
 
 			t, err := toGlobalTrade(r)
 			if err != nil {
