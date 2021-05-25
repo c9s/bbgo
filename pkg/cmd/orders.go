@@ -91,7 +91,14 @@ var listOrdersCmd = &cobra.Command{
 				return err
 			}
 		case "closed":
-			os, err = session.Exchange.QueryClosedOrders(ctx, symbol, time.Now().Add(-3*24*time.Hour), time.Now(), 0)
+			tradeHistoryService, ok := session.Exchange.(types.ExchangeTradeHistoryService)
+			if !ok {
+				// skip exchanges that does not support trading history services
+				log.Warnf("exchange %s does not implement ExchangeTradeHistoryService, skip syncing closed orders", session.Exchange.Name())
+				return nil
+			}
+
+			os, err = tradeHistoryService.QueryClosedOrders(ctx, symbol, time.Now().Add(-3*24*time.Hour), time.Now(), 0)
 			if err != nil {
 				return err
 			}
