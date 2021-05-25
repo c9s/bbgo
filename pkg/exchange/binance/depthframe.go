@@ -2,11 +2,11 @@ package binance
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/adshao/go-binance/v2"
-	"github.com/pkg/errors"
 )
 
 //go:generate callbackgen -type DepthFrame
@@ -68,27 +68,21 @@ func (f *DepthFrame) loadDepthSnapshot() error {
 
 	time.Sleep(3 * time.Second)
 
-	if debugBinanceDepth {
-		log.Infof("loading %s depth from the restful api", f.Symbol)
-	}
-
 	depth, err := f.fetch(f.context)
 	if err != nil {
-		log.WithError(err).Errorf("depth api error")
 		return err
 	}
 
 	if len(depth.Asks) == 0 {
-		log.Errorf("depth response error: empty asks")
-		return errors.New("depth response error: empty asks")
+		return fmt.Errorf("%s depth response error: empty asks", f.Symbol)
 	}
 
 	if len(depth.Bids) == 0 {
-		return errors.New("depth response error: empty bids")
+		return fmt.Errorf("%s depth response error: empty bids", f.Symbol)
 	}
 
 	if debugBinanceDepth {
-		log.Infof("loaded %s depth, last update ID = %d", f.Symbol, depth.FinalUpdateID)
+		log.Infof("fetched %s depth, last update ID = %d", f.Symbol, depth.FinalUpdateID)
 	}
 
 	// filter the events by the event IDs
@@ -130,8 +124,7 @@ func (f *DepthFrame) loadDepthSnapshot() error {
 		// valid
 		nextID := depth.FinalUpdateID + 1
 		if firstEvent.FirstUpdateID > nextID || firstEvent.FinalUpdateID < nextID {
-			log.Warn("MISMATCH final update id for order book, resetting depth...")
-			return errors.New("MISMATCH final update id for order book, resetting depth...")
+			return fmt.Errorf("mismatch %s final update id for order book, resetting depth", f.Symbol)
 		}
 
 		if debugBinanceDepth {
@@ -171,7 +164,7 @@ func (f *DepthFrame) PushEvent(e DepthEvent) {
 
 		go f.once.Do(func() {
 			if err := f.loadDepthSnapshot(); err != nil {
-				log.WithError(err).Error("depth snapshot load failed, resetting..")
+				log.WithError(err).Error("%s depth snapshot load failed, resetting..", f.Symbol)
 				f.emitReset()
 			}
 		})
