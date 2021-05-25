@@ -267,6 +267,9 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		})
 
 		for _, r := range resp.Result {
+			// always update since to avoid infinite loop
+			since = r.Time.Time
+
 			if _, ok := tradeIDs[r.TradeId]; ok {
 				continue
 			}
@@ -276,7 +279,6 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 			}
 			tradeIDs[r.TradeId] = struct{}{}
 			lastTradeID = r.TradeId
-			since = r.Time.Time
 
 			t, err := toGlobalTrade(r)
 			if err != nil {
