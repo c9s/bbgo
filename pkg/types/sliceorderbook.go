@@ -182,15 +182,15 @@ func (b *SliceOrderBook) String() string {
 func (b *SliceOrderBook) CopyDepth(limit int) OrderBook {
 	var book SliceOrderBook
 	book.Symbol = b.Symbol
-	book.Bids = book.Bids.CopyDepth(limit)
-	book.Asks = book.Asks.CopyDepth(limit)
+	book.Bids = b.Bids.CopyDepth(limit)
+	book.Asks = b.Asks.CopyDepth(limit)
 	return &book
 }
 
 func (b *SliceOrderBook) Copy() OrderBook {
 	var book SliceOrderBook
 	book.Symbol = b.Symbol
-	book.Bids = book.Bids.Copy()
-	book.Asks = book.Asks.Copy()
+	book.Bids = b.Bids.Copy()
+	book.Asks = b.Asks.Copy()
 	return &book
 }
