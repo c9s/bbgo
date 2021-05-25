@@ -68,7 +68,7 @@ func (r *orderRequest) CancelOrderByOrderID(ctx context.Context, orderID uint64)
 	resp, err := r.
 		Method("DELETE").
 		ReferenceURL("api/orders").
-		Payloads(map[string]interface{}{"order_id": orderID}).
+		ID(strconv.FormatUint(orderID, 10)).
 		DoAuthenticatedRequest(ctx)
 	if err != nil {
 		return cancelOrderResponse{}, err
@@ -85,7 +85,7 @@ func (r *orderRequest) CancelOrderByClientID(ctx context.Context, clientID strin
 	resp, err := r.
 		Method("DELETE").
 		ReferenceURL("api/orders/by_client_id").
-		Payloads(map[string]interface{}{"client_order_id": clientID}).
+		ID(clientID).
 		DoAuthenticatedRequest(ctx)
 	if err != nil {
 		return cancelOrderResponse{}, err
