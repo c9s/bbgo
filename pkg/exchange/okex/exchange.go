@@ -9,7 +9,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-
 // OKB is the platform currency of OKEx, pre-allocate static string here
 const OKB = "OKB"
 
@@ -81,7 +80,23 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 }
 
 func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticker, error) {
-	return nil, nil
+	symbol = toLocalSymbol(symbol)
+
+	marketTicker, err := e.client.MarketTicker(symbol)
+	if err != nil {
+		return nil, err
+	}
+
+	return &types.Ticker{
+		Time:   marketTicker.Timestamp.Time(),
+		Volume: marketTicker.Volume24H.Float64(),
+		Last:   marketTicker.Last.Float64(),
+		Open:   marketTicker.Open24H.Float64(),
+		High:   marketTicker.High24H.Float64(),
+		Low:    marketTicker.Low24H.Float64(),
+		Buy:    marketTicker.BidPrice.Float64(),
+		Sell:   marketTicker.AskPrice.Float64(),
+	}, nil
 }
 
 func (e *Exchange) QueryTickers(ctx context.Context, symbol string) (*types.Ticker, error) {
