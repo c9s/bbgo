@@ -6,6 +6,7 @@ func toGlobalSymbol(symbol string) string {
 	return strings.ReplaceAll(symbol, "-", "")
 }
 
+//go:generate sh -c "echo \"package okex\nvar symbolMap = map[string]string{\n\" $(curl -s -L 'https://okex.com/api/v5/public/instruments?instType=SPOT' | jq -r '.data[] | \"\\(.instId | sub(\"-\" ; \"\") | tojson ): \\( .instId | tojson),\n\"') \"\n}\" > symbols.go"
 func toLocalSymbol(symbol string) string {
 	if s, ok := symbolMap[symbol]; ok {
 		return s
