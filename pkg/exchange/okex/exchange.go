@@ -123,3 +123,23 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbols ...string) (map[str
 func (e *Exchange) PlatformFeeCurrency() string {
 	return OKB
 }
+
+func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
+	panic("implement me")
+}
+
+func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
+	panic("implement me")
+}
+
+func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error) {
+	panic("implement me")
+}
+
+func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
+	panic("implement me")
+}
+
+func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) error {
+	panic("implement me")
+}
