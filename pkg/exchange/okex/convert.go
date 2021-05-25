@@ -1,6 +1,11 @@
 package okex
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
+	"github.com/c9s/bbgo/pkg/types"
+)
 
 func toGlobalSymbol(symbol string) string {
 	return strings.ReplaceAll(symbol, "-", "")
@@ -15,4 +20,18 @@ func toLocalSymbol(symbol string) string {
 
 	log.Errorf("failed to look up local symbol from %s", symbol)
 	return symbol
+}
+
+
+func toGlobalTicker(marketTicker okexapi.MarketTicker) *types.Ticker {
+	return &types.Ticker{
+		Time:   marketTicker.Timestamp.Time(),
+		Volume: marketTicker.Volume24H.Float64(),
+		Last:   marketTicker.Last.Float64(),
+		Open:   marketTicker.Open24H.Float64(),
+		High:   marketTicker.High24H.Float64(),
+		Low:    marketTicker.Low24H.Float64(),
+		Buy:    marketTicker.BidPrice.Float64(),
+		Sell:   marketTicker.AskPrice.Float64(),
+	}
 }

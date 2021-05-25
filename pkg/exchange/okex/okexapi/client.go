@@ -335,7 +335,7 @@ func (c *RestClient) MarketTicker(instId string) (*MarketTicker, error) {
 	var params = url.Values{}
 	params.Add("instId", instId)
 
-	req, err := c.newAuthenticatedRequest("GET", "/api/v5/market/ticker", params, nil)
+	req, err := c.newRequest("GET", "/api/v5/market/ticker", params, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -361,12 +361,12 @@ func (c *RestClient) MarketTicker(instId string) (*MarketTicker, error) {
 	return &tickerResponse.Data[0], nil
 }
 
-func (c *RestClient) MarketTickers(instType string) ([]MarketTicker, error) {
+func (c *RestClient) MarketTickers(instType InstrumentType) ([]MarketTicker, error) {
 	// SPOT, SWAP, FUTURES, OPTION
 	var params = url.Values{}
-	params.Add("instType", instType)
+	params.Add("instType", string(instType))
 
-	req, err := c.newAuthenticatedRequest("GET", "/api/v5/market/tickers", params, nil)
+	req, err := c.newRequest("GET", "/api/v5/market/tickers", params, nil)
 	if err != nil {
 		return nil, err
 	}
