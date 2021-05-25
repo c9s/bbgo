@@ -3,6 +3,7 @@ package binance
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/adshao/go-binance/v2"
@@ -283,3 +284,19 @@ func ConvertTrades(remoteTrades []*binance.TradeV3) (trades []types.Trade, err e
 
 	return trades, err
 }
+
+func convertSubscription(s types.Subscription) string {
+	// binance uses lower case symbol name,
+	// for kline, it's "<symbol>@kline_<interval>"
+	// for depth, it's "<symbol>@depth OR <symbol>@depth@100ms"
+	switch s.Channel {
+	case types.KLineChannel:
+		return fmt.Sprintf("%s@%s_%s", strings.ToLower(s.Symbol), s.Channel, s.Options.String())
+
+	case types.BookChannel:
+		return fmt.Sprintf("%s@depth", strings.ToLower(s.Symbol))
+	}
+
+	return fmt.Sprintf("%s@%s", strings.ToLower(s.Symbol), s.Channel)
+}
+
