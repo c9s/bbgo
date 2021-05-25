@@ -100,7 +100,7 @@ var rootCmd = &cobra.Command{
 		})
 
 		stream.OnBalanceSnapshot(func(balances types.BalanceMap) {
-			log.Infof("balances: %+v",balances)
+			log.Infof("balances: %+v", balances)
 		})
 
 		streambook := types.NewStreamBook(symbol)
