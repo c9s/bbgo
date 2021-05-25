@@ -61,7 +61,7 @@ type loginArgs struct {
 	SubAccount string `json:"subaccount"`
 }
 
-func newLoginRequest(key, secret string, t time.Time, subsaccount string) websocketRequest {
+func newLoginRequest(key, secret string, t time.Time, subaccount string) websocketRequest {
 	millis := t.UnixNano() / int64(time.Millisecond)
 	return websocketRequest{
 		Operation: login,
@@ -69,7 +69,7 @@ func newLoginRequest(key, secret string, t time.Time, subsaccount string) websoc
 			Key:        key,
 			Signature:  sign(secret, loginBody(millis)),
 			Time:       millis,
-			SubAccount: subsaccount,
+			SubAccount: subaccount,
 		},
 	}
 }
