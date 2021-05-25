@@ -43,6 +43,7 @@ const (
 	ExchangeMax      = ExchangeName("max")
 	ExchangeBinance  = ExchangeName("binance")
 	ExchangeFTX      = ExchangeName("ftx")
+	ExchangeOKEx     = ExchangeName("okex")
 	ExchangeBacktest = ExchangeName("backtest")
 )
 
