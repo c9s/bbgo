@@ -2,6 +2,7 @@ package okex
 
 import (
 	"context"
+	"fmt"
 	"math"
 
 	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
@@ -87,20 +88,36 @@ func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticke
 		return nil, err
 	}
 
-	return &types.Ticker{
-		Time:   marketTicker.Timestamp.Time(),
-		Volume: marketTicker.Volume24H.Float64(),
-		Last:   marketTicker.Last.Float64(),
-		Open:   marketTicker.Open24H.Float64(),
-		High:   marketTicker.High24H.Float64(),
-		Low:    marketTicker.Low24H.Float64(),
-		Buy:    marketTicker.BidPrice.Float64(),
-		Sell:   marketTicker.AskPrice.Float64(),
-	}, nil
+	return toGlobalTicker(*marketTicker), nil
 }
 
-func (e *Exchange) QueryTickers(ctx context.Context, symbol string) (*types.Ticker, error) {
-	return nil, nil
+func (e *Exchange) QueryTickers(ctx context.Context, symbols ...string) (map[string]types.Ticker, error) {
+	marketTickers, err := e.client.MarketTickers(okexapi.InstrumentTypeSpot)
+	if err != nil {
+		return nil, err
+	}
+
+	tickers := make(map[string]types.Ticker)
+	for _, marketTicker := range marketTickers {
+		symbol := toGlobalSymbol(marketTicker.InstrumentID)
+		ticker := toGlobalTicker(marketTicker)
+		tickers[symbol] = *ticker
+	}
+
+	if len(symbols) == 0 {
+		return tickers, nil
+	}
+
+	selectedTickers := make(map[string]types.Ticker)
+	for _, symbol := range symbols {
+		if ticker, ok := tickers[symbol]; ok {
+			selectedTickers[symbol] = ticker
+		} else {
+			return selectedTickers, fmt.Errorf("ticker of symbol %s not found", symbols)
+		}
+	}
+
+	return selectedTickers, nil
 }
 
 func (e *Exchange) PlatformFeeCurrency() string {
