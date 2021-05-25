@@ -248,7 +248,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 
 	tradeIDs := make(map[int64]struct{})
 
-	var lastTradeID int64
+	lastTradeID := options.LastTradeID
 	var trades []types.Trade
 	symbol = strings.ToUpper(symbol)
 
