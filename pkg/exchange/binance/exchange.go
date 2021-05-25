@@ -122,6 +122,7 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 	for _, symbol := range exchangeInfo.Symbols {
 		market := types.Market{
 			Symbol:          symbol.Symbol,
+			LocalSymbol:     symbol.Symbol,
 			PricePrecision:  symbol.QuotePrecision,
 			VolumePrecision: symbol.BaseAssetPrecision,
 			QuoteCurrency:   symbol.QuoteAsset,
