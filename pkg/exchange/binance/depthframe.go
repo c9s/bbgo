@@ -154,20 +154,20 @@ func (f *DepthFrame) loadDepthSnapshot() error {
 }
 
 func (f *DepthFrame) PushEvent(e DepthEvent) {
+	select {
+	case <-f.resetC:
+		f.reset()
+	default:
+	}
+
 	f.snapshotMutex.Lock()
 	snapshot := f.snapshotDepth
 	f.snapshotMutex.Unlock()
 
 	// before the snapshot is loaded, we need to buffer the events until we loaded the snapshot.
 	if snapshot == nil {
-
-		select {
-		case <-f.resetC:
-			f.reset()
-		default:
-			// buffer the events until we loaded the snapshot
-			f.bufferEvent(e)
-		}
+		// buffer the events until we loaded the snapshot
+		f.bufferEvent(e)
 
 		go f.once.Do(func() {
 			if err := f.loadDepthSnapshot(); err != nil {
