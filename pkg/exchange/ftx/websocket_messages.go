@@ -58,7 +58,7 @@ type loginArgs struct {
 	Key        string `json:"key"`
 	Signature  string `json:"sign"`
 	Time       int64  `json:"time"`
-	SubAccount string `json:"subaccount"`
+	SubAccount string `json:"subaccount,omitempty"`
 }
 
 func newLoginRequest(key, secret string, t time.Time, subaccount string) websocketRequest {
