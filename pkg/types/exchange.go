@@ -40,9 +40,9 @@ func (n ExchangeName) String() string {
 }
 
 const (
-	ExchangeMax     = ExchangeName("max")
-	ExchangeBinance = ExchangeName("binance")
-	ExchangeFTX     = ExchangeName("ftx")
+	ExchangeMax      = ExchangeName("max")
+	ExchangeBinance  = ExchangeName("binance")
+	ExchangeFTX      = ExchangeName("ftx")
 	ExchangeBacktest = ExchangeName("backtest")
 )
 
@@ -64,26 +64,26 @@ type Exchange interface {
 
 	PlatformFeeCurrency() string
 
-	// required implementation
 	ExchangeMarketDataService
 
-	ExchangeTradingService
+	ExchangeTradeService
 }
 
-type ExchangeTradingService interface {
+type ExchangeTradeService interface {
 	QueryAccount(ctx context.Context) (*Account, error)
 
 	QueryAccountBalances(ctx context.Context) (BalanceMap, error)
-
-	QueryTrades(ctx context.Context, symbol string, options *TradeQueryOptions) ([]Trade, error)
 
 	SubmitOrders(ctx context.Context, orders ...SubmitOrder) (createdOrders OrderSlice, err error)
 
 	QueryOpenOrders(ctx context.Context, symbol string) (orders []Order, err error)
 
-	QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []Order, err error)
-
 	CancelOrders(ctx context.Context, orders ...Order) error
+}
+
+type ExchangeTradeHistoryService interface {
+	QueryTrades(ctx context.Context, symbol string, options *TradeQueryOptions) ([]Trade, error)
+	QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []Order, err error)
 }
 
 type ExchangeMarketDataService interface {

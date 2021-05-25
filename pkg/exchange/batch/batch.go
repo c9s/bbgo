@@ -18,6 +18,13 @@ func (e ClosedOrderBatchQuery) Query(ctx context.Context, symbol string, startTi
 	c = make(chan types.Order, 500)
 	errC = make(chan error, 1)
 
+	tradeHistoryService, ok := e.Exchange.(types.ExchangeTradeHistoryService)
+	if !ok {
+		// skip exchanges that does not support trading history services
+		logrus.Warnf("exchange %s does not implement ExchangeTradeHistoryService, skip syncing closed orders", e.Exchange.Name())
+		return c, errC
+	}
+
 	go func() {
 		limiter := rate.NewLimiter(rate.Every(5*time.Second), 2) // from binance (original 1200, use 1000 for safety)
 
@@ -36,7 +43,7 @@ func (e ClosedOrderBatchQuery) Query(ctx context.Context, symbol string, startTi
 
 			logrus.Infof("batch querying %s closed orders %s <=> %s", symbol, startTime, endTime)
 
-			orders, err := e.QueryClosedOrders(ctx, symbol, startTime, endTime, lastOrderID)
+			orders, err := tradeHistoryService.QueryClosedOrders(ctx, symbol, startTime, endTime, lastOrderID)
 			if err != nil {
 				errC <- err
 				return
@@ -116,6 +123,13 @@ func (e TradeBatchQuery) Query(ctx context.Context, symbol string, options *type
 	c = make(chan types.Trade, 500)
 	errC = make(chan error, 1)
 
+	tradeHistoryService, ok := e.Exchange.(types.ExchangeTradeHistoryService)
+	if !ok {
+		// skip exchanges that does not support trading history services
+		logrus.Warnf("exchange %s does not implement ExchangeTradeHistoryService, skip syncing closed orders", e.Exchange.Name())
+		return c, errC
+	}
+
 	var lastTradeID = options.LastTradeID
 
 	go func() {
@@ -136,7 +150,7 @@ func (e TradeBatchQuery) Query(ctx context.Context, symbol string, options *type
 			var err error
 			var trades []types.Trade
 
-			trades, err = e.Exchange.QueryTrades(ctx, symbol, &types.TradeQueryOptions{
+			trades, err = tradeHistoryService.QueryTrades(ctx, symbol, &types.TradeQueryOptions{
 				Limit:       options.Limit,
 				LastTradeID: lastTradeID,
 			})
