@@ -92,7 +92,7 @@ var rootCmd = &cobra.Command{
 		}
 
 		log.Infof("MARKET TICKERS:")
-		tickers, err := client.MarketTickers("SPOT")
+		tickers, err := client.MarketTickers(okexapi.InstrumentTypeSpot)
 		if err != nil {
 			return err
 		}
