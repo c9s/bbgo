@@ -3,6 +3,7 @@ package binance
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/adshao/go-binance/v2"
 )
@@ -52,6 +53,12 @@ func (f *DepthFrame) bufferEvent(e DepthEvent) {
 }
 
 func (f *DepthFrame) loadDepthSnapshot() {
+	if debugBinanceDepth {
+		log.Infof("buffering %s depth events...", f.Symbol)
+	}
+
+	time.Sleep(3 * time.Second)
+
 	if debugBinanceDepth {
 		log.Infof("loading %s depth from the restful api", f.Symbol)
 	}
@@ -115,7 +122,7 @@ func (f *DepthFrame) loadDepthSnapshot() {
 		// valid
 		nextID := depth.FinalUpdateID + 1
 		if firstEvent.FirstUpdateID > nextID || firstEvent.FinalUpdateID < nextID {
-			log.Warn("miss matched final update id for order book, resetting depth...")
+			log.Warn("MISMATCH final update id for order book, resetting depth...")
 			return
 		}
 
