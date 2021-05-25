@@ -84,12 +84,13 @@ func NewStream(client *binance.Client) *Stream {
 				client:  client,
 				context: context.Background(),
 				Symbol:  e.Symbol,
+				resetC:  make(chan struct{}, 1),
 			}
 
 			stream.depthFrames[e.Symbol] = f
 
 			f.OnReady(func(snapshotDepth DepthEvent, bufEvents []DepthEvent) {
-				log.Infof("depth snapshot: %s", snapshotDepth.String())
+				log.Infof("depth snapshot ready: %s", snapshotDepth.String())
 
 				snapshot, err := snapshotDepth.OrderBook()
 				if err != nil {
@@ -189,7 +190,7 @@ func NewStream(client *binance.Client) *Stream {
 	stream.OnDisconnect(func() {
 		log.Infof("resetting depth snapshots...")
 		for _, f := range stream.depthFrames {
-			f.reset()
+			f.emitReset()
 		}
 	})
 
