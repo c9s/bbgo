@@ -93,10 +93,10 @@ func (b *SliceOrderBook) PriceVolumesBySide(side SideType) PriceVolumeSlice {
 	switch side {
 
 	case SideTypeBuy:
-		return b.Bids
+		return b.Bids.Copy()
 
 	case SideTypeSell:
-		return b.Asks
+		return b.Asks.Copy()
 	}
 
 	return nil
@@ -122,11 +122,6 @@ func (b *SliceOrderBook) updateBids(pvs PriceVolumeSlice) {
 	}
 }
 
-func (b *SliceOrderBook) load(book SliceOrderBook) {
-	b.Reset()
-	b.update(book)
-}
-
 func (b *SliceOrderBook) update(book SliceOrderBook) {
 	b.updateBids(book.Bids)
 	b.updateAsks(book.Asks)
@@ -138,7 +133,8 @@ func (b *SliceOrderBook) Reset() {
 }
 
 func (b *SliceOrderBook) Load(book SliceOrderBook) {
-	b.load(book)
+	b.Reset()
+	b.update(book)
 	b.EmitLoad(b)
 }
 

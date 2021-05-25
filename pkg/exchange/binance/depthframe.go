@@ -160,6 +160,18 @@ func (f *DepthFrame) PushEvent(e DepthEvent) {
 
 	// drop old events
 	if e.FinalUpdateID <= snapshot.FinalUpdateID {
+		log.Infof("DROP %s depth update event, updateID %d ~ %d (len %d)",
+			f.Symbol,
+			e.FirstUpdateID, e.FinalUpdateID, e.FinalUpdateID-e.FirstUpdateID)
+		return
+	}
+
+	if e.FirstUpdateID > snapshot.FinalUpdateID+1 {
+		log.Infof("MISSING %s depth update event, resetting, updateID %d ~ %d (len %d)",
+			f.Symbol,
+			e.FirstUpdateID, e.FinalUpdateID, e.FinalUpdateID-e.FirstUpdateID)
+
+		f.reset()
 		return
 	}
 
@@ -181,6 +193,7 @@ func (f *DepthFrame) fetch(ctx context.Context) (*DepthEvent, error) {
 	}
 
 	event := DepthEvent{
+		Symbol:        f.Symbol,
 		FirstUpdateID: 0,
 		FinalUpdateID: response.LastUpdateID,
 	}

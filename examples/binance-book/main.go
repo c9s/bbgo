@@ -48,16 +48,8 @@ var rootCmd = &cobra.Command{
 		stream.SetPublicOnly()
 		stream.Subscribe(types.BookChannel, symbol, types.SubscribeOptions{})
 
-		stream.OnBookSnapshot(func(book types.SliceOrderBook) {
-			// log.Infof("book snapshot: %+v", book)
-		})
-
-		stream.OnBookUpdate(func(book types.SliceOrderBook) {
-			// log.Infof("book update: %+v", book)
-		})
-
-		streambook := types.NewStreamBook(symbol)
-		streambook.BindStream(stream)
+		streamBook := types.NewStreamBook(symbol)
+		streamBook.BindStream(stream)
 
 		go func() {
 			for {
@@ -66,8 +58,8 @@ var rootCmd = &cobra.Command{
 				case <-ctx.Done():
 					return
 
-				case <-streambook.C:
-					book := streambook.Copy()
+				case <-streamBook.C:
+					book := streamBook.Copy()
 
 					if valid, err := book.IsValid(); !valid {
 						log.Errorf("order book is invalid, error: %v", err)

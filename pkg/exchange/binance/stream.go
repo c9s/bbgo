@@ -75,7 +75,7 @@ func NewStream(client *binance.Client) *Stream {
 
 	stream.OnDepthEvent(func(e *DepthEvent) {
 		if debugBinanceDepth {
-			log.Infof("received %s depth event updateID %d~%d (len %d)", e.Symbol, e.FirstUpdateID, e.FinalUpdateID, e.FinalUpdateID-e.FirstUpdateID)
+			log.Infof("received %s depth event updateID %d ~ %d (len %d)", e.Symbol, e.FirstUpdateID, e.FinalUpdateID, e.FinalUpdateID-e.FirstUpdateID)
 		}
 
 		f, ok := stream.depthFrames[e.Symbol]
@@ -88,27 +88,29 @@ func NewStream(client *binance.Client) *Stream {
 
 			stream.depthFrames[e.Symbol] = f
 
-			f.OnReady(func(e DepthEvent, bufEvents []DepthEvent) {
-				snapshot, err := e.OrderBook()
+			f.OnReady(func(snapshotDepth DepthEvent, bufEvents []DepthEvent) {
+				log.Infof("depth snapshot: %s", snapshotDepth.String())
+
+				snapshot, err := snapshotDepth.OrderBook()
 				if err != nil {
 					log.WithError(err).Error("book snapshot convert error")
 					return
 				}
 
 				if valid, err := snapshot.IsValid(); !valid {
-					log.Warnf("depth snapshot is invalid, event: %+v, error: %v", e, err)
+					log.Errorf("depth snapshot is invalid, event: %+v, error: %v", snapshotDepth, err)
 				}
 
 				stream.EmitBookSnapshot(snapshot)
 
 				for _, e := range bufEvents {
-					book, err := e.OrderBook()
+					bookUpdate, err := e.OrderBook()
 					if err != nil {
 						log.WithError(err).Error("book convert error")
 						return
 					}
 
-					stream.EmitBookUpdate(book)
+					stream.EmitBookUpdate(bookUpdate)
 				}
 			})
 
@@ -185,7 +187,7 @@ func NewStream(client *binance.Client) *Stream {
 	})
 
 	stream.OnDisconnect(func() {
-		log.Infof("resetting depth snapshot...")
+		log.Infof("resetting depth snapshots...")
 		for _, f := range stream.depthFrames {
 			f.reset()
 		}
