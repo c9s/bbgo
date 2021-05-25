@@ -52,6 +52,27 @@ func NewMutexOrderBook(symbol string) *MutexOrderBook {
 	}
 }
 
+func (b *MutexOrderBook) IsValid() (ok bool, err error) {
+	b.Lock()
+	ok, err = b.OrderBook.IsValid()
+	b.Unlock()
+	return ok, err
+}
+
+func (b *MutexOrderBook) BestBid() (pv PriceVolume, ok bool) {
+	b.Lock()
+	pv, ok = b.OrderBook.BestBid()
+	b.Unlock()
+	return pv, ok
+}
+
+func (b *MutexOrderBook) BestAsk() (pv PriceVolume, ok bool) {
+	b.Lock()
+	pv, ok = b.OrderBook.BestAsk()
+	b.Unlock()
+	return pv, ok
+}
+
 func (b *MutexOrderBook) Load(book SliceOrderBook) {
 	b.Lock()
 	b.OrderBook.Load(book)
@@ -66,14 +87,16 @@ func (b *MutexOrderBook) Reset() {
 
 func (b *MutexOrderBook) CopyDepth(depth int) OrderBook {
 	b.Lock()
-	defer b.Unlock()
-	return b.OrderBook.CopyDepth(depth)
+	book := b.OrderBook.CopyDepth(depth)
+	b.Unlock()
+	return book
 }
 
 func (b *MutexOrderBook) Copy() OrderBook {
 	b.Lock()
-	defer b.Unlock()
-	return b.OrderBook.Copy()
+	book := b.OrderBook.Copy()
+	b.Unlock()
+	return book
 }
 
 func (b *MutexOrderBook) Update(update SliceOrderBook) {

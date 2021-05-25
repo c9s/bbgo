@@ -56,14 +56,14 @@ executionReport
 type ExecutionReportEvent struct {
 	EventBase
 
-	Symbol        string `json:"s"`
-	Side          string `json:"S"`
+	Symbol string `json:"s"`
+	Side   string `json:"S"`
 
 	ClientOrderID         string `json:"c"`
 	OriginalClientOrderID string `json:"C"`
 
 	OrderType         string `json:"o"`
-	OrderCreationTime int64 `json:"O"`
+	OrderCreationTime int64  `json:"O"`
 
 	TimeInForce     string `json:"f"`
 	IcebergQuantity string `json:"F"`
@@ -71,13 +71,13 @@ type ExecutionReportEvent struct {
 	OrderQuantity      string `json:"q"`
 	QuoteOrderQuantity string `json:"Q"`
 
-	OrderPrice    string `json:"p"`
-	StopPrice     string `json:"P"`
+	OrderPrice string `json:"p"`
+	StopPrice  string `json:"P"`
 
 	IsOnBook bool `json:"w"`
 
-	IsMaker  bool `json:"m"`
-	Ignore   bool `json:"M"`
+	IsMaker bool `json:"m"`
+	Ignore  bool `json:"M"`
 
 	CommissionAmount string `json:"n"`
 	CommissionAsset  string `json:"N"`
@@ -319,17 +319,40 @@ type DepthEvent struct {
 	Asks []DepthEntry
 }
 
+func (e *DepthEvent) String() (o string) {
+	o += fmt.Sprintf("Depth %s bid/ask = ", e.Symbol)
+
+	if len(e.Bids) == 0 {
+		o += "empty"
+	} else {
+		o += e.Bids[0].PriceLevel
+	}
+
+	o += "/"
+
+	if len(e.Asks) == 0 {
+		o += "empty"
+	} else {
+		o += e.Asks[0].PriceLevel
+	}
+
+	o += fmt.Sprintf(" %d ~ %d", e.FirstUpdateID, e.FinalUpdateID)
+	return o
+}
+
 func (e *DepthEvent) OrderBook() (book types.SliceOrderBook, err error) {
 	book.Symbol = e.Symbol
 
 	for _, entry := range e.Bids {
 		quantity, err := fixedpoint.NewFromString(entry.Quantity)
 		if err != nil {
+			log.WithError(err).Errorf("depth quantity parse error: %s", entry.Quantity)
 			continue
 		}
 
 		price, err := fixedpoint.NewFromString(entry.PriceLevel)
 		if err != nil {
+			log.WithError(err).Errorf("depth price parse error: %s", entry.PriceLevel)
 			continue
 		}
 
@@ -344,11 +367,13 @@ func (e *DepthEvent) OrderBook() (book types.SliceOrderBook, err error) {
 	for _, entry := range e.Asks {
 		quantity, err := fixedpoint.NewFromString(entry.Quantity)
 		if err != nil {
+			log.WithError(err).Errorf("depth quantity parse error: %s", entry.Quantity)
 			continue
 		}
 
 		price, err := fixedpoint.NewFromString(entry.PriceLevel)
 		if err != nil {
+			log.WithError(err).Errorf("depth price parse error: %s", entry.PriceLevel)
 			continue
 		}
 
@@ -360,7 +385,7 @@ func (e *DepthEvent) OrderBook() (book types.SliceOrderBook, err error) {
 		book.Asks = book.Asks.Upsert(pv, false)
 	}
 
-	return
+	return book, nil
 }
 
 func parseDepthEntry(val *fastjson.Value) (*DepthEntry, error) {
