@@ -9,6 +9,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+//go:generate sh -c "echo \"package okex\nvar symbolMap = map[string]string{\n\" $(curl -s -L 'https://okex.com/api/v5/public/instruments?instType=SPOT' | jq -r '.data[] | \"\\(.instId | sub(\"-\" ; \"\") | tojson ): \\( .instId | tojson),\n\"') \"\n}\" > symbols.go"
+
 // OKB is the platform currency of OKEx, pre-allocate static string here
 const OKB = "OKB"
 
