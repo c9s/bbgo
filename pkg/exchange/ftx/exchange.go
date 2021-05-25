@@ -107,7 +107,7 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 		market := types.Market{
 			Symbol:      symbol,
 			LocalSymbol: m.Name,
-		
+
 			// The max precision is length(DefaultPow). For example, currently fixedpoint.DefaultPow
 			// is 1e8, so the max precision will be 8.
 			PricePrecision:  fixedpoint.NumFractionalDigits(fixedpoint.NewFromFloat(m.PriceIncrement)),
