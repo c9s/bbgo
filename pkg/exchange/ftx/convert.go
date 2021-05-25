@@ -20,6 +20,10 @@ func toGlobalSymbol(original string) string {
 }
 
 func toLocalSymbol(original string) string {
+	if symbolMap[original] == "" {
+		return original
+	}
+
 	return symbolMap[original]
 }
 
