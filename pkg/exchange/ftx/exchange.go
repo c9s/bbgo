@@ -270,7 +270,8 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 			if _, ok := tradeIDs[r.TradeId]; ok {
 				continue
 			}
-			if r.TradeId <= lastTradeID || r.Time.Before(since) || r.Time.After(until) || r.Market != symbol {
+
+			if r.TradeId <= lastTradeID || r.Time.Before(since) || r.Time.After(until) || r.Market != toLocalSymbol(symbol) {
 				continue
 			}
 			tradeIDs[r.TradeId] = struct{}{}
