@@ -9,6 +9,9 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// OKB is the platform currency of OKEx, pre-allocate static string here
+const OKB = "OKB"
+
 var log = logrus.WithFields(logrus.Fields{
 	"exchange": "okex",
 })
@@ -47,7 +50,9 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 	for _, instrument := range instruments {
 		symbol := toGlobalSymbol(instrument.InstrumentID)
 		market := types.Market{
-			Symbol:        symbol,
+			Symbol:      symbol,
+			LocalSymbol: instrument.InstrumentID,
+
 			QuoteCurrency: instrument.QuoteCurrency,
 			BaseCurrency:  instrument.BaseCurrency,
 
@@ -83,5 +88,5 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbol string) (*types.Tick
 }
 
 func (e *Exchange) PlatformFeeCurrency() string {
-	return "OKB"
+	return OKB
 }
