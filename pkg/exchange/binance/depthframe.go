@@ -3,7 +3,6 @@ package binance
 import (
 	"context"
 	"sync"
-	"time"
 
 	"github.com/adshao/go-binance/v2"
 )
@@ -53,9 +52,6 @@ func (f *DepthFrame) bufferEvent(e DepthEvent) {
 }
 
 func (f *DepthFrame) loadDepthSnapshot() {
-	log.Infof("buffering %s depth events for 3 seconds...", f.Symbol)
-	time.Sleep(3 * time.Second)
-
 	if debugBinanceDepth {
 		log.Infof("loading %s depth from the restful api", f.Symbol)
 	}
@@ -152,7 +148,7 @@ func (f *DepthFrame) PushEvent(e DepthEvent) {
 		// buffer the events until we loaded the snapshot
 		f.bufferEvent(e)
 
-		go f.once.Do(func() {
+		f.once.Do(func() {
 			f.loadDepthSnapshot()
 		})
 		return
