@@ -76,10 +76,6 @@ func (f *DepthFrame) loadDepthSnapshot() {
 		log.Infof("loaded %s depth, last update ID = %d", f.Symbol, depth.FinalUpdateID)
 	}
 
-	f.snapshotMutex.Lock()
-	f.snapshotDepth = depth
-	f.snapshotMutex.Unlock()
-
 	// filter the events by the event IDs
 	f.bufMutex.Lock()
 	bufEvents := f.bufEvents
@@ -120,7 +116,6 @@ func (f *DepthFrame) loadDepthSnapshot() {
 		nextID := depth.FinalUpdateID + 1
 		if firstEvent.FirstUpdateID > nextID || firstEvent.FinalUpdateID < nextID {
 			log.Warn("miss matched final update id for order book, resetting depth...")
-			f.reset()
 			return
 		}
 
@@ -135,6 +130,10 @@ func (f *DepthFrame) loadDepthSnapshot() {
 		log.Infof("READY %s depth, %d bufferred events", f.Symbol, len(events))
 	}
 
+	f.snapshotMutex.Lock()
+	f.snapshotDepth = depth
+	f.snapshotMutex.Unlock()
+
 	f.EmitReady(*depth, events)
 }
 
@@ -147,7 +146,6 @@ func (f *DepthFrame) PushEvent(e DepthEvent) {
 	if snapshot == nil {
 		// buffer the events until we loaded the snapshot
 		f.bufferEvent(e)
-
 		f.once.Do(func() {
 			f.loadDepthSnapshot()
 		})
