@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/adshao/go-binance/v2"
+	"github.com/pkg/errors"
 )
 
 //go:generate callbackgen -type DepthFrame
@@ -21,7 +22,8 @@ type DepthFrame struct {
 	bufMutex  sync.Mutex
 	bufEvents []DepthEvent
 
-	once sync.Once
+	resetC chan struct{}
+	once   sync.Once
 
 	readyCallbacks []func(snapshotDepth DepthEvent, bufEvents []DepthEvent)
 	pushCallbacks  []func(e DepthEvent)
@@ -42,6 +44,13 @@ func (f *DepthFrame) reset() {
 	f.snapshotMutex.Unlock()
 }
 
+func (f *DepthFrame) emitReset() {
+	select {
+	case f.resetC <- struct{}{}:
+	default:
+	}
+}
+
 func (f *DepthFrame) bufferEvent(e DepthEvent) {
 	if debugBinanceDepth {
 		log.Infof("buffering %s depth event FirstUpdateID = %d, FinalUpdateID = %d", f.Symbol, e.FirstUpdateID, e.FinalUpdateID)
@@ -52,7 +61,7 @@ func (f *DepthFrame) bufferEvent(e DepthEvent) {
 	f.bufMutex.Unlock()
 }
 
-func (f *DepthFrame) loadDepthSnapshot() {
+func (f *DepthFrame) loadDepthSnapshot() error {
 	if debugBinanceDepth {
 		log.Infof("buffering %s depth events...", f.Symbol)
 	}
@@ -66,17 +75,16 @@ func (f *DepthFrame) loadDepthSnapshot() {
 	depth, err := f.fetch(f.context)
 	if err != nil {
 		log.WithError(err).Errorf("depth api error")
-		return
+		return err
 	}
 
 	if len(depth.Asks) == 0 {
 		log.Errorf("depth response error: empty asks")
-		return
+		return errors.New("depth response error: empty asks")
 	}
 
 	if len(depth.Bids) == 0 {
-		log.Errorf("depth response error: empty bids")
-		return
+		return errors.New("depth response error: empty bids")
 	}
 
 	if debugBinanceDepth {
@@ -123,7 +131,7 @@ func (f *DepthFrame) loadDepthSnapshot() {
 		nextID := depth.FinalUpdateID + 1
 		if firstEvent.FirstUpdateID > nextID || firstEvent.FinalUpdateID < nextID {
 			log.Warn("MISMATCH final update id for order book, resetting depth...")
-			return
+			return errors.New("MISMATCH final update id for order book, resetting depth...")
 		}
 
 		if debugBinanceDepth {
@@ -142,6 +150,7 @@ func (f *DepthFrame) loadDepthSnapshot() {
 	f.snapshotMutex.Unlock()
 
 	f.EmitReady(*depth, events)
+	return nil
 }
 
 func (f *DepthFrame) PushEvent(e DepthEvent) {
@@ -151,10 +160,20 @@ func (f *DepthFrame) PushEvent(e DepthEvent) {
 
 	// before the snapshot is loaded, we need to buffer the events until we loaded the snapshot.
 	if snapshot == nil {
-		// buffer the events until we loaded the snapshot
-		f.bufferEvent(e)
-		f.once.Do(func() {
-			f.loadDepthSnapshot()
+
+		select {
+		case <-f.resetC:
+			f.reset()
+		default:
+			// buffer the events until we loaded the snapshot
+			f.bufferEvent(e)
+		}
+
+		go f.once.Do(func() {
+			if err := f.loadDepthSnapshot(); err != nil {
+				log.WithError(err).Error("depth snapshot load failed, resetting..")
+				f.emitReset()
+			}
 		})
 		return
 	}
@@ -172,7 +191,7 @@ func (f *DepthFrame) PushEvent(e DepthEvent) {
 			f.Symbol,
 			e.FirstUpdateID, e.FinalUpdateID, e.FinalUpdateID-e.FirstUpdateID)
 
-		f.reset()
+		f.emitReset()
 		return
 	}
 
