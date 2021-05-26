@@ -160,3 +160,11 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) error {
 	panic("implement me")
 }
+
+func (e *Exchange) NewStream() types.Stream {
+	panic("implement me")
+}
+
+func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
+	panic("implement me")
+}

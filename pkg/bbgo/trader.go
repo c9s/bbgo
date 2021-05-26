@@ -9,12 +9,8 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/c9s/bbgo/pkg/types"
-
 	_ "github.com/go-sql-driver/mysql"
 )
-
-var SupportedExchanges = []types.ExchangeName{"binance", "max", "ftx"}
 
 // SingleExchangeStrategy represents the single Exchange strategy
 type SingleExchangeStrategy interface {
