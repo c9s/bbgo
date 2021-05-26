@@ -196,7 +196,7 @@ func (environ *Environment) ConfigureExchangeSessions(userConfig *Config) error 
 }
 
 func (environ *Environment) AddExchangesByViperKeys() error {
-	for _, n := range SupportedExchanges {
+	for _, n := range types.SupportedExchanges {
 		if viper.IsSet(string(n) + "-api-key") {
 			exchange, err := cmdutil.NewExchangeWithEnvVarPrefix(n, "")
 			if err != nil {
@@ -224,7 +224,7 @@ func InitExchangeSession(name string, session *ExchangeSession) error {
 			}
 		}
 
-		exchange, err = cmdutil.NewExchangeStandard(exchangeName, session.Key, session.Secret, session.SubAccount)
+		exchange, err = cmdutil.NewExchangeStandard(exchangeName, session.Key, session.Secret, "", session.SubAccount)
 	} else {
 		exchange, err = cmdutil.NewExchangeWithEnvVarPrefix(exchangeName, session.EnvVarPrefix)
 	}

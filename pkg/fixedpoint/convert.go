@@ -50,6 +50,10 @@ func (v Value) Float64() float64 {
 	return float64(v) / DefaultPow
 }
 
+func (v Value) String() string {
+	return strconv.FormatFloat(float64(v)/DefaultPow, 'f', -1, 64)
+}
+
 func (v Value) Int64() int64 {
 	return int64(v)
 }
@@ -236,6 +240,11 @@ func Parse(input string) (num int64, numDecimalPoints int, err error) {
 
 func NewFromString(input string) (Value, error) {
 	length := len(input)
+
+	if length == 0 {
+		return 0, nil
+	}
+
 	isPercentage := input[length-1] == '%'
 	if isPercentage {
 		input = input[0 : length-1]
