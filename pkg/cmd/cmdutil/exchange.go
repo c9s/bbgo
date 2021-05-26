@@ -23,6 +23,9 @@ func NewExchangeStandard(n types.ExchangeName, key, secret, subAccount string) (
 	case types.ExchangeMax:
 		return max.New(key, secret), nil
 
+	// case types.ExchangeOKEx:
+	//	 return okex.New(key, secret, ""), nil
+
 	default:
 		return nil, fmt.Errorf("unsupported exchange: %v", n)
 
