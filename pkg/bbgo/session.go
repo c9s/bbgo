@@ -16,15 +16,16 @@ import (
 	"github.com/c9s/bbgo/pkg/util"
 )
 
-var fiatCurrencies = []string{"USDC", "USDT", "USD", "TWD", "EUR", "GBP"}
+var fiatCurrencies = []string{"USDC", "USDT", "USD", "TWD", "EUR", "GBP", "BUSD"}
 
 type StandardIndicatorSet struct {
 	Symbol string
 	// Standard indicators
 	// interval -> window
-	sma  map[types.IntervalWindow]*indicator.SMA
-	ewma map[types.IntervalWindow]*indicator.EWMA
-	boll map[types.IntervalWindow]*indicator.BOLL
+	sma   map[types.IntervalWindow]*indicator.SMA
+	ewma  map[types.IntervalWindow]*indicator.EWMA
+	boll  map[types.IntervalWindow]*indicator.BOLL
+	stoch map[types.IntervalWindow]*indicator.STOCH
 
 	store *MarketDataStore
 }
@@ -35,6 +36,7 @@ func NewStandardIndicatorSet(symbol string, store *MarketDataStore) *StandardInd
 		sma:    make(map[types.IntervalWindow]*indicator.SMA),
 		ewma:   make(map[types.IntervalWindow]*indicator.EWMA),
 		boll:   make(map[types.IntervalWindow]*indicator.BOLL),
+		stoch:  make(map[types.IntervalWindow]*indicator.STOCH),
 		store:  store,
 	}
 
@@ -65,7 +67,7 @@ func NewStandardIndicatorSet(symbol string, store *MarketDataStore) *StandardInd
 func (set *StandardIndicatorSet) BOLL(iw types.IntervalWindow, bandWidth float64) *indicator.BOLL {
 	inc, ok := set.boll[iw]
 	if !ok {
-		inc := &indicator.BOLL{IntervalWindow: iw, K: bandWidth}
+		inc = &indicator.BOLL{IntervalWindow: iw, K: bandWidth}
 		inc.Bind(set.store)
 		set.boll[iw] = inc
 	}
@@ -77,7 +79,7 @@ func (set *StandardIndicatorSet) BOLL(iw types.IntervalWindow, bandWidth float64
 func (set *StandardIndicatorSet) SMA(iw types.IntervalWindow) *indicator.SMA {
 	inc, ok := set.sma[iw]
 	if !ok {
-		inc := &indicator.SMA{IntervalWindow: iw}
+		inc = &indicator.SMA{IntervalWindow: iw}
 		inc.Bind(set.store)
 		set.sma[iw] = inc
 	}
@@ -89,9 +91,20 @@ func (set *StandardIndicatorSet) SMA(iw types.IntervalWindow) *indicator.SMA {
 func (set *StandardIndicatorSet) EWMA(iw types.IntervalWindow) *indicator.EWMA {
 	inc, ok := set.ewma[iw]
 	if !ok {
-		inc := &indicator.EWMA{IntervalWindow: iw}
+		inc = &indicator.EWMA{IntervalWindow: iw}
 		inc.Bind(set.store)
 		set.ewma[iw] = inc
+	}
+
+	return inc
+}
+
+func (set *StandardIndicatorSet) STOCH(iw types.IntervalWindow) *indicator.STOCH {
+	inc, ok := set.stoch[iw]
+	if !ok {
+		inc = &indicator.STOCH{IntervalWindow: iw}
+		inc.Bind(set.store)
+		set.stoch[iw] = inc
 	}
 
 	return inc
@@ -385,7 +398,7 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 	var lastPriceTime time.Time
 	for interval := range usedKLineIntervals {
 		// avoid querying the last unclosed kline
-		endTime := environ.startTime.Add(- interval.Duration())
+		endTime := environ.startTime.Add(-interval.Duration())
 		kLines, err := session.Exchange.QueryKLines(ctx, symbol, interval, types.KLineQueryOptions{
 			EndTime: &endTime,
 			Limit:   1000, // indicators need at least 100
@@ -536,7 +549,7 @@ func (session *ExchangeSession) FormatOrder(order types.SubmitOrder) (types.Subm
 }
 
 func (session *ExchangeSession) UpdatePrices(ctx context.Context) (err error) {
-	if session.lastPriceUpdatedAt.After(time.Now().Add(- time.Hour)) {
+	if session.lastPriceUpdatedAt.After(time.Now().Add(-time.Hour)) {
 		return nil
 	}
 
