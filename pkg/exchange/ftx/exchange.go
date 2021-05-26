@@ -22,7 +22,8 @@ const (
 )
 
 var logger = logrus.WithField("exchange", "ftx")
-var symbolMap map[string]string
+
+//go:generate go run generate_symbol_map.go
 
 type Exchange struct {
 	key, secret  string
@@ -61,7 +62,7 @@ func NewExchange(key, secret string, subAccount string) *Exchange {
 	if err != nil {
 		panic(err)
 	}
-	symbolMap = make(map[string]string)
+
 	return &Exchange{
 		restEndpoint: u,
 		key:          key,
