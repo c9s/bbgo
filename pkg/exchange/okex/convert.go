@@ -35,3 +35,17 @@ func toGlobalTicker(marketTicker okexapi.MarketTicker) *types.Ticker {
 		Sell:   marketTicker.AskPrice.Float64(),
 	}
 }
+
+func toGlobalBalance(balanceSummaries []okexapi.BalanceSummary) types.BalanceMap {
+	var balanceMap = types.BalanceMap{}
+	for _, balanceSummary := range balanceSummaries {
+		for _, balanceDetail := range balanceSummary.Details {
+			balanceMap[balanceDetail.Currency] = types.Balance{
+				Currency:  balanceDetail.Currency,
+				Available: balanceDetail.Available,
+				Locked:    balanceDetail.Frozen,
+			}
+		}
+	}
+	return balanceMap
+}
