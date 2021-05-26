@@ -128,14 +128,8 @@ func (a *Address) UnmarshalJSON(body []byte) error {
 		return nil
 	}
 
-	var newA Address
-	err = json.Unmarshal(body, &newA)
-	if err != nil {
-		return err
-	}
-
-	*a = newA
-	return nil
+	type addressTemplate Address
+	return json.Unmarshal(body, (*addressTemplate)(a))
 }
 
 type Strategy struct {
