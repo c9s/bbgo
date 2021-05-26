@@ -164,7 +164,7 @@ func (f *DepthFrame) PushEvent(e DepthEvent) {
 
 		go f.once.Do(func() {
 			if err := f.loadDepthSnapshot(); err != nil {
-				log.WithError(err).Error("%s depth snapshot load failed, resetting..", f.Symbol)
+				log.WithError(err).Errorf("%s depth snapshot load failed, resetting..", f.Symbol)
 				f.emitReset()
 			}
 		})
