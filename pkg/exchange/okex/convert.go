@@ -22,7 +22,6 @@ func toLocalSymbol(symbol string) string {
 	return symbol
 }
 
-
 func toGlobalTicker(marketTicker okexapi.MarketTicker) *types.Ticker {
 	return &types.Ticker{
 		Time:   marketTicker.Timestamp.Time(),
@@ -42,7 +41,7 @@ func toGlobalBalance(balanceSummaries []okexapi.BalanceSummary) types.BalanceMap
 		for _, balanceDetail := range balanceSummary.Details {
 			balanceMap[balanceDetail.Currency] = types.Balance{
 				Currency:  balanceDetail.Currency,
-				Available: balanceDetail.Available,
+				Available: balanceDetail.CashBalance,
 				Locked:    balanceDetail.Frozen,
 			}
 		}

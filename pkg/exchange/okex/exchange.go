@@ -31,6 +31,7 @@ func New(key, secret, passphrase string) *Exchange {
 		key:        key,
 		secret:     secret,
 		passphrase: passphrase,
+		client:     client,
 	}
 }
 
@@ -162,7 +163,7 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 }
 
 func (e *Exchange) NewStream() types.Stream {
-	panic("implement me")
+	return NewStream(e.client)
 }
 
 func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
