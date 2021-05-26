@@ -55,6 +55,8 @@ func ValidExchangeName(a string) (ExchangeName, error) {
 		return ExchangeBinance, nil
 	case "ftx":
 		return ExchangeFTX, nil
+	case "okex":
+		return ExchangeOKEx, nil
 	}
 
 	return "", fmt.Errorf("invalid exchange name: %s", a)
