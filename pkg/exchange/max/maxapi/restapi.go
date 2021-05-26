@@ -293,7 +293,7 @@ func (c *RestClient) sendRequest(req *http.Request) (*util.Response, error) {
 
 	// Check error, if there is an error, return the ErrorResponse struct type
 	if response.IsError() {
-		errorResponse, err := toErrorResponse(response)
+		errorResponse, err := ToErrorResponse(response)
 		if err != nil {
 			return response, err
 		}
@@ -377,8 +377,8 @@ func (r *ErrorResponse) Error() string {
 	)
 }
 
-// toErrorResponse tries to convert/parse the server response to the standard Error interface object
-func toErrorResponse(response *util.Response) (errorResponse *ErrorResponse, err error) {
+// ToErrorResponse tries to convert/parse the server response to the standard Error interface object
+func ToErrorResponse(response *util.Response) (errorResponse *ErrorResponse, err error) {
 	errorResponse = &ErrorResponse{Response: response}
 
 	contentType := response.Header.Get("content-type")

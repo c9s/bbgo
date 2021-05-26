@@ -19,6 +19,8 @@ import (
 	"github.com/c9s/bbgo/pkg/util"
 )
 
+const BNB = "BNB"
+
 var log = logrus.WithFields(logrus.Fields{
 	"exchange": "binance",
 })
@@ -122,6 +124,7 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 	for _, symbol := range exchangeInfo.Symbols {
 		market := types.Market{
 			Symbol:          symbol.Symbol,
+			LocalSymbol:     symbol.Symbol,
 			PricePrecision:  symbol.QuotePrecision,
 			VolumePrecision: symbol.BaseAssetPrecision,
 			QuoteCurrency:   symbol.QuoteAsset,
@@ -393,9 +396,8 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 	return account.Balances(), nil
 }
 
-// PlatformFeeCurrency
 func (e *Exchange) PlatformFeeCurrency() string {
-	return "BNB"
+	return BNB
 }
 
 func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {

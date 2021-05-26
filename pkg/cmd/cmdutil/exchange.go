@@ -8,10 +8,11 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/binance"
 	"github.com/c9s/bbgo/pkg/exchange/ftx"
 	"github.com/c9s/bbgo/pkg/exchange/max"
+	"github.com/c9s/bbgo/pkg/exchange/okex"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func NewExchangeStandard(n types.ExchangeName, key, secret, subAccount string) (types.Exchange, error) {
+func NewExchangeStandard(n types.ExchangeName, key, secret, passphrase, subAccount string) (types.Exchange, error) {
 	switch n {
 
 	case types.ExchangeFTX:
@@ -22,6 +23,9 @@ func NewExchangeStandard(n types.ExchangeName, key, secret, subAccount string) (
 
 	case types.ExchangeMax:
 		return max.New(key, secret), nil
+
+	case types.ExchangeOKEx:
+		return okex.New(key, secret, passphrase), nil
 
 	default:
 		return nil, fmt.Errorf("unsupported exchange: %v", n)
@@ -42,8 +46,9 @@ func NewExchangeWithEnvVarPrefix(n types.ExchangeName, varPrefix string) (types.
 		return nil, fmt.Errorf("can not initialize exchange %s: empty key or secret, env var prefix: %s", n, varPrefix)
 	}
 
+	passphrase := os.Getenv(varPrefix + "_API_PASSPHRASE")
 	subAccount := os.Getenv(varPrefix + "_SUBACCOUNT")
-	return NewExchangeStandard(n, key, secret, subAccount)
+	return NewExchangeStandard(n, key, secret, passphrase, subAccount)
 }
 
 // NewExchange constructor exchange object from viper config.
