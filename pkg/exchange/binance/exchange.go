@@ -204,15 +204,28 @@ func (e *Exchange) getLaunchDate() (time.Time, error) {
 	return time.Date(2017, time.July, 14, 0, 0, 0, 0, loc), nil
 }
 
-func (e *Exchange) Withdrawal(ctx context.Context, currency string, amount fixedpoint.Value, address string) error {
-	response, err := e.Client.NewCreateWithdrawService().
-		Asset(currency).
+func (e *Exchange) Withdrawal(ctx context.Context, asset string, amount fixedpoint.Value, address string, options *types.WithdrawalOptions) error {
+	req := e.Client.NewCreateWithdrawService().
+		Asset(asset).
 		Address(address).
-		Amount(fmt.Sprintf("%f", amount.Float64())).
-		Do(ctx)
+		Amount(fmt.Sprintf("%f", amount.Float64()))
 
+	if options != nil {
+		if options.Network != "" {
+			req.Network(options.Network)
+		}
+		if options.AddressTag != "" {
+			req.Network(options.AddressTag)
+		}
+	}
+
+	response, err := req.Do(ctx)
 	if err != nil {
 		return err
+	}
+
+	if !response.Success {
+		return fmt.Errorf("withdrawal request failed: %s ID=%s", response.Msg, response.ID)
 	}
 
 	log.Infof("withdrawal request sent, response: %+v", response)

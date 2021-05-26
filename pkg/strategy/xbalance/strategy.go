@@ -2,6 +2,7 @@ package xbalance
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"sync"
@@ -108,6 +109,35 @@ func (r *WithdrawalRequest) SlackAttachment() slack.Attachment {
 	}
 }
 
+type Address struct {
+	Address    string `json:"address"`
+	AddressTag string `json:"addressTag"`
+	Network    string `json:"network"`
+}
+
+func (a *Address) UnmarshalJSON(body []byte) error {
+	var arg interface{}
+	err := json.Unmarshal(body, &arg)
+	if err != nil {
+		return err
+	}
+
+	switch argT := arg.(type) {
+	case string:
+		a.Address = argT
+		return nil
+	}
+
+	var newA Address
+	err = json.Unmarshal(body, &newA)
+	if err != nil {
+		return err
+	}
+
+	*a = newA
+	return nil
+}
+
 type Strategy struct {
 	Notifiability *bbgo.Notifiability
 	*bbgo.Graceful
@@ -115,7 +145,7 @@ type Strategy struct {
 
 	Interval types.Duration `json:"interval"`
 
-	Addresses map[string]string `json:"addresses"`
+	Addresses map[string]Address `json:"addresses"`
 
 	MaxDailyNumberOfTransfer int              `json:"maxDailyNumberOfTransfer"`
 	MaxDailyAmountOfTransfer fixedpoint.Value `json:"maxDailyAmountOfTransfer"`
@@ -213,7 +243,10 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 		Amount:      requiredAmount,
 	})
 
-	if err := withdrawalService.Withdrawal(ctx, s.Asset, requiredAmount, toAddress); err != nil {
+	if err := withdrawalService.Withdrawal(ctx, s.Asset, requiredAmount, toAddress.Address, &types.WithdrawalOptions{
+		Network:    toAddress.Network,
+		AddressTag: toAddress.AddressTag,
+	}); err != nil {
 		log.WithError(err).Errorf("withdrawal failed")
 		s.Notifiability.Notify("withdrawal request failed, error: %v", err)
 		return

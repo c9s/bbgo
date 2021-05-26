@@ -29,3 +29,9 @@ func (w Withdraw) String() string {
 func (w Withdraw) EffectiveTime() time.Time {
 	return w.ApplyTime.Time()
 }
+
+type WithdrawalOptions struct {
+	Network    string
+	AddressTag string
+}
+

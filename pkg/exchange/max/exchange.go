@@ -363,11 +363,11 @@ func toMaxSubmitOrder(o types.SubmitOrder) (*maxapi.Order, error) {
 	return &maxOrder, nil
 }
 
-func (e *Exchange) Withdrawal(ctx context.Context, currency string, amount fixedpoint.Value, address string) error {
-	currency = toLocalCurrency(currency)
+func (e *Exchange) Withdrawal(ctx context.Context, asset string, amount fixedpoint.Value, address string, options *types.WithdrawalOptions) error {
+	asset = toLocalCurrency(asset)
 
 	addresses, err := e.client.WithdrawalService.NewGetWithdrawalAddressesRequest().
-		Currency(currency).
+		Currency(asset).
 		Do(ctx)
 
 	if err != nil {
@@ -391,7 +391,7 @@ func (e *Exchange) Withdrawal(ctx context.Context, currency string, amount fixed
 	}
 
 	response, err := e.client.WithdrawalService.NewWithdrawalRequest().
-		Currency(currency).
+		Currency(asset).
 		Amount(amount.Float64()).
 		AddressUUID(whitelistAddress.UUID).
 		Do(ctx)
@@ -538,7 +538,6 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	a.UpdateBalances(balances)
 	return a, nil
 }
-
 
 func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (allWithdraws []types.Withdraw, err error) {
 	startTime := since
@@ -865,4 +864,3 @@ func (e *Exchange) QueryAveragePrice(ctx context.Context, symbol string) (float6
 
 	return (util.MustParseFloat(ticker.Sell) + util.MustParseFloat(ticker.Buy)) / 2, nil
 }
-
