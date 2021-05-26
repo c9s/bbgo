@@ -125,11 +125,28 @@ func (e *Exchange) PlatformFeeCurrency() string {
 }
 
 func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
-	panic("implement me")
+	balanceSummaries, err := e.client.AccountBalances()
+	if err != nil {
+		return nil, err
+	}
+
+	var account = types.Account{
+		AccountType: "SPOT",
+	}
+
+	var balanceMap = toGlobalBalance(balanceSummaries)
+	account.UpdateBalances(balanceMap)
+	return &account, nil
 }
 
 func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
-	panic("implement me")
+	balanceSummaries, err := e.client.AccountBalances()
+	if err != nil {
+		return nil, err
+	}
+
+	var balanceMap = toGlobalBalance(balanceSummaries)
+	return balanceMap, nil
 }
 
 func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error) {
