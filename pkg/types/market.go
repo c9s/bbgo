@@ -47,7 +47,9 @@ func (d *Duration) UnmarshalJSON(data []byte) error {
 }
 
 type Market struct {
-	Symbol          string
+	Symbol      string
+	LocalSymbol string // LocalSymbol is used for exchange's API
+
 	PricePrecision  int
 	VolumePrecision int
 	QuoteCurrency   string

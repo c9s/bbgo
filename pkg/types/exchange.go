@@ -40,11 +40,14 @@ func (n ExchangeName) String() string {
 }
 
 const (
-	ExchangeMax     = ExchangeName("max")
-	ExchangeBinance = ExchangeName("binance")
-	ExchangeFTX     = ExchangeName("ftx")
+	ExchangeMax      = ExchangeName("max")
+	ExchangeBinance  = ExchangeName("binance")
+	ExchangeFTX      = ExchangeName("ftx")
+	ExchangeOKEx     = ExchangeName("okex")
 	ExchangeBacktest = ExchangeName("backtest")
 )
+
+var SupportedExchanges = []ExchangeName{"binance", "max", "ftx", "okex"}
 
 func ValidExchangeName(a string) (ExchangeName, error) {
 	switch strings.ToLower(a) {
@@ -54,6 +57,8 @@ func ValidExchangeName(a string) (ExchangeName, error) {
 		return ExchangeBinance, nil
 	case "ftx":
 		return ExchangeFTX, nil
+	case "okex":
+		return ExchangeOKEx, nil
 	}
 
 	return "", fmt.Errorf("invalid exchange name: %s", a)
@@ -64,26 +69,26 @@ type Exchange interface {
 
 	PlatformFeeCurrency() string
 
-	// required implementation
 	ExchangeMarketDataService
 
-	ExchangeTradingService
+	ExchangeTradeService
 }
 
-type ExchangeTradingService interface {
+type ExchangeTradeService interface {
 	QueryAccount(ctx context.Context) (*Account, error)
 
 	QueryAccountBalances(ctx context.Context) (BalanceMap, error)
-
-	QueryTrades(ctx context.Context, symbol string, options *TradeQueryOptions) ([]Trade, error)
 
 	SubmitOrders(ctx context.Context, orders ...SubmitOrder) (createdOrders OrderSlice, err error)
 
 	QueryOpenOrders(ctx context.Context, symbol string) (orders []Order, err error)
 
-	QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []Order, err error)
-
 	CancelOrders(ctx context.Context, orders ...Order) error
+}
+
+type ExchangeTradeHistoryService interface {
+	QueryTrades(ctx context.Context, symbol string, options *TradeQueryOptions) ([]Trade, error)
+	QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []Order, err error)
 }
 
 type ExchangeMarketDataService interface {

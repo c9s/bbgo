@@ -128,6 +128,7 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 
 		market := types.Market{
 			Symbol:          symbol,
+			LocalSymbol:     m.ID,
 			PricePrecision:  m.QuoteUnitPrecision,
 			VolumePrecision: m.BaseUnitPrecision,
 			QuoteCurrency:   toGlobalCurrency(m.QuoteUnit),
