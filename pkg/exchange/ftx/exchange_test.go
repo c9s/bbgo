@@ -416,6 +416,7 @@ func TestExchange_QueryMarkets(t *testing.T) {
 	assert.Len(t, resp, 1)
 	assert.Equal(t, types.Market{
 		Symbol:          "BTCUSD",
+		LocalSymbol:     "BTC/USD",
 		PricePrecision:  0,
 		VolumePrecision: 4,
 		QuoteCurrency:   "USD",
