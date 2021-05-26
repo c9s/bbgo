@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"sync"
 	"time"
 
@@ -365,7 +364,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	}
 
 	go func() {
-		ticker := time.NewTimer(durationJitter(s.Interval.Duration(), 1000))
+		ticker := time.NewTimer(util.MillisecondsJitter(s.Interval.Duration(), 1000))
 		defer ticker.Stop()
 
 		for {
@@ -382,7 +381,3 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	return nil
 }
 
-func durationJitter(d time.Duration, jitterInMilliseconds int) time.Duration {
-	n := rand.Intn(jitterInMilliseconds)
-	return d + time.Duration(n)*time.Millisecond
-}
