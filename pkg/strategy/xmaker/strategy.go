@@ -219,8 +219,13 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 	if b, ok := hedgeBalances[s.sourceMarket.BaseCurrency]; ok {
 		// to make bid orders, we need enough base asset in the foreign exchange,
 		// if the base asset balance is not enough for selling
-		if s.StopHedgeBaseBalance > 0 && b.Available > (s.StopHedgeBaseBalance+fixedpoint.NewFromFloat(s.sourceMarket.MinQuantity)) {
-			hedgeQuota.BaseAsset.Add(b.Available - s.StopHedgeBaseBalance - fixedpoint.NewFromFloat(s.sourceMarket.MinQuantity))
+		if s.StopHedgeBaseBalance > 0 {
+			if b.Available > (s.StopHedgeBaseBalance + fixedpoint.NewFromFloat(s.sourceMarket.MinQuantity)) {
+				hedgeQuota.BaseAsset.Add(b.Available - s.StopHedgeBaseBalance - fixedpoint.NewFromFloat(s.sourceMarket.MinQuantity))
+			} else {
+				log.Warnf("%s maker bid disabled: insufficient base balance %s", s.Symbol, b.String())
+				disableMakerBid = true
+			}
 		} else if b.Available.Float64() > s.sourceMarket.MinQuantity {
 			hedgeQuota.BaseAsset.Add(b.Available)
 		} else {
@@ -232,8 +237,13 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 	if b, ok := hedgeBalances[s.sourceMarket.QuoteCurrency]; ok {
 		// to make ask orders, we need enough quote asset in the foreign exchange,
 		// if the quote asset balance is not enough for buying
-		if s.StopHedgeQuoteBalance > 0 && b.Available > (s.StopHedgeQuoteBalance+fixedpoint.NewFromFloat(s.sourceMarket.MinNotional)) {
-			hedgeQuota.QuoteAsset.Add(b.Available - s.StopHedgeQuoteBalance - fixedpoint.NewFromFloat(s.sourceMarket.MinNotional))
+		if s.StopHedgeQuoteBalance > 0 {
+			if b.Available > (s.StopHedgeQuoteBalance + fixedpoint.NewFromFloat(s.sourceMarket.MinNotional)) {
+				hedgeQuota.QuoteAsset.Add(b.Available - s.StopHedgeQuoteBalance - fixedpoint.NewFromFloat(s.sourceMarket.MinNotional))
+			} else {
+				log.Warnf("%s maker ask disabled: insufficient quote balance %s", s.Symbol, b.String())
+				disableMakerAsk = true
+			}
 		} else if b.Available.Float64() > s.sourceMarket.MinNotional {
 			hedgeQuota.QuoteAsset.Add(b.Available)
 		} else {
