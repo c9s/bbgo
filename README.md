@@ -387,6 +387,16 @@ bbgo list-orders open --session=max --symbol=MAXUSDT
 bbgo list-orders open --session=binance --symbol=BNBUSDT
 ```
 
+### Canceling an open order
+
+```shell
+# both order id and symbol is required for okex
+bbgo cancel-order --session=okex --order-id=318223238325248000 --symbol=OKBUSDT
+
+# for max, you can just give your order id
+bbgo cancel-order --session=max --order-id=1234566
+```
+
 ## Dynamic Injection
 
 In order to minimize the strategy code, bbgo supports dynamic dependency injection.
