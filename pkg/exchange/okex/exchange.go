@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strconv"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
 	"github.com/c9s/bbgo/pkg/types"
@@ -141,25 +143,114 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 }
 
 func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
-	balanceSummaries, err := e.client.AccountBalances()
+	accountBalances, err := e.client.AccountBalances()
 	if err != nil {
 		return nil, err
 	}
 
-	var balanceMap = toGlobalBalance(balanceSummaries)
+	var balanceMap = toGlobalBalance(accountBalances)
 	return balanceMap, nil
 }
 
 func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error) {
-	panic("implement me")
+	var reqs []*okexapi.PlaceOrderRequest
+	for _, order := range orders {
+		orderReq := e.client.TradeService.NewPlaceOrderRequest()
+
+		orderType, err := toLocalOrderType(order.Type)
+		if err != nil {
+			return nil, err
+		}
+
+		orderReq.InstrumentID(toLocalSymbol(order.Symbol))
+		orderReq.Side(toLocalSideType(order.Side))
+
+		if len(order.QuantityString) > 0 {
+			orderReq.Quantity(order.QuantityString)
+		} else if order.Market.Symbol != "" {
+			orderReq.Quantity(order.Market.FormatQuantity(order.Quantity))
+		} else {
+			orderReq.Quantity(strconv.FormatFloat(order.Quantity, 'f', 8, 64))
+		}
+
+		// set price field for limit orders
+		switch order.Type {
+		case types.OrderTypeStopLimit, types.OrderTypeLimit:
+			if len(order.PriceString) > 0 {
+				orderReq.Price(order.PriceString)
+			} else if order.Market.Symbol != "" {
+				orderReq.Price(order.Market.FormatPrice(order.Price))
+			}
+		}
+
+		switch order.TimeInForce {
+		case "FOK":
+			orderReq.OrderType(okexapi.OrderTypeFOK)
+		case "IOC":
+			orderReq.OrderType(okexapi.OrderTypeIOC)
+		default:
+			orderReq.OrderType(orderType)
+		}
+
+		reqs = append(reqs, orderReq)
+	}
+
+	batchReq := e.client.TradeService.NewBatchPlaceOrderRequest()
+	batchReq.Add(reqs...)
+	orderHeads, err := batchReq.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	for idx, orderHead := range orderHeads {
+		orderID, err := strconv.ParseInt(orderHead.OrderID, 10, 64)
+		if err != nil {
+			return createdOrders, err
+		}
+
+		submitOrder := orders[idx]
+		createdOrders = append(createdOrders, types.Order{
+			SubmitOrder:      submitOrder,
+			Exchange:         types.ExchangeOKEx,
+			OrderID:          uint64(orderID),
+			Status:           types.OrderStatusNew,
+			ExecutedQuantity: 0,
+			IsWorking:        true,
+			CreationTime:     types.Time(time.Now()),
+			UpdateTime:       types.Time(time.Now()),
+			IsMargin:         false,
+			IsIsolated:       false,
+		})
+	}
+
+	return createdOrders, nil
 }
 
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
-	panic("implement me")
+	instrumentID := toLocalSymbol(symbol)
+	req := e.client.TradeService.NewGetPendingOrderRequest().InstrumentType(okexapi.InstrumentTypeSpot).InstrumentID(instrumentID)
+	orderDetails, err := req.Do(ctx)
+	if err != nil {
+		return orders, err
+	}
+
+	orders, err = toGlobalOrders(orderDetails)
+	return orders, err
 }
 
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) error {
-	panic("implement me")
+	var reqs []*okexapi.CancelOrderRequest
+	for _, order := range orders {
+		req := e.client.TradeService.NewCancelOrderRequest()
+		req.OrderID(strconv.FormatUint(order.OrderID, 10))
+		req.ClientOrderID(order.ClientOrderID)
+		reqs = append(reqs, req)
+	}
+
+	batchReq := e.client.TradeService.NewBatchCancelOrderRequest()
+	batchReq.Add(reqs...)
+	_, err := batchReq.Do(ctx)
+	return err
 }
 
 func (e *Exchange) NewStream() types.Stream {
@@ -167,5 +258,5 @@ func (e *Exchange) NewStream() types.Stream {
 }
 
 func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
-	panic("implement me")
+	return nil, nil
 }
