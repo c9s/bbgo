@@ -4,16 +4,40 @@ package okex
 
 import ()
 
-func (s *Stream) OnKline(cb func()) {
-	s.klineCallbacks = append(s.klineCallbacks, cb)
+func (s *Stream) OnCancelData(cb func()) {
+	s.cancelDataCallbacks = append(s.cancelDataCallbacks, cb)
 }
 
-func (s *Stream) EmitKline() {
-	for _, cb := range s.klineCallbacks {
+func (s *Stream) EmitCancelData() {
+	for _, cb := range s.cancelDataCallbacks {
 		cb()
 	}
 }
 
+func (s *Stream) OnBookData(cb func(data BookData)) {
+	s.bookDataCallbacks = append(s.bookDataCallbacks, cb)
+}
+
+func (s *Stream) EmitBookData(data BookData) {
+	for _, cb := range s.bookDataCallbacks {
+		cb(data)
+	}
+}
+
+func (s *Stream) OnEvent(cb func(event WebSocketEvent)) {
+	s.eventCallbacks = append(s.eventCallbacks, cb)
+}
+
+func (s *Stream) EmitEvent(event WebSocketEvent) {
+	for _, cb := range s.eventCallbacks {
+		cb(event)
+	}
+}
+
 type StreamEventHub interface {
-	OnKline(cb func())
+	OnCancelData(cb func())
+
+	OnBookData(cb func(data BookData))
+
+	OnEvent(cb func(event WebSocketEvent))
 }

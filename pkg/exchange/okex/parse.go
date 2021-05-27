@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
 	"github.com/valyala/fastjson"
 )
 
@@ -52,6 +53,22 @@ type BookData struct {
 	Asks                 []BookEntry
 	MillisecondTimestamp int64
 	Checksum             int
+}
+
+func (data *BookData) Book() types.SliceOrderBook {
+	book := types.SliceOrderBook{
+		Symbol: data.Symbol,
+	}
+
+	for _, bid := range data.Bids {
+		book.Bids = append(book.Bids, types.PriceVolume{Price: bid.Price, Volume: bid.Volume})
+	}
+
+	for _, ask := range data.Asks {
+		book.Asks = append(book.Asks, types.PriceVolume{Price: ask.Price, Volume: ask.Volume})
+	}
+
+	return book
 }
 
 type BookEntry struct {
