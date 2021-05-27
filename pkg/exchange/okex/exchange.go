@@ -9,6 +9,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -241,9 +242,17 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) error {
 	var reqs []*okexapi.CancelOrderRequest
 	for _, order := range orders {
+		if len(order.Symbol) == 0 {
+			return errors.New("symbol is required for canceling an okex order")
+		}
+
 		req := e.client.TradeService.NewCancelOrderRequest()
+		req.InstrumentID(toLocalSymbol(order.Symbol))
 		req.OrderID(strconv.FormatUint(order.OrderID, 10))
-		req.ClientOrderID(order.ClientOrderID)
+
+		if len(order.ClientOrderID) > 0 {
+			req.ClientOrderID(order.ClientOrderID)
+		}
 		reqs = append(reqs, req)
 	}
 

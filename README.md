@@ -278,7 +278,7 @@ const stateKey = "state-v1"
 var log = logrus.WithField("strategy", ID)
 
 func init() {
-    bbgo.RegisterStrategy(ID, &Strategy{})
+	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 ```
 
@@ -288,12 +288,12 @@ Implement the strategy methods:
 package newstrategy
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
-    session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "2m"})
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "2m"})
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-    // ....
-    return nil
+	// ....
+	return nil
 }
 ```
 
@@ -368,6 +368,23 @@ Or you can build your own wrapper binary via:
 
 ```shell
 bbgo build --config config/bbgo.yaml
+```
+
+## Command Usages
+
+### Submitting Orders to a specific exchagne session
+
+```shell
+bbgo submit-order --session=okex --symbol=OKBUSDT --side=buy --price=10.0 --quantity=1
+```
+
+### Listing Open Orders of a specific exchange session
+
+```sh
+bbgo list-orders open --session=okex --symbol=OKBUSDT
+bbgo list-orders open --session=ftx --symbol=FTTUSDT
+bbgo list-orders open --session=max --symbol=MAXUSDT
+bbgo list-orders open --session=binance --symbol=BNBUSDT
 ```
 
 ## Dynamic Injection
