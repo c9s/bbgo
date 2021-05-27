@@ -84,13 +84,13 @@ func (s *Stream) Connect(ctx context.Context) error {
 	}
 
 	// start one re-connector goroutine with the base context
-	go s.reconnector(ctx)
+	go s.Reconnector(ctx)
 
 	s.EmitStart()
 	return nil
 }
 
-func (s *Stream) reconnector(ctx context.Context) {
+func (s *Stream) Reconnector(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
