@@ -101,6 +101,10 @@ func convertSubscription(s types.Subscription) (WebsocketSubscription, error) {
 	return WebsocketSubscription{}, fmt.Errorf("unsupported public stream channel %s", s.Channel)
 }
 
+func toLocalSideType(side types.SideType) okexapi.SideType {
+	return okexapi.SideType(strings.ToLower(string(side)))
+}
+
 func segmentOrderDetails(orderDetails []okexapi.OrderDetails) (trades, orders []okexapi.OrderDetails) {
 	for _, orderDetail := range orderDetails {
 		if len(orderDetail.LastTradeID) > 0 {
@@ -225,6 +229,22 @@ func toGlobalOrderStatus(state okexapi.OrderState) (types.OrderStatus, error) {
 	}
 
 	return "", fmt.Errorf("unknown or unsupported okex order state: %s", state)
+}
+
+func toLocalOrderType(orderType types.OrderType) (okexapi.OrderType, error) {
+	switch orderType {
+	case types.OrderTypeMarket:
+		return okexapi.OrderTypeMarket, nil
+
+	case types.OrderTypeLimit:
+		return okexapi.OrderTypeLimit, nil
+
+	case types.OrderTypeLimitMaker:
+		return okexapi.OrderTypePostOnly, nil
+
+	}
+
+	return "", fmt.Errorf("unknown or unsupported okex order type: %s", orderType)
 }
 
 func toGlobalOrderType(orderType okexapi.OrderType) (types.OrderType, error) {
