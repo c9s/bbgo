@@ -474,7 +474,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		}
 
 		book := types.NewStreamBook(s.Symbol)
-		book.BindStream(session.UserDataStream)
+		book.BindStream(session.MarketDataStream)
 		s.books[sessionID] = book
 
 		session.UserDataStream.OnTradeUpdate(s.handleTradeUpdate)
