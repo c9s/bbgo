@@ -126,7 +126,7 @@ func (e *Exchange) PlatformFeeCurrency() string {
 }
 
 func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
-	balanceSummaries, err := e.client.AccountBalances()
+	accountBalance, err := e.client.AccountBalances()
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +135,7 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 		AccountType: "SPOT",
 	}
 
-	var balanceMap = toGlobalBalance(balanceSummaries)
+	var balanceMap = toGlobalBalance(accountBalance)
 	account.UpdateBalances(balanceMap)
 	return &account, nil
 }

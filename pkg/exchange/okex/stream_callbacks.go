@@ -2,7 +2,9 @@
 
 package okex
 
-import ()
+import (
+	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
+)
 
 func (s *Stream) OnCandleData(cb func(candle Candle)) {
 	s.candleDataCallbacks = append(s.candleDataCallbacks, cb)
@@ -34,10 +36,22 @@ func (s *Stream) EmitEvent(event WebSocketEvent) {
 	}
 }
 
+func (s *Stream) OnAccount(cb func(account okexapi.Account)) {
+	s.accountCallbacks = append(s.accountCallbacks, cb)
+}
+
+func (s *Stream) EmitAccount(account okexapi.Account) {
+	for _, cb := range s.accountCallbacks {
+		cb(account)
+	}
+}
+
 type StreamEventHub interface {
 	OnCandleData(cb func(candle Candle))
 
 	OnBookData(cb func(book BookData))
 
 	OnEvent(cb func(event WebSocketEvent))
+
+	OnAccount(cb func(account okexapi.Account))
 }

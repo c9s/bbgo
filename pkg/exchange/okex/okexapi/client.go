@@ -205,15 +205,13 @@ type BalanceDetail struct {
 	UnrealizedProfitAndLoss fixedpoint.Value           `json:"upl"`
 }
 
-type BalanceSummary struct {
+type Account struct {
 	TotalEquityInUSD fixedpoint.Value `json:"totalEq"`
 	UpdateTime       string           `json:"uTime"`
 	Details          []BalanceDetail  `json:"details"`
 }
 
-type BalanceSummaryList []BalanceSummary
-
-func (c *RestClient) AccountBalances() (BalanceSummaryList, error) {
+func (c *RestClient) AccountBalances() (*Account, error) {
 	req, err := c.newAuthenticatedRequest("GET", "/api/v5/account/balance", nil, nil)
 	if err != nil {
 		return nil, err
@@ -225,15 +223,20 @@ func (c *RestClient) AccountBalances() (BalanceSummaryList, error) {
 	}
 
 	var balanceResponse struct {
-		Code    string           `json:"code"`
-		Message string           `json:"msg"`
-		Data    []BalanceSummary `json:"data"`
+		Code    string    `json:"code"`
+		Message string    `json:"msg"`
+		Data    []Account `json:"data"`
 	}
+
 	if err := response.DecodeJSON(&balanceResponse); err != nil {
 		return nil, err
 	}
 
-	return balanceResponse.Data, nil
+	if len(balanceResponse.Data) == 0 {
+		return nil, errors.New("empty account data")
+	}
+
+	return &balanceResponse.Data[0], nil
 }
 
 type AssetBalance struct {

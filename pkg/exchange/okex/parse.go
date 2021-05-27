@@ -1,12 +1,14 @@
 package okex
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/valyala/fastjson"
@@ -113,7 +115,8 @@ func parseBookEntry(v *fastjson.Value) (*BookEntry, error) {
 	}, nil
 }
 
-func parseBookData(instrumentId string, v *fastjson.Value) (*BookData, error) {
+func parseBookData(v *fastjson.Value) (*BookData, error) {
+	instrumentId := string(v.GetStringBytes("arg", "instId"))
 	data := v.GetArray("data")
 	if len(data) == 0 {
 		return nil, errors.New("empty data payload")
@@ -198,7 +201,8 @@ func (c *Candle) KLine() types.KLine {
 	}
 }
 
-func parseCandle(channel, instrumentID string, v *fastjson.Value) (*Candle, error) {
+func parseCandle(channel string, v *fastjson.Value) (*Candle, error) {
+	instrumentID := string(v.GetStringBytes("arg", "instId"))
 	data, err := v.Get("data").Array()
 	if err != nil {
 		return nil, err
@@ -271,17 +275,36 @@ func parseCandle(channel, instrumentID string, v *fastjson.Value) (*Candle, erro
 	}, nil
 }
 
+func parseAccount(v *fastjson.Value) (*okexapi.Account, error) {
+	data := v.Get("data").MarshalTo(nil)
+
+	var accounts []okexapi.Account
+	err := json.Unmarshal(data, &accounts)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(accounts) == 0 {
+		return nil, errors.New("empty account data")
+	}
+
+	return &accounts[0], nil
+}
+
 func parseData(v *fastjson.Value) (interface{}, error) {
-	instrumentId := string(v.GetStringBytes("arg", "instId"))
+
 	channel := string(v.GetStringBytes("arg", "channel"))
 
 	switch channel {
 	case "books":
-		return parseBookData(instrumentId, v)
+		return parseBookData(v)
+
+	case "account":
+		return parseAccount(v)
 
 	default:
 		if strings.HasPrefix(channel, "candle") {
-			return parseCandle(channel, instrumentId, v)
+			return parseCandle(channel, v)
 		}
 
 	}
