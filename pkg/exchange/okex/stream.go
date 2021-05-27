@@ -32,6 +32,13 @@ type Stream struct {
 	candleDataCallbacks []func(candle Candle)
 	bookDataCallbacks   []func(book BookData)
 	eventCallbacks      []func(event WebSocketEvent)
+
+	lastCandle map[CandleKey]Candle
+}
+
+type CandleKey struct {
+	InstrumentID string
+	Channel      string
 }
 
 func NewStream(client *okexapi.RestClient) *Stream {
@@ -40,11 +47,23 @@ func NewStream(client *okexapi.RestClient) *Stream {
 		StandardStream: types.StandardStream{
 			ReconnectC: make(chan struct{}, 1),
 		},
+		lastCandle: make(map[CandleKey]Candle),
 	}
 
 	stream.OnCandleData(func(candle Candle) {
+		key := CandleKey{Channel: candle.Channel, InstrumentID: candle.InstrumentID}
 		kline := candle.KLine()
+
+		// check if we need to close previous kline
+		lastCandle, ok := stream.lastCandle[key]
+		if ok && candle.StartTime.After(lastCandle.StartTime) {
+			lastKline := lastCandle.KLine()
+			lastKline.Closed = true
+			stream.EmitKLineClosed(lastKline)
+		}
+
 		stream.EmitKLine(kline)
+		stream.lastCandle[key] = candle
 	})
 
 	stream.OnBookData(func(data BookData) {
@@ -186,13 +205,11 @@ func (s *Stream) read(ctx context.Context) {
 			return
 
 		default:
-			s.connLock.Lock()
 			if err := s.Conn.SetReadDeadline(time.Now().Add(30 * time.Second)); err != nil {
 				log.WithError(err).Errorf("set read deadline error: %s", err.Error())
 			}
 
 			mt, message, err := s.Conn.ReadMessage()
-			s.connLock.Unlock()
 
 			if err != nil {
 				// if it's a network timeout error, we should re-connect
@@ -232,8 +249,6 @@ func (s *Stream) read(ctx context.Context) {
 			}
 
 			if e != nil {
-				log.Infof("%+v", e)
-
 				switch et := e.(type) {
 				case *WebSocketEvent:
 					s.EmitEvent(*et)
