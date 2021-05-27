@@ -743,17 +743,17 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	}
 
 	s.book = types.NewStreamBook(s.Symbol)
-	s.book.BindStream(s.sourceSession.Stream)
+	s.book.BindStream(s.sourceSession.UserDataStream)
 
-	s.sourceSession.Stream.OnTradeUpdate(s.handleTradeUpdate)
-	s.makerSession.Stream.OnTradeUpdate(s.handleTradeUpdate)
+	s.sourceSession.UserDataStream.OnTradeUpdate(s.handleTradeUpdate)
+	s.makerSession.UserDataStream.OnTradeUpdate(s.handleTradeUpdate)
 
 	s.activeMakerOrders = bbgo.NewLocalActiveOrderBook()
-	s.activeMakerOrders.BindStream(s.makerSession.Stream)
+	s.activeMakerOrders.BindStream(s.makerSession.UserDataStream)
 
 	s.orderStore = bbgo.NewOrderStore(s.Symbol)
-	s.orderStore.BindStream(s.sourceSession.Stream)
-	s.orderStore.BindStream(s.makerSession.Stream)
+	s.orderStore.BindStream(s.sourceSession.UserDataStream)
+	s.orderStore.BindStream(s.makerSession.UserDataStream)
 
 	s.stopC = make(chan struct{})
 

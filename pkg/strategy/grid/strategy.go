@@ -552,12 +552,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.Notify("current position %+v", s.state.Position)
 
 	s.orderStore = bbgo.NewOrderStore(s.Symbol)
-	s.orderStore.BindStream(session.Stream)
+	s.orderStore.BindStream(session.UserDataStream)
 
 	// we don't persist orders so that we can not clear the previous orders for now. just need time to support this.
 	s.activeOrders = bbgo.NewLocalActiveOrderBook()
 	s.activeOrders.OnFilled(s.handleFilledOrder)
-	s.activeOrders.BindStream(session.Stream)
+	s.activeOrders.BindStream(session.UserDataStream)
 
 	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
@@ -579,9 +579,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 	})
 
-	session.Stream.OnTradeUpdate(s.tradeUpdateHandler)
+	session.UserDataStream.OnTradeUpdate(s.tradeUpdateHandler)
 
-	session.Stream.OnStart(func() {
+	session.UserDataStream.OnStart(func() {
 		if stateLoaded && len(s.state.Orders) > 0 {
 			createdOrders, err := orderExecutor.SubmitOrders(ctx, s.state.Orders...)
 			if err != nil {
@@ -595,7 +595,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 
 	if s.CatchUp {
-		session.Stream.OnKLineClosed(func(kline types.KLine) {
+		session.UserDataStream.OnKLineClosed(func(kline types.KLine) {
 			log.Infof("catchUp mode is enabled, updating grid orders...")
 			// update grid
 			s.placeGridOrders(orderExecutor, session)

@@ -335,20 +335,20 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	}, 2.0)
 
 	s.orders = bbgo.NewOrderStore(s.Symbol)
-	s.orders.BindStream(session.Stream)
+	s.orders.BindStream(session.UserDataStream)
 
 	// we don't persist orders so that we can not clear the previous orders for now. just need time to support this.
 	s.activeOrders = bbgo.NewLocalActiveOrderBook()
 	s.activeOrders.OnFilled(func(o types.Order) {
 		s.submitReverseOrder(o, session)
 	})
-	s.activeOrders.BindStream(session.Stream)
+	s.activeOrders.BindStream(session.UserDataStream)
 
 	s.profitOrders = bbgo.NewLocalActiveOrderBook()
 	s.profitOrders.OnFilled(func(o types.Order) {
 		// we made profit here!
 	})
-	s.profitOrders.BindStream(session.Stream)
+	s.profitOrders.BindStream(session.UserDataStream)
 
 	// setup graceful shutting down handler
 	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
@@ -370,13 +370,13 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 	})
 
-	session.Stream.OnStart(func() {
+	session.UserDataStream.OnStart(func() {
 		log.Infof("connected, submitting the first round of the orders")
 		s.updateOrders(orderExecutor, session)
 	})
 
 	// avoid using time ticker since we will need back testing here
-	session.Stream.OnKLineClosed(func(kline types.KLine) {
+	session.UserDataStream.OnKLineClosed(func(kline types.KLine) {
 		// skip kline events that does not belong to this symbol
 		if kline.Symbol != s.Symbol {
 			log.Infof("%s != %s", kline.Symbol, s.Symbol)

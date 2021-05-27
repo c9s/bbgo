@@ -83,7 +83,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	var iw = types.IntervalWindow{Interval: s.Interval, Window: s.MovingAverageWindow}
 	var ema = standardIndicatorSet.EWMA(iw)
 
-	session.Stream.OnKLineClosed(func(kline types.KLine) {
+	session.UserDataStream.OnKLineClosed(func(kline types.KLine) {
 		// skip k-lines from other symbols
 		if kline.Symbol != s.Symbol {
 			return

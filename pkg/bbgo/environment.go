@@ -254,7 +254,7 @@ func InitExchangeSession(name string, session *ExchangeSession) error {
 		ObjectChannelRouter:  NewObjectChannelRouter(),
 	}
 	session.Exchange = exchange
-	session.Stream = exchange.NewStream()
+	session.UserDataStream = exchange.NewStream()
 
 	// pointer fields
 	session.Subscriptions = make(map[types.Subscription]types.Subscription)
@@ -367,11 +367,11 @@ func (environ *Environment) ConfigureNotificationRouting(conf *NotificationConfi
 				// if we can route session name to channel successfully...
 				channel, ok := environ.SessionChannelRouter.Route(name)
 				if ok {
-					session.Stream.OnTradeUpdate(func(trade types.Trade) {
+					session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
 						environ.NotifyTo(channel, &trade)
 					})
 				} else {
-					session.Stream.OnTradeUpdate(defaultTradeUpdateHandler)
+					session.UserDataStream.OnTradeUpdate(defaultTradeUpdateHandler)
 				}
 			}
 
@@ -396,7 +396,7 @@ func (environ *Environment) ConfigureNotificationRouting(conf *NotificationConfi
 				}
 			}
 			for _, session := range environ.sessions {
-				session.Stream.OnTradeUpdate(handler)
+				session.UserDataStream.OnTradeUpdate(handler)
 			}
 		}
 
@@ -415,12 +415,12 @@ func (environ *Environment) ConfigureNotificationRouting(conf *NotificationConfi
 				// if we can route session name to channel successfully...
 				channel, ok := environ.SessionChannelRouter.Route(name)
 				if ok {
-					session.Stream.OnOrderUpdate(func(order types.Order) {
+					session.UserDataStream.OnOrderUpdate(func(order types.Order) {
 						text := util.Render(TemplateOrderReport, order)
 						environ.NotifyTo(channel, text, &order)
 					})
 				} else {
-					session.Stream.OnOrderUpdate(defaultOrderUpdateHandler)
+					session.UserDataStream.OnOrderUpdate(defaultOrderUpdateHandler)
 				}
 			}
 
@@ -446,7 +446,7 @@ func (environ *Environment) ConfigureNotificationRouting(conf *NotificationConfi
 				}
 			}
 			for _, session := range environ.sessions {
-				session.Stream.OnOrderUpdate(handler)
+				session.UserDataStream.OnOrderUpdate(handler)
 			}
 		}
 
@@ -508,12 +508,12 @@ func (environ *Environment) Connect(ctx context.Context) error {
 			// add the subscribe requests to the stream
 			for _, s := range session.Subscriptions {
 				logger.Infof("subscribing %s %s %v", s.Symbol, s.Channel, s.Options)
-				session.Stream.Subscribe(s.Channel, s.Symbol, s.Options)
+				session.UserDataStream.Subscribe(s.Channel, s.Symbol, s.Options)
 			}
 		}
 
 		logger.Infof("connecting session %s...", session.Name)
-		if err := session.Stream.Connect(ctx); err != nil {
+		if err := session.UserDataStream.Connect(ctx); err != nil {
 			return err
 		}
 	}
