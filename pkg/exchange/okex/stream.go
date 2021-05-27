@@ -29,8 +29,8 @@ type Stream struct {
 	publicOnly bool
 
 	// public callbacks
-	cancelDataCallbacks []func()
-	bookDataCallbacks   []func(data BookData)
+	candleDataCallbacks []func(candle Candle)
+	bookDataCallbacks   []func(book BookData)
 	eventCallbacks      []func(event WebSocketEvent)
 }
 
@@ -41,6 +41,11 @@ func NewStream(client *okexapi.RestClient) *Stream {
 			ReconnectC: make(chan struct{}, 1),
 		},
 	}
+
+	stream.OnCandleData(func(candle Candle) {
+		kline := candle.KLine()
+		stream.EmitKLine(kline)
+	})
 
 	stream.OnBookData(func(data BookData) {
 		book := data.Book()
@@ -182,7 +187,7 @@ func (s *Stream) read(ctx context.Context) {
 
 		default:
 			s.connLock.Lock()
-			if err := s.Conn.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
+			if err := s.Conn.SetReadDeadline(time.Now().Add(30 * time.Second)); err != nil {
 				log.WithError(err).Errorf("set read deadline error: %s", err.Error())
 			}
 
@@ -235,6 +240,9 @@ func (s *Stream) read(ctx context.Context) {
 
 				case *BookData:
 					s.EmitBookData(*et)
+
+				case *Candle:
+					s.EmitCandleData(*et)
 				}
 			}
 		}

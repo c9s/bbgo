@@ -110,7 +110,7 @@ func parseBookEntry(v *fastjson.Value) (*BookEntry, error) {
 	}, nil
 }
 
-func parseBookData(instrumentId string, v *fastjson.Value) (interface{}, error) {
+func parseBookData(instrumentId string, v *fastjson.Value) (*BookData, error) {
 	data := v.GetArray("data")
 	if len(data) == 0 {
 		return nil, errors.New("empty data payload")
@@ -178,17 +178,40 @@ type Candle struct {
 
 	MillisecondTimestamp int64
 
-	Time time.Time
+	StartTime time.Time
 }
 
-func parseCandle(channel, instrumentID string, v *fastjson.Value) (interface{}, error) {
-	arr, err := v.Array()
+func (c *Candle) KLine() types.KLine {
+	interval := types.Interval(c.Interval)
+	endTime := c.StartTime.Add(interval.Duration() - 1*time.Millisecond)
+	return types.KLine{
+		Interval:  interval,
+		Open:      c.Open.Float64(),
+		High:      c.High.Float64(),
+		Low:       c.Low.Float64(),
+		Close:     c.Close.Float64(),
+		StartTime: c.StartTime,
+		EndTime:   endTime,
+	}
+}
+
+func parseCandle(channel, instrumentID string, v *fastjson.Value) (*Candle, error) {
+	data, err := v.Get("data").Array()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(data) == 0 {
+		return nil, errors.New("candle data is empty")
+	}
+
+	arr, err := data[0].Array()
 	if err != nil {
 		return nil, err
 	}
 
 	if len(arr) < 7 {
-		return nil, fmt.Errorf("unexpected data array length: %d", len(arr))
+		return nil, fmt.Errorf("unexpected candle data length: %d", len(arr))
 	}
 
 	interval := strings.ToLower(strings.TrimPrefix(channel, "candle"))
@@ -241,7 +264,7 @@ func parseCandle(channel, instrumentID string, v *fastjson.Value) (interface{}, 
 		Volume:               vol,
 		VolumeInCurrency:     volCurrency,
 		MillisecondTimestamp: timestamp,
-		Time:                 candleTime,
+		StartTime:            candleTime,
 	}, nil
 }
 
@@ -256,7 +279,6 @@ func parseData(v *fastjson.Value) (interface{}, error) {
 	default:
 		if strings.HasPrefix(channel, "candle") {
 			return parseCandle(channel, instrumentId, v)
-
 		}
 
 	}

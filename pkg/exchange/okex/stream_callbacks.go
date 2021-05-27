@@ -4,23 +4,23 @@ package okex
 
 import ()
 
-func (s *Stream) OnCancelData(cb func()) {
-	s.cancelDataCallbacks = append(s.cancelDataCallbacks, cb)
+func (s *Stream) OnCandleData(cb func(candle Candle)) {
+	s.candleDataCallbacks = append(s.candleDataCallbacks, cb)
 }
 
-func (s *Stream) EmitCancelData() {
-	for _, cb := range s.cancelDataCallbacks {
-		cb()
+func (s *Stream) EmitCandleData(candle Candle) {
+	for _, cb := range s.candleDataCallbacks {
+		cb(candle)
 	}
 }
 
-func (s *Stream) OnBookData(cb func(data BookData)) {
+func (s *Stream) OnBookData(cb func(book BookData)) {
 	s.bookDataCallbacks = append(s.bookDataCallbacks, cb)
 }
 
-func (s *Stream) EmitBookData(data BookData) {
+func (s *Stream) EmitBookData(book BookData) {
 	for _, cb := range s.bookDataCallbacks {
-		cb(data)
+		cb(book)
 	}
 }
 
@@ -35,9 +35,9 @@ func (s *Stream) EmitEvent(event WebSocketEvent) {
 }
 
 type StreamEventHub interface {
-	OnCancelData(cb func())
+	OnCandleData(cb func(candle Candle))
 
-	OnBookData(cb func(data BookData))
+	OnBookData(cb func(book BookData))
 
 	OnEvent(cb func(event WebSocketEvent))
 }
