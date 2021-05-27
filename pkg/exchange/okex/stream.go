@@ -3,6 +3,7 @@ package okex
 import (
 	"context"
 	"net"
+	"strconv"
 	"sync"
 	"time"
 
@@ -14,6 +15,13 @@ import (
 type WebsocketOp struct {
 	Op   string      `json:"op"`
 	Args interface{} `json:"args"`
+}
+
+type WebsocketLogin struct {
+	Key        string `json:"apiKey"`
+	Passphrase string `json:"passphrase"`
+	Timestamp  string `json:"timestamp"`
+	Sign       string `json:"sign"`
 }
 
 //go:generate callbackgen -type Stream -interface
@@ -76,30 +84,78 @@ func NewStream(client *okexapi.RestClient) *Stream {
 		}
 	})
 
+	stream.OnEvent(func(event WebSocketEvent) {
+		log.Infof("event: %+v", event)
+		switch event.Event {
+		case "login":
+			if event.Code == "0" {
+				var subs = []WebsocketSubscription{
+					{Channel: "account"},
+					{Channel: "orders", InstrumentType: string(okexapi.InstrumentTypeSpot)},
+				}
+
+				log.Infof("subscribing private channels: %+v", subs)
+				err := stream.Conn.WriteJSON(WebsocketOp{
+					Op:   "subscribe",
+					Args: subs,
+				})
+
+				if err != nil {
+					log.WithError(err).Error("private channel subscribe error")
+				}
+			}
+		}
+	})
+
 	stream.OnConnect(func() {
-		var subs []WebsocketSubscription
-		for _, subscription := range stream.Subscriptions {
-			sub, err := convertSubscription(subscription)
-			if err != nil {
-				log.WithError(err).Errorf("subscription convert error")
-				continue
+		if stream.publicOnly {
+			var subs []WebsocketSubscription
+			for _, subscription := range stream.Subscriptions {
+				sub, err := convertSubscription(subscription)
+				if err != nil {
+					log.WithError(err).Errorf("subscription convert error")
+					continue
+				}
+
+				subs = append(subs, sub)
+			}
+			if len(subs) == 0 {
+				return
 			}
 
-			subs = append(subs, sub)
-		}
+			log.Infof("subscribing channels: %+v", subs)
+			err := stream.Conn.WriteJSON(WebsocketOp{
+				Op:   "subscribe",
+				Args: subs,
+			})
 
-		if len(subs) == 0 {
-			return
-		}
+			if err != nil {
+				log.WithError(err).Error("subscribe error")
+			}
+		} else {
+			// login as private channel
+			// sign example:
+			// sign=CryptoJS.enc.Base64.Stringify(CryptoJS.HmacSHA256(timestamp +'GET'+'/users/self/verify', secretKey))
+			msTimestamp := strconv.FormatFloat(float64(time.Now().UnixNano())/float64(time.Second), 'f', -1, 64)
+			payload := msTimestamp + "GET" + "/users/self/verify"
+			sign := okexapi.Sign(payload, stream.Client.Secret)
+			op := WebsocketOp{
+				Op: "login",
+				Args: []WebsocketLogin{
+					{
+						Key:        stream.Client.Key,
+						Passphrase: stream.Client.Passphrase,
+						Timestamp:  msTimestamp,
+						Sign:       sign,
+					},
+				},
+			}
 
-		log.Infof("subscribing channels: %+v", subs)
-		err := stream.Conn.WriteJSON(WebsocketOp{
-			Op:   "subscribe",
-			Args: subs,
-		})
-
-		if err != nil {
-			log.WithError(err).Error("subscribe error")
+			log.Infof("sending login request: %+v", op)
+			err := stream.Conn.WriteJSON(op)
+			if err != nil {
+				log.WithError(err).Errorf("can not send login message")
+			}
 		}
 	})
 
@@ -210,7 +266,6 @@ func (s *Stream) read(ctx context.Context) {
 			}
 
 			mt, message, err := s.Conn.ReadMessage()
-
 			if err != nil {
 				// if it's a network timeout error, we should re-connect
 				switch err := err.(type) {

@@ -52,7 +52,8 @@ func toGlobalBalance(balanceSummaries []okexapi.BalanceSummary) types.BalanceMap
 
 type WebsocketSubscription struct {
 	Channel      string `json:"channel"`
-	InstrumentID string `json:"instId"`
+	InstrumentID string `json:"instId,omitempty"`
+	InstrumentType string `json:"instType,omitempty"`
 }
 
 var CandleChannels = []string{
