@@ -42,11 +42,10 @@ type Stream struct {
 
 	types.StandardStream
 
-	Client     *binance.Client
-	ListenKey  string
-	Conn       *websocket.Conn
-	connLock   sync.Mutex
-	reconnectC chan struct{}
+	Client    *binance.Client
+	ListenKey string
+	Conn      *websocket.Conn
+	ConnLock  sync.Mutex
 
 	connCtx    context.Context
 	connCancel context.CancelFunc
@@ -68,9 +67,11 @@ type Stream struct {
 
 func NewStream(client *binance.Client) *Stream {
 	stream := &Stream{
+		StandardStream: types.StandardStream{
+			ReconnectC: make(chan struct{}, 1),
+		},
 		Client:      client,
 		depthFrames: make(map[string]*DepthFrame),
-		reconnectC:  make(chan struct{}, 1),
 	}
 
 	stream.OnDepthEvent(func(e *DepthEvent) {
@@ -274,13 +275,6 @@ func (s *Stream) keepaliveListenKey(ctx context.Context, listenKey string) error
 	return s.Client.NewKeepaliveUserStreamService().ListenKey(listenKey).Do(ctx)
 }
 
-func (s *Stream) emitReconnect() {
-	select {
-	case s.reconnectC <- struct{}{}:
-	default:
-	}
-}
-
 func (s *Stream) Connect(ctx context.Context) error {
 	err := s.connect(ctx)
 	if err != nil {
@@ -300,7 +294,7 @@ func (s *Stream) reconnector(ctx context.Context) {
 		case <-ctx.Done():
 			return
 
-		case <-s.reconnectC:
+		case <-s.ReconnectC:
 			// ensure the previous context is cancelled
 			if s.connCancel != nil {
 				s.connCancel()
@@ -311,7 +305,7 @@ func (s *Stream) reconnector(ctx context.Context) {
 
 			if err := s.connect(ctx); err != nil {
 				log.WithError(err).Errorf("connect error, try to reconnect again...")
-				s.emitReconnect()
+				s.Reconnect()
 			}
 		}
 	}
@@ -319,7 +313,7 @@ func (s *Stream) reconnector(ctx context.Context) {
 
 func (s *Stream) connect(ctx context.Context) error {
 	// should only start one connection one time, so we lock the mutex
-	s.connLock.Lock()
+	s.ConnLock.Lock()
 
 	// create a new context
 	s.connCtx, s.connCancel = context.WithCancel(ctx)
@@ -332,7 +326,7 @@ func (s *Stream) connect(ctx context.Context) error {
 		listenKey, err := s.fetchListenKey(ctx)
 		if err != nil {
 			s.connCancel()
-			s.connLock.Unlock()
+			s.ConnLock.Unlock()
 			return err
 		}
 
@@ -346,14 +340,14 @@ func (s *Stream) connect(ctx context.Context) error {
 	conn, err := s.dial(s.ListenKey)
 	if err != nil {
 		s.connCancel()
-		s.connLock.Unlock()
+		s.ConnLock.Unlock()
 		return err
 	}
 
 	log.Infof("websocket connected")
 
 	s.Conn = conn
-	s.connLock.Unlock()
+	s.ConnLock.Unlock()
 
 	s.EmitConnect()
 
@@ -374,12 +368,12 @@ func (s *Stream) ping(ctx context.Context) {
 			return
 
 		case <-pingTicker.C:
-			s.connLock.Lock()
+			s.ConnLock.Lock()
 			if err := s.Conn.WriteControl(websocket.PingMessage, []byte("hb"), time.Now().Add(3*time.Second)); err != nil {
 				log.WithError(err).Error("ping error", err)
-				s.emitReconnect()
+				s.Reconnect()
 			}
-			s.connLock.Unlock()
+			s.ConnLock.Unlock()
 		}
 	}
 }
@@ -405,7 +399,7 @@ func (s *Stream) listenKeyKeepAlive(ctx context.Context, listenKey string) {
 		case <-keepAliveTicker.C:
 			if err := s.keepaliveListenKey(ctx, listenKey); err != nil {
 				log.WithError(err).Errorf("listen key keep-alive error: %v key: %s", err, maskListenKey(listenKey))
-				s.emitReconnect()
+				s.Reconnect()
 				return
 			}
 
@@ -428,13 +422,13 @@ func (s *Stream) read(ctx context.Context) {
 			return
 
 		default:
-			s.connLock.Lock()
+			s.ConnLock.Lock()
 			if err := s.Conn.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
 				log.WithError(err).Errorf("set read deadline error: %s", err.Error())
 			}
 
 			mt, message, err := s.Conn.ReadMessage()
-			s.connLock.Unlock()
+			s.ConnLock.Unlock()
 
 			if err != nil {
 				// if it's a network timeout error, we should re-connect
@@ -448,17 +442,17 @@ func (s *Stream) read(ctx context.Context) {
 
 					// for unexpected close error, we should re-connect
 					// emit reconnect to start a new connection
-					s.emitReconnect()
+					s.Reconnect()
 					return
 
 				case net.Error:
 					log.WithError(err).Error("network error")
-					s.emitReconnect()
+					s.Reconnect()
 					return
 
 				default:
 					log.WithError(err).Error("unexpected connection error")
-					s.emitReconnect()
+					s.Reconnect()
 					return
 				}
 			}
@@ -538,9 +532,9 @@ func (s *Stream) Close() error {
 		s.connCancel()
 	}
 
-	s.connLock.Lock()
+	s.ConnLock.Lock()
 	err := s.Conn.Close()
-	s.connLock.Unlock()
+	s.ConnLock.Unlock()
 	return err
 }
 
