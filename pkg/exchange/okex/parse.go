@@ -30,20 +30,23 @@ func Parse(str string) (interface{}, error) {
 }
 
 type WebSocketEvent struct {
-	Event   string
-	Code    string
-	Message string
+	Event   string      `json:"event"`
+	Code    string      `json:"code,omitempty"`
+	Message string      `json:"msg,omitempty"`
+	Arg     interface{} `json:"arg,omitempty"`
 }
 
 func parseEvent(v *fastjson.Value) (*WebSocketEvent, error) {
 	// event could be "subscribe", "unsubscribe" or "error"
 	event := string(v.GetStringBytes("event"))
 	code := string(v.GetStringBytes("code"))
-	message := string(v.GetStringBytes("message"))
+	message := string(v.GetStringBytes("msg"))
+	arg := v.GetObject("arg")
 	return &WebSocketEvent{
 		Event:   event,
 		Code:    code,
 		Message: message,
+		Arg:     arg,
 	}, nil
 }
 
