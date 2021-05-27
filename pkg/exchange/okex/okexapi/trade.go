@@ -261,7 +261,7 @@ func (r *BatchCancelOrderRequest) Add(reqs ...*CancelOrderRequest) *BatchCancelO
 	return r
 }
 
-func (r *BatchCancelOrderRequest) Do(ctx context.Context) (*OrderResponse, error) {
+func (r *BatchCancelOrderRequest) Do(ctx context.Context) ([]OrderResponse, error) {
 	var parameterList []map[string]interface{}
 
 	for _, req := range r.reqs {
@@ -288,11 +288,7 @@ func (r *BatchCancelOrderRequest) Do(ctx context.Context) (*OrderResponse, error
 		return nil, err
 	}
 
-	if len(orderResponse.Data) == 0 {
-		return nil, errors.New("order create error")
-	}
-
-	return &orderResponse.Data[0], nil
+	return orderResponse.Data, nil
 }
 
 type BatchPlaceOrderRequest struct {

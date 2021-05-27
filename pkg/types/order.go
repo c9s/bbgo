@@ -169,7 +169,7 @@ func (o Order) Backup() SubmitOrder {
 }
 
 func (o Order) String() string {
-	return fmt.Sprintf("ORDER %s %s %s %f/%f @ %f -> %s", o.Exchange.String(), o.Symbol, o.Side, o.ExecutedQuantity, o.Quantity, o.Price, o.Status)
+	return fmt.Sprintf("ORDER %s %d %s %s %f/%f @ %f -> %s", o.Exchange.String(), o.OrderID, o.Symbol, o.Side, o.ExecutedQuantity, o.Quantity, o.Price, o.Status)
 }
 
 // PlainText is used for telegram-styled messages
