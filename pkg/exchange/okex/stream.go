@@ -40,6 +40,7 @@ type Stream struct {
 	candleDataCallbacks []func(candle Candle)
 	bookDataCallbacks   []func(book BookData)
 	eventCallbacks      []func(event WebSocketEvent)
+	accountCallbacks    []func(account okexapi.Account)
 
 	lastCandle map[CandleKey]Candle
 }
@@ -82,6 +83,11 @@ func NewStream(client *okexapi.RestClient) *Stream {
 		case "update":
 			stream.EmitBookUpdate(book)
 		}
+	})
+
+	stream.OnAccount(func(account okexapi.Account) {
+		balances := toGlobalBalance(&account)
+		stream.EmitBalanceSnapshot(balances)
 	})
 
 	stream.OnEvent(func(event WebSocketEvent) {
@@ -313,6 +319,10 @@ func (s *Stream) read(ctx context.Context) {
 
 				case *Candle:
 					s.EmitCandleData(*et)
+
+				case *okexapi.Account:
+					s.EmitAccount(*et)
+
 				}
 			}
 		}
