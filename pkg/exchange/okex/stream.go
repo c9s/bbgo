@@ -113,16 +113,6 @@ func (s *Stream) Reconnector(ctx context.Context) {
 	}
 }
 
-func (s *Stream) dial() (*websocket.Conn, error) {
-	var url string
-	if s.publicOnly {
-		url = okexapi.PublicWebSocketURL
-	} else {
-		url = okexapi.PrivateWebSocketURL
-	}
-	return s.StandardStream.Dial(url)
-}
-
 func (s *Stream) connect(ctx context.Context) error {
 	// should only start one connection one time, so we lock the mutex
 	s.connLock.Lock()
@@ -137,7 +127,14 @@ func (s *Stream) connect(ctx context.Context) error {
 	}
 
 	// when in public mode, the listen key is an empty string
-	conn, err := s.dial()
+	var url string
+	if s.publicOnly {
+		url = okexapi.PublicWebSocketURL
+	} else {
+		url = okexapi.PrivateWebSocketURL
+	}
+
+	conn, err := s.StandardStream.Dial(url)
 	if err != nil {
 		s.connCancel()
 		s.connLock.Unlock()
