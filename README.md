@@ -397,6 +397,14 @@ bbgo cancel-order --session=okex --order-id=318223238325248000 --symbol=OKBUSDT
 bbgo cancel-order --session=max --order-id=1234566
 ```
 
+### Debugging user data stream
+
+```shell
+bbgo userdatastream --session okex
+bbgo userdatastream --session max
+bbgo userdatastream --session binance
+```
+
 ## Dynamic Injection
 
 In order to minimize the strategy code, bbgo supports dynamic dependency injection.
