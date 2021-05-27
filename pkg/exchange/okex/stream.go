@@ -120,16 +120,7 @@ func (s *Stream) dial() (*websocket.Conn, error) {
 	} else {
 		url = okexapi.PrivateWebSocketURL
 	}
-
-	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	// use the default ping handler
-	conn.SetPingHandler(nil)
-
-	return conn, nil
+	return s.StandardStream.Dial(url)
 }
 
 func (s *Stream) connect(ctx context.Context) error {

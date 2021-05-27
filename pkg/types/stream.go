@@ -2,6 +2,8 @@ package types
 
 import (
 	"context"
+
+	"github.com/gorilla/websocket"
 )
 
 type Stream interface {
@@ -64,6 +66,17 @@ func (stream *StandardStream) Reconnect() {
 	case stream.ReconnectC <- struct{}{}:
 	default:
 	}
+}
+
+func (stream *StandardStream) Dial(url string) (*websocket.Conn, error) {
+	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// use the default ping handler
+	conn.SetPingHandler(nil)
+	return conn, nil
 }
 
 // SubscribeOptions provides the standard stream options
