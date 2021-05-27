@@ -291,6 +291,18 @@ func parseAccount(v *fastjson.Value) (*okexapi.Account, error) {
 	return &accounts[0], nil
 }
 
+func parseOrder(v *fastjson.Value) ([]okexapi.OrderDetails, error) {
+	data := v.Get("data").MarshalTo(nil)
+
+	var orderDetails []okexapi.OrderDetails
+	err := json.Unmarshal(data, &orderDetails)
+	if err != nil {
+		return nil, err
+	}
+
+	return orderDetails, nil
+}
+
 func parseData(v *fastjson.Value) (interface{}, error) {
 
 	channel := string(v.GetStringBytes("arg", "channel"))
@@ -301,6 +313,9 @@ func parseData(v *fastjson.Value) (interface{}, error) {
 
 	case "account":
 		return parseAccount(v)
+
+	case "orders":
+		return parseOrder(v)
 
 	default:
 		if strings.HasPrefix(channel, "candle") {

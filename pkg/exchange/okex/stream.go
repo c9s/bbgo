@@ -37,10 +37,11 @@ type Stream struct {
 	publicOnly bool
 
 	// public callbacks
-	candleDataCallbacks []func(candle Candle)
-	bookDataCallbacks   []func(book BookData)
-	eventCallbacks      []func(event WebSocketEvent)
-	accountCallbacks    []func(account okexapi.Account)
+	candleDataCallbacks   []func(candle Candle)
+	bookDataCallbacks     []func(book BookData)
+	eventCallbacks        []func(event WebSocketEvent)
+	accountCallbacks      []func(account okexapi.Account)
+	orderDetailsCallbacks []func(orderDetails []okexapi.OrderDetails)
 
 	lastCandle map[CandleKey]Candle
 }
@@ -88,6 +89,28 @@ func NewStream(client *okexapi.RestClient) *Stream {
 	stream.OnAccount(func(account okexapi.Account) {
 		balances := toGlobalBalance(&account)
 		stream.EmitBalanceSnapshot(balances)
+	})
+
+	stream.OnOrderDetails(func(orderDetails []okexapi.OrderDetails) {
+		detailTrades, detailOrders := segmentOrderDetails(orderDetails)
+
+		trades, err := toGlobalTrades(detailTrades)
+		if err != nil {
+			log.WithError(err).Errorf("error converting order details into trades")
+		} else {
+			for _, trade := range trades {
+				stream.EmitTradeUpdate(trade)
+			}
+		}
+
+		orders, err := toGlobalOrders(detailOrders)
+		if err != nil {
+			log.WithError(err).Errorf("error converting order details into orders")
+		} else {
+			for _, order := range orders {
+				stream.EmitOrderUpdate(order)
+			}
+		}
 	})
 
 	stream.OnEvent(func(event WebSocketEvent) {
@@ -304,6 +327,8 @@ func (s *Stream) read(ctx context.Context) {
 				continue
 			}
 
+			log.Info(string(message))
+
 			e, err := Parse(string(message))
 			if err != nil {
 				log.WithError(err).Error("message parse error")
@@ -322,6 +347,9 @@ func (s *Stream) read(ctx context.Context) {
 
 				case *okexapi.Account:
 					s.EmitAccount(*et)
+
+				case []okexapi.OrderDetails:
+					s.EmitOrderDetails(et)
 
 				}
 			}
