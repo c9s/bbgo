@@ -128,7 +128,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 	}
 
-	session.Stream.OnKLineClosed(func(kline types.KLine) {
+	session.UserDataStream.OnKLineClosed(func(kline types.KLine) {
 		if kline.Symbol != s.Symbol {
 			return
 		}
