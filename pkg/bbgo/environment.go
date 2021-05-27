@@ -508,11 +508,16 @@ func (environ *Environment) Connect(ctx context.Context) error {
 			// add the subscribe requests to the stream
 			for _, s := range session.Subscriptions {
 				logger.Infof("subscribing %s %s %v", s.Symbol, s.Channel, s.Options)
-				session.UserDataStream.Subscribe(s.Channel, s.Symbol, s.Options)
+				session.MarketDataStream.Subscribe(s.Channel, s.Symbol, s.Options)
 			}
 		}
 
-		logger.Infof("connecting session %s...", session.Name)
+		logger.Infof("connecting %s market data stream...", session.Name)
+		if err := session.MarketDataStream.Connect(ctx); err != nil {
+			return err
+		}
+
+		logger.Infof("connecting %s user data stream...", session.Name)
 		if err := session.UserDataStream.Connect(ctx); err != nil {
 			return err
 		}

@@ -281,12 +281,12 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 		})
 	}
 
-	session.UserDataStream.OnKLineClosed(func(kline types.KLine) {
+	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		log.WithField("marketData", "kline").Infof("kline closed: %+v", kline)
 	})
 
 	// update last prices
-	session.UserDataStream.OnKLineClosed(func(kline types.KLine) {
+	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		if _, ok := session.startPrices[kline.Symbol]; !ok {
 			session.startPrices[kline.Symbol] = kline.Open
 		}
@@ -371,7 +371,7 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 	session.orderStores[symbol] = orderStore
 
 	marketDataStore := NewMarketDataStore(symbol)
-	marketDataStore.BindStream(session.UserDataStream)
+	marketDataStore.BindStream(session.MarketDataStream)
 	session.marketDataStores[symbol] = marketDataStore
 
 	standardIndicatorSet := NewStandardIndicatorSet(symbol, marketDataStore)
