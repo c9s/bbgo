@@ -455,11 +455,18 @@ func (r *GetOrderDetailsRequest) Do(ctx context.Context) (*OrderDetails, error) 
 type GetPendingOrderRequest struct {
 	client *RestClient
 
+	instId *string
+
 	instType *InstrumentType
 
 	orderTypes []string
 
 	state *OrderState
+}
+
+func (r *GetPendingOrderRequest) InstrumentID(instId string) *GetPendingOrderRequest {
+	r.instId = &instId
+	return r
 }
 
 func (r *GetPendingOrderRequest) InstrumentType(instType InstrumentType) *GetPendingOrderRequest {
@@ -484,6 +491,10 @@ func (r *GetPendingOrderRequest) AddOrderTypes(orderTypes ...string) *GetPending
 
 func (r *GetPendingOrderRequest) Parameters() map[string]interface{} {
 	var payload = map[string]interface{}{}
+
+	if r.instId != nil {
+		payload["instId"] = r.instId
+	}
 
 	if r.instType != nil {
 		payload["instType"] = r.instType
