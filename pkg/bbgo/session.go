@@ -188,6 +188,10 @@ type ExchangeSession struct {
 }
 
 func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
+	userDataStream := exchange.NewStream()
+	marketDataStream := exchange.NewStream()
+	marketDataStream.SetPublicOnly()
+
 	session := &ExchangeSession{
 		Notifiability: Notifiability{
 			SymbolChannelRouter:  NewPatternChannelRouter(nil),
@@ -197,8 +201,8 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 
 		Name:             name,
 		Exchange:         exchange,
-		UserDataStream:   exchange.NewStream(),
-		MarketDataStream: exchange.NewStream(),
+		UserDataStream:   userDataStream,
+		MarketDataStream: marketDataStream,
 		Subscriptions:    make(map[types.Subscription]types.Subscription),
 		Account:          &types.Account{},
 		Trades:           make(map[string]*types.TradeSlice),
