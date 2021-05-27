@@ -109,7 +109,7 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbols ...string) (map[str
 		return tickers, nil
 	}
 
-	selectedTickers := make(map[string]types.Ticker)
+	selectedTickers := make(map[string]types.Ticker, len(symbols))
 	for _, symbol := range symbols {
 		if ticker, ok := tickers[symbol]; ok {
 			selectedTickers[symbol] = ticker
