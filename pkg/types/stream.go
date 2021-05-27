@@ -21,6 +21,8 @@ var KLineChannel = Channel("kline")
 
 //go:generate callbackgen -type StandardStream -interface
 type StandardStream struct {
+	ReconnectC chan struct{}
+
 	Subscriptions []Subscription
 
 	startCallbacks []func()
@@ -55,6 +57,13 @@ func (stream *StandardStream) Subscribe(channel Channel, symbol string, options 
 		Symbol:  symbol,
 		Options: options,
 	})
+}
+
+func (stream *StandardStream) Reconnect() {
+	select {
+	case stream.ReconnectC <- struct{}{}:
+	default:
+	}
 }
 
 // SubscribeOptions provides the standard stream options
