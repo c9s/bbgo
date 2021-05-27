@@ -423,7 +423,7 @@ func (s *Stream) read(ctx context.Context) {
 
 		default:
 			s.ConnLock.Lock()
-			if err := s.Conn.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
+			if err := s.Conn.SetReadDeadline(time.Now().Add(30 * time.Second)); err != nil {
 				log.WithError(err).Errorf("set read deadline error: %s", err.Error())
 			}
 
