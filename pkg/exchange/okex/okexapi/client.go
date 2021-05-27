@@ -177,7 +177,7 @@ func (c *RestClient) newAuthenticatedRequest(method, refURL string, params url.V
 	}
 
 	signKey := timestamp + strings.ToUpper(method) + path + string(body)
-	signature := sign(signKey, c.Secret)
+	signature := Sign(signKey, c.Secret)
 
 	req, err := http.NewRequest(method, pathURL.String(), bytes.NewReader(body))
 	if err != nil {
@@ -388,7 +388,7 @@ func (c *RestClient) MarketTickers(instType InstrumentType) ([]MarketTicker, err
 	return tickerResponse.Data, nil
 }
 
-func sign(payload string, secret string) string {
+func Sign(payload string, secret string) string {
 	var sig = hmac.New(sha256.New, []byte(secret))
 	_, err := sig.Write([]byte(payload))
 	if err != nil {
