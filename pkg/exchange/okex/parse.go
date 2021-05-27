@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -154,6 +156,95 @@ func parseBookData(instrumentId string, v *fastjson.Value) (interface{}, error) 
 	}, nil
 }
 
+type Candle struct {
+	Channel      string
+	InstrumentID string
+	Symbol       string
+	Interval     string
+	Open         fixedpoint.Value
+	High         fixedpoint.Value
+	Low          fixedpoint.Value
+	Close        fixedpoint.Value
+
+	// Trading volume, with a unit of contact.
+	// If it is a derivatives contract, the value is the number of contracts.
+	// If it is SPOT/MARGIN, the value is the amount of trading currency.
+	Volume fixedpoint.Value
+
+	// Trading volume, with a unit of currency.
+	// If it is a derivatives contract, the value is the number of settlement currency.
+	// If it is SPOT/MARGIN, the value is the number of quote currency.
+	VolumeInCurrency fixedpoint.Value
+
+	MillisecondTimestamp int64
+
+	Time time.Time
+}
+
+func parseCandle(channel, instrumentID string, v *fastjson.Value) (interface{}, error) {
+	arr, err := v.Array()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(arr) < 7 {
+		return nil, fmt.Errorf("unexpected data array length: %d", len(arr))
+	}
+
+	interval := strings.ToLower(strings.TrimPrefix(channel, "candle"))
+
+	timestamp, err := strconv.ParseInt(string(arr[0].GetStringBytes()), 10, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	open, err := fixedpoint.NewFromString(string(arr[1].GetStringBytes()))
+	if err != nil {
+		return nil, err
+	}
+
+	high, err := fixedpoint.NewFromString(string(arr[2].GetStringBytes()))
+	if err != nil {
+		return nil, err
+	}
+
+	low, err := fixedpoint.NewFromString(string(arr[3].GetStringBytes()))
+	if err != nil {
+		return nil, err
+	}
+
+	cls, err := fixedpoint.NewFromString(string(arr[4].GetStringBytes()))
+	if err != nil {
+		return nil, err
+	}
+
+	vol, err := fixedpoint.NewFromString(string(arr[5].GetStringBytes()))
+	if err != nil {
+		return nil, err
+	}
+
+	volCurrency, err := fixedpoint.NewFromString(string(arr[6].GetStringBytes()))
+	if err != nil {
+		return nil, err
+	}
+
+	candleTime := time.Unix(0, timestamp*int64(time.Millisecond))
+	return &Candle{
+		Channel:              channel,
+		InstrumentID:         instrumentID,
+		Symbol:               toGlobalSymbol(instrumentID),
+		Interval:             interval,
+		Open:                 open,
+		High:                 high,
+		Low:                  low,
+		Close:                cls,
+		Volume:               vol,
+		VolumeInCurrency:     volCurrency,
+		MillisecondTimestamp: timestamp,
+		Time:                 candleTime,
+	}, nil
+}
+
 func parseData(v *fastjson.Value) (interface{}, error) {
 	instrumentId := string(v.GetStringBytes("arg", "instId"))
 	channel := string(v.GetStringBytes("arg", "channel"))
@@ -161,6 +252,12 @@ func parseData(v *fastjson.Value) (interface{}, error) {
 	switch channel {
 	case "books":
 		return parseBookData(instrumentId, v)
+
+	default:
+		if strings.HasPrefix(channel, "candle") {
+			return parseCandle(channel, instrumentId, v)
+
+		}
 
 	}
 
