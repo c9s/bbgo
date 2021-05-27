@@ -46,6 +46,16 @@ func (s *Stream) EmitAccount(account okexapi.Account) {
 	}
 }
 
+func (s *Stream) OnOrderDetails(cb func(orderDetails []okexapi.OrderDetails)) {
+	s.orderDetailsCallbacks = append(s.orderDetailsCallbacks, cb)
+}
+
+func (s *Stream) EmitOrderDetails(orderDetails []okexapi.OrderDetails) {
+	for _, cb := range s.orderDetailsCallbacks {
+		cb(orderDetails)
+	}
+}
+
 type StreamEventHub interface {
 	OnCandleData(cb func(candle Candle))
 
@@ -54,4 +64,6 @@ type StreamEventHub interface {
 	OnEvent(cb func(event WebSocketEvent))
 
 	OnAccount(cb func(account okexapi.Account))
+
+	OnOrderDetails(cb func(orderDetails []okexapi.OrderDetails))
 }

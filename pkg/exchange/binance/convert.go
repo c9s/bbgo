@@ -299,4 +299,3 @@ func convertSubscription(s types.Subscription) string {
 
 	return fmt.Sprintf("%s@%s", strings.ToLower(s.Symbol), s.Channel)
 }
-
