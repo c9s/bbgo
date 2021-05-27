@@ -55,14 +55,38 @@ type WebsocketSubscription struct {
 	InstrumentID string `json:"instId"`
 }
 
+var CandleChannels = []string{
+	"candle1Y",
+	"candle6M", "candle3M", "candle1M",
+	"candle1W",
+	"candle1D", "candle2D", "candle3D", "candle5D",
+	"candle12H", "candle6H", "candle4H", "candle2H", "candle1H",
+	"candle30m", "candle15m", "candle5m", "candle3m", "candle1m",
+}
+
+func convertIntervalToCandle(interval string) string {
+	switch interval {
+
+	case "1h", "2h", "4h", "6h", "12h", "1d", "3d":
+		return "candle" + strings.ToUpper(interval)
+
+	case "1m", "5m", "15m", "30m":
+		return "candle" + interval
+
+	}
+
+	return "candle" + interval
+}
+
 func convertSubscription(s types.Subscription) (WebsocketSubscription, error) {
 	// binance uses lower case symbol name,
 	// for kline, it's "<symbol>@kline_<interval>"
 	// for depth, it's "<symbol>@depth OR <symbol>@depth@100ms"
 	switch s.Channel {
 	case types.KLineChannel:
+		// Channel names are:
 		return WebsocketSubscription{
-			Channel:      "candle" + s.Options.Interval,
+			Channel:      convertIntervalToCandle(s.Options.Interval),
 			InstrumentID: toLocalSymbol(s.Symbol),
 		}, nil
 
