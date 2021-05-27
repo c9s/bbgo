@@ -28,7 +28,10 @@ type Stream struct {
 
 	publicOnly bool
 
-	klineCallbacks []func()
+	// public callbacks
+	cancelDataCallbacks []func()
+	bookDataCallbacks   []func(data BookData)
+	eventCallbacks      []func(event WebSocketEvent)
 }
 
 func NewStream(client *okexapi.RestClient) *Stream {
@@ -38,6 +41,16 @@ func NewStream(client *okexapi.RestClient) *Stream {
 			ReconnectC: make(chan struct{}, 1),
 		},
 	}
+
+	stream.OnBookData(func(data BookData) {
+		book := data.Book()
+		switch data.Action {
+		case "snapshot":
+			stream.EmitBookSnapshot(book)
+		case "update":
+			stream.EmitBookUpdate(book)
+		}
+	})
 
 	stream.OnConnect(func() {
 		var subs []WebsocketSubscription
@@ -213,7 +226,17 @@ func (s *Stream) read(ctx context.Context) {
 				log.WithError(err).Error("message parse error")
 			}
 
-			log.Infof("%+v", e)
+			if e != nil {
+				log.Infof("%+v", e)
+
+				switch et := e.(type) {
+				case *WebSocketEvent:
+					s.EmitEvent(*et)
+
+				case *BookData:
+					s.EmitBookData(*et)
+				}
+			}
 		}
 	}
 }
