@@ -255,6 +255,8 @@ func InitExchangeSession(name string, session *ExchangeSession) error {
 	}
 	session.Exchange = exchange
 	session.UserDataStream = exchange.NewStream()
+	session.MarketDataStream = exchange.NewStream()
+	session.MarketDataStream.SetPublicOnly()
 
 	// pointer fields
 	session.Subscriptions = make(map[types.Subscription]types.Subscription)
