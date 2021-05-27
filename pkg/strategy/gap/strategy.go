@@ -198,7 +198,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	})
 
 	// from here, set data binding
-	s.sourceSession.UserDataStream.OnKLine(func(kline types.KLine) {
+	s.sourceSession.MarketDataStream.OnKLine(func(kline types.KLine) {
 		log.Infof("source exchange %s price: %f", s.Symbol, kline.Close)
 		s.mu.Lock()
 		s.lastKLine = kline
@@ -206,10 +206,10 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	})
 
 	s.sourceBook = types.NewStreamBook(s.Symbol)
-	s.sourceBook.BindStream(s.sourceSession.UserDataStream)
+	s.sourceBook.BindStream(s.sourceSession.MarketDataStream)
 
 	s.tradingBook = types.NewStreamBook(s.Symbol)
-	s.tradingBook.BindStream(s.tradingSession.UserDataStream)
+	s.tradingBook.BindStream(s.tradingSession.MarketDataStream)
 
 	s.tradingSession.UserDataStream.OnTradeUpdate(s.handleTradeUpdate)
 

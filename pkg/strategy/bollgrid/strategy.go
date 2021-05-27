@@ -376,7 +376,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 
 	// avoid using time ticker since we will need back testing here
-	session.UserDataStream.OnKLineClosed(func(kline types.KLine) {
+	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		// skip kline events that does not belong to this symbol
 		if kline.Symbol != s.Symbol {
 			log.Infof("%s != %s", kline.Symbol, s.Symbol)

@@ -595,7 +595,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 
 	if s.CatchUp {
-		session.UserDataStream.OnKLineClosed(func(kline types.KLine) {
+		session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 			log.Infof("catchUp mode is enabled, updating grid orders...")
 			// update grid
 			s.placeGridOrders(orderExecutor, session)
