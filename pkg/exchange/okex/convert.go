@@ -36,23 +36,21 @@ func toGlobalTicker(marketTicker okexapi.MarketTicker) *types.Ticker {
 	}
 }
 
-func toGlobalBalance(balanceSummaries []okexapi.BalanceSummary) types.BalanceMap {
+func toGlobalBalance(account *okexapi.Account) types.BalanceMap {
 	var balanceMap = types.BalanceMap{}
-	for _, balanceSummary := range balanceSummaries {
-		for _, balanceDetail := range balanceSummary.Details {
-			balanceMap[balanceDetail.Currency] = types.Balance{
-				Currency:  balanceDetail.Currency,
-				Available: balanceDetail.CashBalance,
-				Locked:    balanceDetail.Frozen,
-			}
+	for _, balanceDetail := range account.Details {
+		balanceMap[balanceDetail.Currency] = types.Balance{
+			Currency:  balanceDetail.Currency,
+			Available: balanceDetail.CashBalance,
+			Locked:    balanceDetail.Frozen,
 		}
 	}
 	return balanceMap
 }
 
 type WebsocketSubscription struct {
-	Channel      string `json:"channel"`
-	InstrumentID string `json:"instId,omitempty"`
+	Channel        string `json:"channel"`
+	InstrumentID   string `json:"instId,omitempty"`
 	InstrumentType string `json:"instType,omitempty"`
 }
 
