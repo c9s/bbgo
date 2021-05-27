@@ -11,16 +11,18 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+type WebsocketOp struct {
+	Op   string      `json:"op"`
+	Args interface{} `json:"args"`
+}
+
 //go:generate callbackgen -type Stream -interface
 type Stream struct {
 	types.StandardStream
 
 	Client     *okexapi.RestClient
-	ListenKey  string
 	Conn       *websocket.Conn
 	connLock   sync.Mutex
-	reconnectC chan struct{}
-
 	connCtx    context.Context
 	connCancel context.CancelFunc
 
@@ -31,9 +33,39 @@ type Stream struct {
 
 func NewStream(client *okexapi.RestClient) *Stream {
 	stream := &Stream{
-		Client:     client,
-		reconnectC: make(chan struct{}, 1),
+		Client: client,
+		StandardStream: types.StandardStream{
+			ReconnectC: make(chan struct{}, 1),
+		},
 	}
+
+	stream.OnConnect(func() {
+		var subs []WebsocketSubscription
+		for _, subscription := range stream.Subscriptions {
+			sub, err := convertSubscription(subscription)
+			if err != nil {
+				log.WithError(err).Errorf("subscription convert error")
+				continue
+			}
+
+			subs = append(subs, sub)
+		}
+
+		if len(subs) == 0 {
+			return
+		}
+
+		log.Infof("subscribing channels: %+v", subs)
+		err := stream.Conn.WriteJSON(WebsocketOp{
+			Op:   "subscribe",
+			Args: subs,
+		})
+
+		if err != nil {
+			log.WithError(err).Error("subscribe error")
+		}
+	})
+
 	return stream
 }
 
@@ -58,20 +90,13 @@ func (s *Stream) Connect(ctx context.Context) error {
 	return nil
 }
 
-func (s *Stream) emitReconnect() {
-	select {
-	case s.reconnectC <- struct{}{}:
-	default:
-	}
-}
-
 func (s *Stream) reconnector(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
 
-		case <-s.reconnectC:
+		case <-s.ReconnectC:
 			// ensure the previous context is cancelled
 			if s.connCancel != nil {
 				s.connCancel()
@@ -82,7 +107,7 @@ func (s *Stream) reconnector(ctx context.Context) {
 
 			if err := s.connect(ctx); err != nil {
 				log.WithError(err).Errorf("connect error, try to reconnect again...")
-				s.emitReconnect()
+				s.Reconnect()
 			}
 		}
 	}
@@ -175,17 +200,17 @@ func (s *Stream) read(ctx context.Context) {
 
 					// for unexpected close error, we should re-connect
 					// emit reconnect to start a new connection
-					s.emitReconnect()
+					s.Reconnect()
 					return
 
 				case net.Error:
 					log.WithError(err).Error("network error")
-					s.emitReconnect()
+					s.Reconnect()
 					return
 
 				default:
 					log.WithError(err).Error("unexpected connection error")
-					s.emitReconnect()
+					s.Reconnect()
 					return
 				}
 			}
@@ -195,7 +220,7 @@ func (s *Stream) read(ctx context.Context) {
 				continue
 			}
 
-			log.Debug(string(message))
+			log.Infof(string(message))
 		}
 	}
 }
@@ -215,7 +240,7 @@ func (s *Stream) ping(ctx context.Context) {
 			s.connLock.Lock()
 			if err := s.Conn.WriteControl(websocket.PingMessage, []byte("hb"), time.Now().Add(3*time.Second)); err != nil {
 				log.WithError(err).Error("ping error", err)
-				s.emitReconnect()
+				s.Reconnect()
 			}
 			s.connLock.Unlock()
 		}

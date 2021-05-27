@@ -1,6 +1,7 @@
 package okex
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
@@ -47,4 +48,30 @@ func toGlobalBalance(balanceSummaries []okexapi.BalanceSummary) types.BalanceMap
 		}
 	}
 	return balanceMap
+}
+
+type WebsocketSubscription struct {
+	Channel      string `json:"channel"`
+	InstrumentID string `json:"instId"`
+}
+
+func convertSubscription(s types.Subscription) (WebsocketSubscription, error) {
+	// binance uses lower case symbol name,
+	// for kline, it's "<symbol>@kline_<interval>"
+	// for depth, it's "<symbol>@depth OR <symbol>@depth@100ms"
+	switch s.Channel {
+	case types.KLineChannel:
+		return WebsocketSubscription{
+			Channel:      "candle" + s.Options.Interval,
+			InstrumentID: toLocalSymbol(s.Symbol),
+		}, nil
+
+	case types.BookChannel:
+		return WebsocketSubscription{
+			Channel:      "books",
+			InstrumentID: toLocalSymbol(s.Symbol),
+		}, nil
+	}
+
+	return WebsocketSubscription{}, fmt.Errorf("unsupported public stream channel %s", s.Channel)
 }
