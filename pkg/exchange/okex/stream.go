@@ -327,8 +327,6 @@ func (s *Stream) read(ctx context.Context) {
 				continue
 			}
 
-			log.Info(string(message))
-
 			e, err := Parse(string(message))
 			if err != nil {
 				log.WithError(err).Error("message parse error")
