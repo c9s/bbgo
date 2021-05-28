@@ -40,13 +40,14 @@ func init() {
 }
 
 type State struct {
-	HedgePosition     fixedpoint.Value `json:"hedgePosition"`
-	Position          *bbgo.Position   `json:"position,omitempty"`
-	AccumulatedVolume fixedpoint.Value `json:"accumulatedVolume,omitempty"`
-	AccumulatedPnL    fixedpoint.Value `json:"accumulatedPnL,omitempty"`
-	AccumulatedProfit fixedpoint.Value `json:"accumulatedProfit,omitempty"`
-	AccumulatedLoss   fixedpoint.Value `json:"accumulatedLoss,omitempty"`
-	AccumulatedSince  int64            `json:"accumulatedSince,omitempty"`
+	HedgePosition        fixedpoint.Value `json:"hedgePosition"`
+	Position             *bbgo.Position   `json:"position,omitempty"`
+	AccumulatedVolume    fixedpoint.Value `json:"accumulatedVolume,omitempty"`
+	AccumulatedPnL       fixedpoint.Value `json:"accumulatedPnL,omitempty"`
+	AccumulatedNetProfit fixedpoint.Value `json:"accumulatedNetProfit,omitempty"`
+	AccumulatedProfit    fixedpoint.Value `json:"accumulatedProfit,omitempty"`
+	AccumulatedLoss      fixedpoint.Value `json:"accumulatedLoss,omitempty"`
+	AccumulatedSince     int64            `json:"accumulatedSince,omitempty"`
 }
 
 type Strategy struct {
@@ -561,6 +562,7 @@ func (s *Strategy) processTrade(trade types.Trade) {
 
 	if profit, netProfit, madeProfit := s.state.Position.AddTrade(trade); madeProfit {
 		s.state.AccumulatedPnL.AtomicAdd(profit)
+		s.state.AccumulatedNetProfit.AtomicAdd(netProfit)
 
 		if profit < 0 {
 			s.state.AccumulatedLoss.AtomicAdd(profit)
@@ -576,16 +578,22 @@ func (s *Strategy) processTrade(trade types.Trade) {
 			since = time.Unix(s.state.AccumulatedSince, 0).In(localTimeZone)
 		}
 
-		s.Notify("%s trade profit %s %f %s (%.2f%%), net profit =~ %f %s (%.2f%%), since %s accumulated PnL %f %s, accumulated loss %f %s",
+		s.Notify("%s trade profit %s %f %s (%.2f%%), net profit =~ %f %s (%.2f%%),\n"+
+			"accumulated profit %f %s,\n"+
+			"accumulated net profit %f %s,\n"+
+			"accumulated trade loss %f %s\n"+
+			"since %s",
 			s.Symbol,
 			pnlEmoji(profit),
 			profit.Float64(), s.state.Position.QuoteCurrency,
 			profitMargin.Float64()*100.0,
 			netProfit.Float64(), s.state.Position.QuoteCurrency,
 			netProfitMargin.Float64()*100.0,
-			since.Format(time.RFC822),
 			s.state.AccumulatedPnL.Float64(), s.state.Position.QuoteCurrency,
-			s.state.AccumulatedLoss.Float64(), s.state.Position.QuoteCurrency)
+			s.state.AccumulatedNetProfit.Float64(), s.state.Position.QuoteCurrency,
+			s.state.AccumulatedLoss.Float64(), s.state.Position.QuoteCurrency,
+			since.Format(time.RFC822),
+		)
 
 	} else {
 		log.Infof("position changed: %s", s.state.Position)
