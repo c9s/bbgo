@@ -88,6 +88,8 @@ type Strategy struct {
 
 	DisableHedge bool `json:"disableHedge"`
 
+	NotifyTrade bool `json:"notifyTrade"`
+
 	NumLayers int `json:"numLayers"`
 
 	// Pips is the pips of the layer prices
@@ -518,6 +520,10 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 
 func (s *Strategy) handleTrade(trade types.Trade) {
 	s.tradeC <- trade
+
+	if s.NotifyTrade {
+		s.Notifiability.Notify(trade)
+	}
 }
 
 func (s *Strategy) processTrade(trade types.Trade) {
