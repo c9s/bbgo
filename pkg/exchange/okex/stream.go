@@ -361,23 +361,25 @@ func (s *Stream) read(ctx context.Context) {
 }
 
 func (s *Stream) ping(ctx context.Context) {
-	pingTicker := time.NewTicker(15 * time.Second)
+	pingTicker := time.NewTicker(5 * time.Second)
 	defer pingTicker.Stop()
 
 	for {
 		select {
 
 		case <-ctx.Done():
-			log.Info("ping worker stopped")
+			log.Debug("ping worker stopped")
 			return
 
 		case <-pingTicker.C:
 			s.connLock.Lock()
-			if err := s.Conn.WriteControl(websocket.PingMessage, []byte("hb"), time.Now().Add(3*time.Second)); err != nil {
+			conn := s.Conn
+			s.connLock.Unlock()
+
+			if err := conn.WriteControl(websocket.PingMessage, []byte("hb"), time.Now().Add(3*time.Second)); err != nil {
 				log.WithError(err).Error("ping error", err)
 				s.Reconnect()
 			}
-			s.connLock.Unlock()
 		}
 	}
 }
