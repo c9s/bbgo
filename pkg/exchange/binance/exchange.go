@@ -782,7 +782,7 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 	var kLines []types.KLine
 	for _, k := range resp {
 		kLines = append(kLines, types.KLine{
-			Exchange:       types.ExchangeBinance.String(),
+			Exchange:       types.ExchangeBinance,
 			Symbol:         symbol,
 			Interval:       interval,
 			StartTime:      time.Unix(0, k.OpenTime*int64(time.Millisecond)),

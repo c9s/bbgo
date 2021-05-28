@@ -267,5 +267,40 @@ func (e *Exchange) NewStream() types.Stream {
 }
 
 func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
-	return nil, nil
+	req := e.client.MarketDataService.NewCandlesticksRequest(toLocalSymbol(symbol))
+	req.Bar(interval.String())
+
+	if options.StartTime != nil {
+		req.After(options.StartTime.UnixNano() / int64(time.Millisecond))
+	}
+
+	if options.EndTime != nil {
+		req.Before(options.EndTime.UnixNano() / int64(time.Millisecond))
+	}
+
+	candles, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var klines []types.KLine
+	for _, candle := range candles {
+		klines = append(klines, types.KLine{
+			Exchange:    types.ExchangeOKEx,
+			Symbol:      symbol,
+			Interval:    interval,
+			Open:        candle.Open.Float64(),
+			High:        candle.High.Float64(),
+			Low:         candle.Low.Float64(),
+			Close:       candle.Close.Float64(),
+			Closed:      true,
+			Volume:      candle.Volume.Float64(),
+			QuoteVolume: candle.VolumeInCurrency.Float64(),
+			StartTime:   candle.Time,
+			EndTime:     candle.Time.Add(interval.Duration() - time.Millisecond),
+		})
+	}
+
+	return klines, nil
+
 }

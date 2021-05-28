@@ -191,13 +191,16 @@ func (c *Candle) KLine() types.KLine {
 	interval := types.Interval(c.Interval)
 	endTime := c.StartTime.Add(interval.Duration() - 1*time.Millisecond)
 	return types.KLine{
-		Interval:  interval,
-		Open:      c.Open.Float64(),
-		High:      c.High.Float64(),
-		Low:       c.Low.Float64(),
-		Close:     c.Close.Float64(),
-		StartTime: c.StartTime,
-		EndTime:   endTime,
+		Exchange:    types.ExchangeOKEx,
+		Interval:    interval,
+		Open:        c.Open.Float64(),
+		High:        c.High.Float64(),
+		Low:         c.Low.Float64(),
+		Close:       c.Close.Float64(),
+		Volume:      c.Volume.Float64(),
+		QuoteVolume: c.VolumeInCurrency.Float64(),
+		StartTime:   c.StartTime,
+		EndTime:     endTime,
 	}
 }
 

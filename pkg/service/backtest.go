@@ -207,7 +207,7 @@ func (s *BacktestService) Insert(kline types.KLine) error {
 
 	sql := "INSERT INTO `binance_klines` (`exchange`, `start_time`, `end_time`, `symbol`, `interval`, `open`, `high`, `low`, `close`, `closed`, `volume`)" +
 		"VALUES (:exchange, :start_time, :end_time, :symbol, :interval, :open, :high, :low, :close, :closed, :volume)"
-	sql = strings.ReplaceAll(sql, "binance_klines", kline.Exchange+"_klines")
+	sql = strings.ReplaceAll(sql, "binance_klines", kline.Exchange.String()+"_klines")
 
 	_, err := s.DB.NamedExec(sql, kline)
 	return err
