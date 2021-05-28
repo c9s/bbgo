@@ -96,7 +96,32 @@ func (s *WebSocketService) Connect(ctx context.Context) error {
 	}
 
 	go s.reconnector(ctx)
+	go s.ping(ctx)
 	return nil
+}
+
+func (s *WebSocketService) ping(ctx context.Context) {
+	pingTicker := time.NewTicker(5 * time.Second)
+	defer pingTicker.Stop()
+
+	for {
+		select {
+
+		case <-ctx.Done():
+			log.Debug("ping worker stopped")
+			return
+
+		case <-pingTicker.C:
+			s.mu.Lock()
+			conn := s.conn
+			s.mu.Unlock()
+
+			if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(3*time.Second)); err != nil {
+				log.WithError(err).Error("ping error", err)
+				s.Reconnect()
+			}
+		}
+	}
 }
 
 func (s *WebSocketService) Auth() error {
@@ -112,7 +137,6 @@ func (s *WebSocketService) Auth() error {
 }
 
 func (s *WebSocketService) connect(ctx context.Context) error {
-
 	dialer := websocket.DefaultDialer
 	conn, _, err := dialer.DialContext(ctx, s.baseURL, nil)
 	if err != nil {
@@ -167,12 +191,14 @@ func (s *WebSocketService) read(ctx context.Context) {
 
 		default:
 			s.mu.Lock()
-			if err := s.conn.SetReadDeadline(time.Now().Add(time.Second * 5)); err != nil {
+			conn := s.conn
+			s.mu.Unlock()
+
+			if err := conn.SetReadDeadline(time.Now().Add(time.Second * 5)); err != nil {
 				log.WithError(err).Error("can not set read deadline")
 			}
 
-			mt, msg, err := s.conn.ReadMessage()
-			s.mu.Unlock()
+			mt, msg, err := conn.ReadMessage()
 
 			if err != nil {
 				// if it's a network timeout error, we should re-connect
