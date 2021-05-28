@@ -240,6 +240,10 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 }
 
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) error {
+	if len(orders) == 0 {
+		return nil
+	}
+
 	var reqs []*okexapi.CancelOrderRequest
 	for _, order := range orders {
 		if len(order.Symbol) == 0 {
@@ -249,7 +253,6 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 		req := e.client.TradeService.NewCancelOrderRequest()
 		req.InstrumentID(toLocalSymbol(order.Symbol))
 		req.OrderID(strconv.FormatUint(order.OrderID, 10))
-
 		if len(order.ClientOrderID) > 0 {
 			req.ClientOrderID(order.ClientOrderID)
 		}
