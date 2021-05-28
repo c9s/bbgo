@@ -521,10 +521,6 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 
 func (s *Strategy) handleTrade(trade types.Trade) {
 	s.tradeC <- trade
-
-	if s.NotifyTrade {
-		s.Notifiability.Notify(trade)
-	}
 }
 
 func (s *Strategy) processTrade(trade types.Trade) {
@@ -535,6 +531,10 @@ func (s *Strategy) processTrade(trade types.Trade) {
 
 	if !s.orderStore.Exists(trade.OrderID) {
 		return
+	}
+
+	if s.NotifyTrade {
+		s.Notifiability.Notify(trade)
 	}
 
 	log.Infof("identified %s trade %d with an existing order: %d", trade.Symbol, trade.ID, trade.OrderID)
