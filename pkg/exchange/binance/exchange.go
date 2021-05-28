@@ -434,7 +434,7 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 			return orders, err
 		}
 
-		return ToGlobalOrders(binanceOrders)
+		return toGlobalOrders(binanceOrders)
 	}
 
 	binanceOrders, err := e.Client.NewListOpenOrdersService().Symbol(symbol).Do(ctx)
@@ -442,7 +442,7 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 		return orders, err
 	}
 
-	return ToGlobalOrders(binanceOrders)
+	return toGlobalOrders(binanceOrders)
 }
 
 func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []types.Order, err error) {
@@ -468,7 +468,7 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 			return orders, err
 		}
 
-		return ToGlobalOrders(binanceOrders)
+		return toGlobalOrders(binanceOrders)
 	}
 
 	req := e.Client.NewListOrdersService().
@@ -486,7 +486,7 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 		return orders, err
 	}
 
-	return ToGlobalOrders(binanceOrders)
+	return toGlobalOrders(binanceOrders)
 }
 
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err2 error) {
@@ -590,7 +590,7 @@ func (e *Exchange) submitMarginOrder(ctx context.Context, order types.SubmitOrde
 
 	log.Infof("margin order creation response: %+v", response)
 
-	createdOrder, err := ToGlobalOrder(&binance.Order{
+	createdOrder, err := toGlobalOrder(&binance.Order{
 		Symbol:                   response.Symbol,
 		OrderID:                  response.OrderID,
 		ClientOrderID:            response.ClientOrderID,
@@ -691,9 +691,9 @@ func (e *Exchange) submitSpotOrder(ctx context.Context, order types.SubmitOrder)
 		return nil, err
 	}
 
-	log.Infof("order creation response: %+v", response)
+	log.Infof("spot order creation response: %+v", response)
 
-	createdOrder, err := ToGlobalOrder(&binance.Order{
+	createdOrder, err := toGlobalOrder(&binance.Order{
 		Symbol:                   response.Symbol,
 		OrderID:                  response.OrderID,
 		ClientOrderID:            response.ClientOrderID,
