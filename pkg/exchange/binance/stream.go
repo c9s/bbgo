@@ -370,7 +370,7 @@ func (s *Stream) ping(ctx context.Context) {
 		select {
 
 		case <-ctx.Done():
-			log.Info("ping worker stopped")
+			log.Debug("ping worker stopped")
 			return
 
 		case <-pingTicker.C:
