@@ -67,6 +67,7 @@ type RestClient struct {
 
 	TradeService      *TradeService
 	PublicDataService *PublicDataService
+	MarketDataService *MarketDataService
 }
 
 func NewClient() *RestClient {
@@ -84,6 +85,7 @@ func NewClient() *RestClient {
 
 	client.TradeService = &TradeService{client: client}
 	client.PublicDataService = &PublicDataService{client: client}
+	client.MarketDataService = &MarketDataService{client: client}
 	return client
 }
 

@@ -139,7 +139,7 @@ func toGlobalTrade(f fill) (types.Trade, error) {
 
 func toGlobalKLine(symbol string, interval types.Interval, h Candle) (types.KLine, error) {
 	return types.KLine{
-		Exchange:  types.ExchangeFTX.String(),
+		Exchange:  types.ExchangeFTX,
 		Symbol:    toGlobalSymbol(symbol),
 		StartTime: h.StartTime.Time,
 		EndTime:   h.StartTime.Add(interval.Duration()),

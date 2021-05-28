@@ -45,8 +45,8 @@ type KLineQueryOptions struct {
 
 // KLine uses binance's kline as the standard structure
 type KLine struct {
-	GID      uint64 `json:"gid" db:"gid"`
-	Exchange string `json:"exchange" db:"exchange"`
+	GID      uint64       `json:"gid" db:"gid"`
+	Exchange ExchangeName `json:"exchange" db:"exchange"`
 
 	Symbol string `json:"symbol" db:"symbol"`
 
@@ -169,10 +169,10 @@ func (k KLine) GetChange() float64 {
 }
 
 func (k KLine) String() string {
-	return fmt.Sprintf("%s %s %s %s Open: %.8f Close: %.8f High: %.8f Low: %.8f Volume: %.8f Change: %.4f Max Change: %.4f",
-		k.Exchange,
+	return fmt.Sprintf("%s %s %s %s O: %.4f H: %.4f L: %.4f C: %.4f V: %.4f QV: %.2f CHG: %.4f MAX CHG: %.4f",
+		k.Exchange.String(),
 		k.StartTime.Format("2006-01-02 15:04"),
-		k.Symbol, k.Interval, k.Open, k.Close, k.High, k.Low, k.Volume, k.GetChange(), k.GetMaxChange())
+		k.Symbol, k.Interval, k.Open, k.High, k.Low, k.Close, k.Volume, k.QuoteVolume, k.GetChange(), k.GetMaxChange())
 }
 
 func (k KLine) Color() string {
