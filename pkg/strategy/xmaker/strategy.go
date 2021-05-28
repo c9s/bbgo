@@ -576,7 +576,7 @@ func (s *Strategy) processTrade(trade types.Trade) {
 			since = time.Unix(s.state.AccumulatedSince, 0).In(localTimeZone)
 		}
 
-		s.Notify("%s trade profit %s %f %s (%.2f%%), net profit =~ %f %s (%.2f%%), since %s accumulated net profit %f %s, accumulated loss %f %s",
+		s.Notify("%s trade profit %s %f %s (%.2f%%), net profit =~ %f %s (%.2f%%), since %s accumulated PnL %f %s, accumulated loss %f %s",
 			s.Symbol,
 			pnlEmoji(profit),
 			profit.Float64(), s.state.Position.QuoteCurrency,
