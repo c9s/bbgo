@@ -264,6 +264,11 @@ func (s *Stream) connect(ctx context.Context) error {
 	}
 
 	log.Infof("websocket connected")
+	conn.SetReadDeadline(time.Now().Add(15 * time.Second))
+	conn.SetPongHandler(func(string) error {
+		conn.SetReadDeadline(time.Now().Add(15 * time.Second))
+		return nil
+	})
 
 	s.Conn = conn
 	s.connLock.Unlock()
