@@ -519,9 +519,11 @@ func (environ *Environment) Connect(ctx context.Context) error {
 			return err
 		}
 
-		logger.Infof("connecting %s user data stream...", session.Name)
-		if err := session.UserDataStream.Connect(ctx); err != nil {
-			return err
+		if !session.PublicOnly {
+			logger.Infof("connecting %s user data stream...", session.Name)
+			if err := session.UserDataStream.Connect(ctx); err != nil {
+				return err
+			}
 		}
 	}
 
