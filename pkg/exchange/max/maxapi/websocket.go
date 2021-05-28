@@ -119,6 +119,12 @@ func (s *WebSocketService) connect(ctx context.Context) error {
 		return err
 	}
 
+	conn.SetReadDeadline(time.Now().Add(15 * time.Second))
+	conn.SetPongHandler(func(string) error {
+		conn.SetReadDeadline(time.Now().Add(15 * time.Second))
+		return nil
+	})
+
 	s.mu.Lock()
 	s.conn = conn
 	s.mu.Unlock()
