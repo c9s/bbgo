@@ -109,9 +109,8 @@ func segmentOrderDetails(orderDetails []okexapi.OrderDetails) (trades, orders []
 	for _, orderDetail := range orderDetails {
 		if len(orderDetail.LastTradeID) > 0 {
 			trades = append(trades, orderDetail)
-		} else {
-			orders = append(orders, orderDetail)
 		}
+		orders = append(orders, orderDetail)
 	}
 	return trades, orders
 }
