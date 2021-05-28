@@ -111,6 +111,7 @@ type Strategy struct {
 	activeMakerOrders *bbgo.LocalActiveOrderBook
 
 	orderStore *bbgo.OrderStore
+	tradeStore *bbgo.TradeStore
 
 	lastPrice float64
 	groupID   uint32
@@ -437,8 +438,8 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 }
 
 func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
-	side := types.SideTypeBuy
 
+	side := types.SideTypeBuy
 	if pos == 0 {
 		return
 	}
@@ -452,7 +453,7 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	}
 
 	lastPrice := s.lastPrice
-	sourceBook := s.book.Copy()
+	sourceBook := s.book.CopyDepth(1)
 	switch side {
 
 	case types.SideTypeBuy:
@@ -495,6 +496,7 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 
 	}
 
+	log.Infof("submitting %s hedge order %s %f", s.Symbol, side.String(), quantity.Float64())
 	s.Notifiability.Notify("Submitting %s hedge order %s %f", s.Symbol, side.String(), quantity.Float64())
 	orderExecutor := &bbgo.ExchangeOrderExecutor{Session: s.sourceSession}
 	returnOrders, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
@@ -513,15 +515,16 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 }
 
 func (s *Strategy) handleTradeUpdate(trade types.Trade) {
-	log.Infof("received trade %+v", trade)
-
 	if trade.Symbol != s.Symbol {
 		return
 	}
 
 	if !s.orderStore.Exists(trade.OrderID) {
+		s.tradeStore.Add(trade)
 		return
 	}
+
+	log.Infof("received trade %+v", trade)
 
 	q := fixedpoint.NewFromFloat(trade.Quantity)
 	switch trade.Side {
@@ -576,6 +579,7 @@ func (s *Strategy) handleTradeUpdate(trade types.Trade) {
 
 	} else {
 		s.Notify(s.state.Position)
+		log.Info("position changed: %s", s.state.Position)
 	}
 
 	s.lastPrice = trade.Price
@@ -751,6 +755,8 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	s.activeMakerOrders = bbgo.NewLocalActiveOrderBook()
 	s.activeMakerOrders.BindStream(s.makerSession.UserDataStream)
 
+	s.tradeStore = bbgo.NewTradeStore(s.Symbol)
+
 	s.orderStore = bbgo.NewOrderStore(s.Symbol)
 	s.orderStore.BindStream(s.sourceSession.UserDataStream)
 	s.orderStore.BindStream(s.makerSession.UserDataStream)
@@ -785,9 +791,16 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 				s.updateQuote(ctx, orderExecutionRouter)
 
 			case <-posTicker.C:
+				if s.tradeStore.Num() > 0 {
+					for _, trade := range s.tradeStore.Trades() {
+						s.handleTradeUpdate(trade)
+					}
+					s.tradeStore.Clear()
+				}
+
 				position := s.state.HedgePosition.AtomicLoad()
-				abspos := math.Abs(position.Float64())
-				if !s.DisableHedge && abspos > s.sourceMarket.MinQuantity {
+				absPos := math.Abs(position.Float64())
+				if !s.DisableHedge && absPos > s.sourceMarket.MinQuantity {
 					s.Hedge(ctx, -position)
 				}
 			}
