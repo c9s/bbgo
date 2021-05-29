@@ -824,7 +824,9 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 				// process pending trades
 				if s.tradeStore.Num() > 0 {
 					for _, trade := range s.tradeStore.Trades() {
-						s.processTrade(trade)
+						if s.orderStore.Exists(trade.OrderID) {
+							s.processTrade(trade)
+						}
 					}
 					s.tradeStore.Clear()
 				}
