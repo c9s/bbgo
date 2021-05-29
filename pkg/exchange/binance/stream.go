@@ -369,7 +369,7 @@ func (s *Stream) connect(ctx context.Context) error {
 }
 
 func (s *Stream) ping(ctx context.Context) {
-	pingTicker := time.NewTicker(5 * time.Second)
+	pingTicker := time.NewTicker(readTimeout / 2)
 	defer pingTicker.Stop()
 
 	for {
