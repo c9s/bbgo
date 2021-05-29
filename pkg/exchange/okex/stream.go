@@ -12,6 +12,8 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+const readTimeout = 15 * time.Second
+
 type WebsocketOp struct {
 	Op   string      `json:"op"`
 	Args interface{} `json:"args"`
@@ -264,9 +266,9 @@ func (s *Stream) connect(ctx context.Context) error {
 	}
 
 	log.Infof("websocket connected")
-	conn.SetReadDeadline(time.Now().Add(15 * time.Second))
+	conn.SetReadDeadline(time.Now().Add(readTimeout))
 	conn.SetPongHandler(func(string) error {
-		conn.SetReadDeadline(time.Now().Add(15 * time.Second))
+		conn.SetReadDeadline(time.Now().Add(readTimeout))
 		return nil
 	})
 
@@ -295,11 +297,15 @@ func (s *Stream) read(ctx context.Context) {
 			return
 
 		default:
-			if err := s.Conn.SetReadDeadline(time.Now().Add(30 * time.Second)); err != nil {
+			s.connLock.Lock()
+			conn := s.Conn
+			s.connLock.Unlock()
+
+			if err := conn.SetReadDeadline(time.Now().Add(readTimeout)); err != nil {
 				log.WithError(err).Errorf("set read deadline error: %s", err.Error())
 			}
 
-			mt, message, err := s.Conn.ReadMessage()
+			mt, message, err := conn.ReadMessage()
 			if err != nil {
 				// if it's a network timeout error, we should re-connect
 				switch err := err.(type) {
@@ -361,7 +367,7 @@ func (s *Stream) read(ctx context.Context) {
 }
 
 func (s *Stream) ping(ctx context.Context) {
-	pingTicker := time.NewTicker(5 * time.Second)
+	pingTicker := time.NewTicker(readTimeout / 2)
 	defer pingTicker.Stop()
 
 	for {
@@ -376,7 +382,7 @@ func (s *Stream) ping(ctx context.Context) {
 			conn := s.Conn
 			s.connLock.Unlock()
 
-			if err := conn.WriteControl(websocket.PingMessage, []byte("hb"), time.Now().Add(3*time.Second)); err != nil {
+			if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(3*time.Second)); err != nil {
 				log.WithError(err).Error("ping error", err)
 				s.Reconnect()
 			}
