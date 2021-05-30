@@ -171,10 +171,10 @@ func (k KLine) GetChange() float64 {
 }
 
 func (k KLine) String() string {
-	return fmt.Sprintf("%s %s %s %s O: %.4f H: %.4f L: %.4f C: %.4f V: %.4f QV: %.2f CHG: %.4f MAX CHG: %.4f",
+	return fmt.Sprintf("%s %s %s %s O: %.4f H: %.4f L: %.4f C: %.4f CHG: %.4f MAXCHG: %.4f V: %.4f QV: %.2f TBBV: %.2f",
 		k.Exchange.String(),
 		k.StartTime.Format("2006-01-02 15:04"),
-		k.Symbol, k.Interval, k.Open, k.High, k.Low, k.Close, k.Volume, k.QuoteVolume, k.GetChange(), k.GetMaxChange())
+		k.Symbol, k.Interval, k.Open, k.High, k.Low, k.Close, k.GetChange(), k.GetMaxChange(), k.Volume, k.QuoteVolume, k.TakerBuyBaseAssetVolume)
 }
 
 func (k KLine) Color() string {
@@ -197,6 +197,9 @@ func (k KLine) SlackAttachment() slack.Attachment {
 			{Title: "Close", Value: util.FormatFloat(k.Close, 2), Short: true},
 			{Title: "Mid", Value: util.FormatFloat(k.Mid(), 2), Short: true},
 			{Title: "Change", Value: util.FormatFloat(k.GetChange(), 2), Short: true},
+			{Title: "Volume", Value: util.FormatFloat(k.Volume, 2), Short: true},
+			{Title: "Taker Buy Base Volume", Value: util.FormatFloat(k.TakerBuyBaseAssetVolume, 2), Short: true},
+			{Title: "Taker Buy Quote Volume", Value: util.FormatFloat(k.TakerBuyQuoteAssetVolume, 2), Short: true},
 			{Title: "Max Change", Value: util.FormatFloat(k.GetMaxChange(), 2), Short: true},
 			{
 				Title: "Thickness",
