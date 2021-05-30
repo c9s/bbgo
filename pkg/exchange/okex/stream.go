@@ -244,12 +244,6 @@ func (s *Stream) connect(ctx context.Context) error {
 	// create a new context
 	s.connCtx, s.connCancel = context.WithCancel(ctx)
 
-	if s.publicOnly {
-		log.Infof("stream is set to public only mode")
-	} else {
-		log.Infof("request listen key for creating user data stream...")
-	}
-
 	// when in public mode, the listen key is an empty string
 	var url string
 	if s.publicOnly {
