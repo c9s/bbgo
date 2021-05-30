@@ -312,10 +312,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			})
 		}
 
-		_, err = orderExecutor.SubmitOrders(ctx, targetOrders...)
+		createdOrders, err = orderExecutor.SubmitOrders(ctx, targetOrders...)
 		if err != nil {
 			log.WithError(err).Error("submit profit target order error")
 		}
+		s.orderStore.Add(createdOrders...)
 	})
 
 	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
