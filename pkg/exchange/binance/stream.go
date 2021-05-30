@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/adshao/go-binance/v2"
-	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/gorilla/websocket"
 
 	"github.com/c9s/bbgo/pkg/types"
@@ -134,12 +133,10 @@ func NewStream(client *binance.Client) *Stream {
 	stream.OnOutboundAccountPositionEvent(func(e *OutboundAccountPositionEvent) {
 		snapshot := types.BalanceMap{}
 		for _, balance := range e.Balances {
-			available := fixedpoint.Must(fixedpoint.NewFromString(balance.Free))
-			locked := fixedpoint.Must(fixedpoint.NewFromString(balance.Locked))
 			snapshot[balance.Asset] = types.Balance{
 				Currency:  balance.Asset,
-				Available: available,
-				Locked:    locked,
+				Available: balance.Free,
+				Locked:    balance.Locked,
 			}
 		}
 		stream.EmitBalanceSnapshot(snapshot)
