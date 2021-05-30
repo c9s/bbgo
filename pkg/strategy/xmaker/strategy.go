@@ -8,15 +8,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/c9s/bbgo/pkg/indicator"
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
-
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/exchange/max"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 var defaultMargin = fixedpoint.NewFromFloat(0.003)
@@ -40,13 +39,15 @@ func init() {
 }
 
 type State struct {
-	HedgePosition     fixedpoint.Value `json:"hedgePosition"`
-	Position          *bbgo.Position   `json:"position,omitempty"`
-	AccumulatedVolume fixedpoint.Value `json:"accumulatedVolume,omitempty"`
-	AccumulatedPnL    fixedpoint.Value `json:"accumulatedPnL,omitempty"`
-	AccumulatedProfit fixedpoint.Value `json:"accumulatedProfit,omitempty"`
-	AccumulatedLoss   fixedpoint.Value `json:"accumulatedLoss,omitempty"`
-	AccumulatedSince  int64            `json:"accumulatedSince,omitempty"`
+	HedgePosition        fixedpoint.Value `json:"hedgePosition"`
+	CoveredPosition      fixedpoint.Value `json:"coveredPosition,omitempty"`
+	Position             *bbgo.Position   `json:"position,omitempty"`
+	AccumulatedVolume    fixedpoint.Value `json:"accumulatedVolume,omitempty"`
+	AccumulatedPnL       fixedpoint.Value `json:"accumulatedPnL,omitempty"`
+	AccumulatedNetProfit fixedpoint.Value `json:"accumulatedNetProfit,omitempty"`
+	AccumulatedProfit    fixedpoint.Value `json:"accumulatedProfit,omitempty"`
+	AccumulatedLoss      fixedpoint.Value `json:"accumulatedLoss,omitempty"`
+	AccumulatedSince     int64            `json:"accumulatedSince,omitempty"`
 }
 
 type Strategy struct {
@@ -54,9 +55,13 @@ type Strategy struct {
 	*bbgo.Notifiability
 	*bbgo.Persistence
 
-	Symbol         string `json:"symbol"`
+	Symbol string `json:"symbol"`
+
+	// SourceExchange session name
 	SourceExchange string `json:"sourceExchange"`
-	MakerExchange  string `json:"makerExchange"`
+
+	// MakerExchange session name
+	MakerExchange string `json:"makerExchange"`
 
 	UpdateInterval      types.Duration `json:"updateInterval"`
 	HedgeInterval       types.Duration `json:"hedgeInterval"`
@@ -88,6 +93,8 @@ type Strategy struct {
 
 	DisableHedge bool `json:"disableHedge"`
 
+	NotifyTrade bool `json:"notifyTrade"`
+
 	NumLayers int `json:"numLayers"`
 
 	// Pips is the pips of the layer prices
@@ -111,6 +118,8 @@ type Strategy struct {
 	activeMakerOrders *bbgo.LocalActiveOrderBook
 
 	orderStore *bbgo.OrderStore
+	tradeStore *bbgo.TradeStore
+	tradeC     chan types.Trade
 
 	lastPrice float64
 	groupID   uint32
@@ -436,23 +445,27 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 	s.orderStore.Add(makerOrders...)
 }
 
+func quantityToPosition(quantity fixedpoint.Value, side types.SideType) fixedpoint.Value {
+	if side == types.SideTypeSell {
+		return - quantity
+	}
+	return quantity
+}
+
 func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	side := types.SideTypeBuy
-
 	if pos == 0 {
 		return
 	}
 
-	quantity := pos
+	quantity := fixedpoint.Abs(pos)
+
 	if pos < 0 {
 		side = types.SideTypeSell
-
-		// quantity must be a positive number
-		quantity = -pos
 	}
 
 	lastPrice := s.lastPrice
-	sourceBook := s.book.Copy()
+	sourceBook := s.book.CopyDepth(1)
 	switch side {
 
 	case types.SideTypeBuy:
@@ -495,7 +508,9 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 
 	}
 
+	log.Infof("submitting %s hedge order %s %f", s.Symbol, side.String(), quantity.Float64())
 	s.Notifiability.Notify("Submitting %s hedge order %s %f", s.Symbol, side.String(), quantity.Float64())
+
 	orderExecutor := &bbgo.ExchangeOrderExecutor{Session: s.sourceSession}
 	returnOrders, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 		Symbol:   s.Symbol,
@@ -509,12 +524,22 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 		return
 	}
 
+	// if it's selling, than we should add positive position
+	if side == types.SideTypeSell {
+		s.state.CoveredPosition.AtomicAdd(quantity)
+	} else {
+		s.state.CoveredPosition.AtomicAdd(-quantity)
+	}
+
 	s.orderStore.Add(returnOrders...)
 }
 
-func (s *Strategy) handleTradeUpdate(trade types.Trade) {
-	log.Infof("received trade %+v", trade)
+func (s *Strategy) handleTrade(trade types.Trade) {
+	s.tradeC <- trade
+}
 
+func (s *Strategy) processTrade(trade types.Trade) {
+	log.Infof("processing trade %+v", trade)
 	if trade.Symbol != s.Symbol {
 		return
 	}
@@ -522,6 +547,12 @@ func (s *Strategy) handleTradeUpdate(trade types.Trade) {
 	if !s.orderStore.Exists(trade.OrderID) {
 		return
 	}
+
+	if s.NotifyTrade {
+		s.Notifiability.Notify(trade)
+	}
+
+	log.Infof("identified %s trade %d with an existing order: %d", trade.Symbol, trade.ID, trade.OrderID)
 
 	q := fixedpoint.NewFromFloat(trade.Quantity)
 	switch trade.Side {
@@ -541,13 +572,17 @@ func (s *Strategy) handleTradeUpdate(trade types.Trade) {
 
 	}
 
-	log.Infof("identified %s trade %d with an existing order: %d", trade.Symbol, trade.ID, trade.OrderID)
-
 	s.state.HedgePosition.AtomicAdd(q)
+
+	if trade.Exchange == s.sourceSession.ExchangeName {
+		s.state.CoveredPosition.AtomicAdd(q)
+	}
+
 	s.state.AccumulatedVolume.AtomicAdd(fixedpoint.NewFromFloat(trade.Quantity))
 
 	if profit, netProfit, madeProfit := s.state.Position.AddTrade(trade); madeProfit {
 		s.state.AccumulatedPnL.AtomicAdd(profit)
+		s.state.AccumulatedNetProfit.AtomicAdd(netProfit)
 
 		if profit < 0 {
 			s.state.AccumulatedLoss.AtomicAdd(profit)
@@ -563,18 +598,25 @@ func (s *Strategy) handleTradeUpdate(trade types.Trade) {
 			since = time.Unix(s.state.AccumulatedSince, 0).In(localTimeZone)
 		}
 
-		s.Notify("%s trade profit %s %f %s (%.2f%%), net profit =~ %f %s (%.2f%%), since %s accumulated net profit %f %s, accumulated loss %f %s",
+		s.Notify("%s trade profit %s %f %s (%.2f%%), net profit =~ %f %s (%.2f%%),\n"+
+			"accumulated profit %f %s,\n"+
+			"accumulated net profit %f %s,\n"+
+			"accumulated trade loss %f %s\n"+
+			"since %s",
 			s.Symbol,
 			pnlEmoji(profit),
 			profit.Float64(), s.state.Position.QuoteCurrency,
 			profitMargin.Float64()*100.0,
 			netProfit.Float64(), s.state.Position.QuoteCurrency,
 			netProfitMargin.Float64()*100.0,
-			since.Format(time.RFC822),
 			s.state.AccumulatedPnL.Float64(), s.state.Position.QuoteCurrency,
-			s.state.AccumulatedLoss.Float64(), s.state.Position.QuoteCurrency)
+			s.state.AccumulatedNetProfit.Float64(), s.state.Position.QuoteCurrency,
+			s.state.AccumulatedLoss.Float64(), s.state.Position.QuoteCurrency,
+			since.Format(time.RFC822),
+		)
 
 	} else {
+		log.Infof("position changed: %s", s.state.Position)
 		s.Notify(s.state.Position)
 	}
 
@@ -629,6 +671,9 @@ func (s *Strategy) SaveState() error {
 }
 
 func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession) error {
+	// buffer 100 trades in the channel
+	s.tradeC = make(chan types.Trade, 100)
+
 	if s.BollBandInterval == "" {
 		s.BollBandInterval = types.Interval1m
 	}
@@ -743,17 +788,19 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	}
 
 	s.book = types.NewStreamBook(s.Symbol)
-	s.book.BindStream(s.sourceSession.Stream)
+	s.book.BindStream(s.sourceSession.MarketDataStream)
 
-	s.sourceSession.Stream.OnTradeUpdate(s.handleTradeUpdate)
-	s.makerSession.Stream.OnTradeUpdate(s.handleTradeUpdate)
+	s.sourceSession.UserDataStream.OnTradeUpdate(s.handleTrade)
+	s.makerSession.UserDataStream.OnTradeUpdate(s.handleTrade)
 
 	s.activeMakerOrders = bbgo.NewLocalActiveOrderBook()
-	s.activeMakerOrders.BindStream(s.makerSession.Stream)
+	s.activeMakerOrders.BindStream(s.makerSession.UserDataStream)
+
+	s.tradeStore = bbgo.NewTradeStore(s.Symbol)
 
 	s.orderStore = bbgo.NewOrderStore(s.Symbol)
-	s.orderStore.BindStream(s.sourceSession.Stream)
-	s.orderStore.BindStream(s.makerSession.Stream)
+	s.orderStore.BindStream(s.sourceSession.UserDataStream)
+	s.orderStore.BindStream(s.makerSession.UserDataStream)
 
 	s.stopC = make(chan struct{})
 
@@ -784,11 +831,35 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 			case <-quoteTicker.C:
 				s.updateQuote(ctx, orderExecutionRouter)
 
+			case trade := <-s.tradeC:
+				log.Infof("recieved trade %+v", trade)
+				if s.orderStore.Exists(trade.OrderID) {
+					s.processTrade(trade)
+				} else {
+					// buffer this trade to the next tick of hedge
+					s.tradeStore.Add(trade)
+				}
+
 			case <-posTicker.C:
+				// process pending trades
+				if s.tradeStore.Num() > 0 {
+					for _, trade := range s.tradeStore.Trades() {
+						if s.orderStore.Exists(trade.OrderID) {
+							s.processTrade(trade)
+						}
+					}
+					s.tradeStore.Clear()
+				}
+
+				// for positive position:
+				// uncover position = 5 - 3 (covered position) = 2
+				// for negative position:
+				// uncover position = -5 - -3 (covered position) = -2
 				position := s.state.HedgePosition.AtomicLoad()
-				abspos := math.Abs(position.Float64())
-				if !s.DisableHedge && abspos > s.sourceMarket.MinQuantity {
-					s.Hedge(ctx, -position)
+				uncoverPosition := position - s.state.CoveredPosition.AtomicLoad()
+				absPos := math.Abs(uncoverPosition.Float64())
+				if !s.DisableHedge && absPos > s.sourceMarket.MinQuantity {
+					s.Hedge(ctx, -uncoverPosition)
 				}
 			}
 		}

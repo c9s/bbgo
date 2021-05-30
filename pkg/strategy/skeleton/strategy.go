@@ -31,7 +31,7 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-	session.Stream.OnKLineClosed(func(kline types.KLine) {
+	session.UserDataStream.OnKLineClosed(func(kline types.KLine) {
 		quoteBalance, ok := session.Account.Balance(s.Market.QuoteCurrency)
 		if !ok {
 			return

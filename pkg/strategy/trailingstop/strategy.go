@@ -206,10 +206,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		return err
 	}
 
-	session.Stream.OnOrderUpdate(s.handleOrderUpdate)
+	session.UserDataStream.OnOrderUpdate(s.handleOrderUpdate)
 
-	// session.Stream.OnKLineClosed
-	session.Stream.OnKLineClosed(func(kline types.KLine) {
+	// session.UserDataStream.OnKLineClosed
+	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		// skip k-lines from other symbols
 		if kline.Symbol != s.Symbol || kline.Interval != s.Interval {
 			return
@@ -250,10 +250,10 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		return err
 	}
 
-	session.Stream.OnOrderUpdate(s.handleOrderUpdate)
+	session.UserDataStream.OnOrderUpdate(s.handleOrderUpdate)
 
-	// session.Stream.OnKLineClosed
-	sourceSession.Stream.OnKLineClosed(func(kline types.KLine) {
+	// session.UserDataStream.OnKLineClosed
+	sourceSession.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		// skip k-lines from other symbols
 		if kline.Symbol != s.Symbol || kline.Interval != s.Interval {
 			return

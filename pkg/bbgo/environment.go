@@ -211,11 +211,8 @@ func (environ *Environment) AddExchangesByViperKeys() error {
 }
 
 func InitExchangeSession(name string, session *ExchangeSession) error {
-	exchangeName, err := types.ValidExchangeName(session.ExchangeName)
-	if err != nil {
-		return err
-	}
-
+	var err error
+	var exchangeName = session.ExchangeName
 	var exchange types.Exchange
 	if session.Key != "" && session.Secret != "" {
 		if !session.PublicOnly {
@@ -254,7 +251,9 @@ func InitExchangeSession(name string, session *ExchangeSession) error {
 		ObjectChannelRouter:  NewObjectChannelRouter(),
 	}
 	session.Exchange = exchange
-	session.Stream = exchange.NewStream()
+	session.UserDataStream = exchange.NewStream()
+	session.MarketDataStream = exchange.NewStream()
+	session.MarketDataStream.SetPublicOnly()
 
 	// pointer fields
 	session.Subscriptions = make(map[types.Subscription]types.Subscription)
@@ -367,11 +366,11 @@ func (environ *Environment) ConfigureNotificationRouting(conf *NotificationConfi
 				// if we can route session name to channel successfully...
 				channel, ok := environ.SessionChannelRouter.Route(name)
 				if ok {
-					session.Stream.OnTradeUpdate(func(trade types.Trade) {
+					session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
 						environ.NotifyTo(channel, &trade)
 					})
 				} else {
-					session.Stream.OnTradeUpdate(defaultTradeUpdateHandler)
+					session.UserDataStream.OnTradeUpdate(defaultTradeUpdateHandler)
 				}
 			}
 
@@ -396,7 +395,7 @@ func (environ *Environment) ConfigureNotificationRouting(conf *NotificationConfi
 				}
 			}
 			for _, session := range environ.sessions {
-				session.Stream.OnTradeUpdate(handler)
+				session.UserDataStream.OnTradeUpdate(handler)
 			}
 		}
 
@@ -415,12 +414,12 @@ func (environ *Environment) ConfigureNotificationRouting(conf *NotificationConfi
 				// if we can route session name to channel successfully...
 				channel, ok := environ.SessionChannelRouter.Route(name)
 				if ok {
-					session.Stream.OnOrderUpdate(func(order types.Order) {
+					session.UserDataStream.OnOrderUpdate(func(order types.Order) {
 						text := util.Render(TemplateOrderReport, order)
 						environ.NotifyTo(channel, text, &order)
 					})
 				} else {
-					session.Stream.OnOrderUpdate(defaultOrderUpdateHandler)
+					session.UserDataStream.OnOrderUpdate(defaultOrderUpdateHandler)
 				}
 			}
 
@@ -446,7 +445,7 @@ func (environ *Environment) ConfigureNotificationRouting(conf *NotificationConfi
 				}
 			}
 			for _, session := range environ.sessions {
-				session.Stream.OnOrderUpdate(handler)
+				session.UserDataStream.OnOrderUpdate(handler)
 			}
 		}
 
@@ -508,13 +507,20 @@ func (environ *Environment) Connect(ctx context.Context) error {
 			// add the subscribe requests to the stream
 			for _, s := range session.Subscriptions {
 				logger.Infof("subscribing %s %s %v", s.Symbol, s.Channel, s.Options)
-				session.Stream.Subscribe(s.Channel, s.Symbol, s.Options)
+				session.MarketDataStream.Subscribe(s.Channel, s.Symbol, s.Options)
 			}
 		}
 
-		logger.Infof("connecting session %s...", session.Name)
-		if err := session.Stream.Connect(ctx); err != nil {
+		logger.Infof("connecting %s market data stream...", session.Name)
+		if err := session.MarketDataStream.Connect(ctx); err != nil {
 			return err
+		}
+
+		if !session.PublicOnly {
+			logger.Infof("connecting %s user data stream...", session.Name)
+			if err := session.UserDataStream.Connect(ctx); err != nil {
+				return err
+			}
 		}
 	}
 

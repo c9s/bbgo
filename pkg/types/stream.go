@@ -2,6 +2,8 @@ package types
 
 import (
 	"context"
+
+	"github.com/gorilla/websocket"
 )
 
 type Stream interface {
@@ -21,6 +23,8 @@ var KLineChannel = Channel("kline")
 
 //go:generate callbackgen -type StandardStream -interface
 type StandardStream struct {
+	ReconnectC chan struct{}
+
 	Subscriptions []Subscription
 
 	startCallbacks []func()
@@ -55,6 +59,24 @@ func (stream *StandardStream) Subscribe(channel Channel, symbol string, options 
 		Symbol:  symbol,
 		Options: options,
 	})
+}
+
+func (stream *StandardStream) Reconnect() {
+	select {
+	case stream.ReconnectC <- struct{}{}:
+	default:
+	}
+}
+
+func (stream *StandardStream) Dial(url string) (*websocket.Conn, error) {
+	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// use the default ping handler
+	conn.SetPingHandler(nil)
+	return conn, nil
 }
 
 // SubscribeOptions provides the standard stream options

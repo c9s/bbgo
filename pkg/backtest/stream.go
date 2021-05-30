@@ -15,6 +15,8 @@ type Stream struct {
 	types.StandardStream
 
 	exchange *Exchange
+
+	publicOnly bool
 }
 
 func (s *Stream) Connect(ctx context.Context) error {
@@ -51,48 +53,72 @@ func (s *Stream) Connect(ctx context.Context) error {
 
 	log.Infof("used symbols: %v and intervals: %v", symbols, intervals)
 
-	go func() {
-		log.Infof("emitting connect callbacks...")
-		s.EmitConnect()
+	if !s.publicOnly {
+		// user data stream
+		s.OnTradeUpdate(func(trade types.Trade) {
+			s.exchange.trades[trade.Symbol] = append(s.exchange.trades[trade.Symbol], trade)
+		})
 
-		log.Infof("emitting start callbacks...")
-		s.EmitStart()
+		for symbol, market := range s.exchange.markets {
+			matching := &SimplePriceMatching{
+				CurrentTime:     s.exchange.startTime,
+				Account:         s.exchange.account,
+				Market:          market,
+				MakerCommission: s.exchange.config.Account.MakerCommission,
+				TakerCommission: s.exchange.config.Account.TakerCommission,
+			}
+			matching.OnTradeUpdate(s.EmitTradeUpdate)
+			matching.OnOrderUpdate(s.EmitOrderUpdate)
+			matching.OnBalanceUpdate(s.EmitBalanceUpdate)
+			s.exchange.matchingBooks[symbol] = matching
+		}
 
-		log.Infof("querying klines from database...")
-		klineC, errC := s.exchange.srv.QueryKLinesCh(s.exchange.startTime, s.exchange.endTime, s.exchange, symbols, intervals)
-		numKlines := 0
-		for k := range klineC {
-			if k.Interval == types.Interval1m {
-				matching, ok := s.exchange.matchingBooks[k.Symbol]
-				if !ok {
-					log.Errorf("matching book of %s is not initialized", k.Symbol)
-					continue
+		// assign user data stream back
+		s.exchange.userDataStream = s
+	}
+
+	s.EmitConnect()
+	s.EmitStart()
+
+	if s.publicOnly {
+		go func() {
+			log.Infof("querying klines from database...")
+			klineC, errC := s.exchange.srv.QueryKLinesCh(s.exchange.startTime, s.exchange.endTime, s.exchange, symbols, intervals)
+			numKlines := 0
+			for k := range klineC {
+				if k.Interval == types.Interval1m {
+					matching, ok := s.exchange.matchingBooks[k.Symbol]
+					if !ok {
+						log.Errorf("matching book of %s is not initialized", k.Symbol)
+						continue
+					}
+
+					matching.processKLine(k)
+					numKlines++
 				}
 
-				matching.processKLine(k)
-				numKlines++
+				s.EmitKLineClosed(k)
 			}
 
-			s.EmitKLineClosed(k)
-		}
+			if err := <-errC; err != nil {
+				log.WithError(err).Error("backtest data feed error")
+			}
 
-		if err := <-errC; err != nil {
-			log.WithError(err).Error("backtest data feed error")
-		}
+			if numKlines == 0 {
+				log.Error("kline data is empty, make sure you have sync the exchange market data")
+			}
 
-		if numKlines == 0 {
-			log.Error("kline data is empty, make sure you have sync the exchange market data")
-		}
-
-		if err := s.Close(); err != nil {
-			log.WithError(err).Error("stream close error")
-		}
-	}()
+			if err := s.Close(); err != nil {
+				log.WithError(err).Error("stream close error")
+			}
+		}()
+	}
 
 	return nil
 }
 
 func (s *Stream) SetPublicOnly() {
+	s.publicOnly = true
 	return
 }
 

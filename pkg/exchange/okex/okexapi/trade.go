@@ -261,7 +261,7 @@ func (r *BatchCancelOrderRequest) Add(reqs ...*CancelOrderRequest) *BatchCancelO
 	return r
 }
 
-func (r *BatchCancelOrderRequest) Do(ctx context.Context) (*OrderResponse, error) {
+func (r *BatchCancelOrderRequest) Do(ctx context.Context) ([]OrderResponse, error) {
 	var parameterList []map[string]interface{}
 
 	for _, req := range r.reqs {
@@ -288,11 +288,7 @@ func (r *BatchCancelOrderRequest) Do(ctx context.Context) (*OrderResponse, error
 		return nil, err
 	}
 
-	if len(orderResponse.Data) == 0 {
-		return nil, errors.New("order create error")
-	}
-
-	return &orderResponse.Data[0], nil
+	return orderResponse.Data, nil
 }
 
 type BatchPlaceOrderRequest struct {
@@ -339,36 +335,52 @@ func (r *BatchPlaceOrderRequest) Do(ctx context.Context) ([]OrderResponse, error
 type OrderDetails struct {
 	InstrumentType string           `json:"instType"`
 	InstrumentID   string           `json:"instId"`
-	Currency       string           `json:"ccy"`
 	Tag            string           `json:"tag"`
 	Price          fixedpoint.Value `json:"px"`
 	Quantity       fixedpoint.Value `json:"sz"`
 
+	OrderID       string    `json:"ordId"`
+	ClientOrderID string    `json:"clOrdId"`
+	OrderType     OrderType `json:"ordType"`
+	Side          SideType  `json:"side"`
+
 	// Accumulated fill quantity
 	FilledQuantity fixedpoint.Value `json:"accFillSz"`
-
-	LastFilledPrice    fixedpoint.Value `json:"fillPx"`
-	LastFilledQuantity fixedpoint.Value `json:"fillSz"`
-
-	// Average filled price. If none is filled, it will return 0.
-	AveragePrice fixedpoint.Value `json:"avgPx"`
-
-	Leverage fixedpoint.Value `json:"lever"`
 
 	FeeCurrency string           `json:"feeCcy"`
 	Fee         fixedpoint.Value `json:"fee"`
 
+	// trade related fields
+	LastTradeID           string                     `json:"tradeId,omitempty"`
+	LastFilledPrice       fixedpoint.Value           `json:"fillPx"`
+	LastFilledQuantity    fixedpoint.Value           `json:"fillSz"`
+	LastFilledTime        types.MillisecondTimestamp `json:"fillTime"`
+	LastFilledFee         fixedpoint.Value           `json:"fillFee"`
+	LastFilledFeeCurrency string                     `json:"fillFeeCcy"`
+
+	// ExecutionType = liquidity (M = maker or T = taker)
+	ExecutionType string `json:"execType"`
+
+	// Average filled price. If none is filled, it will return 0.
+	AveragePrice fixedpoint.Value `json:"avgPx"`
+
+	// Currency = Margin currency
+	// Only applicable to cross MARGIN orders in Single-currency margin.
+	Currency string `json:"ccy"`
+
+	// Leverage = from 0.01 to 125.
+	//Only applicable to MARGIN/FUTURES/SWAP
+	Leverage fixedpoint.Value `json:"lever"`
+
 	RebateCurrency string           `json:"rebateCcy"`
 	Rebate         fixedpoint.Value `json:"rebate"`
 
-	PnL       fixedpoint.Value `json:"pnl"`
-	OrderType OrderType        `json:"ordType"`
-	Side      SideType         `json:"side"`
+	PnL fixedpoint.Value `json:"pnl"`
 
 	UpdateTime   types.MillisecondTimestamp `json:"uTime"`
 	CreationTime types.MillisecondTimestamp `json:"cTime"`
 
-	State string `json:"state"`
+	State OrderState `json:"state"`
 }
 
 type GetOrderDetailsRequest struct {
@@ -439,11 +451,18 @@ func (r *GetOrderDetailsRequest) Do(ctx context.Context) (*OrderDetails, error) 
 type GetPendingOrderRequest struct {
 	client *RestClient
 
+	instId *string
+
 	instType *InstrumentType
 
 	orderTypes []string
 
 	state *OrderState
+}
+
+func (r *GetPendingOrderRequest) InstrumentID(instId string) *GetPendingOrderRequest {
+	r.instId = &instId
+	return r
 }
 
 func (r *GetPendingOrderRequest) InstrumentType(instType InstrumentType) *GetPendingOrderRequest {
@@ -468,6 +487,10 @@ func (r *GetPendingOrderRequest) AddOrderTypes(orderTypes ...string) *GetPending
 
 func (r *GetPendingOrderRequest) Parameters() map[string]interface{} {
 	var payload = map[string]interface{}{}
+
+	if r.instId != nil {
+		payload["instId"] = r.instId
+	}
 
 	if r.instType != nil {
 		payload["instType"] = r.instType
