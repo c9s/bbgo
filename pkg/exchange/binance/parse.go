@@ -446,16 +446,16 @@ type KLine struct {
 	Symbol   string `json:"s"`
 	Interval string `json:"i"`
 
-	Open  string `json:"o"`
-	Close string `json:"c"`
-	High  string `json:"h"`
-	Low   string `json:"l"`
+	Open  fixedpoint.Value `json:"o"`
+	Close fixedpoint.Value `json:"c"`
+	High  fixedpoint.Value `json:"h"`
+	Low   fixedpoint.Value `json:"l"`
 
-	Volume      string `json:"v"` // base asset volume (like 10 BTC)
-	QuoteVolume string `json:"q"` // quote asset volume
+	Volume      fixedpoint.Value `json:"v"` // base asset volume (like 10 BTC)
+	QuoteVolume fixedpoint.Value `json:"q"` // quote asset volume
 
-	TakerBaseVolume  string `json:"V"` // taker buy base asset volume (like 10 BTC)
-	TakerQuoteVolume string `json:"Q"` // taker buy quote asset volume (like 1000USDT)
+	TakerBuyBaseAssetVolume  fixedpoint.Value `json:"V"` // taker buy base asset volume (like 10 BTC)
+	TakerBuyQuoteAssetVolume fixedpoint.Value `json:"Q"` // taker buy quote asset volume (like 1000USDT)
 
 	LastTradeID    int   `json:"L"`
 	NumberOfTrades int64 `json:"n"`
@@ -475,12 +475,12 @@ func (k *KLine) KLine() types.KLine {
 		Interval:       types.Interval(k.Interval),
 		StartTime:      time.Unix(0, k.StartTime*int64(time.Millisecond)),
 		EndTime:        time.Unix(0, k.EndTime*int64(time.Millisecond)),
-		Open:           util.MustParseFloat(k.Open),
-		Close:          util.MustParseFloat(k.Close),
-		High:           util.MustParseFloat(k.High),
-		Low:            util.MustParseFloat(k.Low),
-		Volume:         util.MustParseFloat(k.Volume),
-		QuoteVolume:    util.MustParseFloat(k.TakerQuoteVolume),
+		Open:           k.Open.Float64(),
+		Close:          k.Close.Float64(),
+		High:           k.High.Float64(),
+		Low:            k.Low.Float64(),
+		Volume:         k.Volume.Float64(),
+		QuoteVolume:    k.QuoteVolume.Float64(),
 		LastTradeID:    uint64(k.LastTradeID),
 		NumberOfTrades: uint64(k.NumberOfTrades),
 		Closed:         k.Closed,
