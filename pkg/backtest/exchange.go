@@ -25,7 +25,7 @@ type Exchange struct {
 	account *types.Account
 	config  *bbgo.Backtest
 
-	stream *Stream
+	userDataStream *Stream
 
 	trades        map[string][]types.Trade
 	closedOrders  map[string][]types.Order
@@ -91,31 +91,7 @@ func (e *Exchange) Done() chan struct{} {
 }
 
 func (e *Exchange) NewStream() types.Stream {
-	if e.stream != nil {
-		panic("backtest stream can not be allocated twice")
-	}
-
-	e.stream = &Stream{exchange: e}
-
-	e.stream.OnTradeUpdate(func(trade types.Trade) {
-		e.trades[trade.Symbol] = append(e.trades[trade.Symbol], trade)
-	})
-
-	for symbol, market := range e.markets {
-		matching := &SimplePriceMatching{
-			CurrentTime:     e.startTime,
-			Account:         e.account,
-			Market:          market,
-			MakerCommission: e.config.Account.MakerCommission,
-			TakerCommission: e.config.Account.TakerCommission,
-		}
-		matching.OnTradeUpdate(e.stream.EmitTradeUpdate)
-		matching.OnOrderUpdate(e.stream.EmitOrderUpdate)
-		matching.OnBalanceUpdate(e.stream.EmitBalanceUpdate)
-		e.matchingBooks[symbol] = matching
-	}
-
-	return e.stream
+	return &Stream{exchange: e}
 }
 
 func (e Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error) {
@@ -140,11 +116,11 @@ func (e Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder)
 				e.closedOrders[symbol] = append(e.closedOrders[symbol], *createdOrder)
 			}
 
-			e.stream.EmitOrderUpdate(*createdOrder)
+			e.userDataStream.EmitOrderUpdate(*createdOrder)
 		}
 
 		if trade != nil {
-			e.stream.EmitTradeUpdate(*trade)
+			e.userDataStream.EmitTradeUpdate(*trade)
 		}
 	}
 
@@ -180,7 +156,7 @@ func (e Exchange) CancelOrders(ctx context.Context, orders ...types.Order) error
 			return err
 		}
 
-		e.stream.EmitOrderUpdate(canceledOrder)
+		e.userDataStream.EmitOrderUpdate(canceledOrder)
 	}
 
 	return nil
