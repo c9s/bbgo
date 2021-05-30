@@ -470,20 +470,22 @@ type KLineEvent struct {
 
 func (k *KLine) KLine() types.KLine {
 	return types.KLine{
-		Exchange:       types.ExchangeBinance,
-		Symbol:         k.Symbol,
-		Interval:       types.Interval(k.Interval),
-		StartTime:      time.Unix(0, k.StartTime*int64(time.Millisecond)),
-		EndTime:        time.Unix(0, k.EndTime*int64(time.Millisecond)),
-		Open:           k.Open.Float64(),
-		Close:          k.Close.Float64(),
-		High:           k.High.Float64(),
-		Low:            k.Low.Float64(),
-		Volume:         k.Volume.Float64(),
-		QuoteVolume:    k.QuoteVolume.Float64(),
-		LastTradeID:    uint64(k.LastTradeID),
-		NumberOfTrades: uint64(k.NumberOfTrades),
-		Closed:         k.Closed,
+		Exchange:                 types.ExchangeBinance,
+		Symbol:                   k.Symbol,
+		Interval:                 types.Interval(k.Interval),
+		StartTime:                time.Unix(0, k.StartTime*int64(time.Millisecond)),
+		EndTime:                  time.Unix(0, k.EndTime*int64(time.Millisecond)),
+		Open:                     k.Open.Float64(),
+		Close:                    k.Close.Float64(),
+		High:                     k.High.Float64(),
+		Low:                      k.Low.Float64(),
+		Volume:                   k.Volume.Float64(),
+		QuoteVolume:              k.QuoteVolume.Float64(),
+		TakerBuyBaseAssetVolume:  k.TakerBuyBaseAssetVolume.Float64(),
+		TakerBuyQuoteAssetVolume: k.TakerBuyQuoteAssetVolume.Float64(),
+		LastTradeID:              uint64(k.LastTradeID),
+		NumberOfTrades:           uint64(k.NumberOfTrades),
+		Closed:                   k.Closed,
 	}
 }
 
