@@ -312,22 +312,20 @@ func (s *Stream) reconnector(ctx context.Context) {
 }
 
 func (s *Stream) connect(ctx context.Context) error {
+	var err error
 	var listenKey string
 	if s.publicOnly {
 		log.Infof("stream is set to public only mode")
 	} else {
 		log.Infof("request listen key for creating user data stream...")
 
-		listenKey, err := s.fetchListenKey(ctx)
+		listenKey, err = s.fetchListenKey(ctx)
 		if err != nil {
 			return err
 		}
 
 		log.Infof("listen key is created: %s", MaskKey(listenKey))
 	}
-
-	// should only start one connection one time, so we lock the mutex
-	s.ConnLock.Lock()
 
 	// when in public mode, the listen key is an empty string
 	conn, err := s.dial(listenKey)
@@ -337,6 +335,8 @@ func (s *Stream) connect(ctx context.Context) error {
 
 	log.Infof("websocket connected")
 
+	// should only start one connection one time, so we lock the mutex
+	s.ConnLock.Lock()
 
 	// ensure the previous context is cancelled
 	if s.connCancel != nil {
