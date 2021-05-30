@@ -631,6 +631,8 @@ Each issue has its BBG label, by completing the issue with a pull request, you c
 
 If you have feature request, you can offer your BBG for contributors.
 
+BBG/ETH liquidity pool on Uniswap: <https://app.uniswap.org/#/pool/28377>
+
 For further request, please contact us: <https://t.me/c123456789s>
 
 ## License
