@@ -211,11 +211,8 @@ func (environ *Environment) AddExchangesByViperKeys() error {
 }
 
 func InitExchangeSession(name string, session *ExchangeSession) error {
-	exchangeName, err := types.ValidExchangeName(session.ExchangeName)
-	if err != nil {
-		return err
-	}
-
+	var err error
+	var exchangeName = session.ExchangeName
 	var exchange types.Exchange
 	if session.Key != "" && session.Secret != "" {
 		if !session.PublicOnly {
