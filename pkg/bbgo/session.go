@@ -123,7 +123,7 @@ type ExchangeSession struct {
 
 	// Exchange Session name
 	Name         string `json:"name,omitempty" yaml:"name,omitempty"`
-	ExchangeName string `json:"exchange" yaml:"exchange"`
+	ExchangeName types.ExchangeName `json:"exchange" yaml:"exchange"`
 	EnvVarPrefix string `json:"envVarPrefix" yaml:"envVarPrefix"`
 	Key          string `json:"key,omitempty" yaml:"key,omitempty"`
 	Secret       string `json:"secret,omitempty" yaml:"secret,omitempty"`

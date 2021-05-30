@@ -8,15 +8,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/c9s/bbgo/pkg/indicator"
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
-
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/exchange/max"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 var defaultMargin = fixedpoint.NewFromFloat(0.003)
@@ -41,6 +40,7 @@ func init() {
 
 type State struct {
 	HedgePosition        fixedpoint.Value `json:"hedgePosition"`
+	CoveredPosition      fixedpoint.Value `json:"coveredPosition,omitempty"`
 	Position             *bbgo.Position   `json:"position,omitempty"`
 	AccumulatedVolume    fixedpoint.Value `json:"accumulatedVolume,omitempty"`
 	AccumulatedPnL       fixedpoint.Value `json:"accumulatedPnL,omitempty"`
@@ -55,9 +55,13 @@ type Strategy struct {
 	*bbgo.Notifiability
 	*bbgo.Persistence
 
-	Symbol         string `json:"symbol"`
+	Symbol string `json:"symbol"`
+
+	// SourceExchange session name
 	SourceExchange string `json:"sourceExchange"`
-	MakerExchange  string `json:"makerExchange"`
+
+	// MakerExchange session name
+	MakerExchange string `json:"makerExchange"`
 
 	UpdateInterval      types.Duration `json:"updateInterval"`
 	HedgeInterval       types.Duration `json:"hedgeInterval"`
@@ -441,19 +445,23 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 	s.orderStore.Add(makerOrders...)
 }
 
-func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
+func quantityToPosition(quantity fixedpoint.Value, side types.SideType) fixedpoint.Value {
+	if side == types.SideTypeSell {
+		return - quantity
+	}
+	return quantity
+}
 
+func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	side := types.SideTypeBuy
 	if pos == 0 {
 		return
 	}
 
-	quantity := pos
+	quantity := fixedpoint.Abs(pos)
+
 	if pos < 0 {
 		side = types.SideTypeSell
-
-		// quantity must be a positive number
-		quantity = -pos
 	}
 
 	lastPrice := s.lastPrice
@@ -516,6 +524,13 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 		return
 	}
 
+	// if it's selling, than we should add positive position
+	if side == types.SideTypeSell {
+		s.state.CoveredPosition.AtomicAdd(quantity)
+	} else {
+		s.state.CoveredPosition.AtomicAdd(-quantity)
+	}
+
 	s.orderStore.Add(returnOrders...)
 }
 
@@ -558,6 +573,11 @@ func (s *Strategy) processTrade(trade types.Trade) {
 	}
 
 	s.state.HedgePosition.AtomicAdd(q)
+
+	if trade.Exchange == s.sourceSession.ExchangeName {
+		s.state.CoveredPosition.AtomicAdd(q)
+	}
+
 	s.state.AccumulatedVolume.AtomicAdd(fixedpoint.NewFromFloat(trade.Quantity))
 
 	if profit, netProfit, madeProfit := s.state.Position.AddTrade(trade); madeProfit {
@@ -831,10 +851,15 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 					s.tradeStore.Clear()
 				}
 
+				// for positive position:
+				// uncover position = 5 - 3 (covered position) = 2
+				// for negative position:
+				// uncover position = -5 - -3 (covered position) = -2
 				position := s.state.HedgePosition.AtomicLoad()
-				absPos := math.Abs(position.Float64())
+				uncoverPosition := position - s.state.CoveredPosition.AtomicLoad()
+				absPos := math.Abs(uncoverPosition.Float64())
 				if !s.DisableHedge && absPos > s.sourceMarket.MinQuantity {
-					s.Hedge(ctx, -position)
+					s.Hedge(ctx, -uncoverPosition)
 				}
 			}
 		}

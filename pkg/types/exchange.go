@@ -26,7 +26,7 @@ func (n *ExchangeName) UnmarshalJSON(data []byte) error {
 	}
 
 	switch s {
-	case "max", "binance", "ftx":
+	case "max", "binance", "ftx", "okex":
 		*n = ExchangeName(s)
 		return nil
 
