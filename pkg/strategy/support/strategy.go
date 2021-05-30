@@ -3,7 +3,9 @@ package support
 import (
 	"context"
 	"fmt"
+	"sync"
 
+	"github.com/c9s/bbgo/pkg/service"
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -13,10 +15,16 @@ import (
 
 const ID = "support"
 
+const stateKey = "state-v1"
+
 var log = logrus.WithField("strategy", ID)
 
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
+}
+
+type State struct {
+	Position *bbgo.Position `json:"position,omitempty"`
 }
 
 type Target struct {
@@ -27,6 +35,8 @@ type Target struct {
 
 type Strategy struct {
 	*bbgo.Notifiability
+	*bbgo.Persistence
+	*bbgo.Graceful
 
 	Symbol                string                          `json:"symbol"`
 	Interval              types.Interval                  `json:"interval"`
@@ -46,6 +56,7 @@ type Strategy struct {
 	orderStore *bbgo.OrderStore
 	tradeStore *bbgo.TradeStore
 	tradeC     chan types.Trade
+	state      *State
 }
 
 func (s *Strategy) ID() string {
@@ -85,6 +96,33 @@ func (s *Strategy) tradeCollector(ctx context.Context) {
 	}
 }
 
+func (s *Strategy) SaveState() error {
+	if err := s.Persistence.Save(s.state, ID, s.Symbol, stateKey); err != nil {
+		return err
+	} else {
+		log.Infof("state is saved => %+v", s.state)
+	}
+	return nil
+}
+
+func (s *Strategy) LoadState() error {
+	var state State
+
+	// load position
+	if err := s.Persistence.Load(&state, ID, s.Symbol, stateKey); err != nil {
+		if err != service.ErrPersistenceNotExists {
+			return err
+		}
+
+		s.state = &State{}
+	} else {
+		s.state = &state
+		log.Infof("state is restored: %+v", s.state)
+	}
+
+	return nil
+}
+
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	// buffer 100 trades in the channel
 	s.tradeC = make(chan types.Trade, 100)
@@ -114,6 +152,21 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	var iw = types.IntervalWindow{Interval: s.Interval, Window: s.MovingAverageWindow}
 	var ema = standardIndicatorSet.EWMA(iw)
+
+	if err := s.LoadState(); err != nil {
+		return err
+	} else {
+		s.Notify("%s state is restored => %+v", s.Symbol, s.state)
+	}
+
+	// init state
+	if s.state.Position == nil {
+		s.state.Position = &bbgo.Position{
+			Symbol:        s.Symbol,
+			BaseCurrency:  market.BaseCurrency,
+			QuoteCurrency: market.QuoteCurrency,
+		}
+	}
 
 	go s.tradeCollector(ctx)
 
@@ -152,7 +205,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			closePrice.Float64(),
 			ema.Last(),
 			kline.Volume,
-			s.MinVolume.Float64(), kline)
+			s.MinVolume.Float64(),
+			kline)
 
 		var quantity fixedpoint.Value
 		if s.Quantity > 0 {
@@ -221,6 +275,15 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 		s.orderStore.Add(createdOrders...)
 
+		trades := s.tradeStore.GetAndClear()
+		for _, trade := range trades {
+			if s.orderStore.Exists(trade.OrderID) {
+				s.Notify(trade)
+				s.state.Position.AddTrade(trade)
+			}
+		}
+		s.Notify(s.state.Position)
+
 		// submit target orders
 		var targetOrders []types.SubmitOrder
 		for _, target := range s.Targets {
@@ -252,6 +315,16 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		_, err = orderExecutor.SubmitOrders(ctx, targetOrders...)
 		if err != nil {
 			log.WithError(err).Error("submit profit target order error")
+		}
+	})
+
+	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
+		defer wg.Done()
+
+		if err := s.SaveState(); err != nil {
+			log.WithError(err).Errorf("can not save state: %+v", s.state)
+		} else {
+			s.Notify("%s position is saved", s.Symbol, s.state.Position)
 		}
 	})
 

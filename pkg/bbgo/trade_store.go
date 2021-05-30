@@ -56,6 +56,17 @@ func (s *TradeStore) Clear() {
 	s.mu.Unlock()
 }
 
+func (s *TradeStore) GetAndClear() (trades []types.Trade) {
+	s.mu.Lock()
+	for _, o := range s.trades {
+		trades = append(trades, o)
+	}
+	s.trades = make(map[int64]types.Trade)
+	s.mu.Unlock()
+
+	return trades
+}
+
 func (s *TradeStore) Add(trades ...types.Trade) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
