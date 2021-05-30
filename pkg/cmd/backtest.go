@@ -1,13 +1,12 @@
 package cmd
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"os"
+	"strings"
 	"time"
-
-	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
 
 	"github.com/c9s/bbgo/pkg/accounting/pnl"
 	"github.com/c9s/bbgo/pkg/backtest"
@@ -15,6 +14,9 @@ import (
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
 )
 
 func init() {
@@ -115,7 +117,7 @@ var BacktestCmd = &cobra.Command{
 		log.Infof("starting backtest with startTime %s", startTime.Format(time.ANSIC))
 
 		environ := bbgo.NewEnvironment()
-		if err := BootstrapBacktestEnvironment(ctx, environ, userConfig) ; err != nil {
+		if err := BootstrapBacktestEnvironment(ctx, environ, userConfig); err != nil {
 			return err
 		}
 
@@ -203,11 +205,21 @@ var BacktestCmd = &cobra.Command{
 			}
 		}
 
+		log.Warn("!!! To run backtest, you should use an isolated database for storing backtest trades !!!")
+		log.Warn("!!! The trade record in the current database WILL ALL BE DELETE !!!")
+		if !confirmation("Are you sure to continue?") {
+			return nil
+		}
+
+		if err := environ.TradeService.DeleteAll(); err != nil {
+			return err
+		}
+
 		backtestExchange := backtest.NewExchange(exchangeName, backtestService, userConfig.Backtest)
 		environ.SetStartTime(startTime)
 		environ.AddExchange(exchangeName.String(), backtestExchange)
 
-		if err := environ.Init(ctx) ; err != nil {
+		if err := environ.Init(ctx); err != nil {
 			return err
 		}
 
@@ -223,10 +235,9 @@ var BacktestCmd = &cobra.Command{
 			trader.DisableLogging()
 		}
 
-		if err := trader.Configure(userConfig) ; err != nil {
+		if err := trader.Configure(userConfig); err != nil {
 			return err
 		}
-
 
 		if err := trader.Run(ctx); err != nil {
 			return err
@@ -242,7 +253,6 @@ var BacktestCmd = &cobra.Command{
 		// put the logger back to print the pnl
 		log.SetLevel(log.InfoLevel)
 		for _, session := range environ.Sessions() {
-
 			calculator := &pnl.AverageCostCalculator{
 				TradingFeeCurrency: backtestExchange.PlatformFeeCurrency(),
 			}
@@ -291,4 +301,26 @@ var BacktestCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+func confirmation(s string) bool {
+	reader := bufio.NewReader(os.Stdin)
+	for {
+		fmt.Printf("%s [y/N]: ", s)
+
+		response, err := reader.ReadString('\n')
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		response = strings.ToLower(strings.TrimSpace(response))
+
+		if response == "y" || response == "yes" {
+			return true
+		} else if response == "n" || response == "no" {
+			return false
+		} else {
+			return false
+		}
+	}
 }
