@@ -122,12 +122,12 @@ type ExchangeSession struct {
 	// ---------------------------
 
 	// Exchange Session name
-	Name         string `json:"name,omitempty" yaml:"name,omitempty"`
-	ExchangeName string `json:"exchange" yaml:"exchange"`
-	EnvVarPrefix string `json:"envVarPrefix" yaml:"envVarPrefix"`
-	Key          string `json:"key,omitempty" yaml:"key,omitempty"`
-	Secret       string `json:"secret,omitempty" yaml:"secret,omitempty"`
-	SubAccount   string `json:"subAccount,omitempty" yaml:"subAccount,omitempty"`
+	Name         string             `json:"name,omitempty" yaml:"name,omitempty"`
+	ExchangeName types.ExchangeName `json:"exchange" yaml:"exchange"`
+	EnvVarPrefix string             `json:"envVarPrefix" yaml:"envVarPrefix"`
+	Key          string             `json:"key,omitempty" yaml:"key,omitempty"`
+	Secret       string             `json:"secret,omitempty" yaml:"secret,omitempty"`
+	SubAccount   string             `json:"subAccount,omitempty" yaml:"subAccount,omitempty"`
 
 	// Withdrawal is used for enabling withdrawal functions
 	Withdrawal   bool             `json:"withdrawal,omitempty" yaml:"withdrawal,omitempty"`
@@ -150,8 +150,9 @@ type ExchangeSession struct {
 
 	OrderExecutor *ExchangeOrderExecutor `json:"orderExecutor,omitempty" yaml:"orderExecutor,omitempty"`
 
-	// Stream is the connection stream of the exchange
-	Stream types.Stream `json:"-" yaml:"-"`
+	// UserDataStream is the connection stream of the exchange
+	UserDataStream   types.Stream `json:"-" yaml:"-"`
+	MarketDataStream types.Stream `json:"-" yaml:"-"`
 
 	Subscriptions map[types.Subscription]types.Subscription `json:"-" yaml:"-"`
 
@@ -187,6 +188,10 @@ type ExchangeSession struct {
 }
 
 func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
+	userDataStream := exchange.NewStream()
+	marketDataStream := exchange.NewStream()
+	marketDataStream.SetPublicOnly()
+
 	session := &ExchangeSession{
 		Notifiability: Notifiability{
 			SymbolChannelRouter:  NewPatternChannelRouter(nil),
@@ -194,12 +199,13 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 			ObjectChannelRouter:  NewObjectChannelRouter(),
 		},
 
-		Name:          name,
-		Exchange:      exchange,
-		Stream:        exchange.NewStream(),
-		Subscriptions: make(map[types.Subscription]types.Subscription),
-		Account:       &types.Account{},
-		Trades:        make(map[string]*types.TradeSlice),
+		Name:             name,
+		Exchange:         exchange,
+		UserDataStream:   userDataStream,
+		MarketDataStream: marketDataStream,
+		Subscriptions:    make(map[types.Subscription]types.Subscription),
+		Account:          &types.Account{},
+		Trades:           make(map[string]*types.TradeSlice),
 
 		markets:               make(map[string]types.Market),
 		startPrices:           make(map[string]float64),
@@ -264,27 +270,25 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 	session.Account.UpdateBalances(balances)
 
 	// forward trade updates and order updates to the order executor
-	session.Stream.OnTradeUpdate(session.OrderExecutor.EmitTradeUpdate)
-	session.Stream.OnOrderUpdate(session.OrderExecutor.EmitOrderUpdate)
-	session.Account.BindStream(session.Stream)
+	session.UserDataStream.OnTradeUpdate(session.OrderExecutor.EmitTradeUpdate)
+	session.UserDataStream.OnOrderUpdate(session.OrderExecutor.EmitOrderUpdate)
+	session.Account.BindStream(session.UserDataStream)
 
 	// insert trade into db right before everything
-	// TODO: we should insert the backtest trades into the database,
-	// 		 however we should clean up the trades before we start the next backtesting
-	if environ.TradeService != nil && environ.BacktestService == nil {
-		session.Stream.OnTradeUpdate(func(trade types.Trade) {
+	if environ.TradeService != nil {
+		session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
 			if err := environ.TradeService.Insert(trade); err != nil {
 				log.WithError(err).Errorf("trade insert error: %+v", trade)
 			}
 		})
 	}
 
-	session.Stream.OnKLineClosed(func(kline types.KLine) {
+	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		log.WithField("marketData", "kline").Infof("kline closed: %+v", kline)
 	})
 
 	// update last prices
-	session.Stream.OnKLineClosed(func(kline types.KLine) {
+	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		if _, ok := session.startPrices[kline.Symbol]; !ok {
 			session.startPrices[kline.Symbol] = kline.Open
 		}
@@ -349,7 +353,7 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 	}
 
 	session.Trades[symbol] = &types.TradeSlice{Trades: trades}
-	session.Stream.OnTradeUpdate(func(trade types.Trade) {
+	session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
 		session.Trades[symbol].Append(trade)
 	})
 
@@ -359,17 +363,17 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 		QuoteCurrency: market.QuoteCurrency,
 	}
 	position.AddTrades(trades)
-	position.BindStream(session.Stream)
+	position.BindStream(session.UserDataStream)
 	session.positions[symbol] = position
 
 	orderStore := NewOrderStore(symbol)
 	orderStore.AddOrderUpdate = true
 
-	orderStore.BindStream(session.Stream)
+	orderStore.BindStream(session.UserDataStream)
 	session.orderStores[symbol] = orderStore
 
 	marketDataStore := NewMarketDataStore(symbol)
-	marketDataStore.BindStream(session.Stream)
+	marketDataStore.BindStream(session.MarketDataStream)
 	session.marketDataStores[symbol] = marketDataStore
 
 	standardIndicatorSet := NewStandardIndicatorSet(symbol, marketDataStore)

@@ -121,7 +121,6 @@ func (s *TradeService) Sync(ctx context.Context, exchange types.Exchange, symbol
 	return <-errC
 }
 
-
 func (s *TradeService) QueryTradingVolume(startTime time.Time, options TradingVolumeQueryOptions) ([]TradingVolume, error) {
 	args := map[string]interface{}{
 		// "symbol":      symbol,
@@ -443,5 +442,10 @@ func (s *TradeService) Insert(trade types.Trade) error {
 			INSERT INTO trades (id, exchange, order_id, symbol, price, quantity, quote_quantity, side, is_buyer, is_maker, fee, fee_currency, traded_at, is_margin, is_isolated)
 			VALUES (:id, :exchange, :order_id, :symbol, :price, :quantity, :quote_quantity, :side, :is_buyer, :is_maker, :fee, :fee_currency, :traded_at, :is_margin, :is_isolated)`,
 		trade)
+	return err
+}
+
+func (s *TradeService) DeleteAll() error {
+	_, err := s.DB.Exec(`DELETE FROM trades`)
 	return err
 }

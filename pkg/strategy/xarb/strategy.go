@@ -474,12 +474,12 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		}
 
 		book := types.NewStreamBook(s.Symbol)
-		book.BindStream(session.Stream)
+		book.BindStream(session.MarketDataStream)
 		s.books[sessionID] = book
 
-		session.Stream.OnTradeUpdate(s.handleTradeUpdate)
+		session.UserDataStream.OnTradeUpdate(s.handleTradeUpdate)
 
-		s.orderStore.BindStream(session.Stream)
+		s.orderStore.BindStream(session.UserDataStream)
 
 		c := make(chan types.SubmitOrder, 1)
 		s.orderChannels[sessionID] = c

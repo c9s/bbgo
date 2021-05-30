@@ -20,9 +20,9 @@ import (
 	"github.com/c9s/bbgo/pkg/util"
 )
 
-// go run ./cmd/bbgo listorders [open|closed] --session=ftx --symbol=BTC/USDT
+// go run ./cmd/bbgo list-orders [open|closed] --session=ftx --symbol=BTCUSDT
 var listOrdersCmd = &cobra.Command{
-	Use:  "listorders [status]",
+	Use:  "list-orders [status]",
 	Args: cobra.OnlyValidArgs,
 	// default is open which means we query open orders if you haven't provided args.
 	ValidArgs:    []string{"", "open", "closed"},
@@ -260,7 +260,7 @@ var executeOrderCmd = &cobra.Command{
 	},
 }
 
-// go run ./cmd/bbgo submit-order --session=ftx --symbol=BTC/USDT --side=buy --price=<price> --quantity=<quantity>
+// go run ./cmd/bbgo submit-order --session=ftx --symbol=BTCUSDT --side=buy --price=<price> --quantity=<quantity>
 var submitOrderCmd = &cobra.Command{
 	Use:          "submit-order",
 	SilenceUsage: true,
@@ -313,6 +313,11 @@ var submitOrderCmd = &cobra.Command{
 			return fmt.Errorf("session %s not found", sessionName)
 		}
 
+		market, ok := session.Market(symbol)
+		if !ok {
+			return fmt.Errorf("market definition %s not found", symbol)
+		}
+
 		so := types.SubmitOrder{
 			ClientOrderID:  uuid.New().String(),
 			Symbol:         symbol,
@@ -322,9 +327,10 @@ var submitOrderCmd = &cobra.Command{
 			QuantityString: quantity,
 			Price:          util.MustParseFloat(price),
 			PriceString:    price,
-			Market:         types.Market{Symbol: symbol},
+			Market:         market,
 			TimeInForce:    "GTC",
 		}
+
 		co, err := session.Exchange.SubmitOrders(ctx, so)
 		if err != nil {
 			return err

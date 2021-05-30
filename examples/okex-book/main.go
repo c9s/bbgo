@@ -62,14 +62,13 @@ var rootCmd = &cobra.Command{
 		log.Infof("funding rate: %+v", fundingRate)
 
 		log.Infof("ACCOUNT BALANCES:")
-		balanceSummaries, err := client.AccountBalances()
+		account, err := client.AccountBalances()
 		if err != nil {
 			return err
 		}
 
-		for _, balanceSummary := range balanceSummaries {
-			log.Infof("%+v", balanceSummary)
-		}
+		log.Infof("%+v", account)
+
 
 		log.Infof("ASSET BALANCES:")
 		assetBalances, err := client.AssetBalances()
