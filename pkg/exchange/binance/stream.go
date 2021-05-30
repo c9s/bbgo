@@ -44,10 +44,9 @@ type Stream struct {
 
 	types.StandardStream
 
-	Client    *binance.Client
-	ListenKey string
-	Conn      *websocket.Conn
-	ConnLock  sync.Mutex
+	Client   *binance.Client
+	Conn     *websocket.Conn
+	ConnLock sync.Mutex
 
 	connCtx    context.Context
 	connCancel context.CancelFunc
@@ -318,12 +317,7 @@ func (s *Stream) reconnector(ctx context.Context) {
 }
 
 func (s *Stream) connect(ctx context.Context) error {
-	// should only start one connection one time, so we lock the mutex
-	s.ConnLock.Lock()
-
-	// create a new context
-	s.connCtx, s.connCancel = context.WithCancel(ctx)
-
+	var listenKey string
 	if s.publicOnly {
 		log.Infof("stream is set to public only mode")
 	} else {
@@ -331,27 +325,25 @@ func (s *Stream) connect(ctx context.Context) error {
 
 		listenKey, err := s.fetchListenKey(ctx)
 		if err != nil {
-			s.connCancel()
-			s.ConnLock.Unlock()
 			return err
 		}
 
-		s.ListenKey = listenKey
-		log.Infof("user data stream created. listenKey: %s", maskListenKey(s.ListenKey))
-
-		go s.listenKeyKeepAlive(s.connCtx, listenKey)
+		log.Infof("listen key is created: %s", MaskKey(listenKey))
 	}
 
 	// when in public mode, the listen key is an empty string
-	conn, err := s.dial(s.ListenKey)
+	conn, err := s.dial(listenKey)
 	if err != nil {
-		s.connCancel()
-		s.ConnLock.Unlock()
 		return err
 	}
 
 	log.Infof("websocket connected")
 
+	// should only start one connection one time, so we lock the mutex
+	s.ConnLock.Lock()
+
+	// create a new context
+	s.connCtx, s.connCancel = context.WithCancel(ctx)
 	conn.SetReadDeadline(time.Now().Add(readTimeout))
 	conn.SetPongHandler(func(string) error {
 		conn.SetReadDeadline(time.Now().Add(readTimeout))
@@ -362,6 +354,10 @@ func (s *Stream) connect(ctx context.Context) error {
 	s.ConnLock.Unlock()
 
 	s.EmitConnect()
+
+	if !s.publicOnly {
+		go s.listenKeyKeepAlive(s.connCtx, listenKey)
+	}
 
 	go s.read(s.connCtx)
 	go s.ping(s.connCtx)
@@ -415,7 +411,7 @@ func (s *Stream) listenKeyKeepAlive(ctx context.Context, listenKey string) {
 
 		case <-keepAliveTicker.C:
 			if err := s.keepaliveListenKey(ctx, listenKey); err != nil {
-				log.WithError(err).Errorf("listen key keep-alive error: %v key: %s", err, maskListenKey(listenKey))
+				log.WithError(err).Errorf("listen key keep-alive error: %v key: %s", err, MaskKey(listenKey))
 				s.Reconnect()
 				return
 			}
@@ -552,7 +548,7 @@ func (s *Stream) Close() error {
 	return err
 }
 
-func maskListenKey(listenKey string) string {
-	maskKey := listenKey[0:5]
-	return maskKey + strings.Repeat("*", len(listenKey)-1-5)
+func MaskKey(key string) string {
+	maskKey := key[0:5]
+	return maskKey + strings.Repeat("*", len(key)-1-5)
 }
