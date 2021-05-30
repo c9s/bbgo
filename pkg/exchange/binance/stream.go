@@ -300,11 +300,6 @@ func (s *Stream) reconnector(ctx context.Context) {
 			return
 
 		case <-s.ReconnectC:
-			// ensure the previous context is cancelled
-			if s.connCancel != nil {
-				s.connCancel()
-			}
-
 			log.Warnf("received reconnect signal, reconnecting...")
 			time.Sleep(3 * time.Second)
 
@@ -341,6 +336,11 @@ func (s *Stream) connect(ctx context.Context) error {
 
 	// should only start one connection one time, so we lock the mutex
 	s.ConnLock.Lock()
+
+	// ensure the previous context is cancelled
+	if s.connCancel != nil {
+		s.connCancel()
+	}
 
 	// create a new context
 	s.connCtx, s.connCancel = context.WithCancel(ctx)
