@@ -55,12 +55,14 @@ type KLine struct {
 
 	Interval Interval `json:"interval" db:"interval"`
 
-	Open        float64 `json:"open" db:"open"`
-	Close       float64 `json:"close" db:"close"`
-	High        float64 `json:"high" db:"high"`
-	Low         float64 `json:"low" db:"low"`
-	Volume      float64 `json:"volume" db:"volume"`
-	QuoteVolume float64 `json:"quoteVolume" db:"quote_volume"`
+	Open                     float64 `json:"open" db:"open"`
+	Close                    float64 `json:"close" db:"close"`
+	High                     float64 `json:"high" db:"high"`
+	Low                      float64 `json:"low" db:"low"`
+	Volume                   float64 `json:"volume" db:"volume"`
+	QuoteVolume              float64 `json:"quoteVolume" db:"quote_volume"`
+	TakerBuyBaseAssetVolume  float64 `json:"takerBuyBaseAssetVolume"`
+	TakerBuyQuoteAssetVolume float64 `json:"takerBuyQuoteAssetVolume"`
 
 	LastTradeID    uint64 `json:"lastTradeID" db:"last_trade_id"`
 	NumberOfTrades uint64 `json:"numberOfTrades" db:"num_trades"`
