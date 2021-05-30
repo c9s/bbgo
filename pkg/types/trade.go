@@ -115,7 +115,7 @@ func (trade Trade) SlackAttachment() slack.Attachment {
 			{Title: "Exchange", Value: trade.Exchange.String(), Short: true},
 			{Title: "Price", Value: util.FormatFloat(trade.Price, 2), Short: true},
 			{Title: "Quantity", Value: util.FormatFloat(trade.Quantity, 4), Short: true},
-			{Title: "QuoteQuantity", Value: util.FormatFloat(trade.QuoteQuantity, 2)},
+			{Title: "QuoteQuantity", Value: util.FormatFloat(trade.QuoteQuantity, 2), Short: true},
 			{Title: "Fee", Value: util.FormatFloat(trade.Fee, 4), Short: true},
 			{Title: "FeeCurrency", Value: trade.FeeCurrency, Short: true},
 			{Title: "Liquidity", Value: liquidity, Short: true},

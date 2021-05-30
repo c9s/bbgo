@@ -42,7 +42,7 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 
 	s.book = types.NewStreamBook(s.Symbol)
-	s.book.BindStream(session.Stream)
+	s.book.BindStream(session.UserDataStream)
 
 	s.activeOrders = make(map[string]types.Order)
 

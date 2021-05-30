@@ -3,10 +3,16 @@ package slacknotifier
 import (
 	"context"
 	"fmt"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
 )
+
+type notifyTask struct {
+	Channel string
+	Opts    []slack.MsgOption
+}
 
 type SlackAttachmentCreator interface {
 	SlackAttachment() slack.Attachment
@@ -15,6 +21,8 @@ type SlackAttachmentCreator interface {
 type Notifier struct {
 	client  *slack.Client
 	channel string
+
+	taskC chan notifyTask
 }
 
 type NotifyOption func(notifier *Notifier)
@@ -26,13 +34,34 @@ func New(token, channel string, options ...NotifyOption) *Notifier {
 	notifier := &Notifier{
 		channel: channel,
 		client:  client,
+		taskC:   make(chan notifyTask, 100),
 	}
 
 	for _, o := range options {
 		o(notifier)
 	}
 
+	go notifier.worker()
+
 	return notifier
+}
+
+func (n *Notifier) worker() {
+	ctx := context.Background()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+
+		case task := <-n.taskC:
+			_, _, err := n.client.PostMessageContext(ctx, task.Channel, task.Opts...)
+			if err != nil {
+				log.WithError(err).
+					WithField("channel", task.Channel).
+					Errorf("slack api error: %s", err.Error())
+			}
+		}
+	}
 }
 
 func (n *Notifier) Notify(obj interface{}, args ...interface{}) {
@@ -91,20 +120,18 @@ func (n *Notifier) NotifyTo(channel string, obj interface{}, args ...interface{}
 		opts = append(opts, slack.MsgOptionAttachments(append([]slack.Attachment{a.SlackAttachment()}, slackAttachments...)...))
 
 	default:
-		log.Errorf("slack notifier error, unsupported object: %T %+v", a, a)
+		log.Errorf("slack message conversion error, unsupported object: %T %+v", a, a)
 
 	}
 
-	go func() {
-		_, _, err := n.client.PostMessageContext(context.Background(), channel, opts...)
-		if err != nil {
-			log.WithError(err).
-				WithField("channel", channel).
-				Errorf("slack api error: %s", err.Error())
-		}
-	}()
-
-	return
+	select {
+	case n.taskC <- notifyTask{
+		Channel: channel,
+		Opts:    opts,
+	}:
+	case <-time.After(50 * time.Millisecond):
+		return
+	}
 }
 
 /*

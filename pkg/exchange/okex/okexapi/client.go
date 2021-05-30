@@ -67,6 +67,7 @@ type RestClient struct {
 
 	TradeService      *TradeService
 	PublicDataService *PublicDataService
+	MarketDataService *MarketDataService
 }
 
 func NewClient() *RestClient {
@@ -84,6 +85,7 @@ func NewClient() *RestClient {
 
 	client.TradeService = &TradeService{client: client}
 	client.PublicDataService = &PublicDataService{client: client}
+	client.MarketDataService = &MarketDataService{client: client}
 	return client
 }
 
@@ -177,7 +179,7 @@ func (c *RestClient) newAuthenticatedRequest(method, refURL string, params url.V
 	}
 
 	signKey := timestamp + strings.ToUpper(method) + path + string(body)
-	signature := sign(signKey, c.Secret)
+	signature := Sign(signKey, c.Secret)
 
 	req, err := http.NewRequest(method, pathURL.String(), bytes.NewReader(body))
 	if err != nil {
@@ -205,15 +207,13 @@ type BalanceDetail struct {
 	UnrealizedProfitAndLoss fixedpoint.Value           `json:"upl"`
 }
 
-type BalanceSummary struct {
+type Account struct {
 	TotalEquityInUSD fixedpoint.Value `json:"totalEq"`
 	UpdateTime       string           `json:"uTime"`
 	Details          []BalanceDetail  `json:"details"`
 }
 
-type BalanceSummaryList []BalanceSummary
-
-func (c *RestClient) AccountBalances() (BalanceSummaryList, error) {
+func (c *RestClient) AccountBalances() (*Account, error) {
 	req, err := c.newAuthenticatedRequest("GET", "/api/v5/account/balance", nil, nil)
 	if err != nil {
 		return nil, err
@@ -225,15 +225,20 @@ func (c *RestClient) AccountBalances() (BalanceSummaryList, error) {
 	}
 
 	var balanceResponse struct {
-		Code    string           `json:"code"`
-		Message string           `json:"msg"`
-		Data    []BalanceSummary `json:"data"`
+		Code    string    `json:"code"`
+		Message string    `json:"msg"`
+		Data    []Account `json:"data"`
 	}
+
 	if err := response.DecodeJSON(&balanceResponse); err != nil {
 		return nil, err
 	}
 
-	return balanceResponse.Data, nil
+	if len(balanceResponse.Data) == 0 {
+		return nil, errors.New("empty account data")
+	}
+
+	return &balanceResponse.Data[0], nil
 }
 
 type AssetBalance struct {
@@ -388,7 +393,7 @@ func (c *RestClient) MarketTickers(instType InstrumentType) ([]MarketTicker, err
 	return tickerResponse.Data, nil
 }
 
-func sign(payload string, secret string) string {
+func Sign(payload string, secret string) string {
 	var sig = hmac.New(sha256.New, []byte(secret))
 	_, err := sig.Write([]byte(payload))
 	if err != nil {

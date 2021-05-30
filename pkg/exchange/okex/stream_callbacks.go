@@ -2,18 +2,68 @@
 
 package okex
 
-import ()
+import (
+	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
+)
 
-func (s *Stream) OnKline(cb func()) {
-	s.klineCallbacks = append(s.klineCallbacks, cb)
+func (s *Stream) OnCandleData(cb func(candle Candle)) {
+	s.candleDataCallbacks = append(s.candleDataCallbacks, cb)
 }
 
-func (s *Stream) EmitKline() {
-	for _, cb := range s.klineCallbacks {
-		cb()
+func (s *Stream) EmitCandleData(candle Candle) {
+	for _, cb := range s.candleDataCallbacks {
+		cb(candle)
+	}
+}
+
+func (s *Stream) OnBookData(cb func(book BookData)) {
+	s.bookDataCallbacks = append(s.bookDataCallbacks, cb)
+}
+
+func (s *Stream) EmitBookData(book BookData) {
+	for _, cb := range s.bookDataCallbacks {
+		cb(book)
+	}
+}
+
+func (s *Stream) OnEvent(cb func(event WebSocketEvent)) {
+	s.eventCallbacks = append(s.eventCallbacks, cb)
+}
+
+func (s *Stream) EmitEvent(event WebSocketEvent) {
+	for _, cb := range s.eventCallbacks {
+		cb(event)
+	}
+}
+
+func (s *Stream) OnAccount(cb func(account okexapi.Account)) {
+	s.accountCallbacks = append(s.accountCallbacks, cb)
+}
+
+func (s *Stream) EmitAccount(account okexapi.Account) {
+	for _, cb := range s.accountCallbacks {
+		cb(account)
+	}
+}
+
+func (s *Stream) OnOrderDetails(cb func(orderDetails []okexapi.OrderDetails)) {
+	s.orderDetailsCallbacks = append(s.orderDetailsCallbacks, cb)
+}
+
+func (s *Stream) EmitOrderDetails(orderDetails []okexapi.OrderDetails) {
+	for _, cb := range s.orderDetailsCallbacks {
+		cb(orderDetails)
 	}
 }
 
 type StreamEventHub interface {
-	OnKline(cb func())
+	OnCandleData(cb func(candle Candle))
+
+	OnBookData(cb func(book BookData))
+
+	OnEvent(cb func(event WebSocketEvent))
+
+	OnAccount(cb func(account okexapi.Account))
+
+	OnOrderDetails(cb func(orderDetails []okexapi.OrderDetails))
 }

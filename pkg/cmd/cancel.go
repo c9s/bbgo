@@ -19,15 +19,16 @@ type advancedOrderCancelApi interface {
 }
 
 func init() {
-	CancelCmd.Flags().String("session", "", "session to execute cancel orders")
-	CancelCmd.Flags().String("symbol", "", "symbol to cancel orders")
-	CancelCmd.Flags().Int64("group-id", 0, "groupID to cancel orders")
-	CancelCmd.Flags().Bool("all", false, "cancel all orders")
-	RootCmd.AddCommand(CancelCmd)
+	cancelOrderCmd.Flags().String("session", "", "session to execute cancel orders")
+	cancelOrderCmd.Flags().String("symbol", "", "symbol to cancel orders")
+	cancelOrderCmd.Flags().Int64("group-id", 0, "group ID to cancel orders")
+	cancelOrderCmd.Flags().Uint64("order-id", 0, "order ID to cancel orders")
+	cancelOrderCmd.Flags().Bool("all", false, "cancel all orders")
+	RootCmd.AddCommand(cancelOrderCmd)
 }
 
-var CancelCmd = &cobra.Command{
-	Use:   "cancel",
+var cancelOrderCmd = &cobra.Command{
+	Use:   "cancel-order",
 	Short: "cancel orders",
 	Long:  "this command can cancel orders from exchange",
 
@@ -44,6 +45,11 @@ var CancelCmd = &cobra.Command{
 		}
 
 		groupID, err := cmd.Flags().GetInt64("group-id")
+		if err != nil {
+			return err
+		}
+
+		orderID, err := cmd.Flags().GetUint64("order-id")
 		if err != nil {
 			return err
 		}
@@ -84,13 +90,32 @@ var CancelCmd = &cobra.Command{
 
 		var sessions = environ.Sessions()
 
-		if n, err := cmd.Flags().GetString("session"); err == nil && len(n) > 0 {
-			ses, ok := sessions[n]
+		sessionName, err := cmd.Flags().GetString("session")
+		if err != nil {
+			return err
+		}
+
+		if len(sessionName) > 0 {
+			ses, ok := sessions[sessionName]
 			if !ok {
-				return fmt.Errorf("session %s not found", n)
+				return fmt.Errorf("session %s not found", sessionName)
 			}
 
-			sessions = map[string]*bbgo.ExchangeSession{n: ses}
+			if orderID > 0 {
+				logrus.Infof("canceling order by the given order id %d", orderID)
+				err := ses.Exchange.CancelOrders(ctx, types.Order{
+					SubmitOrder: types.SubmitOrder{
+						Symbol: symbol,
+					},
+					OrderID: orderID,
+				})
+				if err != nil {
+					return err
+				}
+				return nil
+			}
+
+			sessions = map[string]*bbgo.ExchangeSession{sessionName: ses}
 		}
 
 		for sessionID, session := range sessions {

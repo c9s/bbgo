@@ -19,6 +19,8 @@ import (
 
 var debugBinanceDepth bool
 
+const readTimeout = 30 * time.Second
+
 func init() {
 	// randomize pulling
 	rand.Seed(time.Now().UnixNano())
@@ -42,11 +44,9 @@ type Stream struct {
 
 	types.StandardStream
 
-	Client     *binance.Client
-	ListenKey  string
-	Conn       *websocket.Conn
-	connLock   sync.Mutex
-	reconnectC chan struct{}
+	Client   *binance.Client
+	Conn     *websocket.Conn
+	ConnLock sync.Mutex
 
 	connCtx    context.Context
 	connCancel context.CancelFunc
@@ -68,9 +68,11 @@ type Stream struct {
 
 func NewStream(client *binance.Client) *Stream {
 	stream := &Stream{
+		StandardStream: types.StandardStream{
+			ReconnectC: make(chan struct{}, 1),
+		},
 		Client:      client,
 		depthFrames: make(map[string]*DepthFrame),
-		reconnectC:  make(chan struct{}, 1),
 	}
 
 	stream.OnDepthEvent(func(e *DepthEvent) {
@@ -237,6 +239,10 @@ func (s *Stream) dial(listenKey string) (*websocket.Conn, error) {
 	}
 
 	// use the default ping handler
+	// The websocket server will send a ping frame every 3 minutes.
+	// If the websocket server does not receive a pong frame back from the connection within a 10 minute period,
+	// the connection will be disconnected.
+	// Unsolicited pong frames are allowed.
 	conn.SetPingHandler(nil)
 
 	return conn, nil
@@ -274,13 +280,6 @@ func (s *Stream) keepaliveListenKey(ctx context.Context, listenKey string) error
 	return s.Client.NewKeepaliveUserStreamService().ListenKey(listenKey).Do(ctx)
 }
 
-func (s *Stream) emitReconnect() {
-	select {
-	case s.reconnectC <- struct{}{}:
-	default:
-	}
-}
-
 func (s *Stream) Connect(ctx context.Context) error {
 	err := s.connect(ctx)
 	if err != nil {
@@ -300,30 +299,20 @@ func (s *Stream) reconnector(ctx context.Context) {
 		case <-ctx.Done():
 			return
 
-		case <-s.reconnectC:
-			// ensure the previous context is cancelled
-			if s.connCancel != nil {
-				s.connCancel()
-			}
-
+		case <-s.ReconnectC:
 			log.Warnf("received reconnect signal, reconnecting...")
 			time.Sleep(3 * time.Second)
 
 			if err := s.connect(ctx); err != nil {
 				log.WithError(err).Errorf("connect error, try to reconnect again...")
-				s.emitReconnect()
+				s.Reconnect()
 			}
 		}
 	}
 }
 
 func (s *Stream) connect(ctx context.Context) error {
-	// should only start one connection one time, so we lock the mutex
-	s.connLock.Lock()
-
-	// create a new context
-	s.connCtx, s.connCancel = context.WithCancel(ctx)
-
+	var listenKey string
 	if s.publicOnly {
 		log.Infof("stream is set to public only mode")
 	} else {
@@ -331,31 +320,44 @@ func (s *Stream) connect(ctx context.Context) error {
 
 		listenKey, err := s.fetchListenKey(ctx)
 		if err != nil {
-			s.connCancel()
-			s.connLock.Unlock()
 			return err
 		}
 
-		s.ListenKey = listenKey
-		log.Infof("user data stream created. listenKey: %s", maskListenKey(s.ListenKey))
-
-		go s.listenKeyKeepAlive(s.connCtx, listenKey)
+		log.Infof("listen key is created: %s", MaskKey(listenKey))
 	}
 
 	// when in public mode, the listen key is an empty string
-	conn, err := s.dial(s.ListenKey)
+	conn, err := s.dial(listenKey)
 	if err != nil {
-		s.connCancel()
-		s.connLock.Unlock()
 		return err
 	}
 
 	log.Infof("websocket connected")
 
+	// should only start one connection one time, so we lock the mutex
+	s.ConnLock.Lock()
+
+	// ensure the previous context is cancelled
+	if s.connCancel != nil {
+		s.connCancel()
+	}
+
+	// create a new context
+	s.connCtx, s.connCancel = context.WithCancel(ctx)
+	conn.SetReadDeadline(time.Now().Add(readTimeout))
+	conn.SetPongHandler(func(string) error {
+		conn.SetReadDeadline(time.Now().Add(readTimeout))
+		return nil
+	})
+
 	s.Conn = conn
-	s.connLock.Unlock()
+	s.ConnLock.Unlock()
 
 	s.EmitConnect()
+
+	if !s.publicOnly {
+		go s.listenKeyKeepAlive(s.connCtx, listenKey)
+	}
 
 	go s.read(s.connCtx)
 	go s.ping(s.connCtx)
@@ -363,35 +365,40 @@ func (s *Stream) connect(ctx context.Context) error {
 }
 
 func (s *Stream) ping(ctx context.Context) {
-	pingTicker := time.NewTicker(15 * time.Second)
+	pingTicker := time.NewTicker(readTimeout / 2)
 	defer pingTicker.Stop()
 
 	for {
 		select {
 
 		case <-ctx.Done():
-			log.Info("ping worker stopped")
+			log.Debug("ping worker stopped")
 			return
 
 		case <-pingTicker.C:
-			s.connLock.Lock()
-			if err := s.Conn.WriteControl(websocket.PingMessage, []byte("hb"), time.Now().Add(3*time.Second)); err != nil {
+			s.ConnLock.Lock()
+			conn := s.Conn
+			s.ConnLock.Unlock()
+
+			if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(3*time.Second)); err != nil {
 				log.WithError(err).Error("ping error", err)
-				s.emitReconnect()
+				s.Reconnect()
 			}
-			s.connLock.Unlock()
 		}
 	}
 }
 
+// From Binance
+// Keepalive a user data stream to prevent a time out. User data streams will close after 60 minutes.
+// It's recommended to send a ping about every 30 minutes.
 func (s *Stream) listenKeyKeepAlive(ctx context.Context, listenKey string) {
 	keepAliveTicker := time.NewTicker(5 * time.Minute)
 	defer keepAliveTicker.Stop()
 
 	// if we exit, we should invalidate the existing listen key
 	defer func() {
-		log.Info("keepalive worker stopped")
-		if err := s.invalidateListenKey(ctx, listenKey); err != nil {
+		log.Debugf("keepalive worker stopped")
+		if err := s.invalidateListenKey(context.Background(), listenKey); err != nil {
 			log.WithError(err).Error("invalidate listen key error")
 		}
 	}()
@@ -404,8 +411,8 @@ func (s *Stream) listenKeyKeepAlive(ctx context.Context, listenKey string) {
 
 		case <-keepAliveTicker.C:
 			if err := s.keepaliveListenKey(ctx, listenKey); err != nil {
-				log.WithError(err).Errorf("listen key keep-alive error: %v key: %s", err, maskListenKey(listenKey))
-				s.emitReconnect()
+				log.WithError(err).Errorf("listen key keep-alive error: %v key: %s", err, MaskKey(listenKey))
+				s.Reconnect()
 				return
 			}
 
@@ -428,14 +435,16 @@ func (s *Stream) read(ctx context.Context) {
 			return
 
 		default:
-			s.connLock.Lock()
-			if err := s.Conn.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
+
+			s.ConnLock.Lock()
+			conn := s.Conn
+			s.ConnLock.Unlock()
+
+			if err := conn.SetReadDeadline(time.Now().Add(readTimeout)); err != nil {
 				log.WithError(err).Errorf("set read deadline error: %s", err.Error())
 			}
 
-			mt, message, err := s.Conn.ReadMessage()
-			s.connLock.Unlock()
-
+			mt, message, err := conn.ReadMessage()
 			if err != nil {
 				// if it's a network timeout error, we should re-connect
 				switch err := err.(type) {
@@ -448,17 +457,17 @@ func (s *Stream) read(ctx context.Context) {
 
 					// for unexpected close error, we should re-connect
 					// emit reconnect to start a new connection
-					s.emitReconnect()
+					s.Reconnect()
 					return
 
 				case net.Error:
 					log.WithError(err).Error("network error")
-					s.emitReconnect()
+					s.Reconnect()
 					return
 
 				default:
 					log.WithError(err).Error("unexpected connection error")
-					s.emitReconnect()
+					s.Reconnect()
 					return
 				}
 			}
@@ -472,23 +481,19 @@ func (s *Stream) read(ctx context.Context) {
 
 			e, err := ParseEvent(string(message))
 			if err != nil {
-				log.WithError(err).Errorf("[binance] event parse error")
+				log.WithError(err).Errorf("websocket event parse error")
 				continue
 			}
 
-			// log.NotifyTo("[binance] event: %+v", e)
 			switch e := e.(type) {
 
 			case *OutboundAccountPositionEvent:
-				log.Info(e.Event, " ", e.Balances)
 				s.EmitOutboundAccountPositionEvent(e)
 
 			case *OutboundAccountInfoEvent:
-				log.Info(e.Event, " ", e.Balances)
 				s.EmitOutboundAccountInfoEvent(e)
 
 			case *BalanceUpdateEvent:
-				log.Info(e.Event, " ", e.Asset, " ", e.Delta)
 				s.EmitBalanceUpdateEvent(e)
 
 			case *KLineEvent:
@@ -498,7 +503,6 @@ func (s *Stream) read(ctx context.Context) {
 				s.EmitDepthEvent(e)
 
 			case *ExecutionReportEvent:
-				log.Info(e.Event, " ", e)
 				s.EmitExecutionReportEvent(e)
 			}
 		}
@@ -538,15 +542,13 @@ func (s *Stream) Close() error {
 		s.connCancel()
 	}
 
-	s.connLock.Lock()
+	s.ConnLock.Lock()
 	err := s.Conn.Close()
-	s.connLock.Unlock()
+	s.ConnLock.Unlock()
 	return err
 }
 
-func maskListenKey(listenKey string) string {
-	maskKey := listenKey[0:5]
-	return maskKey + strings.Repeat("*", len(listenKey)-1-5)
+func MaskKey(key string) string {
+	maskKey := key[0:5]
+	return maskKey + strings.Repeat("*", len(key)-1-5)
 }
-
-//go:generate callbackgen -type DepthFrame
