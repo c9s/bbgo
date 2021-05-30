@@ -221,11 +221,6 @@ func (s *Stream) Reconnector(ctx context.Context) {
 			return
 
 		case <-s.ReconnectC:
-			// ensure the previous context is cancelled
-			if s.connCancel != nil {
-				s.connCancel()
-			}
-
 			log.Warnf("received reconnect signal, reconnecting...")
 			time.Sleep(3 * time.Second)
 
@@ -238,12 +233,6 @@ func (s *Stream) Reconnector(ctx context.Context) {
 }
 
 func (s *Stream) connect(ctx context.Context) error {
-	// should only start one connection one time, so we lock the mutex
-	s.connLock.Lock()
-
-	// create a new context
-	s.connCtx, s.connCancel = context.WithCancel(ctx)
-
 	// when in public mode, the listen key is an empty string
 	var url string
 	if s.publicOnly {
@@ -254,12 +243,22 @@ func (s *Stream) connect(ctx context.Context) error {
 
 	conn, err := s.StandardStream.Dial(url)
 	if err != nil {
-		s.connCancel()
-		s.connLock.Unlock()
 		return err
 	}
 
-	log.Infof("websocket connected")
+	log.Infof("websocket connected: %s", url)
+
+	// should only start one connection one time, so we lock the mutex
+	s.connLock.Lock()
+
+	// ensure the previous context is cancelled
+	if s.connCancel != nil {
+		s.connCancel()
+	}
+
+	// create a new context
+	s.connCtx, s.connCancel = context.WithCancel(ctx)
+
 	conn.SetReadDeadline(time.Now().Add(readTimeout))
 	conn.SetPongHandler(func(string) error {
 		conn.SetReadDeadline(time.Now().Add(readTimeout))
