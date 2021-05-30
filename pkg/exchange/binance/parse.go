@@ -220,9 +220,9 @@ outboundAccountInfo
 
 */
 type Balance struct {
-	Asset  string `json:"a"`
-	Free   string `json:"f"`
-	Locked string `json:"l"`
+	Asset  string           `json:"a"`
+	Free   fixedpoint.Value `json:"f"`
+	Locked fixedpoint.Value `json:"l"`
 }
 
 type OutboundAccountPositionEvent struct {
