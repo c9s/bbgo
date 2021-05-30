@@ -241,6 +241,9 @@ func (s *Stream) connect(ctx context.Context) error {
 		url = okexapi.PrivateWebSocketURL
 	}
 
+	// should only start one connection one time, so we lock the mutex
+	s.connLock.Lock()
+
 	conn, err := s.StandardStream.Dial(url)
 	if err != nil {
 		return err
@@ -248,8 +251,6 @@ func (s *Stream) connect(ctx context.Context) error {
 
 	log.Infof("websocket connected: %s", url)
 
-	// should only start one connection one time, so we lock the mutex
-	s.connLock.Lock()
 
 	// ensure the previous context is cancelled
 	if s.connCancel != nil {
