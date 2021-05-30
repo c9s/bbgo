@@ -122,12 +122,12 @@ type ExchangeSession struct {
 	// ---------------------------
 
 	// Exchange Session name
-	Name         string `json:"name,omitempty" yaml:"name,omitempty"`
+	Name         string             `json:"name,omitempty" yaml:"name,omitempty"`
 	ExchangeName types.ExchangeName `json:"exchange" yaml:"exchange"`
-	EnvVarPrefix string `json:"envVarPrefix" yaml:"envVarPrefix"`
-	Key          string `json:"key,omitempty" yaml:"key,omitempty"`
-	Secret       string `json:"secret,omitempty" yaml:"secret,omitempty"`
-	SubAccount   string `json:"subAccount,omitempty" yaml:"subAccount,omitempty"`
+	EnvVarPrefix string             `json:"envVarPrefix" yaml:"envVarPrefix"`
+	Key          string             `json:"key,omitempty" yaml:"key,omitempty"`
+	Secret       string             `json:"secret,omitempty" yaml:"secret,omitempty"`
+	SubAccount   string             `json:"subAccount,omitempty" yaml:"subAccount,omitempty"`
 
 	// Withdrawal is used for enabling withdrawal functions
 	Withdrawal   bool             `json:"withdrawal,omitempty" yaml:"withdrawal,omitempty"`
@@ -275,9 +275,7 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 	session.Account.BindStream(session.UserDataStream)
 
 	// insert trade into db right before everything
-	// TODO: we should insert the backtest trades into the database,
-	// 		 however we should clean up the trades before we start the next backtesting
-	if environ.TradeService != nil && environ.BacktestService == nil {
+	if environ.TradeService != nil {
 		session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
 			if err := environ.TradeService.Insert(trade); err != nil {
 				log.WithError(err).Errorf("trade insert error: %+v", trade)
