@@ -364,7 +364,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	}
 
 	go func() {
-		ticker := time.NewTimer(util.MillisecondsJitter(s.Interval.Duration(), 1000))
+		ticker := time.NewTicker(util.MillisecondsJitter(s.Interval.Duration(), 1000))
 		defer ticker.Stop()
 
 		for {
