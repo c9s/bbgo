@@ -205,8 +205,8 @@ func (s *BacktestService) Insert(kline types.KLine) error {
 		return errors.New("kline.Exchange field should not be empty")
 	}
 
-	sql := "INSERT INTO `binance_klines` (`exchange`, `start_time`, `end_time`, `symbol`, `interval`, `open`, `high`, `low`, `close`, `closed`, `volume`)" +
-		"VALUES (:exchange, :start_time, :end_time, :symbol, :interval, :open, :high, :low, :close, :closed, :volume)"
+	sql := "INSERT INTO `binance_klines` (`exchange`, `start_time`, `end_time`, `symbol`, `interval`, `open`, `high`, `low`, `close`, `closed`, `volume`, `quote_volume`, `taker_buy_base_volume`, `taker_buy_quote_volume`)" +
+		"VALUES (:exchange, :start_time, :end_time, :symbol, :interval, :open, :high, :low, :close, :closed, :volume, :quote_volume, :taker_buy_base_volume, :taker_buy_quote_volume)"
 	sql = strings.ReplaceAll(sql, "binance_klines", kline.Exchange.String()+"_klines")
 
 	_, err := s.DB.NamedExec(sql, kline)

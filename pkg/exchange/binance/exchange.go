@@ -782,20 +782,22 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 	var kLines []types.KLine
 	for _, k := range resp {
 		kLines = append(kLines, types.KLine{
-			Exchange:       types.ExchangeBinance,
-			Symbol:         symbol,
-			Interval:       interval,
-			StartTime:      time.Unix(0, k.OpenTime*int64(time.Millisecond)),
-			EndTime:        time.Unix(0, k.CloseTime*int64(time.Millisecond)),
-			Open:           util.MustParseFloat(k.Open),
-			Close:          util.MustParseFloat(k.Close),
-			High:           util.MustParseFloat(k.High),
-			Low:            util.MustParseFloat(k.Low),
-			Volume:         util.MustParseFloat(k.Volume),
-			QuoteVolume:    util.MustParseFloat(k.QuoteAssetVolume),
-			LastTradeID:    0,
-			NumberOfTrades: uint64(k.TradeNum),
-			Closed:         true,
+			Exchange:                 types.ExchangeBinance,
+			Symbol:                   symbol,
+			Interval:                 interval,
+			StartTime:                time.Unix(0, k.OpenTime*int64(time.Millisecond)),
+			EndTime:                  time.Unix(0, k.CloseTime*int64(time.Millisecond)),
+			Open:                     util.MustParseFloat(k.Open),
+			Close:                    util.MustParseFloat(k.Close),
+			High:                     util.MustParseFloat(k.High),
+			Low:                      util.MustParseFloat(k.Low),
+			Volume:                   util.MustParseFloat(k.Volume),
+			QuoteVolume:              util.MustParseFloat(k.QuoteAssetVolume),
+			TakerBuyBaseAssetVolume:  util.MustParseFloat(k.TakerBuyBaseAssetVolume),
+			TakerBuyQuoteAssetVolume: util.MustParseFloat(k.TakerBuyQuoteAssetVolume),
+			LastTradeID:              0,
+			NumberOfTrades:           uint64(k.TradeNum),
+			Closed:                   true,
 		})
 	}
 	return kLines, nil
