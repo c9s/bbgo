@@ -82,9 +82,9 @@ CREATE TABLE `max_klines`
 
 -- +begin
 CREATE INDEX `klines_end_time_symbol_interval` ON `klines` (`end_time`, `symbol`, `interval`);
-CREATE INDEX `klines_end_time_symbol_interval` ON `binance_klines` (`end_time`, `symbol`, `interval`);
-CREATE INDEX `klines_end_time_symbol_interval` ON `okex_klines` (`end_time`, `symbol`, `interval`);
-CREATE INDEX `klines_end_time_symbol_interval` ON `max_klines` (`end_time`, `symbol`, `interval`);
+CREATE INDEX `binance_klines_end_time_symbol_interval` ON `binance_klines` (`end_time`, `symbol`, `interval`);
+CREATE INDEX `okex_klines_end_time_symbol_interval` ON `okex_klines` (`end_time`, `symbol`, `interval`);
+CREATE INDEX `max_klines_end_time_symbol_interval` ON `max_klines` (`end_time`, `symbol`, `interval`);
 -- +end
 
 
