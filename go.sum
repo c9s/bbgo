@@ -21,6 +21,8 @@ github.com/adshao/go-binance/v2 v2.2.1-0.20210119141603-20ceb26d876b h1:5GJlWxRj
 github.com/adshao/go-binance/v2 v2.2.1-0.20210119141603-20ceb26d876b/go.mod h1:o+84WK3DQxq9vEKV9ncRcQi+J7RFCGhM27osbECZiJQ=
 github.com/adshao/go-binance/v2 v2.2.1 h1:H5tfXqDu+bx1mZqJP+5gc8ahidgDFvj683M3RStg9C4=
 github.com/adshao/go-binance/v2 v2.2.1/go.mod h1:o+84WK3DQxq9vEKV9ncRcQi+J7RFCGhM27osbECZiJQ=
+github.com/adshao/go-binance/v2 v2.2.2 h1:vKpvZupkgcUPG/CSl9uW0s5hqxzVZgNI/nEzKG1JiUs=
+github.com/adshao/go-binance/v2 v2.2.2/go.mod h1:o+84WK3DQxq9vEKV9ncRcQi+J7RFCGhM27osbECZiJQ=
 github.com/ajstarks/svgo v0.0.0-20180226025133-644b8db467af/go.mod h1:K08gAheRH3/J6wwsYMMT4xOr94bZjxIelGM0+d/wbFw=
 github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc/go.mod h1:LOuyumcjzFXgccqObfd/Ljyb9UuFJ6TxHnclSeseNhc=
 github.com/alecthomas/units v0.0.0-20151022065526-2efee857e7cf/go.mod h1:ybxpYRFXyAe+OPACYpWeL0wqObRcbAqCMya13uyzqw0=
