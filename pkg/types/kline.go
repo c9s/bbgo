@@ -61,8 +61,8 @@ type KLine struct {
 	Low                      float64 `json:"low" db:"low"`
 	Volume                   float64 `json:"volume" db:"volume"`
 	QuoteVolume              float64 `json:"quoteVolume" db:"quote_volume"`
-	TakerBuyBaseAssetVolume  float64 `json:"takerBuyBaseAssetVolume"`
-	TakerBuyQuoteAssetVolume float64 `json:"takerBuyQuoteAssetVolume"`
+	TakerBuyBaseAssetVolume  float64 `json:"takerBuyBaseAssetVolume" db:"taker_buy_base_volume"`
+	TakerBuyQuoteAssetVolume float64 `json:"takerBuyQuoteAssetVolume" db:"taker_buy_quote_volume"`
 
 	LastTradeID    uint64 `json:"lastTradeID" db:"last_trade_id"`
 	NumberOfTrades uint64 `json:"numberOfTrades" db:"num_trades"`

@@ -576,6 +576,12 @@ rockhopper --config rockhopper_sqlite.yaml up
 rockhopper --config rockhopper_mysql.yaml up
 ```
 
+Then run the following command to compile the migration files into go files:
+
+```shell
+make migrations
+```
+
 ### Setup frontend development environment
 
 ```sh
