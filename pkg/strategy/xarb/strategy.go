@@ -83,6 +83,8 @@ type Strategy struct {
 	state *State
 
 	orderStore *bbgo.OrderStore
+	tradeStore *bbgo.TradeStore
+	tradeC     chan types.Trade
 
 	groupID uint32
 
@@ -452,6 +454,10 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	s.markets = make(map[string]types.Market)
 	s.orderStore = bbgo.NewOrderStore(s.Symbol)
 
+	// buffer 100 trades in the channel
+	s.tradeC = make(chan types.Trade, 100)
+	s.tradeStore = bbgo.NewTradeStore(s.Symbol)
+
 	// we're using market order, market orders will be finally filled
 	s.orderStore.RemoveFilled = true
 
@@ -533,7 +539,6 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		}
 
 		for {
-
 			select {
 			case <-s.stopC:
 				log.Warnf("%s maker goroutine stopped, due to the stop signal", s.Symbol)
