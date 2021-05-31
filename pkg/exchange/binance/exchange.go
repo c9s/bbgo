@@ -37,13 +37,17 @@ func init() {
 type Exchange struct {
 	types.MarginSettings
 
-	Client *binance.Client
+	key, secret string
+	Client      *binance.Client
 }
 
 func New(key, secret string) *Exchange {
 	var client = binance.NewClient(key, secret)
 	_, _ = client.NewSetServerTimeService().Do(context.Background())
 	return &Exchange{
+		key:    key,
+		secret: secret,
+
 		Client: client,
 	}
 }
@@ -899,4 +903,21 @@ func (e *Exchange) BatchQueryKLines(ctx context.Context, symbol string, interval
 	}
 
 	return allKLines, nil
+}
+
+func (e *Exchange) QueryLastFundingRate(ctx context.Context, symbol string) (fixedpoint.Value, error) {
+	futuresClient := binance.NewFuturesClient(e.key, e.secret)
+	rates, err := futuresClient.NewFundingRateService().
+		Symbol(symbol).
+		Limit(1).
+		Do(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	if len(rates) == 0 {
+		return 0, errors.New("empty funding rate data")
+	}
+
+	return fixedpoint.NewFromString(rates[0].FundingRate)
 }
