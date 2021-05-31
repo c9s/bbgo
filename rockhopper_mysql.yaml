@@ -2,4 +2,5 @@
 driver: mysql
 dialect: mysql
 dsn: "root@tcp(localhost:3306)/bbgo_dev?parseTime=true"
+# dsn: "root@tcp(localhost:3306)/bbgo_backtest?parseTime=true"
 migrationsDir: migrations/mysql
