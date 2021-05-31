@@ -139,7 +139,7 @@ func (s *Stream) pollKLines(ctx context.Context) {
 	for _, sub := range s.klineSubscriptions {
 		klines := getLastKLine(s.exchange, ctx, sub.symbol, sub.interval)
 
-		if len(klines) >= 0 {
+		if len(klines) > 0 {
 			// handle mutiple klines, get the latest one
 			s.EmitKLineClosed(klines[len(klines)-1])
 		}
