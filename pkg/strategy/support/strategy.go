@@ -197,6 +197,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 					takerBuyBaseVolumeThreshold,
 					s.TakerBuyRatio.Float64(),
 				)
+				return
 			}
 		}
 
@@ -255,7 +256,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		s.Notify("Submitting %s market order buy with quantity %f according to the base volume %f, taker buy base volume %f",
 			s.Symbol,
-			quantity,
+			quantity.Float64(),
 			kline.Volume,
 			kline.TakerBuyBaseAssetVolume)
 
