@@ -347,7 +347,7 @@ func (tree *RBTree) RightmostOf(current *RBNode) *RBNode {
 		return nil
 	}
 
-	for current.Right != tree.neel {
+	for current.Right != tree.neel && current.Right != nil {
 		current = current.Right
 	}
 
@@ -363,7 +363,7 @@ func (tree *RBTree) LeftmostOf(current *RBNode) *RBNode {
 		return nil
 	}
 
-	for current.Left != tree.neel {
+	for current.Left != tree.neel && current.Left != nil {
 		current = current.Left
 	}
 
@@ -402,7 +402,7 @@ func (tree *RBTree) Inorder(cb func(n *RBNode) bool) {
 }
 
 func (tree *RBTree) InorderOf(current *RBNode, cb func(n *RBNode) bool) {
-	if current != tree.neel {
+	if current != tree.neel && current != nil {
 		tree.InorderOf(current.Left, cb)
 		if !cb(current) {
 			return
@@ -417,7 +417,7 @@ func (tree *RBTree) InorderReverse(cb func(n *RBNode) bool) {
 }
 
 func (tree *RBTree) InorderReverseOf(current *RBNode, cb func(n *RBNode) bool) {
-	if current != tree.neel {
+	if current != tree.neel && current != nil {
 		tree.InorderReverseOf(current.Right, cb)
 		if !cb(current) {
 			return
@@ -431,7 +431,7 @@ func (tree *RBTree) Postorder(cb func(n *RBNode) bool) {
 }
 
 func (tree *RBTree) PostorderOf(current *RBNode, cb func(n *RBNode) bool) {
-	if current != tree.neel {
+	if current != tree.neel && current != nil {
 		tree.PostorderOf(current.Left, cb)
 		tree.PostorderOf(current.Right, cb)
 		if !cb(current) {
