@@ -229,12 +229,16 @@ func (tree *RBTree) Insert(key, val fixedpoint.Value) {
 
 func (tree *RBTree) Search(key fixedpoint.Value) *RBNode {
 	var current = tree.Root
-	for current != nil && key != current.Key {
+	for current != tree.neel && key != current.Key {
 		if key < current.Key {
 			current = current.Left
 		} else {
 			current = current.Right
 		}
+	}
+
+	if current == tree.neel {
+		return nil
 	}
 
 	return current
