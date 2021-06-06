@@ -452,14 +452,14 @@ func (tree *RBTree) PostorderOf(current *RBNode, cb func(n *RBNode) bool) {
 	}
 }
 
-func (tree *RBTree) copyNode(node *RBNode) *RBNode {
+func (tree *RBTree) copyNode(node, neel *RBNode) *RBNode {
 	if node == tree.neel {
-		return tree.neel
+		return neel
 	}
 
 	newNode := *node
-	newNode.Left = tree.copyNode(node.Left)
-	newNode.Right = tree.copyNode(node.Right)
+	newNode.Left = tree.copyNode(node.Left, neel)
+	newNode.Right = tree.copyNode(node.Right, neel)
 	return &newNode
 }
 
@@ -503,6 +503,6 @@ func (tree *RBTree) Print() {
 
 func (tree *RBTree) Copy() *RBTree {
 	newTree := NewRBTree()
-	newTree.Root = tree.copyNode(tree.Root)
+	newTree.Root = tree.copyNode(tree.Root, newTree.neel)
 	return newTree
 }
