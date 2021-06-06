@@ -31,6 +31,7 @@ func TestRBTree_Rightmost(t *testing.T) {
 	tree.Insert(10, 10)
 	node = tree.Rightmost()
 	assert.Equal(t, fixedpoint.Value(10), node.Key)
+	assert.Equal(t, fixedpoint.Value(10), node.Value)
 
 	tree.Insert(12, 12)
 	tree.Insert(9, 9)
@@ -38,17 +39,20 @@ func TestRBTree_Rightmost(t *testing.T) {
 	assert.Equal(t, fixedpoint.Value(12), node.Key)
 }
 
-func TestRBTree_RandomInsertAndDelete(t *testing.T) {
+func TestRBTree_RandomInsertSearchAndDelete(t *testing.T) {
 	var keys []fixedpoint.Value
 
 	tree := NewRBTree()
 	for i := 1; i < 100; i++ {
 		v := fixedpoint.NewFromFloat(rand.Float64()*100 + 1.0)
 		keys = append(keys, v)
-		tree.Insert(v, fixedpoint.NewFromFloat(float64(i)))
+		tree.Insert(v, v)
 	}
 
 	for _, key := range keys {
+		node := tree.Search(key)
+		assert.NotNil(t, node)
+
 		ok := tree.Delete(key)
 		assert.True(t, ok, "should find and delete the node")
 	}
