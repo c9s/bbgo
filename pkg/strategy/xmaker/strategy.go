@@ -281,10 +281,13 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 		return
 	}
 
-	bestBid, _ := sourceBook.BestBid()
-	bestBidPrice := bestBid.Price
+	bestBid, hasBid := sourceBook.BestBid()
+	bestAsk, hasAsk := sourceBook.BestAsk()
+	if !hasBid || !hasAsk {
+		return
+	}
 
-	bestAsk, _ := sourceBook.BestAsk()
+	bestBidPrice := bestBid.Price
 	bestAskPrice := bestAsk.Price
 	log.Infof("%s book ticker: best ask / best bid = %f / %f", s.Symbol, bestAskPrice.Float64(), bestBidPrice.Float64())
 
