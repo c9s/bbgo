@@ -10,14 +10,18 @@ import (
 
 func TestRBTree_InsertAndDelete(t *testing.T) {
 	tree := NewRBTree()
+	node := tree.Rightmost()
+	assert.Nil(t, node)
+
 	tree.Insert(fixedpoint.NewFromInt(10), 10)
 	tree.Insert(fixedpoint.NewFromInt(9), 9)
 	tree.Insert(fixedpoint.NewFromInt(12), 12)
 	tree.Insert(fixedpoint.NewFromInt(11), 11)
 	tree.Insert(fixedpoint.NewFromInt(13), 13)
 
-	node := tree.Rightmost()
+	node = tree.Rightmost()
 	assert.Equal(t, fixedpoint.NewFromInt(13), node.Key)
+	assert.Equal(t, fixedpoint.Value(13), node.Value)
 
 	ok := tree.Delete(fixedpoint.NewFromInt(12))
 	assert.True(t, ok, "should delete the node successfully")
