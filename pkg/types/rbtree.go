@@ -40,7 +40,7 @@ func (tree *RBTree) Delete(key fixedpoint.Value) bool {
 
 	// the deleting node has only one child, it's easy,
 	// we just connect the child the parent of the deleting node
-	if deleting.Left == tree.neel || deleting.Right == tree.neel  {
+	if deleting.Left == tree.neel || deleting.Right == tree.neel {
 		y = deleting
 		// fmt.Printf("y = deleting = %+v\n", y)
 	} else {
@@ -343,6 +343,10 @@ func (tree *RBTree) Rightmost() *RBNode {
 }
 
 func (tree *RBTree) RightmostOf(current *RBNode) *RBNode {
+	if current == tree.neel {
+		return nil
+	}
+
 	for current.Right != tree.neel {
 		current = current.Right
 	}
@@ -355,6 +359,10 @@ func (tree *RBTree) Leftmost() *RBNode {
 }
 
 func (tree *RBTree) LeftmostOf(current *RBNode) *RBNode {
+	if current == tree.neel {
+		return nil
+	}
+
 	for current.Left != tree.neel {
 		current = current.Left
 	}
