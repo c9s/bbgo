@@ -418,6 +418,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 				// if we bought, then we need to sell the base from the hedge session
 				submitOrders = append(submitOrders, types.SubmitOrder{
 					Symbol:      s.Symbol,
+					Market:      s.makerMarket,
 					Type:        types.OrderTypeLimit,
 					Side:        types.SideTypeSell,
 					Price:       askPrice.Float64(),
@@ -521,6 +522,7 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 
 	orderExecutor := &bbgo.ExchangeOrderExecutor{Session: s.sourceSession}
 	returnOrders, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+		Market:   s.sourceMarket,
 		Symbol:   s.Symbol,
 		Type:     types.OrderTypeMarket,
 		Side:     side,
