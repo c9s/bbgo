@@ -355,6 +355,10 @@ func (tree *RBTree) RightmostOf(current *RBNode) *RBNode {
 		current = current.Right
 	}
 
+	if current == tree.neel {
+		return nil
+	}
+
 	return current
 }
 
@@ -369,6 +373,10 @@ func (tree *RBTree) LeftmostOf(current *RBNode) *RBNode {
 
 	for current.Left != tree.neel && current.Left != nil {
 		current = current.Left
+	}
+
+	if current == tree.neel {
+		return nil
 	}
 
 	return current
