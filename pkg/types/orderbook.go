@@ -59,6 +59,16 @@ func (b *MutexOrderBook) IsValid() (ok bool, err error) {
 	return ok, err
 }
 
+func (b *MutexOrderBook) BestBidAndAsk() (bid, ask PriceVolume, ok bool) {
+	var ok1, ok2 bool
+	b.Lock()
+	bid, ok1 = b.OrderBook.BestBid()
+	ask, ok2 = b.OrderBook.BestAsk()
+	ok = ok1 && ok2
+	b.Unlock()
+	return bid, ask, ok
+}
+
 func (b *MutexOrderBook) BestBid() (pv PriceVolume, ok bool) {
 	b.Lock()
 	pv, ok = b.OrderBook.BestBid()
