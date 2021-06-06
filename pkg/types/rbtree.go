@@ -57,8 +57,8 @@ func (tree *RBTree) Delete(key fixedpoint.Value) bool {
 	} else {
 		x = y.Right
 	}
-	// fmt.Printf("x = %+v\n", y)
 
+	// fmt.Printf("x = %+v\n", y)
 	x.Parent = y.Parent
 
 	if y.Parent == tree.neel {
@@ -69,14 +69,14 @@ func (tree *RBTree) Delete(key fixedpoint.Value) bool {
 		y.Parent.Right = x
 	}
 
+	// copy the data from the successor to the memory location of the deleting node
 	if y != deleting {
 		deleting.Key = y.Key
+		deleting.Value = y.Value
 	}
 
 	if y.Color == Black {
-		if x != nil {
-			tree.DeleteFixup(x)
-		}
+		tree.DeleteFixup(x)
 	}
 
 	tree.size--
