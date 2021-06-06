@@ -27,26 +27,37 @@ func NewRBTree() *RBTree {
 }
 
 func (tree *RBTree) Delete(key fixedpoint.Value) bool {
-	var del = tree.Search(key)
-	if del == nil {
+	var deleting = tree.Search(key)
+	if deleting == nil {
 		return false
 	}
 
 	// y = the node to be deleted
 	// x (the child of the deleted node)
 	var x, y *RBNode
+	// fmt.Printf("neel = %p %+v\n", tree.neel, tree.neel)
+	// fmt.Printf("deleting = %+v\n", deleting)
 
-	if del.Left == tree.neel || del.Right == tree.neel {
-		y = del
+	// the deleting node has only one child, it's easy,
+	// we just connect the child the parent of the deleting node
+	if deleting.Left == tree.neel || deleting.Right == tree.neel  {
+		y = deleting
+		// fmt.Printf("y = deleting = %+v\n", y)
 	} else {
-		y = tree.Successor(del)
+		// if both children are not NIL (neel), we need to find the successor
+		// and copy the successor to the memory location of the deleting node.
+		// since it's successor, it always has no child connecting to it.
+		y = tree.Successor(deleting)
+		// fmt.Printf("y = successor = %+v\n", y)
 	}
 
+	// y.Left or y.Right could be neel
 	if y.Left != tree.neel {
 		x = y.Left
 	} else {
 		x = y.Right
 	}
+	// fmt.Printf("x = %+v\n", y)
 
 	x.Parent = y.Parent
 
@@ -58,12 +69,14 @@ func (tree *RBTree) Delete(key fixedpoint.Value) bool {
 		y.Parent.Right = x
 	}
 
-	if y != del {
-		del.Key = y.Key
+	if y != deleting {
+		deleting.Key = y.Key
 	}
 
 	if y.Color == Black {
-		tree.DeleteFixup(x)
+		if x != nil {
+			tree.DeleteFixup(x)
+		}
 	}
 
 	tree.size--
@@ -216,17 +229,12 @@ func (tree *RBTree) Insert(key, val fixedpoint.Value) {
 
 func (tree *RBTree) Search(key fixedpoint.Value) *RBNode {
 	var current = tree.Root
-	for current != tree.neel && key != current.Key {
+	for current != nil && key != current.Key {
 		if key < current.Key {
 			current = current.Left
 		} else {
 			current = current.Right
 		}
-	}
-
-	// convert Neel to real nil
-	if current == tree.neel {
-		return nil
 	}
 
 	return current
@@ -335,7 +343,7 @@ func (tree *RBTree) Rightmost() *RBNode {
 }
 
 func (tree *RBTree) RightmostOf(current *RBNode) *RBNode {
-	for current.Right != nil {
+	for current.Right != tree.neel {
 		current = current.Right
 	}
 
@@ -347,7 +355,7 @@ func (tree *RBTree) Leftmost() *RBNode {
 }
 
 func (tree *RBTree) LeftmostOf(current *RBNode) *RBNode {
-	for current.Left != nil {
+	for current.Left != tree.neel {
 		current = current.Left
 	}
 
@@ -355,12 +363,12 @@ func (tree *RBTree) LeftmostOf(current *RBNode) *RBNode {
 }
 
 func (tree *RBTree) Successor(current *RBNode) *RBNode {
-	if current.Right != nil {
+	if current.Right != tree.neel {
 		return tree.LeftmostOf(current.Right)
 	}
 
 	var newNode = current.Parent
-	for newNode != nil && current == newNode.Right {
+	for newNode != tree.neel && current == newNode.Right {
 		current = newNode
 		newNode = newNode.Parent
 	}

@@ -12,8 +12,8 @@ func TestTree_InsertAndDelete(t *testing.T) {
 	var keys []fixedpoint.Value
 
 	tree := NewRBTree()
-	for i := 1; i < 10.0; i++ {
-		v := fixedpoint.NewFromFloat(rand.Float64())
+	for i := 1; i < 100; i++ {
+		v := fixedpoint.NewFromFloat(rand.Float64() * 100 + 1.0)
 		keys = append(keys, v)
 		tree.Insert(v, fixedpoint.NewFromFloat(float64(i)))
 	}
@@ -22,7 +22,6 @@ func TestTree_InsertAndDelete(t *testing.T) {
 		ok := tree.Delete(key)
 		assert.True(t, ok, "should find and delete the node")
 	}
-
 }
 
 func TestTree_CopyInorder(t *testing.T) {
