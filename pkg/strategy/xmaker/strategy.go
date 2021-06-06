@@ -67,9 +67,10 @@ type Strategy struct {
 	HedgeInterval       types.Duration `json:"hedgeInterval"`
 	OrderCancelWaitTime types.Duration `json:"orderCancelWaitTime"`
 
-	Margin    fixedpoint.Value `json:"margin"`
-	BidMargin fixedpoint.Value `json:"bidMargin"`
-	AskMargin fixedpoint.Value `json:"askMargin"`
+	Margin        fixedpoint.Value `json:"margin"`
+	BidMargin     fixedpoint.Value `json:"bidMargin"`
+	AskMargin     fixedpoint.Value `json:"askMargin"`
+	UseDepthPrice bool             `json:"useDepthPrice"`
 
 	EnableBollBandMargin bool             `json:"enableBollBandMargin"`
 	BollBandInterval     types.Interval   `json:"bollBandInterval"`
@@ -336,6 +337,8 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 		}
 	}
 
+	bidPrice := bestBidPrice
+	askPrice := bestAskPrice
 	for i := 0; i < s.NumLayers; i++ {
 		// for maker bid orders
 		if !disableMakerBid {
@@ -353,9 +356,11 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 			}
 
 			accumulativeBidQuantity += bidQuantity
-			bidPrice := aggregatePrice(sourceBook.SideBook(types.SideTypeBuy), accumulativeBidQuantity)
-			bidPrice = bidPrice.MulFloat64(1.0 - bidMargin.Float64())
+			if s.UseDepthPrice {
+				bidPrice = aggregatePrice(sourceBook.SideBook(types.SideTypeBuy), accumulativeBidQuantity)
+			}
 
+			bidPrice = bidPrice.MulFloat64(1.0 - bidMargin.Float64())
 			if i > 0 && pips > 0 {
 				bidPrice -= pips.MulFloat64(s.makerMarket.TickSize)
 			}
@@ -400,7 +405,10 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 			}
 			accumulativeAskQuantity += askQuantity
 
-			askPrice := aggregatePrice(sourceBook.SideBook(types.SideTypeSell), accumulativeAskQuantity)
+			if s.UseDepthPrice {
+				askPrice = aggregatePrice(sourceBook.SideBook(types.SideTypeSell), accumulativeAskQuantity)
+			}
+
 			askPrice = askPrice.MulFloat64(1.0 + askMargin.Float64())
 			if i > 0 && pips > 0 {
 				askPrice -= pips.MulFloat64(s.makerMarket.TickSize)
