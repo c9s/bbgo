@@ -1,11 +1,19 @@
 package max
 
-import "github.com/google/uuid"
+import (
+	"github.com/c9s/bbgo/pkg/types"
+	"github.com/google/uuid"
+)
 
 // BBGO is a broker on MAX
 const spotBrokerID = "bbgo"
 
 func NewClientOrderID(originalID string, tags ...string) (clientOrderID string) {
+	// skip blank client order ID
+	if originalID == types.NoClientOrderID {
+		return ""
+	}
+
 	prefix := "x-" + spotBrokerID + "-"
 
 	for _, tag := range tags {

@@ -79,6 +79,8 @@ func (t *OrderType) Scan(v interface{}) error {
 }
 */
 
+const NoClientOrderID = "0"
+
 type OrderStatus string
 
 const (

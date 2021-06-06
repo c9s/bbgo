@@ -522,19 +522,13 @@ func (e *Exchange) submitMarginOrder(ctx context.Context, order types.SubmitOrde
 		return nil, err
 	}
 
-	clientOrderID := uuid.New().String()
-	if len(order.ClientOrderID) > 0 {
-		clientOrderID = order.ClientOrderID
-	}
+	clientOrderID := newSpotClientOrderID(order.ClientOrderID)
 
 	req := e.Client.NewCreateMarginOrderService().
 		Symbol(order.Symbol).
 		Type(orderType).
-		Side(binance.SideType(order.Side))
-
-	if len(clientOrderID) > 0 {
-		req.NewClientOrderID(clientOrderID)
-	}
+		Side(binance.SideType(order.Side)).
+		NewClientOrderID(clientOrderID)
 
 	// use response result format
 	req.NewOrderRespType(binance.NewOrderRespTypeRESULT)
@@ -618,6 +612,10 @@ func (e *Exchange) submitMarginOrder(ctx context.Context, order types.SubmitOrde
 const spotBrokerID = "NSUYEBKM"
 
 func newSpotClientOrderID(originalID string) (clientOrderID string) {
+	if originalID == types.NoClientOrderID {
+		return ""
+	}
+
 	prefix := "x-" + spotBrokerID
 	prefixLen := len(prefix)
 
