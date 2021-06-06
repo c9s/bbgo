@@ -389,7 +389,7 @@ func (tree *RBTree) Preorder(cb func(n *RBNode)) {
 }
 
 func (tree *RBTree) PreorderOf(current *RBNode, cb func(n *RBNode)) {
-	if current != tree.neel {
+	if current != tree.neel && current != nil {
 		cb(current)
 		tree.PreorderOf(current.Left, cb)
 		tree.PreorderOf(current.Right, cb)
