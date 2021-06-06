@@ -406,7 +406,7 @@ func (e *Exchange) Withdrawal(ctx context.Context, asset string, amount fixedpoi
 }
 
 func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error) {
-	if len(orders) <= 10 {
+	if len(orders) > 1 && len(orders) < 15 {
 		var ordersBySymbol = map[string][]maxapi.Order{}
 		for _, o := range orders {
 			maxOrder, err := toMaxSubmitOrder(o)
