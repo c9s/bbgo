@@ -1,11 +1,29 @@
 package types
 
 import (
+	"math/rand"
 	"testing"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestTree_InsertAndDelete(t *testing.T) {
+	var keys []fixedpoint.Value
+
+	tree := NewRBTree()
+	for i := 1; i < 10.0; i++ {
+		v := fixedpoint.NewFromFloat(rand.Float64())
+		keys = append(keys, v)
+		tree.Insert(v, fixedpoint.NewFromFloat(float64(i)))
+	}
+
+	for _, key := range keys {
+		ok := tree.Delete(key)
+		assert.True(t, ok, "should find and delete the node")
+	}
+
+}
 
 func TestTree_CopyInorder(t *testing.T) {
 	tree := NewRBTree()
