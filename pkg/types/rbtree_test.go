@@ -8,12 +8,42 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestTree_InsertAndDelete(t *testing.T) {
+func TestRBTree_InsertAndDelete(t *testing.T) {
+	tree := NewRBTree()
+	tree.Insert(fixedpoint.NewFromInt(10), 10)
+	tree.Insert(fixedpoint.NewFromInt(9), 9)
+	tree.Insert(fixedpoint.NewFromInt(12), 12)
+	tree.Insert(fixedpoint.NewFromInt(11), 11)
+	tree.Insert(fixedpoint.NewFromInt(13), 13)
+
+	node := tree.Rightmost()
+	assert.Equal(t, fixedpoint.NewFromInt(13), node.Key)
+
+	ok := tree.Delete(fixedpoint.NewFromInt(12))
+	assert.True(t, ok, "should delete the node successfully")
+}
+
+func TestRBTree_Rightmost(t *testing.T) {
+	tree := NewRBTree()
+	node := tree.Rightmost()
+	assert.Nil(t, node, "should be nil")
+
+	tree.Insert(10, 10)
+	node = tree.Rightmost()
+	assert.Equal(t, fixedpoint.Value(10), node.Key)
+
+	tree.Insert(12, 12)
+	tree.Insert(9, 9)
+	node = tree.Rightmost()
+	assert.Equal(t, fixedpoint.Value(12), node.Key)
+}
+
+func TestRBTree_RandomInsertAndDelete(t *testing.T) {
 	var keys []fixedpoint.Value
 
 	tree := NewRBTree()
 	for i := 1; i < 100; i++ {
-		v := fixedpoint.NewFromFloat(rand.Float64() * 100 + 1.0)
+		v := fixedpoint.NewFromFloat(rand.Float64()*100 + 1.0)
 		keys = append(keys, v)
 		tree.Insert(v, fixedpoint.NewFromFloat(float64(i)))
 	}
@@ -24,7 +54,7 @@ func TestTree_InsertAndDelete(t *testing.T) {
 	}
 }
 
-func TestTree_CopyInorder(t *testing.T) {
+func TestRBTree_CopyInorder(t *testing.T) {
 	tree := NewRBTree()
 	for i := 1.0; i < 10.0; i += 1.0 {
 		tree.Insert(fixedpoint.NewFromFloat(i*100.0), fixedpoint.NewFromFloat(i))
