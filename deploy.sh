@@ -5,8 +5,12 @@ target=$1
 bin_dir=bin
 bin_type=bbgo-slim
 host=bbgo
+host_user=root
+host_home=/root
+host_systemd_service_dir=/etc/systemd/system
 os=linux
 arch=amd64
+setup_host_systemd_service=no
 
 # use the git describe as the binary version, you may override this with something else.
 tag=$(git describe --tags)
@@ -16,12 +20,20 @@ GREEN='\033[1;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+function remote_test() {
+  ssh $host "(test $* && echo yes)"
+}
+
+function remote_run() {
+  ssh $host "$*"
+}
+
 function warn() {
-  echo "${YELLOW}$@${NC}"
+  echo "${YELLOW}$*${NC}"
 }
 
 function error() {
-  echo "${RED}$@${NC}"
+  echo "${RED}$*${NC}"
 }
 
 function info() {
@@ -41,11 +53,44 @@ if [[ -z $target ]]; then
   exit 1
 fi
 
-make $bin_type-$os-$arch
-
 # initialize the remote environment
 # create the directory for placing binaries
-ssh $host "mkdir -p \$HOME/$bin_dir"
+ssh $host "mkdir -p \$HOME/$bin_dir && mkdir -p \$HOME/$target"
+
+if [[ $(remote_test "-e $host_systemd_service_dir/$target.service") != "yes" ]]; then
+  if [[ "$setup_host_systemd_service" == "no" ]]; then
+    error "The systemd $target.service on host $host is not configured, can not deploy"
+    exit 1
+  fi
+
+  warn "$host_systemd_service_dir/$target.service does not exist, setting up..."
+
+  cat <<END >".systemd.$target.service"
+[Unit]
+After=network-online.target
+Wants=network-online.target
+
+[Install]
+WantedBy=multi-user.target
+
+[Service]
+WorkingDirectory=$host_home/$target
+KillMode=process
+ExecStart=$host_home/$target/bbgo run
+User=$host_user
+Restart=always
+RestartSec=30
+END
+
+  info "uploading systemd service file..."
+  scp ".systemd.$target.service" "$host:$host_systemd_service_dir/$target.service"
+
+  info "reloading systemd daemon..."
+  remote_run "systemctl daemon-reload && systemctl enable $target"
+fi
+
+info "building binary: $bin_type-$os-$arch..."
+make $bin_type-$os-$arch
 
 # copy the binary to the server
 info "deploying..."
