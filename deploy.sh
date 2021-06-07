@@ -8,8 +8,14 @@ host=bbgo
 host_user=root
 host_home=/root
 host_systemd_service_dir=/etc/systemd/system
-os=linux
-arch=amd64
+host_os=linux
+host_arch=amd64
+
+# setup_host_systemd_service: should we create a new systemd service file if it does not exist?
+# change this to "yes" to enable the automatic setup.
+# if setup_host_systemd_service is enabled, the script will create a systemd service file from a template
+# and then upload the systemd service file to $host_systemd_service_dir,
+# root permission might be needed, you can change the host user to root temporarily while setting up the environment.
 setup_host_systemd_service=no
 
 # use the git describe as the binary version, you may override this with something else.
@@ -89,13 +95,13 @@ END
   remote_run "systemctl daemon-reload && systemctl enable $target"
 fi
 
-info "building binary: $bin_type-$os-$arch..."
-make $bin_type-$os-$arch
+info "building binary: $bin_type-$host_os-$host_arch..."
+make $bin_type-$host_os-$host_arch
 
 # copy the binary to the server
 info "deploying..."
 info "copying binary to host $host..."
-scp build/bbgo/$bin_type-$os-$arch $host:$bin_dir/bbgo-$tag
+scp build/bbgo/$bin_type-$host_os-$host_arch $host:$bin_dir/bbgo-$tag
 
 # link binary and restart the systemd service
 info "linking binary and restarting..."
