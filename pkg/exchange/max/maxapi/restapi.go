@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -118,9 +119,20 @@ func NewRestClientWithHttpClient(baseURL string, httpClient *http.Client) *RestC
 }
 
 func NewRestClient(baseURL string) *RestClient {
-	transport := http.DefaultTransport.(*http.Transport)
-	transport.MaxIdleConnsPerHost = httpTransportMaxIdleConnsPerHost
-	transport.MaxIdleConns = httpTransportMaxIdleConns
+	// create an isolated http transport rather than the default one
+	transport := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          httpTransportMaxIdleConns,
+		MaxIdleConnsPerHost:   httpTransportMaxIdleConnsPerHost,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
 
 	client := &http.Client{
 		Timeout:   defaultHTTPTimeout,
