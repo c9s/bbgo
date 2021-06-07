@@ -44,6 +44,7 @@ var addUserAgentHeader = true
 
 var httpTransportMaxIdleConnsPerHost = http.DefaultMaxIdleConnsPerHost
 var httpTransportMaxIdleConns = 100
+var httpTransportIdleConnTimeout = 90 * time.Second
 
 func init() {
 	debugMaxRequestPayload, _ = util.GetEnvVarBool("DEBUG_MAX_REQUEST_PAYLOAD")
@@ -56,6 +57,9 @@ func init() {
 
 	if val, ok := util.GetEnvVarInt("HTTP_TRANSPORT_MAX_IDLE_CONNS"); ok {
 		httpTransportMaxIdleConns = val
+	}
+	if val, ok := util.GetEnvVarDuration("HTTP_TRANSPORT_IDLE_CONN_TIMEOUT"); ok {
+		httpTransportIdleConnTimeout = val
 	}
 }
 
@@ -129,7 +133,7 @@ func NewRestClient(baseURL string) *RestClient {
 		ForceAttemptHTTP2:     true,
 		MaxIdleConns:          httpTransportMaxIdleConns,
 		MaxIdleConnsPerHost:   httpTransportMaxIdleConnsPerHost,
-		IdleConnTimeout:       90 * time.Second,
+		IdleConnTimeout:       httpTransportIdleConnTimeout,
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
 	}
