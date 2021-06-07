@@ -3,9 +3,25 @@ package util
 import (
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/sirupsen/logrus"
 )
+
+func GetEnvVarDuration(n string) (time.Duration, bool) {
+	str, ok := os.LookupEnv(n)
+	if !ok {
+		return 0, false
+	}
+
+	du, err := time.ParseDuration(str)
+	if err != nil {
+		logrus.WithError(err).Errorf("can not parse env var %q as time.Duration, incorrect format", str)
+		return 0, false
+	}
+
+	return du, true
+}
 
 func GetEnvVarInt(n string) (int, bool) {
 	str, ok := os.LookupEnv(n)
