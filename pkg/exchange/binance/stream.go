@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/rand"
 	"net"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -18,7 +19,24 @@ import (
 
 var debugBinanceDepth bool
 
-const readTimeout = 30 * time.Second
+var defaultDialer = &websocket.Dialer{
+	Proxy:            http.ProxyFromEnvironment,
+	HandshakeTimeout: 45 * time.Second,
+	ReadBufferSize:   4096 * 2,
+}
+
+// from Binance document:
+// The websocket server will send a ping frame every 3 minutes.
+// If the websocket server does not receive a pong frame back from the connection within a 10 minute period, the connection will be disconnected.
+// Unsolicited pong frames are allowed.
+
+// WebSocket connections have a limit of 5 incoming messages per second. A message is considered:
+// A PING frame
+// A PONG frame
+// A JSON controlled message (e.g. subscribe, unsubscribe)
+const readTimeout = 60 * time.Second
+
+const pongWaitTime = 10 * time.Second
 
 func init() {
 	// randomize pulling
@@ -230,7 +248,7 @@ func (s *Stream) dial(listenKey string) (*websocket.Conn, error) {
 		url = "wss://stream.binance.com:9443/ws/" + listenKey
 	}
 
-	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
+	conn, _, err := defaultDialer.Dial(url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -342,9 +360,10 @@ func (s *Stream) connect(ctx context.Context) error {
 
 	// create a new context
 	s.connCtx, s.connCancel = context.WithCancel(ctx)
-	conn.SetReadDeadline(time.Now().Add(readTimeout))
 	conn.SetPongHandler(func(string) error {
-		conn.SetReadDeadline(time.Now().Add(readTimeout))
+		if err := conn.SetReadDeadline(time.Now().Add(readTimeout * 2)); err != nil {
+			log.WithError(err).Error("pong handler can not set read deadline")
+		}
 		return nil
 	})
 
@@ -378,7 +397,7 @@ func (s *Stream) ping(ctx context.Context) {
 			conn := s.Conn
 			s.ConnLock.Unlock()
 
-			if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(3*time.Second)); err != nil {
+			if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(pongWaitTime)); err != nil {
 				log.WithError(err).Error("ping error", err)
 				s.Reconnect()
 			}
@@ -453,18 +472,21 @@ func (s *Stream) read(ctx context.Context) {
 						return
 					}
 
+					_ = conn.Close()
 					// for unexpected close error, we should re-connect
 					// emit reconnect to start a new connection
 					s.Reconnect()
 					return
 
 				case net.Error:
-					log.WithError(err).Error("network error")
+					log.WithError(err).Error("websocket network error")
+					_ = conn.Close()
 					s.Reconnect()
 					return
 
 				default:
 					log.WithError(err).Error("unexpected connection error")
+					_ = conn.Close()
 					s.Reconnect()
 					return
 				}
