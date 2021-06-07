@@ -194,9 +194,14 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 		return
 	}
 
-	sourceBook := s.book.Copy()
+	bestBid, bestAsk, hasPrice := s.book.BestBidAndAsk()
+	if !hasPrice {
+		return
+	}
+
+	sourceBook := s.book.CopyDepth(20)
 	if valid, err := sourceBook.IsValid(); !valid {
-		log.WithError(err).Errorf("%s invalid order book, skip quoting: %v", s.Symbol, err)
+		log.WithError(err).Errorf("%s invalid copied order book, skip quoting: %v", s.Symbol, err)
 		return
 	}
 
@@ -278,12 +283,6 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 
 	if disableMakerAsk && disableMakerBid {
 		log.Warnf("%s bid/ask maker is disabled due to insufficient balances", s.Symbol)
-		return
-	}
-
-	bestBid, hasBid := sourceBook.BestBid()
-	bestAsk, hasAsk := sourceBook.BestAsk()
-	if !hasBid || !hasAsk {
 		return
 	}
 
