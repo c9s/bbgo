@@ -106,7 +106,7 @@ func (it *Interaction) HandleAuth(m *telebot.Message) {
 		it.session.Owner = m.Sender
 		it.session.Chat = m.Chat
 
-		if _, err := it.bot.Send(m.Chat, fmt.Sprintf("Hi %s, I know you, I will send you the notifications!", m.Sender.Username)); err != nil {
+		if _, err := it.bot.Send(m.Chat, fmt.Sprintf("👋 Hi %s, nice to meet you. 🤝 I will send you the notifications!", m.Sender.Username)); err != nil {
 			log.WithError(err).Error("telegram send error")
 		}
 
@@ -122,7 +122,7 @@ func (it *Interaction) HandleAuth(m *telebot.Message) {
 			it.session.Owner = m.Sender
 			it.session.Chat = m.Chat
 
-			if _, err := it.bot.Send(m.Chat, fmt.Sprintf("Hi %s, I know you, I will send you the notifications!", m.Sender.Username)); err != nil {
+			if _, err := it.bot.Send(m.Chat, fmt.Sprintf("👋 Hi %s, nice to meet you. 🤝 I will send you the notifications!", m.Sender.Username)); err != nil {
 				log.WithError(err).Error("telegram send error")
 			}
 
