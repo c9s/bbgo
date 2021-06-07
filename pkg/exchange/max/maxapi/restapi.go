@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"math"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"os"
 	"reflect"
@@ -37,7 +38,8 @@ const (
 	TimestampSince = 1535760000
 )
 
-var debugMaxRequestPayload = true
+var debugRequestDump = false
+var debugMaxRequestPayload = false
 
 func init() {
 	debugMaxRequestPayload, _ = strconv.ParseBool(os.Getenv("DEBUG_MAX_REQUEST_PAYLOAD"))
@@ -68,11 +70,11 @@ type RestClient struct {
 	APIKey    string
 	APISecret string
 
-	AccountService *AccountService
-	PublicService  *PublicService
-	TradeService   *TradeService
-	OrderService   *OrderService
-	RewardService  *RewardService
+	AccountService    *AccountService
+	PublicService     *PublicService
+	TradeService      *TradeService
+	OrderService      *OrderService
+	RewardService     *RewardService
 	WithdrawalService *WithdrawalService
 	// OrderBookService *OrderBookService
 	// MaxTokenService  *MaxTokenService
@@ -220,14 +222,23 @@ func (c *RestClient) newAuthenticatedRequest(m string, refURL string, data inter
 		return nil, err
 	}
 
-
 	encoded := base64.StdEncoding.EncodeToString(p)
 
 	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("Accept", "application/json")
+	// accept is not necessary
+	// req.Header.Add("Accept", "application/json")
 	req.Header.Add("X-MAX-ACCESSKEY", c.APIKey)
 	req.Header.Add("X-MAX-PAYLOAD", encoded)
 	req.Header.Add("X-MAX-SIGNATURE", signPayload(encoded, c.APISecret))
+
+	if debugRequestDump {
+		dump, err := httputil.DumpRequestOut(req, true)
+		if err != nil {
+			log.Panic(err)
+		}
+
+		fmt.Printf("REQUEST:\n%s", dump)
+	}
 
 	return req, nil
 }
