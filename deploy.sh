@@ -2,11 +2,20 @@
 set -e
 
 target=$1
-bin_dir=bin
+
+# bin_type is the binary type that you want to build bbgo
+# use "bbgo" for full-features binary (including web application)
+# use "bbgo-slim" for slim version binary (without web application)
 bin_type=bbgo-slim
+
+# host_bin_dir is the directory that binary file will be uploaded to.
+# default to $HOME/bin
+host_bin_dir=bin
+
 host=bbgo
 host_user=root
 host_home=/root
+
 host_systemd_service_dir=/etc/systemd/system
 host_os=linux
 host_arch=amd64
@@ -32,6 +41,10 @@ function remote_test() {
 
 function remote_run() {
   ssh $host "$*"
+}
+
+function remote_eval() {
+  ssh $host "echo $*"
 }
 
 function warn() {
@@ -61,7 +74,7 @@ fi
 
 # initialize the remote environment
 # create the directory for placing binaries
-ssh $host "mkdir -p \$HOME/$bin_dir && mkdir -p \$HOME/$target"
+ssh $host "mkdir -p \$HOME/$host_bin_dir && mkdir -p \$HOME/$target"
 
 if [[ $(remote_test "-e $host_systemd_service_dir/$target.service") != "yes" ]]; then
   if [[ "$setup_host_systemd_service" == "no" ]]; then
@@ -70,6 +83,10 @@ if [[ $(remote_test "-e $host_systemd_service_dir/$target.service") != "yes" ]];
   fi
 
   warn "$host_systemd_service_dir/$target.service does not exist, setting up..."
+
+  if [[ -z $host_home ]]; then
+    host_home=$(remote_eval "\$HOME")
+  fi
 
   cat <<END >".systemd.$target.service"
 [Unit]
@@ -101,10 +118,10 @@ make $bin_type-$host_os-$host_arch
 # copy the binary to the server
 info "deploying..."
 info "copying binary to host $host..."
-scp build/bbgo/$bin_type-$host_os-$host_arch $host:$bin_dir/bbgo-$tag
+scp build/bbgo/$bin_type-$host_os-$host_arch $host:$host_bin_dir/bbgo-$tag
 
 # link binary and restart the systemd service
 info "linking binary and restarting..."
-ssh $host "(cd $target && ln -sf \$HOME/$bin_dir/bbgo-$tag bbgo && systemctl restart $target.service)"
+ssh $host "(cd $target && ln -sf \$HOME/$host_bin_dir/bbgo-$tag bbgo && systemctl restart $target.service)"
 
 info "deployed successfully!"
