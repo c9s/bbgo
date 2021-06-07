@@ -149,7 +149,7 @@ func (it *Interaction) Start(session Session) {
 	it.session = &session
 
 	if it.session.Owner != nil && it.session.Chat != nil {
-		if _, err := it.bot.Send(it.session.Chat, fmt.Sprintf("Hi %s, I'm back, this is version %s",
+		if _, err := it.bot.Send(it.session.Chat, fmt.Sprintf("👋 Hi %s, I'm back, this is version %s, good luck! 🖖",
 			it.session.Owner.Username,
 			version.Version,
 		)); err != nil {
