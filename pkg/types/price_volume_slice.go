@@ -54,10 +54,10 @@ func (slice PriceVolumeSlice) First() (PriceVolume, bool) {
 }
 
 func (slice PriceVolumeSlice) IndexByVolumeDepth(requiredVolume fixedpoint.Value) int {
-	var tv int64 = 0
+	var tv fixedpoint.Value = 0
 	for x, el := range slice {
-		tv += el.Volume.Int64()
-		if tv >= requiredVolume.Int64() {
+		tv += el.Volume
+		if tv >= requiredVolume {
 			return x
 		}
 	}
