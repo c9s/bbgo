@@ -118,7 +118,12 @@ make $bin_type-$host_os-$host_arch
 # copy the binary to the server
 info "deploying..."
 info "copying binary to host $host..."
-scp build/bbgo/$bin_type-$host_os-$host_arch $host:$host_bin_dir/bbgo-$tag
+
+if [[ $(remote_test "-e $host_bin_dir/bbgo-$tag") != "yes" ]] ; then
+  scp build/bbgo/$bin_type-$host_os-$host_arch $host:$host_bin_dir/bbgo-$tag
+else
+  info "binary $host_bin_dir/bbgo-$tag already exists, we will use the existing one"
+fi
 
 # link binary and restart the systemd service
 info "linking binary and restarting..."
