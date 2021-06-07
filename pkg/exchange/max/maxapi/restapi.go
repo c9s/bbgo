@@ -12,18 +12,17 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"os"
 	"reflect"
 	"regexp"
 	"strconv"
 	"sync/atomic"
 	"time"
 
-	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
-
 	"github.com/c9s/bbgo/pkg/util"
 	"github.com/c9s/bbgo/pkg/version"
+	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -41,7 +40,8 @@ const (
 var debugMaxRequestPayload = true
 
 func init() {
-	debugMaxRequestPayload = viper.GetBool("MAX_DEBUG_REQUEST_PAYLOAD")
+	debugMaxRequestPayload, _ = strconv.ParseBool(os.Getenv("DEBUG_MAX_REQUEST_PAYLOAD"))
+	debugRequestDump, _ = strconv.ParseBool(os.Getenv("DEBUG_MAX_REQUEST"))
 }
 
 var logger = log.WithField("exchange", "max")
