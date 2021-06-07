@@ -13,7 +13,6 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"os"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -40,10 +39,23 @@ const (
 
 var debugRequestDump = false
 var debugMaxRequestPayload = false
+var addUserAgentHeader = true
+
+var httpTransportMaxIdleConnsPerHost = http.DefaultMaxIdleConnsPerHost
+var httpTransportMaxIdleConns = 100
 
 func init() {
-	debugMaxRequestPayload, _ = strconv.ParseBool(os.Getenv("DEBUG_MAX_REQUEST_PAYLOAD"))
-	debugRequestDump, _ = strconv.ParseBool(os.Getenv("DEBUG_MAX_REQUEST"))
+	debugMaxRequestPayload, _ = util.GetEnvVarBool("DEBUG_MAX_REQUEST_PAYLOAD")
+	debugRequestDump, _ = util.GetEnvVarBool("DEBUG_MAX_REQUEST")
+	addUserAgentHeader, _ = util.GetEnvVarBool("DISABLE_MAX_USER_AGENT_HEADER")
+
+	if val, ok := util.GetEnvVarInt("HTTP_TRANSPORT_MAX_IDLE_CONNS_PER_HOST"); ok {
+		httpTransportMaxIdleConnsPerHost = val
+	}
+
+	if val, ok := util.GetEnvVarInt("HTTP_TRANSPORT_MAX_IDLE_CONNS"); ok {
+		httpTransportMaxIdleConns = val
+	}
 }
 
 var logger = log.WithField("exchange", "max")
@@ -106,9 +118,16 @@ func NewRestClientWithHttpClient(baseURL string, httpClient *http.Client) *RestC
 }
 
 func NewRestClient(baseURL string) *RestClient {
-	return NewRestClientWithHttpClient(baseURL, &http.Client{
-		Timeout: defaultHTTPTimeout,
-	})
+	transport := http.DefaultTransport.(*http.Transport)
+	transport.MaxIdleConnsPerHost = httpTransportMaxIdleConnsPerHost
+	transport.MaxIdleConns = httpTransportMaxIdleConns
+
+	client := &http.Client{
+		Timeout:   defaultHTTPTimeout,
+		Transport: transport,
+	}
+
+	return NewRestClientWithHttpClient(baseURL, client)
 }
 
 // Auth sets api key and secret for usage is requests that requires authentication.
@@ -155,7 +174,9 @@ func (c *RestClient) newRequest(method string, refURL string, params url.Values,
 		return nil, err
 	}
 
-	req.Header.Add("User-Agent", UserAgent)
+	if addUserAgentHeader {
+		req.Header.Add("User-Agent", UserAgent)
+	}
 	return req, nil
 }
 
