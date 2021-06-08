@@ -188,7 +188,7 @@ func (r *RewardsRequest) Do(ctx context.Context) (rewards []Reward, err error) {
 		refURL += "/" + string(*r.pathType)
 	}
 
-	req, err := r.client.newAuthenticatedRequest("GET", refURL, payload)
+	req, err := r.client.newAuthenticatedRequest("GET", refURL, payload, nil)
 	if err != nil {
 		return rewards, err
 	}
