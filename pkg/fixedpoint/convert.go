@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"math/big"
 	"strconv"
 	"sync/atomic"
 )
@@ -60,6 +61,12 @@ func (v Value) Int64() int64 {
 
 func (v Value) Int() int {
 	return int(v.Float64())
+}
+
+// BigMul is the math/big version multiplication
+func (v Value) BigMul(v2 Value) Value {
+	x := new(big.Int).Mul(big.NewInt(int64(v)), big.NewInt(int64(v2)))
+	return Value(x.Int64() / DefaultPow)
 }
 
 func (v Value) Mul(v2 Value) Value {
