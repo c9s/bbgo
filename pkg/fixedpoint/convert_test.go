@@ -17,10 +17,26 @@ func BenchmarkMul(b *testing.B) {
 		}
 	})
 
-	b.Run("mul-big", func(b *testing.B) {
+	b.Run("mul-float64-large-numbers", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			x := NewFromFloat(88.12345678)
+			y := NewFromFloat(88.12345678)
+			x = x.Mul(y)
+		}
+	})
+
+	b.Run("mul-big-small-numbers", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			x := NewFromFloat(20.0)
 			y := NewFromFloat(20.0)
+			x = x.BigMul(y)
+		}
+	})
+
+	b.Run("mul-big-large-numbers", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			x := NewFromFloat(88.12345678)
+			y := NewFromFloat(88.12345678)
 			x = x.BigMul(y)
 		}
 	})
