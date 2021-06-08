@@ -65,7 +65,7 @@ type VipLevel struct {
 }
 
 func (s *AccountService) VipLevel() (*VipLevel, error) {
-	req, err := s.client.newAuthenticatedRequest("GET", "v2/members/vip_level", nil)
+	req, err := s.client.newAuthenticatedRequest("GET", "v2/members/vip_level", nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +85,7 @@ func (s *AccountService) VipLevel() (*VipLevel, error) {
 }
 
 func (s *AccountService) Account(currency string) (*Account, error) {
-	req, err := s.client.newAuthenticatedRequest("GET", "v2/members/accounts/"+currency, nil)
+	req, err := s.client.newAuthenticatedRequest("GET", "v2/members/accounts/"+currency, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +111,7 @@ func (s *AccountService) NewGetWithdrawalHistoryRequest() *GetWithdrawHistoryReq
 }
 
 func (s *AccountService) Accounts() ([]Account, error) {
-	req, err := s.client.newAuthenticatedRequest("GET", "v2/members/accounts", nil)
+	req, err := s.client.newAuthenticatedRequest("GET", "v2/members/accounts", nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +132,7 @@ func (s *AccountService) Accounts() ([]Account, error) {
 
 // Me returns the current user info by the current used MAX key and secret
 func (s *AccountService) Me() (*UserInfo, error) {
-	req, err := s.client.newAuthenticatedRequest("GET", "v2/members/me", nil)
+	req, err := s.client.newAuthenticatedRequest("GET", "v2/members/me", nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -204,7 +204,7 @@ func (r *GetDepositHistoryRequest) To(to int64) *GetDepositHistoryRequest {
 }
 
 func (r *GetDepositHistoryRequest) Do(ctx context.Context) (deposits []Deposit, err error) {
-	req, err := r.client.newAuthenticatedRequest("GET", "v2/deposits", &r.params)
+	req, err := r.client.newAuthenticatedRequest("GET", "v2/deposits", &r.params, nil)
 	if err != nil {
 		return deposits, err
 	}
@@ -290,7 +290,7 @@ func (r *GetWithdrawHistoryRequest) To(to int64) *GetWithdrawHistoryRequest {
 }
 
 func (r *GetWithdrawHistoryRequest) Do(ctx context.Context) (withdraws []Withdraw, err error) {
-	req, err := r.client.newAuthenticatedRequest("GET", "v2/withdrawals", &r.params)
+	req, err := r.client.newAuthenticatedRequest("GET", "v2/withdrawals", &r.params, nil)
 	if err != nil {
 		return withdraws, err
 	}

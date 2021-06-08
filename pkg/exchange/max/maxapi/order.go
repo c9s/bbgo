@@ -2,11 +2,34 @@ package max
 
 import (
 	"context"
+	"net/url"
 	"strconv"
 	"time"
 
 	"github.com/pkg/errors"
 )
+
+var relUrlV2Order *url.URL
+var relUrlV2Orders *url.URL
+var relUrlV2OrdersClear *url.URL
+var relUrlV2OrdersDelete *url.URL
+var relUrlV2OrdersMultiOneByOne *url.URL
+
+func mustParseURL(s string) *url.URL {
+	u, err := url.Parse(s)
+	if err != nil {
+		panic(err)
+	}
+	return u
+}
+
+func init() {
+	relUrlV2Order = mustParseURL("v2/order")
+	relUrlV2Orders = mustParseURL("v2/orders")
+	relUrlV2OrdersClear = mustParseURL("v2/orders/clear")
+	relUrlV2OrdersDelete = mustParseURL("v2/orders/delete")
+	relUrlV2OrdersMultiOneByOne = mustParseURL("v2/orders/multi/onebyone")
+}
 
 type OrderStateToQuery int
 
@@ -90,7 +113,7 @@ func (s *OrderService) Closed(market string, options QueryOrderOptions) ([]Order
 		payload["limit"] = options.Limit
 	}
 
-	req, err := s.client.newAuthenticatedRequest("GET", "v2/orders", payload)
+	req, err := s.client.newAuthenticatedRequest("GET", "v2/orders", payload, relUrlV2Orders)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +144,7 @@ func (s *OrderService) Open(market string, options QueryOrderOptions) ([]Order, 
 		payload["group_id"] = options.GroupID
 	}
 
-	req, err := s.client.newAuthenticatedRequest("GET", "v2/orders", payload)
+	req, err := s.client.newAuthenticatedRequest("GET", "v2/orders", payload, relUrlV2Orders)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +172,7 @@ func (s *OrderService) All(market string, limit, page int, states ...OrderState)
 		"order_by": "desc",
 	}
 
-	req, err := s.client.newAuthenticatedRequest("GET", "v2/orders", payload)
+	req, err := s.client.newAuthenticatedRequest("GET", "v2/orders", payload, relUrlV2Orders)
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +200,7 @@ func (s *OrderService) CancelAll(side string, market string) error {
 		payload["market"] = market
 	}
 
-	req, err := s.client.newAuthenticatedRequest("POST", "v2/orders/clear", payload)
+	req, err := s.client.newAuthenticatedRequest("POST", "v2/orders/clear", payload, relUrlV2OrdersClear)
 	if err != nil {
 		return err
 	}
@@ -279,7 +302,7 @@ func (r *OrderCancelAllRequest) Do(ctx context.Context) (orders []Order, err err
 		payload["groupID"] = *r.groupID
 	}
 
-	req, err := r.client.newAuthenticatedRequest("POST", "v2/orders/clear", payload)
+	req, err := r.client.newAuthenticatedRequest("POST", "v2/orders/clear", payload, nil)
 	if err != nil {
 		return
 	}
@@ -321,7 +344,7 @@ func (r *OrderCancelRequest) ClientOrderID(id string) *OrderCancelRequest {
 }
 
 func (r *OrderCancelRequest) Do(ctx context.Context) error {
-	req, err := r.client.newAuthenticatedRequest("POST", "v2/order/delete", &r.params)
+	req, err := r.client.newAuthenticatedRequest("POST", "v2/order/delete", &r.params, relUrlV2OrdersDelete)
 	if err != nil {
 		return err
 	}
@@ -349,8 +372,7 @@ func (s *OrderService) Get(orderID uint64) (*Order, error) {
 		"id": orderID,
 	}
 
-	req, err := s.client.newAuthenticatedRequest("GET", "v2/order", payload)
-
+	req, err := s.client.newAuthenticatedRequest("GET", "v2/order", payload, relUrlV2Order)
 	if err != nil {
 		return &Order{}, err
 	}
@@ -428,7 +450,7 @@ func (r *CreateMultiOrderRequest) Do(ctx context.Context) (multiOrderResponse *M
 
 	payload["orders"] = r.orders
 
-	req, err := r.client.newAuthenticatedRequest("POST", "v2/orders/multi/onebyone", payload)
+	req, err := r.client.newAuthenticatedRequest("POST", "v2/orders/multi/onebyone", payload, relUrlV2OrdersMultiOneByOne)
 	if err != nil {
 		return multiOrderResponse, errors.Wrapf(err, "order create error")
 	}
@@ -525,7 +547,7 @@ func (r *CreateOrderRequest) Do(ctx context.Context) (order *Order, err error) {
 		payload["group_id"] = r.groupID
 	}
 
-	req, err := r.client.newAuthenticatedRequest("POST", "v2/orders", payload)
+	req, err := r.client.newAuthenticatedRequest("POST", "v2/orders", payload, relUrlV2Orders)
 	if err != nil {
 		return order, errors.Wrapf(err, "order create error")
 	}

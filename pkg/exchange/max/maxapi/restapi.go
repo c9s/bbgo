@@ -197,10 +197,13 @@ func (c *RestClient) newRequest(method string, refURL string, params url.Values,
 }
 
 // newAuthenticatedRequest creates new http request for authenticated routes.
-func (c *RestClient) newAuthenticatedRequest(m string, refURL string, data interface{}) (*http.Request, error) {
-	rel, err := url.Parse(refURL)
-	if err != nil {
-		return nil, err
+func (c *RestClient) newAuthenticatedRequest(m string, refURL string, data interface{}, rel *url.URL) (*http.Request, error) {
+	var err error
+	if rel == nil {
+		rel, err = url.Parse(refURL)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var p []byte
@@ -351,7 +354,7 @@ func (c *RestClient) sendRequest(req *http.Request) (*util.Response, error) {
 }
 
 func (c *RestClient) sendAuthenticatedRequest(m string, refURL string, data map[string]interface{}) (*util.Response, error) {
-	req, err := c.newAuthenticatedRequest(m, refURL, data)
+	req, err := c.newAuthenticatedRequest(m, refURL, data, nil)
 	if err != nil {
 		return nil, err
 	}
