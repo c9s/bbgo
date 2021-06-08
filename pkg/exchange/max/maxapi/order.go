@@ -499,14 +499,10 @@ func (r *CreateOrderRequest) ClientOrderID(clientOrderID string) *CreateOrderReq
 }
 
 func (r *CreateOrderRequest) Do(ctx context.Context) (order *Order, err error) {
-	var payload = map[string]interface{}{}
-
-	if r.market != nil {
-		payload["market"] = r.market
-	}
-
-	if r.volume != nil {
-		payload["volume"] = r.volume
+	var payload = map[string]interface{}{
+		"market": r.market,
+		"volume": r.volume,
+		"side":   r.side,
 	}
 
 	if r.price != nil {
@@ -515,10 +511,6 @@ func (r *CreateOrderRequest) Do(ctx context.Context) (order *Order, err error) {
 
 	if r.stopPrice != nil {
 		payload["stop_price"] = r.stopPrice
-	}
-
-	if r.side != nil {
-		payload["side"] = r.side
 	}
 
 	if r.orderType != nil {
