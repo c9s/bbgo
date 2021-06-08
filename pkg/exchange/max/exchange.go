@@ -459,14 +459,11 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 		req := e.client.OrderService.NewCreateOrderRequest().
 			Market(maxOrder.Market).
 			Side(maxOrder.Side).
+			Volume(maxOrder.Volume).
 			OrderType(string(maxOrder.OrderType))
 
 		if len(maxOrder.ClientOID) > 0 {
 			req.ClientOrderID(maxOrder.ClientOID)
-		}
-
-		if len(maxOrder.Volume) > 0 {
-			req.Volume(maxOrder.Volume)
 		}
 
 		if len(maxOrder.Price) > 0 {
