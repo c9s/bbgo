@@ -359,7 +359,7 @@ func toMaxSubmitOrder(o types.SubmitOrder) (*maxapi.Order, error) {
 			if o.Market.Symbol != "" {
 				priceInString = o.Market.FormatPrice(o.StopPrice)
 			} else {
-				priceInString = strconv.FormatFloat(o.StopPrice, 'f', 8, 64)
+				priceInString = strconv.FormatFloat(o.StopPrice, 'f', -1, 64)
 			}
 		}
 
