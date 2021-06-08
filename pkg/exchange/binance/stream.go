@@ -409,14 +409,14 @@ func (s *Stream) ping(ctx context.Context) {
 // Keepalive a user data stream to prevent a time out. User data streams will close after 60 minutes.
 // It's recommended to send a ping about every 30 minutes.
 func (s *Stream) listenKeyKeepAlive(ctx context.Context, listenKey string) {
-	keepAliveTicker := time.NewTicker(5 * time.Minute)
+	keepAliveTicker := time.NewTicker(1 * time.Minute)
 	defer keepAliveTicker.Stop()
 
 	// if we exit, we should invalidate the existing listen key
 	defer func() {
 		log.Debugf("keepalive worker stopped")
 		if err := s.invalidateListenKey(context.Background(), listenKey); err != nil {
-			log.WithError(err).Error("invalidate listen key error")
+			log.WithError(err).Errorf("invalidate listen key error: %v key: %s", err, MaskKey(listenKey))
 		}
 	}()
 
@@ -427,10 +427,24 @@ func (s *Stream) listenKeyKeepAlive(ctx context.Context, listenKey string) {
 			return
 
 		case <-keepAliveTicker.C:
-			if err := s.keepaliveListenKey(ctx, listenKey); err != nil {
-				log.WithError(err).Errorf("listen key keep-alive error: %v key: %s", err, MaskKey(listenKey))
-				s.Reconnect()
-				return
+			for i := 0; i < 5; i++ {
+				err := s.keepaliveListenKey(ctx, listenKey)
+				if err == nil {
+					break
+				} else {
+					switch err.(type) {
+					case net.Error:
+						log.WithError(err).Errorf("listen key keep-alive network error: %v key: %s", err, MaskKey(listenKey))
+						time.Sleep(1 * time.Second)
+						continue
+
+					default:
+						log.WithError(err).Errorf("listen key keep-alive unexpected error: %v key: %s", err, MaskKey(listenKey))
+						s.Reconnect()
+						return
+
+					}
+				}
 			}
 
 		}
@@ -531,7 +545,7 @@ func (s *Stream) read(ctx context.Context) {
 
 func (s *Stream) invalidateListenKey(ctx context.Context, listenKey string) (err error) {
 	// should use background context to invalidate the user stream
-	log.Info("closing listen key")
+	log.Infof("closing listen key: %s", MaskKey(listenKey))
 
 	if s.IsMargin {
 		if s.IsIsolatedMargin {
@@ -548,7 +562,7 @@ func (s *Stream) invalidateListenKey(ctx context.Context, listenKey string) (err
 	}
 
 	if err != nil {
-		log.WithError(err).Error("error deleting listen key")
+		log.WithError(err).Errorf("error deleting listen key: %s", MaskKey(listenKey))
 		return err
 	}
 
