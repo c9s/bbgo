@@ -536,8 +536,8 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	//  "maker_fee": 0.0005 -> 0.05%
 	//  "taker_fee": 0.0015 -> 0.15%
 	a := &types.Account{
-		MakerCommission: fixedpoint.NewFromFloat(vipLevel.Current.MakerFee), // 0.15% = 0.0015
-		TakerCommission: fixedpoint.NewFromFloat(vipLevel.Current.TakerFee), // 0.15% = 0.0015
+		MakerFeeRate: fixedpoint.NewFromFloat(vipLevel.Current.MakerFee), // 0.15% = 0.0015
+		TakerFeeRate: fixedpoint.NewFromFloat(vipLevel.Current.TakerFee), // 0.15% = 0.0015
 	}
 
 	a.UpdateBalances(balances)
