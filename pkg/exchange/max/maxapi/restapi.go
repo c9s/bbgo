@@ -269,12 +269,12 @@ func (c *RestClient) newAuthenticatedRequest(m string, refURL string, data inter
 	req.Header.Add("X-MAX-SIGNATURE", signPayload(encoded, c.APISecret))
 
 	if debugRequestDump {
-		dump, err := httputil.DumpRequestOut(req, true)
-		if err != nil {
-			log.Panic(err)
+		dump, err2 := httputil.DumpRequestOut(req, true)
+		if err2 != nil {
+			log.Errorf("dump request error: %v", err2)
+		} else {
+			fmt.Printf("REQUEST:\n%s", dump)
 		}
-
-		fmt.Printf("REQUEST:\n%s", dump)
 	}
 
 	return req, nil
