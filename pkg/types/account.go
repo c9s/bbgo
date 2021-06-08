@@ -112,7 +112,10 @@ type Account struct {
 	// bps. 0.15% fee will be 15.
 	MakerCommission fixedpoint.Value `json:"makerCommission,omitempty"`
 	TakerCommission fixedpoint.Value `json:"takerCommission,omitempty"`
-	AccountType     string           `json:"accountType,omitempty"`
+
+	MakerFeeRate fixedpoint.Value `json:"makerFeeRate,omitempty"`
+	TakerFeeRate fixedpoint.Value `json:"takerFeeRate,omitempty"`
+	AccountType  string           `json:"accountType,omitempty"`
 
 	balances BalanceMap
 }
@@ -243,8 +246,12 @@ func (a *Account) Print() {
 		logrus.Infof("account type: %s", a.AccountType)
 	}
 
-	logrus.Infof("maker commission: %f", a.MakerCommission.Float64())
-	logrus.Infof("taker commission: %f", a.TakerCommission.Float64())
+	if a.MakerFeeRate > 0 {
+		logrus.Infof("maker fee rate: %f", a.MakerFeeRate.Float64())
+	}
+	if a.TakerFeeRate > 0 {
+		logrus.Infof("taker fee rate: %f", a.TakerFeeRate.Float64())
+	}
 
 	a.balances.Print()
 }
