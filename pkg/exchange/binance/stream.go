@@ -409,7 +409,7 @@ func (s *Stream) ping(ctx context.Context) {
 // Keepalive a user data stream to prevent a time out. User data streams will close after 60 minutes.
 // It's recommended to send a ping about every 30 minutes.
 func (s *Stream) listenKeyKeepAlive(ctx context.Context, listenKey string) {
-	keepAliveTicker := time.NewTicker(1 * time.Minute)
+	keepAliveTicker := time.NewTicker(20 * time.Minute)
 	defer keepAliveTicker.Stop()
 
 	// if we exit, we should invalidate the existing listen key
