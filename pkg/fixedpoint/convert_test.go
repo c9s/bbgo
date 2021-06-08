@@ -1,6 +1,37 @@
 package fixedpoint
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
+
+func BenchmarkMul(b *testing.B) {
+	b.ResetTimer()
+
+	b.Run("mul-float64", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			x := NewFromFloat(20.0)
+			y := NewFromFloat(20.0)
+			x = x.Mul(y)
+		}
+	})
+
+	b.Run("mul-big", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			x := NewFromFloat(20.0)
+			y := NewFromFloat(20.0)
+			x = x.BigMul(y)
+		}
+	})
+}
+
+func TestBigMul(t *testing.T) {
+	x := NewFromFloat(10.55)
+	y := NewFromFloat(10.55)
+	x = x.BigMul(y)
+	assert.Equal(t, NewFromFloat(111.3025), x)
+}
 
 func TestParse(t *testing.T) {
 	type args struct {
