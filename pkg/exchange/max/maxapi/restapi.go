@@ -322,13 +322,12 @@ func signPayload(payload string, secret string) string {
 }
 
 func (c *RestClient) Do(req *http.Request) (resp *http.Response, err error) {
-	req.Header.Set("User-Agent", UserAgent)
 	return c.client.Do(req)
 }
 
 // sendRequest sends the request to the API server and handle the response
 func (c *RestClient) sendRequest(req *http.Request) (*util.Response, error) {
-	resp, err := c.Do(req)
+	resp, err := c.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
