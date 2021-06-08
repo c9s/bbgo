@@ -109,9 +109,10 @@ func (r *WithdrawalRequest) SlackAttachment() slack.Attachment {
 }
 
 type Address struct {
-	Address    string `json:"address"`
-	AddressTag string `json:"addressTag"`
-	Network    string `json:"network"`
+	Address    string           `json:"address"`
+	AddressTag string           `json:"addressTag"`
+	Network    string           `json:"network"`
+	ForeignFee fixedpoint.Value `json:"foreignFee"`
 }
 
 func (a *Address) UnmarshalJSON(body []byte) error {
@@ -205,6 +206,10 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 	if !ok {
 		log.Errorf("%s address of session %s not found", s.Asset, lowLevelSession.Name)
 		return
+	}
+
+	if toAddress.ForeignFee > 0 {
+		requiredAmount += toAddress.ForeignFee
 	}
 
 	if s.state != nil {
@@ -380,4 +385,3 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 	return nil
 }
-
