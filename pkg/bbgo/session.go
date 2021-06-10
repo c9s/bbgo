@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -163,6 +164,9 @@ type ExchangeSession struct {
 	// markets defines market configuration of a symbol
 	markets map[string]types.Market
 
+	// orderBooks stores the streaming order book
+	orderBooks map[string]*types.StreamOrderBook
+
 	// startPrices is used for backtest
 	startPrices map[string]float64
 
@@ -205,6 +209,7 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 		Account:          &types.Account{},
 		Trades:           make(map[string]*types.TradeSlice),
 
+		orderBooks:            make(map[string]*types.StreamOrderBook),
 		markets:               make(map[string]types.Market),
 		startPrices:           make(map[string]float64),
 		lastPrices:            make(map[string]float64),
@@ -378,27 +383,31 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 	session.standardIndicatorSets[symbol] = standardIndicatorSet
 
 	// used kline intervals by the given symbol
-	var usedKLineIntervals = map[types.Interval]struct{}{}
+	var klineSubscriptions = map[types.Interval]struct{}{}
 
 	// always subscribe the 1m kline so we can make sure the connection persists.
-	usedKLineIntervals[types.Interval1m] = struct{}{}
+	klineSubscriptions[types.Interval1m] = struct{}{}
 
 	for _, sub := range session.Subscriptions {
-		if sub.Channel != types.KLineChannel {
-			continue
-		}
+		switch sub.Channel {
+		case types.BookChannel:
+			book := types.NewStreamBook(sub.Symbol)
+			book.BindStream(session.MarketDataStream)
+			session.orderBooks[sub.Symbol] = book
 
-		if sub.Options.Interval == "" {
-			continue
-		}
+		case types.KLineChannel:
+			if sub.Options.Interval == "" {
+				continue
+			}
 
-		if sub.Symbol == symbol {
-			usedKLineIntervals[types.Interval(sub.Options.Interval)] = struct{}{}
+			if sub.Symbol == symbol {
+				klineSubscriptions[types.Interval(sub.Options.Interval)] = struct{}{}
+			}
 		}
 	}
 
 	var lastPriceTime time.Time
-	for interval := range usedKLineIntervals {
+	for interval := range klineSubscriptions {
 		// avoid querying the last unclosed kline
 		endTime := environ.startTime.Add(-interval.Duration())
 		kLines, err := session.Exchange.QueryKLines(ctx, symbol, interval, types.KLineQueryOptions{
@@ -469,6 +478,12 @@ func (session *ExchangeSession) Positions() map[string]*Position {
 // MarketDataStore returns the market data store of a symbol
 func (session *ExchangeSession) MarketDataStore(symbol string) (s *MarketDataStore, ok bool) {
 	s, ok = session.marketDataStores[symbol]
+	return s, ok
+}
+
+// MarketDataStore returns the market data store of a symbol
+func (session *ExchangeSession) OrderBook(symbol string) (s *types.StreamOrderBook, ok bool) {
+	s, ok = session.orderBooks[symbol]
 	return s, ok
 }
 
@@ -615,4 +630,74 @@ func (session *ExchangeSession) FindPossibleSymbols() (symbols []string, err err
 	}
 
 	return symbols, nil
+}
+
+func InitExchangeSession(name string, session *ExchangeSession) error {
+	var err error
+	var exchangeName = session.ExchangeName
+	var exchange types.Exchange
+	if session.Key != "" && session.Secret != "" {
+		if !session.PublicOnly {
+			if len(session.Key) == 0 || len(session.Secret) == 0 {
+				return fmt.Errorf("can not create exchange %s: empty key or secret", exchangeName)
+			}
+		}
+
+		exchange, err = cmdutil.NewExchangeStandard(exchangeName, session.Key, session.Secret, "", session.SubAccount)
+	} else {
+		exchange, err = cmdutil.NewExchangeWithEnvVarPrefix(exchangeName, session.EnvVarPrefix)
+	}
+
+	if err != nil {
+		return err
+	}
+
+	// configure exchange
+	if session.Margin {
+		marginExchange, ok := exchange.(types.MarginExchange)
+		if !ok {
+			return fmt.Errorf("exchange %s does not support margin", exchangeName)
+		}
+
+		if session.IsolatedMargin {
+			marginExchange.UseIsolatedMargin(session.IsolatedMarginSymbol)
+		} else {
+			marginExchange.UseMargin()
+		}
+	}
+
+	session.Name = name
+	session.Notifiability = Notifiability{
+		SymbolChannelRouter:  NewPatternChannelRouter(nil),
+		SessionChannelRouter: NewPatternChannelRouter(nil),
+		ObjectChannelRouter:  NewObjectChannelRouter(),
+	}
+	session.Exchange = exchange
+	session.UserDataStream = exchange.NewStream()
+	session.MarketDataStream = exchange.NewStream()
+	session.MarketDataStream.SetPublicOnly()
+
+	// pointer fields
+	session.Subscriptions = make(map[types.Subscription]types.Subscription)
+	session.Account = &types.Account{}
+	session.Trades = make(map[string]*types.TradeSlice)
+
+	session.orderBooks = make(map[string]*types.StreamOrderBook)
+	session.markets = make(map[string]types.Market)
+	session.lastPrices = make(map[string]float64)
+	session.startPrices = make(map[string]float64)
+	session.marketDataStores = make(map[string]*MarketDataStore)
+	session.positions = make(map[string]*Position)
+	session.standardIndicatorSets = make(map[string]*StandardIndicatorSet)
+	session.orderStores = make(map[string]*OrderStore)
+	session.OrderExecutor = &ExchangeOrderExecutor{
+		// copy the notification system so that we can route
+		Notifiability: session.Notifiability,
+		Session:       session,
+	}
+
+	session.usedSymbols = make(map[string]struct{})
+	session.initializedSymbols = make(map[string]struct{})
+	session.logger = log.WithField("session", name)
+	return nil
 }
