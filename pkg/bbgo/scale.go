@@ -218,6 +218,27 @@ type SlideRule struct {
 	QuadraticScale *QuadraticScale   `json:"quadratic"`
 }
 
+func (rule *SlideRule) Range() ([2]float64, error) {
+	if rule.LogScale != nil {
+		return rule.LogScale.Range, nil
+	}
+
+	if rule.ExpScale != nil {
+		return rule.ExpScale.Range, nil
+	}
+
+	if rule.LinearScale != nil {
+		return rule.LinearScale.Range, nil
+	}
+
+	if rule.QuadraticScale != nil {
+		r := rule.QuadraticScale.Range
+		return [2]float64{r[0], r[len(r)-1]}, nil
+	}
+
+	return [2]float64{}, errors.New("no any scale domain is defined")
+}
+
 func (rule *SlideRule) Scale() (Scale, error) {
 	if rule.LogScale != nil {
 		return rule.LogScale, nil
@@ -237,7 +258,6 @@ func (rule *SlideRule) Scale() (Scale, error) {
 
 	return nil, errors.New("no any scale is defined")
 }
-
 
 // LayerScale defines the scale DSL for maker layers, e.g.,
 //
@@ -275,7 +295,6 @@ func (s *LayerScale) Scale(layer int) (quantity float64, err error) {
 
 	return scale.Call(float64(layer)), nil
 }
-
 
 // PriceVolumeScale defines the scale DSL for strategy, e.g.,
 //
