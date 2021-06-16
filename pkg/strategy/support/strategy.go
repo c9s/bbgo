@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/sirupsen/logrus"
@@ -34,13 +35,18 @@ type Target struct {
 }
 
 type Strategy struct {
-	*bbgo.Notifiability
+	*bbgo.Notifiability `json:"-"`
 	*bbgo.Persistence
 	*bbgo.Graceful
 
-	Symbol                string                          `json:"symbol"`
-	Interval              types.Interval                  `json:"interval"`
-	MovingAverageWindow   int                             `json:"movingAverageWindow"`
+	Symbol              string         `json:"symbol"`
+	Interval            types.Interval `json:"interval"`
+	Market              types.Market   `json:"-"`
+	MovingAverageWindow int            `json:"movingAverageWindow"`
+
+	LongTermMovingAverageInterval types.Interval `json:"longTermMovingAverage"`
+	LongTermMovingAverageWindow   int `json:"longTermMovingAverageWindow"`
+
 	Quantity              fixedpoint.Value                `json:"quantity"`
 	MinVolume             fixedpoint.Value                `json:"minVolume"`
 	Sensitivity           fixedpoint.Value                `json:"sensitivity"`
@@ -128,6 +134,69 @@ func (s *Strategy) LoadState() error {
 	return nil
 }
 
+func (s *Strategy) submitOrders(ctx context.Context, orderExecutor bbgo.OrderExecutor, orderForms ...types.SubmitOrder) error {
+	for _, o := range orderForms {
+		s.Notifiability.Notify(o)
+	}
+
+	createdOrders, err := orderExecutor.SubmitOrders(ctx, orderForms...)
+	if err != nil {
+		return err
+	}
+
+	s.orderStore.Add(createdOrders...)
+	return nil
+}
+
+func (s *Strategy) calculateQuantity(session *bbgo.ExchangeSession, side types.SideType, closePrice fixedpoint.Value, volume float64) (fixedpoint.Value, error) {
+	var quantity fixedpoint.Value
+	if s.Quantity > 0 {
+		quantity = s.Quantity
+	} else if s.ScaleQuantity != nil {
+		qf, err := s.ScaleQuantity.Scale(closePrice.Float64(), volume)
+		if err != nil {
+			return 0, err
+		}
+		quantity = fixedpoint.NewFromFloat(qf)
+	}
+
+	if side == types.SideTypeBuy {
+		baseBalance, _ := session.Account.Balance(s.Market.BaseCurrency)
+		if s.MaxBaseAssetBalance > 0 && baseBalance.Total()+quantity > s.MaxBaseAssetBalance {
+			quota := s.MaxBaseAssetBalance - baseBalance.Total()
+			quantity = bbgo.AdjustQuantityByMaxAmount(quantity, closePrice, quota)
+		}
+
+		quoteBalance, ok := session.Account.Balance(s.Market.QuoteCurrency)
+		if !ok {
+			return 0, fmt.Errorf("quote balance %s not found", s.Market.QuoteCurrency)
+		}
+
+		// for spot, we need to modify the quantity according to the quote balance
+		if !session.Margin {
+			// add 0.3% for price slippage
+			notional := closePrice.Mul(quantity).MulFloat64(1.003)
+
+			if s.MinQuoteAssetBalance > 0 && quoteBalance.Available-notional < s.MinQuoteAssetBalance {
+				log.Warnf("modifying quantity %f according to the min quote asset balance %f %s",
+					quantity.Float64(),
+					quoteBalance.Available.Float64(),
+					s.Market.QuoteCurrency)
+				quota := quoteBalance.Available - s.MinQuoteAssetBalance
+				quantity = bbgo.AdjustQuantityByMinAmount(quantity, closePrice, quota)
+			} else if notional > quoteBalance.Available {
+				log.Warnf("modifying quantity %f according to the quote asset balance %f %s",
+					quantity.Float64(),
+					quoteBalance.Available.Float64(),
+					s.Market.QuoteCurrency)
+				quantity = bbgo.AdjustQuantityByMaxAmount(quantity, closePrice, quoteBalance.Available)
+			}
+		}
+	}
+
+	return quantity, nil
+}
+
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	// buffer 100 trades in the channel
 	s.tradeC = make(chan types.Trade, 100)
@@ -148,7 +217,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return err
 		}
 
-		s.MinVolume = fixedpoint.NewFromFloat(volRange[0]) + fixedpoint.NewFromFloat(volRange[1] - volRange[0]).Mul(fixedpoint.NewFromFloat(1.0) - s.Sensitivity)
+		s.MinVolume = fixedpoint.NewFromFloat(volRange[0]) + fixedpoint.NewFromFloat(volRange[1]-volRange[0]).Mul(fixedpoint.NewFromFloat(1.0)-s.Sensitivity)
 		log.Infof("adjusted minimal support volume to %f according to sensitivity %f", s.MinVolume.Float64(), s.Sensitivity.Float64())
 	}
 
@@ -162,7 +231,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return err
 		}
 
-		s.ResistanceMinVolume = fixedpoint.NewFromFloat(volRange[0]) + fixedpoint.NewFromFloat(volRange[1] - volRange[0]).Mul(fixedpoint.NewFromFloat(1.0) - s.ResistanceSensitivity)
+		s.ResistanceMinVolume = fixedpoint.NewFromFloat(volRange[0]) + fixedpoint.NewFromFloat(volRange[1]-volRange[0]).Mul(fixedpoint.NewFromFloat(1.0)-s.ResistanceSensitivity)
 		log.Infof("adjusted minimal resistance volume to %f according to sensitivity %f", s.ResistanceMinVolume.Float64(), s.ResistanceSensitivity.Float64())
 	}
 
@@ -170,6 +239,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	if !ok {
 		return fmt.Errorf("market %s is not defined", s.Symbol)
 	}
+	s.Market = market
 
 	standardIndicatorSet, ok := session.StandardIndicatorSet(s.Symbol)
 	if !ok {
@@ -225,6 +295,26 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 					kline.Volume,
 					closePriceF,
 				)
+
+				quantity, err := s.calculateQuantity(session, types.SideTypeSell, closePrice, kline.Volume)
+				if err != nil {
+					log.WithError(err).Errorf("quantity calculation error")
+					return
+				}
+
+				orderForm := types.SubmitOrder{
+					Symbol:   s.Symbol,
+					Market:   market,
+					Side:     types.SideTypeSell,
+					Type:     types.OrderTypeMarket,
+					Quantity: quantity.Float64(),
+				}
+
+				if err := s.submitOrders(ctx, orderExecutor, orderForm); err != nil {
+					log.WithError(err).Error("submit sell order error")
+					return
+				}
+
 				return
 			}
 
@@ -258,56 +348,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			s.MinVolume.Float64(),
 			kline)
 
-		var quantity fixedpoint.Value
-		if s.Quantity > 0 {
-			quantity = s.Quantity
-		} else if s.ScaleQuantity != nil {
-			qf, err := s.ScaleQuantity.Scale(closePrice.Float64(), kline.Volume)
-			if err != nil {
-				log.WithError(err).Error(err.Error())
-				return
-			}
-			quantity = fixedpoint.NewFromFloat(qf)
-		}
-
-		baseBalance, _ := session.Account.Balance(market.BaseCurrency)
-		if s.MaxBaseAssetBalance > 0 && baseBalance.Total()+quantity > s.MaxBaseAssetBalance {
-			quota := s.MaxBaseAssetBalance - baseBalance.Total()
-			quantity = bbgo.AdjustQuantityByMaxAmount(quantity, closePrice, quota)
-		}
-
-		quoteBalance, ok := session.Account.Balance(market.QuoteCurrency)
-		if !ok {
-			log.Errorf("quote balance %s not found", market.QuoteCurrency)
+		quantity, err := s.calculateQuantity(session, types.SideTypeBuy, closePrice, kline.Volume)
+		if err != nil {
+			log.WithError(err).Errorf("%s quantity calculation error", s.Symbol)
 			return
 		}
-
-		// for spot, we need to modify the quantity according to the quote balance
-		if !session.Margin {
-			// add 0.3% for price slippage
-			notional := closePrice.Mul(quantity).MulFloat64(1.003)
-
-			if s.MinQuoteAssetBalance > 0 && quoteBalance.Available-notional < s.MinQuoteAssetBalance {
-				log.Warnf("modifying quantity %f according to the min quote asset balance %f %s",
-					quantity.Float64(),
-					quoteBalance.Available.Float64(),
-					market.QuoteCurrency)
-				quota := quoteBalance.Available - s.MinQuoteAssetBalance
-				quantity = bbgo.AdjustQuantityByMinAmount(quantity, closePrice, quota)
-			} else if notional > quoteBalance.Available {
-				log.Warnf("modifying quantity %f according to the quote asset balance %f %s",
-					quantity.Float64(),
-					quoteBalance.Available.Float64(),
-					market.QuoteCurrency)
-				quantity = bbgo.AdjustQuantityByMaxAmount(quantity, closePrice, quoteBalance.Available)
-			}
-		}
-
-		s.Notify("Submitting %s market order buy with quantity %f according to the base volume %f, taker buy base volume %f",
-			s.Symbol,
-			quantity.Float64(),
-			kline.Volume,
-			kline.TakerBuyBaseAssetVolume)
 
 		orderForm := types.SubmitOrder{
 			Symbol:           s.Symbol,
@@ -318,12 +363,19 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			MarginSideEffect: s.MarginOrderSideEffect,
 		}
 
-		createdOrders, err := orderExecutor.SubmitOrders(ctx, orderForm)
-		if err != nil {
+		s.Notify("Submitting %s market order buy with quantity %f according to the base volume %f, taker buy base volume %f",
+			s.Symbol,
+			quantity.Float64(),
+			kline.Volume,
+			kline.TakerBuyBaseAssetVolume,
+			orderForm)
+
+		if err := s.submitOrders(ctx, orderExecutor, orderForm); err != nil {
 			log.WithError(err).Error("submit order error")
 			return
 		}
-		s.orderStore.Add(createdOrders...)
+
+		time.Sleep(500 * time.Millisecond)
 
 		trades := s.tradeStore.GetAndClear()
 		for _, trade := range trades {
@@ -362,11 +414,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			})
 		}
 
-		createdOrders, err = orderExecutor.SubmitOrders(ctx, targetOrders...)
-		if err != nil {
+		if err := s.submitOrders(ctx, orderExecutor, targetOrders...); err != nil {
 			log.WithError(err).Error("submit profit target order error")
+			return
 		}
-		s.orderStore.Add(createdOrders...)
 	})
 
 	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
