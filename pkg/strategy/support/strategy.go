@@ -43,6 +43,7 @@ type Strategy struct {
 	MovingAverageWindow   int                             `json:"movingAverageWindow"`
 	Quantity              fixedpoint.Value                `json:"quantity"`
 	MinVolume             fixedpoint.Value                `json:"minVolume"`
+	Sensitivity           fixedpoint.Value                `json:"sensitivity"`
 	TakerBuyRatio         fixedpoint.Value                `json:"takerBuyRatio"`
 	MarginOrderSideEffect types.MarginOrderSideEffectType `json:"marginOrderSideEffect"`
 	Targets               []Target                        `json:"targets"`
@@ -68,8 +69,8 @@ func (s *Strategy) Validate() error {
 		return fmt.Errorf("quantity or scaleQuantity can not be zero")
 	}
 
-	if s.MinVolume == 0 {
-		return fmt.Errorf("minVolume can not be zero")
+	if s.MinVolume == 0 && s.Sensitivity == 0 {
+		return fmt.Errorf("either minVolume nor sensitivity can not be zero")
 	}
 
 	return nil
@@ -135,6 +136,16 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	if s.MovingAverageWindow == 0 {
 		s.MovingAverageWindow = 99
+	}
+
+	if s.Sensitivity > 0 {
+		volRange, err := s.ScaleQuantity.ByVolumeRule.Range()
+		if err != nil {
+			return err
+		}
+
+		s.MinVolume = fixedpoint.NewFromFloat(volRange[1]).Mul(fixedpoint.NewFromFloat(1.0) - s.Sensitivity)
+		log.Infof("adjusted minimal triggering volume to %f according to sensitivity %f", s.MinVolume.Float64(), s.Sensitivity.Float64())
 	}
 
 	market, ok := session.Market(s.Symbol)
