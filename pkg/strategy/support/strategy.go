@@ -48,6 +48,10 @@ type Strategy struct {
 	MarginOrderSideEffect types.MarginOrderSideEffectType `json:"marginOrderSideEffect"`
 	Targets               []Target                        `json:"targets"`
 
+	ResistanceSensitivity   fixedpoint.Value `json:"resistanceSensitivity"`
+	ResistanceMinVolume     fixedpoint.Value `json:"resistanceMinVolume"`
+	ResistanceTakerBuyRatio fixedpoint.Value `json:"resistanceTakerBuyRatio"`
+
 	// Max BaseAsset balance to buy
 	MaxBaseAssetBalance  fixedpoint.Value `json:"maxBaseAssetBalance"`
 	MinQuoteAssetBalance fixedpoint.Value `json:"minQuoteAssetBalance"`
@@ -145,7 +149,21 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 
 		s.MinVolume = fixedpoint.NewFromFloat(volRange[1]).Mul(fixedpoint.NewFromFloat(1.0) - s.Sensitivity)
-		log.Infof("adjusted minimal triggering volume to %f according to sensitivity %f", s.MinVolume.Float64(), s.Sensitivity.Float64())
+		log.Infof("adjusted minimal support volume to %f according to sensitivity %f", s.MinVolume.Float64(), s.Sensitivity.Float64())
+	}
+
+	if s.ResistanceTakerBuyRatio == 0 {
+		s.ResistanceTakerBuyRatio = fixedpoint.NewFromFloat(0.5)
+	}
+
+	if s.ResistanceSensitivity > 0 {
+		volRange, err := s.ScaleQuantity.ByVolumeRule.Range()
+		if err != nil {
+			return err
+		}
+
+		s.ResistanceMinVolume = fixedpoint.NewFromFloat(volRange[1]).Mul(fixedpoint.NewFromFloat(1.0) - s.ResistanceSensitivity)
+		log.Infof("adjusted minimal resistance volume to %f according to sensitivity %f", s.ResistanceMinVolume.Float64(), s.ResistanceSensitivity.Float64())
 	}
 
 	market, ok := session.Market(s.Symbol)
@@ -189,12 +207,32 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 
 		closePriceF := kline.GetClose()
+		closePrice := fixedpoint.NewFromFloat(closePriceF)
+
+		// if it's above the EMA, it's resistance
 		if closePriceF > ema.Last() {
+			// check resistance volume
+			if kline.Volume < s.ResistanceMinVolume.Float64() {
+				return
+			}
+
+			takerBuyBaseVolumeThreshold := kline.Volume * s.ResistanceTakerBuyRatio.Float64()
+			if kline.TakerBuyBaseAssetVolume < takerBuyBaseVolumeThreshold {
+				s.Notify("%s: resistance detected, taker buy base volume %f > threshold %f (volume %f) at price %f",
+					s.Symbol,
+					kline.TakerBuyBaseAssetVolume,
+					takerBuyBaseVolumeThreshold,
+					kline.Volume,
+					s.TakerBuyRatio.Float64(),
+					closePriceF,
+				)
+				return
+			}
+
 			return
 		}
 
-		closePrice := fixedpoint.NewFromFloat(closePriceF)
-
+		// check support
 		if kline.Volume < s.MinVolume.Float64() {
 			return
 		}
@@ -202,10 +240,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		if s.TakerBuyRatio > 0 {
 			takerBuyBaseVolumeThreshold := kline.Volume * s.TakerBuyRatio.Float64()
 			if kline.TakerBuyBaseAssetVolume < takerBuyBaseVolumeThreshold {
-				s.Notify("%s: taker buy base volume %f is less than %f (volume ratio %f)",
+				s.Notify("%s: taker buy base volume %f is less than threshold %f (volume %f volume ratio %f)",
 					s.Symbol,
 					kline.TakerBuyBaseAssetVolume,
 					takerBuyBaseVolumeThreshold,
+					kline.Volume,
 					s.TakerBuyRatio.Float64(),
 				)
 				return
