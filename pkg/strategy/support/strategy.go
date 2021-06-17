@@ -58,6 +58,8 @@ type Strategy struct {
 	ResistanceMinVolume     fixedpoint.Value `json:"resistanceMinVolume"`
 	ResistanceTakerBuyRatio fixedpoint.Value `json:"resistanceTakerBuyRatio"`
 
+
+	MinBaseAssetBalance  fixedpoint.Value `json:"minBaseAssetBalance"`
 	// Max BaseAsset balance to buy
 	MaxBaseAssetBalance  fixedpoint.Value `json:"maxBaseAssetBalance"`
 	MinQuoteAssetBalance fixedpoint.Value `json:"minQuoteAssetBalance"`
@@ -160,8 +162,16 @@ func (s *Strategy) calculateQuantity(session *bbgo.ExchangeSession, side types.S
 		quantity = fixedpoint.NewFromFloat(qf)
 	}
 
-	if side == types.SideTypeBuy {
-		baseBalance, _ := session.Account.Balance(s.Market.BaseCurrency)
+
+	baseBalance, _ := session.Account.Balance(s.Market.BaseCurrency)
+	if side == types.SideTypeSell {
+		// quantity = bbgo.AdjustQuantityByMaxAmount(quantity, closePrice, quota)
+		if s.MinBaseAssetBalance > 0 && (baseBalance.Total() - quantity) < s.MinBaseAssetBalance {
+			quota := baseBalance.Available - s.MinBaseAssetBalance
+			quantity = bbgo.AdjustQuantityByMaxAmount(quantity, closePrice, quota)
+		}
+
+	} else if side == types.SideTypeBuy {
 		if s.MaxBaseAssetBalance > 0 && baseBalance.Total()+quantity > s.MaxBaseAssetBalance {
 			quota := s.MaxBaseAssetBalance - baseBalance.Total()
 			quantity = bbgo.AdjustQuantityByMaxAmount(quantity, closePrice, quota)
