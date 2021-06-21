@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/sirupsen/logrus"
 
@@ -40,12 +41,16 @@ type Strategy struct {
 	*bbgo.Graceful
 
 	Symbol              string         `json:"symbol"`
-	Interval            types.Interval `json:"interval"`
 	Market              types.Market   `json:"-"`
+
+	// Interval for checking support
+	Interval            types.Interval `json:"interval"`
+
+	// moving average window for checking support (support should be under the moving average line)
 	MovingAverageWindow int            `json:"movingAverageWindow"`
 
-	LongTermMovingAverageInterval types.Interval `json:"longTermMovingAverage"`
-	LongTermMovingAverageWindow   int `json:"longTermMovingAverageWindow"`
+	// LongTermMovingAverage is the second moving average line for checking support position
+	LongTermMovingAverage types.IntervalWindow `json:"longTermMovingAverage"`
 
 	Quantity              fixedpoint.Value                `json:"quantity"`
 	MinVolume             fixedpoint.Value                `json:"minVolume"`
@@ -54,12 +59,13 @@ type Strategy struct {
 	MarginOrderSideEffect types.MarginOrderSideEffectType `json:"marginOrderSideEffect"`
 	Targets               []Target                        `json:"targets"`
 
+	ResistanceInterval      types.Interval   `json:"resistanceInterval"`
 	ResistanceSensitivity   fixedpoint.Value `json:"resistanceSensitivity"`
 	ResistanceMinVolume     fixedpoint.Value `json:"resistanceMinVolume"`
 	ResistanceTakerBuyRatio fixedpoint.Value `json:"resistanceTakerBuyRatio"`
 
-
-	MinBaseAssetBalance  fixedpoint.Value `json:"minBaseAssetBalance"`
+	// Min BaseAsset balance to keep
+	MinBaseAssetBalance fixedpoint.Value `json:"minBaseAssetBalance"`
 	// Max BaseAsset balance to buy
 	MaxBaseAssetBalance  fixedpoint.Value `json:"maxBaseAssetBalance"`
 	MinQuoteAssetBalance fixedpoint.Value `json:"minQuoteAssetBalance"`
@@ -70,6 +76,9 @@ type Strategy struct {
 	tradeStore *bbgo.TradeStore
 	tradeC     chan types.Trade
 	state      *State
+
+	triggerEMA  *indicator.EWMA
+	longTermEMA *indicator.EWMA
 }
 
 func (s *Strategy) ID() string {
@@ -162,11 +171,10 @@ func (s *Strategy) calculateQuantity(session *bbgo.ExchangeSession, side types.S
 		quantity = fixedpoint.NewFromFloat(qf)
 	}
 
-
 	baseBalance, _ := session.Account.Balance(s.Market.BaseCurrency)
 	if side == types.SideTypeSell {
 		// quantity = bbgo.AdjustQuantityByMaxAmount(quantity, closePrice, quota)
-		if s.MinBaseAssetBalance > 0 && (baseBalance.Total() - quantity) < s.MinBaseAssetBalance {
+		if s.MinBaseAssetBalance > 0 && (baseBalance.Total()-quantity) < s.MinBaseAssetBalance {
 			quota := baseBalance.Available - s.MinBaseAssetBalance
 			quantity = bbgo.AdjustQuantityByMaxAmount(quantity, closePrice, quota)
 		}
@@ -205,6 +213,40 @@ func (s *Strategy) calculateQuantity(session *bbgo.ExchangeSession, side types.S
 	}
 
 	return quantity, nil
+}
+
+func (s *Strategy) detectResistance(kline types.KLine) (confidence fixedpoint.Value) {
+	// if it's above the EMA, it's resistance
+	if kline.Close < s.triggerEMA.Last() {
+		return 0
+	}
+
+	// check resistance trigger volume
+	if kline.Volume < s.ResistanceMinVolume.Float64() {
+		return 0
+	}
+
+	// check taker buy base volume
+	// it's not resistance if it's strong buy kline
+	takerBuyBaseVolumeThreshold := kline.Volume * s.ResistanceTakerBuyRatio.Float64()
+	if kline.TakerBuyBaseAssetVolume > takerBuyBaseVolumeThreshold {
+		return 0
+	}
+
+	// resistance usually a larger upper shadow, here we use 50%
+	if kline.GetUpperShadowRatio() < 0.1 {
+		return 0
+	}
+
+	s.Notify("%s: resistance detected, taker buy base volume %f < threshold %f (volume %f) at price %f",
+		s.Symbol,
+		kline.TakerBuyBaseAssetVolume,
+		takerBuyBaseVolumeThreshold,
+		kline.Volume,
+		kline.Close,
+	)
+
+	return
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
@@ -259,8 +301,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderStore = bbgo.NewOrderStore(s.Symbol)
 	s.orderStore.BindStream(session.UserDataStream)
 
-	var iw = types.IntervalWindow{Interval: s.Interval, Window: s.MovingAverageWindow}
-	var ema = standardIndicatorSet.EWMA(iw)
+	s.triggerEMA = standardIndicatorSet.EWMA(types.IntervalWindow{Interval: s.Interval, Window: s.MovingAverageWindow})
+
+	var zeroiw = types.IntervalWindow{}
+	if s.LongTermMovingAverage != zeroiw {
+		s.longTermEMA = standardIndicatorSet.EWMA(s.LongTermMovingAverage)
+	}
 
 	if err := s.LoadState(); err != nil {
 		return err
@@ -290,7 +336,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		closePrice := fixedpoint.NewFromFloat(closePriceF)
 
 		// if it's above the EMA, it's resistance
-		if closePriceF > ema.Last() {
+		if closePriceF > s.triggerEMA.Last() {
 			// check resistance volume
 			if kline.Volume < s.ResistanceMinVolume.Float64() {
 				return
@@ -319,11 +365,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 					Type:     types.OrderTypeMarket,
 					Quantity: quantity.Float64(),
 				}
+				_ = orderForm
 
+				/*
 				if err := s.submitOrders(ctx, orderExecutor, orderForm); err != nil {
 					log.WithError(err).Error("submit sell order error")
 					return
 				}
+				*/
 
 				return
 			}
@@ -331,15 +380,16 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 
-		// check support
+		// check support volume
 		if kline.Volume < s.MinVolume.Float64() {
 			return
 		}
 
+		// check taker buy ratio, we need strong buy taker
 		if s.TakerBuyRatio > 0 {
 			takerBuyBaseVolumeThreshold := kline.Volume * s.TakerBuyRatio.Float64()
 			if kline.TakerBuyBaseAssetVolume < takerBuyBaseVolumeThreshold {
-				s.Notify("%s: taker buy base volume %f is less than threshold %f (volume %f volume ratio %f)",
+				s.Notify("%s: taker buy base volume %f is less than threshold %f (volume %f volume ratio %f), skipping this support",
 					s.Symbol,
 					kline.TakerBuyBaseAssetVolume,
 					takerBuyBaseVolumeThreshold,
@@ -350,10 +400,18 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 		}
 
+		if s.longTermEMA != nil && closePriceF > s.longTermEMA.Last() {
+			s.Notify("%s: closed price is above the long term moving average line, skipping this support",
+				s.Symbol,
+				kline,
+			)
+			return
+		}
+
 		s.Notify("Found %s support: the close price %f is under EMA %f and volume %f > minimum volume %f",
 			s.Symbol,
 			closePrice.Float64(),
-			ema.Last(),
+			s.triggerEMA.Last(),
 			kline.Volume,
 			s.MinVolume.Float64(),
 			kline)
