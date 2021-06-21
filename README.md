@@ -544,6 +544,9 @@ helm delete bbgo-$INSTANCE
 
 ## Development
 
+The overview function flow at bbgo
+![image info](./assets/overview.svg)
+
 ### Setting up your local repository
 
 1. Click the "Fork" button from the GitHub repository.
