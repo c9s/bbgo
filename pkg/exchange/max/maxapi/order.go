@@ -12,7 +12,7 @@ import (
 var relUrlV2Order *url.URL
 var relUrlV2Orders *url.URL
 var relUrlV2OrdersClear *url.URL
-var relUrlV2OrdersDelete *url.URL
+var relUrlV2OrderDelete *url.URL
 var relUrlV2OrdersMultiOneByOne *url.URL
 
 func mustParseURL(s string) *url.URL {
@@ -27,7 +27,7 @@ func init() {
 	relUrlV2Order = mustParseURL("v2/order")
 	relUrlV2Orders = mustParseURL("v2/orders")
 	relUrlV2OrdersClear = mustParseURL("v2/orders/clear")
-	relUrlV2OrdersDelete = mustParseURL("v2/orders/delete")
+	relUrlV2OrderDelete = mustParseURL("v2/order/delete")
 	relUrlV2OrdersMultiOneByOne = mustParseURL("v2/orders/multi/onebyone")
 }
 
@@ -344,7 +344,7 @@ func (r *OrderCancelRequest) ClientOrderID(id string) *OrderCancelRequest {
 }
 
 func (r *OrderCancelRequest) Do(ctx context.Context) error {
-	req, err := r.client.newAuthenticatedRequest("POST", "v2/order/delete", &r.params, relUrlV2OrdersDelete)
+	req, err := r.client.newAuthenticatedRequest("POST", "v2/order/delete", &r.params, relUrlV2OrderDelete)
 	if err != nil {
 		return err
 	}
