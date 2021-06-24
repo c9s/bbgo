@@ -66,15 +66,7 @@ func (c *TradeCollector) Run(ctx context.Context) {
 			c.EmitPositionUpdate(c.position)
 
 		case trade := <-c.tradeC:
-			if c.orderStore.Exists(trade.OrderID) {
-				c.EmitTrade(trade)
-				if profit, netProfit, madeProfit := c.position.AddTrade(trade) ; madeProfit {
-					c.EmitProfit(trade, profit, netProfit)
-				}
-				c.EmitPositionUpdate(c.position)
-			} else {
-				c.tradeStore.Add(trade)
-			}
+			c.tradeStore.Add(trade)
 		}
 	}
 }
