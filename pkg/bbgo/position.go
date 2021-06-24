@@ -34,6 +34,22 @@ type Position struct {
 	sync.Mutex
 }
 
+func NewPositionFromMarket(market types.Market) *Position {
+	return &Position{
+		Symbol:        market.Symbol,
+		BaseCurrency:  market.BaseCurrency,
+		QuoteCurrency: market.QuoteCurrency,
+	}
+}
+
+func NewPosition(symbol, base, quote string) *Position {
+	return &Position{
+		Symbol:        symbol,
+		BaseCurrency:  base,
+		QuoteCurrency: quote,
+	}
+}
+
 func (p *Position) Reset() {
 	p.Base = 0
 	p.Quote = 0
