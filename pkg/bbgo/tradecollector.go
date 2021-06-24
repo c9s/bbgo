@@ -71,6 +71,7 @@ func (c *TradeCollector) Run(ctx context.Context) {
 				if profit, netProfit, madeProfit := c.position.AddTrade(trade) ; madeProfit {
 					c.EmitProfit(trade, profit, netProfit)
 				}
+				c.EmitPositionUpdate(c.position)
 			} else {
 				c.tradeStore.Add(trade)
 			}
