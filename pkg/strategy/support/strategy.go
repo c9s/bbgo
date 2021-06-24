@@ -50,6 +50,7 @@ type Strategy struct {
 	// moving average window for checking support (support should be under the moving average line)
 	MovingAverageWindow int            `json:"movingAverageWindow"`
 
+
 	// LongTermMovingAverage is the second moving average line for checking support position
 	LongTermMovingAverage types.IntervalWindow `json:"longTermMovingAverage"`
 
@@ -148,6 +149,7 @@ func (s *Strategy) submitOrders(ctx context.Context, orderExecutor bbgo.OrderExe
 	}
 
 	s.orderStore.Add(createdOrders...)
+	s.tradeCollector.Emit()
 	return nil
 }
 
