@@ -3,6 +3,7 @@ package bbgo
 import (
 	"context"
 
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/sigchan"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -19,6 +20,7 @@ type TradeCollector struct {
 
 	tradeCallbacks          []func(trade types.Trade)
 	positionUpdateCallbacks []func(position *Position)
+	profitCallbacks []func(trade types.Trade, profit, netProfit fixedpoint.Value)
 }
 
 func NewTradeCollector(symbol string, position *Position, orderStore *OrderStore) *TradeCollector {
@@ -55,15 +57,23 @@ func (c *TradeCollector) Run(ctx context.Context) {
 			trades := c.tradeStore.GetAndClear()
 			for _, trade := range trades {
 				if c.orderStore.Exists(trade.OrderID) {
-					c.position.AddTrade(trade)
 					c.EmitTrade(trade)
+					if profit, netProfit, madeProfit := c.position.AddTrade(trade) ; madeProfit {
+						c.EmitProfit(trade, profit, netProfit)
+					}
 				}
 			}
 			c.EmitPositionUpdate(c.position)
 
 		case trade := <-c.tradeC:
-			c.tradeStore.Add(trade)
-
+			if c.orderStore.Exists(trade.OrderID) {
+				c.EmitTrade(trade)
+				if profit, netProfit, madeProfit := c.position.AddTrade(trade) ; madeProfit {
+					c.EmitProfit(trade, profit, netProfit)
+				}
+			} else {
+				c.tradeStore.Add(trade)
+			}
 		}
 	}
 }
