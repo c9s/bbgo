@@ -379,8 +379,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 
 		if s.longTermEMA != nil && closePriceF > s.longTermEMA.Last() {
-			s.Notify("%s: closed price is above the long term moving average line, skipping this support",
+			s.Notify("%s: closed price is above the long term moving average line %f, skipping this support",
 				s.Symbol,
+				s.longTermEMA.Last(),
 				kline,
 			)
 			return
