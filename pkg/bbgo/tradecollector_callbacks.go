@@ -3,6 +3,7 @@
 package bbgo
 
 import (
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -23,5 +24,15 @@ func (c *TradeCollector) OnPositionUpdate(cb func(position *Position)) {
 func (c *TradeCollector) EmitPositionUpdate(position *Position) {
 	for _, cb := range c.positionUpdateCallbacks {
 		cb(position)
+	}
+}
+
+func (c *TradeCollector) OnProfit(cb func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value)) {
+	c.profitCallbacks = append(c.profitCallbacks, cb)
+}
+
+func (c *TradeCollector) EmitProfit(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
+	for _, cb := range c.profitCallbacks {
+		cb(trade, profit, netProfit)
 	}
 }
