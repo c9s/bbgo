@@ -246,6 +246,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.MovingAverageWindow = 99
 	}
 
+
 	if s.Sensitivity > 0 {
 		volRange, err := s.ScaleQuantity.ByVolumeRule.Range()
 		if err != nil {
@@ -281,15 +282,16 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		return fmt.Errorf("standardIndicatorSet is nil, symbol %s", s.Symbol)
 	}
 
+	var zeroiw = types.IntervalWindow{}
+	if s.LongTermMovingAverage != zeroiw {
+		s.longTermEMA = standardIndicatorSet.EWMA(s.LongTermMovingAverage)
+	}
+
 	s.orderStore = bbgo.NewOrderStore(s.Symbol)
 	s.orderStore.BindStream(session.UserDataStream)
 
 	s.triggerEMA = standardIndicatorSet.EWMA(types.IntervalWindow{Interval: s.Interval, Window: s.MovingAverageWindow})
 
-	var zeroiw = types.IntervalWindow{}
-	if s.LongTermMovingAverage != zeroiw {
-		s.longTermEMA = standardIndicatorSet.EWMA(s.LongTermMovingAverage)
-	}
 
 	if err := s.LoadState(); err != nil {
 		return err
