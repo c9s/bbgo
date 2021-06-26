@@ -14,6 +14,7 @@ import (
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -42,12 +43,81 @@ type State struct {
 	HedgePosition        fixedpoint.Value `json:"hedgePosition"`
 	CoveredPosition      fixedpoint.Value `json:"coveredPosition,omitempty"`
 	Position             *bbgo.Position   `json:"position,omitempty"`
-	AccumulatedVolume    fixedpoint.Value `json:"accumulatedVolume,omitempty"`
-	AccumulatedPnL       fixedpoint.Value `json:"accumulatedPnL,omitempty"`
-	AccumulatedNetProfit fixedpoint.Value `json:"accumulatedNetProfit,omitempty"`
-	AccumulatedProfit    fixedpoint.Value `json:"accumulatedProfit,omitempty"`
-	AccumulatedLoss      fixedpoint.Value `json:"accumulatedLoss,omitempty"`
-	AccumulatedSince     int64            `json:"accumulatedSince,omitempty"`
+	ProfitStats ProfitStats `json:"profitStats,omitempty"`
+}
+
+type ProfitStats struct {
+	MakerExchange types.ExchangeName `json:"makerExchange"`
+
+	AccumulatedMakerVolume    fixedpoint.Value `json:"accumulatedMakerVolume,omitempty"`
+	AccumulatedMakerBidVolume fixedpoint.Value `json:"accumulatedMakerBidVolume,omitempty"`
+	AccumulatedMakerAskVolume fixedpoint.Value `json:"accumulatedMakerAskVolume,omitempty"`
+	AccumulatedPnL            fixedpoint.Value `json:"accumulatedPnL,omitempty"`
+	AccumulatedNetProfit      fixedpoint.Value `json:"accumulatedNetProfit,omitempty"`
+	AccumulatedProfit         fixedpoint.Value `json:"accumulatedProfit,omitempty"`
+	AccumulatedLoss           fixedpoint.Value `json:"accumulatedLoss,omitempty"`
+	AccumulatedSince          int64            `json:"accumulatedSince,omitempty"`
+
+	TodayMakerVolume    fixedpoint.Value `json:"todayMakerVolume,omitempty"`
+	TodayMakerBidVolume fixedpoint.Value `json:"todayMakerBidVolume,omitempty"`
+	TodayMakerAskVolume fixedpoint.Value `json:"todayMakerAskVolume,omitempty"`
+	TodayPnL            fixedpoint.Value `json:"todayPnL,omitempty"`
+	TodayNetProfit      fixedpoint.Value `json:"todayNetProfit,omitempty"`
+	TodayProfit         fixedpoint.Value `json:"todayProfit,omitempty"`
+	TodayLoss           fixedpoint.Value `json:"todayLoss,omitempty"`
+	TodaySince          int64            `json:"todaySince,omitempty"`
+}
+
+func (s *ProfitStats) AddProfit(profit, netProfit fixedpoint.Value) {
+	s.AccumulatedPnL += profit
+	s.AccumulatedNetProfit += netProfit
+
+	s.TodayPnL += profit
+	s.TodayNetProfit += netProfit
+
+	if profit < 0 {
+		s.AccumulatedLoss += profit
+		s.TodayLoss += profit
+	} else if profit > 0 {
+		s.AccumulatedProfit += profit
+		s.TodayProfit += profit
+	}
+}
+
+func (s *ProfitStats) AddTrade(trade types.Trade) {
+	if trade.Exchange == s.MakerExchange {
+		s.AccumulatedMakerVolume.AtomicAdd(fixedpoint.NewFromFloat(trade.Quantity))
+		s.TodayMakerVolume.AtomicAdd(fixedpoint.NewFromFloat(trade.Quantity))
+
+		switch trade.Side {
+
+		case types.SideTypeSell:
+			s.AccumulatedMakerAskVolume.AtomicAdd(fixedpoint.NewFromFloat(trade.Quantity))
+			s.TodayMakerAskVolume.AtomicAdd(fixedpoint.NewFromFloat(trade.Quantity))
+
+		case types.SideTypeBuy:
+			s.AccumulatedMakerBidVolume.AtomicAdd(fixedpoint.NewFromFloat(trade.Quantity))
+			s.TodayMakerBidVolume.AtomicAdd(fixedpoint.NewFromFloat(trade.Quantity))
+
+		}
+	}
+}
+
+func (s *ProfitStats) IsOver24Hours() bool {
+	return time.Now().Sub(time.Unix(s.TodaySince, 0)) >= 24*time.Hour
+}
+
+func (s *ProfitStats) ResetToday() {
+	s.TodayMakerVolume = 0
+	s.TodayMakerBidVolume = 0
+	s.TodayMakerAskVolume = 0
+	s.TodayPnL = 0
+	s.TodayNetProfit = 0
+	s.TodayProfit = 0
+	s.TodayLoss = 0
+
+	var beginningOfTheDay = util.BeginningOfTheDay(time.Now().Local())
+	s.TodaySince = beginningOfTheDay.Unix()
 }
 
 type Strategy struct {
@@ -456,13 +526,6 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 	s.orderStore.Add(makerOrders...)
 }
 
-func quantityToPosition(quantity fixedpoint.Value, side types.SideType) fixedpoint.Value {
-	if side == types.SideTypeSell {
-		return - quantity
-	}
-	return quantity
-}
-
 func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	side := types.SideTypeBuy
 	if pos == 0 {
@@ -590,27 +653,21 @@ func (s *Strategy) processTrade(trade types.Trade) {
 		s.state.CoveredPosition.AtomicAdd(q)
 	}
 
-	s.state.AccumulatedVolume.AtomicAdd(fixedpoint.NewFromFloat(trade.Quantity))
+	s.state.ProfitStats.AddTrade(trade)
 
 	if profit, netProfit, madeProfit := s.state.Position.AddTrade(trade); madeProfit {
-		s.state.AccumulatedPnL.AtomicAdd(profit)
-		s.state.AccumulatedNetProfit.AtomicAdd(netProfit)
-
-		if profit < 0 {
-			s.state.AccumulatedLoss.AtomicAdd(profit)
-		} else if profit > 0 {
-			s.state.AccumulatedProfit.AtomicAdd(profit)
-		}
+		s.state.ProfitStats.AddProfit(profit, netProfit)
 
 		profitMargin := profit.DivFloat64(trade.QuoteQuantity)
 		netProfitMargin := netProfit.DivFloat64(trade.QuoteQuantity)
 
-		var since time.Time
-		if s.state.AccumulatedSince > 0 {
-			since = time.Unix(s.state.AccumulatedSince, 0).In(localTimeZone)
-		}
+		since := time.Unix(s.state.ProfitStats.AccumulatedSince, 0).Local()
 
 		s.Notify("%s trade profit %s %f %s (%.2f%%), net profit =~ %f %s (%.2f%%),\n"+
+			"today profit %f %s,\n"+
+			"today net profit %f %s,\n"+
+			"today trade loss %f %s\n"+
+
 			"accumulated profit %f %s,\n"+
 			"accumulated net profit %f %s,\n"+
 			"accumulated trade loss %f %s\n"+
@@ -621,9 +678,14 @@ func (s *Strategy) processTrade(trade types.Trade) {
 			profitMargin.Float64()*100.0,
 			netProfit.Float64(), s.state.Position.QuoteCurrency,
 			netProfitMargin.Float64()*100.0,
-			s.state.AccumulatedPnL.Float64(), s.state.Position.QuoteCurrency,
-			s.state.AccumulatedNetProfit.Float64(), s.state.Position.QuoteCurrency,
-			s.state.AccumulatedLoss.Float64(), s.state.Position.QuoteCurrency,
+
+			s.state.ProfitStats.TodayPnL.Float64(), s.state.Position.QuoteCurrency,
+			s.state.ProfitStats.TodayNetProfit.Float64(), s.state.Position.QuoteCurrency,
+			s.state.ProfitStats.TodayLoss.Float64(), s.state.Position.QuoteCurrency,
+
+			s.state.ProfitStats.AccumulatedPnL.Float64(), s.state.Position.QuoteCurrency,
+			s.state.ProfitStats.AccumulatedNetProfit.Float64(), s.state.Position.QuoteCurrency,
+			s.state.ProfitStats.AccumulatedLoss.Float64(), s.state.Position.QuoteCurrency,
 			since.Format(time.RFC822),
 		)
 
@@ -668,6 +730,20 @@ func (s *Strategy) LoadState() error {
 	} else {
 		s.state = &state
 		log.Infof("state is restored: %+v", s.state)
+	}
+
+	// if position is nil, we need to allocate a new position for calculation
+	if s.state.Position == nil {
+		s.state.Position = &bbgo.Position{
+			Symbol:        s.Symbol,
+			BaseCurrency:  s.makerMarket.BaseCurrency,
+			QuoteCurrency: s.makerMarket.QuoteCurrency,
+		}
+	}
+
+	s.state.ProfitStats.MakerExchange = s.makerSession.ExchangeName
+	if s.state.ProfitStats.AccumulatedSince == 0 {
+		s.state.ProfitStats.AccumulatedSince = time.Now().Unix()
 	}
 
 	return nil
@@ -772,14 +848,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		s.Notify("%s position is restored => %f", s.Symbol, s.state.HedgePosition.Float64())
 	}
 
-	// if position is nil, we need to allocate a new position for calculation
-	if s.state.Position == nil {
-		s.state.Position = &bbgo.Position{
-			Symbol:        s.Symbol,
-			BaseCurrency:  s.makerMarket.BaseCurrency,
-			QuoteCurrency: s.makerMarket.QuoteCurrency,
-		}
-	}
+
 
 	if s.makerSession.MakerFeeRate > 0 || s.makerSession.TakerFeeRate > 0 {
 		s.state.Position.SetExchangeFeeRate(types.ExchangeName(s.MakerExchange), bbgo.ExchangeFee{
@@ -795,9 +864,6 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		})
 	}
 
-	if s.state.AccumulatedSince == 0 {
-		s.state.AccumulatedSince = time.Now().Unix()
-	}
 
 	s.book = types.NewStreamBook(s.Symbol)
 	s.book.BindStream(s.sourceSession.MarketDataStream)
