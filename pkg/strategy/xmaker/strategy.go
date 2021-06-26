@@ -40,10 +40,10 @@ func init() {
 }
 
 type State struct {
-	HedgePosition        fixedpoint.Value `json:"hedgePosition"`
-	CoveredPosition      fixedpoint.Value `json:"coveredPosition,omitempty"`
-	Position             *bbgo.Position   `json:"position,omitempty"`
-	ProfitStats ProfitStats `json:"profitStats,omitempty"`
+	HedgePosition   fixedpoint.Value `json:"hedgePosition"`
+	CoveredPosition fixedpoint.Value `json:"coveredPosition,omitempty"`
+	Position        *bbgo.Position   `json:"position,omitempty"`
+	ProfitStats     ProfitStats      `json:"profitStats,omitempty"`
 }
 
 type ProfitStats struct {
@@ -667,7 +667,6 @@ func (s *Strategy) processTrade(trade types.Trade) {
 			"today profit %f %s,\n"+
 			"today net profit %f %s,\n"+
 			"today trade loss %f %s\n"+
-
 			"accumulated profit %f %s,\n"+
 			"accumulated net profit %f %s,\n"+
 			"accumulated trade loss %f %s\n"+
@@ -848,8 +847,6 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		s.Notify("%s position is restored => %f", s.Symbol, s.state.HedgePosition.Float64())
 	}
 
-
-
 	if s.makerSession.MakerFeeRate > 0 || s.makerSession.TakerFeeRate > 0 {
 		s.state.Position.SetExchangeFeeRate(types.ExchangeName(s.MakerExchange), bbgo.ExchangeFee{
 			MakerFeeRate: s.makerSession.MakerFeeRate,
@@ -863,7 +860,6 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 			TakerFeeRate: s.sourceSession.TakerFeeRate,
 		})
 	}
-
 
 	s.book = types.NewStreamBook(s.Symbol)
 	s.book.BindStream(s.sourceSession.MarketDataStream)
