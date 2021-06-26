@@ -56,7 +56,7 @@ func (s *State) SlackAttachment() slack.Attachment {
 }
 
 func (s *State) Reset() {
-	var beginningOfTheDay = Bod(time.Now())
+	var beginningOfTheDay = util.BeginningOfTheDay(time.Now().Local())
 	*s = State{
 		DailyNumberOfTransfers: 0,
 		DailyAmountOfTransfers: 0,
@@ -302,11 +302,6 @@ func (s *Strategy) findLowBalanceLevelSession(sessions map[string]*bbgo.Exchange
 	}
 
 	return nil, balance, nil
-}
-
-func Bod(t time.Time) time.Time {
-	year, month, day := t.Date()
-	return time.Date(year, month, day, 0, 0, 0, 0, t.Location())
 }
 
 func (s *Strategy) SaveState() {
