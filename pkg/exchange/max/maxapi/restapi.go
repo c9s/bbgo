@@ -76,7 +76,7 @@ var timeOffset int64 = 0
 var serverTimestamp = time.Now().Unix()
 
 // reqCount is used for nonce, this variable counts the API request count.
-var reqCount int64 = 0
+var reqCount int64 = 1
 
 type RestClient struct {
 	client *http.Client
@@ -158,19 +158,19 @@ func (c *RestClient) initNonce() {
 	var err error
 	serverTimestamp, err = c.PublicService.Timestamp()
 	if err != nil {
-		logger.WithError(err).Panic("failed to sync timestamp with Max")
+		logger.WithError(err).Panic("failed to sync timestamp with max")
 	}
 
-	// 1 is for the request count mod 0.000 to 0.999
-	timeOffset = serverTimestamp - clientTime.Unix() - 1
-
+	timeOffset = serverTimestamp - clientTime.Unix()
 	logger.Infof("loaded max server timestamp: %d offset=%d", serverTimestamp, timeOffset)
 }
 
 func (c *RestClient) getNonce() int64 {
+	// nonce 是以正整數表示的時間戳記，代表了從 Unix epoch 到當前時間所經過的毫秒數(ms)。
+	// nonce 與伺服器的時間差不得超過正負30秒，每個 nonce 只能使用一次。
 	var seconds = time.Now().Unix()
 	var rc = atomic.AddInt64(&reqCount, 1)
-	return (seconds+timeOffset)*1000 + int64(math.Mod(float64(rc), 1000.0))
+	return (seconds+timeOffset)*1000 - 1 + int64(math.Mod(float64(rc), 1000.0))
 }
 
 // NewRequest create new API request. Relative url can be provided in refURL.
