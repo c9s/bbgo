@@ -338,8 +338,8 @@ func IsBookTicker(val *fastjson.Value) bool {
 }
 
 type DepthEntry struct {
-	PriceLevel string
-	Quantity   string
+	PriceLevel fixedpoint.Value
+	Quantity   fixedpoint.Value
 }
 
 type DepthEvent struct {
@@ -349,8 +349,8 @@ type DepthEvent struct {
 	FirstUpdateID int64  `json:"U"`
 	FinalUpdateID int64  `json:"u"`
 
-	Bids []DepthEntry
-	Asks []DepthEntry
+	Bids types.PriceVolumeSlice `json:"b"`
+	Asks types.PriceVolumeSlice `json:"a"`
 }
 
 func (e *DepthEvent) String() (o string) {
@@ -359,7 +359,7 @@ func (e *DepthEvent) String() (o string) {
 	if len(e.Bids) == 0 {
 		o += "empty"
 	} else {
-		o += e.Bids[0].PriceLevel
+		o += e.Bids[0].Price.String()
 	}
 
 	o += "/"
@@ -367,7 +367,7 @@ func (e *DepthEvent) String() (o string) {
 	if len(e.Asks) == 0 {
 		o += "empty"
 	} else {
-		o += e.Asks[0].PriceLevel
+		o += e.Asks[0].Price.String()
 	}
 
 	o += fmt.Sprintf(" %d ~ %d", e.FirstUpdateID, e.FinalUpdateID)
@@ -375,54 +375,15 @@ func (e *DepthEvent) String() (o string) {
 }
 
 func (e *DepthEvent) OrderBook() (book types.SliceOrderBook, err error) {
-	var quantity, price fixedpoint.Value
-
 	book.Symbol = e.Symbol
 
 	// already in descending order
-	for _, entry := range e.Bids {
-		quantity, err = fixedpoint.NewFromString(entry.Quantity)
-		if err != nil {
-			log.WithError(err).Errorf("depth quantity parse error: %s", entry.Quantity)
-			continue
-		}
-
-		price, err = fixedpoint.NewFromString(entry.PriceLevel)
-		if err != nil {
-			log.WithError(err).Errorf("depth price parse error: %s", entry.PriceLevel)
-			continue
-		}
-
-		book.Bids = append(book.Bids, types.PriceVolume{
-			Price:  price,
-			Volume: quantity,
-		})
-	}
-
-	// already in ascending order
-	for _, entry := range e.Asks {
-		quantity, err = fixedpoint.NewFromString(entry.Quantity)
-		if err != nil {
-			log.WithError(err).Errorf("depth quantity parse error: %s", entry.Quantity)
-			continue
-		}
-
-		price, err = fixedpoint.NewFromString(entry.PriceLevel)
-		if err != nil {
-			log.WithError(err).Errorf("depth price parse error: %s", entry.PriceLevel)
-			continue
-		}
-
-		book.Asks = append(book.Asks, types.PriceVolume{
-			Price:  price,
-			Volume: quantity,
-		})
-	}
-
+	book.Bids = e.Bids
+	book.Asks = e.Asks
 	return book, err
 }
 
-func parseDepthEntry(val *fastjson.Value) (*DepthEntry, error) {
+func parseDepthEntry(val *fastjson.Value) (*types.PriceVolume, error) {
 	arr, err := val.Array()
 	if err != nil {
 		return nil, err
@@ -432,9 +393,19 @@ func parseDepthEntry(val *fastjson.Value) (*DepthEntry, error) {
 		return nil, errors.New("incorrect depth entry element length")
 	}
 
-	return &DepthEntry{
-		PriceLevel: string(arr[0].GetStringBytes()),
-		Quantity:   string(arr[1].GetStringBytes()),
+	price, err := fixedpoint.NewFromString(string(arr[0].GetStringBytes()))
+	if err != nil {
+		return nil, err
+	}
+
+	quantity, err := fixedpoint.NewFromString(string(arr[1].GetStringBytes()))
+	if err != nil {
+		return nil, err
+	}
+
+	return &types.PriceVolume{
+		Price:  price,
+		Volume: quantity,
 	}, nil
 }
 
