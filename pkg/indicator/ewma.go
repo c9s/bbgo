@@ -9,8 +9,8 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-const MaxEWMAValues = 1_000
-const EWMAValueTruncateSize = 500
+const MaxNumOfEWMA = 1_000
+const MaxNumOfEWMATruncateSize = 500
 
 //go:generate callbackgen -type EWMA
 type EWMA struct {
@@ -27,8 +27,8 @@ func (inc *EWMA) Update(value float64) {
 	if len(inc.Values) == 0 {
 		inc.Values.Push(value)
 		return
-	} else if len(inc.Values) > MaxEWMAValues {
-		inc.Values = inc.Values[EWMAValueTruncateSize:]
+	} else if len(inc.Values) > MaxNumOfEWMA {
+		inc.Values = inc.Values[MaxNumOfEWMATruncateSize:]
 	}
 
 	ema := (1-multiplier)*inc.Last() + multiplier*value
