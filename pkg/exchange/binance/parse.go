@@ -419,7 +419,7 @@ func (e *DepthEvent) OrderBook() (book types.SliceOrderBook, err error) {
 		book.Asks = book.Asks.Upsert(pv, false)
 	}
 
-	return book, nil
+	return book, err
 }
 
 func parseDepthEntry(val *fastjson.Value) (*DepthEntry, error) {
