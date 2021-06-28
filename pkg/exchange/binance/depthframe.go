@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/adshao/go-binance/v2"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 //go:generate callbackgen -type DepthFrame
@@ -212,11 +214,32 @@ func (f *DepthFrame) fetch(ctx context.Context) (*DepthEvent, error) {
 	}
 
 	for _, entry := range response.Bids {
-		event.Bids = append(event.Bids, DepthEntry{PriceLevel: entry.Price, Quantity: entry.Quantity})
+		// entry.Price, Quantity: entry.Quantity
+		price, err := fixedpoint.NewFromString(entry.Price)
+		if err != nil {
+			return nil, err
+		}
+
+		quantity, err := fixedpoint.NewFromString(entry.Quantity)
+		if err != nil {
+			return nil, err
+		}
+
+		event.Bids = append(event.Bids, types.PriceVolume{Price: price, Volume: quantity})
 	}
 
 	for _, entry := range response.Asks {
-		event.Asks = append(event.Asks, DepthEntry{PriceLevel: entry.Price, Quantity: entry.Quantity})
+		price, err := fixedpoint.NewFromString(entry.Price)
+		if err != nil {
+			return nil, err
+		}
+
+		quantity, err := fixedpoint.NewFromString(entry.Quantity)
+		if err != nil {
+			return nil, err
+		}
+
+		event.Asks = append(event.Asks, types.PriceVolume{Price: price, Volume : quantity})
 	}
 
 	return &event, nil
