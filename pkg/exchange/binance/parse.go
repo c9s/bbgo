@@ -375,48 +375,48 @@ func (e *DepthEvent) String() (o string) {
 }
 
 func (e *DepthEvent) OrderBook() (book types.SliceOrderBook, err error) {
+	var quantity, price fixedpoint.Value
+
 	book.Symbol = e.Symbol
 
+	// already in descending order
 	for _, entry := range e.Bids {
-		quantity, err := fixedpoint.NewFromString(entry.Quantity)
+		quantity, err = fixedpoint.NewFromString(entry.Quantity)
 		if err != nil {
 			log.WithError(err).Errorf("depth quantity parse error: %s", entry.Quantity)
 			continue
 		}
 
-		price, err := fixedpoint.NewFromString(entry.PriceLevel)
+		price, err = fixedpoint.NewFromString(entry.PriceLevel)
 		if err != nil {
 			log.WithError(err).Errorf("depth price parse error: %s", entry.PriceLevel)
 			continue
 		}
 
-		pv := types.PriceVolume{
+		book.Bids = append(book.Bids, types.PriceVolume{
 			Price:  price,
 			Volume: quantity,
-		}
-
-		book.Bids = book.Bids.Upsert(pv, true)
+		})
 	}
 
+	// already in ascending order
 	for _, entry := range e.Asks {
-		quantity, err := fixedpoint.NewFromString(entry.Quantity)
+		quantity, err = fixedpoint.NewFromString(entry.Quantity)
 		if err != nil {
 			log.WithError(err).Errorf("depth quantity parse error: %s", entry.Quantity)
 			continue
 		}
 
-		price, err := fixedpoint.NewFromString(entry.PriceLevel)
+		price, err = fixedpoint.NewFromString(entry.PriceLevel)
 		if err != nil {
 			log.WithError(err).Errorf("depth price parse error: %s", entry.PriceLevel)
 			continue
 		}
 
-		pv := types.PriceVolume{
+		book.Asks = append(book.Asks, types.PriceVolume{
 			Price:  price,
 			Volume: quantity,
-		}
-
-		book.Asks = book.Asks.Upsert(pv, false)
+		})
 	}
 
 	return book, err
