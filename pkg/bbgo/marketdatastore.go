@@ -2,6 +2,9 @@ package bbgo
 
 import "github.com/c9s/bbgo/pkg/types"
 
+const MaxNumOfKLines = 5_000
+const MaxNumOfKLinesTruncate = 1_000
+
 // MarketDataStore receives and maintain the public market data
 //go:generate callbackgen -type MarketDataStore
 type MarketDataStore struct {
@@ -51,6 +54,11 @@ func (store *MarketDataStore) AddKLine(kline types.KLine) {
 	} else {
 		window.Add(kline)
 	}
+
+	if len(window) > MaxNumOfKLines {
+		window = window[MaxNumOfKLinesTruncate:]
+	}
+
 	store.KLineWindows[kline.Interval] = window
 	store.EmitKLineWindowUpdate(kline.Interval, window)
 }
