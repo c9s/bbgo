@@ -283,29 +283,6 @@ func parseBookEntries2(vals []*fastjson.Value) (entries types.PriceVolumeSlice, 
 	return entries, err
 }
 
-// parseBookEntries parses JSON struct like `[["233330", "0.33"], ....]`
-func parseBookEntries(vals []*fastjson.Value, side int, t time.Time) (entries []BookEntry, err error) {
-	for _, entry := range vals {
-		pv, err := entry.Array()
-		if err != nil {
-			return nil, err
-		}
-
-		if len(pv) < 2 {
-			return nil, ErrIncorrectBookEntryElementLength
-		}
-
-		entries = append(entries, BookEntry{
-			Side:   side,
-			Time:   t,
-			Price:  string(pv[0].GetStringBytes()),
-			Volume: string(pv[1].GetStringBytes()),
-		})
-	}
-
-	return entries, nil
-}
-
 type ErrorEvent struct {
 	Timestamp int64
 	Errors    []string
