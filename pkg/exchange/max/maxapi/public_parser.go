@@ -216,7 +216,7 @@ func parseBookEvent(val *fastjson.Value) (*BookEvent, error) {
 		Timestamp: val.GetInt64("T"),
 	}
 
-	t := time.Unix(0, event.Timestamp*int64(time.Millisecond))
+	// t := time.Unix(0, event.Timestamp*int64(time.Millisecond))
 
 	var err error
 	event.Asks, err = parseBookEntries2(val.GetArray("a"))
