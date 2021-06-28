@@ -192,17 +192,19 @@ func parseKLineEvent(val *fastjson.Value) (*KLineEvent, error) {
 		Timestamp: val.GetInt64("T"),
 	}
 
+	k := val.Get("k")
+
 	event.KLine = KLine{
-		Symbol:    string(val.GetStringBytes("k", "M")),
-		Interval:  string(val.GetStringBytes("k", "R")),
-		StartTime: time.Unix(0, val.GetInt64("k", "ST")*int64(time.Millisecond)),
-		EndTime:   time.Unix(0, val.GetInt64("k", "ET")*int64(time.Millisecond)),
-		Open:      fixedpoint.MustNewFromBytes(val.GetStringBytes("k", "O")),
-		High:      fixedpoint.MustNewFromBytes(val.GetStringBytes("k", "H")),
-		Low:       fixedpoint.MustNewFromBytes(val.GetStringBytes("k", "L")),
-		Close:     fixedpoint.MustNewFromBytes(val.GetStringBytes("k", "C")),
-		Volume:    fixedpoint.MustNewFromBytes(val.GetStringBytes("k", "v")),
-		Closed:    val.GetBool("k", "x"),
+		Symbol:    string(k.GetStringBytes("M")),
+		Interval:  string(k.GetStringBytes("R")),
+		StartTime: time.Unix(0, k.GetInt64("ST")*int64(time.Millisecond)),
+		EndTime:   time.Unix(0, k.GetInt64("ET")*int64(time.Millisecond)),
+		Open:      fixedpoint.MustNewFromBytes(k.GetStringBytes("O")),
+		High:      fixedpoint.MustNewFromBytes(k.GetStringBytes("H")),
+		Low:       fixedpoint.MustNewFromBytes(k.GetStringBytes("L")),
+		Close:     fixedpoint.MustNewFromBytes(k.GetStringBytes("C")),
+		Volume:    fixedpoint.MustNewFromBytes(k.GetStringBytes("v")),
+		Closed:    k.GetBool("x"),
 	}
 
 	return &event, nil
