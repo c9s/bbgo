@@ -9,6 +9,9 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+const MaxEWMAValues = 1_000
+const EWMAValueTruncateSize = 500
+
 //go:generate callbackgen -type EWMA
 type EWMA struct {
 	types.IntervalWindow
@@ -24,6 +27,8 @@ func (inc *EWMA) Update(value float64) {
 	if len(inc.Values) == 0 {
 		inc.Values.Push(value)
 		return
+	} else if len(inc.Values) > MaxEWMAValues {
+		inc.Values = inc.Values[EWMAValueTruncateSize:]
 	}
 
 	ema := (1-multiplier)*inc.Last() + multiplier*value

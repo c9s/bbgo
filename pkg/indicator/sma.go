@@ -9,6 +9,9 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+const MaxSMAValues = 1_000
+const SMAValueTruncateSize = 500
+
 var zeroTime time.Time
 
 //go:generate callbackgen -type SMA
@@ -44,6 +47,11 @@ func (inc *SMA) calculateAndUpdate(kLines []types.KLine) {
 		return
 	}
 	inc.Values.Push(sma)
+
+	if len(inc.Values) > MaxSMAValues {
+		inc.Values = inc.Values[SMAValueTruncateSize:]
+	}
+
 	inc.EndTime = kLines[index].EndTime
 
 	inc.EmitUpdate(sma)
