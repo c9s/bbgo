@@ -168,8 +168,8 @@ type BookEvent struct {
 	Market    string `json:"M"`
 	Channel   string `json:"c"`
 	Timestamp int64  `json:"t"` // Millisecond timestamp
-	Bids      []BookEntry
-	Asks      []BookEntry
+	Bids      types.PriceVolumeSlice
+	Asks      types.PriceVolumeSlice
 }
 
 func (e *BookEvent) Time() time.Time {
@@ -179,25 +179,8 @@ func (e *BookEvent) Time() time.Time {
 func (e *BookEvent) OrderBook() (snapshot types.SliceOrderBook, err error) {
 	snapshot.Symbol = strings.ToUpper(e.Market)
 	snapshot.Time = e.Time()
-
-	for _, bid := range e.Bids {
-		pv, err := bid.PriceVolumePair()
-		if err != nil {
-			return snapshot, err
-		}
-
-		snapshot.Bids = append(snapshot.Bids, pv)
-	}
-
-	for _, ask := range e.Asks {
-		pv, err := ask.PriceVolumePair()
-		if err != nil {
-			return snapshot, err
-		}
-
-		snapshot.Asks = append(snapshot.Asks, pv)
-	}
-
+	snapshot.Bids = e.Bids
+	snapshot.Asks = e.Asks
 	return snapshot, nil
 }
 
@@ -236,12 +219,12 @@ func parseBookEvent(val *fastjson.Value) (*BookEvent, error) {
 	t := time.Unix(0, event.Timestamp*int64(time.Millisecond))
 
 	var err error
-	event.Asks, err = parseBookEntries(val.GetArray("a"), Sell, t)
+	event.Asks, err = parseBookEntries2(val.GetArray("a"))
 	if err != nil {
 		return nil, err
 	}
 
-	event.Bids, err = parseBookEntries(val.GetArray("b"), Buy, t)
+	event.Bids, err = parseBookEntries2(val.GetArray("b"))
 	if err != nil {
 		return nil, err
 	}
@@ -268,6 +251,37 @@ func (e *BookEntry) PriceVolumePair() (pv types.PriceVolume, err error) {
 	}
 
 	return pv, err
+}
+
+// parseBookEntries2 parses JSON struct like `[["233330", "0.33"], ....]`
+func parseBookEntries2(vals []*fastjson.Value) (entries types.PriceVolumeSlice, err error) {
+	for _, entry := range vals {
+		pv, err := entry.Array()
+		if err != nil {
+			return nil, err
+		}
+
+		if len(pv) < 2 {
+			return nil, ErrIncorrectBookEntryElementLength
+		}
+
+		price, err := fixedpoint.NewFromString(string(pv[0].GetStringBytes()))
+		if err != nil {
+			return nil, err
+		}
+
+		volume, err := fixedpoint.NewFromString(string(pv[1].GetStringBytes()))
+		if err != nil {
+			return nil, err
+		}
+
+		entries = append(entries, types.PriceVolume{
+			Price:  price,
+			Volume: volume,
+		})
+	}
+
+	return entries, err
 }
 
 // parseBookEntries parses JSON struct like `[["233330", "0.33"], ....]`
