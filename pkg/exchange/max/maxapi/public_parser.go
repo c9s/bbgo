@@ -255,7 +255,8 @@ func (e *BookEntry) PriceVolumePair() (pv types.PriceVolume, err error) {
 }
 
 // parseBookEntries2 parses JSON struct like `[["233330", "0.33"], ....]`
-func parseBookEntries2(vals []*fastjson.Value) (entries types.PriceVolumeSlice, err error) {
+func parseBookEntries2(vals []*fastjson.Value) (types.PriceVolumeSlice, error) {
+	entries := make(types.PriceVolumeSlice, 0, 50)
 	for _, entry := range vals {
 		pv, err := entry.Array()
 		if err != nil {
@@ -282,7 +283,7 @@ func parseBookEntries2(vals []*fastjson.Value) (entries types.PriceVolumeSlice, 
 		})
 	}
 
-	return entries, err
+	return entries, nil
 }
 
 type ErrorEvent struct {
