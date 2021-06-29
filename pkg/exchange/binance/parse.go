@@ -448,6 +448,8 @@ func parseDepthEvent(val *fastjson.Value) (*DepthEvent, error) {
 		Symbol:        string(val.GetStringBytes("s")),
 		FirstUpdateID: val.GetInt64("U"),
 		FinalUpdateID: val.GetInt64("u"),
+		Bids: make(types.PriceVolumeSlice, 0, 50),
+		Asks: make(types.PriceVolumeSlice, 0, 50),
 	}
 
 	for _, ev := range val.GetArray("b") {
