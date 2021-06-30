@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/c9s/bbgo/pkg/types"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -14,6 +15,7 @@ import (
 
 func init() {
 	accountCmd.Flags().String("session", "", "the exchange session name for querying information")
+	accountCmd.Flags().Bool("total", false, "report total asset")
 	RootCmd.AddCommand(accountCmd)
 }
 
@@ -31,6 +33,11 @@ var accountCmd = &cobra.Command{
 
 		if len(configFile) == 0 {
 			return errors.New("--config option is required")
+		}
+
+		showTotal, err := cmd.Flags().GetBool("total")
+		if err != nil {
+			return err
 		}
 
 		sessionName, err := cmd.Flags().GetString("session")
@@ -75,15 +82,37 @@ var accountCmd = &cobra.Command{
 
 			a.Print()
 		} else {
+			var total = types.BalanceMap{}
 			for _, session := range environ.Sessions() {
 				a, err := session.Exchange.QueryAccount(ctx)
 				if err != nil {
 					return errors.Wrapf(err, "account query failed")
 				}
 
+				log.Infof("--------------------------------------------")
 				log.Infof("SESSION %s", session.Name)
+				log.Infof("--------------------------------------------")
 				a.Print()
+
+				for c, b := range a.Balances() {
+					tb, ok := total[c]
+					if !ok {
+						total[c] = b
+					} else {
+						tb.Available = tb.Available + b.Available
+						tb.Locked = tb.Locked + b.Locked
+						total[c] = tb
+					}
+				}
+
+				if showTotal {
+					log.Infof("===============================================")
+					log.Infof("TOTAL ASSETS")
+					log.Infof("===============================================")
+					total.Print()
+				}
 			}
+
 		}
 
 		return nil
