@@ -108,7 +108,7 @@ func (s *ProfitStats) AddTrade(trade types.Trade) {
 }
 
 func (s *ProfitStats) IsOver24Hours() bool {
-	return time.Now().Sub(time.Unix(s.TodaySince, 0)) >= 24*time.Hour
+	return time.Since(time.Unix(s.TodaySince, 0)) > 24*time.Hour
 }
 
 func (s *ProfitStats) ResetToday() {
