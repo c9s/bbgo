@@ -3,20 +3,23 @@
 package server
 
 import (
+	"embed"
+	"io/fs"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
 
+//go:embed "out/*" "out/_next/*"
+var embededFiles embed.FS
+
 func (s *Server) assetsHandler(c *gin.Context) {
-	// redirect to .html page if the page exists
-	if pageRoutePattern.MatchString(c.Request.URL.Path) {
-		_, err := FS.Open(c.Request.URL.Path + ".html")
-		if err == nil {
-			c.Request.URL.Path += ".html"
-		}
+
+	fsys, err := fs.Sub(embededFiles, "out")
+	if err != nil {
+		c.JSON(404, gin.H{"code": "PAGE_NOT_FOUND", "message": "Page not found"})
 	}
 
-	fs := http.FileServer(FS)
-	fs.ServeHTTP(c.Writer, c.Request)
+	wfs := http.FileServer(http.FS(fsys))
+	wfs.ServeHTTP(c.Writer, c.Request)
 }

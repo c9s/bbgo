@@ -32,3 +32,4 @@
 /config/bbgo.yaml
 
 /pkg/server/assets.go
+/pkg/server/out/
