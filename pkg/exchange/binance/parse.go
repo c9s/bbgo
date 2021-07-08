@@ -500,9 +500,8 @@ func parseDepthEntry(val *fastjson.Value) (*types.PriceVolume, error) {
 	}, nil
 }
 
-func parseDepthEvent(val *fastjson.Value) (*DepthEvent, error) {
-	var err error
-	var depth = &DepthEvent{
+func parseDepthEvent(val *fastjson.Value) (depth *DepthEvent, err error) {
+	depth = &DepthEvent{
 		EventBase: EventBase{
 			Event: string(val.GetStringBytes("e")),
 			Time:  types.NewMillisecondTimestampFromInt(val.GetInt64("E")),
