@@ -55,6 +55,14 @@ func (m BalanceMap) String() string {
 	return "BalanceMap[" + strings.Join(ss, ", ") + "]"
 }
 
+func (m BalanceMap) Copy() (d BalanceMap) {
+	d = make(BalanceMap)
+	for c, b := range m {
+		d[c] = b
+	}
+	return d
+}
+
 func (m BalanceMap) Assets(prices map[string]float64) AssetMap {
 	assets := make(AssetMap)
 
@@ -129,15 +137,10 @@ func NewAccount() *Account {
 }
 
 // Balances lock the balances and returned the copied balances
-func (a *Account) Balances() BalanceMap {
-	d := make(BalanceMap)
-
+func (a *Account) Balances() (d BalanceMap) {
 	a.Lock()
-	for c, b := range a.balances {
-		d[c] = b
-	}
+	d = a.balances.Copy()
 	a.Unlock()
-
 	return d
 }
 
