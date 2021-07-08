@@ -230,25 +230,27 @@ func parseBookEvent(val *fastjson.Value) (event *BookEvent, err error) {
 // parseBookEntries2 parses JSON struct like `[["233330", "0.33"], ....]`
 func parseBookEntries2(vals []*fastjson.Value) (entries types.PriceVolumeSlice, err error) {
 	entries = make(types.PriceVolumeSlice, 0, 50)
+
+	var arr []*fastjson.Value
 	for _, entry := range vals {
-		arr, err := entry.Array()
+		arr, err = entry.Array()
 		if err != nil {
-			return nil, err
+			return entries, err
 		}
 
 		if len(arr) < 2 {
-			return nil, ErrIncorrectBookEntryElementLength
+			return entries, ErrIncorrectBookEntryElementLength
 		}
 
 		var pv types.PriceVolume
 		pv.Price, err = fixedpoint.NewFromString(string(arr[0].GetStringBytes()))
 		if err != nil {
-			return nil, err
+			return entries, err
 		}
 
 		pv.Volume, err = fixedpoint.NewFromString(string(arr[1].GetStringBytes()))
 		if err != nil {
-			return nil, err
+			return entries, err
 		}
 
 		entries = append(entries, pv)
