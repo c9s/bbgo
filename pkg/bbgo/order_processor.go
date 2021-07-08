@@ -18,12 +18,12 @@ var (
 func AdjustQuantityByMaxAmount(quantity, currentPrice, maxAmount fixedpoint.Value) fixedpoint.Value {
 	// modify quantity for the min amount
 	amount := currentPrice.Mul(quantity)
-	if amount > maxAmount {
-		ratio := maxAmount.Div(amount)
-		quantity = quantity.Mul(ratio)
+	if amount < maxAmount {
+		return quantity
 	}
 
-	return quantity
+	ratio := maxAmount.Div(amount)
+	return quantity.Mul(ratio)
 }
 
 // AdjustQuantityByMinAmount adjusts the quantity to make the amount greater than the given minAmount
