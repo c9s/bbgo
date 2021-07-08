@@ -423,20 +423,16 @@ func parseDepthEntry(val *fastjson.Value) (pv types.PriceVolume, err error) {
 		return pv, err
 	}
 
-	price, err := fixedpoint.NewFromString(string(arr[0].GetStringBytes()))
+	pv.Price, err = fixedpoint.NewFromString(string(arr[0].GetStringBytes()))
 	if err != nil {
 		return pv, err
 	}
 
-	quantity, err := fixedpoint.NewFromString(string(arr[1].GetStringBytes()))
+	pv.Volume, err = fixedpoint.NewFromString(string(arr[1].GetStringBytes()))
 	if err != nil {
 		return pv, err
 	}
 
-	pv = types.PriceVolume{
-		Price:  price,
-		Volume: quantity,
-	}
 	return pv, err
 }
 
