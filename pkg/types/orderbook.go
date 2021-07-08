@@ -64,8 +64,8 @@ func (b *MutexOrderBook) BestBidAndAsk() (bid, ask PriceVolume, ok bool) {
 	b.Lock()
 	bid, ok1 = b.OrderBook.BestBid()
 	ask, ok2 = b.OrderBook.BestAsk()
-	ok = ok1 && ok2
 	b.Unlock()
+	ok = ok1 && ok2
 	return bid, ask, ok
 }
 
