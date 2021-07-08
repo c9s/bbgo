@@ -513,30 +513,32 @@ func (e *DepthEvent) OrderBook() (book types.SliceOrderBook) {
 	return book
 }
 
-func parseDepthEntry(val *fastjson.Value) (*types.PriceVolume, error) {
+func parseDepthEntry(val *fastjson.Value) (pv types.PriceVolume, err error) {
 	arr, err := val.Array()
 	if err != nil {
-		return nil, err
+		return pv, err
 	}
 
 	if len(arr) < 2 {
-		return nil, errors.New("incorrect depth entry element length")
+		err = errors.New("incorrect depth entry element length")
+		return pv, err
 	}
 
 	price, err := fixedpoint.NewFromString(string(arr[0].GetStringBytes()))
 	if err != nil {
-		return nil, err
+		return pv, err
 	}
 
 	quantity, err := fixedpoint.NewFromString(string(arr[1].GetStringBytes()))
 	if err != nil {
-		return nil, err
+		return pv, err
 	}
 
-	return &types.PriceVolume{
+	pv = types.PriceVolume{
 		Price:  price,
 		Volume: quantity,
-	}, nil
+	}
+	return pv, err
 }
 
 func parseDepthEvent(val *fastjson.Value) (depth *DepthEvent, err error) {
@@ -559,7 +561,7 @@ func parseDepthEvent(val *fastjson.Value) (depth *DepthEvent, err error) {
 			continue
 		}
 
-		depth.Bids = append(depth.Bids, *entry)
+		depth.Bids = append(depth.Bids, entry)
 	}
 
 	for _, ev := range val.GetArray("a") {
@@ -569,7 +571,7 @@ func parseDepthEvent(val *fastjson.Value) (depth *DepthEvent, err error) {
 			continue
 		}
 
-		depth.Asks = append(depth.Asks, *entry)
+		depth.Asks = append(depth.Asks, entry)
 	}
 
 	return depth, err
