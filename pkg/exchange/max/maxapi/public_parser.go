@@ -209,8 +209,8 @@ func parseKLineEvent(val *fastjson.Value) (*KLineEvent, error) {
 	return &event, nil
 }
 
-func parseBookEvent(val *fastjson.Value) (*BookEvent, error) {
-	event := BookEvent{
+func parseBookEvent(val *fastjson.Value) (event *BookEvent, err error) {
+	event = &BookEvent{
 		Event:     string(val.GetStringBytes("e")),
 		Market:    string(val.GetStringBytes("M")),
 		Channel:   string(val.GetStringBytes("c")),
@@ -218,72 +218,43 @@ func parseBookEvent(val *fastjson.Value) (*BookEvent, error) {
 	}
 
 	// t := time.Unix(0, event.Timestamp*int64(time.Millisecond))
-
-	var err error
 	event.Asks, err = parseBookEntries2(val.GetArray("a"))
 	if err != nil {
-		return nil, err
+		return event, err
 	}
 
 	event.Bids, err = parseBookEntries2(val.GetArray("b"))
-	if err != nil {
-		return nil, err
-	}
-
-	return &event, nil
-}
-
-type BookEntry struct {
-	Side   int
-	Time   time.Time
-	Price  string
-	Volume string
-}
-
-func (e *BookEntry) PriceVolumePair() (pv types.PriceVolume, err error) {
-	pv.Price, err = fixedpoint.NewFromString(e.Price)
-	if err != nil {
-		return pv, err
-	}
-
-	pv.Volume, err = fixedpoint.NewFromString(e.Volume)
-	if err != nil {
-		return pv, err
-	}
-
-	return pv, err
+	return event, err
 }
 
 // parseBookEntries2 parses JSON struct like `[["233330", "0.33"], ....]`
-func parseBookEntries2(vals []*fastjson.Value) (types.PriceVolumeSlice, error) {
-	entries := make(types.PriceVolumeSlice, 0, 50)
+func parseBookEntries2(vals []*fastjson.Value) (entries types.PriceVolumeSlice, err error) {
+	entries = make(types.PriceVolumeSlice, 0, 50)
 	for _, entry := range vals {
-		pv, err := entry.Array()
+		arr, err := entry.Array()
 		if err != nil {
 			return nil, err
 		}
 
-		if len(pv) < 2 {
+		if len(arr) < 2 {
 			return nil, ErrIncorrectBookEntryElementLength
 		}
 
-		price, err := fixedpoint.NewFromString(string(pv[0].GetStringBytes()))
+		var pv types.PriceVolume
+		pv.Price, err = fixedpoint.NewFromString(string(arr[0].GetStringBytes()))
 		if err != nil {
 			return nil, err
 		}
 
-		volume, err := fixedpoint.NewFromString(string(pv[1].GetStringBytes()))
+		pv.Volume, err = fixedpoint.NewFromString(string(arr[1].GetStringBytes()))
 		if err != nil {
 			return nil, err
 		}
 
-		entries = append(entries, types.PriceVolume{
-			Price:  price,
-			Volume: volume,
-		})
+		entries = append(entries, pv)
 	}
 
-	return entries, nil
+	return entries, err
 }
 
 type ErrorEvent struct {
