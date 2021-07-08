@@ -95,11 +95,6 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 			})
 			f.SetBufferingPeriod(time.Second)
 			f.OnReady(func(snapshot types.SliceOrderBook, updates []depth.Update) {
-				if valid, err := snapshot.IsValid(); !valid {
-					log.Errorf("%s depth snapshot is invalid, error: %v", e.Symbol, err)
-					return
-				}
-
 				stream.EmitBookSnapshot(snapshot)
 				for _, u := range updates {
 					stream.EmitBookUpdate(u.Object)

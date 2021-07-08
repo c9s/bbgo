@@ -403,13 +403,13 @@ func (e *DepthEvent) String() (o string) {
 	return o
 }
 
-func (e *DepthEvent) OrderBook() (book types.SliceOrderBook, err error) {
+func (e *DepthEvent) OrderBook() (book types.SliceOrderBook) {
 	book.Symbol = e.Symbol
 
 	// already in descending order
 	book.Bids = e.Bids
 	book.Asks = e.Asks
-	return book, err
+	return book
 }
 
 func parseDepthEntry(val *fastjson.Value) (*types.PriceVolume, error) {
