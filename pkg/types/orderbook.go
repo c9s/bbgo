@@ -11,8 +11,7 @@ import (
 )
 
 type PriceVolume struct {
-	Price  fixedpoint.Value
-	Volume fixedpoint.Value
+	Price, Volume fixedpoint.Value
 }
 
 func (p PriceVolume) String() string {
