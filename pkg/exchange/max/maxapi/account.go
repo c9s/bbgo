@@ -158,7 +158,7 @@ type Deposit struct {
 	Fee             string `json:"fee"`
 	TxID            string `json:"txid"`
 	State           string `json:"state"`
-	Confirmations   string `json:"confirmations"`
+	Confirmations   int64  `json:"confirmations"`
 	CreatedAt       int64  `json:"created_at"`
 	UpdatedAt       int64  `json:"updated_at"`
 }
@@ -306,4 +306,3 @@ func (r *GetWithdrawHistoryRequest) Do(ctx context.Context) (withdraws []Withdra
 
 	return withdraws, err
 }
-
