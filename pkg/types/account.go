@@ -117,6 +117,8 @@ type Account struct {
 	TakerFeeRate fixedpoint.Value `json:"takerFeeRate,omitempty"`
 	AccountType  string           `json:"accountType,omitempty"`
 
+	TotalAccountValue fixedpoint.Value `json:"totalAccountValue,omitempty"`
+
 	balances BalanceMap
 }
 
