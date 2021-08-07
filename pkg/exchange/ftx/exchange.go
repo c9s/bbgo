@@ -141,8 +141,9 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	}
 
 	a := &types.Account{
-		MakerCommission: fixedpoint.NewFromFloat(resp.Result.MakerFee),
-		TakerCommission: fixedpoint.NewFromFloat(resp.Result.TakerFee),
+		MakerCommission:   fixedpoint.NewFromFloat(resp.Result.MakerFee),
+		TakerCommission:   fixedpoint.NewFromFloat(resp.Result.TakerFee),
+		TotalAccountValue: fixedpoint.NewFromFloat(resp.Result.TotalAccountValue),
 	}
 
 	balances, err := e.QueryAccountBalances(ctx)
@@ -455,4 +456,21 @@ func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticke
 
 func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[string]types.Ticker, error) {
 	panic("implement me")
+}
+
+func (e *Exchange) Transfer(ctx context.Context, coin string, size float64, destination string) (string, error) {
+	payload := TransferPayload{
+		Coin:        coin,
+		Size:        size,
+		Source:      e.subAccount,
+		Destination: destination,
+	}
+	resp, err := e.newRest().Transfer(ctx, payload)
+	if err != nil {
+		return "", err
+	}
+	if !resp.Success {
+		return "", fmt.Errorf("ftx returns transfer failure")
+	}
+	return resp.Result.String(), nil
 }

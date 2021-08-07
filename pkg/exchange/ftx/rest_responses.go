@@ -1,6 +1,7 @@
 package ftx
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -86,8 +87,9 @@ type accountResponse struct {
 }
 
 type account struct {
-	MakerFee float64 `json:"makerFee"`
-	TakerFee float64 `json:"takerFee"`
+	MakerFee          float64 `json:"makerFee"`
+	TakerFee          float64 `json:"takerFee"`
+	TotalAccountValue float64 `json:"totalAccountValue"`
 }
 
 type positionsResponse struct {
@@ -367,4 +369,22 @@ type fill struct {
 	Fee           float64        `json:"fee"`
 	FeeCurrency   string         `json:"feeCurrency"`
 	Liquidity     string         `json:"liquidity"`
+}
+
+type transferResponse struct {
+	Success bool     `json:"success"`
+	Result  transfer `json:"result"`
+}
+
+type transfer struct {
+	Id     uint    `json:"id"`
+	Coin   string  `json:"coin"`
+	Size   float64 `json:"size"`
+	Time   string  `json:"time"`
+	Notes  string  `json:"notes"`
+	Status string  `json:"status"`
+}
+
+func (t *transfer) String() string {
+	return fmt.Sprintf("%+v", *t)
 }

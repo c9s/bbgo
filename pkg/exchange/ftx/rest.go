@@ -18,12 +18,47 @@ import (
 	"github.com/c9s/bbgo/pkg/util"
 )
 
+type transferRequest struct {
+	*restRequest
+}
+
+type TransferPayload struct {
+	Coin        string
+	Size        float64
+	Source      string
+	Destination string
+}
+
+func (r *restRequest) Transfer(ctx context.Context, p TransferPayload) (transferResponse, error) {
+	resp, err := r.
+		Method("POST").
+		ReferenceURL("api/subaccounts/transfer").
+		Payloads(map[string]interface{}{
+			"coin":        p.Coin,
+			"size":        p.Size,
+			"source":      p.Source,
+			"destination": p.Destination,
+		}).
+		DoAuthenticatedRequest(ctx)
+	if err != nil {
+		return transferResponse{}, err
+	}
+
+	var t transferResponse
+	if err := json.Unmarshal(resp.Body, &t); err != nil {
+		return transferResponse{}, fmt.Errorf("failed to unmarshal transfer response body to json: %w", err)
+	}
+
+	return t, nil
+}
+
 type restRequest struct {
 	*walletRequest
 	*orderRequest
 	*accountRequest
 	*marketRequest
 	*fillsRequest
+	*transferRequest
 
 	key, secret string
 	// Optional sub-account name
