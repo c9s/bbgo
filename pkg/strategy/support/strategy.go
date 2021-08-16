@@ -236,7 +236,6 @@ func (s *Strategy) detectResistance(kline types.KLine) (confidence fixedpoint.Va
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-
 	// set default values
 	if s.Interval == "" {
 		s.Interval = types.Interval5m
@@ -245,7 +244,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	if s.MovingAverageWindow == 0 {
 		s.MovingAverageWindow = 99
 	}
-
 
 	if s.Sensitivity > 0 {
 		volRange, err := s.ScaleQuantity.ByVolumeRule.Range()
@@ -312,8 +310,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		closePriceF := kline.GetClose()
 		closePrice := fixedpoint.NewFromFloat(closePriceF)
 
-		// if it's above the EMA, it's resistance
-		if closePriceF > s.triggerEMA.Last() {
+		// If it's above the EMA, it's resistance
+		if s.ResistanceMinVolume > 0 && closePriceF > s.triggerEMA.Last() {
 			// check resistance volume
 			if kline.Volume < s.ResistanceMinVolume.Float64() {
 				return
