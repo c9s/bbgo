@@ -212,7 +212,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		}
 
-		s.Notifiability.Notify("Submitting scheduled order %s quantity %f", s.Symbol, quantity.Floor())
+		s.Notifiability.Notify("Submitting scheduled order %s quantity %f", s.Symbol, quantity.Float64())
 		_, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 			Symbol:   s.Symbol,
 			Side:     side,
