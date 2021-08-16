@@ -164,7 +164,6 @@ func (s *Strategy) ID() string {
 func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {}
 
 func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.ExchangeSession) {
-
 	s.Notifiability.Notify("📝 Checking %s low balance level exchange session...", s.Asset)
 
 	lowLevelSession, lowLevelBalance, err := s.findLowBalanceLevelSession(sessions)
@@ -180,7 +179,20 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 
 	s.Notifiability.Notify("⚠️ Found low level %s balance from session %s: %s", s.Asset, lowLevelSession.Name, lowLevelBalance.String())
 
-	requiredAmount := s.Middle - lowLevelBalance.Available
+	middle := s.Middle
+	if middle == 0 {
+		var total fixedpoint.Value
+		for _, session := range sessions {
+			if b, ok := session.Account.Balance(s.Asset); ok {
+				total += b.Total()
+			}
+		}
+
+		middle = total.DivFloat64(float64(len(sessions)))
+		s.Notifiability.Notify("Total value %f %s, setting middle to %f", total.Float64(), s.Asset, middle.Float64())
+	}
+
+	requiredAmount := middle - lowLevelBalance.Available
 
 	s.Notifiability.Notify("Need %f %s to satisfy the middle balance level %f", requiredAmount.Float64(), s.Asset, s.Middle.Float64())
 
@@ -205,6 +217,7 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 	toAddress, ok := s.Addresses[lowLevelSession.Name]
 	if !ok {
 		log.Errorf("%s address of session %s not found", s.Asset, lowLevelSession.Name)
+		s.Notifiability.Notify("%s address of session %s not found", s.Asset, lowLevelSession.Name)
 		return
 	}
 
