@@ -69,10 +69,10 @@ var SupportedIntervals = map[Interval]int{
 // IntervalWindow is used by the indicators
 type IntervalWindow struct {
 	// The interval of kline
-	Interval Interval
+	Interval Interval `json:"interval"`
 
 	// The windows size of the indicator (EWMA and SMA)
-	Window int
+	Window int `json:"window"`
 }
 
 func (iw IntervalWindow) String() string {
