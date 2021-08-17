@@ -20,6 +20,8 @@ const stateKey = "state-v1"
 
 var log = logrus.WithField("strategy", ID)
 
+var zeroiw = types.IntervalWindow{}
+
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
@@ -98,6 +100,10 @@ func (s *Strategy) Validate() error {
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: string(s.Interval)})
+
+	if s.LongTermMovingAverage != zeroiw {
+		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: string(s.LongTermMovingAverage.Interval)})
+	}
 }
 
 func (s *Strategy) SaveState() error {
@@ -280,7 +286,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		return fmt.Errorf("standardIndicatorSet is nil, symbol %s", s.Symbol)
 	}
 
-	var zeroiw = types.IntervalWindow{}
 	if s.LongTermMovingAverage != zeroiw {
 		s.longTermEMA = standardIndicatorSet.EWMA(s.LongTermMovingAverage)
 	}
