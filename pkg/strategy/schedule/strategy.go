@@ -140,7 +140,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 
 			if !match {
-				s.Notifiability.Notify("skip, the %s closed price is below or above moving average", s.Symbol)
+				s.Notifiability.Notify("skip, the %s closed price %f is below or above moving average", s.Symbol, closePrice.Float64())
 				return
 			}
 		}
