@@ -96,6 +96,12 @@ func (s *Strategy) ID() string {
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval.String()})
+	if s.BelowMovingAverage != nil {
+		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.BelowMovingAverage.Interval.String()})
+	}
+	if s.AboveMovingAverage != nil {
+		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.AboveMovingAverage.Interval.String()})
+	}
 }
 
 func (s *Strategy) Validate() error {
