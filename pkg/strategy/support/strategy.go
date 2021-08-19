@@ -311,6 +311,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		if kline.Symbol != s.Symbol {
 			return
 		}
+		if kline.Interval != s.Interval {
+			return
+		}
 
 		closePriceF := kline.GetClose()
 		closePrice := fixedpoint.NewFromFloat(closePriceF)
