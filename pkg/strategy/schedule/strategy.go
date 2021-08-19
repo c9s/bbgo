@@ -94,6 +94,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 
+		if kline.Interval != s.Interval {
+			return
+		}
+
 		closePrice := fixedpoint.NewFromFloat(kline.Close)
 		quantity := s.Quantity
 		amount := s.Amount
@@ -136,7 +140,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 
 			if !match {
-				s.Notifiability.Notify("skip, the closed price is below or above moving average")
+				s.Notifiability.Notify("skip, the %s closed price is below or above moving average", s.Symbol)
 				return
 			}
 		}
