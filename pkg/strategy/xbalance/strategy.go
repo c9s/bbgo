@@ -198,7 +198,7 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 
 	fromSession, _, err := s.findHighestBalanceLevelSession(sessions, requiredAmount)
 	if err != nil || fromSession == nil {
-		s.Notifiability.Notify("can not find session with enough balance")
+		s.Notifiability.Notify("Can not find session with enough balance")
 		log.WithError(err).Errorf("can not find session with enough balance")
 		return
 	}
