@@ -65,7 +65,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 					ticker, err := session.Exchange.QueryTicker(ctx, symbol)
 					if err != nil {
+						s.Notifiability.Notify("query ticker error: %s", err.Error())
 						log.WithError(err).Error("query ticker error")
+						break
 					}
 
 					askPrice := fixedpoint.NewFromFloat(ticker.Sell)
@@ -74,11 +76,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 					// execute orders
 					quoteBalance, ok := session.Account.Balance(s.Market.QuoteCurrency)
 					if !ok {
-						return
+						break
 					}
 					if quoteBalance.Available < amount {
 						s.Notifiability.Notify("Quote balance %s is not enough: %f < %f", s.Market.QuoteCurrency, quoteBalance.Available.Float64(), amount.Float64())
-						return
+						break
 					}
 
 					s.Notifiability.Notify("Submitting etf order %s quantity %f at price %f (index ratio %f %%)",
