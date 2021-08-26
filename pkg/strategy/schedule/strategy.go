@@ -2,8 +2,6 @@ package schedule
 
 import (
 	"context"
-	"fmt"
-
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -21,45 +19,6 @@ func init() {
 // Float64Indicator is the indicators (SMA and EWMA) that we want to use are returning float64 data.
 type Float64Indicator interface {
 	Last() float64
-}
-
-type MovingAverageSettings struct {
-	Type     string         `json:"type"`
-	Interval types.Interval `json:"interval"`
-	Window   int            `json:"window"`
-
-	Side     *types.SideType   `json:"side"`
-	Quantity *fixedpoint.Value `json:"quantity"`
-	Amount   *fixedpoint.Value `json:"amount"`
-}
-
-func (settings MovingAverageSettings) IntervalWindow() types.IntervalWindow {
-	var window = 99
-	if settings.Window > 0 {
-		window = settings.Window
-	}
-
-	return types.IntervalWindow{
-		Interval: settings.Interval,
-		Window:   window,
-	}
-}
-
-func (settings *MovingAverageSettings) Indicator(indicatorSet *bbgo.StandardIndicatorSet) (inc Float64Indicator, err error) {
-	var iw = settings.IntervalWindow()
-
-	switch settings.Type {
-	case "SMA":
-		inc = indicatorSet.SMA(iw)
-
-	case "EWMA", "EMA":
-		inc = indicatorSet.EWMA(iw)
-
-	default:
-		return nil, fmt.Errorf("unsupported moving average type: %s", settings.Type)
-	}
-
-	return inc, nil
 }
 
 type Strategy struct {
@@ -85,9 +44,9 @@ type Strategy struct {
 
 	Amount fixedpoint.Value `json:"amount,omitempty"`
 
-	BelowMovingAverage *MovingAverageSettings `json:"belowMovingAverage,omitempty"`
+	BelowMovingAverage *bbgo.MovingAverageSettings `json:"belowMovingAverage,omitempty"`
 
-	AboveMovingAverage *MovingAverageSettings `json:"aboveMovingAverage,omitempty"`
+	AboveMovingAverage *bbgo.MovingAverageSettings `json:"aboveMovingAverage,omitempty"`
 }
 
 func (s *Strategy) ID() string {
@@ -218,7 +177,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		}
 
-		s.Notifiability.Notify("Submitting scheduled order %s quantity %f", s.Symbol, quantity.Float64())
+		s.Notifiability.Notify("Submitting scheduled order %s quantity %f at price %f", s.Symbol, quantity.Float64(), closePrice.Float64())
 		_, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 			Symbol:   s.Symbol,
 			Side:     side,
