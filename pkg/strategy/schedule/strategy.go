@@ -16,10 +16,6 @@ func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
-// Float64Indicator is the indicators (SMA and EWMA) that we want to use are returning float64 data.
-type Float64Indicator interface {
-	Last() float64
-}
 
 type Strategy struct {
 	Market types.Market
@@ -76,8 +72,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		return errors.New("StandardIndicatorSet can not be nil, injection failed?")
 	}
 
-	var belowMA Float64Indicator
-	var aboveMA Float64Indicator
+	var belowMA types.Float64Indicator
+	var aboveMA types.Float64Indicator
 	var err error
 	if s.BelowMovingAverage != nil {
 		belowMA, err = s.BelowMovingAverage.Indicator(s.StandardIndicatorSet)
