@@ -3,7 +3,6 @@ package bbgo
 import (
 	"fmt"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/strategy/schedule"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -29,7 +28,7 @@ func (settings MovingAverageSettings) IntervalWindow() types.IntervalWindow {
 	}
 }
 
-func (settings *MovingAverageSettings) Indicator(indicatorSet *StandardIndicatorSet) (inc schedule.Float64Indicator, err error) {
+func (settings *MovingAverageSettings) Indicator(indicatorSet *StandardIndicatorSet) (inc types.Float64Indicator, err error) {
 	var iw = settings.IntervalWindow()
 
 	switch settings.Type {
