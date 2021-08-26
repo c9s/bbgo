@@ -1,11 +1,11 @@
 exchangeStrategies:
 - on: max
-   etf:
-     duration: 24h
-     totalAmount: 200.0
-     index:
-       BTCUSDT: 5%
-       LTCUSDT: 15%
-       ETHUSDT: 30%
-       LINKUSDT: 20%
-       DOTUSDT: 30%
+  etf:
+    duration: 24h
+    totalAmount: 200.0
+    index:
+      BTCUSDT: 5%
+      LTCUSDT: 15%
+      ETHUSDT: 30%
+      LINKUSDT: 20%
+      DOTUSDT: 30%
