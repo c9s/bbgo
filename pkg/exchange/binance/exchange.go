@@ -212,10 +212,10 @@ func (e *Exchange) getLaunchDate() (time.Time, error) {
 }
 
 func (e *Exchange) Withdrawal(ctx context.Context, asset string, amount fixedpoint.Value, address string, options *types.WithdrawalOptions) error {
-	req := e.Client.NewCreateWithdrawService().
-		Asset(asset).
-		Address(address).
-		Amount(fmt.Sprintf("%f", amount.Float64()))
+	req := e.Client.NewCreateWithdrawService()
+	req.Coin(asset)
+	req.Address(address)
+	req.Amount(fmt.Sprintf("%f", amount.Float64()))
 
 	if options != nil {
 		if options.Network != "" {
