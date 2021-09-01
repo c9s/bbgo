@@ -231,10 +231,6 @@ func (e *Exchange) Withdrawal(ctx context.Context, asset string, amount fixedpoi
 		return err
 	}
 
-	if !response.Success {
-		return fmt.Errorf("withdrawal request failed: %s ID=%s", response.Msg, response.ID)
-	}
-
 	log.Infof("withdrawal request sent, response: %+v", response)
 	return nil
 }
@@ -261,7 +257,7 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 
 		req := e.Client.NewListWithdrawsService()
 		if len(asset) > 0 {
-			req.Asset(asset)
+			req.Coin(asset)
 		}
 
 		withdraws, err := req.
@@ -300,15 +296,20 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 			}
 
 			txIDs[d.TxID] = struct{}{}
+
+			applyTime, err := time.Parse(time.RFC3339, d.ApplyTime)
+			if err != nil {
+				return nil, err
+			}
+
 			allWithdraws = append(allWithdraws, types.Withdraw{
 				Exchange:        types.ExchangeBinance,
-				ApplyTime:       types.Time(time.Unix(0, d.ApplyTime*int64(time.Millisecond))),
-				Asset:           d.Asset,
-				Amount:          d.Amount,
+				ApplyTime:       types.Time(applyTime),
+				Asset:           d.Coin,
+				Amount:          util.MustParseFloat(d.Amount),
 				Address:         d.Address,
-				AddressTag:      d.AddressTag,
 				TransactionID:   d.TxID,
-				TransactionFee:  d.TransactionFee,
+				TransactionFee:  util.MustParseFloat(d.TransactionFee),
 				WithdrawOrderID: d.WithdrawOrderID,
 				Network:         d.Network,
 				Status:          status,
@@ -342,7 +343,7 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 
 		req := e.Client.NewListDepositsService()
 		if len(asset) > 0 {
-			req.Asset(asset)
+			req.Coin(asset)
 		}
 
 		deposits, err := req.
@@ -376,8 +377,8 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 			allDeposits = append(allDeposits, types.Deposit{
 				Exchange:      types.ExchangeBinance,
 				Time:          types.Time(time.Unix(0, d.InsertTime*int64(time.Millisecond))),
-				Asset:         d.Asset,
-				Amount:        d.Amount,
+				Asset:         d.Coin,
+				Amount:        util.MustParseFloat(d.Amount),
 				Address:       d.Address,
 				AddressTag:    d.AddressTag,
 				TransactionID: d.TxID,
