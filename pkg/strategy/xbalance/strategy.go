@@ -154,6 +154,8 @@ type Strategy struct {
 	// Middle is the middle balance level used for re-fill asset
 	Middle fixedpoint.Value `json:"middle"`
 
+	Verbose bool `json:"verbose"`
+
 	state *State
 }
 
@@ -164,16 +166,28 @@ func (s *Strategy) ID() string {
 func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {}
 
 func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.ExchangeSession) {
-	s.Notifiability.Notify("📝 Checking %s low balance level exchange session...", s.Asset)
+	if s.Verbose {
+		s.Notifiability.Notify("📝 Checking %s low balance level exchange session...", s.Asset)
+	}
+
+	var total fixedpoint.Value
+	for _, session := range sessions {
+		if b, ok := session.Account.Balance(s.Asset); ok {
+			total += b.Total()
+		}
+	}
 
 	lowLevelSession, lowLevelBalance, err := s.findLowBalanceLevelSession(sessions)
 	if err != nil {
-		log.WithError(err).Errorf("can not find low balance level session")
+		s.Notifiability.Notify("Can not find low balance level session: %s", err.Error())
+		log.WithError(err).Errorf("Can not find low balance level session")
 		return
 	}
 
 	if lowLevelSession == nil {
-		s.Notifiability.Notify("✅ All %s balances are looking good", s.Asset)
+		if s.Verbose {
+			s.Notifiability.Notify("✅ All %s balances are looking good, total value: %f", s.Asset, total.Float64())
+		}
 		return
 	}
 
@@ -181,14 +195,8 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 
 	middle := s.Middle
 	if middle == 0 {
-		var total fixedpoint.Value
-		for _, session := range sessions {
-			if b, ok := session.Account.Balance(s.Asset); ok {
-				total += b.Total()
-			}
-		}
 
-		middle = total.DivFloat64(float64(len(sessions)))
+		middle = total.DivFloat64(float64(len(sessions))).MulFloat64(0.99)
 		s.Notifiability.Notify("Total value %f %s, setting middle to %f", total.Float64(), s.Asset, middle.Float64())
 	}
 
