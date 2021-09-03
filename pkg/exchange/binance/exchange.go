@@ -297,7 +297,8 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 
 			txIDs[d.TxID] = struct{}{}
 
-			applyTime, err := time.Parse(time.RFC3339, d.ApplyTime)
+			// 2006-01-02 15:04:05
+			applyTime, err := time.Parse("2006-01-02 15:04:05", d.ApplyTime)
 			if err != nil {
 				return nil, err
 			}
