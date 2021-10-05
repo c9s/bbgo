@@ -53,7 +53,7 @@ func (c *TradeCollector) Emit() {
 // Process filters the received trades and see if there are orders matching the trades
 // if we have the order in the order store, then the trade will be considered for the position.
 // profit will also be calculated.
-func (c *TradeCollector) Process() {
+func (c *TradeCollector) Process() bool {
 	positionChanged := false
 	c.tradeStore.Filter(func(trade types.Trade) bool {
 		if c.orderStore.Exists(trade.OrderID) {
@@ -69,6 +69,8 @@ func (c *TradeCollector) Process() {
 	if positionChanged {
 		c.EmitPositionUpdate(c.position)
 	}
+
+	return positionChanged
 }
 
 func (c *TradeCollector) Run(ctx context.Context) {
