@@ -20,7 +20,7 @@ type TradeCollector struct {
 
 	tradeCallbacks          []func(trade types.Trade)
 	positionUpdateCallbacks []func(position *Position)
-	profitCallbacks []func(trade types.Trade, profit, netProfit fixedpoint.Value)
+	profitCallbacks         []func(trade types.Trade, profit, netProfit fixedpoint.Value)
 }
 
 func NewTradeCollector(symbol string, position *Position, orderStore *OrderStore) *TradeCollector {
@@ -47,6 +47,24 @@ func (c *TradeCollector) Emit() {
 	c.orderSig.Emit()
 }
 
+func (c *TradeCollector) Process() {
+	positionChanged := false
+	c.tradeStore.Filter(func(trade types.Trade) bool {
+		if c.orderStore.Exists(trade.OrderID) {
+			c.EmitTrade(trade)
+			if profit, netProfit, madeProfit := c.position.AddTrade(trade); madeProfit {
+				c.EmitProfit(trade, profit, netProfit)
+			}
+			positionChanged = true
+			return true
+		}
+		return false
+	})
+	if positionChanged {
+		c.EmitPositionUpdate(c.position)
+	}
+}
+
 func (c *TradeCollector) Run(ctx context.Context) {
 	for {
 		select {
@@ -54,19 +72,18 @@ func (c *TradeCollector) Run(ctx context.Context) {
 			return
 
 		case <-c.orderSig:
-			trades := c.tradeStore.GetAndClear()
-			for _, trade := range trades {
-				if c.orderStore.Exists(trade.OrderID) {
-					c.EmitTrade(trade)
-					if profit, netProfit, madeProfit := c.position.AddTrade(trade) ; madeProfit {
-						c.EmitProfit(trade, profit, netProfit)
-					}
-				}
-			}
-			c.EmitPositionUpdate(c.position)
+			c.Process()
 
 		case trade := <-c.tradeC:
-			c.tradeStore.Add(trade)
+			if c.orderStore.Exists(trade.OrderID) {
+				c.EmitTrade(trade)
+				if profit, netProfit, madeProfit := c.position.AddTrade(trade); madeProfit {
+					c.EmitProfit(trade, profit, netProfit)
+				}
+				c.EmitPositionUpdate(c.position)
+			} else {
+				c.tradeStore.Add(trade)
+			}
 		}
 	}
 }

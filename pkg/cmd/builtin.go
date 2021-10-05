@@ -3,6 +3,7 @@ package cmd
 // import built-in strategies
 import (
 	_ "github.com/c9s/bbgo/pkg/strategy/bollgrid"
+	_ "github.com/c9s/bbgo/pkg/strategy/bpp"
 	_ "github.com/c9s/bbgo/pkg/strategy/buyandhold"
 	_ "github.com/c9s/bbgo/pkg/strategy/etf"
 	_ "github.com/c9s/bbgo/pkg/strategy/flashcrash"

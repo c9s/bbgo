@@ -63,7 +63,7 @@ func (s *TradeStore) Filter(filter TradeFilter) {
 	s.Lock()
 	var trades = make(map[int64]types.Trade)
 	for _, trade := range s.trades {
-		if filter(trade) {
+		if !filter(trade) {
 			trades[trade.ID] = trade
 		}
 	}
