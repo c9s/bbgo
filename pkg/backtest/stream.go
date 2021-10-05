@@ -93,6 +93,7 @@ func (s *Stream) Connect(ctx context.Context) error {
 						continue
 					}
 
+					// here we generate trades and order updates
 					matching.processKLine(k)
 					numKlines++
 				}
