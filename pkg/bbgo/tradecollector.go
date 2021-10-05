@@ -43,10 +43,16 @@ func (c *TradeCollector) BindStream(stream types.Stream) {
 	stream.OnTradeUpdate(c.handleTradeUpdate)
 }
 
+// Emit triggers the trade processing (position update)
+// If you sent order, and the order store is updated, you can call this method
+// so that trades will be processed in the next round of the goroutine loop
 func (c *TradeCollector) Emit() {
 	c.orderSig.Emit()
 }
 
+// Process filters the received trades and see if there are orders matching the trades
+// if we have the order in the order store, then the trade will be considered for the position.
+// profit will also be calculated.
 func (c *TradeCollector) Process() {
 	positionChanged := false
 	c.tradeStore.Filter(func(trade types.Trade) bool {
