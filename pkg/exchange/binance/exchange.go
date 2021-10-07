@@ -36,6 +36,7 @@ func init() {
 
 type Exchange struct {
 	types.MarginSettings
+	types.FuturesSettings
 
 	key, secret string
 	Client      *binance.Client
