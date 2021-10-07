@@ -2,6 +2,23 @@ package types
 
 import "github.com/c9s/bbgo/pkg/fixedpoint"
 
+type FuturesExchange interface {
+	UseFutures()
+}
+
+type FuturesSettings struct {
+	IsFutures bool
+}
+
+func (s *FuturesSettings) UseFutures() {
+	s.IsFutures = true
+}
+
+func (s FuturesSettings) GetFuturesSettings() FuturesSettings {
+	return s
+}
+
+
 type MarginExchange interface {
 	UseMargin()
 	UseIsolatedMargin(symbol string)
