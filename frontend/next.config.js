@@ -5,12 +5,12 @@ const withTM = require('next-transpile-modules')
   ])
 
 module.exports = withTM({
-  webpack: config => {
+  webpack5: false,
+  webpack: (config, options) => {
     config.module.rules.push({
       test: /react-spring/,
       sideEffects: true,
     })
-
     return config
   },
 })
