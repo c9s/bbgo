@@ -7,13 +7,11 @@ go 1.13
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/adshao/go-binance/v2 v2.3.1
-	github.com/c-bata/go-prompt v0.2.6 // indirect
 	github.com/c9s/rockhopper v1.2.1-0.20210217093258-2661955904a9
 	github.com/codingconcepts/env v0.0.0-20200821220118-a8fbf8d84482
 	github.com/fastly/go-utils v0.0.0-20180712184237-d95a45783239 // indirect
 	github.com/gin-contrib/cors v1.3.1
 	github.com/gin-gonic/gin v1.7.0
-	github.com/go-playground/validator/v10 v10.4.1 // indirect
 	github.com/go-redis/redis/v8 v8.8.0
 	github.com/go-sql-driver/mysql v1.5.0
 	github.com/go-test/deep v1.0.6 // indirect
@@ -30,6 +28,7 @@ require (
 	github.com/lestrrat-go/strftime v1.0.0 // indirect
 	github.com/magefile/mage v1.11.0 // indirect
 	github.com/magiconair/properties v1.8.4 // indirect
+	github.com/mattn/go-colorable v0.1.7 // indirect
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible // indirect
 	github.com/mitchellh/mapstructure v1.4.1 // indirect
 	github.com/pelletier/go-toml v1.8.1 // indirect
