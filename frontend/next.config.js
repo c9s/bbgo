@@ -5,6 +5,7 @@ const withTM = require('next-transpile-modules')
   ])
 
 module.exports = withTM({
+  // disable webpack 5 to make it compatible with the following rules
   webpack5: false,
   webpack: (config, options) => {
     config.module.rules.push({
