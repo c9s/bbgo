@@ -18,8 +18,11 @@ type Profit struct {
 
 	TradeAmount float64 `json:"tradeAmount" db:"trade_amount"`
 
-	// ProfitMargin is a percentage of the profit and the capital
-	ProfitMargin fixedpoint.Value `json:"profitMargin" db:"profit_margin"`
+	// ProfitMargin is a percentage of the profit and the capital amount
+	ProfitMargin    fixedpoint.Value `json:"profitMargin" db:"profit_margin"`
+
+	// NetProfitMargin is a percentage of the net profit and the capital amount
+	NetProfitMargin fixedpoint.Value `json:"netProfitMargin" db:"net_profit_margin"`
 
 	QuoteCurrency string `json:"quote_currency" db:"quote_currency"`
 	BaseCurrency  string `json:"base_currency" db:"base_currency"`
