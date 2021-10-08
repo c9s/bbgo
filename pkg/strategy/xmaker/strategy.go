@@ -41,8 +41,8 @@ func init() {
 type State struct {
 	HedgePosition   fixedpoint.Value `json:"hedgePosition"`
 	CoveredPosition fixedpoint.Value `json:"coveredPosition,omitempty"`
-	Position    *bbgo.Position   `json:"position,omitempty"`
-	ProfitStats bbgo.ProfitStats `json:"profitStats,omitempty"`
+	Position        *bbgo.Position   `json:"position,omitempty"`
+	ProfitStats     ProfitStats      `json:"profitStats,omitempty"`
 }
 
 type ProfitStats struct {
@@ -623,7 +623,10 @@ func (s *Strategy) processTrade(trade types.Trade) {
 	s.state.ProfitStats.AddTrade(trade)
 
 	if profit, netProfit, madeProfit := s.state.Position.AddTrade(trade); madeProfit {
-		s.state.ProfitStats.AddProfit(profit, netProfit)
+		s.state.ProfitStats.AddProfit(bbgo.Profit{
+			Profit:    profit,
+			NetProfit: netProfit,
+		})
 
 		profitMargin := profit.DivFloat64(trade.QuoteQuantity)
 		netProfitMargin := netProfit.DivFloat64(trade.QuoteQuantity)

@@ -38,19 +38,19 @@ type ProfitStats struct {
 	TodaySince     int64            `json:"todaySince,omitempty"`
 }
 
-func (s *ProfitStats) AddProfit(profit, netProfit fixedpoint.Value) {
-	s.AccumulatedPnL += profit
-	s.AccumulatedNetProfit += netProfit
+func (s *ProfitStats) AddProfit(profit Profit) {
+	s.AccumulatedPnL += profit.Profit
+	s.AccumulatedNetProfit += profit.NetProfit
 
-	s.TodayPnL += profit
-	s.TodayNetProfit += netProfit
+	s.TodayPnL += profit.Profit
+	s.TodayNetProfit += profit.NetProfit
 
-	if profit < 0 {
-		s.AccumulatedLoss += profit
-		s.TodayLoss += profit
-	} else if profit > 0 {
-		s.AccumulatedProfit += profit
-		s.TodayProfit += profit
+	if profit.Profit < 0 {
+		s.AccumulatedLoss += profit.Profit
+		s.TodayLoss += profit.Profit
+	} else if profit.Profit > 0 {
+		s.AccumulatedProfit += profit.Profit
+		s.TodayProfit += profit.Profit
 	}
 }
 
