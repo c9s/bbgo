@@ -22,7 +22,7 @@ type Profit struct {
 	ProfitMargin fixedpoint.Value `json:"profitMargin" db:"profit_margin"`
 
 	QuoteCurrency string `json:"quote_currency" db:"quote_currency"`
-	BaseCurrency string `json:"base_currency" db:"base_currency"`
+	BaseCurrency  string `json:"base_currency" db:"base_currency"`
 
 	// FeeInUSD is the summed fee of this profit,
 	// you will need to convert the trade fee into USD since the fee currencies can be different.
@@ -37,6 +37,7 @@ type ProfitStats struct {
 	AccumulatedNetProfit fixedpoint.Value `json:"accumulatedNetProfit,omitempty"`
 	AccumulatedProfit    fixedpoint.Value `json:"accumulatedProfit,omitempty"`
 	AccumulatedLoss      fixedpoint.Value `json:"accumulatedLoss,omitempty"`
+	AccumulatedVolume    fixedpoint.Value `json:"accumulatedVolume,omitempty"`
 	AccumulatedSince     int64            `json:"accumulatedSince,omitempty"`
 
 	TodayPnL       fixedpoint.Value `json:"todayPnL,omitempty"`
@@ -65,6 +66,8 @@ func (s *ProfitStats) AddTrade(trade types.Trade) {
 	if s.IsOver24Hours() {
 		s.ResetToday()
 	}
+
+	s.AccumulatedVolume += fixedpoint.NewFromFloat(trade.Quantity)
 }
 
 func (s *ProfitStats) IsOver24Hours() bool {
