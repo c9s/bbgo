@@ -16,6 +16,14 @@ type Profit struct {
 	NetProfit   fixedpoint.Value `json:"netProfit" db:"net_profit"`
 	AverageCost fixedpoint.Value `json:"averageCost" db:"average_ost"`
 
+	TradeAmount float64 `json:"tradeAmount" db:"trade_amount"`
+
+	// ProfitMargin is a percentage of the profit and the capital
+	ProfitMargin fixedpoint.Value `json:"profitMargin" db:"profit_margin"`
+
+	QuoteCurrency string `json:"quote_currency" db:"quote_currency"`
+	BaseCurrency string `json:"base_currency" db:"base_currency"`
+
 	// FeeInUSD is the summed fee of this profit,
 	// you will need to convert the trade fee into USD since the fee currencies can be different.
 	FeeInUSD           fixedpoint.Value `json:"feeInUSD" db:"fee_in_usd"`
@@ -41,7 +49,6 @@ type ProfitStats struct {
 func (s *ProfitStats) AddProfit(profit Profit) {
 	s.AccumulatedPnL += profit.Profit
 	s.AccumulatedNetProfit += profit.NetProfit
-
 	s.TodayPnL += profit.Profit
 	s.TodayNetProfit += profit.NetProfit
 
