@@ -8,8 +8,6 @@ import (
 )
 
 type ProfitStats struct {
-	MakerExchange types.ExchangeName `json:"makerExchange"`
-
 	AccumulatedPnL            fixedpoint.Value `json:"accumulatedPnL,omitempty"`
 	AccumulatedNetProfit      fixedpoint.Value `json:"accumulatedNetProfit,omitempty"`
 	AccumulatedProfit         fixedpoint.Value `json:"accumulatedProfit,omitempty"`
