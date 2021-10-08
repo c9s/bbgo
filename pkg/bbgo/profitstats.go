@@ -7,18 +7,35 @@ import (
 	"time"
 )
 
-type ProfitStats struct {
-	AccumulatedPnL            fixedpoint.Value `json:"accumulatedPnL,omitempty"`
-	AccumulatedNetProfit      fixedpoint.Value `json:"accumulatedNetProfit,omitempty"`
-	AccumulatedProfit         fixedpoint.Value `json:"accumulatedProfit,omitempty"`
-	AccumulatedLoss           fixedpoint.Value `json:"accumulatedLoss,omitempty"`
-	AccumulatedSince          int64            `json:"accumulatedSince,omitempty"`
+// Profit struct stores the PnL information
+type Profit struct {
+	// Profit is the profit of this trade made. negative profit means loss.
+	Profit fixedpoint.Value `json:"profit" db:"profit"`
 
-	TodayPnL            fixedpoint.Value `json:"todayPnL,omitempty"`
-	TodayNetProfit      fixedpoint.Value `json:"todayNetProfit,omitempty"`
-	TodayProfit         fixedpoint.Value `json:"todayProfit,omitempty"`
-	TodayLoss           fixedpoint.Value `json:"todayLoss,omitempty"`
-	TodaySince          int64            `json:"todaySince,omitempty"`
+	// NetProfit is (profit - trading fee)
+	NetProfit   fixedpoint.Value `json:"netProfit" db:"net_profit"`
+	AverageCost fixedpoint.Value `json:"averageCost" db:"average_ost"`
+
+	// FeeInUSD is the summed fee of this profit,
+	// you will need to convert the trade fee into USD since the fee currencies can be different.
+	FeeInUSD           fixedpoint.Value `json:"feeInUSD" db:"fee_in_usd"`
+	Time               time.Time        `json:"time" db:"time"`
+	Strategy           string           `json:"strategy" db:"strategy"`
+	StrategyInstanceID string           `json:"strategyInstanceID" db:"strategy_instance_id"`
+}
+
+type ProfitStats struct {
+	AccumulatedPnL       fixedpoint.Value `json:"accumulatedPnL,omitempty"`
+	AccumulatedNetProfit fixedpoint.Value `json:"accumulatedNetProfit,omitempty"`
+	AccumulatedProfit    fixedpoint.Value `json:"accumulatedProfit,omitempty"`
+	AccumulatedLoss      fixedpoint.Value `json:"accumulatedLoss,omitempty"`
+	AccumulatedSince     int64            `json:"accumulatedSince,omitempty"`
+
+	TodayPnL       fixedpoint.Value `json:"todayPnL,omitempty"`
+	TodayNetProfit fixedpoint.Value `json:"todayNetProfit,omitempty"`
+	TodayProfit    fixedpoint.Value `json:"todayProfit,omitempty"`
+	TodayLoss      fixedpoint.Value `json:"todayLoss,omitempty"`
+	TodaySince     int64            `json:"todaySince,omitempty"`
 }
 
 func (s *ProfitStats) AddProfit(profit, netProfit fixedpoint.Value) {
