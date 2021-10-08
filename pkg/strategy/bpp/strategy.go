@@ -267,8 +267,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.tradeCollector.OnPositionUpdate(func(position *bbgo.Position) {
 		s.Notifiability.Notify(position)
 	})
+
 	s.tradeCollector.BindStream(session.UserDataStream)
-	go s.tradeCollector.Run(ctx)
+	
+	// s.tradeCollector.BindStreamForBackground(session.UserDataStream)
+	// go s.tradeCollector.Run(ctx)
 
 	session.UserDataStream.OnStart(func() {
 		s.placeOrders(ctx, orderExecutor)
@@ -285,7 +288,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 
 	// s.book = types.NewStreamBook(s.Symbol)
-	// s.book.BindStream(session.MarketDataStream)
+	// s.book.BindStreamForBackground(session.MarketDataStream)
 
 	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
