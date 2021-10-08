@@ -306,7 +306,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.tradeCollector = bbgo.NewTradeCollector(s.Symbol, s.state.Position, s.orderStore)
 	s.tradeCollector.BindStream(session.UserDataStream)
-	go s.tradeCollector.Run(ctx)
+
+	// s.tradeCollector.BindStreamForBackground(session.UserDataStream)
+	// go s.tradeCollector.Run(ctx)
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		// skip k-lines from other symbols
