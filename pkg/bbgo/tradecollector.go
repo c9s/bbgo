@@ -35,12 +35,19 @@ func NewTradeCollector(symbol string, position *Position, orderStore *OrderStore
 	}
 }
 
-func (c *TradeCollector) handleTradeUpdate(trade types.Trade) {
+// handleTradeUpdateInBackground sends the trade object to the trade channel,
+// so that the goroutine can receive the trade and process in the background.
+func (c *TradeCollector) handleTradeUpdateInBackground(trade types.Trade) {
 	c.tradeC <- trade
 }
 
+// BindStreamForBackground bind the stream callback for background processing
+func (c *TradeCollector) BindStreamForBackground(stream types.Stream) {
+	stream.OnTradeUpdate(c.handleTradeUpdateInBackground)
+}
+
 func (c *TradeCollector) BindStream(stream types.Stream) {
-	stream.OnTradeUpdate(c.handleTradeUpdate)
+	stream.OnTradeUpdate(c.processTrade)
 }
 
 // Emit triggers the trade processing (position update)
@@ -73,6 +80,19 @@ func (c *TradeCollector) Process() bool {
 	return positionChanged
 }
 
+func (c *TradeCollector) processTrade(trade types.Trade) {
+	if c.orderStore.Exists(trade.OrderID) {
+		c.EmitTrade(trade)
+		if profit, netProfit, madeProfit := c.position.AddTrade(trade); madeProfit {
+			c.EmitProfit(trade, profit, netProfit)
+		}
+		c.EmitPositionUpdate(c.position)
+	} else {
+		c.tradeStore.Add(trade)
+	}
+}
+
+// Run is a goroutine executed in the background
 func (c *TradeCollector) Run(ctx context.Context) {
 	for {
 		select {
@@ -83,15 +103,7 @@ func (c *TradeCollector) Run(ctx context.Context) {
 			c.Process()
 
 		case trade := <-c.tradeC:
-			if c.orderStore.Exists(trade.OrderID) {
-				c.EmitTrade(trade)
-				if profit, netProfit, madeProfit := c.position.AddTrade(trade); madeProfit {
-					c.EmitProfit(trade, profit, netProfit)
-				}
-				c.EmitPositionUpdate(c.position)
-			} else {
-				c.tradeStore.Add(trade)
-			}
+			c.processTrade(trade)
 		}
 	}
 }
