@@ -708,6 +708,9 @@ func (s *Strategy) LoadState() error {
 		}
 	}
 
+	s.state.ProfitStats.Symbol = s.makerMarket.Symbol
+	s.state.ProfitStats.BaseCurrency = s.makerMarket.BaseCurrency
+	s.state.ProfitStats.QuoteCurrency = s.makerMarket.QuoteCurrency
 	s.state.ProfitStats.MakerExchange = s.makerSession.ExchangeName
 	if s.state.ProfitStats.AccumulatedSince == 0 {
 		s.state.ProfitStats.AccumulatedSince = time.Now().Unix()
