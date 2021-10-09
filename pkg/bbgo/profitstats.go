@@ -1,14 +1,18 @@
 package bbgo
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
-	"time"
 )
 
 // Profit struct stores the PnL information
 type Profit struct {
+	Symbol string `json:"symbol"`
+
 	// Profit is the profit of this trade made. negative profit means loss.
 	Profit fixedpoint.Value `json:"profit" db:"profit"`
 
@@ -19,7 +23,7 @@ type Profit struct {
 	TradeAmount float64 `json:"tradeAmount" db:"trade_amount"`
 
 	// ProfitMargin is a percentage of the profit and the capital amount
-	ProfitMargin    fixedpoint.Value `json:"profitMargin" db:"profit_margin"`
+	ProfitMargin fixedpoint.Value `json:"profitMargin" db:"profit_margin"`
 
 	// NetProfitMargin is a percentage of the net profit and the capital amount
 	NetProfitMargin fixedpoint.Value `json:"netProfitMargin" db:"net_profit_margin"`
@@ -33,6 +37,32 @@ type Profit struct {
 	Time               time.Time        `json:"time" db:"time"`
 	Strategy           string           `json:"strategy" db:"strategy"`
 	StrategyInstanceID string           `json:"strategyInstanceID" db:"strategy_instance_id"`
+}
+
+func (p Profit) PlainText() string {
+	return fmt.Sprintf("%s trade profit %s %f %s (%.2f%%), net profit =~ %f %s (%.2f%%)",
+		p.Symbol,
+		pnlEmoji(p.Profit),
+		p.Profit.Float64(), p.QuoteCurrency,
+		p.ProfitMargin.Float64()*100.0,
+		p.NetProfit.Float64(), p.QuoteCurrency,
+		p.NetProfitMargin.Float64()*100.0,
+	)
+}
+
+var lossEmoji = "🔥"
+var profitEmoji = "💰"
+
+func pnlEmoji(pnl fixedpoint.Value) string {
+	if pnl < 0 {
+		return lossEmoji
+	}
+
+	if pnl == 0 {
+		return ""
+	}
+
+	return profitEmoji
 }
 
 type ProfitStats struct {
