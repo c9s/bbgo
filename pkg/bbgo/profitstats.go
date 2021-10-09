@@ -66,6 +66,10 @@ func pnlEmoji(pnl fixedpoint.Value) string {
 }
 
 type ProfitStats struct {
+	Symbol        string `json:"symbol"`
+	QuoteCurrency string `json:"quoteCurrency"`
+	BaseCurrency  string `json:"baseCurrency"`
+
 	AccumulatedPnL       fixedpoint.Value `json:"accumulatedPnL,omitempty"`
 	AccumulatedNetProfit fixedpoint.Value `json:"accumulatedNetProfit,omitempty"`
 	AccumulatedProfit    fixedpoint.Value `json:"accumulatedProfit,omitempty"`
@@ -115,4 +119,23 @@ func (s *ProfitStats) ResetToday() {
 
 	var beginningOfTheDay = util.BeginningOfTheDay(time.Now().Local())
 	s.TodaySince = beginningOfTheDay.Unix()
+}
+
+func (s *ProfitStats) PlainText() string {
+	since := time.Unix(s.AccumulatedSince, 0).Local()
+	return fmt.Sprintf("today %s profit %f %s,\n"+
+		"today %s net profit %f %s,\n"+
+		"today %s trade loss %f %s\n"+
+		"accumulated profit %f %s,\n"+
+		"accumulated net profit %f %s,\n"+
+		"accumulated trade loss %f %s\n"+
+		"since %s",
+		s.Symbol, s.TodayPnL.Float64(), s.QuoteCurrency,
+		s.Symbol, s.TodayNetProfit.Float64(), s.QuoteCurrency,
+		s.Symbol, s.TodayLoss.Float64(), s.QuoteCurrency,
+		s.AccumulatedPnL.Float64(), s.QuoteCurrency,
+		s.AccumulatedNetProfit.Float64(), s.QuoteCurrency,
+		s.AccumulatedLoss.Float64(), s.QuoteCurrency,
+		since.Format(time.RFC822),
+	)
 }
