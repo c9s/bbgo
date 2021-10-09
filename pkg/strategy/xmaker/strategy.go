@@ -723,7 +723,7 @@ func (s *Strategy) SaveState() error {
 	if err := s.Persistence.Save(s.state, ID, s.Symbol, stateKey); err != nil {
 		return err
 	} else {
-		log.Infof("state is saved => %+v", s.state)
+		log.Infof("%s state is saved => %+v", ID, s.state)
 	}
 	return nil
 }
@@ -964,7 +964,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		if err := s.SaveState(); err != nil {
 			log.WithError(err).Errorf("can not save state: %+v", s.state)
 		} else {
-			s.Notify("%s position is saved: position = %f", s.Symbol, s.state.HedgePosition.Float64(), s.state.Position)
+			s.Notify("%s: %s position is saved: %f", ID, s.Symbol, s.state.HedgePosition.Float64(), s.state.Position)
 		}
 	})
 
