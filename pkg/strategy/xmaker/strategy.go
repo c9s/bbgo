@@ -632,7 +632,7 @@ func (s *Strategy) processTrade(trade types.Trade) {
 			NetProfitMargin: netProfit.DivFloat64(trade.QuoteQuantity),
 			QuoteCurrency:   s.state.Position.QuoteCurrency,
 			BaseCurrency:    s.state.Position.BaseCurrency,
-			Time:            trade.Time,
+			Time:            trade.Time.Time(),
 		}
 		s.state.ProfitStats.AddProfit(p)
 
