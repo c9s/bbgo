@@ -623,35 +623,33 @@ func (s *Strategy) processTrade(trade types.Trade) {
 	s.state.ProfitStats.AddTrade(trade)
 
 	if profit, netProfit, madeProfit := s.state.Position.AddTrade(trade); madeProfit {
-		s.state.ProfitStats.AddProfit(bbgo.Profit{
-			Profit:    profit,
-			NetProfit: netProfit,
-		})
-
-		profitMargin := profit.DivFloat64(trade.QuoteQuantity)
-		netProfitMargin := netProfit.DivFloat64(trade.QuoteQuantity)
+		p := bbgo.Profit{
+			Symbol:          s.Symbol,
+			Profit:          profit,
+			NetProfit:       netProfit,
+			TradeAmount:     trade.QuoteQuantity,
+			ProfitMargin:    profit.DivFloat64(trade.QuoteQuantity),
+			NetProfitMargin: netProfit.DivFloat64(trade.QuoteQuantity),
+			QuoteCurrency:   s.state.Position.QuoteCurrency,
+			BaseCurrency:    s.state.Position.BaseCurrency,
+			Time:            trade.Time,
+		}
+		s.state.ProfitStats.AddProfit(p)
 
 		since := time.Unix(s.state.ProfitStats.AccumulatedSince, 0).Local()
 
-		s.Notify("%s trade profit %s %f %s (%.2f%%), net profit =~ %f %s (%.2f%%),\n"+
-			"today profit %f %s,\n"+
-			"today net profit %f %s,\n"+
-			"today trade loss %f %s\n"+
-			"accumulated profit %f %s,\n"+
-			"accumulated net profit %f %s,\n"+
-			"accumulated trade loss %f %s\n"+
-			"since %s",
-			s.Symbol,
-			pnlEmoji(profit),
-			profit.Float64(), s.state.Position.QuoteCurrency,
-			profitMargin.Float64()*100.0,
-			netProfit.Float64(), s.state.Position.QuoteCurrency,
-			netProfitMargin.Float64()*100.0,
-
-			s.state.ProfitStats.TodayPnL.Float64(), s.state.Position.QuoteCurrency,
-			s.state.ProfitStats.TodayNetProfit.Float64(), s.state.Position.QuoteCurrency,
-			s.state.ProfitStats.TodayLoss.Float64(), s.state.Position.QuoteCurrency,
-
+		s.Notify(&p)
+		s.Notify(
+			"today %s profit %f %s,\n"+
+				"today %s net profit %f %s,\n"+
+				"today %s trade loss %f %s\n"+
+				"accumulated profit %f %s,\n"+
+				"accumulated net profit %f %s,\n"+
+				"accumulated trade loss %f %s\n"+
+				"since %s",
+			s.Symbol, s.state.ProfitStats.TodayPnL.Float64(), s.state.Position.QuoteCurrency,
+			s.Symbol, s.state.ProfitStats.TodayNetProfit.Float64(), s.state.Position.QuoteCurrency,
+			s.Symbol, s.state.ProfitStats.TodayLoss.Float64(), s.state.Position.QuoteCurrency,
 			s.state.ProfitStats.AccumulatedPnL.Float64(), s.state.Position.QuoteCurrency,
 			s.state.ProfitStats.AccumulatedNetProfit.Float64(), s.state.Position.QuoteCurrency,
 			s.state.ProfitStats.AccumulatedLoss.Float64(), s.state.Position.QuoteCurrency,
@@ -973,20 +971,4 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 func durationJitter(d time.Duration, jitterInMilliseconds int) time.Duration {
 	n := rand.Intn(jitterInMilliseconds)
 	return d + time.Duration(n)*time.Millisecond
-}
-
-// lets move this to the fun package
-var lossEmoji = "🔥"
-var profitEmoji = "💰"
-
-func pnlEmoji(pnl fixedpoint.Value) string {
-	if pnl < 0 {
-		return lossEmoji
-	}
-
-	if pnl == 0 {
-		return ""
-	}
-
-	return profitEmoji
 }
