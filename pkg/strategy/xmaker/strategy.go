@@ -627,7 +627,7 @@ func (s *Strategy) processTrade(trade types.Trade) {
 			Symbol:          s.Symbol,
 			Profit:          profit,
 			NetProfit:       netProfit,
-			TradeAmount:     trade.QuoteQuantity,
+			TradeAmount:     fixedpoint.NewFromFloat(trade.QuoteQuantity),
 			ProfitMargin:    profit.DivFloat64(trade.QuoteQuantity),
 			NetProfitMargin: netProfit.DivFloat64(trade.QuoteQuantity),
 			QuoteCurrency:   s.state.Position.QuoteCurrency,

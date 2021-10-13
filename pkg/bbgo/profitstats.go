@@ -2,6 +2,7 @@ package bbgo
 
 import (
 	"fmt"
+	"github.com/slack-go/slack"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -20,7 +21,7 @@ type Profit struct {
 	NetProfit   fixedpoint.Value `json:"netProfit" db:"net_profit"`
 	AverageCost fixedpoint.Value `json:"averageCost" db:"average_ost"`
 
-	TradeAmount float64 `json:"tradeAmount" db:"trade_amount"`
+	TradeAmount fixedpoint.Value `json:"tradeAmount" db:"trade_amount"`
 
 	// ProfitMargin is a percentage of the profit and the capital amount
 	ProfitMargin fixedpoint.Value `json:"profitMargin" db:"profit_margin"`
@@ -37,6 +38,75 @@ type Profit struct {
 	Time               time.Time        `json:"time" db:"time"`
 	Strategy           string           `json:"strategy" db:"strategy"`
 	StrategyInstanceID string           `json:"strategyInstanceID" db:"strategy_instance_id"`
+}
+
+func (p Profit) SlackAttachment() slack.Attachment {
+	var title string = fmt.Sprintf("%s PnL ", p.Symbol)
+	var color string
+	if p.Profit > 0 {
+		color = types.GreenColor
+		title = "+" + p.Profit.String() + " " + p.QuoteCurrency
+	} else {
+		color = types.RedColor
+		title = "-" + p.Profit.String() + " " + p.QuoteCurrency
+	}
+
+	var fields []slack.AttachmentField
+
+	if p.NetProfit > 0 {
+		fields = append(fields, slack.AttachmentField{
+			Title: "Net Profit",
+			Value: p.NetProfit.String() + " " + p.QuoteCurrency,
+			Short: true,
+		})
+	}
+
+	if p.ProfitMargin > 0 {
+		fields = append(fields, slack.AttachmentField{
+			Title: "Profit Margin",
+			Value: p.ProfitMargin.Percentage(),
+			Short: true,
+		})
+	}
+
+	if p.NetProfitMargin > 0 {
+		fields = append(fields, slack.AttachmentField{
+			Title: "Net Profit Margin",
+			Value: p.NetProfitMargin.Percentage(),
+			Short: true,
+		})
+	}
+
+	if p.TradeAmount > 0.0 {
+		fields = append(fields, slack.AttachmentField{
+			Title: "Trade Amount",
+			Value: p.TradeAmount.String() + " " + p.QuoteCurrency,
+			Short: true,
+		})
+	}
+
+	if p.FeeInUSD > 0 {
+		fields = append(fields, slack.AttachmentField{
+			Title: "Fee In USD",
+			Value: p.FeeInUSD.String() + " USD",
+			Short: true,
+		})
+	}
+
+	if len(p.Strategy) > 0 {
+		fields = append(fields, slack.AttachmentField{
+			Title: "Strategy",
+			Value: p.Strategy,
+			Short: true,
+		})
+	}
+
+	return slack.Attachment{
+		Color:  color,
+		Title:  title,
+		Fields: fields,
+		// Footer:        "",
+	}
 }
 
 func (p Profit) PlainText() string {
