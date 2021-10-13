@@ -209,3 +209,73 @@ func (s *ProfitStats) PlainText() string {
 		since.Format(time.RFC822),
 	)
 }
+
+func (s ProfitStats) SlackAttachment() slack.Attachment {
+	var title string = fmt.Sprintf("%s Accumulated PnL ", s.Symbol)
+	var color string
+	if s.AccumulatedPnL > 0 {
+		color = types.GreenColor
+		title = "+" + s.AccumulatedPnL.String() + " " + s.QuoteCurrency
+	} else {
+		color = types.RedColor
+		title = "-" + s.AccumulatedPnL.String() + " " + s.QuoteCurrency
+	}
+
+	since := time.Unix(s.AccumulatedSince, 0).Local()
+	title += " Since " + since.Format(time.RFC822)
+
+	var fields []slack.AttachmentField
+
+	if s.TodayProfit > 0 {
+		fields = append(fields, slack.AttachmentField{
+			Title: "Profit Today",
+			Value: s.TodayProfit.String() + " " + s.QuoteCurrency,
+			Short: true,
+		})
+	}
+
+	if s.TodayNetProfit > 0 {
+		fields = append(fields, slack.AttachmentField{
+			Title: "Net Profit Today",
+			Value: s.TodayNetProfit.String() + " " + s.QuoteCurrency,
+			Short: true,
+		})
+	}
+
+	if s.TodayLoss > 0 {
+		fields = append(fields, slack.AttachmentField{
+			Title: "Loss Today",
+			Value: s.TodayLoss.String() + " " + s.QuoteCurrency,
+			Short: true,
+		})
+	}
+
+
+	if s.AccumulatedProfit > 0 {
+		fields = append(fields, slack.AttachmentField{
+			Title: "Accumulated Profit",
+			Value: s.AccumulatedProfit.String() + " " + s.QuoteCurrency,
+		})
+	}
+
+	if s.AccumulatedNetProfit > 0 {
+		fields = append(fields, slack.AttachmentField{
+			Title: "Accumulated Net Profit",
+			Value: s.AccumulatedNetProfit.String() + " " + s.QuoteCurrency,
+		})
+	}
+
+	if s.AccumulatedLoss > 0 {
+		fields = append(fields, slack.AttachmentField{
+			Title: "Accumulated Loss",
+			Value: s.AccumulatedLoss.String() + " " + s.QuoteCurrency,
+		})
+	}
+
+	return slack.Attachment{
+		Color:  color,
+		Title:  title,
+		Fields: fields,
+		// Footer:        "",
+	}
+}
