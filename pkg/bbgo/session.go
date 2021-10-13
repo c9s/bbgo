@@ -406,10 +406,10 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 		}
 	}
 
-	var lastPriceTime time.Time
 	for interval := range klineSubscriptions {
 		// avoid querying the last unclosed kline
-		endTime := environ.startTime.Add(-interval.Duration())
+		// endTime := environ.startTime.Add(-interval.Duration())
+		endTime := environ.startTime.Add(-time.Millisecond)
 		kLines, err := session.Exchange.QueryKLines(ctx, symbol, interval, types.KLineQueryOptions{
 			EndTime: &endTime,
 			Limit:   1000, // indicators need at least 100
@@ -425,12 +425,9 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 
 		// update last prices by the given kline
 		lastKLine := kLines[len(kLines)-1]
-		if lastPriceTime == emptyTime {
+		if interval == types.Interval1m {
+			log.Infof("last kline %+v", lastKLine)
 			session.lastPrices[symbol] = lastKLine.Close
-			lastPriceTime = lastKLine.EndTime
-		} else if lastKLine.EndTime.After(lastPriceTime) {
-			session.lastPrices[symbol] = lastKLine.Close
-			lastPriceTime = lastKLine.EndTime
 		}
 
 		for _, k := range kLines {
