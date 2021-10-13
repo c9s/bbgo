@@ -43,6 +43,13 @@ type Profit struct {
 func (p *Profit) SlackAttachment() slack.Attachment {
 	var title string = fmt.Sprintf("%s PnL ", p.Symbol)
 	var color string
+
+	if p.ProfitMargin != 0 {
+		title += pnlEmojiMargin(p.Profit, p.ProfitMargin, defaultPnlLevelResolution) + " "
+	} else {
+		title += pnlEmojiSimple(p.Profit) + " "
+	}
+
 	if p.Profit > 0 {
 		color = types.GreenColor
 		title = "+" + p.Profit.String() + " " + p.QuoteCurrency
@@ -110,9 +117,16 @@ func (p *Profit) SlackAttachment() slack.Attachment {
 }
 
 func (p *Profit) PlainText() string {
+	var emoji string
+	if p.ProfitMargin != 0 {
+		emoji = pnlEmojiMargin(p.Profit, p.ProfitMargin, defaultPnlLevelResolution)
+	} else {
+		emoji = pnlEmojiSimple(p.Profit)
+	}
+
 	return fmt.Sprintf("%s trade profit %s %f %s (%.2f%%), net profit =~ %f %s (%.2f%%)",
 		p.Symbol,
-		pnlEmoji(p.Profit),
+		emoji,
 		p.Profit.Float64(), p.QuoteCurrency,
 		p.ProfitMargin.Float64()*100.0,
 		p.NetProfit.Float64(), p.QuoteCurrency,
@@ -122,8 +136,9 @@ func (p *Profit) PlainText() string {
 
 var lossEmoji = "🔥"
 var profitEmoji = "💰"
+var defaultPnlLevelResolution = fixedpoint.NewFromFloat(0.001)
 
-func pnlEmoji(pnl fixedpoint.Value) string {
+func pnlEmojiSimple(pnl fixedpoint.Value) string {
 	if pnl < 0 {
 		return lossEmoji
 	}
@@ -134,6 +149,29 @@ func pnlEmoji(pnl fixedpoint.Value) string {
 
 	return profitEmoji
 }
+
+func pnlEmojiMargin(pnl, margin, resolution fixedpoint.Value) (out string) {
+	if pnl < 0 {
+		out = lossEmoji
+		level := (-margin).Div(resolution).Floor()
+		for i := 1; i < level.Int(); i++ {
+			out += lossEmoji
+		}
+		return out
+	}
+
+	if pnl == 0 {
+		return out
+	}
+
+	out = profitEmoji
+	level := margin.Div(resolution).Floor()
+	for i := 1; i < level.Int(); i++ {
+		out += profitEmoji
+	}
+	return out
+}
+
 
 type ProfitStats struct {
 	Symbol        string `json:"symbol"`
