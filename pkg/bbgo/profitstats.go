@@ -40,7 +40,7 @@ type Profit struct {
 	StrategyInstanceID string           `json:"strategyInstanceID" db:"strategy_instance_id"`
 }
 
-func (p Profit) SlackAttachment() slack.Attachment {
+func (p *Profit) SlackAttachment() slack.Attachment {
 	var title string = fmt.Sprintf("%s PnL ", p.Symbol)
 	var color string
 	if p.Profit > 0 {
@@ -48,12 +48,12 @@ func (p Profit) SlackAttachment() slack.Attachment {
 		title = "+" + p.Profit.String() + " " + p.QuoteCurrency
 	} else {
 		color = types.RedColor
-		title = "-" + p.Profit.String() + " " + p.QuoteCurrency
+		title = p.Profit.String() + " " + p.QuoteCurrency
 	}
 
 	var fields []slack.AttachmentField
 
-	if p.NetProfit > 0 {
+	if p.NetProfit != 0 {
 		fields = append(fields, slack.AttachmentField{
 			Title: "Net Profit",
 			Value: p.NetProfit.String() + " " + p.QuoteCurrency,
@@ -61,7 +61,7 @@ func (p Profit) SlackAttachment() slack.Attachment {
 		})
 	}
 
-	if p.ProfitMargin > 0 {
+	if p.ProfitMargin != 0 {
 		fields = append(fields, slack.AttachmentField{
 			Title: "Profit Margin",
 			Value: p.ProfitMargin.Percentage(),
@@ -69,7 +69,7 @@ func (p Profit) SlackAttachment() slack.Attachment {
 		})
 	}
 
-	if p.NetProfitMargin > 0 {
+	if p.NetProfitMargin != 0 {
 		fields = append(fields, slack.AttachmentField{
 			Title: "Net Profit Margin",
 			Value: p.NetProfitMargin.Percentage(),
@@ -77,7 +77,7 @@ func (p Profit) SlackAttachment() slack.Attachment {
 		})
 	}
 
-	if p.TradeAmount > 0.0 {
+	if p.TradeAmount != 0.0 {
 		fields = append(fields, slack.AttachmentField{
 			Title: "Trade Amount",
 			Value: p.TradeAmount.String() + " " + p.QuoteCurrency,
@@ -85,7 +85,7 @@ func (p Profit) SlackAttachment() slack.Attachment {
 		})
 	}
 
-	if p.FeeInUSD > 0 {
+	if p.FeeInUSD != 0 {
 		fields = append(fields, slack.AttachmentField{
 			Title: "Fee In USD",
 			Value: p.FeeInUSD.String() + " USD",
@@ -93,7 +93,7 @@ func (p Profit) SlackAttachment() slack.Attachment {
 		})
 	}
 
-	if len(p.Strategy) > 0 {
+	if len(p.Strategy) != 0 {
 		fields = append(fields, slack.AttachmentField{
 			Title: "Strategy",
 			Value: p.Strategy,
@@ -109,7 +109,7 @@ func (p Profit) SlackAttachment() slack.Attachment {
 	}
 }
 
-func (p Profit) PlainText() string {
+func (p *Profit) PlainText() string {
 	return fmt.Sprintf("%s trade profit %s %f %s (%.2f%%), net profit =~ %f %s (%.2f%%)",
 		p.Symbol,
 		pnlEmoji(p.Profit),
@@ -210,7 +210,7 @@ func (s *ProfitStats) PlainText() string {
 	)
 }
 
-func (s ProfitStats) SlackAttachment() slack.Attachment {
+func (s *ProfitStats) SlackAttachment() slack.Attachment {
 	var title string = fmt.Sprintf("%s Accumulated PnL ", s.Symbol)
 	var color string
 	if s.AccumulatedPnL > 0 {
@@ -218,7 +218,7 @@ func (s ProfitStats) SlackAttachment() slack.Attachment {
 		title = "+" + s.AccumulatedPnL.String() + " " + s.QuoteCurrency
 	} else {
 		color = types.RedColor
-		title = "-" + s.AccumulatedPnL.String() + " " + s.QuoteCurrency
+		title = s.AccumulatedPnL.String() + " " + s.QuoteCurrency
 	}
 
 	since := time.Unix(s.AccumulatedSince, 0).Local()
@@ -226,7 +226,7 @@ func (s ProfitStats) SlackAttachment() slack.Attachment {
 
 	var fields []slack.AttachmentField
 
-	if s.TodayProfit > 0 {
+	if s.TodayProfit != 0 {
 		fields = append(fields, slack.AttachmentField{
 			Title: "Profit Today",
 			Value: s.TodayProfit.String() + " " + s.QuoteCurrency,
@@ -234,7 +234,7 @@ func (s ProfitStats) SlackAttachment() slack.Attachment {
 		})
 	}
 
-	if s.TodayNetProfit > 0 {
+	if s.TodayNetProfit != 0 {
 		fields = append(fields, slack.AttachmentField{
 			Title: "Net Profit Today",
 			Value: s.TodayNetProfit.String() + " " + s.QuoteCurrency,
@@ -242,7 +242,7 @@ func (s ProfitStats) SlackAttachment() slack.Attachment {
 		})
 	}
 
-	if s.TodayLoss > 0 {
+	if s.TodayLoss != 0 {
 		fields = append(fields, slack.AttachmentField{
 			Title: "Loss Today",
 			Value: s.TodayLoss.String() + " " + s.QuoteCurrency,
@@ -251,21 +251,21 @@ func (s ProfitStats) SlackAttachment() slack.Attachment {
 	}
 
 
-	if s.AccumulatedProfit > 0 {
+	if s.AccumulatedProfit != 0 {
 		fields = append(fields, slack.AttachmentField{
 			Title: "Accumulated Profit",
 			Value: s.AccumulatedProfit.String() + " " + s.QuoteCurrency,
 		})
 	}
 
-	if s.AccumulatedNetProfit > 0 {
+	if s.AccumulatedNetProfit != 0 {
 		fields = append(fields, slack.AttachmentField{
 			Title: "Accumulated Net Profit",
 			Value: s.AccumulatedNetProfit.String() + " " + s.QuoteCurrency,
 		})
 	}
 
-	if s.AccumulatedLoss > 0 {
+	if s.AccumulatedLoss != 0 {
 		fields = append(fields, slack.AttachmentField{
 			Title: "Accumulated Loss",
 			Value: s.AccumulatedLoss.String() + " " + s.QuoteCurrency,
