@@ -9,6 +9,7 @@ require (
 	github.com/adshao/go-binance/v2 v2.3.1
 	github.com/c9s/rockhopper v1.2.1-0.20210217093258-2661955904a9
 	github.com/codingconcepts/env v0.0.0-20200821220118-a8fbf8d84482
+	github.com/dgrijalva/jwt-go v3.2.0+incompatible // indirect
 	github.com/fastly/go-utils v0.0.0-20180712184237-d95a45783239 // indirect
 	github.com/gin-contrib/cors v1.3.1
 	github.com/gin-gonic/gin v1.7.0
