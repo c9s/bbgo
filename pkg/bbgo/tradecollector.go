@@ -2,6 +2,7 @@ package bbgo
 
 import (
 	"context"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/sigchan"
@@ -93,11 +94,16 @@ func (c *TradeCollector) processTrade(trade types.Trade) {
 }
 
 // Run is a goroutine executed in the background
+// Do not use this function if you need back-testing
 func (c *TradeCollector) Run(ctx context.Context) {
+	var ticker = time.NewTicker(3 * time.Second)
 	for {
 		select {
 		case <-ctx.Done():
 			return
+
+		case <-ticker.C:
+			c.Process()
 
 		case <-c.orderSig:
 			c.Process()
