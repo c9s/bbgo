@@ -93,7 +93,7 @@ func filterSlackAttachments(args []interface{}) (slackAttachments []slack.Attach
 			if firstAttachmentOffset == -1 {
 				firstAttachmentOffset = idx
 			}
-		
+
 			// fallback to PlainText if it's not supported
 			// convert plain text to slack attachment
 			text := a.PlainText()
