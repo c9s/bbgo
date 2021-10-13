@@ -3,6 +3,7 @@ package slacknotifier
 import (
 	"context"
 	"fmt"
+	"github.com/c9s/bbgo/pkg/types"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -88,6 +89,17 @@ func filterSlackAttachments(args []interface{}) (slackAttachments []slack.Attach
 
 			slackAttachments = append(slackAttachments, a.SlackAttachment())
 
+		case types.PlainText:
+			if firstAttachmentOffset == -1 {
+				firstAttachmentOffset = idx
+			}
+		
+			// fallback to PlainText if it's not supported
+			// convert plain text to slack attachment
+			text := a.PlainText()
+			slackAttachments = append(slackAttachments, slack.Attachment{
+				Title: text,
+			})
 		}
 	}
 
@@ -95,7 +107,8 @@ func filterSlackAttachments(args []interface{}) (slackAttachments []slack.Attach
 	if firstAttachmentOffset > -1 {
 		pureArgs = args[:firstAttachmentOffset]
 	}
-	return
+
+	return slackAttachments, pureArgs
 }
 
 func (n *Notifier) NotifyTo(channel string, obj interface{}, args ...interface{}) {
