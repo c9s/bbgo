@@ -635,27 +635,7 @@ func (s *Strategy) processTrade(trade types.Trade) {
 			Time:            trade.Time.Time(),
 		}
 		s.state.ProfitStats.AddProfit(p)
-
-		since := time.Unix(s.state.ProfitStats.AccumulatedSince, 0).Local()
-
 		s.Notify(&p)
-		s.Notify(
-			"today %s profit %f %s,\n"+
-				"today %s net profit %f %s,\n"+
-				"today %s trade loss %f %s\n"+
-				"accumulated profit %f %s,\n"+
-				"accumulated net profit %f %s,\n"+
-				"accumulated trade loss %f %s\n"+
-				"since %s",
-			s.Symbol, s.state.ProfitStats.TodayPnL.Float64(), s.state.Position.QuoteCurrency,
-			s.Symbol, s.state.ProfitStats.TodayNetProfit.Float64(), s.state.Position.QuoteCurrency,
-			s.Symbol, s.state.ProfitStats.TodayLoss.Float64(), s.state.Position.QuoteCurrency,
-			s.state.ProfitStats.AccumulatedPnL.Float64(), s.state.Position.QuoteCurrency,
-			s.state.ProfitStats.AccumulatedNetProfit.Float64(), s.state.Position.QuoteCurrency,
-			s.state.ProfitStats.AccumulatedLoss.Float64(), s.state.Position.QuoteCurrency,
-			since.Format(time.RFC822),
-		)
-
 	} else {
 		log.Infof("position changed: %s", s.state.Position)
 		s.Notify(s.state.Position)
@@ -856,6 +836,9 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		quoteTicker := time.NewTicker(durationJitter(s.UpdateInterval.Duration(), 200))
 		defer quoteTicker.Stop()
 
+		reportTicker := time.NewTicker(time.Hour)
+		defer reportTicker.Stop()
+
 		defer func() {
 			if err := s.makerSession.Exchange.CancelOrders(context.Background(), s.activeMakerOrders.Orders()...); err != nil {
 				log.WithError(err).Errorf("can not cancel %s orders", s.Symbol)
@@ -875,6 +858,9 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 			case <-quoteTicker.C:
 				s.updateQuote(ctx, orderExecutionRouter)
+
+			case <-reportTicker.C:
+				s.Notifiability.Notify(&s.state.ProfitStats)
 
 			case trade := <-s.tradeC:
 				log.Infof("recieved trade %+v", trade)
