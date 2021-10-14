@@ -17,11 +17,6 @@ const ID = "emastop"
 
 var log = logrus.WithField("strategy", ID)
 
-// The indicators (SMA and EWMA) that we want to use are returning float64 data.
-type Float64Indicator interface {
-	Last() float64
-}
-
 func init() {
 	// Register the pointer of the strategy struct,
 	// so that bbgo knows what struct to be used to unmarshal the configs (YAML or JSON)
@@ -102,7 +97,7 @@ func (s *Strategy) clear(ctx context.Context, session *bbgo.ExchangeSession) {
 	}
 }
 
-func (s *Strategy) place(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession, indicator Float64Indicator, closePrice float64) {
+func (s *Strategy) place(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession, indicator types.Float64Indicator, closePrice float64) {
 	movingAveragePrice := indicator.Last()
 
 	// skip it if it's near zero because it's not loaded yet
@@ -180,7 +175,7 @@ func (s *Strategy) handleOrderUpdate(order types.Order) {
 	}
 }
 
-func (s *Strategy) loadIndicator(sourceSession *bbgo.ExchangeSession) (Float64Indicator, error) {
+func (s *Strategy) loadIndicator(sourceSession *bbgo.ExchangeSession) (types.Float64Indicator, error) {
 	var standardIndicatorSet, ok = sourceSession.StandardIndicatorSet(s.Symbol)
 	if !ok {
 		return nil, fmt.Errorf("standardIndicatorSet is nil, symbol %s", s.Symbol)
