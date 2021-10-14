@@ -170,13 +170,6 @@ func (k KLine) GetChange() float64 {
 	return k.Close - k.Open
 }
 
-func (k KLine) String() string {
-	return fmt.Sprintf("%s %s %s %s O: %.4f H: %.4f L: %.4f C: %.4f CHG: %.4f MAXCHG: %.4f V: %.4f QV: %.2f TBBV: %.2f",
-		k.Exchange.String(),
-		k.StartTime.Format("2006-01-02 15:04"),
-		k.Symbol, k.Interval, k.Open, k.High, k.Low, k.Close, k.GetChange(), k.GetMaxChange(), k.Volume, k.QuoteVolume, k.TakerBuyBaseAssetVolume)
-}
-
 func (k KLine) Color() string {
 	if k.Direction() > 0 {
 		return GreenColor
@@ -184,6 +177,18 @@ func (k KLine) Color() string {
 		return RedColor
 	}
 	return GrayColor
+}
+
+
+func (k KLine) String() string {
+	return fmt.Sprintf("%s %s %s %s O: %.4f H: %.4f L: %.4f C: %.4f CHG: %.4f MAXCHG: %.4f V: %.4f QV: %.2f TBBV: %.2f",
+		k.Exchange.String(),
+		k.StartTime.Format("2006-01-02 15:04"),
+		k.Symbol, k.Interval, k.Open, k.High, k.Low, k.Close, k.GetChange(), k.GetMaxChange(), k.Volume, k.QuoteVolume, k.TakerBuyBaseAssetVolume)
+}
+
+func (k KLine) PlainText() string {
+	return k.String()
 }
 
 func (k KLine) SlackAttachment() slack.Attachment {
