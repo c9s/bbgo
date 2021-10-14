@@ -55,7 +55,7 @@ backtest:
 
 exchangeStrategies:
 - on: binance
-  buyandhold:
+  pricedrop:
     symbol: "BTCUSDT"
     interval: "1m"
     baseQuantity: 0.001

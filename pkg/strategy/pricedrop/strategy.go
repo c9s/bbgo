@@ -1,4 +1,4 @@
-package buyandhold
+package pricedrop
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-const ID = "buyandhold"
+const ID = "pricedrop"
 
 var log = logrus.WithField("strategy", ID)
 
