@@ -227,7 +227,7 @@ Check out the strategy directory [strategy](pkg/strategy) for all built-in strat
 - `xpuremaker` strategy demonstrates how to maintain the orderbook and submit maker
   orders [xpuremaker](pkg/strategy/xpuremaker)
 - `buyandhold` strategy demonstrates how to subscribe kline events and submit market
-  order [buyandhold](pkg/strategy/buyandhold)
+  order [buyandhold](pkg/strategy/pricedrop)
 - `bollgrid` strategy implements a basic grid strategy with the built-in bollinger
   indicator [bollgrid](pkg/strategy/bollgrid)
 - `grid` strategy implements the fixed price band grid strategy [grid](pkg/strategy/grid)

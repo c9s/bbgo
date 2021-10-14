@@ -4,7 +4,7 @@ package cmd
 import (
 	_ "github.com/c9s/bbgo/pkg/strategy/bollgrid"
 	_ "github.com/c9s/bbgo/pkg/strategy/bollpp"
-	_ "github.com/c9s/bbgo/pkg/strategy/buyandhold"
+	_ "github.com/c9s/bbgo/pkg/strategy/pricedrop"
 	_ "github.com/c9s/bbgo/pkg/strategy/etf"
 	_ "github.com/c9s/bbgo/pkg/strategy/flashcrash"
 	_ "github.com/c9s/bbgo/pkg/strategy/gap"
