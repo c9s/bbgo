@@ -172,7 +172,6 @@ func pnlEmojiMargin(pnl, margin, resolution fixedpoint.Value) (out string) {
 	return out
 }
 
-
 type ProfitStats struct {
 	Symbol        string `json:"symbol"`
 	QuoteCurrency string `json:"quoteCurrency"`
@@ -231,16 +230,19 @@ func (s *ProfitStats) ResetToday() {
 
 func (s *ProfitStats) PlainText() string {
 	since := time.Unix(s.AccumulatedSince, 0).Local()
-	return fmt.Sprintf("today %s profit %f %s,\n"+
-		"today %s net profit %f %s,\n"+
-		"today %s trade loss %f %s\n"+
-		"accumulated profit %f %s,\n"+
-		"accumulated net profit %f %s,\n"+
-		"accumulated trade loss %f %s\n"+
-		"since %s",
-		s.Symbol, s.TodayPnL.Float64(), s.QuoteCurrency,
-		s.Symbol, s.TodayNetProfit.Float64(), s.QuoteCurrency,
-		s.Symbol, s.TodayLoss.Float64(), s.QuoteCurrency,
+	return fmt.Sprintf("%s Profit Today\n"+
+		"Profit %f %s,\n"+
+		"Net profit %f %s,\n"+
+		"trade loss %f %s\n"+
+		"Summary:\n"+
+		"Accumulated profit %f %s,\n"+
+		"Accumulated net profit %f %s,\n"+
+		"Accumulated trade loss %f %s\n"+
+		"Since %s",
+		s.Symbol,
+		s.TodayPnL.Float64(), s.QuoteCurrency,
+		s.TodayNetProfit.Float64(), s.QuoteCurrency,
+		s.TodayLoss.Float64(), s.QuoteCurrency,
 		s.AccumulatedPnL.Float64(), s.QuoteCurrency,
 		s.AccumulatedNetProfit.Float64(), s.QuoteCurrency,
 		s.AccumulatedLoss.Float64(), s.QuoteCurrency,
@@ -287,7 +289,6 @@ func (s *ProfitStats) SlackAttachment() slack.Attachment {
 			Short: true,
 		})
 	}
-
 
 	if s.AccumulatedProfit != 0 {
 		fields = append(fields, slack.AttachmentField{
