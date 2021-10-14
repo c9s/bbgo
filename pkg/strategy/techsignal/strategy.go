@@ -118,7 +118,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 			// skip if the closed price is above the moving average
 			if closePrice.Float64() > lastMA {
-				// return
+				return
 			}
 
 			prettyBaseVolume := accounting.DefaultAccounting(s.Market.BaseCurrency, s.Market.VolumePrecision)
@@ -128,15 +128,15 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			prettyQuoteVolume.Format = "%v %s"
 
 			if detection.MinVolume > 0 && kline.Volume > detection.MinVolume.Float64() {
-				s.Notifiability.Notify("Detected %s support base volume %s > min base volume %s, quote volume %s",
-					s.Symbol,
+				s.Notifiability.Notify("Detected %s %s support base volume %s > min base volume %s, quote volume %s",
+					s.Symbol, detection.Interval,
 					prettyBaseVolume.FormatMoney(kline.Volume),
 					prettyBaseVolume.FormatMoney(detection.MinVolume.Float64()),
 					prettyQuoteVolume.FormatMoney(kline.QuoteVolume),
 				)
 			} else if detection.MinQuoteVolume > 0 && kline.QuoteVolume > detection.MinQuoteVolume.Float64() {
-				s.Notifiability.Notify("Detected %s support quote volume %s > min quote volume %s, base volume %s",
-					s.Symbol,
+				s.Notifiability.Notify("Detected %s %s support quote volume %s > min quote volume %s, base volume %s",
+					s.Symbol, detection.Interval,
 					prettyQuoteVolume.FormatMoney(kline.QuoteVolume),
 					prettyQuoteVolume.FormatMoney(detection.MinQuoteVolume.Float64()),
 					prettyBaseVolume.FormatMoney(kline.Volume),
