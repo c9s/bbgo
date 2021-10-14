@@ -42,7 +42,6 @@ type Profit struct {
 
 func (p *Profit) SlackAttachment() slack.Attachment {
 	var title string = fmt.Sprintf("%s PnL ", p.Symbol)
-	var color string
 
 	if p.ProfitMargin != 0 {
 		title += pnlEmojiMargin(p.Profit, p.ProfitMargin, defaultPnlLevelResolution) + " "
@@ -50,13 +49,8 @@ func (p *Profit) SlackAttachment() slack.Attachment {
 		title += pnlEmojiSimple(p.Profit) + " "
 	}
 
-	if p.Profit > 0 {
-		color = types.GreenColor
-		title += "+" + p.Profit.String() + " " + p.QuoteCurrency
-	} else {
-		color = types.RedColor
-		title += p.Profit.String() + " " + p.QuoteCurrency
-	}
+	color := pnlColor(p.Profit)
+	title += pnlSignString(p.Profit) + " " + p.QuoteCurrency
 
 	var fields []slack.AttachmentField
 
@@ -137,6 +131,20 @@ func (p *Profit) PlainText() string {
 var lossEmoji = "🔥"
 var profitEmoji = "💰"
 var defaultPnlLevelResolution = fixedpoint.NewFromFloat(0.001)
+
+func pnlColor(pnl fixedpoint.Value) string {
+	if pnl > 0 {
+		return types.GreenColor
+	}
+	return types.RedColor
+}
+
+func pnlSignString(pnl fixedpoint.Value) string {
+	if pnl > 0 {
+		return "+" + pnl.String()
+	}
+	return pnl.String()
+}
 
 func pnlEmojiSimple(pnl fixedpoint.Value) string {
 	if pnl < 0 {
@@ -251,15 +259,8 @@ func (s *ProfitStats) PlainText() string {
 }
 
 func (s *ProfitStats) SlackAttachment() slack.Attachment {
-	var title string = fmt.Sprintf("%s Accumulated PnL ", s.Symbol)
-	var color string
-	if s.AccumulatedPnL > 0 {
-		color = types.GreenColor
-		title += "+" + s.AccumulatedPnL.String() + " " + s.QuoteCurrency
-	} else {
-		color = types.RedColor
-		title += s.AccumulatedPnL.String() + " " + s.QuoteCurrency
-	}
+	var color = pnlColor(s.AccumulatedPnL)
+	var title = fmt.Sprintf("%s Accumulated PnL %s %s", s.Symbol, pnlSignString(s.AccumulatedPnL), s.QuoteCurrency)
 
 	since := time.Unix(s.AccumulatedSince, 0).Local()
 	title += " Since " + since.Format(time.RFC822)
