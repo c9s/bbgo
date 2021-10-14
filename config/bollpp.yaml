@@ -1,0 +1,33 @@
+---
+notifications:
+  slack:
+    defaultChannel: "dev-bbgo"
+    errorChannel: "bbgo-error"
+
+  # if you want to route channel by symbol
+  symbolChannels:
+    "^BTC": "btc"
+    "^ETH": "eth"
+    "^BNB": "bnb"
+
+  # object routing rules
+  routing:
+    trade: "$symbol"
+    order: "$silent"
+    submitOrder: "$silent" # not supported yet
+    pnL: "bbgo-pnl"
+
+sessions:
+  max:
+    exchange: max
+    envVarPrefix: MAX
+
+exchangeStrategies:
+
+- on: max
+  bollpp:
+    symbol: LTCUSDT
+    interval: 15m
+    quantity: 0.1
+    spread: 0.05%
+
