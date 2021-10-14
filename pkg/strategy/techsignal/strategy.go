@@ -134,6 +134,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 					prettyBaseVolume.FormatMoney(detection.MinVolume.Float64()),
 					prettyQuoteVolume.FormatMoney(kline.QuoteVolume),
 				)
+				s.Notifiability.Notify(kline)
 			} else if detection.MinQuoteVolume > 0 && kline.QuoteVolume > detection.MinQuoteVolume.Float64() {
 				s.Notifiability.Notify("Detected %s %s support quote volume %s > min quote volume %s, base volume %s",
 					s.Symbol, detection.Interval,
@@ -141,6 +142,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 					prettyQuoteVolume.FormatMoney(detection.MinQuoteVolume.Float64()),
 					prettyBaseVolume.FormatMoney(kline.Volume),
 				)
+				s.Notifiability.Notify(kline)
 			}
 		}
 	})
