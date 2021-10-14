@@ -29,8 +29,8 @@ type Profit struct {
 	// NetProfitMargin is a percentage of the net profit and the capital amount
 	NetProfitMargin fixedpoint.Value `json:"netProfitMargin" db:"net_profit_margin"`
 
-	QuoteCurrency string `json:"quote_currency" db:"quote_currency"`
-	BaseCurrency  string `json:"base_currency" db:"base_currency"`
+	QuoteCurrency string `json:"quoteCurrency" db:"quote_currency"`
+	BaseCurrency  string `json:"baseCurrency" db:"base_currency"`
 
 	// FeeInUSD is the summed fee of this profit,
 	// you will need to convert the trade fee into USD since the fee currencies can be different.
@@ -41,10 +41,9 @@ type Profit struct {
 }
 
 func (p *Profit) SlackAttachment() slack.Attachment {
-	var title string = fmt.Sprintf("%s PnL ", p.Symbol)
+	var color = pnlColor(p.Profit)
+	var title = fmt.Sprintf("%s PnL ", p.Symbol)
 	title += pnlEmojiMargin(p.Profit, p.ProfitMargin, defaultPnlLevelResolution) + " "
-
-	color := pnlColor(p.Profit)
 	title += pnlSignString(p.Profit) + " " + p.QuoteCurrency
 
 	var fields []slack.AttachmentField
