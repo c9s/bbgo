@@ -1,4 +1,4 @@
-package bpp
+package bollpp
 
 import (
 	"context"
@@ -16,7 +16,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-const ID = "bpp"
+const ID = "bollpp"
 
 const stateKey = "state-v1"
 
