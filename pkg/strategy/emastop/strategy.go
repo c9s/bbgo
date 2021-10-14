@@ -1,4 +1,4 @@
-package trailingstop
+package emastop
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-const ID = "trailingstop"
+const ID = "emastop"
 
 var log = logrus.WithField("strategy", ID)
 
