@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/c9s/bbgo/pkg/exchange/binance"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/leekchan/accounting"
 	"github.com/sirupsen/logrus"
 	"strings"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/types"
@@ -30,6 +32,12 @@ type Strategy struct {
 	// These fields will be filled from the config file (it translates YAML to JSON)
 	Symbol string       `json:"symbol"`
 	Market types.Market `json:"-"`
+
+	FundingRate *struct {
+		High          fixedpoint.Value `json:"high"`
+		Neutral       fixedpoint.Value `json:"neutral"`
+		DiffThreshold fixedpoint.Value `json:"diffThreshold"`
+	} `json:"fundingRate"`
 
 	SupportDetection []struct {
 		Interval types.Interval `json:"interval"`
@@ -74,10 +82,68 @@ func (s *Strategy) Validate() error {
 	return nil
 }
 
+func (s *Strategy) listenToFundingRate(ctx context.Context, exchange *binance.Exchange) {
+	var previousFundingRate, fundingRate24HoursLow *binance.FundingRate
+
+	fundingRateTicker := time.NewTicker(1 * time.Hour)
+	defer fundingRateTicker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-fundingRateTicker.C:
+			fundingRate, err := exchange.QueryLastFundingRate(ctx, s.Symbol)
+			if err != nil {
+				log.WithError(err).Error("can not query last funding rate")
+				continue
+			}
+
+			if fundingRate.FundingRate >= s.FundingRate.High {
+				s.Notifiability.Notify("%s funding rate is too high! %s > %s",
+					s.Symbol,
+					fundingRate.FundingRate.Percentage(),
+					s.FundingRate.High.Percentage(),
+				)
+			}
+
+			if previousFundingRate != nil {
+				diff := fundingRate.FundingRate - previousFundingRate.FundingRate
+				if diff > fixedpoint.NewFromFloat(0.001*0.01) {
+					s.Notifiability.Notify("%s funding rate changed %s -> %s",
+						s.Symbol,
+						diff.Percentage(),
+						fundingRate.FundingRate.Percentage(),
+					)
+				}
+			}
+
+			previousFundingRate = fundingRate
+			if fundingRate24HoursLow != nil {
+				if fundingRate24HoursLow.Time.Before(time.Now().Add(24 * time.Hour)) {
+					fundingRate24HoursLow = fundingRate
+				}
+				if fundingRate.FundingRate < fundingRate24HoursLow.FundingRate {
+					fundingRate24HoursLow = fundingRate
+				}
+			} else {
+				fundingRate24HoursLow = fundingRate
+			}
+		}
+	}
+}
+
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	standardIndicatorSet, ok := session.StandardIndicatorSet(s.Symbol)
 	if !ok {
 		return fmt.Errorf("standardIndicatorSet is nil, symbol %s", s.Symbol)
+	}
+
+	if s.FundingRate != nil {
+		if binanceExchange, ok := session.Exchange.(*binance.Exchange); ok {
+			go s.listenToFundingRate(ctx, binanceExchange)
+		} else {
+			log.Error("exchange does not support funding rate api")
+		}
 	}
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
