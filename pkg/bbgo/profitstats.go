@@ -255,10 +255,10 @@ func (s *ProfitStats) SlackAttachment() slack.Attachment {
 	var color string
 	if s.AccumulatedPnL > 0 {
 		color = types.GreenColor
-		title = "+" + s.AccumulatedPnL.String() + " " + s.QuoteCurrency
+		title += "+" + s.AccumulatedPnL.String() + " " + s.QuoteCurrency
 	} else {
 		color = types.RedColor
-		title = s.AccumulatedPnL.String() + " " + s.QuoteCurrency
+		title += s.AccumulatedPnL.String() + " " + s.QuoteCurrency
 	}
 
 	since := time.Unix(s.AccumulatedSince, 0).Local()
