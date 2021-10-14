@@ -237,13 +237,13 @@ func (s *ProfitStats) ResetToday() {
 func (s *ProfitStats) PlainText() string {
 	since := time.Unix(s.AccumulatedSince, 0).Local()
 	return fmt.Sprintf("%s Profit Today\n"+
-		"Profit %f %s,\n"+
-		"Net profit %f %s,\n"+
-		"trade loss %f %s\n"+
+		"Profit %f %s\n"+
+		"Net profit %f %s\n"+
+		"Trade Loss %f %s\n"+
 		"Summary:\n"+
-		"Accumulated profit %f %s,\n"+
-		"Accumulated net profit %f %s,\n"+
-		"Accumulated trade loss %f %s\n"+
+		"Accumulated Profit %f %s\n"+
+		"Accumulated Net Profit %f %s\n"+
+		"Accumulated Trade Loss %f %s\n"+
 		"Since %s",
 		s.Symbol,
 		s.TodayPnL.Float64(), s.QuoteCurrency,
