@@ -408,8 +408,7 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 
 	for interval := range klineSubscriptions {
 		// avoid querying the last unclosed kline
-		// endTime := environ.startTime.Add(-interval.Duration())
-		endTime := environ.startTime.Add(-time.Millisecond)
+		endTime := environ.startTime.Add(-interval.Duration())
 		kLines, err := session.Exchange.QueryKLines(ctx, symbol, interval, types.KLineQueryOptions{
 			EndTime: &endTime,
 			Limit:   1000, // indicators need at least 100
