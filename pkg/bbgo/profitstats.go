@@ -52,10 +52,10 @@ func (p *Profit) SlackAttachment() slack.Attachment {
 
 	if p.Profit > 0 {
 		color = types.GreenColor
-		title = "+" + p.Profit.String() + " " + p.QuoteCurrency
+		title += "+" + p.Profit.String() + " " + p.QuoteCurrency
 	} else {
 		color = types.RedColor
-		title = p.Profit.String() + " " + p.QuoteCurrency
+		title += p.Profit.String() + " " + p.QuoteCurrency
 	}
 
 	var fields []slack.AttachmentField
