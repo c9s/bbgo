@@ -911,19 +911,35 @@ func (e *Exchange) BatchQueryKLines(ctx context.Context, symbol string, interval
 	return allKLines, nil
 }
 
-func (e *Exchange) QueryLastFundingRate(ctx context.Context, symbol string) (fixedpoint.Value, error) {
+type FundingRate struct {
+	FundingRate fixedpoint.Value
+	FundingTime time.Time
+	Time        time.Time
+}
+
+func (e *Exchange) QueryLastFundingRate(ctx context.Context, symbol string) (*FundingRate, error) {
 	futuresClient := binance.NewFuturesClient(e.key, e.secret)
 	rates, err := futuresClient.NewFundingRateService().
 		Symbol(symbol).
 		Limit(1).
 		Do(ctx)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	if len(rates) == 0 {
-		return 0, errors.New("empty funding rate data")
+		return nil, errors.New("empty funding rate data")
 	}
 
-	return fixedpoint.NewFromString(rates[0].FundingRate)
+	rate := rates[0]
+	fundingRate, err := fixedpoint.NewFromString(rate.FundingRate)
+	if err != nil {
+		return nil, err
+	}
+
+	return &FundingRate{
+		FundingRate: fundingRate,
+		FundingTime: time.Unix(0, rate.FundingTime*int64(time.Millisecond)),
+		Time:        time.Unix(0, rate.Time*int64(time.Millisecond)),
+	}, nil
 }
