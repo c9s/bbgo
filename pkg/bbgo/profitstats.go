@@ -42,12 +42,7 @@ type Profit struct {
 
 func (p *Profit) SlackAttachment() slack.Attachment {
 	var title string = fmt.Sprintf("%s PnL ", p.Symbol)
-
-	if p.ProfitMargin != 0 {
-		title += pnlEmojiMargin(p.Profit, p.ProfitMargin, defaultPnlLevelResolution) + " "
-	} else {
-		title += pnlEmojiSimple(p.Profit) + " "
-	}
+	title += pnlEmojiMargin(p.Profit, p.ProfitMargin, defaultPnlLevelResolution) + " "
 
 	color := pnlColor(p.Profit)
 	title += pnlSignString(p.Profit) + " " + p.QuoteCurrency
@@ -57,7 +52,7 @@ func (p *Profit) SlackAttachment() slack.Attachment {
 	if p.NetProfit != 0 {
 		fields = append(fields, slack.AttachmentField{
 			Title: "Net Profit",
-			Value: p.NetProfit.String() + " " + p.QuoteCurrency,
+			Value: pnlSignString(p.NetProfit) + " " + p.QuoteCurrency,
 			Short: true,
 		})
 	}
@@ -159,6 +154,10 @@ func pnlEmojiSimple(pnl fixedpoint.Value) string {
 }
 
 func pnlEmojiMargin(pnl, margin, resolution fixedpoint.Value) (out string) {
+	if margin == 0 {
+		return pnlEmojiSimple(pnl)
+	}
+
 	if pnl < 0 {
 		out = lossEmoji
 		level := (-margin).Div(resolution).Floor()
@@ -270,7 +269,7 @@ func (s *ProfitStats) SlackAttachment() slack.Attachment {
 	if s.TodayProfit != 0 {
 		fields = append(fields, slack.AttachmentField{
 			Title: "Profit Today",
-			Value: s.TodayProfit.String() + " " + s.QuoteCurrency,
+			Value: pnlSignString(s.TodayProfit) + " " + s.QuoteCurrency,
 			Short: true,
 		})
 	}
@@ -278,7 +277,7 @@ func (s *ProfitStats) SlackAttachment() slack.Attachment {
 	if s.TodayNetProfit != 0 {
 		fields = append(fields, slack.AttachmentField{
 			Title: "Net Profit Today",
-			Value: s.TodayNetProfit.String() + " " + s.QuoteCurrency,
+			Value: pnlSignString(s.TodayNetProfit) + " " + s.QuoteCurrency,
 			Short: true,
 		})
 	}
@@ -286,7 +285,7 @@ func (s *ProfitStats) SlackAttachment() slack.Attachment {
 	if s.TodayLoss != 0 {
 		fields = append(fields, slack.AttachmentField{
 			Title: "Loss Today",
-			Value: s.TodayLoss.String() + " " + s.QuoteCurrency,
+			Value: pnlSignString(s.TodayLoss) + " " + s.QuoteCurrency,
 			Short: true,
 		})
 	}
@@ -294,21 +293,21 @@ func (s *ProfitStats) SlackAttachment() slack.Attachment {
 	if s.AccumulatedProfit != 0 {
 		fields = append(fields, slack.AttachmentField{
 			Title: "Accumulated Profit",
-			Value: s.AccumulatedProfit.String() + " " + s.QuoteCurrency,
+			Value: pnlSignString(s.AccumulatedProfit) + " " + s.QuoteCurrency,
 		})
 	}
 
 	if s.AccumulatedNetProfit != 0 {
 		fields = append(fields, slack.AttachmentField{
 			Title: "Accumulated Net Profit",
-			Value: s.AccumulatedNetProfit.String() + " " + s.QuoteCurrency,
+			Value: pnlSignString(s.AccumulatedNetProfit) + " " + s.QuoteCurrency,
 		})
 	}
 
 	if s.AccumulatedLoss != 0 {
 		fields = append(fields, slack.AttachmentField{
 			Title: "Accumulated Loss",
-			Value: s.AccumulatedLoss.String() + " " + s.QuoteCurrency,
+			Value: pnlSignString(s.AccumulatedLoss) + " " + s.QuoteCurrency,
 		})
 	}
 
