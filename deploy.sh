@@ -26,6 +26,10 @@ host_arch=amd64
 # and then upload the systemd service file to $host_systemd_service_dir,
 # root permission might be needed, you can change the host user to root temporarily while setting up the environment.
 setup_host_systemd_service=no
+if [[ -n $SETUP_SYSTEMD ]] ; then
+    setup_host_systemd_service=yes
+fi
+
 
 # use the git describe as the binary version, you may override this with something else.
 tag=$(git describe --tags)
