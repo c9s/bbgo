@@ -59,6 +59,13 @@ func (v Value) Percentage() string {
 	return fmt.Sprintf("%.2f%%", v.Float64() * 100.0)
 }
 
+func (v Value) SignedPercentage() string {
+	if v > 0 {
+		return "+" + v.Percentage()
+	}
+	return v.Percentage()
+}
+
 func (v Value) Int64() int64 {
 	return int64(v.Float64())
 }
