@@ -3,6 +3,7 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/leekchan/accounting"
 	"math"
 	"strconv"
 	"time"
@@ -68,6 +69,18 @@ type Market struct {
 	MinPrice float64
 	MaxPrice float64
 	TickSize float64
+}
+
+func (m Market) BaseCurrencyFormatter() *accounting.Accounting {
+	a := accounting.DefaultAccounting(m.BaseCurrency, m.VolumePrecision)
+	a.Format = "%v %s"
+	return a
+}
+
+func (m Market) QuoteCurrencyFormatter() *accounting.Accounting {
+	a := accounting.DefaultAccounting(m.QuoteCurrency, m.PricePrecision)
+	a.Format = "%v %s"
+	return a
 }
 
 func (m Market) FormatPriceCurrency(val float64) string {

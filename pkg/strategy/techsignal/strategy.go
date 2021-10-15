@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/c9s/bbgo/pkg/exchange/binance"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/leekchan/accounting"
 	"github.com/sirupsen/logrus"
 	"strings"
 	"time"
@@ -198,11 +197,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				return
 			}
 
-			prettyBaseVolume := accounting.DefaultAccounting(s.Market.BaseCurrency, s.Market.VolumePrecision)
-			prettyBaseVolume.Format = "%v %s"
-
-			prettyQuoteVolume := accounting.DefaultAccounting(s.Market.QuoteCurrency, 0)
-			prettyQuoteVolume.Format = "%v %s"
+			prettyBaseVolume := s.Market.BaseCurrencyFormatter()
+			prettyQuoteVolume := s.Market.QuoteCurrencyFormatter()
 
 			if detection.MinVolume > 0 && kline.Volume > detection.MinVolume.Float64() {
 				s.Notifiability.Notify("Detected %s %s support base volume %s > min base volume %s, quote volume %s",
