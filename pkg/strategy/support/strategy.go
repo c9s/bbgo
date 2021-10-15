@@ -36,20 +36,32 @@ type Target struct {
 	MarginOrderSideEffect types.MarginOrderSideEffectType `json:"marginOrderSideEffect"`
 }
 
+// PercentageTargetStop is a kind of stop order by setting fixed percentage target
+type PercentageTargetStop struct {
+	Targets []Target `json:"targets"`
+}
+
+// ResistanceStop is a kind of stop order by detecting resistance
+type ResistanceStop struct {
+	Interval      types.Interval   `json:"interval"`
+	sensitivity   fixedpoint.Value `json:"sensitivity"`
+	MinVolume     fixedpoint.Value `json:"minVolume"`
+	TakerBuyRatio fixedpoint.Value `json:"takerBuyRatio"`
+}
+
 type Strategy struct {
 	*bbgo.Notifiability `json:"-"`
 	*bbgo.Persistence
 	*bbgo.Graceful `json:"-"`
 
-	Symbol              string         `json:"symbol"`
-	Market              types.Market   `json:"-"`
+	Symbol string       `json:"symbol"`
+	Market types.Market `json:"-"`
 
 	// Interval for checking support
-	Interval            types.Interval `json:"interval"`
+	Interval types.Interval `json:"interval"`
 
 	// moving average window for checking support (support should be under the moving average line)
-	MovingAverageWindow int            `json:"movingAverageWindow"`
-
+	MovingAverageWindow int `json:"movingAverageWindow"`
 
 	// LongTermMovingAverage is the second moving average line for checking support position
 	LongTermMovingAverage types.IntervalWindow `json:"longTermMovingAverage"`
@@ -61,9 +73,8 @@ type Strategy struct {
 	MarginOrderSideEffect types.MarginOrderSideEffectType `json:"marginOrderSideEffect"`
 	Targets               []Target                        `json:"targets"`
 
-	ResistanceInterval      types.Interval   `json:"resistanceInterval"`
-	ResistanceSensitivity   fixedpoint.Value `json:"resistanceSensitivity"`
-	ResistanceMinVolume     fixedpoint.Value `json:"resistanceMinVolume"`
+	ResistanceStop *ResistanceStop `json:"resistanceStop"`
+
 	ResistanceTakerBuyRatio fixedpoint.Value `json:"resistanceTakerBuyRatio"`
 
 	// Min BaseAsset balance to keep
@@ -209,40 +220,6 @@ func (s *Strategy) calculateQuantity(session *bbgo.ExchangeSession, side types.S
 	return quantity, nil
 }
 
-func (s *Strategy) detectResistance(kline types.KLine) (confidence fixedpoint.Value) {
-	// if it's above the EMA, it's resistance
-	if kline.Close < s.triggerEMA.Last() {
-		return 0
-	}
-
-	// check resistance trigger volume
-	if kline.Volume < s.ResistanceMinVolume.Float64() {
-		return 0
-	}
-
-	// check taker buy base volume
-	// it's not resistance if it's strong buy kline
-	takerBuyBaseVolumeThreshold := kline.Volume * s.ResistanceTakerBuyRatio.Float64()
-	if kline.TakerBuyBaseAssetVolume > takerBuyBaseVolumeThreshold {
-		return 0
-	}
-
-	// resistance usually a larger upper shadow, here we use 50%
-	if kline.GetUpperShadowRatio() < 0.1 {
-		return 0
-	}
-
-	s.Notify("%s: resistance detected, taker buy base volume %f < threshold %f (volume %f) at price %f",
-		s.Symbol,
-		kline.TakerBuyBaseAssetVolume,
-		takerBuyBaseVolumeThreshold,
-		kline.Volume,
-		kline.Close,
-	)
-
-	return
-}
-
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	// set default values
 	if s.Interval == "" {
@@ -261,20 +238,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		s.MinVolume = fixedpoint.NewFromFloat(volRange[0]) + fixedpoint.NewFromFloat(volRange[1]-volRange[0]).Mul(fixedpoint.NewFromFloat(1.0)-s.Sensitivity)
 		log.Infof("adjusted minimal support volume to %f according to sensitivity %f", s.MinVolume.Float64(), s.Sensitivity.Float64())
-	}
-
-	if s.ResistanceTakerBuyRatio == 0 {
-		s.ResistanceTakerBuyRatio = fixedpoint.NewFromFloat(0.5)
-	}
-
-	if s.ResistanceSensitivity > 0 {
-		volRange, err := s.ScaleQuantity.ByVolumeRule.Range()
-		if err != nil {
-			return err
-		}
-
-		s.ResistanceMinVolume = fixedpoint.NewFromFloat(volRange[0]) + fixedpoint.NewFromFloat(volRange[1]-volRange[0]).Mul(fixedpoint.NewFromFloat(1.0)-s.ResistanceSensitivity)
-		log.Infof("adjusted minimal resistance volume to %f according to sensitivity %f", s.ResistanceMinVolume.Float64(), s.ResistanceSensitivity.Float64())
 	}
 
 	market, ok := session.Market(s.Symbol)
@@ -296,7 +259,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderStore.BindStream(session.UserDataStream)
 
 	s.triggerEMA = standardIndicatorSet.EWMA(types.IntervalWindow{Interval: s.Interval, Window: s.MovingAverageWindow})
-
 
 	if err := s.LoadState(); err != nil {
 		return err
@@ -321,51 +283,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		closePriceF := kline.GetClose()
 		closePrice := fixedpoint.NewFromFloat(closePriceF)
-
-		// If it's above the EMA, it's resistance
-		if s.ResistanceMinVolume > 0 && closePriceF > s.triggerEMA.Last() {
-			// check resistance volume
-			if kline.Volume < s.ResistanceMinVolume.Float64() {
-				return
-			}
-
-			takerBuyBaseVolumeThreshold := kline.Volume * s.ResistanceTakerBuyRatio.Float64()
-			if kline.TakerBuyBaseAssetVolume < takerBuyBaseVolumeThreshold {
-				s.Notify("%s: resistance detected, taker buy base volume %f < threshold %f (volume %f) at price %f",
-					s.Symbol,
-					kline.TakerBuyBaseAssetVolume,
-					takerBuyBaseVolumeThreshold,
-					kline.Volume,
-					closePriceF,
-				)
-
-				quantity, err := s.calculateQuantity(session, types.SideTypeSell, closePrice, kline.Volume)
-				if err != nil {
-					log.WithError(err).Errorf("quantity calculation error")
-					return
-				}
-
-				orderForm := types.SubmitOrder{
-					Symbol:   s.Symbol,
-					Market:   market,
-					Side:     types.SideTypeSell,
-					Type:     types.OrderTypeMarket,
-					Quantity: quantity.Float64(),
-				}
-				_ = orderForm
-
-				/*
-				if err := s.submitOrders(ctx, orderExecutor, orderForm); err != nil {
-					log.WithError(err).Error("submit sell order error")
-					return
-				}
-				*/
-
-				return
-			}
-
-			return
-		}
 
 		// check support volume
 		if kline.Volume < s.MinVolume.Float64() {
