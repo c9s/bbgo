@@ -82,6 +82,7 @@ func (it *Interaction) HandleInfo(m *telebot.Message) {
 
 func (it *Interaction) SendToOwner(message string) {
 	if it.session.OwnerChat == nil {
+		log.Warnf("owner's chat is not configured, you need to auth first")
 		return
 	}
 
