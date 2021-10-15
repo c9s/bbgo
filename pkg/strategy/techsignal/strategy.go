@@ -82,6 +82,13 @@ func (s *Strategy) Validate() error {
 	return nil
 }
 
+func signedPercentage(val fixedpoint.Value) string {
+	if val > 0 {
+		return "+" + val.Percentage()
+	}
+	return val.Percentage()
+}
+
 func (s *Strategy) listenToFundingRate(ctx context.Context, exchange *binance.Exchange) {
 	var previousFundingRate, fundingRate24HoursLow *binance.FundingRate
 
@@ -99,7 +106,7 @@ func (s *Strategy) listenToFundingRate(ctx context.Context, exchange *binance.Ex
 			}
 
 			if fundingRate.FundingRate >= s.FundingRate.High {
-				s.Notifiability.Notify("%s funding rate is too high! %s > %s",
+				s.Notifiability.Notify("%s funding rate is too high! current %s > threshold %s",
 					s.Symbol,
 					fundingRate.FundingRate.Percentage(),
 					s.FundingRate.High.Percentage(),
@@ -107,11 +114,15 @@ func (s *Strategy) listenToFundingRate(ctx context.Context, exchange *binance.Ex
 			}
 
 			if previousFundingRate != nil {
+				if s.FundingRate.DiffThreshold == 0 {
+					s.FundingRate.DiffThreshold = fixedpoint.NewFromFloat(0.005 * 0.01)
+				}
+
 				diff := fundingRate.FundingRate - previousFundingRate.FundingRate
-				if diff > fixedpoint.NewFromFloat(0.001*0.01) {
-					s.Notifiability.Notify("%s funding rate changed %s -> %s",
+				if diff > s.FundingRate.DiffThreshold {
+					s.Notifiability.Notify("%s funding rate changed %s, current funding rate %s",
 						s.Symbol,
-						diff.Percentage(),
+						signedPercentage(diff),
 						fundingRate.FundingRate.Percentage(),
 					)
 				}
