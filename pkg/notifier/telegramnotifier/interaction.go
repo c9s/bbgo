@@ -16,14 +16,14 @@ var log = logrus.WithField("service", "telegram")
 
 type Session struct {
 	Owner              *telebot.User `json:"owner"`
-	Chat               *telebot.Chat `json:"chat"`
+	OwnerChat          *telebot.Chat `json:"chat"`
 	OneTimePasswordKey *otp.Key      `json:"otpKey"`
 }
 
 func NewSession(key *otp.Key) Session {
 	return Session{
 		Owner:              nil,
-		Chat:               nil,
+		OwnerChat:          nil,
 		OneTimePasswordKey: key,
 	}
 }
@@ -63,14 +63,14 @@ func (it *Interaction) Session() *Session {
 }
 
 func (it *Interaction) HandleInfo(m *telebot.Message) {
-	if it.session.Owner == nil || it.session.Chat == nil {
+	if it.session.Owner == nil || it.session.OwnerChat == nil {
 		return
 	}
 
 	if m.Sender.ID != it.session.Owner.ID {
 		log.Warningf("incorrect user tried to access bot! sender: %+v", m.Sender)
 	} else {
-		if _, err := it.bot.Send(it.session.Chat,
+		if _, err := it.bot.Send(it.session.OwnerChat,
 			fmt.Sprintf("Welcome! your username: %s, user ID: %d",
 				it.session.Owner.Username,
 				it.session.Owner.ID,
@@ -81,11 +81,11 @@ func (it *Interaction) HandleInfo(m *telebot.Message) {
 }
 
 func (it *Interaction) SendToOwner(message string) {
-	if it.session.Chat == nil {
+	if it.session.OwnerChat == nil {
 		return
 	}
 
-	if _, err := it.bot.Send(it.session.Chat, message); err != nil {
+	if _, err := it.bot.Send(it.session.OwnerChat, message); err != nil {
 		log.WithError(err).Error("failed to send message to the owner")
 	}
 }
@@ -104,7 +104,7 @@ info	- show information about current chat
 func (it *Interaction) HandleAuth(m *telebot.Message) {
 	if len(it.AuthToken) > 0 && m.Payload == it.AuthToken {
 		it.session.Owner = m.Sender
-		it.session.Chat = m.Chat
+		it.session.OwnerChat = m.Chat
 
 		if _, err := it.bot.Send(m.Chat, fmt.Sprintf("👋 Hi %s, nice to meet you. 🤝 I will send you the notifications!", m.Sender.Username)); err != nil {
 			log.WithError(err).Error("telegram send error")
@@ -120,7 +120,7 @@ func (it *Interaction) HandleAuth(m *telebot.Message) {
 
 		if totp.Validate(m.Payload, it.session.OneTimePasswordKey.Secret()) {
 			it.session.Owner = m.Sender
-			it.session.Chat = m.Chat
+			it.session.OwnerChat = m.Chat
 
 			if _, err := it.bot.Send(m.Chat, fmt.Sprintf("👋 Hi %s, nice to meet you. 🤝 I will send you the notifications!", m.Sender.Username)); err != nil {
 				log.WithError(err).Error("telegram send error")
@@ -148,8 +148,8 @@ func (it *Interaction) HandleAuth(m *telebot.Message) {
 func (it *Interaction) Start(session Session) {
 	it.session = &session
 
-	if it.session.Owner != nil && it.session.Chat != nil {
-		if _, err := it.bot.Send(it.session.Chat, fmt.Sprintf("👋 Hi %s, I'm back, this is version %s, good luck! 🖖",
+	if it.session.Owner != nil && it.session.OwnerChat != nil {
+		if _, err := it.bot.Send(it.session.OwnerChat, fmt.Sprintf("👋 Hi %s, I'm back, this is version %s, good luck! 🖖",
 			it.session.Owner.Username,
 			version.Version,
 		)); err != nil {
