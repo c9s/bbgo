@@ -2,6 +2,7 @@ package telegramnotifier
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/c9s/bbgo/pkg/version"
 	"github.com/pquerna/otp"
@@ -18,6 +19,9 @@ type Session struct {
 	Owner              *telebot.User `json:"owner"`
 	OwnerChat          *telebot.Chat `json:"chat"`
 	OneTimePasswordKey *otp.Key      `json:"otpKey"`
+
+	// Chat objects
+	Chats map[int64]bool `json:"chats"`
 }
 
 func NewSession(key *otp.Key) Session {
@@ -25,6 +29,7 @@ func NewSession(key *otp.Key) Session {
 		Owner:              nil,
 		OwnerChat:          nil,
 		OneTimePasswordKey: key,
+		Chats:              make(map[int64]bool),
 	}
 }
 
@@ -51,6 +56,7 @@ func NewInteraction(bot *telebot.Bot, store service.Store) *Interaction {
 	bot.Handle("/help", interaction.HandleHelp)
 	bot.Handle("/auth", interaction.HandleAuth)
 	bot.Handle("/info", interaction.HandleInfo)
+	bot.Handle("/subscribe", interaction.HandleSubscribe)
 	return interaction
 }
 
@@ -60,6 +66,18 @@ func (it *Interaction) SetAuthToken(token string) {
 
 func (it *Interaction) Session() *Session {
 	return it.session
+}
+
+func (it *Interaction) HandleSubscribe(m *telebot.Message) {
+	if it.session == nil {
+		return
+	}
+
+	it.session.Chats[m.Chat.ID] = true
+
+	if _, err := it.bot.Send(m.Chat, "I just added your subscription"); err != nil {
+		log.WithError(err).Error("failed to send telegram message")
+	}
 }
 
 func (it *Interaction) HandleInfo(m *telebot.Message) {
@@ -77,6 +95,20 @@ func (it *Interaction) HandleInfo(m *telebot.Message) {
 				it.session.Owner.ID,
 			)); err != nil {
 			log.WithError(err).Error("failed to send telegram message")
+		}
+	}
+}
+
+func (it *Interaction) Broadcast(message string) {
+	for chatID := range it.session.Chats {
+		chat, err := it.bot.ChatByID(strconv.FormatInt(chatID, 10))
+		if err != nil {
+			log.WithError(err).Error("can not get chat by ID")
+			continue
+		}
+
+		if _, err := it.bot.Send(chat, message); err != nil {
+			log.WithError(err).Error("failed to send message")
 		}
 	}
 }
