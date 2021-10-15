@@ -85,8 +85,15 @@ func (n *Notifier) NotifyTo(channel string, obj interface{}, args ...interface{}
 
 	}
 
-	n.interaction.SendToOwner(message)
-	for _, text := range texts {
-		n.interaction.SendToOwner(text)
+	if n.broadcast {
+		n.interaction.Broadcast(message)
+		for _, text := range texts {
+			n.interaction.Broadcast(text)
+		}
+	} else {
+		n.interaction.SendToOwner(message)
+		for _, text := range texts {
+			n.interaction.SendToOwner(text)
+		}
 	}
 }
