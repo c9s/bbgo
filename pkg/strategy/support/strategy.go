@@ -41,6 +41,41 @@ type PercentageTargetStop struct {
 	Targets []Target `json:"targets"`
 }
 
+// GenerateOrders generates the orders from the given targets
+func (stop *PercentageTargetStop) GenerateOrders(market types.Market, pos *bbgo.Position) []types.SubmitOrder {
+	var price = pos.AverageCost
+	var quantity = pos.Base
+
+	// submit target orders
+	var targetOrders []types.SubmitOrder
+	for _, target := range stop.Targets {
+		targetPrice := price.Float64() * (1.0 + target.ProfitPercentage)
+		targetQuantity := quantity.Float64() * target.QuantityPercentage
+		targetQuoteQuantity := targetPrice * targetQuantity
+
+		if targetQuoteQuantity <= market.MinNotional {
+			continue
+		}
+
+		if targetQuantity <= market.MinQuantity {
+			continue
+		}
+
+		targetOrders = append(targetOrders, types.SubmitOrder{
+			Symbol:   market.Symbol,
+			Market:   market,
+			Type:     types.OrderTypeLimit,
+			Side:     types.SideTypeSell,
+			Price:    targetPrice,
+			Quantity: targetQuantity,
+			MarginSideEffect: target.MarginOrderSideEffect,
+			TimeInForce:      "GTC",
+		})
+	}
+
+	return targetOrders
+}
+
 // ResistanceStop is a kind of stop order by detecting resistance
 type ResistanceStop struct {
 	Interval      types.Interval   `json:"interval"`
