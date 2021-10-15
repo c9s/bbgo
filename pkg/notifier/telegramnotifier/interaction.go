@@ -64,6 +64,7 @@ func (it *Interaction) Session() *Session {
 
 func (it *Interaction) HandleInfo(m *telebot.Message) {
 	if it.session.Owner == nil || it.session.OwnerChat == nil {
+		log.Warnf("can not handle info command, either owner or owner chat is not configured, please auth first")
 		return
 	}
 
