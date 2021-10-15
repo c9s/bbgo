@@ -605,7 +605,13 @@ func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) erro
 
 		go interaction.Start(session)
 
-		var notifier = telegramnotifier.New(interaction)
+		var opts []telegramnotifier.Option
+
+		if userConfig.Notifications != nil && userConfig.Notifications.Telegram != nil {
+			opts = append(opts, telegramnotifier.UseBroadcast())
+		}
+
+		var notifier = telegramnotifier.New(interaction, opts...)
 		environ.Notifiability.AddNotifier(notifier)
 	}
 
