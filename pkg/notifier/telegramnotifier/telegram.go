@@ -8,13 +8,20 @@ import (
 
 type Notifier struct {
 	interaction *Interaction
+	broadcast   bool
 }
 
-type NotifyOption func(notifier *Notifier)
+type Option func(notifier *Notifier)
+
+func UseBroadcast() Option {
+	return func(notifier *Notifier) {
+		notifier.broadcast = true
+	}
+}
 
 // New
 // TODO: register interaction with channel, so that we can route message to the specific telegram bot
-func New(interaction *Interaction, options ...NotifyOption) *Notifier {
+func New(interaction *Interaction, options ...Option) *Notifier {
 	notifier := &Notifier{
 		interaction: interaction,
 	}
