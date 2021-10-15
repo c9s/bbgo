@@ -78,8 +78,20 @@ func (m Market) BaseCurrencyFormatter() *accounting.Accounting {
 }
 
 func (m Market) QuoteCurrencyFormatter() *accounting.Accounting {
-	a := accounting.DefaultAccounting(m.QuoteCurrency, m.PricePrecision)
-	a.Format = "%v %s"
+	var format, symbol string
+
+	switch m.QuoteCurrency {
+	case "USDT", "USDC", "USD":
+		symbol = "$"
+		format = "%s %v"
+
+	default:
+		symbol = m.QuoteCurrency
+		format = "%v %s"
+	}
+
+	a := accounting.DefaultAccounting(symbol, m.PricePrecision)
+	a.Format = format
 	return a
 }
 
