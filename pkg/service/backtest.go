@@ -98,9 +98,9 @@ func (s *BacktestService) QueryKLinesForward(exchange types.ExchangeName, symbol
 
 	rows, err := s.DB.NamedQuery(sql, map[string]interface{}{
 		"start_time": startTime,
-		"limit": limit,
-		"symbol":    symbol,
-		"interval":  interval,
+		"limit":      limit,
+		"symbol":     symbol,
+		"interval":   interval,
 	})
 	if err != nil {
 		return nil, err
@@ -110,12 +110,13 @@ func (s *BacktestService) QueryKLinesForward(exchange types.ExchangeName, symbol
 }
 
 func (s *BacktestService) QueryKLinesBackward(exchange types.ExchangeName, symbol string, interval types.Interval, endTime time.Time, limit int) ([]types.KLine, error) {
-	sql := "SELECT * FROM `binance_klines` WHERE `end_time` <= :end_time AND `symbol` = :symbol AND `interval` = :interval ORDER BY end_time ASC LIMIT :limit"
+	sql := "SELECT * FROM `binance_klines` WHERE `end_time` <= :end_time AND `symbol` = :symbol AND `interval` = :interval ORDER BY end_time DESC LIMIT :limit"
 	sql = strings.ReplaceAll(sql, "binance_klines", exchange.String()+"_klines")
+	sql = "SELECT t.* FROM (" + sql + ") AS t ORDER BY t.end_time ASC"
 
 	rows, err := s.DB.NamedQuery(sql, map[string]interface{}{
 		"limit":    limit,
-		"end_time":  endTime,
+		"end_time": endTime,
 		"symbol":   symbol,
 		"interval": interval,
 	})
