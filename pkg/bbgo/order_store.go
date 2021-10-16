@@ -24,6 +24,27 @@ func NewOrderStore(symbol string) *OrderStore {
 	}
 }
 
+func (s *OrderStore) AllFilled() bool {
+	// If any order is new or partially filled, we return false
+	for _, o := range s.orders {
+		switch o.Status {
+
+		case types.OrderStatusCanceled, types.OrderStatusRejected:
+			continue
+
+		case types.OrderStatusNew, types.OrderStatusPartiallyFilled:
+			return false
+
+		case types.OrderStatusFilled:
+			// do nothing for the filled order
+
+		}
+	}
+
+	// If we pass through the for loop, then all the orders filled
+	return true
+}
+
 func (s *OrderStore) NumOfOrders() (num int) {
 	s.mu.Lock()
 	num = len(s.orders)
