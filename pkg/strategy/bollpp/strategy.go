@@ -289,6 +289,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 		s.state.ProfitStats.AddProfit(p)
 		s.Notify(&p)
+		s.Notify(&s.state.ProfitStats)
 	})
 
 	s.tradeCollector.OnTrade(func(trade types.Trade) {
