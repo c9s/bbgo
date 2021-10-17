@@ -556,7 +556,7 @@ func (e *Exchange) submitMarginOrder(ctx context.Context, order types.SubmitOrde
 
 	// set price field for limit orders
 	switch order.Type {
-	case types.OrderTypeStopLimit, types.OrderTypeLimit:
+	case types.OrderTypeStopLimit, types.OrderTypeLimit, types.OrderTypeLimitMaker:
 		if len(order.PriceString) > 0 {
 			req.Price(order.PriceString)
 		} else if order.Market.Symbol != "" {
@@ -669,7 +669,7 @@ func (e *Exchange) submitSpotOrder(ctx context.Context, order types.SubmitOrder)
 
 	// set price field for limit orders
 	switch order.Type {
-	case types.OrderTypeStopLimit, types.OrderTypeLimit:
+	case types.OrderTypeStopLimit, types.OrderTypeLimit, types.OrderTypeLimitMaker:
 		if len(order.PriceString) > 0 {
 			req.Price(order.PriceString)
 		} else if order.Market.Symbol != "" {
@@ -695,6 +695,8 @@ func (e *Exchange) submitSpotOrder(ctx context.Context, order types.SubmitOrder)
 			req.TimeInForce(binance.TimeInForceTypeGTC)
 		}
 	}
+
+	req.NewOrderRespType(binance.NewOrderRespTypeRESULT)
 
 	response, err := req.Do(ctx)
 	if err != nil {
