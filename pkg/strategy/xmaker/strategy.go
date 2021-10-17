@@ -681,11 +681,7 @@ func (s *Strategy) LoadState() error {
 
 	// if position is nil, we need to allocate a new position for calculation
 	if s.state.Position == nil {
-		s.state.Position = &bbgo.Position{
-			Symbol:        s.Symbol,
-			BaseCurrency:  s.makerMarket.BaseCurrency,
-			QuoteCurrency: s.makerMarket.QuoteCurrency,
-		}
+		s.state.Position = bbgo.NewPositionFromMarket(s.makerMarket)
 	}
 
 	s.state.ProfitStats.Symbol = s.makerMarket.Symbol
