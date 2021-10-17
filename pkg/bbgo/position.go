@@ -21,6 +21,8 @@ type Position struct {
 	BaseCurrency  string `json:"baseCurrency"`
 	QuoteCurrency string `json:"quoteCurrency"`
 
+	Market types.Market `json:"market"`
+
 	Base        fixedpoint.Value `json:"base"`
 	Quote       fixedpoint.Value `json:"quote"`
 	AverageCost fixedpoint.Value `json:"averageCost"`
@@ -39,6 +41,7 @@ func NewPositionFromMarket(market types.Market) *Position {
 		Symbol:        market.Symbol,
 		BaseCurrency:  market.BaseCurrency,
 		QuoteCurrency: market.QuoteCurrency,
+		Market:        market,
 	}
 }
 
