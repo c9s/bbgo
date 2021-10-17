@@ -29,12 +29,8 @@ func init() {
 }
 
 type State struct {
-	Position          *bbgo.Position   `json:"position,omitempty"`
-	AccumulatedVolume fixedpoint.Value `json:"accumulatedVolume,omitempty"`
-	AccumulatedPnL    fixedpoint.Value `json:"accumulatedPnL,omitempty"`
-	AccumulatedProfit fixedpoint.Value `json:"accumulatedProfit,omitempty"`
-	AccumulatedLoss   fixedpoint.Value `json:"accumulatedLoss,omitempty"`
-	AccumulatedSince  int64            `json:"accumulatedSince,omitempty"`
+	Position    *bbgo.Position   `json:"position,omitempty"`
+	ProfitStats bbgo.ProfitStats `json:"profitStats,omitempty"`
 }
 
 type Strategy struct {
@@ -111,8 +107,12 @@ func (s *Strategy) LoadState() error {
 		s.state.Position = bbgo.NewPositionFromMarket(s.market)
 	}
 
-	if s.state.AccumulatedSince == 0 {
-		s.state.AccumulatedSince = time.Now().Unix()
+	// init profit states
+	s.state.ProfitStats.Symbol = s.market.Symbol
+	s.state.ProfitStats.BaseCurrency = s.market.BaseCurrency
+	s.state.ProfitStats.QuoteCurrency = s.market.QuoteCurrency
+	if s.state.ProfitStats.AccumulatedSince == 0 {
+		s.state.ProfitStats.AccumulatedSince = time.Now().Unix()
 	}
 
 	return nil
@@ -252,24 +252,33 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.tradeCollector = bbgo.NewTradeCollector(s.Symbol, s.state.Position, s.orderStore)
 	s.tradeCollector.OnProfit(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
-		profitMargin := profit.DivFloat64(trade.QuoteQuantity)
-		s.Notify("%s maker profit %s %f %s (%.3f%%), net profit =~ %f %s",
-			s.Symbol,
-			pnlEmoji(profit),
-			profit.Float64(), s.market.QuoteCurrency,
-			profitMargin.Float64()*100.0,
-			netProfit.Float64(), s.market.QuoteCurrency)
+		p := bbgo.Profit{
+			Symbol:          s.Symbol,
+			Profit:          profit,
+			NetProfit:       netProfit,
+			TradeAmount:     fixedpoint.NewFromFloat(trade.QuoteQuantity),
+			ProfitMargin:    profit.DivFloat64(trade.QuoteQuantity),
+			NetProfitMargin: netProfit.DivFloat64(trade.QuoteQuantity),
+			QuoteCurrency:   s.state.Position.QuoteCurrency,
+			BaseCurrency:    s.state.Position.BaseCurrency,
+			Time:            trade.Time.Time(),
+		}
+		s.state.ProfitStats.AddProfit(p)
+		s.Notify(&p)
 	})
+
 	s.tradeCollector.OnTrade(func(trade types.Trade) {
 		s.Notifiability.Notify(trade)
-		log.Infof("%s", trade)
+		s.state.ProfitStats.AddTrade(trade)
 	})
+
 	s.tradeCollector.OnPositionUpdate(func(position *bbgo.Position) {
-		s.Notifiability.Notify(position)
+		log.Infof("position changed: %s", s.state.Position)
+		s.Notify(s.state.Position)
 	})
 
 	s.tradeCollector.BindStream(session.UserDataStream)
-	
+
 	// s.tradeCollector.BindStreamForBackground(session.UserDataStream)
 	// go s.tradeCollector.Run(ctx)
 
