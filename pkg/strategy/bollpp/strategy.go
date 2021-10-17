@@ -3,6 +3,7 @@ package bollpp
 import (
 	"context"
 	"fmt"
+	"github.com/c9s/bbgo/pkg/indicator"
 	"sync"
 	"time"
 
@@ -33,16 +34,26 @@ type State struct {
 	ProfitStats bbgo.ProfitStats `json:"profitStats,omitempty"`
 }
 
+type BollingerSetting struct {
+	types.IntervalWindow
+	BandWidth float64 `json:"bandWidth"`
+}
+
 type Strategy struct {
 	*bbgo.Graceful
 	*bbgo.Notifiability
 	*bbgo.Persistence
+
+	StandardIndicatorSet *bbgo.StandardIndicatorSet
 
 	Symbol    string           `json:"symbol"`
 	Interval  types.Interval   `json:"interval"`
 	Quantity  fixedpoint.Value `json:"quantity"`
 	MinSpread fixedpoint.Value `json:"minSpread"`
 	Spread    fixedpoint.Value `json:"spread"`
+
+	DefaultBollinger *BollingerSetting `json:"defaultBollinger"`
+	NeutralBollinger *BollingerSetting `json:"neutralBollinger"`
 
 	session *bbgo.ExchangeSession
 	book    *types.StreamOrderBook
@@ -57,6 +68,10 @@ type Strategy struct {
 	groupID uint32
 
 	stopC chan struct{}
+
+	// defaultBoll is the BOLLINGER indicator we used for predicting the price.
+	defaultBoll *indicator.BOLL
+	neutralBoll *indicator.BOLL
 }
 
 func (s *Strategy) ID() string {
@@ -118,6 +133,7 @@ func (s *Strategy) LoadState() error {
 	return nil
 }
 
+// cancelOrders cancels the orders gracefully
 func (s *Strategy) cancelOrders(ctx context.Context) {
 	if err := s.session.Exchange.CancelOrders(ctx, s.activeMakerOrders.Orders()...); err != nil {
 		log.WithError(err).Errorf("can not cancel %s orders", s.Symbol)
@@ -180,25 +196,32 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 	bidPrice := midPrice.Mul(one - s.Spread)
 	base := s.state.Position.Base
 
+	log.Infof("mid price:%f spread: %s ask:%f bid: %f",
+		midPrice.Float64(),
+		s.Spread.Percentage(),
+		askPrice.Float64(),
+		bidPrice.Float64(),
+	)
+
 	sellOrder := types.SubmitOrder{
-		Symbol:      s.Symbol,
-		Side:        types.SideTypeSell,
-		Type:        types.OrderTypeLimitMaker,
-		Quantity:    s.Quantity.Float64(),
-		Price:       askPrice.Float64(),
-		Market:      s.market,
-		TimeInForce: "GTC",
-		GroupID:     s.groupID,
+		Symbol:   s.Symbol,
+		Side:     types.SideTypeSell,
+		Type:     types.OrderTypeLimitMaker,
+		Quantity: s.Quantity.Float64(),
+		Price:    askPrice.Float64(),
+		Market:   s.market,
+		// TimeInForce: "GTC",
+		GroupID: s.groupID,
 	}
 	buyOrder := types.SubmitOrder{
-		Symbol:      s.Symbol,
-		Side:        types.SideTypeBuy,
-		Type:        types.OrderTypeLimitMaker,
-		Quantity:    s.Quantity.Float64(),
-		Price:       bidPrice.Float64(),
-		Market:      s.market,
-		TimeInForce: "GTC",
-		GroupID:     s.groupID,
+		Symbol:   s.Symbol,
+		Side:     types.SideTypeBuy,
+		Type:     types.OrderTypeLimitMaker,
+		Quantity: s.Quantity.Float64(),
+		Price:    bidPrice.Float64(),
+		Market:   s.market,
+		// TimeInForce: "GTC",
+		GroupID: s.groupID,
 	}
 
 	var submitOrders []types.SubmitOrder
@@ -231,6 +254,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		return fmt.Errorf("market %s not found", s.Symbol)
 	}
 	s.market = market
+
+	s.defaultBoll = s.StandardIndicatorSet.BOLL(s.DefaultBollinger.IntervalWindow, s.DefaultBollinger.BandWidth)
+	s.neutralBoll = s.StandardIndicatorSet.BOLL(s.NeutralBollinger.IntervalWindow, s.NeutralBollinger.BandWidth)
 
 	// calculate group id for orders
 	instanceID := fmt.Sprintf("%s-%s", ID, s.Symbol)
@@ -291,8 +317,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 
-		s.tradeCollector.Process()
 		s.cancelOrders(ctx)
+
+		s.tradeCollector.Process()
 		s.placeOrders(ctx, orderExecutor)
 	})
 
