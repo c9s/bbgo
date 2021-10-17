@@ -210,8 +210,7 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 		Quantity: s.Quantity.Float64(),
 		Price:    askPrice.Float64(),
 		Market:   s.market,
-		// TimeInForce: "GTC",
-		GroupID: s.groupID,
+		GroupID:  s.groupID,
 	}
 	buyOrder := types.SubmitOrder{
 		Symbol:   s.Symbol,
@@ -220,20 +219,19 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 		Quantity: s.Quantity.Float64(),
 		Price:    bidPrice.Float64(),
 		Market:   s.market,
-		// TimeInForce: "GTC",
-		GroupID: s.groupID,
+		GroupID:  s.groupID,
 	}
 
 	var submitOrders []types.SubmitOrder
 
 	minQuantity := fixedpoint.NewFromFloat(s.market.MinQuantity)
-	if base > -minQuantity && base < minQuantity {
+	if base == 0 || base.Abs() < minQuantity {
 		submitOrders = append(submitOrders, sellOrder, buyOrder)
 	} else if base > minQuantity {
 		sellOrder.Quantity = base.Float64()
 		submitOrders = append(submitOrders, sellOrder)
 	} else if base < -minQuantity {
-		buyOrder.Quantity = base.Float64()
+		buyOrder.Quantity = base.Abs().Float64()
 		submitOrders = append(submitOrders, buyOrder)
 	}
 

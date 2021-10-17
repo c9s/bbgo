@@ -1,16 +1,16 @@
 ---
 exchangeStrategies:
 
-- on: binance
+- on: max
   bollpp:
     symbol: ETHUSDT
-    interval: 1m
-    quantity: 0.01
+    interval: 5m
+    quantity: 0.005
 
     # spread: sell price = middle price + spread, buy price = middle price - spread
     # you need to ensure that the spread can cover your trading fee
     # for example, the trading fee on binance is 0.075%, so the total fee of your buy/sell orders is 0.075% * 2 = 0.14%
-    spread: 0.05%
+    spread: 0.01%
     defaultBollinger:
       interval: "5m"
       window: 21
