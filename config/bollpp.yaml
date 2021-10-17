@@ -1,33 +1,22 @@
 ---
-notifications:
-  slack:
-    defaultChannel: "dev-bbgo"
-    errorChannel: "bbgo-error"
-
-  # if you want to route channel by symbol
-  symbolChannels:
-    "^BTC": "btc"
-    "^ETH": "eth"
-    "^BNB": "bnb"
-
-  # object routing rules
-  routing:
-    trade: "$symbol"
-    order: "$silent"
-    submitOrder: "$silent" # not supported yet
-    pnL: "bbgo-pnl"
-
-sessions:
-  max:
-    exchange: max
-    envVarPrefix: MAX
-
 exchangeStrategies:
 
-- on: max
+- on: binance
   bollpp:
-    symbol: LTCUSDT
-    interval: 15m
-    quantity: 0.1
+    symbol: ETHUSDT
+    interval: 1m
+    quantity: 0.01
+
+    # spread: sell price = middle price + spread, buy price = middle price - spread
+    # you need to ensure that the spread can cover your trading fee
+    # for example, the trading fee on binance is 0.075%, so the total fee of your buy/sell orders is 0.075% * 2 = 0.14%
     spread: 0.05%
+    defaultBollinger:
+      interval: "5m"
+      window: 21
+      bandWidth: 2.0
+    neutralBollinger:
+      interval: "5m"
+      window: 21
+      bandWidth: 1.0
 
