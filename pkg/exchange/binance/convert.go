@@ -105,6 +105,10 @@ func toGlobalTicker(stats *binance.PriceChangeStats) types.Ticker {
 
 func toLocalOrderType(orderType types.OrderType) (binance.OrderType, error) {
 	switch orderType {
+
+	case types.OrderTypeLimitMaker:
+		return binance.OrderTypeLimitMaker, nil
+
 	case types.OrderTypeLimit:
 		return binance.OrderTypeLimit, nil
 
@@ -118,7 +122,7 @@ func toLocalOrderType(orderType types.OrderType) (binance.OrderType, error) {
 		return binance.OrderTypeMarket, nil
 	}
 
-	return "", fmt.Errorf("order type %s not supported", orderType)
+	return "", fmt.Errorf("can not convert to local order, order type %s not supported", orderType)
 }
 
 func toGlobalOrders(binanceOrders []*binance.Order) (orders []types.Order, err error) {
@@ -223,7 +227,7 @@ func toGlobalSideType(side binance.SideType) types.SideType {
 		return types.SideTypeSell
 
 	default:
-		log.Errorf("unknown side type: %v", side)
+		log.Errorf("can not convert binance side type, unknown side type: %q", side)
 		return ""
 	}
 }
