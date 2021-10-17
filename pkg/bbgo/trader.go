@@ -18,6 +18,8 @@ type SingleExchangeStrategy interface {
 	Run(ctx context.Context, orderExecutor OrderExecutor, session *ExchangeSession) error
 }
 
+// ExchangeSessionSubscriber provides an interface for collecting subscriptions from different strategies
+// Subscribe method will be called before the user data stream connection is created.
 type ExchangeSessionSubscriber interface {
 	Subscribe(session *ExchangeSession)
 }
