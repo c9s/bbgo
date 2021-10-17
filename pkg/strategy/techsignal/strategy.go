@@ -111,7 +111,7 @@ func (s *Strategy) listenToFundingRate(ctx context.Context, exchange *binance.Ex
 				}
 
 				diff := fundingRate.FundingRate - previousFundingRate.FundingRate
-				if diff > s.FundingRate.DiffThreshold {
+				if diff.Abs() > s.FundingRate.DiffThreshold {
 					s.Notifiability.Notify("%s funding rate changed %s, current funding rate %s",
 						s.Symbol,
 						diff.SignedPercentage(),

@@ -51,12 +51,19 @@ func (v Value) Float64() float64 {
 	return float64(v) / DefaultPow
 }
 
+func (v Value) Abs() Value {
+	if v < 0 {
+		return -v
+	}
+	return v
+}
+
 func (v Value) String() string {
 	return strconv.FormatFloat(float64(v)/DefaultPow, 'f', -1, 64)
 }
 
 func (v Value) Percentage() string {
-	return fmt.Sprintf("%.2f%%", v.Float64() * 100.0)
+	return fmt.Sprintf("%.2f%%", v.Float64()*100.0)
 }
 
 func (v Value) SignedPercentage() string {
