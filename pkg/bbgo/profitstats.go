@@ -265,6 +265,14 @@ func (s *ProfitStats) SlackAttachment() slack.Attachment {
 
 	var fields []slack.AttachmentField
 
+	if s.TodayPnL != 0 {
+		fields = append(fields, slack.AttachmentField{
+			Title: "P&L Today",
+			Value: pnlSignString(s.TodayPnL) + " " + s.QuoteCurrency,
+			Short: true,
+		})
+	}
+
 	if s.TodayProfit != 0 {
 		fields = append(fields, slack.AttachmentField{
 			Title: "Profit Today",
@@ -286,6 +294,13 @@ func (s *ProfitStats) SlackAttachment() slack.Attachment {
 			Title: "Loss Today",
 			Value: pnlSignString(s.TodayLoss) + " " + s.QuoteCurrency,
 			Short: true,
+		})
+	}
+
+	if s.AccumulatedPnL != 0 {
+		fields = append(fields, slack.AttachmentField{
+			Title: "Accumulated P&L",
+			Value: pnlSignString(s.AccumulatedPnL) + " " + s.QuoteCurrency,
 		})
 	}
 
