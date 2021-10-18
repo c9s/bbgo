@@ -191,6 +191,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 			// skip if the closed price is above the moving average
 			if closePrice.Float64() > lastMA {
+				log.Infof("skip %s support closed price %f > last ma %f", s.Symbol, closePrice.Float64(), lastMA)
 				return
 			}
 
