@@ -70,6 +70,10 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
 			Interval: string(detection.Interval),
 		})
+
+		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
+			Interval: string(detection.MovingAverageInterval),
+		})
 	}
 }
 
