@@ -19,17 +19,12 @@ import (
 
 var (
 	debugEWMA = false
-	debugSMA = false
+	debugSMA  = false
 )
 
 func init() {
-	if v, ok := util.GetEnvVarBool("DEBUG_EWMA"); ok {
-		debugEWMA = v
-	}
-
-	if v, ok := util.GetEnvVarBool("DEBUG_SMA"); ok {
-		debugSMA = v
-	}
+	util.SetEnvVarBool("DEBUG_EWMA", &debugEWMA)
+	util.SetEnvVarBool("DEBUG_SMA", &debugSMA)
 }
 
 type StandardIndicatorSet struct {
@@ -69,7 +64,7 @@ func NewStandardIndicatorSet(symbol string, store *MarketDataStore) *StandardInd
 			set.ewma[iw] = &indicator.EWMA{IntervalWindow: iw}
 			set.ewma[iw].Bind(store)
 
-			// if debug ewma is enabled, we add the debug handler
+			// if debug EWMA is enabled, we add the debug handler
 			if debugEWMA {
 				set.ewma[iw].OnUpdate(func(value float64) {
 					log.Infof("%s EWMA %s: %f", symbol, iw.String(), value)

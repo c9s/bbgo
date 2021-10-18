@@ -38,6 +38,15 @@ func GetEnvVarInt(n string) (int, bool) {
 	return num, true
 }
 
+func SetEnvVarBool(n string, v *bool) bool {
+	b, ok := GetEnvVarBool(n)
+	if ok {
+		*v = b
+	}
+
+	return ok
+}
+
 func GetEnvVarBool(n string) (bool, bool) {
 	str, ok := os.LookupEnv(n)
 	if !ok {
