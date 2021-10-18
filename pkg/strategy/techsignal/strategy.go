@@ -7,6 +7,7 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/binance"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/sirupsen/logrus"
+	"math"
 	"strings"
 	"time"
 
@@ -201,17 +202,17 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			if detection.MinVolume > 0 && kline.Volume > detection.MinVolume.Float64() {
 				s.Notifiability.Notify("Detected %s %s support base volume %s > min base volume %s, quote volume %s",
 					s.Symbol, detection.Interval.String(),
-					prettyBaseVolume.FormatMoney(kline.Volume),
-					prettyBaseVolume.FormatMoney(detection.MinVolume.Float64()),
-					prettyQuoteVolume.FormatMoney(kline.QuoteVolume),
+					prettyBaseVolume.FormatMoney(math.Round(kline.Volume)),
+					prettyBaseVolume.FormatMoney(math.Round(detection.MinVolume.Float64())),
+					prettyQuoteVolume.FormatMoney(math.Round(kline.QuoteVolume)),
 				)
 				s.Notifiability.Notify(kline)
 			} else if detection.MinQuoteVolume > 0 && kline.QuoteVolume > detection.MinQuoteVolume.Float64() {
 				s.Notifiability.Notify("Detected %s %s support quote volume %s > min quote volume %s, base volume %s",
 					s.Symbol, detection.Interval.String(),
-					prettyQuoteVolume.FormatMoney(kline.QuoteVolume),
-					prettyQuoteVolume.FormatMoney(detection.MinQuoteVolume.Float64()),
-					prettyBaseVolume.FormatMoney(kline.Volume),
+					prettyQuoteVolume.FormatMoney(math.Round(kline.QuoteVolume)),
+					prettyQuoteVolume.FormatMoney(math.Round(detection.MinQuoteVolume.Float64())),
+					prettyBaseVolume.FormatMoney(math.Round(kline.Volume)),
 				)
 				s.Notifiability.Notify(kline)
 			}
