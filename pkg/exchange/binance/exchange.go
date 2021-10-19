@@ -919,7 +919,7 @@ type FundingRate struct {
 	Time        time.Time
 }
 
-func (e *Exchange) QueryLastFundingRate(ctx context.Context, symbol string) (*FundingRate, error) {
+func (e *Exchange) QueryFundingRateHistory(ctx context.Context, symbol string) (*FundingRate, error) {
 	futuresClient := binance.NewFuturesClient(e.key, e.secret)
 	rates, err := futuresClient.NewFundingRateService().
 		Symbol(symbol).

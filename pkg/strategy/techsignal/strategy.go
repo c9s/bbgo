@@ -96,7 +96,7 @@ func (s *Strategy) listenToFundingRate(ctx context.Context, exchange *binance.Ex
 		case <-ctx.Done():
 			return
 		case <-fundingRateTicker.C:
-			fundingRate, err := exchange.QueryLastFundingRate(ctx, s.Symbol)
+			fundingRate, err := exchange.QueryFundingRateHistory(ctx, s.Symbol)
 			if err != nil {
 				log.WithError(err).Error("can not query last funding rate")
 				continue
