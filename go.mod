@@ -6,7 +6,7 @@ go 1.13
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
-	github.com/adshao/go-binance/v2 v2.3.1
+	github.com/adshao/go-binance/v2 v2.3.2
 	github.com/c9s/rockhopper v1.2.1-0.20210217093258-2661955904a9
 	github.com/codingconcepts/env v0.0.0-20200821220118-a8fbf8d84482
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible // indirect
@@ -23,6 +23,7 @@ require (
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/joho/godotenv v1.3.0
 	github.com/json-iterator/go v1.1.10 // indirect
+	github.com/klauspost/compress v1.13.6 // indirect
 	github.com/leekchan/accounting v0.0.0-20191218023648-17a4ce5f94d4
 	github.com/leodido/go-urn v1.2.1 // indirect
 	github.com/lestrrat-go/file-rotatelogs v2.2.0+incompatible
