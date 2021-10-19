@@ -9,8 +9,9 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-const MaxNumOfEWMA = 1_000
-const MaxNumOfEWMATruncateSize = 500
+// These numbers should be aligned with bbgo MaxNumOfKLines and MaxNumOfKLinesTruncate
+const MaxNumOfEWMA = 5_000
+const MaxNumOfEWMATruncateSize = 1000
 
 //go:generate callbackgen -type EWMA
 type EWMA struct {
@@ -71,6 +72,11 @@ func (inc *EWMA) calculateAndUpdate(allKLines []types.KLine) {
 			}
 		}
 	}
+
+    if len(inc.Values) >= MaxNumOfEWMA {
+        TruncateSize := MaxNumOfEWMATruncateSize
+        inc.Values = inc.Values[TruncateSize:]
+    }
 
 	for i := from; i < dataLen; i++ {
 		var k = allKLines[i]
