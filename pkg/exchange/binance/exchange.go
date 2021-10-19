@@ -3,6 +3,7 @@ package binance
 import (
 	"context"
 	"fmt"
+	"github.com/adshao/go-binance/v2/futures"
 	"os"
 	"strconv"
 	"strings"
@@ -917,6 +918,57 @@ type FundingRate struct {
 	FundingRate fixedpoint.Value
 	FundingTime time.Time
 	Time        time.Time
+}
+
+type PremiumIndex struct {
+	Symbol          string           `json:"symbol"`
+	MarkPrice       fixedpoint.Value `json:"markPrice"`
+	LastFundingRate fixedpoint.Value `json:"lastFundingRate"`
+	NextFundingTime time.Time        `json:"nextFundingTime"`
+	Time            time.Time        `json:"time"`
+}
+
+func convertPremiumIndex(index *futures.PremiumIndex) (*PremiumIndex, error) {
+	markPrice, err := fixedpoint.NewFromString(index.MarkPrice)
+	if err != nil {
+		return nil, err
+	}
+
+	lastFundingRate, err := fixedpoint.NewFromString(index.LastFundingRate)
+	if err != nil {
+		return nil, err
+	}
+
+	nextFundingTime := time.Unix(0, index.NextFundingTime*int64(time.Millisecond))
+	t := time.Unix(0, index.Time*int64(time.Millisecond))
+
+	return &PremiumIndex{
+		Symbol:          index.Symbol,
+		MarkPrice:       markPrice,
+		NextFundingTime: nextFundingTime,
+		LastFundingRate: lastFundingRate,
+		Time:            t,
+	}, nil
+}
+
+func (e *Exchange) QueryPremiumIndex(ctx context.Context, symbol string) ([]PremiumIndex, error) {
+	futuresClient := binance.NewFuturesClient(e.key, e.secret)
+	indexes, err := futuresClient.NewPremiumIndexService().Symbol(symbol).Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var globalIndexes []PremiumIndex
+	for _, index := range indexes {
+		globalIndex, err := convertPremiumIndex(index)
+		if err != nil {
+			return nil, err
+		}
+
+		globalIndexes = append(globalIndexes, *globalIndex)
+	}
+
+	return globalIndexes, nil
 }
 
 func (e *Exchange) QueryFundingRateHistory(ctx context.Context, symbol string) (*FundingRate, error) {
