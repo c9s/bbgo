@@ -87,54 +87,58 @@ func (s *Strategy) Validate() error {
 }
 
 func (s *Strategy) listenToFundingRate(ctx context.Context, exchange *binance.Exchange) {
-	var previousFundingRate, fundingRate24HoursLow *binance.FundingRate
+	var previousIndex, fundingRate24HoursLowIndex *binance.PremiumIndex
 
 	fundingRateTicker := time.NewTicker(1 * time.Hour)
 	defer fundingRateTicker.Stop()
 	for {
 		select {
+
 		case <-ctx.Done():
 			return
+
 		case <-fundingRateTicker.C:
-			fundingRate, err := exchange.QueryFundingRateHistory(ctx, s.Symbol)
+			index, err := exchange.QueryPremiumIndex(ctx, s.Symbol)
 			if err != nil {
 				log.WithError(err).Error("can not query last funding rate")
 				continue
 			}
 
-			if fundingRate.FundingRate >= s.FundingRate.High {
+			fundingRate := index.LastFundingRate
+
+			if fundingRate >= s.FundingRate.High {
 				s.Notifiability.Notify("%s funding rate is too high! current %s > threshold %s",
 					s.Symbol,
-					fundingRate.FundingRate.Percentage(),
+					fundingRate.Percentage(),
 					s.FundingRate.High.Percentage(),
 				)
 			}
 
-			if previousFundingRate != nil {
+			if previousIndex != nil {
 				if s.FundingRate.DiffThreshold == 0 {
 					s.FundingRate.DiffThreshold = fixedpoint.NewFromFloat(0.005 * 0.01)
 				}
 
-				diff := fundingRate.FundingRate - previousFundingRate.FundingRate
+				diff := fundingRate - previousIndex.LastFundingRate
 				if diff.Abs() > s.FundingRate.DiffThreshold {
 					s.Notifiability.Notify("%s funding rate changed %s, current funding rate %s",
 						s.Symbol,
 						diff.SignedPercentage(),
-						fundingRate.FundingRate.Percentage(),
+						fundingRate.Percentage(),
 					)
 				}
 			}
 
-			previousFundingRate = fundingRate
-			if fundingRate24HoursLow != nil {
-				if fundingRate24HoursLow.Time.Before(time.Now().Add(24 * time.Hour)) {
-					fundingRate24HoursLow = fundingRate
+			previousIndex = index
+			if fundingRate24HoursLowIndex != nil {
+				if fundingRate24HoursLowIndex.Time.Before(time.Now().Add(24 * time.Hour)) {
+					fundingRate24HoursLowIndex = index
 				}
-				if fundingRate.FundingRate < fundingRate24HoursLow.FundingRate {
-					fundingRate24HoursLow = fundingRate
+				if fundingRate < fundingRate24HoursLowIndex.LastFundingRate {
+					fundingRate24HoursLowIndex = index
 				}
 			} else {
-				fundingRate24HoursLow = fundingRate
+				fundingRate24HoursLowIndex = index
 			}
 		}
 	}
