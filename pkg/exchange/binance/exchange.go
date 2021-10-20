@@ -951,24 +951,16 @@ func convertPremiumIndex(index *futures.PremiumIndex) (*PremiumIndex, error) {
 	}, nil
 }
 
-func (e *Exchange) QueryPremiumIndex(ctx context.Context, symbol string) ([]PremiumIndex, error) {
+func (e *Exchange) QueryPremiumIndex(ctx context.Context, symbol string) (*PremiumIndex, error) {
 	futuresClient := binance.NewFuturesClient(e.key, e.secret)
+
+	// when symbol is set, only one index will be returned.
 	indexes, err := futuresClient.NewPremiumIndexService().Symbol(symbol).Do(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	var globalIndexes []PremiumIndex
-	for _, index := range indexes {
-		globalIndex, err := convertPremiumIndex(index)
-		if err != nil {
-			return nil, err
-		}
-
-		globalIndexes = append(globalIndexes, *globalIndex)
-	}
-
-	return globalIndexes, nil
+	return convertPremiumIndex(indexes[0])
 }
 
 func (e *Exchange) QueryFundingRateHistory(ctx context.Context, symbol string) (*FundingRate, error) {
