@@ -8,6 +8,8 @@ import Container from '@material-ui/core/Container';
 
 import SideBar from "../components/SideBar";
 
+import ConnectWallet from '../components/ConnectWallet';
+
 const useStyles = makeStyles((theme) => ({
     root: {
         flexGrow: 1,
@@ -22,7 +24,10 @@ const useStyles = makeStyles((theme) => ({
         zIndex: theme.zIndex.drawer + 1,
     },
     appBarSpacer: theme.mixins.toolbar,
-    container: { }
+    container: { },
+    toolbar:{
+        justifyContent: 'space-between',
+    }
 }));
 
 export default function DashboardLayout({children}) {
@@ -31,11 +36,12 @@ export default function DashboardLayout({children}) {
     return (
         <div className={classes.root}>
             <AppBar className={classes.appBar}>
-                <Toolbar>
+                <Toolbar className={classes.toolbar}>
                     <Typography variant="h6" className={classes.title}>
                         BBGO
                     </Typography>
                     {/* <Button color="inherit">Login</Button> */}
+                    <ConnectWallet />
                 </Toolbar>
             </AppBar>
 
