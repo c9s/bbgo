@@ -1,0 +1,1 @@
+{"ast":null,"code":"// Next.js API route support: https://nextjs.org/docs/api-routes/introduction\nexport default ((req, res) => {\n  res.statusCode = 200;\n  res.json({\n    name: 'John Doe'\n  });\n});","map":null,"metadata":{},"sourceType":"module"}
