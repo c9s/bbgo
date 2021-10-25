@@ -18,6 +18,9 @@ import DashboardLayout from '../layouts/DashboardLayout';
 
 import {queryAssets, querySessions} from "../api/bbgo";
 
+import { ChainId, Config, DAppProvider } from '@usedapp/core';
+
+
 const useStyles = makeStyles((theme) => ({
     totalAssetsSummary: {
         margin: theme.spacing(2),
@@ -30,6 +33,14 @@ const useStyles = makeStyles((theme) => ({
         padding: theme.spacing(2),
     },
 }));
+
+
+const config: Config = {
+    readOnlyChainId: ChainId.Mainnet,
+    readOnlyUrls: {
+      [ChainId.Mainnet]: 'https://mainnet.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161',
+    },
+  }
 
 
 // props are pageProps passed from _app.tsx
@@ -68,34 +79,37 @@ export default function Home() {
     console.log("index: assets", assets)
 
     return (
-        <DashboardLayout>
-            <Paper className={classes.totalAssetsSummary}>
-                <Typography variant="h4" gutterBottom>
-                    Total Assets
-                </Typography>
+        <DAppProvider config={config}>
+            <DashboardLayout>
+                <Paper className={classes.totalAssetsSummary}>
+                    <Typography variant="h4" gutterBottom>
+                        Total Assets
+                    </Typography>
 
-                <div className={classes.grid}>
-                    <Grid container
-                          direction="row"
-                          justify="space-around"
-                          alignItems="flex-start"
-                          spacing={1}>
-                        <Grid item xs={12} md={8}>
-                            <TotalAssetSummary assets={assets}/>
-                            <TotalAssetsPie assets={assets}/>
+                    <div className={classes.grid}>
+                        <Grid container
+                            direction="row"
+                            justify="space-around"
+                            alignItems="flex-start"
+                            spacing={1}>
+                            <Grid item xs={12} md={8}>
+                                <TotalAssetSummary assets={assets}/>
+                                <TotalAssetsPie assets={assets}/>
+                            </Grid>
+
+                            <Grid item xs={12} md={4}>
+                                <TotalAssetDetails assets={assets}/>
+                            </Grid>
                         </Grid>
+                    </div>
+                </Paper>
 
-                        <Grid item xs={12} md={4}>
-                            <TotalAssetDetails assets={assets}/>
-                        </Grid>
-                    </Grid>
-                </div>
-            </Paper>
+                <TradingVolumePanel/>
 
-            <TradingVolumePanel/>
+                <ExchangeSessionTabPanel/>
+            </DashboardLayout>
+        </DAppProvider>
 
-            <ExchangeSessionTabPanel/>
-        </DashboardLayout>
     );
 }
 
