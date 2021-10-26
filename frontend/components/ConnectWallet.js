@@ -75,9 +75,9 @@ export default function ConnectWallet() {
     }, [open]);
 
     return (
-    <div>
+      <>
         {account?
-        (<div>
+        (<>
         <Button
           ref={anchorRef}
           id="composition-button"
@@ -122,10 +122,10 @@ export default function ConnectWallet() {
             </Grow>
           )}
         </Popper>
-        </div>):(<div>
+        </>):(<div>
           <button onClick={() => activateBrowserWallet()} className={classes.buttons}>Connect Wallet</button>
         </div>)}
-      </div>
+      </>
     )
 
 }
