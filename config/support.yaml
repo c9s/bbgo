@@ -18,10 +18,8 @@ notifications:
     pnL: "bbgo-pnl"
 
 sessions:
-  #  binance:
-  #  exchange: binance
-  max:
-    exchange: max
+   binance:
+   exchange: binance
 
 riskControls:
   # This is the session-based risk controller, which let you configure different risk controller by session.
@@ -54,7 +52,7 @@ backtest:
 
 exchangeStrategies:
 
-- on: max
+- on: binance
   support:
     symbol: LINKUSDT
     interval: 1m
