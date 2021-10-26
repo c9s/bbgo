@@ -1,1 +1,0 @@
-{"ast":null,"code":"\"use strict\";\n\nObject.defineProperty(exports, \"__esModule\", {\n  value: true\n});\nexports.isDynamicRoute = isDynamicRoute; // Identify /[param]/ in route string\n\nvar TEST_ROUTE = /\\/\\[[^/]+?\\](?=\\/|$)/;\n\nfunction isDynamicRoute(route) {\n  return TEST_ROUTE.test(route);\n}","map":null,"metadata":{},"sourceType":"script"}

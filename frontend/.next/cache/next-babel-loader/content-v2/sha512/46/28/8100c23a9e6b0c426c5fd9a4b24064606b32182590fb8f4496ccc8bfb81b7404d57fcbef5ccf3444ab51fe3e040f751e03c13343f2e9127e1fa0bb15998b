@@ -1,1 +1,0 @@
-{"ast":null,"code":"\"use strict\";\n\nObject.defineProperty(exports, \"__esModule\", {\n  value: true\n});\nexports[\"default\"] = resolveRewrites;\n\nfunction resolveRewrites() {}","map":null,"metadata":{},"sourceType":"script"}
