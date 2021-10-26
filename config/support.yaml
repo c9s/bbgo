@@ -52,7 +52,7 @@ backtest:
 
 exchangeStrategies:
 
-- on:binance
+- on: binance
   support:
     symbol: LINKUSDT
     interval: 1m
