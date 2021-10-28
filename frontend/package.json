@@ -23,7 +23,8 @@
     "react": "^17.0.1",
     "react-dom": "^17.0.1",
     "react-number-format": "^4.4.4",
-    "react-spring": "^9.3.0"
+    "react-spring": "^9.3.0",
+    "@usedapp/core": "0.5.4"
   },
   "devDependencies": {
     "@types/node": "^14.14.22",
