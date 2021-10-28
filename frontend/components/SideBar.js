@@ -8,7 +8,6 @@ import DashboardIcon from "@material-ui/icons/Dashboard";
 import ListItemText from "@material-ui/core/ListItemText";
 import ListIcon from "@material-ui/icons/List";
 import TrendingUpIcon from "@material-ui/icons/TrendingUp";
-// import PersonIcon from "@material-ui/icons/Person";
 import React from "react";
 import {makeStyles} from "@material-ui/core/styles";
 
@@ -97,15 +96,6 @@ export default function SideBar() {
                 <ListItemText primary="Strategies"/>
             </ListItem>
         </List>
-        {/* <Divider/>
-        <List>
-            <ListItem button>
-                <ListItemIcon>
-                    <PersonIcon/>
-                </ListItemIcon>
-                <ListItemText primary="Wallet"/>
-            </ListItem>
-        </List> */}
     </Drawer>
 
 
