@@ -2,8 +2,12 @@ package types
 
 import (
 	"fmt"
+	"github.com/slack-go/slack"
+	"math"
+	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -40,9 +44,69 @@ type Asset struct {
 	Total    fixedpoint.Value `json:"total"`
 	InUSD    fixedpoint.Value `json:"inUSD"`
 	InBTC    fixedpoint.Value `json:"inBTC"`
+	Time     time.Time        `json:"time"`
 }
 
 type AssetMap map[string]Asset
+
+func (m AssetMap) PlainText() (o string) {
+	for _, a := range m {
+		o += fmt.Sprintf("%s: %f (≈ %s) (≈ %s)",
+			a.Currency,
+			a.Total.Float64(),
+			USD.FormatMoneyFloat64(a.InUSD.Float64()),
+			BTC.FormatMoneyFloat64(a.InBTC.Float64()),
+		) + "\n"
+	}
+
+	return o
+}
+
+func (m AssetMap) Slice() (assets []Asset) {
+	for _, a := range m {
+		assets = append(assets, a)
+	}
+	return assets
+}
+
+func (m AssetMap) SlackAttachment() slack.Attachment {
+	var fields []slack.AttachmentField
+	var totalBTC, totalUSD fixedpoint.Value
+
+	var assets = m.Slice()
+
+	// sort assets
+	sort.Slice(assets, func(i, j int) bool {
+		return assets[i].InUSD > assets[j].InUSD
+	})
+
+	for _, a := range assets {
+		totalUSD += a.InUSD
+		totalBTC += a.InBTC
+	}
+
+	for _, a := range assets {
+		fields = append(fields, slack.AttachmentField{
+			Title: a.Currency,
+			Value: fmt.Sprintf("%f (≈ %s) (≈ %s) (%.2f%%)",
+				a.Total.Float64(),
+				USD.FormatMoneyFloat64(a.InUSD.Float64()),
+				BTC.FormatMoneyFloat64(a.InBTC.Float64()),
+				math.Round(a.InUSD.Div(totalUSD).Float64() * 100.0),
+			),
+			Short: false,
+		})
+	}
+
+
+	return slack.Attachment{
+		Title: fmt.Sprintf("Net Asset Value %s (≈ %s)",
+			USD.FormatMoneyFloat64(totalUSD.Float64()),
+			BTC.FormatMoneyFloat64(totalBTC.Float64()),
+		),
+		Fields: fields,
+	}
+}
 
 type BalanceMap map[string]Balance
 
@@ -66,6 +130,7 @@ func (m BalanceMap) Copy() (d BalanceMap) {
 func (m BalanceMap) Assets(prices map[string]float64) AssetMap {
 	assets := make(AssetMap)
 
+	now := time.Now()
 	for currency, b := range m {
 		if b.Locked == 0 && b.Available == 0 {
 			continue
@@ -74,6 +139,7 @@ func (m BalanceMap) Assets(prices map[string]float64) AssetMap {
 		asset := Asset{
 			Currency: currency,
 			Total:    b.Available + b.Locked,
+			Time:     now,
 		}
 
 		btcusdt, hasBtcPrice := prices["BTCUSDT"]

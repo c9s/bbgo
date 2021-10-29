@@ -15,3 +15,6 @@ func BeginningOfTheDay(t time.Time) time.Time {
 	return time.Date(year, month, day, 0, 0, 0, 0, t.Location())
 }
 
+func Over24Hours(since time.Time) bool {
+	return time.Since(since) >= 24 * time.Hour
+}
