@@ -197,6 +197,15 @@ type ProfitStats struct {
 	TodaySince     int64            `json:"todaySince,omitempty"`
 }
 
+func (s *ProfitStats) Init(market types.Market) {
+	s.Symbol = market.Symbol
+	s.BaseCurrency = market.BaseCurrency
+	s.QuoteCurrency = market.QuoteCurrency
+	if s.AccumulatedSince == 0 {
+		s.AccumulatedSince = time.Now().Unix()
+	}
+}
+
 func (s *ProfitStats) AddProfit(profit Profit) {
 	s.AccumulatedPnL += profit.Profit
 	s.AccumulatedNetProfit += profit.NetProfit

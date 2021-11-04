@@ -3,10 +3,9 @@ package grid
 import (
 	"context"
 	"fmt"
-	"sync"
-
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"sync"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/exchange/max"
@@ -38,6 +37,8 @@ type State struct {
 	// any created orders for tracking trades
 	// [source Order ID] -> arbitrage order
 	ArbitrageOrders map[uint64]types.Order `json:"arbitrageOrders"`
+
+	ProfitStats     bbgo.ProfitStats      `json:"profitStats,omitempty"`
 }
 
 type Strategy struct {
@@ -521,6 +522,58 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
 }
 
+func (s *Strategy) LoadState() error {
+	instanceID := s.InstanceID()
+
+	var state State
+	if s.Persistence != nil {
+		if err := s.Persistence.Load(&state, ID, instanceID); err != nil {
+			if err != service.ErrPersistenceNotExists {
+				return errors.Wrapf(err, "state load error")
+			}
+
+			s.state = &State{
+				FilledBuyGrids:  make(map[fixedpoint.Value]struct{}),
+				FilledSellGrids: make(map[fixedpoint.Value]struct{}),
+				ArbitrageOrders: make(map[uint64]types.Order),
+				Position:        bbgo.NewPositionFromMarket(s.Market),
+			}
+		} else {
+			s.state = &state
+		}
+	}
+
+	// init profit stats
+	s.state.ProfitStats.Init(s.Market)
+
+	if s.state.ArbitrageOrders == nil {
+		s.state.ArbitrageOrders = make(map[uint64]types.Order)
+	}
+
+	return nil
+}
+
+func (s *Strategy) SaveState() error {
+	if s.Persistence != nil {
+		log.Infof("backing up grid state...")
+
+		instanceID := s.InstanceID()
+		submitOrders := s.activeOrders.Backup()
+		s.state.Orders = submitOrders
+
+		if err := s.Persistence.Save(s.state, ID, instanceID); err != nil {
+			return err
+		} else {
+			log.Infof("%s state is saved => %+v", ID, s.state)
+		}
+	}
+	return nil
+}
+
+func (s *Strategy) InstanceID() string {
+	return fmt.Sprintf("grid-%s-%d-%d-%d", s.Symbol, s.GridNum, s.UpperPrice, s.LowerPrice)
+}
+
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	// do some basic validation
 	if s.GridNum == 0 {
@@ -531,40 +584,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.Side = types.SideTypeBoth
 	}
 
-	instanceID := fmt.Sprintf("grid-%s-%d-%d-%d", s.Symbol, s.GridNum, s.UpperPrice, s.LowerPrice)
+	instanceID := s.InstanceID()
 	s.groupID = max.GenerateGroupID(instanceID)
 	log.Infof("using group id %d from fnv(%s)", s.groupID, instanceID)
 
-	var stateLoaded = false
-	if s.Persistence != nil {
-		var state State
-		if err := s.Persistence.Load(&state, ID, instanceID); err != nil {
-			if err != service.ErrPersistenceNotExists {
-				return errors.Wrapf(err, "state load error")
-			}
-		} else {
-			log.Infof("grid state loaded")
-			stateLoaded = true
-			s.state = &state
-		}
-	}
-
-	if s.state == nil {
-		position, ok := session.Position(s.Symbol)
-		if !ok {
-			return fmt.Errorf("position not found")
-		}
-
-		s.state = &State{
-			FilledBuyGrids:  make(map[fixedpoint.Value]struct{}),
-			FilledSellGrids: make(map[fixedpoint.Value]struct{}),
-			ArbitrageOrders: make(map[uint64]types.Order),
-			Position:        position,
-		}
-	}
-
-	if s.state.ArbitrageOrders == nil {
-		s.state.ArbitrageOrders = make(map[uint64]types.Order)
+	if err := s.LoadState(); err != nil {
+		 return err
 	}
 
 	s.Notify("grid %s position", s.Symbol, s.state.Position)
@@ -580,17 +605,13 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 
-		if s.Persistence != nil {
-			log.Infof("backing up grid state...")
-			submitOrders := s.activeOrders.Backup()
-			s.state.Orders = submitOrders
-			if err := s.Persistence.Save(s.state, ID, instanceID); err != nil {
-				log.WithError(err).Error("can not save active order backups")
-			} else {
-				log.Infof("active order snapshot saved")
-			}
+		if err := s.SaveState(); err != nil {
+			log.WithError(err).Errorf("can not save state: %+v", s.state)
+		} else {
+			s.Notify("%s: %s grid is saved", ID, s.Symbol)
 		}
 
+		// now we can cancel the open orders
 		log.Infof("canceling active orders...")
 		if err := session.Exchange.CancelOrders(ctx, s.activeOrders.Orders()...); err != nil {
 			log.WithError(err).Errorf("cancel order error")
@@ -600,7 +621,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	session.UserDataStream.OnTradeUpdate(s.tradeUpdateHandler)
 
 	session.UserDataStream.OnStart(func() {
-		if stateLoaded && len(s.state.Orders) > 0 {
+		// if we have orders in the state data, we can restore them
+		if len(s.state.Orders) > 0 {
 			createdOrders, err := orderExecutor.SubmitOrders(ctx, s.state.Orders...)
 			if err != nil {
 				log.WithError(err).Error("active orders restore error")
@@ -608,6 +630,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			s.activeOrders.Add(createdOrders...)
 			s.orderStore.Add(createdOrders...)
 		} else {
+			// or place new orders
 			s.placeGridOrders(orderExecutor, session)
 		}
 	})
