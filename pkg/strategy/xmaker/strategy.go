@@ -676,7 +676,6 @@ func (s *Strategy) LoadState() error {
 		s.state = &State{}
 	} else {
 		s.state = &state
-		log.Infof("state is restored: %+v", s.state)
 	}
 
 	// if position is nil, we need to allocate a new position for calculation
