@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/adshao/go-binance/v2/futures"
+	"golang.org/x/time/rate"
 	"os"
 	"strconv"
 	"strings"
@@ -21,6 +22,8 @@ import (
 )
 
 const BNB = "BNB"
+
+var orderLimiter = rate.NewLimiter(rate.Every(10 * time.Second), 50)
 
 var log = logrus.WithFields(logrus.Fields{
 	"exchange": "binance",
@@ -732,8 +735,11 @@ func (e *Exchange) submitSpotOrder(ctx context.Context, order types.SubmitOrder)
 
 func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error) {
 	for _, order := range orders {
-		var createdOrder *types.Order
+		if err := orderLimiter.Wait(ctx) ; err != nil {
+			log.WithError(err).Errorf("order rate limiter wait error")
+		}
 
+		var createdOrder *types.Order
 		if e.IsMargin {
 			createdOrder, err = e.submitMarginOrder(ctx, order)
 		} else {
