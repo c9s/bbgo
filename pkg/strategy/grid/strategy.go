@@ -376,14 +376,6 @@ func (s *Strategy) placeGridOrders(orderExecutor bbgo.OrderExecutor, session *bb
 	}
 }
 
-func (s *Strategy) tradeUpdateHandler(trade types.Trade) {
-	if s.TradeService != nil {
-		if err := s.TradeService.Mark(context.Background(), trade.ID, ID); err != nil {
-			log.WithError(err).Error("trade mark error")
-		}
-	}
-}
-
 func (s *Strategy) handleFilledOrder(filledOrder types.Order) {
 	// generate arbitrage order
 	var side = filledOrder.Side.Reverse()
@@ -591,11 +583,20 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.activeOrders.BindStream(session.UserDataStream)
 
 	s.tradeCollector = bbgo.NewTradeCollector(s.Symbol, s.state.Position, s.orderStore)
+
 	s.tradeCollector.OnTrade(func(trade types.Trade) {
 		s.Notifiability.Notify(trade)
 		s.state.ProfitStats.AddTrade(trade)
-		s.tradeUpdateHandler(trade)
 	})
+
+	if s.TradeService != nil {
+		s.tradeCollector.OnTrade(func(trade types.Trade) {
+			if err := s.TradeService.Mark(ctx, trade.ID, ID); err != nil {
+				log.WithError(err).Error("trade mark error")
+			}
+		})
+	}
+
 	s.tradeCollector.OnPositionUpdate(func(position *bbgo.Position) {
 		s.Notifiability.Notify(position)
 	})
