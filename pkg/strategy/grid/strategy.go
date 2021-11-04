@@ -528,8 +528,15 @@ func (s *Strategy) LoadState() error {
 	// init profit stats
 	s.state.ProfitStats.Init(s.Market)
 
+	// field guards
 	if s.state.ArbitrageOrders == nil {
 		s.state.ArbitrageOrders = make(map[uint64]types.Order)
+	}
+	if s.state.FilledBuyGrids == nil {
+		s.state.FilledBuyGrids = make(map[fixedpoint.Value]struct{})
+	}
+	if s.state.FilledSellGrids == nil {
+		s.state.FilledSellGrids = make(map[fixedpoint.Value]struct{})
 	}
 
 	return nil
@@ -545,15 +552,14 @@ func (s *Strategy) SaveState() error {
 
 		if err := s.Persistence.Save(s.state, ID, instanceID); err != nil {
 			return err
-		} else {
-			log.Infof("%s state is saved => %+v", ID, s.state)
 		}
 	}
 	return nil
 }
 
+// InstanceID returns the instance identifier from the current grid configuration parameters
 func (s *Strategy) InstanceID() string {
-	return fmt.Sprintf("grid-%s-%d-%d-%d", s.Symbol, s.GridNum, s.UpperPrice, s.LowerPrice)
+	return fmt.Sprintf("%s-%s-%d-%d-%d", ID, s.Symbol, s.GridNum, s.UpperPrice, s.LowerPrice)
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
@@ -614,6 +620,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	session.UserDataStream.OnStart(func() {
 		// if we have orders in the state data, we can restore them
 		if len(s.state.Orders) > 0 {
+			s.Notifiability.Notify("restoring %s %d grid orders...", s.Symbol, len(s.state.Orders))
+
 			createdOrders, err := orderExecutor.SubmitOrders(ctx, s.state.Orders...)
 			if err != nil {
 				log.WithError(err).Error("active orders restore error")
