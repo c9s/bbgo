@@ -38,7 +38,7 @@ type State struct {
 	// [source Order ID] -> arbitrage order
 	ArbitrageOrders map[uint64]types.Order `json:"arbitrageOrders"`
 
-	ProfitStats     bbgo.ProfitStats      `json:"profitStats,omitempty"`
+	ProfitStats bbgo.ProfitStats `json:"profitStats,omitempty"`
 }
 
 type Strategy struct {
@@ -98,6 +98,8 @@ type Strategy struct {
 
 	// activeOrders is the locally maintained active order book of the maker orders.
 	activeOrders *bbgo.LocalActiveOrderBook
+
+	tradeCollector *bbgo.TradeCollector
 
 	// groupID is the group ID used for the strategy instance for canceling orders
 	groupID uint32
@@ -375,29 +377,9 @@ func (s *Strategy) placeGridOrders(orderExecutor bbgo.OrderExecutor, session *bb
 }
 
 func (s *Strategy) tradeUpdateHandler(trade types.Trade) {
-	if trade.Symbol != s.Symbol {
-		return
-	}
-
-	if s.orderStore.Exists(trade.OrderID) {
-		log.Infof("received trade update of order %d: %+v", trade.OrderID, trade)
-
-		if s.TradeService != nil {
-			if err := s.TradeService.Mark(context.Background(), trade.ID, ID); err != nil {
-				log.WithError(err).Error("trade mark error")
-			}
-		}
-
-		if trade.Side == types.SideTypeSelf {
-			return
-		}
-
-		profit, netProfit, madeProfit := s.state.Position.AddTrade(trade)
-		if madeProfit {
-			s.Notify("%s average cost profit: %f %s, net profit =~ %f %s",
-				s.Symbol,
-				profit.Float64(), s.Market.QuoteCurrency,
-				netProfit.Float64(), s.Market.QuoteCurrency)
+	if s.TradeService != nil {
+		if err := s.TradeService.Mark(context.Background(), trade.ID, ID); err != nil {
+			log.WithError(err).Error("trade mark error")
 		}
 	}
 }
@@ -430,7 +412,7 @@ func (s *Strategy) handleFilledOrder(filledOrder types.Order) {
 	}
 
 	if amount <= s.Market.MinNotional {
-		quantity = bbgo.AdjustFloatQuantityByMinAmount(quantity, price, s.Market.MinNotional * 1.001)
+		quantity = bbgo.AdjustFloatQuantityByMinAmount(quantity, price, s.Market.MinNotional*1.001)
 
 		// update amount
 		amount = quantity * price
@@ -589,7 +571,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	log.Infof("using group id %d from fnv(%s)", s.groupID, instanceID)
 
 	if err := s.LoadState(); err != nil {
-		 return err
+		return err
 	}
 
 	s.Notify("grid %s position", s.Symbol, s.state.Position)
@@ -601,6 +583,17 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.activeOrders = bbgo.NewLocalActiveOrderBook()
 	s.activeOrders.OnFilled(s.handleFilledOrder)
 	s.activeOrders.BindStream(session.UserDataStream)
+
+	s.tradeCollector = bbgo.NewTradeCollector(s.Symbol, s.state.Position, s.orderStore)
+	s.tradeCollector.OnTrade(func(trade types.Trade) {
+		s.Notifiability.Notify(trade)
+		s.state.ProfitStats.AddTrade(trade)
+		s.tradeUpdateHandler(trade)
+	})
+	s.tradeCollector.OnPositionUpdate(func(position *bbgo.Position) {
+		s.Notifiability.Notify(position)
+	})
+	s.tradeCollector.BindStream(session.UserDataStream)
 
 	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
@@ -617,8 +610,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			log.WithError(err).Errorf("cancel order error")
 		}
 	})
-
-	session.UserDataStream.OnTradeUpdate(s.tradeUpdateHandler)
 
 	session.UserDataStream.OnStart(func() {
 		// if we have orders in the state data, we can restore them
