@@ -428,8 +428,8 @@ func (s *Strategy) handleFilledOrder(filledOrder types.Order) {
 		amount = quantity * price
 	}
 
-	if amount < s.Market.MinNotional {
-		quantity = bbgo.AdjustFloatQuantityByMinAmount(quantity, price, s.Market.MinNotional)
+	if amount <= s.Market.MinNotional {
+		quantity = bbgo.AdjustFloatQuantityByMinAmount(quantity, price, s.Market.MinNotional * 1.001)
 
 		// update amount
 		amount = quantity * price
@@ -458,7 +458,7 @@ func (s *Strategy) handleFilledOrder(filledOrder types.Order) {
 	s.activeOrders.Add(createdOrders...)
 
 	if err != nil {
-		log.WithError(err).Errorf("can not place orders")
+		log.WithError(err).Errorf("can not place orders: %+v", submitOrder)
 		return
 	}
 
