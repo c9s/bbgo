@@ -403,6 +403,7 @@ func (s *Strategy) handleFilledOrder(filledOrder types.Order) {
 	var side = filledOrder.Side.Reverse()
 	var price = filledOrder.Price
 	var quantity = filledOrder.Quantity
+	var amount = filledOrder.Price * filledOrder.Quantity
 
 	switch side {
 	case types.SideTypeSell:
@@ -415,9 +416,20 @@ func (s *Strategy) handleFilledOrder(filledOrder types.Order) {
 		quantity = s.FixedAmount.Float64() / price
 	} else if s.Long {
 		// long = use the same amount to buy more quantity back
-		// the original amount
-		var amount = filledOrder.Price * filledOrder.Quantity
 		quantity = amount / price
+		amount = quantity * price
+	}
+
+	if quantity < s.Market.MinQuantity {
+		quantity = s.Market.MinQuantity
+		amount = quantity * price
+	}
+
+	if amount < s.Market.MinNotional {
+		quantity = bbgo.AdjustFloatQuantityByMinAmount(quantity, price, s.Market.MinNotional)
+
+		// update amount
+		amount = quantity * price
 	}
 
 	submitOrder := types.SubmitOrder{
