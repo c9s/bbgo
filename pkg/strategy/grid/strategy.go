@@ -393,7 +393,10 @@ func (s *Strategy) tradeUpdateHandler(trade types.Trade) {
 
 		profit, netProfit, madeProfit := s.state.Position.AddTrade(trade)
 		if madeProfit {
-			s.Notify("%s average cost profit: %f, net profit =~ %f", s.Symbol, profit.Float64(), netProfit.Float64())
+			s.Notify("%s average cost profit: %f %s, net profit =~ %f %s",
+				s.Symbol,
+				profit.Float64(), s.Market.QuoteCurrency,
+				netProfit.Float64(), s.Market.QuoteCurrency)
 		}
 	}
 }
@@ -468,7 +471,8 @@ func (s *Strategy) handleFilledOrder(filledOrder types.Order) {
 				// use base asset quantity here
 				baseProfit := buyOrder.Quantity - filledOrder.Quantity
 				s.state.AccumulativeArbitrageProfit += fixedpoint.NewFromFloat(baseProfit)
-				s.Notify("%s grid arbitrage profit %f %s, accumulative arbitrage profit %f %s", s.Symbol,
+				s.Notify("%s grid arbitrage profit %f %s, accumulative arbitrage profit %f %s",
+					s.Symbol,
 					baseProfit, s.Market.BaseCurrency,
 					s.state.AccumulativeArbitrageProfit.Float64(), s.Market.BaseCurrency,
 				)
@@ -479,7 +483,8 @@ func (s *Strategy) handleFilledOrder(filledOrder types.Order) {
 				// use base asset quantity here
 				baseProfit := filledOrder.Quantity - sellOrder.Quantity
 				s.state.AccumulativeArbitrageProfit += fixedpoint.NewFromFloat(baseProfit)
-				s.Notify("%s grid arbitrage profit %f %s, accumulative arbitrage profit %f %s", s.Symbol,
+				s.Notify("%s grid arbitrage profit %f %s, accumulative arbitrage profit %f %s",
+					s.Symbol,
 					baseProfit, s.Market.BaseCurrency,
 					s.state.AccumulativeArbitrageProfit.Float64(), s.Market.BaseCurrency,
 				)
@@ -492,7 +497,8 @@ func (s *Strategy) handleFilledOrder(filledOrder types.Order) {
 				// use base asset quantity here
 				quoteProfit := (filledOrder.Quantity * filledOrder.Price) - (buyOrder.Quantity * buyOrder.Price)
 				s.state.AccumulativeArbitrageProfit += fixedpoint.NewFromFloat(quoteProfit)
-				s.Notify("%s grid arbitrage profit %f %s, accumulative arbitrage profit %f %s", s.Symbol,
+				s.Notify("%s grid arbitrage profit %f %s, accumulative arbitrage profit %f %s",
+					s.Symbol,
 					quoteProfit, s.Market.QuoteCurrency,
 					s.state.AccumulativeArbitrageProfit.Float64(), s.Market.QuoteCurrency,
 				)
@@ -561,7 +567,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.state.ArbitrageOrders = make(map[uint64]types.Order)
 	}
 
-	s.Notify("current position %+v", s.state.Position)
+	s.Notify("grid %s position", s.Symbol, s.state.Position)
 
 	s.orderStore = bbgo.NewOrderStore(s.Symbol)
 	s.orderStore.BindStream(session.UserDataStream)
