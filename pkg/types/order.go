@@ -131,8 +131,33 @@ func (o *SubmitOrder) SlackAttachment() slack.Attachment {
 		{Title: "Quantity", Value: o.QuantityString, Short: true},
 	}
 
+
 	if len(o.PriceString) > 0 {
 		fields = append(fields, slack.AttachmentField{Title: "Price", Value: o.PriceString, Short: true})
+	}
+
+	if o.Price > 0 && o.Quantity > 0 && len(o.Market.QuoteCurrency) > 0 {
+		if IsFiatCurrency(o.Market.QuoteCurrency) {
+			fields = append(fields, slack.AttachmentField{
+				Title: "Amount",
+				Value: USD.FormatMoneyFloat64(o.Price * o.Quantity),
+				Short: true,
+			})
+		} else {
+			fields = append(fields, slack.AttachmentField{
+				Title: "Amount",
+				Value: fmt.Sprintf("%f %s", o.Price * o.Quantity, o.Market.QuoteCurrency),
+				Short: true,
+			})
+		}
+	}
+
+	if len(o.ClientOrderID) > 0 {
+		fields = append(fields, slack.AttachmentField{Title: "ClientOrderID", Value: o.ClientOrderID, Short: true})
+	}
+
+	if len(o.MarginSideEffect) > 0 {
+		fields = append(fields, slack.AttachmentField{Title: "MarginSideEffect", Value: string(o.MarginSideEffect), Short: true})
 	}
 
 	return slack.Attachment{

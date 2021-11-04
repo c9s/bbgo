@@ -8,3 +8,12 @@ var BNB = accounting.Accounting{Symbol: "BNB ", Precision: 4}
 
 var FiatCurrencies = []string{"USDC", "USDT", "USD", "TWD", "EUR", "GBP", "BUSD"}
 
+func IsFiatCurrency(currency string) bool {
+	for _, c := range FiatCurrencies {
+		if c == currency {
+			return true
+		}
+	}
+	return false
+}
+
