@@ -23,7 +23,8 @@ import (
 
 const BNB = "BNB"
 
-var orderLimiter = rate.NewLimiter(rate.Every(10 * time.Second), 50)
+// 50 per 10 seconds = 5 per second
+var orderLimiter = rate.NewLimiter(5, 50)
 
 var log = logrus.WithFields(logrus.Fields{
 	"exchange": "binance",
