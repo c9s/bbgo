@@ -107,27 +107,29 @@ func (s *Strategy) listenToFundingRate(ctx context.Context, exchange *binance.Ex
 			fundingRate := index.LastFundingRate
 
 			if fundingRate >= s.FundingRate.High {
-				s.Notifiability.Notify("%s funding rate is too high! current %s > threshold %s",
+				s.Notifiability.Notify("%s funding rate %s is too high! threshold %s",
 					s.Symbol,
 					fundingRate.Percentage(),
 					s.FundingRate.High.Percentage(),
 				)
+			} else {
+				if previousIndex != nil {
+					if s.FundingRate.DiffThreshold == 0 {
+						// 0.6%
+						s.FundingRate.DiffThreshold = fixedpoint.NewFromFloat(0.006 * 0.01)
+					}
+
+					diff := fundingRate - previousIndex.LastFundingRate
+					if diff.Abs() > s.FundingRate.DiffThreshold {
+						s.Notifiability.Notify("%s funding rate changed %s, current funding rate %s",
+							s.Symbol,
+							diff.SignedPercentage(),
+							fundingRate.Percentage(),
+						)
+					}
+				}
 			}
 
-			if previousIndex != nil {
-				if s.FundingRate.DiffThreshold == 0 {
-					s.FundingRate.DiffThreshold = fixedpoint.NewFromFloat(0.005 * 0.01)
-				}
-
-				diff := fundingRate - previousIndex.LastFundingRate
-				if diff.Abs() > s.FundingRate.DiffThreshold {
-					s.Notifiability.Notify("%s funding rate changed %s, current funding rate %s",
-						s.Symbol,
-						diff.SignedPercentage(),
-						fundingRate.Percentage(),
-					)
-				}
-			}
 
 			previousIndex = index
 			if fundingRate24HoursLowIndex != nil {
