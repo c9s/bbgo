@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const baseURL = process.env.NODE_ENV === "development" ? "http://localhost:8080" : ""
+const baseURL = "http://66.228.52.222:8080"//process.env.NODE_ENV === "development" ? "http://localhost:8080" : ""
 
 export function ping(cb) {
     return axios.get(baseURL + '/api/ping').then(response => {
