@@ -7,6 +7,7 @@ go 1.13
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/adshao/go-binance/v2 v2.3.2
+	github.com/c9s/callbackgen v0.0.0-20200923145104-900eb6f89ba4 // indirect
 	github.com/c9s/rockhopper v1.2.1-0.20210217093258-2661955904a9
 	github.com/codingconcepts/env v0.0.0-20200821220118-a8fbf8d84482
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible // indirect
@@ -49,6 +50,7 @@ require (
 	github.com/spf13/viper v1.7.1
 	github.com/stretchr/testify v1.7.0
 	github.com/tebeka/strftime v0.1.3 // indirect
+	github.com/tools/godep v0.0.0-20180126220526-ce0bfadeb516 // indirect
 	github.com/ugorji/go v1.2.3 // indirect
 	github.com/valyala/fastjson v1.5.1
 	github.com/webview/webview v0.0.0-20210216142346-e0bfdf0e5d90

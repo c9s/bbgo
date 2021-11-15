@@ -292,6 +292,11 @@ func ParseEvent(message string) (interface{}, error) {
 
 	case "depthUpdate":
 		return parseDepthEvent(val)
+	
+	case "markPriceUpdate":
+		var event MarkPriceUpdateEvent
+		err := json.Unmarshal([]byte(message), &event)
+		return &event, err
 
 	default:
 		id := val.GetInt("id")
@@ -488,6 +493,33 @@ func (k *KLine) KLine() types.KLine {
 		Closed:                   k.Closed,
 	}
 }
+
+
+type MarkPriceUpdateEvent struct {
+	EventBase
+
+	Symbol        string `json:"s"`
+
+	MarkPrice	fixedpoint.Value  `json:"p"`
+	IndexPrice	fixedpoint.Value  `json:"i"`
+	EstimatedPrice	fixedpoint.Value  `json:"P"`
+	
+	FundingRate	fixedpoint.Value  `json:"r"`
+	NextFundingTime	int64		  `json:"T"`
+}
+
+/*
+{
+  "e": "markPriceUpdate",     // Event type
+  "E": 1562305380000,         // Event time
+  "s": "BTCUSDT",             // Symbol
+  "p": "11794.15000000",      // Mark price
+  "i": "11784.62659091",      // Index price
+  "P": "11784.25641265",      // Estimated Settle Price, only useful in the last hour before the settlement starts
+  "r": "0.00038167",          // Funding rate
+  "T": 1562306400000          // Next funding time
+}
+*/
 
 /*
 
