@@ -34,6 +34,16 @@ func (s *Stream) EmitKLineClosedEvent(e *KLineEvent) {
 	}
 }
 
+func (s *Stream) OnMarkPriceUpdateEvent(cb func(e *MarkPriceUpdateEvent)) {
+	s.MarkPriceUpdateEventCallbacks = append(s.MarkPriceUpdateEventCallbacks, cb)
+}
+
+func (s *Stream) EmitMarkPriceUpdateEvent(e *MarkPriceUpdateEvent) {
+	for _, cb := range s.MarkPriceUpdateEventCallbacks {
+		cb(e)
+	}
+}
+
 func (s *Stream) OnBalanceUpdateEvent(cb func(event *BalanceUpdateEvent)) {
 	s.balanceUpdateEventCallbacks = append(s.balanceUpdateEventCallbacks, cb)
 }
@@ -80,6 +90,8 @@ type StreamEventHub interface {
 	OnKLineEvent(cb func(e *KLineEvent))
 
 	OnKLineClosedEvent(cb func(e *KLineEvent))
+
+	OnMarkPriceUpdateEvent(cb func(e *MarkPriceUpdateEvent))
 
 	OnBalanceUpdateEvent(cb func(event *BalanceUpdateEvent))
 
