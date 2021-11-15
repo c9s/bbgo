@@ -58,7 +58,7 @@ type StreamRequest struct {
 //go:generate callbackgen -type Stream -interface
 type Stream struct {
 	types.MarginSettings
-
+	types.FuturesSettings
 	types.StandardStream
 
 	Client   *binance.Client
@@ -74,6 +74,8 @@ type Stream struct {
 	depthEventCallbacks       []func(e *DepthEvent)
 	kLineEventCallbacks       []func(e *KLineEvent)
 	kLineClosedEventCallbacks []func(e *KLineEvent)
+
+	MarkPriceUpdateEventCallbacks []func(e *MarkPriceUpdateEvent)
 
 	balanceUpdateEventCallbacks           []func(event *BalanceUpdateEvent)
 	outboundAccountInfoEventCallbacks     []func(event *OutboundAccountInfoEvent)
@@ -538,6 +540,9 @@ func (s *Stream) read(ctx context.Context) {
 
 			case *ExecutionReportEvent:
 				s.EmitExecutionReportEvent(e)
+			
+			case *MarkPriceUpdateEvent:
+				s.EmitMarkPriceUpdateEvent(e)
 			}
 		}
 	}
