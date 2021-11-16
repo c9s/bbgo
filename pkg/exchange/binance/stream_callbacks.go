@@ -35,11 +35,21 @@ func (s *Stream) EmitKLineClosedEvent(e *KLineEvent) {
 }
 
 func (s *Stream) OnMarkPriceUpdateEvent(cb func(e *MarkPriceUpdateEvent)) {
-	s.MarkPriceUpdateEventCallbacks = append(s.MarkPriceUpdateEventCallbacks, cb)
+	s.markPriceUpdateEventCallbacks = append(s.markPriceUpdateEventCallbacks, cb)
 }
 
 func (s *Stream) EmitMarkPriceUpdateEvent(e *MarkPriceUpdateEvent) {
-	for _, cb := range s.MarkPriceUpdateEventCallbacks {
+	for _, cb := range s.markPriceUpdateEventCallbacks {
+		cb(e)
+	}
+}
+
+func (s *Stream) OnContinuousKLineEvent(cb func(e *ContinuousKLineEvent)) {
+	s.continuousKLineEventCallbacks = append(s.continuousKLineEventCallbacks, cb)
+}
+
+func (s *Stream) EmitContinuousKLineEvent(e *ContinuousKLineEvent) {
+	for _, cb := range s.continuousKLineEventCallbacks {
 		cb(e)
 	}
 }
@@ -92,6 +102,8 @@ type StreamEventHub interface {
 	OnKLineClosedEvent(cb func(e *KLineEvent))
 
 	OnMarkPriceUpdateEvent(cb func(e *MarkPriceUpdateEvent))
+
+	OnContinuousKLineEvent(cb func(e *ContinuousKLineEvent))
 
 	OnBalanceUpdateEvent(cb func(event *BalanceUpdateEvent))
 
