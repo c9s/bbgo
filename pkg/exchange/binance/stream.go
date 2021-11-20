@@ -75,7 +75,8 @@ type Stream struct {
 	kLineEventCallbacks       []func(e *KLineEvent)
 	kLineClosedEventCallbacks []func(e *KLineEvent)
 
-	MarkPriceUpdateEventCallbacks []func(e *MarkPriceUpdateEvent)
+	markPriceUpdateEventCallbacks []func(e *MarkPriceUpdateEvent)
+	continuousKLineEventCallbacks []func(e *ContinuousKLineEvent)
 
 	balanceUpdateEventCallbacks           []func(event *BalanceUpdateEvent)
 	outboundAccountInfoEventCallbacks     []func(event *OutboundAccountInfoEvent)
@@ -543,6 +544,8 @@ func (s *Stream) read(ctx context.Context) {
 			
 			case *MarkPriceUpdateEvent:
 				s.EmitMarkPriceUpdateEvent(e)
+                        case *ContinuousKLineEvent:
+                                 s.EmitContinuousKLineEvent(e)
 			}
 		}
 	}

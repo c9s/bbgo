@@ -297,7 +297,10 @@ func ParseEvent(message string) (interface{}, error) {
 		var event MarkPriceUpdateEvent
 		err := json.Unmarshal([]byte(message), &event)
 		return &event, err
-
+         case "continuousKline":
+                 var event ContinuousKLineEvent
+                 err := json.Unmarshal([]byte(message), &event)
+                 return &event, err
 	default:
 		id := val.GetInt("id")
 		if id > 0 {
@@ -518,6 +521,40 @@ type MarkPriceUpdateEvent struct {
   "P": "11784.25641265",      // Estimated Settle Price, only useful in the last hour before the settlement starts
   "r": "0.00038167",          // Funding rate
   "T": 1562306400000          // Next funding time
+}
+*/
+
+type ContinuousKLineEvent struct {
+	EventBase
+	Symbol string `json:"ps"`
+	ct     string `json:"ct"`
+	KLine  KLine  `json:"k,omitempty"`
+}
+
+/*
+{
+  "e":"continuous_kline",   // Event type
+  "E":1607443058651,        // Event time
+  "ps":"BTCUSDT",           // Pair
+  "ct":"PERPETUAL"          // Contract type
+  "k":{
+    "t":1607443020000,      // Kline start time
+    "T":1607443079999,      // Kline close time
+    "i":"1m",               // Interval
+    "f":116467658886,       // First trade ID
+    "L":116468012423,       // Last trade ID
+    "o":"18787.00",         // Open price
+    "c":"18804.04",         // Close price
+    "h":"18804.04",         // High price
+    "l":"18786.54",         // Low price
+    "v":"197.664",          // volume
+    "n": 543,               // Number of trades
+    "x":false,              // Is this kline closed?
+    "q":"3715253.19494",    // Quote asset volume
+    "V":"184.769",          // Taker buy volume
+    "Q":"3472925.84746",    //Taker buy quote asset volume
+    "B":"0"                 // Ignore
+  }
 }
 */
 
