@@ -6,7 +6,7 @@
     "test": "test"
   },
   "dependencies": {
-    "@truffle/hdwallet-provider": "^1.2.1"
+    "@truffle/hdwallet-provider": "1.4"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.2",
@@ -16,7 +16,8 @@
     "chai": "^4.3.4",
     "ethereum-waffle": "^3.4.0",
     "ethers": "^5.4.7",
-    "hardhat": "^2.6.5"
+    "hardhat": "^2.6.5",
+    "truffle-plugin-verify": "^0.5.18"
   },
   "scripts": {
     "test": "mocha"
