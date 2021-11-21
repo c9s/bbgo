@@ -9,6 +9,7 @@ import (
 	_ "github.com/c9s/bbgo/pkg/strategy/flashcrash"
 	_ "github.com/c9s/bbgo/pkg/strategy/gap"
 	_ "github.com/c9s/bbgo/pkg/strategy/grid"
+	_ "github.com/c9s/bbgo/pkg/strategy/kline"
 	_ "github.com/c9s/bbgo/pkg/strategy/pricealert"
 	_ "github.com/c9s/bbgo/pkg/strategy/pricedrop"
 	_ "github.com/c9s/bbgo/pkg/strategy/schedule"
@@ -16,7 +17,7 @@ import (
 	_ "github.com/c9s/bbgo/pkg/strategy/swing"
 	_ "github.com/c9s/bbgo/pkg/strategy/techsignal"
 	_ "github.com/c9s/bbgo/pkg/strategy/xbalance"
-	_ "github.com/c9s/bbgo/pkg/strategy/xnav"
 	_ "github.com/c9s/bbgo/pkg/strategy/xmaker"
+	_ "github.com/c9s/bbgo/pkg/strategy/xnav"
 	_ "github.com/c9s/bbgo/pkg/strategy/xpuremaker"
 )

@@ -23,6 +23,8 @@ var (
 )
 
 func init() {
+	// when using --dotenv option, the dotenv is loaded from command.PersistentPreRunE, not init.
+	// hence here the env var won't enable the debug flag
 	util.SetEnvVarBool("DEBUG_EWMA", &debugEWMA)
 	util.SetEnvVarBool("DEBUG_SMA", &debugSMA)
 }
@@ -411,6 +413,7 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 	// always subscribe the 1m kline so we can make sure the connection persists.
 	klineSubscriptions[types.Interval1m] = struct{}{}
 
+	// Aggregate the intervals that we are using in the subscriptions.
 	for _, sub := range session.Subscriptions {
 		switch sub.Channel {
 		case types.BookChannel:
