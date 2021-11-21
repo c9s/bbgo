@@ -9,8 +9,8 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-const MaxNumOfSMA = 1_000
-const MaxNumOfSMATruncateSize = 500
+const MaxNumOfSMA = 5_000
+const MaxNumOfSMATruncateSize = 100
 
 var zeroTime time.Time
 
@@ -52,7 +52,7 @@ func (inc *SMA) calculateAndUpdate(kLines []types.KLine) {
 	inc.Values.Push(sma)
 
 	if len(inc.Values) > MaxNumOfSMA {
-		inc.Values = inc.Values[MaxNumOfSMATruncateSize:]
+		inc.Values = inc.Values[MaxNumOfSMATruncateSize - 1:]
 	}
 
 	inc.EndTime = kLines[index].EndTime
