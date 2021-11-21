@@ -29,7 +29,7 @@ func (inc *EWMA) Update(value float64) {
 		inc.Values.Push(value)
 		return
 	} else if len(inc.Values) > MaxNumOfEWMA {
-		inc.Values = inc.Values[MaxNumOfEWMATruncateSize - 1:]
+		inc.Values = inc.Values[MaxNumOfEWMATruncateSize-1:]
 	}
 
 	ema := (1-multiplier)*inc.Last() + multiplier*value
@@ -54,31 +54,30 @@ func (inc *EWMA) calculateAndUpdate(allKLines []types.KLine) {
 	var dataLen = len(allKLines)
 	var multiplier = 2.0 / (float64(inc.Window) + 1)
 
-	// init the values from the kline data
-	var from = 1
+	// init the values fromNthK the kline data
+	var fromNthK = 1
 	if len(inc.Values) == 0 {
 		// for the first value, we should use the close price
 		inc.Values = []float64{priceF(allKLines[0])}
 	} else {
-		// from = len(inc.Values)
+		fromNthK = len(inc.Values)
 
 		// update ewma with the existing values
 		for i := dataLen - 1; i > 0; i-- {
 			var k = allKLines[i]
 			if k.StartTime.After(inc.LastOpenTime) {
-				from = i
+				fromNthK = i
 			} else {
 				break
 			}
 		}
 	}
 
-    if len(inc.Values) >= MaxNumOfEWMA {
-        TruncateSize := MaxNumOfEWMATruncateSize
-        inc.Values = inc.Values[TruncateSize:]
-    }
+	if len(inc.Values) >= MaxNumOfEWMA {
+		inc.Values = inc.Values[MaxNumOfEWMATruncateSize-1:]
+	}
 
-	for i := from; i < dataLen; i++ {
+	for i := fromNthK; i < dataLen; i++ {
 		var k = allKLines[i]
 		var ewma = priceF(k)*multiplier + (1-multiplier)*inc.Values[i-1]
 		inc.Values.Push(ewma)
@@ -87,7 +86,8 @@ func (inc *EWMA) calculateAndUpdate(allKLines []types.KLine) {
 	}
 
 	if len(inc.Values) != dataLen {
-		log.Warnf("%s EMA (%d) value length (%d) != all kline data length (%d)", inc.Interval, inc.Window, len(inc.Values), dataLen)
+		// check error
+		log.Warnf("%s EMA (%d) value length (%d) != kline window length (%d)", inc.Interval, inc.Window, len(inc.Values), dataLen)
 	}
 
 	v1 := math.Floor(inc.Values[len(inc.Values)-1]*100.0) / 100.0

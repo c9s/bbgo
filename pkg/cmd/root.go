@@ -106,9 +106,7 @@ func init() {
 	RootCmd.PersistentFlags().String("ftx-api-key", "", "ftx api key")
 	RootCmd.PersistentFlags().String("ftx-api-secret", "", "ftx api secret")
 	RootCmd.PersistentFlags().String("ftx-subaccount", "", "subaccount name. Specify it if the credential is for subaccount.")
-}
 
-func Execute() {
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 
 	// Enable environment variable binding, the env vars are not overloaded yet.
@@ -129,7 +127,6 @@ func Execute() {
 			log.WithError(err).Fatal("failed to load config file")
 		}
 	*/
-
 	// Once the flags are defined, we can bind config keys with flags.
 	if err := viper.BindPFlags(RootCmd.PersistentFlags()); err != nil {
 		log.WithError(err).Errorf("failed to bind persistent flags. please check the flag settings.")
@@ -140,6 +137,9 @@ func Execute() {
 		log.WithError(err).Errorf("failed to bind local flags. please check the flag settings.")
 		return
 	}
+}
+
+func Execute() {
 
 	log.SetFormatter(&prefixed.TextFormatter{})
 

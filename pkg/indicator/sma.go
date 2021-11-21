@@ -52,7 +52,7 @@ func (inc *SMA) calculateAndUpdate(kLines []types.KLine) {
 	inc.Values.Push(sma)
 
 	if len(inc.Values) > MaxNumOfSMA {
-		inc.Values = inc.Values[MaxNumOfSMATruncateSize - 1:]
+		inc.Values = inc.Values[MaxNumOfSMATruncateSize-1:]
 	}
 
 	inc.EndTime = kLines[index].EndTime
