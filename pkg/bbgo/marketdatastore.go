@@ -50,10 +50,9 @@ func (store *MarketDataStore) handleKLineClosed(kline types.KLine) {
 func (store *MarketDataStore) AddKLine(kline types.KLine) {
 	window, ok := store.KLineWindows[kline.Interval]
 	if !ok {
-		window = types.KLineWindow{kline}
-	} else {
-		window.Add(kline)
+		window = make(types.KLineWindow, 0, 1000)
 	}
+	window.Add(kline)
 
 	if len(window) > MaxNumOfKLines {
 		window = window[MaxNumOfKLinesTruncate-1:]
