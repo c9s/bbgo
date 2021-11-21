@@ -11,7 +11,7 @@ import (
 
 // These numbers should be aligned with bbgo MaxNumOfKLines and MaxNumOfKLinesTruncate
 const MaxNumOfEWMA = 5_000
-const MaxNumOfEWMATruncateSize = 1000
+const MaxNumOfEWMATruncateSize = 100
 
 //go:generate callbackgen -type EWMA
 type EWMA struct {
@@ -29,7 +29,7 @@ func (inc *EWMA) Update(value float64) {
 		inc.Values.Push(value)
 		return
 	} else if len(inc.Values) > MaxNumOfEWMA {
-		inc.Values = inc.Values[MaxNumOfEWMATruncateSize:]
+		inc.Values = inc.Values[MaxNumOfEWMATruncateSize - 1:]
 	}
 
 	ema := (1-multiplier)*inc.Last() + multiplier*value
