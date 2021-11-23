@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/adshao/go-binance/v2/futures"
 	"golang.org/x/time/rate"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -50,6 +51,8 @@ type Exchange struct {
 
 func New(key, secret string) *Exchange {
 	var client = binance.NewClient(key, secret)
+	client.HTTPClient = &http.Client{Timeout: 15 * time.Second}
+
 	_, _ = client.NewSetServerTimeService().Do(context.Background())
 	return &Exchange{
 		key:    key,
