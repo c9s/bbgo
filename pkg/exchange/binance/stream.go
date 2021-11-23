@@ -545,8 +545,8 @@ func (s *Stream) read(ctx context.Context) {
 			case *MarkPriceUpdateEvent:
 				s.EmitMarkPriceUpdateEvent(e)
 
-                        case *ContinuousKLineEvent:
-                                s.EmitContinuousKLineEvent(e)
+            case *ContinuousKLineEvent:
+                s.EmitContinuousKLineEvent(e)
 			}
 		}
 	}
