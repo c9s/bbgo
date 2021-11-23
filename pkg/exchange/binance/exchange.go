@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
+	"net/http"
 	"github.com/adshao/go-binance/v2"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
@@ -54,7 +54,8 @@ type Exchange struct {
 func New(key, secret string) *Exchange {
 	var Client = binance.NewClient(key, secret)
 	var futuresClient = binance.NewFuturesClient(key, secret)
-
+	Client.HTTPClient = &http.Client{Timeout: 15 * time.Second}
+	futuresClient.HTTPClient = &http.Client{Timeout: 15 * time.Second}
 	_, _ = Client.NewSetServerTimeService().Do(context.Background())
 	_, _ = futuresClient.NewSetServerTimeService().Do(context.Background())
 	return &Exchange{
