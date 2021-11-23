@@ -477,9 +477,7 @@ type KLineEvent struct {
 }
 
 /*
-
 kline
-
 {
   "e": "kline",     // KLineEvent type
   "E": 123456789,   // KLineEvent time
@@ -504,6 +502,7 @@ kline
     "B": "123456"   // Ignore
   }
 }
+*/
 
 func (k *KLine) KLine() types.KLine {
 	return types.KLine{
@@ -587,7 +586,6 @@ type ContinuousKLineEvent struct {
 }
 */
 
-*/
 type EventBase struct {
 	Event string `json:"e"` // event
 	Time  int64  `json:"E"`
