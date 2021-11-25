@@ -606,23 +606,10 @@ for lorca
 make embed && go run -tags web ./cmd/bbgo-lorca
 ```
 
-## Support
 
-### By contributing pull requests
+## Contributing
 
-Any pull request is welcome, documentation, format fixing, testing, features.
-
-### By registering account with referral ID
-
-You may register your exchange account with my referral ID to support this project.
-
-- For MAX Exchange: <https://max.maicoin.com/signup?r=c7982718> (default commission rate to your account)
-- For Binance Exchange: <https://www.binancezh.com/en/register?ref=VGDGLT80> (5% commission back to your account)
-
-### By small amount cryptos
-
-- BTC address `3J6XQJNWT56amqz9Hz2BEVQ7W4aNmb5kiU`
-- USDT ERC20 address `0x63E5805e027548A384c57E20141f6778591Bac6F`
+See (./CONTRIBUTING.md)[CONTRIBUTING]
 
 ## Community
 
@@ -630,19 +617,6 @@ You can join our telegram channels:
 
 - BBGO International <https://t.me/bbgo_intl>
 - BBGO Taiwan <https://t.me/bbgocrypto>
-
-## Contribution
-
-BBGO has a token BBG for the ecosystem (contract
-address: <https://etherscan.io/address/0x3afe98235d680e8d7a52e1458a59d60f45f935c0>).
-
-Each issue has its BBG label, by completing the issue with a pull request, you can get correspond amount of BBG.
-
-If you have feature request, you can offer your BBG for contributors.
-
-BBG/ETH liquidity pool on Uniswap: <https://app.uniswap.org/#/pool/28377>
-
-For further request, please contact us: <https://t.me/c123456789s>
 
 ## License
 
