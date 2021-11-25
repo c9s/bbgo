@@ -102,6 +102,9 @@ type SubmitOrder struct {
 	Price     float64 `json:"price" db:"price"`
 	StopPrice float64 `json:"stopPrice,omitempty" db:"stop_price"`
 
+	ReduceOnly bool `json:"reduceOnly" db:"reduce_only"`
+	ClosePosition bool `json:"closePosition" db:"close_position"`
+
 	Market Market `json:"-" db:"-"`
 
 	// TODO: we can probably remove these field
