@@ -59,13 +59,11 @@ func New(key, secret string) *Exchange {
 	statsClient, errClient := client.NewSetServerTimeService().Do(context.Background())
 	if errClient != nil {
 		panic(statsClient)
-		panic(errClient)
 		return nil
 	}
 	statsFuturesClient, errFuturesClient := futuresClient.NewSetServerTimeService().Do(context.Background())
 	if errFuturesClient != nil {
 		panic(statsFuturesClient)
-		panic(errFuturesClient)
 		return nil
 	}
 	return &Exchange{
