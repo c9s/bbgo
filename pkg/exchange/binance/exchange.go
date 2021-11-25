@@ -56,8 +56,14 @@ func New(key, secret string) *Exchange {
 	var futuresClient = binance.NewFuturesClient(key, secret)
 	client.HTTPClient = &http.Client{Timeout: 15 * time.Second}
 	futuresClient.HTTPClient = &http.Client{Timeout: 15 * time.Second}
-	_, _ = Client.NewSetServerTimeService().Do(context.Background())
-	_, _ = futuresClient.NewSetServerTimeService().Do(context.Background())
+	_, err = Client.NewSetServerTimeService().Do(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	_, err = futuresClient.NewSetServerTimeService().Do(context.Background())
+	if err != nil {
+		return nil, err
+	}
 	return &Exchange{
 		key:    key,
 		secret: secret,
