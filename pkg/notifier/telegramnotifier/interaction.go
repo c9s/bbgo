@@ -115,7 +115,7 @@ func (it *Interaction) HandleInfo(m *telebot.Message) {
 
 func (it *Interaction) Broadcast(message string) {
 	it.SendToOwner(message)
-	
+
 	for chatID := range it.session.Chats {
 		chat, err := it.bot.ChatByID(strconv.FormatInt(chatID, 10))
 		if err != nil {

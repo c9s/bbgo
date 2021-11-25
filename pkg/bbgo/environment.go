@@ -608,6 +608,7 @@ func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) erro
 		var opts []telegramnotifier.Option
 
 		if userConfig.Notifications != nil && userConfig.Notifications.Telegram != nil {
+			log.Infof("telegram broadcast is enabled")
 			opts = append(opts, telegramnotifier.UseBroadcast())
 		}
 
