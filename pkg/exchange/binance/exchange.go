@@ -233,20 +233,6 @@ func (e *Exchange) QueryIsolatedMarginAccount(ctx context.Context, symbols ...st
 	return toGlobalIsolatedMarginAccount(account), nil
 }
 
-// func (e *Exchange) QueryIsolatedFuturesAccount(ctx context.Context, symbols ...string) (*types.IsolatedFuturesAccount, error) {
-// 	req := e.futuresClient.NewGetAccountService()
-// 	if len(symbols) > 0 {
-// 		req.Symbols(symbols...)
-// 	}
-
-// 	account, err := req.Do(ctx)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	return toGlobalIsolatedFuturesAccount(account), nil
-// }
-
 func (e *Exchange) getLaunchDate() (time.Time, error) {
 	// binance launch date 12:00 July 14th, 2017
 	loc, err := time.LoadLocation("Asia/Shanghai")
@@ -487,16 +473,6 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 		}
 
 		return toGlobalOrders(binanceOrders)
-	} else if e.IsFutures {
-		req := e.futuresClient.NewListOpenOrdersService().Symbol(symbol)
-		// req.IsIsolated(e.IsIsolatedFutures)
-
-		futuresOrders, err := req.Do(ctx)
-		if err != nil {
-			return orders, err
-		}
-
-		return toGlobalFuturesOrders(futuresOrders)
 	}
 
 	binanceOrders, err := e.Client.NewListOpenOrdersService().Symbol(symbol).Do(ctx)
@@ -531,23 +507,6 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 		}
 
 		return toGlobalOrders(binanceOrders)
-	} else if e.IsFutures {
-		req := e.futuresClient.NewListOrdersService().Symbol(symbol)
-		// req.IsIsolated(e.IsIsolatedFutures)
-
-		if lastOrderID > 0 {
-			req.OrderID(int64(lastOrderID))
-		} else {
-			req.StartTime(since.UnixNano() / int64(time.Millisecond)).
-				EndTime(until.UnixNano() / int64(time.Millisecond))
-		}
-
-		futuresOrders, err := req.Do(ctx)
-		if err != nil {
-			return orders, err
-		}
-
-		return toGlobalFuturesOrders(futuresOrders)
 	}
 
 	req := e.Client.NewListOrdersService().
