@@ -609,7 +609,7 @@ make embed && go run -tags web ./cmd/bbgo-lorca
 
 ## Contributing
 
-See (./CONTRIBUTING.md)[CONTRIBUTING]
+See [./CONTRIBUTING.md](Contributing)
 
 ## Community
 
