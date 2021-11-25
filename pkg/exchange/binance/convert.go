@@ -330,6 +330,8 @@ func toGlobalFuturesOrder(futuresOrder *futures.Order, isMargin bool) (*types.Or
 			Symbol:        futuresOrder.Symbol,
 			Side:          toGlobalFuturesSideType(futuresOrder.Side),
 			Type:          toGlobalFuturesOrderType(futuresOrder.Type),
+			ReduceOnly:    futuresOrder.ReduceOnly,
+			ClosePosition: futuresOrder.ClosePosition,
 			Quantity:      util.MustParseFloat(futuresOrder.OrigQuantity),
 			Price:         util.MustParseFloat(futuresOrder.Price),
 			TimeInForce:   string(futuresOrder.TimeInForce),
