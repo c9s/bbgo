@@ -57,6 +57,7 @@ func NewInteraction(bot *telebot.Bot, store service.Store) *Interaction {
 	bot.Handle("/auth", interaction.HandleAuth)
 	bot.Handle("/info", interaction.HandleInfo)
 	bot.Handle("/subscribe", interaction.HandleSubscribe)
+	bot.Handle("/start", interaction.HandleStart)
 	return interaction
 }
 
@@ -66,6 +67,10 @@ func (it *Interaction) SetAuthToken(token string) {
 
 func (it *Interaction) Session() *Session {
 	return it.session
+}
+
+func (it *Interaction) HandleStart(m *telebot.Message) {
+	it.HandleSubscribe(m)
 }
 
 func (it *Interaction) HandleSubscribe(m *telebot.Message) {
