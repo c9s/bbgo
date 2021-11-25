@@ -52,9 +52,9 @@ type Exchange struct {
 }
 
 func New(key, secret string) *Exchange {
-	var Client = binance.NewClient(key, secret)
+	var client = binance.NewClient(key, secret)
 	var futuresClient = binance.NewFuturesClient(key, secret)
-	Client.HTTPClient = &http.Client{Timeout: 15 * time.Second}
+	client.HTTPClient = &http.Client{Timeout: 15 * time.Second}
 	futuresClient.HTTPClient = &http.Client{Timeout: 15 * time.Second}
 	_, _ = Client.NewSetServerTimeService().Do(context.Background())
 	_, _ = futuresClient.NewSetServerTimeService().Do(context.Background())
@@ -62,7 +62,7 @@ func New(key, secret string) *Exchange {
 		key:    key,
 		secret: secret,
 
-		Client: Client,
+		Client: client,
 		futuresClient: futuresClient,
 		// deliveryClient: deliveryClient,
 	}
