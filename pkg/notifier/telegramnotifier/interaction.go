@@ -73,6 +73,10 @@ func (it *Interaction) HandleSubscribe(m *telebot.Message) {
 		return
 	}
 
+	if it.session.Chats == nil {
+		it.session.Chats = make(map[int64]bool)
+	}
+
 	it.session.Chats[m.Chat.ID] = true
 
 	if _, err := it.bot.Send(m.Chat, "I just added your subscription"); err != nil {
