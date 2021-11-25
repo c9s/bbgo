@@ -61,6 +61,11 @@ func NewInteraction(bot *telebot.Bot, store service.Store) *Interaction {
 	return interaction
 }
 
+// TODO: wrapper the handler function parameter to a global struct
+func (it *Interaction) Command(command string, h func(m *telebot.Message)) {
+	it.bot.Handle(command, h)
+}
+
 func (it *Interaction) SetAuthToken(token string) {
 	it.AuthToken = token
 }
