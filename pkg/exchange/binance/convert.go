@@ -455,16 +455,16 @@ func toGlobalOrderType(orderType binance.OrderType) types.OrderType {
 
 func toGlobalFuturesOrderType(orderType futures.OrderType) types.OrderType {
 	switch orderType {
-
+	// TODO
 	case futures.OrderTypeLimit: //, futures.OrderTypeLimitMaker, futures.OrderTypeTakeProfitLimit:
 		return types.OrderTypeLimit
 
 	case futures.OrderTypeMarket:
 		return types.OrderTypeMarket
-
+	// TODO
 	// case futures.OrderTypeStopLossLimit:
 	// 	return types.OrderTypeStopLimit
-
+	// TODO
 	// case futures.OrderTypeStopLoss:
 	// 	return types.OrderTypeStopMarket
 
