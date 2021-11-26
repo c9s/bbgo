@@ -45,6 +45,7 @@ type Asset struct {
 	InUSD    fixedpoint.Value `json:"inUSD"`
 	InBTC    fixedpoint.Value `json:"inBTC"`
 	Time     time.Time        `json:"time"`
+	TotalAsset		fixedpoint.Value `json:"totalAsset"`
 }
 
 type AssetMap map[string]Asset
@@ -180,6 +181,12 @@ func (m BalanceMap) Print() {
 	}
 }
 
+type AccountType string
+const (
+    AccountTypeFutures = AccountType("futures")
+    AccountTypeSpot = AccountType("spot")
+)
+
 type Account struct {
 	sync.Mutex `json:"-"`
 
@@ -189,11 +196,28 @@ type Account struct {
 
 	MakerFeeRate fixedpoint.Value `json:"makerFeeRate,omitempty"`
 	TakerFeeRate fixedpoint.Value `json:"takerFeeRate,omitempty"`
-	AccountType  string           `json:"accountType,omitempty"`
+	AccountType  AccountType           `json:"accountType,omitempty"`
 
 	TotalAccountValue fixedpoint.Value `json:"totalAccountValue,omitempty"`
 
 	balances BalanceMap
+
+	// Futures fields
+	Assets                      []FuturesUserAsset    `json:"assets"`
+	CanDeposit                  bool               `json:"canDeposit"`
+	CanTrade                    bool               `json:"canTrade"`
+	CanWithdraw                 bool               `json:"canWithdraw"`
+	FeeTier                     int                `json:"feeTier"`
+	MaxWithdrawAmount           fixedpoint.Value             `json:"maxWithdrawAmount"`
+	Positions                   []Position `json:"positions"`
+	TotalInitialMargin          fixedpoint.Value             `json:"totalInitialMargin"`
+	TotalMaintMargin            fixedpoint.Value             `json:"totalMaintMargin"`
+	TotalMarginBalance          fixedpoint.Value             `json:"totalMarginBalance"`
+	TotalOpenOrderInitialMargin fixedpoint.Value             `json:"totalOpenOrderInitialMargin"`
+	TotalPositionInitialMargin  fixedpoint.Value             `json:"totalPositionInitialMargin"`
+	TotalUnrealizedProfit       fixedpoint.Value             `json:"totalUnrealizedProfit"`
+	TotalWalletBalance          fixedpoint.Value             `json:"totalWalletBalance"`
+	UpdateTime                  int64              `json:"updateTime"`
 }
 
 func NewAccount() *Account {

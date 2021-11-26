@@ -1,4 +1,4 @@
-package bbgo
+package types
 
 import (
 	"fmt"
@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 	"github.com/slack-go/slack"
 )
@@ -21,7 +20,7 @@ type Position struct {
 	BaseCurrency  string `json:"baseCurrency"`
 	QuoteCurrency string `json:"quoteCurrency"`
 
-	Market types.Market `json:"market"`
+	Market Market `json:"market"`
 
 	Base        fixedpoint.Value `json:"base"`
 	Quote       fixedpoint.Value `json:"quote"`
@@ -31,7 +30,7 @@ type Position struct {
 	// This is used for calculating net profit
 	ApproximateAverageCost fixedpoint.Value `json:"approximateAverageCost"`
 
-	ExchangeFeeRates map[types.ExchangeName]ExchangeFee `json:"exchangeFeeRates"`
+	ExchangeFeeRates map[ExchangeName]ExchangeFee `json:"exchangeFeeRates"`
 
 	Isolated               bool             		  `json:"isolated"`
 	Leverage               fixedpoint.Value           `json:"leverage"`
@@ -51,7 +50,7 @@ type Position struct {
 	sync.Mutex
 }
 
-func NewPositionFromMarket(market types.Market) *Position {
+func NewPositionFromMarket(market Market) *Position {
 	return &Position{
 		Symbol:        market.Symbol,
 		BaseCurrency:  market.BaseCurrency,
@@ -74,9 +73,9 @@ func (p *Position) Reset() {
 	p.AverageCost = 0
 }
 
-func (p *Position) SetExchangeFeeRate(ex types.ExchangeName, exchangeFee ExchangeFee) {
+func (p *Position) SetExchangeFeeRate(ex ExchangeName, exchangeFee ExchangeFee) {
 	if p.ExchangeFeeRates == nil {
-		p.ExchangeFeeRates = make(map[types.ExchangeName]ExchangeFee)
+		p.ExchangeFeeRates = make(map[ExchangeName]ExchangeFee)
 	}
 
 	p.ExchangeFeeRates[ex] = exchangeFee
@@ -137,15 +136,15 @@ func (p *Position) String() string {
 	)
 }
 
-func (p *Position) BindStream(stream types.Stream) {
-	stream.OnTradeUpdate(func(trade types.Trade) {
+func (p *Position) BindStream(stream Stream) {
+	stream.OnTradeUpdate(func(trade Trade) {
 		if p.Symbol == trade.Symbol {
 			p.AddTrade(trade)
 		}
 	})
 }
 
-func (p *Position) AddTrades(trades []types.Trade) (fixedpoint.Value, fixedpoint.Value, bool) {
+func (p *Position) AddTrades(trades []Trade) (fixedpoint.Value, fixedpoint.Value, bool) {
 	var totalProfitAmount, totalNetProfit fixedpoint.Value
 	for _, trade := range trades {
 		if profit, netProfit, madeProfit := p.AddTrade(trade); madeProfit {
@@ -157,7 +156,7 @@ func (p *Position) AddTrades(trades []types.Trade) (fixedpoint.Value, fixedpoint
 	return totalProfitAmount, totalNetProfit, totalProfitAmount != 0
 }
 
-func (p *Position) AddTrade(t types.Trade) (profit fixedpoint.Value, netProfit fixedpoint.Value, madeProfit bool) {
+func (p *Position) AddTrade(t Trade) (profit fixedpoint.Value, netProfit fixedpoint.Value, madeProfit bool) {
 	price := fixedpoint.NewFromFloat(t.Price)
 	quantity := fixedpoint.NewFromFloat(t.Quantity)
 	quoteQuantity := fixedpoint.NewFromFloat(t.QuoteQuantity)
@@ -193,7 +192,7 @@ func (p *Position) AddTrade(t types.Trade) (profit fixedpoint.Value, netProfit f
 	// Base < 0  means we're in short position
 	switch t.Side {
 
-	case types.SideTypeBuy:
+	case SideTypeBuy:
 		if p.Base < 0 {
 			// convert short position to long position
 			if p.Base+quantity > 0 {
@@ -221,7 +220,7 @@ func (p *Position) AddTrade(t types.Trade) (profit fixedpoint.Value, netProfit f
 
 		return 0, 0, false
 
-	case types.SideTypeSell:
+	case SideTypeSell:
 		if p.Base > 0 {
 			// convert long position to short position
 			if p.Base-quantity < 0 {

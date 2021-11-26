@@ -102,9 +102,6 @@ type SubmitOrder struct {
 	Price     float64 `json:"price" db:"price"`
 	StopPrice float64 `json:"stopPrice,omitempty" db:"stop_price"`
 
-	ReduceOnly bool `json:"reduceOnly" db:"reduce_only"`
-	ClosePosition bool `json:"closePosition" db:"close_position"`
-
 	Market Market `json:"-" db:"-"`
 
 	// TODO: we can probably remove these field
@@ -117,6 +114,10 @@ type SubmitOrder struct {
 	GroupID uint32 `json:"groupID,omitempty"`
 
 	MarginSideEffect MarginOrderSideEffectType `json:"marginSideEffect,omitempty"` // AUTO_REPAY = repay, MARGIN_BUY = borrow, defaults to  NO_SIDE_EFFECT
+
+	// futures order fields
+	ReduceOnly bool `json:"reduceOnly" db:"reduce_only"`
+	ClosePosition bool `json:"closePosition" db:"close_position"`
 }
 
 func (o *SubmitOrder) String() string {

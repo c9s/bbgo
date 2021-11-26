@@ -12,6 +12,7 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
+
 )
 
 func toGlobalIsolatedUserAsset(userAsset binance.IsolatedUserAsset) types.IsolatedUserAsset {
@@ -28,7 +29,6 @@ func toGlobalIsolatedUserAsset(userAsset binance.IsolatedUserAsset) types.Isolat
 		TotalAsset:    fixedpoint.MustNewFromString(userAsset.TotalAsset),
 	}
 }
-
 func toGlobalIsolatedMarginAsset(asset binance.IsolatedMarginAsset) types.IsolatedMarginAsset {
 	return types.IsolatedMarginAsset{
 		Symbol:            asset.Symbol,
@@ -90,16 +90,15 @@ func toGlobalMarginAccount(account *binance.MarginAccount) *types.MarginAccount 
 	}
 }
 
-// Cross
-func toGlobalFuturesAccount(account *futures.Account) *types.FuturesAccount {
-	return &types.FuturesAccount{
+func toGlobalFuturesAccount(account *futures.Account) *types.Account {
+	return &types.Account{
 		Assets:                      toGlobalFuturesUserAssets(account.Assets),
 		CanDeposit:                  account.CanDeposit,
 		CanTrade:                    account.CanTrade,
 		CanWithdraw:                 account.CanWithdraw,
 		FeeTier:                     account.FeeTier,
 		MaxWithdrawAmount:           fixedpoint.MustNewFromString(account.MaxWithdrawAmount),
-		Positions:                   toGlobalFuturesUserPositions(account.Positions),//TODO
+		Positions:                   toGlobalPositions(account.Positions),//TODO
 		TotalInitialMargin:          fixedpoint.MustNewFromString(account.TotalInitialMargin),
 		TotalMaintMargin:            fixedpoint.MustNewFromString(account.TotalMaintMargin),
 		TotalMarginBalance:          fixedpoint.MustNewFromString(account.TotalMarginBalance),
@@ -111,8 +110,8 @@ func toGlobalFuturesAccount(account *futures.Account) *types.FuturesAccount {
 	}
 }
 
-func toGlobalFuturesUserAssets(userAssets []*futures.AccountAsset) (retAssets []types.FuturesUserAsset) {
-	for _, asset := range userAssets {
+func toGlobalFuturesUserAssets(assets []*futures.AccountAsset) (retAssets []types.FuturesUserAsset) {
+	for _, asset := range assets {
 		retAssets = append(retAssets, types.FuturesUserAsset{
 			Asset:				asset.Asset,
 			InitialMargin:		fixedpoint.MustNewFromString(asset.InitialMargin),
@@ -129,9 +128,9 @@ func toGlobalFuturesUserAssets(userAssets []*futures.AccountAsset) (retAssets []
 	return retAssets
 }
 
-func toGlobalFuturesUserPositions(userPositions []*futures.AccountPosition) (retAssets []types.FuturesUserPosition) {
-	for _, position := range userPositions {
-		retAssets = append(retAssets, types.FuturesUserPosition{
+func toGlobalPositions(positions []*futures.AccountPosition) (retAssets []types.Position) {
+	for _, position := range positions {
+		retAssets = append(retAssets, types.Position{
 			Isolated:               position.Isolated,
 			Leverage:               fixedpoint.MustNewFromString(position.Leverage),
 			InitialMargin:          fixedpoint.MustNewFromString(position.InitialMargin),
@@ -154,67 +153,67 @@ func toGlobalFuturesUserPositions(userPositions []*futures.AccountPosition) (ret
 }
 
 // Isolated
-func toGlobalIsolatedFuturesAccount(account *futures.Account) *types.IsolatedFuturesAccount {
-	return &types.IsolatedFuturesAccount{
-		Assets:                      toGlobalIsolatedFuturesUserAssets(account.Assets),
-		CanDeposit:                  account.CanDeposit,
-		CanTrade:                    account.CanTrade,
-		CanWithdraw:                 account.CanWithdraw,
-		FeeTier:                     account.FeeTier,
-		MaxWithdrawAmount:           fixedpoint.MustNewFromString(account.MaxWithdrawAmount),
-		Positions:                   toGlobalIsolatedFuturesUserPositions(account.Positions),//TODO
-		TotalInitialMargin:          fixedpoint.MustNewFromString(account.TotalInitialMargin),
-		TotalMaintMargin:            fixedpoint.MustNewFromString(account.TotalMaintMargin),
-		TotalMarginBalance:          fixedpoint.MustNewFromString(account.TotalMarginBalance),
-		TotalOpenOrderInitialMargin: fixedpoint.MustNewFromString(account.TotalOpenOrderInitialMargin),
-		TotalPositionInitialMargin:  fixedpoint.MustNewFromString(account.TotalPositionInitialMargin),
-		TotalUnrealizedProfit:       fixedpoint.MustNewFromString(account.TotalUnrealizedProfit),
-		TotalWalletBalance:          fixedpoint.MustNewFromString(account.TotalWalletBalance),
-		UpdateTime:                  account.UpdateTime,
-	}
-}
+// func toGlobalIsolatedFuturesAccount(account *futures.Account) *types.Account {
+// 	return &types.IsolatedFuturesAccount{
+// 		Assets:                      toGlobalIsolatedFuturesUserAssets(account.Assets),
+// 		CanDeposit:                  account.CanDeposit,
+// 		CanTrade:                    account.CanTrade,
+// 		CanWithdraw:                 account.CanWithdraw,
+// 		FeeTier:                     account.FeeTier,
+// 		MaxWithdrawAmount:           fixedpoint.MustNewFromString(account.MaxWithdrawAmount),
+// 		Positions:                   toGlobalIsolatedFuturesUserPositions(account.Positions),//TODO
+// 		TotalInitialMargin:          fixedpoint.MustNewFromString(account.TotalInitialMargin),
+// 		TotalMaintMargin:            fixedpoint.MustNewFromString(account.TotalMaintMargin),
+// 		TotalMarginBalance:          fixedpoint.MustNewFromString(account.TotalMarginBalance),
+// 		TotalOpenOrderInitialMargin: fixedpoint.MustNewFromString(account.TotalOpenOrderInitialMargin),
+// 		TotalPositionInitialMargin:  fixedpoint.MustNewFromString(account.TotalPositionInitialMargin),
+// 		TotalUnrealizedProfit:       fixedpoint.MustNewFromString(account.TotalUnrealizedProfit),
+// 		TotalWalletBalance:          fixedpoint.MustNewFromString(account.TotalWalletBalance),
+// 		UpdateTime:                  account.UpdateTime,
+// 	}
+// }
 
-func toGlobalIsolatedFuturesUserAssets(userAssets []*futures.AccountAsset) (retAssets []types.IsolatedFuturesUserAsset) {
-	for _, asset := range userAssets {
-		retAssets = append(retAssets, types.IsolatedFuturesUserAsset{
-			Asset:				asset.Asset,
-			InitialMargin:		fixedpoint.MustNewFromString(asset.InitialMargin),
-			MaintMargin:            fixedpoint.MustNewFromString(asset.MaintMargin),
-			MarginBalance:          fixedpoint.MustNewFromString(asset.MarginBalance),
-			MaxWithdrawAmount:      fixedpoint.MustNewFromString(asset.MaxWithdrawAmount),
-			OpenOrderInitialMargin: fixedpoint.MustNewFromString(asset.OpenOrderInitialMargin),
-			PositionInitialMargin:  fixedpoint.MustNewFromString(asset.PositionInitialMargin),
-			UnrealizedProfit:       fixedpoint.MustNewFromString(asset.UnrealizedProfit),
-			WalletBalance:         fixedpoint.MustNewFromString(asset.WalletBalance),
-		})
-	}
+// func toGlobalIsolatedFuturesUserAssets(userAssets []*futures.AccountAsset) (retAssets []types.IsolatedFuturesUserAsset) {
+// 	for _, asset := range userAssets {
+// 		retAssets = append(retAssets, types.IsolatedFuturesUserAsset{
+// 			Asset:				asset.Asset,
+// 			InitialMargin:		fixedpoint.MustNewFromString(asset.InitialMargin),
+// 			MaintMargin:            fixedpoint.MustNewFromString(asset.MaintMargin),
+// 			MarginBalance:          fixedpoint.MustNewFromString(asset.MarginBalance),
+// 			MaxWithdrawAmount:      fixedpoint.MustNewFromString(asset.MaxWithdrawAmount),
+// 			OpenOrderInitialMargin: fixedpoint.MustNewFromString(asset.OpenOrderInitialMargin),
+// 			PositionInitialMargin:  fixedpoint.MustNewFromString(asset.PositionInitialMargin),
+// 			UnrealizedProfit:       fixedpoint.MustNewFromString(asset.UnrealizedProfit),
+// 			WalletBalance:         fixedpoint.MustNewFromString(asset.WalletBalance),
+// 		})
+// 	}
 
-	return retAssets
-}
+// 	return retAssets
+// }
 
-func toGlobalIsolatedFuturesUserPositions(userPositions []*futures.AccountPosition) (retAssets []types.IsolatedFuturesUserPosition) {
-	for _, position := range userPositions {
-		retAssets = append(retAssets, types.IsolatedFuturesUserPosition{
-			Isolated:               position.Isolated,
-			Leverage:               fixedpoint.MustNewFromString(position.Leverage),
-			InitialMargin:          fixedpoint.MustNewFromString(position.InitialMargin),
-			MaintMargin:            fixedpoint.MustNewFromString(position.MaintMargin),
-			OpenOrderInitialMargin: fixedpoint.MustNewFromString(position.OpenOrderInitialMargin),
-			PositionInitialMargin:  fixedpoint.MustNewFromString(position.PositionInitialMargin),
-			Symbol:                 position.Symbol,
-			UnrealizedProfit:       fixedpoint.MustNewFromString(position.UnrealizedProfit),
-			EntryPrice:             fixedpoint.MustNewFromString(position.EntryPrice),
-			MaxNotional:            fixedpoint.MustNewFromString(position.MaxNotional),
-			PositionSide:           string(position.PositionSide),
-			PositionAmt:            fixedpoint.MustNewFromString(position.PositionAmt),
-			Notional:               fixedpoint.MustNewFromString(position.Notional),
-			IsolatedWallet:         fixedpoint.MustNewFromString(position.IsolatedWallet),
-			UpdateTime:             position.UpdateTime,
-		})
-	}
+// func toGlobalIsolatedFuturesUserPositions(userPositions []*futures.AccountPosition) (retAssets []bbgo.Position) {
+// 	for _, position := range userPositions {
+// 		retAssets = append(retAssets, types.IsolatedFuturesUserPosition{
+// 			Isolated:               position.Isolated,
+// 			Leverage:               fixedpoint.MustNewFromString(position.Leverage),
+// 			InitialMargin:          fixedpoint.MustNewFromString(position.InitialMargin),
+// 			MaintMargin:            fixedpoint.MustNewFromString(position.MaintMargin),
+// 			OpenOrderInitialMargin: fixedpoint.MustNewFromString(position.OpenOrderInitialMargin),
+// 			PositionInitialMargin:  fixedpoint.MustNewFromString(position.PositionInitialMargin),
+// 			Symbol:                 position.Symbol,
+// 			UnrealizedProfit:       fixedpoint.MustNewFromString(position.UnrealizedProfit),
+// 			EntryPrice:             fixedpoint.MustNewFromString(position.EntryPrice),
+// 			MaxNotional:            fixedpoint.MustNewFromString(position.MaxNotional),
+// 			PositionSide:           string(position.PositionSide),
+// 			PositionAmt:            fixedpoint.MustNewFromString(position.PositionAmt),
+// 			Notional:               fixedpoint.MustNewFromString(position.Notional),
+// 			IsolatedWallet:         fixedpoint.MustNewFromString(position.IsolatedWallet),
+// 			UpdateTime:             position.UpdateTime,
+// 		})
+// 	}
 
-	return retAssets
-}
+// 	return retAssets
+// }
 
 func toGlobalTicker(stats *binance.PriceChangeStats) types.Ticker {
 	return types.Ticker{
