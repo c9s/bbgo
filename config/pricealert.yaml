@@ -20,6 +20,8 @@ sessions:
   binance:
     exchange: binance
     envVarPrefix: binance
+    # isMargin: true
+    isFutures: true
 
 exchangeStrategies:
 - on: binance

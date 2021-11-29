@@ -33,6 +33,7 @@ type Position struct {
 
 	ExchangeFeeRates map[types.ExchangeName]ExchangeFee `json:"exchangeFeeRates"`
 
+	// Futures data fields
 	Isolated               bool             		  `json:"isolated"`
 	Leverage               fixedpoint.Value           `json:"leverage"`
 	InitialMargin          fixedpoint.Value           `json:"initialMargin"`

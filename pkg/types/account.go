@@ -110,6 +110,7 @@ func (m AssetMap) SlackAttachment() slack.Attachment {
 }
 
 type BalanceMap map[string]Balance
+type PositionMap map[string]Position
 
 func (m BalanceMap) String() string {
 	var ss []string
@@ -119,6 +120,7 @@ func (m BalanceMap) String() string {
 
 	return "BalanceMap[" + strings.Join(ss, ", ") + "]"
 }
+
 
 func (m BalanceMap) Copy() (d BalanceMap) {
 	d = make(BalanceMap)
@@ -209,7 +211,7 @@ type Account struct {
 	CanWithdraw                 bool               `json:"canWithdraw"`
 	FeeTier                     int                `json:"feeTier"`
 	MaxWithdrawAmount           fixedpoint.Value             `json:"maxWithdrawAmount"`
-	Positions                   []Position `json:"positions"`
+	Positions                   PositionMap `json:"positions"`
 	TotalInitialMargin          fixedpoint.Value             `json:"totalInitialMargin"`
 	TotalMaintMargin            fixedpoint.Value             `json:"totalMaintMargin"`
 	TotalMarginBalance          fixedpoint.Value             `json:"totalMarginBalance"`
@@ -223,6 +225,7 @@ type Account struct {
 func NewAccount() *Account {
 	return &Account{
 		balances: make(BalanceMap),
+		Positions: make(PositionMap),
 	}
 }
 
@@ -321,13 +324,31 @@ func (a *Account) UpdateBalances(balances BalanceMap) {
 	}
 }
 
+func (a *Account) UpdatePositions(position PositionMap) {
+	a.Lock()
+	defer a.Unlock()
+
+	if a.Positions == nil {
+		a.Positions = make(PositionMap)
+	}
+
+	for _, position := range a.Positions {
+		a.Positions[position.Symbol] = position
+	}
+}
+
 func printBalanceUpdate(balances BalanceMap) {
 	logrus.Infof("balance update: %+v", balances)
+}
+func printPositioneUpdate(position PositionMap) {
+	logrus.Infof("position update: %+v", position)
 }
 
 func (a *Account) BindStream(stream Stream) {
 	stream.OnBalanceUpdate(a.UpdateBalances)
 	stream.OnBalanceSnapshot(a.UpdateBalances)
+	stream.OnPositionUpdate(a.UpdatePositions)
+	stream.OnPositionSnapshot(a.UpdatePositions)
 	if debugBalance {
 		stream.OnBalanceUpdate(printBalanceUpdate)
 	}

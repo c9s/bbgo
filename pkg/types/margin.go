@@ -4,12 +4,14 @@ import "github.com/c9s/bbgo/pkg/fixedpoint"
 
 type FuturesExchange interface {
 	UseFutures()
+	UseIsolatedFutures(symbol string)
+	GetFuturesSettings() FuturesSettings
 }
 
 type FuturesSettings struct {
 	IsFutures bool
-	// IsIsolatedFutures     bool
-	// IsolatedFuturesSymbol string
+	IsIsolatedFutures     bool
+	IsolatedFuturesSymbol string
 }
 
 func (s FuturesSettings) GetFuturesSettings() FuturesSettings {
@@ -22,8 +24,8 @@ func (s *FuturesSettings) UseFutures() {
 
 func (e *FuturesSettings) UseIsolatedFutures(symbol string) {
 	e.IsFutures = true
-	// e.IsIsolatedFutures = true
-	// e.IsolatedFuturesSymbol = symbol
+	e.IsIsolatedFutures = true
+	e.IsolatedFuturesSymbol = symbol
 }
 
 // FuturesAccount is for the cross futures account
