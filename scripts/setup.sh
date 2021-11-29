@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 osf=$(uname | tr '[:upper:]' '[:lower:]')
-version=v1.15.3
+version=v1.18.0
 dist_file=bbgo-$version-$osf-amd64.tar.gz
 
 RED='\033[0;31m'
