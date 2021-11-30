@@ -20,7 +20,9 @@ type OrderService struct {
 
 func (s *OrderService) Sync(ctx context.Context, exchange types.Exchange, symbol string, startTime time.Time) error {
 	isMargin := false
+	isFutures := false
 	isIsolated := false
+
 	if marginExchange, ok := exchange.(types.MarginExchange); ok {
 		marginSettings := marginExchange.GetMarginSettings()
 		isMargin = marginSettings.IsMargin
@@ -30,7 +32,17 @@ func (s *OrderService) Sync(ctx context.Context, exchange types.Exchange, symbol
 		}
 	}
 
-	records, err := s.QueryLast(exchange.Name(), symbol, isMargin, isIsolated, 50)
+	if futuresExchange, ok := exchange.(types.FuturesExchange); ok {
+		futuresSettings := futuresExchange.GetFuturesSettings()
+		isFutures = futuresSettings.IsFutures
+		isIsolated = futuresSettings.IsIsolatedFutures
+		if futuresSettings.IsIsolatedFutures {
+			symbol = futuresSettings.IsolatedFuturesSymbol
+		}
+	}
+	
+
+	records, err := s.QueryLast(exchange.Name(), symbol, isMargin, isFutures, isIsolated, 50)
 	if err != nil {
 		return err
 	}
@@ -78,14 +90,15 @@ func (s *OrderService) Sync(ctx context.Context, exchange types.Exchange, symbol
 
 
 // QueryLast queries the last order from the database
-func (s *OrderService) QueryLast(ex types.ExchangeName, symbol string, isMargin, isIsolated bool, limit int) ([]types.Order, error) {
-	log.Infof("querying last order exchange = %s AND symbol = %s AND is_margin = %v AND is_isolated = %v", ex, symbol, isMargin, isIsolated)
+func (s *OrderService) QueryLast(ex types.ExchangeName, symbol string, isMargin, isFutures, isIsolated bool, limit int) ([]types.Order, error) {
+	log.Infof("querying last order exchange = %s AND symbol = %s AND is_margin = %v AND is_futures = %v AND is_isolated = %v", ex, symbol, isMargin, isFutures, isIsolated)
 
-	sql := `SELECT * FROM orders WHERE exchange = :exchange AND symbol = :symbol AND is_margin = :is_margin AND is_isolated = :is_isolated ORDER BY gid DESC LIMIT :limit`
+	sql := `SELECT * FROM orders WHERE exchange = :exchange AND symbol = :symbol AND is_margin = :is_margin AND is_futures = :is_futures AND is_isolated = :is_isolated ORDER BY gid DESC LIMIT :limit`
 	rows, err := s.DB.NamedQuery(sql, map[string]interface{}{
 		"exchange":    ex,
 		"symbol":      symbol,
 		"is_margin":   isMargin,
+		"is_futures":  isFutures,
 		"is_isolated": isIsolated,
 		"limit":       limit,
 	})
@@ -195,15 +208,15 @@ func (s *OrderService) scanRows(rows *sqlx.Rows) (orders []types.Order, err erro
 func (s *OrderService) Insert(order types.Order) (err error) {
 	if s.DB.DriverName() == "mysql" {
 		_, err = s.DB.NamedExec(`
-			INSERT INTO orders (exchange, order_id, client_order_id, order_type, status, symbol, price, stop_price, quantity, executed_quantity, side, is_working, time_in_force, created_at, updated_at, is_margin, is_isolated)
-			VALUES (:exchange, :order_id, :client_order_id, :order_type, :status, :symbol, :price, :stop_price, :quantity, :executed_quantity, :side, :is_working, :time_in_force, :created_at, :updated_at, :is_margin, :is_isolated)
+			INSERT INTO orders (exchange, order_id, client_order_id, order_type, status, symbol, price, stop_price, quantity, executed_quantity, side, is_working, time_in_force, created_at, updated_at, is_margin, is_futures, is_isolated)
+			VALUES (:exchange, :order_id, :client_order_id, :order_type, :status, :symbol, :price, :stop_price, :quantity, :executed_quantity, :side, :is_working, :time_in_force, :created_at, :updated_at, :is_margin, :is_futures, :is_isolated)
 			ON DUPLICATE KEY UPDATE status=:status, executed_quantity=:executed_quantity, is_working=:is_working, updated_at=:updated_at`, order)
 		return err
 	}
 
 	_, err = s.DB.NamedExec(`
-			INSERT INTO orders (exchange, order_id, client_order_id, order_type, status, symbol, price, stop_price, quantity, executed_quantity, side, is_working, time_in_force, created_at, updated_at, is_margin, is_isolated)
-			VALUES (:exchange, :order_id, :client_order_id, :order_type, :status, :symbol, :price, :stop_price, :quantity, :executed_quantity, :side, :is_working, :time_in_force, :created_at, :updated_at, :is_margin, :is_isolated)
+			INSERT INTO orders (exchange, order_id, client_order_id, order_type, status, symbol, price, stop_price, quantity, executed_quantity, side, is_working, time_in_force, created_at, updated_at, is_margin, is_futures, is_isolated)
+			VALUES (:exchange, :order_id, :client_order_id, :order_type, :status, :symbol, :price, :stop_price, :quantity, :executed_quantity, :side, :is_working, :time_in_force, :created_at, :updated_at, :is_margin, :is_futures, :is_isolated)
 	`, order)
 
 	return err

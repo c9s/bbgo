@@ -33,4 +33,4 @@
 
 /pkg/server/assets.go
 
-.env
+*.env

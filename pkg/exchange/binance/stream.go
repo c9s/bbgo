@@ -534,6 +534,7 @@ func (s *Stream) fetchListenKey(ctx context.Context) (string, error) {
 		req := s.futuresClient.NewStartUserStreamService()
 		return req.Do(ctx)
 	}
+	log.Infof("spot mode is enabled, requesting margin user stream listen key...")
 	
 	return s.Client.NewStartUserStreamService().Do(ctx)
 }

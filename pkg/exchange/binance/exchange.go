@@ -319,22 +319,17 @@ func (e *Exchange) QueryAveragePrice(ctx context.Context, symbol string) (float6
 
 func (e *Exchange) NewStream() types.Stream {
 
-	// TODO: add global type Exchange support IsFutures
+	if e.IsMargin {
+		stream := NewStream(e.Client)
+		stream.MarginSettings = e.MarginSettings
+		return stream
+	}else if e.IsFutures {
+		stream := NewFuturesStream(e.futuresClient)
+		stream.FuturesSettings = e.FuturesSettings
+		return stream
+	}
 	
-	// stream := NewStream(e.Client)
-
-	// if e.IsMargin {
-	// 	stream = NewStream(e.Client)
-	// 	stream.MarginSettings = e.MarginSettings
-	// }else if e.IsFutures {
-	// 	stream = NewFuturesStream(e.futuresClient)
-	// 	stream.FuturesSettings = e.FuturesSettings
-	// }
-	
-	stream := NewFuturesStream(e.futuresClient)
-	e.IsFutures = true
-	stream.IsFutures = true
-
+	stream := NewStream(e.Client)
 	return stream
 }
 
