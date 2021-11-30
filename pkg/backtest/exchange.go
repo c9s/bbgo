@@ -30,6 +30,7 @@ package backtest
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -57,6 +58,8 @@ type Exchange struct {
 	trades        map[string][]types.Trade
 	closedOrders  map[string][]types.Order
 	matchingBooks map[string]*SimplePriceMatching
+	matchingBooksMutex sync.Mutex
+
 	markets       types.MarketMap
 	doneC         chan struct{}
 }
@@ -124,7 +127,7 @@ func (e *Exchange) NewStream() types.Stream {
 func (e Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error) {
 	for _, order := range orders {
 		symbol := order.Symbol
-		matching, ok := e.matchingBooks[symbol]
+		matching, ok := e.matchingBook(symbol)
 		if !ok {
 			return nil, fmt.Errorf("matching engine is not initialized for symbol %s", symbol)
 		}
@@ -155,7 +158,7 @@ func (e Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder)
 }
 
 func (e Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
-	matching, ok := e.matchingBooks[symbol]
+	matching, ok := e.matchingBook(symbol)
 	if !ok {
 		return nil, fmt.Errorf("matching engine is not initialized for symbol %s", symbol)
 	}
@@ -174,7 +177,7 @@ func (e Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, u
 
 func (e Exchange) CancelOrders(ctx context.Context, orders ...types.Order) error {
 	for _, order := range orders {
-		matching, ok := e.matchingBooks[order.Symbol]
+		matching, ok := e.matchingBook(order.Symbol)
 		if !ok {
 			return fmt.Errorf("matching engine is not initialized for symbol %s", order.Symbol)
 		}
@@ -215,7 +218,7 @@ func (e Exchange) QueryTrades(ctx context.Context, symbol string, options *types
 }
 
 func (e Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticker, error) {
-	matching, ok := e.matchingBooks[symbol]
+	matching, ok := e.matchingBook(symbol)
 	if !ok {
 		return nil, fmt.Errorf("matching engine is not initialized for symbol %s", symbol)
 	}
@@ -256,6 +259,13 @@ func (e Exchange) QueryDepositHistory(ctx context.Context, asset string, since, 
 
 func (e Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (allWithdraws []types.Withdraw, err error) {
 	return nil, nil
+}
+
+func (e *Exchange) matchingBook(symbol string) (*SimplePriceMatching, bool){
+	e.matchingBooksMutex.Lock()
+	m, ok := e.matchingBooks[symbol]
+	e.matchingBooksMutex.Unlock()
+	return m, ok
 }
 
 func newPublicExchange(sourceExchange types.ExchangeName) (types.Exchange, error) {
