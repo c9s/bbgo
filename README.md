@@ -16,6 +16,7 @@ A trading bot framework written in Go. The name bbgo comes from the BB8 bot in t
 - Built-in strategies
 - Multi-session support
 - Standard indicators (SMA, EMA, BOLL)
+- React-powered Web Dashboard
 
 ## Supported Exchanges
 
@@ -133,6 +134,12 @@ To run strategy:
 
 ```sh
 bbgo run
+```
+
+To start bbgo with the frontend dashboard:
+
+```sh
+bbgo run --enable-webserver
 ```
 
 ## Advanced Setup
