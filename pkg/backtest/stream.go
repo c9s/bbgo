@@ -87,7 +87,7 @@ func (s *Stream) Connect(ctx context.Context) error {
 			numKlines := 0
 			for k := range klineC {
 				if k.Interval == types.Interval1m {
-					matching, ok := s.exchange.matchingBooks[k.Symbol]
+					matching, ok := s.exchange.matchingBook(k.Symbol)
 					if !ok {
 						log.Errorf("matching book of %s is not initialized", k.Symbol)
 						continue
