@@ -276,11 +276,6 @@ var submitOrderCmd = &cobra.Command{
 			return err
 		}
 
-		// isFutures, err := cmd.Flags().GetString("isFutures")
-		// if err != nil {
-		// 	return err
-		// }
-
 		symbol, err := cmd.Flags().GetString("symbol")
 		if err != nil {
 			return fmt.Errorf("can't get the symbol from flags: %w", err)
@@ -335,12 +330,12 @@ var submitOrderCmd = &cobra.Command{
 			Market:         market,
 			TimeInForce:    "GTC",
 		}
-		
+
 		co, err := session.Exchange.SubmitOrders(ctx, so)
 		if err != nil {
 			return err
 		}
-		
+
 		log.Infof("submitted order: %+v\ncreated order: %+v", so, co[0])
 		return nil
 	},
