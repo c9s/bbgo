@@ -720,7 +720,7 @@ type OrderTrade struct {
 	CommissionAsset  string `json:"N"`
 
 	OrderTradeTime	int64  `json:"T"`
-	TradeId  		string `json:"t"`
+	TradeId  		int64 `json:"t"`
 
 	BidsNotional  	string `json:"b"`
 	AskNotional  	string `json:"a"`
