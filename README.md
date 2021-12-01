@@ -625,6 +625,10 @@ You can join our telegram channels:
 - BBGO International <https://t.me/bbgo_intl>
 - BBGO Taiwan <https://t.me/bbgocrypto>
 
+## Supporter
+
+- GitBook
+
 ## License
 
 MIT License
