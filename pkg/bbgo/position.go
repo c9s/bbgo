@@ -33,22 +33,6 @@ type Position struct {
 
 	ExchangeFeeRates map[types.ExchangeName]ExchangeFee `json:"exchangeFeeRates"`
 
-	// Futures data fields
-	Isolated               bool             		  `json:"isolated"`
-	Leverage               fixedpoint.Value           `json:"leverage"`
-	InitialMargin          fixedpoint.Value           `json:"initialMargin"`
-	MaintMargin            fixedpoint.Value           `json:"maintMargin"`
-	OpenOrderInitialMargin fixedpoint.Value           `json:"openOrderInitialMargin"`
-	PositionInitialMargin  fixedpoint.Value           `json:"positionInitialMargin"`
-	UnrealizedProfit       fixedpoint.Value           `json:"unrealizedProfit"`
-	EntryPrice             fixedpoint.Value           `json:"entryPrice"`
-	MaxNotional            fixedpoint.Value           `json:"maxNotional"`
-	PositionSide           string 					  `json:"positionSide"`
-	PositionAmt            fixedpoint.Value           `json:"positionAmt"`
-	Notional               fixedpoint.Value           `json:"notional"`
-	IsolatedWallet         fixedpoint.Value           `json:"isolatedWallet"`
-	UpdateTime             int64           			   `json:"updateTime"`
-
 	sync.Mutex
 }
 
