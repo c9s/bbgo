@@ -606,7 +606,7 @@ type ContinuousKLineEvent struct {
 }
 */
 
-type UpdateData struct {
+type PositionUpdate struct {
 	EventReasonType string `json:"m"`
 	Balances    []Balance `json:"B,omitempty"`
 	Positions 	[]types.Position  `json:"P,omitempty"`
@@ -616,7 +616,7 @@ type AccountUpdateEvent struct {
 	EventBase
 	Transaction  int64  `json:"T"`
 
-	UpdateData UpdateData `json:"a"`
+	PositionUpdate PositionUpdate `json:"a"`
 }
 
 // {
