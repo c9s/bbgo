@@ -298,7 +298,8 @@ func ParseEvent(message string) (interface{}, error) {
 		var event MarkPriceUpdateEvent
 		err := json.Unmarshal([]byte(message), &event)
 		return &event, err
-
+	
+	// Binance futures data --------------
 	case "continuousKline":
 		var event ContinuousKLineEvent
 		err := json.Unmarshal([]byte(message), &event)
