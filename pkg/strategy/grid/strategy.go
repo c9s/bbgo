@@ -206,7 +206,7 @@ func (s *Strategy) generateGridSellOrders(session *bbgo.ExchangeSession) ([]type
 			Type:        types.OrderTypeLimit,
 			Market:      s.Market,
 			Quantity:    quantity.Float64(),
-			Price:       price.Float64(),
+			Price:       price.Float64() + s.ProfitSpread.Float64(),
 			TimeInForce: "GTC",
 			GroupID:     s.groupID,
 		})
