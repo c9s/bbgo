@@ -406,6 +406,7 @@ func NewFuturesStream(client *futures.Client) *Stream {
 
 		case "TRADE":
 			// TODO
+			
 			// trade, err := e.Trade()
 			// if err != nil {
 			// 	log.WithError(err).Error("trade convert error")
