@@ -4,8 +4,6 @@ import (
 	"regexp"
 
 	"github.com/robfig/cron/v3"
-
-	"github.com/c9s/bbgo/pkg/accounting/pnl"
 )
 
 type PnLReporter interface {
@@ -67,17 +65,20 @@ func (reporter *AverageCostPnLReporter) When(specs ...string) *AverageCostPnLRep
 }
 
 func (reporter *AverageCostPnLReporter) Run() {
-	for _, sessionName := range reporter.Sessions {
-		session := reporter.environment.sessions[sessionName]
-		calculator := &pnl.AverageCostCalculator{
-			TradingFeeCurrency: session.Exchange.PlatformFeeCurrency(),
-		}
+	// FIXME: this is causing cyclic import
+	/*
+		for _, sessionName := range reporter.Sessions {
+			session := reporter.environment.sessions[sessionName]
+			calculator := &pnl.AverageCostCalculator{
+				TradingFeeCurrency: session.Exchange.PlatformFeeCurrency(),
+			}
 
-		for _, symbol := range reporter.Symbols {
-			report := calculator.Calculate(symbol, session.Trades[symbol].Copy(), session.lastPrices[symbol])
-			report.Print()
+			for _, symbol := range reporter.Symbols {
+				report := calculator.Calculate(symbol, session.Trades[symbol].Copy(), session.lastPrices[symbol])
+				report.Print()
+			}
 		}
-	}
+	*/
 }
 
 type PatternChannelRouter struct {

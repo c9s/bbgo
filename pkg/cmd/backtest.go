@@ -262,13 +262,15 @@ var BacktestCmd = &cobra.Command{
 		// put the logger back to print the pnl
 		log.SetLevel(log.InfoLevel)
 		for _, session := range environ.Sessions() {
-			calculator := &pnl.AverageCostCalculator{
-				TradingFeeCurrency: backtestExchange.PlatformFeeCurrency(),
-			}
 			for symbol, trades := range session.Trades {
 				market, ok := session.Market(symbol)
 				if !ok {
 					return fmt.Errorf("market not found: %s", symbol)
+				}
+
+				calculator := &pnl.AverageCostCalculator{
+					TradingFeeCurrency: backtestExchange.PlatformFeeCurrency(),
+					Market: market,
 				}
 
 				startPrice, ok := session.StartPrice(symbol)

@@ -18,7 +18,6 @@ import (
 	"github.com/spf13/viper"
 	"gopkg.in/tucnak/telebot.v2"
 
-	"github.com/c9s/bbgo/pkg/accounting/pnl"
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/notifier/slacknotifier"
 	"github.com/c9s/bbgo/pkg/notifier/telegramnotifier"
@@ -398,7 +397,9 @@ func (environ *Environment) ConfigureNotificationRouting(conf *NotificationConfi
 
 		}
 
-		// currently not used
+		// currently, not used
+		// FIXME: this is causing cyclic import
+		/*
 		switch conf.Routing.PnL {
 		case "$symbol":
 			environ.ObjectChannelRouter.Route(func(obj interface{}) (channel string, ok bool) {
@@ -410,6 +411,7 @@ func (environ *Environment) ConfigureNotificationRouting(conf *NotificationConfi
 				return
 			})
 		}
+		 */
 
 	}
 	return nil

@@ -1,26 +1,23 @@
 package pnl
 
 import (
-	"strings"
 	"time"
 
+	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
 type AverageCostCalculator struct {
 	TradingFeeCurrency string
+	Market             types.Market
 }
 
 func (c *AverageCostCalculator) Calculate(symbol string, trades []types.Trade, currentPrice float64) *AverageCostPnlReport {
 	// copy trades, so that we can truncate it.
 	var bidVolume = 0.0
-	var bidAmount = 0.0
-
 	var askVolume = 0.0
-
 	var feeUSD = 0.0
-	var bidFeeUSD = 0.0
-	var feeRate = 0.0015
 
 	if len(trades) == 0 {
 		return &AverageCostPnlReport{
@@ -35,64 +32,41 @@ func (c *AverageCostCalculator) Calculate(symbol string, trades []types.Trade, c
 
 	var currencyFees = map[string]float64{}
 
+	var position = bbgo.NewPositionFromMarket(c.Market)
+	position.SetFeeRate(bbgo.ExchangeFee{
+		// binance vip 0 uses 0.075%
+		MakerFeeRate: fixedpoint.NewFromFloat(0.075 * 0.01),
+		TakerFeeRate: fixedpoint.NewFromFloat(0.075 * 0.01),
+	})
+
+	// TODO: configure the exchange fee rate here later
+	// position.SetExchangeFeeRate()
+	var totalProfit fixedpoint.Value
+	var totalNetProfit fixedpoint.Value
+
 	for _, trade := range trades {
 		if trade.Symbol == symbol {
-			if trade.IsBuyer && trade.Side != types.SideTypeSelf {
+			profit, netProfit, madeProfit := position.AddTrade(trade)
+			if madeProfit {
+				totalProfit += profit
+				totalNetProfit += netProfit
+			}
+
+			if trade.IsBuyer {
 				bidVolume += trade.Quantity
-				bidAmount += trade.Price * trade.Quantity
-			}
-
-			// since we use USDT as the quote currency, we simply check if it matches the currency symbol
-			if strings.HasPrefix(trade.Symbol, trade.FeeCurrency) {
-				bidVolume -= trade.Fee
-				feeUSD += trade.Price * trade.Fee
-				if trade.IsBuyer {
-					bidFeeUSD += trade.Price * trade.Fee
-				}
-			} else if trade.FeeCurrency == "USDT" {
-				feeUSD += trade.Fee
-				if trade.IsBuyer {
-					bidFeeUSD += trade.Fee
-				}
-			}
-
-		} else {
-			if trade.FeeCurrency == c.TradingFeeCurrency {
-				bidVolume -= trade.Fee
+			} else {
+				askVolume += trade.Quantity
 			}
 		}
 
 		if _, ok := currencyFees[trade.FeeCurrency]; !ok {
-			currencyFees[trade.FeeCurrency] = 0.0
+			currencyFees[trade.FeeCurrency] = trade.Fee
+		} else {
+			currencyFees[trade.FeeCurrency] += trade.Fee
 		}
-		currencyFees[trade.FeeCurrency] += trade.Fee
 	}
 
-	profit := 0.0
-	averageCost := (bidAmount + bidFeeUSD) / bidVolume
-
-	for _, t := range trades {
-		if t.Symbol != symbol {
-			continue
-		}
-
-		if t.IsBuyer || t.Side == types.SideTypeSelf {
-			continue
-		}
-
-		profit += (t.Price - averageCost) * t.Quantity
-		askVolume += t.Quantity
-	}
-
-	profit -= feeUSD
-	unrealizedProfit := profit
-
-	stock := bidVolume - askVolume
-	if stock > 0 {
-		stockFee := currentPrice * stock * feeRate
-		unrealizedProfit += (currentPrice-averageCost)*stock - stockFee
-	}
-
+	unrealizedProfit := (fixedpoint.NewFromFloat(currentPrice) - position.AverageCost).Mul(position.Base)
 	return &AverageCostPnlReport{
 		Symbol:       symbol,
 		CurrentPrice: currentPrice,
@@ -102,11 +76,12 @@ func (c *AverageCostCalculator) Calculate(symbol string, trades []types.Trade, c
 		BuyVolume:  bidVolume,
 		SellVolume: askVolume,
 
-		Stock:            stock,
-		Profit:           profit,
+		Stock:            position.Base.Float64(),
+		Profit:           totalProfit,
+		NetProfit:        totalNetProfit,
 		UnrealizedProfit: unrealizedProfit,
-		AverageBidCost:   averageCost,
-		FeeInUSD:         feeUSD,
+		AverageBidCost:   position.AverageCost.Float64(),
+		FeeInUSD:         (totalProfit - totalNetProfit).Float64(),
 		CurrencyFees:     currencyFees,
 	}
 }

@@ -31,6 +31,7 @@ type Position struct {
 	// This is used for calculating net profit
 	ApproximateAverageCost fixedpoint.Value `json:"approximateAverageCost"`
 
+	FeeRate *ExchangeFee `json:"feeRate,omitempty"`
 	ExchangeFeeRates map[types.ExchangeName]ExchangeFee `json:"exchangeFeeRates"`
 
 	sync.Mutex
@@ -57,6 +58,10 @@ func (p *Position) Reset() {
 	p.Base = 0
 	p.Quote = 0
 	p.AverageCost = 0
+}
+
+func (p *Position) SetFeeRate(exchangeFee ExchangeFee) {
+	p.FeeRate = &exchangeFee
 }
 
 func (p *Position) SetExchangeFeeRate(ex types.ExchangeName, exchangeFee ExchangeFee) {
@@ -167,6 +172,12 @@ func (p *Position) AddTrade(t types.Trade) (profit fixedpoint.Value, netProfit f
 				} else {
 					feeInQuote += exchangeFee.TakerFeeRate.Mul(quoteQuantity)
 				}
+			}
+		} else if p.FeeRate != nil {
+			if t.IsMaker {
+				feeInQuote += p.FeeRate.MakerFeeRate.Mul(quoteQuantity)
+			} else {
+				feeInQuote += p.FeeRate.TakerFeeRate.Mul(quoteQuantity)
 			}
 		}
 	}
