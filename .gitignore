@@ -32,5 +32,3 @@
 /config/bbgo.yaml
 
 /pkg/server/assets.go
-
-*.env

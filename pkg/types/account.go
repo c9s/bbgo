@@ -45,7 +45,6 @@ type Asset struct {
 	InUSD    fixedpoint.Value `json:"inUSD"`
 	InBTC    fixedpoint.Value `json:"inBTC"`
 	Time     time.Time        `json:"time"`
-	TotalAsset		fixedpoint.Value `json:"totalAsset"`
 }
 
 type AssetMap map[string]Asset
