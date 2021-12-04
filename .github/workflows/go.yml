@@ -13,16 +13,17 @@ jobs:
 
     strategy:
       matrix:
-        # node-version: [10.x, 12.x, 14.x]
-        redis-version: [6]
+        redis-version:
+        - 6.2
 
     steps:
     - uses: actions/checkout@v2
 
-    - name: Start Redis
-      uses: supercharge/redis-github-action@1.2.0
+    - name: Setup redis
+      uses: shogo82148/actions-setup-redis@v1
       with:
         redis-version: ${{ matrix.redis-version }}
+        # auto-start: "false"
 
     - name: Set up Go
       uses: actions/setup-go@v2
