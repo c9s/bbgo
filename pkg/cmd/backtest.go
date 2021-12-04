@@ -27,6 +27,7 @@ func init() {
 	BacktestCmd.Flags().Bool("base-asset-baseline", false, "use base asset performance as the competitive baseline performance")
 	BacktestCmd.Flags().CountP("verbose", "v", "verbose level")
 	BacktestCmd.Flags().String("config", "config/bbgo.yaml", "strategy config file")
+	BacktestCmd.Flags().Bool("force", false, "force execution without confirm")
 	RootCmd.AddCommand(BacktestCmd)
 }
 
@@ -55,6 +56,11 @@ var BacktestCmd = &cobra.Command{
 		}
 
 		wantSync, err := cmd.Flags().GetBool("sync")
+		if err != nil {
+			return err
+		}
+
+		force, err := cmd.Flags().GetBool("force")
 		if err != nil {
 			return err
 		}
@@ -207,8 +213,11 @@ var BacktestCmd = &cobra.Command{
 
 		log.Warn("!!! To run backtest, you should use an isolated database for storing backtest trades !!!")
 		log.Warn("!!! The trade record in the current database WILL ALL BE DELETE !!!")
-		if !confirmation("Are you sure to continue?") {
-			return nil
+
+		if !force {
+			if !confirmation("Are you sure to continue?") {
+				return nil
+			}
 		}
 
 		if err := environ.TradeService.DeleteAll(); err != nil {
