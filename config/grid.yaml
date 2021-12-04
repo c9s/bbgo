@@ -51,8 +51,8 @@ exchangeStrategies:
     #     exp:
     #       domain: [20_000, 30_000]
     #       range: [0.2, 0.001]
-    gridNumber: 30
-    profitSpread: 50.0
+    gridNumber: 100
+    profitSpread: 1000.0
     upperPrice: 50_000.0
     lowerPrice: 20_000.0
     long: true
