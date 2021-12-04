@@ -583,7 +583,11 @@ or
 bash utils/generate-new-migration.sh add_pnl_column
 ```
 
+<<<<<<< HEAD
 Be sure to edit both sqlite3 and mysql migration files. ( [Sample](migrations/mysql/20210531234123_add_kline_taker_buy_columns.sql) )
+=======
+Be sure to edit both sqlite3 and mysql migration files. ( [Sample] (migrations/mysql/20210531234123_add_kline_taker_buy_columns.sql) )
+>>>>>>> 1bef922a (fix #288 for adding migration)
 
 
 To test the drivers, you have to update the rockhopper_mysql.yaml file to connect your database,
