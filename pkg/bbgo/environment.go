@@ -616,6 +616,15 @@ func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) erro
 		environ.Notifiability.AddNotifier(notifier)
 	}
 
+	if userConfig.Notifications == nil {
+		userConfig.Notifications = &NotificationConfig{
+			Routing :  &SlackNotificationRouting{
+				Trade: "$session",
+				Order: "$session",
+			},
+		}
+	}
+
 	if userConfig.Notifications != nil {
 		if err := environ.ConfigureNotificationRouting(userConfig.Notifications); err != nil {
 			return err
