@@ -25,12 +25,14 @@ riskControls:
               minBaseAssetBalance: 0.0
               maxOrderAmount: 1000.0
 
+# example command:
+#    godotenv -f .env.local -- go run ./cmd/bbgo backtest --exchange max --sync-from 2020-11-01 --config config/grid.yaml --base-asset-baseline
 backtest:
   # for testing max draw down (MDD) at 03-12
   # see here for more details
   # https://www.investopedia.com/terms/m/maximum-drawdown-mdd.asp
-  startTime: "2020-10-01"
-  endTime: "2021-10-01"
+  startTime: "2021-01-10"
+  endTime: "2021-01-21"
   symbols:
   - BTCUSDT
   account:
@@ -43,15 +45,15 @@ exchangeStrategies:
 - on: max
   grid:
     symbol: BTCUSDT
-    # quantity: 0.001
-    scaleQuantity:
-      byPrice:
-        exp:
-          domain: [20_000, 30_000]
-          range: [0.2, 0.001]
+    quantity: 0.001
+    # scaleQuantity:
+    #   byPrice:
+    #     exp:
+    #       domain: [20_000, 30_000]
+    #       range: [0.2, 0.001]
     gridNumber: 30
     profitSpread: 50.0
-    upperPrice: 20_000.0
-    lowerPrice: 30_000.0
+    upperPrice: 50_000.0
+    lowerPrice: 20_000.0
     long: true
 
