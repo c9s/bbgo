@@ -25,9 +25,109 @@ func (s *FuturesSettings) UseIsolatedFutures(symbol string) {
 	s.IsFutures = true
 	s.IsIsolatedFutures = true
 	s.IsolatedFuturesSymbol = symbol
-
 }
 
+// FuturesAccount is for the cross futures account
+// type FuturesAccount struct {
+// 	Assets                      []FuturesUserAsset    `json:"assets"`
+// 	CanDeposit                  bool               `json:"canDeposit"`
+// 	CanTrade                    bool               `json:"canTrade"`
+// 	CanWithdraw                 bool               `json:"canWithdraw"`
+// 	FeeTier                     int                `json:"feeTier"`
+// 	MaxWithdrawAmount           fixedpoint.Value             `json:"maxWithdrawAmount"`
+// 	Positions                   []FuturesUserPosition `json:"positions"`
+// 	TotalInitialMargin          fixedpoint.Value             `json:"totalInitialMargin"`
+// 	TotalMaintMargin            fixedpoint.Value             `json:"totalMaintMargin"`
+// 	TotalMarginBalance          fixedpoint.Value             `json:"totalMarginBalance"`
+// 	TotalOpenOrderInitialMargin fixedpoint.Value             `json:"totalOpenOrderInitialMargin"`
+// 	TotalPositionInitialMargin  fixedpoint.Value             `json:"totalPositionInitialMargin"`
+// 	TotalUnrealizedProfit       fixedpoint.Value             `json:"totalUnrealizedProfit"`
+// 	TotalWalletBalance          fixedpoint.Value             `json:"totalWalletBalance"`
+// 	UpdateTime                  int64              `json:"updateTime"`
+// }
+
+// FuturesUserAsset define cross futures account asset
+type FuturesUserAsset struct {
+	Asset                  string `json:"asset"`
+	InitialMargin          fixedpoint.Value `json:"initialMargin"`
+	MaintMargin            fixedpoint.Value `json:"maintMargin"`
+	MarginBalance          fixedpoint.Value `json:"marginBalance"`
+	MaxWithdrawAmount      fixedpoint.Value `json:"maxWithdrawAmount"`
+	OpenOrderInitialMargin fixedpoint.Value `json:"openOrderInitialMargin"`
+	PositionInitialMargin  fixedpoint.Value `json:"positionInitialMargin"`
+	UnrealizedProfit       fixedpoint.Value `json:"unrealizedProfit"`
+	WalletBalance          fixedpoint.Value `json:"walletBalance"`
+}
+
+// FuturesUserPosition define cross futures account position
+// type FuturesUserPosition struct {
+// 	Isolated               bool             `json:"isolated"`
+// 	Leverage               fixedpoint.Value           `json:"leverage"`
+// 	InitialMargin          fixedpoint.Value           `json:"initialMargin"`
+// 	MaintMargin            fixedpoint.Value           `json:"maintMargin"`
+// 	OpenOrderInitialMargin fixedpoint.Value           `json:"openOrderInitialMargin"`
+// 	PositionInitialMargin  fixedpoint.Value           `json:"positionInitialMargin"`
+// 	Symbol                 string           `json:"symbol"`
+// 	UnrealizedProfit       fixedpoint.Value           `json:"unrealizedProfit"`
+// 	EntryPrice             fixedpoint.Value           `json:"entryPrice"`
+// 	MaxNotional            fixedpoint.Value           `json:"maxNotional"`
+// 	PositionSide           string `json:"positionSide"`
+// 	PositionAmt            fixedpoint.Value           `json:"positionAmt"`
+// 	Notional               fixedpoint.Value           `json:"notional"`
+// 	IsolatedWallet         fixedpoint.Value           `json:"isolatedWallet"`
+// 	UpdateTime             int64            `json:"updateTime"`
+// }
+
+// IsolatedFuturesAccount is for the isolated futures account
+// type IsolatedFuturesAccount struct {
+// 	Assets                      []IsolatedFuturesUserAsset    `json:"assets"`
+// 	CanDeposit                  bool               `json:"canDeposit"`
+// 	CanTrade                    bool               `json:"canTrade"`
+// 	CanWithdraw                 bool               `json:"canWithdraw"`
+// 	FeeTier                     int                `json:"feeTier"`
+// 	MaxWithdrawAmount           fixedpoint.Value             `json:"maxWithdrawAmount"`
+// 	Positions                   []IsolatedFuturesUserPosition `json:"positions"`
+// 	TotalInitialMargin          fixedpoint.Value             `json:"totalInitialMargin"`
+// 	TotalMaintMargin            fixedpoint.Value             `json:"totalMaintMargin"`
+// 	TotalMarginBalance          fixedpoint.Value             `json:"totalMarginBalance"`
+// 	TotalOpenOrderInitialMargin fixedpoint.Value             `json:"totalOpenOrderInitialMargin"`
+// 	TotalPositionInitialMargin  fixedpoint.Value             `json:"totalPositionInitialMargin"`
+// 	TotalUnrealizedProfit       fixedpoint.Value             `json:"totalUnrealizedProfit"`
+// 	TotalWalletBalance          fixedpoint.Value             `json:"totalWalletBalance"`
+// 	UpdateTime                  int64              `json:"updateTime"`
+// }
+
+// IsolatedFuturesUserAsset define isolated futures account asset
+type IsolatedFuturesUserAsset struct {
+	Asset                  string `json:"asset"`
+	InitialMargin          fixedpoint.Value `json:"initialMargin"`
+	MaintMargin            fixedpoint.Value `json:"maintMargin"`
+	MarginBalance          fixedpoint.Value `json:"marginBalance"`
+	MaxWithdrawAmount      fixedpoint.Value `json:"maxWithdrawAmount"`
+	OpenOrderInitialMargin fixedpoint.Value `json:"openOrderInitialMargin"`
+	PositionInitialMargin  fixedpoint.Value `json:"positionInitialMargin"`
+	UnrealizedProfit       fixedpoint.Value `json:"unrealizedProfit"`
+	WalletBalance          fixedpoint.Value `json:"walletBalance"`
+}
+
+// IsolatedFuturesUserPosition define isolated futures account position
+// type IsolatedFuturesUserPosition struct {
+// 	Isolated               bool             `json:"isolated"`
+// 	Leverage               fixedpoint.Value           `json:"leverage"`
+// 	InitialMargin          fixedpoint.Value           `json:"initialMargin"`
+// 	MaintMargin            fixedpoint.Value           `json:"maintMargin"`
+// 	OpenOrderInitialMargin fixedpoint.Value           `json:"openOrderInitialMargin"`
+// 	PositionInitialMargin  fixedpoint.Value           `json:"positionInitialMargin"`
+// 	Symbol                 string           `json:"symbol"`
+// 	UnrealizedProfit       fixedpoint.Value           `json:"unrealizedProfit"`
+// 	EntryPrice             fixedpoint.Value           `json:"entryPrice"`
+// 	MaxNotional            fixedpoint.Value           `json:"maxNotional"`
+// 	PositionSide           string `json:"positionSide"`
+// 	PositionAmt            fixedpoint.Value           `json:"positionAmt"`
+// 	Notional               fixedpoint.Value           `json:"notional"`
+// 	IsolatedWallet         fixedpoint.Value           `json:"isolatedWallet"`
+// 	UpdateTime             int64            `json:"updateTime"`
+// }
 
 type MarginExchange interface {
 	UseMargin()
