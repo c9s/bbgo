@@ -46,8 +46,8 @@ type SimplePriceMatching struct {
 
 	Account *types.Account
 
-	MakerCommission fixedpoint.Value `json:"makerCommission"`
-	TakerCommission fixedpoint.Value `json:"takerCommission"`
+	MakerFeeRate fixedpoint.Value `json:"makerFeeRate"`
+	TakerFeeRate fixedpoint.Value `json:"takerFeeRate"`
 
 	tradeUpdateCallbacks   []func(trade types.Trade)
 	orderUpdateCallbacks   []func(order types.Order)
@@ -202,11 +202,15 @@ func (m *SimplePriceMatching) executeTrade(trade types.Trade) {
 func (m *SimplePriceMatching) newTradeFromOrder(order types.Order, isMaker bool) types.Trade {
 	// BINANCE uses 0.1% for both maker and taker
 	// MAX uses 0.050% for maker and 0.15% for taker
-	var commission = DefaultFeeRate
-	if isMaker && m.Account.MakerCommission > 0 {
-		commission = fixedpoint.NewFromFloat(0.0001).Mul(m.Account.MakerCommission).Float64() // binance uses 10~15
-	} else if m.Account.TakerCommission > 0 {
-		commission = fixedpoint.NewFromFloat(0.0001).Mul(m.Account.TakerCommission).Float64() // binance uses 10~15
+	var feeRate = DefaultFeeRate
+	if isMaker {
+		if m.MakerFeeRate > 0 {
+			feeRate = m.MakerFeeRate.Float64()
+		}
+	} else {
+		if m.TakerFeeRate > 0 {
+			feeRate = m.TakerFeeRate.Float64()
+		}
 	}
 
 	var fee float64
@@ -215,11 +219,11 @@ func (m *SimplePriceMatching) newTradeFromOrder(order types.Order, isMaker bool)
 	switch order.Side {
 
 	case types.SideTypeBuy:
-		fee = order.Quantity * commission
+		fee = order.Quantity * feeRate
 		feeCurrency = m.Market.BaseCurrency
 
 	case types.SideTypeSell:
-		fee = order.Quantity * order.Price * commission
+		fee = order.Quantity * order.Price * feeRate
 		feeCurrency = m.Market.QuoteCurrency
 
 	}
