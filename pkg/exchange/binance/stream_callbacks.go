@@ -105,31 +105,31 @@ func (s *Stream) EmitExecutionReportEvent(event *ExecutionReportEvent) {
 }
 
 func (s *Stream) OnAccountUpdateEvent(cb func(e *AccountUpdateEvent)) {
-	s.AccountUpdateEventCallbacks = append(s.AccountUpdateEventCallbacks, cb)
+	s.accountUpdateEventCallbacks = append(s.accountUpdateEventCallbacks, cb)
 }
 
 func (s *Stream) EmitAccountUpdateEvent(e *AccountUpdateEvent) {
-	for _, cb := range s.AccountUpdateEventCallbacks {
+	for _, cb := range s.accountUpdateEventCallbacks {
 		cb(e)
 	}
 }
 
 func (s *Stream) OnAccountConfigUpdateEvent(cb func(e *AccountConfigUpdateEvent)) {
-	s.AccountConfigUpdateEventCallbacks = append(s.AccountConfigUpdateEventCallbacks, cb)
+	s.accountConfigUpdateEventCallbacks = append(s.accountConfigUpdateEventCallbacks, cb)
 }
 
 func (s *Stream) EmitAccountConfigUpdateEvent(e *AccountConfigUpdateEvent) {
-	for _, cb := range s.AccountConfigUpdateEventCallbacks {
+	for _, cb := range s.accountConfigUpdateEventCallbacks {
 		cb(e)
 	}
 }
 
 func (s *Stream) OnOrderTradeUpdateEvent(cb func(e *OrderTradeUpdateEvent)) {
-	s.OrderTradeUpdateEventCallbacks = append(s.OrderTradeUpdateEventCallbacks, cb)
+	s.orderTradeUpdateEventCallbacks = append(s.orderTradeUpdateEventCallbacks, cb)
 }
 
 func (s *Stream) EmitOrderTradeUpdateEvent(e *OrderTradeUpdateEvent) {
-	for _, cb := range s.OrderTradeUpdateEventCallbacks {
+	for _, cb := range s.orderTradeUpdateEventCallbacks {
 		cb(e)
 	}
 }

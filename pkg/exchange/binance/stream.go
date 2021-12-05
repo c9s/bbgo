@@ -62,8 +62,8 @@ type Stream struct {
 	types.FuturesSettings
 	types.StandardStream
 
-	Client   *binance.Client
-	futuresClient   *futures.Client
+	Client        *binance.Client
+	futuresClient *futures.Client
 
 	Conn     *websocket.Conn
 	ConnLock sync.Mutex
@@ -80,7 +80,7 @@ type Stream struct {
 
 	markPriceUpdateEventCallbacks []func(e *MarkPriceUpdateEvent)
 
-	continuousKLineEventCallbacks []func(e *ContinuousKLineEvent)
+	continuousKLineEventCallbacks       []func(e *ContinuousKLineEvent)
 	continuousKLineClosedEventCallbacks []func(e *ContinuousKLineEvent)
 
 	balanceUpdateEventCallbacks           []func(event *BalanceUpdateEvent)
@@ -88,9 +88,9 @@ type Stream struct {
 	outboundAccountPositionEventCallbacks []func(event *OutboundAccountPositionEvent)
 	executionReportEventCallbacks         []func(event *ExecutionReportEvent)
 
-	AccountUpdateEventCallbacks []func(e *AccountUpdateEvent)
-	AccountConfigUpdateEventCallbacks []func(e *AccountConfigUpdateEvent)
-	OrderTradeUpdateEventCallbacks []func(e *OrderTradeUpdateEvent)
+	accountUpdateEventCallbacks       []func(e *AccountUpdateEvent)
+	accountConfigUpdateEventCallbacks []func(e *AccountConfigUpdateEvent)
+	orderTradeUpdateEventCallbacks    []func(e *OrderTradeUpdateEvent)
 
 	depthFrames map[string]*DepthFrame
 }
@@ -263,8 +263,8 @@ func NewFuturesStream(client *futures.Client) *Stream {
 		StandardStream: types.StandardStream{
 			ReconnectC: make(chan struct{}, 1),
 		},
-		futuresClient:      client,
-		depthFrames: make(map[string]*DepthFrame),
+		futuresClient: client,
+		depthFrames:   make(map[string]*DepthFrame),
 	}
 
 	stream.OnDepthEvent(func(e *DepthEvent) {
