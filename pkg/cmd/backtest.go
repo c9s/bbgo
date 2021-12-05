@@ -3,8 +3,11 @@ package cmd
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -28,6 +31,7 @@ func init() {
 	BacktestCmd.Flags().CountP("verbose", "v", "verbose level")
 	BacktestCmd.Flags().String("config", "config/bbgo.yaml", "strategy config file")
 	BacktestCmd.Flags().Bool("force", false, "force execution without confirm")
+	BacktestCmd.Flags().String("output", "", "the report output directory")
 	RootCmd.AddCommand(BacktestCmd)
 }
 
@@ -64,6 +68,12 @@ var BacktestCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		outputDirectory, err := cmd.Flags().GetString("output")
+		if err != nil {
+			return err
+		}
+		jsonOutputEnabled := len(outputDirectory) > 0
 
 		syncOnly, err := cmd.Flags().GetBool("sync-only")
 		if err != nil {
@@ -270,7 +280,7 @@ var BacktestCmd = &cobra.Command{
 
 				calculator := &pnl.AverageCostCalculator{
 					TradingFeeCurrency: backtestExchange.PlatformFeeCurrency(),
-					Market: market,
+					Market:             market,
 				}
 
 				startPrice, ok := session.StartPrice(symbol)
@@ -278,13 +288,13 @@ var BacktestCmd = &cobra.Command{
 					return fmt.Errorf("start price not found: %s", symbol)
 				}
 
-				log.Infof("%s PROFIT AND LOSS REPORT", symbol)
-				log.Infof("===============================================")
-
 				lastPrice, ok := session.LastPrice(symbol)
 				if !ok {
 					return fmt.Errorf("last price not found: %s", symbol)
 				}
+
+				log.Infof("%s PROFIT AND LOSS REPORT", symbol)
+				log.Infof("===============================================")
 
 				report := calculator.Calculate(symbol, trades.Trades, lastPrice)
 				report.Print()
@@ -297,6 +307,29 @@ var BacktestCmd = &cobra.Command{
 
 				log.Infof("FINAL BALANCES:")
 				finalBalances.Print()
+
+				if jsonOutputEnabled {
+					result := struct {
+						Symbol          string                    `json:"symbol,omitempty"`
+						PnLReport       *pnl.AverageCostPnlReport `json:"pnlReport,omitempty"`
+						InitialBalances types.BalanceMap          `json:"initialBalances,omitempty"`
+						FinalBalances   types.BalanceMap          `json:"finalBalances,omitempty"`
+					}{
+						Symbol: symbol,
+						PnLReport: report,
+						InitialBalances: initBalances,
+						FinalBalances: finalBalances,
+					}
+
+					jsonOutput, err := json.MarshalIndent(&result,"", "  ")
+					if err != nil {
+						return err
+					}
+
+					if err := ioutil.WriteFile(filepath.Join(outputDirectory, symbol + ".json"), jsonOutput, 0644) ; err != nil {
+						return err
+					}
+				}
 
 				if wantBaseAssetBaseline {
 					initBaseAsset := inBaseAsset(initBalances, market, startPrice)

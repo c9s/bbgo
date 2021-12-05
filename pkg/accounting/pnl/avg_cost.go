@@ -21,12 +21,13 @@ func (c *AverageCostCalculator) Calculate(symbol string, trades []types.Trade, c
 
 	if len(trades) == 0 {
 		return &AverageCostPnlReport{
-			Symbol:       symbol,
-			CurrentPrice: currentPrice,
-			NumTrades:    0,
-			BuyVolume:    bidVolume,
-			SellVolume:   askVolume,
-			FeeInUSD:     feeUSD,
+			Symbol:     symbol,
+			Market:     c.Market,
+			LastPrice:  currentPrice,
+			NumTrades:  0,
+			BuyVolume:  bidVolume,
+			SellVolume: askVolume,
+			FeeInUSD:   feeUSD,
 		}
 	}
 
@@ -68,10 +69,11 @@ func (c *AverageCostCalculator) Calculate(symbol string, trades []types.Trade, c
 
 	unrealizedProfit := (fixedpoint.NewFromFloat(currentPrice) - position.AverageCost).Mul(position.Base)
 	return &AverageCostPnlReport{
-		Symbol:       symbol,
-		CurrentPrice: currentPrice,
-		NumTrades:    len(trades),
-		StartTime:    time.Time(trades[0].Time),
+		Symbol:    symbol,
+		Market:    c.Market,
+		LastPrice: currentPrice,
+		NumTrades: len(trades),
+		StartTime: time.Time(trades[0].Time),
 
 		BuyVolume:  bidVolume,
 		SellVolume: askVolume,
@@ -80,7 +82,7 @@ func (c *AverageCostCalculator) Calculate(symbol string, trades []types.Trade, c
 		Profit:           totalProfit,
 		NetProfit:        totalNetProfit,
 		UnrealizedProfit: unrealizedProfit,
-		AverageBidCost:   position.AverageCost.Float64(),
+		AverageCost:      position.AverageCost.Float64(),
 		FeeInUSD:         (totalProfit - totalNetProfit).Float64(),
 		CurrencyFees:     currencyFees,
 	}
