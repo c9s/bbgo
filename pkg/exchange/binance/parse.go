@@ -694,6 +694,8 @@ type AccountConfigUpdateEvent struct {
 //     }
 // }
 
+// Similar to the ExecutionReportEvent's fields. But with totally different json key.
+// e.g., Stop price. So that, we can not merge them.
 type OrderTrade struct {
 	Symbol           string `json:"s"`
 	ClientOrderID    string `json:"c"`
