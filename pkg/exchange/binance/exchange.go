@@ -88,6 +88,19 @@ func (e *Exchange) Name() types.ExchangeName {
 }
 
 func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticker, error) {
+	// Futures 
+	if e.IsFutures {
+		req := e.futuresClient.NewListPriceChangeStatsService()
+		req.Symbol(strings.ToUpper(symbol))
+		stats, err := req.Do(ctx)
+		if err != nil {
+			return nil, err
+		}
+	
+		ticker := toGlobalFuturesTicker(stats[0])
+		return &ticker, nil
+	}
+	// Spot or Margin 
 	req := e.Client.NewListPriceChangeStatsService()
 	req.Symbol(strings.ToUpper(symbol))
 	stats, err := req.Do(ctx)
@@ -99,6 +112,56 @@ func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticke
 }
 
 func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[string]types.Ticker, error) {
+	// Futures
+	if e.IsFutures {
+		var tickers = make(map[string]types.Ticker)
+
+		if len(symbol) == 1 {
+			ticker, err := e.QueryTicker(ctx, symbol[0])
+			if err != nil {
+				return nil, err
+			}
+	
+			tickers[strings.ToUpper(symbol[0])] = *ticker
+			return tickers, nil
+		}
+	
+		var req = e.futuresClient.NewListPriceChangeStatsService()
+		changeStats, err := req.Do(ctx)
+		if err != nil {
+			return nil, err
+		}
+	
+		m := make(map[string]struct{})
+		exists := struct{}{}
+	
+		for _, s := range symbol {
+			m[s] = exists
+		}
+	
+		for _, stats := range changeStats {
+			if _, ok := m[stats.Symbol]; len(symbol) != 0 && !ok {
+				continue
+			}
+	
+			tick := types.Ticker{
+				Volume: util.MustParseFloat(stats.Volume),
+				Last:   util.MustParseFloat(stats.LastPrice),
+				Open:   util.MustParseFloat(stats.OpenPrice),
+				High:   util.MustParseFloat(stats.HighPrice),
+				Low:    util.MustParseFloat(stats.LowPrice),
+				// Buy:    util.MustParseFloat(stats.BidPrice),
+				// Sell:   util.MustParseFloat(stats.AskPrice),
+				Time:   time.Unix(0, stats.CloseTime*int64(time.Millisecond)),
+			}
+	
+			tickers[stats.Symbol] = tick
+		}
+	
+		return tickers, nil
+	}
+
+	// Spot or Margin 
 	var tickers = make(map[string]types.Ticker)
 
 	if len(symbol) == 1 {
