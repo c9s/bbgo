@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/adshao/go-binance/v2"
+	"github.com/adshao/go-binance/v2/futures"
 	"github.com/valyala/fastjson"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -297,10 +298,29 @@ func ParseEvent(message string) (interface{}, error) {
 		var event MarkPriceUpdateEvent
 		err := json.Unmarshal([]byte(message), &event)
 		return &event, err
-         case "continuousKline":
-                 var event ContinuousKLineEvent
-                 err := json.Unmarshal([]byte(message), &event)
-                 return &event, err
+	
+	// Binance futures data --------------
+	case "continuousKline":
+		var event ContinuousKLineEvent
+		err := json.Unmarshal([]byte(message), &event)
+		return &event, err
+
+	case "ACCOUNT_UPDATE":
+		var event AccountUpdateEvent
+		err := json.Unmarshal([]byte(message), &event)
+		return &event, err
+
+	case "ORDER_TRADE_UPDATE":
+		var event OrderTradeUpdateEvent
+		err := json.Unmarshal([]byte(message), &event)
+		return &event, err
+
+	case "ACCOUNT_CONFIG_UPDATE":
+		log.Infof("ACCOUNT_CONFIG_UPDATE")
+		var event AccountConfigUpdateEvent
+		err := json.Unmarshal([]byte(message), &event)
+		return &event, err
+
 	default:
 		id := val.GetInt("id")
 		if id > 0 {
@@ -585,6 +605,214 @@ type ContinuousKLineEvent struct {
   }
 }
 */
+
+type UpdateData struct {
+	EventReasonType string `json:"m"`
+	Balances    []Balance `json:"B,omitempty"`
+	Positions 	[]types.Position  `json:"P,omitempty"`
+}
+
+type AccountUpdateEvent struct {
+	EventBase
+	Transaction  int64  `json:"T"`
+
+	UpdateData UpdateData `json:"a"`
+}
+
+// {
+// 	"e": "ACCOUNT_UPDATE",                // Event Type
+// 	"E": 1564745798939,                   // Event Time
+// 	"T": 1564745798938 ,                  // Transaction
+// 	"a":                                  // Update Data
+// 	  {
+// 		"m":"ORDER",                      // Event reason type
+// 		"B":[                             // Balances
+// 		  {
+// 			"a":"USDT",                   // Asset
+// 			"wb":"122624.12345678",       // Wallet Balance
+// 			"cw":"100.12345678",          // Cross Wallet Balance
+// 			"bc":"50.12345678"            // Balance Change except PnL and Commission
+// 		  },
+// 		  {
+// 			"a":"BUSD",           
+// 			"wb":"1.00000000",
+// 			"cw":"0.00000000",         
+// 			"bc":"-49.12345678"
+// 		  }
+// 		],
+// 		"P":[
+// 		  {
+// 			"s":"BTCUSDT",            // Symbol
+// 			"pa":"0",                 // Position Amount
+// 			"ep":"0.00000",            // Entry Price
+// 			"cr":"200",               // (Pre-fee) Accumulated Realized
+// 			"up":"0",                     // Unrealized PnL
+// 			"mt":"isolated",              // Margin Type
+// 			"iw":"0.00000000",            // Isolated Wallet (if isolated position)
+// 			"ps":"BOTH"                   // Position Side
+// 		  }，
+// 		  {
+// 			  "s":"BTCUSDT",
+// 			  "pa":"20",
+// 			  "ep":"6563.66500",
+// 			  "cr":"0",
+// 			  "up":"2850.21200",
+// 			  "mt":"isolated",
+// 			  "iw":"13200.70726908",
+// 			  "ps":"LONG"
+// 		   },
+// 		  {
+// 			  "s":"BTCUSDT",
+// 			  "pa":"-10",
+// 			  "ep":"6563.86000",
+// 			  "cr":"-45.04000000",
+// 			  "up":"-1423.15600",
+// 			  "mt":"isolated",
+// 			  "iw":"6570.42511771",
+// 			  "ps":"SHORT"
+// 		  }
+// 		]
+// 	  }
+//   }
+
+type AccountConfig struct {
+	Symbol  string  `json:"s"`
+	Leverage  fixedpoint.Value  `json:"l"`
+}
+
+type AccountConfigUpdateEvent struct {
+	EventBase
+	Transaction  int64  `json:"T"`
+
+	AccountConfig  AccountConfig `json:"ac"`
+}
+
+// {
+//     "e":"ACCOUNT_CONFIG_UPDATE",       // Event Type
+//     "E":1611646737479,                 // Event Time
+//     "T":1611646737476,                 // Transaction Time
+//     "ac":{                              
+//     "s":"BTCUSDT",                     // symbol
+//     "l":25                             // leverage
+//     }
+// }  
+
+
+type OrderTrade struct {
+	Symbol  			string  `json:"s"`
+	ClientOrderID		string `json:"c"`
+	Side   				string `json:"S"`
+	OrderType         	string `json:"o"`
+	TimeInForce     	string `json:"f"`
+	OriginalQuantity 	string `json:"q"`
+	OriginalPrice      	string `json:"p"`
+
+	AveragePrice 		string `json:"ap"`
+	StopPrice  			string `json:"sp"`
+	CurrentExecutionType string `json:"x"`   
+	CurrentOrderStatus 	 string `json:"X"`     
+	
+	OrderId 						int64 `json:"i"`
+	OrderLastFilledQuantity			string `json:"l"`
+	OrderFilledAccumulatedQuantity	string `json:"z"`
+	LastFilledPrice 			  	string `json:"L"`
+
+	CommissionAmount string `json:"n"`
+	CommissionAsset  string `json:"N"`
+
+	OrderTradeTime	int64  `json:"T"`
+	TradeId  		string `json:"t"`
+
+	BidsNotional  	string `json:"b"`
+	AskNotional  	string `json:"a"`
+
+	IsMaker 		bool `json:"m"`
+	IsReduceOnly 	bool` json:"r"`
+
+	StopPriceWorkingType 	string `json:"wt"`
+	OriginalOrderType 		string `json:"ot"`
+	PositionSide 	string `json:"ps"`
+	RealizedProfit 	string `json:"rp"`
+
+}
+
+type OrderTradeUpdateEvent struct {
+	EventBase
+	Transaction int64 	`json:"T"`
+	OrderTrade 		OrderTrade	`json:"o"`
+}
+
+// {
+
+// 	"e":"ORDER_TRADE_UPDATE",     // Event Type
+// 	"E":1568879465651,            // Event Time
+// 	"T":1568879465650,            // Transaction Time
+// 	"o":{                             
+// 	  "s":"BTCUSDT",              // Symbol
+// 	  "c":"TEST",                 // Client Order Id
+// 		// special client order id:
+// 		// starts with "autoclose-": liquidation order
+// 		// "adl_autoclose": ADL auto close order
+// 	  "S":"SELL",                 // Side
+// 	  "o":"TRAILING_STOP_MARKET", // Order Type
+// 	  "f":"GTC",                  // Time in Force
+// 	  "q":"0.001",                // Original Quantity
+// 	  "p":"0",                    // Original Price
+// 	  "ap":"0",                   // Average Price
+// 	  "sp":"7103.04",             // Stop Price. Please ignore with TRAILING_STOP_MARKET order
+// 	  "x":"NEW",                  // Execution Type
+// 	  "X":"NEW",                  // Order Status
+// 	  "i":8886774,                // Order Id
+// 	  "l":"0",                    // Order Last Filled Quantity
+// 	  "z":"0",                    // Order Filled Accumulated Quantity
+// 	  "L":"0",                    // Last Filled Price
+// 	  "N":"USDT",             // Commission Asset, will not push if no commission
+// 	  "n":"0",                // Commission, will not push if no commission
+// 	  "T":1568879465651,          // Order Trade Time
+// 	  "t":0,                      // Trade Id
+// 	  "b":"0",                    // Bids Notional
+// 	  "a":"9.91",                 // Ask Notional
+// 	  "m":false,                  // Is this trade the maker side?
+// 	  "R":false,                  // Is this reduce only
+// 	  "wt":"CONTRACT_PRICE",      // Stop Price Working Type
+// 	  "ot":"TRAILING_STOP_MARKET",    // Original Order Type
+// 	  "ps":"LONG",                        // Position Side
+// 	  "cp":false,                     // If Close-All, pushed with conditional order
+// 	  "AP":"7476.89",             // Activation Price, only puhed with TRAILING_STOP_MARKET order
+// 	  "cr":"5.0",                 // Callback Rate, only puhed with TRAILING_STOP_MARKET order
+// 	  "rp":"0"                            // Realized Profit of the trade
+// 	}
+  
+//   }
+
+func (e *OrderTradeUpdateEvent) OrderFutures() (*types.Order, error) {
+
+	switch e.OrderTrade.CurrentExecutionType {
+	case "NEW", "CANCELED", "EXPIRED":
+	case "CALCULATED - Liquidation Execution":
+	case "TRADE": // For Order FILLED status. And the order has been completed.
+	default:
+		return nil, errors.New("execution report type is not for futures order")
+	}
+
+	orderCreationTime := time.Unix(0, e.OrderTrade.OrderTradeTime*int64(time.Millisecond))
+	return &types.Order{
+		Exchange: types.ExchangeBinance,
+		SubmitOrder: types.SubmitOrder{
+			Symbol:        e.OrderTrade.Symbol,
+			ClientOrderID: e.OrderTrade.ClientOrderID,
+			Side:          toGlobalFuturesSideType(futures.SideType(e.OrderTrade.Side)),
+			Type:          toGlobalFuturesOrderType(futures.OrderType(e.OrderTrade.OrderType)),
+			Quantity:      util.MustParseFloat(e.OrderTrade.OriginalQuantity),
+			Price:         util.MustParseFloat(e.OrderTrade.OriginalPrice),
+			TimeInForce:   e.OrderTrade.TimeInForce,
+		},
+		OrderID:          uint64(e.OrderTrade.OrderId),
+		Status:           toGlobalFuturesOrderStatus(futures.OrderStatusType(e.OrderTrade.CurrentOrderStatus)),
+		ExecutedQuantity: util.MustParseFloat(e.OrderTrade.OrderFilledAccumulatedQuantity),
+		CreationTime:     types.Time(orderCreationTime),
+	}, nil
+}
 
 type EventBase struct {
 	Event string `json:"e"` // event
