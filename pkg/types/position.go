@@ -32,6 +32,7 @@ type Position struct {
 
 	ExchangeFeeRates map[ExchangeName]ExchangeFee `json:"exchangeFeeRates"`
 
+	// Futures data fields
 	Isolated               bool             		  `json:"isolated"`
 	Leverage               fixedpoint.Value           `json:"leverage"`
 	InitialMargin          fixedpoint.Value           `json:"initialMargin"`
@@ -45,7 +46,7 @@ type Position struct {
 	PositionAmt            fixedpoint.Value           `json:"positionAmt"`
 	Notional               fixedpoint.Value           `json:"notional"`
 	IsolatedWallet         fixedpoint.Value           `json:"isolatedWallet"`
-	UpdateTime             int64           			   `json:"updateTime"`
+	UpdateTime             int64           			  `json:"updateTime"`
 
 	sync.Mutex
 }
