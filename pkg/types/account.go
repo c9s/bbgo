@@ -93,12 +93,11 @@ func (m AssetMap) SlackAttachment() slack.Attachment {
 				a.Total.Float64(),
 				USD.FormatMoneyFloat64(a.InUSD.Float64()),
 				BTC.FormatMoneyFloat64(a.InBTC.Float64()),
-				math.Round(a.InUSD.Div(totalUSD).Float64() * 100.0),
+				math.Round(a.InUSD.Div(totalUSD).Float64()*100.0),
 			),
 			Short: false,
 		})
 	}
-
 
 	return slack.Attachment{
 		Title: fmt.Sprintf("Net Asset Value %s (≈ %s)",
