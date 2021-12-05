@@ -1254,7 +1254,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 			return nil, err
 		}
 		for _, t := range remoteTrades {
-			localTrade, err := ToGlobalTrade(*t, e.IsMargin)
+			localTrade, err := toGlobalTrade(*t, e.IsMargin)
 			if err != nil {
 				log.WithError(err).Errorf("can not convert binance trade: %+v", t)
 				continue
@@ -1293,7 +1293,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 			return nil, err
 		}
 		for _, t := range remoteTrades {
-			localTrade, err := ToGlobalFuturesTrade(*t)
+			localTrade, err := toGlobalFuturesTrade(*t)
 			if err != nil {
 				log.WithError(err).Errorf("can not convert binance trade: %+v", t)
 				continue
@@ -1331,7 +1331,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 			return nil, err
 		}
 		for _, t := range remoteTrades {
-			localTrade, err := ToGlobalTrade(*t, e.IsMargin)
+			localTrade, err := toGlobalTrade(*t, e.IsMargin)
 			if err != nil {
 				log.WithError(err).Errorf("can not convert binance trade: %+v", t)
 				continue
