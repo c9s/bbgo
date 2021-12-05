@@ -221,17 +221,19 @@ var BacktestCmd = &cobra.Command{
 			}
 		}
 
-		log.Warn("!!! To run backtest, you should use an isolated database for storing backtest trades !!!")
-		log.Warn("!!! The trade record in the current database WILL ALL BE DELETE !!!")
-
-		if !force {
-			if !confirmation("Are you sure to continue?") {
-				return nil
+		if userConfig.Backtest.RecordTrades {
+			log.Warn("!!! Trade recording is enabled for back-testing !!!")
+			log.Warn("!!! To run back-testing, you should use an isolated database for storing back-testing trades !!!")
+			log.Warn("!!! The trade record in the current database WILL ALL BE DELETED BEFORE THIS BACK-TESTING !!!")
+			if !force {
+				if !confirmation("Are you sure to continue?") {
+					return nil
+				}
 			}
-		}
 
-		if err := environ.TradeService.DeleteAll(); err != nil {
-			return err
+			if err := environ.TradeService.DeleteAll(); err != nil {
+				return err
+			}
 		}
 
 		backtestExchange := backtest.NewExchange(exchangeName, backtestService, userConfig.Backtest)
@@ -315,18 +317,18 @@ var BacktestCmd = &cobra.Command{
 						InitialBalances types.BalanceMap          `json:"initialBalances,omitempty"`
 						FinalBalances   types.BalanceMap          `json:"finalBalances,omitempty"`
 					}{
-						Symbol: symbol,
-						PnLReport: report,
+						Symbol:          symbol,
+						PnLReport:       report,
 						InitialBalances: initBalances,
-						FinalBalances: finalBalances,
+						FinalBalances:   finalBalances,
 					}
 
-					jsonOutput, err := json.MarshalIndent(&result,"", "  ")
+					jsonOutput, err := json.MarshalIndent(&result, "", "  ")
 					if err != nil {
 						return err
 					}
 
-					if err := ioutil.WriteFile(filepath.Join(outputDirectory, symbol + ".json"), jsonOutput, 0644) ; err != nil {
+					if err := ioutil.WriteFile(filepath.Join(outputDirectory, symbol+".json"), jsonOutput, 0644); err != nil {
 						return err
 					}
 				}
