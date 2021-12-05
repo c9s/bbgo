@@ -275,7 +275,6 @@ func NewFuturesStream(client *futures.Client) *Stream {
 		f, ok := stream.depthFrames[e.Symbol]
 		if !ok {
 			f = &DepthFrame{
-				futuresClient:  client,
 				context: context.Background(),
 				Symbol:  e.Symbol,
 				resetC:  make(chan struct{}, 1),
@@ -336,33 +335,14 @@ func NewFuturesStream(client *futures.Client) *Stream {
 	})
 
 	stream.OnAccountUpdateEvent(func(e *AccountUpdateEvent) {
-		// snapshot := AccountUpdateEvent {
-		// 	UpdateData: UpdateData {
-		// 		Balances:  e.UpdateData.Balances,
-		// 		Positions: e.UpdateData.Positions,
-		// 	},
-		// }
-		// snapshot := Position {
-		// 		Positions: e.UpdateData.Positions,
-		// }
-		// stream.EmitPositionSnapshot(&snapshot)
+		// TODO
 	})
 
 	stream.OnAccountConfigUpdateEvent(func(e *AccountConfigUpdateEvent) {
-		// snapshot := AccountConfigUpdateEvent {
-		// 	AccountConfig: AccountConfig {
-		// 		Symbol:  e.AccountConfig.Symbol,
-		// 		Leverage: e.AccountConfig.Leverage,
-		// 	},
-		// }
-		// snapshot := types.Position {
-		// 		Symbol:  e.AccountConfig.Symbol,
-		// 		Leverage: e.AccountConfig.Leverage,
-		// }
 		snapshot := types.PositionMap{}
-			snapshot[e.AccountConfig.Symbol] = types.Position{
-				Symbol:  e.AccountConfig.Symbol,
-				Leverage: e.AccountConfig.Leverage,
+		snapshot[e.AccountConfig.Symbol] = types.Position{
+			Symbol:   e.AccountConfig.Symbol,
+			Leverage: e.AccountConfig.Leverage,
 		}
 
 		stream.EmitPositionSnapshot(snapshot)
@@ -425,6 +405,8 @@ func NewFuturesStream(client *futures.Client) *Stream {
 			stream.EmitOrderUpdate(*order)
 
 		case "TRADE":
+			// TODO
+			
 			// trade, err := e.Trade()
 			// if err != nil {
 			// 	log.WithError(err).Error("trade convert error")
@@ -504,7 +486,7 @@ func (s *Stream) dial(listenKey string) (*websocket.Conn, error) {
 
 	if s.IsFutures {
 		url = "wss://fstream.binance.com/ws/" + listenKey
-	} 
+	}
 
 	conn, _, err := defaultDialer.Dial(url, nil)
 	if err != nil {
@@ -539,7 +521,7 @@ func (s *Stream) fetchListenKey(ctx context.Context) (string, error) {
 		return req.Do(ctx)
 	}
 	log.Infof("spot mode is enabled, requesting margin user stream listen key...")
-	
+
 	return s.Client.NewStartUserStreamService().Do(ctx)
 }
 
