@@ -56,22 +56,17 @@ func (s *Stream) Connect(ctx context.Context) error {
 	if !s.publicOnly {
 		// user data stream
 		s.OnTradeUpdate(func(trade types.Trade) {
-			s.exchange.trades[trade.Symbol] = append(s.exchange.trades[trade.Symbol], trade)
+			s.exchange.addTrade(trade)
 		})
 
-		for symbol, market := range s.exchange.markets {
-			matching := &SimplePriceMatching{
-				CurrentTime:     s.exchange.startTime,
-				Account:         s.exchange.account,
-				Market:          market,
-			}
+		// FIXME: here if we created two user data stream, since the callbacks are not de-registered we might have problem
+		s.exchange.matchingBooksMutex.Lock()
+		for _, matching := range s.exchange.matchingBooks {
 			matching.OnTradeUpdate(s.EmitTradeUpdate)
 			matching.OnOrderUpdate(s.EmitOrderUpdate)
 			matching.OnBalanceUpdate(s.EmitBalanceUpdate)
-			s.exchange.matchingBooksMutex.Lock()
-			s.exchange.matchingBooks[symbol] = matching
-			s.exchange.matchingBooksMutex.Unlock()
 		}
+		s.exchange.matchingBooksMutex.Unlock()
 
 		// assign user data stream back
 		s.exchange.userDataStream = s
