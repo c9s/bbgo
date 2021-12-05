@@ -142,6 +142,10 @@ To start bbgo with the frontend dashboard:
 bbgo run --enable-webserver
 ```
 
+Note on date formats, the following date formats are supported:
+* RFC3339, which looks like `2006-01-02T15:04:05Z07:00`
+* RFC822, which looks like `02 Jan 06 15:04 MST`
+
 ## Advanced Setup
 
 ### Setting up Telegram Bot Notification
