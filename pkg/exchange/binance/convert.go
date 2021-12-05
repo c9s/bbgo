@@ -286,7 +286,7 @@ func toGlobalFuturesTicker(stats *futures.PriceChangeStats) types.Ticker {
 		Low:    util.MustParseFloat(stats.LowPrice),
 		// Buy:    util.MustParseFloat(stats.BidPrice),
 		// Sell:   util.MustParseFloat(stats.AskPrice),
-		Time:   time.Unix(0, stats.CloseTime*int64(time.Millisecond)),
+		Time: time.Unix(0, stats.CloseTime*int64(time.Millisecond)),
 	}
 }
 
