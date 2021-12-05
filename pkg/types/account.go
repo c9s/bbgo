@@ -41,11 +41,11 @@ func (b Balance) String() string {
 }
 
 type Asset struct {
-	Currency string           `json:"currency"`
-	Total    fixedpoint.Value `json:"total"`
-	InUSD    fixedpoint.Value `json:"inUSD"`
-	InBTC    fixedpoint.Value `json:"inBTC"`
-	Time     time.Time        `json:"time"`
+	Currency   string           `json:"currency"`
+	Total      fixedpoint.Value `json:"total"`
+	InUSD      fixedpoint.Value `json:"inUSD"`
+	InBTC      fixedpoint.Value `json:"inBTC"`
+	Time       time.Time        `json:"time"`
 }
 
 type AssetMap map[string]Asset
@@ -181,10 +181,17 @@ func (m BalanceMap) Print() {
 	}
 }
 
+type AccountType string
+
+const (
+	AccountTypeFutures = AccountType("futures")
+	AccountTypeSpot    = AccountType("spot")
+)
+
 type Account struct {
 	sync.Mutex `json:"-"`
 
-	AccountType  string           `json:"accountType,omitempty"`
+	AccountType AccountType `json:"accountType,omitempty"`
 
 	MakerFeeRate fixedpoint.Value `json:"makerFeeRate,omitempty"`
 	TakerFeeRate fixedpoint.Value `json:"takerFeeRate,omitempty"`
