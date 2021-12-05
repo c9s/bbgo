@@ -70,7 +70,9 @@ func (s *Stream) Connect(ctx context.Context) error {
 			matching.OnTradeUpdate(s.EmitTradeUpdate)
 			matching.OnOrderUpdate(s.EmitOrderUpdate)
 			matching.OnBalanceUpdate(s.EmitBalanceUpdate)
+			s.exchange.matchingBooksMutex.Lock()
 			s.exchange.matchingBooks[symbol] = matching
+			s.exchange.matchingBooksMutex.Unlock()
 		}
 
 		// assign user data stream back
