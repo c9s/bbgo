@@ -186,6 +186,15 @@ func (e *Exchange) QueryMarginAccount(ctx context.Context) (*types.MarginAccount
 	return toGlobalMarginAccount(account), nil
 }
 
+func (e *Exchange) QueryFuturesAccount(ctx context.Context) (*types.Account, error) {
+	account, err := e.futuresClient.NewGetAccountService().Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return toGlobalFuturesAccount(account), nil
+}
+
 func (e *Exchange) QueryIsolatedMarginAccount(ctx context.Context, symbols ...string) (*types.IsolatedMarginAccount, error) {
 	req := e.Client.NewGetIsolatedMarginAccountService()
 	if len(symbols) > 0 {
