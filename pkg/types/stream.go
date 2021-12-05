@@ -51,6 +51,11 @@ type StandardStream struct {
 	bookUpdateCallbacks []func(book SliceOrderBook)
 
 	bookSnapshotCallbacks []func(book SliceOrderBook)
+
+	// Futures
+	PositionUpdateCallbacks []func(position PositionMap)
+	
+	PositionSnapshotCallbacks []func(position PositionMap)
 }
 
 func (stream *StandardStream) Subscribe(channel Channel, symbol string, options SubscribeOptions) {
