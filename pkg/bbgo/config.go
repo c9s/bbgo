@@ -98,8 +98,10 @@ type Backtest struct {
 	StartTime string `json:"startTime" yaml:"startTime"`
 	EndTime   string `json:"endTime" yaml:"endTime"`
 
-	Account BacktestAccount `json:"account" yaml:"account"`
-	Symbols []string        `json:"symbols" yaml:"symbols"`
+	// RecordTrades is an option, if set to true, back-testing should record the trades into database
+	RecordTrades bool            `json:"recordTrades,omitempty" yaml:"recordTrades,omitempty"`
+	Account      BacktestAccount `json:"account" yaml:"account"`
+	Symbols      []string        `json:"symbols" yaml:"symbols"`
 }
 
 func (t Backtest) ParseEndTime() (time.Time, error) {

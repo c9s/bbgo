@@ -302,13 +302,18 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 	session.UserDataStream.OnOrderUpdate(session.OrderExecutor.EmitOrderUpdate)
 	session.Account.BindStream(session.UserDataStream)
 
-	// insert trade into db right before everything
-	if environ.TradeService != nil {
-		session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
-			if err := environ.TradeService.Insert(trade); err != nil {
-				log.WithError(err).Errorf("trade insert error: %+v", trade)
-			}
-		})
+	// TODO: move this logic to Environment struct
+	// if back-test service is not set, meaning we are not back-testing
+	// we should insert trade into db right before everything
+	if environ.BacktestService == nil {
+		// if trade service is configured, we have the db configured
+		if environ.TradeService != nil {
+			session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
+				if err := environ.TradeService.Insert(trade); err != nil {
+					log.WithError(err).Errorf("trade insert error: %+v", trade)
+				}
+			})
+		}
 	}
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
