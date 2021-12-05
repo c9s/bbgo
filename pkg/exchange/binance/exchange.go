@@ -210,6 +210,55 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[stri
 }
 
 func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
+	// Futures
+	if e.IsFutures {
+		log.Info("querying futures market info...")
+
+		exchangeInfo, err := e.futuresClient.NewExchangeInfoService().Do(ctx)
+		if err != nil {
+			return nil, err
+		}
+	
+		markets := types.MarketMap{}
+		for _, symbol := range exchangeInfo.Symbols {
+			market := types.Market{
+				Symbol:          symbol.Symbol,
+				LocalSymbol:     symbol.Symbol,
+				PricePrecision:  symbol.QuotePrecision,
+				VolumePrecision: symbol.BaseAssetPrecision,
+				QuoteCurrency:   symbol.QuoteAsset,
+				BaseCurrency:    symbol.BaseAsset,
+			}
+	
+			// if f := symbol.MinNotionalFilter(); f != nil {
+			// 	market.MinNotional = util.MustParseFloat(f.MinNotional)
+			// 	market.MinAmount = util.MustParseFloat(f.MinNotional)
+			// }
+	
+			// The LOT_SIZE filter defines the quantity (aka "lots" in auction terms) rules for a symbol.
+			// There are 3 parts:
+			// minQty defines the minimum quantity/icebergQty allowed.
+			//	maxQty defines the maximum quantity/icebergQty allowed.
+			//	stepSize defines the intervals that a quantity/icebergQty can be increased/decreased by.
+			if f := symbol.LotSizeFilter(); f != nil {
+				market.MinQuantity = util.MustParseFloat(f.MinQuantity)
+				market.MaxQuantity = util.MustParseFloat(f.MaxQuantity)
+				market.StepSize = util.MustParseFloat(f.StepSize)
+			}
+	
+			if f := symbol.PriceFilter(); f != nil {
+				market.MaxPrice = util.MustParseFloat(f.MaxPrice)
+				market.MinPrice = util.MustParseFloat(f.MinPrice)
+				market.TickSize = util.MustParseFloat(f.TickSize)
+			}
+	
+			markets[symbol.Symbol] = market
+		}
+	
+		return markets, nil
+	}
+	
+	// Spot or Margin
 	log.Info("querying market info...")
 
 	exchangeInfo, err := e.Client.NewExchangeInfoService().Do(ctx)
