@@ -2,12 +2,13 @@ package types
 
 import (
 	"fmt"
-	"github.com/slack-go/slack"
 	"math"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/slack-go/slack"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -183,13 +184,14 @@ func (m BalanceMap) Print() {
 type Account struct {
 	sync.Mutex `json:"-"`
 
-	// bps. 0.15% fee will be 15.
-	MakerCommission fixedpoint.Value `json:"makerCommission,omitempty"`
-	TakerCommission fixedpoint.Value `json:"takerCommission,omitempty"`
+	AccountType  string           `json:"accountType,omitempty"`
 
 	MakerFeeRate fixedpoint.Value `json:"makerFeeRate,omitempty"`
 	TakerFeeRate fixedpoint.Value `json:"takerFeeRate,omitempty"`
-	AccountType  string           `json:"accountType,omitempty"`
+
+	// bps. 0.15% fee will be 15.
+	MakerCommission fixedpoint.Value `json:"makerCommission,omitempty"`
+	TakerCommission fixedpoint.Value `json:"takerCommission,omitempty"`
 
 	TotalAccountValue fixedpoint.Value `json:"totalAccountValue,omitempty"`
 

@@ -23,8 +23,8 @@ func newLimitOrder(symbol string, side types.SideType, price, quantity float64) 
 
 func TestSimplePriceMatching_LimitOrder(t *testing.T) {
 	account := &types.Account{
-		MakerCommission: 15,
-		TakerCommission: 15,
+		MakerFeeRate: fixedpoint.NewFromFloat(0.075 * 0.01),
+		TakerFeeRate: fixedpoint.NewFromFloat(0.075 * 0.01),
 	}
 
 	account.UpdateBalances(types.BalanceMap{
