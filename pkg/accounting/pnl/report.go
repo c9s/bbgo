@@ -1,6 +1,7 @@
 package pnl
 
 import (
+	"encoding/json"
 	"strconv"
 	"time"
 
@@ -28,6 +29,10 @@ type AverageCostPnlReport struct {
 	FeeInUSD         float64            `json:"feeInUSD,omitempty"`
 	Stock            float64            `json:"stock,omitempty"`
 	CurrencyFees     map[string]float64 `json:"currencyFees,omitempty"`
+}
+
+func (report *AverageCostPnlReport) JSON() ([]byte, error) {
+	return json.MarshalIndent(report, "", "  ")
 }
 
 func (report AverageCostPnlReport) Print() {
