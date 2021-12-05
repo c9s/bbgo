@@ -66,6 +66,7 @@ type Trade struct {
 	FeeCurrency string   `json:"feeCurrency" db:"fee_currency"`
 
 	IsMargin   bool `json:"isMargin" db:"is_margin"`
+	IsFutures  bool `json:"isFutures" db:"is_futures"`
 	IsIsolated bool `json:"isIsolated" db:"is_isolated"`
 
 	StrategyID sql.NullString  `json:"strategyID" db:"strategy"`
