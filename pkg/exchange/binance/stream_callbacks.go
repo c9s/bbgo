@@ -54,6 +54,16 @@ func (s *Stream) EmitContinuousKLineEvent(e *ContinuousKLineEvent) {
 	}
 }
 
+func (s *Stream) OnContinuousKLineClosedEvent(cb func(e *ContinuousKLineEvent)) {
+	s.continuousKLineClosedEventCallbacks = append(s.continuousKLineClosedEventCallbacks, cb)
+}
+
+func (s *Stream) EmitContinuousKLineClosedEvent(e *ContinuousKLineEvent) {
+	for _, cb := range s.continuousKLineClosedEventCallbacks {
+		cb(e)
+	}
+}
+
 func (s *Stream) OnBalanceUpdateEvent(cb func(event *BalanceUpdateEvent)) {
 	s.balanceUpdateEventCallbacks = append(s.balanceUpdateEventCallbacks, cb)
 }
@@ -94,6 +104,36 @@ func (s *Stream) EmitExecutionReportEvent(event *ExecutionReportEvent) {
 	}
 }
 
+func (s *Stream) OnAccountUpdateEvent(cb func(e *AccountUpdateEvent)) {
+	s.AccountUpdateEventCallbacks = append(s.AccountUpdateEventCallbacks, cb)
+}
+
+func (s *Stream) EmitAccountUpdateEvent(e *AccountUpdateEvent) {
+	for _, cb := range s.AccountUpdateEventCallbacks {
+		cb(e)
+	}
+}
+
+func (s *Stream) OnAccountConfigUpdateEvent(cb func(e *AccountConfigUpdateEvent)) {
+	s.AccountConfigUpdateEventCallbacks = append(s.AccountConfigUpdateEventCallbacks, cb)
+}
+
+func (s *Stream) EmitAccountConfigUpdateEvent(e *AccountConfigUpdateEvent) {
+	for _, cb := range s.AccountConfigUpdateEventCallbacks {
+		cb(e)
+	}
+}
+
+func (s *Stream) OnOrderTradeUpdateEvent(cb func(e *OrderTradeUpdateEvent)) {
+	s.OrderTradeUpdateEventCallbacks = append(s.OrderTradeUpdateEventCallbacks, cb)
+}
+
+func (s *Stream) EmitOrderTradeUpdateEvent(e *OrderTradeUpdateEvent) {
+	for _, cb := range s.OrderTradeUpdateEventCallbacks {
+		cb(e)
+	}
+}
+
 type StreamEventHub interface {
 	OnDepthEvent(cb func(e *DepthEvent))
 
@@ -105,6 +145,8 @@ type StreamEventHub interface {
 
 	OnContinuousKLineEvent(cb func(e *ContinuousKLineEvent))
 
+	OnContinuousKLineClosedEvent(cb func(e *ContinuousKLineEvent))
+
 	OnBalanceUpdateEvent(cb func(event *BalanceUpdateEvent))
 
 	OnOutboundAccountInfoEvent(cb func(event *OutboundAccountInfoEvent))
@@ -112,4 +154,10 @@ type StreamEventHub interface {
 	OnOutboundAccountPositionEvent(cb func(event *OutboundAccountPositionEvent))
 
 	OnExecutionReportEvent(cb func(event *ExecutionReportEvent))
+
+	OnAccountUpdateEvent(cb func(e *AccountUpdateEvent))
+
+	OnAccountConfigUpdateEvent(cb func(e *AccountConfigUpdateEvent))
+
+	OnOrderTradeUpdateEvent(cb func(e *OrderTradeUpdateEvent))
 }
