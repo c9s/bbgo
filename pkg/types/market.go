@@ -3,10 +3,11 @@ package types
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/leekchan/accounting"
 	"math"
 	"strconv"
 	"time"
+
+	"github.com/leekchan/accounting"
 )
 
 type Duration time.Duration
@@ -48,27 +49,27 @@ func (d *Duration) UnmarshalJSON(data []byte) error {
 }
 
 type Market struct {
-	Symbol      string
-	LocalSymbol string // LocalSymbol is used for exchange's API
+	Symbol      string `json:"symbol"`
+	LocalSymbol string `json:"localSymbol,omitempty" `// LocalSymbol is used for exchange's API
 
-	PricePrecision  int
-	VolumePrecision int
-	QuoteCurrency   string
-	BaseCurrency    string
+	PricePrecision  int `json:"pricePrecision,omitempty"`
+	VolumePrecision int `json:"volumePrecision,omitempty"`
+	QuoteCurrency   string `json:"quoteCurrency,omitempty"`
+	BaseCurrency    string `json:"baseCurrency,omitempty"`
 
 	// The MIN_NOTIONAL filter defines the minimum notional value allowed for an order on a symbol.
 	// An order's notional value is the price * quantity
-	MinNotional float64
-	MinAmount   float64
+	MinNotional float64 `json:"minNotional,omitempty"`
+	MinAmount   float64 `json:"minAmount,omitempty"`
 
 	// The LOT_SIZE filter defines the quantity
-	MinQuantity float64
-	MaxQuantity float64
-	StepSize    float64
+	MinQuantity float64 `json:"minQuantity,omitempty"`
+	MaxQuantity float64 `json:"maxQuantity,omitempty"`
+	StepSize    float64 `json:"stepSize,omitempty"`
 
-	MinPrice float64
-	MaxPrice float64
-	TickSize float64
+	MinPrice float64 `json:"minPrice,omitempty"`
+	MaxPrice float64 `json:"maxPrice,omitempty"`
+	TickSize float64 `json:"tickSize,omitempty"`
 }
 
 func (m Market) BaseCurrencyFormatter() *accounting.Accounting {
