@@ -163,28 +163,29 @@ func toGlobalFuturesUserAssets(assets []*futures.AccountAsset) (retAssets []type
 	return retAssets
 }
 
-func toGlobalPositions(positions []*futures.AccountPosition) (retAssets []types.Position) {
-	for _, position := range positions {
-		retAssets = append(retAssets, types.Position{
-			Isolated:               position.Isolated,
-			Leverage:               fixedpoint.MustNewFromString(position.Leverage),
-			InitialMargin:          fixedpoint.MustNewFromString(position.InitialMargin),
-			MaintMargin:            fixedpoint.MustNewFromString(position.MaintMargin),
-			OpenOrderInitialMargin: fixedpoint.MustNewFromString(position.OpenOrderInitialMargin),
-			PositionInitialMargin:  fixedpoint.MustNewFromString(position.PositionInitialMargin),
-			Symbol:                 position.Symbol,
-			UnrealizedProfit:       fixedpoint.MustNewFromString(position.UnrealizedProfit),
-			EntryPrice:             fixedpoint.MustNewFromString(position.EntryPrice),
-			MaxNotional:            fixedpoint.MustNewFromString(position.MaxNotional),
-			PositionSide:           string(position.PositionSide),
-			PositionAmt:            fixedpoint.MustNewFromString(position.PositionAmt),
-			Notional:               fixedpoint.MustNewFromString(position.Notional),
-			IsolatedWallet:         fixedpoint.MustNewFromString(position.IsolatedWallet),
-			UpdateTime:             position.UpdateTime,
-		})
-	}
+func toGlobalPositions(positions []*futures.AccountPosition) types.PositionMap {
+	retPositions := make(types.PositionMap)
+		for _, position := range positions {
+			retPositions[position.Symbol] = types.Position{
+				Isolated:               position.Isolated,
+				Leverage:               fixedpoint.MustNewFromString(position.Leverage),
+				InitialMargin:          fixedpoint.MustNewFromString(position.InitialMargin),
+				MaintMargin:            fixedpoint.MustNewFromString(position.MaintMargin),
+				OpenOrderInitialMargin: fixedpoint.MustNewFromString(position.OpenOrderInitialMargin),
+				PositionInitialMargin:  fixedpoint.MustNewFromString(position.PositionInitialMargin),
+				Symbol:                 position.Symbol,
+				UnrealizedProfit:       fixedpoint.MustNewFromString(position.UnrealizedProfit),
+				EntryPrice:             fixedpoint.MustNewFromString(position.EntryPrice),
+				MaxNotional:            fixedpoint.MustNewFromString(position.MaxNotional),
+				PositionSide:           string(position.PositionSide),
+				PositionAmt:            fixedpoint.MustNewFromString(position.PositionAmt),
+				Notional:               fixedpoint.MustNewFromString(position.Notional),
+				IsolatedWallet:         fixedpoint.MustNewFromString(position.IsolatedWallet),
+				UpdateTime:             position.UpdateTime,
+			}
+		}
 
-	return retAssets
+	return retPositions
 }
 
 // Isolated
