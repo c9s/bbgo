@@ -452,6 +452,59 @@ func ToGlobalTrade(t binance.TradeV3, isMargin bool) (*types.Trade, error) {
 	}, nil
 }
 
+func ToGlobalFuturesTrade(t futures.AccountTrade) (*types.Trade, error) {
+	// skip trade ID that is the same. however this should not happen
+	var side types.SideType
+	if t.Buyer {
+		side = types.SideTypeBuy
+	} else {
+		side = types.SideTypeSell
+	}
+
+	price, err := strconv.ParseFloat(t.Price, 64)
+	if err != nil {
+		return nil, errors.Wrapf(err, "price parse error, price: %+v", t.Price)
+	}
+
+	quantity, err := strconv.ParseFloat(t.Quantity, 64)
+	if err != nil {
+		return nil, errors.Wrapf(err, "quantity parse error, quantity: %+v", t.Quantity)
+	}
+
+	var quoteQuantity = 0.0
+	if len(t.QuoteQuantity) > 0 {
+		quoteQuantity, err = strconv.ParseFloat(t.QuoteQuantity, 64)
+		if err != nil {
+			return nil, errors.Wrapf(err, "quote quantity parse error, quoteQuantity: %+v", t.QuoteQuantity)
+		}
+	} else {
+		quoteQuantity = price * quantity
+	}
+
+	fee, err := strconv.ParseFloat(t.Commission, 64)
+	if err != nil {
+		return nil, errors.Wrapf(err, "commission parse error, commission: %+v", t.Commission)
+	}
+
+	return &types.Trade{
+		ID:            t.ID,
+		OrderID:       uint64(t.OrderID),
+		Price:         price,
+		Symbol:        t.Symbol,
+		Exchange:      "binance",
+		Quantity:      quantity,
+		QuoteQuantity: quoteQuantity,
+		Side:          side,
+		IsBuyer:       t.Buyer,
+		IsMaker:       t.Maker,
+		Fee:           fee,
+		FeeCurrency:   t.CommissionAsset,
+		Time:          types.Time(millisecondTime(t.Time)),
+		IsFutures:     true,
+		// IsIsolated:    t.IsIsolated,
+	}, nil
+}
+
 func toGlobalSideType(side binance.SideType) types.SideType {
 	switch side {
 	case binance.SideTypeBuy:
@@ -571,6 +624,20 @@ func ConvertTrades(remoteTrades []*binance.TradeV3) (trades []types.Trade, err e
 		trade, err := ToGlobalTrade(*t, false)
 		if err != nil {
 			return nil, errors.Wrapf(err, "binance v3 trade parse error, trade: %+v", *t)
+		}
+
+		trades = append(trades, *trade)
+	}
+
+	return trades, err
+}
+
+// ConvertTrades converts the futures v3 trade into the global trade type
+func ConvertFuturesTrades(remoteTrades []*futures.AccountTrade) (trades []types.Trade, err error) {
+	for _, t := range remoteTrades {
+		trade, err := ToGlobalFuturesTrade(*t)
+		if err != nil {
+			return nil, errors.Wrapf(err, "futures v3 trade parse error, trade: %+v", *t)
 		}
 
 		trades = append(trades, *trade)
