@@ -160,6 +160,10 @@ type ExchangeSession struct {
 	Margin               bool   `json:"margin,omitempty" yaml:"margin"`
 	IsolatedMargin       bool   `json:"isolatedMargin,omitempty" yaml:"isolatedMargin,omitempty"`
 	IsolatedMarginSymbol string `json:"isolatedMarginSymbol,omitempty" yaml:"isolatedMarginSymbol,omitempty"`
+	Futures               bool   `json:"futures,omitempty" yaml:"futures"`
+	IsolatedFutures      bool   `json:"isolatedFutures,omitempty" yaml:"isolatedFutures,omitempty"`
+	IsolatedFuturesSymbol string `json:"isolatedFuturesSymbol,omitempty" yaml:"isolatedFuturesSymbol,omitempty"`
+	
 
 	// ---------------------------
 	// Runtime fields
@@ -688,6 +692,19 @@ func InitExchangeSession(name string, session *ExchangeSession) error {
 			marginExchange.UseIsolatedMargin(session.IsolatedMarginSymbol)
 		} else {
 			marginExchange.UseMargin()
+		}
+	}
+
+	if session.Futures {
+		futuresExchange, ok := exchange.(types.FuturesExchange)
+		if !ok {
+			return fmt.Errorf("exchange %s does not support futures", exchangeName)
+		}
+
+		if session.IsolatedFutures {
+			futuresExchange.UseIsolatedFutures(session.IsolatedFuturesSymbol)
+		} else {
+			futuresExchange.UseFutures()
 		}
 	}
 
