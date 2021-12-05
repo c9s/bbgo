@@ -56,7 +56,11 @@ type Exchange struct {
 	userDataStream *Stream
 
 	trades        map[string][]types.Trade
+	tradesMutex sync.Mutex
+
 	closedOrders  map[string][]types.Order
+	closedOrdersMutex sync.Mutex
+
 	matchingBooks map[string]*SimplePriceMatching
 	matchingBooksMutex sync.Mutex
 
@@ -107,13 +111,48 @@ func NewExchange(sourceName types.ExchangeName, srv *service.BacktestService, co
 		account:        account,
 		startTime:      startTime,
 		endTime:        endTime,
-		matchingBooks:  make(map[string]*SimplePriceMatching),
 		closedOrders:   make(map[string][]types.Order),
 		trades:         make(map[string][]types.Trade),
 		doneC:          make(chan struct{}),
 	}
 
+	e.resetMatchingBooks()
 	return e
+}
+
+func (e *Exchange) addTrade(trade types.Trade) {
+	e.tradesMutex.Lock()
+	e.trades[trade.Symbol] = append(e.trades[trade.Symbol], trade)
+	e.tradesMutex.Unlock()
+}
+
+func (e *Exchange) addClosedOrder(order types.Order) {
+	e.closedOrdersMutex.Lock()
+	e.closedOrders[order.Symbol] = append(e.closedOrders[order.Symbol], order)
+	e.closedOrdersMutex.Unlock()
+}
+
+func (e *Exchange) resetMatchingBooks() {
+	e.matchingBooksMutex.Lock()
+	e.matchingBooks = make(map[string]*SimplePriceMatching)
+	for symbol, market := range e.markets {
+		e._addMatchingBook(symbol, market)
+	}
+	e.matchingBooksMutex.Unlock()
+}
+
+func (e *Exchange) addMatchingBook(symbol string, market types.Market) {
+	e.matchingBooksMutex.Lock()
+	e._addMatchingBook(symbol, market)
+	e.matchingBooksMutex.Unlock()
+}
+
+func (e *Exchange) _addMatchingBook(symbol string, market types.Market) {
+	e.matchingBooks[symbol] = &SimplePriceMatching{
+		CurrentTime:     e.startTime,
+		Account:         e.account,
+		Market:          market,
+	}
 }
 
 func (e *Exchange) Done() chan struct{} {
@@ -143,7 +182,7 @@ func (e Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder)
 			// market order can be closed immediately.
 			switch createdOrder.Status {
 			case types.OrderStatusFilled, types.OrderStatusCanceled, types.OrderStatusRejected:
-				e.closedOrders[symbol] = append(e.closedOrders[symbol], *createdOrder)
+				e.addClosedOrder(*createdOrder)
 			}
 
 			e.userDataStream.EmitOrderUpdate(*createdOrder)
