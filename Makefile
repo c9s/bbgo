@@ -128,6 +128,7 @@ pkg/version/version.go: .FORCE
 version: pkg/version/version.go migrations
 	git commit $< -m "bump version to $(VERSION)" || true
 	git tag -f $(VERSION)
+	git push origin $(VERSION)
 
 migrations:
 	rockhopper compile --config rockhopper_mysql.yaml --output pkg/migrations/mysql
