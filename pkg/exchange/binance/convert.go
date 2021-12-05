@@ -165,25 +165,25 @@ func toGlobalFuturesUserAssets(assets []*futures.AccountAsset) (retAssets []type
 
 func toGlobalPositions(positions []*futures.AccountPosition) types.PositionMap {
 	retPositions := make(types.PositionMap)
-		for _, position := range positions {
-			retPositions[position.Symbol] = types.Position{
-				Isolated:               position.Isolated,
-				Leverage:               fixedpoint.MustNewFromString(position.Leverage),
-				InitialMargin:          fixedpoint.MustNewFromString(position.InitialMargin),
-				MaintMargin:            fixedpoint.MustNewFromString(position.MaintMargin),
-				OpenOrderInitialMargin: fixedpoint.MustNewFromString(position.OpenOrderInitialMargin),
-				PositionInitialMargin:  fixedpoint.MustNewFromString(position.PositionInitialMargin),
-				Symbol:                 position.Symbol,
-				UnrealizedProfit:       fixedpoint.MustNewFromString(position.UnrealizedProfit),
-				EntryPrice:             fixedpoint.MustNewFromString(position.EntryPrice),
-				MaxNotional:            fixedpoint.MustNewFromString(position.MaxNotional),
-				PositionSide:           string(position.PositionSide),
-				PositionAmt:            fixedpoint.MustNewFromString(position.PositionAmt),
-				Notional:               fixedpoint.MustNewFromString(position.Notional),
-				IsolatedWallet:         fixedpoint.MustNewFromString(position.IsolatedWallet),
-				UpdateTime:             position.UpdateTime,
-			}
+	for _, position := range positions {
+		retPositions[position.Symbol] = types.Position{
+			Isolated:               position.Isolated,
+			Leverage:               fixedpoint.MustNewFromString(position.Leverage),
+			InitialMargin:          fixedpoint.MustNewFromString(position.InitialMargin),
+			MaintMargin:            fixedpoint.MustNewFromString(position.MaintMargin),
+			OpenOrderInitialMargin: fixedpoint.MustNewFromString(position.OpenOrderInitialMargin),
+			PositionInitialMargin:  fixedpoint.MustNewFromString(position.PositionInitialMargin),
+			Symbol:                 position.Symbol,
+			UnrealizedProfit:       fixedpoint.MustNewFromString(position.UnrealizedProfit),
+			EntryPrice:             fixedpoint.MustNewFromString(position.EntryPrice),
+			MaxNotional:            fixedpoint.MustNewFromString(position.MaxNotional),
+			PositionSide:           string(position.PositionSide),
+			PositionAmt:            fixedpoint.MustNewFromString(position.PositionAmt),
+			Notional:               fixedpoint.MustNewFromString(position.Notional),
+			IsolatedWallet:         fixedpoint.MustNewFromString(position.IsolatedWallet),
+			UpdateTime:             position.UpdateTime,
 		}
+	}
 
 	return retPositions
 }
@@ -273,7 +273,7 @@ func toGlobalFuturesTicker(stats *futures.PriceChangeStats) types.Ticker {
 		Low:    util.MustParseFloat(stats.LowPrice),
 		// Buy:    util.MustParseFloat(stats.BidPrice),
 		// Sell:   util.MustParseFloat(stats.AskPrice),
-		Time:   time.Unix(0, stats.CloseTime*int64(time.Millisecond)),
+		Time: time.Unix(0, stats.CloseTime*int64(time.Millisecond)),
 	}
 }
 
@@ -399,7 +399,7 @@ func millisecondTime(t int64) time.Time {
 	return time.Unix(0, t*int64(time.Millisecond))
 }
 
-func ToGlobalTrade(t binance.TradeV3, isMargin bool) (*types.Trade, error) {
+func toGlobalTrade(t binance.TradeV3, isMargin bool) (*types.Trade, error) {
 	// skip trade ID that is the same. however this should not happen
 	var side types.SideType
 	if t.IsBuyer {
@@ -452,7 +452,7 @@ func ToGlobalTrade(t binance.TradeV3, isMargin bool) (*types.Trade, error) {
 	}, nil
 }
 
-func ToGlobalFuturesTrade(t futures.AccountTrade) (*types.Trade, error) {
+func toGlobalFuturesTrade(t futures.AccountTrade) (*types.Trade, error) {
 	// skip trade ID that is the same. however this should not happen
 	var side types.SideType
 	if t.Buyer {
@@ -621,7 +621,7 @@ func toGlobalFuturesOrderStatus(orderStatus futures.OrderStatusType) types.Order
 // ConvertTrades converts the binance v3 trade into the global trade type
 func ConvertTrades(remoteTrades []*binance.TradeV3) (trades []types.Trade, err error) {
 	for _, t := range remoteTrades {
-		trade, err := ToGlobalTrade(*t, false)
+		trade, err := toGlobalTrade(*t, false)
 		if err != nil {
 			return nil, errors.Wrapf(err, "binance v3 trade parse error, trade: %+v", *t)
 		}
@@ -635,7 +635,7 @@ func ConvertTrades(remoteTrades []*binance.TradeV3) (trades []types.Trade, err e
 // ConvertTrades converts the futures v3 trade into the global trade type
 func ConvertFuturesTrades(remoteTrades []*futures.AccountTrade) (trades []types.Trade, err error) {
 	for _, t := range remoteTrades {
-		trade, err := ToGlobalFuturesTrade(*t)
+		trade, err := toGlobalFuturesTrade(*t)
 		if err != nil {
 			return nil, errors.Wrapf(err, "futures v3 trade parse error, trade: %+v", *t)
 		}
