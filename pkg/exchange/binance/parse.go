@@ -264,7 +264,7 @@ func ParseEvent(message string) (interface{}, error) {
 	}
 
 	eventType := string(val.GetStringBytes("e"))
-
+	log.Infof("ParseEvent")
 	switch eventType {
 	case "kline":
 		var event KLineEvent

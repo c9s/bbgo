@@ -13,7 +13,8 @@ import (
 type DepthFrame struct {
 	Symbol string
 
-	client  *binance.Client
+	client *binance.Client
+
 	context context.Context
 
 	snapshotMutex sync.Mutex
