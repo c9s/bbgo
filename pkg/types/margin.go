@@ -8,14 +8,23 @@ type FuturesExchange interface {
 
 type FuturesSettings struct {
 	IsFutures bool
+	IsIsolatedFutures     bool
+	IsolatedFuturesSymbol string
+}
+
+func (s FuturesSettings) GetFuturesSettings() FuturesSettings {
+	return s
 }
 
 func (s *FuturesSettings) UseFutures() {
 	s.IsFutures = true
 }
 
-func (s FuturesSettings) GetFuturesSettings() FuturesSettings {
-	return s
+func (s *FuturesSettings) UseIsolatedFutures(symbol string) {
+	s.IsFutures = true
+	s.IsIsolatedFutures = true
+	s.IsolatedFuturesSymbol = symbol
+
 }
 
 
