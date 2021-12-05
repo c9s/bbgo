@@ -3,9 +3,10 @@ package grid
 import (
 	"context"
 	"fmt"
+	"sync"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"sync"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/exchange/max"
@@ -589,6 +590,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.state.ProfitStats.AddTrade(trade)
 	})
 
+	/*
 	if s.TradeService != nil {
 		s.tradeCollector.OnTrade(func(trade types.Trade) {
 			if err := s.TradeService.Mark(ctx, trade.ID, ID); err != nil {
@@ -596,6 +598,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 		})
 	}
+	*/
 
 	s.tradeCollector.OnPositionUpdate(func(position *bbgo.Position) {
 		s.Notifiability.Notify(position)
