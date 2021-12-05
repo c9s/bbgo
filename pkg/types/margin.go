@@ -4,11 +4,12 @@ import "github.com/c9s/bbgo/pkg/fixedpoint"
 
 type FuturesExchange interface {
 	UseFutures()
+	UseIsolatedFutures(symbol string)
 	GetFuturesSettings() FuturesSettings
 }
 
 type FuturesSettings struct {
-	IsFutures bool
+	IsFutures             bool
 	IsIsolatedFutures     bool
 	IsolatedFuturesSymbol string
 }
@@ -48,7 +49,7 @@ func (s *FuturesSettings) UseIsolatedFutures(symbol string) {
 
 // FuturesUserAsset define cross futures account asset
 type FuturesUserAsset struct {
-	Asset                  string `json:"asset"`
+	Asset                  string           `json:"asset"`
 	InitialMargin          fixedpoint.Value `json:"initialMargin"`
 	MaintMargin            fixedpoint.Value `json:"maintMargin"`
 	MarginBalance          fixedpoint.Value `json:"marginBalance"`
@@ -99,7 +100,7 @@ type FuturesUserAsset struct {
 
 // IsolatedFuturesUserAsset define isolated futures account asset
 type IsolatedFuturesUserAsset struct {
-	Asset                  string `json:"asset"`
+	Asset                  string           `json:"asset"`
 	InitialMargin          fixedpoint.Value `json:"initialMargin"`
 	MaintMargin            fixedpoint.Value `json:"maintMargin"`
 	MarginBalance          fixedpoint.Value `json:"marginBalance"`
