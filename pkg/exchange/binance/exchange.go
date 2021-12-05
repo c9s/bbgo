@@ -818,13 +818,15 @@ func (e *Exchange) submitSpotOrder(ctx context.Context, order types.SubmitOrder)
 
 func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error) {
 	for _, order := range orders {
-		if err := orderLimiter.Wait(ctx) ; err != nil {
+		if err := orderLimiter.Wait(ctx); err != nil {
 			log.WithError(err).Errorf("order rate limiter wait error")
 		}
 
 		var createdOrder *types.Order
 		if e.IsMargin {
 			createdOrder, err = e.submitMarginOrder(ctx, order)
+		} else if e.IsFutures {
+			createdOrder, err = e.submitFuturesOrder(ctx, order)
 		} else {
 			createdOrder, err = e.submitSpotOrder(ctx, order)
 		}
