@@ -605,7 +605,7 @@ type ContinuousKLineEvent struct {
 }
 */
 
-type UpdateData struct {
+type PositionUpdate struct {
 	EventReasonType string `json:"m"`
 	Balances    []Balance `json:"B,omitempty"`
 	Positions 	[]types.Position  `json:"P,omitempty"`
@@ -615,7 +615,7 @@ type AccountUpdateEvent struct {
 	EventBase
 	Transaction  int64  `json:"T"`
 
-	UpdateData UpdateData `json:"a"`
+	PositionUpdate PositionUpdate `json:"a"`
 }
 
 // {
@@ -681,64 +681,64 @@ type AccountConfig struct {
 
 type AccountConfigUpdateEvent struct {
 	EventBase
-	Transaction  int64  `json:"T"`
+	Transaction int64 `json:"T"`
 
-	AccountConfig  AccountConfig `json:"ac"`
+	AccountConfig AccountConfig `json:"ac"`
 }
 
 // {
 //     "e":"ACCOUNT_CONFIG_UPDATE",       // Event Type
 //     "E":1611646737479,                 // Event Time
 //     "T":1611646737476,                 // Transaction Time
-//     "ac":{                              
+//     "ac":{
 //     "s":"BTCUSDT",                     // symbol
 //     "l":25                             // leverage
 //     }
-// }  
+// }
 
-
+// Similar to the ExecutionReportEvent's fields. But with totally different json key.
+// e.g., Stop price. So that, we can not merge them.
 type OrderTrade struct {
-	Symbol  			string  `json:"s"`
-	ClientOrderID		string `json:"c"`
-	Side   				string `json:"S"`
-	OrderType         	string `json:"o"`
-	TimeInForce     	string `json:"f"`
-	OriginalQuantity 	string `json:"q"`
-	OriginalPrice      	string `json:"p"`
+	Symbol           string `json:"s"`
+	ClientOrderID    string `json:"c"`
+	Side             string `json:"S"`
+	OrderType        string `json:"o"`
+	TimeInForce      string `json:"f"`
+	OriginalQuantity string `json:"q"`
+	OriginalPrice    string `json:"p"`
 
-	AveragePrice 		string `json:"ap"`
-	StopPrice  			string `json:"sp"`
-	CurrentExecutionType string `json:"x"`   
-	CurrentOrderStatus 	 string `json:"X"`     
-	
-	OrderId 						int64 `json:"i"`
-	OrderLastFilledQuantity			string `json:"l"`
-	OrderFilledAccumulatedQuantity	string `json:"z"`
-	LastFilledPrice 			  	string `json:"L"`
+	AveragePrice         string `json:"ap"`
+	StopPrice            string `json:"sp"`
+	CurrentExecutionType string `json:"x"`
+	CurrentOrderStatus   string `json:"X"`
+
+	OrderId                        int64  `json:"i"`
+	OrderLastFilledQuantity        string `json:"l"`
+	OrderFilledAccumulatedQuantity string `json:"z"`
+	LastFilledPrice                string `json:"L"`
 
 	CommissionAmount string `json:"n"`
 	CommissionAsset  string `json:"N"`
 
-	OrderTradeTime	int64  `json:"T"`
-	TradeId  		int64 `json:"t"`
+	OrderTradeTime int64 `json:"T"`
+	TradeId        int64 `json:"t"`
 
-	BidsNotional  	string `json:"b"`
-	AskNotional  	string `json:"a"`
+	BidsNotional string `json:"b"`
+	AskNotional  string `json:"a"`
 
-	IsMaker 		bool `json:"m"`
-	IsReduceOnly 	bool` json:"r"`
+	IsMaker      bool `json:"m"`
+	IsReduceOnly bool ` json:"r"`
 
-	StopPriceWorkingType 	string `json:"wt"`
-	OriginalOrderType 		string `json:"ot"`
-	PositionSide 	string `json:"ps"`
-	RealizedProfit 	string `json:"rp"`
-
+	StopPriceWorkingType string `json:"wt"`
+	OriginalOrderType    string `json:"ot"`
+	PositionSide         string `json:"ps"`
+	RealizedProfit       string `json:"rp"`
 }
 
 type OrderTradeUpdateEvent struct {
 	EventBase
-	Transaction int64 	`json:"T"`
-	OrderTrade 		OrderTrade	`json:"o"`
+	Transaction int64      `json:"T"`
+	OrderTrade  OrderTrade `json:"o"`
 }
 
 // {
@@ -746,7 +746,7 @@ type OrderTradeUpdateEvent struct {
 // 	"e":"ORDER_TRADE_UPDATE",     // Event Type
 // 	"E":1568879465651,            // Event Time
 // 	"T":1568879465650,            // Transaction Time
-// 	"o":{                             
+// 	"o":{
 // 	  "s":"BTCUSDT",              // Symbol
 // 	  "c":"TEST",                 // Client Order Id
 // 		// special client order id:
