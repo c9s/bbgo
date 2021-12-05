@@ -251,6 +251,10 @@ func (s *Stream) dial(listenKey string) (*websocket.Conn, error) {
 		url = "wss://stream.binance.com:9443/ws/" + listenKey
 	}
 
+	if s.IsFutures {
+		url = "wss://fstream.binance.com/ws/" + listenKey
+	} 
+
 	conn, _, err := defaultDialer.Dial(url, nil)
 	if err != nil {
 		return nil, err
