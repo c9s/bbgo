@@ -64,8 +64,6 @@ func (s *Stream) Connect(ctx context.Context) error {
 				CurrentTime:     s.exchange.startTime,
 				Account:         s.exchange.account,
 				Market:          market,
-				MakerCommission: s.exchange.config.Account.MakerCommission,
-				TakerCommission: s.exchange.config.Account.TakerCommission,
 			}
 			matching.OnTradeUpdate(s.EmitTradeUpdate)
 			matching.OnOrderUpdate(s.EmitOrderUpdate)
