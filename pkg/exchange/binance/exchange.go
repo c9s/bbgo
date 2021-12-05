@@ -275,6 +275,8 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 }
 
 func (e *Exchange) QueryAveragePrice(ctx context.Context, symbol string) (float64, error) {
+	
+	// Spot or Futures
 	resp, err := e.Client.NewAveragePriceService().Symbol(symbol).Do(ctx)
 	if err != nil {
 		return 0, err
@@ -333,6 +335,7 @@ func (e *Exchange) QueryIsolatedMarginAccount(ctx context.Context, symbols ...st
 
 
 func (e *Exchange) Withdrawal(ctx context.Context, asset string, amount fixedpoint.Value, address string, options *types.WithdrawalOptions) error {
+	
 	req := e.Client.NewCreateWithdrawService()
 	req.Coin(asset)
 	req.Address(address)
@@ -377,6 +380,9 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 		}
 
 		req := e.Client.NewListWithdrawsService()
+		
+		
+		
 		if len(asset) > 0 {
 			req.Coin(asset)
 		}
@@ -464,6 +470,9 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 		}
 
 		req := e.Client.NewListDepositsService()
+
+
+
 		if len(asset) > 0 {
 			req.Coin(asset)
 		}
@@ -528,6 +537,55 @@ func (e *Exchange) PlatformFeeCurrency() string {
 }
 
 func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
+	// TODO
+	if e.IsFutures {
+		account, err := e.futuresClient.NewGetAccountService().Do(ctx)
+		if err != nil {
+			return nil, err
+		}
+	
+	// 	var balances = map[string]types.Balance{}
+	// 	for _, b := range account.Balances {
+	// 		balances[b.Asset] = types.Balance{
+	// 			Currency:  b.Asset,
+	// 			Available: fixedpoint.Must(fixedpoint.NewFromString(b.Free)),
+	// 			Locked:    fixedpoint.Must(fixedpoint.NewFromString(b.Locked)),
+	// 		}
+	// 	}
+		var positions = map[string] types.Position{}
+		for _, position := range account.Positions {
+			positions[position.Symbol] = types.Position{
+				Isolated:               position.Isolated,
+				Leverage:               fixedpoint.MustNewFromString(position.Leverage),
+				InitialMargin:          fixedpoint.MustNewFromString(position.InitialMargin),
+				MaintMargin:            fixedpoint.MustNewFromString(position.MaintMargin),
+				OpenOrderInitialMargin: fixedpoint.MustNewFromString(position.OpenOrderInitialMargin),
+				PositionInitialMargin:  fixedpoint.MustNewFromString(position.PositionInitialMargin),
+				Symbol:                 position.Symbol,
+				UnrealizedProfit:       fixedpoint.MustNewFromString(position.UnrealizedProfit),
+				EntryPrice:             fixedpoint.MustNewFromString(position.EntryPrice),
+				MaxNotional:            fixedpoint.MustNewFromString(position.MaxNotional),
+				PositionSide:           string(position.PositionSide),
+				PositionAmt:            fixedpoint.MustNewFromString(position.PositionAmt),
+				Notional:               fixedpoint.MustNewFromString(position.Notional),
+				IsolatedWallet:         fixedpoint.MustNewFromString(position.IsolatedWallet),
+				UpdateTime:             position.UpdateTime,
+			}
+		}
+
+	// 	// binance use 15 -> 0.15%, so we convert it to 0.0015
+	// 	a := &types.Account{
+	// 		MakerCommission: fixedpoint.NewFromFloat(float64(account.MakerCommission) * 0.0001),
+	// 		TakerCommission: fixedpoint.NewFromFloat(float64(account.TakerCommission) * 0.0001),
+	// 	}
+		a := toGlobalFuturesAccount(account)
+	
+		a.UpdatePositions(positions)
+		return a, nil
+	}
+	
+
+
 	account, err := e.Client.NewGetAccountService().Do(ctx)
 	if err != nil {
 		return nil, err
