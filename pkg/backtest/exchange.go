@@ -90,8 +90,8 @@ func NewExchange(sourceName types.ExchangeName, srv *service.BacktestService, co
 	}
 
 	account := &types.Account{
-		MakerCommission: config.Account.MakerCommission,
-		TakerCommission: config.Account.TakerCommission,
+		MakerFeeRate: config.Account.MakerFeeRate,
+		TakerFeeRate: config.Account.TakerFeeRate,
 		AccountType:     "SPOT", // currently not used
 	}
 

@@ -119,6 +119,10 @@ func (t Backtest) ParseStartTime() (time.Time, error) {
 }
 
 type BacktestAccount struct {
+	// TODO: MakerFeeRate should replace the commission fields
+	MakerFeeRate fixedpoint.Value `json:"makerFeeRate"`
+	TakerFeeRate fixedpoint.Value `json:"takerFeeRate"`
+
 	MakerCommission  fixedpoint.Value          `json:"makerCommission"`
 	TakerCommission  fixedpoint.Value          `json:"takerCommission"`
 	BuyerCommission  int                       `json:"buyerCommission"`
