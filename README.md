@@ -118,24 +118,6 @@ To calculate pnl:
 bbgo pnl --exchange binance --asset BTC --since "2019-01-01"
 ```
 
-## Backtesting
-
-To sync remote exchange klines data for backtesting:
-
-```sh
-bbgo backtest --exchange binance -v --sync --sync-only --sync-from 2020-01-01
-```
-
-To run backtest:
-
-```sh
-bbgo backtest --exchange binance --base-asset-baseline
-```
-
-Note on date formats, the following date formats are supported:
-* RFC3339, which looks like `2006-01-02T15:04:05Z07:00`
-* RFC822, which looks like `02 Jan 06 15:04 MST`
-* You can also use `2021-11-26T15:04:56`
 
 ## Advanced Configuration
 
@@ -218,6 +200,10 @@ vim config/buyandhold.yaml
 # run bbgo with the config
 bbgo run --config config/buyandhold.yaml
 ```
+
+## Back-testing
+
+See [Back-testing](./doc/topics/back-testing.md)
 
 ## Adding New Built-in Strategy
 
