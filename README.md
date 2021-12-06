@@ -64,7 +64,7 @@ CGO_ENABLED=1 go get github.com/mattn/go-sqlite3
 Install the bbgo command:
 
 ```sh
-go get -u github.com/c9s/bbgo/cmd/bbgo
+go install github.com/c9s/bbgo/cmd/bbgo@latest
 ```
 
 Add your dotenv file:
