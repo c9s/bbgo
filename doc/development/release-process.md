@@ -1,7 +1,30 @@
 # Release Process
 
-```sh
-make version VERSION=v1.18.2
+## 1. Prepare the release note
+
+You need to prepare the release note for your next release version.
+
+The release notes are placed in the `doc/release` directory.
+
+If your next version is `v1.20.2`, then you should put the release note in the following file:
+
+```
+doc/release/v1.20.2.md
 ```
 
-go to <https://github.com/c9s/bbgo/releases/v1.18.2> to modify the changelog
+## 2. Make the release
+
+Run the following command to create the release:
+
+```sh
+make version VERSION=v1.20.2
+```
+
+The above command wilL:
+
+- Update and compile the migration scripts into go files.
+- Bump the version name in the go code.
+- Run git tag to create the tag.
+- Run git push to push the created tag.
+
+You can go to <https://github.com/c9s/bbgo/releases/v1.20.2> to modify the changelog
