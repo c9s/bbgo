@@ -45,7 +45,7 @@ The following script will help you set up a config file, dotenv file:
 bash <(curl -s https://raw.githubusercontent.com/c9s/bbgo/main/scripts/setup-grid.sh)
 ```
 
-### Install and Run from the One-click Linode StackScript:
+### One-click Linode StackScript:
 
 - BBGO USDT/TWD Market Grid Trading <https://cloud.linode.com/stackscripts/793380>
 - BBGO USDC/TWD Market Grid Trading <https://cloud.linode.com/stackscripts/797776>
@@ -53,19 +53,11 @@ bash <(curl -s https://raw.githubusercontent.com/c9s/bbgo/main/scripts/setup-gri
 - BBGO USDC/USDT Market Grid Trading <https://cloud.linode.com/stackscripts/797777>
 - BBGO Standard Grid Trading <https://cloud.linode.com/stackscripts/795788>
 
-### Install from source
+### Build from source
 
-If you need to use go-sqlite, you will need to enable CGO first:
+See [Build from source](./doc/build-from-source.md)
 
-```
-CGO_ENABLED=1 go get github.com/mattn/go-sqlite3
-```
-
-Install the bbgo command:
-
-```sh
-go install github.com/c9s/bbgo/cmd/bbgo@latest
-```
+## Configuration
 
 Add your dotenv file:
 
