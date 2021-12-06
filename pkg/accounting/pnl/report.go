@@ -23,12 +23,12 @@ type AverageCostPnlReport struct {
 	Profit           fixedpoint.Value   `json:"profit"`
 	NetProfit        fixedpoint.Value   `json:"netProfit"`
 	UnrealizedProfit fixedpoint.Value   `json:"unrealizedProfit"`
-	AverageCost      float64            `json:"averageCost,omitempty"`
+	AverageCost      float64            `json:"averageCost"`
 	BuyVolume        float64            `json:"buyVolume,omitempty"`
 	SellVolume       float64            `json:"sellVolume,omitempty"`
 	FeeInUSD         float64            `json:"feeInUSD,omitempty"`
-	Stock            float64            `json:"stock,omitempty"`
-	CurrencyFees     map[string]float64 `json:"currencyFees,omitempty"`
+	Stock            float64            `json:"stock"`
+	CurrencyFees     map[string]float64 `json:"currencyFees"`
 }
 
 func (report *AverageCostPnlReport) JSON() ([]byte, error) {

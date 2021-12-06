@@ -52,10 +52,10 @@ type Market struct {
 	Symbol      string `json:"symbol"`
 	LocalSymbol string `json:"localSymbol,omitempty" `// LocalSymbol is used for exchange's API
 
-	PricePrecision  int `json:"pricePrecision,omitempty"`
-	VolumePrecision int `json:"volumePrecision,omitempty"`
-	QuoteCurrency   string `json:"quoteCurrency,omitempty"`
-	BaseCurrency    string `json:"baseCurrency,omitempty"`
+	PricePrecision  int `json:"pricePrecision"`
+	VolumePrecision int `json:"volumePrecision"`
+	QuoteCurrency   string `json:"quoteCurrency"`
+	BaseCurrency    string `json:"baseCurrency"`
 
 	// The MIN_NOTIONAL filter defines the minimum notional value allowed for an order on a symbol.
 	// An order's notional value is the price * quantity
