@@ -1,6 +1,6 @@
 ### Setting up Slack Notification
 
-Put your slack bot token in the .env.local file:
+Put your slack bot token in the `.env.local` file:
 
 ```sh
 SLACK_TOKEN=xxoox
