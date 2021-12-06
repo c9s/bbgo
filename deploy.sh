@@ -113,7 +113,7 @@ END
   scp ".systemd.$target.service" "$host:$host_systemd_service_dir/$target.service"
 
   info "reloading systemd daemon..."
-  remote_run "systemctl daemon-reload && systemctl enable $target"
+  remote_run "sudo systemctl daemon-reload && systemctl enable $target"
 fi
 
 info "building binary: $bin_type-$host_os-$host_arch..."
@@ -131,6 +131,6 @@ fi
 
 # link binary and restart the systemd service
 info "linking binary and restarting..."
-ssh $host "(cd $target && ln -sf \$HOME/$host_bin_dir/bbgo-$tag bbgo && systemctl restart $target.service)"
+ssh $host "(cd $target && ln -sf \$HOME/$host_bin_dir/bbgo-$tag bbgo && sudo systemctl restart $target.service)"
 
 info "deployed successfully!"
