@@ -45,7 +45,7 @@ export GOPATH=~/mygo
 
 Then your bbgo will be installed at `~/mygo/bin/bbgo`.
 
-## Alpine
+## Build inside a Alpine container
 
 Starts a docker container with the alpine image:
 
@@ -67,3 +67,5 @@ Your installed bbgo binary will be located in:
 ```
 /root/go/bin/bbgo version
 ```
+
+You can use the above instruction to write your own Dockerfile.
