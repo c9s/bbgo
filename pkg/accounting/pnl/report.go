@@ -26,7 +26,7 @@ type AverageCostPnlReport struct {
 	AverageCost      float64            `json:"averageCost"`
 	BuyVolume        float64            `json:"buyVolume,omitempty"`
 	SellVolume       float64            `json:"sellVolume,omitempty"`
-	FeeInUSD         float64            `json:"feeInUSD,omitempty"`
+	FeeInUSD         float64            `json:"feeInUSD"`
 	Stock            float64            `json:"stock"`
 	CurrencyFees     map[string]float64 `json:"currencyFees"`
 }
