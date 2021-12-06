@@ -10,9 +10,9 @@ Enter the bot username. This should be global unique. e.g., `bbgo_bot_711222333`
 
 Botfather will response your a bot token. *Keep bot token safe*
 
-Set `TELEGRAM_BOT_TOKEN` in the `.env.local` file, e.g.,
+Add `TELEGRAM_BOT_TOKEN` in your `.env.local` file, e.g.,
 
-```sh
+```shell
 TELEGRAM_BOT_TOKEN=347374838:ABFTjfiweajfiawoejfiaojfeijoaef
 ```
 
@@ -23,10 +23,30 @@ you can set `TELEGRAM_AUTH_TOKEN` in the `.env.local` file, e.g.,
 TELEGRAM_BOT_AUTH_TOKEN=itsme55667788
 ```
 
-Run your bbgo,
+Run your bbgo.
 
 Open your Telegram app, search your bot `bbgo_bot_711222333`
 
 Enter `/start` and `/auth {code}`
 
-Done! your notifications will be routed to the telegram chat.
+Done! Your notifications will be routed to the telegram chat.
+
+## Authenticating yourself with OTP
+
+BBGO supports one-time password (OTP) authentication for Telegram, so you can auth yourself by the one-time password.
+
+When you run your bbgo with the telegram token first time, it will generate an otp token in a PNG file (named otp-xxxx.png) and also the console output.
+
+You should store the otp token in a safe place like 1Password.
+
+In order to save the OTP secret persistently, you should configure your BBGO with redis, simply add the following config to your `bbgo.yaml`:
+
+```yaml
+persistence:
+  json:
+    directory: var/data
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    db: 0
+```
