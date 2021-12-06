@@ -18,6 +18,10 @@ A trading bot framework written in Go. The name bbgo comes from the BB8 bot in t
 - Standard indicators (SMA, EMA, BOLL)
 - React-powered Web Dashboard
 
+## Screenshots
+
+![bbgo dashboard](assets/screenshots/dashboard.jpeg) 
+
 ## Supported Exchanges
 
 - MAX Spot Exchange (located in Taiwan)
