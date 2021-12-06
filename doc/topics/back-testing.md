@@ -33,7 +33,8 @@ And then, you can sync remote exchange k-lines (candle bars) data for back-testi
 bbgo backtest --exchange binance -v --sync --sync-only --sync-from 2020-11-01 --config config/grid.yaml
 ```
 
-Note that, you should sync from an earlier date before your startTime, here we sync one month before `2021-01-10`.
+Note that, you should sync from an earlier date before your startTime because some indicator like EMA needs more data to calculate the current EMA value.
+Here we sync one month before `2021-01-10`.
 
 - `--sync` - sync the data to the latest data point before we start the back-test.
 - `--sync-only` - only the back-test data syncing will be executed. do not run back-test.
