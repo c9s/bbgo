@@ -16,6 +16,20 @@ jobs:
         run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
       - name: Checkout code
         uses: actions/checkout@v2
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.16.6
+      - name: Install Node
+        uses: actions/setup-node@v2
+        with:
+          node-version: "16"
+      - name: Build
+        run: |
+          npm install --global yarn
+          (cd frontend && yarn install)
+          make dist VERSION=${{ steps.get_version.outputs.VERSION }}
+        shell: bash
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
@@ -31,20 +45,6 @@ jobs:
             - Second Change
           draft: true
           prerelease: false
-      - name: Install Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: 1.16.6
-      - name: Install Node
-        uses: actions/setup-node@v2
-        with:
-          node-version: "16"
-      - name: Build
-        run: |
-          npm install --global yarn
-          (cd frontend && yarn install)
-          make dist VERSION=${{ steps.get_version.outputs.VERSION }}
-        shell: bash
       - name: Upload slim Linux amd64
         uses: actions/upload-release-asset@v1
         env:
