@@ -6,11 +6,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
-
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/pkg/errors"
 )
 
 // DefaultFeeRate set the fee rate for most cases
@@ -88,8 +86,6 @@ func (m *SimplePriceMatching) CancelOrder(o types.Order) (types.Order, error) {
 	}
 
 	if !found {
-		logrus.Panicf("cancel order failed, order %d not found: %+v", o.OrderID, o)
-
 		return o, fmt.Errorf("cancel order failed, order %d not found: %+v", o.OrderID, o)
 	}
 
