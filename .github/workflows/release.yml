@@ -22,6 +22,7 @@ jobs:
         with:
           tag_name: ${{ github.ref }}
           release_name: BBGO ${{ github.ref }}
+          # body_path: doc/release/${{ github.ref }}.md
           body: |
             TODO: Fill changes in this Release
             - First Change
