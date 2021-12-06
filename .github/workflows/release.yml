@@ -38,11 +38,12 @@ jobs:
         with:
           tag_name: ${{ github.ref }}
           release_name: BBGO ${{ github.ref }}
-          # body_path: doc/release/${{ github.ref }}.md
-          body: |
-            TODO: Fill changes in this Release
-            - First Change
-            - Second Change
+          body_path: doc/release/${{ github.ref }}.md
+          # body: |
+          #   ## Features
+          #   - PR - title
+          #   ## Fixes
+          #   - (commit hash) title
           draft: true
           prerelease: false
       - name: Upload slim Linux amd64
