@@ -27,6 +27,8 @@ func init() {
 	BacktestCmd.Flags().Bool("sync", false, "sync backtest data")
 	BacktestCmd.Flags().Bool("sync-only", false, "sync backtest data only, do not run backtest")
 	BacktestCmd.Flags().String("sync-from", "", "sync backtest data from the given time, which will override the time range in the backtest config")
+	BacktestCmd.Flags().Bool("verify", false, "verify the kline back-test data")
+
 	BacktestCmd.Flags().Bool("base-asset-baseline", false, "use base asset performance as the competitive baseline performance")
 	BacktestCmd.Flags().CountP("verbose", "v", "verbose level")
 	BacktestCmd.Flags().String("config", "config/bbgo.yaml", "strategy config file")
@@ -73,6 +75,7 @@ var BacktestCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
 		jsonOutputEnabled := len(outputDirectory) > 0
 
 		syncOnly, err := cmd.Flags().GetBool("sync-only")
@@ -81,6 +84,11 @@ var BacktestCmd = &cobra.Command{
 		}
 
 		syncFromDateStr, err := cmd.Flags().GetString("sync-from")
+		if err != nil {
+			return err
+		}
+
+		shouldVerify, err := cmd.Flags().GetBool("verify")
 		if err != nil {
 			return err
 		}
@@ -145,7 +153,7 @@ var BacktestCmd = &cobra.Command{
 		environ.BacktestService = backtestService
 
 		if wantSync {
-			var syncFromTime = startTime
+			var syncFromTime time.Time
 
 			// override the sync from time if the option is given
 			if len(syncFromDateStr) > 0 {
@@ -159,61 +167,78 @@ var BacktestCmd = &cobra.Command{
 				}
 			} else {
 				// we need at least 1 month backward data for EMA and last prices
-				syncFromTime = syncFromTime.AddDate(0, -1, 0)
-				log.Infof("adjusted sync start time to %s for backward market data", syncFromTime)
+				syncFromTime = startTime.AddDate(0, -1, 0)
+				log.Infof("adjusted sync start time %s to %s for backward market data", startTime, syncFromTime)
 			}
 
 			log.Info("starting synchronization...")
 			for _, symbol := range userConfig.Backtest.Symbols {
+				firstKLine, err := backtestService.QueryFirstKLine(sourceExchange.Name(), symbol, types.Interval1m)
+				if err != nil {
+					return errors.Wrapf(err, "failed to query backtest kline")
+				}
+
+				// if we don't have klines before the start time endpoint, the back-test will fail.
+				// because the last price will be missing.
+				if syncFromTime.Before(firstKLine.EndTime) {
+					return fmt.Errorf("the sync-from-time you gave %s is earlier than the previous sync entry %s. "+
+						"re-syncing data from the earlier date before your first sync is not support,"+
+						"please clean up the kline table and restart a new sync",
+						syncFromTime,
+						firstKLine.EndTime)
+				}
+
 				if err := backtestService.Sync(ctx, sourceExchange, symbol, syncFromTime); err != nil {
 					return err
 				}
 			}
 			log.Info("synchronization done")
 
-			var corruptCnt = 0
-			for _, symbol := range userConfig.Backtest.Symbols {
-				log.Infof("verifying backtesting data...")
+			if shouldVerify {
+				var corruptCnt = 0
+				for _, symbol := range userConfig.Backtest.Symbols {
+					log.Infof("verifying backtesting data...")
 
-				for interval := range types.SupportedIntervals {
-					log.Infof("verifying %s %s kline data...", symbol, interval)
+					for interval := range types.SupportedIntervals {
+						log.Infof("verifying %s %s kline data...", symbol, interval)
 
-					klineC, errC := backtestService.QueryKLinesCh(startTime, time.Now(), sourceExchange, []string{symbol}, []types.Interval{interval})
-					var emptyKLine types.KLine
-					var prevKLine types.KLine
-					for k := range klineC {
-						if verboseCnt > 1 {
-							fmt.Fprint(os.Stderr, ".")
-						}
-
-						if prevKLine != emptyKLine {
-							if prevKLine.StartTime.Add(interval.Duration()) != k.StartTime {
-								corruptCnt++
-								log.Errorf("found kline data corrupted at time: %s kline: %+v", k.StartTime, k)
-								log.Errorf("between %d and %d",
-									prevKLine.StartTime.Unix(),
-									k.StartTime.Unix())
+						klineC, errC := backtestService.QueryKLinesCh(startTime, time.Now(), sourceExchange, []string{symbol}, []types.Interval{interval})
+						var emptyKLine types.KLine
+						var prevKLine types.KLine
+						for k := range klineC {
+							if verboseCnt > 1 {
+								fmt.Fprint(os.Stderr, ".")
 							}
+
+							if prevKLine != emptyKLine {
+								if prevKLine.StartTime.Add(interval.Duration()) != k.StartTime {
+									corruptCnt++
+									log.Errorf("found kline data corrupted at time: %s kline: %+v", k.StartTime, k)
+									log.Errorf("between %d and %d",
+										prevKLine.StartTime.Unix(),
+										k.StartTime.Unix())
+								}
+							}
+
+							prevKLine = k
 						}
 
-						prevKLine = k
-					}
+						if verboseCnt > 1 {
+							fmt.Fprintln(os.Stderr)
+						}
 
-					if verboseCnt > 1 {
-						fmt.Fprintln(os.Stderr)
-					}
-
-					if err := <-errC; err != nil {
-						return err
+						if err := <-errC; err != nil {
+							return err
+						}
 					}
 				}
-			}
 
-			log.Infof("backtest verification completed")
-			if corruptCnt > 0 {
-				log.Errorf("found %d corruptions", corruptCnt)
-			} else {
-				log.Infof("found %d corruptions", corruptCnt)
+				log.Infof("backtest verification completed")
+				if corruptCnt > 0 {
+					log.Errorf("found %d corruptions", corruptCnt)
+				} else {
+					log.Infof("found %d corruptions", corruptCnt)
+				}
 			}
 
 			if syncOnly {
