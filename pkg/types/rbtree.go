@@ -152,7 +152,6 @@ func (tree *RBTree) Upsert(key, val fixedpoint.Value) {
 		color: Red,
 		left:  neel,
 		right: neel,
-		parent: neel,
 	}
 
 	for x != neel {
