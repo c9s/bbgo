@@ -38,7 +38,7 @@ jobs:
         with:
           tag_name: ${{ github.ref }}
           release_name: BBGO ${{ github.ref }}
-          body_path: doc/release/${{ github.ref }}.md
+          body_path: doc/release/${{ steps.get_version.outputs.VERSION }}.md
           # body: |
           #   ## Features
           #   - PR - title
