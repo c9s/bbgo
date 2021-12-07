@@ -2,6 +2,25 @@
 
 Go to the Go official website to download the Go SDK <https://go.dev/dl/>.
 
+An example installation looks like this:
+
+```shell
+wget https://go.dev/dl/go1.17.4.linux-amd64.tar.gz
+sudo rm -rf /usr/local/go
+sudo tar -C /usr/local -xzf go1.17.4.linux-amd64.tar.gz
+```
+
+Then edit your ~/.profile or ~/.bashrc to have this line at the end:
+
+```shell
+export PATH=$PATH:/usr/local/go/bin
+```
+
+For the changes to be taken into action, you need to log in again, or run:
+
+```shell
+source $HOME/.profile
+```
 
 Make sure your `go` is successfully installed:
 
