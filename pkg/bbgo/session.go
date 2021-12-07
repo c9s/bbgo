@@ -449,7 +449,7 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 		}
 
 		if len(kLines) == 0 {
-			log.Warnf("no kline data for interval %s (end time <= %s)", interval, environ.startTime)
+			log.Warnf("no kline data for %s %s (end time <= %s)", symbol, interval, environ.startTime)
 			continue
 		}
 
