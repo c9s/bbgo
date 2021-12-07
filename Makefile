@@ -126,8 +126,8 @@ pkg/version/version.go: .FORCE
 	bash utils/generate-version-file.sh > $@
 	git commit $@ -m "bump version to $(VERSION)" || true
 
-version: pkg/version/version.go
-	@[[ ! -e doc/release/$(VERSION).md ]] && echo "file doc/release/$(VERSION).md does not exist" && exit 1
+version: pkg/version/version.go migrations
+	[[ -e doc/release/$(VERSION).md ]] || (echo "file doc/release/$(VERSION).md does not exist" ; exit 1)
 	git add -v doc/release/$(VERSION).md && git commit doc/release/$(VERSION).md -m "add release note" || true
 	git tag -f $(VERSION)
 	git push origin $(VERSION)
