@@ -124,6 +124,7 @@ dist: static dist-bbgo-linux dist-bbgo-darwin desktop
 
 pkg/version/version.go: .FORCE
 	bash utils/generate-version-file.sh > $@
+	[[ ! -e doc/release/$(VERSION).md ]] && echo "file doc/release/$(VERSION).md does not exist" && exit 1
 
 version: pkg/version/version.go migrations
 	git commit $< -m "bump version to $(VERSION)" || true
