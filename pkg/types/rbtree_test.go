@@ -20,8 +20,8 @@ func TestRBTree_InsertAndDelete(t *testing.T) {
 	tree.Insert(fixedpoint.NewFromInt(13), 13)
 
 	node = tree.Rightmost()
-	assert.Equal(t, fixedpoint.NewFromInt(13), node.Key)
-	assert.Equal(t, fixedpoint.Value(13), node.Value)
+	assert.Equal(t, fixedpoint.NewFromInt(13), node.key)
+	assert.Equal(t, fixedpoint.Value(13), node.value)
 
 	ok := tree.Delete(fixedpoint.NewFromInt(12))
 	assert.True(t, ok, "should delete the node successfully")
@@ -34,13 +34,13 @@ func TestRBTree_Rightmost(t *testing.T) {
 
 	tree.Insert(10, 10)
 	node = tree.Rightmost()
-	assert.Equal(t, fixedpoint.Value(10), node.Key)
-	assert.Equal(t, fixedpoint.Value(10), node.Value)
+	assert.Equal(t, fixedpoint.Value(10), node.key)
+	assert.Equal(t, fixedpoint.Value(10), node.value)
 
 	tree.Insert(12, 12)
 	tree.Insert(9, 9)
 	node = tree.Rightmost()
-	assert.Equal(t, fixedpoint.Value(12), node.Key)
+	assert.Equal(t, fixedpoint.Value(12), node.key)
 }
 
 func TestRBTree_RandomInsertSearchAndDelete(t *testing.T) {
@@ -97,18 +97,18 @@ func TestTree_Copy(t *testing.T) {
 	newTree := tree.Copy()
 	node1 := newTree.Search(fixedpoint.NewFromFloat(2000.0))
 	assert.NotNil(t, node1)
-	assert.Equal(t, fixedpoint.NewFromFloat(2000.0), node1.Key)
-	assert.Equal(t, fixedpoint.NewFromFloat(3.0), node1.Value)
+	assert.Equal(t, fixedpoint.NewFromFloat(2000.0), node1.key)
+	assert.Equal(t, fixedpoint.NewFromFloat(3.0), node1.value)
 
 	node2 := newTree.Search(fixedpoint.NewFromFloat(3000.0))
 	assert.NotNil(t, node2)
-	assert.Equal(t, fixedpoint.NewFromFloat(3000.0), node2.Key)
-	assert.Equal(t, fixedpoint.NewFromFloat(1.0), node2.Value)
+	assert.Equal(t, fixedpoint.NewFromFloat(3000.0), node2.key)
+	assert.Equal(t, fixedpoint.NewFromFloat(1.0), node2.value)
 
 	node3 := newTree.Search(fixedpoint.NewFromFloat(4000.0))
 	assert.NotNil(t, node3)
-	assert.Equal(t, fixedpoint.NewFromFloat(4000.0), node3.Key)
-	assert.Equal(t, fixedpoint.NewFromFloat(2.0), node3.Value)
+	assert.Equal(t, fixedpoint.NewFromFloat(4000.0), node3.key)
+	assert.Equal(t, fixedpoint.NewFromFloat(2.0), node3.value)
 }
 
 func TestTree(t *testing.T) {
@@ -120,14 +120,14 @@ func TestTree(t *testing.T) {
 	tree.Insert(fixedpoint.NewFromFloat(2000.0), fixedpoint.NewFromFloat(10.0))
 
 	// root is always black
-	assert.Equal(t, fixedpoint.NewFromFloat(3000.0), tree.Root.Key)
-	assert.Equal(t, Black, tree.Root.Color)
+	assert.Equal(t, fixedpoint.NewFromFloat(3000.0), tree.Root.key)
+	assert.Equal(t, Black, tree.Root.color)
 
-	assert.Equal(t, fixedpoint.NewFromFloat(2000.0), tree.Root.Left.Key)
-	assert.Equal(t, Red, tree.Root.Left.Color)
+	assert.Equal(t, fixedpoint.NewFromFloat(2000.0), tree.Root.left.key)
+	assert.Equal(t, Red, tree.Root.left.color)
 
-	assert.Equal(t, fixedpoint.NewFromFloat(4000.0), tree.Root.Right.Key)
-	assert.Equal(t, Red, tree.Root.Right.Color)
+	assert.Equal(t, fixedpoint.NewFromFloat(4000.0), tree.Root.right.key)
+	assert.Equal(t, Red, tree.Root.right.color)
 
 	// should rotate
 	tree.Insert(fixedpoint.NewFromFloat(1500.0), fixedpoint.NewFromFloat(10.0))
