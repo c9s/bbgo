@@ -127,7 +127,7 @@ pkg/version/version.go: .FORCE
 
 version: pkg/version/version.go migrations
 	@[[ ! -e doc/release/$(VERSION).md ]] && echo "file doc/release/$(VERSION).md does not exist" && exit 1
-	git add -v doc/release/$(VERSION).md
+	git add -v doc/release/$(VERSION).md || true
 	git commit $< -m "bump version to $(VERSION)" || true
 	git tag -f $(VERSION)
 	git push origin $(VERSION)
