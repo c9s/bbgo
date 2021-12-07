@@ -183,7 +183,7 @@ var BacktestCmd = &cobra.Command{
 					var prevKLine types.KLine
 					for k := range klineC {
 						if verboseCnt > 1 {
-							fmt.Print(".")
+							fmt.Fprint(os.Stderr, ".")
 						}
 
 						if prevKLine != emptyKLine {
@@ -200,7 +200,7 @@ var BacktestCmd = &cobra.Command{
 					}
 
 					if verboseCnt > 1 {
-						fmt.Println()
+						fmt.Fprintln(os.Stderr)
 					}
 
 					if err := <-errC; err != nil {
