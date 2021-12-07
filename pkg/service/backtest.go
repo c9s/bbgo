@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,13 +21,13 @@ type BacktestService struct {
 func (s *BacktestService) SyncKLineByInterval(ctx context.Context, exchange types.Exchange, symbol string, interval types.Interval, startTime, endTime time.Time) error {
 	log.Infof("synchronizing lastKLine for interval %s from exchange %s", interval, exchange.Name())
 
-	lastKLine, err := s.QueryLast(exchange.Name(), symbol, interval)
+	lastKLine, err := s.QueryKLine(exchange.Name(), symbol, interval, "DESC", 1)
 	if err != nil {
 		return err
 	}
 
 	if lastKLine != nil {
-		log.Infof("found last checkpoint %s", lastKLine.EndTime)
+		log.Infof("found the last %s kline data checkpoint %s", symbol, lastKLine.EndTime)
 		startTime = lastKLine.StartTime.Add(time.Minute)
 	}
 
@@ -59,12 +60,21 @@ func (s *BacktestService) Sync(ctx context.Context, exchange types.Exchange, sym
 	return nil
 }
 
-// QueryLast queries the last order from the database
-func (s *BacktestService) QueryLast(ex types.ExchangeName, symbol string, interval types.Interval) (*types.KLine, error) {
+func (s *BacktestService) QueryFirstKLine(ex types.ExchangeName, symbol string, interval types.Interval) (*types.KLine, error) {
+	return s.QueryKLine(ex, symbol, interval, "ASC", 1)
+}
+
+// QueryLastKLine queries the last kline from the database
+func (s *BacktestService) QueryLastKLine(ex types.ExchangeName, symbol string, interval types.Interval) (*types.KLine, error) {
+	return s.QueryKLine(ex, symbol, interval, "DESC", 1)
+}
+
+// QueryKLine queries the klines from the database
+func (s *BacktestService) QueryKLine(ex types.ExchangeName, symbol string, interval types.Interval, orderBy string, limit int) (*types.KLine, error) {
 	log.Infof("querying last kline exchange = %s AND symbol = %s AND interval = %s", ex, symbol, interval)
 
 	// make the SQL syntax IDE friendly, so that it can analyze it.
-	sql := "SELECT * FROM binance_klines WHERE  `symbol` = :symbol AND `interval` = :interval ORDER BY end_time DESC LIMIT 1"
+	sql := "SELECT * FROM binance_klines WHERE  `symbol` = :symbol AND `interval` = :interval ORDER BY end_time " + orderBy + " LIMIT " + strconv.Itoa(limit)
 	sql = strings.ReplaceAll(sql, "binance_klines", ex.String()+"_klines")
 
 	rows, err := s.DB.NamedQuery(sql, map[string]interface{}{
@@ -74,7 +84,7 @@ func (s *BacktestService) QueryLast(ex types.ExchangeName, symbol string, interv
 	})
 
 	if err != nil {
-		return nil, errors.Wrap(err, "query last order error")
+		return nil, errors.Wrap(err, "query kline error")
 	}
 
 	if rows.Err() != nil {
