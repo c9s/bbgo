@@ -16,7 +16,7 @@ A red node always has black children.
 A black node may have red or black children
 */
 type RBNode struct {
-	Left, Right, Parent *RBNode
-	Color               Color
-	Key, Value          fixedpoint.Value
+	left, right, parent *RBNode
+	color      Color
+	key, value fixedpoint.Value
 }

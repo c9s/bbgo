@@ -28,7 +28,7 @@ func NewRBOrderBook(symbol string) *RBTOrderBook {
 func (b *RBTOrderBook) BestBid() (PriceVolume, bool) {
 	right := b.Bids.Rightmost()
 	if right != nil {
-		return PriceVolume{Price: right.Key, Volume: right.Value}, true
+		return PriceVolume{Price: right.key, Volume: right.value}, true
 	}
 
 	return PriceVolume{}, false
@@ -37,7 +37,7 @@ func (b *RBTOrderBook) BestBid() (PriceVolume, bool) {
 func (b *RBTOrderBook) BestAsk() (PriceVolume, bool) {
 	left := b.Asks.Leftmost()
 	if left != nil {
-		return PriceVolume{Price: left.Key, Volume: left.Value}, true
+		return PriceVolume{Price: left.key, Volume: left.value}, true
 	}
 
 	return PriceVolume{}, false
@@ -141,8 +141,8 @@ func (b *RBTOrderBook) convertTreeToPriceVolumeSlice(tree *RBTree, limit int, de
 	if descending {
 		tree.InorderReverse(func(n *RBNode) bool {
 			pvs = append(pvs, PriceVolume{
-				Price:  n.Key,
-				Volume: n.Value,
+				Price:  n.key,
+				Volume: n.value,
 			})
 
 			return !(limit > 0 && len(pvs) >= limit)
@@ -153,8 +153,8 @@ func (b *RBTOrderBook) convertTreeToPriceVolumeSlice(tree *RBTree, limit int, de
 
 	tree.Inorder(func(n *RBNode) bool {
 		pvs = append(pvs, PriceVolume{
-			Price:  n.Key,
-			Volume: n.Value,
+			Price:  n.key,
+			Volume: n.value,
 		})
 
 		return !(limit > 0 && len(pvs) >= limit)
@@ -178,12 +178,12 @@ func (b *RBTOrderBook) SideBook(sideType SideType) PriceVolumeSlice {
 
 func (b *RBTOrderBook) Print() {
 	b.Asks.Inorder(func(n *RBNode) bool {
-		fmt.Printf("ask: %f x %f", n.Key.Float64(), n.Value.Float64())
+		fmt.Printf("ask: %f x %f", n.key.Float64(), n.value.Float64())
 		return true
 	})
 
 	b.Bids.InorderReverse(func(n *RBNode) bool {
-		fmt.Printf("bid: %f x %f", n.Key.Float64(), n.Value.Float64())
+		fmt.Printf("bid: %f x %f", n.key.Float64(), n.value.Float64())
 		return true
 	})
 }

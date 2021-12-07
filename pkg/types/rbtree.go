@@ -14,11 +14,11 @@ type RBTree struct {
 
 func NewRBTree() *RBTree {
 	var neel = &RBNode{
-		Color: Black,
+		color: Black,
 	}
 
 	var root = neel
-	root.Parent = neel
+	root.parent = neel
 
 	return &RBTree{
 		Root: root,
@@ -40,7 +40,7 @@ func (tree *RBTree) Delete(key fixedpoint.Value) bool {
 
 	// the deleting node has only one child, it's easy,
 	// we just connect the child the parent of the deleting node
-	if deleting.Left == tree.neel || deleting.Right == tree.neel {
+	if deleting.left == tree.neel || deleting.right == tree.neel {
 		y = deleting
 		// fmt.Printf("y = deleting = %+v\n", y)
 	} else {
@@ -51,31 +51,31 @@ func (tree *RBTree) Delete(key fixedpoint.Value) bool {
 		// fmt.Printf("y = successor = %+v\n", y)
 	}
 
-	// y.Left or y.Right could be neel
-	if y.Left != tree.neel {
-		x = y.Left
+	// y.left or y.right could be neel
+	if y.left != tree.neel {
+		x = y.left
 	} else {
-		x = y.Right
+		x = y.right
 	}
 
 	// fmt.Printf("x = %+v\n", y)
-	x.Parent = y.Parent
+	x.parent = y.parent
 
-	if y.Parent == tree.neel {
+	if y.parent == tree.neel {
 		tree.Root = x
-	} else if y == y.Parent.Left {
-		y.Parent.Left = x
+	} else if y == y.parent.left {
+		y.parent.left = x
 	} else {
-		y.Parent.Right = x
+		y.parent.right = x
 	}
 
 	// copy the data from the successor to the memory location of the deleting node
 	if y != deleting {
-		deleting.Key = y.Key
-		deleting.Value = y.Value
+		deleting.key = y.key
+		deleting.value = y.value
 	}
 
-	if y.Color == Black {
+	if y.color == Black {
 		tree.DeleteFixup(x)
 	}
 
@@ -85,105 +85,104 @@ func (tree *RBTree) Delete(key fixedpoint.Value) bool {
 }
 
 func (tree *RBTree) DeleteFixup(current *RBNode) {
-	for current != tree.Root && current.Color == Black {
-		if current == current.Parent.Left {
-			sibling := current.Parent.Right
-			if sibling.Color == Red {
-				sibling.Color = Black
-				current.Parent.Color = Red
-				tree.RotateLeft(current.Parent)
-				sibling = current.Parent.Right
+	for current != tree.Root && current.color == Black {
+		if current == current.parent.left {
+			sibling := current.parent.right
+			if sibling.color == Red {
+				sibling.color = Black
+				current.parent.color = Red
+				tree.RotateLeft(current.parent)
+				sibling = current.parent.right
 			}
 
 			// if both are black nodes
-			if sibling.Left.Color == Black && sibling.Right.Color == Black {
-				sibling.Color = Red
-				current = current.Parent
+			if sibling.left.color == Black && sibling.right.color == Black {
+				sibling.color = Red
+				current = current.parent
 			} else {
 				// only one of the child is black
-				if sibling.Right.Color == Black {
-					sibling.Left.Color = Black
-					sibling.Color = Red
+				if sibling.right.color == Black {
+					sibling.left.color = Black
+					sibling.color = Red
 					tree.RotateRight(sibling)
-					sibling = current.Parent.Right
+					sibling = current.parent.right
 				}
 
-				sibling.Color = current.Parent.Color
-				current.Parent.Color = Black
-				sibling.Right.Color = Black
-				tree.RotateLeft(current.Parent)
+				sibling.color = current.parent.color
+				current.parent.color = Black
+				sibling.right.color = Black
+				tree.RotateLeft(current.parent)
 				current = tree.Root
 			}
 		} else { // if current is right child
-			sibling := current.Parent.Left
-			if sibling.Color == Red {
-				sibling.Color = Black
-				current.Parent.Color = Red
-				tree.RotateRight(current.Parent)
-				sibling = current.Parent.Left
+			sibling := current.parent.left
+			if sibling.color == Red {
+				sibling.color = Black
+				current.parent.color = Red
+				tree.RotateRight(current.parent)
+				sibling = current.parent.left
 			}
 
-			if sibling.Left.Color == Black && sibling.Right.Color == Black {
-				sibling.Color = Red
-				current = current.Parent
+			if sibling.left.color == Black && sibling.right.color == Black {
+				sibling.color = Red
+				current = current.parent
 			} else { // if only one of child is Black
 
 				// the left child of sibling is black, and right child is red
-				if sibling.Left.Color == Black {
-					sibling.Right.Color = Black
-					sibling.Color = Red
+				if sibling.left.color == Black {
+					sibling.right.color = Black
+					sibling.color = Red
 					tree.RotateLeft(sibling)
-					sibling = current.Parent.Left
+					sibling = current.parent.left
 				}
 
-				sibling.Color = current.Parent.Color
-				current.Parent.Color = Black
-				sibling.Left.Color = Black
-				tree.RotateRight(current.Parent)
+				sibling.color = current.parent.color
+				current.parent.color = Black
+				sibling.left.color = Black
+				tree.RotateRight(current.parent)
 				current = tree.Root
 			}
 		}
 	}
 
-	current.Color = Black
+	current.color = Black
 }
 
 func (tree *RBTree) Upsert(key, val fixedpoint.Value) {
 	var y = tree.neel
 	var x = tree.Root
 	var node = &RBNode{
-		Key:   key,
-		Value: val,
-		Color: Red,
+		key:   key,
+		value: val,
+		color: Red,
+		left:  tree.neel,
+		right: tree.neel,
+		parent: tree.neel,
 	}
 
 	for x != tree.neel {
 		y = x
 
-		if node.Key == x.Key {
+		if node.key == x.key {
 			// found node, skip insert and fix
-			x.Value = val
+			x.value = val
 			return
-		} else if node.Key < x.Key {
-			x = x.Left
+		} else if node.key < x.key {
+			x = x.left
 		} else {
-			x = x.Right
+			x = x.right
 		}
 	}
 
-	node.Parent = y
+	node.parent = y
 
 	if y == tree.neel {
 		tree.Root = node
-	} else if node.Key < y.Key {
-		y.Left = node
+	} else if node.key < y.key {
+		y.left = node
 	} else {
-		y.Right = node
+		y.right = node
 	}
-
-	node.Left = tree.neel
-	node.Right = tree.neel
-	node.Color = Red
 
 	tree.InsertFixup(node)
 }
@@ -192,48 +191,44 @@ func (tree *RBTree) Insert(key, val fixedpoint.Value) {
 	var y = tree.neel
 	var x = tree.Root
 	var node = &RBNode{
-		Key:   key,
-		Value: val,
-		Color: Red,
-		Left:  tree.neel,
-		Right: tree.neel,
+		key:   key,
+		value: val,
+		color: Red,
+		left:  tree.neel,
+		right: tree.neel,
 	}
 
 	for x != tree.neel {
 		y = x
 
-		if node.Key < x.Key {
-			x = x.Left
+		if node.key < x.key {
+			x = x.left
 		} else {
-			x = x.Right
+			x = x.right
 		}
 	}
 
-	node.Parent = y
+	node.parent = y
 
 	if y == tree.neel {
 		tree.Root = node
-	} else if node.Key < y.Key {
-		y.Left = node
+	} else if node.key < y.key {
+		y.left = node
 	} else {
-		y.Right = node
+		y.right = node
 	}
 
-	node.Left = tree.neel
-	node.Right = tree.neel
-	node.Color = Red
 	tree.size++
-
 	tree.InsertFixup(node)
 }
 
 func (tree *RBTree) Search(key fixedpoint.Value) *RBNode {
 	var current = tree.Root
-	for current != tree.neel && key != current.Key {
-		if key < current.Key {
-			current = current.Left
+	for current != tree.neel && key != current.key {
+		if key < current.key {
+			current = current.left
 		} else {
-			current = current.Right
+			current = current.right
 		}
 	}
 
@@ -250,46 +245,46 @@ func (tree *RBTree) Size() int {
 
 func (tree *RBTree) InsertFixup(current *RBNode) {
 	// A red node can't have a red parent, we need to fix it up
-	for current.Parent.Color == Red {
-		if current.Parent == current.Parent.Parent.Left {
-			uncle := current.Parent.Parent.Right
-			if uncle.Color == Red {
-				current.Parent.Color = Black
-				uncle.Color = Black
-				current.Parent.Parent.Color = Red
-				current = current.Parent.Parent
+	for current.parent.color == Red {
+		if current.parent == current.parent.parent.left {
+			uncle := current.parent.parent.right
+			if uncle.color == Red {
+				current.parent.color = Black
+				uncle.color = Black
+				current.parent.parent.color = Red
+				current = current.parent.parent
 			} else { // if uncle is black
-				if current == current.Parent.Right {
-					current = current.Parent
+				if current == current.parent.right {
+					current = current.parent
 					tree.RotateLeft(current)
 				}
 
-				current.Parent.Color = Black
-				current.Parent.Parent.Color = Red
-				tree.RotateRight(current.Parent.Parent)
+				current.parent.color = Black
+				current.parent.parent.color = Red
+				tree.RotateRight(current.parent.parent)
 			}
 		} else {
-			uncle := current.Parent.Parent.Left
-			if uncle.Color == Red {
-				current.Parent.Color = Black
-				uncle.Color = Black
-				current.Parent.Parent.Color = Red
-				current = current.Parent.Parent
+			uncle := current.parent.parent.left
+			if uncle.color == Red {
+				current.parent.color = Black
+				uncle.color = Black
+				current.parent.parent.color = Red
+				current = current.parent.parent
 			} else {
-				if current == current.Parent.Left {
-					current = current.Parent
+				if current == current.parent.left {
+					current = current.parent
 					tree.RotateRight(current)
 				}
 
-				current.Parent.Color = Black
-				current.Parent.Parent.Color = Red
-				tree.RotateLeft(current.Parent.Parent)
+				current.parent.color = Black
+				current.parent.parent.color = Red
+				tree.RotateLeft(current.parent.parent)
 			}
 		}
 	}
 
 	// ensure that root is black
-	tree.Root.Color = Black
+	tree.Root.color = Black
 }
 
 // RotateLeft
@@ -299,47 +294,47 @@ func (tree *RBTree) InsertFixup(current *RBNode) {
 // 2. change y's parent to x's parent
 // 3. change x's parent to y
 func (tree *RBTree) RotateLeft(x *RBNode) {
-	var y = x.Right
-	x.Right = y.Left
+	var y = x.right
+	x.right = y.left
 
-	if y.Left != tree.neel {
-		y.Left.Parent = x
+	if y.left != tree.neel {
+		y.left.parent = x
 	}
 
-	y.Parent = x.Parent
+	y.parent = x.parent
 
-	if x.Parent == tree.neel {
+	if x.parent == tree.neel {
 		tree.Root = y
-	} else if x == x.Parent.Left {
-		x.Parent.Left = y
+	} else if x == x.parent.left {
+		x.parent.left = y
 	} else {
-		x.Parent.Right = y
+		x.parent.right = y
 	}
 
-	y.Left = x
-	x.Parent = y
+	y.left = x
+	x.parent = y
 }
 
 func (tree *RBTree) RotateRight(y *RBNode) {
-	x := y.Left
-	y.Left = x.Right
+	x := y.left
+	y.left = x.right
 
-	if x.Right != tree.neel {
-		x.Right.Parent = y
+	if x.right != tree.neel {
+		x.right.parent = y
 	}
 
-	x.Parent = y.Parent
+	x.parent = y.parent
 
-	if y.Parent == tree.neel {
+	if y.parent == tree.neel {
 		tree.Root = x
-	} else if y == y.Parent.Left {
-		y.Parent.Left = x
+	} else if y == y.parent.left {
+		y.parent.left = x
 	} else {
-		y.Parent.Right = x
+		y.parent.right = x
 	}
 
-	x.Right = y
-	y.Parent = x
+	x.right = y
+	y.parent = x
 }
 
 func (tree *RBTree) Rightmost() *RBNode {
@@ -351,8 +346,8 @@ func (tree *RBTree) RightmostOf(current *RBNode) *RBNode {
 		return nil
 	}
 
-	for current.Right != tree.neel && current.Right != nil {
-		current = current.Right
+	for current.right != tree.neel && current.right != nil {
+		current = current.right
 	}
 
 	if current == tree.neel {
@@ -371,8 +366,8 @@ func (tree *RBTree) LeftmostOf(current *RBNode) *RBNode {
 		return nil
 	}
 
-	for current.Left != tree.neel && current.Left != nil {
-		current = current.Left
+	for current.left != tree.neel && current.left != nil {
+		current = current.left
 	}
 
 	if current == tree.neel {
@@ -383,14 +378,14 @@ func (tree *RBTree) LeftmostOf(current *RBNode) *RBNode {
 }
 
 func (tree *RBTree) Successor(current *RBNode) *RBNode {
-	if current.Right != tree.neel {
-		return tree.LeftmostOf(current.Right)
+	if current.right != tree.neel {
+		return tree.LeftmostOf(current.right)
 	}
 
-	var newNode = current.Parent
-	for newNode != tree.neel && current == newNode.Right {
+	var newNode = current.parent
+	for newNode != tree.neel && current == newNode.right {
 		current = newNode
-		newNode = newNode.Parent
+		newNode = newNode.parent
 	}
 
 	return newNode
@@ -403,8 +398,8 @@ func (tree *RBTree) Preorder(cb func(n *RBNode)) {
 func (tree *RBTree) PreorderOf(current *RBNode, cb func(n *RBNode)) {
 	if current != tree.neel && current != nil {
 		cb(current)
-		tree.PreorderOf(current.Left, cb)
-		tree.PreorderOf(current.Right, cb)
+		tree.PreorderOf(current.left, cb)
+		tree.PreorderOf(current.right, cb)
 	}
 }
 
@@ -415,11 +410,11 @@ func (tree *RBTree) Inorder(cb func(n *RBNode) bool) {
 
 func (tree *RBTree) InorderOf(current *RBNode, cb func(n *RBNode) bool) {
 	if current != tree.neel && current != nil {
-		tree.InorderOf(current.Left, cb)
+		tree.InorderOf(current.left, cb)
 		if !cb(current) {
 			return
 		}
-		tree.InorderOf(current.Right, cb)
+		tree.InorderOf(current.right, cb)
 	}
 }
 
@@ -430,11 +425,11 @@ func (tree *RBTree) InorderReverse(cb func(n *RBNode) bool) {
 
 func (tree *RBTree) InorderReverseOf(current *RBNode, cb func(n *RBNode) bool) {
 	if current != tree.neel && current != nil {
-		tree.InorderReverseOf(current.Right, cb)
+		tree.InorderReverseOf(current.right, cb)
 		if !cb(current) {
 			return
 		}
-		tree.InorderReverseOf(current.Left, cb)
+		tree.InorderReverseOf(current.left, cb)
 	}
 }
 
@@ -444,8 +439,8 @@ func (tree *RBTree) Postorder(cb func(n *RBNode) bool) {
 
 func (tree *RBTree) PostorderOf(current *RBNode, cb func(n *RBNode) bool) {
 	if current != tree.neel && current != nil {
-		tree.PostorderOf(current.Left, cb)
-		tree.PostorderOf(current.Right, cb)
+		tree.PostorderOf(current.left, cb)
+		tree.PostorderOf(current.right, cb)
 		if !cb(current) {
 			return
 		}
@@ -458,8 +453,8 @@ func (tree *RBTree) copyNode(node, neel *RBNode) *RBNode {
 	}
 
 	newNode := *node
-	newNode.Left = tree.copyNode(node.Left, neel)
-	newNode.Right = tree.copyNode(node.Right, neel)
+	newNode.left = tree.copyNode(node.left, neel)
+	newNode.right = tree.copyNode(node.right, neel)
 	return &newNode
 }
 
@@ -471,7 +466,7 @@ func (tree *RBTree) CopyInorderReverse(limit int) *RBTree {
 			return false
 		}
 
-		newTree.Insert(n.Key, n.Value)
+		newTree.Insert(n.key, n.value)
 		cnt++
 		return true
 	})
@@ -486,7 +481,7 @@ func (tree *RBTree) CopyInorder(limit int) *RBTree {
 			return false
 		}
 
-		newTree.Insert(n.Key, n.Value)
+		newTree.Insert(n.key, n.value)
 		cnt++
 		return true
 	})
@@ -496,7 +491,7 @@ func (tree *RBTree) CopyInorder(limit int) *RBTree {
 
 func (tree *RBTree) Print() {
 	tree.Inorder(func(n *RBNode) bool {
-		fmt.Printf("%f -> %f\n", n.Key.Float64(), n.Value.Float64())
+		fmt.Printf("%f -> %f\n", n.key.Float64(), n.value.Float64())
 		return true
 	})
 }
