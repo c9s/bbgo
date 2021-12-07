@@ -180,7 +180,7 @@ var BacktestCmd = &cobra.Command{
 
 				// if we don't have klines before the start time endpoint, the back-test will fail.
 				// because the last price will be missing.
-				if syncFromTime.Before(firstKLine.EndTime) {
+				if firstKLine != nil && syncFromTime.Before(firstKLine.EndTime) {
 					return fmt.Errorf("the sync-from-time you gave %s is earlier than the previous sync-start-time %s. "+
 						"re-syncing data from the earlier date before your first sync is not support,"+
 						"please clean up the kline table and restart a new sync",
