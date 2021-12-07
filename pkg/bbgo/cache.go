@@ -62,7 +62,15 @@ func WithCache(key string, obj interface{}, fetcher DataFetcher) error {
 }
 
 func LoadExchangeMarketsWithCache(ctx context.Context, ex types.Exchange) (markets types.MarketMap, err error) {
-	err = WithCache(fmt.Sprintf("%s-markets", ex.Name()), &markets, func() (interface{}, error) {
+	key := fmt.Sprintf("%s-markets", ex.Name())
+	if futureExchange, implemented := ex.(types.FuturesExchange) ; implemented {
+		settings := futureExchange.GetFuturesSettings()
+		if settings.IsFutures {
+			key = fmt.Sprintf("%s-futures-markets", ex.Name())
+		}
+	}
+
+	err = WithCache(key, &markets, func() (interface{}, error) {
 		return ex.QueryMarkets(ctx)
 	})
 	return markets, err
