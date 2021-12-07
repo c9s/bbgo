@@ -18,7 +18,7 @@ CGO_ENABLED=1 go get github.com/mattn/go-sqlite3
 Install bbgo:
 
 ```sh
-go install github.com/c9s/bbgo/cmd/bbgo@latest
+go install -x github.com/c9s/bbgo/cmd/bbgo@main
 ```
 
 Your binary will be installed into the default GOPATH `~/go/bin`.
