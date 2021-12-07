@@ -51,7 +51,7 @@ bbgo backtest --exchange binance --base-asset-baseline --config config/grid.yaml
 If you're developing a strategy, you might want to start with a command like this:
 
 ```shell
-godotenv -f .env.local -- go run ./cmd/bbgo backtest --exchange max --sync-from 2020-11-01 --config config/grid.yaml --base-asset-baseline
+godotenv -f .env.local -- go run ./cmd/bbgo backtest --exchange binance --config config/grid.yaml --base-asset-baseline
 ```
 
 ## See Also
