@@ -126,8 +126,8 @@ func (s *Strategy) Validate() error {
 		return fmt.Errorf("profit spread should bigger than 0")
 	}
 
-	if s.Quantity == 0 && s.QuantityScale == nil {
-		return fmt.Errorf("quantity or scaleQuantity can not be zero")
+	if s.Quantity == 0 && s.QuantityScale == nil && s.FixedAmount == 0 {
+		return fmt.Errorf("amount, quantity or scaleQuantity can not be zero")
 	}
 
 	return nil
