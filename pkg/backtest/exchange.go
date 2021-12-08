@@ -33,6 +33,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/c9s/bbgo/pkg/exchange/ftx"
+	"github.com/c9s/bbgo/pkg/exchange/okex"
 	"github.com/pkg/errors"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -313,6 +315,10 @@ func newPublicExchange(sourceExchange types.ExchangeName) (types.Exchange, error
 		return binance.New("", ""), nil
 	case types.ExchangeMax:
 		return max.New("", ""), nil
+	case types.ExchangeFTX:
+		return ftx.NewExchange("", "", ""), nil
+	case types.ExchangeOKEx:
+		return okex.New("", "", ""), nil
 	}
 
 	return nil, fmt.Errorf("exchange %s is not supported", sourceExchange)
