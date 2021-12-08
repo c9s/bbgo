@@ -9,9 +9,8 @@ import (
 	"path"
 	"reflect"
 
-	"github.com/pkg/errors"
-
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/pkg/errors"
 )
 
 type DataFetcher func() (interface{}, error)
@@ -63,7 +62,7 @@ func WithCache(key string, obj interface{}, fetcher DataFetcher) error {
 
 func LoadExchangeMarketsWithCache(ctx context.Context, ex types.Exchange) (markets types.MarketMap, err error) {
 	key := fmt.Sprintf("%s-markets", ex.Name())
-	if futureExchange, implemented := ex.(types.FuturesExchange) ; implemented {
+	if futureExchange, implemented := ex.(types.FuturesExchange); implemented {
 		settings := futureExchange.GetFuturesSettings()
 		if settings.IsFutures {
 			key = fmt.Sprintf("%s-futures-markets", ex.Name())
@@ -75,4 +74,3 @@ func LoadExchangeMarketsWithCache(ctx context.Context, ex types.Exchange) (marke
 	})
 	return markets, err
 }
-
