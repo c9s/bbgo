@@ -3,13 +3,13 @@ package binance
 import (
 	"context"
 	"fmt"
-	"github.com/adshao/go-binance/v2/futures"
-	"golang.org/x/time/rate"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"golang.org/x/time/rate"
 
 	"github.com/adshao/go-binance/v2"
 	"github.com/google/uuid"
@@ -36,6 +36,7 @@ func init() {
 	_ = types.Exchange(&Exchange{})
 	_ = types.MarginExchange(&Exchange{})
 
+	// FIXME: this is not effected since dotenv is loaded in the rootCmd, not in the init function
 	if ok, _ := strconv.ParseBool(os.Getenv("DEBUG_BINANCE_STREAM")); ok {
 		log.Level = logrus.DebugLevel
 	}
@@ -74,8 +75,7 @@ func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticke
 		return nil, err
 	}
 
-	ticker := toGlobalTicker(stats[0])
-	return &ticker, nil
+	return toGlobalTicker(stats[0])
 }
 
 func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[string]types.Ticker, error) {
@@ -136,38 +136,7 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 
 	markets := types.MarketMap{}
 	for _, symbol := range exchangeInfo.Symbols {
-		market := types.Market{
-			Symbol:          symbol.Symbol,
-			LocalSymbol:     symbol.Symbol,
-			PricePrecision:  symbol.QuotePrecision,
-			VolumePrecision: symbol.BaseAssetPrecision,
-			QuoteCurrency:   symbol.QuoteAsset,
-			BaseCurrency:    symbol.BaseAsset,
-		}
-
-		if f := symbol.MinNotionalFilter(); f != nil {
-			market.MinNotional = util.MustParseFloat(f.MinNotional)
-			market.MinAmount = util.MustParseFloat(f.MinNotional)
-		}
-
-		// The LOT_SIZE filter defines the quantity (aka "lots" in auction terms) rules for a symbol.
-		// There are 3 parts:
-		// minQty defines the minimum quantity/icebergQty allowed.
-		//	maxQty defines the maximum quantity/icebergQty allowed.
-		//	stepSize defines the intervals that a quantity/icebergQty can be increased/decreased by.
-		if f := symbol.LotSizeFilter(); f != nil {
-			market.MinQuantity = util.MustParseFloat(f.MinQuantity)
-			market.MaxQuantity = util.MustParseFloat(f.MaxQuantity)
-			market.StepSize = util.MustParseFloat(f.StepSize)
-		}
-
-		if f := symbol.PriceFilter(); f != nil {
-			market.MaxPrice = util.MustParseFloat(f.MaxPrice)
-			market.MinPrice = util.MustParseFloat(f.MinPrice)
-			market.TickSize = util.MustParseFloat(f.TickSize)
-		}
-
-		markets[symbol.Symbol] = market
+		markets[symbol.Symbol] = toGlobalMarket(symbol)
 	}
 
 	return markets, nil
@@ -211,15 +180,6 @@ func (e *Exchange) QueryIsolatedMarginAccount(ctx context.Context, symbols ...st
 	return toGlobalIsolatedMarginAccount(account), nil
 }
 
-func (e *Exchange) getLaunchDate() (time.Time, error) {
-	// binance launch date 12:00 July 14th, 2017
-	loc, err := time.LoadLocation("Asia/Shanghai")
-	if err != nil {
-		return time.Time{}, err
-	}
-
-	return time.Date(2017, time.July, 14, 0, 0, 0, 0, loc), nil
-}
 
 func (e *Exchange) Withdrawal(ctx context.Context, asset string, amount fixedpoint.Value, address string, options *types.WithdrawalOptions) error {
 	req := e.Client.NewCreateWithdrawService()
@@ -250,7 +210,7 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 
 	var emptyTime = time.Time{}
 	if startTime == emptyTime {
-		startTime, err = e.getLaunchDate()
+		startTime, err = getLaunchDate()
 		if err != nil {
 			return nil, err
 		}
@@ -338,7 +298,7 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 
 	var emptyTime = time.Time{}
 	if startTime == emptyTime {
-		startTime, err = e.getLaunchDate()
+		startTime, err = getLaunchDate()
 		if err != nil {
 			return nil, err
 		}
@@ -925,44 +885,7 @@ func (e *Exchange) BatchQueryKLines(ctx context.Context, symbol string, interval
 	return allKLines, nil
 }
 
-type FundingRate struct {
-	FundingRate fixedpoint.Value
-	FundingTime time.Time
-	Time        time.Time
-}
-
-type PremiumIndex struct {
-	Symbol          string           `json:"symbol"`
-	MarkPrice       fixedpoint.Value `json:"markPrice"`
-	LastFundingRate fixedpoint.Value `json:"lastFundingRate"`
-	NextFundingTime time.Time        `json:"nextFundingTime"`
-	Time            time.Time        `json:"time"`
-}
-
-func convertPremiumIndex(index *futures.PremiumIndex) (*PremiumIndex, error) {
-	markPrice, err := fixedpoint.NewFromString(index.MarkPrice)
-	if err != nil {
-		return nil, err
-	}
-
-	lastFundingRate, err := fixedpoint.NewFromString(index.LastFundingRate)
-	if err != nil {
-		return nil, err
-	}
-
-	nextFundingTime := time.Unix(0, index.NextFundingTime*int64(time.Millisecond))
-	t := time.Unix(0, index.Time*int64(time.Millisecond))
-
-	return &PremiumIndex{
-		Symbol:          index.Symbol,
-		MarkPrice:       markPrice,
-		NextFundingTime: nextFundingTime,
-		LastFundingRate: lastFundingRate,
-		Time:            t,
-	}, nil
-}
-
-func (e *Exchange) QueryPremiumIndex(ctx context.Context, symbol string) (*PremiumIndex, error) {
+func (e *Exchange) QueryPremiumIndex(ctx context.Context, symbol string) (*types.PremiumIndex, error) {
 	futuresClient := binance.NewFuturesClient(e.key, e.secret)
 
 	// when symbol is set, only one index will be returned.
@@ -974,7 +897,7 @@ func (e *Exchange) QueryPremiumIndex(ctx context.Context, symbol string) (*Premi
 	return convertPremiumIndex(indexes[0])
 }
 
-func (e *Exchange) QueryFundingRateHistory(ctx context.Context, symbol string) (*FundingRate, error) {
+func (e *Exchange) QueryFundingRateHistory(ctx context.Context, symbol string) (*types.FundingRate, error) {
 	futuresClient := binance.NewFuturesClient(e.key, e.secret)
 	rates, err := futuresClient.NewFundingRateService().
 		Symbol(symbol).
@@ -994,9 +917,19 @@ func (e *Exchange) QueryFundingRateHistory(ctx context.Context, symbol string) (
 		return nil, err
 	}
 
-	return &FundingRate{
+	return &types.FundingRate{
 		FundingRate: fundingRate,
 		FundingTime: time.Unix(0, rate.FundingTime*int64(time.Millisecond)),
 		Time:        time.Unix(0, rate.Time*int64(time.Millisecond)),
 	}, nil
+}
+
+func getLaunchDate() (time.Time, error) {
+	// binance launch date 12:00 July 14th, 2017
+	loc, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	return time.Date(2017, time.July, 14, 0, 0, 0, 0, loc), nil
 }
