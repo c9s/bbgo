@@ -885,22 +885,7 @@ func (e *Exchange) BatchQueryKLines(ctx context.Context, symbol string, interval
 	return allKLines, nil
 }
 
-type FundingRate struct {
-	FundingRate fixedpoint.Value
-	FundingTime time.Time
-	Time        time.Time
-}
-
-type PremiumIndex struct {
-	Symbol          string           `json:"symbol"`
-	MarkPrice       fixedpoint.Value `json:"markPrice"`
-	LastFundingRate fixedpoint.Value `json:"lastFundingRate"`
-	NextFundingTime time.Time        `json:"nextFundingTime"`
-	Time            time.Time        `json:"time"`
-}
-
-
-func (e *Exchange) QueryPremiumIndex(ctx context.Context, symbol string) (*PremiumIndex, error) {
+func (e *Exchange) QueryPremiumIndex(ctx context.Context, symbol string) (*types.PremiumIndex, error) {
 	futuresClient := binance.NewFuturesClient(e.key, e.secret)
 
 	// when symbol is set, only one index will be returned.
@@ -912,7 +897,7 @@ func (e *Exchange) QueryPremiumIndex(ctx context.Context, symbol string) (*Premi
 	return convertPremiumIndex(indexes[0])
 }
 
-func (e *Exchange) QueryFundingRateHistory(ctx context.Context, symbol string) (*FundingRate, error) {
+func (e *Exchange) QueryFundingRateHistory(ctx context.Context, symbol string) (*types.FundingRate, error) {
 	futuresClient := binance.NewFuturesClient(e.key, e.secret)
 	rates, err := futuresClient.NewFundingRateService().
 		Symbol(symbol).
@@ -932,7 +917,7 @@ func (e *Exchange) QueryFundingRateHistory(ctx context.Context, symbol string) (
 		return nil, err
 	}
 
-	return &FundingRate{
+	return &types.FundingRate{
 		FundingRate: fundingRate,
 		FundingTime: time.Unix(0, rate.FundingTime*int64(time.Millisecond)),
 		Time:        time.Unix(0, rate.Time*int64(time.Millisecond)),
