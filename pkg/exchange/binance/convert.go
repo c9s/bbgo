@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/adshao/go-binance/v2"
+	"github.com/adshao/go-binance/v2/futures"
 	"github.com/pkg/errors"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -341,4 +342,26 @@ func convertSubscription(s types.Subscription) string {
 	return fmt.Sprintf("%s@%s", strings.ToLower(s.Symbol), s.Channel)
 }
 
+func convertPremiumIndex(index *futures.PremiumIndex) (*PremiumIndex, error) {
+	markPrice, err := fixedpoint.NewFromString(index.MarkPrice)
+	if err != nil {
+		return nil, err
+	}
+
+	lastFundingRate, err := fixedpoint.NewFromString(index.LastFundingRate)
+	if err != nil {
+		return nil, err
+	}
+
+	nextFundingTime := time.Unix(0, index.NextFundingTime*int64(time.Millisecond))
+	t := time.Unix(0, index.Time*int64(time.Millisecond))
+
+	return &PremiumIndex{
+		Symbol:          index.Symbol,
+		MarkPrice:       markPrice,
+		NextFundingTime: nextFundingTime,
+		LastFundingRate: lastFundingRate,
+		Time:            t,
+	}, nil
+}
 
