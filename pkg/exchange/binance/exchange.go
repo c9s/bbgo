@@ -181,15 +181,6 @@ func (e *Exchange) QueryIsolatedMarginAccount(ctx context.Context, symbols ...st
 	return toGlobalIsolatedMarginAccount(account), nil
 }
 
-func (e *Exchange) getLaunchDate() (time.Time, error) {
-	// binance launch date 12:00 July 14th, 2017
-	loc, err := time.LoadLocation("Asia/Shanghai")
-	if err != nil {
-		return time.Time{}, err
-	}
-
-	return time.Date(2017, time.July, 14, 0, 0, 0, 0, loc), nil
-}
 
 func (e *Exchange) Withdrawal(ctx context.Context, asset string, amount fixedpoint.Value, address string, options *types.WithdrawalOptions) error {
 	req := e.Client.NewCreateWithdrawService()
@@ -220,7 +211,7 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 
 	var emptyTime = time.Time{}
 	if startTime == emptyTime {
-		startTime, err = e.getLaunchDate()
+		startTime, err = getLaunchDate()
 		if err != nil {
 			return nil, err
 		}
@@ -308,7 +299,7 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 
 	var emptyTime = time.Time{}
 	if startTime == emptyTime {
-		startTime, err = e.getLaunchDate()
+		startTime, err = getLaunchDate()
 		if err != nil {
 			return nil, err
 		}
@@ -969,4 +960,14 @@ func (e *Exchange) QueryFundingRateHistory(ctx context.Context, symbol string) (
 		FundingTime: time.Unix(0, rate.FundingTime*int64(time.Millisecond)),
 		Time:        time.Unix(0, rate.Time*int64(time.Millisecond)),
 	}, nil
+}
+
+func getLaunchDate() (time.Time, error) {
+	// binance launch date 12:00 July 14th, 2017
+	loc, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	return time.Date(2017, time.July, 14, 0, 0, 0, 0, loc), nil
 }
