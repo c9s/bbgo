@@ -74,10 +74,17 @@ Then your bbgo will be installed at `~/mygo/bin/bbgo`.
 
 ### Install via git clone
 
+Since the default GOPATH is located at `~/go`, you can clone the bbgo repo into the folder `~/go/src/github.com/c9s/bbgo`:
+
 ```shell
 mkdir -p ~/go/src/github.com/c9s
 git clone git@github.com:c9s/bbgo.git ~/go/src/github.com/c9s/bbgo
 cd ~/go/src/github.com/c9s/bbgo
+```
+
+Download the go modules:
+
+```shell
 go mod download
 ```
 
