@@ -535,7 +535,7 @@ rockhopper --config rockhopper_sqlite.yaml create --type sql add_pnl_column
 rockhopper --config rockhopper_mysql.yaml create --type sql add_pnl_column
 ```
 
-or
+or you can use the util script:
 
 ```
 bash utils/generate-new-migration.sh add_pnl_column
@@ -556,6 +556,21 @@ Then run the following command to compile the migration files into go files:
 
 ```shell
 make migrations
+```
+
+
+If you want to override the DSN and the Driver defined in the YAML config file, you can add some env vars in your dotenv file like this:
+
+```shell
+ROCKHOPPER_DRIVER=mysql
+ROCKHOPPER_DIALECT=mysql
+ROCKHOPPER_DSN="root:123123@unix(/opt/local/var/run/mysql57/mysqld.sock)/bbgo"
+```
+
+And then, run:
+
+```shell
+dotenv -f .env.local -- rockhopper --config rockhopper_mysql.yaml up
 ```
 
 ### Setup frontend development environment
