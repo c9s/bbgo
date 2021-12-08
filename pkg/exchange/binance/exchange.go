@@ -3,13 +3,14 @@ package binance
 import (
 	"context"
 	"fmt"
-	"github.com/adshao/go-binance/v2/futures"
-	"golang.org/x/time/rate"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/adshao/go-binance/v2/futures"
+	"golang.org/x/time/rate"
 
 	"github.com/adshao/go-binance/v2"
 	"github.com/google/uuid"
@@ -36,6 +37,7 @@ func init() {
 	_ = types.Exchange(&Exchange{})
 	_ = types.MarginExchange(&Exchange{})
 
+	// FIXME: this is not effected since dotenv is loaded in the rootCmd, not in the init function
 	if ok, _ := strconv.ParseBool(os.Getenv("DEBUG_BINANCE_STREAM")); ok {
 		log.Level = logrus.DebugLevel
 	}
