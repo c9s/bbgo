@@ -147,10 +147,10 @@ docker-push:
 	bash -c "[[ -n $(DOCKER_TAG) ]] && docker push yoanlin/bbgo:$(DOCKER_TAG)"
 
 frontend/node_modules:
-        cd frontend && yarn install
+	cd frontend && yarn install
 
 frontend/out/index.html: frontend/node_modules
-        cd frontend && yarn export
+	cd frontend && yarn export
 
 pkg/server/assets.go: frontend/out/index.html
 	go run ./util/embed -package server -output $@ $(FRONTEND_EXPORT_DIR)
