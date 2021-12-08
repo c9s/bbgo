@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/adshao/go-binance/v2/futures"
 	"golang.org/x/time/rate"
 
 	"github.com/adshao/go-binance/v2"
@@ -900,28 +899,6 @@ type PremiumIndex struct {
 	Time            time.Time        `json:"time"`
 }
 
-func convertPremiumIndex(index *futures.PremiumIndex) (*PremiumIndex, error) {
-	markPrice, err := fixedpoint.NewFromString(index.MarkPrice)
-	if err != nil {
-		return nil, err
-	}
-
-	lastFundingRate, err := fixedpoint.NewFromString(index.LastFundingRate)
-	if err != nil {
-		return nil, err
-	}
-
-	nextFundingTime := time.Unix(0, index.NextFundingTime*int64(time.Millisecond))
-	t := time.Unix(0, index.Time*int64(time.Millisecond))
-
-	return &PremiumIndex{
-		Symbol:          index.Symbol,
-		MarkPrice:       markPrice,
-		NextFundingTime: nextFundingTime,
-		LastFundingRate: lastFundingRate,
-		Time:            t,
-	}, nil
-}
 
 func (e *Exchange) QueryPremiumIndex(ctx context.Context, symbol string) (*PremiumIndex, error) {
 	futuresClient := binance.NewFuturesClient(e.key, e.secret)
