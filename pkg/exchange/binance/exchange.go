@@ -9,8 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/time/rate"
-
 	"github.com/adshao/go-binance/v2"
 	"github.com/adshao/go-binance/v2/futures"
 	"github.com/google/uuid"
@@ -275,7 +273,7 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 }
 
 func (e *Exchange) QueryAveragePrice(ctx context.Context, symbol string) (float64, error) {
-	//Futures
+	// Futures
 	// if e.IsFutures {
 	// 	resp, err := e.futuresClient.NewAveragePriceService().Symbol(symbol).Do(ctx)
 	// 	if err != nil {
