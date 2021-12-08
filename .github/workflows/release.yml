@@ -27,7 +27,6 @@ jobs:
       - name: Build
         run: |
           npm install --global yarn
-          (cd frontend && yarn install)
           make dist VERSION=${{ steps.get_version.outputs.VERSION }}
         shell: bash
       - name: Create Release
