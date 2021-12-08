@@ -55,17 +55,17 @@ type Exchange struct {
 
 	userDataStream *Stream
 
-	trades        map[string][]types.Trade
+	trades      map[string][]types.Trade
 	tradesMutex sync.Mutex
 
-	closedOrders  map[string][]types.Order
+	closedOrders      map[string][]types.Order
 	closedOrdersMutex sync.Mutex
 
-	matchingBooks map[string]*SimplePriceMatching
+	matchingBooks      map[string]*SimplePriceMatching
 	matchingBooksMutex sync.Mutex
 
-	markets       types.MarketMap
-	doneC         chan struct{}
+	markets types.MarketMap
+	doneC   chan struct{}
 }
 
 func NewExchange(sourceName types.ExchangeName, srv *service.BacktestService, config *bbgo.Backtest) *Exchange {
@@ -96,7 +96,7 @@ func NewExchange(sourceName types.ExchangeName, srv *service.BacktestService, co
 	account := &types.Account{
 		MakerFeeRate: config.Account.MakerFeeRate,
 		TakerFeeRate: config.Account.TakerFeeRate,
-		AccountType:     "SPOT", // currently not used
+		AccountType:  "SPOT", // currently not used
 	}
 
 	balances := config.Account.Balances.BalanceMap()
@@ -149,9 +149,9 @@ func (e *Exchange) addMatchingBook(symbol string, market types.Market) {
 
 func (e *Exchange) _addMatchingBook(symbol string, market types.Market) {
 	e.matchingBooks[symbol] = &SimplePriceMatching{
-		CurrentTime:     e.startTime,
-		Account:         e.account,
-		Market:          market,
+		CurrentTime: e.startTime,
+		Account:     e.account,
+		Market:      market,
 	}
 }
 
@@ -289,7 +289,7 @@ func (e Exchange) PlatformFeeCurrency() string {
 }
 
 func (e Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
-	return e.publicExchange.QueryMarkets(ctx)
+	return bbgo.LoadExchangeMarketsWithCache(ctx, e.publicExchange)
 }
 
 func (e Exchange) QueryDepositHistory(ctx context.Context, asset string, since, until time.Time) (allDeposits []types.Deposit, err error) {
@@ -300,7 +300,7 @@ func (e Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since,
 	return nil, nil
 }
 
-func (e *Exchange) matchingBook(symbol string) (*SimplePriceMatching, bool){
+func (e *Exchange) matchingBook(symbol string) (*SimplePriceMatching, bool) {
 	e.matchingBooksMutex.Lock()
 	m, ok := e.matchingBooks[symbol]
 	e.matchingBooksMutex.Unlock()

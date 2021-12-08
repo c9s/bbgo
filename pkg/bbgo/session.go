@@ -8,13 +8,11 @@ import (
 
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
-
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -265,25 +263,25 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 
 	var log = log.WithField("session", session.Name)
 
-	if !viper.GetBool("bbgo-markets-cache") {
-		markets, err := session.Exchange.QueryMarkets(ctx)
-		if err != nil {
-			return err
-		}
-		session.markets = markets
+	// load markets first
+
+	var disableMarketsCache = false
+	var markets types.MarketMap
+	var err error
+	if util.SetEnvVarBool("DISABLE_MARKETS_CACHE", &disableMarketsCache); disableMarketsCache {
+		markets, err = session.Exchange.QueryMarkets(ctx)
 	} else {
-		// load markets first
-		var markets, err = LoadExchangeMarketsWithCache(ctx, session.Exchange)
+		markets, err = LoadExchangeMarketsWithCache(ctx, session.Exchange)
 		if err != nil {
 			return err
 		}
-
-		if len(markets) == 0 {
-			return fmt.Errorf("market config should not be empty")
-		}
-
-		session.markets = markets
 	}
+
+	if len(markets) == 0 {
+		return fmt.Errorf("market config should not be empty")
+	}
+
+	session.markets = markets
 
 	// query and initialize the balances
 	log.Infof("querying balances from session %s...", session.Name)
