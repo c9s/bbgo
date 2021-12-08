@@ -261,7 +261,11 @@ var BacktestCmd = &cobra.Command{
 			}
 		}
 
-		backtestExchange := backtest.NewExchange(exchangeName, backtestService, userConfig.Backtest)
+		backtestExchange, err := backtest.NewExchange(exchangeName, backtestService, userConfig.Backtest)
+		if err != nil {
+			return errors.Wrap(err, "failed to create backtest exchange")
+		}
+
 		environ.SetStartTime(startTime)
 		environ.AddExchange(exchangeName.String(), backtestExchange)
 
