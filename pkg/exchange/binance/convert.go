@@ -342,7 +342,7 @@ func convertSubscription(s types.Subscription) string {
 	return fmt.Sprintf("%s@%s", strings.ToLower(s.Symbol), s.Channel)
 }
 
-func convertPremiumIndex(index *futures.PremiumIndex) (*PremiumIndex, error) {
+func convertPremiumIndex(index *futures.PremiumIndex) (*types.PremiumIndex, error) {
 	markPrice, err := fixedpoint.NewFromString(index.MarkPrice)
 	if err != nil {
 		return nil, err
@@ -356,7 +356,7 @@ func convertPremiumIndex(index *futures.PremiumIndex) (*PremiumIndex, error) {
 	nextFundingTime := time.Unix(0, index.NextFundingTime*int64(time.Millisecond))
 	t := time.Unix(0, index.Time*int64(time.Millisecond))
 
-	return &PremiumIndex{
+	return &types.PremiumIndex{
 		Symbol:          index.Symbol,
 		MarkPrice:       markPrice,
 		NextFundingTime: nextFundingTime,
