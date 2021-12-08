@@ -70,29 +70,29 @@ type Exchange struct {
 	doneC   chan struct{}
 }
 
-func NewExchange(sourceName types.ExchangeName, srv *service.BacktestService, config *bbgo.Backtest) *Exchange {
+func NewExchange(sourceName types.ExchangeName, srv *service.BacktestService, config *bbgo.Backtest) (*Exchange, error) {
 	ex, err := newPublicExchange(sourceName)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	if config == nil {
-		panic(errors.New("backtest config can not be nil"))
+		return nil, errors.New("backtest config can not be nil")
 	}
 
 	markets, err := bbgo.LoadExchangeMarketsWithCache(context.Background(), ex)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	startTime, err := config.ParseStartTime()
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	endTime, err := config.ParseEndTime()
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	account := &types.Account{
@@ -119,7 +119,7 @@ func NewExchange(sourceName types.ExchangeName, srv *service.BacktestService, co
 	}
 
 	e.resetMatchingBooks()
-	return e
+	return e, nil
 }
 
 func (e *Exchange) addTrade(trade types.Trade) {
@@ -321,5 +321,5 @@ func newPublicExchange(sourceExchange types.ExchangeName) (types.Exchange, error
 		return okex.New("", "", ""), nil
 	}
 
-	return nil, fmt.Errorf("exchange %s is not supported", sourceExchange)
+	return nil, fmt.Errorf("public data from exchange %s is not supported", sourceExchange)
 }
