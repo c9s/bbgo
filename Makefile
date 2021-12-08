@@ -124,9 +124,12 @@ dist: static dist-bbgo-linux dist-bbgo-darwin desktop
 
 pkg/version/version.go: .FORCE
 	bash utils/generate-version-file.sh > $@
-	git commit $@ -m "bump version to $(VERSION)" || true
 
-version: pkg/version/version.go migrations
+pkg/version/dev.go: .FORCE
+	VERSION_SUFFIX="-dev" bash utils/generate-version-file.sh > $@
+
+version: pkg/version/version.go pkg/version/dev.go migrations
+	git commit $< $(word 2,$^) -m "bump version to $(VERSION)" || true
 	[[ -e doc/release/$(VERSION).md ]] || (echo "file doc/release/$(VERSION).md does not exist" ; exit 1)
 	git add -v doc/release/$(VERSION).md && git commit doc/release/$(VERSION).md -m "add release note" || true
 	git tag -f $(VERSION)
