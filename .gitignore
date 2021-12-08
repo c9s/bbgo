@@ -32,3 +32,6 @@
 /config/bbgo.yaml
 
 /pkg/server/assets.go
+
+node_modules
+yarn.lock

@@ -24,8 +24,10 @@ $(BIN_DIR):
 
 
 # build native bbgo
-bbgo:
-	go build -tags web,release -o $(BIN_DIR)/$@ ./cmd/bbgo
+bbgo: static bbgo-full
+
+bbgo-full:
+	go build -tags web,release -o $(BIN_DIR)/bbgo ./cmd/bbgo
 
 # build native bbgo (slim version)
 bbgo-slim:
@@ -147,7 +149,8 @@ docker-push:
 	bash -c "[[ -n $(DOCKER_TAG) ]] && docker push yoanlin/bbgo:$(DOCKER_TAG)"
 
 frontend/out/index.html:
-	(cd frontend && yarn export)
+	cd frontend && yarn install
+	cd frontend && yarn export
 
 pkg/server/assets.go: frontend/out/index.html
 	go run ./util/embed -package server -output $@ $(FRONTEND_EXPORT_DIR)
