@@ -14,6 +14,42 @@ import (
 	"github.com/c9s/bbgo/pkg/util"
 )
 
+func toGlobalMarket(symbol binance.Symbol) types.Market {
+	market := types.Market{
+		Symbol:          symbol.Symbol,
+		LocalSymbol:     symbol.Symbol,
+		PricePrecision:  symbol.QuotePrecision,
+		VolumePrecision: symbol.BaseAssetPrecision,
+		QuoteCurrency:   symbol.QuoteAsset,
+		BaseCurrency:    symbol.BaseAsset,
+	}
+
+	if f := symbol.MinNotionalFilter(); f != nil {
+		market.MinNotional = util.MustParseFloat(f.MinNotional)
+		market.MinAmount = util.MustParseFloat(f.MinNotional)
+	}
+
+	// The LOT_SIZE filter defines the quantity (aka "lots" in auction terms) rules for a symbol.
+	// There are 3 parts:
+	// minQty defines the minimum quantity/icebergQty allowed.
+	//	maxQty defines the maximum quantity/icebergQty allowed.
+	//	stepSize defines the intervals that a quantity/icebergQty can be increased/decreased by.
+	if f := symbol.LotSizeFilter(); f != nil {
+		market.MinQuantity = util.MustParseFloat(f.MinQuantity)
+		market.MaxQuantity = util.MustParseFloat(f.MaxQuantity)
+		market.StepSize = util.MustParseFloat(f.StepSize)
+	}
+
+	if f := symbol.PriceFilter(); f != nil {
+		market.MaxPrice = util.MustParseFloat(f.MaxPrice)
+		market.MinPrice = util.MustParseFloat(f.MinPrice)
+		market.TickSize = util.MustParseFloat(f.TickSize)
+	}
+
+	return market
+}
+
+
 func toGlobalIsolatedUserAsset(userAsset binance.IsolatedUserAsset) types.IsolatedUserAsset {
 	return types.IsolatedUserAsset{
 		Asset:         userAsset.Asset,
@@ -90,8 +126,8 @@ func toGlobalMarginAccount(account *binance.MarginAccount) *types.MarginAccount 
 	}
 }
 
-func toGlobalTicker(stats *binance.PriceChangeStats) types.Ticker {
-	return types.Ticker{
+func toGlobalTicker(stats *binance.PriceChangeStats) (*types.Ticker, error) {
+	return &types.Ticker{
 		Volume: util.MustParseFloat(stats.Volume),
 		Last:   util.MustParseFloat(stats.LastPrice),
 		Open:   util.MustParseFloat(stats.OpenPrice),
@@ -100,8 +136,9 @@ func toGlobalTicker(stats *binance.PriceChangeStats) types.Ticker {
 		Buy:    util.MustParseFloat(stats.BidPrice),
 		Sell:   util.MustParseFloat(stats.AskPrice),
 		Time:   time.Unix(0, stats.CloseTime*int64(time.Millisecond)),
-	}
+	},nil
 }
+
 
 func toLocalOrderType(orderType types.OrderType) (binance.OrderType, error) {
 	switch orderType {
@@ -303,3 +340,5 @@ func convertSubscription(s types.Subscription) string {
 
 	return fmt.Sprintf("%s@%s", strings.ToLower(s.Symbol), s.Channel)
 }
+
+
