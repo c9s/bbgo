@@ -35,11 +35,18 @@ Stream
   - [ ] Balance message parser
 - [ ] MarketDataStream
   - [ ] OrderBook message parser (or depth)
-  - [ ] KLine message parser
-  - [ ] Public trade message parser
+  - [ ] KLine message parser (required for backtesting)
+  - [ ] Public trade message parser (optional)
+  - [ ] Ticker message parser (optional)
 - [ ] ping/pong
 - [ ] heart beat integration
 - [ ] handling reconnect
+
+Database
+
+- [ ] Add a new kline table for the exchange (this is required for back-testing)
+  - [ ] Add MySQL migration SQL
+  - [ ] Add SQLite migration SQL
 
 Exchange Factory
 
