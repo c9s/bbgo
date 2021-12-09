@@ -1,6 +1,8 @@
 # Adding New Exchange
 
-Open an issue and paste the following checklist to that issue. You should send multiple small pull request to implement them.
+Open an issue and paste the following checklist to that issue.
+
+You should send multiple small pull request to implement them.
 
 **Please avoid sending a pull request with huge changes**
 
