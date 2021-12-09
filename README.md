@@ -126,7 +126,7 @@ bbgo pnl --exchange binance --asset BTC --since "2019-01-01"
 
 ## Advanced Configuration
 
-### Notification bot
+### Notification
 - [Setting up Telegram notification](./doc/configuration/telegram.md)
 - [Setting up Slack notification](./doc/configuration/slack.md)
 
