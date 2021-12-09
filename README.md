@@ -187,7 +187,7 @@ bbgo sync --session binance
 Check out the strategy directory [strategy](pkg/strategy) for all built-in strategies:
 
 - `pricealert` strategy demonstrates how to use the notification system [pricealert](pkg/strategy/pricealert). See 
-  [Price Alert Strategy](./doc/strategy/pricealert.md).
+  [document](./doc/strategy/pricealert.md).
 - `xpuremaker` strategy demonstrates how to maintain the orderbook and submit maker
   orders [xpuremaker](pkg/strategy/xpuremaker)
 - `buyandhold` strategy demonstrates how to subscribe kline events and submit market
