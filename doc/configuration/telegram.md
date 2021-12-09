@@ -22,6 +22,20 @@ you can set `TELEGRAM_AUTH_TOKEN` in the `.env.local` file, e.g.,
 ```sh
 TELEGRAM_BOT_AUTH_TOKEN=itsme55667788
 ```
+ 
+The alerting strategies use Telegram bot notification without further configuration. You can check the [pricealert
+yaml file](./config/pricealert-tg.yaml) in the `config/` directory for example.
+
+If you want the order submitting/filling notification, add the following to your `bbgo.yaml`:
+
+```yaml
+notifications:
+  routing:
+    trade: "$symbol"
+    order: "$symbol"
+    submitOrder: "$session"
+    pnL: "bbgo-pnl"
+```
 
 Run your bbgo.
 
