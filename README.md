@@ -126,6 +126,8 @@ bbgo pnl --exchange binance --asset BTC --since "2019-01-01"
 
 ## Advanced Configuration
 
+### Notification
+
 - [Setting up Telegram notification](./doc/configuration/telegram.md)
 - [Setting up Slack notification](./doc/configuration/slack.md)
 
@@ -185,7 +187,8 @@ bbgo sync --session binance
 
 Check out the strategy directory [strategy](pkg/strategy) for all built-in strategies:
 
-- `pricealert` strategy demonstrates how to use the notification system [pricealert](pkg/strategy/pricealert)
+- `pricealert` strategy demonstrates how to use the notification system [pricealert](pkg/strategy/pricealert). See
+  [document](./doc/strategy/pricealert.md).
 - `xpuremaker` strategy demonstrates how to maintain the orderbook and submit maker
   orders [xpuremaker](pkg/strategy/xpuremaker)
 - `buyandhold` strategy demonstrates how to subscribe kline events and submit market
