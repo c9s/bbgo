@@ -41,8 +41,8 @@ Stream
   - [ ] KLine message parser (required for backtesting)
   - [ ] Public trade message parser (optional)
   - [ ] Ticker message parser (optional)
-- [ ] ping/pong
-- [ ] heart beat integration
+- [ ] ping/pong handling.
+- [ ] heart-beat hanlding or keep-alive handling.
 - [ ] handling reconnect
 
 Database
