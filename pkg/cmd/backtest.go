@@ -342,11 +342,15 @@ var BacktestCmd = &cobra.Command{
 				if jsonOutputEnabled {
 					result := struct {
 						Symbol          string                    `json:"symbol,omitempty"`
+						LastPrice       float64                   `json:"lastPrice,omitempty"`
+						StartPrice      float64                   `json:"startPrice,omitempty"`
 						PnLReport       *pnl.AverageCostPnlReport `json:"pnlReport,omitempty"`
 						InitialBalances types.BalanceMap          `json:"initialBalances,omitempty"`
 						FinalBalances   types.BalanceMap          `json:"finalBalances,omitempty"`
 					}{
 						Symbol:          symbol,
+						LastPrice:       lastPrice,
+						StartPrice:      startPrice,
 						PnLReport:       report,
 						InitialBalances: initBalances,
 						FinalBalances:   finalBalances,
