@@ -25,6 +25,7 @@ Convert functions:
   - [ ] toGlobalOrder
   - [ ] toGlobalTrade
   - [ ] toGlobalAccount
+  - [ ] toGlobalBalance
 
 Stream
 
