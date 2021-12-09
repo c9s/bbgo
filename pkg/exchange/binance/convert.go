@@ -50,10 +50,6 @@ func toGlobalMarket(symbol binance.Symbol) types.Market {
 	return market
 }
 
-<<<<<<< HEAD
-
-=======
->>>>>>> 45277ff5f0c01f293ac620bcebe8d849732546e8
 func toGlobalIsolatedUserAsset(userAsset binance.IsolatedUserAsset) types.IsolatedUserAsset {
 	return types.IsolatedUserAsset{
 		Asset:         userAsset.Asset,
@@ -129,8 +125,6 @@ func toGlobalMarginAccount(account *binance.MarginAccount) *types.MarginAccount 
 	}
 }
 
-<<<<<<< HEAD
-=======
 func toGlobalFuturesAccount(account *futures.Account) *types.Account {
 	return &types.Account{
 		Assets:                      toGlobalFuturesUserAssets(account.Assets),
@@ -171,25 +165,25 @@ func toGlobalFuturesUserAssets(assets []*futures.AccountAsset) (retAssets []type
 
 func toGlobalPositions(positions []*futures.AccountPosition) types.PositionMap {
 	retPositions := make(types.PositionMap)
-		for _, position := range positions {
-			retPositions[position.Symbol] = types.Position{
-				Isolated:               position.Isolated,
-				Leverage:               fixedpoint.MustNewFromString(position.Leverage),
-				InitialMargin:          fixedpoint.MustNewFromString(position.InitialMargin),
-				MaintMargin:            fixedpoint.MustNewFromString(position.MaintMargin),
-				OpenOrderInitialMargin: fixedpoint.MustNewFromString(position.OpenOrderInitialMargin),
-				PositionInitialMargin:  fixedpoint.MustNewFromString(position.PositionInitialMargin),
-				Symbol:                 position.Symbol,
-				UnrealizedProfit:       fixedpoint.MustNewFromString(position.UnrealizedProfit),
-				EntryPrice:             fixedpoint.MustNewFromString(position.EntryPrice),
-				MaxNotional:            fixedpoint.MustNewFromString(position.MaxNotional),
-				PositionSide:           string(position.PositionSide),
-				PositionAmt:            fixedpoint.MustNewFromString(position.PositionAmt),
-				Notional:               fixedpoint.MustNewFromString(position.Notional),
-				IsolatedWallet:         fixedpoint.MustNewFromString(position.IsolatedWallet),
-				UpdateTime:             position.UpdateTime,
-			}
+	for _, position := range positions {
+		retPositions[position.Symbol] = types.Position{
+			Isolated:               position.Isolated,
+			Leverage:               fixedpoint.MustNewFromString(position.Leverage),
+			InitialMargin:          fixedpoint.MustNewFromString(position.InitialMargin),
+			MaintMargin:            fixedpoint.MustNewFromString(position.MaintMargin),
+			OpenOrderInitialMargin: fixedpoint.MustNewFromString(position.OpenOrderInitialMargin),
+			PositionInitialMargin:  fixedpoint.MustNewFromString(position.PositionInitialMargin),
+			Symbol:                 position.Symbol,
+			UnrealizedProfit:       fixedpoint.MustNewFromString(position.UnrealizedProfit),
+			EntryPrice:             fixedpoint.MustNewFromString(position.EntryPrice),
+			MaxNotional:            fixedpoint.MustNewFromString(position.MaxNotional),
+			PositionSide:           string(position.PositionSide),
+			PositionAmt:            fixedpoint.MustNewFromString(position.PositionAmt),
+			Notional:               fixedpoint.MustNewFromString(position.Notional),
+			IsolatedWallet:         fixedpoint.MustNewFromString(position.IsolatedWallet),
+			UpdateTime:             position.UpdateTime,
 		}
+	}
 
 	return retPositions
 }
@@ -257,7 +251,6 @@ func toGlobalPositions(positions []*futures.AccountPosition) types.PositionMap {
 // 	return retAssets
 // }
 
->>>>>>> 45277ff5f0c01f293ac620bcebe8d849732546e8
 func toGlobalTicker(stats *binance.PriceChangeStats) (*types.Ticker, error) {
 	return &types.Ticker{
 		Volume: util.MustParseFloat(stats.Volume),
@@ -268,9 +261,6 @@ func toGlobalTicker(stats *binance.PriceChangeStats) (*types.Ticker, error) {
 		Buy:    util.MustParseFloat(stats.BidPrice),
 		Sell:   util.MustParseFloat(stats.AskPrice),
 		Time:   time.Unix(0, stats.CloseTime*int64(time.Millisecond)),
-<<<<<<< HEAD
-	},nil
-=======
 	}, nil
 }
 
@@ -283,11 +273,9 @@ func toGlobalFuturesTicker(stats *futures.PriceChangeStats) types.Ticker {
 		Low:    util.MustParseFloat(stats.LowPrice),
 		// Buy:    util.MustParseFloat(stats.BidPrice),
 		// Sell:   util.MustParseFloat(stats.AskPrice),
-		Time:   time.Unix(0, stats.CloseTime*int64(time.Millisecond)),
+		Time: time.Unix(0, stats.CloseTime*int64(time.Millisecond)),
 	}
->>>>>>> 45277ff5f0c01f293ac620bcebe8d849732546e8
 }
-
 
 func toLocalOrderType(orderType types.OrderType) (binance.OrderType, error) {
 	switch orderType {
@@ -411,7 +399,7 @@ func millisecondTime(t int64) time.Time {
 	return time.Unix(0, t*int64(time.Millisecond))
 }
 
-func ToGlobalTrade(t binance.TradeV3, isMargin bool) (*types.Trade, error) {
+func toGlobalTrade(t binance.TradeV3, isMargin bool) (*types.Trade, error) {
 	// skip trade ID that is the same. however this should not happen
 	var side types.SideType
 	if t.IsBuyer {
@@ -695,7 +683,3 @@ func convertPremiumIndex(index *futures.PremiumIndex) (*types.PremiumIndex, erro
 		Time:            t,
 	}, nil
 }
-<<<<<<< HEAD
-
-=======
->>>>>>> 45277ff5f0c01f293ac620bcebe8d849732546e8
