@@ -717,8 +717,8 @@ type OrderTrade struct {
 	CommissionAmount string `json:"n"`
 	CommissionAsset  string `json:"N"`
 
-	OrderTradeTime int64  `json:"T"`
-	TradeId        string `json:"t"`
+	OrderTradeTime int64 `json:"T"`
+	TradeId        int64 `json:"t"`
 
 	BidsNotional string `json:"b"`
 	AskNotional  string `json:"a"`
@@ -744,6 +744,8 @@ type OrderTradeUpdateEvent struct {
 // 	"E":1568879465651,            // Event Time
 // 	"T":1568879465650,            // Transaction Time
 // 	"o":{
+// 			"a":"BUSD",
+// 			"cw":"0.00000000",
 // 	  "s":"BTCUSDT",              // Symbol
 // 	  "c":"TEST",                 // Client Order Id
 // 		// special client order id:
