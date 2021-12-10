@@ -26,7 +26,7 @@ var rootCmd = &cobra.Command{
 	SilenceUsage: true,
 
 	RunE: func(cmd *cobra.Command, args []string) error {
-		accounts, err := client.AccountService.QueryAccounts()
+		accounts, err := client.AccountService.ListAccounts()
 		if err != nil {
 			return err
 		}

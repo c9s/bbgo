@@ -46,7 +46,7 @@ type Account struct {
 	Holds fixedpoint.Value `json:"holds"`
 }
 
-func (s *AccountService) QueryAccounts() ([]Account, error) {
+func (s *AccountService) ListAccounts() ([]Account, error) {
 	req, err := s.client.newAuthenticatedRequest("GET", "/api/v1/accounts", nil, nil)
 	if err != nil {
 		return nil, err
@@ -61,6 +61,30 @@ func (s *AccountService) QueryAccounts() ([]Account, error) {
 		Code    string       `json:"code"`
 		Message string       `json:"msg"`
 		Data    []Account `json:"data"`
+	}
+
+	if err := response.DecodeJSON(&apiResponse); err != nil {
+		return nil, err
+	}
+
+	return apiResponse.Data, nil
+}
+
+func (s *AccountService) GetAccount(accountID string) (*Account, error) {
+	req, err := s.client.newAuthenticatedRequest("GET", "/api/v1/accounts/" + accountID, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := s.client.sendRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var apiResponse struct {
+		Code    string       `json:"code"`
+		Message string       `json:"msg"`
+		Data    *Account `json:"data"`
 	}
 
 	if err := response.DecodeJSON(&apiResponse); err != nil {
