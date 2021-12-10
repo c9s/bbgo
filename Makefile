@@ -24,8 +24,8 @@ $(BIN_DIR):
 
 
 # build native bbgo
-bbgo:
-	go build -tags web,release -o $(BIN_DIR)/$@ ./cmd/bbgo
+bbgo: static
+	go build -tags web,release -o $(BIN_DIR)/bbgo ./cmd/bbgo
 
 # build native bbgo (slim version)
 bbgo-slim:
@@ -124,12 +124,16 @@ dist: static dist-bbgo-linux dist-bbgo-darwin desktop
 
 pkg/version/version.go: .FORCE
 	bash utils/generate-version-file.sh > $@
-	git commit $@ -m "bump version to $(VERSION)" || true
 
-version: pkg/version/version.go migrations
+pkg/version/dev.go: .FORCE
+	VERSION_SUFFIX="-dev" bash utils/generate-version-file.sh > $@
+
+version: pkg/version/version.go pkg/version/dev.go migrations
+	git commit $< $(word 2,$^) -m "bump version to $(VERSION)" || true
 	[[ -e doc/release/$(VERSION).md ]] || (echo "file doc/release/$(VERSION).md does not exist" ; exit 1)
 	git add -v doc/release/$(VERSION).md && git commit doc/release/$(VERSION).md -m "add release note" || true
 	git tag -f $(VERSION)
+	git push origin HEAD
 	git push origin $(VERSION)
 
 migrations:
@@ -146,8 +150,11 @@ docker-push:
 	docker push yoanlin/bbgo
 	bash -c "[[ -n $(DOCKER_TAG) ]] && docker push yoanlin/bbgo:$(DOCKER_TAG)"
 
-frontend/out/index.html:
-	(cd frontend && yarn export)
+frontend/node_modules:
+	cd frontend && yarn install
+
+frontend/out/index.html: frontend/node_modules
+	cd frontend && yarn export
 
 pkg/server/assets.go: frontend/out/index.html
 	go run ./util/embed -package server -output $@ $(FRONTEND_EXPORT_DIR)

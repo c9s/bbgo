@@ -34,3 +34,5 @@
 /pkg/server/assets.go
 
 bbgo.sqlite3
+node_modules
+

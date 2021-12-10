@@ -179,11 +179,11 @@ func (m *SimplePriceMatching) executeTrade(trade types.Trade) {
 	if trade.IsBuyer {
 		err = m.Account.UseLockedBalance(m.Market.QuoteCurrency, fixedpoint.NewFromFloat(trade.Price*trade.Quantity))
 
-		_ = m.Account.AddBalance(m.Market.BaseCurrency, fixedpoint.NewFromFloat(trade.Quantity))
+		m.Account.AddBalance(m.Market.BaseCurrency, fixedpoint.NewFromFloat(trade.Quantity))
 	} else {
 		err = m.Account.UseLockedBalance(m.Market.BaseCurrency, fixedpoint.NewFromFloat(trade.Quantity))
 
-		_ = m.Account.AddBalance(m.Market.QuoteCurrency, fixedpoint.NewFromFloat(trade.Quantity*trade.Price))
+		m.Account.AddBalance(m.Market.QuoteCurrency, fixedpoint.NewFromFloat(trade.Quantity*trade.Price))
 	}
 
 	if err != nil {
