@@ -32,3 +32,5 @@
 /config/bbgo.yaml
 
 /pkg/server/assets.go
+
+bbgo.sqlite3
