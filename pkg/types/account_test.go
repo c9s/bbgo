@@ -10,9 +10,9 @@ import (
 
 func TestAccountLockAndUnlock(t *testing.T) {
 	a := NewAccount()
-	err := a.AddBalance("USDT", 1000)
-	assert.NoError(t, err)
+	a.AddBalance("USDT", 1000)
 
+	var err error
 	balance, ok := a.Balance("USDT")
 	assert.True(t, ok)
 	assert.Equal(t, balance.Available, fixedpoint.Value(1000))
@@ -36,9 +36,9 @@ func TestAccountLockAndUnlock(t *testing.T) {
 
 func TestAccountLockAndUse(t *testing.T) {
 	a := NewAccount()
-	err := a.AddBalance("USDT", 1000)
-	assert.NoError(t, err)
+	a.AddBalance("USDT", 1000)
 
+	var err error
 	balance, ok := a.Balance("USDT")
 	assert.True(t, ok)
 	assert.Equal(t, balance.Available, fixedpoint.Value(1000))
