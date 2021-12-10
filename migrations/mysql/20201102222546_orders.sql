@@ -6,7 +6,7 @@ CREATE TABLE `orders`
     `exchange`          VARCHAR(24)             NOT NULL DEFAULT '',
     -- order_id is the order id returned from the exchange
     `order_id`          BIGINT UNSIGNED         NOT NULL,
-    `client_order_id`   VARCHAR(42)             NOT NULL DEFAULT '',
+    `client_order_id`   VARCHAR(122)             NOT NULL DEFAULT '',
     `order_type`        VARCHAR(16)             NOT NULL,
     `symbol`            VARCHAR(8)              NOT NULL,
     `status`            VARCHAR(12)             NOT NULL,
