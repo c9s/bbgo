@@ -270,64 +270,6 @@ func NewFuturesStream(client *futures.Client) *Stream {
 		futuresClient: client,
 		depthFrames:   make(map[string]*DepthFrame),
 	}
-	// TODO: remove following redundant code
-	/*
-		stream.OnDepthEvent(func(e *DepthEvent) {
-			if debugBinanceDepth {
-				log.Infof("received %s depth event updateID %d ~ %d (len %d)", e.Symbol, e.FirstUpdateID, e.FinalUpdateID, e.FinalUpdateID-e.FirstUpdateID)
-			}
-
-			f, ok := stream.depthFrames[e.Symbol]
-			if !ok {
-				f = &DepthFrame{
-					futuresClient:  client,
-					context: context.Background(),
-					Symbol:  e.Symbol,
-					resetC:  make(chan struct{}, 1),
-				}
-
-				stream.depthFrames[e.Symbol] = f
-
-				f.OnReady(func(snapshotDepth DepthEvent, bufEvents []DepthEvent) {
-					log.Infof("depth snapshot ready: %s", snapshotDepth.String())
-
-					snapshot, err := snapshotDepth.OrderBook()
-					if err != nil {
-						log.WithError(err).Error("book snapshot convert error")
-						return
-					}
-
-					if valid, err := snapshot.IsValid(); !valid {
-						log.Errorf("depth snapshot is invalid, event: %+v, error: %v", snapshotDepth, err)
-					}
-
-					stream.EmitBookSnapshot(snapshot)
-
-					for _, e := range bufEvents {
-						bookUpdate, err := e.OrderBook()
-						if err != nil {
-							log.WithError(err).Error("book convert error")
-							return
-						}
-
-						stream.EmitBookUpdate(bookUpdate)
-					}
-				})
-
-				f.OnPush(func(e DepthEvent) {
-					book, err := e.OrderBook()
-					if err != nil {
-						log.WithError(err).Error("book convert error")
-						return
-					}
-
-					stream.EmitBookUpdate(book)
-				})
-			} else {
-				f.PushEvent(*e)
-			}
-		})
-	*/
 	stream.OnOutboundAccountPositionEvent(func(e *OutboundAccountPositionEvent) {
 		snapshot := types.BalanceMap{}
 		for _, balance := range e.Balances {
@@ -341,29 +283,10 @@ func NewFuturesStream(client *futures.Client) *Stream {
 	})
 
 	stream.OnAccountUpdateEvent(func(e *AccountUpdateEvent) {
-		// snapshot := AccountUpdateEvent {
-		// 	UpdateData: UpdateData {
-		// 		Balances:  e.UpdateData.Balances,
-		// 		Positions: e.UpdateData.Positions,
-		// 	},
-		// }
-		// snapshot := Position {
-		// 		Positions: e.UpdateData.Positions,
-		// }
-		// stream.EmitPositionSnapshot(&snapshot)
+		// TODO
 	})
 
 	stream.OnAccountConfigUpdateEvent(func(e *AccountConfigUpdateEvent) {
-		// snapshot := AccountConfigUpdateEvent {
-		// 	AccountConfig: AccountConfig {
-		// 		Symbol:  e.AccountConfig.Symbol,
-		// 		Leverage: e.AccountConfig.Leverage,
-		// 	},
-		// }
-		// snapshot := types.Position {
-		// 		Symbol:  e.AccountConfig.Symbol,
-		// 		Leverage: e.AccountConfig.Leverage,
-		// }
 		snapshot := types.PositionMap{}
 		snapshot[e.AccountConfig.Symbol] = types.Position{
 			Symbol:   e.AccountConfig.Symbol,
@@ -430,6 +353,8 @@ func NewFuturesStream(client *futures.Client) *Stream {
 			stream.EmitOrderUpdate(*order)
 
 		case "TRADE":
+			// TODO
+
 			// trade, err := e.Trade()
 			// if err != nil {
 			// 	log.WithError(err).Error("trade convert error")
