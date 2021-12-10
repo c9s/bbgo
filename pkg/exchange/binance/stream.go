@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/adshao/go-binance/v2"
+	"github.com/adshao/go-binance/v2/futures"
 	"github.com/gorilla/websocket"
 
 	"github.com/c9s/bbgo/pkg/types"
@@ -61,7 +62,9 @@ type Stream struct {
 	types.FuturesSettings
 	types.StandardStream
 
-	Client   *binance.Client
+	Client        *binance.Client
+	futuresClient *futures.Client
+
 	Conn     *websocket.Conn
 	ConnLock sync.Mutex
 
@@ -76,12 +79,18 @@ type Stream struct {
 	kLineClosedEventCallbacks []func(e *KLineEvent)
 
 	markPriceUpdateEventCallbacks []func(e *MarkPriceUpdateEvent)
-	continuousKLineEventCallbacks []func(e *ContinuousKLineEvent)
+
+	continuousKLineEventCallbacks       []func(e *ContinuousKLineEvent)
+	continuousKLineClosedEventCallbacks []func(e *ContinuousKLineEvent)
 
 	balanceUpdateEventCallbacks           []func(event *BalanceUpdateEvent)
 	outboundAccountInfoEventCallbacks     []func(event *OutboundAccountInfoEvent)
 	outboundAccountPositionEventCallbacks []func(event *OutboundAccountPositionEvent)
 	executionReportEventCallbacks         []func(event *ExecutionReportEvent)
+
+	AccountUpdateEventCallbacks       []func(e *AccountUpdateEvent)
+	AccountConfigUpdateEventCallbacks []func(e *AccountConfigUpdateEvent)
+	OrderTradeUpdateEventCallbacks    []func(e *OrderTradeUpdateEvent)
 
 	depthFrames map[string]*DepthFrame
 }
@@ -207,6 +216,249 @@ func NewStream(client *binance.Client) *Stream {
 		}
 	})
 
+	stream.OnContinuousKLineEvent(func(e *ContinuousKLineEvent) {
+		kline := e.KLine.KLine()
+		if e.KLine.Closed {
+			stream.EmitContinuousKLineClosedEvent(e)
+			stream.EmitKLineClosed(kline)
+		} else {
+			stream.EmitKLine(kline)
+		}
+	})
+
+	stream.OnDisconnect(func() {
+		log.Infof("resetting depth snapshots...")
+		for _, f := range stream.depthFrames {
+			f.emitReset()
+		}
+	})
+
+	stream.OnConnect(func() {
+		var params []string
+		for _, subscription := range stream.Subscriptions {
+			params = append(params, convertSubscription(subscription))
+		}
+
+		if len(params) == 0 {
+			return
+		}
+
+		log.Infof("subscribing channels: %+v", params)
+		err := stream.Conn.WriteJSON(StreamRequest{
+			Method: "SUBSCRIBE",
+			Params: params,
+			ID:     1,
+		})
+
+		if err != nil {
+			log.WithError(err).Error("subscribe error")
+		}
+	})
+
+	return stream
+}
+
+func NewFuturesStream(client *futures.Client) *Stream {
+	stream := &Stream{
+		StandardStream: types.StandardStream{
+			ReconnectC: make(chan struct{}, 1),
+		},
+		futuresClient: client,
+		depthFrames:   make(map[string]*DepthFrame),
+	}
+	// TODO: remove following redundant code
+	/*
+		stream.OnDepthEvent(func(e *DepthEvent) {
+			if debugBinanceDepth {
+				log.Infof("received %s depth event updateID %d ~ %d (len %d)", e.Symbol, e.FirstUpdateID, e.FinalUpdateID, e.FinalUpdateID-e.FirstUpdateID)
+			}
+
+			f, ok := stream.depthFrames[e.Symbol]
+			if !ok {
+				f = &DepthFrame{
+					futuresClient:  client,
+					context: context.Background(),
+					Symbol:  e.Symbol,
+					resetC:  make(chan struct{}, 1),
+				}
+
+				stream.depthFrames[e.Symbol] = f
+
+				f.OnReady(func(snapshotDepth DepthEvent, bufEvents []DepthEvent) {
+					log.Infof("depth snapshot ready: %s", snapshotDepth.String())
+
+					snapshot, err := snapshotDepth.OrderBook()
+					if err != nil {
+						log.WithError(err).Error("book snapshot convert error")
+						return
+					}
+
+					if valid, err := snapshot.IsValid(); !valid {
+						log.Errorf("depth snapshot is invalid, event: %+v, error: %v", snapshotDepth, err)
+					}
+
+					stream.EmitBookSnapshot(snapshot)
+
+					for _, e := range bufEvents {
+						bookUpdate, err := e.OrderBook()
+						if err != nil {
+							log.WithError(err).Error("book convert error")
+							return
+						}
+
+						stream.EmitBookUpdate(bookUpdate)
+					}
+				})
+
+				f.OnPush(func(e DepthEvent) {
+					book, err := e.OrderBook()
+					if err != nil {
+						log.WithError(err).Error("book convert error")
+						return
+					}
+
+					stream.EmitBookUpdate(book)
+				})
+			} else {
+				f.PushEvent(*e)
+			}
+		})
+	*/
+	stream.OnOutboundAccountPositionEvent(func(e *OutboundAccountPositionEvent) {
+		snapshot := types.BalanceMap{}
+		for _, balance := range e.Balances {
+			snapshot[balance.Asset] = types.Balance{
+				Currency:  balance.Asset,
+				Available: balance.Free,
+				Locked:    balance.Locked,
+			}
+		}
+		stream.EmitBalanceSnapshot(snapshot)
+	})
+
+	stream.OnAccountUpdateEvent(func(e *AccountUpdateEvent) {
+		// snapshot := AccountUpdateEvent {
+		// 	UpdateData: UpdateData {
+		// 		Balances:  e.UpdateData.Balances,
+		// 		Positions: e.UpdateData.Positions,
+		// 	},
+		// }
+		// snapshot := Position {
+		// 		Positions: e.UpdateData.Positions,
+		// }
+		// stream.EmitPositionSnapshot(&snapshot)
+	})
+
+	stream.OnAccountConfigUpdateEvent(func(e *AccountConfigUpdateEvent) {
+		// snapshot := AccountConfigUpdateEvent {
+		// 	AccountConfig: AccountConfig {
+		// 		Symbol:  e.AccountConfig.Symbol,
+		// 		Leverage: e.AccountConfig.Leverage,
+		// 	},
+		// }
+		// snapshot := types.Position {
+		// 		Symbol:  e.AccountConfig.Symbol,
+		// 		Leverage: e.AccountConfig.Leverage,
+		// }
+		snapshot := types.PositionMap{}
+		snapshot[e.AccountConfig.Symbol] = types.Position{
+			Symbol:   e.AccountConfig.Symbol,
+			Leverage: e.AccountConfig.Leverage,
+		}
+
+		stream.EmitPositionSnapshot(snapshot)
+	})
+
+	stream.OnKLineEvent(func(e *KLineEvent) {
+		kline := e.KLine.KLine()
+		if e.KLine.Closed {
+			stream.EmitKLineClosedEvent(e)
+			stream.EmitKLineClosed(kline)
+		} else {
+			stream.EmitKLine(kline)
+		}
+	})
+
+	stream.OnExecutionReportEvent(func(e *ExecutionReportEvent) {
+		switch e.CurrentExecutionType {
+
+		case "NEW", "CANCELED", "REJECTED", "EXPIRED", "REPLACED":
+			order, err := e.Order()
+			if err != nil {
+				log.WithError(err).Error("order convert error")
+				return
+			}
+
+			stream.EmitOrderUpdate(*order)
+
+		case "TRADE":
+			trade, err := e.Trade()
+			if err != nil {
+				log.WithError(err).Error("trade convert error")
+				return
+			}
+
+			stream.EmitTradeUpdate(*trade)
+
+			order, err := e.Order()
+			if err != nil {
+				log.WithError(err).Error("order convert error")
+				return
+			}
+
+			// Update Order with FILLED event
+			if order.Status == types.OrderStatusFilled {
+				stream.EmitOrderUpdate(*order)
+			}
+		}
+	})
+
+	stream.OnOrderTradeUpdateEvent(func(e *OrderTradeUpdateEvent) {
+		switch e.OrderTrade.CurrentExecutionType {
+
+		case "NEW", "CANCELED", "EXPIRED":
+			order, err := e.OrderFutures()
+			if err != nil {
+				log.WithError(err).Error("order convert error")
+				return
+			}
+
+			stream.EmitOrderUpdate(*order)
+
+		case "TRADE":
+			// trade, err := e.Trade()
+			// if err != nil {
+			// 	log.WithError(err).Error("trade convert error")
+			// 	return
+			// }
+
+			// stream.EmitTradeUpdate(*trade)
+
+			// order, err := e.OrderFutures()
+			// if err != nil {
+			// 	log.WithError(err).Error("order convert error")
+			// 	return
+			// }
+
+			// Update Order with FILLED event
+			// if order.Status == types.OrderStatusFilled {
+			// 	stream.EmitOrderUpdate(*order)
+			// }
+		case "CALCULATED - Liquidation Execution":
+			log.Infof("CALCULATED - Liquidation Execution not support yet.")
+		}
+	})
+
+	stream.OnContinuousKLineEvent(func(e *ContinuousKLineEvent) {
+		kline := e.KLine.KLine()
+		if e.KLine.Closed {
+			stream.EmitContinuousKLineClosedEvent(e)
+			stream.EmitKLineClosed(kline)
+		} else {
+			stream.EmitKLine(kline)
+		}
+	})
+
 	stream.OnDisconnect(func() {
 		log.Infof("resetting depth snapshots...")
 		for _, f := range stream.depthFrames {
@@ -253,7 +505,7 @@ func (s *Stream) dial(listenKey string) (*websocket.Conn, error) {
 
 	if s.IsFutures {
 		url = "wss://fstream.binance.com/ws/" + listenKey
-	} 
+	}
 
 	conn, _, err := defaultDialer.Dial(url, nil)
 	if err != nil {
@@ -282,7 +534,12 @@ func (s *Stream) fetchListenKey(ctx context.Context) (string, error) {
 		log.Infof("margin mode is enabled, requesting margin user stream listen key...")
 		req := s.Client.NewStartMarginUserStreamService()
 		return req.Do(ctx)
+	} else if s.IsFutures {
+		log.Infof("futures mode is enabled, requesting futures user stream listen key...")
+		req := s.futuresClient.NewStartUserStreamService()
+		return req.Do(ctx)
 	}
+	log.Infof("spot mode is enabled, requesting margin user stream listen key...")
 
 	return s.Client.NewStartUserStreamService().Do(ctx)
 }
@@ -294,8 +551,10 @@ func (s *Stream) keepaliveListenKey(ctx context.Context, listenKey string) error
 			req.Symbol(s.IsolatedMarginSymbol)
 			return req.Do(ctx)
 		}
-
 		req := s.Client.NewKeepaliveMarginUserStreamService().ListenKey(listenKey)
+		return req.Do(ctx)
+	} else if s.IsFutures {
+		req := s.futuresClient.NewKeepaliveUserStreamService().ListenKey(listenKey)
 		return req.Do(ctx)
 	}
 
@@ -551,6 +810,15 @@ func (s *Stream) read(ctx context.Context) {
 
 			case *ContinuousKLineEvent:
 				s.EmitContinuousKLineEvent(e)
+
+			case *AccountUpdateEvent:
+				s.EmitAccountUpdateEvent(e)
+
+			case *AccountConfigUpdateEvent:
+				s.EmitAccountConfigUpdateEvent(e)
+
+			case *OrderTradeUpdateEvent:
+				s.EmitOrderTradeUpdateEvent(e)
 			}
 		}
 	}
@@ -570,6 +838,9 @@ func (s *Stream) invalidateListenKey(ctx context.Context, listenKey string) (err
 			err = req.Do(ctx)
 		}
 
+	} else if s.IsFutures {
+		req := s.futuresClient.NewCloseUserStreamService().ListenKey(listenKey)
+		err = req.Do(ctx)
 	} else {
 		err = s.Client.NewCloseUserStreamService().ListenKey(listenKey).Do(ctx)
 	}
