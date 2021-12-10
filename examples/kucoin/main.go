@@ -21,41 +21,6 @@ func init() {
 	rootCmd.AddCommand(subAccountsCmd)
 }
 
-var accountsCmd = &cobra.Command{
-	Use: "accounts",
-
-	// SilenceUsage is an option to silence usage when an error occurs.
-	SilenceUsage: true,
-
-	RunE: func(cmd *cobra.Command, args []string) error {
-		accounts, err := client.AccountService.QueryAccounts()
-		if err != nil {
-			return err
-		}
-
-		log.Infof("accounts: %+v", accounts)
-		return nil
-	},
-}
-
-var subAccountsCmd = &cobra.Command{
-	Use:   "subaccounts",
-	Short: "subaccounts",
-
-	// SilenceUsage is an option to silence usage when an error occurs.
-	SilenceUsage: true,
-
-	RunE: func(cmd *cobra.Command, args []string) error {
-		subAccounts, err := client.AccountService.QuerySubAccounts()
-		if err != nil {
-			return err
-		}
-
-		log.Infof("subAccounts: %+v", subAccounts)
-		return nil
-	},
-}
-
 var rootCmd = &cobra.Command{
 	Use:   "kucoin",
 	Short: "kucoin",
