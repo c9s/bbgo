@@ -264,7 +264,6 @@ func ParseEvent(message string) (interface{}, error) {
 	}
 
 	eventType := string(val.GetStringBytes("e"))
-
 	switch eventType {
 	case "kline":
 		var event KLineEvent
@@ -293,12 +292,12 @@ func ParseEvent(message string) (interface{}, error) {
 
 	case "depthUpdate":
 		return parseDepthEvent(val)
-	
+
 	case "markPriceUpdate":
 		var event MarkPriceUpdateEvent
 		err := json.Unmarshal([]byte(message), &event)
 		return &event, err
-	
+
 	// Binance futures data --------------
 	case "continuousKline":
 		var event ContinuousKLineEvent
@@ -316,7 +315,6 @@ func ParseEvent(message string) (interface{}, error) {
 		return &event, err
 
 	case "ACCOUNT_CONFIG_UPDATE":
-		log.Infof("ACCOUNT_CONFIG_UPDATE")
 		var event AccountConfigUpdateEvent
 		err := json.Unmarshal([]byte(message), &event)
 		return &event, err
@@ -545,18 +543,17 @@ func (k *KLine) KLine() types.KLine {
 	}
 }
 
-
 type MarkPriceUpdateEvent struct {
 	EventBase
 
-	Symbol        string `json:"s"`
+	Symbol string `json:"s"`
 
-	MarkPrice	fixedpoint.Value  `json:"p"`
-	IndexPrice	fixedpoint.Value  `json:"i"`
-	EstimatedPrice	fixedpoint.Value  `json:"P"`
-	
-	FundingRate	fixedpoint.Value  `json:"r"`
-	NextFundingTime	int64		  `json:"T"`
+	MarkPrice      fixedpoint.Value `json:"p"`
+	IndexPrice     fixedpoint.Value `json:"i"`
+	EstimatedPrice fixedpoint.Value `json:"P"`
+
+	FundingRate     fixedpoint.Value `json:"r"`
+	NextFundingTime int64            `json:"T"`
 }
 
 /*
@@ -607,14 +604,14 @@ type ContinuousKLineEvent struct {
 */
 
 type PositionUpdate struct {
-	EventReasonType string `json:"m"`
-	Balances    []Balance `json:"B,omitempty"`
-	Positions 	[]types.Position  `json:"P,omitempty"`
+	EventReasonType string           `json:"m"`
+	Balances        []Balance        `json:"B,omitempty"`
+	Positions       []types.Position `json:"P,omitempty"`
 }
 
 type AccountUpdateEvent struct {
 	EventBase
-	Transaction  int64  `json:"T"`
+	Transaction int64 `json:"T"`
 
 	PositionUpdate PositionUpdate `json:"a"`
 }
@@ -634,9 +631,9 @@ type AccountUpdateEvent struct {
 // 			"bc":"50.12345678"            // Balance Change except PnL and Commission
 // 		  },
 // 		  {
-// 			"a":"BUSD",           
+// 			"a":"BUSD",
 // 			"wb":"1.00000000",
-// 			"cw":"0.00000000",         
+// 			"cw":"0.00000000",
 // 			"bc":"-49.12345678"
 // 		  }
 // 		],
@@ -676,70 +673,68 @@ type AccountUpdateEvent struct {
 //   }
 
 type AccountConfig struct {
-	Symbol  string  `json:"s"`
-	Leverage  fixedpoint.Value  `json:"l"`
+	Symbol   string           `json:"s"`
+	Leverage fixedpoint.Value `json:"l"`
 }
 
 type AccountConfigUpdateEvent struct {
 	EventBase
-	Transaction  int64  `json:"T"`
+	Transaction int64 `json:"T"`
 
-	AccountConfig  AccountConfig `json:"ac"`
+	AccountConfig AccountConfig `json:"ac"`
 }
 
 // {
 //     "e":"ACCOUNT_CONFIG_UPDATE",       // Event Type
 //     "E":1611646737479,                 // Event Time
 //     "T":1611646737476,                 // Transaction Time
-//     "ac":{                              
+//     "ac":{
 //     "s":"BTCUSDT",                     // symbol
 //     "l":25                             // leverage
 //     }
-// }  
-
+// }
 
 type OrderTrade struct {
-	Symbol  			string  `json:"s"`
-	ClientOrderID		string `json:"c"`
-	Side   				string `json:"S"`
-	OrderType         	string `json:"o"`
-	TimeInForce     	string `json:"f"`
-	OriginalQuantity 	string `json:"q"`
-	OriginalPrice      	string `json:"p"`
+	Symbol           string `json:"s"`
+	ClientOrderID    string `json:"c"`
+	Side             string `json:"S"`
+	OrderType        string `json:"o"`
+	TimeInForce      string `json:"f"`
+	OriginalQuantity string `json:"q"`
+	OriginalPrice    string `json:"p"`
 
-	AveragePrice 		string `json:"ap"`
-	StopPrice  			string `json:"sp"`
-	CurrentExecutionType string `json:"x"`   
-	CurrentOrderStatus 	 string `json:"X"`     
-	
-	OrderId 						int64 `json:"i"`
-	OrderLastFilledQuantity			string `json:"l"`
-	OrderFilledAccumulatedQuantity	string `json:"z"`
-	LastFilledPrice 			  	string `json:"L"`
+	AveragePrice         string `json:"ap"`
+	StopPrice            string `json:"sp"`
+	CurrentExecutionType string `json:"x"`
+	CurrentOrderStatus   string `json:"X"`
+
+	OrderId                        int64  `json:"i"`
+	OrderLastFilledQuantity        string `json:"l"`
+	OrderFilledAccumulatedQuantity string `json:"z"`
+	LastFilledPrice                string `json:"L"`
 
 	CommissionAmount string `json:"n"`
 	CommissionAsset  string `json:"N"`
 
-	OrderTradeTime	int64  `json:"T"`
-	TradeId  		int64 `json:"t"`
+	OrderTradeTime int64 `json:"T"`
+	TradeId        int64 `json:"t"`
 
-	BidsNotional  	string `json:"b"`
-	AskNotional  	string `json:"a"`
+	BidsNotional string `json:"b"`
+	AskNotional  string `json:"a"`
 
-	IsMaker 		bool `json:"m"`
-	IsReduceOnly 	bool` json:"r"`
+	IsMaker      bool `json:"m"`
+	IsReduceOnly bool ` json:"r"`
 
-	StopPriceWorkingType 	string `json:"wt"`
-	OriginalOrderType 		string `json:"ot"`
-	PositionSide 	string `json:"ps"`
-	RealizedProfit 	string `json:"rp"`
-
+	StopPriceWorkingType string `json:"wt"`
+	OriginalOrderType    string `json:"ot"`
+	PositionSide         string `json:"ps"`
+	RealizedProfit       string `json:"rp"`
 }
 
 type OrderTradeUpdateEvent struct {
 	EventBase
-	Transaction int64 	`json:"T"`
-	OrderTrade 		OrderTrade	`json:"o"`
+	Transaction int64      `json:"T"`
+	OrderTrade  OrderTrade `json:"o"`
 }
 
 // {
@@ -747,7 +742,7 @@ type OrderTradeUpdateEvent struct {
 // 	"e":"ORDER_TRADE_UPDATE",     // Event Type
 // 	"E":1568879465651,            // Event Time
 // 	"T":1568879465650,            // Transaction Time
-// 	"o":{                             
+// 	"o":{
 // 	  "s":"BTCUSDT",              // Symbol
 // 	  "c":"TEST",                 // Client Order Id
 // 		// special client order id:
@@ -782,7 +777,7 @@ type OrderTradeUpdateEvent struct {
 // 	  "cr":"5.0",                 // Callback Rate, only puhed with TRAILING_STOP_MARKET order
 // 	  "rp":"0"                            // Realized Profit of the trade
 // 	}
-  
+
 //   }
 
 func (e *OrderTradeUpdateEvent) OrderFutures() (*types.Order, error) {
