@@ -68,9 +68,9 @@ type RestClient struct {
 	KeyVersion string
 
 	AccountService *AccountService
+	MarketDataService *MarketDataService
 	// TradeService      *TradeService
 	// PublicDataService *PublicDataService
-	// MarketDataService *MarketDataService
 }
 
 func NewClient() *RestClient {
@@ -88,9 +88,9 @@ func NewClient() *RestClient {
 	}
 
 	client.AccountService = &AccountService{ client: client }
+	client.MarketDataService = &MarketDataService{client: client}
 	// client.TradeService = &TradeService{client: client}
 	// client.PublicDataService = &PublicDataService{client: client}
-	// client.MarketDataService = &MarketDataService{client: client}
 	return client
 }
 
