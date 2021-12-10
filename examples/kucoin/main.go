@@ -21,6 +21,7 @@ func init() {
 	rootCmd.AddCommand(subAccountsCmd)
 	rootCmd.AddCommand(symbolsCmd)
 	rootCmd.AddCommand(tickersCmd)
+	rootCmd.AddCommand(orderbookCmd)
 }
 
 var rootCmd = &cobra.Command{
