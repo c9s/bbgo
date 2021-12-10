@@ -180,7 +180,7 @@ var BacktestCmd = &cobra.Command{
 
 				// if we don't have klines before the start time endpoint, the back-test will fail.
 				// because the last price will be missing.
-				if firstKLine != nil && syncFromTime.Before(firstKLine.EndTime) {
+				if firstKLine != nil && syncFromTime.Before(firstKLine.StartTime) {
 					return fmt.Errorf("the sync-from-time you gave %s is earlier than the previous sync-start-time %s. "+
 						"re-syncing data from the earlier date before your first sync is not support,"+
 						"please clean up the kline table and restart a new sync",
@@ -261,7 +261,11 @@ var BacktestCmd = &cobra.Command{
 			}
 		}
 
-		backtestExchange := backtest.NewExchange(exchangeName, backtestService, userConfig.Backtest)
+		backtestExchange, err := backtest.NewExchange(exchangeName, backtestService, userConfig.Backtest)
+		if err != nil {
+			return errors.Wrap(err, "failed to create backtest exchange")
+		}
+
 		environ.SetStartTime(startTime)
 		environ.AddExchange(exchangeName.String(), backtestExchange)
 
@@ -338,11 +342,15 @@ var BacktestCmd = &cobra.Command{
 				if jsonOutputEnabled {
 					result := struct {
 						Symbol          string                    `json:"symbol,omitempty"`
+						LastPrice       float64                   `json:"lastPrice,omitempty"`
+						StartPrice      float64                   `json:"startPrice,omitempty"`
 						PnLReport       *pnl.AverageCostPnlReport `json:"pnlReport,omitempty"`
 						InitialBalances types.BalanceMap          `json:"initialBalances,omitempty"`
 						FinalBalances   types.BalanceMap          `json:"finalBalances,omitempty"`
 					}{
 						Symbol:          symbol,
+						LastPrice:       lastPrice,
+						StartPrice:      startPrice,
 						PnLReport:       report,
 						InitialBalances: initBalances,
 						FinalBalances:   finalBalances,

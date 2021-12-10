@@ -32,9 +32,10 @@ A trading bot framework written in Go. The name bbgo comes from the BB8 bot in t
 
 Get your exchange API key and secret after you register the accounts (you can choose one or more exchanges):
 
-- For MAX: <https://max.maicoin.com/signup?r=c7982718>
-- For Binance: <https://www.binancezh.com/en/register?ref=VGDGLT80>
-- For FTX: <https://ftx.com/#a=7710474>
+- MAX: <https://max.maicoin.com/signup?r=c7982718>
+- Binance: <https://www.binancezh.com/en/register?ref=VGDGLT80>
+- FTX: <https://ftx.com/#a=7710474>
+- OKEx: <https://www.okex.com/join/2412712?src=from:ios-share>
 
 Since the exchange implementation and support are done by a small team, if you like the work they've done for you, It
 would be great if you can use their referral code as your support to them. :-D
@@ -125,6 +126,8 @@ bbgo pnl --exchange binance --asset BTC --since "2019-01-01"
 
 ## Advanced Configuration
 
+### Notification
+
 - [Setting up Telegram notification](./doc/configuration/telegram.md)
 - [Setting up Slack notification](./doc/configuration/slack.md)
 
@@ -184,7 +187,8 @@ bbgo sync --session binance
 
 Check out the strategy directory [strategy](pkg/strategy) for all built-in strategies:
 
-- `pricealert` strategy demonstrates how to use the notification system [pricealert](pkg/strategy/pricealert)
+- `pricealert` strategy demonstrates how to use the notification system [pricealert](pkg/strategy/pricealert). See
+  [document](./doc/strategy/pricealert.md).
 - `xpuremaker` strategy demonstrates how to maintain the orderbook and submit maker
   orders [xpuremaker](pkg/strategy/xpuremaker)
 - `buyandhold` strategy demonstrates how to subscribe kline events and submit market
@@ -535,7 +539,7 @@ rockhopper --config rockhopper_sqlite.yaml create --type sql add_pnl_column
 rockhopper --config rockhopper_mysql.yaml create --type sql add_pnl_column
 ```
 
-or
+or you can use the util script:
 
 ```
 bash utils/generate-new-migration.sh add_pnl_column
@@ -556,6 +560,21 @@ Then run the following command to compile the migration files into go files:
 
 ```shell
 make migrations
+```
+
+
+If you want to override the DSN and the Driver defined in the YAML config file, you can add some env vars in your dotenv file like this:
+
+```shell
+ROCKHOPPER_DRIVER=mysql
+ROCKHOPPER_DIALECT=mysql
+ROCKHOPPER_DSN="root:123123@unix(/opt/local/var/run/mysql57/mysqld.sock)/bbgo"
+```
+
+And then, run:
+
+```shell
+dotenv -f .env.local -- rockhopper --config rockhopper_mysql.yaml up
 ```
 
 ### Setup frontend development environment
