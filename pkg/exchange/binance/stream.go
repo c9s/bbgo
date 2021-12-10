@@ -88,9 +88,13 @@ type Stream struct {
 	outboundAccountPositionEventCallbacks []func(event *OutboundAccountPositionEvent)
 	executionReportEventCallbacks         []func(event *ExecutionReportEvent)
 
-	AccountUpdateEventCallbacks       []func(e *AccountUpdateEvent)
-	AccountConfigUpdateEventCallbacks []func(e *AccountConfigUpdateEvent)
-	OrderTradeUpdateEventCallbacks    []func(e *OrderTradeUpdateEvent)
+	accountUpdateEventCallbacks       []func(e *AccountUpdateEvent)
+	accountConfigUpdateEventCallbacks []func(e *AccountConfigUpdateEvent)
+	orderTradeUpdateEventCallbacks    []func(e *OrderTradeUpdateEvent)
+
+	accountUpdateEventCallbacks       []func(e *AccountUpdateEvent)
+	accountConfigUpdateEventCallbacks []func(e *AccountConfigUpdateEvent)
+	orderTradeUpdateEventCallbacks    []func(e *OrderTradeUpdateEvent)
 
 	depthFrames map[string]*DepthFrame
 }
