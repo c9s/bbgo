@@ -1,7 +1,10 @@
 package kucoinapi
 
 import (
+	"fmt"
+	"net/http"
 	"net/url"
+	"strconv"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -99,8 +102,8 @@ func (s *MarketDataService) GetTicker(symbol string) (*Ticker, error) {
 	}
 
 	var apiResponse struct {
-		Code    string   `json:"code"`
-		Message string   `json:"msg"`
+		Code    string  `json:"code"`
+		Message string  `json:"msg"`
 		Data    *Ticker `json:"data"`
 	}
 
@@ -135,21 +138,21 @@ func (s *MarketDataService) GetTicker(symbol string) (*Ticker, error) {
         }
     ]
 }
- */
+*/
 
 type Ticker24H struct {
-	Symbol string `json:"symbol"`
-	Name string `json:"symbolName"`
-	Buy fixedpoint.Value `json:"buy"`
-	Sell fixedpoint.Value `json:"sell"`
-	ChangeRate fixedpoint.Value `json:"changeRate"`
-	ChangePrice fixedpoint.Value `json:"changePrice"`
-	High fixedpoint.Value `json:"high"`
-	Low fixedpoint.Value `json:"low"`
-	Last fixedpoint.Value `json:"last"`
+	Symbol       string           `json:"symbol"`
+	Name         string           `json:"symbolName"`
+	Buy          fixedpoint.Value `json:"buy"`
+	Sell         fixedpoint.Value `json:"sell"`
+	ChangeRate   fixedpoint.Value `json:"changeRate"`
+	ChangePrice  fixedpoint.Value `json:"changePrice"`
+	High         fixedpoint.Value `json:"high"`
+	Low          fixedpoint.Value `json:"low"`
+	Last         fixedpoint.Value `json:"last"`
 	AveragePrice fixedpoint.Value `json:"averagePrice"`
-	Volume fixedpoint.Value `json:"vol"` // base volume
-	VolumeValue fixedpoint.Value `json:"volValue"` // quote volume
+	Volume       fixedpoint.Value `json:"vol"`      // base volume
+	VolumeValue  fixedpoint.Value `json:"volValue"` // quote volume
 
 	TakerFeeRate fixedpoint.Value `json:"takerFeeRate"`
 	MakerFeeRate fixedpoint.Value `json:"makerFeeRate"`
@@ -159,10 +162,9 @@ type Ticker24H struct {
 }
 
 type AllTickers struct {
-	Time types.MillisecondTimestamp `json:"time"`
-	Ticker []Ticker24H `json:"ticker"`
+	Time   types.MillisecondTimestamp `json:"time"`
+	Ticker []Ticker24H                `json:"ticker"`
 }
-
 
 func (s *MarketDataService) ListTickers() (*AllTickers, error) {
 	req, err := s.client.newRequest("GET", "/api/v1/market/allTickers", nil, nil)
@@ -176,8 +178,8 @@ func (s *MarketDataService) ListTickers() (*AllTickers, error) {
 	}
 
 	var apiResponse struct {
-		Code    string   `json:"code"`
-		Message string   `json:"msg"`
+		Code    string      `json:"code"`
+		Message string      `json:"msg"`
 		Data    *AllTickers `json:"data"`
 	}
 
@@ -188,3 +190,64 @@ func (s *MarketDataService) ListTickers() (*AllTickers, error) {
 	return apiResponse.Data, nil
 }
 
+/*
+{
+    "sequence": "3262786978",
+    "time": 1550653727731,
+    "bids": [["6500.12", "0.45054140"],
+             ["6500.11", "0.45054140"]],  //[price，size]
+    "asks": [["6500.16", "0.57753524"],
+             ["6500.15", "0.57753524"]]
+}
+*/
+type OrderBook struct {
+	Sequence string                     `json:"sequence"`
+	Time     types.MillisecondTimestamp `json:"time"`
+	Bids     [][]fixedpoint.Value       `json:"bids,omitempty"`
+	Asks     [][]fixedpoint.Value       `json:"asks,omitempty"`
+}
+
+func (s *MarketDataService) GetOrderBook(symbol string, depth int) (*OrderBook, error) {
+	params := url.Values{}
+	params["symbol"] = []string{symbol}
+
+	var req *http.Request
+	var err error
+
+	switch depth {
+	case 20, 100:
+		refURL := "/api/v1/market/orderbook/level2_" + strconv.Itoa(depth)
+		req, err = s.client.newRequest("GET", refURL, params, nil)
+		if err != nil {
+			return nil, err
+		}
+
+	case 0:
+		refURL := "/api/v3/market/orderbook/level2"
+		req, err = s.client.newAuthenticatedRequest("GET", refURL, params, nil)
+		if err != nil {
+			return nil, err
+		}
+
+	default:
+		return nil, fmt.Errorf("depth %d is not supported, use 20, 100 or 0", depth)
+
+	}
+
+	response, err := s.client.sendRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var apiResponse struct {
+		Code    string     `json:"code"`
+		Message string     `json:"msg"`
+		Data    *OrderBook `json:"data"`
+	}
+
+	if err := response.DecodeJSON(&apiResponse); err != nil {
+		return nil, err
+	}
+
+	return apiResponse.Data, nil
+}
