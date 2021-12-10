@@ -216,40 +216,6 @@ type BalanceDetail struct {
 	UnrealizedProfitAndLoss fixedpoint.Value           `json:"upl"`
 }
 
-type Account struct {
-	TotalEquityInUSD fixedpoint.Value `json:"totalEq"`
-	UpdateTime       string           `json:"uTime"`
-	Details          []BalanceDetail  `json:"details"`
-}
-
-func (c *RestClient) AccountBalances() (*Account, error) {
-	req, err := c.newAuthenticatedRequest("GET", "/api/v5/account/balance", nil, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := c.sendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var balanceResponse struct {
-		Code    string    `json:"code"`
-		Message string    `json:"msg"`
-		Data    []Account `json:"data"`
-	}
-
-	if err := response.DecodeJSON(&balanceResponse); err != nil {
-		return nil, err
-	}
-
-	if len(balanceResponse.Data) == 0 {
-		return nil, errors.New("empty account data")
-	}
-
-	return &balanceResponse.Data[0], nil
-}
-
 type AssetBalance struct {
 	Currency  string           `json:"ccy"`
 	Balance   fixedpoint.Value `json:"bal"`
