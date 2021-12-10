@@ -92,10 +92,6 @@ type Stream struct {
 	accountConfigUpdateEventCallbacks []func(e *AccountConfigUpdateEvent)
 	orderTradeUpdateEventCallbacks    []func(e *OrderTradeUpdateEvent)
 
-	accountUpdateEventCallbacks       []func(e *AccountUpdateEvent)
-	accountConfigUpdateEventCallbacks []func(e *AccountConfigUpdateEvent)
-	orderTradeUpdateEventCallbacks    []func(e *OrderTradeUpdateEvent)
-
 	depthFrames map[string]*DepthFrame
 }
 
