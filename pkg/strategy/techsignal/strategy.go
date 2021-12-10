@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/c9s/bbgo/pkg/exchange/binance"
-	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/sirupsen/logrus"
 	"math"
 	"strings"
 	"time"
+
+	"github.com/c9s/bbgo/pkg/exchange/binance"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/types"
@@ -87,7 +88,7 @@ func (s *Strategy) Validate() error {
 }
 
 func (s *Strategy) listenToFundingRate(ctx context.Context, exchange *binance.Exchange) {
-	var previousIndex, fundingRate24HoursLowIndex *binance.PremiumIndex
+	var previousIndex, fundingRate24HoursLowIndex *types.PremiumIndex
 
 	fundingRateTicker := time.NewTicker(1 * time.Hour)
 	defer fundingRateTicker.Stop()

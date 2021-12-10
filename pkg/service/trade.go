@@ -52,7 +52,9 @@ func NewTradeService(db *sqlx.DB) *TradeService {
 
 func (s *TradeService) Sync(ctx context.Context, exchange types.Exchange, symbol string) error {
 	isMargin := false
+	isFutures := false
 	isIsolated := false
+
 	if marginExchange, ok := exchange.(types.MarginExchange); ok {
 		marginSettings := marginExchange.GetMarginSettings()
 		isMargin = marginSettings.IsMargin
@@ -62,8 +64,18 @@ func (s *TradeService) Sync(ctx context.Context, exchange types.Exchange, symbol
 		}
 	}
 
+	if futuresExchange, ok := exchange.(types.FuturesExchange); ok {
+		futuresSettings := futuresExchange.GetFuturesSettings()
+		isFutures = futuresSettings.IsFutures
+		isIsolated = futuresSettings.IsIsolatedFutures
+		if futuresSettings.IsIsolatedFutures {
+			symbol = futuresSettings.IsolatedFuturesSymbol
+		}
+	}
+	
+
 	// records descending ordered
-	records, err := s.QueryLast(exchange.Name(), symbol, isMargin, isIsolated, 50)
+	records, err := s.QueryLast(exchange.Name(), symbol, isMargin, isFutures, isIsolated, 50)
 	if err != nil {
 		return err
 	}
@@ -265,14 +277,15 @@ func generateMysqlTradingVolumeQuerySQL(options TradingVolumeQueryOptions) strin
 }
 
 // QueryLast queries the last trade from the database
-func (s *TradeService) QueryLast(ex types.ExchangeName, symbol string, isMargin, isIsolated bool, limit int) ([]types.Trade, error) {
-	log.Debugf("querying last trade exchange = %s AND symbol = %s AND is_margin = %v AND is_isolated = %v", ex, symbol, isMargin, isIsolated)
+func (s *TradeService) QueryLast(ex types.ExchangeName, symbol string, isMargin, isFutures, isIsolated bool, limit int) ([]types.Trade, error) {
+	log.Debugf("querying last trade exchange = %s AND symbol = %s AND is_margin = %v AND is_futures = %v AND is_isolated = %v", ex, symbol, isMargin, isFutures, isIsolated)
 
-	sql := "SELECT * FROM trades WHERE exchange = :exchange AND symbol = :symbol AND is_margin = :is_margin AND is_isolated = :is_isolated ORDER BY gid DESC LIMIT :limit"
+	sql := "SELECT * FROM trades WHERE exchange = :exchange AND symbol = :symbol AND is_margin = :is_margin AND is_futures = :is_futures AND is_isolated = :is_isolated ORDER BY gid DESC LIMIT :limit"
 	rows, err := s.DB.NamedQuery(sql, map[string]interface{}{
 		"symbol":      symbol,
 		"exchange":    ex,
 		"is_margin":   isMargin,
+		"is_futures":  isFutures,
 		"is_isolated": isIsolated,
 		"limit":       limit,
 	})
@@ -439,8 +452,8 @@ func (s *TradeService) scanRows(rows *sqlx.Rows) (trades []types.Trade, err erro
 
 func (s *TradeService) Insert(trade types.Trade) error {
 	_, err := s.DB.NamedExec(`
-			INSERT INTO trades (id, exchange, order_id, symbol, price, quantity, quote_quantity, side, is_buyer, is_maker, fee, fee_currency, traded_at, is_margin, is_isolated)
-			VALUES (:id, :exchange, :order_id, :symbol, :price, :quantity, :quote_quantity, :side, :is_buyer, :is_maker, :fee, :fee_currency, :traded_at, :is_margin, :is_isolated)`,
+			INSERT INTO trades (id, exchange, order_id, symbol, price, quantity, quote_quantity, side, is_buyer, is_maker, fee, fee_currency, traded_at, is_margin, is_futures, is_isolated)
+			VALUES (:id, :exchange, :order_id, :symbol, :price, :quantity, :quote_quantity, :side, :is_buyer, :is_maker, :fee, :fee_currency, :traded_at, :is_margin, :is_futures, :is_isolated)`,
 		trade)
 	return err
 }

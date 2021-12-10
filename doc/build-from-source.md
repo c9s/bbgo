@@ -1,5 +1,7 @@
 # Build From Source
 
+## Install Go SDK
+
 Go to the Go official website to download the Go SDK <https://go.dev/dl/>.
 
 An example installation looks like this:
@@ -28,11 +30,17 @@ Make sure your `go` is successfully installed:
 go version
 ```
 
+## Install go-sqlite
+
 If you need to use go-sqlite, you will need to enable CGO first:
 
 ```
 CGO_ENABLED=1 go get github.com/mattn/go-sqlite3
 ```
+
+## Install
+
+### Install bbgo via go install
 
 Install bbgo:
 
@@ -63,6 +71,41 @@ export GOPATH=~/mygo
 ```
 
 Then your bbgo will be installed at `~/mygo/bin/bbgo`.
+
+### Install via git clone
+
+Since the default GOPATH is located at `~/go`, you can clone the bbgo repo into the folder `~/go/src/github.com/c9s/bbgo`:
+
+```shell
+mkdir -p ~/go/src/github.com/c9s
+git clone git@github.com:c9s/bbgo.git ~/go/src/github.com/c9s/bbgo
+cd ~/go/src/github.com/c9s/bbgo
+```
+
+Download the go modules:
+
+```shell
+go mod download
+```
+
+And then you should be able to run bbgo with `go run`
+
+```shell
+go run ./cmd/bbgo run
+```
+
+You can also use the makefile to build bbgo:
+
+```shell
+cd frontend && yarn install
+make bbgo
+```
+
+If you don't need the web interface, you can build the slim version of bbgo:
+
+```shell
+make bbgo-slim
+```
 
 ## Build inside a Alpine container
 

@@ -1,0 +1,20 @@
+---
+notifications:
+  # object routing rules
+  routing:
+    trade: "$symbol"
+    order: "$symbol"
+    submitOrder: "$session" # not supported yet
+    pnL: "bbgo-pnl"
+
+sessions:
+  binance:
+    exchange: binance
+    envVarPrefix: binance
+
+exchangeStrategies:
+- on: binance
+  pricealert:
+    symbol: "BTCUSDT"
+    interval: "1m"
+    minChange: 300
