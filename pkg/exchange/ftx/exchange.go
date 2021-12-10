@@ -3,6 +3,7 @@ package ftx
 import (
 	"context"
 	"fmt"
+	"golang.org/x/time/rate"
 	"net/http"
 	"net/url"
 	"sort"
@@ -22,6 +23,9 @@ const (
 )
 
 var logger = logrus.WithField("exchange", "ftx")
+
+// POST https://ftx.com/api/orders 429, Success: false, err: Do not send more than 2 orders on this market per 200ms
+var requestLimit = rate.NewLimiter(rate.Every(220*time.Millisecond), 2)
 
 //go:generate go run generate_symbol_map.go
 
@@ -338,6 +342,9 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 		if so.TimeInForce != "GTC" && so.TimeInForce != "" {
 			return createdOrders, fmt.Errorf("unsupported TimeInForce %s. only support GTC", so.TimeInForce)
 		}
+		if err := requestLimit.Wait(ctx); err != nil {
+			logrus.WithError(err).Error("rate limit error")
+		}
 		or, err := e.newRest().PlaceOrder(ctx, PlaceOrderPayload{
 			Market:     toLocalSymbol(TrimUpperString(so.Symbol)),
 			Side:       TrimLowerString(string(so.Side)),
@@ -437,6 +444,9 @@ func sortByCreatedASC(orders []order) {
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) error {
 	for _, o := range orders {
 		rest := e.newRest()
+		if err := requestLimit.Wait(ctx); err != nil {
+			logrus.WithError(err).Error("rate limit error")
+		}
 		if len(o.ClientOrderID) > 0 {
 			if _, err := rest.CancelOrderByClientID(ctx, o.ClientOrderID); err != nil {
 				return err
