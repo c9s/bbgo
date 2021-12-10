@@ -12,7 +12,17 @@ var accountsCmd = &cobra.Command{
 	SilenceUsage: true,
 
 	RunE: func(cmd *cobra.Command, args []string) error {
-		accounts, err := client.AccountService.QueryAccounts()
+		if len(args) > 0 {
+			account, err := client.AccountService.GetAccount(args[0])
+			if err != nil {
+				return err
+			}
+
+			logrus.Infof("account: %+v", account)
+			return nil
+		}
+
+		accounts, err := client.AccountService.ListAccounts()
 		if err != nil {
 			return err
 		}
@@ -21,3 +31,4 @@ var accountsCmd = &cobra.Command{
 		return nil
 	},
 }
+
