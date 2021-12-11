@@ -459,14 +459,19 @@ func (r *BatchPlaceOrderRequest) Do(ctx context.Context) ([]OrderResponse, error
 		return nil, err
 	}
 
-	var orderResponse struct {
+	var apiResponse struct {
 		Code    string          `json:"code"`
 		Message string          `json:"msg"`
 		Data    []OrderResponse `json:"data"`
 	}
-	if err := response.DecodeJSON(&orderResponse); err != nil {
+
+	if err := response.DecodeJSON(&apiResponse); err != nil {
 		return nil, err
 	}
 
-	return orderResponse.Data, nil
+	if apiResponse.Data == nil {
+		return nil, errors.New("api error: [" + apiResponse.Code + "] " + apiResponse.Message)
+	}
+
+	return apiResponse.Data, nil
 }
