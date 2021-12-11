@@ -30,7 +30,7 @@ func init() {
 }
 
 type State struct {
-	Position    *bbgo.Position   `json:"position,omitempty"`
+	Position    *types.Position  `json:"position,omitempty"`
 	ProfitStats bbgo.ProfitStats `json:"profitStats,omitempty"`
 }
 
@@ -119,7 +119,7 @@ func (s *Strategy) LoadState() error {
 
 	// if position is nil, we need to allocate a new position for calculation
 	if s.state.Position == nil {
-		s.state.Position = bbgo.NewPositionFromMarket(s.market)
+		s.state.Position = types.NewPositionFromMarket(s.market)
 	}
 
 	// init profit states
@@ -297,7 +297,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.state.ProfitStats.AddTrade(trade)
 	})
 
-	s.tradeCollector.OnPositionUpdate(func(position *bbgo.Position) {
+	s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
 		log.Infof("position changed: %s", s.state.Position)
 		s.Notify(s.state.Position)
 	})
