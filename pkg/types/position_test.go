@@ -1,4 +1,4 @@
-package bbgo
+package types
 
 import (
 	"testing"
@@ -6,7 +6,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/types"
 )
 
 func TestPosition_ExchangeFeeRate_Short(t *testing.T) {
@@ -17,7 +16,7 @@ func TestPosition_ExchangeFeeRate_Short(t *testing.T) {
 	}
 
 	feeRate := 0.075 * 0.01
-	pos.SetExchangeFeeRate(types.ExchangeBinance, ExchangeFee{
+	pos.SetExchangeFeeRate(ExchangeBinance, ExchangeFee{
 		MakerFeeRate: fixedpoint.NewFromFloat(feeRate),
 		TakerFeeRate: fixedpoint.NewFromFloat(feeRate),
 	})
@@ -27,24 +26,24 @@ func TestPosition_ExchangeFeeRate_Short(t *testing.T) {
 	fee := quoteQuantity * feeRate
 	averageCost := (quoteQuantity - fee) / quantity
 	bnbPrice := 570.0
-	pos.AddTrade(types.Trade{
-		Exchange:      types.ExchangeBinance,
+	pos.AddTrade(Trade{
+		Exchange:      ExchangeBinance,
 		Price:         3000.0,
 		Quantity:      quantity,
 		QuoteQuantity: quoteQuantity,
 		Symbol:        "BTCUSDT",
-		Side:          types.SideTypeSell,
+		Side:          SideTypeSell,
 		Fee:           fee / bnbPrice,
 		FeeCurrency:   "BNB",
 	})
 
-	_, netProfit, madeProfit := pos.AddTrade(types.Trade{
-		Exchange:      types.ExchangeBinance,
+	_, netProfit, madeProfit := pos.AddTrade(Trade{
+		Exchange:      ExchangeBinance,
 		Price:         2000.0,
 		Quantity:      10.0,
 		QuoteQuantity: 2000.0 * 10.0,
 		Symbol:        "BTCUSDT",
-		Side:          types.SideTypeBuy,
+		Side:          SideTypeBuy,
 		Fee:           2000.0 * 10.0 * feeRate / bnbPrice,
 		FeeCurrency:   "BNB",
 	})
@@ -62,7 +61,7 @@ func TestPosition_ExchangeFeeRate_Long(t *testing.T) {
 	}
 
 	feeRate := 0.075 * 0.01
-	pos.SetExchangeFeeRate(types.ExchangeBinance, ExchangeFee{
+	pos.SetExchangeFeeRate(ExchangeBinance, ExchangeFee{
 		MakerFeeRate: fixedpoint.NewFromFloat(feeRate),
 		TakerFeeRate: fixedpoint.NewFromFloat(feeRate),
 	})
@@ -72,24 +71,24 @@ func TestPosition_ExchangeFeeRate_Long(t *testing.T) {
 	fee := quoteQuantity * feeRate
 	averageCost := (quoteQuantity + fee) / quantity
 	bnbPrice := 570.0
-	pos.AddTrade(types.Trade{
-		Exchange:      types.ExchangeBinance,
+	pos.AddTrade(Trade{
+		Exchange:      ExchangeBinance,
 		Price:         3000.0,
 		Quantity:      quantity,
 		QuoteQuantity: quoteQuantity,
 		Symbol:        "BTCUSDT",
-		Side:          types.SideTypeBuy,
+		Side:          SideTypeBuy,
 		Fee:           fee / bnbPrice,
 		FeeCurrency:   "BNB",
 	})
 
-	_, netProfit, madeProfit := pos.AddTrade(types.Trade{
-		Exchange:      types.ExchangeBinance,
+	_, netProfit, madeProfit := pos.AddTrade(Trade{
+		Exchange:      ExchangeBinance,
 		Price:         4000.0,
 		Quantity:      10.0,
 		QuoteQuantity: 4000.0 * 10.0,
 		Symbol:        "BTCUSDT",
-		Side:          types.SideTypeSell,
+		Side:          SideTypeSell,
 		Fee:           4000.0 * 10.0 * feeRate / bnbPrice,
 		FeeCurrency:   "BNB",
 	})
@@ -103,7 +102,7 @@ func TestPosition(t *testing.T) {
 	var feeRate = 0.05 * 0.01
 	var testcases = []struct {
 		name                string
-		trades              []types.Trade
+		trades              []Trade
 		expectedAverageCost fixedpoint.Value
 		expectedBase        fixedpoint.Value
 		expectedQuote       fixedpoint.Value
@@ -111,9 +110,9 @@ func TestPosition(t *testing.T) {
 	}{
 		{
 			name: "base fee",
-			trades: []types.Trade{
+			trades: []Trade{
 				{
-					Side:          types.SideTypeBuy,
+					Side:          SideTypeBuy,
 					Price:         1000.0,
 					Quantity:      0.01,
 					QuoteQuantity: 1000.0 * 0.01,
@@ -128,9 +127,9 @@ func TestPosition(t *testing.T) {
 		},
 		{
 			name: "quote fee",
-			trades: []types.Trade{
+			trades: []Trade{
 				{
-					Side:          types.SideTypeSell,
+					Side:          SideTypeSell,
 					Price:         1000.0,
 					Quantity:      0.01,
 					QuoteQuantity: 1000.0 * 0.01,
@@ -145,15 +144,15 @@ func TestPosition(t *testing.T) {
 		},
 		{
 			name: "long",
-			trades: []types.Trade{
+			trades: []Trade{
 				{
-					Side:          types.SideTypeBuy,
+					Side:          SideTypeBuy,
 					Price:         1000.0,
 					Quantity:      0.01,
 					QuoteQuantity: 1000.0 * 0.01,
 				},
 				{
-					Side:          types.SideTypeBuy,
+					Side:          SideTypeBuy,
 					Price:         2000.0,
 					Quantity:      0.03,
 					QuoteQuantity: 2000.0 * 0.03,
@@ -167,21 +166,21 @@ func TestPosition(t *testing.T) {
 
 		{
 			name: "long and sell",
-			trades: []types.Trade{
+			trades: []Trade{
 				{
-					Side:          types.SideTypeBuy,
+					Side:          SideTypeBuy,
 					Price:         1000.0,
 					Quantity:      0.01,
 					QuoteQuantity: 1000.0 * 0.01,
 				},
 				{
-					Side:          types.SideTypeBuy,
+					Side:          SideTypeBuy,
 					Price:         2000.0,
 					Quantity:      0.03,
 					QuoteQuantity: 2000.0 * 0.03,
 				},
 				{
-					Side:          types.SideTypeSell,
+					Side:          SideTypeSell,
 					Price:         3000.0,
 					Quantity:      0.01,
 					QuoteQuantity: 3000.0 * 0.01,
@@ -195,21 +194,21 @@ func TestPosition(t *testing.T) {
 
 		{
 			name: "long and sell to short",
-			trades: []types.Trade{
+			trades: []Trade{
 				{
-					Side:          types.SideTypeBuy,
+					Side:          SideTypeBuy,
 					Price:         1000.0,
 					Quantity:      0.01,
 					QuoteQuantity: 1000.0 * 0.01,
 				},
 				{
-					Side:          types.SideTypeBuy,
+					Side:          SideTypeBuy,
 					Price:         2000.0,
 					Quantity:      0.03,
 					QuoteQuantity: 2000.0 * 0.03,
 				},
 				{
-					Side:          types.SideTypeSell,
+					Side:          SideTypeSell,
 					Price:         3000.0,
 					Quantity:      0.10,
 					QuoteQuantity: 3000.0 * 0.10,
@@ -224,15 +223,15 @@ func TestPosition(t *testing.T) {
 
 		{
 			name: "short",
-			trades: []types.Trade{
+			trades: []Trade{
 				{
-					Side:          types.SideTypeSell,
+					Side:          SideTypeSell,
 					Price:         2000.0,
 					Quantity:      0.01,
 					QuoteQuantity: 2000.0 * 0.01,
 				},
 				{
-					Side:          types.SideTypeSell,
+					Side:          SideTypeSell,
 					Price:         3000.0,
 					Quantity:      0.03,
 					QuoteQuantity: 3000.0 * 0.03,
