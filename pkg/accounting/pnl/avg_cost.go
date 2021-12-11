@@ -3,7 +3,6 @@ package pnl
 import (
 	"time"
 
-	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -33,8 +32,8 @@ func (c *AverageCostCalculator) Calculate(symbol string, trades []types.Trade, c
 
 	var currencyFees = map[string]float64{}
 
-	var position = bbgo.NewPositionFromMarket(c.Market)
-	position.SetFeeRate(bbgo.ExchangeFee{
+	var position = types.NewPositionFromMarket(c.Market)
+	position.SetFeeRate(types.ExchangeFee{
 		// binance vip 0 uses 0.075%
 		MakerFeeRate: fixedpoint.NewFromFloat(0.075 * 0.01),
 		TakerFeeRate: fixedpoint.NewFromFloat(0.075 * 0.01),
