@@ -41,7 +41,7 @@ func init() {
 type State struct {
 	HedgePosition   fixedpoint.Value `json:"hedgePosition"`
 	CoveredPosition fixedpoint.Value `json:"coveredPosition,omitempty"`
-	Position        *bbgo.Position   `json:"position,omitempty"`
+	Position        *types.Position  `json:"position,omitempty"`
 	ProfitStats     ProfitStats      `json:"profitStats,omitempty"`
 }
 
@@ -680,7 +680,7 @@ func (s *Strategy) LoadState() error {
 
 	// if position is nil, we need to allocate a new position for calculation
 	if s.state.Position == nil {
-		s.state.Position = bbgo.NewPositionFromMarket(s.makerMarket)
+		s.state.Position = types.NewPositionFromMarket(s.makerMarket)
 	}
 
 	s.state.ProfitStats.Symbol = s.makerMarket.Symbol
@@ -794,14 +794,14 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	}
 
 	if s.makerSession.MakerFeeRate > 0 || s.makerSession.TakerFeeRate > 0 {
-		s.state.Position.SetExchangeFeeRate(types.ExchangeName(s.MakerExchange), bbgo.ExchangeFee{
+		s.state.Position.SetExchangeFeeRate(types.ExchangeName(s.MakerExchange), types.ExchangeFee{
 			MakerFeeRate: s.makerSession.MakerFeeRate,
 			TakerFeeRate: s.makerSession.TakerFeeRate,
 		})
 	}
 
 	if s.sourceSession.MakerFeeRate > 0 || s.sourceSession.TakerFeeRate > 0 {
-		s.state.Position.SetExchangeFeeRate(types.ExchangeName(s.SourceExchange), bbgo.ExchangeFee{
+		s.state.Position.SetExchangeFeeRate(types.ExchangeName(s.SourceExchange), types.ExchangeFee{
 			MakerFeeRate: s.sourceSession.MakerFeeRate,
 			TakerFeeRate: s.sourceSession.TakerFeeRate,
 		})
