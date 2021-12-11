@@ -17,12 +17,18 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 )
 
 const defaultHTTPTimeout = time.Second * 15
 const RestBaseURL = "https://api.kucoin.com/api"
 const SandboxRestBaseURL = "https://openapi-sandbox.kucoin.com/api"
+
+type TradeType string
+
+const (
+	TradeTypeSpot   TradeType = "TRADE"
+	TradeTypeMargin TradeType = "MARGIN"
+)
 
 type SideType string
 
@@ -50,8 +56,8 @@ const (
 type OrderType string
 
 const (
-	OrderTypeMarket   OrderType = "market"
-	OrderTypeLimit    OrderType = "limit"
+	OrderTypeMarket OrderType = "market"
+	OrderTypeLimit  OrderType = "limit"
 )
 
 type InstrumentType string
@@ -78,9 +84,9 @@ type RestClient struct {
 	client *http.Client
 
 	Key, Secret, Passphrase string
-	KeyVersion string
+	KeyVersion              string
 
-	AccountService *AccountService
+	AccountService    *AccountService
 	MarketDataService *MarketDataService
 	TradeService      *TradeService
 }
@@ -92,14 +98,14 @@ func NewClient() *RestClient {
 	}
 
 	client := &RestClient{
-		BaseURL: u,
+		BaseURL:    u,
 		KeyVersion: "2",
 		client: &http.Client{
 			Timeout: defaultHTTPTimeout,
 		},
 	}
 
-	client.AccountService = &AccountService{ client: client }
+	client.AccountService = &AccountService{client: client}
 	client.MarketDataService = &MarketDataService{client: client}
 	client.TradeService = &TradeService{client: client}
 	return client
@@ -210,8 +216,6 @@ func (c *RestClient) newAuthenticatedRequest(method, refURL string, params url.V
 	req.Header.Add("KC-API-TIMESTAMP", timestamp)
 	req.Header.Add("KC-API-PASSPHRASE", sign(c.Secret, c.Passphrase))
 	req.Header.Add("KC-API-KEY-VERSION", c.KeyVersion)
-
-	log.Infof("%+v", req.Header)
 	return req, nil
 }
 
