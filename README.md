@@ -562,6 +562,14 @@ Then run the following command to compile the migration files into go files:
 make migrations
 ```
 
+or
+
+```shell
+	rockhopper compile --config rockhopper_mysql.yaml --output pkg/migrations/mysql
+	rockhopper compile --config rockhopper_sqlite.yaml --output pkg/migrations/sqlite3
+	git add -v pkg/migrations && git commit -m "compile and update migration package" pkg/migrations || true
+```
+
 
 If you want to override the DSN and the Driver defined in the YAML config file, you can add some env vars in your dotenv file like this:
 
