@@ -116,7 +116,8 @@ type SubmitOrder struct {
 	MarginSideEffect MarginOrderSideEffectType `json:"marginSideEffect,omitempty"` // AUTO_REPAY = repay, MARGIN_BUY = borrow, defaults to  NO_SIDE_EFFECT
 
 	// futures order fields
-	ReduceOnly bool `json:"reduceOnly" db:"reduce_only"`
+	IsFutures     bool `json:"is_futures" db:"is_futures"`
+	ReduceOnly    bool `json:"reduceOnly" db:"reduce_only"`
 	ClosePosition bool `json:"closePosition" db:"close_position"`
 }
 
@@ -135,7 +136,6 @@ func (o *SubmitOrder) SlackAttachment() slack.Attachment {
 		{Title: "Quantity", Value: o.QuantityString, Short: true},
 	}
 
-
 	if len(o.PriceString) > 0 {
 		fields = append(fields, slack.AttachmentField{Title: "Price", Value: o.PriceString, Short: true})
 	}
@@ -150,7 +150,7 @@ func (o *SubmitOrder) SlackAttachment() slack.Attachment {
 		} else {
 			fields = append(fields, slack.AttachmentField{
 				Title: "Amount",
-				Value: fmt.Sprintf("%f %s", o.Price * o.Quantity, o.Market.QuoteCurrency),
+				Value: fmt.Sprintf("%f %s", o.Price*o.Quantity, o.Market.QuoteCurrency),
 				Short: true,
 			})
 		}
