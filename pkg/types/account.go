@@ -41,11 +41,11 @@ func (b Balance) String() string {
 }
 
 type Asset struct {
-	Currency   string           `json:"currency"`
-	Total      fixedpoint.Value `json:"total"`
-	InUSD      fixedpoint.Value `json:"inUSD"`
-	InBTC      fixedpoint.Value `json:"inBTC"`
-	Time       time.Time        `json:"time"`
+	Currency string           `json:"currency"`
+	Total    fixedpoint.Value `json:"total"`
+	InUSD    fixedpoint.Value `json:"inUSD"`
+	InBTC    fixedpoint.Value `json:"inBTC"`
+	Time     time.Time        `json:"time"`
 }
 
 type AssetMap map[string]Asset
@@ -109,6 +109,7 @@ func (m AssetMap) SlackAttachment() slack.Attachment {
 }
 
 type BalanceMap map[string]Balance
+type PositionMap map[string]Position
 
 func (m BalanceMap) String() string {
 	var ss []string
