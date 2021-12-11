@@ -37,7 +37,7 @@ type TwapExecution struct {
 
 	activeMakerOrders *LocalActiveOrderBook
 	orderStore        *OrderStore
-	position          *Position
+	position          *types.Position
 
 	executionCtx    context.Context
 	cancelExecution context.CancelFunc
@@ -444,7 +444,7 @@ func (e *TwapExecution) Run(parentCtx context.Context) error {
 
 	e.userDataStream = e.Session.Exchange.NewStream()
 	e.userDataStream.OnTradeUpdate(e.handleTradeUpdate)
-	e.position = &Position{
+	e.position = &types.Position{
 		Symbol:        e.Symbol,
 		BaseCurrency:  e.market.BaseCurrency,
 		QuoteCurrency: e.market.QuoteCurrency,
