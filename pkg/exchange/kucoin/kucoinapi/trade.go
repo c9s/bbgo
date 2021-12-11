@@ -356,16 +356,20 @@ func (r *CancelOrderRequest) Do(ctx context.Context) (*CancelOrderResponse, erro
 		return nil, err
 	}
 
-	var orderResponse struct {
+	var apiResponse struct {
 		Code    string               `json:"code"`
 		Message string               `json:"msg"`
 		Data    *CancelOrderResponse `json:"data"`
 	}
-	if err := response.DecodeJSON(&orderResponse); err != nil {
+	if err := response.DecodeJSON(&apiResponse); err != nil {
 		return nil, err
 	}
 
-	return orderResponse.Data, nil
+	if apiResponse.Data == nil {
+		return nil, errors.New("api error: [" + apiResponse.Code + "] " + apiResponse.Message)
+	}
+
+	return apiResponse.Data, nil
 }
 
 type CancelAllOrderRequest struct {
@@ -392,17 +396,21 @@ func (r *CancelAllOrderRequest) Do(ctx context.Context) (*CancelOrderResponse, e
 		return nil, err
 	}
 
-	var orderResponse struct {
+	var apiResponse struct {
 		Code    string               `json:"code"`
 		Message string               `json:"msg"`
 		Data    *CancelOrderResponse `json:"data"`
 	}
 
-	if err := response.DecodeJSON(&orderResponse); err != nil {
+	if err := response.DecodeJSON(&apiResponse); err != nil {
 		return nil, err
 	}
 
-	return orderResponse.Data, nil
+	if apiResponse.Data == nil {
+		return nil, errors.New("api error: [" + apiResponse.Code + "] " + apiResponse.Message)
+	}
+
+	return apiResponse.Data, nil
 }
 
 // Request via this endpoint to place 5 orders at the same time.
