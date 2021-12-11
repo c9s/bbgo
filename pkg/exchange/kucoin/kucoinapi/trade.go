@@ -334,7 +334,7 @@ type CancelOrderResponse struct {
 }
 
 func (r *CancelOrderRequest) Do(ctx context.Context) (*CancelOrderResponse, error) {
-	if r.orderID == nil || r.clientOrderID == nil {
+	if r.orderID == nil && r.clientOrderID == nil {
 		return nil, errors.New("either orderID or clientOrderID is required for canceling order")
 	}
 

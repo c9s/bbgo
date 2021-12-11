@@ -9,6 +9,24 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func init() {
+	ordersCmd.Flags().String("symbol", "", "symbol, BTC-USDT, LTC-USDT...etc")
+	ordersCmd.Flags().String("status", "", "status, active or done")
+	rootCmd.AddCommand(ordersCmd)
+
+	cancelOrderCmd.Flags().String("client-order-id", "", "client order id")
+	cancelOrderCmd.Flags().String("order-id", "", "order id")
+	ordersCmd.AddCommand(cancelOrderCmd)
+
+	placeOrderCmd.Flags().String("symbol", "", "symbol")
+	placeOrderCmd.Flags().String("price", "", "price")
+	placeOrderCmd.Flags().String("size", "", "size")
+	placeOrderCmd.Flags().String("order-type", string(kucoinapi.OrderTypeLimit), "order type")
+	placeOrderCmd.Flags().String("side", "", "buy or sell")
+	ordersCmd.AddCommand(placeOrderCmd)
+}
+
+
 // go run ./examples/kucoin orders
 var ordersCmd = &cobra.Command{
 	Use: "orders",
@@ -50,18 +68,6 @@ var ordersCmd = &cobra.Command{
 	},
 }
 
-func init() {
-	ordersCmd.Flags().String("symbol", "", "symbol, BTC-USDT, LTC-USDT...etc")
-	ordersCmd.Flags().String("status", "", "status, active or done")
-	rootCmd.AddCommand(ordersCmd)
-
-	placeOrderCmd.Flags().String("symbol", "", "symbol")
-	placeOrderCmd.Flags().String("price", "", "price")
-	placeOrderCmd.Flags().String("size", "", "size")
-	placeOrderCmd.Flags().String("order-type", string(kucoinapi.OrderTypeLimit), "order type")
-	placeOrderCmd.Flags().String("side", "", "buy or sell")
-	ordersCmd.AddCommand(placeOrderCmd)
-}
 
 // usage:
 // go run ./examples/kucoin orders place --symbol LTC-USDT --price 50 --size 1 --order-type limit --side buy
@@ -129,3 +135,42 @@ var placeOrderCmd = &cobra.Command{
 	},
 }
 
+
+
+// usage:
+var cancelOrderCmd = &cobra.Command{
+	Use: "cancel",
+
+	// SilenceUsage is an option to silence usage when an error occurs.
+	SilenceUsage: true,
+
+	RunE: func(cmd *cobra.Command, args []string) error {
+		req := client.TradeService.NewCancelOrderRequest()
+
+		orderID, err := cmd.Flags().GetString("order-id")
+		if err != nil {
+			return err
+		}
+
+		clientOrderID, err := cmd.Flags().GetString("client-order-id")
+		if err != nil {
+			return err
+		}
+
+		if len(orderID) > 0 {
+			req.OrderID(orderID)
+		} else if len(clientOrderID) > 0 {
+			req.ClientOrderID(clientOrderID)
+		} else {
+			return errors.New("either order id or client order id is required")
+		}
+
+		response, err := req.Do(context.Background())
+		if err != nil {
+			return err
+		}
+
+		logrus.Infof("cancel order response: %+v", response)
+		return nil
+	},
+}
