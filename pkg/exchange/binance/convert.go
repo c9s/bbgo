@@ -50,7 +50,6 @@ func toGlobalMarket(symbol binance.Symbol) types.Market {
 	return market
 }
 
-
 func toGlobalIsolatedUserAsset(userAsset binance.IsolatedUserAsset) types.IsolatedUserAsset {
 	return types.IsolatedUserAsset{
 		Asset:         userAsset.Asset,
@@ -137,9 +136,8 @@ func toGlobalTicker(stats *binance.PriceChangeStats) (*types.Ticker, error) {
 		Buy:    util.MustParseFloat(stats.BidPrice),
 		Sell:   util.MustParseFloat(stats.AskPrice),
 		Time:   time.Unix(0, stats.CloseTime*int64(time.Millisecond)),
-	},nil
+	}, nil
 }
-
 
 func toLocalOrderType(orderType types.OrderType) (binance.OrderType, error) {
 	switch orderType {
@@ -203,7 +201,7 @@ func millisecondTime(t int64) time.Time {
 	return time.Unix(0, t*int64(time.Millisecond))
 }
 
-func ToGlobalTrade(t binance.TradeV3, isMargin bool) (*types.Trade, error) {
+func toGlobalTrade(t binance.TradeV3, isMargin bool) (*types.Trade, error) {
 	// skip trade ID that is the same. however this should not happen
 	var side types.SideType
 	if t.IsBuyer {
@@ -270,6 +268,20 @@ func toGlobalSideType(side binance.SideType) types.SideType {
 	}
 }
 
+func toGlobalFuturesSideType(side futures.SideType) types.SideType {
+	switch side {
+	case futures.SideTypeBuy:
+		return types.SideTypeBuy
+
+	case futures.SideTypeSell:
+		return types.SideTypeSell
+
+	default:
+		log.Errorf("can not convert futures side type, unknown side type: %q", side)
+		return ""
+	}
+}
+
 func toGlobalOrderType(orderType binance.OrderType) types.OrderType {
 	switch orderType {
 
@@ -285,6 +297,27 @@ func toGlobalOrderType(orderType binance.OrderType) types.OrderType {
 
 	case binance.OrderTypeStopLoss:
 		return types.OrderTypeStopMarket
+
+	default:
+		log.Errorf("unsupported order type: %v", orderType)
+		return ""
+	}
+}
+
+func toGlobalFuturesOrderType(orderType futures.OrderType) types.OrderType {
+	switch orderType {
+	// TODO
+	case futures.OrderTypeLimit: // , futures.OrderTypeLimitMaker, futures.OrderTypeTakeProfitLimit:
+		return types.OrderTypeLimit
+
+	case futures.OrderTypeMarket:
+		return types.OrderTypeMarket
+	// TODO
+	// case futures.OrderTypeStopLossLimit:
+	// 	return types.OrderTypeStopLimit
+	// TODO
+	// case futures.OrderTypeStopLoss:
+	// 	return types.OrderTypeStopMarket
 
 	default:
 		log.Errorf("unsupported order type: %v", orderType)
@@ -313,10 +346,31 @@ func toGlobalOrderStatus(orderStatus binance.OrderStatusType) types.OrderStatus 
 	return types.OrderStatus(orderStatus)
 }
 
+func toGlobalFuturesOrderStatus(orderStatus futures.OrderStatusType) types.OrderStatus {
+	switch orderStatus {
+	case futures.OrderStatusTypeNew:
+		return types.OrderStatusNew
+
+	case futures.OrderStatusTypeRejected:
+		return types.OrderStatusRejected
+
+	case futures.OrderStatusTypeCanceled:
+		return types.OrderStatusCanceled
+
+	case futures.OrderStatusTypePartiallyFilled:
+		return types.OrderStatusPartiallyFilled
+
+	case futures.OrderStatusTypeFilled:
+		return types.OrderStatusFilled
+	}
+
+	return types.OrderStatus(orderStatus)
+}
+
 // ConvertTrades converts the binance v3 trade into the global trade type
 func ConvertTrades(remoteTrades []*binance.TradeV3) (trades []types.Trade, err error) {
 	for _, t := range remoteTrades {
-		trade, err := ToGlobalTrade(*t, false)
+		trade, err := toGlobalTrade(*t, false)
 		if err != nil {
 			return nil, errors.Wrapf(err, "binance v3 trade parse error, trade: %+v", *t)
 		}
@@ -364,4 +418,3 @@ func convertPremiumIndex(index *futures.PremiumIndex) (*types.PremiumIndex, erro
 		Time:            t,
 	}, nil
 }
-
