@@ -54,6 +54,16 @@ func (s *Stream) EmitContinuousKLineEvent(e *ContinuousKLineEvent) {
 	}
 }
 
+func (s *Stream) OnContinuousKLineClosedEvent(cb func(e *ContinuousKLineEvent)) {
+	s.continuousKLineClosedEventCallbacks = append(s.continuousKLineClosedEventCallbacks, cb)
+}
+
+func (s *Stream) EmitContinuousKLineClosedEvent(e *ContinuousKLineEvent) {
+	for _, cb := range s.continuousKLineClosedEventCallbacks {
+		cb(e)
+	}
+}
+
 func (s *Stream) OnBalanceUpdateEvent(cb func(event *BalanceUpdateEvent)) {
 	s.balanceUpdateEventCallbacks = append(s.balanceUpdateEventCallbacks, cb)
 }
@@ -94,6 +104,16 @@ func (s *Stream) EmitExecutionReportEvent(event *ExecutionReportEvent) {
 	}
 }
 
+func (s *Stream) OnOrderTradeUpdateEvent(cb func(e *OrderTradeUpdateEvent)) {
+	s.orderTradeUpdateEventCallbacks = append(s.orderTradeUpdateEventCallbacks, cb)
+}
+
+func (s *Stream) EmitOrderTradeUpdateEvent(e *OrderTradeUpdateEvent) {
+	for _, cb := range s.orderTradeUpdateEventCallbacks {
+		cb(e)
+	}
+}
+
 type StreamEventHub interface {
 	OnDepthEvent(cb func(e *DepthEvent))
 
@@ -105,6 +125,8 @@ type StreamEventHub interface {
 
 	OnContinuousKLineEvent(cb func(e *ContinuousKLineEvent))
 
+	OnContinuousKLineClosedEvent(cb func(e *ContinuousKLineEvent))
+
 	OnBalanceUpdateEvent(cb func(event *BalanceUpdateEvent))
 
 	OnOutboundAccountInfoEvent(cb func(event *OutboundAccountInfoEvent))
@@ -112,4 +134,6 @@ type StreamEventHub interface {
 	OnOutboundAccountPositionEvent(cb func(event *OutboundAccountPositionEvent))
 
 	OnExecutionReportEvent(cb func(event *ExecutionReportEvent))
+
+	OnOrderTradeUpdateEvent(cb func(e *OrderTradeUpdateEvent))
 }

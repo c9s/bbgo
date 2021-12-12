@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/adshao/go-binance/v2/futures"
 	"time"
 
 	"github.com/adshao/go-binance/v2"
@@ -292,15 +293,23 @@ func ParseEvent(message string) (interface{}, error) {
 
 	case "depthUpdate":
 		return parseDepthEvent(val)
-	
+
 	case "markPriceUpdate":
 		var event MarkPriceUpdateEvent
 		err := json.Unmarshal([]byte(message), &event)
 		return &event, err
-         case "continuousKline":
-                 var event ContinuousKLineEvent
-                 err := json.Unmarshal([]byte(message), &event)
-                 return &event, err
+
+	// Binance futures data --------------
+	case "continuousKline":
+		var event ContinuousKLineEvent
+		err := json.Unmarshal([]byte(message), &event)
+		return &event, err
+
+	case "ORDER_TRADE_UPDATE":
+		var event OrderTradeUpdateEvent
+		err := json.Unmarshal([]byte(message), &event)
+		return &event, err
+
 	default:
 		id := val.GetInt("id")
 		if id > 0 {
@@ -470,6 +479,37 @@ type KLine struct {
 	Closed         bool  `json:"x"`
 }
 
+/*
+
+kline
+
+{
+  "e": "kline",     // KLineEvent type
+  "E": 123456789,   // KLineEvent time
+  "s": "BNBBTC",    // Symbol
+  "k": {
+    "t": 123400000, // Kline start time
+    "T": 123460000, // Kline close time
+    "s": "BNBBTC",  // Symbol
+    "i": "1m",      // Interval
+    "f": 100,       // First trade ID
+    "L": 200,       // Last trade ID
+    "o": "0.0010",  // Open price
+    "c": "0.0020",  // Close price
+    "h": "0.0025",  // High price
+    "l": "0.0015",  // Low price
+    "v": "1000",    // Base asset volume
+    "n": 100,       // Number of trades
+    "x": false,     // Is this kline closed?
+    "q": "1.0000",  // Quote asset volume
+    "V": "500",     // Taker buy base asset volume
+    "Q": "0.500",   // Taker buy quote asset volume
+    "B": "123456"   // Ignore
+  }
+}
+
+*/
+
 type KLineEvent struct {
 	EventBase
 	Symbol string `json:"s"`
@@ -497,18 +537,17 @@ func (k *KLine) KLine() types.KLine {
 	}
 }
 
-
 type MarkPriceUpdateEvent struct {
 	EventBase
 
-	Symbol        string `json:"s"`
+	Symbol string `json:"s"`
 
-	MarkPrice	fixedpoint.Value  `json:"p"`
-	IndexPrice	fixedpoint.Value  `json:"i"`
-	EstimatedPrice	fixedpoint.Value  `json:"P"`
-	
-	FundingRate	fixedpoint.Value  `json:"r"`
-	NextFundingTime	int64		  `json:"T"`
+	MarkPrice      fixedpoint.Value `json:"p"`
+	IndexPrice     fixedpoint.Value `json:"i"`
+	EstimatedPrice fixedpoint.Value `json:"P"`
+
+	FundingRate     fixedpoint.Value `json:"r"`
+	NextFundingTime int64            `json:"T"`
 }
 
 /*
@@ -558,36 +597,123 @@ type ContinuousKLineEvent struct {
 }
 */
 
-/*
+// Similar to the ExecutionReportEvent's fields. But with totally different json key.
+// e.g., Stop price. So that, we can not merge them.
+type OrderTrade struct {
+	Symbol           string `json:"s"`
+	ClientOrderID    string `json:"c"`
+	Side             string `json:"S"`
+	OrderType        string `json:"o"`
+	TimeInForce      string `json:"f"`
+	OriginalQuantity string `json:"q"`
+	OriginalPrice    string `json:"p"`
 
-kline
+	AveragePrice         string `json:"ap"`
+	StopPrice            string `json:"sp"`
+	CurrentExecutionType string `json:"x"`
+	CurrentOrderStatus   string `json:"X"`
 
-{
-  "e": "kline",     // KLineEvent type
-  "E": 123456789,   // KLineEvent time
-  "s": "BNBBTC",    // Symbol
-  "k": {
-    "t": 123400000, // Kline start time
-    "T": 123460000, // Kline close time
-    "s": "BNBBTC",  // Symbol
-    "i": "1m",      // Interval
-    "f": 100,       // First trade ID
-    "L": 200,       // Last trade ID
-    "o": "0.0010",  // Open price
-    "c": "0.0020",  // Close price
-    "h": "0.0025",  // High price
-    "l": "0.0015",  // Low price
-    "v": "1000",    // Base asset volume
-    "n": 100,       // Number of trades
-    "x": false,     // Is this kline closed?
-    "q": "1.0000",  // Quote asset volume
-    "V": "500",     // Taker buy base asset volume
-    "Q": "0.500",   // Taker buy quote asset volume
-    "B": "123456"   // Ignore
-  }
+	OrderId                        int64  `json:"i"`
+	OrderLastFilledQuantity        string `json:"l"`
+	OrderFilledAccumulatedQuantity string `json:"z"`
+	LastFilledPrice                string `json:"L"`
+
+	CommissionAmount string `json:"n"`
+	CommissionAsset  string `json:"N"`
+
+	OrderTradeTime int64 `json:"T"`
+	TradeId        int64 `json:"t"`
+
+	BidsNotional string `json:"b"`
+	AskNotional  string `json:"a"`
+
+	IsMaker      bool `json:"m"`
+	IsReduceOnly bool ` json:"r"`
+
+	StopPriceWorkingType string `json:"wt"`
+	OriginalOrderType    string `json:"ot"`
+	PositionSide         string `json:"ps"`
+	RealizedProfit       string `json:"rp"`
 }
 
-*/
+type OrderTradeUpdateEvent struct {
+	EventBase
+	Transaction int64      `json:"T"`
+	OrderTrade  OrderTrade `json:"o"`
+}
+
+// {
+
+// 	"e":"ORDER_TRADE_UPDATE",     // Event Type
+// 	"E":1568879465651,            // Event Time
+// 	"T":1568879465650,            // Transaction Time
+// 	"o":{
+// 	  "s":"BTCUSDT",              // Symbol
+// 	  "c":"TEST",                 // Client Order Id
+// 		// special client order id:
+// 		// starts with "autoclose-": liquidation order
+// 		// "adl_autoclose": ADL auto close order
+// 	  "S":"SELL",                 // Side
+// 	  "o":"TRAILING_STOP_MARKET", // Order Type
+// 	  "f":"GTC",                  // Time in Force
+// 	  "q":"0.001",                // Original Quantity
+// 	  "p":"0",                    // Original Price
+// 	  "ap":"0",                   // Average Price
+// 	  "sp":"7103.04",             // Stop Price. Please ignore with TRAILING_STOP_MARKET order
+// 	  "x":"NEW",                  // Execution Type
+// 	  "X":"NEW",                  // Order Status
+// 	  "i":8886774,                // Order Id
+// 	  "l":"0",                    // Order Last Filled Quantity
+// 	  "z":"0",                    // Order Filled Accumulated Quantity
+// 	  "L":"0",                    // Last Filled Price
+// 	  "N":"USDT",             // Commission Asset, will not push if no commission
+// 	  "n":"0",                // Commission, will not push if no commission
+// 	  "T":1568879465651,          // Order Trade Time
+// 	  "t":0,                      // Trade Id
+// 	  "b":"0",                    // Bids Notional
+// 	  "a":"9.91",                 // Ask Notional
+// 	  "m":false,                  // Is this trade the maker side?
+// 	  "R":false,                  // Is this reduce only
+// 	  "wt":"CONTRACT_PRICE",      // Stop Price Working Type
+// 	  "ot":"TRAILING_STOP_MARKET",    // Original Order Type
+// 	  "ps":"LONG",                        // Position Side
+// 	  "cp":false,                     // If Close-All, pushed with conditional order
+// 	  "AP":"7476.89",             // Activation Price, only puhed with TRAILING_STOP_MARKET order
+// 	  "cr":"5.0",                 // Callback Rate, only puhed with TRAILING_STOP_MARKET order
+// 	  "rp":"0"                            // Realized Profit of the trade
+// 	}
+
+//   }
+
+func (e *OrderTradeUpdateEvent) OrderFutures() (*types.Order, error) {
+
+	switch e.OrderTrade.CurrentExecutionType {
+	case "NEW", "CANCELED", "EXPIRED":
+	case "CALCULATED - Liquidation Execution":
+	case "TRADE": // For Order FILLED status. And the order has been completed.
+	default:
+		return nil, errors.New("execution report type is not for futures order")
+	}
+
+	orderCreationTime := time.Unix(0, e.OrderTrade.OrderTradeTime*int64(time.Millisecond))
+	return &types.Order{
+		Exchange: types.ExchangeBinance,
+		SubmitOrder: types.SubmitOrder{
+			Symbol:        e.OrderTrade.Symbol,
+			ClientOrderID: e.OrderTrade.ClientOrderID,
+			Side:          toGlobalFuturesSideType(futures.SideType(e.OrderTrade.Side)),
+			Type:          toGlobalFuturesOrderType(futures.OrderType(e.OrderTrade.OrderType)),
+			Quantity:      util.MustParseFloat(e.OrderTrade.OriginalQuantity),
+			Price:         util.MustParseFloat(e.OrderTrade.OriginalPrice),
+			TimeInForce:   e.OrderTrade.TimeInForce,
+		},
+		OrderID:          uint64(e.OrderTrade.OrderId),
+		Status:           toGlobalFuturesOrderStatus(futures.OrderStatusType(e.OrderTrade.CurrentOrderStatus)),
+		ExecutedQuantity: util.MustParseFloat(e.OrderTrade.OrderFilledAccumulatedQuantity),
+		CreationTime:     types.Time(orderCreationTime),
+	}, nil
+}
+
 type EventBase struct {
 	Event string `json:"e"` // event
 	Time  int64  `json:"E"`
