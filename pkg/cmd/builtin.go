@@ -12,6 +12,7 @@ import (
 	_ "github.com/c9s/bbgo/pkg/strategy/kline"
 	_ "github.com/c9s/bbgo/pkg/strategy/pricealert"
 	_ "github.com/c9s/bbgo/pkg/strategy/pricedrop"
+	_ "github.com/c9s/bbgo/pkg/strategy/rebalance"
 	_ "github.com/c9s/bbgo/pkg/strategy/schedule"
 	_ "github.com/c9s/bbgo/pkg/strategy/support"
 	_ "github.com/c9s/bbgo/pkg/strategy/swing"
