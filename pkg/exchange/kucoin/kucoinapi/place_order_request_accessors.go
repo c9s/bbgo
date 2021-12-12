@@ -4,6 +4,7 @@ package kucoinapi
 
 import (
 	"fmt"
+	"github.com/google/uuid"
 	"net/url"
 )
 
@@ -60,6 +61,9 @@ func (r *PlaceOrderRequest) getParameters() (map[string]interface{}, error) {
 
 		params["clientOid"] = clientOrderID
 	} else {
+		clientOrderID := uuid.New().String()
+
+		params["clientOid"] = clientOrderID
 	}
 
 	// check symbol field -> json key symbol
