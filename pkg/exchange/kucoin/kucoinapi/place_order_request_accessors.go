@@ -27,8 +27,8 @@ func (r *PlaceOrderRequest) Side(side SideType) *PlaceOrderRequest {
 	return r
 }
 
-func (r *PlaceOrderRequest) OrdType(ordType OrderType) *PlaceOrderRequest {
-	r.ordType = ordType
+func (r *PlaceOrderRequest) OrderType(orderType OrderType) *PlaceOrderRequest {
+	r.orderType = orderType
 	return r
 }
 
@@ -59,6 +59,7 @@ func (r *PlaceOrderRequest) getParameters() (map[string]interface{}, error) {
 		}
 
 		params["clientOid"] = clientOrderID
+	} else {
 	}
 
 	// check symbol field -> json key symbol
@@ -75,6 +76,7 @@ func (r *PlaceOrderRequest) getParameters() (map[string]interface{}, error) {
 		tag := *r.tag
 
 		params["tag"] = tag
+	} else {
 	}
 
 	// check side field -> json key side
@@ -82,10 +84,10 @@ func (r *PlaceOrderRequest) getParameters() (map[string]interface{}, error) {
 
 	params["side"] = side
 
-	// check ordType field -> json key ordType
-	ordType := r.ordType
+	// check orderType field -> json key ordType
+	orderType := r.orderType
 
-	params["ordType"] = ordType
+	params["ordType"] = orderType
 
 	// check size field -> json key size
 	size := r.size
@@ -101,6 +103,7 @@ func (r *PlaceOrderRequest) getParameters() (map[string]interface{}, error) {
 		price := *r.price
 
 		params["price"] = price
+	} else {
 	}
 
 	// check timeInForce field -> json key timeInForce
@@ -112,6 +115,7 @@ func (r *PlaceOrderRequest) getParameters() (map[string]interface{}, error) {
 		}
 
 		params["timeInForce"] = timeInForce
+	} else {
 	}
 	return params, nil
 }
