@@ -3,6 +3,7 @@
 package kucoinapi
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/google/uuid"
 	"net/url"
@@ -48,7 +49,7 @@ func (r *PlaceOrderRequest) TimeInForce(timeInForce TimeInForceType) *PlaceOrder
 	return r
 }
 
-func (r *PlaceOrderRequest) getParameters() (map[string]interface{}, error) {
+func (r *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
 
 	// check clientOrderID field -> json key clientOid
@@ -59,10 +60,14 @@ func (r *PlaceOrderRequest) getParameters() (map[string]interface{}, error) {
 			return params, fmt.Errorf("clientOid is required, empty string given")
 		}
 
+		// assign parameter of clientOrderID
 		params["clientOid"] = clientOrderID
 	} else {
+
+		// assign default of clientOrderID
 		clientOrderID := uuid.New().String()
 
+		// assign parameter of clientOrderID
 		params["clientOid"] = clientOrderID
 	}
 
@@ -73,24 +78,27 @@ func (r *PlaceOrderRequest) getParameters() (map[string]interface{}, error) {
 		return params, fmt.Errorf("symbol is required, empty string given")
 	}
 
+	// assign parameter of symbol
 	params["symbol"] = symbol
 
 	// check tag field -> json key tag
 	if r.tag != nil {
 		tag := *r.tag
 
+		// assign parameter of tag
 		params["tag"] = tag
-	} else {
 	}
 
 	// check side field -> json key side
 	side := r.side
 
+	// assign parameter of side
 	params["side"] = side
 
 	// check orderType field -> json key ordType
 	orderType := r.orderType
 
+	// assign parameter of orderType
 	params["ordType"] = orderType
 
 	// check size field -> json key size
@@ -100,14 +108,15 @@ func (r *PlaceOrderRequest) getParameters() (map[string]interface{}, error) {
 		return params, fmt.Errorf("size is required, empty string given")
 	}
 
+	// assign parameter of size
 	params["size"] = size
 
 	// check price field -> json key price
 	if r.price != nil {
 		price := *r.price
 
+		// assign parameter of price
 		params["price"] = price
-	} else {
 	}
 
 	// check timeInForce field -> json key timeInForce
@@ -118,16 +127,17 @@ func (r *PlaceOrderRequest) getParameters() (map[string]interface{}, error) {
 			return params, fmt.Errorf("timeInForce is required, empty string given")
 		}
 
+		// assign parameter of timeInForce
 		params["timeInForce"] = timeInForce
-	} else {
 	}
+
 	return params, nil
 }
 
-func (r *PlaceOrderRequest) getQuery() (url.Values, error) {
+func (r *PlaceOrderRequest) GetParametersQuery() (url.Values, error) {
 	query := url.Values{}
 
-	params, err := r.getParameters()
+	params, err := r.GetParameters()
 	if err != nil {
 		return query, err
 	}
@@ -137,4 +147,13 @@ func (r *PlaceOrderRequest) getQuery() (url.Values, error) {
 	}
 
 	return query, nil
+}
+
+func (r *PlaceOrderRequest) GetParametersJSON() ([]byte, error) {
+	params, err := r.GetParameters()
+	if err != nil {
+		return nil, err
+	}
+
+	return json.Marshal(params)
 }

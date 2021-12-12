@@ -3,6 +3,7 @@
 package kucoinapi
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/url"
 )
@@ -17,31 +18,32 @@ func (c *CancelOrderRequest) ClientOrderID(clientOrderID string) *CancelOrderReq
 	return c
 }
 
-func (c *CancelOrderRequest) getParameters() (map[string]interface{}, error) {
+func (c *CancelOrderRequest) GetParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
 
 	// check orderID field -> json key orderID
 	if c.orderID != nil {
 		orderID := *c.orderID
 
+		// assign parameter of orderID
 		params["orderID"] = orderID
-	} else {
 	}
 
 	// check clientOrderID field -> json key clientOrderID
 	if c.clientOrderID != nil {
 		clientOrderID := *c.clientOrderID
 
+		// assign parameter of clientOrderID
 		params["clientOrderID"] = clientOrderID
-	} else {
 	}
+
 	return params, nil
 }
 
-func (c *CancelOrderRequest) getQuery() (url.Values, error) {
+func (c *CancelOrderRequest) GetParametersQuery() (url.Values, error) {
 	query := url.Values{}
 
-	params, err := c.getParameters()
+	params, err := c.GetParameters()
 	if err != nil {
 		return query, err
 	}
@@ -51,4 +53,13 @@ func (c *CancelOrderRequest) getQuery() (url.Values, error) {
 	}
 
 	return query, nil
+}
+
+func (c *CancelOrderRequest) GetParametersJSON() ([]byte, error) {
+	params, err := c.GetParameters()
+	if err != nil {
+		return nil, err
+	}
+
+	return json.Marshal(params)
 }

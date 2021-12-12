@@ -3,6 +3,7 @@
 package kucoinapi
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -44,7 +45,7 @@ func (r *ListOrdersRequest) EndAt(endAt time.Time) *ListOrdersRequest {
 	return r
 }
 
-func (r *ListOrdersRequest) getParameters() (map[string]interface{}, error) {
+func (r *ListOrdersRequest) GetParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
 
 	// check status field -> json key status
@@ -60,16 +61,16 @@ func (r *ListOrdersRequest) getParameters() (map[string]interface{}, error) {
 
 		}
 
+		// assign parameter of status
 		params["status"] = status
-	} else {
 	}
 
 	// check symbol field -> json key symbol
 	if r.symbol != nil {
 		symbol := *r.symbol
 
+		// assign parameter of symbol
 		params["symbol"] = symbol
-	} else {
 	}
 
 	// check side field -> json key side
@@ -85,50 +86,51 @@ func (r *ListOrdersRequest) getParameters() (map[string]interface{}, error) {
 
 		}
 
+		// assign parameter of side
 		params["side"] = side
-	} else {
 	}
 
 	// check orderType field -> json key type
 	if r.orderType != nil {
 		orderType := *r.orderType
 
+		// assign parameter of orderType
 		params["type"] = orderType
-	} else {
 	}
 
 	// check tradeType field -> json key tradeType
 	if r.tradeType != nil {
 		tradeType := *r.tradeType
 
+		// assign parameter of tradeType
 		params["tradeType"] = tradeType
-	} else {
 	}
 
 	// check startAt field -> json key startAt
 	if r.startAt != nil {
 		startAt := *r.startAt
 
+		// assign parameter of startAt
 		// convert time.Time to milliseconds time
 		params["startAt"] = strconv.FormatInt(startAt.UnixNano()/int64(time.Millisecond), 10)
-	} else {
 	}
 
 	// check endAt field -> json key endAt
 	if r.endAt != nil {
 		endAt := *r.endAt
 
+		// assign parameter of endAt
 		// convert time.Time to milliseconds time
 		params["endAt"] = strconv.FormatInt(endAt.UnixNano()/int64(time.Millisecond), 10)
-	} else {
 	}
+
 	return params, nil
 }
 
-func (r *ListOrdersRequest) getQuery() (url.Values, error) {
+func (r *ListOrdersRequest) GetParametersQuery() (url.Values, error) {
 	query := url.Values{}
 
-	params, err := r.getParameters()
+	params, err := r.GetParameters()
 	if err != nil {
 		return query, err
 	}
@@ -138,4 +140,13 @@ func (r *ListOrdersRequest) getQuery() (url.Values, error) {
 	}
 
 	return query, nil
+}
+
+func (r *ListOrdersRequest) GetParametersJSON() ([]byte, error) {
+	params, err := r.GetParameters()
+	if err != nil {
+		return nil, err
+	}
+
+	return json.Marshal(params)
 }
