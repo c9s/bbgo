@@ -114,6 +114,26 @@ func (stream *StandardStream) EmitBookSnapshot(book SliceOrderBook) {
 	}
 }
 
+func (stream *StandardStream) OnPositionUpdate(cb func(position PositionMap)) {
+	stream.PositionUpdateCallbacks = append(stream.PositionUpdateCallbacks, cb)
+}
+
+func (stream *StandardStream) EmitPositionUpdate(position PositionMap) {
+	for _, cb := range stream.PositionUpdateCallbacks {
+		cb(position)
+	}
+}
+
+func (stream *StandardStream) OnPositionSnapshot(cb func(position PositionMap)) {
+	stream.PositionSnapshotCallbacks = append(stream.PositionSnapshotCallbacks, cb)
+}
+
+func (stream *StandardStream) EmitPositionSnapshot(position PositionMap) {
+	for _, cb := range stream.PositionSnapshotCallbacks {
+		cb(position)
+	}
+}
+
 type StandardStreamEventHub interface {
 	OnStart(cb func())
 
@@ -136,4 +156,8 @@ type StandardStreamEventHub interface {
 	OnBookUpdate(cb func(book SliceOrderBook))
 
 	OnBookSnapshot(cb func(book SliceOrderBook))
+
+	OnPositionUpdate(cb func(position PositionMap))
+
+	OnPositionSnapshot(cb func(position PositionMap))
 }
