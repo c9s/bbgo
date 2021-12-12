@@ -7,52 +7,52 @@ import (
 	"net/url"
 )
 
-func (p *PlaceOrderRequest) ClientOrderID(clientOrderID string) *PlaceOrderRequest {
-	p.clientOrderID = &clientOrderID
-	return p
+func (r *PlaceOrderRequest) ClientOrderID(clientOrderID string) *PlaceOrderRequest {
+	r.clientOrderID = &clientOrderID
+	return r
 }
 
-func (p *PlaceOrderRequest) Symbol(symbol string) *PlaceOrderRequest {
-	p.symbol = symbol
-	return p
+func (r *PlaceOrderRequest) Symbol(symbol string) *PlaceOrderRequest {
+	r.symbol = symbol
+	return r
 }
 
-func (p *PlaceOrderRequest) Tag(tag string) *PlaceOrderRequest {
-	p.tag = &tag
-	return p
+func (r *PlaceOrderRequest) Tag(tag string) *PlaceOrderRequest {
+	r.tag = &tag
+	return r
 }
 
-func (p *PlaceOrderRequest) Side(side SideType) *PlaceOrderRequest {
-	p.side = side
-	return p
+func (r *PlaceOrderRequest) Side(side SideType) *PlaceOrderRequest {
+	r.side = side
+	return r
 }
 
-func (p *PlaceOrderRequest) OrdType(ordType OrderType) *PlaceOrderRequest {
-	p.ordType = ordType
-	return p
+func (r *PlaceOrderRequest) OrdType(ordType OrderType) *PlaceOrderRequest {
+	r.ordType = ordType
+	return r
 }
 
-func (p *PlaceOrderRequest) Size(size string) *PlaceOrderRequest {
-	p.size = size
-	return p
+func (r *PlaceOrderRequest) Size(size string) *PlaceOrderRequest {
+	r.size = size
+	return r
 }
 
-func (p *PlaceOrderRequest) Price(price string) *PlaceOrderRequest {
-	p.price = &price
-	return p
+func (r *PlaceOrderRequest) Price(price string) *PlaceOrderRequest {
+	r.price = &price
+	return r
 }
 
-func (p *PlaceOrderRequest) TimeInForce(timeInForce TimeInForceType) *PlaceOrderRequest {
-	p.timeInForce = &timeInForce
-	return p
+func (r *PlaceOrderRequest) TimeInForce(timeInForce TimeInForceType) *PlaceOrderRequest {
+	r.timeInForce = &timeInForce
+	return r
 }
 
-func (p *PlaceOrderRequest) getParameters() (map[string]interface{}, error) {
+func (r *PlaceOrderRequest) getParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
 
 	// check clientOrderID field -> json key clientOid
-	if p.clientOrderID != nil {
-		clientOrderID := *p.clientOrderID
+	if r.clientOrderID != nil {
+		clientOrderID := *r.clientOrderID
 
 		if len(clientOrderID) == 0 {
 			return params, fmt.Errorf("clientOid is required, empty string given")
@@ -62,7 +62,7 @@ func (p *PlaceOrderRequest) getParameters() (map[string]interface{}, error) {
 	}
 
 	// check symbol field -> json key symbol
-	symbol := p.symbol
+	symbol := r.symbol
 
 	if len(symbol) == 0 {
 		return params, fmt.Errorf("symbol is required, empty string given")
@@ -71,24 +71,24 @@ func (p *PlaceOrderRequest) getParameters() (map[string]interface{}, error) {
 	params["symbol"] = symbol
 
 	// check tag field -> json key tag
-	if p.tag != nil {
-		tag := *p.tag
+	if r.tag != nil {
+		tag := *r.tag
 
 		params["tag"] = tag
 	}
 
 	// check side field -> json key side
-	side := p.side
+	side := r.side
 
 	params["side"] = side
 
 	// check ordType field -> json key ordType
-	ordType := p.ordType
+	ordType := r.ordType
 
 	params["ordType"] = ordType
 
 	// check size field -> json key size
-	size := p.size
+	size := r.size
 
 	if len(size) == 0 {
 		return params, fmt.Errorf("size is required, empty string given")
@@ -97,15 +97,15 @@ func (p *PlaceOrderRequest) getParameters() (map[string]interface{}, error) {
 	params["size"] = size
 
 	// check price field -> json key price
-	if p.price != nil {
-		price := *p.price
+	if r.price != nil {
+		price := *r.price
 
 		params["price"] = price
 	}
 
 	// check timeInForce field -> json key timeInForce
-	if p.timeInForce != nil {
-		timeInForce := *p.timeInForce
+	if r.timeInForce != nil {
+		timeInForce := *r.timeInForce
 
 		if len(timeInForce) == 0 {
 			return params, fmt.Errorf("timeInForce is required, empty string given")
@@ -116,10 +116,10 @@ func (p *PlaceOrderRequest) getParameters() (map[string]interface{}, error) {
 	return params, nil
 }
 
-func (p *PlaceOrderRequest) getQuery() (url.Values, error) {
+func (r *PlaceOrderRequest) getQuery() (url.Values, error) {
 	query := url.Values{}
 
-	params, err := p.getParameters()
+	params, err := r.getParameters()
 	if err != nil {
 		return query, err
 	}
