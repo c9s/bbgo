@@ -3,6 +3,7 @@
 package kucoinapi
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/url"
 )
@@ -17,31 +18,32 @@ func (r *CancelAllOrderRequest) TradeType(tradeType string) *CancelAllOrderReque
 	return r
 }
 
-func (r *CancelAllOrderRequest) getParameters() (map[string]interface{}, error) {
+func (r *CancelAllOrderRequest) GetParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
 
 	// check symbol field -> json key symbol
 	if r.symbol != nil {
 		symbol := *r.symbol
 
+		// assign parameter of symbol
 		params["symbol"] = symbol
-	} else {
 	}
 
 	// check tradeType field -> json key tradeType
 	if r.tradeType != nil {
 		tradeType := *r.tradeType
 
+		// assign parameter of tradeType
 		params["tradeType"] = tradeType
-	} else {
 	}
+
 	return params, nil
 }
 
-func (r *CancelAllOrderRequest) getQuery() (url.Values, error) {
+func (r *CancelAllOrderRequest) GetParametersQuery() (url.Values, error) {
 	query := url.Values{}
 
-	params, err := r.getParameters()
+	params, err := r.GetParameters()
 	if err != nil {
 		return query, err
 	}
@@ -51,4 +53,13 @@ func (r *CancelAllOrderRequest) getQuery() (url.Values, error) {
 	}
 
 	return query, nil
+}
+
+func (r *CancelAllOrderRequest) GetParametersJSON() ([]byte, error) {
+	params, err := r.GetParameters()
+	if err != nil {
+		return nil, err
+	}
+
+	return json.Marshal(params)
 }

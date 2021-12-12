@@ -6,7 +6,6 @@ import (
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 )
 
@@ -98,7 +97,7 @@ type OrderListPage struct {
 }
 
 func (r *ListOrdersRequest) Do(ctx context.Context) (*OrderListPage, error) {
-	params, err := r.getQuery()
+	params, err := r.GetParametersQuery()
 	if err != nil {
 		return nil, err
 	}
@@ -164,7 +163,7 @@ type PlaceOrderRequest struct {
 }
 
 func (r *PlaceOrderRequest) Do(ctx context.Context) (*OrderResponse, error) {
-	payload, err := r.getParameters()
+	payload, err := r.GetParameters()
 	if err != nil {
 		return nil, err
 	}
@@ -260,7 +259,7 @@ type CancelAllOrderRequest struct {
 }
 
 func (r *CancelAllOrderRequest) Do(ctx context.Context) (*CancelOrderResponse, error) {
-	params, err := r.getQuery()
+	params, err := r.GetParametersQuery()
 	if err != nil {
 		return nil, err
 	}
@@ -315,13 +314,9 @@ func (r *BatchPlaceOrderRequest) Add(reqs ...*PlaceOrderRequest) *BatchPlaceOrde
 func (r *BatchPlaceOrderRequest) Do(ctx context.Context) ([]OrderResponse, error) {
 	var orderList []map[string]interface{}
 	for _, req := range r.reqs {
-		params, err := req.getParameters()
+		params, err := req.GetParameters()
 		if err != nil {
 			return nil, err
-		}
-
-		if _, ok := params["clientOid"]; !ok {
-			params["clientOid"] = uuid.New().String()
 		}
 
 		orderList = append(orderList, params)
