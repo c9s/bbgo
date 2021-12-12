@@ -143,7 +143,7 @@ type PlaceOrderRequest struct {
 	client *RestClient
 
 	// A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 32 characters.
-	clientOrderID *string `param:"clientOid,required"`
+	clientOrderID *string `param:"clientOid,required" defaultValuer:"uuid()"`
 
 	symbol string `param:"symbol,required"`
 
@@ -167,10 +167,6 @@ func (r *PlaceOrderRequest) Do(ctx context.Context) (*OrderResponse, error) {
 	payload, err := r.getParameters()
 	if err != nil {
 		return nil, err
-	}
-
-	if _, ok := payload["clientOid"]; !ok {
-		payload["clientOid"] = uuid.New().String()
 	}
 
 	req, err := r.client.newAuthenticatedRequest("POST", "/api/v1/orders", nil, payload)
@@ -200,21 +196,12 @@ func (r *PlaceOrderRequest) Do(ctx context.Context) (*OrderResponse, error) {
 	return orderResponse.Data, nil
 }
 
+//go:generate requestgen -type CancelOrderRequest
 type CancelOrderRequest struct {
 	client *RestClient
 
-	orderID       *string
-	clientOrderID *string
-}
-
-func (r *CancelOrderRequest) OrderID(orderID string) *CancelOrderRequest {
-	r.orderID = &orderID
-	return r
-}
-
-func (r *CancelOrderRequest) ClientOrderID(clientOrderID string) *CancelOrderRequest {
-	r.clientOrderID = &clientOrderID
-	return r
+	orderID       *string `param:"orderID"`
+	clientOrderID *string `param:"clientOrderID"`
 }
 
 type CancelOrderResponse struct {
@@ -264,21 +251,21 @@ func (r *CancelOrderRequest) Do(ctx context.Context) (*CancelOrderResponse, erro
 	return apiResponse.Data, nil
 }
 
+//go:generate requestgen -type CancelAllOrderRequest
 type CancelAllOrderRequest struct {
 	client *RestClient
 
-	symbol *string
-
-	// tradeType string
-}
-
-func (r *CancelAllOrderRequest) Symbol(symbol string) *CancelAllOrderRequest {
-	r.symbol = &symbol
-	return r
+	symbol    *string `param:"symbol"`
+	tradeType *string `param:"tradeType"`
 }
 
 func (r *CancelAllOrderRequest) Do(ctx context.Context) (*CancelOrderResponse, error) {
-	req, err := r.client.newAuthenticatedRequest("DELETE", "/api/v1/orders", nil, nil)
+	params, err := r.getQuery()
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := r.client.newAuthenticatedRequest("DELETE", "/api/v1/orders", params, nil)
 	if err != nil {
 		return nil, err
 	}
