@@ -170,7 +170,9 @@ func (s *Stream) pollKLines(ctx context.Context) {
 
 				if len(klines) > 0 {
 					// handle mutiple klines, get the latest one
-					s.EmitKLineClosed(klines[len(klines)-1])
+					kline := klines[len(klines)-1]
+					s.EmitKLine(kline)
+					s.EmitKLineClosed(kline)
 				}
 			}
 		}
