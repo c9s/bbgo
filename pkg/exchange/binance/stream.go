@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/adshao/go-binance/v2"
+	"github.com/adshao/go-binance/v2/futures"
+
 	"github.com/gorilla/websocket"
 
 	"github.com/c9s/bbgo/pkg/types"
@@ -61,7 +63,9 @@ type Stream struct {
 	types.FuturesSettings
 	types.StandardStream
 
-	Client   *binance.Client
+	Client        *binance.Client
+	futuresClient *futures.Client
+
 	Conn     *websocket.Conn
 	ConnLock sync.Mutex
 
@@ -76,23 +80,28 @@ type Stream struct {
 	kLineClosedEventCallbacks []func(e *KLineEvent)
 
 	markPriceUpdateEventCallbacks []func(e *MarkPriceUpdateEvent)
-	continuousKLineEventCallbacks []func(e *ContinuousKLineEvent)
+
+	continuousKLineEventCallbacks       []func(e *ContinuousKLineEvent)
+	continuousKLineClosedEventCallbacks []func(e *ContinuousKLineEvent)
 
 	balanceUpdateEventCallbacks           []func(event *BalanceUpdateEvent)
 	outboundAccountInfoEventCallbacks     []func(event *OutboundAccountInfoEvent)
 	outboundAccountPositionEventCallbacks []func(event *OutboundAccountPositionEvent)
 	executionReportEventCallbacks         []func(event *ExecutionReportEvent)
 
+	orderTradeUpdateEventCallbacks []func(e *OrderTradeUpdateEvent)
+
 	depthFrames map[string]*DepthFrame
 }
 
-func NewStream(client *binance.Client) *Stream {
+func NewStream(client *binance.Client, futuresClient *futures.Client) *Stream {
 	stream := &Stream{
 		StandardStream: types.StandardStream{
 			ReconnectC: make(chan struct{}, 1),
 		},
-		Client:      client,
-		depthFrames: make(map[string]*DepthFrame),
+		Client:        client,
+		futuresClient: futuresClient,
+		depthFrames:   make(map[string]*DepthFrame),
 	}
 
 	stream.OnDepthEvent(func(e *DepthEvent) {
@@ -207,6 +216,54 @@ func NewStream(client *binance.Client) *Stream {
 		}
 	})
 
+	stream.OnContinuousKLineEvent(func(e *ContinuousKLineEvent) {
+		kline := e.KLine.KLine()
+		if e.KLine.Closed {
+			stream.EmitContinuousKLineClosedEvent(e)
+			stream.EmitKLineClosed(kline)
+		} else {
+			stream.EmitKLine(kline)
+		}
+	})
+
+	stream.OnOrderTradeUpdateEvent(func(e *OrderTradeUpdateEvent) {
+		switch e.OrderTrade.CurrentExecutionType {
+
+		case "NEW", "CANCELED", "EXPIRED":
+			order, err := e.OrderFutures()
+			if err != nil {
+				log.WithError(err).Error("order convert error")
+				return
+			}
+
+			stream.EmitOrderUpdate(*order)
+
+		case "TRADE":
+			// TODO
+
+			// trade, err := e.Trade()
+			// if err != nil {
+			// 	log.WithError(err).Error("trade convert error")
+			// 	return
+			// }
+
+			// stream.EmitTradeUpdate(*trade)
+
+			// order, err := e.OrderFutures()
+			// if err != nil {
+			// 	log.WithError(err).Error("order convert error")
+			// 	return
+			// }
+
+			// Update Order with FILLED event
+			// if order.Status == types.OrderStatusFilled {
+			// 	stream.EmitOrderUpdate(*order)
+			// }
+		case "CALCULATED - Liquidation Execution":
+			log.Infof("CALCULATED - Liquidation Execution not support yet.")
+		}
+	})
+
 	stream.OnDisconnect(func() {
 		log.Infof("resetting depth snapshots...")
 		for _, f := range stream.depthFrames {
@@ -246,9 +303,17 @@ func (s *Stream) SetPublicOnly() {
 func (s *Stream) dial(listenKey string) (*websocket.Conn, error) {
 	var url string
 	if s.publicOnly {
-		url = "wss://stream.binance.com:9443/ws"
+		if s.IsFutures {
+			url = "wss://fstream.binance.com/ws/"
+		} else {
+			url = "wss://stream.binance.com:9443/ws"
+		}
 	} else {
-		url = "wss://stream.binance.com:9443/ws/" + listenKey
+		if s.IsFutures {
+			url = "wss://fstream.binance.com/ws/" + listenKey
+		} else {
+			url = "wss://stream.binance.com:9443/ws/" + listenKey
+		}
 	}
 
 	conn, _, err := defaultDialer.Dial(url, nil)
@@ -278,7 +343,12 @@ func (s *Stream) fetchListenKey(ctx context.Context) (string, error) {
 		log.Infof("margin mode is enabled, requesting margin user stream listen key...")
 		req := s.Client.NewStartMarginUserStreamService()
 		return req.Do(ctx)
+	} else if s.IsFutures {
+		log.Infof("futures mode is enabled, requesting futures user stream listen key...")
+		req := s.futuresClient.NewStartUserStreamService()
+		return req.Do(ctx)
 	}
+	log.Infof("spot mode is enabled, requesting margin user stream listen key...")
 
 	return s.Client.NewStartUserStreamService().Do(ctx)
 }
@@ -290,8 +360,10 @@ func (s *Stream) keepaliveListenKey(ctx context.Context, listenKey string) error
 			req.Symbol(s.IsolatedMarginSymbol)
 			return req.Do(ctx)
 		}
-
 		req := s.Client.NewKeepaliveMarginUserStreamService().ListenKey(listenKey)
+		return req.Do(ctx)
+	} else if s.IsFutures {
+		req := s.futuresClient.NewKeepaliveUserStreamService().ListenKey(listenKey)
 		return req.Do(ctx)
 	}
 
@@ -541,11 +613,15 @@ func (s *Stream) read(ctx context.Context) {
 
 			case *ExecutionReportEvent:
 				s.EmitExecutionReportEvent(e)
-			
+
 			case *MarkPriceUpdateEvent:
 				s.EmitMarkPriceUpdateEvent(e)
-                        case *ContinuousKLineEvent:
-                                 s.EmitContinuousKLineEvent(e)
+
+			case *ContinuousKLineEvent:
+				s.EmitContinuousKLineEvent(e)
+
+			case *OrderTradeUpdateEvent:
+				s.EmitOrderTradeUpdateEvent(e)
 			}
 		}
 	}
@@ -565,6 +641,9 @@ func (s *Stream) invalidateListenKey(ctx context.Context, listenKey string) (err
 			err = req.Do(ctx)
 		}
 
+	} else if s.IsFutures {
+		req := s.futuresClient.NewCloseUserStreamService().ListenKey(listenKey)
+		err = req.Do(ctx)
 	} else {
 		err = s.Client.NewCloseUserStreamService().ListenKey(listenKey).Do(ctx)
 	}
