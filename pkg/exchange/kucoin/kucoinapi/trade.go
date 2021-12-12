@@ -186,99 +186,39 @@ func (c *TradeService) NewListOrdersRequest() *ListOrdersRequest {
 	return &ListOrdersRequest{client: c.client}
 }
 
+//go:generate requestgen -type PlaceOrderRequest
 type PlaceOrderRequest struct {
 	client *RestClient
 
 	// A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 32 characters.
-	clientOrderID *string
+	clientOrderID *string `param:"clientOid,required"`
 
-	symbol string
+	symbol string `param:"symbol,required"`
 
 	// A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 8 characters.
-	tag *string
+	tag *string `param:"tag"`
 
 	// "buy" or "sell"
-	side SideType
+	side SideType `param:"side"`
 
-	ordType OrderType
+	ordType OrderType `param:"ordType"`
 
 	// limit order parameters
-	size string
+	size string `param:"size,required"`
 
-	price *string
+	price *string `param:"price"`
 
-	timeInForce *TimeInForceType
-}
-
-func (r *PlaceOrderRequest) Symbol(symbol string) *PlaceOrderRequest {
-	r.symbol = symbol
-	return r
-}
-
-func (r *PlaceOrderRequest) ClientOrderID(clientOrderID string) *PlaceOrderRequest {
-	r.clientOrderID = &clientOrderID
-	return r
-}
-
-func (r *PlaceOrderRequest) Side(side SideType) *PlaceOrderRequest {
-	r.side = side
-	return r
-}
-
-func (r *PlaceOrderRequest) Size(size string) *PlaceOrderRequest {
-	r.size = size
-	return r
-}
-
-func (r *PlaceOrderRequest) Price(price string) *PlaceOrderRequest {
-	r.price = &price
-	return r
-}
-
-func (r *PlaceOrderRequest) TimeInForce(timeInForce TimeInForceType) *PlaceOrderRequest {
-	r.timeInForce = &timeInForce
-	return r
-}
-
-func (r *PlaceOrderRequest) OrderType(orderType OrderType) *PlaceOrderRequest {
-	r.ordType = orderType
-	return r
-}
-
-func (r *PlaceOrderRequest) getParameters() (map[string]interface{}, error) {
-	payload := map[string]interface{}{}
-
-	payload["symbol"] = r.symbol
-
-	if r.clientOrderID != nil {
-		payload["clientOid"] = r.clientOrderID
-	} else {
-		payload["clientOid"] = uuid.New().String()
-	}
-
-	if len(r.side) == 0 {
-		return nil, errors.New("order side is required")
-	}
-
-	payload["side"] = r.side
-	payload["type"] = r.ordType
-	payload["size"] = r.size
-
-	if r.price != nil {
-		payload["price"] = r.price
-	}
-
-	if r.timeInForce != nil {
-		payload["timeInForce"] = r.timeInForce
-	}
-
-	return payload, nil
+	timeInForce *TimeInForceType `param:"timeInForce,required"`
 }
 
 func (r *PlaceOrderRequest) Do(ctx context.Context) (*OrderResponse, error) {
 	payload, err := r.getParameters()
 	if err != nil {
 		return nil, err
+	}
+
+	if _, ok := payload["clientOid"] ; !ok {
+		payload["clientOid"] = uuid.New().String()
 	}
 
 	req, err := r.client.newAuthenticatedRequest("POST", "/api/v1/orders", nil, payload)
@@ -439,6 +379,10 @@ func (r *BatchPlaceOrderRequest) Do(ctx context.Context) ([]OrderResponse, error
 		params, err := req.getParameters()
 		if err != nil {
 			return nil, err
+		}
+
+		if _, ok := params["clientOid"] ; !ok {
+			params["clientOid"] = uuid.New().String()
 		}
 
 		orderList = append(orderList, params)
