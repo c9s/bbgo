@@ -22,6 +22,7 @@
 
 /.env.local
 /.env.*.local
+/.env.production
 
 .DS_Store
 
