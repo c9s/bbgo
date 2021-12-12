@@ -2,8 +2,6 @@ package kucoinapi
 
 import (
 	"context"
-	"net/url"
-	"strconv"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -44,46 +42,23 @@ func (c *TradeService) NewCancelAllOrderRequest() *CancelAllOrderRequest {
 	}
 }
 
+//go:generate requestgen -type ListOrdersRequest
 type ListOrdersRequest struct {
 	client *RestClient
 
-	status *string
+	status *string `param:"status" validValues:"active,done"`
 
-	symbol *string
+	symbol *string `param:"symbol"`
 
-	side *SideType
+	side *SideType `param:"side" validValues:"buy,sell"`
 
-	orderType *OrderType
+	orderType *OrderType `param:"type"`
 
-	tradeType *TradeType
+	tradeType *TradeType `param:"tradeType"`
 
-	startAt *time.Time
+	startAt *time.Time `param:"startAt,milliseconds"`
 
-	endAt *time.Time
-}
-
-func (r *ListOrdersRequest) Status(status string) {
-	r.status = &status
-}
-
-func (r *ListOrdersRequest) Symbol(symbol string) {
-	r.symbol = &symbol
-}
-
-func (r *ListOrdersRequest) Side(side SideType) {
-	r.side = &side
-}
-
-func (r *ListOrdersRequest) OrderType(orderType OrderType) {
-	r.orderType = &orderType
-}
-
-func (r *ListOrdersRequest) StartAt(startAt time.Time) {
-	r.startAt = &startAt
-}
-
-func (r *ListOrdersRequest) EndAt(endAt time.Time) {
-	r.endAt = &endAt
+	endAt *time.Time `param:"endAt,milliseconds"`
 }
 
 type Order struct {
@@ -123,36 +98,13 @@ type OrderListPage struct {
 }
 
 func (r *ListOrdersRequest) Do(ctx context.Context) (*OrderListPage, error) {
-	var params = url.Values{}
-
-	if r.status != nil {
-		params["status"] = []string{*r.status}
+	params, err := r.getQuery()
+	if err != nil {
+		return nil, err
 	}
 
-	if r.symbol != nil {
-		params["symbol"] = []string{*r.symbol}
-	}
-
-	if r.side != nil {
-		params["side"] = []string{string(*r.side)}
-	}
-
-	if r.orderType != nil {
-		params["type"] = []string{string(*r.orderType)}
-	}
-
-	if r.tradeType != nil {
-		params["tradeType"] = []string{string(*r.tradeType)}
-	} else {
-		params["tradeType"] = []string{"TRADE"}
-	}
-
-	if r.startAt != nil {
-		params["startAt"] = []string{strconv.FormatInt(r.startAt.UnixNano()/int64(time.Millisecond), 10)}
-	}
-
-	if r.endAt != nil {
-		params["endAt"] = []string{strconv.FormatInt(r.endAt.UnixNano()/int64(time.Millisecond), 10)}
+	if !params.Has("tradeType") {
+		params.Add("tradeType", "TRADE")
 	}
 
 	req, err := r.client.newAuthenticatedRequest("GET", "/api/v1/orders", params, nil)
@@ -201,7 +153,7 @@ type PlaceOrderRequest struct {
 	// "buy" or "sell"
 	side SideType `param:"side"`
 
-	ordType OrderType `param:"ordType"`
+	orderType OrderType `param:"ordType"`
 
 	// limit order parameters
 	size string `param:"size,required"`
@@ -217,7 +169,7 @@ func (r *PlaceOrderRequest) Do(ctx context.Context) (*OrderResponse, error) {
 		return nil, err
 	}
 
-	if _, ok := payload["clientOid"] ; !ok {
+	if _, ok := payload["clientOid"]; !ok {
 		payload["clientOid"] = uuid.New().String()
 	}
 
@@ -381,7 +333,7 @@ func (r *BatchPlaceOrderRequest) Do(ctx context.Context) ([]OrderResponse, error
 			return nil, err
 		}
 
-		if _, ok := params["clientOid"] ; !ok {
+		if _, ok := params["clientOid"]; !ok {
 			params["clientOid"] = uuid.New().String()
 		}
 
