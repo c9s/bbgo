@@ -2,8 +2,6 @@ package kucoinapi
 
 import (
 	"context"
-	"net/url"
-	"strconv"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -44,46 +42,23 @@ func (c *TradeService) NewCancelAllOrderRequest() *CancelAllOrderRequest {
 	}
 }
 
+//go:generate requestgen -type ListOrdersRequest
 type ListOrdersRequest struct {
 	client *RestClient
 
-	status *string
+	status *string `param:"status" validValues:"active,done"`
 
-	symbol *string
+	symbol *string `param:"symbol"`
 
-	side *SideType
+	side *SideType `param:"side" validValues:"buy,sell"`
 
-	orderType *OrderType
+	orderType *OrderType `param:"type"`
 
-	tradeType *TradeType
+	tradeType *TradeType `param:"tradeType"`
 
-	startAt *time.Time
+	startAt *time.Time `param:"startAt,milliseconds"`
 
-	endAt *time.Time
-}
-
-func (r *ListOrdersRequest) Status(status string) {
-	r.status = &status
-}
-
-func (r *ListOrdersRequest) Symbol(symbol string) {
-	r.symbol = &symbol
-}
-
-func (r *ListOrdersRequest) Side(side SideType) {
-	r.side = &side
-}
-
-func (r *ListOrdersRequest) OrderType(orderType OrderType) {
-	r.orderType = &orderType
-}
-
-func (r *ListOrdersRequest) StartAt(startAt time.Time) {
-	r.startAt = &startAt
-}
-
-func (r *ListOrdersRequest) EndAt(endAt time.Time) {
-	r.endAt = &endAt
+	endAt *time.Time `param:"endAt,milliseconds"`
 }
 
 type Order struct {
@@ -123,36 +98,13 @@ type OrderListPage struct {
 }
 
 func (r *ListOrdersRequest) Do(ctx context.Context) (*OrderListPage, error) {
-	var params = url.Values{}
-
-	if r.status != nil {
-		params["status"] = []string{*r.status}
+	params, err := r.getQuery()
+	if err != nil {
+		return nil, err
 	}
 
-	if r.symbol != nil {
-		params["symbol"] = []string{*r.symbol}
-	}
-
-	if r.side != nil {
-		params["side"] = []string{string(*r.side)}
-	}
-
-	if r.orderType != nil {
-		params["type"] = []string{string(*r.orderType)}
-	}
-
-	if r.tradeType != nil {
-		params["tradeType"] = []string{string(*r.tradeType)}
-	} else {
-		params["tradeType"] = []string{"TRADE"}
-	}
-
-	if r.startAt != nil {
-		params["startAt"] = []string{strconv.FormatInt(r.startAt.UnixNano()/int64(time.Millisecond), 10)}
-	}
-
-	if r.endAt != nil {
-		params["endAt"] = []string{strconv.FormatInt(r.endAt.UnixNano()/int64(time.Millisecond), 10)}
+	if !params.Has("tradeType") {
+		params.Add("tradeType", "TRADE")
 	}
 
 	req, err := r.client.newAuthenticatedRequest("GET", "/api/v1/orders", params, nil)
@@ -186,93 +138,29 @@ func (c *TradeService) NewListOrdersRequest() *ListOrdersRequest {
 	return &ListOrdersRequest{client: c.client}
 }
 
+//go:generate requestgen -type PlaceOrderRequest
 type PlaceOrderRequest struct {
 	client *RestClient
 
 	// A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 32 characters.
-	clientOrderID *string
+	clientOrderID *string `param:"clientOid,required" defaultValuer:"uuid()"`
 
-	symbol string
+	symbol string `param:"symbol,required"`
 
 	// A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 8 characters.
-	tag *string
+	tag *string `param:"tag"`
 
 	// "buy" or "sell"
-	side SideType
+	side SideType `param:"side"`
 
-	ordType OrderType
+	orderType OrderType `param:"ordType"`
 
 	// limit order parameters
-	size string
+	size string `param:"size,required"`
 
-	price *string
+	price *string `param:"price"`
 
-	timeInForce *TimeInForceType
-}
-
-func (r *PlaceOrderRequest) Symbol(symbol string) *PlaceOrderRequest {
-	r.symbol = symbol
-	return r
-}
-
-func (r *PlaceOrderRequest) ClientOrderID(clientOrderID string) *PlaceOrderRequest {
-	r.clientOrderID = &clientOrderID
-	return r
-}
-
-func (r *PlaceOrderRequest) Side(side SideType) *PlaceOrderRequest {
-	r.side = side
-	return r
-}
-
-func (r *PlaceOrderRequest) Size(size string) *PlaceOrderRequest {
-	r.size = size
-	return r
-}
-
-func (r *PlaceOrderRequest) Price(price string) *PlaceOrderRequest {
-	r.price = &price
-	return r
-}
-
-func (r *PlaceOrderRequest) TimeInForce(timeInForce TimeInForceType) *PlaceOrderRequest {
-	r.timeInForce = &timeInForce
-	return r
-}
-
-func (r *PlaceOrderRequest) OrderType(orderType OrderType) *PlaceOrderRequest {
-	r.ordType = orderType
-	return r
-}
-
-func (r *PlaceOrderRequest) getParameters() (map[string]interface{}, error) {
-	payload := map[string]interface{}{}
-
-	payload["symbol"] = r.symbol
-
-	if r.clientOrderID != nil {
-		payload["clientOid"] = r.clientOrderID
-	} else {
-		payload["clientOid"] = uuid.New().String()
-	}
-
-	if len(r.side) == 0 {
-		return nil, errors.New("order side is required")
-	}
-
-	payload["side"] = r.side
-	payload["type"] = r.ordType
-	payload["size"] = r.size
-
-	if r.price != nil {
-		payload["price"] = r.price
-	}
-
-	if r.timeInForce != nil {
-		payload["timeInForce"] = r.timeInForce
-	}
-
-	return payload, nil
+	timeInForce *TimeInForceType `param:"timeInForce,required"`
 }
 
 func (r *PlaceOrderRequest) Do(ctx context.Context) (*OrderResponse, error) {
@@ -308,21 +196,12 @@ func (r *PlaceOrderRequest) Do(ctx context.Context) (*OrderResponse, error) {
 	return orderResponse.Data, nil
 }
 
+//go:generate requestgen -type CancelOrderRequest
 type CancelOrderRequest struct {
 	client *RestClient
 
-	orderID       *string
-	clientOrderID *string
-}
-
-func (r *CancelOrderRequest) OrderID(orderID string) *CancelOrderRequest {
-	r.orderID = &orderID
-	return r
-}
-
-func (r *CancelOrderRequest) ClientOrderID(clientOrderID string) *CancelOrderRequest {
-	r.clientOrderID = &clientOrderID
-	return r
+	orderID       *string `param:"orderID"`
+	clientOrderID *string `param:"clientOrderID"`
 }
 
 type CancelOrderResponse struct {
@@ -372,21 +251,21 @@ func (r *CancelOrderRequest) Do(ctx context.Context) (*CancelOrderResponse, erro
 	return apiResponse.Data, nil
 }
 
+//go:generate requestgen -type CancelAllOrderRequest
 type CancelAllOrderRequest struct {
 	client *RestClient
 
-	symbol *string
-
-	// tradeType string
-}
-
-func (r *CancelAllOrderRequest) Symbol(symbol string) *CancelAllOrderRequest {
-	r.symbol = &symbol
-	return r
+	symbol    *string `param:"symbol"`
+	tradeType *string `param:"tradeType"`
 }
 
 func (r *CancelAllOrderRequest) Do(ctx context.Context) (*CancelOrderResponse, error) {
-	req, err := r.client.newAuthenticatedRequest("DELETE", "/api/v1/orders", nil, nil)
+	params, err := r.getQuery()
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := r.client.newAuthenticatedRequest("DELETE", "/api/v1/orders", params, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -439,6 +318,10 @@ func (r *BatchPlaceOrderRequest) Do(ctx context.Context) ([]OrderResponse, error
 		params, err := req.getParameters()
 		if err != nil {
 			return nil, err
+		}
+
+		if _, ok := params["clientOid"]; !ok {
+			params["clientOid"] = uuid.New().String()
 		}
 
 		orderList = append(orderList, params)
