@@ -41,11 +41,11 @@ func (b Balance) String() string {
 }
 
 type Asset struct {
-	Currency   string           `json:"currency"`
-	Total      fixedpoint.Value `json:"total"`
-	InUSD      fixedpoint.Value `json:"inUSD"`
-	InBTC      fixedpoint.Value `json:"inBTC"`
-	Time       time.Time        `json:"time"`
+	Currency string           `json:"currency" db:"currency"`
+	Total    fixedpoint.Value `json:"total" db:"total"`
+	InUSD    fixedpoint.Value `json:"inUSD" db:"inUSD"`
+	InBTC    fixedpoint.Value `json:"inBTC" db:"inBTC"`
+	Time     time.Time        `json:"time" db:"time"`
 }
 
 type AssetMap map[string]Asset
