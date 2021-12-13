@@ -606,6 +606,12 @@ for lorca
 make embed && go run -tags web ./cmd/bbgo-lorca
 ```
 
+## FAQ
+
+What's Position?
+
+- Base Currency & Quote Currency <https://www.ig.com/au/glossary-trading-terms/base-currency-definition>
+- How to calculate average cost? <https://www.janushenderson.com/en-us/investor/planning/calculate-average-cost/>
 
 ## Contributing
 
