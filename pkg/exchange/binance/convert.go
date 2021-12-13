@@ -161,9 +161,44 @@ func toLocalOrderType(orderType types.OrderType) (binance.OrderType, error) {
 	return "", fmt.Errorf("can not convert to local order, order type %s not supported", orderType)
 }
 
+func toLocalFuturesOrderType(orderType types.OrderType) (futures.OrderType, error) {
+	switch orderType {
+
+	// case types.OrderTypeLimitMaker:
+	// 	return futures.OrderTypeLimitMaker, nil //TODO
+
+	case types.OrderTypeLimit:
+		return futures.OrderTypeLimit, nil
+
+	// case types.OrderTypeStopLimit:
+	// 	return futures.OrderTypeStopLossLimit, nil //TODO
+
+	// case types.OrderTypeStopMarket:
+	// 	return futures.OrderTypeStopLoss, nil //TODO
+
+	case types.OrderTypeMarket:
+		return futures.OrderTypeMarket, nil
+	}
+
+	return "", fmt.Errorf("can not convert to local order, order type %s not supported", orderType)
+}
+
 func toGlobalOrders(binanceOrders []*binance.Order) (orders []types.Order, err error) {
 	for _, binanceOrder := range binanceOrders {
 		order, err := toGlobalOrder(binanceOrder, false)
+		if err != nil {
+			return orders, err
+		}
+
+		orders = append(orders, *order)
+	}
+
+	return orders, err
+}
+
+func toGlobalFuturesOrders(futuresOrders []*futures.Order) (orders []types.Order, err error) {
+	for _, futuresOrder := range futuresOrders {
+		order, err := toGlobalFuturesOrder(futuresOrder, false)
 		if err != nil {
 			return orders, err
 		}
@@ -194,6 +229,31 @@ func toGlobalOrder(binanceOrder *binance.Order, isMargin bool) (*types.Order, er
 		UpdateTime:       types.Time(millisecondTime(binanceOrder.UpdateTime)),
 		IsMargin:         isMargin,
 		IsIsolated:       binanceOrder.IsIsolated,
+	}, nil
+}
+
+func toGlobalFuturesOrder(futuresOrder *futures.Order, isMargin bool) (*types.Order, error) {
+	return &types.Order{
+		SubmitOrder: types.SubmitOrder{
+			ClientOrderID: futuresOrder.ClientOrderID,
+			Symbol:        futuresOrder.Symbol,
+			Side:          toGlobalFuturesSideType(futuresOrder.Side),
+			Type:          toGlobalFuturesOrderType(futuresOrder.Type),
+			ReduceOnly:    futuresOrder.ReduceOnly,
+			ClosePosition: futuresOrder.ClosePosition,
+			Quantity:      util.MustParseFloat(futuresOrder.OrigQuantity),
+			Price:         util.MustParseFloat(futuresOrder.Price),
+			TimeInForce:   string(futuresOrder.TimeInForce),
+		},
+		Exchange: types.ExchangeBinance,
+		// IsWorking:        futuresOrder.IsWorking,
+		OrderID:          uint64(futuresOrder.OrderID),
+		Status:           toGlobalFuturesOrderStatus(futuresOrder.Status),
+		ExecutedQuantity: util.MustParseFloat(futuresOrder.ExecutedQuantity),
+		CreationTime:     types.Time(millisecondTime(futuresOrder.Time)),
+		UpdateTime:       types.Time(millisecondTime(futuresOrder.UpdateTime)),
+		IsMargin:         isMargin,
+		// IsIsolated:       futuresOrder.IsIsolated,
 	}, nil
 }
 
