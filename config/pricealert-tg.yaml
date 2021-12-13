@@ -1,12 +1,4 @@
 ---
-notifications:
-  # object routing rules
-  routing:
-    trade: "$symbol"
-    order: "$symbol"
-    submitOrder: "$session" # not supported yet
-    pnL: "bbgo-pnl"
-
 sessions:
   binance:
     exchange: binance
