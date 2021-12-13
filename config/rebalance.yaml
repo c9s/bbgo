@@ -10,7 +10,7 @@ exchangeStrategies:
       interval: 24h
       baseCurrency: TWD
       ignoreLocked: true
-      targetPortfolio:
+      weights:
         BTC: 40%
         ETH: 20%
         MAX: 20%

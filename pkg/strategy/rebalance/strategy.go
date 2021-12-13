@@ -20,62 +20,44 @@ func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
-type Asset struct {
-	Currency string
-	Quantity fixedpoint.Value
-	Price    fixedpoint.Value
-}
-
-func (a *Asset) MarketValue() fixedpoint.Value {
-	return a.Quantity.Mul(a.Price)
-}
-
-type Portfolio struct {
-	Assets       map[string]Asset
-	BaseCurrency string
-}
-
-func (p *Portfolio) TotalValue() fixedpoint.Value {
-	v := fixedpoint.NewFromFloat(0.0)
-	for _, a := range p.Assets {
-		v = v.Add(a.MarketValue())
+func Sum(m map[string]fixedpoint.Value) fixedpoint.Value {
+	sum := fixedpoint.NewFromFloat(0.0)
+	for _, v := range m {
+		sum = sum.Add(v)
 	}
-	return v
+	return sum
 }
 
-func (p *Portfolio) Weights() map[string]fixedpoint.Value {
-	weights := make(map[string]fixedpoint.Value)
-	value := p.TotalValue()
-	for currency, asset := range p.Assets {
-		weights[currency] = asset.MarketValue().Div(value)
+func Normalize(m map[string]fixedpoint.Value) map[string]fixedpoint.Value {
+	sum := Sum(m)
+	if sum.Float64() == 1.0 {
+		return m
 	}
-	return weights
-}
 
-func (p *Portfolio) PrintValue() {
-	value := p.TotalValue()
-	log.Infof("portfolio value: %f %s", value.Float64(), p.BaseCurrency)
-}
-
-func (p *Portfolio) PrintWeights() {
-	weights := p.Weights()
-	for currency, weight := range weights {
-		weightInPercent := weight.Float64() * 100.0
-		log.Infof("%s: %.2f%%", currency, weightInPercent)
+	normalized := make(map[string]fixedpoint.Value)
+	for k, v := range m {
+		normalized[k] = v.Div(sum)
 	}
+	return normalized
+}
+
+func ElementwiseProduct(m1, m2 map[string]fixedpoint.Value) map[string]fixedpoint.Value {
+	m := make(map[string]fixedpoint.Value)
+	for k, v := range m1 {
+		m[k] = v.Mul(m2[k])
+	}
+	return m
 }
 
 type Strategy struct {
 	Notifiability *bbgo.Notifiability
 
-	Interval        types.Duration              `json:"interval"`
-	BaseCurrency    string                      `json:"baseCurrency"`
-	TargetPortfolio map[string]fixedpoint.Value `json:"targetPortfolio"`
-	Threshold       fixedpoint.Value            `json:"threshold"`
-	IgnoreLocked    bool                        `json:"ignoreLocked"`
-	Verbose         bool                        `json:"verbose"`
-
-	Portfolio Portfolio
+	Interval     types.Duration              `json:"interval"`
+	BaseCurrency string                      `json:"baseCurrency"`
+	Weights      map[string]fixedpoint.Value `json:"weights"`
+	Threshold    fixedpoint.Value            `json:"threshold"`
+	IgnoreLocked bool                        `json:"ignoreLocked"`
+	Verbose      bool                        `json:"verbose"`
 }
 
 func (s *Strategy) ID() string {
@@ -85,11 +67,7 @@ func (s *Strategy) ID() string {
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {}
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-	if s.Verbose {
-		s.Notifiability.Notify("Start to rebalance the portfolio")
-	}
-
-	s.NormalizeTargetWeights()
+	s.Weights = Normalize(s.Weights)
 
 	go func() {
 		ticker := time.NewTicker(util.MillisecondsJitter(s.Interval.Duration(), 1000))
@@ -101,7 +79,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				return
 
 			case <-ticker.C:
-				s.Rebalance(ctx, orderExecutor, session)
+				s.rebalance(ctx, orderExecutor, session)
 			}
 		}
 	}()
@@ -109,45 +87,27 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	return nil
 }
 
-func (s *Strategy) NormalizeTargetWeights() {
-	sum := fixedpoint.NewFromFloat(0.0)
-	for _, w := range s.TargetPortfolio {
-		sum = sum.Add(w)
-	}
-
-	if sum.Float64() != 1.0 {
-		log.Infof("sum of weights: %f != 1.0", sum.Float64())
-	}
-
-	for currency, w := range s.TargetPortfolio {
-		s.TargetPortfolio[currency] = w.Div(sum)
-	}
-
-}
-
-func (s *Strategy) Rebalance(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) {
-	prices, err := s.GetPrices(ctx, session)
+func (s *Strategy) rebalance(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) {
+	prices, err := s.getPrices(ctx, session)
 	if err != nil {
 		return
 	}
 
 	balances := session.Account.Balances()
-	s.UpdateCurrentPortfolio(balances, prices)
+	quantities := s.getQuantities(balances)
+	marketValues := ElementwiseProduct(prices, quantities)
 
-	s.Portfolio.PrintValue()
-	s.Portfolio.PrintWeights()
-
-	orders := s.generateSubmitOrders(prices)
+	orders := s.generateSubmitOrders(prices, marketValues)
 	_, err = orderExecutor.SubmitOrders(ctx, orders...)
 	if err != nil {
 		return
 	}
 }
 
-func (s *Strategy) GetPrices(ctx context.Context, session *bbgo.ExchangeSession) (map[string]fixedpoint.Value, error) {
+func (s *Strategy) getPrices(ctx context.Context, session *bbgo.ExchangeSession) (map[string]fixedpoint.Value, error) {
 	prices := make(map[string]fixedpoint.Value)
 
-	for currency := range s.TargetPortfolio {
+	for currency := range s.Weights {
 		if currency == s.BaseCurrency {
 			prices[currency] = fixedpoint.NewFromFloat(1.0)
 			continue
@@ -166,25 +126,27 @@ func (s *Strategy) GetPrices(ctx context.Context, session *bbgo.ExchangeSession)
 	return prices, nil
 }
 
-func (s *Strategy) UpdateCurrentPortfolio(balances types.BalanceMap, prices map[string]fixedpoint.Value) {
-	assets := make(map[string]Asset)
-	for currency := range s.TargetPortfolio {
-
-		qty := balances[currency].Available
+func (s *Strategy) getQuantities(balances types.BalanceMap) map[string]fixedpoint.Value {
+	quantities := make(map[string]fixedpoint.Value)
+	for currency := range s.Weights {
 		if s.IgnoreLocked {
-			qty = balances[currency].Total()
+			quantities[currency] = balances[currency].Total()
+		} else {
+			quantities[currency] = balances[currency].Available
 		}
-
-		assets[currency] = Asset{currency, qty, prices[currency]}
 	}
-	s.Portfolio = Portfolio{assets, s.BaseCurrency}
+	return quantities
 }
 
-func (s *Strategy) generateSubmitOrders(prices map[string]fixedpoint.Value) []types.SubmitOrder {
+func (s *Strategy) generateSubmitOrders(prices, marketValues map[string]fixedpoint.Value) []types.SubmitOrder {
 	var submitOrders []types.SubmitOrder
 
-	currentWeights := s.Portfolio.Weights()
-	for currency, target := range s.TargetPortfolio {
+	currentWeights := Normalize(marketValues)
+	totalValue := Sum(marketValues)
+
+	log.Infof("total value: %f", totalValue.Float64())
+
+	for currency, target := range s.Weights {
 		if currency == s.BaseCurrency {
 			continue
 		}
@@ -192,18 +154,19 @@ func (s *Strategy) generateSubmitOrders(prices map[string]fixedpoint.Value) []ty
 		weight := currentWeights[currency]
 		price := prices[currency]
 
-		diff := target - weight
+		diff := target.Sub(weight)
 		if diff.Abs() < s.Threshold {
 			continue
 		}
 
-		quantity := diff.Mul(s.Portfolio.TotalValue()).Div(price)
+		quantity := diff.Mul(totalValue).Div(price)
 
 		side := types.SideTypeBuy
-		if quantity < 0 {
+		if quantity < 0.0 {
 			side = types.SideTypeSell
 			quantity = quantity.Abs()
 		}
+
 		order := types.SubmitOrder{
 			Symbol:   symbol,
 			Side:     side,
