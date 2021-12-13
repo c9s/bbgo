@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"reflect"
 	"runtime"
@@ -109,6 +110,7 @@ type Backtest struct {
 	RecordTrades bool            `json:"recordTrades,omitempty" yaml:"recordTrades,omitempty"`
 	Account      BacktestAccount `json:"account" yaml:"account"`
 	Symbols      []string        `json:"symbols" yaml:"symbols"`
+	Session      string          `json:"session" yaml:"session"`
 }
 
 func parseTimeWithFormats(strTime string, formats []string) (time.Time, error) {
@@ -120,7 +122,6 @@ func parseTimeWithFormats(strTime string, formats []string) (time.Time, error) {
 	}
 	return time.Time{}, fmt.Errorf("failed to parse time %s, valid formats are %+v", strTime, formats)
 }
-
 
 func (t Backtest) ParseEndTime() (time.Time, error) {
 	if len(t.EndTime) == 0 {
@@ -462,7 +463,6 @@ func loadExchangeStrategies(config *Config, stash Stash) (err error) {
 				return fmt.Errorf("unexpected mount type: %T value: %+v", val, val)
 			}
 		}
-
 		for id, conf := range configStash {
 
 			// look up the real struct type
@@ -476,6 +476,9 @@ func loadExchangeStrategies(config *Config, stash Stash) (err error) {
 					Mounts:   mounts,
 					Strategy: st,
 				})
+			} else if id != "on" && id != "off" {
+				//Show error when we didn't find the Strategy
+				logrus.Errorf(" Strategy %s in config not found.", id)
 			}
 		}
 	}

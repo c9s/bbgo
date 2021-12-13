@@ -179,7 +179,63 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 	return balances, nil
 }
 
+func (e *Exchange) SupportedInterval() map[types.Interval]int {
+	return map[types.Interval]int{
+		types.Interval1m:  1,
+		types.Interval5m:  5,
+		types.Interval15m: 15,
+		types.Interval1h:  60,
+		types.Interval1d:  60 * 24,
+		types.Interval3d:  60 * 24 * 3,
+	}
+}
+
+func (e *Exchange) IsSupportedInterval(interval types.Interval) bool {
+	return isIntervalSupportedInKLine(interval)
+}
+
 func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
+	var klines []types.KLine
+	var since, until, current time.Time
+	if options.StartTime != nil {
+		since = *options.StartTime
+	}
+	if options.EndTime != nil {
+		until = *options.EndTime
+	} else {
+		until = time.Now()
+	}
+
+	current = until
+
+	for true {
+		options.EndTime = &current
+		lines, err := e._queryKLines(ctx, symbol, interval, options)
+
+		if len(lines) == 0 || (len(lines) == 1 && lines[0].StartTime.Unix() == current.Unix()) {
+			break
+		}
+
+		for _, line := range lines {
+			if line.StartTime.Unix() < current.Unix() {
+				current = line.StartTime
+			}
+
+			if line.EndTime.Unix() > since.Unix() {
+				klines = append(klines, line)
+			}
+		}
+
+		if err != nil {
+			return nil, err
+		}
+	}
+	sort.Slice(klines, func(i, j int) bool { return klines[i].StartTime.Unix() < klines[j].StartTime.Unix() })
+
+	return klines, nil
+}
+
+func (e *Exchange) _queryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
 	var since, until time.Time
 	if options.StartTime != nil {
 		since = *options.StartTime
@@ -195,6 +251,11 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 	if !isIntervalSupportedInKLine(interval) {
 		return nil, fmt.Errorf("interval %s is not supported", interval.String())
 	}
+
+	if err := requestLimit.Wait(ctx); err != nil {
+		return nil, err
+	}
+
 	resp, err := e.newRest().HistoricalPrices(ctx, toLocalSymbol(symbol), interval, int64(options.Limit), since, until)
 	if err != nil {
 		return nil, err
@@ -203,25 +264,56 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 		return nil, fmt.Errorf("ftx returns failure")
 	}
 
-	var kline []types.KLine
+	var klines []types.KLine
 	for _, r := range resp.Result {
 		globalKline, err := toGlobalKLine(symbol, interval, r)
 		if err != nil {
 			return nil, err
 		}
-		kline = append(kline, globalKline)
+		klines = append(klines, globalKline)
 	}
-	return kline, nil
+	return klines, nil
 }
 
+//resolution field in api
+//window length in seconds. options: 15, 60, 300, 900, 3600, 14400, 86400, or any multiple of 86400 up to 30*86400
 var supportedInterval = map[int]struct{}{
-	15:    {},
-	60:    {},
-	300:   {},
-	900:   {},
-	3600:  {},
-	14400: {},
-	86400: {},
+	15:      {},
+	60:      {},
+	300:     {},
+	900:     {},
+	3600:    {},
+	14400:   {},
+	86400:   {},
+	172800:  {},
+	259200:  {},
+	345600:  {},
+	432000:  {},
+	518400:  {},
+	604800:  {},
+	691200:  {},
+	777600:  {},
+	864000:  {},
+	950400:  {},
+	1036800: {},
+	1123200: {},
+	1209600: {},
+	1296000: {},
+	1382400: {},
+	1468800: {},
+	1555200: {},
+	1641600: {},
+	1728000: {},
+	1814400: {},
+	1900800: {},
+	1987200: {},
+	2073600: {},
+	2160000: {},
+	2246400: {},
+	2332800: {},
+	2419200: {},
+	2505600: {},
+	2592000: {},
 }
 
 func isIntervalSupportedInKLine(interval types.Interval) bool {
@@ -406,6 +498,11 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 	s := since
 	var lastOrder order
 	for hasMoreData {
+
+		if err := requestLimit.Wait(ctx); err != nil {
+			logrus.WithError(err).Error("rate limit error")
+		}
+
 		resp, err := e.newRest().OrdersHistory(ctx, toLocalSymbol(symbol), s, until, limit)
 		if err != nil {
 			return nil, err
