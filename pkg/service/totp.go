@@ -31,12 +31,15 @@ func NewDefaultTotpKey() (*otp.Key, error) {
 	}
 
 	if len(totpAccountName) == 0 {
+
+		//unix like os
 		user, ok := os.LookupEnv("USER")
 		if !ok {
 			user, ok = os.LookupEnv("USERNAME")
 		}
+
 		if !ok {
-			return nil, fmt.Errorf("can not get USER env var for totp account name")
+			return nil, fmt.Errorf("can not get USER or USERNAME env var for totp account name")
 		}
 
 		totpAccountName = user

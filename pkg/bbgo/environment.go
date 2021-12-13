@@ -70,6 +70,7 @@ type Environment struct {
 	BacktestService          *service.BacktestService
 	RewardService            *service.RewardService
 	SyncService              *service.SyncService
+	AccountService 			 *service.AccountService
 
 	// startTime is the time of start point (which is used in the backtest)
 	startTime time.Time
@@ -159,6 +160,7 @@ func (environ *Environment) ConfigureDatabaseDriver(ctx context.Context, driver 
 	environ.OrderService = &service.OrderService{DB: db}
 	environ.TradeService = &service.TradeService{DB: db}
 	environ.RewardService = &service.RewardService{DB: db}
+	environ.AccountService = &service.AccountService{DB: db}
 
 	environ.SyncService = &service.SyncService{
 		TradeService:    environ.TradeService,
