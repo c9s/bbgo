@@ -103,6 +103,11 @@ type ExchangeMarketDataService interface {
 	QueryKLines(ctx context.Context, symbol string, interval Interval, options KLineQueryOptions) ([]KLine, error)
 }
 
+type CustomIntervalProvider interface {
+	SupportedInterval() map[Interval]int
+	IsSupportedInterval(interval Interval) bool
+}
+
 type ExchangeTransferService interface {
 	QueryDepositHistory(ctx context.Context, asset string, since, until time.Time) (allDeposits []Deposit, err error)
 	QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (allWithdraws []Withdraw, err error)
