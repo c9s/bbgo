@@ -627,12 +627,12 @@ func Test_isIntervalSupportedInKLine(t *testing.T) {
 		types.Interval5m,
 		types.Interval15m,
 		types.Interval1h,
-		types.Interval4h,
 		types.Interval1d,
 	}
 	for _, i := range supportedIntervals {
 		assert.True(t, isIntervalSupportedInKLine(i))
 	}
 	assert.False(t, isIntervalSupportedInKLine(types.Interval30m))
-	assert.False(t, isIntervalSupportedInKLine(types.Interval3d))
+	assert.False(t, isIntervalSupportedInKLine(types.Interval2h))
+	assert.True(t, isIntervalSupportedInKLine(types.Interval3d))
 }

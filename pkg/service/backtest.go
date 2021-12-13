@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -35,12 +36,16 @@ func (s *BacktestService) SyncKLineByInterval(ctx context.Context, exchange type
 
 	// should use channel here
 	klineC, errC := batch.Query(ctx, symbol, interval, startTime, endTime)
+
 	// var previousKLine types.KLine
-	for k := range klineC {
-		if err := s.Insert(k); err != nil {
+	count := 0
+	for klines := range klineC {
+		if err := s.BatchInsert(klines); err != nil {
 			return err
 		}
+		count += len(klines)
 	}
+	log.Infof("found %s kline %s data count: %d", symbol, interval.String(), count)
 
 	if err := <-errC; err != nil {
 		return err
@@ -51,7 +56,17 @@ func (s *BacktestService) SyncKLineByInterval(ctx context.Context, exchange type
 
 func (s *BacktestService) Sync(ctx context.Context, exchange types.Exchange, symbol string, startTime time.Time) error {
 	endTime := time.Now()
-	for interval := range types.SupportedIntervals {
+
+	exCustom, ok := exchange.(types.CustomIntervalProvider)
+
+	var supportIntervals map[types.Interval]int
+	if ok {
+		supportIntervals = exCustom.SupportedInterval()
+	} else {
+		supportIntervals = types.SupportedIntervals
+	}
+
+	for interval := range supportIntervals {
 		if err := s.SyncKLineByInterval(ctx, exchange, symbol, interval, startTime, endTime); err != nil {
 			return err
 		}
@@ -73,12 +88,12 @@ func (s *BacktestService) QueryLastKLine(ex types.ExchangeName, symbol string, i
 func (s *BacktestService) QueryKLine(ex types.ExchangeName, symbol string, interval types.Interval, orderBy string, limit int) (*types.KLine, error) {
 	log.Infof("querying last kline exchange = %s AND symbol = %s AND interval = %s", ex, symbol, interval)
 
+	tableName := s._targetKlineTable(ex)
 	// make the SQL syntax IDE friendly, so that it can analyze it.
-	sql := "SELECT * FROM binance_klines WHERE  `symbol` = :symbol AND `interval` = :interval ORDER BY end_time " + orderBy + " LIMIT " + strconv.Itoa(limit)
-	sql = strings.ReplaceAll(sql, "binance_klines", ex.String()+"_klines")
+	sql := fmt.Sprintf("SELECT * FROM `%s` WHERE  `symbol` = :symbol AND `interval` = :interval  and exchange = :exchange  ORDER BY end_time "+orderBy+" LIMIT "+strconv.Itoa(limit), tableName)
 
 	rows, err := s.DB.NamedQuery(sql, map[string]interface{}{
-		"exchange": ex,
+		"exchange": ex.String(),
 		"interval": interval,
 		"symbol":   symbol,
 	})
@@ -103,14 +118,16 @@ func (s *BacktestService) QueryKLine(ex types.ExchangeName, symbol string, inter
 }
 
 func (s *BacktestService) QueryKLinesForward(exchange types.ExchangeName, symbol string, interval types.Interval, startTime time.Time, limit int) ([]types.KLine, error) {
-	sql := "SELECT * FROM `binance_klines` WHERE `end_time` >= :start_time AND `symbol` = :symbol AND `interval` = :interval ORDER BY end_time ASC LIMIT :limit"
-	sql = strings.ReplaceAll(sql, "binance_klines", exchange.String()+"_klines")
+	tableName := s._targetKlineTable(exchange)
+	sql := "SELECT * FROM `binance_klines` WHERE `end_time` >= :start_time AND `symbol` = :symbol AND `interval` = :interval and exchange = :exchange ORDER BY end_time ASC LIMIT :limit"
+	sql = strings.ReplaceAll(sql, "binance_klines", tableName)
 
 	rows, err := s.DB.NamedQuery(sql, map[string]interface{}{
 		"start_time": startTime,
 		"limit":      limit,
 		"symbol":     symbol,
 		"interval":   interval,
+		"exchange":   exchange.String(),
 	})
 	if err != nil {
 		return nil, err
@@ -120,8 +137,10 @@ func (s *BacktestService) QueryKLinesForward(exchange types.ExchangeName, symbol
 }
 
 func (s *BacktestService) QueryKLinesBackward(exchange types.ExchangeName, symbol string, interval types.Interval, endTime time.Time, limit int) ([]types.KLine, error) {
-	sql := "SELECT * FROM `binance_klines` WHERE `end_time` <= :end_time AND `symbol` = :symbol AND `interval` = :interval ORDER BY end_time DESC LIMIT :limit"
-	sql = strings.ReplaceAll(sql, "binance_klines", exchange.String()+"_klines")
+	tableName := s._targetKlineTable(exchange)
+
+	sql := "SELECT * FROM `binance_klines` WHERE `end_time` <= :end_time  and exchange = :exchange  AND `symbol` = :symbol AND `interval` = :interval ORDER BY end_time DESC LIMIT :limit"
+	sql = strings.ReplaceAll(sql, "binance_klines", tableName)
 	sql = "SELECT t.* FROM (" + sql + ") AS t ORDER BY t.end_time ASC"
 
 	rows, err := s.DB.NamedQuery(sql, map[string]interface{}{
@@ -129,6 +148,7 @@ func (s *BacktestService) QueryKLinesBackward(exchange types.ExchangeName, symbo
 		"end_time": endTime,
 		"symbol":   symbol,
 		"interval": interval,
+		"exchange": exchange.String(),
 	})
 	if err != nil {
 		return nil, err
@@ -138,14 +158,28 @@ func (s *BacktestService) QueryKLinesBackward(exchange types.ExchangeName, symbo
 }
 
 func (s *BacktestService) QueryKLinesCh(since, until time.Time, exchange types.Exchange, symbols []string, intervals []types.Interval) (chan types.KLine, chan error) {
-	sql := "SELECT * FROM `binance_klines` WHERE `end_time` BETWEEN :since AND :until AND `symbol` IN (:symbols) AND `interval` IN (:intervals) ORDER BY end_time ASC"
-	sql = strings.ReplaceAll(sql, "binance_klines", exchange.Name().String()+"_klines")
+
+	if len(symbols) == 0 {
+
+		errC := make(chan error, 1)
+		// avoid blocking
+		go func() {
+			errC <- errors.Errorf("symbols is empty when querying kline, plesae check your strategy setting. ")
+			close(errC)
+		}()
+		return nil, errC
+	}
+
+	tableName := s._targetKlineTable(exchange.Name())
+	sql := "SELECT * FROM `binance_klines` WHERE `end_time` BETWEEN :since AND :until AND `symbol` IN (:symbols) AND `interval` IN (:intervals)  and exchange = :exchange  ORDER BY end_time ASC"
+	sql = strings.ReplaceAll(sql, "binance_klines", tableName)
 
 	sql, args, err := sqlx.Named(sql, map[string]interface{}{
 		"since":     since,
 		"until":     until,
 		"symbols":   symbols,
 		"intervals": types.IntervalSlice(intervals),
+		"exchange":  exchange.Name().String(),
 	})
 
 	sql, args, err = sqlx.In(sql, args...)
@@ -153,10 +187,9 @@ func (s *BacktestService) QueryKLinesCh(since, until time.Time, exchange types.E
 
 	rows, err := s.DB.Queryx(sql, args...)
 	if err != nil {
-		log.WithError(err).Error("query error")
+		log.WithError(err).Error("backtest query error")
 
 		errC := make(chan error, 1)
-
 		// avoid blocking
 		go func() {
 			errC <- err
@@ -211,14 +244,48 @@ func (s *BacktestService) scanRows(rows *sqlx.Rows) (klines []types.KLine, err e
 	return klines, rows.Err()
 }
 
+func (s *BacktestService) _targetKlineTable(exchangeName types.ExchangeName) string {
+	switch exchangeName {
+	case types.ExchangeBinance:
+		return "binance_klines"
+	case types.ExchangeFTX:
+		return "ftx_klines"
+	case types.ExchangeMax:
+		return "max_klines"
+	case types.ExchangeOKEx:
+		return "okex_klines"
+	default:
+		return "klines"
+	}
+}
+
 func (s *BacktestService) Insert(kline types.KLine) error {
 	if len(kline.Exchange) == 0 {
 		return errors.New("kline.Exchange field should not be empty")
 	}
 
-	sql := "INSERT INTO `binance_klines` (`exchange`, `start_time`, `end_time`, `symbol`, `interval`, `open`, `high`, `low`, `close`, `closed`, `volume`, `quote_volume`, `taker_buy_base_volume`, `taker_buy_quote_volume`)" +
-		"VALUES (:exchange, :start_time, :end_time, :symbol, :interval, :open, :high, :low, :close, :closed, :volume, :quote_volume, :taker_buy_base_volume, :taker_buy_quote_volume)"
-	sql = strings.ReplaceAll(sql, "binance_klines", kline.Exchange.String()+"_klines")
+	tableName := s._targetKlineTable(kline.Exchange)
+
+	sql := fmt.Sprintf("INSERT INTO `%s` (`exchange`, `start_time`, `end_time`, `symbol`, `interval`, `open`, `high`, `low`, `close`, `closed`, `volume`, `quote_volume`, `taker_buy_base_volume`, `taker_buy_quote_volume`)"+
+		"VALUES (:exchange, :start_time, :end_time, :symbol, :interval, :open, :high, :low, :close, :closed, :volume, :quote_volume, :taker_buy_base_volume, :taker_buy_quote_volume)", tableName)
+
+	_, err := s.DB.NamedExec(sql, kline)
+	return err
+}
+
+// BatchInsert Note: all kline should be same exchange, or it will cause issue.
+func (s *BacktestService) BatchInsert(kline []types.KLine) error {
+	if len(kline) == 0 {
+		return nil
+	}
+	if len(kline[0].Exchange) == 0 {
+		return errors.New("kline.Exchange field should not be empty")
+	}
+
+	tableName := s._targetKlineTable(kline[0].Exchange)
+
+	sql := fmt.Sprintf("INSERT INTO `%s` (`exchange`, `start_time`, `end_time`, `symbol`, `interval`, `open`, `high`, `low`, `close`, `closed`, `volume`, `quote_volume`, `taker_buy_base_volume`, `taker_buy_quote_volume`)"+
+		" values (:exchange, :start_time, :end_time, :symbol, :interval, :open, :high, :low, :close, :closed, :volume, :quote_volume, :taker_buy_base_volume, :taker_buy_quote_volume); ", tableName)
 
 	_, err := s.DB.NamedExec(sql, kline)
 	return err
