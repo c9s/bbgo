@@ -20,7 +20,7 @@ persistence:
 
 strategies:
 - on: max
-  swing:
+  test:
     symbolPosition:
       persistence:
         type: json

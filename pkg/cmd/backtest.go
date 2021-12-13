@@ -98,23 +98,44 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
-		exchangeName, err := types.ValidExchangeName(exchangeNameStr)
-		if err != nil {
-			return err
-		}
-
-		sourceExchange, err := cmdutil.NewExchange(exchangeName)
-		if err != nil {
-			return err
-		}
-
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
 		userConfig, err := bbgo.Load(configFile, true)
 		if err != nil {
 			return err
 		}
+
+		//if it's declared in the cmd , use the cmd one first
+		if exchangeNameStr == "" {
+			exchangeNameStr = userConfig.Backtest.Session
+		}
+
+		var sourceExchange types.Exchange
+		var exchangeName types.ExchangeName
+
+		for key, session := range userConfig.Sessions {
+			if exchangeNameStr == key {
+				err := bbgo.InitExchangeSession(session.Name, session)
+				if err != nil {
+					return err
+				}
+				sourceExchange = session.Exchange
+				exchangeName = session.ExchangeName
+			}
+		}
+
+		if sourceExchange == nil {
+			exchangeName, err = types.ValidExchangeName(exchangeNameStr)
+			if err != nil {
+				return err
+			}
+
+			sourceExchange, err = cmdutil.NewExchange(exchangeName)
+			if err != nil {
+				return err
+			}
+		}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
 		if userConfig.Backtest == nil {
 			return errors.New("backtest config is not defined")
@@ -267,7 +288,9 @@ var BacktestCmd = &cobra.Command{
 		}
 
 		environ.SetStartTime(startTime)
-		environ.AddExchange(exchangeName.String(), backtestExchange)
+
+		//exchangeNameStr is the session name.
+		environ.AddExchange(exchangeNameStr, backtestExchange)
 
 		if err := environ.Init(ctx); err != nil {
 			return err

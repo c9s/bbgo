@@ -2,6 +2,8 @@ package batch
 
 import (
 	"context"
+	"github.com/pkg/errors"
+	"sort"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -74,18 +76,21 @@ type KLineBatchQuery struct {
 	types.Exchange
 }
 
-func (e KLineBatchQuery) Query(ctx context.Context, symbol string, interval types.Interval, startTime, endTime time.Time) (c chan types.KLine, errC chan error) {
-	c = make(chan types.KLine, 1000)
+func (e KLineBatchQuery) Query(ctx context.Context, symbol string, interval types.Interval, startTime, endTime time.Time) (c chan []types.KLine, errC chan error) {
+	c = make(chan []types.KLine, 1000)
 	errC = make(chan error, 1)
 
 	go func() {
 		defer close(c)
 		defer close(errC)
 
+		tryQueryKlineTimes := 0
 		for startTime.Before(endTime) {
 			kLines, err := e.QueryKLines(ctx, symbol, interval, types.KLineQueryOptions{
 				StartTime: &startTime,
 			})
+			sort.Slice(kLines, func(i, j int) bool { return kLines[i].StartTime.Unix() < kLines[j].StartTime.Unix() })
+			tryQueryKlineTimes++
 
 			if err != nil {
 				errC <- err
@@ -95,7 +100,9 @@ func (e KLineBatchQuery) Query(ctx context.Context, symbol string, interval type
 			if len(kLines) == 0 {
 				return
 			}
+			const BatchSize = 200
 
+			var batchKLines = make([]types.KLine, 0, BatchSize)
 			for _, kline := range kLines {
 				// ignore any kline before the given start time
 				if kline.StartTime.Before(startTime) {
@@ -106,8 +113,23 @@ func (e KLineBatchQuery) Query(ctx context.Context, symbol string, interval type
 					return
 				}
 
-				c <- kline
-				startTime = kline.EndTime.Add(time.Millisecond)
+				batchKLines = append(batchKLines, kline)
+
+				if len(batchKLines) == BatchSize {
+					c <- batchKLines
+					batchKLines = batchKLines[:0]
+				}
+
+				//The issue is in FTX, prev endtime = next start time , so if add 1 ms , it would query forever.
+				startTime = kline.EndTime // .Add(time.Millisecond)
+				tryQueryKlineTimes = 0
+			}
+
+			c <- batchKLines
+
+			if tryQueryKlineTimes > 10 { // it means loop 10 times
+				errC <- errors.Errorf("There's a dead loop in batch.go#Query , symbol: %s , interval: %s, startTime :%s ", symbol, interval, startTime.String())
+				return
 			}
 		}
 	}()
