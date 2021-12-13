@@ -35,6 +35,16 @@ type Exchange struct {
 	restEndpoint *url.URL
 }
 
+type MarketTicker struct {
+	Market types.Market
+	Price  float64
+	Ask    float64
+	Bid    float64
+	Last   float64
+}
+
+type MarketMap map[string]MarketTicker
+
 // FTX does not have broker ID
 const spotBrokerID = "BBGO"
 
@@ -96,6 +106,18 @@ func (e *Exchange) NewStream() types.Stream {
 }
 
 func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
+	markets, err := e._queryMarkets(ctx)
+	if err != nil {
+		return nil, err
+	}
+	marketMap := types.MarketMap{}
+	for k, v := range markets {
+		marketMap[k] = v.Market
+	}
+	return marketMap, nil
+}
+
+func (e *Exchange) _queryMarkets(ctx context.Context) (MarketMap, error) {
 	resp, err := e.newRest().Markets(ctx)
 	if err != nil {
 		return nil, err
@@ -104,33 +126,38 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 		return nil, fmt.Errorf("ftx returns querying markets failure")
 	}
 
-	markets := types.MarketMap{}
+	markets := MarketMap{}
 	for _, m := range resp.Result {
 		symbol := toGlobalSymbol(m.Name)
 		symbolMap[symbol] = m.Name
 
-		market := types.Market{
-			Symbol:      symbol,
-			LocalSymbol: m.Name,
-
-			// The max precision is length(DefaultPow). For example, currently fixedpoint.DefaultPow
-			// is 1e8, so the max precision will be 8.
-			PricePrecision:  fixedpoint.NumFractionalDigits(fixedpoint.NewFromFloat(m.PriceIncrement)),
-			VolumePrecision: fixedpoint.NumFractionalDigits(fixedpoint.NewFromFloat(m.SizeIncrement)),
-			QuoteCurrency:   toGlobalCurrency(m.QuoteCurrency),
-			BaseCurrency:    toGlobalCurrency(m.BaseCurrency),
-			// FTX only limit your order by `MinProvideSize`, so I assign zero value to unsupported fields:
-			// MinNotional, MinAmount, MaxQuantity, MinPrice and MaxPrice.
-			MinNotional: 0,
-			MinAmount:   0,
-			MinQuantity: m.MinProvideSize,
-			MaxQuantity: 0,
-			StepSize:    m.SizeIncrement,
-			MinPrice:    0,
-			MaxPrice:    0,
-			TickSize:    m.PriceIncrement,
+		mkt2 := MarketTicker{
+			Market: types.Market{
+				Symbol:      symbol,
+				LocalSymbol: m.Name,
+				// The max precision is length(DefaultPow). For example, currently fixedpoint.DefaultPow
+				// is 1e8, so the max precision will be 8.
+				PricePrecision:  fixedpoint.NumFractionalDigits(fixedpoint.NewFromFloat(m.PriceIncrement)),
+				VolumePrecision: fixedpoint.NumFractionalDigits(fixedpoint.NewFromFloat(m.SizeIncrement)),
+				QuoteCurrency:   toGlobalCurrency(m.QuoteCurrency),
+				BaseCurrency:    toGlobalCurrency(m.BaseCurrency),
+				// FTX only limit your order by `MinProvideSize`, so I assign zero value to unsupported fields:
+				// MinNotional, MinAmount, MaxQuantity, MinPrice and MaxPrice.
+				MinNotional: 0,
+				MinAmount:   0,
+				MinQuantity: m.MinProvideSize,
+				MaxQuantity: 0,
+				StepSize:    m.SizeIncrement,
+				MinPrice:    0,
+				MaxPrice:    0,
+				TickSize:    m.PriceIncrement,
+			},
+			Price: m.Price,
+			Bid:   m.Bid,
+			Ask:   m.Ask,
+			Last:  m.Last,
 		}
-		markets[symbol] = market
+		markets[symbol] = mkt2
 	}
 	return markets, nil
 }
@@ -461,11 +488,65 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 }
 
 func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticker, error) {
-	panic("implement me")
+	ticketMap, err := e.QueryTickers(ctx, symbol)
+	if err != nil {
+		return nil, err
+	}
+
+	if ticker, ok := ticketMap[symbol]; ok {
+		return &ticker, nil
+	}
+	return nil, fmt.Errorf("ticker %s not found", symbol)
 }
 
 func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[string]types.Ticker, error) {
-	panic("implement me")
+
+	var tickers = make(map[string]types.Ticker)
+
+	markets, err := e._queryMarkets(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	m := make(map[string]struct{})
+	for _, s := range symbol {
+		m[toGlobalSymbol(s)] = struct{}{}
+	}
+
+	rest := e.newRest()
+
+	for k, v := range markets {
+
+		// if we provide symbol as condition then we only query the gieven symbol ,
+		// or we should query "ALL" symbol in the market.
+		if _, ok := m[toGlobalSymbol(k)]; len(symbol) != 0 && !ok {
+			continue
+		}
+
+		if err := requestLimit.Wait(ctx); err != nil {
+			logrus.WithError(err).Errorf("order rate limiter wait error")
+		}
+
+		//ctx context.Context, market string, interval types.Interval, limit int64, start, end time.Time
+		prices, err := rest.HistoricalPrices(ctx, v.Market.LocalSymbol, types.Interval1h, 1, time.Now().Add(time.Duration(-1)*time.Hour), time.Now())
+		if err != nil || !prices.Success || len(prices.Result) == 0 {
+			continue
+		}
+
+		lastCandle := prices.Result[0]
+		tickers[toGlobalSymbol(k)] = types.Ticker{
+			Time:   lastCandle.StartTime.Time,
+			Volume: lastCandle.Volume,
+			Last:   v.Last,
+			Open:   lastCandle.Open,
+			High:   lastCandle.High,
+			Low:    lastCandle.Low,
+			Buy:    v.Bid,
+			Sell:   v.Ask,
+		}
+	}
+
+	return tickers, nil
 }
 
 func (e *Exchange) Transfer(ctx context.Context, coin string, size float64, destination string) (string, error) {

@@ -54,6 +54,8 @@ require (
 	github.com/webview/webview v0.0.0-20210216142346-e0bfdf0e5d90
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
 	github.com/zserge/lorca v0.1.9
+	go.uber.org/atomic v1.9.0 // indirect
+	go.uber.org/multierr v1.7.0 // indirect
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad // indirect
 	golang.org/x/net v0.0.0-20211205041911-012df41ee64c // indirect
 	golang.org/x/sys v0.0.0-20211204120058-94396e421777 // indirect
