@@ -245,15 +245,13 @@ func toGlobalFuturesOrder(futuresOrder *futures.Order, isMargin bool) (*types.Or
 			Price:         util.MustParseFloat(futuresOrder.Price),
 			TimeInForce:   string(futuresOrder.TimeInForce),
 		},
-		Exchange: types.ExchangeBinance,
-		// IsWorking:        futuresOrder.IsWorking,
+		Exchange:         types.ExchangeBinance,
 		OrderID:          uint64(futuresOrder.OrderID),
 		Status:           toGlobalFuturesOrderStatus(futuresOrder.Status),
 		ExecutedQuantity: util.MustParseFloat(futuresOrder.ExecutedQuantity),
 		CreationTime:     types.Time(millisecondTime(futuresOrder.Time)),
 		UpdateTime:       types.Time(millisecondTime(futuresOrder.UpdateTime)),
 		IsMargin:         isMargin,
-		// IsIsolated:       futuresOrder.IsIsolated,
 	}, nil
 }
 

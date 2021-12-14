@@ -618,9 +618,6 @@ func (e *Exchange) submitFuturesOrder(ctx context.Context, order types.SubmitOrd
 
 	// use response result format
 	req.NewOrderResponseType(futures.NewOrderRespTypeRESULT)
-	// if e.IsIsolatedFutures {
-	// 	req.IsIsolated(e.IsIsolatedFutures)
-	// }
 
 	if len(order.QuantityString) > 0 {
 		req.Quantity(order.QuantityString)
@@ -676,14 +673,10 @@ func (e *Exchange) submitFuturesOrder(ctx context.Context, order types.SubmitOrd
 		Price:            response.Price,
 		OrigQuantity:     response.OrigQuantity,
 		ExecutedQuantity: response.ExecutedQuantity,
-		// CummulativeQuoteQuantity: response.CummulativeQuoteQuantity,
-		Status:      response.Status,
-		TimeInForce: response.TimeInForce,
-		Type:        response.Type,
-		Side:        response.Side,
-		// UpdateTime:               response.TransactTime,
-		// Time:                     response.TransactTime,
-		// IsIsolated:               response.IsIsolated,
+		Status:           response.Status,
+		TimeInForce:      response.TimeInForce,
+		Type:             response.Type,
+		Side:             response.Side,
 	}, true)
 
 	return createdOrder, err
@@ -796,10 +789,6 @@ func (e *Exchange) submitSpotOrder(ctx context.Context, order types.SubmitOrder)
 		UpdateTime:               response.TransactTime,
 		Time:                     response.TransactTime,
 		IsIsolated:               response.IsIsolated,
-		// StopPrice:
-		// IcebergQuantity:
-		// UpdateTime:
-		// IsWorking:               ,
 	}, false)
 
 	return createdOrder, err
