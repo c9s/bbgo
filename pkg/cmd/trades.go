@@ -101,7 +101,7 @@ var tradesCmd = &cobra.Command{
 
 		log.Infof("%d trades", len(trades))
 		for _, trade := range trades {
-			log.Infof("TRADE %s %s %4s %s @ %s orderID %d %s amount %f",
+			log.Infof("TRADE %s %s %4s %s @ %s orderID %d %s amount %f , fee %f %s ",
 				trade.Exchange.String(),
 				trade.Symbol,
 				trade.Side,
@@ -109,7 +109,9 @@ var tradesCmd = &cobra.Command{
 				util.FormatFloat(trade.Price, 3),
 				trade.OrderID,
 				trade.Time.Time().Format(time.StampMilli),
-				trade.QuoteQuantity)
+				trade.QuoteQuantity,
+				trade.Fee,
+				trade.FeeCurrency)
 		}
 		return nil
 	},
