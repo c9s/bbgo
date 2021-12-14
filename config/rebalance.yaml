@@ -1,0 +1,20 @@
+---
+notifications:
+  slack:
+    defaultChannel: "bbgo"
+    errorChannel: "bbgo-error"
+
+exchangeStrategies:
+  - on: max
+    rebalance:
+      interval: 24h
+      baseCurrency: TWD
+      ignoreLocked: true
+      weights:
+        BTC: 40%
+        ETH: 20%
+        MAX: 20%
+        USDT: 10%
+        TWD: 10%
+      threshold: 2%
+      verbose: true
