@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -21,16 +22,6 @@ type BacktestService struct {
 
 func (s *BacktestService) SyncKLineByInterval(ctx context.Context, exchange types.Exchange, symbol string, interval types.Interval, startTime, endTime time.Time) error {
 	log.Infof("synchronizing lastKLine for interval %s from exchange %s", interval, exchange.Name())
-
-	lastKLine, err := s.QueryKLine(exchange.Name(), symbol, interval, "DESC", 1)
-	if err != nil {
-		return err
-	}
-
-	if lastKLine != nil {
-		log.Infof("found the last %s kline data checkpoint %s", symbol, lastKLine.EndTime)
-		startTime = lastKLine.StartTime.Add(time.Minute)
-	}
 
 	batch := &batch2.KLineBatchQuery{Exchange: exchange}
 
@@ -54,25 +45,62 @@ func (s *BacktestService) SyncKLineByInterval(ctx context.Context, exchange type
 	return nil
 }
 
-func (s *BacktestService) Sync(ctx context.Context, exchange types.Exchange, symbol string, startTime time.Time) error {
-	endTime := time.Now()
+func (s *BacktestService) Verify(symbols []string, startTime time.Time, endTime time.Time, sourceExchange types.Exchange, verboseCnt int) (error, bool) {
+	var corruptCnt = 0
+	for _, symbol := range symbols {
+		log.Infof("verifying backtesting data...")
 
-	exCustom, ok := exchange.(types.CustomIntervalProvider)
+		for interval := range types.SupportedIntervals {
+			log.Infof("verifying %s %s kline data...", symbol, interval)
 
-	var supportIntervals map[types.Interval]int
-	if ok {
-		supportIntervals = exCustom.SupportedInterval()
-	} else {
-		supportIntervals = types.SupportedIntervals
-	}
+			klineC, errC := s.QueryKLinesCh(startTime, time.Now(), sourceExchange, []string{symbol}, []types.Interval{interval})
+			var emptyKLine types.KLine
+			var prevKLine types.KLine
+			for k := range klineC {
+				if verboseCnt > 1 {
+					fmt.Fprint(os.Stderr, ".")
+				}
 
-	for interval := range supportIntervals {
-		if err := s.SyncKLineByInterval(ctx, exchange, symbol, interval, startTime, endTime); err != nil {
-			return err
+				if prevKLine != emptyKLine {
+					if prevKLine.StartTime.Unix() == k.StartTime.Unix() {
+						s._deleteDuplicatedKLine(k)
+						log.Errorf("found kline data duplicated at time: %s kline: %+v , deleted it", k.StartTime, k)
+					} else if prevKLine.StartTime.Add(interval.Duration()) != k.StartTime {
+						corruptCnt++
+						log.Errorf("found kline data corrupted at time: %s kline: %+v", k.StartTime, k)
+						log.Errorf("between %d and %d",
+							prevKLine.StartTime.Unix(),
+							k.StartTime.Unix())
+					}
+				}
+
+				prevKLine = k
+			}
+
+			if verboseCnt > 1 {
+				fmt.Fprintln(os.Stderr)
+			}
+
+			if err := <-errC; err != nil {
+				return err, true
+			}
 		}
 	}
 
-	return nil
+	log.Infof("backtest verification completed")
+	if corruptCnt > 0 {
+		log.Errorf("found %d corruptions", corruptCnt)
+	} else {
+		log.Infof("found %d corruptions", corruptCnt)
+	}
+	return nil, false
+}
+
+func (s *BacktestService) Sync(ctx context.Context, exchange types.Exchange, symbol string,
+	startTime time.Time, endTime time.Time, interval types.Interval) error {
+
+	return s.SyncKLineByInterval(ctx, exchange, symbol, interval, startTime, endTime)
+
 }
 
 func (s *BacktestService) QueryFirstKLine(ex types.ExchangeName, symbol string, interval types.Interval) (*types.KLine, error) {
@@ -291,7 +319,7 @@ func (s *BacktestService) BatchInsert(kline []types.KLine) error {
 	return err
 }
 
-func (s *BacktestService) DeleteDuplicatedKLine(k types.KLine) error {
+func (s *BacktestService) _deleteDuplicatedKLine(k types.KLine) error {
 
 	if len(k.Exchange) == 0 {
 		return errors.New("kline.Exchange field should not be empty")
@@ -301,4 +329,23 @@ func (s *BacktestService) DeleteDuplicatedKLine(k types.KLine) error {
 	sql := fmt.Sprintf("delete from `%s` where gid = :gid  ", tableName)
 	_, err := s.DB.NamedExec(sql, k)
 	return err
+}
+
+func (s *BacktestService) SyncExist(ctx context.Context, exchange types.Exchange, symbol string,
+	fromTime time.Time, endTime time.Time, interval types.Interval) error {
+	klineC, errC := s.QueryKLinesCh(fromTime, endTime, exchange, []string{symbol}, []types.Interval{interval})
+
+	nowStartTime := fromTime
+	for k := range klineC {
+		if nowStartTime.Add(interval.Duration()).Unix() < k.StartTime.Unix() {
+			log.Infof("syncing %s interval %s syncing %s ~ %s ", symbol, interval, nowStartTime, k.EndTime)
+			s.Sync(ctx, exchange, symbol, nowStartTime.Add(interval.Duration()), k.EndTime.Add(-1*interval.Duration()), interval)
+		}
+		nowStartTime = k.StartTime
+	}
+
+	if err := <-errC; err != nil {
+		return err
+	}
+	return nil
 }

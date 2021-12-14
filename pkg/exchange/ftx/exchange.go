@@ -268,7 +268,11 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 			}
 		}
 
-		outBound := currentEnd.Add(interval.Duration()*-1).Unix() < since.Unix()
+		if len(lines) == 1 && lines[0].StartTime.Unix() == currentEnd.Unix() {
+			break
+		}
+
+		outBound := currentEnd.Add(interval.Duration()*-1).Unix() <= since.Unix()
 		if since.IsZero() || currentEnd.Unix() == since.Unix() || outBound {
 			break
 		}
