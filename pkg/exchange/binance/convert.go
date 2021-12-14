@@ -361,7 +361,6 @@ func toGlobalFuturesTrade(t futures.AccountTrade) (*types.Trade, error) {
 		FeeCurrency:   t.CommissionAsset,
 		Time:          types.Time(millisecondTime(t.Time)),
 		IsFutures:     true,
-		// IsIsolated:    t.IsIsolated,
 	}, nil
 }
 
