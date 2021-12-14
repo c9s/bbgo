@@ -435,7 +435,6 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 
 	if e.IsFutures {
 		req := e.futuresClient.NewListOpenOrdersService().Symbol(symbol)
-		// req.IsIsolated(e.IsIsolatedFutures)
 
 		binanceOrders, err := req.Do(ctx)
 		if err != nil {
@@ -481,7 +480,6 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 
 	if e.IsFutures {
 		req := e.futuresClient.NewListOrdersService().Symbol(symbol)
-		// req.IsIsolated(e.IsIsolatedFutures)
 
 		if lastOrderID > 0 {
 			req.OrderID(int64(lastOrderID))
@@ -526,8 +524,6 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 
 			if o.OrderID > 0 {
 				req.OrderID(int64(o.OrderID))
-			} else if len(o.ClientOrderID) > 0 {
-				// req.NewClientOrderID(o.ClientOrderID) // TODO
 			}
 
 			_, _err := req.Do(ctx)
@@ -993,14 +989,6 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		} else {
 			req.Limit(1000)
 		}
-
-		// if options.StartTime != nil {
-		// 	req.StartTime(options.StartTime.UnixNano() / int64(time.Millisecond))
-		// }
-
-		// if options.EndTime != nil {
-		// 	req.EndTime(options.EndTime.UnixNano() / int64(time.Millisecond))
-		// }
 
 		// BINANCE uses inclusive last trade ID
 		if options.LastTradeID > 0 {
