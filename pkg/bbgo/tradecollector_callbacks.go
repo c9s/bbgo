@@ -17,11 +17,11 @@ func (c *TradeCollector) EmitTrade(trade types.Trade) {
 	}
 }
 
-func (c *TradeCollector) OnPositionUpdate(cb func(position *Position)) {
+func (c *TradeCollector) OnPositionUpdate(cb func(position *types.Position)) {
 	c.positionUpdateCallbacks = append(c.positionUpdateCallbacks, cb)
 }
 
-func (c *TradeCollector) EmitPositionUpdate(position *Position) {
+func (c *TradeCollector) EmitPositionUpdate(position *types.Position) {
 	for _, cb := range c.positionUpdateCallbacks {
 		cb(position)
 	}

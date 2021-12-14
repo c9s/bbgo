@@ -16,15 +16,15 @@ type TradeCollector struct {
 
 	tradeStore *TradeStore
 	tradeC     chan types.Trade
-	position   *Position
+	position   *types.Position
 	orderStore *OrderStore
 
 	tradeCallbacks          []func(trade types.Trade)
-	positionUpdateCallbacks []func(position *Position)
+	positionUpdateCallbacks []func(position *types.Position)
 	profitCallbacks         []func(trade types.Trade, profit, netProfit fixedpoint.Value)
 }
 
-func NewTradeCollector(symbol string, position *Position, orderStore *OrderStore) *TradeCollector {
+func NewTradeCollector(symbol string, position *types.Position, orderStore *OrderStore) *TradeCollector {
 	return &TradeCollector{
 		Symbol:   symbol,
 		orderSig: sigchan.New(1),

@@ -27,7 +27,7 @@ func init() {
 }
 
 type State struct {
-	Position *bbgo.Position `json:"position,omitempty"`
+	Position *types.Position `json:"position,omitempty"`
 }
 
 type Target struct {
@@ -42,7 +42,7 @@ type PercentageTargetStop struct {
 }
 
 // GenerateOrders generates the orders from the given targets
-func (stop *PercentageTargetStop) GenerateOrders(market types.Market, pos *bbgo.Position) []types.SubmitOrder {
+func (stop *PercentageTargetStop) GenerateOrders(market types.Market, pos *types.Position) []types.SubmitOrder {
 	var price = pos.AverageCost
 	var quantity = pos.Base
 
@@ -62,12 +62,12 @@ func (stop *PercentageTargetStop) GenerateOrders(market types.Market, pos *bbgo.
 		}
 
 		targetOrders = append(targetOrders, types.SubmitOrder{
-			Symbol:   market.Symbol,
-			Market:   market,
-			Type:     types.OrderTypeLimit,
-			Side:     types.SideTypeSell,
-			Price:    targetPrice,
-			Quantity: targetQuantity,
+			Symbol:           market.Symbol,
+			Market:           market,
+			Type:             types.OrderTypeLimit,
+			Side:             types.SideTypeSell,
+			Price:            targetPrice,
+			Quantity:         targetQuantity,
 			MarginSideEffect: target.MarginOrderSideEffect,
 			TimeInForce:      "GTC",
 		})
@@ -178,7 +178,7 @@ func (s *Strategy) LoadState() error {
 	}
 
 	if s.state.Position == nil {
-		s.state.Position = bbgo.NewPositionFromMarket(s.Market)
+		s.state.Position = types.NewPositionFromMarket(s.Market)
 	}
 
 	return nil

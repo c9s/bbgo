@@ -64,96 +64,37 @@ func (c *TradeService) NewGetTransactionDetailsRequest() *GetTransactionDetailsR
 	}
 }
 
+//go:generate requestgen -type PlaceOrderRequest
 type PlaceOrderRequest struct {
 	client *RestClient
 
-	instId string
+	instrumentID string `param:"instId"`
 
 	// tdMode
 	// margin mode: "cross", "isolated"
 	// non-margin mode cash
-	tdMode string
+	tradeMode string `param:"tdMode" validValues:"cross,isolated,cash"`
 
 	// A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 32 characters.
-	clientOrderID *string
+	clientOrderID *string `param:"clOrdId"`
 
 	// A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 8 characters.
-	tag *string
+	tag *string `param:"tag"`
 
 	// "buy" or "sell"
-	side SideType
+	side SideType `param:"side" validValues:"buy,sell"`
 
-	ordType OrderType
+	orderType OrderType `param:"ordType"`
 
-	// sz Quantity
-	sz string
+	quantity string `param:"sz"`
 
 	// price
-	px *string
-}
-
-func (r *PlaceOrderRequest) InstrumentID(instID string) *PlaceOrderRequest {
-	r.instId = instID
-	return r
-}
-
-func (r *PlaceOrderRequest) TradeMode(mode string) *PlaceOrderRequest {
-	r.tdMode = mode
-	return r
-}
-
-func (r *PlaceOrderRequest) ClientOrderID(clientOrderID string) *PlaceOrderRequest {
-	r.clientOrderID = &clientOrderID
-	return r
-}
-
-func (r *PlaceOrderRequest) Side(side SideType) *PlaceOrderRequest {
-	r.side = side
-	return r
-}
-
-func (r *PlaceOrderRequest) Quantity(quantity string) *PlaceOrderRequest {
-	r.sz = quantity
-	return r
-}
-
-func (r *PlaceOrderRequest) Price(price string) *PlaceOrderRequest {
-	r.px = &price
-	return r
-}
-
-func (r *PlaceOrderRequest) OrderType(orderType OrderType) *PlaceOrderRequest {
-	r.ordType = orderType
-	return r
+	price *string `param:"px"`
 }
 
 func (r *PlaceOrderRequest) Parameters() map[string]interface{} {
-	payload := map[string]interface{}{}
-
-	payload["instId"] = r.instId
-
-	if r.tdMode == "" {
-		payload["tdMode"] = "cash"
-	} else {
-		payload["tdMode"] = r.tdMode
-	}
-
-	if r.clientOrderID != nil {
-		payload["clOrdId"] = r.clientOrderID
-	}
-
-	payload["side"] = r.side
-	payload["ordType"] = r.ordType
-	payload["sz"] = r.sz
-	if r.px != nil {
-		payload["px"] = r.px
-	}
-
-	if r.tag != nil {
-		payload["tag"] = r.tag
-	}
-
-	return payload
+	params, _ := r.GetParameters()
+	return params
 }
 
 func (r *PlaceOrderRequest) Do(ctx context.Context) (*OrderResponse, error) {
@@ -184,47 +125,27 @@ func (r *PlaceOrderRequest) Do(ctx context.Context) (*OrderResponse, error) {
 	return &orderResponse.Data[0], nil
 }
 
+//go:generate requestgen -type CancelOrderRequest
 type CancelOrderRequest struct {
 	client *RestClient
 
-	instId  string
-	ordId   *string
-	clOrdId *string
-}
-
-func (r *CancelOrderRequest) InstrumentID(instId string) *CancelOrderRequest {
-	r.instId = instId
-	return r
-}
-
-func (r *CancelOrderRequest) OrderID(orderID string) *CancelOrderRequest {
-	r.ordId = &orderID
-	return r
-}
-
-func (r *CancelOrderRequest) ClientOrderID(clientOrderID string) *CancelOrderRequest {
-	r.clOrdId = &clientOrderID
-	return r
+	instrumentID  string  `param:"instId"`
+	orderID       *string `param:"ordId"`
+	clientOrderID *string `param:"clOrdId"`
 }
 
 func (r *CancelOrderRequest) Parameters() map[string]interface{} {
-	var payload = map[string]interface{}{
-		"instId": r.instId,
-	}
-
-	if r.ordId != nil {
-		payload["ordId"] = r.ordId
-	} else if r.clOrdId != nil {
-		payload["clOrdId"] = r.clOrdId
-	}
-
+	payload, _ := r.GetParameters()
 	return payload
 }
 
 func (r *CancelOrderRequest) Do(ctx context.Context) ([]OrderResponse, error) {
-	var payload = r.Parameters()
+	payload, err := r.GetParameters()
+	if err != nil {
+		return nil, err
+	}
 
-	if r.ordId == nil && r.clOrdId != nil {
+	if r.clientOrderID == nil && r.orderID != nil {
 		return nil, errors.New("either orderID or clientOrderID is required for canceling order")
 	}
 
@@ -369,7 +290,7 @@ type OrderDetails struct {
 	Currency string `json:"ccy"`
 
 	// Leverage = from 0.01 to 125.
-	//Only applicable to MARGIN/FUTURES/SWAP
+	// Only applicable to MARGIN/FUTURES/SWAP
 	Leverage fixedpoint.Value `json:"lever"`
 
 	RebateCurrency string           `json:"rebateCcy"`
