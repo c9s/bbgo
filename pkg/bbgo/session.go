@@ -601,9 +601,10 @@ func (session *ExchangeSession) UpdatePrices(ctx context.Context) (err error) {
 
 	balances := session.Account.Balances()
 
-	symbols := make([]string, len(balances))
+	var symbols []string
 	for _, b := range balances {
 		symbols = append(symbols, b.Currency+"USDT")
+		symbols = append(symbols, "USDT"+b.Currency)
 	}
 
 	tickers, err := session.Exchange.QueryTickers(ctx, symbols...)
