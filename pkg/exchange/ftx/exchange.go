@@ -500,7 +500,6 @@ func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticke
 }
 
 func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[string]types.Ticker, error) {
-
 	var tickers = make(map[string]types.Ticker)
 
 	markets, err := e._queryMarkets(ctx)
