@@ -87,13 +87,15 @@ func (trade Trade) String() string {
 
 // PlainText is used for telegram-styled messages
 func (trade Trade) PlainText() string {
-	return fmt.Sprintf("Trade %s %s %s %f @ %f, amount %f",
+	return fmt.Sprintf("Trade %s %s %s %f @ %f, amount %f , fee  %f %s ",
 		trade.Exchange.String(),
 		trade.Symbol,
 		trade.Side,
 		trade.Quantity,
 		trade.Price,
-		trade.QuoteQuantity)
+		trade.QuoteQuantity,
+		trade.Fee,
+		trade.FeeCurrency)
 }
 
 var slackTradeTextTemplate = ":handshake: {{ .Symbol }} {{ .Side }} Trade Execution @ {{ .Price  }}"
