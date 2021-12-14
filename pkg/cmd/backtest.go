@@ -232,7 +232,10 @@ var BacktestCmd = &cobra.Command{
 							}
 
 							if prevKLine != emptyKLine {
-								if prevKLine.StartTime.Add(interval.Duration()) != k.StartTime {
+								if prevKLine.StartTime.Unix() == k.StartTime.Unix() {
+									backtestService.DeleteDuplicatedKLine(k)
+									log.Errorf("found kline data duplicated at time: %s kline: %+v , deleted it", k.StartTime, k)
+								} else if prevKLine.StartTime.Add(interval.Duration()) != k.StartTime {
 									corruptCnt++
 									log.Errorf("found kline data corrupted at time: %s kline: %+v", k.StartTime, k)
 									log.Errorf("between %d and %d",
