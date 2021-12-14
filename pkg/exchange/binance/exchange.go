@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"go.uber.org/multierr"
+
 	"golang.org/x/time/rate"
 
 	"github.com/adshao/go-binance/v2"
@@ -514,7 +516,7 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 	return toGlobalOrders(binanceOrders)
 }
 
-func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err2 error) {
+func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err error) {
 	if e.IsFutures {
 		for _, o := range orders {
 			var req = e.futuresClient.NewCancelOrderService()
@@ -528,14 +530,14 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 				// req.NewClientOrderID(o.ClientOrderID) // TODO
 			}
 
-			_, err := req.Do(ctx)
-			if err != nil {
-				log.WithError(err).Errorf("order cancel error")
-				err2 = err
+			_, _err := req.Do(ctx)
+			if _err != nil {
+				log.WithError(_err).Errorf("order cancel error")
+				err = multierr.Append(err, _err)
 			}
 		}
 
-		return err2
+		return err
 	}
 
 	for _, o := range orders {
@@ -550,14 +552,14 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 			req.NewClientOrderID(o.ClientOrderID)
 		}
 
-		_, err := req.Do(ctx)
-		if err != nil {
-			log.WithError(err).Errorf("order cancel error")
-			err2 = err
+		_, _err := req.Do(ctx)
+		if _err != nil {
+			log.WithError(_err).Errorf("order cancel error")
+			err = multierr.Append(err, _err)
 		}
 	}
 
-	return err2
+	return err
 }
 
 func (e *Exchange) submitMarginOrder(ctx context.Context, order types.SubmitOrder) (*types.Order, error) {
