@@ -86,10 +86,10 @@ func (e KLineBatchQuery) Query(ctx context.Context, symbol string, interval type
 
 		tryQueryKlineTimes := 0
 
-		var nowStartTime = startTime
-		for nowStartTime.Before(endTime) {
+		var currentTime = startTime
+		for currentTime.Before(endTime) {
 			kLines, err := e.QueryKLines(ctx, symbol, interval, types.KLineQueryOptions{
-				StartTime: &nowStartTime,
+				StartTime: &currentTime,
 				EndTime:   &endTime,
 			})
 			sort.Slice(kLines, func(i, j int) bool { return kLines[i].StartTime.Unix() < kLines[j].StartTime.Unix() })
@@ -108,7 +108,7 @@ func (e KLineBatchQuery) Query(ctx context.Context, symbol string, interval type
 			var batchKLines = make([]types.KLine, 0, BatchSize)
 			for _, kline := range kLines {
 				// ignore any kline before the given start time
-				if nowStartTime.Unix() != startTime.Unix() && kline.StartTime.Unix() <= nowStartTime.Unix() {
+				if currentTime.Unix() != startTime.Unix() && kline.StartTime.Unix() <= currentTime.Unix() {
 					continue
 				}
 
@@ -128,7 +128,7 @@ func (e KLineBatchQuery) Query(ctx context.Context, symbol string, interval type
 				}
 
 				//The issue is in FTX, prev endtime = next start time , so if add 1 ms , it would query forever.
-				nowStartTime = kline.StartTime
+				currentTime = kline.StartTime
 				tryQueryKlineTimes = 0
 			}
 

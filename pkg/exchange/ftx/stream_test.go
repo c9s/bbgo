@@ -45,9 +45,16 @@ func Test_Batch(t *testing.T) {
 	defer cancel()
 	// should use channel here
 
-	starttime, _ := time.Parse("2006-1-2 15:04", "2021-08-01 00:00")
-	endtime, _ := time.Parse("2006-1-2 15:04", "2021-08-04 00:19")
-	klineC, _ := batch.Query(ctx, "XRPUSDT", types.Interval1d, starttime, endtime)
+	starttime, err := time.Parse("2006-1-2 15:04", "2021-08-01 00:00")
+	assert.NoError(t, err)
+	endtime, err := time.Parse("2006-1-2 15:04", "2021-08-04 00:19")
+	assert.NoError(t, err)
+
+	klineC, errC := batch.Query(ctx, "XRPUSDT", types.Interval1d, starttime, endtime)
+
+	if err := <-errC; err != nil {
+		assert.NoError(t, err)
+	}
 
 	var lastmintime time.Time
 	var lastmaxtime time.Time
