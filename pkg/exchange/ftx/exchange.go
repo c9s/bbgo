@@ -227,7 +227,7 @@ func (e *Exchange) IsSupportedInterval(interval types.Interval) bool {
 
 func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
 	var klines []types.KLine
-	var since, until, current time.Time
+	var since, until, currentEnd time.Time
 	if options.StartTime != nil {
 		since = *options.StartTime
 	}
@@ -237,13 +237,17 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 		until = time.Now()
 	}
 
-	current = until
+	currentEnd = until
 
 	for {
 
-		endTime := current.Add(interval.Duration())
+		//the fetch result is from newest to oldest
+		endTime := currentEnd.Add(interval.Duration())
 		options.EndTime = &endTime
-		lines, err := e._queryKLines(ctx, symbol, interval, options)
+		lines, err := e._queryKLines(ctx, symbol, interval, types.KLineQueryOptions{
+			StartTime: &since,
+			EndTime:   &currentEnd,
+		})
 
 		if err != nil {
 			return nil, err
@@ -255,20 +259,36 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 
 		for _, line := range lines {
 
-			if line.EndTime.Unix() < current.Unix() {
-				current = line.StartTime
+			if line.StartTime.Unix() < currentEnd.Unix() {
+				currentEnd = line.StartTime
 			}
 
-			if line.EndTime.Unix() > since.Unix() {
+			if line.StartTime.Unix() > since.Unix() {
 				klines = append(klines, line)
 			}
 		}
 
-		if since.IsZero() || current.Unix() == since.Unix() {
+		if len(lines) == 1 && lines[0].StartTime.Unix() == currentEnd.Unix() {
+			break
+		}
+
+		outBound := currentEnd.Add(interval.Duration()*-1).Unix() <= since.Unix()
+		if since.IsZero() || currentEnd.Unix() == since.Unix() || outBound {
+			break
+		}
+
+		if options.Limit != 0 && options.Limit <= len(lines) {
 			break
 		}
 	}
 	sort.Slice(klines, func(i, j int) bool { return klines[i].StartTime.Unix() < klines[j].StartTime.Unix() })
+
+	if options.Limit != 0 {
+		limitedItems := len(klines) - options.Limit
+		if limitedItems > 0 {
+			return klines[limitedItems:], nil
+		}
+	}
 
 	return klines, nil
 }
@@ -294,7 +314,7 @@ func (e *Exchange) _queryKLines(ctx context.Context, symbol string, interval typ
 		return nil, err
 	}
 
-	resp, err := e.newRest().HistoricalPrices(ctx, toLocalSymbol(symbol), interval, int64(options.Limit), since, until)
+	resp, err := e.newRest().HistoricalPrices(ctx, toLocalSymbol(symbol), interval, 0, since, until)
 	if err != nil {
 		return nil, err
 	}
