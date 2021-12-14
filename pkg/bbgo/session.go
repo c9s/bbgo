@@ -161,6 +161,10 @@ type ExchangeSession struct {
 	IsolatedMargin       bool   `json:"isolatedMargin,omitempty" yaml:"isolatedMargin,omitempty"`
 	IsolatedMarginSymbol string `json:"isolatedMarginSymbol,omitempty" yaml:"isolatedMarginSymbol,omitempty"`
 
+	Futures               bool   `json:"futures,omitempty" yaml:"futures"`
+	IsolatedFutures       bool   `json:"isolatedFutures,omitempty" yaml:"isolatedFutures,omitempty"`
+	IsolatedFuturesSymbol string `json:"isolatedFuturesSymbol,omitempty" yaml:"isolatedFuturesSymbol,omitempty"`
+
 	// ---------------------------
 	// Runtime fields
 	// ---------------------------
@@ -199,7 +203,7 @@ type ExchangeSession struct {
 	// marketDataStores contains the market data store of each market
 	marketDataStores map[string]*MarketDataStore
 
-	positions map[string]*Position
+	positions map[string]*types.Position
 
 	// standard indicators of each market
 	standardIndicatorSets map[string]*StandardIndicatorSet
@@ -236,7 +240,7 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 		markets:               make(map[string]types.Market),
 		startPrices:           make(map[string]float64),
 		lastPrices:            make(map[string]float64),
-		positions:             make(map[string]*Position),
+		positions:             make(map[string]*types.Position),
 		marketDataStores:      make(map[string]*MarketDataStore),
 		standardIndicatorSets: make(map[string]*StandardIndicatorSet),
 		orderStores:           make(map[string]*OrderStore),
@@ -388,7 +392,7 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 		session.Trades[symbol].Append(trade)
 	})
 
-	position := &Position{
+	position := &types.Position{
 		Symbol:        symbol,
 		BaseCurrency:  market.BaseCurrency,
 		QuoteCurrency: market.QuoteCurrency,
@@ -475,7 +479,7 @@ func (session *ExchangeSession) StandardIndicatorSet(symbol string) (*StandardIn
 	return set, ok
 }
 
-func (session *ExchangeSession) Position(symbol string) (pos *Position, ok bool) {
+func (session *ExchangeSession) Position(symbol string) (pos *types.Position, ok bool) {
 	pos, ok = session.positions[symbol]
 	if ok {
 		return pos, ok
@@ -486,7 +490,7 @@ func (session *ExchangeSession) Position(symbol string) (pos *Position, ok bool)
 		return nil, false
 	}
 
-	pos = &Position{
+	pos = &types.Position{
 		Symbol:        symbol,
 		BaseCurrency:  market.BaseCurrency,
 		QuoteCurrency: market.QuoteCurrency,
@@ -496,7 +500,7 @@ func (session *ExchangeSession) Position(symbol string) (pos *Position, ok bool)
 	return pos, ok
 }
 
-func (session *ExchangeSession) Positions() map[string]*Position {
+func (session *ExchangeSession) Positions() map[string]*types.Position {
 	return session.positions
 }
 
@@ -692,6 +696,19 @@ func InitExchangeSession(name string, session *ExchangeSession) error {
 		}
 	}
 
+	if session.Futures {
+		futuresExchange, ok := exchange.(types.FuturesExchange)
+		if !ok {
+			return fmt.Errorf("exchange %s does not support futures", exchangeName)
+		}
+
+		if session.IsolatedFutures {
+			futuresExchange.UseIsolatedFutures(session.IsolatedFuturesSymbol)
+		} else {
+			futuresExchange.UseFutures()
+		}
+	}
+
 	session.Name = name
 	session.Notifiability = Notifiability{
 		SymbolChannelRouter:  NewPatternChannelRouter(nil),
@@ -713,7 +730,7 @@ func InitExchangeSession(name string, session *ExchangeSession) error {
 	session.lastPrices = make(map[string]float64)
 	session.startPrices = make(map[string]float64)
 	session.marketDataStores = make(map[string]*MarketDataStore)
-	session.positions = make(map[string]*Position)
+	session.positions = make(map[string]*types.Position)
 	session.standardIndicatorSets = make(map[string]*StandardIndicatorSet)
 	session.orderStores = make(map[string]*OrderStore)
 	session.OrderExecutor = &ExchangeOrderExecutor{

@@ -31,7 +31,7 @@ type State struct {
 	Orders          []types.SubmitOrder           `json:"orders,omitempty"`
 	FilledBuyGrids  map[fixedpoint.Value]struct{} `json:"filledBuyGrids"`
 	FilledSellGrids map[fixedpoint.Value]struct{} `json:"filledSellGrids"`
-	Position        *bbgo.Position                `json:"position,omitempty"`
+	Position        *types.Position               `json:"position,omitempty"`
 
 	AccumulativeArbitrageProfit fixedpoint.Value `json:"accumulativeArbitrageProfit"`
 
@@ -511,7 +511,7 @@ func (s *Strategy) LoadState() error {
 				FilledBuyGrids:  make(map[fixedpoint.Value]struct{}),
 				FilledSellGrids: make(map[fixedpoint.Value]struct{}),
 				ArbitrageOrders: make(map[uint64]types.Order),
-				Position:        bbgo.NewPositionFromMarket(s.Market),
+				Position:        types.NewPositionFromMarket(s.Market),
 			}
 		} else {
 			s.state = &state
@@ -591,16 +591,16 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 
 	/*
-	if s.TradeService != nil {
-		s.tradeCollector.OnTrade(func(trade types.Trade) {
-			if err := s.TradeService.Mark(ctx, trade.ID, ID); err != nil {
-				log.WithError(err).Error("trade mark error")
-			}
-		})
-	}
+		if s.TradeService != nil {
+			s.tradeCollector.OnTrade(func(trade types.Trade) {
+				if err := s.TradeService.Mark(ctx, trade.ID, ID); err != nil {
+					log.WithError(err).Error("trade mark error")
+				}
+			})
+		}
 	*/
 
-	s.tradeCollector.OnPositionUpdate(func(position *bbgo.Position) {
+	s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
 		s.Notifiability.Notify(position)
 	})
 	s.tradeCollector.BindStream(session.UserDataStream)

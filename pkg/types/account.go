@@ -109,6 +109,7 @@ func (m AssetMap) SlackAttachment() slack.Attachment {
 }
 
 type BalanceMap map[string]Balance
+type PositionMap map[string]Position
 
 func (m BalanceMap) String() string {
 	var ss []string
