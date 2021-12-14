@@ -177,6 +177,7 @@ func (r *restRequest) newAuthenticatedRequest(ctx context.Context) (*http.Reques
 	if err != nil {
 		return nil, err
 	}
+
 	ts := strconv.FormatInt(timestamp(), 10)
 	p := fmt.Sprintf("%s%s%s", ts, r.m, u.Path)
 	if len(r.q) > 0 {

@@ -3,6 +3,7 @@ package binance
 import (
 	"context"
 	"fmt"
+	"github.com/adshao/go-binance/v2/futures"
 	"net/http"
 	"os"
 	"strconv"
@@ -14,7 +15,6 @@ import (
 	"github.com/adshao/go-binance/v2"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
-
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -27,7 +27,6 @@ const BNB = "BNB"
 // 50 per 10 seconds = 5 per second
 var orderLimiter = rate.NewLimiter(5, 5)
 
-
 var log = logrus.WithFields(logrus.Fields{
 	"exchange": "binance",
 })
@@ -35,6 +34,7 @@ var log = logrus.WithFields(logrus.Fields{
 func init() {
 	_ = types.Exchange(&Exchange{})
 	_ = types.MarginExchange(&Exchange{})
+	_ = types.FuturesExchange(&Exchange{})
 
 	// FIXME: this is not effected since dotenv is loaded in the rootCmd, not in the init function
 	if ok, _ := strconv.ParseBool(os.Getenv("DEBUG_BINANCE_STREAM")); ok {
@@ -46,20 +46,38 @@ type Exchange struct {
 	types.MarginSettings
 	types.FuturesSettings
 
-	key, secret string
-	Client      *binance.Client
+	key, secret   string
+	Client        *binance.Client // Spot & Margin
+	futuresClient *futures.Client // USDT-M Futures
+	// deliveryClient	*delivery.Client // Coin-M Futures
 }
 
 func New(key, secret string) *Exchange {
 	var client = binance.NewClient(key, secret)
 	client.HTTPClient = &http.Client{Timeout: 15 * time.Second}
-
 	_, _ = client.NewSetServerTimeService().Do(context.Background())
-	return &Exchange{
-		key:    key,
-		secret: secret,
 
-		Client: client,
+	var futuresClient = binance.NewFuturesClient(key, secret)
+	futuresClient.HTTPClient = &http.Client{Timeout: 15 * time.Second}
+	_, _ = futuresClient.NewSetServerTimeService().Do(context.Background())
+
+	var err error
+	_, err = client.NewSetServerTimeService().Do(context.Background())
+	if err != nil {
+		panic(err)
+	}
+
+	_, err = futuresClient.NewSetServerTimeService().Do(context.Background())
+	if err != nil {
+		panic(err)
+	}
+
+	return &Exchange{
+		key:           key,
+		secret:        secret,
+		Client:        client,
+		futuresClient: futuresClient,
+		// deliveryClient: deliveryClient,
 	}
 }
 
@@ -152,8 +170,9 @@ func (e *Exchange) QueryAveragePrice(ctx context.Context, symbol string) (float6
 }
 
 func (e *Exchange) NewStream() types.Stream {
-	stream := NewStream(e.Client)
+	stream := NewStream(e.Client, e.futuresClient)
 	stream.MarginSettings = e.MarginSettings
+	stream.FuturesSettings = e.FuturesSettings
 	return stream
 }
 
@@ -179,7 +198,6 @@ func (e *Exchange) QueryIsolatedMarginAccount(ctx context.Context, symbols ...st
 
 	return toGlobalIsolatedMarginAccount(account), nil
 }
-
 
 func (e *Exchange) Withdrawal(ctx context.Context, asset string, amount fixedpoint.Value, address string, options *types.WithdrawalOptions) error {
 	req := e.Client.NewCreateWithdrawService()
@@ -582,6 +600,95 @@ func (e *Exchange) submitMarginOrder(ctx context.Context, order types.SubmitOrde
 	return createdOrder, err
 }
 
+func (e *Exchange) submitFuturesOrder(ctx context.Context, order types.SubmitOrder) (*types.Order, error) {
+	orderType, err := toLocalFuturesOrderType(order.Type)
+	if err != nil {
+		return nil, err
+	}
+
+	req := e.futuresClient.NewCreateOrderService().
+		Symbol(order.Symbol).
+		Type(orderType).
+		Side(futures.SideType(order.Side))
+
+	clientOrderID := newSpotClientOrderID(order.ClientOrderID)
+	if len(clientOrderID) > 0 {
+		req.NewClientOrderID(clientOrderID)
+	}
+
+	// use response result format
+	req.NewOrderResponseType(futures.NewOrderRespTypeRESULT)
+	// if e.IsIsolatedFutures {
+	// 	req.IsIsolated(e.IsIsolatedFutures)
+	// }
+
+	if len(order.QuantityString) > 0 {
+		req.Quantity(order.QuantityString)
+	} else if order.Market.Symbol != "" {
+		req.Quantity(order.Market.FormatQuantity(order.Quantity))
+	} else {
+		req.Quantity(strconv.FormatFloat(order.Quantity, 'f', 8, 64))
+	}
+
+	// set price field for limit orders
+	switch order.Type {
+	case types.OrderTypeStopLimit, types.OrderTypeLimit, types.OrderTypeLimitMaker:
+		if len(order.PriceString) > 0 {
+			req.Price(order.PriceString)
+		} else if order.Market.Symbol != "" {
+			req.Price(order.Market.FormatPrice(order.Price))
+		}
+	}
+
+	// set stop price
+	switch order.Type {
+
+	case types.OrderTypeStopLimit, types.OrderTypeStopMarket:
+		if len(order.StopPriceString) == 0 {
+			return nil, fmt.Errorf("stop price string can not be empty")
+		}
+
+		req.StopPrice(order.StopPriceString)
+	}
+
+	// could be IOC or FOK
+	if len(order.TimeInForce) > 0 {
+		// TODO: check the TimeInForce value
+		req.TimeInForce(futures.TimeInForceType(order.TimeInForce))
+	} else {
+		switch order.Type {
+		case types.OrderTypeLimit, types.OrderTypeStopLimit:
+			req.TimeInForce(futures.TimeInForceTypeGTC)
+		}
+	}
+
+	response, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Infof("futures order creation response: %+v", response)
+
+	createdOrder, err := toGlobalFuturesOrder(&futures.Order{
+		Symbol:           response.Symbol,
+		OrderID:          response.OrderID,
+		ClientOrderID:    response.ClientOrderID,
+		Price:            response.Price,
+		OrigQuantity:     response.OrigQuantity,
+		ExecutedQuantity: response.ExecutedQuantity,
+		// CummulativeQuoteQuantity: response.CummulativeQuoteQuantity,
+		Status:      response.Status,
+		TimeInForce: response.TimeInForce,
+		Type:        response.Type,
+		Side:        response.Side,
+		// UpdateTime:               response.TransactTime,
+		// Time:                     response.TransactTime,
+		// IsIsolated:               response.IsIsolated,
+	}, true)
+
+	return createdOrder, err
+}
+
 // BBGO is a broker on Binance
 const spotBrokerID = "NSUYEBKM"
 
@@ -700,13 +807,15 @@ func (e *Exchange) submitSpotOrder(ctx context.Context, order types.SubmitOrder)
 
 func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error) {
 	for _, order := range orders {
-		if err := orderLimiter.Wait(ctx) ; err != nil {
+		if err := orderLimiter.Wait(ctx); err != nil {
 			log.WithError(err).Errorf("order rate limiter wait error")
 		}
 
 		var createdOrder *types.Order
 		if e.IsMargin {
 			createdOrder, err = e.submitMarginOrder(ctx, order)
+		} else if e.IsFutures {
+			createdOrder, err = e.submitFuturesOrder(ctx, order)
 		} else {
 			createdOrder, err = e.submitSpotOrder(ctx, order)
 		}
@@ -847,7 +956,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	}
 
 	for _, t := range remoteTrades {
-		localTrade, err := ToGlobalTrade(*t, e.IsMargin)
+		localTrade, err := toGlobalTrade(*t, e.IsMargin)
 		if err != nil {
 			log.WithError(err).Errorf("can not convert binance trade: %+v", t)
 			continue

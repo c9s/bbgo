@@ -4,11 +4,12 @@ import "github.com/c9s/bbgo/pkg/fixedpoint"
 
 type FuturesExchange interface {
 	UseFutures()
+	UseIsolatedFutures(symbol string)
 	GetFuturesSettings() FuturesSettings
 }
 
 type FuturesSettings struct {
-	IsFutures bool
+	IsFutures             bool
 	IsIsolatedFutures     bool
 	IsolatedFuturesSymbol string
 }
@@ -25,9 +26,7 @@ func (s *FuturesSettings) UseIsolatedFutures(symbol string) {
 	s.IsFutures = true
 	s.IsIsolatedFutures = true
 	s.IsolatedFuturesSymbol = symbol
-
 }
-
 
 type MarginExchange interface {
 	UseMargin()
