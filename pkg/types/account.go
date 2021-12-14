@@ -41,25 +41,36 @@ func (b Balance) String() string {
 }
 
 type Asset struct {
-	Currency string           `json:"currency" db:"currency"`
-	Total    fixedpoint.Value `json:"total" db:"total"`
-	InUSD    fixedpoint.Value `json:"inUSD" db:"inUSD"`
-	InBTC    fixedpoint.Value `json:"inBTC" db:"inBTC"`
-	Time     time.Time        `json:"time" db:"time"`
+	Currency  string           `json:"currency" db:"currency"`
+	Total     fixedpoint.Value `json:"total" db:"total"`
+	InUSD     fixedpoint.Value `json:"inUSD" db:"inUSD"`
+	InBTC     fixedpoint.Value `json:"inBTC" db:"inBTC"`
+	Time      time.Time        `json:"time" db:"time"`
+	Lock      fixedpoint.Value `json:"lock" db:"lock" `
+	Available fixedpoint.Value `json:"available"  db:"available"`
 }
 
 type AssetMap map[string]Asset
 
 func (m AssetMap) PlainText() (o string) {
+	sumUsd := 0.0
+	sumBTC := 0.0
 	for _, a := range m {
-		o += fmt.Sprintf("%s: %f (≈ %s) (≈ %s)",
+		usd := a.InUSD.Float64()
+		btc := a.InBTC.Float64()
+		o += fmt.Sprintf("  %s: %f (≈ %s) (≈ %s)",
 			a.Currency,
 			a.Total.Float64(),
-			USD.FormatMoneyFloat64(a.InUSD.Float64()),
-			BTC.FormatMoneyFloat64(a.InBTC.Float64()),
+			USD.FormatMoneyFloat64(usd),
+			BTC.FormatMoneyFloat64(btc),
 		) + "\n"
+		sumUsd += usd
+		sumBTC += btc
 	}
-
+	o += fmt.Sprintf(" Summary: (≈ %s) (≈ %s)",
+		USD.FormatMoneyFloat64(sumUsd),
+		BTC.FormatMoneyFloat64(sumBTC),
+	) + "\n"
 	return o
 }
 
@@ -138,14 +149,17 @@ func (m BalanceMap) Assets(prices map[string]float64) AssetMap {
 		}
 
 		asset := Asset{
-			Currency: currency,
-			Total:    b.Available + b.Locked,
-			Time:     now,
+			Currency:  currency,
+			Total:     b.Available + b.Locked,
+			Time:      now,
+			Lock:      b.Locked,
+			Available: b.Available,
 		}
 
 		btcusdt, hasBtcPrice := prices["BTCUSDT"]
 
 		usdMarkets := []string{currency + "USDT", currency + "USDC", currency + "USD", "USDT" + currency}
+
 		for _, market := range usdMarkets {
 			if val, ok := prices[market]; ok {
 
