@@ -290,3 +290,15 @@ func (s *BacktestService) BatchInsert(kline []types.KLine) error {
 	_, err := s.DB.NamedExec(sql, kline)
 	return err
 }
+
+func (s *BacktestService) DeleteDuplicatedKLine(k types.KLine) error {
+
+	if len(k.Exchange) == 0 {
+		return errors.New("kline.Exchange field should not be empty")
+	}
+
+	tableName := s._targetKlineTable(k.Exchange)
+	sql := fmt.Sprintf("delete from `%s` where gid = :gid  ", tableName)
+	_, err := s.DB.NamedExec(sql, k)
+	return err
+}

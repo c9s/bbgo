@@ -137,7 +137,7 @@ func (s *Stream) Subscribe(channel types.Channel, symbol string, option types.Su
 func (s *Stream) pollKLines(ctx context.Context) {
 	// get current kline candle
 	for _, sub := range s.klineSubscriptions {
-		klines := getLastKLine(s.exchange, ctx, sub.symbol, sub.interval)
+		klines := getLastClosedKLine(s.exchange, ctx, sub.symbol, sub.interval)
 
 		if len(klines) > 0 {
 			// handle mutiple klines, get the latest one
@@ -166,7 +166,7 @@ func (s *Stream) pollKLines(ctx context.Context) {
 					// not in the checking time slot, check next subscription
 					continue
 				}
-				klines := getLastKLine(s.exchange, ctx, sub.symbol, sub.interval)
+				klines := getLastClosedKLine(s.exchange, ctx, sub.symbol, sub.interval)
 
 				if len(klines) > 0 {
 					// handle mutiple klines, get the latest one
@@ -179,18 +179,19 @@ func (s *Stream) pollKLines(ctx context.Context) {
 	}
 }
 
-func getLastKLine(e *Exchange, ctx context.Context, symbol string, interval types.Interval) []types.KLine {
+func getLastClosedKLine(e *Exchange, ctx context.Context, symbol string, interval types.Interval) []types.KLine {
 	// set since to more 30s ago to avoid getting no kline candle
-	since := time.Now().Add(time.Duration(-1*(interval.Minutes()*60+30)) * time.Second)
+	since := time.Now().Add(time.Duration(interval.Minutes()*-3) * time.Minute)
 	klines, err := e.QueryKLines(ctx, symbol, interval, types.KLineQueryOptions{
 		StartTime: &since,
+		Limit:     2,
 	})
 	if err != nil {
 		logger.WithError(err).Errorf("failed to get kline data")
 		return klines
 	}
 
-	return klines
+	return []types.KLine{klines[0]}
 }
 
 func (s *Stream) Close() error {

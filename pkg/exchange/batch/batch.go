@@ -85,9 +85,12 @@ func (e KLineBatchQuery) Query(ctx context.Context, symbol string, interval type
 		defer close(errC)
 
 		tryQueryKlineTimes := 0
-		for startTime.Before(endTime) {
+
+		var nowStartTime = startTime
+		for nowStartTime.Before(endTime) {
 			kLines, err := e.QueryKLines(ctx, symbol, interval, types.KLineQueryOptions{
-				StartTime: &startTime,
+				StartTime: &nowStartTime,
+				EndTime:   &endTime,
 			})
 			sort.Slice(kLines, func(i, j int) bool { return kLines[i].StartTime.Unix() < kLines[j].StartTime.Unix() })
 			tryQueryKlineTimes++
@@ -105,11 +108,15 @@ func (e KLineBatchQuery) Query(ctx context.Context, symbol string, interval type
 			var batchKLines = make([]types.KLine, 0, BatchSize)
 			for _, kline := range kLines {
 				// ignore any kline before the given start time
-				if kline.StartTime.Before(startTime) {
+				if nowStartTime.Unix() != startTime.Unix() && kline.StartTime.Unix() <= nowStartTime.Unix() {
 					continue
 				}
 
-				if kline.StartTime.After(endTime) {
+				if kline.StartTime.After(endTime) || kline.EndTime.After(endTime) {
+					if len(batchKLines) != 0 {
+						c <- batchKLines
+						batchKLines = nil
+					}
 					return
 				}
 
@@ -117,15 +124,18 @@ func (e KLineBatchQuery) Query(ctx context.Context, symbol string, interval type
 
 				if len(batchKLines) == BatchSize {
 					c <- batchKLines
-					batchKLines = batchKLines[:0]
+					batchKLines = nil
 				}
 
 				//The issue is in FTX, prev endtime = next start time , so if add 1 ms , it would query forever.
-				startTime = kline.EndTime // .Add(time.Millisecond)
+				nowStartTime = kline.StartTime
 				tryQueryKlineTimes = 0
 			}
 
-			c <- batchKLines
+			if len(batchKLines) != 0 {
+				c <- batchKLines
+				batchKLines = nil
+			}
 
 			if tryQueryKlineTimes > 10 { // it means loop 10 times
 				errC <- errors.Errorf("There's a dead loop in batch.go#Query , symbol: %s , interval: %s, startTime :%s ", symbol, interval, startTime.String())
