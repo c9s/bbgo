@@ -65,7 +65,7 @@ func (s *BacktestService) Verify(symbols []string, startTime time.Time, endTime 
 					if prevKLine.StartTime.Unix() == k.StartTime.Unix() {
 						s._deleteDuplicatedKLine(k)
 						log.Errorf("found kline data duplicated at time: %s kline: %+v , deleted it", k.StartTime, k)
-					} else if prevKLine.StartTime.Add(interval.Duration()) != k.StartTime {
+					} else if prevKLine.StartTime.Time().Add(interval.Duration()).Unix() != k.StartTime.Time().Unix() {
 						corruptCnt++
 						log.Errorf("found kline data corrupted at time: %s kline: %+v", k.StartTime, k)
 						log.Errorf("between %d and %d",
@@ -339,9 +339,9 @@ func (s *BacktestService) SyncExist(ctx context.Context, exchange types.Exchange
 	for k := range klineC {
 		if nowStartTime.Add(interval.Duration()).Unix() < k.StartTime.Unix() {
 			log.Infof("syncing %s interval %s syncing %s ~ %s ", symbol, interval, nowStartTime, k.EndTime)
-			s.Sync(ctx, exchange, symbol, nowStartTime.Add(interval.Duration()), k.EndTime.Add(-1*interval.Duration()), interval)
+			s.Sync(ctx, exchange, symbol, nowStartTime.Add(interval.Duration()), k.EndTime.Time().Add(-1*interval.Duration()), interval)
 		}
-		nowStartTime = k.StartTime
+		nowStartTime = k.StartTime.Time()
 	}
 
 	if err := <-errC; err != nil {

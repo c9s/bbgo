@@ -49,7 +49,7 @@ func (inc *AD) calculateAndUpdate(kLines []types.KLine) {
 
 		inc.update(k)
 		inc.EmitUpdate(inc.Last())
-		inc.EndTime = kLines[i].EndTime
+		inc.EndTime = kLines[i].EndTime.Time()
 	}
 
 }

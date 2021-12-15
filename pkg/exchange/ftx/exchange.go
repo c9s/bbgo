@@ -260,7 +260,7 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 		for _, line := range lines {
 
 			if line.StartTime.Unix() < currentEnd.Unix() {
-				currentEnd = line.StartTime
+				currentEnd = line.StartTime.Time()
 			}
 
 			if line.StartTime.Unix() > since.Unix() {

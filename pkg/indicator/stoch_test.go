@@ -25,7 +25,7 @@ func TestSTOCH_update(t *testing.T) {
 
 	buildKLines := func(open, high, low, close []float64) (kLines []types.KLine) {
 		for i := range high {
-			kLines = append(kLines, types.KLine{Open: open[i], High: high[i], Low: low[i], Close: close[i], EndTime: time.Now()})
+			kLines = append(kLines, types.KLine{Open: open[i], High: high[i], Low: low[i], Close: close[i], EndTime: types.Time(time.Now())})
 		}
 		return kLines
 	}
