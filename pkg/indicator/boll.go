@@ -105,7 +105,7 @@ func (inc *BOLL) calculateAndUpdate(kLines []types.KLine) {
 	inc.DownBand.Push(downBand)
 
 	// update end time
-	inc.EndTime = kLines[index].EndTime
+	inc.EndTime = kLines[index].EndTime.Time()
 
 	// log.Infof("update boll: sma=%f, up=%f, down=%f", sma, upBand, downBand)
 

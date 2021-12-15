@@ -919,8 +919,8 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 			Exchange:                 types.ExchangeBinance,
 			Symbol:                   symbol,
 			Interval:                 interval,
-			StartTime:                time.Unix(0, k.OpenTime*int64(time.Millisecond)),
-			EndTime:                  time.Unix(0, k.CloseTime*int64(time.Millisecond)),
+			StartTime:                types.NewTimeFromUnix(0, k.OpenTime*int64(time.Millisecond)),
+			EndTime:                  types.NewTimeFromUnix(0, k.CloseTime*int64(time.Millisecond)),
 			Open:                     util.MustParseFloat(k.Open),
 			Close:                    util.MustParseFloat(k.Close),
 			High:                     util.MustParseFloat(k.High),
@@ -1070,7 +1070,7 @@ func (e *Exchange) BatchQueryKLines(ctx context.Context, symbol string, interval
 			}
 
 			allKLines = append(allKLines, kline)
-			startTime = kline.EndTime
+			startTime = kline.EndTime.Time()
 		}
 	}
 
