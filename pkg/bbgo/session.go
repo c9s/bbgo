@@ -318,6 +318,10 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 		}
 	}
 
+	session.MarketDataStream.OnKLine(func(kline types.KLine) {
+		log.WithField("marketData", "kline").Infof("kline : %+v", kline)
+	})
+
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		log.WithField("marketData", "kline").Infof("kline closed: %+v", kline)
 	})
