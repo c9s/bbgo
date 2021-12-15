@@ -81,7 +81,7 @@ func (inc *EWMA) calculateAndUpdate(allKLines []types.KLine) {
 		var k = allKLines[i]
 		var ewma = priceF(k)*multiplier + (1-multiplier)*inc.Values[i-1]
 		inc.Values.Push(ewma)
-		inc.LastOpenTime = k.StartTime
+		inc.LastOpenTime = k.StartTime.Time()
 		inc.EmitUpdate(ewma)
 	}
 

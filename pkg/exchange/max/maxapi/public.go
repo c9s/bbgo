@@ -216,8 +216,8 @@ func (k KLine) KLine() types.KLine {
 		Exchange:  types.ExchangeMax,
 		Symbol:    strings.ToUpper(k.Symbol), // global symbol
 		Interval:  types.Interval(k.Interval),
-		StartTime: k.StartTime,
-		EndTime:   k.EndTime,
+		StartTime: types.Time(k.StartTime),
+		EndTime:   types.Time(k.EndTime),
 		Open:      k.Open,
 		Close:     k.Close,
 		High:      k.High,
