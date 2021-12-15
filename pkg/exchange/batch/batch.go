@@ -128,7 +128,7 @@ func (e KLineBatchQuery) Query(ctx context.Context, symbol string, interval type
 				}
 
 				//The issue is in FTX, prev endtime = next start time , so if add 1 ms , it would query forever.
-				currentTime = kline.StartTime
+				currentTime = kline.StartTime.Time()
 				tryQueryKlineTimes = 0
 			}
 

@@ -141,8 +141,8 @@ func toGlobalKLine(symbol string, interval types.Interval, h Candle) (types.KLin
 	return types.KLine{
 		Exchange:  types.ExchangeFTX,
 		Symbol:    toGlobalSymbol(symbol),
-		StartTime: h.StartTime.Time,
-		EndTime:   h.StartTime.Add(interval.Duration()),
+		StartTime: types.Time(h.StartTime.Time),
+		EndTime:   types.Time(h.StartTime.Add(interval.Duration())),
 		Interval:  interval,
 		Open:      h.Open,
 		Close:     h.Close,

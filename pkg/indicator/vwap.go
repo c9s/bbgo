@@ -92,7 +92,7 @@ func (inc *VWAP) calculateAndUpdate(kLines []types.KLine) {
 		inc.Values.Push(vwap)
 		inc.EmitUpdate(vwap)
 
-		inc.EndTime = kLines[i].EndTime
+		inc.EndTime = kLines[i].EndTime.Time()
 	}
 }
 

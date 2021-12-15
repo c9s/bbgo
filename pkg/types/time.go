@@ -96,6 +96,22 @@ func (t Time) Time() time.Time {
 	return time.Time(t)
 }
 
+func (t Time) Unix() int64 {
+	return time.Time(t).Unix()
+}
+
+func (t Time) After(time2 time.Time) bool {
+	return time.Time(t).After(time2)
+}
+
+func (t Time) Before(time2 time.Time) bool {
+	return time.Time(t).Before(time2)
+}
+
+func NewTimeFromUnix(sec int64, nsec int64) Time {
+	return Time(time.Unix(sec, nsec))
+}
+
 // Value implements the driver.Valuer interface
 // see http://jmoiron.net/blog/built-in-interfaces/
 func (t Time) Value() (driver.Value, error) {

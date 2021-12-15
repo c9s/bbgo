@@ -66,7 +66,7 @@ func (inc *STOCH) calculateAndUpdate(kLines []types.KLine) {
 
 		inc.update(k)
 		inc.EmitUpdate(inc.LastK(), inc.LastD())
-		inc.EndTime = kLines[i].EndTime
+		inc.EndTime = kLines[i].EndTime.Time()
 	}
 }
 
