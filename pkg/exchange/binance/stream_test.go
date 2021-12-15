@@ -49,8 +49,8 @@ func Test_Batch(t *testing.T) {
 		assert.True(t, nowMinTime.Unix() > lastmaxtime.Unix())
 		assert.True(t, nowMaxTime.Unix() > lastmaxtime.Unix())
 
-		lastmintime = nowMinTime
-		lastmaxtime = nowMaxTime
+		lastmintime = nowMinTime.Time()
+		lastmaxtime = nowMaxTime.Time()
 		assert.True(t, lastmintime.Unix() <= lastmaxtime.Unix())
 
 	}

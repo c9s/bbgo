@@ -59,7 +59,7 @@ func (inc *OBV) calculateAndUpdate(kLines []types.KLine) {
 
 		inc.update(k, priceF)
 		inc.EmitUpdate(inc.Last())
-		inc.EndTime = kLines[i].EndTime
+		inc.EndTime = kLines[i].EndTime.Time()
 	}
 
 }

@@ -302,8 +302,8 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 			Closed:      true,
 			Volume:      candle.Volume.Float64(),
 			QuoteVolume: candle.VolumeInCurrency.Float64(),
-			StartTime:   candle.Time,
-			EndTime:     candle.Time.Add(interval.Duration() - time.Millisecond),
+			StartTime:   types.Time(candle.Time),
+			EndTime:     types.Time(candle.Time.Add(interval.Duration() - time.Millisecond)),
 		})
 	}
 

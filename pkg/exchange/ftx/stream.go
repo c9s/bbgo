@@ -145,7 +145,7 @@ func (s *Stream) pollKLines(ctx context.Context) {
 			s.EmitKLine(klines[0])
 			s.EmitKLineClosed(klines[0])
 			s.EmitKLine(klines[1])
-			lastClosed = klines[0].StartTime
+			lastClosed = klines[0].StartTime.Time()
 		}
 	}
 
@@ -175,7 +175,7 @@ func (s *Stream) pollKLines(ctx context.Context) {
 					if lastClosed.Unix() < klines[0].StartTime.Unix() {
 						s.EmitKLine(klines[0])
 						s.EmitKLineClosed(klines[0])
-						lastClosed = klines[0].StartTime
+						lastClosed = klines[0].StartTime.Time()
 					}
 					s.EmitKLine(klines[1])
 				}
