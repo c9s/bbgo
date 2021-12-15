@@ -199,8 +199,8 @@ func (c *Candle) KLine() types.KLine {
 		Close:       c.Close.Float64(),
 		Volume:      c.Volume.Float64(),
 		QuoteVolume: c.VolumeInCurrency.Float64(),
-		StartTime:   c.StartTime,
-		EndTime:     endTime,
+		StartTime:   types.Time(c.StartTime),
+		EndTime:     types.Time(endTime),
 	}
 }
 

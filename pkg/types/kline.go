@@ -50,8 +50,8 @@ type KLine struct {
 
 	Symbol string `json:"symbol" db:"symbol"`
 
-	StartTime time.Time `json:"startTime" db:"start_time"`
-	EndTime   time.Time `json:"endTime" db:"end_time"`
+	StartTime Time `json:"startTime" db:"start_time"`
+	EndTime   Time `json:"endTime" db:"end_time"`
 
 	Interval Interval `json:"interval" db:"interval"`
 
@@ -69,11 +69,11 @@ type KLine struct {
 	Closed         bool   `json:"closed" db:"closed"`
 }
 
-func (k KLine) GetStartTime() time.Time {
+func (k KLine) GetStartTime() Time {
 	return k.StartTime
 }
 
-func (k KLine) GetEndTime() time.Time {
+func (k KLine) GetEndTime() Time {
 	return k.EndTime
 }
 
@@ -179,11 +179,10 @@ func (k KLine) Color() string {
 	return GrayColor
 }
 
-
 func (k KLine) String() string {
 	return fmt.Sprintf("%s %s %s %s O: %.4f H: %.4f L: %.4f C: %.4f CHG: %.4f MAXCHG: %.4f V: %.4f QV: %.2f TBBV: %.2f",
 		k.Exchange.String(),
-		k.StartTime.Format("2006-01-02 15:04"),
+		k.StartTime.Time().Format("2006-01-02 15:04"),
 		k.Symbol, k.Interval, k.Open, k.High, k.Low, k.Close, k.GetChange(), k.GetMaxChange(), k.Volume, k.QuoteVolume, k.TakerBuyBaseAssetVolume)
 }
 

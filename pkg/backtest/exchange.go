@@ -266,7 +266,7 @@ func (e Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticker
 
 	kline := matching.LastKLine
 	return &types.Ticker{
-		Time:   kline.EndTime,
+		Time:   kline.EndTime.Time(),
 		Volume: kline.Volume,
 		Last:   kline.Close,
 		Open:   kline.Open,

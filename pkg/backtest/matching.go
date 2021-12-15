@@ -399,7 +399,7 @@ func (m *SimplePriceMatching) SellToPrice(price fixedpoint.Value) (closedOrders 
 }
 
 func (m *SimplePriceMatching) processKLine(kline types.KLine) {
-	m.CurrentTime = kline.EndTime
+	m.CurrentTime = kline.EndTime.Time()
 	m.LastKLine = kline
 
 	switch kline.Direction() {

@@ -76,7 +76,7 @@ func (inc *MACD) calculateAndUpdate(kLines []types.KLine) {
 	for i, kLine := range kLines {
 		inc.update(kLine, priceF)
 		inc.EmitUpdate(inc.Values[len(inc.Values)-1])
-		inc.EndTime = kLines[i].EndTime
+		inc.EndTime = kLines[i].EndTime.Time()
 	}
 
 }
