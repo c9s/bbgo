@@ -35,6 +35,7 @@ type StandardIndicatorSet struct {
 	ewma  map[types.IntervalWindow]*indicator.EWMA
 	boll  map[types.IntervalWindow]*indicator.BOLL
 	stoch map[types.IntervalWindow]*indicator.STOCH
+	vol   map[types.IntervalWindow]*indicator.VOL
 
 	store *MarketDataStore
 }
@@ -46,6 +47,7 @@ func NewStandardIndicatorSet(symbol string, store *MarketDataStore) *StandardInd
 		ewma:   make(map[types.IntervalWindow]*indicator.EWMA),
 		boll:   make(map[types.IntervalWindow]*indicator.BOLL),
 		stoch:  make(map[types.IntervalWindow]*indicator.STOCH),
+		vol:    make(map[types.IntervalWindow]*indicator.VOL),
 		store:  store,
 	}
 
@@ -127,6 +129,18 @@ func (set *StandardIndicatorSet) STOCH(iw types.IntervalWindow) *indicator.STOCH
 		inc = &indicator.STOCH{IntervalWindow: iw}
 		inc.Bind(set.store)
 		set.stoch[iw] = inc
+	}
+
+	return inc
+}
+
+// VOL returns the volatility(stddev) indicator of the given interval and the window size.
+func (set *StandardIndicatorSet) VOL(iw types.IntervalWindow) *indicator.VOL {
+	inc, ok := set.vol[iw]
+	if !ok {
+		inc = &indicator.VOL{IntervalWindow: iw}
+		inc.Bind(set.store)
+		set.vol[iw] = inc
 	}
 
 	return inc
