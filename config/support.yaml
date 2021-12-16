@@ -58,6 +58,9 @@ exchangeStrategies:
     interval: 1m
     minVolume: 1_000
     movingAverageWindow: 99
+    longTermMovingAverage:
+      interval: 1h
+      window: 99
 
     scaleQuantity:
       byVolume:
