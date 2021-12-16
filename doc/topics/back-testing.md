@@ -1,5 +1,8 @@
 ## Back-testing
 
+*Before you start back-testing, you need to setup [MySQL](../../README.md#configure-mysql-database) or [SQLite3
+](../../README.md#configure-sqlite3-database). Using MySQL is highly recommended.*
+
 First, you need to add the back-testing config to your `bbgo.yaml`:
 
 ```yaml
@@ -16,6 +19,8 @@ backtest:
   - BTCUSDT
   
   account:
+    makerCommission: 15  # Commission rate of maker trade, in ‱, i.e., 1 means 0.01% 
+    takerCommission: 15  # Commission rate of taker trade, in ‱ i.e., 1 means 0.01% 
     # the initial account balance you want to start with
     balances:
       BTC: 0.0
