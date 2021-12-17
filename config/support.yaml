@@ -44,8 +44,6 @@ backtest:
   - BTCUSDT
   - ETHUSDT
   account:
-    makerCommission: 15
-    takerCommission: 15
     balances:
       BTC: 0.0
       USDT: 10000.0
