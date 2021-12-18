@@ -15,8 +15,8 @@ const MaxNumOfVOLTruncateSize = 100
 
 //var zeroTime time.Time
 
-//go:generate callbackgen -type VOL
-type VOL struct {
+//go:generate callbackgen -type VOLATILITY
+type VOLATILITY struct {
 	types.IntervalWindow
 	Values  types.Float64Slice
 	EndTime time.Time
@@ -24,44 +24,44 @@ type VOL struct {
 	UpdateCallbacks []func(value float64)
 }
 
-func (inc *VOL) Last() float64 {
+func (inc *VOLATILITY) Last() float64 {
 	if len(inc.Values) == 0 {
 		return 0.0
 	}
 	return inc.Values[len(inc.Values)-1]
 }
 
-func (inc *VOL) calculateAndUpdate(klines []types.KLine) {
+func (inc *VOLATILITY) calculateAndUpdate(klines []types.KLine) {
 	if len(klines) < inc.Window {
 		return
 	}
 
-	var index = len(klines) - 1
-	var kline = klines[index]
+	var end = len(klines) - 1
+	var lastKLine = klines[end]
 
-	if inc.EndTime != zeroTime && kline.GetEndTime().Before(inc.EndTime) {
+	if inc.EndTime != zeroTime && lastKLine.GetEndTime().Before(inc.EndTime) {
 		return
 	}
 
-	var recentT = klines[index-(inc.Window-1) : index+1]
+	var recentT = klines[end-(inc.Window-1) : end+1]
 
-	vol, err := calculateVOL(recentT, inc.Window, KLineClosePriceMapper)
+	volatility, err := calculateVOLATILITY(recentT, inc.Window, KLineClosePriceMapper)
 	if err != nil {
-		log.WithError(err).Error("VOL error")
+		log.WithError(err).Error("can not calculate volatility")
 		return
 	}
-	inc.Values.Push(vol)
+	inc.Values.Push(volatility)
 
 	if len(inc.Values) > MaxNumOfVOL {
 		inc.Values = inc.Values[MaxNumOfVOLTruncateSize-1:]
 	}
 
-	inc.EndTime = klines[index].GetEndTime().Time()
+	inc.EndTime = klines[end].GetEndTime().Time()
 
-	inc.EmitUpdate(vol)
+	inc.EmitUpdate(volatility)
 }
 
-func (inc *VOL) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
+func (inc *VOLATILITY) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
 	if inc.Interval != interval {
 		return
 	}
@@ -69,11 +69,11 @@ func (inc *VOL) handleKLineWindowUpdate(interval types.Interval, window types.KL
 	inc.calculateAndUpdate(window)
 }
 
-func (inc *VOL) Bind(updater KLineWindowUpdater) {
+func (inc *VOLATILITY) Bind(updater KLineWindowUpdater) {
 	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }
 
-func calculateVOL(klines []types.KLine, window int, priceF KLinePriceMapper) (float64, error) {
+func calculateVOLATILITY(klines []types.KLine, window int, priceF KLinePriceMapper) (float64, error) {
 	length := len(klines)
 	if length == 0 || length < window {
 		return 0.0, fmt.Errorf("insufficient elements for calculating VOL with window = %d", window)
