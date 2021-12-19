@@ -354,7 +354,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.Notify("Found %s support: the close price %f is under EMA %f and volume %f > minimum volume %f",
 			s.Symbol,
 			closePrice.Float64(),
-			s.triggerEMA.Last(),
+			s.longTermEMA.Last(),
 			kline.Volume,
 			s.MinVolume.Float64(),
 			kline)
