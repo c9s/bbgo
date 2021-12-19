@@ -343,6 +343,7 @@ func (s *BacktestService) SyncExist(ctx context.Context, exchange types.Exchange
 		}
 		nowStartTime = k.StartTime.Time()
 	}
+	s.Sync(ctx, exchange, symbol, nowStartTime.Add(interval.Duration()), endTime, interval)
 
 	if err := <-errC; err != nil {
 		return err
