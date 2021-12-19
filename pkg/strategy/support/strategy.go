@@ -96,7 +96,7 @@ type Strategy struct {
 	Interval types.Interval `json:"interval"`
 
 	// moving average window for checking support (support should be under the moving average line)
-	MovingAverageWindow int `json:"movingAverageWindow"`
+	TriggerMovingAverage types.IntervalWindow `json:"triggerMovingAverage"`
 
 	// LongTermMovingAverage is the second moving average line for checking support position
 	LongTermMovingAverage types.IntervalWindow `json:"longTermMovingAverage"`
@@ -147,6 +147,10 @@ func (s *Strategy) Validate() error {
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: string(s.Interval)})
+
+	if s.TriggerMovingAverage != zeroiw {
+		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: string(s.TriggerMovingAverage.Interval)})
+	}
 
 	if s.LongTermMovingAverage != zeroiw {
 		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: string(s.LongTermMovingAverage.Interval)})
@@ -261,10 +265,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.Interval = types.Interval5m
 	}
 
-	if s.MovingAverageWindow == 0 {
-		s.MovingAverageWindow = 99
-	}
-
 	if s.Sensitivity > 0 {
 		volRange, err := s.ScaleQuantity.ByVolumeRule.Range()
 		if err != nil {
@@ -286,14 +286,16 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		return fmt.Errorf("standardIndicatorSet is nil, symbol %s", s.Symbol)
 	}
 
+	if s.TriggerMovingAverage != zeroiw {
+		s.triggerEMA = standardIndicatorSet.EWMA(s.TriggerMovingAverage)
+	}
+
 	if s.LongTermMovingAverage != zeroiw {
 		s.longTermEMA = standardIndicatorSet.EWMA(s.LongTermMovingAverage)
 	}
 
 	s.orderStore = bbgo.NewOrderStore(s.Symbol)
 	s.orderStore.BindStream(session.UserDataStream)
-
-	s.triggerEMA = standardIndicatorSet.EWMA(types.IntervalWindow{Interval: s.Interval, Window: s.MovingAverageWindow})
 
 	if err := s.LoadState(); err != nil {
 		return err
