@@ -337,12 +337,14 @@ func (s *BacktestService) SyncExist(ctx context.Context, exchange types.Exchange
 
 	nowStartTime := fromTime
 	for k := range klineC {
-		if nowStartTime.Add(interval.Duration()).Unix() < k.StartTime.Unix() {
+		if nowStartTime.Unix() < k.StartTime.Unix() {
 			log.Infof("syncing %s interval %s syncing %s ~ %s ", symbol, interval, nowStartTime, k.EndTime)
-			s.Sync(ctx, exchange, symbol, nowStartTime.Add(interval.Duration()), k.EndTime.Time().Add(-1*interval.Duration()), interval)
+			s.Sync(ctx, exchange, symbol, nowStartTime, k.EndTime.Time().Add(-1*interval.Duration()), interval)
 		}
-		nowStartTime = k.StartTime.Time()
+		nowStartTime = k.StartTime.Time().Add(interval.Duration())
 	}
+
+	s.Sync(ctx, exchange, symbol, nowStartTime, endTime, interval)
 
 	if err := <-errC; err != nil {
 		return err
