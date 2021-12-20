@@ -202,6 +202,25 @@ bbgo sync --session max
 bbgo sync --session binance
 ```
 
+## Using Redis to keep persistence between BBGO sessions
+
+To use Redis, first you need to install your Redis server:
+
+```sh
+# For Ubuntu/Debian Linux
+sudo apt-get install -y redis
+```
+
+Set the following environment variables in your `bbgo.yaml`:
+
+```yaml
+persistence:
+  redis:
+    host: 127.0.0.1  # The IP address or the hostname to your Redis server, 127.0.0.1 if same as BBGO  
+    port: 6379  # Port to Redis server, default 6379
+    db: 0  # DB number to use. You can set to another DB to avoid conflict if other applications are using Redis too.
+```
+
 ## Built-in Strategies
 
 Check out the strategy directory [strategy](pkg/strategy) for all built-in strategies:
