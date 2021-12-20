@@ -10,11 +10,13 @@ exchangeStrategies:
       interval: 24h
       baseCurrency: TWD
       ignoreLocked: true
-      weights:
+      targetWeights:
         BTC: 40%
         ETH: 20%
         MAX: 20%
         USDT: 10%
         TWD: 10%
       threshold: 2%
+      # max amount to buy or sell per order
+      maxAmount: 10_000
       verbose: true
