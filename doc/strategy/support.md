@@ -14,10 +14,15 @@ This strategy uses K-lines with high volume as support and buys the target asset
 - `minVolume`
     - The threshold, e.g., `1000000`, `5000000`. A K-line with volume larger than this is seen as a support, and 
       triggers a market buy order.  
-- `movingAverageWindow`
-    - The MA window in the current K-line interval to filter out noises, e.g., 99. The support higher than the MA is seen as invalid
+- `triggerMovingAverage`
+    - The MA window in the current K-line interval to filter out noises. The closed price must be below this MA to 
+      trigger the buy order.
+    - `interval`
+        - The K-line interval, e.g., `5m`, `1h`
+    - `window`
+        - The MA window in the specified K-line interval to filter out noises.
 - `longTermMovingAverage`
-    - The MA window in a longer K-line interval
+    - The MA window in a longer K-line interval. The closed price must be above this MA to trigger the buy order.
     - `interval`
         - The K-line interval, e.g., `5m`, `1h`
     - `window`
