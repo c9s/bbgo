@@ -104,11 +104,39 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 }
 
 func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticker, error) {
-	panic("implement me")
+	s, err := e.client.MarketDataService.GetTicker24HStat(symbol)
+	if err != nil {
+		return nil, err
+	}
+
+	return &types.Ticker{
+		Time:   s.Time.Time(),
+		Volume: s.Volume.Float64(),
+		Last:   s.Last.Float64(),
+		Open:   s.Last.Float64() - s.ChangePrice.Float64(),
+		High:   s.High.Float64(),
+		Low:    s.Low.Float64(),
+		Buy:    s.Buy.Float64(),
+		Sell:   s.Sell.Float64(),
+	}, nil
 }
 
-func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[string]types.Ticker, error) {
-	panic("implement me")
+func (e *Exchange) QueryTickers(ctx context.Context, symbols ...string) (map[string]types.Ticker, error) {
+	tickers := map[string]types.Ticker{}
+	if len(symbols) > 0 {
+		for _, s := range symbols {
+			t, err := e.QueryTicker(ctx, s)
+			if err != nil {
+				return nil, err
+			}
+
+			tickers[s] = *t
+		}
+
+		return tickers, nil
+	}
+
+	return tickers, nil
 }
 
 func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
