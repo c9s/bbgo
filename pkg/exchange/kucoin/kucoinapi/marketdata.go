@@ -120,7 +120,7 @@ func (s *MarketDataService) GetTicker(symbol string) (*Ticker, error) {
     "ticker":[
         {
             "symbol": "BTC-USDT",   // symbol
-            "symbolName":"BTC-USDT", // Name of trading pairs, it would change after renaming
+            "symbolName":"BTC-USDT", // SymbolName of trading pairs, it would change after renaming
             "buy": "11328.9",   // bestAsk
             "sell": "11329",    // bestBid
             "changeRate": "-0.0055",    // 24h change rate
@@ -142,7 +142,7 @@ func (s *MarketDataService) GetTicker(symbol string) (*Ticker, error) {
 
 type Ticker24H struct {
 	Symbol       string           `json:"symbol"`
-	Name         string           `json:"symbolName"`
+	SymbolName   string           `json:"symbolName"`
 	Buy          fixedpoint.Value `json:"buy"`
 	Sell         fixedpoint.Value `json:"sell"`
 	ChangeRate   fixedpoint.Value `json:"changeRate"`
@@ -159,6 +159,8 @@ type Ticker24H struct {
 
 	TakerCoefficient fixedpoint.Value `json:"takerCoefficient"`
 	MakerCoefficient fixedpoint.Value `json:"makerCoefficient"`
+
+	Time types.MillisecondTimestamp `json:"time"`
 }
 
 type AllTickers struct {
@@ -181,6 +183,33 @@ func (s *MarketDataService) ListTickers() (*AllTickers, error) {
 		Code    string      `json:"code"`
 		Message string      `json:"msg"`
 		Data    *AllTickers `json:"data"`
+	}
+
+	if err := response.DecodeJSON(&apiResponse); err != nil {
+		return nil, err
+	}
+
+	return apiResponse.Data, nil
+}
+
+func (s *MarketDataService) GetTicker24HStat(symbol string) (*Ticker24H, error) {
+	var params = url.Values{}
+	params.Add("symbol", symbol)
+
+	req, err := s.client.newRequest("GET", "/api/v1/market/stats", params, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := s.client.sendRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var apiResponse struct {
+		Code    string     `json:"code"`
+		Message string     `json:"msg"`
+		Data    *Ticker24H `json:"data"`
 	}
 
 	if err := response.DecodeJSON(&apiResponse); err != nil {

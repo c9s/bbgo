@@ -22,13 +22,20 @@ var tickersCmd = &cobra.Command{
 			return nil
 		}
 
-
 		ticker, err := client.MarketDataService.GetTicker(args[0])
 		if err != nil {
 			return err
 		}
 
 		logrus.Infof("ticker: %+v", ticker)
+
+
+		tickerStats, err := client.MarketDataService.GetTicker24HStat(args[0])
+		if err != nil {
+			return err
+		}
+
+		logrus.Infof("ticker 24h stats: %+v", tickerStats)
 		return nil
 	},
 }
