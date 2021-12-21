@@ -50,11 +50,24 @@ func (d *Duration) UnmarshalJSON(data []byte) error {
 
 type Market struct {
 	Symbol      string `json:"symbol"`
-	LocalSymbol string `json:"localSymbol,omitempty" `// LocalSymbol is used for exchange's API
 
+	// LocalSymbol is used for exchange's API (exchange package internal)
+	LocalSymbol string `json:"localSymbol,omitempty"`
+
+	// PricePrecision is the precision used for formatting price, 8 = 8 decimals
+	// can be converted from price tick step size, e.g.
+	//    int(math.Log10(price step size))
 	PricePrecision  int `json:"pricePrecision"`
+
+	// VolumePrecision is the precision used for formatting quantity and volume, 8 = 8 decimals
+	// can be converted from step size, e.g.
+	//    int(math.Log10(quantity step size))
 	VolumePrecision int `json:"volumePrecision"`
+
+	// QuoteCurrency is the currency name for quote, e.g. USDT in BTC/USDT, USDC in BTC/USDC
 	QuoteCurrency   string `json:"quoteCurrency"`
+
+	// BaseCurrency is the current name for base, e.g. BTC in BTC/USDT, ETH in ETH/USDC
 	BaseCurrency    string `json:"baseCurrency"`
 
 	// The MIN_NOTIONAL filter defines the minimum notional value allowed for an order on a symbol.
@@ -64,11 +77,19 @@ type Market struct {
 
 	// The LOT_SIZE filter defines the quantity
 	MinQuantity float64 `json:"minQuantity,omitempty"`
+
+	// MaxQuantity is currently not used in the code
 	MaxQuantity float64 `json:"maxQuantity,omitempty"`
+
+	// StepSize is the step size of quantity
+	// can be converted from precision, e.g.
+	//    1.0 / math.Pow10(m.BaseUnitPrecision)
 	StepSize    float64 `json:"stepSize,omitempty"`
 
 	MinPrice float64 `json:"minPrice,omitempty"`
 	MaxPrice float64 `json:"maxPrice,omitempty"`
+
+	// TickSize is the step size of price
 	TickSize float64 `json:"tickSize,omitempty"`
 }
 
