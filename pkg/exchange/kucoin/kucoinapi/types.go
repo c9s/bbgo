@@ -1,5 +1,14 @@
 package kucoinapi
 
+type AccountType string
+
+const (
+	AccountTypeMain   AccountType = "main"
+	AccountTypeTrade  AccountType = "trade"
+	AccountTypeMargin AccountType = "margin"
+	AccountTypePool   AccountType = "pool"
+)
+
 type TradeType string
 
 const (
