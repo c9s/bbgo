@@ -195,6 +195,7 @@ func (s *Strategy) generateSubmitOrders(prices, marketValues map[string]fixedpoi
 		weightDifference := targetWeight.Sub(currentWeight)
 		if weightDifference.Abs() < s.Threshold {
 			log.Infof("%s weight distance |%f - %f| = |%f| less than the threshold: %f",
+				symbol,
 				currentWeight.Float64(),
 				targetWeight.Float64(),
 				weightDifference.Float64(),
