@@ -15,6 +15,11 @@ type ExchangeFee struct {
 	TakerFeeRate fixedpoint.Value
 }
 
+type PositionRisk struct {
+	Leverage         fixedpoint.Value `json:"leverage"`
+	LiquidationPrice fixedpoint.Value `json:"liquidationPrice"`
+}
+
 type Position struct {
 	Symbol        string `json:"symbol"`
 	BaseCurrency  string `json:"baseCurrency"`
@@ -35,7 +40,6 @@ type Position struct {
 
 	// Futures data fields
 	Isolated               bool             `json:"isolated"`
-	Leverage               fixedpoint.Value `json:"leverage"`
 	InitialMargin          fixedpoint.Value `json:"initialMargin"`
 	MaintMargin            fixedpoint.Value `json:"maintMargin"`
 	OpenOrderInitialMargin fixedpoint.Value `json:"openOrderInitialMargin"`
@@ -48,6 +52,7 @@ type Position struct {
 	Notional               fixedpoint.Value `json:"notional"`
 	IsolatedWallet         fixedpoint.Value `json:"isolatedWallet"`
 	UpdateTime             int64            `json:"updateTime"`
+	PositionRisk           PositionRisk
 
 	sync.Mutex
 }
