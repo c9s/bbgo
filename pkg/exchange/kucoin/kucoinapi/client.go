@@ -126,7 +126,7 @@ func (c *RestClient) newAuthenticatedRequest(method, refURL string, params url.V
 	// set location to UTC so that it outputs "2020-12-08T09:08:57.715Z"
 	t := time.Now().In(time.UTC)
 	// timestamp := t.Format("2006-01-02T15:04:05.999Z07:00")
-	timestamp := strconv.FormatInt(t.UnixMilli(), 10)
+	timestamp := strconv.FormatInt(t.UnixNano() / int64(time.Millisecond), 10)
 
 	var body []byte
 
