@@ -136,6 +136,24 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbols ...string) (map[str
 		return tickers, nil
 	}
 
+	allTickers, err := e.client.MarketDataService.ListTickers()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, s := range allTickers.Ticker {
+		tickers[ s.Symbol ] = types.Ticker{
+			Time:   s.Time.Time(),
+			Volume: s.Volume.Float64(),
+			Last:   s.Last.Float64(),
+			Open:   s.Last.Float64() - s.ChangePrice.Float64(),
+			High:   s.High.Float64(),
+			Low:    s.Low.Float64(),
+			Buy:    s.Buy.Float64(),
+			Sell:   s.Sell.Float64(),
+		}
+	}
+
 	return tickers, nil
 }
 
