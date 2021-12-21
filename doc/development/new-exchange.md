@@ -55,3 +55,39 @@ Exchange Factory
 
 - [ ] Add the exchange constructor to the exchange instance factory function.
 - [ ] Add extended fields to the ExchangeSession struct. (optional)
+
+# Implementation
+
+Go to `pkg/types/exchange.go` and add your exchange type:
+
+```
+const (
+	ExchangeMax      = ExchangeName("max")
+	ExchangeBinance  = ExchangeName("binance")
+	ExchangeFTX      = ExchangeName("ftx")
+	ExchangeOKEx     = ExchangeName("okex")
+    ExchangeKucoin   = ExchangeName("kucoin")
+    ExchangeBacktest = ExchangeName("backtest")
+)
+```
+
+Go to `pkg/cmd/cmdutil/exchange.go` and add your exchange to the factory
+
+```
+func NewExchangeStandard(n types.ExchangeName, key, secret, passphrase, subAccount string) (types.Exchange, error) {
+	switch n {
+
+	case types.ExchangeFTX:
+		return ftx.NewExchange(key, secret, subAccount), nil
+
+	case types.ExchangeBinance:
+		return binance.New(key, secret), nil
+
+	case types.ExchangeOKEx:
+		return okex.New(key, secret, passphrase), nil
+
+    // ...
+	}
+}
+```
+
