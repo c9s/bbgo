@@ -23,61 +23,6 @@ const defaultHTTPTimeout = time.Second * 15
 const RestBaseURL = "https://api.kucoin.com/api"
 const SandboxRestBaseURL = "https://openapi-sandbox.kucoin.com/api"
 
-type TradeType string
-
-const (
-	TradeTypeSpot   TradeType = "TRADE"
-	TradeTypeMargin TradeType = "MARGIN"
-)
-
-type SideType string
-
-const (
-	SideTypeBuy  SideType = "buy"
-	SideTypeSell SideType = "sell"
-)
-
-type TimeInForceType string
-
-const (
-	// GTC Good Till Canceled orders remain open on the book until canceled. This is the default behavior if no policy is specified.
-	TimeInForceGTC TimeInForceType = "GTC"
-
-	// GTT Good Till Time orders remain open on the book until canceled or the allotted cancelAfter is depleted on the matching engine. GTT orders are guaranteed to cancel before any other order is processed after the cancelAfter seconds placed in order book.
-	TimeInForceGTT TimeInForceType = "GTT"
-
-	// FOK Fill Or Kill orders are rejected if the entire size cannot be matched.
-	TimeInForceFOK TimeInForceType = "FOK"
-
-	// IOC Immediate Or Cancel orders instantly cancel the remaining size of the limit order instead of opening it on the book.
-	TimeInForceIOC TimeInForceType = "IOC"
-)
-
-type OrderType string
-
-const (
-	OrderTypeMarket OrderType = "market"
-	OrderTypeLimit  OrderType = "limit"
-)
-
-type InstrumentType string
-
-const (
-	InstrumentTypeSpot    InstrumentType = "SPOT"
-	InstrumentTypeSwap    InstrumentType = "SWAP"
-	InstrumentTypeFutures InstrumentType = "FUTURES"
-	InstrumentTypeOption  InstrumentType = "OPTION"
-)
-
-type OrderState string
-
-const (
-	OrderStateCanceled        OrderState = "canceled"
-	OrderStateLive            OrderState = "live"
-	OrderStatePartiallyFilled OrderState = "partially_filled"
-	OrderStateFilled          OrderState = "filled"
-)
-
 type RestClient struct {
 	BaseURL *url.URL
 
@@ -354,33 +299,6 @@ func (c *RestClient) MarketTicker(instId string) (*MarketTicker, error) {
 	}
 
 	return &tickerResponse.Data[0], nil
-}
-
-func (c *RestClient) MarketTickers(instType InstrumentType) ([]MarketTicker, error) {
-	// SPOT, SWAP, FUTURES, OPTION
-	var params = url.Values{}
-	params.Add("instType", string(instType))
-
-	req, err := c.newRequest("GET", "/api/v5/market/tickers", params, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := c.sendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var tickerResponse struct {
-		Code    string         `json:"code"`
-		Message string         `json:"msg"`
-		Data    []MarketTicker `json:"data"`
-	}
-	if err := response.DecodeJSON(&tickerResponse); err != nil {
-		return nil, err
-	}
-
-	return tickerResponse.Data, nil
 }
 
 func sign(secret, payload string) string {
