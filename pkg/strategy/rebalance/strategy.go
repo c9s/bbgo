@@ -52,12 +52,15 @@ func ElementwiseProduct(m1, m2 map[string]fixedpoint.Value) map[string]fixedpoin
 type Strategy struct {
 	Notifiability *bbgo.Notifiability
 
-	Interval     types.Duration              `json:"interval"`
-	BaseCurrency string                      `json:"baseCurrency"`
-	Weights      map[string]fixedpoint.Value `json:"weights"`
-	Threshold    fixedpoint.Value            `json:"threshold"`
-	IgnoreLocked bool                        `json:"ignoreLocked"`
-	Verbose      bool                        `json:"verbose"`
+	Interval      types.Duration              `json:"interval"`
+	BaseCurrency  string                      `json:"baseCurrency"`
+	TargetWeights map[string]fixedpoint.Value `json:"targetWeights"`
+	Threshold     fixedpoint.Value            `json:"threshold"`
+	IgnoreLocked  bool                        `json:"ignoreLocked"`
+	Verbose       bool                        `json:"verbose"`
+
+	// max amount to buy or sell per order
+	MaxAmount fixedpoint.Value `json:"maxAmount"`
 }
 
 func (s *Strategy) ID() string {
@@ -67,7 +70,7 @@ func (s *Strategy) ID() string {
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {}
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-	s.Weights = Normalize(s.Weights)
+	s.TargetWeights = Normalize(s.TargetWeights)
 
 	go func() {
 		ticker := time.NewTicker(util.MillisecondsJitter(s.Interval.Duration(), 1000))
@@ -107,7 +110,7 @@ func (s *Strategy) rebalance(ctx context.Context, orderExecutor bbgo.OrderExecut
 func (s *Strategy) getPrices(ctx context.Context, session *bbgo.ExchangeSession) (map[string]fixedpoint.Value, error) {
 	prices := make(map[string]fixedpoint.Value)
 
-	for currency := range s.Weights {
+	for currency := range s.TargetWeights {
 		if currency == s.BaseCurrency {
 			prices[currency] = fixedpoint.NewFromFloat(1.0)
 			continue
@@ -128,7 +131,7 @@ func (s *Strategy) getPrices(ctx context.Context, session *bbgo.ExchangeSession)
 
 func (s *Strategy) getQuantities(balances types.BalanceMap) map[string]fixedpoint.Value {
 	quantities := make(map[string]fixedpoint.Value)
-	for currency := range s.Weights {
+	for currency := range s.TargetWeights {
 		if s.IgnoreLocked {
 			quantities[currency] = balances[currency].Total()
 		} else {
@@ -146,25 +149,37 @@ func (s *Strategy) generateSubmitOrders(prices, marketValues map[string]fixedpoi
 
 	log.Infof("total value: %f", totalValue.Float64())
 
-	for currency, target := range s.Weights {
+	for currency, targetWeight := range s.TargetWeights {
 		if currency == s.BaseCurrency {
 			continue
 		}
 		symbol := currency + s.BaseCurrency
-		weight := currentWeights[currency]
-		price := prices[currency]
+		currentWeight := currentWeights[currency]
+		currentPrice := prices[currency]
 
-		diff := target.Sub(weight)
-		if diff.Abs() < s.Threshold {
+		// calculate the difference between current weight and target weight
+		// if the difference is less than threshold, then we will not create the order
+		weightDifference := targetWeight.Sub(currentWeight)
+		if weightDifference.Abs() < s.Threshold {
 			continue
 		}
 
-		quantity := diff.Mul(totalValue).Div(price)
+		quantity := weightDifference.Mul(totalValue).Div(currentPrice)
 
 		side := types.SideTypeBuy
 		if quantity < 0.0 {
 			side = types.SideTypeSell
 			quantity = quantity.Abs()
+		}
+
+		if s.MaxAmount > 0 {
+			quantity = bbgo.AdjustQuantityByMaxAmount(quantity, currentPrice, s.MaxAmount)
+			log.Infof("adjust the quantity %f (%s %s @ %f) by max amount %f",
+				quantity.Float64(),
+				symbol,
+				side.String(),
+				currentPrice.Float64(),
+				s.MaxAmount.Float64())
 		}
 
 		order := types.SubmitOrder{
