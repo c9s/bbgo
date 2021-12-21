@@ -177,7 +177,10 @@ func (s *Stream) pollKLines(ctx context.Context) {
 						s.EmitKLineClosed(klines[0])
 						lastClosed = klines[0].StartTime.Time()
 					}
-					s.EmitKLine(klines[1])
+
+					if len(klines) > 1 {
+						s.EmitKLine(klines[1])
+					}
 				}
 			}
 		}
@@ -202,6 +205,9 @@ func getLast2KLine(e *Exchange, ctx context.Context, symbol string, interval typ
 func getLastClosedKLine(e *Exchange, ctx context.Context, symbol string, interval types.Interval) []types.KLine {
 	// set since to more 30s ago to avoid getting no kline candle
 	klines := getLast2KLine(e, ctx, symbol, interval)
+	if len(klines) == 0 {
+		return []types.KLine{}
+	}
 	return []types.KLine{klines[0]}
 }
 
