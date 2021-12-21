@@ -60,6 +60,10 @@ func (inc *EWMA) calculateAndUpdate(allKLines []types.KLine) {
 		// for the first value, we should use the close price
 		inc.Values = []float64{priceF(allKLines[0])}
 	} else {
+		if len(inc.Values) >= MaxNumOfEWMA {
+			inc.Values = inc.Values[MaxNumOfEWMATruncateSize-1:]
+		}
+
 		fromNthK = len(inc.Values)
 
 		// update ewma with the existing values
@@ -71,10 +75,6 @@ func (inc *EWMA) calculateAndUpdate(allKLines []types.KLine) {
 				break
 			}
 		}
-	}
-
-	if len(inc.Values) >= MaxNumOfEWMA {
-		inc.Values = inc.Values[MaxNumOfEWMATruncateSize-1:]
 	}
 
 	for i := fromNthK; i < dataLen; i++ {
