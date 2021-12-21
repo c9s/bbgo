@@ -28,7 +28,7 @@ func (s *AccountService) InsertAsset(time time.Time, name types.ExchangeName, ac
 			insert into nav_history_details ( exchange, subaccount, time, currency, balance_in_usd, balance_in_btc,
 		                                              balance,available,locked)
 				values (?,?,?,?,?,?,?,?,?);
-		`, name, account, time, v.Currency, v.InUSD, v.InBTC, v.Total, 0, 0 /* v.Available, v.Lock */)
+		`, name, account, time, v.Currency, v.InUSD, v.InBTC, v.Total, v.Available, v.Locked)
 
 		err = multierr.Append(err, _err) // successful request
 
