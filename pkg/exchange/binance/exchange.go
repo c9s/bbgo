@@ -57,21 +57,21 @@ type Exchange struct {
 func New(key, secret string) *Exchange {
 	var client = binance.NewClient(key, secret)
 	client.HTTPClient = &http.Client{Timeout: 15 * time.Second}
-	_, _ = client.NewSetServerTimeService().Do(context.Background())
 
 	var futuresClient = binance.NewFuturesClient(key, secret)
 	futuresClient.HTTPClient = &http.Client{Timeout: 15 * time.Second}
-	_, _ = futuresClient.NewSetServerTimeService().Do(context.Background())
 
 	var err error
-	_, err = client.NewSetServerTimeService().Do(context.Background())
-	if err != nil {
-		panic(err)
-	}
+	if len(key) > 0 && len(secret) > 0 {
+		_, err = client.NewSetServerTimeService().Do(context.Background())
+		if err != nil {
+			panic(err)
+		}
 
-	_, err = futuresClient.NewSetServerTimeService().Do(context.Background())
-	if err != nil {
-		panic(err)
+		_, err = futuresClient.NewSetServerTimeService().Do(context.Background())
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	return &Exchange{
