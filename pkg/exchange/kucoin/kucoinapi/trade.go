@@ -96,7 +96,7 @@ func (r *GetFillsRequest) Do(ctx context.Context) (*FillListPage, error) {
 		return nil, err
 	}
 
-	if !params.Has("tradeType") {
+	if _, ok := params["tradeType"]; !ok {
 		params.Add("tradeType", "TRADE")
 	}
 
@@ -188,7 +188,7 @@ func (r *ListOrdersRequest) Do(ctx context.Context) (*OrderListPage, error) {
 		return nil, err
 	}
 
-	if !params.Has("tradeType") {
+	if _, ok := params["tradeType"]; !ok {
 		params.Add("tradeType", "TRADE")
 	}
 
