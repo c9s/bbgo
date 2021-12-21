@@ -103,6 +103,7 @@ func (s *Strategy) rebalance(ctx context.Context, orderExecutor bbgo.OrderExecut
 	orders := s.generateSubmitOrders(prices, marketValues)
 	_, err = orderExecutor.SubmitOrders(ctx, orders...)
 	if err != nil {
+		log.WithError(err).Error("submit order error")
 		return
 	}
 }
@@ -156,11 +157,21 @@ func (s *Strategy) generateSubmitOrders(prices, marketValues map[string]fixedpoi
 		symbol := currency + s.BaseCurrency
 		currentWeight := currentWeights[currency]
 		currentPrice := prices[currency]
+		log.Infof("%s price: %f, current weight: %f, target weight: %f",
+			symbol,
+			currentPrice.Float64(),
+			currentWeight.Float64(),
+			targetWeight.Float64())
 
 		// calculate the difference between current weight and target weight
 		// if the difference is less than threshold, then we will not create the order
 		weightDifference := targetWeight.Sub(currentWeight)
 		if weightDifference.Abs() < s.Threshold {
+			log.Infof("%s weight distance |%f - %f| = |%f| less than the threshold: %f",
+				currentWeight.Float64(),
+				targetWeight.Float64(),
+				weightDifference.Float64(),
+				s.Threshold.Float64())
 			continue
 		}
 
