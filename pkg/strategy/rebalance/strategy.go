@@ -2,6 +2,7 @@ package kline
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -65,6 +66,32 @@ type Strategy struct {
 
 func (s *Strategy) ID() string {
 	return ID
+}
+
+func (s *Strategy) Validate() error {
+	if s.Interval == 0 {
+		return fmt.Errorf("interval shoud not be 0")
+	}
+
+	if len(s.TargetWeights) == 0 {
+		return fmt.Errorf("targetWeights should not be empty")
+	}
+
+	for currency, weight := range s.TargetWeights {
+		if weight.Float64() < 0 {
+			return fmt.Errorf("%s weight: %f should not less than 0", currency, weight.Float64())
+		}
+	}
+
+	if s.Threshold < 0 {
+		return fmt.Errorf("threshold should not less than 0")
+	}
+
+	if s.MaxAmount < 0 {
+		return fmt.Errorf("maxAmount shoud not less than 0")
+	}
+
+	return nil
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {}
