@@ -41,6 +41,92 @@ func (c *TradeService) NewCancelAllOrderRequest() *CancelAllOrderRequest {
 	}
 }
 
+func (c *TradeService) NewGetFillsRequest() *GetFillsRequest {
+	return &GetFillsRequest{client: c.client}
+}
+
+//go:generate requestgen -type GetFillsRequest
+type GetFillsRequest struct {
+	client *RestClient
+
+	orderID *string `param:"orderId"`
+
+	symbol *string `param:"symbol"`
+
+	side *string `param:"side" validValues:"buy,sell"`
+
+	orderType *string `param:"type" validValues:"limit,market,limit_stop,market_stop"`
+
+	startAt *time.Time `param:"startAt,milliseconds"`
+
+	endAt *time.Time `param:"endAt,milliseconds"`
+}
+
+type FillListPage struct {
+	CurrentPage int    `json:"currentPage"`
+	PageSize    int    `json:"pageSize"`
+	TotalNumber int    `json:"totalNum"`
+	TotalPage   int    `json:"totalPage"`
+	Items       []Fill `json:"items"`
+}
+
+type Fill struct {
+	Symbol         string                     `json:"symbol"`
+	TradeId        string                     `json:"tradeId"`
+	OrderId        string                     `json:"orderId"`
+	CounterOrderId string                     `json:"counterOrderId"`
+	Side           SideType                   `json:"side"`
+	Liquidity      LiquidityType              `json:"liquidity"`
+	ForceTaker     bool                       `json:"forceTaker"`
+	Price          fixedpoint.Value           `json:"price"`
+	Size           fixedpoint.Value           `json:"size"`
+	Funds          fixedpoint.Value           `json:"funds"`
+	Fee            fixedpoint.Value           `json:"fee"`
+	FeeRate        fixedpoint.Value           `json:"feeRate"`
+	FeeCurrency    string                     `json:"feeCurrency"`
+	Stop           string                     `json:"stop"`
+	Type           OrderType                  `json:"type"`
+	CreatedAt      types.MillisecondTimestamp `json:"createdAt"`
+	TradeType      TradeType                  `json:"tradeType"`
+}
+
+func (r *GetFillsRequest) Do(ctx context.Context) (*FillListPage, error) {
+	params, err := r.GetParametersQuery()
+	if err != nil {
+		return nil, err
+	}
+
+	if !params.Has("tradeType") {
+		params.Add("tradeType", "TRADE")
+	}
+
+	req, err := r.client.newAuthenticatedRequest("GET", "/api/v1/fills", params, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := r.client.sendRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var orderResponse struct {
+		Code    string        `json:"code"`
+		Message string        `json:"msg"`
+		Data    *FillListPage `json:"data"`
+	}
+
+	if err := response.DecodeJSON(&orderResponse); err != nil {
+		return nil, err
+	}
+
+	if orderResponse.Data == nil {
+		return nil, errors.New("api error: [" + orderResponse.Code + "] " + orderResponse.Message)
+	}
+
+	return orderResponse.Data, nil
+}
+
 //go:generate requestgen -type ListOrdersRequest
 type ListOrdersRequest struct {
 	client *RestClient
