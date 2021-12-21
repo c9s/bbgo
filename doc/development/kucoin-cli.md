@@ -13,4 +13,6 @@ go run ./examples/kucoin orders place --symbol LTC-USDT --price 50 --size 1 --or
 go run ./examples/kucoin orders --symbol LTC-USDT --status active
 go run ./examples/kucoin orders --symbol LTC-USDT --status done
 go run ./examples/kucoin orders cancel --order-id 61b48b73b4de3e0001251382
+
+go run ./examples/kucoin fills --symbol LTC-USDT
 ```
