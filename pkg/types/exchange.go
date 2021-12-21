@@ -44,6 +44,7 @@ const (
 	ExchangeBinance  = ExchangeName("binance")
 	ExchangeFTX      = ExchangeName("ftx")
 	ExchangeOKEx     = ExchangeName("okex")
+	ExchangeKucoin   = ExchangeName("kucoin")
 	ExchangeBacktest = ExchangeName("backtest")
 )
 
