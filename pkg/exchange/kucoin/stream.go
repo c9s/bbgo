@@ -2,6 +2,7 @@ package kucoin
 
 import (
 	"context"
+	"encoding/json"
 	"net"
 	"sync"
 	"time"
@@ -235,18 +236,23 @@ func (s *Stream) read(ctx context.Context) {
 				continue
 			}
 
-			e, err := parseWebsocketPayload(string(message))
+			e, err := parseWebsocketPayload(message)
 			if err != nil {
 				log.WithError(err).Error("message parse error")
+				continue
 			}
 
-			if e != nil {
-				switch et := e.(type) {
+			log.Infof("event: %+v", e)
 
-				/*
-					case *AccountEvent:
-						s.EmitOrderDetails(et)
-				*/
+			if e != nil && e.Object != nil {
+				switch et := e.Object.(type) {
+
+				case *kucoinapi.WebSocketTicker:
+				case *kucoinapi.WebSocketOrderBookL2:
+				case *kucoinapi.WebSocketKLine:
+				case *kucoinapi.WebSocketAccountBalance:
+				case *kucoinapi.WebSocketPrivateOrder:
+
 				default:
 					log.Warnf("unhandled event: %+v", et)
 
@@ -300,6 +306,59 @@ func ping(ctx context.Context, w WebSocketConnector, interval time.Duration) {
 	}
 }
 
-func parseWebsocketPayload(in string) (interface{}, error) {
-	return nil, nil
+func parseWebsocketPayload(in []byte) (*kucoinapi.WebSocketResponse, error) {
+	var resp kucoinapi.WebSocketResponse
+	var err = json.Unmarshal(in, &resp)
+	if err != nil {
+		return nil, err
+	}
+
+	switch resp.Type {
+	case kucoinapi.WebSocketMessageTypeAck:
+		return &resp, nil
+
+	case kucoinapi.WebSocketMessageTypeMessage:
+		switch resp.Subject {
+		case kucoinapi.WebSocketSubjectOrderChange:
+			var o kucoinapi.WebSocketPrivateOrder
+			if err := json.Unmarshal(resp.Data, &o) ; err != nil {
+				return &resp, err
+			}
+			resp.Object = &o
+
+		case kucoinapi.WebSocketSubjectAccountBalance:
+			var o kucoinapi.WebSocketAccountBalance
+			if err := json.Unmarshal(resp.Data, &o) ; err != nil {
+				return &resp, err
+			}
+			resp.Object = &o
+
+		case kucoinapi.WebSocketSubjectTradeCandlesUpdate:
+			var o kucoinapi.WebSocketKLine
+			if err := json.Unmarshal(resp.Data, &o) ; err != nil {
+				return &resp, err
+			}
+			resp.Object = &o
+
+		case kucoinapi.WebSocketSubjectTradeL2Update:
+			var o kucoinapi.WebSocketOrderBookL2
+			if err := json.Unmarshal(resp.Data, &o) ; err != nil {
+				return &resp, err
+			}
+			resp.Object = &o
+
+		case kucoinapi.WebSocketSubjectTradeTicker:
+			var o kucoinapi.WebSocketTicker
+			if err := json.Unmarshal(resp.Data, &o) ; err != nil {
+				return &resp, err
+			}
+			resp.Object = &o
+
+		default:
+			// return nil, fmt.Errorf("kucoin: unsupported subject: %s", resp.Subject)
+
+		}
+	}
+
+	return &resp, nil
 }
