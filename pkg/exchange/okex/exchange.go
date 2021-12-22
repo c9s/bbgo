@@ -2,7 +2,6 @@ package okex
 
 import (
 	"context"
-	"fmt"
 	"math"
 	"strconv"
 	"time"
@@ -119,8 +118,6 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbols ...string) (map[str
 	for _, symbol := range symbols {
 		if ticker, ok := tickers[symbol]; ok {
 			selectedTickers[symbol] = ticker
-		} else {
-			return selectedTickers, fmt.Errorf("ticker of symbol %s not found", symbols)
 		}
 	}
 
