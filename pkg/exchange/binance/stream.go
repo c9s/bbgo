@@ -2,12 +2,12 @@ package binance
 
 import (
 	"context"
+	"github.com/c9s/bbgo/pkg/util"
 	"math/rand"
 	"net"
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -419,7 +419,7 @@ func (s *Stream) connect(ctx context.Context) error {
 			return err
 		}
 
-		log.Infof("listen key is created: %s", MaskKey(listenKey))
+		log.Infof("listen key is created: %s", util.MaskKey(listenKey))
 	}
 
 	// when in public mode, the listen key is an empty string
@@ -496,7 +496,7 @@ func (s *Stream) listenKeyKeepAlive(ctx context.Context, listenKey string) {
 	defer func() {
 		log.Debugf("keepalive worker stopped")
 		if err := s.invalidateListenKey(context.Background(), listenKey); err != nil {
-			log.WithError(err).Errorf("invalidate listen key error: %v key: %s", err, MaskKey(listenKey))
+			log.WithError(err).Errorf("invalidate listen key error: %v key: %s", err, util.MaskKey(listenKey))
 		}
 	}()
 
@@ -514,12 +514,12 @@ func (s *Stream) listenKeyKeepAlive(ctx context.Context, listenKey string) {
 				} else {
 					switch err.(type) {
 					case net.Error:
-						log.WithError(err).Errorf("listen key keep-alive network error: %v key: %s", err, MaskKey(listenKey))
+						log.WithError(err).Errorf("listen key keep-alive network error: %v key: %s", err, util.MaskKey(listenKey))
 						time.Sleep(1 * time.Second)
 						continue
 
 					default:
-						log.WithError(err).Errorf("listen key keep-alive unexpected error: %v key: %s", err, MaskKey(listenKey))
+						log.WithError(err).Errorf("listen key keep-alive unexpected error: %v key: %s", err, util.MaskKey(listenKey))
 						s.Reconnect()
 						return
 
@@ -637,7 +637,7 @@ func (s *Stream) read(ctx context.Context) {
 
 func (s *Stream) invalidateListenKey(ctx context.Context, listenKey string) (err error) {
 	// should use background context to invalidate the user stream
-	log.Infof("closing listen key: %s", MaskKey(listenKey))
+	log.Infof("closing listen key: %s", util.MaskKey(listenKey))
 
 	if s.IsMargin {
 		if s.IsIsolatedMargin {
@@ -657,7 +657,7 @@ func (s *Stream) invalidateListenKey(ctx context.Context, listenKey string) (err
 	}
 
 	if err != nil {
-		log.WithError(err).Errorf("error deleting listen key: %s", MaskKey(listenKey))
+		log.WithError(err).Errorf("error deleting listen key: %s", util.MaskKey(listenKey))
 		return err
 	}
 
@@ -675,9 +675,4 @@ func (s *Stream) Close() error {
 	err := s.Conn.Close()
 	s.ConnLock.Unlock()
 	return err
-}
-
-func MaskKey(key string) string {
-	maskKey := key[0:5]
-	return maskKey + strings.Repeat("*", len(key)-1-5)
 }
