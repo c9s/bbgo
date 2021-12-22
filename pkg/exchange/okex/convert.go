@@ -96,6 +96,11 @@ func convertSubscription(s types.Subscription) (WebsocketSubscription, error) {
 			Channel:      "books",
 			InstrumentID: toLocalSymbol(s.Symbol),
 		}, nil
+	case types.BookTickerChannel:
+		return WebsocketSubscription{
+			Channel:      "books5",
+			InstrumentID: toLocalSymbol(s.Symbol),
+		}, nil
 	}
 
 	return WebsocketSubscription{}, fmt.Errorf("unsupported public stream channel %s", s.Channel)

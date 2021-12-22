@@ -342,8 +342,11 @@ func (s *Stream) read(ctx context.Context) {
 					s.EmitEvent(*et)
 
 				case *BookData:
-					s.EmitBookData(*et)
-
+					//there's "books" for 400 depth and books5 for 5 depth
+					if et.channel != "books5" {
+						s.EmitBookData(*et)
+					}
+					s.EmitBookTickerUpdate(et.BookTicker())
 				case *Candle:
 					s.EmitCandleData(*et)
 

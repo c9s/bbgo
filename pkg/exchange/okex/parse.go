@@ -60,6 +60,21 @@ type BookData struct {
 	Asks                 []BookEntry
 	MillisecondTimestamp int64
 	Checksum             int
+	channel              string
+}
+
+func (data *BookData) BookTicker() types.BookTicker {
+
+	var askBookData BookEntry = data.Asks[0]
+	var bidBookData BookEntry = data.Bids[0]
+
+	return types.BookTicker{
+		Symbol:   data.Symbol,
+		Buy:      bidBookData.Price,
+		BuySize:  bidBookData.Price,
+		Sell:     askBookData.Price,
+		SellSize: askBookData.Volume,
+	}
 }
 
 func (data *BookData) Book() types.SliceOrderBook {
@@ -311,18 +326,22 @@ func parseData(v *fastjson.Value) (interface{}, error) {
 	channel := string(v.GetStringBytes("arg", "channel"))
 
 	switch channel {
+	case "books5":
+		data, err := parseBookData(v)
+		data.channel = channel
+		return data, err
 	case "books":
-		return parseBookData(v)
-
+		data, err := parseBookData(v)
+		data.channel = channel
+		return data, err
 	case "account":
 		return parseAccount(v)
-
 	case "orders":
 		return parseOrder(v)
-
 	default:
 		if strings.HasPrefix(channel, "candle") {
-			return parseCandle(channel, v)
+			data, err := parseCandle(channel, v)
+			return data, err
 		}
 
 	}
