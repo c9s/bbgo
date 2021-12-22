@@ -74,6 +74,29 @@ func (s *Stream) handleConnect() {
 			log.WithError(err).Errorf("subscription error")
 			return
 		}
+	} else {
+		id := time.Now().UnixMilli()
+		cmds := []kucoinapi.WebSocketCommand{
+			{
+				Id:             id,
+				Type:           kucoinapi.WebSocketMessageTypeSubscribe,
+				Topic:          "/spotMarket/tradeOrders",
+				PrivateChannel: true,
+				Response:       true,
+			},
+			{
+				Id:             id + 1,
+				Type:           kucoinapi.WebSocketMessageTypeSubscribe,
+				Topic:          "/account/balance",
+				PrivateChannel: true,
+				Response:       true,
+			},
+		}
+		for _, cmd := range cmds {
+			if err := s.conn.WriteJSON(cmd); err != nil {
+				log.WithError(err).Errorf("private subscribe write error, cmd: %+v", cmd)
+			}
+		}
 	}
 }
 
@@ -164,7 +187,6 @@ func (s *Stream) connect(ctx context.Context) error {
 	// create a new context
 	s.connCtx, s.connCancel = context.WithCancel(ctx)
 
-
 	pingTimeout := s.bullet.PingTimeout()
 	conn.SetReadDeadline(time.Now().Add(pingTimeout))
 	conn.SetPongHandler(func(string) error {
@@ -236,12 +258,17 @@ func (s *Stream) read(ctx context.Context) {
 				continue
 			}
 
+			// used for debugging
+			// fmt.Println(string(message))
+
 			e, err := parseWebsocketPayload(message)
 			if err != nil {
 				log.WithError(err).Error("message parse error")
 				continue
 			}
 
+			// remove bytes, so we won't print them
+			e.Data = nil
 			log.Infof("event: %+v", e)
 
 			if e != nil && e.Object != nil {
@@ -321,35 +348,35 @@ func parseWebsocketPayload(in []byte) (*kucoinapi.WebSocketResponse, error) {
 		switch resp.Subject {
 		case kucoinapi.WebSocketSubjectOrderChange:
 			var o kucoinapi.WebSocketPrivateOrder
-			if err := json.Unmarshal(resp.Data, &o) ; err != nil {
+			if err := json.Unmarshal(resp.Data, &o); err != nil {
 				return &resp, err
 			}
 			resp.Object = &o
 
 		case kucoinapi.WebSocketSubjectAccountBalance:
 			var o kucoinapi.WebSocketAccountBalance
-			if err := json.Unmarshal(resp.Data, &o) ; err != nil {
+			if err := json.Unmarshal(resp.Data, &o); err != nil {
 				return &resp, err
 			}
 			resp.Object = &o
 
 		case kucoinapi.WebSocketSubjectTradeCandlesUpdate:
 			var o kucoinapi.WebSocketKLine
-			if err := json.Unmarshal(resp.Data, &o) ; err != nil {
+			if err := json.Unmarshal(resp.Data, &o); err != nil {
 				return &resp, err
 			}
 			resp.Object = &o
 
 		case kucoinapi.WebSocketSubjectTradeL2Update:
 			var o kucoinapi.WebSocketOrderBookL2
-			if err := json.Unmarshal(resp.Data, &o) ; err != nil {
+			if err := json.Unmarshal(resp.Data, &o); err != nil {
 				return &resp, err
 			}
 			resp.Object = &o
 
 		case kucoinapi.WebSocketSubjectTradeTicker:
 			var o kucoinapi.WebSocketTicker
-			if err := json.Unmarshal(resp.Data, &o) ; err != nil {
+			if err := json.Unmarshal(resp.Data, &o); err != nil {
 				return &resp, err
 			}
 			resp.Object = &o
