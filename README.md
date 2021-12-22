@@ -37,6 +37,7 @@ Get your exchange API key and secret after you register the accounts (you can ch
 - Binance: <https://www.binancezh.com/en/register?ref=VGDGLT80>
 - FTX: <https://ftx.com/#a=7710474>
 - OKEx: <https://www.okex.com/join/2412712?src=from:ios-share>
+- Kucoin: <https://www.kucoin.com/ucenter/signup?rcode=r3KX2D4>
 
 Since the exchange implementation and support are done by a small team, if you like the work they've done for you, It
 would be great if you can use their referral code as your support to them. :-D
