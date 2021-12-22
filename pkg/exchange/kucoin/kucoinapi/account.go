@@ -14,12 +14,12 @@ type SubAccount struct {
 }
 
 func (s *AccountService) QuerySubAccounts() ([]SubAccount, error) {
-	req, err := s.client.newAuthenticatedRequest("GET", "/api/v1/sub/user", nil, nil)
+	req, err := s.client.NewAuthenticatedRequest("GET", "/api/v1/sub/user", nil, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := s.client.sendRequest(req)
+	response, err := s.client.SendRequest(req)
 	if err != nil {
 		return nil, err
 	}
@@ -47,12 +47,12 @@ type Account struct {
 }
 
 func (s *AccountService) ListAccounts() ([]Account, error) {
-	req, err := s.client.newAuthenticatedRequest("GET", "/api/v1/accounts", nil, nil)
+	req, err := s.client.NewAuthenticatedRequest("GET", "/api/v1/accounts", nil, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := s.client.sendRequest(req)
+	response, err := s.client.SendRequest(req)
 	if err != nil {
 		return nil, err
 	}
@@ -71,12 +71,12 @@ func (s *AccountService) ListAccounts() ([]Account, error) {
 }
 
 func (s *AccountService) GetAccount(accountID string) (*Account, error) {
-	req, err := s.client.newAuthenticatedRequest("GET", "/api/v1/accounts/"+accountID, nil, nil)
+	req, err := s.client.NewAuthenticatedRequest("GET", "/api/v1/accounts/"+accountID, nil, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := s.client.sendRequest(req)
+	response, err := s.client.SendRequest(req)
 	if err != nil {
 		return nil, err
 	}
