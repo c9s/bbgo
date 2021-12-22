@@ -12,6 +12,7 @@ import (
 )
 
 const readTimeout = 15 * time.Second
+const pingInterval = 18000 * time.Millisecond
 
 type WebsocketOp struct {
 	Op   string      `json:"op"`
@@ -29,12 +30,13 @@ type WebsocketLogin struct {
 type Stream struct {
 	types.StandardStream
 
-	Client     *kucoinapi.RestClient
-	Conn       *websocket.Conn
-	connLock   sync.Mutex
+	client *kucoinapi.RestClient
+	conn   *websocket.Conn
+	connLock sync.Mutex
 	connCtx    context.Context
 	connCancel context.CancelFunc
 
+	bullet *kucoinapi.Bullet
 	publicOnly bool
 }
 
@@ -42,7 +44,7 @@ type WebsocketSubscription struct{}
 
 func NewStream(client *kucoinapi.RestClient) *Stream {
 	stream := &Stream{
-		Client: client,
+		client: client,
 		StandardStream: types.StandardStream{
 			ReconnectC: make(chan struct{}, 1),
 		},
@@ -65,7 +67,7 @@ func NewStream(client *kucoinapi.RestClient) *Stream {
 			}
 
 			log.Infof("subscribing channels: %+v", subs)
-			err := stream.Conn.WriteJSON(WebsocketOp{
+			err := stream.conn.WriteJSON(WebsocketOp{
 				Op:   "subscribe",
 				Args: subs,
 			})
@@ -80,13 +82,13 @@ func NewStream(client *kucoinapi.RestClient) *Stream {
 			/*
 				msTimestamp := strconv.FormatFloat(float64(time.Now().UnixNano())/float64(time.Second), 'f', -1, 64)
 				payload := msTimestamp + "GET" + "/users/self/verify"
-				sign := okexapi.Sign(payload, stream.Client.Secret)
+				sign := okexapi.Sign(payload, stream.client.Secret)
 				op := WebsocketOp{
 					Op: "login",
 					Args: []WebsocketLogin{
 						{
-							Key:        stream.Client.Key,
-							Passphrase: stream.Client.Passphrase,
+							Key:        stream.client.Key,
+							Passphrase: stream.client.Passphrase,
 							Timestamp:  msTimestamp,
 							Sign:       sign,
 						},
@@ -94,7 +96,7 @@ func NewStream(client *kucoinapi.RestClient) *Stream {
 				}
 
 				log.Infof("sending login request: %+v", op)
-				err := stream.Conn.WriteJSON(op)
+				err := stream.conn.WriteJSON(op)
 				if err != nil {
 					log.WithError(err).Errorf("can not send login message")
 				}
@@ -149,9 +151,9 @@ func (s *Stream) getEndpoint() (string, error) {
 	var bullet *kucoinapi.Bullet
 	var err error
 	if s.publicOnly {
-		bullet, err = s.Client.BulletService.NewGetPublicBulletRequest().Do(nil)
+		bullet, err = s.client.BulletService.NewGetPublicBulletRequest().Do(nil)
 	} else {
-		bullet, err = s.Client.BulletService.NewGetPrivateBulletRequest().Do(nil)
+		bullet, err = s.client.BulletService.NewGetPrivateBulletRequest().Do(nil)
 	}
 
 	if err != nil {
@@ -162,6 +164,8 @@ func (s *Stream) getEndpoint() (string, error) {
 	if err != nil {
 		return "", err
 	}
+
+	s.bullet = bullet
 
 	return url.String(), nil
 }
@@ -196,13 +200,13 @@ func (s *Stream) connect(ctx context.Context) error {
 		return nil
 	})
 
-	s.Conn = conn
+	s.conn = conn
 	s.connLock.Unlock()
 
 	s.EmitConnect()
 
 	go s.read(s.connCtx)
-	go s.ping(s.connCtx)
+	go s.ping(s.connCtx, pingInterval)
 	return nil
 }
 
@@ -222,7 +226,7 @@ func (s *Stream) read(ctx context.Context) {
 
 		default:
 			s.connLock.Lock()
-			conn := s.Conn
+			conn := s.conn
 			s.connLock.Unlock()
 
 			if err := conn.SetReadDeadline(time.Now().Add(readTimeout)); err != nil {
@@ -285,13 +289,13 @@ func (s *Stream) read(ctx context.Context) {
 
 func (s *Stream) getConn() *websocket.Conn {
 	s.connLock.Lock()
-	conn := s.Conn
+	conn := s.conn
 	s.connLock.Unlock()
 	return conn
 }
 
-func (s *Stream) ping(ctx context.Context) {
-	pingTicker := time.NewTicker(readTimeout / 2)
+func (s *Stream) ping(ctx context.Context, interval time.Duration) {
+	pingTicker := time.NewTicker(interval)
 	defer pingTicker.Stop()
 
 	for {
