@@ -138,5 +138,5 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 }
 
 func (e *Exchange) NewStream() types.Stream {
-	panic("implement me")
+	return NewStream(e.client)
 }
