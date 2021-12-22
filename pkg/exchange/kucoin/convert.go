@@ -1,6 +1,9 @@
 package kucoin
 
 import (
+	"math"
+	"strings"
+
 	"github.com/c9s/bbgo/pkg/exchange/kucoin/kucoinapi"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -23,3 +26,44 @@ func toGlobalBalanceMap(accounts []kucoinapi.Account) types.BalanceMap {
 	return balances
 }
 
+func toGlobalSymbol(symbol string) string {
+	return strings.ReplaceAll(symbol, "-", "")
+}
+
+func toGlobalMarket(m kucoinapi.Symbol) types.Market {
+	symbol := toGlobalSymbol(m.Symbol)
+	return types.Market{
+		Symbol:          symbol,
+		LocalSymbol:     m.Symbol,
+		PricePrecision:  int(math.Log10(m.PriceIncrement.Float64())), // convert 0.0001 to 4
+		VolumePrecision: int(math.Log10(m.BaseIncrement.Float64())),
+		QuoteCurrency:   m.QuoteCurrency,
+		BaseCurrency:    m.BaseCurrency,
+		MinNotional:     m.QuoteMinSize.Float64(),
+		MinAmount:       m.QuoteMinSize.Float64(),
+		MinQuantity:     m.BaseMinSize.Float64(),
+		MaxQuantity:     0, // not used
+		StepSize:        m.BaseIncrement.Float64(),
+
+		MinPrice: 0, // not used
+		MaxPrice: 0, // not used
+		TickSize: m.PriceIncrement.Float64(),
+	}
+}
+
+func toGlobalTicker(s kucoinapi.Ticker24H) types.Ticker {
+	return types.Ticker{
+		Time:   s.Time.Time(),
+		Volume: s.Volume.Float64(),
+		Last:   s.Last.Float64(),
+		Open:   s.Last.Float64() - s.ChangePrice.Float64(),
+		High:   s.High.Float64(),
+		Low:    s.Low.Float64(),
+		Buy:    s.Buy.Float64(),
+		Sell:   s.Sell.Float64(),
+	}
+}
+
+func convertSubscription(s types.Subscription) (WebsocketSubscription, error) {
+	return WebsocketSubscription{}, nil
+}

@@ -169,3 +169,7 @@ func (m Market) CanonicalizeVolume(val float64) float64 {
 }
 
 type MarketMap map[string]Market
+
+func (m MarketMap) Add(market Market) {
+	m[market.Symbol] = market
+}
