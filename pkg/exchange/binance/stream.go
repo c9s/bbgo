@@ -88,6 +88,7 @@ type Stream struct {
 	outboundAccountInfoEventCallbacks     []func(event *OutboundAccountInfoEvent)
 	outboundAccountPositionEventCallbacks []func(event *OutboundAccountPositionEvent)
 	executionReportEventCallbacks         []func(event *ExecutionReportEvent)
+	bookTickerEventCallbacks              []func(event *BookTickerEvent)
 
 	orderTradeUpdateEventCallbacks []func(e *OrderTradeUpdateEvent)
 
@@ -180,6 +181,10 @@ func NewStream(client *binance.Client, futuresClient *futures.Client) *Stream {
 		} else {
 			stream.EmitKLine(kline)
 		}
+	})
+
+	stream.OnBookTickerEvent(func(e *BookTickerEvent) {
+		stream.EmitBookTickerUpdate(e.BookTicker())
 	})
 
 	stream.OnExecutionReportEvent(func(e *ExecutionReportEvent) {
@@ -607,6 +612,9 @@ func (s *Stream) read(ctx context.Context) {
 
 			case *KLineEvent:
 				s.EmitKLineEvent(e)
+
+			case *BookTickerEvent:
+				s.EmitBookTickerEvent(e)
 
 			case *DepthEvent:
 				s.EmitDepthEvent(e)

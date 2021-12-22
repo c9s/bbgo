@@ -23,6 +23,7 @@ const unsubscribe operation = "unsubscribe"
 type channel string
 
 const orderBookChannel channel = "orderbook"
+const bookTickerChannel channel = "ticker"
 const privateOrdersChannel channel = "orders"
 const privateTradesChannel channel = "fills"
 
@@ -194,6 +195,24 @@ func (r websocketResponse) toErrResponse() errResponse {
 	}
 }
 
+//sample :{"bid": 49194.0, "ask": 49195.0, "bidSize": 0.0775, "askSize": 0.0247, "last": 49200.0, "time": 1640171788.9339821}
+func (r websocketResponse) toBookTickerResponse() (bookTickerResponse, error) {
+	if r.Channel != bookTickerChannel {
+		return bookTickerResponse{}, fmt.Errorf("type %s, channel %s: %w", r.Type, r.Channel, errUnsupportedConversion)
+	}
+
+	var o bookTickerResponse
+	if err := json.Unmarshal(r.Data, &o); err != nil {
+		return bookTickerResponse{}, err
+	}
+
+	o.mandatoryFields = r.mandatoryFields
+	o.Market = r.Market
+	o.Timestamp = nanoToTime(o.Time)
+
+	return o, nil
+}
+
 func (r websocketResponse) toPublicOrderBookResponse() (orderBookResponse, error) {
 	if r.Channel != orderBookChannel {
 		return orderBookResponse{}, fmt.Errorf("type %s, channel %s: %w", r.Type, r.Channel, errUnsupportedConversion)
@@ -234,6 +253,18 @@ type orderBookResponse struct {
 
 	// best 100 orders. Ex. {[51, 1], [102, 3]}
 	Asks [][]json.Number `json:"asks"`
+}
+
+type bookTickerResponse struct {
+	mandatoryFields
+	Market    string           `json:"market"`
+	Bid       fixedpoint.Value `json:"bid"`
+	Ask       fixedpoint.Value `json:"ask"`
+	BidSize   fixedpoint.Value `json:"bidSize"`
+	AskSize   fixedpoint.Value `json:"askSize"`
+	Last      fixedpoint.Value `json:"last"`
+	Time      float64          `json:"time"`
+	Timestamp time.Time
 }
 
 // only 100 orders so we use linear search here
@@ -366,6 +397,19 @@ func toGlobalOrderBook(r orderBookResponse) (types.SliceOrderBook, error) {
 		Symbol: toGlobalSymbol(strings.ToUpper(r.Market)),
 		Bids:   bids,
 		Asks:   asks,
+	}, nil
+}
+
+func toGlobalBookTicker(r bookTickerResponse) (types.BookTicker, error) {
+	return types.BookTicker{
+		// ex. BTC/USDT
+		Symbol: toGlobalSymbol(strings.ToUpper(r.Market)),
+		//Time:     r.Timestamp,
+		Buy:      r.Bid,
+		BuySize:  r.BidSize,
+		Sell:     r.Ask,
+		SellSize: r.AskSize,
+		//Last:     r.Last,
 	}, nil
 }
 
