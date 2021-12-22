@@ -9,6 +9,7 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/kucoin/kucoinapi"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/gorilla/websocket"
+	"github.com/pkg/errors"
 )
 
 const readTimeout = 15 * time.Second
@@ -40,8 +41,6 @@ type Stream struct {
 	publicOnly bool
 }
 
-type WebsocketSubscription struct{}
-
 func NewStream(client *kucoinapi.RestClient) *Stream {
 	stream := &Stream{
 		client: client,
@@ -50,61 +49,32 @@ func NewStream(client *kucoinapi.RestClient) *Stream {
 		},
 	}
 
-	stream.OnConnect(func() {
-		if stream.publicOnly {
-			var subs []WebsocketSubscription
-			for _, subscription := range stream.Subscriptions {
-				sub, err := convertSubscription(subscription)
-				if err != nil {
-					log.WithError(err).Errorf("subscription convert error")
-					continue
-				}
-
-				subs = append(subs, sub)
-			}
-			if len(subs) == 0 {
-				return
-			}
-
-			log.Infof("subscribing channels: %+v", subs)
-			err := stream.conn.WriteJSON(WebsocketOp{
-				Op:   "subscribe",
-				Args: subs,
-			})
-
-			if err != nil {
-				log.WithError(err).Error("subscribe error")
-			}
-		} else {
-			// login as private channel
-			// sign example:
-			// sign=CryptoJS.enc.Base64.Stringify(CryptoJS.HmacSHA256(timestamp +'GET'+'/users/self/verify', secretKey))
-			/*
-				msTimestamp := strconv.FormatFloat(float64(time.Now().UnixNano())/float64(time.Second), 'f', -1, 64)
-				payload := msTimestamp + "GET" + "/users/self/verify"
-				sign := okexapi.Sign(payload, stream.client.Secret)
-				op := WebsocketOp{
-					Op: "login",
-					Args: []WebsocketLogin{
-						{
-							Key:        stream.client.Key,
-							Passphrase: stream.client.Passphrase,
-							Timestamp:  msTimestamp,
-							Sign:       sign,
-						},
-					},
-				}
-
-				log.Infof("sending login request: %+v", op)
-				err := stream.conn.WriteJSON(op)
-				if err != nil {
-					log.WithError(err).Errorf("can not send login message")
-				}
-			*/
-		}
-	})
-
+	stream.OnConnect(stream.handleConnect)
 	return stream
+}
+
+func (s *Stream) sendSubscriptions() error {
+	cmds, err := convertSubscriptions(s.Subscriptions)
+	if err != nil {
+		return errors.Wrapf(err, "subscription convert error, subscriptions: %+v", s.Subscriptions)
+	}
+
+	for _, cmd := range cmds {
+		if err := s.conn.WriteJSON(cmd) ; err != nil {
+			return errors.Wrapf(err, "subscribe write error, cmd: %+v", cmd)
+		}
+	}
+
+	return nil
+}
+
+func (s *Stream) handleConnect() {
+	if s.publicOnly {
+		if err := s.sendSubscriptions() ; err != nil {
+			log.WithError(err).Errorf("subscription error")
+			return
+		}
+	}
 }
 
 func (s *Stream) SetPublicOnly() {
@@ -225,9 +195,7 @@ func (s *Stream) read(ctx context.Context) {
 			return
 
 		default:
-			s.connLock.Lock()
-			conn := s.conn
-			s.connLock.Unlock()
+			conn := s.Conn()
 
 			if err := conn.SetReadDeadline(time.Now().Add(readTimeout)); err != nil {
 				log.WithError(err).Errorf("set read deadline error: %s", err.Error())

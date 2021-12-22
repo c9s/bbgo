@@ -1,8 +1,10 @@
 package kucoin
 
 import (
+	"fmt"
 	"math"
 	"strings"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/exchange/kucoin/kucoinapi"
 	"github.com/c9s/bbgo/pkg/types"
@@ -64,6 +66,36 @@ func toGlobalTicker(s kucoinapi.Ticker24H) types.Ticker {
 	}
 }
 
-func convertSubscription(s types.Subscription) (WebsocketSubscription, error) {
-	return WebsocketSubscription{}, nil
+
+// convertSubscriptions global subscription to local websocket command
+func convertSubscriptions(ss []types.Subscription) ([]kucoinapi.WebSocketCommand, error) {
+	var id = time.Now().UnixMilli()
+	var cmds []kucoinapi.WebSocketCommand
+	for _, s := range ss {
+		id++
+
+		var subscribeType string
+		switch s.Channel {
+		case types.BookChannel:
+			// see https://docs.kucoin.com/#level-2-market-data
+			subscribeType = "/market/level2" + ":" + toLocalSymbol(s.Symbol)
+
+		case types.KLineChannel:
+			subscribeType = "/market/candles" + ":" + toLocalSymbol(s.Symbol) + "_" + s.Options.Interval
+
+		default:
+			return nil, fmt.Errorf("websocket channel %s is not supported by kucoin", s.Channel)
+		}
+
+		cmds = append(cmds, kucoinapi.WebSocketCommand{
+			Id:             id,
+			Type:           subscribeType,
+			Topic:          "subscribe",
+			PrivateChannel: false,
+			Response:       true,
+		})
+	}
+
+	return cmds, nil
 }
+
