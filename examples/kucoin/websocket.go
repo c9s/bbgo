@@ -75,12 +75,31 @@ var websocketCmd = &cobra.Command{
 
 		c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
 		if err != nil {
-			logrus.Fatal("dial:", err)
+			return err
 		}
+
 		defer c.Close()
 
-		done := make(chan struct{})
+		wsCmd := &kucoinapi.WebSocketCommand{
+			Id:             time.Now().UnixMilli(),
+			Type:           "subscribe",
+			Topic:          "/market/ticker:ETH-USDT",
+			PrivateChannel: false,
+			Response:       true,
+		}
 
+		msg, err := wsCmd.JSON()
+		if err != nil {
+			return err
+		}
+
+		err = c.WriteMessage(websocket.TextMessage, msg)
+		if err != nil {
+			return err
+		}
+
+
+		done := make(chan struct{})
 		go func() {
 			defer close(done)
 			for {
