@@ -12,8 +12,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-const readTimeout = 15 * time.Second
-const pingInterval = 18000 * time.Millisecond
+const readTimeout = 20 * time.Second
 
 type WebsocketOp struct {
 	Op   string      `json:"op"`
@@ -31,13 +30,13 @@ type WebsocketLogin struct {
 type Stream struct {
 	types.StandardStream
 
-	client *kucoinapi.RestClient
-	conn   *websocket.Conn
-	connLock sync.Mutex
+	client     *kucoinapi.RestClient
+	conn       *websocket.Conn
+	connLock   sync.Mutex
 	connCtx    context.Context
 	connCancel context.CancelFunc
 
-	bullet *kucoinapi.Bullet
+	bullet     *kucoinapi.Bullet
 	publicOnly bool
 }
 
@@ -60,7 +59,7 @@ func (s *Stream) sendSubscriptions() error {
 	}
 
 	for _, cmd := range cmds {
-		if err := s.conn.WriteJSON(cmd) ; err != nil {
+		if err := s.conn.WriteJSON(cmd); err != nil {
 			return errors.Wrapf(err, "subscribe write error, cmd: %+v", cmd)
 		}
 	}
@@ -70,7 +69,7 @@ func (s *Stream) sendSubscriptions() error {
 
 func (s *Stream) handleConnect() {
 	if s.publicOnly {
-		if err := s.sendSubscriptions() ; err != nil {
+		if err := s.sendSubscriptions(); err != nil {
 			log.WithError(err).Errorf("subscription error")
 			return
 		}
@@ -164,9 +163,11 @@ func (s *Stream) connect(ctx context.Context) error {
 	// create a new context
 	s.connCtx, s.connCancel = context.WithCancel(ctx)
 
-	conn.SetReadDeadline(time.Now().Add(readTimeout))
+
+	pingTimeout := s.bullet.PingTimeout()
+	conn.SetReadDeadline(time.Now().Add(pingTimeout))
 	conn.SetPongHandler(func(string) error {
-		conn.SetReadDeadline(time.Now().Add(readTimeout))
+		conn.SetReadDeadline(time.Now().Add(pingTimeout))
 		return nil
 	})
 
@@ -176,7 +177,7 @@ func (s *Stream) connect(ctx context.Context) error {
 	s.EmitConnect()
 
 	go s.read(s.connCtx)
-	go ping(s.connCtx, s, pingInterval)
+	go ping(s.connCtx, s, s.bullet.PingInterval())
 	return nil
 }
 
@@ -268,6 +269,8 @@ type WebSocketConnector interface {
 }
 
 func ping(ctx context.Context, w WebSocketConnector, interval time.Duration) {
+	log.Infof("starting ping worker with interval %s", interval)
+
 	pingTicker := time.NewTicker(interval)
 	defer pingTicker.Stop()
 
@@ -280,6 +283,15 @@ func ping(ctx context.Context, w WebSocketConnector, interval time.Duration) {
 
 		case <-pingTicker.C:
 			conn := w.Conn()
+
+			if err := conn.WriteJSON(kucoinapi.WebSocketCommand{
+				Id:   time.Now().UnixMilli(),
+				Type: "ping",
+			}); err != nil {
+				log.WithError(err).Error("websocket ping error", err)
+				w.Reconnect()
+			}
+
 			if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(3*time.Second)); err != nil {
 				log.WithError(err).Error("ping error", err)
 				w.Reconnect()
