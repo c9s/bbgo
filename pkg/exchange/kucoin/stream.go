@@ -144,19 +144,33 @@ func (s *Stream) Reconnector(ctx context.Context) {
 	}
 }
 
-func (s *Stream) getEndpoint() string {
-	var url string
+// getEndpoint use the publicOnly flag to check whether we should allocate a public bullet or private bullet
+func (s *Stream) getEndpoint() (string, error) {
+	var bullet *kucoinapi.Bullet
+	var err error
 	if s.publicOnly {
-		url = "XXX"
+		bullet, err = s.Client.BulletService.NewGetPublicBulletRequest().Do(nil)
 	} else {
-		url = "XXX"
+		bullet, err = s.Client.BulletService.NewGetPrivateBulletRequest().Do(nil)
 	}
-	return url
+
+	if err != nil {
+		return "", err
+	}
+
+	url, err := bullet.URL()
+	if err != nil {
+		return "", err
+	}
+
+	return url.String(), nil
 }
 
 func (s *Stream) connect(ctx context.Context) error {
-	// when in public mode, the listen key is an empty string
-	var url = s.getEndpoint()
+	url, err := s.getEndpoint()
+	if err != nil {
+		return err
+	}
 
 	conn, err := s.StandardStream.Dial(url)
 	if err != nil {
