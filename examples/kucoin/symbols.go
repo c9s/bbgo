@@ -5,6 +5,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func init() {
+	rootCmd.AddCommand(symbolsCmd)
+}
+
 var symbolsCmd = &cobra.Command{
 	Use: "symbols",
 

@@ -5,6 +5,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func init() {
+	rootCmd.AddCommand(subAccountsCmd)
+}
+
 var subAccountsCmd = &cobra.Command{
 	Use:   "subaccounts",
 	Short: "subaccounts",
