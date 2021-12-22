@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"net/url"
 	"os"
 	"os/signal"
 	"time"
@@ -59,7 +58,7 @@ var websocketCmd = &cobra.Command{
 		}
 
 
-		u, err := url.Parse(bullet.InstanceServers[0].Endpoint)
+		u, err := bullet.URL()
 		if err != nil {
 			return err
 		}
@@ -67,12 +66,7 @@ var websocketCmd = &cobra.Command{
 		interrupt := make(chan os.Signal, 1)
 		signal.Notify(interrupt, os.Interrupt)
 
-		params := url.Values{}
-		params.Add("token", bullet.Token)
-		u.RawQuery = params.Encode()
-
 		logrus.Infof("connecting %s", u.String())
-
 		c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
 		if err != nil {
 			return err

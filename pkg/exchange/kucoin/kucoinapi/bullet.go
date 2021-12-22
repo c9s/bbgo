@@ -6,6 +6,7 @@ import (
 	"net/url"
 
 	"github.com/c9s/bbgo/pkg/util"
+	"github.com/pkg/errors"
 )
 
 // ApiClient defines the request builder method and request method for the API service
@@ -46,6 +47,23 @@ type Bullet struct {
 		PingTimeout  int    `json:"pingTimeout"`
 	} `json:"instanceServers"`
 	Token string `json:"token"`
+}
+
+func (b *Bullet) URL() (*url.URL, error) {
+	if len(b.InstanceServers) == 0 {
+		return nil, errors.New("InstanceServers is empty")
+	}
+
+	u, err := url.Parse(b.InstanceServers[0].Endpoint)
+	if err != nil {
+		return nil, err
+	}
+
+	params := url.Values{}
+	params.Add("token", b.Token)
+
+	u.RawQuery = params.Encode()
+	return u, nil
 }
 
 func (r *GetPublicBulletRequest) Do(ctx context.Context) (*Bullet, error) {
