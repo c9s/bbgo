@@ -206,7 +206,7 @@ func (s *Stream) connect(ctx context.Context) error {
 	s.EmitConnect()
 
 	go s.read(s.connCtx)
-	go s.ping(s.connCtx, pingInterval)
+	go ping(s.connCtx, s, pingInterval)
 	return nil
 }
 
@@ -287,14 +287,19 @@ func (s *Stream) read(ctx context.Context) {
 	}
 }
 
-func (s *Stream) getConn() *websocket.Conn {
+func (s *Stream) Conn() *websocket.Conn {
 	s.connLock.Lock()
 	conn := s.conn
 	s.connLock.Unlock()
 	return conn
 }
 
-func (s *Stream) ping(ctx context.Context, interval time.Duration) {
+type WebSocketConnector interface {
+	Conn() *websocket.Conn
+	Reconnect()
+}
+
+func ping(ctx context.Context, w WebSocketConnector, interval time.Duration) {
 	pingTicker := time.NewTicker(interval)
 	defer pingTicker.Stop()
 
@@ -306,10 +311,10 @@ func (s *Stream) ping(ctx context.Context, interval time.Duration) {
 			return
 
 		case <-pingTicker.C:
-			conn := s.getConn()
+			conn := w.Conn()
 			if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(3*time.Second)); err != nil {
 				log.WithError(err).Error("ping error", err)
-				s.Reconnect()
+				w.Reconnect()
 			}
 		}
 	}
