@@ -17,11 +17,6 @@ func init() {
 	rootCmd.PersistentFlags().String("kucoin-api-secret", "", "okex api secret")
 	rootCmd.PersistentFlags().String("kucoin-api-passphrase", "", "okex api secret")
 
-	rootCmd.AddCommand(accountsCmd)
-	rootCmd.AddCommand(subAccountsCmd)
-	rootCmd.AddCommand(symbolsCmd)
-	rootCmd.AddCommand(tickersCmd)
-	rootCmd.AddCommand(orderbookCmd)
 }
 
 var rootCmd = &cobra.Command{

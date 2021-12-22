@@ -5,6 +5,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func init() {
+	rootCmd.AddCommand(tickersCmd)
+}
+
 var tickersCmd = &cobra.Command{
 	Use: "tickers",
 

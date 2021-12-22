@@ -7,6 +7,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func init() {
+	rootCmd.AddCommand(orderbookCmd)
+}
+
 var orderbookCmd = &cobra.Command{
 	Use: "orderbook",
 
