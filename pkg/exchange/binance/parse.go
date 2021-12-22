@@ -264,11 +264,19 @@ func ParseEvent(message string) (interface{}, error) {
 	}
 
 	eventType := string(val.GetStringBytes("e"))
+	if eventType == "" && IsBookTicker(val) {
+		eventType = "bookticker"
+	}
 
 	switch eventType {
 	case "kline":
 		var event KLineEvent
 		err := json.Unmarshal([]byte(message), &event)
+		return &event, err
+	case "bookticker":
+		var event BookTickerEvent
+		err := json.Unmarshal([]byte(message), &event)
+		event.Event = eventType
 		return &event, err
 
 	case "outboundAccountPosition":
@@ -318,6 +326,14 @@ func ParseEvent(message string) (interface{}, error) {
 	}
 
 	return nil, fmt.Errorf("unsupported message: %s", message)
+}
+
+// IsBookTicker document ref :https://binance-docs.github.io/apidocs/spot/en/#individual-symbol-book-ticker-streams
+//use key recognition because there's no identify in the content.
+func IsBookTicker(val *fastjson.Value) bool {
+	return !val.Exists("e") && val.Exists("u") &&
+		val.Exists("s") && val.Exists("b") &&
+		val.Exists("B") && val.Exists("a") && val.Exists("A")
 }
 
 type DepthEntry struct {
@@ -717,4 +733,29 @@ func (e *OrderTradeUpdateEvent) OrderFutures() (*types.Order, error) {
 type EventBase struct {
 	Event string `json:"e"` // event
 	Time  int64  `json:"E"`
+}
+
+type BookTickerEvent struct {
+	EventBase
+	Symbol   string           `json:"s"`
+	Buy      fixedpoint.Value `json:"b"`
+	BuySize  fixedpoint.Value `json:"B"`
+	Sell     fixedpoint.Value `json:"a"`
+	SellSize fixedpoint.Value `json:"A"`
+	//"u":400900217,     // order book updateId
+	//"s":"BNBUSDT",     // symbol
+	//"b":"25.35190000", // best bid price
+	//"B":"31.21000000", // best bid qty
+	//"a":"25.36520000", // best ask price
+	//"A":"40.66000000"  // best ask qty
+}
+
+func (k *BookTickerEvent) BookTicker() types.BookTicker {
+	return types.BookTicker{
+		Symbol:   k.Symbol,
+		Buy:      k.Buy,
+		BuySize:  k.BuySize,
+		Sell:     k.Sell,
+		SellSize: k.SellSize,
+	}
 }

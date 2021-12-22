@@ -20,6 +20,7 @@ type Channel string
 var BookChannel = Channel("book")
 
 var KLineChannel = Channel("kline")
+var BookTickerChannel = Channel("bookticker")
 
 //go:generate callbackgen -type StandardStream -interface
 type StandardStream struct {
@@ -49,6 +50,8 @@ type StandardStream struct {
 	kLineCallbacks []func(kline KLine)
 
 	bookUpdateCallbacks []func(book SliceOrderBook)
+
+	bookTickerUpdateCallbacks []func(bookTicker BookTicker)
 
 	bookSnapshotCallbacks []func(book SliceOrderBook)
 

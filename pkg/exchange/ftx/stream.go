@@ -123,7 +123,12 @@ func (s *Stream) Subscribe(channel types.Channel, symbol string, option types.Su
 			Channel:   orderBookChannel,
 			Market:    toLocalSymbol(TrimUpperString(symbol)),
 		})
-
+	} else if channel == types.BookTickerChannel {
+		s.addSubscription(websocketRequest{
+			Operation: subscribe,
+			Channel:   bookTickerChannel,
+			Market:    toLocalSymbol(TrimUpperString(symbol)),
+		})
 	} else if channel == types.KLineChannel {
 		// FTX does not support kline channel, do polling
 		interval := types.Interval(option.Interval)
