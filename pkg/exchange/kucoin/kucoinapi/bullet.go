@@ -10,14 +10,14 @@ import (
 
 // ApiClient defines the request builder method and request method for the API service
 type ApiClient interface {
-	// newAuthenticatedRequest builds up the http request for authentication-required endpoints
-	newAuthenticatedRequest(method, refURL string, params url.Values, payload interface{}) (*http.Request, error)
+	// NewAuthenticatedRequest builds up the http request for authentication-required endpoints
+	NewAuthenticatedRequest(method, refURL string, params url.Values, payload interface{}) (*http.Request, error)
 
-	// newRequest builds up the http request for public endpoints
-	newRequest(method, refURL string, params url.Values, body []byte) (*http.Request, error)
+	// NewRequest builds up the http request for public endpoints
+	NewRequest(method, refURL string, params url.Values, body []byte) (*http.Request, error)
 
-	// sendRequest sends the request object to the api gateway
-	sendRequest(req *http.Request) (*util.Response, error)
+	// SendRequest sends the request object to the api gateway
+	SendRequest(req *http.Request) (*util.Response, error)
 }
 
 type BulletService struct {
@@ -49,12 +49,12 @@ type Bullet struct {
 }
 
 func (r *GetPublicBulletRequest) Do(ctx context.Context) (*Bullet, error) {
-	req, err := r.client.newRequest("POST", "/api/v1/bullet-public", nil, nil)
+	req, err := r.client.NewRequest("POST", "/api/v1/bullet-public", nil, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := r.client.sendRequest(req)
+	response, err := r.client.SendRequest(req)
 	if err != nil {
 		return nil, err
 	}
@@ -78,12 +78,12 @@ type GetPrivateBulletRequest struct {
 }
 
 func (r *GetPrivateBulletRequest) Do(ctx context.Context) (*Bullet, error) {
-	req, err := r.client.newAuthenticatedRequest("POST", "/api/v1/bullet-private", nil, nil)
+	req, err := r.client.NewAuthenticatedRequest("POST", "/api/v1/bullet-private", nil, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := r.client.sendRequest(req)
+	response, err := r.client.SendRequest(req)
 	if err != nil {
 		return nil, err
 	}

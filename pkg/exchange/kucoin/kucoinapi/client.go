@@ -62,7 +62,7 @@ func (c *RestClient) Auth(key, secret, passphrase string) {
 }
 
 // NewRequest create new API request. Relative url can be provided in refURL.
-func (c *RestClient) newRequest(method, refURL string, params url.Values, body []byte) (*http.Request, error) {
+func (c *RestClient) NewRequest(method, refURL string, params url.Values, body []byte) (*http.Request, error) {
 	rel, err := url.Parse(refURL)
 	if err != nil {
 		return nil, err
@@ -77,7 +77,7 @@ func (c *RestClient) newRequest(method, refURL string, params url.Values, body [
 }
 
 // sendRequest sends the request to the API server and handle the response
-func (c *RestClient) sendRequest(req *http.Request) (*util.Response, error) {
+func (c *RestClient) SendRequest(req *http.Request) (*util.Response, error) {
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return nil, err
@@ -98,7 +98,7 @@ func (c *RestClient) sendRequest(req *http.Request) (*util.Response, error) {
 }
 
 // newAuthenticatedRequest creates new http request for authenticated routes.
-func (c *RestClient) newAuthenticatedRequest(method, refURL string, params url.Values, payload interface{}) (*http.Request, error) {
+func (c *RestClient) NewAuthenticatedRequest(method, refURL string, params url.Values, payload interface{}) (*http.Request, error) {
 	if len(c.Key) == 0 {
 		return nil, errors.New("empty api key")
 	}
