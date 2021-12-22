@@ -120,24 +120,10 @@ func (c *RestClient) newAuthenticatedRequest(method, refURL string, params url.V
 		path += "?" + rel.RawQuery
 	}
 
-	var body []byte
-
-	if payload != nil {
-		switch v := payload.(type) {
-		case string:
-			body = []byte(v)
-
-		case []byte:
-			body = v
-
-		default:
-			body, err = json.Marshal(v)
-			if err != nil {
-				return nil, err
-			}
-		}
+	body, err := castPayload(payload)
+	if err != nil {
+		return nil, err
 	}
-
 
 	req, err := http.NewRequest(method, pathURL.String(), bytes.NewReader(body))
 	if err != nil {
@@ -151,6 +137,7 @@ func (c *RestClient) newAuthenticatedRequest(method, refURL string, params url.V
 	c.attachAuthHeaders(req, method, path, body)
 	return req, nil
 }
+
 
 func (c *RestClient) attachAuthHeaders(req *http.Request, method string, path string, body []byte) {
 	// Set location to UTC so that it outputs "2020-12-08T09:08:57.715Z"
@@ -167,6 +154,7 @@ func (c *RestClient) attachAuthHeaders(req *http.Request, method string, path st
 	req.Header.Add("KC-API-KEY-VERSION", c.KeyVersion)
 }
 
+// sign uses sha256 to sign the payload with the given secret
 func sign(secret, payload string) string {
 	var sig = hmac.New(sha256.New, []byte(secret))
 	_, err := sig.Write([]byte(payload))
@@ -175,4 +163,22 @@ func sign(secret, payload string) string {
 	}
 
 	return base64.StdEncoding.EncodeToString(sig.Sum(nil))
+}
+
+func castPayload(payload interface{}) ([]byte, error) {
+	if payload != nil {
+		switch v := payload.(type) {
+		case string:
+			return []byte(v), nil
+
+		case []byte:
+			return v, nil
+
+		default:
+			body, err := json.Marshal(v)
+			return body, err
+		}
+	}
+
+	return nil, nil
 }
