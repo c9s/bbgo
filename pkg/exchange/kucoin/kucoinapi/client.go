@@ -31,6 +31,7 @@ type RestClient struct {
 	AccountService    *AccountService
 	MarketDataService *MarketDataService
 	TradeService      *TradeService
+	BulletService     *BulletService
 }
 
 func NewClient() *RestClient {
@@ -50,6 +51,7 @@ func NewClient() *RestClient {
 	client.AccountService = &AccountService{client: client}
 	client.MarketDataService = &MarketDataService{client: client}
 	client.TradeService = &TradeService{client: client}
+	client.BulletService = &BulletService{client: client}
 	return client
 }
 
@@ -137,7 +139,6 @@ func (c *RestClient) newAuthenticatedRequest(method, refURL string, params url.V
 	c.attachAuthHeaders(req, method, path, body)
 	return req, nil
 }
-
 
 func (c *RestClient) attachAuthHeaders(req *http.Request, method string, path string, body []byte) {
 	// Set location to UTC so that it outputs "2020-12-08T09:08:57.715Z"
