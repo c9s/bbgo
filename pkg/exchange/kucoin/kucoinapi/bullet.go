@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/util"
 	"github.com/pkg/errors"
@@ -47,6 +48,14 @@ type Bullet struct {
 		PingTimeout  int    `json:"pingTimeout"`
 	} `json:"instanceServers"`
 	Token string `json:"token"`
+}
+
+func (b *Bullet) PingInterval() time.Duration {
+	return time.Duration(b.InstanceServers[0].PingInterval) * time.Millisecond
+}
+
+func (b *Bullet) PingTimeout() time.Duration {
+	return time.Duration(b.InstanceServers[0].PingTimeout) * time.Millisecond
 }
 
 func (b *Bullet) URL() (*url.URL, error) {

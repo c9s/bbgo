@@ -91,3 +91,9 @@ func NewExchangeStandard(n types.ExchangeName, key, secret, passphrase, subAccou
 }
 ```
 
+
+## Testing user data stream
+
+```shell
+go run ./cmd/bbgo   --config config/bbgo.yaml userdatastream --session kucoin
+```
