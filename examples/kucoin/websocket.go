@@ -57,7 +57,6 @@ var websocketCmd = &cobra.Command{
 
 		}
 
-
 		u, err := bullet.URL()
 		if err != nil {
 			return err
