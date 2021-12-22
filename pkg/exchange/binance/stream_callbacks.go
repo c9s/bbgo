@@ -104,6 +104,16 @@ func (s *Stream) EmitExecutionReportEvent(event *ExecutionReportEvent) {
 	}
 }
 
+func (s *Stream) OnBookTickerEvent(cb func(event *BookTickerEvent)) {
+	s.bookTickerEventCallbacks = append(s.bookTickerEventCallbacks, cb)
+}
+
+func (s *Stream) EmitBookTickerEvent(event *BookTickerEvent) {
+	for _, cb := range s.bookTickerEventCallbacks {
+		cb(event)
+	}
+}
+
 func (s *Stream) OnOrderTradeUpdateEvent(cb func(e *OrderTradeUpdateEvent)) {
 	s.orderTradeUpdateEventCallbacks = append(s.orderTradeUpdateEventCallbacks, cb)
 }
@@ -134,6 +144,8 @@ type StreamEventHub interface {
 	OnOutboundAccountPositionEvent(cb func(event *OutboundAccountPositionEvent))
 
 	OnExecutionReportEvent(cb func(event *ExecutionReportEvent))
+
+	OnBookTickerEvent(cb func(event *BookTickerEvent))
 
 	OnOrderTradeUpdateEvent(cb func(e *OrderTradeUpdateEvent))
 }

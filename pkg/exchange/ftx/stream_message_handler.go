@@ -29,6 +29,8 @@ func (h *messageHandler) handleMessage(message []byte) {
 	switch r.Channel {
 	case orderBookChannel:
 		h.handleOrderBook(r)
+	case bookTickerChannel:
+		h.handleBookTicker(r)
 	case privateOrdersChannel:
 		h.handlePrivateOrders(r)
 	case privateTradesChannel:
@@ -77,6 +79,34 @@ func (h *messageHandler) handleOrderBook(response websocketResponse) {
 		h.EmitBookUpdate(globalOrderBook)
 	default:
 		logger.Errorf("unsupported order book data type %s", r.Type)
+		return
+	}
+}
+
+func (h *messageHandler) handleBookTicker(response websocketResponse) {
+	if response.Type == subscribedRespType {
+		h.handleSubscribedMessage(response)
+		return
+	}
+
+	r, err := response.toBookTickerResponse()
+	if err != nil {
+		logger.WithError(err).Errorf("failed to convert the book ticker")
+		return
+	}
+
+	globalBookTicker, err := toGlobalBookTicker(r)
+	if err != nil {
+		logger.WithError(err).Errorf("failed to generate book ticker")
+		return
+	}
+
+	switch r.Type {
+	case updateRespType:
+		// emit updates, not the whole orderbook
+		h.EmitBookTickerUpdate(globalBookTicker)
+	default:
+		logger.Errorf("unsupported book ticker data type %s", r.Type)
 		return
 	}
 }
