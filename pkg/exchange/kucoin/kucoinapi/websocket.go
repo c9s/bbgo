@@ -48,7 +48,7 @@ func (c *WebSocketCommand) JSON() ([]byte, error) {
 	return json.Marshal(a)
 }
 
-type WebSocketResponse struct {
+type WebSocketEvent struct {
 	Type    WebSocketMessageType `json:"type"`
 	Topic   string               `json:"topic"`
 	Subject WebSocketSubject     `json:"subject"`
@@ -78,7 +78,7 @@ type WebSocketOrderBookL2 struct {
 	} `json:"changes"`
 }
 
-type WebSocketKLine struct {
+type WebSocketCandle struct {
 	Symbol  string   `json:"symbol"`
 	Candles []string `json:"candles"`
 	Time    int64    `json:"time"`
