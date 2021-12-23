@@ -37,7 +37,6 @@ type Stream struct {
 	connCancel context.CancelFunc
 
 	bullet     *kucoinapi.Bullet
-	publicOnly bool
 
 	candleEventCallbacks         []func(e *kucoinapi.WebSocketCandle)
 	orderBookL2EventCallbacks    []func(e *kucoinapi.WebSocketOrderBookL2)
@@ -130,7 +129,7 @@ func (s *Stream) handlePrivateOrderEvent(e *kucoinapi.WebSocketPrivateOrder) {
 }
 
 func (s *Stream) handleConnect() {
-	if s.publicOnly {
+	if s.PublicOnly {
 		if err := s.sendSubscriptions(); err != nil {
 			log.WithError(err).Errorf("subscription error")
 			return
@@ -161,12 +160,10 @@ func (s *Stream) handleConnect() {
 	}
 }
 
-func (s *Stream) SetPublicOnly() {
-	s.publicOnly = true
-}
 
 func (s *Stream) Close() error {
-	return nil
+	conn := s.Conn()
+	return conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 }
 
 func (s *Stream) Connect(ctx context.Context) error {
@@ -215,11 +212,11 @@ func (s *Stream) sendSubscriptions() error {
 	return nil
 }
 
-// getEndpoint use the publicOnly flag to check whether we should allocate a public bullet or private bullet
+// getEndpoint use the PublicOnly flag to check whether we should allocate a public bullet or private bullet
 func (s *Stream) getEndpoint() (string, error) {
 	var bullet *kucoinapi.Bullet
 	var err error
-	if s.publicOnly {
+	if s.PublicOnly {
 		bullet, err = s.client.BulletService.NewGetPublicBulletRequest().Do(nil)
 	} else {
 		bullet, err = s.client.BulletService.NewGetPrivateBulletRequest().Do(nil)
@@ -236,6 +233,7 @@ func (s *Stream) getEndpoint() (string, error) {
 
 	s.bullet = bullet
 
+	log.Infof("bullet: %+v", bullet)
 	return url.String(), nil
 }
 
@@ -263,10 +261,10 @@ func (s *Stream) connect(ctx context.Context) error {
 	// create a new context
 	s.connCtx, s.connCancel = context.WithCancel(ctx)
 
-	pingTimeout := s.bullet.PingTimeout()
-	conn.SetReadDeadline(time.Now().Add(pingTimeout))
+	// pingTimeout := s.bullet.PingTimeout()
+	conn.SetReadDeadline(time.Now().Add(readTimeout))
 	conn.SetPongHandler(func(string) error {
-		conn.SetReadDeadline(time.Now().Add(pingTimeout))
+		conn.SetReadDeadline(time.Now().Add(readTimeout))
 		return nil
 	})
 

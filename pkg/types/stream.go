@@ -24,6 +24,8 @@ var BookTickerChannel = Channel("bookticker")
 
 //go:generate callbackgen -type StandardStream -interface
 type StandardStream struct {
+	PublicOnly bool
+
 	ReconnectC chan struct{}
 
 	Subscriptions []Subscription
@@ -85,6 +87,10 @@ func (stream *StandardStream) Dial(url string) (*websocket.Conn, error) {
 	// use the default ping handler
 	conn.SetPingHandler(nil)
 	return conn, nil
+}
+
+func (stream *StandardStream) SetPublicOnly() {
+	stream.PublicOnly = true
 }
 
 // SubscribeOptions provides the standard stream options

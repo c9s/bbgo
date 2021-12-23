@@ -15,8 +15,6 @@ type Stream struct {
 	types.StandardStream
 
 	exchange *Exchange
-
-	publicOnly bool
 }
 
 func (s *Stream) Connect(ctx context.Context) error {
@@ -53,7 +51,7 @@ func (s *Stream) Connect(ctx context.Context) error {
 
 	log.Infof("used symbols: %v and intervals: %v", symbols, intervals)
 
-	if !s.publicOnly {
+	if !s.PublicOnly {
 		// user data stream
 		s.OnTradeUpdate(func(trade types.Trade) {
 			s.exchange.addTrade(trade)
@@ -75,7 +73,7 @@ func (s *Stream) Connect(ctx context.Context) error {
 	s.EmitConnect()
 	s.EmitStart()
 
-	if s.publicOnly {
+	if s.PublicOnly {
 		go func() {
 			log.Infof("querying klines from database...")
 			klineC, errC := s.exchange.srv.QueryKLinesCh(s.exchange.startTime, s.exchange.endTime, s.exchange, symbols, intervals)
@@ -111,11 +109,6 @@ func (s *Stream) Connect(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-func (s *Stream) SetPublicOnly() {
-	s.publicOnly = true
-	return
 }
 
 func (s *Stream) Close() error {
