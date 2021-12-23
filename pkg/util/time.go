@@ -18,3 +18,7 @@ func BeginningOfTheDay(t time.Time) time.Time {
 func Over24Hours(since time.Time) bool {
 	return time.Since(since) >= 24 * time.Hour
 }
+
+func UnixMilli() int64 {
+	return time.Now().UnixNano() / int64(time.Millisecond)
+}
