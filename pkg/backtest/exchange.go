@@ -291,7 +291,7 @@ func (e Exchange) PlatformFeeCurrency() string {
 }
 
 func (e Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
-	return bbgo.LoadExchangeMarketsWithCache(ctx, e.publicExchange)
+	return e.markets, nil
 }
 
 func (e Exchange) QueryDepositHistory(ctx context.Context, asset string, since, until time.Time) (allDeposits []types.Deposit, err error) {

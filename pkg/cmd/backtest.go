@@ -20,6 +20,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func init() {
@@ -45,6 +46,10 @@ var BacktestCmd = &cobra.Command{
 		verboseCnt, err := cmd.Flags().GetCount("verbose")
 		if err != nil {
 			return err
+		}
+
+		if viper.GetBool("debug") {
+			verboseCnt = 2
 		}
 
 		configFile, err := cmd.Flags().GetString("config")
@@ -103,7 +108,16 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
-		//if it's declared in the cmd , use the cmd one first
+		if verboseCnt == 2 {
+			log.SetLevel(log.DebugLevel)
+		} else if verboseCnt > 0 {
+			log.SetLevel(log.InfoLevel)
+		} else {
+			// default mode, disable strategy logging and order executor logging
+			log.SetLevel(log.ErrorLevel)
+		}
+
+		// if it's declared in the cmd , use the cmd one first
 		if exchangeNameStr == "" {
 			exchangeNameStr = userConfig.Backtest.Session
 		}
@@ -205,9 +219,9 @@ var BacktestCmd = &cobra.Command{
 				}
 
 				for interval := range supportIntervals {
-					//if err := s.SyncKLineByInterval(ctx, exchange, symbol, interval, startTime, endTime); err != nil {
+					// if err := s.SyncKLineByInterval(ctx, exchange, symbol, interval, startTime, endTime); err != nil {
 					//	return err
-					//}
+					// }
 					firstKLine, err := backtestService.QueryFirstKLine(sourceExchange.Name(), symbol, interval)
 					if err != nil {
 						return errors.Wrapf(err, "failed to query backtest kline")
@@ -262,7 +276,7 @@ var BacktestCmd = &cobra.Command{
 
 		environ.SetStartTime(startTime)
 
-		//exchangeNameStr is the session name.
+		// exchangeNameStr is the session name.
 		environ.AddExchange(exchangeNameStr, backtestExchange)
 
 		if err := environ.Init(ctx); err != nil {
@@ -270,14 +284,7 @@ var BacktestCmd = &cobra.Command{
 		}
 
 		trader := bbgo.NewTrader(environ)
-
-		if verboseCnt == 2 {
-			log.SetLevel(log.DebugLevel)
-		} else if verboseCnt > 0 {
-			log.SetLevel(log.InfoLevel)
-		} else {
-			// default mode, disable strategy logging and order executor logging
-			log.SetLevel(log.ErrorLevel)
+		if verboseCnt == 0 {
 			trader.DisableLogging()
 		}
 
