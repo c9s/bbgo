@@ -11,6 +11,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 )
 
 type DataFetcher func() (interface{}, error)
@@ -24,6 +25,8 @@ func WithCache(key string, obj interface{}, fetcher DataFetcher) error {
 	cacheFile := path.Join(cacheDir, key+".json")
 
 	if _, err := os.Stat(cacheFile); os.IsNotExist(err) {
+		log.Debugf("cache %s not found, executing fetcher callback to get the data", cacheFile)
+
 		data, err := fetcher()
 		if err != nil {
 			return err
@@ -46,6 +49,7 @@ func WithCache(key string, obj interface{}, fetcher DataFetcher) error {
 		rv.Set(reflect.ValueOf(data))
 
 	} else {
+		log.Debugf("cache %s found", cacheFile)
 
 		data, err := ioutil.ReadFile(cacheFile)
 		if err != nil {

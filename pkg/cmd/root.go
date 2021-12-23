@@ -47,6 +47,11 @@ var RootCmd = &cobra.Command{
 			}
 		}
 
+		if viper.GetBool("debug") {
+			log.Infof("debug mode is enabled")
+			log.SetLevel(log.DebugLevel)
+		}
+
 		configFile, err := cmd.Flags().GetString("config")
 		if err != nil {
 			return errors.Wrapf(err, "failed to get the config flag")
@@ -81,7 +86,7 @@ var RootCmd = &cobra.Command{
 }
 
 func init() {
-	RootCmd.PersistentFlags().Bool("debug", false, "debug flag")
+	RootCmd.PersistentFlags().Bool("debug", false, "debug mode")
 	RootCmd.PersistentFlags().String("config", "bbgo.yaml", "config file")
 
 	RootCmd.PersistentFlags().Bool("no-dotenv", false, "disable built-in dotenv")
@@ -133,21 +138,10 @@ func init() {
 		return
 	}
 
-	if err := viper.BindPFlags(RootCmd.Flags()); err != nil {
-		log.WithError(err).Errorf("failed to bind local flags. please check the flag settings.")
-		return
-	}
+	log.SetFormatter(&prefixed.TextFormatter{})
 }
 
 func Execute() {
-
-	log.SetFormatter(&prefixed.TextFormatter{})
-
-	logger := log.StandardLogger()
-	if viper.GetBool("debug") {
-		logger.SetLevel(log.DebugLevel)
-	}
-
 	environment := os.Getenv("BBGO_ENV")
 	switch environment {
 	case "production", "prod":
@@ -161,6 +155,7 @@ func Execute() {
 		if err != nil {
 			log.Panic(err)
 		}
+		logger := log.StandardLogger()
 		logger.AddHook(
 			lfshook.NewHook(
 				lfshook.WriterMap{
