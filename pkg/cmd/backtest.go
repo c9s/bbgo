@@ -127,8 +127,12 @@ var BacktestCmd = &cobra.Command{
 
 		for key, session := range userConfig.Sessions {
 			if exchangeNameStr == key {
-				err := bbgo.InitExchangeSession(session.Name, session)
+				publicExchange, err := cmdutil.NewExchangeStandard(session.ExchangeName, "", "", "", "")
 				if err != nil {
+					return err
+				}
+
+				if err := bbgo.InitExchangeSession(session.Name, session, publicExchange) ; err != nil {
 					return err
 				}
 				sourceExchange = session.Exchange
@@ -142,7 +146,7 @@ var BacktestCmd = &cobra.Command{
 				return err
 			}
 
-			sourceExchange, err = cmdutil.NewExchange(exchangeName)
+			sourceExchange, err = cmdutil.NewExchangeStandard(exchangeName, "", "", "", "")
 			if err != nil {
 				return err
 			}
