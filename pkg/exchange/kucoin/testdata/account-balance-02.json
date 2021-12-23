@@ -1,1 +1,25 @@
-{"id":"61c3728c47d4ea0001c2238a","type":"message","topic":"/account/balance","userId":"61af6413efeab1000113f08b","channelType":"private","subject":"account.balance","data":{"accountId":"61c1fc287de2940001bd2aac","available":"0.00028975","availableChange":"0.00028975","currency":"BTC","hold":"0","holdChange":"0","relationContext":{"symbol":"BTC-USDT","orderId":"61c3728cfd0c3c0001a16a62","tradeId":"61c3728c2e113d2923db40a3"},"relationEvent":"trade.setted","relationEventId":"61c3728c47d4ea0001c2238a","time":"1640198796230","total":"0.00028975"}}
+{
+  "id": "61c3728c47d4ea0001c2238a",
+  "type": "message",
+  "topic": "/account/balance",
+  "userId": "61af6413efeab1000113f08b",
+  "channelType": "private",
+  "subject": "account.balance",
+  "data": {
+    "accountId": "61c1fc287de2940001bd2aac",
+    "available": "0.00028975",
+    "availableChange": "0.00028975",
+    "currency": "BTC",
+    "hold": "0",
+    "holdChange": "0",
+    "relationContext": {
+      "symbol": "BTC-USDT",
+      "orderId": "61c3728cfd0c3c0001a16a62",
+      "tradeId": "61c3728c2e113d2923db40a3"
+    },
+    "relationEvent": "trade.setted",
+    "relationEventId": "61c3728c47d4ea0001c2238a",
+    "time": "1640198796230",
+    "total": "0.00028975"
+  }
+}
