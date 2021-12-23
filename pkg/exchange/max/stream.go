@@ -20,8 +20,6 @@ type Stream struct {
 	types.StandardStream
 
 	websocketService *max.WebSocketService
-
-	publicOnly bool
 }
 
 func NewStream(key, secret string) *Stream {
@@ -150,10 +148,6 @@ func NewStream(key, secret string) *Stream {
 	})
 
 	return stream
-}
-
-func (s *Stream) SetPublicOnly() {
-	s.publicOnly = true
 }
 
 func (s *Stream) Subscribe(channel types.Channel, symbol string, options types.SubscribeOptions) {

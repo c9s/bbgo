@@ -72,8 +72,6 @@ type Stream struct {
 	connCtx    context.Context
 	connCancel context.CancelFunc
 
-	publicOnly bool
-
 	// custom callbacks
 	depthEventCallbacks       []func(e *DepthEvent)
 	kLineEventCallbacks       []func(e *KLineEvent)
@@ -301,13 +299,9 @@ func NewStream(client *binance.Client, futuresClient *futures.Client) *Stream {
 	return stream
 }
 
-func (s *Stream) SetPublicOnly() {
-	s.publicOnly = true
-}
-
 func (s *Stream) dial(listenKey string) (*websocket.Conn, error) {
 	var url string
-	if s.publicOnly {
+	if s.PublicOnly {
 		if s.IsFutures {
 			url = "wss://fstream.binance.com/ws/"
 		} else {
@@ -409,7 +403,7 @@ func (s *Stream) reconnector(ctx context.Context) {
 func (s *Stream) connect(ctx context.Context) error {
 	var err error
 	var listenKey string
-	if s.publicOnly {
+	if s.PublicOnly {
 		log.Infof("stream is set to public only mode")
 	} else {
 		log.Infof("request listen key for creating user data stream...")
@@ -452,7 +446,7 @@ func (s *Stream) connect(ctx context.Context) error {
 
 	s.EmitConnect()
 
-	if !s.publicOnly {
+	if !s.PublicOnly {
 		go s.listenKeyKeepAlive(s.connCtx, listenKey)
 	}
 

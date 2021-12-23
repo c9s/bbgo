@@ -56,7 +56,9 @@ var userDataStreamCmd = &cobra.Command{
 		if err := s.Connect(ctx); err != nil {
 			return fmt.Errorf("failed to connect to %s", sessionName)
 		}
+
 		log.Infof("connected")
+		defer s.Close()
 
 		cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
 		return nil

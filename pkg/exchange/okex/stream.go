@@ -36,8 +36,6 @@ type Stream struct {
 	connCtx    context.Context
 	connCancel context.CancelFunc
 
-	publicOnly bool
-
 	// public callbacks
 	candleDataCallbacks   []func(candle Candle)
 	bookDataCallbacks     []func(book BookData)
@@ -139,7 +137,7 @@ func NewStream(client *okexapi.RestClient) *Stream {
 	})
 
 	stream.OnConnect(func() {
-		if stream.publicOnly {
+		if stream.PublicOnly {
 			var subs []WebsocketSubscription
 			for _, subscription := range stream.Subscriptions {
 				sub, err := convertSubscription(subscription)
@@ -193,10 +191,6 @@ func NewStream(client *okexapi.RestClient) *Stream {
 	return stream
 }
 
-func (s *Stream) SetPublicOnly() {
-	s.publicOnly = true
-}
-
 func (s *Stream) Close() error {
 	return nil
 }
@@ -235,7 +229,7 @@ func (s *Stream) Reconnector(ctx context.Context) {
 func (s *Stream) connect(ctx context.Context) error {
 	// when in public mode, the listen key is an empty string
 	var url string
-	if s.publicOnly {
+	if s.PublicOnly {
 		url = okexapi.PublicWebSocketURL
 	} else {
 		url = okexapi.PrivateWebSocketURL

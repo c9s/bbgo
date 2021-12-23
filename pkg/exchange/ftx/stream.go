@@ -3,7 +3,6 @@ package ftx
 import (
 	"context"
 	"fmt"
-	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -19,9 +18,6 @@ type Stream struct {
 
 	ws       *service.WebsocketClientBase
 	exchange *Exchange
-
-	// publicOnly can only be configured before connecting
-	publicOnly int32
 
 	key        string
 	secret     string
@@ -65,7 +61,7 @@ func NewStream(key, secret string, subAccount string, e *Exchange) *Stream {
 
 func (s *Stream) Connect(ctx context.Context) error {
 	// If it's not public only, let's do the authentication.
-	if atomic.LoadInt32(&s.publicOnly) == 0 {
+	if !s.PublicOnly {
 		s.subscribePrivateEvents()
 	}
 
@@ -110,10 +106,6 @@ func (s *Stream) subscribePrivateEvents() {
 
 func (s *Stream) addSubscription(request websocketRequest) {
 	s.subscriptions = append(s.subscriptions, request)
-}
-
-func (s *Stream) SetPublicOnly() {
-	atomic.StoreInt32(&s.publicOnly, 1)
 }
 
 func (s *Stream) Subscribe(channel types.Channel, symbol string, option types.SubscribeOptions) {
