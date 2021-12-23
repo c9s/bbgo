@@ -1,0 +1,25 @@
+{
+  "type": "message",
+  "topic": "/spotMarket/tradeOrders",
+  "userId": "61af6413efeab1000113f08b",
+  "channelType": "private",
+  "subject": "orderChange",
+  "data": {
+    "symbol": "CRO-USDT",
+    "orderType": "limit",
+    "side": "sell",
+    "orderId": "61c3f71ce5edc90001b10685",
+    "liquidity": "maker",
+    "type": "match",
+    "orderTime": 1640232732749540684,
+    "size": "104.5639",
+    "filledSize": "104.5639",
+    "price": "0.5382",
+    "matchPrice": "0.5382",
+    "matchSize": "104.5639",
+    "tradeId": "61c3f71f7857782458a39b54",
+    "remainSize": "0",
+    "status": "open",
+    "ts": 1640232735930840841
+  }
+}
