@@ -8,6 +8,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/exchange/kucoin/kucoinapi"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 	"github.com/gorilla/websocket"
 	"github.com/pkg/errors"
 )
@@ -390,7 +391,7 @@ type WebSocketConnector interface {
 }
 
 func ping(ctx context.Context, w WebSocketConnector, interval time.Duration) {
-	log.Infof("starting ping worker with interval %s", interval)
+	log.Infof("starting websocket ping worker with interval %s", interval)
 
 	pingTicker := time.NewTicker(interval)
 	defer pingTicker.Stop()
@@ -406,7 +407,7 @@ func ping(ctx context.Context, w WebSocketConnector, interval time.Duration) {
 			conn := w.Conn()
 
 			if err := conn.WriteJSON(WebSocketCommand{
-				Id:   time.Now().UnixNano() / int64(time.Millisecond),
+				Id:   util.UnixMilli(),
 				Type: "ping",
 			}); err != nil {
 				log.WithError(err).Error("websocket ping error", err)
