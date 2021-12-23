@@ -226,7 +226,7 @@ func (m *SimplePriceMatching) newTradeFromOrder(order types.Order, isMaker bool)
 
 	var id = incTradeID()
 	return types.Trade{
-		ID:            int64(id),
+		ID:            id,
 		OrderID:       order.OrderID,
 		Exchange:      "backtest",
 		Price:         order.Price,

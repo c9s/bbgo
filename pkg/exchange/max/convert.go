@@ -233,7 +233,7 @@ func toGlobalTrade(t max.Trade) (*types.Trade, error) {
 	}
 
 	return &types.Trade{
-		ID:            int64(t.ID),
+		ID:            t.ID,
 		OrderID:       t.OrderID,
 		Price:         price,
 		Symbol:        toGlobalSymbol(t.Market),

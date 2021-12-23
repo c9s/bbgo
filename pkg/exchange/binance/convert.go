@@ -294,7 +294,7 @@ func toGlobalTrade(t binance.TradeV3, isMargin bool) (*types.Trade, error) {
 	}
 
 	return &types.Trade{
-		ID:            t.ID,
+		ID:            uint64(t.ID),
 		OrderID:       uint64(t.OrderID),
 		Price:         price,
 		Symbol:        t.Symbol,
@@ -347,7 +347,7 @@ func toGlobalFuturesTrade(t futures.AccountTrade) (*types.Trade, error) {
 	}
 
 	return &types.Trade{
-		ID:            t.ID,
+		ID:            uint64(t.ID),
 		OrderID:       uint64(t.OrderID),
 		Price:         price,
 		Symbol:        t.Symbol,

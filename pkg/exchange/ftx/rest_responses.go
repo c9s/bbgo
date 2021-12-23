@@ -8,7 +8,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-//ex: 2019-03-05T09:56:55.728933+00:00
+// ex: 2019-03-05T09:56:55.728933+00:00
 const timeLayout = "2006-01-02T15:04:05.999999Z07:00"
 
 type datetime struct {
@@ -364,7 +364,7 @@ type fill struct {
 	Size          float64        `json:"size"`
 	OrderId       uint64         `json:"orderId"`
 	Time          datetime       `json:"time"`
-	TradeId       int64          `json:"tradeId"`
+	TradeId       uint64         `json:"tradeId"`
 	FeeRate       float64        `json:"feeRate"`
 	Fee           float64        `json:"fee"`
 	FeeCurrency   string         `json:"feeCurrency"`
