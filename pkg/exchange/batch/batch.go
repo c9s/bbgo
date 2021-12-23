@@ -22,8 +22,10 @@ func (e ClosedOrderBatchQuery) Query(ctx context.Context, symbol string, startTi
 
 	tradeHistoryService, ok := e.Exchange.(types.ExchangeTradeHistoryService)
 	if !ok {
+		defer close(c)
+		defer close(errC)
 		// skip exchanges that does not support trading history services
-		logrus.Warnf("exchange %s does not implement ExchangeTradeHistoryService, skip syncing closed orders", e.Exchange.Name())
+		logrus.Warnf("exchange %s does not implement ExchangeTradeHistoryService, skip syncing closed orders (ClosedOrderBatchQuery.Query) ", e.Exchange.Name())
 		return c, errC
 	}
 
@@ -157,8 +159,10 @@ func (e TradeBatchQuery) Query(ctx context.Context, symbol string, options *type
 
 	tradeHistoryService, ok := e.Exchange.(types.ExchangeTradeHistoryService)
 	if !ok {
+		defer close(c)
+		defer close(errC)
 		// skip exchanges that does not support trading history services
-		logrus.Warnf("exchange %s does not implement ExchangeTradeHistoryService, skip syncing closed orders", e.Exchange.Name())
+		logrus.Warnf("exchange %s does not implement ExchangeTradeHistoryService, skip syncing closed orders (TradeBatchQuery.Query)", e.Exchange.Name())
 		return c, errC
 	}
 
