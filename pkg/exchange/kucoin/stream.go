@@ -61,15 +61,15 @@ func NewStream(client *kucoinapi.RestClient) *Stream {
 	return stream
 }
 
-func (s *Stream) handleCandleEvent(e *kucoinapi.WebSocketCandle) { }
+func (s *Stream) handleCandleEvent(e *kucoinapi.WebSocketCandle) {}
 
-func (s *Stream) handleOrderBookL2Event(e *kucoinapi.WebSocketOrderBookL2) { }
+func (s *Stream) handleOrderBookL2Event(e *kucoinapi.WebSocketOrderBookL2) {}
 
-func (s *Stream) handleTickerEvent(e *kucoinapi.WebSocketTicker) { }
+func (s *Stream) handleTickerEvent(e *kucoinapi.WebSocketTicker) {}
 
-func (s *Stream) handleAccountBalanceEvent(e *kucoinapi.WebSocketAccountBalance) { }
+func (s *Stream) handleAccountBalanceEvent(e *kucoinapi.WebSocketAccountBalance) {}
 
-func (s *Stream) handlePrivateOrderEvent(e *kucoinapi.WebSocketPrivateOrder) { }
+func (s *Stream) handlePrivateOrderEvent(e *kucoinapi.WebSocketPrivateOrder) {}
 
 func (s *Stream) handleConnect() {
 	if s.publicOnly {
@@ -156,7 +156,6 @@ func (s *Stream) sendSubscriptions() error {
 
 	return nil
 }
-
 
 // getEndpoint use the publicOnly flag to check whether we should allocate a public bullet or private bullet
 func (s *Stream) getEndpoint() (string, error) {
@@ -364,4 +363,3 @@ func ping(ctx context.Context, w WebSocketConnector, interval time.Duration) {
 		}
 	}
 }
-

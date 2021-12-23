@@ -1,0 +1,25 @@
+{
+  "id": "61c3f710506791000143eeee",
+  "type": "message",
+  "topic": "/account/balance",
+  "userId": "61af6413efeab1000113f08b",
+  "channelType": "private",
+  "subject": "account.balance",
+  "data": {
+    "accountId": "61c3f710e5756100011faf58",
+    "available": "104.5639",
+    "availableChange": "104.5639",
+    "currency": "CRO",
+    "hold": "0",
+    "holdChange": "0",
+    "relationContext": {
+      "symbol": "CRO-USDT",
+      "orderId": "61c3f702e5edc90001b0b575",
+      "tradeId": "61c3f7107857782458a39b06"
+    },
+    "relationEvent": "trade.setted",
+    "relationEventId": "61c3f710506791000143eeee",
+    "time": "1640232720329",
+    "total": "104.5639"
+  }
+}
