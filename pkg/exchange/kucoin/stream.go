@@ -2,7 +2,6 @@ package kucoin
 
 import (
 	"context"
-	"encoding/json"
 	"net"
 	"sync"
 	"time"
@@ -39,6 +38,12 @@ type Stream struct {
 
 	bullet     *kucoinapi.Bullet
 	publicOnly bool
+
+	candleEventCallbacks         []func(c *kucoinapi.WebSocketCandle)
+	orderBookL2EventCallbacks    []func(c *kucoinapi.WebSocketOrderBookL2)
+	tickerEventCallbacks         []func(c *kucoinapi.WebSocketTicker)
+	accountBalanceEventCallbacks []func(c *kucoinapi.WebSocketAccountBalance)
+	privateOrderEventCallbacks   []func(c *kucoinapi.WebSocketPrivateOrder)
 }
 
 func NewStream(client *kucoinapi.RestClient) *Stream {
@@ -272,20 +277,33 @@ func (s *Stream) read(ctx context.Context) {
 			log.Infof("event: %+v", e)
 
 			if e != nil && e.Object != nil {
-				switch et := e.Object.(type) {
-
-				case *kucoinapi.WebSocketTicker:
-				case *kucoinapi.WebSocketOrderBookL2:
-				case *kucoinapi.WebSocketKLine:
-				case *kucoinapi.WebSocketAccountBalance:
-				case *kucoinapi.WebSocketPrivateOrder:
-
-				default:
-					log.Warnf("unhandled event: %+v", et)
-
-				}
+				s.dispatchEvent(e)
 			}
 		}
+	}
+}
+
+func (s *Stream) dispatchEvent(e *kucoinapi.WebSocketEvent) {
+	switch et := e.Object.(type) {
+
+	case *kucoinapi.WebSocketTicker:
+		s.EmitTickerEvent(et)
+
+	case *kucoinapi.WebSocketOrderBookL2:
+		s.EmitOrderBookL2Event(et)
+
+	case *kucoinapi.WebSocketCandle:
+		s.EmitCandleEvent(et)
+
+	case *kucoinapi.WebSocketAccountBalance:
+		s.EmitAccountBalanceEvent(et)
+
+	case *kucoinapi.WebSocketPrivateOrder:
+		s.EmitPrivateOrderEvent(et)
+
+	default:
+		log.Warnf("unhandled event: %+v", et)
+
 	}
 }
 
@@ -333,59 +351,3 @@ func ping(ctx context.Context, w WebSocketConnector, interval time.Duration) {
 	}
 }
 
-func parseWebsocketPayload(in []byte) (*kucoinapi.WebSocketResponse, error) {
-	var resp kucoinapi.WebSocketResponse
-	var err = json.Unmarshal(in, &resp)
-	if err != nil {
-		return nil, err
-	}
-
-	switch resp.Type {
-	case kucoinapi.WebSocketMessageTypeAck:
-		return &resp, nil
-
-	case kucoinapi.WebSocketMessageTypeMessage:
-		switch resp.Subject {
-		case kucoinapi.WebSocketSubjectOrderChange:
-			var o kucoinapi.WebSocketPrivateOrder
-			if err := json.Unmarshal(resp.Data, &o); err != nil {
-				return &resp, err
-			}
-			resp.Object = &o
-
-		case kucoinapi.WebSocketSubjectAccountBalance:
-			var o kucoinapi.WebSocketAccountBalance
-			if err := json.Unmarshal(resp.Data, &o); err != nil {
-				return &resp, err
-			}
-			resp.Object = &o
-
-		case kucoinapi.WebSocketSubjectTradeCandlesUpdate:
-			var o kucoinapi.WebSocketKLine
-			if err := json.Unmarshal(resp.Data, &o); err != nil {
-				return &resp, err
-			}
-			resp.Object = &o
-
-		case kucoinapi.WebSocketSubjectTradeL2Update:
-			var o kucoinapi.WebSocketOrderBookL2
-			if err := json.Unmarshal(resp.Data, &o); err != nil {
-				return &resp, err
-			}
-			resp.Object = &o
-
-		case kucoinapi.WebSocketSubjectTradeTicker:
-			var o kucoinapi.WebSocketTicker
-			if err := json.Unmarshal(resp.Data, &o); err != nil {
-				return &resp, err
-			}
-			resp.Object = &o
-
-		default:
-			// return nil, fmt.Errorf("kucoin: unsupported subject: %s", resp.Subject)
-
-		}
-	}
-
-	return &resp, nil
-}
