@@ -206,6 +206,7 @@ type Account struct {
 	sync.Mutex `json:"-"`
 
 	AccountType AccountType `json:"accountType,omitempty"`
+	FuturesInfo *FuturesAccountInfo
 
 	MakerFeeRate fixedpoint.Value `json:"makerFeeRate,omitempty"`
 	TakerFeeRate fixedpoint.Value `json:"takerFeeRate,omitempty"`
@@ -216,7 +217,27 @@ type Account struct {
 
 	TotalAccountValue fixedpoint.Value `json:"totalAccountValue,omitempty"`
 
+	CanDeposit  bool `json:"canDeposit"`
+	CanTrade    bool `json:"canTrade"`
+	CanWithdraw bool `json:"canWithdraw"`
+
 	balances BalanceMap
+}
+
+type FuturesAccountInfo struct {
+	// Futures fields
+	Assets                      map[Asset]FuturesUserAsset `json:"assets"`
+	FeeTier                     int                        `json:"feeTier"`
+	MaxWithdrawAmount           fixedpoint.Value           `json:"maxWithdrawAmount"`
+	Positions                   PositionMap                `json:"positions"`
+	TotalInitialMargin          fixedpoint.Value           `json:"totalInitialMargin"`
+	TotalMaintMargin            fixedpoint.Value           `json:"totalMaintMargin"`
+	TotalMarginBalance          fixedpoint.Value           `json:"totalMarginBalance"`
+	TotalOpenOrderInitialMargin fixedpoint.Value           `json:"totalOpenOrderInitialMargin"`
+	TotalPositionInitialMargin  fixedpoint.Value           `json:"totalPositionInitialMargin"`
+	TotalUnrealizedProfit       fixedpoint.Value           `json:"totalUnrealizedProfit"`
+	TotalWalletBalance          fixedpoint.Value           `json:"totalWalletBalance"`
+	UpdateTime                  int64                      `json:"updateTime"`
 }
 
 func NewAccount() *Account {
