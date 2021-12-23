@@ -50,7 +50,7 @@ type Trade struct {
 	GID int64 `json:"gid" db:"gid"`
 
 	// ID is the source trade ID
-	ID            int64        `json:"id" db:"id"`
+	ID            uint64        `json:"id" db:"id"`
 	OrderID       uint64       `json:"orderID" db:"order_id"`
 	Exchange      ExchangeName `json:"exchange" db:"exchange"`
 	Price         float64      `json:"price" db:"price"`
@@ -143,6 +143,6 @@ func (trade Trade) Key() TradeKey {
 }
 
 type TradeKey struct {
-	ID   int64
+	ID   uint64
 	Side SideType
 }

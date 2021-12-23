@@ -126,5 +126,5 @@ type TradeQueryOptions struct {
 	StartTime   *time.Time
 	EndTime     *time.Time
 	Limit       int64
-	LastTradeID int64
+	LastTradeID uint64
 }

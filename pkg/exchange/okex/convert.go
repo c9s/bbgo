@@ -136,7 +136,7 @@ func toGlobalTrades(orderDetails []okexapi.OrderDetails) ([]types.Trade, error) 
 		side := types.SideType(strings.ToUpper(string(orderDetail.Side)))
 
 		trades = append(trades, types.Trade{
-			ID:            tradeID,
+			ID:            uint64(tradeID),
 			OrderID:       uint64(orderID),
 			Exchange:      types.ExchangeOKEx,
 			Price:         orderDetail.LastFilledPrice.Float64(),

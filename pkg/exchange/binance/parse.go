@@ -4,8 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/adshao/go-binance/v2/futures"
 	"time"
+
+	"github.com/adshao/go-binance/v2/futures"
 
 	"github.com/adshao/go-binance/v2"
 	"github.com/valyala/fastjson"
@@ -87,10 +88,10 @@ type ExecutionReportEvent struct {
 	CurrentOrderStatus   string `json:"X"`
 
 	OrderID int64 `json:"i"`
-	Ignored int64 `json:"I"`
+	Ignored int64  `json:"I"`
 
 	TradeID         int64 `json:"t"`
-	TransactionTime int64 `json:"T"`
+	TransactionTime int64  `json:"T"`
 
 	LastExecutedQuantity string `json:"l"`
 	LastExecutedPrice    string `json:"L"`
@@ -137,7 +138,7 @@ func (e *ExecutionReportEvent) Trade() (*types.Trade, error) {
 
 	tt := time.Unix(0, e.TransactionTime*int64(time.Millisecond))
 	return &types.Trade{
-		ID:            e.TradeID,
+		ID:            uint64(e.TradeID),
 		Exchange:      types.ExchangeBinance,
 		Symbol:        e.Symbol,
 		OrderID:       uint64(e.OrderID),

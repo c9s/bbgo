@@ -744,7 +744,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 
 	// MAX uses exclusive last trade ID
 	if options.LastTradeID > 0 {
-		req.From(options.LastTradeID)
+		req.From(int64(options.LastTradeID))
 	}
 
 	// make it compatible with binance, we need the last trade id for the next page.

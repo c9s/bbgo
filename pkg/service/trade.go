@@ -81,7 +81,7 @@ func (s *TradeService) Sync(ctx context.Context, exchange types.Exchange, symbol
 	}
 
 	var tradeKeys = map[types.TradeKey]struct{}{}
-	var lastTradeID int64 = 1
+	var lastTradeID uint64 = 1
 	if len(records) > 0 {
 		for _, record := range records {
 			tradeKeys[record.Key()] = struct{}{}

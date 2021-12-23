@@ -3,12 +3,13 @@ package binance
 import (
 	"context"
 	"fmt"
-	"github.com/adshao/go-binance/v2/futures"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/adshao/go-binance/v2/futures"
 
 	"go.uber.org/multierr"
 
@@ -961,7 +962,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 
 		// BINANCE uses inclusive last trade ID
 		if options.LastTradeID > 0 {
-			req.FromID(options.LastTradeID)
+			req.FromID(int64(options.LastTradeID))
 		}
 
 		remoteTrades, err = req.Do(ctx)
@@ -992,7 +993,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 
 		// BINANCE uses inclusive last trade ID
 		if options.LastTradeID > 0 {
-			req.FromID(options.LastTradeID)
+			req.FromID(int64(options.LastTradeID))
 		}
 
 		remoteTrades, err = req.Do(ctx)
@@ -1030,7 +1031,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 
 		// BINANCE uses inclusive last trade ID
 		if options.LastTradeID > 0 {
-			req.FromID(options.LastTradeID)
+			req.FromID(int64(options.LastTradeID))
 		}
 
 		remoteTrades, err = req.Do(ctx)

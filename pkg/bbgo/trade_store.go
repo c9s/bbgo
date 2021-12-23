@@ -10,7 +10,7 @@ type TradeStore struct {
 	// any created trades for tracking trades
 	sync.Mutex
 
-	trades map[int64]types.Trade
+	trades map[uint64]types.Trade
 
 	Symbol          string
 	RemoveCancelled bool
@@ -21,7 +21,7 @@ type TradeStore struct {
 func NewTradeStore(symbol string) *TradeStore {
 	return &TradeStore{
 		Symbol: symbol,
-		trades: make(map[int64]types.Trade),
+		trades: make(map[uint64]types.Trade),
 	}
 }
 
@@ -43,7 +43,7 @@ func (s *TradeStore) Trades() (trades []types.Trade) {
 	return trades
 }
 
-func (s *TradeStore) Exists(oID int64) (ok bool) {
+func (s *TradeStore) Exists(oID uint64) (ok bool) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -53,7 +53,7 @@ func (s *TradeStore) Exists(oID int64) (ok bool) {
 
 func (s *TradeStore) Clear() {
 	s.Lock()
-	s.trades = make(map[int64]types.Trade)
+	s.trades = make(map[uint64]types.Trade)
 	s.Unlock()
 }
 
@@ -61,7 +61,7 @@ type TradeFilter func(trade types.Trade) bool
 
 func (s *TradeStore) Filter(filter TradeFilter) {
 	s.Lock()
-	var trades = make(map[int64]types.Trade)
+	var trades = make(map[uint64]types.Trade)
 	for _, trade := range s.trades {
 		if !filter(trade) {
 			trades[trade.ID] = trade
@@ -76,7 +76,7 @@ func (s *TradeStore) GetAndClear() (trades []types.Trade) {
 	for _, o := range s.trades {
 		trades = append(trades, o)
 	}
-	s.trades = make(map[int64]types.Trade)
+	s.trades = make(map[uint64]types.Trade)
 	s.Unlock()
 
 	return trades

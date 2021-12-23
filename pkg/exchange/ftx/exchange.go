@@ -363,7 +363,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		limit = 200
 	}
 
-	tradeIDs := make(map[int64]struct{})
+	tradeIDs := make(map[uint64]struct{})
 
 	lastTradeID := options.LastTradeID
 	var trades []types.Trade
