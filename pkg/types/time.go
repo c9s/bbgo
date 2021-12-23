@@ -10,6 +10,28 @@ import (
 
 type MillisecondTimestamp time.Time
 
+func NewMillisecondTimestampFromInt(i int64) MillisecondTimestamp {
+	return MillisecondTimestamp(time.Unix(0, i * int64(time.Millisecond)))
+}
+
+func MustParseMillisecondTimestamp(a string) MillisecondTimestamp {
+	m, err := strconv.ParseInt(a, 10, 64) // startTime
+	if err != nil {
+		panic(fmt.Errorf("millisecond timestamp parse error %v", err))
+	}
+
+	return NewMillisecondTimestampFromInt(m)
+}
+
+func MustParseUnixTimestamp(a string) time.Time {
+	m, err := strconv.ParseInt(a, 10, 64) // startTime
+	if err != nil {
+		panic(fmt.Errorf("millisecond timestamp parse error %v", err))
+	}
+
+	return time.Unix(m, 0)
+}
+
 func (t MillisecondTimestamp) String() string {
 	return time.Time(t).String()
 }

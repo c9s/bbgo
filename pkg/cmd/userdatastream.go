@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"syscall"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
@@ -63,6 +64,7 @@ var userDataStreamCmd = &cobra.Command{
 			if err := s.Close(); err != nil {
 				log.WithError(err).Errorf("connection close error")
 			}
+			time.Sleep(1 * time.Second)
 		}()
 
 		cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
