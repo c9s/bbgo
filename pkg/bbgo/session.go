@@ -387,7 +387,7 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 
 	var err error
 	var trades []types.Trade
-	if environ.SyncService != nil {
+	if environ.SyncService != nil && environ.BacktestService == nil {
 		tradingFeeCurrency := session.Exchange.PlatformFeeCurrency()
 		if strings.HasPrefix(symbol, tradingFeeCurrency) {
 			trades, err = environ.TradeService.QueryForTradingFeeCurrency(session.Exchange.Name(), symbol, tradingFeeCurrency)
