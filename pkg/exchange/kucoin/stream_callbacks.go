@@ -2,68 +2,64 @@
 
 package kucoin
 
-import (
-	"github.com/c9s/bbgo/pkg/exchange/kucoin/kucoinapi"
-)
-
-func (s *Stream) OnCandleEvent(cb func(c *kucoinapi.WebSocketCandle)) {
+func (s *Stream) OnCandleEvent(cb func(candle *WebSocketCandleEvent, e *WebSocketEvent)) {
 	s.candleEventCallbacks = append(s.candleEventCallbacks, cb)
 }
 
-func (s *Stream) EmitCandleEvent(c *kucoinapi.WebSocketCandle) {
+func (s *Stream) EmitCandleEvent(candle *WebSocketCandleEvent, e *WebSocketEvent) {
 	for _, cb := range s.candleEventCallbacks {
-		cb(c)
+		cb(candle, e)
 	}
 }
 
-func (s *Stream) OnOrderBookL2Event(cb func(c *kucoinapi.WebSocketOrderBookL2)) {
+func (s *Stream) OnOrderBookL2Event(cb func(e *WebSocketOrderBookL2Event)) {
 	s.orderBookL2EventCallbacks = append(s.orderBookL2EventCallbacks, cb)
 }
 
-func (s *Stream) EmitOrderBookL2Event(c *kucoinapi.WebSocketOrderBookL2) {
+func (s *Stream) EmitOrderBookL2Event(e *WebSocketOrderBookL2Event) {
 	for _, cb := range s.orderBookL2EventCallbacks {
-		cb(c)
+		cb(e)
 	}
 }
 
-func (s *Stream) OnTickerEvent(cb func(c *kucoinapi.WebSocketTicker)) {
+func (s *Stream) OnTickerEvent(cb func(e *WebSocketTickerEvent)) {
 	s.tickerEventCallbacks = append(s.tickerEventCallbacks, cb)
 }
 
-func (s *Stream) EmitTickerEvent(c *kucoinapi.WebSocketTicker) {
+func (s *Stream) EmitTickerEvent(e *WebSocketTickerEvent) {
 	for _, cb := range s.tickerEventCallbacks {
-		cb(c)
+		cb(e)
 	}
 }
 
-func (s *Stream) OnAccountBalanceEvent(cb func(c *kucoinapi.WebSocketAccountBalance)) {
+func (s *Stream) OnAccountBalanceEvent(cb func(e *WebSocketAccountBalanceEvent)) {
 	s.accountBalanceEventCallbacks = append(s.accountBalanceEventCallbacks, cb)
 }
 
-func (s *Stream) EmitAccountBalanceEvent(c *kucoinapi.WebSocketAccountBalance) {
+func (s *Stream) EmitAccountBalanceEvent(e *WebSocketAccountBalanceEvent) {
 	for _, cb := range s.accountBalanceEventCallbacks {
-		cb(c)
+		cb(e)
 	}
 }
 
-func (s *Stream) OnPrivateOrderEvent(cb func(c *kucoinapi.WebSocketPrivateOrder)) {
+func (s *Stream) OnPrivateOrderEvent(cb func(e *WebSocketPrivateOrderEvent)) {
 	s.privateOrderEventCallbacks = append(s.privateOrderEventCallbacks, cb)
 }
 
-func (s *Stream) EmitPrivateOrderEvent(c *kucoinapi.WebSocketPrivateOrder) {
+func (s *Stream) EmitPrivateOrderEvent(e *WebSocketPrivateOrderEvent) {
 	for _, cb := range s.privateOrderEventCallbacks {
-		cb(c)
+		cb(e)
 	}
 }
 
 type StreamEventHub interface {
-	OnCandleEvent(cb func(c *kucoinapi.WebSocketCandle))
+	OnCandleEvent(cb func(candle *WebSocketCandleEvent, e *WebSocketEvent))
 
-	OnOrderBookL2Event(cb func(c *kucoinapi.WebSocketOrderBookL2))
+	OnOrderBookL2Event(cb func(e *WebSocketOrderBookL2Event))
 
-	OnTickerEvent(cb func(c *kucoinapi.WebSocketTicker))
+	OnTickerEvent(cb func(e *WebSocketTickerEvent))
 
-	OnAccountBalanceEvent(cb func(c *kucoinapi.WebSocketAccountBalance))
+	OnAccountBalanceEvent(cb func(e *WebSocketAccountBalanceEvent))
 
-	OnPrivateOrderEvent(cb func(c *kucoinapi.WebSocketPrivateOrder))
+	OnPrivateOrderEvent(cb func(e *WebSocketPrivateOrderEvent))
 }

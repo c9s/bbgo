@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"syscall"
 
+	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -18,19 +20,23 @@ var klineCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 
-		exName, err := cmd.Flags().GetString("exchange")
-		if err != nil {
-			return fmt.Errorf("can not get exchange from flags: %w", err)
+		if userConfig == nil {
+			return errors.New("--config option or config file is missing")
 		}
 
-		exchangeName, err := types.ValidExchangeName(exName)
+		environ := bbgo.NewEnvironment()
+		if err := environ.ConfigureExchangeSessions(userConfig); err != nil {
+			return err
+		}
+
+		sessionName, err := cmd.Flags().GetString("session")
 		if err != nil {
 			return err
 		}
 
-		ex, err := cmdutil.NewExchange(exchangeName)
-		if err != nil {
-			return err
+		session, ok := environ.Session(sessionName)
+		if !ok {
+			return fmt.Errorf("session %s not found", sessionName)
 		}
 
 		symbol, err := cmd.Flags().GetString("symbol")
@@ -47,7 +53,7 @@ var klineCmd = &cobra.Command{
 			return err
 		}
 
-		s := ex.NewStream()
+		s := session.Exchange.NewStream()
 		s.SetPublicOnly()
 		s.Subscribe(types.KLineChannel, symbol, types.SubscribeOptions{Interval: interval})
 
@@ -61,8 +67,16 @@ var klineCmd = &cobra.Command{
 
 		log.Infof("connecting...")
 		if err := s.Connect(ctx); err != nil {
-			return fmt.Errorf("failed to connect to %s", exchangeName)
+			return err
 		}
+
+		log.Infof("connected")
+		defer func() {
+			log.Infof("closing connection...")
+			if err := s.Close(); err != nil {
+				log.WithError(err).Errorf("connection close error")
+			}
+		}()
 
 		cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
 		return nil
@@ -71,7 +85,7 @@ var klineCmd = &cobra.Command{
 
 func init() {
 	// since the public data does not require trading authentication, we use --exchange option here.
-	klineCmd.Flags().String("exchange", "", "the exchange name")
+	klineCmd.Flags().String("session", "", "session name")
 	klineCmd.Flags().String("symbol", "", "the trading pair. e.g, BTCUSDT, LTCUSDT...")
 	klineCmd.Flags().String("interval", "1m", "interval of the kline (candle), .e.g, 1m, 3m, 15m")
 	RootCmd.AddCommand(klineCmd)

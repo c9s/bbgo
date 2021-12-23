@@ -14,18 +14,6 @@ import (
 
 const readTimeout = 30 * time.Second
 
-type WebsocketOp struct {
-	Op   string      `json:"op"`
-	Args interface{} `json:"args"`
-}
-
-type WebsocketLogin struct {
-	Key        string `json:"apiKey"`
-	Passphrase string `json:"passphrase"`
-	Timestamp  string `json:"timestamp"`
-	Sign       string `json:"sign"`
-}
-
 //go:generate callbackgen -type Stream -interface
 type Stream struct {
 	types.StandardStream
@@ -36,13 +24,15 @@ type Stream struct {
 	connCtx    context.Context
 	connCancel context.CancelFunc
 
-	bullet     *kucoinapi.Bullet
+	bullet *kucoinapi.Bullet
 
-	candleEventCallbacks         []func(e *kucoinapi.WebSocketCandle)
-	orderBookL2EventCallbacks    []func(e *kucoinapi.WebSocketOrderBookL2)
-	tickerEventCallbacks         []func(e *kucoinapi.WebSocketTicker)
-	accountBalanceEventCallbacks []func(e *kucoinapi.WebSocketAccountBalance)
-	privateOrderEventCallbacks   []func(e *kucoinapi.WebSocketPrivateOrder)
+	candleEventCallbacks         []func(candle *WebSocketCandleEvent, e *WebSocketEvent)
+	orderBookL2EventCallbacks    []func(e *WebSocketOrderBookL2Event)
+	tickerEventCallbacks         []func(e *WebSocketTickerEvent)
+	accountBalanceEventCallbacks []func(e *WebSocketAccountBalanceEvent)
+	privateOrderEventCallbacks   []func(e *WebSocketPrivateOrderEvent)
+
+	lastCandle map[string]types.KLine
 }
 
 func NewStream(client *kucoinapi.RestClient) *Stream {
@@ -51,6 +41,7 @@ func NewStream(client *kucoinapi.RestClient) *Stream {
 		StandardStream: types.StandardStream{
 			ReconnectC: make(chan struct{}, 1),
 		},
+		lastCandle: make(map[string]types.KLine),
 	}
 
 	stream.OnConnect(stream.handleConnect)
@@ -58,16 +49,27 @@ func NewStream(client *kucoinapi.RestClient) *Stream {
 	stream.OnOrderBookL2Event(stream.handleOrderBookL2Event)
 	stream.OnTickerEvent(stream.handleTickerEvent)
 	stream.OnPrivateOrderEvent(stream.handlePrivateOrderEvent)
+	stream.OnAccountBalanceEvent(stream.handleAccountBalanceEvent)
 	return stream
 }
 
-func (s *Stream) handleCandleEvent(e *kucoinapi.WebSocketCandle) {}
+func (s *Stream) handleCandleEvent(candle *WebSocketCandleEvent, e *WebSocketEvent) {
+	kline := candle.KLine()
+	last, ok := s.lastCandle[e.Topic]
+	if ok && kline.StartTime.After(last.StartTime.Time()) || e.Subject == WebSocketSubjectTradeCandlesAdd {
+		last.Closed = true
+		s.EmitKLineClosed(last)
+	}
 
-func (s *Stream) handleOrderBookL2Event(e *kucoinapi.WebSocketOrderBookL2) {}
+	s.EmitKLine(kline)
+	s.lastCandle[e.Topic] = kline
+}
 
-func (s *Stream) handleTickerEvent(e *kucoinapi.WebSocketTicker) {}
+func (s *Stream) handleOrderBookL2Event(e *WebSocketOrderBookL2Event) {}
 
-func (s *Stream) handleAccountBalanceEvent(e *kucoinapi.WebSocketAccountBalance) {
+func (s *Stream) handleTickerEvent(e *WebSocketTickerEvent) {}
+
+func (s *Stream) handleAccountBalanceEvent(e *WebSocketAccountBalanceEvent) {
 	bm := types.BalanceMap{}
 	bm[e.Currency] = types.Balance{
 		Currency:  e.Currency,
@@ -77,7 +79,7 @@ func (s *Stream) handleAccountBalanceEvent(e *kucoinapi.WebSocketAccountBalance)
 	s.StandardStream.EmitBalanceUpdate(bm)
 }
 
-func (s *Stream) handlePrivateOrderEvent(e *kucoinapi.WebSocketPrivateOrder) {
+func (s *Stream) handlePrivateOrderEvent(e *WebSocketPrivateOrderEvent) {
 	if e.Type == "match" {
 		s.StandardStream.EmitTradeUpdate(types.Trade{
 			OrderID:       hashStringID(e.OrderId),
@@ -136,17 +138,17 @@ func (s *Stream) handleConnect() {
 		}
 	} else {
 		id := time.Now().UnixMilli()
-		cmds := []kucoinapi.WebSocketCommand{
+		cmds := []WebSocketCommand{
 			{
 				Id:             id,
-				Type:           kucoinapi.WebSocketMessageTypeSubscribe,
+				Type:           WebSocketMessageTypeSubscribe,
 				Topic:          "/spotMarket/tradeOrders",
 				PrivateChannel: true,
 				Response:       true,
 			},
 			{
 				Id:             id + 1,
-				Type:           kucoinapi.WebSocketMessageTypeSubscribe,
+				Type:           WebSocketMessageTypeSubscribe,
 				Topic:          "/account/balance",
 				PrivateChannel: true,
 				Response:       true,
@@ -159,7 +161,6 @@ func (s *Stream) handleConnect() {
 		}
 	}
 }
-
 
 func (s *Stream) Close() error {
 	conn := s.Conn()
@@ -333,7 +334,7 @@ func (s *Stream) read(ctx context.Context) {
 			}
 
 			// used for debugging
-			// fmt.Println(string(message))
+			// log.Println(string(message))
 
 			e, err := parseWebsocketPayload(message)
 			if err != nil {
@@ -352,22 +353,22 @@ func (s *Stream) read(ctx context.Context) {
 	}
 }
 
-func (s *Stream) dispatchEvent(e *kucoinapi.WebSocketEvent) {
+func (s *Stream) dispatchEvent(e *WebSocketEvent) {
 	switch et := e.Object.(type) {
 
-	case *kucoinapi.WebSocketTicker:
+	case *WebSocketTickerEvent:
 		s.EmitTickerEvent(et)
 
-	case *kucoinapi.WebSocketOrderBookL2:
+	case *WebSocketOrderBookL2Event:
 		s.EmitOrderBookL2Event(et)
 
-	case *kucoinapi.WebSocketCandle:
-		s.EmitCandleEvent(et)
+	case *WebSocketCandleEvent:
+		s.EmitCandleEvent(et, e)
 
-	case *kucoinapi.WebSocketAccountBalance:
+	case *WebSocketAccountBalanceEvent:
 		s.EmitAccountBalanceEvent(et)
 
-	case *kucoinapi.WebSocketPrivateOrder:
+	case *WebSocketPrivateOrderEvent:
 		s.EmitPrivateOrderEvent(et)
 
 	default:
@@ -404,7 +405,7 @@ func ping(ctx context.Context, w WebSocketConnector, interval time.Duration) {
 		case <-pingTicker.C:
 			conn := w.Conn()
 
-			if err := conn.WriteJSON(kucoinapi.WebSocketCommand{
+			if err := conn.WriteJSON(WebSocketCommand{
 				Id:   time.Now().UnixMilli(),
 				Type: "ping",
 			}); err != nil {

@@ -67,11 +67,35 @@ func toGlobalTicker(s kucoinapi.Ticker24H) types.Ticker {
 	}
 }
 
+func toLocalInterval(i types.Interval) string {
+	switch i {
+	case types.Interval1m:
+		return "1min"
+
+	case types.Interval15m:
+		return "15min"
+
+	case types.Interval30m:
+		return "30min"
+
+	case types.Interval1h:
+		return "1hour"
+
+	case types.Interval2h:
+		return "2hour"
+
+	case types.Interval4h:
+		return "4hour"
+
+	}
+
+	return "1h"
+}
 
 // convertSubscriptions global subscription to local websocket command
-func convertSubscriptions(ss []types.Subscription) ([]kucoinapi.WebSocketCommand, error) {
+func convertSubscriptions(ss []types.Subscription) ([]WebSocketCommand, error) {
 	var id = time.Now().UnixMilli()
-	var cmds []kucoinapi.WebSocketCommand
+	var cmds []WebSocketCommand
 	for _, s := range ss {
 		id++
 
@@ -82,15 +106,15 @@ func convertSubscriptions(ss []types.Subscription) ([]kucoinapi.WebSocketCommand
 			subscribeTopic = "/market/level2" + ":" + toLocalSymbol(s.Symbol)
 
 		case types.KLineChannel:
-			subscribeTopic = "/market/candles" + ":" + toLocalSymbol(s.Symbol) + "_" + s.Options.Interval
+			subscribeTopic = "/market/candles" + ":" + toLocalSymbol(s.Symbol) + "_" + toLocalInterval(types.Interval(s.Options.Interval))
 
 		default:
 			return nil, fmt.Errorf("websocket channel %s is not supported by kucoin", s.Channel)
 		}
 
-		cmds = append(cmds, kucoinapi.WebSocketCommand{
+		cmds = append(cmds, WebSocketCommand{
 			Id:             id,
-			Type:           kucoinapi.WebSocketMessageTypeSubscribe,
+			Type:           WebSocketMessageTypeSubscribe,
 			Topic:          subscribeTopic,
 			PrivateChannel: false,
 			Response:       true,

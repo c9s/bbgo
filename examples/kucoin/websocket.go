@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"time"
 
+	"github.com/c9s/bbgo/pkg/exchange/kucoin"
 	"github.com/c9s/bbgo/pkg/exchange/kucoin/kucoinapi"
 	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
@@ -73,24 +74,32 @@ var websocketCmd = &cobra.Command{
 
 		defer c.Close()
 
-		wsCmd := &kucoinapi.WebSocketCommand{
-			Id:             time.Now().UnixMilli(),
-			Type:           "subscribe",
-			Topic:          "/market/ticker:ETH-USDT",
-			PrivateChannel: false,
-			Response:       true,
+		id := time.Now().UnixMilli()
+		wsCmds := []kucoin.WebSocketCommand{
+			/*
+			{
+				Id:             id+1,
+				Type:           "subscribe",
+				Topic:          "/market/ticker:ETH-USDT",
+				PrivateChannel: false,
+				Response:       true,
+			},
+			*/
+			{
+				Id:             id+2,
+				Type:           "subscribe",
+				Topic:          "/market/candles:ETH-USDT_1min",
+				PrivateChannel: false,
+				Response:       true,
+			},
 		}
 
-		msg, err := wsCmd.JSON()
-		if err != nil {
-			return err
+		for _, wsCmd := range wsCmds {
+			err = c.WriteJSON(wsCmd)
+			if err != nil {
+				return err
+			}
 		}
-
-		err = c.WriteMessage(websocket.TextMessage, msg)
-		if err != nil {
-			return err
-		}
-
 
 		done := make(chan struct{})
 		go func() {
@@ -106,10 +115,22 @@ var websocketCmd = &cobra.Command{
 			}
 		}()
 
+		pingTicker := time.NewTicker(bullet.PingInterval())
+		defer pingTicker.Stop()
+
 		for {
 			select {
 			case <-done:
 				return nil
+
+			case <-pingTicker.C:
+				if err := c.WriteJSON(kucoin.WebSocketCommand{
+					Id:   time.Now().UnixMilli(),
+					Type: "ping",
+				}); err != nil {
+					logrus.WithError(err).Error("websocket ping error", err)
+				}
+
 
 			case <-interrupt:
 				logrus.Infof("interrupt")

@@ -1,10 +1,12 @@
-package kucoinapi
+package kucoin
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 type WebSocketMessageType string
@@ -14,6 +16,7 @@ const (
 	WebSocketMessageTypeSubscribe   WebSocketMessageType = "subscribe"
 	WebSocketMessageTypeUnsubscribe WebSocketMessageType = "unsubscribe"
 	WebSocketMessageTypeAck         WebSocketMessageType = "ack"
+	WebSocketMessageTypeError       WebSocketMessageType = "error"
 	WebSocketMessageTypePong        WebSocketMessageType = "pong"
 	WebSocketMessageTypeWelcome     WebSocketMessageType = "welcome"
 	WebSocketMessageTypeMessage     WebSocketMessageType = "message"
@@ -27,6 +30,7 @@ const (
 	WebSocketSubjectTradeL2Update      WebSocketSubject = "trade.l2update" // order book L2
 	WebSocketSubjectLevel2             WebSocketSubject = "level2"         // level2
 	WebSocketSubjectTradeCandlesUpdate WebSocketSubject = "trade.candles.update"
+	WebSocketSubjectTradeCandlesAdd    WebSocketSubject = "trade.candles.add"
 
 	// private subjects
 	WebSocketSubjectOrderChange    WebSocketSubject = "orderChange"
@@ -53,12 +57,13 @@ type WebSocketEvent struct {
 	Topic   string               `json:"topic"`
 	Subject WebSocketSubject     `json:"subject"`
 	Data    json.RawMessage      `json:"data"`
+	Code    int                  `json:"code"` // used in type error
 
 	// Object is used for storing the parsed Data
 	Object interface{} `json:"-"`
 }
 
-type WebSocketTicker struct {
+type WebSocketTickerEvent struct {
 	Sequence    string           `json:"sequence"`
 	Price       fixedpoint.Value `json:"price"`
 	Size        fixedpoint.Value `json:"size"`
@@ -68,7 +73,7 @@ type WebSocketTicker struct {
 	BestBidSize fixedpoint.Value `json:"bestBidSize"`
 }
 
-type WebSocketOrderBookL2 struct {
+type WebSocketOrderBookL2Event struct {
 	SequenceStart int64  `json:"sequenceStart"`
 	SequenceEnd   int64  `json:"sequenceEnd"`
 	Symbol        string `json:"symbol"`
@@ -78,13 +83,44 @@ type WebSocketOrderBookL2 struct {
 	} `json:"changes"`
 }
 
-type WebSocketCandle struct {
-	Symbol  string   `json:"symbol"`
-	Candles []string `json:"candles"`
-	Time    int64    `json:"time"`
+type WebSocketCandleEvent struct {
+	Symbol  string                     `json:"symbol"`
+	Candles []string                   `json:"candles"`
+	Time    types.MillisecondTimestamp `json:"time"`
+
+	// Interval is an injected field (not from the payload)
+	Interval types.Interval
+
+	// Is a new candle or not
+	Add bool
 }
 
-type WebSocketPrivateOrder struct {
+func (e *WebSocketCandleEvent) KLine() types.KLine {
+	startTime := types.MustParseUnixTimestamp(e.Candles[0])
+	openPrice := util.MustParseFloat(e.Candles[1])
+	closePrice := util.MustParseFloat(e.Candles[2])
+	highPrice := util.MustParseFloat(e.Candles[3])
+	lowPrice := util.MustParseFloat(e.Candles[4])
+	volume := util.MustParseFloat(e.Candles[5])
+	quoteVolume := util.MustParseFloat(e.Candles[6])
+	kline := types.KLine{
+		Exchange:    types.ExchangeKucoin,
+		Symbol:      toGlobalSymbol(e.Symbol),
+		StartTime:   types.Time(startTime),
+		EndTime:     types.Time(startTime.Add(e.Interval.Duration() - time.Millisecond)),
+		Interval:    e.Interval,
+		Open:        openPrice,
+		Close:       closePrice,
+		High:        highPrice,
+		Low:         lowPrice,
+		Volume:      volume,
+		QuoteVolume: quoteVolume,
+		Closed:      false,
+	}
+	return kline
+}
+
+type WebSocketPrivateOrderEvent struct {
 	OrderId    string                     `json:"orderId"`
 	TradeId    string                     `json:"tradeId"`
 	Symbol     string                     `json:"symbol"`
@@ -105,7 +141,7 @@ type WebSocketPrivateOrder struct {
 	Ts         types.MillisecondTimestamp `json:"ts"`
 }
 
-type WebSocketAccountBalance struct {
+type WebSocketAccountBalanceEvent struct {
 	Total           fixedpoint.Value `json:"total"`
 	Available       fixedpoint.Value `json:"available"`
 	AvailableChange fixedpoint.Value `json:"availableChange"`
