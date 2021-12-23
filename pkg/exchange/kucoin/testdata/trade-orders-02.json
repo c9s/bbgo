@@ -1,1 +1,21 @@
-{"type":"message","topic":"/spotMarket/tradeOrders","userId":"61af6413efeab1000113f08b","channelType":"private","subject":"orderChange","data":{"symbol":"BTC-USDT","orderType":"limit","side":"buy","orderId":"61c3728cfd0c3c0001a16a62","type":"filled","orderTime":1640198796191168550,"size":"0.00028975","filledSize":"0.00028975","price":"48611.5","remainSize":"0","status":"done","ts":1640198796191168550}}
+{
+  "type": "message",
+  "topic": "/spotMarket/tradeOrders",
+  "userId": "61af6413efeab1000113f08b",
+  "channelType": "private",
+  "subject": "orderChange",
+  "data": {
+    "symbol": "BTC-USDT",
+    "orderType": "limit",
+    "side": "buy",
+    "orderId": "61c3728cfd0c3c0001a16a62",
+    "type": "filled",
+    "orderTime": 1640198796191168550,
+    "size": "0.00028975",
+    "filledSize": "0.00028975",
+    "price": "48611.5",
+    "remainSize": "0",
+    "status": "done",
+    "ts": 1640198796191168550
+  }
+}
