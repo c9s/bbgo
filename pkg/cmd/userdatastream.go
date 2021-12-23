@@ -58,7 +58,12 @@ var userDataStreamCmd = &cobra.Command{
 		}
 
 		log.Infof("connected")
-		defer s.Close()
+		defer func() {
+			log.Infof("closing connection...")
+			if err := s.Close(); err != nil {
+				log.WithError(err).Errorf("connection close error")
+			}
+		}()
 
 		cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
 		return nil
