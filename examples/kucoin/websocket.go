@@ -74,7 +74,7 @@ var websocketCmd = &cobra.Command{
 
 		defer c.Close()
 
-		id := time.Now().UnixMilli()
+		id := time.Now().UnixNano() / int64(time.Millisecond)
 		wsCmds := []kucoin.WebSocketCommand{
 			/*
 			{
@@ -125,7 +125,7 @@ var websocketCmd = &cobra.Command{
 
 			case <-pingTicker.C:
 				if err := c.WriteJSON(kucoin.WebSocketCommand{
-					Id:   time.Now().UnixMilli(),
+					Id:   time.Now().UnixNano() / int64(time.Millisecond),
 					Type: "ping",
 				}); err != nil {
 					logrus.WithError(err).Error("websocket ping error", err)
