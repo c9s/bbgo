@@ -137,7 +137,7 @@ func (s *Stream) handleConnect() {
 			return
 		}
 	} else {
-		id := time.Now().UnixMilli()
+		id := time.Now().UnixNano() / int64(time.Millisecond)
 		cmds := []WebSocketCommand{
 			{
 				Id:             id,
@@ -406,7 +406,7 @@ func ping(ctx context.Context, w WebSocketConnector, interval time.Duration) {
 			conn := w.Conn()
 
 			if err := conn.WriteJSON(WebSocketCommand{
-				Id:   time.Now().UnixMilli(),
+				Id:   time.Now().UnixNano() / int64(time.Millisecond),
 				Type: "ping",
 			}); err != nil {
 				log.WithError(err).Error("websocket ping error", err)

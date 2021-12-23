@@ -94,7 +94,7 @@ func toLocalInterval(i types.Interval) string {
 
 // convertSubscriptions global subscription to local websocket command
 func convertSubscriptions(ss []types.Subscription) ([]WebSocketCommand, error) {
-	var id = time.Now().UnixMilli()
+	var id = time.Now().UnixNano() / int64(time.Millisecond)
 	var cmds []WebSocketCommand
 	for _, s := range ss {
 		id++
