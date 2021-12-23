@@ -114,7 +114,6 @@ func NewStream(client *okexapi.RestClient) *Stream {
 	})
 
 	stream.OnEvent(func(event WebSocketEvent) {
-		log.Infof("event: %+v", event)
 		switch event.Event {
 		case "login":
 			if event.Code == "0" {
