@@ -148,8 +148,6 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[stri
 }
 
 func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
-	log.Info("querying market info...")
-
 	exchangeInfo, err := e.Client.NewExchangeInfoService().Do(ctx)
 	if err != nil {
 		return nil, err
