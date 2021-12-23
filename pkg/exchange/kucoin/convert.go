@@ -2,6 +2,7 @@ package kucoin
 
 import (
 	"fmt"
+	"hash/fnv"
 	"math"
 	"strings"
 	"time"
@@ -97,5 +98,41 @@ func convertSubscriptions(ss []types.Subscription) ([]kucoinapi.WebSocketCommand
 	}
 
 	return cmds, nil
+}
+
+func hashStringID(s string) uint64 {
+	h := fnv.New64a()
+	h.Write([]byte(s))
+	return h.Sum64()
+}
+
+func toGlobalSide(s string) types.SideType {
+	switch s {
+	case "buy":
+		return types.SideTypeBuy
+	case "sell":
+		return types.SideTypeSell
+	}
+
+	return types.SideTypeSelf
+}
+
+func toGlobalOrderType(s string) types.OrderType {
+	switch s {
+	case "limit":
+		return types.OrderTypeLimit
+
+	case "stop_limit":
+		return types.OrderTypeStopLimit
+
+	case "market":
+		return types.OrderTypeMarket
+
+	case "stop_market":
+		return types.OrderTypeStopMarket
+
+	}
+
+	return ""
 }
 

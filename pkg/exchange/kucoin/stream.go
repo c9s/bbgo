@@ -12,7 +12,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-const readTimeout = 20 * time.Second
+const readTimeout = 30 * time.Second
 
 type WebsocketOp struct {
 	Op   string      `json:"op"`
@@ -58,6 +58,7 @@ func NewStream(client *kucoinapi.RestClient) *Stream {
 	stream.OnCandleEvent(stream.handleCandleEvent)
 	stream.OnOrderBookL2Event(stream.handleOrderBookL2Event)
 	stream.OnTickerEvent(stream.handleTickerEvent)
+	stream.OnPrivateOrderEvent(stream.handlePrivateOrderEvent)
 	return stream
 }
 
@@ -67,9 +68,66 @@ func (s *Stream) handleOrderBookL2Event(e *kucoinapi.WebSocketOrderBookL2) {}
 
 func (s *Stream) handleTickerEvent(e *kucoinapi.WebSocketTicker) {}
 
-func (s *Stream) handleAccountBalanceEvent(e *kucoinapi.WebSocketAccountBalance) {}
+func (s *Stream) handleAccountBalanceEvent(e *kucoinapi.WebSocketAccountBalance) {
+	bm := types.BalanceMap{}
+	bm[e.Currency] = types.Balance{
+		Currency:  e.Currency,
+		Available: e.Available,
+		Locked:    e.Hold,
+	}
+	s.StandardStream.EmitBalanceUpdate(bm)
+}
 
-func (s *Stream) handlePrivateOrderEvent(e *kucoinapi.WebSocketPrivateOrder) {}
+func (s *Stream) handlePrivateOrderEvent(e *kucoinapi.WebSocketPrivateOrder) {
+	if e.Type == "match" {
+		s.StandardStream.EmitTradeUpdate(types.Trade{
+			OrderID:       hashStringID(e.OrderId),
+			ID:            hashStringID(e.TradeId),
+			Exchange:      types.ExchangeKucoin,
+			Price:         e.MatchPrice.Float64(),
+			Quantity:      e.MatchSize.Float64(),
+			QuoteQuantity: e.MatchPrice.Float64() * e.MatchSize.Float64(),
+			Symbol:        toGlobalSymbol(e.Symbol),
+			Side:          toGlobalSide(e.Side),
+			IsBuyer:       e.Side == "buy",
+			IsMaker:       e.Liquidity == "maker",
+			Time:          types.Time(e.Ts.Time()),
+			Fee:           0,  // not supported
+			FeeCurrency:   "", // not supported
+		})
+	}
+
+	switch e.Type {
+	case "open", "match", "filled":
+		status := types.OrderStatusNew
+		if e.Status == "done" {
+			status = types.OrderStatusFilled
+		} else if e.FilledSize > 0 {
+			status = types.OrderStatusPartiallyFilled
+		}
+
+		s.StandardStream.EmitOrderUpdate(types.Order{
+			SubmitOrder: types.SubmitOrder{
+				Symbol:   toGlobalSymbol(e.Symbol),
+				Side:     toGlobalSide(e.Side),
+				Type:     toGlobalOrderType(e.OrderType),
+				Quantity: e.Size.Float64(),
+				Price:    e.Price.Float64(),
+			},
+			Exchange:         types.ExchangeKucoin,
+			OrderID:          hashStringID(e.OrderId),
+			Status:           status,
+			ExecutedQuantity: e.FilledSize.Float64(),
+			IsWorking:        true,
+			CreationTime:     types.Time(e.OrderTime.Time()),
+			UpdateTime:       types.Time(e.Ts.Time()),
+		})
+
+	default:
+		log.Warnf("unhandled private order type: %s, payload: %+v", e.Type, e)
+
+	}
+}
 
 func (s *Stream) handleConnect() {
 	if s.publicOnly {

@@ -35,11 +35,11 @@ const (
 )
 
 type WebSocketCommand struct {
-	Id             int64  `json:"id"`
+	Id             int64                `json:"id"`
 	Type           WebSocketMessageType `json:"type"`
-	Topic          string `json:"topic"`
-	PrivateChannel bool   `json:"privateChannel"`
-	Response       bool   `json:"response"`
+	Topic          string               `json:"topic"`
+	PrivateChannel bool                 `json:"privateChannel"`
+	Response       bool                 `json:"response"`
 }
 
 func (c *WebSocketCommand) JSON() ([]byte, error) {
@@ -85,16 +85,21 @@ type WebSocketCandle struct {
 }
 
 type WebSocketPrivateOrder struct {
+	OrderId    string                     `json:"orderId"`
+	TradeId    string                     `json:"tradeId"`
 	Symbol     string                     `json:"symbol"`
 	OrderType  string                     `json:"orderType"`
 	Side       string                     `json:"side"`
-	OrderId    string                     `json:"orderId"`
 	Type       string                     `json:"type"`
 	OrderTime  types.MillisecondTimestamp `json:"orderTime"`
 	Price      fixedpoint.Value           `json:"price"`
 	Size       fixedpoint.Value           `json:"size"`
 	FilledSize fixedpoint.Value           `json:"filledSize"`
 	RemainSize fixedpoint.Value           `json:"remainSize"`
+
+	Liquidity  string                     `json:"liquidity"`
+	MatchPrice fixedpoint.Value           `json:"matchPrice"`
+	MatchSize  fixedpoint.Value           `json:"matchSize"`
 	ClientOid  string                     `json:"clientOid"`
 	Status     string                     `json:"status"`
 	Ts         types.MillisecondTimestamp `json:"ts"`
@@ -104,11 +109,11 @@ type WebSocketAccountBalance struct {
 	Total           fixedpoint.Value `json:"total"`
 	Available       fixedpoint.Value `json:"available"`
 	AvailableChange fixedpoint.Value `json:"availableChange"`
-	Currency        string `json:"currency"`
+	Currency        string           `json:"currency"`
 	Hold            fixedpoint.Value `json:"hold"`
 	HoldChange      fixedpoint.Value `json:"holdChange"`
-	RelationEvent   string `json:"relationEvent"`
-	RelationEventId string `json:"relationEventId"`
+	RelationEvent   string           `json:"relationEvent"`
+	RelationEventId string           `json:"relationEventId"`
 	RelationContext struct {
 		Symbol  string `json:"symbol"`
 		TradeId string `json:"tradeId"`
