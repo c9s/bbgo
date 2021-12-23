@@ -680,20 +680,21 @@ func (session *ExchangeSession) FindPossibleSymbols() (symbols []string, err err
 	return symbols, nil
 }
 
-func InitExchangeSession(name string, session *ExchangeSession) error {
+func InitExchangeSession(name string, session *ExchangeSession, exchange types.Exchange) error {
 	var err error
 	var exchangeName = session.ExchangeName
-	var exchange types.Exchange
-	if session.Key != "" && session.Secret != "" {
-		if !session.PublicOnly {
-			if len(session.Key) == 0 || len(session.Secret) == 0 {
-				return fmt.Errorf("can not create exchange %s: empty key or secret", exchangeName)
+	if exchange == nil {
+		if session.Key != "" && session.Secret != "" {
+			if !session.PublicOnly {
+				if len(session.Key) == 0 || len(session.Secret) == 0 {
+					return fmt.Errorf("can not create exchange %s: empty key or secret", exchangeName)
+				}
 			}
-		}
 
-		exchange, err = cmdutil.NewExchangeStandard(exchangeName, session.Key, session.Secret, "", session.SubAccount)
-	} else {
-		exchange, err = cmdutil.NewExchangeWithEnvVarPrefix(exchangeName, session.EnvVarPrefix)
+			exchange, err = cmdutil.NewExchangeStandard(exchangeName, session.Key, session.Secret, "", session.SubAccount)
+		} else {
+			exchange, err = cmdutil.NewExchangeWithEnvVarPrefix(exchangeName, session.EnvVarPrefix)
+		}
 	}
 
 	if err != nil {

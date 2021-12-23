@@ -133,7 +133,7 @@ func (s *Server) newEngine() *gin.Engine {
 			return
 		}
 
-		err := bbgo.InitExchangeSession(session.ExchangeName.String(), &session)
+		err := bbgo.InitExchangeSession(session.ExchangeName.String(), &session, nil)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": err.Error(),
@@ -182,7 +182,7 @@ func (s *Server) newEngine() *gin.Engine {
 			return
 		}
 
-		if err := bbgo.InitExchangeSession(session.ExchangeName.String(), &session); err != nil {
+		if err := bbgo.InitExchangeSession(session.ExchangeName.String(), &session, nil); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": err.Error(),
 			})
