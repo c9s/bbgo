@@ -40,16 +40,16 @@ var userDataStreamCmd = &cobra.Command{
 
 		s := session.Exchange.NewStream()
 		s.OnOrderUpdate(func(order types.Order) {
-			log.Infof("order update: %+v", order)
+			log.Infof("orderUpdate: %+v", order)
 		})
 		s.OnTradeUpdate(func(trade types.Trade) {
-			log.Infof("trade update: %+v", trade)
+			log.Infof("tradeUpdate: %+v", trade)
 		})
 		s.OnBalanceUpdate(func(trade types.BalanceMap) {
-			log.Infof("balance update: %+v", trade)
+			log.Infof("balanceUpdate: %+v", trade)
 		})
 		s.OnBalanceSnapshot(func(trade types.BalanceMap) {
-			log.Infof("balance snapshot: %+v", trade)
+			log.Infof("balanceSnapshot: %+v", trade)
 		})
 
 		log.Infof("connecting...")
