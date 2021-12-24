@@ -20,7 +20,6 @@ type Update struct {
 
 //go:generate callbackgen -type Buffer
 type Buffer struct {
-	Symbol string
 	buffer []Update
 
 	finalUpdateID int64
@@ -36,9 +35,8 @@ type Buffer struct {
 	once   util.Reonce
 }
 
-func NewDepthBuffer(symbol string, fetcher SnapshotFetcher) *Buffer {
+func NewBuffer(fetcher SnapshotFetcher) *Buffer {
 	return &Buffer{
-		Symbol:  symbol,
 		fetcher: fetcher,
 		resetC:  make(chan struct{}, 1),
 	}
@@ -55,6 +53,13 @@ func (b *Buffer) emitReset() {
 	case b.resetC <- struct{}{}:
 	default:
 	}
+}
+
+func (b *Buffer) Reset() {
+	b.mu.Lock()
+	b.resetSnapshot()
+	b.emitReset()
+	b.mu.Unlock()
 }
 
 // AddUpdate adds the update to the buffer or push the update to the subscriber
@@ -95,9 +100,8 @@ func (b *Buffer) AddUpdate(o types.SliceOrderBook, firstUpdateID int64, finalArg
 	// if there is a missing update, we should reset the snapshot and re-fetch the snapshot
 	if u.FirstUpdateID > b.finalUpdateID+1 {
 		// emitReset will reset the once outside the mutex lock section
+		b.buffer = []Update{u}
 		b.resetSnapshot()
-		b.buffer = nil
-		b.buffer = append(b.buffer, u)
 		b.emitReset()
 		b.mu.Unlock()
 		return fmt.Errorf("there is a missing update between %d and %d", u.FirstUpdateID, b.finalUpdateID+1)

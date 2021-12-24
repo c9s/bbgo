@@ -11,7 +11,7 @@ import (
 )
 
 func TestDepthBuffer_ReadyState(t *testing.T) {
-	buf := NewDepthBuffer("", func() (book types.SliceOrderBook, finalID int64, err error) {
+	buf := NewBuffer(func() (book types.SliceOrderBook, finalID int64, err error) {
 		return types.SliceOrderBook{
 			Bids: types.PriceVolumeSlice{
 				{Price: 100, Volume: 1},
@@ -48,7 +48,7 @@ func TestDepthBuffer_CorruptedUpdateAtTheBeginning(t *testing.T) {
 	// snapshot starts from 30,
 	// the first ready event should have a snapshot(30) and updates (31~50)
 	var snapshotFinalID int64 = 0
-	buf := NewDepthBuffer("", func() (types.SliceOrderBook, int64, error) {
+	buf := NewBuffer(func() (types.SliceOrderBook, int64, error) {
 		snapshotFinalID += 30
 		return types.SliceOrderBook{
 			Bids: types.PriceVolumeSlice{
@@ -87,7 +87,7 @@ func TestDepthBuffer_CorruptedUpdateAtTheBeginning(t *testing.T) {
 
 func TestDepthBuffer_ConcurrentRun(t *testing.T) {
 	var snapshotFinalID int64 = 0
-	buf := NewDepthBuffer("", func() (types.SliceOrderBook, int64, error) {
+	buf := NewBuffer(func() (types.SliceOrderBook, int64, error) {
 		snapshotFinalID += 30
 		time.Sleep(10 * time.Millisecond)
 		return types.SliceOrderBook{

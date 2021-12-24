@@ -2,7 +2,6 @@ package binance
 
 import (
 	"context"
-	"github.com/c9s/bbgo/pkg/util"
 	"math/rand"
 	"net"
 	"net/http"
@@ -10,6 +9,10 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/c9s/bbgo/pkg/depth"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/util"
 
 	"github.com/adshao/go-binance/v2"
 	"github.com/adshao/go-binance/v2/futures"
@@ -90,7 +93,7 @@ type Stream struct {
 
 	orderTradeUpdateEventCallbacks []func(e *OrderTradeUpdateEvent)
 
-	depthFrames map[string]*DepthFrame
+	depthFrames map[string]*depth.Buffer
 }
 
 func NewStream(client *binance.Client, futuresClient *futures.Client) *Stream {
@@ -100,7 +103,7 @@ func NewStream(client *binance.Client, futuresClient *futures.Client) *Stream {
 		},
 		Client:        client,
 		futuresClient: futuresClient,
-		depthFrames:   make(map[string]*DepthFrame),
+		depthFrames:   make(map[string]*depth.Buffer),
 	}
 
 	stream.OnDepthEvent(func(e *DepthEvent) {
@@ -110,52 +113,69 @@ func NewStream(client *binance.Client, futuresClient *futures.Client) *Stream {
 
 		f, ok := stream.depthFrames[e.Symbol]
 		if !ok {
-			f = &DepthFrame{
-				client:  client,
-				context: context.Background(),
-				Symbol:  e.Symbol,
-				resetC:  make(chan struct{}, 1),
-			}
+			f = depth.NewBuffer(func() (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
+				response, err := client.NewDepthService().Symbol(e.Symbol).Do(context.Background())
+				if err != nil {
+					return snapshot, finalUpdateID, err
+				}
+
+				snapshot.Symbol = e.Symbol
+				finalUpdateID = response.LastUpdateID
+				for _, entry := range response.Bids {
+					// entry.Price, Quantity: entry.Quantity
+					price, err := fixedpoint.NewFromString(entry.Price)
+					if err != nil {
+						return snapshot, finalUpdateID, err
+					}
+
+					quantity, err := fixedpoint.NewFromString(entry.Quantity)
+					if err != nil {
+						return snapshot, finalUpdateID, err
+					}
+
+					snapshot.Bids = append(snapshot.Bids, types.PriceVolume{Price: price, Volume: quantity})
+				}
+
+				for _, entry := range response.Asks {
+					price, err := fixedpoint.NewFromString(entry.Price)
+					if err != nil {
+						return snapshot, finalUpdateID, err
+					}
+
+					quantity, err := fixedpoint.NewFromString(entry.Quantity)
+					if err != nil {
+						return snapshot, finalUpdateID, err
+					}
+
+					snapshot.Asks = append(snapshot.Asks, types.PriceVolume{Price: price, Volume: quantity})
+				}
+
+				return snapshot, finalUpdateID, nil
+			})
 
 			stream.depthFrames[e.Symbol] = f
 
-			f.OnReady(func(snapshotDepth DepthEvent, bufEvents []DepthEvent) {
-				log.Infof("depth snapshot ready: %s", snapshotDepth.String())
-
-				snapshot, err := snapshotDepth.OrderBook()
-				if err != nil {
-					log.WithError(err).Error("book snapshot convert error")
-					return
-				}
-
+			f.OnReady(func(snapshot types.SliceOrderBook, updates []depth.Update) {
 				if valid, err := snapshot.IsValid(); !valid {
-					log.Errorf("depth snapshot is invalid, event: %+v, error: %v", snapshotDepth, err)
+					log.Errorf("depth snapshot is invalid, error: %v", err)
+					return
 				}
 
 				stream.EmitBookSnapshot(snapshot)
 
-				for _, e := range bufEvents {
-					bookUpdate, err := e.OrderBook()
-					if err != nil {
-						log.WithError(err).Error("book convert error")
-						return
-					}
-
-					stream.EmitBookUpdate(bookUpdate)
+				for _, u := range updates {
+					stream.EmitBookUpdate(u.Object)
 				}
 			})
-
-			f.OnPush(func(e DepthEvent) {
-				book, err := e.OrderBook()
-				if err != nil {
-					log.WithError(err).Error("book convert error")
-					return
-				}
-
-				stream.EmitBookUpdate(book)
+			f.OnPush(func(update depth.Update) {
+				stream.EmitBookUpdate(update.Object)
 			})
 		} else {
-			f.PushEvent(*e)
+			f.AddUpdate(types.SliceOrderBook{
+				Symbol: e.Symbol,
+				Bids:   e.Bids,
+				Asks:   e.Asks,
+			}, e.FirstUpdateID, e.FinalUpdateID)
 		}
 	})
 
@@ -270,7 +290,7 @@ func NewStream(client *binance.Client, futuresClient *futures.Client) *Stream {
 	stream.OnDisconnect(func() {
 		log.Infof("resetting depth snapshots...")
 		for _, f := range stream.depthFrames {
-			f.emitReset()
+			f.Reset()
 		}
 	})
 
