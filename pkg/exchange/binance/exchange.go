@@ -171,7 +171,7 @@ func (e *Exchange) QueryAveragePrice(ctx context.Context, symbol string) (float6
 }
 
 func (e *Exchange) NewStream() types.Stream {
-	stream := NewStream(e.Client, e.futuresClient)
+	stream := NewStream(e, e.Client, e.futuresClient)
 	stream.MarginSettings = e.MarginSettings
 	stream.FuturesSettings = e.FuturesSettings
 	return stream
@@ -1048,6 +1048,46 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 
 		return trades, nil
 	}
+}
+
+func (e *Exchange) QueryDepth(ctx context.Context, symbol string) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
+	response, err := e.Client.NewDepthService().Symbol(symbol).Do(ctx)
+	if err != nil {
+		return snapshot, finalUpdateID, err
+	}
+
+	snapshot.Symbol = symbol
+	finalUpdateID = response.LastUpdateID
+	for _, entry := range response.Bids {
+		// entry.Price, Quantity: entry.Quantity
+		price, err := fixedpoint.NewFromString(entry.Price)
+		if err != nil {
+			return snapshot, finalUpdateID, err
+		}
+
+		quantity, err := fixedpoint.NewFromString(entry.Quantity)
+		if err != nil {
+			return snapshot, finalUpdateID, err
+		}
+
+		snapshot.Bids = append(snapshot.Bids, types.PriceVolume{Price: price, Volume: quantity})
+	}
+
+	for _, entry := range response.Asks {
+		price, err := fixedpoint.NewFromString(entry.Price)
+		if err != nil {
+			return snapshot, finalUpdateID, err
+		}
+
+		quantity, err := fixedpoint.NewFromString(entry.Quantity)
+		if err != nil {
+			return snapshot, finalUpdateID, err
+		}
+
+		snapshot.Asks = append(snapshot.Asks, types.PriceVolume{Price: price, Volume: quantity})
+	}
+
+	return snapshot, finalUpdateID, nil
 }
 
 func (e *Exchange) BatchQueryKLines(ctx context.Context, symbol string, interval types.Interval, startTime, endTime time.Time) ([]types.KLine, error) {
