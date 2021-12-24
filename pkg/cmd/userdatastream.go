@@ -24,13 +24,13 @@ var userDataStreamCmd = &cobra.Command{
 			return errors.New("--config option or config file is missing")
 		}
 
-		environ := bbgo.NewEnvironment()
-		if err := environ.ConfigureExchangeSessions(userConfig); err != nil {
+		sessionName, err := cmd.Flags().GetString("session")
+		if err != nil {
 			return err
 		}
 
-		sessionName, err := cmd.Flags().GetString("session")
-		if err != nil {
+		environ := bbgo.NewEnvironment()
+		if err := environ.ConfigureExchangeSessions(userConfig); err != nil {
 			return err
 		}
 
