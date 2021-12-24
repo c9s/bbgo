@@ -109,7 +109,6 @@ func TestDepthBuffer_ConcurrentRun(t *testing.T) {
 	})
 	buf.OnReady(func(snapshot types.SliceOrderBook, updates []Update) {
 		readyCnt++
-		assert.Greater(t, len(updates), 0)
 	})
 	buf.OnReset(func() {
 		resetCnt++
