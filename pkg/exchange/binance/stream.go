@@ -124,7 +124,6 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 				}
 
 				stream.EmitBookSnapshot(snapshot)
-
 				for _, u := range updates {
 					stream.EmitBookUpdate(u.Object)
 				}
