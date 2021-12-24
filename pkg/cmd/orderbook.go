@@ -50,14 +50,39 @@ var orderbookCmd = &cobra.Command{
 			return fmt.Errorf("session %s not found", sessionName)
 		}
 
+		orderBook := types.NewMutexOrderBook(symbol)
+
 		s := session.Exchange.NewStream()
 		s.SetPublicOnly()
 		s.Subscribe(types.BookChannel, symbol, types.SubscribeOptions{})
 		s.OnBookSnapshot(func(book types.SliceOrderBook) {
 			log.Infof("orderbook snapshot: %s", book.String())
+			orderBook.Load(book)
+
+			if ok, err := orderBook.IsValid() ; !ok {
+				log.WithError(err).Panicf("invalid error book snapshot")
+			}
+
+			if bid, ask, ok := orderBook.BestBidAndAsk() ; ok {
+				log.Infof("ASK | %f x %f / %f x %f | BID",
+					ask.Volume.Float64(), ask.Price.Float64(),
+					bid.Price.Float64(), bid.Volume.Float64())
+			}
 		})
 		s.OnBookUpdate(func(book types.SliceOrderBook) {
 			log.Infof("orderbook update: %s", book.String())
+
+			orderBook.Update(book)
+
+			if ok, err := orderBook.IsValid() ; !ok {
+				log.WithError(err).Panicf("invalid error book update")
+			}
+
+			if bid, ask, ok := orderBook.BestBidAndAsk() ; ok {
+				log.Infof("ASK | %f x %f / %f x %f | BID",
+					ask.Volume.Float64(), ask.Price.Float64(),
+					bid.Price.Float64(), bid.Volume.Float64())
+			}
 		})
 
 		log.Infof("connecting...")
