@@ -82,6 +82,8 @@ func toGlobalInterval(a string) types.Interval {
 	switch a {
 	case "1min":
 		return types.Interval1m
+	case "5min":
+		return types.Interval5m
 	case "15min":
 		return types.Interval15m
 	case "30min":
