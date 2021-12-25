@@ -27,10 +27,11 @@ A trading bot framework written in Go. The name bbgo comes from the BB8 bot in t
 
 ## Supported Exchanges
 
-- MAX Spot Exchange (located in Taiwan)
 - Binance Spot Exchange
 - FTX Spot Exchange
 - OKEx Spot Exchange
+- Kucoin Spot Exchange
+- MAX Spot Exchange (located in Taiwan)
 
 ## Requirements
 
