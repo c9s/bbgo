@@ -1,10 +1,20 @@
 package types
 
 import (
+	"encoding/json"
+	"fmt"
 	"sort"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
+
+type PriceVolume struct {
+	Price, Volume fixedpoint.Value
+}
+
+func (p PriceVolume) String() string {
+	return fmt.Sprintf("PriceVolume{ price: %f, volume: %f }", p.Price.Float64(), p.Volume.Float64())
+}
 
 type PriceVolumeSlice []PriceVolume
 
@@ -74,7 +84,7 @@ func (slice PriceVolumeSlice) InsertAt(idx int, pv PriceVolume) PriceVolumeSlice
 
 func (slice PriceVolumeSlice) Remove(price fixedpoint.Value, descending bool) PriceVolumeSlice {
 	matched, idx := slice.Find(price, descending)
-	if matched.Price != price {
+	if matched.Price != price || matched.Price == 0 {
 		return slice
 	}
 
@@ -115,4 +125,51 @@ func (slice PriceVolumeSlice) Upsert(pv PriceVolume, descending bool) PriceVolum
 
 	slice[idx].Volume = pv.Volume
 	return slice
+}
+
+func (slice *PriceVolumeSlice) UnmarshalJSON(b []byte) error {
+	s, err := ParsePriceVolumeSliceJSON(b)
+	if err != nil {
+		return err
+	}
+
+	*slice = s
+	return nil
+}
+
+// ParsePriceVolumeSliceJSON tries to parse a 2 dimensional string array into a PriceVolumeSlice
+//
+//  [["9000", "10"], ["9900", "10"], ... ]
+//
+func ParsePriceVolumeSliceJSON(b []byte) (slice PriceVolumeSlice, err error) {
+	var as [][]interface{}
+
+	err = json.Unmarshal(b, &as)
+	if err != nil {
+		return slice, err
+	}
+
+	for _, a := range as {
+		var pv PriceVolume
+		price, err := fixedpoint.NewFromAny(a[0])
+		if err != nil {
+			return slice, err
+		}
+
+		volume, err := fixedpoint.NewFromAny(a[1])
+		if err != nil {
+			return slice, err
+		}
+
+		// kucoin returns price in 0, we should skip
+		if price == 0 {
+			continue
+		}
+
+		pv.Price = price
+		pv.Volume = volume
+		slice = append(slice, pv)
+	}
+
+	return slice, nil
 }

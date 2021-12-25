@@ -1,7 +1,6 @@
 package types
 
 import (
-	"fmt"
 	"os"
 	"strconv"
 	"sync"
@@ -9,14 +8,6 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/sigchan"
 )
-
-type PriceVolume struct {
-	Price, Volume fixedpoint.Value
-}
-
-func (p PriceVolume) String() string {
-	return fmt.Sprintf("PriceVolume{ price: %f, volume: %f }", p.Price.Float64(), p.Volume.Float64())
-}
 
 type OrderBook interface {
 	Spread() (fixedpoint.Value, bool)
@@ -26,8 +17,8 @@ type OrderBook interface {
 	Load(book SliceOrderBook)
 	Update(book SliceOrderBook)
 	Copy() OrderBook
-	CopyDepth(depth int) OrderBook
 	SideBook(sideType SideType) PriceVolumeSlice
+	CopyDepth(depth int) OrderBook
 	IsValid() (bool, error)
 }
 

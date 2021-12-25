@@ -3,9 +3,11 @@ package kucoin
 import (
 	"context"
 	"net"
+	"strconv"
 	"sync"
 	"time"
 
+	"github.com/c9s/bbgo/pkg/depth"
 	"github.com/c9s/bbgo/pkg/exchange/kucoin/kucoinapi"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
@@ -33,7 +35,8 @@ type Stream struct {
 	accountBalanceEventCallbacks []func(e *WebSocketAccountBalanceEvent)
 	privateOrderEventCallbacks   []func(e *WebSocketPrivateOrderEvent)
 
-	lastCandle map[string]types.KLine
+	lastCandle   map[string]types.KLine
+	depthBuffers map[string]*depth.Buffer
 }
 
 func NewStream(client *kucoinapi.RestClient) *Stream {
@@ -42,7 +45,8 @@ func NewStream(client *kucoinapi.RestClient) *Stream {
 		StandardStream: types.StandardStream{
 			ReconnectC: make(chan struct{}, 1),
 		},
-		lastCandle: make(map[string]types.KLine),
+		lastCandle:   make(map[string]types.KLine),
+		depthBuffers: make(map[string]*depth.Buffer),
 	}
 
 	stream.OnConnect(stream.handleConnect)
@@ -66,7 +70,54 @@ func (s *Stream) handleCandleEvent(candle *WebSocketCandleEvent, e *WebSocketEve
 	s.lastCandle[e.Topic] = kline
 }
 
-func (s *Stream) handleOrderBookL2Event(e *WebSocketOrderBookL2Event) {}
+func (s *Stream) handleOrderBookL2Event(e *WebSocketOrderBookL2Event) {
+	f, ok := s.depthBuffers[e.Symbol]
+	if !ok {
+		f = depth.NewBuffer(func() (types.SliceOrderBook, int64, error) {
+			orderBook, err := s.client.MarketDataService.GetOrderBook(e.Symbol, 100)
+			if err != nil {
+				return types.SliceOrderBook{}, 0, err
+			}
+
+			if len(orderBook.Sequence) == 0 {
+				return types.SliceOrderBook{}, 0, errors.New("sequence is missing")
+			}
+
+			sequence, err := strconv.ParseInt(orderBook.Sequence, 10, 64)
+			if err != nil {
+				return types.SliceOrderBook{}, 0, err
+			}
+
+			return types.SliceOrderBook{
+				Symbol: toGlobalSymbol(e.Symbol),
+				Bids:   orderBook.Bids,
+				Asks:   orderBook.Asks,
+			}, sequence, nil
+		})
+		s.depthBuffers[e.Symbol] = f
+		f.SetBufferingPeriod(time.Second)
+		f.OnReady(func(snapshot types.SliceOrderBook, updates []depth.Update) {
+			if valid, err := snapshot.IsValid(); !valid {
+				log.Errorf("depth snapshot is invalid, error: %v", err)
+				return
+			}
+
+			s.EmitBookSnapshot(snapshot)
+			for _, u := range updates {
+				s.EmitBookUpdate(u.Object)
+			}
+		})
+		f.OnPush(func(update depth.Update) {
+			s.EmitBookUpdate(update.Object)
+		})
+	} else {
+		f.AddUpdate(types.SliceOrderBook{
+			Symbol: e.Symbol,
+			Bids:   e.Changes.Bids,
+			Asks:   e.Changes.Asks,
+		}, e.SequenceStart, e.SequenceEnd)
+	}
+}
 
 func (s *Stream) handleTickerEvent(e *WebSocketTickerEvent) {}
 

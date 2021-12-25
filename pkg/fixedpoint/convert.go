@@ -271,6 +271,20 @@ func Parse(input string) (num int64, numDecimalPoints int, err error) {
 	return num, numDecimalPoints, nil
 }
 
+func NewFromAny(any interface{}) (Value, error) {
+	switch v := any.(type) {
+	case string:
+		return NewFromString(v)
+	case float64:
+		return NewFromFloat(v), nil
+	case int64:
+		return NewFromInt64(v), nil
+
+	default:
+		return 0, fmt.Errorf("fixedpoint unsupported type %v", v)
+	}
+}
+
 func NewFromString(input string) (Value, error) {
 	length := len(input)
 
