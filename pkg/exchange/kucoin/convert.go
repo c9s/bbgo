@@ -160,3 +160,16 @@ func toGlobalOrderType(s string) types.OrderType {
 	return ""
 }
 
+func toLocalSide(side types.SideType) kucoinapi.SideType {
+	switch side {
+	case types.SideTypeBuy:
+		return kucoinapi.SideTypeBuy
+
+	case types.SideTypeSell:
+		return kucoinapi.SideTypeSell
+
+	}
+
+	return ""
+}
+

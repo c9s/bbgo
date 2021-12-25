@@ -260,9 +260,9 @@ var executeOrderCmd = &cobra.Command{
 	},
 }
 
-// go run ./cmd/bbgo submit-order --session=ftx --symbol=BTCUSDT --side=buy --price=<price> --quantity=<quantity>
+// go run ./cmd/bbgo submit-order --session=ftx --symbol=BTCUSDT --side=buy --price=18000 --quantity=0.001
 var submitOrderCmd = &cobra.Command{
-	Use:          "submit-order",
+	Use:          "submit-order --session SESSION --symbol SYMBOL --side SIDE --quantity QUANTITY [--price PRICE]",
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()

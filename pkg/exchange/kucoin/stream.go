@@ -28,7 +28,6 @@ type Stream struct {
 	connCancel context.CancelFunc
 
 	bullet *kucoinapi.Bullet
-
 	candleEventCallbacks         []func(candle *WebSocketCandleEvent, e *WebSocketEvent)
 	orderBookL2EventCallbacks    []func(e *WebSocketOrderBookL2Event)
 	tickerEventCallbacks         []func(e *WebSocketTickerEvent)
@@ -41,11 +40,11 @@ type Stream struct {
 
 func NewStream(client *kucoinapi.RestClient, ex *Exchange) *Stream {
 	stream := &Stream{
-		client:   client,
-		exchange: ex,
 		StandardStream: types.StandardStream{
 			ReconnectC: make(chan struct{}, 1),
 		},
+		client:   client,
+		exchange: ex,
 		lastCandle:   make(map[string]types.KLine),
 		depthBuffers: make(map[string]*depth.Buffer),
 	}
