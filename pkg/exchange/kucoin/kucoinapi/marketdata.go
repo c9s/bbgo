@@ -230,10 +230,10 @@ func (s *MarketDataService) GetTicker24HStat(symbol string) (*Ticker24H, error) 
 }
 */
 type OrderBook struct {
-	Sequence string                     `json:"sequence"`
+	Sequence string                     `json:"sequence,omitempty"`
 	Time     types.MillisecondTimestamp `json:"time"`
-	Bids     [][]fixedpoint.Value       `json:"bids,omitempty"`
-	Asks     [][]fixedpoint.Value       `json:"asks,omitempty"`
+	Bids     types.PriceVolumeSlice     `json:"bids,omitempty"`
+	Asks     types.PriceVolumeSlice     `json:"asks,omitempty"`
 }
 
 func (s *MarketDataService) GetOrderBook(symbol string, depth int) (*OrderBook, error) {
@@ -267,6 +267,8 @@ func (s *MarketDataService) GetOrderBook(symbol string, depth int) (*OrderBook, 
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Println(string(response.Body))
 
 	var apiResponse struct {
 		Code    string     `json:"code"`

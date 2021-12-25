@@ -117,6 +117,7 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 			})
 			stream.depthBuffers[e.Symbol] = f
 
+			f.SetBufferingPeriod(time.Second)
 			f.OnReady(func(snapshot types.SliceOrderBook, updates []depth.Update) {
 				if valid, err := snapshot.IsValid(); !valid {
 					log.Errorf("depth snapshot is invalid, error: %v", err)

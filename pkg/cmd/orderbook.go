@@ -69,14 +69,10 @@ var orderbookCmd = &cobra.Command{
 					bid.Price.Float64(), bid.Volume.Float64())
 			}
 		})
+
 		s.OnBookUpdate(func(book types.SliceOrderBook) {
 			log.Infof("orderbook update: %s", book.String())
-
 			orderBook.Update(book)
-
-			if ok, err := orderBook.IsValid() ; !ok {
-				log.WithError(err).Panicf("invalid error book update")
-			}
 
 			if bid, ask, ok := orderBook.BestBidAndAsk() ; ok {
 				log.Infof("ASK | %f x %f / %f x %f | BID",
@@ -138,7 +134,15 @@ var orderUpdateCmd = &cobra.Command{
 		if err := s.Connect(ctx); err != nil {
 			return fmt.Errorf("failed to connect to %s", sessionName)
 		}
+
 		log.Infof("connected")
+		defer func() {
+			log.Infof("closing connection...")
+			if err := s.Close(); err != nil {
+				log.WithError(err).Errorf("connection close error")
+			}
+			time.Sleep(1 * time.Second)
+		}()
 
 		cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
 		return nil

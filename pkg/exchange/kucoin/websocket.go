@@ -78,8 +78,8 @@ type WebSocketOrderBookL2Event struct {
 	SequenceEnd   int64  `json:"sequenceEnd"`
 	Symbol        string `json:"symbol"`
 	Changes       struct {
-		Asks [][]string `json:"asks"`
-		Bids [][]string `json:"bids"`
+		Asks types.PriceVolumeSlice `json:"asks"`
+		Bids types.PriceVolumeSlice `json:"bids"`
 	} `json:"changes"`
 }
 

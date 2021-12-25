@@ -3,6 +3,7 @@ package depth
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
@@ -33,6 +34,8 @@ type Buffer struct {
 	resetC chan struct{}
 	mu     sync.Mutex
 	once   util.Reonce
+
+	bufferingPeriod time.Duration
 }
 
 func NewBuffer(fetcher SnapshotFetcher) *Buffer {
@@ -40,6 +43,10 @@ func NewBuffer(fetcher SnapshotFetcher) *Buffer {
 		fetcher: fetcher,
 		resetC:  make(chan struct{}, 1),
 	}
+}
+
+func (b *Buffer) SetBufferingPeriod(d time.Duration) {
+	b.bufferingPeriod = d
 }
 
 func (b *Buffer) resetSnapshot() {
@@ -129,7 +136,7 @@ func (b *Buffer) fetchAndPush() error {
 			b.resetSnapshot()
 			b.emitReset()
 			b.mu.Unlock()
-			return fmt.Errorf("depth final update %d is < the first update id %d", finalUpdateID, b.buffer[0].FirstUpdateID)
+			return fmt.Errorf("depth snapshot is too early, final update %d is < the first update id %d", finalUpdateID, b.buffer[0].FirstUpdateID)
 		}
 	}
 
@@ -139,7 +146,7 @@ func (b *Buffer) fetchAndPush() error {
 			b.resetSnapshot()
 			b.emitReset()
 			b.mu.Unlock()
-			return fmt.Errorf("the update id %d > final update id %d + 1", u.FirstUpdateID, finalUpdateID)
+			return fmt.Errorf("there is a missing depth update, the update id %d > final update id %d + 1", u.FirstUpdateID, finalUpdateID)
 		}
 
 		if u.FirstUpdateID < finalUpdateID+1 {
@@ -168,6 +175,10 @@ func (b *Buffer) fetchAndPush() error {
 
 func (b *Buffer) tryFetch() {
 	for {
+		if b.bufferingPeriod > 0 {
+			<-time.After(b.bufferingPeriod)
+		}
+
 		err := b.fetchAndPush()
 		if err != nil {
 			log.WithError(err).Errorf("snapshot fetch failed")
