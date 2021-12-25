@@ -158,9 +158,8 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 	req.Interval(toLocalInterval(interval))
 	if options.StartTime != nil {
 		req.StartAt(*options.StartTime)
-	}
-
-	if options.EndTime != nil {
+		req.EndAt(options.StartTime.Add(1500 * interval.Duration()))
+	} else if options.EndTime != nil {
 		req.EndAt(*options.EndTime)
 	}
 
