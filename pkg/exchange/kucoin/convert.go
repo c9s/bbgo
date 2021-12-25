@@ -130,6 +130,21 @@ func hashStringID(s string) uint64 {
 	return h.Sum64()
 }
 
+func toGlobalOrderStatus(o kucoinapi.Order) types.OrderStatus {
+	var status types.OrderStatus
+	if o.IsActive {
+		status = types.OrderStatusNew
+	} else if o.DealSize > 0 {
+		status = types.OrderStatusPartiallyFilled
+	} else if o.CancelExist {
+		status = types.OrderStatusCanceled
+	} else {
+		status = types.OrderStatusFilled
+	}
+
+	return status
+}
+
 func toGlobalSide(s string) types.SideType {
 	switch s {
 	case "buy":
@@ -173,3 +188,27 @@ func toLocalSide(side types.SideType) kucoinapi.SideType {
 	return ""
 }
 
+func toGlobalOrder(o kucoinapi.Order) types.Order {
+	var status = toGlobalOrderStatus(o)
+	var order = types.Order{
+		SubmitOrder: types.SubmitOrder{
+			ClientOrderID: o.ClientOrderID,
+			Symbol:        toGlobalSymbol(o.Symbol),
+			Side:          toGlobalSide(o.Side),
+			Type:          toGlobalOrderType(o.Type),
+			Quantity:      o.Size.Float64(),
+			Price:         o.Price.Float64(),
+			StopPrice:     o.StopPrice.Float64(),
+			TimeInForce:   string(o.TimeInForce),
+		},
+		Exchange:         types.ExchangeKucoin,
+		OrderID:          hashStringID(o.ID),
+		UUID:             o.ID,
+		Status:           status,
+		ExecutedQuantity: o.DealSize.Float64(),
+		IsWorking:        o.IsActive,
+		CreationTime:     types.Time(o.CreatedAt.Time()),
+		UpdateTime:       types.Time(o.CreatedAt.Time()), // kucoin does not response updated time
+	}
+	return order
+}

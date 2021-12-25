@@ -108,3 +108,16 @@ godotenv -f .env.local -- go run ./cmd/bbgo --config config/bbgo.yaml userdatast
 ```shell
 godotenv -f .env.local -- go run ./cmd/bbgo submit-order --session=kucoin --symbol=BTCUSDT --side=buy --price=18000 --quantity=0.001
 ```
+
+### Testing open orders query
+
+```shell
+godotenv -f .env.local -- go run ./cmd/bbgo list-orders --session kucoin --symbol=BTCUSDT open
+godotenv -f .env.local -- go run ./cmd/bbgo list-orders --session kucoin --symbol=BTCUSDT closed
+```
+
+### Testing order cancel
+
+```shell
+godotenv -f .env.local -- go run ./cmd/bbgo cancel-order --session kucoin --order-uuid 61c745c44592c200014abdcf
+```

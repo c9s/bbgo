@@ -5,10 +5,12 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/c9s/bbgo/pkg/exchange/kucoin/kucoinapi"
-	"github.com/c9s/bbgo/pkg/types"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/multierr"
+
+	"github.com/c9s/bbgo/pkg/exchange/kucoin/kucoinapi"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 var ErrMissingSequence = errors.New("sequence is missing")
@@ -185,16 +187,67 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 	return createdOrders, err
 }
 
+// QueryOpenOrders
+/*
+Documentation from the Kucoin API page
+
+Any order on the exchange order book is in active status.
+Orders removed from the order book will be marked with done status.
+After an order becomes done, there may be a few milliseconds latency before it’s fully settled.
+
+You can check the orders in any status.
+If the status parameter is not specified, orders of done status will be returned by default.
+
+When you query orders in active status, there is no time limit.
+However, when you query orders in done status, the start and end time range cannot exceed 7* 24 hours.
+An error will occur if the specified time window exceeds the range.
+
+If you specify the end time only, the system will automatically calculate the start time as end time minus 7*24 hours, and vice versa.
+
+The history for cancelled orders is only kept for one month.
+You will not be able to query for cancelled orders that have happened more than a month ago.
+*/
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
 	req := e.client.TradeService.NewListOrdersRequest()
 	req.Symbol(toLocalSymbol(symbol))
+	req.Status("active")
+	orderList, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
 
-	return nil, nil
+	// TODO: support pagination (right now we can only get 50 items from the first page)
+	for _, o := range orderList.Items {
+		order := toGlobalOrder(o)
+		orders = append(orders, order)
+	}
+
+	return orders, err
 }
 
-func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) error {
-	panic("implement me")
-	return nil
+func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (errs error) {
+	for _, o := range orders {
+		req := e.client.TradeService.NewCancelOrderRequest()
+
+		if o.UUID != "" {
+			req.OrderID(o.UUID)
+		} else if o.ClientOrderID != "" {
+			req.ClientOrderID(o.ClientOrderID)
+		} else {
+			errs = multierr.Append(errs, errors.New("can not cancel order, either order uuid nor client order id is empty"))
+			continue
+		}
+
+		response, err := req.Do(ctx)
+		if err != nil {
+			errs = multierr.Append(errs, err)
+			continue
+		}
+
+		log.Infof("cancelled orders: %v", response.CancelledOrderIDs)
+	}
+
+	return errs
 }
 
 func (e *Exchange) NewStream() types.Stream {

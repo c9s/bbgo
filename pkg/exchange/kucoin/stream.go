@@ -6,12 +6,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gorilla/websocket"
+	"github.com/pkg/errors"
+
 	"github.com/c9s/bbgo/pkg/depth"
 	"github.com/c9s/bbgo/pkg/exchange/kucoin/kucoinapi"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
-	"github.com/gorilla/websocket"
-	"github.com/pkg/errors"
 )
 
 const readTimeout = 30 * time.Second
@@ -27,7 +28,7 @@ type Stream struct {
 	connCtx    context.Context
 	connCancel context.CancelFunc
 
-	bullet *kucoinapi.Bullet
+	bullet                       *kucoinapi.Bullet
 	candleEventCallbacks         []func(candle *WebSocketCandleEvent, e *WebSocketEvent)
 	orderBookL2EventCallbacks    []func(e *WebSocketOrderBookL2Event)
 	tickerEventCallbacks         []func(e *WebSocketTickerEvent)
@@ -43,8 +44,8 @@ func NewStream(client *kucoinapi.RestClient, ex *Exchange) *Stream {
 		StandardStream: types.StandardStream{
 			ReconnectC: make(chan struct{}, 1),
 		},
-		client:   client,
-		exchange: ex,
+		client:       client,
+		exchange:     ex,
 		lastCandle:   make(map[string]types.KLine),
 		depthBuffers: make(map[string]*depth.Buffer),
 	}
@@ -136,9 +137,15 @@ func (s *Stream) handlePrivateOrderEvent(e *WebSocketPrivateOrderEvent) {
 	case "open", "match", "filled":
 		status := types.OrderStatusNew
 		if e.Status == "done" {
-			status = types.OrderStatusFilled
-		} else if e.FilledSize > 0 {
-			status = types.OrderStatusPartiallyFilled
+			if e.FilledSize == e.Size {
+				status = types.OrderStatusFilled
+			} else {
+				status = types.OrderStatusCanceled
+			}
+		} else if e.Status == "open" {
+			if e.FilledSize > 0 {
+				status = types.OrderStatusPartiallyFilled
+			}
 		}
 
 		s.StandardStream.EmitOrderUpdate(types.Order{
@@ -151,9 +158,10 @@ func (s *Stream) handlePrivateOrderEvent(e *WebSocketPrivateOrderEvent) {
 			},
 			Exchange:         types.ExchangeKucoin,
 			OrderID:          hashStringID(e.OrderId),
+			UUID:             e.OrderId,
 			Status:           status,
 			ExecutedQuantity: e.FilledSize.Float64(),
-			IsWorking:        true,
+			IsWorking:        e.Status == "open",
 			CreationTime:     types.Time(e.OrderTime.Time()),
 			UpdateTime:       types.Time(e.Ts.Time()),
 		})

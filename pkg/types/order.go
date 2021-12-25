@@ -175,14 +175,18 @@ func (o *SubmitOrder) SlackAttachment() slack.Attachment {
 type Order struct {
 	SubmitOrder
 
-	Exchange         ExchangeName `json:"exchange" db:"exchange"`
-	GID              uint64       `json:"gid" db:"gid"`
-	OrderID          uint64       `json:"orderID" db:"order_id"` // order id
-	Status           OrderStatus  `json:"status" db:"status"`
-	ExecutedQuantity float64      `json:"executedQuantity" db:"executed_quantity"`
-	IsWorking        bool         `json:"isWorking" db:"is_working"`
-	CreationTime     Time         `json:"creationTime" db:"created_at"`
-	UpdateTime       Time         `json:"updateTime" db:"updated_at"`
+	Exchange ExchangeName `json:"exchange" db:"exchange"`
+
+	// GID is used for relational database storage, it's an incremental ID
+	GID     uint64 `json:"gid" db:"gid"`
+	OrderID uint64 `json:"orderID" db:"order_id"` // order id
+	UUID    string `json:"uuid,omitempty"`
+
+	Status           OrderStatus `json:"status" db:"status"`
+	ExecutedQuantity float64     `json:"executedQuantity" db:"executed_quantity"`
+	IsWorking        bool        `json:"isWorking" db:"is_working"`
+	CreationTime     Time        `json:"creationTime" db:"created_at"`
+	UpdateTime       Time        `json:"updateTime" db:"updated_at"`
 
 	IsMargin   bool `json:"isMargin" db:"is_margin"`
 	IsIsolated bool `json:"isIsolated" db:"is_isolated"`
@@ -200,7 +204,14 @@ func (o Order) Backup() SubmitOrder {
 }
 
 func (o Order) String() string {
-	return fmt.Sprintf("ORDER %s %d %s %s %f/%f @ %f -> %s", o.Exchange.String(), o.OrderID, o.Symbol, o.Side, o.ExecutedQuantity, o.Quantity, o.Price, o.Status)
+	var orderID string
+	if o.UUID != "" {
+		orderID = o.UUID
+	} else {
+		orderID = strconv.FormatUint(o.OrderID, 10)
+	}
+
+	return fmt.Sprintf("ORDER %s %s %s %s %f/%f @ %f -> %s", o.Exchange.String(), orderID, o.Symbol, o.Side, o.ExecutedQuantity, o.Quantity, o.Price, o.Status)
 }
 
 // PlainText is used for telegram-styled messages
