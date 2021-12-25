@@ -213,3 +213,23 @@ func toGlobalOrder(o kucoinapi.Order) types.Order {
 	}
 	return order
 }
+
+func toGlobalTrade(fill kucoinapi.Fill) types.Trade {
+	var trade = types.Trade{
+		ID:            hashStringID(fill.TradeId),
+		OrderID:       hashStringID(fill.OrderId),
+		Exchange:      types.ExchangeKucoin,
+		Price:         fill.Price.Float64(),
+		Quantity:      fill.Size.Float64(),
+		QuoteQuantity: fill.Funds.Float64(),
+		Symbol:        toGlobalSymbol(fill.Symbol),
+		Side:          toGlobalSide(string(fill.Side)),
+		IsBuyer:       fill.Side == kucoinapi.SideTypeBuy,
+		IsMaker:       fill.Liquidity == kucoinapi.LiquidityTypeMaker,
+		Time:          types.Time{},
+		Fee:           fill.Fee.Float64(),
+		FeeCurrency:   toGlobalSymbol(fill.FeeCurrency),
+	}
+	return trade
+}
+

@@ -27,7 +27,6 @@ type Exchange struct {
 	client                  *kucoinapi.RestClient
 }
 
-
 func New(key, secret, passphrase string) *Exchange {
 	client := kucoinapi.NewClient()
 
@@ -247,10 +246,26 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 	return orders, err
 }
 
-func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) ([]types.Trade, error) {
-	panic("implement me")
-}
+func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
+	req := e.client.TradeService.NewGetFillsRequest()
+	req.Symbol(toLocalSymbol(symbol))
+	if options.StartTime != nil {
+		req.StartAt(*options.StartTime)
+	} else if options.EndTime != nil {
+		req.EndAt(*options.EndTime)
+	}
 
+	response, err := req.Do(ctx)
+	if err != nil {
+		return trades, err
+	}
+	for _, fill := range response.Items {
+		trade := toGlobalTrade(fill)
+		trades = append(trades, trade)
+	}
+
+	return trades, nil
+}
 
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (errs error) {
 	for _, o := range orders {
