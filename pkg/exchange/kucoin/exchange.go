@@ -129,7 +129,7 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbols ...string) (map[str
 var supportedIntervals = map[types.Interval]int{
 	types.Interval1m:  60,
 	types.Interval5m:  60 * 5,
-	types.Interval5m:  60 * 15,
+	types.Interval15m:  60 * 15,
 	types.Interval30m: 60 * 30,
 	types.Interval1h:  60 * 60,
 	types.Interval2h:  60 * 60 * 2,
