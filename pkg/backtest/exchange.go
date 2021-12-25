@@ -33,14 +33,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/c9s/bbgo/pkg/exchange/ftx"
-	"github.com/c9s/bbgo/pkg/exchange/kucoin"
-	"github.com/c9s/bbgo/pkg/exchange/okex"
 	"github.com/pkg/errors"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
-	"github.com/c9s/bbgo/pkg/exchange/binance"
-	"github.com/c9s/bbgo/pkg/exchange/max"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -70,15 +65,8 @@ type Exchange struct {
 	markets types.MarketMap
 }
 
-func NewExchange(sourceName types.ExchangeName, srv *service.BacktestService, config *bbgo.Backtest) (*Exchange, error) {
-	ex, err := newPublicExchange(sourceName)
-	if err != nil {
-		return nil, err
-	}
-
-	if config == nil {
-		return nil, errors.New("backtest config can not be nil")
-	}
+func NewExchange(sourceName types.ExchangeName, sourceExchange types.Exchange, srv *service.BacktestService, config *bbgo.Backtest) (*Exchange, error) {
+	ex := sourceExchange
 
 	markets, err := bbgo.LoadExchangeMarketsWithCache(context.Background(), ex)
 	if err != nil {
@@ -98,7 +86,7 @@ func NewExchange(sourceName types.ExchangeName, srv *service.BacktestService, co
 	account := &types.Account{
 		MakerFeeRate: config.Account.MakerFeeRate,
 		TakerFeeRate: config.Account.TakerFeeRate,
-		AccountType:  "SPOT", // currently not used
+		AccountType:  types.AccountTypeSpot,
 	}
 
 	balances := config.Account.Balances.BalanceMap()
@@ -302,23 +290,6 @@ func (e *Exchange) matchingBook(symbol string) (*SimplePriceMatching, bool) {
 	m, ok := e.matchingBooks[symbol]
 	e.matchingBooksMutex.Unlock()
 	return m, ok
-}
-
-func newPublicExchange(sourceExchange types.ExchangeName) (types.Exchange, error) {
-	switch sourceExchange {
-	case types.ExchangeBinance:
-		return binance.New("", ""), nil
-	case types.ExchangeMax:
-		return max.New("", ""), nil
-	case types.ExchangeFTX:
-		return ftx.NewExchange("", "", ""), nil
-	case types.ExchangeOKEx:
-		return okex.New("", "", ""), nil
-	case types.ExchangeKucoin:
-		return kucoin.New("", "", ""), nil
-	}
-
-	return nil, fmt.Errorf("public data from exchange %s is not supported", sourceExchange)
 }
 
 func (e *Exchange) FeedMarketData() error {
