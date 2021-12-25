@@ -2,9 +2,11 @@ package kucoin
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/c9s/bbgo/pkg/exchange/kucoin/kucoinapi"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -138,5 +140,29 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 }
 
 func (e *Exchange) NewStream() types.Stream {
-	return NewStream(e.client)
+	return NewStream(e.client, e)
+}
+
+var ErrMissingSequence = errors.New("sequence is missing")
+
+func (e *Exchange) QueryDepth(ctx context.Context, symbol string) (types.SliceOrderBook, int64, error) {
+	orderBook, err := e.client.MarketDataService.GetOrderBook(toLocalSymbol(symbol), 100)
+	if err != nil {
+		return types.SliceOrderBook{}, 0, err
+	}
+
+	if len(orderBook.Sequence) == 0 {
+		return types.SliceOrderBook{}, 0, ErrMissingSequence
+	}
+
+	sequence, err := strconv.ParseInt(orderBook.Sequence, 10, 64)
+	if err != nil {
+		return types.SliceOrderBook{}, 0, err
+	}
+
+	return types.SliceOrderBook{
+		Symbol: toGlobalSymbol(symbol),
+		Bids:   orderBook.Bids,
+		Asks:   orderBook.Asks,
+	}, sequence, nil
 }
