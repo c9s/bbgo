@@ -5,14 +5,16 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
-	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/exchange/ftx"
@@ -106,8 +108,9 @@ var listOrdersCmd = &cobra.Command{
 			return fmt.Errorf("invalid status %s", status)
 		}
 
+		log.Infof("%s ORDERS FROM %s SESSION", strings.ToUpper(status), session.Name)
 		for _, o := range os {
-			log.Infof("%s orders: %+v", status, o)
+			log.Infof("%+v", o)
 		}
 
 		return nil

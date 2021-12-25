@@ -23,6 +23,7 @@ func init() {
 	cancelOrderCmd.Flags().String("symbol", "", "symbol to cancel orders")
 	cancelOrderCmd.Flags().Int64("group-id", 0, "group ID to cancel orders")
 	cancelOrderCmd.Flags().Uint64("order-id", 0, "order ID to cancel orders")
+	cancelOrderCmd.Flags().String("order-uuid", "", "order UUID to cancel orders")
 	cancelOrderCmd.Flags().Bool("all", false, "cancel all orders")
 	RootCmd.AddCommand(cancelOrderCmd)
 }
@@ -54,60 +55,56 @@ var cancelOrderCmd = &cobra.Command{
 			return err
 		}
 
+		orderUUID, err := cmd.Flags().GetString("order-uuid")
+		if err != nil {
+			return err
+		}
+
 		all, err := cmd.Flags().GetBool("all")
 		if err != nil {
 			return err
 		}
-
-		configFile, err := cmd.Flags().GetString("config")
-		if err != nil {
-			return err
-		}
-
-		if len(configFile) == 0 {
-			return errors.New("--config option is required")
-		}
-
-		userConfig, err := bbgo.Load(configFile, false)
-		if err != nil {
-			return err
-		}
-
-		environ := bbgo.NewEnvironment()
-		if err := environ.ConfigureDatabase(ctx); err != nil {
-			return err
-		}
-
-		if err := environ.ConfigureExchangeSessions(userConfig); err != nil {
-			return err
-		}
-
-		if userConfig.Persistence != nil {
-			if err := environ.ConfigurePersistence(userConfig.Persistence); err != nil {
-				return err
-			}
-		}
-
-		var sessions = environ.Sessions()
 
 		sessionName, err := cmd.Flags().GetString("session")
 		if err != nil {
 			return err
 		}
 
+		if userConfig == nil {
+			return errors.New("config file is required")
+		}
+
+		environ := bbgo.NewEnvironment()
+		if err := environ.ConfigureExchangeSessions(userConfig); err != nil {
+			return err
+		}
+
+		if err := environ.Init(ctx); err != nil {
+			return err
+		}
+
+		var sessions = environ.Sessions()
+
+
 		if len(sessionName) > 0 {
-			ses, ok := sessions[sessionName]
+			ses, ok := environ.Session(sessionName)
 			if !ok {
 				return fmt.Errorf("session %s not found", sessionName)
 			}
 
-			if orderID > 0 {
-				logrus.Infof("canceling order by the given order id %d", orderID)
+			if orderID > 0 || orderUUID != "" {
+				if orderID > 0 {
+					logrus.Infof("canceling order by the given order id %d", orderID)
+				} else if orderUUID != "" {
+					logrus.Infof("canceling order by the given order uuid %s", orderUUID)
+				}
+
 				err := ses.Exchange.CancelOrders(ctx, types.Order{
 					SubmitOrder: types.SubmitOrder{
 						Symbol: symbol,
 					},
 					OrderID: orderID,
+					UUID:    orderUUID,
 				})
 				if err != nil {
 					return err
