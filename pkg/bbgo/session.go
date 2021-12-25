@@ -194,6 +194,8 @@ type ExchangeSession struct {
 	UserDataStream   types.Stream `json:"-" yaml:"-"`
 	MarketDataStream types.Stream `json:"-" yaml:"-"`
 
+	// Subscriptions
+	// this is a read-only field when running strategy
 	Subscriptions map[types.Subscription]types.Subscription `json:"-" yaml:"-"`
 
 	Exchange types.Exchange `json:"-" yaml:"-"`
