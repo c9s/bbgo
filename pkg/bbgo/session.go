@@ -163,6 +163,7 @@ type ExchangeSession struct {
 	EnvVarPrefix string             `json:"envVarPrefix" yaml:"envVarPrefix"`
 	Key          string             `json:"key,omitempty" yaml:"key,omitempty"`
 	Secret       string             `json:"secret,omitempty" yaml:"secret,omitempty"`
+	Passphrase   string             `json:"passphrase,omitempty" yaml:"passphrase,omitempty"`
 	SubAccount   string             `json:"subAccount,omitempty" yaml:"subAccount,omitempty"`
 
 	// Withdrawal is used for enabling withdrawal functions
@@ -693,7 +694,7 @@ func InitExchangeSession(name string, session *ExchangeSession, exchange types.E
 				}
 			}
 
-			exchange, err = cmdutil.NewExchangeStandard(exchangeName, session.Key, session.Secret, "", session.SubAccount)
+			exchange, err = cmdutil.NewExchangeStandard(exchangeName, session.Key, session.Secret, session.Passphrase, session.SubAccount)
 		} else {
 			exchange, err = cmdutil.NewExchangeWithEnvVarPrefix(exchangeName, session.EnvVarPrefix)
 		}
