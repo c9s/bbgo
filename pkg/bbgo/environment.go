@@ -692,7 +692,7 @@ To scan your OTP QR code, please run the following command:
 	
 	open %s
 
-send the auth command with the generated one-time password to the bbgo bot you created to enable the notification:
+send the auth command with the generated one-time password to the bbo bot you created to enable the notification:
 
 	/auth {code}
 

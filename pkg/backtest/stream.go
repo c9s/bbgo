@@ -70,11 +70,11 @@ func (s *Stream) Connect(ctx context.Context) error {
 		s.exchange.userDataStream = s
 	}
 
-	s.EmitConnect()
-	s.EmitStart()
-
 	if s.PublicOnly {
 		go func() {
+			s.EmitConnect()
+			s.EmitStart()
+
 			log.Infof("querying klines from database...")
 			klineC, errC := s.exchange.srv.QueryKLinesCh(s.exchange.startTime, s.exchange.endTime, s.exchange, symbols, intervals)
 			numKlines := 0
@@ -106,6 +106,9 @@ func (s *Stream) Connect(ctx context.Context) error {
 				log.WithError(err).Error("stream close error")
 			}
 		}()
+	} else {
+		s.EmitConnect()
+		s.EmitStart()
 	}
 
 	return nil
