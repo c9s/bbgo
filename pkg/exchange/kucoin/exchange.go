@@ -27,6 +27,7 @@ type Exchange struct {
 	client                  *kucoinapi.RestClient
 }
 
+
 func New(key, secret, passphrase string) *Exchange {
 	client := kucoinapi.NewClient()
 
@@ -224,6 +225,32 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 
 	return orders, err
 }
+
+func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []types.Order, err error) {
+	req := e.client.TradeService.NewListOrdersRequest()
+	req.Symbol(toLocalSymbol(symbol))
+	req.Status("done")
+	req.EndAt(until)
+	req.StartAt(since)
+
+	orderList, err := req.Do(ctx)
+	if err != nil {
+		return orders, err
+	}
+
+	// TODO: support pagination (right now we can only get 50 items from the first page)
+	for _, o := range orderList.Items {
+		order := toGlobalOrder(o)
+		orders = append(orders, order)
+	}
+
+	return orders, err
+}
+
+func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) ([]types.Trade, error) {
+	panic("implement me")
+}
+
 
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (errs error) {
 	for _, o := range orders {

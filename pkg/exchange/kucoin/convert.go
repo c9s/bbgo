@@ -134,8 +134,9 @@ func toGlobalOrderStatus(o kucoinapi.Order) types.OrderStatus {
 	var status types.OrderStatus
 	if o.IsActive {
 		status = types.OrderStatusNew
-	} else if o.DealSize > 0 {
-		status = types.OrderStatusPartiallyFilled
+		if o.DealSize > 0 {
+			status = types.OrderStatusPartiallyFilled
+		}
 	} else if o.CancelExist {
 		status = types.OrderStatusCanceled
 	} else {
