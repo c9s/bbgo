@@ -3,6 +3,7 @@ package backtest
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -70,51 +71,53 @@ func (s *Stream) Connect(ctx context.Context) error {
 		s.exchange.userDataStream = s
 	}
 
+	s.EmitConnect()
+	s.EmitStart()
+
 	if s.PublicOnly {
 		go func() {
-			s.EmitConnect()
-			s.EmitStart()
-
-			log.Infof("querying klines from database...")
-			klineC, errC := s.exchange.srv.QueryKLinesCh(s.exchange.startTime, s.exchange.endTime, s.exchange, symbols, intervals)
-			numKlines := 0
-			for k := range klineC {
-				if k.Interval == types.Interval1m {
-					matching, ok := s.exchange.matchingBook(k.Symbol)
-					if !ok {
-						log.Errorf("matching book of %s is not initialized", k.Symbol)
-						continue
-					}
-
-					// here we generate trades and order updates
-					matching.processKLine(k)
-					numKlines++
-				}
-
-				s.EmitKLineClosed(k)
-			}
-
-			if err := <-errC; err != nil {
-				log.WithError(err).Error("backtest data feed error")
-			}
-
-			if numKlines == 0 {
-				log.Error("kline data is empty, make sure you have sync the exchange market data")
-			}
-
-			if err := s.Close(); err != nil {
-				log.WithError(err).Error("stream close error")
-			}
+			FeedMarketData(s, s.exchange, s.exchange.startTime, s.exchange.endTime, symbols, intervals)
 		}()
-	} else {
-		s.EmitConnect()
-		s.EmitStart()
 	}
 
 	return nil
+}
+
+func FeedMarketData(s *Stream, ex *Exchange, startTime, endTime time.Time, symbols []string, intervals []types.Interval) {
+	log.Infof("querying klines from database...")
+	klineC, errC := ex.srv.QueryKLinesCh(startTime, endTime, ex, symbols, intervals)
+	numKlines := 0
+	for k := range klineC {
+		if k.Interval == types.Interval1m {
+			matching, ok := ex.matchingBook(k.Symbol)
+			if !ok {
+				log.Errorf("matching book of %s is not initialized", k.Symbol)
+				continue
+			}
+
+			// here we generate trades and order updates
+			matching.processKLine(k)
+			numKlines++
+		}
+
+		s.EmitKLineClosed(k)
+	}
+
+	if err := <-errC; err != nil {
+		log.WithError(err).Error("backtest data feed error")
+	}
+
+	if numKlines == 0 {
+		log.Error("kline data is empty, make sure you have sync the exchange market data")
+	}
+
+	if err := s.Close(); err != nil {
+		log.WithError(err).Error("stream close error")
+	}
 }
 
 func (s *Stream) Close() error {
 	close(s.exchange.doneC)
 	return nil
 }
+
