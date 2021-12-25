@@ -34,6 +34,7 @@ import (
 	"time"
 
 	"github.com/c9s/bbgo/pkg/exchange/ftx"
+	"github.com/c9s/bbgo/pkg/exchange/kucoin"
 	"github.com/c9s/bbgo/pkg/exchange/okex"
 	"github.com/pkg/errors"
 
@@ -55,7 +56,7 @@ type Exchange struct {
 	account *types.Account
 	config  *bbgo.Backtest
 
-	userDataStream *Stream
+	userDataStream, marketDataStream *Stream
 
 	trades      map[string][]types.Trade
 	tradesMutex sync.Mutex
@@ -67,7 +68,6 @@ type Exchange struct {
 	matchingBooksMutex sync.Mutex
 
 	markets types.MarketMap
-	doneC   chan struct{}
 }
 
 func NewExchange(sourceName types.ExchangeName, srv *service.BacktestService, config *bbgo.Backtest) (*Exchange, error) {
@@ -115,7 +115,6 @@ func NewExchange(sourceName types.ExchangeName, srv *service.BacktestService, co
 		endTime:        endTime,
 		closedOrders:   make(map[string][]types.Order),
 		trades:         make(map[string][]types.Trade),
-		doneC:          make(chan struct{}),
 	}
 
 	e.resetMatchingBooks()
@@ -155,10 +154,6 @@ func (e *Exchange) _addMatchingBook(symbol string, market types.Market) {
 		Account:     e.account,
 		Market:      market,
 	}
-}
-
-func (e *Exchange) Done() chan struct{} {
-	return e.doneC
 }
 
 func (e *Exchange) NewStream() types.Stream {
@@ -319,7 +314,91 @@ func newPublicExchange(sourceExchange types.ExchangeName) (types.Exchange, error
 		return ftx.NewExchange("", "", ""), nil
 	case types.ExchangeOKEx:
 		return okex.New("", "", ""), nil
+	case types.ExchangeKucoin:
+		return kucoin.New("", "", ""), nil
 	}
 
 	return nil, fmt.Errorf("public data from exchange %s is not supported", sourceExchange)
 }
+
+func (e *Exchange) FeedMarketData() error {
+	e.userDataStream.OnTradeUpdate(func(trade types.Trade) {
+		e.addTrade(trade)
+	})
+
+	e.matchingBooksMutex.Lock()
+	for _, matching := range e.matchingBooks {
+		matching.OnTradeUpdate(e.userDataStream.EmitTradeUpdate)
+		matching.OnOrderUpdate(e.userDataStream.EmitOrderUpdate)
+		matching.OnBalanceUpdate(e.userDataStream.EmitBalanceUpdate)
+	}
+	e.matchingBooksMutex.Unlock()
+
+	marketDataStream := e.marketDataStream
+	log.Infof("collecting backtest configurations...")
+
+	loadedSymbols := map[string]struct{}{}
+	loadedIntervals := map[types.Interval]struct{}{
+		// 1m interval is required for the backtest matching engine
+		types.Interval1m: {},
+		types.Interval1d: {},
+	}
+
+	for _, sub := range marketDataStream.Subscriptions {
+		loadedSymbols[sub.Symbol] = struct{}{}
+
+		switch sub.Channel {
+		case types.KLineChannel:
+			loadedIntervals[types.Interval(sub.Options.Interval)] = struct{}{}
+
+		default:
+			return fmt.Errorf("stream channel %marketDataStream is not supported in backtest", sub.Channel)
+		}
+	}
+
+	var symbols []string
+	for symbol := range loadedSymbols {
+		symbols = append(symbols, symbol)
+	}
+
+	var intervals []types.Interval
+	for interval := range loadedIntervals {
+		intervals = append(intervals, interval)
+	}
+
+	log.Infof("using symbols: %v and intervals: %v for back-testing", symbols, intervals)
+	log.Infof("querying klines from database...")
+	klineC, errC := e.srv.QueryKLinesCh(e.startTime, e.endTime, e, symbols, intervals)
+	numKlines := 0
+	for k := range klineC {
+		if k.Interval == types.Interval1m {
+			matching, ok := e.matchingBook(k.Symbol)
+			if !ok {
+				log.Errorf("matching book of %s is not initialized", k.Symbol)
+				continue
+			}
+
+			// here we generate trades and order updates
+			matching.processKLine(k)
+			numKlines++
+		}
+
+		marketDataStream.EmitKLineClosed(k)
+	}
+
+	if err := <-errC; err != nil {
+		log.WithError(err).Error("backtest data feed error")
+	}
+
+	if numKlines == 0 {
+		log.Error("kline data is empty, make sure you have sync the exchange market data")
+	}
+
+	if err := marketDataStream.Close(); err != nil {
+		log.WithError(err).Error("stream close error")
+		return err
+	}
+
+	return nil
+}
+
