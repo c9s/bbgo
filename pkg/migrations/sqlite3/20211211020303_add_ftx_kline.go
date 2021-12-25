@@ -25,7 +25,7 @@ func upAddFtxKline(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
 func downAddFtxKline(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
 	// This code is executed when the migration is rolled back.
 
-	_, err = tx.ExecContext(ctx, "drop table ftx_klines;")
+	_, err = tx.ExecContext(ctx, "DROP TABLE ftx_klines;")
 	if err != nil {
 		return err
 	}
