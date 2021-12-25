@@ -26,5 +26,5 @@ CREATE TABLE `ftx_klines`
 -- +down
 
 -- +begin
-drop table ftx_klines;
+DROP TABLE ftx_klines;
 -- +end

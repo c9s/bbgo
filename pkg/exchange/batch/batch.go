@@ -2,9 +2,10 @@ package batch
 
 import (
 	"context"
-	"github.com/pkg/errors"
 	"sort"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
@@ -94,26 +95,31 @@ func (e KLineBatchQuery) Query(ctx context.Context, symbol string, interval type
 				StartTime: &currentTime,
 				EndTime:   &endTime,
 			})
-			sort.Slice(kLines, func(i, j int) bool { return kLines[i].StartTime.Unix() < kLines[j].StartTime.Unix() })
-			tryQueryKlineTimes++
 
 			if err != nil {
 				errC <- err
 				return
 			}
 
+			sort.Slice(kLines, func(i, j int) bool { return kLines[i].StartTime.Unix() < kLines[j].StartTime.Unix() })
+
 			if len(kLines) == 0 {
 				return
+			} else if len(kLines) == 1 && kLines[0].StartTime.Unix() == currentTime.Unix() {
+				return
 			}
+
+			tryQueryKlineTimes++
 			const BatchSize = 200
 
 			var batchKLines = make([]types.KLine, 0, BatchSize)
 			for _, kline := range kLines {
-				// ignore any kline before the given start time
-				if currentTime.Unix() != startTime.Unix() && kline.StartTime.Unix() <= currentTime.Unix() {
+				// ignore any kline before the given start time of the batch query
+				if currentTime.Unix() != startTime.Unix() && kline.StartTime.Before(currentTime) {
 					continue
 				}
 
+				// if there is a kline after the endTime of the batch query, it means the data is out of scope, we should exit
 				if kline.StartTime.After(endTime) || kline.EndTime.After(endTime) {
 					if len(batchKLines) != 0 {
 						c <- batchKLines
@@ -129,18 +135,19 @@ func (e KLineBatchQuery) Query(ctx context.Context, symbol string, interval type
 					batchKLines = nil
 				}
 
-				//The issue is in FTX, prev endtime = next start time , so if add 1 ms , it would query forever.
+				// The issue is in FTX, prev endtime = next start time , so if add 1 ms , it would query forever.
 				currentTime = kline.StartTime.Time()
 				tryQueryKlineTimes = 0
 			}
 
-			if len(batchKLines) != 0 {
+			// push the rest klines in the buffer
+			if len(batchKLines) > 0 {
 				c <- batchKLines
 				batchKLines = nil
 			}
 
 			if tryQueryKlineTimes > 10 { // it means loop 10 times
-				errC <- errors.Errorf("There's a dead loop in batch.go#Query , symbol: %s , interval: %s, startTime :%s ", symbol, interval, startTime.String())
+				errC <- errors.Errorf("there's a dead loop in batch.go#Query , symbol: %s , interval: %s, startTime:%s ", symbol, interval, startTime.String())
 				return
 			}
 		}
