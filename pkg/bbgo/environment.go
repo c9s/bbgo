@@ -213,7 +213,7 @@ func (environ *Environment) AddExchangesByViperKeys() error {
 
 func (environ *Environment) AddExchangesFromSessionConfig(sessions map[string]*ExchangeSession) error {
 	for sessionName, session := range sessions {
-		if err := InitExchangeSession(sessionName, session, nil); err != nil {
+		if err := session.InitExchange(sessionName, nil); err != nil {
 			return err
 		}
 

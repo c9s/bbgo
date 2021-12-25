@@ -683,7 +683,10 @@ func (session *ExchangeSession) FindPossibleSymbols() (symbols []string, err err
 	return symbols, nil
 }
 
-func InitExchangeSession(name string, session *ExchangeSession, exchange types.Exchange) error {
+// InitExchange initialize the exchange instance and allocate memory for fields
+// In this stage, the session var could be loaded from the JSON config, so the pointer fields are still nil
+// The Init method will be called after this stage, environment.Init will call the session.Init method later.
+func (session *ExchangeSession) InitExchange(name string, exchange types.Exchange) error {
 	var err error
 	var exchangeName = session.ExchangeName
 	if exchange == nil {
