@@ -39,20 +39,20 @@ func (g *GetKLinesRequest) GetParameters() (map[string]interface{}, error) {
 	// assign parameter of symbol
 	params["symbol"] = symbol
 
-	// check interval field -> json key interval
+	// check interval field -> json key type
 	interval := g.interval
 
 	switch interval {
 	case "1min", "3min", "5min", "15min", "30min", "1hour", "2hour", "4hour", "6hour", "8hour", "12hour", "1day", "1week":
-		params["interval"] = interval
+		params["type"] = interval
 
 	default:
-		return params, fmt.Errorf("interval value %v is invalid", interval)
+		return params, fmt.Errorf("type value %v is invalid", interval)
 
 	}
 
 	// assign parameter of interval
-	params["interval"] = interval
+	params["type"] = interval
 
 	// check startAt field -> json key startAt
 	if g.startAt != nil {
