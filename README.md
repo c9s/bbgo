@@ -8,14 +8,17 @@ A trading bot framework written in Go. The name bbgo comes from the BB8 bot in t
 
 ## Features
 
-- Exchange abstraction interface
-- Stream integration (user data websocket)
-- PnL calculation
-- Slack notification
-- KLine-based backtest
-- Built-in strategies
-- Multi-session support
-- Standard indicators (SMA, EMA, BOLL)
+- Exchange abstraction interface.
+- Stream integration (user data websocket, market data websocket).
+- Real-time orderBook integration through websocket.
+- TWAP order execution support. See [TWAP Order Execution](./doc/topics/twap.md)
+- PnL calculation.
+- Slack/Telegram notification.
+- Back-testing: KLine-based back-testing engine. See [Back-testing](./doc/topics/back-testing.md)
+- Built-in Grid strategy.
+- Many built-in strategies.
+- Multi-exchange session support: you can connect to more than 2 exchanges with different accounts or subaccounts.
+- Standard indicators, e.g., SMA, EMA, BOLL, VMA, MACD...
 - React-powered Web Dashboard
 
 ## Screenshots
