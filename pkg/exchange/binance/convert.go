@@ -126,6 +126,69 @@ func toGlobalMarginAccount(account *binance.MarginAccount) *types.MarginAccount 
 	}
 }
 
+func toGlobalFuturesAccountInfo(account *futures.Account) *types.FuturesAccountInfo {
+	return &types.FuturesAccountInfo{
+		Assets:                      toGlobalFuturesUserAssets(account.Assets),
+		FeeTier:                     account.FeeTier,
+		MaxWithdrawAmount:           fixedpoint.MustNewFromString(account.MaxWithdrawAmount),
+		Positions:                   toGlobalFuturesPositions(account.Positions),
+		TotalInitialMargin:          fixedpoint.MustNewFromString(account.TotalInitialMargin),
+		TotalMaintMargin:            fixedpoint.MustNewFromString(account.TotalMaintMargin),
+		TotalMarginBalance:          fixedpoint.MustNewFromString(account.TotalMarginBalance),
+		TotalOpenOrderInitialMargin: fixedpoint.MustNewFromString(account.TotalOpenOrderInitialMargin),
+		TotalPositionInitialMargin:  fixedpoint.MustNewFromString(account.TotalPositionInitialMargin),
+		TotalUnrealizedProfit:       fixedpoint.MustNewFromString(account.TotalUnrealizedProfit),
+		TotalWalletBalance:          fixedpoint.MustNewFromString(account.TotalWalletBalance),
+		UpdateTime:                  account.UpdateTime,
+	}
+}
+
+func toGlobalFuturesBalance(balances []*futures.Balance) types.BalanceMap {
+	retBalances := make(types.BalanceMap)
+	for _, balance := range balances {
+		retBalances[balance.Asset] = types.Balance{
+			Currency:  balance.Asset,
+			Available: fixedpoint.MustNewFromString(balance.AvailableBalance),
+		}
+	}
+	return retBalances
+}
+
+func toGlobalFuturesPositions(positions []*futures.AccountPosition) types.PositionMap {
+	retPositions := make(types.PositionMap)
+	for _, position := range positions {
+		retPositions[position.Symbol] = types.Position{
+			Isolated: position.Isolated,
+			PositionRisk: &types.PositionRisk{
+				Leverage: fixedpoint.MustNewFromString(position.Leverage),
+			},
+			Symbol:     position.Symbol,
+			UpdateTime: position.UpdateTime,
+		}
+	}
+
+	return retPositions
+}
+
+func toGlobalFuturesUserAssets(assets []*futures.AccountAsset) (retAssets map[types.Asset]types.FuturesUserAsset) {
+	for _, asset := range assets {
+		//TODO: or modify to type FuturesAssetMap map[string]FuturesAssetMap
+		retAssets[types.Asset{Currency: asset.Asset}] = types.FuturesUserAsset{
+			Asset:                  asset.Asset,
+			InitialMargin:          fixedpoint.MustNewFromString(asset.InitialMargin),
+			MaintMargin:            fixedpoint.MustNewFromString(asset.MaintMargin),
+			MarginBalance:          fixedpoint.MustNewFromString(asset.MarginBalance),
+			MaxWithdrawAmount:      fixedpoint.MustNewFromString(asset.MaxWithdrawAmount),
+			OpenOrderInitialMargin: fixedpoint.MustNewFromString(asset.OpenOrderInitialMargin),
+			PositionInitialMargin:  fixedpoint.MustNewFromString(asset.PositionInitialMargin),
+			UnrealizedProfit:       fixedpoint.MustNewFromString(asset.UnrealizedProfit),
+			WalletBalance:          fixedpoint.MustNewFromString(asset.WalletBalance),
+		}
+	}
+
+	return retAssets
+}
+
 func toGlobalTicker(stats *binance.PriceChangeStats) (*types.Ticker, error) {
 	return &types.Ticker{
 		Volume: util.MustParseFloat(stats.Volume),
@@ -527,5 +590,22 @@ func convertPremiumIndex(index *futures.PremiumIndex) (*types.PremiumIndex, erro
 		NextFundingTime: nextFundingTime,
 		LastFundingRate: lastFundingRate,
 		Time:            t,
+	}, nil
+}
+
+func convertPositionRisk(risk *futures.PositionRisk) (*types.PositionRisk, error) {
+	leverage, err := fixedpoint.NewFromString(risk.Leverage)
+	if err != nil {
+		return nil, err
+	}
+
+	liquidationPrice, err := fixedpoint.NewFromString(risk.LiquidationPrice)
+	if err != nil {
+		return nil, err
+	}
+
+	return &types.PositionRisk{
+		Leverage:         leverage,
+		LiquidationPrice: liquidationPrice,
 	}, nil
 }
