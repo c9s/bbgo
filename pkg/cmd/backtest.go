@@ -127,15 +127,12 @@ var BacktestCmd = &cobra.Command{
 
 		for key, session := range userConfig.Sessions {
 			if exchangeNameStr == key {
-				publicExchange, err := cmdutil.NewExchangeStandard(session.ExchangeName, "", "", "", "")
+				publicExchange, err := cmdutil.NewExchangePublic(session.ExchangeName)
 				if err != nil {
 					return err
 				}
 
-				if err := bbgo.InitExchangeSession(session.Name, session, publicExchange) ; err != nil {
-					return err
-				}
-				sourceExchange = session.Exchange
+				sourceExchange = publicExchange
 				exchangeName = session.ExchangeName
 			}
 		}
@@ -146,7 +143,7 @@ var BacktestCmd = &cobra.Command{
 				return err
 			}
 
-			sourceExchange, err = cmdutil.NewExchangeStandard(exchangeName, "", "", "", "")
+			sourceExchange, err = cmdutil.NewExchangePublic(exchangeName)
 			if err != nil {
 				return err
 			}
@@ -273,7 +270,11 @@ var BacktestCmd = &cobra.Command{
 			}
 		}
 
-		backtestExchange, err := backtest.NewExchange(exchangeName, backtestService, userConfig.Backtest)
+		if userConfig.Backtest == nil {
+			return errors.New("backtest config can not be nil")
+		}
+
+		backtestExchange, err := backtest.NewExchange(exchangeName, sourceExchange, backtestService, userConfig.Backtest)
 		if err != nil {
 			return errors.Wrap(err, "failed to create backtest exchange")
 		}

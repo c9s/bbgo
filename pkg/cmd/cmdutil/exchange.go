@@ -13,6 +13,10 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+func NewExchangePublic(exchangeName types.ExchangeName) (types.Exchange, error){
+	return NewExchangeStandard(exchangeName, "", "", "", "")
+}
+
 func NewExchangeStandard(n types.ExchangeName, key, secret, passphrase, subAccount string) (types.Exchange, error) {
 	switch n {
 
