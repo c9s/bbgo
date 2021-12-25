@@ -3,7 +3,6 @@ package kucoin
 import (
 	"context"
 	"net"
-	"strconv"
 	"sync"
 	"time"
 
@@ -22,6 +21,7 @@ type Stream struct {
 	types.StandardStream
 
 	client     *kucoinapi.RestClient
+	exchange   *Exchange
 	conn       *websocket.Conn
 	connLock   sync.Mutex
 	connCtx    context.Context
@@ -39,9 +39,10 @@ type Stream struct {
 	depthBuffers map[string]*depth.Buffer
 }
 
-func NewStream(client *kucoinapi.RestClient) *Stream {
+func NewStream(client *kucoinapi.RestClient, ex *Exchange) *Stream {
 	stream := &Stream{
-		client: client,
+		client:   client,
+		exchange: ex,
 		StandardStream: types.StandardStream{
 			ReconnectC: make(chan struct{}, 1),
 		},
@@ -72,27 +73,15 @@ func (s *Stream) handleCandleEvent(candle *WebSocketCandleEvent, e *WebSocketEve
 
 func (s *Stream) handleOrderBookL2Event(e *WebSocketOrderBookL2Event) {
 	f, ok := s.depthBuffers[e.Symbol]
-	if !ok {
+	if ok {
+		f.AddUpdate(types.SliceOrderBook{
+			Symbol: toGlobalSymbol(e.Symbol),
+			Bids:   e.Changes.Bids,
+			Asks:   e.Changes.Asks,
+		}, e.SequenceStart, e.SequenceEnd)
+	} else {
 		f = depth.NewBuffer(func() (types.SliceOrderBook, int64, error) {
-			orderBook, err := s.client.MarketDataService.GetOrderBook(e.Symbol, 100)
-			if err != nil {
-				return types.SliceOrderBook{}, 0, err
-			}
-
-			if len(orderBook.Sequence) == 0 {
-				return types.SliceOrderBook{}, 0, errors.New("sequence is missing")
-			}
-
-			sequence, err := strconv.ParseInt(orderBook.Sequence, 10, 64)
-			if err != nil {
-				return types.SliceOrderBook{}, 0, err
-			}
-
-			return types.SliceOrderBook{
-				Symbol: toGlobalSymbol(e.Symbol),
-				Bids:   orderBook.Bids,
-				Asks:   orderBook.Asks,
-			}, sequence, nil
+			return s.exchange.QueryDepth(context.Background(), e.Symbol)
 		})
 		s.depthBuffers[e.Symbol] = f
 		f.SetBufferingPeriod(time.Second)
@@ -110,12 +99,6 @@ func (s *Stream) handleOrderBookL2Event(e *WebSocketOrderBookL2Event) {
 		f.OnPush(func(update depth.Update) {
 			s.EmitBookUpdate(update.Object)
 		})
-	} else {
-		f.AddUpdate(types.SliceOrderBook{
-			Symbol: toGlobalSymbol(e.Symbol),
-			Bids:   e.Changes.Bids,
-			Asks:   e.Changes.Asks,
-		}, e.SequenceStart, e.SequenceEnd)
 	}
 }
 

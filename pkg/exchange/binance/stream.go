@@ -111,7 +111,13 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 		}
 
 		f, ok := stream.depthBuffers[e.Symbol]
-		if !ok {
+		if ok {
+			f.AddUpdate(types.SliceOrderBook{
+				Symbol: e.Symbol,
+				Bids:   e.Bids,
+				Asks:   e.Asks,
+			}, e.FirstUpdateID, e.FinalUpdateID)
+		} else {
 			f = depth.NewBuffer(func() (types.SliceOrderBook, int64, error) {
 				return ex.QueryDepth(context.Background(), e.Symbol)
 			})
@@ -132,12 +138,6 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 			f.OnPush(func(update depth.Update) {
 				stream.EmitBookUpdate(update.Object)
 			})
-		} else {
-			f.AddUpdate(types.SliceOrderBook{
-				Symbol: e.Symbol,
-				Bids:   e.Bids,
-				Asks:   e.Asks,
-			}, e.FirstUpdateID, e.FinalUpdateID)
 		}
 	})
 
