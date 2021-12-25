@@ -1,18 +1,27 @@
 package kucoinapi
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
+	"time"
+
+	"github.com/pkg/errors"
+	"github.com/valyala/fastjson"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/pkg/errors"
 )
 
 type MarketDataService struct {
 	client *RestClient
+}
+
+func (s *MarketDataService) NewGetKLinesRequest() *GetKLinesRequest {
+	return &GetKLinesRequest{client: s.client}
 }
 
 type Symbol struct {
@@ -268,8 +277,6 @@ func (s *MarketDataService) GetOrderBook(symbol string, depth int) (*OrderBook, 
 		return nil, err
 	}
 
-	fmt.Println(string(response.Body))
-
 	var apiResponse struct {
 		Code    string     `json:"code"`
 		Message string     `json:"msg"`
@@ -281,4 +288,120 @@ func (s *MarketDataService) GetOrderBook(symbol string, depth int) (*OrderBook, 
 	}
 
 	return apiResponse.Data, nil
+}
+
+//go:generate requestgen -type GetKLinesRequest
+type GetKLinesRequest struct {
+	client *RestClient
+
+	symbol string `param:"symbol"`
+
+	interval string `param:"type" validValues:"1min,3min,5min,15min,30min,1hour,2hour,4hour,6hour,8hour,12hour,1day,1week"`
+
+	startAt *time.Time `param:"startAt,seconds"`
+
+	endAt *time.Time `param:"endAt,seconds"`
+}
+
+type KLine struct {
+	Symbol              string
+	Interval            string
+	StartTime           time.Time
+	Open                fixedpoint.Value
+	High                fixedpoint.Value
+	Low                 fixedpoint.Value
+	Close               fixedpoint.Value
+	Volume, QuoteVolume fixedpoint.Value
+}
+
+func (r *GetKLinesRequest) Do(ctx context.Context) ([]KLine, error) {
+	params, err := r.GetParametersQuery()
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := r.client.NewRequest("GET", "/api/v1/market/candles", params, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := r.client.SendRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var apiResponse struct {
+		Code    string          `json:"code"`
+		Message string          `json:"msg"`
+		Data    json.RawMessage `json:"data"`
+	}
+
+	if err := response.DecodeJSON(&apiResponse); err != nil {
+		return nil, err
+	}
+
+	if apiResponse.Data == nil {
+		return nil, errors.New("api error: [" + apiResponse.Code + "] " + apiResponse.Message)
+	}
+
+	return parseKLines(apiResponse.Data, r.symbol, r.interval)
+}
+
+func parseKLines(b []byte, symbol, interval string) (klines []KLine, err error) {
+	s, err := fastjson.ParseBytes(b)
+	if err != nil {
+		return klines, err
+	}
+
+	for _, v := range s.GetArray() {
+		arr := v.GetArray()
+		ts, err := strconv.ParseInt(string(arr[0].GetStringBytes()), 10, 64)
+		if err != nil {
+			return klines, err
+		}
+
+		o, err := fixedpoint.NewFromString(string(arr[1].GetStringBytes()))
+		if err != nil {
+			return klines, err
+		}
+
+		c, err := fixedpoint.NewFromString(string(arr[2].GetStringBytes()))
+		if err != nil {
+			return klines, err
+		}
+
+		h, err := fixedpoint.NewFromString(string(arr[3].GetStringBytes()))
+		if err != nil {
+			return klines, err
+		}
+
+		l, err := fixedpoint.NewFromString(string(arr[4].GetStringBytes()))
+		if err != nil {
+			return klines, err
+		}
+
+		vv, err := fixedpoint.NewFromString(string(arr[5].GetStringBytes()))
+		if err != nil {
+			return klines, err
+		}
+
+		qv, err := fixedpoint.NewFromString(string(arr[6].GetStringBytes()))
+		if err != nil {
+			return klines, err
+		}
+
+		klines = append(klines, KLine{
+			Symbol:      symbol,
+			Interval:    interval,
+			StartTime:   time.Unix(ts, 0),
+			Open:        o,
+			High:        h,
+			Low:         l,
+			Close:       c,
+			Volume:      vv,
+			QuoteVolume: qv,
+		})
+	}
+
+	return klines, err
 }

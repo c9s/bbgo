@@ -284,6 +284,8 @@ func (s *BacktestService) _targetKlineTable(exchangeName types.ExchangeName) str
 		return "max_klines"
 	case types.ExchangeOKEx:
 		return "okex_klines"
+	case types.ExchangeKucoin:
+		return "kucoin_klines"
 	default:
 		return "klines"
 	}
