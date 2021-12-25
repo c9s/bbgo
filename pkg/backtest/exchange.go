@@ -352,7 +352,7 @@ func (e *Exchange) FeedMarketData() error {
 			loadedIntervals[types.Interval(sub.Options.Interval)] = struct{}{}
 
 		default:
-			return fmt.Errorf("stream channel %marketDataStream is not supported in backtest", sub.Channel)
+			return fmt.Errorf("stream channel %s is not supported in backtest", sub.Channel)
 		}
 	}
 
@@ -401,4 +401,3 @@ func (e *Exchange) FeedMarketData() error {
 
 	return nil
 }
-
