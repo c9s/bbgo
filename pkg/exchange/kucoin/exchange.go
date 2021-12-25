@@ -126,6 +126,8 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbols ...string) (map[str
 	return tickers, nil
 }
 
+// From the doc
+// Type of candlestick patterns: 1min, 3min, 5min, 15min, 30min, 1hour, 2hour, 4hour, 6hour, 8hour, 12hour, 1day, 1week
 var supportedIntervals = map[types.Interval]int{
 	types.Interval1m:  60,
 	types.Interval5m:  60 * 5,
@@ -158,6 +160,7 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 	req.Interval(toLocalInterval(interval))
 	if options.StartTime != nil {
 		req.StartAt(*options.StartTime)
+		// For each query, the system would return at most **1500** pieces of data. To obtain more data, please page the data by time.
 		req.EndAt(options.StartTime.Add(1500 * interval.Duration()))
 	} else if options.EndTime != nil {
 		req.EndAt(*options.EndTime)
