@@ -27,6 +27,7 @@ type Exchange struct {
 	client                  *kucoinapi.RestClient
 }
 
+
 func New(key, secret, passphrase string) *Exchange {
 	client := kucoinapi.NewClient()
 
@@ -125,8 +126,64 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbols ...string) (map[str
 	return tickers, nil
 }
 
+
+var supportedIntervals = map[types.Interval]int{
+	types.Interval1m: 60,
+	types.Interval5m: 60 * 5,
+	types.Interval5m: 60 * 15,
+	types.Interval30m: 60 * 30,
+	types.Interval1h: 60 * 60,
+	types.Interval2h: 60 * 60 * 2,
+	types.Interval4h: 60 * 60 * 4,
+	types.Interval6h: 60 * 60 * 6,
+	// types.Interval8h: 60 * 60 * 8,
+	types.Interval12h: 60 * 60 * 12,
+}
+
+func (e *Exchange) SupportedInterval() map[types.Interval]int {
+	return supportedIntervals
+}
+
+func (e *Exchange) IsSupportedInterval(interval types.Interval) bool {
+	_, ok := supportedIntervals[interval]
+	return ok
+}
+
 func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
-	panic("implement me")
+	req := e.client.MarketDataService.NewGetKLinesRequest()
+	req.Symbol(toLocalSymbol(symbol))
+	req.Interval(toLocalInterval(interval))
+	if options.StartTime != nil {
+		req.StartAt(*options.StartTime)
+	} else if options.EndTime != nil {
+		req.StartAt(*options.EndTime)
+	}
+
+	ks, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var klines []types.KLine
+	for _, k := range ks {
+		gi := toGlobalInterval(k.Interval)
+		klines = append(klines, types.KLine{
+			Exchange:                 types.ExchangeKucoin,
+			Symbol:                   toGlobalSymbol(k.Symbol),
+			StartTime:                types.Time(k.StartTime),
+			EndTime:                  types.Time(k.StartTime.Add(gi.Duration() - time.Millisecond)),
+			Interval:                 gi,
+			Open:                     k.Open.Float64(),
+			Close:                    k.Close.Float64(),
+			High:                     k.High.Float64(),
+			Low:                      k.Low.Float64(),
+			Volume:                   k.Volume.Float64(),
+			QuoteVolume:              k.QuoteVolume.Float64(),
+			Closed:                   true,
+		})
+	}
+
+	return klines, nil
 }
 
 func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error) {

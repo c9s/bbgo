@@ -72,6 +72,9 @@ func toLocalInterval(i types.Interval) string {
 	case types.Interval1m:
 		return "1min"
 
+	case types.Interval5m:
+		return "5min"
+
 	case types.Interval15m:
 		return "15min"
 
@@ -87,9 +90,18 @@ func toLocalInterval(i types.Interval) string {
 	case types.Interval4h:
 		return "4hour"
 
+	case types.Interval6h:
+		return "6hour"
+
+	case types.Interval12h:
+		return "12hour"
+
+	case types.Interval1d:
+		return "1day"
+
 	}
 
-	return "1h"
+	return "1hour"
 }
 
 // convertSubscriptions global subscription to local websocket command
