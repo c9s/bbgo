@@ -48,7 +48,7 @@ const (
 	ExchangeBacktest = ExchangeName("backtest")
 )
 
-var SupportedExchanges = []ExchangeName{"binance", "max", "ftx", "okex"}
+var SupportedExchanges = []ExchangeName{"binance", "max", "ftx", "okex", "kucoin"}
 
 func ValidExchangeName(a string) (ExchangeName, error) {
 	switch strings.ToLower(a) {

@@ -3,12 +3,15 @@ package kucoin
 import (
 	"context"
 	"strconv"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/exchange/kucoin/kucoinapi"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
+
+var ErrMissingSequence = errors.New("sequence is missing")
 
 // OKB is the platform currency of OKEx, pre-allocate static string here
 const KCS = "KCS"
@@ -114,7 +117,7 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbols ...string) (map[str
 	}
 
 	for _, s := range allTickers.Ticker {
-		tickers[ s.Symbol ] = toGlobalTicker(s)
+		tickers[s.Symbol] = toGlobalTicker(s)
 	}
 
 	return tickers, nil
@@ -125,12 +128,67 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 }
 
 func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error) {
-	panic("implement me")
-	return nil, nil
+	for _, order := range orders {
+		req := e.client.TradeService.NewPlaceOrderRequest()
+		req.Symbol(toLocalSymbol(order.Symbol))
+		req.Side(toLocalSide(order.Side))
+
+		if order.ClientOrderID != "" {
+			req.ClientOrderID(order.ClientOrderID)
+		}
+
+		if len(order.QuantityString) > 0 {
+			req.Size(order.QuantityString)
+		} else if order.Market.Symbol != "" {
+			req.Size(order.Market.FormatQuantity(order.Quantity))
+		} else {
+			req.Size(strconv.FormatFloat(order.Quantity, 'f', 8, 64))
+		}
+
+		// set price field for limit orders
+		switch order.Type {
+		case types.OrderTypeStopLimit, types.OrderTypeLimit:
+			if len(order.PriceString) > 0 {
+				req.Price(order.PriceString)
+			} else if order.Market.Symbol != "" {
+				req.Price(order.Market.FormatPrice(order.Price))
+			}
+		}
+
+		switch order.TimeInForce {
+		case "FOK":
+			req.TimeInForce(kucoinapi.TimeInForceFOK)
+		case "IOC":
+			req.TimeInForce(kucoinapi.TimeInForceIOC)
+		default:
+			// default to GTC
+			req.TimeInForce(kucoinapi.TimeInForceGTC)
+		}
+
+		orderResponse, err := req.Do(ctx)
+		if err != nil {
+			return createdOrders, err
+		}
+
+		createdOrders = append(createdOrders, types.Order{
+			SubmitOrder:      order,
+			Exchange:         types.ExchangeKucoin,
+			OrderID:          hashStringID(orderResponse.OrderID),
+			Status:           types.OrderStatusNew,
+			ExecutedQuantity: 0,
+			IsWorking:        true,
+			CreationTime:     types.Time(time.Now()),
+			UpdateTime:       types.Time(time.Now()),
+		})
+	}
+
+	return createdOrders, err
 }
 
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
-	panic("implement me")
+	req := e.client.TradeService.NewListOrdersRequest()
+	req.Symbol(toLocalSymbol(symbol))
+
 	return nil, nil
 }
 
@@ -142,8 +200,6 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 func (e *Exchange) NewStream() types.Stream {
 	return NewStream(e.client, e)
 }
-
-var ErrMissingSequence = errors.New("sequence is missing")
 
 func (e *Exchange) QueryDepth(ctx context.Context, symbol string) (types.SliceOrderBook, int64, error) {
 	orderBook, err := e.client.MarketDataService.GetOrderBook(toLocalSymbol(symbol), 100)

@@ -91,9 +91,20 @@ func NewExchangeStandard(n types.ExchangeName, key, secret, passphrase, subAccou
 }
 ```
 
+## Testing order book stream
+
+```shell
+godotenv -f .env.local -- go run ./cmd/bbgo orderbook --config config/bbgo.yaml --session kucoin --symbol BTCUSDT
+```
 
 ## Testing user data stream
 
 ```shell
-go run ./cmd/bbgo   --config config/bbgo.yaml userdatastream --session kucoin
+godotenv -f .env.local -- go run ./cmd/bbgo --config config/bbgo.yaml userdatastream --session kucoin
+```
+
+### Testing order submit
+
+```shell
+godotenv -f .env.local -- go run ./cmd/bbgo submit-order --session=kucoin --symbol=BTCUSDT --side=buy --price=18000 --quantity=0.001
 ```
