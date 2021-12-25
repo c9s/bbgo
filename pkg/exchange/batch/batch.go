@@ -140,7 +140,7 @@ func (e KLineBatchQuery) Query(ctx context.Context, symbol string, interval type
 			}
 
 			if tryQueryKlineTimes > 10 { // it means loop 10 times
-				errC <- errors.Errorf("There's a dead loop in batch.go#Query , symbol: %s , interval: %s, startTime :%s ", symbol, interval, startTime.String())
+				errC <- errors.Errorf("there's a dead loop in batch.go#Query , symbol: %s , interval: %s, startTime :%s ", symbol, interval, startTime.String())
 				return
 			}
 		}
