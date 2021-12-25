@@ -300,7 +300,7 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
-		<-backtestExchange.Done()
+		backtestExchange.FeedMarketData()
 
 		log.Infof("shutting down trader...")
 		shutdownCtx, cancel := context.WithDeadline(ctx, time.Now().Add(10*time.Second))

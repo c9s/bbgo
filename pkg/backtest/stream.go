@@ -2,8 +2,6 @@ package backtest
 
 import (
 	"context"
-	"fmt"
-	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -19,105 +17,26 @@ type Stream struct {
 }
 
 func (s *Stream) Connect(ctx context.Context) error {
-	log.Infof("collecting backtest configurations...")
-
-	loadedSymbols := map[string]struct{}{}
-	loadedIntervals := map[types.Interval]struct{}{
-		// 1m interval is required for the backtest matching engine
-		types.Interval1m: {},
-		types.Interval1d: {},
-	}
-
-	for _, sub := range s.Subscriptions {
-		loadedSymbols[sub.Symbol] = struct{}{}
-
-		switch sub.Channel {
-		case types.KLineChannel:
-			loadedIntervals[types.Interval(sub.Options.Interval)] = struct{}{}
-
-		default:
-			return fmt.Errorf("stream channel %s is not supported in backtest", sub.Channel)
+	if s.PublicOnly {
+		if s.exchange.marketDataStream != nil {
+			panic("you should not set up more than 1 market data stream in back-test")
 		}
-	}
-
-	var symbols []string
-	for symbol := range loadedSymbols {
-		symbols = append(symbols, symbol)
-	}
-
-	var intervals []types.Interval
-	for interval := range loadedIntervals {
-		intervals = append(intervals, interval)
-	}
-
-	log.Infof("used symbols: %v and intervals: %v", symbols, intervals)
-
-	if !s.PublicOnly {
-		// user data stream
-		s.OnTradeUpdate(func(trade types.Trade) {
-			s.exchange.addTrade(trade)
-		})
-
-		// FIXME: here if we created two user data stream, since the callbacks are not de-registered we might have problem
-		s.exchange.matchingBooksMutex.Lock()
-		for _, matching := range s.exchange.matchingBooks {
-			matching.OnTradeUpdate(s.EmitTradeUpdate)
-			matching.OnOrderUpdate(s.EmitOrderUpdate)
-			matching.OnBalanceUpdate(s.EmitBalanceUpdate)
-		}
-		s.exchange.matchingBooksMutex.Unlock()
+		s.exchange.marketDataStream = s
+	} else {
 
 		// assign user data stream back
+		if s.exchange.userDataStream != nil {
+			panic("you should not set up more than 1 user data stream in back-test")
+		}
 		s.exchange.userDataStream = s
 	}
 
 	s.EmitConnect()
 	s.EmitStart()
-
-	if s.PublicOnly {
-		go func() {
-			FeedMarketData(s, s.exchange, s.exchange.startTime, s.exchange.endTime, symbols, intervals)
-		}()
-	}
-
 	return nil
 }
 
-func FeedMarketData(s *Stream, ex *Exchange, startTime, endTime time.Time, symbols []string, intervals []types.Interval) {
-	log.Infof("querying klines from database...")
-	klineC, errC := ex.srv.QueryKLinesCh(startTime, endTime, ex, symbols, intervals)
-	numKlines := 0
-	for k := range klineC {
-		if k.Interval == types.Interval1m {
-			matching, ok := ex.matchingBook(k.Symbol)
-			if !ok {
-				log.Errorf("matching book of %s is not initialized", k.Symbol)
-				continue
-			}
-
-			// here we generate trades and order updates
-			matching.processKLine(k)
-			numKlines++
-		}
-
-		s.EmitKLineClosed(k)
-	}
-
-	if err := <-errC; err != nil {
-		log.WithError(err).Error("backtest data feed error")
-	}
-
-	if numKlines == 0 {
-		log.Error("kline data is empty, make sure you have sync the exchange market data")
-	}
-
-	if err := s.Close(); err != nil {
-		log.WithError(err).Error("stream close error")
-	}
-}
-
 func (s *Stream) Close() error {
-	close(s.exchange.doneC)
 	return nil
 }
 
