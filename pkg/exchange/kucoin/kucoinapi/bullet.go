@@ -6,8 +6,9 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/c9s/bbgo/pkg/util"
 	"github.com/pkg/errors"
+
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 // ApiClient defines the request builder method and request method for the API service
@@ -16,7 +17,7 @@ type ApiClient interface {
 	NewAuthenticatedRequest(method, refURL string, params url.Values, payload interface{}) (*http.Request, error)
 
 	// NewRequest builds up the http request for public endpoints
-	NewRequest(method, refURL string, params url.Values, body []byte) (*http.Request, error)
+	NewRequest(method, refURL string, params url.Values, payload []byte) (*http.Request, error)
 
 	// SendRequest sends the request object to the api gateway
 	SendRequest(req *http.Request) (*util.Response, error)
