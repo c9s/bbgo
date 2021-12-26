@@ -92,6 +92,11 @@ OKEX_API_KEY=
 OKEX_API_SECRET=
 OKEX_API_PASSPHRASE
 
+# for kucoin exchange, if you have one
+KUCOIN_API_KEY=
+KUCOIN_API_SECRET=
+KUCOIN_API_PASSPHRASE=
+KUCOIN_API_KEY_VERSION=2
 ```
 
 Prepare your dotenv file `.env.local` and BBGO yaml config file `bbgo.yaml`.
