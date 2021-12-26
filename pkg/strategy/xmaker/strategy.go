@@ -769,9 +769,8 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
 		s.Notifiability.Notify(position)
 	})
-	s.tradeCollector.BindStreamForBackground(s.sourceSession.UserDataStream)
-	s.tradeCollector.BindStreamForBackground(s.makerSession.UserDataStream)
-	go s.tradeCollector.Run(ctx)
+	s.tradeCollector.BindStream(s.sourceSession.UserDataStream)
+	s.tradeCollector.BindStream(s.makerSession.UserDataStream)
 
 	s.stopC = make(chan struct{})
 
@@ -813,6 +812,8 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 				// uncover position = 5 - 3 (covered position) = 2
 				// for negative position:
 				// uncover position = -5 - -3 (covered position) = -2
+				s.tradeCollector.Process()
+
 				position := s.state.HedgePosition.AtomicLoad()
 				uncoverPosition := position - s.state.CoveredPosition.AtomicLoad()
 				absPos := math.Abs(uncoverPosition.Float64())
