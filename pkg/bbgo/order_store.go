@@ -128,9 +128,7 @@ func (s *OrderStore) handleOrderUpdate(order types.Order) {
 
 	case types.OrderStatusCanceled:
 		if s.RemoveCancelled {
-			if order.Status != types.OrderStatusPartiallyFilled {
-				s.Remove(order)
-			}
+			s.Remove(order)
 		}
 
 	case types.OrderStatusRejected:
