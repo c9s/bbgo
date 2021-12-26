@@ -1,4 +1,4 @@
-package gap
+package xgap
 
 import (
 	"context"
@@ -16,7 +16,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-const ID = "gap"
+const ID = "xgap"
 
 const stateKey = "state-v1"
 

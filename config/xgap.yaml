@@ -50,7 +50,7 @@ sessions:
 
 crossExchangeStrategies:
 
-- gap:
+- xgap:
     symbol: "ETHUSDT"
     sourceExchange: binance
     tradingExchange: max
