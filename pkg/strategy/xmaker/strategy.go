@@ -538,6 +538,7 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 			if quote.Available < notional {
 				// adjust price to higher 0.1%, so that we can ensure that the order can be executed
 				quantity = bbgo.AdjustQuantityByMaxAmount(quantity, fixedpoint.NewFromFloat(lastPrice*1.001), quote.Available)
+				quantity = s.sourceMarket.TruncateQuantity(quantity)
 			}
 		}
 
