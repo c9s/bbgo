@@ -56,9 +56,10 @@ type Strategy struct {
 	*bbgo.Notifiability
 	*bbgo.Persistence
 
-	Symbol          string `json:"symbol"`
-	SourceExchange  string `json:"sourceExchange"`
-	TradingExchange string `json:"tradingExchange"`
+	Symbol          string           `json:"symbol"`
+	SourceExchange  string           `json:"sourceExchange"`
+	TradingExchange string           `json:"tradingExchange"`
+	Quantity        fixedpoint.Value `json:"quantity"`
 
 	DailyFeeBudgets map[string]fixedpoint.Value `json:"dailyFeeBudgets,omitempty"`
 	DailyMaxVolume  fixedpoint.Value            `json:"dailyMaxVolume,omitempty"`
@@ -279,6 +280,12 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 				log.Infof("mid price %f", midPrice.Float64())
 
 				var quantity = s.tradingMarket.MinQuantity
+
+				if s.Quantity > 0 {
+					quantity = s.Quantity.Float64()
+					quantity = math.Min(quantity, s.tradingMarket.MinQuantity)
+				}
+
 				var quoteAmount = price * quantity
 				if quoteAmount <= s.tradingMarket.MinNotional {
 					quantity = math.Max(
@@ -293,7 +300,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 					Quantity:    quantity,
 					Price:       price,
 					Market:      s.tradingMarket,
-					TimeInForce: "GTC",
+					// TimeInForce: "GTC",
 					GroupID:     s.groupID,
 				}, types.SubmitOrder{
 					Symbol:      s.Symbol,
@@ -302,7 +309,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 					Quantity:    quantity,
 					Price:       price,
 					Market:      s.tradingMarket,
-					TimeInForce: "GTC",
+					// TimeInForce: "GTC",
 					GroupID:     s.groupID,
 				})
 				if err != nil {
