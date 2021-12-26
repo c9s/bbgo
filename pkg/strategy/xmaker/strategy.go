@@ -746,6 +746,13 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	s.orderStore.BindStream(s.makerSession.UserDataStream)
 
 	s.tradeCollector = bbgo.NewTradeCollector(s.Symbol, s.state.Position, s.orderStore)
+
+	if s.NotifyTrade {
+		s.tradeCollector.OnTrade(func(trade types.Trade) {
+			s.Notifiability.Notify(trade)
+		})
+	}
+
 	s.tradeCollector.OnTrade(func(trade types.Trade) {
 		c := trade.PositionChange()
 		s.state.HedgePosition.AtomicAdd(c)
@@ -753,9 +760,6 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 			s.state.CoveredPosition.AtomicAdd(c)
 		}
 
-		if s.NotifyTrade {
-			s.Notifiability.Notify(trade)
-		}
 		s.state.ProfitStats.AddTrade(trade)
 
 		if err := s.SaveState(); err != nil {

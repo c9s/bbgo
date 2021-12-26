@@ -45,7 +45,7 @@ crossExchangeStrategies:
     symbol: "ETHUSDT"
     sourceExchange: binance
     tradingExchange: max
-    updateInterval: 5s
+    updateInterval: 1m
     dailyMaxVolume: 100
     dailyFeeBudgets:
       MAX: 100
