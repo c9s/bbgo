@@ -9,6 +9,7 @@ import (
 
 	"github.com/slack-go/slack"
 
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/util"
 )
 
@@ -71,6 +72,21 @@ type Trade struct {
 
 	StrategyID sql.NullString  `json:"strategyID" db:"strategy"`
 	PnL        sql.NullFloat64 `json:"pnl" db:"pnl"`
+}
+
+func (trade Trade) PositionChange() fixedpoint.Value {
+	q := fixedpoint.NewFromFloat(trade.Quantity)
+	switch trade.Side {
+	case SideTypeSell:
+		return -q
+
+	case SideTypeBuy:
+		return q
+
+	case SideTypeSelf:
+		return 0
+	}
+	return 0
 }
 
 func (trade Trade) String() string {
