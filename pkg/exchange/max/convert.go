@@ -70,18 +70,16 @@ func toGlobalRewards(maxRewards []max.Reward) ([]types.Reward, error) {
 	return rewards, nil
 }
 
-func toGlobalOrderStatus(orderStatus max.OrderState, executedVolume, remainingVolume fixedpoint.Value) types.OrderStatus {
+func toGlobalOrderStatus(orderState max.OrderState, executedVolume, remainingVolume fixedpoint.Value) types.OrderStatus {
+	switch orderState {
 
-	switch orderStatus {
-
-	case max.OrderStateCancel:
-		return types.OrderStatusCanceled
-
-	case max.OrderStateFinalizing, max.OrderStateDone:
+	case max.OrderStateFinalizing, max.OrderStateDone, max.OrderStateCancel:
 		if executedVolume > 0 && remainingVolume > 0 {
 			return types.OrderStatusPartiallyFilled
 		} else if remainingVolume == 0 {
 			return types.OrderStatusFilled
+		} else if executedVolume == 0 {
+			return types.OrderStatusCanceled
 		}
 
 		return types.OrderStatusFilled
@@ -105,8 +103,8 @@ func toGlobalOrderStatus(orderStatus max.OrderState, executedVolume, remainingVo
 
 	}
 
-	logger.Errorf("unknown order status: %v", orderStatus)
-	return types.OrderStatus(orderStatus)
+	logger.Errorf("unknown order status: %v", orderState)
+	return types.OrderStatus(orderState)
 }
 
 func toGlobalOrderType(orderType max.OrderType) types.OrderType {

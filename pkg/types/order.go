@@ -84,10 +84,19 @@ const NoClientOrderID = "0"
 type OrderStatus string
 
 const (
+	// OrderStatusNew means the order is active on the orderbook without any filling.
 	OrderStatusNew             OrderStatus = "NEW"
+
+	// OrderStatusFilled means the order is fully-filled, it's an end state.
 	OrderStatusFilled          OrderStatus = "FILLED"
+
+	// OrderStatusPartiallyFilled means the order is partially-filled, it's an end state, the order might be canceled in the end.
 	OrderStatusPartiallyFilled OrderStatus = "PARTIALLY_FILLED"
+
+	// OrderStatusCanceled means the order is canceled without partially filled or filled.
 	OrderStatusCanceled        OrderStatus = "CANCELED"
+
+	// OrderStatusRejected means the order is not placed successfully, it's rejected by the api
 	OrderStatusRejected        OrderStatus = "REJECTED"
 )
 

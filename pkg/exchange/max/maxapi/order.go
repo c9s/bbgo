@@ -44,6 +44,7 @@ type OrderState string
 
 const (
 	OrderStateDone       = OrderState("done")
+
 	OrderStateCancel     = OrderState("cancel")
 	OrderStateWait       = OrderState("wait")
 	OrderStateConvert    = OrderState("convert")
