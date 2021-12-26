@@ -6,12 +6,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/c9s/bbgo/pkg/bbgo"
-	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
-	"github.com/c9s/bbgo/pkg/types"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+
+	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 // go run ./cmd/bbgo userdatastream --session=ftx
@@ -41,16 +42,16 @@ var userDataStreamCmd = &cobra.Command{
 
 		s := session.Exchange.NewStream()
 		s.OnOrderUpdate(func(order types.Order) {
-			log.Infof("orderUpdate: %+v", order)
+			log.Infof("[orderUpdate] %+v", order)
 		})
 		s.OnTradeUpdate(func(trade types.Trade) {
-			log.Infof("tradeUpdate: %+v", trade)
+			log.Infof("[tradeUpdate] %+v", trade)
 		})
 		s.OnBalanceUpdate(func(trade types.BalanceMap) {
-			log.Infof("balanceUpdate: %+v", trade)
+			log.Infof("[balanceUpdate] %+v", trade)
 		})
 		s.OnBalanceSnapshot(func(trade types.BalanceMap) {
-			log.Infof("balanceSnapshot: %+v", trade)
+			log.Infof("[balanceSnapshot] %+v", trade)
 		})
 
 		log.Infof("connecting...")

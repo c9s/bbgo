@@ -25,6 +25,9 @@ func NewOrderStore(symbol string) *OrderStore {
 }
 
 func (s *OrderStore) AllFilled() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	// If any order is new or partially filled, we return false
 	for _, o := range s.orders {
 		switch o.Status {
@@ -101,14 +104,12 @@ func (s *OrderStore) Update(o types.Order) bool {
 func (s *OrderStore) BindStream(stream types.Stream) {
 	hasSymbol := s.Symbol != ""
 	stream.OnOrderUpdate(func(order types.Order) {
-		if hasSymbol {
-			if order.Symbol != s.Symbol {
-				return
-			}
-			s.handleOrderUpdate(order)
-		} else {
-			s.handleOrderUpdate(order)
+		// if we have symbol defined, we should filter out the orders that we are not interested in
+		if hasSymbol && order.Symbol != s.Symbol {
+			return
 		}
+
+		s.handleOrderUpdate(order)
 	})
 }
 
