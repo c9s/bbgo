@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/leekchan/accounting"
+
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 type Duration time.Duration
@@ -49,7 +51,7 @@ func (d *Duration) UnmarshalJSON(data []byte) error {
 }
 
 type Market struct {
-	Symbol      string `json:"symbol"`
+	Symbol string `json:"symbol"`
 
 	// LocalSymbol is used for exchange's API (exchange package internal)
 	LocalSymbol string `json:"localSymbol,omitempty"`
@@ -57,7 +59,7 @@ type Market struct {
 	// PricePrecision is the precision used for formatting price, 8 = 8 decimals
 	// can be converted from price tick step size, e.g.
 	//    int(math.Log10(price step size))
-	PricePrecision  int `json:"pricePrecision"`
+	PricePrecision int `json:"pricePrecision"`
 
 	// VolumePrecision is the precision used for formatting quantity and volume, 8 = 8 decimals
 	// can be converted from step size, e.g.
@@ -65,10 +67,10 @@ type Market struct {
 	VolumePrecision int `json:"volumePrecision"`
 
 	// QuoteCurrency is the currency name for quote, e.g. USDT in BTC/USDT, USDC in BTC/USDC
-	QuoteCurrency   string `json:"quoteCurrency"`
+	QuoteCurrency string `json:"quoteCurrency"`
 
 	// BaseCurrency is the current name for base, e.g. BTC in BTC/USDT, ETH in ETH/USDC
-	BaseCurrency    string `json:"baseCurrency"`
+	BaseCurrency string `json:"baseCurrency"`
 
 	// The MIN_NOTIONAL filter defines the minimum notional value allowed for an order on a symbol.
 	// An order's notional value is the price * quantity
@@ -84,13 +86,19 @@ type Market struct {
 	// StepSize is the step size of quantity
 	// can be converted from precision, e.g.
 	//    1.0 / math.Pow10(m.BaseUnitPrecision)
-	StepSize    float64 `json:"stepSize,omitempty"`
+	StepSize float64 `json:"stepSize,omitempty"`
 
 	MinPrice float64 `json:"minPrice,omitempty"`
 	MaxPrice float64 `json:"maxPrice,omitempty"`
 
 	// TickSize is the step size of price
 	TickSize float64 `json:"tickSize,omitempty"`
+}
+
+// TruncateQuantity uses the step size to truncate floating number, in order to avoid the rounding issue
+func (m Market) TruncateQuantity(quantity fixedpoint.Value) fixedpoint.Value {
+	stepRound := math.Pow10(-int(math.Log10(m.StepSize)))
+	return fixedpoint.NewFromFloat(math.Trunc(quantity.Float64()*stepRound) / stepRound)
 }
 
 func (m Market) BaseCurrencyFormatter() *accounting.Accounting {

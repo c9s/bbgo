@@ -501,6 +501,7 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	}
 
 	quantity := fixedpoint.Abs(pos)
+	quantity = s.sourceMarket.TruncateQuantity(quantity)
 
 	if pos < 0 {
 		side = types.SideTypeSell
