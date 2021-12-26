@@ -73,13 +73,14 @@ func toGlobalRewards(maxRewards []max.Reward) ([]types.Reward, error) {
 func toGlobalOrderStatus(orderState max.OrderState, executedVolume, remainingVolume fixedpoint.Value) types.OrderStatus {
 	switch orderState {
 
-	case max.OrderStateFinalizing, max.OrderStateDone, max.OrderStateCancel:
-		if executedVolume > 0 && remainingVolume > 0 {
-			return types.OrderStatusPartiallyFilled
+	case max.OrderStateCancel:
+		return types.OrderStatusCanceled
+
+	case max.OrderStateFinalizing, max.OrderStateDone:
+		if executedVolume == 0 {
+			return types.OrderStatusCanceled
 		} else if remainingVolume == 0 {
 			return types.OrderStatusFilled
-		} else if executedVolume == 0 {
-			return types.OrderStatusCanceled
 		}
 
 		return types.OrderStatusFilled
