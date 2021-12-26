@@ -766,6 +766,21 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 			log.WithError(err).Error("save state error")
 		}
 	})
+	s.tradeCollector.OnProfit(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
+		p := bbgo.Profit{
+			Symbol:          s.Symbol,
+			Profit:          profit,
+			NetProfit:       netProfit,
+			TradeAmount:     fixedpoint.NewFromFloat(trade.QuoteQuantity),
+			ProfitMargin:    profit.DivFloat64(trade.QuoteQuantity),
+			NetProfitMargin: netProfit.DivFloat64(trade.QuoteQuantity),
+			QuoteCurrency:   s.state.Position.QuoteCurrency,
+			BaseCurrency:    s.state.Position.BaseCurrency,
+			Time:            trade.Time.Time(),
+		}
+		s.state.ProfitStats.AddProfit(p)
+		s.Notify(&p)
+	})
 	s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
 		s.Notifiability.Notify(position)
 	})
