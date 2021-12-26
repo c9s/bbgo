@@ -6,13 +6,14 @@ import (
 	"strings"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
-	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -305,21 +306,22 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 	session.markets = markets
 
 	// query and initialize the balances
-	log.Infof("querying balances from session %s...", session.Name)
-	balances, err := session.Exchange.QueryAccountBalances(ctx)
-	if err != nil {
-		return err
+	if !session.PublicOnly {
+		log.Infof("querying balances from session %s...", session.Name)
+		balances, err := session.Exchange.QueryAccountBalances(ctx)
+		if err != nil {
+			return err
+		}
+
+		log.Infof("%s account", session.Name)
+		balances.Print()
+		session.Account.UpdateBalances(balances)
+
+		// forward trade updates and order updates to the order executor
+		session.UserDataStream.OnTradeUpdate(session.OrderExecutor.EmitTradeUpdate)
+		session.UserDataStream.OnOrderUpdate(session.OrderExecutor.EmitOrderUpdate)
+		session.Account.BindStream(session.UserDataStream)
 	}
-
-	log.Infof("%s account", session.Name)
-	balances.Print()
-
-	session.Account.UpdateBalances(balances)
-
-	// forward trade updates and order updates to the order executor
-	session.UserDataStream.OnTradeUpdate(session.OrderExecutor.EmitTradeUpdate)
-	session.UserDataStream.OnOrderUpdate(session.OrderExecutor.EmitOrderUpdate)
-	session.Account.BindStream(session.UserDataStream)
 
 	// TODO: move this logic to Environment struct
 	// if back-test service is not set, meaning we are not back-testing
@@ -690,16 +692,14 @@ func (session *ExchangeSession) InitExchange(name string, exchange types.Exchang
 	var err error
 	var exchangeName = session.ExchangeName
 	if exchange == nil {
-		if session.Key != "" && session.Secret != "" {
-			if !session.PublicOnly {
-				if len(session.Key) == 0 || len(session.Secret) == 0 {
-					return fmt.Errorf("can not create exchange %s: empty key or secret", exchangeName)
-				}
-			}
-
-			exchange, err = cmdutil.NewExchangeStandard(exchangeName, session.Key, session.Secret, session.Passphrase, session.SubAccount)
+		if session.PublicOnly {
+			exchange, err = cmdutil.NewExchangePublic(exchangeName)
 		} else {
-			exchange, err = cmdutil.NewExchangeWithEnvVarPrefix(exchangeName, session.EnvVarPrefix)
+			if session.Key != "" && session.Secret != "" {
+				exchange, err = cmdutil.NewExchangeStandard(exchangeName, session.Key, session.Secret, session.Passphrase, session.SubAccount)
+			} else {
+				exchange, err = cmdutil.NewExchangeWithEnvVarPrefix(exchangeName, session.EnvVarPrefix)
+			}
 		}
 	}
 

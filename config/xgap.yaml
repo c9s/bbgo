@@ -16,19 +16,10 @@ notifications:
 
   # routing rules
   routing:
-    trade: "$symbol"
+    trade: "$silent"
     order: "$silent"
     submitOrder: "$silent"
     pnL: "bbgo-pnl"
-
-reportPnL:
-- averageCostBySymbols:
-  - "BTCUSDT"
-  - "BNBUSDT"
-  of: binance
-  when:
-  - "@daily"
-  - "@hourly"
 
 persistence:
   json:
@@ -60,4 +51,3 @@ crossExchangeStrategies:
       MAX: 100
     persistence:
       type: redis
-

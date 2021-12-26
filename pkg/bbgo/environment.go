@@ -189,6 +189,7 @@ func (environ *Environment) AddExchange(name string, exchange types.Exchange) (s
 }
 
 func (environ *Environment) ConfigureExchangeSessions(userConfig *Config) error {
+	// if sessions are not defined, we detect the sessions automatically
 	if len(userConfig.Sessions) == 0 {
 		return environ.AddExchangesByViperKeys()
 	}
