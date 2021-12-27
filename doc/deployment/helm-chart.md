@@ -1,4 +1,11 @@
-## Helm Chart
+# Helm Chart
+
+## Requirement
+
+- redis (optional, if you need persistence)
+- docker image (you can use the image from docker hub or build one by yourself)
+
+## Install
 
 If you need redis:
 
@@ -74,7 +81,7 @@ helm upgrade bbgo-$INSTANCE ./charts/bbgo
 helm upgrade --set image.tag=1.15.2 bbgo-$INSTANCE ./charts/bbgo
 ```
 
-Delete chart:
+## Delete an installed chart
 
 ```sh
 helm delete bbgo-$INSTANCE
