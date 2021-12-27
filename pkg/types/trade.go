@@ -103,7 +103,7 @@ func (trade Trade) String() string {
 
 // PlainText is used for telegram-styled messages
 func (trade Trade) PlainText() string {
-	return fmt.Sprintf("Trade %s %s %s %f @ %f, amount %f , fee  %f %s ",
+	return fmt.Sprintf("Trade %s %s %s %f @ %f, amount %f, fee %f %s",
 		trade.Exchange.String(),
 		trade.Symbol,
 		trade.Side,
