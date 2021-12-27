@@ -64,16 +64,17 @@ type Strategy struct {
 	DailyFeeBudgets map[string]fixedpoint.Value `json:"dailyFeeBudgets,omitempty"`
 	DailyMaxVolume  fixedpoint.Value            `json:"dailyMaxVolume,omitempty"`
 	UpdateInterval  types.Duration              `json:"updateInterval"`
+	SimulateVolume  bool                        `json:"simulateVolume"`
 
 	sourceSession, tradingSession *bbgo.ExchangeSession
 	sourceMarket, tradingMarket   types.Market
 
 	state *State
 
-	mu                      sync.Mutex
-	lastKLine               types.KLine
-	sourceBook, tradingBook *types.StreamOrderBook
-	groupID                 uint32
+	mu                                sync.Mutex
+	lastSourceKLine, lastTradingKLine types.KLine
+	sourceBook, tradingBook           *types.StreamOrderBook
+	groupID                           uint32
 
 	stopC chan struct{}
 }
@@ -200,9 +201,15 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 	// from here, set data binding
 	s.sourceSession.MarketDataStream.OnKLine(func(kline types.KLine) {
-		log.Infof("source exchange %s price: %f", s.Symbol, kline.Close)
+		log.Infof("source exchange %s price: %f volume: %f", s.Symbol, kline.Close, kline.Volume)
 		s.mu.Lock()
-		s.lastKLine = kline
+		s.lastSourceKLine = kline
+		s.mu.Unlock()
+	})
+	s.tradingSession.MarketDataStream.OnKLine(func(kline types.KLine) {
+		log.Infof("trading exchange %s price: %f volume: %f", s.Symbol, kline.Close, kline.Volume)
+		s.mu.Lock()
+		s.lastTradingKLine = kline
 		s.mu.Unlock()
 	})
 
@@ -284,6 +291,16 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 				if s.Quantity > 0 {
 					quantity = s.Quantity.Float64()
 					quantity = math.Min(quantity, s.tradingMarket.MinQuantity)
+				} else if s.SimulateVolume {
+					s.mu.Lock()
+					if s.lastTradingKLine.Volume > 0 && s.lastSourceKLine.Volume > 0 {
+						volumeDiff := s.lastSourceKLine.Volume - s.lastTradingKLine.Volume
+						// change the current quantity only diff is positive
+						if volumeDiff > 0 {
+							quantity = volumeDiff
+						}
+					}
+					s.mu.Unlock()
 				}
 
 				var quoteAmount = price * quantity
@@ -294,23 +311,23 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 				}
 
 				createdOrders, err := tradingSession.Exchange.SubmitOrders(ctx, types.SubmitOrder{
-					Symbol:      s.Symbol,
-					Side:        types.SideTypeBuy,
-					Type:        types.OrderTypeLimit,
-					Quantity:    quantity,
-					Price:       price,
-					Market:      s.tradingMarket,
+					Symbol:   s.Symbol,
+					Side:     types.SideTypeBuy,
+					Type:     types.OrderTypeLimit,
+					Quantity: quantity,
+					Price:    price,
+					Market:   s.tradingMarket,
 					// TimeInForce: "GTC",
-					GroupID:     s.groupID,
+					GroupID: s.groupID,
 				}, types.SubmitOrder{
-					Symbol:      s.Symbol,
-					Side:        types.SideTypeSell,
-					Type:        types.OrderTypeLimit,
-					Quantity:    quantity,
-					Price:       price,
-					Market:      s.tradingMarket,
+					Symbol:   s.Symbol,
+					Side:     types.SideTypeSell,
+					Type:     types.OrderTypeLimit,
+					Quantity: quantity,
+					Price:    price,
+					Market:   s.tradingMarket,
 					// TimeInForce: "GTC",
-					GroupID:     s.groupID,
+					GroupID: s.groupID,
 				})
 				if err != nil {
 					log.WithError(err).Error("order submit error")
