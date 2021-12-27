@@ -8,6 +8,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -323,8 +324,11 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 		session.UserDataStream.OnOrderUpdate(session.OrderExecutor.EmitOrderUpdate)
 		session.Account.BindStream(session.UserDataStream)
 
-		session.metricsBalancesUpdater(balances)
-		session.bindUserDataStreamMetrics(session.UserDataStream)
+		// if metrics mode is enabled, we bind the callbacks to update metrics
+		if viper.GetBool("metrics") {
+			session.metricsBalancesUpdater(balances)
+			session.bindUserDataStreamMetrics(session.UserDataStream)
+		}
 	}
 
 	// TODO: move this logic to Environment struct
@@ -799,7 +803,27 @@ func (session *ExchangeSession) metricsBalancesUpdater(balances types.BalanceMap
 		metricsTotalBalances.With(labels).Set(balance.Total().Float64())
 		metricsLockedBalances.With(labels).Set(balance.Locked.Float64())
 		metricsAvailableBalances.With(labels).Set(balance.Available.Float64())
+		metricsLastUpdateTimeBalance.With(prometheus.Labels{
+			"exchange":  session.ExchangeName.String(),
+			"margin":    session.MarginType(),
+			"channel":   "user",
+			"data_type": "balance",
+			"symbol":    "",
+			"currency":  currency,
+		}).SetToCurrentTime()
 	}
+
+}
+
+func (session *ExchangeSession) metricsOrderUpdater(order types.Order) {
+	metricsLastUpdateTimeBalance.With(prometheus.Labels{
+		"exchange":  session.ExchangeName.String(),
+		"margin":    session.MarginType(),
+		"channel":   "user",
+		"data_type": "order",
+		"symbol":    order.Symbol,
+		"currency":  "",
+	}).SetToCurrentTime()
 }
 
 func (session *ExchangeSession) metricsTradeUpdater(trade types.Trade) {
@@ -812,23 +836,55 @@ func (session *ExchangeSession) metricsTradeUpdater(trade types.Trade) {
 	}
 	metricsTradingVolume.With(labels).Add(trade.Quantity * trade.Price)
 	metricsTradesTotal.With(labels).Inc()
+	metricsLastUpdateTimeBalance.With(prometheus.Labels{
+		"exchange":  session.ExchangeName.String(),
+		"margin":    session.MarginType(),
+		"channel":   "user",
+		"data_type": "trade",
+		"symbol":    trade.Symbol,
+		"currency":  "",
+	}).SetToCurrentTime()
+}
+
+func (session *ExchangeSession) bindMarketDataStreamMetrics(stream types.Stream) {
+	stream.OnBookUpdate(func(book types.SliceOrderBook) {
+		metricsLastUpdateTimeBalance.With(prometheus.Labels{
+			"exchange":  session.ExchangeName.String(),
+			"margin":    session.MarginType(),
+			"channel":   "market",
+			"data_type": "book",
+			"symbol":    book.Symbol,
+			"currency":  "",
+		}).SetToCurrentTime()
+	})
+	stream.OnKLineClosed(func(kline types.KLine) {
+		metricsLastUpdateTimeBalance.With(prometheus.Labels{
+			"exchange":  session.ExchangeName.String(),
+			"margin":    session.MarginType(),
+			"channel":   "market",
+			"data_type": "kline",
+			"symbol":    kline.Symbol,
+			"currency":  "",
+		}).SetToCurrentTime()
+	})
 }
 
 func (session *ExchangeSession) bindUserDataStreamMetrics(stream types.Stream) {
 	stream.OnBalanceUpdate(session.metricsBalancesUpdater)
 	stream.OnBalanceSnapshot(session.metricsBalancesUpdater)
 	stream.OnTradeUpdate(session.metricsTradeUpdater)
+	stream.OnOrderUpdate(session.metricsOrderUpdater)
 	stream.OnDisconnect(func() {
 		metricsConnectionStatus.With(prometheus.Labels{
-			"exchange":  session.ExchangeName.String(),
-			"margin":    session.MarginType(),
+			"exchange": session.ExchangeName.String(),
+			"margin":   session.MarginType(),
 			"symbol":   session.IsolatedMarginSymbol,
 		}).Set(0.0)
 	})
 	stream.OnConnect(func() {
 		metricsConnectionStatus.With(prometheus.Labels{
-			"exchange":  session.ExchangeName.String(),
-			"margin":    session.MarginType(),
+			"exchange": session.ExchangeName.String(),
+			"margin":   session.MarginType(),
 			"symbol":   session.IsolatedMarginSymbol,
 		}).Set(1.0)
 	})
