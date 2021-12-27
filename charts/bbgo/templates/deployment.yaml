@@ -48,13 +48,15 @@ spec:
           {{- end }}
 
           ports:
+          {{- if .Values.metrics.enabled }}
           - name: metrics
             containerPort: 9090
             protocol: TCP
-          # livenessProbe:
-          #   httpGet:
-          #     path: /
-          #     port: http
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: metrics
+          {{- end }}
           # readinessProbe:
           #   httpGet:
           #     path: /
