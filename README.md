@@ -21,7 +21,10 @@ A trading bot framework written in Go. The name bbgo comes from the BB8 bot in t
 - Many built-in strategies.
 - Multi-exchange session support: you can connect to more than 2 exchanges with different accounts or subaccounts.
 - Standard indicators, e.g., SMA, EMA, BOLL, VMA, MACD...
-- React-powered Web Dashboard
+- React-powered Web Dashboard.
+- Docker image ready.
+- Kubernetes support.
+- Helm chart ready.
 
 ## Screenshots
 
@@ -474,88 +477,15 @@ streambook := types.NewStreamBook(symbol)
 streambook.BindStream(stream)
 ```
 
-## How To Add A New Exchange
+## Deployment
 
-(TBD)
-
-## Helm Chart
-
-If you need redis:
-
-```sh
-helm repo add bitnami https://charts.bitnami.com/bitnami
-helm install redis bitnami/redis
-```
-
-To get the dynamically generated redis password, you can use the following command:
-
-```sh
-export REDIS_PASSWORD=$(kubectl get secret --namespace bbgo redis -o jsonpath="{.data.redis-password}" | base64 --decode)
-```
-
-Prepare your docker image locally (you can also use the docker image from docker hub):
-
-```sh
-make docker DOCKER_TAG=1.16.0
-```
-
-The docker tag version number is from the file [Chart.yaml](charts/bbgo/Chart.yaml)
-
-Choose your instance name:
-
-```sh
-export INSTANCE=grid
-```
-
-Prepare your secret:
-
-```sh
-kubectl create secret generic bbgo-$INSTANCE --from-env-file .env.local
-```
-
-Configure your config file, the chart defaults to read config/bbgo.yaml to create a configmap:
-
-```sh
-cp config/grid.yaml bbgo-$INSTANCE.yaml
-vim bbgo-$INSTANCE.yaml
-```
-
-Prepare your configmap:
-
-```sh
-kubectl create configmap bbgo-$INSTANCE --from-file=bbgo.yaml=bbgo-$INSTANCE.yaml
-```
-
-Install chart with the preferred release name, the release name maps to the previous secret we just created, that
-is, `bbgo-grid`:
-
-```sh
-helm install --set existingConfigmap=bbgo-$INSTANCE bbgo-$INSTANCE ./charts/bbgo
-```
-
-To use the latest version:
-
-```sh
-helm install --set existingConfigmap=bbgo-$INSTANCE --set image.tag=latest bbgo-$INSTANCE ./charts/bbgo
-```
-
-To upgrade:
-
-```sh
-helm upgrade bbgo-$INSTANCE ./charts/bbgo
-helm upgrade --set image.tag=1.15.2 bbgo-$INSTANCE ./charts/bbgo
-```
-
-Delete chart:
-
-```sh
-helm delete bbgo-$INSTANCE
-```
+- [Helm Chart](./doc/deployment/helm-chart.md)
+- Baremetal machine or a VPS
 
 ## Development
 
-The overview function flow at bbgo
-![image info](./assets/overview.svg)
+- [Adding New Exchange](./doc/development/adding-new-exchange.md)
+- [Migration](./doc/development/migration.md)
 
 ### Setting up your local repository
 
@@ -566,65 +496,6 @@ The overview function flow at bbgo
 5. Test your changes.
 6. Push your changes to your fork.
 7. Send a pull request.
-
-### Adding new migration
-
-1. The project used rockerhopper for db migration. 
-https://github.com/c9s/rockhopper
-
-
-2. Create migration files
-
-```sh
-rockhopper --config rockhopper_sqlite.yaml create --type sql add_pnl_column
-rockhopper --config rockhopper_mysql.yaml create --type sql add_pnl_column
-```
-
-or you can use the util script:
-
-```
-bash utils/generate-new-migration.sh add_pnl_column
-```
-
-Be sure to edit both sqlite3 and mysql migration files. ( [Sample](migrations/mysql/20210531234123_add_kline_taker_buy_columns.sql) )
-
-
-To test the drivers, you have to update the rockhopper_mysql.yaml file to connect your database,
-then do:
-
-```sh
-rockhopper --config rockhopper_sqlite.yaml up
-rockhopper --config rockhopper_mysql.yaml up
-```
-
-Then run the following command to compile the migration files into go files:
-
-```shell
-make migrations
-```
-
-or
-
-```shell
-	rockhopper compile --config rockhopper_mysql.yaml --output pkg/migrations/mysql
-	rockhopper compile --config rockhopper_sqlite.yaml --output pkg/migrations/sqlite3
-	git add -v pkg/migrations && git commit -m "compile and update migration package" pkg/migrations || true
-```
-
-
-If you want to override the DSN and the Driver defined in the YAML config file, you can add some env vars in your dotenv file like this:
-
-```shell
-ROCKHOPPER_DRIVER=mysql
-ROCKHOPPER_DIALECT=mysql
-ROCKHOPPER_DSN="root:123123@unix(/opt/local/var/run/mysql57/mysqld.sock)/bbgo"
-```
-
-And then, run:
-
-```shell
-dotenv -f .env.local -- rockhopper --config rockhopper_mysql.yaml up
-```
 
 ### Setup frontend development environment
 

@@ -16,12 +16,15 @@ nameOverride: ""
 fullnameOverride: ""
 
 # existingConfigMap is used for loading the existing configmap
+# optional, if you have a configmap rather than the default configmap name
 existingConfigMap:
 
 # configmap could be a string pointing to the local file in the chart
 # or a object with inlined bbgo yaml config
 configmap:
 
+# dotenv defines environment variables, which are loaded from a k8s secret.
+# if not defined, then release name will be used to load the secret.
 dotenv:
   secret: null
 
@@ -63,6 +66,13 @@ ingress:
   #  - secretName: chart-example-tls
   #    hosts:
   #      - chart-example.local
+
+webserver:
+  enabled: false
+
+metrics:
+  enabled: false
+  port: 9090
 
 resources:
   # We usually recommend not to specify default resources and to leave this as a conscious
