@@ -233,7 +233,8 @@ Check out the strategy directory [strategy](pkg/strategy) for all built-in strat
   order [buyandhold](pkg/strategy/pricedrop)
 - `bollgrid` strategy implements a basic grid strategy with the built-in bollinger
   indicator [bollgrid](pkg/strategy/bollgrid)
-- `grid` strategy implements the fixed price band grid strategy [grid](pkg/strategy/grid)
+- `grid` strategy implements the fixed price band grid strategy [grid](pkg/strategy/grid). See
+  [document](./doc/strategy/grid.md).
 - `support` strategy implements the fixed price band grid strategy [support](pkg/strategy/support). See
   [document](./doc/strategy/support.md).
 - `flashcrash` strategy implements a strategy that catches the flashcrash [flashcrash](pkg/strategy/flashcrash)
