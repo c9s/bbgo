@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
@@ -321,6 +322,8 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 		session.UserDataStream.OnTradeUpdate(session.OrderExecutor.EmitTradeUpdate)
 		session.UserDataStream.OnOrderUpdate(session.OrderExecutor.EmitOrderUpdate)
 		session.Account.BindStream(session.UserDataStream)
+
+		session.bindUserDataStreamMetrics(session.UserDataStream)
 	}
 
 	// TODO: move this logic to Environment struct
@@ -770,4 +773,47 @@ func (session *ExchangeSession) InitExchange(name string, exchange types.Exchang
 	session.initializedSymbols = make(map[string]struct{})
 	session.logger = log.WithField("session", name)
 	return nil
+}
+
+func (session *ExchangeSession) MarginType() string {
+	margin := "none"
+	if session.Margin {
+		margin = "margin"
+		if session.IsolatedMargin {
+			margin = "isolated"
+		}
+	}
+	return margin
+}
+
+func (session *ExchangeSession) metricsBalancesUpdater(balances types.BalanceMap) {
+	for currency, balance := range balances {
+		labels := prometheus.Labels{
+			"exchange": session.ExchangeName.String(),
+			"margin":   session.MarginType(),
+			"symbol":   session.IsolatedMarginSymbol,
+			"currency": currency,
+		}
+
+		metricsTotalBalances.With(labels).Set(balance.Total().Float64())
+		metricsLockedBalances.With(labels).Set(balance.Locked.Float64())
+		metricsAvailableBalances.With(labels).Set(balance.Available.Float64())
+	}
+}
+
+func (session *ExchangeSession) metricsTradeUpdater(trade types.Trade) {
+	labels := prometheus.Labels{
+		"exchange":  session.ExchangeName.String(),
+		"margin":    session.MarginType(),
+		"side":      trade.Side.String(),
+		"symbol":    trade.Symbol,
+		"liquidity": trade.Liquidity(),
+	}
+	metricsTradingVolume.With(labels).Add(trade.Quantity)
+	metricsTradesTotal.With(labels).Inc()
+}
+
+func (session *ExchangeSession) bindUserDataStreamMetrics(stream types.Stream) {
+	stream.OnBalanceUpdate(session.metricsBalancesUpdater)
+	stream.OnTradeUpdate(session.metricsTradeUpdater)
 }
