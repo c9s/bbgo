@@ -123,10 +123,13 @@ dist-bbgo-darwin: \
 dist: static dist-bbgo-linux dist-bbgo-darwin desktop
 
 pkg/version/version.go: .FORCE
-	bash utils/generate-version-file.sh > $@
+	BUILD_FLAGS="release" bash utils/generate-version-file.sh > $@
 
 pkg/version/dev.go: .FORCE
-	VERSION_SUFFIX="-dev" bash utils/generate-version-file.sh > $@
+	BUILD_FLAGS="!release" VERSION_SUFFIX="-dev" bash utils/generate-version-file.sh > $@
+
+dev-version: pkg/version/dev.go
+	git commit $< -m "update dev build version"
 
 version: pkg/version/version.go pkg/version/dev.go migrations
 	git commit $< $(word 2,$^) -m "bump version to $(VERSION)" || true
