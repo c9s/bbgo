@@ -323,6 +323,7 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 		session.UserDataStream.OnOrderUpdate(session.OrderExecutor.EmitOrderUpdate)
 		session.Account.BindStream(session.UserDataStream)
 
+		session.metricsBalancesUpdater(balances)
 		session.bindUserDataStreamMetrics(session.UserDataStream)
 	}
 
@@ -815,5 +816,6 @@ func (session *ExchangeSession) metricsTradeUpdater(trade types.Trade) {
 
 func (session *ExchangeSession) bindUserDataStreamMetrics(stream types.Stream) {
 	stream.OnBalanceUpdate(session.metricsBalancesUpdater)
+	stream.OnBalanceSnapshot(session.metricsBalancesUpdater)
 	stream.OnTradeUpdate(session.metricsTradeUpdater)
 }
