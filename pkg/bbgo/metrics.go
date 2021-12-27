@@ -10,8 +10,8 @@ var (
 		},
 		[]string{
 			"exchange", // exchange name
-			"stream",   // user data stream, market data stream
-			"margin",   // margin of connection. 1 or 0
+			"channel",  // channel: user or market
+			"margin",   // margin type: none, margin or isolated
 			"symbol",   // margin symbol of the connection.
 		},
 	)
