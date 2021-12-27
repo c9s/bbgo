@@ -74,6 +74,12 @@ To use the latest version:
 helm install --set existingConfigmap=bbgo-$INSTANCE --set image.tag=latest bbgo-$INSTANCE ./charts/bbgo
 ```
 
+Or, if you have custom values.yaml to override the default values:
+
+```sh
+helm install --values deploy/my-bbgo-values.yaml bbgo-$INSTANCE ./charts/bbgo
+```
+
 To upgrade:
 
 ```sh
