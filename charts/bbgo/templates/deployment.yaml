@@ -51,6 +51,11 @@ spec:
           {{- end }}
 
           ports:
+          {{- if .Values.webserver.enabled }}
+          - name: http
+            containerPort: 8080
+            protocol: TCP
+          {{- end }}
           {{- if .Values.metrics.enabled }}
           - name: metrics
             containerPort: 9090
