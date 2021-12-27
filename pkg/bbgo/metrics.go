@@ -16,17 +16,42 @@ var (
 		},
 	)
 
-	metricsBalances = prometheus.NewGaugeVec(
+	metricsLockedBalances = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "bbgo_balances",
-			Help: "bbgo exchange session balance",
+			Name: "bbgo_balances_locked",
+			Help: "bbgo exchange locked balances",
 		},
 		[]string{
 			"exchange", // exchange name
-			"status",   // 1 -> ON, 0 -> OFF
+			"margin",   // margin of connection. 1 or 0
+			"symbol",   // margin symbol of the connection.
 			"currency",
-			"margin", // margin of connection. 1 or 0
-			"symbol", // margin symbol of the connection.
+		},
+	)
+
+	metricsAvailableBalances = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "bbgo_balances_available",
+			Help: "bbgo exchange available balances",
+		},
+		[]string{
+			"exchange", // exchange name
+			"margin",   // margin of connection. 1 or 0
+			"symbol",   // margin symbol of the connection.
+			"currency",
+		},
+	)
+
+	metricsTotalBalances = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "bbgo_balances_total",
+			Help: "bbgo exchange session total balances",
+		},
+		[]string{
+			"exchange", // exchange name
+			"margin",   // margin of connection. 1 or 0
+			"symbol",   // margin symbol of the connection.
+			"currency",
 		},
 	)
 
@@ -64,7 +89,9 @@ var (
 func init() {
 	prometheus.MustRegister(
 		metricsConnectionStatus,
-		metricsBalances,
+		metricsTotalBalances,
+		metricsLockedBalances,
+		metricsAvailableBalances,
 		metricsTradesTotal,
 		metricsTradingVolume,
 	)
