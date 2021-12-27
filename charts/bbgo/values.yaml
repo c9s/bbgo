@@ -64,8 +64,12 @@ ingress:
   #    hosts:
   #      - chart-example.local
 
+webserver:
+  enabled: false
+
 metrics:
   enabled: false
+  port: 9090
 
 resources:
   # We usually recommend not to specify default resources and to leave this as a conscious
