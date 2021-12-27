@@ -286,6 +286,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 				log.Infof("mid price %f", midPrice.Float64())
 
+				var balances = s.tradingSession.Account.Balances()
 				var quantity = s.tradingMarket.MinQuantity
 
 				if s.Quantity > 0 {
@@ -298,6 +299,15 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 						// change the current quantity only diff is positive
 						if volumeDiff > 0 {
 							quantity = volumeDiff
+						}
+
+						if baseBalance, ok := balances[s.tradingMarket.BaseCurrency]; ok {
+							quantity = math.Min(quantity, baseBalance.Available.Float64())
+						}
+
+						if quoteBalance, ok := balances[s.tradingMarket.QuoteCurrency]; ok {
+							maxQuantity := quoteBalance.Available.Float64() / price
+							quantity = math.Min(quantity, maxQuantity)
 						}
 					}
 					s.mu.Unlock()
