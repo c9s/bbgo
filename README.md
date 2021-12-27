@@ -5,6 +5,8 @@ A trading bot framework written in Go. The name bbgo comes from the BB8 bot in t
 ## Current Status
 
 [![Go](https://github.com/c9s/bbgo/actions/workflows/go.yml/badge.svg?branch=main)](https://github.com/c9s/bbgo/actions/workflows/go.yml)
+<img alt="open collective badge" src="https://opencollective.com/bbgo/tiers/badge.svg">
+<img alt="open collective badge" src="https://opencollective.com/bbgo/tiers/backer/badge.svg?label=backer&color=brightgreen" />
 
 ## Features
 
@@ -635,6 +637,10 @@ What's Position?
 ## Contributing
 
 See [Contributing](./CONTRIBUTING.md)
+
+### Financial Contributors
+
+<object type="image/svg+xml" data="https://opencollective.com/bbgo/tiers/backer.svg?avatarHeight=36&width=600"></object>
 
 ## Community
 
