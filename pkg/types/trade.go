@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -51,7 +52,7 @@ type Trade struct {
 	GID int64 `json:"gid" db:"gid"`
 
 	// ID is the source trade ID
-	ID            uint64        `json:"id" db:"id"`
+	ID            uint64       `json:"id" db:"id"`
 	OrderID       uint64       `json:"orderID" db:"order_id"`
 	Exchange      ExchangeName `json:"exchange" db:"exchange"`
 	Price         float64      `json:"price" db:"price"`
@@ -90,12 +91,12 @@ func (trade Trade) PositionChange() fixedpoint.Value {
 }
 
 func (trade Trade) String() string {
-	return fmt.Sprintf("TRADE %s %s %4s %f @ %f orderID %d %s amount %f",
+	return fmt.Sprintf("TRADE %s %s %4s %s @ %s orderID %d %s amount %f",
 		trade.Exchange.String(),
 		trade.Symbol,
 		trade.Side,
-		trade.Quantity,
-		trade.Price,
+		strings.TrimRight(fmt.Sprintf("%f", trade.Quantity), "0"),
+		strings.TrimRight(fmt.Sprintf("%f", trade.Price), "0"),
 		trade.OrderID,
 		trade.Time.Time().Format(time.StampMilli),
 		trade.QuoteQuantity)
@@ -103,12 +104,12 @@ func (trade Trade) String() string {
 
 // PlainText is used for telegram-styled messages
 func (trade Trade) PlainText() string {
-	return fmt.Sprintf("Trade %s %s %s %f @ %f, amount %f, fee %f %s",
+	return fmt.Sprintf("Trade %s %s %s %s @ %s, amount %f, fee %f %s",
 		trade.Exchange.String(),
 		trade.Symbol,
 		trade.Side,
-		trade.Quantity,
-		trade.Price,
+		strings.TrimRight(fmt.Sprintf("%f", trade.Quantity), "0"),
+		strings.TrimRight(fmt.Sprintf("%f", trade.Price), "0"),
 		trade.QuoteQuantity,
 		trade.Fee,
 		trade.FeeCurrency)
