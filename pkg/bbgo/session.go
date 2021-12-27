@@ -876,6 +876,7 @@ func (session *ExchangeSession) bindUserDataStreamMetrics(stream types.Stream) {
 	stream.OnOrderUpdate(session.metricsOrderUpdater)
 	stream.OnDisconnect(func() {
 		metricsConnectionStatus.With(prometheus.Labels{
+			"channel":  "user",
 			"exchange": session.ExchangeName.String(),
 			"margin":   session.MarginType(),
 			"symbol":   session.IsolatedMarginSymbol,
@@ -883,6 +884,7 @@ func (session *ExchangeSession) bindUserDataStreamMetrics(stream types.Stream) {
 	})
 	stream.OnConnect(func() {
 		metricsConnectionStatus.With(prometheus.Labels{
+			"channel":  "user",
 			"exchange": session.ExchangeName.String(),
 			"margin":   session.MarginType(),
 			"symbol":   session.IsolatedMarginSymbol,
