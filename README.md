@@ -202,6 +202,25 @@ bbgo sync --session max
 bbgo sync --session binance
 ```
 
+## Using Redis to keep persistence between BBGO sessions
+
+To use Redis, first you need to install your Redis server:
+
+```sh
+# For Ubuntu/Debian Linux
+sudo apt-get install -y redis
+```
+
+Set the following environment variables in your `bbgo.yaml`:
+
+```yaml
+persistence:
+  redis:
+    host: 127.0.0.1  # The IP address or the hostname to your Redis server, 127.0.0.1 if same as BBGO  
+    port: 6379  # Port to Redis server, default 6379
+    db: 0  # DB number to use. You can set to another DB to avoid conflict if other applications are using Redis too.
+```
+
 ## Built-in Strategies
 
 Check out the strategy directory [strategy](pkg/strategy) for all built-in strategies:
@@ -214,7 +233,8 @@ Check out the strategy directory [strategy](pkg/strategy) for all built-in strat
   order [buyandhold](pkg/strategy/pricedrop)
 - `bollgrid` strategy implements a basic grid strategy with the built-in bollinger
   indicator [bollgrid](pkg/strategy/bollgrid)
-- `grid` strategy implements the fixed price band grid strategy [grid](pkg/strategy/grid)
+- `grid` strategy implements the fixed price band grid strategy [grid](pkg/strategy/grid). See
+  [document](./doc/strategy/grid.md).
 - `support` strategy implements the fixed price band grid strategy [support](pkg/strategy/support). See
   [document](./doc/strategy/support.md).
 - `flashcrash` strategy implements a strategy that catches the flashcrash [flashcrash](pkg/strategy/flashcrash)
