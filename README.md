@@ -21,7 +21,10 @@ A trading bot framework written in Go. The name bbgo comes from the BB8 bot in t
 - Many built-in strategies.
 - Multi-exchange session support: you can connect to more than 2 exchanges with different accounts or subaccounts.
 - Standard indicators, e.g., SMA, EMA, BOLL, VMA, MACD...
-- React-powered Web Dashboard
+- React-powered Web Dashboard.
+- Docker image ready.
+- Kubernetes support.
+- Helm chart ready.
 
 ## Screenshots
 
