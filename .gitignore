@@ -38,3 +38,5 @@ bbgo.sqlite3
 node_modules
 
 otp*png
+
+/.deploy

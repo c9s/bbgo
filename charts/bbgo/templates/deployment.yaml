@@ -33,14 +33,30 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          # ports:
-          #   - name: http
-          #     containerPort: 80
-          #     protocol: TCP
-          # livenessProbe:
-          #   httpGet:
-          #     path: /
-          #     port: http
+          args:
+          {{- if .Values.metrics.enabled }}
+          - "--metrics"
+          - "--metrics-port"
+          - {{ .Values.metrics.port | quote }}
+          {{- end }}
+          - "run"
+          - "--config"
+          - "/config/bbgo.yaml"
+          - "--no-compile"
+          {{- if .Values.webserver.enabled }}
+          - "--enable-webserver"
+          {{- end }}
+
+          ports:
+          {{- if .Values.metrics.enabled }}
+          - name: metrics
+            containerPort: 9090
+            protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: metrics
+          {{- end }}
           # readinessProbe:
           #   httpGet:
           #     path: /

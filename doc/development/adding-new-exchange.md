@@ -8,14 +8,23 @@ You should send multiple small pull request to implement them.
 
 ## Checklist
 
-Exchange Interface (minimum)
+Exchange Interface - minimum requirement for trading
 
 - [ ] QueryMarkets
-- [ ] QueryKLines
 - [ ] QueryTickers
-- [ ] QueryOrders
-- [ ] QueryTrades
+- [ ] QueryOpenOrders
 - [ ] SubmitOrders
+- [ ] CancelOrders
+- [ ] NewStream
+
+Trading History Service Interface - used for syncing user trading data
+
+- [ ] QueryClosedOrders
+- [ ] QueryTrades
+
+Back-testing service - kline data is used for back-testing
+
+- [ ] QueryKLines
 
 Convert functions:
 
