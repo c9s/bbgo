@@ -810,7 +810,7 @@ func (session *ExchangeSession) metricsTradeUpdater(trade types.Trade) {
 		"symbol":    trade.Symbol,
 		"liquidity": trade.Liquidity(),
 	}
-	metricsTradingVolume.With(labels).Add(trade.Quantity)
+	metricsTradingVolume.With(labels).Add(trade.Quantity * trade.Price)
 	metricsTradesTotal.With(labels).Inc()
 }
 
@@ -818,4 +818,18 @@ func (session *ExchangeSession) bindUserDataStreamMetrics(stream types.Stream) {
 	stream.OnBalanceUpdate(session.metricsBalancesUpdater)
 	stream.OnBalanceSnapshot(session.metricsBalancesUpdater)
 	stream.OnTradeUpdate(session.metricsTradeUpdater)
+	stream.OnDisconnect(func() {
+		metricsConnectionStatus.With(prometheus.Labels{
+			"exchange":  session.ExchangeName.String(),
+			"margin":    session.MarginType(),
+			"symbol":   session.IsolatedMarginSymbol,
+		}).Set(0.0)
+	})
+	stream.OnConnect(func() {
+		metricsConnectionStatus.With(prometheus.Labels{
+			"exchange":  session.ExchangeName.String(),
+			"margin":    session.MarginType(),
+			"symbol":   session.IsolatedMarginSymbol,
+		}).Set(1.0)
+	})
 }
