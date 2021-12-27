@@ -8,6 +8,9 @@ spec:
 {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
 {{- end }}
+  strategy:
+    # we need to cleanly cancel all the orders, so we use Recreate strategy here
+    type: Recreate
   selector:
     matchLabels:
       {{- include "bbgo.selectorLabels" . | nindent 6 }}
