@@ -135,6 +135,7 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 		panic(fmt.Errorf("trading session %s is not defined", s.TradingExchange))
 	}
 
+	tradingSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
 	tradingSession.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
 }
 
