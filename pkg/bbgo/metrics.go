@@ -36,7 +36,7 @@ var (
 		},
 		[]string{
 			"exchange", // exchange name
-			"margin",   // margin of connection. 1 or 0
+			"margin",   // margin of connection. none, margin or isolated
 			"symbol",   // margin symbol of the connection.
 			"currency",
 		},
@@ -49,7 +49,7 @@ var (
 		},
 		[]string{
 			"exchange", // exchange name
-			"margin",   // margin of connection. 1 or 0
+			"margin",   // margin of connection. none, margin or isolated
 			"symbol",   // margin symbol of the connection.
 			"currency",
 		},
@@ -62,8 +62,7 @@ var (
 		},
 		[]string{
 			"exchange",  // exchange name
-			"margin",    // margin of connection. 1 or 0
-			"isolated",  // isolated or not
+			"margin",    // margin of connection. none, margin or isolated
 			"symbol",    // margin symbol of the connection.
 			"side",      // side: buy or sell
 			"liquidity", // maker or taker
@@ -77,8 +76,7 @@ var (
 		},
 		[]string{
 			"exchange",  // exchange name
-			"margin",    // margin of connection. 1 or 0
-			"isolated",  // isolated or not
+			"margin",    // margin of connection. none, margin or isolated
 			"symbol",    // margin symbol of the connection.
 			"side",      // side: buy or sell
 			"liquidity", // maker or taker
