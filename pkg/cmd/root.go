@@ -1,20 +1,23 @@
 package cmd
 
 import (
+	"net/http"
 	"os"
 	"path"
 	"strings"
 	"time"
 
-	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/joho/godotenv"
 	"github.com/lestrrat-go/file-rotatelogs"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rifflock/lfshook"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/x-cray/logrus-prefixed-formatter"
+
+	"github.com/c9s/bbgo/pkg/bbgo"
 
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -52,6 +55,18 @@ var RootCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
+		if viper.GetBool("metrics") {
+			http.Handle("/metrics", promhttp.Handler())
+			go func() {
+				port := viper.GetString("metrics-port")
+				log.Infof("starting metrics server at :%s", port)
+				err := http.ListenAndServe(":"+port, nil)
+				if err != nil {
+					log.WithError(err).Errorf("metrics server error")
+				}
+			}()
+		}
+
 		configFile, err := cmd.Flags().GetString("config")
 		if err != nil {
 			return errors.Wrapf(err, "failed to get the config flag")
@@ -87,10 +102,13 @@ var RootCmd = &cobra.Command{
 
 func init() {
 	RootCmd.PersistentFlags().Bool("debug", false, "debug mode")
-	RootCmd.PersistentFlags().String("config", "bbgo.yaml", "config file")
+	RootCmd.PersistentFlags().Bool("metrics", false, "enable prometheus metrics")
+	RootCmd.PersistentFlags().String("metrics-port", "9090", "prometheus http server port")
 
 	RootCmd.PersistentFlags().Bool("no-dotenv", false, "disable built-in dotenv")
 	RootCmd.PersistentFlags().String("dotenv", ".env.local", "the dotenv file you want to load")
+
+	RootCmd.PersistentFlags().String("config", "bbgo.yaml", "config file")
 
 	// A flag can be 'persistent' meaning that this flag will be available to
 	// the command it's assigned to as well as every command under that command.
