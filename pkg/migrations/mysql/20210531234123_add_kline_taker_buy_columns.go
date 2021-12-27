@@ -29,6 +29,11 @@ func upAddKlineTakerBuyColumns(ctx context.Context, tx rockhopper.SQLExecutor) (
 		return err
 	}
 
+	_, err = tx.ExecContext(ctx, "ALTER TABLE `klines`\n    ADD COLUMN `quote_volume`           DECIMAL(32, 8) NOT NULL DEFAULT 0.0,\n    ADD COLUMN `taker_buy_base_volume`  DECIMAL(32, 8) NOT NULL DEFAULT 0.0,\n    ADD COLUMN `taker_buy_quote_volume` DECIMAL(32, 8) NOT NULL DEFAULT 0.0;")
+	if err != nil {
+		return err
+	}
+
 	return err
 }
 
