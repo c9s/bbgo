@@ -82,6 +82,21 @@ var (
 			"liquidity", // maker or taker
 		},
 	)
+
+	metricsLastUpdateTimeBalance = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "bbgo_last_update_time",
+			Help: "bbgo last update time of different channel",
+		},
+		[]string{
+			"exchange",  // exchange name
+			"margin",    // margin of connection. none, margin or isolated
+			"channel",   // channel: user, market
+			"data_type", // type: balance, ticker, kline, orderbook, trade, order
+			"symbol",    // for market data, trade and order
+			"currency",  // for balance
+		},
+	)
 )
 
 func init() {
@@ -92,5 +107,6 @@ func init() {
 		metricsAvailableBalances,
 		metricsTradesTotal,
 		metricsTradingVolume,
+		metricsLastUpdateTimeBalance,
 	)
 }
