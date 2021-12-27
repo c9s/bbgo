@@ -1,5 +1,8 @@
-// +build !release
+// +build release
 
 package version
 
-const Version = "1.x-dev"
+const Version = "v1.21.0-b4044156-dev"
+
+const VersionGitRef = "b4044156"
+
