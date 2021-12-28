@@ -212,3 +212,199 @@ func TestParseOrderUpdate(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, orderUpdate)
 }
+
+func TestFuturesResponseParsing(t *testing.T) {
+	type testcase struct {
+		input string
+	}
+
+	var testcases = []testcase{
+		{
+			input: `{
+			  "e": "ORDER_TRADE_UPDATE",
+			  "T": 1639933384755,
+			  "E": 1639933384763,
+			  "o": {
+				"s": "BTCUSDT",
+				"c": "x-NSUYEBKMe60cf610-f5c7-49a4-9c1",
+				"S": "SELL",
+				"o": "MARKET",
+				"f": "GTC",
+				"q": "0.001",
+				"p": "0",
+				"ap": "0",
+				"sp": "0",
+				"x": "NEW",
+				"X": "NEW",
+				"i": 38541728873,
+				"l": "0",
+				"z": "0",
+				"L": "0",
+				"T": 1639933384755,
+				"t": 0,
+				"b": "0",
+				"a": "0",
+				"m": false,
+				"R": false,
+				"wt": "CONTRACT_PRICE",
+				"ot": "MARKET",
+				"ps": "BOTH",
+				"cp": false,
+				"rp": "0",
+				"pP": false,
+				"si": 0,
+				"ss": 0
+			  }
+			}`,
+		},
+		{
+			input: `{
+			  "e": "ACCOUNT_UPDATE",
+			  "T": 1639933384755,
+			  "E": 1639933384763,
+			  "a": {
+				"B": [
+				  {
+					"a": "USDT",
+					"wb": "86.94966888",
+					"cw": "86.94966888",
+					"bc": "0"
+				  }
+				],
+				"P": [
+				  {
+					"s": "BTCUSDT",
+					"pa": "-0.001",
+					"ep": "47202.40000",
+					"cr": "7.78107001",
+					"up": "-0.00233523",
+					"mt": "cross",
+					"iw": "0",
+					"ps": "BOTH",
+					"ma": "USDT"
+				  }
+				],
+				"m": "ORDER"
+			  }
+			}`,
+		},
+		{
+			input: `{
+			  "e": "ORDER_TRADE_UPDATE",
+			  "T": 1639933384755,
+			  "E": 1639933384763,
+			  "o": {
+				"s": "BTCUSDT",
+				"c": "x-NSUYEBKMe60cf610-f5c7-49a4-9c1",
+				"S": "SELL",
+				"o": "MARKET",
+				"f": "GTC",
+				"q": "0.001",
+				"p": "0",
+				"ap": "47202.40000",
+				"sp": "0",
+				"x": "TRADE",
+				"X": "FILLED",
+				"i": 38541728873,
+				"l": "0.001",
+				"z": "0.001",
+				"L": "47202.40",
+				"n": "0.01888095",
+				"N": "USDT",
+				"T": 1639933384755,
+				"t": 1741505949,
+				"b": "0",
+				"a": "0",
+				"m": false,
+				"R": false,
+				"wt": "CONTRACT_PRICE",
+				"ot": "MARKET",
+				"ps": "BOTH",
+				"cp": false,
+				"rp": "0",
+				"pP": false,
+				"si": 0,
+				"ss": 0
+			  }
+			}`,
+		},
+	}
+
+	for _, testcase := range testcases {
+		payload := testcase.input
+		payload = jsCommentTrimmer.ReplaceAllLiteralString(payload, "")
+		event, err := ParseEvent(payload)
+		assert.NoError(t, err)
+		assert.NotNil(t, event)
+	}
+}
+
+func TestParseOrderFuturesUpdate(t *testing.T) {
+	payload := `{
+				  "e": "ORDER_TRADE_UPDATE",
+				  "T": 1639933384755,
+				  "E": 1639933384763,
+				  "o": {
+					"s": "BTCUSDT",
+					"c": "x-NSUYEBKMe60cf610-f5c7-49a4-9c1",
+					"S": "SELL",
+					"o": "MARKET",
+					"f": "GTC",
+					"q": "0.001",
+					"p": "0",
+					"ap": "47202.40000",
+					"sp": "0",
+					"x": "TRADE",
+					"X": "FILLED",
+					"i": 38541728873,
+					"l": "0.001",
+					"z": "0.001",
+					"L": "47202.40",
+					"n": "0.01888095",
+					"N": "USDT",
+					"T": 1639933384755,
+					"t": 1741505949,
+					"b": "0",
+					"a": "0",
+					"m": false,
+					"R": false,
+					"wt": "CONTRACT_PRICE",
+					"ot": "MARKET",
+					"ps": "BOTH",
+					"cp": false,
+					"rp": "0",
+					"pP": false,
+					"si": 0,
+					"ss": 0
+				  }
+				}`
+
+	payload = jsCommentTrimmer.ReplaceAllLiteralString(payload, "")
+
+	event, err := ParseEvent(payload)
+	assert.NoError(t, err)
+	assert.NotNil(t, event)
+
+	orderTradeEvent, ok := event.(*OrderTradeUpdateEvent)
+	assert.True(t, ok)
+	assert.NotNil(t, orderTradeEvent)
+
+	assert.Equal(t, orderTradeEvent.OrderTrade.Symbol, "BTCUSDT")
+	assert.Equal(t, orderTradeEvent.OrderTrade.Side, "SELL")
+	assert.Equal(t, orderTradeEvent.OrderTrade.ClientOrderID, "x-NSUYEBKMe60cf610-f5c7-49a4-9c1")
+	assert.Equal(t, orderTradeEvent.OrderTrade.OrderType, "MARKET")
+	assert.Equal(t, orderTradeEvent.Time, int64(1639933384763))
+	assert.Equal(t, orderTradeEvent.OrderTrade.OrderTradeTime, int64(1639933384755))
+	assert.Equal(t, orderTradeEvent.OrderTrade.OriginalQuantity, "0.001")
+	assert.Equal(t, orderTradeEvent.OrderTrade.OrderLastFilledQuantity, "0.001")
+	assert.Equal(t, orderTradeEvent.OrderTrade.OrderFilledAccumulatedQuantity, "0.001")
+	assert.Equal(t, orderTradeEvent.OrderTrade.CurrentExecutionType, "TRADE")
+	assert.Equal(t, orderTradeEvent.OrderTrade.CurrentOrderStatus, "FILLED")
+	assert.Equal(t, orderTradeEvent.OrderTrade.LastFilledPrice, "47202.40")
+	assert.Equal(t, orderTradeEvent.OrderTrade.OrderId, int64(38541728873))
+	assert.Equal(t, orderTradeEvent.OrderTrade.TradeId, int64(1741505949))
+
+	orderUpdate, err := orderTradeEvent.OrderFutures()
+	assert.NoError(t, err)
+	assert.NotNil(t, orderUpdate)
+}
