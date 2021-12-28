@@ -88,10 +88,10 @@ type ExecutionReportEvent struct {
 	CurrentOrderStatus   string `json:"X"`
 
 	OrderID int64 `json:"i"`
-	Ignored int64  `json:"I"`
+	Ignored int64 `json:"I"`
 
 	TradeID         int64 `json:"t"`
-	TransactionTime int64  `json:"T"`
+	TransactionTime int64 `json:"T"`
 
 	LastExecutedQuantity string `json:"l"`
 	LastExecutedPrice    string `json:"L"`
@@ -264,6 +264,12 @@ func ParseEvent(message string) (interface{}, error) {
 		return nil, err
 	}
 
+	//res, err := json.MarshalIndent(message, "", "  ")
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	//str := strings.ReplaceAll(string(res), "\\", "")
+	//fmt.Println(str)
 	eventType := string(val.GetStringBytes("e"))
 	if eventType == "" && IsBookTicker(val) {
 		eventType = "bookticker"
@@ -316,6 +322,18 @@ func ParseEvent(message string) (interface{}, error) {
 
 	case "ORDER_TRADE_UPDATE":
 		var event OrderTradeUpdateEvent
+		err := json.Unmarshal([]byte(message), &event)
+		return &event, err
+
+	// Event: Balance and Position Update
+	case "ACCOUNT_UPDATE":
+		var event AccountUpdateEvent
+		err := json.Unmarshal([]byte(message), &event)
+		return &event, err
+
+	// Event: Order Update
+	case "ACCOUNT_CONFIG_UPDATE":
+		var event AccountConfigUpdateEvent
 		err := json.Unmarshal([]byte(message), &event)
 		return &event, err
 
@@ -700,6 +718,31 @@ func (e *OrderTradeUpdateEvent) OrderFutures() (*types.Order, error) {
 		ExecutedQuantity: util.MustParseFloat(e.OrderTrade.OrderFilledAccumulatedQuantity),
 		CreationTime:     types.Time(orderCreationTime),
 	}, nil
+}
+
+type AccountUpdate struct {
+	EventReasonType string                     `json:"m"`
+	Balances        []*futures.Balance         `json:"B,omitempty"`
+	Positions       []*futures.AccountPosition `json:"P,omitempty"`
+}
+
+type AccountUpdateEvent struct {
+	EventBase
+	Transaction int64 `json:"T"`
+
+	AccountUpdate AccountUpdate `json:"a"`
+}
+
+type AccountConfig struct {
+	Symbol   string           `json:"s"`
+	Leverage fixedpoint.Value `json:"l"`
+}
+
+type AccountConfigUpdateEvent struct {
+	EventBase
+	Transaction int64 `json:"T"`
+
+	AccountConfig AccountConfig `json:"ac"`
 }
 
 type EventBase struct {
