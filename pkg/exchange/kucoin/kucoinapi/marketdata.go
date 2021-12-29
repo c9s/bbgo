@@ -3,12 +3,11 @@ package kucoinapi
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	"net/http"
 	"net/url"
 	"strconv"
 	"time"
 
+	"github.com/c9s/requestgen"
 	"github.com/pkg/errors"
 	"github.com/valyala/fastjson"
 
@@ -245,49 +244,46 @@ type OrderBook struct {
 	Asks     types.PriceVolumeSlice     `json:"asks,omitempty"`
 }
 
-func (s *MarketDataService) GetOrderBook(symbol string, depth int) (*OrderBook, error) {
-	params := url.Values{}
-	params["symbol"] = []string{symbol}
+//go:generate -command GetRequest requestgen -method GET -responseType .APIResponse -responseDataField Data
+//go:generate -command PostRequest requestgen -method GET -responseType .APIResponse -responseDataField Data
 
-	var req *http.Request
-	var err error
+//go:generate GetRequest -type GetOrderBookLevel2Depth20Request -url "/api/v1/market/orderbook/level2_20" -responseDataType .OrderBook
+type GetOrderBookLevel2Depth20Request struct {
+	client requestgen.APIClient
+	symbol string `param:"symbol,query"`
+}
 
+//go:generate GetRequest -type GetOrderBookLevel2Depth100Request -url "/api/v1/market/orderbook/level2_100" -responseDataType .OrderBook
+type GetOrderBookLevel2Depth100Request struct {
+	client requestgen.APIClient
+	symbol string `param:"symbol,query"`
+}
+
+//go:generate GetRequest -type GetOrderBookLevel2DepthAllRequest -url "/api/v3/market/orderbook/level2" -responseDataType .OrderBook
+type GetOrderBookLevel2DepthAllRequest struct {
+	client requestgen.AuthenticatedAPIClient
+	symbol string `param:"symbol,query"`
+}
+
+type OrderBookRequest interface {
+	Do(ctx context.Context) (*OrderBook, error)
+}
+
+func (s *MarketDataService) NewGetOrderBookRequest(symbol string, depth int) OrderBookRequest {
 	switch depth {
-	case 20, 100:
-		refURL := "/api/v1/market/orderbook/level2_" + strconv.Itoa(depth)
-		req, err = s.client.NewRequest(context.Background(), "GET", refURL, params, nil)
-		if err != nil {
-			return nil, err
-		}
+	case 20:
+		return &GetOrderBookLevel2Depth20Request{client: s.client, symbol: symbol}
 
-	case 0:
-		refURL := "/api/v3/market/orderbook/level2"
-		req, err = s.client.NewAuthenticatedRequest(context.Background(), "GET", refURL, params, nil)
-		if err != nil {
-			return nil, err
-		}
-
-	default:
-		return nil, fmt.Errorf("depth %d is not supported, use 20, 100 or 0", depth)
-
+	case 100:
+		return &GetOrderBookLevel2Depth100Request{client: s.client, symbol: symbol}
 	}
 
-	response, err := s.client.SendRequest(req)
-	if err != nil {
-		return nil, err
-	}
+	return &GetOrderBookLevel2DepthAllRequest{client: s.client, symbol: symbol}
+}
 
-	var apiResponse struct {
-		Code    string     `json:"code"`
-		Message string     `json:"msg"`
-		Data    *OrderBook `json:"data"`
-	}
-
-	if err := response.DecodeJSON(&apiResponse); err != nil {
-		return nil, err
-	}
-
-	return apiResponse.Data, nil
+func (s *MarketDataService) GetOrderBook(symbol string, depth int) (*OrderBook, error) {
+	req := s.NewGetOrderBookRequest(symbol, depth)
+	return req.Do(context.Background())
 }
 
 //go:generate requestgen -type GetKLinesRequest

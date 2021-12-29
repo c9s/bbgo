@@ -18,9 +18,21 @@ func (r *CancelAllOrderRequest) TradeType(tradeType string) *CancelAllOrderReque
 	return r
 }
 
-func (r *CancelAllOrderRequest) GetParameters() (map[string]interface{}, error) {
+// GetQueryParameters builds and checks the query parameters and returns url.Values
+func (r *CancelAllOrderRequest) GetQueryParameters() (url.Values, error) {
 	var params = map[string]interface{}{}
 
+	query := url.Values{}
+	for k, v := range params {
+		query.Add(k, fmt.Sprintf("%v", v))
+	}
+
+	return query, nil
+}
+
+// GetParameters builds and checks the parameters and return the result in a map object
+func (r *CancelAllOrderRequest) GetParameters() (map[string]interface{}, error) {
+	var params = map[string]interface{}{}
 	// check symbol field -> json key symbol
 	if r.symbol != nil {
 		symbol := *r.symbol
@@ -28,7 +40,6 @@ func (r *CancelAllOrderRequest) GetParameters() (map[string]interface{}, error) 
 		// assign parameter of symbol
 		params["symbol"] = symbol
 	}
-
 	// check tradeType field -> json key tradeType
 	if r.tradeType != nil {
 		tradeType := *r.tradeType
@@ -40,6 +51,7 @@ func (r *CancelAllOrderRequest) GetParameters() (map[string]interface{}, error) 
 	return params, nil
 }
 
+// GetParametersQuery converts the parameters from GetParameters into the url.Values format
 func (r *CancelAllOrderRequest) GetParametersQuery() (url.Values, error) {
 	query := url.Values{}
 
@@ -55,6 +67,7 @@ func (r *CancelAllOrderRequest) GetParametersQuery() (url.Values, error) {
 	return query, nil
 }
 
+// GetParametersJSON converts the parameters from GetParameters into the JSON format
 func (r *CancelAllOrderRequest) GetParametersJSON() ([]byte, error) {
 	params, err := r.GetParameters()
 	if err != nil {

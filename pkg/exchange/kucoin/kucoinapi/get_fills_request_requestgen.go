@@ -40,9 +40,21 @@ func (r *GetFillsRequest) EndAt(endAt time.Time) *GetFillsRequest {
 	return r
 }
 
-func (r *GetFillsRequest) GetParameters() (map[string]interface{}, error) {
+// GetQueryParameters builds and checks the query parameters and returns url.Values
+func (r *GetFillsRequest) GetQueryParameters() (url.Values, error) {
 	var params = map[string]interface{}{}
 
+	query := url.Values{}
+	for k, v := range params {
+		query.Add(k, fmt.Sprintf("%v", v))
+	}
+
+	return query, nil
+}
+
+// GetParameters builds and checks the parameters and return the result in a map object
+func (r *GetFillsRequest) GetParameters() (map[string]interface{}, error) {
+	var params = map[string]interface{}{}
 	// check orderID field -> json key orderId
 	if r.orderID != nil {
 		orderID := *r.orderID
@@ -50,7 +62,6 @@ func (r *GetFillsRequest) GetParameters() (map[string]interface{}, error) {
 		// assign parameter of orderID
 		params["orderId"] = orderID
 	}
-
 	// check symbol field -> json key symbol
 	if r.symbol != nil {
 		symbol := *r.symbol
@@ -58,7 +69,6 @@ func (r *GetFillsRequest) GetParameters() (map[string]interface{}, error) {
 		// assign parameter of symbol
 		params["symbol"] = symbol
 	}
-
 	// check side field -> json key side
 	if r.side != nil {
 		side := *r.side
@@ -75,7 +85,6 @@ func (r *GetFillsRequest) GetParameters() (map[string]interface{}, error) {
 		// assign parameter of side
 		params["side"] = side
 	}
-
 	// check orderType field -> json key type
 	if r.orderType != nil {
 		orderType := *r.orderType
@@ -92,28 +101,27 @@ func (r *GetFillsRequest) GetParameters() (map[string]interface{}, error) {
 		// assign parameter of orderType
 		params["type"] = orderType
 	}
-
 	// check startAt field -> json key startAt
 	if r.startAt != nil {
 		startAt := *r.startAt
 
 		// assign parameter of startAt
-		// convert time.Time to milliseconds time
+		// convert time.Time to milliseconds time stamp
 		params["startAt"] = strconv.FormatInt(startAt.UnixNano()/int64(time.Millisecond), 10)
 	}
-
 	// check endAt field -> json key endAt
 	if r.endAt != nil {
 		endAt := *r.endAt
 
 		// assign parameter of endAt
-		// convert time.Time to milliseconds time
+		// convert time.Time to milliseconds time stamp
 		params["endAt"] = strconv.FormatInt(endAt.UnixNano()/int64(time.Millisecond), 10)
 	}
 
 	return params, nil
 }
 
+// GetParametersQuery converts the parameters from GetParameters into the url.Values format
 func (r *GetFillsRequest) GetParametersQuery() (url.Values, error) {
 	query := url.Values{}
 
@@ -129,6 +137,7 @@ func (r *GetFillsRequest) GetParametersQuery() (url.Values, error) {
 	return query, nil
 }
 
+// GetParametersJSON converts the parameters from GetParameters into the JSON format
 func (r *GetFillsRequest) GetParametersJSON() ([]byte, error) {
 	params, err := r.GetParameters()
 	if err != nil {
