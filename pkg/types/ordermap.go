@@ -85,21 +85,23 @@ func NewSyncOrderMap() *SyncOrderMap {
 	}
 }
 
-func (m *SyncOrderMap) Backup() []SubmitOrder {
+func (m *SyncOrderMap) Backup() (orders []SubmitOrder) {
 	m.Lock()
-	defer m.Unlock()
-	return m.orders.Backup()
+	orders = m.orders.Backup()
+	m.Unlock()
+	return orders
 }
 
 func (m *SyncOrderMap) Remove(orderID uint64) (exists bool) {
-
 	exists = m.Exists(orderID)
 	if exists {
 		m.Lock()
 		m.orders.Remove(orderID)
 		m.Unlock()
 	} else {
+		m.Lock()
 		m.pendingRemoval[orderID] = time.Now()
+		m.Unlock()
 	}
 
 	return exists
@@ -107,6 +109,7 @@ func (m *SyncOrderMap) Remove(orderID uint64) (exists bool) {
 
 func (m *SyncOrderMap) Add(o Order) {
 	m.Lock()
+	defer m.Unlock()
 
 	match := false
 	if len(m.pendingRemoval) > 0 {
@@ -132,7 +135,6 @@ func (m *SyncOrderMap) Add(o Order) {
 		m.orders.Add(o)
 	}
 
-	m.Unlock()
 }
 
 func (m *SyncOrderMap) Update(o Order) {
