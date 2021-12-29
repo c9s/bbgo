@@ -319,44 +319,6 @@ func (s *Stream) dial(listenKey string) (*websocket.Conn, error) {
 	return conn, nil
 }
 
-func (s *Stream) fetchListenKey(ctx context.Context) (string, error) {
-	if s.IsMargin {
-		if s.IsIsolatedMargin {
-			log.Infof("isolated margin %s is enabled, requesting margin user stream listen key...", s.IsolatedMarginSymbol)
-			req := s.Client.NewStartIsolatedMarginUserStreamService()
-			req.Symbol(s.IsolatedMarginSymbol)
-			return req.Do(ctx)
-		}
-
-		log.Infof("margin mode is enabled, requesting margin user stream listen key...")
-		req := s.Client.NewStartMarginUserStreamService()
-		return req.Do(ctx)
-	} else if s.IsFutures {
-		log.Infof("futures mode is enabled, requesting futures user stream listen key...")
-		req := s.futuresClient.NewStartUserStreamService()
-		return req.Do(ctx)
-	}
-	log.Infof("spot mode is enabled, requesting user stream listen key...")
-	return s.Client.NewStartUserStreamService().Do(ctx)
-}
-
-func (s *Stream) keepaliveListenKey(ctx context.Context, listenKey string) error {
-	log.Infof("keepalive listen key: %s", util.MaskKey(listenKey))
-	if s.IsMargin {
-		if s.IsIsolatedMargin {
-			req := s.Client.NewKeepaliveIsolatedMarginUserStreamService().ListenKey(listenKey)
-			req.Symbol(s.IsolatedMarginSymbol)
-			return req.Do(ctx)
-		}
-		req := s.Client.NewKeepaliveMarginUserStreamService().ListenKey(listenKey)
-		return req.Do(ctx)
-	} else if s.IsFutures {
-		req := s.futuresClient.NewKeepaliveUserStreamService().ListenKey(listenKey)
-		return req.Do(ctx)
-	}
-
-	return s.Client.NewKeepaliveUserStreamService().ListenKey(listenKey).Do(ctx)
-}
 
 func (s *Stream) Connect(ctx context.Context) error {
 	err := s.connect(ctx)
@@ -611,9 +573,65 @@ func (s *Stream) read(ctx context.Context) {
 	}
 }
 
+
+func (s *Stream) Close() error {
+	log.Infof("closing stream...")
+
+	if s.connCancel != nil {
+		s.connCancel()
+	}
+
+	s.ConnLock.Lock()
+	err := s.Conn.Close()
+	s.ConnLock.Unlock()
+	return err
+}
+
+
+func (s *Stream) fetchListenKey(ctx context.Context) (string, error) {
+	if s.IsMargin {
+		if s.IsIsolatedMargin {
+			log.Debugf("isolated margin %s is enabled, requesting margin user stream listen key...", s.IsolatedMarginSymbol)
+			req := s.Client.NewStartIsolatedMarginUserStreamService()
+			req.Symbol(s.IsolatedMarginSymbol)
+			return req.Do(ctx)
+		}
+
+		log.Debugf("margin mode is enabled, requesting margin user stream listen key...")
+		req := s.Client.NewStartMarginUserStreamService()
+		return req.Do(ctx)
+	} else if s.IsFutures {
+		log.Debugf("futures mode is enabled, requesting futures user stream listen key...")
+		req := s.futuresClient.NewStartUserStreamService()
+		return req.Do(ctx)
+	}
+
+	log.Debugf("spot mode is enabled, requesting user stream listen key...")
+	return s.Client.NewStartUserStreamService().Do(ctx)
+}
+
+func (s *Stream) keepaliveListenKey(ctx context.Context, listenKey string) error {
+	log.Debugf("keepalive listen key: %s", util.MaskKey(listenKey))
+	if s.IsMargin {
+		if s.IsIsolatedMargin {
+			req := s.Client.NewKeepaliveIsolatedMarginUserStreamService().ListenKey(listenKey)
+			req.Symbol(s.IsolatedMarginSymbol)
+			return req.Do(ctx)
+		}
+		req := s.Client.NewKeepaliveMarginUserStreamService().ListenKey(listenKey)
+		return req.Do(ctx)
+	} else if s.IsFutures {
+		req := s.futuresClient.NewKeepaliveUserStreamService().ListenKey(listenKey)
+		return req.Do(ctx)
+	}
+
+	return s.Client.NewKeepaliveUserStreamService().ListenKey(listenKey).Do(ctx)
+}
+
+
 func (s *Stream) invalidateListenKey(ctx context.Context, listenKey string) (err error) {
 	// should use background context to invalidate the user stream
-	log.Infof("closing listen key: %s", util.MaskKey(listenKey))
+	log.Debugf("closing listen key: %s", util.MaskKey(listenKey))
 
 	if s.IsMargin {
 		if s.IsIsolatedMargin {
@@ -638,17 +656,4 @@ func (s *Stream) invalidateListenKey(ctx context.Context, listenKey string) (err
 	}
 
 	return nil
-}
-
-func (s *Stream) Close() error {
-	log.Infof("closing stream...")
-
-	if s.connCancel != nil {
-		s.connCancel()
-	}
-
-	s.ConnLock.Lock()
-	err := s.Conn.Close()
-	s.ConnLock.Unlock()
-	return err
 }
