@@ -38,9 +38,11 @@ var defaultDialer = &websocket.Dialer{
 // A PING frame
 // A PONG frame
 // A JSON controlled message (e.g. subscribe, unsubscribe)
-const readTimeout = 60 * time.Second
+const readTimeout = 3 * time.Minute
 
-const pongWaitTime = 10 * time.Second
+const pongWaitTime = 15 * time.Second
+
+const listenKeyKeepAliveInterval = 1 * time.Minute
 
 func init() {
 	// randomize pulling
@@ -304,7 +306,7 @@ func (s *Stream) dial(listenKey string) (*websocket.Conn, error) {
 
 	// use the default ping handler
 	// The websocket server will send a ping frame every 3 minutes.
-	// If the websocket server does not receive a pong frame back from the connection within a 10 minute period,
+	// If the websocket server does not receive a pong frame back from the connection within a 10 minutes period,
 	// the connection will be disconnected.
 	// Unsolicited pong frames are allowed.
 	conn.SetPingHandler(nil)
@@ -329,12 +331,12 @@ func (s *Stream) fetchListenKey(ctx context.Context) (string, error) {
 		req := s.futuresClient.NewStartUserStreamService()
 		return req.Do(ctx)
 	}
-	log.Infof("spot mode is enabled, requesting margin user stream listen key...")
-
+	log.Infof("spot mode is enabled, requesting user stream listen key...")
 	return s.Client.NewStartUserStreamService().Do(ctx)
 }
 
 func (s *Stream) keepaliveListenKey(ctx context.Context, listenKey string) error {
+	log.Infof("keepalive listen key: %s", util.MaskKey(listenKey))
 	if s.IsMargin {
 		if s.IsIsolatedMargin {
 			req := s.Client.NewKeepaliveIsolatedMarginUserStreamService().ListenKey(listenKey)
@@ -388,7 +390,6 @@ func (s *Stream) connect(ctx context.Context) error {
 	if s.PublicOnly {
 		log.Infof("stream is set to public only mode")
 	} else {
-		log.Infof("request listen key for creating user data stream...")
 
 		listenKey, err = s.fetchListenKey(ctx)
 		if err != nil {
@@ -417,6 +418,7 @@ func (s *Stream) connect(ctx context.Context) error {
 	// create a new context
 	s.connCtx, s.connCancel = context.WithCancel(ctx)
 	conn.SetPongHandler(func(string) error {
+		log.Infof("pong")
 		if err := conn.SetReadDeadline(time.Now().Add(readTimeout * 2)); err != nil {
 			log.WithError(err).Error("pong handler can not set read deadline")
 		}
@@ -453,6 +455,7 @@ func (s *Stream) ping(ctx context.Context) {
 			conn := s.Conn
 			s.ConnLock.Unlock()
 
+			log.Infof("websocket ping")
 			if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(pongWaitTime)); err != nil {
 				log.WithError(err).Error("ping error", err)
 				s.Reconnect()
@@ -465,7 +468,7 @@ func (s *Stream) ping(ctx context.Context) {
 // Keepalive a user data stream to prevent a time out. User data streams will close after 60 minutes.
 // It's recommended to send a ping about every 30 minutes.
 func (s *Stream) listenKeyKeepAlive(ctx context.Context, listenKey string) {
-	keepAliveTicker := time.NewTicker(30 * time.Minute)
+	keepAliveTicker := time.NewTicker(listenKeyKeepAliveInterval)
 	defer keepAliveTicker.Stop()
 
 	// if we exit, we should invalidate the existing listen key
@@ -491,7 +494,7 @@ func (s *Stream) listenKeyKeepAlive(ctx context.Context, listenKey string) {
 					switch err.(type) {
 					case net.Error:
 						log.WithError(err).Errorf("listen key keep-alive network error: %v key: %s", err, util.MaskKey(listenKey))
-						time.Sleep(1 * time.Second)
+						time.Sleep(5 * time.Second)
 						continue
 
 					default:
