@@ -138,6 +138,7 @@ version: pkg/version/version.go pkg/version/dev.go migrations
 	git tag -f $(VERSION)
 	git push origin HEAD
 	git push origin $(VERSION)
+	bash utils/changelog.sh
 
 migrations:
 	rockhopper compile --config rockhopper_mysql.yaml --output pkg/migrations/mysql
