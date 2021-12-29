@@ -43,14 +43,18 @@ type Symbol struct {
 	EnableTrading   bool             `json:"enableTrading"`
 }
 
-//go:generate GetRequest -type ListSymbolsRequest -method "GET" -url "/api/v1/symbols" -responseDataType []Symbol -debug
+//go:generate GetRequest -type ListSymbolsRequest -url "/api/v1/symbols" -responseDataType []Symbol
 type ListSymbolsRequest struct {
 	client requestgen.APIClient
 	market *string `param:"market"`
 }
 
+func (s *MarketDataService) NewListSymbolsRequest() *ListSymbolsRequest {
+	return &ListSymbolsRequest{client: s.client}
+}
+
 func (s *MarketDataService) ListSymbols(market ...string) ([]Symbol, error) {
-	req := &ListSymbolsRequest{client: s.client}
+	req := s.NewListSymbolsRequest()
 	if len(market) == 1 {
 		req.Market(market[0])
 	} else if len(market) > 1 {
@@ -83,31 +87,19 @@ type Ticker struct {
 	Time        types.MillisecondTimestamp `json:"time"`
 }
 
+//go:generate GetRequest -type GetTickerRequest -url "/api/v1/market/orderbook/level1" -responseDataType Ticker
+type GetTickerRequest struct {
+	client requestgen.APIClient
+	symbol string `param:"symbol,query"`
+}
+
+func (s *MarketDataService) NewGetTickerRequest(symbol string) *GetTickerRequest {
+	return &GetTickerRequest{client: s.client, symbol: symbol}
+}
+
 func (s *MarketDataService) GetTicker(symbol string) (*Ticker, error) {
-	var params = url.Values{}
-	params["symbol"] = []string{symbol}
-
-	req, err := s.client.NewRequest(context.Background(), "GET", "/api/v1/market/orderbook/level1", params, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := s.client.SendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var apiResponse struct {
-		Code    string  `json:"code"`
-		Message string  `json:"msg"`
-		Data    *Ticker `json:"data"`
-	}
-
-	if err := response.DecodeJSON(&apiResponse); err != nil {
-		return nil, err
-	}
-
-	return apiResponse.Data, nil
+	req := s.NewGetTickerRequest(symbol)
+	return req.Do(context.Background())
 }
 
 /*
