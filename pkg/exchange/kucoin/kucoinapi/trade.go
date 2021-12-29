@@ -52,6 +52,8 @@ type GetFillsRequest struct {
 
 	orderID *string `param:"orderId"`
 
+	// tradeType *string `param:"tradeType" default:"TRADE"`
+
 	symbol *string `param:"symbol"`
 
 	side *string `param:"side" validValues:"buy,sell"`
