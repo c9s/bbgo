@@ -90,28 +90,57 @@ func (trade Trade) PositionChange() fixedpoint.Value {
 	return 0
 }
 
+func trimTrailingZero(a string) string {
+	index := strings.Index(a, ".")
+	if index == -1 {
+		return a
+	}
+
+	var c byte
+	var i int
+	for i = len(a) - 1; i >= 0; i-- {
+		c = a[i]
+		if c == '0' {
+			continue
+		} else if c == '.' {
+			return a[0:i]
+		} else {
+			return a[0 : i+1]
+		}
+	}
+	return a
+}
+
+func trimTrailingZeroFloat(a float64) string {
+	return trimTrailingZero(fmt.Sprintf("%f", a))
+}
+
+// String is for console output
 func (trade Trade) String() string {
-	return fmt.Sprintf("TRADE %s %s %4s %s @ %s orderID %d %s amount %f",
+	return fmt.Sprintf("TRADE %s %s %4s %s @ %s amount %s fee %s %s orderID %d %s",
 		trade.Exchange.String(),
 		trade.Symbol,
 		trade.Side,
-		strings.TrimRight(fmt.Sprintf("%f", trade.Quantity), "0"),
-		strings.TrimRight(fmt.Sprintf("%f", trade.Price), "0"),
+		trimTrailingZeroFloat(trade.Quantity),
+		trimTrailingZeroFloat(trade.Price),
+		trimTrailingZeroFloat(trade.QuoteQuantity),
+		trimTrailingZeroFloat(trade.Fee),
+		trade.FeeCurrency,
 		trade.OrderID,
 		trade.Time.Time().Format(time.StampMilli),
-		trade.QuoteQuantity)
+	)
 }
 
 // PlainText is used for telegram-styled messages
 func (trade Trade) PlainText() string {
-	return fmt.Sprintf("Trade %s %s %s %s @ %s, amount %f, fee %f %s",
+	return fmt.Sprintf("Trade %s %s %s %s @ %s, amount %s, fee %s %s",
 		trade.Exchange.String(),
 		trade.Symbol,
 		trade.Side,
-		strings.TrimRight(fmt.Sprintf("%f", trade.Quantity), "0"),
-		strings.TrimRight(fmt.Sprintf("%f", trade.Price), "0"),
-		trade.QuoteQuantity,
-		trade.Fee,
+		trimTrailingZeroFloat(trade.Quantity),
+		trimTrailingZeroFloat(trade.Price),
+		trimTrailingZeroFloat(trade.QuoteQuantity),
+		trimTrailingZeroFloat(trade.Fee),
 		trade.FeeCurrency)
 }
 
@@ -133,10 +162,10 @@ func (trade Trade) SlackAttachment() slack.Attachment {
 		Color: color,
 		Fields: []slack.AttachmentField{
 			{Title: "Exchange", Value: trade.Exchange.String(), Short: true},
-			{Title: "Price", Value: util.FormatFloat(trade.Price, 2), Short: true},
-			{Title: "Quantity", Value: util.FormatFloat(trade.Quantity, 4), Short: true},
-			{Title: "QuoteQuantity", Value: util.FormatFloat(trade.QuoteQuantity, 2), Short: true},
-			{Title: "Fee", Value: util.FormatFloat(trade.Fee, 4), Short: true},
+			{Title: "Price", Value: trimTrailingZeroFloat(trade.Price), Short: true},
+			{Title: "Quantity", Value: trimTrailingZeroFloat(trade.Quantity), Short: true},
+			{Title: "QuoteQuantity", Value: trimTrailingZeroFloat(trade.QuoteQuantity), Short: true},
+			{Title: "Fee", Value: trimTrailingZeroFloat(trade.Fee), Short: true},
 			{Title: "FeeCurrency", Value: trade.FeeCurrency, Short: true},
 			{Title: "Liquidity", Value: liquidity, Short: true},
 			{Title: "Order ID", Value: strconv.FormatUint(trade.OrderID, 10), Short: true},
