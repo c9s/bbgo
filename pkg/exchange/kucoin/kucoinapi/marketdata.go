@@ -1,5 +1,8 @@
 package kucoinapi
 
+//go:generate -command GetRequest requestgen -method GET -responseType .APIResponse -responseDataField Data
+//go:generate -command PostRequest requestgen -method GET -responseType .APIResponse -responseDataField Data
+
 import (
 	"context"
 	"encoding/json"
@@ -40,36 +43,21 @@ type Symbol struct {
 	EnableTrading   bool             `json:"enableTrading"`
 }
 
-func (s *MarketDataService) ListSymbols(market ...string) ([]Symbol, error) {
-	var params = url.Values{}
+//go:generate GetRequest -type ListSymbolsRequest -method "GET" -url "/api/v1/symbols" -responseDataType []Symbol -debug
+type ListSymbolsRequest struct {
+	client requestgen.APIClient
+	market *string `param:"market"`
+}
 
+func (s *MarketDataService) ListSymbols(market ...string) ([]Symbol, error) {
+	req := &ListSymbolsRequest{client: s.client}
 	if len(market) == 1 {
-		params["market"] = []string{market[0]}
+		req.Market(market[0])
 	} else if len(market) > 1 {
 		return nil, errors.New("symbols api only supports one market parameter")
 	}
 
-	req, err := s.client.NewRequest(context.Background(), "GET", "/api/v1/symbols", params, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := s.client.SendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var apiResponse struct {
-		Code    string   `json:"code"`
-		Message string   `json:"msg"`
-		Data    []Symbol `json:"data"`
-	}
-
-	if err := response.DecodeJSON(&apiResponse); err != nil {
-		return nil, err
-	}
-
-	return apiResponse.Data, nil
+	return req.Do(context.Background())
 }
 
 /*
@@ -243,9 +231,6 @@ type OrderBook struct {
 	Bids     types.PriceVolumeSlice     `json:"bids,omitempty"`
 	Asks     types.PriceVolumeSlice     `json:"asks,omitempty"`
 }
-
-//go:generate -command GetRequest requestgen -method GET -responseType .APIResponse -responseDataField Data
-//go:generate -command PostRequest requestgen -method GET -responseType .APIResponse -responseDataField Data
 
 //go:generate GetRequest -type GetOrderBookLevel2Depth20Request -url "/api/v1/market/orderbook/level2_20" -responseDataType .OrderBook
 type GetOrderBookLevel2Depth20Request struct {
