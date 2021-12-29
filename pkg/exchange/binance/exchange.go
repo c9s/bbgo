@@ -539,6 +539,7 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 	for _, o := range orders {
 		if e.IsMargin {
 			var req = e.Client.NewCancelMarginOrderService()
+			req.IsIsolated(e.IsIsolatedMargin)
 			req.Symbol(o.Symbol)
 
 			if o.OrderID > 0 {
