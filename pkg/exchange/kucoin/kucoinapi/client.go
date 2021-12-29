@@ -2,6 +2,7 @@ package kucoinapi
 
 import (
 	"bytes"
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
@@ -12,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/c9s/bbgo/pkg/util"
+	"github.com/c9s/requestgen"
 	"github.com/pkg/errors"
 )
 
@@ -62,7 +63,7 @@ func (c *RestClient) Auth(key, secret, passphrase string) {
 }
 
 // NewRequest create new API request. Relative url can be provided in refURL.
-func (c *RestClient) NewRequest(method, refURL string, params url.Values, body []byte) (*http.Request, error) {
+func (c *RestClient) NewRequest(ctx context.Context, method, refURL string, params url.Values, payload interface{}) (*http.Request, error) {
 	rel, err := url.Parse(refURL)
 	if err != nil {
 		return nil, err
@@ -72,19 +73,24 @@ func (c *RestClient) NewRequest(method, refURL string, params url.Values, body [
 		rel.RawQuery = params.Encode()
 	}
 
+	body, err := castPayload(payload)
+	if err != nil {
+		return nil, err
+	}
+
 	pathURL := c.BaseURL.ResolveReference(rel)
-	return http.NewRequest(method, pathURL.String(), bytes.NewReader(body))
+	return http.NewRequestWithContext(ctx, method, pathURL.String(), bytes.NewReader(body))
 }
 
 // sendRequest sends the request to the API server and handle the response
-func (c *RestClient) SendRequest(req *http.Request) (*util.Response, error) {
+func (c *RestClient) SendRequest(req *http.Request) (*requestgen.Response, error) {
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 
 	// newResponse reads the response body and return a new Response object
-	response, err := util.NewResponse(resp)
+	response, err := requestgen.NewResponse(resp)
 	if err != nil {
 		return response, err
 	}
@@ -98,7 +104,7 @@ func (c *RestClient) SendRequest(req *http.Request) (*util.Response, error) {
 }
 
 // newAuthenticatedRequest creates new http request for authenticated routes.
-func (c *RestClient) NewAuthenticatedRequest(method, refURL string, params url.Values, payload interface{}) (*http.Request, error) {
+func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, method, refURL string, params url.Values, payload interface{}) (*http.Request, error) {
 	if len(c.Key) == 0 {
 		return nil, errors.New("empty api key")
 	}
@@ -127,7 +133,7 @@ func (c *RestClient) NewAuthenticatedRequest(method, refURL string, params url.V
 		return nil, err
 	}
 
-	req, err := http.NewRequest(method, pathURL.String(), bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, method, pathURL.String(), bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -183,3 +189,10 @@ func castPayload(payload interface{}) ([]byte, error) {
 
 	return nil, nil
 }
+
+type APIResponse struct {
+	Code    string          `json:"code"`
+	Message string          `json:"msg"`
+	Data    json.RawMessage `json:"data"`
+}
+

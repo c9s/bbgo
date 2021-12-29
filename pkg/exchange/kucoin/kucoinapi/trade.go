@@ -4,9 +4,10 @@ import (
 	"context"
 	"time"
 
+	"github.com/pkg/errors"
+
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/pkg/errors"
 )
 
 type TradeService struct {
@@ -100,7 +101,7 @@ func (r *GetFillsRequest) Do(ctx context.Context) (*FillListPage, error) {
 		params.Add("tradeType", "TRADE")
 	}
 
-	req, err := r.client.NewAuthenticatedRequest("GET", "/api/v1/fills", params, nil)
+	req, err := r.client.NewAuthenticatedRequest(ctx, "GET", "/api/v1/fills", params, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +193,7 @@ func (r *ListOrdersRequest) Do(ctx context.Context) (*OrderListPage, error) {
 		params.Add("tradeType", "TRADE")
 	}
 
-	req, err := r.client.NewAuthenticatedRequest("GET", "/api/v1/orders", params, nil)
+	req, err := r.client.NewAuthenticatedRequest(ctx, "GET", "/api/v1/orders", params, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -254,7 +255,7 @@ func (r *PlaceOrderRequest) Do(ctx context.Context) (*OrderResponse, error) {
 		return nil, err
 	}
 
-	req, err := r.client.NewAuthenticatedRequest("POST", "/api/v1/orders", nil, payload)
+	req, err := r.client.NewAuthenticatedRequest(ctx, "POST", "/api/v1/orders", nil, payload)
 	if err != nil {
 		return nil, err
 	}
@@ -310,7 +311,7 @@ func (r *CancelOrderRequest) Do(ctx context.Context) (*CancelOrderResponse, erro
 		refURL = "/api/v1/order/client-order/" + *r.clientOrderID
 	}
 
-	req, err := r.client.NewAuthenticatedRequest("DELETE", refURL, nil, nil)
+	req, err := r.client.NewAuthenticatedRequest(ctx, "DELETE", refURL, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -350,7 +351,7 @@ func (r *CancelAllOrderRequest) Do(ctx context.Context) (*CancelOrderResponse, e
 		return nil, err
 	}
 
-	req, err := r.client.NewAuthenticatedRequest("DELETE", "/api/v1/orders", params, nil)
+	req, err := r.client.NewAuthenticatedRequest(ctx, "DELETE", "/api/v1/orders", params, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -413,7 +414,7 @@ func (r *BatchPlaceOrderRequest) Do(ctx context.Context) ([]OrderResponse, error
 		"orderList": orderList,
 	}
 
-	req, err := r.client.NewAuthenticatedRequest("POST", "/api/v1/orders/multi", nil, payload)
+	req, err := r.client.NewAuthenticatedRequest(ctx, "POST", "/api/v1/orders/multi", nil, payload)
 	if err != nil {
 		return nil, err
 	}

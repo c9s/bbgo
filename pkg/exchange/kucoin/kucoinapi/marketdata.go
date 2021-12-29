@@ -50,7 +50,7 @@ func (s *MarketDataService) ListSymbols(market ...string) ([]Symbol, error) {
 		return nil, errors.New("symbols api only supports one market parameter")
 	}
 
-	req, err := s.client.NewRequest("GET", "/api/v1/symbols", params, nil)
+	req, err := s.client.NewRequest(context.Background(), "GET", "/api/v1/symbols", params, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +100,7 @@ func (s *MarketDataService) GetTicker(symbol string) (*Ticker, error) {
 	var params = url.Values{}
 	params["symbol"] = []string{symbol}
 
-	req, err := s.client.NewRequest("GET", "/api/v1/market/orderbook/level1", params, nil)
+	req, err := s.client.NewRequest(context.Background(), "GET", "/api/v1/market/orderbook/level1", params, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +178,7 @@ type AllTickers struct {
 }
 
 func (s *MarketDataService) ListTickers() (*AllTickers, error) {
-	req, err := s.client.NewRequest("GET", "/api/v1/market/allTickers", nil, nil)
+	req, err := s.client.NewRequest(context.Background(), "GET", "/api/v1/market/allTickers", nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -205,7 +205,7 @@ func (s *MarketDataService) GetTicker24HStat(symbol string) (*Ticker24H, error) 
 	var params = url.Values{}
 	params.Add("symbol", symbol)
 
-	req, err := s.client.NewRequest("GET", "/api/v1/market/stats", params, nil)
+	req, err := s.client.NewRequest(context.Background(), "GET", "/api/v1/market/stats", params, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -255,14 +255,14 @@ func (s *MarketDataService) GetOrderBook(symbol string, depth int) (*OrderBook, 
 	switch depth {
 	case 20, 100:
 		refURL := "/api/v1/market/orderbook/level2_" + strconv.Itoa(depth)
-		req, err = s.client.NewRequest("GET", refURL, params, nil)
+		req, err = s.client.NewRequest(context.Background(), "GET", refURL, params, nil)
 		if err != nil {
 			return nil, err
 		}
 
 	case 0:
 		refURL := "/api/v3/market/orderbook/level2"
-		req, err = s.client.NewAuthenticatedRequest("GET", refURL, params, nil)
+		req, err = s.client.NewAuthenticatedRequest(context.Background(), "GET", refURL, params, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -320,7 +320,7 @@ func (r *GetKLinesRequest) Do(ctx context.Context) ([]KLine, error) {
 		return nil, err
 	}
 
-	req, err := r.client.NewRequest("GET", "/api/v1/market/candles", params, nil)
+	req, err := r.client.NewRequest(ctx, "GET", "/api/v1/market/candles", params, nil)
 	if err != nil {
 		return nil, err
 	}
