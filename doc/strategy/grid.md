@@ -9,7 +9,8 @@ form `grids`. The price gap is calculated from price range and the number of gri
 - `symbol`
     - The trading pair symbol, e.g., `BTCUSDT`, `ETHUSDT`
 - `quantity`
-    - Quantity per order
+    - Quantity of asset per order. 
+      You can also instead specify an amount of fiat per order with the `amount` parameter.
 - `gridNumber`
     - Number of grids, which is the maximum numbers of orders minus one.
 - `profitSpread`
