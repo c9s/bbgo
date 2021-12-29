@@ -49,9 +49,21 @@ func (r *PlaceOrderRequest) TimeInForce(timeInForce TimeInForceType) *PlaceOrder
 	return r
 }
 
-func (r *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
+// GetQueryParameters builds and checks the query parameters and returns url.Values
+func (r *PlaceOrderRequest) GetQueryParameters() (url.Values, error) {
 	var params = map[string]interface{}{}
 
+	query := url.Values{}
+	for k, v := range params {
+		query.Add(k, fmt.Sprintf("%v", v))
+	}
+
+	return query, nil
+}
+
+// GetParameters builds and checks the parameters and return the result in a map object
+func (r *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
+	var params = map[string]interface{}{}
 	// check clientOrderID field -> json key clientOid
 	if r.clientOrderID != nil {
 		clientOrderID := *r.clientOrderID
@@ -70,7 +82,6 @@ func (r *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 		// assign parameter of clientOrderID
 		params["clientOid"] = clientOrderID
 	}
-
 	// check symbol field -> json key symbol
 	symbol := r.symbol
 
@@ -80,7 +91,6 @@ func (r *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 	// assign parameter of symbol
 	params["symbol"] = symbol
-
 	// check tag field -> json key tag
 	if r.tag != nil {
 		tag := *r.tag
@@ -88,19 +98,16 @@ func (r *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 		// assign parameter of tag
 		params["tag"] = tag
 	}
-
 	// check side field -> json key side
 	side := r.side
 
 	// assign parameter of side
 	params["side"] = side
-
 	// check orderType field -> json key ordType
 	orderType := r.orderType
 
 	// assign parameter of orderType
 	params["ordType"] = orderType
-
 	// check size field -> json key size
 	size := r.size
 
@@ -110,7 +117,6 @@ func (r *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 	// assign parameter of size
 	params["size"] = size
-
 	// check price field -> json key price
 	if r.price != nil {
 		price := *r.price
@@ -118,7 +124,6 @@ func (r *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 		// assign parameter of price
 		params["price"] = price
 	}
-
 	// check timeInForce field -> json key timeInForce
 	if r.timeInForce != nil {
 		timeInForce := *r.timeInForce
@@ -134,6 +139,7 @@ func (r *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 	return params, nil
 }
 
+// GetParametersQuery converts the parameters from GetParameters into the url.Values format
 func (r *PlaceOrderRequest) GetParametersQuery() (url.Values, error) {
 	query := url.Values{}
 
@@ -149,6 +155,7 @@ func (r *PlaceOrderRequest) GetParametersQuery() (url.Values, error) {
 	return query, nil
 }
 
+// GetParametersJSON converts the parameters from GetParameters into the JSON format
 func (r *PlaceOrderRequest) GetParametersJSON() ([]byte, error) {
 	params, err := r.GetParameters()
 	if err != nil {

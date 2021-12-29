@@ -8,18 +8,18 @@ import (
 	"net/url"
 )
 
-func (r *GetPublicBulletRequest) Do(ctx context.Context) (*Bullet, error) {
+func (g *GetPublicBulletRequest) Do(ctx context.Context) (*Bullet, error) {
 
 	// no body params
 	var params interface{}
 	query := url.Values{}
 
-	req, err := r.client.NewRequest(ctx, "POST", "/api/v1/bullet-public", query, params)
+	req, err := g.client.NewRequest(ctx, "POST", "/api/v1/bullet-public", query, params)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := r.client.SendRequest(req)
+	response, err := g.client.SendRequest(req)
 	if err != nil {
 		return nil, err
 	}
