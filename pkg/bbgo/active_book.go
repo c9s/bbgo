@@ -11,8 +11,7 @@ import (
 // LocalActiveOrderBook manages the local active order books.
 //go:generate callbackgen -type LocalActiveOrderBook
 type LocalActiveOrderBook struct {
-	Bids *types.SyncOrderMap
-	Asks *types.SyncOrderMap
+	Asks, Bids *types.SyncOrderMap
 
 	filledCallbacks []func(o types.Order)
 }
