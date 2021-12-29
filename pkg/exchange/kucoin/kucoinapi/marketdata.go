@@ -156,28 +156,14 @@ type AllTickers struct {
 	Ticker []Ticker24H                `json:"ticker"`
 }
 
+//go:generate GetRequest -type GetAllTickersRequest -url "/api/v1/market/allTickers" -responseDataType AllTickers
+type GetAllTickersRequest struct {
+	client requestgen.APIClient
+}
+
 func (s *MarketDataService) ListTickers() (*AllTickers, error) {
-	req, err := s.client.NewRequest(context.Background(), "GET", "/api/v1/market/allTickers", nil, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := s.client.SendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var apiResponse struct {
-		Code    string      `json:"code"`
-		Message string      `json:"msg"`
-		Data    *AllTickers `json:"data"`
-	}
-
-	if err := response.DecodeJSON(&apiResponse); err != nil {
-		return nil, err
-	}
-
-	return apiResponse.Data, nil
+	req := &GetAllTickersRequest{client: s.client}
+	return req.Do(context.Background())
 }
 
 func (s *MarketDataService) GetTicker24HStat(symbol string) (*Ticker24H, error) {
