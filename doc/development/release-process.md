@@ -27,4 +27,10 @@ The above command wilL:
 - Run git tag to create the tag.
 - Run git push to push the created tag.
 
+Run changelog script to generate a changelog template:
+
+```sh
+bash utils/changelog.sh
+```
+
 You can go to <https://github.com/c9s/bbgo/releases/v1.20.2> to modify the changelog
