@@ -68,11 +68,12 @@ bash <(curl -s https://raw.githubusercontent.com/c9s/bbgo/main/scripts/setup-gri
 
 ### One-click Linode StackScript:
 
-- BBGO USDT/TWD Market Grid Trading <https://cloud.linode.com/stackscripts/793380>
-- BBGO USDC/TWD Market Grid Trading <https://cloud.linode.com/stackscripts/797776>
-- BBGO LINK/TWD Market Grid Trading <https://cloud.linode.com/stackscripts/797774>
-- BBGO USDC/USDT Market Grid Trading <https://cloud.linode.com/stackscripts/797777>
-- BBGO Standard Grid Trading <https://cloud.linode.com/stackscripts/795788>
+- BBGO Grid Trading on Binance <https://cloud.linode.com/stackscripts/950715>
+- BBGO USDT/TWD Grid Trading on MAX <https://cloud.linode.com/stackscripts/793380>
+- BBGO USDC/TWD Grid Trading on MAX <https://cloud.linode.com/stackscripts/797776>
+- BBGO LINK/TWD Grid Trading on MAX <https://cloud.linode.com/stackscripts/797774>
+- BBGO USDC/USDT Grid Trading on MAX <https://cloud.linode.com/stackscripts/797777>
+- BBGO Standard Grid Trading on MAX <https://cloud.linode.com/stackscripts/795788>
 
 ### Build from source
 
