@@ -14,6 +14,8 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+var marketDataLimiter = rate.NewLimiter(rate.Every(500*time.Millisecond), 1)
+
 var ErrMissingSequence = errors.New("sequence is missing")
 
 // OKB is the platform currency of OKEx, pre-allocate static string here
@@ -53,7 +55,7 @@ func (e *Exchange) PlatformFeeCurrency() string {
 }
 
 func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
-	accounts, err := e.client.AccountService.ListAccounts()
+	accounts, err := e.client.AccountService.ListAccounts(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +68,7 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 }
 
 func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
-	accounts, err := e.client.AccountService.ListAccounts()
+	accounts, err := e.client.AccountService.ListAccounts(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +152,6 @@ func (e *Exchange) IsSupportedInterval(interval types.Interval) bool {
 	return ok
 }
 
-var marketDataLimiter = rate.NewLimiter(rate.Every(200*time.Millisecond), 1)
 
 func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
 	_ = marketDataLimiter.Wait(ctx)
