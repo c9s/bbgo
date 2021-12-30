@@ -55,8 +55,6 @@ const writeTimeout = 10 * time.Second
 const listenKeyKeepAliveInterval = 10 * time.Minute
 
 func init() {
-	// randomize pulling
-	rand.Seed(time.Now().UnixNano())
 
 	debugBinanceDepth, _ = strconv.ParseBool(os.Getenv("DEBUG_BINANCE_DEPTH"))
 	if debugBinanceDepth {
