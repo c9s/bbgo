@@ -1,7 +1,7 @@
 package kucoinapi
 
 //go:generate -command GetRequest requestgen -method GET -responseType .APIResponse -responseDataField Data
-//go:generate -command PostRequest requestgen -method GET -responseType .APIResponse -responseDataField Data
+//go:generate -command PostRequest requestgen -method POST -responseType .APIResponse -responseDataField Data
 
 import (
 	"context"
