@@ -21,8 +21,6 @@ import (
 
 var defaultMargin = fixedpoint.NewFromFloat(0.003)
 
-var localTimeZone *time.Location
-
 const ID = "xmaker"
 
 const stateKey = "state-v1"
@@ -31,12 +29,6 @@ var log = logrus.WithField("strategy", ID)
 
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
-
-	var err error
-	localTimeZone, err = time.LoadLocation("Local")
-	if err != nil {
-		panic(err)
-	}
 }
 
 type State struct {
