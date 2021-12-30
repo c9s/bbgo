@@ -59,7 +59,11 @@ would be great if you can use their referral code as your support to them. :-D
 The following script will help you set up a config file, dotenv file:
 
 ```sh
-bash <(curl -s https://raw.githubusercontent.com/c9s/bbgo/main/scripts/setup-grid.sh)
+# grid trading strategy for binance exchange
+bash <(curl -s https://raw.githubusercontent.com/c9s/bbgo/main/scripts/setup-grid.sh) binance
+
+# grid trading strategy for max exchange
+bash <(curl -s https://raw.githubusercontent.com/c9s/bbgo/main/scripts/setup-grid.sh) max
 ```
 
 ### One-click Linode StackScript:
