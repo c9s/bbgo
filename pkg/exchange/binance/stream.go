@@ -141,75 +141,11 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 		}
 	})
 
-	stream.OnOutboundAccountPositionEvent(func(e *OutboundAccountPositionEvent) {
-		snapshot := types.BalanceMap{}
-		for _, balance := range e.Balances {
-			snapshot[balance.Asset] = types.Balance{
-				Currency:  balance.Asset,
-				Available: balance.Free,
-				Locked:    balance.Locked,
-			}
-		}
-		stream.EmitBalanceSnapshot(snapshot)
-	})
-
-	stream.OnKLineEvent(func(e *KLineEvent) {
-		kline := e.KLine.KLine()
-		if e.KLine.Closed {
-			stream.EmitKLineClosedEvent(e)
-			stream.EmitKLineClosed(kline)
-		} else {
-			stream.EmitKLine(kline)
-		}
-	})
-
-	stream.OnBookTickerEvent(func(e *BookTickerEvent) {
-		stream.EmitBookTickerUpdate(e.BookTicker())
-	})
-
-	stream.OnExecutionReportEvent(func(e *ExecutionReportEvent) {
-		switch e.CurrentExecutionType {
-
-		case "NEW", "CANCELED", "REJECTED", "EXPIRED", "REPLACED":
-			order, err := e.Order()
-			if err != nil {
-				log.WithError(err).Error("order convert error")
-				return
-			}
-
-			stream.EmitOrderUpdate(*order)
-
-		case "TRADE":
-			trade, err := e.Trade()
-			if err != nil {
-				log.WithError(err).Error("trade convert error")
-				return
-			}
-
-			stream.EmitTradeUpdate(*trade)
-
-			order, err := e.Order()
-			if err != nil {
-				log.WithError(err).Error("order convert error")
-				return
-			}
-
-			// Update Order with FILLED event
-			if order.Status == types.OrderStatusFilled {
-				stream.EmitOrderUpdate(*order)
-			}
-		}
-	})
-
-	stream.OnContinuousKLineEvent(func(e *ContinuousKLineEvent) {
-		kline := e.KLine.KLine()
-		if e.KLine.Closed {
-			stream.EmitContinuousKLineClosedEvent(e)
-			stream.EmitKLineClosed(kline)
-		} else {
-			stream.EmitKLine(kline)
-		}
-	})
+	stream.OnOutboundAccountPositionEvent(stream.handleOutboundAccountPositionEvent)
+	stream.OnKLineEvent(stream.handleKLineEvent)
+	stream.OnBookTickerEvent(stream.handleBookTickerEvent)
+	stream.OnExecutionReportEvent(stream.handleExecutionReportEvent)
+	stream.OnContinuousKLineEvent(stream.handleContinuousKLineEvent)
 
 	stream.OnOrderTradeUpdateEvent(func(e *OrderTradeUpdateEvent) {
 		switch e.OrderTrade.CurrentExecutionType {
@@ -281,6 +217,76 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 	return stream
 }
 
+func (s *Stream) handleContinuousKLineEvent(e *ContinuousKLineEvent) {
+	kline := e.KLine.KLine()
+	if e.KLine.Closed {
+		s.EmitContinuousKLineClosedEvent(e)
+		s.EmitKLineClosed(kline)
+	} else {
+		s.EmitKLine(kline)
+	}
+}
+
+func (s *Stream) handleExecutionReportEvent(e *ExecutionReportEvent) {
+	switch e.CurrentExecutionType {
+
+	case "NEW", "CANCELED", "REJECTED", "EXPIRED", "REPLACED":
+		order, err := e.Order()
+		if err != nil {
+			log.WithError(err).Error("order convert error")
+			return
+		}
+
+		s.EmitOrderUpdate(*order)
+
+	case "TRADE":
+		trade, err := e.Trade()
+		if err != nil {
+			log.WithError(err).Error("trade convert error")
+			return
+		}
+
+		s.EmitTradeUpdate(*trade)
+
+		order, err := e.Order()
+		if err != nil {
+			log.WithError(err).Error("order convert error")
+			return
+		}
+
+		// Update Order with FILLED event
+		if order.Status == types.OrderStatusFilled {
+			s.EmitOrderUpdate(*order)
+		}
+	}
+}
+
+func (s *Stream) handleBookTickerEvent(e *BookTickerEvent) {
+	s.EmitBookTickerUpdate(e.BookTicker())
+}
+
+func (s *Stream) handleKLineEvent(e *KLineEvent) {
+	kline := e.KLine.KLine()
+	if e.KLine.Closed {
+		s.EmitKLineClosedEvent(e)
+		s.EmitKLineClosed(kline)
+	} else {
+		s.EmitKLine(kline)
+	}
+}
+
+func (s *Stream) handleOutboundAccountPositionEvent(e *OutboundAccountPositionEvent) {
+	snapshot := types.BalanceMap{}
+	for _, balance := range e.Balances {
+		snapshot[balance.Asset] = types.Balance{
+			Currency:  balance.Asset,
+			Available: balance.Free,
+			Locked:    balance.Locked,
+		}
+	}
+	s.EmitBalanceSnapshot(snapshot)
+}
+
 func (s *Stream) dial(listenKey string) (*websocket.Conn, error) {
 	var url string
 	if s.PublicOnly {
@@ -318,7 +324,6 @@ func (s *Stream) dial(listenKey string) (*websocket.Conn, error) {
 
 	return conn, nil
 }
-
 
 func (s *Stream) Connect(ctx context.Context) error {
 	err := s.connect(ctx)
@@ -573,7 +578,6 @@ func (s *Stream) read(ctx context.Context) {
 	}
 }
 
-
 func (s *Stream) Close() error {
 	log.Infof("closing stream...")
 
@@ -586,7 +590,6 @@ func (s *Stream) Close() error {
 	s.ConnLock.Unlock()
 	return err
 }
-
 
 func (s *Stream) fetchListenKey(ctx context.Context) (string, error) {
 	if s.IsMargin {
@@ -627,7 +630,6 @@ func (s *Stream) keepaliveListenKey(ctx context.Context, listenKey string) error
 
 	return s.Client.NewKeepaliveUserStreamService().ListenKey(listenKey).Do(ctx)
 }
-
 
 func (s *Stream) invalidateListenKey(ctx context.Context, listenKey string) (err error) {
 	// should use background context to invalidate the user stream
