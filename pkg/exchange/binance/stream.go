@@ -161,56 +161,11 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 	stream.OnContinuousKLineEvent(stream.handleContinuousKLineEvent)
 
 	// Event type ACCOUNT_UPDATE from user data stream updates Balance and FuturesPosition.
-	stream.OnAccountUpdateEvent(func(e *AccountUpdateEvent) {
-		futuresPositionSnapshot := types.FuturesPositionMap{}
-		futuresPositionSnapshot = toGlobalFuturesPositions(e.AccountUpdate.Positions)
-		stream.EmitFuturesPositionSnapshot(futuresPositionSnapshot)
+	stream.OnAccountUpdateEvent(stream.handleAccountUpdateEvent)
 
-		balanceSnapshot := types.BalanceMap{}
-		balanceSnapshot = toGlobalFuturesBalance(e.AccountUpdate.Balances)
-		stream.EmitBalanceSnapshot(balanceSnapshot)
-	})
+	stream.OnAccountConfigUpdateEvent(stream.handleAccountConfigUpdateEvent)
 
-	// TODO: emit account config leverage updates
-	stream.OnAccountConfigUpdateEvent(func(e *AccountConfigUpdateEvent) {})
-
-	stream.OnOrderTradeUpdateEvent(func(e *OrderTradeUpdateEvent) {
-		switch e.OrderTrade.CurrentExecutionType {
-
-		case "NEW", "CANCELED", "EXPIRED":
-			order, err := e.OrderFutures()
-			if err != nil {
-				log.WithError(err).Error("order convert error")
-				return
-			}
-
-			stream.EmitOrderUpdate(*order)
-
-		case "TRADE":
-			// TODO
-
-			// trade, err := e.Trade()
-			// if err != nil {
-			// 	log.WithError(err).Error("trade convert error")
-			// 	return
-			// }
-
-			// stream.EmitTradeUpdate(*trade)
-
-			// order, err := e.OrderFutures()
-			// if err != nil {
-			// 	log.WithError(err).Error("order convert error")
-			// 	return
-			// }
-
-			// Update Order with FILLED event
-			// if order.Status == types.OrderStatusFilled {
-			// 	stream.EmitOrderUpdate(*order)
-			// }
-		case "CALCULATED - Liquidation Execution":
-			log.Infof("CALCULATED - Liquidation Execution not support yet.")
-		}
-	})
+	stream.OnOrderTradeUpdateEvent(stream.handleOrderTradeUpdateEvent)
 
 	stream.OnDisconnect(func() {
 		log.Infof("resetting depth snapshots...")
@@ -312,6 +267,57 @@ func (s *Stream) handleOutboundAccountPositionEvent(e *OutboundAccountPositionEv
 		}
 	}
 	s.EmitBalanceSnapshot(snapshot)
+}
+
+func (s *Stream) handleAccountUpdateEvent(e *AccountUpdateEvent) {
+	futuresPositionSnapshot := toGlobalFuturesPositions(e.AccountUpdate.Positions)
+	s.EmitFuturesPositionSnapshot(futuresPositionSnapshot)
+
+	balanceSnapshot := toGlobalFuturesBalance(e.AccountUpdate.Balances)
+	s.EmitBalanceSnapshot(balanceSnapshot)
+}
+
+// TODO: emit account config leverage updates
+func (s *Stream) handleAccountConfigUpdateEvent(e *AccountConfigUpdateEvent) {
+}
+
+func (s *Stream) handleOrderTradeUpdateEvent(e *OrderTradeUpdateEvent) {
+	switch e.OrderTrade.CurrentExecutionType {
+
+	case "NEW", "CANCELED", "EXPIRED":
+		order, err := e.OrderFutures()
+		if err != nil {
+			log.WithError(err).Error("order convert error")
+			return
+		}
+
+		s.EmitOrderUpdate(*order)
+
+	case "TRADE":
+		// TODO
+
+		// trade, err := e.Trade()
+		// if err != nil {
+		// 	log.WithError(err).Error("trade convert error")
+		// 	return
+		// }
+
+		// stream.EmitTradeUpdate(*trade)
+
+		// order, err := e.OrderFutures()
+		// if err != nil {
+		// 	log.WithError(err).Error("order convert error")
+		// 	return
+		// }
+
+		// Update Order with FILLED event
+		// if order.Status == types.OrderStatusFilled {
+		// 	stream.EmitOrderUpdate(*order)
+		// }
+	case "CALCULATED - Liquidation Execution":
+		log.Infof("CALCULATED - Liquidation Execution not support yet.")
+	}
+
 }
 
 func (s *Stream) getEndpointUrl(listenKey string) string {
