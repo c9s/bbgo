@@ -300,18 +300,17 @@ func (s *Stream) handleOutboundAccountPositionEvent(e *OutboundAccountPositionEv
 
 func (s *Stream) getEndpointUrl(listenKey string) string {
 	var url string
-	if s.PublicOnly {
-		if s.IsFutures {
-			url = "wss://fstream.binance.com/ws/"
-		} else {
-			url = "wss://stream.binance.com:9443/ws"
-		}
+
+	if s.IsFutures {
+		url = BinanceFuturesWebSocketURL + "/ws"
+	} else if isBinanceUs() {
+		url = BinanceUSWebSocketURL + "/ws"
 	} else {
-		if s.IsFutures {
-			url = "wss://fstream.binance.com/ws/" + listenKey
-		} else {
-			url = "wss://stream.binance.com:9443/ws/" + listenKey
-		}
+		url = BinanceWebSocketURL + "/ws"
+	}
+
+	if !s.PublicOnly {
+		url += "/" + listenKey
 	}
 
 	return url

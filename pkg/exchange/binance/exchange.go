@@ -27,6 +27,12 @@ import (
 
 const BNB = "BNB"
 
+
+const BinanceUSBaseURL = "https://api.binance.us"
+const BinanceUSWebSocketURL = "wss://stream.binance.us:9443"
+const BinanceWebSocketURL = "wss://stream.binance.com:9443"
+const BinanceFuturesWebSocketURL = "wss://fstream.binance.com"
+
 // 50 per 10 seconds = 5 per second
 var orderLimiter = rate.NewLimiter(5, 5)
 
@@ -45,6 +51,11 @@ func init() {
 	}
 }
 
+func isBinanceUs() bool {
+	v, err := strconv.ParseBool(os.Getenv("BINANCE_US"))
+	return err == nil && v
+}
+
 type Exchange struct {
 	types.MarginSettings
 	types.FuturesSettings
@@ -61,6 +72,10 @@ func New(key, secret string) *Exchange {
 
 	var futuresClient = binance.NewFuturesClient(key, secret)
 	futuresClient.HTTPClient = &http.Client{Timeout: 15 * time.Second}
+
+	if isBinanceUs() {
+		client.BaseURL = BinanceUSBaseURL
+	}
 
 	var err error
 	if len(key) > 0 && len(secret) > 0 {

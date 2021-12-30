@@ -88,6 +88,9 @@ Add your dotenv file:
 BINANCE_API_KEY=
 BINANCE_API_SECRET=
 
+# if you want to use binance.us, change this to 1
+BINANCE_US=0
+
 # for MAX exchange, if you have one
 MAX_API_KEY=
 MAX_API_SECRET=
