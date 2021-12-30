@@ -26,9 +26,12 @@ jobs:
           node-version: "16"
       - name: Build
         run: |
+          go get github.com/mattn/go-sqlite3
           npm install --global yarn
           make dist VERSION=${{ steps.get_version.outputs.VERSION }}
         shell: bash
+        env:
+          CGO_ENABLED: 1
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
