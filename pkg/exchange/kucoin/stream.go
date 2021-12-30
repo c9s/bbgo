@@ -150,6 +150,7 @@ func (s *Stream) handlePrivateOrderEvent(e *WebSocketPrivateOrderEvent) {
 
 		s.StandardStream.EmitOrderUpdate(types.Order{
 			SubmitOrder: types.SubmitOrder{
+				ClientOrderID: e.ClientOid,
 				Symbol:   toGlobalSymbol(e.Symbol),
 				Side:     toGlobalSide(e.Side),
 				Type:     toGlobalOrderType(e.OrderType),
