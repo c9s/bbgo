@@ -121,6 +121,7 @@ func (m AssetMap) SlackAttachment() slack.Attachment {
 
 type BalanceMap map[string]Balance
 type PositionMap map[string]Position
+type FuturesPositionMap map[string]FuturesPosition
 
 func (m BalanceMap) String() string {
 	var ss []string
@@ -229,7 +230,7 @@ type FuturesAccountInfo struct {
 	Assets                      map[Asset]FuturesUserAsset `json:"assets"`
 	FeeTier                     int                        `json:"feeTier"`
 	MaxWithdrawAmount           fixedpoint.Value           `json:"maxWithdrawAmount"`
-	Positions                   PositionMap                `json:"positions"`
+	Positions                   FuturesPositionMap         `json:"positions"`
 	TotalInitialMargin          fixedpoint.Value           `json:"totalInitialMargin"`
 	TotalMaintMargin            fixedpoint.Value           `json:"totalMaintMargin"`
 	TotalMarginBalance          fixedpoint.Value           `json:"totalMarginBalance"`
