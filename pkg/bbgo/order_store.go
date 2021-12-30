@@ -130,6 +130,8 @@ func (s *OrderStore) handleOrderUpdate(order types.Order) {
 	case types.OrderStatusCanceled:
 		if s.RemoveCancelled {
 			s.Remove(order)
+		} else if order.ExecutedQuantity == 0.0 {
+			s.Remove(order)
 		}
 
 	case types.OrderStatusRejected:
