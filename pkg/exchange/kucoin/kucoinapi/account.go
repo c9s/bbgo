@@ -16,17 +16,17 @@ type AccountService struct {
 }
 
 func (s *AccountService) ListSubAccounts(ctx context.Context) ([]SubAccount, error) {
-	req := &NewListSubAccountsRequest{client: s.client}
+	req := &ListSubAccountsRequest{client: s.client}
 	return req.Do(ctx)
 }
 
 func (s *AccountService) ListAccounts(ctx context.Context) ([]Account, error) {
-	req := &NewListAccountsRequest{client: s.client}
+	req := &ListAccountsRequest{client: s.client}
 	return req.Do(ctx)
 }
 
 func (s *AccountService) GetAccount(ctx context.Context, accountID string) (*Account, error) {
-	req := &NewGetAccountRequest{client: s.client, accountID: accountID}
+	req := &GetAccountRequest{client: s.client, accountID: accountID}
 	return req.Do(ctx)
 }
 
@@ -37,8 +37,8 @@ type SubAccount struct {
 	Remark string `json:"remarks"`
 }
 
-//go:generate GetRequest -url "/api/v1/sub/user" -type NewListSubAccountsRequest -responseDataType []SubAccount
-type NewListSubAccountsRequest struct {
+//go:generate GetRequest -url "/api/v1/sub/user" -type ListSubAccountsRequest -responseDataType []SubAccount
+type ListSubAccountsRequest struct {
 	client requestgen.AuthenticatedAPIClient
 }
 
@@ -51,13 +51,13 @@ type Account struct {
 	Holds     fixedpoint.Value `json:"holds"`
 }
 
-//go:generate GetRequest -url "/api/v1/accounts" -type NewListAccountsRequest -responseDataType []Account
-type NewListAccountsRequest struct {
+//go:generate GetRequest -url "/api/v1/accounts" -type ListAccountsRequest -responseDataType []Account
+type ListAccountsRequest struct {
 	client requestgen.AuthenticatedAPIClient
 }
 
-//go:generate GetRequest -url "/api/v1/accounts/:accountID" -type NewGetAccountRequest -responseDataType .Account
-type NewGetAccountRequest struct {
+//go:generate GetRequest -url "/api/v1/accounts/:accountID" -type GetAccountRequest -responseDataType .Account
+type GetAccountRequest struct {
 	client    requestgen.AuthenticatedAPIClient
 	accountID string `param:"accountID,slug"`
 }
