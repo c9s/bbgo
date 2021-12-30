@@ -154,20 +154,20 @@ func toGlobalFuturesBalance(balances []*futures.Balance) types.BalanceMap {
 	return retBalances
 }
 
-func toGlobalFuturesPositions(positions []*futures.AccountPosition) types.PositionMap {
-	retPositions := make(types.PositionMap)
-	for _, position := range positions {
-		retPositions[position.Symbol] = types.Position{
-			Isolated: position.Isolated,
+func toGlobalFuturesPositions(futuresPositions []*futures.AccountPosition) types.FuturesPositionMap {
+	retFuturesPositions := make(types.FuturesPositionMap)
+	for _, futuresPosition := range futuresPositions {
+		retFuturesPositions[futuresPosition.Symbol] = types.FuturesPosition{ //TODO: types.FuturesPosition
+			Isolated: futuresPosition.Isolated,
 			PositionRisk: &types.PositionRisk{
-				Leverage: fixedpoint.MustNewFromString(position.Leverage),
+				Leverage: fixedpoint.MustNewFromString(futuresPosition.Leverage),
 			},
-			Symbol:     position.Symbol,
-			UpdateTime: position.UpdateTime,
+			Symbol:     futuresPosition.Symbol,
+			UpdateTime: futuresPosition.UpdateTime,
 		}
 	}
 
-	return retPositions
+	return retFuturesPositions
 }
 
 func toGlobalFuturesUserAssets(assets []*futures.AccountAsset) (retAssets map[types.Asset]types.FuturesUserAsset) {

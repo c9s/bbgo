@@ -124,23 +124,23 @@ func (stream *StandardStream) EmitBookSnapshot(book SliceOrderBook) {
 	}
 }
 
-func (stream *StandardStream) OnPositionUpdate(cb func(position PositionMap)) {
-	stream.PositionUpdateCallbacks = append(stream.PositionUpdateCallbacks, cb)
+func (stream *StandardStream) OnFuturesPositionUpdate(cb func(futuresPositions FuturesPositionMap)) {
+	stream.FuturesPositionUpdateCallbacks = append(stream.FuturesPositionUpdateCallbacks, cb)
 }
 
-func (stream *StandardStream) EmitPositionUpdate(position PositionMap) {
-	for _, cb := range stream.PositionUpdateCallbacks {
-		cb(position)
+func (stream *StandardStream) EmitFuturesPositionUpdate(futuresPositions FuturesPositionMap) {
+	for _, cb := range stream.FuturesPositionUpdateCallbacks {
+		cb(futuresPositions)
 	}
 }
 
-func (stream *StandardStream) OnPositionSnapshot(cb func(position PositionMap)) {
-	stream.PositionSnapshotCallbacks = append(stream.PositionSnapshotCallbacks, cb)
+func (stream *StandardStream) OnFuturesPositionSnapshot(cb func(futuresPositions FuturesPositionMap)) {
+	stream.FuturesPositionSnapshotCallbacks = append(stream.FuturesPositionSnapshotCallbacks, cb)
 }
 
-func (stream *StandardStream) EmitPositionSnapshot(position PositionMap) {
-	for _, cb := range stream.PositionSnapshotCallbacks {
-		cb(position)
+func (stream *StandardStream) EmitFuturesPositionSnapshot(futuresPositions FuturesPositionMap) {
+	for _, cb := range stream.FuturesPositionSnapshotCallbacks {
+		cb(futuresPositions)
 	}
 }
 
@@ -169,7 +169,7 @@ type StandardStreamEventHub interface {
 
 	OnBookSnapshot(cb func(book SliceOrderBook))
 
-	OnPositionUpdate(cb func(position PositionMap))
+	OnFuturesPositionUpdate(cb func(futuresPositions FuturesPositionMap))
 
-	OnPositionSnapshot(cb func(position PositionMap))
+	OnFuturesPositionSnapshot(cb func(futuresPositions FuturesPositionMap))
 }
