@@ -2,6 +2,7 @@ package kucoinapi
 
 //go:generate -command GetRequest requestgen -method GET -responseType .APIResponse -responseDataField Data
 //go:generate -command PostRequest requestgen -method POST -responseType .APIResponse -responseDataField Data
+//go:generate -command DeleteRequest requestgen -method DELETE -responseType .APIResponse -responseDataField Data
 
 import (
 	"context"
@@ -255,13 +256,6 @@ type PlaceOrderRequest struct {
 	timeInForce *TimeInForceType `param:"timeInForce,required"`
 }
 
-//go:generate requestgen -type CancelOrderRequest
-type CancelOrderRequest struct {
-	client *RestClient
-
-	orderID       *string `param:"orderID"`
-	clientOrderID *string `param:"clientOrderID"`
-}
 
 type CancelOrderResponse struct {
 	CancelledOrderIDs []string `json:"cancelledOrderIds,omitempty"`
@@ -270,6 +264,15 @@ type CancelOrderResponse struct {
 	CancelledOrderId string `json:"cancelledOrderId,omitempty"`
 	ClientOrderID    string `json:"clientOid,omitempty"`
 }
+
+//go:generate requestgen -type CancelOrderRequest
+type CancelOrderRequest struct {
+	client requestgen.AuthenticatedAPIClient
+
+	orderID       *string `param:"orderID"`
+	clientOrderID *string `param:"clientOrderID"`
+}
+
 
 func (r *CancelOrderRequest) Do(ctx context.Context) (*CancelOrderResponse, error) {
 	if r.orderID == nil && r.clientOrderID == nil {
@@ -310,45 +313,12 @@ func (r *CancelOrderRequest) Do(ctx context.Context) (*CancelOrderResponse, erro
 	return apiResponse.Data, nil
 }
 
-//go:generate requestgen -type CancelAllOrderRequest
+//go:generate DeleteRequest -url /api/v1/orders -type CancelAllOrderRequest -responseDataType .CancelOrderResponse
 type CancelAllOrderRequest struct {
-	client *RestClient
+	client requestgen.AuthenticatedAPIClient
 
 	symbol    *string `param:"symbol"`
 	tradeType *string `param:"tradeType"`
-}
-
-func (r *CancelAllOrderRequest) Do(ctx context.Context) (*CancelOrderResponse, error) {
-	params, err := r.GetParametersQuery()
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := r.client.NewAuthenticatedRequest(ctx, "DELETE", "/api/v1/orders", params, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := r.client.SendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var apiResponse struct {
-		Code    string               `json:"code"`
-		Message string               `json:"msg"`
-		Data    *CancelOrderResponse `json:"data"`
-	}
-
-	if err := response.DecodeJSON(&apiResponse); err != nil {
-		return nil, err
-	}
-
-	if apiResponse.Data == nil {
-		return nil, errors.New("api error: [" + apiResponse.Code + "] " + apiResponse.Message)
-	}
-
-	return apiResponse.Data, nil
 }
 
 // Request via this endpoint to place 5 orders at the same time.
