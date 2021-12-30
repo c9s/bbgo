@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -26,7 +28,7 @@ var accountsCmd = &cobra.Command{
 			return nil
 		}
 
-		accounts, err := client.AccountService.ListAccounts()
+		accounts, err := client.AccountService.ListAccounts(context.Background())
 		if err != nil {
 			return err
 		}

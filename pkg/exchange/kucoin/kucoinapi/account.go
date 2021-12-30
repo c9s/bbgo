@@ -50,8 +50,8 @@ type Account struct {
 	Holds     fixedpoint.Value `json:"holds"`
 }
 
-func (s *AccountService) ListAccounts() ([]Account, error) {
-	req, err := s.client.NewAuthenticatedRequest(context.Background(), "GET", "/api/v1/accounts", nil, nil)
+func (s *AccountService) ListAccounts(ctx context.Context) ([]Account, error) {
+	req, err := s.client.NewAuthenticatedRequest(ctx, "GET", "/api/v1/accounts", nil, nil)
 	if err != nil {
 		return nil, err
 	}

@@ -260,9 +260,9 @@ func (s *Stream) getEndpoint() (string, error) {
 	var bullet *kucoinapi.Bullet
 	var err error
 	if s.PublicOnly {
-		bullet, err = s.client.BulletService.NewGetPublicBulletRequest().Do(nil)
+		bullet, err = s.client.BulletService.NewGetPublicBulletRequest().Do(context.Background())
 	} else {
-		bullet, err = s.client.BulletService.NewGetPrivateBulletRequest().Do(nil)
+		bullet, err = s.client.BulletService.NewGetPrivateBulletRequest().Do(context.Background())
 	}
 
 	if err != nil {
