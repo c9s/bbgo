@@ -134,7 +134,7 @@ dev-version: pkg/version/dev.go
 version: pkg/version/version.go pkg/version/dev.go migrations
 	git commit $< $(word 2,$^) -m "bump version to $(VERSION)" || true
 	[[ -e doc/release/$(VERSION).md ]] || (echo "file doc/release/$(VERSION).md does not exist" ; exit 1)
-	git add -v doc/release/$(VERSION).md && git commit doc/release/$(VERSION).md -m "add release note" || true
+	git add -v doc/release/$(VERSION).md && git commit doc/release/$(VERSION).md -m "add $(VERSION) release note" || true
 	git tag -f $(VERSION)
 	git push origin HEAD
 	git push -f origin $(VERSION)
