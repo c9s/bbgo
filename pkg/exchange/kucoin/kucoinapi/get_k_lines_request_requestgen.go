@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"regexp"
 	"strconv"
 	"time"
 )
@@ -108,4 +109,34 @@ func (r *GetKLinesRequest) GetParametersJSON() ([]byte, error) {
 	}
 
 	return json.Marshal(params)
+}
+
+// GetSlugParameters builds and checks the slug parameters and return the result in a map object
+func (r *GetKLinesRequest) GetSlugParameters() (map[string]interface{}, error) {
+	var params = map[string]interface{}{}
+
+	return params, nil
+}
+
+func (r *GetKLinesRequest) applySlugsToUrl(url string, slugs map[string]string) string {
+	for k, v := range slugs {
+		needleRE := regexp.MustCompile(":" + k + "\\b")
+		url = needleRE.ReplaceAllString(url, v)
+	}
+
+	return url
+}
+
+func (r *GetKLinesRequest) GetSlugsMap() (map[string]string, error) {
+	slugs := map[string]string{}
+	params, err := r.GetSlugParameters()
+	if err != nil {
+		return slugs, nil
+	}
+
+	for k, v := range params {
+		slugs[k] = fmt.Sprintf("%v", v)
+	}
+
+	return slugs, nil
 }

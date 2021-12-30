@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"regexp"
 )
 
 func (l *ListSymbolsRequest) Market(market string) *ListSymbolsRequest {
@@ -66,13 +67,45 @@ func (l *ListSymbolsRequest) GetParametersJSON() ([]byte, error) {
 	return json.Marshal(params)
 }
 
+// GetSlugParameters builds and checks the slug parameters and return the result in a map object
+func (l *ListSymbolsRequest) GetSlugParameters() (map[string]interface{}, error) {
+	var params = map[string]interface{}{}
+
+	return params, nil
+}
+
+func (l *ListSymbolsRequest) applySlugsToUrl(url string, slugs map[string]string) string {
+	for k, v := range slugs {
+		needleRE := regexp.MustCompile(":" + k + "\\b")
+		url = needleRE.ReplaceAllString(url, v)
+	}
+
+	return url
+}
+
+func (l *ListSymbolsRequest) GetSlugsMap() (map[string]string, error) {
+	slugs := map[string]string{}
+	params, err := l.GetSlugParameters()
+	if err != nil {
+		return slugs, nil
+	}
+
+	for k, v := range params {
+		slugs[k] = fmt.Sprintf("%v", v)
+	}
+
+	return slugs, nil
+}
+
 func (l *ListSymbolsRequest) Do(ctx context.Context) ([]Symbol, error) {
 
 	// empty params for GET operation
 	var params interface{}
 	query := url.Values{}
 
-	req, err := l.client.NewRequest(ctx, "GET", "/api/v1/symbols", query, params)
+	apiURL := "/api/v1/symbols"
+
+	req, err := l.client.NewRequest(ctx, "GET", apiURL, query, params)
 	if err != nil {
 		return nil, err
 	}

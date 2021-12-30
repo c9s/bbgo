@@ -5,8 +5,85 @@ package kucoinapi
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/url"
+	"regexp"
 )
+
+// GetQueryParameters builds and checks the query parameters and returns url.Values
+func (g *GetPrivateBulletRequest) GetQueryParameters() (url.Values, error) {
+	var params = map[string]interface{}{}
+
+	query := url.Values{}
+	for k, v := range params {
+		query.Add(k, fmt.Sprintf("%v", v))
+	}
+
+	return query, nil
+}
+
+// GetParameters builds and checks the parameters and return the result in a map object
+func (g *GetPrivateBulletRequest) GetParameters() (map[string]interface{}, error) {
+	var params = map[string]interface{}{}
+
+	return params, nil
+}
+
+// GetParametersQuery converts the parameters from GetParameters into the url.Values format
+func (g *GetPrivateBulletRequest) GetParametersQuery() (url.Values, error) {
+	query := url.Values{}
+
+	params, err := g.GetParameters()
+	if err != nil {
+		return query, err
+	}
+
+	for k, v := range params {
+		query.Add(k, fmt.Sprintf("%v", v))
+	}
+
+	return query, nil
+}
+
+// GetParametersJSON converts the parameters from GetParameters into the JSON format
+func (g *GetPrivateBulletRequest) GetParametersJSON() ([]byte, error) {
+	params, err := g.GetParameters()
+	if err != nil {
+		return nil, err
+	}
+
+	return json.Marshal(params)
+}
+
+// GetSlugParameters builds and checks the slug parameters and return the result in a map object
+func (g *GetPrivateBulletRequest) GetSlugParameters() (map[string]interface{}, error) {
+	var params = map[string]interface{}{}
+
+	return params, nil
+}
+
+func (g *GetPrivateBulletRequest) applySlugsToUrl(url string, slugs map[string]string) string {
+	for k, v := range slugs {
+		needleRE := regexp.MustCompile(":" + k + "\\b")
+		url = needleRE.ReplaceAllString(url, v)
+	}
+
+	return url
+}
+
+func (g *GetPrivateBulletRequest) GetSlugsMap() (map[string]string, error) {
+	slugs := map[string]string{}
+	params, err := g.GetSlugParameters()
+	if err != nil {
+		return slugs, nil
+	}
+
+	for k, v := range params {
+		slugs[k] = fmt.Sprintf("%v", v)
+	}
+
+	return slugs, nil
+}
 
 func (g *GetPrivateBulletRequest) Do(ctx context.Context) (*Bullet, error) {
 
@@ -14,7 +91,9 @@ func (g *GetPrivateBulletRequest) Do(ctx context.Context) (*Bullet, error) {
 	var params interface{}
 	query := url.Values{}
 
-	req, err := g.client.NewAuthenticatedRequest(ctx, "POST", "/api/v1/bullet-private", query, params)
+	apiURL := "/api/v1/bullet-private"
+
+	req, err := g.client.NewAuthenticatedRequest(ctx, "POST", apiURL, query, params)
 	if err != nil {
 		return nil, err
 	}
