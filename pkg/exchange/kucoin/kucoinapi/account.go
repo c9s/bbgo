@@ -1,13 +1,33 @@
 package kucoinapi
 
+//go:generate -command GetRequest requestgen -method GET -responseType .APIResponse -responseDataField Data
+//go:generate -command PostRequest requestgen -method GET -responseType .APIResponse -responseDataField Data
+
 import (
 	"context"
+
+	"github.com/c9s/requestgen"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 type AccountService struct {
 	client *RestClient
+}
+
+func (s *AccountService) ListSubAccounts(ctx context.Context) ([]SubAccount, error) {
+	req := &NewListSubAccountsRequest{client: s.client}
+	return req.Do(ctx)
+}
+
+func (s *AccountService) ListAccounts(ctx context.Context) ([]Account, error) {
+	req := &NewListAccountsRequest{client: s.client}
+	return req.Do(ctx)
+}
+
+func (s *AccountService) GetAccount(ctx context.Context, accountID string) (*Account, error) {
+	req := &NewGetAccountRequest{client: s.client, accountID: accountID}
+	return req.Do(ctx)
 }
 
 type SubAccount struct {
@@ -17,28 +37,9 @@ type SubAccount struct {
 	Remark string `json:"remarks"`
 }
 
-func (s *AccountService) QuerySubAccounts() ([]SubAccount, error) {
-	req, err := s.client.NewAuthenticatedRequest(context.Background(), "GET", "/api/v1/sub/user", nil, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := s.client.SendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var apiResponse struct {
-		Code    string       `json:"code"`
-		Message string       `json:"msg"`
-		Data    []SubAccount `json:"data"`
-	}
-
-	if err := response.DecodeJSON(&apiResponse); err != nil {
-		return nil, err
-	}
-
-	return apiResponse.Data, nil
+//go:generate GetRequest -url "/api/v1/sub/user" -type NewListSubAccountsRequest -responseDataType []SubAccount
+type NewListSubAccountsRequest struct {
+	client requestgen.AuthenticatedAPIClient
 }
 
 type Account struct {
@@ -50,50 +51,13 @@ type Account struct {
 	Holds     fixedpoint.Value `json:"holds"`
 }
 
-func (s *AccountService) ListAccounts(ctx context.Context) ([]Account, error) {
-	req, err := s.client.NewAuthenticatedRequest(ctx, "GET", "/api/v1/accounts", nil, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := s.client.SendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var apiResponse struct {
-		Code    string    `json:"code"`
-		Message string    `json:"msg"`
-		Data    []Account `json:"data"`
-	}
-
-	if err := response.DecodeJSON(&apiResponse); err != nil {
-		return nil, err
-	}
-
-	return apiResponse.Data, nil
+//go:generate GetRequest -url "/api/v1/accounts" -type NewListAccountsRequest -responseDataType []Account
+type NewListAccountsRequest struct {
+	client requestgen.AuthenticatedAPIClient
 }
 
-func (s *AccountService) GetAccount(accountID string) (*Account, error) {
-	req, err := s.client.NewAuthenticatedRequest(context.Background(), "GET", "/api/v1/accounts/"+accountID, nil, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := s.client.SendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var apiResponse struct {
-		Code    string   `json:"code"`
-		Message string   `json:"msg"`
-		Data    *Account `json:"data"`
-	}
-
-	if err := response.DecodeJSON(&apiResponse); err != nil {
-		return nil, err
-	}
-
-	return apiResponse.Data, nil
+//go:generate GetRequest -url "/api/v1/accounts/:accountID" -type NewGetAccountRequest -responseDataType .Account
+type NewGetAccountRequest struct {
+	client    requestgen.AuthenticatedAPIClient
+	accountID string `param:"accountID,slug"`
 }
