@@ -137,7 +137,7 @@ version: pkg/version/version.go pkg/version/dev.go migrations
 	git add -v doc/release/$(VERSION).md && git commit doc/release/$(VERSION).md -m "add release note" || true
 	git tag -f $(VERSION)
 	git push origin HEAD
-	git push origin $(VERSION)
+	git push -f origin $(VERSION)
 
 migrations:
 	rockhopper compile --config rockhopper_mysql.yaml --output pkg/migrations/mysql
