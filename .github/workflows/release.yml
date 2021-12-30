@@ -9,7 +9,8 @@ name: Create Release
 jobs:
   release:
     name: Create Release
-    runs-on: macos-latest
+    # runs-on: macos-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Get the version
         id: get_version
@@ -26,12 +27,10 @@ jobs:
           node-version: "16"
       - name: Build
         run: |
-          go get github.com/mattn/go-sqlite3
+          CGO_ENABLED=1 go get github.com/mattn/go-sqlite3
           npm install --global yarn
           make dist VERSION=${{ steps.get_version.outputs.VERSION }}
         shell: bash
-        env:
-          CGO_ENABLED: 1
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
