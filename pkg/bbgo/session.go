@@ -322,15 +322,9 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 		// forward trade updates and order updates to the order executor
 		session.UserDataStream.OnTradeUpdate(session.OrderExecutor.EmitTradeUpdate)
 		session.UserDataStream.OnOrderUpdate(session.OrderExecutor.EmitOrderUpdate)
-		
-		session.UserDataStream.OnDisconnect(func() {
-			session.Notifiability.Notify("session %s user data stream disconnected", session.Name)
-		})
-		session.UserDataStream.OnConnect(func() {
-			session.Notifiability.Notify("session %s user data stream connected", session.Name)
-		})
-
 		session.Account.BindStream(session.UserDataStream)
+
+		session.bindConnectionStatusNotification(session.UserDataStream, "user data")
 
 		// if metrics mode is enabled, we bind the callbacks to update metrics
 		if viper.GetBool("metrics") {
@@ -897,5 +891,14 @@ func (session *ExchangeSession) bindUserDataStreamMetrics(stream types.Stream) {
 			"margin":   session.MarginType(),
 			"symbol":   session.IsolatedMarginSymbol,
 		}).Set(1.0)
+	})
+}
+
+func (session *ExchangeSession) bindConnectionStatusNotification(stream types.Stream, streamName string) {
+	stream.OnDisconnect(func() {
+		session.Notifiability.Notify("session %s %s stream disconnected", session.Name, streamName)
+	})
+	stream.OnConnect(func() {
+		session.Notifiability.Notify("session %s %s stream connected", session.Name, streamName)
 	})
 }
