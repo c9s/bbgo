@@ -26,7 +26,11 @@ var BookTickerChannel = Channel("bookticker")
 type StandardStream struct {
 	PublicOnly bool
 
+	// ReconnectC is a signal channel for reconnecting
 	ReconnectC chan struct{}
+
+	// CloseC is a signal channel for closing stream
+	CloseC chan struct{}
 
 	Subscriptions []Subscription
 
