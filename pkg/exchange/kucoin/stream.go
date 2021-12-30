@@ -134,7 +134,7 @@ func (s *Stream) handlePrivateOrderEvent(e *WebSocketPrivateOrderEvent) {
 	}
 
 	switch e.Type {
-	case "open", "match", "filled":
+	case "open", "match", "filled", "canceled":
 		status := types.OrderStatusNew
 		if e.Status == "done" {
 			if e.FilledSize == e.Size {
@@ -151,11 +151,11 @@ func (s *Stream) handlePrivateOrderEvent(e *WebSocketPrivateOrderEvent) {
 		s.StandardStream.EmitOrderUpdate(types.Order{
 			SubmitOrder: types.SubmitOrder{
 				ClientOrderID: e.ClientOid,
-				Symbol:   toGlobalSymbol(e.Symbol),
-				Side:     toGlobalSide(e.Side),
-				Type:     toGlobalOrderType(e.OrderType),
-				Quantity: e.Size.Float64(),
-				Price:    e.Price.Float64(),
+				Symbol:        toGlobalSymbol(e.Symbol),
+				Side:          toGlobalSide(e.Side),
+				Type:          toGlobalOrderType(e.OrderType),
+				Quantity:      e.Size.Float64(),
+				Price:         e.Price.Float64(),
 			},
 			Exchange:         types.ExchangeKucoin,
 			OrderID:          hashStringID(e.OrderId),
@@ -378,6 +378,7 @@ func (s *Stream) read(ctx context.Context) {
 
 			// used for debugging
 			// log.Println(string(message))
+			log.Debug(string(message))
 
 			e, err := parseWebsocketPayload(message)
 			if err != nil {
@@ -387,9 +388,8 @@ func (s *Stream) read(ctx context.Context) {
 
 			// remove bytes, so we won't print them
 			e.Data = nil
-			log.Infof("event: %+v", e)
-
 			if e != nil && e.Object != nil {
+				log.Debugf("parsed event data: %+v",e.Object)
 				s.dispatchEvent(e)
 			}
 		}

@@ -121,17 +121,17 @@ func (e *WebSocketCandleEvent) KLine() types.KLine {
 }
 
 type WebSocketPrivateOrderEvent struct {
-	OrderId    string                     `json:"orderId"`
-	TradeId    string                     `json:"tradeId"`
-	Symbol     string                     `json:"symbol"`
-	OrderType  string                     `json:"orderType"`
-	Side       string                     `json:"side"`
-	Type       string                     `json:"type"`
-	OrderTime  types.MillisecondTimestamp `json:"orderTime"`
-	Price      fixedpoint.Value           `json:"price"`
-	Size       fixedpoint.Value           `json:"size"`
-	FilledSize fixedpoint.Value           `json:"filledSize"`
-	RemainSize fixedpoint.Value           `json:"remainSize"`
+	OrderId    string                    `json:"orderId"`
+	TradeId    string                    `json:"tradeId"`
+	Symbol     string                    `json:"symbol"`
+	OrderType  string                    `json:"orderType"`
+	Side       string                    `json:"side"`
+	Type       string                    `json:"type"`
+	OrderTime  types.NanosecondTimestamp `json:"orderTime"`
+	Price      fixedpoint.Value          `json:"price"`
+	Size       fixedpoint.Value          `json:"size"`
+	FilledSize fixedpoint.Value          `json:"filledSize"`
+	RemainSize fixedpoint.Value          `json:"remainSize"`
 
 	Liquidity  string                     `json:"liquidity"`
 	MatchPrice fixedpoint.Value           `json:"matchPrice"`
