@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"regexp"
 )
 
 // GetQueryParameters builds and checks the query parameters and returns url.Values
@@ -54,13 +55,45 @@ func (g *GetAllTickersRequest) GetParametersJSON() ([]byte, error) {
 	return json.Marshal(params)
 }
 
+// GetSlugParameters builds and checks the slug parameters and return the result in a map object
+func (g *GetAllTickersRequest) GetSlugParameters() (map[string]interface{}, error) {
+	var params = map[string]interface{}{}
+
+	return params, nil
+}
+
+func (g *GetAllTickersRequest) applySlugsToUrl(url string, slugs map[string]string) string {
+	for k, v := range slugs {
+		needleRE := regexp.MustCompile(":" + k + "\\b")
+		url = needleRE.ReplaceAllString(url, v)
+	}
+
+	return url
+}
+
+func (g *GetAllTickersRequest) GetSlugsMap() (map[string]string, error) {
+	slugs := map[string]string{}
+	params, err := g.GetSlugParameters()
+	if err != nil {
+		return slugs, nil
+	}
+
+	for k, v := range params {
+		slugs[k] = fmt.Sprintf("%v", v)
+	}
+
+	return slugs, nil
+}
+
 func (g *GetAllTickersRequest) Do(ctx context.Context) (*AllTickers, error) {
 
 	// no body params
 	var params interface{}
 	query := url.Values{}
 
-	req, err := g.client.NewRequest(ctx, "GET", "/api/v1/market/allTickers", query, params)
+	apiURL := "/api/v1/market/allTickers"
+
+	req, err := g.client.NewRequest(ctx, "GET", apiURL, query, params)
 	if err != nil {
 		return nil, err
 	}

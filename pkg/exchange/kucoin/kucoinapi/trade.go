@@ -7,6 +7,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/c9s/requestgen"
 	"github.com/pkg/errors"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -229,9 +230,9 @@ func (c *TradeService) NewListOrdersRequest() *ListOrdersRequest {
 	return &ListOrdersRequest{client: c.client}
 }
 
-//go:generate requestgen -type PlaceOrderRequest
+//go:generate PostRequest -url /api/v1/orders -type PlaceOrderRequest -responseDataType .OrderResponse
 type PlaceOrderRequest struct {
-	client *RestClient
+	client requestgen.AuthenticatedAPIClient
 
 	// A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 32 characters.
 	clientOrderID *string `param:"clientOid,required" defaultValuer:"uuid()"`
@@ -252,39 +253,6 @@ type PlaceOrderRequest struct {
 	price *string `param:"price"`
 
 	timeInForce *TimeInForceType `param:"timeInForce,required"`
-}
-
-func (r *PlaceOrderRequest) Do(ctx context.Context) (*OrderResponse, error) {
-	payload, err := r.GetParameters()
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := r.client.NewAuthenticatedRequest(ctx, "POST", "/api/v1/orders", nil, payload)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := r.client.SendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var orderResponse struct {
-		Code    string         `json:"code"`
-		Message string         `json:"msg"`
-		Data    *OrderResponse `json:"data"`
-	}
-
-	if err := response.DecodeJSON(&orderResponse); err != nil {
-		return nil, err
-	}
-
-	if orderResponse.Data == nil {
-		return nil, errors.New("api error: [" + orderResponse.Code + "] " + orderResponse.Message)
-	}
-
-	return orderResponse.Data, nil
 }
 
 //go:generate requestgen -type CancelOrderRequest
