@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"image/png"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"strings"
 	"sync"
@@ -26,6 +27,11 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 )
+
+func init() {
+	// randomize pulling
+	rand.Seed(time.Now().UnixNano())
+}
 
 var LoadedExchangeStrategies = make(map[string]SingleExchangeStrategy)
 var LoadedCrossExchangeStrategies = make(map[string]CrossExchangeStrategy)
