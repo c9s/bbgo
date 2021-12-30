@@ -33,7 +33,7 @@ A trading bot framework written in Go. The name bbgo comes from the BB8 bot in t
 
 ## Supported Exchanges
 
-- Binance Spot Exchange
+- Binance Spot Exchange (and binance.us)
 - FTX Spot Exchange
 - OKEx Spot Exchange
 - Kucoin Spot Exchange
