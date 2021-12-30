@@ -49,10 +49,10 @@ var defaultDialer = &websocket.Dialer{
 //   - the re-connector calls connect() to create the new connection object, go to the 1 step.
 // When stream.Close() is called, a close message must be written to the websocket connection.
 
-const readTimeout = 3 * time.Minute
-const writeTimeout = 15 * time.Second
-const pingInterval = readTimeout / 3
-const listenKeyKeepAliveInterval = 10 * time.Minute
+const readTimeout = 1 * time.Minute
+const writeTimeout = 5 * time.Second
+const pingInterval = readTimeout / 2
+const listenKeyKeepAliveInterval = 30 * time.Minute
 const reconnectCoolDownPeriod = 15 * time.Second
 
 func init() {
