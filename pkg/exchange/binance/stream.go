@@ -2,7 +2,6 @@ package binance
 
 import (
 	"context"
-	"math/rand"
 	"net"
 	"net/http"
 	"os"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/depth"
 	"github.com/c9s/bbgo/pkg/util"
@@ -55,10 +55,14 @@ const writeTimeout = 10 * time.Second
 const listenKeyKeepAliveInterval = 10 * time.Minute
 
 func init() {
-
 	debugBinanceDepth, _ = strconv.ParseBool(os.Getenv("DEBUG_BINANCE_DEPTH"))
 	if debugBinanceDepth {
 		log.Info("binance depth debugging is enabled")
+	}
+
+	debugBinanceStream, _ := strconv.ParseBool(os.Getenv("DEBUG_BINANCE_STREAM"))
+	if debugBinanceStream {
+		log.Level = logrus.DebugLevel
 	}
 }
 
@@ -109,7 +113,7 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 	stream := &Stream{
 		StandardStream: types.StandardStream{
 			ReconnectC: make(chan struct{}, 1),
-			CloseC: make(chan struct{}),
+			CloseC:     make(chan struct{}),
 		},
 		Client:        client,
 		futuresClient: futuresClient,
@@ -416,7 +420,7 @@ func (s *Stream) connect(ctx context.Context) error {
 	}
 
 	go s.read(s.connCtx, conn)
-	go s.ping(s.connCtx, conn, readTimeout / 3)
+	go s.ping(s.connCtx, conn, readTimeout/3)
 	return nil
 }
 
