@@ -322,15 +322,13 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 		// forward trade updates and order updates to the order executor
 		session.UserDataStream.OnTradeUpdate(session.OrderExecutor.EmitTradeUpdate)
 		session.UserDataStream.OnOrderUpdate(session.OrderExecutor.EmitOrderUpdate)
-
-		if len(session.Notifiability.notifiers) > 0 {
-			session.UserDataStream.OnDisconnect(func() {
-				session.Notifiability.Notify("session %s user data stream disconnected", session.Name)
-			})
-			session.UserDataStream.OnConnect(func() {
-				session.Notifiability.Notify("session %s user data stream connected", session.Name)
-			})
-		}
+		
+		session.UserDataStream.OnDisconnect(func() {
+			session.Notifiability.Notify("session %s user data stream disconnected", session.Name)
+		})
+		session.UserDataStream.OnConnect(func() {
+			session.Notifiability.Notify("session %s user data stream connected", session.Name)
+		})
 
 		session.Account.BindStream(session.UserDataStream)
 
