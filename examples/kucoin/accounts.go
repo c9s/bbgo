@@ -19,7 +19,7 @@ var accountsCmd = &cobra.Command{
 
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) > 0 {
-			account, err := client.AccountService.GetAccount(args[0])
+			account, err := client.AccountService.GetAccount(context.Background(), args[0])
 			if err != nil {
 				return err
 			}

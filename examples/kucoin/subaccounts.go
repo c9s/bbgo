@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -17,7 +19,7 @@ var subAccountsCmd = &cobra.Command{
 	SilenceUsage: true,
 
 	RunE: func(cmd *cobra.Command, args []string) error {
-		subAccounts, err := client.AccountService.QuerySubAccounts()
+		subAccounts, err := client.AccountService.ListSubAccounts(context.Background())
 		if err != nil {
 			return err
 		}

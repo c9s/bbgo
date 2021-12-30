@@ -7,7 +7,7 @@ go 1.13
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/adshao/go-binance/v2 v2.3.3
-	github.com/c9s/requestgen v1.1.0
+	github.com/c9s/requestgen v1.1.1-0.20211230171502-c042072e23cd
 	github.com/c9s/rockhopper v1.2.1-0.20210217093258-2661955904a9
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/codingconcepts/env v0.0.0-20200821220118-a8fbf8d84482
