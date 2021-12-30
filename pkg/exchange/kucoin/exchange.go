@@ -2,6 +2,7 @@ package kucoin
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -133,7 +134,7 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbols ...string) (map[str
 var supportedIntervals = map[types.Interval]int{
 	types.Interval1m:  60,
 	types.Interval5m:  60 * 5,
-	types.Interval15m:  60 * 15,
+	types.Interval15m: 60 * 15,
 	types.Interval30m: 60 * 30,
 	types.Interval1h:  60 * 60,
 	types.Interval2h:  60 * 60 * 2,
@@ -151,7 +152,6 @@ func (e *Exchange) IsSupportedInterval(interval types.Interval) bool {
 	_, ok := supportedIntervals[interval]
 	return ok
 }
-
 
 func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
 	_ = marketDataLimiter.Wait(ctx)
@@ -241,6 +241,7 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 			SubmitOrder:      order,
 			Exchange:         types.ExchangeKucoin,
 			OrderID:          hashStringID(orderResponse.OrderID),
+			UUID:             orderResponse.OrderID,
 			Status:           types.OrderStatusNew,
 			ExecutedQuantity: 0,
 			IsWorking:        true,
@@ -341,7 +342,10 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 		} else if o.ClientOrderID != "" {
 			req.ClientOrderID(o.ClientOrderID)
 		} else {
-			errs = multierr.Append(errs, errors.New("can not cancel order, either order uuid nor client order id is empty"))
+			errs = multierr.Append(
+				errs,
+				fmt.Errorf("the order uuid or client order id is empty, order: %#v", o),
+			)
 			continue
 		}
 
@@ -354,7 +358,7 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 		log.Infof("cancelled orders: %v", response.CancelledOrderIDs)
 	}
 
-	return errs
+	return errors.Wrap(errs, "order cancel error")
 }
 
 func (e *Exchange) NewStream() types.Stream {

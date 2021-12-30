@@ -8,6 +8,25 @@ import (
 	"time"
 )
 
+type NanosecondTimestamp time.Time
+
+func (t NanosecondTimestamp) Time() time.Time {
+	return time.Time(t)
+}
+
+func (t *NanosecondTimestamp) UnmarshalJSON(data []byte) error {
+	var v int64
+
+	var err = json.Unmarshal(data, &v)
+	if err != nil {
+		return err
+	}
+
+	*t = NanosecondTimestamp(time.Unix(0, v))
+	return nil
+}
+
+
 type MillisecondTimestamp time.Time
 
 func NewMillisecondTimestampFromInt(i int64) MillisecondTimestamp {
@@ -96,6 +115,8 @@ func (t *MillisecondTimestamp) UnmarshalJSON(data []byte) error {
 	// fallback to RFC3339
 	return (*time.Time)(t).UnmarshalJSON(data)
 }
+
+
 
 type Time time.Time
 

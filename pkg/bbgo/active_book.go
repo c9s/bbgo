@@ -51,14 +51,14 @@ func (b *LocalActiveOrderBook) orderUpdateHandler(order types.Order) {
 
 	case types.OrderStatusNew:
 		if order.Quantity == 0 {
-			log.Debugf("[LocalActiveOrderBook] order status %s, removing %d...", order.Status, order.OrderID)
+			log.Debugf("[LocalActiveOrderBook] order status %s, removing order %s", order.Status, order)
 			b.Remove(order)
 		} else {
 			b.Update(order)
 		}
 
 	case types.OrderStatusCanceled, types.OrderStatusRejected:
-		log.Debugf("[LocalActiveOrderBook] order status %s, removing %d...", order.Status, order.OrderID)
+		log.Debugf("[LocalActiveOrderBook] order status %s, removing order %s", order.Status, order)
 		b.Remove(order)
 
 	default:

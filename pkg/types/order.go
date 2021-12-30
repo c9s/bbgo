@@ -215,12 +215,20 @@ func (o Order) Backup() SubmitOrder {
 func (o Order) String() string {
 	var orderID string
 	if o.UUID != "" {
-		orderID = o.UUID
+		orderID = fmt.Sprintf("UUID %s (%d)", o.UUID, o.OrderID)
 	} else {
 		orderID = strconv.FormatUint(o.OrderID, 10)
 	}
 
-	return fmt.Sprintf("ORDER %s %s %s %s %f/%f @ %f -> %s", o.Exchange.String(), orderID, o.Symbol, o.Side, o.ExecutedQuantity, o.Quantity, o.Price, o.Status)
+	return fmt.Sprintf("ORDER %s %s %s %s %f/%f @ %f -> %s",
+		o.Exchange.String(),
+		orderID,
+		o.Symbol,
+		o.Side,
+		o.ExecutedQuantity,
+		o.Quantity,
+		o.Price,
+		o.Status)
 }
 
 // PlainText is used for telegram-styled messages
