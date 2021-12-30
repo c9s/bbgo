@@ -100,7 +100,9 @@ type Stream struct {
 	executionReportEventCallbacks         []func(event *ExecutionReportEvent)
 	bookTickerEventCallbacks              []func(event *BookTickerEvent)
 
-	orderTradeUpdateEventCallbacks []func(e *OrderTradeUpdateEvent)
+	orderTradeUpdateEventCallbacks    []func(e *OrderTradeUpdateEvent)
+	accountUpdateEventCallbacks       []func(e *AccountUpdateEvent)
+	accountConfigUpdateEventCallbacks []func(e *AccountConfigUpdateEvent)
 
 	depthBuffers map[string]*depth.Buffer
 }
@@ -157,6 +159,20 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 	stream.OnBookTickerEvent(stream.handleBookTickerEvent)
 	stream.OnExecutionReportEvent(stream.handleExecutionReportEvent)
 	stream.OnContinuousKLineEvent(stream.handleContinuousKLineEvent)
+
+	// Event type ACCOUNT_UPDATE from user data stream updates Balance and FuturesPosition.
+	stream.OnAccountUpdateEvent(func(e *AccountUpdateEvent) {
+		futuresPositionSnapshot := types.FuturesPositionMap{}
+		futuresPositionSnapshot = toGlobalFuturesPositions(e.AccountUpdate.Positions)
+		stream.EmitFuturesPositionSnapshot(futuresPositionSnapshot)
+
+		balanceSnapshot := types.BalanceMap{}
+		balanceSnapshot = toGlobalFuturesBalance(e.AccountUpdate.Balances)
+		stream.EmitBalanceSnapshot(balanceSnapshot)
+	})
+
+	// TODO: emit account config leverage updates
+	stream.OnAccountConfigUpdateEvent(func(e *AccountConfigUpdateEvent) {})
 
 	stream.OnOrderTradeUpdateEvent(func(e *OrderTradeUpdateEvent) {
 		switch e.OrderTrade.CurrentExecutionType {
@@ -557,6 +573,12 @@ func (s *Stream) dispatchEvent(e interface{}) {
 
 	case *OrderTradeUpdateEvent:
 		s.EmitOrderTradeUpdateEvent(e)
+
+	case *AccountUpdateEvent:
+		s.EmitAccountUpdateEvent(e)
+
+	case *AccountConfigUpdateEvent:
+		s.EmitAccountConfigUpdateEvent(e)
 	}
 
 }

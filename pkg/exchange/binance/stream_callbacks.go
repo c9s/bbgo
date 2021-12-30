@@ -124,6 +124,26 @@ func (s *Stream) EmitOrderTradeUpdateEvent(e *OrderTradeUpdateEvent) {
 	}
 }
 
+func (s *Stream) OnAccountUpdateEvent(cb func(e *AccountUpdateEvent)) {
+	s.accountUpdateEventCallbacks = append(s.accountUpdateEventCallbacks, cb)
+}
+
+func (s *Stream) EmitAccountUpdateEvent(e *AccountUpdateEvent) {
+	for _, cb := range s.accountUpdateEventCallbacks {
+		cb(e)
+	}
+}
+
+func (s *Stream) OnAccountConfigUpdateEvent(cb func(e *AccountConfigUpdateEvent)) {
+	s.accountConfigUpdateEventCallbacks = append(s.accountConfigUpdateEventCallbacks, cb)
+}
+
+func (s *Stream) EmitAccountConfigUpdateEvent(e *AccountConfigUpdateEvent) {
+	for _, cb := range s.accountConfigUpdateEventCallbacks {
+		cb(e)
+	}
+}
+
 type StreamEventHub interface {
 	OnDepthEvent(cb func(e *DepthEvent))
 
@@ -148,4 +168,8 @@ type StreamEventHub interface {
 	OnBookTickerEvent(cb func(event *BookTickerEvent))
 
 	OnOrderTradeUpdateEvent(cb func(e *OrderTradeUpdateEvent))
+
+	OnAccountUpdateEvent(cb func(e *AccountUpdateEvent))
+
+	OnAccountConfigUpdateEvent(cb func(e *AccountConfigUpdateEvent))
 }
