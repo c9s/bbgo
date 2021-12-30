@@ -23,7 +23,7 @@ function info()
 
 osf=$(uname | tr '[:upper:]' '[:lower:]')
 arch=amd64
-version=v1.18.0
+version=v1.21.1
 dist_file=bbgo-$version-$osf-$arch.tar.gz
 
 info "downloading..."
@@ -65,19 +65,6 @@ fi
 
 cat <<END > bbgo.yaml
 ---
-riskControls:
-  sessionBased:
-    max:
-      orderExecutor:
-        bySymbol:
-          BTCUSDT:
-            # basic risk control order executor
-            basic:
-              minQuoteBalance: 100.0
-              maxBaseAssetBalance: 3.0
-              minBaseAssetBalance: 0.0
-              maxOrderAmount: 1000.0
-
 exchangeStrategies:
 - on: max
   bollgrid:
