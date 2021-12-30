@@ -302,7 +302,7 @@ func (s *Stream) handleOutboundAccountPositionEvent(e *OutboundAccountPositionEv
 	s.EmitBalanceSnapshot(snapshot)
 }
 
-func (s *Stream) dial(listenKey string) (*websocket.Conn, error) {
+func (s *Stream) getEndpointUrl(listenKey string) string {
 	var url string
 	if s.PublicOnly {
 		if s.IsFutures {
@@ -318,6 +318,11 @@ func (s *Stream) dial(listenKey string) (*websocket.Conn, error) {
 		}
 	}
 
+	return url
+}
+
+func (s *Stream) dial(listenKey string) (*websocket.Conn, error) {
+	url := s.getEndpointUrl(listenKey)
 	conn, _, err := defaultDialer.Dial(url, nil)
 	if err != nil {
 		return nil, err
