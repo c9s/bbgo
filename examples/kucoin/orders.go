@@ -3,10 +3,11 @@ package main
 import (
 	"context"
 
-	"github.com/c9s/bbgo/pkg/exchange/kucoin/kucoinapi"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+
+	"github.com/c9s/bbgo/pkg/exchange/kucoin/kucoinapi"
 )
 
 func init() {
@@ -16,6 +17,7 @@ func init() {
 
 	cancelOrderCmd.Flags().String("client-order-id", "", "client order id")
 	cancelOrderCmd.Flags().String("order-id", "", "order id")
+	cancelOrderCmd.Flags().Bool("all", false, "cancel all")
 	ordersCmd.AddCommand(cancelOrderCmd)
 
 	placeOrderCmd.Flags().String("symbol", "", "symbol")
@@ -145,8 +147,24 @@ var cancelOrderCmd = &cobra.Command{
 	SilenceUsage: true,
 
 	RunE: func(cmd *cobra.Command, args []string) error {
-		req := client.TradeService.NewCancelOrderRequest()
 
+		cancelAll, err := cmd.Flags().GetBool("all")
+		if err != nil {
+			return err
+		}
+
+		if cancelAll {
+			req := client.TradeService.NewCancelAllOrderRequest()
+			req.TradeType("TRADE")
+			response, err := req.Do(context.Background())
+			if err != nil {
+				return err
+			}
+			logrus.Infof("cancel all order response: %+v", response)
+			return nil
+		}
+
+		req := client.TradeService.NewCancelOrderRequest()
 		orderID, err := cmd.Flags().GetString("order-id")
 		if err != nil {
 			return err
