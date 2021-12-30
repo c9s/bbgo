@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/depth"
 	"github.com/c9s/bbgo/pkg/util"
@@ -63,7 +62,7 @@ func init() {
 	}
 }
 
-type StreamRequest struct {
+type WebSocketCommand struct {
 	// request ID is required
 	ID     int      `json:"id"`
 	Method string   `json:"method"`
@@ -215,7 +214,7 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 		}
 
 		log.Infof("subscribing channels: %+v", params)
-		err := stream.Conn.WriteJSON(StreamRequest{
+		err := stream.Conn.WriteJSON(WebSocketCommand{
 			Method: "SUBSCRIBE",
 			Params: params,
 			ID:     1,
