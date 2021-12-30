@@ -5,9 +5,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/slack-go/slack"
+
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/util"
-	"github.com/slack-go/slack"
 )
 
 type ExchangeFee struct {
@@ -109,9 +110,9 @@ func (p *Position) SlackAttachment() slack.Attachment {
 		Title: title,
 		Color: color,
 		Fields: []slack.AttachmentField{
-			{Title: "Average Cost", Value: util.FormatFloat(averageCost.Float64(), 2), Short: true},
-			{Title: p.BaseCurrency, Value: util.FormatFloat(base.Float64(), 4), Short: true},
-			{Title: p.QuoteCurrency, Value: util.FormatFloat(quote.Float64(), 2)},
+			{Title: "Average Cost", Value: trimTrailingZeroFloat(averageCost.Float64()) + " " + p.QuoteCurrency, Short: true},
+			{Title: p.BaseCurrency, Value: trimTrailingZeroFloat(base.Float64()), Short: true},
+			{Title: p.QuoteCurrency, Value: trimTrailingZeroFloat(quote.Float64())},
 		},
 		Footer: util.Render("update time {{ . }}", time.Now().Format(time.RFC822)),
 		// FooterIcon: "",
@@ -119,11 +120,11 @@ func (p *Position) SlackAttachment() slack.Attachment {
 }
 
 func (p *Position) PlainText() string {
-	return fmt.Sprintf("Position %s: average cost = %f, base = %f, quote = %f",
+	return fmt.Sprintf("Position %s: average cost = %s, base = %s, quote = %s",
 		p.Symbol,
-		p.AverageCost.Float64(),
-		p.Base.Float64(),
-		p.Quote.Float64(),
+		trimTrailingZeroFloat(p.AverageCost.Float64()),
+		trimTrailingZeroFloat(p.Base.Float64()),
+		trimTrailingZeroFloat(p.Quote.Float64()),
 	)
 }
 
