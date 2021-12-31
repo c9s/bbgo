@@ -2,6 +2,7 @@ package batch
 
 import (
 	"context"
+	"sort"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -68,6 +69,11 @@ func (e ClosedOrderBatchQuery) Query(ctx context.Context, symbol string, startTi
 					return
 				}
 			}
+
+			// sort orders by time in ascending order
+			sort.Slice(orders, func(i, j int) bool {
+				return orders[i].CreationTime.Before(time.Time(orders[j].CreationTime))
+			})
 
 			for _, o := range orders {
 				if _, ok := orderIDs[o.OrderID]; ok {
