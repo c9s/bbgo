@@ -74,7 +74,7 @@ func (s *TradeService) Sync(ctx context.Context, exchange types.Exchange, symbol
 	}
 	
 
-	// records descending ordered
+	// records descending ordered, buffer 50 trades and use the trades ID to scan if the new trades are duplicated
 	records, err := s.QueryLast(exchange.Name(), symbol, isMargin, isFutures, isIsolated, 50)
 	if err != nil {
 		return err
