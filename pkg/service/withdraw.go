@@ -2,9 +2,11 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -46,6 +48,15 @@ func (s *WithdrawService) Sync(ctx context.Context, ex types.Exchange) error {
 	for _, withdraw := range withdraws {
 		if _, exists := txnIDs[withdraw.TransactionID]; exists {
 			continue
+		}
+
+		if withdraw.Status == "rejected" {
+			log.Warnf("skip record, withdraw transaction rejected: %+v", withdraw)
+			continue
+		}
+
+		if len(withdraw.TransactionID) == 0 {
+			return fmt.Errorf("empty withdraw transacion ID: %+v", withdraw)
 		}
 
 		if err := s.Insert(withdraw); err != nil {
