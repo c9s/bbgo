@@ -45,7 +45,7 @@ func (e TradeBatchQuery) Query(ctx context.Context, symbol string, options *type
 				logrus.WithError(err).Error("rate limit error")
 			}
 
-			logrus.Infof("querying %s trades from id=%d limit=%d", symbol, lastTradeID, options.Limit)
+			logrus.Infof("querying %s trades from id=%d limit=%d between %s <=> %s", symbol, lastTradeID, options.Limit, startTime, endTime)
 
 			var err error
 			var trades []types.Trade
