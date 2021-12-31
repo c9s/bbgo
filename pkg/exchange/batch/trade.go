@@ -2,6 +2,7 @@ package batch
 
 import (
 	"context"
+	"errors"
 	"sort"
 	"time"
 
@@ -21,16 +22,25 @@ func (e TradeBatchQuery) Query(ctx context.Context, symbol string, options *type
 
 	tradeHistoryService, ok := e.Exchange.(types.ExchangeTradeHistoryService)
 	if !ok {
-		defer close(c)
-		defer close(errC)
+		close(errC)
+		close(c)
 		// skip exchanges that does not support trading history services
 		logrus.Warnf("exchange %s does not implement ExchangeTradeHistoryService, skip syncing closed orders (TradeBatchQuery.Query)", e.Exchange.Name())
+		return c, errC
+	}
+
+	if options.StartTime == nil {
+
+		errC <- errors.New("start time is required for syncing trades")
+		close(errC)
+		close(c)
 		return c, errC
 	}
 
 	var lastTradeID = options.LastTradeID
 	var startTime = *options.StartTime
 	var endTime = *options.EndTime
+
 
 	go func() {
 		limiter := rate.NewLimiter(rate.Every(5*time.Second), 2) // from binance (original 1200, use 1000 for safety)
