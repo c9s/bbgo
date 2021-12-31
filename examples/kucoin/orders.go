@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -26,6 +27,9 @@ func init() {
 	placeOrderCmd.Flags().String("order-type", string(kucoinapi.OrderTypeLimit), "order type")
 	placeOrderCmd.Flags().String("side", "", "buy or sell")
 	ordersCmd.AddCommand(placeOrderCmd)
+
+	historyOrdersCmd.Flags().String("symbol", "", "symbol, BTC-USDT, LTC-USDT...etc")
+	ordersCmd.AddCommand(historyOrdersCmd)
 }
 
 
@@ -37,7 +41,6 @@ var ordersCmd = &cobra.Command{
 	SilenceUsage: true,
 
 	RunE: func(cmd *cobra.Command, args []string) error {
-		req := client.TradeService.NewListOrdersRequest()
 
 		symbol, err := cmd.Flags().GetString("symbol")
 		if err != nil {
@@ -48,17 +51,49 @@ var ordersCmd = &cobra.Command{
 			return errors.New("--symbol option is required")
 		}
 
-		req.Symbol(symbol)
-
-
 		status, err := cmd.Flags().GetString("status")
 		if err != nil {
 			return err
 		}
 
+		req := client.TradeService.NewListOrdersRequest()
+		req.Symbol(symbol)
+
 		if len(status) > 0 {
 			req.Status(status)
 		}
+
+		page, err := req.Do(context.Background())
+		if err != nil {
+			return err
+		}
+
+		logrus.Infof("page: %+v", page)
+		return nil
+	},
+}
+
+
+// go run ./examples/kucoin orders history
+var historyOrdersCmd = &cobra.Command{
+	Use: "history [--symbol SYMBOL]",
+
+	// SilenceUsage is an option to silence usage when an error occurs.
+	SilenceUsage: true,
+
+	RunE: func(cmd *cobra.Command, args []string) error {
+		symbol, err := cmd.Flags().GetString("symbol")
+		if err != nil {
+			return err
+		}
+
+		if len(symbol) == 0 {
+			return errors.New("--symbol option is required")
+		}
+
+		req := client.TradeService.NewListHistoryOrdersRequest()
+		req.Symbol(symbol)
+		req.StartAt(time.Now().AddDate(0, -2, 0))
 
 		page, err := req.Do(context.Background())
 		if err != nil {

@@ -295,15 +295,24 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 	req := e.client.TradeService.NewListOrdersRequest()
 	req.Symbol(toLocalSymbol(symbol))
 	req.Status("done")
-	req.EndAt(until)
 	req.StartAt(since)
+
+	// kucoin:
+	// When you query orders in active status, there is no time limit.
+	// However, when you query orders in done status, the start and end time range cannot exceed 7* 24 hours.
+	// An error will occur if the specified time window exceeds the range.
+	// If you specify the end time only, the system will automatically calculate the start time as end time minus 7*24 hours, and vice versa.
+	if until.Sub(since) < 7 * 24 * time.Hour {
+		req.EndAt(until)
+	} else {
+		req.EndAt(since.Add(7 * 24 * time.Hour - time.Minute))
+	}
 
 	orderList, err := req.Do(ctx)
 	if err != nil {
 		return orders, err
 	}
 
-	// TODO: support pagination (right now we can only get 50 items from the first page)
 	for _, o := range orderList.Items {
 		order := toGlobalOrder(o)
 		orders = append(orders, order)

@@ -80,6 +80,11 @@ func (s *OrderService) Sync(ctx context.Context, exchange types.Exchange, symbol
 			continue
 		}
 
+		// skip canceled and not filled orders
+		if order.Status == types.OrderStatusCanceled && order.ExecutedQuantity == 0.0 {
+			continue
+		}
+
 		if err := s.Insert(order); err != nil {
 			return err
 		}
