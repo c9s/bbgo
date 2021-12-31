@@ -72,7 +72,6 @@ func (s *TradeService) Sync(ctx context.Context, exchange types.Exchange, symbol
 			symbol = futuresSettings.IsolatedFuturesSymbol
 		}
 	}
-	
 
 	// records descending ordered, buffer 50 trades and use the trades ID to scan if the new trades are duplicated
 	records, err := s.QueryLast(exchange.Name(), symbol, isMargin, isFutures, isIsolated, 50)
@@ -82,7 +81,8 @@ func (s *TradeService) Sync(ctx context.Context, exchange types.Exchange, symbol
 
 	var tradeKeys = map[types.TradeKey]struct{}{}
 	var lastTradeID uint64 = 1
-	var startTime time.Time
+	var lastTradeTime time.Time
+	var startTime *time.Time
 	var now = time.Now()
 	if len(records) > 0 {
 		for _, record := range records {
@@ -90,14 +90,15 @@ func (s *TradeService) Sync(ctx context.Context, exchange types.Exchange, symbol
 		}
 
 		lastTradeID = records[0].ID
-		startTime = time.Time(records[0].Time)
+		lastTradeTime = time.Time(records[0].Time)
+		startTime = &lastTradeTime
 	}
 
 	b := &batch.TradeBatchQuery{Exchange: exchange}
 	tradeC, errC := b.Query(ctx, symbol, &types.TradeQueryOptions{
 		LastTradeID: lastTradeID,
-		StartTime: &startTime,
-		EndTime: &now,
+		StartTime:   startTime,
+		EndTime:     &now,
 	})
 
 	for trade := range tradeC {
