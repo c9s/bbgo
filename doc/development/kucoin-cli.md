@@ -14,5 +14,9 @@ go run ./examples/kucoin orders --symbol LTC-USDT --status active
 go run ./examples/kucoin orders --symbol LTC-USDT --status done
 go run ./examples/kucoin orders cancel --order-id 61b48b73b4de3e0001251382
 
+# list history orders
+go run ./examples/kucoin orders history --symbol BTC-USDT
+
 go run ./examples/kucoin fills --symbol LTC-USDT
+
 ```
