@@ -238,7 +238,7 @@ func toGlobalTrade(fill kucoinapi.Fill) types.Trade {
 		Side:          toGlobalSide(string(fill.Side)),
 		IsBuyer:       fill.Side == kucoinapi.SideTypeBuy,
 		IsMaker:       fill.Liquidity == kucoinapi.LiquidityTypeMaker,
-		Time:          types.Time{},
+		Time:          types.Time(fill.CreatedAt.Time()),
 		Fee:           fill.Fee.Float64(),
 		FeeCurrency:   toGlobalSymbol(fill.FeeCurrency),
 	}
