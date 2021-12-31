@@ -70,17 +70,19 @@ func (r *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 	if r.clientOrderID != nil {
 		clientOrderID := *r.clientOrderID
 
+		// TEMPLATE check-required
 		if len(clientOrderID) == 0 {
 			return params, fmt.Errorf("clientOid is required, empty string given")
 		}
+		// END TEMPLATE check-required
 
 		// assign parameter of clientOrderID
 		params["clientOid"] = clientOrderID
+
 	} else {
 
 		// assign default of clientOrderID
 		clientOrderID := uuid.New().String()
-
 		// assign parameter of clientOrderID
 		params["clientOid"] = clientOrderID
 
@@ -88,9 +90,11 @@ func (r *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 	// check symbol field -> json key symbol
 	symbol := r.symbol
 
+	// TEMPLATE check-required
 	if len(symbol) == 0 {
 		return params, fmt.Errorf("symbol is required, empty string given")
 	}
+	// END TEMPLATE check-required
 
 	// assign parameter of symbol
 	params["symbol"] = symbol
@@ -100,6 +104,7 @@ func (r *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 		// assign parameter of tag
 		params["tag"] = tag
+
 	}
 	// check side field -> json key side
 	side := r.side
@@ -114,9 +119,11 @@ func (r *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 	// check size field -> json key size
 	size := r.size
 
+	// TEMPLATE check-required
 	if len(size) == 0 {
 		return params, fmt.Errorf("size is required, empty string given")
 	}
+	// END TEMPLATE check-required
 
 	// assign parameter of size
 	params["size"] = size
@@ -126,17 +133,21 @@ func (r *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 		// assign parameter of price
 		params["price"] = price
+
 	}
 	// check timeInForce field -> json key timeInForce
 	if r.timeInForce != nil {
 		timeInForce := *r.timeInForce
 
+		// TEMPLATE check-required
 		if len(timeInForce) == 0 {
 			return params, fmt.Errorf("timeInForce is required, empty string given")
 		}
+		// END TEMPLATE check-required
 
 		// assign parameter of timeInForce
 		params["timeInForce"] = timeInForce
+
 	}
 
 	return params, nil
