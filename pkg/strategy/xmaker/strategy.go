@@ -748,7 +748,10 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	s.tradeCollector.OnTrade(func(trade types.Trade) {
 		c := trade.PositionChange()
 		s.state.HedgePosition.AtomicAdd(c)
-		s.state.CoveredPosition.AtomicAdd(c)
+		if trade.Exchange == s.sourceSession.ExchangeName {
+			s.state.CoveredPosition.AtomicAdd(c)
+		}
+
 		s.state.ProfitStats.AddTrade(trade)
 
 		if err := s.SaveState(); err != nil {
