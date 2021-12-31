@@ -56,7 +56,8 @@ func (e *Exchange) PlatformFeeCurrency() string {
 }
 
 func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
-	accounts, err := e.client.AccountService.ListAccounts(ctx)
+	req := e.client.AccountService.NewListAccountsRequest()
+	accounts, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +70,8 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 }
 
 func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
-	accounts, err := e.client.AccountService.ListAccounts(ctx)
+	req := e.client.AccountService.NewListAccountsRequest()
+	accounts, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
