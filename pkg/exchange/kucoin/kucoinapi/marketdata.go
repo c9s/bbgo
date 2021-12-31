@@ -97,11 +97,6 @@ func (s *MarketDataService) NewGetTickerRequest(symbol string) *GetTickerRequest
 	return &GetTickerRequest{client: s.client, symbol: symbol}
 }
 
-func (s *MarketDataService) GetTicker(symbol string) (*Ticker, error) {
-	req := s.NewGetTickerRequest(symbol)
-	return req.Do(context.Background())
-}
-
 /*
 {
     "time":1602832092060,
