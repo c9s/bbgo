@@ -712,7 +712,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	if err := s.LoadState(); err != nil {
 		return err
 	} else {
-		s.Notify("xmaker: %s position is restored => %s", s.Symbol, s.state.Position)
+		s.Notify("xmaker: %s position is restored", s.Symbol, s.state.Position)
 	}
 
 	if s.makerSession.MakerFeeRate > 0 || s.makerSession.TakerFeeRate > 0 {
