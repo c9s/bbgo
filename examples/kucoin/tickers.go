@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -26,7 +28,8 @@ var tickersCmd = &cobra.Command{
 			return nil
 		}
 
-		ticker, err := client.MarketDataService.GetTicker(args[0])
+		req := client.MarketDataService.NewGetTickerRequest(args[0])
+		ticker, err := req.Do(context.Background())
 		if err != nil {
 			return err
 		}
