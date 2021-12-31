@@ -315,6 +315,7 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
 	req := e.client.TradeService.NewGetFillsRequest()
 	req.Symbol(toLocalSymbol(symbol))
+
 	if options.StartTime != nil {
 		req.StartAt(*options.StartTime)
 	} else if options.EndTime != nil {

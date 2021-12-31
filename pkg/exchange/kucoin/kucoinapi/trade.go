@@ -10,6 +10,7 @@ import (
 
 	"github.com/c9s/requestgen"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -107,6 +108,8 @@ func (r *GetFillsRequest) Do(ctx context.Context) (*FillListPage, error) {
 	if _, ok := params["tradeType"]; !ok {
 		params.Add("tradeType", "TRADE")
 	}
+
+	logrus.Infof("get fills: %+v", params)
 
 	req, err := r.client.NewAuthenticatedRequest(ctx, "GET", "/api/v1/fills", params, nil)
 	if err != nil {
