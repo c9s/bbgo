@@ -304,10 +304,10 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 	// However, when you query orders in done status, the start and end time range cannot exceed 7* 24 hours.
 	// An error will occur if the specified time window exceeds the range.
 	// If you specify the end time only, the system will automatically calculate the start time as end time minus 7*24 hours, and vice versa.
-	if until.Sub(since) < 7 * 24 * time.Hour {
+	if until.Sub(since) < 7*24*time.Hour {
 		req.EndAt(until)
 	} else {
-		req.EndAt(since.Add(7 * 24 * time.Hour - time.Minute))
+		req.EndAt(since.Add(7*24*time.Hour - time.Minute))
 	}
 
 	orderList, err := req.Do(ctx)
@@ -323,11 +323,28 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 	return orders, err
 }
 
+var launchDate = time.Date(2017, 9, 0, 0, 0, 0, 0, nil)
+
 func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
 	req := e.client.TradeService.NewGetFillsRequest()
 	req.Symbol(toLocalSymbol(symbol))
 
-	if options.StartTime != nil {
+	// we always sync trades in the ascending order, and kucoin does not support last trade ID query
+	// hence we need to set the start time here
+	if options.StartTime != nil && options.StartTime.Before(launchDate) {
+		// copy the time data object
+		t := launchDate
+		options.StartTime = &t
+	}
+
+	if options.StartTime != nil && options.EndTime != nil {
+		req.StartAt(*options.StartTime)
+		if options.EndTime.Sub(*options.StartTime) < 7*24*time.Hour {
+			req.EndAt(*options.EndTime)
+		} else {
+			req.StartAt(options.StartTime.Add(7*24*time.Hour - time.Minute))
+		}
+	} else if options.StartTime != nil {
 		req.StartAt(*options.StartTime)
 	} else if options.EndTime != nil {
 		req.EndAt(*options.EndTime)
