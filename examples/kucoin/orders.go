@@ -106,7 +106,6 @@ var historyOrdersCmd = &cobra.Command{
 }
 
 
-
 // usage:
 // go run ./examples/kucoin orders place --symbol LTC-USDT --price 50 --size 1 --order-type limit --side buy
 var placeOrderCmd = &cobra.Command{
