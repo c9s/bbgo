@@ -10,7 +10,6 @@ import (
 
 	"github.com/c9s/requestgen"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -24,41 +23,38 @@ type OrderResponse struct {
 	OrderID string `json:"orderId"`
 }
 
+func (c *TradeService) NewListHistoryOrdersRequest() *ListHistoryOrdersRequest {
+	return &ListHistoryOrdersRequest{client: c.client}
+
+}
+
 func (c *TradeService) NewPlaceOrderRequest() *PlaceOrderRequest {
-	return &PlaceOrderRequest{
-		client: c.client,
-	}
+	return &PlaceOrderRequest{client: c.client}
 }
 
 func (c *TradeService) NewBatchPlaceOrderRequest() *BatchPlaceOrderRequest {
-	return &BatchPlaceOrderRequest{
-		client: c.client,
-	}
+	return &BatchPlaceOrderRequest{client: c.client}
 }
 
 func (c *TradeService) NewCancelOrderRequest() *CancelOrderRequest {
-	return &CancelOrderRequest{
-		client: c.client,
-	}
+	return &CancelOrderRequest{client: c.client}
 }
 
 func (c *TradeService) NewCancelAllOrderRequest() *CancelAllOrderRequest {
-	return &CancelAllOrderRequest{
-		client: c.client,
-	}
+	return &CancelAllOrderRequest{client: c.client}
 }
 
 func (c *TradeService) NewGetFillsRequest() *GetFillsRequest {
 	return &GetFillsRequest{client: c.client}
 }
 
-//go:generate requestgen -type GetFillsRequest
+//go:generate GetRequest -url /api/v1/fills -type GetFillsRequest -responseDataType .FillListPage
 type GetFillsRequest struct {
-	client *RestClient
+	client requestgen.AuthenticatedAPIClient
 
 	orderID *string `param:"orderId"`
 
-	// tradeType *string `param:"tradeType" default:"TRADE"`
+	tradeType *string `param:"tradeType" default:"TRADE"`
 
 	symbol *string `param:"symbol"`
 
@@ -99,48 +95,38 @@ type Fill struct {
 	TradeType      TradeType                  `json:"tradeType"`
 }
 
-func (r *GetFillsRequest) Do(ctx context.Context) (*FillListPage, error) {
-	params, err := r.GetParametersQuery()
-	if err != nil {
-		return nil, err
-	}
+//go:generate GetRequest -url /api/v1/hist-orders -type ListHistoryOrdersRequest -responseDataType .HistoryOrderListPage
+type ListHistoryOrdersRequest struct {
+	client requestgen.AuthenticatedAPIClient
 
-	if _, ok := params["tradeType"]; !ok {
-		params.Add("tradeType", "TRADE")
-	}
+	symbol *string `param:"symbol"`
 
-	logrus.Infof("get fills: %+v", params)
+	startAt *time.Time `param:"startAt,milliseconds"`
 
-	req, err := r.client.NewAuthenticatedRequest(ctx, "GET", "/api/v1/fills", params, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := r.client.SendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var orderResponse struct {
-		Code    string        `json:"code"`
-		Message string        `json:"msg"`
-		Data    *FillListPage `json:"data"`
-	}
-
-	if err := response.DecodeJSON(&orderResponse); err != nil {
-		return nil, err
-	}
-
-	if orderResponse.Data == nil {
-		return nil, errors.New("api error: [" + orderResponse.Code + "] " + orderResponse.Message)
-	}
-
-	return orderResponse.Data, nil
+	endAt *time.Time `param:"endAt,milliseconds"`
 }
 
-//go:generate requestgen -type ListOrdersRequest
+type HistoryOrder struct {
+	Symbol    string `json:"symbol"`
+	DealPrice string `json:"dealPrice"`
+	DealValue string `json:"dealValue"`
+	Amount    string `json:"amount"`
+	Fee       string `json:"fee"`
+	Side      string `json:"side"`
+	CreatedAt int    `json:"createdAt"`
+}
+
+type HistoryOrderListPage struct {
+	CurrentPage int            `json:"currentPage"`
+	PageSize    int            `json:"pageSize"`
+	TotalNum    int            `json:"totalNum"`
+	TotalPage   int            `json:"totalPage"`
+	Items       []HistoryOrder `json:"items"`
+}
+
+//go:generate GetRequest -url /api/v1/orders -type ListOrdersRequest -responseDataType .OrderListPage
 type ListOrdersRequest struct {
-	client *RestClient
+	client requestgen.AuthenticatedAPIClient
 
 	status *string `param:"status" validValues:"active,done"`
 
@@ -150,7 +136,7 @@ type ListOrdersRequest struct {
 
 	orderType *OrderType `param:"type"`
 
-	tradeType *TradeType `param:"tradeType"`
+	tradeType *TradeType `param:"tradeType" default:"TRADE"`
 
 	startAt *time.Time `param:"startAt,milliseconds"`
 
@@ -193,43 +179,6 @@ type OrderListPage struct {
 	Items       []Order `json:"items"`
 }
 
-func (r *ListOrdersRequest) Do(ctx context.Context) (*OrderListPage, error) {
-	params, err := r.GetParametersQuery()
-	if err != nil {
-		return nil, err
-	}
-
-	if _, ok := params["tradeType"]; !ok {
-		params.Add("tradeType", "TRADE")
-	}
-
-	req, err := r.client.NewAuthenticatedRequest(ctx, "GET", "/api/v1/orders", params, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := r.client.SendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var orderResponse struct {
-		Code    string         `json:"code"`
-		Message string         `json:"msg"`
-		Data    *OrderListPage `json:"data"`
-	}
-
-	if err := response.DecodeJSON(&orderResponse); err != nil {
-		return nil, err
-	}
-
-	if orderResponse.Data == nil {
-		return nil, errors.New("api error: [" + orderResponse.Code + "] " + orderResponse.Message)
-	}
-
-	return orderResponse.Data, nil
-}
-
 func (c *TradeService) NewListOrdersRequest() *ListOrdersRequest {
 	return &ListOrdersRequest{client: c.client}
 }
@@ -259,7 +208,6 @@ type PlaceOrderRequest struct {
 	timeInForce *TimeInForceType `param:"timeInForce,required"`
 }
 
-
 type CancelOrderResponse struct {
 	CancelledOrderIDs []string `json:"cancelledOrderIds,omitempty"`
 
@@ -275,7 +223,6 @@ type CancelOrderRequest struct {
 	orderID       *string `param:"orderID"`
 	clientOrderID *string `param:"clientOrderID"`
 }
-
 
 func (r *CancelOrderRequest) Do(ctx context.Context) (*CancelOrderResponse, error) {
 	if r.orderID == nil && r.clientOrderID == nil {
