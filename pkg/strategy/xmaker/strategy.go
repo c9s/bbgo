@@ -835,6 +835,13 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 				uncoverPosition := position - s.state.CoveredPosition.AtomicLoad()
 				absPos := math.Abs(uncoverPosition.Float64())
 				if !s.DisableHedge && absPos > s.sourceMarket.MinQuantity {
+					log.Infof("%s base position %f coveredPosition: %f uncoverPosition: %f",
+						s.Symbol,
+						position.Float64(),
+						s.state.CoveredPosition.AtomicLoad().Float64(),
+						uncoverPosition.Float64(),
+					)
+
 					s.Hedge(ctx, -uncoverPosition)
 				}
 			}
