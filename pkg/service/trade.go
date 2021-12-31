@@ -50,7 +50,7 @@ func NewTradeService(db *sqlx.DB) *TradeService {
 	return &TradeService{db}
 }
 
-func (s *TradeService) Sync(ctx context.Context, exchange types.Exchange, symbol string) error {
+func (s *TradeService) Sync(ctx context.Context, exchange types.Exchange, symbol string, startTime time.Time) error {
 	isMargin := false
 	isFutures := false
 	isIsolated := false
@@ -81,8 +81,6 @@ func (s *TradeService) Sync(ctx context.Context, exchange types.Exchange, symbol
 
 	var tradeKeys = map[types.TradeKey]struct{}{}
 	var lastTradeID uint64 = 1
-	var lastTradeTime time.Time
-	var startTime *time.Time
 	var now = time.Now()
 	if len(records) > 0 {
 		for _, record := range records {
@@ -90,14 +88,13 @@ func (s *TradeService) Sync(ctx context.Context, exchange types.Exchange, symbol
 		}
 
 		lastTradeID = records[0].ID
-		lastTradeTime = time.Time(records[0].Time)
-		startTime = &lastTradeTime
+		startTime = time.Time(records[0].Time)
 	}
 
 	b := &batch.TradeBatchQuery{Exchange: exchange}
 	tradeC, errC := b.Query(ctx, symbol, &types.TradeQueryOptions{
 		LastTradeID: lastTradeID,
-		StartTime:   startTime,
+		StartTime:   &startTime,
 		EndTime:     &now,
 	})
 

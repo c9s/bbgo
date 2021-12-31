@@ -25,7 +25,7 @@ type SyncService struct {
 func (s *SyncService) SyncSessionSymbols(ctx context.Context, exchange types.Exchange, startTime time.Time, symbols ...string) error {
 	for _, symbol := range symbols {
 		log.Infof("syncing %s %s trades...", exchange.Name(), symbol)
-		if err := s.TradeService.Sync(ctx, exchange, symbol); err != nil {
+		if err := s.TradeService.Sync(ctx, exchange, symbol, startTime); err != nil {
 			return err
 		}
 
