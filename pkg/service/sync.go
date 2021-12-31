@@ -35,6 +35,7 @@ func (s *SyncService) SyncSessionSymbols(ctx context.Context, exchange types.Exc
 		}
 	}
 
+
 	log.Infof("syncing %s deposit records...", exchange.Name())
 	if err := s.DepositService.Sync(ctx, exchange); err != nil {
 		if err != ErrNotImplemented {
@@ -52,6 +53,7 @@ func (s *SyncService) SyncSessionSymbols(ctx context.Context, exchange types.Exc
 	log.Infof("syncing %s reward records...", exchange.Name())
 	if err := s.RewardService.Sync(ctx, exchange); err != nil {
 		if err != ErrExchangeRewardServiceNotImplemented {
+			log.Infof("%s reward service is not supported", exchange.Name())
 			return err
 		}
 	}
