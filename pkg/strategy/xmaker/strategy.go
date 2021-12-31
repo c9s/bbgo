@@ -32,7 +32,6 @@ func init() {
 }
 
 type State struct {
-	HedgePosition   fixedpoint.Value `json:"hedgePosition"`
 	CoveredPosition fixedpoint.Value `json:"coveredPosition,omitempty"`
 	Position        *types.Position  `json:"position,omitempty"`
 	ProfitStats     ProfitStats      `json:"profitStats,omitempty"`
@@ -301,7 +300,10 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 	// 1. place bid orders when we already bought too much
 	// 2. place ask orders when we already sold too much
 	if s.MaxExposurePosition > 0 {
-		pos := s.state.HedgePosition.AtomicLoad()
+		s.state.Position.Lock()
+		pos := s.state.Position.Base
+		s.state.Position.Unlock()
+
 		if pos < -s.MaxExposurePosition {
 			// stop sell if we over-sell
 			disableMakerAsk = true
@@ -710,7 +712,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	if err := s.LoadState(); err != nil {
 		return err
 	} else {
-		s.Notify("%s position is restored => %f", s.Symbol, s.state.HedgePosition.Float64())
+		s.Notify("xmaker: %s position is restored => %s", s.Symbol, s.state.Position)
 	}
 
 	if s.makerSession.MakerFeeRate > 0 || s.makerSession.TakerFeeRate > 0 {
@@ -747,7 +749,6 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 	s.tradeCollector.OnTrade(func(trade types.Trade) {
 		c := trade.PositionChange()
-		s.state.HedgePosition.AtomicAdd(c)
 		if trade.Exchange == s.sourceSession.ExchangeName {
 			s.state.CoveredPosition.AtomicAdd(c)
 		}
@@ -815,13 +816,22 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 				s.Notifiability.Notify(&s.state.ProfitStats)
 
 			case <-posTicker.C:
-				// for positive position:
-				// uncover position = 5 - 3 (covered position) = 2
-				// for negative position:
+				// For positive position and positive covered position:
+				// uncover position = +5 - +3 (covered position) = 2
+				//
+				// For positive position and negative covered position:
+				// uncover position = +5 - (-3) (covered position) = 8
+				//
+				// meaning we bought 5 on MAX and sent buy order with 3 on binance
+				//
+				// For negative position:
 				// uncover position = -5 - -3 (covered position) = -2
 				s.tradeCollector.Process()
 
-				position := s.state.HedgePosition.AtomicLoad()
+				s.state.Position.Lock()
+				position := s.state.Position.Base
+				s.state.Position.Unlock()
+
 				uncoverPosition := position - s.state.CoveredPosition.AtomicLoad()
 				absPos := math.Abs(uncoverPosition.Float64())
 				if !s.DisableHedge && absPos > s.sourceMarket.MinQuantity {
@@ -885,7 +895,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		if err := s.SaveState(); err != nil {
 			log.WithError(err).Errorf("can not save state: %+v", s.state)
 		} else {
-			s.Notify("%s: %s position is saved: %f", ID, s.Symbol, s.state.HedgePosition.Float64(), s.state.Position)
+			s.Notify("%s: %s position is saved", ID, s.Symbol, s.state.Position)
 		}
 	})
 
