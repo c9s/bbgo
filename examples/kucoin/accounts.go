@@ -19,7 +19,8 @@ var accountsCmd = &cobra.Command{
 
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) > 0 {
-			account, err := client.AccountService.GetAccount(context.Background(), args[0])
+			req := client.AccountService.NewGetAccountRequest(args[0])
+			account, err := req.Do(context.Background())
 			if err != nil {
 				return err
 			}
@@ -28,7 +29,8 @@ var accountsCmd = &cobra.Command{
 			return nil
 		}
 
-		accounts, err := client.AccountService.ListAccounts(context.Background())
+		req := client.AccountService.NewListAccountsRequest()
+		accounts, err := req.Do(context.Background())
 		if err != nil {
 			return err
 		}

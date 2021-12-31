@@ -4,8 +4,6 @@ package kucoinapi
 //go:generate -command PostRequest requestgen -method POST -responseType .APIResponse -responseDataField Data
 
 import (
-	"context"
-
 	"github.com/c9s/requestgen"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -15,19 +13,16 @@ type AccountService struct {
 	client *RestClient
 }
 
-func (s *AccountService) ListSubAccounts(ctx context.Context) ([]SubAccount, error) {
-	req := &ListSubAccountsRequest{client: s.client}
-	return req.Do(ctx)
+func (s *AccountService) NewListSubAccountsRequest() *ListSubAccountsRequest {
+	return &ListSubAccountsRequest{client: s.client}
 }
 
-func (s *AccountService) ListAccounts(ctx context.Context) ([]Account, error) {
-	req := &ListAccountsRequest{client: s.client}
-	return req.Do(ctx)
+func (s *AccountService) NewListAccountsRequest() *ListAccountsRequest {
+	return &ListAccountsRequest{client: s.client}
 }
 
-func (s *AccountService) GetAccount(ctx context.Context, accountID string) (*Account, error) {
-	req := &GetAccountRequest{client: s.client, accountID: accountID}
-	return req.Do(ctx)
+func (s *AccountService) NewGetAccountRequest(accountID string) *GetAccountRequest {
+	return &GetAccountRequest{client: s.client, accountID: accountID}
 }
 
 type SubAccount struct {

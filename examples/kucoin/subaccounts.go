@@ -19,7 +19,8 @@ var subAccountsCmd = &cobra.Command{
 	SilenceUsage: true,
 
 	RunE: func(cmd *cobra.Command, args []string) error {
-		subAccounts, err := client.AccountService.ListSubAccounts(context.Background())
+		req := client.AccountService.NewListSubAccountsRequest()
+		subAccounts, err := req.Do(context.Background())
 		if err != nil {
 			return err
 		}
