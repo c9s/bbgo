@@ -6,22 +6,22 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
 )
 
-func (s *Stream) OnCandleData(cb func(candle Candle)) {
-	s.candleDataCallbacks = append(s.candleDataCallbacks, cb)
+func (s *Stream) OnCandleEvent(cb func(candle Candle)) {
+	s.candleEventCallbacks = append(s.candleEventCallbacks, cb)
 }
 
-func (s *Stream) EmitCandleData(candle Candle) {
-	for _, cb := range s.candleDataCallbacks {
+func (s *Stream) EmitCandleEvent(candle Candle) {
+	for _, cb := range s.candleEventCallbacks {
 		cb(candle)
 	}
 }
 
-func (s *Stream) OnBookData(cb func(book BookData)) {
-	s.bookDataCallbacks = append(s.bookDataCallbacks, cb)
+func (s *Stream) OnBookEvent(cb func(book BookEvent)) {
+	s.bookEventCallbacks = append(s.bookEventCallbacks, cb)
 }
 
-func (s *Stream) EmitBookData(book BookData) {
-	for _, cb := range s.bookDataCallbacks {
+func (s *Stream) EmitBookEvent(book BookEvent) {
+	for _, cb := range s.bookEventCallbacks {
 		cb(book)
 	}
 }
@@ -36,34 +36,34 @@ func (s *Stream) EmitEvent(event WebSocketEvent) {
 	}
 }
 
-func (s *Stream) OnAccount(cb func(account okexapi.Account)) {
-	s.accountCallbacks = append(s.accountCallbacks, cb)
+func (s *Stream) OnAccountEvent(cb func(account okexapi.Account)) {
+	s.accountEventCallbacks = append(s.accountEventCallbacks, cb)
 }
 
-func (s *Stream) EmitAccount(account okexapi.Account) {
-	for _, cb := range s.accountCallbacks {
+func (s *Stream) EmitAccountEvent(account okexapi.Account) {
+	for _, cb := range s.accountEventCallbacks {
 		cb(account)
 	}
 }
 
-func (s *Stream) OnOrderDetails(cb func(orderDetails []okexapi.OrderDetails)) {
-	s.orderDetailsCallbacks = append(s.orderDetailsCallbacks, cb)
+func (s *Stream) OnOrderDetailsEvent(cb func(orderDetails []okexapi.OrderDetails)) {
+	s.orderDetailsEventCallbacks = append(s.orderDetailsEventCallbacks, cb)
 }
 
-func (s *Stream) EmitOrderDetails(orderDetails []okexapi.OrderDetails) {
-	for _, cb := range s.orderDetailsCallbacks {
+func (s *Stream) EmitOrderDetailsEvent(orderDetails []okexapi.OrderDetails) {
+	for _, cb := range s.orderDetailsEventCallbacks {
 		cb(orderDetails)
 	}
 }
 
 type StreamEventHub interface {
-	OnCandleData(cb func(candle Candle))
+	OnCandleEvent(cb func(candle Candle))
 
-	OnBookData(cb func(book BookData))
+	OnBookEvent(cb func(book BookEvent))
 
 	OnEvent(cb func(event WebSocketEvent))
 
-	OnAccount(cb func(account okexapi.Account))
+	OnAccountEvent(cb func(account okexapi.Account))
 
-	OnOrderDetails(cb func(orderDetails []okexapi.OrderDetails))
+	OnOrderDetailsEvent(cb func(orderDetails []okexapi.OrderDetails))
 }
