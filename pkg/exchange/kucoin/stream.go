@@ -199,7 +199,7 @@ func (s *Stream) handleConnect() {
 			},
 		}
 		for _, cmd := range cmds {
-			if err := s.conn.WriteJSON(cmd); err != nil {
+			if err := s.Conn.WriteJSON(cmd); err != nil {
 				log.WithError(err).Errorf("private subscribe write error, cmd: %+v", cmd)
 			}
 		}
@@ -213,7 +213,7 @@ func (s *Stream) sendSubscriptions() error {
 	}
 
 	for _, cmd := range cmds {
-		if err := s.conn.WriteJSON(cmd); err != nil {
+		if err := s.Conn.WriteJSON(cmd); err != nil {
 			return errors.Wrapf(err, "subscribe write error, cmd: %+v", cmd)
 		}
 	}
@@ -277,13 +277,6 @@ func (s *Stream) dispatchEvent(event interface{}) {
 		log.Warnf("unhandled event: %+v", et)
 
 	}
-}
-
-func (s *Stream) Conn() *websocket.Conn {
-	s.connLock.Lock()
-	conn := s.conn
-	s.connLock.Unlock()
-	return conn
 }
 
 type WebSocketConnector interface {
