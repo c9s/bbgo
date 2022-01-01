@@ -127,7 +127,7 @@ func TestMarginResponseParsing(t *testing.T) {
 	for _, testcase := range testcases {
 		payload := testcase.input
 		payload = jsCommentTrimmer.ReplaceAllLiteralString(payload, "")
-		event, err := parseWebSocketEvent(payload)
+		event, err := parseWebSocketEvent([]byte(payload))
 		assert.NoError(t, err)
 		assert.NotNil(t, event)
 	}
@@ -171,7 +171,7 @@ func TestParseOrderUpdate(t *testing.T) {
 
 	payload = jsCommentTrimmer.ReplaceAllLiteralString(payload, "")
 
-	event, err := parseWebSocketEvent(payload)
+	event, err := parseWebSocketEvent([]byte(payload))
 	assert.NoError(t, err)
 	assert.NotNil(t, event)
 
@@ -333,7 +333,7 @@ func TestFuturesResponseParsing(t *testing.T) {
 	for _, testcase := range testcases {
 		payload := testcase.input
 		payload = jsCommentTrimmer.ReplaceAllLiteralString(payload, "")
-		event, err := parseWebSocketEvent(payload)
+		event, err := parseWebSocketEvent([]byte(payload))
 		assert.NoError(t, err)
 		assert.NotNil(t, event)
 	}
@@ -381,7 +381,7 @@ func TestParseOrderFuturesUpdate(t *testing.T) {
 
 	payload = jsCommentTrimmer.ReplaceAllLiteralString(payload, "")
 
-	event, err := parseWebSocketEvent(payload)
+	event, err := parseWebSocketEvent([]byte(payload))
 	assert.NoError(t, err)
 	assert.NotNil(t, event)
 
