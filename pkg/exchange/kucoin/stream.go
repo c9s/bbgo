@@ -2,7 +2,6 @@ package kucoin
 
 import (
 	"context"
-	"net"
 	"sync"
 	"time"
 
@@ -41,14 +40,16 @@ type Stream struct {
 
 func NewStream(client *kucoinapi.RestClient, ex *Exchange) *Stream {
 	stream := &Stream{
-		StandardStream: types.StandardStream{
-			ReconnectC: make(chan struct{}, 1),
-		},
-		client:       client,
-		exchange:     ex,
-		lastCandle:   make(map[string]types.KLine),
-		depthBuffers: make(map[string]*depth.Buffer),
+		StandardStream: types.NewStandardStream(),
+		client:         client,
+		exchange:       ex,
+		lastCandle:     make(map[string]types.KLine),
+		depthBuffers:   make(map[string]*depth.Buffer),
 	}
+
+	stream.SetParser(parseWebSocketEvent)
+	stream.SetDispatcher(stream.dispatchEvent)
+	stream.SetEndpointCreator(stream.getEndpoint)
 
 	stream.OnConnect(stream.handleConnect)
 	stream.OnCandleEvent(stream.handleCandleEvent)
@@ -205,13 +206,8 @@ func (s *Stream) handleConnect() {
 	}
 }
 
-func (s *Stream) Close() error {
-	conn := s.Conn()
-	return conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
-}
-
 func (s *Stream) Connect(ctx context.Context) error {
-	err := s.connect(ctx)
+	err := s.StandardStream.Connect(ctx)
 	if err != nil {
 		return err
 	}
@@ -233,7 +229,7 @@ func (s *Stream) Reconnector(ctx context.Context) {
 			log.Warnf("received reconnect signal, reconnecting...")
 			time.Sleep(3 * time.Second)
 
-			if err := s.connect(ctx); err != nil {
+			if err := s.StandardStream.Connect(ctx); err != nil {
 				log.WithError(err).Errorf("connect error, try to reconnect again...")
 				s.Reconnect()
 			}
@@ -257,13 +253,13 @@ func (s *Stream) sendSubscriptions() error {
 }
 
 // getEndpoint use the PublicOnly flag to check whether we should allocate a public bullet or private bullet
-func (s *Stream) getEndpoint() (string, error) {
+func (s *Stream) getEndpoint(ctx context.Context) (string, error) {
 	var bullet *kucoinapi.Bullet
 	var err error
 	if s.PublicOnly {
-		bullet, err = s.client.BulletService.NewGetPublicBulletRequest().Do(context.Background())
+		bullet, err = s.client.BulletService.NewGetPublicBulletRequest().Do(ctx)
 	} else {
-		bullet, err = s.client.BulletService.NewGetPrivateBulletRequest().Do(context.Background())
+		bullet, err = s.client.BulletService.NewGetPrivateBulletRequest().Do(ctx)
 	}
 
 	if err != nil {
@@ -277,126 +273,20 @@ func (s *Stream) getEndpoint() (string, error) {
 
 	s.bullet = bullet
 
-	log.Infof("bullet: %+v", bullet)
+	log.Debugf("bullet: %+v", bullet)
 	return url.String(), nil
 }
 
-func (s *Stream) connect(ctx context.Context) error {
-	url, err := s.getEndpoint()
-	if err != nil {
-		return err
+func (s *Stream) dispatchEvent(event interface{}) {
+	e, ok := event.(*WebSocketEvent)
+	if !ok {
+		return
 	}
 
-	conn, err := s.StandardStream.Dial(url)
-	if err != nil {
-		return err
+	if e.Object == nil {
+		return
 	}
 
-	log.Infof("websocket connected: %s", url)
-
-	// should only start one connection one time, so we lock the mutex
-	s.connLock.Lock()
-
-	// ensure the previous context is cancelled
-	if s.connCancel != nil {
-		s.connCancel()
-	}
-
-	// create a new context
-	s.connCtx, s.connCancel = context.WithCancel(ctx)
-
-	// pingTimeout := s.bullet.PingTimeout()
-	conn.SetReadDeadline(time.Now().Add(readTimeout))
-	conn.SetPongHandler(func(string) error {
-		conn.SetReadDeadline(time.Now().Add(readTimeout))
-		return nil
-	})
-
-	s.conn = conn
-	s.connLock.Unlock()
-
-	s.EmitConnect()
-
-	go s.read(s.connCtx)
-	go ping(s.connCtx, s, s.bullet.PingInterval())
-	return nil
-}
-
-func (s *Stream) read(ctx context.Context) {
-	defer func() {
-		if s.connCancel != nil {
-			s.connCancel()
-		}
-		s.EmitDisconnect()
-	}()
-
-	for {
-		select {
-
-		case <-ctx.Done():
-			return
-
-		default:
-			conn := s.Conn()
-
-			if err := conn.SetReadDeadline(time.Now().Add(readTimeout)); err != nil {
-				log.WithError(err).Errorf("set read deadline error: %s", err.Error())
-			}
-
-			mt, message, err := conn.ReadMessage()
-			if err != nil {
-				// if it's a network timeout error, we should re-connect
-				switch err := err.(type) {
-
-				// if it's a websocket related error
-				case *websocket.CloseError:
-					if err.Code == websocket.CloseNormalClosure {
-						return
-					}
-
-					// for unexpected close error, we should re-connect
-					// emit reconnect to start a new connection
-					s.Reconnect()
-					return
-
-				case net.Error:
-					log.WithError(err).Error("network error")
-					s.Reconnect()
-					return
-
-				default:
-					log.WithError(err).Error("unexpected connection error")
-					s.Reconnect()
-					return
-				}
-			}
-
-			// skip non-text messages
-			if mt != websocket.TextMessage {
-				continue
-			}
-
-			// used for debugging
-			// log.Println(string(message))
-			log.Debug(string(message))
-
-			e, err := parseWebsocketPayload(message)
-			if err != nil {
-				log.WithError(err).Error("message parse error")
-				continue
-			}
-
-			// remove bytes, so we won't print them
-			e.Data = nil
-			if e != nil && e.Object != nil {
-				log.Debugf("parsed event data: %+v",e.Object)
-				s.dispatchEvent(e)
-			}
-		}
-	}
-}
-
-func (s *Stream) dispatchEvent(e *WebSocketEvent) {
 	switch et := e.Object.(type) {
 
 	case *WebSocketTickerEvent:

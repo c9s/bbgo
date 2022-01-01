@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/adshao/go-binance/v2/futures"
+	"github.com/spf13/viper"
 
 	"go.uber.org/multierr"
 
@@ -69,6 +70,7 @@ type Exchange struct {
 func New(key, secret string) *Exchange {
 	var client = binance.NewClient(key, secret)
 	client.HTTPClient = &http.Client{Timeout: 15 * time.Second}
+	client.Debug = viper.GetBool("debug")
 
 	var futuresClient = binance.NewFuturesClient(key, secret)
 	futuresClient.HTTPClient = &http.Client{Timeout: 15 * time.Second}

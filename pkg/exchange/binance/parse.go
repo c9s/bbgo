@@ -257,8 +257,8 @@ type ResultEvent struct {
 	ID     int         `json:"id"`
 }
 
-func ParseEvent(message string) (interface{}, error) {
-	val, err := fastjson.Parse(message)
+func parseWebSocketEvent(message []byte) (interface{}, error) {
+	val, err := fastjson.ParseBytes(message)
 
 	if err != nil {
 		return nil, err
