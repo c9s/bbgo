@@ -15,6 +15,7 @@ import (
 const pingInterval = 30 * time.Second
 const readTimeout = 2 * time.Minute
 const writeTimeout = 10 * time.Second
+const reconnectCoolDownPeriod = 15 * time.Second
 
 var defaultDialer = &websocket.Dialer{
 	Proxy:            http.ProxyFromEnvironment,
@@ -269,9 +270,46 @@ func (s *StandardStream) Reconnect() {
 	}
 }
 
-// connect calls the listen key API to get the listen key, and use it to create the websocket connection
-// the created connection will be stored in the Conn field.
+// Connect starts the stream and create the websocket connection
 func (s *StandardStream) Connect(ctx context.Context) error {
+	err := s.DialAndConnect(ctx)
+	if err != nil {
+		return err
+	}
+
+	// start one re-connector goroutine with the base context
+	go s.Reconnector(ctx)
+
+	s.EmitStart()
+	return nil
+}
+
+func (s *StandardStream) Reconnector(ctx context.Context) {
+	for {
+		select {
+
+		case <-ctx.Done():
+			return
+
+		case <-s.CloseC:
+			return
+
+		case <-s.ReconnectC:
+			log.Warnf("received reconnect signal, cooling for %s...", reconnectCoolDownPeriod)
+			time.Sleep(reconnectCoolDownPeriod)
+
+			log.Warnf("re-connecting...")
+			if err := s.DialAndConnect(ctx); err != nil {
+				log.WithError(err).Errorf("re-connect error, try to reconnect later")
+
+				// re-emit the re-connect signal if error
+				s.Reconnect()
+			}
+		}
+	}
+}
+
+func (s *StandardStream) DialAndConnect(ctx context.Context) error {
 	conn, err := s.Dial(ctx)
 	if err != nil {
 		return err

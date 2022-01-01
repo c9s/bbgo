@@ -27,18 +27,7 @@ var debugBinanceDepth bool
 // A PING frame
 // A PONG frame
 // A JSON controlled message (e.g. subscribe, unsubscribe)
-
-// The connect() method dials and creates the connection object, then it starts 2 go-routine, 1 for reading message, 2 for writing ping messages.
-// The re-connector uses the ReconnectC signal channel to start a new websocket connection.
-// When ReconnectC is triggered
-//   - The context created for the connection must be canceled
-//   - The read goroutine must close the connection and exit
-//   - The ping goroutine must stop the ticker and exit
-//   - the re-connector calls connect() to create the new connection object, go to the 1 step.
-// When stream.Close() is called, a close message must be written to the websocket connection.
-
 const listenKeyKeepAliveInterval = 2 * time.Minute
-const reconnectCoolDownPeriod = 15 * time.Second
 
 func init() {
 	debugBinanceDepth, _ = strconv.ParseBool(os.Getenv("DEBUG_BINANCE_DEPTH"))
@@ -339,44 +328,6 @@ func (s *Stream) createEndpoint(ctx context.Context) (string, error) {
 	return url, nil
 }
 
-// Connect starts the stream and create the websocket connection
-func (s *Stream) Connect(ctx context.Context) error {
-	err := s.StandardStream.Connect(ctx)
-	if err != nil {
-		return err
-	}
-
-	// start one re-connector goroutine with the base context
-	go s.reconnector(ctx)
-
-	s.EmitStart()
-	return nil
-}
-
-func (s *Stream) reconnector(ctx context.Context) {
-	for {
-		select {
-
-		case <-ctx.Done():
-			return
-
-		case <-s.CloseC:
-			return
-
-		case <-s.ReconnectC:
-			log.Warnf("received reconnect signal")
-			time.Sleep(reconnectCoolDownPeriod)
-
-			log.Warnf("re-connecting...")
-			if err := s.StandardStream.Connect(ctx); err != nil {
-				log.WithError(err).Errorf("re-connect error, try to reconnect after %s...", reconnectCoolDownPeriod)
-
-				// re-emit the re-connect signal if error
-				s.Reconnect()
-			}
-		}
-	}
-}
 
 func (s *Stream) dispatchEvent(e interface{}) {
 	switch e := e.(type) {
@@ -498,6 +449,8 @@ func (s *Stream) listenKeyKeepAlive(ctx context.Context, listenKey string) {
 			log.WithError(err).Errorf("close listen key error: %v key: %s", err, util.MaskKey(listenKey))
 		}
 	}()
+
+	log.Debugf("starting listen key keep alive worker with interval %s, listen key = %s", listenKeyKeepAliveInterval, util.MaskKey(listenKey))
 
 	for {
 		select {

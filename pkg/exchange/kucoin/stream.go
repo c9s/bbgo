@@ -206,37 +206,6 @@ func (s *Stream) handleConnect() {
 	}
 }
 
-func (s *Stream) Connect(ctx context.Context) error {
-	err := s.StandardStream.Connect(ctx)
-	if err != nil {
-		return err
-	}
-
-	// start one re-connector goroutine with the base context
-	go s.Reconnector(ctx)
-
-	s.EmitStart()
-	return nil
-}
-
-func (s *Stream) Reconnector(ctx context.Context) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-
-		case <-s.ReconnectC:
-			log.Warnf("received reconnect signal, reconnecting...")
-			time.Sleep(3 * time.Second)
-
-			if err := s.StandardStream.Connect(ctx); err != nil {
-				log.WithError(err).Errorf("connect error, try to reconnect again...")
-				s.Reconnect()
-			}
-		}
-	}
-}
-
 func (s *Stream) sendSubscriptions() error {
 	cmds, err := convertSubscriptions(s.Subscriptions)
 	if err != nil {
