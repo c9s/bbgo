@@ -2,7 +2,6 @@ package kucoin
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -22,10 +21,6 @@ type Stream struct {
 
 	client     *kucoinapi.RestClient
 	exchange   *Exchange
-	conn       *websocket.Conn
-	connLock   sync.Mutex
-	connCtx    context.Context
-	connCancel context.CancelFunc
 
 	bullet                       *kucoinapi.Bullet
 	candleEventCallbacks         []func(candle *WebSocketCandleEvent, e *WebSocketEvent)
