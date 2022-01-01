@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/adshao/go-binance/v2/futures"
@@ -27,7 +28,6 @@ import (
 )
 
 const BNB = "BNB"
-
 
 const BinanceUSBaseURL = "https://api.binance.us"
 const BinanceUSWebSocketURL = "wss://stream.binance.us:9443"
@@ -67,6 +67,8 @@ type Exchange struct {
 	// deliveryClient	*delivery.Client // Coin-M Futures
 }
 
+var timeSetter sync.Once
+
 func New(key, secret string) *Exchange {
 	var client = binance.NewClient(key, secret)
 	client.HTTPClient = &http.Client{Timeout: 15 * time.Second}
@@ -81,15 +83,17 @@ func New(key, secret string) *Exchange {
 
 	var err error
 	if len(key) > 0 && len(secret) > 0 {
-		_, err = client.NewSetServerTimeService().Do(context.Background())
-		if err != nil {
-			panic(err)
-		}
+		timeSetter.Do(func() {
+			_, err = client.NewSetServerTimeService().Do(context.Background())
+			if err != nil {
+				log.WithError(err).Error("can not set server time")
+			}
 
-		_, err = futuresClient.NewSetServerTimeService().Do(context.Background())
-		if err != nil {
-			panic(err)
-		}
+			_, err = futuresClient.NewSetServerTimeService().Do(context.Background())
+			if err != nil {
+				log.WithError(err).Error("can not set server time")
+			}
+		})
 	}
 
 	return &Exchange{
@@ -551,7 +555,6 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 
 		return err
 	}
-
 
 	for _, o := range orders {
 		if e.IsMargin {
