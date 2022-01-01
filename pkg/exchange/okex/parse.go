@@ -8,14 +8,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/valyala/fastjson"
+
 	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/valyala/fastjson"
 )
 
-func Parse(str string) (interface{}, error) {
-	v, err := fastjson.Parse(str)
+func parseWebSocketEvent(str []byte) (interface{}, error) {
+	v, err := fastjson.ParseBytes(str)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +53,7 @@ func parseEvent(v *fastjson.Value) (*WebSocketEvent, error) {
 	}, nil
 }
 
-type BookData struct {
+type BookEvent struct {
 	InstrumentID         string
 	Symbol               string
 	Action               string
@@ -63,7 +64,7 @@ type BookData struct {
 	channel              string
 }
 
-func (data *BookData) BookTicker() types.BookTicker {
+func (data *BookEvent) BookTicker() types.BookTicker {
 
 	var askBookData BookEntry = data.Asks[0]
 	var bidBookData BookEntry = data.Bids[0]
@@ -77,7 +78,7 @@ func (data *BookData) BookTicker() types.BookTicker {
 	}
 }
 
-func (data *BookData) Book() types.SliceOrderBook {
+func (data *BookEvent) Book() types.SliceOrderBook {
 	book := types.SliceOrderBook{
 		Symbol: data.Symbol,
 	}
@@ -130,7 +131,7 @@ func parseBookEntry(v *fastjson.Value) (*BookEntry, error) {
 	}, nil
 }
 
-func parseBookData(v *fastjson.Value) (*BookData, error) {
+func parseBookData(v *fastjson.Value) (*BookEvent, error) {
 	instrumentId := string(v.GetStringBytes("arg", "instId"))
 	data := v.GetArray("data")
 	if len(data) == 0 {
@@ -166,7 +167,7 @@ func parseBookData(v *fastjson.Value) (*BookData, error) {
 		bids = append(bids, *entry)
 	}
 
-	return &BookData{
+	return &BookEvent{
 		InstrumentID:         instrumentId,
 		Symbol:               toGlobalSymbol(instrumentId),
 		Action:               action,
