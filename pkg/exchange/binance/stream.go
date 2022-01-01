@@ -27,7 +27,7 @@ var debugBinanceDepth bool
 // A PING frame
 // A PONG frame
 // A JSON controlled message (e.g. subscribe, unsubscribe)
-const listenKeyKeepAliveInterval = 2 * time.Minute
+const listenKeyKeepAliveInterval = 10 * time.Minute
 
 func init() {
 	debugBinanceDepth, _ = strconv.ParseBool(os.Getenv("DEBUG_BINANCE_DEPTH"))
