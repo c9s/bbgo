@@ -139,10 +139,15 @@ func (s *Stream) pollKLines(ctx context.Context) {
 		klines := getLast2KLine(s.exchange, ctx, sub.symbol, sub.interval)
 		if len(klines) > 0 {
 			// handle mutiple klines, get the latest one
-			s.EmitKLine(klines[0])
-			s.EmitKLineClosed(klines[0])
-			s.EmitKLine(klines[1])
-			lastClosed = klines[0].StartTime.Time()
+			if lastClosed.Unix() < klines[0].StartTime.Unix() {
+				s.EmitKLine(klines[0])
+				s.EmitKLineClosed(klines[0])
+				lastClosed = klines[0].StartTime.Time()
+			}
+
+			if len(klines) > 1 {
+				s.EmitKLine(klines[1])
+			}
 		}
 	}
 
