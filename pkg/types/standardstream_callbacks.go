@@ -4,142 +4,142 @@ package types
 
 import ()
 
-func (stream *StandardStream) OnStart(cb func()) {
-	stream.startCallbacks = append(stream.startCallbacks, cb)
+func (s *StandardStream) OnStart(cb func()) {
+	s.startCallbacks = append(s.startCallbacks, cb)
 }
 
-func (stream *StandardStream) EmitStart() {
-	for _, cb := range stream.startCallbacks {
+func (s *StandardStream) EmitStart() {
+	for _, cb := range s.startCallbacks {
 		cb()
 	}
 }
 
-func (stream *StandardStream) OnConnect(cb func()) {
-	stream.connectCallbacks = append(stream.connectCallbacks, cb)
+func (s *StandardStream) OnConnect(cb func()) {
+	s.connectCallbacks = append(s.connectCallbacks, cb)
 }
 
-func (stream *StandardStream) EmitConnect() {
-	for _, cb := range stream.connectCallbacks {
+func (s *StandardStream) EmitConnect() {
+	for _, cb := range s.connectCallbacks {
 		cb()
 	}
 }
 
-func (stream *StandardStream) OnDisconnect(cb func()) {
-	stream.disconnectCallbacks = append(stream.disconnectCallbacks, cb)
+func (s *StandardStream) OnDisconnect(cb func()) {
+	s.disconnectCallbacks = append(s.disconnectCallbacks, cb)
 }
 
-func (stream *StandardStream) EmitDisconnect() {
-	for _, cb := range stream.disconnectCallbacks {
+func (s *StandardStream) EmitDisconnect() {
+	for _, cb := range s.disconnectCallbacks {
 		cb()
 	}
 }
 
-func (stream *StandardStream) OnTradeUpdate(cb func(trade Trade)) {
-	stream.tradeUpdateCallbacks = append(stream.tradeUpdateCallbacks, cb)
+func (s *StandardStream) OnTradeUpdate(cb func(trade Trade)) {
+	s.tradeUpdateCallbacks = append(s.tradeUpdateCallbacks, cb)
 }
 
-func (stream *StandardStream) EmitTradeUpdate(trade Trade) {
-	for _, cb := range stream.tradeUpdateCallbacks {
+func (s *StandardStream) EmitTradeUpdate(trade Trade) {
+	for _, cb := range s.tradeUpdateCallbacks {
 		cb(trade)
 	}
 }
 
-func (stream *StandardStream) OnOrderUpdate(cb func(order Order)) {
-	stream.orderUpdateCallbacks = append(stream.orderUpdateCallbacks, cb)
+func (s *StandardStream) OnOrderUpdate(cb func(order Order)) {
+	s.orderUpdateCallbacks = append(s.orderUpdateCallbacks, cb)
 }
 
-func (stream *StandardStream) EmitOrderUpdate(order Order) {
-	for _, cb := range stream.orderUpdateCallbacks {
+func (s *StandardStream) EmitOrderUpdate(order Order) {
+	for _, cb := range s.orderUpdateCallbacks {
 		cb(order)
 	}
 }
 
-func (stream *StandardStream) OnBalanceSnapshot(cb func(balances BalanceMap)) {
-	stream.balanceSnapshotCallbacks = append(stream.balanceSnapshotCallbacks, cb)
+func (s *StandardStream) OnBalanceSnapshot(cb func(balances BalanceMap)) {
+	s.balanceSnapshotCallbacks = append(s.balanceSnapshotCallbacks, cb)
 }
 
-func (stream *StandardStream) EmitBalanceSnapshot(balances BalanceMap) {
-	for _, cb := range stream.balanceSnapshotCallbacks {
+func (s *StandardStream) EmitBalanceSnapshot(balances BalanceMap) {
+	for _, cb := range s.balanceSnapshotCallbacks {
 		cb(balances)
 	}
 }
 
-func (stream *StandardStream) OnBalanceUpdate(cb func(balances BalanceMap)) {
-	stream.balanceUpdateCallbacks = append(stream.balanceUpdateCallbacks, cb)
+func (s *StandardStream) OnBalanceUpdate(cb func(balances BalanceMap)) {
+	s.balanceUpdateCallbacks = append(s.balanceUpdateCallbacks, cb)
 }
 
-func (stream *StandardStream) EmitBalanceUpdate(balances BalanceMap) {
-	for _, cb := range stream.balanceUpdateCallbacks {
+func (s *StandardStream) EmitBalanceUpdate(balances BalanceMap) {
+	for _, cb := range s.balanceUpdateCallbacks {
 		cb(balances)
 	}
 }
 
-func (stream *StandardStream) OnKLineClosed(cb func(kline KLine)) {
-	stream.kLineClosedCallbacks = append(stream.kLineClosedCallbacks, cb)
+func (s *StandardStream) OnKLineClosed(cb func(kline KLine)) {
+	s.kLineClosedCallbacks = append(s.kLineClosedCallbacks, cb)
 }
 
-func (stream *StandardStream) EmitKLineClosed(kline KLine) {
-	for _, cb := range stream.kLineClosedCallbacks {
+func (s *StandardStream) EmitKLineClosed(kline KLine) {
+	for _, cb := range s.kLineClosedCallbacks {
 		cb(kline)
 	}
 }
 
-func (stream *StandardStream) OnKLine(cb func(kline KLine)) {
-	stream.kLineCallbacks = append(stream.kLineCallbacks, cb)
+func (s *StandardStream) OnKLine(cb func(kline KLine)) {
+	s.kLineCallbacks = append(s.kLineCallbacks, cb)
 }
 
-func (stream *StandardStream) EmitKLine(kline KLine) {
-	for _, cb := range stream.kLineCallbacks {
+func (s *StandardStream) EmitKLine(kline KLine) {
+	for _, cb := range s.kLineCallbacks {
 		cb(kline)
 	}
 }
 
-func (stream *StandardStream) OnBookUpdate(cb func(book SliceOrderBook)) {
-	stream.bookUpdateCallbacks = append(stream.bookUpdateCallbacks, cb)
+func (s *StandardStream) OnBookUpdate(cb func(book SliceOrderBook)) {
+	s.bookUpdateCallbacks = append(s.bookUpdateCallbacks, cb)
 }
 
-func (stream *StandardStream) EmitBookUpdate(book SliceOrderBook) {
-	for _, cb := range stream.bookUpdateCallbacks {
+func (s *StandardStream) EmitBookUpdate(book SliceOrderBook) {
+	for _, cb := range s.bookUpdateCallbacks {
 		cb(book)
 	}
 }
 
-func (stream *StandardStream) OnBookTickerUpdate(cb func(bookTicker BookTicker)) {
-	stream.bookTickerUpdateCallbacks = append(stream.bookTickerUpdateCallbacks, cb)
+func (s *StandardStream) OnBookTickerUpdate(cb func(bookTicker BookTicker)) {
+	s.bookTickerUpdateCallbacks = append(s.bookTickerUpdateCallbacks, cb)
 }
 
-func (stream *StandardStream) EmitBookTickerUpdate(bookTicker BookTicker) {
-	for _, cb := range stream.bookTickerUpdateCallbacks {
+func (s *StandardStream) EmitBookTickerUpdate(bookTicker BookTicker) {
+	for _, cb := range s.bookTickerUpdateCallbacks {
 		cb(bookTicker)
 	}
 }
 
-func (stream *StandardStream) OnBookSnapshot(cb func(book SliceOrderBook)) {
-	stream.bookSnapshotCallbacks = append(stream.bookSnapshotCallbacks, cb)
+func (s *StandardStream) OnBookSnapshot(cb func(book SliceOrderBook)) {
+	s.bookSnapshotCallbacks = append(s.bookSnapshotCallbacks, cb)
 }
 
-func (stream *StandardStream) EmitBookSnapshot(book SliceOrderBook) {
-	for _, cb := range stream.bookSnapshotCallbacks {
+func (s *StandardStream) EmitBookSnapshot(book SliceOrderBook) {
+	for _, cb := range s.bookSnapshotCallbacks {
 		cb(book)
 	}
 }
 
-func (stream *StandardStream) OnFuturesPositionUpdate(cb func(futuresPositions FuturesPositionMap)) {
-	stream.FuturesPositionUpdateCallbacks = append(stream.FuturesPositionUpdateCallbacks, cb)
+func (s *StandardStream) OnFuturesPositionUpdate(cb func(futuresPositions FuturesPositionMap)) {
+	s.FuturesPositionUpdateCallbacks = append(s.FuturesPositionUpdateCallbacks, cb)
 }
 
-func (stream *StandardStream) EmitFuturesPositionUpdate(futuresPositions FuturesPositionMap) {
-	for _, cb := range stream.FuturesPositionUpdateCallbacks {
+func (s *StandardStream) EmitFuturesPositionUpdate(futuresPositions FuturesPositionMap) {
+	for _, cb := range s.FuturesPositionUpdateCallbacks {
 		cb(futuresPositions)
 	}
 }
 
-func (stream *StandardStream) OnFuturesPositionSnapshot(cb func(futuresPositions FuturesPositionMap)) {
-	stream.FuturesPositionSnapshotCallbacks = append(stream.FuturesPositionSnapshotCallbacks, cb)
+func (s *StandardStream) OnFuturesPositionSnapshot(cb func(futuresPositions FuturesPositionMap)) {
+	s.FuturesPositionSnapshotCallbacks = append(s.FuturesPositionSnapshotCallbacks, cb)
 }
 
-func (stream *StandardStream) EmitFuturesPositionSnapshot(futuresPositions FuturesPositionMap) {
-	for _, cb := range stream.FuturesPositionSnapshotCallbacks {
+func (s *StandardStream) EmitFuturesPositionSnapshot(futuresPositions FuturesPositionMap) {
+	for _, cb := range s.FuturesPositionSnapshotCallbacks {
 		cb(futuresPositions)
 	}
 }

@@ -234,7 +234,7 @@ func (s *Stream) connect(ctx context.Context) error {
 		url = okexapi.PrivateWebSocketURL
 	}
 
-	conn, err := s.StandardStream.Dial(url)
+	conn, err := s.StandardStream.Dial(ctx, url)
 	if err != nil {
 		return err
 	}

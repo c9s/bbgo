@@ -7,7 +7,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func parseWebsocketPayload(in []byte) (*WebSocketEvent, error) {
+func parseWebSocketEvent(in []byte) (interface{}, error) {
 	var resp WebSocketEvent
 	var err = json.Unmarshal(in, &resp)
 	if err != nil {

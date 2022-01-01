@@ -2,9 +2,25 @@ package types
 
 import (
 	"context"
+	"net"
+	"net/http"
+	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 )
+
+const pingInterval = 30 * time.Second
+const readTimeout = 2 * time.Minute
+const writeTimeout = 10 * time.Second
+
+var defaultDialer = &websocket.Dialer{
+	Proxy:            http.ProxyFromEnvironment,
+	HandshakeTimeout: 10 * time.Second,
+	ReadBufferSize:   4096,
+}
 
 type Stream interface {
 	StandardStreamEventHub
@@ -22,8 +38,32 @@ var BookChannel = Channel("book")
 var KLineChannel = Channel("kline")
 var BookTickerChannel = Channel("bookticker")
 
+type EndpointCreator func(ctx context.Context) (string, error)
+
+type Parser func(message []byte) (interface{}, error)
+
+type Dispatcher func(e interface{})
+
 //go:generate callbackgen -type StandardStream -interface
 type StandardStream struct {
+	parser     Parser
+	dispatcher Dispatcher
+
+	endpointCreator EndpointCreator
+
+	// Conn is the websocket connection
+	Conn *websocket.Conn
+
+	// ConnCtx is the context of the current websocket connection
+	ConnCtx context.Context
+
+	// ConnCancel is the cancel funcion of the current websocket connection
+	ConnCancel context.CancelFunc
+
+	// ConnLock is used for locking Conn, ConnCtx and ConnCancel fields.
+	// When changing these field values, be sure to call ConnLock
+	ConnLock sync.Mutex
+
 	PublicOnly bool
 
 	// ReconnectC is a signal channel for reconnecting
@@ -67,34 +107,249 @@ type StandardStream struct {
 	FuturesPositionSnapshotCallbacks []func(futuresPositions FuturesPositionMap)
 }
 
-func (stream *StandardStream) Subscribe(channel Channel, symbol string, options SubscribeOptions) {
-	stream.Subscriptions = append(stream.Subscriptions, Subscription{
+func NewStandardStream() StandardStream {
+	return StandardStream{
+		ReconnectC: make(chan struct{}, 1),
+		CloseC:     make(chan struct{}),
+	}
+}
+
+func (s *StandardStream) SetPublicOnly() {
+	s.PublicOnly = true
+}
+
+func (s *StandardStream) SetEndpointCreator(creator EndpointCreator) {
+	s.endpointCreator = creator
+}
+
+func (s *StandardStream) SetDispatcher(dispatcher Dispatcher) {
+	s.dispatcher = dispatcher
+}
+
+func (s *StandardStream) SetParser(parser Parser) {
+	s.parser = parser
+}
+
+func (s *StandardStream) SetConn(ctx context.Context, conn *websocket.Conn) (context.Context, context.CancelFunc) {
+	// should only start one connection one time, so we lock the mutex
+	connCtx, connCancel := context.WithCancel(ctx)
+	s.ConnLock.Lock()
+
+	// ensure the previous context is cancelled
+	if s.ConnCancel != nil {
+		s.ConnCancel()
+	}
+
+	// create a new context for this connection
+	s.Conn = conn
+	s.ConnCtx = connCtx
+	s.ConnCancel = connCancel
+	s.ConnLock.Unlock()
+	return connCtx, connCancel
+}
+
+func (s *StandardStream) Read(ctx context.Context, conn *websocket.Conn, cancel context.CancelFunc) {
+	defer func() {
+		cancel()
+		// if we failed to read, we need to cancel the context
+		_ = conn.Close()
+		s.EmitDisconnect()
+	}()
+
+	for {
+		select {
+
+		case <-ctx.Done():
+			return
+
+		case <-s.CloseC:
+			return
+
+		default:
+			if err := conn.SetReadDeadline(time.Now().Add(readTimeout)); err != nil {
+				log.WithError(err).Errorf("set read deadline error: %s", err.Error())
+			}
+
+			mt, message, err := conn.ReadMessage()
+			if err != nil {
+				// if it's a network timeout error, we should re-connect
+				switch err := err.(type) {
+
+				// if it's a websocket related error
+				case *websocket.CloseError:
+					if err.Code == websocket.CloseNormalClosure {
+						return
+					}
+
+					log.WithError(err).Errorf("websocket error abnormal close: %+v", err)
+
+					_ = conn.Close()
+					// for unexpected close error, we should re-connect
+					// emit reconnect to start a new connection
+					s.Reconnect()
+					return
+
+				case net.Error:
+					log.WithError(err).Error("websocket read network error")
+					_ = conn.Close()
+					s.Reconnect()
+					return
+
+				default:
+					log.WithError(err).Error("unexpected websocket error")
+					_ = conn.Close()
+					s.Reconnect()
+					return
+				}
+			}
+
+			// skip non-text messages
+			if mt != websocket.TextMessage {
+				continue
+			}
+
+			log.Debug(string(message))
+
+			var e interface{}
+			if s.parser != nil {
+				e, err = s.parser(message)
+				if err != nil {
+					log.WithError(err).Errorf("websocket event parse error")
+					continue
+				}
+			}
+
+			if s.dispatcher != nil {
+				s.dispatcher(e)
+			}
+		}
+	}
+}
+
+func (s *StandardStream) Ping(ctx context.Context, conn *websocket.Conn, cancel context.CancelFunc, interval time.Duration) {
+	defer func() {
+		cancel()
+		log.Debug("ping worker stopped")
+	}()
+
+	var pingTicker = time.NewTicker(interval)
+	defer pingTicker.Stop()
+
+	for {
+		select {
+
+		case <-ctx.Done():
+			return
+
+		case <-s.CloseC:
+			return
+
+		case <-pingTicker.C:
+			log.Debugf("websocket -> ping")
+			if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(writeTimeout)); err != nil {
+				log.WithError(err).Error("ping error", err)
+				s.Reconnect()
+			}
+		}
+	}
+}
+
+func (s *StandardStream) Subscribe(channel Channel, symbol string, options SubscribeOptions) {
+	s.Subscriptions = append(s.Subscriptions, Subscription{
 		Channel: channel,
 		Symbol:  symbol,
 		Options: options,
 	})
 }
 
-func (stream *StandardStream) Reconnect() {
+func (s *StandardStream) Reconnect() {
 	select {
-	case stream.ReconnectC <- struct{}{}:
+	case s.ReconnectC <- struct{}{}:
 	default:
 	}
 }
 
-func (stream *StandardStream) Dial(url string) (*websocket.Conn, error) {
-	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
+// connect calls the listen key API to get the listen key, and use it to create the websocket connection
+// the created connection will be stored in the Conn field.
+func (s *StandardStream) Connect(ctx context.Context) error {
+	conn, err := s.Dial(ctx)
+	if err != nil {
+		return err
+	}
+
+	connCtx, connCancel := s.SetConn(ctx, conn)
+	s.EmitConnect()
+
+	go s.Read(connCtx, conn, connCancel)
+	go s.Ping(connCtx, conn, connCancel, pingInterval)
+	return nil
+}
+
+func (s *StandardStream) Dial(ctx context.Context, args ...string) (*websocket.Conn, error) {
+	var url string
+	var err error
+	if len(args) > 0 {
+		url = args[0]
+	} else if s.endpointCreator != nil {
+		url, err = s.endpointCreator(ctx)
+		if err != nil {
+			return nil, errors.Wrap(err, "can not dial, can not create endpoint via the endpoint creator")
+		}
+	} else {
+		return nil, errors.New("can not dial, neither url nor endpoint creator is not defined, you should pass an url to Dial() or call SetEndpointCreator()")
+	}
+
+	conn, _, err := defaultDialer.Dial(url, nil)
 	if err != nil {
 		return nil, err
 	}
 
+	readTimeout := 1 * time.Minute
+
 	// use the default ping handler
+	// The websocket server will send a ping frame every 3 minutes.
+	// If the websocket server does not receive a pong frame back from the connection within a 10 minutes period,
+	// the connection will be disconnected.
+	// Unsolicited pong frames are allowed.
 	conn.SetPingHandler(nil)
+	conn.SetPongHandler(func(string) error {
+		log.Debugf("websocket <- received pong")
+		if err := conn.SetReadDeadline(time.Now().Add(readTimeout * 2)); err != nil {
+			log.WithError(err).Error("pong handler can not set read deadline")
+		}
+		return nil
+	})
+
+	log.Infof("websocket connected, public = %v, read timeout = %v", s.PublicOnly, readTimeout)
 	return conn, nil
 }
 
-func (stream *StandardStream) SetPublicOnly() {
-	stream.PublicOnly = true
+func (s *StandardStream) Close() error {
+	log.Infof("closing stream...")
+
+	// close the close signal channel, so that reader and ping worker will stop
+	close(s.CloseC)
+
+	// get the connection object before call the context cancel function
+	s.ConnLock.Lock()
+	conn := s.Conn
+	connCancel := s.ConnCancel
+	s.ConnLock.Unlock()
+
+	// cancel the context so that the ticker loop and listen key updater will be stopped.
+	if connCancel != nil {
+		connCancel()
+	}
+
+	// gracefully write the close message to the connection
+	err := conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+	if err != nil {
+		return errors.Wrap(err, "websocket write close message error")
+	}
+
+	// let the reader close the connection
+	<-time.After(time.Second)
+	return nil
 }
 
 // SubscribeOptions provides the standard stream options

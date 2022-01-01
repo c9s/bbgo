@@ -3,13 +3,9 @@ package binance
 import (
 	"context"
 	"net"
-	"net/http"
 	"os"
 	"strconv"
-	"sync"
 	"time"
-
-	"github.com/pkg/errors"
 
 	"github.com/c9s/bbgo/pkg/depth"
 	"github.com/c9s/bbgo/pkg/util"
@@ -17,18 +13,10 @@ import (
 	"github.com/adshao/go-binance/v2"
 	"github.com/adshao/go-binance/v2/futures"
 
-	"github.com/gorilla/websocket"
-
 	"github.com/c9s/bbgo/pkg/types"
 )
 
 var debugBinanceDepth bool
-
-var defaultDialer = &websocket.Dialer{
-	Proxy:            http.ProxyFromEnvironment,
-	HandshakeTimeout: 10 * time.Second,
-	ReadBufferSize:   4096,
-}
 
 // from Binance document:
 // The websocket server will send a ping frame every 3 minutes.
@@ -49,10 +37,7 @@ var defaultDialer = &websocket.Dialer{
 //   - the re-connector calls connect() to create the new connection object, go to the 1 step.
 // When stream.Close() is called, a close message must be written to the websocket connection.
 
-const readTimeout = 1 * time.Minute
-const writeTimeout = 5 * time.Second
-const pingInterval = readTimeout / 2
-const listenKeyKeepAliveInterval = 30 * time.Minute
+const listenKeyKeepAliveInterval = 2 * time.Minute
 const reconnectCoolDownPeriod = 15 * time.Second
 
 func init() {
@@ -75,14 +60,8 @@ type Stream struct {
 	types.FuturesSettings
 	types.StandardStream
 
-	Client        *binance.Client
+	client        *binance.Client
 	futuresClient *futures.Client
-
-	Conn     *websocket.Conn
-	ConnLock sync.Mutex
-
-	connCtx    context.Context
-	connCancel context.CancelFunc
 
 	// custom callbacks
 	depthEventCallbacks       []func(e *DepthEvent)
@@ -109,14 +88,15 @@ type Stream struct {
 
 func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Client) *Stream {
 	stream := &Stream{
-		StandardStream: types.StandardStream{
-			ReconnectC: make(chan struct{}, 1),
-			CloseC:     make(chan struct{}),
-		},
-		Client:        client,
+		StandardStream: types.NewStandardStream(),
+		client:        client,
 		futuresClient: futuresClient,
 		depthBuffers:  make(map[string]*depth.Buffer),
 	}
+
+	stream.SetParser(parseWebSocketEvent)
+	stream.SetDispatcher(stream.dispatchEvent)
+	stream.SetEndpointCreator(stream.createEndpoint)
 
 	stream.OnDepthEvent(func(e *DepthEvent) {
 		if debugBinanceDepth {
@@ -175,24 +155,26 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 	})
 
 	stream.OnConnect(func() {
-		var params []string
-		for _, subscription := range stream.Subscriptions {
-			params = append(params, convertSubscription(subscription))
-		}
+		if stream.PublicOnly {
+			var params []string
+			for _, subscription := range stream.Subscriptions {
+				params = append(params, convertSubscription(subscription))
+			}
 
-		if len(params) == 0 {
-			return
-		}
+			if len(params) == 0 {
+				return
+			}
 
-		log.Infof("subscribing channels: %+v", params)
-		err := stream.Conn.WriteJSON(WebSocketCommand{
-			Method: "SUBSCRIBE",
-			Params: params,
-			ID:     1,
-		})
+			log.Infof("subscribing channels: %+v", params)
+			err := stream.Conn.WriteJSON(WebSocketCommand{
+				Method: "SUBSCRIBE",
+				Params: params,
+				ID:     1,
+			})
 
-		if err != nil {
-			log.WithError(err).Error("subscribe error")
+			if err != nil {
+				log.WithError(err).Error("subscribe error")
+			}
 		}
 	})
 
@@ -338,33 +320,28 @@ func (s *Stream) getEndpointUrl(listenKey string) string {
 	return url
 }
 
-func (s *Stream) dial(listenKey string) (*websocket.Conn, error) {
-	url := s.getEndpointUrl(listenKey)
-	conn, _, err := defaultDialer.Dial(url, nil)
-	if err != nil {
-		return nil, err
+func (s *Stream) createEndpoint(ctx context.Context) (string, error) {
+	var err error
+	var listenKey string
+	if s.PublicOnly {
+		log.Debugf("stream is set to public only mode")
+	} else {
+		listenKey, err = s.fetchListenKey(ctx)
+		if err != nil {
+			return "", err
+		}
+
+		log.Debugf("listen key is created: %s", util.MaskKey(listenKey))
+		go s.keepaliveListenKey(ctx, listenKey)
 	}
 
-	// use the default ping handler
-	// The websocket server will send a ping frame every 3 minutes.
-	// If the websocket server does not receive a pong frame back from the connection within a 10 minutes period,
-	// the connection will be disconnected.
-	// Unsolicited pong frames are allowed.
-	conn.SetPingHandler(nil)
-	conn.SetPongHandler(func(string) error {
-		log.Debugf("websocket <- received pong")
-		if err := conn.SetReadDeadline(time.Now().Add(readTimeout * 2)); err != nil {
-			log.WithError(err).Error("pong handler can not set read deadline")
-		}
-		return nil
-	})
-
-	return conn, nil
+	url := s.getEndpointUrl(listenKey)
+	return url, nil
 }
 
 // Connect starts the stream and create the websocket connection
 func (s *Stream) Connect(ctx context.Context) error {
-	err := s.connect(ctx)
+	err := s.StandardStream.Connect(ctx)
 	if err != nil {
 		return err
 	}
@@ -391,158 +368,12 @@ func (s *Stream) reconnector(ctx context.Context) {
 			time.Sleep(reconnectCoolDownPeriod)
 
 			log.Warnf("re-connecting...")
-			if err := s.connect(ctx); err != nil {
+			if err := s.StandardStream.Connect(ctx); err != nil {
 				log.WithError(err).Errorf("re-connect error, try to reconnect after %s...", reconnectCoolDownPeriod)
 
 				// re-emit the re-connect signal if error
 				s.Reconnect()
 			}
-		}
-	}
-}
-
-func (s *Stream) connect(ctx context.Context) error {
-	var err error
-	var listenKey string
-	if s.PublicOnly {
-		log.Infof("stream is set to public only mode")
-	} else {
-		listenKey, err = s.fetchListenKey(ctx)
-		if err != nil {
-			return err
-		}
-
-		log.Infof("listen key is created: %s", util.MaskKey(listenKey))
-	}
-
-	// when in public mode, the listen key is an empty string
-	conn, err := s.dial(listenKey)
-	if err != nil {
-		return err
-	}
-
-	log.Infof("websocket connected")
-
-	// should only start one connection one time, so we lock the mutex
-	s.ConnLock.Lock()
-
-	// ensure the previous context is cancelled
-	if s.connCancel != nil {
-		s.connCancel()
-	}
-
-	// create a new context for this connection
-	s.connCtx, s.connCancel = context.WithCancel(ctx)
-	s.Conn = conn
-	s.ConnLock.Unlock()
-
-	s.EmitConnect()
-
-	if !s.PublicOnly {
-		go s.listenKeyKeepAlive(s.connCtx, listenKey)
-	}
-
-	go s.read(s.connCtx, conn)
-	go s.ping(s.connCtx, conn, pingInterval)
-	return nil
-}
-
-func (s *Stream) ping(ctx context.Context, conn *websocket.Conn, interval time.Duration) {
-	defer log.Debug("ping worker stopped")
-
-	var pingTicker = time.NewTicker(interval)
-	defer pingTicker.Stop()
-
-	for {
-		select {
-
-		case <-ctx.Done():
-			return
-
-		case <-s.CloseC:
-			return
-
-		case <-pingTicker.C:
-			log.Debugf("websocket -> ping")
-			if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(writeTimeout)); err != nil {
-				log.WithError(err).Error("ping error", err)
-				s.Reconnect()
-			}
-		}
-	}
-}
-
-func (s *Stream) read(ctx context.Context, conn *websocket.Conn) {
-	defer func() {
-		// if we failed to read, we need to cancel the context
-		if s.connCancel != nil {
-			s.connCancel()
-		}
-		_ = conn.Close()
-		s.EmitDisconnect()
-	}()
-
-	for {
-		select {
-
-		case <-ctx.Done():
-			return
-
-		case <-s.CloseC:
-			return
-
-		default:
-			if err := conn.SetReadDeadline(time.Now().Add(readTimeout)); err != nil {
-				log.WithError(err).Errorf("set read deadline error: %s", err.Error())
-			}
-
-			mt, message, err := conn.ReadMessage()
-			if err != nil {
-				// if it's a network timeout error, we should re-connect
-				switch err := err.(type) {
-
-				// if it's a websocket related error
-				case *websocket.CloseError:
-					if err.Code == websocket.CloseNormalClosure {
-						return
-					}
-
-					log.WithError(err).Errorf("websocket error abnormal close: %+v", err)
-
-					_ = conn.Close()
-					// for unexpected close error, we should re-connect
-					// emit reconnect to start a new connection
-					s.Reconnect()
-					return
-
-				case net.Error:
-					log.WithError(err).Error("websocket read network error")
-					_ = conn.Close()
-					s.Reconnect()
-					return
-
-				default:
-					log.WithError(err).Error("unexpected websocket error")
-					_ = conn.Close()
-					s.Reconnect()
-					return
-				}
-			}
-
-			// skip non-text messages
-			if mt != websocket.TextMessage {
-				continue
-			}
-
-			log.Debug(string(message))
-
-			e, err := ParseEvent(string(message))
-			if err != nil {
-				log.WithError(err).Errorf("websocket event parse error")
-				continue
-			}
-
-			s.dispatchEvent(e)
 		}
 	}
 }
@@ -586,48 +417,19 @@ func (s *Stream) dispatchEvent(e interface{}) {
 	case *AccountConfigUpdateEvent:
 		s.EmitAccountConfigUpdateEvent(e)
 	}
-
-}
-
-func (s *Stream) Close() error {
-	log.Infof("closing stream...")
-
-	// close the close signal channel
-	close(s.CloseC)
-
-	// get the connection object before call the context cancel function
-	s.ConnLock.Lock()
-	conn := s.Conn
-	connCancel := s.connCancel
-	s.ConnLock.Unlock()
-
-	// cancel the context so that the ticker loop and listen key updater will be stopped.
-	if connCancel != nil {
-		connCancel()
-	}
-
-	// gracefully write the close message to the connection
-	err := conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
-	if err != nil {
-		return errors.Wrap(err, "websocket write close message error")
-	}
-
-	// let the reader close the connection
-	<-time.After(time.Second)
-	return nil
 }
 
 func (s *Stream) fetchListenKey(ctx context.Context) (string, error) {
 	if s.IsMargin {
 		if s.IsIsolatedMargin {
 			log.Debugf("isolated margin %s is enabled, requesting margin user stream listen key...", s.IsolatedMarginSymbol)
-			req := s.Client.NewStartIsolatedMarginUserStreamService()
+			req := s.client.NewStartIsolatedMarginUserStreamService()
 			req.Symbol(s.IsolatedMarginSymbol)
 			return req.Do(ctx)
 		}
 
 		log.Debugf("margin mode is enabled, requesting margin user stream listen key...")
-		req := s.Client.NewStartMarginUserStreamService()
+		req := s.client.NewStartMarginUserStreamService()
 		return req.Do(ctx)
 	} else if s.IsFutures {
 		log.Debugf("futures mode is enabled, requesting futures user stream listen key...")
@@ -636,25 +438,25 @@ func (s *Stream) fetchListenKey(ctx context.Context) (string, error) {
 	}
 
 	log.Debugf("spot mode is enabled, requesting user stream listen key...")
-	return s.Client.NewStartUserStreamService().Do(ctx)
+	return s.client.NewStartUserStreamService().Do(ctx)
 }
 
 func (s *Stream) keepaliveListenKey(ctx context.Context, listenKey string) error {
 	log.Debugf("keepalive listen key: %s", util.MaskKey(listenKey))
 	if s.IsMargin {
 		if s.IsIsolatedMargin {
-			req := s.Client.NewKeepaliveIsolatedMarginUserStreamService().ListenKey(listenKey)
+			req := s.client.NewKeepaliveIsolatedMarginUserStreamService().ListenKey(listenKey)
 			req.Symbol(s.IsolatedMarginSymbol)
 			return req.Do(ctx)
 		}
-		req := s.Client.NewKeepaliveMarginUserStreamService().ListenKey(listenKey)
+		req := s.client.NewKeepaliveMarginUserStreamService().ListenKey(listenKey)
 		return req.Do(ctx)
 	} else if s.IsFutures {
 		req := s.futuresClient.NewKeepaliveUserStreamService().ListenKey(listenKey)
 		return req.Do(ctx)
 	}
 
-	return s.Client.NewKeepaliveUserStreamService().ListenKey(listenKey).Do(ctx)
+	return s.client.NewKeepaliveUserStreamService().ListenKey(listenKey).Do(ctx)
 }
 
 func (s *Stream) closeListenKey(ctx context.Context, listenKey string) (err error) {
@@ -663,11 +465,11 @@ func (s *Stream) closeListenKey(ctx context.Context, listenKey string) (err erro
 
 	if s.IsMargin {
 		if s.IsIsolatedMargin {
-			req := s.Client.NewCloseIsolatedMarginUserStreamService().ListenKey(listenKey)
+			req := s.client.NewCloseIsolatedMarginUserStreamService().ListenKey(listenKey)
 			req.Symbol(s.IsolatedMarginSymbol)
 			err = req.Do(ctx)
 		} else {
-			req := s.Client.NewCloseMarginUserStreamService().ListenKey(listenKey)
+			req := s.client.NewCloseMarginUserStreamService().ListenKey(listenKey)
 			err = req.Do(ctx)
 		}
 
@@ -675,15 +477,10 @@ func (s *Stream) closeListenKey(ctx context.Context, listenKey string) (err erro
 		req := s.futuresClient.NewCloseUserStreamService().ListenKey(listenKey)
 		err = req.Do(ctx)
 	} else {
-		err = s.Client.NewCloseUserStreamService().ListenKey(listenKey).Do(ctx)
+		err = s.client.NewCloseUserStreamService().ListenKey(listenKey).Do(ctx)
 	}
 
-	if err != nil {
-		log.WithError(err).Errorf("error deleting listen key: %s", util.MaskKey(listenKey))
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // listenKeyKeepAlive
@@ -698,7 +495,7 @@ func (s *Stream) listenKeyKeepAlive(ctx context.Context, listenKey string) {
 	defer func() {
 		log.Debugf("keepalive worker stopped")
 		if err := s.closeListenKey(context.Background(), listenKey); err != nil {
-			log.WithError(err).Errorf("invalidate listen key error: %v key: %s", err, util.MaskKey(listenKey))
+			log.WithError(err).Errorf("close listen key error: %v key: %s", err, util.MaskKey(listenKey))
 		}
 	}()
 
@@ -717,10 +514,10 @@ func (s *Stream) listenKeyKeepAlive(ctx context.Context, listenKey string) {
 				if err == nil {
 					break
 				} else {
+					time.Sleep(5 * time.Second)
 					switch err.(type) {
 					case net.Error:
 						log.WithError(err).Errorf("listen key keep-alive network error: %v key: %s", err, util.MaskKey(listenKey))
-						time.Sleep(5 * time.Second)
 						continue
 
 					default:
