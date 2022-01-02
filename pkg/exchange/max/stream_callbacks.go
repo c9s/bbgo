@@ -6,6 +6,16 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 )
 
+func (s *Stream) OnAuthEvent(cb func(e max.AuthEvent)) {
+	s.authEventCallbacks = append(s.authEventCallbacks, cb)
+}
+
+func (s *Stream) EmitAuthEvent(e max.AuthEvent) {
+	for _, cb := range s.authEventCallbacks {
+		cb(e)
+	}
+}
+
 func (s *Stream) OnBookEvent(cb func(e max.BookEvent)) {
 	s.bookEventCallbacks = append(s.bookEventCallbacks, cb)
 }

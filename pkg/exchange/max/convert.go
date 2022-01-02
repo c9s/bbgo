@@ -268,3 +268,76 @@ func toGlobalDepositStatus(a string) types.DepositStatus {
 
 	return types.DepositStatus(a)
 }
+
+func convertWebSocketTrade(t max.TradeUpdate) (*types.Trade, error) {
+	// skip trade ID that is the same. however this should not happen
+	var side = toGlobalSideType(t.Side)
+
+	// trade time
+	mts := time.Unix(0, t.Timestamp*int64(time.Millisecond))
+
+	price, err := strconv.ParseFloat(t.Price, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	quantity, err := strconv.ParseFloat(t.Volume, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	quoteQuantity := price * quantity
+
+	fee, err := strconv.ParseFloat(t.Fee, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	return &types.Trade{
+		ID:            t.ID,
+		OrderID:       t.OrderID,
+		Symbol:        toGlobalSymbol(t.Market),
+		Exchange:      types.ExchangeMax,
+		Price:         price,
+		Quantity:      quantity,
+		Side:          side,
+		IsBuyer:       side == types.SideTypeBuy,
+		IsMaker:       t.Maker,
+		Fee:           fee,
+		FeeCurrency:   toGlobalCurrency(t.FeeCurrency),
+		QuoteQuantity: quoteQuantity,
+		Time:          types.Time(mts),
+	}, nil
+}
+
+func convertWebSocketOrderUpdate(u max.OrderUpdate) (*types.Order, error) {
+	executedVolume, err := fixedpoint.NewFromString(u.ExecutedVolume)
+	if err != nil {
+		return nil, err
+	}
+
+	remainingVolume, err := fixedpoint.NewFromString(u.RemainingVolume)
+	if err != nil {
+		return nil, err
+	}
+
+	return &types.Order{
+		SubmitOrder: types.SubmitOrder{
+			ClientOrderID: u.ClientOID,
+			Symbol:        toGlobalSymbol(u.Market),
+			Side:          toGlobalSideType(u.Side),
+			Type:          toGlobalOrderType(u.OrderType),
+			Quantity:      util.MustParseFloat(u.Volume),
+			Price:         util.MustParseFloat(u.Price),
+			StopPrice:     util.MustParseFloat(u.StopPrice),
+			TimeInForce:   "GTC", // MAX only supports GTC
+			GroupID:       u.GroupID,
+		},
+		Exchange:         types.ExchangeMax,
+		OrderID:          u.ID,
+		Status:           toGlobalOrderStatus(u.State, executedVolume, remainingVolume),
+		ExecutedQuantity: executedVolume.Float64(),
+		CreationTime:     types.Time(time.Unix(0, u.CreatedAtMs*int64(time.Millisecond))),
+	}, nil
+}
+
