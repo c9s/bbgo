@@ -1,6 +1,7 @@
 package max
 
 import (
+	"encoding/json"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -168,35 +169,17 @@ func parseTradeSnapshotEvent(v *fastjson.Value) *TradeSnapshotEvent {
 }
 
 type BalanceMessage struct {
-	Currency  string `json:"cu"`
-	Available string `json:"av"`
-	Locked    string `json:"l"`
+	Currency  string           `json:"cu"`
+	Available fixedpoint.Value `json:"av"`
+	Locked    fixedpoint.Value `json:"l"`
 }
 
 func (m *BalanceMessage) Balance() (*types.Balance, error) {
-	available, err := fixedpoint.NewFromString(m.Available)
-	if err != nil {
-		return nil, err
-	}
-
-	locked, err := fixedpoint.NewFromString(m.Locked)
-	if err != nil {
-		return nil, err
-	}
-
 	return &types.Balance{
 		Currency:  strings.ToUpper(m.Currency),
-		Locked:    locked,
-		Available: available,
+		Locked:    m.Locked,
+		Available: m.Available,
 	}, nil
-}
-
-func parseBalance(v *fastjson.Value) BalanceMessage {
-	return BalanceMessage{
-		Currency:  string(v.GetStringBytes("cu")),
-		Available: string(v.GetStringBytes("av")),
-		Locked:    string(v.GetStringBytes("l")),
-	}
 }
 
 type AccountUpdateEvent struct {
@@ -204,41 +187,15 @@ type AccountUpdateEvent struct {
 	Balances []BalanceMessage `json:"B"`
 }
 
-func parserAccountUpdateEvent(v *fastjson.Value) *AccountUpdateEvent {
-	var e AccountUpdateEvent
-	e.Event = string(v.GetStringBytes("e"))
-	e.Timestamp = v.GetInt64("T")
-
-	for _, bv := range v.GetArray("B") {
-		e.Balances = append(e.Balances, parseBalance(bv))
-	}
-
-	return &e
-}
-
 type AccountSnapshotEvent struct {
 	BaseEvent
 	Balances []BalanceMessage `json:"B"`
 }
 
-func parserAccountSnapshotEvent(v *fastjson.Value) *AccountSnapshotEvent {
-	var e AccountSnapshotEvent
-	e.Event = string(v.GetStringBytes("e"))
-	e.Timestamp = v.GetInt64("T")
-
-	for _, bv := range v.GetArray("B") {
-		e.Balances = append(e.Balances, parseBalance(bv))
-	}
-
-	return &e
-}
-
-func parseAuthEvent(v *fastjson.Value) *AuthEvent {
-	return &AuthEvent{
-		Event:     string(v.GetStringBytes("e")),
-		ID:        string(v.GetStringBytes("i")),
-		Timestamp: v.GetInt64("T"),
-	}
+func parseAuthEvent(v *fastjson.Value) (*AuthEvent, error) {
+	var e AuthEvent
+	var err = json.Unmarshal([]byte(v.String()), &e)
+	return &e, err
 }
 
 func ParseUserEvent(v *fastjson.Value) (interface{}, error) {
@@ -256,14 +213,11 @@ func ParseUserEvent(v *fastjson.Value) (interface{}, error) {
 	case "trade_update":
 		return parseTradeUpdateEvent(v), nil
 
-	case "account_snapshot":
-		return parserAccountSnapshotEvent(v), nil
-
-	case "account_update":
-		return parserAccountUpdateEvent(v), nil
-
-	case "authenticated":
-		return parseAuthEvent(v), nil
+	case "account_snapshot", "account_update":
+		var e AccountUpdateEvent
+		o := v.String()
+		err := json.Unmarshal([]byte(o), &e)
+		return &e, err
 
 	case "error":
 		logger.Errorf("error %s", v.MarshalTo(nil))
