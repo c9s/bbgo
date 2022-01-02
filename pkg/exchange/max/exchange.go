@@ -758,7 +758,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	for _, t := range remoteTrades {
 		localTrade, err := toGlobalTrade(t)
 		if err != nil {
-			logger.WithError(err).Errorf("can not convert trade: %+v", t)
+			log.WithError(err).Errorf("can not convert trade: %+v", t)
 			continue
 		}
 
