@@ -104,7 +104,7 @@ func toGlobalOrderStatus(orderState max.OrderState, executedVolume, remainingVol
 
 	}
 
-	logger.Errorf("unknown order status: %v", orderState)
+	log.Errorf("unknown order status: %v", orderState)
 	return types.OrderStatus(orderState)
 }
 
@@ -130,7 +130,7 @@ func toGlobalOrderType(orderType max.OrderType) types.OrderType {
 
 	}
 
-	logger.Errorf("order convert error, unknown order type: %v", orderType)
+	log.Errorf("order convert error, unknown order type: %v", orderType)
 	return types.OrderType(orderType)
 }
 
