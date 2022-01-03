@@ -50,6 +50,42 @@ func toGlobalMarket(symbol binance.Symbol) types.Market {
 	return market
 }
 
+// TODO: Cuz it returns types.Market as well, merge following to the above function
+func toGlobalFuturesMarket(symbol futures.Symbol) types.Market {
+	market := types.Market{
+		Symbol:          symbol.Symbol,
+		LocalSymbol:     symbol.Symbol,
+		PricePrecision:  symbol.QuotePrecision,
+		VolumePrecision: symbol.BaseAssetPrecision,
+		QuoteCurrency:   symbol.QuoteAsset,
+		BaseCurrency:    symbol.BaseAsset,
+	}
+
+	if f := symbol.MinNotionalFilter(); f != nil {
+		market.MinNotional = util.MustParseFloat(f.Notional)
+		market.MinAmount = util.MustParseFloat(f.Notional)
+	}
+
+	// The LOT_SIZE filter defines the quantity (aka "lots" in auction terms) rules for a symbol.
+	// There are 3 parts:
+	// minQty defines the minimum quantity/icebergQty allowed.
+	//	maxQty defines the maximum quantity/icebergQty allowed.
+	//	stepSize defines the intervals that a quantity/icebergQty can be increased/decreased by.
+	if f := symbol.LotSizeFilter(); f != nil {
+		market.MinQuantity = util.MustParseFloat(f.MinQuantity)
+		market.MaxQuantity = util.MustParseFloat(f.MaxQuantity)
+		market.StepSize = util.MustParseFloat(f.StepSize)
+	}
+
+	if f := symbol.PriceFilter(); f != nil {
+		market.MaxPrice = util.MustParseFloat(f.MaxPrice)
+		market.MinPrice = util.MustParseFloat(f.MinPrice)
+		market.TickSize = util.MustParseFloat(f.TickSize)
+	}
+
+	return market
+}
+
 func toGlobalIsolatedUserAsset(userAsset binance.IsolatedUserAsset) types.IsolatedUserAsset {
 	return types.IsolatedUserAsset{
 		Asset:         userAsset.Asset,
@@ -170,23 +206,23 @@ func toGlobalFuturesPositions(futuresPositions []*futures.AccountPosition) types
 	return retFuturesPositions
 }
 
-func toGlobalFuturesUserAssets(assets []*futures.AccountAsset) (retAssets map[types.Asset]types.FuturesUserAsset) {
-	for _, asset := range assets {
-		// TODO: or modify to type FuturesAssetMap map[string]FuturesAssetMap
-		retAssets[types.Asset{Currency: asset.Asset}] = types.FuturesUserAsset{
-			Asset:                  asset.Asset,
-			InitialMargin:          fixedpoint.MustNewFromString(asset.InitialMargin),
-			MaintMargin:            fixedpoint.MustNewFromString(asset.MaintMargin),
-			MarginBalance:          fixedpoint.MustNewFromString(asset.MarginBalance),
-			MaxWithdrawAmount:      fixedpoint.MustNewFromString(asset.MaxWithdrawAmount),
-			OpenOrderInitialMargin: fixedpoint.MustNewFromString(asset.OpenOrderInitialMargin),
-			PositionInitialMargin:  fixedpoint.MustNewFromString(asset.PositionInitialMargin),
-			UnrealizedProfit:       fixedpoint.MustNewFromString(asset.UnrealizedProfit),
-			WalletBalance:          fixedpoint.MustNewFromString(asset.WalletBalance),
+func toGlobalFuturesUserAssets(assets []*futures.AccountAsset) (retAssets types.FuturesAssetMap) {
+	retFuturesAssets := make(types.FuturesAssetMap)
+	for _, futuresAsset := range assets {
+		retFuturesAssets[futuresAsset.Asset] = types.FuturesUserAsset{
+			Asset:                  futuresAsset.Asset,
+			InitialMargin:          fixedpoint.MustNewFromString(futuresAsset.InitialMargin),
+			MaintMargin:            fixedpoint.MustNewFromString(futuresAsset.MaintMargin),
+			MarginBalance:          fixedpoint.MustNewFromString(futuresAsset.MarginBalance),
+			MaxWithdrawAmount:      fixedpoint.MustNewFromString(futuresAsset.MaxWithdrawAmount),
+			OpenOrderInitialMargin: fixedpoint.MustNewFromString(futuresAsset.OpenOrderInitialMargin),
+			PositionInitialMargin:  fixedpoint.MustNewFromString(futuresAsset.PositionInitialMargin),
+			UnrealizedProfit:       fixedpoint.MustNewFromString(futuresAsset.UnrealizedProfit),
+			WalletBalance:          fixedpoint.MustNewFromString(futuresAsset.WalletBalance),
 		}
 	}
 
-	return retAssets
+	return retFuturesAssets
 }
 
 func toGlobalTicker(stats *binance.PriceChangeStats) (*types.Ticker, error) {
