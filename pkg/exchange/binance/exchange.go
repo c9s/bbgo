@@ -169,6 +169,22 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[stri
 }
 
 func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
+
+	if e.IsFutures {
+		exchangeInfo, err := e.futuresClient.NewExchangeInfoService().Do(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		markets := types.MarketMap{}
+		for _, symbol := range exchangeInfo.Symbols {
+			log.Info(symbol)
+			markets[symbol.Symbol] = toGlobalFuturesMarket(symbol)
+		}
+
+		return markets, nil
+	}
+
 	exchangeInfo, err := e.Client.NewExchangeInfoService().Do(ctx)
 	if err != nil {
 		return nil, err
@@ -416,7 +432,7 @@ func (e *Exchange) PlatformFeeCurrency() string {
 	return BNB
 }
 
-func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
+func (e *Exchange) QuerySpotAccount(ctx context.Context) (*types.Account, error) {
 	account, err := e.Client.NewGetAccountService().Do(ctx)
 	if err != nil {
 		return nil, err
@@ -431,13 +447,59 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 		}
 	}
 
-	// binance use 15 -> 0.15%, so we convert it to 0.0015
 	a := &types.Account{
+		AccountType:     types.AccountTypeSpot, // TODO: types.AccountTypeMargin
 		MakerCommission: fixedpoint.NewFromFloat(float64(account.MakerCommission) * 0.0001),
 		TakerCommission: fixedpoint.NewFromFloat(float64(account.TakerCommission) * 0.0001),
+		CanDeposit:      account.CanDeposit,  // if can transfer in asset
+		CanTrade:        account.CanTrade,    // if can trade
+		CanWithdraw:     account.CanWithdraw, // if can transfer out asset
 	}
 	a.UpdateBalances(balances)
 	return a, nil
+}
+
+func (e *Exchange) QueryFuturesAccount(ctx context.Context) (*types.Account, error) {
+	account, err := e.futuresClient.NewGetAccountService().Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+	accountBalances, err := e.futuresClient.NewGetBalanceService().Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var balances = map[string]types.Balance{}
+	for _, b := range accountBalances {
+		balances[b.Asset] = types.Balance{
+			Currency:  b.Asset,
+			Available: fixedpoint.Must(fixedpoint.NewFromString(b.AvailableBalance)),
+		}
+	}
+
+	a := &types.Account{
+		AccountType: types.AccountTypeFutures,
+		FuturesInfo: toGlobalFuturesAccountInfo(account), // In binance GO api, Account define account info which mantain []*AccountAsset and []*AccountPosition.
+		CanDeposit:  account.CanDeposit,                  // if can transfer in asset
+		CanTrade:    account.CanTrade,                    // if can trade
+		CanWithdraw: account.CanWithdraw,                 // if can transfer out asset
+	}
+	a.UpdateBalances(balances)
+	return a, nil
+}
+
+func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
+	futuresAccount, err := e.QueryFuturesAccount(ctx)
+	if !(err != nil) {
+		return futuresAccount, nil
+	}
+
+	account, err := e.QuerySpotAccount(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return account, nil
 }
 
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
@@ -1205,6 +1267,18 @@ func (e *Exchange) QueryFundingRateHistory(ctx context.Context, symbol string) (
 		FundingTime: time.Unix(0, rate.FundingTime*int64(time.Millisecond)),
 		Time:        time.Unix(0, rate.Time*int64(time.Millisecond)),
 	}, nil
+}
+
+func (e *Exchange) QueryPositionRisk(ctx context.Context, symbol string) (*types.PositionRisk, error) {
+	futuresClient := binance.NewFuturesClient(e.key, e.secret)
+
+	// when symbol is set, only one position risk will be returned.
+	risks, err := futuresClient.NewGetPositionRiskService().Symbol(symbol).Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return convertPositionRisk(risks[0])
 }
 
 func getLaunchDate() (time.Time, error) {
