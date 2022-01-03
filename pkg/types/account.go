@@ -121,6 +121,7 @@ func (m AssetMap) SlackAttachment() slack.Attachment {
 
 type BalanceMap map[string]Balance
 type PositionMap map[string]Position
+type FuturesAssetMap map[string]FuturesUserAsset
 type FuturesPositionMap map[string]FuturesPosition
 
 func (m BalanceMap) String() string {
@@ -227,18 +228,18 @@ type Account struct {
 
 type FuturesAccountInfo struct {
 	// Futures fields
-	Assets                      map[Asset]FuturesUserAsset `json:"assets"`
-	FeeTier                     int                        `json:"feeTier"`
-	MaxWithdrawAmount           fixedpoint.Value           `json:"maxWithdrawAmount"`
-	Positions                   FuturesPositionMap         `json:"positions"`
-	TotalInitialMargin          fixedpoint.Value           `json:"totalInitialMargin"`
-	TotalMaintMargin            fixedpoint.Value           `json:"totalMaintMargin"`
-	TotalMarginBalance          fixedpoint.Value           `json:"totalMarginBalance"`
-	TotalOpenOrderInitialMargin fixedpoint.Value           `json:"totalOpenOrderInitialMargin"`
-	TotalPositionInitialMargin  fixedpoint.Value           `json:"totalPositionInitialMargin"`
-	TotalUnrealizedProfit       fixedpoint.Value           `json:"totalUnrealizedProfit"`
-	TotalWalletBalance          fixedpoint.Value           `json:"totalWalletBalance"`
-	UpdateTime                  int64                      `json:"updateTime"`
+	Assets                      FuturesAssetMap    `json:"assets"`
+	FeeTier                     int                `json:"feeTier"`
+	MaxWithdrawAmount           fixedpoint.Value   `json:"maxWithdrawAmount"`
+	Positions                   FuturesPositionMap `json:"positions"`
+	TotalInitialMargin          fixedpoint.Value   `json:"totalInitialMargin"`
+	TotalMaintMargin            fixedpoint.Value   `json:"totalMaintMargin"`
+	TotalMarginBalance          fixedpoint.Value   `json:"totalMarginBalance"`
+	TotalOpenOrderInitialMargin fixedpoint.Value   `json:"totalOpenOrderInitialMargin"`
+	TotalPositionInitialMargin  fixedpoint.Value   `json:"totalPositionInitialMargin"`
+	TotalUnrealizedProfit       fixedpoint.Value   `json:"totalUnrealizedProfit"`
+	TotalWalletBalance          fixedpoint.Value   `json:"totalWalletBalance"`
+	UpdateTime                  int64              `json:"updateTime"`
 }
 
 func NewAccount() *Account {
