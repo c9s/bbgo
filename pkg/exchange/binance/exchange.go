@@ -178,7 +178,6 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 
 		markets := types.MarketMap{}
 		for _, symbol := range exchangeInfo.Symbols {
-			log.Info(symbol)
 			markets[symbol.Symbol] = toGlobalFuturesMarket(symbol)
 		}
 
@@ -494,12 +493,7 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 		return futuresAccount, nil
 	}
 
-	account, err := e.QuerySpotAccount(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return account, nil
+	return e.QuerySpotAccount(ctx)
 }
 
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
@@ -578,7 +572,6 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 		if err != nil {
 			return orders, err
 		}
-
 		return toGlobalFuturesOrders(binanceOrders)
 	}
 
@@ -1094,9 +1087,8 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		return trades, nil
 	} else if e.IsFutures {
 		var remoteTrades []*futures.AccountTrade
-		req := e.futuresClient.NewListAccountTradeService(). // IsIsolated(e.IsIsolatedFutures).
+		req := e.futuresClient.NewListAccountTradeService(). //IsIsolated(e.IsIsolatedFutures).
 									Symbol(symbol)
-
 		if options.Limit > 0 {
 			req.Limit(int(options.Limit))
 		} else {
@@ -1115,7 +1107,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		for _, t := range remoteTrades {
 			localTrade, err := toGlobalFuturesTrade(*t)
 			if err != nil {
-				log.WithError(err).Errorf("can not convert binance trade: %+v", t)
+				log.WithError(err).Errorf("can not convert binance futures trade: %+v", t)
 				continue
 			}
 

@@ -25,16 +25,19 @@ type SyncService struct {
 func (s *SyncService) SyncSessionSymbols(ctx context.Context, exchange types.Exchange, startTime time.Time, symbols ...string) error {
 	for _, symbol := range symbols {
 		log.Infof("syncing %s %s trades...", exchange.Name(), symbol)
-		if err := s.TradeService.Sync(ctx, exchange, symbol, startTime); err != nil {
-			return err
-		}
-
-		log.Infof("syncing %s %s orders...", exchange.Name(), symbol)
-		if err := s.OrderService.Sync(ctx, exchange, symbol, startTime); err != nil {
-			return err
+		markets, err := exchange.QueryMarkets(ctx)
+		if err != nil {
+			if _, ok := markets[symbol]; ok {
+				if err := s.TradeService.Sync(ctx, exchange, symbol, startTime); err != nil {
+					return err
+				}
+				log.Infof("syncing %s %s orders...", exchange.Name(), symbol)
+				if err := s.OrderService.Sync(ctx, exchange, symbol, startTime); err != nil {
+					return err
+				}
+			}
 		}
 	}
-
 
 	log.Infof("syncing %s deposit records...", exchange.Name())
 	if err := s.DepositService.Sync(ctx, exchange); err != nil {
