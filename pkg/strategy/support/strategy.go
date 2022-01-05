@@ -76,13 +76,14 @@ func (stop *PercentageTargetStop) GenerateOrders(market types.Market, pos *types
 	return targetOrders
 }
 
+// Not implemented yet
 // ResistanceStop is a kind of stop order by detecting resistance
-type ResistanceStop struct {
-	Interval      types.Interval   `json:"interval"`
-	sensitivity   fixedpoint.Value `json:"sensitivity"`
-	MinVolume     fixedpoint.Value `json:"minVolume"`
-	TakerBuyRatio fixedpoint.Value `json:"takerBuyRatio"`
-}
+//type ResistanceStop struct {
+//	Interval      types.Interval   `json:"interval"`
+//	sensitivity   fixedpoint.Value `json:"sensitivity"`
+//	MinVolume     fixedpoint.Value `json:"minVolume"`
+//	TakerBuyRatio fixedpoint.Value `json:"takerBuyRatio"`
+//}
 
 type Strategy struct {
 	*bbgo.Notifiability `json:"-"`
@@ -108,7 +109,8 @@ type Strategy struct {
 	MarginOrderSideEffect types.MarginOrderSideEffectType `json:"marginOrderSideEffect"`
 	Targets               []Target                        `json:"targets"`
 
-	ResistanceStop *ResistanceStop `json:"resistanceStop"`
+    // Not implemented yet
+	// ResistanceStop *ResistanceStop `json:"resistanceStop"`
 
 	ResistanceTakerBuyRatio fixedpoint.Value `json:"resistanceTakerBuyRatio"`
 
