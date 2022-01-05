@@ -396,7 +396,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 
 			bidPrice = bidPrice.MulFloat64(1.0 - bidMargin.Float64())
 			if i > 0 && pips > 0 {
-				bidPrice -= pips.MulFloat64(s.makerMarket.TickSize)
+				bidPrice -= pips.MulFloat64(float64(i) * s.makerMarket.TickSize)
 			}
 
 			if makerQuota.QuoteAsset.Lock(bidQuantity.Mul(bidPrice)) && hedgeQuota.BaseAsset.Lock(bidQuantity) {
@@ -445,7 +445,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 
 			askPrice = askPrice.MulFloat64(1.0 + askMargin.Float64())
 			if i > 0 && pips > 0 {
-				askPrice += pips.MulFloat64(s.makerMarket.TickSize)
+				askPrice += pips.MulFloat64(float64(i) * s.makerMarket.TickSize)
 			}
 
 			if makerQuota.BaseAsset.Lock(askQuantity) && hedgeQuota.QuoteAsset.Lock(askQuantity.Mul(askPrice)) {
