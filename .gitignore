@@ -40,3 +40,5 @@ node_modules
 otp*png
 
 /.deploy
+
+*.swp
