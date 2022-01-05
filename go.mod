@@ -65,7 +65,7 @@ require (
 	gonum.org/v1/gonum v0.8.1
 	google.golang.org/protobuf v1.27.1 // indirect
 	gopkg.in/ini.v1 v1.62.0 // indirect
-	gopkg.in/tucnak/telebot.v2 v2.4.0
+	gopkg.in/tucnak/telebot.v2 v2.5.0
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 )
 
