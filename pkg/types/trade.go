@@ -185,10 +185,15 @@ func (trade Trade) Liquidity() (o string) {
 }
 
 func (trade Trade) Key() TradeKey {
-	return TradeKey{ID: trade.ID, Side: trade.Side}
+	return TradeKey{
+		Exchange: trade.Exchange,
+		ID:       trade.ID,
+		Side:     trade.Side,
+	}
 }
 
 type TradeKey struct {
-	ID   uint64
-	Side SideType
+	Exchange ExchangeName
+	ID       uint64
+	Side     SideType
 }
