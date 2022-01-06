@@ -266,7 +266,7 @@ func (e *TwapExecution) updateOrder(ctx context.Context) error {
 			}
 		}
 
-		e.cancelActiveOrders(ctx)
+		e.cancelActiveOrders()
 	}
 
 	orderForm, err := e.newBestPriceOrder()
@@ -284,51 +284,10 @@ func (e *TwapExecution) updateOrder(ctx context.Context) error {
 	return nil
 }
 
-func (e *TwapExecution) cancelActiveOrders(ctx context.Context) {
-	didCancel := false
-	for e.activeMakerOrders.NumOfOrders() > 0 {
-		didCancel = true
-
-		orders := e.activeMakerOrders.Orders()
-		log.Infof("canceling %d open orders:", len(orders))
-		e.activeMakerOrders.Print()
-
-		if err := e.Session.Exchange.CancelOrders(ctx, orders...); err != nil {
-			log.WithError(err).Errorf("can not cancel %s orders", e.Symbol)
-		}
-
-		select {
-		case <-ctx.Done():
-			return
-
-		case <-time.After(3 * time.Second):
-
-		}
-
-		// verify the current open orders via the RESTful API
-		if e.activeMakerOrders.NumOfOrders() > 0 {
-			log.Warnf("there are orders not cancelled, using REStful API to verify...")
-			openOrders, err := e.Session.Exchange.QueryOpenOrders(ctx, e.Symbol)
-			if err != nil {
-				log.WithError(err).Errorf("can not query %s open orders", e.Symbol)
-				continue
-			}
-
-			openOrderStore := NewOrderStore(e.Symbol)
-			openOrderStore.Add(openOrders...)
-
-			for _, o := range e.activeMakerOrders.Orders() {
-				// if it does not exist, we should remove it
-				if !openOrderStore.Exists(o.OrderID) {
-					e.activeMakerOrders.Remove(o)
-				}
-			}
-		}
-	}
-
-	if didCancel {
-		log.Infof("orders are canceled successfully")
-	}
+func (e *TwapExecution) cancelActiveOrders() {
+	gracefulCtx, gracefulCancel := context.WithTimeout(context.TODO(), 30 * time.Second)
+	defer gracefulCancel()
+	e.activeMakerOrders.GracefulCancel(gracefulCtx, e.Session.Exchange)
 }
 
 func (e *TwapExecution) orderUpdater(ctx context.Context) {
@@ -340,7 +299,7 @@ func (e *TwapExecution) orderUpdater(ctx context.Context) {
 	// 1. the given context is canceled.
 	// 2. the base quantity equals to or greater than the target quantity
 	defer func() {
-		e.cancelActiveOrders(context.Background())
+		e.cancelActiveOrders()
 		e.cancelUserDataStream()
 		e.emitDone()
 	}()

@@ -63,7 +63,7 @@ func (b *LocalActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exch
 		case <-time.After(3 * time.Second):
 
 		case <-ctx.Done():
-			break
+			return ctx.Err()
 
 		}
 
