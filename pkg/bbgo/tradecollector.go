@@ -50,7 +50,9 @@ func (c *TradeCollector) BindStreamForBackground(stream types.Stream) {
 }
 
 func (c *TradeCollector) BindStream(stream types.Stream) {
-	stream.OnTradeUpdate(c.ProcessTrade)
+	stream.OnTradeUpdate(func(trade types.Trade) {
+		c.ProcessTrade(trade)
+	})
 }
 
 // Emit triggers the trade processing (position update)
@@ -66,7 +68,6 @@ func (c *TradeCollector) Emit() {
 func (c *TradeCollector) Process() bool {
 	positionChanged := false
 	c.tradeStore.Filter(func(trade types.Trade) bool {
-		return c.processTrade(trade)
 		key := trade.Key()
 
 		// if it's already done, remove the trade from the trade store
@@ -112,10 +113,12 @@ func (c *TradeCollector) processTrade(trade types.Trade) bool {
 	return false
 }
 
-func (c *TradeCollector) ProcessTrade(trade types.Trade) {
+func (c *TradeCollector) ProcessTrade(trade types.Trade) bool {
 	if !c.processTrade(trade) {
 		c.tradeStore.Add(trade)
+		return false
 	}
+	return true
 }
 
 // Run is a goroutine executed in the background
