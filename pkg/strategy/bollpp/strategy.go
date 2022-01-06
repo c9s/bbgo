@@ -3,9 +3,10 @@ package bollpp
 import (
 	"context"
 	"fmt"
-	"github.com/c9s/bbgo/pkg/indicator"
 	"sync"
 	"time"
+
+	"github.com/c9s/bbgo/pkg/indicator"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -268,7 +269,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.stopC = make(chan struct{})
 
-	s.activeMakerOrders = bbgo.NewLocalActiveOrderBook()
+	s.activeMakerOrders = bbgo.NewLocalActiveOrderBook(s.Symbol)
 	s.activeMakerOrders.BindStream(session.UserDataStream)
 
 	s.orderStore = bbgo.NewOrderStore(s.Symbol)

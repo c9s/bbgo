@@ -1,7 +1,9 @@
 package bbgo
 
 import (
+	"context"
 	"encoding/json"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -11,15 +13,16 @@ import (
 // LocalActiveOrderBook manages the local active order books.
 //go:generate callbackgen -type LocalActiveOrderBook
 type LocalActiveOrderBook struct {
-	Asks, Bids *types.SyncOrderMap
-
+	Symbol          string
+	Asks, Bids      *types.SyncOrderMap
 	filledCallbacks []func(o types.Order)
 }
 
-func NewLocalActiveOrderBook() *LocalActiveOrderBook {
+func NewLocalActiveOrderBook(symbol string) *LocalActiveOrderBook {
 	return &LocalActiveOrderBook{
-		Bids: types.NewSyncOrderMap(),
-		Asks: types.NewSyncOrderMap(),
+		Symbol: symbol,
+		Bids:   types.NewSyncOrderMap(),
+		Asks:   types.NewSyncOrderMap(),
 	}
 }
 
@@ -34,6 +37,59 @@ func (b *LocalActiveOrderBook) Backup() []types.SubmitOrder {
 
 func (b *LocalActiveOrderBook) BindStream(stream types.Stream) {
 	stream.OnOrderUpdate(b.orderUpdateHandler)
+}
+
+// GracefulCancel cancels the active orders gracefully
+func (b *LocalActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange) error {
+	if err := ex.CancelOrders(ctx, b.Orders()...); err != nil {
+		log.WithError(err).Error("order cancel error")
+	}
+
+	// ensure every order is cancelled
+	for b.NumOfOrders() > 0 {
+		orders := b.Orders()
+		log.Warnf("%d orders are not cancelled yet:", len(orders))
+		b.Print()
+
+		if err := ex.CancelOrders(ctx, b.Orders()...); err != nil {
+			log.WithError(err).Errorf("can not cancel %s orders", b.Symbol)
+			continue
+		}
+
+		log.Infof("waiting for orders to be cancelled...")
+
+		// wait for 3 seconds to get the order updates
+		select {
+		case <-time.After(3 * time.Second):
+
+		case <-ctx.Done():
+			break
+
+		}
+
+		// verify the current open orders via the RESTful API
+		if b.NumOfOrders() > 0 {
+			log.Warnf("there are orders not cancelled, using REStful API to verify...")
+			openOrders, err := ex.QueryOpenOrders(ctx, b.Symbol)
+			if err != nil {
+				log.WithError(err).Errorf("can not query %s open orders", b.Symbol)
+				continue
+			}
+
+			openOrderStore := NewOrderStore(b.Symbol)
+			openOrderStore.Add(openOrders...)
+
+			for _, o := range b.Orders() {
+				// if it does not exist, we should remove it
+				if !openOrderStore.Exists(o.OrderID) {
+					b.Remove(o)
+				}
+			}
+		}
+	}
+
+	log.Info("all orders are cancelled successfully")
+	return nil
 }
 
 func (b *LocalActiveOrderBook) orderUpdateHandler(order types.Order) {
