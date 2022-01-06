@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"math/rand"
 	"sync"
 	"time"
 
@@ -17,6 +16,7 @@ import (
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 var defaultMargin = fixedpoint.NewFromFloat(0.003)
@@ -784,10 +784,10 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	s.stopC = make(chan struct{})
 
 	go func() {
-		posTicker := time.NewTicker(durationJitter(s.HedgeInterval.Duration(), 200))
+		posTicker := time.NewTicker(util.MillisecondsJitter(s.HedgeInterval.Duration(), 200))
 		defer posTicker.Stop()
 
-		quoteTicker := time.NewTicker(durationJitter(s.UpdateInterval.Duration(), 200))
+		quoteTicker := time.NewTicker(util.MillisecondsJitter(s.UpdateInterval.Duration(), 200))
 		defer quoteTicker.Stop()
 
 		reportTicker := time.NewTicker(time.Hour)
@@ -872,9 +872,4 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	})
 
 	return nil
-}
-
-func durationJitter(d time.Duration, jitterInMilliseconds int) time.Duration {
-	n := rand.Intn(jitterInMilliseconds)
-	return d + time.Duration(n)*time.Millisecond
 }
