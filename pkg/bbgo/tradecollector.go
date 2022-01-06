@@ -50,7 +50,7 @@ func (c *TradeCollector) BindStreamForBackground(stream types.Stream) {
 }
 
 func (c *TradeCollector) BindStream(stream types.Stream) {
-	stream.OnTradeUpdate(c.processTrade)
+	stream.OnTradeUpdate(c.ProcessTrade)
 }
 
 // Emit triggers the trade processing (position update)
@@ -66,10 +66,11 @@ func (c *TradeCollector) Emit() {
 func (c *TradeCollector) Process() bool {
 	positionChanged := false
 	c.tradeStore.Filter(func(trade types.Trade) bool {
+		return c.processTrade(trade)
 		key := trade.Key()
 
 		// if it's already done, remove the trade from the trade store
-		if _, done := c.doneTrades[key] ; done {
+		if _, done := c.doneTrades[key]; done {
 			return true
 		}
 
@@ -91,13 +92,13 @@ func (c *TradeCollector) Process() bool {
 	return positionChanged
 }
 
-func (c *TradeCollector) processTrade(trade types.Trade) {
+func (c *TradeCollector) processTrade(trade types.Trade) bool {
 	if c.orderStore.Exists(trade.OrderID) {
 		key := trade.Key()
 
 		// if it's already done, remove the trade from the trade store
-		if _, done := c.doneTrades[key] ; done {
-			return
+		if _, done := c.doneTrades[key]; done {
+			return true
 		}
 
 		c.EmitTrade(trade)
@@ -106,7 +107,13 @@ func (c *TradeCollector) processTrade(trade types.Trade) {
 		}
 		c.EmitPositionUpdate(c.position)
 		c.doneTrades[key] = struct{}{}
-	} else {
+		return true
+	}
+	return false
+}
+
+func (c *TradeCollector) ProcessTrade(trade types.Trade) {
+	if !c.processTrade(trade) {
 		c.tradeStore.Add(trade)
 	}
 }
@@ -127,7 +134,7 @@ func (c *TradeCollector) Run(ctx context.Context) {
 			c.Process()
 
 		case trade := <-c.tradeC:
-			c.processTrade(trade)
+			c.ProcessTrade(trade)
 		}
 	}
 }

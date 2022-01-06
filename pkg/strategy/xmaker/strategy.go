@@ -793,6 +793,10 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		reportTicker := time.NewTicker(time.Hour)
 		defer reportTicker.Stop()
 
+		tradeScanInterval := 20 * time.Minute
+		tradeScanTicker := time.NewTicker(tradeScanInterval)
+		defer tradeScanTicker.Stop()
+
 		defer func() {
 			if err := s.makerSession.Exchange.CancelOrders(context.Background(), s.activeMakerOrders.Orders()...); err != nil {
 				log.WithError(err).Errorf("can not cancel %s orders", s.Symbol)
@@ -815,6 +819,22 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 			case <-reportTicker.C:
 				s.Notifiability.Notify(&s.state.ProfitStats)
+
+			case <-tradeScanTicker.C:
+				log.Infof("scanning trades from %s ago...", tradeScanInterval)
+				startTime := time.Now().Add(- tradeScanInterval)
+				trades, err := s.sourceSession.Exchange.(types.ExchangeTradeHistoryService).QueryTrades(ctx, s.Symbol, &types.TradeQueryOptions{
+					StartTime: &startTime,
+				})
+
+				if err != nil {
+					log.WithError(err).Errorf("query trades error")
+				} else {
+					for _, td := range trades {
+						log.Infof("processing trade: %s", td.String())
+						s.tradeCollector.ProcessTrade(td)
+					}
+				}
 
 			case <-posTicker.C:
 				// For positive position and positive covered position:
