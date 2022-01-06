@@ -607,6 +607,7 @@ func (s *Strategy) LoadState() error {
 	if s.state.Position == nil {
 		s.state.Position = types.NewPositionFromMarket(s.makerMarket)
 	}
+	s.state.Position.Market = s.makerMarket
 
 	s.state.ProfitStats.Symbol = s.makerMarket.Symbol
 	s.state.ProfitStats.BaseCurrency = s.makerMarket.BaseCurrency
