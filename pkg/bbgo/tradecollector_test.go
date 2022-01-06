@@ -8,7 +8,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func TestTradeCollector(t *testing.T) {
+func TestTradeCollector_ShouldNotCountDuplicatedTrade(t *testing.T) {
 	symbol := "BTCUSDT"
 	position := types.NewPosition(symbol, "BTC", "USDT")
 	orderStore := NewOrderStore(symbol)
@@ -25,8 +25,6 @@ func TestTradeCollector(t *testing.T) {
 		Symbol:        "BTCUSDT",
 		Side:          types.SideTypeBuy,
 		IsBuyer:       true,
-		Fee:           0,
-		FeeCurrency:   "",
 	})
 	assert.False(t, matched, "should be added to the trade store")
 	assert.Equal(t, 1, len(collector.tradeStore.Trades()), "should have one trade in the trade store")
@@ -60,8 +58,6 @@ func TestTradeCollector(t *testing.T) {
 		Symbol:        "BTCUSDT",
 		Side:          types.SideTypeBuy,
 		IsBuyer:       true,
-		Fee:           0,
-		FeeCurrency:   "",
 	})
 	assert.True(t, matched, "the same trade should match")
 	assert.Equal(t, 0, len(collector.tradeStore.Trades()), "the same trade should not be added to the trade store")
