@@ -338,13 +338,13 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orders.BindStream(session.UserDataStream)
 
 	// we don't persist orders so that we can not clear the previous orders for now. just need time to support this.
-	s.activeOrders = bbgo.NewLocalActiveOrderBook()
+	s.activeOrders = bbgo.NewLocalActiveOrderBook(s.Symbol)
 	s.activeOrders.OnFilled(func(o types.Order) {
 		s.submitReverseOrder(o, session)
 	})
 	s.activeOrders.BindStream(session.UserDataStream)
 
-	s.profitOrders = bbgo.NewLocalActiveOrderBook()
+	s.profitOrders = bbgo.NewLocalActiveOrderBook(s.Symbol)
 	s.profitOrders.OnFilled(func(o types.Order) {
 		// we made profit here!
 	})

@@ -6,11 +6,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/types"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
+
+	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 type TwapExecution struct {
@@ -452,7 +453,7 @@ func (e *TwapExecution) Run(parentCtx context.Context) error {
 
 	e.orderStore = NewOrderStore(e.Symbol)
 	e.orderStore.BindStream(e.userDataStream)
-	e.activeMakerOrders = NewLocalActiveOrderBook()
+	e.activeMakerOrders = NewLocalActiveOrderBook(e.Symbol)
 	e.activeMakerOrders.OnFilled(e.handleFilledOrder)
 	e.activeMakerOrders.BindStream(e.userDataStream)
 

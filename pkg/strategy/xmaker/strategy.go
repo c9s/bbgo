@@ -733,7 +733,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	s.book = types.NewStreamBook(s.Symbol)
 	s.book.BindStream(s.sourceSession.MarketDataStream)
 
-	s.activeMakerOrders = bbgo.NewLocalActiveOrderBook()
+	s.activeMakerOrders = bbgo.NewLocalActiveOrderBook(s.Symbol)
 	s.activeMakerOrders.BindStream(s.makerSession.UserDataStream)
 
 	s.orderStore = bbgo.NewOrderStore(s.Symbol)
@@ -857,48 +857,12 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		// wait for the quoter to stop
 		time.Sleep(s.UpdateInterval.Duration())
 
-		// ensure every order is cancelled
-		for s.activeMakerOrders.NumOfOrders() > 0 {
-			orders := s.activeMakerOrders.Orders()
-			log.Warnf("%d orders are not cancelled yet:", len(orders))
-			s.activeMakerOrders.Print()
+		shutdownCtx, cancelShutdown := context.WithTimeout(context.TODO(), time.Minute)
+		defer cancelShutdown()
 
-			if err := s.makerSession.Exchange.CancelOrders(ctx, s.activeMakerOrders.Orders()...); err != nil {
-				log.WithError(err).Errorf("can not cancel %s orders", s.Symbol)
-				continue
-			}
-
-			log.Infof("waiting for orders to be cancelled...")
-
-			select {
-			case <-time.After(3 * time.Second):
-
-			case <-ctx.Done():
-				break
-
-			}
-
-			// verify the current open orders via the RESTful API
-			if s.activeMakerOrders.NumOfOrders() > 0 {
-				log.Warnf("there are orders not cancelled, using REStful API to verify...")
-				openOrders, err := s.makerSession.Exchange.QueryOpenOrders(ctx, s.Symbol)
-				if err != nil {
-					log.WithError(err).Errorf("can not query %s open orders", s.Symbol)
-					continue
-				}
-
-				openOrderStore := bbgo.NewOrderStore(s.Symbol)
-				openOrderStore.Add(openOrders...)
-
-				for _, o := range s.activeMakerOrders.Orders() {
-					// if it does not exist, we should remove it
-					if !openOrderStore.Exists(o.OrderID) {
-						s.activeMakerOrders.Remove(o)
-					}
-				}
-			}
+		if err := s.activeMakerOrders.GracefulCancel(shutdownCtx, s.makerSession.Exchange); err != nil {
+			log.WithError(err).Errorf("graceful cancel error")
 		}
-		log.Info("all orders are cancelled successfully")
 
 		if err := s.SaveState(); err != nil {
 			log.WithError(err).Errorf("can not save state: %+v", s.state)
