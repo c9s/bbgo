@@ -18,6 +18,7 @@ type TradeCollector struct {
 	tradeC     chan types.Trade
 	position   *types.Position
 	orderStore *OrderStore
+	doneTrades map[types.TradeKey]struct{}
 
 	tradeCallbacks          []func(trade types.Trade)
 	positionUpdateCallbacks []func(position *types.Position)
@@ -31,20 +32,21 @@ func NewTradeCollector(symbol string, position *types.Position, orderStore *Orde
 
 		tradeC:     make(chan types.Trade, 100),
 		tradeStore: NewTradeStore(symbol),
+		doneTrades: make(map[types.TradeKey]struct{}),
 		position:   position,
 		orderStore: orderStore,
 	}
 }
 
-// handleTradeUpdateInBackground sends the trade object to the trade channel,
+// QueueTrade sends the trade object to the trade channel,
 // so that the goroutine can receive the trade and process in the background.
-func (c *TradeCollector) handleTradeUpdateInBackground(trade types.Trade) {
+func (c *TradeCollector) QueueTrade(trade types.Trade) {
 	c.tradeC <- trade
 }
 
 // BindStreamForBackground bind the stream callback for background processing
 func (c *TradeCollector) BindStreamForBackground(stream types.Stream) {
-	stream.OnTradeUpdate(c.handleTradeUpdateInBackground)
+	stream.OnTradeUpdate(c.QueueTrade)
 }
 
 func (c *TradeCollector) BindStream(stream types.Stream) {
@@ -64,8 +66,16 @@ func (c *TradeCollector) Emit() {
 func (c *TradeCollector) Process() bool {
 	positionChanged := false
 	c.tradeStore.Filter(func(trade types.Trade) bool {
+		key := trade.Key()
+
+		// if it's already done, remove the trade from the trade store
+		if _, done := c.doneTrades[key] ; done {
+			return true
+		}
+
 		if c.orderStore.Exists(trade.OrderID) {
 			c.EmitTrade(trade)
+			c.doneTrades[key] = struct{}{}
 			if profit, netProfit, madeProfit := c.position.AddTrade(trade); madeProfit {
 				c.EmitProfit(trade, profit, netProfit)
 			}
@@ -83,11 +93,19 @@ func (c *TradeCollector) Process() bool {
 
 func (c *TradeCollector) processTrade(trade types.Trade) {
 	if c.orderStore.Exists(trade.OrderID) {
+		key := trade.Key()
+
+		// if it's already done, remove the trade from the trade store
+		if _, done := c.doneTrades[key] ; done {
+			return
+		}
+
 		c.EmitTrade(trade)
 		if profit, netProfit, madeProfit := c.position.AddTrade(trade); madeProfit {
 			c.EmitProfit(trade, profit, netProfit)
 		}
 		c.EmitPositionUpdate(c.position)
+		c.doneTrades[key] = struct{}{}
 	} else {
 		c.tradeStore.Add(trade)
 	}
