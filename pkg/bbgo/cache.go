@@ -8,13 +8,17 @@ import (
 	"os"
 	"path"
 	"reflect"
+	"time"
 
-	"github.com/c9s/bbgo/pkg/types"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 type DataFetcher func() (interface{}, error)
+
+const cacheExpiry = 24 * time.Hour
 
 // WithCache let you use the cache with the given cache key, variable reference and your data fetcher,
 // The key must be an unique ID.
@@ -24,8 +28,9 @@ func WithCache(key string, obj interface{}, fetcher DataFetcher) error {
 	cacheDir := CacheDir()
 	cacheFile := path.Join(cacheDir, key+".json")
 
-	if _, err := os.Stat(cacheFile); os.IsNotExist(err) {
-		log.Debugf("cache %s not found, executing fetcher callback to get the data", cacheFile)
+	stat, err := os.Stat(cacheFile)
+	if os.IsNotExist(err) || (stat != nil && time.Since(stat.ModTime()) > cacheExpiry) {
+		log.Debugf("cache %s not found or cache expired, executing fetcher callback to get the data", cacheFile)
 
 		data, err := fetcher()
 		if err != nil {
