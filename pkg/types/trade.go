@@ -176,9 +176,9 @@ func (trade Trade) SlackAttachment() slack.Attachment {
 
 func (trade Trade) Liquidity() (o string) {
 	if trade.IsMaker {
-		o += "MAKER"
+		o = "MAKER"
 	} else {
-		o += "TAKER"
+		o = "TAKER"
 	}
 
 	return o
