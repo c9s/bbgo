@@ -47,11 +47,14 @@ type Strategy struct {
 
 	StandardIndicatorSet *bbgo.StandardIndicatorSet
 
-	Symbol    string           `json:"symbol"`
-	Interval  types.Interval   `json:"interval"`
-	Quantity  fixedpoint.Value `json:"quantity"`
-	MinSpread fixedpoint.Value `json:"minSpread"`
-	Spread    fixedpoint.Value `json:"spread"`
+	Symbol              string           `json:"symbol"`
+	Interval            types.Interval   `json:"interval"`
+	Quantity            fixedpoint.Value `json:"quantity"`
+	MinSpread           fixedpoint.Value `json:"minSpread"`
+	Spread              fixedpoint.Value `json:"spread"`
+	MinProfitSpread     fixedpoint.Value `json:"minProfitSpread"`
+	UseTickerPrice      bool             `json:"useTickerPrice"`
+	MaxExposurePosition fixedpoint.Value `json:"maxExposurePosition"`
 
 	DefaultBollinger *BollingerSetting `json:"defaultBollinger"`
 	NeutralBollinger *BollingerSetting `json:"neutralBollinger"`
@@ -84,6 +87,18 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
 		Interval: string(s.Interval),
 	})
+
+	if s.DefaultBollinger != nil && s.DefaultBollinger.Interval != "" {
+		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
+			Interval: string(s.DefaultBollinger.Interval),
+		})
+	}
+
+	if s.NeutralBollinger != nil && s.NeutralBollinger.Interval != "" {
+		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
+			Interval: string(s.NeutralBollinger.Interval),
+		})
+	}
 }
 
 func (s *Strategy) Validate() error {
@@ -140,8 +155,6 @@ func (s *Strategy) cancelOrders(ctx context.Context) {
 		log.WithError(err).Errorf("can not cancel %s orders", s.Symbol)
 	}
 
-	time.Sleep(30 * time.Millisecond)
-
 	for s.activeMakerOrders.NumOfOrders() > 0 {
 		orders := s.activeMakerOrders.Orders()
 		log.Warnf("%d orders are not cancelled yet:", len(orders))
@@ -184,18 +197,14 @@ func (s *Strategy) cancelOrders(ctx context.Context) {
 	}
 }
 
-func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExecutor) {
-	ticker, err := s.session.Exchange.QueryTicker(ctx, s.Symbol)
-	if err != nil {
-		return
-	}
-
-	midPrice := fixedpoint.NewFromFloat((ticker.Buy + ticker.Sell) / 2)
+func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExecutor, midPrice fixedpoint.Value) {
+	sma := s.defaultBoll.LastSMA()
 
 	one := fixedpoint.NewFromFloat(1.0)
 	askPrice := midPrice.Mul(one + s.Spread)
 	bidPrice := midPrice.Mul(one - s.Spread)
 	base := s.state.Position.Base
+	balances := s.session.Account.Balances()
 
 	log.Infof("mid price:%f spread: %s ask:%f bid: %f",
 		midPrice.Float64(),
@@ -204,11 +213,12 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 		bidPrice.Float64(),
 	)
 
+	quantity := s.Quantity
 	sellOrder := types.SubmitOrder{
 		Symbol:   s.Symbol,
 		Side:     types.SideTypeSell,
 		Type:     types.OrderTypeLimitMaker,
-		Quantity: s.Quantity.Float64(),
+		Quantity: quantity.Float64(),
 		Price:    askPrice.Float64(),
 		Market:   s.market,
 		GroupID:  s.groupID,
@@ -217,7 +227,7 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 		Symbol:   s.Symbol,
 		Side:     types.SideTypeBuy,
 		Type:     types.OrderTypeLimitMaker,
-		Quantity: s.Quantity.Float64(),
+		Quantity: quantity.Float64(),
 		Price:    bidPrice.Float64(),
 		Market:   s.market,
 		GroupID:  s.groupID,
@@ -225,15 +235,37 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 
 	var submitOrders []types.SubmitOrder
 
+	baseBalance, hasBaseBalance := balances[s.market.BaseCurrency]
+	quoteBalance, hasQuoteBalance := balances[s.market.QuoteCurrency]
+	canBuy := hasQuoteBalance && quoteBalance.Available > s.Quantity.Mul(midPrice)
+	canSell := hasBaseBalance && baseBalance.Available > s.Quantity
 	minQuantity := fixedpoint.NewFromFloat(s.market.MinQuantity)
 	if base == 0 || base.Abs() < minQuantity {
-		submitOrders = append(submitOrders, sellOrder, buyOrder)
+		// neutral position
+		if midPrice.Float64() < sma*0.99 && canBuy {
+			submitOrders = append(submitOrders, buyOrder)
+		} else if midPrice.Float64() > sma*1.01 && canSell {
+			submitOrders = append(submitOrders, sellOrder)
+		} else if canSell && canBuy {
+			submitOrders = append(submitOrders, buyOrder, sellOrder)
+		}
 	} else if base > minQuantity {
-		sellOrder.Quantity = base.Float64()
-		submitOrders = append(submitOrders, sellOrder)
+		if midPrice > s.state.Position.AverageCost.MulFloat64(1.0+s.MinProfitSpread.Float64()) && canSell {
+			submitOrders = append(submitOrders, sellOrder)
+		}
+
+		if midPrice < s.state.Position.AverageCost.MulFloat64(1.0-s.MinProfitSpread.Float64()) && canBuy {
+			submitOrders = append(submitOrders, buyOrder)
+		}
+
 	} else if base < -minQuantity {
-		buyOrder.Quantity = base.Abs().Float64()
-		submitOrders = append(submitOrders, buyOrder)
+		if midPrice > s.state.Position.AverageCost.MulFloat64(1.0+s.MinProfitSpread.Float64()) && canSell {
+			submitOrders = append(submitOrders, sellOrder)
+		}
+
+		if midPrice < s.state.Position.AverageCost.MulFloat64(1.0-s.MinProfitSpread.Float64()) && canBuy {
+			submitOrders = append(submitOrders, buyOrder)
+		}
 	}
 
 	createdOrders, err := orderExecutor.SubmitOrders(ctx, submitOrders...)
@@ -247,6 +279,10 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	// initial required information
 	s.session = session
+
+	if s.MinProfitSpread == 0 {
+		s.MinProfitSpread = fixedpoint.NewFromFloat(0.001)
+	}
 
 	market, ok := session.Market(s.Symbol)
 	if !ok {
@@ -294,6 +330,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 
 	s.tradeCollector.OnTrade(func(trade types.Trade) {
+		log.Infof("trade: %s", trade)
 		s.Notifiability.Notify(trade)
 		s.state.ProfitStats.AddTrade(trade)
 	})
@@ -305,22 +342,47 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.tradeCollector.BindStream(session.UserDataStream)
 
-	// s.tradeCollector.BindStreamForBackground(session.UserDataStream)
-	// go s.tradeCollector.Run(ctx)
-
 	session.UserDataStream.OnStart(func() {
-		s.placeOrders(ctx, orderExecutor)
+		if s.UseTickerPrice {
+			ticker, err := s.session.Exchange.QueryTicker(ctx, s.Symbol)
+			if err != nil {
+				return
+			}
+
+			midPrice := fixedpoint.NewFromFloat((ticker.Buy + ticker.Sell) / 2)
+			s.placeOrders(ctx, orderExecutor, midPrice)
+		} else {
+			if price, ok := session.LastPrice(s.Symbol); ok {
+				s.placeOrders(ctx, orderExecutor, fixedpoint.NewFromFloat(price))
+			}
+		}
 	})
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		if kline.Symbol != s.Symbol {
 			return
 		}
+		if kline.Interval != s.Interval {
+			return
+		}
 
-		s.cancelOrders(ctx)
+		if err := s.activeMakerOrders.GracefulCancel(ctx, s.session.Exchange); err != nil {
+			log.WithError(err).Errorf("graceful cancel order error")
+		}
 
 		s.tradeCollector.Process()
-		s.placeOrders(ctx, orderExecutor)
+
+		if s.UseTickerPrice {
+			ticker, err := s.session.Exchange.QueryTicker(ctx, s.Symbol)
+			if err != nil {
+				return
+			}
+
+			midPrice := fixedpoint.NewFromFloat((ticker.Buy + ticker.Sell) / 2)
+			s.placeOrders(ctx, orderExecutor, midPrice)
+		} else {
+			s.placeOrders(ctx, orderExecutor, fixedpoint.NewFromFloat(kline.Close))
+		}
 	})
 
 	// s.book = types.NewStreamBook(s.Symbol)
@@ -330,7 +392,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		defer wg.Done()
 		close(s.stopC)
 
-		s.cancelOrders(ctx)
+		if err := s.activeMakerOrders.GracefulCancel(ctx, s.session.Exchange); err != nil {
+			log.WithError(err).Errorf("graceful cancel order error")
+		}
 
 		if err := s.SaveState(); err != nil {
 			log.WithError(err).Errorf("can not save state: %+v", s.state)
@@ -338,20 +402,4 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 
 	return nil
-}
-
-// lets move this to the fun package
-var lossEmoji = "🔥"
-var profitEmoji = "💰"
-
-func pnlEmoji(pnl fixedpoint.Value) string {
-	if pnl < 0 {
-		return lossEmoji
-	}
-
-	if pnl == 0 {
-		return ""
-	}
-
-	return profitEmoji
 }

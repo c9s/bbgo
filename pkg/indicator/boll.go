@@ -64,7 +64,10 @@ func (inc *BOLL) LastStdDev() float64 {
 }
 
 func (inc *BOLL) LastSMA() float64 {
-	return inc.SMA[len(inc.SMA)-1]
+	if len(inc.SMA) > 0 {
+		return inc.SMA[len(inc.SMA)-1]
+	}
+	return 0.0
 }
 
 func (inc *BOLL) calculateAndUpdate(kLines []types.KLine) {
