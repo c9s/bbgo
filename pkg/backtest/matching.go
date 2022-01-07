@@ -6,9 +6,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/pkg/errors"
+
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/pkg/errors"
 )
 
 // DefaultFeeRate set the fee rate for most cases
@@ -114,7 +115,7 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (closedOrders *typ
 	switch o.Type {
 	case types.OrderTypeMarket:
 		price = m.LastPrice.Float64()
-	case types.OrderTypeLimit:
+	case types.OrderTypeLimit, types.OrderTypeLimitMaker:
 		price = o.Price
 	}
 
@@ -296,7 +297,7 @@ func (m *SimplePriceMatching) BuyToPrice(price fixedpoint.Value) (closedOrders [
 				askOrders = append(askOrders, o)
 			}
 
-		case types.OrderTypeLimit:
+		case types.OrderTypeLimit, types.OrderTypeLimitMaker:
 			if priceF >= o.Price {
 				o.ExecutedQuantity = o.Quantity
 				o.Status = types.OrderStatusFilled
@@ -371,7 +372,7 @@ func (m *SimplePriceMatching) SellToPrice(price fixedpoint.Value) (closedOrders 
 				bidOrders = append(bidOrders, o)
 			}
 
-		case types.OrderTypeLimit:
+		case types.OrderTypeLimit, types.OrderTypeLimitMaker:
 			if sellPrice <= o.Price {
 				o.ExecutedQuantity = o.Quantity
 				o.Status = types.OrderStatusFilled
