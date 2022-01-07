@@ -265,7 +265,7 @@ var parserPool fastjson.ParserPool
 
 func parseWebSocketEvent(message []byte) (interface{}, error) {
 	parser := parserPool.Get()
-	val, err := parser.Parse(message)
+	val, err := parser.ParseBytes(message)
 	if err != nil {
 		return nil, err
 	}
@@ -445,8 +445,8 @@ func parseDepthEvent(val *fastjson.Value) (depth *DepthEvent, err error) {
 		Symbol:        string(val.GetStringBytes("s")),
 		FirstUpdateID: val.GetInt64("U"),
 		FinalUpdateID: val.GetInt64("u"),
-		Bids: make(types.PriceVolumeSlice, 0, 50),
-		Asks: make(types.PriceVolumeSlice, 0, 50),
+		Bids:          make(types.PriceVolumeSlice, 0, 50),
+		Asks:          make(types.PriceVolumeSlice, 0, 50),
 	}
 
 	for _, ev := range val.GetArray("b") {
