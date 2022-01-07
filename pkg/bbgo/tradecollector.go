@@ -93,13 +93,17 @@ func (c *TradeCollector) Process() bool {
 	return positionChanged
 }
 
+// processTrade takes a trade and see if there is a matched order
+// if the order is found, then we add the trade to the position
+// return true when the given trade is added
+// return false when the given trade is not added
 func (c *TradeCollector) processTrade(trade types.Trade) bool {
 	if c.orderStore.Exists(trade.OrderID) {
 		key := trade.Key()
 
 		// if it's already done, remove the trade from the trade store
 		if _, done := c.doneTrades[key]; done {
-			return true
+			return false
 		}
 
 		c.EmitTrade(trade)
@@ -113,12 +117,21 @@ func (c *TradeCollector) processTrade(trade types.Trade) bool {
 	return false
 }
 
+// return true when the given trade is added
+// return false when the given trade is not added
 func (c *TradeCollector) ProcessTrade(trade types.Trade) bool {
-	if !c.processTrade(trade) {
-		c.tradeStore.Add(trade)
+	key := trade.Key()
+	// if it's already done, remove the trade from the trade store
+	if _, done := c.doneTrades[key]; done {
 		return false
 	}
-	return true
+
+	if c.processTrade(trade) {
+		return true
+	}
+
+	c.tradeStore.Add(trade)
+	return false
 }
 
 // Run is a goroutine executed in the background
