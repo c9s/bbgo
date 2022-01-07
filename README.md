@@ -1,4 +1,4 @@
-# bbgo
+# BBGO
 
 A trading bot framework written in Go. The name bbgo comes from the BB8 bot in the Star Wars movie. aka Buy BitCoin Go!
 
@@ -8,6 +8,12 @@ A trading bot framework written in Go. The name bbgo comes from the BB8 bot in t
 [![DockerHub](https://img.shields.io/docker/pulls/yoanlin/bbgo.svg)](https://hub.docker.com/r/yoanlin/bbgo)
 <img alt="open collective badge" src="https://opencollective.com/bbgo/tiers/badge.svg">
 <img alt="open collective badge" src="https://opencollective.com/bbgo/tiers/backer/badge.svg?label=backer&color=brightgreen" />
+
+## Community
+
+[![Telegram Global](https://img.shields.io/badge/telegram-global-blue.svg)](https://t.me/bbgo_intl)
+[![Telegram Taiwan](https://img.shields.io/badge/telegram-tw-blue.svg)](https://t.me/bbgocrypto)
+[![Twitter](https://img.shields.io/twitter/follow/bbgotrading?label=Follow&style=social)](https://twitter.com/bbgotrading)
 
 ## Features
 
@@ -541,13 +547,6 @@ See [Contributing](./CONTRIBUTING.md)
 ### Financial Contributors
 
 <object type="image/svg+xml" data="https://opencollective.com/bbgo/tiers/backer.svg?avatarHeight=36&width=600"></object>
-
-## Community
-
-You can join our telegram channels:
-
-- BBGO International <https://t.me/bbgo_intl>
-- BBGO Taiwan <https://t.me/bbgocrypto>
 
 ## Supporter
 
