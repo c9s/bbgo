@@ -59,6 +59,6 @@ func TestTradeCollector_ShouldNotCountDuplicatedTrade(t *testing.T) {
 		Side:          types.SideTypeBuy,
 		IsBuyer:       true,
 	})
-	assert.True(t, matched, "the same trade should match")
+	assert.False(t, matched, "the same trade should not match")
 	assert.Equal(t, 0, len(collector.tradeStore.Trades()), "the same trade should not be added to the trade store")
 }
