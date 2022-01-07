@@ -3,12 +3,17 @@ package slacknotifier
 import (
 	"context"
 	"fmt"
-	"github.com/c9s/bbgo/pkg/types"
 	"time"
+
+	"golang.org/x/time/rate"
+
+	"github.com/c9s/bbgo/pkg/types"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
 )
+
+var limiter = rate.NewLimiter(rate.Every(1*time.Second), 1)
 
 type notifyTask struct {
 	Channel string
@@ -55,6 +60,7 @@ func (n *Notifier) worker() {
 			return
 
 		case task := <-n.taskC:
+			limiter.Wait(ctx)
 			_, _, err := n.client.PostMessageContext(ctx, task.Channel, task.Opts...)
 			if err != nil {
 				log.WithError(err).
