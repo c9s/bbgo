@@ -832,7 +832,9 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 				} else {
 					for _, td := range trades {
 						log.Infof("processing trade: %s", td.String())
-						s.tradeCollector.ProcessTrade(td)
+						if s.tradeCollector.ProcessTrade(td) {
+							s.Notifiability.Notify("recovered trade", td)
+						}
 					}
 				}
 
