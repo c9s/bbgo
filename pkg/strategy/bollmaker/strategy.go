@@ -49,14 +49,21 @@ type Strategy struct {
 
 	StandardIndicatorSet *bbgo.StandardIndicatorSet
 
-	Symbol              string           `json:"symbol"`
-	Interval            types.Interval   `json:"interval"`
-	Quantity            fixedpoint.Value `json:"quantity"`
-	MinSpread           fixedpoint.Value `json:"minSpread"`
-	Spread              fixedpoint.Value `json:"spread"`
-	MinProfitSpread     fixedpoint.Value `json:"minProfitSpread"`
-	UseTickerPrice      bool             `json:"useTickerPrice"`
+	Symbol          string           `json:"symbol"`
+	Interval        types.Interval   `json:"interval"`
+	Quantity        fixedpoint.Value `json:"quantity"`
+	MinSpread       fixedpoint.Value `json:"minSpread"`
+	Spread          fixedpoint.Value `json:"spread"`
+	MinProfitSpread fixedpoint.Value `json:"minProfitSpread"`
+	UseTickerPrice  bool             `json:"useTickerPrice"`
+
+	// MaxExposurePosition is the maximum position you can hold
+	// +10 means you can hold 10 ETH long position by maximum
+	// -10 means you can hold -10 ETH short position by maximum
 	MaxExposurePosition fixedpoint.Value `json:"maxExposurePosition"`
+
+	// DisableShort means you can don't want short position during the market making
+	DisableShort bool `json:"disableShort"`
 
 	DefaultBollinger *BollingerSetting `json:"defaultBollinger"`
 	NeutralBollinger *BollingerSetting `json:"neutralBollinger"`
@@ -268,12 +275,14 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 			if canBuy {
 				submitOrders = append(submitOrders, buyOrder)
 			}
-			if canSell {
+			if !s.DisableShort && canSell {
 				submitOrders = append(submitOrders, sellOrder)
 			}
 		} else if base > minQuantity {
 			if midPrice > s.state.Position.AverageCost.MulFloat64(1.0+s.MinProfitSpread.Float64()) && canSell {
-				submitOrders = append(submitOrders, sellOrder)
+				if !(s.DisableShort && (base.Float64() - sellOrder.Quantity < 0)) {
+					submitOrders = append(submitOrders, sellOrder)
+				}
 			}
 
 			if midPrice < s.state.Position.AverageCost.MulFloat64(1.0-s.MinProfitSpread.Float64()) && canBuy {
@@ -281,7 +290,9 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 			}
 		} else if base < -minQuantity {
 			if midPrice > s.state.Position.AverageCost.MulFloat64(1.0+s.MinProfitSpread.Float64()) && canSell {
-				submitOrders = append(submitOrders, sellOrder)
+				if !(s.DisableShort && (base.Float64() - sellOrder.Quantity < 0)) {
+					submitOrders = append(submitOrders, sellOrder)
+				}
 			}
 
 			if midPrice < s.state.Position.AverageCost.MulFloat64(1.0-s.MinProfitSpread.Float64()) && canBuy {
