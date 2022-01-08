@@ -11,6 +11,14 @@ import (
 	"github.com/c9s/bbgo/pkg/util"
 )
 
+type PositionType string
+
+const (
+	PositionShort  = PositionType("Short")
+	PositionLong   = PositionType("Long")
+	PositionClosed = PositionType("Closed")
+)
+
 type ExchangeFee struct {
 	MakerFeeRate fixedpoint.Value
 	TakerFeeRate fixedpoint.Value
@@ -84,7 +92,7 @@ func NewPositionFromMarket(market Market) *Position {
 		BaseCurrency:  market.BaseCurrency,
 		QuoteCurrency: market.QuoteCurrency,
 		Market:        market,
-		TotalFee: make(map[string]fixedpoint.Value),
+		TotalFee:      make(map[string]fixedpoint.Value),
 	}
 }
 
@@ -93,7 +101,7 @@ func NewPosition(symbol, base, quote string) *Position {
 		Symbol:        symbol,
 		BaseCurrency:  base,
 		QuoteCurrency: quote,
-		TotalFee: make(map[string]fixedpoint.Value),
+		TotalFee:      make(map[string]fixedpoint.Value),
 	}
 }
 
@@ -122,45 +130,67 @@ func (p *Position) SetExchangeFeeRate(ex ExchangeName, exchangeFee ExchangeFee) 
 	p.ExchangeFeeRates[ex] = exchangeFee
 }
 
+func (p *Position) Type() PositionType {
+	if p.Base > 0 {
+		return PositionLong
+	} else if p.Base < 0 {
+		return PositionShort
+	}
+	return PositionClosed
+}
+
 func (p *Position) SlackAttachment() slack.Attachment {
 	p.Lock()
+	defer p.Unlock()
+
 	averageCost := p.AverageCost
 	base := p.Base
 	quote := p.Quote
-	p.Unlock()
 
-	var posType = ""
+	var posType = p.Type()
 	var color = ""
 
 	if p.Base == 0 {
 		color = "#cccccc"
-		posType = "Closed"
 	} else if p.Base > 0 {
-		posType = "Long"
 		color = "#228B22"
 	} else if p.Base < 0 {
-		posType = "Short"
 		color = "#DC143C"
 	}
 
-	title := util.Render(posType+` Position {{ .Symbol }} `, p)
+	title := util.Render(string(posType)+` Position {{ .Symbol }} `, p)
+
+	fields := []slack.AttachmentField{
+		{Title: "Average Cost", Value: trimTrailingZeroFloat(averageCost.Float64()) + " " + p.QuoteCurrency, Short: true},
+		{Title: p.BaseCurrency, Value: trimTrailingZeroFloat(base.Float64()), Short: true},
+		{Title: p.QuoteCurrency, Value: trimTrailingZeroFloat(quote.Float64())},
+	}
+
+	if p.TotalFee != nil {
+		for feeCurrency, fee := range p.TotalFee {
+			fields = append(fields, slack.AttachmentField{
+				Title: fmt.Sprintf("FEE (%s)", feeCurrency),
+				Value: trimTrailingZeroFloat(fee.Float64()),
+				Short: true,
+			})
+		}
+	}
+
 	return slack.Attachment{
 		// Pretext:       "",
 		// Text:  text,
-		Title: title,
-		Color: color,
-		Fields: []slack.AttachmentField{
-			{Title: "Average Cost", Value: trimTrailingZeroFloat(averageCost.Float64()) + " " + p.QuoteCurrency, Short: true},
-			{Title: p.BaseCurrency, Value: trimTrailingZeroFloat(base.Float64()), Short: true},
-			{Title: p.QuoteCurrency, Value: trimTrailingZeroFloat(quote.Float64())},
-		},
+		Title:  title,
+		Color:  color,
+		Fields: fields,
 		Footer: util.Render("update time {{ . }}", time.Now().Format(time.RFC822)),
 		// FooterIcon: "",
 	}
 }
 
 func (p *Position) PlainText() string {
-	return fmt.Sprintf("Position %s: average cost = %s, base = %s, quote = %s",
+	posType := p.Type()
+	return fmt.Sprintf("%s Position %s: Average cost = %s, Base = %s, Quote = %s",
+		posType,
 		p.Symbol,
 		trimTrailingZeroFloat(p.AverageCost.Float64()),
 		trimTrailingZeroFloat(p.Base.Float64()),
