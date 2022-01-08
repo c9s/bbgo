@@ -252,9 +252,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 	// 1. place bid orders when we already bought too much
 	// 2. place ask orders when we already sold too much
 	if s.MaxExposurePosition > 0 {
-		s.state.Position.Lock()
-		pos := s.state.Position.Base
-		s.state.Position.Unlock()
+		pos := s.state.Position.GetBase()
 
 		if pos < -s.MaxExposurePosition {
 			// stop sell if we over-sell
@@ -814,9 +812,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 				// uncover position = -5 - -3 (covered position) = -2
 				s.tradeCollector.Process()
 
-				s.state.Position.Lock()
-				position := s.state.Position.Base
-				s.state.Position.Unlock()
+				position := s.state.Position.GetBase()
 
 				uncoverPosition := position - s.state.CoveredPosition.AtomicLoad()
 				absPos := math.Abs(uncoverPosition.Float64())

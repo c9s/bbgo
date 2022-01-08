@@ -203,7 +203,7 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 	one := fixedpoint.NewFromFloat(1.0)
 	askPrice := midPrice.Mul(one + s.Spread)
 	bidPrice := midPrice.Mul(one - s.Spread)
-	base := s.state.Position.Base
+	base := s.state.Position.GetBase()
 	balances := s.session.Account.Balances()
 
 	log.Infof("mid price:%f spread: %s ask:%f bid: %f",

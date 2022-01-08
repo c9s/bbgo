@@ -66,7 +66,7 @@ func (c *AverageCostCalculator) Calculate(symbol string, trades []types.Trade, c
 		}
 	}
 
-	unrealizedProfit := (fixedpoint.NewFromFloat(currentPrice) - position.AverageCost).Mul(position.Base)
+	unrealizedProfit := (fixedpoint.NewFromFloat(currentPrice) - position.AverageCost).Mul(position.GetBase())
 	return &AverageCostPnlReport{
 		Symbol:    symbol,
 		Market:    c.Market,
@@ -77,7 +77,7 @@ func (c *AverageCostCalculator) Calculate(symbol string, trades []types.Trade, c
 		BuyVolume:  bidVolume,
 		SellVolume: askVolume,
 
-		Stock:            position.Base.Float64(),
+		Stock:            position.GetBase().Float64(),
 		Profit:           totalProfit,
 		NetProfit:        totalNetProfit,
 		UnrealizedProfit: unrealizedProfit,
