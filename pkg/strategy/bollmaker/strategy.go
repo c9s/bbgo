@@ -305,6 +305,10 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 
 	}
 
+	if len(submitOrders) == 0 {
+		return
+	}
+
 	createdOrders, err := orderExecutor.SubmitOrders(ctx, submitOrders...)
 	if err != nil {
 		log.WithError(err).Errorf("can not place ping pong orders")

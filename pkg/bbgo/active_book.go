@@ -88,7 +88,7 @@ func (b *LocalActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exch
 		}
 	}
 
-	log.Info("all orders are cancelled successfully")
+	log.Debug("all orders are cancelled successfully")
 	return nil
 }
 
