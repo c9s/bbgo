@@ -39,6 +39,9 @@ type Position struct {
 	FeeRate          *ExchangeFee                 `json:"feeRate,omitempty"`
 	ExchangeFeeRates map[ExchangeName]ExchangeFee `json:"exchangeFeeRates"`
 
+	// TotalFee stores the fee currency -> total fee quantity
+	TotalFee map[string]fixedpoint.Value `json:"totalFee"`
+
 	sync.Mutex
 }
 
@@ -81,6 +84,7 @@ func NewPositionFromMarket(market Market) *Position {
 		BaseCurrency:  market.BaseCurrency,
 		QuoteCurrency: market.QuoteCurrency,
 		Market:        market,
+		TotalFee: make(map[string]fixedpoint.Value),
 	}
 }
 
@@ -89,7 +93,15 @@ func NewPosition(symbol, base, quote string) *Position {
 		Symbol:        symbol,
 		BaseCurrency:  base,
 		QuoteCurrency: quote,
+		TotalFee: make(map[string]fixedpoint.Value),
 	}
+}
+
+func (p *Position) addTradeFee(trade Trade) {
+	if p.TotalFee == nil {
+		p.TotalFee = make(map[string]fixedpoint.Value)
+	}
+	p.TotalFee[trade.FeeCurrency] = p.TotalFee[trade.FeeCurrency] + fixedpoint.NewFromFloat(trade.Fee)
 }
 
 func (p *Position) Reset() {
@@ -185,16 +197,16 @@ func (p *Position) AddTrades(trades []Trade) (fixedpoint.Value, fixedpoint.Value
 	return totalProfitAmount, totalNetProfit, totalProfitAmount != 0
 }
 
-func (p *Position) AddTrade(t Trade) (profit fixedpoint.Value, netProfit fixedpoint.Value, madeProfit bool) {
-	price := fixedpoint.NewFromFloat(t.Price)
-	quantity := fixedpoint.NewFromFloat(t.Quantity)
-	quoteQuantity := fixedpoint.NewFromFloat(t.QuoteQuantity)
-	fee := fixedpoint.NewFromFloat(t.Fee)
+func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedpoint.Value, madeProfit bool) {
+	price := fixedpoint.NewFromFloat(td.Price)
+	quantity := fixedpoint.NewFromFloat(td.Quantity)
+	quoteQuantity := fixedpoint.NewFromFloat(td.QuoteQuantity)
+	fee := fixedpoint.NewFromFloat(td.Fee)
 
 	// calculated fee in quote (some exchange accounts may enable platform currency fee discount, like BNB)
 	var feeInQuote fixedpoint.Value = 0
 
-	switch t.FeeCurrency {
+	switch td.FeeCurrency {
 
 	case p.BaseCurrency:
 		quantity -= fee
@@ -204,15 +216,15 @@ func (p *Position) AddTrade(t Trade) (profit fixedpoint.Value, netProfit fixedpo
 
 	default:
 		if p.ExchangeFeeRates != nil {
-			if exchangeFee, ok := p.ExchangeFeeRates[t.Exchange]; ok {
-				if t.IsMaker {
+			if exchangeFee, ok := p.ExchangeFeeRates[td.Exchange]; ok {
+				if td.IsMaker {
 					feeInQuote += exchangeFee.MakerFeeRate.Mul(quoteQuantity)
 				} else {
 					feeInQuote += exchangeFee.TakerFeeRate.Mul(quoteQuantity)
 				}
 			}
 		} else if p.FeeRate != nil {
-			if t.IsMaker {
+			if td.IsMaker {
 				feeInQuote += p.FeeRate.MakerFeeRate.Mul(quoteQuantity)
 			} else {
 				feeInQuote += p.FeeRate.TakerFeeRate.Mul(quoteQuantity)
@@ -223,9 +235,11 @@ func (p *Position) AddTrade(t Trade) (profit fixedpoint.Value, netProfit fixedpo
 	p.Lock()
 	defer p.Unlock()
 
+	p.addTradeFee(td)
+
 	// Base > 0 means we're in long position
 	// Base < 0  means we're in short position
-	switch t.Side {
+	switch td.Side {
 
 	case SideTypeBuy:
 		if p.Base < 0 {
