@@ -250,7 +250,7 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 	canSell := hasBaseBalance && baseBalance.Available > s.Quantity
 
 	// adjust quantity for closing position if we over sold or over bought
-	if base.Abs() > s.MaxExposurePosition {
+	if s.MaxExposurePosition > 0 && base.Abs() > s.MaxExposurePosition {
 		scale := &bbgo.ExponentialScale{
 			Domain: [2]float64{0, s.MaxExposurePosition.Float64()},
 			Range:  [2]float64{quantity.Float64(), base.Abs().Float64()},
