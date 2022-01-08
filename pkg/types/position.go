@@ -42,6 +42,13 @@ type Position struct {
 	sync.Mutex
 }
 
+func (p *Position) GetBase() (base fixedpoint.Value) {
+	p.Lock()
+	base = p.Base
+	p.Unlock()
+	return base
+}
+
 type FuturesPosition struct {
 	Symbol        string `json:"symbol"`
 	BaseCurrency  string `json:"baseCurrency"`

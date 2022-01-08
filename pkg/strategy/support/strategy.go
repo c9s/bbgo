@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/service"
-	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -44,7 +45,7 @@ type PercentageTargetStop struct {
 // GenerateOrders generates the orders from the given targets
 func (stop *PercentageTargetStop) GenerateOrders(market types.Market, pos *types.Position) []types.SubmitOrder {
 	var price = pos.AverageCost
-	var quantity = pos.Base
+	var quantity = pos.GetBase()
 
 	// submit target orders
 	var targetOrders []types.SubmitOrder
