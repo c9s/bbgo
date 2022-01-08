@@ -31,54 +31,6 @@ func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
-type State struct {
-	CoveredPosition fixedpoint.Value `json:"coveredPosition,omitempty"`
-	Position        *types.Position  `json:"position,omitempty"`
-	ProfitStats     ProfitStats      `json:"profitStats,omitempty"`
-}
-
-type ProfitStats struct {
-	bbgo.ProfitStats
-
-	MakerExchange types.ExchangeName `json:"makerExchange"`
-
-	AccumulatedMakerVolume    fixedpoint.Value `json:"accumulatedMakerVolume,omitempty"`
-	AccumulatedMakerBidVolume fixedpoint.Value `json:"accumulatedMakerBidVolume,omitempty"`
-	AccumulatedMakerAskVolume fixedpoint.Value `json:"accumulatedMakerAskVolume,omitempty"`
-
-	TodayMakerVolume    fixedpoint.Value `json:"todayMakerVolume,omitempty"`
-	TodayMakerBidVolume fixedpoint.Value `json:"todayMakerBidVolume,omitempty"`
-	TodayMakerAskVolume fixedpoint.Value `json:"todayMakerAskVolume,omitempty"`
-}
-
-func (s *ProfitStats) AddTrade(trade types.Trade) {
-	s.ProfitStats.AddTrade(trade)
-
-	if trade.Exchange == s.MakerExchange {
-		s.AccumulatedMakerVolume.AtomicAdd(fixedpoint.NewFromFloat(trade.Quantity))
-		s.TodayMakerVolume.AtomicAdd(fixedpoint.NewFromFloat(trade.Quantity))
-
-		switch trade.Side {
-
-		case types.SideTypeSell:
-			s.AccumulatedMakerAskVolume.AtomicAdd(fixedpoint.NewFromFloat(trade.Quantity))
-			s.TodayMakerAskVolume.AtomicAdd(fixedpoint.NewFromFloat(trade.Quantity))
-
-		case types.SideTypeBuy:
-			s.AccumulatedMakerBidVolume.AtomicAdd(fixedpoint.NewFromFloat(trade.Quantity))
-			s.TodayMakerBidVolume.AtomicAdd(fixedpoint.NewFromFloat(trade.Quantity))
-
-		}
-	}
-}
-
-func (s *ProfitStats) ResetToday() {
-	s.ProfitStats.ResetToday()
-	s.TodayMakerVolume = 0
-	s.TodayMakerBidVolume = 0
-	s.TodayMakerAskVolume = 0
-}
-
 type Strategy struct {
 	*bbgo.Graceful
 	*bbgo.Notifiability
@@ -495,7 +447,6 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	}
 
 	quantity := fixedpoint.Abs(pos)
-	quantity = s.sourceMarket.TruncateQuantity(quantity)
 
 	if pos < 0 {
 		side = types.SideTypeSell
@@ -543,7 +494,19 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 				quantity = base.Available
 			}
 		}
+	}
 
+	// truncate quantity for the supported precision
+	quantity = s.sourceMarket.TruncateQuantity(quantity)
+
+	if notional.Float64() <= s.sourceMarket.MinNotional {
+		s.Notifiability.Notify("The adjusted amount %f is less than minimal notional %f, skipping hedge", notional.Float64(), s.sourceMarket.MinNotional)
+		return
+	}
+
+	if quantity.Float64() <= s.sourceMarket.MinQuantity {
+		s.Notifiability.Notify("The adjusted quantity %f is less than minimal quantity %f, skipping hedge", quantity.Float64(), s.sourceMarket.MinQuantity)
+		return
 	}
 
 	log.Infof("submitting %s hedge order %s %f", s.Symbol, side.String(), quantity.Float64())
