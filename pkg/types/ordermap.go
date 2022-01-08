@@ -73,6 +73,10 @@ func (m OrderMap) Orders() (orders OrderSlice) {
 
 type SyncOrderMap struct {
 	orders         OrderMap
+
+	// pendingRemoval is for recording the order remove message for unknown orders.
+	// the order removal message might arrive before the order update, so if we found there is a pending removal,
+	// we should not keep the order in the order map
 	pendingRemoval map[uint64]time.Time
 
 	sync.RWMutex
