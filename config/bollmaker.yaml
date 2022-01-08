@@ -23,7 +23,7 @@ backtest:
 exchangeStrategies:
 
 - on: max
-  bollpp:
+  bollmaker:
     symbol: ETHUSDT
     interval: 5m
     quantity: 0.005

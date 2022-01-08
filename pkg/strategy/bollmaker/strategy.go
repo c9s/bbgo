@@ -1,4 +1,4 @@
-package bollpp
+package bollmaker
 
 import (
 	"context"
@@ -18,7 +18,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-const ID = "bollpp"
+const ID = "bollmaker"
 
 const stateKey = "state-v1"
 
