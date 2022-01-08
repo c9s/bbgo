@@ -22,6 +22,8 @@ const ID = "bollmaker"
 
 const stateKey = "state-v1"
 
+var one = fixedpoint.NewFromFloat(1.0)
+
 var defaultFeeRate = fixedpoint.NewFromFloat(0.001)
 
 var log = logrus.WithField("strategy", ID)
@@ -75,6 +77,8 @@ type Strategy struct {
 
 	// defaultBoll is the BOLLINGER indicator we used for predicting the price.
 	defaultBoll *indicator.BOLL
+
+	// neutralBoll is the neutral price section
 	neutralBoll *indicator.BOLL
 }
 
@@ -198,9 +202,6 @@ func (s *Strategy) cancelOrders(ctx context.Context) {
 }
 
 func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExecutor, midPrice fixedpoint.Value) {
-	sma := s.defaultBoll.LastSMA()
-
-	one := fixedpoint.NewFromFloat(1.0)
 	askPrice := midPrice.Mul(one + s.Spread)
 	bidPrice := midPrice.Mul(one - s.Spread)
 	base := s.state.Position.GetBase()
@@ -235,37 +236,62 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 
 	var submitOrders []types.SubmitOrder
 
+	minQuantity := fixedpoint.NewFromFloat(s.market.MinQuantity)
 	baseBalance, hasBaseBalance := balances[s.market.BaseCurrency]
 	quoteBalance, hasQuoteBalance := balances[s.market.QuoteCurrency]
 	canBuy := hasQuoteBalance && quoteBalance.Available > s.Quantity.Mul(midPrice)
 	canSell := hasBaseBalance && baseBalance.Available > s.Quantity
-	minQuantity := fixedpoint.NewFromFloat(s.market.MinQuantity)
-	if base == 0 || base.Abs() < minQuantity {
-		// neutral position
-		if midPrice.Float64() < sma*0.99 && canBuy {
-			submitOrders = append(submitOrders, buyOrder)
-		} else if midPrice.Float64() > sma*1.01 && canSell {
-			submitOrders = append(submitOrders, sellOrder)
-		} else if canSell && canBuy {
-			submitOrders = append(submitOrders, buyOrder, sellOrder)
+
+	// adjust quantity for closing position if we over sold or over bought
+	if base.Abs() > s.MaxExposurePosition {
+		scale := &bbgo.ExponentialScale{
+			Domain: [2]float64{0, s.MaxExposurePosition.Float64()},
+			Range:  [2]float64{quantity.Float64(), base.Abs().Float64()},
 		}
-	} else if base > minQuantity {
-		if midPrice > s.state.Position.AverageCost.MulFloat64(1.0+s.MinProfitSpread.Float64()) && canSell {
-			submitOrders = append(submitOrders, sellOrder)
+		if err := scale.Solve(); err != nil {
+			log.WithError(err).Errorf("scale solving error")
+			return
 		}
 
-		if midPrice < s.state.Position.AverageCost.MulFloat64(1.0-s.MinProfitSpread.Float64()) && canBuy {
-			submitOrders = append(submitOrders, buyOrder)
+		qf := scale.Call(base.Abs().Float64())
+		if base > minQuantity {
+			sellOrder.Quantity = qf
+		} else if base < -minQuantity {
+			buyOrder.Quantity = qf
 		}
+	}
 
-	} else if base < -minQuantity {
-		if midPrice > s.state.Position.AverageCost.MulFloat64(1.0+s.MinProfitSpread.Float64()) && canSell {
-			submitOrders = append(submitOrders, sellOrder)
-		}
+	if midPrice.Float64() > s.neutralBoll.LastDownBand() && midPrice.Float64() < s.neutralBoll.LastUpBand() {
+		// we don't have position yet
+		if base == 0 || base.Abs() < minQuantity {
+			// place orders on both side if it's in oscillating band
+			if canBuy {
+				submitOrders = append(submitOrders, buyOrder)
+			}
+			if canSell {
+				submitOrders = append(submitOrders, sellOrder)
+			}
+		} else if base > minQuantity {
+			if midPrice > s.state.Position.AverageCost.MulFloat64(1.0+s.MinProfitSpread.Float64()) && canSell {
+				submitOrders = append(submitOrders, sellOrder)
+			}
 
-		if midPrice < s.state.Position.AverageCost.MulFloat64(1.0-s.MinProfitSpread.Float64()) && canBuy {
-			submitOrders = append(submitOrders, buyOrder)
+			if midPrice < s.state.Position.AverageCost.MulFloat64(1.0-s.MinProfitSpread.Float64()) && canBuy {
+				submitOrders = append(submitOrders, buyOrder)
+			}
+		} else if base < -minQuantity {
+			if midPrice > s.state.Position.AverageCost.MulFloat64(1.0+s.MinProfitSpread.Float64()) && canSell {
+				submitOrders = append(submitOrders, sellOrder)
+			}
+
+			if midPrice < s.state.Position.AverageCost.MulFloat64(1.0-s.MinProfitSpread.Float64()) && canBuy {
+				submitOrders = append(submitOrders, buyOrder)
+			}
 		}
+	} else if midPrice.Float64() < s.defaultBoll.LastDownBand() { // strong downtrend
+
+	} else if midPrice.Float64() > s.defaultBoll.LastUpBand() { // strong uptrend
+
 	}
 
 	createdOrders, err := orderExecutor.SubmitOrders(ctx, submitOrders...)
@@ -290,8 +316,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	}
 	s.market = market
 
-	s.defaultBoll = s.StandardIndicatorSet.BOLL(s.DefaultBollinger.IntervalWindow, s.DefaultBollinger.BandWidth)
 	s.neutralBoll = s.StandardIndicatorSet.BOLL(s.NeutralBollinger.IntervalWindow, s.NeutralBollinger.BandWidth)
+	s.defaultBoll = s.StandardIndicatorSet.BOLL(s.DefaultBollinger.IntervalWindow, s.DefaultBollinger.BandWidth)
 
 	// calculate group id for orders
 	instanceID := fmt.Sprintf("%s-%s", ID, s.Symbol)
