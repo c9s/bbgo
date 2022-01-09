@@ -3,6 +3,7 @@ package bollmaker
 import (
 	"context"
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -66,7 +67,34 @@ type Strategy struct {
 	DisableShort bool `json:"disableShort"`
 
 	DefaultBollinger *BollingerSetting `json:"defaultBollinger"`
+
+	// NeutralBollinger is the smaller range of the bollinger band
+	// If price is in this band, it usually means the price is oscillating.
 	NeutralBollinger *BollingerSetting `json:"neutralBollinger"`
+
+	// StrongDowntrendSkew is the order quantity skew for strong downtrend band.
+	// when the bollinger band detect a strong downtrend, what's the order quantity skew we want to use.
+	// greater than 1.0 means when placing buy order, place sell order with less quantity
+	// less than 1.0 means when placing sell order, place buy order with less quantity
+	StrongDowntrendSkew fixedpoint.Value `json:"strongDowntrendSkew"`
+
+	// StrongUptrendSkew is the order quantity skew for strong uptrend band.
+	// when the bollinger band detect a strong uptrend, what's the order quantity skew we want to use.
+	// greater than 1.0 means when placing buy order, place sell order with less quantity
+	// less than 1.0 means when placing sell order, place buy order with less quantity
+	StrongUptrendSkew   fixedpoint.Value `json:"strongUptrendSkew"`
+
+	// DowntrendSkew is the order quantity skew for normal downtrend band.
+	// The price is still in the default bollinger band.
+	// greater than 1.0 means when placing buy order, place sell order with less quantity
+	// less than 1.0 means when placing sell order, place buy order with less quantity
+	DowntrendSkew fixedpoint.Value `json:"downtrendSkew"`
+
+	// UptrendSkew is the order quantity skew for normal uptrend band.
+	// The price is still in the default bollinger band.
+	// greater than 1.0 means when placing buy order, place sell order with less quantity
+	// less than 1.0 means when placing sell order, place buy order with less quantity
+	UptrendSkew   fixedpoint.Value `json:"uptrendSkew"`
 
 	session *bbgo.ExchangeSession
 	book    *types.StreamOrderBook
@@ -214,11 +242,12 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 	base := s.state.Position.GetBase()
 	balances := s.session.Account.Balances()
 
-	log.Infof("mid price:%f spread: %s ask:%f bid: %f",
+	log.Infof("mid price:%f spread: %s ask:%f bid: %f position: %s",
 		midPrice.Float64(),
 		s.Spread.Percentage(),
 		askPrice.Float64(),
 		bidPrice.Float64(),
+		s.state.Position.String(),
 	)
 
 	quantity := s.Quantity
@@ -246,8 +275,8 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 	minQuantity := fixedpoint.NewFromFloat(s.market.MinQuantity)
 	baseBalance, hasBaseBalance := balances[s.market.BaseCurrency]
 	quoteBalance, hasQuoteBalance := balances[s.market.QuoteCurrency]
-	canBuy := hasQuoteBalance && quoteBalance.Available > s.Quantity.Mul(midPrice)
-	canSell := hasBaseBalance && baseBalance.Available > s.Quantity
+	canBuy := hasQuoteBalance && quoteBalance.Available > s.Quantity.Mul(midPrice) && (s.MaxExposurePosition > 0 && base < s.MaxExposurePosition)
+	canSell := hasBaseBalance && baseBalance.Available > s.Quantity && (s.MaxExposurePosition > 0 && base > -s.MaxExposurePosition)
 
 	// adjust quantity for closing position if we over sold or over bought
 	if s.MaxExposurePosition > 0 && base.Abs() > s.MaxExposurePosition {
@@ -261,10 +290,11 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 		}
 
 		qf := scale.Call(base.Abs().Float64())
+		_ = qf
 		if base > minQuantity {
-			sellOrder.Quantity = qf
+			// sellOrder.Quantity = qf
 		} else if base < -minQuantity {
-			buyOrder.Quantity = qf
+			// buyOrder.Quantity = qf
 		}
 	}
 
@@ -278,31 +308,42 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 			if !s.DisableShort && canSell {
 				submitOrders = append(submitOrders, sellOrder)
 			}
-		} else if base > minQuantity {
-			if midPrice > s.state.Position.AverageCost.MulFloat64(1.0+s.MinProfitSpread.Float64()) && canSell {
-				if !(s.DisableShort && (base.Float64() - sellOrder.Quantity < 0)) {
-					submitOrders = append(submitOrders, sellOrder)
-				}
-			}
-
-			if midPrice < s.state.Position.AverageCost.MulFloat64(1.0-s.MinProfitSpread.Float64()) && canBuy {
-				submitOrders = append(submitOrders, buyOrder)
-			}
-		} else if base < -minQuantity {
-			if midPrice > s.state.Position.AverageCost.MulFloat64(1.0+s.MinProfitSpread.Float64()) && canSell {
-				if !(s.DisableShort && (base.Float64() - sellOrder.Quantity < 0)) {
-					submitOrders = append(submitOrders, sellOrder)
-				}
-			}
-
-			if midPrice < s.state.Position.AverageCost.MulFloat64(1.0-s.MinProfitSpread.Float64()) && canBuy {
-				submitOrders = append(submitOrders, buyOrder)
-			}
 		}
+	} else if midPrice.Float64() > s.defaultBoll.LastDownBand() && midPrice.Float64() < s.neutralBoll.LastDownBand() { // downtrend, might bounce back
+
+		skew := 2.0
+		ratio := 1.0 / skew
+		sellOrder.Quantity = math.Max(s.market.MinQuantity, buyOrder.Quantity*ratio)
+
+	} else if midPrice.Float64() < s.defaultBoll.LastUpBand() && midPrice.Float64() > s.neutralBoll.LastUpBand() { // uptrend, might bounce back
+
+		skew := 0.5
+		buyOrder.Quantity = math.Max(s.market.MinQuantity, sellOrder.Quantity*skew)
+
 	} else if midPrice.Float64() < s.defaultBoll.LastDownBand() { // strong downtrend
+
+		skew := s.StrongDowntrendSkew.Float64()
+		ratio := 1.0 / skew
+		sellOrder.Quantity = math.Max(s.market.MinQuantity, buyOrder.Quantity*ratio)
 
 	} else if midPrice.Float64() > s.defaultBoll.LastUpBand() { // strong uptrend
 
+		skew := s.StrongUptrendSkew.Float64()
+		buyOrder.Quantity = math.Max(s.market.MinQuantity, sellOrder.Quantity*skew)
+
+	}
+
+	if midPrice > s.state.Position.AverageCost.MulFloat64(1.0+s.MinProfitSpread.Float64()) && canSell {
+		if !(s.DisableShort && (base.Float64()-sellOrder.Quantity < 0)) {
+			submitOrders = append(submitOrders, sellOrder)
+		}
+	}
+
+	if midPrice < s.state.Position.AverageCost.MulFloat64(1.0-s.MinProfitSpread.Float64()) && canBuy {
+		// submitOrders = append(submitOrders, buyOrder)
+	}
+	if canBuy {
+		submitOrders = append(submitOrders, buyOrder)
 	}
 
 	if len(submitOrders) == 0 {
@@ -318,12 +359,28 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-	// initial required information
-	s.session = session
-
 	if s.MinProfitSpread == 0 {
 		s.MinProfitSpread = fixedpoint.NewFromFloat(0.001)
 	}
+
+	if s.StrongUptrendSkew == 0 {
+		s.StrongUptrendSkew = fixedpoint.NewFromFloat(1.0 / 5.0)
+	}
+
+	if s.StrongDowntrendSkew == 0 {
+		s.StrongDowntrendSkew = fixedpoint.NewFromFloat(5.0)
+	}
+
+	if s.UptrendSkew == 0 {
+		s.UptrendSkew = fixedpoint.NewFromFloat(1.0 / 2.0)
+	}
+
+	if s.DowntrendSkew == 0 {
+		s.DowntrendSkew = fixedpoint.NewFromFloat(2.0)
+	}
+
+	// initial required information
+	s.session = session
 
 	market, ok := session.Market(s.Symbol)
 	if !ok {
