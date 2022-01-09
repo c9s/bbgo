@@ -500,12 +500,12 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	// truncate quantity for the supported precision
 	quantity = s.sourceMarket.TruncateQuantity(quantity)
 
-	if notional.Float64() <= s.sourceMarket.MinNotional * 1.02 {
+	if notional.Float64() <= s.sourceMarket.MinNotional*1.02 {
 		log.Warnf("the adjusted amount %f is less than minimal notional %f, skipping hedge", notional.Float64(), s.sourceMarket.MinNotional)
 		return
 	}
 
-	if quantity.Float64() <= s.sourceMarket.MinQuantity * 1.0 {
+	if quantity.Float64() <= s.sourceMarket.MinQuantity*1.0 {
 		log.Warnf("the adjusted quantity %f is less than minimal quantity %f, skipping hedge", quantity.Float64(), s.sourceMarket.MinQuantity)
 		return
 	}
@@ -749,6 +749,9 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
 		s.Notifiability.Notify(position)
 	})
+	s.tradeCollector.OnRecover(func(trade types.Trade) {
+		s.Notifiability.Notify("Recover trade", trade)
+	})
 	s.tradeCollector.BindStream(s.sourceSession.UserDataStream)
 	s.tradeCollector.BindStream(s.makerSession.UserDataStream)
 
@@ -793,20 +796,9 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 			case <-tradeScanTicker.C:
 				log.Infof("scanning trades from %s ago...", tradeScanInterval)
-				startTime := time.Now().Add(- tradeScanInterval)
-				trades, err := s.sourceSession.Exchange.(types.ExchangeTradeHistoryService).QueryTrades(ctx, s.Symbol, &types.TradeQueryOptions{
-					StartTime: &startTime,
-				})
-
-				if err != nil {
+				startTime := time.Now().Add(-tradeScanInterval)
+				if err := s.tradeCollector.Recover(ctx, s.sourceSession.Exchange.(types.ExchangeTradeHistoryService), s.Symbol, startTime); err != nil {
 					log.WithError(err).Errorf("query trades error")
-				} else {
-					for _, td := range trades {
-						log.Infof("processing trade: %s", td.String())
-						if s.tradeCollector.ProcessTrade(td) {
-							s.Notifiability.Notify("recovered trade", td)
-						}
-					}
 				}
 
 			case <-posTicker.C:

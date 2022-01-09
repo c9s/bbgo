@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/sigchan"
 	"github.com/c9s/bbgo/pkg/types"
@@ -20,6 +22,7 @@ type TradeCollector struct {
 	orderStore *OrderStore
 	doneTrades map[types.TradeKey]struct{}
 
+	recoverCallbacks        []func(trade types.Trade)
 	tradeCallbacks          []func(trade types.Trade)
 	positionUpdateCallbacks []func(position *types.Position)
 	profitCallbacks         []func(trade types.Trade, profit, netProfit fixedpoint.Value)
@@ -60,6 +63,25 @@ func (c *TradeCollector) BindStream(stream types.Stream) {
 // so that trades will be processed in the next round of the goroutine loop
 func (c *TradeCollector) Emit() {
 	c.orderSig.Emit()
+}
+
+func (c *TradeCollector) Recover(ctx context.Context, ex types.ExchangeTradeHistoryService, symbol string, from time.Time) error {
+	trades, err := ex.QueryTrades(ctx, symbol, &types.TradeQueryOptions{
+		StartTime: &from,
+	})
+
+	if err != nil {
+		return err
+	}
+
+	for _, td := range trades {
+		log.Debugf("processing trade: %s", td.String())
+		if c.ProcessTrade(td) {
+			log.Infof("recovered trade: %s", td.String())
+			c.EmitRecover(td)
+		}
+	}
+	return nil
 }
 
 // Process filters the received trades and see if there are orders matching the trades
