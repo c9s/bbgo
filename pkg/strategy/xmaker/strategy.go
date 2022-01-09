@@ -9,6 +9,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/exchange/max"
@@ -96,6 +97,8 @@ type Strategy struct {
 
 	book              *types.StreamOrderBook
 	activeMakerOrders *bbgo.LocalActiveOrderBook
+
+	hedgeErrorLimiter *rate.Limiter
 
 	orderStore     *bbgo.OrderStore
 	tradeCollector *bbgo.TradeCollector
@@ -498,18 +501,22 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	quantity = s.sourceMarket.TruncateQuantity(quantity)
 
 	if notional.Float64() <= s.sourceMarket.MinNotional * 1.02 {
-		s.Notifiability.Notify("The adjusted amount %f is less than minimal notional %f, skipping hedge", notional.Float64(), s.sourceMarket.MinNotional)
+		log.Warnf("the adjusted amount %f is less than minimal notional %f, skipping hedge", notional.Float64(), s.sourceMarket.MinNotional)
 		return
 	}
 
-	if quantity.Float64() <= s.sourceMarket.MinQuantity * 1.02 {
-		s.Notifiability.Notify("The adjusted quantity %f is less than minimal quantity %f, skipping hedge", quantity.Float64(), s.sourceMarket.MinQuantity)
+	if quantity.Float64() <= s.sourceMarket.MinQuantity * 1.0 {
+		log.Warnf("the adjusted quantity %f is less than minimal quantity %f, skipping hedge", quantity.Float64(), s.sourceMarket.MinQuantity)
+		return
+	}
+
+	if !s.hedgeErrorLimiter.Allow() {
+		log.Warn("rate limit hit, not allowed to hedge again, skip")
 		return
 	}
 
 	log.Infof("submitting %s hedge order %s %f", s.Symbol, side.String(), quantity.Float64())
 	s.Notifiability.Notify("Submitting %s hedge order %s %f", s.Symbol, side.String(), quantity.Float64())
-
 	orderExecutor := &bbgo.ExchangeOrderExecutor{Session: s.sourceSession}
 	returnOrders, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 		Market:   s.sourceMarket,
@@ -520,6 +527,7 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	})
 
 	if err != nil {
+		s.hedgeErrorLimiter.Reserve()
 		log.WithError(err).Errorf("market order submit error: %s", err.Error())
 		return
 	}
@@ -630,6 +638,8 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 			s.AskMargin = defaultMargin
 		}
 	}
+
+	s.hedgeErrorLimiter = rate.NewLimiter(rate.Every(time.Minute), 1)
 
 	// configure sessions
 	sourceSession, ok := sessions[s.SourceExchange]
