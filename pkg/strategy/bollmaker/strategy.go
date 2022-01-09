@@ -50,12 +50,29 @@ type Strategy struct {
 
 	StandardIndicatorSet *bbgo.StandardIndicatorSet
 
+	// Symbol is the market symbol you want to trade
 	Symbol          string           `json:"symbol"`
+
+	// Interval is how long do you want to update your order price and quantity
 	Interval        types.Interval   `json:"interval"`
+
+	// Quantity is the base order quantity for your buy/sell order.
 	Quantity        fixedpoint.Value `json:"quantity"`
-	MinSpread       fixedpoint.Value `json:"minSpread"`
+
+	// Spread is the price spread from the middle price.
+	// For ask orders, the ask price is ((bestAsk + bestBid) / 2 * (1.0 + spread))
+	// For bid orders, the bid price is ((bestAsk + bestBid) / 2 * (1.0 - spread))
+	// Spread can be set by percentage or floating number. e.g., 0.1% or 0.001
 	Spread          fixedpoint.Value `json:"spread"`
+
+	// MinProfitSpread is the minimal order price spread from the current average cost.
+	// For long position, you will only place sell order above the price (= average cost * (1 + minProfitSpread))
+	// For short position, you will only place buy order below the price (= average cost * (1 - minProfitSpread))
 	MinProfitSpread fixedpoint.Value `json:"minProfitSpread"`
+
+	// UseTickerPrice use the ticker api to get the mid price instead of the closed kline price.
+	// The back-test engine is kline-based, so the ticker price api is not supported.
+	// Turn this on if you want to do real trading.
 	UseTickerPrice  bool             `json:"useTickerPrice"`
 
 	// MaxExposurePosition is the maximum position you can hold
@@ -64,6 +81,7 @@ type Strategy struct {
 	MaxExposurePosition fixedpoint.Value `json:"maxExposurePosition"`
 
 	// DisableShort means you can don't want short position during the market making
+	// Set to true if you want to hold more spot during market making.
 	DisableShort bool `json:"disableShort"`
 
 	DefaultBollinger *BollingerSetting `json:"defaultBollinger"`
