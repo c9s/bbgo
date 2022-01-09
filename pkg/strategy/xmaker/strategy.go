@@ -510,10 +510,12 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 		return
 	}
 
+	/*
 	if !s.hedgeErrorLimiter.Allow() {
 		log.Warn("rate limit hit, not allowed to hedge again, skip")
 		return
 	}
+	*/
 
 	log.Infof("submitting %s hedge order %s %f", s.Symbol, side.String(), quantity.Float64())
 	s.Notifiability.Notify("Submitting %s hedge order %s %f", s.Symbol, side.String(), quantity.Float64())
@@ -639,7 +641,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		}
 	}
 
-	s.hedgeErrorLimiter = rate.NewLimiter(rate.Every(time.Minute), 1)
+	s.hedgeErrorLimiter = rate.NewLimiter(rate.Every(1 * time.Minute), 1)
 
 	// configure sessions
 	sourceSession, ok := sessions[s.SourceExchange]
