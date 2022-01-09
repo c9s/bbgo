@@ -12,7 +12,7 @@ backtest:
   # see here for more details
   # https://www.investopedia.com/terms/m/maximum-drawdown-mdd.asp
   startTime: "2021-08-01"
-  endTime: "2021-10-30"
+  endTime: "2021-08-30"
   symbols:
   - ETHUSDT
   account:
@@ -22,7 +22,7 @@ backtest:
 
 exchangeStrategies:
 
-- on: max
+- on: binance
   bollmaker:
     symbol: ETHUSDT
 
