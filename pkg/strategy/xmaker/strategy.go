@@ -497,12 +497,12 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	// truncate quantity for the supported precision
 	quantity = s.sourceMarket.TruncateQuantity(quantity)
 
-	if notional.Float64() <= s.sourceMarket.MinNotional {
+	if notional.Float64() <= s.sourceMarket.MinNotional * 1.02 {
 		s.Notifiability.Notify("The adjusted amount %f is less than minimal notional %f, skipping hedge", notional.Float64(), s.sourceMarket.MinNotional)
 		return
 	}
 
-	if quantity.Float64() <= s.sourceMarket.MinQuantity {
+	if quantity.Float64() <= s.sourceMarket.MinQuantity * 1.02 {
 		s.Notifiability.Notify("The adjusted quantity %f is less than minimal quantity %f, skipping hedge", quantity.Float64(), s.sourceMarket.MinQuantity)
 		return
 	}
