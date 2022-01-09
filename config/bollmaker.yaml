@@ -88,3 +88,5 @@ exchangeStrategies:
       window: 21
       bandWidth: 1.0
 
+    persistence:
+      type: redis
