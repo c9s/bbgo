@@ -364,19 +364,19 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	}
 
 	if s.StrongUptrendSkew == 0 {
-		s.StrongUptrendSkew = fixedpoint.NewFromFloat(1.0 / 5.0)
+		s.StrongUptrendSkew = fixedpoint.NewFromFloat(1.0 / 2.0)
 	}
 
 	if s.StrongDowntrendSkew == 0 {
-		s.StrongDowntrendSkew = fixedpoint.NewFromFloat(5.0)
+		s.StrongDowntrendSkew = fixedpoint.NewFromFloat(2.0)
 	}
 
 	if s.UptrendSkew == 0 {
-		s.UptrendSkew = fixedpoint.NewFromFloat(1.0 / 2.0)
+		s.UptrendSkew = fixedpoint.NewFromFloat(1.0 / 1.2)
 	}
 
 	if s.DowntrendSkew == 0 {
-		s.DowntrendSkew = fixedpoint.NewFromFloat(2.0)
+		s.DowntrendSkew = fixedpoint.NewFromFloat(1.2)
 	}
 
 	// initial required information
