@@ -169,7 +169,7 @@ func (p *Position) SlackAttachment() slack.Attachment {
 	if p.TotalFee != nil {
 		for feeCurrency, fee := range p.TotalFee {
 			fields = append(fields, slack.AttachmentField{
-				Title: fmt.Sprintf("FEE (%s)", feeCurrency),
+				Title: fmt.Sprintf("Fee (%s)", feeCurrency),
 				Value: trimTrailingZeroFloat(fee.Float64()),
 				Short: true,
 			})
@@ -187,15 +187,23 @@ func (p *Position) SlackAttachment() slack.Attachment {
 	}
 }
 
-func (p *Position) PlainText() string {
+func (p *Position) PlainText() (msg string) {
 	posType := p.Type()
-	return fmt.Sprintf("%s Position %s: Average cost = %s, Base = %s, Quote = %s",
+	msg = fmt.Sprintf("%s Position %s: average cost = %s, base = %s, quote = %s",
 		posType,
 		p.Symbol,
 		trimTrailingZeroFloat(p.AverageCost.Float64()),
 		trimTrailingZeroFloat(p.Base.Float64()),
 		trimTrailingZeroFloat(p.Quote.Float64()),
 	)
+
+	if p.TotalFee != nil {
+		for feeCurrency, fee := range p.TotalFee {
+			msg += fmt.Sprintf("\nfee (%s) = %s", feeCurrency, trimTrailingZeroFloat(fee.Float64()))
+		}
+	}
+
+	return msg
 }
 
 func (p *Position) String() string {
