@@ -25,19 +25,63 @@ exchangeStrategies:
 - on: max
   bollmaker:
     symbol: ETHUSDT
-    interval: 5m
-    quantity: 0.005
 
-    # spread: sell price = middle price + spread, buy price = middle price - spread
-    # you need to ensure that the spread can cover your trading fee
-    # for example, the trading fee on binance is 0.075%, so the total fee of your buy/sell orders is 0.075% * 2 = 0.14%
-    spread: 0.01%
+    # interval is how long do you want to update your order price and quantity
+    interval: 1m
+
+    # quantity is the base order quantity for your buy/sell order.
+    quantity: 0.05
+
+    # useTickerPrice use the ticker api to get the mid price instead of the closed kline price.
+    # The back-test engine is kline-based, so the ticker price api is not supported.
+    # Turn this on if you want to do real trading.
+    useTickerPrice: false
+
+    # spread is the price spread from the middle price.
+    # For ask orders, the ask price is ((bestAsk + bestBid) / 2 * (1.0 + spread))
+    # For bid orders, the bid price is ((bestAsk + bestBid) / 2 * (1.0 - spread))
+    # Spread can be set by percentage or floating number. e.g., 0.1% or 0.001
+    spread: 0.1%
+
+    # minProfitSpread is the minimal order price spread from the current average cost.
+    # For long position, you will only place sell order above the price (= average cost * (1 + minProfitSpread))
+    # For short position, you will only place buy order below the price (= average cost * (1 - minProfitSpread))
     minProfitSpread: 0.1%
+
+    # maxExposurePosition is the maximum position you can hold
+    # +10 means you can hold 10 ETH long position by maximum
+    # -10 means you can hold -10 ETH short position by maximum
+    # maxExposurePosition: 3.0
+    maxExposurePosition: 10
+
+    # strongUptrendSkew is the order quantity skew for strong uptrend band.
+    # when the bollinger band detect a strong uptrend, what's the order quantity skew we want to use.
+    # greater than 1.0 means when placing buy order, place sell order with less quantity
+    # less than 1.0 means when placing sell order, place buy order with less quantity
+    strongUptrendSkew: 0.3
+
+    # strongDowntrendSkew is the order quantity skew for strong downtrend band.
+    # when the bollinger band detect a strong downtrend, what's the order quantity skew we want to use.
+    # greater than 1.0 means when placing buy order, place sell order with less quantity
+    # less than 1.0 means when placing sell order, place buy order with less quantity
+    strongDowntrendSkew: 2.0
+
+    # uptrendSkew, like the strongUptrendSkew, but the price is still in the default band.
+    uptrendSkew: 0.8
+
+    # downtrendSkew, like the strongDowntrendSkew, but the price is still in the default band.
+    downtrendSkew: 1.2
+
+    # DisableShort means you can don't want short position during the market making
+    disableShort: true
 
     defaultBollinger:
       interval: "5m"
       window: 21
       bandWidth: 2.0
+
+    # neutralBollinger is the smaller range of the bollinger band
+    # If price is in this band, it usually means the price is oscillating.
     neutralBollinger:
       interval: "5m"
       window: 21
