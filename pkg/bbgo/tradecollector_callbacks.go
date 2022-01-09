@@ -7,6 +7,16 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+func (c *TradeCollector) OnRecover(cb func(trade types.Trade)) {
+	c.recoverCallbacks = append(c.recoverCallbacks, cb)
+}
+
+func (c *TradeCollector) EmitRecover(trade types.Trade) {
+	for _, cb := range c.recoverCallbacks {
+		cb(trade)
+	}
+}
+
 func (c *TradeCollector) OnTrade(cb func(trade types.Trade)) {
 	c.tradeCallbacks = append(c.tradeCallbacks, cb)
 }
