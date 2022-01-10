@@ -33,13 +33,6 @@ type Stream interface {
 	Close() error
 }
 
-type Channel string
-
-var BookChannel = Channel("book")
-
-var KLineChannel = Channel("kline")
-var BookTickerChannel = Channel("bookticker")
-
 type EndpointCreator func(ctx context.Context) (string, error)
 
 type Parser func(message []byte) (interface{}, error)
