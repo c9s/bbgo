@@ -477,6 +477,10 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 		until = since.Add(24*time.Hour - time.Millisecond)
 	}
 
+	if err := orderLimiter.Wait(ctx); err != nil {
+		log.WithError(err).Errorf("order rate limiter wait error")
+	}
+
 	log.Infof("querying closed orders %s from %s <=> %s ...", symbol, since, until)
 
 	if e.IsMargin {
