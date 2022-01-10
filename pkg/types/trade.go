@@ -144,7 +144,7 @@ func (trade Trade) PlainText() string {
 		trade.FeeCurrency)
 }
 
-var slackTradeTextTemplate = ":handshake: {{ .Symbol }} {{ .Side }} Trade Execution @ {{ .Price  }}"
+var slackTradeTextTemplate = ":handshake: Trade {{ .Symbol }} {{ .Side }} {{ .Quantity }} @ {{ .Price  }}"
 
 func (trade Trade) SlackAttachment() slack.Attachment {
 	var color = "#DC143C"
@@ -176,7 +176,6 @@ func (trade Trade) SlackAttachment() slack.Attachment {
 		// Pretext: pretext,
 		Color: color,
 		Fields: []slack.AttachmentField{
-			{Title: "Exchange", Value: trade.Exchange.String(), Short: true},
 			{Title: "Price", Value: trimTrailingZeroFloat(trade.Price), Short: true},
 			{Title: "Quantity", Value: trimTrailingZeroFloat(trade.Quantity), Short: true},
 			{Title: "QuoteQuantity", Value: trimTrailingZeroFloat(trade.QuoteQuantity), Short: true},
