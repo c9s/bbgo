@@ -72,7 +72,7 @@ func (m OrderMap) Orders() (orders OrderSlice) {
 }
 
 type SyncOrderMap struct {
-	orders         OrderMap
+	orders OrderMap
 
 	// pendingRemoval is for recording the order remove message for unknown orders.
 	// the order removal message might arrive before the order update, so if we found there is a pending removal,
@@ -97,15 +97,14 @@ func (m *SyncOrderMap) Backup() (orders []SubmitOrder) {
 }
 
 func (m *SyncOrderMap) Remove(orderID uint64) (exists bool) {
-	exists = m.Exists(orderID)
+	m.Lock()
+	defer m.Unlock()
+
+	exists = m.orders.Exists(orderID)
 	if exists {
-		m.Lock()
 		m.orders.Remove(orderID)
-		m.Unlock()
 	} else {
-		m.Lock()
 		m.pendingRemoval[orderID] = time.Now()
-		m.Unlock()
 	}
 
 	return exists
