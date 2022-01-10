@@ -168,11 +168,13 @@ func (p *Position) SlackAttachment() slack.Attachment {
 
 	if p.TotalFee != nil {
 		for feeCurrency, fee := range p.TotalFee {
-			fields = append(fields, slack.AttachmentField{
-				Title: fmt.Sprintf("Fee (%s)", feeCurrency),
-				Value: trimTrailingZeroFloat(fee.Float64()),
-				Short: true,
-			})
+			if fee > 0 {
+				fields = append(fields, slack.AttachmentField{
+					Title: fmt.Sprintf("Fee (%s)", feeCurrency),
+					Value: trimTrailingZeroFloat(fee.Float64()),
+					Short: true,
+				})
+			}
 		}
 	}
 
