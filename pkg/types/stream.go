@@ -233,7 +233,7 @@ func (s *StandardStream) Read(ctx context.Context, conn *websocket.Conn, cancel 
 	}
 }
 
-func (s *StandardStream) Ping(ctx context.Context, conn *websocket.Conn, cancel context.CancelFunc, interval time.Duration) {
+func (s *StandardStream) ping(ctx context.Context, conn *websocket.Conn, cancel context.CancelFunc, interval time.Duration) {
 	defer func() {
 		cancel()
 		log.Debug("ping worker stopped")
@@ -325,7 +325,7 @@ func (s *StandardStream) DialAndConnect(ctx context.Context) error {
 	s.EmitConnect()
 
 	go s.Read(connCtx, conn, connCancel)
-	go s.Ping(connCtx, conn, connCancel, pingInterval)
+	go s.ping(connCtx, conn, connCancel, pingInterval)
 	return nil
 }
 
