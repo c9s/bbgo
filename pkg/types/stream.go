@@ -10,6 +10,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 )
 
 const pingInterval = 30 * time.Second
@@ -157,6 +158,9 @@ func (s *StandardStream) Read(ctx context.Context, conn *websocket.Conn, cancel 
 		s.EmitDisconnect()
 	}()
 
+	// flag format: debug-{component}-{message type}
+	debugRawMessage := viper.GetBool("debug-websocket-raw-message")
+
 	for {
 		select {
 
@@ -209,7 +213,9 @@ func (s *StandardStream) Read(ctx context.Context, conn *websocket.Conn, cancel 
 				continue
 			}
 
-			log.Debug(string(message))
+			if debugRawMessage {
+				log.Info(string(message))
+			}
 
 			var e interface{}
 			if s.parser != nil {
