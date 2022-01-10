@@ -548,7 +548,6 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 
 			_, _err := req.Do(ctx)
 			if _err != nil {
-				log.WithError(_err).Errorf("order cancel error")
 				err = multierr.Append(err, _err)
 			}
 		}
@@ -565,13 +564,12 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 			if o.OrderID > 0 {
 				req.OrderID(int64(o.OrderID))
 			} else if len(o.ClientOrderID) > 0 {
-				req.NewClientOrderID(o.ClientOrderID)
+				req.OrigClientOrderID(o.ClientOrderID)
 			}
 
-			_, _err := req.Do(ctx)
-			if _err != nil {
-				log.WithError(_err).Errorf("order cancel error")
-				err = multierr.Append(err, _err)
+			_, err2 := req.Do(ctx)
+			if err2 != nil {
+				err = multierr.Append(err, err2)
 			}
 		} else {
 			var req = e.Client.NewCancelOrderService()
@@ -580,13 +578,12 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 			if o.OrderID > 0 {
 				req.OrderID(int64(o.OrderID))
 			} else if len(o.ClientOrderID) > 0 {
-				req.NewClientOrderID(o.ClientOrderID)
+				req.OrigClientOrderID(o.ClientOrderID)
 			}
 
-			_, _err := req.Do(ctx)
-			if _err != nil {
-				log.WithError(_err).Errorf("order cancel error")
-				err = multierr.Append(err, _err)
+			_, err2 := req.Do(ctx)
+			if err2 != nil {
+				err = multierr.Append(err, err2)
 			}
 		}
 	}
