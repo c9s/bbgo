@@ -13,7 +13,6 @@ import (
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
 )
 
 /*
@@ -67,22 +66,22 @@ type ExecutionReportEvent struct {
 	OrderType         string `json:"o"`
 	OrderCreationTime int64  `json:"O"`
 
-	TimeInForce     string `json:"f"`
-	IcebergQuantity string `json:"F"`
+	TimeInForce     string           `json:"f"`
+	IcebergQuantity fixedpoint.Value `json:"F"`
 
-	OrderQuantity      string `json:"q"`
-	QuoteOrderQuantity string `json:"Q"`
+	OrderQuantity      fixedpoint.Value `json:"q"`
+	QuoteOrderQuantity fixedpoint.Value `json:"Q"`
 
-	OrderPrice string `json:"p"`
-	StopPrice  string `json:"P"`
+	OrderPrice fixedpoint.Value `json:"p"`
+	StopPrice  fixedpoint.Value `json:"P"`
 
 	IsOnBook bool `json:"w"`
 
 	IsMaker bool `json:"m"`
 	Ignore  bool `json:"M"`
 
-	CommissionAmount string `json:"n"`
-	CommissionAsset  string `json:"N"`
+	CommissionAmount fixedpoint.Value `json:"n"`
+	CommissionAsset  string           `json:"N"`
 
 	CurrentExecutionType string `json:"x"`
 	CurrentOrderStatus   string `json:"X"`
@@ -93,13 +92,13 @@ type ExecutionReportEvent struct {
 	TradeID         int64 `json:"t"`
 	TransactionTime int64 `json:"T"`
 
-	LastExecutedQuantity string `json:"l"`
-	LastExecutedPrice    string `json:"L"`
+	LastExecutedQuantity fixedpoint.Value `json:"l"`
+	LastExecutedPrice    fixedpoint.Value `json:"L"`
 
-	CumulativeFilledQuantity               string `json:"z"`
-	CumulativeQuoteAssetTransactedQuantity string `json:"Z"`
+	CumulativeFilledQuantity               fixedpoint.Value `json:"z"`
+	CumulativeQuoteAssetTransactedQuantity fixedpoint.Value `json:"Z"`
 
-	LastQuoteAssetTransactedQuantity string `json:"Y"`
+	LastQuoteAssetTransactedQuantity fixedpoint.Value `json:"Y"`
 }
 
 func (e *ExecutionReportEvent) Order() (*types.Order, error) {
@@ -120,13 +119,13 @@ func (e *ExecutionReportEvent) Order() (*types.Order, error) {
 			ClientOrderID: e.ClientOrderID,
 			Side:          toGlobalSideType(binance.SideType(e.Side)),
 			Type:          toGlobalOrderType(binance.OrderType(e.OrderType)),
-			Quantity:      util.MustParseFloat(e.OrderQuantity),
-			Price:         util.MustParseFloat(e.OrderPrice),
+			Quantity:      e.OrderQuantity.Float64(),
+			Price:         e.OrderPrice.Float64(),
 			TimeInForce:   e.TimeInForce,
 		},
 		OrderID:          uint64(e.OrderID),
 		Status:           toGlobalOrderStatus(binance.OrderStatusType(e.CurrentOrderStatus)),
-		ExecutedQuantity: util.MustParseFloat(e.CumulativeFilledQuantity),
+		ExecutedQuantity: e.CumulativeFilledQuantity.Float64(),
 		CreationTime:     types.Time(orderCreationTime),
 	}, nil
 }
@@ -143,13 +142,13 @@ func (e *ExecutionReportEvent) Trade() (*types.Trade, error) {
 		Symbol:        e.Symbol,
 		OrderID:       uint64(e.OrderID),
 		Side:          toGlobalSideType(binance.SideType(e.Side)),
-		Price:         util.MustParseFloat(e.LastExecutedPrice),
-		Quantity:      util.MustParseFloat(e.LastExecutedQuantity),
-		QuoteQuantity: util.MustParseFloat(e.LastQuoteAssetTransactedQuantity),
+		Price:         e.LastExecutedPrice.Float64(),
+		Quantity:      e.LastExecutedQuantity.Float64(),
+		QuoteQuantity: e.LastQuoteAssetTransactedQuantity.Float64(),
 		IsBuyer:       e.Side == "BUY",
 		IsMaker:       e.IsMaker,
 		Time:          types.Time(tt),
-		Fee:           util.MustParseFloat(e.CommissionAmount),
+		Fee:           e.CommissionAmount.Float64(),
 		FeeCurrency:   e.CommissionAsset,
 	}, nil
 }
@@ -264,12 +263,12 @@ func parseWebSocketEvent(message []byte) (interface{}, error) {
 		return nil, err
 	}
 
-	//res, err := json.MarshalIndent(message, "", "  ")
-	//if err != nil {
+	// res, err := json.MarshalIndent(message, "", "  ")
+	// if err != nil {
 	//	log.Fatal(err)
-	//}
-	//str := strings.ReplaceAll(string(res), "\\", "")
-	//fmt.Println(str)
+	// }
+	// str := strings.ReplaceAll(string(res), "\\", "")
+	// fmt.Println(str)
 	eventType := string(val.GetStringBytes("e"))
 	if eventType == "" && IsBookTicker(val) {
 		eventType = "bookticker"
@@ -348,7 +347,7 @@ func parseWebSocketEvent(message []byte) (interface{}, error) {
 }
 
 // IsBookTicker document ref :https://binance-docs.github.io/apidocs/spot/en/#individual-symbol-book-ticker-streams
-//use key recognition because there's no identify in the content.
+// use key recognition because there's no identify in the content.
 func IsBookTicker(val *fastjson.Value) bool {
 	return !val.Exists("e") && val.Exists("u") &&
 		val.Exists("s") && val.Exists("b") &&
@@ -606,26 +605,26 @@ type ContinuousKLineEvent struct {
 // Similar to the ExecutionReportEvent's fields. But with totally different json key.
 // e.g., Stop price. So that, we can not merge them.
 type OrderTrade struct {
-	Symbol           string `json:"s"`
-	ClientOrderID    string `json:"c"`
-	Side             string `json:"S"`
-	OrderType        string `json:"o"`
-	TimeInForce      string `json:"f"`
-	OriginalQuantity string `json:"q"`
-	OriginalPrice    string `json:"p"`
+	Symbol           string           `json:"s"`
+	ClientOrderID    string           `json:"c"`
+	Side             string           `json:"S"`
+	OrderType        string           `json:"o"`
+	TimeInForce      string           `json:"f"`
+	OriginalQuantity fixedpoint.Value `json:"q"`
+	OriginalPrice    fixedpoint.Value `json:"p"`
 
-	AveragePrice         string `json:"ap"`
-	StopPrice            string `json:"sp"`
-	CurrentExecutionType string `json:"x"`
-	CurrentOrderStatus   string `json:"X"`
+	AveragePrice         fixedpoint.Value `json:"ap"`
+	StopPrice            fixedpoint.Value `json:"sp"`
+	CurrentExecutionType string           `json:"x"`
+	CurrentOrderStatus   string           `json:"X"`
 
-	OrderId                        int64  `json:"i"`
-	OrderLastFilledQuantity        string `json:"l"`
-	OrderFilledAccumulatedQuantity string `json:"z"`
-	LastFilledPrice                string `json:"L"`
+	OrderId                        int64            `json:"i"`
+	OrderLastFilledQuantity        fixedpoint.Value `json:"l"`
+	OrderFilledAccumulatedQuantity fixedpoint.Value `json:"z"`
+	LastFilledPrice                fixedpoint.Value `json:"L"`
 
-	CommissionAmount string `json:"n"`
-	CommissionAsset  string `json:"N"`
+	CommissionAmount fixedpoint.Value `json:"n"`
+	CommissionAsset  string           `json:"N"`
 
 	OrderTradeTime int64 `json:"T"`
 	TradeId        int64 `json:"t"`
@@ -709,13 +708,13 @@ func (e *OrderTradeUpdateEvent) OrderFutures() (*types.Order, error) {
 			ClientOrderID: e.OrderTrade.ClientOrderID,
 			Side:          toGlobalFuturesSideType(futures.SideType(e.OrderTrade.Side)),
 			Type:          toGlobalFuturesOrderType(futures.OrderType(e.OrderTrade.OrderType)),
-			Quantity:      util.MustParseFloat(e.OrderTrade.OriginalQuantity),
-			Price:         util.MustParseFloat(e.OrderTrade.OriginalPrice),
+			Quantity:      e.OrderTrade.OriginalQuantity.Float64(),
+			Price:         e.OrderTrade.OriginalPrice.Float64(),
 			TimeInForce:   e.OrderTrade.TimeInForce,
 		},
 		OrderID:          uint64(e.OrderTrade.OrderId),
 		Status:           toGlobalFuturesOrderStatus(futures.OrderStatusType(e.OrderTrade.CurrentOrderStatus)),
-		ExecutedQuantity: util.MustParseFloat(e.OrderTrade.OrderFilledAccumulatedQuantity),
+		ExecutedQuantity: e.OrderTrade.OrderFilledAccumulatedQuantity.Float64(),
 		CreationTime:     types.Time(orderCreationTime),
 	}, nil
 }
@@ -757,12 +756,12 @@ type BookTickerEvent struct {
 	BuySize  fixedpoint.Value `json:"B"`
 	Sell     fixedpoint.Value `json:"a"`
 	SellSize fixedpoint.Value `json:"A"`
-	//"u":400900217,     // order book updateId
-	//"s":"BNBUSDT",     // symbol
-	//"b":"25.35190000", // best bid price
-	//"B":"31.21000000", // best bid qty
-	//"a":"25.36520000", // best ask price
-	//"A":"40.66000000"  // best ask qty
+	// "u":400900217,     // order book updateId
+	// "s":"BNBUSDT",     // symbol
+	// "b":"25.35190000", // best bid price
+	// "B":"31.21000000", // best bid qty
+	// "a":"25.36520000", // best ask price
+	// "A":"40.66000000"  // best ask qty
 }
 
 func (k *BookTickerEvent) BookTicker() types.BookTicker {
