@@ -506,7 +506,7 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 		return
 	}
 
-	if quantity.Float64() <= s.sourceMarket.MinQuantity*1.0 {
+	if quantity.Float64() <= s.sourceMarket.MinQuantity*1.02 {
 		log.Warnf("the adjusted quantity %f is less than minimal quantity %f, skipping hedge", quantity.Float64(), s.sourceMarket.MinQuantity)
 		return
 	}
