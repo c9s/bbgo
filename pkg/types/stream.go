@@ -284,13 +284,13 @@ func (s *StandardStream) Connect(ctx context.Context) error {
 	}
 
 	// start one re-connector goroutine with the base context
-	go s.Reconnector(ctx)
+	go s.reconnector(ctx)
 
 	s.EmitStart()
 	return nil
 }
 
-func (s *StandardStream) Reconnector(ctx context.Context) {
+func (s *StandardStream) reconnector(ctx context.Context) {
 	for {
 		select {
 
