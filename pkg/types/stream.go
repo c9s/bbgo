@@ -342,8 +342,6 @@ func (s *StandardStream) Dial(ctx context.Context, args ...string) (*websocket.C
 		return nil, err
 	}
 
-	readTimeout := 1 * time.Minute
-
 	// use the default ping handler
 	// The websocket server will send a ping frame every 3 minutes.
 	// If the websocket server does not receive a pong frame back from the connection within a 10 minutes period,
