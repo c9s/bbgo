@@ -99,6 +99,7 @@ type Strategy struct {
 	activeMakerOrders *bbgo.LocalActiveOrderBook
 
 	hedgeErrorLimiter *rate.Limiter
+	hedgeErrorRateReservation *rate.Reservation
 
 	orderStore     *bbgo.OrderStore
 	tradeCollector *bbgo.TradeCollector
@@ -510,12 +511,13 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 		return
 	}
 
-	/*
-	if !s.hedgeErrorLimiter.Allow() {
-		log.Warn("rate limit hit, not allowed to hedge again, skip")
-		return
+	if s.hedgeErrorRateReservation != nil {
+		if !s.hedgeErrorRateReservation.OK() {
+			return
+		}
+		time.Sleep(s.hedgeErrorRateReservation.Delay())
+		s.hedgeErrorRateReservation = nil
 	}
-	*/
 
 	log.Infof("submitting %s hedge order %s %f", s.Symbol, side.String(), quantity.Float64())
 	s.Notifiability.Notify("Submitting %s hedge order %s %f", s.Symbol, side.String(), quantity.Float64())
@@ -529,7 +531,7 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	})
 
 	if err != nil {
-		s.hedgeErrorLimiter.Reserve()
+		s.hedgeErrorRateReservation = s.hedgeErrorLimiter.Reserve()
 		log.WithError(err).Errorf("market order submit error: %s", err.Error())
 		return
 	}
