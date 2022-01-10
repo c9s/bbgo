@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/slack-go/slack"
@@ -85,19 +86,19 @@ type OrderStatus string
 
 const (
 	// OrderStatusNew means the order is active on the orderbook without any filling.
-	OrderStatusNew             OrderStatus = "NEW"
+	OrderStatusNew OrderStatus = "NEW"
 
 	// OrderStatusFilled means the order is fully-filled, it's an end state.
-	OrderStatusFilled          OrderStatus = "FILLED"
+	OrderStatusFilled OrderStatus = "FILLED"
 
 	// OrderStatusPartiallyFilled means the order is partially-filled, it's an end state, the order might be canceled in the end.
 	OrderStatusPartiallyFilled OrderStatus = "PARTIALLY_FILLED"
 
 	// OrderStatusCanceled means the order is canceled without partially filled or filled.
-	OrderStatusCanceled        OrderStatus = "CANCELED"
+	OrderStatusCanceled OrderStatus = "CANCELED"
 
 	// OrderStatusRejected means the order is not placed successfully, it's rejected by the api
-	OrderStatusRejected        OrderStatus = "REJECTED"
+	OrderStatusRejected OrderStatus = "REJECTED"
 )
 
 type SubmitOrder struct {
@@ -244,27 +245,41 @@ func (o Order) PlainText() string {
 		o.Status)
 }
 
-func (o Order) SlackAttachment() slack.Attachment {
+func (o *Order) SlackAttachment() slack.Attachment {
 	var fields = []slack.AttachmentField{
 		{Title: "Exchange", Value: o.Exchange.String(), Short: true},
 		{Title: "Symbol", Value: o.Symbol, Short: true},
 		{Title: "Side", Value: string(o.Side), Short: true},
-		{Title: "Quantity", Value: o.QuantityString, Short: true},
-		{Title: "Executed Quantity", Value: util.FormatFloat(o.ExecutedQuantity, 4), Short: true},
+		{Title: "Quantity", Value: trimTrailingZeroFloat(o.Quantity), Short: true},
+		{Title: "Executed Quantity", Value: trimTrailingZeroFloat(o.ExecutedQuantity), Short: true},
 	}
 
 	if len(o.PriceString) > 0 {
 		fields = append(fields, slack.AttachmentField{Title: "Price", Value: o.PriceString, Short: true})
+	} else {
+		fields = append(fields, slack.AttachmentField{Title: "Price", Value: trimTrailingZeroFloat(o.Price), Short: true})
 	}
 
 	fields = append(fields, slack.AttachmentField{
-		Title: "Order ID", Value: strconv.FormatUint(o.OrderID, 10), Short: true,
+		Title: "ID",
+		Value: strconv.FormatUint(o.OrderID, 10),
+		Short: true,
 	})
+
+	fields = append(fields, slack.AttachmentField{
+		Title: "Status",
+		Value: string(o.Status),
+		Short: true,
+	})
+
+	footerIcon := exchangeFooterIcon(o.Exchange)
 
 	return slack.Attachment{
 		Color: SideToColorName(o.Side),
 		Title: string(o.Type) + " Order " + string(o.Side),
 		// Text:   "",
 		Fields: fields,
+		FooterIcon: footerIcon,
+		Footer:     strings.ToLower(o.Exchange.String()) + util.Render(" creation time {{ . }}", o.CreationTime.Time().Format(time.StampMilli)),
 	}
 }

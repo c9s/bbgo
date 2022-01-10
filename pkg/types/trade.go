@@ -146,18 +146,11 @@ func (trade Trade) PlainText() string {
 
 var slackTradeTextTemplate = ":handshake: Trade {{ .Symbol }} {{ .Side }} {{ .Quantity }} @ {{ .Price  }}"
 
-func (trade Trade) SlackAttachment() slack.Attachment {
-	var color = "#DC143C"
 
-	if trade.IsBuyer {
-		color = "#228B22"
-	}
-
-	liquidity := trade.Liquidity()
-	text := util.Render(slackTradeTextTemplate, trade)
-
+func exchangeFooterIcon(exName ExchangeName) string {
 	footerIcon := ""
-	switch trade.Exchange {
+
+	switch exName {
 	case ExchangeBinance:
 		footerIcon = "https://bin.bnbstatic.com/static/images/common/favicon.ico"
 	case ExchangeMax:
@@ -169,6 +162,20 @@ func (trade Trade) SlackAttachment() slack.Attachment {
 	case ExchangeKucoin:
 		footerIcon = "https://assets.staticimg.com/cms/media/7AV75b9jzr9S8H3eNuOuoqj8PwdUjaDQGKGczGqTS.png"
 	}
+
+	return footerIcon
+}
+
+func (trade Trade) SlackAttachment() slack.Attachment {
+	var color = "#DC143C"
+
+	if trade.IsBuyer {
+		color = "#228B22"
+	}
+
+	liquidity := trade.Liquidity()
+	text := util.Render(slackTradeTextTemplate, trade)
+	footerIcon := exchangeFooterIcon(trade.Exchange)
 
 	return slack.Attachment{
 		Text: text,
