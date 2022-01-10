@@ -9,7 +9,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -17,7 +16,6 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
-	"github.com/c9s/bbgo/pkg/exchange/ftx"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 )
@@ -322,9 +320,8 @@ var submitOrderCmd = &cobra.Command{
 		}
 
 		so := types.SubmitOrder{
-			ClientOrderID:  uuid.New().String(),
 			Symbol:         symbol,
-			Side:           types.SideType(ftx.TrimUpperString(side)),
+			Side:           types.SideType(strings.ToUpper(side)),
 			Type:           types.OrderTypeLimit,
 			Quantity:       util.MustParseFloat(quantity),
 			QuantityString: quantity,
