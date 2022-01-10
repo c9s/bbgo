@@ -146,6 +146,9 @@ func (b *LocalActiveOrderBook) Add(orders ...types.Order) {
 		case types.SideTypeSell:
 			b.Asks.Add(order)
 
+		default:
+			log.Errorf("unexpected order side %s, order: %#v", order.Side, order)
+
 		}
 	}
 }
