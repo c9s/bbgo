@@ -245,7 +245,7 @@ func (o Order) PlainText() string {
 		o.Status)
 }
 
-func (o *Order) SlackAttachment() slack.Attachment {
+func (o Order) SlackAttachment() slack.Attachment {
 	var fields = []slack.AttachmentField{
 		{Title: "Exchange", Value: o.Exchange.String(), Short: true},
 		{Title: "Symbol", Value: o.Symbol, Short: true},
