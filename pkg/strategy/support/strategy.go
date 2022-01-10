@@ -289,6 +289,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	if s.TriggerMovingAverage != zeroiw {
 		s.triggerEMA = standardIndicatorSet.EWMA(s.TriggerMovingAverage)
+	} else {
+		s.triggerEMA = standardIndicatorSet.EWMA(types.IntervalWindow{
+			Interval: s.Interval,
+			Window: 99, // default window
+		})
 	}
 
 	if s.LongTermMovingAverage != zeroiw {
