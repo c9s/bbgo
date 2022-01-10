@@ -320,15 +320,13 @@ var submitOrderCmd = &cobra.Command{
 		}
 
 		so := types.SubmitOrder{
-			Symbol:         symbol,
-			Side:           types.SideType(strings.ToUpper(side)),
-			Type:           types.OrderTypeLimit,
-			Quantity:       util.MustParseFloat(quantity),
-			QuantityString: quantity,
-			Price:          util.MustParseFloat(price),
-			PriceString:    price,
-			Market:         market,
-			TimeInForce:    "GTC",
+			Symbol:      symbol,
+			Side:        types.SideType(strings.ToUpper(side)),
+			Type:        types.OrderTypeLimit,
+			Quantity:    util.MustParseFloat(quantity),
+			Price:       util.MustParseFloat(price),
+			Market:      market,
+			TimeInForce: "GTC",
 		}
 
 		co, err := session.Exchange.SubmitOrders(ctx, so)

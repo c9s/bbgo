@@ -356,7 +356,6 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 		})
 	}
 
-
 	// update last prices
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		if _, ok := session.startPrices[kline.Symbol]; !ok {
@@ -610,24 +609,6 @@ func (session *ExchangeSession) FormatOrder(order types.SubmitOrder) (types.Subm
 	}
 
 	order.Market = market
-
-	switch order.Type {
-	case types.OrderTypeStopMarket, types.OrderTypeStopLimit:
-		order.StopPriceString = market.FormatPrice(order.StopPrice)
-
-	}
-
-	switch order.Type {
-	case types.OrderTypeMarket, types.OrderTypeStopMarket:
-		order.Price = 0.0
-		order.PriceString = ""
-
-	default:
-		order.PriceString = market.FormatPrice(order.Price)
-
-	}
-
-	order.QuantityString = market.FormatQuantity(order.Quantity)
 	return order, nil
 }
 

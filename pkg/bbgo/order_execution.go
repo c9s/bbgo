@@ -29,12 +29,12 @@ type OrderExecutionRouter interface {
 type ExchangeOrderExecutionRouter struct {
 	Notifiability
 
-	sessions map[string]*ExchangeSession
+	sessions  map[string]*ExchangeSession
 	executors map[string]OrderExecutor
 }
 
 func (e *ExchangeOrderExecutionRouter) SubmitOrdersTo(ctx context.Context, session string, orders ...types.SubmitOrder) (types.OrderSlice, error) {
-	if executor, ok := e.executors[session] ; ok {
+	if executor, ok := e.executors[session]; ok {
 		return executor.SubmitOrders(ctx, orders...)
 	}
 
@@ -72,9 +72,9 @@ func (e *ExchangeOrderExecutor) notifySubmitOrders(orders ...types.SubmitOrder) 
 		// pass submit order as an interface object.
 		channel, ok := e.RouteObject(&order)
 		if ok {
-			e.NotifyTo(channel, ":memo: Submitting %s %s %s order with quantity: %s at price: %s", order.Symbol, order.Type, order.Side, order.QuantityString, order.PriceString, &order)
+			e.NotifyTo(channel, ":memo: Submitting %s %s %s order with quantity: %f @ %f", order.Symbol, order.Type, order.Side, order.Quantity, order.Price, &order)
 		} else {
-			e.Notify(":memo: Submitting %s %s %s order with quantity: %s at price: %s", order.Symbol, order.Type, order.Side, order.QuantityString, order.PriceString, &order)
+			e.Notify(":memo: Submitting %s %s %s order with quantity: %f @ %f", order.Symbol, order.Type, order.Side, order.Quantity, order.Price, &order)
 		}
 	}
 }
@@ -89,9 +89,9 @@ func (e *ExchangeOrderExecutor) SubmitOrders(ctx context.Context, orders ...type
 		// pass submit order as an interface object.
 		channel, ok := e.RouteObject(&order)
 		if ok {
-			e.NotifyTo(channel, ":memo: Submitting %s %s %s order with quantity: %s", order.Symbol, order.Type, order.Side, order.QuantityString, order)
+			e.NotifyTo(channel, ":memo: Submitting %s %s %s order with quantity: %f", order.Symbol, order.Type, order.Side, order.Quantity, order)
 		} else {
-			e.Notify(":memo: Submitting %s %s %s order with quantity: %s", order.Symbol, order.Type, order.Side, order.QuantityString, order)
+			e.Notify(":memo: Submitting %s %s %s order with quantity: %f", order.Symbol, order.Type, order.Side, order.Quantity, order)
 		}
 
 		log.Infof("submitting order: %s", order.String())

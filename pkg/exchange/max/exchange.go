@@ -308,13 +308,11 @@ func toMaxSubmitOrder(o types.SubmitOrder) (*maxapi.Order, error) {
 		return nil, err
 	}
 
-	volumeInString := o.QuantityString
-	if len(volumeInString) == 0 {
-		if o.Market.Symbol != "" {
-			volumeInString = o.Market.FormatQuantity(o.Quantity)
-		} else {
-			volumeInString = strconv.FormatFloat(o.Quantity, 'f', -1, 64)
-		}
+	var quantityString string
+	if o.Market.Symbol != "" {
+		quantityString = o.Market.FormatQuantity(o.Quantity)
+	} else {
+		quantityString = strconv.FormatFloat(o.Quantity, 'f', -1, 64)
 	}
 
 	maxOrder := maxapi.Order{
@@ -322,7 +320,7 @@ func toMaxSubmitOrder(o types.SubmitOrder) (*maxapi.Order, error) {
 		Side:      toLocalSideType(o.Side),
 		OrderType: orderType,
 		// Price:     priceInString,
-		Volume: volumeInString,
+		Volume: quantityString,
 	}
 
 	if o.GroupID > 0 {
@@ -336,13 +334,11 @@ func toMaxSubmitOrder(o types.SubmitOrder) (*maxapi.Order, error) {
 
 	switch o.Type {
 	case types.OrderTypeStopLimit, types.OrderTypeLimit, types.OrderTypeLimitMaker, types.OrderTypeIOCLimit:
-		priceInString := o.PriceString
-		if len(priceInString) == 0 {
-			if o.Market.Symbol != "" {
-				priceInString = o.Market.FormatPrice(o.Price)
-			} else {
-				priceInString = strconv.FormatFloat(o.Price, 'f', -1, 64)
-			}
+		var priceInString string
+		if o.Market.Symbol != "" {
+			priceInString = o.Market.FormatPrice(o.Price)
+		} else {
+			priceInString = strconv.FormatFloat(o.Price, 'f', -1, 64)
 		}
 		maxOrder.Price = priceInString
 	}
@@ -350,19 +346,12 @@ func toMaxSubmitOrder(o types.SubmitOrder) (*maxapi.Order, error) {
 	// set stop price field for limit orders
 	switch o.Type {
 	case types.OrderTypeStopLimit, types.OrderTypeStopMarket:
-		if len(o.StopPriceString) == 0 {
-			return nil, fmt.Errorf("stop price string can not be empty")
+		var priceInString string
+		if o.Market.Symbol != "" {
+			priceInString = o.Market.FormatPrice(o.StopPrice)
+		} else {
+			priceInString = strconv.FormatFloat(o.StopPrice, 'f', -1, 64)
 		}
-
-		priceInString := o.StopPriceString
-		if len(priceInString) == 0 {
-			if o.Market.Symbol != "" {
-				priceInString = o.Market.FormatPrice(o.StopPrice)
-			} else {
-				priceInString = strconv.FormatFloat(o.StopPrice, 'f', -1, 64)
-			}
-		}
-
 		maxOrder.StopPrice = priceInString
 	}
 

@@ -114,11 +114,6 @@ type SubmitOrder struct {
 
 	Market Market `json:"-" db:"-"`
 
-	// TODO: we can probably remove these field
-	StopPriceString string `json:"-"`
-	PriceString     string `json:"-"`
-	QuantityString  string `json:"-"`
-
 	TimeInForce string `json:"timeInForce,omitempty" db:"time_in_force"` // GTC, IOC, FOK
 
 	GroupID uint32 `json:"groupID,omitempty"`
@@ -143,11 +138,8 @@ func (o *SubmitOrder) SlackAttachment() slack.Attachment {
 	var fields = []slack.AttachmentField{
 		{Title: "Symbol", Value: o.Symbol, Short: true},
 		{Title: "Side", Value: string(o.Side), Short: true},
-		{Title: "Quantity", Value: o.QuantityString, Short: true},
-	}
-
-	if len(o.PriceString) > 0 {
-		fields = append(fields, slack.AttachmentField{Title: "Price", Value: o.PriceString, Short: true})
+		{Title: "Price", Value: trimTrailingZeroFloat(o.Price), Short: true},
+		{Title: "Quantity", Value: trimTrailingZeroFloat(o.Quantity), Short: true},
 	}
 
 	if o.Price > 0 && o.Quantity > 0 && len(o.Market.QuoteCurrency) > 0 {
