@@ -182,7 +182,7 @@ func (trade Trade) SlackAttachment() slack.Attachment {
 			{Title: "Order ID", Value: strconv.FormatUint(trade.OrderID, 10), Short: true},
 		},
 		FooterIcon: footerIcon,
-		Footer: util.Render("trade time {{ . }}", trade.Time.Time().Format(time.StampMilli)),
+		Footer:     strings.ToLower(trade.Exchange.String()) + util.Render(" creation time {{ . }}", trade.Time.Time().Format(time.StampMilli)),
 	}
 }
 
