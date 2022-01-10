@@ -618,9 +618,7 @@ func (e *Exchange) submitMarginOrder(ctx context.Context, order types.SubmitOrde
 		req.SideEffectType(binance.SideEffectType(order.MarginSideEffect))
 	}
 
-	if len(order.QuantityString) > 0 {
-		req.Quantity(order.QuantityString)
-	} else if order.Market.Symbol != "" {
+	if order.Market.Symbol != "" {
 		req.Quantity(order.Market.FormatQuantity(order.Quantity))
 	} else {
 		req.Quantity(strconv.FormatFloat(order.Quantity, 'f', 8, 64))
@@ -629,10 +627,10 @@ func (e *Exchange) submitMarginOrder(ctx context.Context, order types.SubmitOrde
 	// set price field for limit orders
 	switch order.Type {
 	case types.OrderTypeStopLimit, types.OrderTypeLimit, types.OrderTypeLimitMaker:
-		if len(order.PriceString) > 0 {
-			req.Price(order.PriceString)
-		} else if order.Market.Symbol != "" {
+		if order.Market.Symbol != "" {
 			req.Price(order.Market.FormatPrice(order.Price))
+		} else {
+			req.Price(strconv.FormatFloat(order.Price, 'f', 8, 64))
 		}
 	}
 
@@ -640,11 +638,11 @@ func (e *Exchange) submitMarginOrder(ctx context.Context, order types.SubmitOrde
 	switch order.Type {
 
 	case types.OrderTypeStopLimit, types.OrderTypeStopMarket:
-		if len(order.StopPriceString) == 0 {
-			return nil, fmt.Errorf("stop price string can not be empty")
+		if order.Market.Symbol != "" {
+			req.StopPrice(order.Market.FormatPrice(order.StopPrice))
+		} else {
+			req.StopPrice(strconv.FormatFloat(order.StopPrice, 'f', 8, 64))
 		}
-
-		req.StopPrice(order.StopPriceString)
 	}
 
 	// could be IOC or FOK
@@ -704,9 +702,7 @@ func (e *Exchange) submitFuturesOrder(ctx context.Context, order types.SubmitOrd
 	// use response result format
 	req.NewOrderResponseType(futures.NewOrderRespTypeRESULT)
 
-	if len(order.QuantityString) > 0 {
-		req.Quantity(order.QuantityString)
-	} else if order.Market.Symbol != "" {
+	if order.Market.Symbol != "" {
 		req.Quantity(order.Market.FormatQuantity(order.Quantity))
 	} else {
 		req.Quantity(strconv.FormatFloat(order.Quantity, 'f', 8, 64))
@@ -715,10 +711,10 @@ func (e *Exchange) submitFuturesOrder(ctx context.Context, order types.SubmitOrd
 	// set price field for limit orders
 	switch order.Type {
 	case types.OrderTypeStopLimit, types.OrderTypeLimit, types.OrderTypeLimitMaker:
-		if len(order.PriceString) > 0 {
-			req.Price(order.PriceString)
-		} else if order.Market.Symbol != "" {
+		if order.Market.Symbol != "" {
 			req.Price(order.Market.FormatPrice(order.Price))
+		} else {
+			req.Price(strconv.FormatFloat(order.Price, 'f', 8, 64))
 		}
 	}
 
@@ -726,11 +722,11 @@ func (e *Exchange) submitFuturesOrder(ctx context.Context, order types.SubmitOrd
 	switch order.Type {
 
 	case types.OrderTypeStopLimit, types.OrderTypeStopMarket:
-		if len(order.StopPriceString) == 0 {
-			return nil, fmt.Errorf("stop price string can not be empty")
+		if order.Market.Symbol != "" {
+			req.StopPrice(order.Market.FormatPrice(order.StopPrice))
+		} else {
+			req.StopPrice(strconv.FormatFloat(order.StopPrice, 'f', 8, 64))
 		}
-
-		req.StopPrice(order.StopPriceString)
 	}
 
 	// could be IOC or FOK
@@ -813,9 +809,7 @@ func (e *Exchange) submitSpotOrder(ctx context.Context, order types.SubmitOrder)
 		req.NewClientOrderID(clientOrderID)
 	}
 
-	if len(order.QuantityString) > 0 {
-		req.Quantity(order.QuantityString)
-	} else if order.Market.Symbol != "" {
+	if order.Market.Symbol != "" {
 		req.Quantity(order.Market.FormatQuantity(order.Quantity))
 	} else {
 		req.Quantity(strconv.FormatFloat(order.Quantity, 'f', 8, 64))
@@ -824,20 +818,20 @@ func (e *Exchange) submitSpotOrder(ctx context.Context, order types.SubmitOrder)
 	// set price field for limit orders
 	switch order.Type {
 	case types.OrderTypeStopLimit, types.OrderTypeLimit, types.OrderTypeLimitMaker:
-		if len(order.PriceString) > 0 {
-			req.Price(order.PriceString)
-		} else if order.Market.Symbol != "" {
+		if order.Market.Symbol != "" {
 			req.Price(order.Market.FormatPrice(order.Price))
+		} else {
+			req.Price(strconv.FormatFloat(order.Price, 'f', 8, 64))
 		}
 	}
 
 	switch order.Type {
 	case types.OrderTypeStopLimit, types.OrderTypeStopMarket:
-		if len(order.StopPriceString) == 0 {
-			return nil, fmt.Errorf("stop price string can not be empty")
+		if order.Market.Symbol != "" {
+			req.StopPrice(order.Market.FormatPrice(order.StopPrice))
+		} else {
+			req.StopPrice(strconv.FormatFloat(order.StopPrice, 'f', 8, 64))
 		}
-
-		req.StopPrice(order.StopPriceString)
 	}
 
 	if len(order.TimeInForce) > 0 {

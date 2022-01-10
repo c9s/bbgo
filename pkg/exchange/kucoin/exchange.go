@@ -206,9 +206,7 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 			req.ClientOrderID(order.ClientOrderID)
 		}
 
-		if len(order.QuantityString) > 0 {
-			req.Size(order.QuantityString)
-		} else if order.Market.Symbol != "" {
+		if order.Market.Symbol != "" {
 			req.Size(order.Market.FormatQuantity(order.Quantity))
 		} else {
 			req.Size(strconv.FormatFloat(order.Quantity, 'f', 8, 64))
@@ -217,10 +215,10 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 		// set price field for limit orders
 		switch order.Type {
 		case types.OrderTypeStopLimit, types.OrderTypeLimit:
-			if len(order.PriceString) > 0 {
-				req.Price(order.PriceString)
-			} else if order.Market.Symbol != "" {
+			if order.Market.Symbol != "" {
 				req.Price(order.Market.FormatPrice(order.Price))
+			} else {
+				req.Price(strconv.FormatFloat(order.Price, 'f', 8, 64))
 			}
 		}
 

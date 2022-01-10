@@ -6,10 +6,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
-	"github.com/c9s/bbgo/pkg/types"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+
+	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 // OKB is the platform currency of OKEx, pre-allocate static string here
@@ -166,9 +167,7 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 		orderReq.InstrumentID(toLocalSymbol(order.Symbol))
 		orderReq.Side(toLocalSideType(order.Side))
 
-		if len(order.QuantityString) > 0 {
-			orderReq.Quantity(order.QuantityString)
-		} else if order.Market.Symbol != "" {
+		if order.Market.Symbol != "" {
 			orderReq.Quantity(order.Market.FormatQuantity(order.Quantity))
 		} else {
 			orderReq.Quantity(strconv.FormatFloat(order.Quantity, 'f', 8, 64))
@@ -177,10 +176,10 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 		// set price field for limit orders
 		switch order.Type {
 		case types.OrderTypeStopLimit, types.OrderTypeLimit:
-			if len(order.PriceString) > 0 {
-				orderReq.Price(order.PriceString)
-			} else if order.Market.Symbol != "" {
+			if order.Market.Symbol != "" {
 				orderReq.Price(order.Market.FormatPrice(order.Price))
+			} else {
+				orderReq.Price(strconv.FormatFloat(order.Price, 'f', 8, 64))
 			}
 		}
 
