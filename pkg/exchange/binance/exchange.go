@@ -72,7 +72,7 @@ var timeSetter sync.Once
 func New(key, secret string) *Exchange {
 	var client = binance.NewClient(key, secret)
 	client.HTTPClient = &http.Client{Timeout: 15 * time.Second}
-	client.Debug = viper.GetBool("debug")
+	client.Debug = viper.GetBool("debug-binance-client")
 
 	var futuresClient = binance.NewFuturesClient(key, secret)
 	futuresClient.HTTPClient = &http.Client{Timeout: 15 * time.Second}
