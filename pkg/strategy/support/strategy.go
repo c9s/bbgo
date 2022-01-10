@@ -363,14 +363,23 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 
-		s.Notify("Found %s support: the close price %f is below trigger EMA %f and above long term EMA %f and volume %f > minimum volume %f",
-			s.Symbol,
-			closePrice.Float64(),
-			s.triggerEMA.Last(),
-			s.longTermEMA.Last(),
-			kline.Volume,
-			s.MinVolume.Float64(),
-			kline)
+		if s.triggerEMA != nil && s.longTermEMA != nil {
+			s.Notify("Found %s support: the close price %f is below trigger EMA %f and above long term EMA %f and volume %f > minimum volume %f",
+				s.Symbol,
+				closePrice.Float64(),
+				s.triggerEMA.Last(),
+				s.longTermEMA.Last(),
+				kline.Volume,
+				s.MinVolume.Float64(),
+				kline)
+		} else {
+			s.Notify("Found %s support: the close price %f and volume %f > minimum volume %f",
+				s.Symbol,
+				closePrice.Float64(),
+				kline.Volume,
+				s.MinVolume.Float64(),
+				kline)
+		}
 
 		quantity, err := s.calculateQuantity(session, types.SideTypeBuy, closePrice, kline.Volume)
 		if err != nil {
