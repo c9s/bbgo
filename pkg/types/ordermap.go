@@ -3,8 +3,6 @@ package types
 import (
 	"sync"
 	"time"
-
-	log "github.com/sirupsen/logrus"
 )
 
 // OrderMap is used for storing orders by their order id
@@ -114,30 +112,22 @@ func (m *SyncOrderMap) Add(o Order) {
 	m.Lock()
 	defer m.Unlock()
 
-	match := false
+	m.orders.Add(o)
+
 	if len(m.pendingRemoval) > 0 {
-		expireTime := time.Now().Add(-10 * time.Second)
-		newPendingRemoval := make(map[uint64]time.Time, 10)
+		expireTime := time.Now().Add(-5 * time.Minute)
+		removing := make(map[uint64]struct{})
 		for orderID, creationTime := range m.pendingRemoval {
-			if o.OrderID == orderID {
-				log.Warnf("found pending removal orderID = %d, removing order %+v from the store", orderID, o)
-				match = true
-				continue
+			if m.orders.Exists(orderID) || creationTime.Before(expireTime) {
+				m.orders.Remove(orderID)
+				removing[orderID] = struct{}{}
 			}
-
-			if creationTime.Before(expireTime) {
-				continue
-			}
-
-			newPendingRemoval[orderID] = creationTime
 		}
-		m.pendingRemoval = newPendingRemoval
-	}
 
-	if !match {
-		m.orders.Add(o)
+		for orderID := range removing {
+			delete(m.pendingRemoval, orderID)
+		}
 	}
-
 }
 
 func (m *SyncOrderMap) Update(o Order) {
