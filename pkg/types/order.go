@@ -247,17 +247,14 @@ func (o Order) PlainText() string {
 
 func (o Order) SlackAttachment() slack.Attachment {
 	var fields = []slack.AttachmentField{
-		{Title: "Exchange", Value: o.Exchange.String(), Short: true},
 		{Title: "Symbol", Value: o.Symbol, Short: true},
 		{Title: "Side", Value: string(o.Side), Short: true},
-		{Title: "Quantity", Value: trimTrailingZeroFloat(o.Quantity), Short: true},
-		{Title: "Executed Quantity", Value: trimTrailingZeroFloat(o.ExecutedQuantity), Short: true},
-	}
-
-	if len(o.PriceString) > 0 {
-		fields = append(fields, slack.AttachmentField{Title: "Price", Value: o.PriceString, Short: true})
-	} else {
-		fields = append(fields, slack.AttachmentField{Title: "Price", Value: trimTrailingZeroFloat(o.Price), Short: true})
+		{Title: "Price", Value: trimTrailingZeroFloat(o.Price), Short: true},
+		{
+			Title: "Executed Quantity",
+			Value: trimTrailingZeroFloat(o.ExecutedQuantity) + "/" + trimTrailingZeroFloat(o.Quantity),
+			Short: true,
+		},
 	}
 
 	fields = append(fields, slack.AttachmentField{
@@ -266,9 +263,23 @@ func (o Order) SlackAttachment() slack.Attachment {
 		Short: true,
 	})
 
+	orderStatusIcon := ""
+
+	switch o.Status {
+	case OrderStatusNew:
+		orderStatusIcon = ":new:"
+	case OrderStatusCanceled:
+		orderStatusIcon = ":eject:"
+	case OrderStatusPartiallyFilled:
+		orderStatusIcon = ":arrow_forward:"
+	case OrderStatusFilled:
+		orderStatusIcon = ":white_check_mark:"
+
+	}
+
 	fields = append(fields, slack.AttachmentField{
 		Title: "Status",
-		Value: string(o.Status),
+		Value: string(o.Status) + " " + orderStatusIcon,
 		Short: true,
 	})
 
@@ -278,7 +289,7 @@ func (o Order) SlackAttachment() slack.Attachment {
 		Color: SideToColorName(o.Side),
 		Title: string(o.Type) + " Order " + string(o.Side),
 		// Text:   "",
-		Fields: fields,
+		Fields:     fields,
 		FooterIcon: footerIcon,
 		Footer:     strings.ToLower(o.Exchange.String()) + util.Render(" creation time {{ . }}", o.CreationTime.Time().Format(time.StampMilli)),
 	}
