@@ -448,9 +448,7 @@ func (s *Stream) listenKeyKeepAlive(ctx context.Context, listenKey string) {
 		case <-keepAliveTicker.C:
 			for i := 0; i < 5; i++ {
 				err := s.keepaliveListenKey(ctx, listenKey)
-				if err == nil {
-					break
-				} else {
+				if err != nil {
 					time.Sleep(5 * time.Second)
 					switch err.(type) {
 					case net.Error:
@@ -463,6 +461,8 @@ func (s *Stream) listenKeyKeepAlive(ctx context.Context, listenKey string) {
 						return
 
 					}
+				} else {
+					break
 				}
 			}
 
