@@ -306,7 +306,7 @@ func (s *Stream) createEndpoint(ctx context.Context) (string, error) {
 		}
 
 		log.Debugf("listen key is created: %s", util.MaskKey(listenKey))
-		go s.keepaliveListenKey(ctx, listenKey)
+		go s.listenKeyKeepAlive(ctx, listenKey)
 	}
 
 	url := s.getEndpointUrl(listenKey)
