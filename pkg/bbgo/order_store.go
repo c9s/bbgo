@@ -74,12 +74,12 @@ func (s *OrderStore) Exists(oID uint64) (ok bool) {
 	return ok
 }
 
-func (s *OrderStore) Get(oID uint64) (order types.Order) {
+func (s *OrderStore) Get(oID uint64) (order types.Order, ok bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	order, _ = s.orders[oID]
-	return order
+	order, ok = s.orders[oID]
+	return order, ok
 }
 
 func (s *OrderStore) Add(orders ...types.Order) {
