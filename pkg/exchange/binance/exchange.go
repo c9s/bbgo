@@ -545,15 +545,15 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 			if o.OrderID > 0 {
 				req.OrderID(int64(o.OrderID))
 			} else {
-				err = multierr.Append(err, fmt.Errorf(
-					"can not cancel %s order, order does not contain orderID or clientOrderID. %#v",
-					o.Symbol, o))
+				err = multierr.Append(err, types.NewOrderError(
+					fmt.Errorf("can not cancel %s order, order does not contain orderID or clientOrderID", o.Symbol),
+					o))
 				continue
 			}
 
 			_, err2 := req.Do(ctx)
 			if err2 != nil {
-				err = multierr.Append(err, err2)
+				err = multierr.Append(err, types.NewOrderError(err2, o))
 			}
 		}
 
@@ -571,20 +571,15 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 			} else if len(o.ClientOrderID) > 0 {
 				req.OrigClientOrderID(o.ClientOrderID)
 			} else {
-				err = multierr.Append(err, fmt.Errorf(
-					"can not cancel %s order, order does not contain orderID or clientOrderID. %#v",
-					o.Symbol, o))
+				err = multierr.Append(err, types.NewOrderError(
+					fmt.Errorf("can not cancel %s order, order does not contain orderID or clientOrderID", o.Symbol),
+					o))
 				continue
 			}
 
 			_, err2 := req.Do(ctx)
 			if err2 != nil {
-				err = multierr.Append(err, errors.Wrapf(
-					err2, "can not cancel %s order. orderID: %d clientOrderID: %s order: %#v",
-					o.Symbol,
-					o.OrderID,
-					o.ClientOrderID,
-					o))
+				err = multierr.Append(err, types.NewOrderError(err2, o))
 			}
 		} else {
 			// SPOT
@@ -596,20 +591,15 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 			} else if len(o.ClientOrderID) > 0 {
 				req.OrigClientOrderID(o.ClientOrderID)
 			} else {
-				err = multierr.Append(err, fmt.Errorf(
-					"can not cancel %s order, order does not contain orderID or clientOrderID. order: %#v",
-					o.Symbol, o))
+				err = multierr.Append(err, types.NewOrderError(
+					fmt.Errorf("can not cancel %s order, order does not contain orderID or clientOrderID", o.Symbol),
+					o))
 				continue
 			}
 
 			_, err2 := req.Do(ctx)
 			if err2 != nil {
-				err = multierr.Append(err, errors.Wrapf(
-					err2, "can not cancel %s order. orderID: %d clientOrderID: %s order: %#v",
-					o.Symbol,
-					o.OrderID,
-					o.ClientOrderID,
-					o))
+				err = multierr.Append(err, types.NewOrderError(err2, o))
 			}
 		}
 	}
