@@ -23,7 +23,7 @@ import (
 // A PING frame
 // A PONG frame
 // A JSON controlled message (e.g. subscribe, unsubscribe)
-const listenKeyKeepAliveInterval = 10 * time.Minute
+const listenKeyKeepAliveInterval = 15 * time.Minute
 
 type WebSocketCommand struct {
 	// request ID is required
