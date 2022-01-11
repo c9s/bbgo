@@ -53,6 +53,7 @@ type Strategy struct {
 	BidMargin     fixedpoint.Value `json:"bidMargin"`
 	AskMargin     fixedpoint.Value `json:"askMargin"`
 	UseDepthPrice bool             `json:"useDepthPrice"`
+	DepthQuantity fixedpoint.Value `json:"depthQuantity"`
 
 	EnableBollBandMargin bool             `json:"enableBollBandMargin"`
 	BollBandInterval     types.Interval   `json:"bollBandInterval"`
@@ -98,7 +99,7 @@ type Strategy struct {
 	book              *types.StreamOrderBook
 	activeMakerOrders *bbgo.LocalActiveOrderBook
 
-	hedgeErrorLimiter *rate.Limiter
+	hedgeErrorLimiter         *rate.Limiter
 	hedgeErrorRateReservation *rate.Reservation
 
 	orderStore     *bbgo.OrderStore
@@ -345,7 +346,11 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 
 			accumulativeBidQuantity += bidQuantity
 			if s.UseDepthPrice {
-				bidPrice = aggregatePrice(sourceBook.SideBook(types.SideTypeBuy), accumulativeBidQuantity)
+				if s.DepthQuantity > 0 {
+					bidPrice = aggregatePrice(sourceBook.SideBook(types.SideTypeBuy), s.DepthQuantity)
+				} else {
+					bidPrice = aggregatePrice(sourceBook.SideBook(types.SideTypeBuy), accumulativeBidQuantity)
+				}
 			}
 
 			bidPrice = bidPrice.MulFloat64(1.0 - bidMargin.Float64())
@@ -394,7 +399,11 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 			accumulativeAskQuantity += askQuantity
 
 			if s.UseDepthPrice {
-				askPrice = aggregatePrice(sourceBook.SideBook(types.SideTypeSell), accumulativeAskQuantity)
+				if s.DepthQuantity > 0 {
+					askPrice = aggregatePrice(sourceBook.SideBook(types.SideTypeSell), s.DepthQuantity)
+				} else {
+					askPrice = aggregatePrice(sourceBook.SideBook(types.SideTypeSell), accumulativeAskQuantity)
+				}
 			}
 
 			askPrice = askPrice.MulFloat64(1.0 + askMargin.Float64())
@@ -643,7 +652,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		}
 	}
 
-	s.hedgeErrorLimiter = rate.NewLimiter(rate.Every(1 * time.Minute), 1)
+	s.hedgeErrorLimiter = rate.NewLimiter(rate.Every(1*time.Minute), 1)
 
 	// configure sessions
 	sourceSession, ok := sessions[s.SourceExchange]
