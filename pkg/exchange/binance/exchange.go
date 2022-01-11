@@ -546,9 +546,9 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 				req.OrderID(int64(o.OrderID))
 			}
 
-			_, _err := req.Do(ctx)
-			if _err != nil {
-				err = multierr.Append(err, _err)
+			_, err2 := req.Do(ctx)
+			if err2 != nil {
+				err = multierr.Append(err, err2)
 			}
 		}
 
@@ -569,9 +569,14 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 
 			_, err2 := req.Do(ctx)
 			if err2 != nil {
-				err = multierr.Append(err, err2)
+				err = multierr.Append(err, errors.Wrapf(
+					err2, "can not cancel %s order. orderID: %d clientOrderID: %s",
+					o.Symbol,
+					o.OrderID,
+					o.ClientOrderID))
 			}
 		} else {
+			// SPOT
 			var req = e.Client.NewCancelOrderService()
 			req.Symbol(o.Symbol)
 
@@ -583,7 +588,11 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 
 			_, err2 := req.Do(ctx)
 			if err2 != nil {
-				err = multierr.Append(err, err2)
+				err = multierr.Append(err, errors.Wrapf(
+					err2, "can not cancel %s order. orderID: %d clientOrderID: %s",
+					o.Symbol,
+					o.OrderID,
+					o.ClientOrderID))
 			}
 		}
 	}
