@@ -544,6 +544,11 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 
 			if o.OrderID > 0 {
 				req.OrderID(int64(o.OrderID))
+			} else {
+				err = multierr.Append(err, fmt.Errorf(
+					"can not cancel %s order, order does not contain orderID or clientOrderID. %#v",
+					o.Symbol, o))
+				continue
 			}
 
 			_, err2 := req.Do(ctx)
@@ -565,6 +570,11 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 				req.OrderID(int64(o.OrderID))
 			} else if len(o.ClientOrderID) > 0 {
 				req.OrigClientOrderID(o.ClientOrderID)
+			} else {
+				err = multierr.Append(err, fmt.Errorf(
+					"can not cancel %s order, order does not contain orderID or clientOrderID. %#v",
+					o.Symbol, o))
+				continue
 			}
 
 			_, err2 := req.Do(ctx)
@@ -584,6 +594,11 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 				req.OrderID(int64(o.OrderID))
 			} else if len(o.ClientOrderID) > 0 {
 				req.OrigClientOrderID(o.ClientOrderID)
+			} else {
+				err = multierr.Append(err, fmt.Errorf(
+					"can not cancel %s order, order does not contain orderID or clientOrderID. %#v",
+					o.Symbol, o))
+				continue
 			}
 
 			_, err2 := req.Do(ctx)
