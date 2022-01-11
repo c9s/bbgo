@@ -183,6 +183,7 @@ func (trade Trade) SlackAttachment() slack.Attachment {
 		// Pretext: pretext,
 		Color: color,
 		Fields: []slack.AttachmentField{
+			{Title: "Exchange", Value: trade.Exchange.String(), Short: true},
 			{Title: "Price", Value: trimTrailingZeroFloat(trade.Price), Short: true},
 			{Title: "Quantity", Value: trimTrailingZeroFloat(trade.Quantity), Short: true},
 			{Title: "QuoteQuantity", Value: trimTrailingZeroFloat(trade.QuoteQuantity), Short: true},
