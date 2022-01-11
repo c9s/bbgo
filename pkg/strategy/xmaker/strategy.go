@@ -524,6 +524,7 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 		if !s.hedgeErrorRateReservation.OK() {
 			return
 		}
+		s.Notify("Hit hedge error rate limit, waiting...")
 		time.Sleep(s.hedgeErrorRateReservation.Delay())
 		s.hedgeErrorRateReservation = nil
 	}
