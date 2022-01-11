@@ -580,10 +580,11 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 			_, err2 := req.Do(ctx)
 			if err2 != nil {
 				err = multierr.Append(err, errors.Wrapf(
-					err2, "can not cancel %s order. orderID: %d clientOrderID: %s",
+					err2, "can not cancel %s order. orderID: %d clientOrderID: %s status: %s",
 					o.Symbol,
 					o.OrderID,
-					o.ClientOrderID))
+					o.ClientOrderID,
+					o.Status))
 			}
 		} else {
 			// SPOT
@@ -604,10 +605,11 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 			_, err2 := req.Do(ctx)
 			if err2 != nil {
 				err = multierr.Append(err, errors.Wrapf(
-					err2, "can not cancel %s order. orderID: %d clientOrderID: %s",
+					err2, "can not cancel %s order. orderID: %d clientOrderID: %s status: %s",
 					o.Symbol,
 					o.OrderID,
-					o.ClientOrderID))
+					o.ClientOrderID,
+					o.Status))
 			}
 		}
 	}
