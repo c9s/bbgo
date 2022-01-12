@@ -5,9 +5,10 @@ import (
 	"sync"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
-	log "github.com/sirupsen/logrus"
 )
 
 type SnapshotFetcher func() (snapshot types.SliceOrderBook, finalUpdateID int64, err error)
@@ -35,6 +36,10 @@ type Buffer struct {
 	mu     sync.Mutex
 	once   util.Reonce
 
+	// updateTimeout the timeout duration when not receiving update messages
+	updateTimeout time.Duration
+
+	// bufferingPeriod is used to buffer the update message before we get the full depth
 	bufferingPeriod time.Duration
 }
 
@@ -43,6 +48,10 @@ func NewBuffer(fetcher SnapshotFetcher) *Buffer {
 		fetcher: fetcher,
 		resetC:  make(chan struct{}, 1),
 	}
+}
+
+func (b *Buffer) SetUpdateTimeout(d time.Duration) {
+	b.updateTimeout = d
 }
 
 func (b *Buffer) SetBufferingPeriod(d time.Duration) {
