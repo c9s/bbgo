@@ -20,6 +20,26 @@ import (
 	"github.com/c9s/bbgo/pkg/util"
 )
 
+type PriceHeartBeat struct {
+	PriceVolume   types.PriceVolume
+	LastTime      time.Time
+}
+
+func (b *PriceHeartBeat) Update(pv types.PriceVolume) (bool, error) {
+	if b.PriceVolume.Price == 0 || b.PriceVolume != pv {
+		b.PriceVolume = pv
+		b.LastTime = time.Now()
+		return true, nil // successfully updated
+	} else if time.Since(b.LastTime) > priceNotUpdatingTimeout {
+		return false, fmt.Errorf("price %s has not been updating for %s, last update: %s, skip quoting",
+			b.PriceVolume.String(),
+			priceNotUpdatingTimeout,
+			b.LastTime)
+	}
+
+	return false, nil
+}
+
 var defaultMargin = fixedpoint.NewFromFloat(0.003)
 
 const priceNotUpdatingTimeout = 30 * time.Second
@@ -110,6 +130,8 @@ type Strategy struct {
 	lastBidPrice, lastAskPrice         fixedpoint.Value
 	lastBidPriceTime, lastAskPriceTime time.Time
 
+	askPriceHeartBeat, bidPriceHeartBeat PriceHeartBeat
+
 	lastPrice float64
 	groupID   uint32
 
@@ -190,40 +212,14 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 	// use mid-price for the last price
 	s.lastPrice = (bestBid.Price + bestAsk.Price).Float64() / 2
 
-	if s.lastBidPrice == 0 {
-		s.lastBidPrice = bestBid.Price
-		s.lastBidPriceTime = time.Now()
-	} else if s.lastBidPrice != bestBid.Price {
-		s.lastBidPrice = bestAsk.Price
-		s.lastBidPriceTime = time.Now()
-	} else {
-		// same price, check time
-		if time.Since(s.lastBidPriceTime) > priceNotUpdatingTimeout {
-			log.Errorf("%s bid price %f has not been updating for %s, last update: %s, skip quoting",
-				s.Symbol,
-				s.lastBidPrice.Float64(),
-				priceNotUpdatingTimeout,
-				s.lastBidPriceTime)
-			return
-		}
+	if _, err := s.bidPriceHeartBeat.Update(bestBid) ; err != nil {
+		log.WithError(err).Errorf("quote update error, %s price not updating", s.Symbol)
+		return
 	}
 
-	if s.lastAskPrice == 0 {
-		s.lastAskPrice = bestAsk.Price
-		s.lastAskPriceTime = time.Now()
-	} else if s.lastAskPrice != bestAsk.Price {
-		s.lastAskPrice = bestAsk.Price
-		s.lastAskPriceTime = time.Now()
-	} else {
-		// same price, check time
-		if time.Since(s.lastAskPriceTime) > priceNotUpdatingTimeout {
-			log.Errorf("%s ask price %f has not been updating for %s, last update: %s, skip quoting",
-				s.Symbol,
-				s.lastAskPrice.Float64(),
-				priceNotUpdatingTimeout,
-				s.lastAskPriceTime)
-			return
-		}
+	if _, err := s.askPriceHeartBeat.Update(bestAsk) ; err != nil {
+		log.WithError(err).Errorf("quote update error, %s price not updating", s.Symbol)
+		return
 	}
 
 	sourceBook := s.book.CopyDepth(20)
