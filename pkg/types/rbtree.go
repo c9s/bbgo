@@ -11,7 +11,7 @@ type RBTree struct {
 	size int
 }
 
-var neel = &RBNode{ color: Black }
+var neel = &RBNode{color: Black}
 
 func NewRBTree() *RBTree {
 	var root = neel
@@ -147,11 +147,12 @@ func (tree *RBTree) Upsert(key, val fixedpoint.Value) {
 	var y = neel
 	var x = tree.Root
 	var node = &RBNode{
-		key:   key,
-		value: val,
-		color: Red,
-		left:  neel,
-		right: neel,
+		key:    key,
+		value:  val,
+		color:  Red,
+		left:   neel,
+		right:  neel,
+		parent: neel,
 	}
 
 	for x != neel {
@@ -190,6 +191,7 @@ func (tree *RBTree) Insert(key, val fixedpoint.Value) {
 		color: Red,
 		left:  neel,
 		right: neel,
+		parent: neel,
 	}
 
 	for x != neel {
@@ -340,12 +342,8 @@ func (tree *RBTree) RightmostOf(current *RBNode) *RBNode {
 		return nil
 	}
 
-	for current.right != neel && current.right != nil {
+	for current.right != neel {
 		current = current.right
-	}
-
-	if current == neel {
-		return nil
 	}
 
 	return current
@@ -360,12 +358,8 @@ func (tree *RBTree) LeftmostOf(current *RBNode) *RBNode {
 		return nil
 	}
 
-	for current.left != neel && current.left != nil {
+	for current.left != neel {
 		current = current.left
-	}
-
-	if current == neel {
-		return nil
 	}
 
 	return current
@@ -471,7 +465,7 @@ func (tree *RBTree) CopyInorder(limit int) *RBTree {
 	cnt := 0
 	newTree := NewRBTree()
 	tree.Inorder(func(n *RBNode) bool {
-		if cnt >= limit {
+		if limit > 0 && cnt >= limit {
 			return false
 		}
 
