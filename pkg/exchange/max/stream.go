@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -73,14 +72,19 @@ func (s *Stream) handleConnect() {
 			Action: "subscribe",
 		}
 		for _, sub := range s.Subscriptions {
-			var err error
 			var depth int
 
 			if len(sub.Options.Depth) > 0 {
-				depth, err = strconv.Atoi(sub.Options.Depth)
-				if err != nil {
-					log.WithError(err).Errorf("depth parse error, given %v", sub.Options.Depth)
-					continue
+				switch sub.Options.Depth {
+				case types.DepthLevelFull:
+					depth = 0
+
+				case types.DepthLevelMedium:
+					depth = 20
+
+				case types.DepthLevel5:
+					depth = 5
+
 				}
 			}
 

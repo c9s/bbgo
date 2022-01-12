@@ -157,7 +157,7 @@ func toGlobalFuturesBalance(balances []*futures.Balance) types.BalanceMap {
 func toGlobalFuturesPositions(futuresPositions []*futures.AccountPosition) types.FuturesPositionMap {
 	retFuturesPositions := make(types.FuturesPositionMap)
 	for _, futuresPosition := range futuresPositions {
-		retFuturesPositions[futuresPosition.Symbol] = types.FuturesPosition{ //TODO: types.FuturesPosition
+		retFuturesPositions[futuresPosition.Symbol] = types.FuturesPosition{ // TODO: types.FuturesPosition
 			Isolated: futuresPosition.Isolated,
 			PositionRisk: &types.PositionRisk{
 				Leverage: fixedpoint.MustNewFromString(futuresPosition.Leverage),
@@ -172,7 +172,7 @@ func toGlobalFuturesPositions(futuresPositions []*futures.AccountPosition) types
 
 func toGlobalFuturesUserAssets(assets []*futures.AccountAsset) (retAssets map[types.Asset]types.FuturesUserAsset) {
 	for _, asset := range assets {
-		//TODO: or modify to type FuturesAssetMap map[string]FuturesAssetMap
+		// TODO: or modify to type FuturesAssetMap map[string]FuturesAssetMap
 		retAssets[types.Asset{Currency: asset.Asset}] = types.FuturesUserAsset{
 			Asset:                  asset.Asset,
 			InitialMargin:          fixedpoint.MustNewFromString(asset.InitialMargin),
@@ -565,7 +565,28 @@ func convertSubscription(s types.Subscription) string {
 		// depth values: 5, 10, 20
 		// Stream Names: <symbol>@depth<levels> OR <symbol>@depth<levels>@100ms.
 		// Update speed: 1000ms or 100ms
-		return fmt.Sprintf("%s@depth10@100ms", strings.ToLower(s.Symbol))
+		n := strings.ToLower(s.Symbol) + "@depth"
+		switch s.Options.Depth {
+		case types.DepthLevel5:
+			n += "5"
+
+		case types.DepthLevelMedium:
+			n += "20"
+
+		case types.DepthLevelFull:
+		default:
+
+		}
+
+		switch s.Options.Speed {
+		case types.SpeedHigh:
+			n += "@100ms"
+
+		case types.SpeedLow:
+			n += "@1000ms"
+
+		}
+		return n
 	case types.BookTickerChannel:
 		return fmt.Sprintf("%s@bookTicker", strings.ToLower(s.Symbol))
 	}

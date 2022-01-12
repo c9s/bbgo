@@ -387,10 +387,29 @@ func (s *StandardStream) Close() error {
 	return nil
 }
 
+type Depth string
+
+const (
+	DepthLevelFull   Depth = "FULL"
+	DepthLevelMedium Depth = "MEDIUM"
+	DepthLevel1      Depth = "1"
+	DepthLevel5      Depth = "5"
+	DepthLevel20     Depth = "20"
+)
+
+type Speed string
+
+const (
+	SpeedHigh   Speed = "HIGH"
+	SpeedMedium Speed = "MEDIUM"
+	SpeedLow    Speed = "LOW"
+)
+
 // SubscribeOptions provides the standard stream options
 type SubscribeOptions struct {
 	Interval string `json:"interval,omitempty"`
-	Depth    string `json:"depth,omitempty"`
+	Depth    Depth  `json:"depth,omitempty"`
+	Speed    Speed  `json:"speed,omitempty"`
 }
 
 func (o SubscribeOptions) String() string {
@@ -398,7 +417,7 @@ func (o SubscribeOptions) String() string {
 		return o.Interval
 	}
 
-	return o.Depth
+	return string(o.Depth)
 }
 
 type Subscription struct {
