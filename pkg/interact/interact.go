@@ -243,8 +243,13 @@ func parseFuncArgsAndCall(f interface{}, args []string, objects ...interface{}) 
 	}
 
 	out := fv.Call(rArgs)
-	if ft.NumOut() > 0 {
-		outType := ft.Out(0)
+	if ft.NumOut() == 0 {
+		return nil
+	}
+
+	// try to get the error object from the return value
+	for i := 0; i < ft.NumOut(); i++ {
+		outType := ft.Out(i)
 		switch outType.Kind() {
 		case reflect.Interface:
 			o := out[0].Interface()
