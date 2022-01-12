@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net"
 	"strings"
 
@@ -44,6 +45,11 @@ type RedisStore struct {
 }
 
 func (store *RedisStore) Load(val interface{}) error {
+	if store.redis == nil {
+		return errors.New("can not load from redis, possible cause: redis persistence is not configured, or you are trying to use redis in back-test")
+	}
+
+
 	cmd := store.redis.Get(context.Background(), store.ID)
 	data, err := cmd.Result()
 	if err != nil {
