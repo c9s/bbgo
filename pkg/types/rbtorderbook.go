@@ -14,7 +14,8 @@ type RBTOrderBook struct {
 	Symbol string
 	Bids   *RBTree
 	Asks   *RBTree
-	LastUpdateTime time.Time
+
+	lastUpdateTime time.Time
 
 	loadCallbacks   []func(book *RBTOrderBook)
 	updateCallbacks []func(book *RBTOrderBook)
@@ -26,6 +27,10 @@ func NewRBOrderBook(symbol string) *RBTOrderBook {
 		Bids:   NewRBTree(),
 		Asks:   NewRBTree(),
 	}
+}
+
+func (b *RBTOrderBook) LastUpdateTime() time.Time {
+	return b.lastUpdateTime
 }
 
 func (b *RBTOrderBook) BestBid() (PriceVolume, bool) {
@@ -118,14 +123,14 @@ func (b *RBTOrderBook) updateBids(pvs PriceVolumeSlice) {
 func (b *RBTOrderBook) update(book SliceOrderBook) {
 	b.updateBids(book.Bids)
 	b.updateAsks(book.Asks)
-	b.LastUpdateTime = time.Now()
+	b.lastUpdateTime = time.Now()
 }
 
 func (b *RBTOrderBook) load(book SliceOrderBook) {
 	b.Reset()
 	b.updateBids(book.Bids)
 	b.updateAsks(book.Asks)
-	b.LastUpdateTime = time.Now()
+	b.lastUpdateTime = time.Now()
 }
 
 func (b *RBTOrderBook) Copy() OrderBook {

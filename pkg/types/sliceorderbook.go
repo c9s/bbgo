@@ -3,9 +3,11 @@ package types
 import (
 	"fmt"
 	"strings"
+	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/pkg/errors"
 )
 
 // SliceOrderBook is a general order book structure which could be used
@@ -16,6 +18,8 @@ type SliceOrderBook struct {
 	Bids   PriceVolumeSlice
 	Asks   PriceVolumeSlice
 
+	lastUpdateTime time.Time
+
 	loadCallbacks   []func(book *SliceOrderBook)
 	updateCallbacks []func(book *SliceOrderBook)
 }
@@ -24,6 +28,10 @@ func NewSliceOrderBook(symbol string) *SliceOrderBook {
 	return &SliceOrderBook{
 		Symbol: symbol,
 	}
+}
+
+func (b *SliceOrderBook) LastUpdateTime() time.Time {
+	return b.lastUpdateTime
 }
 
 func (b *SliceOrderBook) Spread() (fixedpoint.Value, bool) {
@@ -125,6 +133,7 @@ func (b *SliceOrderBook) updateBids(pvs PriceVolumeSlice) {
 func (b *SliceOrderBook) update(book SliceOrderBook) {
 	b.updateBids(book.Bids)
 	b.updateAsks(book.Asks)
+	b.lastUpdateTime = time.Now()
 }
 
 func (b *SliceOrderBook) Reset() {
