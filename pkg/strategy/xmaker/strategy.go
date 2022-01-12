@@ -107,9 +107,6 @@ type Strategy struct {
 	orderStore     *bbgo.OrderStore
 	tradeCollector *bbgo.TradeCollector
 
-	lastBidPrice, lastAskPrice         fixedpoint.Value
-	lastBidPriceTime, lastAskPriceTime time.Time
-
 	askPriceHeartBeat, bidPriceHeartBeat types.PriceHeartBeat
 
 	lastPrice float64
