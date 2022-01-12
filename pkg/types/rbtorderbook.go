@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/pkg/errors"
 
@@ -13,6 +14,7 @@ type RBTOrderBook struct {
 	Symbol string
 	Bids   *RBTree
 	Asks   *RBTree
+	LastUpdateTime time.Time
 
 	loadCallbacks   []func(book *RBTOrderBook)
 	updateCallbacks []func(book *RBTOrderBook)
@@ -116,12 +118,14 @@ func (b *RBTOrderBook) updateBids(pvs PriceVolumeSlice) {
 func (b *RBTOrderBook) update(book SliceOrderBook) {
 	b.updateBids(book.Bids)
 	b.updateAsks(book.Asks)
+	b.LastUpdateTime = time.Now()
 }
 
 func (b *RBTOrderBook) load(book SliceOrderBook) {
 	b.Reset()
 	b.updateBids(book.Bids)
 	b.updateAsks(book.Asks)
+	b.LastUpdateTime = time.Now()
 }
 
 func (b *RBTOrderBook) Copy() OrderBook {
