@@ -123,6 +123,7 @@ func (b *Buffer) AddUpdate(o types.SliceOrderBook, firstUpdateID int64, finalArg
 		return fmt.Errorf("there is a missing update between %d and %d", u.FirstUpdateID, b.finalUpdateID+1)
 	}
 
+	log.Debugf("depth update id %d -> %d", b.finalUpdateID, u.FinalUpdateID)
 	b.finalUpdateID = u.FinalUpdateID
 	b.EmitPush(u)
 	b.mu.Unlock()
@@ -130,13 +131,12 @@ func (b *Buffer) AddUpdate(o types.SliceOrderBook, firstUpdateID int64, finalArg
 }
 
 func (b *Buffer) fetchAndPush() error {
-	log.Info("fetching depth snapshot...")
 	book, finalUpdateID, err := b.fetcher()
 	if err != nil {
 		return err
 	}
 
-	log.Infof("fetched depth snapshot, final update id %d", finalUpdateID)
+	log.Debugf("fetched depth snapshot, final update id %d", finalUpdateID)
 
 	b.mu.Lock()
 	if len(b.buffer) > 0 {
@@ -151,15 +151,16 @@ func (b *Buffer) fetchAndPush() error {
 
 	var pushUpdates []Update
 	for _, u := range b.buffer {
+		// skip old events
+		if u.FirstUpdateID < finalUpdateID+1 {
+			continue
+		}
+
 		if u.FirstUpdateID > finalUpdateID+1 {
 			b.resetSnapshot()
 			b.emitReset()
 			b.mu.Unlock()
 			return fmt.Errorf("there is a missing depth update, the update id %d > final update id %d + 1", u.FirstUpdateID, finalUpdateID)
-		}
-
-		if u.FirstUpdateID < finalUpdateID+1 {
-			continue
 		}
 
 		pushUpdates = append(pushUpdates, u)
