@@ -11,6 +11,20 @@ import (
 )
 
 func main() {
+	var (
+		// Universal markup builders.
+		menu = &tb.ReplyMarkup{ResizeReplyKeyboard: true}
+
+		// Reply buttons.
+		btnHelp     = menu.Text("ℹ Help")
+		btnSettings = menu.Text("⚙ Settings")
+	)
+
+	menu.Reply(
+		menu.Row(btnHelp),
+		menu.Row(btnSettings),
+	)
+
 	b, err := tb.NewBot(tb.Settings{
 		// You can also set custom API URL.
 		// If field is empty it equals to "https://api.telegram.org".
@@ -30,6 +44,46 @@ func main() {
 		log.Fatal(err)
 		return
 	}
+	// Command: /start <PAYLOAD>
+	b.Handle("/start", func(m *tb.Message) {
+		if !m.Private() {
+			return
+		}
+
+		b.Send(m.Sender, "Hello!", menu)
+	})
+
+	// On reply button pressed (message)
+	b.Handle(&btnHelp, func(m *tb.Message) {
+		var (
+			// Inline buttons.
+			//
+			// Pressing it will cause the client to
+			// send the bot a callback.
+			//
+			// Make sure Unique stays unique as per button kind,
+			// as it has to be for callback routing to work.
+			//
+			selector = &tb.ReplyMarkup{}
+			btnPrev  = selector.Data("⬅", "prev", "data1", "data2")
+			btnNext  = selector.Data("➡", "next", "data1", "data2")
+		)
+		selector.Inline(
+			selector.Row(btnPrev, btnNext),
+		)
+
+		// On inline button pressed (callback)
+		b.Handle(&btnPrev, func(c *tb.Callback) {
+			// Always respond!
+			b.Respond(c, &tb.CallbackResponse{
+				Text:      "callback response",
+				ShowAlert: false,
+				// URL:        "",
+			})
+		})
+
+		b.Send(m.Sender, "help button clicked", selector)
+	})
 
 	b.Handle("/hello", func(m *tb.Message) {
 		fmt.Printf("message: %#v\n", m)
@@ -69,7 +123,7 @@ func main() {
 					// Type:        "photo",
 					// Content:     nil,
 					// ReplyMarkup: nil,
-					ID:          uuid.New().String(),
+					ID: uuid.New().String(),
 				},
 
 				URL: url,
