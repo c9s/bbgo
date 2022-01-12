@@ -36,6 +36,11 @@ var orderbookCmd = &cobra.Command{
 			return fmt.Errorf("--symbol option is required")
 		}
 
+		dumpDepthUpdate, err := cmd.Flags().GetBool("dump-update")
+		if err != nil {
+			return err
+		}
+
 		if userConfig == nil {
 			return errors.New("--config option or config file is missing")
 		}
@@ -56,14 +61,17 @@ var orderbookCmd = &cobra.Command{
 		s.SetPublicOnly()
 		s.Subscribe(types.BookChannel, symbol, types.SubscribeOptions{})
 		s.OnBookSnapshot(func(book types.SliceOrderBook) {
-			log.Infof("orderbook snapshot: %s", book.String())
+			if dumpDepthUpdate {
+				log.Infof("orderbook snapshot: %s", book.String())
+			}
+
 			orderBook.Load(book)
 
-			if ok, err := orderBook.IsValid() ; !ok {
+			if ok, err := orderBook.IsValid(); !ok {
 				log.WithError(err).Panicf("invalid error book snapshot")
 			}
 
-			if bid, ask, ok := orderBook.BestBidAndAsk() ; ok {
+			if bid, ask, ok := orderBook.BestBidAndAsk(); ok {
 				log.Infof("ASK | %f x %f / %f x %f | BID",
 					ask.Volume.Float64(), ask.Price.Float64(),
 					bid.Price.Float64(), bid.Volume.Float64())
@@ -71,10 +79,12 @@ var orderbookCmd = &cobra.Command{
 		})
 
 		s.OnBookUpdate(func(book types.SliceOrderBook) {
-			log.Infof("orderbook update: %s", book.String())
+			if dumpDepthUpdate {
+				log.Infof("orderbook update: %s", book.String())
+			}
 			orderBook.Update(book)
 
-			if bid, ask, ok := orderBook.BestBidAndAsk() ; ok {
+			if bid, ask, ok := orderBook.BestBidAndAsk(); ok {
 				log.Infof("ASK | %f x %f / %f x %f | BID",
 					ask.Volume.Float64(), ask.Price.Float64(),
 					bid.Price.Float64(), bid.Volume.Float64())
@@ -152,6 +162,7 @@ var orderUpdateCmd = &cobra.Command{
 func init() {
 	orderbookCmd.Flags().String("session", "", "session name")
 	orderbookCmd.Flags().String("symbol", "", "the trading pair. e.g, BTCUSDT, LTCUSDT...")
+	orderbookCmd.Flags().Bool("dump-update", false, "dump the depth update")
 
 	orderUpdateCmd.Flags().String("session", "", "session name")
 	RootCmd.AddCommand(orderbookCmd)
