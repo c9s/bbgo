@@ -79,19 +79,23 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 	stream.OnDepthEvent(func(e *DepthEvent) {
 		f, ok := stream.depthBuffers[e.Symbol]
 		if ok {
-			f.AddUpdate(types.SliceOrderBook{
+			err := f.AddUpdate(types.SliceOrderBook{
 				Symbol: e.Symbol,
 				Bids:   e.Bids,
 				Asks:   e.Asks,
 			}, e.FirstUpdateID, e.FinalUpdateID)
+			if err != nil {
+				log.WithError(err).Errorf("found missing %s update event", e.Symbol)
+			}
 		} else {
 			f = depth.NewBuffer(func() (types.SliceOrderBook, int64, error) {
+				log.Infof("fetching %s depth...", e.Symbol)
 				return ex.QueryDepth(context.Background(), e.Symbol)
 			})
 			f.SetBufferingPeriod(time.Second)
 			f.OnReady(func(snapshot types.SliceOrderBook, updates []depth.Update) {
 				if valid, err := snapshot.IsValid(); !valid {
-					log.Errorf("depth snapshot is invalid, error: %v", err)
+					log.Errorf("%s depth snapshot is invalid, error: %v", e.Symbol, err)
 					return
 				}
 
