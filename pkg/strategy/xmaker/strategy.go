@@ -189,13 +189,19 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 	// use mid-price for the last price
 	s.lastPrice = (bestBid.Price + bestAsk.Price).Float64() / 2
 
+	bookLastUpdateTime := s.book.LastUpdateTime()
+
 	if _, err := s.bidPriceHeartBeat.Update(bestBid, priceUpdateTimeout) ; err != nil {
-		log.WithError(err).Errorf("quote update error, %s price not updating", s.Symbol)
+		log.WithError(err).Errorf("quote update error, %s price not updating, order book last update: %s ago",
+			s.Symbol,
+			time.Since(bookLastUpdateTime))
 		return
 	}
 
 	if _, err := s.askPriceHeartBeat.Update(bestAsk, priceUpdateTimeout) ; err != nil {
-		log.WithError(err).Errorf("quote update error, %s price not updating", s.Symbol)
+		log.WithError(err).Errorf("quote update error, %s price not updating, order book last update: %s ago",
+			s.Symbol,
+			time.Since(bookLastUpdateTime))
 		return
 	}
 
