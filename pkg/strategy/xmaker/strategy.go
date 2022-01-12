@@ -22,6 +22,8 @@ import (
 
 var defaultMargin = fixedpoint.NewFromFloat(0.003)
 
+const priceNotUpdatingTimeout = 30 * time.Second
+
 const ID = "xmaker"
 
 const stateKey = "state-v1"
@@ -105,6 +107,9 @@ type Strategy struct {
 	orderStore     *bbgo.OrderStore
 	tradeCollector *bbgo.TradeCollector
 
+	lastBidPrice, lastAskPrice         fixedpoint.Value
+	lastBidPriceTime, lastAskPriceTime time.Time
+
 	lastPrice float64
 	groupID   uint32
 
@@ -184,6 +189,42 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 
 	// use mid-price for the last price
 	s.lastPrice = (bestBid.Price + bestAsk.Price).Float64() / 2
+
+	if s.lastBidPrice == 0 {
+		s.lastBidPrice = bestBid.Price
+		s.lastBidPriceTime = time.Now()
+	} else if s.lastBidPrice != bestBid.Price {
+		s.lastBidPrice = bestAsk.Price
+		s.lastBidPriceTime = time.Now()
+	} else {
+		// same price, check time
+		if time.Since(s.lastBidPriceTime) > priceNotUpdatingTimeout {
+			log.Errorf("%s bid price %f has not been updating for %s, last update: %s, skip quoting",
+				s.Symbol,
+				s.lastBidPrice.Float64(),
+				priceNotUpdatingTimeout,
+				s.lastBidPriceTime)
+			return
+		}
+	}
+
+	if s.lastAskPrice == 0 {
+		s.lastAskPrice = bestAsk.Price
+		s.lastAskPriceTime = time.Now()
+	} else if s.lastAskPrice != bestAsk.Price {
+		s.lastAskPrice = bestAsk.Price
+		s.lastAskPriceTime = time.Now()
+	} else {
+		// same price, check time
+		if time.Since(s.lastAskPriceTime) > priceNotUpdatingTimeout {
+			log.Errorf("%s ask price %f has not been updating for %s, last update: %s, skip quoting",
+				s.Symbol,
+				s.lastAskPrice.Float64(),
+				priceNotUpdatingTimeout,
+				s.lastAskPriceTime)
+			return
+		}
+	}
 
 	sourceBook := s.book.CopyDepth(20)
 	if valid, err := sourceBook.IsValid(); !valid {
