@@ -562,7 +562,10 @@ func convertSubscription(s types.Subscription) string {
 	case types.KLineChannel:
 		return fmt.Sprintf("%s@%s_%s", strings.ToLower(s.Symbol), s.Channel, s.Options.String())
 	case types.BookChannel:
-		return fmt.Sprintf("%s@depth", strings.ToLower(s.Symbol))
+		// depth values: 5, 10, 20
+		// Stream Names: <symbol>@depth<levels> OR <symbol>@depth<levels>@100ms.
+		// Update speed: 1000ms or 100ms
+		return fmt.Sprintf("%s@depth10@100ms", strings.ToLower(s.Symbol))
 	case types.BookTickerChannel:
 		return fmt.Sprintf("%s@bookTicker", strings.ToLower(s.Symbol))
 	}
