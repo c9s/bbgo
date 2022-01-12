@@ -1,4 +1,4 @@
-package bbgo
+package interact
 
 import (
 	"errors"
@@ -41,4 +41,36 @@ func Test_parseCommand(t *testing.T) {
 	assert.Equal(t, "BTC USDT", args[1])
 	assert.Equal(t, "3.1415926", args[2])
 	assert.Equal(t, "market", args[3])
+}
+
+type TestState int
+
+const (
+	TestStateStart = 0
+
+	TestStateShowNetAssetValue = 101
+
+	TestStateShowPositionChoosingSymbol = 201
+
+	TestStateClosePositionChoosingSymbol = 301
+	TestStateClosePositionEnteringPercentage = 302
+	TestStateClosePositionConfirming = 303
+)
+
+type TestInteraction struct {
+	State TestState
+}
+
+func (m *TestInteraction) HandleMessage() {
+
+}
+
+func (m *TestInteraction) Commands(interact *Interact) {
+	interact.Command("closePosition", func() {
+
+	})
+}
+
+func TestCustomInteraction(t *testing.T) {
+
 }

@@ -1,4 +1,4 @@
-package bbgo
+package interact
 
 import (
 	"reflect"
@@ -11,11 +11,23 @@ import (
 
 // Interact implements the interaction between bot and message software.
 type Interact struct {
-	Commands map[string]func()
+	Commands map[string]interface{}
+}
+
+func New()  *Interact {
+	return &Interact{}
+}
+
+func (i *Interact) Command(command string, f interface{}) {
+	i.Commands[command] = f
 }
 
 func (i *Interact) HandleTelegramMessage(msg *telebot.Message) {
-
+	// For registered commands, will contain the string payload
+	// msg.Payload
+	// msg.Text
+	args := parseCommand(msg.Text)
+	_ = args
 }
 
 func parseCommand(src string) (args []string) {
