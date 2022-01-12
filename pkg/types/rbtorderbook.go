@@ -3,8 +3,9 @@ package types
 import (
 	"fmt"
 
-	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/pkg/errors"
+
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 //go:generate callbackgen -type RBTOrderBook
@@ -125,15 +126,15 @@ func (b *RBTOrderBook) load(book SliceOrderBook) {
 
 func (b *RBTOrderBook) Copy() OrderBook {
 	var book = NewRBOrderBook(b.Symbol)
-	book.Asks = b.Asks.Copy()
-	book.Bids = b.Bids.Copy()
+	book.Asks = b.Asks.CopyInorder(0)
+	book.Bids = b.Bids.CopyInorder(0)
 	return book
 }
 
 func (b *RBTOrderBook) CopyDepth(limit int) OrderBook {
 	var book = NewRBOrderBook(b.Symbol)
 	book.Asks = b.Asks.CopyInorder(limit)
-	book.Bids = b.Bids.CopyInorderReverse(limit)
+	book.Bids = b.Bids.CopyInorder(limit)
 	return book
 }
 
