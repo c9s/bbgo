@@ -152,3 +152,29 @@ func toGlobalKLine(symbol string, interval types.Interval, h Candle) (types.KLin
 		Closed:    true,
 	}, nil
 }
+
+type OrderType string
+
+const (
+	OrderTypeLimit  OrderType = "limit"
+	OrderTypeMarket OrderType = "market"
+)
+
+func toLocalOrderType(orderType types.OrderType) (OrderType, bool, bool, error) {
+	switch orderType {
+
+	case types.OrderTypeLimitMaker:
+		return OrderTypeLimit, true, false, nil
+
+	case types.OrderTypeLimit:
+		return OrderTypeLimit, false, false, nil
+
+	case types.OrderTypeMarket:
+		return OrderTypeMarket, false, false, nil
+
+	case types.OrderTypeIOCLimit:
+		return OrderTypeLimit, false, true, nil
+	}
+
+	return "", false, false, fmt.Errorf("order type %s not supported", orderType)
+}

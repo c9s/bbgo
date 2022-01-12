@@ -100,3 +100,43 @@ func TestTrimLowerString(t *testing.T) {
 func Test_toGlobalSymbol(t *testing.T) {
 	assert.Equal(t, "BTCUSDT", toGlobalSymbol("BTC/USDT"))
 }
+
+func Test_toLocalOrderTypeWithLimitMaker(t *testing.T) {
+
+	orderType, postOnly, IOC, err := toLocalOrderType(types.OrderTypeLimitMaker)
+
+	assert.NoError(t, err)
+	assert.Equal(t, orderType, OrderTypeLimit)
+	assert.Equal(t, postOnly, true)
+	assert.Equal(t, IOC, false)
+}
+
+func Test_toLocalOrderTypeWithLimit(t *testing.T) {
+
+	orderType, postOnly, IOC, err := toLocalOrderType(types.OrderTypeLimit)
+
+	assert.NoError(t, err)
+	assert.Equal(t, orderType, OrderTypeLimit)
+	assert.Equal(t, postOnly, false)
+	assert.Equal(t, IOC, false)
+}
+
+func Test_toLocalOrderTypeWithMarket(t *testing.T) {
+
+	orderType, postOnly, IOC, err := toLocalOrderType(types.OrderTypeMarket)
+
+	assert.NoError(t, err)
+	assert.Equal(t, orderType, OrderTypeMarket)
+	assert.Equal(t, postOnly, false)
+	assert.Equal(t, IOC, false)
+}
+
+func Test_toLocalOrderTypeWithIOCLimit(t *testing.T) {
+
+	orderType, postOnly, IOC, err := toLocalOrderType(types.OrderTypeIOCLimit)
+
+	assert.NoError(t, err)
+	assert.Equal(t, orderType, OrderTypeLimit)
+	assert.Equal(t, postOnly, false)
+	assert.Equal(t, IOC, true)
+}
