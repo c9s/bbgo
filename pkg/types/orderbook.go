@@ -51,6 +51,13 @@ func (b *MutexOrderBook) IsValid() (ok bool, err error) {
 	return ok, err
 }
 
+func (b *MutexOrderBook) LastUpdateTime() time.Time {
+	b.Lock()
+	t := b.OrderBook.LastUpdateTime()
+	b.Unlock()
+	return t
+}
+
 func (b *MutexOrderBook) BestBidAndAsk() (bid, ask PriceVolume, ok bool) {
 	var ok1, ok2 bool
 	b.Lock()
