@@ -3,12 +3,13 @@ package ftx
 import (
 	"context"
 	"fmt"
-	"golang.org/x/time/rate"
 	"net/http"
 	"net/url"
 	"sort"
 	"strings"
 	"time"
+
+	"golang.org/x/time/rate"
 
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
@@ -454,15 +455,19 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 		if err := requestLimit.Wait(ctx); err != nil {
 			logrus.WithError(err).Error("rate limit error")
 		}
+		orderType, postOnly, IOC, err := toLocalOrderType(so.Type)
+		if err != nil {
+			logrus.WithError(err).Error("type error")
+		}
 		or, err := e.newRest().PlaceOrder(ctx, PlaceOrderPayload{
 			Market:     toLocalSymbol(TrimUpperString(so.Symbol)),
 			Side:       TrimLowerString(string(so.Side)),
 			Price:      so.Price,
-			Type:       TrimLowerString(string(so.Type)),
+			Type:       string(orderType),
 			Size:       so.Quantity,
 			ReduceOnly: false,
-			IOC:        false,
-			PostOnly:   false,
+			IOC:        IOC,
+			PostOnly:   postOnly,
 			ClientID:   newSpotClientOrderID(so.ClientOrderID),
 		})
 		if err != nil {
