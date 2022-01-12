@@ -36,8 +36,10 @@ func Test_parseFuncArgsAndCall_InterfaceInjection(t *testing.T) {
 		return err
 	}
 
-	err := parseFuncArgsAndCall(f, []string{"BTCUSDT", "0.123"}, bytes.NewBuffer(nil))
-	assert.Error(t, err)
+	buf := bytes.NewBuffer(nil)
+	err := parseFuncArgsAndCall(f, []string{"BTCUSDT", "0.123"}, buf)
+	assert.NoError(t, err)
+	assert.Equal(t, "123", buf.String())
 }
 
 func Test_parseCommand(t *testing.T) {
