@@ -4,8 +4,9 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 func TestRBTree_InsertAndDelete(t *testing.T) {
@@ -94,7 +95,7 @@ func TestTree_Copy(t *testing.T) {
 	tree.Insert(fixedpoint.NewFromFloat(4000.0), fixedpoint.NewFromFloat(2.0))
 	tree.Insert(fixedpoint.NewFromFloat(2000.0), fixedpoint.NewFromFloat(3.0))
 
-	newTree := tree.Copy()
+	newTree := tree.CopyInorder(0)
 	node1 := newTree.Search(fixedpoint.NewFromFloat(2000.0))
 	assert.NotNil(t, node1)
 	assert.Equal(t, fixedpoint.NewFromFloat(2000.0), node1.key)

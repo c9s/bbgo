@@ -186,11 +186,11 @@ func (tree *RBTree) Insert(key, val fixedpoint.Value) {
 	var y = neel
 	var x = tree.Root
 	var node = &RBNode{
-		key:   key,
-		value: val,
-		color: Red,
-		left:  neel,
-		right: neel,
+		key:    key,
+		value:  val,
+		color:  Red,
+		left:   neel,
+		right:  neel,
 		parent: neel,
 	}
 
@@ -435,17 +435,6 @@ func (tree *RBTree) PostorderOf(current *RBNode, cb func(n *RBNode) bool) {
 	}
 }
 
-func (tree *RBTree) copyNode(node *RBNode) *RBNode {
-	if node == neel {
-		return neel
-	}
-
-	newNode := *node
-	newNode.left = tree.copyNode(node.left)
-	newNode.right = tree.copyNode(node.right)
-	return &newNode
-}
-
 func (tree *RBTree) CopyInorderReverse(limit int) *RBTree {
 	cnt := 0
 	newTree := NewRBTree()
@@ -482,10 +471,4 @@ func (tree *RBTree) Print() {
 		fmt.Printf("%f -> %f\n", n.key.Float64(), n.value.Float64())
 		return true
 	})
-}
-
-func (tree *RBTree) Copy() *RBTree {
-	newTree := NewRBTree()
-	newTree.Root = tree.copyNode(tree.Root)
-	return newTree
 }
