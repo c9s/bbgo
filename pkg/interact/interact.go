@@ -164,15 +164,40 @@ func parseCommand(src string) (args []string) {
 	return args
 }
 
-func parseFuncArgsAndCall(f interface{}, args []string) error {
+func parseFuncArgsAndCall(f interface{}, args []string, objects ...interface{}) error {
 	fv := reflect.ValueOf(f)
 	ft := reflect.TypeOf(f)
+
+	objectIndex := 0
 
 	var rArgs []reflect.Value
 	for i := 0; i < ft.NumIn(); i++ {
 		at := ft.In(i)
 
 		switch k := at.Kind(); k {
+
+		case reflect.Interface:
+			found := false
+			for oi := objectIndex; oi < len(objects)-1; oi++ {
+				obj := objects[oi]
+				objT := reflect.TypeOf(obj)
+				objV := reflect.ValueOf(obj)
+
+				fmt.Println(
+					at.PkgPath(),
+					at.Name(),
+					"implements", at, " = ", objT.Implements(at),
+				)
+
+				if objT.Implements(at) {
+					found = true
+					rArgs = append(rArgs, objV)
+					break
+				}
+			}
+			if !found {
+				return fmt.Errorf("can not find object implements %s", at)
+			}
 
 		case reflect.String:
 			av := reflect.ValueOf(args[i])

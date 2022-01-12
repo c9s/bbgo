@@ -1,7 +1,9 @@
 package interact
 
 import (
+	"bytes"
 	"errors"
+	"io"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -26,7 +28,16 @@ func Test_parseFuncArgsAndCall_ErrorFunction(t *testing.T) {
 
 	err := parseFuncArgsAndCall(errorFunc, []string{"BTCUSDT", "0.123"})
 	assert.Error(t, err)
+}
 
+func Test_parseFuncArgsAndCall_InterfaceInjection(t *testing.T) {
+	f := func(w io.Writer, a string, b float64) error {
+		_, err := w.Write([]byte("123"))
+		return err
+	}
+
+	err := parseFuncArgsAndCall(f, []string{"BTCUSDT", "0.123"}, bytes.NewBuffer(nil))
+	assert.Error(t, err)
 }
 
 func Test_parseCommand(t *testing.T) {
@@ -43,19 +54,21 @@ func Test_parseCommand(t *testing.T) {
 	assert.Equal(t, "market", args[3])
 }
 
-
 type closePositionTask struct {
-	symbol string
+	symbol     string
 	percentage float64
-	confirmed bool
+	confirmed  bool
 }
 
 type TestInteraction struct {
 	closePositionTask closePositionTask
 }
 
+type Reply interface {
+}
+
 func (m *TestInteraction) Commands(interact *Interact) {
-	interact.Command("closePosition", func() error {
+	interact.Command("closePosition", func(reply Reply) error {
 		// send symbol options
 		return nil
 	}).Next(func(symbol string) error {
