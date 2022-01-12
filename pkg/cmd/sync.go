@@ -64,12 +64,7 @@ var SyncCmd = &cobra.Command{
 		)
 
 		if len(since) > 0 {
-			loc, err := time.LoadLocation("Local")
-			if err != nil {
-				return err
-			}
-
-			startTime, err = time.ParseInLocation("2006-01-02", since, loc)
+			startTime, err = time.ParseInLocation("2006-01-02", since, time.Local)
 			if err != nil {
 				return err
 			}

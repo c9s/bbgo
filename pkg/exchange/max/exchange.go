@@ -732,6 +732,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	}
 
 	// MAX uses exclusive last trade ID
+	// the timestamp parameter is used for reverse order, we can't use it.
 	if options.LastTradeID > 0 {
 		req.From(int64(options.LastTradeID))
 	}
