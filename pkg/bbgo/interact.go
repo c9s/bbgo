@@ -1,11 +1,10 @@
 package bbgo
 
 import (
-	"errors"
-	"go/scanner"
-	"go/token"
 	"reflect"
 	"strconv"
+	"strings"
+	"text/scanner"
 
 	"gopkg.in/tucnak/telebot.v2"
 )
@@ -19,31 +18,19 @@ func (i *Interact) HandleTelegramMessage(msg *telebot.Message) {
 
 }
 
-func parseCommand(text string) (args []string, err error) {
-	src := []byte(text)
-
-	// Initialize the scanner.
-	var errHandler scanner.ErrorHandler = func(pos token.Position, msg string) {
-		err = errors.New(msg)
-	}
-
+func parseCommand(src string) (args []string) {
 	var s scanner.Scanner
-	fset := token.NewFileSet()                      // positions are relative to fset
-	file := fset.AddFile("", fset.Base(), len(src)) // register input "file"
-	s.Init(file, src, errHandler, 0)
-
-	// Repeated calls to Scan yield the token sequence found in the input.
-	for {
-		_, tok, lit := s.Scan()
-		if tok == token.EOF {
-			break
+	s.Init(strings.NewReader(src))
+	s.Filename = "command"
+	for tok := s.Scan(); tok != scanner.EOF; tok = s.Scan() {
+		text := s.TokenText()
+		if text[0] == '"' && text[len(text) - 1] == '"' {
+			text, _ = strconv.Unquote(text)
 		}
-
-		// we are not using the token type right now, but we will use them later
-		args = append(args, lit)
+		args = append(args,text)
 	}
 
-	return args, nil
+	return args
 }
 
 func parseFuncArgsAndCall(f interface{}, args []string) error {

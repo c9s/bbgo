@@ -30,6 +30,15 @@ func Test_parseFuncArgsAndCall_ErrorFunction(t *testing.T) {
 }
 
 func Test_parseCommand(t *testing.T) {
+	args := parseCommand(`closePosition "BTC USDT" 3.1415926 market`)
+	t.Logf("args: %+v", args)
+	for i, a := range args {
+		t.Logf("args(%d): %#v", i, a)
+	}
 
+	assert.Equal(t, 4, len(args))
+	assert.Equal(t, "closePosition", args[0])
+	assert.Equal(t, "BTC USDT", args[1])
+	assert.Equal(t, "3.1415926", args[2])
+	assert.Equal(t, "market", args[3])
 }
-
