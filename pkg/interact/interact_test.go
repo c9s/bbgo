@@ -43,34 +43,70 @@ func Test_parseCommand(t *testing.T) {
 	assert.Equal(t, "market", args[3])
 }
 
-type TestState int
 
-const (
-	TestStateStart = 0
-
-	TestStateShowNetAssetValue = 101
-
-	TestStateShowPositionChoosingSymbol = 201
-
-	TestStateClosePositionChoosingSymbol = 301
-	TestStateClosePositionEnteringPercentage = 302
-	TestStateClosePositionConfirming = 303
-)
-
-type TestInteraction struct {
-	State TestState
+type closePositionTask struct {
+	symbol string
+	percentage float64
+	confirmed bool
 }
 
-func (m *TestInteraction) HandleMessage() {
-
+type TestInteraction struct {
+	closePositionTask closePositionTask
 }
 
 func (m *TestInteraction) Commands(interact *Interact) {
-	interact.Command("closePosition", func() {
+	interact.Command("closePosition", func() error {
+		// send symbol options
+		return nil
+	}).Next(func(symbol string) error {
+		// get symbol from user
+		m.closePositionTask.symbol = symbol
 
+		// send percentage options
+		return nil
+	}).Next(func(percentage float64) error {
+		// get percentage from user
+		m.closePositionTask.percentage = percentage
+
+		// send confirmation
+		return nil
+	}).Next(func(confirmed bool) error {
+		m.closePositionTask.confirmed = confirmed
+		// call position close
+
+		// reply result
+		return nil
 	})
 }
 
 func TestCustomInteraction(t *testing.T) {
+	globalInteraction := New()
+	testInteraction := &TestInteraction{}
+	testInteraction.Commands(globalInteraction)
 
+	err := globalInteraction.init()
+	assert.NoError(t, err)
+
+	err = globalInteraction.runCommand("closePosition")
+	assert.NoError(t, err)
+
+	assert.Equal(t, "closePosition_1", globalInteraction.curState)
+
+	err = globalInteraction.handleResponse("BTCUSDT")
+	assert.NoError(t, err)
+	assert.Equal(t, "closePosition_2", globalInteraction.curState)
+
+	err = globalInteraction.handleResponse("0.20")
+	assert.NoError(t, err)
+	assert.Equal(t, "closePosition_3", globalInteraction.curState)
+
+	err = globalInteraction.handleResponse("true")
+	assert.NoError(t, err)
+	assert.Equal(t, "closePosition_4", globalInteraction.curState)
+
+	assert.Equal(t, closePositionTask{
+		symbol:     "BTCUSDT",
+		percentage: 0.2,
+		confirmed:  true,
+	}, testInteraction.closePositionTask)
 }
