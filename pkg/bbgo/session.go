@@ -347,6 +347,11 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 		}
 	}
 
+	// add trade logger
+	session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
+		log.Info(trade.String())
+	})
+
 	if viper.GetBool("debug-kline") {
 		session.MarketDataStream.OnKLine(func(kline types.KLine) {
 			log.WithField("marketData", "kline").Infof("kline: %+v", kline)
