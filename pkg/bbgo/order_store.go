@@ -74,6 +74,16 @@ func (s *OrderStore) Exists(oID uint64) (ok bool) {
 	return ok
 }
 
+// Get a single order from the order store by order ID
+// Should check ok to make sure the order is returned successfully
+func (s *OrderStore) Get(oID uint64) (order types.Order, ok bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	order, ok = s.orders[oID]
+	return order, ok
+}
+
 func (s *OrderStore) Add(orders ...types.Order) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
