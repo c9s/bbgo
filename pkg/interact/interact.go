@@ -169,6 +169,7 @@ func parseFuncArgsAndCall(f interface{}, args []string, objects ...interface{}) 
 	ft := reflect.TypeOf(f)
 
 	objectIndex := 0
+	argIndex := 0
 
 	var rArgs []reflect.Value
 	for i := 0; i < ft.NumIn(); i++ {
@@ -178,7 +179,12 @@ func parseFuncArgsAndCall(f interface{}, args []string, objects ...interface{}) 
 
 		case reflect.Interface:
 			found := false
-			for oi := objectIndex; oi < len(objects)-1; oi++ {
+
+			if objectIndex >= len(objects) {
+				return fmt.Errorf("found interface type %s, but object args are empty", at)
+			}
+
+			for oi := objectIndex; oi < len(objects); oi++ {
 				obj := objects[oi]
 				objT := reflect.TypeOf(obj)
 				objV := reflect.ValueOf(obj)
@@ -186,12 +192,13 @@ func parseFuncArgsAndCall(f interface{}, args []string, objects ...interface{}) 
 				fmt.Println(
 					at.PkgPath(),
 					at.Name(),
-					"implements", at, " = ", objT.Implements(at),
+					objT, "implements", at, "=", objT.Implements(at),
 				)
 
 				if objT.Implements(at) {
 					found = true
 					rArgs = append(rArgs, objV)
+					objectIndex = oi + 1
 					break
 				}
 			}
@@ -200,34 +207,38 @@ func parseFuncArgsAndCall(f interface{}, args []string, objects ...interface{}) 
 			}
 
 		case reflect.String:
-			av := reflect.ValueOf(args[i])
+			av := reflect.ValueOf(args[argIndex])
 			rArgs = append(rArgs, av)
+			argIndex++
 
 		case reflect.Bool:
-			bv, err := strconv.ParseBool(args[i])
+			bv, err := strconv.ParseBool(args[argIndex])
 			if err != nil {
 				return err
 			}
 			av := reflect.ValueOf(bv)
 			rArgs = append(rArgs, av)
+			argIndex++
 
 		case reflect.Int64:
-			nf, err := strconv.ParseInt(args[i], 10, 64)
+			nf, err := strconv.ParseInt(args[argIndex], 10, 64)
 			if err != nil {
 				return err
 			}
 
 			av := reflect.ValueOf(nf)
 			rArgs = append(rArgs, av)
+			argIndex++
 
 		case reflect.Float64:
-			nf, err := strconv.ParseFloat(args[i], 64)
+			nf, err := strconv.ParseFloat(args[argIndex], 64)
 			if err != nil {
 				return err
 			}
 
 			av := reflect.ValueOf(nf)
 			rArgs = append(rArgs, av)
+			argIndex++
 		}
 	}
 
