@@ -71,7 +71,6 @@ func (n *Notifier) NotifyTo(channel string, obj interface{}, args ...interface{}
 	switch a := obj.(type) {
 
 	case string:
-		log.Infof(a, pureArgs...)
 		message = fmt.Sprintf(a, pureArgs...)
 
 	case types.PlainText:
