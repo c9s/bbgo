@@ -120,7 +120,10 @@ func (b *Buffer) AddUpdate(o types.SliceOrderBook, firstUpdateID int64, finalArg
 		b.resetSnapshot()
 		b.emitReset()
 		b.mu.Unlock()
-		return fmt.Errorf("there is a missing update between %d and %d", u.FirstUpdateID, b.finalUpdateID+1)
+		return fmt.Errorf("found missing update between finalUpdateID %d and firstUpdateID %d, diff: %d",
+			b.finalUpdateID+1,
+			u.FirstUpdateID,
+			u.FirstUpdateID-b.finalUpdateID)
 	}
 
 	log.Debugf("depth update id %d -> %d", b.finalUpdateID, u.FinalUpdateID)
