@@ -112,7 +112,7 @@ func TestTree_Copy(t *testing.T) {
 	assert.Equal(t, fixedpoint.NewFromFloat(2.0), node3.value)
 }
 
-func TestTree(t *testing.T) {
+func TestRBTree_basic(t *testing.T) {
 	tree := NewRBTree()
 	tree.Insert(fixedpoint.NewFromFloat(3000.0), fixedpoint.NewFromFloat(10.0))
 	assert.NotNil(t, tree.Root)
@@ -140,4 +140,79 @@ func TestTree(t *testing.T) {
 	deleted = tree.Delete(fixedpoint.NewFromFloat(1500.0))
 	assert.True(t, deleted)
 
+}
+
+func TestRBTree_bulkInsert(t *testing.T) {
+	var pvs = map[fixedpoint.Value]fixedpoint.Value{}
+	var tree = NewRBTree()
+	for i := 0; i < 1000000; i++ {
+		price := fixedpoint.NewFromFloat(rand.Float64())
+		volume := fixedpoint.NewFromFloat(rand.Float64())
+		tree.Upsert(price, volume)
+		pvs[price] = volume
+	}
+	tree.Inorder(func(n *RBNode) bool {
+		if n.left != neel {
+			if !assert.Greater(t, n.key, n.left.key) {
+				return false
+			}
+		}
+		if n.right != neel {
+			if !assert.Less(t, n.key, n.right.key) {
+				return false
+			}
+		}
+		return true
+	})
+}
+
+func TestRBTree_bulkInsertAndDelete(t *testing.T) {
+	var pvs = map[fixedpoint.Value]fixedpoint.Value{}
+
+	var getRandomPrice = func() fixedpoint.Value {
+		for p := range pvs {
+			return p
+		}
+		return 0
+	}
+
+	var tree = NewRBTree()
+	for i := 0; i < 1000000; i++ {
+		price := fixedpoint.NewFromFloat(rand.Float64())
+		volume := fixedpoint.NewFromFloat(rand.Float64())
+		tree.Upsert(price, volume)
+		pvs[price] = volume
+
+		if i%3 == 0 || i%2 == 0 {
+			removePrice := getRandomPrice()
+			if removePrice > 0 {
+				if !assert.True(t, tree.Delete(removePrice), "existing price %f should be removed at round %d", removePrice.Float64(), i) {
+					return
+				}
+				delete(pvs, removePrice)
+			}
+		}
+	}
+
+	for p := range pvs {
+		node := tree.Search(p)
+		if !assert.NotNil(t, node, "should found price %f", p.Float64()) {
+			return
+		}
+	}
+
+	// validate tree structure
+	tree.Inorder(func(n *RBNode) bool {
+		if n.left != neel {
+			if !assert.Greater(t, n.key, n.left.key) {
+				return false
+			}
+		}
+		if n.right != neel {
+			if !assert.Less(t, n.key, n.right.key) {
+				return false
+			}
+		}
+		return true
+	})
 }
