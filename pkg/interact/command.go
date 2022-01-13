@@ -35,7 +35,7 @@ func (c *Command) Transit(state1, state2 State, f interface{}) *Command {
 	return c
 }
 
-func (c *Command) NamedNext(n string, f interface{}) *Command {
+func (c *Command) NamedNext(n State, f interface{}) *Command {
 	var curState State
 	if c.lastState == "" {
 		curState = State(c.Name + "_" + strconv.Itoa(c.stateID))
@@ -43,7 +43,7 @@ func (c *Command) NamedNext(n string, f interface{}) *Command {
 		curState = c.lastState
 	}
 
-	nextState := State(n)
+	nextState := n
 	c.states[curState] = nextState
 	c.statesFunc[curState] = f
 	c.lastState = nextState
