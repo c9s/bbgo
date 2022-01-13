@@ -10,6 +10,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 	tb "gopkg.in/tucnak/telebot.v2"
 
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
@@ -104,6 +105,8 @@ func (m *PositionInteraction) Commands(i *interact.Interact) {
 }
 
 func main() {
+	log.SetFormatter(&prefixed.TextFormatter{})
+
 	b, err := tb.NewBot(tb.Settings{
 		// You can also set custom API URL.
 		// If field is empty it equals to "https://api.telegram.org".

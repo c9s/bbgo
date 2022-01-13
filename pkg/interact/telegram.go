@@ -1,6 +1,7 @@
 package interact
 
 import (
+	"context"
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
@@ -38,56 +39,85 @@ func (r *TelegramReply) build() {
 	r.menu.Reply(rows...)
 }
 
+type TelegramAuthorizer struct {
+	Telegram *Telegram
+	Message  *telebot.Message
+}
+
+func (a *TelegramAuthorizer) Authorize() error {
+	a.Telegram.Owner = a.Message.Sender
+	a.Telegram.OwnerChat = a.Message.Chat
+
+	log.Infof("[interact][telegram] authorized owner %+v and chat %+v", a.Message.Sender, a.Message.Chat)
+	return nil
+}
+
 type Telegram struct {
-	Bot *telebot.Bot
+	Bot *telebot.Bot `json:"-"`
+
+	// Owner is the authorized bot owner
+	// This field is exported in order to be stored in file
+	Owner *telebot.User `json:"owner"`
+
+	// OwnerChat is the chat of the authorized bot owner
+	// This field is exported in order to be stored in file
+	OwnerChat *telebot.Chat `json:"chat"`
 
 	// textMessageResponder is used for interact to register its message handler
 	textMessageResponder Responder
 }
 
-func (b *Telegram) SetTextMessageResponder(textMessageResponder Responder) {
-	b.textMessageResponder = textMessageResponder
+func (tm *Telegram) newAuthorizer(message *telebot.Message) *TelegramAuthorizer {
+	return &TelegramAuthorizer{
+		Telegram: tm,
+		Message:  message,
+	}
 }
 
-func (b *Telegram) Start() {
-	b.Bot.Handle(telebot.OnText, func(m *telebot.Message) {
-		log.Infof("onText: %+v", m)
+func (tm *Telegram) SetTextMessageResponder(textMessageResponder Responder) {
+	tm.textMessageResponder = textMessageResponder
+}
 
-		reply := b.newReply()
-		if b.textMessageResponder != nil {
-			if err := b.textMessageResponder(reply, m.Text); err != nil {
-				log.WithError(err).Errorf("response handling error")
+func (tm *Telegram) Start(context.Context) {
+	tm.Bot.Handle(telebot.OnText, func(m *telebot.Message) {
+		log.Infof("[interact][telegram] onText: %+v", m)
+
+		authorizer := tm.newAuthorizer(m)
+		reply := tm.newReply()
+		if tm.textMessageResponder != nil {
+			if err := tm.textMessageResponder(m.Text, reply, authorizer); err != nil {
+				log.WithError(err).Errorf("[interact][telegram] response handling error")
 			}
 		}
 
 		reply.build()
-		if _, err := b.Bot.Send(m.Sender, reply.message, reply.menu); err != nil {
-			log.WithError(err).Errorf("message send error")
+		if _, err := tm.Bot.Send(m.Sender, reply.message, reply.menu); err != nil {
+			log.WithError(err).Errorf("[interact][telegram] message send error")
 		}
 	})
-	go b.Bot.Start()
+	go tm.Bot.Start()
 }
 
-func (b *Telegram) AddCommand(command string, responder Responder) {
-	b.Bot.Handle(command, func(m *telebot.Message) {
-		reply := b.newReply()
-		if err := responder(reply, m.Payload); err != nil {
-			log.WithError(err).Errorf("responder error")
-			b.Bot.Send(m.Sender, fmt.Sprintf("error: %v", err))
+func (tm *Telegram) AddCommand(command string, responder Responder) {
+	tm.Bot.Handle(command, func(m *telebot.Message) {
+		reply := tm.newReply()
+		if err := responder(m.Payload, reply); err != nil {
+			log.WithError(err).Errorf("[interact][telegram] responder error")
+			tm.Bot.Send(m.Sender, fmt.Sprintf("error: %v", err))
 			return
 		}
 
 		// build up the response objects
 		reply.build()
-		if _, err := b.Bot.Send(m.Sender, reply.message, reply.menu); err != nil {
-			log.WithError(err).Errorf("message send error")
+		if _, err := tm.Bot.Send(m.Sender, reply.message, reply.menu); err != nil {
+			log.WithError(err).Errorf("[interact][telegram] message send error")
 		}
 	})
 }
 
-func (b *Telegram) newReply() *TelegramReply {
+func (tm *Telegram) newReply() *TelegramReply {
 	return &TelegramReply{
-		bot:  b.Bot,
+		bot:  tm.Bot,
 		menu: &telebot.ReplyMarkup{ResizeReplyKeyboard: true},
 	}
 }
