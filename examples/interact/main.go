@@ -128,7 +128,12 @@ func main() {
 
 	globalInteraction := interact.New()
 	globalInteraction.SetMessenger(&interact.Telegram{
-		Bot:      b,
+		Bot: b,
+	})
+
+	globalInteraction.AddCustomInteraction(&interact.AuthInteract{
+		Mode:  interact.AuthModeToken,
+		Token: "123",
 	})
 
 	globalInteraction.AddCustomInteraction(&PositionInteraction{})
