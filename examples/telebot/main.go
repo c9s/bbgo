@@ -1,12 +1,11 @@
 package main
 
 import (
-	"fmt"
-	"log"
 	"os"
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	tb "gopkg.in/tucnak/telebot.v2"
 )
 
@@ -33,7 +32,7 @@ func main() {
 		Token:  os.Getenv("TELEGRAM_BOT_TOKEN"),
 		Poller: &tb.LongPoller{Timeout: 10 * time.Second},
 		// Synchronous: false,
-		Verbose: true,
+		Verbose: false,
 		// ParseMode:   "",
 		// Reporter:    nil,
 		// Client:      nil,
@@ -55,6 +54,8 @@ func main() {
 
 	// On reply button pressed (message)
 	b.Handle(&btnHelp, func(m *tb.Message) {
+		log.Infof("btnHelp: %#v", m)
+
 		var (
 			// Inline buttons.
 			//
@@ -86,18 +87,18 @@ func main() {
 	})
 
 	b.Handle("/hello", func(m *tb.Message) {
-		fmt.Printf("message: %#v\n", m)
+		log.Infof("/hello %#v", m)
 		// b.Send(m.Sender, "Hello World!")
 	})
 
 	b.Handle(tb.OnText, func(m *tb.Message) {
-		fmt.Printf("text: %#v\n", m)
+		log.Infof("[onText] %#v", m)
 		// all the text messages that weren't
 		// captured by existing handlers
 	})
 
 	b.Handle(tb.OnQuery, func(q *tb.Query) {
-		fmt.Printf("query: %#v\n", q)
+		log.Infof("[onQuery] %#v", q)
 
 		// r := &tb.ReplyMarkup{}
 		// r.URL("test", "https://media.tenor.com/images/f176705ae1bb3c457e19d8cd71718ac0/tenor.gif")

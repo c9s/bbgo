@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	tb "gopkg.in/tucnak/telebot.v2"
 )
 
 func Test_parseFuncArgsAndCall_NoErrorFunction(t *testing.T) {
@@ -66,11 +67,8 @@ type TestInteraction struct {
 	closePositionTask closePositionTask
 }
 
-type Reply interface {
-}
-
 func (m *TestInteraction) Commands(interact *Interact) {
-	interact.Command("closePosition", func(reply Reply) error {
+	interact.Command("/closePosition", func(reply Reply) error {
 		// send symbol options
 		return nil
 	}).Next(func(symbol string) error {
@@ -95,29 +93,43 @@ func (m *TestInteraction) Commands(interact *Interact) {
 }
 
 func TestCustomInteraction(t *testing.T) {
+	b, err := tb.NewBot(tb.Settings{
+		Offline: true,
+	})
+	if !assert.NoError(t, err, "should have bot setup without error") {
+		return
+	}
+
 	globalInteraction := New()
+
+	telegram := &Telegram{
+		Bot:      b,
+		Interact: globalInteraction,
+	}
+	globalInteraction.SetMessenger(telegram)
+
 	testInteraction := &TestInteraction{}
 	testInteraction.Commands(globalInteraction)
 
-	err := globalInteraction.init()
+	err = globalInteraction.init()
 	assert.NoError(t, err)
 
-	err = globalInteraction.runCommand("closePosition")
+	err = globalInteraction.runCommand("/closePosition", []string{}, telegram.newReply())
 	assert.NoError(t, err)
 
-	assert.Equal(t, "closePosition_1", globalInteraction.curState)
+	assert.Equal(t, State("/closePosition_1"), globalInteraction.currentState)
 
-	err = globalInteraction.handleResponse("BTCUSDT")
+	err = globalInteraction.handleResponse("BTCUSDT", telegram.newReply())
 	assert.NoError(t, err)
-	assert.Equal(t, "closePosition_2", globalInteraction.curState)
+	assert.Equal(t, State("/closePosition_2"), globalInteraction.currentState)
 
-	err = globalInteraction.handleResponse("0.20")
+	err = globalInteraction.handleResponse("0.20", telegram.newReply())
 	assert.NoError(t, err)
-	assert.Equal(t, "closePosition_3", globalInteraction.curState)
+	assert.Equal(t, State("/closePosition_3"), globalInteraction.currentState)
 
-	err = globalInteraction.handleResponse("true")
+	err = globalInteraction.handleResponse("true", telegram.newReply())
 	assert.NoError(t, err)
-	assert.Equal(t, "closePosition_4", globalInteraction.curState)
+	assert.Equal(t, State("public"), globalInteraction.currentState)
 
 	assert.Equal(t, closePositionTask{
 		symbol:     "BTCUSDT",
