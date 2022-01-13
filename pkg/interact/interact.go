@@ -30,7 +30,6 @@ const (
 	StateAuthenticated State = "authenticated"
 )
 
-
 type TextMessageResponder interface {
 	SetTextMessageResponder(responder Responder)
 }
@@ -47,7 +46,11 @@ type Messenger interface {
 
 // Interact implements the interaction between bot and message software.
 type Interact struct {
+	// commands is the default public command map
 	commands map[string]*Command
+
+	// privateCommands is the private command map, need auth
+	privateCommands map[string]*Command
 
 	states     map[State]State
 	statesFunc map[State]interface{}
@@ -73,6 +76,12 @@ func (i *Interact) SetOriginState(s State) {
 
 func (i *Interact) AddCustomInteraction(custom CustomInteraction) {
 	custom.Commands(i)
+}
+
+func (i *Interact) PrivateCommand(command string, f interface{}) *Command {
+	cmd := NewCommand(command, f)
+	i.commands[command] = cmd
+	return cmd
 }
 
 func (i *Interact) Command(command string, f interface{}) *Command {
