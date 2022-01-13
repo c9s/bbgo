@@ -183,7 +183,7 @@ func TestRBTree_bulkInsertAndDelete(t *testing.T) {
 		tree.Upsert(price, volume)
 		pvs[price] = volume
 
-		if i%3 == 0 || i%2 == 0 {
+		if i%3 == 0 || i%7 == 0 {
 			removePrice := getRandomPrice()
 			if removePrice > 0 {
 				if !assert.True(t, tree.Delete(removePrice), "existing price %f should be removed at round %d", removePrice.Float64(), i) {
@@ -194,6 +194,7 @@ func TestRBTree_bulkInsertAndDelete(t *testing.T) {
 		}
 	}
 
+	// all prices should be found
 	for p := range pvs {
 		node := tree.Search(p)
 		if !assert.NotNil(t, node, "should found price %f", p.Float64()) {
