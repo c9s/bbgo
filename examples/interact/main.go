@@ -135,6 +135,7 @@ func main() {
 	})
 
 	globalInteraction.AddCustomInteraction(&interact.AuthInteract{
+		Strict: true,
 		Mode:  interact.AuthModeToken,
 		Token: "123",
 	})
