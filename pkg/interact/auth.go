@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/pquerna/otp"
+	"github.com/pquerna/otp/totp"
 )
 
 type AuthMode string
@@ -23,25 +24,26 @@ type AuthInteract struct {
 	OneTimePasswordKey *otp.Key `json:"otpKey,omitempty"`
 }
 
-func (i *AuthInteract) Commands(interact *Interact) {
+func (it *AuthInteract) Commands(interact *Interact) {
 	interact.Command("/auth", func(reply Reply) error {
 		reply.Message("Enter your authentication code")
 		return nil
 	}).NamedNext(StateAuthenticated, func(reply Reply, code string) error {
-		switch i.Mode {
+		switch it.Mode {
 		case AuthModeToken:
-			if code == i.Token {
+			if code == it.Token {
 				reply.Message("Great! You're authenticated!")
 				return nil
-			} else {
-				reply.Message("Incorrect authentication code")
-				return ErrAuthenticationFailed
 			}
 
 		case AuthModeOTP:
-
+			if totp.Validate(code, it.OneTimePasswordKey.Secret()) {
+				reply.Message("Great! You're authenticated!")
+				return nil
+			}
 		}
 
-		return nil
+		reply.Message("Incorrect authentication code")
+		return ErrAuthenticationFailed
 	})
 }
