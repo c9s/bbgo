@@ -196,7 +196,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 		return
 	}
 
-	sourceBook := s.book.CopyDepth(20)
+	sourceBook := s.book.CopyDepth(10)
 	if valid, err := sourceBook.IsValid(); !valid {
 		log.WithError(err).Errorf("%s invalid copied order book, skip quoting: %v", s.Symbol, err)
 		return
