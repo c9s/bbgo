@@ -80,7 +80,7 @@ func (i *Interact) AddCustomInteraction(custom CustomInteraction) {
 
 func (i *Interact) PrivateCommand(command string, f interface{}) *Command {
 	cmd := NewCommand(command, f)
-	i.commands[command] = cmd
+	i.privateCommands[command] = cmd
 	return cmd
 }
 
@@ -108,7 +108,7 @@ func (i *Interact) getNextState(currentState State) (nextState State, final bool
 }
 
 func (i *Interact) setState(s State) {
-	log.Infof("[interact]: tansiting state from %s -> %s", i.currentState, s)
+	log.Infof("[interact]: transiting state from %s -> %s", i.currentState, s)
 	i.currentState = s
 }
 
@@ -135,15 +135,35 @@ func (i *Interact) handleResponse(text string, ctxObjects ...interface{}) error 
 	return nil
 }
 
+func (i *Interact) getCommand(command string) (*Command, error) {
+	switch i.currentState {
+	case StateAuthenticated:
+		if cmd, ok := i.privateCommands[command]; ok {
+			return cmd, nil
+		}
+
+	case StatePublic:
+		if _, ok := i.privateCommands[command]; ok {
+			return nil, fmt.Errorf("private command can not be executed in the public mode")
+		}
+
+	}
+
+	if cmd, ok := i.commands[command]; ok {
+		return cmd, nil
+	}
+
+	return nil, fmt.Errorf("command %s not found", command)
+}
+
 func (i *Interact) runCommand(command string, args []string, ctxObjects ...interface{}) error {
-	cmd, ok := i.commands[command]
-	if !ok {
-		return fmt.Errorf("command %s not found", command)
+	cmd, err := i.getCommand(command)
+	if err != nil {
+		return err
 	}
 
 	i.setState(cmd.initState)
-	err := parseFuncArgsAndCall(cmd.F, args, ctxObjects...)
-	if err != nil {
+	if err := parseFuncArgsAndCall(cmd.F, args, ctxObjects...); err != nil {
 		return err
 	}
 
@@ -165,9 +185,31 @@ func (i *Interact) SetMessenger(messenger Messenger) {
 	i.messenger = messenger
 }
 
+// builtin initializes the built-in commands
+func (i *Interact) builtin() error {
+	i.Command("/auth", func(reply Reply) error {
+		reply.Message("Enter your authentication code")
+		return nil
+	}).NamedNext(StateAuthenticated, func(reply Reply, code string) error {
+		// check code
+		reply.Message("Great! You're authenticated!")
+		return nil
+	})
+
+	i.Command("/uptime", func(reply Reply) error {
+		reply.Message("uptime")
+		return nil
+	})
+
+	return nil
+}
+
 func (i *Interact) init() error {
+	if err := i.builtin(); err != nil {
+		return err
+	}
+
 	for n, cmd := range i.commands {
-		_ = n
 		for s1, s2 := range cmd.states {
 			if _, exist := i.states[s1]; exist {
 				return fmt.Errorf("state %s already exists", s1)
@@ -184,9 +226,10 @@ func (i *Interact) init() error {
 			return fmt.Errorf("messenger is not set")
 		}
 
-		i.messenger.AddCommand(n, func(reply Reply, response string) error {
+		commandName := n
+		i.messenger.AddCommand(commandName, func(reply Reply, response string) error {
 			args := parseCommand(response)
-			return i.runCommand(n, args, reply)
+			return i.runCommand(commandName, args, reply)
 		})
 	}
 
