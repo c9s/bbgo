@@ -70,33 +70,33 @@ func New() *Interact {
 	}
 }
 
-func (i *Interact) SetOriginState(s State) {
-	i.originState = s
+func (it *Interact) SetOriginState(s State) {
+	it.originState = s
 }
 
-func (i *Interact) AddCustomInteraction(custom CustomInteraction) {
-	custom.Commands(i)
+func (it *Interact) AddCustomInteraction(custom CustomInteraction) {
+	custom.Commands(it)
 }
 
-func (i *Interact) PrivateCommand(command string, f interface{}) *Command {
+func (it *Interact) PrivateCommand(command string, f interface{}) *Command {
 	cmd := NewCommand(command, f)
-	i.privateCommands[command] = cmd
+	it.privateCommands[command] = cmd
 	return cmd
 }
 
-func (i *Interact) Command(command string, f interface{}) *Command {
+func (it *Interact) Command(command string, f interface{}) *Command {
 	cmd := NewCommand(command, f)
-	i.commands[command] = cmd
+	it.commands[command] = cmd
 	return cmd
 }
 
-func (i *Interact) getNextState(currentState State) (nextState State, final bool) {
+func (it *Interact) getNextState(currentState State) (nextState State, final bool) {
 	var ok bool
 	final = false
-	nextState, ok = i.states[currentState]
+	nextState, ok = it.states[currentState]
 	if ok {
 		// check if it's the final state
-		if _, hasTransition := i.statesFunc[nextState]; !hasTransition {
+		if _, hasTransition := it.statesFunc[nextState]; !hasTransition {
 			final = true
 		}
 
@@ -104,90 +104,90 @@ func (i *Interact) getNextState(currentState State) (nextState State, final bool
 	}
 
 	// state not found, return to the origin state
-	return i.originState, final
+	return it.originState, final
 }
 
-func (i *Interact) setState(s State) {
-	log.Infof("[interact]: transiting state from %s -> %s", i.currentState, s)
-	i.currentState = s
+func (it *Interact) setState(s State) {
+	log.Infof("[interact]: transiting state from %s -> %s", it.currentState, s)
+	it.currentState = s
 }
 
-func (i *Interact) handleResponse(text string, ctxObjects ...interface{}) error {
+func (it *Interact) handleResponse(text string, ctxObjects ...interface{}) error {
 	args := parseCommand(text)
 
-	f, ok := i.statesFunc[i.currentState]
+	f, ok := it.statesFunc[it.currentState]
 	if !ok {
-		return fmt.Errorf("state function of %s is not defined", i.currentState)
+		return fmt.Errorf("state function of %s is not defined", it.currentState)
 	}
 
-	err := parseFuncArgsAndCall(f, args, ctxObjects...)
+	_, err := parseFuncArgsAndCall(f, args, ctxObjects...)
 	if err != nil {
 		return err
 	}
 
-	nextState, end := i.getNextState(i.currentState)
+	nextState, end := it.getNextState(it.currentState)
 	if end {
-		i.setState(i.originState)
+		it.setState(it.originState)
 		return nil
 	}
 
-	i.setState(nextState)
+	it.setState(nextState)
 	return nil
 }
 
-func (i *Interact) getCommand(command string) (*Command, error) {
-	switch i.currentState {
+func (it *Interact) getCommand(command string) (*Command, error) {
+	switch it.currentState {
 	case StateAuthenticated:
-		if cmd, ok := i.privateCommands[command]; ok {
+		if cmd, ok := it.privateCommands[command]; ok {
 			return cmd, nil
 		}
 
 	case StatePublic:
-		if _, ok := i.privateCommands[command]; ok {
+		if _, ok := it.privateCommands[command]; ok {
 			return nil, fmt.Errorf("private command can not be executed in the public mode")
 		}
 
 	}
 
-	if cmd, ok := i.commands[command]; ok {
+	if cmd, ok := it.commands[command]; ok {
 		return cmd, nil
 	}
 
 	return nil, fmt.Errorf("command %s not found", command)
 }
 
-func (i *Interact) runCommand(command string, args []string, ctxObjects ...interface{}) error {
-	cmd, err := i.getCommand(command)
+func (it *Interact) runCommand(command string, args []string, ctxObjects ...interface{}) error {
+	cmd, err := it.getCommand(command)
 	if err != nil {
 		return err
 	}
 
-	i.setState(cmd.initState)
-	if err := parseFuncArgsAndCall(cmd.F, args, ctxObjects...); err != nil {
+	it.setState(cmd.initState)
+	if _, err := parseFuncArgsAndCall(cmd.F, args, ctxObjects...); err != nil {
 		return err
 	}
 
 	// if we can successfully execute the command, then we can go to the next state.
-	nextState, end := i.getNextState(i.currentState)
+	nextState, end := it.getNextState(it.currentState)
 	if end {
-		i.setState(i.originState)
+		it.setState(it.originState)
 		return nil
 	}
 
-	i.setState(nextState)
+	it.setState(nextState)
 	return nil
 }
 
-func (i *Interact) SetMessenger(messenger Messenger) {
+func (it *Interact) SetMessenger(messenger Messenger) {
 	messenger.SetTextMessageResponder(func(reply Reply, response string) error {
-		return i.handleResponse(response, reply)
+		return it.handleResponse(response, reply)
 	})
-	i.messenger = messenger
+	it.messenger = messenger
 }
 
 // builtin initializes the built-in commands
-func (i *Interact) builtin() error {
-	i.Command("/uptime", func(reply Reply) error {
+func (it *Interact) builtin() error {
+	it.Command("/uptime", func(reply Reply) error {
 		reply.Message("uptime")
 		return nil
 	})
@@ -195,45 +195,45 @@ func (i *Interact) builtin() error {
 	return nil
 }
 
-func (i *Interact) init() error {
-	if err := i.builtin(); err != nil {
+func (it *Interact) init() error {
+	if err := it.builtin(); err != nil {
 		return err
 	}
 
-	for n, cmd := range i.commands {
+	for n, cmd := range it.commands {
 		for s1, s2 := range cmd.states {
-			if _, exist := i.states[s1]; exist {
+			if _, exist := it.states[s1]; exist {
 				return fmt.Errorf("state %s already exists", s1)
 			}
 
-			i.states[s1] = s2
+			it.states[s1] = s2
 		}
 		for s, f := range cmd.statesFunc {
-			i.statesFunc[s] = f
+			it.statesFunc[s] = f
 		}
 
 		// register commands to the service
-		if i.messenger == nil {
+		if it.messenger == nil {
 			return fmt.Errorf("messenger is not set")
 		}
 
 		commandName := n
-		i.messenger.AddCommand(commandName, func(reply Reply, response string) error {
+		it.messenger.AddCommand(commandName, func(reply Reply, response string) error {
 			args := parseCommand(response)
-			return i.runCommand(commandName, args, reply)
+			return it.runCommand(commandName, args, reply)
 		})
 	}
 
 	return nil
 }
 
-func (i *Interact) Start(ctx context.Context) error {
-	if err := i.init(); err != nil {
+func (it *Interact) Start(ctx context.Context) error {
+	if err := it.init(); err != nil {
 		return err
 	}
 
 	// TODO: use go routine and context
-	i.messenger.Start()
+	it.messenger.Start()
 	return nil
 }
 
@@ -252,7 +252,7 @@ func parseCommand(src string) (args []string) {
 	return args
 }
 
-func parseFuncArgsAndCall(f interface{}, args []string, objects ...interface{}) error {
+func parseFuncArgsAndCall(f interface{}, args []string, objects ...interface{}) (State, error) {
 	fv := reflect.ValueOf(f)
 	ft := reflect.TypeOf(f)
 
@@ -269,7 +269,7 @@ func parseFuncArgsAndCall(f interface{}, args []string, objects ...interface{}) 
 			found := false
 
 			if objectIndex >= len(objects) {
-				return fmt.Errorf("found interface type %s, but object args are empty", at)
+				return "", fmt.Errorf("found interface type %s, but object args are empty", at)
 			}
 
 			for oi := objectIndex; oi < len(objects); oi++ {
@@ -290,8 +290,10 @@ func parseFuncArgsAndCall(f interface{}, args []string, objects ...interface{}) 
 					break
 				}
 			}
+
 			if !found {
-				return fmt.Errorf("can not find object implements %s", at)
+				v := reflect.Zero(at)
+				rArgs = append(rArgs, v)
 			}
 
 		case reflect.String:
@@ -302,7 +304,7 @@ func parseFuncArgsAndCall(f interface{}, args []string, objects ...interface{}) 
 		case reflect.Bool:
 			bv, err := strconv.ParseBool(args[argIndex])
 			if err != nil {
-				return err
+				return "", err
 			}
 			av := reflect.ValueOf(bv)
 			rArgs = append(rArgs, av)
@@ -311,7 +313,7 @@ func parseFuncArgsAndCall(f interface{}, args []string, objects ...interface{}) 
 		case reflect.Int64:
 			nf, err := strconv.ParseInt(args[argIndex], 10, 64)
 			if err != nil {
-				return err
+				return "", err
 			}
 
 			av := reflect.ValueOf(nf)
@@ -321,7 +323,7 @@ func parseFuncArgsAndCall(f interface{}, args []string, objects ...interface{}) 
 		case reflect.Float64:
 			nf, err := strconv.ParseFloat(args[argIndex], 64)
 			if err != nil {
-				return err
+				return "", err
 			}
 
 			av := reflect.ValueOf(nf)
@@ -332,22 +334,29 @@ func parseFuncArgsAndCall(f interface{}, args []string, objects ...interface{}) 
 
 	out := fv.Call(rArgs)
 	if ft.NumOut() == 0 {
-		return nil
+		return "", nil
 	}
 
 	// try to get the error object from the return value
+	var state State
+	var err error
 	for i := 0; i < ft.NumOut(); i++ {
 		outType := ft.Out(i)
 		switch outType.Kind() {
+		case reflect.String:
+			if outType.Name() == "State" {
+				state = State(out[i].String())
+			}
+
 		case reflect.Interface:
-			o := out[0].Interface()
+			o := out[i].Interface()
 			switch ov := o.(type) {
 			case error:
-				return ov
+				err = ov
 
 			}
 
 		}
 	}
-	return nil
+	return state, err
 }
