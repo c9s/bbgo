@@ -187,15 +187,6 @@ func (i *Interact) SetMessenger(messenger Messenger) {
 
 // builtin initializes the built-in commands
 func (i *Interact) builtin() error {
-	i.Command("/auth", func(reply Reply) error {
-		reply.Message("Enter your authentication code")
-		return nil
-	}).NamedNext(StateAuthenticated, func(reply Reply, code string) error {
-		// check code
-		reply.Message("Great! You're authenticated!")
-		return nil
-	})
-
 	i.Command("/uptime", func(reply Reply) error {
 		reply.Message("uptime")
 		return nil
