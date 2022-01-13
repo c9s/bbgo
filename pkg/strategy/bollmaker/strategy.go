@@ -329,13 +329,13 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 		}
 	} else if midPrice.Float64() > s.defaultBoll.LastDownBand() && midPrice.Float64() < s.neutralBoll.LastDownBand() { // downtrend, might bounce back
 
-		skew := 2.0
+		skew := s.DowntrendSkew.Float64()
 		ratio := 1.0 / skew
 		sellOrder.Quantity = math.Max(s.market.MinQuantity, buyOrder.Quantity*ratio)
 
 	} else if midPrice.Float64() < s.defaultBoll.LastUpBand() && midPrice.Float64() > s.neutralBoll.LastUpBand() { // uptrend, might bounce back
 
-		skew := 0.5
+		skew := s.UptrendSkew.Float64()
 		buyOrder.Quantity = math.Max(s.market.MinQuantity, sellOrder.Quantity*skew)
 
 	} else if midPrice.Float64() < s.defaultBoll.LastDownBand() { // strong downtrend
