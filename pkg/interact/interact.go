@@ -30,8 +30,18 @@ const (
 	StateAuthenticated State = "authenticated"
 )
 
-type Messenger interface {
+
+type TextMessageResponder interface {
+	SetTextMessageResponder(responder Responder)
+}
+
+type CommandResponder interface {
 	AddCommand(command string, responder Responder)
+}
+
+type Messenger interface {
+	TextMessageResponder
+	CommandResponder
 	Start()
 }
 
@@ -140,6 +150,9 @@ func (i *Interact) runCommand(command string, args []string, ctxObjects ...inter
 }
 
 func (i *Interact) SetMessenger(messenger Messenger) {
+	messenger.SetTextMessageResponder(func(reply Reply, response string) error {
+		return i.handleResponse(response, reply)
+	})
 	i.messenger = messenger
 }
 

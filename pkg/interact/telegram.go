@@ -38,13 +38,15 @@ func (r *TelegramReply) build() {
 	r.menu.Reply(rows...)
 }
 
-//go:generate callbackgen -type Telegram
 type Telegram struct {
-	Interact *Interact
-	Bot      *telebot.Bot
+	Bot *telebot.Bot
 
-	// messageCallbacks is used for interact to register its message handler
-	messageCallbacks []func(reply Reply, message string)
+	// textMessageResponder is used for interact to register its message handler
+	textMessageResponder Responder
+}
+
+func (b *Telegram) SetTextMessageResponder(textMessageResponder Responder) {
+	b.textMessageResponder = textMessageResponder
 }
 
 func (b *Telegram) Start() {
@@ -52,8 +54,10 @@ func (b *Telegram) Start() {
 		log.Infof("onText: %+v", m)
 
 		reply := b.newReply()
-		if err := b.Interact.handleResponse(m.Text, reply); err != nil {
-			log.WithError(err).Errorf("response handling error")
+		if b.textMessageResponder != nil {
+			if err := b.textMessageResponder(reply, m.Text); err != nil {
+				log.WithError(err).Errorf("response handling error")
+			}
 		}
 
 		reply.build()

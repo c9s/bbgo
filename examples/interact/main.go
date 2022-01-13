@@ -128,7 +128,6 @@ func main() {
 
 	globalInteraction := interact.New()
 	globalInteraction.SetMessenger(&interact.Telegram{
-		Interact: globalInteraction,
 		Bot:      b,
 	})
 
