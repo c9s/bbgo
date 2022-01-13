@@ -1,64 +1,68 @@
 package interact
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
 	"text/scanner"
 
-	"gopkg.in/tucnak/telebot.v2"
+	log "github.com/sirupsen/logrus"
 )
 
-type Command struct {
-	// Name is the command name
-	Name string
-
-	// StateF is the command handler function
-	F interface{}
-
-	stateID    int
-	states     map[string]string
-	statesFunc map[string]interface{}
-	initState  string
+type Reply interface {
+	Message(message string)
+	AddButton(text string)
+	RemoveKeyboard()
 }
 
-func NewCommand(name string, f interface{}) *Command {
-	c := &Command{
-		Name:       name,
-		F:          f,
-		states:     make(map[string]string),
-		statesFunc: make(map[string]interface{}),
-		initState:  name + "_" + strconv.Itoa(0),
-	}
-	return c.Next(f)
+type Responder func(reply Reply, response string) error
+
+type CustomInteraction interface {
+	Commands(interact *Interact)
 }
 
-func (c *Command) Next(f interface{}) *Command {
-	curState := c.Name + "_" + strconv.Itoa(c.stateID)
-	c.stateID++
-	nextState := c.Name + "_" + strconv.Itoa(c.stateID)
+type State string
 
-	c.states[curState] = nextState
-	c.statesFunc[curState] = f
-	return c
+const (
+	StatePublic        State = "public"
+	StateAuthenticated State = "authenticated"
+)
+
+type Messenger interface {
+	AddCommand(command string, responder Responder)
+	Start()
 }
 
 // Interact implements the interaction between bot and message software.
 type Interact struct {
 	commands map[string]*Command
 
-	states     map[string]string
-	statesFunc map[string]interface{}
-	curState   string
+	states     map[State]State
+	statesFunc map[State]interface{}
+
+	originState, currentState State
+
+	messenger Messenger
 }
 
 func New() *Interact {
 	return &Interact{
-		commands:   make(map[string]*Command),
-		states:     make(map[string]string),
-		statesFunc: make(map[string]interface{}),
+		commands:     make(map[string]*Command),
+		originState:  StatePublic,
+		currentState: StatePublic,
+		states:       make(map[State]State),
+		statesFunc:   make(map[State]interface{}),
 	}
+}
+
+func (i *Interact) SetOriginState(s State) {
+	i.originState = s
+}
+
+func (i *Interact) AddCustomInteraction(custom CustomInteraction) {
+	custom.Commands(i)
 }
 
 func (i *Interact) Command(command string, f interface{}) *Command {
@@ -67,60 +71,76 @@ func (i *Interact) Command(command string, f interface{}) *Command {
 	return cmd
 }
 
-func (i *Interact) getNextState(currentState string) (nextState string, end bool) {
+func (i *Interact) getNextState(currentState State) (nextState State, final bool) {
 	var ok bool
+	final = false
 	nextState, ok = i.states[currentState]
 	if ok {
-		end = false
-		return nextState, end
+		// check if it's the final state
+		if _, hasTransition := i.statesFunc[nextState]; !hasTransition {
+			final = true
+		}
+
+		return nextState, final
 	}
 
-	end = true
-	return nextState, end
+	// state not found, return to the origin state
+	return i.originState, final
 }
 
-func (i *Interact) handleResponse(text string) error {
+func (i *Interact) setState(s State) {
+	log.Infof("[interact]: tansiting state from %s -> %s", i.currentState, s)
+	i.currentState = s
+}
+
+func (i *Interact) handleResponse(text string, ctxObjects ...interface{}) error {
 	args := parseCommand(text)
 
-	f, ok := i.statesFunc[i.curState]
+	f, ok := i.statesFunc[i.currentState]
 	if !ok {
-		return fmt.Errorf("state function of %s is not defined", i.curState)
+		return fmt.Errorf("state function of %s is not defined", i.currentState)
 	}
 
-	err := parseFuncArgsAndCall(f, args)
+	err := parseFuncArgsAndCall(f, args, ctxObjects...)
 	if err != nil {
 		return err
 	}
 
-	nextState, end := i.getNextState(i.curState)
+	nextState, end := i.getNextState(i.currentState)
 	if end {
+		i.setState(i.originState)
 		return nil
 	}
 
-	i.curState = nextState
+	i.setState(nextState)
 	return nil
 }
 
-func (i *Interact) runCommand(command string, args ...string) error {
+func (i *Interact) runCommand(command string, args []string, ctxObjects ...interface{}) error {
 	cmd, ok := i.commands[command]
 	if !ok {
 		return fmt.Errorf("command %s not found", command)
 	}
 
-	i.curState = cmd.initState
-	err := parseFuncArgsAndCall(cmd.F, args)
+	i.setState(cmd.initState)
+	err := parseFuncArgsAndCall(cmd.F, args, ctxObjects...)
 	if err != nil {
 		return err
 	}
 
 	// if we can successfully execute the command, then we can go to the next state.
-	nextState, end := i.getNextState(i.curState)
+	nextState, end := i.getNextState(i.currentState)
 	if end {
+		i.setState(i.originState)
 		return nil
 	}
 
-	i.curState = nextState
+	i.setState(nextState)
 	return nil
+}
+
+func (i *Interact) SetMessenger(messenger Messenger) {
+	i.messenger = messenger
 }
 
 func (i *Interact) init() error {
@@ -136,17 +156,29 @@ func (i *Interact) init() error {
 		for s, f := range cmd.statesFunc {
 			i.statesFunc[s] = f
 		}
+
+		// register commands to the service
+		if i.messenger == nil {
+			return fmt.Errorf("messenger is not set")
+		}
+
+		i.messenger.AddCommand(n, func(reply Reply, response string) error {
+			args := parseCommand(response)
+			return i.runCommand(n, args, reply)
+		})
 	}
 
 	return nil
 }
 
-func (i *Interact) HandleTelegramMessage(msg *telebot.Message) {
-	// For registered commands, will contain the string payload
-	// msg.Payload
-	// msg.Text
-	args := parseCommand(msg.Text)
-	_ = args
+func (i *Interact) Start(ctx context.Context) error {
+	if err := i.init(); err != nil {
+		return err
+	}
+
+	// TODO: use go routine and context
+	i.messenger.Start()
+	return nil
 }
 
 func parseCommand(src string) (args []string) {
