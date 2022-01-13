@@ -162,22 +162,13 @@ func aggregatePrice(pvs types.PriceVolumeSlice, requiredQuantity fixedpoint.Valu
 }
 
 func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.OrderExecutionRouter) {
-	if err := s.makerSession.Exchange.CancelOrders(ctx, s.activeMakerOrders.Orders()...); err != nil {
-		log.WithError(err).Errorf("can not cancel %s orders", s.Symbol)
+	if err := s.activeMakerOrders.GracefulCancel(ctx, s.makerSession.Exchange); err != nil {
+		log.Warnf("there are some %s orders not canceled, skipping placing maker orders", s.Symbol)
+		s.activeMakerOrders.Print()
 		return
 	}
 
-	// avoid unlock issue and wait for the balance update
-	if s.OrderCancelWaitTime > 0 {
-		time.Sleep(s.OrderCancelWaitTime.Duration())
-	} else {
-		// use the default wait time
-		time.Sleep(500 * time.Millisecond)
-	}
-
 	if s.activeMakerOrders.NumOfAsks() > 0 || s.activeMakerOrders.NumOfBids() > 0 {
-		log.Warnf("there are some %s orders not canceled, skipping placing maker orders", s.Symbol)
-		s.activeMakerOrders.Print()
 		return
 	}
 
@@ -191,14 +182,14 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 
 	bookLastUpdateTime := s.book.LastUpdateTime()
 
-	if _, err := s.bidPriceHeartBeat.Update(bestBid, priceUpdateTimeout) ; err != nil {
+	if _, err := s.bidPriceHeartBeat.Update(bestBid, priceUpdateTimeout); err != nil {
 		log.WithError(err).Errorf("quote update error, %s price not updating, order book last update: %s ago",
 			s.Symbol,
 			time.Since(bookLastUpdateTime))
 		return
 	}
 
-	if _, err := s.askPriceHeartBeat.Update(bestAsk, priceUpdateTimeout) ; err != nil {
+	if _, err := s.askPriceHeartBeat.Update(bestAsk, priceUpdateTimeout); err != nil {
 		log.WithError(err).Errorf("quote update error, %s price not updating, order book last update: %s ago",
 			s.Symbol,
 			time.Since(bookLastUpdateTime))
