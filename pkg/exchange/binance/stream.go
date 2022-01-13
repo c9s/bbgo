@@ -247,33 +247,21 @@ func (s *Stream) handleOrderTradeUpdateEvent(e *OrderTradeUpdateEvent) {
 	case "NEW", "CANCELED", "EXPIRED":
 		order, err := e.OrderFutures()
 		if err != nil {
-			log.WithError(err).Error("order convert error")
+			log.WithError(err).Error("futures order convert error")
 			return
 		}
 
 		s.EmitOrderUpdate(*order)
 
 	case "TRADE":
-		// TODO
+		trade, err := e.TradeFutures()
+		if err != nil {
+			log.WithError(err).Error("futures trade convert error")
+			return
+		}
 
-		// trade, err := e.Trade()
-		// if err != nil {
-		// 	log.WithError(err).Error("trade convert error")
-		// 	return
-		// }
+		s.EmitTradeUpdate(*trade)
 
-		// stream.EmitTradeUpdate(*trade)
-
-		// order, err := e.OrderFutures()
-		// if err != nil {
-		// 	log.WithError(err).Error("order convert error")
-		// 	return
-		// }
-
-		// Update Order with FILLED event
-		// if order.Status == types.OrderStatusFilled {
-		// 	stream.EmitOrderUpdate(*order)
-		// }
 	case "CALCULATED - Liquidation Execution":
 		log.Infof("CALCULATED - Liquidation Execution not support yet.")
 	}
