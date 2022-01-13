@@ -213,16 +213,21 @@ func (e *Exchange) NewStream() types.Stream {
 	return stream
 }
 
-func (e *Exchange) QueryMarginAccount(ctx context.Context) (*types.MarginAccount, error) {
+func (e *Exchange) QueryMarginAccount(ctx context.Context) (*types.Account, error) {
 	account, err := e.Client.NewGetMarginAccountService().Do(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	return toGlobalMarginAccount(account), nil
+	a := &types.Account{
+		AccountType: types.AccountTypeMargin,
+		MarginInfo:  toGlobalMarginAccountInfo(account), // In binance GO api, Account define account info which mantain []*AccountAsset and []*AccountPosition.
+	}
+
+	return a, nil
 }
 
-func (e *Exchange) QueryIsolatedMarginAccount(ctx context.Context, symbols ...string) (*types.IsolatedMarginAccount, error) {
+func (e *Exchange) QueryIsolatedMarginAccount(ctx context.Context, symbols ...string) (*types.Account, error) {
 	req := e.Client.NewGetIsolatedMarginAccountService()
 	if len(symbols) > 0 {
 		req.Symbols(symbols...)
@@ -233,7 +238,12 @@ func (e *Exchange) QueryIsolatedMarginAccount(ctx context.Context, symbols ...st
 		return nil, err
 	}
 
-	return toGlobalIsolatedMarginAccount(account), nil
+	a := &types.Account{
+		AccountType:        types.AccountTypeMargin,
+		IsolatedMarginInfo: toGlobalIsolatedMarginAccountInfo(account), // In binance GO api, Account define account info which mantain []*AccountAsset and []*AccountPosition.
+	}
+
+	return a, nil
 }
 
 func (e *Exchange) Withdrawal(ctx context.Context, asset string, amount fixedpoint.Value, address string, options *types.WithdrawalOptions) error {
@@ -441,13 +451,13 @@ func (e *Exchange) QuerySpotAccount(ctx context.Context) (*types.Account, error)
 	for _, b := range account.Balances {
 		balances[b.Asset] = types.Balance{
 			Currency:  b.Asset,
-			Available: fixedpoint.Must(fixedpoint.NewFromString(b.Free)),
-			Locked:    fixedpoint.Must(fixedpoint.NewFromString(b.Locked)),
+			Available: fixedpoint.MustNewFromString(b.Free),
+			Locked:    fixedpoint.MustNewFromString(b.Locked),
 		}
 	}
 
 	a := &types.Account{
-		AccountType:     types.AccountTypeSpot, // TODO: types.AccountTypeMargin
+		AccountType:     types.AccountTypeSpot,
 		MakerCommission: fixedpoint.NewFromFloat(float64(account.MakerCommission) * 0.0001),
 		TakerCommission: fixedpoint.NewFromFloat(float64(account.TakerCommission) * 0.0001),
 		CanDeposit:      account.CanDeposit,  // if can transfer in asset
@@ -488,12 +498,21 @@ func (e *Exchange) QueryFuturesAccount(ctx context.Context) (*types.Account, err
 }
 
 func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
-	futuresAccount, err := e.QueryFuturesAccount(ctx)
-	if !(err != nil) {
-		return futuresAccount, nil
+	var account *types.Account
+	var err error
+	if e.IsFutures {
+		account, err = e.QueryFuturesAccount(ctx)
+	} else if e.IsIsolatedMargin {
+		account, err = e.QueryIsolatedMarginAccount(ctx)
+	} else if e.IsMargin {
+		account, err = e.QueryMarginAccount(ctx)
+	} else {
+		account, err = e.QuerySpotAccount(ctx)
 	}
-
-	return e.QuerySpotAccount(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return account, nil
 }
 
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
@@ -1087,8 +1106,8 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		return trades, nil
 	} else if e.IsFutures {
 		var remoteTrades []*futures.AccountTrade
-		req := e.futuresClient.NewListAccountTradeService(). //IsIsolated(e.IsIsolatedFutures).
-									Symbol(symbol)
+		req := e.futuresClient.NewListAccountTradeService().
+			Symbol(symbol)
 		if options.Limit > 0 {
 			req.Limit(int(options.Limit))
 		} else {
