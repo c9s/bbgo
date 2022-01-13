@@ -103,8 +103,7 @@ func TestCustomInteraction(t *testing.T) {
 	globalInteraction := New()
 
 	telegram := &Telegram{
-		Bot:      b,
-		Interact: globalInteraction,
+		Bot: b,
 	}
 	globalInteraction.SetMessenger(telegram)
 
