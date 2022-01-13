@@ -17,7 +17,8 @@ type Reply interface {
 	RemoveKeyboard()
 }
 
-type Responder func(reply Reply, response string) error
+// Responder defines the logic of responding the message
+type Responder func(message string, reply Reply, ctxObjects ...interface{}) error
 
 type CustomInteraction interface {
 	Commands(interact *Interact)
@@ -41,7 +42,7 @@ type CommandResponder interface {
 type Messenger interface {
 	TextMessageResponder
 	CommandResponder
-	Start()
+	Start(ctx context.Context)
 }
 
 // Interact implements the interaction between bot and message software.
@@ -108,7 +109,7 @@ func (it *Interact) getNextState(currentState State) (nextState State, final boo
 }
 
 func (it *Interact) setState(s State) {
-	log.Infof("[interact]: transiting state from %s -> %s", it.currentState, s)
+	log.Infof("[interact] transiting state from %s -> %s", it.currentState, s)
 	it.currentState = s
 }
 
@@ -179,8 +180,9 @@ func (it *Interact) runCommand(command string, args []string, ctxObjects ...inte
 }
 
 func (it *Interact) SetMessenger(messenger Messenger) {
-	messenger.SetTextMessageResponder(func(reply Reply, response string) error {
-		return it.handleResponse(response, reply)
+	// pass Responder function
+	messenger.SetTextMessageResponder(func(message string, reply Reply, ctxObjects ...interface{}) error {
+		return it.handleResponse(message, append(ctxObjects, reply)...)
 	})
 	it.messenger = messenger
 }
@@ -218,9 +220,9 @@ func (it *Interact) init() error {
 		}
 
 		commandName := n
-		it.messenger.AddCommand(commandName, func(reply Reply, response string) error {
-			args := parseCommand(response)
-			return it.runCommand(commandName, args, reply)
+		it.messenger.AddCommand(commandName, func(message string, reply Reply, ctxObjects ...interface{}) error {
+			args := parseCommand(message)
+			return it.runCommand(commandName, args, append(ctxObjects, reply)...)
 		})
 	}
 
@@ -233,7 +235,7 @@ func (it *Interact) Start(ctx context.Context) error {
 	}
 
 	// TODO: use go routine and context
-	it.messenger.Start()
+	it.messenger.Start(ctx)
 	return nil
 }
 
@@ -256,7 +258,6 @@ func parseFuncArgsAndCall(f interface{}, args []string, objects ...interface{}) 
 	fv := reflect.ValueOf(f)
 	ft := reflect.TypeOf(f)
 
-	objectIndex := 0
 	argIndex := 0
 
 	var rArgs []reflect.Value
@@ -268,11 +269,7 @@ func parseFuncArgsAndCall(f interface{}, args []string, objects ...interface{}) 
 		case reflect.Interface:
 			found := false
 
-			if objectIndex >= len(objects) {
-				return "", fmt.Errorf("found interface type %s, but object args are empty", at)
-			}
-
-			for oi := objectIndex; oi < len(objects); oi++ {
+			for oi := 0; oi < len(objects); oi++ {
 				obj := objects[oi]
 				objT := reflect.TypeOf(obj)
 				objV := reflect.ValueOf(obj)
@@ -286,7 +283,6 @@ func parseFuncArgsAndCall(f interface{}, args []string, objects ...interface{}) 
 				if objT.Implements(at) {
 					found = true
 					rArgs = append(rArgs, objV)
-					objectIndex = oi + 1
 					break
 				}
 			}
