@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"text/scanner"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -47,6 +48,8 @@ type Messenger interface {
 
 // Interact implements the interaction between bot and message software.
 type Interact struct {
+	startTime time.Time
+
 	// commands is the default public command map
 	commands map[string]*Command
 
@@ -63,6 +66,7 @@ type Interact struct {
 
 func New() *Interact {
 	return &Interact{
+		startTime:    time.Now(),
 		commands:     make(map[string]*Command),
 		originState:  StatePublic,
 		currentState: StatePublic,
@@ -114,6 +118,13 @@ func (it *Interact) setState(s State) {
 }
 
 func (it *Interact) handleResponse(text string, ctxObjects ...interface{}) error {
+	// we only need response when executing a command
+	switch it.currentState {
+	case StatePublic, StateAuthenticated:
+		return nil
+
+	}
+
 	args := parseCommand(text)
 
 	f, ok := it.statesFunc[it.currentState]
@@ -190,7 +201,8 @@ func (it *Interact) SetMessenger(messenger Messenger) {
 // builtin initializes the built-in commands
 func (it *Interact) builtin() error {
 	it.Command("/uptime", func(reply Reply) error {
-		reply.Message("uptime")
+		uptime := time.Since(it.startTime)
+		reply.Message(fmt.Sprintf("uptime %s", uptime))
 		return nil
 	})
 

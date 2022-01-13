@@ -20,6 +20,7 @@ const (
 var ErrAuthenticationFailed = errors.New("authentication failed")
 
 type Authorizer interface {
+	StartAuthorizing()
 	Authorize() error
 }
 
@@ -50,8 +51,9 @@ func (it *AuthInteract) Commands(interact *Interact) {
 
 			it.OneTimePasswordKey = key
 		}
-		interact.Command("/auth", func(reply Reply) error {
+		interact.Command("/auth", func(reply Reply, authorizer Authorizer) error {
 			reply.Message("Enter your authentication token")
+			authorizer.StartAuthorizing()
 			return nil
 		}).Next(func(token string, reply Reply) error {
 			if token == it.Token {
@@ -72,6 +74,7 @@ func (it *AuthInteract) Commands(interact *Interact) {
 		}).NamedNext(StateAuthenticated, func(code string, reply Reply, authorizer Authorizer) error {
 			if totp.Validate(code, it.OneTimePasswordKey.Secret()) {
 				reply.Message("Great! You're authenticated!")
+				interact.SetOriginState(StateAuthenticated)
 				return authorizer.Authorize()
 			}
 
@@ -87,12 +90,14 @@ func (it *AuthInteract) Commands(interact *Interact) {
 			case AuthModeToken:
 				if code == it.Token {
 					reply.Message("Great! You're authenticated!")
+					interact.SetOriginState(StateAuthenticated)
 					return authorizer.Authorize()
 				}
 
 			case AuthModeOTP:
 				if totp.Validate(code, it.OneTimePasswordKey.Secret()) {
 					reply.Message("Great! You're authenticated!")
+					interact.SetOriginState(StateAuthenticated)
 					return authorizer.Authorize()
 				}
 			}

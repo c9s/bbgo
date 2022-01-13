@@ -13,14 +13,17 @@ type TelegramReply struct {
 	message string
 	menu    *telebot.ReplyMarkup
 	buttons [][]telebot.Btn
+	set bool
 }
 
 func (r *TelegramReply) Message(message string) {
 	r.message = message
+	r.set = true
 }
 
 func (r *TelegramReply) RemoveKeyboard() {
 	r.menu.ReplyKeyboardRemove = true
+	r.set = true
 }
 
 func (r *TelegramReply) AddButton(text string) {
@@ -29,6 +32,7 @@ func (r *TelegramReply) AddButton(text string) {
 		r.buttons = append(r.buttons, []telebot.Btn{})
 	}
 	r.buttons[len(r.buttons)-1] = append(r.buttons[len(r.buttons)-1], button)
+	r.set = true
 }
 
 func (r *TelegramReply) build() {
@@ -47,21 +51,30 @@ type TelegramAuthorizer struct {
 func (a *TelegramAuthorizer) Authorize() error {
 	a.Telegram.Owner = a.Message.Sender
 	a.Telegram.OwnerChat = a.Message.Chat
-
+	a.Telegram.authorizing = false
 	log.Infof("[interact][telegram] authorized owner %+v and chat %+v", a.Message.Sender, a.Message.Chat)
 	return nil
+}
+
+func (a *TelegramAuthorizer) StartAuthorizing() {
+	a.Telegram.authorizing = true
 }
 
 type Telegram struct {
 	Bot *telebot.Bot `json:"-"`
 
+	// Private is used to protect the telegram bot, users not authenticated can not see messages or sending commands
+	Private bool `json:"private,omitempty"`
+
+	authorizing bool
+
 	// Owner is the authorized bot owner
 	// This field is exported in order to be stored in file
-	Owner *telebot.User `json:"owner"`
+	Owner *telebot.User `json:"owner,omitempty"`
 
 	// OwnerChat is the chat of the authorized bot owner
 	// This field is exported in order to be stored in file
-	OwnerChat *telebot.Chat `json:"chat"`
+	OwnerChat *telebot.Chat `json:"chat,omitempty"`
 
 	// textMessageResponder is used for interact to register its message handler
 	textMessageResponder Responder
@@ -80,19 +93,32 @@ func (tm *Telegram) SetTextMessageResponder(textMessageResponder Responder) {
 
 func (tm *Telegram) Start(context.Context) {
 	tm.Bot.Handle(telebot.OnText, func(m *telebot.Message) {
-		log.Infof("[interact][telegram] onText: %+v", m)
+		log.Infof("[telegram] onText: %+v", m)
+
+		if tm.Private && !tm.authorizing {
+			// ignore the message directly if it's not authorized yet
+			if tm.Owner == nil {
+				log.Warn("[telegram] telegram is set to private mode, skipping")
+				return
+			} else if tm.Owner != nil && tm.Owner.ID != m.Sender.ID {
+				log.Warnf("[telegram] telegram is set to private mode, owner does not match: %d != %d", tm.Owner.ID, m.Sender.ID)
+				return
+			}
+		}
 
 		authorizer := tm.newAuthorizer(m)
 		reply := tm.newReply()
 		if tm.textMessageResponder != nil {
 			if err := tm.textMessageResponder(m.Text, reply, authorizer); err != nil {
-				log.WithError(err).Errorf("[interact][telegram] response handling error")
+				log.WithError(err).Errorf("[telegram] response handling error")
 			}
 		}
 
-		reply.build()
-		if _, err := tm.Bot.Send(m.Sender, reply.message, reply.menu); err != nil {
-			log.WithError(err).Errorf("[interact][telegram] message send error")
+		if reply.set {
+			reply.build()
+			if _, err := tm.Bot.Send(m.Sender, reply.message, reply.menu); err != nil {
+				log.WithError(err).Errorf("[telegram] message send error")
+			}
 		}
 	})
 	go tm.Bot.Start()
@@ -100,17 +126,20 @@ func (tm *Telegram) Start(context.Context) {
 
 func (tm *Telegram) AddCommand(command string, responder Responder) {
 	tm.Bot.Handle(command, func(m *telebot.Message) {
+		authorizer := tm.newAuthorizer(m)
 		reply := tm.newReply()
-		if err := responder(m.Payload, reply); err != nil {
+		if err := responder(m.Payload, reply, authorizer); err != nil {
 			log.WithError(err).Errorf("[interact][telegram] responder error")
 			tm.Bot.Send(m.Sender, fmt.Sprintf("error: %v", err))
 			return
 		}
 
 		// build up the response objects
-		reply.build()
-		if _, err := tm.Bot.Send(m.Sender, reply.message, reply.menu); err != nil {
-			log.WithError(err).Errorf("[interact][telegram] message send error")
+		if reply.set {
+			reply.build()
+			if _, err := tm.Bot.Send(m.Sender, reply.message, reply.menu); err != nil {
+				log.WithError(err).Errorf("[interact][telegram] message send error")
+			}
 		}
 	})
 }
