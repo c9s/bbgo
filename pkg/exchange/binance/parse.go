@@ -719,6 +719,29 @@ func (e *OrderTradeUpdateEvent) OrderFutures() (*types.Order, error) {
 	}, nil
 }
 
+func (e *OrderTradeUpdateEvent) TradeFutures() (*types.Trade, error) {
+	if e.OrderTrade.CurrentExecutionType != "TRADE" {
+		return nil, errors.New("execution report is not a futures trade")
+	}
+
+	tt := time.Unix(0, e.OrderTrade.OrderTradeTime*int64(time.Millisecond))
+	return &types.Trade{
+		ID:            uint64(e.OrderTrade.TradeId),
+		Exchange:      types.ExchangeBinance,
+		Symbol:        e.OrderTrade.Symbol,
+		OrderID:       uint64(e.OrderTrade.OrderId),
+		Side:          toGlobalSideType(binance.SideType(e.OrderTrade.Side)),
+		Price:         util.MustParseFloat(e.OrderTrade.LastFilledPrice),
+		Quantity:      util.MustParseFloat(e.OrderTrade.OrderLastFilledQuantity),
+		QuoteQuantity: util.MustParseFloat(e.OrderTrade.OrderFilledAccumulatedQuantity),
+		IsBuyer:       e.OrderTrade.Side == "BUY",
+		IsMaker:       e.OrderTrade.IsMaker,
+		Time:          types.Time(tt),
+		Fee:           util.MustParseFloat(e.OrderTrade.CommissionAmount),
+		FeeCurrency:   e.OrderTrade.CommissionAsset,
+	}, nil
+}
+
 type AccountUpdate struct {
 	EventReasonType string                     `json:"m"`
 	Balances        []*futures.Balance         `json:"B,omitempty"`
