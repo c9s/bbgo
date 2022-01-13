@@ -92,10 +92,10 @@ type MarginUserAsset struct {
 
 // IsolatedMarginAccount defines isolated user assets of margin account
 type IsolatedMarginAccount struct {
-	TotalAssetOfBTC     fixedpoint.Value      `json:"totalAssetOfBtc"`
-	TotalLiabilityOfBTC fixedpoint.Value      `json:"totalLiabilityOfBtc"`
-	TotalNetAssetOfBTC  fixedpoint.Value      `json:"totalNetAssetOfBtc"`
-	Assets              []IsolatedMarginAsset `json:"assets"`
+	TotalAssetOfBTC     fixedpoint.Value       `json:"totalAssetOfBtc"`
+	TotalLiabilityOfBTC fixedpoint.Value       `json:"totalLiabilityOfBtc"`
+	TotalNetAssetOfBTC  fixedpoint.Value       `json:"totalNetAssetOfBtc"`
+	Assets              IsolatedMarginAssetMap `json:"assets"`
 }
 
 // IsolatedMarginAsset defines isolated margin asset information, like margin level, liquidation price... etc
