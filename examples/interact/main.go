@@ -41,7 +41,7 @@ type PositionInteraction struct {
 }
 
 func (m *PositionInteraction) Commands(i *interact.Interact) {
-	i.Command("/closePosition", func(reply interact.Reply) error {
+	i.Command("/closePosition", "", func(reply interact.Reply) error {
 		// send symbol options
 		reply.Message("Choose your position")
 		for _, symbol := range []string{"BTCUSDT", "ETHUSDT"} {

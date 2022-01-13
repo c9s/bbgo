@@ -8,6 +8,9 @@ type Command struct {
 	// Name is the command name
 	Name string
 
+	// Desc is the command description
+	Desc string
+
 	// StateF is the command handler function
 	F interface{}
 
@@ -17,9 +20,10 @@ type Command struct {
 	initState, lastState State
 }
 
-func NewCommand(name string, f interface{}) *Command {
+func NewCommand(name, desc string, f interface{}) *Command {
 	c := &Command{
 		Name:       name,
+		Desc:       desc,
 		F:          f,
 		states:     make(map[State]State),
 		statesFunc: make(map[State]interface{}),

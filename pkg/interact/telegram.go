@@ -3,6 +3,7 @@ package interact
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/tucnak/telebot.v2"
@@ -13,7 +14,7 @@ type TelegramReply struct {
 	message string
 	menu    *telebot.ReplyMarkup
 	buttons [][]telebot.Btn
-	set bool
+	set     bool
 }
 
 func (r *TelegramReply) Message(message string) {
@@ -78,6 +79,8 @@ type Telegram struct {
 
 	// textMessageResponder is used for interact to register its message handler
 	textMessageResponder Responder
+
+	commands []*Command
 }
 
 func (tm *Telegram) newAuthorizer(message *telebot.Message) *TelegramAuthorizer {
@@ -121,11 +124,28 @@ func (tm *Telegram) Start(context.Context) {
 			}
 		}
 	})
+
+	var cmdList []telebot.Command
+	for _, cmd := range tm.commands {
+		if len(cmd.Desc) == 0 {
+			continue
+		}
+
+		cmdList = append(cmdList, telebot.Command{
+			Text:        strings.ToLower(strings.TrimLeft(cmd.Name, "/")),
+			Description: cmd.Desc,
+		})
+	}
+	if err := tm.Bot.SetCommands(cmdList); err != nil {
+		log.WithError(err).Errorf("[telegram] set commands error")
+	}
+
 	go tm.Bot.Start()
 }
 
-func (tm *Telegram) AddCommand(command string, responder Responder) {
-	tm.Bot.Handle(command, func(m *telebot.Message) {
+func (tm *Telegram) AddCommand(cmd *Command, responder Responder) {
+	tm.commands = append(tm.commands, cmd)
+	tm.Bot.Handle(cmd.Name, func(m *telebot.Message) {
 		authorizer := tm.newAuthorizer(m)
 		reply := tm.newReply()
 		if err := responder(m.Payload, reply, authorizer); err != nil {
