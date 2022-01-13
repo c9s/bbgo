@@ -68,7 +68,7 @@ type TestInteraction struct {
 }
 
 func (m *TestInteraction) Commands(interact *Interact) {
-	interact.Command("/closePosition", func(reply Reply) error {
+	interact.Command("/closePosition", "", func(reply Reply) error {
 		// send symbol options
 		return nil
 	}).Next(func(symbol string) error {

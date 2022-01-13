@@ -37,7 +37,7 @@ type TextMessageResponder interface {
 }
 
 type CommandResponder interface {
-	AddCommand(command string, responder Responder)
+	AddCommand(command *Command, responder Responder)
 }
 
 type Messenger interface {
@@ -84,13 +84,13 @@ func (it *Interact) AddCustomInteraction(custom CustomInteraction) {
 }
 
 func (it *Interact) PrivateCommand(command string, f interface{}) *Command {
-	cmd := NewCommand(command, f)
+	cmd := NewCommand(command, "", f)
 	it.privateCommands[command] = cmd
 	return cmd
 }
 
-func (it *Interact) Command(command string, f interface{}) *Command {
-	cmd := NewCommand(command, f)
+func (it *Interact) Command(command string, desc string, f interface{}) *Command {
+	cmd := NewCommand(command, desc, f)
 	it.commands[command] = cmd
 	return cmd
 }
@@ -200,7 +200,7 @@ func (it *Interact) SetMessenger(messenger Messenger) {
 
 // builtin initializes the built-in commands
 func (it *Interact) builtin() error {
-	it.Command("/uptime", func(reply Reply) error {
+	it.Command("/uptime", "show bot uptime", func(reply Reply) error {
 		uptime := time.Since(it.startTime)
 		reply.Message(fmt.Sprintf("uptime %s", uptime))
 		return nil
@@ -232,7 +232,7 @@ func (it *Interact) init() error {
 		}
 
 		commandName := n
-		it.messenger.AddCommand(commandName, func(message string, reply Reply, ctxObjects ...interface{}) error {
+		it.messenger.AddCommand(cmd, func(message string, reply Reply, ctxObjects ...interface{}) error {
 			args := parseCommand(message)
 			return it.runCommand(commandName, args, append(ctxObjects, reply)...)
 		})

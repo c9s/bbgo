@@ -51,7 +51,7 @@ func (it *AuthInteract) Commands(interact *Interact) {
 
 			it.OneTimePasswordKey = key
 		}
-		interact.Command("/auth", func(reply Reply, authorizer Authorizer) error {
+		interact.Command("/auth", "authorize", func(reply Reply, authorizer Authorizer) error {
 			reply.Message("Enter your authentication token")
 			authorizer.StartAuthorizing()
 			return nil
@@ -82,7 +82,7 @@ func (it *AuthInteract) Commands(interact *Interact) {
 			return ErrAuthenticationFailed
 		})
 	} else {
-		interact.Command("/auth", func(reply Reply) error {
+		interact.Command("/auth", "authorize", func(reply Reply) error {
 			reply.Message("Enter your authentication code")
 			return nil
 		}).NamedNext(StateAuthenticated, func(code string, reply Reply, authorizer Authorizer) error {
