@@ -1,13 +1,13 @@
 package interact
 
 import (
-	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
 	"text/scanner"
 
 	"github.com/mattn/go-shellwords"
+	log "github.com/sirupsen/logrus"
 )
 
 func parseFuncArgsAndCall(f interface{}, args []string, objects ...interface{}) (State, error) {
@@ -30,7 +30,7 @@ func parseFuncArgsAndCall(f interface{}, args []string, objects ...interface{}) 
 				objT := reflect.TypeOf(obj)
 				objV := reflect.ValueOf(obj)
 
-				fmt.Println(
+				log.Debugln(
 					at.PkgPath(),
 					at.Name(),
 					objT, "implements", at, "=", objT.Implements(at),

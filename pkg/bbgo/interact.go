@@ -43,6 +43,51 @@ func NewCoreInteraction(environment *Environment, trader *Trader) *CoreInteracti
 }
 
 func (it *CoreInteraction) Commands(i *interact.Interact) {
+	i.PrivateCommand("/position", "show the current position of a strategy", func(reply interact.Reply) error {
+		// it.trader.exchangeStrategies
+		// send symbol options
+		found := false
+		for signature, strategy := range it.exchangeStrategies {
+			if _, ok := strategy.(PositionReader); ok {
+				reply.AddButton(signature)
+				found = true
+			}
+		}
+
+		if found {
+			reply.Message("Please choose one strategy")
+		} else {
+			reply.Message("No any strategy supports PositionReader")
+		}
+		return nil
+	}).Next(func(signature string, reply interact.Reply) error {
+		strategy, ok := it.exchangeStrategies[signature]
+		if !ok {
+			reply.Message("Strategy not found")
+			return fmt.Errorf("strategy %s not found", signature)
+		}
+
+		reader, implemented := strategy.(PositionReader)
+		if !implemented {
+			reply.Message(fmt.Sprintf("Strategy %s does not support position close", signature))
+			return fmt.Errorf("strategy %s does not implement PositionCloser interface", signature)
+		}
+
+		position := reader.CurrentPosition()
+		if position != nil {
+			reply.Send("Your current position:")
+			reply.Send(position.String())
+
+			if position.Base == 0 {
+				reply.Message(fmt.Sprintf("Strategy %q has no opened position", signature))
+				return fmt.Errorf("strategy %T has no opened position", strategy)
+			}
+		}
+
+		reply.RemoveKeyboard()
+		return nil
+	})
+
 	i.PrivateCommand("/closeposition", "close the position of a strategy", func(reply interact.Reply) error {
 		// it.trader.exchangeStrategies
 		// send symbol options
