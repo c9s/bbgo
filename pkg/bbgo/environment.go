@@ -20,6 +20,7 @@ import (
 	"gopkg.in/tucnak/telebot.v2"
 
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
+	"github.com/c9s/bbgo/pkg/interact"
 	"github.com/c9s/bbgo/pkg/notifier/slacknotifier"
 	"github.com/c9s/bbgo/pkg/notifier/telegramnotifier"
 	"github.com/c9s/bbgo/pkg/service"
@@ -581,14 +582,27 @@ func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) erro
 
 		// allocate a store, so that we can save the chatID for the owner
 		var sessionStore = persistence.NewStore("bbgo", "telegram", telegramID)
-		var interaction = telegramnotifier.NewInteraction(bot, sessionStore)
+
+		interact.SetMessenger(&interact.Telegram{
+			Private: true,
+			Bot:     bot,
+		})
+
+
+		// TODO: replace this background context later
+		if err := interact.Start(context.Background()); err != nil {
+			return err
+		}
 
 		authToken := viper.GetString("telegram-bot-auth-token")
 		if len(authToken) > 0 {
-			interaction.SetAuthToken(authToken)
+			interact.AddCustomInteraction(&interact.AuthInteract{
+				Strict: true,
+				Mode:   interact.AuthModeToken,
+				Token:  authToken,
+			})
 
 			log.Debugf("telegram bot auth token is set, using fixed token for authorization...")
-
 			printTelegramAuthTokenGuide(authToken)
 		}
 

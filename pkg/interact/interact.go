@@ -222,4 +222,3 @@ func (it *Interact) Start(ctx context.Context) error {
 	it.messenger.Start(ctx)
 	return nil
 }
-
