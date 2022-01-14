@@ -26,11 +26,13 @@ exchangeStrategies:
 - on: binance
   funding:
     symbol: ETHUSDT
+    quantity: 0.0001
     fundingRate:
       high: 0.01%
     supportDetection:
-      - interval: 5m
+      - interval: 1m
         movingAverageType: EMA
-        movingAverageInterval: 1h
-        movingAverageWindow: 99
+        movingAverageIntervalWindow:
+          interval: 15m
+          window: 60
         minVolume: 8_000
