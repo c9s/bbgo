@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -312,6 +313,9 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 						}
 					}
 					s.mu.Unlock()
+				} else {
+					// plus a 2% quantity jitter
+					quantity *= 1.0 + math.Max(0.02, rand.Float64())
 				}
 
 				var quoteAmount = price * quantity
