@@ -12,6 +12,10 @@ type CustomInteraction interface {
 	Commands(interact *Interact)
 }
 
+type Initializer interface {
+	Initialize() error
+}
+
 type Messenger interface {
 	TextMessageResponder
 	CommandResponder
@@ -33,17 +37,20 @@ type Interact struct {
 
 	originState, currentState State
 
+	customInteractions []CustomInteraction
+
 	messenger Messenger
 }
 
 func New() *Interact {
 	return &Interact{
-		startTime:    time.Now(),
-		commands:     make(map[string]*Command),
-		originState:  StatePublic,
-		currentState: StatePublic,
-		states:       make(map[State]State),
-		statesFunc:   make(map[State]interface{}),
+		startTime:       time.Now(),
+		commands:        make(map[string]*Command),
+		privateCommands: make(map[string]*Command),
+		originState:     StatePublic,
+		currentState:    StatePublic,
+		states:          make(map[State]State),
+		statesFunc:      make(map[State]interface{}),
 	}
 }
 
@@ -53,10 +60,11 @@ func (it *Interact) SetOriginState(s State) {
 
 func (it *Interact) AddCustomInteraction(custom CustomInteraction) {
 	custom.Commands(it)
+	it.customInteractions = append(it.customInteractions, custom)
 }
 
-func (it *Interact) PrivateCommand(command string, f interface{}) *Command {
-	cmd := NewCommand(command, "", f)
+func (it *Interact) PrivateCommand(command, desc string, f interface{}) *Command {
+	cmd := NewCommand(command, desc, f)
 	it.privateCommands[command] = cmd
 	return cmd
 }
@@ -84,7 +92,7 @@ func (it *Interact) getNextState(currentState State) (nextState State, final boo
 	return it.originState, final
 }
 
-func (it *Interact) setState(s State) {
+func (it *Interact) SetState(s State) {
 	log.Infof("[interact] transiting state from %s -> %s", it.currentState, s)
 	it.currentState = s
 }
@@ -111,11 +119,11 @@ func (it *Interact) handleResponse(text string, ctxObjects ...interface{}) error
 
 	nextState, end := it.getNextState(it.currentState)
 	if end {
-		it.setState(it.originState)
+		it.SetState(it.originState)
 		return nil
 	}
 
-	it.setState(nextState)
+	it.SetState(nextState)
 	return nil
 }
 
@@ -146,7 +154,7 @@ func (it *Interact) runCommand(command string, args []string, ctxObjects ...inte
 		return err
 	}
 
-	it.setState(cmd.initState)
+	it.SetState(cmd.initState)
 	if _, err := parseFuncArgsAndCall(cmd.F, args, ctxObjects...); err != nil {
 		return err
 	}
@@ -154,11 +162,11 @@ func (it *Interact) runCommand(command string, args []string, ctxObjects ...inte
 	// if we can successfully execute the command, then we can go to the next state.
 	nextState, end := it.getNextState(it.currentState)
 	if end {
-		it.setState(it.originState)
+		it.SetState(it.originState)
 		return nil
 	}
 
-	it.setState(nextState)
+	it.SetState(nextState)
 	return nil
 }
 
@@ -186,7 +194,19 @@ func (it *Interact) init() error {
 		return err
 	}
 
-	for n, cmd := range it.commands {
+	if err := it.registerCommands(it.commands); err != nil {
+		return err
+	}
+
+	if err := it.registerCommands(it.privateCommands); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (it *Interact) registerCommands(commands map[string]*Command) error {
+	for n, cmd := range commands {
 		for s1, s2 := range cmd.states {
 			if _, exist := it.states[s1]; exist {
 				return fmt.Errorf("state %s already exists", s1)
@@ -209,13 +229,22 @@ func (it *Interact) init() error {
 			return it.runCommand(commandName, args, append(ctxObjects, reply)...)
 		})
 	}
-
 	return nil
 }
 
 func (it *Interact) Start(ctx context.Context) error {
 	if err := it.init(); err != nil {
 		return err
+	}
+
+	for _, custom := range it.customInteractions {
+		log.Infof("checking %T custom interaction...", custom)
+		if initializer, ok := custom.(Initializer); ok {
+			log.Infof("initializing %T custom interaction...", custom)
+			if err := initializer.Initialize(); err != nil {
+				return err
+			}
+		}
 	}
 
 	// TODO: use go routine and context

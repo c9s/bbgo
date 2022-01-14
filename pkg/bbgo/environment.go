@@ -716,6 +716,10 @@ func (environ *Environment) setupTelegram(userConfig *Config, telegramBotToken s
 
 		// you must restore the session after the notifier updates
 		messenger.RestoreSession(session)
+
+		// right now it's only for telegram, should we share the session (?)
+		interact.Default().SetOriginState(interact.StateAuthenticated)
+		interact.Default().SetState(interact.StateAuthenticated)
 	}
 
 	messenger.OnAuthorized(func(a *interact.TelegramAuthorizer) {

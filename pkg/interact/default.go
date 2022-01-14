@@ -13,7 +13,7 @@ func SetMessenger(messenger Messenger) {
 }
 
 func AddCustomInteraction(custom CustomInteraction) {
-	custom.Commands(defaultInteraction)
+	defaultInteraction.AddCustomInteraction(custom)
 }
 
 func Start(ctx context.Context) error {

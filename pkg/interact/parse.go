@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 	"text/scanner"
+
+	"github.com/mattn/go-shellwords"
 )
 
 func parseFuncArgsAndCall(f interface{}, args []string, objects ...interface{}) (State, error) {
@@ -112,6 +114,13 @@ func parseFuncArgsAndCall(f interface{}, args []string, objects ...interface{}) 
 }
 
 func parseCommand(src string) (args []string) {
+	var err error
+	args, err = shellwords.Parse(src)
+	if err == nil {
+		return args
+	}
+
+	// fallback to go text/scanner
 	var s scanner.Scanner
 	s.Init(strings.NewReader(src))
 	s.Filename = "command"
@@ -125,4 +134,3 @@ func parseCommand(src string) (args []string) {
 
 	return args
 }
-

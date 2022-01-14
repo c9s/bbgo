@@ -11,11 +11,17 @@ import (
 )
 
 type TelegramReply struct {
-	bot     *telebot.Bot
+	bot  *telebot.Bot
+	chat *telebot.Chat
+
 	message string
 	menu    *telebot.ReplyMarkup
 	buttons [][]telebot.Btn
 	set     bool
+}
+
+func (r *TelegramReply) Send(message string) {
+	checkSendErr(r.bot.Send(r.chat, message))
 }
 
 func (r *TelegramReply) Message(message string) {
@@ -115,7 +121,7 @@ func (tm *Telegram) Start(context.Context) {
 		}
 
 		authorizer := tm.newAuthorizer(m)
-		reply := tm.newReply()
+		reply := tm.newReply(m)
 		if tm.textMessageResponder != nil {
 			if err := tm.textMessageResponder(m.Text, reply, authorizer); err != nil {
 				log.WithError(err).Errorf("[telegram] response handling error")
@@ -148,30 +154,35 @@ func (tm *Telegram) Start(context.Context) {
 	go tm.Bot.Start()
 }
 
+func checkSendErr(m *telebot.Message, err error) {
+	if err != nil {
+		log.WithError(err).Errorf("[telegram] message send error")
+	}
+}
+
 func (tm *Telegram) AddCommand(cmd *Command, responder Responder) {
 	tm.commands = append(tm.commands, cmd)
 	tm.Bot.Handle(cmd.Name, func(m *telebot.Message) {
 		authorizer := tm.newAuthorizer(m)
-		reply := tm.newReply()
+		reply := tm.newReply(m)
 		if err := responder(m.Payload, reply, authorizer); err != nil {
 			log.WithError(err).Errorf("[telegram] responder error")
-			tm.Bot.Send(m.Sender, fmt.Sprintf("error: %v", err))
+			checkSendErr(tm.Bot.Send(m.Sender, fmt.Sprintf("error: %v", err)))
 			return
 		}
 
 		// build up the response objects
 		if reply.set {
 			reply.build()
-			if _, err := tm.Bot.Send(m.Sender, reply.message, reply.menu); err != nil {
-				log.WithError(err).Errorf("[telegram] message send error")
-			}
+			checkSendErr(tm.Bot.Send(m.Sender, reply.message, reply.menu))
 		}
 	})
 }
 
-func (tm *Telegram) newReply() *TelegramReply {
+func (tm *Telegram) newReply(m *telebot.Message) *TelegramReply {
 	return &TelegramReply{
 		bot:  tm.Bot,
+		chat: m.Chat,
 		menu: &telebot.ReplyMarkup{ResizeReplyKeyboard: true},
 	}
 }
