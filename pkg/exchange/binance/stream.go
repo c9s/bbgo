@@ -284,11 +284,11 @@ func (s *Stream) getEndpointUrl(listenKey string) string {
 	var url string
 
 	if s.IsFutures {
-		url = BinanceFuturesWebSocketURL + "/ws"
+		url = FuturesWebSocketURL + "/ws"
 	} else if isBinanceUs() {
 		url = BinanceUSWebSocketURL + "/ws"
 	} else {
-		url = BinanceWebSocketURL + "/ws"
+		url = WebSocketURL + "/ws"
 	}
 
 	if !s.PublicOnly {

@@ -31,11 +31,11 @@ const BNB = "BNB"
 
 const BinanceUSBaseURL = "https://api.binance.us"
 const BinanceUSWebSocketURL = "wss://stream.binance.us:9443"
-const BinanceWebSocketURL = "wss://stream.binance.com:9443"
-const BinanceFuturesWebSocketURL = "wss://fstream.binance.com"
+const WebSocketURL = "wss://stream.binance.com:9443"
+const FuturesWebSocketURL = "wss://fstream.binance.com"
 
-// 50 per 10 seconds = 5 per second
-var orderLimiter = rate.NewLimiter(5, 5)
+// 5 per second and a 2 initial bucket
+var orderLimiter = rate.NewLimiter(5, 2)
 
 var log = logrus.WithFields(logrus.Fields{
 	"exchange": "binance",
@@ -539,6 +539,10 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 }
 
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err error) {
+	if err := orderLimiter.Wait(ctx); err != nil {
+		log.WithError(err).Errorf("order rate limiter wait error")
+	}
+
 	if e.IsFutures {
 		for _, o := range orders {
 			var req = e.futuresClient.NewCancelOrderService()
