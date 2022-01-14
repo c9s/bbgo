@@ -1,0 +1,128 @@
+package interact
+
+import (
+	"fmt"
+	"reflect"
+	"strconv"
+	"strings"
+	"text/scanner"
+)
+
+func parseFuncArgsAndCall(f interface{}, args []string, objects ...interface{}) (State, error) {
+	fv := reflect.ValueOf(f)
+	ft := reflect.TypeOf(f)
+
+	argIndex := 0
+
+	var rArgs []reflect.Value
+	for i := 0; i < ft.NumIn(); i++ {
+		at := ft.In(i)
+
+		switch k := at.Kind(); k {
+
+		case reflect.Interface:
+			found := false
+
+			for oi := 0; oi < len(objects); oi++ {
+				obj := objects[oi]
+				objT := reflect.TypeOf(obj)
+				objV := reflect.ValueOf(obj)
+
+				fmt.Println(
+					at.PkgPath(),
+					at.Name(),
+					objT, "implements", at, "=", objT.Implements(at),
+				)
+
+				if objT.Implements(at) {
+					found = true
+					rArgs = append(rArgs, objV)
+					break
+				}
+			}
+
+			if !found {
+				v := reflect.Zero(at)
+				rArgs = append(rArgs, v)
+			}
+
+		case reflect.String:
+			av := reflect.ValueOf(args[argIndex])
+			rArgs = append(rArgs, av)
+			argIndex++
+
+		case reflect.Bool:
+			bv, err := strconv.ParseBool(args[argIndex])
+			if err != nil {
+				return "", err
+			}
+			av := reflect.ValueOf(bv)
+			rArgs = append(rArgs, av)
+			argIndex++
+
+		case reflect.Int64:
+			nf, err := strconv.ParseInt(args[argIndex], 10, 64)
+			if err != nil {
+				return "", err
+			}
+
+			av := reflect.ValueOf(nf)
+			rArgs = append(rArgs, av)
+			argIndex++
+
+		case reflect.Float64:
+			nf, err := strconv.ParseFloat(args[argIndex], 64)
+			if err != nil {
+				return "", err
+			}
+
+			av := reflect.ValueOf(nf)
+			rArgs = append(rArgs, av)
+			argIndex++
+		}
+	}
+
+	out := fv.Call(rArgs)
+	if ft.NumOut() == 0 {
+		return "", nil
+	}
+
+	// try to get the error object from the return value
+	var state State
+	var err error
+	for i := 0; i < ft.NumOut(); i++ {
+		outType := ft.Out(i)
+		switch outType.Kind() {
+		case reflect.String:
+			if outType.Name() == "State" {
+				state = State(out[i].String())
+			}
+
+		case reflect.Interface:
+			o := out[i].Interface()
+			switch ov := o.(type) {
+			case error:
+				err = ov
+
+			}
+
+		}
+	}
+	return state, err
+}
+
+func parseCommand(src string) (args []string) {
+	var s scanner.Scanner
+	s.Init(strings.NewReader(src))
+	s.Filename = "command"
+	for tok := s.Scan(); tok != scanner.EOF; tok = s.Scan() {
+		text := s.TokenText()
+		if text[0] == '"' && text[len(text)-1] == '"' {
+			text, _ = strconv.Unquote(text)
+		}
+		args = append(args, text)
+	}
+
+	return args
+}
+
