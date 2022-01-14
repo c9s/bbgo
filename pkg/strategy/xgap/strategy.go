@@ -61,6 +61,7 @@ type Strategy struct {
 	Symbol          string           `json:"symbol"`
 	SourceExchange  string           `json:"sourceExchange"`
 	TradingExchange string           `json:"tradingExchange"`
+	MinSpread       fixedpoint.Value `json:"minSpread"`
 	Quantity        fixedpoint.Value `json:"quantity"`
 
 	DailyFeeBudgets map[string]fixedpoint.Value `json:"dailyFeeBudgets,omitempty"`
@@ -267,6 +268,13 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 						log.Warnf("spread too large (%f %f%%), using source book", spread.Float64(), spreadPercentage)
 						bestBid, hasBid = s.sourceBook.BestBid()
 						bestAsk, hasAsk = s.sourceBook.BestAsk()
+					}
+
+					if s.MinSpread > 0 {
+						if spread < s.MinSpread {
+							log.Warnf("spread < min spread, spread=%f minSpread=%f bid=%f ask=%f", spread.Float64(), s.MinSpread.Float64(), bestBid.Price.Float64(), bestAsk.Price.Float64())
+							continue
+						}
 					}
 
 					// if the spread is less than 100 ticks (100 pips), skip
