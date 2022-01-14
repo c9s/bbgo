@@ -54,6 +54,21 @@ func (c *Command) NamedNext(n State, f interface{}) *Command {
 	return c
 }
 
+func (c *Command) Cycle(f interface{}) *Command {
+	var curState State
+	if c.lastState == "" {
+		curState = State(c.Name + "_" + strconv.Itoa(c.stateID))
+	} else {
+		curState = c.lastState
+	}
+
+	nextState := curState
+	c.states[curState] = nextState
+	c.statesFunc[curState] = f
+	c.lastState = nextState
+	return c
+}
+
 // Next defines the next state with the transition function from the last defined state.
 func (c *Command) Next(f interface{}) *Command {
 	var curState State
