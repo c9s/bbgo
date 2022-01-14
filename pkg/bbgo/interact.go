@@ -60,7 +60,7 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 			reply.Message("No any strategy supports PositionReader")
 		}
 		return nil
-	}).Next(func(signature string, reply interact.Reply) error {
+	}).Cycle(func(signature string, reply interact.Reply) error {
 		strategy, ok := it.exchangeStrategies[signature]
 		if !ok {
 			reply.Message("Strategy not found")
