@@ -115,6 +115,11 @@ func (n *Notifier) AddSubscriber(m *telebot.Message) {
 	n.Chats[m.Chat.ID] = m.Time()
 }
 
+func (n *Notifier) SetOwner(owner *telebot.User, chat *telebot.Chat) {
+	n.Owner = owner
+	n.OwnerChat = chat
+}
+
 func (n *Notifier) SendToOwner(message string) {
 	if _, err := n.Bot.Send(n.OwnerChat, message); err != nil {
 		log.WithError(err).Error("telegram send error")
