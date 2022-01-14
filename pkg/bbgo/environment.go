@@ -77,7 +77,7 @@ type Environment struct {
 	BacktestService          *service.BacktestService
 	RewardService            *service.RewardService
 	SyncService              *service.SyncService
-	AccountService 			 *service.AccountService
+	AccountService           *service.AccountService
 
 	// startTime is the time of start point (which is used in the backtest)
 	startTime time.Time
@@ -410,18 +410,18 @@ func (environ *Environment) ConfigureNotificationRouting(conf *NotificationConfi
 		// currently, not used
 		// FIXME: this is causing cyclic import
 		/*
-		switch conf.Routing.PnL {
-		case "$symbol":
-			environ.ObjectChannelRouter.Route(func(obj interface{}) (channel string, ok bool) {
-				report, matched := obj.(*pnl.AverageCostPnlReport)
-				if !matched {
+			switch conf.Routing.PnL {
+			case "$symbol":
+				environ.ObjectChannelRouter.Route(func(obj interface{}) (channel string, ok bool) {
+					report, matched := obj.(*pnl.AverageCostPnlReport)
+					if !matched {
+						return
+					}
+					channel, ok = environ.SymbolChannelRouter.Route(report.Symbol)
 					return
-				}
-				channel, ok = environ.SymbolChannelRouter.Route(report.Symbol)
-				return
-			})
-		}
-		 */
+				})
+			}
+		*/
 
 	}
 	return nil
@@ -563,6 +563,20 @@ func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) erro
 	}
 
 	persistence := environ.PersistenceServiceFacade.Get()
+
+	authToken := viper.GetString("telegram-bot-auth-token")
+	if len(authToken) > 0 {
+		interact.AddCustomInteraction(&interact.AuthInteract{
+			Strict: false,
+			Mode:   interact.AuthModeToken,
+			Token:  authToken,
+		})
+
+		log.Debugf("telegram bot auth token is set, using fixed token for authorization...")
+		printAuthTokenGuide(authToken)
+	}
+
+	// check if telegram bot token is defined
 	telegramBotToken := viper.GetString("telegram-bot-token")
 	if len(telegramBotToken) > 0 {
 		tt := strings.Split(telegramBotToken, ":")
@@ -584,27 +598,9 @@ func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) erro
 		var sessionStore = persistence.NewStore("bbgo", "telegram", telegramID)
 
 		interact.SetMessenger(&interact.Telegram{
-			Private: true,
-			Bot:     bot,
+			Bot:       bot,
+			Private:   true,
 		})
-
-
-		// TODO: replace this background context later
-		if err := interact.Start(context.Background()); err != nil {
-			return err
-		}
-
-		authToken := viper.GetString("telegram-bot-auth-token")
-		if len(authToken) > 0 {
-			interact.AddCustomInteraction(&interact.AuthInteract{
-				Strict: true,
-				Mode:   interact.AuthModeToken,
-				Token:  authToken,
-			})
-
-			log.Debugf("telegram bot auth token is set, using fixed token for authorization...")
-			printTelegramAuthTokenGuide(authToken)
-		}
 
 		var session telegramnotifier.Session
 		var qrcodeImagePath = fmt.Sprintf("otp-%s.png", telegramID)
@@ -616,7 +612,7 @@ func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) erro
 				return errors.Wrapf(err, "failed to setup totp (time-based one time password) key")
 			}
 
-			printTelegramOtpAuthGuide(qrcodeImagePath)
+			printOtpAuthGuide(qrcodeImagePath)
 
 			session = telegramnotifier.NewSession(key)
 			if err := sessionStore.Save(&session); err != nil {
@@ -625,10 +621,9 @@ func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) erro
 		} else if session.OneTimePasswordKey != nil {
 			log.Infof("telegram session loaded: %+v", session)
 
-			printTelegramOtpAuthGuide(qrcodeImagePath)
+			printOtpAuthGuide(qrcodeImagePath)
 		}
 
-		go interaction.Start(session)
 
 		var opts []telegramnotifier.Option
 
@@ -643,7 +638,7 @@ func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) erro
 
 	if userConfig.Notifications == nil {
 		userConfig.Notifications = &NotificationConfig{
-			Routing :  &SlackNotificationRouting{
+			Routing: &SlackNotificationRouting{
 				Trade: "$session",
 				Order: "$session",
 			},
@@ -654,6 +649,11 @@ func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) erro
 		if err := environ.ConfigureNotificationRouting(userConfig.Notifications); err != nil {
 			return err
 		}
+	}
+
+	// TODO: replace this background context later
+	if err := interact.Start(context.Background()); err != nil {
+		return err
 	}
 
 	return nil
@@ -707,24 +707,28 @@ func printOtpKey(key *otp.Key) {
 	fmt.Println("")
 }
 
-func printTelegramOtpAuthGuide(qrcodeImagePath string) {
+func printOtpAuthGuide(qrcodeImagePath string) {
 	fmt.Printf(`
 To scan your OTP QR code, please run the following command:
 	
 	open %s
 
-send the auth command with the generated one-time password to the bbo bot you created to enable the notification:
+For telegram, send the auth command with the generated one-time password to the bbo bot you created to enable the notification:
 
-	/auth {code}
+	/auth
 
 `, qrcodeImagePath)
 }
 
-func printTelegramAuthTokenGuide(token string) {
+func printAuthTokenGuide(token string) {
 	fmt.Printf(`
-send the following command to the bbgo bot you created to enable the notification:
+For telegram, send the following command to the bbgo bot you created to enable the notification:
 
-	/auth %s
+	/auth
+
+And then enter your token
+
+	%s
 
 `, token)
 }
