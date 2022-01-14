@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/tucnak/telebot.v2"
@@ -54,6 +55,7 @@ func (a *TelegramAuthorizer) Authorize() error {
 	a.Telegram.OwnerChat = a.Message.Chat
 	a.Telegram.authorizing = false
 	log.Infof("[interact][telegram] authorized owner %+v and chat %+v", a.Message.Sender, a.Message.Chat)
+	a.Telegram.EmitAuthorized(a)
 	return nil
 }
 
@@ -61,6 +63,7 @@ func (a *TelegramAuthorizer) StartAuthorizing() {
 	a.Telegram.authorizing = true
 }
 
+//go:generate callbackgen -type Telegram
 type Telegram struct {
 	Bot *telebot.Bot `json:"-"`
 
@@ -81,6 +84,8 @@ type Telegram struct {
 	textMessageResponder Responder
 
 	commands []*Command
+
+	authorizedCallbacks []func(a *TelegramAuthorizer)
 }
 
 func (tm *Telegram) newAuthorizer(message *telebot.Message) *TelegramAuthorizer {
@@ -101,7 +106,7 @@ func (tm *Telegram) Start(context.Context) {
 		if tm.Private && !tm.authorizing {
 			// ignore the message directly if it's not authorized yet
 			if tm.Owner == nil {
-				log.Warn("[telegram] telegram is set to private mode, skipping")
+				log.Warn("[telegram] telegram is set to private mode, skipping message")
 				return
 			} else if tm.Owner != nil && tm.Owner.ID != m.Sender.ID {
 				log.Warnf("[telegram] telegram is set to private mode, owner does not match: %d != %d", tm.Owner.ID, m.Sender.ID)
@@ -149,7 +154,7 @@ func (tm *Telegram) AddCommand(cmd *Command, responder Responder) {
 		authorizer := tm.newAuthorizer(m)
 		reply := tm.newReply()
 		if err := responder(m.Payload, reply, authorizer); err != nil {
-			log.WithError(err).Errorf("[interact][telegram] responder error")
+			log.WithError(err).Errorf("[telegram] responder error")
 			tm.Bot.Send(m.Sender, fmt.Sprintf("error: %v", err))
 			return
 		}
@@ -158,7 +163,7 @@ func (tm *Telegram) AddCommand(cmd *Command, responder Responder) {
 		if reply.set {
 			reply.build()
 			if _, err := tm.Bot.Send(m.Sender, reply.message, reply.menu); err != nil {
-				log.WithError(err).Errorf("[interact][telegram] message send error")
+				log.WithError(err).Errorf("[telegram] message send error")
 			}
 		}
 	})
@@ -171,19 +176,29 @@ func (tm *Telegram) newReply() *TelegramReply {
 	}
 }
 
+func (tm *Telegram) RestoreSession(session *TelegramSession) {
+	log.Infof("[telegram] restoring telegram session: %+v", session)
+	if session.OwnerChat != nil {
+		tm.OwnerChat = session.OwnerChat
+		tm.Owner = session.Owner
+		if _, err := tm.Bot.Send(tm.OwnerChat, fmt.Sprintf("Hi %s, I'm back. Your telegram session is restored.", tm.Owner.Username)); err != nil {
+			log.WithError(err).Error("[telegram] can not send telegram message")
+		}
+	}
+}
+
 type TelegramSession struct {
 	Owner     *telebot.User `json:"owner"`
 	OwnerChat *telebot.Chat `json:"chat"`
 
-	// Chat objects
-	Chats map[int64]bool `json:"chats"`
+	// Subscribers stores the Chat objects
+	Subscribers map[int64]time.Time `json:"chats"`
 }
 
-func NewTelegramSession() TelegramSession {
-	return TelegramSession{
-		Owner:     nil,
-		OwnerChat: nil,
-		Chats:     make(map[int64]bool),
+func NewTelegramSession() *TelegramSession {
+	return &TelegramSession{
+		Owner:       nil,
+		OwnerChat:   nil,
+		Subscribers: make(map[int64]time.Time),
 	}
 }
-

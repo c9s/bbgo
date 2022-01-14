@@ -14,10 +14,10 @@ import (
 var log = logrus.WithField("service", "telegram")
 
 type Notifier struct {
-	Bot *telebot.Bot
+	bot *telebot.Bot
 
-	// Chats stores the Chat objects for broadcasting
-	Chats map[int64]time.Time `json:"chats"`
+	// Subscribers stores the Chat objects for broadcasting
+	Subscribers map[int64]time.Time `json:"chats"`
 
 	// Owner
 	// when owner and owner chat is not nil, notification will send to the owner chat
@@ -36,8 +36,8 @@ func UseBroadcast() Option {
 }
 
 // New
-func New(options ...Option) *Notifier {
-	notifier := &Notifier{}
+func New(bot *telebot.Bot, options ...Option) *Notifier {
+	notifier := &Notifier{ bot: bot }
 
 	for _, o := range options {
 		o(notifier)
@@ -111,11 +111,11 @@ func (n *Notifier) NotifyTo(channel string, obj interface{}, args ...interface{}
 }
 
 func (n *Notifier) AddSubscriber(m *telebot.Message) {
-	if n.Chats == nil {
-		n.Chats = make(map[int64]time.Time)
+	if n.Subscribers == nil {
+		n.Subscribers = make(map[int64]time.Time)
 	}
 
-	n.Chats[m.Chat.ID] = m.Time()
+	n.Subscribers[m.Chat.ID] = m.Time()
 }
 
 func (n *Notifier) SetOwner(owner *telebot.User, chat *telebot.Chat) {
@@ -124,20 +124,28 @@ func (n *Notifier) SetOwner(owner *telebot.User, chat *telebot.Chat) {
 }
 
 func (n *Notifier) SendToOwner(message string) {
-	if _, err := n.Bot.Send(n.OwnerChat, message); err != nil {
+	if n.OwnerChat == nil {
+		return
+	}
+
+	if _, err := n.bot.Send(n.OwnerChat, message); err != nil {
 		log.WithError(err).Error("telegram send error")
 	}
 }
 
 func (n *Notifier) Broadcast(message string) {
-	for chatID := range n.Chats {
-		chat, err := n.Bot.ChatByID(strconv.FormatInt(chatID, 10))
+	if n.Subscribers == nil {
+		return
+	}
+
+	for chatID := range n.Subscribers {
+		chat, err := n.bot.ChatByID(strconv.FormatInt(chatID, 10))
 		if err != nil {
 			log.WithError(err).Error("can not get chat by ID")
 			continue
 		}
 
-		if _, err := n.Bot.Send(chat, message); err != nil {
+		if _, err := n.bot.Send(chat, message); err != nil {
 			log.WithError(err).Error("failed to send message")
 		}
 	}
