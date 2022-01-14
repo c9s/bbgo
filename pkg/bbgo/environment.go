@@ -623,7 +623,7 @@ func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) erro
 			opts = append(opts, telegramnotifier.UseBroadcast())
 		}
 
-		var notifier = telegramnotifier.New(interaction, opts...)
+		var notifier = telegramnotifier.New(opts...)
 		environ.Notifiability.AddNotifier(notifier)
 	}
 
