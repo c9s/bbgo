@@ -560,12 +560,6 @@ func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) erro
 	}
 
 	persistence := environ.PersistenceServiceFacade.Get()
-	authToken := viper.GetString("telegram-bot-auth-token")
-
-	if len(authToken) > 0 {
-		log.Debugf("telegram bot auth token is set, using fixed token for authorization...")
-		printAuthTokenGuide(authToken)
-	}
 
 	var otpQRCodeImagePath = fmt.Sprintf("otp.png")
 	var key *otp.Key
@@ -599,12 +593,19 @@ func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) erro
 
 	authStrict := false
 	authMode := interact.AuthModeToken
+	authToken := viper.GetString("telegram-bot-auth-token")
+
 	if authToken != "" && key != nil {
 		authStrict = true
 	} else if authToken != "" {
 		authMode = interact.AuthModeToken
 	} else if key != nil {
 		authMode = interact.AuthModeOTP
+	}
+
+	if authMode == interact.AuthModeToken {
+		log.Debugf("found interaction auth token, using token mode for authorization...")
+		printAuthTokenGuide(authToken)
 	}
 
 	interact.AddCustomInteraction(&interact.AuthInteract{
