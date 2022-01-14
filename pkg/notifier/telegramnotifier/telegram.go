@@ -2,13 +2,26 @@ package telegramnotifier
 
 import (
 	"fmt"
+	"strconv"
+	"time"
+
+	"gopkg.in/tucnak/telebot.v2"
 
 	"github.com/c9s/bbgo/pkg/types"
 )
 
 type Notifier struct {
-	interaction *Interaction
-	broadcast   bool
+	Bot *telebot.Bot
+
+	// Chats stores the Chat objects for broadcasting
+	Chats map[int64]time.Time `json:"chats"`
+
+	// Owner
+	// when owner and owner chat is not nil, notification will send to the owner chat
+	Owner     *telebot.User `json:"owner"`
+	OwnerChat *telebot.Chat `json:"chat"`
+
+	broadcast bool
 }
 
 type Option func(notifier *Notifier)
@@ -20,11 +33,8 @@ func UseBroadcast() Option {
 }
 
 // New
-// TODO: register interaction with channel, so that we can route message to the specific telegram bot
-func New(interaction *Interaction, options ...Option) *Notifier {
-	notifier := &Notifier{
-		interaction: interaction,
-	}
+func New(options ...Option) *Notifier {
+	notifier := &Notifier{}
 
 	for _, o := range options {
 		o(notifier)
@@ -85,14 +95,42 @@ func (n *Notifier) NotifyTo(channel string, obj interface{}, args ...interface{}
 	}
 
 	if n.broadcast {
-		n.interaction.Broadcast(message)
+		n.Broadcast(message)
 		for _, text := range texts {
-			n.interaction.Broadcast(text)
+			n.Broadcast(text)
 		}
-	} else {
-		n.interaction.SendToOwner(message)
+	} else if n.OwnerChat != nil {
+		n.SendToOwner(message)
 		for _, text := range texts {
-			n.interaction.SendToOwner(text)
+			n.SendToOwner(text)
+		}
+	}
+}
+
+func (n *Notifier) AddSubscriber(m *telebot.Message) {
+	if n.Chats == nil {
+		n.Chats = make(map[int64]time.Time)
+	}
+
+	n.Chats[m.Chat.ID] = m.Time()
+}
+
+func (n *Notifier) SendToOwner(message string) {
+	if _, err := n.Bot.Send(n.OwnerChat, message); err != nil {
+		log.WithError(err).Error("telegram send error")
+	}
+}
+
+func (n *Notifier) Broadcast(message string) {
+	for chatID := range n.Chats {
+		chat, err := n.Bot.ChatByID(strconv.FormatInt(chatID, 10))
+		if err != nil {
+			log.WithError(err).Error("can not get chat by ID")
+			continue
+		}
+
+		if _, err := n.Bot.Send(chat, message); err != nil {
+			log.WithError(err).Error("failed to send message")
 		}
 	}
 }
