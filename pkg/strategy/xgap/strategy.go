@@ -15,6 +15,7 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 const ID = "xgap"
@@ -228,7 +229,9 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	log.Infof("using group id %d from fnv32(%s)", s.groupID, instanceID)
 
 	go func() {
-		ticker := time.NewTicker(s.UpdateInterval.Duration())
+		ticker := time.NewTicker(
+			util.MillisecondsJitter(s.UpdateInterval.Duration(), 1000),
+		)
 		defer ticker.Stop()
 
 		for {
@@ -244,10 +247,14 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 					continue
 				}
 
-				sourceBook := s.sourceBook.Copy()
-				book := s.tradingBook.Copy()
-				bestBid, hasBid := book.BestBid()
-				bestAsk, hasAsk := book.BestAsk()
+				// < 10 seconds jitter sleep
+				delay := util.MillisecondsJitter(s.UpdateInterval.Duration(), 10*1000)
+				if delay < s.UpdateInterval.Duration() {
+					time.Sleep(delay)
+				}
+
+				bestBid, hasBid := s.tradingBook.BestBid()
+				bestAsk, hasAsk := s.tradingBook.BestAsk()
 
 				// try to use the bid/ask price from the trading book
 				if hasBid && hasAsk {
@@ -258,8 +265,8 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 					// use the source book price if the spread percentage greater than 10%
 					if spreadPercentage > 0.05 {
 						log.Warnf("spread too large (%f %f%%), using source book", spread.Float64(), spreadPercentage)
-						bestBid, hasBid = sourceBook.BestBid()
-						bestAsk, hasAsk = sourceBook.BestAsk()
+						bestBid, hasBid = s.sourceBook.BestBid()
+						bestAsk, hasAsk = s.sourceBook.BestAsk()
 					}
 
 					// if the spread is less than 100 ticks (100 pips), skip
@@ -269,8 +276,8 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 					}
 
 				} else {
-					bestBid, hasBid = sourceBook.BestBid()
-					bestAsk, hasAsk = sourceBook.BestAsk()
+					bestBid, hasBid = s.sourceBook.BestBid()
+					bestAsk, hasAsk = s.sourceBook.BestAsk()
 				}
 
 				if !hasBid || !hasAsk {
