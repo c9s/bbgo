@@ -558,8 +558,6 @@ func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) erro
 		}
 	}
 
-
-
 	persistence := environ.PersistenceServiceFacade.Get()
 	authToken := viper.GetString("telegram-bot-auth-token")
 
@@ -570,8 +568,9 @@ func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) erro
 
 	var otpQRCodeImagePath = fmt.Sprintf("otp.png")
 	var key *otp.Key
+	var keySecret string
 	var authStore = persistence.NewStore("bbgo", "auth")
-	if err := authStore.Load(key); err != nil {
+	if err := authStore.Load(&keySecret); err != nil {
 		log.Warnf("telegram session not found, generating new one-time password key for new telegram session...")
 
 		newKey, err := setupNewOTPKey(otpQRCodeImagePath)
@@ -579,15 +578,20 @@ func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) erro
 			return errors.Wrapf(err, "failed to setup totp (time-based one time password) key")
 		}
 
-		if err := authStore.Save(key); err != nil {
+		key = newKey
+		keySecret = key.Secret()
+		if err := authStore.Save(keySecret); err != nil {
 			return err
 		}
 
-		key = newKey
-
 		printOtpAuthGuide(otpQRCodeImagePath)
 
-	} else if key != nil {
+	} else if keySecret != "" {
+		key, err = otp.NewKeyFromURL(keySecret)
+		if err != nil {
+			return err
+		}
+
 		log.Infof("otp key loaded: %+v", key)
 		printOtpAuthGuide(otpQRCodeImagePath)
 	}
@@ -667,29 +671,49 @@ func (environ *Environment) setupTelegram(userConfig *Config, telegramBotToken s
 		return err
 	}
 
-	// allocate a store, so that we can save the chatID for the owner
-	interact.SetMessenger(&interact.Telegram{
-		Bot:     bot,
-		Private: true,
-	})
-
-	var session interact.TelegramSession
-	var sessionStore = persistence.NewStore("bbgo", "telegram", telegramID)
-	if err := sessionStore.Load(&session); err != nil || session.Owner == nil {
-		session = interact.NewTelegramSession()
-		if err := sessionStore.Save(&session); err != nil {
-			return errors.Wrap(err, "failed to save session")
-		}
-	}
-
 	var opts []telegramnotifier.Option
 	if userConfig.Notifications != nil && userConfig.Notifications.Telegram != nil {
 		log.Infof("telegram broadcast is enabled")
 		opts = append(opts, telegramnotifier.UseBroadcast())
 	}
 
-	var notifier = telegramnotifier.New(opts...)
+	var notifier = telegramnotifier.New(bot, opts...)
 	environ.Notifiability.AddNotifier(notifier)
+
+	// allocate a store, so that we can save the chatID for the owner
+	var messenger = &interact.Telegram{
+		Bot:     bot,
+		Private: true,
+	}
+
+	var session = interact.NewTelegramSession()
+	var sessionStore = persistence.NewStore("bbgo", "telegram", telegramID)
+	if err := sessionStore.Load(session); err != nil {
+		log.WithError(err).Errorf("session load error")
+
+		if err := sessionStore.Save(session); err != nil {
+			return errors.Wrap(err, "failed to save session")
+		}
+	} else {
+		notifier.OwnerChat = session.OwnerChat
+		notifier.Owner = session.Owner
+		notifier.Subscribers = session.Subscribers
+
+		// you must restore the session after the notifier updates
+		messenger.RestoreSession(session)
+	}
+
+	messenger.OnAuthorized(func(a *interact.TelegramAuthorizer) {
+		session.Owner = a.Telegram.Owner
+		session.OwnerChat = a.Telegram.OwnerChat
+
+		log.Infof("saving telegram session...")
+		if err := sessionStore.Save(session); err != nil {
+			log.WithError(err).Errorf("telegram session save error")
+		}
+	})
+
+	interact.SetMessenger(messenger)
 	return nil
 }
 
