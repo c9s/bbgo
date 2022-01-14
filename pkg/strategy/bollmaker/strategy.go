@@ -51,19 +51,19 @@ type Strategy struct {
 	StandardIndicatorSet *bbgo.StandardIndicatorSet
 
 	// Symbol is the market symbol you want to trade
-	Symbol          string           `json:"symbol"`
+	Symbol string `json:"symbol"`
 
 	// Interval is how long do you want to update your order price and quantity
-	Interval        types.Interval   `json:"interval"`
+	Interval types.Interval `json:"interval"`
 
 	// Quantity is the base order quantity for your buy/sell order.
-	Quantity        fixedpoint.Value `json:"quantity"`
+	Quantity fixedpoint.Value `json:"quantity"`
 
 	// Spread is the price spread from the middle price.
 	// For ask orders, the ask price is ((bestAsk + bestBid) / 2 * (1.0 + spread))
 	// For bid orders, the bid price is ((bestAsk + bestBid) / 2 * (1.0 - spread))
 	// Spread can be set by percentage or floating number. e.g., 0.1% or 0.001
-	Spread          fixedpoint.Value `json:"spread"`
+	Spread fixedpoint.Value `json:"spread"`
 
 	// MinProfitSpread is the minimal order price spread from the current average cost.
 	// For long position, you will only place sell order above the price (= average cost * (1 + minProfitSpread))
@@ -73,7 +73,7 @@ type Strategy struct {
 	// UseTickerPrice use the ticker api to get the mid price instead of the closed kline price.
 	// The back-test engine is kline-based, so the ticker price api is not supported.
 	// Turn this on if you want to do real trading.
-	UseTickerPrice  bool             `json:"useTickerPrice"`
+	UseTickerPrice bool `json:"useTickerPrice"`
 
 	// MaxExposurePosition is the maximum position you can hold
 	// +10 means you can hold 10 ETH long position by maximum
@@ -100,7 +100,7 @@ type Strategy struct {
 	// when the bollinger band detect a strong uptrend, what's the order quantity skew we want to use.
 	// greater than 1.0 means when placing buy order, place sell order with less quantity
 	// less than 1.0 means when placing sell order, place buy order with less quantity
-	StrongUptrendSkew   fixedpoint.Value `json:"strongUptrendSkew"`
+	StrongUptrendSkew fixedpoint.Value `json:"strongUptrendSkew"`
 
 	// DowntrendSkew is the order quantity skew for normal downtrend band.
 	// The price is still in the default bollinger band.
@@ -112,7 +112,7 @@ type Strategy struct {
 	// The price is still in the default bollinger band.
 	// greater than 1.0 means when placing buy order, place sell order with less quantity
 	// less than 1.0 means when placing sell order, place buy order with less quantity
-	UptrendSkew   fixedpoint.Value `json:"uptrendSkew"`
+	UptrendSkew fixedpoint.Value `json:"uptrendSkew"`
 
 	session *bbgo.ExchangeSession
 	book    *types.StreamOrderBook
@@ -164,6 +164,47 @@ func (s *Strategy) Validate() error {
 	}
 
 	return nil
+}
+
+func (s *Strategy) CurrentPosition() *types.Position {
+	return s.state.Position
+}
+
+func (s *Strategy) ClosePosition(ctx context.Context, percentage float64) error {
+	base := s.state.Position.GetBase()
+	if base == 0 {
+		return fmt.Errorf("no opened %s position", s.state.Position.Symbol)
+	}
+
+	// make it negative
+	quantity := base.MulFloat64(percentage).Abs()
+	side := types.SideTypeBuy
+	if base > 0 {
+		side = types.SideTypeSell
+	}
+
+	if quantity.Float64() < s.market.MinQuantity {
+		return fmt.Errorf("order quantity %f is too small, less than %f", quantity.Float64(), s.market.MinQuantity)
+	}
+
+	submitOrder := types.SubmitOrder{
+		Symbol:   s.Symbol,
+		Side:     side,
+		Type:     types.OrderTypeMarket,
+		Quantity: quantity.Float64(),
+		Market:   s.market,
+	}
+
+	s.Notify("Submitting %s %s order to close position by %f", s.Symbol, side.String(), percentage, submitOrder)
+
+	createdOrders, err := s.session.Exchange.SubmitOrders(ctx, submitOrder)
+	if err != nil {
+		log.WithError(err).Errorf("can not place position close order")
+	}
+
+	s.orderStore.Add(createdOrders...)
+	s.activeMakerOrders.Add(createdOrders...)
+	return err
 }
 
 func (s *Strategy) SaveState() error {

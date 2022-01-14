@@ -10,6 +10,8 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	_ "github.com/go-sql-driver/mysql"
+
+	"github.com/c9s/bbgo/pkg/interact"
 )
 
 // SingleExchangeStrategy represents the single Exchange strategy
@@ -291,6 +293,11 @@ func (trader *Trader) RunAllSingleExchangeStrategy(ctx context.Context) error {
 }
 
 func (trader *Trader) Run(ctx context.Context) error {
+	// before we start the interaction,
+	// register the core interaction, because we can only get the strategies in this scope
+	// trader.environment.Connect will call interact.Start
+	interact.AddCustomInteraction(NewCoreInteraction(trader.environment, trader))
+
 	trader.Subscribe()
 
 	if err := trader.environment.Start(ctx); err != nil {
