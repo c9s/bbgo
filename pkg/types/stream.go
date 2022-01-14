@@ -146,8 +146,6 @@ func (s *StandardStream) SetConn(ctx context.Context, conn *websocket.Conn) (con
 func (s *StandardStream) Read(ctx context.Context, conn *websocket.Conn, cancel context.CancelFunc) {
 	defer func() {
 		cancel()
-		// if we failed to read, we need to cancel the context
-		_ = conn.Close()
 		s.EmitDisconnect()
 	}()
 
@@ -360,7 +358,7 @@ func (s *StandardStream) Dial(ctx context.Context, args ...string) (*websocket.C
 }
 
 func (s *StandardStream) Close() error {
-	log.Infof("closing stream...")
+	log.Debugf("closing stream...")
 
 	// close the close signal channel, so that reader and ping worker will stop
 	close(s.CloseC)
@@ -381,6 +379,8 @@ func (s *StandardStream) Close() error {
 	if err != nil {
 		return errors.Wrap(err, "websocket write close message error")
 	}
+
+	log.Debugf("stream closed")
 
 	// let the reader close the connection
 	<-time.After(time.Second)

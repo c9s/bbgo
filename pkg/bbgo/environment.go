@@ -246,6 +246,7 @@ func (environ *Environment) Init(ctx context.Context) (err error) {
 	return
 }
 
+// Start initializes the symbols data streams
 func (environ *Environment) Start(ctx context.Context) (err error) {
 	for n := range environ.sessions {
 		var session = environ.sessions[n]
@@ -439,6 +440,11 @@ func (environ *Environment) SetSyncStartTime(t time.Time) *Environment {
 }
 
 func (environ *Environment) Connect(ctx context.Context) error {
+	log.Debugf("starting interaction...")
+	if err := interact.Start(ctx); err != nil {
+		return err
+	}
+
 	for n := range environ.sessions {
 		// avoid using the placeholder variable for the session because we use that in the callbacks
 		var session = environ.sessions[n]
@@ -561,7 +567,7 @@ func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) erro
 
 	var persistence = environ.PersistenceServiceFacade.Get()
 
-	err := environ.setupInteractionAuth(persistence)
+	err := environ.setupInteraction(persistence)
 	if err != nil {
 		return err
 	}
@@ -586,19 +592,14 @@ func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) erro
 		}
 	}
 
-	// TODO: replace this background context later
-	if err := interact.Start(context.Background()); err != nil {
-		return err
-	}
-
 	return nil
 }
 
-func (environ *Environment) setupInteractionAuth(persistence service.PersistenceService) error {
+func (environ *Environment) setupInteraction(persistence service.PersistenceService) error {
 	var otpQRCodeImagePath = fmt.Sprintf("otp.png")
 	var key *otp.Key
 	var keySecret string
-	var authStore = persistence.NewStore("bbgo", "auth")
+	var authStore = environ.getAuthStore(persistence)
 	if err := authStore.Load(&keySecret); err != nil {
 		log.Warnf("telegram session not found, generating new one-time password key for new telegram session...")
 
@@ -649,6 +650,10 @@ func (environ *Environment) setupInteractionAuth(persistence service.Persistence
 		OneTimePasswordKey: key,       // can be nil here
 	})
 	return nil
+}
+
+func (environ *Environment) getAuthStore(persistence service.PersistenceService) service.Store {
+	return persistence.NewStore("bbgo", "auth")
 }
 
 func (environ *Environment) setupSlack(userConfig *Config, slackToken string) {
