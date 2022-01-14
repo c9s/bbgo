@@ -10,6 +10,9 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+const CancelOrderWaitTime = 100 * time.Millisecond
+const SentOrderWaitTime = 10 * time.Millisecond
+
 // LocalActiveOrderBook manages the local active order books.
 //go:generate callbackgen -type LocalActiveOrderBook
 type LocalActiveOrderBook struct {
@@ -39,56 +42,73 @@ func (b *LocalActiveOrderBook) BindStream(stream types.Stream) {
 	stream.OnOrderUpdate(b.orderUpdateHandler)
 }
 
+func (b *LocalActiveOrderBook) waitAllClear(ctx context.Context, waitTime, timeout time.Duration) (bool, error) {
+	timeoutC := time.After(timeout)
+	for {
+		time.Sleep(waitTime)
+		numOfOrders := b.NumOfOrders()
+		clear := numOfOrders == 0
+		select {
+		case <-timeoutC:
+			return clear, nil
+
+		case <-ctx.Done():
+			return clear, ctx.Err()
+
+		default:
+			if clear {
+				return clear, nil
+			}
+		}
+	}
+}
+
 // GracefulCancel cancels the active orders gracefully
 func (b *LocalActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange) error {
-	if err := ex.CancelOrders(ctx, b.Orders()...); err != nil {
-		log.WithError(err).Error("order cancel error")
-	}
+	log.Infof("[LocalActiveOrderBook] gracefully cancelling %s orders...", b.Symbol)
 
+	startTime := time.Now()
 	// ensure every order is cancelled
-	for b.NumOfOrders() > 0 {
+	for {
 		orders := b.Orders()
-		log.Warnf("%d orders are not cancelled yet:", len(orders))
+
+		// Some orders in the variable are not created on the server side yet,
+		// If we cancel these orders directly, we will get an unsent order error
+		// We wait here for a while for server to create these orders.
+		time.Sleep(SentOrderWaitTime)
+		if err := ex.CancelOrders(ctx, orders...); err != nil {
+			log.WithError(err).Errorf("[LocalActiveOrderBook] can not cancel %s orders", b.Symbol)
+		}
+
+		log.Debugf("[LocalActiveOrderBook] waiting %s for %s orders to be cancelled...", CancelOrderWaitTime, b.Symbol)
+
+		clear, err := b.waitAllClear(ctx, CancelOrderWaitTime, 5*time.Second)
+		if clear || err != nil {
+			break
+		}
+
+		log.Warnf("[LocalActiveOrderBook] %d %s orders are not cancelled yet:", b.NumOfOrders(), b.Symbol)
 		b.Print()
 
-		if err := ex.CancelOrders(ctx, b.Orders()...); err != nil {
-			log.WithError(err).Errorf("can not cancel %s orders", b.Symbol)
+		// verify the current open orders via the RESTful API
+		log.Warnf("[LocalActiveOrderBook] using REStful API to verify active orders...")
+		openOrders, err := ex.QueryOpenOrders(ctx, b.Symbol)
+		if err != nil {
+			log.WithError(err).Errorf("can not query %s open orders", b.Symbol)
 			continue
 		}
 
-		log.Infof("waiting for orders to be cancelled...")
-
-		// wait for 3 seconds to get the order updates
-		select {
-		case <-time.After(3 * time.Second):
-
-		case <-ctx.Done():
-			return ctx.Err()
-
-		}
-
-		// verify the current open orders via the RESTful API
-		if b.NumOfOrders() > 0 {
-			log.Warnf("there are orders not cancelled, using REStful API to verify...")
-			openOrders, err := ex.QueryOpenOrders(ctx, b.Symbol)
-			if err != nil {
-				log.WithError(err).Errorf("can not query %s open orders", b.Symbol)
-				continue
-			}
-
-			openOrderStore := NewOrderStore(b.Symbol)
-			openOrderStore.Add(openOrders...)
-
-			for _, o := range b.Orders() {
-				// if it does not exist, we should remove it
-				if !openOrderStore.Exists(o.OrderID) {
-					b.Remove(o)
-				}
+		openOrderStore := NewOrderStore(b.Symbol)
+		openOrderStore.Add(openOrders...)
+		for _, o := range orders {
+			// if it's not on the order book (open orders), we should remove it from our local side
+			if !openOrderStore.Exists(o.OrderID) {
+				b.Remove(o)
 			}
 		}
 	}
 
-	log.Debug("all orders are cancelled successfully")
+	log.Debugf("[LocalActiveOrderBook] all %s orders are cancelled successfully in %s", b.Symbol, time.Since(startTime))
 	return nil
 }
 
