@@ -1,6 +1,12 @@
 name: Docker Image
 
 on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'ref to build'
+        required: false
+        default: 'main'
   push:
     # Sequence of patterns matched against refs/tags
     tags:
