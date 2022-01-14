@@ -76,7 +76,7 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 		position := reader.CurrentPosition()
 		if position != nil {
 			reply.Send("Your current position:")
-			reply.Send(position.String())
+			reply.Send(position.PlainText())
 
 			if position.Base == 0 {
 				reply.Message(fmt.Sprintf("Strategy %q has no opened position", signature))
@@ -125,7 +125,7 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 			position := reader.CurrentPosition()
 			if position != nil {
 				reply.Send("Your current position:")
-				reply.Send(position.String())
+				reply.Send(position.PlainText())
 
 				if position.Base == 0 {
 					reply.Message("No opened position")
