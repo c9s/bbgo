@@ -128,21 +128,19 @@ func main() {
 	}
 
 	ctx := context.Background()
-
-	globalInteraction := interact.New()
-	globalInteraction.SetMessenger(&interact.Telegram{
+	interact.SetMessenger(&interact.Telegram{
 		Private: true,
 		Bot:     b,
 	})
 
-	globalInteraction.AddCustomInteraction(&interact.AuthInteract{
+	interact.AddCustomInteraction(&interact.AuthInteract{
 		Strict: true,
 		Mode:   interact.AuthModeToken,
 		Token:  "123",
 	})
 
-	globalInteraction.AddCustomInteraction(&PositionInteraction{})
-	if err := globalInteraction.Start(ctx); err != nil {
+	interact.AddCustomInteraction(&PositionInteraction{})
+	if err := interact.Start(ctx); err != nil {
 		log.Fatal(err)
 	}
 	cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
