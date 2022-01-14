@@ -552,8 +552,9 @@ func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) erro
 	if userConfig.Notifications == nil {
 		userConfig.Notifications = &NotificationConfig{
 			Routing: &SlackNotificationRouting{
-				Trade: "$session",
-				Order: "$session",
+				Trade:       "$session",
+				Order:       "$silent",
+				SubmitOrder: "$silent",
 			},
 		}
 	}
