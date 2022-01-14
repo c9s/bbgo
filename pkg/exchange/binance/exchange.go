@@ -509,10 +509,8 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	} else {
 		account, err = e.QuerySpotAccount(ctx)
 	}
-	if err != nil {
-		return nil, err
-	}
-	return account, nil
+
+	return account, err
 }
 
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
