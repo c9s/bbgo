@@ -113,20 +113,21 @@ func TestCustomInteraction(t *testing.T) {
 	err = globalInteraction.init()
 	assert.NoError(t, err)
 
-	err = globalInteraction.runCommand("/closePosition", []string{}, telegram.newReply())
+	m := &tb.Message{}
+	err = globalInteraction.runCommand("/closePosition", []string{}, telegram.newReply(m))
 	assert.NoError(t, err)
 
 	assert.Equal(t, State("/closePosition_1"), globalInteraction.currentState)
 
-	err = globalInteraction.handleResponse("BTCUSDT", telegram.newReply())
+	err = globalInteraction.handleResponse("BTCUSDT", telegram.newReply(m))
 	assert.NoError(t, err)
 	assert.Equal(t, State("/closePosition_2"), globalInteraction.currentState)
 
-	err = globalInteraction.handleResponse("0.20", telegram.newReply())
+	err = globalInteraction.handleResponse("0.20", telegram.newReply(m))
 	assert.NoError(t, err)
 	assert.Equal(t, State("/closePosition_3"), globalInteraction.currentState)
 
-	err = globalInteraction.handleResponse("true", telegram.newReply())
+	err = globalInteraction.handleResponse("true", telegram.newReply(m))
 	assert.NoError(t, err)
 	assert.Equal(t, State("public"), globalInteraction.currentState)
 
