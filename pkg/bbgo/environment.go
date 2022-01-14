@@ -559,8 +559,42 @@ func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) erro
 		}
 	}
 
-	persistence := environ.PersistenceServiceFacade.Get()
+	var persistence = environ.PersistenceServiceFacade.Get()
 
+	err := environ.setupInteractionAuth(persistence)
+	if err != nil {
+		return err
+	}
+
+	// setup slack
+	slackToken := viper.GetString("slack-token")
+	if len(slackToken) > 0 && userConfig.Notifications != nil {
+		environ.setupSlack(userConfig, slackToken)
+	}
+
+	// check if telegram bot token is defined
+	telegramBotToken := viper.GetString("telegram-bot-token")
+	if len(telegramBotToken) > 0 {
+		if err := environ.setupTelegram(userConfig, telegramBotToken, persistence); err != nil {
+			return err
+		}
+	}
+
+	if userConfig.Notifications != nil {
+		if err := environ.ConfigureNotificationRouting(userConfig.Notifications); err != nil {
+			return err
+		}
+	}
+
+	// TODO: replace this background context later
+	if err := interact.Start(context.Background()); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (environ *Environment) setupInteractionAuth(persistence service.PersistenceService) error {
 	var otpQRCodeImagePath = fmt.Sprintf("otp.png")
 	var key *otp.Key
 	var keySecret string
@@ -614,32 +648,6 @@ func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) erro
 		Token:              authToken, // can be empty string here
 		OneTimePasswordKey: key,       // can be nil here
 	})
-
-	// setup slack
-	slackToken := viper.GetString("slack-token")
-	if len(slackToken) > 0 && userConfig.Notifications != nil {
-		environ.setupSlack(userConfig, slackToken)
-	}
-
-	// check if telegram bot token is defined
-	telegramBotToken := viper.GetString("telegram-bot-token")
-	if len(telegramBotToken) > 0 {
-		if err := environ.setupTelegram(userConfig, telegramBotToken, persistence); err != nil {
-			return err
-		}
-	}
-
-	if userConfig.Notifications != nil {
-		if err := environ.ConfigureNotificationRouting(userConfig.Notifications); err != nil {
-			return err
-		}
-	}
-
-	// TODO: replace this background context later
-	if err := interact.Start(context.Background()); err != nil {
-		return err
-	}
-
 	return nil
 }
 
