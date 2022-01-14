@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"github.com/c9s/bbgo/pkg/cache"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -25,9 +26,7 @@ type SyncService struct {
 func (s *SyncService) SyncSessionSymbols(ctx context.Context, exchange types.Exchange, startTime time.Time, symbols ...string) error {
 	for _, symbol := range symbols {
 		log.Infof("syncing %s %s trades...", exchange.Name(), symbol)
-		// TODO: bbgo import cycle error
-		//markets, err := bbgo.LoadExchangeMarketsWithCache(ctx, exchange)
-		markets, err := exchange.QueryMarkets(ctx)
+		markets, err := cache.LoadExchangeMarketsWithCache(ctx, exchange)
 		if err != nil {
 			return err
 		}
