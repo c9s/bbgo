@@ -170,3 +170,20 @@ func (tm *Telegram) newReply() *TelegramReply {
 		menu: &telebot.ReplyMarkup{ResizeReplyKeyboard: true},
 	}
 }
+
+type TelegramSession struct {
+	Owner     *telebot.User `json:"owner"`
+	OwnerChat *telebot.Chat `json:"chat"`
+
+	// Chat objects
+	Chats map[int64]bool `json:"chats"`
+}
+
+func NewTelegramSession() TelegramSession {
+	return TelegramSession{
+		Owner:     nil,
+		OwnerChat: nil,
+		Chats:     make(map[int64]bool),
+	}
+}
+

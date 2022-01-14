@@ -548,100 +548,78 @@ func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) erro
 		ObjectChannelRouter:  NewObjectChannelRouter(),
 	}
 
-	slackToken := viper.GetString("slack-token")
-	if len(slackToken) > 0 && userConfig.Notifications != nil {
-		if conf := userConfig.Notifications.Slack; conf != nil {
-			if conf.ErrorChannel != "" {
-				log.Debugf("found slack configured, setting up log hook...")
-				log.AddHook(slacklog.NewLogHook(slackToken, conf.ErrorChannel))
-			}
-
-			log.Debugf("adding slack notifier with default channel: %s", conf.DefaultChannel)
-			var notifier = slacknotifier.New(slackToken, conf.DefaultChannel)
-			environ.AddNotifier(notifier)
-		}
-	}
-
-	persistence := environ.PersistenceServiceFacade.Get()
-
-	authToken := viper.GetString("telegram-bot-auth-token")
-	if len(authToken) > 0 {
-		interact.AddCustomInteraction(&interact.AuthInteract{
-			Strict: false,
-			Mode:   interact.AuthModeToken,
-			Token:  authToken,
-		})
-
-		log.Debugf("telegram bot auth token is set, using fixed token for authorization...")
-		printAuthTokenGuide(authToken)
-	}
-
-	// check if telegram bot token is defined
-	telegramBotToken := viper.GetString("telegram-bot-token")
-	if len(telegramBotToken) > 0 {
-		tt := strings.Split(telegramBotToken, ":")
-		telegramID := tt[0]
-
-		bot, err := telebot.NewBot(telebot.Settings{
-			// You can also set custom API URL.
-			// If field is empty it equals to "https://api.telegram.org".
-			// URL: "http://195.129.111.17:8012",
-			Token:  telegramBotToken,
-			Poller: &telebot.LongPoller{Timeout: 10 * time.Second},
-		})
-
-		if err != nil {
-			return err
-		}
-
-		// allocate a store, so that we can save the chatID for the owner
-		var sessionStore = persistence.NewStore("bbgo", "telegram", telegramID)
-
-		interact.SetMessenger(&interact.Telegram{
-			Bot:       bot,
-			Private:   true,
-		})
-
-		var session telegramnotifier.Session
-		var qrcodeImagePath = fmt.Sprintf("otp-%s.png", telegramID)
-		if err := sessionStore.Load(&session); err != nil || session.Owner == nil {
-			log.Warnf("telegram session not found, generating new one-time password key for new telegram session...")
-
-			key, err := setupNewOTPKey(qrcodeImagePath)
-			if err != nil {
-				return errors.Wrapf(err, "failed to setup totp (time-based one time password) key")
-			}
-
-			printOtpAuthGuide(qrcodeImagePath)
-
-			session = telegramnotifier.NewSession(key)
-			if err := sessionStore.Save(&session); err != nil {
-				return errors.Wrap(err, "failed to save session")
-			}
-		} else if session.OneTimePasswordKey != nil {
-			log.Infof("telegram session loaded: %+v", session)
-
-			printOtpAuthGuide(qrcodeImagePath)
-		}
-
-
-		var opts []telegramnotifier.Option
-
-		if userConfig.Notifications != nil && userConfig.Notifications.Telegram != nil {
-			log.Infof("telegram broadcast is enabled")
-			opts = append(opts, telegramnotifier.UseBroadcast())
-		}
-
-		var notifier = telegramnotifier.New(opts...)
-		environ.Notifiability.AddNotifier(notifier)
-	}
-
+	// setup default notification config
 	if userConfig.Notifications == nil {
 		userConfig.Notifications = &NotificationConfig{
 			Routing: &SlackNotificationRouting{
 				Trade: "$session",
 				Order: "$session",
 			},
+		}
+	}
+
+
+
+	persistence := environ.PersistenceServiceFacade.Get()
+	authToken := viper.GetString("telegram-bot-auth-token")
+
+	if len(authToken) > 0 {
+		log.Debugf("telegram bot auth token is set, using fixed token for authorization...")
+		printAuthTokenGuide(authToken)
+	}
+
+	var otpQRCodeImagePath = fmt.Sprintf("otp.png")
+	var key *otp.Key
+	var authStore = persistence.NewStore("bbgo", "auth")
+	if err := authStore.Load(key); err != nil {
+		log.Warnf("telegram session not found, generating new one-time password key for new telegram session...")
+
+		newKey, err := setupNewOTPKey(otpQRCodeImagePath)
+		if err != nil {
+			return errors.Wrapf(err, "failed to setup totp (time-based one time password) key")
+		}
+
+		if err := authStore.Save(key); err != nil {
+			return err
+		}
+
+		key = newKey
+
+		printOtpAuthGuide(otpQRCodeImagePath)
+
+	} else if key != nil {
+		log.Infof("otp key loaded: %+v", key)
+		printOtpAuthGuide(otpQRCodeImagePath)
+	}
+
+	authStrict := false
+	authMode := interact.AuthModeToken
+	if authToken != "" && key != nil {
+		authStrict = true
+	} else if authToken != "" {
+		authMode = interact.AuthModeToken
+	} else if key != nil {
+		authMode = interact.AuthModeOTP
+	}
+
+	interact.AddCustomInteraction(&interact.AuthInteract{
+		Strict:             authStrict,
+		Mode:               authMode,
+		Token:              authToken, // can be empty string here
+		OneTimePasswordKey: key,       // can be nil here
+	})
+
+	// setup slack
+	slackToken := viper.GetString("slack-token")
+	if len(slackToken) > 0 && userConfig.Notifications != nil {
+		environ.setupSlack(userConfig, slackToken)
+	}
+
+	// check if telegram bot token is defined
+	telegramBotToken := viper.GetString("telegram-bot-token")
+	if len(telegramBotToken) > 0 {
+		if err := environ.setupTelegram(userConfig, telegramBotToken, persistence); err != nil {
+			return err
 		}
 	}
 
@@ -656,6 +634,62 @@ func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) erro
 		return err
 	}
 
+	return nil
+}
+
+func (environ *Environment) setupSlack(userConfig *Config, slackToken string) {
+	if conf := userConfig.Notifications.Slack; conf != nil {
+		if conf.ErrorChannel != "" {
+			log.Debugf("found slack configured, setting up log hook...")
+			log.AddHook(slacklog.NewLogHook(slackToken, conf.ErrorChannel))
+		}
+
+		log.Debugf("adding slack notifier with default channel: %s", conf.DefaultChannel)
+
+		var notifier = slacknotifier.New(slackToken, conf.DefaultChannel)
+		environ.AddNotifier(notifier)
+	}
+}
+
+func (environ *Environment) setupTelegram(userConfig *Config, telegramBotToken string, persistence service.PersistenceService) error {
+	tt := strings.Split(telegramBotToken, ":")
+	telegramID := tt[0]
+
+	bot, err := telebot.NewBot(telebot.Settings{
+		// You can also set custom API URL.
+		// If field is empty it equals to "https://api.telegram.org".
+		// URL: "http://195.129.111.17:8012",
+		Token:  telegramBotToken,
+		Poller: &telebot.LongPoller{Timeout: 10 * time.Second},
+	})
+
+	if err != nil {
+		return err
+	}
+
+	// allocate a store, so that we can save the chatID for the owner
+	interact.SetMessenger(&interact.Telegram{
+		Bot:     bot,
+		Private: true,
+	})
+
+	var session interact.TelegramSession
+	var sessionStore = persistence.NewStore("bbgo", "telegram", telegramID)
+	if err := sessionStore.Load(&session); err != nil || session.Owner == nil {
+		session = interact.NewTelegramSession()
+		if err := sessionStore.Save(&session); err != nil {
+			return errors.Wrap(err, "failed to save session")
+		}
+	}
+
+	var opts []telegramnotifier.Option
+	if userConfig.Notifications != nil && userConfig.Notifications.Telegram != nil {
+		log.Infof("telegram broadcast is enabled")
+		opts = append(opts, telegramnotifier.UseBroadcast())
+	}
+
+	var notifier = telegramnotifier.New(opts...)
+	environ.Notifiability.AddNotifier(notifier)
 	return nil
 }
 
