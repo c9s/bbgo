@@ -159,12 +159,21 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config, enableWebServer
 	}
 
 	cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
+	cancelTrading()
 
-	log.Infof("shutting down stratgies...")
+	log.Infof("shutting down...")
 	shutdownCtx, cancelShutdown := context.WithDeadline(ctx, time.Now().Add(30*time.Second))
 	trader.Graceful.Shutdown(shutdownCtx)
 	cancelShutdown()
-	cancelTrading()
+
+	for _, session := range environ.Sessions() {
+		if err := session.MarketDataStream.Close(); err != nil {
+			log.WithError(err).Errorf("[%s] market data stream close error", session.Name)
+		}
+		if err := session.UserDataStream.Close(); err != nil {
+			log.WithError(err).Errorf("[%s] user data stream close error", session.Name)
+		}
+	}
 
 	return nil
 }

@@ -76,7 +76,9 @@ func (b *LocalActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exch
 		// If we cancel these orders directly, we will get an unsent order error
 		// We wait here for a while for server to create these orders.
 		time.Sleep(SentOrderWaitTime)
-		if err := ex.CancelOrders(ctx, orders...); err != nil {
+
+		// since ctx might be canceled, we should use background context here
+		if err := ex.CancelOrders(context.Background(), orders...); err != nil {
 			log.WithError(err).Errorf("[LocalActiveOrderBook] can not cancel %s orders", b.Symbol)
 		}
 
