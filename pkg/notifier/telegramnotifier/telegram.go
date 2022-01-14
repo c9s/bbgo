@@ -5,10 +5,13 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"gopkg.in/tucnak/telebot.v2"
 
 	"github.com/c9s/bbgo/pkg/types"
 )
+
+var log = logrus.WithField("service", "telegram")
 
 type Notifier struct {
 	Bot *telebot.Bot
