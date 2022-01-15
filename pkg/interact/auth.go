@@ -51,9 +51,9 @@ func (it *AuthInteract) Commands(interact *Interact) {
 
 			it.OneTimePasswordKey = key
 		}
-		interact.Command("/auth", "authorize", func(reply Reply, authorizer Authorizer) error {
+		interact.Command("/auth", "authorize", func(reply Reply, session Session) error {
 			reply.Message("Enter your authentication token")
-			authorizer.StartAuthorizing()
+			session.SetAuthorizing(true)
 			return nil
 		}).Next(func(token string, reply Reply) error {
 			if token == it.Token {
@@ -71,11 +71,12 @@ func (it *AuthInteract) Commands(interact *Interact) {
 			}
 
 			return ErrAuthenticationFailed
-		}).NamedNext(StateAuthenticated, func(code string, reply Reply, authorizer Authorizer) error {
+		}).NamedNext(StateAuthenticated, func(code string, reply Reply, session Session) error {
 			if totp.Validate(code, it.OneTimePasswordKey.Secret()) {
 				reply.Message("Great! You're authenticated!")
-				interact.SetOriginState(StateAuthenticated)
-				return authorizer.Authorize()
+				session.SetOriginState(StateAuthenticated)
+				session.SetAuthorized()
+				return nil
 			}
 
 			reply.Message("Incorrect authentication code")
@@ -85,20 +86,23 @@ func (it *AuthInteract) Commands(interact *Interact) {
 		interact.Command("/auth", "authorize", func(reply Reply) error {
 			reply.Message("Enter your authentication code")
 			return nil
-		}).NamedNext(StateAuthenticated, func(code string, reply Reply, authorizer Authorizer) error {
+		}).NamedNext(StateAuthenticated, func(code string, reply Reply, session Session) error {
 			switch it.Mode {
 			case AuthModeToken:
 				if code == it.Token {
 					reply.Message("Great! You're authenticated!")
-					interact.SetOriginState(StateAuthenticated)
-					return authorizer.Authorize()
+					session.SetOriginState(StateAuthenticated)
+					session.SetAuthorized()
+					return nil
 				}
 
 			case AuthModeOTP:
 				if totp.Validate(code, it.OneTimePasswordKey.Secret()) {
 					reply.Message("Great! You're authenticated!")
-					interact.SetOriginState(StateAuthenticated)
-					return authorizer.Authorize()
+					session.SetOriginState(StateAuthenticated)
+					session.SetAuthorized()
+					session.SetAuthorized()
+					return nil
 				}
 			}
 

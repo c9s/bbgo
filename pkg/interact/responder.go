@@ -1,7 +1,7 @@
 package interact
 
 // Responder defines the logic of responding the message
-type Responder func(message string, reply Reply, ctxObjects ...interface{}) error
+type Responder func(session Session, message string, reply Reply, ctxObjects ...interface{}) error
 
 type TextMessageResponder interface {
 	SetTextMessageResponder(responder Responder)

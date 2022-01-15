@@ -10,9 +10,44 @@ import (
 	"gopkg.in/tucnak/telebot.v2"
 )
 
+type TelegramSessionKey struct {
+	UserID, ChatID int64
+}
+
+type TelegramSessionMap map[TelegramSessionKey]*TelegramSession
+
+type TelegramSession struct {
+	BaseSession
+
+	telegram *Telegram
+
+	User *telebot.User `json:"user"`
+	Chat *telebot.Chat `json:"chat"`
+}
+
+func (s *TelegramSession) ID() string {
+	return fmt.Sprintf("telegram-%d-%d", s.User.ID, s.Chat.ID)
+}
+
+func NewTelegramSession(telegram *Telegram, message *telebot.Message) *TelegramSession {
+	return &TelegramSession{
+		BaseSession: BaseSession{
+			OriginState:  StatePublic,
+			CurrentState: StatePublic,
+			Authorized:   false,
+			authorizing:  false,
+
+			StartedTime: time.Now(),
+		},
+		telegram: telegram,
+		User:     message.Sender,
+		Chat:     message.Chat,
+	}
+}
+
 type TelegramReply struct {
-	bot  *telebot.Bot
-	chat *telebot.Chat
+	bot     *telebot.Bot
+	session *TelegramSession
 
 	message string
 	menu    *telebot.ReplyMarkup
@@ -21,7 +56,7 @@ type TelegramReply struct {
 }
 
 func (r *TelegramReply) Send(message string) {
-	checkSendErr(r.bot.Send(r.chat, message))
+	checkSendErr(r.bot.Send(r.session.Chat, message))
 }
 
 func (r *TelegramReply) Message(message string) {
@@ -51,24 +86,6 @@ func (r *TelegramReply) build() {
 	r.menu.Reply(rows...)
 }
 
-type TelegramAuthorizer struct {
-	Telegram *Telegram
-	Message  *telebot.Message
-}
-
-func (a *TelegramAuthorizer) Authorize() error {
-	a.Telegram.Owner = a.Message.Sender
-	a.Telegram.OwnerChat = a.Message.Chat
-	a.Telegram.authorizing = false
-	log.Infof("[interact][telegram] authorized owner %+v and chat %+v", a.Message.Sender, a.Message.Chat)
-	a.Telegram.EmitAuthorized(a)
-	return nil
-}
-
-func (a *TelegramAuthorizer) StartAuthorizing() {
-	a.Telegram.authorizing = true
-}
-
 //go:generate callbackgen -type Telegram
 type Telegram struct {
 	Bot *telebot.Bot `json:"-"`
@@ -78,27 +95,14 @@ type Telegram struct {
 
 	authorizing bool
 
-	// Owner is the authorized bot owner
-	// This field is exported in order to be stored in file
-	Owner *telebot.User `json:"owner,omitempty"`
-
-	// OwnerChat is the chat of the authorized bot owner
-	// This field is exported in order to be stored in file
-	OwnerChat *telebot.Chat `json:"chat,omitempty"`
+	sessions map[TelegramSessionKey]*TelegramSession
 
 	// textMessageResponder is used for interact to register its message handler
 	textMessageResponder Responder
 
 	commands []*Command
 
-	authorizedCallbacks []func(a *TelegramAuthorizer)
-}
-
-func (tm *Telegram) newAuthorizer(message *telebot.Message) *TelegramAuthorizer {
-	return &TelegramAuthorizer{
-		Telegram: tm,
-		Message:  message,
-	}
+	authorizedCallbacks []func(s *TelegramSession)
 }
 
 func (tm *Telegram) SetTextMessageResponder(textMessageResponder Responder) {
@@ -109,30 +113,24 @@ func (tm *Telegram) Start(context.Context) {
 	tm.Bot.Handle(telebot.OnText, func(m *telebot.Message) {
 		log.Infof("[telegram] onText: %+v", m)
 
-		if tm.Private && !tm.authorizing {
-			// ignore the message directly if it's not authorized yet
-			if tm.Owner == nil {
+		session := tm.loadSession(m)
+		if tm.Private {
+			if !session.authorizing && !session.Authorized {
 				log.Warn("[telegram] telegram is set to private mode, skipping message")
-				return
-			} else if tm.Owner != nil && tm.Owner.ID != m.Sender.ID {
-				log.Warnf("[telegram] telegram is set to private mode, owner does not match: %d != %d", tm.Owner.ID, m.Sender.ID)
 				return
 			}
 		}
 
-		authorizer := tm.newAuthorizer(m)
-		reply := tm.newReply(m)
+		reply := tm.newReply(session)
 		if tm.textMessageResponder != nil {
-			if err := tm.textMessageResponder(m.Text, reply, authorizer); err != nil {
+			if err := tm.textMessageResponder(session, m.Text, reply); err != nil {
 				log.WithError(err).Errorf("[telegram] response handling error")
 			}
 		}
 
 		if reply.set {
 			reply.build()
-			if _, err := tm.Bot.Send(m.Sender, reply.message, reply.menu); err != nil {
-				log.WithError(err).Errorf("[telegram] message send error")
-			}
+			checkSendErr(tm.Bot.Send(m.Sender, reply.message, reply.menu))
 		}
 	})
 
@@ -160,12 +158,28 @@ func checkSendErr(m *telebot.Message, err error) {
 	}
 }
 
+func (tm *Telegram) loadSession(m *telebot.Message) *TelegramSession {
+	if tm.sessions == nil {
+		tm.sessions = make(map[TelegramSessionKey]*TelegramSession)
+	}
+
+	key := TelegramSessionKey{UserID: m.Sender.ID, ChatID: m.Chat.ID}
+	session, ok := tm.sessions[key]
+	if ok {
+		return session
+	}
+
+	session = NewTelegramSession(tm, m)
+	tm.sessions[key] = session
+	return session
+}
+
 func (tm *Telegram) AddCommand(cmd *Command, responder Responder) {
 	tm.commands = append(tm.commands, cmd)
 	tm.Bot.Handle(cmd.Name, func(m *telebot.Message) {
-		authorizer := tm.newAuthorizer(m)
-		reply := tm.newReply(m)
-		if err := responder(m.Payload, reply, authorizer); err != nil {
+		session := tm.loadSession(m)
+		reply := tm.newReply(session)
+		if err := responder(session, m.Payload, reply); err != nil {
 			log.WithError(err).Errorf("[telegram] responder error")
 			checkSendErr(tm.Bot.Send(m.Sender, fmt.Sprintf("error: %v", err)))
 			return
@@ -179,37 +193,30 @@ func (tm *Telegram) AddCommand(cmd *Command, responder Responder) {
 	})
 }
 
-func (tm *Telegram) newReply(m *telebot.Message) *TelegramReply {
+func (tm *Telegram) newReply(session *TelegramSession) *TelegramReply {
 	return &TelegramReply{
-		bot:  tm.Bot,
-		chat: m.Chat,
-		menu: &telebot.ReplyMarkup{ResizeReplyKeyboard: true},
+		bot:     tm.Bot,
+		session: session,
+		menu:    &telebot.ReplyMarkup{ResizeReplyKeyboard: true},
 	}
 }
 
-func (tm *Telegram) RestoreSession(session *TelegramSession) {
-	log.Infof("[telegram] restoring telegram session: %+v", session)
-	if session.OwnerChat != nil {
-		tm.OwnerChat = session.OwnerChat
-		tm.Owner = session.Owner
-		if _, err := tm.Bot.Send(tm.OwnerChat, fmt.Sprintf("Hi %s, I'm back. Your telegram session is restored.", tm.Owner.Username)); err != nil {
-			log.WithError(err).Error("[telegram] can not send telegram message")
+func (tm *Telegram) Sessions() TelegramSessionMap {
+	return tm.sessions
+}
+
+func (tm *Telegram) RestoreSessions(sessions TelegramSessionMap) {
+	if len(sessions) == 0 {
+		return
+	}
+
+	log.Infof("[telegram] restoring telegram %d sessions", len(sessions))
+	tm.sessions = sessions
+	for _, session := range sessions {
+		if session.IsAuthorized() {
+			if _, err := tm.Bot.Send(session.Chat, fmt.Sprintf("Hi %s, I'm back. Your telegram session is restored.", session.User.Username)); err != nil {
+				log.WithError(err).Error("[telegram] can not send telegram message")
+			}
 		}
-	}
-}
-
-type TelegramSession struct {
-	Owner     *telebot.User `json:"owner"`
-	OwnerChat *telebot.Chat `json:"chat"`
-
-	// Subscribers stores the Chat objects
-	Subscribers map[int64]time.Time `json:"chats"`
-}
-
-func NewTelegramSession() *TelegramSession {
-	return &TelegramSession{
-		Owner:       nil,
-		OwnerChat:   nil,
-		Subscribers: make(map[int64]time.Time),
 	}
 }
