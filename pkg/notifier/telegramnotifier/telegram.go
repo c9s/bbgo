@@ -120,6 +120,9 @@ func (n *Notifier) NotifyTo(channel string, obj interface{}, args ...interface{}
 }
 
 func (n *Notifier) AddChat(c *telebot.Chat) {
+	if n.Chats == nil {
+		n.Chats = make(map[int64]*telebot.Chat)
+	}
 	n.Chats[c.ID] = c
 }
 
