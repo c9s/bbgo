@@ -154,9 +154,11 @@ func (k KLine) GetLowerShadowRatio() float64 {
 
 func (k KLine) GetLowerShadowHeight() float64 {
 	low := k.Low
-	if k.Open < k.Close {
+	if k.Open < k.Close { // uptrend
 		return k.Open - low
 	}
+
+	// downtrend
 	return k.Close - low
 }
 
