@@ -16,13 +16,11 @@ var log = logrus.WithField("service", "telegram")
 type Notifier struct {
 	bot *telebot.Bot
 
-	// Subscribers stores the Chat objects for broadcasting
-	Subscribers map[int64]time.Time `json:"chats"`
+	// Subscribers stores the Chat objects for broadcasting public notification
+	Subscribers map[int64]time.Time `json:"subscribers"`
 
-	// Owner
-	// when owner and owner chat is not nil, notification will send to the owner chat
-	Owner     *telebot.User `json:"owner"`
-	OwnerChat *telebot.Chat `json:"chat"`
+	// Chats are the private chats that we will send private notification
+	Chats map[int64]*telebot.Chat `json:"chats"`
 
 	broadcast bool
 }
@@ -37,7 +35,11 @@ func UseBroadcast() Option {
 
 // New
 func New(bot *telebot.Bot, options ...Option) *Notifier {
-	notifier := &Notifier{ bot: bot }
+	notifier := &Notifier{
+		bot:         bot,
+		Chats:       make(map[int64]*telebot.Chat),
+		Subscribers: make(map[int64]time.Time),
+	}
 
 	for _, o := range options {
 		o(notifier)
@@ -102,12 +104,23 @@ func (n *Notifier) NotifyTo(channel string, obj interface{}, args ...interface{}
 		for _, text := range texts {
 			n.Broadcast(text)
 		}
-	} else if n.OwnerChat != nil {
-		n.SendToOwner(message)
-		for _, text := range texts {
-			n.SendToOwner(text)
+	} else if n.Chats != nil {
+		for _, chat := range n.Chats {
+			if _, err := n.bot.Send(chat, message); err != nil {
+				log.WithError(err).Error("telegram send error")
+			}
+
+			for _, text := range texts {
+				if _, err := n.bot.Send(chat, text); err != nil {
+					log.WithError(err).Error("telegram send error")
+				}
+			}
 		}
 	}
+}
+
+func (n *Notifier) AddChat(c *telebot.Chat) {
+	n.Chats[c.ID] = c
 }
 
 func (n *Notifier) AddSubscriber(m *telebot.Message) {
@@ -116,21 +129,6 @@ func (n *Notifier) AddSubscriber(m *telebot.Message) {
 	}
 
 	n.Subscribers[m.Chat.ID] = m.Time()
-}
-
-func (n *Notifier) SetOwner(owner *telebot.User, chat *telebot.Chat) {
-	n.Owner = owner
-	n.OwnerChat = chat
-}
-
-func (n *Notifier) SendToOwner(message string) {
-	if n.OwnerChat == nil {
-		return
-	}
-
-	if _, err := n.bot.Send(n.OwnerChat, message); err != nil {
-		log.WithError(err).Error("telegram send error")
-	}
 }
 
 func (n *Notifier) Broadcast(message string) {

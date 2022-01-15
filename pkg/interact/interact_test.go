@@ -113,23 +113,27 @@ func TestCustomInteraction(t *testing.T) {
 	err = globalInteraction.init()
 	assert.NoError(t, err)
 
-	m := &tb.Message{}
-	err = globalInteraction.runCommand("/closePosition", []string{}, telegram.newReply(m))
+	m := &tb.Message{
+		Chat:   &tb.Chat{ID: 22},
+		Sender: &tb.User{ID: 999},
+	}
+	session := telegram.loadSession(m)
+	err = globalInteraction.runCommand(session, "/closePosition", []string{}, telegram.newReply(session))
 	assert.NoError(t, err)
 
-	assert.Equal(t, State("/closePosition_1"), globalInteraction.currentState)
+	assert.Equal(t, State("/closePosition_1"), session.CurrentState)
 
-	err = globalInteraction.handleResponse("BTCUSDT", telegram.newReply(m))
+	err = globalInteraction.handleResponse(session, "BTCUSDT", telegram.newReply(session))
 	assert.NoError(t, err)
-	assert.Equal(t, State("/closePosition_2"), globalInteraction.currentState)
+	assert.Equal(t, State("/closePosition_2"), session.CurrentState)
 
-	err = globalInteraction.handleResponse("0.20", telegram.newReply(m))
+	err = globalInteraction.handleResponse(session, "0.20", telegram.newReply(session))
 	assert.NoError(t, err)
-	assert.Equal(t, State("/closePosition_3"), globalInteraction.currentState)
+	assert.Equal(t, State("/closePosition_3"), session.CurrentState)
 
-	err = globalInteraction.handleResponse("true", telegram.newReply(m))
+	err = globalInteraction.handleResponse(session, "true", telegram.newReply(session))
 	assert.NoError(t, err)
-	assert.Equal(t, State("public"), globalInteraction.currentState)
+	assert.Equal(t, State("public"), session.CurrentState)
 
 	assert.Equal(t, closePositionTask{
 		symbol:     "BTCUSDT",
