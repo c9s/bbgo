@@ -10,8 +10,8 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-const CancelOrderWaitTime = 10 * time.Millisecond
-const SentOrderWaitTime = 10 * time.Millisecond
+const SentOrderWaitTime = 50 * time.Millisecond
+const CancelOrderWaitTime = 20 * time.Millisecond
 
 // LocalActiveOrderBook manages the local active order books.
 //go:generate callbackgen -type LocalActiveOrderBook
@@ -81,7 +81,7 @@ func (b *LocalActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exch
 		// Some orders in the variable are not created on the server side yet,
 		// If we cancel these orders directly, we will get an unsent order error
 		// We wait here for a while for server to create these orders.
-		time.Sleep(SentOrderWaitTime)
+		// time.Sleep(SentOrderWaitTime)
 
 		// since ctx might be canceled, we should use background context here
 		if err := ex.CancelOrders(context.Background(), orders...); err != nil {

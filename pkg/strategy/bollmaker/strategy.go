@@ -115,7 +115,7 @@ type Strategy struct {
 	UptrendSkew fixedpoint.Value `json:"uptrendSkew"`
 
 	// ShadowProtection is used to avoid placing bid order when price goes down strongly (without shadow)
-	ShadowProtection      *bool            `json:"shadowProtection"`
+	ShadowProtection      bool             `json:"shadowProtection"`
 	ShadowProtectionRatio fixedpoint.Value `json:"shadowProtectionRatio"`
 
 	session *bbgo.ExchangeSession
@@ -293,6 +293,26 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 	canBuy := hasQuoteBalance && quoteBalance.Available > s.Quantity.Mul(midPrice) && (s.MaxExposurePosition > 0 && base < s.MaxExposurePosition)
 	canSell := hasBaseBalance && baseBalance.Available > s.Quantity && (s.MaxExposurePosition > 0 && base > -s.MaxExposurePosition)
 
+	if s.ShadowProtection && kline != nil {
+
+		switch kline.Direction() {
+		case types.DirectionDown:
+			shadowHeight := kline.GetLowerShadowHeight()
+			shadowRatio := kline.GetLowerShadowRatio()
+			if shadowHeight == 0.0 && shadowRatio < s.ShadowProtectionRatio.Float64() {
+				log.Infof("%s shadow protection enabled, lower shadow ratio %f < %f", s.Symbol, shadowRatio, s.ShadowProtectionRatio.Float64())
+				canBuy = false
+			}
+		case types.DirectionUp:
+			shadowHeight := kline.GetUpperShadowHeight()
+			shadowRatio := kline.GetUpperShadowRatio()
+			if shadowHeight == 0.0 || shadowRatio < s.ShadowProtectionRatio.Float64() {
+				log.Infof("%s shadow protection enabled, upper shadow ratio %f < %f", s.Symbol, shadowRatio, s.ShadowProtectionRatio.Float64())
+				canSell = false
+			}
+		}
+	}
+
 	// adjust quantity for closing position if we over sold or over bought
 	if s.MaxExposurePosition > 0 && base.Abs() > s.MaxExposurePosition {
 		scale := &bbgo.ExponentialScale{
@@ -315,67 +335,39 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 
 	if midPrice.Float64() > s.neutralBoll.LastDownBand() && midPrice.Float64() < s.neutralBoll.LastUpBand() {
 		// we don't have position yet
-		if base == 0 || base.Abs() < minQuantity {
-			// place orders on both side if it's in oscillating band
-			if canBuy {
-				submitOrders = append(submitOrders, buyOrder)
-			}
-			if !s.DisableShort && canSell {
-				submitOrders = append(submitOrders, sellOrder)
-			}
-		}
+		// place orders on both side if it's in oscillating band
+		// if base == 0 || base.Abs() < minQuantity { }
 	} else if midPrice.Float64() > s.defaultBoll.LastDownBand() && midPrice.Float64() < s.neutralBoll.LastDownBand() { // downtrend, might bounce back
-
 		skew := s.DowntrendSkew.Float64()
 		ratio := 1.0 / skew
 		sellOrder.Quantity = math.Max(s.market.MinQuantity, buyOrder.Quantity*ratio)
-
 	} else if midPrice.Float64() < s.defaultBoll.LastUpBand() && midPrice.Float64() > s.neutralBoll.LastUpBand() { // uptrend, might bounce back
-
 		skew := s.UptrendSkew.Float64()
 		buyOrder.Quantity = math.Max(s.market.MinQuantity, sellOrder.Quantity*skew)
-
 	} else if midPrice.Float64() < s.defaultBoll.LastDownBand() { // strong downtrend
-
 		skew := s.StrongDowntrendSkew.Float64()
 		ratio := 1.0 / skew
 		sellOrder.Quantity = math.Max(s.market.MinQuantity, buyOrder.Quantity*ratio)
-
 	} else if midPrice.Float64() > s.defaultBoll.LastUpBand() { // strong uptrend
-
 		skew := s.StrongUptrendSkew.Float64()
 		buyOrder.Quantity = math.Max(s.market.MinQuantity, sellOrder.Quantity*skew)
-
 	}
 
-	if midPrice > s.state.Position.AverageCost.MulFloat64(1.0+s.MinProfitSpread.Float64()) && canSell {
+	if canSell && midPrice > s.state.Position.AverageCost.MulFloat64(1.0+s.MinProfitSpread.Float64()) {
 		if !(s.DisableShort && (base.Float64()-sellOrder.Quantity < 0)) {
 			submitOrders = append(submitOrders, sellOrder)
 		}
 	}
-
-	if midPrice < s.state.Position.AverageCost.MulFloat64(1.0-s.MinProfitSpread.Float64()) && canBuy {
-		// submitOrders = append(submitOrders, buyOrder)
+	if canBuy {
+		submitOrders = append(submitOrders, buyOrder)
 	}
 
-	if canBuy {
-		if s.ShadowProtection != nil && *s.ShadowProtection && kline != nil {
-			switch kline.Direction() {
-			case types.DirectionUp:
-
-			case types.DirectionDown:
-				lowerShadowRatio := kline.GetLowerShadowRatio()
-				if lowerShadowRatio < s.ShadowProtectionRatio.Float64() {
-					log.Infof("%s shadow protection enabled, lower shadow ratio %f < %f", s.Symbol, lowerShadowRatio, s.ShadowProtectionRatio.Float64())
-				} else {
-					submitOrders = append(submitOrders, buyOrder)
-				}
-			}
-		} else {
+	// condition for lower the average cost
+	/*
+		if midPrice < s.state.Position.AverageCost.MulFloat64(1.0-s.MinProfitSpread.Float64()) && canBuy {
 			submitOrders = append(submitOrders, buyOrder)
 		}
-
-	}
+	*/
 
 	if len(submitOrders) == 0 {
 		return
@@ -426,14 +418,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.DowntrendSkew = fixedpoint.NewFromFloat(1.2)
 	}
 
-	// enable shadow protection by default
-	if s.ShadowProtection == nil {
-		s.ShadowProtection = &[]bool{true}[0]
-	}
-
 	if s.ShadowProtectionRatio == 0 {
-		// 1%
-		s.ShadowProtectionRatio = fixedpoint.NewFromFloat(0.02)
+		s.ShadowProtectionRatio = fixedpoint.NewFromFloat(0.01)
 	}
 
 	// initial required information
