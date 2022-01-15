@@ -521,6 +521,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			log.WithError(err).Errorf("graceful cancel order error")
 		}
 
+		s.tradeCollector.Process()
+
 		if err := s.SaveState(); err != nil {
 			log.WithError(err).Errorf("can not save state: %+v", s.state)
 		}
