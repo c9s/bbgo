@@ -10,7 +10,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-const CancelOrderWaitTime = 100 * time.Millisecond
+const CancelOrderWaitTime = 10 * time.Millisecond
 const SentOrderWaitTime = 10 * time.Millisecond
 
 // LocalActiveOrderBook manages the local active order books.
@@ -43,11 +43,17 @@ func (b *LocalActiveOrderBook) BindStream(stream types.Stream) {
 }
 
 func (b *LocalActiveOrderBook) waitAllClear(ctx context.Context, waitTime, timeout time.Duration) (bool, error) {
+	numOfOrders := b.NumOfOrders()
+	clear := numOfOrders == 0
+	if clear {
+		return clear, nil
+	}
+
 	timeoutC := time.After(timeout)
 	for {
 		time.Sleep(waitTime)
-		numOfOrders := b.NumOfOrders()
-		clear := numOfOrders == 0
+		numOfOrders = b.NumOfOrders()
+		clear = numOfOrders == 0
 		select {
 		case <-timeoutC:
 			return clear, nil
@@ -65,7 +71,7 @@ func (b *LocalActiveOrderBook) waitAllClear(ctx context.Context, waitTime, timeo
 
 // GracefulCancel cancels the active orders gracefully
 func (b *LocalActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange) error {
-	log.Infof("[LocalActiveOrderBook] gracefully cancelling %s orders...", b.Symbol)
+	log.Debugf("[LocalActiveOrderBook] gracefully cancelling %s orders...", b.Symbol)
 
 	startTime := time.Now()
 	// ensure every order is cancelled
