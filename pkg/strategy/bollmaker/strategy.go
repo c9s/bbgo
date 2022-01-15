@@ -353,6 +353,10 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 	if midPrice < s.state.Position.AverageCost.MulFloat64(1.0-s.MinProfitSpread.Float64()) && canBuy {
 		// submitOrders = append(submitOrders, buyOrder)
 	}
+
+	buyOrder = s.adjustOrderQuantity(buyOrder)
+	sellOrder = s.adjustOrderQuantity(sellOrder)
+
 	if canBuy {
 		submitOrders = append(submitOrders, buyOrder)
 	}
@@ -367,6 +371,18 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 	}
 	s.orderStore.Add(createdOrders...)
 	s.activeMakerOrders.Add(createdOrders...)
+}
+
+func (s *Strategy) adjustOrderQuantity(submitOrder types.SubmitOrder) types.SubmitOrder {
+	if submitOrder.Quantity*submitOrder.Price < s.market.MinNotional {
+		submitOrder.Quantity = bbgo.AdjustFloatQuantityByMinAmount(submitOrder.Quantity, submitOrder.Price, s.market.MinNotional)
+	}
+
+	if submitOrder.Quantity < s.market.MinQuantity {
+		submitOrder.Quantity = math.Max(submitOrder.Quantity, s.market.MinQuantity)
+	}
+
+	return submitOrder
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
