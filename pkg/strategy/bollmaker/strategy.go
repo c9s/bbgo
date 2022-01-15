@@ -114,6 +114,10 @@ type Strategy struct {
 	// less than 1.0 means when placing sell order, place buy order with less quantity
 	UptrendSkew fixedpoint.Value `json:"uptrendSkew"`
 
+	// ShadowProtection is used to avoid placing bid order when price goes down strongly (without shadow)
+	ShadowProtection      *bool            `json:"shadowProtection"`
+	ShadowProtectionRatio fixedpoint.Value `json:"shadowProtectionRatio"`
+
 	session *bbgo.ExchangeSession
 	book    *types.StreamOrderBook
 	market  types.Market
@@ -247,7 +251,7 @@ func (s *Strategy) LoadState() error {
 	return nil
 }
 
-func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExecutor, midPrice fixedpoint.Value) {
+func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExecutor, midPrice fixedpoint.Value, kline *types.KLine) {
 	askPrice := midPrice.Mul(one + s.Spread)
 	bidPrice := midPrice.Mul(one - s.Spread)
 	base := s.state.Position.GetBase()
@@ -354,15 +358,31 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 		// submitOrders = append(submitOrders, buyOrder)
 	}
 
-	buyOrder = s.adjustOrderQuantity(buyOrder)
-	sellOrder = s.adjustOrderQuantity(sellOrder)
-
 	if canBuy {
-		submitOrders = append(submitOrders, buyOrder)
+		if s.ShadowProtection != nil && *s.ShadowProtection && kline != nil {
+			switch kline.Direction() {
+			case types.DirectionUp:
+
+			case types.DirectionDown:
+				lowerShadowRatio := kline.GetLowerShadowRatio()
+				if lowerShadowRatio < s.ShadowProtectionRatio.Float64() {
+					log.Infof("%s shadow protection enabled, lower shadow ratio %f < %f", s.Symbol, lowerShadowRatio, s.ShadowProtectionRatio.Float64())
+				} else {
+					submitOrders = append(submitOrders, buyOrder)
+				}
+			}
+		} else {
+			submitOrders = append(submitOrders, buyOrder)
+		}
+
 	}
 
 	if len(submitOrders) == 0 {
 		return
+	}
+
+	for i := range submitOrders {
+		submitOrders[i] = s.adjustOrderQuantity(submitOrders[i])
 	}
 
 	createdOrders, err := orderExecutor.SubmitOrders(ctx, submitOrders...)
@@ -404,6 +424,16 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	if s.DowntrendSkew == 0 {
 		s.DowntrendSkew = fixedpoint.NewFromFloat(1.2)
+	}
+
+	// enable shadow protection by default
+	if s.ShadowProtection == nil {
+		s.ShadowProtection = &[]bool{true}[0]
+	}
+
+	if s.ShadowProtectionRatio == 0 {
+		// 1%
+		s.ShadowProtectionRatio = fixedpoint.NewFromFloat(0.02)
 	}
 
 	// initial required information
@@ -475,10 +505,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 
 			midPrice := fixedpoint.NewFromFloat((ticker.Buy + ticker.Sell) / 2)
-			s.placeOrders(ctx, orderExecutor, midPrice)
+			s.placeOrders(ctx, orderExecutor, midPrice, nil)
 		} else {
 			if price, ok := session.LastPrice(s.Symbol); ok {
-				s.placeOrders(ctx, orderExecutor, fixedpoint.NewFromFloat(price))
+				s.placeOrders(ctx, orderExecutor, fixedpoint.NewFromFloat(price), nil)
 			}
 		}
 	})
@@ -504,9 +534,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 
 			midPrice := fixedpoint.NewFromFloat((ticker.Buy + ticker.Sell) / 2)
-			s.placeOrders(ctx, orderExecutor, midPrice)
+			s.placeOrders(ctx, orderExecutor, midPrice, &kline)
 		} else {
-			s.placeOrders(ctx, orderExecutor, fixedpoint.NewFromFloat(kline.Close))
+			s.placeOrders(ctx, orderExecutor, fixedpoint.NewFromFloat(kline.Close), &kline)
 		}
 	})
 
