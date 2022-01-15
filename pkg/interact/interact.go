@@ -22,6 +22,17 @@ type Messenger interface {
 	Start(ctx context.Context)
 }
 
+type Session interface {
+	ID() string
+	SetOriginState(state State)
+	GetOriginState() State
+	SetState(state State)
+	GetState() State
+	IsAuthorized() bool
+	SetAuthorized()
+	SetAuthorizing(b bool)
+}
+
 // Interact implements the interaction between bot and message software.
 type Interact struct {
 	startTime time.Time
@@ -35,7 +46,7 @@ type Interact struct {
 	states     map[State]State
 	statesFunc map[State]interface{}
 
-	originState, currentState State
+	authenticatedSessions map[string]Session
 
 	customInteractions []CustomInteraction
 
@@ -47,15 +58,9 @@ func New() *Interact {
 		startTime:       time.Now(),
 		commands:        make(map[string]*Command),
 		privateCommands: make(map[string]*Command),
-		originState:     StatePublic,
-		currentState:    StatePublic,
 		states:          make(map[State]State),
 		statesFunc:      make(map[State]interface{}),
 	}
-}
-
-func (it *Interact) SetOriginState(s State) {
-	it.originState = s
 }
 
 func (it *Interact) AddCustomInteraction(custom CustomInteraction) {
@@ -75,7 +80,7 @@ func (it *Interact) Command(command string, desc string, f interface{}) *Command
 	return cmd
 }
 
-func (it *Interact) getNextState(currentState State) (nextState State, final bool) {
+func (it *Interact) getNextState(session Session, currentState State) (nextState State, final bool) {
 	var ok bool
 	final = false
 	nextState, ok = it.states[currentState]
@@ -89,17 +94,12 @@ func (it *Interact) getNextState(currentState State) (nextState State, final boo
 	}
 
 	// state not found, return to the origin state
-	return it.originState, final
+	return session.GetOriginState(), final
 }
 
-func (it *Interact) SetState(s State) {
-	log.Infof("[interact] transiting state from %s -> %s", it.currentState, s)
-	it.currentState = s
-}
-
-func (it *Interact) handleResponse(text string, ctxObjects ...interface{}) error {
-	// we only need response when executing a command
-	switch it.currentState {
+func (it *Interact) handleResponse(session Session, text string, ctxObjects ...interface{}) error {
+	// We only need response when executing a command
+	switch session.GetState() {
 	case StatePublic, StateAuthenticated:
 		return nil
 
@@ -107,40 +107,40 @@ func (it *Interact) handleResponse(text string, ctxObjects ...interface{}) error
 
 	args := parseCommand(text)
 
-	f, ok := it.statesFunc[it.currentState]
+	state := session.GetState()
+	f, ok := it.statesFunc[state]
 	if !ok {
-		return fmt.Errorf("state function of %s is not defined", it.currentState)
+		return fmt.Errorf("state function of %s is not defined", state)
 	}
 
+	ctxObjects = append(ctxObjects, session)
 	_, err := parseFuncArgsAndCall(f, args, ctxObjects...)
 	if err != nil {
 		return err
 	}
 
-	nextState, end := it.getNextState(it.currentState)
+	nextState, end := it.getNextState(session, state)
 	if end {
-		it.SetState(it.originState)
+		session.SetState(session.GetOriginState())
 		return nil
 	}
 
-	it.SetState(nextState)
+	session.SetState(nextState)
 	return nil
 }
 
-func (it *Interact) getCommand(command string) (*Command, error) {
-	switch it.currentState {
-	case StateAuthenticated:
+func (it *Interact) getCommand(session Session, command string) (*Command, error) {
+	if session.IsAuthorized() {
 		if cmd, ok := it.privateCommands[command]; ok {
 			return cmd, nil
 		}
-
-	case StatePublic:
+	} else {
 		if _, ok := it.privateCommands[command]; ok {
-			return nil, fmt.Errorf("private command can not be executed in the public mode")
+			return nil, fmt.Errorf("private command can not be executed in the public mode, type /auth to get authorized")
 		}
-
 	}
 
+	// find any public command
 	if cmd, ok := it.commands[command]; ok {
 		return cmd, nil
 	}
@@ -148,32 +148,34 @@ func (it *Interact) getCommand(command string) (*Command, error) {
 	return nil, fmt.Errorf("command %s not found", command)
 }
 
-func (it *Interact) runCommand(command string, args []string, ctxObjects ...interface{}) error {
-	cmd, err := it.getCommand(command)
+func (it *Interact) runCommand(session Session, command string, args []string, ctxObjects ...interface{}) error {
+	cmd, err := it.getCommand(session, command)
 	if err != nil {
 		return err
 	}
 
-	it.SetState(cmd.initState)
+	ctxObjects = append(ctxObjects, session)
+	session.SetState(cmd.initState)
 	if _, err := parseFuncArgsAndCall(cmd.F, args, ctxObjects...); err != nil {
 		return err
 	}
 
 	// if we can successfully execute the command, then we can go to the next state.
-	nextState, end := it.getNextState(it.currentState)
+	state := session.GetState()
+	nextState, end := it.getNextState(session, state)
 	if end {
-		it.SetState(it.originState)
+		session.SetState(session.GetOriginState())
 		return nil
 	}
 
-	it.SetState(nextState)
+	session.SetState(nextState)
 	return nil
 }
 
 func (it *Interact) SetMessenger(messenger Messenger) {
 	// pass Responder function
-	messenger.SetTextMessageResponder(func(message string, reply Reply, ctxObjects ...interface{}) error {
-		return it.handleResponse(message, append(ctxObjects, reply)...)
+	messenger.SetTextMessageResponder(func(session Session, message string, reply Reply, ctxObjects ...interface{}) error {
+		return it.handleResponse(session, message, append(ctxObjects, reply)...)
 	})
 	it.messenger = messenger
 }
@@ -224,9 +226,9 @@ func (it *Interact) registerCommands(commands map[string]*Command) error {
 		}
 
 		commandName := n
-		it.messenger.AddCommand(cmd, func(message string, reply Reply, ctxObjects ...interface{}) error {
+		it.messenger.AddCommand(cmd, func(session Session, message string, reply Reply, ctxObjects ...interface{}) error {
 			args := parseCommand(message)
-			return it.runCommand(commandName, args, append(ctxObjects, reply)...)
+			return it.runCommand(session, commandName, args, append(ctxObjects, reply)...)
 		})
 	}
 	return nil

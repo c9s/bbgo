@@ -595,6 +595,21 @@ func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) erro
 	return nil
 }
 
+func getAuthStoreID() string {
+	telegramBotToken := viper.GetString("telegram-bot-token")
+	if len(telegramBotToken) > 0 {
+		tt := strings.Split(telegramBotToken, ":")
+		return tt[0]
+	}
+
+	userEnv := os.Getenv("USER")
+	if userEnv != "" {
+		return userEnv
+	}
+
+	return "default"
+}
+
 func (environ *Environment) setupInteraction(persistence service.PersistenceService) error {
 	var otpQRCodeImagePath = fmt.Sprintf("otp.png")
 	var key *otp.Key
@@ -653,7 +668,8 @@ func (environ *Environment) setupInteraction(persistence service.PersistenceServ
 }
 
 func (environ *Environment) getAuthStore(persistence service.PersistenceService) service.Store {
-	return persistence.NewStore("bbgo", "auth")
+	id := getAuthStoreID()
+	return persistence.NewStore("bbgo", "auth", id)
 }
 
 func (environ *Environment) setupSlack(userConfig *Config, slackToken string) {
@@ -701,33 +717,25 @@ func (environ *Environment) setupTelegram(userConfig *Config, telegramBotToken s
 		Private: true,
 	}
 
-	var session = interact.NewTelegramSession()
+	var sessions = interact.TelegramSessionMap{}
 	var sessionStore = persistence.NewStore("bbgo", "telegram", telegramID)
-	if err := sessionStore.Load(session); err != nil {
-		log.WithError(err).Errorf("session load error")
+	if err := sessionStore.Load(sessions); err != nil {
 
-		if err := sessionStore.Save(session); err != nil {
-			return errors.Wrap(err, "failed to save session")
-		}
 	} else {
-		notifier.OwnerChat = session.OwnerChat
-		notifier.Owner = session.Owner
-		notifier.Subscribers = session.Subscribers
+		for _, session := range sessions {
+			if session.IsAuthorized() {
+				notifier.OwnerChat = session.Chat
+				notifier.Owner = session.User
+			}
+		}
 
 		// you must restore the session after the notifier updates
-		messenger.RestoreSession(session)
-
-		// right now it's only for telegram, should we share the session (?)
-		interact.Default().SetOriginState(interact.StateAuthenticated)
-		interact.Default().SetState(interact.StateAuthenticated)
+		messenger.RestoreSessions(sessions)
 	}
 
-	messenger.OnAuthorized(func(a *interact.TelegramAuthorizer) {
-		session.Owner = a.Telegram.Owner
-		session.OwnerChat = a.Telegram.OwnerChat
-
-		log.Infof("saving telegram session...")
-		if err := sessionStore.Save(session); err != nil {
+	messenger.OnAuthorized(func(userSession *interact.TelegramSession) {
+		log.Infof("saving telegram sessions...")
+		if err := sessionStore.Save(messenger.Sessions()); err != nil {
 			log.WithError(err).Errorf("telegram session save error")
 		}
 	})

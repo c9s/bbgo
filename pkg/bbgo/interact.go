@@ -43,7 +43,40 @@ func NewCoreInteraction(environment *Environment, trader *Trader) *CoreInteracti
 }
 
 func (it *CoreInteraction) Commands(i *interact.Interact) {
-	i.PrivateCommand("/position", "show the current position of a strategy", func(reply interact.Reply) error {
+	i.PrivateCommand("/sessions", "List Exchange Sessions", func(reply interact.Reply) error {
+		message := "Your connected sessions:\n"
+		for name, session := range it.environment.Sessions() {
+			message += "- " + name + " (" + session.ExchangeName.String() + ")\n"
+		}
+
+		reply.Message(message)
+		return nil
+	})
+
+	i.PrivateCommand("/balances", "Show balances", func(reply interact.Reply) error {
+		reply.Message("Please select an exchange session")
+		for name := range it.environment.Sessions() {
+			reply.AddButton(name)
+		}
+		return nil
+	}).Next(func(sessionName string, reply interact.Reply) error {
+		session, ok := it.environment.Session(sessionName)
+		if !ok {
+			reply.Message(fmt.Sprintf("Session %s not found", sessionName))
+			return fmt.Errorf("session %s not found", sessionName)
+		}
+
+		message := "Your balances\n"
+		balances := session.Account.Balances()
+		for _, balance := range balances {
+			message += "- " + balance.String() + "\n"
+		}
+
+		reply.Message(message)
+		return nil
+	})
+
+	i.PrivateCommand("/position", "Show Position", func(reply interact.Reply) error {
 		// it.trader.exchangeStrategies
 		// send symbol options
 		found := false
@@ -88,7 +121,7 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 		return nil
 	})
 
-	i.PrivateCommand("/closeposition", "close the position of a strategy", func(reply interact.Reply) error {
+	i.PrivateCommand("/closeposition", "Close position", func(reply interact.Reply) error {
 		// it.trader.exchangeStrategies
 		// send symbol options
 		found := false
@@ -156,6 +189,7 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 			return err
 		}
 
+		reply.Message("Done")
 		return nil
 	})
 }
