@@ -131,6 +131,11 @@ func (k KLine) GetMaxChange() float64 {
 	return k.GetHigh() - k.GetLow()
 }
 
+func (k KLine) GetAmplification() float64 {
+	return k.GetMaxChange() / k.GetLow()
+}
+
+
 // GetThickness returns the thickness of the kline. 1 => thick, 0.1 => thin
 func (k KLine) GetThickness() float64 {
 	return math.Abs(k.GetChange()) / math.Abs(k.GetMaxChange())
@@ -290,6 +295,10 @@ func (k KLineWindow) GetChange() float64 {
 
 func (k KLineWindow) GetMaxChange() float64 {
 	return k.GetHigh() - k.GetLow()
+}
+
+func (k KLineWindow) GetAmplification() float64 {
+	return k.GetMaxChange() / k.GetLow()
 }
 
 func (k KLineWindow) AllDrop() bool {
