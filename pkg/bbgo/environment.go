@@ -719,8 +719,8 @@ func (environ *Environment) setupTelegram(userConfig *Config, telegramBotToken s
 
 	var sessions = interact.TelegramSessionMap{}
 	var sessionStore = persistence.NewStore("bbgo", "telegram", telegramID)
-	if err := sessionStore.Load(sessions); err != nil {
-
+	if err := sessionStore.Load(&sessions); err != nil {
+		log.WithError(err).Errorf("sessions load error")
 	} else {
 		for _, session := range sessions {
 			if session.IsAuthorized() {
@@ -734,7 +734,7 @@ func (environ *Environment) setupTelegram(userConfig *Config, telegramBotToken s
 	}
 
 	messenger.OnAuthorized(func(userSession *interact.TelegramSession) {
-		log.Infof("saving telegram sessions...")
+		log.Infof("user session %d got authorized, saving telegram sessions...", userSession.User.ID)
 		if err := sessionStore.Save(messenger.Sessions()); err != nil {
 			log.WithError(err).Errorf("telegram session save error")
 		}

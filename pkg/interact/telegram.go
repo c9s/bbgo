@@ -10,11 +10,7 @@ import (
 	"gopkg.in/tucnak/telebot.v2"
 )
 
-type TelegramSessionKey struct {
-	UserID, ChatID int64
-}
-
-type TelegramSessionMap map[TelegramSessionKey]*TelegramSession
+type TelegramSessionMap map[int64]*TelegramSession
 
 type TelegramSession struct {
 	BaseSession
@@ -27,6 +23,11 @@ type TelegramSession struct {
 
 func (s *TelegramSession) ID() string {
 	return fmt.Sprintf("telegram-%d-%d", s.User.ID, s.Chat.ID)
+}
+
+func (s *TelegramSession) SetAuthorized() {
+	s.BaseSession.SetAuthorized()
+	s.telegram.EmitAuthorized(s)
 }
 
 func NewTelegramSession(telegram *Telegram, message *telebot.Message) *TelegramSession {
@@ -95,7 +96,7 @@ type Telegram struct {
 
 	authorizing bool
 
-	sessions map[TelegramSessionKey]*TelegramSession
+	sessions map[int64]*TelegramSession
 
 	// textMessageResponder is used for interact to register its message handler
 	textMessageResponder Responder
@@ -130,7 +131,7 @@ func (tm *Telegram) Start(context.Context) {
 
 		if reply.set {
 			reply.build()
-			checkSendErr(tm.Bot.Send(m.Sender, reply.message, reply.menu))
+			checkSendErr(tm.Bot.Send(m.Chat, reply.message, reply.menu))
 		}
 	})
 
@@ -160,17 +161,16 @@ func checkSendErr(m *telebot.Message, err error) {
 
 func (tm *Telegram) loadSession(m *telebot.Message) *TelegramSession {
 	if tm.sessions == nil {
-		tm.sessions = make(map[TelegramSessionKey]*TelegramSession)
+		tm.sessions = make(map[int64]*TelegramSession)
 	}
 
-	key := TelegramSessionKey{UserID: m.Sender.ID, ChatID: m.Chat.ID}
-	session, ok := tm.sessions[key]
+	session, ok := tm.sessions[m.Chat.ID]
 	if ok {
 		return session
 	}
 
 	session = NewTelegramSession(tm, m)
-	tm.sessions[key] = session
+	tm.sessions[m.Chat.ID] = session
 	return session
 }
 
@@ -181,14 +181,14 @@ func (tm *Telegram) AddCommand(cmd *Command, responder Responder) {
 		reply := tm.newReply(session)
 		if err := responder(session, m.Payload, reply); err != nil {
 			log.WithError(err).Errorf("[telegram] responder error")
-			checkSendErr(tm.Bot.Send(m.Sender, fmt.Sprintf("error: %v", err)))
+			checkSendErr(tm.Bot.Send(m.Chat, fmt.Sprintf("error: %v", err)))
 			return
 		}
 
 		// build up the response objects
 		if reply.set {
 			reply.build()
-			checkSendErr(tm.Bot.Send(m.Sender, reply.message, reply.menu))
+			checkSendErr(tm.Bot.Send(m.Chat, reply.message, reply.menu))
 		}
 	})
 }

@@ -101,7 +101,6 @@ func (it *AuthInteract) Commands(interact *Interact) {
 					reply.Message("Great! You're authenticated!")
 					session.SetOriginState(StateAuthenticated)
 					session.SetAuthorized()
-					session.SetAuthorized()
 					return nil
 				}
 			}
