@@ -247,54 +247,6 @@ func (s *Strategy) LoadState() error {
 	return nil
 }
 
-// cancelOrders cancels the orders gracefully
-func (s *Strategy) cancelOrders(ctx context.Context) {
-	if err := s.session.Exchange.CancelOrders(ctx, s.activeMakerOrders.Orders()...); err != nil {
-		log.WithError(err).Errorf("can not cancel %s orders", s.Symbol)
-	}
-
-	for s.activeMakerOrders.NumOfOrders() > 0 {
-		orders := s.activeMakerOrders.Orders()
-		log.Warnf("%d orders are not cancelled yet:", len(orders))
-		s.activeMakerOrders.Print()
-
-		if err := s.session.Exchange.CancelOrders(ctx, s.activeMakerOrders.Orders()...); err != nil {
-			log.WithError(err).Errorf("can not cancel %s orders", s.Symbol)
-			continue
-		}
-
-		log.Infof("waiting for orders to be cancelled...")
-
-		select {
-		case <-time.After(3 * time.Second):
-
-		case <-ctx.Done():
-			break
-
-		}
-
-		// verify the current open orders via the RESTful API
-		if s.activeMakerOrders.NumOfOrders() > 0 {
-			log.Warnf("there are orders not cancelled, using REStful API to verify...")
-			openOrders, err := s.session.Exchange.QueryOpenOrders(ctx, s.Symbol)
-			if err != nil {
-				log.WithError(err).Errorf("can not query %s open orders", s.Symbol)
-				continue
-			}
-
-			openOrderStore := bbgo.NewOrderStore(s.Symbol)
-			openOrderStore.Add(openOrders...)
-
-			for _, o := range s.activeMakerOrders.Orders() {
-				// if it does not exist, we should remove it
-				if !openOrderStore.Exists(o.OrderID) {
-					s.activeMakerOrders.Remove(o)
-				}
-			}
-		}
-	}
-}
-
 func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExecutor, midPrice fixedpoint.Value) {
 	askPrice := midPrice.Mul(one + s.Spread)
 	bidPrice := midPrice.Mul(one - s.Spread)
