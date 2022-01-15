@@ -192,6 +192,7 @@ func (it *Interact) builtin() error {
 }
 
 func (it *Interact) init() error {
+
 	if err := it.builtin(); err != nil {
 		return err
 	}
@@ -235,6 +236,11 @@ func (it *Interact) registerCommands(commands map[string]*Command) error {
 }
 
 func (it *Interact) Start(ctx context.Context) error {
+	if it.messenger == nil {
+		log.Warn("messenger is not set, skip initializing")
+		return nil
+	}
+
 	if err := it.init(); err != nil {
 		return err
 	}

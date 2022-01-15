@@ -25,7 +25,7 @@ func init() {
 type Balance struct {
 	Currency  string           `json:"currency"`
 	Available fixedpoint.Value `json:"available"`
-	Locked    fixedpoint.Value `json:"locked"`
+	Locked    fixedpoint.Value `json:"locked,omitempty"`
 }
 
 func (b Balance) Total() fixedpoint.Value {
