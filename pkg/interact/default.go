@@ -8,8 +8,8 @@ func Default() *Interact {
 	return defaultInteraction
 }
 
-func SetMessenger(messenger Messenger) {
-	defaultInteraction.SetMessenger(messenger)
+func AddMessenger(messenger Messenger) {
+	defaultInteraction.AddMessenger(messenger)
 }
 
 func AddCustomInteraction(custom CustomInteraction) {

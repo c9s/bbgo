@@ -43,7 +43,7 @@ require (
 	github.com/robfig/cron/v3 v3.0.0
 	github.com/shopspring/decimal v1.2.0 // indirect
 	github.com/sirupsen/logrus v1.8.1
-	github.com/slack-go/slack v0.6.6-0.20200602212211-b04b8521281b
+	github.com/slack-go/slack v0.10.1
 	github.com/spf13/afero v1.5.1 // indirect
 	github.com/spf13/cast v1.3.1 // indirect
 	github.com/spf13/cobra v1.1.1

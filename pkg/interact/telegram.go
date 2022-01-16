@@ -96,7 +96,7 @@ type Telegram struct {
 
 	authorizing bool
 
-	sessions map[int64]*TelegramSession
+	sessions TelegramSessionMap
 
 	// textMessageResponder is used for interact to register its message handler
 	textMessageResponder Responder
@@ -104,6 +104,14 @@ type Telegram struct {
 	commands []*Command
 
 	authorizedCallbacks []func(s *TelegramSession)
+}
+
+func NewTelegram(bot *telebot.Bot) *Telegram {
+	return &Telegram{
+		Bot:      bot,
+		Private:  true,
+		sessions: make(map[int64]*TelegramSession),
+	}
 }
 
 func (tm *Telegram) SetTextMessageResponder(textMessageResponder Responder) {
@@ -213,6 +221,10 @@ func (tm *Telegram) RestoreSessions(sessions TelegramSessionMap) {
 	log.Infof("[telegram] restoring telegram %d sessions", len(sessions))
 	tm.sessions = sessions
 	for _, session := range sessions {
+		if session.Chat == nil || session.User == nil {
+			continue
+		}
+
 		if session.IsAuthorized() {
 			if _, err := tm.Bot.Send(session.Chat, fmt.Sprintf("Hi %s, I'm back. Your telegram session is restored.", session.User.Username)); err != nil {
 				log.WithError(err).Error("[telegram] can not send telegram message")
