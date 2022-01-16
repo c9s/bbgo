@@ -13,8 +13,17 @@ func StringSliceContains(slice []string, needle string) bool {
 }
 
 func MaskKey(key string) string {
-	maskKey := key[0:5]
-	maskKey += strings.Repeat("*", len(key)-1-5-5)
-	maskKey += key[len(key)-5-1:]
+	if len(key) == 0 {
+		return "{empty}"
+	}
+
+	h := len(key) / 3
+	if h > 5 {
+		h = 5
+	}
+
+	maskKey := key[0:h]
+	maskKey += strings.Repeat("*", len(key)-h*2)
+	maskKey += key[len(key)-h:]
 	return maskKey
 }
