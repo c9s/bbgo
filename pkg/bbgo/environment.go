@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"image/png"
 	"io/ioutil"
+	stdlog "log"
 	"math/rand"
 	"os"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/pquerna/otp"
 	log "github.com/sirupsen/logrus"
+	"github.com/slack-go/slack"
 	"github.com/spf13/viper"
 	"gopkg.in/tucnak/telebot.v2"
 
@@ -575,7 +577,7 @@ func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) erro
 	// setup slack
 	slackToken := viper.GetString("slack-token")
 	if len(slackToken) > 0 && userConfig.Notifications != nil {
-		environ.setupSlack(userConfig, slackToken)
+		environ.setupSlack(userConfig, slackToken, persistence)
 	}
 
 	// check if telegram bot token is defined
@@ -672,18 +674,65 @@ func (environ *Environment) getAuthStore(persistence service.PersistenceService)
 	return persistence.NewStore("bbgo", "auth", id)
 }
 
-func (environ *Environment) setupSlack(userConfig *Config, slackToken string) {
-	if conf := userConfig.Notifications.Slack; conf != nil {
-		if conf.ErrorChannel != "" {
-			log.Debugf("found slack configured, setting up log hook...")
-			log.AddHook(slacklog.NewLogHook(slackToken, conf.ErrorChannel))
+func (environ *Environment) setupSlack(userConfig *Config, slackToken string, persistence service.PersistenceService) {
+
+	conf := userConfig.Notifications.Slack
+	if conf == nil {
+		return
+	}
+
+	if !strings.HasPrefix(slackToken, "xoxb-") {
+		log.Error("SLACK_BOT_TOKEN must have the prefix \"xoxb-\".")
+		return
+	}
+
+	// app-level token (for specific api)
+	slackAppToken := viper.GetString("slack-app-token")
+	if !strings.HasPrefix(slackAppToken, "xapp-") {
+		log.Errorf("SLACK_APP_TOKEN must have the prefix \"xapp-\".")
+		return
+	}
+
+	if conf.ErrorChannel != "" {
+		log.Debugf("found slack configured, setting up log hook...")
+		log.AddHook(slacklog.NewLogHook(slackToken, conf.ErrorChannel))
+	}
+
+	log.Debugf("adding slack notifier with default channel: %s", conf.DefaultChannel)
+
+	var client = slack.New(slackToken,
+		slack.OptionDebug(true),
+		slack.OptionLog(stdlog.New(os.Stdout, "api: ", stdlog.Lshortfile|stdlog.LstdFlags)),
+		slack.OptionAppLevelToken(slackAppToken))
+
+	var notifier = slacknotifier.New(client, conf.DefaultChannel)
+	environ.AddNotifier(notifier)
+
+	// allocate a store, so that we can save the chatID for the owner
+	var messenger = interact.NewSlack(client)
+
+	var sessions = interact.SlackSessionMap{}
+	var sessionStore = persistence.NewStore("bbgo", "slack")
+	if err := sessionStore.Load(&sessions); err != nil {
+		log.WithError(err).Errorf("sessions load error")
+	} else {
+		for _, session := range sessions {
+			if session.IsAuthorized() {
+				// notifier.AddChat(session.Chat)
+			}
 		}
 
-		log.Debugf("adding slack notifier with default channel: %s", conf.DefaultChannel)
-
-		var notifier = slacknotifier.New(slackToken, conf.DefaultChannel)
-		environ.AddNotifier(notifier)
+		// you must restore the session after the notifier updates
+		// messenger.RestoreSessions(sessions)
 	}
+
+	messenger.OnAuthorized(func(userSession *interact.SlackSession) {
+		if userSession.IsAuthorized() {
+			// notifier.AddChat(userSession.Chat)
+		}
+
+	})
+	interact.AddMessenger(messenger)
 }
 
 func (environ *Environment) setupTelegram(userConfig *Config, telegramBotToken string, persistence service.PersistenceService) error {
@@ -712,10 +761,7 @@ func (environ *Environment) setupTelegram(userConfig *Config, telegramBotToken s
 	environ.Notifiability.AddNotifier(notifier)
 
 	// allocate a store, so that we can save the chatID for the owner
-	var messenger = &interact.Telegram{
-		Bot:     bot,
-		Private: true,
-	}
+	var messenger = interact.NewTelegram(bot)
 
 	var sessions = interact.TelegramSessionMap{}
 	var sessionStore = persistence.NewStore("bbgo", "telegram", telegramID)
@@ -745,7 +791,7 @@ func (environ *Environment) setupTelegram(userConfig *Config, telegramBotToken s
 		}
 	})
 
-	interact.SetMessenger(messenger)
+	interact.AddMessenger(messenger)
 	return nil
 }
 

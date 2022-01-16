@@ -50,7 +50,7 @@ type Interact struct {
 
 	customInteractions []CustomInteraction
 
-	messenger Messenger
+	messengers []Messenger
 }
 
 func New() *Interact {
@@ -172,12 +172,12 @@ func (it *Interact) runCommand(session Session, command string, args []string, c
 	return nil
 }
 
-func (it *Interact) SetMessenger(messenger Messenger) {
+func (it *Interact) AddMessenger(messenger Messenger) {
 	// pass Responder function
 	messenger.SetTextMessageResponder(func(session Session, message string, reply Reply, ctxObjects ...interface{}) error {
 		return it.handleResponse(session, message, append(ctxObjects, reply)...)
 	})
-	it.messenger = messenger
+	it.messengers = append(it.messengers, messenger)
 }
 
 // builtin initializes the built-in commands
@@ -222,21 +222,24 @@ func (it *Interact) registerCommands(commands map[string]*Command) error {
 		}
 
 		// register commands to the service
-		if it.messenger == nil {
+		if len(it.messengers) == 0 {
 			return fmt.Errorf("messenger is not set")
 		}
 
+		// commandName is used in the closure, we need to copy the variable
 		commandName := n
-		it.messenger.AddCommand(cmd, func(session Session, message string, reply Reply, ctxObjects ...interface{}) error {
-			args := parseCommand(message)
-			return it.runCommand(session, commandName, args, append(ctxObjects, reply)...)
-		})
+		for _, messenger := range it.messengers {
+			messenger.AddCommand(cmd, func(session Session, message string, reply Reply, ctxObjects ...interface{}) error {
+				args := parseCommand(message)
+				return it.runCommand(session, commandName, args, append(ctxObjects, reply)...)
+			})
+		}
 	}
 	return nil
 }
 
 func (it *Interact) Start(ctx context.Context) error {
-	if it.messenger == nil {
+	if len(it.messengers) == 0 {
 		log.Warn("messenger is not set, skip initializing")
 		return nil
 	}
@@ -256,6 +259,8 @@ func (it *Interact) Start(ctx context.Context) error {
 	}
 
 	// TODO: use go routine and context
-	it.messenger.Start(ctx)
+	for _, m := range it.messengers {
+		m.Start(ctx)
+	}
 	return nil
 }

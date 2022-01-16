@@ -33,10 +33,8 @@ type Notifier struct {
 
 type NotifyOption func(notifier *Notifier)
 
-func New(token, channel string, options ...NotifyOption) *Notifier {
+func New(client *slack.Client, channel string, options ...NotifyOption) *Notifier {
 	// var client = slack.New(token, slack.OptionDebug(true))
-	var client = slack.New(token)
-
 	notifier := &Notifier{
 		channel: channel,
 		client:  client,

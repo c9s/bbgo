@@ -128,7 +128,7 @@ func main() {
 	}
 
 	ctx := context.Background()
-	interact.SetMessenger(&interact.Telegram{
+	interact.AddMessenger(&interact.Telegram{
 		Private: true,
 		Bot:     b,
 	})
