@@ -639,7 +639,7 @@ func (environ *Environment) setupInteraction(persistence service.PersistenceServ
 			return err
 		}
 
-		log.Infof("otp key loaded: %+v", key)
+		log.Infof("otp key loaded: %s", util.MaskKey(key.Secret()))
 		printOtpAuthGuide(otpQRCodeImagePath)
 	}
 
@@ -675,7 +675,6 @@ func (environ *Environment) getAuthStore(persistence service.PersistenceService)
 }
 
 func (environ *Environment) setupSlack(userConfig *Config, slackToken string, persistence service.PersistenceService) {
-
 	conf := userConfig.Notifications.Slack
 	if conf == nil {
 		return
@@ -832,13 +831,13 @@ func setupNewOTPKey(qrcodeImagePath string) (*otp.Key, error) {
 
 func printOtpKey(key *otp.Key) {
 	fmt.Println("")
-	fmt.Println("====================PLEASE STORE YOUR OTP KEY=======================")
-	fmt.Println("")
-	fmt.Printf("Issuer:       %s\n", key.Issuer())
-	fmt.Printf("AccountName:  %s\n", key.AccountName())
-	fmt.Printf("Secret:       %s\n", key.Secret())
-	fmt.Printf("Key URL:      %s\n", key.URL())
-	fmt.Println("")
+	fmt.Println("====================================================================")
+	fmt.Println("               PLEASE STORE YOUR OTP KEY SAFELY                     ")
+	fmt.Println("====================================================================")
+	fmt.Printf("  Issuer:       %s\n", key.Issuer())
+	fmt.Printf("  AccountName:  %s\n", key.AccountName())
+	fmt.Printf("  Secret:       %s\n", key.Secret())
+	fmt.Printf("  Key URL:      %s\n", key.URL())
 	fmt.Println("====================================================================")
 	fmt.Println("")
 }
