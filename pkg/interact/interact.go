@@ -97,6 +97,10 @@ func (it *Interact) getNextState(session Session, currentState State) (nextState
 	return session.GetOriginState(), final
 }
 
+func (it *Interact) handleCallback(session Session, payload string) error {
+	return nil
+}
+
 func (it *Interact) handleResponse(session Session, text string, ctxObjects ...interface{}) error {
 	// We only need response when executing a command
 	switch session.GetState() {

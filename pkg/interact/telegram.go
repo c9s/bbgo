@@ -119,6 +119,15 @@ func (tm *Telegram) SetTextMessageResponder(textMessageResponder Responder) {
 }
 
 func (tm *Telegram) Start(context.Context) {
+	tm.Bot.Handle(telebot.OnCallback, func(c *telebot.Callback) {
+		log.Infof("[telegram] onCallback: %+v", c)
+		if c.Message != nil {
+			session := tm.loadSession(c.Message)
+			_ = session
+		}
+		// c.Sender
+	})
+
 	tm.Bot.Handle(telebot.OnText, func(m *telebot.Message) {
 		log.Infof("[telegram] onText: %+v", m)
 
