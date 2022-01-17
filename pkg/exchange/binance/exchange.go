@@ -169,6 +169,21 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[stri
 }
 
 func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
+
+	if e.IsFutures {
+		exchangeInfo, err := e.futuresClient.NewExchangeInfoService().Do(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		markets := types.MarketMap{}
+		for _, symbol := range exchangeInfo.Symbols {
+			markets[symbol.Symbol] = toGlobalFuturesMarket(symbol)
+		}
+
+		return markets, nil
+	}
+
 	exchangeInfo, err := e.Client.NewExchangeInfoService().Do(ctx)
 	if err != nil {
 		return nil, err
@@ -198,16 +213,21 @@ func (e *Exchange) NewStream() types.Stream {
 	return stream
 }
 
-func (e *Exchange) QueryMarginAccount(ctx context.Context) (*types.MarginAccount, error) {
+func (e *Exchange) QueryMarginAccount(ctx context.Context) (*types.Account, error) {
 	account, err := e.Client.NewGetMarginAccountService().Do(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	return toGlobalMarginAccount(account), nil
+	a := &types.Account{
+		AccountType: types.AccountTypeMargin,
+		MarginInfo:  toGlobalMarginAccountInfo(account), // In binance GO api, Account define account info which mantain []*AccountAsset and []*AccountPosition.
+	}
+
+	return a, nil
 }
 
-func (e *Exchange) QueryIsolatedMarginAccount(ctx context.Context, symbols ...string) (*types.IsolatedMarginAccount, error) {
+func (e *Exchange) QueryIsolatedMarginAccount(ctx context.Context, symbols ...string) (*types.Account, error) {
 	req := e.Client.NewGetIsolatedMarginAccountService()
 	if len(symbols) > 0 {
 		req.Symbols(symbols...)
@@ -218,7 +238,12 @@ func (e *Exchange) QueryIsolatedMarginAccount(ctx context.Context, symbols ...st
 		return nil, err
 	}
 
-	return toGlobalIsolatedMarginAccount(account), nil
+	a := &types.Account{
+		AccountType:        types.AccountTypeMargin,
+		IsolatedMarginInfo: toGlobalIsolatedMarginAccountInfo(account), // In binance GO api, Account define account info which mantain []*AccountAsset and []*AccountPosition.
+	}
+
+	return a, nil
 }
 
 func (e *Exchange) Withdrawal(ctx context.Context, asset string, amount fixedpoint.Value, address string, options *types.WithdrawalOptions) error {
@@ -416,7 +441,7 @@ func (e *Exchange) PlatformFeeCurrency() string {
 	return BNB
 }
 
-func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
+func (e *Exchange) QuerySpotAccount(ctx context.Context) (*types.Account, error) {
 	account, err := e.Client.NewGetAccountService().Do(ctx)
 	if err != nil {
 		return nil, err
@@ -426,18 +451,66 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	for _, b := range account.Balances {
 		balances[b.Asset] = types.Balance{
 			Currency:  b.Asset,
-			Available: fixedpoint.Must(fixedpoint.NewFromString(b.Free)),
-			Locked:    fixedpoint.Must(fixedpoint.NewFromString(b.Locked)),
+			Available: fixedpoint.MustNewFromString(b.Free),
+			Locked:    fixedpoint.MustNewFromString(b.Locked),
 		}
 	}
 
-	// binance use 15 -> 0.15%, so we convert it to 0.0015
 	a := &types.Account{
+		AccountType:     types.AccountTypeSpot,
 		MakerCommission: fixedpoint.NewFromFloat(float64(account.MakerCommission) * 0.0001),
 		TakerCommission: fixedpoint.NewFromFloat(float64(account.TakerCommission) * 0.0001),
+		CanDeposit:      account.CanDeposit,  // if can transfer in asset
+		CanTrade:        account.CanTrade,    // if can trade
+		CanWithdraw:     account.CanWithdraw, // if can transfer out asset
 	}
 	a.UpdateBalances(balances)
 	return a, nil
+}
+
+func (e *Exchange) QueryFuturesAccount(ctx context.Context) (*types.Account, error) {
+	account, err := e.futuresClient.NewGetAccountService().Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+	accountBalances, err := e.futuresClient.NewGetBalanceService().Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var balances = map[string]types.Balance{}
+	for _, b := range accountBalances {
+		balances[b.Asset] = types.Balance{
+			Currency:  b.Asset,
+			Available: fixedpoint.Must(fixedpoint.NewFromString(b.AvailableBalance)),
+		}
+	}
+
+	a := &types.Account{
+		AccountType: types.AccountTypeFutures,
+		FuturesInfo: toGlobalFuturesAccountInfo(account), // In binance GO api, Account define account info which mantain []*AccountAsset and []*AccountPosition.
+		CanDeposit:  account.CanDeposit,                  // if can transfer in asset
+		CanTrade:    account.CanTrade,                    // if can trade
+		CanWithdraw: account.CanWithdraw,                 // if can transfer out asset
+	}
+	a.UpdateBalances(balances)
+	return a, nil
+}
+
+func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
+	var account *types.Account
+	var err error
+	if e.IsFutures {
+		account, err = e.QueryFuturesAccount(ctx)
+	} else if e.IsIsolatedMargin {
+		account, err = e.QueryIsolatedMarginAccount(ctx)
+	} else if e.IsMargin {
+		account, err = e.QueryMarginAccount(ctx)
+	} else {
+		account, err = e.QuerySpotAccount(ctx)
+	}
+
+	return account, err
 }
 
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
@@ -516,7 +589,6 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 		if err != nil {
 			return orders, err
 		}
-
 		return toGlobalFuturesOrders(binanceOrders)
 	}
 
@@ -1032,9 +1104,8 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		return trades, nil
 	} else if e.IsFutures {
 		var remoteTrades []*futures.AccountTrade
-		req := e.futuresClient.NewListAccountTradeService(). // IsIsolated(e.IsIsolatedFutures).
-									Symbol(symbol)
-
+		req := e.futuresClient.NewListAccountTradeService().
+			Symbol(symbol)
 		if options.Limit > 0 {
 			req.Limit(int(options.Limit))
 		} else {
@@ -1053,7 +1124,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		for _, t := range remoteTrades {
 			localTrade, err := toGlobalFuturesTrade(*t)
 			if err != nil {
-				log.WithError(err).Errorf("can not convert binance trade: %+v", t)
+				log.WithError(err).Errorf("can not convert binance futures trade: %+v", t)
 				continue
 			}
 
@@ -1205,6 +1276,18 @@ func (e *Exchange) QueryFundingRateHistory(ctx context.Context, symbol string) (
 		FundingTime: time.Unix(0, rate.FundingTime*int64(time.Millisecond)),
 		Time:        time.Unix(0, rate.Time*int64(time.Millisecond)),
 	}, nil
+}
+
+func (e *Exchange) QueryPositionRisk(ctx context.Context, symbol string) (*types.PositionRisk, error) {
+	futuresClient := binance.NewFuturesClient(e.key, e.secret)
+
+	// when symbol is set, only one position risk will be returned.
+	risks, err := futuresClient.NewGetPositionRiskService().Symbol(symbol).Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return convertPositionRisk(risks[0])
 }
 
 func getLaunchDate() (time.Time, error) {

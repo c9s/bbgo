@@ -1,0 +1,38 @@
+---
+notifications:
+  slack:
+    defaultChannel: "dev-bbgo"
+    errorChannel: "bbgo-error"
+
+  # if you want to route channel by symbol
+  symbolChannels:
+    "^BTC": "btc"
+    "^ETH": "eth"
+
+  # object routing rules
+  routing:
+    trade: "$symbol"
+    order: "$symbol"
+    submitOrder: "$session" # not supported yet
+    pnL: "bbgo-pnl"
+
+sessions:
+  binance:
+    exchange: binance
+    envVarPrefix: binance
+    futures: true
+
+exchangeStrategies:
+- on: binance
+  funding:
+    symbol: ETHUSDT
+    quantity: 0.0001
+    fundingRate:
+      high: 0.01%
+    supportDetection:
+      - interval: 1m
+        movingAverageType: EMA
+        movingAverageIntervalWindow:
+          interval: 15m
+          window: 60
+        minVolume: 8_000

@@ -30,6 +30,7 @@ package backtest
 import (
 	"context"
 	"fmt"
+	"github.com/c9s/bbgo/pkg/cache"
 	"sync"
 	"time"
 
@@ -68,7 +69,7 @@ type Exchange struct {
 func NewExchange(sourceName types.ExchangeName, sourceExchange types.Exchange, srv *service.BacktestService, config *bbgo.Backtest) (*Exchange, error) {
 	ex := sourceExchange
 
-	markets, err := bbgo.LoadExchangeMarketsWithCache(context.Background(), ex)
+	markets, err := cache.LoadExchangeMarketsWithCache(context.Background(), ex)
 	if err != nil {
 		return nil, err
 	}
