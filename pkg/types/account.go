@@ -121,6 +121,9 @@ func (m AssetMap) SlackAttachment() slack.Attachment {
 
 type BalanceMap map[string]Balance
 type PositionMap map[string]Position
+type IsolatedMarginAssetMap map[string]IsolatedMarginAsset
+type MarginAssetMap map[string]MarginUserAsset
+type FuturesAssetMap map[string]FuturesUserAsset
 type FuturesPositionMap map[string]FuturesPosition
 
 func (m BalanceMap) String() string {
@@ -200,14 +203,17 @@ type AccountType string
 
 const (
 	AccountTypeFutures = AccountType("futures")
+	AccountTypeMargin  = AccountType("margin")
 	AccountTypeSpot    = AccountType("spot")
 )
 
 type Account struct {
 	sync.Mutex `json:"-"`
 
-	AccountType AccountType `json:"accountType,omitempty"`
-	FuturesInfo *FuturesAccountInfo
+	AccountType        AccountType `json:"accountType,omitempty"`
+	FuturesInfo        *FuturesAccountInfo
+	MarginInfo         *MarginAccountInfo
+	IsolatedMarginInfo *IsolatedMarginAccountInfo
 
 	MakerFeeRate fixedpoint.Value `json:"makerFeeRate,omitempty"`
 	TakerFeeRate fixedpoint.Value `json:"takerFeeRate,omitempty"`
@@ -227,18 +233,35 @@ type Account struct {
 
 type FuturesAccountInfo struct {
 	// Futures fields
-	Assets                      map[Asset]FuturesUserAsset `json:"assets"`
-	FeeTier                     int                        `json:"feeTier"`
-	MaxWithdrawAmount           fixedpoint.Value           `json:"maxWithdrawAmount"`
-	Positions                   FuturesPositionMap         `json:"positions"`
-	TotalInitialMargin          fixedpoint.Value           `json:"totalInitialMargin"`
-	TotalMaintMargin            fixedpoint.Value           `json:"totalMaintMargin"`
-	TotalMarginBalance          fixedpoint.Value           `json:"totalMarginBalance"`
-	TotalOpenOrderInitialMargin fixedpoint.Value           `json:"totalOpenOrderInitialMargin"`
-	TotalPositionInitialMargin  fixedpoint.Value           `json:"totalPositionInitialMargin"`
-	TotalUnrealizedProfit       fixedpoint.Value           `json:"totalUnrealizedProfit"`
-	TotalWalletBalance          fixedpoint.Value           `json:"totalWalletBalance"`
-	UpdateTime                  int64                      `json:"updateTime"`
+	Assets                      FuturesAssetMap    `json:"assets"`
+	Positions                   FuturesPositionMap `json:"positions"`
+	TotalInitialMargin          fixedpoint.Value   `json:"totalInitialMargin"`
+	TotalMaintMargin            fixedpoint.Value   `json:"totalMaintMargin"`
+	TotalMarginBalance          fixedpoint.Value   `json:"totalMarginBalance"`
+	TotalOpenOrderInitialMargin fixedpoint.Value   `json:"totalOpenOrderInitialMargin"`
+	TotalPositionInitialMargin  fixedpoint.Value   `json:"totalPositionInitialMargin"`
+	TotalUnrealizedProfit       fixedpoint.Value   `json:"totalUnrealizedProfit"`
+	TotalWalletBalance          fixedpoint.Value   `json:"totalWalletBalance"`
+	UpdateTime                  int64              `json:"updateTime"`
+}
+
+type MarginAccountInfo struct {
+	// Margin fields
+	BorrowEnabled       bool             `json:"borrowEnabled"`
+	MarginLevel         fixedpoint.Value `json:"marginLevel"`
+	TotalAssetOfBTC     fixedpoint.Value `json:"totalAssetOfBtc"`
+	TotalLiabilityOfBTC fixedpoint.Value `json:"totalLiabilityOfBtc"`
+	TotalNetAssetOfBTC  fixedpoint.Value `json:"totalNetAssetOfBtc"`
+	TradeEnabled        bool             `json:"tradeEnabled"`
+	TransferEnabled     bool             `json:"transferEnabled"`
+	Assets              MarginAssetMap   `json:"userAssets"`
+}
+
+type IsolatedMarginAccountInfo struct {
+	TotalAssetOfBTC     fixedpoint.Value       `json:"totalAssetOfBtc"`
+	TotalLiabilityOfBTC fixedpoint.Value       `json:"totalLiabilityOfBtc"`
+	TotalNetAssetOfBTC  fixedpoint.Value       `json:"totalNetAssetOfBtc"`
+	Assets              IsolatedMarginAssetMap `json:"userAssets"`
 }
 
 func NewAccount() *Account {

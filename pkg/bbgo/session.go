@@ -3,6 +3,7 @@ package bbgo
 import (
 	"context"
 	"fmt"
+	"github.com/c9s/bbgo/pkg/cache"
 	"strings"
 	"time"
 
@@ -295,7 +296,7 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 	if util.SetEnvVarBool("DISABLE_MARKETS_CACHE", &disableMarketsCache); disableMarketsCache {
 		markets, err = session.Exchange.QueryMarkets(ctx)
 	} else {
-		markets, err = LoadExchangeMarketsWithCache(ctx, session.Exchange)
+		markets, err = cache.LoadExchangeMarketsWithCache(ctx, session.Exchange)
 		if err != nil {
 			return err
 		}
