@@ -616,7 +616,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		// now we can cancel the open orders
 		log.Infof("canceling active orders...")
-		if err := session.Exchange.CancelOrders(ctx, s.activeOrders.Orders()...); err != nil {
+		if err := session.Exchange.CancelOrders(context.Background(), s.activeOrders.Orders()...); err != nil {
 			log.WithError(err).Errorf("cancel order error")
 		}
 	})
