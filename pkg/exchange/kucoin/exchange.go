@@ -3,6 +3,7 @@ package kucoin
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strconv"
 	"time"
 
@@ -192,6 +193,10 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 			Closed:      true,
 		})
 	}
+
+	sort.Slice(klines, func(i, j int) bool {
+		return klines[i].StartTime.Before(klines[j].StartTime.Time())
+	})
 
 	return klines, nil
 }
