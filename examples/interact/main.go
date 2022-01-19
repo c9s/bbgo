@@ -45,7 +45,7 @@ func (m *PositionInteraction) Commands(i *interact.Interact) {
 		// send symbol options
 		reply.Message("Choose your position")
 		for _, symbol := range []string{"BTCUSDT", "ETHUSDT"} {
-			reply.AddButton(symbol)
+			reply.AddButton(symbol, symbol, symbol)
 		}
 
 		return nil
@@ -68,7 +68,7 @@ func (m *PositionInteraction) Commands(i *interact.Interact) {
 
 		reply.Message("Choose or enter the percentage to close")
 		for _, symbol := range []string{"25%", "50%", "100%"} {
-			reply.AddButton(symbol)
+			reply.AddButton(symbol, symbol, symbol)
 		}
 
 		// send percentage options
@@ -85,7 +85,7 @@ func (m *PositionInteraction) Commands(i *interact.Interact) {
 
 		// send confirmation
 		reply.Message("Are you sure to close the position?")
-		reply.AddButton("Yes")
+		reply.AddButton("Yes", "confirm", "yes")
 		return nil
 	}).Next(func(reply interact.Reply, confirm string) error {
 		switch strings.ToLower(confirm) {
