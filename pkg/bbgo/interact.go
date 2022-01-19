@@ -44,6 +44,12 @@ func NewCoreInteraction(environment *Environment, trader *Trader) *CoreInteracti
 
 func (it *CoreInteraction) Commands(i *interact.Interact) {
 	i.PrivateCommand("/sessions", "List Exchange Sessions", func(reply interact.Reply) error {
+		switch r := reply.(type) {
+		case *interact.SlackReply:
+			// call slack specific api to build the reply object
+			_ = r
+		}
+
 		message := "Your connected sessions:\n"
 		for name, session := range it.environment.Sessions() {
 			message += "- " + name + " (" + session.ExchangeName.String() + ")\n"
@@ -56,7 +62,7 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 	i.PrivateCommand("/balances", "Show balances", func(reply interact.Reply) error {
 		reply.Message("Please select an exchange session")
 		for name := range it.environment.Sessions() {
-			reply.AddButton(name)
+			reply.AddButton(name, "session", name)
 		}
 		return nil
 	}).Next(func(sessionName string, reply interact.Reply) error {
@@ -86,7 +92,7 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 		found := false
 		for signature, strategy := range it.exchangeStrategies {
 			if _, ok := strategy.(PositionReader); ok {
-				reply.AddButton(signature)
+				reply.AddButton(signature, "strategy", signature)
 				found = true
 			}
 		}
@@ -131,7 +137,7 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 		found := false
 		for signature, strategy := range it.exchangeStrategies {
 			if _, ok := strategy.(PositionCloser); ok {
-				reply.AddButton(signature)
+				reply.AddButton(signature, strategy, signature)
 				found = true
 			}
 		}
@@ -173,8 +179,8 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 		}
 
 		reply.Message("Choose or enter the percentage to close")
-		for _, symbol := range []string{"5%", "25%", "50%", "80%", "100%"} {
-			reply.AddButton(symbol)
+		for _, p := range []string{"5%", "25%", "50%", "80%", "100%"} {
+			reply.AddButton(p, "percentage", p)
 		}
 
 		return nil

@@ -6,14 +6,108 @@ import (
 	"log"
 	"os"
 
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
 	"github.com/slack-go/slack/socketmode"
 )
 
+
+type SlackReply struct {
+	// uuid is the unique id of this question
+	// can be used as the callback id
+	uuid string
+
+	session *SlackSession
+
+	client *slack.Client
+
+	message string
+
+	accessories []*slack.Accessory
+}
+
+func (reply *SlackReply) Send(message string) {
+	cID, tsID, err := reply.client.PostMessage(
+		reply.session.ChannelID,
+		slack.MsgOptionText(message, false),
+		slack.MsgOptionAsUser(false), // Add this if you want that the bot would post message as a user, otherwise it will send response using the default slackbot
+	)
+	if err != nil {
+		logrus.WithError(err).Errorf("slack post message error: channel=%s thread=%s", cID, tsID)
+		return
+	}
+}
+
+func (reply *SlackReply) Message(message string) {
+	reply.message = message
+}
+
+// RemoveKeyboard is not supported by Slack
+func (reply *SlackReply) RemoveKeyboard() {}
+
+func (reply *SlackReply) AddButton(text string, name string, value string) {
+	actionID := reply.uuid + ":" + value
+	reply.accessories = append(reply.accessories, slack.NewAccessory(
+		slack.NewButtonBlockElement(
+			// action id should be unique
+			actionID,
+			value,
+			&slack.TextBlockObject{
+				Type: slack.PlainTextType,
+				Text: text,
+			},
+		),
+	))
+}
+
+func (reply *SlackReply) build() map[string]interface{} {
+	var blocks []slack.Block
+
+	blocks = append(blocks, slack.NewSectionBlock(
+		&slack.TextBlockObject{
+			Type: slack.MarkdownType,
+			Text: reply.message,
+		},
+		nil, // fields
+		nil, // accessory
+		nil, // options
+	))
+
+	blocks = append(blocks, slack.NewActionBlock("",
+		slack.NewButtonBlockElement(
+			"actionID",
+			"value",
+			slack.NewTextBlockObject(
+				slack.PlainTextType, "text", true, false),
+		)))
+
+	var payload = map[string]interface{}{
+		"blocks": blocks,
+	}
+	return payload
+}
+
 type SlackSession struct {
 	BaseSession
+
+	ChannelID string
+	UserID    string
+
+	// questions is used to store the questions that we added in the reply
+	// the key is the client generated callback id
+	questions map[string]interface{}
+}
+
+func NewSlackSession() *SlackSession {
+	return &SlackSession{
+		questions: make(map[string]interface{}),
+	}
+}
+
+func (s *SlackSession) ID() string {
+	return fmt.Sprintf("%s-%s", s.UserID, s.ChannelID)
 }
 
 type SlackSessionMap map[int64]*SlackSession
@@ -31,6 +125,8 @@ type Slack struct {
 	textMessageResponder Responder
 
 	authorizedCallbacks []func(userSession *SlackSession)
+
+	eventsApiCallbacks []func(slackevents.EventsAPIEvent)
 }
 
 func NewSlack(client *slack.Client) *Slack {
@@ -68,14 +164,14 @@ func (s *Slack) listen() {
 		case socketmode.EventTypeEventsAPI:
 			eventsAPIEvent, ok := evt.Data.(slackevents.EventsAPIEvent)
 			if !ok {
-				fmt.Printf("Ignored %+v\n", evt)
-
+				logrus.Debugf("ignored %+v", evt)
 				continue
 			}
 
-			fmt.Printf("Event received: %+v\n", eventsAPIEvent)
-
+			logrus.Debugf("event received: %+v", eventsAPIEvent)
 			s.socket.Ack(*evt.Request)
+
+			s.EmitEventsApi(eventsAPIEvent)
 
 			switch eventsAPIEvent.Type {
 			case slackevents.CallbackEvent:
@@ -95,20 +191,19 @@ func (s *Slack) listen() {
 		case socketmode.EventTypeInteractive:
 			callback, ok := evt.Data.(slack.InteractionCallback)
 			if !ok {
-				fmt.Printf("Ignored %+v\n", evt)
-
+				logrus.Debugf("ignored %+v", evt)
 				continue
 			}
 
-			fmt.Printf("Interaction received: %+v\n", callback)
+			logrus.Debugf("interaction received: %+v", callback)
 
 			var payload interface{}
 
 			switch callback.Type {
 			case slack.InteractionTypeBlockActions:
 				// See https://api.slack.com/apis/connections/socket-implement#button
+				logrus.Debugf("button clicked!")
 
-				s.socket.Debugf("button clicked!")
 			case slack.InteractionTypeShortcut:
 			case slack.InteractionTypeViewSubmission:
 				// See https://api.slack.com/apis/connections/socket-implement#modal
@@ -118,47 +213,44 @@ func (s *Slack) listen() {
 			}
 
 			s.socket.Ack(*evt.Request, payload)
+
 		case socketmode.EventTypeSlashCommand:
 			cmd, ok := evt.Data.(slack.SlashCommand)
 			if !ok {
-				fmt.Printf("Ignored %+v\n", evt)
-
+				logrus.Debugf("ignored %+v", evt)
 				continue
 			}
 
-			s.socket.Debugf("Slash command received: %+v", cmd)
+			logrus.Debugf("slash command received: %+v", cmd)
 
-			payload := map[string]interface{}{
-				"blocks": []slack.Block{
-					slack.NewSectionBlock(
-						&slack.TextBlockObject{
-							Type: slack.MarkdownType,
-							Text: "foo",
-						},
-						nil,
-						slack.NewAccessory(
-							slack.NewButtonBlockElement(
-								"",
-								"somevalue",
-								&slack.TextBlockObject{
-									Type: slack.PlainTextType,
-									Text: "bar",
-								},
-							),
-						),
-					),
-				}}
+			session := s.newSession(evt)
+			reply := s.newReply(session)
+			if err := s.textMessageResponder(session, "", reply); err != nil {
+				continue
+			}
 
+			payload := reply.build()
 			s.socket.Ack(*evt.Request, payload)
 		default:
-			fmt.Fprintf(os.Stderr, "Unexpected event type received: %s\n", evt.Type)
+			logrus.Debugf("unexpected event type received: %s", evt.Type)
 		}
+	}
+}
+
+func (s *Slack) newSession(evt socketmode.Event) *SlackSession {
+	return NewSlackSession()
+}
+
+func (s *Slack) newReply(session *SlackSession) *SlackReply {
+	return &SlackReply{
+		uuid:    uuid.New().String(),
+		session: session,
 	}
 }
 
 func (s *Slack) Start(ctx context.Context) {
 	go s.listen()
-	if err := s.socket.Run() ; err != nil {
+	if err := s.socket.Run(); err != nil {
 		logrus.WithError(err).Errorf("slack socketmode error")
 	}
 }
