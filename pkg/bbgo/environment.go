@@ -720,7 +720,9 @@ func (environ *Environment) setupTelegram(userConfig *Config, telegramBotToken s
 	var sessions = interact.TelegramSessionMap{}
 	var sessionStore = persistence.NewStore("bbgo", "telegram", telegramID)
 	if err := sessionStore.Load(&sessions); err != nil {
-		log.WithError(err).Errorf("sessions load error")
+		if err != service.ErrPersistenceNotExists {
+			log.WithError(err).Errorf("unexpected persistence error")
+		}
 	} else {
 		for _, session := range sessions {
 			if session.IsAuthorized() {
