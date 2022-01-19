@@ -70,7 +70,7 @@ func (r *TelegramReply) RemoveKeyboard() {
 	r.set = true
 }
 
-func (r *TelegramReply) AddButton(text string) {
+func (r *TelegramReply) AddButton(text string, name string, value string) {
 	var button = r.menu.Text(text)
 	if len(r.buttons) == 0 {
 		r.buttons = append(r.buttons, []telebot.Btn{})
@@ -101,6 +101,8 @@ type Telegram struct {
 	// textMessageResponder is used for interact to register its message handler
 	textMessageResponder Responder
 
+	callbackResponder CallbackResponder
+
 	commands []*Command
 
 	authorizedCallbacks []func(s *TelegramSession)
@@ -114,8 +116,12 @@ func NewTelegram(bot *telebot.Bot) *Telegram {
 	}
 }
 
-func (tm *Telegram) SetTextMessageResponder(textMessageResponder Responder) {
-	tm.textMessageResponder = textMessageResponder
+func (tm *Telegram) SetCallbackResponder(responder CallbackResponder) {
+	tm.callbackResponder = responder
+}
+
+func (tm *Telegram) SetTextMessageResponder(responder Responder) {
+	tm.textMessageResponder = responder
 }
 
 func (tm *Telegram) Start(context.Context) {
