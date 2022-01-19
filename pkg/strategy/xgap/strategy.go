@@ -131,7 +131,7 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 	}
 
 	sourceSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
-	sourceSession.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{Depth: "5"})
+	sourceSession.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{})
 
 	tradingSession, ok := sessions[s.TradingExchange]
 	if !ok {
@@ -139,7 +139,7 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 	}
 
 	tradingSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
-	tradingSession.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
+	tradingSession.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{})
 }
 
 func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession) error {
