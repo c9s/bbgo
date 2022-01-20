@@ -2,6 +2,7 @@ package interact
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	stdlog "log"
 	"os"
@@ -247,6 +248,8 @@ func (s *Slack) listen() {
 			case slack.InteractionTypeShortcut:
 			case slack.InteractionTypeViewSubmission:
 				// See https://api.slack.com/apis/connections/socket-implement#modal
+				log.Debugf("InteractionTypeViewSubmission: state: %s", toJson(callback.View.State))
+
 			case slack.InteractionTypeDialogSubmission:
 			default:
 
@@ -349,8 +352,9 @@ func generateTextInputModalRequest(title string, prompt string, textFields ...Te
 		labelObject := slack.NewTextBlockObject("plain_text", textField.Label, false, false)
 		placeHolderObject := slack.NewTextBlockObject("plain_text", textField.PlaceHolder, false, false)
 		textInputObject := slack.NewPlainTextInputBlockElement(placeHolderObject, textField.Name)
+
 		// Notice that blockID is a unique identifier for a block
-		inputBlock := slack.NewInputBlock(textField.Name, labelObject, textInputObject)
+		inputBlock := slack.NewInputBlock("block-"+textField.Name+"-"+uuid.NewString(), labelObject, textInputObject)
 		blocks.BlockSet = append(blocks.BlockSet, inputBlock)
 	}
 
@@ -361,4 +365,13 @@ func generateTextInputModalRequest(title string, prompt string, textFields ...Te
 	modalRequest.Submit = submitText
 	modalRequest.Blocks = blocks
 	return &modalRequest
+}
+
+func toJson(v interface{}) string {
+	o, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		log.WithError(err).Errorf("json marshal error")
+		return ""
+	}
+	return string(o)
 }
