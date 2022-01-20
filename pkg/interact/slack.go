@@ -25,6 +25,8 @@ type SlackReply struct {
 	message string
 
 	buttons []Button
+
+	textInputModalViewRequest *slack.ModalViewRequest
 }
 
 func (reply *SlackReply) Send(message string) {
@@ -39,8 +41,16 @@ func (reply *SlackReply) Send(message string) {
 	}
 }
 
+func (reply *SlackReply) Choose(prompt string, options ...Option) {
+}
+
 func (reply *SlackReply) Message(message string) {
 	reply.message = message
+}
+
+func (reply *SlackReply) InputText(prompt string, textFields ...TextField) {
+	reply.message = prompt
+	reply.textInputModalViewRequest = generateTextInputModalRequest(prompt, prompt, textFields...)
 }
 
 // RemoveKeyboard is not supported by Slack
@@ -54,7 +64,15 @@ func (reply *SlackReply) AddButton(text string, name string, value string) {
 	})
 }
 
-func (reply *SlackReply) build() map[string]interface{} {
+func (reply *SlackReply) build() interface{} {
+	if reply.textInputModalViewRequest != nil {
+		return reply.textInputModalViewRequest
+	}
+
+	if len(reply.message) > 0 {
+		return reply.message
+	}
+
 	var blocks []slack.Block
 
 	blocks = append(blocks, slack.NewSectionBlock(
@@ -247,28 +265,37 @@ func (s *Slack) listen() {
 			}
 
 			log.Debugf("slash command received: %+v", slashCmd)
-			if responder, exists := s.commandResponders[slashCmd.Command]; exists {
-				session := s.findSession(evt, slashCmd.UserID)
-				reply := s.newReply(session)
-				if err := responder(session, slashCmd.Text, reply); err != nil {
-					log.WithError(err).Errorf("responder returns error")
-					continue
-				}
+			responder, exists := s.commandResponders[slashCmd.Command]
+			if !exists {
+				log.Errorf("command %s does not exist", slashCmd.Command)
+				s.socket.Ack(*evt.Request)
+				continue
+			}
 
-				req := generateTextInputModalRequest("Authentication", "Please enter your code", TextField{
-					Label:       "First Name",
-					Name:        "first_name",
-					PlaceHolder: "Enter your first name",
-				})
-				// s.socket.Ack(*evt.Request, req)
-				if resp, err := s.client.OpenView(slashCmd.TriggerID, req); err != nil {
+			session := s.findSession(evt, slashCmd.UserID)
+			reply := s.newReply(session)
+			if err := responder(session, slashCmd.Text, reply); err != nil {
+				log.WithError(err).Errorf("responder returns error")
+				s.socket.Ack(*evt.Request)
+				continue
+			}
+
+			payload := reply.build()
+			if payload == nil {
+				log.Warnf("reply returns nil payload")
+				// ack with empty payload
+				s.socket.Ack(*evt.Request)
+				continue
+			}
+
+			switch o := payload.(type) {
+			case *slack.ModalViewRequest:
+				if resp, err := s.client.OpenView(slashCmd.TriggerID, *o); err != nil {
 					log.WithError(err).Error("view open error, resp: %+v", resp)
 				}
-
-				payload := reply.build()
-				s.socket.Ack(*evt.Request, payload)
-			} else {
-				log.Errorf("command %s does not exist", slashCmd.Command)
+				s.socket.Ack(*evt.Request)
+			default:
+				s.socket.Ack(*evt.Request, o)
 			}
 
 		default:
@@ -301,18 +328,7 @@ func (s *Slack) Start(ctx context.Context) {
 	}
 }
 
-type TextField struct {
-	// Label is the field label
-	Label string
-
-	// Name is the form field name
-	Name string
-
-	// PlaceHolder is the sample text in the text input
-	PlaceHolder string
-}
-
-func generateTextInputModalRequest(title string, prompt string, textFields ...TextField) slack.ModalViewRequest {
+func generateTextInputModalRequest(title string, prompt string, textFields ...TextField) *slack.ModalViewRequest {
 	// create a ModalViewRequest with a header and two inputs
 	titleText := slack.NewTextBlockObject("plain_text", title, false, false)
 	closeText := slack.NewTextBlockObject("plain_text", "Close", false, false)
@@ -328,12 +344,12 @@ func generateTextInputModalRequest(title string, prompt string, textFields ...Te
 	}
 
 	for _, textField := range textFields {
-		firstNameText := slack.NewTextBlockObject("plain_text", textField.Label, false, false)
-		firstNamePlaceholder := slack.NewTextBlockObject("plain_text", textField.PlaceHolder, false, false)
-		firstNameElement := slack.NewPlainTextInputBlockElement(firstNamePlaceholder, textField.Name)
+		labelObject := slack.NewTextBlockObject("plain_text", textField.Label, false, false)
+		placeHolderObject := slack.NewTextBlockObject("plain_text", textField.PlaceHolder, false, false)
+		textInputObject := slack.NewPlainTextInputBlockElement(placeHolderObject, textField.Name)
 		// Notice that blockID is a unique identifier for a block
-		firstName := slack.NewInputBlock(textField.Name, firstNameText, firstNameElement)
-		blocks.BlockSet = append(blocks.BlockSet, firstName)
+		inputBlock := slack.NewInputBlock(textField.Name, labelObject, textInputObject)
+		blocks.BlockSet = append(blocks.BlockSet, inputBlock)
 	}
 
 	var modalRequest slack.ModalViewRequest
@@ -342,5 +358,5 @@ func generateTextInputModalRequest(title string, prompt string, textFields ...Te
 	modalRequest.Close = closeText
 	modalRequest.Submit = submitText
 	modalRequest.Blocks = blocks
-	return modalRequest
+	return &modalRequest
 }
