@@ -1,8 +1,30 @@
 package interact
 
 type Button struct {
-	Text string
+	Text  string
+	Name  string
+	Value string
+}
+
+type TextField struct {
+	// Name is the form field name
 	Name string
+
+	// Label is the field label
+	Label string
+
+	// PlaceHolder is the sample text in the text input
+	PlaceHolder string
+}
+
+type Option struct {
+	// Name is the form field name
+	Name string
+
+	// Label is the option label for display
+	Label string
+
+	// Value is the option value
 	Value string
 }
 
@@ -16,7 +38,12 @@ type Reply interface {
 	// AddButton adds the button to the reply
 	AddButton(text string, name, value string)
 
-	RequireTextInput(title, message string, textFields ...TextField)
+	InputText(prompt string, textFields ...TextField)
+
+	Choose(prompt string, options ...Option)
+
+	// Confirm shows the confirm dialog or confirm button in the user interface
+	// Confirm(prompt string)
 
 	// RemoveKeyboard hides the keyboard from the client user interface
 	RemoveKeyboard()
