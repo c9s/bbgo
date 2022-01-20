@@ -328,6 +328,8 @@ func (s *Slack) Start(ctx context.Context) {
 	}
 }
 
+// generateTextInputModalRequest generates a general slack modal view request with the given text fields
+// see also https://api.slack.com/surfaces/modals/using#opening
 func generateTextInputModalRequest(title string, prompt string, textFields ...TextField) *slack.ModalViewRequest {
 	// create a ModalViewRequest with a header and two inputs
 	titleText := slack.NewTextBlockObject("plain_text", title, false, false)
