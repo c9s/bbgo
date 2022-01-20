@@ -57,10 +57,9 @@ type TelegramReply struct {
 
 	message string
 	menu    *telebot.ReplyMarkup
-	buttons [][]telebot.Btn
+	buttons []telebot.Btn
 	set     bool
 }
-
 
 func (r *TelegramReply) Send(message string) {
 	checkSendErr(r.bot.Send(r.session.Chat, message))
@@ -71,8 +70,12 @@ func (r *TelegramReply) Message(message string) {
 	r.set = true
 }
 
-func (r *TelegramReply) RequireTextInput(title, message string, textFields ...TextField) {
-	r.message = message
+func (r *TelegramReply) Choose(prompt string, options ...Option) {
+
+}
+
+func (r *TelegramReply) InputText(prompt string, textFields ...TextField) {
+	r.message = prompt
 }
 
 func (r *TelegramReply) RemoveKeyboard() {
@@ -82,17 +85,16 @@ func (r *TelegramReply) RemoveKeyboard() {
 
 func (r *TelegramReply) AddButton(text string, name string, value string) {
 	var button = r.menu.Text(text)
-	if len(r.buttons) == 0 {
-		r.buttons = append(r.buttons, []telebot.Btn{})
-	}
-	r.buttons[len(r.buttons)-1] = append(r.buttons[len(r.buttons)-1], button)
+	r.buttons = append(r.buttons, button)
 	r.set = true
 }
 
 func (r *TelegramReply) build() {
 	var rows []telebot.Row
-	for _, buttons := range r.buttons {
-		rows = append(rows, telebot.Row(buttons))
+	for _, button := range r.buttons {
+		rows = append(rows, telebot.Row{
+			button,
+		})
 	}
 	r.menu.Reply(rows...)
 }
