@@ -16,12 +16,12 @@ func (s *Slack) EmitAuthorized(userSession *SlackSession) {
 	}
 }
 
-func (s *Slack) OnEventsApi(cb func(slackevents.EventsAPIEvent)) {
+func (s *Slack) OnEventsApi(cb func(evt slackevents.EventsAPIEvent)) {
 	s.eventsApiCallbacks = append(s.eventsApiCallbacks, cb)
 }
 
-func (s *Slack) EmitEventsApi(slackevents.EventsAPIEvent) {
+func (s *Slack) EmitEventsApi(evt slackevents.EventsAPIEvent) {
 	for _, cb := range s.eventsApiCallbacks {
-		cb()
+		cb(evt)
 	}
 }
