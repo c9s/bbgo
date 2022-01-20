@@ -17,11 +17,24 @@
     "ethereum-waffle": "^3.4.0",
     "ethers": "^5.4.7",
     "hardhat": "^2.6.5",
+    "prettier": "^2.5.1",
+    "solhint": "^3.3.6",
     "truffle-plugin-verify": "^0.5.18"
   },
   "scripts": {
-    "test": "mocha"
+    "devserver": "KEY=development-secret.json truffle develop",
+    "test": "KEY=development-secret.json truffle test",
+    "migrate:dev": "KEY=development-secret.json truffle migrate --network development",
+    "migrate:polygon": "KEY=polygon-secret.json truffle migrate --network polygon",
+    "migrate:polygon-test": "KEY=polygon-secret.json truffle migrate --network mumbai",
+    "migrate:bsc": "KEY=bsc-secret.json truffle migrate --network bsc",
+    "migrate:bsc-test": "KEY=bsc-secret.json truffle migrate --network bsctestnet",
+    "lint": "npm run lint:sol && npm run lint:js",
+    "lint:js:fix": "prettier --write test/**/*.js",
+    "lint:js": "prettier test/**/*.js",
+    "lint:sol": "solhint contracts/**/*.sol",
+    "lint:sol:fix": "solhint -d contracts/**/*.sol --fix"
   },
-  "author": "",
-  "license": "ISC"
+  "author": "starcrypto",
+  "license": "MIT"
 }
