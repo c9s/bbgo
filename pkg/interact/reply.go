@@ -16,6 +16,8 @@ type Reply interface {
 	// AddButton adds the button to the reply
 	AddButton(text string, name, value string)
 
+	RequireTextInput(title, message string, textFields ...TextField)
+
 	// RemoveKeyboard hides the keyboard from the client user interface
 	RemoveKeyboard()
 }

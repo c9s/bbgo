@@ -137,7 +137,7 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 		found := false
 		for signature, strategy := range it.exchangeStrategies {
 			if _, ok := strategy.(PositionCloser); ok {
-				reply.AddButton(signature, strategy, signature)
+				reply.AddButton(signature, signature, signature)
 				found = true
 			}
 		}

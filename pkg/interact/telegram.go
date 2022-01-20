@@ -10,6 +10,11 @@ import (
 	"gopkg.in/tucnak/telebot.v2"
 )
 
+func init() {
+	// force interface type check
+	_ = Reply(&TelegramReply{})
+}
+
 type TelegramSessionMap map[int64]*TelegramSession
 
 type TelegramSession struct {
@@ -56,6 +61,7 @@ type TelegramReply struct {
 	set     bool
 }
 
+
 func (r *TelegramReply) Send(message string) {
 	checkSendErr(r.bot.Send(r.session.Chat, message))
 }
@@ -63,6 +69,10 @@ func (r *TelegramReply) Send(message string) {
 func (r *TelegramReply) Message(message string) {
 	r.message = message
 	r.set = true
+}
+
+func (r *TelegramReply) RequireTextInput(title, message string, textFields ...TextField) {
+	r.message = message
 }
 
 func (r *TelegramReply) RemoveKeyboard() {
