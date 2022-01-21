@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/c9s/bbgo/pkg/service"
+	log "github.com/sirupsen/logrus"
 )
 
 type PersistenceSelector struct {
@@ -27,6 +28,10 @@ func (p *Persistence) backendService(t string) (service.PersistenceService, erro
 		return p.Facade.Json, nil
 
 	case "redis":
+		if p.Facade.Redis == nil {
+			log.Warn("redis persistence is not available, fallback to memory backend")
+			return p.Facade.Memory, nil
+		}
 		return p.Facade.Redis, nil
 
 	case "memory":
