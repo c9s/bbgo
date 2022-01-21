@@ -70,13 +70,23 @@ func (reply *SlackReply) build() interface{} {
 		return reply.textInputModalViewRequest
 	}
 
+	var blocks slack.Blocks
+
 	if len(reply.message) > 0 {
-		return reply.message
+		blocks.BlockSet = append(blocks.BlockSet, slack.NewSectionBlock(
+			&slack.TextBlockObject{
+				Type: slack.MarkdownType,
+				Text: reply.message,
+			},
+			nil, // fields
+			nil, // accessory
+			// slack.SectionBlockOptionBlockID(reply.uuid),
+		))
+
+		return blocks
 	}
 
-	var blocks []slack.Block
-
-	blocks = append(blocks, slack.NewSectionBlock(
+	blocks.BlockSet = append(blocks.BlockSet, slack.NewSectionBlock(
 		&slack.TextBlockObject{
 			Type: slack.MarkdownType,
 			Text: reply.message,
@@ -102,13 +112,10 @@ func (reply *SlackReply) build() interface{} {
 				),
 			)
 		}
-		blocks = append(blocks, slack.NewActionBlock(reply.uuid, buttons...))
+		blocks.BlockSet = append(blocks.BlockSet, slack.NewActionBlock(reply.uuid, buttons...))
 	}
 
-	var payload = map[string]interface{}{
-		"blocks": blocks,
-	}
-	return payload
+	return blocks
 }
 
 type SlackSession struct {
@@ -122,9 +129,10 @@ type SlackSession struct {
 	questions map[string]interface{}
 }
 
-func NewSlackSession(userID string) *SlackSession {
+func NewSlackSession(userID, channelID string) *SlackSession {
 	return &SlackSession{
 		UserID:    userID,
+		ChannelID: channelID,
 		questions: make(map[string]interface{}),
 	}
 }
@@ -240,52 +248,92 @@ func (s *Slack) listen() {
 			switch callback.Type {
 			case slack.InteractionTypeBlockActions:
 				// See https://api.slack.com/apis/connections/socket-implement#button
-				log.Debugf("button clicked!")
-				// TODO: check and find what's the response handler for the reply
-				// we need to find the session first,
-				// and then look up the state, call the function to transit the state with the given value
+				log.Debugf("InteractionTypeBlockActions: %+v", callback)
 
 			case slack.InteractionTypeShortcut:
+				log.Debugf("InteractionTypeShortcut: %+v", callback)
+
 			case slack.InteractionTypeViewSubmission:
 				// See https://api.slack.com/apis/connections/socket-implement#modal
-				log.Debugf("InteractionTypeViewSubmission: state: %s", toJson(callback.View.State))
+				log.Debugf("[slack] InteractionTypeViewSubmission: %+v", callback)
+				var values = simplifyStateValues(callback.View.State)
+
+				if len(values) > 1 {
+					log.Warnf("[slack] more than 1 values received from the modal view submission, the value choosen from the state values might be incorrect")
+				}
+
+				log.Debugln(toJson(values))
+				if inputValue, ok := takeOneValue(values); ok {
+					session := s.loadSession(evt, callback.User.ID, callback.Channel.ID)
+
+					if !session.authorizing && !session.Authorized {
+						log.Warn("[slack] telegram is set to private mode, skipping message")
+						return
+					}
+
+					reply := s.newReply(session)
+					if s.textMessageResponder != nil {
+						if err := s.textMessageResponder(session, inputValue, reply); err != nil {
+							log.WithError(err).Errorf("[slack] response handling error")
+						}
+					}
+
+					// close the modal view by sending a null payload
+					s.socket.Ack(*evt.Request)
+
+					// build the response
+					response := reply.build()
+
+					log.Debugln("response payload", toJson(response))
+					switch response := response.(type) {
+					case slack.Blocks:
+						payload = map[string]interface{}{
+							"response_action": "clear",
+							// "errors": { "ticket-due-date": "You may not select a due date in the past" },
+							"blocks":          response.BlockSet,
+						}
+					}
+				}
 
 			case slack.InteractionTypeDialogSubmission:
+				log.Debugf("[slack] InteractionTypeDialogSubmission: %+v", callback)
+
 			default:
+				log.Debugf("[slack] unexpected callback type: %+v", callback)
 
 			}
 
 			s.socket.Ack(*evt.Request, payload)
 
 		case socketmode.EventTypeHello:
-			log.Debugf("hello command received: %+v", evt)
+			log.Debugf("[slack] hello command received: %+v", evt)
 
 		case socketmode.EventTypeSlashCommand:
 			slashCmd, ok := evt.Data.(slack.SlashCommand)
 			if !ok {
-				log.Debugf("ignored %+v", evt)
+				log.Debugf("[slack] ignored %+v", evt)
 				continue
 			}
 
-			log.Debugf("slash command received: %+v", slashCmd)
+			log.Debugf("[slack] slash command received: %+v", slashCmd)
 			responder, exists := s.commandResponders[slashCmd.Command]
 			if !exists {
-				log.Errorf("command %s does not exist", slashCmd.Command)
+				log.Errorf("[slack] command %s does not exist", slashCmd.Command)
 				s.socket.Ack(*evt.Request)
 				continue
 			}
 
-			session := s.findSession(evt, slashCmd.UserID)
+			session := s.loadSession(evt, slashCmd.UserID, slashCmd.ChannelID)
 			reply := s.newReply(session)
 			if err := responder(session, slashCmd.Text, reply); err != nil {
-				log.WithError(err).Errorf("responder returns error")
+				log.WithError(err).Errorf("[slack] responder returns error")
 				s.socket.Ack(*evt.Request)
 				continue
 			}
 
 			payload := reply.build()
 			if payload == nil {
-				log.Warnf("reply returns nil payload")
+				log.Warnf("[slack] reply returns nil payload")
 				// ack with empty payload
 				s.socket.Ack(*evt.Request)
 				continue
@@ -293,8 +341,8 @@ func (s *Slack) listen() {
 
 			switch o := payload.(type) {
 			case *slack.ModalViewRequest:
-				if resp, err := s.client.OpenView(slashCmd.TriggerID, *o); err != nil {
-					log.WithError(err).Error("view open error, resp: %+v", resp)
+				if resp, err := s.socket.OpenView(slashCmd.TriggerID, *o); err != nil {
+					log.WithError(err).Error("[slack] view open error, resp: %+v", resp)
 				}
 				s.socket.Ack(*evt.Request)
 			default:
@@ -302,17 +350,17 @@ func (s *Slack) listen() {
 			}
 
 		default:
-			log.Debugf("unexpected event type received: %s", evt.Type)
+			log.Debugf("[slack] unexpected event type received: %s", evt.Type)
 		}
 	}
 }
 
-func (s *Slack) findSession(evt socketmode.Event, userID string) *SlackSession {
+func (s *Slack) loadSession(evt socketmode.Event, userID, channelID string) *SlackSession {
 	if session, ok := s.sessions[userID]; ok {
 		return session
 	}
 
-	session := NewSlackSession(userID)
+	session := NewSlackSession(userID, channelID)
 	s.sessions[userID] = session
 	return session
 }
@@ -365,6 +413,30 @@ func generateTextInputModalRequest(title string, prompt string, textFields ...Te
 	modalRequest.Submit = submitText
 	modalRequest.Blocks = blocks
 	return &modalRequest
+}
+
+// simplifyStateValues simplifies the multi-layer structured values into just name=value mapping
+func simplifyStateValues(state *slack.ViewState) map[string]string {
+	var values = make(map[string]string)
+
+	if state == nil {
+		return values
+	}
+
+	for blockID, fields := range state.Values {
+		_ = blockID
+		for fieldName, fieldValues := range fields {
+			values[fieldName] = fieldValues.Value
+		}
+	}
+	return values
+}
+
+func takeOneValue(values map[string]string) (string, bool) {
+	for _, v := range values {
+		return v, true
+	}
+	return "", false
 }
 
 func toJson(v interface{}) string {
