@@ -46,6 +46,12 @@ type Reply interface {
 	RemoveKeyboard()
 }
 
+// KeyboardController is used when messenger supports keyboard controls
+type KeyboardController interface {
+	// RemoveKeyboard hides the keyboard from the client user interface
+	RemoveKeyboard()
+}
+
 // ButtonReply can be used if your reply needs button user interface.
 type ButtonReply interface {
 	// AddButton adds the button to the reply
