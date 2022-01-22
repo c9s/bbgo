@@ -264,7 +264,7 @@ func (it *Interact) Start(ctx context.Context) error {
 
 	// TODO: use go routine and context
 	for _, m := range it.messengers {
-		m.Start(ctx)
+		go m.Start(ctx)
 	}
 	return nil
 }
