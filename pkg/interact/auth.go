@@ -52,11 +52,7 @@ func (it *AuthInteract) Commands(interact *Interact) {
 			it.OneTimePasswordKey = key
 		}
 		interact.Command("/auth", "authorize", func(reply Reply, session Session) error {
-			reply.InputText("Authentication Token", TextField{
-				Label:       "Authentication Token",
-				Name:        "token",
-				PlaceHolder: "Enter Your Authentication Token",
-			})
+			reply.Message("Please enter your authentication token")
 			session.SetAuthorizing(true)
 			return nil
 		}).Next(func(token string, reply Reply) error {

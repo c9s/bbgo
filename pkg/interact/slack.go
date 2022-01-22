@@ -6,6 +6,7 @@ import (
 	"fmt"
 	stdlog "log"
 	"os"
+	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -42,16 +43,16 @@ func (reply *SlackReply) Send(message string) {
 	}
 }
 
+func (reply *SlackReply) InputText(prompt string, textFields ...TextField) {
+	reply.message = prompt
+	reply.textInputModalViewRequest = generateTextInputModalRequest(prompt, prompt, textFields...)
+}
+
 func (reply *SlackReply) Choose(prompt string, options ...Option) {
 }
 
 func (reply *SlackReply) Message(message string) {
 	reply.message = message
-}
-
-func (reply *SlackReply) InputText(prompt string, textFields ...TextField) {
-	reply.message = prompt
-	reply.textInputModalViewRequest = generateTextInputModalRequest(prompt, prompt, textFields...)
 }
 
 // RemoveKeyboard is not supported by Slack
@@ -66,26 +67,18 @@ func (reply *SlackReply) AddButton(text string, name string, value string) {
 }
 
 func (reply *SlackReply) build() interface{} {
+	// you should avoid using this modal view request, because it interrupts the interaction flow
+	// once we send the modal view request, we can't go back to the channel.
+	// (we don't know which channel the user started the interaction)
 	if reply.textInputModalViewRequest != nil {
 		return reply.textInputModalViewRequest
 	}
 
-	var blocks slack.Blocks
-
 	if len(reply.message) > 0 {
-		blocks.BlockSet = append(blocks.BlockSet, slack.NewSectionBlock(
-			&slack.TextBlockObject{
-				Type: slack.MarkdownType,
-				Text: reply.message,
-			},
-			nil, // fields
-			nil, // accessory
-			// slack.SectionBlockOptionBlockID(reply.uuid),
-		))
-
-		return blocks
+		return reply.message
 	}
 
+	var blocks slack.Blocks
 	blocks.BlockSet = append(blocks.BlockSet, slack.NewSectionBlock(
 		&slack.TextBlockObject{
 			Type: slack.MarkdownType,
@@ -121,25 +114,34 @@ func (reply *SlackReply) build() interface{} {
 type SlackSession struct {
 	BaseSession
 
+	slack     *Slack
 	ChannelID string
 	UserID    string
-
-	// questions is used to store the questions that we added in the reply
-	// the key is the client generated callback id
-	questions map[string]interface{}
 }
 
-func NewSlackSession(userID, channelID string) *SlackSession {
+func NewSlackSession(slack *Slack, userID, channelID string) *SlackSession {
 	return &SlackSession{
+		BaseSession: BaseSession{
+			OriginState:  StatePublic,
+			CurrentState: StatePublic,
+			Authorized:   false,
+			authorizing:  false,
+
+			StartedTime: time.Now(),
+		},
+		slack:     slack,
 		UserID:    userID,
 		ChannelID: channelID,
-		questions: make(map[string]interface{}),
 	}
 }
 
 func (s *SlackSession) ID() string {
-	return s.UserID
-	// return fmt.Sprintf("%s-%s", s.UserID, s.ChannelID)
+	return fmt.Sprintf("%s-%s", s.UserID, s.ChannelID)
+}
+
+func (s *SlackSession) SetAuthorized() {
+	s.BaseSession.SetAuthorized()
+	s.slack.EmitAuthorized(s)
 }
 
 type SlackSessionMap map[string]*SlackSession
@@ -193,19 +195,22 @@ func (s *Slack) AddCommand(command *Command, responder Responder) {
 	s.commandResponders[command.Name] = responder
 }
 
-func (s *Slack) listen() {
+func (s *Slack) listen(ctx context.Context) {
 	for evt := range s.socket.Events {
 		log.Debugf("event: %+v", evt)
 
 		switch evt.Type {
 		case socketmode.EventTypeConnecting:
-			fmt.Println("Connecting to Slack with Socket Mode...")
+			log.Infof("connecting to slack with socket mode...")
 
 		case socketmode.EventTypeConnectionError:
-			fmt.Println("Connection failed. Retrying later...")
+			log.Infof("connection failed. retrying later...")
 
 		case socketmode.EventTypeConnected:
-			fmt.Println("Connected to Slack with Socket Mode.")
+			log.Infof("connected to slack with socket mode.")
+
+		case socketmode.EventTypeDisconnect:
+			log.Infof("slack socket mode disconnected")
 
 		case socketmode.EventTypeEventsAPI:
 			eventsAPIEvent, ok := evt.Data.(slackevents.EventsAPIEvent)
@@ -215,6 +220,8 @@ func (s *Slack) listen() {
 			}
 
 			log.Debugf("event received: %+v", eventsAPIEvent)
+
+			// events api don't have response trigger, we can't set the response
 			s.socket.Ack(*evt.Request)
 
 			s.EmitEventsApi(eventsAPIEvent)
@@ -223,17 +230,63 @@ func (s *Slack) listen() {
 			case slackevents.CallbackEvent:
 				innerEvent := eventsAPIEvent.InnerEvent
 				switch ev := innerEvent.Data.(type) {
-				case *slackevents.AppMentionEvent:
-					_, _, err := s.client.PostMessage(ev.Channel, slack.MsgOptionText("Yes, hello.", false))
-					if err != nil {
-						fmt.Printf("failed posting message: %v", err)
+				case *slackevents.MessageEvent:
+					log.Infof("message event: text=%+v", ev.Text)
+
+					if len(ev.BotID) > 0 {
+						log.Debug("skip bot message")
+						continue
 					}
+
+					session := s.loadSession(evt, ev.User, ev.Channel)
+
+					if !session.authorizing && !session.Authorized {
+						log.Warn("[slack] session is not authorizing nor authorized, skipping message handler")
+						continue
+					}
+
+					if s.textMessageResponder != nil {
+						reply := s.newReply(session)
+						if err := s.textMessageResponder(session, ev.Text, reply); err != nil {
+							log.WithError(err).Errorf("[slack] response handling error")
+							continue
+						}
+
+						// build the response
+						response := reply.build()
+
+						log.Debugln("response payload", toJson(response))
+						switch response := response.(type) {
+
+						case string:
+							_, _, err := s.client.PostMessage(ev.Channel, slack.MsgOptionText(response, false))
+							if err != nil {
+								log.WithError(err).Error("failed posting plain text message")
+							}
+						case slack.Blocks:
+							_, _, err := s.client.PostMessage(ev.Channel, slack.MsgOptionBlocks(response.BlockSet...))
+							if err != nil {
+								log.WithError(err).Error("failed posting blocks message")
+							}
+
+						default:
+							log.Errorf("[slack] unexpected message type %T: %+v", response, response)
+
+						}
+					}
+
+				case *slackevents.AppMentionEvent:
+					log.Infof("app mention event: %+v", ev)
+					s.socket.Ack(*evt.Request)
+
 				case *slackevents.MemberJoinedChannelEvent:
-					fmt.Printf("user %q joined to channel %q", ev.User, ev.Channel)
+					log.Infof("user %q joined to channel %q", ev.User, ev.Channel)
+					s.socket.Ack(*evt.Request)
 				}
 			default:
 				s.socket.Debugf("unsupported Events API event received")
 			}
+
 		case socketmode.EventTypeInteractive:
 			callback, ok := evt.Data.(slack.InteractionCallback)
 			if !ok {
@@ -254,6 +307,7 @@ func (s *Slack) listen() {
 				log.Debugf("InteractionTypeShortcut: %+v", callback)
 
 			case slack.InteractionTypeViewSubmission:
+
 				// See https://api.slack.com/apis/connections/socket-implement#modal
 				log.Debugf("[slack] InteractionTypeViewSubmission: %+v", callback)
 				var values = simplifyStateValues(callback.View.State)
@@ -268,13 +322,14 @@ func (s *Slack) listen() {
 
 					if !session.authorizing && !session.Authorized {
 						log.Warn("[slack] telegram is set to private mode, skipping message")
-						return
+						continue
 					}
 
 					reply := s.newReply(session)
 					if s.textMessageResponder != nil {
 						if err := s.textMessageResponder(session, inputValue, reply); err != nil {
 							log.WithError(err).Errorf("[slack] response handling error")
+							continue
 						}
 					}
 
@@ -286,12 +341,20 @@ func (s *Slack) listen() {
 
 					log.Debugln("response payload", toJson(response))
 					switch response := response.(type) {
+
+					case string:
+						payload = map[string]interface{}{
+							"blocks": []slack.Block{
+								translateMessageToBlock(response),
+							},
+						}
+
 					case slack.Blocks:
 						payload = map[string]interface{}{
-							"response_action": "clear",
-							// "errors": { "ticket-due-date": "You may not select a due date in the past" },
-							"blocks":          response.BlockSet,
+							"blocks": response.BlockSet,
 						}
+					default:
+						s.socket.Ack(*evt.Request, response)
 					}
 				}
 
@@ -340,11 +403,24 @@ func (s *Slack) listen() {
 			}
 
 			switch o := payload.(type) {
+
+			case string:
+				s.socket.Ack(*evt.Request, map[string]interface{}{
+					"blocks": []slack.Block{
+						translateMessageToBlock(o),
+					},
+				})
+
 			case *slack.ModalViewRequest:
 				if resp, err := s.socket.OpenView(slashCmd.TriggerID, *o); err != nil {
 					log.WithError(err).Error("[slack] view open error, resp: %+v", resp)
 				}
 				s.socket.Ack(*evt.Request)
+
+			case slack.Blocks:
+				s.socket.Ack(*evt.Request, map[string]interface{}{
+					"blocks": o.BlockSet,
+				})
 			default:
 				s.socket.Ack(*evt.Request, o)
 			}
@@ -356,12 +432,15 @@ func (s *Slack) listen() {
 }
 
 func (s *Slack) loadSession(evt socketmode.Event, userID, channelID string) *SlackSession {
-	if session, ok := s.sessions[userID]; ok {
+	key := userID + "-" + channelID
+	if session, ok := s.sessions[key]; ok {
+		log.Infof("[slack] an existing session %q found, session: %+v", key, session)
 		return session
 	}
 
-	session := NewSlackSession(userID, channelID)
-	s.sessions[userID] = session
+	session := NewSlackSession(s, userID, channelID)
+	s.sessions[key] = session
+	log.Infof("[slack] allocated a new session %q, session: %+v", key, session)
 	return session
 }
 
@@ -373,7 +452,7 @@ func (s *Slack) newReply(session *SlackSession) *SlackReply {
 }
 
 func (s *Slack) Start(ctx context.Context) {
-	go s.listen()
+	go s.listen(ctx)
 	if err := s.socket.Run(); err != nil {
 		log.WithError(err).Errorf("slack socketmode error")
 	}
@@ -446,4 +525,16 @@ func toJson(v interface{}) string {
 		return ""
 	}
 	return string(o)
+}
+
+func translateMessageToBlock(message string) slack.Block {
+	return slack.NewSectionBlock(
+		&slack.TextBlockObject{
+			Type: slack.MarkdownType,
+			Text: message,
+		},
+		nil, // fields
+		nil, // accessory
+		// slack.SectionBlockOptionBlockID(reply.uuid),
+	)
 }

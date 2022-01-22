@@ -38,10 +38,7 @@ type Reply interface {
 	// AddButton adds the button to the reply
 	AddButton(text string, name, value string)
 
-	InputText(prompt string, textFields ...TextField)
-
-	Choose(prompt string, options ...Option)
-
+	// Choose(prompt string, options ...Option)
 	// Confirm shows the confirm dialog or confirm button in the user interface
 	// Confirm(prompt string)
 
