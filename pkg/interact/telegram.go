@@ -70,14 +70,6 @@ func (r *TelegramReply) Message(message string) {
 	r.set = true
 }
 
-func (r *TelegramReply) Choose(prompt string, options ...Option) {
-
-}
-
-func (r *TelegramReply) InputText(prompt string, textFields ...TextField) {
-	r.message = prompt
-}
-
 func (r *TelegramReply) RemoveKeyboard() {
 	r.menu.ReplyKeyboardRemove = true
 	r.set = true
@@ -139,11 +131,6 @@ func (tm *Telegram) SetTextMessageResponder(responder Responder) {
 func (tm *Telegram) Start(context.Context) {
 	tm.Bot.Handle(telebot.OnCallback, func(c *telebot.Callback) {
 		log.Infof("[telegram] onCallback: %+v", c)
-		if c.Message != nil {
-			session := tm.loadSession(c.Message)
-			_ = session
-		}
-		// c.Sender
 	})
 
 	tm.Bot.Handle(telebot.OnText, func(m *telebot.Message) {
@@ -185,7 +172,7 @@ func (tm *Telegram) Start(context.Context) {
 		log.WithError(err).Errorf("[telegram] set commands error")
 	}
 
-	go tm.Bot.Start()
+	tm.Bot.Start()
 }
 
 func checkSendErr(m *telebot.Message, err error) {
@@ -201,11 +188,14 @@ func (tm *Telegram) loadSession(m *telebot.Message) *TelegramSession {
 
 	session, ok := tm.sessions[m.Chat.ID]
 	if ok {
+		log.Infof("[telegram] loaded existing session: %+v", session)
 		return session
 	}
 
 	session = NewTelegramSession(tm, m)
 	tm.sessions[m.Chat.ID] = session
+
+	log.Infof("[telegram] allocated a new session: %+v", session)
 	return session
 }
 
@@ -241,7 +231,7 @@ func (tm *Telegram) Sessions() TelegramSessionMap {
 }
 
 func (tm *Telegram) RestoreSessions(sessions TelegramSessionMap) {
-	if len(sessions) == 0 {
+	if sessions == nil || len(sessions) == 0 {
 		return
 	}
 
@@ -251,6 +241,9 @@ func (tm *Telegram) RestoreSessions(sessions TelegramSessionMap) {
 		if session.Chat == nil || session.User == nil {
 			continue
 		}
+
+		// update telegram context reference
+		session.telegram = tm
 
 		if session.IsAuthorized() {
 			if _, err := tm.Bot.Send(session.Chat, fmt.Sprintf("Hi %s, I'm back. Your telegram session is restored.", session.User.Username)); err != nil {
