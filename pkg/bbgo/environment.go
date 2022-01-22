@@ -713,24 +713,24 @@ func (environ *Environment) setupSlack(userConfig *Config, slackToken string, pe
 	var sessions = interact.SlackSessionMap{}
 	var sessionStore = persistence.NewStore("bbgo", "slack")
 	if err := sessionStore.Load(&sessions); err != nil {
-		log.WithError(err).Errorf("sessions load error")
-	} else {
-		for _, session := range sessions {
-			if session.IsAuthorized() {
-				// notifier.AddChat(session.Chat)
-			}
-		}
 
-		// you must restore the session after the notifier updates
-		// messenger.RestoreSessions(sessions)
+	} else {
+		// TODO: this is not necessary for slack, but we should find a way to restore the sessions
+		/*
+			for _, session := range sessions {
+				if session.IsAuthorized() {
+					// notifier.AddChat(session.Chat)
+				}
+			}
+			messenger.RestoreSessions(sessions)
+			messenger.OnAuthorized(func(userSession *interact.SlackSession) {
+				if userSession.IsAuthorized() {
+					// notifier.AddChat(userSession.Chat)
+				}
+			})
+		*/
 	}
 
-	messenger.OnAuthorized(func(userSession *interact.SlackSession) {
-		if userSession.IsAuthorized() {
-			// notifier.AddChat(userSession.Chat)
-		}
-
-	})
 	interact.AddMessenger(messenger)
 }
 
