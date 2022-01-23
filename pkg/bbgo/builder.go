@@ -80,8 +80,6 @@ func Build(ctx context.Context, userConfig *Config, targetConfig BuildTargetConf
 		return "", err
 	}
 
-	defer os.RemoveAll(packageDir)
-
 	if err := compilePackage(packageDir, userConfig, imports); err != nil {
 		return "", err
 	}
@@ -110,8 +108,9 @@ func Build(ctx context.Context, userConfig *Config, targetConfig BuildTargetConf
 
 	output := filepath.Join(buildDir, binary)
 
-	logrus.Infof("building binary %s from %s...", output, buildTarget)
-	buildCmd := exec.CommandContext(ctx, "go", "build", "-tags", "wrapper", "-o", output, buildTarget)
+	args := []string{"build", "-tags", "wrapper", "-o", output, buildTarget}
+	logrus.Debugf("building binary %s from %s: go %v", output, buildTarget, args)
+	buildCmd := exec.CommandContext(ctx, "go", args...)
 	buildCmd.Env = append(os.Environ(), buildEnvs...)
 	buildCmd.Stdout = os.Stdout
 	buildCmd.Stderr = os.Stderr
@@ -119,7 +118,7 @@ func Build(ctx context.Context, userConfig *Config, targetConfig BuildTargetConf
 		return output, err
 	}
 
-	return output, nil
+	return output, os.RemoveAll(packageDir)
 }
 
 func BuildTarget(ctx context.Context, userConfig *Config, target BuildTargetConfig) (string, error) {
