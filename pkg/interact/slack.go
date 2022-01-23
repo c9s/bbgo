@@ -413,7 +413,7 @@ func (s *Slack) listen(ctx context.Context) {
 
 			case *slack.ModalViewRequest:
 				if resp, err := s.socket.OpenView(slashCmd.TriggerID, *o); err != nil {
-					log.WithError(err).Error("[slack] view open error, resp: %+v", resp)
+					log.WithError(err).Errorf("[slack] view open error, resp: %+v", resp)
 				}
 				s.socket.Ack(*evt.Request)
 
