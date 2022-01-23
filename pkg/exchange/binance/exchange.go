@@ -546,9 +546,14 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 }
 
 func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []types.Order, err error) {
-	if until.Sub(since) >= 24*time.Hour {
-		until = since.Add(24*time.Hour - time.Millisecond)
-	}
+	// we can only query orders within 24 hours
+	// if the until-since is more than 24 hours, we should reset the until to:
+	// new until = since + 24 hours - 1 millisecond
+	/*
+		if until.Sub(since) >= 24*time.Hour {
+			until = since.Add(24*time.Hour - time.Millisecond)
+		}
+	*/
 
 	if err := orderLimiter.Wait(ctx); err != nil {
 		log.WithError(err).Errorf("order rate limiter wait error")
@@ -581,8 +586,11 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 		if lastOrderID > 0 {
 			req.OrderID(int64(lastOrderID))
 		} else {
-			req.StartTime(since.UnixNano() / int64(time.Millisecond)).
-				EndTime(until.UnixNano() / int64(time.Millisecond))
+			req.StartTime(since.UnixNano() / int64(time.Millisecond))
+
+			if until.Sub(since) <= 24*time.Hour {
+				req.EndTime(until.UnixNano() / int64(time.Millisecond))
+			}
 		}
 
 		binanceOrders, err := req.Do(ctx)
@@ -592,15 +600,24 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 		return toGlobalFuturesOrders(binanceOrders)
 	}
 
+	// If orderId is set, it will get orders >= that orderId. Otherwise most recent orders are returned.
+	// For some historical orders cummulativeQuoteQty will be < 0, meaning the data is not available at this time.
+	// If startTime and/or endTime provided, orderId is not required.
 	req := e.Client.NewListOrdersService().
 		Symbol(symbol)
 
 	if lastOrderID > 0 {
 		req.OrderID(int64(lastOrderID))
 	} else {
-		req.StartTime(since.UnixNano() / int64(time.Millisecond)).
-			EndTime(until.UnixNano() / int64(time.Millisecond))
+		req.StartTime(since.UnixNano() / int64(time.Millisecond))
+
+		if until.Sub(since) <= 24*time.Hour {
+			req.EndTime(until.UnixNano() / int64(time.Millisecond))
+		}
 	}
+
+	// default 500, max 1000
+	req.Limit(1000)
 
 	binanceOrders, err := req.Do(ctx)
 	if err != nil {
