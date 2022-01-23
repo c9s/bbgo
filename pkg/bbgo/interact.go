@@ -127,7 +127,10 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 			}
 		}
 
-		reply.RemoveKeyboard()
+		if kc, ok := reply.(interact.KeyboardController) ; ok {
+			kc.RemoveKeyboard()
+		}
+
 		return nil
 	})
 
@@ -172,7 +175,9 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 
 				if position.Base == 0 {
 					reply.Message("No opened position")
-					reply.RemoveKeyboard()
+					if kc, ok := reply.(interact.KeyboardController) ; ok {
+						kc.RemoveKeyboard()
+					}
 					return fmt.Errorf("no opened position")
 				}
 			}
@@ -191,7 +196,9 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 			return err
 		}
 
-		reply.RemoveKeyboard()
+		if kc, ok := reply.(interact.KeyboardController) ; ok {
+			kc.RemoveKeyboard()
+		}
 
 		err = it.closePositionContext.closer.ClosePosition(context.Background(), percentage)
 		if err != nil {

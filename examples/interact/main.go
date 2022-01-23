@@ -92,12 +92,15 @@ func (m *PositionInteraction) Commands(i *interact.Interact) {
 		case "yes":
 			m.closePositionTask.confirmed = true
 			reply.Message(fmt.Sprintf("Your %s position is closed", m.closePositionTask.symbol))
-			reply.RemoveKeyboard()
 
 		default:
 
 		}
+
 		// call position close
+		if kc, ok := reply.(interact.KeyboardController); ok {
+			kc.RemoveKeyboard()
+		}
 
 		// reply result
 		return nil
