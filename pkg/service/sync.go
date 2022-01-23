@@ -3,8 +3,9 @@ package service
 import (
 	"context"
 	"errors"
-	"github.com/c9s/bbgo/pkg/cache"
 	"time"
+
+	"github.com/c9s/bbgo/pkg/cache"
 
 	log "github.com/sirupsen/logrus"
 
@@ -24,17 +25,18 @@ type SyncService struct {
 
 // SyncSessionSymbols syncs the trades from the given exchange session
 func (s *SyncService) SyncSessionSymbols(ctx context.Context, exchange types.Exchange, startTime time.Time, symbols ...string) error {
-	for _, symbol := range symbols {
-		log.Infof("syncing %s %s trades...", exchange.Name(), symbol)
-		markets, err := cache.LoadExchangeMarketsWithCache(ctx, exchange)
-		if err != nil {
-			return err
-		}
+	markets, err := cache.LoadExchangeMarketsWithCache(ctx, exchange)
+	if err != nil {
+		return err
+	}
 
+	for _, symbol := range symbols {
 		if _, ok := markets[symbol]; ok {
+			log.Infof("syncing %s %s trades...", exchange.Name(), symbol)
 			if err := s.TradeService.Sync(ctx, exchange, symbol, startTime); err != nil {
 				return err
 			}
+
 			log.Infof("syncing %s %s orders...", exchange.Name(), symbol)
 			if err := s.OrderService.Sync(ctx, exchange, symbol, startTime); err != nil {
 				return err
