@@ -41,9 +41,6 @@ type Reply interface {
 	// Choose(prompt string, options ...Option)
 	// Confirm shows the confirm dialog or confirm button in the user interface
 	// Confirm(prompt string)
-
-	// RemoveKeyboard hides the keyboard from the client user interface
-	RemoveKeyboard()
 }
 
 // KeyboardController is used when messenger supports keyboard controls
