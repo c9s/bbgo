@@ -178,7 +178,10 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 	limit := 1000 // max limit = 1000, default 100
 	orderIDs := make(map[uint64]struct{}, limit*2)
 
-	log.Warn("max exchange does not support time-range-based query, we will start from the first record")
+	log.Warn("since/until condition will not be effected on closed orders query, max exchange does not support time-range-based query, we will start from the first record")
+	if lastOrderID > 0 {
+		log.Warn("last order id condition will not be effected on max exchange, max exchange does not support last order id query")
+	}
 
 	page := 1
 	for {
