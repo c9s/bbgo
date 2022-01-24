@@ -19,7 +19,7 @@ import (
 	"github.com/c9s/bbgo/pkg/util"
 )
 
-var closedOrderQueryLimiter = rate.NewLimiter(rate.Every(5*time.Second), 1)
+var closedOrderQueryLimiter = rate.NewLimiter(rate.Every(1*time.Second), 1)
 var tradeQueryLimiter = rate.NewLimiter(rate.Every(3*time.Second), 1)
 var accountQueryLimiter = rate.NewLimiter(rate.Every(3*time.Second), 1)
 var marketDataLimiter = rate.NewLimiter(rate.Every(2*time.Second), 10)
@@ -179,32 +179,34 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 		return nil, err
 	}
 
-	numBatches := 3
-	limit := 1000 // max limit = 1000
-	offset := limit * numBatches
+	limit := 1000 // max limit = 1000, default 100
 	orderIDs := make(map[uint64]struct{}, limit*2)
 
-	for ; offset > 0; offset -= limit {
-		log.Infof("querying %s closed orders offset %d ~ ", symbol, offset)
+	log.Warn("max exchange does not support time-range-based query, we will start from the first record")
 
+	page := 1
+	for {
+		log.Infof("querying %s closed orders from page %d ~ ", symbol, page)
 		maxOrders, err := e.client.OrderService.Closed(toLocalSymbol(symbol), maxapi.QueryOrderOptions{
-			Offset: offset,
-			Limit:  limit,
+			Limit: limit,
+			Page:  page,
 		})
 		if err != nil {
 			return orders, err
 		}
 
 		if len(maxOrders) == 0 {
-			break
+			return orders, err
 		}
 
+		log.Infof("%d orders", len(maxOrders))
 		for _, maxOrder := range maxOrders {
-			if maxOrder.CreatedAt.Before(since) {
+			if maxOrder.CreatedAtMs.Time().Before(since) {
+				log.Debugf("skip orders with creation time before %s, found %s", since, maxOrder.CreatedAtMs.Time())
 				continue
 			}
 
-			if maxOrder.CreatedAt.After(until) {
+			if maxOrder.CreatedAtMs.Time().After(until) {
 				return orders, err
 			}
 
@@ -214,12 +216,14 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 			}
 
 			if _, ok := orderIDs[order.OrderID]; ok {
-				log.Infof("skipping duplicated order: %d", order.OrderID)
+				log.Debugf("skipping duplicated order: %d", order.OrderID)
 			}
 
 			orderIDs[order.OrderID] = struct{}{}
 			orders = append(orders, *order)
+			log.Infof("order %+v", order)
 		}
+		page++
 	}
 
 	return orders, err

@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 var relUrlV2Order *url.URL
@@ -43,7 +45,7 @@ const (
 type OrderState string
 
 const (
-	OrderStateDone       = OrderState("done")
+	OrderStateDone = OrderState("done")
 
 	OrderStateCancel     = OrderState("cancel")
 	OrderStateWait       = OrderState("wait")
@@ -68,6 +70,7 @@ type QueryOrderOptions struct {
 	GroupID int
 	Offset  int
 	Limit   int
+	Page    int
 }
 
 // OrderService manages the Order endpoint.
@@ -77,32 +80,30 @@ type OrderService struct {
 
 // Order represents one returned order (POST order/GET order/GET orders) on the max platform.
 type Order struct {
-	ID              uint64     `json:"id,omitempty"`
-	Side            string     `json:"side"`
-	OrderType       OrderType  `json:"ord_type"`
-	Price           string     `json:"price,omitempty"`
-	StopPrice       string     `json:"stop_price,omitempty"`
-	AveragePrice    string     `json:"avg_price,omitempty"`
-	State           OrderState `json:"state,omitempty"`
-	Market          string     `json:"market,omitempty"`
-	Volume          string     `json:"volume"`
-	RemainingVolume string     `json:"remaining_volume,omitempty"`
-	ExecutedVolume  string     `json:"executed_volume,omitempty"`
-	TradesCount     int64      `json:"trades_count,omitempty"`
-	GroupID         uint32     `json:"group_id,omitempty"`
-	ClientOID       string     `json:"client_oid,omitempty"`
-	CreatedAt       time.Time  `json:"-" db:"created_at"`
-	CreatedAtMs     int64      `json:"created_at_in_ms,omitempty"`
-	InsertedAt      time.Time  `json:"-" db:"inserted_at"`
+	ID              uint64                     `json:"id,omitempty"`
+	Side            string                     `json:"side"`
+	OrderType       OrderType                  `json:"ord_type"`
+	Price           string                     `json:"price,omitempty"`
+	StopPrice       string                     `json:"stop_price,omitempty"`
+	AveragePrice    string                     `json:"avg_price,omitempty"`
+	State           OrderState                 `json:"state,omitempty"`
+	Market          string                     `json:"market,omitempty"`
+	Volume          string                     `json:"volume"`
+	RemainingVolume string                     `json:"remaining_volume,omitempty"`
+	ExecutedVolume  string                     `json:"executed_volume,omitempty"`
+	TradesCount     int64                      `json:"trades_count,omitempty"`
+	GroupID         uint32                     `json:"group_id,omitempty"`
+	ClientOID       string                     `json:"client_oid,omitempty"`
+	CreatedAt       time.Time                  `json:"-" db:"created_at"`
+	CreatedAtMs     types.MillisecondTimestamp `json:"created_at_in_ms,omitempty"`
+	InsertedAt      time.Time                  `json:"-" db:"inserted_at"`
 }
 
 // Open returns open orders
 func (s *OrderService) Closed(market string, options QueryOrderOptions) ([]Order, error) {
 	payload := map[string]interface{}{
-		"market":     market,
-		"state":      []OrderState{OrderStateDone, OrderStateCancel, OrderStateFailed},
-		"order_by":   "desc",
-		"pagination": false,
+		"market": market,
+		"state":  []OrderState{OrderStateDone},
 	}
 
 	if options.GroupID > 0 {
@@ -113,6 +114,9 @@ func (s *OrderService) Closed(market string, options QueryOrderOptions) ([]Order
 	}
 	if options.Limit > 0 {
 		payload["limit"] = options.Limit
+	}
+	if options.Page > 0 {
+		payload["page"] = options.Page
 	}
 
 	req, err := s.client.newAuthenticatedRequest("GET", "v2/orders", payload, relUrlV2Orders)
