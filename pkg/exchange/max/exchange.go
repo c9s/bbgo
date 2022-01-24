@@ -202,6 +202,11 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 			return orders, err
 		}
 
+		// ensure everything is ascending ordered
+		sort.Slice(maxOrders, func(i, j int) bool {
+			return maxOrders[i].CreatedAtMs.Time().Before(maxOrders[j].CreatedAtMs.Time())
+		})
+
 		log.Infof("%d orders", len(maxOrders))
 		for _, maxOrder := range maxOrders {
 			if maxOrder.CreatedAtMs.Time().Before(since) {
