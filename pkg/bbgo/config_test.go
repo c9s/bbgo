@@ -184,7 +184,6 @@ func TestLoadConfig(t *testing.T) {
 				assert.NotNil(t, config.Backtest.Account)
 				assert.NotNil(t, config.Backtest.Account.Balances)
 				assert.Len(t, config.Backtest.Account.Balances, 2)
-				assert.NotEmpty(t, config.Backtest.StartTime)
 			},
 		},
 	}

@@ -229,17 +229,17 @@ type LooseFormatTime time.Time
 
 func (t *LooseFormatTime) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	var str string
-	if err := unmarshal(&str); err == nil {
-		return t.UnmarshalJSON([]byte(str))
+	if err := unmarshal(&str); err != nil {
+		return err
 	}
 
-	var bin []byte
-	err := unmarshal(&bin)
+	tv, err := util.ParseTimeWithFormats(str, looseTimeFormats)
 	if err != nil {
 		return err
 	}
 
-	return t.UnmarshalJSON(bin)
+	*t = LooseFormatTime(tv)
+	return nil
 }
 
 func (t *LooseFormatTime) UnmarshalJSON(data []byte) error {
