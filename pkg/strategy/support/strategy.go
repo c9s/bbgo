@@ -28,7 +28,8 @@ func init() {
 }
 
 type State struct {
-	Position *types.Position `json:"position,omitempty"`
+	Position            *types.Position   `json:"position,omitempty"`
+	CurrentHighestPrice *fixedpoint.Value `json:"position,omitempty"`
 }
 
 type Target struct {
@@ -245,6 +246,11 @@ func (s *Strategy) LoadState() error {
 		s.state.Position = types.NewPositionFromMarket(s.Market)
 	}
 
+	if s.state.CurrentHighestPrice == nil {
+		s.trailingStopControl.CurrentHighestPrice = fixedpoint.NewFromInt(0)
+	}
+	s.state.CurrentHighestPrice = &s.trailingStopControl.CurrentHighestPrice
+
 	return nil
 }
 
@@ -380,14 +386,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderStore = bbgo.NewOrderStore(s.Symbol)
 	s.orderStore.BindStream(session.UserDataStream)
 
+	if s.TrailingStopTarget.TrailingStopCallBackRatio != 0 {
+		s.trailingStopControl = NewTrailingStopControl(s.Symbol, s.Market, s.MarginOrderSideEffect, s.TrailingStopTarget.TrailingStopCallBackRatio, s.TrailingStopTarget.MinimumProfitPercentage)
+	}
+
 	if err := s.LoadState(); err != nil {
 		return err
 	} else {
 		s.Notify("%s state is restored => %+v", s.Symbol, s.state)
-	}
-
-	if s.TrailingStopTarget.TrailingStopCallBackRatio != 0 {
-		s.trailingStopControl = NewTrailingStopControl(s.Symbol, s.Market, s.MarginOrderSideEffect, s.TrailingStopTarget.TrailingStopCallBackRatio, s.TrailingStopTarget.MinimumProfitPercentage)
 	}
 
 	s.tradeCollector = bbgo.NewTradeCollector(s.Symbol, s.state.Position, s.orderStore)
@@ -403,7 +409,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				s.trailingStopControl.OrderID = 0
 
 				// Calculate minimum target price
-				var minTargetPrice float64 = 0.0
+				var minTargetPrice = 0.0
 				if s.trailingStopControl.minimumProfitPercentage > 0 {
 					minTargetPrice = position.AverageCost.Float64() * (1 + s.trailingStopControl.minimumProfitPercentage)
 				}
@@ -418,6 +424,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 						s.trailingStopControl.OrderID = orders.IDs()[0]
 					}
 				}
+			}
+			// Save state
+			if err := s.SaveState(); err != nil {
+				log.WithError(err).Errorf("can not save state: %+v", s.state)
+			} else {
+				s.Notify("%s position is saved", s.Symbol, s.state.Position)
 			}
 		})
 	}
@@ -456,7 +468,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				s.trailingStopControl.OrderID = 0
 
 				// Calculate minimum target price
-				var minTargetPrice float64 = 0.0
+				var minTargetPrice = 0.0
 				if s.trailingStopControl.minimumProfitPercentage > 0 {
 					minTargetPrice = s.state.Position.AverageCost.Float64() * (1 + s.trailingStopControl.minimumProfitPercentage)
 				}
@@ -471,6 +483,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 						s.trailingStopControl.OrderID = orders.IDs()[0]
 					}
 				}
+			}
+			// Save state
+			if err := s.SaveState(); err != nil {
+				log.WithError(err).Errorf("can not save state: %+v", s.state)
+			} else {
+				s.Notify("%s position is saved", s.Symbol, s.state.Position)
 			}
 		}
 
@@ -559,6 +577,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			log.WithError(err).Error("submit order error")
 			return
 		}
+		// Save state
+		if err := s.SaveState(); err != nil {
+			log.WithError(err).Errorf("can not save state: %+v", s.state)
+		} else {
+			s.Notify("%s position is saved", s.Symbol, s.state.Position)
+		}
 
 		if s.TrailingStopTarget.TrailingStopCallBackRatio == 0 { // submit fixed target orders
 			var targetOrders []types.SubmitOrder
@@ -599,6 +623,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
+
+		// Cancel trailing stop order
+		if s.TrailingStopTarget.TrailingStopCallBackRatio > 0 {
+			if err := s.cancelOrder(s.trailingStopControl.OrderID, ctx, session); err != nil {
+				log.WithError(err).Errorf("Can not cancel the trailing stop order!")
+			}
+			s.trailingStopControl.OrderID = 0
+		}
 
 		if err := s.SaveState(); err != nil {
 			log.WithError(err).Errorf("can not save state: %+v", s.state)
