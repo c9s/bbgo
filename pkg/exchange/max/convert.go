@@ -199,8 +199,8 @@ func toGlobalOrder(maxOrder max.Order) (*types.Order, error) {
 		OrderID:          maxOrder.ID,
 		Status:           toGlobalOrderStatus(maxOrder.State, executedVolume, remainingVolume),
 		ExecutedQuantity: executedVolume.Float64(),
-		CreationTime:     types.Time(maxOrder.CreatedAt),
-		UpdateTime:       types.Time(maxOrder.CreatedAt),
+		CreationTime:     types.Time(maxOrder.CreatedAtMs.Time()),
+		UpdateTime:       types.Time(maxOrder.CreatedAtMs.Time()),
 	}, nil
 }
 
@@ -340,4 +340,3 @@ func convertWebSocketOrderUpdate(u max.OrderUpdate) (*types.Order, error) {
 		CreationTime:     types.Time(time.Unix(0, u.CreatedAtMs*int64(time.Millisecond))),
 	}, nil
 }
-
