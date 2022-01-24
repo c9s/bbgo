@@ -94,48 +94,15 @@ type Session struct {
 	IsolatedMarginSymbol string `json:"isolatedMarginSymbol,omitempty" yaml:"isolatedMarginSymbol,omitempty"`
 }
 
-var supportedTimeFormats = []string{
-	time.RFC3339,
-	time.RFC822,
-	"2006-01-02T15:04:05",
-	"2006-01-02",
-}
-
 type Backtest struct {
-	StartTime string `json:"startTime" yaml:"startTime"`
-	EndTime   string `json:"endTime" yaml:"endTime"`
+	StartTime types.LooseFormatTime  `json:"startTime,omitempty" yaml:"startTime,omitempty"`
+	EndTime   *types.LooseFormatTime `json:"endTime,omitempty" yaml:"endTime,omitempty"`
 
 	// RecordTrades is an option, if set to true, back-testing should record the trades into database
 	RecordTrades bool            `json:"recordTrades,omitempty" yaml:"recordTrades,omitempty"`
 	Account      BacktestAccount `json:"account" yaml:"account"`
 	Symbols      []string        `json:"symbols" yaml:"symbols"`
 	Session      string          `json:"session" yaml:"session"`
-}
-
-func parseTimeWithFormats(strTime string, formats []string) (time.Time, error) {
-	for _, format := range formats {
-		tt, err := time.Parse(format, strTime)
-		if err == nil {
-			return tt, nil
-		}
-	}
-	return time.Time{}, fmt.Errorf("failed to parse time %s, valid formats are %+v", strTime, formats)
-}
-
-func (t Backtest) ParseEndTime() (time.Time, error) {
-	if len(t.EndTime) == 0 {
-		return time.Time{}, errors.New("backtest.endTime must be defined")
-	}
-
-	return parseTimeWithFormats(t.EndTime, supportedTimeFormats)
-}
-
-func (t Backtest) ParseStartTime() (time.Time, error) {
-	if len(t.StartTime) == 0 {
-		return time.Time{}, errors.New("backtest.startTime must be defined")
-	}
-
-	return parseTimeWithFormats(t.StartTime, supportedTimeFormats)
 }
 
 type BacktestAccount struct {

@@ -1,6 +1,7 @@
 package util
 
 import (
+	"fmt"
 	"math/rand"
 	"time"
 )
@@ -22,3 +23,17 @@ func Over24Hours(since time.Time) bool {
 func UnixMilli() int64 {
 	return time.Now().UnixNano() / int64(time.Millisecond)
 }
+
+func ParseTimeWithFormats(strTime string, formats []string) (time.Time, error) {
+	for _, format := range formats {
+		tt, err := time.Parse(format, strTime)
+		if err == nil {
+			return tt, nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("failed to parse time %s, valid formats are %+v", strTime, formats)
+}
+
+
+
+
