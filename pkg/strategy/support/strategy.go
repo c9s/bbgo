@@ -95,18 +95,14 @@ type TrailingStopControl struct {
 }
 
 func NewTrailingStopControl(symbol string, market types.Market, marginSideEffect types.MarginOrderSideEffectType, trailingStopCallBackRatio float64, minimumProfitPercentage float64) *TrailingStopControl {
-	var control TrailingStopControl
-
-	control.symbol = symbol
-	control.market = market
-	control.marginSideEffect = marginSideEffect
-
-	control.CurrentHighestPrice = fixedpoint.NewFromInt(0)
-
-	control.trailingStopCallBackRatio = trailingStopCallBackRatio
-	control.minimumProfitPercentage = minimumProfitPercentage
-
-	return &control
+	return &TrailingStopControl{
+		symbol:                    symbol,
+		market:                    market,
+		marginSideEffect:          marginSideEffect,
+		CurrentHighestPrice:       fixedpoint.NewFromInt(0),
+		trailingStopCallBackRatio: trailingStopCallBackRatio,
+		minimumProfitPercentage:   minimumProfitPercentage,
+	}
 }
 
 func (control *TrailingStopControl) IsHigherThanMin(minTargetPrice float64) bool {
@@ -115,7 +111,7 @@ func (control *TrailingStopControl) IsHigherThanMin(minTargetPrice float64) bool
 	return targetPrice >= minTargetPrice
 }
 
-func (control *TrailingStopControl) GenerateTrailingStopOrder(quantity float64) types.SubmitOrder {
+func (control *TrailingStopControl) GenerateStopOrder(quantity float64) types.SubmitOrder {
 	targetPrice := control.CurrentHighestPrice.Float64() * (1 - control.trailingStopCallBackRatio)
 
 	orderForm := types.SubmitOrder{
@@ -414,7 +410,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 				// Place new order if the target price is higher than the minimum target price
 				if s.trailingStopControl.IsHigherThanMin(minTargetPrice) {
-					orderForm := s.trailingStopControl.GenerateTrailingStopOrder(position.Base.Float64())
+					orderForm := s.trailingStopControl.GenerateStopOrder(position.Base.Float64())
 					ids, err := s.submitOrders(ctx, orderExecutor, orderForm)
 					if err != nil {
 						log.WithError(err).Error("submit profit trailing stop order error")
@@ -467,7 +463,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 				// Place new order if the target price is higher than the minimum target price
 				if s.trailingStopControl.IsHigherThanMin(minTargetPrice) {
-					orderForm := s.trailingStopControl.GenerateTrailingStopOrder(s.state.Position.Base.Float64())
+					orderForm := s.trailingStopControl.GenerateStopOrder(s.state.Position.Base.Float64())
 					ids, err := s.submitOrders(ctx, orderExecutor, orderForm)
 					if err != nil {
 						log.WithError(err).Error("submit profit trailing stop order error")
