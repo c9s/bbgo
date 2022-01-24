@@ -175,10 +175,6 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 
 // lastOrderID is not supported on MAX
 func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []types.Order, err error) {
-	if err := closedOrderQueryLimiter.Wait(ctx); err != nil {
-		return nil, err
-	}
-
 	limit := 1000 // max limit = 1000, default 100
 	orderIDs := make(map[uint64]struct{}, limit*2)
 
@@ -186,6 +182,10 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 
 	page := 1
 	for {
+		if err := closedOrderQueryLimiter.Wait(ctx); err != nil {
+			return nil, err
+		}
+
 		log.Infof("querying %s closed orders from page %d ~ ", symbol, page)
 		maxOrders, err := e.client.OrderService.Closed(toLocalSymbol(symbol), maxapi.QueryOrderOptions{
 			Limit: limit,
