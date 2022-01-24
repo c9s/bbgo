@@ -192,6 +192,17 @@ func GetNativeBuildTargetConfig() BuildTargetConfig {
 	}
 }
 
+type SyncConfig struct {
+	// Sessions to sync, if ignored, all defined sessions will sync
+	Sessions []string `json:"sessions,omitempty" yaml:"sessions,omitempty"`
+
+	// Symbols is the list of symbol to sync, if ignored, symbols wlll be discovered by your existing crypto balances
+	Symbols []string `json:"symbols,omitempty" yaml:"symbols,omitempty"`
+
+	// Since is the date where you want to start syncing data
+	Since *time.Time `json:"since,omitempty"`
+}
+
 type Config struct {
 	Build *BuildConfig `json:"build,omitempty" yaml:"build,omitempty"`
 
@@ -200,6 +211,8 @@ type Config struct {
 	Imports []string `json:"imports,omitempty" yaml:"imports,omitempty"`
 
 	Backtest *Backtest `json:"backtest,omitempty" yaml:"backtest,omitempty"`
+
+	Sync *SyncConfig `json:"sync,omitempty" yaml:"sync,omitempty"`
 
 	Notifications *NotificationConfig `json:"notifications,omitempty" yaml:"notifications,omitempty"`
 
@@ -476,7 +489,7 @@ func loadExchangeStrategies(config *Config, stash Stash) (err error) {
 					Strategy: st,
 				})
 			} else if id != "on" && id != "off" {
-				//Show error when we didn't find the Strategy
+				// Show error when we didn't find the Strategy
 				return fmt.Errorf("strategy %s in config not found", id)
 			}
 		}
