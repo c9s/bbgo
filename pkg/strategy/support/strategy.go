@@ -248,7 +248,7 @@ func (s *Strategy) LoadState() error {
 	return nil
 }
 
-func (s *Strategy) submitOrders(ctx context.Context, orderExecutor bbgo.OrderExecutor, orderForms ...types.SubmitOrder) ([]uint64, error) {
+func (s *Strategy) submitOrders(ctx context.Context, orderExecutor bbgo.OrderExecutor, orderForms ...types.SubmitOrder) (types.OrderSlice, error) {
 	for _, o := range orderForms {
 		s.Notifiability.Notify(o)
 	}
@@ -260,7 +260,7 @@ func (s *Strategy) submitOrders(ctx context.Context, orderExecutor bbgo.OrderExe
 
 	s.orderStore.Add(createdOrders...)
 	s.tradeCollector.Emit()
-	return createdOrders.IDs(), nil
+	return createdOrders, nil
 }
 
 // Cancel order
@@ -411,11 +411,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				// Place new order if the target price is higher than the minimum target price
 				if s.trailingStopControl.IsHigherThanMin(minTargetPrice) {
 					orderForm := s.trailingStopControl.GenerateStopOrder(position.Base.Float64())
-					ids, err := s.submitOrders(ctx, orderExecutor, orderForm)
+					orders, err := s.submitOrders(ctx, orderExecutor, orderForm)
 					if err != nil {
 						log.WithError(err).Error("submit profit trailing stop order error")
 					} else {
-						s.trailingStopControl.OrderID = ids[0]
+						s.trailingStopControl.OrderID = orders.IDs()[0]
 					}
 				}
 			}
@@ -464,11 +464,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				// Place new order if the target price is higher than the minimum target price
 				if s.trailingStopControl.IsHigherThanMin(minTargetPrice) {
 					orderForm := s.trailingStopControl.GenerateStopOrder(s.state.Position.Base.Float64())
-					ids, err := s.submitOrders(ctx, orderExecutor, orderForm)
+					orders, err := s.submitOrders(ctx, orderExecutor, orderForm)
 					if err != nil {
 						log.WithError(err).Error("submit profit trailing stop order error")
 					} else {
-						s.trailingStopControl.OrderID = ids[0]
+						s.trailingStopControl.OrderID = orders.IDs()[0]
 					}
 				}
 			}
