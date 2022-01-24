@@ -5,10 +5,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/util"
 )
+
+var numOfDigitsOfUnixTimestamp = len(strconv.FormatInt(time.Now().Unix(), 10))
+var numOfDigitsOfMilliSecondUnixTimestamp = len(strconv.FormatInt(time.Now().UnixMilli(), 10))
+var numOfDigitsOfNanoSecondsUnixTimestamp = len(strconv.FormatInt(time.Now().UnixNano(), 10))
 
 type NanosecondTimestamp time.Time
 
@@ -28,11 +33,10 @@ func (t *NanosecondTimestamp) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-
 type MillisecondTimestamp time.Time
 
 func NewMillisecondTimestampFromInt(i int64) MillisecondTimestamp {
-	return MillisecondTimestamp(time.Unix(0, i * int64(time.Millisecond)))
+	return MillisecondTimestamp(time.Unix(0, i*int64(time.Millisecond)))
 }
 
 func MustParseMillisecondTimestamp(a string) MillisecondTimestamp {
@@ -77,15 +81,14 @@ func (t *MillisecondTimestamp) UnmarshalJSON(data []byte) error {
 			return nil
 		}
 
-		i, err := strconv.ParseInt(vt, 10, 64)
-		if err == nil {
-			*t = MillisecondTimestamp(time.Unix(0, i*int64(time.Millisecond)))
-			return nil
-		}
-
 		f, err := strconv.ParseFloat(vt, 64)
 		if err == nil {
-			*t = MillisecondTimestamp(time.Unix(0, int64(f*float64(time.Millisecond))))
+			tt, err := convertFloat64ToTime(vt, f)
+			if err != nil {
+				return err
+			}
+
+			*t = MillisecondTimestamp(tt)
 			return nil
 		}
 
@@ -97,16 +100,14 @@ func (t *MillisecondTimestamp) UnmarshalJSON(data []byte) error {
 
 		return err
 
-	case int64:
-		*t = MillisecondTimestamp(time.Unix(0, vt*int64(time.Millisecond)))
-		return nil
-
-	case int:
-		*t = MillisecondTimestamp(time.Unix(0, int64(vt)*int64(time.Millisecond)))
-		return nil
-
 	case float64:
-		*t = MillisecondTimestamp(time.Unix(0, int64(vt)*int64(time.Millisecond)))
+		str := strconv.FormatFloat(vt, 'f', -1, 64)
+		tt, err := convertFloat64ToTime(str, vt)
+		if err != nil {
+			return err
+		}
+
+		*t = MillisecondTimestamp(tt)
 		return nil
 
 	default:
@@ -118,7 +119,22 @@ func (t *MillisecondTimestamp) UnmarshalJSON(data []byte) error {
 	return (*time.Time)(t).UnmarshalJSON(data)
 }
 
+func convertFloat64ToTime(vt string, f float64) (time.Time, error) {
+	idx := strings.Index(vt, ".")
+	if idx > 0 {
+		vt = vt[0 : idx-1]
+	}
 
+	if len(vt) <= numOfDigitsOfUnixTimestamp {
+		return time.Unix(0, int64(f*float64(time.Second))), nil
+	} else if len(vt) <= numOfDigitsOfMilliSecondUnixTimestamp {
+		return time.Unix(0, int64(f)*int64(time.Millisecond)), nil
+	} else if len(vt) <= numOfDigitsOfNanoSecondsUnixTimestamp {
+		return time.Unix(0, int64(f)), nil
+	}
+
+	return time.Time{}, fmt.Errorf("the floating point value %f is out of the timestamp range", f)
+}
 
 type Time time.Time
 
@@ -227,7 +243,13 @@ func (t *LooseFormatTime) UnmarshalYAML(unmarshal func(interface{}) error) error
 }
 
 func (t *LooseFormatTime) UnmarshalJSON(data []byte) error {
-	tv, err := util.ParseTimeWithFormats(string(data), looseTimeFormats)
+	var v string
+	err := json.Unmarshal(data, &v)
+	if err != nil {
+		return err
+	}
+
+	tv, err := util.ParseTimeWithFormats(v, looseTimeFormats)
 	if err != nil {
 		return err
 	}
@@ -239,4 +261,3 @@ func (t *LooseFormatTime) UnmarshalJSON(data []byte) error {
 func (t LooseFormatTime) Time() time.Time {
 	return time.Time(t)
 }
-
