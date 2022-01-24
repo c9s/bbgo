@@ -30,9 +30,10 @@ package backtest
 import (
 	"context"
 	"fmt"
-	"github.com/c9s/bbgo/pkg/cache"
 	"sync"
 	"time"
+
+	"github.com/c9s/bbgo/pkg/cache"
 
 	"github.com/pkg/errors"
 
@@ -74,14 +75,12 @@ func NewExchange(sourceName types.ExchangeName, sourceExchange types.Exchange, s
 		return nil, err
 	}
 
-	startTime, err := config.ParseStartTime()
-	if err != nil {
-		return nil, err
-	}
-
-	endTime, err := config.ParseEndTime()
-	if err != nil {
-		return nil, err
+	var startTime, endTime time.Time
+	startTime = config.StartTime.Time()
+	if config.EndTime != nil {
+		endTime = config.EndTime.Time()
+	} else {
+		endTime = time.Now()
 	}
 
 	account := &types.Account{

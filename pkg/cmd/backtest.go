@@ -11,16 +11,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+
 	"github.com/c9s/bbgo/pkg/accounting/pnl"
 	"github.com/c9s/bbgo/pkg/backtest"
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 func init() {
@@ -156,22 +157,23 @@ var BacktestCmd = &cobra.Command{
 			return errors.New("backtest config is not defined")
 		}
 
-		now := time.Now()
+		var now = time.Now()
+		var startTime, endTime time.Time
+
+		startTime = userConfig.Backtest.StartTime.Time()
+
 		// set default start time to the past 6 months
-		if len(userConfig.Backtest.StartTime) == 0 {
-			userConfig.Backtest.StartTime = now.AddDate(0, -6, 0).Format("2006-01-02")
+		// userConfig.Backtest.StartTime = now.AddDate(0, -6, 0).Format("2006-01-02")
+
+		if userConfig.Backtest.EndTime != nil {
+			endTime = userConfig.Backtest.EndTime.Time()
+		} else {
+			endTime = now
 		}
-		if len(userConfig.Backtest.EndTime) == 0 {
-			userConfig.Backtest.EndTime = now.Format("2006-01-02")
-		}
+		_ = endTime
 
 		if len(userConfig.CrossExchangeStrategies) > 0 {
 			log.Warnf("backtest does not support CrossExchangeStrategy, strategies won't be added.")
-		}
-
-		startTime, err := userConfig.Backtest.ParseStartTime()
-		if err != nil {
-			return err
 		}
 
 		log.Infof("starting backtest with startTime %s", startTime.Format(time.ANSIC))

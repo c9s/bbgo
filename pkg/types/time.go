@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strconv"
 	"time"
+
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 type NanosecondTimestamp time.Time
@@ -198,3 +200,43 @@ func (t *Time) Scan(src interface{}) error {
 
 	return fmt.Errorf("datatype.Time scan error, type: %T is not supported, value; %+v", src, src)
 }
+
+var looseTimeFormats = []string{
+	time.RFC3339,
+	time.RFC822,
+	"2006-01-02T15:04:05",
+	"2006-01-02",
+}
+
+// LooseFormatTime parses date time string with a wide range of formats.
+type LooseFormatTime time.Time
+
+func (t *LooseFormatTime) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var str string
+	if err := unmarshal(&str); err == nil {
+		return t.UnmarshalJSON([]byte(str))
+	}
+
+	var bin []byte
+	err := unmarshal(&bin)
+	if err != nil {
+		return err
+	}
+
+	return t.UnmarshalJSON(bin)
+}
+
+func (t *LooseFormatTime) UnmarshalJSON(data []byte) error {
+	tv, err := util.ParseTimeWithFormats(string(data), looseTimeFormats)
+	if err != nil {
+		return err
+	}
+
+	*t = LooseFormatTime(tv)
+	return nil
+}
+
+func (t LooseFormatTime) Time() time.Time {
+	return time.Time(t)
+}
+
