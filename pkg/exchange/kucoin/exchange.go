@@ -309,8 +309,6 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 	// If you specify the end time only, the system will automatically calculate the start time as end time minus 7*24 hours, and vice versa.
 	if until.Sub(since) < 7*24*time.Hour {
 		req.EndAt(until)
-	} else {
-		req.EndAt(since.Add(7*24*time.Hour - time.Minute))
 	}
 
 	orderList, err := req.Do(ctx)
