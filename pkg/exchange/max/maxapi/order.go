@@ -103,7 +103,7 @@ type Order struct {
 func (s *OrderService) Closed(market string, options QueryOrderOptions) ([]Order, error) {
 	payload := map[string]interface{}{
 		"market": market,
-		"state":  []OrderState{OrderStateDone},
+		"state":  []OrderState{OrderStateDone, OrderStateCancel},
 	}
 
 	if options.GroupID > 0 {
