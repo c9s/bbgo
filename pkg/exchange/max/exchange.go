@@ -19,6 +19,7 @@ import (
 	"github.com/c9s/bbgo/pkg/util"
 )
 
+// closedOrderQueryLimiter is used for the closed orders query rate limit, 1 request per second
 var closedOrderQueryLimiter = rate.NewLimiter(rate.Every(1*time.Second), 1)
 var tradeQueryLimiter = rate.NewLimiter(rate.Every(3*time.Second), 1)
 var accountQueryLimiter = rate.NewLimiter(rate.Every(3*time.Second), 1)
@@ -752,12 +753,17 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	// make it compatible with binance, we need the last trade id for the next page.
 	req.OrderBy("asc")
 
-	remoteTrades, err := req.Do(ctx)
+	maxTrades, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, t := range remoteTrades {
+	// ensure everything is sorted ascending
+	sort.Slice(maxTrades, func(i, j int) bool {
+		return maxTrades[i].CreatedAtMilliSeconds < maxTrades[j].CreatedAtMilliSeconds
+	})
+
+	for _, t := range maxTrades {
 		localTrade, err := toGlobalTrade(t)
 		if err != nil {
 			log.WithError(err).Errorf("can not convert trade: %+v", t)
