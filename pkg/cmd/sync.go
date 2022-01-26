@@ -78,7 +78,7 @@ var SyncCmd = &cobra.Command{
 		var syncStartTime = defaultSyncStartTime
 
 		if userConfig.Sync != nil && userConfig.Sync.Since != nil {
-			syncStartTime = *userConfig.Sync.Since
+			syncStartTime = userConfig.Sync.Since.Time()
 		}
 
 		if len(since) > 0 {

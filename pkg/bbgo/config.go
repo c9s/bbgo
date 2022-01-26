@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"reflect"
 	"runtime"
-	"time"
 
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
@@ -167,7 +166,7 @@ type SyncConfig struct {
 	Symbols []string `json:"symbols,omitempty" yaml:"symbols,omitempty"`
 
 	// Since is the date where you want to start syncing data
-	Since *time.Time `json:"since,omitempty"`
+	Since *types.LooseFormatTime `json:"since,omitempty"`
 }
 
 type Config struct {
