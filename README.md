@@ -216,12 +216,7 @@ DB_DSN=bbgo.sqlite3
 
 Once you have your database configured, you can sync your own trading data from the exchange.
 
-To sync your own trade data:
-
-```sh
-bbgo sync --session max
-bbgo sync --session binance
-```
+See [Configure Sync For Private Trading Data](./doc/configuration/sync.md)
 
 ## Using Redis to keep persistence between BBGO sessions
 
