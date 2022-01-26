@@ -346,11 +346,15 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 	log.Infof("bollinger band: up %f sma %f down %f", upBand, sma, downBand)
 
 	bandPercentage := calculateBandPercentage(upBand, downBand, sma, midPrice.Float64())
+	log.Infof("mid price band percentage: %f", bandPercentage)
+
 	maxExposurePosition, err := s.getCurrentAllowedExposurePosition(bandPercentage)
 	if err != nil {
 		log.WithError(err).Errorf("can not calculate CurrentAllowedExposurePosition")
 		return
 	}
+
+	log.Infof("calculated max exposure position: %f", maxExposurePosition.Float64())
 
 	canBuy := hasQuoteBalance && quoteBalance.Available > s.Quantity.Mul(midPrice) && (maxExposurePosition > 0 && base < maxExposurePosition)
 	canSell := hasBaseBalance && baseBalance.Available > s.Quantity && (maxExposurePosition > 0 && base > -maxExposurePosition)
