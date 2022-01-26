@@ -152,5 +152,24 @@ func TestPercentageScale(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, fixedpoint.NewFromFloat(100.0), fixedpoint.NewFromFloat(v))
 	})
+
+	t.Run("negative range", func(t *testing.T) {
+		s := &PercentageScale{
+			ByPercentage: &SlideRule{
+				ExpScale: &ExponentialScale{
+					Domain: [2]float64{0.0, 1.0},
+					Range:  [2]float64{-100.0, 100.0},
+				},
+			},
+		}
+
+		v, err := s.Scale(0.0)
+		assert.NoError(t, err)
+		assert.Equal(t, fixedpoint.NewFromFloat(-100.0), fixedpoint.NewFromFloat(v))
+
+		v, err = s.Scale(1.0)
+		assert.NoError(t, err)
+		assert.Equal(t, fixedpoint.NewFromFloat(100.0), fixedpoint.NewFromFloat(v))
+	})
 }
 
