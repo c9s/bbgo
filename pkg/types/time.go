@@ -12,7 +12,7 @@ import (
 )
 
 var numOfDigitsOfUnixTimestamp = len(strconv.FormatInt(time.Now().Unix(), 10))
-var numOfDigitsOfMilliSecondUnixTimestamp = len(strconv.FormatInt(time.Now().UnixMilli(), 10))
+var numOfDigitsOfMilliSecondUnixTimestamp = len(strconv.FormatInt(time.Now().UnixNano()/int64(time.Millisecond), 10))
 var numOfDigitsOfNanoSecondsUnixTimestamp = len(strconv.FormatInt(time.Now().UnixNano(), 10))
 
 type NanosecondTimestamp time.Time
