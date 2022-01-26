@@ -40,13 +40,16 @@ type ExponentialScale struct {
 }
 
 func (s *ExponentialScale) Solve() error {
-	s.h = s.Domain[0]
-	s.a = s.Range[0]
+	if s.Domain[0] > s.Domain[1] {
+		return errors.New("domain[0] can not greater than domain[1]")
+	}
 
 	if s.Range[0] == 0 {
 		return errors.New("for ExponentialScale, range can not start from 0")
 	}
 
+	s.h = s.Domain[0]
+	s.a = s.Range[0]
 	s.b = math.Pow(s.Range[1]/s.Range[0], 1/(s.Domain[1]-s.h))
 	return nil
 }
