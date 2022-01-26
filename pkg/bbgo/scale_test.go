@@ -95,7 +95,6 @@ func TestLinearScale2(t *testing.T) {
 	assert.Equal(t, fixedpoint.NewFromFloat(0.4), fixedpoint.NewFromFloat(scale.Call(3)))
 }
 
-
 func TestQuadraticScale(t *testing.T) {
 	// see https://www.desmos.com/calculator/vfqntrxzpr
 	scale := QuadraticScale{
@@ -114,3 +113,44 @@ func TestQuadraticScale(t *testing.T) {
 		t.Logf("%s = %f", scale.FormulaOf(float64(x)), y)
 	}
 }
+
+func TestPercentageScale(t *testing.T) {
+	t.Run("from 0.0 to 1.0", func(t *testing.T) {
+		s := &PercentageScale{
+			ByPercentage: &SlideRule{
+				ExpScale: &ExponentialScale{
+					Domain: [2]float64{0.0, 1.0},
+					Range:  [2]float64{1.0, 100.0},
+				},
+			},
+		}
+
+		v, err := s.Scale(0.0)
+		assert.NoError(t, err)
+		assert.Equal(t, fixedpoint.NewFromFloat(1.0), fixedpoint.NewFromFloat(v))
+
+		v, err = s.Scale(1.0)
+		assert.NoError(t, err)
+		assert.Equal(t, fixedpoint.NewFromFloat(100.0), fixedpoint.NewFromFloat(v))
+	})
+
+	t.Run("from -1.0 to 1.0", func(t *testing.T) {
+		s := &PercentageScale{
+			ByPercentage: &SlideRule{
+				ExpScale: &ExponentialScale{
+					Domain: [2]float64{-1.0, 1.0},
+					Range:  [2]float64{10.0, 100.0},
+				},
+			},
+		}
+
+		v, err := s.Scale(-1.0)
+		assert.NoError(t, err)
+		assert.Equal(t, fixedpoint.NewFromFloat(10.0), fixedpoint.NewFromFloat(v))
+
+		v, err = s.Scale(1.0)
+		assert.NoError(t, err)
+		assert.Equal(t, fixedpoint.NewFromFloat(100.0), fixedpoint.NewFromFloat(v))
+	})
+}
+

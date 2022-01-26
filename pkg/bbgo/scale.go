@@ -42,6 +42,11 @@ type ExponentialScale struct {
 func (s *ExponentialScale) Solve() error {
 	s.h = s.Domain[0]
 	s.a = s.Range[0]
+
+	if s.Range[0] == 0 {
+		return errors.New("for ExponentialScale, range can not start from 0")
+	}
+
 	s.b = math.Pow(s.Range[1]/s.Range[0], 1/(s.Domain[1]-s.h))
 	return nil
 }
@@ -362,4 +367,25 @@ func (s *PriceVolumeScale) ScaleByVolume(volume float64) (float64, error) {
 	}
 
 	return scale.Call(volume), nil
+}
+
+type PercentageScale struct {
+	ByPercentage *SlideRule `json:"byPercentage"`
+}
+
+func (s *PercentageScale) Scale(percentage float64) (float64, error) {
+	if s.ByPercentage == nil {
+		return 0.0, errors.New("percentage scale is not defined")
+	}
+
+	scale, err := s.ByPercentage.Scale()
+	if err != nil {
+		return 0.0, err
+	}
+
+	if err := scale.Solve(); err != nil {
+		return 0.0, err
+	}
+
+	return scale.Call(percentage), nil
 }
