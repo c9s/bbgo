@@ -58,17 +58,7 @@ var SyncCmd = &cobra.Command{
 			return err
 		}
 
-		var (
-			// default sync start time
-			startTime = time.Now().AddDate(-1, 0, 0)
-		)
 
-		if len(since) > 0 {
-			startTime, err = time.ParseInLocation("2006-01-02", since, time.Local)
-			if err != nil {
-				return err
-			}
-		}
 
 		sessionName, err := cmd.Flags().GetString("session")
 		if err != nil {
@@ -80,22 +70,49 @@ var SyncCmd = &cobra.Command{
 			return err
 		}
 
-		environ.SetSyncStartTime(startTime)
+		var (
+			// default sync start time
+			defaultSyncStartTime = time.Now().AddDate(-1, 0, 0)
+		)
 
-		var defaultSymbols []string
+		var syncStartTime = defaultSyncStartTime
+
+		if userConfig.Sync != nil && userConfig.Sync.Since != nil {
+			syncStartTime = *userConfig.Sync.Since
+		}
+
+		if len(since) > 0 {
+			syncStartTime, err = time.ParseInLocation("2006-01-02", since, time.Local)
+			if err != nil {
+				return err
+			}
+		}
+
+		environ.SetSyncStartTime(syncStartTime)
+
+		// syncSymbols is the symbol list to sync
+		var syncSymbols []string
+
+		if userConfig.Sync != nil && len(userConfig.Sync.Symbols) > 0 {
+			syncSymbols = userConfig.Sync.Symbols
+		}
+
 		if len(symbol) > 0 {
-			defaultSymbols = []string{symbol}
+			syncSymbols = []string{symbol}
 		}
 
 		var selectedSessions []string
 
+		if userConfig.Sync != nil && len(userConfig.Sync.Sessions) > 0 {
+			selectedSessions = userConfig.Sync.Sessions
+		}
 		if len(sessionName) > 0 {
 			selectedSessions = []string{sessionName}
 		}
 
 		sessions := environ.SelectSessions(selectedSessions...)
 		for _, session := range sessions {
-			if err := environ.SyncSession(ctx, session, defaultSymbols...); err != nil {
+			if err := environ.SyncSession(ctx, session, syncSymbols...); err != nil {
 				return err
 			}
 
