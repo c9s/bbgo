@@ -100,13 +100,10 @@ type Strategy struct {
 	// -10 means you can hold -10 ETH short position by maximum
 	MaxExposurePosition fixedpoint.Value `json:"maxExposurePosition"`
 
-	// UseDynamicExposurePosition is used for enabling the dynamic position
-	// when UseDynamicExposurePosition is set,
+	// DynamicExposurePositionScale is used to define the exposure position range with the given percentage
+	// when DynamicExposurePositionScale is set,
 	// your MaxExposurePosition will be calculated dynamically according to the bollinger band you set.
-	UseDynamicExposurePosition bool `json:"useDynamicExposurePosition"`
-
-	DynamicExposurePositionScale bbgo.Scale `json:"dynamicExposurePositionScale"`
-
+	DynamicExposurePositionScale *bbgo.PercentageScale `json:"dynamicExposurePositionScale"`
 
 	// Long means your position will be long position
 	// Currently not used yet
