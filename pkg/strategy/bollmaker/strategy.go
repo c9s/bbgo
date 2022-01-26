@@ -43,6 +43,27 @@ type BollingerSetting struct {
 	BandWidth float64 `json:"bandWidth"`
 }
 
+// QuantityOrAmount is a setting structure used for quantity/amount settings
+type QuantityOrAmount struct {
+	// Quantity is the base order quantity for your buy/sell order.
+	// when quantity is set, the amount option will be not used.
+	Quantity fixedpoint.Value `json:"quantity"`
+
+	// Amount is the order quote amount for your buy/sell order.
+	Amount fixedpoint.Value `json:"amount"`
+}
+
+// CalculateQuantity calculates the equivalent quantity of the given price when amount is set
+// it returns the quantity if the quantity is set
+func (qa *QuantityOrAmount) CalculateQuantity(currentPrice fixedpoint.Value) fixedpoint.Value {
+	if qa.Amount > 0 {
+		quantity := qa.Amount.Div(currentPrice)
+		return quantity
+	}
+
+	return qa.Quantity
+}
+
 type Strategy struct {
 	*bbgo.Graceful
 	*bbgo.Notifiability
@@ -56,8 +77,7 @@ type Strategy struct {
 	// Interval is how long do you want to update your order price and quantity
 	Interval types.Interval `json:"interval"`
 
-	// Quantity is the base order quantity for your buy/sell order.
-	Quantity fixedpoint.Value `json:"quantity"`
+	QuantityOrAmount
 
 	// Spread is the price spread from the middle price.
 	// For ask orders, the ask price is ((bestAsk + bestBid) / 2 * (1.0 + spread))
@@ -80,15 +100,26 @@ type Strategy struct {
 	// -10 means you can hold -10 ETH short position by maximum
 	MaxExposurePosition fixedpoint.Value `json:"maxExposurePosition"`
 
+	// Long means your position will be long position
+	// Currently not used yet
+	Long *bool `json:"long,omitempty"`
+
+	// Short means your position will be long position
+	// Currently not used yet
+	Short *bool `json:"short,omitempty"`
+
 	// DisableShort means you can don't want short position during the market making
 	// Set to true if you want to hold more spot during market making.
 	DisableShort bool `json:"disableShort"`
 
-	DefaultBollinger *BollingerSetting `json:"defaultBollinger"`
-
 	// NeutralBollinger is the smaller range of the bollinger band
 	// If price is in this band, it usually means the price is oscillating.
+	// If price goes out of this band, we tend to not place sell orders or buy orders
 	NeutralBollinger *BollingerSetting `json:"neutralBollinger"`
+
+	// DefaultBollinger is the wide range of the bollinger band
+	// for controlling your exposure position
+	DefaultBollinger *BollingerSetting `json:"defaultBollinger"`
 
 	// StrongDowntrendSkew is the order quantity skew for strong downtrend band.
 	// when the bollinger band detect a strong downtrend, what's the order quantity skew we want to use.
@@ -265,12 +296,15 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 		s.state.Position.String(),
 	)
 
-	quantity := s.Quantity
+	quantity := s.CalculateQuantity(midPrice)
+	sellQuantity := s.CalculateQuantity(askPrice)
+	buyQuantity := s.CalculateQuantity(bidPrice)
+
 	sellOrder := types.SubmitOrder{
 		Symbol:   s.Symbol,
 		Side:     types.SideTypeSell,
 		Type:     types.OrderTypeLimitMaker,
-		Quantity: quantity.Float64(),
+		Quantity: sellQuantity.Float64(),
 		Price:    askPrice.Float64(),
 		Market:   s.market,
 		GroupID:  s.groupID,
@@ -279,7 +313,7 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 		Symbol:   s.Symbol,
 		Side:     types.SideTypeBuy,
 		Type:     types.OrderTypeLimitMaker,
-		Quantity: quantity.Float64(),
+		Quantity: buyQuantity.Float64(),
 		Price:    bidPrice.Float64(),
 		Market:   s.market,
 		GroupID:  s.groupID,
@@ -519,7 +553,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				return
 			}
 
-			midPrice := fixedpoint.NewFromFloat((ticker.Buy + ticker.Sell) / 2)
+			mid := (ticker.Buy + ticker.Sell) / 2
+			log.Infof("using ticker price: bid %f / ask %f, mid price %f", ticker.Buy, ticker.Sell, mid)
+			midPrice := fixedpoint.NewFromFloat(mid)
 			s.placeOrders(ctx, orderExecutor, midPrice, &kline)
 		} else {
 			s.placeOrders(ctx, orderExecutor, fixedpoint.NewFromFloat(kline.Close), &kline)
