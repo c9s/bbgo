@@ -170,6 +170,14 @@ func TestPercentageScale(t *testing.T) {
 		v, err = s.Scale(1.0)
 		assert.NoError(t, err)
 		assert.Equal(t, fixedpoint.NewFromFloat(10.0), fixedpoint.NewFromFloat(v))
+
+		v, err = s.Scale(2.0)
+		assert.NoError(t, err)
+		assert.Equal(t, fixedpoint.NewFromFloat(10.0), fixedpoint.NewFromFloat(v))
+
+		v, err = s.Scale(-2.0)
+		assert.NoError(t, err)
+		assert.Equal(t, fixedpoint.NewFromFloat(100.0), fixedpoint.NewFromFloat(v))
 	})
 
 	t.Run("negative range", func(t *testing.T) {
