@@ -33,6 +33,7 @@ const BinanceUSBaseURL = "https://api.binance.us"
 const BinanceUSWebSocketURL = "wss://stream.binance.us:9443"
 const WebSocketURL = "wss://stream.binance.com:9443"
 const FuturesWebSocketURL = "wss://fstream.binance.com"
+const ONE_DAY_MILLISEC = 86400000
 
 // 5 per second and a 2 initial bucket
 var orderLimiter = rate.NewLimiter(5, 2)
@@ -1190,30 +1191,41 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 			req.Limit(1000)
 		}
 
-		if options.StartTime != nil {
-			req.StartTime(options.StartTime.UnixNano() / int64(time.Millisecond))
-		}
-		if options.EndTime != nil {
-			req.EndTime(options.EndTime.UnixNano() / int64(time.Millisecond))
-		}
-
 		// BINANCE uses inclusive last trade ID
 		if options.LastTradeID > 0 {
 			req.FromID(int64(options.LastTradeID))
 		}
 
-		remoteTrades, err = req.Do(ctx)
-		if err != nil {
-			return nil, err
+		var startTime int64
+		var endTime int64
+		var t int64
+		if options.StartTime != nil {
+			startTime = options.StartTime.UnixNano() / int64(time.Millisecond)
 		}
-		for _, t := range remoteTrades {
-			localTrade, err := toGlobalTrade(*t, e.IsMargin)
+		if options.EndTime != nil {
+			endTime = options.EndTime.UnixNano() / int64(time.Millisecond)
+		}
+
+		for t = startTime; t < endTime; t += ONE_DAY_MILLISEC {
+			req.StartTime(t)
+			et := t + ONE_DAY_MILLISEC
+			if et > endTime {
+				et = endTime
+			}
+			req.EndTime(et)
+			remoteTrades, err = req.Do(ctx)
 			if err != nil {
-				log.WithError(err).Errorf("can not convert binance trade: %+v", t)
-				continue
+				return nil, err
+			}
+			for _, t := range remoteTrades {
+				localTrade, err := toGlobalTrade(*t, e.IsMargin)
+				if err != nil {
+					log.WithError(err).Errorf("cannot convert binance trade: %+v", t)
+					continue
+				}
+				trades = append(trades, *localTrade)
 			}
 
-			trades = append(trades, *localTrade)
 		}
 
 		return trades, nil
