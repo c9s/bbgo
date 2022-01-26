@@ -71,6 +71,7 @@ type QueryOrderOptions struct {
 	Offset  int
 	Limit   int
 	Page    int
+	OrderBy string
 }
 
 // OrderService manages the Order endpoint.
@@ -117,6 +118,9 @@ func (s *OrderService) Closed(market string, options QueryOrderOptions) ([]Order
 	}
 	if options.Page > 0 {
 		payload["page"] = options.Page
+	}
+	if len(options.OrderBy) > 0 {
+		payload["order_by"] = options.OrderBy
 	}
 
 	req, err := s.client.newAuthenticatedRequest("GET", "v2/orders", payload, relUrlV2Orders)
