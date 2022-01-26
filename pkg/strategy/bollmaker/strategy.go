@@ -287,6 +287,18 @@ func (s *Strategy) LoadState() error {
 	return nil
 }
 
+func (s *Strategy) getCurrentAllowedExposurePosition(bandPercentage float64) (fixedpoint.Value, error) {
+	if s.DynamicExposurePositionScale != nil {
+		v, err := s.DynamicExposurePositionScale.Scale(bandPercentage)
+		if err != nil {
+			return 0, err
+		}
+		return fixedpoint.NewFromFloat(v), nil
+	}
+
+	return s.MaxExposurePosition, nil
+}
+
 func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExecutor, midPrice fixedpoint.Value, kline *types.KLine) {
 	askPrice := midPrice.Mul(one + s.Spread)
 	bidPrice := midPrice.Mul(one - s.Spread)
@@ -301,7 +313,6 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 		s.state.Position.String(),
 	)
 
-	quantity := s.CalculateQuantity(midPrice)
 	sellQuantity := s.CalculateQuantity(askPrice)
 	buyQuantity := s.CalculateQuantity(bidPrice)
 
@@ -326,14 +337,25 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 
 	var submitOrders []types.SubmitOrder
 
-	minQuantity := fixedpoint.NewFromFloat(s.market.MinQuantity)
 	baseBalance, hasBaseBalance := balances[s.market.BaseCurrency]
 	quoteBalance, hasQuoteBalance := balances[s.market.QuoteCurrency]
-	canBuy := hasQuoteBalance && quoteBalance.Available > s.Quantity.Mul(midPrice) && (s.MaxExposurePosition > 0 && base < s.MaxExposurePosition)
-	canSell := hasBaseBalance && baseBalance.Available > s.Quantity && (s.MaxExposurePosition > 0 && base > -s.MaxExposurePosition)
+
+	downBand := s.defaultBoll.LastDownBand()
+	upBand := s.defaultBoll.LastUpBand()
+	sma := s.defaultBoll.LastSMA()
+	log.Infof("bollinger band: up %f sma %f down %f", upBand, sma, downBand)
+
+	bandPercentage := calculateBandPercentage(upBand, downBand, sma, midPrice.Float64())
+	maxExposurePosition, err := s.getCurrentAllowedExposurePosition(bandPercentage)
+	if err != nil {
+		log.WithError(err).Errorf("can not calculate CurrentAllowedExposurePosition")
+		return
+	}
+
+	canBuy := hasQuoteBalance && quoteBalance.Available > s.Quantity.Mul(midPrice) && (maxExposurePosition > 0 && base < maxExposurePosition)
+	canSell := hasBaseBalance && baseBalance.Available > s.Quantity && (maxExposurePosition > 0 && base > -maxExposurePosition)
 
 	if s.ShadowProtection && kline != nil {
-
 		switch kline.Direction() {
 		case types.DirectionDown:
 			shadowHeight := kline.GetLowerShadowHeight()
@@ -349,26 +371,6 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 				log.Infof("%s shadow protection enabled, upper shadow ratio %f < %f", s.Symbol, shadowRatio, s.ShadowProtectionRatio.Float64())
 				canSell = false
 			}
-		}
-	}
-
-	// adjust quantity for closing position if we over sold or over bought
-	if s.MaxExposurePosition > 0 && base.Abs() > s.MaxExposurePosition {
-		scale := &bbgo.ExponentialScale{
-			Domain: [2]float64{0, s.MaxExposurePosition.Float64()},
-			Range:  [2]float64{quantity.Float64(), base.Abs().Float64()},
-		}
-		if err := scale.Solve(); err != nil {
-			log.WithError(err).Errorf("scale solving error")
-			return
-		}
-
-		qf := scale.Call(base.Abs().Float64())
-		_ = qf
-		if base > minQuantity {
-			// sellOrder.Quantity = qf
-		} else if base < -minQuantity {
-			// buyOrder.Quantity = qf
 		}
 	}
 
@@ -586,4 +588,16 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 
 	return nil
+}
+
+func calculateBandPercentage(up, down, sma, midPrice float64) float64 {
+	if midPrice < sma {
+		// should be negative percentage
+		return (midPrice - sma) / math.Abs(sma-down)
+	} else if midPrice > sma {
+		// should be positive percentage
+		return (midPrice - sma) / math.Abs(up-sma)
+	}
+
+	return 0.0
 }
