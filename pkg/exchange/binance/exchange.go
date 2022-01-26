@@ -807,7 +807,7 @@ func (e *Exchange) submitFuturesOrder(ctx context.Context, order types.SubmitOrd
 		Type(orderType).
 		Side(futures.SideType(order.Side))
 
-	clientOrderID := newSpotClientOrderID(order.ClientOrderID)
+	clientOrderID := newFuturesClientOrderID(order.ClientOrderID)
 	if len(clientOrderID) > 0 {
 		req.NewClientOrderID(clientOrderID)
 	}
@@ -885,6 +885,36 @@ func newSpotClientOrderID(originalID string) (clientOrderID string) {
 	}
 
 	prefix := "x-" + spotBrokerID
+	prefixLen := len(prefix)
+
+	if originalID != "" {
+		// try to keep the whole original client order ID if user specifies it.
+		if prefixLen+len(originalID) > 32 {
+			return originalID
+		}
+
+		clientOrderID = prefix + originalID
+		return clientOrderID
+	}
+
+	clientOrderID = uuid.New().String()
+	clientOrderID = prefix + clientOrderID
+	if len(clientOrderID) > 32 {
+		return clientOrderID[0:32]
+	}
+
+	return clientOrderID
+}
+
+// BBGO is a futures broker on Binance
+const futuresBrokerID = "gBhMvywy"
+
+func newFuturesClientOrderID(originalID string) (clientOrderID string) {
+	if originalID == types.NoClientOrderID {
+		return ""
+	}
+
+	prefix := "x-" + futuresBrokerID
 	prefixLen := len(prefix)
 
 	if originalID != "" {
