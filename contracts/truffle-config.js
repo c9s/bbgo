@@ -19,7 +19,8 @@
  */
 const fs = require('fs');
 const HDWalletProvider = require('@truffle/hdwallet-provider');
-const secret = JSON.parse(fs.readFileSync("polygon-secret.json").toString().trim());
+const secret = JSON.parse(fs.readFileSync(process.env.KEY).toString().trim());
+
 
 module.exports = {
   /**
@@ -69,19 +70,38 @@ module.exports = {
     // network_id: 2111,   // This network is yours, in the cloud.
     // production: true    // Treats this network as if it was a public net. (default: false)
     // }
+    development: {
+      host: "127.0.0.1",
+      port: 9545,
+      network_id: "*",
+    },
     polygon: {
-        provider: () => new HDWalletProvider(secret.privateKey, "https://polygon-rpc.com"),
-        network_id: 137,
-        confirmations: 3,
-        timeoutBlocks: 200,
-        skipDryRun: true
+      provider: () => new HDWalletProvider(secret.privateKey, "https://polygon-rpc.com"),
+      network_id: 137,
+      confirmations: 3,
+      timeoutBlocks: 200,
+      skipDryRun: true
     },
     mumbai: {
-        provider: () => new HDWalletProvider(secret.privateKey, "https://matic-mumbai.chainstacklabs.com"),
-        network_id: 80001,
-        confirmations: 3,
-        timeoutBlocks: 200,
-        skipDryRun: true
+      provider: () => new HDWalletProvider(secret.privateKey, "https://matic-mumbai.chainstacklabs.com"),
+      network_id: 80001,
+      confirmations: 3,
+      timeoutBlocks: 200,
+      skipDryRun: true
+    },
+    bsctestnet: {
+      // "https://speedy-nodes-nyc.moralis.io/91d001d6e2a55a9696521b4b/bsc/testnet"
+      provider: () => new HDWalletProvider(secret.privateKey, "https://data-seed-prebsc-1-s1.binance.org:8545"),
+      network_id: 97,
+      confirmations: 10,
+      timeoutBlocks: 200,
+    },
+    bsc: {
+      provider: () => new HDWalletProvider(secret.privateKey, "https://bsc-dataseed1.binance.org"),
+      network_id: 56,
+      confirmations: 10,
+      timeoutBlocks: 200,
+      skipDryRun: true
     },
   },
 
