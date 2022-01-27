@@ -334,20 +334,6 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 		}
 	}
 
-	// TODO: move this logic to Environment struct
-	// if back-test service is not set, meaning we are not back-testing
-	// we should insert trade into db right before everything
-	if environ.BacktestService == nil {
-		// if trade service is configured, we have the db configured
-		if environ.TradeService != nil {
-			session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
-				if err := environ.TradeService.Insert(trade); err != nil {
-					log.WithError(err).Errorf("trade insert error: %+v", trade)
-				}
-			})
-		}
-	}
-
 	// add trade logger
 	session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
 		log.Info(trade.String())
