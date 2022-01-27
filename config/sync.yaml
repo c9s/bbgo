@@ -1,0 +1,40 @@
+---
+sessions:
+  binance:
+    exchange: binance
+    envVarPrefix: binance
+
+  max:
+    exchange: max
+    envVarPrefix: max
+
+  okex:
+    exchange: okex
+    envVarPrefix: okex
+
+  kucoin:
+    exchange: kucoin
+    envVarPrefix: kucoin
+
+sync:
+  # userDataStream is used to sync the trading data in real-time
+  # it uses the websocket connection to insert the trades
+  userDataStream:
+    trade: true
+    filledOrders: true
+
+  # since is the start date of your trading data
+  since: 2019-11-01
+
+  # sessions is the list of session names you want to sync
+  # by default, BBGO sync all your available sessions.
+  sessions:
+  - binance
+  - max
+
+  # symbols is the list of symbols you want to sync
+  # by default, BBGO try to guess your symbols by your existing account balances.
+  symbols:
+  - BTCUSDT
+  - ETHUSDT
+  - LINKUSDT
