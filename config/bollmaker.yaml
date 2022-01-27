@@ -74,18 +74,6 @@ exchangeStrategies:
     # THe short here means you might sell some of your existing inventory.
     disableShort: true
 
-    # strongUptrendSkew is the order quantity skew for strong uptrend band.
-    # when the bollinger band detect a strong uptrend, what's the order quantity skew we want to use.
-    # greater than 1.0 means when placing buy order, place sell order with less quantity
-    # less than 1.0 means when placing sell order, place buy order with less quantity
-    strongUptrendSkew: 0.3
-
-    # strongDowntrendSkew is the order quantity skew for strong downtrend band.
-    # when the bollinger band detect a strong downtrend, what's the order quantity skew we want to use.
-    # greater than 1.0 means when placing buy order, place sell order with less quantity
-    # less than 1.0 means when placing sell order, place buy order with less quantity
-    strongDowntrendSkew: 2.0
-
     # uptrendSkew, like the strongUptrendSkew, but the price is still in the default band.
     uptrendSkew: 0.8
 
