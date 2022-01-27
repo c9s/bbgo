@@ -93,7 +93,7 @@ exchangeStrategies:
     downtrendSkew: 1.2
 
     defaultBollinger:
-      interval: "5m"
+      interval: "1h"
       window: 21
       bandWidth: 2.0
 
@@ -102,7 +102,7 @@ exchangeStrategies:
     neutralBollinger:
       interval: "5m"
       window: 21
-      bandWidth: 1.0
+      bandWidth: 2.0
 
     persistence:
       type: redis
