@@ -142,6 +142,10 @@ type Strategy struct {
 	// less than 1.0 means when placing sell order, place buy order with less quantity
 	UptrendSkew fixedpoint.Value `json:"uptrendSkew"`
 
+	// TradeInBand
+	// When this is on, places orders only when the current price is in the bollinger band.
+	TradeInBand bool `json:"tradeInBand"`
+
 	// ShadowProtection is used to avoid placing bid order when price goes down strongly (without shadow)
 	ShadowProtection      bool             `json:"shadowProtection"`
 	ShadowProtectionRatio fixedpoint.Value `json:"shadowProtectionRatio"`
@@ -386,6 +390,13 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 	// CASE #5:
 	// WHEN: price breaks the upper band (price > window 2) == strongUpTrend
 	// THEN: we apply strongUpTrend skew
+	if s.TradeInBand {
+		if !inBetween(midPrice.Float64(), s.neutralBoll.LastDownBand(), s.neutralBoll.LastUpBand()) {
+			log.Infof("tradeInBand is set, skip placing orders when the price is outside of the band")
+			return
+		}
+	}
+
 	trend := s.detectPriceTrend(s.neutralBoll, midPrice.Float64())
 	switch trend {
 	case NeutralTrend:
@@ -461,7 +472,7 @@ func (s *Strategy) detectPriceTrend(inc *indicator.BOLL, price float64) PriceTre
 
 func (s *Strategy) adjustOrderQuantity(submitOrder types.SubmitOrder) types.SubmitOrder {
 	if submitOrder.Quantity*submitOrder.Price < s.market.MinNotional {
-		submitOrder.Quantity = bbgo.AdjustFloatQuantityByMinAmount(submitOrder.Quantity, submitOrder.Price, s.market.MinNotional * 1.1)
+		submitOrder.Quantity = bbgo.AdjustFloatQuantityByMinAmount(submitOrder.Quantity, submitOrder.Price, s.market.MinNotional*1.1)
 	}
 
 	if submitOrder.Quantity < s.market.MinQuantity {
