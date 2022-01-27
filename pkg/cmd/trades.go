@@ -81,7 +81,7 @@ var tradesCmd = &cobra.Command{
 		}
 
 		now := time.Now()
-		since := now.Add(-3 * 24 * time.Hour)
+		since := now.Add(-24 * time.Hour)
 
 		tradeHistoryService, ok := session.Exchange.(types.ExchangeTradeHistoryService)
 		if !ok {
