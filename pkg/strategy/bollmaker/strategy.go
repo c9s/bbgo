@@ -19,6 +19,10 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+// TODO:
+// 1) add option for placing orders only when in neutral band
+// 2) add option for only placing buy orders when price is below the SMA line
+
 const ID = "bollmaker"
 
 const stateKey = "state-v1"
@@ -125,18 +129,6 @@ type Strategy struct {
 	// DefaultBollinger is the wide range of the bollinger band
 	// for controlling your exposure position
 	DefaultBollinger *BollingerSetting `json:"defaultBollinger"`
-
-	// StrongDowntrendSkew is the order quantity skew for strong downtrend band.
-	// when the bollinger band detect a strong downtrend, what's the order quantity skew we want to use.
-	// greater than 1.0 means when placing buy order, place sell order with less quantity
-	// less than 1.0 means when placing sell order, place buy order with less quantity
-	StrongDowntrendSkew fixedpoint.Value `json:"strongDowntrendSkew"`
-
-	// StrongUptrendSkew is the order quantity skew for strong uptrend band.
-	// when the bollinger band detect a strong uptrend, what's the order quantity skew we want to use.
-	// greater than 1.0 means when placing buy order, place sell order with less quantity
-	// less than 1.0 means when placing sell order, place buy order with less quantity
-	StrongUptrendSkew fixedpoint.Value `json:"strongUptrendSkew"`
 
 	// DowntrendSkew is the order quantity skew for normal downtrend band.
 	// The price is still in the default bollinger band.
@@ -378,24 +370,36 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 		}
 	}
 
-	if midPrice.Float64() > s.neutralBoll.LastDownBand() && midPrice.Float64() < s.neutralBoll.LastUpBand() {
-		// we don't have position yet
-		// place orders on both side if it's in oscillating band
-		// if base == 0 || base.Abs() < minQuantity { }
-	} else if midPrice.Float64() > s.defaultBoll.LastDownBand() && midPrice.Float64() < s.neutralBoll.LastDownBand() { // downtrend, might bounce back
+	// Apply quantity skew
+	// CASE #1:
+	// WHEN: price is in the neutral bollginer band (window 1) == neutral
+	// THEN: we don't apply skew
+	// CASE #2:
+	// WHEN: price is in the upper band (window 2 > price > window 1) == upTrend
+	// THEN: we apply upTrend skew
+	// CASE #3:
+	// WHEN: price is in the lower band (window 2 < price < window 1) == downTrend
+	// THEN: we apply downTrend skew
+	// CASE #4:
+	// WHEN: price breaks the lower band (price < window 2) == strongDownTrend
+	// THEN: we apply strongDownTrend skew
+	// CASE #5:
+	// WHEN: price breaks the upper band (price > window 2) == strongUpTrend
+	// THEN: we apply strongUpTrend skew
+	trend := s.detectPriceTrend(s.neutralBoll, midPrice.Float64())
+	switch trend {
+	case NeutralTrend:
+		// do nothing
+
+	case UpTrend:
+		skew := s.UptrendSkew.Float64()
+		buyOrder.Quantity = math.Max(s.market.MinQuantity, sellOrder.Quantity*skew)
+
+	case DownTrend:
 		skew := s.DowntrendSkew.Float64()
 		ratio := 1.0 / skew
 		sellOrder.Quantity = math.Max(s.market.MinQuantity, buyOrder.Quantity*ratio)
-	} else if midPrice.Float64() < s.defaultBoll.LastUpBand() && midPrice.Float64() > s.neutralBoll.LastUpBand() { // uptrend, might bounce back
-		skew := s.UptrendSkew.Float64()
-		buyOrder.Quantity = math.Max(s.market.MinQuantity, sellOrder.Quantity*skew)
-	} else if midPrice.Float64() < s.defaultBoll.LastDownBand() { // strong downtrend
-		skew := s.StrongDowntrendSkew.Float64()
-		ratio := 1.0 / skew
-		sellOrder.Quantity = math.Max(s.market.MinQuantity, buyOrder.Quantity*ratio)
-	} else if midPrice.Float64() > s.defaultBoll.LastUpBand() { // strong uptrend
-		skew := s.StrongUptrendSkew.Float64()
-		buyOrder.Quantity = math.Max(s.market.MinQuantity, sellOrder.Quantity*skew)
+
 	}
 
 	if canSell && midPrice > s.state.Position.AverageCost.MulFloat64(1.0+s.MinProfitSpread.Float64()) {
@@ -430,6 +434,31 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 	s.activeMakerOrders.Add(createdOrders...)
 }
 
+type PriceTrend string
+
+const (
+	NeutralTrend PriceTrend = "neutral"
+	UpTrend      PriceTrend = "upTrend"
+	DownTrend    PriceTrend = "downTrend"
+	UnknownTrend PriceTrend = "unknown"
+)
+
+func (s *Strategy) detectPriceTrend(inc *indicator.BOLL, price float64) PriceTrend {
+	if inBetween(price, inc.LastDownBand(), inc.LastUpBand()) {
+		return NeutralTrend
+	}
+
+	if price < inc.LastDownBand() {
+		return DownTrend
+	}
+
+	if price > inc.LastUpBand() {
+		return UpTrend
+	}
+
+	return UnknownTrend
+}
+
 func (s *Strategy) adjustOrderQuantity(submitOrder types.SubmitOrder) types.SubmitOrder {
 	if submitOrder.Quantity*submitOrder.Price < s.market.MinNotional {
 		submitOrder.Quantity = bbgo.AdjustFloatQuantityByMinAmount(submitOrder.Quantity, submitOrder.Price, s.market.MinNotional)
@@ -445,14 +474,6 @@ func (s *Strategy) adjustOrderQuantity(submitOrder types.SubmitOrder) types.Subm
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	if s.MinProfitSpread == 0 {
 		s.MinProfitSpread = fixedpoint.NewFromFloat(0.001)
-	}
-
-	if s.StrongUptrendSkew == 0 {
-		s.StrongUptrendSkew = fixedpoint.NewFromFloat(1.0 / 2.0)
-	}
-
-	if s.StrongDowntrendSkew == 0 {
-		s.StrongDowntrendSkew = fixedpoint.NewFromFloat(2.0)
 	}
 
 	if s.UptrendSkew == 0 {
@@ -604,4 +625,8 @@ func calculateBandPercentage(up, down, sma, midPrice float64) float64 {
 	}
 
 	return 0.0
+}
+
+func inBetween(x, a, b float64) bool {
+	return a < x && x < b
 }
