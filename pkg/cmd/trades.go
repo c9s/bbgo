@@ -7,10 +7,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/c9s/bbgo/pkg/util"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+
+	"github.com/c9s/bbgo/pkg/util"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
@@ -79,8 +80,8 @@ var tradesCmd = &cobra.Command{
 			return err
 		}
 
-		until := time.Now()
-		since := until.Add(-3 * 24 * time.Hour)
+		now := time.Now()
+		since := now.Add(-3 * 24 * time.Hour)
 
 		tradeHistoryService, ok := session.Exchange.(types.ExchangeTradeHistoryService)
 		if !ok {
@@ -91,7 +92,6 @@ var tradesCmd = &cobra.Command{
 
 		trades, err := tradeHistoryService.QueryTrades(ctx, symbol, &types.TradeQueryOptions{
 			StartTime:   &since,
-			EndTime:     &until,
 			Limit:       limit,
 			LastTradeID: 0,
 		})
