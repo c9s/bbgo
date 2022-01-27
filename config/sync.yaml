@@ -20,7 +20,7 @@ sync:
   # userDataStream is used to sync the trading data in real-time
   # it uses the websocket connection to insert the trades
   userDataStream:
-    trade: true
+    trades: true
     filledOrders: true
 
   # since is the start date of your trading data

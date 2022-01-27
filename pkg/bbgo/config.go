@@ -167,6 +167,12 @@ type SyncConfig struct {
 
 	// Since is the date where you want to start syncing data
 	Since *types.LooseFormatTime `json:"since,omitempty"`
+
+	// UserDataStream is for real-time sync with websocket user data stream
+	UserDataStream struct {
+		Trades       bool `json:"trades,omitempty" yaml:"trades,omitempty"`
+		FilledOrders bool `json:"filledOrders,omitempty" yaml:"filledOrders,omitempty"`
+	} `json:"userDataStream,omitempty" yaml:"userDataStream,omitempty"`
 }
 
 type Config struct {
