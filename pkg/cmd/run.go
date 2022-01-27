@@ -22,6 +22,7 @@ import (
 
 func init() {
 	RunCmd.Flags().Bool("no-compile", false, "do not compile wrapper binary")
+	RunCmd.Flags().Bool("no-sync", false, "do not sync on startup")
 	RunCmd.Flags().String("totp-key-url", "", "time-based one-time password key URL, if defined, it will be used for restoring the otp key")
 	RunCmd.Flags().String("totp-issuer", "", "")
 	RunCmd.Flags().String("totp-account-name", "", "")
@@ -118,7 +119,31 @@ func BootstrapEnvironment(ctx context.Context, environ *bbgo.Environment, userCo
 	return nil
 }
 
-func runConfig(basectx context.Context, userConfig *bbgo.Config, enableWebServer bool, webServerBind string) error {
+func runConfig(basectx context.Context, cmd *cobra.Command, userConfig *bbgo.Config) error {
+	noSync, err := cmd.Flags().GetBool("no-sync")
+	if err != nil {
+		return err
+	}
+
+	enableWebServer, err := cmd.Flags().GetBool("enable-webserver")
+	if err != nil {
+		return err
+	}
+
+	webServerBind, err := cmd.Flags().GetString("webserver-bind")
+	if err != nil {
+		return err
+	}
+
+	enableWebServerLegacy, err := cmd.Flags().GetBool("enable-web-server")
+	if err != nil {
+		return err
+	}
+	if enableWebServerLegacy {
+		log.Warn("command option --enable-web-server is renamed to --enable-webserver")
+		enableWebServer = true
+	}
+
 	ctx, cancelTrading := context.WithCancel(basectx)
 	defer cancelTrading()
 
@@ -131,8 +156,10 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config, enableWebServer
 		return err
 	}
 
-	if err := environ.Sync(ctx, userConfig); err != nil {
-		return err
+	if !noSync {
+		if err := environ.Sync(ctx, userConfig); err != nil {
+			return err
+		}
 	}
 
 	trader := bbgo.NewTrader(environ)
@@ -182,25 +209,6 @@ func run(cmd *cobra.Command, args []string) error {
 	setup, err := cmd.Flags().GetBool("setup")
 	if err != nil {
 		return err
-	}
-
-	enableWebServer, err := cmd.Flags().GetBool("enable-webserver")
-	if err != nil {
-		return err
-	}
-
-	webServerBind, err := cmd.Flags().GetString("webserver-bind")
-	if err != nil {
-		return err
-	}
-
-	enableWebServerLegacy, err := cmd.Flags().GetBool("enable-web-server")
-	if err != nil {
-		return err
-	}
-	if enableWebServerLegacy {
-		log.Warn("command option --enable-web-server is renamed to --enable-webserver")
-		enableWebServer = true
 	}
 
 	noCompile, err := cmd.Flags().GetBool("no-compile")
@@ -268,13 +276,13 @@ func run(cmd *cobra.Command, args []string) error {
 			defer pprof.StopCPUProfile()
 		}
 
-		return runConfig(ctx, userConfig, enableWebServer, webServerBind)
+		return runConfig(ctx, cmd, userConfig)
 	}
 
-	return runWrapperBinary(ctx, userConfig, cmd, args)
+	return runWrapperBinary(ctx, cmd, userConfig, args)
 }
 
-func runWrapperBinary(ctx context.Context, userConfig *bbgo.Config, cmd *cobra.Command, args []string) error {
+func runWrapperBinary(ctx context.Context, cmd *cobra.Command, userConfig *bbgo.Config, args []string) error {
 	var runArgs = []string{"run"}
 	cmd.Flags().Visit(func(flag *flag.Flag) {
 		runArgs = append(runArgs, "--"+flag.Name, flag.Value.String())
