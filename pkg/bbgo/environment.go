@@ -441,6 +441,45 @@ func (environ *Environment) SetSyncStartTime(t time.Time) *Environment {
 	return environ
 }
 
+func (environ *Environment) BindSync(userConfig *Config) {
+	if environ.BacktestService != nil {
+		return
+	}
+
+	// If trade service is configured, we have the db configured
+	if environ.TradeService == nil {
+		return
+	}
+
+	if userConfig.Sync == nil || userConfig.Sync.UserDataStream == nil {
+		return
+	}
+
+	for _, session := range environ.sessions {
+		if userConfig.Sync.UserDataStream.Trades {
+			session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
+				if err := environ.TradeService.Insert(trade); err != nil {
+					log.WithError(err).Errorf("trade insert error: %+v", trade)
+				}
+			})
+		}
+
+		if userConfig.Sync.UserDataStream.FilledOrders {
+			session.UserDataStream.OnOrderUpdate(func(order types.Order) {
+				switch order.Status {
+				case types.OrderStatusFilled, types.OrderStatusCanceled:
+					if order.ExecutedQuantity > 0.0 {
+						if err := environ.OrderService.Insert(order); err != nil {
+							log.WithError(err).Errorf("order insert error: %+v", order)
+						}
+					}
+				}
+			})
+		}
+	}
+}
+
+
 func (environ *Environment) Connect(ctx context.Context) error {
 	log.Debugf("starting interaction...")
 	if err := interact.Start(ctx); err != nil {
