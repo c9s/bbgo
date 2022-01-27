@@ -461,7 +461,7 @@ func (s *Strategy) detectPriceTrend(inc *indicator.BOLL, price float64) PriceTre
 
 func (s *Strategy) adjustOrderQuantity(submitOrder types.SubmitOrder) types.SubmitOrder {
 	if submitOrder.Quantity*submitOrder.Price < s.market.MinNotional {
-		submitOrder.Quantity = bbgo.AdjustFloatQuantityByMinAmount(submitOrder.Quantity, submitOrder.Price, s.market.MinNotional)
+		submitOrder.Quantity = bbgo.AdjustFloatQuantityByMinAmount(submitOrder.Quantity, submitOrder.Price, s.market.MinNotional * 1.1)
 	}
 
 	if submitOrder.Quantity < s.market.MinQuantity {
