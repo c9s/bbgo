@@ -131,7 +131,7 @@ func runConfig(basectx context.Context, userConfig *bbgo.Config, enableWebServer
 		return err
 	}
 
-	if err := environ.Sync(ctx); err != nil {
+	if err := environ.Sync(ctx, userConfig); err != nil {
 		return err
 	}
 

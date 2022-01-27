@@ -492,7 +492,7 @@ func (environ *Environment) setSyncing(status SyncStatus) {
 }
 
 // Sync syncs all registered exchange sessions
-func (environ *Environment) Sync(ctx context.Context) error {
+func (environ *Environment) Sync(ctx context.Context, userConfig ...*Config) error {
 	if environ.SyncService == nil {
 		return nil
 	}
@@ -503,6 +503,23 @@ func (environ *Environment) Sync(ctx context.Context) error {
 	environ.setSyncing(Syncing)
 	defer environ.setSyncing(SyncDone)
 
+	// sync by the defined user config
+	if len(userConfig) > 0 && userConfig[0] != nil && userConfig[0].Sync != nil {
+		syncSymbols := userConfig[0].Sync.Symbols
+		sessions := environ.sessions
+		selectedSessions := userConfig[0].Sync.Sessions
+		if len(selectedSessions) > 0 {
+			sessions = environ.SelectSessions(selectedSessions...)
+		}
+		for _, session := range sessions {
+			if err := environ.syncSession(ctx, session, syncSymbols...); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	// the default sync logics
 	for _, session := range environ.sessions {
 		if err := environ.syncSession(ctx, session); err != nil {
 			return err
