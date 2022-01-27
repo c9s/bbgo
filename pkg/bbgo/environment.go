@@ -455,30 +455,31 @@ func (environ *Environment) BindSync(userConfig *Config) {
 		return
 	}
 
+	tradeWriter := func(trade types.Trade) {
+		if err := environ.TradeService.Insert(trade); err != nil {
+			log.WithError(err).Errorf("trade insert error: %+v", trade)
+		}
+	}
+	orderWriter := func(order types.Order) {
+		switch order.Status {
+		case types.OrderStatusFilled, types.OrderStatusCanceled:
+			if order.ExecutedQuantity > 0.0 {
+				if err := environ.OrderService.Insert(order); err != nil {
+					log.WithError(err).Errorf("order insert error: %+v", order)
+				}
+			}
+		}
+	}
+
 	for _, session := range environ.sessions {
 		if userConfig.Sync.UserDataStream.Trades {
-			session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
-				if err := environ.TradeService.Insert(trade); err != nil {
-					log.WithError(err).Errorf("trade insert error: %+v", trade)
-				}
-			})
+			session.UserDataStream.OnTradeUpdate(tradeWriter)
 		}
-
 		if userConfig.Sync.UserDataStream.FilledOrders {
-			session.UserDataStream.OnOrderUpdate(func(order types.Order) {
-				switch order.Status {
-				case types.OrderStatusFilled, types.OrderStatusCanceled:
-					if order.ExecutedQuantity > 0.0 {
-						if err := environ.OrderService.Insert(order); err != nil {
-							log.WithError(err).Errorf("order insert error: %+v", order)
-						}
-					}
-				}
-			})
+			session.UserDataStream.OnOrderUpdate(orderWriter)
 		}
 	}
 }
-
 
 func (environ *Environment) Connect(ctx context.Context) error {
 	log.Debugf("starting interaction...")
