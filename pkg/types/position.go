@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -34,7 +35,7 @@ type Position struct {
 	BaseCurrency  string `json:"baseCurrency"`
 	QuoteCurrency string `json:"quoteCurrency"`
 
-	Market Market `json:"market"`
+	Market Market `json:"market,omitempty"`
 
 	Base        fixedpoint.Value `json:"base"`
 	Quote       fixedpoint.Value `json:"quote"`
@@ -51,6 +52,29 @@ type Position struct {
 	TotalFee map[string]fixedpoint.Value `json:"totalFee"`
 
 	sync.Mutex
+}
+
+func (p *Position) NewClosePositionOrder(percentage float64) *SubmitOrder {
+	base := p.GetBase()
+	quantity := base.Float64()
+	quantity = quantity * percentage
+	quantity = math.Min(quantity, p.Market.MinQuantity)
+	side := SideTypeSell
+	if base == 0 {
+		return nil
+	}
+
+	if base < 0 {
+		side = SideTypeBuy
+	}
+
+	return &SubmitOrder{
+		Symbol:   p.Symbol,
+		Market:   p.Market,
+		Type:     OrderTypeMarket,
+		Side:     side,
+		Quantity: quantity,
+	}
 }
 
 func (p *Position) GetBase() (base fixedpoint.Value) {

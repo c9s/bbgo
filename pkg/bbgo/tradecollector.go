@@ -41,6 +41,14 @@ func NewTradeCollector(symbol string, position *types.Position, orderStore *Orde
 	}
 }
 
+func (c *TradeCollector) OrderStore() *OrderStore {
+	return c.orderStore
+}
+
+func (c *TradeCollector) Position() *types.Position {
+	return c.position
+}
+
 // QueueTrade sends the trade object to the trade channel,
 // so that the goroutine can receive the trade and process in the background.
 func (c *TradeCollector) QueueTrade(trade types.Trade) {

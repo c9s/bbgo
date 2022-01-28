@@ -20,6 +20,10 @@ type SingleExchangeStrategy interface {
 	Run(ctx context.Context, orderExecutor OrderExecutor, session *ExchangeSession) error
 }
 
+type StrategyInitializer interface {
+	Initialize() error
+}
+
 // ExchangeSessionSubscriber provides an interface for collecting subscriptions from different strategies
 // Subscribe method will be called before the user data stream connection is created.
 type ExchangeSessionSubscriber interface {
@@ -171,11 +175,19 @@ func (trader *Trader) SetRiskControls(riskControls *RiskControls) {
 	trader.riskControls = riskControls
 }
 
+
 func (trader *Trader) Subscribe() {
 	// pre-subscribe the data
 	for sessionName, strategies := range trader.exchangeStrategies {
 		session := trader.environment.sessions[sessionName]
 		for _, strategy := range strategies {
+			for _, strategy := range strategies {
+				if initializer, ok := strategy.(StrategyInitializer); ok {
+					initializer.Initialize()
+				}
+			}
+
+
 			if subscriber, ok := strategy.(ExchangeSessionSubscriber); ok {
 				subscriber.Subscribe(session)
 			} else {
@@ -185,6 +197,12 @@ func (trader *Trader) Subscribe() {
 	}
 
 	for _, strategy := range trader.crossExchangeStrategies {
+		for _, strategy := range strategies {
+			if initializer, ok := strategy.(StrategyInitializer); ok {
+				initializer.Initialize()
+			}
+		}
+
 		if subscriber, ok := strategy.(CrossExchangeSessionSubscriber); ok {
 			subscriber.CrossSubscribe(trader.environment.sessions)
 		} else {
@@ -364,7 +382,6 @@ func (trader *Trader) injectCommonServices(rs reflect.Value) error {
 			return errors.Wrap(err, "failed to inject AccountService")
 		}
 	}
-
 
 	if field, ok := hasField(rs, "Persistence"); ok {
 		if trader.environment.PersistenceServiceFacade == nil {

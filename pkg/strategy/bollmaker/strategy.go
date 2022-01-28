@@ -47,25 +47,163 @@ type BollingerSetting struct {
 	BandWidth float64 `json:"bandWidth"`
 }
 
-// QuantityOrAmount is a setting structure used for quantity/amount settings
-type QuantityOrAmount struct {
-	// Quantity is the base order quantity for your buy/sell order.
-	// when quantity is set, the amount option will be not used.
-	Quantity fixedpoint.Value `json:"quantity"`
+type TrailingStop struct {
+	// CallbackRate is the callback rate from the previous high price
+	CallbackRate fixedpoint.Value `json:"callbackRate,omitempty"`
 
-	// Amount is the order quote amount for your buy/sell order.
-	Amount fixedpoint.Value `json:"amount"`
+	// ClosePosition is a percentage of the position to be closed
+	ClosePosition fixedpoint.Value `json:"closePosition,omitempty"`
+
+	// MinProfit is the percentage of the minimum profit ratio.
+	// Stop order will be activiated only when the price reaches above this threshold.
+	MinProfit fixedpoint.Value `json:"minProfit,omitempty"`
+
+	// Interval is the time resolution to update the stop order
+	// KLine per Interval will be used for updating the stop order
+	Interval types.Interval `json:"interval,omitempty"`
+
+	// Virtual is used when you don't want to place the real order on the exchange and lock the balance.
+	// You want to handle the stop order by the strategy itself.
+	Virtual bool `json:"virtual,omitempty"`
 }
 
-// CalculateQuantity calculates the equivalent quantity of the given price when amount is set
-// it returns the quantity if the quantity is set
-func (qa *QuantityOrAmount) CalculateQuantity(currentPrice fixedpoint.Value) fixedpoint.Value {
-	if qa.Amount > 0 {
-		quantity := qa.Amount.Div(currentPrice)
-		return quantity
+type TrailingStopController struct {
+	*TrailingStop
+
+	Symbol string
+
+	position    *types.Position
+	latestHigh  float64
+	averageCost fixedpoint.Value
+}
+
+func NewTrailingStopController(symbol string, config *TrailingStop) *TrailingStopController {
+	return &TrailingStopController{
+		TrailingStop: config,
+		Symbol:       symbol,
+	}
+}
+
+func (c *TrailingStopController) Subscribe(session *bbgo.ExchangeSession) {
+	session.Subscribe(types.KLineChannel, c.Symbol, types.SubscribeOptions{
+		Interval: c.Interval.String(),
+	})
+}
+
+func (c *TrailingStopController) Setup(ctx context.Context, session *bbgo.ExchangeSession, tradeCollector *bbgo.TradeCollector) {
+	// store the position
+	c.position = tradeCollector.Position()
+
+	// Use trade collector to get the position update event
+	tradeCollector.OnPositionUpdate(func(position *types.Position) {
+		// update average cost if we have it.
+		c.averageCost = position.AverageCost
+	})
+
+	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
+		if kline.Symbol != c.Symbol {
+			return
+		}
+
+		if kline.Interval != c.Interval {
+			return
+		}
+
+		closePrice := kline.Close
+
+		// update the latest high
+		c.latestHigh = math.Max(closePrice, c.latestHigh)
+
+		if c.Virtual {
+			if c.position == nil {
+				return
+			}
+
+			// if it's in the callback rate, we don't want to trigger stop
+			if closePrice < c.latestHigh && changeRate(closePrice, c.latestHigh) < c.CallbackRate.Float64() {
+				return
+			}
+
+			// if average cost is updated, we can check min profit
+			if c.averageCost == 0 {
+				return
+			}
+
+			// if it's below the average cost, we skip stop
+			if closePrice < c.averageCost.Float64() {
+				return
+			}
+
+			// if the profit rate is defined, and it is less than our minimum profit rate, we skip stop
+			if c.MinProfit > 0 && changeRate(closePrice, c.averageCost.Float64()) < c.MinProfit.Float64() {
+				return
+			}
+
+			log.Infof("trailing stop event emitted, submitting market order to stop...")
+			marketOrder := c.position.NewClosePositionOrder(c.ClosePosition.Float64())
+			if marketOrder != nil {
+				createdOrders, err := session.Exchange.SubmitOrders(ctx, *marketOrder)
+				if err != nil {
+					log.WithError(err).Errorf("stop order place error")
+				}
+				tradeCollector.OrderStore().Add(createdOrders...)
+			}
+		} else {
+			// place stop order only when the closed price is greater than the current average cost
+			if c.position != nil && c.MinProfit > 0 && c.averageCost > 0 &&
+				closePrice > c.averageCost.Float64() &&
+				changeRate(closePrice, c.averageCost.Float64()) >= c.MinProfit.Float64() {
+
+				stopPrice := c.averageCost.MulFloat64(1.0 + c.MinProfit.Float64())
+				orderForm := c.GenerateStopOrder(stopPrice.Float64(), c.averageCost.Float64())
+				if orderForm != nil {
+					log.Infof("updating stop limit order to simulate trailing stop order...")
+					createdOrders, err := session.Exchange.SubmitOrders(ctx, *orderForm)
+					if err != nil {
+						log.WithError(err).Errorf("stop order place error")
+					}
+					tradeCollector.OrderStore().Add(createdOrders...)
+				}
+			}
+		}
+	})
+}
+
+func (c *TrailingStopController) GenerateStopOrder(stopPrice, price float64) *types.SubmitOrder {
+	base := c.position.GetBase()
+	if base == 0 {
+		return nil
 	}
 
-	return qa.Quantity
+	quantity := math.Abs(base.Float64())
+
+	if c.ClosePosition > 0 {
+		quantity = quantity * c.ClosePosition.Float64()
+	}
+
+	quantity = math.Min(quantity, c.position.Market.MinQuantity)
+
+	side := types.SideTypeSell
+	if base < 0 {
+		side = types.SideTypeBuy
+	}
+
+	return &types.SubmitOrder{
+		Symbol:    c.Symbol,
+		Market:    c.position.Market,
+		Type:      types.OrderTypeStopLimit,
+		Side:      side,
+		StopPrice: stopPrice,
+		Price:     price,
+		Quantity:  quantity,
+	}
+}
+
+type FixedStop struct{}
+
+type Stop struct {
+	TrailingStop *TrailingStop `json:"trailingStop,omitempty"`
+	FixedStop    *FixedStop    `json:"fixedStop,omitempty"`
 }
 
 type Strategy struct {
@@ -150,6 +288,8 @@ type Strategy struct {
 	ShadowProtection      bool             `json:"shadowProtection"`
 	ShadowProtectionRatio fixedpoint.Value `json:"shadowProtectionRatio"`
 
+	Stops []Stop `json:"stops,omitempty"`
+
 	session *bbgo.ExchangeSession
 	book    *types.StreamOrderBook
 	market  types.Market
@@ -169,10 +309,20 @@ type Strategy struct {
 
 	// neutralBoll is the neutral price section
 	neutralBoll *indicator.BOLL
+
+	stopControllers []*TrailingStopController
 }
 
 func (s *Strategy) ID() string {
 	return ID
+}
+
+func (s *Strategy) Initialize(session *bbgo.ExchangeSession) error {
+	for _, stop := range s.Stops {
+		s.stopControllers = append(s.stopControllers,
+			NewTrailingStopController(s.Symbol, stop.TrailingStop))
+	}
+	return nil
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
@@ -191,6 +341,10 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
 			Interval: string(s.NeutralBollinger.Interval),
 		})
+	}
+
+	for _, stopController := range s.stopControllers {
+		stopController.Subscribe(session)
 	}
 }
 
@@ -640,4 +794,8 @@ func calculateBandPercentage(up, down, sma, midPrice float64) float64 {
 
 func inBetween(x, a, b float64) bool {
 	return a < x && x < b
+}
+
+func changeRate(a, b float64) float64 {
+	return math.Abs(a-b) / b
 }
