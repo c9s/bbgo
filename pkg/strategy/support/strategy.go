@@ -399,7 +399,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	if s.TrailingStopTarget.TrailingStopCallbackRatio != 0 {
 		// Update trailing stop when the position changes
 		s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
-			if position.Base.Float64() > 0 { // Update order if we have a position
+			if position.Base > 0 { // Update order if we have a position
 				// Cancel the original order
 				if err := s.cancelOrder(s.trailingStopControl.OrderID, ctx, session); err != nil {
 					log.WithError(err).Errorf("Can not cancel the original trailing stop order!")
@@ -452,7 +452,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		highPrice := fixedpoint.NewFromFloat(highPriceF)
 
 		if s.TrailingStopTarget.TrailingStopCallbackRatio > 0 {
-			if s.state.Position.Base.Float64() <= 0 { // Without a position
+			if s.state.Position.Base <= 0 { // Without a position
 				// Update trailing orders with current high price
 				s.trailingStopControl.CurrentHighestPrice = highPrice
 			} else if s.trailingStopControl.CurrentHighestPrice.Float64() < highPriceF { // With a position
