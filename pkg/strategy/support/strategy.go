@@ -79,7 +79,7 @@ func (stop *PercentageTargetStop) GenerateOrders(market types.Market, pos *types
 }
 
 type TrailingStopTarget struct {
-	TrailingStopCallBackRatio fixedpoint.Value `json:"callBackRatio"`
+	TrailingStopCallbackRatio fixedpoint.Value `json:"callbackRatio"`
 	MinimumProfitPercentage   fixedpoint.Value `json:"minimumProfitPercentage"`
 }
 
@@ -88,7 +88,7 @@ type TrailingStopControl struct {
 	market           types.Market
 	marginSideEffect types.MarginOrderSideEffectType
 
-	trailingStopCallBackRatio fixedpoint.Value
+	trailingStopCallbackRatio fixedpoint.Value
 	minimumProfitPercentage   fixedpoint.Value
 
 	CurrentHighestPrice fixedpoint.Value
@@ -96,13 +96,13 @@ type TrailingStopControl struct {
 }
 
 func (control *TrailingStopControl) IsHigherThanMin(minTargetPrice float64) bool {
-	targetPrice := control.CurrentHighestPrice.Float64() * (1 - control.trailingStopCallBackRatio.Float64())
+	targetPrice := control.CurrentHighestPrice.Float64() * (1 - control.trailingStopCallbackRatio.Float64())
 
 	return targetPrice >= minTargetPrice
 }
 
 func (control *TrailingStopControl) GenerateStopOrder(quantity float64) types.SubmitOrder {
-	targetPrice := control.CurrentHighestPrice.Float64() * (1 - control.trailingStopCallBackRatio.Float64())
+	targetPrice := control.CurrentHighestPrice.Float64() * (1 - control.trailingStopCallbackRatio.Float64())
 
 	orderForm := types.SubmitOrder{
 		Symbol:           control.symbol,
@@ -377,13 +377,13 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderStore = bbgo.NewOrderStore(s.Symbol)
 	s.orderStore.BindStream(session.UserDataStream)
 
-	if s.TrailingStopTarget.TrailingStopCallBackRatio != 0 {
+	if s.TrailingStopTarget.TrailingStopCallbackRatio != 0 {
 		s.trailingStopControl = &TrailingStopControl{
 			symbol:                    s.Symbol,
 			market:                    s.Market,
 			marginSideEffect:          s.MarginOrderSideEffect,
 			CurrentHighestPrice:       fixedpoint.NewFromInt(0),
-			trailingStopCallBackRatio: s.TrailingStopTarget.TrailingStopCallBackRatio,
+			trailingStopCallbackRatio: s.TrailingStopTarget.TrailingStopCallbackRatio,
 			minimumProfitPercentage:   s.TrailingStopTarget.MinimumProfitPercentage,
 		}
 	}
@@ -396,7 +396,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.tradeCollector = bbgo.NewTradeCollector(s.Symbol, s.state.Position, s.orderStore)
 
-	if s.TrailingStopTarget.TrailingStopCallBackRatio != 0 {
+	if s.TrailingStopTarget.TrailingStopCallbackRatio != 0 {
 		// Update trailing stop when the position changes
 		s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
 			if position.Base.Float64() > 0 { // Update order if we have a position
@@ -451,7 +451,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		highPriceF := kline.GetHigh()
 		highPrice := fixedpoint.NewFromFloat(highPriceF)
 
-		if s.TrailingStopTarget.TrailingStopCallBackRatio > 0 {
+		if s.TrailingStopTarget.TrailingStopCallbackRatio > 0 {
 			if s.state.Position.Base.Float64() <= 0 { // Without a position
 				// Update trailing orders with current high price
 				s.trailingStopControl.CurrentHighestPrice = highPrice
@@ -582,7 +582,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			s.Notify("%s position is saved", s.Symbol, s.state.Position)
 		}
 
-		if s.TrailingStopTarget.TrailingStopCallBackRatio == 0 { // submit fixed target orders
+		if s.TrailingStopTarget.TrailingStopCallbackRatio == 0 { // submit fixed target orders
 			var targetOrders []types.SubmitOrder
 			for _, target := range s.Targets {
 				targetPrice := closePrice.Float64() * (1.0 + target.ProfitPercentage)
@@ -623,7 +623,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		defer wg.Done()
 
 		// Cancel trailing stop order
-		if s.TrailingStopTarget.TrailingStopCallBackRatio > 0 {
+		if s.TrailingStopTarget.TrailingStopCallbackRatio > 0 {
 			if err := s.cancelOrder(s.trailingStopControl.OrderID, ctx, session); err != nil {
 				log.WithError(err).Errorf("Can not cancel the trailing stop order!")
 			}
