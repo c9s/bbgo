@@ -79,7 +79,7 @@ func (stop *PercentageTargetStop) GenerateOrders(market types.Market, pos *types
 }
 
 type TrailingStopTarget struct {
-	TrailingStopCallBackRatio fixedpoint.Value `json:"trailingStopCallBackRatio"`
+	TrailingStopCallBackRatio fixedpoint.Value `json:"callBackRatio"`
 	MinimumProfitPercentage   fixedpoint.Value `json:"minimumProfitPercentage"`
 }
 
