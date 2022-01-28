@@ -39,7 +39,7 @@ This strategy uses K-lines with high volume as support and buys the target asset
           profit.
 - `trailingStopTarget`
   - Use trailing stop to take profit
-  - `callBackRatio`
+  - `callbackRatio`
     - Callback ratio of the trailing stop
   - `minimumProfitPercentage`
     - The minimum profit ratio of the trailing stop. The trailing stop is triggered when the profit is higher than the minimum.

@@ -72,7 +72,7 @@ exchangeStrategies:
     minQuoteAssetBalance: 2000.0
 
     #trailingStopTarget:
-    #  callBackRatio: 0.015
+    #  callbackRatio: 0.015
     #  minimumProfitPercentage: 0.02
 
     targets:
