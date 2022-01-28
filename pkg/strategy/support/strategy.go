@@ -235,10 +235,12 @@ func (s *Strategy) LoadState() error {
 		s.state.Position = types.NewPositionFromMarket(s.Market)
 	}
 
-	if s.state.CurrentHighestPrice == nil {
-		s.trailingStopControl.CurrentHighestPrice = fixedpoint.NewFromInt(0)
+	if s.trailingStopControl != nil {
+		if s.state.CurrentHighestPrice == nil {
+			s.trailingStopControl.CurrentHighestPrice = fixedpoint.NewFromInt(0)
+		}
+		s.state.CurrentHighestPrice = &s.trailingStopControl.CurrentHighestPrice
 	}
-	s.state.CurrentHighestPrice = &s.trailingStopControl.CurrentHighestPrice
 
 	return nil
 }
