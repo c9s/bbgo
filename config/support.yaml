@@ -71,6 +71,10 @@ exchangeStrategies:
     maxBaseAssetBalance: 1000.0
     minQuoteAssetBalance: 2000.0
 
+    #trailingStopTarget:
+    #  callBackRatio: 0.015
+    #  minimumProfitPercentage: 0.02
+
     targets:
     - profitPercentage: 0.02
       quantityPercentage: 0.5
