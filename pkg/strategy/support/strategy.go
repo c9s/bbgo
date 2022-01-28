@@ -95,17 +95,6 @@ type TrailingStopControl struct {
 	OrderID             uint64
 }
 
-func NewTrailingStopControl(symbol string, market types.Market, marginSideEffect types.MarginOrderSideEffectType, trailingStopCallBackRatio float64, minimumProfitPercentage float64) *TrailingStopControl {
-	return &TrailingStopControl{
-		symbol:                    symbol,
-		market:                    market,
-		marginSideEffect:          marginSideEffect,
-		CurrentHighestPrice:       fixedpoint.NewFromInt(0),
-		trailingStopCallBackRatio: trailingStopCallBackRatio,
-		minimumProfitPercentage:   minimumProfitPercentage,
-	}
-}
-
 func (control *TrailingStopControl) IsHigherThanMin(minTargetPrice float64) bool {
 	targetPrice := control.CurrentHighestPrice.Float64() * (1 - control.trailingStopCallBackRatio)
 
@@ -387,7 +376,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderStore.BindStream(session.UserDataStream)
 
 	if s.TrailingStopTarget.TrailingStopCallBackRatio != 0 {
-		s.trailingStopControl = NewTrailingStopControl(s.Symbol, s.Market, s.MarginOrderSideEffect, s.TrailingStopTarget.TrailingStopCallBackRatio, s.TrailingStopTarget.MinimumProfitPercentage)
+		s.trailingStopControl = &TrailingStopControl{
+			symbol:                    s.Symbol,
+			market:                    s.Market,
+			marginSideEffect:          s.MarginOrderSideEffect,
+			CurrentHighestPrice:       fixedpoint.NewFromInt(0),
+			trailingStopCallBackRatio: s.TrailingStopTarget.TrailingStopCallBackRatio,
+			minimumProfitPercentage:   s.TrailingStopTarget.MinimumProfitPercentage,
+		}
 	}
 
 	if err := s.LoadState(); err != nil {
