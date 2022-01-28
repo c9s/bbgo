@@ -29,7 +29,7 @@ func init() {
 
 type State struct {
 	Position            *types.Position   `json:"position,omitempty"`
-	CurrentHighestPrice *fixedpoint.Value `json:"position,omitempty"`
+	CurrentHighestPrice *fixedpoint.Value `json:"currentHighestPrice,omitempty"`
 }
 
 type Target struct {
