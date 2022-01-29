@@ -134,9 +134,9 @@ func (c *TrailingStopController) Run(ctx context.Context, session *bbgo.Exchange
 				return
 			}
 
-			log.Infof("trailing stop event emitted, submitting market order to stop...")
 			marketOrder := c.position.NewClosePositionOrder(c.ClosePosition.Float64())
 			if marketOrder != nil {
+				log.Infof("trailing stop event emitted, submitting market order to stop: %+v", marketOrder)
 				// skip dust order
 				if marketOrder.Quantity*closePrice < c.position.Market.MinNotional {
 					return
@@ -147,6 +147,10 @@ func (c *TrailingStopController) Run(ctx context.Context, session *bbgo.Exchange
 					log.WithError(err).Errorf("stop order place error")
 				}
 				tradeCollector.OrderStore().Add(createdOrders...)
+				tradeCollector.Process()
+
+				// reset the state
+				c.latestHigh = 0.0
 			}
 		} else {
 			// place stop order only when the closed price is greater than the current average cost
@@ -163,6 +167,7 @@ func (c *TrailingStopController) Run(ctx context.Context, session *bbgo.Exchange
 						log.WithError(err).Errorf("stop order place error")
 					}
 					tradeCollector.OrderStore().Add(createdOrders...)
+					tradeCollector.Process()
 				}
 			}
 		}
@@ -511,8 +516,8 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 
 	log.Infof("calculated max exposure position: %f", maxExposurePosition.Float64())
 
-	canBuy := hasQuoteBalance && quoteBalance.Available > s.Quantity.Mul(midPrice) && (maxExposurePosition > 0 && base < maxExposurePosition)
-	canSell := hasBaseBalance && baseBalance.Available > s.Quantity && (maxExposurePosition > 0 && base > -maxExposurePosition)
+	canBuy := maxExposurePosition > 0 && base < maxExposurePosition
+	canSell := maxExposurePosition > 0 && base > -maxExposurePosition
 
 	if s.ShadowProtection && kline != nil {
 		switch kline.Direction() {
@@ -570,6 +575,14 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 		ratio := 1.0 / skew
 		sellOrder.Quantity = math.Max(s.market.MinQuantity, buyOrder.Quantity*ratio)
 
+	}
+
+	if !hasQuoteBalance || (buyOrder.Quantity*buyOrder.Price) > quoteBalance.Available.Float64() {
+		canBuy = false
+	}
+
+	if !hasBaseBalance || sellOrder.Quantity > baseBalance.Available.Float64() {
+		canSell = false
 	}
 
 	if canSell && midPrice > s.state.Position.AverageCost.MulFloat64(1.0+s.MinProfitSpread.Float64()) {
