@@ -109,10 +109,15 @@ func (m *SimplePriceMatching) CancelOrder(o types.Order) (types.Order, error) {
 }
 
 func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (closedOrders *types.Order, trades *types.Trade, err error) {
-	// price for checking account balance
+	// price for checking account balance, default price
 	price := o.Price
+
 	switch o.Type {
 	case types.OrderTypeMarket:
+		if m.LastPrice == 0 {
+			panic("unexpected: last price can not be zero")
+		}
+
 		price = m.LastPrice.Float64()
 	case types.OrderTypeLimit, types.OrderTypeLimitMaker:
 		price = o.Price
@@ -156,12 +161,13 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (closedOrders *typ
 		order.Status = types.OrderStatusFilled
 		order.ExecutedQuantity = order.Quantity
 		order.Price = price
+		order.IsWorking = false
 		m.EmitOrderUpdate(order)
-		m.EmitBalanceUpdate(m.Account.Balances())
 		return &order, &trade, nil
 	}
 
 	// for limit maker orders
+	// TODO: handle limit taker order
 	switch o.Side {
 
 	case types.SideTypeBuy:
@@ -219,6 +225,10 @@ func (m *SimplePriceMatching) newTradeFromOrder(order types.Order, isMaker bool)
 	price := order.Price
 	switch order.Type {
 	case types.OrderTypeMarket, types.OrderTypeStopMarket:
+		if m.LastPrice == 0 {
+			panic("unexpected: last price can not be zero")
+		}
+
 		price = m.LastPrice.Float64()
 
 	}
@@ -237,7 +247,6 @@ func (m *SimplePriceMatching) newTradeFromOrder(order types.Order, isMaker bool)
 		feeCurrency = m.Market.QuoteCurrency
 
 	}
-
 
 	var id = incTradeID()
 	return types.Trade{
