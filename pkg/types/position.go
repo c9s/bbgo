@@ -64,10 +64,10 @@ func (p *Position) NewClosePositionOrder(percentage float64) *SubmitOrder {
 	side := SideTypeSell
 	if base == 0 {
 		return nil
-	}
-
-	if base < 0 {
+	} else if base < 0 {
 		side = SideTypeBuy
+	} else if base > 0 {
+		side = SideTypeSell
 	}
 
 	return &SubmitOrder{
