@@ -754,10 +754,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
-		if kline.Symbol != s.Symbol {
-			return
-		}
-		if kline.Interval != s.Interval {
+		if kline.Symbol != s.Symbol || kline.Interval != s.Interval {
 			return
 		}
 
@@ -765,6 +762,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			log.WithError(err).Errorf("graceful cancel order error")
 		}
 
+		// check if there is a canceled order had partially filled.
 		s.tradeCollector.Process()
 
 		if s.UseTickerPrice {
