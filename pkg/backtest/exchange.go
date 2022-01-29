@@ -148,7 +148,7 @@ func (e *Exchange) NewStream() types.Stream {
 	return &Stream{exchange: e}
 }
 
-func (e Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error) {
+func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error) {
 	for _, order := range orders {
 		symbol := order.Symbol
 		matching, ok := e.matchingBook(symbol)
@@ -156,7 +156,7 @@ func (e Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder)
 			return nil, fmt.Errorf("matching engine is not initialized for symbol %s", symbol)
 		}
 
-		createdOrder, trade, err := matching.PlaceOrder(order)
+		createdOrder, _, err := matching.PlaceOrder(order)
 		if err != nil {
 			return nil, err
 		}
@@ -172,16 +172,12 @@ func (e Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder)
 
 			e.userDataStream.EmitOrderUpdate(*createdOrder)
 		}
-
-		if trade != nil {
-			e.userDataStream.EmitTradeUpdate(*trade)
-		}
 	}
 
 	return createdOrders, nil
 }
 
-func (e Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
+func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
 	matching, ok := e.matchingBook(symbol)
 	if !ok {
 		return nil, fmt.Errorf("matching engine is not initialized for symbol %s", symbol)
@@ -190,7 +186,7 @@ func (e Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []
 	return append(matching.bidOrders, matching.askOrders...), nil
 }
 
-func (e Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []types.Order, err error) {
+func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []types.Order, err error) {
 	orders, ok := e.closedOrders[symbol]
 	if !ok {
 		return orders, fmt.Errorf("matching engine is not initialized for symbol %s", symbol)
@@ -199,7 +195,7 @@ func (e Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, u
 	return orders, nil
 }
 
-func (e Exchange) CancelOrders(ctx context.Context, orders ...types.Order) error {
+func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) error {
 	for _, order := range orders {
 		matching, ok := e.matchingBook(order.Symbol)
 		if !ok {
@@ -216,7 +212,7 @@ func (e Exchange) CancelOrders(ctx context.Context, orders ...types.Order) error
 	return nil
 }
 
-func (e Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
+func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	return e.account, nil
 }
 
@@ -224,7 +220,7 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 	return e.account.Balances(), nil
 }
 
-func (e Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
+func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
 	if options.EndTime != nil {
 		return e.srv.QueryKLinesBackward(e.sourceName, symbol, interval, *options.EndTime, 1000)
 	}
@@ -236,12 +232,12 @@ func (e Exchange) QueryKLines(ctx context.Context, symbol string, interval types
 	return nil, errors.New("endTime or startTime can not be nil")
 }
 
-func (e Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) ([]types.Trade, error) {
+func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) ([]types.Trade, error) {
 	// we don't need query trades for backtest
 	return nil, nil
 }
 
-func (e Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticker, error) {
+func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticker, error) {
 	matching, ok := e.matchingBook(symbol)
 	if !ok {
 		return nil, fmt.Errorf("matching engine is not initialized for symbol %s", symbol)
@@ -260,20 +256,20 @@ func (e Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticker
 	}, nil
 }
 
-func (e Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[string]types.Ticker, error) {
+func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[string]types.Ticker, error) {
 	// Not using Tickers in back test (yet)
 	return nil, ErrUnimplemented
 }
 
-func (e Exchange) Name() types.ExchangeName {
+func (e *Exchange) Name() types.ExchangeName {
 	return e.publicExchange.Name()
 }
 
-func (e Exchange) PlatformFeeCurrency() string {
+func (e *Exchange) PlatformFeeCurrency() string {
 	return e.publicExchange.PlatformFeeCurrency()
 }
 
-func (e Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
+func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 	return e.markets, nil
 }
 

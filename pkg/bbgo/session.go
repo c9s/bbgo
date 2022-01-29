@@ -3,9 +3,10 @@ package bbgo
 import (
 	"context"
 	"fmt"
-	"github.com/c9s/bbgo/pkg/cache"
 	"strings"
 	"time"
+
+	"github.com/c9s/bbgo/pkg/cache"
 
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
