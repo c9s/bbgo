@@ -145,7 +145,8 @@ func (c *TrailingStopController) Run(ctx context.Context, session *bbgo.Exchange
 
 				createdOrders, err := session.Exchange.SubmitOrders(ctx, *marketOrder)
 				if err != nil {
-					log.WithError(err).Errorf("stop order place error")
+					log.WithError(err).Errorf("stop market order place error")
+					return
 				}
 				tradeCollector.OrderStore().Add(createdOrders...)
 				tradeCollector.Process()
@@ -721,7 +722,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 
 	s.tradeCollector.OnTrade(func(trade types.Trade) {
-		log.Infof("trade: %s", trade)
 		s.Notifiability.Notify(trade)
 		s.state.ProfitStats.AddTrade(trade)
 	})
