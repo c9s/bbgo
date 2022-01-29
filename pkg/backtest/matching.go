@@ -216,6 +216,13 @@ func (m *SimplePriceMatching) newTradeFromOrder(order types.Order, isMaker bool)
 		}
 	}
 
+	price := order.Price
+	switch order.Type {
+	case types.OrderTypeMarket, types.OrderTypeStopMarket:
+		price = m.LastPrice.Float64()
+
+	}
+
 	var fee float64
 	var feeCurrency string
 
@@ -226,17 +233,11 @@ func (m *SimplePriceMatching) newTradeFromOrder(order types.Order, isMaker bool)
 		feeCurrency = m.Market.BaseCurrency
 
 	case types.SideTypeSell:
-		fee = order.Quantity * order.Price * feeRate
+		fee = order.Quantity * price * feeRate
 		feeCurrency = m.Market.QuoteCurrency
 
 	}
 
-	price := order.Price
-	switch order.Type {
-	case types.OrderTypeMarket, types.OrderTypeStopMarket:
-		price = m.LastPrice.Float64()
-
-	}
 
 	var id = incTradeID()
 	return types.Trade{
