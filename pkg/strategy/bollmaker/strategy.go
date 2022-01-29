@@ -90,9 +90,10 @@ func (c *TrailingStopController) Subscribe(session *bbgo.ExchangeSession) {
 	})
 }
 
-func (c *TrailingStopController) Setup(ctx context.Context, session *bbgo.ExchangeSession, tradeCollector *bbgo.TradeCollector) {
+func (c *TrailingStopController) Run(ctx context.Context, session *bbgo.ExchangeSession, tradeCollector *bbgo.TradeCollector) {
 	// store the position
 	c.position = tradeCollector.Position()
+	c.averageCost = c.position.AverageCost
 
 	// Use trade collector to get the position update event
 	tradeCollector.OnPositionUpdate(func(position *types.Position) {
@@ -101,11 +102,7 @@ func (c *TrailingStopController) Setup(ctx context.Context, session *bbgo.Exchan
 	})
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
-		if kline.Symbol != c.Symbol {
-			return
-		}
-
-		if kline.Interval != c.Interval {
+		if kline.Symbol != c.Symbol || kline.Interval != c.Interval {
 			return
 		}
 
@@ -115,7 +112,13 @@ func (c *TrailingStopController) Setup(ctx context.Context, session *bbgo.Exchan
 		c.latestHigh = math.Max(closePrice, c.latestHigh)
 
 		if c.Virtual {
-			if c.position == nil {
+			// if average cost is updated, we can check min profit
+			if c.averageCost == 0 {
+				return
+			}
+
+			// skip dust position
+			if c.position.Base.Abs().Float64() < c.position.Market.MinQuantity || c.position.Base.Abs().Float64()*closePrice < c.position.Market.MinNotional {
 				return
 			}
 
@@ -124,24 +127,21 @@ func (c *TrailingStopController) Setup(ctx context.Context, session *bbgo.Exchan
 				return
 			}
 
-			// if average cost is updated, we can check min profit
-			if c.averageCost == 0 {
-				return
-			}
-
-			// if it's below the average cost, we skip stop
-			if closePrice < c.averageCost.Float64() {
-				return
-			}
-
 			// if the profit rate is defined, and it is less than our minimum profit rate, we skip stop
-			if c.MinProfit > 0 && changeRate(closePrice, c.averageCost.Float64()) < c.MinProfit.Float64() {
+			if c.MinProfit > 0 &&
+				(closePrice < c.averageCost.Float64() ||
+					changeRate(closePrice, c.averageCost.Float64()) < c.MinProfit.Float64()) {
 				return
 			}
 
 			log.Infof("trailing stop event emitted, submitting market order to stop...")
 			marketOrder := c.position.NewClosePositionOrder(c.ClosePosition.Float64())
 			if marketOrder != nil {
+				// skip dust order
+				if marketOrder.Quantity*closePrice < c.position.Market.MinNotional {
+					return
+				}
+
 				createdOrders, err := session.Exchange.SubmitOrders(ctx, *marketOrder)
 				if err != nil {
 					log.WithError(err).Errorf("stop order place error")
@@ -176,12 +176,16 @@ func (c *TrailingStopController) GenerateStopOrder(stopPrice, price float64) *ty
 	}
 
 	quantity := math.Abs(base.Float64())
+	quoteQuantity := price * quantity
 
 	if c.ClosePosition > 0 {
 		quantity = quantity * c.ClosePosition.Float64()
 	}
 
-	quantity = math.Min(quantity, c.position.Market.MinQuantity)
+	// skip dust orders
+	if quantity < c.position.Market.MinQuantity || quoteQuantity < c.position.Market.MinNotional {
+		return nil
+	}
 
 	side := types.SideTypeSell
 	if base < 0 {
@@ -317,10 +321,11 @@ func (s *Strategy) ID() string {
 	return ID
 }
 
-func (s *Strategy) Initialize(session *bbgo.ExchangeSession) error {
+func (s *Strategy) Initialize() error {
 	for _, stop := range s.Stops {
 		s.stopControllers = append(s.stopControllers,
-			NewTrailingStopController(s.Symbol, stop.TrailingStop))
+			NewTrailingStopController(s.Symbol, stop.TrailingStop),
+		)
 	}
 	return nil
 }
@@ -713,6 +718,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 
 	s.tradeCollector.BindStream(session.UserDataStream)
+
+	for _, stopController := range s.stopControllers {
+		stopController.Run(ctx, session, s.tradeCollector)
+	}
 
 	session.UserDataStream.OnStart(func() {
 		if s.UseTickerPrice {

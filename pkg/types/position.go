@@ -2,7 +2,6 @@ package types
 
 import (
 	"fmt"
-	"math"
 	"sync"
 	"time"
 
@@ -58,7 +57,10 @@ func (p *Position) NewClosePositionOrder(percentage float64) *SubmitOrder {
 	base := p.GetBase()
 	quantity := base.Float64()
 	quantity = quantity * percentage
-	quantity = math.Min(quantity, p.Market.MinQuantity)
+	if quantity < p.Market.MinQuantity {
+		return nil
+	}
+
 	side := SideTypeSell
 	if base == 0 {
 		return nil
