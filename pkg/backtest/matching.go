@@ -109,7 +109,6 @@ func (m *SimplePriceMatching) CancelOrder(o types.Order) (types.Order, error) {
 }
 
 func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (closedOrders *types.Order, trades *types.Trade, err error) {
-
 	// price for checking account balance
 	price := o.Price
 	switch o.Type {
@@ -119,16 +118,23 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (closedOrders *typ
 		price = o.Price
 	}
 
+	if o.Quantity < m.Market.MinQuantity {
+		return nil, nil, fmt.Errorf("order quantity %f is less than minQuantity %f, order: %+v", o.Quantity, m.Market.MinQuantity, o)
+	}
+
+	quoteQuantity := o.Quantity * price
+	if quoteQuantity < m.Market.MinNotional {
+		return nil, nil, fmt.Errorf("order amount %f is less than minNotional %f, order: %+v", quoteQuantity, m.Market.MinNotional, o)
+	}
+
 	switch o.Side {
 	case types.SideTypeBuy:
-		quote := price * o.Quantity
-		if err := m.Account.LockBalance(m.Market.QuoteCurrency, fixedpoint.NewFromFloat(quote)); err != nil {
+		if err := m.Account.LockBalance(m.Market.QuoteCurrency, fixedpoint.NewFromFloat(quoteQuantity)); err != nil {
 			return nil, nil, err
 		}
 
 	case types.SideTypeSell:
-		baseQuantity := o.Quantity
-		if err := m.Account.LockBalance(m.Market.BaseCurrency, fixedpoint.NewFromFloat(baseQuantity)); err != nil {
+		if err := m.Account.LockBalance(m.Market.BaseCurrency, fixedpoint.NewFromFloat(o.Quantity)); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -427,8 +433,8 @@ func (m *SimplePriceMatching) processKLine(kline types.KLine) {
 		} else {
 			m.BuyToPrice(fixedpoint.NewFromFloat(kline.Close))
 		}
-    default: // no trade up or down
-		if (m.LastPrice == 0) {
+	default: // no trade up or down
+		if m.LastPrice == 0 {
 			m.BuyToPrice(fixedpoint.NewFromFloat(kline.Close))
 		}
 

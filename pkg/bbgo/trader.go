@@ -175,18 +175,16 @@ func (trader *Trader) SetRiskControls(riskControls *RiskControls) {
 	trader.riskControls = riskControls
 }
 
-
 func (trader *Trader) Subscribe() {
 	// pre-subscribe the data
 	for sessionName, strategies := range trader.exchangeStrategies {
 		session := trader.environment.sessions[sessionName]
 		for _, strategy := range strategies {
-			for _, strategy := range strategies {
-				if initializer, ok := strategy.(StrategyInitializer); ok {
-					initializer.Initialize()
+			if initializer, ok := strategy.(StrategyInitializer); ok {
+				if err := initializer.Initialize(); err != nil {
+					panic(err)
 				}
 			}
-
 
 			if subscriber, ok := strategy.(ExchangeSessionSubscriber); ok {
 				subscriber.Subscribe(session)
@@ -197,9 +195,9 @@ func (trader *Trader) Subscribe() {
 	}
 
 	for _, strategy := range trader.crossExchangeStrategies {
-		for _, strategy := range strategies {
-			if initializer, ok := strategy.(StrategyInitializer); ok {
-				initializer.Initialize()
+		if initializer, ok := strategy.(StrategyInitializer); ok {
+			if err := initializer.Initialize(); err != nil {
+				panic(err)
 			}
 		}
 
