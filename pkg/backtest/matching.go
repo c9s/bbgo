@@ -231,14 +231,21 @@ func (m *SimplePriceMatching) newTradeFromOrder(order types.Order, isMaker bool)
 
 	}
 
+	price := order.Price
+	switch order.Type {
+	case types.OrderTypeMarket, types.OrderTypeStopMarket:
+		price = m.LastPrice.Float64()
+
+	}
+
 	var id = incTradeID()
 	return types.Trade{
 		ID:            id,
 		OrderID:       order.OrderID,
 		Exchange:      "backtest",
-		Price:         order.Price,
+		Price:         price,
 		Quantity:      order.Quantity,
-		QuoteQuantity: order.Quantity * order.Price,
+		QuoteQuantity: order.Quantity * price,
 		Symbol:        order.Symbol,
 		Side:          order.Side,
 		IsBuyer:       order.Side == types.SideTypeBuy,
