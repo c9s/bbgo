@@ -136,9 +136,10 @@ func (c *TrailingStopController) Run(ctx context.Context, session *bbgo.Exchange
 
 			marketOrder := c.position.NewClosePositionOrder(c.ClosePosition.Float64())
 			if marketOrder != nil {
-				log.Infof("trailing stop event emitted, submitting market order to stop: %+v", marketOrder)
+				log.Infof("trailing stop event emitted, latest high: %f, closed price: %f, average cost: %f, submitting market order to stop: %+v", c.latestHigh, closePrice, c.averageCost.Float64(), marketOrder)
 				// skip dust order
 				if marketOrder.Quantity*closePrice < c.position.Market.MinNotional {
+					log.Warnf("market order quote quantity %f < min notional %f, skip placing order", marketOrder.Quantity*closePrice, c.position.Market.MinNotional)
 					return
 				}
 
