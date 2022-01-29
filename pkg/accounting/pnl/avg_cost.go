@@ -3,6 +3,8 @@ package pnl
 import (
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -44,19 +46,28 @@ func (c *AverageCostCalculator) Calculate(symbol string, trades []types.Trade, c
 	var totalProfit fixedpoint.Value
 	var totalNetProfit fixedpoint.Value
 
-	for _, trade := range trades {
-		if trade.Symbol == symbol {
-			profit, netProfit, madeProfit := position.AddTrade(trade)
-			if madeProfit {
-				totalProfit += profit
-				totalNetProfit += netProfit
-			}
+	var tradeIDs = map[uint64]types.Trade{}
 
-			if trade.IsBuyer {
-				bidVolume += trade.Quantity
-			} else {
-				askVolume += trade.Quantity
-			}
+	for _, trade := range trades {
+		if _, exists := tradeIDs[trade.ID]; exists {
+			log.Warnf("duplicated trade: %+v", trade)
+			continue
+		}
+
+		if trade.Symbol != symbol {
+			continue
+		}
+
+		profit, netProfit, madeProfit := position.AddTrade(trade)
+		if madeProfit {
+			totalProfit += profit
+			totalNetProfit += netProfit
+		}
+
+		if trade.IsBuyer {
+			bidVolume += trade.Quantity
+		} else {
+			askVolume += trade.Quantity
 		}
 
 		if _, ok := currencyFees[trade.FeeCurrency]; !ok {
@@ -64,6 +75,8 @@ func (c *AverageCostCalculator) Calculate(symbol string, trades []types.Trade, c
 		} else {
 			currencyFees[trade.FeeCurrency] += trade.Fee
 		}
+
+		tradeIDs[trade.ID] = trade
 	}
 
 	unrealizedProfit := (fixedpoint.NewFromFloat(currentPrice) - position.AverageCost).Mul(position.GetBase())
