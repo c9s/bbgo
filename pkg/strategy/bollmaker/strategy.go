@@ -134,9 +134,18 @@ func (c *TrailingStopController) Run(ctx context.Context, session *bbgo.Exchange
 				return
 			}
 
+			log.Infof("trailing stop emitted, latest high: %f, closed price: %f, average cost: %f, profit spread: %f",
+				c.latestHigh,
+				closePrice,
+				c.averageCost.Float64(),
+				closePrice-c.averageCost.Float64())
+
+			log.Infof("current position: %s", c.position.String())
+
 			marketOrder := c.position.NewClosePositionOrder(c.ClosePosition.Float64())
 			if marketOrder != nil {
-				log.Infof("trailing stop event emitted, latest high: %f, closed price: %f, average cost: %f, submitting market order to stop: %+v", c.latestHigh, closePrice, c.averageCost.Float64(), marketOrder)
+				log.Infof("submitting market order to stop: %+v", marketOrder)
+
 				// skip dust order
 				if marketOrder.Quantity*closePrice < c.position.Market.MinNotional {
 					log.Warnf("market order quote quantity %f < min notional %f, skip placing order", marketOrder.Quantity*closePrice, c.position.Market.MinNotional)
@@ -705,6 +714,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.tradeCollector = bbgo.NewTradeCollector(s.Symbol, s.state.Position, s.orderStore)
 	s.tradeCollector.OnProfit(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
+		log.Infof("generated profit: %f", profit.Float64())
 		p := bbgo.Profit{
 			Symbol:          s.Symbol,
 			Profit:          profit,
