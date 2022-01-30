@@ -2,7 +2,7 @@ package bbgo
 
 import (
 	"fmt"
-	"github.com/c9s/bbgo/pkg/fixedpoint"
+
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -12,8 +12,8 @@ type MovingAverageSettings struct {
 	Window   int            `json:"window"`
 
 	Side     *types.SideType   `json:"side"`
-	Quantity *fixedpoint.Value `json:"quantity"`
-	Amount   *fixedpoint.Value `json:"amount"`
+
+	QuantityOrAmount
 }
 
 func (settings MovingAverageSettings) IntervalWindow() types.IntervalWindow {
