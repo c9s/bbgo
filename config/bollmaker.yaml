@@ -64,11 +64,11 @@ exchangeStrategies:
       byPercentage:
         # exp means we want to use exponential scale, you can replace "exp" with "linear" for linear scale
         exp:
-          # from down to up
+          # from lower band -100% (-1) to upper band 100% (+1)
           domain: [ -1, 1 ]
           # when in down band, holds 1.0 by maximum
           # when in up band, holds 0.05 by maximum
-          range: [ 1.0, 0.05 ]
+          range: [ 10.0, 1.0 ]
 
     # DisableShort means you can don't want short position during the market making
     # THe short here means you might sell some of your existing inventory.
@@ -94,3 +94,29 @@ exchangeStrategies:
 
     persistence:
       type: redis
+
+    # Set up your stop order, this is optional
+    # sometimes the stop order might decrease your total profit.
+    # you can setup multiple stop,
+    stops:
+    # use trailing stop order
+    - trailingStop:
+        # callbackRate: when the price reaches -1% from the previous highest, we trigger the stop
+        callbackRate: 5.1%
+
+        # closePosition is how much position do you want to close
+        closePosition: 20%
+
+        # minProfit is how much profit you want to take.
+        # if you set this option, your stop will only be triggered above the average cost.
+        minProfit: 5%
+
+        # interval is the time interval for checking your stop
+        interval: 1m
+
+        # virtual means we don't place a a REAL stop order
+        # when virtual is on
+        # the strategy won't place a REAL stop order, instead if watches the close price,
+        # and if the condition matches, it submits a market order to close your position.
+        virtual: true
+
