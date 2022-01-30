@@ -135,7 +135,7 @@ type Strategy struct {
 	ShadowProtection      bool             `json:"shadowProtection"`
 	ShadowProtectionRatio fixedpoint.Value `json:"shadowProtectionRatio"`
 
-	SmartStops
+	bbgo.SmartStops
 
 	session *bbgo.ExchangeSession
 	book    *types.StreamOrderBook
@@ -311,8 +311,8 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 		s.state.Position.String(),
 	)
 
-	sellQuantity := s.CalculateQuantity(askPrice)
-	buyQuantity := s.CalculateQuantity(bidPrice)
+	sellQuantity := s.QuantityOrAmount.CalculateQuantity(askPrice)
+	buyQuantity := s.QuantityOrAmount.CalculateQuantity(bidPrice)
 
 	sellOrder := types.SubmitOrder{
 		Symbol:   s.Symbol,
@@ -652,6 +652,3 @@ func inBetween(x, a, b float64) bool {
 	return a < x && x < b
 }
 
-func changeRate(a, b float64) float64 {
-	return math.Abs(a-b) / b
-}
