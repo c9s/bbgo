@@ -37,7 +37,13 @@ exchangeStrategies:
 
     symbol: ETHUSDT
     side: buy
+
+    # quantity is the quantity of the crypto (in base currency) you want to buy/sell
     # quantity: 0.01
+
+    # amount is the quote quantity of the crypto (in quote currency), here is USDT.
+    # 11.0 means you want to buy ETH with 11 USDT.
+    # the quantity will be calculated automatically, according to the latest price
     amount: 11.0
 
     # belowMovingAverage is a special override (optional)
