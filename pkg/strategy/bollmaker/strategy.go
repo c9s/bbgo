@@ -68,6 +68,12 @@ type Strategy struct {
 	// Spread can be set by percentage or floating number. e.g., 0.1% or 0.001
 	Spread fixedpoint.Value `json:"spread"`
 
+	// BidSpread overrides the spread setting, this spread will be used for the buy order
+	BidSpread fixedpoint.Value `json:"bidSpread,omitempty"`
+
+	// AskSpread overrides the spread setting, this spread will be used for the sell order
+	AskSpread fixedpoint.Value `json:"askSpread,omitempty"`
+
 	// MinProfitSpread is the minimal order price spread from the current average cost.
 	// For long position, you will only place sell order above the price (= average cost * (1 + minProfitSpread))
 	// For short position, you will only place buy order below the price (= average cost * (1 - minProfitSpread))
