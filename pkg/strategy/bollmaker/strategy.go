@@ -288,8 +288,18 @@ func (s *Strategy) getCurrentAllowedExposurePosition(bandPercentage float64) (fi
 }
 
 func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExecutor, midPrice fixedpoint.Value, kline *types.KLine) {
-	askPrice := midPrice.Mul(one + s.Spread)
-	bidPrice := midPrice.Mul(one - s.Spread)
+	bidSpread := s.Spread
+	if s.BidSpread > 0 {
+		bidSpread = s.BidSpread
+	}
+
+	askSpread := s.Spread
+	if s.AskSpread > 0 {
+		askSpread = s.AskSpread
+	}
+
+	askPrice := midPrice.Mul(one + askSpread)
+	bidPrice := midPrice.Mul(one - bidSpread)
 	base := s.state.Position.GetBase()
 	balances := s.session.Account.Balances()
 
