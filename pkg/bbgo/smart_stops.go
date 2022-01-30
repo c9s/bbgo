@@ -138,7 +138,7 @@ func (c *TrailingStopController) Run(ctx context.Context, session *ExchangeSessi
 				orderForm := c.GenerateStopOrder(stopPrice.Float64(), c.averageCost.Float64())
 				if orderForm != nil {
 					log.Infof("updating %s stop limit order to simulate trailing stop order...", c.Symbol)
-				
+
 					createdOrders, err := session.Exchange.SubmitOrders(ctx, *orderForm)
 					if err != nil {
 						log.WithError(err).Errorf("%s stop order place error", c.Symbol)
