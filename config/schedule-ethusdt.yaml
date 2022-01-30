@@ -7,7 +7,7 @@ backtest:
   - ETHUSDT
   account:
     balances:
-      ETH: 0.0
+      ETH: 1.0
       USDT: 20_000.0
 
 riskControls:
@@ -40,6 +40,7 @@ exchangeStrategies:
     # quantity: 0.01
     amount: 11.0
 
+    # belowMovingAverage is a special override (optional)
     # execute order only when the closed price is below the moving average line.
     # you can open the app to adjust your parameters here.
     # the interval here could be different from the triggering interval.
@@ -47,6 +48,23 @@ exchangeStrategies:
       type: EWMA
       interval: 1h
       window: 99
+
+      # you can override the default side
+      side: buy
+
+      # you can choose one of quantity or amount
       # quantity: 0.05
+      # amount is how much quote balance you want to buy
+      # here 11.0 means you want to buy ETH with 11.0 USDT
+      # please note that crypto exchange requires you to submit an order above the min notional limit $10 usdt
       amount: 11.0
+
+    # aboveMovingAverage is a special override (optional)
+    # aboveMovingAverage:
+    #   type: EWMA
+    #   interval: 1h
+    #   window: 99
+    #   side: sell
+    #   # quantity: 0.05
+    #   amount: 11.0
 
