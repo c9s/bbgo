@@ -2,6 +2,7 @@ package bollmaker
 
 import (
 	"context"
+	"errors"
 	"math"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -188,46 +189,68 @@ type Stop struct {
 	FixedStop    *FixedStop    `json:"fixedStop,omitempty"`
 }
 
-// StopSettings shares the stop order logics between different strategies
+// SmartStops shares the stop order logics between different strategies
+//
+// See also:
+// - Stop-Loss order: https://www.investopedia.com/terms/s/stop-lossorder.asp
+// - Trailing Stop-loss order: https://www.investopedia.com/articles/trading/08/trailing-stop-loss.asp
+//
+// How to integrate this into your strategy?
+//
 // To use the stop controllers, you can embed this struct into your Strategy struct
-
+//
 // func (s *Strategy) Initialize() error {
-//     return s.StopSettings.SetupStopControllers(s.Symbol)
+//     return s.SmartStops.InitializeStopControllers(s.Symbol)
 // }
 // func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
-//     s.StopSettings.Subscribe(session)
-// }
-//
-// func (s *Strategy) Subscribe() {
+//     s.SmartStops.Subscribe(session)
 // }
 //
 // func (s *Strategy) Run() {
-//     ...
-//     s.StopSettings.RunStopControllers(ctx, session, s.tradeCollector)
-//     ...
+//     s.SmartStops.RunStopControllers(ctx, session, s.tradeCollector)
 // }
-type StopSettings struct {
-	Stops           []Stop                    `json:"stops,omitempty"`
-	StopControllers []*TrailingStopController `json:"-"`
+//
+type SmartStops struct {
+	// Stops is the slice of the stop order config
+	Stops []Stop `json:"stops,omitempty"`
+
+	// StopControllers are constructed from the stop config
+	StopControllers []StopController `json:"-"`
 }
 
-func (s *StopSettings) SetupStopControllers(symbol string) error {
+type StopController interface {
+	Subscribe(session *bbgo.ExchangeSession)
+	Run(ctx context.Context, session *bbgo.ExchangeSession, tradeCollector *bbgo.TradeCollector)
+}
+
+func (s *SmartStops) newStopController(symbol string, config Stop) (StopController, error) {
+	if config.TrailingStop != nil {
+		return NewTrailingStopController(symbol, config.TrailingStop), nil
+	}
+
+	return nil, errors.New("incorrect stop controller setup")
+}
+
+func (s *SmartStops) InitializeStopControllers(symbol string) error {
 	for _, stop := range s.Stops {
-		s.StopControllers = append(s.StopControllers,
-			NewTrailingStopController(symbol, stop.TrailingStop),
-		)
+		controller, err := s.newStopController(symbol, stop)
+		if err != nil {
+			return err
+		}
+
+		s.StopControllers = append(s.StopControllers, controller)
 	}
 	return nil
 }
 
-func (s *StopSettings) RunStopControllers(ctx context.Context, session *bbgo.ExchangeSession, tradeCollector *bbgo.TradeCollector) {
+func (s *SmartStops) Subscribe(session *bbgo.ExchangeSession) {
 	for _, stopController := range s.StopControllers {
-		stopController.Run(ctx, session, tradeCollector)
+		stopController.Subscribe(session)
 	}
 }
 
-func (s *StopSettings) Subscribe(session *bbgo.ExchangeSession) {
+func (s *SmartStops) RunStopControllers(ctx context.Context, session *bbgo.ExchangeSession, tradeCollector *bbgo.TradeCollector) {
 	for _, stopController := range s.StopControllers {
-		stopController.Subscribe(session)
+		stopController.Run(ctx, session, tradeCollector)
 	}
 }

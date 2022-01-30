@@ -129,7 +129,7 @@ type Strategy struct {
 	ShadowProtection      bool             `json:"shadowProtection"`
 	ShadowProtectionRatio fixedpoint.Value `json:"shadowProtectionRatio"`
 
-	StopSettings
+	SmartStops
 
 	session *bbgo.ExchangeSession
 	book    *types.StreamOrderBook
@@ -157,11 +157,10 @@ func (s *Strategy) ID() string {
 }
 
 func (s *Strategy) Initialize() error {
-	return s.StopSettings.SetupStopControllers(s.Symbol)
+	return s.SmartStops.InitializeStopControllers(s.Symbol)
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
-	// session.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{})
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
 		Interval: string(s.Interval),
 	})
@@ -178,7 +177,7 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 		})
 	}
 
-	s.StopSettings.Subscribe(session)
+	s.SmartStops.Subscribe(session)
 }
 
 func (s *Strategy) Validate() error {
@@ -555,7 +554,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.tradeCollector.BindStream(session.UserDataStream)
 
-	s.StopSettings.RunStopControllers(ctx, session, s.tradeCollector)
+	s.SmartStops.RunStopControllers(ctx, session, s.tradeCollector)
 
 	session.UserDataStream.OnStart(func() {
 		if s.UseTickerPrice {
