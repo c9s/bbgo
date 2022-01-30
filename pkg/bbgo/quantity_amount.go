@@ -1,6 +1,10 @@
 package bbgo
 
-import "github.com/c9s/bbgo/pkg/fixedpoint"
+import (
+	"errors"
+
+	"github.com/c9s/bbgo/pkg/fixedpoint"
+)
 
 // QuantityOrAmount is a setting structure used for quantity/amount settings
 // You can embed this struct into your strategy to share the setting methods
@@ -10,7 +14,18 @@ type QuantityOrAmount struct {
 	Quantity fixedpoint.Value `json:"quantity"`
 
 	// Amount is the order quote amount for your buy/sell order.
-	Amount fixedpoint.Value `json:"amount"`
+	Amount fixedpoint.Value `json:"amount,omitempty"`
+}
+
+func (qa *QuantityOrAmount) IsSet() bool {
+	return qa.Quantity > 0 || qa.Amount > 0
+}
+
+func (qa *QuantityOrAmount) Validate() error {
+	if qa.Quantity == 0 && qa.Amount == 0 {
+		return errors.New("either quantity or amount can not be empty")
+	}
+	return nil
 }
 
 // CalculateQuantity calculates the equivalent quantity of the given price when amount is set

@@ -2,9 +2,11 @@ package schedule
 
 import (
 	"context"
-	"github.com/c9s/bbgo/pkg/fixedpoint"
+
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/types"
@@ -15,7 +17,6 @@ const ID = "schedule"
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
-
 
 type Strategy struct {
 	Market types.Market
@@ -33,12 +34,9 @@ type Strategy struct {
 	Symbol string `json:"symbol"`
 
 	// Side is the order side type, which can be buy or sell
-	Side types.SideType `json:"side"`
+	Side types.SideType `json:"side,omitempty"`
 
-	// Quantity is the quantity of the submit order
-	Quantity fixedpoint.Value `json:"quantity,omitempty"`
-
-	Amount fixedpoint.Value `json:"amount,omitempty"`
+	bbgo.QuantityOrAmount
 
 	BelowMovingAverage *bbgo.MovingAverageSettings `json:"belowMovingAverage,omitempty"`
 
@@ -60,8 +58,8 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 }
 
 func (s *Strategy) Validate() error {
-	if s.Quantity == 0 && s.Amount == 0 {
-		return errors.New("either quantity or amount can not be empty")
+	if err := s.QuantityOrAmount.Validate(); err != nil {
+		return err
 	}
 
 	return nil
@@ -99,9 +97,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 
 		closePrice := fixedpoint.NewFromFloat(kline.Close)
-		quantity := s.Quantity
-		amount := s.Amount
-
+		quantity := s.QuantityOrAmount.CalculateQuantity(closePrice)
 		side := s.Side
 
 		if s.BelowMovingAverage != nil || s.AboveMovingAverage != nil {
@@ -116,12 +112,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 					}
 
 					// override the default quantity or amount
-					if s.BelowMovingAverage.Quantity != nil {
-						quantity = *s.BelowMovingAverage.Quantity
-					} else if s.BelowMovingAverage.Amount != nil {
-						amount = *s.BelowMovingAverage.Amount
+					if s.BelowMovingAverage.QuantityOrAmount.IsSet() {
+						quantity = s.BelowMovingAverage.QuantityOrAmount.CalculateQuantity(closePrice)
 					}
-
 				}
 			} else if aboveMA != nil && closePrice.Float64() > aboveMA.Last() {
 				match = true
@@ -130,11 +123,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 						side = *s.AboveMovingAverage.Side
 					}
 
-					// override the default quantity or amount
-					if s.AboveMovingAverage.Quantity != nil {
-						quantity = *s.AboveMovingAverage.Quantity
-					} else if s.AboveMovingAverage.Amount != nil {
-						amount = *s.AboveMovingAverage.Amount
+					if s.AboveMovingAverage.QuantityOrAmount.IsSet() {
+						quantity = s.AboveMovingAverage.QuantityOrAmount.CalculateQuantity(closePrice)
 					}
 				}
 			}
@@ -145,11 +135,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 		}
 
-		// convert amount to quantity if amount is given
-		if amount > 0 {
-			quantity = amount.Div(closePrice)
-		}
-
 		// calculate quote quantity for balance checking
 		quoteQuantity := quantity.Mul(closePrice)
 
@@ -158,35 +143,42 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		case types.SideTypeBuy:
 			quoteBalance, ok := session.Account.Balance(s.Market.QuoteCurrency)
 			if !ok {
+				log.Errorf("can not place scheduled %s order, quote balance %s is empty", s.Symbol, s.Market.QuoteCurrency)
 				return
 			}
+
 			if quoteBalance.Available < quoteQuantity {
-				s.Notifiability.Notify("Quote balance %s is not enough: %f < %f", s.Market.QuoteCurrency, quoteBalance.Available.Float64(), quoteQuantity.Float64())
+				s.Notifiability.Notify("Can not place scheduled %s order: quote balance %s is not enough: %f < %f", s.Symbol, s.Market.QuoteCurrency, quoteBalance.Available.Float64(), quoteQuantity.Float64())
+				log.Errorf("can not place scheduled %s order: quote balance %s is not enough: %f < %f", s.Symbol, s.Market.QuoteCurrency, quoteBalance.Available.Float64(), quoteQuantity.Float64())
 				return
 			}
 
 		case types.SideTypeSell:
 			baseBalance, ok := session.Account.Balance(s.Market.BaseCurrency)
 			if !ok {
+				log.Errorf("can not place scheduled %s order, base balance %s is empty", s.Symbol, s.Market.BaseCurrency)
 				return
 			}
+
 			if baseBalance.Available < quantity {
-				s.Notifiability.Notify("Base balance %s is not enough: %f < %f", s.Market.QuoteCurrency, baseBalance.Available.Float64(), quantity.Float64())
+				s.Notifiability.Notify("Can not place scheduled %s order: base balance %s is not enough: %f < %f", s.Symbol, s.Market.QuoteCurrency, baseBalance.Available.Float64(), quantity.Float64())
+				log.Errorf("can not place scheduled %s order: base balance %s is not enough: %f < %f", s.Symbol, s.Market.QuoteCurrency, baseBalance.Available.Float64(), quantity.Float64())
 				return
 			}
 
 		}
 
-		s.Notifiability.Notify("Submitting scheduled order %s quantity %f at price %f", s.Symbol, quantity.Float64(), closePrice.Float64())
+		s.Notifiability.Notify("Submitting scheduled %s order with quantity %f at price %f", s.Symbol, quantity.Float64(), closePrice.Float64())
 		_, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 			Symbol:   s.Symbol,
 			Side:     side,
 			Type:     types.OrderTypeMarket,
 			Quantity: quantity.Float64(),
+			Market:   s.Market,
 		})
-
 		if err != nil {
-			log.WithError(err).Error("submit order error")
+			s.Notifiability.Notify("Can not place scheduled %s order: submit error %s", s.Symbol, err.Error())
+			log.WithError(err).Errorf("can not place scheduled %s order error", s.Symbol)
 		}
 	})
 
