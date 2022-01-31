@@ -9,10 +9,16 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+func inQuoteAsset(balances types.BalanceMap, market types.Market, price float64) float64 {
+	quote := balances[market.QuoteCurrency]
+	base := balances[market.BaseCurrency]
+	return base.Total().Float64()*price + quote.Total().Float64()
+}
+
 func inBaseAsset(balances types.BalanceMap, market types.Market, price float64) float64 {
 	quote := balances[market.QuoteCurrency]
 	base := balances[market.BaseCurrency]
-	return (base.Locked.Float64() + base.Available.Float64()) + ((quote.Locked.Float64() + quote.Available.Float64()) / price)
+	return base.Total().Float64() + (quote.Total().Float64() / price)
 }
 
 func newExchange(session string) (types.Exchange, error) {

@@ -24,6 +24,15 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+type BackTestReport struct {
+	Symbol          string                    `json:"symbol,omitempty"`
+	LastPrice       float64                   `json:"lastPrice,omitempty"`
+	StartPrice      float64                   `json:"startPrice,omitempty"`
+	PnLReport       *pnl.AverageCostPnlReport `json:"pnlReport,omitempty"`
+	InitialBalances types.BalanceMap          `json:"initialBalances,omitempty"`
+	FinalBalances   types.BalanceMap          `json:"finalBalances,omitempty"`
+}
+
 func init() {
 	BacktestCmd.Flags().String("exchange", "", "target exchange")
 	BacktestCmd.Flags().Bool("sync", false, "sync backtest data")
@@ -350,14 +359,7 @@ var BacktestCmd = &cobra.Command{
 				finalBalances.Print()
 
 				if jsonOutputEnabled {
-					result := struct {
-						Symbol          string                    `json:"symbol,omitempty"`
-						LastPrice       float64                   `json:"lastPrice,omitempty"`
-						StartPrice      float64                   `json:"startPrice,omitempty"`
-						PnLReport       *pnl.AverageCostPnlReport `json:"pnlReport,omitempty"`
-						InitialBalances types.BalanceMap          `json:"initialBalances,omitempty"`
-						FinalBalances   types.BalanceMap          `json:"finalBalances,omitempty"`
-					}{
+					result := BackTestReport{
 						Symbol:          symbol,
 						LastPrice:       lastPrice,
 						StartPrice:      startPrice,
@@ -376,14 +378,24 @@ var BacktestCmd = &cobra.Command{
 					}
 				}
 
-				if wantBaseAssetBaseline {
-					initBaseAsset := inBaseAsset(initBalances, market, startPrice)
-					finalBaseAsset := inBaseAsset(finalBalances, market, lastPrice)
-					log.Infof("INITIAL ASSET ~= %s %s (1 %s = %f)", market.FormatQuantity(initBaseAsset), market.BaseCurrency, market.BaseCurrency, startPrice)
-					log.Infof("FINAL ASSET ~= %s %s (1 %s = %f)", market.FormatQuantity(finalBaseAsset), market.BaseCurrency, market.BaseCurrency, lastPrice)
+				initQuoteAsset := inQuoteAsset(initBalances, market, startPrice)
+				finalQuoteAsset := inQuoteAsset(finalBalances, market, startPrice)
+				log.Infof("INITIAL ASSET IN %s ~= %s %s (1 %s = %f)", market.QuoteCurrency, market.FormatQuantity(initQuoteAsset), market.QuoteCurrency, market.BaseCurrency, startPrice)
+				log.Infof("FINAL ASSET IN %s ~= %s %s (1 %s = %f)", market.QuoteCurrency, market.FormatQuantity(finalQuoteAsset), market.QuoteCurrency, market.BaseCurrency, lastPrice)
 
-					log.Infof("%s BASE ASSET PERFORMANCE: %.2f%% (= (%.2f - %.2f) / %.2f)", market.BaseCurrency, (finalBaseAsset-initBaseAsset)/initBaseAsset*100.0, finalBaseAsset, initBaseAsset, initBaseAsset)
-					log.Infof("%s PERFORMANCE: %.2f%% (= (%.2f - %.2f) / %.2f)", market.BaseCurrency, (lastPrice-startPrice)/startPrice*100.0, lastPrice, startPrice, startPrice)
+				if finalQuoteAsset > initQuoteAsset {
+					log.Infof("ASSET INCREASED %f %s (+%f%%)", finalQuoteAsset-initQuoteAsset, market.QuoteCurrency, (finalQuoteAsset-initQuoteAsset)/initQuoteAsset*100.0)
+				} else {
+					log.Infof("ASSET DECREASED %f %s (-%f%%)", finalQuoteAsset-initQuoteAsset, market.QuoteCurrency, (finalQuoteAsset-initQuoteAsset)/initQuoteAsset*100.0)
+				}
+
+				if wantBaseAssetBaseline {
+					// initBaseAsset := inBaseAsset(initBalances, market, startPrice)
+					// finalBaseAsset := inBaseAsset(finalBalances, market, lastPrice)
+					// log.Infof("INITIAL ASSET IN %s ~= %s %s (1 %s = %f)", market.BaseCurrency, market.FormatQuantity(initBaseAsset), market.BaseCurrency, market.BaseCurrency, startPrice)
+					// log.Infof("FINAL ASSET IN %s ~= %s %s (1 %s = %f)", market.BaseCurrency, market.FormatQuantity(finalBaseAsset), market.BaseCurrency, market.BaseCurrency, lastPrice)
+
+					log.Infof("%s BASE ASSET PERFORMANCE: %.2f%% (= (%.2f - %.2f) / %.2f)", market.BaseCurrency, (lastPrice-startPrice)/startPrice*100.0, lastPrice, startPrice, startPrice)
 				}
 			}
 		}
