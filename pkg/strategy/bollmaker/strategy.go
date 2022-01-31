@@ -106,6 +106,9 @@ type Strategy struct {
 	// Set to true if you want to hold more spot during market making.
 	DisableShort bool `json:"disableShort"`
 
+	// BuyBelowNeutralSMA if true, the market maker will only place buy order when the current price is below the neutral band SMA.
+	BuyBelowNeutralSMA bool `json:"buyBelowNeutralSMA"`
+
 	// NeutralBollinger is the smaller range of the bollinger band
 	// If price is in this band, it usually means the price is oscillating.
 	// If price goes out of this band, we tend to not place sell orders or buy orders
@@ -354,8 +357,20 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 
 	log.Infof("calculated max exposure position: %f", maxExposurePosition.Float64())
 
-	canBuy := maxExposurePosition > 0 && base < maxExposurePosition
-	canSell := maxExposurePosition > 0 && base > -maxExposurePosition
+	canSell := true
+	canBuy := true
+
+	if maxExposurePosition > 0 && base > maxExposurePosition {
+		canBuy = false
+	}
+
+	if maxExposurePosition > 0 {
+		if s.Long != nil && *s.Long && base < 0 {
+			canSell = false
+		} else if base < -maxExposurePosition {
+			canSell = false
+		}
+	}
 
 	if s.ShadowProtection && kline != nil {
 		switch kline.Direction() {
@@ -423,10 +438,20 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 		canSell = false
 	}
 
-	if canSell && midPrice > s.state.Position.AverageCost.MulFloat64(1.0+s.MinProfitSpread.Float64()) {
-		if !(s.DisableShort && (base.Float64()-sellOrder.Quantity < 0)) {
-			submitOrders = append(submitOrders, sellOrder)
-		}
+	if midPrice < s.state.Position.AverageCost.MulFloat64(1.0+s.MinProfitSpread.Float64()) {
+		canSell = false
+	}
+
+	if s.Long != nil && *s.Long && (base.Float64()-sellOrder.Quantity < 0) {
+		canSell = false
+	}
+
+	if s.BuyBelowNeutralSMA && midPrice.Float64() > s.neutralBoll.LastSMA() {
+		canBuy = false
+	}
+
+	if canSell {
+		submitOrders = append(submitOrders, sellOrder)
 	}
 	if canBuy {
 		submitOrders = append(submitOrders, buyOrder)
@@ -493,6 +518,10 @@ func (s *Strategy) adjustOrderQuantity(submitOrder types.SubmitOrder) types.Subm
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+	if s.DisableShort {
+		s.Long = &[]bool{true}[0]
+	}
+
 	if s.MinProfitSpread == 0 {
 		s.MinProfitSpread = fixedpoint.NewFromFloat(0.001)
 	}
@@ -651,4 +680,3 @@ func calculateBandPercentage(up, down, sma, midPrice float64) float64 {
 func inBetween(x, a, b float64) bool {
 	return a < x && x < b
 }
-

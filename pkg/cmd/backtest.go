@@ -387,13 +387,19 @@ var BacktestCmd = &cobra.Command{
 				if report.Profit > 0 {
 					color.Green("REALIZED PROFIT: +%f %s", report.Profit.Float64(), market.QuoteCurrency)
 				} else {
-					color.Red("REALIZED PROFIT: -%f %s", report.Profit.Float64(), market.QuoteCurrency)
+					color.Red("REALIZED PROFIT: %f %s", report.Profit.Float64(), market.QuoteCurrency)
+				}
+
+				if report.UnrealizedProfit > 0 {
+					color.Green("UNREALIZED PROFIT: +%f %s", report.UnrealizedProfit.Float64(), market.QuoteCurrency)
+				} else {
+					color.Red("UNREALIZED PROFIT: %f %s", report.UnrealizedProfit.Float64(), market.QuoteCurrency)
 				}
 
 				if finalQuoteAsset > initQuoteAsset {
 					color.Green("ASSET INCREASED: +%f %s (+%.2f%%)", finalQuoteAsset-initQuoteAsset, market.QuoteCurrency, (finalQuoteAsset-initQuoteAsset)/initQuoteAsset*100.0)
 				} else {
-					color.Red("ASSET DECREASED: -%f %s (-%.2f%%)", finalQuoteAsset-initQuoteAsset, market.QuoteCurrency, (finalQuoteAsset-initQuoteAsset)/initQuoteAsset*100.0)
+					color.Red("ASSET DECREASED: %f %s (%.2f%%)", finalQuoteAsset-initQuoteAsset, market.QuoteCurrency, (finalQuoteAsset-initQuoteAsset)/initQuoteAsset*100.0)
 				}
 
 				if wantBaseAssetBaseline {
@@ -405,7 +411,7 @@ var BacktestCmd = &cobra.Command{
 					if lastPrice > startPrice {
 						color.Green("%s BASE ASSET PERFORMANCE: +%.2f%% (= (%.2f - %.2f) / %.2f)", market.BaseCurrency, (lastPrice-startPrice)/startPrice*100.0, lastPrice, startPrice, startPrice)
 					} else {
-						color.Red("%s BASE ASSET PERFORMANCE: -%.2f%% (= (%.2f - %.2f) / %.2f)", market.BaseCurrency, (lastPrice-startPrice)/startPrice*100.0, lastPrice, startPrice, startPrice)
+						color.Red("%s BASE ASSET PERFORMANCE: %.2f%% (= (%.2f - %.2f) / %.2f)", market.BaseCurrency, (lastPrice-startPrice)/startPrice*100.0, lastPrice, startPrice, startPrice)
 					}
 				}
 			}
