@@ -384,10 +384,16 @@ var BacktestCmd = &cobra.Command{
 				log.Infof("INITIAL ASSET IN %s ~= %s %s (1 %s = %f)", market.QuoteCurrency, market.FormatQuantity(initQuoteAsset), market.QuoteCurrency, market.BaseCurrency, startPrice)
 				log.Infof("FINAL ASSET IN %s ~= %s %s (1 %s = %f)", market.QuoteCurrency, market.FormatQuantity(finalQuoteAsset), market.QuoteCurrency, market.BaseCurrency, lastPrice)
 
-				if finalQuoteAsset > initQuoteAsset {
-					color.Green("ASSET INCREASED %f %s (+%.2f%%)", finalQuoteAsset-initQuoteAsset, market.QuoteCurrency, (finalQuoteAsset-initQuoteAsset)/initQuoteAsset*100.0)
+				if report.Profit > 0 {
+					color.Green("REALIZED PROFIT: +%f %s", report.Profit.Float64(), market.QuoteCurrency)
 				} else {
-					color.Red("ASSET DECREASED %f %s (-%.2f%%)", finalQuoteAsset-initQuoteAsset, market.QuoteCurrency, (finalQuoteAsset-initQuoteAsset)/initQuoteAsset*100.0)
+					color.Red("REALIZED PROFIT: -%f %s", report.Profit.Float64(), market.QuoteCurrency)
+				}
+
+				if finalQuoteAsset > initQuoteAsset {
+					color.Green("ASSET INCREASED: +%f %s (+%.2f%%)", finalQuoteAsset-initQuoteAsset, market.QuoteCurrency, (finalQuoteAsset-initQuoteAsset)/initQuoteAsset*100.0)
+				} else {
+					color.Red("ASSET DECREASED: -%f %s (-%.2f%%)", finalQuoteAsset-initQuoteAsset, market.QuoteCurrency, (finalQuoteAsset-initQuoteAsset)/initQuoteAsset*100.0)
 				}
 
 				if wantBaseAssetBaseline {
