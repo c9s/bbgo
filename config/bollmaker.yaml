@@ -95,6 +95,9 @@ exchangeStrategies:
     # tradeInBand: when tradeInBand is set, you will only place orders in the bollinger band.
     tradeInBand: false
 
+    # buyBelowNeutralSMA: when this set, it will only place buy order when the current price is below the SMA line.
+    buyBelowNeutralSMA: false
+
     persistence:
       type: redis
 
