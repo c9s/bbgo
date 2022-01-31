@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -384,9 +385,9 @@ var BacktestCmd = &cobra.Command{
 				log.Infof("FINAL ASSET IN %s ~= %s %s (1 %s = %f)", market.QuoteCurrency, market.FormatQuantity(finalQuoteAsset), market.QuoteCurrency, market.BaseCurrency, lastPrice)
 
 				if finalQuoteAsset > initQuoteAsset {
-					log.Infof("ASSET INCREASED %f %s (+%f%%)", finalQuoteAsset-initQuoteAsset, market.QuoteCurrency, (finalQuoteAsset-initQuoteAsset)/initQuoteAsset*100.0)
+					color.Green("ASSET INCREASED %f %s (+%.2f%%)", finalQuoteAsset-initQuoteAsset, market.QuoteCurrency, (finalQuoteAsset-initQuoteAsset)/initQuoteAsset*100.0)
 				} else {
-					log.Infof("ASSET DECREASED %f %s (-%f%%)", finalQuoteAsset-initQuoteAsset, market.QuoteCurrency, (finalQuoteAsset-initQuoteAsset)/initQuoteAsset*100.0)
+					color.Red("ASSET DECREASED %f %s (-%.2f%%)", finalQuoteAsset-initQuoteAsset, market.QuoteCurrency, (finalQuoteAsset-initQuoteAsset)/initQuoteAsset*100.0)
 				}
 
 				if wantBaseAssetBaseline {
@@ -395,7 +396,11 @@ var BacktestCmd = &cobra.Command{
 					// log.Infof("INITIAL ASSET IN %s ~= %s %s (1 %s = %f)", market.BaseCurrency, market.FormatQuantity(initBaseAsset), market.BaseCurrency, market.BaseCurrency, startPrice)
 					// log.Infof("FINAL ASSET IN %s ~= %s %s (1 %s = %f)", market.BaseCurrency, market.FormatQuantity(finalBaseAsset), market.BaseCurrency, market.BaseCurrency, lastPrice)
 
-					log.Infof("%s BASE ASSET PERFORMANCE: %.2f%% (= (%.2f - %.2f) / %.2f)", market.BaseCurrency, (lastPrice-startPrice)/startPrice*100.0, lastPrice, startPrice, startPrice)
+					if lastPrice > startPrice {
+						color.Green("%s BASE ASSET PERFORMANCE: +%.2f%% (= (%.2f - %.2f) / %.2f)", market.BaseCurrency, (lastPrice-startPrice)/startPrice*100.0, lastPrice, startPrice, startPrice)
+					} else {
+						color.Red("%s BASE ASSET PERFORMANCE: -%.2f%% (= (%.2f - %.2f) / %.2f)", market.BaseCurrency, (lastPrice-startPrice)/startPrice*100.0, lastPrice, startPrice, startPrice)
+					}
 				}
 			}
 		}
