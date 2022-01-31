@@ -39,6 +39,9 @@ type TrailingStopController struct {
 	position    *types.Position
 	latestHigh  float64
 	averageCost fixedpoint.Value
+
+	// activated: when the price reaches the min profit price, we set the activated to true to enable trailing stop
+	activated bool
 }
 
 func NewTrailingStopController(symbol string, config *TrailingStop) *TrailingStopController {
@@ -70,27 +73,46 @@ func (c *TrailingStopController) Run(ctx context.Context, session *ExchangeSessi
 			return
 		}
 
+		// if average cost is zero, we don't need trailing stop
+		if c.averageCost == 0 || c.position == nil {
+			return
+		}
+
 		closePrice := kline.Close
 
+		// if we don't hold position, we just skip dust position
+		if c.position.Base.Abs().Float64() < c.position.Market.MinQuantity || c.position.Base.Abs().Float64()*closePrice < c.position.Market.MinNotional {
+			return
+		}
+
+		if c.MinProfit <= 0 {
+			// when minProfit is not set, we should always activate the trailing stop order
+			c.activated = true
+		} else if closePrice > c.averageCost.Float64() ||
+			changeRate(closePrice, c.averageCost.Float64()) > c.MinProfit.Float64() {
+
+			if !c.activated {
+				log.Infof("%s trailing stop activated at price %f", c.Symbol, closePrice)
+				c.activated = true
+			}
+		} else {
+			return
+		}
+
+		if !c.activated {
+			return
+		}
+
+		// if the trailing stop order is activated, we should update the latest high
 		// update the latest high
 		c.latestHigh = math.Max(closePrice, c.latestHigh)
 
+		// if it's in the callback rate, we don't want to trigger stop
+		if closePrice < c.latestHigh && changeRate(closePrice, c.latestHigh) < c.CallbackRate.Float64() {
+			return
+		}
+
 		if c.Virtual {
-			// if average cost is updated, we can check min profit
-			if c.averageCost == 0 {
-				return
-			}
-
-			// skip dust position
-			if c.position.Base.Abs().Float64() < c.position.Market.MinQuantity || c.position.Base.Abs().Float64()*closePrice < c.position.Market.MinNotional {
-				return
-			}
-
-			// if it's in the callback rate, we don't want to trigger stop
-			if closePrice < c.latestHigh && changeRate(closePrice, c.latestHigh) < c.CallbackRate.Float64() {
-				return
-			}
-
 			// if the profit rate is defined, and it is less than our minimum profit rate, we skip stop
 			if c.MinProfit > 0 &&
 				(closePrice < c.averageCost.Float64() ||
@@ -127,11 +149,11 @@ func (c *TrailingStopController) Run(ctx context.Context, session *ExchangeSessi
 
 				// reset the state
 				c.latestHigh = 0.0
+				c.activated = false
 			}
 		} else {
 			// place stop order only when the closed price is greater than the current average cost
-			if c.position != nil && c.MinProfit > 0 && c.averageCost > 0 &&
-				closePrice > c.averageCost.Float64() &&
+			if c.MinProfit > 0 && closePrice > c.averageCost.Float64() &&
 				changeRate(closePrice, c.averageCost.Float64()) >= c.MinProfit.Float64() {
 
 				stopPrice := c.averageCost.MulFloat64(1.0 + c.MinProfit.Float64())
