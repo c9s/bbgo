@@ -92,6 +92,9 @@ exchangeStrategies:
       window: 21
       bandWidth: 2.0
 
+    # tradeInBand: when tradeInBand is set, you will only place orders in the bollinger band.
+    tradeInBand: false
+
     persistence:
       type: redis
 
