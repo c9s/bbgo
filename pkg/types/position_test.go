@@ -8,6 +8,8 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
+const Delta = 1e-9
+
 func TestPosition_ExchangeFeeRate_Short(t *testing.T) {
 	pos := &Position{
 		Symbol:        "BTCUSDT",
@@ -50,7 +52,7 @@ func TestPosition_ExchangeFeeRate_Short(t *testing.T) {
 
 	expectedProfit := (averageCost-2000.0)*10.0 - (2000.0 * 10.0 * feeRate)
 	assert.True(t, madeProfit)
-	assert.Equal(t, fixedpoint.NewFromFloat(expectedProfit), netProfit)
+	assert.InDelta(t, expectedProfit, netProfit.Float64(), Delta)
 }
 
 func TestPosition_ExchangeFeeRate_Long(t *testing.T) {
@@ -95,18 +97,18 @@ func TestPosition_ExchangeFeeRate_Long(t *testing.T) {
 
 	expectedProfit := (4000.0-averageCost)*10.0 - (4000.0 * 10.0 * feeRate)
 	assert.True(t, madeProfit)
-	assert.Equal(t, fixedpoint.NewFromFloat(expectedProfit), netProfit)
+	assert.InDelta(t, expectedProfit, netProfit.Float64(), Delta)
 }
 
 func TestPosition(t *testing.T) {
-	var feeRate = 0.05 * 0.01
+	var feeRate float64 = 0.05 * 0.01
 	var testcases = []struct {
 		name                string
 		trades              []Trade
-		expectedAverageCost fixedpoint.Value
-		expectedBase        fixedpoint.Value
-		expectedQuote       fixedpoint.Value
-		expectedProfit      fixedpoint.Value
+		expectedAverageCost float64
+		expectedBase        float64
+		expectedQuote       float64
+		expectedProfit      float64
 	}{
 		{
 			name: "base fee",
@@ -120,10 +122,10 @@ func TestPosition(t *testing.T) {
 					FeeCurrency:   "BTC",
 				},
 			},
-			expectedAverageCost: fixedpoint.NewFromFloat((1000.0 * 0.01) / (0.01 * (1.0 - feeRate))),
-			expectedBase:        fixedpoint.NewFromFloat(0.01 - (0.01 * feeRate)),
-			expectedQuote:       fixedpoint.NewFromFloat(0 - 1000.0*0.01),
-			expectedProfit:      fixedpoint.NewFromFloat(0.0),
+			expectedAverageCost: (1000.0 * 0.01) / (0.01 * (1.0 - feeRate)),
+			expectedBase:        0.01 - (0.01 * feeRate),
+			expectedQuote:       0 - 1000.0*0.01,
+			expectedProfit:      0.0,
 		},
 		{
 			name: "quote fee",
@@ -137,10 +139,10 @@ func TestPosition(t *testing.T) {
 					FeeCurrency:   "USDT",
 				},
 			},
-			expectedAverageCost: fixedpoint.NewFromFloat((1000.0 * 0.01 * (1.0 - feeRate)) / 0.01),
-			expectedBase:        fixedpoint.NewFromFloat(-0.01),
-			expectedQuote:       fixedpoint.NewFromFloat(0 + 1000.0*0.01*(1.0-feeRate)),
-			expectedProfit:      fixedpoint.NewFromFloat(0.0),
+			expectedAverageCost: (1000.0 * 0.01 * (1.0 - feeRate)) / 0.01,
+			expectedBase:        -0.01,
+			expectedQuote:       0.0 + 1000.0 * 0.01 * (1.0 - feeRate),
+			expectedProfit:      0.0,
 		},
 		{
 			name: "long",
@@ -158,10 +160,10 @@ func TestPosition(t *testing.T) {
 					QuoteQuantity: 2000.0 * 0.03,
 				},
 			},
-			expectedAverageCost: fixedpoint.NewFromFloat((1000.0*0.01 + 2000.0*0.03) / 0.04),
-			expectedBase:        fixedpoint.NewFromFloat(0.01 + 0.03),
-			expectedQuote:       fixedpoint.NewFromFloat(0 - 1000.0*0.01 - 2000.0*0.03),
-			expectedProfit:      fixedpoint.NewFromFloat(0.0),
+			expectedAverageCost: (1000.0*0.01 + 2000.0*0.03) / 0.04,
+			expectedBase:        0.01 + 0.03,
+			expectedQuote:       0 - 1000.0*0.01 - 2000.0*0.03,
+			expectedProfit:      0.0,
 		},
 
 		{
@@ -186,10 +188,10 @@ func TestPosition(t *testing.T) {
 					QuoteQuantity: 3000.0 * 0.01,
 				},
 			},
-			expectedAverageCost: fixedpoint.NewFromFloat((1000.0*0.01 + 2000.0*0.03) / 0.04),
-			expectedBase:        fixedpoint.NewFromFloat(0.03),
-			expectedQuote:       fixedpoint.NewFromFloat(0 - 1000.0*0.01 - 2000.0*0.03 + 3000.0*0.01),
-			expectedProfit:      fixedpoint.NewFromFloat((3000.0 - (1000.0*0.01+2000.0*0.03)/0.04) * 0.01),
+			expectedAverageCost: (1000.0*0.01 + 2000.0*0.03) / 0.04,
+			expectedBase:        0.03,
+			expectedQuote:       0 - 1000.0*0.01 - 2000.0*0.03 + 3000.0*0.01,
+			expectedProfit:      (3000.0 - (1000.0*0.01+2000.0*0.03)/0.04) * 0.01,
 		},
 
 		{
@@ -215,10 +217,10 @@ func TestPosition(t *testing.T) {
 				},
 			},
 
-			expectedAverageCost: fixedpoint.NewFromFloat(3000.0),
-			expectedBase:        fixedpoint.NewFromFloat(-0.06),
-			expectedQuote:       fixedpoint.NewFromFloat(-1000.0*0.01 - 2000.0*0.03 + 3000.0*0.1),
-			expectedProfit:      fixedpoint.NewFromFloat((3000.0 - (1000.0*0.01+2000.0*0.03)/0.04) * 0.04),
+			expectedAverageCost: 3000.0,
+			expectedBase:        -0.06,
+			expectedQuote:       -1000.0*0.01 - 2000.0*0.03 + 3000.0*0.1,
+			expectedProfit:      (3000.0 - (1000.0*0.01+2000.0*0.03)/0.04) * 0.04,
 		},
 
 		{
@@ -238,10 +240,10 @@ func TestPosition(t *testing.T) {
 				},
 			},
 
-			expectedAverageCost: fixedpoint.NewFromFloat((2000.0*0.01 + 3000.0*0.03) / (0.01 + 0.03)),
-			expectedBase:        fixedpoint.NewFromFloat(0 - 0.01 - 0.03),
-			expectedQuote:       fixedpoint.NewFromFloat(2000.0*0.01 + 3000.0*0.03),
-			expectedProfit:      fixedpoint.NewFromFloat(0.0),
+			expectedAverageCost: (2000.0*0.01 + 3000.0*0.03) / (0.01 + 0.03),
+			expectedBase:        0 - 0.01 - 0.03,
+			expectedQuote:       2000.0*0.01 + 3000.0*0.03,
+			expectedProfit:      0.0,
 		},
 	}
 
@@ -253,12 +255,11 @@ func TestPosition(t *testing.T) {
 				QuoteCurrency: "USDT",
 			}
 			profitAmount, _, profit := pos.AddTrades(testcase.trades)
-
-			assert.Equal(t, testcase.expectedQuote, pos.Quote, "expectedQuote")
-			assert.Equal(t, testcase.expectedBase, pos.Base, "expectedBase")
-			assert.Equal(t, testcase.expectedAverageCost, pos.AverageCost, "expectedAverageCost")
+			assert.InDelta(t, testcase.expectedQuote, pos.Quote.Float64(), Delta, "expectedQuote")
+			assert.InDelta(t, testcase.expectedBase, pos.Base.Float64(), Delta, "expectedBase")
+			assert.InDelta(t, testcase.expectedAverageCost, pos.AverageCost.Float64(), Delta, "expectedAverageCost")
 			if profit {
-				assert.Equal(t, testcase.expectedProfit, profitAmount, "expectedProfit")
+				assert.InDelta(t, testcase.expectedProfit, profitAmount.Float64(), Delta, "expectedProfit")
 			}
 		})
 	}

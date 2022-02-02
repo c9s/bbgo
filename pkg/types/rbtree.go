@@ -162,7 +162,7 @@ func (tree *RBTree) Upsert(key, val fixedpoint.Value) {
 			// found node, skip insert and fix
 			x.value = val
 			return
-		} else if node.key < x.key {
+		} else if node.key.Compare(x.key) < 0 {
 			x = x.left
 		} else {
 			x = x.right
@@ -173,7 +173,7 @@ func (tree *RBTree) Upsert(key, val fixedpoint.Value) {
 
 	if y == neel {
 		tree.Root = node
-	} else if node.key < y.key {
+	} else if node.key.Compare(y.key) < 0 {
 		y.left = node
 	} else {
 		y.right = node
@@ -197,7 +197,7 @@ func (tree *RBTree) Insert(key, val fixedpoint.Value) {
 	for x != neel {
 		y = x
 
-		if node.key < x.key {
+		if node.key.Compare(x.key) < 0 {
 			x = x.left
 		} else {
 			x = x.right
@@ -208,7 +208,7 @@ func (tree *RBTree) Insert(key, val fixedpoint.Value) {
 
 	if y == neel {
 		tree.Root = node
-	} else if node.key < y.key {
+	} else if node.key.Compare(y.key) < 0 {
 		y.left = node
 	} else {
 		y.right = node
@@ -221,7 +221,7 @@ func (tree *RBTree) Insert(key, val fixedpoint.Value) {
 func (tree *RBTree) Search(key fixedpoint.Value) *RBNode {
 	var current = tree.Root
 	for current != neel && key != current.key {
-		if key < current.key {
+		if key.Compare(current.key) < 0 {
 			current = current.left
 		} else {
 			current = current.right

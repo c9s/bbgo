@@ -217,9 +217,9 @@ type ExchangeSession struct {
 	orderBooks map[string]*types.StreamOrderBook
 
 	// startPrices is used for backtest
-	startPrices map[string]float64
+	startPrices map[string]fixedpoint.Value
 
-	lastPrices         map[string]float64
+	lastPrices         map[string]fixedpoint.Value
 	lastPriceUpdatedAt time.Time
 
 	// marketDataStores contains the market data store of each market
@@ -260,8 +260,8 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 
 		orderBooks:            make(map[string]*types.StreamOrderBook),
 		markets:               make(map[string]types.Market),
-		startPrices:           make(map[string]float64),
-		lastPrices:            make(map[string]float64),
+		startPrices:           make(map[string]fixedpoint.Value),
+		lastPrices:            make(map[string]fixedpoint.Value),
 		positions:             make(map[string]*types.Position),
 		marketDataStores:      make(map[string]*MarketDataStore),
 		standardIndicatorSets: make(map[string]*StandardIndicatorSet),

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 /*
@@ -16,10 +17,10 @@ On-Balance Volume (OBV) Definition
 type OBV struct {
 	types.IntervalWindow
 	Values   types.Float64Slice
-	PrePrice float64
+	PrePrice fixedpoint.Value
 
 	EndTime         time.Time
-	UpdateCallbacks []func(value float64)
+	UpdateCallbacks []func(value fixedpoint.Value)
 }
 
 func (inc *OBV) update(kLine types.KLine, priceF KLinePriceMapper) {

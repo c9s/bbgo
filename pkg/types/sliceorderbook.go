@@ -37,15 +37,15 @@ func (b *SliceOrderBook) LastUpdateTime() time.Time {
 func (b *SliceOrderBook) Spread() (fixedpoint.Value, bool) {
 	bestBid, ok := b.BestBid()
 	if !ok {
-		return 0, false
+		return fixedpoint.Zero, false
 	}
 
 	bestAsk, ok := b.BestAsk()
 	if !ok {
-		return 0, false
+		return fixedpoint.Zero, false
 	}
 
-	return bestAsk.Price - bestBid.Price, true
+	return bestAsk.Price.Sub(bestBid.Price), true
 }
 
 func (b *SliceOrderBook) BestBid() (PriceVolume, bool) {
@@ -90,8 +90,8 @@ func (b *SliceOrderBook) IsValid() (bool, error) {
 		return false, errors.New("empty asks")
 	}
 
-	if bid.Price > ask.Price {
-		return false, fmt.Errorf("bid price %f > ask price %f", bid.Price.Float64(), ask.Price.Float64())
+	if bid.Price.Compare(ask.Price) > 0 {
+		return false, fmt.Errorf("bid price %s > ask price %s", bid.Price.String(), ask.Price.String())
 	}
 
 	return true, nil
@@ -112,7 +112,7 @@ func (b *SliceOrderBook) PriceVolumesBySide(side SideType) PriceVolumeSlice {
 
 func (b *SliceOrderBook) updateAsks(pvs PriceVolumeSlice) {
 	for _, pv := range pvs {
-		if pv.Volume == 0 {
+		if pv.Volume.IsZero() {
 			b.Asks = b.Asks.Remove(pv.Price, false)
 		} else {
 			b.Asks = b.Asks.Upsert(pv, false)
@@ -122,7 +122,7 @@ func (b *SliceOrderBook) updateAsks(pvs PriceVolumeSlice) {
 
 func (b *SliceOrderBook) updateBids(pvs PriceVolumeSlice) {
 	for _, pv := range pvs {
-		if pv.Volume == 0 {
+		if pv.Volume.IsZero() {
 			b.Bids = b.Bids.Remove(pv.Price, true)
 		} else {
 			b.Bids = b.Bids.Upsert(pv, true)
