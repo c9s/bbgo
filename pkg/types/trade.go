@@ -55,16 +55,16 @@ type Trade struct {
 	ID            uint64       `json:"id" db:"id"`
 	OrderID       uint64       `json:"orderID" db:"order_id"`
 	Exchange      ExchangeName `json:"exchange" db:"exchange"`
-	Price         float64      `json:"price" db:"price"`
-	Quantity      float64      `json:"quantity" db:"quantity"`
-	QuoteQuantity float64      `json:"quoteQuantity" db:"quote_quantity"`
+	Price         fixedpoint.Value      `json:"price" db:"price"`
+	Quantity      fixedpoint.Value      `json:"quantity" db:"quantity"`
+	QuoteQuantity fixedpoint.Value      `json:"quoteQuantity" db:"quote_quantity"`
 	Symbol        string       `json:"symbol" db:"symbol"`
 
 	Side        SideType `json:"side" db:"side"`
 	IsBuyer     bool     `json:"isBuyer" db:"is_buyer"`
 	IsMaker     bool     `json:"isMaker" db:"is_maker"`
 	Time        Time     `json:"tradedAt" db:"traded_at"`
-	Fee         float64  `json:"fee" db:"fee"`
+	Fee         fixedpoint.Value  `json:"fee" db:"fee"`
 	FeeCurrency string   `json:"feeCurrency" db:"fee_currency"`
 
 	IsMargin   bool `json:"isMargin" db:"is_margin"`
@@ -76,18 +76,18 @@ type Trade struct {
 }
 
 func (trade Trade) PositionChange() fixedpoint.Value {
-	q := fixedpoint.NewFromFloat(trade.Quantity)
+	q := trade.Quantity
 	switch trade.Side {
 	case SideTypeSell:
-		return -q
+		return q.Neg()
 
 	case SideTypeBuy:
 		return q
 
 	case SideTypeSelf:
-		return 0
+		return fixedpoint.Zero
 	}
-	return 0
+	return fixedpoint.Zero
 }
 
 func trimTrailingZero(a string) string {
@@ -121,10 +121,10 @@ func (trade Trade) String() string {
 		trade.Exchange.String(),
 		trade.Symbol,
 		trade.Side,
-		trimTrailingZeroFloat(trade.Quantity),
-		trimTrailingZeroFloat(trade.Price),
-		trimTrailingZeroFloat(trade.QuoteQuantity),
-		trimTrailingZeroFloat(trade.Fee),
+		trimTrailingZeroFloat(trade.Quantity.Float64()),
+		trimTrailingZeroFloat(trade.Price.Float64()),
+		trimTrailingZeroFloat(trade.QuoteQuantity.Float64()),
+		trimTrailingZeroFloat(trade.Fee.Float64()),
 		trade.FeeCurrency,
 		trade.OrderID,
 		trade.Time.Time().Format(time.StampMilli),
@@ -137,10 +137,10 @@ func (trade Trade) PlainText() string {
 		trade.Exchange.String(),
 		trade.Symbol,
 		trade.Side,
-		trimTrailingZeroFloat(trade.Quantity),
-		trimTrailingZeroFloat(trade.Price),
-		trimTrailingZeroFloat(trade.QuoteQuantity),
-		trimTrailingZeroFloat(trade.Fee),
+		trimTrailingZeroFloat(trade.Quantity.Float64()),
+		trimTrailingZeroFloat(trade.Price.Float64()),
+		trimTrailingZeroFloat(trade.QuoteQuantity.Float64()),
+		trimTrailingZeroFloat(trade.Fee.Float64()),
 		trade.FeeCurrency)
 }
 
@@ -184,10 +184,10 @@ func (trade Trade) SlackAttachment() slack.Attachment {
 		Color: color,
 		Fields: []slack.AttachmentField{
 			{Title: "Exchange", Value: trade.Exchange.String(), Short: true},
-			{Title: "Price", Value: trimTrailingZeroFloat(trade.Price), Short: true},
-			{Title: "Quantity", Value: trimTrailingZeroFloat(trade.Quantity), Short: true},
-			{Title: "QuoteQuantity", Value: trimTrailingZeroFloat(trade.QuoteQuantity), Short: true},
-			{Title: "Fee", Value: trimTrailingZeroFloat(trade.Fee), Short: true},
+			{Title: "Price", Value: trimTrailingZeroFloat(trade.Price.Float64()), Short: true},
+			{Title: "Quantity", Value: trimTrailingZeroFloat(trade.Quantity.Float64()), Short: true},
+			{Title: "QuoteQuantity", Value: trimTrailingZeroFloat(trade.QuoteQuantity.Float64()), Short: true},
+			{Title: "Fee", Value: trimTrailingZeroFloat(trade.Fee.Float64()), Short: true},
 			{Title: "FeeCurrency", Value: trade.FeeCurrency, Short: true},
 			{Title: "Liquidity", Value: liquidity, Short: true},
 			{Title: "Order ID", Value: strconv.FormatUint(trade.OrderID, 10), Short: true},

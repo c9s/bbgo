@@ -2,7 +2,7 @@ package fixedpoint
 
 import (
 	"testing"
-
+    "math/big"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -27,29 +27,31 @@ func BenchmarkMul(b *testing.B) {
 
 	b.Run("mul-big-small-numbers", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			x := NewFromFloat(20.0)
-			y := NewFromFloat(20.0)
-			x = x.BigMul(y)
+			x := big.NewFloat(20.0)
+			y := big.NewFloat(20.0)
+			x = new(big.Float).Mul(x, y)
 		}
 	})
 
 	b.Run("mul-big-large-numbers", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			x := NewFromFloat(88.12345678)
-			y := NewFromFloat(88.12345678)
-			x = x.BigMul(y)
+			x := big.NewFloat(88.12345678)
+			y := big.NewFloat(88.12345678)
+			x = new(big.Float).Mul(x, y)
 		}
 	})
 }
 
-func TestBigMul(t *testing.T) {
+func TestMulString(t *testing.T) {
 	x := NewFromFloat(10.55)
+	assert.Equal(t, "10.55", x.String())
 	y := NewFromFloat(10.55)
-	x = x.BigMul(y)
-	assert.Equal(t, NewFromFloat(111.3025), x)
+	x = x.Mul(y)
+	assert.Equal(t, "111.3025", x.String())
 }
 
-func TestParse(t *testing.T) {
+// Not used
+/*func TestParse(t *testing.T) {
 	type args struct {
 		input string
 	}
@@ -118,7 +120,7 @@ func TestParse(t *testing.T) {
 			}
 		})
 	}
-}
+}*/
 
 func TestNumFractionalDigits(t *testing.T) {
 	tests := []struct {
@@ -129,7 +131,7 @@ func TestNumFractionalDigits(t *testing.T) {
 		{
 			name: "over the default precision",
 			v:    MustNewFromString("0.123456789"),
-			want: 8,
+			want: 9,
 		},
 		{
 			name: "ignore the integer part",

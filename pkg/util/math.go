@@ -3,6 +3,7 @@ package util
 import (
 	"math"
 	"strconv"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 const MaxDigits = 18 // MAX_INT64 ~ 9 * 10^18
@@ -16,6 +17,10 @@ func Pow10(n int64) int64 {
 		return 0
 	}
 	return Pow10Table[n]
+}
+
+func FormatValue(val fixedpoint.Value, prec int) string {
+	return strconv.FormatFloat(val.Float64(), 'f', prec, 64)
 }
 
 func FormatFloat(val float64, prec int) string {

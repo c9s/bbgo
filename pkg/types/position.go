@@ -62,11 +62,12 @@ func (p *Position) NewClosePositionOrder(percentage float64) *SubmitOrder {
 	}
 
 	side := SideTypeSell
-	if base == 0 {
+	sign := base.Sign()
+	if sign == 0 {
 		return nil
-	} else if base < 0 {
+	} else if sign < 0 {
 		side = SideTypeBuy
-	} else if base > 0 {
+	} else if sign > 0 {
 		side = SideTypeSell
 	}
 
@@ -135,13 +136,13 @@ func (p *Position) addTradeFee(trade Trade) {
 	if p.TotalFee == nil {
 		p.TotalFee = make(map[string]fixedpoint.Value)
 	}
-	p.TotalFee[trade.FeeCurrency] = p.TotalFee[trade.FeeCurrency] + fixedpoint.NewFromFloat(trade.Fee)
+	p.TotalFee[trade.FeeCurrency] = p.TotalFee[trade.FeeCurrency].Add(trade.Fee)
 }
 
 func (p *Position) Reset() {
-	p.Base = 0
-	p.Quote = 0
-	p.AverageCost = 0
+	p.Base = fixedpoint.Zero
+	p.Quote = fixedpoint.Zero
+	p.AverageCost = fixedpoint.Zero
 }
 
 func (p *Position) SetFeeRate(exchangeFee ExchangeFee) {
@@ -157,9 +158,9 @@ func (p *Position) SetExchangeFeeRate(ex ExchangeName, exchangeFee ExchangeFee) 
 }
 
 func (p *Position) Type() PositionType {
-	if p.Base > 0 {
+	if p.Base.Sign() > 0 {
 		return PositionLong
-	} else if p.Base < 0 {
+	} else if p.Base.Sign() < 0 {
 		return PositionShort
 	}
 	return PositionClosed
@@ -176,11 +177,12 @@ func (p *Position) SlackAttachment() slack.Attachment {
 	var posType = p.Type()
 	var color = ""
 
-	if p.Base == 0 {
+	sign := p.Base.Sign()
+	if sign == 0 {
 		color = "#cccccc"
-	} else if p.Base > 0 {
+	} else if sign > 0 {
 		color = "#228B22"
-	} else if p.Base < 0 {
+	} else if sign < 0 {
 		color = "#DC143C"
 	}
 
@@ -194,7 +196,7 @@ func (p *Position) SlackAttachment() slack.Attachment {
 
 	if p.TotalFee != nil {
 		for feeCurrency, fee := range p.TotalFee {
-			if fee > 0 {
+			if fee.Sign() > 0 {
 				fields = append(fields, slack.AttachmentField{
 					Title: fmt.Sprintf("Fee (%s)", feeCurrency),
 					Value: trimTrailingZeroFloat(fee.Float64()),
@@ -237,9 +239,9 @@ func (p *Position) PlainText() (msg string) {
 func (p *Position) String() string {
 	return fmt.Sprintf("POSITION %s: average cost = %f, base = %f, quote = %f",
 		p.Symbol,
-		p.AverageCost.Float64(),
-		p.Base.Float64(),
-		p.Quote.Float64(),
+		p.AverageCost.String(),
+		p.Base.String(),
+		p.Quote.String(),
 	)
 }
 
@@ -255,45 +257,45 @@ func (p *Position) AddTrades(trades []Trade) (fixedpoint.Value, fixedpoint.Value
 	var totalProfitAmount, totalNetProfit fixedpoint.Value
 	for _, trade := range trades {
 		if profit, netProfit, madeProfit := p.AddTrade(trade); madeProfit {
-			totalProfitAmount += profit
-			totalNetProfit += netProfit
+			totalProfitAmount = totalProfitAmount.Add(profit)
+			totalNetProfit = totalNetProfit.Add(netProfit)
 		}
 	}
 
-	return totalProfitAmount, totalNetProfit, totalProfitAmount != 0
+	return totalProfitAmount, totalNetProfit, !totalProfitAmount.IsZero()
 }
 
 func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedpoint.Value, madeProfit bool) {
-	price := fixedpoint.NewFromFloat(td.Price)
-	quantity := fixedpoint.NewFromFloat(td.Quantity)
-	quoteQuantity := fixedpoint.NewFromFloat(td.QuoteQuantity)
-	fee := fixedpoint.NewFromFloat(td.Fee)
+	price := td.Price
+	quantity := td.Quantity
+	quoteQuantity := td.QuoteQuantity
+	fee := td.Fee
 
 	// calculated fee in quote (some exchange accounts may enable platform currency fee discount, like BNB)
-	var feeInQuote fixedpoint.Value = 0
+	var feeInQuote fixedpoint.Value = fixedpoint.Zero
 
 	switch td.FeeCurrency {
 
 	case p.BaseCurrency:
-		quantity -= fee
+		quantity = quantity.Sub(fee)
 
 	case p.QuoteCurrency:
-		quoteQuantity -= fee
+		quoteQuantity = quoteQuantity.Sub(fee)
 
 	default:
 		if p.ExchangeFeeRates != nil {
 			if exchangeFee, ok := p.ExchangeFeeRates[td.Exchange]; ok {
 				if td.IsMaker {
-					feeInQuote += exchangeFee.MakerFeeRate.Mul(quoteQuantity)
+					feeInQuote = feeInQuote.Add(exchangeFee.MakerFeeRate.Mul(quoteQuantity))
 				} else {
-					feeInQuote += exchangeFee.TakerFeeRate.Mul(quoteQuantity)
+					feeInQuote = feeInQuote.Add(exchangeFee.TakerFeeRate.Mul(quoteQuantity))
 				}
 			}
 		} else if p.FeeRate != nil {
 			if td.IsMaker {
-				feeInQuote += p.FeeRate.MakerFeeRate.Mul(quoteQuantity)
+				feeInQuote = feeInQuote.Add(p.FeeRate.MakerFeeRate.Mul(quoteQuantity))
 			} else {
-				feeInQuote += p.FeeRate.TakerFeeRate.Mul(quoteQuantity)
+				feeInQuote = feeInQuote.Add(p.FeeRate.TakerFeeRate.Mul(quoteQuantity))
 			}
 		}
 	}
@@ -308,61 +310,71 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 	switch td.Side {
 
 	case SideTypeBuy:
-		if p.Base < 0 {
+		if p.Base.Sign() < 0 {
 			// convert short position to long position
-			if p.Base+quantity > 0 {
-				profit = (p.AverageCost - price).Mul(-p.Base)
-				netProfit = (p.ApproximateAverageCost - price).Mul(-p.Base) - feeInQuote
-				p.Base += quantity
-				p.Quote -= quoteQuantity
+			if p.Base.Add(quantity).Sign() > 0 {
+				profit = p.AverageCost.Sub(price).Mul(p.Base.Neg())
+				netProfit = p.ApproximateAverageCost.Sub(price).Mul(p.Base.Neg()).Sub(feeInQuote)
+				p.Base = p.Base.Add(quantity)
+				p.Quote = p.Quote.Sub(quoteQuantity)
 				p.AverageCost = price
 				p.ApproximateAverageCost = price
 				return profit, netProfit, true
 			} else {
 				// covering short position
-				p.Base += quantity
-				p.Quote -= quoteQuantity
-				profit = (p.AverageCost - price).Mul(quantity)
-				netProfit = (p.ApproximateAverageCost - price).Mul(quantity) - feeInQuote
+				p.Base = p.Base.Add(quantity)
+				p.Quote = p.Quote.Sub(quoteQuantity)
+				profit = p.AverageCost.Sub(price).Mul(quantity)
+				netProfit = p.ApproximateAverageCost.Sub(price).Mul(quantity).Sub(feeInQuote)
 				return profit, netProfit, true
 			}
 		}
 
-		p.ApproximateAverageCost = (p.ApproximateAverageCost.Mul(p.Base) + quoteQuantity + feeInQuote).Div(p.Base + quantity)
-		p.AverageCost = (p.AverageCost.Mul(p.Base) + quoteQuantity).Div(p.Base + quantity)
-		p.Base += quantity
-		p.Quote -= quoteQuantity
+		dividor := p.Base.Add(quantity)
+		p.ApproximateAverageCost = p.ApproximateAverageCost.Mul(p.Base).
+			Add(quoteQuantity).
+			Add(feeInQuote).
+			Div(dividor)
+		p.AverageCost = p.AverageCost.Mul(p.Base).Add(quoteQuantity).Div(dividor)
+		p.Base = p.Base.Add(quantity)
+		p.Quote = p.Quote.Sub(quoteQuantity)
 
-		return 0, 0, false
+		return fixedpoint.Zero, fixedpoint.Zero, false
 
 	case SideTypeSell:
-		if p.Base > 0 {
+		if p.Base.Sign() > 0 {
 			// convert long position to short position
-			if p.Base-quantity < 0 {
-				profit = (price - p.AverageCost).Mul(p.Base)
-				netProfit = (price - p.ApproximateAverageCost).Mul(p.Base) - feeInQuote
-				p.Base -= quantity
-				p.Quote += quoteQuantity
+			if p.Base.Compare(quantity) < 0 {
+				profit = price.Sub(p.AverageCost).Mul(p.Base)
+				netProfit = price.Sub(p.ApproximateAverageCost).Mul(p.Base).Sub(feeInQuote)
+				p.Base = p.Base.Sub(quantity)
+				p.Quote = p.Quote.Add(quoteQuantity)
 				p.AverageCost = price
 				p.ApproximateAverageCost = price
 				return profit, netProfit, true
 			} else {
-				p.Base -= quantity
-				p.Quote += quoteQuantity
-				profit = (price - p.AverageCost).Mul(quantity)
-				netProfit = (price - p.ApproximateAverageCost).Mul(quantity) - feeInQuote
+				p.Base = p.Base.Sub(quantity)
+				p.Quote = p.Quote.Add(quoteQuantity)
+				profit = price.Sub(p.AverageCost).Mul(quantity)
+				netProfit = price.Sub(p.ApproximateAverageCost).Mul(quantity).Sub(feeInQuote)
 				return profit, netProfit, true
 			}
 		}
 
 		// handling short position, since Base here is negative we need to reverse the sign
-		p.ApproximateAverageCost = (p.ApproximateAverageCost.Mul(-p.Base) + quoteQuantity - feeInQuote).Div(-p.Base + quantity)
-		p.AverageCost = (p.AverageCost.Mul(-p.Base) + quoteQuantity).Div(-p.Base + quantity)
-		p.Base -= quantity
-		p.Quote += quoteQuantity
+		dividor := quantity.Sub(p.Base)
+		p.ApproximateAverageCost = p.ApproximateAverageCost.Mul(p.Base.Neg()).
+			Add(quoteQuantity).
+			Sub(feeInQuote).
+			Div(dividor)
+		p.AverageCost = p.AverageCost.Mul(p.Base.Neg()).
+			Add(quoteQuantity).
+			Div(dividor)
+		p.Base = p.Base.Sub(quantity)
+		p.Quote = p.Quote.Add(quoteQuantity)
 
-		return 0, 0, false
+		return fixedpoint.Zero, fixedpoint.Zero, false
 	}
 
-	return 0, 0, false
+	return fixedpoint.Zero, fixedpoint.Zero, false
 }

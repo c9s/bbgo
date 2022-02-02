@@ -54,15 +54,15 @@ func (b *RBTOrderBook) BestAsk() (PriceVolume, bool) {
 func (b *RBTOrderBook) Spread() (fixedpoint.Value, bool) {
 	bestBid, ok := b.BestBid()
 	if !ok {
-		return 0, false
+		return fixedpoint.Zero, false
 	}
 
 	bestAsk, ok := b.BestAsk()
 	if !ok {
-		return 0, false
+		return fixedpoint.Zero, false
 	}
 
-	return bestAsk.Price - bestBid.Price, true
+	return bestAsk.Price.Sub(bestBid.Price), true
 }
 
 func (b *RBTOrderBook) IsValid() (bool, error) {
@@ -77,8 +77,8 @@ func (b *RBTOrderBook) IsValid() (bool, error) {
 		return false, errors.New("empty asks")
 	}
 
-	if bid.Price > ask.Price {
-		return false, fmt.Errorf("bid price %f > ask price %f", bid.Price.Float64(), ask.Price.Float64())
+	if bid.Price.Compare(ask.Price) > 0 {
+		return false, fmt.Errorf("bid price %s > ask price %s", bid.Price.String(), ask.Price.String())
 	}
 
 	return true, nil
@@ -102,7 +102,7 @@ func (b *RBTOrderBook) Reset() {
 
 func (b *RBTOrderBook) updateAsks(pvs PriceVolumeSlice) {
 	for _, pv := range pvs {
-		if pv.Volume == 0 {
+		if pv.Volume.IsZero() {
 			b.Asks.Delete(pv.Price)
 		} else {
 			b.Asks.Upsert(pv.Price, pv.Volume)
@@ -112,7 +112,7 @@ func (b *RBTOrderBook) updateAsks(pvs PriceVolumeSlice) {
 
 func (b *RBTOrderBook) updateBids(pvs PriceVolumeSlice) {
 	for _, pv := range pvs {
-		if pv.Volume == 0 {
+		if pv.Volume.IsZero() {
 			b.Bids.Delete(pv.Price)
 		} else {
 			b.Bids.Upsert(pv.Price, pv.Volume)
@@ -188,12 +188,12 @@ func (b *RBTOrderBook) SideBook(sideType SideType) PriceVolumeSlice {
 
 func (b *RBTOrderBook) Print() {
 	b.Asks.Inorder(func(n *RBNode) bool {
-		fmt.Printf("ask: %f x %f", n.key.Float64(), n.value.Float64())
+		fmt.Printf("ask: %s x %s", n.key.String(), n.value.String())
 		return true
 	})
 
 	b.Bids.InorderReverse(func(n *RBNode) bool {
-		fmt.Printf("bid: %f x %f", n.key.Float64(), n.value.Float64())
+		fmt.Printf("bid: %s x %s", n.key.String(), n.value.String())
 		return true
 	})
 }
