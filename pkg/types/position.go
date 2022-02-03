@@ -53,11 +53,10 @@ type Position struct {
 	sync.Mutex
 }
 
-func (p *Position) NewClosePositionOrder(percentage float64) *SubmitOrder {
+func (p *Position) NewClosePositionOrder(percentage fixedpoint.Value) *SubmitOrder {
 	base := p.GetBase()
-	quantity := base.Float64()
-	quantity = quantity * percentage
-	if quantity < p.Market.MinQuantity {
+	quantity := base.Mul(percentage)
+	if quantity.Compare(p.Market.MinQuantity) < 0 {
 		return nil
 	}
 
@@ -67,8 +66,6 @@ func (p *Position) NewClosePositionOrder(percentage float64) *SubmitOrder {
 		return nil
 	} else if sign < 0 {
 		side = SideTypeBuy
-	} else if sign > 0 {
-		side = SideTypeSell
 	}
 
 	return &SubmitOrder{
@@ -189,9 +186,9 @@ func (p *Position) SlackAttachment() slack.Attachment {
 	title := util.Render(string(posType)+` Position {{ .Symbol }} `, p)
 
 	fields := []slack.AttachmentField{
-		{Title: "Average Cost", Value: trimTrailingZeroFloat(averageCost.Float64()) + " " + p.QuoteCurrency, Short: true},
-		{Title: p.BaseCurrency, Value: trimTrailingZeroFloat(base.Float64()), Short: true},
-		{Title: p.QuoteCurrency, Value: trimTrailingZeroFloat(quote.Float64())},
+		{Title: "Average Cost", Value: averageCost.String() + " " + p.QuoteCurrency, Short: true},
+		{Title: p.BaseCurrency, Value: base.String(), Short: true},
+		{Title: p.QuoteCurrency, Value: quote.String()},
 	}
 
 	if p.TotalFee != nil {
@@ -199,7 +196,7 @@ func (p *Position) SlackAttachment() slack.Attachment {
 			if fee.Sign() > 0 {
 				fields = append(fields, slack.AttachmentField{
 					Title: fmt.Sprintf("Fee (%s)", feeCurrency),
-					Value: trimTrailingZeroFloat(fee.Float64()),
+					Value: fee.String(),
 					Short: true,
 				})
 			}
@@ -222,14 +219,14 @@ func (p *Position) PlainText() (msg string) {
 	msg = fmt.Sprintf("%s Position %s: average cost = %s, base = %s, quote = %s",
 		posType,
 		p.Symbol,
-		trimTrailingZeroFloat(p.AverageCost.Float64()),
-		trimTrailingZeroFloat(p.Base.Float64()),
-		trimTrailingZeroFloat(p.Quote.Float64()),
+		p.AverageCost.String(),
+		p.Base.String(),
+		p.Quote.String(),
 	)
 
 	if p.TotalFee != nil {
 		for feeCurrency, fee := range p.TotalFee {
-			msg += fmt.Sprintf("\nfee (%s) = %s", feeCurrency, trimTrailingZeroFloat(fee.Float64()))
+			msg += fmt.Sprintf("\nfee (%s) = %s", feeCurrency, fee.String())
 		}
 	}
 

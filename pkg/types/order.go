@@ -11,6 +11,7 @@ import (
 	"github.com/slack-go/slack"
 
 	"github.com/c9s/bbgo/pkg/util"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 func init() {
@@ -108,9 +109,9 @@ type SubmitOrder struct {
 	Side   SideType  `json:"side" db:"side"`
 	Type   OrderType `json:"orderType" db:"order_type"`
 
-	Quantity  float64 `json:"quantity" db:"quantity"`
-	Price     float64 `json:"price" db:"price"`
-	StopPrice float64 `json:"stopPrice,omitempty" db:"stop_price"`
+	Quantity  fixedpoint.Value `json:"quantity" db:"quantity"`
+	Price     fixedpoint.Value `json:"price" db:"price"`
+	StopPrice fixedpoint.Value `json:"stopPrice,omitempty" db:"stop_price"`
 
 	Market Market `json:"-" db:"-"`
 
@@ -129,40 +130,40 @@ type SubmitOrder struct {
 func (o SubmitOrder) String() string {
 	switch o.Type {
 	case OrderTypeMarket:
-		return fmt.Sprintf("SubmitOrder %s %s %s %f", o.Symbol, o.Type, o.Side, o.Quantity)
+		return fmt.Sprintf("SubmitOrder %s %s %s %s", o.Symbol, o.Type, o.Side, o.Quantity.String())
 	}
 
-	return fmt.Sprintf("SubmitOrder %s %s %s %f @ %f", o.Symbol, o.Type, o.Side, o.Quantity, o.Price)
+	return fmt.Sprintf("SubmitOrder %s %s %s %s @ %s", o.Symbol, o.Type, o.Side, o.Quantity.String(), o.Price.String())
 }
 
 func (o SubmitOrder) PlainText() string {
 	switch o.Type {
 	case OrderTypeMarket:
-		return fmt.Sprintf("SubmitOrder %s %s %s %f", o.Symbol, o.Type, o.Side, o.Quantity)
+		return fmt.Sprintf("SubmitOrder %s %s %s %s", o.Symbol, o.Type, o.Side, o.Quantity.String())
 	}
 
-	return fmt.Sprintf("SubmitOrder %s %s %s %f @ %f", o.Symbol, o.Type, o.Side, o.Quantity, o.Price)
+	return fmt.Sprintf("SubmitOrder %s %s %s %s @ %s", o.Symbol, o.Type, o.Side, o.Quantity.String(), o.Price.String())
 }
 
 func (o SubmitOrder) SlackAttachment() slack.Attachment {
 	var fields = []slack.AttachmentField{
 		{Title: "Symbol", Value: o.Symbol, Short: true},
 		{Title: "Side", Value: string(o.Side), Short: true},
-		{Title: "Price", Value: trimTrailingZeroFloat(o.Price), Short: true},
-		{Title: "Quantity", Value: trimTrailingZeroFloat(o.Quantity), Short: true},
+		{Title: "Price", Value: o.Price.String(), Short: true},
+		{Title: "Quantity", Value: o.Quantity.String(), Short: true},
 	}
 
-	if o.Price > 0 && o.Quantity > 0 && len(o.Market.QuoteCurrency) > 0 {
+	if o.Price.Sign() > 0 && o.Quantity.Sign() > 0 && len(o.Market.QuoteCurrency) > 0 {
 		if IsFiatCurrency(o.Market.QuoteCurrency) {
 			fields = append(fields, slack.AttachmentField{
 				Title: "Amount",
-				Value: USD.FormatMoneyFloat64(o.Price * o.Quantity),
+				Value: USD.FormatMoney(o.Price.Mul(o.Quantity)),
 				Short: true,
 			})
 		} else {
 			fields = append(fields, slack.AttachmentField{
 				Title: "Amount",
-				Value: fmt.Sprintf("%f %s", o.Price*o.Quantity, o.Market.QuoteCurrency),
+				Value: fmt.Sprintf("%s %s", o.Price.Mul(o.Quantity).String(), o.Market.QuoteCurrency),
 				Short: true,
 			})
 		}
@@ -201,7 +202,7 @@ type Order struct {
 	UUID    string `json:"uuid,omitempty"`
 
 	Status           OrderStatus `json:"status" db:"status"`
-	ExecutedQuantity float64     `json:"executedQuantity" db:"executed_quantity"`
+	ExecutedQuantity fixedpoint.Value     `json:"executedQuantity" db:"executed_quantity"`
 	IsWorking        bool        `json:"isWorking" db:"is_working"`
 	CreationTime     Time        `json:"creationTime" db:"created_at"`
 	UpdateTime       Time        `json:"updateTime" db:"updated_at"`
@@ -214,7 +215,7 @@ type Order struct {
 // so that we can post the order later when we want to restore the orders.
 func (o Order) Backup() SubmitOrder {
 	so := o.SubmitOrder
-	so.Quantity = o.Quantity - o.ExecutedQuantity
+	so.Quantity = o.Quantity.Sub(o.ExecutedQuantity)
 
 	// ClientOrderID can not be reused
 	so.ClientOrderID = ""
@@ -229,14 +230,14 @@ func (o Order) String() string {
 		orderID = strconv.FormatUint(o.OrderID, 10)
 	}
 
-	return fmt.Sprintf("ORDER %s %s %s %s %f/%f @ %f -> %s",
+	return fmt.Sprintf("ORDER %s %s %s %s %s/%s @ %s -> %s",
 		o.Exchange.String(),
 		orderID,
 		o.Symbol,
 		o.Side,
-		o.ExecutedQuantity,
-		o.Quantity,
-		o.Price,
+		o.ExecutedQuantity.String(),
+		o.Quantity.String(),
+		o.Price.String(),
 		o.Status)
 }
 
@@ -247,9 +248,9 @@ func (o Order) PlainText() string {
 		o.Symbol,
 		o.Type,
 		o.Side,
-		util.FormatFloat(o.Price, 2),
-		util.FormatFloat(o.ExecutedQuantity, 2),
-		util.FormatFloat(o.Quantity, 4),
+		o.Price.FormatString(2),
+		o.ExecutedQuantity.FormatString(2),
+		o.Quantity.FormatString(4),
 		o.Status)
 }
 
@@ -257,10 +258,10 @@ func (o Order) SlackAttachment() slack.Attachment {
 	var fields = []slack.AttachmentField{
 		{Title: "Symbol", Value: o.Symbol, Short: true},
 		{Title: "Side", Value: string(o.Side), Short: true},
-		{Title: "Price", Value: trimTrailingZeroFloat(o.Price), Short: true},
+		{Title: "Price", Value: o.Price.String(), Short: true},
 		{
 			Title: "Executed Quantity",
-			Value: trimTrailingZeroFloat(o.ExecutedQuantity) + "/" + trimTrailingZeroFloat(o.Quantity),
+			Value: o.ExecutedQuantity.String() + "/" + o.Quantity.String(),
 			Short: true,
 		},
 	}

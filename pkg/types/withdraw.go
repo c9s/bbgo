@@ -3,19 +3,20 @@ package types
 import (
 	"fmt"
 	"time"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 type Withdraw struct {
 	GID        int64        `json:"gid" db:"gid"`
 	Exchange   ExchangeName `json:"exchange" db:"exchange"`
 	Asset      string       `json:"asset" db:"asset"`
-	Amount     float64      `json:"amount" db:"amount"`
+	Amount     fixedpoint.Value      `json:"amount" db:"amount"`
 	Address    string       `json:"address" db:"address"`
 	AddressTag string       `json:"addressTag"`
 	Status     string       `json:"status"`
 
 	TransactionID          string  `json:"transactionID" db:"txn_id"`
-	TransactionFee         float64 `json:"transactionFee" db:"txn_fee"`
+	TransactionFee         fixedpoint.Value `json:"transactionFee" db:"txn_fee"`
 	TransactionFeeCurrency string  `json:"transactionFeeCurrency" db:"txn_fee_currency"`
 	WithdrawOrderID        string  `json:"withdrawOrderId"`
 	ApplyTime              Time    `json:"applyTime" db:"time"`

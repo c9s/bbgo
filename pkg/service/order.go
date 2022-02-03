@@ -81,7 +81,7 @@ func (s *OrderService) Sync(ctx context.Context, exchange types.Exchange, symbol
 		}
 
 		// skip canceled and not filled orders
-		if order.Status == types.OrderStatusCanceled && order.ExecutedQuantity == 0.0 {
+		if order.Status == types.OrderStatusCanceled && order.ExecutedQuantity.IsZero() {
 			continue
 		}
 

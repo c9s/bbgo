@@ -2,7 +2,6 @@ package max
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -11,7 +10,6 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
 )
 
 func toGlobalCurrency(currency string) string {
@@ -77,23 +75,23 @@ func toGlobalOrderStatus(orderState max.OrderState, executedVolume, remainingVol
 		return types.OrderStatusCanceled
 
 	case max.OrderStateFinalizing, max.OrderStateDone:
-		if executedVolume == 0 {
+		if executedVolume.IsZero() {
 			return types.OrderStatusCanceled
-		} else if remainingVolume == 0 {
+		} else if remainingVolume.IsZero() {
 			return types.OrderStatusFilled
 		}
 
 		return types.OrderStatusFilled
 
 	case max.OrderStateWait:
-		if executedVolume > 0 && remainingVolume > 0 {
+		if executedVolume.Sign() > 0 && remainingVolume.Sign() > 0 {
 			return types.OrderStatusPartiallyFilled
 		}
 
 		return types.OrderStatusNew
 
 	case max.OrderStateConvert:
-		if executedVolume > 0 && remainingVolume > 0 {
+		if executedVolume.Sign() > 0 && remainingVolume.Sign() > 0 {
 			return types.OrderStatusPartiallyFilled
 		}
 
@@ -189,8 +187,8 @@ func toGlobalOrder(maxOrder max.Order) (*types.Order, error) {
 			Symbol:        toGlobalSymbol(maxOrder.Market),
 			Side:          toGlobalSideType(maxOrder.Side),
 			Type:          toGlobalOrderType(maxOrder.OrderType),
-			Quantity:      util.MustParseFloat(maxOrder.Volume),
-			Price:         util.MustParseFloat(maxOrder.Price),
+			Quantity:      fixedpoint.MustNewFromString(maxOrder.Volume),
+			Price:         fixedpoint.MustNewFromString(maxOrder.Price),
 			TimeInForce:   "GTC", // MAX only supports GTC
 			GroupID:       maxOrder.GroupID,
 		},
@@ -198,7 +196,7 @@ func toGlobalOrder(maxOrder max.Order) (*types.Order, error) {
 		IsWorking:        maxOrder.State == "wait",
 		OrderID:          maxOrder.ID,
 		Status:           toGlobalOrderStatus(maxOrder.State, executedVolume, remainingVolume),
-		ExecutedQuantity: executedVolume.Float64(),
+		ExecutedQuantity: executedVolume,
 		CreationTime:     types.Time(maxOrder.CreatedAtMs.Time()),
 		UpdateTime:       types.Time(maxOrder.CreatedAtMs.Time()),
 	}, nil
@@ -211,22 +209,22 @@ func toGlobalTrade(t max.Trade) (*types.Trade, error) {
 	// trade time
 	mts := time.Unix(0, t.CreatedAtMilliSeconds*int64(time.Millisecond))
 
-	price, err := strconv.ParseFloat(t.Price, 64)
+	price, err := fixedpoint.NewFromString(t.Price)
 	if err != nil {
 		return nil, err
 	}
 
-	quantity, err := strconv.ParseFloat(t.Volume, 64)
+	quantity, err := fixedpoint.NewFromString(t.Volume)
 	if err != nil {
 		return nil, err
 	}
 
-	quoteQuantity, err := strconv.ParseFloat(t.Funds, 64)
+	quoteQuantity, err := fixedpoint.NewFromString(t.Funds)
 	if err != nil {
 		return nil, err
 	}
 
-	fee, err := strconv.ParseFloat(t.Fee, 64)
+	fee, err := fixedpoint.NewFromString(t.Fee)
 	if err != nil {
 		return nil, err
 	}
@@ -276,19 +274,19 @@ func convertWebSocketTrade(t max.TradeUpdate) (*types.Trade, error) {
 	// trade time
 	mts := time.Unix(0, t.Timestamp*int64(time.Millisecond))
 
-	price, err := strconv.ParseFloat(t.Price, 64)
+	price, err := fixedpoint.NewFromString(t.Price)
 	if err != nil {
 		return nil, err
 	}
 
-	quantity, err := strconv.ParseFloat(t.Volume, 64)
+	quantity, err := fixedpoint.NewFromString(t.Volume)
 	if err != nil {
 		return nil, err
 	}
 
-	quoteQuantity := price * quantity
+	quoteQuantity := price.Mul(quantity)
 
-	fee, err := strconv.ParseFloat(t.Fee, 64)
+	fee, err := fixedpoint.NewFromString(t.Fee)
 	if err != nil {
 		return nil, err
 	}
@@ -327,16 +325,16 @@ func convertWebSocketOrderUpdate(u max.OrderUpdate) (*types.Order, error) {
 			Symbol:        toGlobalSymbol(u.Market),
 			Side:          toGlobalSideType(u.Side),
 			Type:          toGlobalOrderType(u.OrderType),
-			Quantity:      util.MustParseFloat(u.Volume),
-			Price:         util.MustParseFloat(u.Price),
-			StopPrice:     util.MustParseFloat(u.StopPrice),
+			Quantity:      fixedpoint.MustNewFromString(u.Volume),
+			Price:         fixedpoint.MustNewFromString(u.Price),
+			StopPrice:     fixedpoint.MustNewFromString(u.StopPrice),
 			TimeInForce:   "GTC", // MAX only supports GTC
 			GroupID:       u.GroupID,
 		},
 		Exchange:         types.ExchangeMax,
 		OrderID:          u.ID,
 		Status:           toGlobalOrderStatus(u.State, executedVolume, remainingVolume),
-		ExecutedQuantity: executedVolume.Float64(),
+		ExecutedQuantity: executedVolume,
 		CreationTime:     types.Time(time.Unix(0, u.CreatedAtMs*int64(time.Millisecond))),
 	}, nil
 }

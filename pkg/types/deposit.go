@@ -2,6 +2,7 @@ package types
 
 import (
 	"time"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 type DepositStatus string
@@ -25,7 +26,7 @@ type Deposit struct {
 	GID           int64         `json:"gid" db:"gid"`
 	Exchange      ExchangeName  `json:"exchange" db:"exchange"`
 	Time          Time          `json:"time" db:"time"`
-	Amount        float64       `json:"amount" db:"amount"`
+	Amount        fixedpoint.Value       `json:"amount" db:"amount"`
 	Asset         string        `json:"asset" db:"asset"`
 	Address       string        `json:"address" db:"address"`
 	AddressTag    string        `json:"addressTag"`

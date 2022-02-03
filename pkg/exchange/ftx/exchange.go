@@ -38,10 +38,10 @@ type Exchange struct {
 
 type MarketTicker struct {
 	Market types.Market
-	Price  float64
-	Ask    float64
-	Bid    float64
-	Last   float64
+	Price  fixedpoint.Value
+	Ask    fixedpoint.Value
+	Bid    fixedpoint.Value
+	Last   fixedpoint.Value
 }
 
 type MarketMap map[string]MarketTicker
@@ -138,19 +138,19 @@ func (e *Exchange) _queryMarkets(ctx context.Context) (MarketMap, error) {
 				LocalSymbol: m.Name,
 				// The max precision is length(DefaultPow). For example, currently fixedpoint.DefaultPow
 				// is 1e8, so the max precision will be 8.
-				PricePrecision:  fixedpoint.NumFractionalDigits(fixedpoint.NewFromFloat(m.PriceIncrement)),
-				VolumePrecision: fixedpoint.NumFractionalDigits(fixedpoint.NewFromFloat(m.SizeIncrement)),
+				PricePrecision:  fixedpoint.NumFractionalDigits(m.PriceIncrement),
+				VolumePrecision: fixedpoint.NumFractionalDigits(m.SizeIncrement),
 				QuoteCurrency:   toGlobalCurrency(m.QuoteCurrency),
 				BaseCurrency:    toGlobalCurrency(m.BaseCurrency),
 				// FTX only limit your order by `MinProvideSize`, so I assign zero value to unsupported fields:
 				// MinNotional, MinAmount, MaxQuantity, MinPrice and MaxPrice.
-				MinNotional: 0,
-				MinAmount:   0,
+				MinNotional: fixedpoint.Zero,
+				MinAmount:   fixedpoint.Zero,
 				MinQuantity: m.MinProvideSize,
-				MaxQuantity: 0,
+				MaxQuantity: fixedpoint.Zero,
 				StepSize:    m.SizeIncrement,
-				MinPrice:    0,
-				MaxPrice:    0,
+				MinPrice:    fixedpoint.Zero,
+				MaxPrice:    fixedpoint.Zero,
 				TickSize:    m.PriceIncrement,
 			},
 			Price: m.Price,
@@ -173,9 +173,9 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	}
 
 	a := &types.Account{
-		MakerCommission:   fixedpoint.NewFromFloat(resp.Result.MakerFee),
-		TakerCommission:   fixedpoint.NewFromFloat(resp.Result.TakerFee),
-		TotalAccountValue: fixedpoint.NewFromFloat(resp.Result.TotalAccountValue),
+		MakerCommission:   resp.Result.MakerFee,
+		TakerCommission:   resp.Result.TakerFee,
+		TotalAccountValue: resp.Result.TotalAccountValue,
 	}
 
 	balances, err := e.QueryAccountBalances(ctx)
@@ -199,8 +199,8 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 	for _, r := range resp.Result {
 		balances[toGlobalCurrency(r.Coin)] = types.Balance{
 			Currency:  toGlobalCurrency(r.Coin),
-			Available: fixedpoint.NewFromFloat(r.Free),
-			Locked:    fixedpoint.NewFromFloat(r.Total).Sub(fixedpoint.NewFromFloat(r.Free)),
+			Available: r.Free,
+			Locked:    r.Total.Sub(r.Free),
 		}
 	}
 

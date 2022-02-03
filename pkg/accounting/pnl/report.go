@@ -70,8 +70,8 @@ func (report AverageCostPnlReport) SlackAttachment() slack.Attachment {
 		Fields: []slack.AttachmentField{
 			{Title: "Profit", Value: types.USD.FormatMoney(report.Profit)},
 			{Title: "Unrealized Profit", Value: types.USD.FormatMoney(report.UnrealizedProfit)},
-			{Title: "Current Price", Value: report.Market.FormatPrice(report.LastPrice.Float64()), Short: true},
-			{Title: "Average Cost", Value: report.Market.FormatPrice(report.AverageCost.Float64()), Short: true},
+			{Title: "Current Price", Value: report.Market.FormatPrice(report.LastPrice), Short: true},
+			{Title: "Average Cost", Value: report.Market.FormatPrice(report.AverageCost), Short: true},
 
 			// FIXME:
 			// {Title: "Fee (USD)", Value: types.USD.FormatMoney(report.FeeInUSD), Short: true},

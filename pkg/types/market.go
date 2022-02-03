@@ -74,30 +74,30 @@ type Market struct {
 
 	// The MIN_NOTIONAL filter defines the minimum notional value allowed for an order on a symbol.
 	// An order's notional value is the price * quantity
-	MinNotional float64 `json:"minNotional,omitempty"`
-	MinAmount   float64 `json:"minAmount,omitempty"`
+	MinNotional fixedpoint.Value `json:"minNotional,omitempty"`
+	MinAmount   fixedpoint.Value `json:"minAmount,omitempty"`
 
 	// The LOT_SIZE filter defines the quantity
-	MinQuantity float64 `json:"minQuantity,omitempty"`
+	MinQuantity fixedpoint.Value `json:"minQuantity,omitempty"`
 
 	// MaxQuantity is currently not used in the code
-	MaxQuantity float64 `json:"maxQuantity,omitempty"`
+	MaxQuantity fixedpoint.Value `json:"maxQuantity,omitempty"`
 
 	// StepSize is the step size of quantity
 	// can be converted from precision, e.g.
 	//    1.0 / math.Pow10(m.BaseUnitPrecision)
-	StepSize float64 `json:"stepSize,omitempty"`
+	StepSize fixedpoint.Value `json:"stepSize,omitempty"`
 
-	MinPrice float64 `json:"minPrice,omitempty"`
-	MaxPrice float64 `json:"maxPrice,omitempty"`
+	MinPrice fixedpoint.Value `json:"minPrice,omitempty"`
+	MaxPrice fixedpoint.Value `json:"maxPrice,omitempty"`
 
 	// TickSize is the step size of price
-	TickSize float64 `json:"tickSize,omitempty"`
+	TickSize fixedpoint.Value `json:"tickSize,omitempty"`
 }
 
 // TruncateQuantity uses the step size to truncate floating number, in order to avoid the rounding issue
 func (m Market) TruncateQuantity(quantity fixedpoint.Value) fixedpoint.Value {
-	stepRound := math.Pow10(-int(math.Log10(m.StepSize)))
+	stepRound := math.Pow10(-int(math.Log10(m.StepSize.Float64())))
 	return fixedpoint.NewFromFloat(math.Trunc(quantity.Float64()*stepRound) / stepRound)
 }
 
@@ -125,55 +125,59 @@ func (m Market) QuoteCurrencyFormatter() *accounting.Accounting {
 	return a
 }
 
-func (m Market) FormatPriceCurrency(val float64) string {
+func (m Market) FormatPriceCurrency(val fixedpoint.Value) string {
 	switch m.QuoteCurrency {
 
 	case "USD", "USDT":
-		return USD.FormatMoneyFloat64(val)
+		return USD.FormatMoney(val)
 
 	case "BTC":
-		return BTC.FormatMoneyFloat64(val)
+		return BTC.FormatMoney(val)
 
 	case "BNB":
-		return BNB.FormatMoneyFloat64(val)
+		return BNB.FormatMoney(val)
 
 	}
 
 	return m.FormatPrice(val)
 }
 
-func (m Market) FormatPrice(val float64) string {
+func (m Market) FormatPrice(val fixedpoint.Value) string {
 	// p := math.Pow10(m.PricePrecision)
 	return formatPrice(val, m.TickSize)
 }
 
-func formatPrice(price float64, tickSize float64) string {
-	prec := int(math.Round(math.Abs(math.Log10(tickSize))))
+func formatPrice(price fixedpoint.Value, tickSize fixedpoint.Value) string {
+	// TODO Round
+	prec := int(math.Round(math.Abs(math.Log10(tickSize.Float64()))))
 	p := math.Pow10(prec)
-	price = math.Trunc(price*p) / p
-	return strconv.FormatFloat(price, 'f', prec, 64)
+	pp := math.Trunc(price.Float64()*p) / p
+	return strconv.FormatFloat(pp, 'f', prec, 64)
 }
 
-func (m Market) FormatQuantity(val float64) string {
+func (m Market) FormatQuantity(val fixedpoint.Value) string {
 	return formatQuantity(val, m.StepSize)
 }
 
-func formatQuantity(quantity float64, lot float64) string {
-	prec := int(math.Round(math.Abs(math.Log10(lot))))
+func formatQuantity(quantity fixedpoint.Value, lot fixedpoint.Value) string {
+	// TODO Round
+	prec := int(math.Round(math.Abs(math.Log10(lot.Float64()))))
 	p := math.Pow10(prec)
-	quantity = math.Trunc(quantity*p) / p
-	return strconv.FormatFloat(quantity, 'f', prec, 64)
+	q := math.Trunc(quantity.Float64() * p) / p
+	return strconv.FormatFloat(q, 'f', prec, 64)
 }
 
-func (m Market) FormatVolume(val float64) string {
+func (m Market) FormatVolume(val fixedpoint.Value) string {
+	// TODO Round
 	p := math.Pow10(m.VolumePrecision)
-	val = math.Trunc(val*p) / p
-	return strconv.FormatFloat(val, 'f', m.VolumePrecision, 64)
+	v := math.Trunc(val.Float64()*p) / p
+	return strconv.FormatFloat(v, 'f', m.VolumePrecision, 64)
 }
 
-func (m Market) CanonicalizeVolume(val float64) float64 {
+func (m Market) CanonicalizeVolume(val fixedpoint.Value) float64 {
+	// TODO Round
 	p := math.Pow10(m.VolumePrecision)
-	return math.Trunc(p*val) / p
+	return math.Trunc(p*val.Float64()) / p
 }
 
 type MarketMap map[string]Market
