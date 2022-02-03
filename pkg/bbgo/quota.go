@@ -14,18 +14,18 @@ type Quota struct {
 
 func (q *Quota) Add(fund fixedpoint.Value) {
 	q.mu.Lock()
-	q.Available += fund
+	q.Available = q.Available.Add(fund)
 	q.mu.Unlock()
 }
 
 func (q *Quota) Lock(fund fixedpoint.Value) bool {
-	if fund > q.Available {
+	if fund.Compare(q.Available) > 0 {
 		return false
 	}
 
 	q.mu.Lock()
-	q.Available -= fund
-	q.Locked += fund
+	q.Available = q.Available.Sub(fund)
+	q.Locked = q.Locked.Add(fund)
 	q.mu.Unlock()
 
 	return true
@@ -33,14 +33,14 @@ func (q *Quota) Lock(fund fixedpoint.Value) bool {
 
 func (q *Quota) Commit() {
 	q.mu.Lock()
-	q.Locked = 0
+	q.Locked = fixedpoint.Zero
 	q.mu.Unlock()
 }
 
 func (q *Quota) Rollback() {
 	q.mu.Lock()
-	q.Available += q.Locked
-	q.Locked = 0
+	q.Available = q.Available.Add(q.Locked)
+	q.Locked = fixedpoint.Zero
 	q.mu.Unlock()
 }
 

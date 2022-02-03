@@ -418,17 +418,17 @@ func genFakeAssets() types.AssetMap {
 		"MAX":  types.Balance{Currency: "MAX", Available: fixedpoint.NewFromFloat(200000.0 * rand.Float64())},
 		"COMP": types.Balance{Currency: "COMP", Available: fixedpoint.NewFromFloat(100.0 * rand.Float64())},
 	}
-	assets := balances.Assets(map[string]float64{
-		"BTCUSDT":  38000.0,
-		"BCHUSDT":  478.0,
-		"LTCUSDT":  150.0,
-		"COMPUSDT": 450.0,
-		"ETHUSDT":  1700.0,
-		"BNBUSDT":  70.0,
-		"GRTUSDT":  0.89,
-		"DOTUSDT":  20.0,
-		"SANDUSDT": 0.13,
-		"MAXUSDT":  0.122,
+	assets := balances.Assets(map[string]fixedpoint.Value{
+		"BTCUSDT":  fixedpoint.NewFromFloat(38000.0),
+		"BCHUSDT":  fixedpoint.NewFromFloat(478.0),
+		"LTCUSDT":  fixedpoint.NewFromFloat(150.0),
+		"COMPUSDT": fixedpoint.NewFromFloat(450.0),
+		"ETHUSDT":  fixedpoint.NewFromFloat(1700.0),
+		"BNBUSDT":  fixedpoint.NewFromFloat(70.0),
+		"GRTUSDT":  fixedpoint.NewFromFloat(0.89),
+		"DOTUSDT":  fixedpoint.NewFromFloat(20.0),
+		"SANDUSDT": fixedpoint.NewFromFloat(0.13),
+		"MAXUSDT":  fixedpoint.NewFromFloat(0.122),
 	})
 	for currency, asset := range assets {
 		totalAssets[currency] = asset

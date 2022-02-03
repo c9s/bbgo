@@ -3,7 +3,6 @@ package bbgo
 import (
 	"context"
 	"errors"
-	"math"
 
 	log "github.com/sirupsen/logrus"
 
@@ -37,7 +36,7 @@ type TrailingStopController struct {
 	Symbol string
 
 	position    *types.Position
-	latestHigh  float64
+	latestHigh  fixedpoint.Value
 	averageCost fixedpoint.Value
 
 	// activated: when the price reaches the min profit price, we set the activated to true to enable trailing stop
@@ -74,25 +73,25 @@ func (c *TrailingStopController) Run(ctx context.Context, session *ExchangeSessi
 		}
 
 		// if average cost is zero, we don't need trailing stop
-		if c.averageCost == 0 || c.position == nil {
+		if c.averageCost.IsZero() || c.position == nil {
 			return
 		}
 
 		closePrice := kline.Close
 
 		// if we don't hold position, we just skip dust position
-		if c.position.Base.Abs().Float64() < c.position.Market.MinQuantity || c.position.Base.Abs().Float64()*closePrice < c.position.Market.MinNotional {
+		if c.position.Base.Abs().Compare(c.position.Market.MinQuantity) < 0 || c.position.Base.Abs().Mul(closePrice).Compare(c.position.Market.MinNotional) < 0 {
 			return
 		}
 
-		if c.MinProfit <= 0 {
+		if c.MinProfit.Sign() <= 0 {
 			// when minProfit is not set, we should always activate the trailing stop order
 			c.activated = true
-		} else if closePrice > c.averageCost.Float64() ||
-			changeRate(closePrice, c.averageCost.Float64()) > c.MinProfit.Float64() {
+		} else if closePrice.Compare(c.averageCost) > 0 ||
+			changeRate(closePrice, c.averageCost).Compare(c.MinProfit) > 0 {
 
 			if !c.activated {
-				log.Infof("%s trailing stop activated at price %f", c.Symbol, closePrice)
+				log.Infof("%s trailing stop activated at price %s", c.Symbol, closePrice.String())
 				c.activated = true
 			}
 		} else {
@@ -105,37 +104,37 @@ func (c *TrailingStopController) Run(ctx context.Context, session *ExchangeSessi
 
 		// if the trailing stop order is activated, we should update the latest high
 		// update the latest high
-		c.latestHigh = math.Max(closePrice, c.latestHigh)
+		c.latestHigh = fixedpoint.Max(closePrice, c.latestHigh)
 
 		// if it's in the callback rate, we don't want to trigger stop
-		if closePrice < c.latestHigh && changeRate(closePrice, c.latestHigh) < c.CallbackRate.Float64() {
+		if closePrice.Compare(c.latestHigh) < 0 && changeRate(closePrice, c.latestHigh).Compare(c.CallbackRate) < 0 {
 			return
 		}
 
 		if c.Virtual {
 			// if the profit rate is defined, and it is less than our minimum profit rate, we skip stop
-			if c.MinProfit > 0 &&
-				(closePrice < c.averageCost.Float64() ||
-					changeRate(closePrice, c.averageCost.Float64()) < c.MinProfit.Float64()) {
+			if c.MinProfit.Sign() > 0 &&
+				closePrice.Compare(c.averageCost) < 0 ||
+					changeRate(closePrice, c.averageCost).Compare(c.MinProfit) < 0 {
 				return
 			}
 
-			log.Infof("%s trailing stop emitted, latest high: %f, closed price: %f, average cost: %f, profit spread: %f",
+			log.Infof("%s trailing stop emitted, latest high: %s, closed price: %s, average cost: %s, profit spread: %s",
 				c.Symbol,
-				c.latestHigh,
-				closePrice,
-				c.averageCost.Float64(),
-				closePrice-c.averageCost.Float64())
+				c.latestHigh.String(),
+				closePrice.String(),
+				c.averageCost.String(),
+				closePrice.Sub(c.averageCost).String())
 
 			log.Infof("current %s position: %s", c.Symbol, c.position.String())
 
-			marketOrder := c.position.NewClosePositionOrder(c.ClosePosition.Float64())
+			marketOrder := c.position.NewClosePositionOrder(c.ClosePosition)
 			if marketOrder != nil {
 				log.Infof("submitting %s market order to stop: %+v", c.Symbol, marketOrder)
 
 				// skip dust order
-				if marketOrder.Quantity*closePrice < c.position.Market.MinNotional {
-					log.Warnf("%s market order quote quantity %f < min notional %f, skip placing order", c.Symbol, marketOrder.Quantity*closePrice, c.position.Market.MinNotional)
+				if marketOrder.Quantity.Mul(closePrice).Compare(c.position.Market.MinNotional) < 0 {
+					log.Warnf("%s market order quote quantity %s < min notional %s, skip placing order", c.Symbol, marketOrder.Quantity.Mul(closePrice).String(), c.position.Market.MinNotional.String())
 					return
 				}
 
@@ -148,16 +147,16 @@ func (c *TrailingStopController) Run(ctx context.Context, session *ExchangeSessi
 				tradeCollector.Process()
 
 				// reset the state
-				c.latestHigh = 0.0
+				c.latestHigh = fixedpoint.Zero
 				c.activated = false
 			}
 		} else {
 			// place stop order only when the closed price is greater than the current average cost
-			if c.MinProfit > 0 && closePrice > c.averageCost.Float64() &&
-				changeRate(closePrice, c.averageCost.Float64()) >= c.MinProfit.Float64() {
+			if c.MinProfit.Sign() > 0 && closePrice.Compare(c.averageCost) > 0 &&
+				changeRate(closePrice, c.averageCost).Compare(c.MinProfit) >= 0 {
 
-				stopPrice := c.averageCost.MulFloat64(1.0 + c.MinProfit.Float64())
-				orderForm := c.GenerateStopOrder(stopPrice.Float64(), c.averageCost.Float64())
+				stopPrice := c.averageCost.Mul(fixedpoint.One.Add(c.MinProfit))
+				orderForm := c.GenerateStopOrder(stopPrice, c.averageCost)
 				if orderForm != nil {
 					log.Infof("updating %s stop limit order to simulate trailing stop order...", c.Symbol)
 
@@ -175,26 +174,27 @@ func (c *TrailingStopController) Run(ctx context.Context, session *ExchangeSessi
 	})
 }
 
-func (c *TrailingStopController) GenerateStopOrder(stopPrice, price float64) *types.SubmitOrder {
+func (c *TrailingStopController) GenerateStopOrder(stopPrice, price fixedpoint.Value) *types.SubmitOrder {
 	base := c.position.GetBase()
-	if base == 0 {
+	if base.IsZero() {
 		return nil
 	}
 
-	quantity := math.Abs(base.Float64())
-	quoteQuantity := price * quantity
+	quantity := base.Abs()
+	quoteQuantity := price.Mul(quantity)
 
-	if c.ClosePosition > 0 {
-		quantity = quantity * c.ClosePosition.Float64()
+	if c.ClosePosition.Sign() > 0 {
+		quantity = quantity.Mul(c.ClosePosition)
 	}
 
 	// skip dust orders
-	if quantity < c.position.Market.MinQuantity || quoteQuantity < c.position.Market.MinNotional {
+	if quantity.Compare(c.position.Market.MinQuantity) < 0 ||
+		quoteQuantity.Compare(c.position.Market.MinNotional) < 0 {
 		return nil
 	}
 
 	side := types.SideTypeSell
-	if base < 0 {
+	if base.Sign() < 0 {
 		side = types.SideTypeBuy
 	}
 
@@ -282,6 +282,6 @@ func (s *SmartStops) RunStopControllers(ctx context.Context, session *ExchangeSe
 	}
 }
 
-func changeRate(a, b float64) float64 {
-	return math.Abs(a-b) / b
+func changeRate(a, b fixedpoint.Value) fixedpoint.Value {
+	return a.Sub(b).Div(b).Abs()
 }

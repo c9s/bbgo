@@ -10,10 +10,11 @@ import (
 
 	"github.com/c9s/bbgo/pkg/interact"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 type PositionCloser interface {
-	ClosePosition(ctx context.Context, percentage float64) error
+	ClosePosition(ctx context.Context, percentage fixedpoint.Value) error
 }
 
 type PositionReader interface {
@@ -23,7 +24,7 @@ type PositionReader interface {
 type closePositionContext struct {
 	signature  string
 	closer     PositionCloser
-	percentage float64
+	percentage fixedpoint.Value
 }
 
 type CoreInteraction struct {
@@ -75,7 +76,7 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 		message := "Your balances\n"
 		balances := session.Account.Balances()
 		for _, balance := range balances {
-			if balance.Total() == 0 {
+			if balance.Total().IsZero() {
 				continue
 			}
 
@@ -121,7 +122,7 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 			reply.Send("Your current position:")
 			reply.Send(position.PlainText())
 
-			if position.Base == 0 {
+			if position.Base.IsZero() {
 				reply.Message(fmt.Sprintf("Strategy %q has no opened position", signature))
 				return fmt.Errorf("strategy %T has no opened position", strategy)
 			}
@@ -173,7 +174,7 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 				reply.Send("Your current position:")
 				reply.Send(position.PlainText())
 
-				if position.Base == 0 {
+				if position.Base.IsZero() {
 					reply.Message("No opened position")
 					if kc, ok := reply.(interact.KeyboardController) ; ok {
 						kc.RemoveKeyboard()
@@ -190,7 +191,7 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 
 		return nil
 	}).Next(func(percentageStr string, reply interact.Reply) error {
-		percentage, err := parseFloatPercent(percentageStr, 64)
+		percentage, err := fixedpoint.NewFromString(percentageStr)
 		if err != nil {
 			reply.Message(fmt.Sprintf("%q is not a valid percentage string", percentageStr))
 			return err

@@ -15,7 +15,7 @@ type PriceOrder struct {
 type PriceOrderSlice []PriceOrder
 
 func (slice PriceOrderSlice) Len() int           { return len(slice) }
-func (slice PriceOrderSlice) Less(i, j int) bool { return slice[i].Price < slice[j].Price }
+func (slice PriceOrderSlice) Less(i, j int) bool { return slice[i].Price.Compare(slice[j].Price) < 0 }
 func (slice PriceOrderSlice) Swap(i, j int)      { slice[i], slice[j] = slice[j], slice[i] }
 
 func (slice PriceOrderSlice) InsertAt(idx int, po PriceOrder) PriceOrderSlice {
@@ -47,9 +47,9 @@ func (slice PriceOrderSlice) First() (PriceOrder, bool) {
 func (slice PriceOrderSlice) Find(price fixedpoint.Value, descending bool) (pv PriceOrder, idx int) {
 	idx = sort.Search(len(slice), func(i int) bool {
 		if descending {
-			return slice[i].Price <= price
+			return slice[i].Price.Compare(price) <= 0
 		}
-		return slice[i].Price >= price
+		return slice[i].Price.Compare(price) >= 0
 	})
 
 	if idx >= len(slice) || slice[idx].Price != price {
