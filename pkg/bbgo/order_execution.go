@@ -3,7 +3,6 @@ package bbgo
 import (
 	"context"
 	"fmt"
-	"math"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -122,8 +121,10 @@ func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...
 		errs = append(errs, err)
 	}
 
-	accumulativeQuoteAmount := 0.0
-	accumulativeBaseSellQuantity := 0.0
+	accumulativeQuoteAmount := fixedpoint.Zero
+	accumulativeBaseSellQuantity := fixedpoint.Zero
+	increaseFactor := fixedpoint.NewFromFloat(1.01)
+
 	for _, order := range orders {
 		lastPrice, ok := session.LastPrice(order.Symbol)
 		if !ok {
@@ -146,6 +147,7 @@ func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...
 
 		switch order.Side {
 		case types.SideTypeBuy:
+			minAmount := market.MinAmount.Mul(increaseFactor)
 			// Critical conditions for placing buy orders
 			quoteBalance, ok := balances[market.QuoteCurrency]
 			if !ok {
@@ -153,67 +155,70 @@ func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...
 				continue
 			}
 
-			if quoteBalance.Available < c.MinQuoteBalance {
+			if quoteBalance.Available.Compare(c.MinQuoteBalance) < 0 {
 				addError(errors.Wrapf(ErrQuoteBalanceLevelTooLow, "can not place buy order, quote balance level is too low: %s < %s, order: %s",
-					types.USD.FormatMoneyFloat64(quoteBalance.Available.Float64()),
-					types.USD.FormatMoneyFloat64(c.MinQuoteBalance.Float64()), order.String()))
+					types.USD.FormatMoney(quoteBalance.Available),
+					types.USD.FormatMoney(c.MinQuoteBalance), order.String()))
 				continue
 			}
 
 			// Increase the quantity if the amount is not enough,
 			// this is the only increase op, later we will decrease the quantity if it meets the criteria
-			quantity = AdjustFloatQuantityByMinAmount(quantity, price, market.MinAmount*1.01)
+			quantity = AdjustFloatQuantityByMinAmount(quantity, price, minAmount)
 
-			if c.MaxOrderAmount > 0 {
-				quantity = AdjustFloatQuantityByMaxAmount(quantity, price, c.MaxOrderAmount.Float64())
+			if c.MaxOrderAmount.Sign() > 0 {
+				quantity = AdjustFloatQuantityByMaxAmount(quantity, price, c.MaxOrderAmount)
 			}
 
-			quoteAssetQuota := math.Max(0.0, quoteBalance.Available.Float64()-c.MinQuoteBalance.Float64())
-			if quoteAssetQuota < market.MinAmount {
+			quoteAssetQuota := fixedpoint.Max(
+				fixedpoint.Zero, quoteBalance.Available.Sub(c.MinQuoteBalance))
+			if quoteAssetQuota.Compare(market.MinAmount) < 0 {
 				addError(
 					errors.Wrapf(
 						ErrInsufficientQuoteBalance,
-						"can not place buy order, insufficient quote balance: quota %f < min amount %f, order: %s",
-						quoteAssetQuota, market.MinAmount, order.String()))
+						"can not place buy order, insufficient quote balance: quota %s < min amount %s, order: %s",
+						quoteAssetQuota.String(), market.MinAmount.String(), order.String()))
 				continue
 			}
 
 			quantity = AdjustFloatQuantityByMaxAmount(quantity, price, quoteAssetQuota)
 
 			// if MaxBaseAssetBalance is enabled, we should check the current base asset balance
-			if baseBalance, hasBaseAsset := balances[market.BaseCurrency]; hasBaseAsset && c.MaxBaseAssetBalance > 0 {
-				if baseBalance.Available > c.MaxBaseAssetBalance {
+			if baseBalance, hasBaseAsset := balances[market.BaseCurrency]; hasBaseAsset && c.MaxBaseAssetBalance.Sign() > 0 {
+				if baseBalance.Available.Compare(c.MaxBaseAssetBalance) > 0 {
 					addError(
 						errors.Wrapf(
 							ErrAssetBalanceLevelTooHigh,
-							"should not place buy order, asset balance level is too high: %f > %f, order: %s",
-							baseBalance.Available.Float64(),
-							c.MaxBaseAssetBalance.Float64(),
+							"should not place buy order, asset balance level is too high: %s > %s, order: %s",
+							baseBalance.Available.String(),
+							c.MaxBaseAssetBalance.String(),
 							order.String()))
 					continue
 				}
 
-				baseAssetQuota := math.Max(0.0, c.MaxBaseAssetBalance.Float64()-baseBalance.Available.Float64())
-				if quantity > baseAssetQuota {
+				baseAssetQuota := fixedpoint.Max(fixedpoint.Zero, c.MaxBaseAssetBalance.Sub(baseBalance.Available))
+				if quantity.Compare(baseAssetQuota) > 0 {
 					quantity = baseAssetQuota
 				}
 			}
 
 			// if the amount is still too small, we should skip it.
-			notional := quantity * lastPrice
-			if notional < market.MinAmount {
+			notional := quantity.Mul(lastPrice)
+			if notional.Compare(market.MinAmount) < 0 {
 				addError(
 					fmt.Errorf(
-						"can not place buy order, quote amount too small: notional %f < min amount %f, order: %s",
-						notional,
-						market.MinAmount,
+						"can not place buy order, quote amount too small: notional %s < min amount %s, order: %s",
+						notional.String(),
+						market.MinAmount.String(),
 						order.String()))
 				continue
 			}
 
-			accumulativeQuoteAmount += notional
+			accumulativeQuoteAmount = accumulativeQuoteAmount.Add(notional)
 
 		case types.SideTypeSell:
+	        minNotion := market.MinNotional.Mul(increaseFactor)
+
 			// Critical conditions for placing SELL orders
 			baseAssetBalance, ok := balances[market.BaseCurrency]
 			if !ok {
@@ -226,58 +231,58 @@ func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...
 			}
 
 			// if the amount is too small, we should increase it.
-			quantity = AdjustFloatQuantityByMinAmount(quantity, price, market.MinNotional*1.01)
+			quantity = AdjustFloatQuantityByMinAmount(quantity, price, minNotion)
 
 			// we should not SELL too much
-			quantity = math.Min(quantity, baseAssetBalance.Available.Float64())
+			quantity = fixedpoint.Min(quantity, baseAssetBalance.Available)
 
-			if c.MinBaseAssetBalance > 0 {
-				if baseAssetBalance.Available < c.MinBaseAssetBalance {
+			if c.MinBaseAssetBalance.Sign() > 0 {
+				if baseAssetBalance.Available.Compare(c.MinBaseAssetBalance) < 0 {
 					addError(
 						errors.Wrapf(
 							ErrAssetBalanceLevelTooLow,
-							"asset balance level is too low: %f > %f", baseAssetBalance.Available.Float64(), c.MinBaseAssetBalance.Float64()))
+							"asset balance level is too low: %s > %s", baseAssetBalance.Available.String(), c.MinBaseAssetBalance.String()))
 					continue
 				}
 
-				quantity = math.Min(quantity, baseAssetBalance.Available.Float64()-c.MinBaseAssetBalance.Float64())
-				if quantity < market.MinQuantity {
+				quantity = fixedpoint.Min(quantity, baseAssetBalance.Available.Sub(c.MinBaseAssetBalance))
+				if quantity.Compare(market.MinQuantity) < 0 {
 					addError(
 						errors.Wrapf(
 							ErrInsufficientAssetBalance,
-							"insufficient asset balance: %f > minimal quantity %f",
-							baseAssetBalance.Available.Float64(),
-							market.MinQuantity))
+							"insufficient asset balance: %s > minimal quantity %s",
+							baseAssetBalance.Available.String(),
+							market.MinQuantity.String()))
 					continue
 				}
 			}
 
-			if c.MaxOrderAmount > 0 {
-				quantity = AdjustFloatQuantityByMaxAmount(quantity, price, c.MaxOrderAmount.Float64())
+			if c.MaxOrderAmount.Sign() > 0 {
+				quantity = AdjustFloatQuantityByMaxAmount(quantity, price, c.MaxOrderAmount)
 			}
 
-			notional := quantity * lastPrice
-			if notional < market.MinNotional {
+			notional := quantity.Mul(lastPrice)
+			if notional.Compare(market.MinNotional) < 0 {
 				addError(
 					fmt.Errorf(
-						"can not place sell order, notional %f < min notional: %f, order: %s",
-						notional,
-						market.MinNotional,
+						"can not place sell order, notional %s < min notional: %s, order: %s",
+						notional.String(),
+						market.MinNotional.String(),
 						order.String()))
 				continue
 			}
 
-			if quantity < market.MinQuantity {
+			if quantity.Compare(market.MinQuantity) < 0 {
 				addError(
 					fmt.Errorf(
-						"can not place sell order, quantity %f is less than the minimal lot %f, order: %s",
-						quantity,
-						market.MinQuantity,
+						"can not place sell order, quantity %s is less than the minimal lot %s, order: %s",
+						quantity.String(),
+						market.MinQuantity.String(),
 						order.String()))
 				continue
 			}
 
-			accumulativeBaseSellQuantity += quantity
+			accumulativeBaseSellQuantity = accumulativeBaseSellQuantity.Add(quantity)
 		}
 
 		// update quantity and format the order

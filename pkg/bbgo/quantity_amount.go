@@ -18,11 +18,11 @@ type QuantityOrAmount struct {
 }
 
 func (qa *QuantityOrAmount) IsSet() bool {
-	return qa.Quantity > 0 || qa.Amount > 0
+	return qa.Quantity.Sign() > 0 || qa.Amount.Sign() > 0
 }
 
 func (qa *QuantityOrAmount) Validate() error {
-	if qa.Quantity == 0 && qa.Amount == 0 {
+	if qa.Quantity.IsZero() && qa.Amount.IsZero() {
 		return errors.New("either quantity or amount can not be empty")
 	}
 	return nil
@@ -31,7 +31,7 @@ func (qa *QuantityOrAmount) Validate() error {
 // CalculateQuantity calculates the equivalent quantity of the given price when amount is set
 // it returns the quantity if the quantity is set
 func (qa *QuantityOrAmount) CalculateQuantity(currentPrice fixedpoint.Value) fixedpoint.Value {
-	if qa.Amount > 0 {
+	if qa.Amount.Sign() > 0 {
 		quantity := qa.Amount.Div(currentPrice)
 		return quantity
 	}

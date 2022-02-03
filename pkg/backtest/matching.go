@@ -16,7 +16,7 @@ import (
 // BINANCE uses 0.1% for both maker and taker
 //  for BNB holders, it's 0.075% for both maker and taker
 // MAX uses 0.050% for maker and 0.15% for taker
-const DefaultFeeRate = 0.075 * 0.01
+var DefaultFeeRate = fixedpoint.NewFromFloat(0.075 * 0.01)
 
 var orderID uint64 = 1
 var tradeID uint64 = 1
@@ -92,12 +92,12 @@ func (m *SimplePriceMatching) CancelOrder(o types.Order) (types.Order, error) {
 
 	switch o.Side {
 	case types.SideTypeBuy:
-		if err := m.Account.UnlockBalance(m.Market.QuoteCurrency, fixedpoint.NewFromFloat(o.Price*o.Quantity)); err != nil {
+		if err := m.Account.UnlockBalance(m.Market.QuoteCurrency, o.Price.Mul(o.Quantity)); err != nil {
 			return o, err
 		}
 
 	case types.SideTypeSell:
-		if err := m.Account.UnlockBalance(m.Market.BaseCurrency, fixedpoint.NewFromFloat(o.Quantity)); err != nil {
+		if err := m.Account.UnlockBalance(m.Market.BaseCurrency, o.Quantity); err != nil {
 			return o, err
 		}
 	}
@@ -114,32 +114,32 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (closedOrders *typ
 
 	switch o.Type {
 	case types.OrderTypeMarket:
-		if m.LastPrice == 0 {
+		if m.LastPrice.IsZero() {
 			panic("unexpected: last price can not be zero")
 		}
 
-		price = m.LastPrice.Float64()
+		price = m.LastPrice
 	case types.OrderTypeLimit, types.OrderTypeLimitMaker:
 		price = o.Price
 	}
 
-	if o.Quantity < m.Market.MinQuantity {
-		return nil, nil, fmt.Errorf("order quantity %f is less than minQuantity %f, order: %+v", o.Quantity, m.Market.MinQuantity, o)
+	if o.Quantity.Compare(m.Market.MinQuantity) < 0 {
+		return nil, nil, fmt.Errorf("order quantity %s is less than minQuantity %s, order: %+v", o.Quantity.String(), m.Market.MinQuantity.String(), o)
 	}
 
-	quoteQuantity := o.Quantity * price
-	if quoteQuantity < m.Market.MinNotional {
-		return nil, nil, fmt.Errorf("order amount %f is less than minNotional %f, order: %+v", quoteQuantity, m.Market.MinNotional, o)
+	quoteQuantity := o.Quantity.Mul(price)
+	if quoteQuantity.Compare(m.Market.MinNotional) < 0 {
+		return nil, nil, fmt.Errorf("order amount %s is less than minNotional %s, order: %+v", quoteQuantity.String(), m.Market.MinNotional.String(), o)
 	}
 
 	switch o.Side {
 	case types.SideTypeBuy:
-		if err := m.Account.LockBalance(m.Market.QuoteCurrency, fixedpoint.NewFromFloat(quoteQuantity)); err != nil {
+		if err := m.Account.LockBalance(m.Market.QuoteCurrency, quoteQuantity); err != nil {
 			return nil, nil, err
 		}
 
 	case types.SideTypeSell:
-		if err := m.Account.LockBalance(m.Market.BaseCurrency, fixedpoint.NewFromFloat(o.Quantity)); err != nil {
+		if err := m.Account.LockBalance(m.Market.BaseCurrency, o.Quantity); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -190,13 +190,13 @@ func (m *SimplePriceMatching) executeTrade(trade types.Trade) {
 	var err error
 	// execute trade, update account balances
 	if trade.IsBuyer {
-		err = m.Account.UseLockedBalance(m.Market.QuoteCurrency, fixedpoint.NewFromFloat(trade.Price*trade.Quantity))
+		err = m.Account.UseLockedBalance(m.Market.QuoteCurrency, trade.Price.Mul(trade.Quantity))
 
-		m.Account.AddBalance(m.Market.BaseCurrency, fixedpoint.NewFromFloat(trade.Quantity))
+		m.Account.AddBalance(m.Market.BaseCurrency, trade.Quantity)
 	} else {
-		err = m.Account.UseLockedBalance(m.Market.BaseCurrency, fixedpoint.NewFromFloat(trade.Quantity))
+		err = m.Account.UseLockedBalance(m.Market.BaseCurrency, trade.Quantity)
 
-		m.Account.AddBalance(m.Market.QuoteCurrency, fixedpoint.NewFromFloat(trade.Quantity*trade.Price))
+		m.Account.AddBalance(m.Market.QuoteCurrency, trade.Quantity.Mul(trade.Price))
 	}
 
 	if err != nil {
@@ -213,37 +213,37 @@ func (m *SimplePriceMatching) newTradeFromOrder(order types.Order, isMaker bool)
 	// MAX uses 0.050% for maker and 0.15% for taker
 	var feeRate = DefaultFeeRate
 	if isMaker {
-		if m.MakerFeeRate > 0 {
-			feeRate = m.MakerFeeRate.Float64()
+		if m.MakerFeeRate.Sign() > 0 {
+			feeRate = m.MakerFeeRate
 		}
 	} else {
-		if m.TakerFeeRate > 0 {
-			feeRate = m.TakerFeeRate.Float64()
+		if m.TakerFeeRate.Sign() > 0 {
+			feeRate = m.TakerFeeRate
 		}
 	}
 
 	price := order.Price
 	switch order.Type {
 	case types.OrderTypeMarket, types.OrderTypeStopMarket:
-		if m.LastPrice == 0 {
+		if m.LastPrice.IsZero() {
 			panic("unexpected: last price can not be zero")
 		}
 
-		price = m.LastPrice.Float64()
+		price = m.LastPrice
 
 	}
 
-	var fee float64
+	var fee fixedpoint.Value
 	var feeCurrency string
 
 	switch order.Side {
 
 	case types.SideTypeBuy:
-		fee = order.Quantity * feeRate
+		fee = order.Quantity.Mul(feeRate)
 		feeCurrency = m.Market.BaseCurrency
 
 	case types.SideTypeSell:
-		fee = order.Quantity * price * feeRate
+		fee = order.Quantity.Mul(price).Mul(feeRate)
 		feeCurrency = m.Market.QuoteCurrency
 
 	}
@@ -255,7 +255,7 @@ func (m *SimplePriceMatching) newTradeFromOrder(order types.Order, isMaker bool)
 		Exchange:      "backtest",
 		Price:         price,
 		Quantity:      order.Quantity,
-		QuoteQuantity: order.Quantity * price,
+		QuoteQuantity: order.Quantity.Mul(price),
 		Symbol:        order.Symbol,
 		Side:          order.Side,
 		IsBuyer:       order.Side == types.SideTypeBuy,
@@ -267,7 +267,6 @@ func (m *SimplePriceMatching) newTradeFromOrder(order types.Order, isMaker bool)
 }
 
 func (m *SimplePriceMatching) BuyToPrice(price fixedpoint.Value) (closedOrders []types.Order, trades []types.Trade) {
-	var priceF = price.Float64()
 	var askOrders []types.Order
 
 	for _, o := range m.askOrders {
@@ -275,7 +274,7 @@ func (m *SimplePriceMatching) BuyToPrice(price fixedpoint.Value) (closedOrders [
 
 		case types.OrderTypeStopMarket:
 			// should we trigger the order
-			if priceF <= o.StopPrice {
+			if price.Compare(o.StopPrice) <= 0 {
 				// not triggering it, put it back
 				askOrders = append(askOrders, o)
 				break
@@ -283,7 +282,7 @@ func (m *SimplePriceMatching) BuyToPrice(price fixedpoint.Value) (closedOrders [
 
 			o.Type = types.OrderTypeMarket
 			o.ExecutedQuantity = o.Quantity
-			o.Price = priceF
+			o.Price = price
 			o.Status = types.OrderStatusFilled
 			closedOrders = append(closedOrders, o)
 
@@ -296,7 +295,7 @@ func (m *SimplePriceMatching) BuyToPrice(price fixedpoint.Value) (closedOrders [
 
 		case types.OrderTypeStopLimit:
 			// should we trigger the order?
-			if priceF <= o.StopPrice {
+			if price.Compare(o.StopPrice) <= 0 {
 				askOrders = append(askOrders, o)
 				break
 			}
@@ -304,7 +303,7 @@ func (m *SimplePriceMatching) BuyToPrice(price fixedpoint.Value) (closedOrders [
 			o.Type = types.OrderTypeLimit
 
 			// is it a taker order?
-			if priceF >= o.Price {
+			if price.Compare(o.Price) >= 0 {
 				o.ExecutedQuantity = o.Quantity
 				o.Status = types.OrderStatusFilled
 				closedOrders = append(closedOrders, o)
@@ -321,7 +320,7 @@ func (m *SimplePriceMatching) BuyToPrice(price fixedpoint.Value) (closedOrders [
 			}
 
 		case types.OrderTypeLimit, types.OrderTypeLimitMaker:
-			if priceF >= o.Price {
+			if price.Compare(o.Price) >= 0 {
 				o.ExecutedQuantity = o.Quantity
 				o.Status = types.OrderStatusFilled
 				closedOrders = append(closedOrders, o)
@@ -349,14 +348,14 @@ func (m *SimplePriceMatching) BuyToPrice(price fixedpoint.Value) (closedOrders [
 }
 
 func (m *SimplePriceMatching) SellToPrice(price fixedpoint.Value) (closedOrders []types.Order, trades []types.Trade) {
-	var sellPrice = price.Float64()
+	var sellPrice = price
 	var bidOrders []types.Order
 	for _, o := range m.bidOrders {
 		switch o.Type {
 
 		case types.OrderTypeStopMarket:
 			// should we trigger the order
-			if sellPrice <= o.StopPrice {
+			if sellPrice.Compare(o.StopPrice) <= 0 {
 				o.ExecutedQuantity = o.Quantity
 				o.Price = sellPrice
 				o.Status = types.OrderStatusFilled
@@ -374,10 +373,10 @@ func (m *SimplePriceMatching) SellToPrice(price fixedpoint.Value) (closedOrders 
 
 		case types.OrderTypeStopLimit:
 			// should we trigger the order
-			if sellPrice <= o.StopPrice {
+			if sellPrice.Compare(o.StopPrice) <= 0 {
 				o.Type = types.OrderTypeLimit
 
-				if sellPrice <= o.Price {
+				if sellPrice.Compare(o.Price) <= 0 {
 					o.ExecutedQuantity = o.Quantity
 					o.Status = types.OrderStatusFilled
 					closedOrders = append(closedOrders, o)
@@ -396,7 +395,7 @@ func (m *SimplePriceMatching) SellToPrice(price fixedpoint.Value) (closedOrders 
 			}
 
 		case types.OrderTypeLimit, types.OrderTypeLimitMaker:
-			if sellPrice <= o.Price {
+			if sellPrice.Compare(o.Price) <= 0 {
 				o.ExecutedQuantity = o.Quantity
 				o.Status = types.OrderStatusFilled
 				closedOrders = append(closedOrders, o)
@@ -428,31 +427,31 @@ func (m *SimplePriceMatching) processKLine(kline types.KLine) {
 
 	switch kline.Direction() {
 	case types.DirectionDown:
-		if kline.High >= kline.Open {
-			m.BuyToPrice(fixedpoint.NewFromFloat(kline.High))
+		if kline.High.Compare(kline.Open) >= 0 {
+			m.BuyToPrice(kline.High)
 		}
 
-		if kline.Low > kline.Close {
-			m.SellToPrice(fixedpoint.NewFromFloat(kline.Low))
-			m.BuyToPrice(fixedpoint.NewFromFloat(kline.Close))
+		if kline.Low.Compare(kline.Close) > 0 {
+			m.SellToPrice(kline.Low)
+			m.BuyToPrice(kline.Close)
 		} else {
-			m.SellToPrice(fixedpoint.NewFromFloat(kline.Close))
+			m.SellToPrice(kline.Close)
 		}
 
 	case types.DirectionUp:
-		if kline.Low <= kline.Open {
-			m.SellToPrice(fixedpoint.NewFromFloat(kline.Low))
+		if kline.Low.Compare(kline.Open) <= 0 {
+			m.SellToPrice(kline.Low)
 		}
 
-		if kline.High > kline.Close {
-			m.BuyToPrice(fixedpoint.NewFromFloat(kline.High))
-			m.SellToPrice(fixedpoint.NewFromFloat(kline.Close))
+		if kline.High.Compare(kline.Close) > 0 {
+			m.BuyToPrice(kline.High)
+			m.SellToPrice(kline.Close)
 		} else {
-			m.BuyToPrice(fixedpoint.NewFromFloat(kline.Close))
+			m.BuyToPrice(kline.Close)
 		}
 	default: // no trade up or down
-		if m.LastPrice == 0 {
-			m.BuyToPrice(fixedpoint.NewFromFloat(kline.Close))
+		if m.LastPrice.IsZero() {
+			m.BuyToPrice(kline.Close)
 		}
 
 	}
@@ -464,7 +463,7 @@ func (m *SimplePriceMatching) newOrder(o types.SubmitOrder, orderID uint64) type
 		SubmitOrder:      o,
 		Exchange:         types.ExchangeBacktest,
 		Status:           types.OrderStatusNew,
-		ExecutedQuantity: 0,
+		ExecutedQuantity: fixedpoint.Zero,
 		IsWorking:        true,
 		CreationTime:     types.Time(m.CurrentTime),
 		UpdateTime:       types.Time(m.CurrentTime),
