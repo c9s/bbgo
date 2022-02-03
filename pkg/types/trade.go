@@ -90,7 +90,7 @@ func (trade Trade) PositionChange() fixedpoint.Value {
 	return fixedpoint.Zero
 }
 
-func trimTrailingZero(a string) string {
+/*func trimTrailingZero(a string) string {
 	index := strings.Index(a, ".")
 	if index == -1 {
 		return a
@@ -111,9 +111,9 @@ func trimTrailingZero(a string) string {
 	return a
 }
 
-func trimTrailingZeroFloat(a float64) string {
+func trimTrailingZero(a float64) string {
 	return trimTrailingZero(fmt.Sprintf("%f", a))
-}
+}*/
 
 // String is for console output
 func (trade Trade) String() string {
@@ -121,10 +121,10 @@ func (trade Trade) String() string {
 		trade.Exchange.String(),
 		trade.Symbol,
 		trade.Side,
-		trimTrailingZeroFloat(trade.Quantity.Float64()),
-		trimTrailingZeroFloat(trade.Price.Float64()),
-		trimTrailingZeroFloat(trade.QuoteQuantity.Float64()),
-		trimTrailingZeroFloat(trade.Fee.Float64()),
+		trade.Quantity.String(),
+		trade.Price.String(),
+		trade.QuoteQuantity.String(),
+		trade.Fee.String(),
 		trade.FeeCurrency,
 		trade.OrderID,
 		trade.Time.Time().Format(time.StampMilli),
@@ -137,10 +137,10 @@ func (trade Trade) PlainText() string {
 		trade.Exchange.String(),
 		trade.Symbol,
 		trade.Side,
-		trimTrailingZeroFloat(trade.Quantity.Float64()),
-		trimTrailingZeroFloat(trade.Price.Float64()),
-		trimTrailingZeroFloat(trade.QuoteQuantity.Float64()),
-		trimTrailingZeroFloat(trade.Fee.Float64()),
+		trade.Quantity.String(),
+		trade.Price.String(),
+		trade.QuoteQuantity.String(),
+		trade.Fee.String(),
 		trade.FeeCurrency)
 }
 
@@ -184,10 +184,10 @@ func (trade Trade) SlackAttachment() slack.Attachment {
 		Color: color,
 		Fields: []slack.AttachmentField{
 			{Title: "Exchange", Value: trade.Exchange.String(), Short: true},
-			{Title: "Price", Value: trimTrailingZeroFloat(trade.Price.Float64()), Short: true},
-			{Title: "Quantity", Value: trimTrailingZeroFloat(trade.Quantity.Float64()), Short: true},
-			{Title: "QuoteQuantity", Value: trimTrailingZeroFloat(trade.QuoteQuantity.Float64()), Short: true},
-			{Title: "Fee", Value: trimTrailingZeroFloat(trade.Fee.Float64()), Short: true},
+			{Title: "Price", Value: trade.Price.String(), Short: true},
+			{Title: "Quantity", Value: trade.Quantity.String(), Short: true},
+			{Title: "QuoteQuantity", Value: trade.QuoteQuantity.String(), Short: true},
+			{Title: "Fee", Value: trade.Fee.String(), Short: true},
 			{Title: "FeeCurrency", Value: trade.FeeCurrency, Short: true},
 			{Title: "Liquidity", Value: liquidity, Short: true},
 			{Title: "Order ID", Value: strconv.FormatUint(trade.OrderID, 10), Short: true},

@@ -108,6 +108,13 @@ var halfpow10 = [...]uint64{
 	500000000000000000,
 	5000000000000000000}
 
+func min(a int, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 func (v Value) Value() (driver.Value, error) {
 	return v.Float64(), nil
 }
@@ -230,6 +237,41 @@ func Inf(sign int8) Value {
 		return PosInf
 	default:
 		return Zero
+	}
+}
+
+func (dn Value) FormatString(prec int) string {
+	if dn.sign == 0 {
+		return "0"
+	}
+	const maxLeadingZeros = 7
+	sign := ""
+	if dn.sign < 0 {
+		sign = "-"
+	}
+	if dn.IsInf() {
+		return sign + "inf"
+	}
+	digits := getDigits(dn.coef)
+	nd := len(digits)
+	e := int(dn.exp) - nd
+	if -maxLeadingZeros <= dn.exp && dn.exp <= 0 {
+		// decimal to the left
+		return sign + "." + strings.Repeat("0", -e-nd) + digits[:min(prec, nd)]
+	} else if -nd < e && e <= -1 {
+		// decimal within
+		dec := nd + e
+		return sign + digits[:dec] + "." + digits[dec:min(dec+prec, nd)]
+	} else if 0 < dn.exp && dn.exp <= digitsMax {
+		// decimal to the right
+		return sign + digits + strings.Repeat("0", e)
+	} else {
+		// scientific notation
+		after := ""
+		if nd > 1 {
+			after = "." + digits[1:min(1+prec, nd)]
+		}
+		return sign + digits[:1] + after + "e" + strconv.Itoa(int(dn.exp-1))
 	}
 }
 
@@ -360,12 +402,12 @@ func NewFromString(s string) (Value, error) {
 		s = s[:length-1]
 	}
 	r := &reader{s, 0}
-	sign := getSign(r)
+	sign := r.getSign()
 	if r.matchStr("inf") {
 		return Inf(sign), nil
 	}
-	coef, exp := getCoef(r)
-	exp += getExp(r)
+	coef, exp := r.getCoef()
+	exp += r.getExp()
 	if r.len() != 0 { // didn't consume entire string
 		return Zero, errors.New("invalid number")
 	} else if coef == 0 || exp < math.MinInt8 {
@@ -386,6 +428,158 @@ func MustNewFromString(input string) Value {
 		panic(fmt.Errorf("cannot parse %s into fixedpoint, error: %s", input, err.Error()))
 	}
 	return v
+}
+
+func NewFromBytes(s []byte) (Value, error) {
+	length := len(s)
+	isPercentage := s[length - 1] == '%'
+	if isPercentage {
+		s = s[:length-1]
+	}
+	r := &readerBytes{s, 0}
+	sign := r.getSign()
+	if r.matchStr("inf") {
+		return Inf(sign), nil
+	}
+	coef, exp := r.getCoef()
+	exp += r.getExp()
+	if r.len() != 0 { // didn't consume entire string
+		return Zero, errors.New("invalid number")
+	} else if coef == 0 || exp < math.MinInt8 {
+		return Zero, nil
+	} else if exp > math.MaxInt8 {
+		return Inf(sign), nil
+	}
+	if isPercentage {
+		exp -= 2
+	}
+	//check(coefMin <= coef && coef <= coefMax)
+	return Value{coef, sign, exp}, nil
+}
+
+func MustNewFromBytes(input []byte) Value {
+	v, err := NewFromBytes(input)
+	if err != nil {
+		panic(fmt.Errorf("cannot parse %s into fixedpoint, error: %s", input, err.Error()))
+	}
+	return v
+}
+
+
+// TODO: refactor by interface
+
+type readerBytes struct {
+	s []byte
+	i int
+}
+
+func (r *readerBytes) cur() byte {
+	if r.i >= len(r.s) {
+		return 0
+	}
+	return byte(r.s[r.i])
+}
+
+func (r *readerBytes) prev() byte {
+	if r.i == 0 {
+		return 0
+	}
+	return byte(r.s[r.i-1])
+}
+
+func (r *readerBytes) len() int {
+	return len(r.s) - r.i
+}
+
+func (r *readerBytes) match(c byte) bool {
+	if r.cur() == c {
+		r.i++
+		return true
+	}
+	return false
+}
+
+func (r *readerBytes) matchDigit() bool {
+	c := r.cur()
+	if '0' <= c && c <= '9' {
+		r.i++
+		return true
+	}
+	return false
+}
+
+func (r *readerBytes) matchStr(pre string) bool {
+	for i, c := range r.s[r.i:] {
+		if pre[i] != c {
+			return false
+		}
+	}
+	r.i += len(pre)
+	return true
+}
+
+func (r *readerBytes) getSign() int8 {
+	if r.match('-') {
+		return int8(signNeg)
+	}
+	r.match('+')
+	return int8(signPos)
+}
+
+func (r *readerBytes) getCoef() (uint64, int) {
+	digits := false
+	beforeDecimal := true
+	for r.match('0') {
+		digits = true
+	}
+	if r.cur() == '.' && r.len() > 1 {
+		digits = false
+	}
+	n := uint64(0)
+	exp := 0
+	p := shiftMax
+	for {
+		c := r.cur()
+		if r.matchDigit() {
+			digits = true
+			// ignore extra decimal places
+			if c != '0' && p >= 0 {
+				n += uint64(c-'0') * pow10[p]
+			}
+			p--
+		} else if beforeDecimal {
+			// decimal point or end
+			exp = shiftMax - p
+			if !r.match('.') {
+				break
+			}
+			beforeDecimal = false
+			if !digits {
+				for r.match('0') {
+					digits = true
+					exp--
+				}
+			}
+		} else {
+			break
+		}
+	}
+	if !digits {
+		panic("numbers require at least one digit")
+	}
+	return n, exp
+}
+
+func (r *readerBytes) getExp() int {
+	e := 0
+	if r.match('e') || r.match('E') {
+		esign := r.getSign()
+		for r.matchDigit() {
+			e = e*10 + int(r.prev()-'0')
+		}
+		e *= int(esign)
+	}
+	return e
 }
 
 type reader struct {
@@ -436,7 +630,7 @@ func (r *reader) matchStr(pre string) bool {
 	return false
 }
 
-func getSign(r *reader) int8 {
+func (r *reader) getSign() int8 {
 	if r.match('-') {
 		return int8(signNeg)
 	}
@@ -444,7 +638,7 @@ func getSign(r *reader) int8 {
 	return int8(signPos)
 }
 
-func getCoef(r *reader) (uint64, int) {
+func (r *reader) getCoef() (uint64, int) {
 	digits := false
 	beforeDecimal := true
 	for r.match('0') {
@@ -488,10 +682,10 @@ func getCoef(r *reader) (uint64, int) {
 	return n, exp
 }
 
-func getExp(r *reader) int {
+func (r *reader) getExp() int {
 	e := 0
 	if r.match('e') || r.match('E') {
-		esign := getSign(r)
+		esign := r.getSign()
 		for r.matchDigit() {
 			e = e*10 + int(r.prev()-'0')
 		}

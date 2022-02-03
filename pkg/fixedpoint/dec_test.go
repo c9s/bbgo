@@ -48,6 +48,7 @@ func TestMulString(t *testing.T) {
 	y := NewFromFloat(10.55)
 	x = x.Mul(y)
 	assert.Equal(t, "111.3025", x.String())
+	assert.Equal(t, "111.30", x.FormatString(2))
 }
 
 // Not used

@@ -20,7 +20,7 @@ func Pow10(n int64) int64 {
 }
 
 func FormatValue(val fixedpoint.Value, prec int) string {
-	return strconv.FormatFloat(val.Float64(), 'f', prec, 64)
+	return val.FormatString(prec)
 }
 
 func FormatFloat(val float64, prec int) string {

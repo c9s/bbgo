@@ -11,6 +11,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 // OKB is the platform currency of OKEx, pre-allocate static string here
@@ -69,17 +70,17 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 			VolumePrecision: int(-math.Log10(instrument.LotSize.Float64())),
 
 			// TickSize: OKEx's price tick, for BTC-USDT it's "0.1"
-			TickSize: instrument.TickSize.Float64(),
+			TickSize: instrument.TickSize,
 
 			// Quantity step size, for BTC-USDT, it's "0.00000001"
-			StepSize: instrument.LotSize.Float64(),
+			StepSize: instrument.LotSize,
 
 			// for BTC-USDT, it's "0.00001"
-			MinQuantity: instrument.MinSize.Float64(),
+			MinQuantity: instrument.MinSize,
 
 			// OKEx does not offer minimal notional, use 1 USD here.
-			MinNotional: 1.0,
-			MinAmount:   1.0,
+			MinNotional: fixedpoint.One,
+			MinAmount:   fixedpoint.One,
 		}
 		markets[symbol] = market
 	}
@@ -170,7 +171,8 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 		if order.Market.Symbol != "" {
 			orderReq.Quantity(order.Market.FormatQuantity(order.Quantity))
 		} else {
-			orderReq.Quantity(strconv.FormatFloat(order.Quantity, 'f', 8, 64))
+			// TODO report error
+			orderReq.Quantity(order.Quantity.FormatString(8))
 		}
 
 		// set price field for limit orders
@@ -179,7 +181,8 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 			if order.Market.Symbol != "" {
 				orderReq.Price(order.Market.FormatPrice(order.Price))
 			} else {
-				orderReq.Price(strconv.FormatFloat(order.Price, 'f', 8, 64))
+				// TODO report error
+				orderReq.Price(order.Price.FormatString(8))
 			}
 		}
 
@@ -214,7 +217,7 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 			Exchange:         types.ExchangeOKEx,
 			OrderID:          uint64(orderID),
 			Status:           types.OrderStatusNew,
-			ExecutedQuantity: 0,
+			ExecutedQuantity: fixedpoint.Zero,
 			IsWorking:        true,
 			CreationTime:     types.Time(time.Now()),
 			UpdateTime:       types.Time(time.Now()),

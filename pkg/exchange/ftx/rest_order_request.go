@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"time"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 type orderRequest struct {
@@ -28,9 +29,9 @@ type orderRequest struct {
 type PlaceOrderPayload struct {
 	Market     string
 	Side       string
-	Price      float64
+	Price      fixedpoint.Value
 	Type       string
-	Size       float64
+	Size       fixedpoint.Value
 	ReduceOnly bool
 	IOC        bool
 	PostOnly   bool

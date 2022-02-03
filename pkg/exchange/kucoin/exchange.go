@@ -14,6 +14,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/exchange/kucoin/kucoinapi"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 var marketDataLimiter = rate.NewLimiter(rate.Every(500*time.Millisecond), 1)
@@ -184,12 +185,12 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 			StartTime:   types.Time(k.StartTime),
 			EndTime:     types.Time(k.StartTime.Add(gi.Duration() - time.Millisecond)),
 			Interval:    gi,
-			Open:        k.Open.Float64(),
-			Close:       k.Close.Float64(),
-			High:        k.High.Float64(),
-			Low:         k.Low.Float64(),
-			Volume:      k.Volume.Float64(),
-			QuoteVolume: k.QuoteVolume.Float64(),
+			Open:        k.Open,
+			Close:       k.Close,
+			High:        k.High,
+			Low:         k.Low,
+			Volume:      k.Volume,
+			QuoteVolume: k.QuoteVolume,
 			Closed:      true,
 		})
 	}
@@ -214,7 +215,8 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 		if order.Market.Symbol != "" {
 			req.Size(order.Market.FormatQuantity(order.Quantity))
 		} else {
-			req.Size(strconv.FormatFloat(order.Quantity, 'f', 8, 64))
+			// TODO: report error?
+			req.Size(order.Quantity.FormatString(8))
 		}
 
 		// set price field for limit orders
@@ -223,7 +225,8 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 			if order.Market.Symbol != "" {
 				req.Price(order.Market.FormatPrice(order.Price))
 			} else {
-				req.Price(strconv.FormatFloat(order.Price, 'f', 8, 64))
+				// TODO: report error?
+				req.Price(order.Price.FormatString(8))
 			}
 		}
 
@@ -248,7 +251,7 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 			OrderID:          hashStringID(orderResponse.OrderID),
 			UUID:             orderResponse.OrderID,
 			Status:           types.OrderStatusNew,
-			ExecutedQuantity: 0,
+			ExecutedQuantity: fixedpoint.Zero,
 			IsWorking:        true,
 			CreationTime:     types.Time(time.Now()),
 			UpdateTime:       types.Time(time.Now()),

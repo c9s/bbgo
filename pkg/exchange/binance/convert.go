@@ -2,7 +2,6 @@ package binance
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -12,7 +11,6 @@ import (
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
 )
 
 func toGlobalMarket(symbol binance.Symbol) types.Market {
@@ -26,8 +24,8 @@ func toGlobalMarket(symbol binance.Symbol) types.Market {
 	}
 
 	if f := symbol.MinNotionalFilter(); f != nil {
-		market.MinNotional = util.MustParseFloat(f.MinNotional)
-		market.MinAmount = util.MustParseFloat(f.MinNotional)
+		market.MinNotional = fixedpoint.MustNewFromString(f.MinNotional)
+		market.MinAmount = fixedpoint.MustNewFromString(f.MinNotional)
 	}
 
 	// The LOT_SIZE filter defines the quantity (aka "lots" in auction terms) rules for a symbol.
@@ -36,15 +34,15 @@ func toGlobalMarket(symbol binance.Symbol) types.Market {
 	//	maxQty defines the maximum quantity/icebergQty allowed.
 	//	stepSize defines the intervals that a quantity/icebergQty can be increased/decreased by.
 	if f := symbol.LotSizeFilter(); f != nil {
-		market.MinQuantity = util.MustParseFloat(f.MinQuantity)
-		market.MaxQuantity = util.MustParseFloat(f.MaxQuantity)
-		market.StepSize = util.MustParseFloat(f.StepSize)
+		market.MinQuantity = fixedpoint.MustNewFromString(f.MinQuantity)
+		market.MaxQuantity = fixedpoint.MustNewFromString(f.MaxQuantity)
+		market.StepSize = fixedpoint.MustNewFromString(f.StepSize)
 	}
 
 	if f := symbol.PriceFilter(); f != nil {
-		market.MaxPrice = util.MustParseFloat(f.MaxPrice)
-		market.MinPrice = util.MustParseFloat(f.MinPrice)
-		market.TickSize = util.MustParseFloat(f.TickSize)
+		market.MaxPrice = fixedpoint.MustNewFromString(f.MaxPrice)
+		market.MinPrice = fixedpoint.MustNewFromString(f.MinPrice)
+		market.TickSize = fixedpoint.MustNewFromString(f.TickSize)
 	}
 
 	return market
@@ -62,8 +60,8 @@ func toGlobalFuturesMarket(symbol futures.Symbol) types.Market {
 	}
 
 	if f := symbol.MinNotionalFilter(); f != nil {
-		market.MinNotional = util.MustParseFloat(f.Notional)
-		market.MinAmount = util.MustParseFloat(f.Notional)
+		market.MinNotional = fixedpoint.MustNewFromString(f.Notional)
+		market.MinAmount = fixedpoint.MustNewFromString(f.Notional)
 	}
 
 	// The LOT_SIZE filter defines the quantity (aka "lots" in auction terms) rules for a symbol.
@@ -72,15 +70,15 @@ func toGlobalFuturesMarket(symbol futures.Symbol) types.Market {
 	//	maxQty defines the maximum quantity/icebergQty allowed.
 	//	stepSize defines the intervals that a quantity/icebergQty can be increased/decreased by.
 	if f := symbol.LotSizeFilter(); f != nil {
-		market.MinQuantity = util.MustParseFloat(f.MinQuantity)
-		market.MaxQuantity = util.MustParseFloat(f.MaxQuantity)
-		market.StepSize = util.MustParseFloat(f.StepSize)
+		market.MinQuantity = fixedpoint.MustNewFromString(f.MinQuantity)
+		market.MaxQuantity = fixedpoint.MustNewFromString(f.MaxQuantity)
+		market.StepSize = fixedpoint.MustNewFromString(f.StepSize)
 	}
 
 	if f := symbol.PriceFilter(); f != nil {
-		market.MaxPrice = util.MustParseFloat(f.MaxPrice)
-		market.MinPrice = util.MustParseFloat(f.MinPrice)
-		market.TickSize = util.MustParseFloat(f.TickSize)
+		market.MaxPrice = fixedpoint.MustNewFromString(f.MaxPrice)
+		market.MinPrice = fixedpoint.MustNewFromString(f.MinPrice)
+		market.TickSize = fixedpoint.MustNewFromString(f.TickSize)
 	}
 
 	return market
@@ -236,13 +234,13 @@ func toGlobalFuturesUserAssets(assets []*futures.AccountAsset) (retAssets types.
 
 func toGlobalTicker(stats *binance.PriceChangeStats) (*types.Ticker, error) {
 	return &types.Ticker{
-		Volume: util.MustParseFloat(stats.Volume),
-		Last:   util.MustParseFloat(stats.LastPrice),
-		Open:   util.MustParseFloat(stats.OpenPrice),
-		High:   util.MustParseFloat(stats.HighPrice),
-		Low:    util.MustParseFloat(stats.LowPrice),
-		Buy:    util.MustParseFloat(stats.BidPrice),
-		Sell:   util.MustParseFloat(stats.AskPrice),
+		Volume: fixedpoint.MustNewFromString(stats.Volume),
+		Last:   fixedpoint.MustNewFromString(stats.LastPrice),
+		Open:   fixedpoint.MustNewFromString(stats.OpenPrice),
+		High:   fixedpoint.MustNewFromString(stats.HighPrice),
+		Low:    fixedpoint.MustNewFromString(stats.LowPrice),
+		Buy:    fixedpoint.MustNewFromString(stats.BidPrice),
+		Sell:   fixedpoint.MustNewFromString(stats.AskPrice),
 		Time:   time.Unix(0, stats.CloseTime*int64(time.Millisecond)),
 	}, nil
 }
@@ -324,15 +322,15 @@ func toGlobalOrder(binanceOrder *binance.Order, isMargin bool) (*types.Order, er
 			Symbol:        binanceOrder.Symbol,
 			Side:          toGlobalSideType(binanceOrder.Side),
 			Type:          toGlobalOrderType(binanceOrder.Type),
-			Quantity:      util.MustParseFloat(binanceOrder.OrigQuantity),
-			Price:         util.MustParseFloat(binanceOrder.Price),
+			Quantity:      fixedpoint.MustNewFromString(binanceOrder.OrigQuantity),
+			Price:         fixedpoint.MustNewFromString(binanceOrder.Price),
 			TimeInForce:   string(binanceOrder.TimeInForce),
 		},
 		Exchange:         types.ExchangeBinance,
 		IsWorking:        binanceOrder.IsWorking,
 		OrderID:          uint64(binanceOrder.OrderID),
 		Status:           toGlobalOrderStatus(binanceOrder.Status),
-		ExecutedQuantity: util.MustParseFloat(binanceOrder.ExecutedQuantity),
+		ExecutedQuantity: fixedpoint.MustNewFromString(binanceOrder.ExecutedQuantity),
 		CreationTime:     types.Time(millisecondTime(binanceOrder.Time)),
 		UpdateTime:       types.Time(millisecondTime(binanceOrder.UpdateTime)),
 		IsMargin:         isMargin,
@@ -349,14 +347,14 @@ func toGlobalFuturesOrder(futuresOrder *futures.Order, isMargin bool) (*types.Or
 			Type:          toGlobalFuturesOrderType(futuresOrder.Type),
 			ReduceOnly:    futuresOrder.ReduceOnly,
 			ClosePosition: futuresOrder.ClosePosition,
-			Quantity:      util.MustParseFloat(futuresOrder.OrigQuantity),
-			Price:         util.MustParseFloat(futuresOrder.Price),
+			Quantity:      fixedpoint.MustNewFromString(futuresOrder.OrigQuantity),
+			Price:         fixedpoint.MustNewFromString(futuresOrder.Price),
 			TimeInForce:   string(futuresOrder.TimeInForce),
 		},
 		Exchange:         types.ExchangeBinance,
 		OrderID:          uint64(futuresOrder.OrderID),
 		Status:           toGlobalFuturesOrderStatus(futuresOrder.Status),
-		ExecutedQuantity: util.MustParseFloat(futuresOrder.ExecutedQuantity),
+		ExecutedQuantity: fixedpoint.MustNewFromString(futuresOrder.ExecutedQuantity),
 		CreationTime:     types.Time(millisecondTime(futuresOrder.Time)),
 		UpdateTime:       types.Time(millisecondTime(futuresOrder.UpdateTime)),
 		IsMargin:         isMargin,
@@ -376,27 +374,27 @@ func toGlobalTrade(t binance.TradeV3, isMargin bool) (*types.Trade, error) {
 		side = types.SideTypeSell
 	}
 
-	price, err := strconv.ParseFloat(t.Price, 64)
+	price, err := fixedpoint.NewFromString(t.Price)
 	if err != nil {
 		return nil, errors.Wrapf(err, "price parse error, price: %+v", t.Price)
 	}
 
-	quantity, err := strconv.ParseFloat(t.Quantity, 64)
+	quantity, err := fixedpoint.NewFromString(t.Quantity)
 	if err != nil {
 		return nil, errors.Wrapf(err, "quantity parse error, quantity: %+v", t.Quantity)
 	}
 
-	var quoteQuantity = 0.0
+	var quoteQuantity fixedpoint.Value
 	if len(t.QuoteQuantity) > 0 {
-		quoteQuantity, err = strconv.ParseFloat(t.QuoteQuantity, 64)
+		quoteQuantity, err = fixedpoint.NewFromString(t.QuoteQuantity)
 		if err != nil {
 			return nil, errors.Wrapf(err, "quote quantity parse error, quoteQuantity: %+v", t.QuoteQuantity)
 		}
 	} else {
-		quoteQuantity = price * quantity
+		quoteQuantity = price.Mul(quantity)
 	}
 
-	fee, err := strconv.ParseFloat(t.Commission, 64)
+	fee, err := fixedpoint.NewFromString(t.Commission)
 	if err != nil {
 		return nil, errors.Wrapf(err, "commission parse error, commission: %+v", t.Commission)
 	}
@@ -429,27 +427,27 @@ func toGlobalFuturesTrade(t futures.AccountTrade) (*types.Trade, error) {
 		side = types.SideTypeSell
 	}
 
-	price, err := strconv.ParseFloat(t.Price, 64)
+	price, err := fixedpoint.NewFromString(t.Price)
 	if err != nil {
 		return nil, errors.Wrapf(err, "price parse error, price: %+v", t.Price)
 	}
 
-	quantity, err := strconv.ParseFloat(t.Quantity, 64)
+	quantity, err := fixedpoint.NewFromString(t.Quantity)
 	if err != nil {
 		return nil, errors.Wrapf(err, "quantity parse error, quantity: %+v", t.Quantity)
 	}
 
-	var quoteQuantity = 0.0
+	var quoteQuantity fixedpoint.Value
 	if len(t.QuoteQuantity) > 0 {
-		quoteQuantity, err = strconv.ParseFloat(t.QuoteQuantity, 64)
+		quoteQuantity, err = fixedpoint.NewFromString(t.QuoteQuantity)
 		if err != nil {
 			return nil, errors.Wrapf(err, "quote quantity parse error, quoteQuantity: %+v", t.QuoteQuantity)
 		}
 	} else {
-		quoteQuantity = price * quantity
+		quoteQuantity = price.Mul(quantity)
 	}
 
-	fee, err := strconv.ParseFloat(t.Commission, 64)
+	fee, err := fixedpoint.NewFromString(t.Commission)
 	if err != nil {
 		return nil, errors.Wrapf(err, "commission parse error, commission: %+v", t.Commission)
 	}

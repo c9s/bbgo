@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/valyala/fastjson"
 
+    "github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -25,8 +26,8 @@ type Market struct {
 	BaseUnitPrecision  int     `json:"base_unit_precision"`
 	QuoteUnit          string  `json:"quote_unit"`
 	QuoteUnitPrecision int     `json:"quote_unit_precision"`
-	MinBaseAmount      float64 `json:"min_base_amount"`
-	MinQuoteAmount     float64 `json:"min_quote_amount"`
+	MinBaseAmount      fixedpoint.Value `json:"min_base_amount"`
+	MinQuoteAmount     fixedpoint.Value `json:"min_quote_amount"`
 }
 
 type Ticker struct {
@@ -206,8 +207,8 @@ type KLine struct {
 	Symbol                 string
 	Interval               string
 	StartTime, EndTime     time.Time
-	Open, High, Low, Close float64
-	Volume                 float64
+	Open, High, Low, Close fixedpoint.Value
+	Volume                 fixedpoint.Value
 	Closed                 bool
 }
 
@@ -309,11 +310,11 @@ func parseKLines(payload []byte, symbol, resolution string, interval Interval) (
 			Interval:  resolution,
 			StartTime: startTime,
 			EndTime:   endTime,
-			Open:      slice[1].GetFloat64(),
-			High:      slice[2].GetFloat64(),
-			Low:       slice[3].GetFloat64(),
-			Close:     slice[4].GetFloat64(),
-			Volume:    slice[5].GetFloat64(),
+			Open:      fixedpoint.MustNewFromBytes(slice[1].GetStringBytes()),
+			High:      fixedpoint.MustNewFromBytes(slice[2].GetStringBytes()),
+			Low:       fixedpoint.MustNewFromBytes(slice[3].GetStringBytes()),
+			Close:     fixedpoint.MustNewFromBytes(slice[4].GetStringBytes()),
+			Volume:    fixedpoint.MustNewFromBytes(slice[5].GetStringBytes()),
 			Closed:    isClosed,
 		})
 	}

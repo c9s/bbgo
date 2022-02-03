@@ -24,7 +24,6 @@ import (
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
 )
 
 const BNB = "BNB"
@@ -152,13 +151,13 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[stri
 		}
 
 		tick := types.Ticker{
-			Volume: util.MustParseFloat(stats.Volume),
-			Last:   util.MustParseFloat(stats.LastPrice),
-			Open:   util.MustParseFloat(stats.OpenPrice),
-			High:   util.MustParseFloat(stats.HighPrice),
-			Low:    util.MustParseFloat(stats.LowPrice),
-			Buy:    util.MustParseFloat(stats.BidPrice),
-			Sell:   util.MustParseFloat(stats.AskPrice),
+			Volume: fixedpoint.MustNewFromString(stats.Volume),
+			Last:   fixedpoint.MustNewFromString(stats.LastPrice),
+			Open:   fixedpoint.MustNewFromString(stats.OpenPrice),
+			High:   fixedpoint.MustNewFromString(stats.HighPrice),
+			Low:    fixedpoint.MustNewFromString(stats.LowPrice),
+			Buy:    fixedpoint.MustNewFromString(stats.BidPrice),
+			Sell:   fixedpoint.MustNewFromString(stats.AskPrice),
 			Time:   time.Unix(0, stats.CloseTime*int64(time.Millisecond)),
 		}
 
@@ -197,13 +196,13 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 	return markets, nil
 }
 
-func (e *Exchange) QueryAveragePrice(ctx context.Context, symbol string) (float64, error) {
+func (e *Exchange) QueryAveragePrice(ctx context.Context, symbol string) (fixedpoint.Value, error) {
 	resp, err := e.Client.NewAveragePriceService().Symbol(symbol).Do(ctx)
 	if err != nil {
-		return 0, err
+		return fixedpoint.Zero, err
 	}
 
-	return util.MustParseFloat(resp.Price), nil
+	return fixedpoint.MustNewFromString(resp.Price), nil
 }
 
 func (e *Exchange) NewStream() types.Stream {
@@ -342,10 +341,10 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 				Exchange:        types.ExchangeBinance,
 				ApplyTime:       types.Time(applyTime),
 				Asset:           d.Coin,
-				Amount:          util.MustParseFloat(d.Amount),
+				Amount:          fixedpoint.MustNewFromString(d.Amount),
 				Address:         d.Address,
 				TransactionID:   d.TxID,
-				TransactionFee:  util.MustParseFloat(d.TransactionFee),
+				TransactionFee:  fixedpoint.MustNewFromString(d.TransactionFee),
 				WithdrawOrderID: d.WithdrawOrderID,
 				Network:         d.Network,
 				Status:          status,
@@ -414,7 +413,7 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 				Exchange:      types.ExchangeBinance,
 				Time:          types.Time(time.Unix(0, d.InsertTime*int64(time.Millisecond))),
 				Asset:         d.Coin,
-				Amount:        util.MustParseFloat(d.Amount),
+				Amount:        fixedpoint.MustNewFromString(d.Amount),
 				Address:       d.Address,
 				AddressTag:    d.AddressTag,
 				TransactionID: d.TxID,
@@ -754,7 +753,8 @@ func (e *Exchange) submitMarginOrder(ctx context.Context, order types.SubmitOrde
 	if order.Market.Symbol != "" {
 		req.Quantity(order.Market.FormatQuantity(order.Quantity))
 	} else {
-		req.Quantity(strconv.FormatFloat(order.Quantity, 'f', 8, 64))
+		// TODO report error
+		req.Quantity(order.Quantity.FormatString(8))
 	}
 
 	// set price field for limit orders
@@ -763,7 +763,8 @@ func (e *Exchange) submitMarginOrder(ctx context.Context, order types.SubmitOrde
 		if order.Market.Symbol != "" {
 			req.Price(order.Market.FormatPrice(order.Price))
 		} else {
-			req.Price(strconv.FormatFloat(order.Price, 'f', 8, 64))
+			// TODO report error
+			req.Price(order.Price.FormatString(8))
 		}
 	}
 
@@ -774,7 +775,8 @@ func (e *Exchange) submitMarginOrder(ctx context.Context, order types.SubmitOrde
 		if order.Market.Symbol != "" {
 			req.StopPrice(order.Market.FormatPrice(order.StopPrice))
 		} else {
-			req.StopPrice(strconv.FormatFloat(order.StopPrice, 'f', 8, 64))
+			// TODO report error
+			req.StopPrice(order.StopPrice.FormatString(8))
 		}
 	}
 
@@ -838,7 +840,8 @@ func (e *Exchange) submitFuturesOrder(ctx context.Context, order types.SubmitOrd
 	if order.Market.Symbol != "" {
 		req.Quantity(order.Market.FormatQuantity(order.Quantity))
 	} else {
-		req.Quantity(strconv.FormatFloat(order.Quantity, 'f', 8, 64))
+		// TODO report error
+		req.Quantity(order.Quantity.FormatString(8))
 	}
 
 	// set price field for limit orders
@@ -847,7 +850,8 @@ func (e *Exchange) submitFuturesOrder(ctx context.Context, order types.SubmitOrd
 		if order.Market.Symbol != "" {
 			req.Price(order.Market.FormatPrice(order.Price))
 		} else {
-			req.Price(strconv.FormatFloat(order.Price, 'f', 8, 64))
+			// TODO report error
+			req.Price(order.Price.FormatString(8))
 		}
 	}
 
@@ -858,7 +862,8 @@ func (e *Exchange) submitFuturesOrder(ctx context.Context, order types.SubmitOrd
 		if order.Market.Symbol != "" {
 			req.StopPrice(order.Market.FormatPrice(order.StopPrice))
 		} else {
-			req.StopPrice(strconv.FormatFloat(order.StopPrice, 'f', 8, 64))
+			// TODO report error
+			req.StopPrice(order.StopPrice.FormatString(8))
 		}
 	}
 
@@ -975,7 +980,8 @@ func (e *Exchange) submitSpotOrder(ctx context.Context, order types.SubmitOrder)
 	if order.Market.Symbol != "" {
 		req.Quantity(order.Market.FormatQuantity(order.Quantity))
 	} else {
-		req.Quantity(strconv.FormatFloat(order.Quantity, 'f', 8, 64))
+		// TODO: report error
+		req.Quantity(order.Quantity.FormatString(8))
 	}
 
 	// set price field for limit orders
@@ -984,7 +990,8 @@ func (e *Exchange) submitSpotOrder(ctx context.Context, order types.SubmitOrder)
 		if order.Market.Symbol != "" {
 			req.Price(order.Market.FormatPrice(order.Price))
 		} else {
-			req.Price(strconv.FormatFloat(order.Price, 'f', 8, 64))
+			// TODO: report error
+			req.Price(order.Price.FormatString(8))
 		}
 	}
 
@@ -993,7 +1000,8 @@ func (e *Exchange) submitSpotOrder(ctx context.Context, order types.SubmitOrder)
 		if order.Market.Symbol != "" {
 			req.StopPrice(order.Market.FormatPrice(order.StopPrice))
 		} else {
-			req.StopPrice(strconv.FormatFloat(order.StopPrice, 'f', 8, 64))
+			// TODO: report error
+			req.StopPrice(order.StopPrice.FormatString(8))
 		}
 	}
 
@@ -1111,14 +1119,14 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 			Interval:                 interval,
 			StartTime:                types.NewTimeFromUnix(0, k.OpenTime*int64(time.Millisecond)),
 			EndTime:                  types.NewTimeFromUnix(0, k.CloseTime*int64(time.Millisecond)),
-			Open:                     util.MustParseFloat(k.Open),
-			Close:                    util.MustParseFloat(k.Close),
-			High:                     util.MustParseFloat(k.High),
-			Low:                      util.MustParseFloat(k.Low),
-			Volume:                   util.MustParseFloat(k.Volume),
-			QuoteVolume:              util.MustParseFloat(k.QuoteAssetVolume),
-			TakerBuyBaseAssetVolume:  util.MustParseFloat(k.TakerBuyBaseAssetVolume),
-			TakerBuyQuoteAssetVolume: util.MustParseFloat(k.TakerBuyQuoteAssetVolume),
+			Open:                     fixedpoint.MustNewFromString(k.Open),
+			Close:                    fixedpoint.MustNewFromString(k.Close),
+			High:                     fixedpoint.MustNewFromString(k.High),
+			Low:                      fixedpoint.MustNewFromString(k.Low),
+			Volume:                   fixedpoint.MustNewFromString(k.Volume),
+			QuoteVolume:              fixedpoint.MustNewFromString(k.QuoteAssetVolume),
+			TakerBuyBaseAssetVolume:  fixedpoint.MustNewFromString(k.TakerBuyBaseAssetVolume),
+			TakerBuyQuoteAssetVolume: fixedpoint.MustNewFromString(k.TakerBuyQuoteAssetVolume),
 			LastTradeID:              0,
 			NumberOfTrades:           uint64(k.TradeNum),
 			Closed:                   true,

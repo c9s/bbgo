@@ -93,7 +93,7 @@ func (inc *BOLL) calculateAndUpdate(kLines []types.KLine) {
 
 	var prices []float64
 	for _, k := range recentK {
-		prices = append(prices, k.Close)
+		prices = append(prices, k.Close.Float64())
 	}
 
 	var std = stat.StdDev(prices, nil)
