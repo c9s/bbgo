@@ -51,6 +51,15 @@ func TestMulString(t *testing.T) {
 	assert.Equal(t, "111.30", x.FormatString(2))
 }
 
+func TestMulExp(t *testing.T) {
+	x, _ := NewFromString("166")
+	digits := x.NumIntDigits()
+	assert.Equal(t, digits, 3)
+	step := x.MulExp(-digits+1)
+	assert.Equal(t, "1.66", step.String())
+
+}
+
 // Not used
 /*func TestParse(t *testing.T) {
 	type args struct {
@@ -172,7 +181,7 @@ func TestNumFractionalDigits(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := NumFractionalDigits(tt.v); got != tt.want {
+			if got := tt.v.NumFractionalDigits(); got != tt.want {
 				t.Errorf("NumFractionalDigits() = %v, want %v", got, tt.want)
 			}
 		})
