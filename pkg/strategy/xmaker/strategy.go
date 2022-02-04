@@ -3,7 +3,6 @@ package xmaker
 import (
 	"context"
 	"fmt"
-	"math"
 	"sync"
 	"time"
 
@@ -21,6 +20,7 @@ import (
 )
 
 var defaultMargin = fixedpoint.NewFromFloat(0.003)
+var Two = fixedpoint.NewFromInt(2)
 
 const priceUpdateTimeout = 30 * time.Second
 
@@ -109,7 +109,7 @@ type Strategy struct {
 
 	askPriceHeartBeat, bidPriceHeartBeat types.PriceHeartBeat
 
-	lastPrice float64
+	lastPrice fixedpoint.Value
 	groupID   uint32
 
 	stopC chan struct{}
@@ -137,24 +137,24 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 
 func aggregatePrice(pvs types.PriceVolumeSlice, requiredQuantity fixedpoint.Value) (price fixedpoint.Value) {
 	q := requiredQuantity
-	totalAmount := fixedpoint.Value(0)
+	totalAmount := fixedpoint.Zero
 
 	if len(pvs) == 0 {
-		price = 0
+		price = fixedpoint.Zero
 		return price
-	} else if pvs[0].Volume >= requiredQuantity {
+	} else if pvs[0].Volume.Compare(requiredQuantity) >= 0 {
 		return pvs[0].Price
 	}
 
 	for i := 0; i < len(pvs); i++ {
 		pv := pvs[i]
-		if pv.Volume >= q {
-			totalAmount += q.Mul(pv.Price)
+		if pv.Volume.Compare(q) >= 0 {
+			totalAmount = totalAmount.Add(q.Mul(pv.Price))
 			break
 		}
 
-		q -= pv.Volume
-		totalAmount += pv.Volume.Mul(pv.Price)
+		q = q.Sub(pv.Volume)
+		totalAmount = totalAmount.Add(pv.Volume.Mul(pv.Price))
 	}
 
 	price = totalAmount.Div(requiredQuantity)
@@ -178,7 +178,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 	}
 
 	// use mid-price for the last price
-	s.lastPrice = (bestBid.Price + bestAsk.Price).Float64() / 2
+	s.lastPrice = bestBid.Price.Add(bestAsk.Price).Div(Two)
 
 	bookLastUpdateTime := s.book.LastUpdateTime()
 
@@ -211,7 +211,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 	makerBalances := s.makerSession.Account.Balances()
 	makerQuota := &bbgo.QuotaTransaction{}
 	if b, ok := makerBalances[s.makerMarket.BaseCurrency]; ok {
-		if b.Available.Float64() > s.makerMarket.MinQuantity {
+		if b.Available.Compare(s.makerMarket.MinQuantity) > 0 {
 			makerQuota.BaseAsset.Add(b.Available)
 		} else {
 			disableMakerAsk = true
@@ -219,7 +219,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 	}
 
 	if b, ok := makerBalances[s.makerMarket.QuoteCurrency]; ok {
-		if b.Available.Float64() > s.makerMarket.MinNotional {
+		if b.Available.Compare(s.makerMarket.MinNotional) > 0 {
 			makerQuota.QuoteAsset.Add(b.Available)
 		} else {
 			disableMakerBid = true
@@ -231,14 +231,15 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 	if b, ok := hedgeBalances[s.sourceMarket.BaseCurrency]; ok {
 		// to make bid orders, we need enough base asset in the foreign exchange,
 		// if the base asset balance is not enough for selling
-		if s.StopHedgeBaseBalance > 0 {
-			if b.Available > (s.StopHedgeBaseBalance + fixedpoint.NewFromFloat(s.sourceMarket.MinQuantity)) {
-				hedgeQuota.BaseAsset.Add(b.Available - s.StopHedgeBaseBalance - fixedpoint.NewFromFloat(s.sourceMarket.MinQuantity))
+		if s.StopHedgeBaseBalance.Sign() > 0 {
+            minAvailable := s.StopHedgeBaseBalance.Add(s.sourceMarket.MinQuantity)
+			if b.Available.Compare(minAvailable) > 0 {
+				hedgeQuota.BaseAsset.Add(b.Available.Sub(minAvailable))
 			} else {
 				log.Warnf("%s maker bid disabled: insufficient base balance %s", s.Symbol, b.String())
 				disableMakerBid = true
 			}
-		} else if b.Available.Float64() > s.sourceMarket.MinQuantity {
+		} else if b.Available.Compare(s.sourceMarket.MinQuantity) > 0 {
 			hedgeQuota.BaseAsset.Add(b.Available)
 		} else {
 			log.Warnf("%s maker bid disabled: insufficient base balance %s", s.Symbol, b.String())
@@ -249,14 +250,15 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 	if b, ok := hedgeBalances[s.sourceMarket.QuoteCurrency]; ok {
 		// to make ask orders, we need enough quote asset in the foreign exchange,
 		// if the quote asset balance is not enough for buying
-		if s.StopHedgeQuoteBalance > 0 {
-			if b.Available > (s.StopHedgeQuoteBalance + fixedpoint.NewFromFloat(s.sourceMarket.MinNotional)) {
-				hedgeQuota.QuoteAsset.Add(b.Available - s.StopHedgeQuoteBalance - fixedpoint.NewFromFloat(s.sourceMarket.MinNotional))
+		if s.StopHedgeQuoteBalance.Sign() > 0 {
+			minAvailable := s.StopHedgeQuoteBalance.Add(s.sourceMarket.MinNotional)
+			if b.Available.Compare(minAvailable) > 0 {
+				hedgeQuota.QuoteAsset.Add(b.Available.Sub(minAvailable))
 			} else {
 				log.Warnf("%s maker ask disabled: insufficient quote balance %s", s.Symbol, b.String())
 				disableMakerAsk = true
 			}
-		} else if b.Available.Float64() > s.sourceMarket.MinNotional {
+		} else if b.Available.Compare(s.sourceMarket.MinNotional) > 0 {
 			hedgeQuota.QuoteAsset.Add(b.Available)
 		} else {
 			log.Warnf("%s maker ask disabled: insufficient quote balance %s", s.Symbol, b.String())
@@ -267,13 +269,13 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 	// if max exposure position is configured, we should not:
 	// 1. place bid orders when we already bought too much
 	// 2. place ask orders when we already sold too much
-	if s.MaxExposurePosition > 0 {
+	if s.MaxExposurePosition.Sign() > 0 {
 		pos := s.state.Position.GetBase()
 
-		if pos < -s.MaxExposurePosition {
+		if pos.Compare(s.MaxExposurePosition.Neg()) > 0 {
 			// stop sell if we over-sell
 			disableMakerAsk = true
-		} else if pos > s.MaxExposurePosition {
+		} else if pos.Compare(s.MaxExposurePosition) > 0 {
 			// stop buy if we over buy
 			disableMakerBid = true
 		}
@@ -286,7 +288,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 
 	bestBidPrice := bestBid.Price
 	bestAskPrice := bestAsk.Price
-	log.Infof("%s book ticker: best ask / best bid = %f / %f", s.Symbol, bestAskPrice.Float64(), bestBidPrice.Float64())
+	log.Infof("%s book ticker: best ask / best bid = %v / %v", s.Symbol, bestAskPrice, bestBidPrice)
 
 	var submitOrders []types.SubmitOrder
 	var accumulativeBidQuantity, accumulativeAskQuantity fixedpoint.Value
@@ -304,36 +306,36 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 		// when ask price is higher than the up band, then it's in the uptrend
 		if bestBidPrice.Float64() < lastDownBand {
 			// ratio here should be greater than 1.00
-			ratio := lastDownBand / bestBidPrice.Float64()
+			ratio := fixedpoint.NewFromFloat(lastDownBand).Div(bestBidPrice)
 
 			// so that the original bid margin can be multiplied by 1.x
-			bollMargin := s.BollBandMargin.MulFloat64(ratio).Mul(s.BollBandMarginFactor)
+			bollMargin := s.BollBandMargin.Mul(ratio).Mul(s.BollBandMarginFactor)
 
-			log.Infof("%s bollband downtrend: adjusting ask margin %f + %f = %f",
+			log.Infof("%s bollband downtrend: adjusting ask margin %v + %v = %v",
 				s.Symbol,
-				askMargin.Float64(),
-				bollMargin.Float64(),
-				(askMargin + bollMargin).Float64())
+				askMargin,
+				bollMargin,
+				askMargin.Add(bollMargin))
 
-			askMargin = askMargin + bollMargin
-			pips = pips.MulFloat64(ratio)
+			askMargin = askMargin.Add(bollMargin)
+			pips = pips.Mul(ratio)
 		}
 
 		if bestAskPrice.Float64() > lastUpBand {
 			// ratio here should be greater than 1.00
-			ratio := bestAskPrice.Float64() / lastUpBand
+			ratio := bestAskPrice.Div(fixedpoint.NewFromFloat(lastUpBand))
 
 			// so that the original bid margin can be multiplied by 1.x
-			bollMargin := s.BollBandMargin.MulFloat64(ratio).Mul(s.BollBandMarginFactor)
+			bollMargin := s.BollBandMargin.Mul(ratio).Mul(s.BollBandMarginFactor)
 
-			log.Infof("%s bollband uptrend adjusting bid margin %f + %f = %f",
+			log.Infof("%s bollband uptrend adjusting bid margin %v + %v = %v",
 				s.Symbol,
-				bidMargin.Float64(),
-				bollMargin.Float64(),
-				(bidMargin + bollMargin).Float64())
+				bidMargin,
+				bollMargin,
+				bidMargin.Add(bollMargin))
 
-			bidMargin = bidMargin + bollMargin
-			pips = pips.MulFloat64(ratio)
+			bidMargin = bidMargin.Add(bollMargin)
+			pips = pips.Mul(ratio)
 		}
 	}
 
@@ -355,18 +357,19 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 				bidQuantity = fixedpoint.NewFromFloat(qf)
 			}
 
-			accumulativeBidQuantity += bidQuantity
+			accumulativeBidQuantity = accumulativeBidQuantity.Add(bidQuantity)
 			if s.UseDepthPrice {
-				if s.DepthQuantity > 0 {
+				if s.DepthQuantity.Sign() > 0 {
 					bidPrice = aggregatePrice(sourceBook.SideBook(types.SideTypeBuy), s.DepthQuantity)
 				} else {
 					bidPrice = aggregatePrice(sourceBook.SideBook(types.SideTypeBuy), accumulativeBidQuantity)
 				}
 			}
 
-			bidPrice = bidPrice.MulFloat64(1.0 - bidMargin.Float64())
-			if i > 0 && pips > 0 {
-				bidPrice -= pips.MulFloat64(float64(i) * s.makerMarket.TickSize)
+			bidPrice = bidPrice.Mul(fixedpoint.One.Sub(bidMargin))
+			if i > 0 && pips.Sign() > 0 {
+				bidPrice = bidPrice.Sub(pips.Mul(fixedpoint.NewFromInt(int64(i)).
+					Mul(s.makerMarket.TickSize)))
 			}
 
 			if makerQuota.QuoteAsset.Lock(bidQuantity.Mul(bidPrice)) && hedgeQuota.BaseAsset.Lock(bidQuantity) {
@@ -375,8 +378,8 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 					Symbol:      s.Symbol,
 					Type:        types.OrderTypeLimit,
 					Side:        types.SideTypeBuy,
-					Price:       bidPrice.Float64(),
-					Quantity:    bidQuantity.Float64(),
+					Price:       bidPrice,
+					Quantity:    bidQuantity,
 					TimeInForce: "GTC",
 					GroupID:     s.groupID,
 				})
@@ -388,7 +391,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 				hedgeQuota.Rollback()
 			}
 
-			if s.QuantityMultiplier > 0 {
+			if s.QuantityMultiplier.Sign() > 0 {
 				bidQuantity = bidQuantity.Mul(s.QuantityMultiplier)
 			}
 		}
@@ -407,19 +410,19 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 				// override the default bid quantity
 				askQuantity = fixedpoint.NewFromFloat(qf)
 			}
-			accumulativeAskQuantity += askQuantity
+			accumulativeAskQuantity = accumulativeAskQuantity.Add(askQuantity)
 
 			if s.UseDepthPrice {
-				if s.DepthQuantity > 0 {
+				if s.DepthQuantity.Sign() > 0 {
 					askPrice = aggregatePrice(sourceBook.SideBook(types.SideTypeSell), s.DepthQuantity)
 				} else {
 					askPrice = aggregatePrice(sourceBook.SideBook(types.SideTypeSell), accumulativeAskQuantity)
 				}
 			}
 
-			askPrice = askPrice.MulFloat64(1.0 + askMargin.Float64())
-			if i > 0 && pips > 0 {
-				askPrice += pips.MulFloat64(float64(i) * s.makerMarket.TickSize)
+			askPrice = askPrice.Mul(fixedpoint.One.Add(askMargin))
+			if i > 0 && pips.Sign() > 0 {
+				askPrice = askPrice.Add(pips.Mul(fixedpoint.NewFromInt(int64(i)).Mul(s.makerMarket.TickSize)))
 			}
 
 			if makerQuota.BaseAsset.Lock(askQuantity) && hedgeQuota.QuoteAsset.Lock(askQuantity.Mul(askPrice)) {
@@ -429,8 +432,8 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 					Market:      s.makerMarket,
 					Type:        types.OrderTypeLimit,
 					Side:        types.SideTypeSell,
-					Price:       askPrice.Float64(),
-					Quantity:    askQuantity.Float64(),
+					Price:       askPrice,
+					Quantity:    askQuantity,
 					TimeInForce: "GTC",
 					GroupID:     s.groupID,
 				})
@@ -441,7 +444,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 				hedgeQuota.Rollback()
 			}
 
-			if s.QuantityMultiplier > 0 {
+			if s.QuantityMultiplier.Sign() > 0 {
 				askQuantity = askQuantity.Mul(s.QuantityMultiplier)
 			}
 		}
@@ -462,15 +465,17 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 	s.orderStore.Add(makerOrders...)
 }
 
+var lastPriceModifier = fixedpoint.NewFromFloat(1.001)
+var minGap = fixedpoint.NewFromFloat(1.02)
 func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	side := types.SideTypeBuy
-	if pos == 0 {
+	if pos.IsZero() {
 		return
 	}
 
-	quantity := fixedpoint.Abs(pos)
+	quantity := pos.Abs()
 
-	if pos < 0 {
+	if pos.Sign() < 0 {
 		side = types.SideTypeSell
 	}
 
@@ -480,18 +485,18 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 
 	case types.SideTypeBuy:
 		if bestAsk, ok := sourceBook.BestAsk(); ok {
-			lastPrice = bestAsk.Price.Float64()
+			lastPrice = bestAsk.Price
 		}
 
 	case types.SideTypeSell:
 		if bestBid, ok := sourceBook.BestBid(); ok {
-			lastPrice = bestBid.Price.Float64()
+			lastPrice = bestBid.Price
 		}
 	}
 
-	notional := quantity.MulFloat64(lastPrice)
-	if notional.Float64() <= s.sourceMarket.MinNotional {
-		log.Warnf("%s %f less than min notional, skipping hedge", s.Symbol, notional.Float64())
+	notional := quantity.Mul(lastPrice)
+	if notional.Compare(s.sourceMarket.MinNotional) <= 0 {
+		log.Warnf("%s %v less than min notional, skipping hedge", s.Symbol, notional)
 		return
 	}
 
@@ -502,9 +507,9 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	case types.SideTypeBuy:
 		// check quote quantity
 		if quote, ok := account.Balance(s.sourceMarket.QuoteCurrency); ok {
-			if quote.Available < notional {
+			if quote.Available.Compare(notional) < 0 {
 				// adjust price to higher 0.1%, so that we can ensure that the order can be executed
-				quantity = bbgo.AdjustQuantityByMaxAmount(quantity, fixedpoint.NewFromFloat(lastPrice*1.001), quote.Available)
+				quantity = bbgo.AdjustQuantityByMaxAmount(quantity, lastPrice.Mul(lastPriceModifier), quote.Available)
 				quantity = s.sourceMarket.TruncateQuantity(quantity)
 			}
 		}
@@ -512,7 +517,7 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	case types.SideTypeSell:
 		// check quote quantity
 		if base, ok := account.Balance(s.sourceMarket.BaseCurrency); ok {
-			if base.Available < quantity {
+			if base.Available.Compare(quantity) < 0 {
 				quantity = base.Available
 			}
 		}
@@ -521,13 +526,13 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	// truncate quantity for the supported precision
 	quantity = s.sourceMarket.TruncateQuantity(quantity)
 
-	if notional.Float64() <= s.sourceMarket.MinNotional*1.02 {
-		log.Warnf("the adjusted amount %f is less than minimal notional %f, skipping hedge", notional.Float64(), s.sourceMarket.MinNotional)
+	if notional.Compare(s.sourceMarket.MinNotional.Mul(minGap)) <= 0 {
+		log.Warnf("the adjusted amount %v is less than minimal notional %v, skipping hedge", notional, s.sourceMarket.MinNotional)
 		return
 	}
 
-	if quantity.Float64() <= s.sourceMarket.MinQuantity*1.02 {
-		log.Warnf("the adjusted quantity %f is less than minimal quantity %f, skipping hedge", quantity.Float64(), s.sourceMarket.MinQuantity)
+	if quantity.Compare(s.sourceMarket.MinQuantity.Mul(minGap)) <= 0 {
+		log.Warnf("the adjusted quantity %v is less than minimal quantity %v, skipping hedge", quantity, s.sourceMarket.MinQuantity)
 		return
 	}
 
@@ -540,15 +545,15 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 		s.hedgeErrorRateReservation = nil
 	}
 
-	log.Infof("submitting %s hedge order %s %f", s.Symbol, side.String(), quantity.Float64())
-	s.Notifiability.Notify("Submitting %s hedge order %s %f", s.Symbol, side.String(), quantity.Float64())
+	log.Infof("submitting %s hedge order %s %v", s.Symbol, side.String(), quantity)
+	s.Notifiability.Notify("Submitting %s hedge order %s %v", s.Symbol, side.String(), quantity)
 	orderExecutor := &bbgo.ExchangeOrderExecutor{Session: s.sourceSession}
 	returnOrders, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 		Market:   s.sourceMarket,
 		Symbol:   s.Symbol,
 		Type:     types.OrderTypeMarket,
 		Side:     side,
-		Quantity: quantity.Float64(),
+		Quantity: quantity,
 	})
 
 	if err != nil {
@@ -559,20 +564,20 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 
 	// if it's selling, than we should add positive position
 	if side == types.SideTypeSell {
-		s.state.CoveredPosition.AtomicAdd(quantity)
+		s.state.CoveredPosition = s.state.CoveredPosition.Add(quantity)
 	} else {
-		s.state.CoveredPosition.AtomicAdd(-quantity)
+		s.state.CoveredPosition = s.state.CoveredPosition.Add(quantity.Neg())
 	}
 
 	s.orderStore.Add(returnOrders...)
 }
 
 func (s *Strategy) Validate() error {
-	if s.Quantity == 0 || s.QuantityScale == nil {
+	if s.Quantity.IsZero() || s.QuantityScale == nil {
 		return errors.New("quantity or quantityScale can not be empty")
 	}
 
-	if s.QuantityMultiplier != 0 && s.QuantityMultiplier < 0 {
+	if !s.QuantityMultiplier.IsZero() && s.QuantityMultiplier.Sign() < 0 {
 		return errors.New("quantityMultiplier can not be a negative number")
 	}
 
@@ -628,10 +633,10 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		s.BollBandInterval = types.Interval1m
 	}
 
-	if s.BollBandMarginFactor == 0 {
-		s.BollBandMarginFactor = fixedpoint.NewFromFloat(1.0)
+	if s.BollBandMarginFactor.IsZero() {
+		s.BollBandMarginFactor = fixedpoint.One
 	}
-	if s.BollBandMargin == 0 {
+	if s.BollBandMargin.IsZero() {
 		s.BollBandMargin = fixedpoint.NewFromFloat(0.001)
 	}
 
@@ -648,16 +653,16 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		s.NumLayers = 1
 	}
 
-	if s.BidMargin == 0 {
-		if s.Margin != 0 {
+	if s.BidMargin.IsZero() {
+		if !s.Margin.IsZero() {
 			s.BidMargin = s.Margin
 		} else {
 			s.BidMargin = defaultMargin
 		}
 	}
 
-	if s.AskMargin == 0 {
-		if s.Margin != 0 {
+	if s.AskMargin.IsZero() {
+		if !s.Margin.IsZero() {
 			s.AskMargin = s.Margin
 		} else {
 			s.AskMargin = defaultMargin
@@ -712,14 +717,14 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		s.Notify("xmaker: %s position is restored", s.Symbol, s.state.Position)
 	}
 
-	if s.makerSession.MakerFeeRate > 0 || s.makerSession.TakerFeeRate > 0 {
+	if s.makerSession.MakerFeeRate.Sign() > 0 || s.makerSession.TakerFeeRate.Sign() > 0 {
 		s.state.Position.SetExchangeFeeRate(types.ExchangeName(s.MakerExchange), types.ExchangeFee{
 			MakerFeeRate: s.makerSession.MakerFeeRate,
 			TakerFeeRate: s.makerSession.TakerFeeRate,
 		})
 	}
 
-	if s.sourceSession.MakerFeeRate > 0 || s.sourceSession.TakerFeeRate > 0 {
+	if s.sourceSession.MakerFeeRate.Sign() > 0 || s.sourceSession.TakerFeeRate.Sign() > 0 {
 		s.state.Position.SetExchangeFeeRate(types.ExchangeName(s.SourceExchange), types.ExchangeFee{
 			MakerFeeRate: s.sourceSession.MakerFeeRate,
 			TakerFeeRate: s.sourceSession.TakerFeeRate,
@@ -747,7 +752,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	s.tradeCollector.OnTrade(func(trade types.Trade) {
 		c := trade.PositionChange()
 		if trade.Exchange == s.sourceSession.ExchangeName {
-			s.state.CoveredPosition.AtomicAdd(c)
+			s.state.CoveredPosition = s.state.CoveredPosition.Add(c)
 		}
 
 		s.state.ProfitStats.AddTrade(trade)
@@ -761,9 +766,9 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 			Symbol:          s.Symbol,
 			Profit:          profit,
 			NetProfit:       netProfit,
-			TradeAmount:     fixedpoint.NewFromFloat(trade.QuoteQuantity),
-			ProfitMargin:    profit.DivFloat64(trade.QuoteQuantity),
-			NetProfitMargin: netProfit.DivFloat64(trade.QuoteQuantity),
+			TradeAmount:     trade.QuoteQuantity,
+			ProfitMargin:    profit.Div(trade.QuoteQuantity),
+			NetProfitMargin: netProfit.Div(trade.QuoteQuantity),
 			QuoteCurrency:   s.state.Position.QuoteCurrency,
 			BaseCurrency:    s.state.Position.BaseCurrency,
 			Time:            trade.Time.Time(),
@@ -841,17 +846,17 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 				position := s.state.Position.GetBase()
 
-				uncoverPosition := position - s.state.CoveredPosition.AtomicLoad()
-				absPos := math.Abs(uncoverPosition.Float64())
-				if !s.DisableHedge && absPos > s.sourceMarket.MinQuantity {
-					log.Infof("%s base position %f coveredPosition: %f uncoverPosition: %f",
+				uncoverPosition := position.Sub(s.state.CoveredPosition)
+				absPos := uncoverPosition.Abs()
+				if !s.DisableHedge && absPos.Compare(s.sourceMarket.MinQuantity) > 0 {
+					log.Infof("%s base position %v coveredPosition: %v uncoverPosition: %v",
 						s.Symbol,
-						position.Float64(),
-						s.state.CoveredPosition.AtomicLoad().Float64(),
-						uncoverPosition.Float64(),
+						position,
+						s.state.CoveredPosition,
+						uncoverPosition,
 					)
 
-					s.Hedge(ctx, -uncoverPosition)
+					s.Hedge(ctx, uncoverPosition.Neg())
 				}
 			}
 		}

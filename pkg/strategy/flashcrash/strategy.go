@@ -11,6 +11,7 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 const ID = "flashcrash"
@@ -30,10 +31,10 @@ type Strategy struct {
 	// GridNum is the grid number, how many orders you want to places
 	GridNum int `json:"gridNumber"`
 
-	Percentage float64 `json:"percentage"`
+	Percentage fixedpoint.Value `json:"percentage"`
 
 	// BaseQuantity is the quantity you want to submit for each order.
-	BaseQuantity float64 `json:"baseQuantity"`
+	BaseQuantity fixedpoint.Value `json:"baseQuantity"`
 
 	// activeOrders is the locally maintained active order book of the maker orders.
 	activeOrders *bbgo.LocalActiveOrderBook
@@ -73,12 +74,12 @@ func (s *Strategy) updateBidOrders(orderExecutor bbgo.OrderExecutor, session *bb
 	balances := session.Account.Balances()
 
 	balance, ok := balances[quoteCurrency]
-	if !ok || balance.Available <= 0 {
-		log.Infof("insufficient balance of %s: %f", quoteCurrency, balance.Available.Float64())
+	if !ok || balance.Available.Sign() <= 0 {
+		log.Infof("insufficient balance of %s: %v", quoteCurrency, balance.Available)
 		return
 	}
 
-	var startPrice = s.ewma.Last() * s.Percentage
+	var startPrice = fixedpoint.NewFromFloat(s.ewma.Last()).Mul(s.Percentage)
 
 	var submitOrders []types.SubmitOrder
 	for i := 0; i < s.GridNum; i++ {
@@ -92,7 +93,7 @@ func (s *Strategy) updateBidOrders(orderExecutor bbgo.OrderExecutor, session *bb
 			TimeInForce: "GTC",
 		})
 
-		startPrice *= s.Percentage
+		startPrice = startPrice.Mul(s.Percentage)
 	}
 
 	orders, err := orderExecutor.SubmitOrders(context.Background(), submitOrders...)

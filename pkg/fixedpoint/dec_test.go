@@ -49,6 +49,7 @@ func TestMulString(t *testing.T) {
 	x = x.Mul(y)
 	assert.Equal(t, "111.3025", x.String())
 	assert.Equal(t, "111.30", x.FormatString(2))
+	assert.Equal(t, 111.3025, x.Float64())
 }
 
 func TestMulExp(t *testing.T) {

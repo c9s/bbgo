@@ -3,7 +3,6 @@ package bollgrid
 import (
 	"context"
 	"fmt"
-	"math"
 	"sync"
 
 	"github.com/sirupsen/logrus"
@@ -72,7 +71,7 @@ type Strategy struct {
 	GridNum int `json:"gridNumber"`
 
 	// Quantity is the quantity you want to submit for each order.
-	Quantity float64 `json:"quantity"`
+	Quantity fixedpoint.Value `json:"quantity"`
 
 	// activeOrders is the locally maintained active order book of the maker orders.
 	activeOrders *bbgo.LocalActiveOrderBook
@@ -92,11 +91,11 @@ func (s *Strategy) ID() string {
 }
 
 func (s *Strategy) Validate() error {
-	if s.ProfitSpread <= 0 {
+	if s.ProfitSpread.Sign() <= 0 {
 		// If profitSpread is empty or its value is negative
 		return fmt.Errorf("profit spread should bigger than 0")
 	}
-	if s.Quantity <= 0 {
+	if s.Quantity.Sign() <= 0 {
 		// If quantity is empty or its value is negative
 		return fmt.Errorf("quantity should bigger than 0")
 	}
@@ -119,8 +118,8 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types.SubmitOrder, error) {
 	balances := session.Account.Balances()
 	quoteBalance := balances[s.Market.QuoteCurrency].Available
-	if quoteBalance <= 0 {
-		return nil, fmt.Errorf("quote balance %s is zero: %f", s.Market.QuoteCurrency, quoteBalance.Float64())
+	if quoteBalance.Sign() <= 0 {
+		return nil, fmt.Errorf("quote balance %s is zero: %v", s.Market.QuoteCurrency, quoteBalance)
 	}
 
 	upBand, downBand := s.boll.LastUpBand(), s.boll.LastDownBand()
@@ -136,8 +135,8 @@ func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types
 		return nil, fmt.Errorf("last price not found")
 	}
 
-	if currentPrice > upBand || currentPrice < downBand {
-		return nil, fmt.Errorf("current price %f exceed the bollinger band %f <> %f", currentPrice, upBand, downBand)
+	if currentPrice.Float64() > upBand || currentPrice.Float64() < downBand {
+		return nil, fmt.Errorf("current price %v exceed the bollinger band %f <> %f", currentPrice, upBand, downBand)
 	}
 
 	ema99 := s.StandardIndicatorSet.EWMA(types.IntervalWindow{Interval: s.Interval, Window: 99})
@@ -152,12 +151,13 @@ func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types
 	gridSize := priceRange / float64(s.GridNum)
 
 	var orders []types.SubmitOrder
-	for price := upBand; price >= downBand; price -= gridSize {
-		if price >= currentPrice {
+	for pricef := upBand; pricef >= downBand; pricef -= gridSize {
+		if pricef >= currentPrice.Float64() {
 			continue
 		}
+		price := fixedpoint.NewFromFloat(pricef)
 		// adjust buy quantity using current quote balance
-		quantity := bbgo.AdjustFloatQuantityByMaxAmount(s.Quantity, price, quoteBalance.Float64())
+		quantity := bbgo.AdjustFloatQuantityByMaxAmount(s.Quantity, price, quoteBalance)
 		order := types.SubmitOrder{
 			Symbol:      s.Symbol,
 			Side:        types.SideTypeBuy,
@@ -167,10 +167,10 @@ func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types
 			Price:       price,
 			TimeInForce: "GTC",
 		}
-		quoteQuantity := fixedpoint.NewFromFloat(order.Quantity).MulFloat64(price)
-		if quantity < s.MinQuantity {
+		quoteQuantity := order.Quantity.Mul(price)
+		if quantity.Compare(s.MinQuantity) < 0 {
 			// don't submit this order if buy quantity is too small
-			log.Infof("quote balance %f is not enough, stop generating buy orders", quoteBalance.Float64())
+			log.Infof("quote balance %v is not enough, stop generating buy orders", quoteBalance)
 			break
 		}
 		quoteBalance = quoteBalance.Sub(quoteQuantity)
@@ -183,8 +183,8 @@ func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types
 func (s *Strategy) generateGridSellOrders(session *bbgo.ExchangeSession) ([]types.SubmitOrder, error) {
 	balances := session.Account.Balances()
 	baseBalance := balances[s.Market.BaseCurrency].Available
-	if baseBalance <= 0 {
-		return nil, fmt.Errorf("base balance %s is zero: %+v", s.Market.BaseCurrency, baseBalance.Float64())
+	if baseBalance.Sign() <= 0 {
+		return nil, fmt.Errorf("base balance %s is zero: %+v", s.Market.BaseCurrency, baseBalance)
 	}
 
 	upBand, downBand := s.boll.LastUpBand(), s.boll.LastDownBand()
@@ -200,7 +200,9 @@ func (s *Strategy) generateGridSellOrders(session *bbgo.ExchangeSession) ([]type
 		return nil, fmt.Errorf("last price not found")
 	}
 
-	if currentPrice > upBand || currentPrice < downBand {
+	currentPricef := currentPrice.Float64()
+
+	if currentPricef > upBand || currentPricef < downBand {
 		return nil, fmt.Errorf("current price exceed the bollinger band")
 	}
 
@@ -216,12 +218,13 @@ func (s *Strategy) generateGridSellOrders(session *bbgo.ExchangeSession) ([]type
 	gridSize := priceRange / float64(s.GridNum)
 
 	var orders []types.SubmitOrder
-	for price := downBand; price <= upBand; price += gridSize {
-		if price <= currentPrice {
+	for pricef := downBand; pricef <= upBand; pricef += gridSize {
+		if pricef <= currentPricef {
 			continue
 		}
+		price := fixedpoint.NewFromFloat(pricef)
 		// adjust sell quantity using current base balance
-		quantity := math.Min(s.Quantity, baseBalance.Float64())
+		quantity := fixedpoint.Min(s.Quantity, baseBalance)
 		order := types.SubmitOrder{
 			Symbol:      s.Symbol,
 			Side:        types.SideTypeSell,
@@ -231,10 +234,10 @@ func (s *Strategy) generateGridSellOrders(session *bbgo.ExchangeSession) ([]type
 			Price:       price,
 			TimeInForce: "GTC",
 		}
-		baseQuantity := fixedpoint.NewFromFloat(order.Quantity)
-		if quantity < s.MinQuantity {
+		baseQuantity := order.Quantity
+		if quantity.Compare(s.MinQuantity) < 0 {
 			// don't submit this order if sell quantity is too small
-			log.Infof("base balance %f is not enough, stop generating sell orders", baseBalance.Float64())
+			log.Infof("base balance %s is not enough, stop generating sell orders", baseBalance)
 			break
 		}
 		baseBalance = baseBalance.Sub(baseQuantity)
@@ -293,14 +296,14 @@ func (s *Strategy) submitReverseOrder(order types.Order, session *bbgo.ExchangeS
 
 	switch side {
 	case types.SideTypeSell:
-		price += s.ProfitSpread.Float64()
-		maxQuantity := balances[s.Market.BaseCurrency].Available.Float64()
-		quantity = math.Min(quantity, maxQuantity)
+		price = price.Add(s.ProfitSpread)
+		maxQuantity := balances[s.Market.BaseCurrency].Available
+		quantity = fixedpoint.Min(quantity, maxQuantity)
 
 	case types.SideTypeBuy:
-		price -= s.ProfitSpread.Float64()
-		maxQuantity := balances[s.Market.QuoteCurrency].Available.Float64() / price
-		quantity = math.Min(quantity, maxQuantity)
+		price = price.Sub(s.ProfitSpread)
+		maxQuantity := balances[s.Market.QuoteCurrency].Available.Div(price)
+		quantity = fixedpoint.Min(quantity, maxQuantity)
 	}
 
 	submitOrder := types.SubmitOrder{
