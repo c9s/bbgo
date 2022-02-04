@@ -24,8 +24,6 @@ const (
 	signZero   = 0
 	signNeg    = -1
 	signNegInf = -2
-	expMin     = math.MinInt16
-	expMax     = math.MaxInt16
 	coefMin    = 1000_0000_0000_0000
 	coefMax    = 9999_9999_9999_9999
 	digitsMax  = 16
@@ -41,6 +39,12 @@ var (
 	PosInf = Value{1, signPosInf, 0}
 	NegInf = Value{1, signNegInf, 0}
 )
+
+var pow10f32rev = [...]float64 {
+	1e16, 1e15, 1e14, 1e13, 1e12, 1e11, 1e10, 1e9, 1e8, 1e7, 1e6, 1e5, 1e4, 1e3, 1e2, 1e1, 1,
+	1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10, 1e-11, 1e-12, 1e-13, 1e-14, 1e-15,
+	1e-16,
+}
 
 var pow10f = [...]float64{
 	1,
@@ -130,14 +134,7 @@ func NewFromInt(n int64) Value {
 		n = -n
 		sign = signNeg
 	}
-	dn := New(sign, uint64(n), digitsMax)
-	//check(reversible(n0, dn))
-	return dn
-}
-
-func reversible(n int64, dn Value) bool {
-	n2 := dn.Int64()
-	return n2 == n
+	return newNoSignCheck(sign, uint64(n), digitsMax)
 }
 
 const log2of10 = 3.32192809488736234
@@ -153,9 +150,8 @@ func NewFromFloat(f float64) Value {
 		panic("value.NewFromFloat can't convert NaN")
 	}
 
-	n := int64(f)
-	if f == float64(n) {
-		return NewFromInt(n)
+	if f == 0 {
+		return Zero
 	}
 
 	sign := int8(signPos)
@@ -163,21 +159,36 @@ func NewFromFloat(f float64) Value {
 		f = -f
 		sign = signNeg
 	}
+	n := uint64(f)
+	if float64(n) == f {
+		return newNoSignCheck(sign, n, digitsMax)
+	}
 	_, e := math.Frexp(f)
 	e = int(float32(e) / log2of10)
-	if e - 16 < 0 {
-		c := uint64(f * pow10f[16 - e])
-		return New(sign, c, e)
-	} else {
-		c := uint64(f / pow10f[e - 16])
-		return New(sign, c, e)
-	}
+	c := uint64(f * pow10f32rev[e])
+	return newNoSignCheck(sign, c, e)
 }
 
 // Raw constructs a Value without normalizing - arguments must be valid.
 // Used by SuValue Unpack
 func Raw(sign int8, coef uint64, exp int) Value {
 	return Value{coef, sign, int(exp)}
+}
+
+func newNoSignCheck(sign int8, coef uint64, exp int) Value {
+	atmax := false
+	for coef > coefMax {
+		coef = (coef + 5) / 10
+		exp++
+		atmax = true
+	}
+
+	if !atmax {
+		p := maxShift(coef)
+		coef *= pow10[p]
+		exp -= p
+	}
+	return Value{coef, sign, exp}
 }
 
 // New constructs a Value, maximizing coef and handling exp out of range
@@ -201,9 +212,6 @@ func New(sign int8, coef uint64, exp int) Value {
 			p := maxShift(coef)
 			coef *= pow10[p]
 			exp -= p
-		}
-		if exp > expMax {
-			return Inf(sign)
 		}
 		return Value{coef, sign, exp}
 	}
@@ -725,7 +733,7 @@ func (dn Value) IsZero() bool {
 	return dn.sign == signZero
 }
 
-// ToFloat converts a Value to float64
+// Float64 converts a Value to float64
 func (dn Value) Float64() float64 {
 	if dn.IsInf() {
 		return math.Inf(int(dn.sign))
@@ -734,8 +742,12 @@ func (dn Value) Float64() float64 {
 	if dn.sign == signNeg {
 		g = -g
 	}
-	e := pow10f[int(dn.exp) - digitsMax]
-	return g * e
+	i := int(dn.exp) - digitsMax
+	if i >= 0 {
+		return g * pow10f[i]
+	} else {
+		return g / pow10f[-i]
+	}
 }
 
 // Int64 converts a Value to an int64, returning whether it was convertible
@@ -1075,14 +1087,20 @@ func Mul(x, y Value) Value {
 
 	// split unevenly to use full 64 bit range to get more precision
 	// and avoid needing xlo * ylo
-	xhi := x.coef / e7 // 9 digits
-	xlo := x.coef % e7 // 7 digits
-	yhi := y.coef / e7 // 9 digits
-	ylo := y.coef % e7 // 7 digits
+    // xhi := x.coef / e7 // 9 digits
+	// xlo := x.coef % e7 // 7 digits
+	// yhi := y.coef / e7 // 9 digits
+	// ylo := y.coef % e7 // 7 digits
+	xhi, xlo := bits.Div64(0, x.coef, e7)
+	yhi, ylo := bits.Div64(0, y.coef, e7)
 
 	c := xhi * yhi
-	if xlo != 0 || ylo != 0 {
-		c += (xlo*yhi + ylo*xhi) / e7
+	if (xlo | ylo) != 0 {
+		yhi, xlo = bits.Mul64(xlo, yhi)
+		xhi, ylo = bits.Mul64(xhi, ylo)
+        xhi, _ = bits.Add64(xhi, yhi, 0)
+		c += xhi
+		//c += (xlo*yhi + ylo*xhi) / e7
 	}
 	return New(sign, c, e-2)
 }

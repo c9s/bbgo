@@ -2,10 +2,10 @@ package pricealert
 
 import (
 	"context"
-	"math"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 const ID = "pricealert"
@@ -21,7 +21,7 @@ type Strategy struct {
 	// These fields will be filled from the config file (it translates YAML to JSON)
 	Symbol    string  `json:"symbol"`
 	Interval  string  `json:"interval"`
-	MinChange float64 `json:"minChange"`
+	MinChange fixedpoint.Value `json:"minChange"`
 }
 
 func (s *Strategy) ID() string {
@@ -39,11 +39,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 
-		if math.Abs(kline.GetChange()) > s.MinChange {
+		if kline.GetChange().Abs().Compare(s.MinChange) > 0 {
 			if channel, ok := s.RouteSymbol(s.Symbol); ok {
-				s.NotifyTo(channel, "%s hit price %s, change %f", s.Symbol, market.FormatPrice(kline.Close), kline.GetChange())
+				s.NotifyTo(channel, "%s hit price %s, change %v", s.Symbol, market.FormatPrice(kline.Close), kline.GetChange())
 			} else {
-				s.Notify("%s hit price %s, change %f", s.Symbol, market.FormatPrice(kline.Close), kline.GetChange())
+				s.Notify("%s hit price %s, change %v", s.Symbol, market.FormatPrice(kline.Close), kline.GetChange())
 			}
 		}
 	})

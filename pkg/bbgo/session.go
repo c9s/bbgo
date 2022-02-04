@@ -93,10 +93,10 @@ func NewStandardIndicatorSet(symbol string, store *MarketDataStore) *StandardInd
 
 // BOLL returns the bollinger band indicator of the given interval and the window,
 // Please note that the K for std dev is fixed and defaults to 2.0
-func (set *StandardIndicatorSet) BOLL(iw types.IntervalWindow, bandWidth fixedpoint.Value) *indicator.BOLL {
+func (set *StandardIndicatorSet) BOLL(iw types.IntervalWindow, bandWidth float64) *indicator.BOLL {
 	inc, ok := set.boll[iw]
 	if !ok {
-		inc = &indicator.BOLL{IntervalWindow: iw, K: bandWidth.Float64()}
+		inc = &indicator.BOLL{IntervalWindow: iw, K: bandWidth}
 		inc.Bind(set.store)
 		set.boll[iw] = inc
 	}
