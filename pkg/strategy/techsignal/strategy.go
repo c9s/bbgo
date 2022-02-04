@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"strings"
 	"time"
 
@@ -107,7 +106,7 @@ func (s *Strategy) listenToFundingRate(ctx context.Context, exchange *binance.Ex
 
 			fundingRate := index.LastFundingRate
 
-			if fundingRate >= s.FundingRate.High {
+			if fundingRate.Compare(s.FundingRate.High) >= 0 {
 				s.Notifiability.Notify("%s funding rate %s is too high! threshold %s",
 					s.Symbol,
 					fundingRate.Percentage(),
@@ -115,13 +114,13 @@ func (s *Strategy) listenToFundingRate(ctx context.Context, exchange *binance.Ex
 				)
 			} else {
 				if previousIndex != nil {
-					if s.FundingRate.DiffThreshold == 0 {
+					if s.FundingRate.DiffThreshold.IsZero() {
 						// 0.6%
 						s.FundingRate.DiffThreshold = fixedpoint.NewFromFloat(0.006 * 0.01)
 					}
 
-					diff := fundingRate - previousIndex.LastFundingRate
-					if diff.Abs() > s.FundingRate.DiffThreshold {
+					diff := fundingRate.Sub(previousIndex.LastFundingRate)
+					if diff.Abs().Compare(s.FundingRate.DiffThreshold) > 0 {
 						s.Notifiability.Notify("%s funding rate changed %s, current funding rate %s",
 							s.Symbol,
 							diff.SignedPercentage(),
@@ -137,7 +136,7 @@ func (s *Strategy) listenToFundingRate(ctx context.Context, exchange *binance.Ex
 				if fundingRate24HoursLowIndex.Time.Before(time.Now().Add(24 * time.Hour)) {
 					fundingRate24HoursLowIndex = index
 				}
-				if fundingRate < fundingRate24HoursLowIndex.LastFundingRate {
+				if fundingRate.Compare(fundingRate24HoursLowIndex.LastFundingRate) < 0 {
 					fundingRate24HoursLowIndex = index
 				}
 			} else {
@@ -172,8 +171,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				continue
 			}
 
-			closePriceF := kline.GetClose()
-			closePrice := fixedpoint.NewFromFloat(closePriceF)
+			closePrice := kline.GetClose()
 
 			var ma types.Float64Indicator
 
@@ -206,20 +204,20 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			prettyBaseVolume := s.Market.BaseCurrencyFormatter()
 			prettyQuoteVolume := s.Market.QuoteCurrencyFormatter()
 
-			if detection.MinVolume > 0 && kline.Volume > detection.MinVolume.Float64() {
+			if detection.MinVolume.Sign() > 0 && kline.Volume.Compare(detection.MinVolume) > 0 {
 				s.Notifiability.Notify("Detected %s %s support base volume %s > min base volume %s, quote volume %s",
 					s.Symbol, detection.Interval.String(),
-					prettyBaseVolume.FormatMoney(math.Round(kline.Volume)),
-					prettyBaseVolume.FormatMoney(math.Round(detection.MinVolume.Float64())),
-					prettyQuoteVolume.FormatMoney(math.Round(kline.QuoteVolume)),
+					prettyBaseVolume.FormatMoney(kline.Volume.Trunc()),
+					prettyBaseVolume.FormatMoney(detection.MinVolume.Trunc()),
+					prettyQuoteVolume.FormatMoney(kline.QuoteVolume.Trunc()),
 				)
 				s.Notifiability.Notify(kline)
-			} else if detection.MinQuoteVolume > 0 && kline.QuoteVolume > detection.MinQuoteVolume.Float64() {
+			} else if detection.MinQuoteVolume.Sign() > 0 && kline.QuoteVolume.Compare(detection.MinQuoteVolume) > 0 {
 				s.Notifiability.Notify("Detected %s %s support quote volume %s > min quote volume %s, base volume %s",
 					s.Symbol, detection.Interval.String(),
-					prettyQuoteVolume.FormatMoney(math.Round(kline.QuoteVolume)),
-					prettyQuoteVolume.FormatMoney(math.Round(detection.MinQuoteVolume.Float64())),
-					prettyBaseVolume.FormatMoney(math.Round(kline.Volume)),
+					prettyQuoteVolume.FormatMoney(kline.QuoteVolume.Trunc()),
+					prettyQuoteVolume.FormatMoney(detection.MinQuoteVolume.Trunc()),
+					prettyBaseVolume.FormatMoney(kline.Volume.Trunc()),
 				)
 				s.Notifiability.Notify(kline)
 			}

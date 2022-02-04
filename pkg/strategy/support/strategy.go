@@ -33,8 +33,8 @@ type State struct {
 }
 
 type Target struct {
-	ProfitPercentage      float64                         `json:"profitPercentage"`
-	QuantityPercentage    float64                         `json:"quantityPercentage"`
+	ProfitPercentage      fixedpoint.Value                         `json:"profitPercentage"`
+	QuantityPercentage    fixedpoint.Value                         `json:"quantityPercentage"`
 	MarginOrderSideEffect types.MarginOrderSideEffectType `json:"marginOrderSideEffect"`
 }
 
@@ -51,15 +51,15 @@ func (stop *PercentageTargetStop) GenerateOrders(market types.Market, pos *types
 	// submit target orders
 	var targetOrders []types.SubmitOrder
 	for _, target := range stop.Targets {
-		targetPrice := price.Float64() * (1.0 + target.ProfitPercentage)
-		targetQuantity := quantity.Float64() * target.QuantityPercentage
-		targetQuoteQuantity := targetPrice * targetQuantity
+		targetPrice := price.Mul(fixedpoint.One.Add(target.ProfitPercentage))
+		targetQuantity := quantity.Mul(target.QuantityPercentage)
+		targetQuoteQuantity := targetPrice.Mul(targetQuantity)
 
-		if targetQuoteQuantity <= market.MinNotional {
+		if targetQuoteQuantity.Compare(market.MinNotional) <= 0 {
 			continue
 		}
 
-		if targetQuantity <= market.MinQuantity {
+		if targetQuantity.Compare(market.MinQuantity) <= 0 {
 			continue
 		}
 
@@ -184,11 +184,11 @@ func (s *Strategy) ID() string {
 }
 
 func (s *Strategy) Validate() error {
-	if s.Quantity == 0 && s.ScaleQuantity == nil {
+	if s.Quantity.IsZero() && s.ScaleQuantity == nil {
 		return fmt.Errorf("quantity or scaleQuantity can not be zero")
 	}
 
-	if s.MinVolume == 0 && s.Sensitivity == 0 {
+	if s.MinVolume.IsZero() && s.Sensitivity.IsZero() {
 		return fmt.Errorf("either minVolume nor sensitivity can not be zero")
 	}
 
@@ -278,53 +278,58 @@ func (s *Strategy) cancelOrder(orderID uint64, ctx context.Context, session *bbg
 	return nil
 }
 
-func (s *Strategy) calculateQuantity(session *bbgo.ExchangeSession, side types.SideType, closePrice fixedpoint.Value, volume float64) (fixedpoint.Value, error) {
+var slippageModifier = fixedpoint.NewFromFloat(1.003)
+
+func (s *Strategy) calculateQuantity(session *bbgo.ExchangeSession, side types.SideType, closePrice fixedpoint.Value, volume fixedpoint.Value) (fixedpoint.Value, error) {
 	var quantity fixedpoint.Value
-	if s.Quantity > 0 {
+	if s.Quantity.Sign() > 0 {
 		quantity = s.Quantity
 	} else if s.ScaleQuantity != nil {
-		qf, err := s.ScaleQuantity.Scale(closePrice.Float64(), volume)
+		q, err := s.ScaleQuantity.Scale(closePrice.Float64(), volume.Float64())
 		if err != nil {
-			return 0, err
+			return fixedpoint.Zero, err
 		}
-		quantity = fixedpoint.NewFromFloat(qf)
+		quantity = fixedpoint.NewFromFloat(q)
 	}
 
 	baseBalance, _ := session.Account.Balance(s.Market.BaseCurrency)
 	if side == types.SideTypeSell {
 		// quantity = bbgo.AdjustQuantityByMaxAmount(quantity, closePrice, quota)
-		if s.MinBaseAssetBalance > 0 && (baseBalance.Total()-quantity) < s.MinBaseAssetBalance {
-			quota := baseBalance.Available - s.MinBaseAssetBalance
+		if s.MinBaseAssetBalance.Sign() > 0 && 
+			baseBalance.Total().Sub(quantity).Compare(s.MinBaseAssetBalance) < 0 {
+			quota := baseBalance.Available.Sub(s.MinBaseAssetBalance)
 			quantity = bbgo.AdjustQuantityByMaxAmount(quantity, closePrice, quota)
 		}
 
 	} else if side == types.SideTypeBuy {
-		if s.MaxBaseAssetBalance > 0 && baseBalance.Total()+quantity > s.MaxBaseAssetBalance {
-			quota := s.MaxBaseAssetBalance - baseBalance.Total()
+		if s.MaxBaseAssetBalance.Sign() > 0 &&
+			baseBalance.Total().Add(quantity).Compare(s.MaxBaseAssetBalance) > 0 {
+			quota := s.MaxBaseAssetBalance.Sub(baseBalance.Total())
 			quantity = bbgo.AdjustQuantityByMaxAmount(quantity, closePrice, quota)
 		}
 
 		quoteBalance, ok := session.Account.Balance(s.Market.QuoteCurrency)
 		if !ok {
-			return 0, fmt.Errorf("quote balance %s not found", s.Market.QuoteCurrency)
+			return fixedpoint.Zero, fmt.Errorf("quote balance %s not found", s.Market.QuoteCurrency)
 		}
 
 		// for spot, we need to modify the quantity according to the quote balance
 		if !session.Margin {
 			// add 0.3% for price slippage
-			notional := closePrice.Mul(quantity).MulFloat64(1.003)
+			notional := closePrice.Mul(quantity).Mul(slippageModifier)
 
-			if s.MinQuoteAssetBalance > 0 && quoteBalance.Available-notional < s.MinQuoteAssetBalance {
-				log.Warnf("modifying quantity %f according to the min quote asset balance %f %s",
-					quantity.Float64(),
-					quoteBalance.Available.Float64(),
+			if s.MinQuoteAssetBalance.Sign() > 0 &&
+				quoteBalance.Available.Sub(notional).Compare(s.MinQuoteAssetBalance) < 0 {
+				log.Warnf("modifying quantity %s according to the min quote asset balance %s %s",
+					quantity.String(),
+					quoteBalance.Available.String(),
 					s.Market.QuoteCurrency)
-				quota := quoteBalance.Available - s.MinQuoteAssetBalance
+				quota := quoteBalance.Available.Sub(s.MinQuoteAssetBalance)
 				quantity = bbgo.AdjustQuantityByMinAmount(quantity, closePrice, quota)
-			} else if notional > quoteBalance.Available {
+			} else if notional.Compare(quoteBalance.Available) > 0 {
 				log.Warnf("modifying quantity %f according to the quote asset balance %f %s",
-					quantity.Float64(),
-					quoteBalance.Available.Float64(),
+					quantity.String(),
+					quoteBalance.Available.String(),
 					s.Market.QuoteCurrency)
 				quantity = bbgo.AdjustQuantityByMaxAmount(quantity, closePrice, quoteBalance.Available)
 			}
@@ -340,14 +345,18 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.Interval = types.Interval5m
 	}
 
-	if s.Sensitivity > 0 {
+	if s.Sensitivity.Sign() > 0 {
 		volRange, err := s.ScaleQuantity.ByVolumeRule.Range()
 		if err != nil {
 			return err
 		}
 
-		s.MinVolume = fixedpoint.NewFromFloat(volRange[0]) + fixedpoint.NewFromFloat(volRange[1]-volRange[0]).Mul(fixedpoint.NewFromFloat(1.0)-s.Sensitivity)
-		log.Infof("adjusted minimal support volume to %f according to sensitivity %f", s.MinVolume.Float64(), s.Sensitivity.Float64())
+		scaleUp := fixedpoint.NewFromFloat(volRange[1])
+		scaleLow := fixedpoint.NewFromFloat(volRange[0])
+		s.MinVolume = scaleUp.Sub(scaleLow).
+			Mul(fixedpoint.One.Sub(s.Sensitivity)).
+			Add(scaleLow)
+		log.Infof("adjusted minimal support volume to %s according to sensitivity %s", s.MinVolume.String(), s.Sensitivity.String())
 	}
 
 	market, ok := session.Market(s.Symbol)
@@ -446,16 +455,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 
-		closePriceF := kline.GetClose()
-		closePrice := fixedpoint.NewFromFloat(closePriceF)
-		highPriceF := kline.GetHigh()
-		highPrice := fixedpoint.NewFromFloat(highPriceF)
+		closePrice := kline.GetClose()
+		highPrice := kline.GetHigh()
 
 		if s.TrailingStopTarget.TrailingStopCallbackRatio > 0 {
-			if s.state.Position.Base <= 0 { // Without a position
+			if s.state.Position.Base.Sign() <= 0 { // Without a position
 				// Update trailing orders with current high price
 				s.trailingStopControl.CurrentHighestPrice = highPrice
-			} else if s.trailingStopControl.CurrentHighestPrice.Float64() < highPriceF { // With a position
+			} else if s.trailingStopControl.CurrentHighestPrice.Compare(highPrice) < 0 { // With a position
 				// Update trailing orders with current high price if it's higher
 				s.trailingStopControl.CurrentHighestPrice = highPrice
 
@@ -466,14 +473,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				s.trailingStopControl.OrderID = 0
 
 				// Calculate minimum target price
-				var minTargetPrice = 0.0
-				if s.trailingStopControl.minimumProfitPercentage > 0 {
-					minTargetPrice = s.state.Position.AverageCost.Float64() * (1 + s.trailingStopControl.minimumProfitPercentage.Float64())
+				var minTargetPrice = fixedpoint.Zero
+				if s.trailingStopControl.minimumProfitPercentage.Sign() > 0 {
+					minTargetPrice = s.state.Position.AverageCost.Mul(fixedpoint.One.Add(s.trailingStopControl.minimumProfitPercentage))
 				}
 
 				// Place new order if the target price is higher than the minimum target price
 				if s.trailingStopControl.IsHigherThanMin(minTargetPrice) {
-					orderForm := s.trailingStopControl.GenerateStopOrder(s.state.Position.Base.Float64())
+					orderForm := s.trailingStopControl.GenerateStopOrder(s.state.Position.Base)
 					orders, err := s.submitOrders(ctx, orderExecutor, orderForm)
 					if err != nil {
 						log.WithError(err).Error("submit profit trailing stop order error")
@@ -491,29 +498,29 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 
 		// check support volume
-		if kline.Volume < s.MinVolume.Float64() {
+		if kline.Volume.Compare(s.MinVolume) < 0 {
 			return
 		}
 
 		// check taker buy ratio, we need strong buy taker
-		if s.TakerBuyRatio > 0 {
-			takerBuyRatio := kline.TakerBuyBaseAssetVolume / kline.Volume
-			takerBuyBaseVolumeThreshold := kline.Volume * s.TakerBuyRatio.Float64()
-			if takerBuyRatio < s.TakerBuyRatio.Float64() {
-				s.Notify("%s: taker buy base volume %f (volume ratio %f) is less than %f (volume ratio %f)",
+		if s.TakerBuyRatio.Sign() > 0 {
+			takerBuyRatio := kline.TakerBuyBaseAssetVolume.Div(kline.Volume)
+			takerBuyBaseVolumeThreshold := kline.Volume.Mul(s.TakerBuyRatio)
+			if takerBuyRatio.Compare(s.TakerBuyRatio) < 0 {
+				s.Notify("%s: taker buy base volume %s (volume ratio %s) is less than %s (volume ratio %s)",
 					s.Symbol,
-					kline.TakerBuyBaseAssetVolume,
-					takerBuyRatio,
-					takerBuyBaseVolumeThreshold,
-					kline.Volume,
-					s.TakerBuyRatio.Float64(),
+					kline.TakerBuyBaseAssetVolume.String(),
+					takerBuyRatio.String(),
+					takerBuyBaseVolumeThreshold.String(),
+					kline.Volume.String(),
+					s.TakerBuyRatio.String(),
 					kline,
 				)
 				return
 			}
 		}
 
-		if s.longTermEMA != nil && closePriceF < s.longTermEMA.Last() {
+		if s.longTermEMA != nil && closePrice.Float64() < s.longTermEMA.Last() {
 			s.Notify("%s: closed price is below the long term moving average line %f, skipping this support",
 				s.Symbol,
 				s.longTermEMA.Last(),
@@ -522,7 +529,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 
-		if s.triggerEMA != nil && closePriceF > s.triggerEMA.Last() {
+		if s.triggerEMA != nil && closePrice.Float64() < s.triggerEMA.Last() {
 			s.Notify("%s: closed price is above the trigger moving average line %f, skipping this support",
 				s.Symbol,
 				s.triggerEMA.Last(),
@@ -532,20 +539,20 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 
 		if s.triggerEMA != nil && s.longTermEMA != nil {
-			s.Notify("Found %s support: the close price %f is below trigger EMA %f and above long term EMA %f and volume %f > minimum volume %f",
+			s.Notify("Found %s support: the close price %s is below trigger EMA %f and above long term EMA %f and volume %s > minimum volume %s",
 				s.Symbol,
-				closePrice.Float64(),
+				closePrice.String(),
 				s.triggerEMA.Last(),
 				s.longTermEMA.Last(),
-				kline.Volume,
-				s.MinVolume.Float64(),
+				kline.Volume.String(),
+				s.MinVolume.String(),
 				kline)
 		} else {
-			s.Notify("Found %s support: the close price %f and volume %f > minimum volume %f",
+			s.Notify("Found %s support: the close price %s and volume %s > minimum volume %s",
 				s.Symbol,
-				closePrice.Float64(),
-				kline.Volume,
-				s.MinVolume.Float64(),
+				closePrice.String(),
+				kline.Volume.String(),
+				s.MinVolume.String(),
 				kline)
 		}
 
@@ -560,15 +567,15 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			Market:           market,
 			Side:             types.SideTypeBuy,
 			Type:             types.OrderTypeMarket,
-			Quantity:         quantity.Float64(),
+			Quantity:         quantity,
 			MarginSideEffect: s.MarginOrderSideEffect,
 		}
 
-		s.Notify("Submitting %s market order buy with quantity %f according to the base volume %f, taker buy base volume %f",
+		s.Notify("Submitting %s market order buy with quantity %s according to the base volume %s, taker buy base volume %s",
 			s.Symbol,
-			quantity.Float64(),
-			kline.Volume,
-			kline.TakerBuyBaseAssetVolume,
+			quantity.String(),
+			kline.Volume.String(),
+			kline.TakerBuyBaseAssetVolume.String(),
 			orderForm)
 
 		if _, err := s.submitOrders(ctx, orderExecutor, orderForm); err != nil {
@@ -585,15 +592,15 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		if s.TrailingStopTarget.TrailingStopCallbackRatio == 0 { // submit fixed target orders
 			var targetOrders []types.SubmitOrder
 			for _, target := range s.Targets {
-				targetPrice := closePrice.Float64() * (1.0 + target.ProfitPercentage)
-				targetQuantity := quantity.Float64() * target.QuantityPercentage
-				targetQuoteQuantity := targetPrice * targetQuantity
+				targetPrice := closePrice.Mul(fixedpoint.One.Add(target.ProfitPercentage))
+				targetQuantity := quantity.Mul(target.QuantityPercentage)
+				targetQuoteQuantity := targetPrice.Mul(targetQuantity)
 
-				if targetQuoteQuantity <= market.MinNotional {
+				if targetQuoteQuantity.Compare(market.MinNotional) <= 0 {
 					continue
 				}
 
-				if targetQuantity <= market.MinQuantity {
+				if targetQuantity.Compare(market.MinQuantity) <= 0 {
 					continue
 				}
 

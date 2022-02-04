@@ -346,8 +346,16 @@ func (dn Value) Percentage() string {
 	}
 }
 
-func NumFractionalDigits(a Value) int {
-	i := shiftMax
+func (dn Value) SignedPercentage() string {
+	if dn.Sign() >= 0 {
+		return "+" + dn.Percentage()
+	}
+	return dn.Percentage()
+}
+
+// get digit length
+func (a Value) NumDigits() int {
+    i := shiftMax
 	coef := a.coef
 	nd := 0
 	for coef != 0 && coef < pow10[i] {
@@ -358,7 +366,18 @@ func NumFractionalDigits(a Value) int {
 		i--
 		nd++
 	}
-	return nd - int(a.exp)
+	return nd
+}
+
+// alias of Exp
+func (a Value) NumIntDigits() int {
+	return a.exp
+}
+
+// get fractional digits
+func (a Value) NumFractionalDigits() int {
+	nd := a.NumDigits()
+	return nd - a.exp
 }
 
 func getDigits(coef uint64) string {
@@ -965,6 +984,12 @@ func Must(v Value, err error) Value {
 	if err != nil {
 		panic(err)
 	}
+	return v
+}
+
+// v * 10^(exp)
+func (v Value) MulExp(exp int) Value {
+	v.exp += exp
 	return v
 }
 

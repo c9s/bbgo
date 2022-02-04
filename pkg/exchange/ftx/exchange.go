@@ -138,8 +138,8 @@ func (e *Exchange) _queryMarkets(ctx context.Context) (MarketMap, error) {
 				LocalSymbol: m.Name,
 				// The max precision is length(DefaultPow). For example, currently fixedpoint.DefaultPow
 				// is 1e8, so the max precision will be 8.
-				PricePrecision:  fixedpoint.NumFractionalDigits(m.PriceIncrement),
-				VolumePrecision: fixedpoint.NumFractionalDigits(m.SizeIncrement),
+				PricePrecision:  m.PriceIncrement.NumFractionalDigits(),
+				VolumePrecision: m.SizeIncrement.NumFractionalDigits(),
 				QuoteCurrency:   toGlobalCurrency(m.QuoteCurrency),
 				BaseCurrency:    toGlobalCurrency(m.BaseCurrency),
 				// FTX only limit your order by `MinProvideSize`, so I assign zero value to unsupported fields:

@@ -39,7 +39,7 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 }
 
 func (s *Strategy) Validate() error {
-	if s.TotalAmount == 0 {
+	if s.TotalAmount.IsZero() {
 		return errors.New("amount can not be empty")
 	}
 
@@ -70,7 +70,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 						break
 					}
 
-					askPrice := fixedpoint.NewFromFloat(ticker.Sell)
+					askPrice := ticker.Sell
 					quantity := askPrice.Div(amount)
 
 					// execute orders
@@ -78,21 +78,21 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 					if !ok {
 						break
 					}
-					if quoteBalance.Available < amount {
-						s.Notifiability.Notify("Quote balance %s is not enough: %f < %f", s.Market.QuoteCurrency, quoteBalance.Available.Float64(), amount.Float64())
+					if quoteBalance.Available.Compare(amount) < 0 {
+						s.Notifiability.Notify("Quote balance %s is not enough: %s < %s", s.Market.QuoteCurrency, quoteBalance.Available.String(), amount.String())
 						break
 					}
 
-					s.Notifiability.Notify("Submitting etf order %s quantity %f at price %f (index ratio %f %%)",
+					s.Notifiability.Notify("Submitting etf order %s quantity %s at price %s (index ratio %s)",
 						symbol,
-						quantity.Float64(),
-						askPrice.Float64(),
-						ratio.Float64()*100.0)
+						quantity.String(),
+						askPrice.String(),
+						ratio.Percentage())
 					_, err = orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 						Symbol:   symbol,
 						Side:     types.SideTypeBuy,
 						Type:     types.OrderTypeMarket,
-						Quantity: quantity.Float64(),
+						Quantity: quantity,
 					})
 
 					if err != nil {
