@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"strconv"
 	"time"
 
 	"github.com/leekchan/accounting"
@@ -148,11 +147,8 @@ func (m Market) FormatPrice(val fixedpoint.Value) string {
 }
 
 func formatPrice(price fixedpoint.Value, tickSize fixedpoint.Value) string {
-	// TODO Round
 	prec := int(math.Round(math.Abs(math.Log10(tickSize.Float64()))))
-	p := math.Pow10(prec)
-	pp := math.Trunc(price.Float64()*p) / p
-	return strconv.FormatFloat(pp, 'f', prec, 64)
+	return price.FormatString(prec)
 }
 
 func (m Market) FormatQuantity(val fixedpoint.Value) string {
@@ -160,18 +156,12 @@ func (m Market) FormatQuantity(val fixedpoint.Value) string {
 }
 
 func formatQuantity(quantity fixedpoint.Value, lot fixedpoint.Value) string {
-	// TODO Round
 	prec := int(math.Round(math.Abs(math.Log10(lot.Float64()))))
-	p := math.Pow10(prec)
-	q := math.Trunc(quantity.Float64() * p) / p
-	return strconv.FormatFloat(q, 'f', prec, 64)
+	return quantity.FormatString(prec)
 }
 
 func (m Market) FormatVolume(val fixedpoint.Value) string {
-	// TODO Round
-	p := math.Pow10(m.VolumePrecision)
-	v := math.Trunc(val.Float64()*p) / p
-	return strconv.FormatFloat(v, 'f', m.VolumePrecision, 64)
+	return val.FormatString(m.VolumePrecision)
 }
 
 func (m Market) CanonicalizeVolume(val fixedpoint.Value) float64 {

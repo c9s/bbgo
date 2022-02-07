@@ -11,8 +11,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"github.com/c9s/bbgo/pkg/util"
-
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/types"
@@ -101,12 +99,12 @@ var tradesCmd = &cobra.Command{
 
 		log.Infof("%d trades", len(trades))
 		for _, trade := range trades {
-			log.Infof("TRADE %s %s %4s %s @ %s orderID %d %s amount %f , fee %f %s ",
+			log.Infof("TRADE %s %s %4s %s @ %s orderID %d %s amount %v , fee %v %s ",
 				trade.Exchange.String(),
 				trade.Symbol,
 				trade.Side,
-				util.FormatFloat(trade.Quantity, 4),
-				util.FormatFloat(trade.Price, 3),
+				trade.Quantity.FormatString(4),
+				trade.Price.FormatString(3),
 				trade.OrderID,
 				trade.Time.Time().Format(time.StampMilli),
 				trade.QuoteQuantity,
