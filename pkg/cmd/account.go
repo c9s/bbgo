@@ -99,8 +99,8 @@ var accountCmd = &cobra.Command{
 					if !ok {
 						total[c] = b
 					} else {
-						tb.Available = tb.Available + b.Available
-						tb.Locked = tb.Locked + b.Locked
+						tb.Available = tb.Available.Add(b.Available)
+						tb.Locked = tb.Locked.Add(b.Locked)
 						total[c] = tb
 					}
 				}

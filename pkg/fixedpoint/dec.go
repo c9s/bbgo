@@ -40,12 +40,6 @@ var (
 	NegInf = Value{1, signNegInf, 0}
 )
 
-var pow10f32rev = [...]float64 {
-	1e16, 1e15, 1e14, 1e13, 1e12, 1e11, 1e10, 1e9, 1e8, 1e7, 1e6, 1e5, 1e4, 1e3, 1e2, 1e1, 1,
-	1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10, 1e-11, 1e-12, 1e-13, 1e-14, 1e-15,
-	1e-16,
-}
-
 var pow10f = [...]float64{
 	1,
 	10,
@@ -119,6 +113,13 @@ func min(a int, b int) int {
 	return b
 }
 
+func max(a int, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
 func (v Value) Value() (driver.Value, error) {
 	return v.Float64(), nil
 }
@@ -165,7 +166,7 @@ func NewFromFloat(f float64) Value {
 	}
 	_, e := math.Frexp(f)
 	e = int(float32(e) / log2of10)
-	c := uint64(f * pow10f32rev[e])
+	c := uint64(f / math.Pow(10, float64(e-16)))
 	return newNoSignCheck(sign, c, e)
 }
 
@@ -265,19 +266,19 @@ func (dn Value) FormatString(prec int) string {
 	e := int(dn.exp) - nd
 	if -maxLeadingZeros <= dn.exp && dn.exp <= 0 {
 		// decimal to the left
-		return sign + "." + strings.Repeat("0", -e-nd) + digits[:min(prec, nd)]
+		return sign + "0." + strings.Repeat("0", -e-nd) + digits[:min(prec, nd)] + strings.Repeat("0", max(0, prec-nd+e+nd))
 	} else if -nd < e && e <= -1 {
 		// decimal within
 		dec := nd + e
-		return sign + digits[:dec] + "." + digits[dec:min(dec+prec, nd)]
+		return sign + digits[:dec] + "." + digits[dec:min(dec+prec, nd)] + strings.Repeat("0", max(0, min(dec+prec, nd)-dec-prec))
 	} else if 0 < dn.exp && dn.exp <= digitsMax {
 		// decimal to the right
-		return sign + digits + strings.Repeat("0", e)
+		return sign + digits + strings.Repeat("0", e) + "." + strings.Repeat("0", prec)
 	} else {
 		// scientific notation
 		after := ""
 		if nd > 1 {
-			after = "." + digits[1:min(1+prec, nd)]
+			after = "." + digits[1:min(1+prec, nd)] + strings.Repeat("0", min(1+prec, nd)-1-prec)
 		}
 		return sign + digits[:1] + after + "e" + strconv.Itoa(int(dn.exp-1))
 	}
@@ -301,7 +302,7 @@ func (dn Value) String() string {
 	e := int(dn.exp) - nd
 	if -maxLeadingZeros <= dn.exp && dn.exp <= 0 {
 		// decimal to the left
-		return sign + "." + strings.Repeat("0", -e-nd) + digits
+		return sign + "0." + strings.Repeat("0", -e-nd) + digits
 	} else if -nd < e && e <= -1 {
 		// decimal within
 		dec := nd + e
@@ -313,7 +314,7 @@ func (dn Value) String() string {
 		// scientific notation
 		after := ""
 		if nd > 1 {
-			after = "." + digits[1:]
+			after = "0." + digits[1:]
 		}
 		return sign + digits[:1] + after + "e" + strconv.Itoa(int(dn.exp-1))
 	}
@@ -334,9 +335,10 @@ func (dn Value) Percentage() string {
 	digits := getDigits(dn.coef)
 	nd := len(digits)
 	e := int(dn.exp) - nd + 2
+
 	if -maxLeadingZeros <= dn.exp && dn.exp <= 0 {
 		// decimal to the left
-		return sign + "." + strings.Repeat("0", -e-nd) + digits + "%"
+		return sign + "0." + strings.Repeat("0", -e-nd) + digits + "%"
 	} else if -nd < e && e <= -1 {
 		// decimal within
 		dec := nd + e
@@ -348,9 +350,46 @@ func (dn Value) Percentage() string {
 		// scientific notation
 		after := ""
 		if nd > 1 {
-			after = "." + digits[1:]
+			after = "0." + digits[1:]
 		}
 		return sign + digits[:1] + after + "e" + strconv.Itoa(int(dn.exp-1)) + "%"
+	}
+}
+
+func (dn Value) FormatPercentage(prec int) string {
+	if dn.sign == 0 {
+		return "0"
+	}
+	const maxLeadingZeros = 7
+	sign := ""
+	if dn.sign < 0 {
+		sign = "-"
+	}
+	if dn.IsInf() {
+		return sign + "inf"
+	}
+	digits := getDigits(dn.coef)
+	nd := len(digits)
+	exp := dn.exp + 2
+	e := int(exp) - nd
+
+	if -maxLeadingZeros <= exp && exp <= 0 {
+		// decimal to the left
+		return sign + "0." + strings.Repeat("0", -e-nd) + digits[:min(prec, nd)] + strings.Repeat("0", max(0, prec-nd+e+nd)) + "%"
+	} else if -nd < e && e <= -1 {
+		// decimal within
+		dec := nd + e
+		return sign + digits[:dec] + "." + digits[dec:min(dec+prec, nd)] + strings.Repeat("0", max(0, min(dec+prec, nd)-dec-prec)) + "%"
+	} else if 0 < exp && exp <= digitsMax {
+		// decimal to the right
+		return sign + digits + strings.Repeat("0", e) + "." + strings.Repeat("0", prec) + "%"
+	} else {
+		// scientific notation
+		after := ""
+		if nd > 1 {
+			after = "." + digits[1:min(1+prec, nd)] + strings.Repeat("0", min(1+prec, nd)-1-prec)
+		}
+		return sign + digits[:1] + after + "e" + strconv.Itoa(int(exp-1)) + "%"
 	}
 }
 
@@ -743,11 +782,7 @@ func (dn Value) Float64() float64 {
 		g = -g
 	}
 	i := int(dn.exp) - digitsMax
-	if i >= 0 {
-		return g * pow10f[i]
-	} else {
-		return g / pow10f[-i]
-	}
+	return g * math.Pow(10, float64(i))
 }
 
 // Int64 converts a Value to an int64, returning whether it was convertible

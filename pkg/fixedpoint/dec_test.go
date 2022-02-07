@@ -6,6 +6,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const Delta = 1e-9
+
 func BenchmarkMul(b *testing.B) {
 	b.ResetTimer()
 
@@ -49,7 +51,7 @@ func TestMulString(t *testing.T) {
 	x = x.Mul(y)
 	assert.Equal(t, "111.3025", x.String())
 	assert.Equal(t, "111.30", x.FormatString(2))
-	assert.Equal(t, 111.3025, x.Float64())
+	assert.InDelta(t, 111.3025, x.Float64(), Delta)
 }
 
 func TestMulExp(t *testing.T) {
@@ -58,7 +60,14 @@ func TestMulExp(t *testing.T) {
 	assert.Equal(t, digits, 3)
 	step := x.MulExp(-digits+1)
 	assert.Equal(t, "1.66", step.String())
+}
 
+func TestNew(t *testing.T) {
+	f := NewFromFloat(0.001)
+	assert.Equal(t, "0.001", f.String())
+	assert.Equal(t, "0.0010", f.FormatString(4))
+	assert.Equal(t, "0.1%", f.Percentage())
+	assert.Equal(t, "0.10%", f.FormatPercentage(2))
 }
 
 // Not used

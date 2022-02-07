@@ -7,18 +7,19 @@ import (
 
 	"github.com/c9s/bbgo/pkg/exchange/ftx"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
-func inQuoteAsset(balances types.BalanceMap, market types.Market, price float64) float64 {
+func inQuoteAsset(balances types.BalanceMap, market types.Market, price fixedpoint.Value) fixedpoint.Value {
 	quote := balances[market.QuoteCurrency]
 	base := balances[market.BaseCurrency]
-	return base.Total().Float64()*price + quote.Total().Float64()
+	return base.Total().Mul(price).Add(quote.Total())
 }
 
-func inBaseAsset(balances types.BalanceMap, market types.Market, price float64) float64 {
+func inBaseAsset(balances types.BalanceMap, market types.Market, price fixedpoint.Value) fixedpoint.Value {
 	quote := balances[market.QuoteCurrency]
 	base := balances[market.BaseCurrency]
-	return base.Total().Float64() + (quote.Total().Float64() / price)
+	return quote.Total().Div(price).Add(base.Total())
 }
 
 func newExchange(session string) (types.Exchange, error) {
