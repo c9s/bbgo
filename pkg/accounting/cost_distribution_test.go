@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 func TestStockManager(t *testing.T) {
@@ -28,7 +29,7 @@ func TestStockManager(t *testing.T) {
 
 		_, err = stockManager.AddTrades(trades)
 		assert.NoError(t, err)
-		assert.Equal(t, 0.72970242, stockManager.Stocks.Quantity())
+		assert.Equal(t, "0.72970242", stockManager.Stocks.Quantity().String())
 		assert.NotEmpty(t, stockManager.Stocks)
 		assert.Equal(t, 20, len(stockManager.Stocks))
 		assert.Equal(t, 0, len(stockManager.PendingSells))
@@ -37,9 +38,9 @@ func TestStockManager(t *testing.T) {
 
 	t.Run("stock", func(t *testing.T) {
 		var trades = []types.Trade{
-			{Symbol: "BTCUSDT", Price: 9100.0, Quantity: 0.05, IsBuyer: true},
-			{Symbol: "BTCUSDT", Price: 9100.0, Quantity: 0.05, IsBuyer: true},
-			{Symbol: "BTCUSDT", Price: 9200.0, Quantity: 0.01, IsBuyer: false},
+			{Symbol: "BTCUSDT", Price: fixedpoint.MustNewFromString("9100.0"), Quantity: fixedpoint.MustNewFromString("0.05"), IsBuyer: true},
+			{Symbol: "BTCUSDT", Price: fixedpoint.MustNewFromString("9100.0"), Quantity: fixedpoint.MustNewFromString("0.05"), IsBuyer: true},
+			{Symbol: "BTCUSDT", Price: fixedpoint.MustNewFromString("9200.0"), Quantity: fixedpoint.MustNewFromString("0.01"), IsBuyer: false},
 		}
 
 		var stockManager = &StockDistribution{
@@ -53,14 +54,14 @@ func TestStockManager(t *testing.T) {
 		assert.Equal(t, StockSlice{
 			{
 				Symbol:   "BTCUSDT",
-				Price:    9100.0,
-				Quantity: 0.05,
+				Price:    fixedpoint.MustNewFromString("9100.0"),
+				Quantity: fixedpoint.MustNewFromString("0.05"),
 				IsBuyer:  true,
 			},
 			{
 				Symbol:   "BTCUSDT",
-				Price:    9100.0,
-				Quantity: 0.04,
+				Price:    fixedpoint.MustNewFromString("9100.0"),
+				Quantity: fixedpoint.MustNewFromString("0.04"),
 				IsBuyer:  true,
 			},
 		}, stockManager.Stocks)
@@ -69,10 +70,10 @@ func TestStockManager(t *testing.T) {
 
 	t.Run("sold out", func(t *testing.T) {
 		var trades = []types.Trade{
-			{Symbol: "BTCUSDT", Price: 9100.0, Quantity: 0.05, IsBuyer: true},
-			{Symbol: "BTCUSDT", Price: 9200.0, Quantity: 0.05, IsBuyer: false},
-			{Symbol: "BTCUSDT", Price: 9100.0, Quantity: 0.05, IsBuyer: true},
-			{Symbol: "BTCUSDT", Price: 9200.0, Quantity: 0.05, IsBuyer: false},
+			{Symbol: "BTCUSDT", Price: fixedpoint.MustNewFromString("9100.0"), Quantity: fixedpoint.MustNewFromString("0.05"), IsBuyer: true},
+			{Symbol: "BTCUSDT", Price: fixedpoint.MustNewFromString("9200.0"), Quantity: fixedpoint.MustNewFromString("0.05"), IsBuyer: false},
+			{Symbol: "BTCUSDT", Price: fixedpoint.MustNewFromString("9100.0"), Quantity: fixedpoint.MustNewFromString("0.05"), IsBuyer: true},
+			{Symbol: "BTCUSDT", Price: fixedpoint.MustNewFromString("9200.0"), Quantity: fixedpoint.MustNewFromString("0.05"), IsBuyer: false},
 		}
 
 		var stockManager = &StockDistribution{
@@ -88,9 +89,9 @@ func TestStockManager(t *testing.T) {
 
 	t.Run("oversell", func(t *testing.T) {
 		var trades = []types.Trade{
-			{Symbol: "BTCUSDT", Price: 9100.0, Quantity: 0.05, IsBuyer: true},
-			{Symbol: "BTCUSDT", Price: 9200.0, Quantity: 0.05, IsBuyer: false},
-			{Symbol: "BTCUSDT", Price: 9200.0, Quantity: 0.05, IsBuyer: false},
+			{Symbol: "BTCUSDT", Price: fixedpoint.MustNewFromString("9100.0"), Quantity: fixedpoint.MustNewFromString("0.05"), IsBuyer: true},
+			{Symbol: "BTCUSDT", Price: fixedpoint.MustNewFromString("9200.0"), Quantity: fixedpoint.MustNewFromString("0.05"), IsBuyer: false},
+			{Symbol: "BTCUSDT", Price: fixedpoint.MustNewFromString("9200.0"), Quantity: fixedpoint.MustNewFromString("0.05"), IsBuyer: false},
 		}
 
 		var stockManager = &StockDistribution{
@@ -106,9 +107,9 @@ func TestStockManager(t *testing.T) {
 
 	t.Run("loss sell", func(t *testing.T) {
 		var trades = []types.Trade{
-			{Symbol: "BTCUSDT", Price: 9100.0, Quantity: 0.05, IsBuyer: true},
-			{Symbol: "BTCUSDT", Price: 9200.0, Quantity: 0.02, IsBuyer: false},
-			{Symbol: "BTCUSDT", Price: 8000.0, Quantity: 0.01, IsBuyer: false},
+			{Symbol: "BTCUSDT", Price: fixedpoint.MustNewFromString("9100.0"), Quantity: fixedpoint.MustNewFromString("0.05"), IsBuyer: true},
+			{Symbol: "BTCUSDT", Price: fixedpoint.MustNewFromString("9200.0"), Quantity: fixedpoint.MustNewFromString("0.02"), IsBuyer: false},
+			{Symbol: "BTCUSDT", Price: fixedpoint.MustNewFromString("8000.0"), Quantity: fixedpoint.MustNewFromString("0.01"), IsBuyer: false},
 		}
 
 		var stockManager = &StockDistribution{
@@ -122,8 +123,8 @@ func TestStockManager(t *testing.T) {
 		assert.Equal(t, StockSlice{
 			{
 				Symbol:   "BTCUSDT",
-				Price:    9100.0,
-				Quantity: 0.02,
+				Price:    fixedpoint.MustNewFromString("9100.0"),
+				Quantity: fixedpoint.MustNewFromString("0.02"),
 				IsBuyer:  true,
 			},
 		}, stockManager.Stocks)
@@ -132,8 +133,8 @@ func TestStockManager(t *testing.T) {
 
 	t.Run("pending sell 1", func(t *testing.T) {
 		var trades = []types.Trade{
-			{Symbol: "BTCUSDT", Price: 9200.0, Quantity: 0.02},
-			{Symbol: "BTCUSDT", Price: 9100.0, Quantity: 0.05, IsBuyer: true},
+			{Symbol: "BTCUSDT", Price: fixedpoint.MustNewFromString("9200.0"), Quantity: fixedpoint.MustNewFromString("0.02")},
+			{Symbol: "BTCUSDT", Price: fixedpoint.MustNewFromString("9100.0"), Quantity: fixedpoint.MustNewFromString("0.05"), IsBuyer: true},
 		}
 
 		var stockManager = &StockDistribution{
@@ -147,8 +148,8 @@ func TestStockManager(t *testing.T) {
 		assert.Equal(t, StockSlice{
 			{
 				Symbol:   "BTCUSDT",
-				Price:    9100.0,
-				Quantity: 0.03,
+				Price:    fixedpoint.MustNewFromString("9100.0"),
+				Quantity: fixedpoint.MustNewFromString("0.03"),
 				IsBuyer:  true,
 			},
 		}, stockManager.Stocks)
@@ -157,8 +158,8 @@ func TestStockManager(t *testing.T) {
 
 	t.Run("pending sell 2", func(t *testing.T) {
 		var trades = []types.Trade{
-			{Symbol: "BTCUSDT", Price: 9200.0, Quantity: 0.1},
-			{Symbol: "BTCUSDT", Price: 9100.0, Quantity: 0.05, IsBuyer: true},
+			{Symbol: "BTCUSDT", Price: fixedpoint.MustNewFromString("9200.0"), Quantity: fixedpoint.MustNewFromString("0.1")},
+			{Symbol: "BTCUSDT", Price: fixedpoint.MustNewFromString("9100.0"), Quantity: fixedpoint.MustNewFromString("0.05"), IsBuyer: true},
 		}
 
 		var stockManager = &StockDistribution{
@@ -173,8 +174,8 @@ func TestStockManager(t *testing.T) {
 		assert.Equal(t, StockSlice{
 			{
 				Symbol:   "BTCUSDT",
-				Price:    9200.0,
-				Quantity: 0.05,
+				Price:    fixedpoint.MustNewFromString("9200.0"),
+				Quantity: fixedpoint.MustNewFromString("0.05"),
 				IsBuyer:  false,
 			},
 		}, stockManager.PendingSells)

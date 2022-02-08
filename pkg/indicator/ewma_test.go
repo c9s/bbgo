@@ -3,15 +3,17 @@ package indicator
 import (
 	"math"
 	"testing"
+	"encoding/json"
 
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 // generated from:
 // 2020/12/05 10:25
 // curl -s 'https://www.binance.com/api/v3/klines?symbol=ETHUSDT&interval=5m&endTime=1607135400000&limit=1000' | jq '. | map({ closePrice: (.[4] | tonumber), openTime: .[0] })'
 // curl -s 'https://www.binance.com/api/v3/klines?symbol=ETHUSDT&interval=5m&endTime=1607135400000&limit=1000' | jq '. | map(.[4] | tonumber)'
-var ethusdt5m = []float64{
+var ethusdt5m = []byte(`[
 	614.36,
 	613.62,
 	611.68,
@@ -1011,10 +1013,10 @@ var ethusdt5m = []float64{
 	572.85,
 	572.21,
 	572.63,
-	572.74,
-}
+	572.74
+]`)
 
-func buildKLines(prices []float64) (klines []types.KLine) {
+func buildKLines(prices []fixedpoint.Value) (klines []types.KLine) {
 	for _, p := range prices {
 		klines = append(klines, types.KLine{Close: p})
 	}
@@ -1028,6 +1030,10 @@ func Test_calculateEWMA(t *testing.T) {
 		priceF    KLinePriceMapper
 		window    int
 	}
+	var input []fixedpoint.Value;
+	if err := json.Unmarshal(ethusdt5m, &input); err != nil {
+		panic(err)
+	}
 	tests := []struct {
 		name string
 		args args
@@ -1036,7 +1042,7 @@ func Test_calculateEWMA(t *testing.T) {
 		{
 			name: "ETHUSDT EMA 7",
 			args: args{
-				allKLines: buildKLines(ethusdt5m),
+				allKLines: buildKLines(input),
 				priceF:    KLineClosePriceMapper,
 				window:    7,
 			},
@@ -1045,7 +1051,7 @@ func Test_calculateEWMA(t *testing.T) {
 		{
 			name: "ETHUSDT EMA 25",
 			args: args{
-				allKLines: buildKLines(ethusdt5m),
+				allKLines: buildKLines(input),
 				priceF:    KLineClosePriceMapper,
 				window:    25,
 			},
@@ -1054,7 +1060,7 @@ func Test_calculateEWMA(t *testing.T) {
 		{
 			name: "ETHUSDT EMA 99",
 			args: args{
-				allKLines: buildKLines(ethusdt5m),
+				allKLines: buildKLines(input),
 				priceF:    KLineClosePriceMapper,
 				window:    99,
 			},

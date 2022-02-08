@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 	"database/sql/driver"
-	"encoding/json"
 	"fmt"
 	"errors"
 )
@@ -1001,28 +1000,9 @@ func (v Value) MarshalJSON() ([]byte, error) {
 }
 
 func (v *Value) UnmarshalJSON(data []byte) error {
-	var a interface{}
-	err := json.Unmarshal(data, &a)
-	if err != nil {
+	var err error
+	if *v, err = NewFromBytes(data); err != nil {
 		return err
-	}
-	switch d := a.(type) {
-	case float64:
-		*v = NewFromFloat(d)
-	case float32:
-		*v = NewFromFloat(float64(d))
-	case int:
-		*v = NewFromInt(int64(d))
-	case int64:
-		*v = NewFromInt(d)
-	case string:
-        v2, err := NewFromString(d)
-		if err != nil {
-			return err
-		}
-		*v = v2;
-	default:
-		return fmt.Errorf("unsupported type :%T %v", d, d)
 	}
 	return nil
 }

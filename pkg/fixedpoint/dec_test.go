@@ -70,6 +70,22 @@ func TestNew(t *testing.T) {
 	assert.Equal(t, "0.10%", f.FormatPercentage(2))
 }
 
+func TestRound(t *testing.T) {
+	f := NewFromFloat(1.2345)
+	f = f.Round(0, Down)
+	assert.Equal(t, "1", f.String())
+	w := NewFromFloat(1.2345)
+	w = w.Trunc()
+	assert.Equal(t, "1", w.String())
+	s := NewFromFloat(1.2345)
+	assert.Equal(t, "1.23", s.Round(2, Down).String())
+}
+
+func TestFromString(t *testing.T) {
+	f := MustNewFromString("0.004075")
+	assert.Equal(t, "0.004075", f.String())
+}
+
 // Not used
 /*func TestParse(t *testing.T) {
 	type args struct {
