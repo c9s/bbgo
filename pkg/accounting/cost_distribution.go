@@ -1,7 +1,6 @@
 package accounting
 
 import (
-	"fmt"
 	"math"
 	"sort"
 	"strconv"
@@ -16,19 +15,15 @@ func zero(a float64) bool {
 	return int(math.Round(a*1e8)) == 0
 }
 
-func round(a float64) float64 {
-	return math.Round(a*1e8) / 1e8
-}
-
 type Stock types.Trade
 
 func (stock *Stock) String() string {
-	return fmt.Sprintf("%f (%f)", stock.Price, stock.Quantity)
+	return stock.Price.String() + " (" + stock.Quantity.String() + ")"
 }
 
 func (stock *Stock) Consume(quantity fixedpoint.Value) fixedpoint.Value {
 	q := fixedpoint.Min(stock.Quantity, quantity)
-	stock.Quantity = stock.Quantity.Sub(q).Round(0, fixedpoint.Down)
+	stock.Quantity = stock.Quantity.Sub(q)
 	return q
 }
 
@@ -41,7 +36,7 @@ func (slice StockSlice) QuantityBelowPrice(price fixedpoint.Value) (quantity fix
 		}
 	}
 
-	return quantity.Round(0, fixedpoint.Down)
+	return quantity
 }
 
 func (slice StockSlice) Quantity() (total fixedpoint.Value) {
@@ -49,7 +44,7 @@ func (slice StockSlice) Quantity() (total fixedpoint.Value) {
 		total = total.Add(stock.Quantity)
 	}
 
-	return total.Round(0, fixedpoint.Down)
+	return total
 }
 
 type StockDistribution struct {
@@ -77,10 +72,7 @@ func (m *StockDistribution) DistributionStats(level int) *DistributionStats {
 	for _, stock := range m.Stocks {
 		n := math.Ceil(math.Log10(stock.Price.Float64()))
 		digits := int(n - math.Max(float64(level), 1.0))
-		// TODO: use Round function in fixedpoint
-		div := math.Pow10(digits)
-		priceLevel := math.Floor(stock.Price.Float64()/div) * div
-		key := strconv.FormatFloat(priceLevel, 'f', 2, 64)
+		key := stock.Price.Round(-digits, fixedpoint.Down).FormatString(2)
 
 		d.TotalQuantity = d.TotalQuantity.Add(stock.Quantity)
 		d.Stocks[key] = append(d.Stocks[key], stock)
@@ -97,8 +89,6 @@ func (m *StockDistribution) DistributionStats(level int) *DistributionStats {
 	for _, price := range priceLevels {
 		d.PriceLevels = append(d.PriceLevels, strconv.FormatFloat(price, 'f', 2, 64))
 	}
-
-	sort.Float64s(priceLevels)
 
 	return &d
 }
