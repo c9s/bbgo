@@ -1000,6 +1000,11 @@ func (v Value) MarshalJSON() ([]byte, error) {
 }
 
 func (v *Value) UnmarshalJSON(data []byte) error {
+	// FIXME: do we need to compare {}, [], "", or "null"?
+	if bytes.Compare(data, []byte{'n', 'u', 'l', 'l'}) == 0 {
+		*v = Zero
+		return nil
+	}
 	var err error
 	if *v, err = NewFromBytes(data); err != nil {
 		return err

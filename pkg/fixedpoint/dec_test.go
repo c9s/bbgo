@@ -84,6 +84,8 @@ func TestRound(t *testing.T) {
 func TestFromString(t *testing.T) {
 	f := MustNewFromString("0.004075")
 	assert.Equal(t, "0.004075", f.String())
+	f = MustNewFromString("0.03")
+	assert.Equal(t, "0.03", f.String())
 }
 
 // Not used

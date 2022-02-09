@@ -39,8 +39,8 @@ func (report AverageCostPnlReport) Print() {
 	log.Infof("TRADES SINCE: %v", report.StartTime)
 	log.Infof("NUMBER OF TRADES: %d", report.NumTrades)
 	log.Infof("AVERAGE COST: %s", types.USD.FormatMoney(report.AverageCost))
-	log.Infof("TOTAL BUY VOLUME: %s", report.BuyVolume.String())
-	log.Infof("TOTAL SELL VOLUME: %s", report.SellVolume.String())
+	log.Infof("TOTAL BUY VOLUME: %v", report.BuyVolume)
+	log.Infof("TOTAL SELL VOLUME: %v", report.SellVolume)
 	log.Infof("STOCK: %s", report.Stock.String())
 
 	// FIXME:

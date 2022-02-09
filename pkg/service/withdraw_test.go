@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 func TestWithdrawService(t *testing.T) {
@@ -24,10 +25,10 @@ func TestWithdrawService(t *testing.T) {
 	err = service.Insert(types.Withdraw{
 		Exchange:       types.ExchangeMax,
 		Asset:          "BTC",
-		Amount:         0.0001,
+		Amount:         fixedpoint.NewFromFloat(0.0001),
 		Address:        "test",
 		TransactionID:  "01",
-		TransactionFee: 0.0001,
+		TransactionFee: fixedpoint.NewFromFloat(0.0001),
 		Network:        "omni",
 		ApplyTime:      types.Time(time.Now()),
 	})

@@ -468,7 +468,7 @@ func (tree *RBTree) CopyInorder(limit int) *RBTree {
 
 func (tree *RBTree) Print() {
 	tree.Inorder(func(n *RBNode) bool {
-		fmt.Printf("%f -> %f\n", n.key.Float64(), n.value.Float64())
+		fmt.Printf("%v -> %v\n", n.key, n.value)
 		return true
 	})
 }

@@ -381,14 +381,14 @@ var BacktestCmd = &cobra.Command{
 				}
 
 				initQuoteAsset := inQuoteAsset(initBalances, market, startPrice)
-				finalQuoteAsset := inQuoteAsset(finalBalances, market, startPrice)
+				finalQuoteAsset := inQuoteAsset(finalBalances, market, lastPrice)
 				log.Infof("INITIAL ASSET IN %s ~= %s %s (1 %s = %v)", market.QuoteCurrency, market.FormatQuantity(initQuoteAsset), market.QuoteCurrency, market.BaseCurrency, startPrice)
 				log.Infof("FINAL ASSET IN %s ~= %s %s (1 %s = %v)", market.QuoteCurrency, market.FormatQuantity(finalQuoteAsset), market.QuoteCurrency, market.BaseCurrency, lastPrice)
 
 				if report.Profit.Sign() > 0 {
 					color.Green("REALIZED PROFIT: +%v %s", report.Profit, market.QuoteCurrency)
 				} else {
-					color.Red("REALIZED PROFIT: %f %s", report.Profit.Float64(), market.QuoteCurrency)
+					color.Red("REALIZED PROFIT: %v %s", report.Profit, market.QuoteCurrency)
 				}
 
 				if report.UnrealizedProfit.Sign() > 0 {

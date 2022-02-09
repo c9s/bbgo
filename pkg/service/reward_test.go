@@ -30,7 +30,7 @@ func TestRewardService_InsertAndQueryUnspent(t *testing.T) {
 		Exchange:  "max",
 		Type:      "commission",
 		Currency:  "BTC",
-		Quantity:  1,
+		Quantity:  fixedpoint.One,
 		State:     "done",
 		Spent:     false,
 		CreatedAt: types.Time(time.Now()),
@@ -48,7 +48,7 @@ func TestRewardService_InsertAndQueryUnspent(t *testing.T) {
 		Exchange:  "max",
 		Type:      "airdrop",
 		Currency:  "MAX",
-		Quantity:  1000000,
+		Quantity:  fixedpoint.NewFromInt(1000000),
 		State:     "done",
 		Spent:     false,
 		CreatedAt: types.Time(time.Now()),
@@ -95,7 +95,7 @@ func TestRewardService_AggregateUnspentCurrencyPosition(t *testing.T) {
 		Exchange:  "max",
 		Type:      "commission",
 		Currency:  "BTC",
-		Quantity:  1,
+		Quantity:  fixedpoint.One,
 		State:     "done",
 		Spent:     false,
 		CreatedAt: types.Time(now),
@@ -107,7 +107,7 @@ func TestRewardService_AggregateUnspentCurrencyPosition(t *testing.T) {
 		Exchange:  "max",
 		Type:      "commission",
 		Currency:  "LTC",
-		Quantity:  2,
+		Quantity:  fixedpoint.NewFromInt(2),
 		State:     "done",
 		Spent:     false,
 		CreatedAt: types.Time(now),
@@ -119,7 +119,7 @@ func TestRewardService_AggregateUnspentCurrencyPosition(t *testing.T) {
 		Exchange:  "max",
 		Type:      "airdrop",
 		Currency:  "MAX",
-		Quantity:  1000000,
+		Quantity:  fixedpoint.NewFromInt(1000000),
 		State:     "done",
 		Spent:     false,
 		CreatedAt: types.Time(now),
@@ -133,9 +133,9 @@ func TestRewardService_AggregateUnspentCurrencyPosition(t *testing.T) {
 
 	v, ok := currencyPositions["LTC"]
 	assert.True(t, ok)
-	assert.Equal(t, fixedpoint.Value(2), v)
+	assert.Equal(t, fixedpoint.NewFromInt(2), v)
 
 	v, ok = currencyPositions["BTC"]
 	assert.True(t, ok)
-	assert.Equal(t, fixedpoint.Value(1), v)
+	assert.Equal(t, fixedpoint.One, v)
 }

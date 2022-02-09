@@ -6,21 +6,30 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
+var s func(string)fixedpoint.Value = fixedpoint.MustNewFromString
+
 func TestFormatQuantity(t *testing.T) {
-	quantity := formatQuantity(0.12511, 0.01)
+	quantity := formatQuantity(
+		s("0.12511"),
+		s("0.01"))
 	assert.Equal(t, "0.12", quantity)
 
-	quantity = formatQuantity(0.12511, 0.001)
+	quantity = formatQuantity(
+		s("0.12511"),
+		s("0.001"))
 	assert.Equal(t, "0.125", quantity)
 }
 
 func TestFormatPrice(t *testing.T) {
-	price := formatPrice(26.288256, 0.0001)
+	price := formatPrice(
+		s("26.288256"),
+		s("0.0001"))
 	assert.Equal(t, "26.2882", price)
 
-	price = formatPrice(26.288656, 0.001)
+	price = formatPrice(s("26.288656"), s("0.001"))
 	assert.Equal(t, "26.288", price)
 }
 

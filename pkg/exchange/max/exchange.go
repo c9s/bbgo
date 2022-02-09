@@ -261,7 +261,7 @@ queryRecentlyClosedOrders:
 				log.Debugf("skipping duplicated order: %d", order.OrderID)
 			}
 
-			log.Debugf("max order %d %s %f %s %s", order.OrderID, order.Symbol, order.Price, order.Status, order.CreationTime.Time().Format(time.StampMilli))
+			log.Debugf("max order %d %s %v %s %s", order.OrderID, order.Symbol, order.Price, order.Status, order.CreationTime.Time().Format(time.StampMilli))
 
 			orderIDs[order.OrderID] = struct{}{}
 			orders = append(orders, *order)
