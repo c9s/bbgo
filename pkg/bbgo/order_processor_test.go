@@ -50,7 +50,7 @@ func TestAdjustQuantityByMinAmount(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			q := AdjustFloatQuantityByMinAmount(test.args.quantity, test.args.price, test.args.minAmount)
-			assert.Equal(t, test.wanted, q.String())
+			assert.Equal(t, fixedpoint.MustNewFromString(test.wanted), q)
 		})
 	}
 }

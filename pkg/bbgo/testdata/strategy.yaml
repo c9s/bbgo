@@ -3,9 +3,13 @@ sessions:
   max:
     exchange: max
     envVarPrefix: MAX
+    takerFeeRate: 0
+    makerFeeRate: 0
   binance:
     exchange: binance
     envVarPrefix: BINANCE
+    takerFeeRate: 0
+    makerFeeRate: 0
 
 exchangeStrategies:
 - on: ["binance"]
