@@ -320,16 +320,16 @@ func (s *Strategy) calculateQuantity(session *bbgo.ExchangeSession, side types.S
 
 			if s.MinQuoteAssetBalance.Sign() > 0 &&
 				quoteBalance.Available.Sub(notional).Compare(s.MinQuoteAssetBalance) < 0 {
-				log.Warnf("modifying quantity %s according to the min quote asset balance %s %s",
-					quantity.String(),
-					quoteBalance.Available.String(),
+				log.Warnf("modifying quantity %v according to the min quote asset balance %v %s",
+					quantity,
+					quoteBalance.Available,
 					s.Market.QuoteCurrency)
 				quota := quoteBalance.Available.Sub(s.MinQuoteAssetBalance)
 				quantity = bbgo.AdjustQuantityByMinAmount(quantity, closePrice, quota)
 			} else if notional.Compare(quoteBalance.Available) > 0 {
-				log.Warnf("modifying quantity %f according to the quote asset balance %f %s",
-					quantity.String(),
-					quoteBalance.Available.String(),
+				log.Warnf("modifying quantity %v according to the quote asset balance %v %s",
+					quantity,
+					quoteBalance.Available,
 					s.Market.QuoteCurrency)
 				quantity = bbgo.AdjustQuantityByMaxAmount(quantity, closePrice, quoteBalance.Available)
 			}

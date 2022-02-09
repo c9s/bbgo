@@ -1005,7 +1005,14 @@ func (v *Value) UnmarshalJSON(data []byte) error {
 		*v = Zero
 		return nil
 	}
+	if len(data) == 0 {
+		*v = Zero
+		return nil
+	}
 	var err error
+	if data[0] == '"' {
+		data = data[1:len(data)-1]
+	}
 	if *v, err = NewFromBytes(data); err != nil {
 		return err
 	}

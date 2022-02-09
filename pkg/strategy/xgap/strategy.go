@@ -289,8 +289,8 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 					// if the spread is less than 100 ticks (100 pips), skip
 					if spread.Compare(s.tradingMarket.TickSize.MulExp(2)) < 0 {
-						log.Warnf("spread too small, we can't place orders: spread=%s bid=%s ask=%s",
-							spread.String(), bestBid.Price.String(), bestAsk.Price.String())
+						log.Warnf("spread too small, we can't place orders: spread=%v bid=%v ask=%v",
+							spread, bestBid.Price, bestAsk.Price)
 						continue
 					}
 
@@ -306,15 +306,15 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 				var spread = bestAsk.Price.Sub(bestBid.Price)
 				var spreadPercentage = spread.Div(bestAsk.Price)
-				log.Infof("spread=%s %s ask=%s bid=%s",
-					spread.String(), spreadPercentage.Percentage(),
-					bestAsk.Price.String(), bestBid.Price.String())
+				log.Infof("spread=%v %s ask=%v bid=%v",
+					spread, spreadPercentage.Percentage(),
+					bestAsk.Price, bestBid.Price)
 				// var spreadPercentage = spread.Float64() / bestBid.Price.Float64()
 
 				var midPrice = bestAsk.Price.Add(bestBid.Price).Div(Two)
 				var price = midPrice
 
-				log.Infof("mid price %f", midPrice.String())
+				log.Infof("mid price %v", midPrice)
 
 				var balances = s.tradingSession.Account.Balances()
 				var quantity = s.tradingMarket.MinQuantity
