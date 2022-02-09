@@ -11,8 +11,8 @@ import (
 
 func prepareOrderBookBenchmarkData() (asks, bids PriceVolumeSlice) {
 	for p := 0.0; p < 1000.0; p++ {
-		asks = append(asks, PriceVolume{fixedpoint.NewFromFloat(1000 + p), fixedpoint.NewFromFloat(1)})
-		bids = append(bids, PriceVolume{fixedpoint.NewFromFloat(1000 - 0.1 - p), fixedpoint.NewFromFloat(1)})
+		asks = append(asks, PriceVolume{fixedpoint.NewFromFloat(1000 + p), fixedpoint.One})
+		bids = append(bids, PriceVolume{fixedpoint.NewFromFloat(1000 - 0.1 - p), fixedpoint.One})
 	}
 	return
 }
@@ -20,8 +20,8 @@ func prepareOrderBookBenchmarkData() (asks, bids PriceVolumeSlice) {
 func BenchmarkOrderBook_Load(b *testing.B) {
 	var asks, bids = prepareOrderBookBenchmarkData()
 	for p := 0.0; p < 1000.0; p++ {
-		asks = append(asks, PriceVolume{fixedpoint.NewFromFloat(1000 + p), fixedpoint.NewFromFloat(1)})
-		bids = append(bids, PriceVolume{fixedpoint.NewFromFloat(1000 - 0.1 - p), fixedpoint.NewFromFloat(1)})
+		asks = append(asks, PriceVolume{fixedpoint.NewFromFloat(1000 + p), fixedpoint.One})
+		bids = append(bids, PriceVolume{fixedpoint.NewFromFloat(1000 - 0.1 - p), fixedpoint.One})
 	}
 
 	b.Run("RBTOrderBook", func(b *testing.B) {
@@ -52,8 +52,8 @@ func BenchmarkOrderBook_Load(b *testing.B) {
 func BenchmarkOrderBook_UpdateAndInsert(b *testing.B) {
 	var asks, bids = prepareOrderBookBenchmarkData()
 	for p := 0.0; p < 1000.0; p += 2 {
-		asks = append(asks, PriceVolume{fixedpoint.NewFromFloat(1000 + p), fixedpoint.NewFromFloat(1)})
-		bids = append(bids, PriceVolume{fixedpoint.NewFromFloat(1000 - 0.1 - p), fixedpoint.NewFromFloat(1)})
+		asks = append(asks, PriceVolume{fixedpoint.NewFromFloat(1000 + p), fixedpoint.One})
+		bids = append(bids, PriceVolume{fixedpoint.NewFromFloat(1000 - 0.1 - p), fixedpoint.One})
 	}
 
 	rbBook := NewRBOrderBook("ETHUSDT")
@@ -67,10 +67,10 @@ func BenchmarkOrderBook_UpdateAndInsert(b *testing.B) {
 	b.Run("RBTOrderBook", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			var price = fixedpoint.NewFromFloat(rand.Float64() * 2000.0)
-			if price >= fixedpoint.NewFromFloat(1000) {
-				rbBook.Asks.Upsert(price, fixedpoint.NewFromFloat(1))
+			if price.Compare(fixedpoint.NewFromInt(1000)) >= 0 {
+				rbBook.Asks.Upsert(price, fixedpoint.One)
 			} else {
-				rbBook.Bids.Upsert(price, fixedpoint.NewFromFloat(1))
+				rbBook.Bids.Upsert(price, fixedpoint.One)
 			}
 		}
 	})
@@ -87,7 +87,7 @@ func BenchmarkOrderBook_UpdateAndInsert(b *testing.B) {
 	b.Run("OrderBook", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			var price = fixedpoint.NewFromFloat(rand.Float64() * 2000.0)
-			if price >= fixedpoint.NewFromFloat(1000) {
+			if price.Compare(fixedpoint.NewFromFloat(1000)) >= 0 {
 				sliceBook.Asks = sliceBook.Asks.Upsert(PriceVolume{Price: price, Volume: fixedpoint.NewFromFloat(1)}, false)
 			} else {
 				sliceBook.Bids = sliceBook.Bids.Upsert(PriceVolume{Price: price, Volume: fixedpoint.NewFromFloat(1)}, true)
@@ -134,5 +134,5 @@ func TestOrderBook_IsValid(t *testing.T) {
 	}
 	isValid, err = ob.IsValid()
 	assert.False(t, isValid)
-	assert.EqualError(t, err, "bid price 80000.000000 > ask price 100.000000")
+	assert.EqualError(t, err, "bid price 80000 > ask price 100")
 }

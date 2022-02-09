@@ -1,0 +1,21 @@
+---
+sessions:
+  binance:
+    exchange: binance
+    envVarPrefix: binance
+
+exchangeStrategies:
+ 
+- on: binance
+  skeleton:
+    symbol: BNBBUSD
+
+backtest:
+  startTime: "2022-01-02"
+  endTime: "2022-01-19"
+  symbols:
+    - BNBBUSD
+  account:
+    balances:
+      BNB: 0
+      BUSD: 10000

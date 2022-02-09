@@ -11,11 +11,11 @@ func TestRBOrderBook_EmptyBook(t *testing.T) {
 	book := NewRBOrderBook("BTCUSDT")
 	bid, ok := book.BestBid()
 	assert.False(t, ok)
-	assert.Equal(t, fixedpoint.Value(0), bid.Price)
+	assert.Equal(t, fixedpoint.Zero, bid.Price)
 
 	ask, ok := book.BestAsk()
 	assert.False(t, ok)
-	assert.Equal(t, fixedpoint.Value(0), ask.Price)
+	assert.Equal(t, fixedpoint.Zero, ask.Price)
 }
 
 func TestRBOrderBook_Load(t *testing.T) {
@@ -24,10 +24,10 @@ func TestRBOrderBook_Load(t *testing.T) {
 	book.Load(SliceOrderBook{
 		Symbol: "BTCUSDT",
 		Bids: PriceVolumeSlice{
-			{Price: fixedpoint.NewFromFloat(2800.0), Volume: fixedpoint.NewFromFloat(1.0)},
+			{Price: fixedpoint.NewFromFloat(2800.0), Volume: fixedpoint.One},
 		},
 		Asks: PriceVolumeSlice{
-			{Price: fixedpoint.NewFromFloat(2810.0), Volume: fixedpoint.NewFromFloat(1.0)},
+			{Price: fixedpoint.NewFromFloat(2810.0), Volume: fixedpoint.One},
 		},
 	})
 
@@ -46,10 +46,10 @@ func TestRBOrderBook_LoadAndDelete(t *testing.T) {
 	book.Load(SliceOrderBook{
 		Symbol: "BTCUSDT",
 		Bids: PriceVolumeSlice{
-			{Price: fixedpoint.NewFromFloat(2800.0), Volume: fixedpoint.NewFromFloat(1.0)},
+			{Price: fixedpoint.NewFromFloat(2800.0), Volume: fixedpoint.One},
 		},
 		Asks: PriceVolumeSlice{
-			{Price: fixedpoint.NewFromFloat(2810.0), Volume: fixedpoint.NewFromFloat(1.0)},
+			{Price: fixedpoint.NewFromFloat(2810.0), Volume: fixedpoint.One},
 		},
 	})
 
@@ -64,10 +64,10 @@ func TestRBOrderBook_LoadAndDelete(t *testing.T) {
 	book.Load(SliceOrderBook{
 		Symbol: "BTCUSDT",
 		Bids: PriceVolumeSlice{
-			{Price: fixedpoint.NewFromFloat(2800.0), Volume: 0},
+			{Price: fixedpoint.NewFromFloat(2800.0), Volume: fixedpoint.Zero},
 		},
 		Asks: PriceVolumeSlice{
-			{Price: fixedpoint.NewFromFloat(2810.0), Volume: 0},
+			{Price: fixedpoint.NewFromFloat(2810.0), Volume: fixedpoint.Zero},
 		},
 	})
 

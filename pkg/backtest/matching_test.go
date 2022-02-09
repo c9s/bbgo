@@ -15,8 +15,8 @@ func newLimitOrder(symbol string, side types.SideType, price, quantity float64) 
 		Symbol:      symbol,
 		Side:        side,
 		Type:        types.OrderTypeLimit,
-		Quantity:    quantity,
-		Price:       price,
+		Quantity:    fixedpoint.NewFromFloat(quantity),
+		Price:       fixedpoint.NewFromFloat(price),
 		TimeInForce: "GTC",
 	}
 }
@@ -38,9 +38,9 @@ func TestSimplePriceMatching_LimitOrder(t *testing.T) {
 		VolumePrecision: 8,
 		QuoteCurrency:   "USDT",
 		BaseCurrency:    "BTC",
-		MinNotional:     0.001,
-		MinAmount:       10.0,
-		MinQuantity:     0.001,
+		MinNotional:     fixedpoint.MustNewFromString("0.001"),
+		MinAmount:       fixedpoint.MustNewFromString("10.0"),
+		MinQuantity:     fixedpoint.MustNewFromString("0.001"),
 	}
 
 	engine := &SimplePriceMatching{

@@ -2,7 +2,6 @@ package types
 
 import (
 	"fmt"
-	"math"
 	"sort"
 	"strings"
 	"sync"
@@ -34,7 +33,7 @@ func (b Balance) Total() fixedpoint.Value {
 
 func (b Balance) String() string {
 	if b.Locked.Sign() > 0 {
-		return fmt.Sprintf("%s: %s (locked %s)", b.Currency, b.Available.String(), b.Locked.String())
+		return fmt.Sprintf("%s: %v (locked %v)", b.Currency, b.Available, b.Locked)
 	}
 
 	return fmt.Sprintf("%s: %s", b.Currency, b.Available.String())
@@ -53,23 +52,23 @@ type Asset struct {
 type AssetMap map[string]Asset
 
 func (m AssetMap) PlainText() (o string) {
-	sumUsd := 0.0
-	sumBTC := 0.0
+	sumUsd := fixedpoint.Zero
+	sumBTC := fixedpoint.Zero
 	for _, a := range m {
-		usd := a.InUSD.Float64()
-		btc := a.InBTC.Float64()
+		usd := a.InUSD
+		btc := a.InBTC
 		o += fmt.Sprintf("  %s: %s (≈ %s) (≈ %s)",
 			a.Currency,
 			a.Total.String(),
-			USD.FormatMoneyFloat64(usd),
-			BTC.FormatMoneyFloat64(btc),
+			USD.FormatMoney(usd),
+			BTC.FormatMoney(btc),
 		) + "\n"
-		sumUsd += usd
-		sumBTC += btc
+		sumUsd = sumUsd.Add(usd)
+		sumBTC = sumBTC.Add(btc)
 	}
 	o += fmt.Sprintf(" Summary: (≈ %s) (≈ %s)",
-		USD.FormatMoneyFloat64(sumUsd),
-		BTC.FormatMoneyFloat64(sumBTC),
+		USD.FormatMoney(sumUsd),
+		BTC.FormatMoney(sumBTC),
 	) + "\n"
 	return o
 }
@@ -100,11 +99,11 @@ func (m AssetMap) SlackAttachment() slack.Attachment {
 	for _, a := range assets {
 		fields = append(fields, slack.AttachmentField{
 			Title: a.Currency,
-			Value: fmt.Sprintf("%s (≈ %s) (≈ %s) (%.2f%%)",
+			Value: fmt.Sprintf("%s (≈ %s) (≈ %s) (%s)",
 				a.Total.String(),
-				USD.FormatMoneyFloat64(a.InUSD.Float64()),
-				BTC.FormatMoneyFloat64(a.InBTC.Float64()),
-				math.Round(a.InUSD.Div(totalUSD).Float64()*100.0),
+				USD.FormatMoney(a.InUSD),
+				BTC.FormatMoney(a.InBTC),
+				a.InUSD.Div(totalUSD).FormatPercentage(2),
 			),
 			Short: false,
 		})
@@ -112,8 +111,8 @@ func (m AssetMap) SlackAttachment() slack.Attachment {
 
 	return slack.Attachment{
 		Title: fmt.Sprintf("Net Asset Value %s (≈ %s)",
-			USD.FormatMoneyFloat64(totalUSD.Float64()),
-			BTC.FormatMoneyFloat64(totalBTC.Float64()),
+			USD.FormatMoney(totalUSD),
+			BTC.FormatMoney(totalBTC),
 		),
 		Fields: fields,
 	}
@@ -192,9 +191,9 @@ func (m BalanceMap) Print() {
 		}
 
 		if balance.Locked.Sign() > 0 {
-			logrus.Infof(" %s: %s (locked %s)", balance.Currency, balance.Available.String(), balance.Locked.String())
+			logrus.Infof(" %s: %v (locked %v)", balance.Currency, balance.Available, balance.Locked)
 		} else {
-			logrus.Infof(" %s: %s", balance.Currency, balance.Available.String())
+			logrus.Infof(" %s: %v", balance.Currency, balance.Available)
 		}
 	}
 }
@@ -314,7 +313,7 @@ func (a *Account) UseLockedBalance(currency string, fund fixedpoint.Value) error
 		return nil
 	}
 
-	return fmt.Errorf("trying to use more than locked: locked %s < want to use %s", balance.Locked.String(), fund.String())
+	return fmt.Errorf("trying to use more than locked: locked %v < want to use %v", balance.Locked, fund)
 }
 
 func (a *Account) UnlockBalance(currency string, unlocked fixedpoint.Value) error {
@@ -326,8 +325,8 @@ func (a *Account) UnlockBalance(currency string, unlocked fixedpoint.Value) erro
 		return fmt.Errorf("trying to unlocked inexisted balance: %s", currency)
 	}
 
-	if unlocked.Compare(balance.Locked) > 0 {
-		return fmt.Errorf("trying to unlocked more than locked %s: locked %s < want to unlock %s", currency, balance.Locked.String(), unlocked.String())
+	if unlocked.Compare(balance.Locked) >= 0 {
+		return fmt.Errorf("trying to unlocked more than locked %s: locked %v < want to unlock %v", currency, balance.Locked, unlocked)
 	}
 
 	balance.Locked = balance.Locked.Sub(unlocked)
@@ -343,12 +342,12 @@ func (a *Account) LockBalance(currency string, locked fixedpoint.Value) error {
 	balance, ok := a.balances[currency]
 	if ok && balance.Available.Compare(locked) >= 0 {
 		balance.Locked = balance.Locked.Add(locked)
-		balance.Available = balance.Locked.Sub(locked)
+		balance.Available = balance.Available.Sub(locked)
 		a.balances[currency] = balance
 		return nil
 	}
 
-	return fmt.Errorf("insufficient available balance %s for lock: want to lock %s, available %s", currency, locked.String(), balance.Available.String())
+	return fmt.Errorf("insufficient available balance %s for lock: want to lock %v, available %v", currency, locked, balance.Available)
 }
 
 func (a *Account) UpdateBalances(balances BalanceMap) {
@@ -385,10 +384,10 @@ func (a *Account) Print() {
 	}
 
 	if a.MakerFeeRate.Sign() > 0 {
-		logrus.Infof("maker fee rate: %s", a.MakerFeeRate.String())
+		logrus.Infof("maker fee rate: %v", a.MakerFeeRate)
 	}
 	if a.TakerFeeRate.Sign() > 0 {
-		logrus.Infof("taker fee rate: %s", a.TakerFeeRate.String())
+		logrus.Infof("taker fee rate: %v", a.TakerFeeRate)
 	}
 
 	a.balances.Print()

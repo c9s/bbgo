@@ -24,7 +24,7 @@ type Withdraw struct {
 }
 
 func (w Withdraw) String() string {
-	return fmt.Sprintf("withdraw %s %f to %s at %s", w.Asset, w.Amount, w.Address, w.ApplyTime.Time())
+	return fmt.Sprintf("withdraw %s %v to %s at %s", w.Asset, w.Amount, w.Address, w.ApplyTime.Time())
 }
 
 func (w Withdraw) EffectiveTime() time.Time {

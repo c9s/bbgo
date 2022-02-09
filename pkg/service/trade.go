@@ -118,7 +118,7 @@ func (s *TradeService) Sync(ctx context.Context, exchange types.Exchange, symbol
 
 		tradeKeys[key] = struct{}{}
 
-		log.Infof("inserting trade: %s %d %s %-4s price: %-13f volume: %-11f %5s %s",
+		log.Infof("inserting trade: %s %d %s %-4s price: %-13v volume: %-11v %5s %s",
 			trade.Exchange,
 			trade.ID,
 			trade.Symbol,

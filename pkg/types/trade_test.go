@@ -1,6 +1,7 @@
 package types
 
 import "testing"
+import "github.com/c9s/bbgo/pkg/fixedpoint"
 
 func Test_trimTrailingZero(t *testing.T) {
 	type args struct {
@@ -42,7 +43,7 @@ func Test_trimTrailingZero(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := trimTrailingZero(tt.args.a); got != tt.want {
+			if got := fixedpoint.MustNewFromString(tt.args.a).String(); got != tt.want {
 				t.Errorf("trimTrailingZero() = %v, want %v", got, tt.want)
 			}
 		})

@@ -216,17 +216,17 @@ func (p *Position) SlackAttachment() slack.Attachment {
 
 func (p *Position) PlainText() (msg string) {
 	posType := p.Type()
-	msg = fmt.Sprintf("%s Position %s: average cost = %s, base = %s, quote = %s",
+	msg = fmt.Sprintf("%s Position %s: average cost = %v, base = %v, quote = %v",
 		posType,
 		p.Symbol,
-		p.AverageCost.String(),
-		p.Base.String(),
-		p.Quote.String(),
+		p.AverageCost,
+		p.Base,
+		p.Quote,
 	)
 
 	if p.TotalFee != nil {
 		for feeCurrency, fee := range p.TotalFee {
-			msg += fmt.Sprintf("\nfee (%s) = %s", feeCurrency, fee.String())
+			msg += fmt.Sprintf("\nfee (%s) = %v", feeCurrency, fee)
 		}
 	}
 
@@ -234,11 +234,11 @@ func (p *Position) PlainText() (msg string) {
 }
 
 func (p *Position) String() string {
-	return fmt.Sprintf("POSITION %s: average cost = %f, base = %f, quote = %f",
+	return fmt.Sprintf("POSITION %s: average cost = %v, base = %v, quote = %v",
 		p.Symbol,
-		p.AverageCost.String(),
-		p.Base.String(),
-		p.Quote.String(),
+		p.AverageCost,
+		p.Base,
+		p.Quote,
 	)
 }
 
@@ -364,6 +364,7 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 			Add(quoteQuantity).
 			Sub(feeInQuote).
 			Div(dividor)
+
 		p.AverageCost = p.AverageCost.Mul(p.Base.Neg()).
 			Add(quoteQuantity).
 			Div(dividor)
