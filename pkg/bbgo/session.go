@@ -497,7 +497,7 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 		}
 	}
 
-	log.Infof("%s last price: %f", symbol, session.lastPrices[symbol])
+	log.Infof("%s last price: %v", symbol, session.lastPrices[symbol])
 
 	session.initializedSymbols[symbol] = struct{}{}
 	return nil

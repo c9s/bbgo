@@ -325,7 +325,7 @@ func (a *Account) UnlockBalance(currency string, unlocked fixedpoint.Value) erro
 		return fmt.Errorf("trying to unlocked inexisted balance: %s", currency)
 	}
 
-	if unlocked.Compare(balance.Locked) >= 0 {
+	if unlocked.Compare(balance.Locked) > 0 {
 		return fmt.Errorf("trying to unlocked more than locked %s: locked %v < want to unlock %v", currency, balance.Locked, unlocked)
 	}
 
