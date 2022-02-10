@@ -75,6 +75,11 @@ type Exchange interface {
 	ExchangeTradeService
 }
 
+// ExchangeOrderQueryService provides an interface for querying the order status via order ID or client order ID
+type ExchangeOrderQueryService interface {
+	QueryOrder(ctx context.Context, q OrderQuery) (*Order, error)
+}
+
 type ExchangeTradeService interface {
 	QueryAccount(ctx context.Context) (*Account, error)
 

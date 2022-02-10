@@ -157,6 +157,20 @@ func (e *Exchange) NewStream() types.Stream {
 	return NewStream(e.key, e.secret)
 }
 
+func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.Order, error) {
+	orderID, err := strconv.ParseInt(q.OrderID, 10, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	maxOrder, err := e.client.OrderService.Get(uint64(orderID))
+	if err != nil {
+		return nil, err
+	}
+
+	return toGlobalOrder(*maxOrder)
+}
+
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
 	maxOrders, err := e.client.OrderService.Open(toLocalSymbol(symbol), maxapi.QueryOrderOptions{})
 	if err != nil {
