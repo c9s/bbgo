@@ -37,6 +37,12 @@ This strategy uses K-lines with high volume as support and buys the target asset
     - `quantityPercentage`
         - The position ratio to take profit, e.g., 0.5 means selling 50% of the original buy order position when takes 
           profit.
+- `trailingStopTarget`
+  - Use trailing stop to take profit
+  - `callbackRatio`
+    - Callback ratio of the trailing stop
+  - `minimumProfitPercentage`
+    - The minimum profit ratio of the trailing stop. The trailing stop is triggered when the profit is higher than the minimum.
 
 
 #### Examples
