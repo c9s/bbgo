@@ -129,4 +129,3 @@ func mulsub(u1, u0, v1, v0 uint32, q0 uint64) uint64 {
 func make64(hi, lo uint32) uint64 {
 	return uint64(hi)<<32 | uint64(lo)
 }
-

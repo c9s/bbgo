@@ -316,6 +316,8 @@ func (a *Account) UseLockedBalance(currency string, fund fixedpoint.Value) error
 	return fmt.Errorf("trying to use more than locked: locked %v < want to use %v", balance.Locked, fund)
 }
 
+var QuantityDelta = fixedpoint.MustNewFromString("0.0000000000001")
+
 func (a *Account) UnlockBalance(currency string, unlocked fixedpoint.Value) error {
 	a.Lock()
 	defer a.Unlock()
@@ -325,7 +327,17 @@ func (a *Account) UnlockBalance(currency string, unlocked fixedpoint.Value) erro
 		return fmt.Errorf("trying to unlocked inexisted balance: %s", currency)
 	}
 
+	// Instead of showing error in UnlockBalance,
+	// since this function is only called when cancel orders,
+	// there might be inequivalence in the last order quantity
 	if unlocked.Compare(balance.Locked) > 0 {
+		// check if diff is within delta
+		if unlocked.Sub(balance.Locked).Compare(QuantityDelta) <= 0 {
+			balance.Available = balance.Available.Add(balance.Locked)
+			balance.Locked = fixedpoint.Zero
+			a.balances[currency] = balance
+			return nil
+		}
 		return fmt.Errorf("trying to unlocked more than locked %s: locked %v < want to unlock %v", currency, balance.Locked, unlocked)
 	}
 
