@@ -1,9 +1,9 @@
 package fixedpoint
 
 import (
-	"testing"
-    "math/big"
 	"github.com/stretchr/testify/assert"
+	"math/big"
+	"testing"
 )
 
 const Delta = 1e-9
@@ -58,7 +58,7 @@ func TestMulExp(t *testing.T) {
 	x, _ := NewFromString("166")
 	digits := x.NumIntDigits()
 	assert.Equal(t, digits, 3)
-	step := x.MulExp(-digits+1)
+	step := x.MulExp(-digits + 1)
 	assert.Equal(t, "1.66", step.String())
 }
 
@@ -86,6 +86,12 @@ func TestFromString(t *testing.T) {
 	assert.Equal(t, "0.004075", f.String())
 	f = MustNewFromString("0.03")
 	assert.Equal(t, "0.03", f.String())
+}
+
+func TestDelta(t *testing.T) {
+	f1 := MustNewFromString("0.0009763593380614657")
+	f2 := NewFromInt(42300)
+	assert.InDelta(t, f1.Mul(f2).Float64(), 41.3, 1e-14)
 }
 
 // Not used

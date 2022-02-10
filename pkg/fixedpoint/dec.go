@@ -2,13 +2,13 @@ package fixedpoint
 
 import (
 	"bytes"
+	"database/sql/driver"
+	"errors"
+	"fmt"
 	"math"
 	"math/bits"
 	"strconv"
 	"strings"
-	"database/sql/driver"
-	"fmt"
-	"errors"
 )
 
 type Value struct {
@@ -28,7 +28,6 @@ const (
 	digitsMax  = 16
 	shiftMax   = digitsMax - 1
 )
-
 
 // common values
 var (
@@ -59,8 +58,8 @@ var pow10f = [...]float64{
 	10000000000000000,
 	100000000000000000,
 	1000000000000000000,
-    10000000000000000000,
-    100000000000000000000}
+	10000000000000000000,
+	100000000000000000000}
 
 var pow10 = [...]uint64{
 	1,
@@ -320,7 +319,7 @@ func (dn Value) String() string {
 }
 
 func (dn Value) Percentage() string {
-    if dn.sign == 0 {
+	if dn.sign == 0 {
 		return "0%"
 	}
 	const maxLeadingZeros = 7
@@ -401,7 +400,7 @@ func (dn Value) SignedPercentage() string {
 
 // get digit length
 func (a Value) NumDigits() int {
-    i := shiftMax
+	i := shiftMax
 	coef := a.coef
 	nd := 0
 	for coef != 0 && coef < pow10[i] {
@@ -439,7 +438,7 @@ func getDigits(coef uint64) string {
 	return string(digits[:nd])
 }
 
-func (v *Value) Scan(src interface {}) error {
+func (v *Value) Scan(src interface{}) error {
 	var err error
 	switch d := src.(type) {
 	case int64:
@@ -462,7 +461,7 @@ func (v *Value) Scan(src interface {}) error {
 // NewFromString parses a numeric string and returns a Value representation.
 func NewFromString(s string) (Value, error) {
 	length := len(s)
-	isPercentage := s[length - 1] == '%'
+	isPercentage := s[length-1] == '%'
 	if isPercentage {
 		s = s[:length-1]
 	}
@@ -497,7 +496,7 @@ func MustNewFromString(input string) Value {
 
 func NewFromBytes(s []byte) (Value, error) {
 	length := len(s)
-	isPercentage := s[length - 1] == '%'
+	isPercentage := s[length-1] == '%'
 	if isPercentage {
 		s = s[:length-1]
 	}
@@ -529,7 +528,6 @@ func MustNewFromBytes(input []byte) Value {
 	}
 	return v
 }
-
 
 // TODO: refactor by interface
 
@@ -996,7 +994,7 @@ func (v *Value) UnmarshalYAML(unmarshal func(a interface{}) error) (err error) {
 }
 
 func (v Value) MarshalJSON() ([]byte, error) {
-    return []byte(v.String()), nil
+	return []byte(v.String()), nil
 }
 
 func (v *Value) UnmarshalJSON(data []byte) error {
@@ -1011,7 +1009,7 @@ func (v *Value) UnmarshalJSON(data []byte) error {
 	}
 	var err error
 	if data[0] == '"' {
-		data = data[1:len(data)-1]
+		data = data[1 : len(data)-1]
 	}
 	if *v, err = NewFromBytes(data); err != nil {
 		return err
@@ -1114,20 +1112,14 @@ func Mul(x, y Value) Value {
 
 	// split unevenly to use full 64 bit range to get more precision
 	// and avoid needing xlo * ylo
-    // xhi := x.coef / e7 // 9 digits
-	// xlo := x.coef % e7 // 7 digits
-	// yhi := y.coef / e7 // 9 digits
-	// ylo := y.coef % e7 // 7 digits
-	xhi, xlo := bits.Div64(0, x.coef, e7)
-	yhi, ylo := bits.Div64(0, y.coef, e7)
+	xhi := x.coef / e7 // 9 digits
+	xlo := x.coef % e7 // 7 digits
+	yhi := y.coef / e7 // 9 digits
+	ylo := y.coef % e7 // 7 digits
 
 	c := xhi * yhi
 	if (xlo | ylo) != 0 {
-		yhi, xlo = bits.Mul64(xlo, yhi)
-		xhi, ylo = bits.Mul64(xhi, ylo)
-        xhi, _ = bits.Add64(xhi, yhi, 0)
-		c += xhi
-		//c += (xlo*yhi + ylo*xhi) / e7
+		c += (xlo*yhi + ylo*xhi) / e7
 	}
 	return New(sign, c, e-2)
 }
