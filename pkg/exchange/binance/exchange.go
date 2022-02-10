@@ -545,6 +545,26 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 	return toGlobalOrders(binanceOrders)
 }
 
+func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.Order, error) {
+	orderID, err := strconv.ParseInt(q.OrderID, 10, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	var order *binance.Order
+	if e.IsMargin {
+		order, err = e.Client.NewGetMarginOrderService().Symbol(q.Symbol).OrderID(orderID).Do(ctx)
+	} else {
+		order, err = e.Client.NewGetOrderService().Symbol(q.Symbol).OrderID(orderID).Do(ctx)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return toGlobalOrder(order, e.IsMargin)
+}
+
 func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []types.Order, err error) {
 	// we can only query orders within 24 hours
 	// if the until-since is more than 24 hours, we should reset the until to:

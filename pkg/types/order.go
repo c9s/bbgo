@@ -184,6 +184,12 @@ func (o SubmitOrder) SlackAttachment() slack.Attachment {
 	}
 }
 
+type OrderQuery struct {
+	Symbol string
+	OrderID string
+	ClientOrderID string
+}
+
 type Order struct {
 	SubmitOrder
 
