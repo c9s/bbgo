@@ -731,13 +731,13 @@ func (e *OrderTradeUpdateEvent) TradeFutures() (*types.Trade, error) {
 		Symbol:        e.OrderTrade.Symbol,
 		OrderID:       uint64(e.OrderTrade.OrderId),
 		Side:          toGlobalSideType(binance.SideType(e.OrderTrade.Side)),
-		Price:         float64(e.OrderTrade.LastFilledPrice),
-		Quantity:      float64(e.OrderTrade.OrderLastFilledQuantity),
-		QuoteQuantity: float64(e.OrderTrade.OrderFilledAccumulatedQuantity),
+		Price:         e.OrderTrade.LastFilledPrice.Float64(),
+		Quantity:      e.OrderTrade.OrderLastFilledQuantity.Float64(),
+		QuoteQuantity: e.OrderTrade.OrderFilledAccumulatedQuantity.Float64(),
 		IsBuyer:       e.OrderTrade.Side == "BUY",
 		IsMaker:       e.OrderTrade.IsMaker,
 		Time:          types.Time(tt),
-		Fee:           float64(e.OrderTrade.CommissionAmount),
+		Fee:           e.OrderTrade.CommissionAmount.Float64(),
 		FeeCurrency:   e.OrderTrade.CommissionAsset,
 	}, nil
 }
