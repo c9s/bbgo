@@ -1,0 +1,145 @@
+syntax = "proto3";
+
+package protobuf;
+
+option go_package = "pkg/protobuf";
+
+service BBGO {
+    // should support streaming
+    rpc SubscribeKLine(SubscribeKLineRequest) returns (stream SubscribeKLineResponse) {}
+    rpc SubscribeOrderBook(SubscribeOrderBookRequest) returns (SubscribeOrderBookResponse) {}
+    rpc SubscribeUserData(SubscribeUserDataRequest) returns (SubscribeUserDataResponse) {}
+
+    // request-response
+    rpc CreateOrder(CreateOrderRequest) returns (CreateOrderResponse) {}
+    rpc CancelOrder(CancelOrderRequest) returns (CancelOrderResponse) {}
+    rpc QueryOrder(QueryOrderRequest) returns (QueryOrderResponse) {}
+    rpc QueryOpenOrders(QueryOpenOrdersRequest) returns (QueryOpenOrdersResponse) {}
+    rpc QueryTrades(QueryTradesRequest) returns (QueryTradesResponse) {}
+}
+
+message SubscribeKLineRequest {
+    string exchange = 1;
+    string symbol = 2;
+    string interval = 3;
+    int64 limit = 4;
+    uint64 since = 5;
+}
+
+message SubscribeKLineResponse {
+    string exchange = 1;
+    string symbol = 2;
+    KLine kline = 3;
+}
+
+message KLine {
+    int64 timestamp = 1;
+    double open = 2;
+    double high = 3;
+    double low = 4;
+    double close = 5;
+    double volume = 6;
+}
+
+message SubscribeOrderBookRequest {
+    string Symbol = 1;
+    optional int64 limit = 2;
+}
+
+message SubscribeOrderBookResponse {
+    int64 timestamp = 1;
+    string symbol = 2;
+    repeated PriceVolume bids = 3;
+    repeated PriceVolume asks = 4;
+}
+
+message PriceVolume {
+    int64 price = 1;
+    int64 volume = 2;
+}
+
+message SubscribeUserDataRequest {
+    repeated BalanceRequest balanceRequests = 1;
+}
+
+message BalanceRequest {
+    string exchange = 1;
+    string currency = 2;
+}
+
+message SubscribeUserDataResponse {
+    repeated Balance balances = 1;
+    repeated Order orders = 2;
+}
+
+message Balance {
+    string exchange = 1;
+    string currency = 2;
+    double quantity = 3;
+    double available = 4;
+}
+
+message CreateOrderRequest {
+    string exchange = 1;
+    string symbol = 2;
+    string side = 3;   // buy, sell
+    string order = 4;  // limit, limit maker, market, stop limit, stop market, ioc limit
+    double quantity = 5;
+    double price = 6;
+    optional double stopPrice = 7;
+    optional string timeInForce = 8;  // GTC, IOC, FOK
+}
+
+message CreateOrderResponse {
+    bool ok = 1;
+    Order order = 2;
+}
+
+message CancelOrderRequest {
+    string orderID = 1;
+}
+
+message CancelOrderResponse {
+    bool ok = 1;
+}
+
+message QueryOrderRequest {
+    string orderID = 1;
+}
+
+message QueryOrderResponse {
+    bool exists = 1;
+    Order order = 2;
+}
+
+message Order {
+    string orderID = 1;
+    string exchange = 2;
+    string symbol = 3;
+    string side = 4;   // buy, sell
+    string order = 5;  // limit, limit maker, market, stop limit, stop market, ioc limit
+    double quantity = 6;
+    double price = 7;
+    double stopPrice = 8;
+    string timeInForce = 9;  // GTC, IOC, FOK
+
+    string orderStatus = 10;  // new, filled, partially filled, canceled, rejected
+    double executedQuantity = 11;
+    bool isWorking = 12;
+    int64 creationTime = 13;
+    int64 updateTime = 14;
+}
+
+message QueryOpenOrdersRequest {}
+
+message QueryOpenOrdersResponse {}
+
+message QueryTradesRequest {
+    string exchange = 1;
+    string symbol = 2;
+    int64 since = 3;
+    int64 until = 4;
+    optional int64 order_id = 5;
+}
+
+message QueryTradesResponse {}
