@@ -793,6 +793,9 @@ func (dn Value) Int64() int64 {
 		if 0 < dn.exp && dn.exp < digitsMax &&
 			(dn.coef%pow10[digitsMax-dn.exp]) == 0 { // usual case
 			return int64(dn.sign) * int64(dn.coef/pow10[digitsMax-dn.exp])
+		} else if dn.exp <= 0 && dn.coef != 0 {
+			result := math.Log10(float64(dn.coef)) - float64(digitsMax) + float64(dn.exp)
+			return int64(dn.sign) * int64(math.Pow(10, result))
 		}
 		if dn.exp == digitsMax {
 			return int64(dn.sign) * int64(dn.coef)
