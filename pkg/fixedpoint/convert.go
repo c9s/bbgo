@@ -1,3 +1,5 @@
+//go:build !dnum
+
 package fixedpoint
 
 import (
@@ -6,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"math/big"
 	"strconv"
 	"sync/atomic"
 )
@@ -17,6 +18,37 @@ const DefaultPrecision = 8
 const DefaultPow = 1e8
 
 type Value int64
+
+const Zero = Value(0)
+const One = Value(1e8)
+const NegOne = Value(-1e8)
+
+type RoundingMode int
+
+const (
+	Up RoundingMode = iota
+	Down
+	HalfUp
+)
+
+// Trunc returns the integer portion (truncating any fractional part)
+func (v Value) Trunc() Value {
+	return NewFromFloat(math.Floor(v.Float64()))
+}
+
+func (v Value) Round(r int, mode RoundingMode) Value {
+	pow := math.Pow10(r)
+	result := v.Float64() * pow
+	switch mode {
+	case Up:
+		return NewFromFloat(math.Ceil(result) / pow)
+	case HalfUp:
+		return NewFromFloat(math.Floor(result+0.5) / pow)
+	case Down:
+		return NewFromFloat(math.Floor(result) / pow)
+	}
+	return v
+}
 
 func (v Value) Value() (driver.Value, error) {
 	return v.Float64(), nil
@@ -62,8 +94,22 @@ func (v Value) String() string {
 	return strconv.FormatFloat(float64(v)/DefaultPow, 'f', -1, 64)
 }
 
+func (v Value) FormatString(prec int) string {
+	return strconv.FormatFloat(float64(v)/DefaultPow, 'f', prec, 64)
+}
+
 func (v Value) Percentage() string {
-	return fmt.Sprintf("%.2f%%", v.Float64()*100.0)
+	if v == 0 {
+		return "0"
+	}
+	return strconv.FormatFloat(float64(v)/DefaultPow*100., 'f', -1, 64) + "%"
+}
+
+func (v Value) FormatPercentage(prec int) string {
+	if v == 0 {
+		return "0"
+	}
+	return strconv.FormatFloat(float64(v)/DefaultPow*100., 'f', prec, 64) + "%"
 }
 
 func (v Value) SignedPercentage() string {
@@ -78,33 +124,46 @@ func (v Value) Int64() int64 {
 }
 
 func (v Value) Int() int {
-	return int(v.Float64())
+	n := v.Int64()
+	if int64(int(n)) != n {
+		panic("unable to convert Value to int32")
+	}
+	return int(n)
 }
 
-// BigMul is the math/big version multiplication
-func (v Value) BigMul(v2 Value) Value {
-	x := new(big.Int).Mul(big.NewInt(int64(v)), big.NewInt(int64(v2)))
-	return Value(x.Int64() / DefaultPow)
+func (v Value) Neg() Value {
+	return -v
+}
+
+// TODO inf
+func (v Value) Sign() int {
+	if v > 0 {
+		return 1
+	} else if v == 0 {
+		return 0
+	} else {
+		return -1
+	}
+}
+
+func (v Value) IsZero() bool {
+	return v == 0
+}
+
+func Mul(x, y Value) Value {
+	return NewFromFloat(x.Float64() * y.Float64())
 }
 
 func (v Value) Mul(v2 Value) Value {
 	return NewFromFloat(v.Float64() * v2.Float64())
 }
 
-func (v Value) MulInt(v2 int) Value {
-	return NewFromFloat(v.Float64() * float64(v2))
-}
-
-func (v Value) MulFloat64(v2 float64) Value {
-	return NewFromFloat(v.Float64() * v2)
+func Div(x, y Value) Value {
+	return NewFromFloat(x.Float64() / y.Float64())
 }
 
 func (v Value) Div(v2 Value) Value {
 	return NewFromFloat(v.Float64() / v2.Float64())
-}
-
-func (v Value) DivFloat64(v2 float64) Value {
-	return NewFromFloat(v.Float64() / v2)
 }
 
 func (v Value) Floor() Value {
@@ -141,7 +200,7 @@ func (v *Value) UnmarshalYAML(unmarshal func(a interface{}) error) (err error) {
 
 	var i int64
 	if err = unmarshal(&i); err == nil {
-		*v = NewFromInt64(i)
+		*v = NewFromInt(i)
 		return
 	}
 
@@ -173,15 +232,13 @@ func (v *Value) UnmarshalJSON(data []byte) error {
 	switch d := a.(type) {
 	case float64:
 		*v = NewFromFloat(d)
-
 	case float32:
-		*v = NewFromFloat32(d)
-
-	case int:
-		*v = NewFromInt(d)
+		*v = NewFromFloat(float64(d))
 
 	case int64:
-		*v = NewFromInt64(d)
+		*v = NewFromInt(d)
+	case int:
+		*v = NewFromInt(int64(d))
 
 	case string:
 		v2, err := NewFromString(d)
@@ -197,14 +254,6 @@ func (v *Value) UnmarshalJSON(data []byte) error {
 	}
 
 	return nil
-}
-
-func Must(v Value, err error) Value {
-	if err != nil {
-		panic(err)
-	}
-
-	return v
 }
 
 var ErrPrecisionLoss = errors.New("precision loss")
@@ -271,20 +320,6 @@ func Parse(input string) (num int64, numDecimalPoints int, err error) {
 	return num, numDecimalPoints, nil
 }
 
-func NewFromAny(any interface{}) (Value, error) {
-	switch v := any.(type) {
-	case string:
-		return NewFromString(v)
-	case float64:
-		return NewFromFloat(v), nil
-	case int64:
-		return NewFromInt64(v), nil
-
-	default:
-		return 0, fmt.Errorf("fixedpoint unsupported type %v", v)
-	}
-}
-
 func NewFromString(input string) (Value, error) {
 	length := len(input)
 
@@ -317,23 +352,48 @@ func MustNewFromString(input string) Value {
 	return v
 }
 
+func NewFromBytes(input []byte) (Value, error) {
+	return NewFromString(string(input))
+}
+
+func MustNewFromBytes(input []byte) (v Value) {
+	var err error
+	if v, err = NewFromString(string(input)); err != nil {
+		return Zero
+	}
+	return v
+}
+
+func Must(v Value, err error) Value {
+	if err != nil {
+		panic(err)
+	}
+	return v
+}
+
 func NewFromFloat(val float64) Value {
 	return Value(int64(math.Round(val * DefaultPow)))
 }
 
-func NewFromFloat32(val float32) Value {
-	return Value(int64(math.Round(float64(val) * DefaultPow)))
-}
-
-func NewFromInt(val int) Value {
-	return Value(int64(val * DefaultPow))
-}
-
-func NewFromInt64(val int64) Value {
+func NewFromInt(val int64) Value {
 	return Value(val * DefaultPow)
 }
 
-func NumFractionalDigits(a Value) int {
+func (a Value) MulExp(exp int) Value {
+	return Value(int64(float64(a) * math.Pow(10, float64(exp))))
+}
+
+func (a Value) NumIntDigits() int {
+	digits := 0
+	target := int64(a)
+	for pow := int64(DefaultPow); pow <= target; pow *= 10 {
+		digits++
+	}
+	return digits
+}
+
+// TODO: speedup
+func (a Value) NumFractionalDigits() int {
 	numPow := 0
 	for pow := int64(DefaultPow); pow%10 != 1; pow /= 10 {
 		numPow++
@@ -343,6 +403,26 @@ func NumFractionalDigits(a Value) int {
 		numZeros++
 	}
 	return numPow - numZeros
+}
+
+func Compare(x, y Value) int {
+	if x > y {
+		return 1
+	} else if x == y {
+		return 0
+	} else {
+		return -1
+	}
+}
+
+func (x Value) Compare(y Value) int {
+	if x > y {
+		return 1
+	} else if x == y {
+		return 0
+	} else {
+		return -1
+	}
 }
 
 func Min(a, b Value) Value {
@@ -359,6 +439,14 @@ func Max(a, b Value) Value {
 	}
 
 	return b
+}
+
+func Equal(x, y Value) bool {
+	return x == y
+}
+
+func (x Value) Eq(y Value) bool {
+	return x == y
 }
 
 func Abs(a Value) Value {
