@@ -149,6 +149,12 @@ func (s *Strategy) generateGridSellOrders(session *bbgo.ExchangeSession) ([]type
 	numGrids := fixedpoint.NewFromInt(s.GridNum)
 	gridSpread := priceRange.Div(numGrids)
 
+	if gridSpread.IsZero() {
+		return nil, fmt.Errorf(
+			"either numGrids(%v) is too big or priceRange(%v) is too small, "+
+				"the differences of grid prices become zero", numGrids, priceRange)
+	}
+
 	// find the nearest grid price from the current price
 	startPrice := fixedpoint.Max(
 		s.LowerPrice,
@@ -156,9 +162,9 @@ func (s *Strategy) generateGridSellOrders(session *bbgo.ExchangeSession) ([]type
 			s.UpperPrice.Sub(currentPrice).Div(gridSpread).Trunc().Mul(gridSpread)))
 
 	if startPrice.Compare(s.UpperPrice) > 0 {
-		return nil, fmt.Errorf("current price %s exceeded the upper price boundary %s",
-			currentPrice.String(),
-			s.UpperPrice.String())
+		return nil, fmt.Errorf("current price %v exceeded the upper price boundary %v",
+			currentPrice,
+			s.UpperPrice)
 	}
 
 	balances := session.Account.Balances()
@@ -230,12 +236,19 @@ func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types
 	}
 
 	if currentPrice.Compare(s.LowerPrice) < 0 {
-		return nil, fmt.Errorf("current price %s is lower than the lower price %s", currentPrice.String(), s.LowerPrice.String())
+		return nil, fmt.Errorf("current price %v is lower than the lower price %v",
+			currentPrice, s.LowerPrice)
 	}
 
 	priceRange := s.UpperPrice.Sub(s.LowerPrice)
 	numGrids := fixedpoint.NewFromInt(s.GridNum)
 	gridSpread := priceRange.Div(numGrids)
+
+	if gridSpread.IsZero() {
+		return nil, fmt.Errorf(
+			"either numGrids(%v) is too big or priceRange(%v) is too small, "+
+				"the differences of grid prices become zero", numGrids, priceRange)
+	}
 
 	// Find the nearest grid price for placing buy orders:
 	// buyRange = currentPrice - lowerPrice
@@ -250,7 +263,7 @@ func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types
 			currentPrice.Sub(s.LowerPrice).Div(gridSpread).Trunc().Mul(gridSpread)))
 
 	if startPrice.Compare(s.LowerPrice) < 0 {
-		return nil, fmt.Errorf("current price %s exceeded the lower price boundary %v",
+		return nil, fmt.Errorf("current price %v exceeded the lower price boundary %v",
 			currentPrice,
 			s.UpperPrice)
 	}

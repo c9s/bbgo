@@ -316,7 +316,7 @@ func (a *Account) UseLockedBalance(currency string, fund fixedpoint.Value) error
 	return fmt.Errorf("trying to use more than locked: locked %v < want to use %v", balance.Locked, fund)
 }
 
-var QuantityDelta = fixedpoint.MustNewFromString("0.0000000000001")
+var QuantityDelta = fixedpoint.MustNewFromString("0.00000000001")
 
 func (a *Account) UnlockBalance(currency string, unlocked fixedpoint.Value) error {
 	a.Lock()
