@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
-	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 const ID = "pricealert"
@@ -19,8 +19,8 @@ type Strategy struct {
 	bbgo.Notifiability
 
 	// These fields will be filled from the config file (it translates YAML to JSON)
-	Symbol    string  `json:"symbol"`
-	Interval  string  `json:"interval"`
+	Symbol    string           `json:"symbol"`
+	Interval  string           `json:"interval"`
 	MinChange fixedpoint.Value `json:"minChange"`
 }
 

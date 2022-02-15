@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
 )
 
 const Delta = 1e-9
@@ -200,4 +199,3 @@ func TestPercentageScale(t *testing.T) {
 		assert.InDelta(t, 100.0, v, Delta)
 	})
 }
-

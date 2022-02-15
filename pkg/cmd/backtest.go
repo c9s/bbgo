@@ -21,15 +21,15 @@ import (
 	"github.com/c9s/bbgo/pkg/backtest"
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 type BackTestReport struct {
 	Symbol          string                    `json:"symbol,omitempty"`
-	LastPrice       fixedpoint.Value                   `json:"lastPrice,omitempty"`
-	StartPrice      fixedpoint.Value                   `json:"startPrice,omitempty"`
+	LastPrice       fixedpoint.Value          `json:"lastPrice,omitempty"`
+	StartPrice      fixedpoint.Value          `json:"startPrice,omitempty"`
 	PnLReport       *pnl.AverageCostPnlReport `json:"pnlReport,omitempty"`
 	InitialBalances types.BalanceMap          `json:"initialBalances,omitempty"`
 	FinalBalances   types.BalanceMap          `json:"finalBalances,omitempty"`

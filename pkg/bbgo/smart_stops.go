@@ -115,7 +115,7 @@ func (c *TrailingStopController) Run(ctx context.Context, session *ExchangeSessi
 			// if the profit rate is defined, and it is less than our minimum profit rate, we skip stop
 			if c.MinProfit.Sign() > 0 &&
 				closePrice.Compare(c.averageCost) < 0 ||
-					changeRate(closePrice, c.averageCost).Compare(c.MinProfit) < 0 {
+				changeRate(closePrice, c.averageCost).Compare(c.MinProfit) < 0 {
 				return
 			}
 

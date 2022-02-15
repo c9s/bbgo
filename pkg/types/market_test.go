@@ -5,11 +5,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/stretchr/testify/assert"
 )
 
-var s func(string)fixedpoint.Value = fixedpoint.MustNewFromString
+var s func(string) fixedpoint.Value = fixedpoint.MustNewFromString
 
 func TestFormatQuantity(t *testing.T) {
 	quantity := formatQuantity(
@@ -53,7 +53,7 @@ func TestDurationParse(t *testing.T) {
 		{
 			name:     "float64 to second",
 			input:    `{ "duration": 1.1 }`,
-			expected: Duration(time.Second + 100 * time.Millisecond),
+			expected: Duration(time.Second + 100*time.Millisecond),
 		},
 		{
 			name:     "2m",
@@ -63,7 +63,7 @@ func TestDurationParse(t *testing.T) {
 		{
 			name:     "2m3s",
 			input:    `{ "duration": "2m3s" }`,
-			expected: Duration(2 * time.Minute + 3 * time.Second),
+			expected: Duration(2*time.Minute + 3*time.Second),
 		},
 	}
 	for _, test := range tests {

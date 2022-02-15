@@ -22,7 +22,6 @@ type Strategy struct {
 
 	Notifiability *bbgo.Notifiability
 
-
 	TotalAmount fixedpoint.Value `json:"totalAmount,omitempty"`
 
 	// Interval is the period that you want to submit order

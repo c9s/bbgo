@@ -670,7 +670,7 @@ func calculateBandPercentage(up, down, sma, midPrice float64) float64 {
 		return (midPrice - sma) / math.Abs(sma-down)
 	} else if midPrice > sma {
 		// should be positive percentage
-		return (midPrice - sma) / math.Abs(up - sma)
+		return (midPrice - sma) / math.Abs(up-sma)
 	}
 
 	return 0.0

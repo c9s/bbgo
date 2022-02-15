@@ -232,7 +232,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 		// to make bid orders, we need enough base asset in the foreign exchange,
 		// if the base asset balance is not enough for selling
 		if s.StopHedgeBaseBalance.Sign() > 0 {
-            minAvailable := s.StopHedgeBaseBalance.Add(s.sourceMarket.MinQuantity)
+			minAvailable := s.StopHedgeBaseBalance.Add(s.sourceMarket.MinQuantity)
 			if b.Available.Compare(minAvailable) > 0 {
 				hedgeQuota.BaseAsset.Add(b.Available.Sub(minAvailable))
 			} else {
@@ -467,6 +467,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 
 var lastPriceModifier = fixedpoint.NewFromFloat(1.001)
 var minGap = fixedpoint.NewFromFloat(1.02)
+
 func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	side := types.SideTypeBuy
 	if pos.IsZero() {

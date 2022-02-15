@@ -1,13 +1,13 @@
 package indicator
 
 import (
-	"testing"
 	"encoding/json"
+	"testing"
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 const Delta = 1e-9
@@ -33,7 +33,7 @@ func Test_calculateOBV(t *testing.T) {
 		want   types.Float64Slice
 	}{
 		{
-			name:   "trivial_case",
+			name: "trivial_case",
 			kLines: buildKLines(
 				[]fixedpoint.Value{fixedpoint.Zero}, []fixedpoint.Value{fixedpoint.One},
 			),
@@ -53,7 +53,7 @@ func Test_calculateOBV(t *testing.T) {
 			obv := OBV{IntervalWindow: types.IntervalWindow{Window: tt.window}}
 			obv.calculateAndUpdate(tt.kLines)
 			assert.Equal(t, len(obv.Values), len(tt.want))
-			for i, v := range(obv.Values) {
+			for i, v := range obv.Values {
 				assert.InDelta(t, v, tt.want[i], Delta)
 			}
 		})

@@ -6,11 +6,12 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
-	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 const ID = "skeleton"
+
 var log = logrus.WithField("strategy", ID)
 
 func init() {
@@ -25,7 +26,6 @@ func (s *Strategy) ID() string {
 	return ID
 }
 
-
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	log.Infof("subscribe %s", s.Symbol)
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
@@ -35,7 +35,7 @@ var Ten = fixedpoint.NewFromInt(10)
 
 // This strategy simply spent all available quote currency to buy the symbol whenever kline gets closed
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-    market, ok := session.Market(s.Symbol)
+	market, ok := session.Market(s.Symbol)
 	if !ok {
 		log.Warnf("fetch market fail %s", s.Symbol)
 		return nil
@@ -73,7 +73,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		log.Infof("connected")
 	})
 
-    session.MarketDataStream.OnKLineClosed(callback)
+	session.MarketDataStream.OnKLineClosed(callback)
 
 	return nil
 }

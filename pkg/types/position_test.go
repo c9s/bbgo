@@ -129,10 +129,10 @@ func TestPosition(t *testing.T) {
 			},
 			expectedAverageCost: fixedpoint.NewFromFloat(1000.0 * 0.01).
 				Div(fixedpoint.NewFromFloat(0.01).Mul(fixedpoint.One.Sub(feeRateValue))),
-			expectedBase:        fixedpoint.NewFromFloat(0.01).
+			expectedBase: fixedpoint.NewFromFloat(0.01).
 				Sub(fixedpoint.NewFromFloat(0.01).Mul(feeRateValue)),
-			expectedQuote:       fixedpoint.NewFromFloat(0 - 1000.0*0.01),
-			expectedProfit:      fixedpoint.Zero,
+			expectedQuote:  fixedpoint.NewFromFloat(0 - 1000.0*0.01),
+			expectedProfit: fixedpoint.Zero,
 		},
 		{
 			name: "quote fee",
@@ -149,9 +149,9 @@ func TestPosition(t *testing.T) {
 			expectedAverageCost: fixedpoint.NewFromFloat(1000.0 * 0.01).
 				Mul(fixedpoint.One.Sub(feeRateValue)).
 				Div(fixedpoint.NewFromFloat(0.01)),
-			expectedBase:        fixedpoint.NewFromFloat(-0.01),
-			expectedQuote:       fixedpoint.NewFromFloat(0.0 + 1000.0 * 0.01 * (1.0 - feeRate)),
-			expectedProfit:      fixedpoint.Zero,
+			expectedBase:   fixedpoint.NewFromFloat(-0.01),
+			expectedQuote:  fixedpoint.NewFromFloat(0.0 + 1000.0*0.01*(1.0-feeRate)),
+			expectedProfit: fixedpoint.Zero,
 		},
 		{
 			name: "long",

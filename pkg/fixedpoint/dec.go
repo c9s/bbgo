@@ -166,7 +166,7 @@ func NewFromFloat(f float64) Value {
 	}
 	_, e := math.Frexp(f)
 	e = int(float32(e) / log2of10)
-	c := uint64(f / math.Pow(10, float64(e-16)))
+	c := uint64(f/math.Pow10(e-16) + 0.5)
 	return newNoSignCheck(sign, c, e)
 }
 
@@ -995,8 +995,9 @@ func (v *Value) UnmarshalYAML(unmarshal func(a interface{}) error) (err error) {
 	return err
 }
 
+// FIXME: should we limit to 8 prec?
 func (v Value) MarshalJSON() ([]byte, error) {
-	return []byte(v.String()), nil
+	return []byte(v.FormatString(8)), nil
 }
 
 func (v *Value) UnmarshalJSON(data []byte) error {

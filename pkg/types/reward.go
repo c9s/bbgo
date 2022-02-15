@@ -33,10 +33,12 @@ type Reward struct {
 }
 
 type RewardSlice []Reward
+
 func (s RewardSlice) Len() int      { return len(s) }
 func (s RewardSlice) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 
 type RewardSliceByCreationTime RewardSlice
+
 func (s RewardSliceByCreationTime) Len() int      { return len(s) }
 func (s RewardSliceByCreationTime) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 

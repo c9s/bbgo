@@ -16,7 +16,7 @@ type State struct {
 
 type ProfitStats struct {
 	bbgo.ProfitStats
-	lock			sync.Mutex
+	lock sync.Mutex
 
 	MakerExchange types.ExchangeName `json:"makerExchange"`
 

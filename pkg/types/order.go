@@ -10,8 +10,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/slack-go/slack"
 
-	"github.com/c9s/bbgo/pkg/util"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 func init() {
@@ -186,8 +186,8 @@ func (o SubmitOrder) SlackAttachment() slack.Attachment {
 }
 
 type OrderQuery struct {
-	Symbol string
-	OrderID string
+	Symbol        string
+	OrderID       string
 	ClientOrderID string
 }
 
@@ -201,11 +201,11 @@ type Order struct {
 	OrderID uint64 `json:"orderID" db:"order_id"` // order id
 	UUID    string `json:"uuid,omitempty"`
 
-	Status           OrderStatus `json:"status" db:"status"`
-	ExecutedQuantity fixedpoint.Value     `json:"executedQuantity" db:"executed_quantity"`
-	IsWorking        bool        `json:"isWorking" db:"is_working"`
-	CreationTime     Time        `json:"creationTime" db:"created_at"`
-	UpdateTime       Time        `json:"updateTime" db:"updated_at"`
+	Status           OrderStatus      `json:"status" db:"status"`
+	ExecutedQuantity fixedpoint.Value `json:"executedQuantity" db:"executed_quantity"`
+	IsWorking        bool             `json:"isWorking" db:"is_working"`
+	CreationTime     Time             `json:"creationTime" db:"created_at"`
+	UpdateTime       Time             `json:"updateTime" db:"updated_at"`
 
 	IsMargin   bool `json:"isMargin" db:"is_margin"`
 	IsIsolated bool `json:"isIsolated" db:"is_isolated"`
