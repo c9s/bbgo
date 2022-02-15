@@ -86,85 +86,10 @@ func TestFromString(t *testing.T) {
 	assert.Equal(t, "0.004075", f.String())
 	f = MustNewFromString("0.03")
 	assert.Equal(t, "0.03", f.String())
-}
 
-func TestDelta(t *testing.T) {
-	f1 := MustNewFromString("0.0009763593380614657")
-	f2 := NewFromInt(42300)
-	assert.InDelta(t, f1.Mul(f2).Float64(), 41.3, 1e-14)
+	f = MustNewFromString("0.75%")
+	assert.Equal(t, "0.0075", f.String())
 }
-
-// Not used
-/*func TestParse(t *testing.T) {
-	type args struct {
-		input string
-	}
-	tests := []struct {
-		name                 string
-		args                 args
-		wantNum              int64
-		wantNumDecimalPoints int
-		wantErr              bool
-	}{
-		{
-			args:                 args{input: "-99.9"},
-			wantNum:              -999,
-			wantNumDecimalPoints: 1,
-			wantErr:              false,
-		},
-		{
-			args:                 args{input: "0.75%"},
-			wantNum:              75,
-			wantNumDecimalPoints: 4,
-			wantErr:              false,
-		},
-		{
-			args:                 args{input: "0.12345678"},
-			wantNum:              12345678,
-			wantNumDecimalPoints: 8,
-			wantErr:              false,
-		},
-		{
-			args:                 args{input: "a"},
-			wantNum:              0,
-			wantNumDecimalPoints: 0,
-			wantErr:              true,
-		},
-		{
-			args:                 args{input: "0.1"},
-			wantNum:              1,
-			wantNumDecimalPoints: 1,
-			wantErr:              false,
-		},
-		{
-			args:                 args{input: "100"},
-			wantNum:              100,
-			wantNumDecimalPoints: 0,
-			wantErr:              false,
-		},
-		{
-			args:                 args{input: "100.9999"},
-			wantNum:              1009999,
-			wantNumDecimalPoints: 4,
-			wantErr:              false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			gotNum, gotNumDecimalPoints, err := Parse(tt.args.input)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Parse() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if gotNum != tt.wantNum {
-				t.Errorf("Parse() gotNum = %v, want %v", gotNum, tt.wantNum)
-			}
-			if gotNumDecimalPoints != tt.wantNumDecimalPoints {
-				t.Errorf("Parse() gotNumDecimalPoints = %v, want %v", gotNumDecimalPoints, tt.wantNumDecimalPoints)
-			}
-		})
-	}
-}*/
 
 func TestNumFractionalDigits(t *testing.T) {
 	tests := []struct {
@@ -172,11 +97,6 @@ func TestNumFractionalDigits(t *testing.T) {
 		v    Value
 		want int
 	}{
-		{
-			name: "over the default precision",
-			v:    MustNewFromString("0.123456789"),
-			want: 9,
-		},
 		{
 			name: "ignore the integer part",
 			v:    MustNewFromString("123.4567"),

@@ -1,3 +1,5 @@
+//go:build dnum
+
 package fixedpoint
 
 import (
@@ -1026,8 +1028,7 @@ func Must(v Value, err error) Value {
 
 // v * 10^(exp)
 func (v Value) MulExp(exp int) Value {
-	v.exp += exp
-	return v
+	return Value{v.coef, v.sign, v.exp + exp}
 }
 
 // Sub returns the difference of two Value's
