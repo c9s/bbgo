@@ -58,8 +58,6 @@ var SyncCmd = &cobra.Command{
 			return err
 		}
 
-
-
 		sessionName, err := cmd.Flags().GetString("session")
 		if err != nil {
 			return err

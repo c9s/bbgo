@@ -1,4 +1,4 @@
-// +build web
+//go:build web
 
 package server
 

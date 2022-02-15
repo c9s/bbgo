@@ -6,8 +6,8 @@ import (
 
 	"github.com/slack-go/slack"
 
-	"github.com/c9s/bbgo/pkg/util"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 type Direction int
@@ -136,7 +136,6 @@ func (k KLine) GetMaxChange() fixedpoint.Value {
 func (k KLine) GetAmplification() fixedpoint.Value {
 	return k.GetMaxChange().Div(k.GetLow())
 }
-
 
 // GetThickness returns the thickness of the kline. 1 => thick, 0.1 => thin
 func (k KLine) GetThickness() fixedpoint.Value {
@@ -416,7 +415,7 @@ func (k KLineWindow) GetBody() fixedpoint.Value {
 }
 
 func (k KLineWindow) GetThickness() fixedpoint.Value {
-    out := k.GetChange().Div(k.GetMaxChange())
+	out := k.GetChange().Div(k.GetMaxChange())
 	if out.Sign() < 0 {
 		return out.Neg()
 	}
@@ -471,7 +470,7 @@ func (k KLineWindow) SlackAttachment() slack.Attachment {
 	return slack.Attachment{
 		Text:  fmt.Sprintf("*%s* KLineWindow %s x %d", first.Symbol, first.Interval, windowSize),
 		Color: k.Color(),
-		Fields: []slack.AttachmentField {
+		Fields: []slack.AttachmentField{
 			{Title: "Open", Value: util.FormatValue(k.GetOpen(), 2), Short: true},
 			{Title: "High", Value: util.FormatValue(k.GetHigh(), 2), Short: true},
 			{Title: "Low", Value: util.FormatValue(k.GetLow(), 2), Short: true},

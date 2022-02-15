@@ -32,4 +32,3 @@ func IsFiatCurrency(currency string) bool {
 	}
 	return false
 }
-

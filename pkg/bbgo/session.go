@@ -173,8 +173,8 @@ type ExchangeSession struct {
 
 	// Withdrawal is used for enabling withdrawal functions
 	Withdrawal   bool             `json:"withdrawal,omitempty" yaml:"withdrawal,omitempty"`
-	MakerFeeRate fixedpoint.Value `json:"makerFeeRate,omitempty" yaml:"makerFeeRate,omitempty"`
-	TakerFeeRate fixedpoint.Value `json:"takerFeeRate,omitempty" yaml:"takerFeeRate,omitempty"`
+	MakerFeeRate fixedpoint.Value `json:"makerFeeRate" yaml:"makerFeeRate"`
+	TakerFeeRate fixedpoint.Value `json:"takerFeeRate" yaml:"takerFeeRate"`
 
 	PublicOnly           bool   `json:"publicOnly,omitempty" yaml:"publicOnly"`
 	Margin               bool   `json:"margin,omitempty" yaml:"margin"`

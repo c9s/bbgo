@@ -1,9 +1,9 @@
 package types
 
 import (
-	"testing"
-	"github.com/stretchr/testify/assert"
 	"encoding/json"
+	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
 func TestKLineWindow_Tail(t *testing.T) {
@@ -34,7 +34,7 @@ func TestKLineWindow_Tail(t *testing.T) {
 }
 
 func TestKLineWindow_Truncate(t *testing.T) {
-    var jsonWin = []byte(`[
+	var jsonWin = []byte(`[
       {"open": 11600.0, "close": 11600.0, "high": 11600.0, "low": 11600.0},
 	  {"open": 11601.0, "close": 11600.0, "high": 11600.0, "low": 11600.0},
 	  {"open": 11602.0, "close": 11600.0, "high": 11600.0, "low": 11600.0},

@@ -29,9 +29,9 @@ func Test_trimTrailingZero(t *testing.T) {
 		{
 			name: "non trailing zero",
 			args: args{
-				a: "1.0001234567",
+				a: "1.00012345",
 			},
-			want: "1.0001234567",
+			want: "1.00012345",
 		},
 		{
 			name: "integer",

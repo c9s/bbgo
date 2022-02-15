@@ -14,6 +14,7 @@ import (
 	_ "github.com/c9s/bbgo/pkg/strategy/pricedrop"
 	_ "github.com/c9s/bbgo/pkg/strategy/rebalance"
 	_ "github.com/c9s/bbgo/pkg/strategy/schedule"
+	_ "github.com/c9s/bbgo/pkg/strategy/skeleton"
 	_ "github.com/c9s/bbgo/pkg/strategy/support"
 	_ "github.com/c9s/bbgo/pkg/strategy/swing"
 	_ "github.com/c9s/bbgo/pkg/strategy/techsignal"
@@ -22,5 +23,4 @@ import (
 	_ "github.com/c9s/bbgo/pkg/strategy/xmaker"
 	_ "github.com/c9s/bbgo/pkg/strategy/xnav"
 	_ "github.com/c9s/bbgo/pkg/strategy/xpuremaker"
-	_ "github.com/c9s/bbgo/pkg/strategy/skeleton"
 )

@@ -3,8 +3,8 @@
 package fixedpoint
 
 import (
+	"bytes"
 	"database/sql/driver"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -57,7 +57,7 @@ func (v Value) Value() (driver.Value, error) {
 func (v *Value) Scan(src interface{}) error {
 	switch d := src.(type) {
 	case int64:
-		*v = Value(d)
+		*v = NewFromInt(d)
 		return nil
 
 	case float64:
@@ -95,7 +95,8 @@ func (v Value) String() string {
 }
 
 func (v Value) FormatString(prec int) string {
-	return strconv.FormatFloat(float64(v)/DefaultPow, 'f', prec, 64)
+	result := strconv.FormatFloat(float64(v)/DefaultPow, 'f', prec+1, 64)
+	return result[:len(result)-1]
 }
 
 func (v Value) Percentage() string {
@@ -109,7 +110,8 @@ func (v Value) FormatPercentage(prec int) string {
 	if v == 0 {
 		return "0"
 	}
-	return strconv.FormatFloat(float64(v)/DefaultPow*100., 'f', prec, 64) + "%"
+	result := strconv.FormatFloat(float64(v)/DefaultPow*100., 'f', prec+1, 64)
+	return result[:len(result)-1] + "%"
 }
 
 func (v Value) SignedPercentage() string {
@@ -223,36 +225,21 @@ func (v Value) MarshalJSON() ([]byte, error) {
 }
 
 func (v *Value) UnmarshalJSON(data []byte) error {
-	var a interface{}
-	var err = json.Unmarshal(data, &a)
-	if err != nil {
+	if bytes.Compare(data, []byte{'n', 'u', 'l', 'l'}) == 0 {
+		*v = Zero
+		return nil
+	}
+	if len(data) == 0 {
+		*v = Zero
+		return nil
+	}
+	var err error
+	if data[0] == '"' {
+		data = data[1 : len(data)-1]
+	}
+	if *v, err = NewFromString(string(data)); err != nil {
 		return err
 	}
-
-	switch d := a.(type) {
-	case float64:
-		*v = NewFromFloat(d)
-	case float32:
-		*v = NewFromFloat(float64(d))
-
-	case int64:
-		*v = NewFromInt(d)
-	case int:
-		*v = NewFromInt(int64(d))
-
-	case string:
-		v2, err := NewFromString(d)
-		if err != nil {
-			return err
-		}
-
-		*v = v2
-
-	default:
-		return fmt.Errorf("unsupported type: %T %v", d, d)
-
-	}
-
 	return nil
 }
 

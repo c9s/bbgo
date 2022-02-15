@@ -6,8 +6,8 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/c9s/bbgo/pkg/exchange/ftx"
-	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 func inQuoteAsset(balances types.BalanceMap, market types.Market, price fixedpoint.Value) fixedpoint.Value {

@@ -5,8 +5,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 func TestTradeCollector_ShouldNotCountDuplicatedTrade(t *testing.T) {
@@ -31,12 +31,12 @@ func TestTradeCollector_ShouldNotCountDuplicatedTrade(t *testing.T) {
 	assert.Equal(t, 1, len(collector.tradeStore.Trades()), "should have one trade in the trade store")
 
 	orderStore.Add(types.Order{
-		SubmitOrder:      types.SubmitOrder{
-			Symbol:           "BTCUSDT",
-			Side:             types.SideTypeBuy,
-			Type:             types.OrderTypeLimit,
-			Quantity:         fixedpoint.One,
-			Price:            fixedpoint.NewFromInt(40000),
+		SubmitOrder: types.SubmitOrder{
+			Symbol:   "BTCUSDT",
+			Side:     types.SideTypeBuy,
+			Type:     types.OrderTypeLimit,
+			Quantity: fixedpoint.One,
+			Price:    fixedpoint.NewFromInt(40000),
 		},
 		Exchange:         types.ExchangeBinance,
 		OrderID:          399,

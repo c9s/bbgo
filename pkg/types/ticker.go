@@ -1,8 +1,8 @@
 package types
 
 import (
-	"time"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"time"
 )
 
 type Ticker struct {

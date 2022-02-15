@@ -162,7 +162,7 @@ func (s *Strategy) generateOrders(symbol string, side types.SideType, price, pri
 	}
 
 	decdigits := priceTick.Abs().NumIntDigits()
-	step := priceTick.Abs().MulExp(-decdigits+1)
+	step := priceTick.Abs().MulExp(-decdigits + 1)
 
 	for i := 0; i < numOrders; i++ {
 		quantityExp := fixedpoint.NewFromFloat(math.Exp(expBase.Float64()))
@@ -190,7 +190,7 @@ func (s *Strategy) generateOrders(symbol string, side types.SideType, price, pri
 		}
 
 		price = price.Add(priceTick)
-        expBase = expBase.Add(step)
+		expBase = expBase.Add(step)
 	}
 
 	return orders

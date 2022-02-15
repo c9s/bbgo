@@ -8,9 +8,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/interact"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 type PositionCloser interface {
@@ -128,7 +128,7 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 			}
 		}
 
-		if kc, ok := reply.(interact.KeyboardController) ; ok {
+		if kc, ok := reply.(interact.KeyboardController); ok {
 			kc.RemoveKeyboard()
 		}
 
@@ -176,7 +176,7 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 
 				if position.Base.IsZero() {
 					reply.Message("No opened position")
-					if kc, ok := reply.(interact.KeyboardController) ; ok {
+					if kc, ok := reply.(interact.KeyboardController); ok {
 						kc.RemoveKeyboard()
 					}
 					return fmt.Errorf("no opened position")
@@ -197,7 +197,7 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 			return err
 		}
 
-		if kc, ok := reply.(interact.KeyboardController) ; ok {
+		if kc, ok := reply.(interact.KeyboardController); ok {
 			kc.RemoveKeyboard()
 		}
 

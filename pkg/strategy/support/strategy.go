@@ -33,8 +33,8 @@ type State struct {
 }
 
 type Target struct {
-	ProfitPercentage      fixedpoint.Value                         `json:"profitPercentage"`
-	QuantityPercentage    fixedpoint.Value                         `json:"quantityPercentage"`
+	ProfitPercentage      fixedpoint.Value                `json:"profitPercentage"`
+	QuantityPercentage    fixedpoint.Value                `json:"quantityPercentage"`
 	MarginOrderSideEffect types.MarginOrderSideEffectType `json:"marginOrderSideEffect"`
 }
 
@@ -295,7 +295,7 @@ func (s *Strategy) calculateQuantity(session *bbgo.ExchangeSession, side types.S
 	baseBalance, _ := session.Account.Balance(s.Market.BaseCurrency)
 	if side == types.SideTypeSell {
 		// quantity = bbgo.AdjustQuantityByMaxAmount(quantity, closePrice, quota)
-		if s.MinBaseAssetBalance.Sign() > 0 && 
+		if s.MinBaseAssetBalance.Sign() > 0 &&
 			baseBalance.Total().Sub(quantity).Compare(s.MinBaseAssetBalance) < 0 {
 			quota := baseBalance.Available.Sub(s.MinBaseAssetBalance)
 			quantity = bbgo.AdjustQuantityByMaxAmount(quantity, closePrice, quota)

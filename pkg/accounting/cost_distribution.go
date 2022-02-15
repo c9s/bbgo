@@ -7,8 +7,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 func zero(a float64) bool {
@@ -57,15 +57,15 @@ type StockDistribution struct {
 }
 
 type DistributionStats struct {
-	PriceLevels   []string              `json:"priceLevels"`
-	TotalQuantity fixedpoint.Value               `json:"totalQuantity"`
-	Quantities    map[string]fixedpoint.Value    `json:"quantities"`
-	Stocks        map[string]StockSlice `json:"stocks"`
+	PriceLevels   []string                    `json:"priceLevels"`
+	TotalQuantity fixedpoint.Value            `json:"totalQuantity"`
+	Quantities    map[string]fixedpoint.Value `json:"quantities"`
+	Stocks        map[string]StockSlice       `json:"stocks"`
 }
 
 func (m *StockDistribution) DistributionStats(level int) *DistributionStats {
 	var d = DistributionStats{
-		Quantities: map[string]fixedpoint.Value {},
+		Quantities: map[string]fixedpoint.Value{},
 		Stocks:     map[string]StockSlice{},
 	}
 

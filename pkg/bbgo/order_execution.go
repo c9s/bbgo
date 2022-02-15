@@ -217,7 +217,7 @@ func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...
 			accumulativeQuoteAmount = accumulativeQuoteAmount.Add(notional)
 
 		case types.SideTypeSell:
-	        minNotion := market.MinNotional.Mul(increaseFactor)
+			minNotion := market.MinNotional.Mul(increaseFactor)
 
 			// Critical conditions for placing SELL orders
 			baseAssetBalance, ok := balances[market.BaseCurrency]

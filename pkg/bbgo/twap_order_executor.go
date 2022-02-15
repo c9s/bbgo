@@ -283,7 +283,7 @@ func (e *TwapExecution) updateOrder(ctx context.Context) error {
 }
 
 func (e *TwapExecution) cancelActiveOrders() {
-	gracefulCtx, gracefulCancel := context.WithTimeout(context.TODO(), 30 * time.Second)
+	gracefulCtx, gracefulCancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer gracefulCancel()
 	e.activeMakerOrders.GracefulCancel(gracefulCtx, e.Session.Exchange)
 }

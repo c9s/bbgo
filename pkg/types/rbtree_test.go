@@ -9,7 +9,7 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
-var itov func(int64)fixedpoint.Value = fixedpoint.NewFromInt
+var itov func(int64) fixedpoint.Value = fixedpoint.NewFromInt
 
 func TestRBTree_InsertAndDelete(t *testing.T) {
 	tree := NewRBTree()

@@ -13,7 +13,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func NewExchangePublic(exchangeName types.ExchangeName) (types.Exchange, error){
+func NewExchangePublic(exchangeName types.ExchangeName) (types.Exchange, error) {
 	return NewExchangeStandard(exchangeName, "", "", "", "")
 }
 

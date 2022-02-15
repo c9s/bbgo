@@ -130,7 +130,6 @@ func (s *Strategy) listenToFundingRate(ctx context.Context, exchange *binance.Ex
 				}
 			}
 
-
 			previousIndex = index
 			if fundingRate24HoursLowIndex != nil {
 				if fundingRate24HoursLowIndex.Time.Before(time.Now().Add(24 * time.Hour)) {

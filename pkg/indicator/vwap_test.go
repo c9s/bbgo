@@ -1,13 +1,14 @@
 package indicator
 
 import (
+	"encoding/json"
 	"math"
 	"testing"
-	"encoding/json"
 
-	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
 )
+
 var trivialPrices = []byte(`[0]`)
 var trivialVolumes = []byte(`[1]`)
 var easyPrices = []byte(`[1, 2, 3]`)

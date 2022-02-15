@@ -1,12 +1,12 @@
 package indicator
 
 import (
+	"encoding/json"
 	"math"
 	"testing"
-	"encoding/json"
 
-	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 // generated from:
@@ -1030,7 +1030,7 @@ func Test_calculateEWMA(t *testing.T) {
 		priceF    KLinePriceMapper
 		window    int
 	}
-	var input []fixedpoint.Value;
+	var input []fixedpoint.Value
 	if err := json.Unmarshal(ethusdt5m, &input); err != nil {
 		panic(err)
 	}
