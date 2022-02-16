@@ -7,8 +7,8 @@ option go_package = "pkg/protobuf";
 service BBGO {
     // should support streaming
     rpc SubscribeKLine(SubscribeKLineRequest) returns (stream SubscribeKLineResponse) {}
-    rpc SubscribeOrderBook(SubscribeOrderBookRequest) returns (SubscribeOrderBookResponse) {}
-    rpc SubscribeUserData(SubscribeUserDataRequest) returns (SubscribeUserDataResponse) {}
+    rpc SubscribeOrderBook(SubscribeOrderBookRequest) returns (stream SubscribeOrderBookResponse) {}
+    rpc SubscribeUserData(SubscribeUserDataRequest) returns (stream SubscribeUserDataResponse) {}
 
     // request-response
     rpc CreateOrder(CreateOrderRequest) returns (CreateOrderResponse) {}
@@ -29,7 +29,7 @@ message SubscribeKLineRequest {
 message SubscribeKLineResponse {
     string exchange = 1;
     string symbol = 2;
-    KLine kline = 3;
+    repeated KLine klines = 3;
 }
 
 message KLine {
@@ -42,7 +42,7 @@ message KLine {
 }
 
 message SubscribeOrderBookRequest {
-    string Symbol = 1;
+    string symbol = 1;
     optional int64 limit = 2;
 }
 
@@ -59,7 +59,7 @@ message PriceVolume {
 }
 
 message SubscribeUserDataRequest {
-    repeated BalanceRequest balanceRequests = 1;
+    repeated BalanceRequest balance_requests = 1;
 }
 
 message BalanceRequest {
@@ -86,8 +86,8 @@ message CreateOrderRequest {
     string order = 4;  // limit, limit maker, market, stop limit, stop market, ioc limit
     double quantity = 5;
     double price = 6;
-    optional double stopPrice = 7;
-    optional string timeInForce = 8;  // GTC, IOC, FOK
+    optional double stop_price = 7;
+    optional string time_in_force = 8;  // GTC, IOC, FOK
 }
 
 message CreateOrderResponse {
@@ -96,7 +96,7 @@ message CreateOrderResponse {
 }
 
 message CancelOrderRequest {
-    string orderID = 1;
+    string order_id = 1;
 }
 
 message CancelOrderResponse {
@@ -104,7 +104,7 @@ message CancelOrderResponse {
 }
 
 message QueryOrderRequest {
-    string orderID = 1;
+    string order_id = 1;
 }
 
 message QueryOrderResponse {
@@ -113,26 +113,31 @@ message QueryOrderResponse {
 }
 
 message Order {
-    string orderID = 1;
+    string order_id = 1;
     string exchange = 2;
     string symbol = 3;
     string side = 4;   // buy, sell
     string order = 5;  // limit, limit maker, market, stop limit, stop market, ioc limit
     double quantity = 6;
     double price = 7;
-    double stopPrice = 8;
-    string timeInForce = 9;  // GTC, IOC, FOK
+    double stop_price = 8;
+    string time_in_force = 9;  // GTC, IOC, FOK
 
-    string orderStatus = 10;  // new, filled, partially filled, canceled, rejected
-    double executedQuantity = 11;
+    string order_status = 10;  // new, filled, partially filled, canceled, rejected
+    double executed_quantity = 11;
     bool isWorking = 12;
-    int64 creationTime = 13;
-    int64 updateTime = 14;
+    int64 creation_time = 13;
+    int64 update_time = 14;
 }
 
-message QueryOpenOrdersRequest {}
+message QueryOpenOrdersRequest {
+    string order_id = 1;
+}
 
-message QueryOpenOrdersResponse {}
+message QueryOpenOrdersResponse {
+    bool exists = 1;
+    Order order = 2;
+}
 
 message QueryTradesRequest {
     string exchange = 1;
@@ -142,4 +147,21 @@ message QueryTradesRequest {
     optional int64 order_id = 5;
 }
 
-message QueryTradesResponse {}
+message QueryTradesResponse {
+    repeated Trade trades = 1;
+}
+
+message Trade {
+    string order_id = 1;
+    string exchange = 2;
+    string symbol = 3;
+    string side = 4;  // buy, sell
+    double quantity = 5;
+    double quote_quantity = 6;
+    double price = 7;
+    bool is_buyer = 8;
+    bool is_maker = 9;
+    int64 trade_at = 10;
+    double fee = 11;
+    string fee_currency = 12;
+}
