@@ -17,6 +17,11 @@ func TestNumFractionalDigitsLegacy(t *testing.T) {
 			v:    MustNewFromString("0.123456789"),
 			want: 8,
 		},
+		{
+			name: "zero underflow",
+			v:	  MustNewFromString("1e-100"),
+			want: 0,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

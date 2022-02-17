@@ -314,7 +314,7 @@ func (dn Value) String() string {
 		// scientific notation
 		after := ""
 		if nd > 1 {
-			after = "0." + digits[1:]
+			after = "." + digits[1:]
 		}
 		return sign + digits[:1] + after + "e" + strconv.Itoa(int(dn.exp-1))
 	}
@@ -350,7 +350,7 @@ func (dn Value) Percentage() string {
 		// scientific notation
 		after := ""
 		if nd > 1 {
-			after = "0." + digits[1:]
+			after = "." + digits[1:]
 		}
 		return sign + digits[:1] + after + "e" + strconv.Itoa(int(dn.exp-1)) + "%"
 	}
@@ -484,6 +484,18 @@ func NewFromString(s string) (Value, error) {
 	if isPercentage {
 		exp -= 2
 	}
+	atmax := false
+	for coef > coefMax {
+		coef = (coef + 5) / 10
+		exp++
+		atmax = true
+	}
+
+	if !atmax {
+		p := maxShift(coef)
+		coef *= pow10[p]
+		exp -= p
+	}
 	//check(coefMin <= coef && coef <= coefMax)
 	return Value{coef, sign, exp}, nil
 }
@@ -518,6 +530,18 @@ func NewFromBytes(s []byte) (Value, error) {
 	}
 	if isPercentage {
 		exp -= 2
+	}
+	atmax := false
+	for coef > coefMax {
+		coef = (coef + 5) / 10
+		exp++
+		atmax = true
+	}
+
+	if !atmax {
+		p := maxShift(coef)
+		coef *= pow10[p]
+		exp -= p
 	}
 	//check(coefMin <= coef && coef <= coefMax)
 	return Value{coef, sign, exp}, nil
