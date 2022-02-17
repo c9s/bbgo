@@ -381,6 +381,9 @@ func (a Value) NumIntDigits() int {
 
 // TODO: speedup
 func (a Value) NumFractionalDigits() int {
+	if a == 0 {
+		return 0
+	}
 	numPow := 0
 	for pow := int64(DefaultPow); pow%10 != 1; pow /= 10 {
 		numPow++

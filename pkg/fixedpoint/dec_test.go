@@ -89,6 +89,10 @@ func TestFromString(t *testing.T) {
 
 	f = MustNewFromString("0.75%")
 	assert.Equal(t, "0.0075", f.String())
+	f = MustNewFromString("1.1e-7")
+	assert.Equal(t, "0.00000011", f.String())
+	f = MustNewFromString(".0%")
+	assert.Equal(t, Zero, f)
 }
 
 func TestNumFractionalDigits(t *testing.T) {
@@ -131,6 +135,16 @@ func TestNumFractionalDigits(t *testing.T) {
 			name: "percentage",
 			v:    MustNewFromString("0.075%"), // 0.075 * 0.01
 			want: 5,
+		},
+		{
+			name: "scientific notation",
+			v:    MustNewFromString("1.1e-7"),
+			want: 8,
+		},
+		{
+			name: "zero",
+			v:    MustNewFromString("0"),
+			want: 0,
 		},
 	}
 	for _, tt := range tests {
