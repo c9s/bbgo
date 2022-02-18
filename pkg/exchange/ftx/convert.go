@@ -159,21 +159,19 @@ const (
 	OrderTypeMarket OrderType = "market"
 )
 
-func toLocalOrderType(orderType types.OrderType) (OrderType, bool, bool, error) {
+func toLocalOrderType(orderType types.OrderType) (OrderType, error) {
 	switch orderType {
 
 	case types.OrderTypeLimitMaker:
-		return OrderTypeLimit, true, false, nil
+		return OrderTypeLimit, nil
 
 	case types.OrderTypeLimit:
-		return OrderTypeLimit, false, false, nil
+		return OrderTypeLimit, nil
 
 	case types.OrderTypeMarket:
-		return OrderTypeMarket, false, false, nil
+		return OrderTypeMarket, nil
 
-	case types.OrderTypeIOCLimit:
-		return OrderTypeLimit, false, true, nil
 	}
 
-	return "", false, false, fmt.Errorf("order type %s not supported", orderType)
+	return "", fmt.Errorf("order type %s not supported", orderType)
 }
