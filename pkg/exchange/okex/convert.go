@@ -5,10 +5,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
-	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/pkg/errors"
+
+	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 func toGlobalSymbol(symbol string) string {
@@ -173,12 +174,12 @@ func toGlobalOrders(orderDetails []okexapi.OrderDetails) ([]types.Order, error) 
 			return orders, err
 		}
 
-		timeInForce := "GTC"
+		timeInForce := types.TimeInForceGTC
 		switch orderDetail.OrderType {
 		case okexapi.OrderTypeFOK:
-			timeInForce = "FOK"
+			timeInForce = types.TimeInForceFOK
 		case okexapi.OrderTypeIOC:
-			timeInForce = "IOC"
+			timeInForce = types.TimeInForceIOC
 
 		}
 

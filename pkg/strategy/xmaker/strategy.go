@@ -380,7 +380,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 					Side:        types.SideTypeBuy,
 					Price:       bidPrice,
 					Quantity:    bidQuantity,
-					TimeInForce: "GTC",
+					TimeInForce: types.TimeInForceGTC,
 					GroupID:     s.groupID,
 				})
 
@@ -434,7 +434,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 					Side:        types.SideTypeSell,
 					Price:       askPrice,
 					Quantity:    askQuantity,
-					TimeInForce: "GTC",
+					TimeInForce: types.TimeInForceGTC,
 					GroupID:     s.groupID,
 				})
 				makerQuota.Commit()

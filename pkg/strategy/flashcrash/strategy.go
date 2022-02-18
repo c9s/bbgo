@@ -90,7 +90,7 @@ func (s *Strategy) updateBidOrders(orderExecutor bbgo.OrderExecutor, session *bb
 			Market:      s.Market,
 			Quantity:    s.BaseQuantity,
 			Price:       startPrice,
-			TimeInForce: "GTC",
+			TimeInForce: types.TimeInForceGTC,
 		})
 
 		startPrice = startPrice.Mul(s.Percentage)

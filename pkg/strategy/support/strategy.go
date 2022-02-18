@@ -71,7 +71,7 @@ func (stop *PercentageTargetStop) GenerateOrders(market types.Market, pos *types
 			Price:            targetPrice,
 			Quantity:         targetQuantity,
 			MarginSideEffect: target.MarginOrderSideEffect,
-			TimeInForce:      "GTC",
+			TimeInForce:      types.TimeInForceGTC,
 		})
 	}
 
@@ -111,7 +111,7 @@ func (control *TrailingStopControl) GenerateStopOrder(quantity fixedpoint.Value)
 		Type:             types.OrderTypeStopLimit,
 		Quantity:         quantity,
 		MarginSideEffect: control.marginSideEffect,
-		TimeInForce:      "GTC",
+		TimeInForce:      types.TimeInForceGTC,
 
 		Price:     targetPrice,
 		StopPrice: targetPrice,
@@ -613,7 +613,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 					Quantity: targetQuantity,
 
 					MarginSideEffect: target.MarginOrderSideEffect,
-					TimeInForce:      "GTC",
+					TimeInForce:      types.TimeInForceGTC,
 				})
 			}
 
