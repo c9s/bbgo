@@ -207,8 +207,8 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 	return balances, nil
 }
 
-//resolution field in api
-//window length in seconds. options: 15, 60, 300, 900, 3600, 14400, 86400, or any multiple of 86400 up to 30*86400
+// resolution field in api
+// window length in seconds. options: 15, 60, 300, 900, 3600, 14400, 86400, or any multiple of 86400 up to 30*86400
 var supportedIntervals = map[types.Interval]int{
 	types.Interval1m:  1,
 	types.Interval5m:  5,
@@ -242,7 +242,7 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 
 	for {
 
-		//the fetch result is from newest to oldest
+		// the fetch result is from newest to oldest
 		endTime := currentEnd.Add(interval.Duration())
 		options.EndTime = &endTime
 		lines, err := e._queryKLines(ctx, symbol, interval, types.KLineQueryOptions{
@@ -455,10 +455,12 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 		if err := requestLimit.Wait(ctx); err != nil {
 			logrus.WithError(err).Error("rate limit error")
 		}
-		orderType, postOnly, IOC, err := toLocalOrderType(so.Type)
+
+		orderType, err := toLocalOrderType(so.Type)
 		if err != nil {
 			logrus.WithError(err).Error("type error")
 		}
+
 		or, err := e.newRest().PlaceOrder(ctx, PlaceOrderPayload{
 			Market:     toLocalSymbol(TrimUpperString(so.Symbol)),
 			Side:       TrimLowerString(string(so.Side)),
@@ -466,8 +468,8 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 			Type:       string(orderType),
 			Size:       so.Quantity,
 			ReduceOnly: false,
-			IOC:        IOC,
-			PostOnly:   postOnly,
+			IOC:        so.TimeInForce == types.TimeInForceIOC,
+			PostOnly:   so.Type == types.OrderTypeLimitMaker,
 			ClientID:   newSpotClientOrderID(so.ClientOrderID),
 		})
 		if err != nil {
@@ -619,7 +621,7 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[stri
 			logrus.WithError(err).Errorf("order rate limiter wait error")
 		}
 
-		//ctx context.Context, market string, interval types.Interval, limit int64, start, end time.Time
+		// ctx context.Context, market string, interval types.Interval, limit int64, start, end time.Time
 		prices, err := rest.HistoricalPrices(ctx, v.Market.LocalSymbol, types.Interval1h, 1, time.Now().Add(time.Duration(-1)*time.Hour), time.Now())
 		if err != nil || !prices.Success || len(prices.Result) == 0 {
 			continue
