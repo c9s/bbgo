@@ -38,6 +38,10 @@ var errUnsupportedOrderStatus = fmt.Errorf("unsupported order status")
 
 func toGlobalOrder(r order) (types.Order, error) {
 	// In exchange/max/convert.go, it only parses these fields.
+	timeInForce := types.TimeInForceGTC
+	if r.Ioc {
+		timeInForce = types.TimeInForceIOC
+	}
 	o := types.Order{
 		SubmitOrder: types.SubmitOrder{
 			ClientOrderID: r.ClientId,
@@ -47,7 +51,7 @@ func toGlobalOrder(r order) (types.Order, error) {
 			Type:        types.OrderType(TrimUpperString(r.Type)),
 			Quantity:    r.Size,
 			Price:       r.Price,
-			TimeInForce: "GTC",
+			TimeInForce: timeInForce,
 		},
 		Exchange:         types.ExchangeFTX,
 		IsWorking:        r.Status == "open",
