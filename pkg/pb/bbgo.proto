@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package protobuf;
+package pb;
 
-option go_package = "../protobuf";
+option go_package = "../pb";
 
 service BBGO {
     // should support streaming
