@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/pkg/errors"
 
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
@@ -78,9 +79,10 @@ func (s *Stream) Connect(ctx context.Context) error {
 		for {
 			select {
 			case <-ctx.Done():
-				if err := ctx.Err(); err != nil {
-					logger.WithError(err).Errorf("websocket ping goroutine is terminated")
+				if err := ctx.Err(); err != nil && !errors.Is(err, context.Canceled) {
+					logger.WithError(err).Errorf("context returned error")
 				}
+
 			case <-tk.C:
 				if err := s.ws.Conn().WriteJSON(websocketRequest{
 					Operation: ping,

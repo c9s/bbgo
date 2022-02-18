@@ -165,7 +165,7 @@ func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types
 			Market:      s.Market,
 			Quantity:    quantity,
 			Price:       price,
-			TimeInForce: "GTC",
+			TimeInForce: types.TimeInForceGTC,
 		}
 		quoteQuantity := order.Quantity.Mul(price)
 		if quantity.Compare(s.MinQuantity) < 0 {
@@ -232,7 +232,7 @@ func (s *Strategy) generateGridSellOrders(session *bbgo.ExchangeSession) ([]type
 			Market:      s.Market,
 			Quantity:    quantity,
 			Price:       price,
-			TimeInForce: "GTC",
+			TimeInForce: types.TimeInForceGTC,
 		}
 		baseQuantity := order.Quantity
 		if quantity.Compare(s.MinQuantity) < 0 {
@@ -312,7 +312,7 @@ func (s *Strategy) submitReverseOrder(order types.Order, session *bbgo.ExchangeS
 		Type:        types.OrderTypeLimit,
 		Quantity:    quantity,
 		Price:       price,
-		TimeInForce: "GTC",
+		TimeInForce: types.TimeInForceGTC,
 	}
 
 	log.Infof("submitting reverse order: %s against %s", submitOrder.String(), order.String())

@@ -17,7 +17,7 @@ func newLimitOrder(symbol string, side types.SideType, price, quantity float64) 
 		Type:        types.OrderTypeLimit,
 		Quantity:    fixedpoint.NewFromFloat(quantity),
 		Price:       fixedpoint.NewFromFloat(price),
-		TimeInForce: "GTC",
+		TimeInForce: types.TimeInForceGTC,
 	}
 }
 
