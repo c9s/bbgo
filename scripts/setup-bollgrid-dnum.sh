@@ -21,42 +21,33 @@ function info()
     echo -e "${GREEN}$@${NC}"
 }
 
-osf=$(uname | tr '[:upper:]' '[:lower:]')
 source $(dirname $(readlink -f $0))/tagname.sh
+osf=$(uname | tr '[:upper:]' '[:lower:]')
 arch=amd64
-dist_file=bbgo-$version-$osf-$arch.tar.gz
-exchange=max
-
-if [[ -n $1 ]] ; then
-    exchange=$1
-fi
-
-exchange_upper=$(echo -n $exchange | tr 'a-z' 'A-Z')
-
+dist_file=bbgo-$version-$osf-$arch-dnum.tar.gz
 
 info "downloading..."
 curl -O -L https://github.com/c9s/bbgo/releases/download/$version/$dist_file
 tar xzf $dist_file
-mv bbgo-$osf-$arch bbgo
+mv bbgo-$osf-$arch-dnum bbgo
 chmod +x bbgo
 info "downloaded successfully"
 
 function gen_dotenv()
 {
-    read -p "Enter your $exchange_upper API key: " api_key
-    read -p "Enter your $exchange_upper API secret: " api_secret
-    info "generating your .env.local file..."
+    read -p "Enter your MAX API key: " api_key
+    read -p "Enter your MAX API secret: " api_secret
+    echo "Generating your .env.local file..."
 cat <<END > .env.local
-${exchange_upper}_API_KEY=$api_key
-${exchange_upper}_API_SECRET=$api_secret
+MAX_API_KEY=$api_key
+MAX_API_SECRET=$api_secret
 END
 
-    info "dotenv is configured successfully"
 }
 
 if [[ -e ".env.local" ]] ; then
-    warn "found an existing .env.local, you will overwrite the existing .env.local file!"
-    read -p "are you sure? (Y/n) " a
+    echo "Found existing .env.local, you will overwrite the existing .env.local file!"
+    read -p "Are you sure? (Y/n) " a
     if [[ $a != "n" ]] ; then
         gen_dotenv
     fi
@@ -64,10 +55,9 @@ else
     gen_dotenv
 fi
 
-
 if [[ -e "bbgo.yaml" ]] ; then
-  warn "found existing bbgo.yaml, you will overwrite the existing bbgo.yaml file!"
-  read -p "are you sure? (Y/n) " a
+  echo "Found existing bbgo.yaml, you will overwrite the existing bbgo.yaml file!"
+  read -p "Are you sure? (Y/n) " a
   if [[ $a == "n" ]] ; then
     exit
   fi
@@ -76,15 +66,13 @@ fi
 cat <<END > bbgo.yaml
 ---
 exchangeStrategies:
-- on: ${exchange}
-  grid:
+- on: max
+  bollgrid:
     symbol: BTCUSDT
+    interval: 1h
+    gridNumber: 20
     quantity: 0.001
-    gridNumber: 100
     profitSpread: 100.0
-    upperPrice: 50_000.0
-    lowerPrice: 10_000.0
-    long: true
 
 END
 

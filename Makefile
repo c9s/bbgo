@@ -65,6 +65,48 @@ bbgo-slim-darwin-amd64: $(BIN_DIR)
 
 bbgo-slim-darwin: bbgo-slim-darwin-amd64 bbgo-slim-darwin-arm64
 
+# build native bbgo
+bbgo-dnum: static
+	go build -tags web,release,dnum -o $(BIN_DIR)/bbgo ./cmd/bbgo
+
+# build native bbgo (slim version)
+bbgo-slim-dnum:
+	go build -tags release,dnum -o $(BIN_DIR)/$@ ./cmd/bbgo
+
+# build cross-compile linux bbgo
+bbgo-linux-dnum: bbgo-linux-amd64-dnum bbgo-linux-arm64-dnum
+
+bbgo-linux-amd64-dnum: $(BIN_DIR) pkg/server/assets.go
+	GOOS=linux GOARCH=amd64 go build -tags web,release,dnum -o $(BIN_DIR)/$@ ./cmd/bbgo
+
+bbgo-linux-arm64-dnum: $(BIN_DIR) pkg/server/assets.go
+	GOOS=linux GOARCH=arm64 go build -tags web,release,dnum -o $(BIN_DIR)/$@ ./cmd/bbgo
+
+# build cross-compile linux bbgo (slim version)
+bbgo-slim-linux-dnum: bbgo-slim-linux-amd64-dnum bbgo-slim-linux-arm64-dnum
+
+bbgo-slim-linux-amd64-dnum: $(BIN_DIR)
+	GOOS=linux GOARCH=amd64 go build -tags release,dnum -o $(BIN_DIR)/$@ ./cmd/bbgo
+
+bbgo-slim-linux-arm64-dnum: $(BIN_DIR)
+	GOOS=linux GOARCH=arm64 go build -tags release,dnum -o $(BIN_DIR)/$@ ./cmd/bbgo
+
+bbgo-darwin-dnum: bbgo-darwin-arm64-dnum bbgo-darwin-amd64-dnum
+
+bbgo-darwin-arm64-dnum: $(BIN_DIR) pkg/server/assets.go
+	GOOS=darwin GOARCH=arm64 go build -tags web,release,dnum -o $(BIN_DIR)/$@ ./cmd/bbgo
+
+bbgo-darwin-amd64-dnum: $(BIN_DIR) pkg/server/assets.go
+	GOOS=darwin GOARCH=amd64 go build -tags web,release,dnum -o $(BIN_DIR)/$@ ./cmd/bbgo
+
+bbgo-slim-darwin-arm64-dnum: $(BIN_DIR)
+	GOOS=darwin GOARCH=arm64 go build -tags release,dnum -o $(BIN_DIR)/$@ ./cmd/bbgo
+
+bbgo-slim-darwin-amd64-dnum: $(BIN_DIR)
+	GOOS=darwin GOARCH=amd64 go build -tags release,dnum -o $(BIN_DIR)/$@ ./cmd/bbgo
+
+bbgo-slim-darwin-dnum: bbgo-slim-darwin-amd64-dnum bbgo-slim-darwin-arm64-dnum
+
 
 clean:
 	rm -rf $(BUILD_DIR) $(DIST_DIR) $(FRONTEND_EXPORT_DIR)
@@ -112,13 +154,21 @@ dist-bbgo-linux: \
 	$(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-linux-arm64.tar.gz \
 	$(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-linux-amd64.tar.gz \
 	$(DIST_DIR)/$(VERSION)/bbgo-slim-$(VERSION)-linux-arm64.tar.gz \
-	$(DIST_DIR)/$(VERSION)/bbgo-slim-$(VERSION)-linux-amd64.tar.gz
+	$(DIST_DIR)/$(VERSION)/bbgo-slim-$(VERSION)-linux-amd64.tar.gz \
+	$(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-linux-arm64-dnum.tar.gz \
+	$(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-linux-amd64-dnum.tar.gz \
+	$(DIST_DIR)/$(VERSION)/bbgo-slim-$(VERSION)-linux-arm64-dnum.tar.gz \
+	$(DIST_DIR)/$(VERSION)/bbgo-slim-$(VERSION)-linux-amd64-dnum.tar.gz
 
 dist-bbgo-darwin: \
 	$(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-darwin-arm64.tar.gz \
 	$(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-darwin-amd64.tar.gz \
 	$(DIST_DIR)/$(VERSION)/bbgo-slim-$(VERSION)-darwin-arm64.tar.gz \
-	$(DIST_DIR)/$(VERSION)/bbgo-slim-$(VERSION)-darwin-amd64.tar.gz
+	$(DIST_DIR)/$(VERSION)/bbgo-slim-$(VERSION)-darwin-amd64.tar.gz \
+	$(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-darwin-arm64-dnum.tar.gz \
+	$(DIST_DIR)/$(VERSION)/bbgo-$(VERSION)-darwin-amd64-dnum.tar.gz \
+	$(DIST_DIR)/$(VERSION)/bbgo-slim-$(VERSION)-darwin-arm64-dnum.tar.gz \
+	$(DIST_DIR)/$(VERSION)/bbgo-slim-$(VERSION)-darwin-amd64-dnum.tar.gz
 
 dist: static dist-bbgo-linux dist-bbgo-darwin desktop
 

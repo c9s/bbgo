@@ -21,9 +21,9 @@ function info()
     echo -e "${GREEN}$@${NC}"
 }
 
+source $(dirname $(readlink -f $0))/tagname.sh
 osf=$(uname | tr '[:upper:]' '[:lower:]')
 arch=amd64
-version=v1.21.4
 dist_file=bbgo-$version-$osf-$arch.tar.gz
 
 info "downloading..."

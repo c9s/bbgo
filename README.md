@@ -35,6 +35,7 @@ A trading bot framework written in Go. The name bbgo comes from the BB8 bot in t
 - Docker image ready.
 - Kubernetes support.
 - Helm chart ready.
+- High precision float point (up to 16 digits, run with `-tags dnum`)
 
 ## Screenshots
 
@@ -77,7 +78,40 @@ bash <(curl -s https://raw.githubusercontent.com/c9s/bbgo/main/scripts/setup-gri
 
 # grid trading strategy for max exchange
 bash <(curl -s https://raw.githubusercontent.com/c9s/bbgo/main/scripts/setup-grid.sh) max
+
+# bollinger grid trading strategy for binance exchange
+bash <(curl -s https://raw.githubusercontent.com/c9s/bbgo/main/scripts/setup-bollgrid.sh) binance
+
+# bollinger grid trading strategy for max exchange
+bash <(curl -s https://raw.githubusercontent.com/c9s/bbgo/main/scripts/setup-bollgrid.sh) max
 ```
+
+Since v1.28, we've added new float point implementation from dnum to support decimals with higher precision, and could set up using the following scripts:
+
+```sh
+# grid trading strategy for binance exchange
+bash <(curl -s https://raw.githubusercontent.com/c9s/bbgo/main/scripts/setup-grid-dnum.sh) binance
+
+# grid trading strategy for max exchange
+bash <(curl -s https://raw.githubusercontent.com/c9s/bbgo/main/scripts/setup-grid-dnum.sh) max
+
+# bollinger grid trading strategy for binance exchange
+bash <(curl -s https://raw.githubusercontent.com/c9s/bbgo/main/scripts/setup-bollgrid-dnum.sh) binance
+
+# bollinger grid trading strategy for max exchange
+bash <(curl -s https://raw.githubusercontent.com/c9s/bbgo/main/scripts/setup-bollgrid-dnum.sh) max
+```
+
+If you purely want to download the precompiled bbgo binaries, check https://github.com/c9s/bbgo/releases.
+Or using the download scripts:
+```sh
+# for high precision implementation
+bash <(curl -s https://raw.githubusercontent.com/c9s/bbgo/main/scripts/download-dnum.sh)
+
+# for legacy float point implementation
+bash <(curl -s https://raw.githubusercontent.com/c9s/bbgo/main/scripts/download.sh)
+```
+
 
 ### One-click Linode StackScript:
 

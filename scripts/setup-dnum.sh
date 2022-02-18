@@ -2,7 +2,7 @@
 set -e
 source $(dirname $(readlink -f $0))/tagname.sh
 osf=$(uname | tr '[:upper:]' '[:lower:]')
-dist_file=bbgo-$version-$osf-amd64.tar.gz
+dist_file=bbgo-$version-$osf-amd64-dnum.tar.gz
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -27,7 +27,7 @@ function info()
 info "downloading..."
 curl -O -L https://github.com/c9s/bbgo/releases/download/$version/$dist_file
 tar xzf $dist_file
-mv bbgo-$osf-amd64 bbgo
+mv bbgo-$osf-amd64-dnum bbgo
 chmod +x bbgo
 info "downloaded successfully"
 
