@@ -131,12 +131,3 @@ func Test_toLocalOrderTypeWithMarket(t *testing.T) {
 	assert.Equal(t, IOC, false)
 }
 
-func Test_toLocalOrderTypeWithIOCLimit(t *testing.T) {
-
-	orderType, postOnly, IOC, err := toLocalOrderType(types.OrderTypeIOCLimit)
-
-	assert.NoError(t, err)
-	assert.Equal(t, orderType, OrderTypeLimit)
-	assert.Equal(t, postOnly, false)
-	assert.Equal(t, IOC, true)
-}

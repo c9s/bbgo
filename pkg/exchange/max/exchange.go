@@ -418,6 +418,11 @@ func toMaxSubmitOrder(o types.SubmitOrder) (*maxapi.Order, error) {
 		return nil, err
 	}
 
+	// case IOC type
+	if orderType == maxapi.OrderTypeLimit && o.TimeInForce == types.TimeInForceIOC {
+		orderType = maxapi.OrderTypeIOCLimit
+	}
+
 	var quantityString string
 	if o.Market.Symbol != "" {
 		quantityString = o.Market.FormatQuantity(o.Quantity)
@@ -443,7 +448,7 @@ func toMaxSubmitOrder(o types.SubmitOrder) (*maxapi.Order, error) {
 	}
 
 	switch o.Type {
-	case types.OrderTypeStopLimit, types.OrderTypeLimit, types.OrderTypeLimitMaker, types.OrderTypeIOCLimit:
+	case types.OrderTypeStopLimit, types.OrderTypeLimit, types.OrderTypeLimitMaker:
 		var priceInString string
 		if o.Market.Symbol != "" {
 			priceInString = o.Market.FormatPrice(o.Price)
