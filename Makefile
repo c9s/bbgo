@@ -167,3 +167,6 @@ embed: pkg/server/assets.go
 static: frontend/out/index.html pkg/server/assets.go
 
 .PHONY: bbgo bbgo-slim-darwin bbgo-slim-darwin-amd64 bbgo-slim-darwin-arm64 bbgo-darwin version dist pack migrations static embed desktop  .FORCE
+
+protobuf:
+	protoc -I=$(PWD)/pkg/protobuf --go_out=$(PWD)/pkg/protobuf $(PWD)/pkg/protobuf/bbgo.proto
