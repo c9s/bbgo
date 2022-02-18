@@ -42,13 +42,19 @@ func toGlobalOrder(r order) (types.Order, error) {
 	if r.Ioc {
 		timeInForce = types.TimeInForceIOC
 	}
+
+	// order type definition: https://github.com/ftexchange/ftx/blob/master/rest/client.py#L122
+	orderType := types.OrderType(TrimUpperString(r.Type))
+	if orderType == types.OrderTypeLimit && r.PostOnly {
+		orderType = types.OrderTypeLimitMaker
+	}
+
 	o := types.Order{
 		SubmitOrder: types.SubmitOrder{
 			ClientOrderID: r.ClientId,
 			Symbol:        toGlobalSymbol(r.Market),
 			Side:          types.SideType(TrimUpperString(r.Side)),
-			// order type definition: https://github.com/ftexchange/ftx/blob/master/rest/client.py#L122
-			Type:        types.OrderType(TrimUpperString(r.Type)),
+			Type:        orderType,
 			Quantity:    r.Size,
 			Price:       r.Price,
 			TimeInForce: timeInForce,

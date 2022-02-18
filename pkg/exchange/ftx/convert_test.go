@@ -102,27 +102,20 @@ func Test_toGlobalSymbol(t *testing.T) {
 }
 
 func Test_toLocalOrderTypeWithLimitMaker(t *testing.T) {
-
 	orderType, err := toLocalOrderType(types.OrderTypeLimitMaker)
-
 	assert.NoError(t, err)
 	assert.Equal(t, orderType, OrderTypeLimit)
-	assert.Equal(t, postOnly, true)
 }
 
 func Test_toLocalOrderTypeWithLimit(t *testing.T) {
-
 	orderType, err := toLocalOrderType(types.OrderTypeLimit)
-
 	assert.NoError(t, err)
 	assert.Equal(t, orderType, OrderTypeLimit)
-	assert.Equal(t, postOnly, false)
 }
 
 func Test_toLocalOrderTypeWithMarket(t *testing.T) {
 	orderType, err := toLocalOrderType(types.OrderTypeMarket)
 	assert.NoError(t, err)
 	assert.Equal(t, orderType, OrderTypeMarket)
-	assert.Equal(t, postOnly, false)
 }
 
