@@ -38,16 +38,26 @@ var errUnsupportedOrderStatus = fmt.Errorf("unsupported order status")
 
 func toGlobalOrder(r order) (types.Order, error) {
 	// In exchange/max/convert.go, it only parses these fields.
+	timeInForce := types.TimeInForceGTC
+	if r.Ioc {
+		timeInForce = types.TimeInForceIOC
+	}
+
+	// order type definition: https://github.com/ftexchange/ftx/blob/master/rest/client.py#L122
+	orderType := types.OrderType(TrimUpperString(r.Type))
+	if orderType == types.OrderTypeLimit && r.PostOnly {
+		orderType = types.OrderTypeLimitMaker
+	}
+
 	o := types.Order{
 		SubmitOrder: types.SubmitOrder{
 			ClientOrderID: r.ClientId,
 			Symbol:        toGlobalSymbol(r.Market),
 			Side:          types.SideType(TrimUpperString(r.Side)),
-			// order type definition: https://github.com/ftexchange/ftx/blob/master/rest/client.py#L122
-			Type:        types.OrderType(TrimUpperString(r.Type)),
+			Type:        orderType,
 			Quantity:    r.Size,
 			Price:       r.Price,
-			TimeInForce: "GTC",
+			TimeInForce: timeInForce,
 		},
 		Exchange:         types.ExchangeFTX,
 		IsWorking:        r.Status == "open",
@@ -159,21 +169,19 @@ const (
 	OrderTypeMarket OrderType = "market"
 )
 
-func toLocalOrderType(orderType types.OrderType) (OrderType, bool, bool, error) {
+func toLocalOrderType(orderType types.OrderType) (OrderType, error) {
 	switch orderType {
 
 	case types.OrderTypeLimitMaker:
-		return OrderTypeLimit, true, false, nil
+		return OrderTypeLimit, nil
 
 	case types.OrderTypeLimit:
-		return OrderTypeLimit, false, false, nil
+		return OrderTypeLimit, nil
 
 	case types.OrderTypeMarket:
-		return OrderTypeMarket, false, false, nil
+		return OrderTypeMarket, nil
 
-	case types.OrderTypeIOCLimit:
-		return OrderTypeLimit, false, true, nil
 	}
 
-	return "", false, false, fmt.Errorf("order type %s not supported", orderType)
+	return "", fmt.Errorf("order type %s not supported", orderType)
 }

@@ -217,7 +217,7 @@ func (s *Strategy) generateGridSellOrders(session *bbgo.ExchangeSession) ([]type
 			Market:      s.Market,
 			Quantity:    quantity,
 			Price:       price.Add(s.ProfitSpread),
-			TimeInForce: "GTC",
+			TimeInForce: types.TimeInForceGTC,
 			GroupID:     s.groupID,
 		})
 		baseBalance.Available = baseBalance.Available.Sub(quantity)
@@ -318,7 +318,7 @@ func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types
 			Market:      s.Market,
 			Quantity:    quantity,
 			Price:       price,
-			TimeInForce: "GTC",
+			TimeInForce: types.TimeInForceGTC,
 			GroupID:     s.groupID,
 		})
 		balance.Available = balance.Available.Sub(quoteQuantity)
@@ -434,7 +434,7 @@ func (s *Strategy) handleFilledOrder(filledOrder types.Order) {
 		Type:        types.OrderTypeLimit,
 		Quantity:    quantity,
 		Price:       price,
-		TimeInForce: "GTC",
+		TimeInForce: types.TimeInForceGTC,
 		GroupID:     s.groupID,
 	}
 

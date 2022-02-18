@@ -14,11 +14,21 @@ import (
 	"github.com/c9s/bbgo/pkg/util"
 )
 
+
 func init() {
 	// make sure we can cast Order to PlainText
 	_ = PlainText(Order{})
 	_ = PlainText(&Order{})
 }
+
+
+type TimeInForce string
+
+var (
+	TimeInForceGTC TimeInForce = "GTC"
+	TimeInForceIOC TimeInForce = "IOC"
+	TimeInForceFOK TimeInForce = "FOK"
+)
 
 // MarginOrderSideEffectType define side effect type for orders
 type MarginOrderSideEffectType string
@@ -28,6 +38,7 @@ var (
 	SideEffectTypeMarginBuy    MarginOrderSideEffectType = "MARGIN_BUY"
 	SideEffectTypeAutoRepay    MarginOrderSideEffectType = "AUTO_REPAY"
 )
+
 
 func (t *MarginOrderSideEffectType) UnmarshalJSON(data []byte) error {
 	var s string
@@ -64,7 +75,6 @@ const (
 	OrderTypeMarket     OrderType = "MARKET"
 	OrderTypeStopLimit  OrderType = "STOP_LIMIT"
 	OrderTypeStopMarket OrderType = "STOP_MARKET"
-	OrderTypeIOCLimit   OrderType = "IOC_LIMIT"
 )
 
 /*
@@ -115,7 +125,7 @@ type SubmitOrder struct {
 
 	Market Market `json:"-" db:"-"`
 
-	TimeInForce string `json:"timeInForce,omitempty" db:"time_in_force"` // GTC, IOC, FOK
+	TimeInForce TimeInForce `json:"timeInForce,omitempty" db:"time_in_force"` // GTC, IOC, FOK
 
 	GroupID uint32 `json:"groupID,omitempty"`
 
