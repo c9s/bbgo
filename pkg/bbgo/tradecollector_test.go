@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -19,9 +20,9 @@ func TestTradeCollector_ShouldNotCountDuplicatedTrade(t *testing.T) {
 		ID:            1,
 		OrderID:       399,
 		Exchange:      types.ExchangeBinance,
-		Price:         40000.0,
-		Quantity:      1.0,
-		QuoteQuantity: 40000.0,
+		Price:         fixedpoint.NewFromInt(40000),
+		Quantity:      fixedpoint.One,
+		QuoteQuantity: fixedpoint.NewFromInt(40000),
 		Symbol:        "BTCUSDT",
 		Side:          types.SideTypeBuy,
 		IsBuyer:       true,
@@ -30,17 +31,17 @@ func TestTradeCollector_ShouldNotCountDuplicatedTrade(t *testing.T) {
 	assert.Equal(t, 1, len(collector.tradeStore.Trades()), "should have one trade in the trade store")
 
 	orderStore.Add(types.Order{
-		SubmitOrder:      types.SubmitOrder{
-			Symbol:           "BTCUSDT",
-			Side:             types.SideTypeBuy,
-			Type:             types.OrderTypeLimit,
-			Quantity:         1.0,
-			Price:            40000.0,
+		SubmitOrder: types.SubmitOrder{
+			Symbol:   "BTCUSDT",
+			Side:     types.SideTypeBuy,
+			Type:     types.OrderTypeLimit,
+			Quantity: fixedpoint.One,
+			Price:    fixedpoint.NewFromInt(40000),
 		},
 		Exchange:         types.ExchangeBinance,
 		OrderID:          399,
 		Status:           types.OrderStatusFilled,
-		ExecutedQuantity: 1.0,
+		ExecutedQuantity: fixedpoint.One,
 		IsWorking:        false,
 	})
 
@@ -52,9 +53,9 @@ func TestTradeCollector_ShouldNotCountDuplicatedTrade(t *testing.T) {
 		ID:            1,
 		OrderID:       399,
 		Exchange:      types.ExchangeBinance,
-		Price:         40000.0,
-		Quantity:      1.0,
-		QuoteQuantity: 40000.0,
+		Price:         fixedpoint.NewFromInt(40000),
+		Quantity:      fixedpoint.One,
+		QuoteQuantity: fixedpoint.NewFromInt(40000),
 		Symbol:        "BTCUSDT",
 		Side:          types.SideTypeBuy,
 		IsBuyer:       true,

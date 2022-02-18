@@ -9,7 +9,6 @@ import (
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
 )
 
 var ErrIncorrectBookEntryElementLength = errors.New("incorrect book entry element length")
@@ -122,12 +121,12 @@ func (k KLinePayload) KLine() types.KLine {
 		EndTime:        types.Time(time.Unix(0, k.EndTime*int64(time.Millisecond))),
 		Symbol:         k.Market,
 		Interval:       types.Interval(k.Resolution),
-		Open:           util.MustParseFloat(k.Open),
-		Close:          util.MustParseFloat(k.Close),
-		High:           util.MustParseFloat(k.High),
-		Low:            util.MustParseFloat(k.Low),
-		Volume:         util.MustParseFloat(k.Volume),
-		QuoteVolume:    0, // TODO: add this from kingfisher
+		Open:           fixedpoint.MustNewFromString(k.Open),
+		Close:          fixedpoint.MustNewFromString(k.Close),
+		High:           fixedpoint.MustNewFromString(k.High),
+		Low:            fixedpoint.MustNewFromString(k.Low),
+		Volume:         fixedpoint.MustNewFromString(k.Volume),
+		QuoteVolume:    fixedpoint.Zero, // TODO: add this from kingfisher
 		LastTradeID:    uint64(k.LastTradeID),
 		NumberOfTrades: 0, // TODO: add this from kingfisher
 		Closed:         k.Closed,
@@ -211,11 +210,11 @@ func parseKLineEvent(val *fastjson.Value) (*KLineEvent, error) {
 		Interval:  string(val.GetStringBytes("k", "R")),
 		StartTime: time.Unix(0, val.GetInt64("k", "ST")*int64(time.Millisecond)),
 		EndTime:   time.Unix(0, val.GetInt64("k", "ET")*int64(time.Millisecond)),
-		Open:      util.MustParseFloat(string(val.GetStringBytes("k", "O"))),
-		High:      util.MustParseFloat(string(val.GetStringBytes("k", "H"))),
-		Low:       util.MustParseFloat(string(val.GetStringBytes("k", "L"))),
-		Close:     util.MustParseFloat(string(val.GetStringBytes("k", "C"))),
-		Volume:    util.MustParseFloat(string(val.GetStringBytes("k", "v"))),
+		Open:      fixedpoint.MustNewFromBytes(val.GetStringBytes("k", "O")),
+		High:      fixedpoint.MustNewFromBytes(val.GetStringBytes("k", "H")),
+		Low:       fixedpoint.MustNewFromBytes(val.GetStringBytes("k", "L")),
+		Close:     fixedpoint.MustNewFromBytes(val.GetStringBytes("k", "C")),
+		Volume:    fixedpoint.MustNewFromBytes(val.GetStringBytes("k", "v")),
 		Closed:    val.GetBool("k", "x"),
 	}
 

@@ -7,7 +7,6 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/binance"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/sirupsen/logrus"
-	"math"
 	"strings"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -146,17 +145,17 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		for _, detection := range s.SupportDetection {
 			var lastMA = ma.Last()
 
-			closePriceF := kline.GetClose()
-			closePrice := fixedpoint.NewFromFloat(closePriceF)
+			closePrice := kline.GetClose()
+			closePriceF := closePrice.Float64()
 			// skip if the closed price is under the moving average
-			if closePrice.Float64() < lastMA {
-				log.Infof("skip %s closed price %f < last ma %f", s.Symbol, closePrice.Float64(), lastMA)
+			if closePriceF < lastMA {
+				log.Infof("skip %s closed price %v < last ma %f", s.Symbol, closePrice, lastMA)
 				return
 			}
 
 			fundingRate := premiumIndex.LastFundingRate
 
-			if fundingRate >= s.FundingRate.High {
+			if fundingRate.Compare(s.FundingRate.High) >= 0 {
 				s.Notifiability.Notify("%s funding rate %s is too high! threshold %s",
 					s.Symbol,
 					fundingRate.Percentage(),
@@ -170,12 +169,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			prettyBaseVolume := s.Market.BaseCurrencyFormatter()
 			prettyQuoteVolume := s.Market.QuoteCurrencyFormatter()
 
-			if detection.MinVolume > 0 && kline.Volume > detection.MinVolume.Float64() {
+			if detection.MinVolume.Sign() > 0 && kline.Volume.Compare(detection.MinVolume) > 0 {
 				s.Notifiability.Notify("Detected %s %s resistance base volume %s > min base volume %s, quote volume %s",
 					s.Symbol, detection.Interval.String(),
-					prettyBaseVolume.FormatMoney(math.Round(kline.Volume)),
-					prettyBaseVolume.FormatMoney(math.Round(detection.MinVolume.Float64())),
-					prettyQuoteVolume.FormatMoney(math.Round(kline.QuoteVolume)),
+					prettyBaseVolume.FormatMoney(kline.Volume.Trunc()),
+					prettyBaseVolume.FormatMoney(detection.MinVolume.Trunc()),
+					prettyQuoteVolume.FormatMoney(kline.QuoteVolume.Trunc()),
 				)
 				s.Notifiability.Notify(kline)
 
@@ -184,24 +183,24 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 					return
 				}
 
-				if baseBalance.Available > 0 && baseBalance.Total() < s.MaxExposurePosition {
+				if baseBalance.Available.Sign() > 0 && baseBalance.Total().Compare(s.MaxExposurePosition) < 0 {
 					log.Infof("opening a short position")
 					_, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 						Symbol:   kline.Symbol,
 						Side:     types.SideTypeSell,
 						Type:     types.OrderTypeMarket,
-						Quantity: s.Quantity.Float64(),
+						Quantity: s.Quantity,
 					})
 					if err != nil {
 						log.WithError(err).Error("submit order error")
 					}
 				}
-			} else if detection.MinQuoteVolume > 0 && kline.QuoteVolume > detection.MinQuoteVolume.Float64() {
+			} else if detection.MinQuoteVolume.Sign() > 0 && kline.QuoteVolume.Compare(detection.MinQuoteVolume) > 0 {
 				s.Notifiability.Notify("Detected %s %s resistance quote volume %s > min quote volume %s, base volume %s",
 					s.Symbol, detection.Interval.String(),
-					prettyQuoteVolume.FormatMoney(math.Round(kline.QuoteVolume)),
-					prettyQuoteVolume.FormatMoney(math.Round(detection.MinQuoteVolume.Float64())),
-					prettyBaseVolume.FormatMoney(math.Round(kline.Volume)),
+					prettyQuoteVolume.FormatMoney(kline.QuoteVolume.Trunc()),
+					prettyQuoteVolume.FormatMoney(detection.MinQuoteVolume.Trunc()),
+					prettyBaseVolume.FormatMoney(kline.Volume.Trunc()),
 				)
 				s.Notifiability.Notify(kline)
 			}

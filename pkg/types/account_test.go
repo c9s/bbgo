@@ -10,53 +10,53 @@ import (
 
 func TestAccountLockAndUnlock(t *testing.T) {
 	a := NewAccount()
-	a.AddBalance("USDT", 1000)
+	a.AddBalance("USDT", fixedpoint.NewFromInt(1000))
 
 	var err error
 	balance, ok := a.Balance("USDT")
 	assert.True(t, ok)
-	assert.Equal(t, balance.Available, fixedpoint.Value(1000))
-	assert.Equal(t, balance.Locked, fixedpoint.Value(0))
+	assert.Equal(t, balance.Available, fixedpoint.NewFromInt(1000))
+	assert.Equal(t, balance.Locked, fixedpoint.Zero)
 
-	err = a.LockBalance("USDT", fixedpoint.Value(100))
+	err = a.LockBalance("USDT", fixedpoint.NewFromInt(100))
 	assert.NoError(t, err)
 
 	balance, ok = a.Balance("USDT")
 	assert.True(t, ok)
-	assert.Equal(t, balance.Available, fixedpoint.Value(900))
-	assert.Equal(t, balance.Locked, fixedpoint.Value(100))
+	assert.Equal(t, balance.Available, fixedpoint.NewFromInt(900))
+	assert.Equal(t, balance.Locked, fixedpoint.NewFromInt(100))
 
-	err = a.UnlockBalance("USDT", 100)
+	err = a.UnlockBalance("USDT", fixedpoint.NewFromInt(100))
 	assert.NoError(t, err)
 	balance, ok = a.Balance("USDT")
 	assert.True(t, ok)
-	assert.Equal(t, balance.Available, fixedpoint.Value(1000))
-	assert.Equal(t, balance.Locked, fixedpoint.Value(0))
+	assert.Equal(t, balance.Available, fixedpoint.NewFromInt(1000))
+	assert.Equal(t, balance.Locked, fixedpoint.Zero)
 }
 
 func TestAccountLockAndUse(t *testing.T) {
 	a := NewAccount()
-	a.AddBalance("USDT", 1000)
+	a.AddBalance("USDT", fixedpoint.NewFromInt(1000))
 
 	var err error
 	balance, ok := a.Balance("USDT")
 	assert.True(t, ok)
-	assert.Equal(t, balance.Available, fixedpoint.Value(1000))
-	assert.Equal(t, balance.Locked, fixedpoint.Value(0))
+	assert.Equal(t, balance.Available, fixedpoint.NewFromInt(1000))
+	assert.Equal(t, balance.Locked, fixedpoint.Zero)
 
-	err = a.LockBalance("USDT", 100)
+	err = a.LockBalance("USDT", fixedpoint.NewFromInt(100))
 	assert.NoError(t, err)
 
 	balance, ok = a.Balance("USDT")
 	assert.True(t, ok)
-	assert.Equal(t, balance.Available, fixedpoint.Value(900))
-	assert.Equal(t, balance.Locked, fixedpoint.Value(100))
+	assert.Equal(t, balance.Available, fixedpoint.NewFromInt(900))
+	assert.Equal(t, balance.Locked, fixedpoint.NewFromInt(100))
 
-	err = a.UseLockedBalance("USDT", 100)
+	err = a.UseLockedBalance("USDT", fixedpoint.NewFromInt(100))
 	assert.NoError(t, err)
 
 	balance, ok = a.Balance("USDT")
 	assert.True(t, ok)
-	assert.Equal(t, balance.Available, fixedpoint.Value(900))
-	assert.Equal(t, balance.Locked, fixedpoint.Value(0))
+	assert.Equal(t, balance.Available, fixedpoint.NewFromInt(900))
+	assert.Equal(t, balance.Locked, fixedpoint.Zero)
 }

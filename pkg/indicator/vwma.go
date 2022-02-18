@@ -35,11 +35,11 @@ func (inc *VWMA) Last() float64 {
 }
 
 func KLinePriceVolumeMapper(k types.KLine) float64 {
-	return k.Close * k.Volume
+	return k.Close.Mul(k.Volume).Float64()
 }
 
 func KLineVolumeMapper(k types.KLine) float64 {
-	return k.Volume
+	return k.Volume.Float64()
 }
 
 func (inc *VWMA) calculateAndUpdate(kLines []types.KLine) {

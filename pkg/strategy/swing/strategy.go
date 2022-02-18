@@ -3,11 +3,11 @@ package swing
 import (
 	"context"
 	"fmt"
-	"math"
 
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -59,10 +59,10 @@ type Strategy struct {
 
 	// MinChange filters out the k-lines with small changes. so that our strategy will only be triggered
 	// in specific events.
-	MinChange float64 `json:"minChange"`
+	MinChange fixedpoint.Value `json:"minChange"`
 
 	// BaseQuantity is the base quantity of the submit order. for both BUY and SELL, market order will be used.
-	BaseQuantity float64 `json:"baseQuantity"`
+	BaseQuantity fixedpoint.Value `json:"baseQuantity"`
 
 	// MovingAverageType is the moving average indicator type that we want to use,
 	// it could be SMA or EWMA
@@ -116,20 +116,20 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 
 		// skip if the change is not above the minChange
-		if math.Abs(kline.GetChange()) < s.MinChange {
+		if kline.GetChange().Abs().Compare(s.MinChange) < 0 {
 			return
 		}
 
 		closePrice := kline.Close
-		changePercentage := kline.GetChange() / kline.Open
-		quantity := s.BaseQuantity * (1.0 + math.Abs(changePercentage))
+		changePercentage := kline.GetChange().Div(kline.Open)
+		quantity := s.BaseQuantity.Mul(fixedpoint.One.Add(changePercentage.Abs()))
 
 		trend := kline.Direction()
 		switch trend {
 		case types.DirectionUp:
 			// if it goes up and it's above the moving average price, then we sell
-			if closePrice > movingAveragePrice {
-				s.notify(":chart_with_upwards_trend: closePrice %f is above movingAveragePrice %f, submitting SELL order", closePrice, movingAveragePrice)
+			if closePrice.Float64() > movingAveragePrice {
+				s.notify(":chart_with_upwards_trend: closePrice %v is above movingAveragePrice %v, submitting SELL order", closePrice, movingAveragePrice)
 
 				_, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 					Symbol:   s.Symbol,
@@ -144,8 +144,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 		case types.DirectionDown:
 			// if it goes down and it's below the moving average price, then we buy
-			if closePrice < movingAveragePrice {
-				s.notify(":chart_with_downwards_trend: closePrice %f is below movingAveragePrice %f, submitting BUY order", closePrice, movingAveragePrice)
+			if closePrice.Float64() < movingAveragePrice {
+				s.notify(":chart_with_downwards_trend: closePrice %v is below movingAveragePrice %v, submitting BUY order", closePrice, movingAveragePrice)
 
 				_, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 					Symbol:   s.Symbol,

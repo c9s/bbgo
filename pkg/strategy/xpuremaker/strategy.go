@@ -14,6 +14,8 @@ import (
 
 const ID = "xpuremaker"
 
+var Ten = fixedpoint.NewFromInt(10)
+
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
@@ -145,26 +147,31 @@ func (s *Strategy) updateOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.
 }
 
 func (s *Strategy) generateOrders(symbol string, side types.SideType, price, priceTick, baseQuantity fixedpoint.Value, numOrders int) (orders []types.SubmitOrder) {
-	var expBase = fixedpoint.NewFromFloat(0.0)
+	var expBase = fixedpoint.Zero
 
 	switch side {
 	case types.SideTypeBuy:
-		if priceTick > 0 {
-			priceTick = -priceTick
+		if priceTick.Sign() > 0 {
+			priceTick = priceTick.Neg()
 		}
 
 	case types.SideTypeSell:
-		if priceTick < 0 {
-			priceTick = -priceTick
+		if priceTick.Sign() < 0 {
+			priceTick = priceTick.Neg()
 		}
 	}
 
-	for i := 0; i < numOrders; i++ {
-		volume := math.Exp(expBase.Float64()) * baseQuantity.Float64()
+	decdigits := priceTick.Abs().NumIntDigits()
+	step := priceTick.Abs().MulExp(-decdigits + 1)
 
+	for i := 0; i < numOrders; i++ {
+		quantityExp := fixedpoint.NewFromFloat(math.Exp(expBase.Float64()))
+		volume := baseQuantity.Mul(quantityExp)
+		amount := volume.Mul(price)
 		// skip order less than 10usd
-		if volume*price.Float64() < 10.0 {
-			log.Warnf("amount too small (< 10usd). price=%f volume=%f amount=%f", price.Float64(), volume, volume*price.Float64())
+		if amount.Compare(Ten) < 0 {
+			log.Warnf("amount too small (< 10usd). price=%s volume=%s amount=%s",
+				price.String(), volume.String(), amount.String())
 			continue
 		}
 
@@ -172,19 +179,18 @@ func (s *Strategy) generateOrders(symbol string, side types.SideType, price, pri
 			Symbol:   symbol,
 			Side:     side,
 			Type:     types.OrderTypeLimit,
-			Price:    price.Float64(),
+			Price:    price,
 			Quantity: volume,
 		})
 
-		log.Infof("%s order: %.2f @ %f", side, volume, price.Float64())
+		log.Infof("%s order: %s @ %s", side, volume.String(), price.String())
 
 		if len(orders) >= numOrders {
 			break
 		}
 
-		price = price + priceTick
-		declog := math.Log10(math.Abs(priceTick.Float64()))
-		expBase += fixedpoint.NewFromFloat(math.Pow10(-int(declog)) * math.Abs(priceTick.Float64()))
+		price = price.Add(priceTick)
+		expBase = expBase.Add(step)
 	}
 
 	return orders

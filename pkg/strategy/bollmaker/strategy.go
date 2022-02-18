@@ -27,9 +27,9 @@ const ID = "bollmaker"
 
 const stateKey = "state-v1"
 
-var one = fixedpoint.NewFromFloat(1.0)
-
 var defaultFeeRate = fixedpoint.NewFromFloat(0.001)
+var notionModifier = fixedpoint.NewFromFloat(1.1)
+var two = fixedpoint.NewFromInt(2)
 
 var log = logrus.WithField("strategy", ID)
 
@@ -201,32 +201,32 @@ func (s *Strategy) CurrentPosition() *types.Position {
 	return s.state.Position
 }
 
-func (s *Strategy) ClosePosition(ctx context.Context, percentage float64) error {
+func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Value) error {
 	base := s.state.Position.GetBase()
-	if base == 0 {
+	if base.IsZero() {
 		return fmt.Errorf("no opened %s position", s.state.Position.Symbol)
 	}
 
 	// make it negative
-	quantity := base.MulFloat64(percentage).Abs()
+	quantity := base.Mul(percentage).Abs()
 	side := types.SideTypeBuy
-	if base > 0 {
+	if base.Sign() > 0 {
 		side = types.SideTypeSell
 	}
 
-	if quantity.Float64() < s.market.MinQuantity {
-		return fmt.Errorf("order quantity %f is too small, less than %f", quantity.Float64(), s.market.MinQuantity)
+	if quantity.Compare(s.market.MinQuantity) < 0 {
+		return fmt.Errorf("order quantity %v is too small, less than %v", quantity, s.market.MinQuantity)
 	}
 
 	submitOrder := types.SubmitOrder{
 		Symbol:   s.Symbol,
 		Side:     side,
 		Type:     types.OrderTypeMarket,
-		Quantity: quantity.Float64(),
+		Quantity: quantity,
 		Market:   s.market,
 	}
 
-	s.Notify("Submitting %s %s order to close position by %f", s.Symbol, side.String(), percentage, submitOrder)
+	s.Notify("Submitting %s %s order to close position by %v", s.Symbol, side.String(), percentage, submitOrder)
 
 	createdOrders, err := s.session.Exchange.SubmitOrders(ctx, submitOrder)
 	if err != nil {
@@ -282,7 +282,7 @@ func (s *Strategy) getCurrentAllowedExposurePosition(bandPercentage float64) (fi
 	if s.DynamicExposurePositionScale != nil {
 		v, err := s.DynamicExposurePositionScale.Scale(bandPercentage)
 		if err != nil {
-			return 0, err
+			return fixedpoint.Zero, err
 		}
 		return fixedpoint.NewFromFloat(v), nil
 	}
@@ -292,26 +292,26 @@ func (s *Strategy) getCurrentAllowedExposurePosition(bandPercentage float64) (fi
 
 func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExecutor, midPrice fixedpoint.Value, kline *types.KLine) {
 	bidSpread := s.Spread
-	if s.BidSpread > 0 {
+	if s.BidSpread.Sign() > 0 {
 		bidSpread = s.BidSpread
 	}
 
 	askSpread := s.Spread
-	if s.AskSpread > 0 {
+	if s.AskSpread.Sign() > 0 {
 		askSpread = s.AskSpread
 	}
 
-	askPrice := midPrice.Mul(one + askSpread)
-	bidPrice := midPrice.Mul(one - bidSpread)
+	askPrice := midPrice.Mul(fixedpoint.One.Add(askSpread))
+	bidPrice := midPrice.Mul(fixedpoint.One.Sub(bidSpread))
 	base := s.state.Position.GetBase()
 	balances := s.session.Account.Balances()
 
-	log.Infof("mid price:%f spread: %s ask:%f bid: %f position: %s",
-		midPrice.Float64(),
+	log.Infof("mid price:%v spread: %s ask:%v bid: %v position: %s",
+		midPrice,
 		s.Spread.Percentage(),
-		askPrice.Float64(),
-		bidPrice.Float64(),
-		s.state.Position.String(),
+		askPrice,
+		bidPrice,
+		s.state.Position,
 	)
 
 	sellQuantity := s.QuantityOrAmount.CalculateQuantity(askPrice)
@@ -321,8 +321,8 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 		Symbol:   s.Symbol,
 		Side:     types.SideTypeSell,
 		Type:     types.OrderTypeLimitMaker,
-		Quantity: sellQuantity.Float64(),
-		Price:    askPrice.Float64(),
+		Quantity: sellQuantity,
+		Price:    askPrice,
 		Market:   s.market,
 		GroupID:  s.groupID,
 	}
@@ -330,8 +330,8 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 		Symbol:   s.Symbol,
 		Side:     types.SideTypeBuy,
 		Type:     types.OrderTypeLimitMaker,
-		Quantity: buyQuantity.Float64(),
-		Price:    bidPrice.Float64(),
+		Quantity: buyQuantity,
+		Price:    bidPrice,
 		Market:   s.market,
 		GroupID:  s.groupID,
 	}
@@ -347,7 +347,7 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 	log.Infof("bollinger band: up %f sma %f down %f", upBand, sma, downBand)
 
 	bandPercentage := calculateBandPercentage(upBand, downBand, sma, midPrice.Float64())
-	log.Infof("mid price band percentage: %f", bandPercentage)
+	log.Infof("mid price band percentage: %v", bandPercentage)
 
 	maxExposurePosition, err := s.getCurrentAllowedExposurePosition(bandPercentage)
 	if err != nil {
@@ -355,19 +355,19 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 		return
 	}
 
-	log.Infof("calculated max exposure position: %f", maxExposurePosition.Float64())
+	log.Infof("calculated max exposure position: %v", maxExposurePosition)
 
 	canSell := true
 	canBuy := true
 
-	if maxExposurePosition > 0 && base > maxExposurePosition {
+	if maxExposurePosition.Sign() > 0 && base.Compare(maxExposurePosition) > 0 {
 		canBuy = false
 	}
 
-	if maxExposurePosition > 0 {
-		if s.Long != nil && *s.Long && base < 0 {
+	if maxExposurePosition.Sign() > 0 {
+		if s.Long != nil && *s.Long && base.Sign() < 0 {
 			canSell = false
-		} else if base < -maxExposurePosition {
+		} else if base.Compare(maxExposurePosition.Neg()) < 0 {
 			canSell = false
 		}
 	}
@@ -377,15 +377,15 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 		case types.DirectionDown:
 			shadowHeight := kline.GetLowerShadowHeight()
 			shadowRatio := kline.GetLowerShadowRatio()
-			if shadowHeight == 0.0 && shadowRatio < s.ShadowProtectionRatio.Float64() {
-				log.Infof("%s shadow protection enabled, lower shadow ratio %f < %f", s.Symbol, shadowRatio, s.ShadowProtectionRatio.Float64())
+			if shadowHeight.IsZero() && shadowRatio.Compare(s.ShadowProtectionRatio) < 0 {
+				log.Infof("%s shadow protection enabled, lower shadow ratio %v < %v", s.Symbol, shadowRatio, s.ShadowProtectionRatio)
 				canBuy = false
 			}
 		case types.DirectionUp:
 			shadowHeight := kline.GetUpperShadowHeight()
 			shadowRatio := kline.GetUpperShadowRatio()
-			if shadowHeight == 0.0 || shadowRatio < s.ShadowProtectionRatio.Float64() {
-				log.Infof("%s shadow protection enabled, upper shadow ratio %f < %f", s.Symbol, shadowRatio, s.ShadowProtectionRatio.Float64())
+			if shadowHeight.IsZero() || shadowRatio.Compare(s.ShadowProtectionRatio) < 0 {
+				log.Infof("%s shadow protection enabled, upper shadow ratio %v < %v", s.Symbol, shadowRatio, s.ShadowProtectionRatio)
 				canSell = false
 			}
 		}
@@ -420,29 +420,29 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 		// do nothing
 
 	case UpTrend:
-		skew := s.UptrendSkew.Float64()
-		buyOrder.Quantity = math.Max(s.market.MinQuantity, sellOrder.Quantity*skew)
+		skew := s.UptrendSkew
+		buyOrder.Quantity = fixedpoint.Max(s.market.MinQuantity, sellOrder.Quantity.Mul(skew))
 
 	case DownTrend:
-		skew := s.DowntrendSkew.Float64()
-		ratio := 1.0 / skew
-		sellOrder.Quantity = math.Max(s.market.MinQuantity, buyOrder.Quantity*ratio)
+		skew := s.DowntrendSkew
+		ratio := fixedpoint.One.Div(skew)
+		sellOrder.Quantity = fixedpoint.Max(s.market.MinQuantity, buyOrder.Quantity.Mul(ratio))
 
 	}
 
-	if !hasQuoteBalance || (buyOrder.Quantity*buyOrder.Price) > quoteBalance.Available.Float64() {
+	if !hasQuoteBalance || buyOrder.Quantity.Mul(buyOrder.Price).Compare(quoteBalance.Available) > 0 {
 		canBuy = false
 	}
 
-	if !hasBaseBalance || sellOrder.Quantity > baseBalance.Available.Float64() {
+	if !hasBaseBalance || sellOrder.Quantity.Compare(baseBalance.Available) > 0 {
 		canSell = false
 	}
 
-	if midPrice < s.state.Position.AverageCost.MulFloat64(1.0+s.MinProfitSpread.Float64()) {
+	if midPrice.Compare(s.state.Position.AverageCost.Mul(fixedpoint.One.Add(s.MinProfitSpread))) < 0 {
 		canSell = false
 	}
 
-	if s.Long != nil && *s.Long && (base.Float64()-sellOrder.Quantity < 0) {
+	if s.Long != nil && *s.Long && base.Sub(sellOrder.Quantity).Sign() < 0 {
 		canSell = false
 	}
 
@@ -506,12 +506,12 @@ func (s *Strategy) detectPriceTrend(inc *indicator.BOLL, price float64) PriceTre
 }
 
 func (s *Strategy) adjustOrderQuantity(submitOrder types.SubmitOrder) types.SubmitOrder {
-	if submitOrder.Quantity*submitOrder.Price < s.market.MinNotional {
-		submitOrder.Quantity = bbgo.AdjustFloatQuantityByMinAmount(submitOrder.Quantity, submitOrder.Price, s.market.MinNotional*1.1)
+	if submitOrder.Quantity.Mul(submitOrder.Price).Compare(s.market.MinNotional) < 0 {
+		submitOrder.Quantity = bbgo.AdjustFloatQuantityByMinAmount(submitOrder.Quantity, submitOrder.Price, s.market.MinNotional.Mul(notionModifier))
 	}
 
-	if submitOrder.Quantity < s.market.MinQuantity {
-		submitOrder.Quantity = math.Max(submitOrder.Quantity, s.market.MinQuantity)
+	if submitOrder.Quantity.Compare(s.market.MinQuantity) < 0 {
+		submitOrder.Quantity = fixedpoint.Max(submitOrder.Quantity, s.market.MinQuantity)
 	}
 
 	return submitOrder
@@ -522,19 +522,19 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.Long = &[]bool{true}[0]
 	}
 
-	if s.MinProfitSpread == 0 {
+	if s.MinProfitSpread.IsZero() {
 		s.MinProfitSpread = fixedpoint.NewFromFloat(0.001)
 	}
 
-	if s.UptrendSkew == 0 {
+	if s.UptrendSkew.IsZero() {
 		s.UptrendSkew = fixedpoint.NewFromFloat(1.0 / 1.2)
 	}
 
-	if s.DowntrendSkew == 0 {
+	if s.DowntrendSkew.IsZero() {
 		s.DowntrendSkew = fixedpoint.NewFromFloat(1.2)
 	}
 
-	if s.ShadowProtectionRatio == 0 {
+	if s.ShadowProtectionRatio.IsZero() {
 		s.ShadowProtectionRatio = fixedpoint.NewFromFloat(0.01)
 	}
 
@@ -570,14 +570,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.tradeCollector = bbgo.NewTradeCollector(s.Symbol, s.state.Position, s.orderStore)
 	s.tradeCollector.OnProfit(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
-		log.Infof("generated profit: %f", profit.Float64())
+		log.Infof("generated profit: %v", profit)
 		p := bbgo.Profit{
 			Symbol:          s.Symbol,
 			Profit:          profit,
 			NetProfit:       netProfit,
-			TradeAmount:     fixedpoint.NewFromFloat(trade.QuoteQuantity),
-			ProfitMargin:    profit.DivFloat64(trade.QuoteQuantity),
-			NetProfitMargin: netProfit.DivFloat64(trade.QuoteQuantity),
+			TradeAmount:     trade.QuoteQuantity,
+			ProfitMargin:    profit.Div(trade.QuoteQuantity),
+			NetProfitMargin: netProfit.Div(trade.QuoteQuantity),
 			QuoteCurrency:   s.state.Position.QuoteCurrency,
 			BaseCurrency:    s.state.Position.BaseCurrency,
 			Time:            trade.Time.Time(),
@@ -608,11 +608,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				return
 			}
 
-			midPrice := fixedpoint.NewFromFloat((ticker.Buy + ticker.Sell) / 2)
+			midPrice := ticker.Buy.Add(ticker.Sell).Div(two)
 			s.placeOrders(ctx, orderExecutor, midPrice, nil)
 		} else {
 			if price, ok := session.LastPrice(s.Symbol); ok {
-				s.placeOrders(ctx, orderExecutor, fixedpoint.NewFromFloat(price), nil)
+				s.placeOrders(ctx, orderExecutor, price, nil)
 			}
 		}
 	})
@@ -635,12 +635,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				return
 			}
 
-			mid := (ticker.Buy + ticker.Sell) / 2
-			log.Infof("using ticker price: bid %f / ask %f, mid price %f", ticker.Buy, ticker.Sell, mid)
-			midPrice := fixedpoint.NewFromFloat(mid)
+			midPrice := ticker.Buy.Add(ticker.Sell).Div(two)
+			log.Infof("using ticker price: bid %v / ask %v, mid price %v", ticker.Buy, ticker.Sell, midPrice)
 			s.placeOrders(ctx, orderExecutor, midPrice, &kline)
 		} else {
-			s.placeOrders(ctx, orderExecutor, fixedpoint.NewFromFloat(kline.Close), &kline)
+			s.placeOrders(ctx, orderExecutor, kline.Close, &kline)
 		}
 	})
 

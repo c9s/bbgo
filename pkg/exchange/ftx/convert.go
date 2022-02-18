@@ -7,7 +7,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -64,14 +63,14 @@ func toGlobalOrder(r order) (types.Order, error) {
 	case "new":
 		o.Status = types.OrderStatusNew
 	case "open":
-		if fixedpoint.NewFromFloat(o.ExecutedQuantity) != fixedpoint.NewFromInt(0) {
+		if !o.ExecutedQuantity.IsZero() {
 			o.Status = types.OrderStatusPartiallyFilled
 		} else {
 			o.Status = types.OrderStatusNew
 		}
 	case "closed":
 		// filled or canceled
-		if fixedpoint.NewFromFloat(o.Quantity) == fixedpoint.NewFromFloat(o.ExecutedQuantity) {
+		if o.Quantity == o.ExecutedQuantity {
 			o.Status = types.OrderStatusFilled
 		} else {
 			// can't distinguish it's canceled or rejected from order response, so always set to canceled
@@ -124,7 +123,7 @@ func toGlobalTrade(f fill) (types.Trade, error) {
 		Exchange:      types.ExchangeFTX,
 		Price:         f.Price,
 		Quantity:      f.Size,
-		QuoteQuantity: f.Price * f.Size,
+		QuoteQuantity: f.Price.Mul(f.Size),
 		Symbol:        toGlobalSymbol(f.Market),
 		Side:          f.Side,
 		IsBuyer:       f.Side == types.SideTypeBuy,

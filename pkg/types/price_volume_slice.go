@@ -13,19 +13,19 @@ type PriceVolume struct {
 }
 
 func (p PriceVolume) String() string {
-	return fmt.Sprintf("PriceVolume{ price: %f, volume: %f }", p.Price.Float64(), p.Volume.Float64())
+	return fmt.Sprintf("PriceVolume{ price: %s, volume: %s }", p.Price.String(), p.Volume.String())
 }
 
 type PriceVolumeSlice []PriceVolume
 
 func (slice PriceVolumeSlice) Len() int           { return len(slice) }
-func (slice PriceVolumeSlice) Less(i, j int) bool { return slice[i].Price < slice[j].Price }
+func (slice PriceVolumeSlice) Less(i, j int) bool { return slice[i].Price.Compare(slice[j].Price) < 0 }
 func (slice PriceVolumeSlice) Swap(i, j int)      { slice[i], slice[j] = slice[j], slice[i] }
 
 // Trim removes the pairs that volume = 0
 func (slice PriceVolumeSlice) Trim() (pvs PriceVolumeSlice) {
 	for _, pv := range slice {
-		if pv.Volume > 0 {
+		if pv.Volume.Sign() > 0 {
 			pvs = append(pvs, pv)
 		}
 	}
@@ -64,10 +64,10 @@ func (slice PriceVolumeSlice) First() (PriceVolume, bool) {
 }
 
 func (slice PriceVolumeSlice) IndexByVolumeDepth(requiredVolume fixedpoint.Value) int {
-	var tv fixedpoint.Value = 0
+	var tv fixedpoint.Value = fixedpoint.Zero
 	for x, el := range slice {
-		tv += el.Volume
-		if tv >= requiredVolume {
+		tv = tv.Add(el.Volume)
+		if tv.Compare(requiredVolume) >= 0 {
 			return x
 		}
 	}
@@ -84,7 +84,7 @@ func (slice PriceVolumeSlice) InsertAt(idx int, pv PriceVolume) PriceVolumeSlice
 
 func (slice PriceVolumeSlice) Remove(price fixedpoint.Value, descending bool) PriceVolumeSlice {
 	matched, idx := slice.Find(price, descending)
-	if matched.Price != price || matched.Price == 0 {
+	if matched.Price.Compare(price) != 0 || matched.Price.IsZero() {
 		return slice
 	}
 
@@ -98,12 +98,12 @@ func (slice PriceVolumeSlice) Remove(price fixedpoint.Value, descending bool) Pr
 func (slice PriceVolumeSlice) Find(price fixedpoint.Value, descending bool) (pv PriceVolume, idx int) {
 	idx = sort.Search(len(slice), func(i int) bool {
 		if descending {
-			return slice[i].Price <= price
+			return slice[i].Price.Compare(price) <= 0
 		}
-		return slice[i].Price >= price
+		return slice[i].Price.Compare(price) >= 0
 	})
 
-	if idx >= len(slice) || slice[idx].Price != price {
+	if idx >= len(slice) || slice[idx].Price.Compare(price) != 0 {
 		return pv, idx
 	}
 
@@ -119,7 +119,7 @@ func (slice PriceVolumeSlice) Upsert(pv PriceVolume, descending bool) PriceVolum
 
 	price := pv.Price
 	_, idx := slice.Find(price, descending)
-	if idx >= len(slice) || slice[idx].Price != price {
+	if idx >= len(slice) || slice[idx].Price.Compare(price) != 0 {
 		return slice.InsertAt(idx, pv)
 	}
 
@@ -142,7 +142,7 @@ func (slice *PriceVolumeSlice) UnmarshalJSON(b []byte) error {
 //  [["9000", "10"], ["9900", "10"], ... ]
 //
 func ParsePriceVolumeSliceJSON(b []byte) (slice PriceVolumeSlice, err error) {
-	var as [][]interface{}
+	var as [][]fixedpoint.Value
 
 	err = json.Unmarshal(b, &as)
 	if err != nil {
@@ -151,23 +151,14 @@ func ParsePriceVolumeSliceJSON(b []byte) (slice PriceVolumeSlice, err error) {
 
 	for _, a := range as {
 		var pv PriceVolume
-		price, err := fixedpoint.NewFromAny(a[0])
-		if err != nil {
-			return slice, err
-		}
-
-		volume, err := fixedpoint.NewFromAny(a[1])
-		if err != nil {
-			return slice, err
-		}
+		pv.Price = a[0]
+		pv.Volume = a[1]
 
 		// kucoin returns price in 0, we should skip
-		if price == 0 {
+		if pv.Price.Eq(fixedpoint.Zero) {
 			continue
 		}
 
-		pv.Price = price
-		pv.Volume = volume
 		slice = append(slice, pv)
 	}
 

@@ -24,7 +24,6 @@ var balancesCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 
-
 		configFile, err := cmd.Flags().GetString("config")
 		if err != nil {
 			return err
@@ -38,7 +37,6 @@ var balancesCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-
 
 		// if config file exists, use the config loaded from the config file.
 		// otherwise, use a empty config object
@@ -62,7 +60,6 @@ var balancesCmd = &cobra.Command{
 		if err := environ.ConfigureExchangeSessions(userConfig); err != nil {
 			return err
 		}
-
 
 		if len(sessionName) > 0 {
 			session, ok := environ.Session(sessionName)
@@ -88,7 +85,6 @@ var balancesCmd = &cobra.Command{
 				b.Print()
 			}
 		}
-
 
 		return nil
 	},

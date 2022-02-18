@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 func Test_messageHandler_handleMessage(t *testing.T) {
@@ -46,14 +47,14 @@ func Test_messageHandler_handleMessage(t *testing.T) {
 					Symbol:        "OXY-PERP",
 					Side:          types.SideTypeSell,
 					Type:          types.OrderTypeLimit,
-					Quantity:      1.0,
-					Price:         2.7185,
+					Quantity:      fixedpoint.One,
+					Price:         fixedpoint.NewFromFloat(2.7185),
 					TimeInForce:   "GTC",
 				},
 				Exchange:         types.ExchangeFTX,
 				OrderID:          36379,
 				Status:           types.OrderStatusFilled,
-				ExecutedQuantity: 1.0,
+				ExecutedQuantity: fixedpoint.One,
 				CreationTime:     types.Time(mustParseDatetime("2021-03-28T06:12:50.991447+00:00")),
 				UpdateTime:       types.Time(mustParseDatetime("2021-03-28T06:12:50.991447+00:00")),
 			}, order)
@@ -96,15 +97,15 @@ func Test_messageHandler_handleMessage(t *testing.T) {
 				ID:            6276431,
 				OrderID:       323789,
 				Exchange:      types.ExchangeFTX,
-				Price:         2.723,
-				Quantity:      1.0,
-				QuoteQuantity: 2.723 * 1.0,
+				Price:         fixedpoint.NewFromFloat(2.723),
+				Quantity:      fixedpoint.One,
+				QuoteQuantity: fixedpoint.NewFromFloat(2.723 * 1.0),
 				Symbol:        "OXY-PERP",
 				Side:          types.SideTypeBuy,
 				IsBuyer:       true,
 				IsMaker:       false,
 				Time:          types.Time(mustParseDatetime("2021-03-28T06:12:34.702926+00:00")),
-				Fee:           0.00153917575,
+				Fee:           fixedpoint.NewFromFloat(0.00153917575),
 				FeeCurrency:   "USD",
 				IsMargin:      false,
 				IsIsolated:    false,

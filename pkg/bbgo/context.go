@@ -8,4 +8,3 @@ import (
 type Context struct {
 	sync.Mutex
 }
-

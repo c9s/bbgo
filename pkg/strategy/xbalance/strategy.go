@@ -21,6 +21,8 @@ const ID = "xbalance"
 
 const stateKey = "state-v1"
 
+var priceFixer = fixedpoint.NewFromFloat(0.99)
+
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
@@ -59,7 +61,7 @@ func (s *State) Reset() {
 	var beginningOfTheDay = util.BeginningOfTheDay(time.Now().Local())
 	*s = State{
 		DailyNumberOfTransfers: 0,
-		DailyAmountOfTransfers: 0,
+		DailyAmountOfTransfers: fixedpoint.Zero,
 		Since:                  beginningOfTheDay.Unix(),
 	}
 }
@@ -73,7 +75,7 @@ type WithdrawalRequest struct {
 
 func (r *WithdrawalRequest) String() string {
 	return fmt.Sprintf("WITHDRAWAL REQUEST: sending %s %s from %s -> %s",
-		util.FormatFloat(r.Amount.Float64(), 4),
+		r.Amount.FormatString(4),
 		r.Asset,
 		r.FromSession,
 		r.ToSession,
@@ -82,7 +84,7 @@ func (r *WithdrawalRequest) String() string {
 
 func (r *WithdrawalRequest) PlainText() string {
 	return fmt.Sprintf("Withdrawal request: sending %s %s from %s -> %s",
-		util.FormatFloat(r.Amount.Float64(), 4),
+		r.Amount.FormatString(4),
 		r.Asset,
 		r.FromSession,
 		r.ToSession,
@@ -99,7 +101,7 @@ func (r *WithdrawalRequest) SlackAttachment() slack.Attachment {
 		Color: color,
 		Fields: []slack.AttachmentField{
 			{Title: "Asset", Value: r.Asset, Short: true},
-			{Title: "Amount", Value: util.FormatFloat(r.Amount.Float64(), 4), Short: true},
+			{Title: "Amount", Value: r.Amount.FormatString(4), Short: true},
 			{Title: "From", Value: r.FromSession},
 			{Title: "To", Value: r.ToSession},
 		},
@@ -173,7 +175,7 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 	var total fixedpoint.Value
 	for _, session := range sessions {
 		if b, ok := session.Account.Balance(s.Asset); ok {
-			total += b.Total()
+			total = total.Add(b.Total())
 		}
 	}
 
@@ -186,23 +188,22 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 
 	if lowLevelSession == nil {
 		if s.Verbose {
-			s.Notifiability.Notify("✅ All %s balances are looking good, total value: %f", s.Asset, total.Float64())
+			s.Notifiability.Notify("✅ All %s balances are looking good, total value: %v", s.Asset, total)
 		}
 		return
 	}
 
-	s.Notifiability.Notify("⚠️ Found low level %s balance from session %s: %s", s.Asset, lowLevelSession.Name, lowLevelBalance.String())
+	s.Notifiability.Notify("⚠️ Found low level %s balance from session %s: %v", s.Asset, lowLevelSession.Name, lowLevelBalance)
 
 	middle := s.Middle
-	if middle == 0 {
-
-		middle = total.DivFloat64(float64(len(sessions))).MulFloat64(0.99)
-		s.Notifiability.Notify("Total value %f %s, setting middle to %f", total.Float64(), s.Asset, middle.Float64())
+	if middle.IsZero() {
+		middle = total.Div(fixedpoint.NewFromInt(int64(len(sessions)))).Mul(priceFixer)
+		s.Notifiability.Notify("Total value %v %s, setting middle to %v", total, s.Asset, middle)
 	}
 
-	requiredAmount := middle - lowLevelBalance.Available
+	requiredAmount := middle.Sub(lowLevelBalance.Available)
 
-	s.Notifiability.Notify("Need %f %s to satisfy the middle balance level %f", requiredAmount.Float64(), s.Asset, middle.Float64())
+	s.Notifiability.Notify("Need %v %s to satisfy the middle balance level %v", requiredAmount, s.Asset, middle)
 
 	fromSession, _, err := s.findHighestBalanceLevelSession(sessions, requiredAmount)
 	if err != nil || fromSession == nil {
@@ -230,8 +231,8 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 		return
 	}
 
-	if toAddress.ForeignFee > 0 {
-		requiredAmount += toAddress.ForeignFee
+	if toAddress.ForeignFee.Sign() > 0 {
+		requiredAmount = requiredAmount.Add(toAddress.ForeignFee)
 	}
 
 	if s.state != nil {
@@ -245,12 +246,12 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 			}
 		}
 
-		if s.MaxDailyAmountOfTransfer > 0 {
-			if s.state.DailyAmountOfTransfers >= s.MaxDailyAmountOfTransfer {
-				s.Notifiability.Notify("⚠️ Exceeded %s max daily amount of transfers %f (current %f), skipping transfer...",
+		if s.MaxDailyAmountOfTransfer.Sign() > 0 {
+			if s.state.DailyAmountOfTransfers.Compare(s.MaxDailyAmountOfTransfer) >= 0 {
+				s.Notifiability.Notify("⚠️ Exceeded %s max daily amount of transfers %v (current %v), skipping transfer...",
 					s.Asset,
-					s.MaxDailyAmountOfTransfer.Float64(),
-					s.state.DailyAmountOfTransfers.Float64())
+					s.MaxDailyAmountOfTransfer,
+					s.state.DailyAmountOfTransfers)
 				return
 			}
 		}
@@ -280,14 +281,14 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 		}
 
 		s.state.DailyNumberOfTransfers += 1
-		s.state.DailyAmountOfTransfers += requiredAmount
+		s.state.DailyAmountOfTransfers = s.state.DailyAmountOfTransfers.Add(requiredAmount)
 		s.SaveState()
 	}
 }
 
 func (s *Strategy) findHighestBalanceLevelSession(sessions map[string]*bbgo.ExchangeSession, requiredAmount fixedpoint.Value) (*bbgo.ExchangeSession, types.Balance, error) {
 	var balance types.Balance
-	var maxBalanceLevel fixedpoint.Value = 0
+	var maxBalanceLevel = fixedpoint.Zero
 	var maxBalanceSession *bbgo.ExchangeSession = nil
 	for sessionID := range s.Addresses {
 		session, ok := sessions[sessionID]
@@ -296,7 +297,7 @@ func (s *Strategy) findHighestBalanceLevelSession(sessions map[string]*bbgo.Exch
 		}
 
 		if b, ok := session.Account.Balance(s.Asset); ok {
-			if b.Available-requiredAmount > s.Low && b.Available > maxBalanceLevel {
+			if b.Available.Sub(requiredAmount).Compare(s.Low) > 0 && b.Available.Compare(maxBalanceLevel) > 0 {
 				maxBalanceLevel = b.Available
 				maxBalanceSession = session
 				balance = b
@@ -317,7 +318,7 @@ func (s *Strategy) findLowBalanceLevelSession(sessions map[string]*bbgo.Exchange
 
 		balance, ok = session.Account.Balance(s.Asset)
 		if ok {
-			if balance.Available <= s.Low {
+			if balance.Available.Compare(s.Low) <= 0 {
 				return session, balance, nil
 			}
 		}
@@ -339,7 +340,7 @@ func (s *Strategy) newDefaultState() *State {
 	return &State{
 		Asset:                  s.Asset,
 		DailyNumberOfTransfers: 0,
-		DailyAmountOfTransfers: 0,
+		DailyAmountOfTransfers: fixedpoint.Zero,
 	}
 }
 

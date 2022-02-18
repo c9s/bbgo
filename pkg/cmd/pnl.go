@@ -159,7 +159,7 @@ var PnLCmd = &cobra.Command{
 		}
 
 		log.Infof("found checkpoints: %+v", checkpoints)
-		log.Infof("stock: %f", stockManager.Stocks.Quantity())
+		log.Infof("stock: %v", stockManager.Stocks.Quantity())
 
 		tickers, err := exchange.QueryTickers(ctx, symbol)
 

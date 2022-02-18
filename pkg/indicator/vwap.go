@@ -44,7 +44,7 @@ func (inc *VWAP) calculateVWAP(kLines []types.KLine, priceF KLinePriceMapper) (v
 func (inc *VWAP) update(kLine types.KLine, priceF KLinePriceMapper, multiplier float64) {
 	// multiplier = 1 or -1
 	price := priceF(kLine)
-	volume := kLine.Volume
+	volume := kLine.Volume.Float64()
 
 	inc.WeightedSum += multiplier * price * volume
 	inc.VolumeSum += multiplier * volume
@@ -63,7 +63,7 @@ func (inc *VWAP) calculateAndUpdate(kLines []types.KLine) {
 	if len(inc.Values) == 0 {
 		// for the first value, we should use the close price
 		price := priceF(kLines[0])
-		volume := kLines[0].Volume
+		volume := kLines[0].Volume.Float64()
 
 		inc.Values = []float64{price}
 		inc.WeightedSum = price * volume

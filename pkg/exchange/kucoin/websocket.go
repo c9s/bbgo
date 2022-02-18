@@ -6,7 +6,6 @@ import (
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
 )
 
 type WebSocketMessageType string
@@ -97,12 +96,12 @@ type WebSocketCandleEvent struct {
 
 func (e *WebSocketCandleEvent) KLine() types.KLine {
 	startTime := types.MustParseUnixTimestamp(e.Candles[0])
-	openPrice := util.MustParseFloat(e.Candles[1])
-	closePrice := util.MustParseFloat(e.Candles[2])
-	highPrice := util.MustParseFloat(e.Candles[3])
-	lowPrice := util.MustParseFloat(e.Candles[4])
-	volume := util.MustParseFloat(e.Candles[5])
-	quoteVolume := util.MustParseFloat(e.Candles[6])
+	openPrice := fixedpoint.MustNewFromString(e.Candles[1])
+	closePrice := fixedpoint.MustNewFromString(e.Candles[2])
+	highPrice := fixedpoint.MustNewFromString(e.Candles[3])
+	lowPrice := fixedpoint.MustNewFromString(e.Candles[4])
+	volume := fixedpoint.MustNewFromString(e.Candles[5])
+	quoteVolume := fixedpoint.MustNewFromString(e.Candles[6])
 	kline := types.KLine{
 		Exchange:    types.ExchangeKucoin,
 		Symbol:      toGlobalSymbol(e.Symbol),

@@ -68,12 +68,14 @@ func (s *Strategy) ID() string {
 	return ID
 }
 
+var Ten = fixedpoint.NewFromInt(10)
+
 func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {}
 
 func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]*bbgo.ExchangeSession) {
 	totalAssets := types.AssetMap{}
 	totalBalances := types.BalanceMap{}
-	lastPrices := map[string]float64{}
+	lastPrices := map[string]fixedpoint.Value{}
 	for _, session := range sessions {
 		balances := session.Account.Balances()
 		if err := session.UpdatePrices(ctx); err != nil {
@@ -83,8 +85,8 @@ func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]
 
 		for _, b := range balances {
 			if tb, ok := totalBalances[b.Currency]; ok {
-				tb.Available += b.Available
-				tb.Locked += b.Locked
+				tb.Available = tb.Available.Add(b.Available)
+				tb.Locked = tb.Locked.Add(b.Locked)
 				totalBalances[b.Currency] = tb
 			} else {
 				totalBalances[b.Currency] = b
@@ -99,7 +101,7 @@ func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]
 
 	assets := totalBalances.Assets(lastPrices)
 	for currency, asset := range assets {
-		if s.IgnoreDusts && asset.InUSD < fixedpoint.NewFromFloat(10.0) {
+		if s.IgnoreDusts && asset.InUSD.Compare(Ten) < 0 {
 			continue
 		}
 

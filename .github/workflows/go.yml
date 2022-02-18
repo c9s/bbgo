@@ -44,3 +44,6 @@ jobs:
 
     - name: Test
       run: go test -v ./pkg/...
+
+    - name: TestDnum
+      run: go test -tags dnum -v ./pkg/...

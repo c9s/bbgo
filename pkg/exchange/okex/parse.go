@@ -209,12 +209,12 @@ func (c *Candle) KLine() types.KLine {
 	return types.KLine{
 		Exchange:    types.ExchangeOKEx,
 		Interval:    interval,
-		Open:        c.Open.Float64(),
-		High:        c.High.Float64(),
-		Low:         c.Low.Float64(),
-		Close:       c.Close.Float64(),
-		Volume:      c.Volume.Float64(),
-		QuoteVolume: c.VolumeInCurrency.Float64(),
+		Open:        c.Open,
+		High:        c.High,
+		Low:         c.Low,
+		Close:       c.Close,
+		Volume:      c.Volume,
+		QuoteVolume: c.VolumeInCurrency,
 		StartTime:   types.Time(c.StartTime),
 		EndTime:     types.Time(endTime),
 	}

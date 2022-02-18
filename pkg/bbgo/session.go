@@ -173,8 +173,8 @@ type ExchangeSession struct {
 
 	// Withdrawal is used for enabling withdrawal functions
 	Withdrawal   bool             `json:"withdrawal,omitempty" yaml:"withdrawal,omitempty"`
-	MakerFeeRate fixedpoint.Value `json:"makerFeeRate,omitempty" yaml:"makerFeeRate,omitempty"`
-	TakerFeeRate fixedpoint.Value `json:"takerFeeRate,omitempty" yaml:"takerFeeRate,omitempty"`
+	MakerFeeRate fixedpoint.Value `json:"makerFeeRate" yaml:"makerFeeRate"`
+	TakerFeeRate fixedpoint.Value `json:"takerFeeRate" yaml:"takerFeeRate"`
 
 	PublicOnly           bool   `json:"publicOnly,omitempty" yaml:"publicOnly"`
 	Margin               bool   `json:"margin,omitempty" yaml:"margin"`
@@ -217,9 +217,9 @@ type ExchangeSession struct {
 	orderBooks map[string]*types.StreamOrderBook
 
 	// startPrices is used for backtest
-	startPrices map[string]float64
+	startPrices map[string]fixedpoint.Value
 
-	lastPrices         map[string]float64
+	lastPrices         map[string]fixedpoint.Value
 	lastPriceUpdatedAt time.Time
 
 	// marketDataStores contains the market data store of each market
@@ -260,8 +260,8 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 
 		orderBooks:            make(map[string]*types.StreamOrderBook),
 		markets:               make(map[string]types.Market),
-		startPrices:           make(map[string]float64),
-		lastPrices:            make(map[string]float64),
+		startPrices:           make(map[string]fixedpoint.Value),
+		lastPrices:            make(map[string]fixedpoint.Value),
 		positions:             make(map[string]*types.Position),
 		marketDataStores:      make(map[string]*MarketDataStore),
 		standardIndicatorSets: make(map[string]*StandardIndicatorSet),
@@ -497,7 +497,7 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 		}
 	}
 
-	log.Infof("%s last price: %f", symbol, session.lastPrices[symbol])
+	log.Infof("%s last price: %v", symbol, session.lastPrices[symbol])
 
 	session.initializedSymbols[symbol] = struct{}{}
 	return nil
@@ -545,17 +545,17 @@ func (session *ExchangeSession) OrderBook(symbol string) (s *types.StreamOrderBo
 	return s, ok
 }
 
-func (session *ExchangeSession) StartPrice(symbol string) (price float64, ok bool) {
+func (session *ExchangeSession) StartPrice(symbol string) (price fixedpoint.Value, ok bool) {
 	price, ok = session.startPrices[symbol]
 	return price, ok
 }
 
-func (session *ExchangeSession) LastPrice(symbol string) (price float64, ok bool) {
+func (session *ExchangeSession) LastPrice(symbol string) (price fixedpoint.Value, ok bool) {
 	price, ok = session.lastPrices[symbol]
 	return price, ok
 }
 
-func (session *ExchangeSession) LastPrices() map[string]float64 {
+func (session *ExchangeSession) LastPrices() map[string]fixedpoint.Value {
 	return session.lastPrices
 }
 
@@ -644,7 +644,7 @@ func (session *ExchangeSession) FindPossibleSymbols() (symbols []string, err err
 	var fiatAssets []string
 
 	for _, currency := range types.FiatCurrencies {
-		if balance, ok := balances[currency]; ok && balance.Total() > 0 {
+		if balance, ok := balances[currency]; ok && balance.Total().Sign() > 0 {
 			fiatAssets = append(fiatAssets, currency)
 		}
 	}
@@ -659,7 +659,7 @@ func (session *ExchangeSession) FindPossibleSymbols() (symbols []string, err err
 
 		// ignore the asset that we don't have in the balance sheet
 		balance, hasAsset := balances[market.BaseCurrency]
-		if !hasAsset || balance.Total() == 0 {
+		if !hasAsset || balance.Total().IsZero() {
 			continue
 		}
 
@@ -740,8 +740,8 @@ func (session *ExchangeSession) InitExchange(name string, exchange types.Exchang
 
 	session.orderBooks = make(map[string]*types.StreamOrderBook)
 	session.markets = make(map[string]types.Market)
-	session.lastPrices = make(map[string]float64)
-	session.startPrices = make(map[string]float64)
+	session.lastPrices = make(map[string]fixedpoint.Value)
+	session.startPrices = make(map[string]fixedpoint.Value)
 	session.marketDataStores = make(map[string]*MarketDataStore)
 	session.positions = make(map[string]*types.Position)
 	session.standardIndicatorSets = make(map[string]*StandardIndicatorSet)
@@ -812,7 +812,7 @@ func (session *ExchangeSession) metricsTradeUpdater(trade types.Trade) {
 		"symbol":    trade.Symbol,
 		"liquidity": trade.Liquidity(),
 	}
-	metricsTradingVolume.With(labels).Add(trade.Quantity * trade.Price)
+	metricsTradingVolume.With(labels).Add(trade.Quantity.Mul(trade.Price).Float64())
 	metricsTradesTotal.With(labels).Inc()
 	metricsLastUpdateTimeBalance.With(prometheus.Labels{
 		"exchange":  session.ExchangeName.String(),

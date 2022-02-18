@@ -463,7 +463,7 @@ func (environ *Environment) BindSync(userConfig *Config) {
 	orderWriter := func(order types.Order) {
 		switch order.Status {
 		case types.OrderStatusFilled, types.OrderStatusCanceled:
-			if order.ExecutedQuantity > 0.0 {
+			if order.ExecutedQuantity.Sign() > 0 {
 				if err := environ.OrderService.Insert(order); err != nil {
 					log.WithError(err).Errorf("order insert error: %+v", order)
 				}

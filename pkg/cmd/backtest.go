@@ -21,14 +21,15 @@ import (
 	"github.com/c9s/bbgo/pkg/backtest"
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
 type BackTestReport struct {
 	Symbol          string                    `json:"symbol,omitempty"`
-	LastPrice       float64                   `json:"lastPrice,omitempty"`
-	StartPrice      float64                   `json:"startPrice,omitempty"`
+	LastPrice       fixedpoint.Value          `json:"lastPrice,omitempty"`
+	StartPrice      fixedpoint.Value          `json:"startPrice,omitempty"`
 	PnLReport       *pnl.AverageCostPnlReport `json:"pnlReport,omitempty"`
 	InitialBalances types.BalanceMap          `json:"initialBalances,omitempty"`
 	FinalBalances   types.BalanceMap          `json:"finalBalances,omitempty"`
@@ -380,26 +381,26 @@ var BacktestCmd = &cobra.Command{
 				}
 
 				initQuoteAsset := inQuoteAsset(initBalances, market, startPrice)
-				finalQuoteAsset := inQuoteAsset(finalBalances, market, startPrice)
-				log.Infof("INITIAL ASSET IN %s ~= %s %s (1 %s = %f)", market.QuoteCurrency, market.FormatQuantity(initQuoteAsset), market.QuoteCurrency, market.BaseCurrency, startPrice)
-				log.Infof("FINAL ASSET IN %s ~= %s %s (1 %s = %f)", market.QuoteCurrency, market.FormatQuantity(finalQuoteAsset), market.QuoteCurrency, market.BaseCurrency, lastPrice)
+				finalQuoteAsset := inQuoteAsset(finalBalances, market, lastPrice)
+				log.Infof("INITIAL ASSET IN %s ~= %s %s (1 %s = %v)", market.QuoteCurrency, market.FormatQuantity(initQuoteAsset), market.QuoteCurrency, market.BaseCurrency, startPrice)
+				log.Infof("FINAL ASSET IN %s ~= %s %s (1 %s = %v)", market.QuoteCurrency, market.FormatQuantity(finalQuoteAsset), market.QuoteCurrency, market.BaseCurrency, lastPrice)
 
-				if report.Profit > 0 {
-					color.Green("REALIZED PROFIT: +%f %s", report.Profit.Float64(), market.QuoteCurrency)
+				if report.Profit.Sign() > 0 {
+					color.Green("REALIZED PROFIT: +%v %s", report.Profit, market.QuoteCurrency)
 				} else {
-					color.Red("REALIZED PROFIT: %f %s", report.Profit.Float64(), market.QuoteCurrency)
+					color.Red("REALIZED PROFIT: %v %s", report.Profit, market.QuoteCurrency)
 				}
 
-				if report.UnrealizedProfit > 0 {
-					color.Green("UNREALIZED PROFIT: +%f %s", report.UnrealizedProfit.Float64(), market.QuoteCurrency)
+				if report.UnrealizedProfit.Sign() > 0 {
+					color.Green("UNREALIZED PROFIT: +%v %s", report.UnrealizedProfit, market.QuoteCurrency)
 				} else {
-					color.Red("UNREALIZED PROFIT: %f %s", report.UnrealizedProfit.Float64(), market.QuoteCurrency)
+					color.Red("UNREALIZED PROFIT: %v %s", report.UnrealizedProfit, market.QuoteCurrency)
 				}
 
-				if finalQuoteAsset > initQuoteAsset {
-					color.Green("ASSET INCREASED: +%f %s (+%.2f%%)", finalQuoteAsset-initQuoteAsset, market.QuoteCurrency, (finalQuoteAsset-initQuoteAsset)/initQuoteAsset*100.0)
+				if finalQuoteAsset.Compare(initQuoteAsset) > 0 {
+					color.Green("ASSET INCREASED: +%v %s (+%s)", finalQuoteAsset.Sub(initQuoteAsset), market.QuoteCurrency, finalQuoteAsset.Sub(initQuoteAsset).Div(initQuoteAsset).FormatPercentage(2))
 				} else {
-					color.Red("ASSET DECREASED: %f %s (%.2f%%)", finalQuoteAsset-initQuoteAsset, market.QuoteCurrency, (finalQuoteAsset-initQuoteAsset)/initQuoteAsset*100.0)
+					color.Red("ASSET DECREASED: %v %s (%s)", finalQuoteAsset.Sub(initQuoteAsset), market.QuoteCurrency, finalQuoteAsset.Sub(initQuoteAsset).Div(initQuoteAsset).FormatPercentage(2))
 				}
 
 				if wantBaseAssetBaseline {
@@ -408,10 +409,20 @@ var BacktestCmd = &cobra.Command{
 					// log.Infof("INITIAL ASSET IN %s ~= %s %s (1 %s = %f)", market.BaseCurrency, market.FormatQuantity(initBaseAsset), market.BaseCurrency, market.BaseCurrency, startPrice)
 					// log.Infof("FINAL ASSET IN %s ~= %s %s (1 %s = %f)", market.BaseCurrency, market.FormatQuantity(finalBaseAsset), market.BaseCurrency, market.BaseCurrency, lastPrice)
 
-					if lastPrice > startPrice {
-						color.Green("%s BASE ASSET PERFORMANCE: +%.2f%% (= (%.2f - %.2f) / %.2f)", market.BaseCurrency, (lastPrice-startPrice)/startPrice*100.0, lastPrice, startPrice, startPrice)
+					if lastPrice.Compare(startPrice) > 0 {
+						color.Green("%s BASE ASSET PERFORMANCE: +%s (= (%s - %s) / %s)",
+							market.BaseCurrency,
+							lastPrice.Sub(startPrice).Div(startPrice).FormatPercentage(2),
+							lastPrice.FormatString(2),
+							startPrice.FormatString(2),
+							startPrice.FormatString(2))
 					} else {
-						color.Red("%s BASE ASSET PERFORMANCE: %.2f%% (= (%.2f - %.2f) / %.2f)", market.BaseCurrency, (lastPrice-startPrice)/startPrice*100.0, lastPrice, startPrice, startPrice)
+						color.Red("%s BASE ASSET PERFORMANCE: %s (= (%s - %s) / %s)",
+							market.BaseCurrency,
+							lastPrice.Sub(startPrice).Div(startPrice).FormatPercentage(2),
+							lastPrice.FormatString(2),
+							startPrice.FormatString(2),
+							startPrice.FormatString(2))
 					}
 				}
 			}

@@ -1,9 +1,11 @@
 package indicator
 
 import (
+	"encoding/json"
 	"math"
 	"testing"
 
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -18,7 +20,11 @@ print(fast - slow)
 */
 
 func Test_calculateMACD(t *testing.T) {
-	var randomPrices = []float64{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
+	var randomPrices = []byte(`[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]`)
+	var input []fixedpoint.Value
+	if err := json.Unmarshal(randomPrices, &input); err != nil {
+		panic(err)
+	}
 	tests := []struct {
 		name   string
 		kLines []types.KLine
@@ -26,7 +32,7 @@ func Test_calculateMACD(t *testing.T) {
 	}{
 		{
 			name:   "random_case",
-			kLines: buildKLines(randomPrices),
+			kLines: buildKLines(input),
 			want:   0.7967670223776384,
 		},
 	}
