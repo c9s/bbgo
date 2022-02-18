@@ -160,8 +160,8 @@ func (s *Stream) pollKLines(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			if err := ctx.Err(); err != nil {
-				logger.WithError(err).Errorf("pollKLines goroutine is terminated")
+			if err := ctx.Err(); err != nil && !errors.Is(err, context.Canceled) {
+				logger.WithError(err).Errorf("context returned error")
 			}
 			return
 		case <-ticker.C:
