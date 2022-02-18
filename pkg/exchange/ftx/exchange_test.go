@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"testing"
 	"time"
 
@@ -16,6 +17,46 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
+
+func integrationTestConfigured() (key, secret string, ok bool) {
+	var hasKey, hasSecret bool
+	key, hasKey = os.LookupEnv("FTX_API_KEY")
+	secret, hasSecret = os.LookupEnv("FTX_API_SECRET")
+	ok = hasKey && hasSecret && os.Getenv("TEST_FTX") == "1"
+	return key, secret, ok
+}
+
+func TestExchange_IOCOrder(t *testing.T) {
+	key, secret, ok := integrationTestConfigured()
+	if !ok {
+		t.SkipNow()
+		return
+	}
+
+	ex := NewExchange(key, secret, "")
+	createdOrder, err := ex.SubmitOrders(context.Background(), types.SubmitOrder{
+		Symbol:   "LTCUSDT",
+		Side:     types.SideTypeBuy,
+		Type:     types.OrderTypeLimitMaker,
+		Quantity: fixedpoint.NewFromFloat(1.0),
+		Price:    fixedpoint.NewFromFloat(50.0),
+		Market: types.Market{
+			Symbol:          "LTCUSDT",
+			LocalSymbol:     "LTC/USDT",
+			PricePrecision:  3,
+			VolumePrecision: 2,
+			QuoteCurrency:   "USDT",
+			BaseCurrency:    "LTC",
+			MinQuantity:     fixedpoint.NewFromFloat(0.01),
+			StepSize:        fixedpoint.NewFromFloat(0.01),
+			TickSize:        fixedpoint.NewFromFloat(0.01),
+		},
+		TimeInForce: "IOC",
+	})
+	assert.NoError(t, err)
+	assert.NotEmpty(t, createdOrder)
+	t.Logf("created orders: %+v", createdOrder)
+}
 
 func TestExchange_QueryAccountBalances(t *testing.T) {
 	successResp := `
