@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -134,10 +135,10 @@ var TransferHistoryCmd = &cobra.Command{
 			switch record := record.Record.(type) {
 
 			case types.Deposit:
-				logrus.Infof("%s: <--- DEPOSIT %f %s [%s]", record.Time, record.Amount, record.Asset, record.Status)
+				logrus.Infof("%s: <--- DEPOSIT %v %s [%s]", record.Time, record.Amount, record.Asset, record.Status)
 
 			case types.Withdraw:
-				logrus.Infof("%s: ---> WITHDRAW %f %s  [%s]", record.ApplyTime, record.Amount, record.Asset, record.Status)
+				logrus.Infof("%s: ---> WITHDRAW %v %s  [%s]", record.ApplyTime, record.Amount, record.Asset, record.Status)
 
 			default:
 				logrus.Infof("unknown record: %+v", record)
@@ -147,15 +148,15 @@ var TransferHistoryCmd = &cobra.Command{
 
 		stats := calBaselineStats(asset, deposits, withdraws)
 		for asset, quantity := range stats.TotalDeposit {
-			logrus.Infof("total %s deposit: %f", asset, quantity)
+			logrus.Infof("total %s deposit: %v", asset, quantity)
 		}
 
 		for asset, quantity := range stats.TotalWithdraw {
-			logrus.Infof("total %s withdraw: %f", asset, quantity)
+			logrus.Infof("total %s withdraw: %v", asset, quantity)
 		}
 
 		for asset, quantity := range stats.BaselineBalance {
-			logrus.Infof("baseline %s balance: %f", asset, quantity)
+			logrus.Infof("baseline %s balance: %v", asset, quantity)
 		}
 
 		return nil
@@ -164,44 +165,44 @@ var TransferHistoryCmd = &cobra.Command{
 
 type BaselineStats struct {
 	Asset           string
-	TotalDeposit    map[string]float64
-	TotalWithdraw   map[string]float64
-	BaselineBalance map[string]float64
+	TotalDeposit    map[string]fixedpoint.Value
+	TotalWithdraw   map[string]fixedpoint.Value
+	BaselineBalance map[string]fixedpoint.Value
 }
 
 func calBaselineStats(asset string, deposits []types.Deposit, withdraws []types.Withdraw) (stats BaselineStats) {
 	stats.Asset = asset
-	stats.TotalDeposit = make(map[string]float64)
-	stats.TotalWithdraw = make(map[string]float64)
-	stats.BaselineBalance = make(map[string]float64)
+	stats.TotalDeposit = make(map[string]fixedpoint.Value)
+	stats.TotalWithdraw = make(map[string]fixedpoint.Value)
+	stats.BaselineBalance = make(map[string]fixedpoint.Value)
 
 	for _, deposit := range deposits {
 		if deposit.Status == types.DepositSuccess {
 			if _, ok := stats.TotalDeposit[deposit.Asset]; !ok {
-				stats.TotalDeposit[deposit.Asset] = 0.0
+				stats.TotalDeposit[deposit.Asset] = fixedpoint.Zero
 			}
 
-			stats.TotalDeposit[deposit.Asset] += deposit.Amount
+			stats.TotalDeposit[deposit.Asset] = stats.TotalDeposit[deposit.Asset].Add(deposit.Amount)
 		}
 	}
 
 	for _, withdraw := range withdraws {
 		if withdraw.Status == "completed" {
 			if _, ok := stats.TotalWithdraw[withdraw.Asset]; !ok {
-				stats.TotalWithdraw[withdraw.Asset] = 0.0
+				stats.TotalWithdraw[withdraw.Asset] = fixedpoint.Zero
 			}
 
-			stats.TotalWithdraw[withdraw.Asset] += withdraw.Amount
+			stats.TotalWithdraw[withdraw.Asset] = stats.TotalWithdraw[withdraw.Asset].Add(withdraw.Amount)
 		}
 	}
 
 	for asset, deposit := range stats.TotalDeposit {
 		withdraw, ok := stats.TotalWithdraw[asset]
 		if !ok {
-			withdraw = 0.0
+			withdraw = fixedpoint.Zero
 		}
 
-		stats.BaselineBalance[asset] = deposit - withdraw
+		stats.BaselineBalance[asset] = deposit.Sub(withdraw)
 	}
 
 	return stats

@@ -3,7 +3,6 @@ package pricedrop
 import (
 	"context"
 	"fmt"
-	"math"
 
 	"github.com/sirupsen/logrus"
 
@@ -24,7 +23,7 @@ type Strategy struct {
 	Symbol string `json:"symbol"`
 
 	Interval          types.Interval   `json:"interval"`
-	BaseQuantity      float64          `json:"baseQuantity"`
+	BaseQuantity      fixedpoint.Value `json:"baseQuantity"`
 	MinDropPercentage fixedpoint.Value `json:"minDropPercentage"`
 	MinDropChange     fixedpoint.Value `json:"minDropChange"`
 
@@ -71,23 +70,23 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		change := kline.GetChange()
 
 		// skip positive change
-		if change > 0 {
+		if change.Sign() > 0 {
 			return
 		}
 
-		if kline.Close > ema.Last() {
-			log.Warnf("kline close price %f is above EMA %s %f", kline.Close, ema.IntervalWindow, ema.Last())
+		if kline.Close.Float64() > ema.Last() {
+			log.Warnf("kline close price %v is above EMA %s %f", kline.Close, ema.IntervalWindow, ema.Last())
 			return
 		}
 
-		changeP := change / kline.Open
+		changeP := change.Div(kline.Open).Abs()
 
-		if s.MinDropPercentage != 0 {
-			if math.Abs(changeP) < math.Abs(s.MinDropPercentage.Float64()) {
+		if !s.MinDropPercentage.IsZero() {
+			if changeP.Compare(s.MinDropPercentage.Abs()) < 0 {
 				return
 			}
-		} else if s.MinDropChange != 0 {
-			if math.Abs(change) < math.Abs(s.MinDropChange.Float64()) {
+		} else if !s.MinDropChange.IsZero() {
+			if change.Abs().Compare(s.MinDropChange.Abs()) < 0 {
 				return
 			}
 		} else {
@@ -96,7 +95,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 
-		quantity := s.BaseQuantity * (1.0 + math.Abs(changeP))
+		quantity := s.BaseQuantity.Mul(fixedpoint.One.Add(changeP))
 		_, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 			Symbol:   kline.Symbol,
 			Market:   market,

@@ -18,7 +18,7 @@ var (
 func AdjustQuantityByMaxAmount(quantity, currentPrice, maxAmount fixedpoint.Value) fixedpoint.Value {
 	// modify quantity for the min amount
 	amount := currentPrice.Mul(quantity)
-	if amount < maxAmount {
+	if amount.Compare(maxAmount) < 0 {
 		return quantity
 	}
 
@@ -30,7 +30,7 @@ func AdjustQuantityByMaxAmount(quantity, currentPrice, maxAmount fixedpoint.Valu
 func AdjustQuantityByMinAmount(quantity, currentPrice, minAmount fixedpoint.Value) fixedpoint.Value {
 	// modify quantity for the min amount
 	amount := currentPrice.Mul(quantity)
-	if amount < minAmount {
+	if amount.Compare(minAmount) < 0 {
 		ratio := minAmount.Div(amount)
 		quantity = quantity.Mul(ratio)
 	}
@@ -39,22 +39,22 @@ func AdjustQuantityByMinAmount(quantity, currentPrice, minAmount fixedpoint.Valu
 }
 
 // AdjustFloatQuantityByMinAmount adjusts the quantity to make the amount greater than the given minAmount
-func AdjustFloatQuantityByMinAmount(quantity, currentPrice, minAmount float64) float64 {
+func AdjustFloatQuantityByMinAmount(quantity, currentPrice, minAmount fixedpoint.Value) fixedpoint.Value {
 	// modify quantity for the min amount
-	amount := currentPrice * quantity
-	if amount < minAmount {
-		ratio := minAmount / amount
-		quantity *= ratio
+	amount := currentPrice.Mul(quantity)
+	if amount.Compare(minAmount) < 0 {
+		ratio := minAmount.Div(amount)
+		return quantity.Mul(ratio)
 	}
 
 	return quantity
 }
 
-func AdjustFloatQuantityByMaxAmount(quantity float64, price float64, maxAmount float64) float64 {
-	amount := price * quantity
-	if amount > maxAmount {
-		ratio := maxAmount / amount
-		quantity *= ratio
+func AdjustFloatQuantityByMaxAmount(quantity fixedpoint.Value, price fixedpoint.Value, maxAmount fixedpoint.Value) fixedpoint.Value {
+	amount := price.Mul(quantity)
+	if amount.Compare(maxAmount) > 0 {
+		ratio := maxAmount.Div(amount)
+		return quantity.Mul(ratio)
 	}
 
 	return quantity

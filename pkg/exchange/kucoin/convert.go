@@ -9,6 +9,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/exchange/kucoin/kucoinapi"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 func toGlobalBalanceMap(accounts []kucoinapi.Account) types.BalanceMap {
@@ -42,28 +43,28 @@ func toGlobalMarket(m kucoinapi.Symbol) types.Market {
 		VolumePrecision: int(math.Log10(m.BaseIncrement.Float64())),
 		QuoteCurrency:   m.QuoteCurrency,
 		BaseCurrency:    m.BaseCurrency,
-		MinNotional:     m.QuoteMinSize.Float64(),
-		MinAmount:       m.QuoteMinSize.Float64(),
-		MinQuantity:     m.BaseMinSize.Float64(),
-		MaxQuantity:     0, // not used
-		StepSize:        m.BaseIncrement.Float64(),
+		MinNotional:     m.QuoteMinSize,
+		MinAmount:       m.QuoteMinSize,
+		MinQuantity:     m.BaseMinSize,
+		MaxQuantity:     fixedpoint.Zero, // not used
+		StepSize:        m.BaseIncrement,
 
-		MinPrice: 0, // not used
-		MaxPrice: 0, // not used
-		TickSize: m.PriceIncrement.Float64(),
+		MinPrice: fixedpoint.Zero, // not used
+		MaxPrice: fixedpoint.Zero, // not used
+		TickSize: m.PriceIncrement,
 	}
 }
 
 func toGlobalTicker(s kucoinapi.Ticker24H) types.Ticker {
 	return types.Ticker{
 		Time:   s.Time.Time(),
-		Volume: s.Volume.Float64(),
-		Last:   s.Last.Float64(),
-		Open:   s.Last.Float64() - s.ChangePrice.Float64(),
-		High:   s.High.Float64(),
-		Low:    s.Low.Float64(),
-		Buy:    s.Buy.Float64(),
-		Sell:   s.Sell.Float64(),
+		Volume: s.Volume,
+		Last:   s.Last,
+		Open:   s.Last.Sub(s.ChangePrice),
+		High:   s.High,
+		Low:    s.Low,
+		Buy:    s.Buy,
+		Sell:   s.Sell,
 	}
 }
 
@@ -146,7 +147,7 @@ func toGlobalOrderStatus(o kucoinapi.Order) types.OrderStatus {
 	var status types.OrderStatus
 	if o.IsActive {
 		status = types.OrderStatusNew
-		if o.DealSize > 0 {
+		if o.DealSize.Sign() > 0 {
 			status = types.OrderStatusPartiallyFilled
 		}
 	} else if o.CancelExist {
@@ -209,16 +210,16 @@ func toGlobalOrder(o kucoinapi.Order) types.Order {
 			Symbol:        toGlobalSymbol(o.Symbol),
 			Side:          toGlobalSide(o.Side),
 			Type:          toGlobalOrderType(o.Type),
-			Quantity:      o.Size.Float64(),
-			Price:         o.Price.Float64(),
-			StopPrice:     o.StopPrice.Float64(),
+			Quantity:      o.Size,
+			Price:         o.Price,
+			StopPrice:     o.StopPrice,
 			TimeInForce:   string(o.TimeInForce),
 		},
 		Exchange:         types.ExchangeKucoin,
 		OrderID:          hashStringID(o.ID),
 		UUID:             o.ID,
 		Status:           status,
-		ExecutedQuantity: o.DealSize.Float64(),
+		ExecutedQuantity: o.DealSize,
 		IsWorking:        o.IsActive,
 		CreationTime:     types.Time(o.CreatedAt.Time()),
 		UpdateTime:       types.Time(o.CreatedAt.Time()), // kucoin does not response updated time
@@ -231,15 +232,15 @@ func toGlobalTrade(fill kucoinapi.Fill) types.Trade {
 		ID:            hashStringID(fill.TradeId),
 		OrderID:       hashStringID(fill.OrderId),
 		Exchange:      types.ExchangeKucoin,
-		Price:         fill.Price.Float64(),
-		Quantity:      fill.Size.Float64(),
-		QuoteQuantity: fill.Funds.Float64(),
+		Price:         fill.Price,
+		Quantity:      fill.Size,
+		QuoteQuantity: fill.Funds,
 		Symbol:        toGlobalSymbol(fill.Symbol),
 		Side:          toGlobalSide(string(fill.Side)),
 		IsBuyer:       fill.Side == kucoinapi.SideTypeBuy,
 		IsMaker:       fill.Liquidity == kucoinapi.LiquidityTypeMaker,
 		Time:          types.Time(fill.CreatedAt.Time()),
-		Fee:           fill.Fee.Float64(),
+		Fee:           fill.Fee,
 		FeeCurrency:   toGlobalSymbol(fill.FeeCurrency),
 	}
 	return trade

@@ -1,6 +1,7 @@
 package util
 
 import (
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"math"
 	"strconv"
 )
@@ -16,6 +17,10 @@ func Pow10(n int64) int64 {
 		return 0
 	}
 	return Pow10Table[n]
+}
+
+func FormatValue(val fixedpoint.Value, prec int) string {
+	return val.FormatString(prec)
 }
 
 func FormatFloat(val float64, prec int) string {

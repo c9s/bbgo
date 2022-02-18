@@ -7,6 +7,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/pkg/errors"
 )
 
@@ -28,13 +29,13 @@ func toLocalSymbol(symbol string) string {
 func toGlobalTicker(marketTicker okexapi.MarketTicker) *types.Ticker {
 	return &types.Ticker{
 		Time:   marketTicker.Timestamp.Time(),
-		Volume: marketTicker.Volume24H.Float64(),
-		Last:   marketTicker.Last.Float64(),
-		Open:   marketTicker.Open24H.Float64(),
-		High:   marketTicker.High24H.Float64(),
-		Low:    marketTicker.Low24H.Float64(),
-		Buy:    marketTicker.BidPrice.Float64(),
-		Sell:   marketTicker.AskPrice.Float64(),
+		Volume: marketTicker.Volume24H,
+		Last:   marketTicker.Last,
+		Open:   marketTicker.Open24H,
+		High:   marketTicker.High24H,
+		Low:    marketTicker.Low24H,
+		Buy:    marketTicker.BidPrice,
+		Sell:   marketTicker.AskPrice,
 	}
 }
 
@@ -139,15 +140,15 @@ func toGlobalTrades(orderDetails []okexapi.OrderDetails) ([]types.Trade, error) 
 			ID:            uint64(tradeID),
 			OrderID:       uint64(orderID),
 			Exchange:      types.ExchangeOKEx,
-			Price:         orderDetail.LastFilledPrice.Float64(),
-			Quantity:      orderDetail.LastFilledQuantity.Float64(),
-			QuoteQuantity: orderDetail.LastFilledPrice.Float64() * orderDetail.LastFilledQuantity.Float64(),
+			Price:         orderDetail.LastFilledPrice,
+			Quantity:      orderDetail.LastFilledQuantity,
+			QuoteQuantity: orderDetail.LastFilledPrice.Mul(orderDetail.LastFilledQuantity),
 			Symbol:        toGlobalSymbol(orderDetail.InstrumentID),
 			Side:          side,
 			IsBuyer:       side == types.SideTypeBuy,
 			IsMaker:       orderDetail.ExecutionType == "M",
 			Time:          types.Time(orderDetail.LastFilledTime),
-			Fee:           orderDetail.LastFilledFee.Float64(),
+			Fee:           orderDetail.LastFilledFee,
 			FeeCurrency:   orderDetail.LastFilledFeeCurrency,
 			IsMargin:      false,
 			IsIsolated:    false,
@@ -199,15 +200,15 @@ func toGlobalOrders(orderDetails []okexapi.OrderDetails) ([]types.Order, error) 
 				Symbol:        toGlobalSymbol(orderDetail.InstrumentID),
 				Side:          side,
 				Type:          orderType,
-				Price:         orderDetail.Price.Float64(),
-				Quantity:      orderDetail.Quantity.Float64(),
-				StopPrice:     0, // not supported yet
+				Price:         orderDetail.Price,
+				Quantity:      orderDetail.Quantity,
+				StopPrice:     fixedpoint.Zero, // not supported yet
 				TimeInForce:   timeInForce,
 			},
 			Exchange:         types.ExchangeOKEx,
 			OrderID:          uint64(orderID),
 			Status:           orderStatus,
-			ExecutedQuantity: orderDetail.FilledQuantity.Float64(),
+			ExecutedQuantity: orderDetail.FilledQuantity,
 			IsWorking:        isWorking,
 			CreationTime:     types.Time(orderDetail.CreationTime),
 			UpdateTime:       types.Time(orderDetail.UpdateTime),

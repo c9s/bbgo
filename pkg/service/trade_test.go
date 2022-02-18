@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 func Test_tradeService(t *testing.T) {
@@ -27,9 +28,9 @@ func Test_tradeService(t *testing.T) {
 		ID:            1,
 		OrderID:       1,
 		Exchange:      "binance",
-		Price:         1000.0,
-		Quantity:      0.1,
-		QuoteQuantity: 1000.0 * 0.1,
+		Price:         fixedpoint.NewFromInt(1000),
+		Quantity:      fixedpoint.NewFromFloat(0.1),
+		QuoteQuantity: fixedpoint.NewFromFloat(1000.0 * 0.1),
 		Symbol:        "BTCUSDT",
 		Side:          "BUY",
 		IsBuyer:       true,

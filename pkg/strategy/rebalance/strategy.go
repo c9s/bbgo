@@ -83,11 +83,11 @@ func (s *Strategy) Validate() error {
 		}
 	}
 
-	if s.Threshold < 0 {
+	if s.Threshold.Sign() < 0 {
 		return fmt.Errorf("threshold should not less than 0")
 	}
 
-	if s.MaxAmount < 0 {
+	if s.MaxAmount.Sign() < 0 {
 		return fmt.Errorf("maxAmount shoud not less than 0")
 	}
 
@@ -140,7 +140,7 @@ func (s *Strategy) getPrices(ctx context.Context, session *bbgo.ExchangeSession)
 
 	for currency := range s.TargetWeights {
 		if currency == s.BaseCurrency {
-			prices[currency] = fixedpoint.NewFromFloat(1.0)
+			prices[currency] = fixedpoint.One
 			continue
 		}
 
@@ -152,7 +152,7 @@ func (s *Strategy) getPrices(ctx context.Context, session *bbgo.ExchangeSession)
 			return prices, err
 		}
 
-		prices[currency] = fixedpoint.NewFromFloat(ticker.Last)
+		prices[currency] = ticker.Last
 	}
 	return prices, nil
 }
@@ -184,48 +184,48 @@ func (s *Strategy) generateSubmitOrders(prices, marketValues map[string]fixedpoi
 		symbol := currency + s.BaseCurrency
 		currentWeight := currentWeights[currency]
 		currentPrice := prices[currency]
-		log.Infof("%s price: %f, current weight: %f, target weight: %f",
+		log.Infof("%s price: %v, current weight: %v, target weight: %v",
 			symbol,
-			currentPrice.Float64(),
-			currentWeight.Float64(),
-			targetWeight.Float64())
+			currentPrice,
+			currentWeight,
+			targetWeight)
 
 		// calculate the difference between current weight and target weight
 		// if the difference is less than threshold, then we will not create the order
 		weightDifference := targetWeight.Sub(currentWeight)
-		if weightDifference.Abs() < s.Threshold {
-			log.Infof("%s weight distance |%f - %f| = |%f| less than the threshold: %f",
+		if weightDifference.Abs().Compare(s.Threshold) < 0 {
+			log.Infof("%s weight distance |%v - %v| = |%v| less than the threshold: %v",
 				symbol,
-				currentWeight.Float64(),
-				targetWeight.Float64(),
-				weightDifference.Float64(),
-				s.Threshold.Float64())
+				currentWeight,
+				targetWeight,
+				weightDifference,
+				s.Threshold)
 			continue
 		}
 
 		quantity := weightDifference.Mul(totalValue).Div(currentPrice)
 
 		side := types.SideTypeBuy
-		if quantity < 0.0 {
+		if quantity.Sign() < 0 {
 			side = types.SideTypeSell
 			quantity = quantity.Abs()
 		}
 
-		if s.MaxAmount > 0 {
+		if s.MaxAmount.Sign() > 0 {
 			quantity = bbgo.AdjustQuantityByMaxAmount(quantity, currentPrice, s.MaxAmount)
-			log.Infof("adjust the quantity %f (%s %s @ %f) by max amount %f",
-				quantity.Float64(),
+			log.Infof("adjust the quantity %v (%s %s @ %v) by max amount %v",
+				quantity,
 				symbol,
 				side.String(),
-				currentPrice.Float64(),
-				s.MaxAmount.Float64())
+				currentPrice,
+				s.MaxAmount)
 		}
 
 		order := types.SubmitOrder{
 			Symbol:   symbol,
 			Side:     side,
 			Type:     types.OrderTypeMarket,
-			Quantity: quantity.Float64()}
+			Quantity: quantity}
 
 		submitOrders = append(submitOrders, order)
 	}

@@ -11,6 +11,7 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/kucoin/kucoinapi"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 const readTimeout = 30 * time.Second
@@ -116,15 +117,15 @@ func (s *Stream) handlePrivateOrderEvent(e *WebSocketPrivateOrderEvent) {
 			OrderID:       hashStringID(e.OrderId),
 			ID:            hashStringID(e.TradeId),
 			Exchange:      types.ExchangeKucoin,
-			Price:         e.MatchPrice.Float64(),
-			Quantity:      e.MatchSize.Float64(),
-			QuoteQuantity: e.MatchPrice.Float64() * e.MatchSize.Float64(),
+			Price:         e.MatchPrice,
+			Quantity:      e.MatchSize,
+			QuoteQuantity: e.MatchPrice.Mul(e.MatchSize),
 			Symbol:        toGlobalSymbol(e.Symbol),
 			Side:          toGlobalSide(e.Side),
 			IsBuyer:       e.Side == "buy",
 			IsMaker:       e.Liquidity == "maker",
 			Time:          types.Time(e.Ts.Time()),
-			Fee:           0,  // not supported
+			Fee:           fixedpoint.Zero,  // not supported
 			FeeCurrency:   "", // not supported
 		})
 	}
@@ -139,7 +140,7 @@ func (s *Stream) handlePrivateOrderEvent(e *WebSocketPrivateOrderEvent) {
 				status = types.OrderStatusCanceled
 			}
 		} else if e.Status == "open" {
-			if e.FilledSize > 0 {
+			if e.FilledSize.Sign() > 0 {
 				status = types.OrderStatusPartiallyFilled
 			}
 		}
@@ -150,14 +151,14 @@ func (s *Stream) handlePrivateOrderEvent(e *WebSocketPrivateOrderEvent) {
 				Symbol:        toGlobalSymbol(e.Symbol),
 				Side:          toGlobalSide(e.Side),
 				Type:          toGlobalOrderType(e.OrderType),
-				Quantity:      e.Size.Float64(),
-				Price:         e.Price.Float64(),
+				Quantity:      e.Size,
+				Price:         e.Price,
 			},
 			Exchange:         types.ExchangeKucoin,
 			OrderID:          hashStringID(e.OrderId),
 			UUID:             e.OrderId,
 			Status:           status,
-			ExecutedQuantity: e.FilledSize.Float64(),
+			ExecutedQuantity: e.FilledSize,
 			IsWorking:        e.Status == "open",
 			CreationTime:     types.Time(e.OrderTime.Time()),
 			UpdateTime:       types.Time(e.Ts.Time()),

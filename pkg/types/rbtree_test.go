@@ -9,20 +9,22 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
+var itov func(int64) fixedpoint.Value = fixedpoint.NewFromInt
+
 func TestRBTree_InsertAndDelete(t *testing.T) {
 	tree := NewRBTree()
 	node := tree.Rightmost()
 	assert.Nil(t, node)
 
-	tree.Insert(fixedpoint.NewFromInt(10), 10)
-	tree.Insert(fixedpoint.NewFromInt(9), 9)
-	tree.Insert(fixedpoint.NewFromInt(12), 12)
-	tree.Insert(fixedpoint.NewFromInt(11), 11)
-	tree.Insert(fixedpoint.NewFromInt(13), 13)
+	tree.Insert(itov(10), itov(10))
+	tree.Insert(itov(9), itov(9))
+	tree.Insert(itov(12), itov(12))
+	tree.Insert(itov(11), itov(11))
+	tree.Insert(itov(13), itov(13))
 
 	node = tree.Rightmost()
-	assert.Equal(t, fixedpoint.NewFromInt(13), node.key)
-	assert.Equal(t, fixedpoint.Value(13), node.value)
+	assert.Equal(t, itov(13), node.key)
+	assert.Equal(t, itov(13), node.value)
 
 	ok := tree.Delete(fixedpoint.NewFromInt(12))
 	assert.True(t, ok, "should delete the node successfully")
@@ -33,15 +35,15 @@ func TestRBTree_Rightmost(t *testing.T) {
 	node := tree.Rightmost()
 	assert.Nil(t, node, "should be nil")
 
-	tree.Insert(10, 10)
+	tree.Insert(itov(10), itov(10))
 	node = tree.Rightmost()
-	assert.Equal(t, fixedpoint.Value(10), node.key)
-	assert.Equal(t, fixedpoint.Value(10), node.value)
+	assert.Equal(t, itov(10), node.key)
+	assert.Equal(t, itov(10), node.value)
 
-	tree.Insert(12, 12)
-	tree.Insert(9, 9)
+	tree.Insert(itov(12), itov(12))
+	tree.Insert(itov(9), itov(9))
 	node = tree.Rightmost()
-	assert.Equal(t, fixedpoint.Value(12), node.key)
+	assert.Equal(t, itov(12), node.key)
 }
 
 func TestRBTree_RandomInsertSearchAndDelete(t *testing.T) {
@@ -153,12 +155,12 @@ func TestRBTree_bulkInsert(t *testing.T) {
 	}
 	tree.Inorder(func(n *RBNode) bool {
 		if n.left != neel {
-			if !assert.Greater(t, n.key, n.left.key) {
+			if !assert.True(t, n.key.Compare(n.left.key) > 0) {
 				return false
 			}
 		}
 		if n.right != neel {
-			if !assert.Less(t, n.key, n.right.key) {
+			if !assert.True(t, n.key.Compare(n.right.key) < 0) {
 				return false
 			}
 		}
@@ -173,7 +175,7 @@ func TestRBTree_bulkInsertAndDelete(t *testing.T) {
 		for p := range pvs {
 			return p
 		}
-		return 0
+		return fixedpoint.Zero
 	}
 
 	var tree = NewRBTree()
@@ -185,7 +187,7 @@ func TestRBTree_bulkInsertAndDelete(t *testing.T) {
 
 		if i%3 == 0 || i%7 == 0 {
 			removePrice := getRandomPrice()
-			if removePrice > 0 {
+			if removePrice.Sign() > 0 {
 				if !assert.True(t, tree.Delete(removePrice), "existing price %f should be removed at round %d", removePrice.Float64(), i) {
 					return
 				}
@@ -205,12 +207,12 @@ func TestRBTree_bulkInsertAndDelete(t *testing.T) {
 	// validate tree structure
 	tree.Inorder(func(n *RBNode) bool {
 		if n.left != neel {
-			if !assert.Greater(t, n.key, n.left.key) {
+			if !assert.True(t, n.key.Compare(n.left.key) > 0) {
 				return false
 			}
 		}
 		if n.right != neel {
-			if !assert.Less(t, n.key, n.right.key) {
+			if !assert.True(t, n.key.Compare(n.right.key) < 0) {
 				return false
 			}
 		}

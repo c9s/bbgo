@@ -30,10 +30,11 @@ func (inc *STOCH) update(kLine types.KLine) {
 	inc.KLineWindow.Add(kLine)
 	inc.KLineWindow.Truncate(inc.Window)
 
-	lowest := inc.KLineWindow.GetLow()
-	highest := inc.KLineWindow.GetHigh()
+	lowest := inc.KLineWindow.GetLow().Float64()
+	highest := inc.KLineWindow.GetHigh().Float64()
+	clos := kLine.Close.Float64()
 
-	k := 100.0 * (kLine.Close - lowest) / (highest - lowest)
+	k := 100.0 * (clos - lowest) / (highest - lowest)
 	inc.K.Push(k)
 
 	d := inc.K.Tail(DPeriod).Mean()

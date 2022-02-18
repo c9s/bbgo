@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 // ex: 2019-03-05T09:56:55.728933+00:00
@@ -87,9 +88,9 @@ type accountResponse struct {
 }
 
 type account struct {
-	MakerFee          float64 `json:"makerFee"`
-	TakerFee          float64 `json:"takerFee"`
-	TotalAccountValue float64 `json:"totalAccountValue"`
+	MakerFee          fixedpoint.Value `json:"makerFee"`
+	TakerFee          fixedpoint.Value `json:"takerFee"`
+	TotalAccountValue fixedpoint.Value `json:"totalAccountValue"`
 }
 
 type positionsResponse struct {
@@ -117,21 +118,21 @@ type positionsResponse struct {
 }
 */
 type position struct {
-	Cost                         float64 `json:"cost"`
-	EntryPrice                   float64 `json:"entryPrice"`
-	EstimatedLiquidationPrice    float64 `json:"estimatedLiquidationPrice"`
+	Cost                         fixedpoint.Value `json:"cost"`
+	EntryPrice                   fixedpoint.Value `json:"entryPrice"`
+	EstimatedLiquidationPrice    fixedpoint.Value `json:"estimatedLiquidationPrice"`
 	Future                       string  `json:"future"`
-	InitialMarginRequirement     float64 `json:"initialMarginRequirement"`
-	LongOrderSize                float64 `json:"longOrderSize"`
-	MaintenanceMarginRequirement float64 `json:"maintenanceMarginRequirement"`
-	NetSize                      float64 `json:"netSize"`
-	OpenSize                     float64 `json:"openSize"`
-	RealizedPnl                  float64 `json:"realizedPnl"`
-	ShortOrderSize               float64 `json:"shortOrderSize"`
+	InitialMarginRequirement     fixedpoint.Value `json:"initialMarginRequirement"`
+	LongOrderSize                fixedpoint.Value `json:"longOrderSize"`
+	MaintenanceMarginRequirement fixedpoint.Value `json:"maintenanceMarginRequirement"`
+	NetSize                      fixedpoint.Value `json:"netSize"`
+	OpenSize                     fixedpoint.Value `json:"openSize"`
+	RealizedPnl                  fixedpoint.Value `json:"realizedPnl"`
+	ShortOrderSize               fixedpoint.Value `json:"shortOrderSize"`
 	Side                         string  `json:"Side"`
-	Size                         float64 `json:"size"`
-	UnrealizedPnl                float64 `json:"unrealizedPnl"`
-	CollateralUsed               float64 `json:"collateralUsed"`
+	Size                         fixedpoint.Value `json:"size"`
+	UnrealizedPnl                fixedpoint.Value `json:"unrealizedPnl"`
+	CollateralUsed               fixedpoint.Value `json:"collateralUsed"`
 }
 
 type balances struct {
@@ -139,8 +140,8 @@ type balances struct {
 
 	Result []struct {
 		Coin  string  `json:"coin"`
-		Free  float64 `json:"free"`
-		Total float64 `json:"total"`
+		Free  fixedpoint.Value `json:"free"`
+		Total fixedpoint.Value `json:"total"`
 	} `json:"result"`
 }
 
@@ -180,24 +181,24 @@ type market struct {
 	Name                  string  `json:"name"`
 	Enabled               bool    `json:"enabled"`
 	PostOnly              bool    `json:"postOnly"`
-	PriceIncrement        float64 `json:"priceIncrement"`
-	SizeIncrement         float64 `json:"sizeIncrement"`
-	MinProvideSize        float64 `json:"minProvideSize"`
-	Last                  float64 `json:"last"`
-	Bid                   float64 `json:"bid"`
-	Ask                   float64 `json:"ask"`
-	Price                 float64 `json:"price"`
+	PriceIncrement        fixedpoint.Value `json:"priceIncrement"`
+	SizeIncrement         fixedpoint.Value `json:"sizeIncrement"`
+	MinProvideSize        fixedpoint.Value `json:"minProvideSize"`
+	Last                  fixedpoint.Value `json:"last"`
+	Bid                   fixedpoint.Value `json:"bid"`
+	Ask                   fixedpoint.Value `json:"ask"`
+	Price                 fixedpoint.Value `json:"price"`
 	Type                  string  `json:"type"`
 	BaseCurrency          string  `json:"baseCurrency"`
 	QuoteCurrency         string  `json:"quoteCurrency"`
 	Underlying            string  `json:"underlying"`
 	Restricted            bool    `json:"restricted"`
 	HighLeverageFeeExempt bool    `json:"highLeverageFeeExempt"`
-	Change1h              float64 `json:"change1h"`
-	Change24h             float64 `json:"change24h"`
-	ChangeBod             float64 `json:"changeBod"`
-	QuoteVolume24h        float64 `json:"quoteVolume24h"`
-	VolumeUsd24h          float64 `json:"volumeUsd24h"`
+	Change1h              fixedpoint.Value `json:"change1h"`
+	Change24h             fixedpoint.Value `json:"change24h"`
+	ChangeBod             fixedpoint.Value `json:"changeBod"`
+	QuoteVolume24h        fixedpoint.Value `json:"quoteVolume24h"`
+	VolumeUsd24h          fixedpoint.Value `json:"volumeUsd24h"`
 }
 
 /*
@@ -221,12 +222,12 @@ type HistoricalPricesResponse struct {
 }
 
 type Candle struct {
-	Close     float64  `json:"close"`
-	High      float64  `json:"high"`
-	Low       float64  `json:"low"`
-	Open      float64  `json:"open"`
+	Close     fixedpoint.Value  `json:"close"`
+	High      fixedpoint.Value  `json:"high"`
+	Low       fixedpoint.Value  `json:"low"`
+	Open      fixedpoint.Value  `json:"open"`
 	StartTime datetime `json:"startTime"`
-	Volume    float64  `json:"volume"`
+	Volume    fixedpoint.Value  `json:"volume"`
 }
 
 type ordersHistoryResponse struct {
@@ -248,16 +249,16 @@ type cancelOrderResponse struct {
 
 type order struct {
 	CreatedAt  datetime `json:"createdAt"`
-	FilledSize float64  `json:"filledSize"`
+	FilledSize fixedpoint.Value  `json:"filledSize"`
 	// Future field is not defined in the response format table but in the response example.
 	Future        string  `json:"future"`
 	ID            int64   `json:"id"`
 	Market        string  `json:"market"`
-	Price         float64 `json:"price"`
-	AvgFillPrice  float64 `json:"avgFillPrice"`
-	RemainingSize float64 `json:"remainingSize"`
+	Price         fixedpoint.Value `json:"price"`
+	AvgFillPrice  fixedpoint.Value `json:"avgFillPrice"`
+	RemainingSize fixedpoint.Value `json:"remainingSize"`
 	Side          string  `json:"side"`
-	Size          float64 `json:"size"`
+	Size          fixedpoint.Value `json:"size"`
 	Status        string  `json:"status"`
 	Type          string  `json:"type"`
 	ReduceOnly    bool    `json:"reduceOnly"`
@@ -304,9 +305,9 @@ type depositHistory struct {
 	Address       address  `json:"address"`
 	Confirmations int64    `json:"confirmations"`
 	ConfirmedTime datetime `json:"confirmedTime"`
-	Fee           float64  `json:"fee"`
+	Fee           fixedpoint.Value  `json:"fee"`
 	SentTime      datetime `json:"sentTime"`
-	Size          float64  `json:"size"`
+	Size          fixedpoint.Value  `json:"size"`
 	Status        string   `json:"status"`
 	Time          datetime `json:"time"`
 	Notes         string   `json:"notes"`
@@ -360,13 +361,13 @@ type fill struct {
 	QuoteCurrency string         `json:"quoteCurrency"`
 	Type          string         `json:"type"`
 	Side          types.SideType `json:"side"`
-	Price         float64        `json:"price"`
-	Size          float64        `json:"size"`
+	Price         fixedpoint.Value        `json:"price"`
+	Size          fixedpoint.Value        `json:"size"`
 	OrderId       uint64         `json:"orderId"`
 	Time          datetime       `json:"time"`
 	TradeId       uint64         `json:"tradeId"`
-	FeeRate       float64        `json:"feeRate"`
-	Fee           float64        `json:"fee"`
+	FeeRate       fixedpoint.Value        `json:"feeRate"`
+	Fee           fixedpoint.Value        `json:"fee"`
 	FeeCurrency   string         `json:"feeCurrency"`
 	Liquidity     string         `json:"liquidity"`
 }
@@ -379,7 +380,7 @@ type transferResponse struct {
 type transfer struct {
 	Id     uint    `json:"id"`
 	Coin   string  `json:"coin"`
-	Size   float64 `json:"size"`
+	Size   fixedpoint.Value `json:"size"`
 	Time   string  `json:"time"`
 	Notes  string  `json:"notes"`
 	Status string  `json:"status"`

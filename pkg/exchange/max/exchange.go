@@ -60,13 +60,13 @@ func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticke
 
 	return &types.Ticker{
 		Time:   ticker.Time,
-		Volume: util.MustParseFloat(ticker.Volume),
-		Last:   util.MustParseFloat(ticker.Last),
-		Open:   util.MustParseFloat(ticker.Open),
-		High:   util.MustParseFloat(ticker.High),
-		Low:    util.MustParseFloat(ticker.Low),
-		Buy:    util.MustParseFloat(ticker.Buy),
-		Sell:   util.MustParseFloat(ticker.Sell),
+		Volume: fixedpoint.MustNewFromString(ticker.Volume),
+		Last:   fixedpoint.MustNewFromString(ticker.Last),
+		Open:   fixedpoint.MustNewFromString(ticker.Open),
+		High:   fixedpoint.MustNewFromString(ticker.High),
+		Low:    fixedpoint.MustNewFromString(ticker.Low),
+		Buy:    fixedpoint.MustNewFromString(ticker.Buy),
+		Sell:   fixedpoint.MustNewFromString(ticker.Sell),
 	}, nil
 }
 
@@ -102,13 +102,13 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[stri
 			}
 			tickers[toGlobalSymbol(k)] = types.Ticker{
 				Time:   v.Time,
-				Volume: util.MustParseFloat(v.Volume),
-				Last:   util.MustParseFloat(v.Last),
-				Open:   util.MustParseFloat(v.Open),
-				High:   util.MustParseFloat(v.High),
-				Low:    util.MustParseFloat(v.Low),
-				Buy:    util.MustParseFloat(v.Buy),
-				Sell:   util.MustParseFloat(v.Sell),
+				Volume: fixedpoint.MustNewFromString(v.Volume),
+				Last:   fixedpoint.MustNewFromString(v.Last),
+				Open:   fixedpoint.MustNewFromString(v.Open),
+				High:   fixedpoint.MustNewFromString(v.High),
+				Low:    fixedpoint.MustNewFromString(v.Low),
+				Buy:    fixedpoint.MustNewFromString(v.Buy),
+				Sell:   fixedpoint.MustNewFromString(v.Sell),
 			}
 		}
 	}
@@ -139,12 +139,13 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 			MinAmount:       m.MinQuoteAmount,
 
 			MinQuantity: m.MinBaseAmount,
-			MaxQuantity: 10000.0,
-			StepSize:    1.0 / math.Pow10(m.BaseUnitPrecision), // make it like 0.0001
-
-			MinPrice: 1.0 / math.Pow10(m.QuoteUnitPrecision), // used in the price formatter
-			MaxPrice: 10000.0,
-			TickSize: 1.0 / math.Pow10(m.QuoteUnitPrecision),
+			MaxQuantity: fixedpoint.NewFromInt(10000),
+			// make it like 0.0001
+			StepSize: fixedpoint.NewFromFloat(1.0 / math.Pow10(m.BaseUnitPrecision)),
+            // used in the price formatter
+			MinPrice: fixedpoint.NewFromFloat(1.0 / math.Pow10(m.QuoteUnitPrecision)),
+			MaxPrice: fixedpoint.NewFromInt(10000),
+			TickSize: fixedpoint.NewFromFloat(1.0 / math.Pow10(m.QuoteUnitPrecision)),
 		}
 
 		markets[symbol] = market
@@ -261,7 +262,7 @@ queryRecentlyClosedOrders:
 				log.Debugf("skipping duplicated order: %d", order.OrderID)
 			}
 
-			log.Debugf("max order %d %s %f %s %s", order.OrderID, order.Symbol, order.Price, order.Status, order.CreationTime.Time().Format(time.StampMilli))
+			log.Debugf("max order %d %s %v %s %s", order.OrderID, order.Symbol, order.Price, order.Status, order.CreationTime.Time().Format(time.StampMilli))
 
 			orderIDs[order.OrderID] = struct{}{}
 			orders = append(orders, *order)
@@ -421,7 +422,7 @@ func toMaxSubmitOrder(o types.SubmitOrder) (*maxapi.Order, error) {
 	if o.Market.Symbol != "" {
 		quantityString = o.Market.FormatQuantity(o.Quantity)
 	} else {
-		quantityString = strconv.FormatFloat(o.Quantity, 'f', -1, 64)
+		quantityString = o.Quantity.String()
 	}
 
 	maxOrder := maxapi.Order{
@@ -447,7 +448,7 @@ func toMaxSubmitOrder(o types.SubmitOrder) (*maxapi.Order, error) {
 		if o.Market.Symbol != "" {
 			priceInString = o.Market.FormatPrice(o.Price)
 		} else {
-			priceInString = strconv.FormatFloat(o.Price, 'f', -1, 64)
+			priceInString = o.Price.String()
 		}
 		maxOrder.Price = priceInString
 	}
@@ -459,7 +460,7 @@ func toMaxSubmitOrder(o types.SubmitOrder) (*maxapi.Order, error) {
 		if o.Market.Symbol != "" {
 			priceInString = o.Market.FormatPrice(o.StopPrice)
 		} else {
-			priceInString = strconv.FormatFloat(o.StopPrice, 'f', -1, 64)
+			priceInString = o.StopPrice.String()
 		}
 		maxOrder.StopPrice = priceInString
 	}
@@ -713,11 +714,11 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 				Exchange:               types.ExchangeMax,
 				ApplyTime:              types.Time(time.Unix(d.CreatedAt, 0)),
 				Asset:                  toGlobalCurrency(d.Currency),
-				Amount:                 util.MustParseFloat(d.Amount),
+				Amount:                 fixedpoint.MustNewFromString(d.Amount),
 				Address:                "",
 				AddressTag:             "",
 				TransactionID:          d.TxID,
-				TransactionFee:         util.MustParseFloat(d.Fee),
+				TransactionFee:         fixedpoint.MustNewFromString(d.Fee),
 				TransactionFeeCurrency: d.FeeCurrency,
 				// WithdrawOrderID: d.WithdrawOrderID,
 				// Network:         d.Network,
@@ -784,7 +785,7 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 			allDeposits = append(allDeposits, types.Deposit{
 				Exchange:      types.ExchangeMax,
 				Time:          types.Time(time.Unix(d.CreatedAt, 0)),
-				Amount:        util.MustParseFloat(d.Amount),
+				Amount:        fixedpoint.MustNewFromString(d.Amount),
 				Asset:         toGlobalCurrency(d.Currency),
 				Address:       "", // not supported
 				AddressTag:    "", // not supported
@@ -965,11 +966,14 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 	return kLines, nil
 }
 
-func (e *Exchange) QueryAveragePrice(ctx context.Context, symbol string) (float64, error) {
+var Two = fixedpoint.NewFromInt(2)
+
+func (e *Exchange) QueryAveragePrice(ctx context.Context, symbol string) (fixedpoint.Value, error) {
 	ticker, err := e.client.PublicService.Ticker(toLocalSymbol(symbol))
 	if err != nil {
-		return 0, err
+		return fixedpoint.Zero, err
 	}
 
-	return (util.MustParseFloat(ticker.Sell) + util.MustParseFloat(ticker.Buy)) / 2, nil
+	return fixedpoint.MustNewFromString(ticker.Sell).
+		Add(fixedpoint.MustNewFromString(ticker.Buy)).Div(Two), nil
 }

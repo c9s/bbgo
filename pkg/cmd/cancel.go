@@ -85,7 +85,6 @@ var cancelOrderCmd = &cobra.Command{
 
 		var sessions = environ.Sessions()
 
-
 		if len(sessionName) > 0 {
 			ses, ok := environ.Session(sessionName)
 			if !ok {

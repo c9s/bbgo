@@ -144,11 +144,11 @@ func (b *LocalActiveOrderBook) orderUpdateHandler(order types.Order) {
 
 func (b *LocalActiveOrderBook) Print() {
 	for _, o := range b.Bids.Orders() {
-		log.Infof("%s bid order: %d @ %f -> %s", o.Symbol, o.OrderID, o.Price, o.Status)
+		log.Infof("%s bid order: %d @ %v -> %s", o.Symbol, o.OrderID, o.Price, o.Status)
 	}
 
 	for _, o := range b.Asks.Orders() {
-		log.Infof("%s ask order: %d @ %f -> %s", o.Symbol, o.OrderID, o.Price, o.Status)
+		log.Infof("%s ask order: %d @ %v -> %s", o.Symbol, o.OrderID, o.Price, o.Status)
 	}
 }
 

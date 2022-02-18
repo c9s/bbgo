@@ -1,6 +1,8 @@
 package xmaker
 
 import (
+	"sync"
+
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -14,6 +16,7 @@ type State struct {
 
 type ProfitStats struct {
 	bbgo.ProfitStats
+	lock sync.Mutex
 
 	MakerExchange types.ExchangeName `json:"makerExchange"`
 
@@ -30,26 +33,31 @@ func (s *ProfitStats) AddTrade(trade types.Trade) {
 	s.ProfitStats.AddTrade(trade)
 
 	if trade.Exchange == s.MakerExchange {
-		s.AccumulatedMakerVolume.AtomicAdd(fixedpoint.NewFromFloat(trade.Quantity))
-		s.TodayMakerVolume.AtomicAdd(fixedpoint.NewFromFloat(trade.Quantity))
+		s.lock.Lock()
+		s.AccumulatedMakerVolume = s.AccumulatedMakerVolume.Add(trade.Quantity)
+		s.TodayMakerVolume = s.TodayMakerVolume.Add(trade.Quantity)
 
 		switch trade.Side {
 
 		case types.SideTypeSell:
-			s.AccumulatedMakerAskVolume.AtomicAdd(fixedpoint.NewFromFloat(trade.Quantity))
-			s.TodayMakerAskVolume.AtomicAdd(fixedpoint.NewFromFloat(trade.Quantity))
+			s.AccumulatedMakerAskVolume = s.AccumulatedMakerAskVolume.Add(trade.Quantity)
+			s.TodayMakerAskVolume = s.TodayMakerAskVolume.Add(trade.Quantity)
 
 		case types.SideTypeBuy:
-			s.AccumulatedMakerBidVolume.AtomicAdd(fixedpoint.NewFromFloat(trade.Quantity))
-			s.TodayMakerBidVolume.AtomicAdd(fixedpoint.NewFromFloat(trade.Quantity))
+			s.AccumulatedMakerBidVolume = s.AccumulatedMakerBidVolume.Add(trade.Quantity)
+			s.TodayMakerBidVolume = s.TodayMakerBidVolume.Add(trade.Quantity)
 
 		}
+		s.lock.Unlock()
 	}
 }
 
 func (s *ProfitStats) ResetToday() {
 	s.ProfitStats.ResetToday()
-	s.TodayMakerVolume = 0
-	s.TodayMakerBidVolume = 0
-	s.TodayMakerAskVolume = 0
+
+	s.lock.Lock()
+	s.TodayMakerVolume = fixedpoint.Zero
+	s.TodayMakerBidVolume = fixedpoint.Zero
+	s.TodayMakerAskVolume = fixedpoint.Zero
+	s.lock.Unlock()
 }

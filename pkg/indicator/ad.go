@@ -23,10 +23,10 @@ type AD struct {
 }
 
 func (inc *AD) update(kLine types.KLine) {
-	close := kLine.Close
-	high := kLine.High
-	low := kLine.Low
-	volume := kLine.Volume
+	close := kLine.Close.Float64()
+	high := kLine.High.Float64()
+	low := kLine.Low.Float64()
+	volume := kLine.Volume.Float64()
 
 	moneyFlowVolume := ((2*close - high - low) / (high - low)) * volume
 

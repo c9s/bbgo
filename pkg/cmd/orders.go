@@ -17,7 +17,6 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
 )
 
 // go run ./cmd/bbgo list-orders [open|closed] --session=ftx --symbol=BTCUSDT
@@ -323,8 +322,8 @@ var submitOrderCmd = &cobra.Command{
 			Symbol:      symbol,
 			Side:        types.SideType(strings.ToUpper(side)),
 			Type:        types.OrderTypeLimit,
-			Quantity:    util.MustParseFloat(quantity),
-			Price:       util.MustParseFloat(price),
+			Quantity:    fixedpoint.MustNewFromString(quantity),
+			Price:       fixedpoint.MustNewFromString(price),
 			Market:      market,
 			TimeInForce: "GTC",
 		}

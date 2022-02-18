@@ -37,6 +37,7 @@ type ExponentialScale struct {
 	a float64
 	b float64
 	h float64
+	s float64
 }
 
 func (s *ExponentialScale) Solve() error {
@@ -51,6 +52,7 @@ func (s *ExponentialScale) Solve() error {
 	s.h = s.Domain[0]
 	s.a = s.Range[0]
 	s.b = math.Pow(s.Range[1]/s.Range[0], 1/(s.Domain[1]-s.h))
+	s.s = s.Domain[1] - s.h
 	return nil
 }
 
@@ -73,7 +75,7 @@ func (s *ExponentialScale) Call(x float64) (y float64) {
 		x = s.Domain[1]
 	}
 
-	y = s.a * math.Pow(s.b, x-s.h)
+	y = s.a * math.Pow(s.Range[1]/s.Range[0], (x-s.h)/s.s)
 	return y
 }
 

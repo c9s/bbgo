@@ -40,14 +40,14 @@ func Test_toGlobalOrderFromOpenOrder(t *testing.T) {
 	assert.Equal(t, "XRP-PERP", o.Symbol)
 	assert.Equal(t, types.SideTypeSell, o.Side)
 	assert.Equal(t, types.OrderTypeLimit, o.Type)
-	assert.Equal(t, float64(31431), o.Quantity)
-	assert.Equal(t, 0.306525, o.Price)
+	assert.Equal(t, "31431", o.Quantity.String())
+	assert.Equal(t, "0.306525", o.Price.String())
 	assert.Equal(t, "GTC", o.TimeInForce)
 	assert.Equal(t, types.ExchangeFTX, o.Exchange)
 	assert.True(t, o.IsWorking)
 	assert.Equal(t, uint64(9596912), o.OrderID)
 	assert.Equal(t, types.OrderStatusPartiallyFilled, o.Status)
-	assert.Equal(t, float64(10), o.ExecutedQuantity)
+	assert.Equal(t, "10", o.ExecutedQuantity.String())
 }
 
 func TestTrimLowerString(t *testing.T) {

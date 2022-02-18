@@ -16,7 +16,7 @@ type PriceHeartBeat struct {
 // If the price is not updated (same price) and the last time exceeded the timeout,
 // Then false, and an error will be returned
 func (b *PriceHeartBeat) Update(pv PriceVolume, timeout time.Duration) (bool, error) {
-	if b.PriceVolume.Price == 0 || b.PriceVolume != pv {
+	if b.PriceVolume.Price.IsZero() || b.PriceVolume != pv {
 		b.PriceVolume = pv
 		b.LastTime = time.Now()
 		return true, nil // successfully updated

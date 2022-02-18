@@ -11,7 +11,7 @@ type MovingAverageSettings struct {
 	Interval types.Interval `json:"interval"`
 	Window   int            `json:"window"`
 
-	Side     *types.SideType   `json:"side"`
+	Side *types.SideType `json:"side"`
 
 	QuantityOrAmount
 }

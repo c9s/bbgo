@@ -7,6 +7,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
+
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 func init() {
@@ -14,11 +16,11 @@ func init() {
 }
 
 type TestStrategy struct {
-	Symbol            string  `json:"symbol"`
-	Interval          string  `json:"interval"`
-	BaseQuantity      float64 `json:"baseQuantity"`
-	MaxAssetQuantity  float64 `json:"maxAssetQuantity"`
-	MinDropPercentage float64 `json:"minDropPercentage"`
+	Symbol            string           `json:"symbol"`
+	Interval          string           `json:"interval"`
+	BaseQuantity      fixedpoint.Value `json:"baseQuantity"`
+	MaxAssetQuantity  fixedpoint.Value `json:"maxAssetQuantity"`
+	MinDropPercentage fixedpoint.Value `json:"minDropPercentage"`
 }
 
 func (s *TestStrategy) ID() string {
@@ -69,9 +71,9 @@ func TestLoadConfig(t *testing.T) {
 					Strategy: &TestStrategy{
 						Symbol:            "BTCUSDT",
 						Interval:          "1m",
-						BaseQuantity:      0.1,
-						MaxAssetQuantity:  1.1,
-						MinDropPercentage: -0.05,
+						BaseQuantity:      fixedpoint.NewFromFloat(0.1),
+						MaxAssetQuantity:  fixedpoint.NewFromFloat(1.1),
+						MinDropPercentage: fixedpoint.NewFromFloat(-0.05),
 					},
 				}}, config.ExchangeStrategies)
 
@@ -82,10 +84,14 @@ func TestLoadConfig(t *testing.T) {
 						"max": map[string]interface{}{
 							"exchange":     "max",
 							"envVarPrefix": "MAX",
+							"takerFeeRate": 0.,
+							"makerFeeRate": 0.,
 						},
 						"binance": map[string]interface{}{
 							"exchange":     "binance",
 							"envVarPrefix": "BINANCE",
+							"takerFeeRate": 0.,
+							"makerFeeRate": 0.,
 						},
 					},
 					"build": map[string]interface{}{

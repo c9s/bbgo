@@ -6,8 +6,6 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/c9s/bbgo/pkg/fixedpoint"
-
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -96,7 +94,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 
-		closePrice := fixedpoint.NewFromFloat(kline.Close)
+		closePrice := kline.Close
+		closePriceF := closePrice.Float64()
 		quantity := s.QuantityOrAmount.CalculateQuantity(closePrice)
 		side := s.Side
 
@@ -104,7 +103,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 			match := false
 			// if any of the conditions satisfies then we execute order
-			if belowMA != nil && closePrice.Float64() < belowMA.Last() {
+			if belowMA != nil && closePriceF < belowMA.Last() {
 				match = true
 				if s.BelowMovingAverage != nil {
 					if s.BelowMovingAverage.Side != nil {
@@ -116,7 +115,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 						quantity = s.BelowMovingAverage.QuantityOrAmount.CalculateQuantity(closePrice)
 					}
 				}
-			} else if aboveMA != nil && closePrice.Float64() > aboveMA.Last() {
+			} else if aboveMA != nil && closePriceF > aboveMA.Last() {
 				match = true
 				if s.AboveMovingAverage != nil {
 					if s.AboveMovingAverage.Side != nil {
@@ -130,7 +129,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 
 			if !match {
-				s.Notifiability.Notify("skip, the %s closed price %f is below or above moving average", s.Symbol, closePrice.Float64())
+				s.Notifiability.Notify("skip, the %s closed price %v is below or above moving average", s.Symbol, closePrice)
 				return
 			}
 		}
@@ -147,9 +146,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				return
 			}
 
-			if quoteBalance.Available < quoteQuantity {
-				s.Notifiability.Notify("Can not place scheduled %s order: quote balance %s is not enough: %f < %f", s.Symbol, s.Market.QuoteCurrency, quoteBalance.Available.Float64(), quoteQuantity.Float64())
-				log.Errorf("can not place scheduled %s order: quote balance %s is not enough: %f < %f", s.Symbol, s.Market.QuoteCurrency, quoteBalance.Available.Float64(), quoteQuantity.Float64())
+			if quoteBalance.Available.Compare(quoteQuantity) < 0 {
+				s.Notifiability.Notify("Can not place scheduled %s order: quote balance %s is not enough: %v < %v", s.Symbol, s.Market.QuoteCurrency, quoteBalance.Available, quoteQuantity)
+				log.Errorf("can not place scheduled %s order: quote balance %s is not enough: %v < %v", s.Symbol, s.Market.QuoteCurrency, quoteBalance.Available, quoteQuantity)
 				return
 			}
 
@@ -160,20 +159,20 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				return
 			}
 
-			if baseBalance.Available < quantity {
-				s.Notifiability.Notify("Can not place scheduled %s order: base balance %s is not enough: %f < %f", s.Symbol, s.Market.QuoteCurrency, baseBalance.Available.Float64(), quantity.Float64())
-				log.Errorf("can not place scheduled %s order: base balance %s is not enough: %f < %f", s.Symbol, s.Market.QuoteCurrency, baseBalance.Available.Float64(), quantity.Float64())
+			if baseBalance.Available.Compare(quantity) < 0 {
+				s.Notifiability.Notify("Can not place scheduled %s order: base balance %s is not enough: %v < %v", s.Symbol, s.Market.QuoteCurrency, baseBalance.Available, quantity)
+				log.Errorf("can not place scheduled %s order: base balance %s is not enough: %v < %v", s.Symbol, s.Market.QuoteCurrency, baseBalance.Available, quantity)
 				return
 			}
 
 		}
 
-		s.Notifiability.Notify("Submitting scheduled %s order with quantity %f at price %f", s.Symbol, quantity.Float64(), closePrice.Float64())
+		s.Notifiability.Notify("Submitting scheduled %s order with quantity %v at price %v", s.Symbol, quantity, closePrice)
 		_, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 			Symbol:   s.Symbol,
 			Side:     side,
 			Type:     types.OrderTypeMarket,
-			Quantity: quantity.Float64(),
+			Quantity: quantity,
 			Market:   s.Market,
 		})
 		if err != nil {

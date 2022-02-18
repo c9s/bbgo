@@ -10,14 +10,16 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var itov = fixedpoint.NewFromInt
+
 func TestDepthBuffer_ReadyState(t *testing.T) {
 	buf := NewBuffer(func() (book types.SliceOrderBook, finalID int64, err error) {
 		return types.SliceOrderBook{
 			Bids: types.PriceVolumeSlice{
-				{Price: 100, Volume: 1},
+				{Price: itov(100), Volume: itov(1)},
 			},
 			Asks: types.PriceVolumeSlice{
-				{Price: 99, Volume: 1},
+				{Price: itov(99), Volume: itov(1)},
 			},
 		}, 33, nil
 	})
@@ -33,10 +35,10 @@ func TestDepthBuffer_ReadyState(t *testing.T) {
 		buf.AddUpdate(
 			types.SliceOrderBook{
 				Bids: types.PriceVolumeSlice{
-					{Price: 100, Volume: fixedpoint.Value(updateID)},
+					{Price: itov(100), Volume: itov(updateID)},
 				},
 				Asks: types.PriceVolumeSlice{
-					{Price: 99, Volume: fixedpoint.Value(updateID)},
+					{Price: itov(99), Volume: itov(updateID)},
 				},
 			}, updateID)
 	}
@@ -52,10 +54,10 @@ func TestDepthBuffer_CorruptedUpdateAtTheBeginning(t *testing.T) {
 		snapshotFinalID += 30
 		return types.SliceOrderBook{
 			Bids: types.PriceVolumeSlice{
-				{Price: 100, Volume: 1},
+				{Price: itov(100), Volume: itov(1)},
 			},
 			Asks: types.PriceVolumeSlice{
-				{Price: 99, Volume: 1},
+				{Price: itov(99), Volume: itov(1)},
 			},
 		}, snapshotFinalID, nil
 	})
@@ -74,10 +76,10 @@ func TestDepthBuffer_CorruptedUpdateAtTheBeginning(t *testing.T) {
 
 		buf.AddUpdate(types.SliceOrderBook{
 			Bids: types.PriceVolumeSlice{
-				{Price: 100, Volume: fixedpoint.Value(updateID)},
+				{Price: itov(100), Volume: itov(updateID)},
 			},
 			Asks: types.PriceVolumeSlice{
-				{Price: 99, Volume: fixedpoint.Value(updateID)},
+				{Price: itov(99), Volume: itov(updateID)},
 			},
 		}, updateID)
 	}
@@ -92,10 +94,10 @@ func TestDepthBuffer_ConcurrentRun(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 		return types.SliceOrderBook{
 			Bids: types.PriceVolumeSlice{
-				{Price: 100, Volume: 1},
+				{Price: itov(100), Volume: itov(1)},
 			},
 			Asks: types.PriceVolumeSlice{
-				{Price: 99, Volume: 1},
+				{Price: itov(99), Volume: itov(1)},
 			},
 		}, snapshotFinalID, nil
 	})
@@ -138,10 +140,10 @@ func TestDepthBuffer_ConcurrentRun(t *testing.T) {
 
 			buf.AddUpdate(types.SliceOrderBook{
 				Bids: types.PriceVolumeSlice{
-					{Price: 100, Volume: fixedpoint.Value(updateID)},
+					{Price: itov(100), Volume: itov(updateID)},
 				},
 				Asks: types.PriceVolumeSlice{
-					{Price: 99, Volume: fixedpoint.Value(updateID)},
+					{Price: itov(99), Volume: itov(updateID)},
 				},
 			}, updateID)
 

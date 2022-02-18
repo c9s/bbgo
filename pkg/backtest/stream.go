@@ -39,4 +39,3 @@ func (s *Stream) Connect(ctx context.Context) error {
 func (s *Stream) Close() error {
 	return nil
 }
-

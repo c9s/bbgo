@@ -1,13 +1,13 @@
 package accounting
 
 import (
-	"fmt"
 	"math"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -15,40 +15,36 @@ func zero(a float64) bool {
 	return int(math.Round(a*1e8)) == 0
 }
 
-func round(a float64) float64 {
-	return math.Round(a*1e8) / 1e8
-}
-
 type Stock types.Trade
 
 func (stock *Stock) String() string {
-	return fmt.Sprintf("%f (%f)", stock.Price, stock.Quantity)
+	return stock.Price.String() + " (" + stock.Quantity.String() + ")"
 }
 
-func (stock *Stock) Consume(quantity float64) float64 {
-	q := math.Min(stock.Quantity, quantity)
-	stock.Quantity = round(stock.Quantity - q)
+func (stock *Stock) Consume(quantity fixedpoint.Value) fixedpoint.Value {
+	q := fixedpoint.Min(stock.Quantity, quantity)
+	stock.Quantity = stock.Quantity.Sub(q)
 	return q
 }
 
 type StockSlice []Stock
 
-func (slice StockSlice) QuantityBelowPrice(price float64) (quantity float64) {
+func (slice StockSlice) QuantityBelowPrice(price fixedpoint.Value) (quantity fixedpoint.Value) {
 	for _, stock := range slice {
-		if stock.Price < price {
-			quantity += stock.Quantity
+		if stock.Price.Compare(price) < 0 {
+			quantity = quantity.Add(stock.Quantity)
 		}
 	}
 
-	return round(quantity)
+	return quantity
 }
 
-func (slice StockSlice) Quantity() (total float64) {
+func (slice StockSlice) Quantity() (total fixedpoint.Value) {
 	for _, stock := range slice {
-		total += stock.Quantity
+		total = total.Add(stock.Quantity)
 	}
 
-	return round(total)
+	return total
 }
 
 type StockDistribution struct {
@@ -61,28 +57,26 @@ type StockDistribution struct {
 }
 
 type DistributionStats struct {
-	PriceLevels   []string              `json:"priceLevels"`
-	TotalQuantity float64               `json:"totalQuantity"`
-	Quantities    map[string]float64    `json:"quantities"`
-	Stocks        map[string]StockSlice `json:"stocks"`
+	PriceLevels   []string                    `json:"priceLevels"`
+	TotalQuantity fixedpoint.Value            `json:"totalQuantity"`
+	Quantities    map[string]fixedpoint.Value `json:"quantities"`
+	Stocks        map[string]StockSlice       `json:"stocks"`
 }
 
 func (m *StockDistribution) DistributionStats(level int) *DistributionStats {
 	var d = DistributionStats{
-		Quantities: map[string]float64{},
+		Quantities: map[string]fixedpoint.Value{},
 		Stocks:     map[string]StockSlice{},
 	}
 
 	for _, stock := range m.Stocks {
-		n := math.Ceil(math.Log10(stock.Price))
+		n := math.Ceil(math.Log10(stock.Price.Float64()))
 		digits := int(n - math.Max(float64(level), 1.0))
-		div := math.Pow10(digits)
-		priceLevel := math.Floor(stock.Price/div) * div
-		key := strconv.FormatFloat(priceLevel, 'f', 2, 64)
+		key := stock.Price.Round(-digits, fixedpoint.Down).FormatString(2)
 
-		d.TotalQuantity += stock.Quantity
+		d.TotalQuantity = d.TotalQuantity.Add(stock.Quantity)
 		d.Stocks[key] = append(d.Stocks[key], stock)
-		d.Quantities[key] += stock.Quantity
+		d.Quantities[key] = d.Quantities[key].Add(stock.Quantity)
 	}
 
 	var priceLevels []float64
@@ -95,8 +89,6 @@ func (m *StockDistribution) DistributionStats(level int) *DistributionStats {
 	for _, price := range priceLevels {
 		d.PriceLevels = append(d.PriceLevels, strconv.FormatFloat(price, 'f', 2, 64))
 	}
-
-	sort.Float64s(priceLevels)
 
 	return &d
 }
@@ -114,7 +106,7 @@ func (m *StockDistribution) squash() {
 
 	var squashed StockSlice
 	for _, stock := range m.Stocks {
-		if !zero(stock.Quantity) {
+		if !stock.Quantity.IsZero() {
 			squashed = append(squashed, stock)
 		}
 	}
@@ -152,11 +144,11 @@ func (m *StockDistribution) consume(sell Stock) error {
 		stock := m.Stocks[idx]
 
 		// find any stock price is lower than the sell trade
-		if stock.Price >= sell.Price {
+		if stock.Price.Compare(sell.Price) >= 0 {
 			continue
 		}
 
-		if zero(stock.Quantity) {
+		if stock.Quantity.IsZero() {
 			continue
 		}
 
@@ -164,7 +156,7 @@ func (m *StockDistribution) consume(sell Stock) error {
 		sell.Consume(delta)
 		m.Stocks[idx] = stock
 
-		if zero(sell.Quantity) {
+		if sell.Quantity.IsZero() {
 			return nil
 		}
 	}
@@ -173,7 +165,7 @@ func (m *StockDistribution) consume(sell Stock) error {
 	for ; idx >= 0; idx-- {
 		stock := m.Stocks[idx]
 
-		if zero(stock.Quantity) {
+		if stock.Quantity.IsZero() {
 			continue
 		}
 
@@ -181,12 +173,12 @@ func (m *StockDistribution) consume(sell Stock) error {
 		sell.Consume(delta)
 		m.Stocks[idx] = stock
 
-		if zero(sell.Quantity) {
+		if sell.Quantity.IsZero() {
 			return nil
 		}
 	}
 
-	if sell.Quantity > 0.0 {
+	if sell.Quantity.Sign() > 0 {
 		m.PendingSells = append(m.PendingSells, sell)
 	}
 
@@ -203,7 +195,7 @@ func (m *StockDistribution) AddTrades(trades []types.Trade) (checkpoints []int, 
 				trade.Symbol = m.Symbol
 				trade.IsBuyer = false
 				trade.Quantity = trade.Fee
-				trade.Fee = 0.0
+				trade.Fee = fixedpoint.Zero
 			}
 		}
 
@@ -238,11 +230,11 @@ func (m *StockDistribution) AddTrades(trades []types.Trade) (checkpoints []int, 
 func toStock(trade types.Trade) Stock {
 	if strings.HasPrefix(trade.Symbol, trade.FeeCurrency) {
 		if trade.IsBuyer {
-			trade.Quantity -= trade.Fee
+			trade.Quantity = trade.Quantity.Sub(trade.Fee)
 		} else {
-			trade.Quantity += trade.Fee
+			trade.Quantity = trade.Quantity.Add(trade.Fee)
 		}
-		trade.Fee = 0.0
+		trade.Fee = fixedpoint.Zero
 	}
 	return Stock(trade)
 }

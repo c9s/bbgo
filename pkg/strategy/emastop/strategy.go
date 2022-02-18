@@ -97,22 +97,25 @@ func (s *Strategy) clear(ctx context.Context, session *bbgo.ExchangeSession) {
 	}
 }
 
-func (s *Strategy) place(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession, indicator types.Float64Indicator, closePrice float64) {
-	movingAveragePrice := indicator.Last()
+func (s *Strategy) place(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession, indicator types.Float64Indicator, closePrice fixedpoint.Value) {
+	closePriceF := closePrice.Float64()
+	movingAveragePriceF := indicator.Last()
 
 	// skip it if it's near zero because it's not loaded yet
-	if movingAveragePrice < 0.0001 {
-		log.Warnf("moving average price is near 0: %f", movingAveragePrice)
+	if movingAveragePriceF < 0.0001 {
+		log.Warnf("moving average price is near 0: %f", movingAveragePriceF)
 		return
 	}
 
 	// place stop limit order only when the closed price is greater than the moving average price
-	if closePrice <= movingAveragePrice {
-		log.Warnf("close price %f is less than moving average price %f", closePrice, movingAveragePrice)
+	if closePriceF <= movingAveragePriceF {
+		log.Warnf("close price %v is less than moving average price %f", closePrice, movingAveragePriceF)
 		return
 	}
 
-	var price = 0.0
+	movingAveragePrice := fixedpoint.NewFromFloat(movingAveragePriceF)
+
+	var price = fixedpoint.Zero
 	var orderType = types.OrderTypeStopMarket
 
 	switch strings.ToLower(s.OrderType) {
@@ -121,8 +124,8 @@ func (s *Strategy) place(ctx context.Context, orderExecutor bbgo.OrderExecutor, 
 	case "limit":
 		orderType = types.OrderTypeStopLimit
 		price = movingAveragePrice
-		if s.PriceRatio > 0 {
-			price = price * s.PriceRatio.Float64()
+		if s.PriceRatio.Sign() > 0 {
+			price = price.Mul(s.PriceRatio)
 		}
 	}
 
@@ -133,24 +136,25 @@ func (s *Strategy) place(ctx context.Context, orderExecutor bbgo.OrderExecutor, 
 	}
 
 	quantity := s.Quantity
-	if s.BalancePercentage > 0 {
+	if s.BalancePercentage.Sign() > 0 {
 
 		if balance, ok := session.Account.Balance(market.BaseCurrency); ok {
 			quantity = balance.Available.Mul(s.BalancePercentage)
 		}
 	}
 
-	if quantity.Float64()*closePrice < market.MinNotional {
-		log.Errorf("the amount of stop order (%f) is less than min notional %f", quantity.Float64()*closePrice, market.MinNotional)
+	amount := quantity.Mul(closePrice)
+	if amount.Compare(market.MinNotional) < 0 {
+		log.Errorf("the amount of stop order (%v) is less than min notional %v", amount, market.MinNotional)
 		return
 	}
 
 	var stopPrice = movingAveragePrice
-	if s.StopPriceRatio > 0 {
-		stopPrice = stopPrice * s.StopPriceRatio.Float64()
+	if s.StopPriceRatio.Sign() > 0 {
+		stopPrice = stopPrice.Mul(s.StopPriceRatio)
 	}
 
-	log.Infof("placing trailingstop order %s at stop price %f, quantity %f", s.Symbol, stopPrice, quantity.Float64())
+	log.Infof("placing trailingstop order %s at stop price %v, quantity %v", s.Symbol, stopPrice, quantity)
 
 	retOrders, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 		Symbol:    s.Symbol,
@@ -158,7 +162,7 @@ func (s *Strategy) place(ctx context.Context, orderExecutor bbgo.OrderExecutor, 
 		Type:      orderType,
 		Price:     price,
 		StopPrice: stopPrice,
-		Quantity:  quantity.Float64(),
+		Quantity:  quantity,
 	})
 	if err != nil {
 		log.WithError(err).Error("submit order error")

@@ -93,56 +93,56 @@ func (e *TwapExecution) newBestPriceOrder() (orderForm types.SubmitOrder, err er
 	// if number of ticks = 2, than the tickSpread is 0.02
 	// tickSpread = min(0.02 - 0.01, 0.02)
 	// price = first bid price 28.00 + tickSpread (0.01) = 28.01
-	tickSize := fixedpoint.NewFromFloat(e.market.TickSize)
-	tickSpread := tickSize.MulInt(e.NumOfTicks)
-	if spread > tickSize {
+	tickSize := e.market.TickSize
+	tickSpread := tickSize.Mul(fixedpoint.NewFromInt(int64(e.NumOfTicks)))
+	if spread.Compare(tickSize) > 0 {
 		// there is a gap in the spread
-		tickSpread = fixedpoint.Min(tickSpread, spread-tickSize)
+		tickSpread = fixedpoint.Min(tickSpread, spread.Sub(tickSize))
 		switch e.Side {
 		case types.SideTypeSell:
-			newPrice -= tickSpread
+			newPrice = newPrice.Sub(tickSpread)
 		case types.SideTypeBuy:
-			newPrice += tickSpread
+			newPrice = newPrice.Add(tickSpread)
 		}
 	}
 
-	if e.StopPrice > 0 {
+	if e.StopPrice.Sign() > 0 {
 		switch e.Side {
 		case types.SideTypeSell:
-			if newPrice < e.StopPrice {
-				log.Infof("%s order price %f is lower than the stop sell price %f, setting order price to the stop sell price %f",
+			if newPrice.Compare(e.StopPrice) < 0 {
+				log.Infof("%s order price %s is lower than the stop sell price %s, setting order price to the stop sell price %s",
 					e.Symbol,
-					newPrice.Float64(),
-					e.StopPrice.Float64(),
-					e.StopPrice.Float64())
+					newPrice.String(),
+					e.StopPrice.String(),
+					e.StopPrice.String())
 				newPrice = e.StopPrice
 			}
 
 		case types.SideTypeBuy:
-			if newPrice > e.StopPrice {
-				log.Infof("%s order price %f is higher than the stop buy price %f, setting order price to the stop buy price %f",
+			if newPrice.Compare(e.StopPrice) > 0 {
+				log.Infof("%s order price %s is higher than the stop buy price %s, setting order price to the stop buy price %s",
 					e.Symbol,
-					newPrice.Float64(),
-					e.StopPrice.Float64(),
-					e.StopPrice.Float64())
+					newPrice.String(),
+					e.StopPrice.String(),
+					e.StopPrice.String())
 				newPrice = e.StopPrice
 			}
 		}
 	}
 
-	minQuantity := fixedpoint.NewFromFloat(e.market.MinQuantity)
+	minQuantity := e.market.MinQuantity
 	base := e.position.GetBase()
 
-	restQuantity := e.TargetQuantity - fixedpoint.Abs(base)
+	restQuantity := e.TargetQuantity.Sub(base.Abs())
 
-	if restQuantity <= 0 {
+	if restQuantity.Sign() <= 0 {
 		if e.cancelContextIfTargetQuantityFilled() {
 			return
 		}
 	}
 
-	if restQuantity < minQuantity {
-		return orderForm, fmt.Errorf("can not continue placing orders, rest quantity %f is less than the min quantity %f", restQuantity.Float64(), minQuantity.Float64())
+	if restQuantity.Compare(minQuantity) < 0 {
+		return orderForm, fmt.Errorf("can not continue placing orders, rest quantity %s is less than the min quantity %s", restQuantity.String(), minQuantity.String())
 	}
 
 	// when slice = 1000, if we only have 998, we should adjust our quantity to 998
@@ -150,12 +150,12 @@ func (e *TwapExecution) newBestPriceOrder() (orderForm types.SubmitOrder, err er
 
 	// if the rest quantity in the next round is not enough, we should merge the rest quantity into this round
 	// if there are rest slices
-	nextRestQuantity := restQuantity - e.SliceQuantity
-	if nextRestQuantity > 0 && nextRestQuantity < minQuantity {
+	nextRestQuantity := restQuantity.Sub(e.SliceQuantity)
+	if nextRestQuantity.Sign() > 0 && nextRestQuantity.Compare(minQuantity) < 0 {
 		orderQuantity = restQuantity
 	}
 
-	minNotional := fixedpoint.NewFromFloat(e.market.MinNotional)
+	minNotional := e.market.MinNotional
 	orderQuantity = AdjustQuantityByMinAmount(orderQuantity, newPrice, minNotional)
 
 	switch e.Side {
@@ -179,7 +179,7 @@ func (e *TwapExecution) newBestPriceOrder() (orderForm types.SubmitOrder, err er
 				Symbol:   e.Symbol,
 				Side:     e.Side,
 				Type:     types.OrderTypeMarket,
-				Quantity: restQuantity.Float64(),
+				Quantity: restQuantity,
 				Market:   e.market,
 			}
 			return orderForm, nil
@@ -191,8 +191,8 @@ func (e *TwapExecution) newBestPriceOrder() (orderForm types.SubmitOrder, err er
 		Symbol:      e.Symbol,
 		Side:        e.Side,
 		Type:        types.OrderTypeLimitMaker,
-		Quantity:    orderQuantity.Float64(),
-		Price:       newPrice.Float64(),
+		Quantity:    orderQuantity,
+		Price:       newPrice,
 		Market:      e.market,
 		TimeInForce: "GTC",
 	}
@@ -214,8 +214,9 @@ func (e *TwapExecution) updateOrder(ctx context.Context) error {
 		return fmt.Errorf("no secoond price on the %s order book %s, can not update", e.Symbol, e.Side)
 	}
 
-	tickSize := fixedpoint.NewFromFloat(e.market.TickSize)
-	tickSpread := tickSize.MulInt(e.NumOfTicks)
+	tickSize := e.market.TickSize
+	numOfTicks := fixedpoint.NewFromInt(int64(e.NumOfTicks))
+	tickSpread := tickSize.Mul(numOfTicks)
 
 	// check and see if we need to cancel the existing active orders
 	for e.activeMakerOrders.NumOfOrders() > 0 {
@@ -227,12 +228,12 @@ func (e *TwapExecution) updateOrder(ctx context.Context) error {
 
 		// get the first order
 		order := orders[0]
-		orderPrice := fixedpoint.NewFromFloat(order.Price)
+		orderPrice := order.Price
 		// quantity := fixedpoint.NewFromFloat(order.Quantity)
 
-		remainingQuantity := order.Quantity - order.ExecutedQuantity
-		if remainingQuantity <= e.market.MinQuantity {
-			log.Infof("order remaining quantity %f is less than the market minimal quantity %f, skip updating order", remainingQuantity, e.market.MinQuantity)
+		remainingQuantity := order.Quantity.Sub(order.ExecutedQuantity)
+		if remainingQuantity.Compare(e.market.MinQuantity) <= 0 {
+			log.Infof("order remaining quantity %s is less than the market minimal quantity %s, skip updating order", remainingQuantity.String(), e.market.MinQuantity.String())
 			return nil
 		}
 
@@ -241,24 +242,24 @@ func (e *TwapExecution) updateOrder(ctx context.Context) error {
 		// DO NOT UPDATE IF:
 		//   tickSpread > 0 AND current order price == second price + tickSpread
 		//   current order price == first price
-		log.Infof("orderPrice = %f first.Price = %f second.Price = %f tickSpread = %f", orderPrice.Float64(), first.Price.Float64(), second.Price.Float64(), tickSpread.Float64())
+		log.Infof("orderPrice = %s first.Price = %s second.Price = %s tickSpread = %s", orderPrice.String(), first.Price.String(), second.Price.String(), tickSpread.String())
 
 		switch e.Side {
 		case types.SideTypeBuy:
-			if tickSpread > 0 && orderPrice == second.Price+tickSpread {
-				log.Infof("the current order is already on the best ask price %f", orderPrice.Float64())
+			if tickSpread.Sign() > 0 && orderPrice == second.Price.Add(tickSpread) {
+				log.Infof("the current order is already on the best ask price %s", orderPrice.String())
 				return nil
 			} else if orderPrice == first.Price {
-				log.Infof("the current order is already on the best bid price %f", orderPrice.Float64())
+				log.Infof("the current order is already on the best bid price %s", orderPrice.String())
 				return nil
 			}
 
 		case types.SideTypeSell:
-			if tickSpread > 0 && orderPrice == second.Price-tickSpread {
-				log.Infof("the current order is already on the best ask price %f", orderPrice.Float64())
+			if tickSpread.Sign() > 0 && orderPrice == second.Price.Sub(tickSpread) {
+				log.Infof("the current order is already on the best ask price %s", orderPrice.String())
 				return nil
 			} else if orderPrice == first.Price {
-				log.Infof("the current order is already on the best ask price %f", orderPrice.Float64())
+				log.Infof("the current order is already on the best ask price %s", orderPrice.String())
 				return nil
 			}
 		}
@@ -282,7 +283,7 @@ func (e *TwapExecution) updateOrder(ctx context.Context) error {
 }
 
 func (e *TwapExecution) cancelActiveOrders() {
-	gracefulCtx, gracefulCancel := context.WithTimeout(context.TODO(), 30 * time.Second)
+	gracefulCtx, gracefulCancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer gracefulCancel()
 	e.activeMakerOrders.GracefulCancel(gracefulCtx, e.Session.Exchange)
 }
@@ -340,7 +341,7 @@ func (e *TwapExecution) orderUpdater(ctx context.Context) {
 func (e *TwapExecution) cancelContextIfTargetQuantityFilled() bool {
 	base := e.position.GetBase()
 
-	if fixedpoint.Abs(base) >= e.TargetQuantity {
+	if base.Abs().Compare(e.TargetQuantity) >= 0 {
 		log.Infof("filled target quantity, canceling the order execution context")
 		e.cancelExecution()
 		return true

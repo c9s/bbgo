@@ -14,11 +14,11 @@ type AverageCostCalculator struct {
 	Market             types.Market
 }
 
-func (c *AverageCostCalculator) Calculate(symbol string, trades []types.Trade, currentPrice float64) *AverageCostPnlReport {
+func (c *AverageCostCalculator) Calculate(symbol string, trades []types.Trade, currentPrice fixedpoint.Value) *AverageCostPnlReport {
 	// copy trades, so that we can truncate it.
-	var bidVolume = 0.0
-	var askVolume = 0.0
-	var feeUSD = 0.0
+	var bidVolume = fixedpoint.Zero
+	var askVolume = fixedpoint.Zero
+	var feeUSD = fixedpoint.Zero
 
 	if len(trades) == 0 {
 		return &AverageCostPnlReport{
@@ -32,7 +32,7 @@ func (c *AverageCostCalculator) Calculate(symbol string, trades []types.Trade, c
 		}
 	}
 
-	var currencyFees = map[string]float64{}
+	var currencyFees = map[string]fixedpoint.Value{}
 
 	var position = types.NewPositionFromMarket(c.Market)
 	position.SetFeeRate(types.ExchangeFee{
@@ -60,26 +60,27 @@ func (c *AverageCostCalculator) Calculate(symbol string, trades []types.Trade, c
 
 		profit, netProfit, madeProfit := position.AddTrade(trade)
 		if madeProfit {
-			totalProfit += profit
-			totalNetProfit += netProfit
+			totalProfit = totalProfit.Add(profit)
+			totalNetProfit = totalNetProfit.Add(netProfit)
 		}
 
 		if trade.IsBuyer {
-			bidVolume += trade.Quantity
+			bidVolume = bidVolume.Add(trade.Quantity)
 		} else {
-			askVolume += trade.Quantity
+			askVolume = askVolume.Add(trade.Quantity)
 		}
 
 		if _, ok := currencyFees[trade.FeeCurrency]; !ok {
 			currencyFees[trade.FeeCurrency] = trade.Fee
 		} else {
-			currencyFees[trade.FeeCurrency] += trade.Fee
+			currencyFees[trade.FeeCurrency] = currencyFees[trade.FeeCurrency].Add(trade.Fee)
 		}
 
 		tradeIDs[trade.ID] = trade
 	}
 
-	unrealizedProfit := (fixedpoint.NewFromFloat(currentPrice) - position.AverageCost).Mul(position.GetBase())
+	unrealizedProfit := currentPrice.Sub(position.AverageCost).
+		Mul(position.GetBase())
 	return &AverageCostPnlReport{
 		Symbol:    symbol,
 		Market:    c.Market,
@@ -90,12 +91,12 @@ func (c *AverageCostCalculator) Calculate(symbol string, trades []types.Trade, c
 		BuyVolume:  bidVolume,
 		SellVolume: askVolume,
 
-		Stock:            position.GetBase().Float64(),
+		Stock:            position.GetBase(),
 		Profit:           totalProfit,
 		NetProfit:        totalNetProfit,
 		UnrealizedProfit: unrealizedProfit,
-		AverageCost:      position.AverageCost.Float64(),
-		FeeInUSD:         (totalProfit - totalNetProfit).Float64(),
+		AverageCost:      position.AverageCost,
+		FeeInUSD:         totalProfit.Sub(totalNetProfit),
 		CurrencyFees:     currencyFees,
 	}
 }
