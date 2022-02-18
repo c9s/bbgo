@@ -75,7 +75,6 @@ const (
 	OrderTypeMarket     OrderType = "MARKET"
 	OrderTypeStopLimit  OrderType = "STOP_LIMIT"
 	OrderTypeStopMarket OrderType = "STOP_MARKET"
-	OrderTypeIOCLimit   OrderType = "IOC_LIMIT"
 )
 
 /*

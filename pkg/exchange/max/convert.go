@@ -121,7 +121,7 @@ func toGlobalOrderType(orderType max.OrderType) types.OrderType {
 		return types.OrderTypeStopMarket
 
 	case max.OrderTypeIOCLimit:
-		return types.OrderTypeIOCLimit
+		return types.OrderTypeLimit
 
 	case max.OrderTypePostOnly:
 		return types.OrderTypeLimitMaker
@@ -149,9 +149,6 @@ func toLocalOrderType(orderType types.OrderType) (max.OrderType, error) {
 
 	case types.OrderTypeMarket:
 		return max.OrderTypeMarket, nil
-
-	case types.OrderTypeIOCLimit:
-		return max.OrderTypeIOCLimit, nil
 	}
 
 	return "", fmt.Errorf("order type %s not supported", orderType)
