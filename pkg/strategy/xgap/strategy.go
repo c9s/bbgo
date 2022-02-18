@@ -360,7 +360,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 					Quantity: quantity,
 					Price:    price,
 					Market:   s.tradingMarket,
-					// TimeInForce: "GTC",
+					// TimeInForce: types.TimeInForceGTC,
 					GroupID: s.groupID,
 				}, types.SubmitOrder{
 					Symbol:   s.Symbol,
@@ -369,7 +369,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 					Quantity: quantity,
 					Price:    price,
 					Market:   s.tradingMarket,
-					// TimeInForce: "GTC",
+					// TimeInForce: types.TimeInForceGTC,
 					GroupID: s.groupID,
 				})
 				if err != nil {

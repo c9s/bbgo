@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/c9s/bbgo/pkg/exchange/kucoin/kucoinapi"
-	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 func toGlobalBalanceMap(accounts []kucoinapi.Account) types.BalanceMap {
@@ -213,7 +213,7 @@ func toGlobalOrder(o kucoinapi.Order) types.Order {
 			Quantity:      o.Size,
 			Price:         o.Price,
 			StopPrice:     o.StopPrice,
-			TimeInForce:   string(o.TimeInForce),
+			TimeInForce:   types.TimeInForce(o.TimeInForce),
 		},
 		Exchange:         types.ExchangeKucoin,
 		OrderID:          hashStringID(o.ID),
