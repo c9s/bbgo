@@ -24,12 +24,12 @@ function info()
 source $(dirname $(readlink -f $0))/tagname.sh
 osf=$(uname | tr '[:upper:]' '[:lower:]')
 arch=amd64
-dist_file=bbgo-$version-$osf-$arch-dnum.tar.gz
+dist_file=bbgo-dnum-$version-$osf-$arch.tar.gz
 
 info "downloading..."
 curl -O -L https://github.com/c9s/bbgo/releases/download/$version/$dist_file
 tar xzf $dist_file
-mv bbgo-$osf-$arch-dnum bbgo
+mv bbgo-dnum-$osf-$arch bbgo
 chmod +x bbgo
 info "downloaded successfully"
 
