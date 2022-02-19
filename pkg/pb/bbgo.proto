@@ -6,51 +6,43 @@ option go_package = "../pb";
 
 service BBGO {
     // should support streaming
-    rpc SubscribeKLine(SubscribeKLineRequest) returns (stream SubscribeKLineResponse) {}
-    rpc SubscribeOrderBook(SubscribeOrderBookRequest) returns (stream SubscribeOrderBookResponse) {}
-    rpc SubscribeUserData(SubscribeUserDataRequest) returns (stream SubscribeUserDataResponse) {}
+    rpc Subcribe(SubscribeRequest) returns (stream SubscribeResponse) {}
 
     // request-response
     rpc CreateOrder(CreateOrderRequest) returns (CreateOrderResponse) {}
     rpc CancelOrder(CancelOrderRequest) returns (CancelOrderResponse) {}
     rpc QueryOrder(QueryOrderRequest) returns (QueryOrderResponse) {}
-    rpc QueryOpenOrders(QueryOpenOrdersRequest) returns (QueryOpenOrdersResponse) {}
+    rpc QueryOrders(QueryOrdersRequest) returns (QueryOrdersResponse) {}
     rpc QueryTrades(QueryTradesRequest) returns (QueryTradesResponse) {}
 }
 
-message SubscribeKLineRequest {
+message SubscribeRequest {
+    repeated Subscription subscriptions = 1;
+}
+
+message Subscription {
     string exchange = 1;
-    string symbol = 2;
-    string interval = 3;
-    int64 limit = 4;
-    uint64 since = 5;
+    string channel = 2;  // book, trade, ticker
+    string market = 3;
+    int64 depth = 4;
 }
 
-message SubscribeKLineResponse {
+message SubscribeResponse {
+    repeated SuccessResponse success_responses = 1;
+}
+
+message SuccessResponse {
     string exchange = 1;
-    string symbol = 2;
-    repeated KLine klines = 3;
-}
-
-message KLine {
-    int64 timestamp = 1;
-    double open = 2;
-    double high = 3;
-    double low = 4;
-    double close = 5;
-    double volume = 6;
-}
-
-message SubscribeOrderBookRequest {
-    string symbol = 1;
-    optional int64 limit = 2;
-}
-
-message SubscribeOrderBookResponse {
-    int64 timestamp = 1;
-    string symbol = 2;
-    repeated PriceVolume bids = 3;
-    repeated PriceVolume asks = 4;
+    string channel = 2;  // book, trade, ticker, user
+    string event = 3;    // snapshot, update, order_snapshot, ...
+    string market = 4;
+    repeated PriceVolume asks = 5;
+    repeated PriceVolume bids = 6;
+    repeated Trade trades = 7;
+    Ticker ticker = 8;
+    repeated Order orders = 9;
+    repeated Balance balances = 10;
+    int64 timestamp = 11;
 }
 
 message PriceVolume {
@@ -58,110 +50,124 @@ message PriceVolume {
     int64 volume = 2;
 }
 
-message SubscribeUserDataRequest {
-    repeated BalanceRequest balance_requests = 1;
+// https://maicoin.github.io/max-websocket-docs/#/private_channels?id=trade-response
+// https://maicoin.github.io/max-websocket-docs/#/public_trade?id=success-response
+message Trade {
+    int64 id = 1;  // trade id
+    double price = 2;
+    double volume = 3;
+    string market = 4;
+    int64 created_at = 5;
+    string side = 6;
+    double fee = 7;
+    string fee_currency = 8;
+    bool maker = 9;
+    string trend = 10;
 }
 
-message BalanceRequest {
-    string exchange = 1;
-    string currency = 2;
+// https://maicoin.github.io/max-websocket-docs/#/public_ticker?id=success-response
+message Ticker {
+    double open = 1;
+    double high = 2;
+    double low = 3;
+    double close = 4;
+    double volume = 5;
 }
 
-message SubscribeUserDataResponse {
-    repeated Balance balances = 1;
-    repeated Order orders = 2;
+// https://maicoin.github.io/max-websocket-docs/#/private_channels?id=snapshot
+message Order {
+    int64 id = 1;
+    string side = 2;
+    string order_type = 3;  // limit, ...
+    double price = 4;
+    double stop_price = 5;
+    double avg_price = 6;
+    string state = 7;
+    string market = 8;
+    int64 created_at = 9;
+    double volume = 10;
+    double remaining_volume = 11;
+    double executed_volume = 12;
+    int64 trades_count = 13;
+    int64 client_oid = 14;
+    int64 group_id = 15;
 }
 
+// https://maicoin.github.io/max-websocket-docs/#/private_channels?id=account-response
 message Balance {
-    string exchange = 1;
-    string currency = 2;
-    double quantity = 3;
-    double available = 4;
+    string currency = 1;
+    double available = 2;
+    double locked = 3;
 }
 
 message CreateOrderRequest {
     string exchange = 1;
-    string symbol = 2;
-    string side = 3;   // buy, sell
-    string order = 4;  // limit, limit maker, market, stop limit, stop market, ioc limit
-    double quantity = 5;
-    double price = 6;
-    optional double stop_price = 7;
-    optional string time_in_force = 8;  // GTC, IOC, FOK
+    Order order = 2;
 }
 
 message CreateOrderResponse {
-    bool ok = 1;
+    string exchange = 1;
     Order order = 2;
 }
 
 message CancelOrderRequest {
-    string order_id = 1;
+    string exchange = 1;
+    int64 id = 2;
+    int64 client_oid = 3;
 }
 
 message CancelOrderResponse {
-    bool ok = 1;
+    string exchange = 1;
+    Order order = 2;
+    int64 status_code = 3;
 }
 
 message QueryOrderRequest {
-    string order_id = 1;
+    string exchange = 1;
+    int64 id = 2;
+    int64 client_oid = 3;
 }
 
 message QueryOrderResponse {
-    bool exists = 1;
+    string exchange = 1;
     Order order = 2;
+    int64 status_code = 3;
 }
 
-message Order {
-    string order_id = 1;
-    string exchange = 2;
-    string symbol = 3;
-    string side = 4;   // buy, sell
-    string order = 5;  // limit, limit maker, market, stop limit, stop market, ioc limit
-    double quantity = 6;
-    double price = 7;
-    double stop_price = 8;
-    string time_in_force = 9;  // GTC, IOC, FOK
-
-    string order_status = 10;  // new, filled, partially filled, canceled, rejected
-    double executed_quantity = 11;
-    bool isWorking = 12;
-    int64 creation_time = 13;
-    int64 update_time = 14;
+// https://max.maicoin.com/documents/api_list/v2#!/private/getApiV2Orders
+message QueryOrdersRequest {
+    string exchange = 1;
+    string market = 2;
+    repeated string state = 3;
+    string order_by = 4;
+    int64 group_id = 5;
+    bool pagination = 6;
+    int64 page = 7;
+    int64 limit = 8;
+    int64 offset = 9;
 }
 
-message QueryOpenOrdersRequest {
-    string order_id = 1;
-}
-
-message QueryOpenOrdersResponse {
-    bool exists = 1;
-    Order order = 2;
+message QueryOrdersResponse {
+    string exchange = 1;
+    repeated Order orders = 2;
+    int64 status_code = 3;
 }
 
 message QueryTradesRequest {
     string exchange = 1;
-    string symbol = 2;
-    int64 since = 3;
-    int64 until = 4;
-    optional int64 order_id = 5;
+    string market = 2;
+    int64 timestamp = 3;
+    int64 from = 4;
+    int64 to = 5;
+    string order_by = 6;
+    bool pagination = 7;
+    int64 page = 8;
+    int64 limit = 9;
+    int64 offset = 10;
 }
 
 message QueryTradesResponse {
-    repeated Trade trades = 1;
-}
-
-message Trade {
-    string order_id = 1;
-    string exchange = 2;
-    string symbol = 3;
-    string side = 4;  // buy, sell
-    double quantity = 5;
-    double quote_quantity = 6;
-    double price = 7;
-    bool is_buyer = 8;
-    bool is_maker = 9;
-    int64 trade_at = 10;
-    double fee = 11;
-    string fee_currency = 12;
+    string exchange = 1;
+    repeated Trade trades = 2;
+    int64 status_code = 3;
 }
