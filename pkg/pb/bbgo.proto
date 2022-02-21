@@ -9,12 +9,12 @@ service BBGO {
     rpc Subcribe(SubscribeRequest) returns (stream SubscribeResponse) {}
 
     // request-response
-    rpc CreateOrder(CreateOrderRequest) returns (CreateOrderResponse) {}
+    rpc SubmitOrder(SubmitOrderRequest) returns (SubmitOrderResponse) {}
     rpc CancelOrder(CancelOrderRequest) returns (CancelOrderResponse) {}
     rpc QueryOrder(QueryOrderRequest) returns (QueryOrderResponse) {}
     rpc QueryOrders(QueryOrdersRequest) returns (QueryOrdersResponse) {}
     rpc QueryTrades(QueryTradesRequest) returns (QueryTradesResponse) {}
-    rpc QueryKLines(QueryKlinesRequest) returns (QueryKLinesResponse) {}
+    rpc QueryKLines(QueryKLinesRequest) returns (QueryKLinesResponse) {}
 }
 
 message SubscribeRequest {
@@ -24,7 +24,7 @@ message SubscribeRequest {
 message Subscription {
     string exchange = 1;
     string channel = 2;  // book, trade, ticker
-    string market = 3;
+    string symbol = 3;
     int64 depth = 4;
 }
 
@@ -36,7 +36,7 @@ message SuccessResponse {
     string exchange = 1;
     string channel = 2;  // book, trade, ticker, user
     string event = 3;    // snapshot, update, order_snapshot, ...
-    string market = 4;
+    string symbol = 4;
     repeated PriceVolume asks = 5;
     repeated PriceVolume bids = 6;
     repeated Trade trades = 7;
@@ -57,7 +57,7 @@ message Trade {
     int64 id = 1;  // trade id
     double price = 2;
     double volume = 3;
-    string market = 4;
+    string symbol = 4;
     int64 created_at = 5;
     string side = 6;
     double fee = 7;
@@ -77,21 +77,33 @@ message Ticker {
 
 // https://maicoin.github.io/max-websocket-docs/#/private_channels?id=snapshot
 message Order {
-    int64 id = 1;
-    string side = 2;
-    string order_type = 3;  // limit, ...
-    double price = 4;
-    double stop_price = 5;
-    double avg_price = 6;
-    string state = 7;
-    string market = 8;
-    int64 created_at = 9;
-    double volume = 10;
-    double remaining_volume = 11;
+    string exchange = 1;
+    int64 id = 2;
+    string side = 3;
+    string order_type = 4;
+    double price = 5;
+    double stop_price = 6;
+    double avg_price = 7;
+    string status = 8;
+    string symbol = 9;
+    int64 created_at = 10;
+    double quantity = 11;
     double executed_volume = 12;
     int64 trades_count = 13;
-    int64 client_oid = 14;
+    int64 client_order_id = 14;
     int64 group_id = 15;
+}
+
+message SubmitOrder {
+    string exchange = 1;
+    string symbol = 2;
+    string side = 3;
+    double quantity = 4;
+    double price = 5;
+    double stop_price = 6;
+    string order_type = 7;
+    int64 client_order_id = 8;
+    int64 group_id = 9;
 }
 
 // https://maicoin.github.io/max-websocket-docs/#/private_channels?id=account-response
@@ -101,12 +113,11 @@ message Balance {
     double locked = 3;
 }
 
-message CreateOrderRequest {
-    string exchange = 1;
-    Order order = 2;
+message SubmitOrderRequest {
+    SubmitOrder submit_order = 1;
 }
 
-message CreateOrderResponse {
+message SubmitOrderResponse {
     string exchange = 1;
     Order order = 2;
 }
@@ -114,7 +125,7 @@ message CreateOrderResponse {
 message CancelOrderRequest {
     string exchange = 1;
     int64 id = 2;
-    int64 client_oid = 3;
+    int64 client_order_id = 3;
 }
 
 message CancelOrderResponse {
@@ -124,9 +135,8 @@ message CancelOrderResponse {
 }
 
 message QueryOrderRequest {
-    string exchange = 1;
-    int64 id = 2;
-    int64 client_oid = 3;
+    int64 id = 1;
+    int64 client_order_id = 2;
 }
 
 message QueryOrderResponse {
@@ -135,10 +145,9 @@ message QueryOrderResponse {
     int64 status_code = 3;
 }
 
-// https://max.maicoin.com/documents/api_list/v2#!/private/getApiV2Orders
 message QueryOrdersRequest {
     string exchange = 1;
-    string market = 2;
+    string symbol = 2;
     repeated string state = 3;
     string order_by = 4;
     int64 group_id = 5;
@@ -156,7 +165,7 @@ message QueryOrdersResponse {
 
 message QueryTradesRequest {
     string exchange = 1;
-    string market = 2;
+    string symbol = 2;
     int64 timestamp = 3;
     int64 from = 4;
     int64 to = 5;
@@ -173,25 +182,27 @@ message QueryTradesResponse {
     int64 status_code = 3;
 }
 
-// https://max.maicoin.com/documents/api_list/v2#!/public/getApiV2K
-message QueryKlinesRequest {
+message QueryKLinesRequest {
     string exchange = 1;
-    string market = 2;
-    int64 int64 = 3;
-    int64 period = 4;  // time period of K line in minute
+    string symbol = 2;
+    int64 limit = 3;
+    int64 interval = 4;  // time period of K line in minute
     int64 timestamp = 5;
 }
 
 message QueryKLinesResponse {
-    string exchange = 1;
-    repeated KLine klines = 2;
-    int64 status_code = 3;
+    repeated KLine klines = 1;
+    int64 status_code = 2;
 }
 
 message KLine {
-    int64 timestamp = 1;
-    double open = 2;
-    double high = 3;
-    double low = 4;
-    double close = 5;
+    string exchange = 1;
+    string symbol = 2;
+    int64 timestamp = 3;
+    double open = 4;
+    double high = 5;
+    double low = 6;
+    double close = 7;
+    double volume = 8;
+    double quote_volume = 9;
 }
