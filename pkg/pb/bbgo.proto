@@ -54,16 +54,17 @@ message PriceVolume {
 // https://maicoin.github.io/max-websocket-docs/#/private_channels?id=trade-response
 // https://maicoin.github.io/max-websocket-docs/#/public_trade?id=success-response
 message Trade {
-    int64 id = 1;  // trade id
-    double price = 2;
-    double volume = 3;
-    string symbol = 4;
-    int64 created_at = 5;
-    string side = 6;
-    double fee = 7;
-    string fee_currency = 8;
-    bool maker = 9;
-    string trend = 10;
+    string exchange = 1;
+    int64 id = 2;
+    double price = 3;
+    double volume = 4;
+    string symbol = 5;
+    int64 created_at = 6;
+    string side = 7;
+    double fee = 8;
+    string fee_currency = 9;
+    bool maker = 10;
+    string trend = 11;
 }
 
 // https://maicoin.github.io/max-websocket-docs/#/public_ticker?id=success-response
@@ -140,9 +141,8 @@ message QueryOrderRequest {
 }
 
 message QueryOrderResponse {
-    string exchange = 1;
-    Order order = 2;
-    int64 status_code = 3;
+    Order order = 1;
+    int64 status_code = 2;
 }
 
 message QueryOrdersRequest {
@@ -177,9 +177,8 @@ message QueryTradesRequest {
 }
 
 message QueryTradesResponse {
-    string exchange = 1;
-    repeated Trade trades = 2;
-    int64 status_code = 3;
+    repeated Trade trades = 1;
+    int64 status_code = 2;
 }
 
 message QueryKLinesRequest {
