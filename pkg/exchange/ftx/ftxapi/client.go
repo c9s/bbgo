@@ -172,7 +172,6 @@ func (c *RestClient) attachAuthHeaders(req *http.Request, method string, path st
 	}
 }
 
-
 // sign uses sha256 to sign the payload with the given secret
 func sign(secret, payload string) string {
 	var sig = hmac.New(sha256.New, []byte(secret))
@@ -247,7 +246,6 @@ func (c *RestClient) NewGetAccountRequest() *GetAccountRequest {
 	}
 }
 
-
 //go:generate GetRequest -url /api/positions -type GetPositionsRequest -responseDataType []Position
 type GetPositionsRequest struct {
 	client requestgen.AuthenticatedAPIClient
@@ -255,6 +253,41 @@ type GetPositionsRequest struct {
 
 func (c *RestClient) NewGetPositionsRequest() *GetPositionsRequest {
 	return &GetPositionsRequest{
+		client: c,
+	}
+}
+
+type Market struct {
+	Name                  string           `json:"name"`
+	BaseCurrency          string           `json:"baseCurrency"`
+	QuoteCurrency         string           `json:"quoteCurrency"`
+	QuoteVolume24H        fixedpoint.Value `json:"quoteVolume24h"`
+	Change1H              fixedpoint.Value `json:"change1h"`
+	Change24H             fixedpoint.Value `json:"change24h"`
+	ChangeBod             fixedpoint.Value `json:"changeBod"`
+	VolumeUsd24H          fixedpoint.Value `json:"volumeUsd24h"`
+	HighLeverageFeeExempt bool             `json:"highLeverageFeeExempt"`
+	MinProvideSize        fixedpoint.Value `json:"minProvideSize"`
+	Type                  string           `json:"type"`
+	Underlying            string           `json:"underlying"`
+	Enabled               bool             `json:"enabled"`
+	Ask                   fixedpoint.Value `json:"ask"`
+	Bid                   int              `json:"bid"`
+	Last                  fixedpoint.Value `json:"last"`
+	PostOnly              bool             `json:"postOnly"`
+	Price                 fixedpoint.Value `json:"price"`
+	PriceIncrement        fixedpoint.Value `json:"priceIncrement"`
+	SizeIncrement         fixedpoint.Value `json:"sizeIncrement"`
+	Restricted            bool             `json:"restricted"`
+}
+
+//go:generate GetRequest -url /api/markets -type GetMarketsRequest -responseDataType []Market
+type GetMarketsRequest struct {
+	client requestgen.AuthenticatedAPIClient
+}
+
+func (c *RestClient) NewGetMarketsRequest() *GetMarketsRequest {
+	return &GetMarketsRequest{
 		client: c,
 	}
 }
