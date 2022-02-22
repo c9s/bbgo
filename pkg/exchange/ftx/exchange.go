@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/exchange/ftx/ftxapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -31,6 +33,8 @@ var requestLimit = rate.NewLimiter(rate.Every(220*time.Millisecond), 2)
 //go:generate go run generate_symbol_map.go
 
 type Exchange struct {
+	client *ftxapi.RestClient
+
 	key, secret  string
 	subAccount   string
 	restEndpoint *url.URL
@@ -78,7 +82,9 @@ func NewExchange(key, secret string, subAccount string) *Exchange {
 		panic(err)
 	}
 
+	client := ftxapi.NewClient()
 	return &Exchange{
+		client:       client,
 		restEndpoint: u,
 		key:          key,
 		secret:       secret,
@@ -486,6 +492,15 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 		createdOrders = append(createdOrders, globalOrder)
 	}
 	return createdOrders, nil
+}
+
+func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.Order, error) {
+	orderID, err := strconv.ParseInt(q.OrderID, 10, 64)
+	if err != nil {
+		return nil, err
+	}
+	_ = orderID
+	return nil, nil
 }
 
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {

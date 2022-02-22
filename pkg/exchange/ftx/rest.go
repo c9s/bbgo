@@ -241,12 +241,12 @@ func (r *restRequest) sendRequest(req *http.Request) (*util.Response, error) {
 type ErrorResponse struct {
 	*util.Response
 
-	IsSuccess   bool   `json:"Success"`
+	IsSuccess   bool   `json:"success"`
 	ErrorString string `json:"error,omitempty"`
 }
 
 func (r *ErrorResponse) Error() string {
-	return fmt.Sprintf("%s %s %d, Success: %t, err: %s",
+	return fmt.Sprintf("%s %s %d, success: %t, err: %s",
 		r.Response.Request.Method,
 		r.Response.Request.URL.String(),
 		r.Response.StatusCode,
