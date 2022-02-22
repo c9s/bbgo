@@ -89,6 +89,10 @@ var PnLCmd = &cobra.Command{
 			return err
 		}
 
+		if err = environ.Init(ctx); err != nil {
+			return err
+		}
+
 		exchange := session.Exchange
 
 		market, ok := session.Market(symbol)
