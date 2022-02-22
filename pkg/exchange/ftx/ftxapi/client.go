@@ -291,3 +291,16 @@ func (c *RestClient) NewGetMarketsRequest() *GetMarketsRequest {
 		client: c,
 	}
 }
+
+//go:generate GetRequest -url "/api/markets/:market" -type GetMarketRequest -responseDataType .Market
+type GetMarketRequest struct {
+	client requestgen.AuthenticatedAPIClient
+	market string `param:"market,slug"`
+}
+
+func (c *RestClient) NewGetMarketRequest(market string) *GetMarketRequest {
+	return &GetMarketRequest{
+		client: c,
+		market: market,
+	}
+}
