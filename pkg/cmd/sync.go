@@ -20,8 +20,8 @@ func init() {
 }
 
 var SyncCmd = &cobra.Command{
-	Use:          "sync",
-	Short:        "sync trades, orders",
+	Use:          "sync --session=[exchange_name] --symbol=[pair_name] [--since=yyyy/mm/dd]",
+	Short:        "sync trades and orders history",
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()

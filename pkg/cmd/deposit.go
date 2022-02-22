@@ -24,6 +24,7 @@ func init() {
 // This is a testing util and will query deposits in last 7 days.
 var depositsCmd = &cobra.Command{
 	Use:          "deposits",
+	Short:        "A testing utility that will query deposition history in last 7 days",
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()

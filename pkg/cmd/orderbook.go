@@ -17,7 +17,7 @@ import (
 
 // go run ./cmd/bbgo orderbook --session=ftx --symbol=BTCUSDT
 var orderbookCmd = &cobra.Command{
-	Use:   "orderbook",
+	Use:   "orderbook --session=[exchange_name] --symbol=[pair_name]",
 	Short: "connect to the order book market data streaming service of an exchange",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
@@ -113,6 +113,7 @@ var orderbookCmd = &cobra.Command{
 // go run ./cmd/bbgo orderupdate --session=ftx
 var orderUpdateCmd = &cobra.Command{
 	Use: "orderupdate",
+	Short: "Listen to order update events",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 

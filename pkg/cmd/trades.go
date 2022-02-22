@@ -16,9 +16,10 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-// go run ./cmd/bbgo tradesCmd --session=ftx --symbol="BTC/USD"
+// go run ./cmd/bbgo trades --session=ftx --symbol="BTC/USD"
 var tradesCmd = &cobra.Command{
-	Use:          "trades",
+	Use:          "trades --session=[exchange_name] --symbol=[pair_name]",
+	Short:        "Query trading history",
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
@@ -117,7 +118,8 @@ var tradesCmd = &cobra.Command{
 
 // go run ./cmd/bbgo tradeupdate --session=ftx
 var tradeUpdateCmd = &cobra.Command{
-	Use: "tradeupdate",
+	Use: "tradeupdate --session=[exchange_name]",
+	Short: "Listen to trade update events",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 
