@@ -18,6 +18,7 @@ import (
 // go run ./cmd/bbgo userdatastream --session=ftx
 var userDataStreamCmd = &cobra.Command{
 	Use: "userdatastream",
+	Short: "Listen to session events (orderUpdate, tradeUpdate, balanceUpdate, balanceSnapshot)",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 

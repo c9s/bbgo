@@ -20,6 +20,7 @@ func init() {
 // go run ./cmd/bbgo market --session=ftx --config=config/bbgo.yaml
 var marketCmd = &cobra.Command{
 	Use:          "market",
+	Short:        "List the symbols that the are available to be traded in the exchange",
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()

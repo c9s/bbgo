@@ -22,6 +22,7 @@ import (
 // go run ./cmd/bbgo list-orders [open|closed] --session=ftx --symbol=BTCUSDT
 var listOrdersCmd = &cobra.Command{
 	Use:  "list-orders [status]",
+	Short: "list user's open orders in exchange of a specific trading pair",
 	Args: cobra.OnlyValidArgs,
 	// default is open which means we query open orders if you haven't provided args.
 	ValidArgs:    []string{"", "open", "closed"},
@@ -116,6 +117,7 @@ var listOrdersCmd = &cobra.Command{
 
 var executeOrderCmd = &cobra.Command{
 	Use:          "execute-order",
+	Short:        "execute buy/sell on the balance/position you have on specific symbol",
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
@@ -263,6 +265,7 @@ var executeOrderCmd = &cobra.Command{
 // go run ./cmd/bbgo submit-order --session=ftx --symbol=BTCUSDT --side=buy --price=18000 --quantity=0.001
 var submitOrderCmd = &cobra.Command{
 	Use:          "submit-order --session SESSION --symbol SYMBOL --side SIDE --quantity QUANTITY [--price PRICE]",
+	Short:        "submit limit order to the exchange",
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()

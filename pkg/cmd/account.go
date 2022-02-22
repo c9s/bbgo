@@ -16,12 +16,14 @@ import (
 func init() {
 	accountCmd.Flags().String("session", "", "the exchange session name for querying information")
 	accountCmd.Flags().Bool("total", false, "report total asset")
+	accountCmd.MarkFlagRequired("config")
 	RootCmd.AddCommand(accountCmd)
 }
 
 // go run ./cmd/bbgo account --session=ftx --config=config/bbgo.yaml
 var accountCmd = &cobra.Command{
-	Use:          "account",
+	Use:          "account [--session=[exchange_name]]",
+	Short:        "show user account details (ex: balance)",
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
