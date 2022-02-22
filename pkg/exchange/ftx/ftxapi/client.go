@@ -27,8 +27,9 @@ const defaultHTTPTimeout = time.Second * 15
 const RestBaseURL = "https://ftx.com/api"
 
 type APIResponse struct {
-	Success bool            `json:"success"`
-	Result  json.RawMessage `json:"result,omitempty"`
+	Success     bool            `json:"success"`
+	Result      json.RawMessage `json:"result,omitempty"`
+	HasMoreData bool            `json:"hasMoreData,omitempty"`
 }
 
 type RestClient struct {
@@ -306,23 +307,23 @@ func (c *RestClient) NewGetMarketRequest(market string) *GetMarketRequest {
 }
 
 type Coin struct {
-	Bep2Asset        *string  `json:"bep2Asset"`
-	CanConvert       bool     `json:"canConvert"`
-	CanDeposit       bool     `json:"canDeposit"`
-	CanWithdraw      bool     `json:"canWithdraw"`
-	Collateral       bool     `json:"collateral"`
-	CollateralWeight fixedpoint.Value  `json:"collateralWeight"`
-	CreditTo         *string  `json:"creditTo"`
-	Erc20Contract    string   `json:"erc20Contract"`
-	Fiat             bool     `json:"fiat"`
-	HasTag           bool     `json:"hasTag"`
-	Id               string   `json:"id"`
-	IsToken          bool     `json:"isToken"`
-	Methods          []string `json:"methods"`
-	Name             string   `json:"name"`
-	SplMint          string   `json:"splMint"`
-	Trc20Contract    string   `json:"trc20Contract"`
-	UsdFungible      bool     `json:"usdFungible"`
+	Bep2Asset        *string          `json:"bep2Asset"`
+	CanConvert       bool             `json:"canConvert"`
+	CanDeposit       bool             `json:"canDeposit"`
+	CanWithdraw      bool             `json:"canWithdraw"`
+	Collateral       bool             `json:"collateral"`
+	CollateralWeight fixedpoint.Value `json:"collateralWeight"`
+	CreditTo         *string          `json:"creditTo"`
+	Erc20Contract    string           `json:"erc20Contract"`
+	Fiat             bool             `json:"fiat"`
+	HasTag           bool             `json:"hasTag"`
+	Id               string           `json:"id"`
+	IsToken          bool             `json:"isToken"`
+	Methods          []string         `json:"methods"`
+	Name             string           `json:"name"`
+	SplMint          string           `json:"splMint"`
+	Trc20Contract    string           `json:"trc20Contract"`
+	UsdFungible      bool             `json:"usdFungible"`
 }
 
 //go:generate GetRequest -url "/api/coins" -type GetCoinsRequest -responseDataType []Coin
@@ -332,6 +333,26 @@ type GetCoinsRequest struct {
 
 func (c *RestClient) NewGetCoinsRequest() *GetCoinsRequest {
 	return &GetCoinsRequest{
+		client: c,
+	}
+}
+
+type Balance struct {
+	Coin                   string           `json:"coin"`
+	Free                   fixedpoint.Value `json:"free"`
+	SpotBorrow             fixedpoint.Value `json:"spotBorrow"`
+	Total                  fixedpoint.Value `json:"total"`
+	UsdValue               fixedpoint.Value `json:"usdValue"`
+	AvailableWithoutBorrow fixedpoint.Value `json:"availableWithoutBorrow"`
+}
+
+//go:generate GetRequest -url "/api/balances" -type GetBalancesRequest -responseDataType []Balance
+type GetBalancesRequest struct {
+	client requestgen.AuthenticatedAPIClient
+}
+
+func (c *RestClient) NewGetBalancesRequest() *GetBalancesRequest {
+	return &GetBalancesRequest{
 		client: c,
 	}
 }
