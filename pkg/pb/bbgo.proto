@@ -30,9 +30,9 @@ message Subscription {
 
 message SubscribeResponse {
     string exchange = 1;
-    string channel = 2;  // book, trade, ticker, user
-    string event = 3;    // snapshot, update, order_snapshot, ...
-    string symbol = 4;
+    string symbol = 2;
+    string channel = 3;  // book, trade, ticker, user
+    string event = 4;    // snapshot, update, order_snapshot, ...
     Depth depth = 5;
     repeated Trade trades = 6;
     Ticker ticker = 7;
@@ -59,10 +59,10 @@ message PriceVolume {
 // https://maicoin.github.io/max-websocket-docs/#/public_trade?id=success-response
 message Trade {
     string exchange = 1;
-    int64 id = 2;
-    double price = 3;
-    double volume = 4;
-    string symbol = 5;
+    string symbol = 2;
+    int64 id = 3;
+    double price = 4;
+    double volume = 5;
     int64 created_at = 6;
     string side = 7;
     double fee = 8;
@@ -73,24 +73,26 @@ message Trade {
 
 // https://maicoin.github.io/max-websocket-docs/#/public_ticker?id=success-response
 message Ticker {
-    double open = 1;
-    double high = 2;
-    double low = 3;
-    double close = 4;
-    double volume = 5;
+    string exchange = 1;
+    string symbol = 2;
+    double open = 3;
+    double high = 4;
+    double low = 5;
+    double close = 6;
+    double volume = 7;
 }
 
 // https://maicoin.github.io/max-websocket-docs/#/private_channels?id=snapshot
 message Order {
     string exchange = 1;
-    int64 id = 2;
-    string side = 3;
-    string order_type = 4;
-    double price = 5;
-    double stop_price = 6;
-    double avg_price = 7;
-    string status = 8;
-    string symbol = 9;
+    string symbol = 2;
+    int64 id = 3;
+    string side = 4;
+    string order_type = 5;
+    double price = 6;
+    double stop_price = 7;
+    double avg_price = 8;
+    string status = 9;
     int64 created_at = 10;
     double quantity = 11;
     double executed_volume = 12;
@@ -113,9 +115,11 @@ message SubmitOrder {
 
 // https://maicoin.github.io/max-websocket-docs/#/private_channels?id=account-response
 message Balance {
-    string currency = 1;
-    double available = 2;
-    double locked = 3;
+    string exchange = 1;
+    string symbol = 2;
+    string currency = 3;
+    double available = 4;
+    double locked = 5;
 }
 
 message SubmitOrderRequest {
