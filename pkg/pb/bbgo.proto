@@ -29,10 +29,6 @@ message Subscription {
 }
 
 message SubscribeResponse {
-    repeated SuccessResponse success_responses = 1;
-}
-
-message SuccessResponse {
     string exchange = 1;
     string channel = 2;  // book, trade, ticker, user
     string event = 3;    // snapshot, update, order_snapshot, ...
@@ -42,7 +38,9 @@ message SuccessResponse {
     Ticker ticker = 7;
     repeated Order orders = 8;
     repeated Balance balances = 9;
-    int64 created_at = 10;
+    int64 subscribed_at = 10;
+    int64 error_code = 11;
+    string error_message = 12;
 }
 
 message Depth {
