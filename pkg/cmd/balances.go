@@ -20,6 +20,7 @@ func init() {
 // go run ./cmd/bbgo balances --session=ftx
 var balancesCmd = &cobra.Command{
 	Use:          "balances",
+	Short:        "Show user account balances",
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()

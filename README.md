@@ -15,6 +15,9 @@ A trading bot framework written in Go. The name bbgo comes from the BB8 bot in t
 [![Telegram Taiwan](https://img.shields.io/badge/telegram-tw-blue.svg)](https://t.me/bbgocrypto)
 [![Twitter](https://img.shields.io/twitter/follow/bbgotrading?label=Follow&style=social)](https://twitter.com/bbgotrading)
 
+## Documentation and General Topics
+- Check the [documentation index](doc/README.md)
+
 ## Features
 
 - Exchange abstraction interface.
@@ -44,6 +47,10 @@ A trading bot framework written in Go. The name bbgo comes from the BB8 bot in t
 - OKEx Spot Exchange
 - Kucoin Spot Exchange
 - MAX Spot Exchange (located in Taiwan)
+
+## BBGO Tokenomics
+To support the development of BBGO, we have created a bounty pool to support contributors by giving away $BBG tokens.
+Check the details in [$BBG Contract Page](contracts/README.md) and our [official website](https://bbgo.finance)
 
 ## Requirements
 
