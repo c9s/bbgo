@@ -37,13 +37,19 @@ message SuccessResponse {
     string channel = 2;  // book, trade, ticker, user
     string event = 3;    // snapshot, update, order_snapshot, ...
     string symbol = 4;
-    repeated PriceVolume asks = 5;
-    repeated PriceVolume bids = 6;
-    repeated Trade trades = 7;
-    Ticker ticker = 8;
-    repeated Order orders = 9;
-    repeated Balance balances = 10;
-    int64 created_at = 11;
+    Depth depth = 5;
+    repeated Trade trades = 6;
+    Ticker ticker = 7;
+    repeated Order orders = 8;
+    repeated Balance balances = 9;
+    int64 created_at = 10;
+}
+
+message Depth {
+    string exchange = 1;
+    string symbol = 2;
+    repeated PriceVolume asks = 3;
+    repeated PriceVolume bids = 4;
 }
 
 message PriceVolume {
