@@ -20,6 +20,11 @@ service BBGO {
 
 message Empty {}
 
+message Error {
+    int64 error_code = 1;
+    string error_message = 2;
+}
+
 message SubscribeRequest {
     repeated Subscription subscriptions = 1;
 }
@@ -42,8 +47,7 @@ message SubscribeResponse {
     repeated Order orders = 8;
     repeated Balance balances = 9;
     int64 subscribed_at = 10;
-    int64 error_code = 11;
-    string error_message = 12;
+    Error error = 11;
 }
 
 message Depth {
@@ -130,8 +134,8 @@ message SubmitOrderRequest {
 }
 
 message SubmitOrderResponse {
-    string exchange = 1;
-    Order order = 2;
+    Order order = 1;
+    Error error = 2;
 }
 
 message CancelOrderRequest {
@@ -141,9 +145,8 @@ message CancelOrderRequest {
 }
 
 message CancelOrderResponse {
-    string exchange = 1;
-    Order order = 2;
-    int64 status_code = 3;
+    Order order = 1;
+    Error error = 2;
 }
 
 message QueryOrderRequest {
@@ -153,7 +156,7 @@ message QueryOrderRequest {
 
 message QueryOrderResponse {
     Order order = 1;
-    int64 status_code = 2;
+    Error error = 2;
 }
 
 message QueryOrdersRequest {
@@ -169,9 +172,8 @@ message QueryOrdersRequest {
 }
 
 message QueryOrdersResponse {
-    string exchange = 1;
-    repeated Order orders = 2;
-    int64 status_code = 3;
+    repeated Order orders = 1;
+    Error error = 2;
 }
 
 message QueryTradesRequest {
@@ -189,7 +191,7 @@ message QueryTradesRequest {
 
 message QueryTradesResponse {
     repeated Trade trades = 1;
-    int64 status_code = 2;
+    Error error = 2;
 }
 
 message QueryKLinesRequest {
@@ -202,7 +204,7 @@ message QueryKLinesRequest {
 
 message QueryKLinesResponse {
     repeated KLine klines = 1;
-    int64 status_code = 2;
+    Error error = 2;
 }
 
 message KLine {
