@@ -9,9 +9,8 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
-	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -135,7 +134,10 @@ func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, method, refURL
 		rel.RawQuery = params.Encode()
 	}
 
+	// pathURL is for sending request
 	pathURL := c.BaseURL.ResolveReference(rel)
+
+	// path here is used for auth header
 	path := pathURL.Path
 	if rel.RawQuery != "" {
 		path += "?" + rel.RawQuery
@@ -162,8 +164,7 @@ func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, method, refURL
 func (c *RestClient) attachAuthHeaders(req *http.Request, method string, path string, body []byte) {
 	millisecondTs := time.Now().UnixNano() / int64(time.Millisecond)
 	ts := strconv.FormatInt(millisecondTs, 10)
-	p := fmt.Sprintf("%s%s%s", ts, method, path)
-	p += string(body)
+	p := ts + method + path + string(body)
 	signature := sign(c.Secret, p)
 	req.Header.Set("FTX-KEY", c.Key)
 	req.Header.Set("FTX-SIGN", signature)
@@ -181,7 +182,7 @@ func sign(secret, payload string) string {
 		return ""
 	}
 
-	return base64.StdEncoding.EncodeToString(sig.Sum(nil))
+	return hex.EncodeToString(sig.Sum(nil))
 }
 
 func castPayload(payload interface{}) ([]byte, error) {
@@ -222,7 +223,7 @@ type Account struct {
 	BackstopProvider             bool             `json:"backstopProvider"`
 	Collateral                   fixedpoint.Value `json:"collateral"`
 	FreeCollateral               fixedpoint.Value `json:"freeCollateral"`
-	Leverage                     int              `json:"leverage"`
+	Leverage                     fixedpoint.Value `json:"leverage"`
 	InitialMarginRequirement     fixedpoint.Value `json:"initialMarginRequirement"`
 	MaintenanceMarginRequirement fixedpoint.Value `json:"maintenanceMarginRequirement"`
 	Liquidating                  bool             `json:"liquidating"`
@@ -236,7 +237,7 @@ type Account struct {
 	Positions                    []Position       `json:"positions"`
 }
 
-//go:generate GetRequest -url /api/account -type GetAccountRequest -responseDataType .Account
+//go:generate GetRequest -url "api/account" -type GetAccountRequest -responseDataType .Account
 type GetAccountRequest struct {
 	client requestgen.AuthenticatedAPIClient
 }
@@ -247,7 +248,7 @@ func (c *RestClient) NewGetAccountRequest() *GetAccountRequest {
 	}
 }
 
-//go:generate GetRequest -url /api/positions -type GetPositionsRequest -responseDataType []Position
+//go:generate GetRequest -url "api/positions" -type GetPositionsRequest -responseDataType []Position
 type GetPositionsRequest struct {
 	client requestgen.AuthenticatedAPIClient
 }
@@ -282,7 +283,7 @@ type Market struct {
 	Restricted            bool             `json:"restricted"`
 }
 
-//go:generate GetRequest -url /api/markets -type GetMarketsRequest -responseDataType []Market
+//go:generate GetRequest -url "api/markets" -type GetMarketsRequest -responseDataType []Market
 type GetMarketsRequest struct {
 	client requestgen.AuthenticatedAPIClient
 }
@@ -293,7 +294,7 @@ func (c *RestClient) NewGetMarketsRequest() *GetMarketsRequest {
 	}
 }
 
-//go:generate GetRequest -url "/api/markets/:market" -type GetMarketRequest -responseDataType .Market
+//go:generate GetRequest -url "api/markets/:market" -type GetMarketRequest -responseDataType .Market
 type GetMarketRequest struct {
 	client requestgen.AuthenticatedAPIClient
 	market string `param:"market,slug"`
@@ -326,7 +327,7 @@ type Coin struct {
 	UsdFungible      bool             `json:"usdFungible"`
 }
 
-//go:generate GetRequest -url "/api/coins" -type GetCoinsRequest -responseDataType []Coin
+//go:generate GetRequest -url "api/coins" -type GetCoinsRequest -responseDataType []Coin
 type GetCoinsRequest struct {
 	client requestgen.AuthenticatedAPIClient
 }
@@ -346,7 +347,7 @@ type Balance struct {
 	AvailableWithoutBorrow fixedpoint.Value `json:"availableWithoutBorrow"`
 }
 
-//go:generate GetRequest -url "/api/balances" -type GetBalancesRequest -responseDataType []Balance
+//go:generate GetRequest -url "api/balances" -type GetBalancesRequest -responseDataType []Balance
 type GetBalancesRequest struct {
 	client requestgen.AuthenticatedAPIClient
 }
