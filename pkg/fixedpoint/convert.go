@@ -111,8 +111,8 @@ func (v Value) FormatPercentage(prec int) string {
 	if v == 0 {
 		return "0"
 	}
-	result := strconv.FormatFloat(float64(v)/DefaultPow*100., 'f', prec+1, 64)
-	return result[:len(result)-1] + "%"
+	result := strconv.FormatFloat(float64(v)/DefaultPow*100., 'f', prec, 64)
+	return result + "%"
 }
 
 func (v Value) SignedPercentage() string {

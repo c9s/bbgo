@@ -273,7 +273,11 @@ func (dn Value) FormatString(prec int) string {
 		return sign + digits[:dec] + "." + digits[dec:min(dec+prec, nd)] + strings.Repeat("0", max(0, min(dec+prec, nd)-dec-prec))
 	} else if 0 < dn.exp && dn.exp <= digitsMax {
 		// decimal to the right
-		return sign + digits + strings.Repeat("0", e) + "." + strings.Repeat("0", prec)
+		if prec > 0 {
+			return sign + digits + strings.Repeat("0", e) + "." + strings.Repeat("0", prec)
+		} else {
+			return sign + digits + strings.Repeat("0", e)
+		}
 	} else {
 		// scientific notation
 		after := ""

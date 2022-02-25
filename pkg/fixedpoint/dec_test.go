@@ -74,28 +74,28 @@ func TestNew(t *testing.T) {
 func TestFormatString(t *testing.T) {
 	testCases := []struct {
 		value Value
-		prec int
-		out string
+		prec  int
+		out   string
 	}{
 		{
 			value: NewFromFloat(0.001),
-			prec: 8,
-			out: "0.00100000",
+			prec:  8,
+			out:   "0.00100000",
 		},
 		{
 			value: NewFromFloat(0.123456789),
-			prec: 4,
-			out: "0.1234",
+			prec:  4,
+			out:   "0.1234",
 		},
 		{
 			value: NewFromFloat(0.123456789),
-			prec: 5,
-			out: "0.12345",
+			prec:  5,
+			out:   "0.12345",
 		},
 		{
 			value: NewFromFloat(20.0),
-			prec: 0,
-			out: "20",
+			prec:  0,
+			out:   "20",
 		},
 	}
 	for _, testCase := range testCases {
