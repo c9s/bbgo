@@ -95,8 +95,9 @@ func (v Value) String() string {
 }
 
 func (v Value) FormatString(prec int) string {
-	result := strconv.FormatFloat(float64(v)/DefaultPow, 'f', prec+1, 64)
-	return result[:len(result)-1]
+	pow := math.Pow10(prec)
+	return strconv.FormatFloat(
+		math.Trunc(float64(v)/DefaultPow * pow) / pow, 'f', prec, 64)
 }
 
 func (v Value) Percentage() string {
