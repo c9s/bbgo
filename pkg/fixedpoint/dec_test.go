@@ -1,9 +1,10 @@
 package fixedpoint
 
 import (
-	"github.com/stretchr/testify/assert"
 	"math/big"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 const Delta = 1e-9
@@ -68,6 +69,38 @@ func TestNew(t *testing.T) {
 	assert.Equal(t, "0.0010", f.FormatString(4))
 	assert.Equal(t, "0.1%", f.Percentage())
 	assert.Equal(t, "0.10%", f.FormatPercentage(2))
+}
+
+func TestFormatString(t *testing.T) {
+	testCases := []struct {
+		value Value
+		prec int
+		out string
+	}{
+		{
+			value: NewFromFloat(0.001),
+			prec: 8,
+			out: "0.00100000",
+		},
+		{
+			value: NewFromFloat(0.123456789),
+			prec: 4,
+			out: "0.1234",
+		},
+		{
+			value: NewFromFloat(0.123456789),
+			prec: 5,
+			out: "0.12345",
+		},
+		{
+			value: NewFromFloat(20.0),
+			prec: 0,
+			out: "20",
+		},
+	}
+	for _, testCase := range testCases {
+		assert.Equal(t, testCase.out, testCase.value.FormatString(testCase.prec))
+	}
 }
 
 func TestRound(t *testing.T) {
