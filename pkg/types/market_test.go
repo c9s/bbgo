@@ -5,8 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 var s func(string) fixedpoint.Value = fixedpoint.MustNewFromString
@@ -72,6 +73,42 @@ func TestDurationParse(t *testing.T) {
 			err := json.Unmarshal([]byte(test.input), &a)
 			assert.NoError(t, err)
 			assert.Equal(t, test.expected, a.Duration)
+		})
+	}
+}
+
+func Test_formatPrice(t *testing.T) {
+	type args struct {
+		price    fixedpoint.Value
+		tickSize fixedpoint.Value
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "fraction truncate",
+			args: args{
+				price: fixedpoint.NewFromFloat(2.334),
+				tickSize: fixedpoint.NewFromFloat(0.01),
+			},
+			want: "2.33",
+		},
+		{
+			name: "fraction",
+			args: args{
+				price: fixedpoint.NewFromFloat(2.334),
+				tickSize: fixedpoint.NewFromFloat(0.0001),
+			},
+			want: "2.3340",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := formatPrice(tt.args.price, tt.args.tickSize); got != tt.want {
+				t.Errorf("formatPrice() = %v, want %v", got, tt.want)
+			}
 		})
 	}
 }
