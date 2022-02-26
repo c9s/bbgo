@@ -29,6 +29,8 @@ const (
 	coefMax    = 9999_9999_9999_9999
 	digitsMax  = 16
 	shiftMax   = digitsMax - 1
+	// to switch between scientific notion and normal presentation format
+	maxLeadingZeros = 19
 )
 
 // common values
@@ -251,9 +253,12 @@ func Inf(sign int8) Value {
 
 func (dn Value) FormatString(prec int) string {
 	if dn.sign == 0 {
-		return "0"
+		if prec <= 0 {
+			return "0"
+		} else {
+			return "0." + strings.Repeat("0", prec)
+		}
 	}
-	const maxLeadingZeros = 7
 	sign := ""
 	if dn.sign < 0 {
 		sign = "-"
@@ -266,11 +271,18 @@ func (dn Value) FormatString(prec int) string {
 	e := int(dn.exp) - nd
 	if -maxLeadingZeros <= dn.exp && dn.exp <= 0 {
 		// decimal to the left
-		return sign + "0." + strings.Repeat("0", -e-nd) + digits[:min(prec, nd)] + strings.Repeat("0", max(0, prec-nd+e+nd))
+		if prec+e+nd > 0 {
+			return sign + "0." + strings.Repeat("0", -e-nd) + digits[:min(prec+e+nd, nd)] + strings.Repeat("0", max(0, prec-nd+e+nd))
+		} else if -e-nd > 0 {
+			return "0." + strings.Repeat("0", -e-nd)
+		} else {
+			return "0"
+		}
 	} else if -nd < e && e <= -1 {
 		// decimal within
 		dec := nd + e
-		return sign + digits[:dec] + "." + digits[dec:min(dec+prec, nd)] + strings.Repeat("0", max(0, min(dec+prec, nd)-dec-prec))
+		decimals := digits[dec:min(dec+prec, nd)]
+		return sign + digits[:dec] + "." + decimals + strings.Repeat("0", max(0, prec - len(decimals)))
 	} else if 0 < dn.exp && dn.exp <= digitsMax {
 		// decimal to the right
 		if prec > 0 {
@@ -282,7 +294,7 @@ func (dn Value) FormatString(prec int) string {
 		// scientific notation
 		after := ""
 		if nd > 1 {
-			after = "." + digits[1:min(1+prec, nd)] + strings.Repeat("0", min(1+prec, nd)-1-prec)
+			after = "." + digits[1:min(1+prec, nd)] + strings.Repeat("0", max(0, min(1+prec, nd)-1-prec))
 		}
 		return sign + digits[:1] + after + "e" + strconv.Itoa(int(dn.exp-1))
 	}
@@ -293,7 +305,6 @@ func (dn Value) String() string {
 	if dn.sign == 0 {
 		return "0"
 	}
-	const maxLeadingZeros = 7
 	sign := ""
 	if dn.sign < 0 {
 		sign = "-"
@@ -328,7 +339,6 @@ func (dn Value) Percentage() string {
 	if dn.sign == 0 {
 		return "0%"
 	}
-	const maxLeadingZeros = 7
 	sign := ""
 	if dn.sign < 0 {
 		sign = "-"
@@ -362,9 +372,12 @@ func (dn Value) Percentage() string {
 
 func (dn Value) FormatPercentage(prec int) string {
 	if dn.sign == 0 {
-		return "0"
+		if prec <= 0 {
+			return "0"
+		} else {
+			return "0." + strings.Repeat("0", prec)
+		}
 	}
-	const maxLeadingZeros = 7
 	sign := ""
 	if dn.sign < 0 {
 		sign = "-"
@@ -379,19 +392,30 @@ func (dn Value) FormatPercentage(prec int) string {
 
 	if -maxLeadingZeros <= exp && exp <= 0 {
 		// decimal to the left
-		return sign + "0." + strings.Repeat("0", -e-nd) + digits[:min(prec, nd)] + strings.Repeat("0", max(0, prec-nd+e+nd)) + "%"
+		if prec+e+nd > 0 {
+			return sign + "0." + strings.Repeat("0", -e-nd) + digits[:min(prec+e+nd, nd)] + strings.Repeat("0", max(0, prec-nd+e+nd)) + "%"
+		} else if -e-nd > 0 {
+			return "0." + strings.Repeat("0", -e-nd) + "%"
+		} else {
+			return "0"
+		}
 	} else if -nd < e && e <= -1 {
 		// decimal within
 		dec := nd + e
-		return sign + digits[:dec] + "." + digits[dec:min(dec+prec, nd)] + strings.Repeat("0", max(0, min(dec+prec, nd)-dec-prec)) + "%"
+		decimals := digits[dec:min(dec+prec, nd)]
+		return sign + digits[:dec] + "." + decimals + strings.Repeat("0", max(0, prec - len(decimals))) + "%"
 	} else if 0 < exp && exp <= digitsMax {
 		// decimal to the right
-		return sign + digits + strings.Repeat("0", e) + "." + strings.Repeat("0", prec) + "%"
+		if prec > 0 {
+			return sign + digits + strings.Repeat("0", e) + "." + strings.Repeat("0", prec) + "%"
+		} else {
+			return sign + digits + strings.Repeat("0", e) + "%"
+		}
 	} else {
 		// scientific notation
 		after := ""
 		if nd > 1 {
-			after = "." + digits[1:min(1+prec, nd)] + strings.Repeat("0", min(1+prec, nd)-1-prec)
+			after = "." + digits[1:min(1+prec, nd)] + strings.Repeat("0", max(0, min(1+prec, nd)-1-prec))
 		}
 		return sign + digits[:1] + after + "e" + strconv.Itoa(int(exp-1)) + "%"
 	}
