@@ -3,8 +3,8 @@ package fixedpoint
 import (
 	"math/big"
 	"testing"
-
 	"github.com/stretchr/testify/assert"
+	"encoding/json"
 )
 
 const Delta = 1e-9
@@ -126,6 +126,46 @@ func TestFromString(t *testing.T) {
 	assert.Equal(t, "0.00000011", f.String())
 	f = MustNewFromString(".0%")
 	assert.Equal(t, Zero, f)
+}
+
+func TestJson(t *testing.T) {
+	p := MustNewFromString("0")
+	e, err := json.Marshal(p)
+	assert.NoError(t, err)
+	assert.Equal(t, "0.00000000", string(e))
+	p = MustNewFromString("1.00000003")
+	e, err = json.Marshal(p)
+	assert.NoError(t, err)
+	assert.Equal(t, "1.00000003", string(e))
+	p = MustNewFromString("1.000000003")
+	e, err = json.Marshal(p)
+	assert.NoError(t, err)
+	assert.Equal(t, "1.00000000", string(e))
+	p = MustNewFromString("1.000000008")
+	e, err = json.Marshal(p)
+	assert.NoError(t, err)
+	assert.Equal(t, "1.00000000", string(e))
+	p = MustNewFromString("0.999999999")
+	e, err = json.Marshal(p)
+	assert.NoError(t, err)
+	assert.Equal(t, "0.99999999", string(e))
+
+	p = MustNewFromString("1.2e-9")
+	e, err = json.Marshal(p)
+	assert.NoError(t, err)
+	assert.Equal(t, "0.00000000", p.FormatString(8))
+	assert.Equal(t, "0.00000000", string(e))
+
+
+	_ = json.Unmarshal([]byte("0.00153917575"), &p)
+	assert.Equal(t, "0.00153917", p.FormatString(8))
+
+	var q Value
+	q = NewFromFloat(0.00153917575)
+	assert.Equal(t, p, q)
+	_ = json.Unmarshal([]byte("6e-8"), &p)
+	_ = json.Unmarshal([]byte("0.000062"), &q)
+	assert.Equal(t, "0.00006194", q.Sub(p).String())
 }
 
 func TestNumFractionalDigits(t *testing.T) {

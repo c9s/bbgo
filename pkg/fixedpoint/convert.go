@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 	"sync/atomic"
 )
 
@@ -111,7 +112,9 @@ func (v Value) FormatPercentage(prec int) string {
 	if v == 0 {
 		return "0"
 	}
-	result := strconv.FormatFloat(float64(v)/DefaultPow*100., 'f', prec, 64)
+	pow := math.Pow10(prec)
+	result := strconv.FormatFloat(
+		math.Trunc(float64(v)/DefaultPow * pow * 100.) / pow, 'f', prec, 64)
 	return result + "%"
 }
 
@@ -220,9 +223,7 @@ func (v *Value) UnmarshalYAML(unmarshal func(a interface{}) error) (err error) {
 }
 
 func (v Value) MarshalJSON() ([]byte, error) {
-	f := float64(v) / DefaultPow
-	o := strconv.FormatFloat(f, 'f', 8, 64)
-	return []byte(o), nil
+	return []byte(v.FormatString(DefaultPrecision)), nil
 }
 
 func (v *Value) UnmarshalJSON(data []byte) error {
@@ -319,17 +320,72 @@ func NewFromString(input string) (Value, error) {
 	if isPercentage {
 		input = input[0 : length-1]
 	}
+	dotIndex := -1
+	hasDecimal := false
+	decimalCount := 0
+	// if is decimal, we don't need this
+	hasScientificNotion := false
+	scIndex := -1
+	for i, c := range(input) {
+		if hasDecimal {
+			if c <= '9' && c >= '0' {
+				decimalCount++
+			} else {
+				break
+			}
 
-	v, err := strconv.ParseFloat(input, 64)
-	if err != nil {
-		return 0, err
+		} else if c == '.' {
+			dotIndex = i
+			hasDecimal = true
+		}
+		if c == 'e' || c == 'E' {
+			hasScientificNotion = true
+			scIndex = i
+			break
+		}
+	}
+	if hasDecimal {
+		after := input[dotIndex+1:len(input)]
+		if decimalCount >= 8 {
+			after = after[0:8] + "." + after[8:len(after)]
+		} else {
+			after = after[0:decimalCount] + strings.Repeat("0", 8-decimalCount) + after[decimalCount:len(after)]
+		}
+		input = input[0:dotIndex] + after
+		v, err := strconv.ParseFloat(input, 64)
+		if err != nil {
+			return 0, err
+		}
+
+		if isPercentage {
+			v = v * 0.01
+		}
+
+		return Value(int64(math.Trunc(v))), nil
+
+	} else if hasScientificNotion {
+		exp, err := strconv.ParseInt(input[scIndex+1:len(input)], 10, 32)
+		if err != nil {
+			return 0, err
+		}
+		v, err := strconv.ParseFloat(input[0:scIndex+1] + strconv.FormatInt(exp + 8, 10), 64)
+		if err != nil {
+			return 0, err
+		}
+		return Value(int64(math.Trunc(v))), nil
+	} else {
+		v, err := strconv.ParseInt(input, 10, 64)
+		if err != nil {
+			return 0, err
+		}
+		if isPercentage {
+			v = v * DefaultPow / 100
+		} else {
+			v = v * DefaultPow
+		}
+		return Value(v), nil
 	}
 
-	if isPercentage {
-		v = v * 0.01
-	}
-
-	return NewFromFloat(v), nil
 }
 
 func MustNewFromString(input string) Value {
@@ -360,7 +416,7 @@ func Must(v Value, err error) Value {
 }
 
 func NewFromFloat(val float64) Value {
-	return Value(int64(math.Round(val * DefaultPow)))
+	return Value(int64(math.Trunc(val * DefaultPow)))
 }
 
 func NewFromInt(val int64) Value {
