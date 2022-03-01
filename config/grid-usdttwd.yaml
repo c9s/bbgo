@@ -30,12 +30,13 @@ backtest:
   symbols:
   - USDTTWD
   account:
-    makerCommission: 15
-    takerCommission: 15
-    balances:
-      BTC: 0.0
-      USDT: 10_000.0
-      TWD: 100_000.0
+    max:
+      makerCommission: 15
+      takerCommission: 15
+      balances:
+        BTC: 0.0
+        USDT: 10_000.0
+        TWD: 100_000.0
 
 exchangeStrategies:
 - on: max

@@ -14,13 +14,14 @@ backtest:
   # https://www.investopedia.com/terms/m/maximum-drawdown-mdd.asp
   startTime: "2020-01-01"
   account:
-    makerCommission: 15
-    takerCommission: 15
-    buyerCommission: 0
-    sellerCommission: 0
-    balances:
-      BTC: 1.0
-      USDT: 5000.0
+    binance:
+      makerCommission: 15
+      takerCommission: 15
+      buyerCommission: 0
+      sellerCommission: 0
+      balances:
+        BTC: 1.0
+        USDT: 5000.0
 
 
 exchangeStrategies:

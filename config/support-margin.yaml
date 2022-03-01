@@ -44,14 +44,14 @@ backtest:
   startTime: "2020-09-04"
   endTime: "2020-09-14"
   symbols:
-  - BTCUSDT
-  - ETHUSDT
+  - LINKUSDT
   account:
-    makerCommission: 15
-    takerCommission: 15
-    balances:
-      BTC: 0.0
-      USDT: 10000.0
+    binance:
+      makerCommission: 15
+      takerCommission: 15
+      balances:
+        LINK: 0.0
+        USDT: 10000.0
 
 exchangeStrategies:
 
@@ -59,14 +59,14 @@ exchangeStrategies:
   support:
     symbol: LINKUSDT
     interval: 1m
-    minVolume: 1_000
+    minVolume: 2_000
     marginOrderSideEffect: borrow
 
     scaleQuantity:
       byVolume:
         exp:
           domain: [ 1_000, 200_000 ]
-          range: [ 0.5, 1.0 ]
+          range: [ 3.0, 5.0 ]
 
     maxBaseAssetBalance: 1000.0
     minQuoteAssetBalance: 2000.0

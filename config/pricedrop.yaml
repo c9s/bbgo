@@ -40,18 +40,19 @@ backtest:
   # for testing max draw down (MDD) at 03-12
   # see here for more details
   # https://www.investopedia.com/terms/m/maximum-drawdown-mdd.asp
-  startTime: "2020-01-01"
-  endTime: "2020-01-15"
+  startTime: "2022-01-01"
+  endTime: "2022-01-15"
   symbols:
   - BTCUSDT
   account:
-    makerCommission: 15
-    takerCommission: 15
-    buyerCommission: 0
-    sellerCommission: 0
-    balances:
-      BTC: 0.1
-      USDT: 10000.0
+    binance:
+      makerCommission: 15
+      takerCommission: 15
+      buyerCommission: 0
+      sellerCommission: 0
+      balances:
+        BTC: 0.1
+        USDT: 10000.0
 
 exchangeStrategies:
 - on: binance

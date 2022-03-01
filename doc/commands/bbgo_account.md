@@ -3,7 +3,7 @@
 show user account details (ex: balance)
 
 ```
-bbgo account [--session=[exchange_name]] [flags]
+bbgo account [--session SESSION] [flags]
 ```
 
 ### Options
