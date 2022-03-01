@@ -188,8 +188,8 @@ func TestLoadConfig(t *testing.T) {
 				assert.Len(t, config.ExchangeStrategies, 1)
 				assert.NotNil(t, config.Backtest)
 				assert.NotNil(t, config.Backtest.Account)
-				assert.NotNil(t, config.Backtest.Account.Balances)
-				assert.Len(t, config.Backtest.Account.Balances, 2)
+				assert.NotNil(t, config.Backtest.Account["binance"].Balances)
+				assert.Len(t, config.Backtest.Account["binance"].Balances, 2)
 			},
 		},
 	}

@@ -36,7 +36,6 @@ type BackTestReport struct {
 }
 
 func init() {
-	BacktestCmd.Flags().String("exchange", "", "target exchange")
 	BacktestCmd.Flags().Bool("sync", false, "sync backtest data")
 	BacktestCmd.Flags().Bool("sync-only", false, "sync backtest data only, do not run backtest")
 	BacktestCmd.Flags().String("sync-from", "", "sync backtest data from the given time, which will override the time range in the backtest config")
@@ -54,6 +53,9 @@ var BacktestCmd = &cobra.Command{
 	Use:          "backtest",
 	Short:        "backtest your strategies",
 	SilenceUsage: true,
+	PreRunE: cobraInitRequired([]string{
+		"config",
+	}),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		verboseCnt, err := cmd.Flags().GetCount("verbose")
 		if err != nil {
@@ -110,11 +112,6 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
-		exchangeNameStr, err := cmd.Flags().GetString("exchange")
-		if err != nil {
-			return err
-		}
-
 		userConfig, err := bbgo.Load(configFile, true)
 		if err != nil {
 			return err
@@ -129,44 +126,43 @@ var BacktestCmd = &cobra.Command{
 			log.SetLevel(log.ErrorLevel)
 		}
 
-		// if it's declared in the cmd , use the cmd one first
-		if exchangeNameStr == "" {
-			exchangeNameStr = userConfig.Backtest.Session
+		if userConfig.Backtest == nil {
+			return errors.New("backtest config is not defined")
 		}
 
-		var sourceExchange types.Exchange
-		var exchangeName types.ExchangeName
+		acceptAllSessions := false
+		var whitelistedSessions map[string]struct{}
+		if len(userConfig.Backtest.Sessions) == 0 {
+			acceptAllSessions = true
+		} else {
+			for _, name := range userConfig.Backtest.Sessions {
+				_, err := types.ValidExchangeName(name)
+				if err != nil {
+					return err
+				}
+				whitelistedSessions[name] = struct{}{}
+			}
+		}
+
+		sourceExchanges := make(map[string]types.Exchange)
 
 		for key, session := range userConfig.Sessions {
-			if exchangeNameStr == key {
+			ok := acceptAllSessions
+			if !ok {
+				_, ok = whitelistedSessions[key]
+			}
+			if ok {
 				publicExchange, err := cmdutil.NewExchangePublic(session.ExchangeName)
 				if err != nil {
 					return err
 				}
 
-				sourceExchange = publicExchange
-				exchangeName = session.ExchangeName
-			}
-		}
-
-		if sourceExchange == nil {
-			exchangeName, err = types.ValidExchangeName(exchangeNameStr)
-			if err != nil {
-				return err
-			}
-
-			sourceExchange, err = cmdutil.NewExchangePublic(exchangeName)
-			if err != nil {
-				return err
+				sourceExchanges[key] = publicExchange
 			}
 		}
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-
-		if userConfig.Backtest == nil {
-			return errors.New("backtest config is not defined")
-		}
 
 		var now = time.Now()
 		var startTime, endTime time.Time
@@ -182,10 +178,6 @@ var BacktestCmd = &cobra.Command{
 			endTime = now
 		}
 		_ = endTime
-
-		if len(userConfig.CrossExchangeStrategies) > 0 {
-			log.Warnf("backtest does not support CrossExchangeStrategy, strategies won't be added.")
-		}
 
 		log.Infof("starting backtest with startTime %s", startTime.Format(time.ANSIC))
 
@@ -223,43 +215,47 @@ var BacktestCmd = &cobra.Command{
 			log.Info("starting synchronization...")
 			for _, symbol := range userConfig.Backtest.Symbols {
 
-				exCustom, ok := sourceExchange.(types.CustomIntervalProvider)
+				for _, sourceExchange := range sourceExchanges {
+					exCustom, ok := sourceExchange.(types.CustomIntervalProvider)
 
-				var supportIntervals map[types.Interval]int
-				if ok {
-					supportIntervals = exCustom.SupportedInterval()
-				} else {
-					supportIntervals = types.SupportedIntervals
-				}
-
-				for interval := range supportIntervals {
-					// if err := s.SyncKLineByInterval(ctx, exchange, symbol, interval, startTime, endTime); err != nil {
-					//	return err
-					// }
-					firstKLine, err := backtestService.QueryFirstKLine(sourceExchange.Name(), symbol, interval)
-					if err != nil {
-						return errors.Wrapf(err, "failed to query backtest kline")
+					var supportIntervals map[types.Interval]int
+					if ok {
+						supportIntervals = exCustom.SupportedInterval()
+					} else {
+						supportIntervals = types.SupportedIntervals
 					}
 
-					// if we don't have klines before the start time endpoint, the back-test will fail.
-					// because the last price will be missing.
-					if firstKLine != nil {
-						if err := backtestService.SyncExist(ctx, sourceExchange, symbol, syncFromTime, time.Now(), interval); err != nil {
-							return err
+					for interval := range supportIntervals {
+						// if err := s.SyncKLineByInterval(ctx, exchange, symbol, interval, startTime, endTime); err != nil {
+						//	return err
+						// }
+						firstKLine, err := backtestService.QueryFirstKLine(sourceExchange.Name(), symbol, interval)
+						if err != nil {
+							return errors.Wrapf(err, "failed to query backtest kline")
 						}
-					} else {
-						if err := backtestService.Sync(ctx, sourceExchange, symbol, syncFromTime, time.Now(), interval); err != nil {
-							return err
+
+						// if we don't have klines before the start time endpoint, the back-test will fail.
+						// because the last price will be missing.
+						if firstKLine != nil {
+							if err := backtestService.SyncExist(ctx, sourceExchange, symbol, syncFromTime, time.Now(), interval); err != nil {
+								return err
+							}
+						} else {
+							if err := backtestService.Sync(ctx, sourceExchange, symbol, syncFromTime, time.Now(), interval); err != nil {
+								return err
+							}
 						}
 					}
 				}
 			}
 			log.Info("synchronization done")
 
-			if shouldVerify {
-				err2, done := backtestService.Verify(userConfig.Backtest.Symbols, startTime, time.Now(), sourceExchange, verboseCnt)
-				if done {
-					return err2
+			for _, sourceExchange := range sourceExchanges {
+				if shouldVerify {
+					err2, done := backtestService.Verify(userConfig.Backtest.Symbols, startTime, time.Now(), sourceExchange, verboseCnt)
+					if done {
+						return err2
+					}
 				}
 			}
 
@@ -283,19 +279,17 @@ var BacktestCmd = &cobra.Command{
 			}
 		}
 
-		if userConfig.Backtest == nil {
-			return errors.New("backtest config can not be nil")
-		}
-
-		backtestExchange, err := backtest.NewExchange(exchangeName, sourceExchange, backtestService, userConfig.Backtest)
-		if err != nil {
-			return errors.Wrap(err, "failed to create backtest exchange")
-		}
-
 		environ.SetStartTime(startTime)
 
 		// exchangeNameStr is the session name.
-		environ.AddExchange(exchangeNameStr, backtestExchange)
+		for name, sourceExchange := range sourceExchanges {
+
+			backtestExchange, err := backtest.NewExchange(sourceExchange.Name(), sourceExchange, backtestService, userConfig.Backtest)
+			if err != nil {
+				return errors.Wrap(err, "failed to create backtest exchange")
+			}
+			environ.AddExchange(name, backtestExchange)
+		}
 
 		if err := environ.Init(ctx); err != nil {
 			return err
@@ -314,7 +308,42 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
-		backtestExchange.FeedMarketData()
+		type KChanEx struct {
+			KChan    chan types.KLine
+			Exchange *backtest.Exchange
+		}
+		for _, session := range environ.Sessions() {
+			backtestExchange := session.Exchange.(*backtest.Exchange)
+			backtestExchange.InitMarketData()
+		}
+
+		var klineChans []KChanEx
+		for _, session := range environ.Sessions() {
+			exchange := session.Exchange.(*backtest.Exchange)
+			c, err := exchange.GetMarketData()
+			if err != nil {
+				return err
+			}
+			klineChans = append(klineChans, KChanEx{KChan: c, Exchange: exchange})
+		}
+
+		for {
+			count := len(klineChans)
+			for _, kchanex := range klineChans {
+				kLine, more := <-kchanex.KChan
+				if more {
+					kchanex.Exchange.ConsumeKLine(kLine)
+				} else {
+					if err := kchanex.Exchange.CloseMarketData(); err != nil {
+						return err
+					}
+					count--
+				}
+			}
+			if count == 0 {
+				break
+			}
+		}
 
 		log.Infof("shutting down trader...")
 		shutdownCtx, cancel := context.WithDeadline(ctx, time.Now().Add(10*time.Second))
@@ -324,10 +353,12 @@ var BacktestCmd = &cobra.Command{
 		// put the logger back to print the pnl
 		log.SetLevel(log.InfoLevel)
 		for _, session := range environ.Sessions() {
+			backtestExchange := session.Exchange.(*backtest.Exchange)
+			exchangeName := session.Exchange.Name().String()
 			for symbol, trades := range session.Trades {
 				market, ok := session.Market(symbol)
 				if !ok {
-					return fmt.Errorf("market not found: %s", symbol)
+					return fmt.Errorf("market not found: %s, %s", symbol, exchangeName)
 				}
 
 				calculator := &pnl.AverageCostCalculator{
@@ -337,21 +368,21 @@ var BacktestCmd = &cobra.Command{
 
 				startPrice, ok := session.StartPrice(symbol)
 				if !ok {
-					return fmt.Errorf("start price not found: %s", symbol)
+					return fmt.Errorf("start price not found: %s, %s", symbol, exchangeName)
 				}
 
 				lastPrice, ok := session.LastPrice(symbol)
 				if !ok {
-					return fmt.Errorf("last price not found: %s", symbol)
+					return fmt.Errorf("last price not found: %s, %s", symbol, exchangeName)
 				}
 
-				log.Infof("%s PROFIT AND LOSS REPORT", symbol)
-				log.Infof("===============================================")
+				color.Green("%s %s PROFIT AND LOSS REPORT", strings.ToUpper(exchangeName), symbol)
+				color.Green("===============================================")
 
 				report := calculator.Calculate(symbol, trades.Trades, lastPrice)
 				report.Print()
 
-				initBalances := userConfig.Backtest.Account.Balances.BalanceMap()
+				initBalances := userConfig.Backtest.Account[exchangeName].Balances.BalanceMap()
 				finalBalances := session.Account.Balances()
 
 				log.Infof("INITIAL BALANCES:")

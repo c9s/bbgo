@@ -83,13 +83,15 @@ func NewExchange(sourceName types.ExchangeName, sourceExchange types.Exchange, s
 		endTime = time.Now()
 	}
 
+	configAccount := config.Account[sourceName.String()]
+
 	account := &types.Account{
-		MakerFeeRate: config.Account.MakerFeeRate,
-		TakerFeeRate: config.Account.TakerFeeRate,
+		MakerFeeRate: configAccount.MakerFeeRate,
+		TakerFeeRate: configAccount.TakerFeeRate,
 		AccountType:  types.AccountTypeSpot,
 	}
 
-	balances := config.Account.Balances.BalanceMap()
+	balances := configAccount.Balances.BalanceMap()
 	account.UpdateBalances(balances)
 
 	e := &Exchange{
@@ -288,7 +290,7 @@ func (e *Exchange) matchingBook(symbol string) (*SimplePriceMatching, bool) {
 	return m, ok
 }
 
-func (e *Exchange) FeedMarketData() error {
+func (e *Exchange) InitMarketData() {
 	e.userDataStream.OnTradeUpdate(func(trade types.Trade) {
 		e.addTrade(trade)
 	})
@@ -301,7 +303,9 @@ func (e *Exchange) FeedMarketData() error {
 	}
 	e.matchingBooksMutex.Unlock()
 
-	marketDataStream := e.marketDataStream
+}
+
+func (e *Exchange) GetMarketData() (chan types.KLine, error) {
 	log.Infof("collecting backtest configurations...")
 
 	loadedSymbols := map[string]struct{}{}
@@ -310,8 +314,7 @@ func (e *Exchange) FeedMarketData() error {
 		types.Interval1m: {},
 		types.Interval1d: {},
 	}
-
-	for _, sub := range marketDataStream.Subscriptions {
+	for _, sub := range e.marketDataStream.Subscriptions {
 		loadedSymbols[sub.Symbol] = struct{}{}
 
 		switch sub.Channel {
@@ -319,7 +322,7 @@ func (e *Exchange) FeedMarketData() error {
 			loadedIntervals[types.Interval(sub.Options.Interval)] = struct{}{}
 
 		default:
-			return fmt.Errorf("stream channel %s is not supported in backtest", sub.Channel)
+			return nil, fmt.Errorf("stream channel %s is not supported in backtest", sub.Channel)
 		}
 	}
 
@@ -336,35 +339,33 @@ func (e *Exchange) FeedMarketData() error {
 	log.Infof("using symbols: %v and intervals: %v for back-testing", symbols, intervals)
 	log.Infof("querying klines from database...")
 	klineC, errC := e.srv.QueryKLinesCh(e.startTime, e.endTime, e, symbols, intervals)
-	numKlines := 0
-	for k := range klineC {
-		if k.Interval == types.Interval1m {
-			matching, ok := e.matchingBook(k.Symbol)
-			if !ok {
-				log.Errorf("matching book of %s is not initialized", k.Symbol)
-				continue
-			}
+	go func() {
+		if err := <-errC; err != nil {
+			log.WithError(err).Error("backtest data feed error")
+		}
+	}()
+	return klineC, nil
+}
 
-			// here we generate trades and order updates
-			matching.processKLine(k)
-			numKlines++
+func (e *Exchange) ConsumeKLine(k types.KLine) {
+	if k.Interval == types.Interval1m {
+		matching, ok := e.matchingBook(k.Symbol)
+		if !ok {
+			log.Errorf("matching book of %s is not initialized", k.Symbol)
+			return
 		}
 
-		marketDataStream.EmitKLineClosed(k)
+		// here we generate trades and order updates
+		matching.processKLine(k)
 	}
 
-	if err := <-errC; err != nil {
-		log.WithError(err).Error("backtest data feed error")
-	}
+	e.marketDataStream.EmitKLineClosed(k)
+}
 
-	if numKlines == 0 {
-		log.Error("kline data is empty, make sure you have sync the exchange market data")
-	}
-
-	if err := marketDataStream.Close(); err != nil {
+func (e *Exchange) CloseMarketData() error {
+	if err := e.marketDataStream.Close(); err != nil {
 		log.WithError(err).Error("stream close error")
 		return err
 	}
-
 	return nil
 }

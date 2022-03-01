@@ -44,9 +44,10 @@ backtest:
   - BTCUSDT
   - ETHUSDT
   account:
-    balances:
-      BTC: 0.0
-      USDT: 10000.0
+    binance:
+      balances:
+        BTC: 0.0
+        USDT: 10000.0
 
 exchangeStrategies:
 

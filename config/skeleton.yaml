@@ -16,6 +16,7 @@ backtest:
   symbols:
     - BNBBUSD
   account:
-    balances:
-      BNB: 0
-      BUSD: 10000
+    binance:
+      balances:
+        BNB: 0
+        BUSD: 10000
