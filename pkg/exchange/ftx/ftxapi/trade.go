@@ -22,9 +22,9 @@ type Order struct {
 	Size          fixedpoint.Value `json:"size"`
 	RemainingSize fixedpoint.Value `json:"remainingSize"`
 	FilledSize    fixedpoint.Value `json:"filledSize"`
-	Side          string           `json:"side"`
-	Status        string           `json:"status"`
-	Type          string           `json:"type"`
+	Side          Side             `json:"side"`
+	Status        OrderStatus      `json:"status"`
+	Type          OrderType        `json:"type"`
 	ReduceOnly    bool             `json:"reduceOnly"`
 	Ioc           bool             `json:"ioc"`
 	PostOnly      bool             `json:"postOnly"`
