@@ -1,0 +1,220 @@
+syntax = "proto3";
+
+package pb;
+
+option go_package = "../pb";
+
+service BBGO {
+    // should support streaming
+    rpc Subcribe(SubscribeRequest) returns (stream SubscribeResponse) {}
+    rpc SubcribeUserData(Empty) returns (stream SubscribeResponse) {}
+
+    // request-response
+    rpc SubmitOrder(SubmitOrderRequest) returns (SubmitOrderResponse) {}
+    rpc CancelOrder(CancelOrderRequest) returns (CancelOrderResponse) {}
+    rpc QueryOrder(QueryOrderRequest) returns (QueryOrderResponse) {}
+    rpc QueryOrders(QueryOrdersRequest) returns (QueryOrdersResponse) {}
+    rpc QueryTrades(QueryTradesRequest) returns (QueryTradesResponse) {}
+    rpc QueryKLines(QueryKLinesRequest) returns (QueryKLinesResponse) {}
+}
+
+message Empty {}
+
+message Error {
+    int64 error_code = 1;
+    string error_message = 2;
+}
+
+message SubscribeRequest {
+    repeated Subscription subscriptions = 1;
+}
+
+message Subscription {
+    string exchange = 1;
+    string channel = 2;  // book, trade, ticker
+    string symbol = 3;
+    int64 depth = 4;
+}
+
+message SubscribeResponse {
+    string exchange = 1;
+    string symbol = 2;
+    string channel = 3;  // book, trade, ticker, user
+    string event = 4;    // snapshot, update, order_snapshot, ...
+    Depth depth = 5;
+    repeated Trade trades = 6;
+    Ticker ticker = 7;
+    repeated Order orders = 8;
+    repeated Balance balances = 9;
+    int64 subscribed_at = 10;
+    Error error = 11;
+}
+
+message Depth {
+    string exchange = 1;
+    string symbol = 2;
+    repeated PriceVolume asks = 3;
+    repeated PriceVolume bids = 4;
+}
+
+message PriceVolume {
+    int64 price = 1;
+    int64 volume = 2;
+}
+
+// https://maicoin.github.io/max-websocket-docs/#/private_channels?id=trade-response
+// https://maicoin.github.io/max-websocket-docs/#/public_trade?id=success-response
+message Trade {
+    string exchange = 1;
+    string symbol = 2;
+    int64 id = 3;
+    double price = 4;
+    double volume = 5;
+    int64 created_at = 6;
+    string side = 7;
+    double fee = 8;
+    string fee_currency = 9;
+    bool maker = 10;
+    string trend = 11;
+}
+
+// https://maicoin.github.io/max-websocket-docs/#/public_ticker?id=success-response
+message Ticker {
+    string exchange = 1;
+    string symbol = 2;
+    double open = 3;
+    double high = 4;
+    double low = 5;
+    double close = 6;
+    double volume = 7;
+}
+
+// https://maicoin.github.io/max-websocket-docs/#/private_channels?id=snapshot
+message Order {
+    string exchange = 1;
+    string symbol = 2;
+    int64 id = 3;
+    string side = 4;
+    string order_type = 5;
+    double price = 6;
+    double stop_price = 7;
+    double avg_price = 8;
+    string status = 9;
+    int64 created_at = 10;
+    double quantity = 11;
+    double executed_volume = 12;
+    int64 trades_count = 13;
+    int64 client_order_id = 14;
+    int64 group_id = 15;
+}
+
+message SubmitOrder {
+    string exchange = 1;
+    string symbol = 2;
+    string side = 3;
+    double quantity = 4;
+    double price = 5;
+    double stop_price = 6;
+    string order_type = 7;
+    int64 client_order_id = 8;
+    int64 group_id = 9;
+}
+
+// https://maicoin.github.io/max-websocket-docs/#/private_channels?id=account-response
+message Balance {
+    string exchange = 1;
+    string symbol = 2;
+    string currency = 3;
+    double available = 4;
+    double locked = 5;
+}
+
+message SubmitOrderRequest {
+    SubmitOrder submit_order = 1;
+}
+
+message SubmitOrderResponse {
+    Order order = 1;
+    Error error = 2;
+}
+
+message CancelOrderRequest {
+    string exchange = 1;
+    int64 id = 2;
+    int64 client_order_id = 3;
+}
+
+message CancelOrderResponse {
+    Order order = 1;
+    Error error = 2;
+}
+
+message QueryOrderRequest {
+    int64 id = 1;
+    int64 client_order_id = 2;
+}
+
+message QueryOrderResponse {
+    Order order = 1;
+    Error error = 2;
+}
+
+message QueryOrdersRequest {
+    string exchange = 1;
+    string symbol = 2;
+    repeated string state = 3;
+    string order_by = 4;
+    int64 group_id = 5;
+    bool pagination = 6;
+    int64 page = 7;
+    int64 limit = 8;
+    int64 offset = 9;
+}
+
+message QueryOrdersResponse {
+    repeated Order orders = 1;
+    Error error = 2;
+}
+
+message QueryTradesRequest {
+    string exchange = 1;
+    string symbol = 2;
+    int64 timestamp = 3;
+    int64 from = 4;
+    int64 to = 5;
+    string order_by = 6;
+    bool pagination = 7;
+    int64 page = 8;
+    int64 limit = 9;
+    int64 offset = 10;
+}
+
+message QueryTradesResponse {
+    repeated Trade trades = 1;
+    Error error = 2;
+}
+
+message QueryKLinesRequest {
+    string exchange = 1;
+    string symbol = 2;
+    int64 limit = 3;
+    int64 interval = 4;  // time period of K line in minute
+    int64 timestamp = 5;
+}
+
+message QueryKLinesResponse {
+    repeated KLine klines = 1;
+    Error error = 2;
+}
+
+message KLine {
+    string exchange = 1;
+    string symbol = 2;
+    int64 timestamp = 3;
+    double open = 4;
+    double high = 5;
+    double low = 6;
+    double close = 7;
+    double volume = 8;
+    double quote_volume = 9;
+}
