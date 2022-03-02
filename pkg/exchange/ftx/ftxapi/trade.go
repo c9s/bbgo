@@ -28,7 +28,7 @@ type Order struct {
 	ReduceOnly    bool             `json:"reduceOnly"`
 	Ioc           bool             `json:"ioc"`
 	PostOnly      bool             `json:"postOnly"`
-	ClientId      *string          `json:"clientId"`
+	ClientId      string           `json:"clientId"`
 }
 
 //go:generate GetRequest -url "/api/orders" -type GetOpenOrdersRequest -responseDataType []Order
@@ -107,13 +107,13 @@ func (c *RestClient) NewCancelAllOrderRequest() *CancelAllOrderRequest {
 }
 
 type Fill struct {
-	Id            uint64              `json:"id"`
+	Id            uint64           `json:"id"`
 	Future        string           `json:"future"`
 	Liquidity     Liquidity        `json:"liquidity"`
 	Market        string           `json:"market"`
 	BaseCurrency  string           `json:"baseCurrency"`
 	QuoteCurrency string           `json:"quoteCurrency"`
-	OrderId       uint64              `json:"orderId"`
+	OrderId       uint64           `json:"orderId"`
 	TradeId       int              `json:"tradeId"`
 	Price         fixedpoint.Value `json:"price"`
 	Side          Side             `json:"side"`
@@ -135,7 +135,7 @@ type GetFillsRequest struct {
 	orderID   *int       `param:"orderId,query"`
 
 	// order is the order of the returned records, asc or null
-	order     *string     `param:"order,query"`
+	order *string `param:"order,query"`
 }
 
 func (c *RestClient) NewGetFillsRequest() *GetFillsRequest {
