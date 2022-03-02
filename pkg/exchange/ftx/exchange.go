@@ -526,48 +526,32 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 // symbol, since and until are all optional. FTX can only query by order created time, not updated time.
 // FTX doesn't support lastOrderID, so we will query by the time range first, and filter by the lastOrderID.
 func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []types.Order, err error) {
-	if until == (time.Time{}) {
-		until = time.Now()
-	}
-	if since.After(until) {
-		return nil, fmt.Errorf("invalid query closed orders time range, since: %+v, until: %+v", since, until)
-	}
-
 	symbol = TrimUpperString(symbol)
-	limit := int64(100)
-	hasMoreData := true
-	s := since
-	var lastOrder order
-	for hasMoreData {
-		if err := requestLimit.Wait(ctx); err != nil {
-			logrus.WithError(err).Error("rate limit error")
-		}
 
-		resp, err := e.newRest().OrdersHistory(ctx, toLocalSymbol(symbol), s, until, limit)
+	req := e.client.NewGetOrderHistoryRequest(toLocalSymbol(symbol))
+
+	if since != (time.Time{}) {
+		req.StartTime(since)
+	} else if until != (time.Time{}) {
+		req.EndTime(until)
+	}
+
+	ftxOrders, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	sort.Slice(ftxOrders, func(i, j int) bool {
+		return ftxOrders[i].CreatedAt.Before(ftxOrders[j].CreatedAt)
+	})
+
+	for _, ftxOrder := range ftxOrders {
+		o, err := toGlobalOrderNew(ftxOrder)
 		if err != nil {
-			return nil, err
-		}
-		if !resp.Success {
-			return nil, fmt.Errorf("ftx returns querying orders history failure")
+			return orders, err
 		}
 
-		sortByCreatedASC(resp.Result)
-
-		for _, r := range resp.Result {
-			// There may be more than one orders at the same time, so also have to check the ID
-			if r.CreatedAt.Before(lastOrder.CreatedAt.Time) || r.ID == lastOrder.ID || r.Status != "closed" || r.ID < int64(lastOrderID) {
-				continue
-			}
-			lastOrder = r
-			o, err := toGlobalOrder(r)
-			if err != nil {
-				return nil, err
-			}
-			orders = append(orders, o)
-		}
-		hasMoreData = resp.HasMoreData
-		// the start_time and end_time precision is second. There might be more than one orders within one second.
-		s = lastOrder.CreatedAt.Add(-1 * time.Second)
+		orders = append(orders, o)
 	}
 	return orders, nil
 }
