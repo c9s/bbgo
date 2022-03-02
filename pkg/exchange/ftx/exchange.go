@@ -505,18 +505,19 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
 	// TODO: invoke open trigger orders
-	resp, err := e.newRest().OpenOrders(ctx, toLocalSymbol(symbol))
+
+	req := e.client.NewGetOpenOrdersRequest(toLocalSymbol(symbol))
+	ftxOrders, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if !resp.Success {
-		return nil, fmt.Errorf("ftx returns querying open orders failure")
-	}
-	for _, r := range resp.Result {
-		o, err := toGlobalOrder(r)
+
+	for _, ftxOrder := range ftxOrders {
+		o, err := toGlobalOrderNew(ftxOrder)
 		if err != nil {
-			return nil, err
+			return orders, err
 		}
+
 		orders = append(orders, o)
 	}
 	return orders, nil
@@ -538,7 +539,6 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 	s := since
 	var lastOrder order
 	for hasMoreData {
-
 		if err := requestLimit.Wait(ctx); err != nil {
 			logrus.WithError(err).Error("rate limit error")
 		}

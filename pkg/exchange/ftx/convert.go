@@ -37,6 +37,67 @@ func TrimLowerString(original string) string {
 
 var errUnsupportedOrderStatus = fmt.Errorf("unsupported order status")
 
+func toGlobalOrderNew(r ftxapi.Order) (types.Order, error) {
+	// In exchange/max/convert.go, it only parses these fields.
+	timeInForce := types.TimeInForceGTC
+	if r.Ioc {
+		timeInForce = types.TimeInForceIOC
+	}
+
+	// order type definition: https://github.com/ftexchange/ftx/blob/master/rest/client.py#L122
+	orderType := types.OrderType(TrimUpperString(string(r.Type)))
+	if orderType == types.OrderTypeLimit && r.PostOnly {
+		orderType = types.OrderTypeLimitMaker
+	}
+
+	o := types.Order{
+		SubmitOrder: types.SubmitOrder{
+			ClientOrderID: r.ClientId,
+			Symbol:        toGlobalSymbol(r.Market),
+			Side:          types.SideType(TrimUpperString(string(r.Side))),
+			Type:          orderType,
+			Quantity:      r.Size,
+			Price:         r.Price,
+			TimeInForce:   timeInForce,
+		},
+		Exchange:         types.ExchangeFTX,
+		IsWorking:        r.Status == "open",
+		OrderID:          uint64(r.Id),
+		Status:           "",
+		ExecutedQuantity: r.FilledSize,
+		CreationTime:     types.Time(r.CreatedAt),
+		UpdateTime:       types.Time(r.CreatedAt),
+	}
+
+	s, err := toGlobalOrderStatus(r, r.Status)
+	o.Status = s
+	return o, err
+}
+
+func toGlobalOrderStatus(o ftxapi.Order, s ftxapi.OrderStatus) (types.OrderStatus, error) {
+	switch s {
+	case ftxapi.OrderStatusNew:
+		return types.OrderStatusNew, nil
+
+	case ftxapi.OrderStatusOpen:
+		if !o.FilledSize.IsZero() {
+			return types.OrderStatusPartiallyFilled, nil
+		} else {
+			return types.OrderStatusNew, nil
+		}
+	case ftxapi.OrderStatusClosed:
+		// filled or canceled
+		if o.FilledSize == o.Size {
+			return types.OrderStatusFilled, nil
+		} else {
+			// can't distinguish it's canceled or rejected from order response, so always set to canceled
+			return types.OrderStatusCanceled, nil
+		}
+	}
+
+	return "", fmt.Errorf("unsupported ftx order status %s: %w", s, errUnsupportedOrderStatus)
+}
+
 func toGlobalOrder(r order) (types.Order, error) {
 	// In exchange/max/convert.go, it only parses these fields.
 	timeInForce := types.TimeInForceGTC
