@@ -25,7 +25,7 @@ type Market struct {
 	Underlying            string           `json:"underlying"`
 	Enabled               bool             `json:"enabled"`
 	Ask                   fixedpoint.Value `json:"ask"`
-	Bid                   int              `json:"bid"`
+	Bid                   fixedpoint.Value              `json:"bid"`
 	Last                  fixedpoint.Value `json:"last"`
 	PostOnly              bool             `json:"postOnly"`
 	Price                 fixedpoint.Value `json:"price"`

@@ -126,16 +126,14 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 }
 
 func (e *Exchange) _queryMarkets(ctx context.Context) (MarketMap, error) {
-	resp, err := e.newRest().Markets(ctx)
+	req := e.client.NewGetMarketsRequest()
+	ftxMarkets,err := req.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if !resp.Success {
-		return nil, fmt.Errorf("ftx returns querying markets failure")
-	}
 
 	markets := MarketMap{}
-	for _, m := range resp.Result {
+	for _, m := range ftxMarkets {
 		symbol := toGlobalSymbol(m.Name)
 		symbolMap[symbol] = m.Name
 
