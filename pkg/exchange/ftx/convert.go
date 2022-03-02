@@ -189,7 +189,7 @@ func toGlobalDepositStatus(input string) (types.DepositStatus, error) {
 
 func toGlobalTrade(f ftxapi.Fill) (types.Trade, error) {
 	return types.Trade{
-		ID:            f.Id,
+		ID:            f.TradeId,
 		OrderID:       f.OrderId,
 		Exchange:      types.ExchangeFTX,
 		Price:         f.Price,

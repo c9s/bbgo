@@ -200,8 +200,9 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 
 	var balances = make(types.BalanceMap)
 	for _, r := range ftxBalances {
-		balances[toGlobalCurrency(r.Coin)] = types.Balance{
-			Currency:  toGlobalCurrency(r.Coin),
+		currency := toGlobalCurrency(r.Coin)
+		balances[currency] = types.Balance{
+			Currency:  currency,
 			Available: r.Free,
 			Locked:    r.Total.Sub(r.Free),
 		}
@@ -343,77 +344,55 @@ func isIntervalSupportedInKLine(interval types.Interval) bool {
 }
 
 func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) ([]types.Trade, error) {
-	var since, until time.Time
-	if options.StartTime != nil {
-		since = *options.StartTime
-	}
-	if options.EndTime != nil {
-		until = *options.EndTime
-	} else {
-		until = time.Now()
-	}
-
-	if since.After(until) {
-		return nil, fmt.Errorf("invalid query trades time range, since: %+v, until: %+v", since, until)
-	}
-
-	if options.Limit == 1 {
-		// FTX doesn't provide pagination api, so we have to split the since/until time range into small slices, and paginate ourselves.
-		// If the limit is 1, we always get the same data from FTX.
-		return nil, fmt.Errorf("limit can't be 1 which can't be used in pagination")
-	}
-
-	limit := options.Limit
-	if limit == 0 {
-		limit = 200
-	}
-
 	tradeIDs := make(map[uint64]struct{})
-
 	lastTradeID := options.LastTradeID
+
+	req := e.client.NewGetFillsRequest()
+	req.Market(toLocalSymbol(symbol))
+
+	if options.StartTime != nil {
+		req.StartTime(*options.StartTime)
+	} else if options.EndTime != nil {
+		req.EndTime(*options.EndTime)
+	}
+
+	req.Order("asc")
+	fills, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	sort.Slice(fills, func(i, j int) bool {
+		return fills[i].Time.Before(fills[j].Time)
+	})
+
 	var trades []types.Trade
 	symbol = strings.ToUpper(symbol)
+	for _, fill := range fills {
+		if _, ok := tradeIDs[fill.TradeId]; ok {
+			continue
+		}
 
-	for since.Before(until) {
-		req := e.client.NewGetFillsRequest()
-		req.Market(toLocalSymbol(symbol))
-		req.StartTime(since)
-		req.EndTime(until)
-		req.Order("asc")
-		fills, err := req.Do(ctx)
+		if options.StartTime != nil && fill.Time.Before(*options.StartTime) {
+			continue
+		}
+
+		if options.EndTime != nil && fill.Time.After(*options.EndTime) {
+			continue
+		}
+
+		if fill.TradeId <= lastTradeID {
+			continue
+		}
+
+		tradeIDs[fill.TradeId] = struct{}{}
+		lastTradeID = fill.TradeId
+
+		t, err := toGlobalTrade(fill)
 		if err != nil {
 			return nil, err
 		}
-
-		sort.Slice(fills, func(i, j int) bool {
-			return fills[i].Id < fills[j].Id
-		})
-
-		for _, fill := range fills {
-			// always update since to avoid infinite loop
-			since = fill.Time
-
-			if _, ok := tradeIDs[fill.Id]; ok {
-				continue
-			}
-
-			if fill.Id <= lastTradeID || fill.Time.Before(since) || fill.Time.After(until) {
-				continue
-			}
-
-			tradeIDs[fill.Id] = struct{}{}
-			lastTradeID = fill.Id
-
-			t, err := toGlobalTrade(fill)
-			if err != nil {
-				return nil, err
-			}
-			trades = append(trades, t)
-		}
-
-		if int64(len(fills)) < limit {
-			return trades, nil
-		}
+		trades = append(trades, t)
 	}
 
 	return trades, nil
@@ -560,6 +539,11 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 	})
 
 	for _, ftxOrder := range ftxOrders {
+		switch ftxOrder.Status {
+		case ftxapi.OrderStatusOpen, ftxapi.OrderStatusNew:
+			continue
+		}
+
 		o, err := toGlobalOrderNew(ftxOrder)
 		if err != nil {
 			return orders, err

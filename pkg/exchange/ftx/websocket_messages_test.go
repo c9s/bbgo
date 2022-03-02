@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/c9s/bbgo/pkg/exchange/ftx/ftxapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -225,8 +226,8 @@ func Test_websocketResponse_toOrderUpdateResponse(t *testing.T) {
 			Channel: privateOrdersChannel,
 			Type:    updateRespType,
 		},
-		Data: order{
-			ID:            12345,
+		Data: ftxapi.Order{
+			Id:            12345,
 			ClientId:      "test-client-id",
 			Market:        "SOL/USD",
 			Type:          "limit",
@@ -237,11 +238,10 @@ func Test_websocketResponse_toOrderUpdateResponse(t *testing.T) {
 			FilledSize:    fixedpoint.Zero,
 			RemainingSize: fixedpoint.Zero,
 			ReduceOnly:    false,
-			Liquidation:   false,
 			AvgFillPrice:  fixedpoint.Zero,
 			PostOnly:      false,
 			Ioc:           false,
-			CreatedAt:     datetime{Time: mustParseDatetime("2021-03-27T11:00:36.418674+00:00")},
+			CreatedAt:     mustParseDatetime("2021-03-27T11:00:36.418674+00:00"),
 			Future:        "",
 		},
 	}, r)
