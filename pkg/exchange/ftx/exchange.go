@@ -83,6 +83,7 @@ func NewExchange(key, secret string, subAccount string) *Exchange {
 	}
 
 	client := ftxapi.NewClient()
+	client.Auth(key, secret, subAccount)
 	return &Exchange{
 		client:       client,
 		restEndpoint: u,
@@ -363,6 +364,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		// If the limit is 1, we always get the same data from FTX.
 		return nil, fmt.Errorf("limit can't be 1 which can't be used in pagination")
 	}
+
 	limit := options.Limit
 	if limit == 0 {
 		limit = 200
@@ -389,21 +391,22 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 			return fills[i].Id < fills[j].Id
 		})
 
-		for _, r := range fills {
+		for _, fill := range fills {
 			// always update since to avoid infinite loop
-			since = r.Time
+			since = fill.Time
 
-			if _, ok := tradeIDs[r.Id]; ok {
+			if _, ok := tradeIDs[fill.Id]; ok {
 				continue
 			}
 
-			if r.Id <= lastTradeID || r.Time.Before(since) || r.Time.After(until) || r.Market != toLocalSymbol(symbol) {
+			if fill.Id <= lastTradeID || fill.Time.Before(since) || fill.Time.After(until) {
 				continue
 			}
-			tradeIDs[r.Id] = struct{}{}
-			lastTradeID = r.Id
 
-			t, err := toGlobalTrade(r)
+			tradeIDs[fill.Id] = struct{}{}
+			lastTradeID = fill.Id
+
+			t, err := toGlobalTrade(fill)
 			if err != nil {
 				return nil, err
 			}
