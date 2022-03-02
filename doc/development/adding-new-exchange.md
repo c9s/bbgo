@@ -153,5 +153,5 @@ godotenv -f .env.local -- go run ./cmd/bbgo get-order --session $BBGO_SESSION --
 ### Test order cancel
 
 ```shell
-godotenv -f .env.local -- go run ./cmd/bbgo cancel-order --session kucoin --order-uuid 61c745c44592c200014abdcf
+godotenv -f .env.local -- go run ./cmd/bbgo cancel-order --session $BBGO_SESSION --order-uuid 61c745c44592c200014abdcf
 ```
