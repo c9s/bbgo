@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 func Test_messageHandler_handleMessage(t *testing.T) {
@@ -93,9 +93,8 @@ func Test_messageHandler_handleMessage(t *testing.T) {
 		h.OnTradeUpdate(func(trade types.Trade) {
 			i++
 			assert.Equal(t, types.Trade{
-				GID:           0,
-				ID:            6276431,
-				OrderID:       323789,
+				ID:            uint64(6276431),
+				OrderID:       uint64(323789),
 				Exchange:      types.ExchangeFTX,
 				Price:         fixedpoint.NewFromFloat(2.723),
 				Quantity:      fixedpoint.One,
@@ -109,6 +108,7 @@ func Test_messageHandler_handleMessage(t *testing.T) {
 				FeeCurrency:   "USD",
 				IsMargin:      false,
 				IsIsolated:    false,
+				IsFutures:     true,
 				StrategyID:    sql.NullString{},
 				PnL:           sql.NullFloat64{},
 			}, trade)

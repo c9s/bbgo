@@ -123,7 +123,7 @@ func (h *messageHandler) handlePrivateOrders(response websocketResponse) {
 		return
 	}
 
-	globalOrder, err := toGlobalOrder(r.Data)
+	globalOrder, err := toGlobalOrderNew(r.Data)
 	if err != nil {
 		logger.WithError(err).Errorf("failed to convert order update to global order")
 		return
