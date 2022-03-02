@@ -61,7 +61,7 @@ func toGlobalOrderNew(r ftxapi.Order) (types.Order, error) {
 			TimeInForce:   timeInForce,
 		},
 		Exchange:         types.ExchangeFTX,
-		IsWorking:        r.Status == "open",
+		IsWorking:        r.Status == ftxapi.OrderStatusOpen || r.Status == ftxapi.OrderStatusNew,
 		OrderID:          uint64(r.Id),
 		Status:           "",
 		ExecutedQuantity: r.FilledSize,
