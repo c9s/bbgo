@@ -15,7 +15,7 @@ import (
 type Order struct {
 	CreatedAt     time.Time        `json:"createdAt"`
 	Future        string           `json:"future"`
-	Id            int              `json:"id"`
+	Id            int64            `json:"id"`
 	Market        string           `json:"market"`
 	Price         fixedpoint.Value `json:"price"`
 	AvgFillPrice  fixedpoint.Value `json:"avgFillPrice"`
@@ -46,9 +46,9 @@ func (c *RestClient) NewGetOpenOrdersRequest(market string) *GetOpenOrdersReques
 
 //go:generate GetRequest -url "/api/orders/history" -type GetOrderHistoryRequest -responseDataType []Order
 type GetOrderHistoryRequest struct {
-	client    requestgen.AuthenticatedAPIClient
+	client requestgen.AuthenticatedAPIClient
 
-	market    string     `param:"market,query"`
+	market string `param:"market,query"`
 
 	startTime *time.Time `param:"start_time,seconds,query"`
 	endTime   *time.Time `param:"end_time,seconds,query"`
@@ -58,5 +58,82 @@ func (c *RestClient) NewGetOrderHistoryRequest(market string) *GetOrderHistoryRe
 	return &GetOrderHistoryRequest{
 		client: c,
 		market: market,
+	}
+}
+
+//go:generate PostRequest -url "/api/orders" -type PlaceOrderRequest -responseDataType .Order
+type PlaceOrderRequest struct {
+	client requestgen.AuthenticatedAPIClient
+
+	market    string           `param:"market,required"`
+	side      Side             `param:"side,required"`
+	price     fixedpoint.Value `param:"price"`
+	size      fixedpoint.Value `param:"size"`
+	orderType OrderType        `param:"type"`
+	ioc       *bool            `param:"ioc"`
+	postOnly  *bool            `param:"postOnly"`
+	clientID  *string          `param:"clientId,optional"`
+}
+
+func (c *RestClient) NewPlaceOrderRequest() *PlaceOrderRequest {
+	return &PlaceOrderRequest{
+		client: c,
+	}
+}
+
+//go:generate requestgen -method DELETE -url "/api/orders/:orderID" -type CancelOrderRequest -responseType .APIResponse
+type CancelOrderRequest struct {
+	client  requestgen.AuthenticatedAPIClient
+	orderID string `param:"orderID,required,slug"`
+}
+
+func (c *RestClient) NewCancelOrderRequest(orderID string) *CancelOrderRequest {
+	return &CancelOrderRequest{
+		client:  c,
+		orderID: orderID,
+	}
+}
+
+//go:generate requestgen -method DELETE -url "/api/orders" -type CancelAllOrderRequest -responseType .APIResponse
+type CancelAllOrderRequest struct {
+	client requestgen.AuthenticatedAPIClient
+	market *string `param:"market"`
+}
+
+func (c *RestClient) NewCancelAllOrderRequest() *CancelAllOrderRequest {
+	return &CancelAllOrderRequest{
+		client: c,
+	}
+}
+
+type Fill struct {
+	Id            int              `json:"id"`
+	Future        string           `json:"future"`
+	Liquidity     Liquidity        `json:"liquidity"`
+	Market        string           `json:"market"`
+	BaseCurrency  string           `json:"baseCurrency"`
+	QuoteCurrency string           `json:"quoteCurrency"`
+	OrderId       int              `json:"orderId"`
+	TradeId       int              `json:"tradeId"`
+	Price         fixedpoint.Value `json:"price"`
+	Side          Side             `json:"side"`
+	Size          fixedpoint.Value `json:"size"`
+	Time          time.Time        `json:"time"`
+	Type          string           `json:"type"` // always = "order"
+	Fee           fixedpoint.Value `json:"fee"`
+	FeeCurrency   string           `json:"feeCurrency"`
+	FeeRate       fixedpoint.Value `json:"feeRate"`
+}
+
+//go:generate GetRequest -url "/api/fills" -type GetFillsRequest -responseDataType []Fill
+type GetFillsRequest struct {
+	client requestgen.AuthenticatedAPIClient
+
+	market *string `param:"market"`
+}
+
+func (c *RestClient) NewGetFillsRequest() *GetFillsRequest {
+	return &GetFillsRequest{
+		client: c,
 	}
 }
