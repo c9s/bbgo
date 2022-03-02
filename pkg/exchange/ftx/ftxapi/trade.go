@@ -106,6 +106,22 @@ func (c *RestClient) NewCancelAllOrderRequest() *CancelAllOrderRequest {
 	}
 }
 
+
+//go:generate requestgen -method DELETE -url "/api/orders/by_client_id/:clientOrderId" -type CancelOrderByClientOrderIdRequest -responseType .APIResponse
+type CancelOrderByClientOrderIdRequest struct {
+	client requestgen.AuthenticatedAPIClient
+	clientOrderId string `param:"clientOrderId,required,slug"`
+}
+
+func (c *RestClient) NewCancelOrderByClientOrderIdRequest(clientOrderId string) *CancelOrderByClientOrderIdRequest {
+	return &CancelOrderByClientOrderIdRequest{
+		client: c,
+		clientOrderId: clientOrderId,
+	}
+}
+
+
+
 type Fill struct {
 	Id            uint64           `json:"id"`
 	Future        string           `json:"future"`
