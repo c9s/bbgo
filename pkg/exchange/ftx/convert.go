@@ -231,17 +231,17 @@ const (
 	OrderTypeMarket OrderType = "market"
 )
 
-func toLocalOrderType(orderType types.OrderType) (OrderType, error) {
+func toLocalOrderType(orderType types.OrderType) (ftxapi.OrderType, error) {
 	switch orderType {
 
 	case types.OrderTypeLimitMaker:
-		return OrderTypeLimit, nil
+		return ftxapi.OrderTypeLimit, nil
 
 	case types.OrderTypeLimit:
-		return OrderTypeLimit, nil
+		return ftxapi.OrderTypeLimit, nil
 
 	case types.OrderTypeMarket:
-		return OrderTypeMarket, nil
+		return ftxapi.OrderTypeMarket, nil
 
 	}
 
