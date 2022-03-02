@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/c9s/bbgo/pkg/exchange/ftx/ftxapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -133,7 +134,7 @@ func (r websocketResponse) toOrderUpdateResponse() (orderUpdateResponse, error) 
 type tradeUpdateResponse struct {
 	mandatoryFields
 
-	Data fill `json:"data"`
+	Data ftxapi.Fill `json:"data"`
 }
 
 func (r websocketResponse) toTradeUpdateResponse() (tradeUpdateResponse, error) {
