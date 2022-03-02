@@ -4,10 +4,13 @@ import (
 	"context"
 	"os"
 	"regexp"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 func maskSecret(s string) string {
@@ -27,7 +30,7 @@ func integrationTestConfigured(t *testing.T) (key, secret string, ok bool) {
 	return key, secret, ok
 }
 
-func TestClient_NewGetAccountRequest(t *testing.T) {
+func TestClient_Requests(t *testing.T) {
 	key, secret, ok := integrationTestConfigured(t)
 	if !ok {
 		t.SkipNow()
@@ -39,9 +42,58 @@ func TestClient_NewGetAccountRequest(t *testing.T) {
 
 	client := NewClient()
 	client.Auth(key, secret, "")
-	req := client.NewGetAccountRequest()
-	account ,err := req.Do(ctx)
-	assert.NoError(t, err)
-	assert.NotNil(t, account)
-	t.Logf("account: %+v", account)
+
+	testCases := []struct {
+		name string
+		tt func(t *testing.T)
+	} {
+		{
+			name: "GetAccountRequest",
+			tt: func(t *testing.T) {
+				req := client.NewGetAccountRequest()
+				account ,err := req.Do(ctx)
+				assert.NoError(t, err)
+				assert.NotNil(t, account)
+				t.Logf("account: %+v", account)
+			},
+		},
+		{
+			name: "PlaceOrderRequest",
+			tt: func(t *testing.T) {
+				req := client.NewPlaceOrderRequest()
+				req.PostOnly(true).
+					Size(fixedpoint.MustNewFromString("1.0")).
+					Price(fixedpoint.MustNewFromString("10.0")).
+					OrderType(OrderTypeLimit).
+					Side(SideBuy).
+					Market("LTC/USDT")
+
+				createdOrder,err := req.Do(ctx)
+				if assert.NoError(t, err) {
+					assert.NotNil(t, createdOrder)
+					t.Logf("createdOrder: %+v", createdOrder)
+
+					req2 := client.NewCancelOrderRequest(strconv.FormatInt(createdOrder.Id, 10))
+					ret, err := req2.Do(ctx)
+					assert.NoError(t, err)
+					t.Logf("cancelOrder: %+v", ret)
+					assert.True(t, ret.Success)
+				}
+			},
+		},
+		{
+			name: "GetFillsRequest",
+			tt: func(t *testing.T) {
+				req := client.NewGetFillsRequest()
+				req.Market("CRO/USDT")
+				fills, err := req.Do(ctx)
+				assert.NoError(t, err)
+				assert.NotNil(t, fills)
+				t.Logf("fills: %+v", fills)
+			},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, testCase.tt)
+	}
 }
