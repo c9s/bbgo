@@ -107,13 +107,13 @@ func (c *RestClient) NewCancelAllOrderRequest() *CancelAllOrderRequest {
 }
 
 type Fill struct {
-	Id            int              `json:"id"`
+	Id            uint64              `json:"id"`
 	Future        string           `json:"future"`
 	Liquidity     Liquidity        `json:"liquidity"`
 	Market        string           `json:"market"`
 	BaseCurrency  string           `json:"baseCurrency"`
 	QuoteCurrency string           `json:"quoteCurrency"`
-	OrderId       int              `json:"orderId"`
+	OrderId       uint64              `json:"orderId"`
 	TradeId       int              `json:"tradeId"`
 	Price         fixedpoint.Value `json:"price"`
 	Side          Side             `json:"side"`
@@ -129,7 +129,13 @@ type Fill struct {
 type GetFillsRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
-	market *string `param:"market"`
+	market    *string    `param:"market,query"`
+	startTime *time.Time `param:"start_time,seconds,query"`
+	endTime   *time.Time `param:"end_time,seconds,query"`
+	orderID   *int       `param:"orderId,query"`
+
+	// order is the order of the returned records, asc or null
+	order     *string     `param:"order,query"`
 }
 
 func (c *RestClient) NewGetFillsRequest() *GetFillsRequest {

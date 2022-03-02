@@ -187,8 +187,8 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	if err != nil {
 		return nil, err
 	}
-	a.UpdateBalances(balances)
 
+	a.UpdateBalances(balances)
 	return a, nil
 }
 
@@ -375,32 +375,33 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	symbol = strings.ToUpper(symbol)
 
 	for since.Before(until) {
-		// DO not set limit to `1` since you will always get the same response.
-		resp, err := e.newRest().Fills(ctx, toLocalSymbol(symbol), since, until, limit, true)
+		req := e.client.NewGetFillsRequest()
+		req.Market(toLocalSymbol(symbol))
+		req.StartTime(since)
+		req.EndTime(until)
+		req.Order("asc")
+		fills ,err := req.Do(ctx)
 		if err != nil {
 			return nil, err
 		}
-		if !resp.Success {
-			return nil, fmt.Errorf("ftx returns failure")
-		}
 
-		sort.Slice(resp.Result, func(i, j int) bool {
-			return resp.Result[i].TradeId < resp.Result[j].TradeId
+		sort.Slice(fills, func(i, j int) bool {
+			return fills[i].Id < fills[j].Id
 		})
 
-		for _, r := range resp.Result {
+		for _, r := range fills {
 			// always update since to avoid infinite loop
-			since = r.Time.Time
+			since = r.Time
 
-			if _, ok := tradeIDs[r.TradeId]; ok {
+			if _, ok := tradeIDs[r.Id]; ok {
 				continue
 			}
 
-			if r.TradeId <= lastTradeID || r.Time.Before(since) || r.Time.After(until) || r.Market != toLocalSymbol(symbol) {
+			if r.Id <= lastTradeID || r.Time.Before(since) || r.Time.After(until) || r.Market != toLocalSymbol(symbol) {
 				continue
 			}
-			tradeIDs[r.TradeId] = struct{}{}
-			lastTradeID = r.TradeId
+			tradeIDs[r.Id] = struct{}{}
+			lastTradeID = r.Id
 
 			t, err := toGlobalTrade(r)
 			if err != nil {
@@ -409,7 +410,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 			trades = append(trades, t)
 		}
 
-		if int64(len(resp.Result)) < limit {
+		if int64(len(fills)) < limit {
 			return trades, nil
 		}
 	}

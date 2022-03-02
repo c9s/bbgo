@@ -7,6 +7,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/exchange/ftx/ftxapi"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -54,10 +55,10 @@ func toGlobalOrder(r order) (types.Order, error) {
 			ClientOrderID: r.ClientId,
 			Symbol:        toGlobalSymbol(r.Market),
 			Side:          types.SideType(TrimUpperString(r.Side)),
-			Type:        orderType,
-			Quantity:    r.Size,
-			Price:       r.Price,
-			TimeInForce: timeInForce,
+			Type:          orderType,
+			Quantity:      r.Size,
+			Price:         r.Price,
+			TimeInForce:   timeInForce,
 		},
 		Exchange:         types.ExchangeFTX,
 		IsWorking:        r.Status == "open",
@@ -125,24 +126,24 @@ func toGlobalDepositStatus(input string) (types.DepositStatus, error) {
 	return "", fmt.Errorf("unsupported status %s", input)
 }
 
-func toGlobalTrade(f fill) (types.Trade, error) {
+func toGlobalTrade(f ftxapi.Fill) (types.Trade, error) {
 	return types.Trade{
-		ID:            f.TradeId,
-		GID:           0,
+		ID:            f.Id,
 		OrderID:       f.OrderId,
 		Exchange:      types.ExchangeFTX,
 		Price:         f.Price,
 		Quantity:      f.Size,
 		QuoteQuantity: f.Price.Mul(f.Size),
 		Symbol:        toGlobalSymbol(f.Market),
-		Side:          f.Side,
-		IsBuyer:       f.Side == types.SideTypeBuy,
-		IsMaker:       f.Liquidity == "maker",
-		Time:          types.Time(f.Time.Time),
+		Side:          types.SideType(strings.ToUpper(string(f.Side))),
+		IsBuyer:       f.Side == ftxapi.SideBuy,
+		IsMaker:       f.Liquidity == ftxapi.LiquidityMaker,
+		Time:          types.Time(f.Time),
 		Fee:           f.Fee,
 		FeeCurrency:   f.FeeCurrency,
 		IsMargin:      false,
 		IsIsolated:    false,
+		IsFutures:     f.Future != "",
 	}, nil
 }
 
