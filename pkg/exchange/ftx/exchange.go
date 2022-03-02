@@ -127,7 +127,7 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 
 func (e *Exchange) _queryMarkets(ctx context.Context) (MarketMap, error) {
 	req := e.client.NewGetMarketsRequest()
-	ftxMarkets,err := req.Do(ctx)
+	ftxMarkets, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -380,7 +380,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		req.StartTime(since)
 		req.EndTime(until)
 		req.Order("asc")
-		fills ,err := req.Do(ctx)
+		fills, err := req.Do(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -556,26 +556,24 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 	return orders, nil
 }
 
-func sortByCreatedASC(orders []order) {
-	sort.Slice(orders, func(i, j int) bool {
-		return orders[i].CreatedAt.Before(orders[j].CreatedAt.Time)
-	})
-}
-
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) error {
 	for _, o := range orders {
-		rest := e.newRest()
 		if err := requestLimit.Wait(ctx); err != nil {
 			logrus.WithError(err).Error("rate limit error")
 		}
+
 		if len(o.ClientOrderID) > 0 {
-			if _, err := rest.CancelOrderByClientID(ctx, o.ClientOrderID); err != nil {
+			req := e.client.NewCancelOrderByClientOrderIdRequest(o.ClientOrderID)
+			_, err := req.Do(ctx)
+			if err != nil {
 				return err
 			}
-			continue
-		}
-		if _, err := rest.CancelOrderByOrderID(ctx, o.OrderID); err != nil {
-			return err
+		} else {
+			req := e.client.NewCancelOrderRequest(strconv.FormatUint(o.OrderID, 10))
+			_, err := req.Do(ctx)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
