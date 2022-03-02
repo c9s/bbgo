@@ -499,8 +499,15 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 	if err != nil {
 		return nil, err
 	}
-	_ = orderID
-	return nil, nil
+
+	req := e.client.NewGetOrderStatusRequest(uint64(orderID))
+	ftxOrder, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	order, err := toGlobalOrderNew(*ftxOrder)
+	return &order, err
 }
 
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {

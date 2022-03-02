@@ -106,21 +106,18 @@ func (c *RestClient) NewCancelAllOrderRequest() *CancelAllOrderRequest {
 	}
 }
 
-
 //go:generate requestgen -method DELETE -url "/api/orders/by_client_id/:clientOrderId" -type CancelOrderByClientOrderIdRequest -responseType .APIResponse
 type CancelOrderByClientOrderIdRequest struct {
-	client requestgen.AuthenticatedAPIClient
+	client        requestgen.AuthenticatedAPIClient
 	clientOrderId string `param:"clientOrderId,required,slug"`
 }
 
 func (c *RestClient) NewCancelOrderByClientOrderIdRequest(clientOrderId string) *CancelOrderByClientOrderIdRequest {
 	return &CancelOrderByClientOrderIdRequest{
-		client: c,
+		client:        c,
 		clientOrderId: clientOrderId,
 	}
 }
-
-
 
 type Fill struct {
 	Id            uint64           `json:"id"`
@@ -157,5 +154,18 @@ type GetFillsRequest struct {
 func (c *RestClient) NewGetFillsRequest() *GetFillsRequest {
 	return &GetFillsRequest{
 		client: c,
+	}
+}
+
+//go:generate GetRequest -url "/api/orders/:orderId" -type GetOrderStatusRequest -responseDataType .Order
+type GetOrderStatusRequest struct {
+	client  requestgen.AuthenticatedAPIClient
+	orderID uint64 `param:"orderId,slug"`
+}
+
+func (c *RestClient) NewGetOrderStatusRequest(orderID uint64) *GetOrderStatusRequest {
+	return &GetOrderStatusRequest{
+		client:  c,
+		orderID: orderID,
 	}
 }
