@@ -55,9 +55,7 @@ func (r *restRequest) Transfer(ctx context.Context, p TransferPayload) (transfer
 type restRequest struct {
 	*walletRequest
 	*orderRequest
-	*accountRequest
 	*marketRequest
-	*fillsRequest
 	*transferRequest
 
 	key, secret string
@@ -88,9 +86,7 @@ func newRestRequest(c *http.Client, baseURL *url.URL) *restRequest {
 		p:       make(map[string]interface{}),
 	}
 
-	r.fillsRequest = &fillsRequest{restRequest: r}
 	r.marketRequest = &marketRequest{restRequest: r}
-	r.accountRequest = &accountRequest{restRequest: r}
 	r.walletRequest = &walletRequest{restRequest: r}
 	r.orderRequest = &orderRequest{restRequest: r}
 	return r
