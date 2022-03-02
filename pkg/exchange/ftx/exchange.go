@@ -464,27 +464,34 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 			logrus.WithError(err).Error("type error")
 		}
 
-		or, err := e.newRest().PlaceOrder(ctx, PlaceOrderPayload{
-			Market:     toLocalSymbol(TrimUpperString(so.Symbol)),
-			Side:       TrimLowerString(string(so.Side)),
-			Price:      so.Price,
-			Type:       string(orderType),
-			Size:       so.Quantity,
-			ReduceOnly: false,
-			IOC:        so.TimeInForce == types.TimeInForceIOC,
-			PostOnly:   so.Type == types.OrderTypeLimitMaker,
-			ClientID:   newSpotClientOrderID(so.ClientOrderID),
-		})
+		req := e.client.NewPlaceOrderRequest()
+		req.Market(toLocalSymbol(TrimUpperString(so.Symbol)))
+		req.OrderType(orderType)
+		req.Side(ftxapi.Side(TrimLowerString(string(so.Side))))
+		req.Size(so.Quantity)
 
+		switch so.Type {
+		case types.OrderTypeLimit, types.OrderTypeLimitMaker:
+			req.Price(so.Price)
+
+		}
+
+		if so.Type == types.OrderTypeLimitMaker {
+			req.PostOnly(true)
+		}
+
+		if so.TimeInForce == types.TimeInForceIOC {
+			req.Ioc(true)
+		}
+
+		req.ClientID(newSpotClientOrderID(so.ClientOrderID))
+
+		or, err := req.Do(ctx)
 		if err != nil {
 			return createdOrders, fmt.Errorf("failed to place order %+v: %w", so, err)
 		}
 
-		if !or.Success {
-			return createdOrders, fmt.Errorf("ftx returns placing order failure")
-		}
-
-		globalOrder, err := toGlobalOrder(or.Result)
+		globalOrder, err := toGlobalOrderNew(*or)
 		if err != nil {
 			return createdOrders, fmt.Errorf("failed to convert response to global order")
 		}
