@@ -44,7 +44,7 @@ type Account struct {
 	Positions                    []Position       `json:"positions"`
 }
 
-//go:generate GetRequest -url "api/account" -type GetAccountRequest -responseDataType .Account
+//go:generate GetRequest -url "/api/account" -type GetAccountRequest -responseDataType .Account
 type GetAccountRequest struct {
 	client requestgen.AuthenticatedAPIClient
 }
@@ -55,7 +55,7 @@ func (c *RestClient) NewGetAccountRequest() *GetAccountRequest {
 	}
 }
 
-//go:generate GetRequest -url "api/positions" -type GetPositionsRequest -responseDataType []Position
+//go:generate GetRequest -url "/api/positions" -type GetPositionsRequest -responseDataType []Position
 type GetPositionsRequest struct {
 	client requestgen.AuthenticatedAPIClient
 }
@@ -76,7 +76,7 @@ type Balance struct {
 	AvailableWithoutBorrow fixedpoint.Value `json:"availableWithoutBorrow"`
 }
 
-//go:generate GetRequest -url "api/balances" -type GetBalancesRequest -responseDataType []Balance
+//go:generate GetRequest -url "/api/wallet/balances" -type GetBalancesRequest -responseDataType []Balance
 type GetBalancesRequest struct {
 	client requestgen.AuthenticatedAPIClient
 }

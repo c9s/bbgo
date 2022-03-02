@@ -100,32 +100,57 @@ func NewExchangeStandard(n types.ExchangeName, key, secret, passphrase, subAccou
 }
 ```
 
-## Testing order book stream
+## Test Market Data Stream
+
+### Test order book stream
 
 ```shell
 godotenv -f .env.local -- go run ./cmd/bbgo orderbook --config config/bbgo.yaml --session kucoin --symbol BTCUSDT
 ```
 
-## Testing user data stream
+## Test User Data Stream
 
 ```shell
 godotenv -f .env.local -- go run ./cmd/bbgo --config config/bbgo.yaml userdatastream --session kucoin
 ```
 
-### Testing order submit
+
+## Test Restful Endpoints
+
+You can choose the session name to set-up for testing:
 
 ```shell
-godotenv -f .env.local -- go run ./cmd/bbgo submit-order --session=kucoin --symbol=BTCUSDT --side=buy --price=18000 --quantity=0.001
+export BBGO_SESSION=ftx
+export BBGO_SESSION=kucoin
+export BBGO_SESSION=binance
 ```
 
-### Testing open orders query
+### Test user account balance
 
 ```shell
-godotenv -f .env.local -- go run ./cmd/bbgo list-orders --session kucoin --symbol=BTCUSDT open
-godotenv -f .env.local -- go run ./cmd/bbgo list-orders --session kucoin --symbol=BTCUSDT closed
+godotenv -f .env.local -- go run ./cmd/bbgo balances --session $BBGO_SESSION
 ```
 
-### Testing order cancel
+### Test order submit
+
+```shell
+godotenv -f .env.local -- go run ./cmd/bbgo submit-order --session $BBGO_SESSION --symbol=BTCUSDT --side=buy --price=18000 --quantity=0.001
+```
+
+### Test open orders query
+
+```shell
+godotenv -f .env.local -- go run ./cmd/bbgo list-orders --session $BBGO_SESSION --symbol=BTCUSDT open
+godotenv -f .env.local -- go run ./cmd/bbgo list-orders --session $BBGO_SESSION --symbol=BTCUSDT closed
+```
+
+### Test order status
+
+```shell
+godotenv -f .env.local -- go run ./cmd/bbgo get-order --session $BBGO_SESSION --order-id ORDER_ID
+```
+
+### Test order cancel
 
 ```shell
 godotenv -f .env.local -- go run ./cmd/bbgo cancel-order --session kucoin --order-uuid 61c745c44592c200014abdcf
