@@ -170,18 +170,17 @@ func (e *Exchange) _queryMarkets(ctx context.Context) (MarketMap, error) {
 }
 
 func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
-	resp, err := e.newRest().Account(ctx)
+
+	req := e.client.NewGetAccountRequest()
+	ftxAccount, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if !resp.Success {
-		return nil, fmt.Errorf("ftx returns querying balances failure")
-	}
 
 	a := &types.Account{
-		MakerCommission:   resp.Result.MakerFee,
-		TakerCommission:   resp.Result.TakerFee,
-		TotalAccountValue: resp.Result.TotalAccountValue,
+		MakerCommission:   ftxAccount.MakerFee,
+		TakerCommission:   ftxAccount.TakerFee,
+		TotalAccountValue: ftxAccount.TotalAccountValue,
 	}
 
 	balances, err := e.QueryAccountBalances(ctx)
@@ -194,15 +193,14 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 }
 
 func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
-	resp, err := e.newRest().Balances(ctx)
+	balanceReq := e.client.NewGetBalancesRequest()
+	ftxBalances, err := balanceReq.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if !resp.Success {
-		return nil, fmt.Errorf("ftx returns querying balances failure")
-	}
+
 	var balances = make(types.BalanceMap)
-	for _, r := range resp.Result {
+	for _, r := range ftxBalances {
 		balances[toGlobalCurrency(r.Coin)] = types.Balance{
 			Currency:  toGlobalCurrency(r.Coin),
 			Available: r.Free,
