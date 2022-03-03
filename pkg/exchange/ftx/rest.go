@@ -54,7 +54,6 @@ func (r *restRequest) Transfer(ctx context.Context, p TransferPayload) (transfer
 
 type restRequest struct {
 	*walletRequest
-	*orderRequest
 	*marketRequest
 	*transferRequest
 
