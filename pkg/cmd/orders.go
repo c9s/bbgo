@@ -79,21 +79,11 @@ var listOrdersCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 
-		configFile, err := cmd.Flags().GetString("config")
-		if err != nil {
-			return err
-		}
-
-		if len(configFile) == 0 {
-			return fmt.Errorf("--config option is required")
-		}
-
 		if userConfig == nil {
 			return errors.New("config file is required")
 		}
 
 		environ := bbgo.NewEnvironment()
-
 		if err := environ.ConfigureExchangeSessions(userConfig); err != nil {
 			return err
 		}
@@ -302,7 +292,7 @@ var executeOrderCmd = &cobra.Command{
 // go run ./cmd/bbgo submit-order --session=ftx --symbol=BTCUSDT --side=buy --price=18000 --quantity=0.001
 var submitOrderCmd = &cobra.Command{
 	Use:          "submit-order --session SESSION --symbol SYMBOL --side SIDE --quantity QUANTITY [--price PRICE]",
-	Short:        "place limit order to the exchange",
+	Short:        "place order to the exchange",
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
@@ -326,17 +316,17 @@ var submitOrderCmd = &cobra.Command{
 
 		side, err := cmd.Flags().GetString("side")
 		if err != nil {
-			return fmt.Errorf("can't get side: %w", err)
+			return fmt.Errorf("can not get side: %w", err)
 		}
 
 		price, err := cmd.Flags().GetString("price")
 		if err != nil {
-			return fmt.Errorf("can't get price: %w", err)
+			return fmt.Errorf("can not get price: %w", err)
 		}
 
 		quantity, err := cmd.Flags().GetString("quantity")
 		if err != nil {
-			return fmt.Errorf("can't get quantity: %w", err)
+			return fmt.Errorf("can not get quantity: %w", err)
 		}
 
 		environ := bbgo.NewEnvironment()
@@ -381,16 +371,25 @@ var submitOrderCmd = &cobra.Command{
 func init() {
 	listOrdersCmd.Flags().String("session", "", "the exchange session name for sync")
 	listOrdersCmd.Flags().String("symbol", "", "the trading pair, like btcusdt")
+	if err := listOrdersCmd.MarkFlagRequired("config") ; err != nil {
+		log.WithError(err).Errorf("can not mark --config option required")
+	}
 
 	getOrderCmd.Flags().String("session", "", "the exchange session name for sync")
 	getOrderCmd.Flags().String("symbol", "", "the trading pair, like btcusdt")
 	getOrderCmd.Flags().String("order-id", "", "order id")
+	if err := getOrderCmd.MarkFlagRequired("config") ; err != nil {
+		log.WithError(err).Errorf("can not mark --config option required")
+	}
 
 	submitOrderCmd.Flags().String("session", "", "the exchange session name for sync")
 	submitOrderCmd.Flags().String("symbol", "", "the trading pair, like btcusdt")
 	submitOrderCmd.Flags().String("side", "", "the trading side: buy or sell")
 	submitOrderCmd.Flags().String("price", "", "the trading price")
 	submitOrderCmd.Flags().String("quantity", "", "the trading quantity")
+	if err := submitOrderCmd.MarkFlagRequired("config") ; err != nil {
+		log.WithError(err).Errorf("can not mark --config option required")
+	}
 
 	executeOrderCmd.Flags().String("session", "", "the exchange session name for sync")
 	executeOrderCmd.Flags().String("symbol", "", "the trading pair, like btcusdt")
@@ -401,6 +400,9 @@ func init() {
 	executeOrderCmd.Flags().Duration("update-interval", time.Second*10, "order update time")
 	executeOrderCmd.Flags().Duration("deadline", 0, "deadline of the order execution")
 	executeOrderCmd.Flags().Int("price-ticks", 0, "the number of price tick for the jump spread, default to 0")
+	if err := executeOrderCmd.MarkFlagRequired("config") ; err != nil {
+		log.WithError(err).Errorf("can not mark --config option required")
+	}
 
 	RootCmd.AddCommand(listOrdersCmd)
 	RootCmd.AddCommand(getOrderCmd)
