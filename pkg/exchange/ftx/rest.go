@@ -88,7 +88,6 @@ func newRestRequest(c *http.Client, baseURL *url.URL) *restRequest {
 
 	r.marketRequest = &marketRequest{restRequest: r}
 	r.walletRequest = &walletRequest{restRequest: r}
-	r.orderRequest = &orderRequest{restRequest: r}
 	return r
 }
 
