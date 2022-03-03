@@ -118,36 +118,3 @@ func (r *orderRequest) OpenOrders(ctx context.Context, market string) (ordersRes
 	return o, nil
 }
 
-func (r *orderRequest) OrdersHistory(ctx context.Context, market string, start, end time.Time, limit int64) (ordersHistoryResponse, error) {
-	q := make(map[string]string)
-
-	if limit > 0 {
-		q["limit"] = strconv.FormatInt(limit, 10)
-	}
-	if len(market) > 0 {
-		q["market"] = market
-	}
-	if start != (time.Time{}) {
-		q["start_time"] = strconv.FormatInt(start.Unix(), 10)
-	}
-	if end != (time.Time{}) {
-		q["end_time"] = strconv.FormatInt(end.Unix(), 10)
-	}
-
-	resp, err := r.
-		Method("GET").
-		ReferenceURL("api/orders/history").
-		Query(q).
-		DoAuthenticatedRequest(ctx)
-
-	if err != nil {
-		return ordersHistoryResponse{}, err
-	}
-
-	var o ordersHistoryResponse
-	if err := json.Unmarshal(resp.Body, &o); err != nil {
-		return ordersHistoryResponse{}, fmt.Errorf("failed to unmarshal orders history response body to json: %w", err)
-	}
-
-	return o, nil
-}
