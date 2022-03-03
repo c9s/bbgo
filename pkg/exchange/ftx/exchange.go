@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/exchange/ftx/ftxapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -31,6 +33,8 @@ var requestLimit = rate.NewLimiter(rate.Every(220*time.Millisecond), 2)
 //go:generate go run generate_symbol_map.go
 
 type Exchange struct {
+	client *ftxapi.RestClient
+
 	key, secret  string
 	subAccount   string
 	restEndpoint *url.URL
@@ -78,7 +82,10 @@ func NewExchange(key, secret string, subAccount string) *Exchange {
 		panic(err)
 	}
 
+	client := ftxapi.NewClient()
+	client.Auth(key, secret, subAccount)
 	return &Exchange{
+		client:       client,
 		restEndpoint: u,
 		key:          key,
 		secret:       secret,
@@ -119,16 +126,14 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 }
 
 func (e *Exchange) _queryMarkets(ctx context.Context) (MarketMap, error) {
-	resp, err := e.newRest().Markets(ctx)
+	req := e.client.NewGetMarketsRequest()
+	ftxMarkets, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if !resp.Success {
-		return nil, fmt.Errorf("ftx returns querying markets failure")
-	}
 
 	markets := MarketMap{}
-	for _, m := range resp.Result {
+	for _, m := range ftxMarkets {
 		symbol := toGlobalSymbol(m.Name)
 		symbolMap[symbol] = m.Name
 
@@ -164,41 +169,40 @@ func (e *Exchange) _queryMarkets(ctx context.Context) (MarketMap, error) {
 }
 
 func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
-	resp, err := e.newRest().Account(ctx)
+
+	req := e.client.NewGetAccountRequest()
+	ftxAccount, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if !resp.Success {
-		return nil, fmt.Errorf("ftx returns querying balances failure")
-	}
 
 	a := &types.Account{
-		MakerCommission:   resp.Result.MakerFee,
-		TakerCommission:   resp.Result.TakerFee,
-		TotalAccountValue: resp.Result.TotalAccountValue,
+		MakerCommission:   ftxAccount.MakerFee,
+		TakerCommission:   ftxAccount.TakerFee,
+		TotalAccountValue: ftxAccount.TotalAccountValue,
 	}
 
 	balances, err := e.QueryAccountBalances(ctx)
 	if err != nil {
 		return nil, err
 	}
-	a.UpdateBalances(balances)
 
+	a.UpdateBalances(balances)
 	return a, nil
 }
 
 func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
-	resp, err := e.newRest().Balances(ctx)
+	balanceReq := e.client.NewGetBalancesRequest()
+	ftxBalances, err := balanceReq.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if !resp.Success {
-		return nil, fmt.Errorf("ftx returns querying balances failure")
-	}
+
 	var balances = make(types.BalanceMap)
-	for _, r := range resp.Result {
-		balances[toGlobalCurrency(r.Coin)] = types.Balance{
-			Currency:  toGlobalCurrency(r.Coin),
+	for _, r := range ftxBalances {
+		currency := toGlobalCurrency(r.Coin)
+		balances[currency] = types.Balance{
+			Currency:  currency,
 			Available: r.Free,
 			Locked:    r.Total.Sub(r.Free),
 		}
@@ -340,74 +344,55 @@ func isIntervalSupportedInKLine(interval types.Interval) bool {
 }
 
 func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) ([]types.Trade, error) {
-	var since, until time.Time
-	if options.StartTime != nil {
-		since = *options.StartTime
-	}
-	if options.EndTime != nil {
-		until = *options.EndTime
-	} else {
-		until = time.Now()
-	}
-
-	if since.After(until) {
-		return nil, fmt.Errorf("invalid query trades time range, since: %+v, until: %+v", since, until)
-	}
-
-	if options.Limit == 1 {
-		// FTX doesn't provide pagination api, so we have to split the since/until time range into small slices, and paginate ourselves.
-		// If the limit is 1, we always get the same data from FTX.
-		return nil, fmt.Errorf("limit can't be 1 which can't be used in pagination")
-	}
-	limit := options.Limit
-	if limit == 0 {
-		limit = 200
-	}
-
 	tradeIDs := make(map[uint64]struct{})
-
 	lastTradeID := options.LastTradeID
+
+	req := e.client.NewGetFillsRequest()
+	req.Market(toLocalSymbol(symbol))
+
+	if options.StartTime != nil {
+		req.StartTime(*options.StartTime)
+	} else if options.EndTime != nil {
+		req.EndTime(*options.EndTime)
+	}
+
+	req.Order("asc")
+	fills, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	sort.Slice(fills, func(i, j int) bool {
+		return fills[i].Time.Before(fills[j].Time)
+	})
+
 	var trades []types.Trade
 	symbol = strings.ToUpper(symbol)
+	for _, fill := range fills {
+		if _, ok := tradeIDs[fill.TradeId]; ok {
+			continue
+		}
 
-	for since.Before(until) {
-		// DO not set limit to `1` since you will always get the same response.
-		resp, err := e.newRest().Fills(ctx, toLocalSymbol(symbol), since, until, limit, true)
+		if options.StartTime != nil && fill.Time.Before(*options.StartTime) {
+			continue
+		}
+
+		if options.EndTime != nil && fill.Time.After(*options.EndTime) {
+			continue
+		}
+
+		if fill.TradeId <= lastTradeID {
+			continue
+		}
+
+		tradeIDs[fill.TradeId] = struct{}{}
+		lastTradeID = fill.TradeId
+
+		t, err := toGlobalTrade(fill)
 		if err != nil {
 			return nil, err
 		}
-		if !resp.Success {
-			return nil, fmt.Errorf("ftx returns failure")
-		}
-
-		sort.Slice(resp.Result, func(i, j int) bool {
-			return resp.Result[i].TradeId < resp.Result[j].TradeId
-		})
-
-		for _, r := range resp.Result {
-			// always update since to avoid infinite loop
-			since = r.Time.Time
-
-			if _, ok := tradeIDs[r.TradeId]; ok {
-				continue
-			}
-
-			if r.TradeId <= lastTradeID || r.Time.Before(since) || r.Time.After(until) || r.Market != toLocalSymbol(symbol) {
-				continue
-			}
-			tradeIDs[r.TradeId] = struct{}{}
-			lastTradeID = r.TradeId
-
-			t, err := toGlobalTrade(r)
-			if err != nil {
-				return nil, err
-			}
-			trades = append(trades, t)
-		}
-
-		if int64(len(resp.Result)) < limit {
-			return trades, nil
-		}
+		trades = append(trades, t)
 	}
 
 	return trades, nil
@@ -458,27 +443,34 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 			logrus.WithError(err).Error("type error")
 		}
 
-		or, err := e.newRest().PlaceOrder(ctx, PlaceOrderPayload{
-			Market:     toLocalSymbol(TrimUpperString(so.Symbol)),
-			Side:       TrimLowerString(string(so.Side)),
-			Price:      so.Price,
-			Type:       string(orderType),
-			Size:       so.Quantity,
-			ReduceOnly: false,
-			IOC:        so.TimeInForce == types.TimeInForceIOC,
-			PostOnly:   so.Type == types.OrderTypeLimitMaker,
-			ClientID:   newSpotClientOrderID(so.ClientOrderID),
-		})
+		req := e.client.NewPlaceOrderRequest()
+		req.Market(toLocalSymbol(TrimUpperString(so.Symbol)))
+		req.OrderType(orderType)
+		req.Side(ftxapi.Side(TrimLowerString(string(so.Side))))
+		req.Size(so.Quantity)
 
+		switch so.Type {
+		case types.OrderTypeLimit, types.OrderTypeLimitMaker:
+			req.Price(so.Price)
+
+		}
+
+		if so.Type == types.OrderTypeLimitMaker {
+			req.PostOnly(true)
+		}
+
+		if so.TimeInForce == types.TimeInForceIOC {
+			req.Ioc(true)
+		}
+
+		req.ClientID(newSpotClientOrderID(so.ClientOrderID))
+
+		or, err := req.Do(ctx)
 		if err != nil {
 			return createdOrders, fmt.Errorf("failed to place order %+v: %w", so, err)
 		}
 
-		if !or.Success {
-			return createdOrders, fmt.Errorf("ftx returns placing order failure")
-		}
-
-		globalOrder, err := toGlobalOrder(or.Result)
+		globalOrder, err := toGlobalOrderNew(*or)
 		if err != nil {
 			return createdOrders, fmt.Errorf("failed to convert response to global order")
 		}
@@ -488,20 +480,37 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 	return createdOrders, nil
 }
 
-func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
-	// TODO: invoke open trigger orders
-	resp, err := e.newRest().OpenOrders(ctx, toLocalSymbol(symbol))
+func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.Order, error) {
+	orderID, err := strconv.ParseInt(q.OrderID, 10, 64)
 	if err != nil {
 		return nil, err
 	}
-	if !resp.Success {
-		return nil, fmt.Errorf("ftx returns querying open orders failure")
+
+	req := e.client.NewGetOrderStatusRequest(uint64(orderID))
+	ftxOrder, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
 	}
-	for _, r := range resp.Result {
-		o, err := toGlobalOrder(r)
+
+	order, err := toGlobalOrderNew(*ftxOrder)
+	return &order, err
+}
+
+func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
+	// TODO: invoke open trigger orders
+
+	req := e.client.NewGetOpenOrdersRequest(toLocalSymbol(symbol))
+	ftxOrders, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, ftxOrder := range ftxOrders {
+		o, err := toGlobalOrderNew(ftxOrder)
 		if err != nil {
-			return nil, err
+			return orders, err
 		}
+
 		orders = append(orders, o)
 	}
 	return orders, nil
@@ -510,73 +519,59 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 // symbol, since and until are all optional. FTX can only query by order created time, not updated time.
 // FTX doesn't support lastOrderID, so we will query by the time range first, and filter by the lastOrderID.
 func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []types.Order, err error) {
-	if until == (time.Time{}) {
-		until = time.Now()
-	}
-	if since.After(until) {
-		return nil, fmt.Errorf("invalid query closed orders time range, since: %+v, until: %+v", since, until)
-	}
-
 	symbol = TrimUpperString(symbol)
-	limit := int64(100)
-	hasMoreData := true
-	s := since
-	var lastOrder order
-	for hasMoreData {
 
-		if err := requestLimit.Wait(ctx); err != nil {
-			logrus.WithError(err).Error("rate limit error")
+	req := e.client.NewGetOrderHistoryRequest(toLocalSymbol(symbol))
+
+	if since != (time.Time{}) {
+		req.StartTime(since)
+	} else if until != (time.Time{}) {
+		req.EndTime(until)
+	}
+
+	ftxOrders, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	sort.Slice(ftxOrders, func(i, j int) bool {
+		return ftxOrders[i].CreatedAt.Before(ftxOrders[j].CreatedAt)
+	})
+
+	for _, ftxOrder := range ftxOrders {
+		switch ftxOrder.Status {
+		case ftxapi.OrderStatusOpen, ftxapi.OrderStatusNew:
+			continue
 		}
 
-		resp, err := e.newRest().OrdersHistory(ctx, toLocalSymbol(symbol), s, until, limit)
+		o, err := toGlobalOrderNew(ftxOrder)
 		if err != nil {
-			return nil, err
-		}
-		if !resp.Success {
-			return nil, fmt.Errorf("ftx returns querying orders history failure")
+			return orders, err
 		}
 
-		sortByCreatedASC(resp.Result)
-
-		for _, r := range resp.Result {
-			// There may be more than one orders at the same time, so also have to check the ID
-			if r.CreatedAt.Before(lastOrder.CreatedAt.Time) || r.ID == lastOrder.ID || r.Status != "closed" || r.ID < int64(lastOrderID) {
-				continue
-			}
-			lastOrder = r
-			o, err := toGlobalOrder(r)
-			if err != nil {
-				return nil, err
-			}
-			orders = append(orders, o)
-		}
-		hasMoreData = resp.HasMoreData
-		// the start_time and end_time precision is second. There might be more than one orders within one second.
-		s = lastOrder.CreatedAt.Add(-1 * time.Second)
+		orders = append(orders, o)
 	}
 	return orders, nil
 }
 
-func sortByCreatedASC(orders []order) {
-	sort.Slice(orders, func(i, j int) bool {
-		return orders[i].CreatedAt.Before(orders[j].CreatedAt.Time)
-	})
-}
-
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) error {
 	for _, o := range orders {
-		rest := e.newRest()
 		if err := requestLimit.Wait(ctx); err != nil {
 			logrus.WithError(err).Error("rate limit error")
 		}
+
 		if len(o.ClientOrderID) > 0 {
-			if _, err := rest.CancelOrderByClientID(ctx, o.ClientOrderID); err != nil {
+			req := e.client.NewCancelOrderByClientOrderIdRequest(o.ClientOrderID)
+			_, err := req.Do(ctx)
+			if err != nil {
 				return err
 			}
-			continue
-		}
-		if _, err := rest.CancelOrderByOrderID(ctx, o.OrderID); err != nil {
-			return err
+		} else {
+			req := e.client.NewCancelOrderRequest(strconv.FormatUint(o.OrderID, 10))
+			_, err := req.Do(ctx)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil

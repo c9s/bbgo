@@ -7,6 +7,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/exchange/ftx/ftxapi"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -36,6 +37,67 @@ func TrimLowerString(original string) string {
 
 var errUnsupportedOrderStatus = fmt.Errorf("unsupported order status")
 
+func toGlobalOrderNew(r ftxapi.Order) (types.Order, error) {
+	// In exchange/max/convert.go, it only parses these fields.
+	timeInForce := types.TimeInForceGTC
+	if r.Ioc {
+		timeInForce = types.TimeInForceIOC
+	}
+
+	// order type definition: https://github.com/ftexchange/ftx/blob/master/rest/client.py#L122
+	orderType := types.OrderType(TrimUpperString(string(r.Type)))
+	if orderType == types.OrderTypeLimit && r.PostOnly {
+		orderType = types.OrderTypeLimitMaker
+	}
+
+	o := types.Order{
+		SubmitOrder: types.SubmitOrder{
+			ClientOrderID: r.ClientId,
+			Symbol:        toGlobalSymbol(r.Market),
+			Side:          types.SideType(TrimUpperString(string(r.Side))),
+			Type:          orderType,
+			Quantity:      r.Size,
+			Price:         r.Price,
+			TimeInForce:   timeInForce,
+		},
+		Exchange:         types.ExchangeFTX,
+		IsWorking:        r.Status == ftxapi.OrderStatusOpen || r.Status == ftxapi.OrderStatusNew,
+		OrderID:          uint64(r.Id),
+		Status:           "",
+		ExecutedQuantity: r.FilledSize,
+		CreationTime:     types.Time(r.CreatedAt),
+		UpdateTime:       types.Time(r.CreatedAt),
+	}
+
+	s, err := toGlobalOrderStatus(r, r.Status)
+	o.Status = s
+	return o, err
+}
+
+func toGlobalOrderStatus(o ftxapi.Order, s ftxapi.OrderStatus) (types.OrderStatus, error) {
+	switch s {
+	case ftxapi.OrderStatusNew:
+		return types.OrderStatusNew, nil
+
+	case ftxapi.OrderStatusOpen:
+		if !o.FilledSize.IsZero() {
+			return types.OrderStatusPartiallyFilled, nil
+		} else {
+			return types.OrderStatusNew, nil
+		}
+	case ftxapi.OrderStatusClosed:
+		// filled or canceled
+		if o.FilledSize == o.Size {
+			return types.OrderStatusFilled, nil
+		} else {
+			// can't distinguish it's canceled or rejected from order response, so always set to canceled
+			return types.OrderStatusCanceled, nil
+		}
+	}
+
+	return "", fmt.Errorf("unsupported ftx order status %s: %w", s, errUnsupportedOrderStatus)
+}
+
 func toGlobalOrder(r order) (types.Order, error) {
 	// In exchange/max/convert.go, it only parses these fields.
 	timeInForce := types.TimeInForceGTC
@@ -54,10 +116,10 @@ func toGlobalOrder(r order) (types.Order, error) {
 			ClientOrderID: r.ClientId,
 			Symbol:        toGlobalSymbol(r.Market),
 			Side:          types.SideType(TrimUpperString(r.Side)),
-			Type:        orderType,
-			Quantity:    r.Size,
-			Price:       r.Price,
-			TimeInForce: timeInForce,
+			Type:          orderType,
+			Quantity:      r.Size,
+			Price:         r.Price,
+			TimeInForce:   timeInForce,
 		},
 		Exchange:         types.ExchangeFTX,
 		IsWorking:        r.Status == "open",
@@ -125,24 +187,24 @@ func toGlobalDepositStatus(input string) (types.DepositStatus, error) {
 	return "", fmt.Errorf("unsupported status %s", input)
 }
 
-func toGlobalTrade(f fill) (types.Trade, error) {
+func toGlobalTrade(f ftxapi.Fill) (types.Trade, error) {
 	return types.Trade{
 		ID:            f.TradeId,
-		GID:           0,
 		OrderID:       f.OrderId,
 		Exchange:      types.ExchangeFTX,
 		Price:         f.Price,
 		Quantity:      f.Size,
 		QuoteQuantity: f.Price.Mul(f.Size),
 		Symbol:        toGlobalSymbol(f.Market),
-		Side:          f.Side,
-		IsBuyer:       f.Side == types.SideTypeBuy,
-		IsMaker:       f.Liquidity == "maker",
-		Time:          types.Time(f.Time.Time),
+		Side:          types.SideType(strings.ToUpper(string(f.Side))),
+		IsBuyer:       f.Side == ftxapi.SideBuy,
+		IsMaker:       f.Liquidity == ftxapi.LiquidityMaker,
+		Time:          types.Time(f.Time),
 		Fee:           f.Fee,
 		FeeCurrency:   f.FeeCurrency,
 		IsMargin:      false,
 		IsIsolated:    false,
+		IsFutures:     f.Future != "",
 	}, nil
 }
 
@@ -169,17 +231,17 @@ const (
 	OrderTypeMarket OrderType = "market"
 )
 
-func toLocalOrderType(orderType types.OrderType) (OrderType, error) {
+func toLocalOrderType(orderType types.OrderType) (ftxapi.OrderType, error) {
 	switch orderType {
 
 	case types.OrderTypeLimitMaker:
-		return OrderTypeLimit, nil
+		return ftxapi.OrderTypeLimit, nil
 
 	case types.OrderTypeLimit:
-		return OrderTypeLimit, nil
+		return ftxapi.OrderTypeLimit, nil
 
 	case types.OrderTypeMarket:
-		return OrderTypeMarket, nil
+		return ftxapi.OrderTypeMarket, nil
 
 	}
 

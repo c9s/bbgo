@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/c9s/bbgo/pkg/exchange/ftx/ftxapi"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -104,18 +105,18 @@ func Test_toGlobalSymbol(t *testing.T) {
 func Test_toLocalOrderTypeWithLimitMaker(t *testing.T) {
 	orderType, err := toLocalOrderType(types.OrderTypeLimitMaker)
 	assert.NoError(t, err)
-	assert.Equal(t, orderType, OrderTypeLimit)
+	assert.Equal(t, ftxapi.OrderTypeLimit, orderType)
 }
 
 func Test_toLocalOrderTypeWithLimit(t *testing.T) {
 	orderType, err := toLocalOrderType(types.OrderTypeLimit)
 	assert.NoError(t, err)
-	assert.Equal(t, orderType, OrderTypeLimit)
+	assert.Equal(t, ftxapi.OrderTypeLimit, orderType)
 }
 
 func Test_toLocalOrderTypeWithMarket(t *testing.T) {
 	orderType, err := toLocalOrderType(types.OrderTypeMarket)
 	assert.NoError(t, err)
-	assert.Equal(t, orderType, OrderTypeMarket)
+	assert.Equal(t, ftxapi.OrderTypeMarket, orderType)
 }
 
