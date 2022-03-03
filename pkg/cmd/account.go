@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -28,15 +27,6 @@ var accountCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 
-		configFile, err := cmd.Flags().GetString("config")
-		if err != nil {
-			return err
-		}
-
-		if len(configFile) == 0 {
-			return errors.New("--config option is required")
-		}
-
 		showTotal, err := cmd.Flags().GetBool("total")
 		if err != nil {
 			return err
@@ -47,20 +37,10 @@ var accountCmd = &cobra.Command{
 			return err
 		}
 
-		var userConfig *bbgo.Config
-		if _, err := os.Stat(configFile); err == nil {
-			// load successfully
-			userConfig, err = bbgo.Load(configFile, false)
-			if err != nil {
-				return err
-			}
-		} else if os.IsNotExist(err) {
-			// config file doesn't exist
-			userConfig = &bbgo.Config{}
-		} else {
-			// other error
-			return err
+		if userConfig == nil {
+			return errors.New("config is not loaded")
 		}
+
 
 		environ := bbgo.NewEnvironment()
 		if err := environ.ConfigureDatabase(ctx); err != nil {
