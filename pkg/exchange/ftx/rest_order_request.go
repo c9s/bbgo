@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
@@ -65,4 +64,3 @@ func (r *orderRequest) PlaceOrder(ctx context.Context, p PlaceOrderPayload) (ord
 
 	return o, nil
 }
-
