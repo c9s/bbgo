@@ -560,18 +560,22 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 			logrus.WithError(err).Error("rate limit error")
 		}
 
+		var resp *ftxapi.APIResponse
+		var err error
 		if len(o.ClientOrderID) > 0 {
 			req := e.client.NewCancelOrderByClientOrderIdRequest(o.ClientOrderID)
-			_, err := req.Do(ctx)
-			if err != nil {
-				return err
-			}
+			resp, err = req.Do(ctx)
 		} else {
 			req := e.client.NewCancelOrderRequest(strconv.FormatUint(o.OrderID, 10))
-			_, err := req.Do(ctx)
-			if err != nil {
-				return err
-			}
+			resp, err = req.Do(ctx)
+		}
+
+		if err != nil {
+			return err
+		}
+
+		if !resp.Success {
+			return fmt.Errorf("cancel order failed: %s", resp.Result)
 		}
 	}
 	return nil

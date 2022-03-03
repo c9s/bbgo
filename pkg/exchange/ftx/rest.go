@@ -54,7 +54,6 @@ func (r *restRequest) Transfer(ctx context.Context, p TransferPayload) (transfer
 
 type restRequest struct {
 	*walletRequest
-	*orderRequest
 	*marketRequest
 	*transferRequest
 
@@ -88,7 +87,6 @@ func newRestRequest(c *http.Client, baseURL *url.URL) *restRequest {
 
 	r.marketRequest = &marketRequest{restRequest: r}
 	r.walletRequest = &walletRequest{restRequest: r}
-	r.orderRequest = &orderRequest{restRequest: r}
 	return r
 }
 
