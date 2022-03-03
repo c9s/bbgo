@@ -23,12 +23,13 @@ var getOrderCmd = &cobra.Command{
 	Use:          "get-order --session SESSION --order-id ORDER_ID",
 	Short:        "Get order status",
 	SilenceUsage: true,
+	PreRunE: cobraInitRequired([]string{
+		"config",
+		"order-id",
+		"symbol",
+	}),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-
-		if userConfig == nil {
-			return errors.New("config file is required")
-		}
 
 		environ := bbgo.NewEnvironment()
 		if err := environ.ConfigureExchangeSessions(userConfig); err != nil {
@@ -76,12 +77,13 @@ var listOrdersCmd = &cobra.Command{
 	// default is open which means we query open orders if you haven't provided args.
 	ValidArgs:    []string{"", "open", "closed"},
 	SilenceUsage: true,
+	PreRunE: cobraInitRequired([]string{
+		"config",
+		"session",
+		"symbol",
+	}),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-
-		if userConfig == nil {
-			return errors.New("config file is required")
-		}
 
 		environ := bbgo.NewEnvironment()
 		if err := environ.ConfigureExchangeSessions(userConfig); err != nil {
@@ -146,12 +148,15 @@ var executeOrderCmd = &cobra.Command{
 	Use:          "execute-order --session SESSION --symbol SYMBOL --side SIDE --target-quantity TOTAL_QUANTITY --slice-quantity SLICE_QUANTITY",
 	Short:        "execute buy/sell on the balance/position you have on specific symbol",
 	SilenceUsage: true,
+	PreRunE: cobraInitRequired([]string{
+		"config",
+		"symbol",
+		"side",
+		"target-quantity",
+		"slice-quantity",
+	}),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-
-		if userConfig == nil {
-			return errors.New("config file is required")
-		}
 
 		sessionName, err := cmd.Flags().GetString("session")
 		if err != nil {
@@ -294,12 +299,16 @@ var submitOrderCmd = &cobra.Command{
 	Use:          "submit-order --session SESSION --symbol SYMBOL --side SIDE --quantity QUANTITY [--price PRICE]",
 	Short:        "place order to the exchange",
 	SilenceUsage: true,
+	PreRunE: cobraInitRequired([]string{
+		"config",
+		"session",
+		"symbol",
+		"side",
+		"price",
+		"quantity",
+	}),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-
-		if userConfig == nil {
-			return errors.New("config file is required")
-		}
 
 		sessionName, err := cmd.Flags().GetString("session")
 		if err != nil {

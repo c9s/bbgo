@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
@@ -35,7 +34,7 @@ var cancelOrderCmd = &cobra.Command{
 
 	// SilenceUsage is an option to silence usage when an error occurs.
 	SilenceUsage: true,
-
+	PreRunE:      cobraInitRequired([]string{"config"}),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -68,10 +67,6 @@ var cancelOrderCmd = &cobra.Command{
 		sessionName, err := cmd.Flags().GetString("session")
 		if err != nil {
 			return err
-		}
-
-		if userConfig == nil {
-			return errors.New("config file is required")
 		}
 
 		environ := bbgo.NewEnvironment()
