@@ -131,7 +131,11 @@ pkg/version/dev.go: .FORCE
 dev-version: pkg/version/dev.go
 	git commit $< -m "update dev build version"
 
-version: pkg/version/version.go pkg/version/dev.go migrations
+cmd-doc: .FORCE
+	go run ./cmd/update-doc
+	git add -v doc/commands
+
+version: pkg/version/version.go pkg/version/dev.go migrations cmd-doc
 	git commit $< $(word 2,$^) -m "bump version to $(VERSION)" || true
 	[[ -e doc/release/$(VERSION).md ]] || (echo "file doc/release/$(VERSION).md does not exist" ; exit 1)
 	git add -v doc/release/$(VERSION).md && git commit doc/release/$(VERSION).md -m "add $(VERSION) release note" || true

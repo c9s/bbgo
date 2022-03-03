@@ -1,17 +1,18 @@
-## bbgo deposits
+## bbgo get-order
 
-A testing utility that will query deposition history in last 7 days
+Get order status
 
 ```
-bbgo deposits [flags]
+bbgo get-order --session SESSION --order-id ORDER_ID [flags]
 ```
 
 ### Options
 
 ```
-      --asset string     the trading pair, like btcusdt
-  -h, --help             help for deposits
-      --session string   the exchange session name for querying balances
+  -h, --help              help for get-order
+      --order-id string   order id
+      --session string    the exchange session name for sync
+      --symbol string     the trading pair, like btcusdt
 ```
 
 ### Options inherited from parent commands

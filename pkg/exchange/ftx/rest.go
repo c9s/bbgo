@@ -55,9 +55,7 @@ func (r *restRequest) Transfer(ctx context.Context, p TransferPayload) (transfer
 type restRequest struct {
 	*walletRequest
 	*orderRequest
-	*accountRequest
 	*marketRequest
-	*fillsRequest
 	*transferRequest
 
 	key, secret string
@@ -88,9 +86,7 @@ func newRestRequest(c *http.Client, baseURL *url.URL) *restRequest {
 		p:       make(map[string]interface{}),
 	}
 
-	r.fillsRequest = &fillsRequest{restRequest: r}
 	r.marketRequest = &marketRequest{restRequest: r}
-	r.accountRequest = &accountRequest{restRequest: r}
 	r.walletRequest = &walletRequest{restRequest: r}
 	r.orderRequest = &orderRequest{restRequest: r}
 	return r
@@ -241,12 +237,12 @@ func (r *restRequest) sendRequest(req *http.Request) (*util.Response, error) {
 type ErrorResponse struct {
 	*util.Response
 
-	IsSuccess   bool   `json:"Success"`
+	IsSuccess   bool   `json:"success"`
 	ErrorString string `json:"error,omitempty"`
 }
 
 func (r *ErrorResponse) Error() string {
-	return fmt.Sprintf("%s %s %d, Success: %t, err: %s",
+	return fmt.Sprintf("%s %s %d, success: %t, err: %s",
 		r.Response.Request.Method,
 		r.Response.Request.URL.String(),
 		r.Response.StatusCode,

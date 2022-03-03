@@ -86,10 +86,11 @@ func TestExchange_QueryAccountBalances(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	ex := NewExchange("", "", "")
+	ex := NewExchange("test-key", "test-secret", "")
 	serverURL, err := url.Parse(ts.URL)
 	assert.NoError(t, err)
-	ex.restEndpoint = serverURL
+	ex.client.BaseURL = serverURL
+
 	resp, err := ex.QueryAccountBalances(context.Background())
 	assert.NoError(t, err)
 
@@ -99,10 +100,6 @@ func TestExchange_QueryAccountBalances(t *testing.T) {
 	expectedAvailable := fixedpoint.Must(fixedpoint.NewFromString("19.48085209"))
 	assert.Equal(t, expectedAvailable, b.Available)
 	assert.Equal(t, fixedpoint.Must(fixedpoint.NewFromString("1094.66405065")).Sub(expectedAvailable), b.Locked)
-
-	resp, err = ex.QueryAccountBalances(context.Background())
-	assert.EqualError(t, err, "ftx returns querying balances failure")
-	assert.Nil(t, resp)
 }
 
 func TestExchange_QueryOpenOrders(t *testing.T) {
@@ -136,10 +133,12 @@ func TestExchange_QueryOpenOrders(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	ex := NewExchange("", "", "")
+	ex := NewExchange("test-key", "test-secret", "")
+
 	serverURL, err := url.Parse(ts.URL)
 	assert.NoError(t, err)
-	ex.restEndpoint = serverURL
+	ex.client.BaseURL = serverURL
+
 	resp, err := ex.QueryOpenOrders(context.Background(), "XRP-PREP")
 	assert.NoError(t, err)
 	assert.Len(t, resp, 1)
@@ -155,10 +154,11 @@ func TestExchange_QueryClosedOrders(t *testing.T) {
 		}))
 		defer ts.Close()
 
-		ex := NewExchange("", "", "")
+		ex := NewExchange("test-key", "test-secret", "")
 		serverURL, err := url.Parse(ts.URL)
 		assert.NoError(t, err)
-		ex.restEndpoint = serverURL
+		ex.client.BaseURL = serverURL
+
 		resp, err := ex.QueryClosedOrders(context.Background(), "BTC-PERP", time.Now(), time.Now(), 100)
 		assert.NoError(t, err)
 
@@ -196,10 +196,11 @@ func TestExchange_QueryClosedOrders(t *testing.T) {
 		}))
 		defer ts.Close()
 
-		ex := NewExchange("", "", "")
+		ex := NewExchange("test-key", "test-secret", "")
 		serverURL, err := url.Parse(ts.URL)
 		assert.NoError(t, err)
-		ex.restEndpoint = serverURL
+		ex.client.BaseURL = serverURL
+
 		resp, err := ex.QueryClosedOrders(context.Background(), "BTC-PERP", time.Now(), time.Now(), 100)
 		assert.NoError(t, err)
 		assert.Len(t, resp, 1)
@@ -240,85 +241,16 @@ func TestExchange_QueryClosedOrders(t *testing.T) {
 		}))
 		defer ts.Close()
 
-		ex := NewExchange("", "", "")
+		ex := NewExchange("test-key", "test-secret", "")
 		serverURL, err := url.Parse(ts.URL)
 		assert.NoError(t, err)
-		ex.restEndpoint = serverURL
+		ex.client.BaseURL = serverURL
+
 		resp, err := ex.QueryClosedOrders(context.Background(), "BTC-PERP", time.Now(), time.Now(), 100)
 		assert.NoError(t, err)
 		assert.Len(t, resp, 3)
 
 		expectedOrderID := []uint64{123, 456, 789}
-		for i, o := range resp {
-			assert.Equal(t, expectedOrderID[i], o.OrderID)
-		}
-	})
-
-	t.Run("receive duplicated orders", func(t *testing.T) {
-		successRespOne := `
-{
-  "success": true,
-  "result": [
-    {
-			"status": "closed",
-      "createdAt": "2020-09-01T15:24:03.101197+00:00",
-      "id": 123
-    }
-  ],
-  "hasMoreData": true
-}
-`
-
-		successRespTwo := `
-{
-  "success": true,
-  "result": [
-    {
-			"clientId": "ignored-by-created-at",
-			"status": "closed",
-      "createdAt": "1999-09-01T15:24:03.101197+00:00",
-      "id": 999
-    },
-    {
-			"clientId": "ignored-by-duplicated-id",
-			"status": "closed",
-      "createdAt": "2020-09-02T15:24:03.101197+00:00",
-      "id": 123
-    },
-    {
-			"clientId": "ignored-duplicated-entry",
-			"status": "closed",
-      "createdAt": "2020-09-01T15:24:03.101197+00:00",
-      "id": 123
-    },
-    {
-			"status": "closed",
-      "createdAt": "2020-09-02T15:24:03.101197+00:00",
-      "id": 456
-    }
-  ],
-  "hasMoreData": false
-}
-`
-		i := 0
-		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if i == 0 {
-				i++
-				fmt.Fprintln(w, successRespOne)
-				return
-			}
-			fmt.Fprintln(w, successRespTwo)
-		}))
-		defer ts.Close()
-
-		ex := NewExchange("", "", "")
-		serverURL, err := url.Parse(ts.URL)
-		assert.NoError(t, err)
-		ex.restEndpoint = serverURL
-		resp, err := ex.QueryClosedOrders(context.Background(), "BTC-PERP", time.Now(), time.Now(), 100)
-		assert.NoError(t, err)
-		assert.Len(t, resp, 2)
-		expectedOrderID := []uint64{123, 456}
 		for i, o := range resp {
 			assert.Equal(t, expectedOrderID[i], o.OrderID)
 		}
@@ -391,10 +323,11 @@ func TestExchange_QueryAccount(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	ex := NewExchange("", "", "")
+	ex := NewExchange("test-key", "test-secret", "")
 	serverURL, err := url.Parse(ts.URL)
 	assert.NoError(t, err)
-	ex.restEndpoint = serverURL
+	ex.client.BaseURL = serverURL
+
 	resp, err := ex.QueryAccount(context.Background())
 	assert.NoError(t, err)
 
@@ -447,10 +380,12 @@ func TestExchange_QueryMarkets(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	ex := NewExchange("", "", "")
+	ex := NewExchange("test-key", "test-secret", "")
 	serverURL, err := url.Parse(ts.URL)
 	assert.NoError(t, err)
+	ex.client.BaseURL = serverURL
 	ex.restEndpoint = serverURL
+
 	resp, err := ex.QueryMarkets(context.Background())
 	assert.NoError(t, err)
 
@@ -494,9 +429,10 @@ func TestExchange_QueryDepositHistory(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	ex := NewExchange("", "", "")
+	ex := NewExchange("test-key", "test-secret", "")
 	serverURL, err := url.Parse(ts.URL)
 	assert.NoError(t, err)
+	ex.client.BaseURL = serverURL
 	ex.restEndpoint = serverURL
 
 	ctx := context.Background()
@@ -543,10 +479,10 @@ func TestExchange_QueryTrades(t *testing.T) {
 		}))
 		defer ts.Close()
 
-		ex := NewExchange("", "", "")
+		ex := NewExchange("test-key", "test-secret", "")
 		serverURL, err := url.Parse(ts.URL)
 		assert.NoError(t, err)
-		ex.restEndpoint = serverURL
+		ex.client.BaseURL = serverURL
 
 		ctx := context.Background()
 		actualConfirmedTime, err := parseDatetime("2021-02-23T09:29:08.534000+00:00")
@@ -619,10 +555,10 @@ func TestExchange_QueryTrades(t *testing.T) {
 		}))
 		defer ts.Close()
 
-		ex := NewExchange("", "", "")
+		ex := NewExchange("test-key", "test-secret", "")
 		serverURL, err := url.Parse(ts.URL)
 		assert.NoError(t, err)
-		ex.restEndpoint = serverURL
+		ex.client.BaseURL = serverURL
 
 		ctx := context.Background()
 		actualConfirmedTime, err := parseDatetime("2021-02-23T09:29:08.534000+00:00")

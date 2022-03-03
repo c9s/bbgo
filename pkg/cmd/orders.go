@@ -19,11 +19,60 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+var getOrderCmd = &cobra.Command{
+	Use:          "get-order --session SESSION --order-id ORDER_ID",
+	Short:        "Get order status",
+	SilenceUsage: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
+
+		if userConfig == nil {
+			return errors.New("config file is required")
+		}
+
+		environ := bbgo.NewEnvironment()
+		if err := environ.ConfigureExchangeSessions(userConfig); err != nil {
+			return err
+		}
+
+		sessionName, err := cmd.Flags().GetString("session")
+		if err != nil {
+			return err
+		}
+
+		session, ok := environ.Session(sessionName)
+		if !ok {
+			return fmt.Errorf("session %s not found", sessionName)
+		}
+
+		orderID, err := cmd.Flags().GetString("order-id")
+		if err != nil {
+			return fmt.Errorf("can't get the symbol from flags: %w", err)
+		}
+
+		service, ok := session.Exchange.(types.ExchangeOrderQueryService)
+		if !ok {
+			return fmt.Errorf("query order status is not supported for exchange %T, interface types.ExchangeOrderQueryService is not implemented", session.Exchange)
+		}
+
+		order, err := service.QueryOrder(ctx, types.OrderQuery{
+			OrderID: orderID,
+		})
+		if err != nil {
+			return err
+		}
+
+		log.Infof("%+v", order)
+
+		return nil
+	},
+}
+
 // go run ./cmd/bbgo list-orders [open|closed] --session=ftx --symbol=BTCUSDT
 var listOrdersCmd = &cobra.Command{
-	Use:  "list-orders [status]",
+	Use:   "list-orders open|closed --session SESSION --symbol SYMBOL",
 	Short: "list user's open orders in exchange of a specific trading pair",
-	Args: cobra.OnlyValidArgs,
+	Args:  cobra.OnlyValidArgs,
 	// default is open which means we query open orders if you haven't provided args.
 	ValidArgs:    []string{"", "open", "closed"},
 	SilenceUsage: true,
@@ -39,22 +88,10 @@ var listOrdersCmd = &cobra.Command{
 			return fmt.Errorf("--config option is required")
 		}
 
-		// if config file exists, use the config loaded from the config file.
-		// otherwise, use a empty config object
-		var userConfig *bbgo.Config
-		if _, err := os.Stat(configFile); err == nil {
-			// load successfully
-			userConfig, err = bbgo.Load(configFile, false)
-			if err != nil {
-				return err
-			}
-		} else if os.IsNotExist(err) {
-			// config file doesn't exist
-			userConfig = &bbgo.Config{}
-		} else {
-			// other error
-			return err
+		if userConfig == nil {
+			return errors.New("config file is required")
 		}
+
 		environ := bbgo.NewEnvironment()
 
 		if err := environ.ConfigureExchangeSessions(userConfig); err != nil {
@@ -116,7 +153,7 @@ var listOrdersCmd = &cobra.Command{
 }
 
 var executeOrderCmd = &cobra.Command{
-	Use:          "execute-order",
+	Use:          "execute-order --session SESSION --symbol SYMBOL --side SIDE --target-quantity TOTAL_QUANTITY --slice-quantity SLICE_QUANTITY",
 	Short:        "execute buy/sell on the balance/position you have on specific symbol",
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -265,7 +302,7 @@ var executeOrderCmd = &cobra.Command{
 // go run ./cmd/bbgo submit-order --session=ftx --symbol=BTCUSDT --side=buy --price=18000 --quantity=0.001
 var submitOrderCmd = &cobra.Command{
 	Use:          "submit-order --session SESSION --symbol SYMBOL --side SIDE --quantity QUANTITY [--price PRICE]",
-	Short:        "submit limit order to the exchange",
+	Short:        "place limit order to the exchange",
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
@@ -345,6 +382,10 @@ func init() {
 	listOrdersCmd.Flags().String("session", "", "the exchange session name for sync")
 	listOrdersCmd.Flags().String("symbol", "", "the trading pair, like btcusdt")
 
+	getOrderCmd.Flags().String("session", "", "the exchange session name for sync")
+	getOrderCmd.Flags().String("symbol", "", "the trading pair, like btcusdt")
+	getOrderCmd.Flags().String("order-id", "", "order id")
+
 	submitOrderCmd.Flags().String("session", "", "the exchange session name for sync")
 	submitOrderCmd.Flags().String("symbol", "", "the trading pair, like btcusdt")
 	submitOrderCmd.Flags().String("side", "", "the trading side: buy or sell")
@@ -362,6 +403,7 @@ func init() {
 	executeOrderCmd.Flags().Int("price-ticks", 0, "the number of price tick for the jump spread, default to 0")
 
 	RootCmd.AddCommand(listOrdersCmd)
+	RootCmd.AddCommand(getOrderCmd)
 	RootCmd.AddCommand(submitOrderCmd)
 	RootCmd.AddCommand(executeOrderCmd)
 }

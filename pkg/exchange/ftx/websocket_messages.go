@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/c9s/bbgo/pkg/exchange/ftx/ftxapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -115,7 +116,7 @@ type optionalFields struct {
 type orderUpdateResponse struct {
 	mandatoryFields
 
-	Data order `json:"data"`
+	Data ftxapi.Order `json:"data"`
 }
 
 func (r websocketResponse) toOrderUpdateResponse() (orderUpdateResponse, error) {
@@ -133,7 +134,7 @@ func (r websocketResponse) toOrderUpdateResponse() (orderUpdateResponse, error) 
 type tradeUpdateResponse struct {
 	mandatoryFields
 
-	Data fill `json:"data"`
+	Data ftxapi.Fill `json:"data"`
 }
 
 func (r websocketResponse) toTradeUpdateResponse() (tradeUpdateResponse, error) {
@@ -195,7 +196,7 @@ func (r websocketResponse) toErrResponse() errResponse {
 	}
 }
 
-//sample :{"bid": 49194.0, "ask": 49195.0, "bidSize": 0.0775, "askSize": 0.0247, "last": 49200.0, "time": 1640171788.9339821}
+// sample :{"bid": 49194.0, "ask": 49195.0, "bidSize": 0.0775, "askSize": 0.0247, "last": 49200.0, "time": 1640171788.9339821}
 func (r websocketResponse) toBookTickerResponse() (bookTickerResponse, error) {
 	if r.Channel != bookTickerChannel {
 		return bookTickerResponse{}, fmt.Errorf("type %s, channel %s: %w", r.Type, r.Channel, errUnsupportedConversion)
@@ -404,12 +405,12 @@ func toGlobalBookTicker(r bookTickerResponse) (types.BookTicker, error) {
 	return types.BookTicker{
 		// ex. BTC/USDT
 		Symbol: toGlobalSymbol(strings.ToUpper(r.Market)),
-		//Time:     r.Timestamp,
+		// Time:     r.Timestamp,
 		Buy:      r.Bid,
 		BuySize:  r.BidSize,
 		Sell:     r.Ask,
 		SellSize: r.AskSize,
-		//Last:     r.Last,
+		// Last:     r.Last,
 	}, nil
 }
 
