@@ -3,10 +3,11 @@ package bollmaker
 import (
 	"context"
 	"fmt"
-	"github.com/c9s/bbgo/pkg/indicator"
 	"math"
 	"sync"
 	"time"
+
+	"github.com/c9s/bbgo/pkg/indicator"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -36,32 +37,30 @@ func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
-// NewStack returns a new position stack.
-func NewStack() *PositionStack {
-	return &PositionStack{}
-}
-
-// Stack is a basic LIFO stack that resizes as needed.
 type PositionStack struct {
 	positions []*types.Position
 }
 
-// Push adds a node to the stack.
-func (s *PositionStack) Length() int {
-	return len(s.positions)
+func NewStack() *PositionStack {
+	return &PositionStack{}
 }
 
-// Push adds a node to the stack.
-func (s *PositionStack) Push(p *types.Position) {
-	s.positions = append(s.positions, p)
+func (ps *PositionStack) Length() int {
+	if ps == nil {
+		return 0
+	}
+	return len(ps.positions)
 }
 
-// Pop removes and returns a node from the stack in last to first order.
-func (s *PositionStack) Pop() *types.Position {
-	if len(s.positions) == 0 {
+func (ps *PositionStack) Push(p *types.Position) {
+	ps.positions = append(ps.positions, p)
+}
+
+func (ps *PositionStack) Pop() *types.Position {
+	if ps.Length() == 0 {
 		return nil
 	}
-	return s.positions[len(s.positions)-1]
+	return ps.positions[len(ps.positions)-1]
 }
 
 type State struct {
@@ -289,10 +288,8 @@ func (s *Strategy) LoadState() error {
 		log.Infof("state is restored: %+v", s.state)
 	}
 
-	// if position is nil, we need to allocate a new position for calculation
-	//if s.state.Position == nil {
+	// we need to allocate a new position for calculation, since it's not a pointer
 	s.state.Position = *types.NewPositionFromMarket(s.market)
-	//}
 
 	// init profit states
 	s.state.ProfitStats.Symbol = s.market.Symbol
@@ -596,6 +593,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.orderStore = bbgo.NewOrderStore(s.Symbol)
 	s.orderStore.BindStream(session.UserDataStream)
+
 	s.tradeCollector = bbgo.NewTradeCollector(s.Symbol, &s.state.Position, s.orderStore)
 	s.tradeCollector.OnProfit(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
 		log.Infof("generated profit: %v", profit)
@@ -656,14 +654,13 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		log.Infof("trade collector position: %v", s.tradeCollector.Position())
 
-		if kline.Close.Float64() < s.state.Position.AverageCost.Float64()*0.8 {
+		if kline.Close.Float64() < s.state.Position.AverageCost.Float64()*0.9 {
 			p := s.state.Position
 			PositionStack.Push(&p)
 			s.state.Position.Reset()
-			//s.tradeCollector = bbgo.NewTradeCollector(s.Symbol, s.state.Position, s.orderStore)
 		}
 
-		if kline.Close.Float64() > s.state.Position.AverageCost.Float64()*1.2 {
+		if kline.Close.Float64() > s.state.Position.AverageCost.Float64()*1.1 {
 			if s.state.Position.GetBase().Float64() > 0 && s.state.Position.GetBase().Float64() < s.Quantity.Float64() {
 				if PositionStack.Length() > 1 {
 					s.ClosePosition(ctx, 100.0)
@@ -673,9 +670,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				}
 			}
 		}
-		if PositionStack.Length() > 1 {
-			log.Infof("position stack: %v, length: %d, current position: %v", PositionStack.positions, PositionStack.Length(), s.state.Position)
-		}
+		//if PositionStack.Length() > 1 {
+		//	log.Infof("position stack: %v, current position: %v", PositionStack.positions, s.state.Position)
+		//}
+		log.Infof("position stack length: %d", PositionStack.Length())
 
 		// check if there is a canceled order had partially filled.
 		s.tradeCollector.Process()
