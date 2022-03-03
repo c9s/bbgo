@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
-	"time"
+
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
@@ -99,22 +99,4 @@ func (r *orderRequest) CancelOrderByClientID(ctx context.Context, clientID strin
 	return co, nil
 }
 
-func (r *orderRequest) OpenOrders(ctx context.Context, market string) (ordersResponse, error) {
-	resp, err := r.
-		Method("GET").
-		ReferenceURL("api/orders").
-		Query(map[string]string{"market": market}).
-		DoAuthenticatedRequest(ctx)
-
-	if err != nil {
-		return ordersResponse{}, err
-	}
-
-	var o ordersResponse
-	if err := json.Unmarshal(resp.Body, &o); err != nil {
-		return ordersResponse{}, fmt.Errorf("failed to unmarshal open orders response body to json: %w", err)
-	}
-
-	return o, nil
-}
 
