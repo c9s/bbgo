@@ -20,16 +20,16 @@ var balancesCmd = &cobra.Command{
 	Use:          "balances [--session SESSION]",
 	Short:        "Show user account balances",
 	SilenceUsage: true,
+	PreRunE: cobraInitRequired([]string{
+		"config",
+		"session",
+	}),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 
 		sessionName, err := cmd.Flags().GetString("session")
 		if err != nil {
 			return err
-		}
-
-		if userConfig == nil {
-			return fmt.Errorf("user config is not loaded")
 		}
 
 		environ := bbgo.NewEnvironment()
