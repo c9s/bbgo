@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/c9s/bbgo/pkg/types"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+
+	"github.com/c9s/bbgo/pkg/types"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 )
@@ -16,7 +17,6 @@ import (
 func init() {
 	accountCmd.Flags().String("session", "", "the exchange session name for querying information")
 	accountCmd.Flags().Bool("total", false, "report total asset")
-	accountCmd.MarkFlagRequired("config")
 	RootCmd.AddCommand(accountCmd)
 }
 

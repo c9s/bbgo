@@ -371,25 +371,16 @@ var submitOrderCmd = &cobra.Command{
 func init() {
 	listOrdersCmd.Flags().String("session", "", "the exchange session name for sync")
 	listOrdersCmd.Flags().String("symbol", "", "the trading pair, like btcusdt")
-	if err := listOrdersCmd.MarkPersistentFlagRequired("config") ; err != nil {
-		log.WithError(err).Errorf("can not mark --config option required")
-	}
 
 	getOrderCmd.Flags().String("session", "", "the exchange session name for sync")
 	getOrderCmd.Flags().String("symbol", "", "the trading pair, like btcusdt")
 	getOrderCmd.Flags().String("order-id", "", "order id")
-	if err := getOrderCmd.MarkPersistentFlagRequired("config") ; err != nil {
-		log.WithError(err).Errorf("can not mark --config option required")
-	}
 
 	submitOrderCmd.Flags().String("session", "", "the exchange session name for sync")
 	submitOrderCmd.Flags().String("symbol", "", "the trading pair, like btcusdt")
 	submitOrderCmd.Flags().String("side", "", "the trading side: buy or sell")
 	submitOrderCmd.Flags().String("price", "", "the trading price")
 	submitOrderCmd.Flags().String("quantity", "", "the trading quantity")
-	if err := submitOrderCmd.MarkPersistentFlagRequired("config") ; err != nil {
-		log.WithError(err).Errorf("can not mark --config option required")
-	}
 
 	executeOrderCmd.Flags().String("session", "", "the exchange session name for sync")
 	executeOrderCmd.Flags().String("symbol", "", "the trading pair, like btcusdt")
@@ -400,9 +391,6 @@ func init() {
 	executeOrderCmd.Flags().Duration("update-interval", time.Second*10, "order update time")
 	executeOrderCmd.Flags().Duration("deadline", 0, "deadline of the order execution")
 	executeOrderCmd.Flags().Int("price-ticks", 0, "the number of price tick for the jump spread, default to 0")
-	if err := executeOrderCmd.MarkPersistentFlagRequired("config") ; err != nil {
-		log.WithError(err).Errorf("can not mark --config option required")
-	}
 
 	RootCmd.AddCommand(listOrdersCmd)
 	RootCmd.AddCommand(getOrderCmd)
