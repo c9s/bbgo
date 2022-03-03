@@ -21,7 +21,7 @@ func init() {
 
 // go run ./cmd/bbgo account --session=ftx --config=config/bbgo.yaml
 var accountCmd = &cobra.Command{
-	Use:          "account [--session=[exchange_name]]",
+	Use:          "account [--session SESSION]",
 	Short:        "show user account details (ex: balance)",
 	SilenceUsage: true,
 	PreRunE: cobraInitRequired([]string{
