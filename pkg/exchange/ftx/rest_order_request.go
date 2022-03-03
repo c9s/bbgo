@@ -66,21 +66,3 @@ func (r *orderRequest) PlaceOrder(ctx context.Context, p PlaceOrderPayload) (ord
 	return o, nil
 }
 
-func (r *orderRequest) CancelOrderByClientID(ctx context.Context, clientID string) (cancelOrderResponse, error) {
-	resp, err := r.
-		Method("DELETE").
-		ReferenceURL("api/orders/by_client_id").
-		ID(clientID).
-		DoAuthenticatedRequest(ctx)
-	if err != nil {
-		return cancelOrderResponse{}, err
-	}
-
-	var co cancelOrderResponse
-	if err := json.Unmarshal(resp.Body, &r); err != nil {
-		return cancelOrderResponse{}, err
-	}
-	return co, nil
-}
-
-
