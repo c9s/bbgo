@@ -3,11 +3,9 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
 	"syscall"
 	"time"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
@@ -21,34 +19,13 @@ var tradesCmd = &cobra.Command{
 	Use:          "trades --session=[exchange_name] --symbol=[pair_name]",
 	Short:        "Query trading history",
 	SilenceUsage: true,
+	PreRunE: cobraInitRequired([]string{
+		"config",
+		"session",
+		"symbol",
+	}),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-
-		configFile, err := cmd.Flags().GetString("config")
-		if err != nil {
-			return err
-		}
-
-		if len(configFile) == 0 {
-			return errors.New("--config option is required")
-		}
-
-		// if config file exists, use the config loaded from the config file.
-		// otherwise, use a empty config object
-		var userConfig *bbgo.Config
-		if _, err := os.Stat(configFile); err == nil {
-			// load successfully
-			userConfig, err = bbgo.Load(configFile, false)
-			if err != nil {
-				return err
-			}
-		} else if os.IsNotExist(err) {
-			// config file doesn't exist
-			userConfig = &bbgo.Config{}
-		} else {
-			// other error
-			return err
-		}
 
 		environ := bbgo.NewEnvironment()
 
@@ -118,36 +95,14 @@ var tradesCmd = &cobra.Command{
 
 // go run ./cmd/bbgo tradeupdate --session=ftx
 var tradeUpdateCmd = &cobra.Command{
-	Use: "tradeupdate --session=[exchange_name]",
+	Use:   "tradeupdate --session=[exchange_name]",
 	Short: "Listen to trade update events",
+	PreRunE: cobraInitRequired([]string{
+		"config",
+		"session",
+	}),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-
-		configFile, err := cmd.Flags().GetString("config")
-		if err != nil {
-			return err
-		}
-
-		if len(configFile) == 0 {
-			return errors.New("--config option is required")
-		}
-
-		// if config file exists, use the config loaded from the config file.
-		// otherwise, use a empty config object
-		var userConfig *bbgo.Config
-		if _, err := os.Stat(configFile); err == nil {
-			// load successfully
-			userConfig, err = bbgo.Load(configFile, false)
-			if err != nil {
-				return err
-			}
-		} else if os.IsNotExist(err) {
-			// config file doesn't exist
-			userConfig = &bbgo.Config{}
-		} else {
-			// other error
-			return err
-		}
 
 		environ := bbgo.NewEnvironment()
 

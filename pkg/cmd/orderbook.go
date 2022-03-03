@@ -6,7 +6,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
@@ -19,6 +18,11 @@ import (
 var orderbookCmd = &cobra.Command{
 	Use:   "orderbook --session=[exchange_name] --symbol=[pair_name]",
 	Short: "connect to the order book market data streaming service of an exchange",
+	PreRunE: cobraInitRequired([]string{
+		"config",
+		"session",
+		"symbol",
+	}),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 
@@ -39,10 +43,6 @@ var orderbookCmd = &cobra.Command{
 		dumpDepthUpdate, err := cmd.Flags().GetBool("dump-update")
 		if err != nil {
 			return err
-		}
-
-		if userConfig == nil {
-			return errors.New("--config option or config file is missing")
 		}
 
 		environ := bbgo.NewEnvironment()
@@ -112,14 +112,14 @@ var orderbookCmd = &cobra.Command{
 
 // go run ./cmd/bbgo orderupdate --session=ftx
 var orderUpdateCmd = &cobra.Command{
-	Use: "orderupdate",
+	Use:   "orderupdate",
 	Short: "Listen to order update events",
+	PreRunE: cobraInitRequired([]string{
+		"config",
+		"session",
+	}),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-
-		if userConfig == nil {
-			return errors.New("--config option or config file is missing")
-		}
 
 		environ := bbgo.NewEnvironment()
 		if err := environ.ConfigureExchangeSessions(userConfig); err != nil {

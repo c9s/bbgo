@@ -40,7 +40,10 @@ var RunCmd = &cobra.Command{
 
 	// SilenceUsage is an option to silence usage when an error occurs.
 	SilenceUsage: true,
-	RunE:         run,
+	PreRunE: cobraInitRequired([]string{
+		"config",
+	}),
+	RunE: run,
 }
 
 func runSetup(baseCtx context.Context, userConfig *bbgo.Config, enableApiServer bool) error {
@@ -228,8 +231,6 @@ func run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	var userConfig = &bbgo.Config{}
-
 	if !setup {
 		// if it's not setup, then the config file option is required.
 		if len(configFile) == 0 {
@@ -240,10 +241,6 @@ func run(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		userConfig, err = bbgo.Load(configFile, false)
-		if err != nil {
-			return err
-		}
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -259,6 +256,7 @@ func run(cmd *cobra.Command, args []string) error {
 			return runSetup(ctx, userConfig, true)
 		}
 
+		// default setting is false, here load as true
 		userConfig, err = bbgo.Load(configFile, true)
 		if err != nil {
 			return err
