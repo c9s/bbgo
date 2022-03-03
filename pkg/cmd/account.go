@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -25,17 +24,11 @@ var accountCmd = &cobra.Command{
 	Use:          "account [--session=[exchange_name]]",
 	Short:        "show user account details (ex: balance)",
 	SilenceUsage: true,
+	PreRunE: cobraInitRequired([]string{
+		"config",
+	}),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-
-		configFile, err := cmd.Flags().GetString("config")
-		if err != nil {
-			return err
-		}
-
-		if len(configFile) == 0 {
-			return errors.New("--config option is required")
-		}
 
 		showTotal, err := cmd.Flags().GetBool("total")
 		if err != nil {
@@ -44,21 +37,6 @@ var accountCmd = &cobra.Command{
 
 		sessionName, err := cmd.Flags().GetString("session")
 		if err != nil {
-			return err
-		}
-
-		var userConfig *bbgo.Config
-		if _, err := os.Stat(configFile); err == nil {
-			// load successfully
-			userConfig, err = bbgo.Load(configFile, false)
-			if err != nil {
-				return err
-			}
-		} else if os.IsNotExist(err) {
-			// config file doesn't exist
-			userConfig = &bbgo.Config{}
-		} else {
-			// other error
 			return err
 		}
 

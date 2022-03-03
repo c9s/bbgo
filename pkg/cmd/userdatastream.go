@@ -6,7 +6,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
@@ -17,14 +16,14 @@ import (
 
 // go run ./cmd/bbgo userdatastream --session=ftx
 var userDataStreamCmd = &cobra.Command{
-	Use: "userdatastream",
+	Use:   "userdatastream",
 	Short: "Listen to session events (orderUpdate, tradeUpdate, balanceUpdate, balanceSnapshot)",
+	PreRunE: cobraInitRequired([]string{
+		"config",
+		"session",
+	}),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-
-		if userConfig == nil {
-			return errors.New("--config option or config file is missing")
-		}
 
 		sessionName, err := cmd.Flags().GetString("session")
 		if err != nil {

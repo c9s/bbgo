@@ -8,7 +8,6 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -17,12 +16,14 @@ import (
 var klineCmd = &cobra.Command{
 	Use:   "kline",
 	Short: "connect to the kline market data streaming service of an exchange",
+	PreRunE: cobraInitRequired([]string{
+		"config",
+		"session",
+		"symbol",
+		"interval",
+	}),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-
-		if userConfig == nil {
-			return errors.New("--config option or config file is missing")
-		}
 
 		environ := bbgo.NewEnvironment()
 		if err := environ.ConfigureExchangeSessions(userConfig); err != nil {
