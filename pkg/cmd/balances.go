@@ -12,12 +12,17 @@ import (
 
 func init() {
 	balancesCmd.Flags().String("session", "", "the exchange session name for querying balances")
+
+	if err := balancesCmd.MarkFlagRequired("config") ; err != nil {
+		log.WithError(err).Errorf("can not mark --config option required")
+	}
+
 	RootCmd.AddCommand(balancesCmd)
 }
 
 // go run ./cmd/bbgo balances --session=ftx
 var balancesCmd = &cobra.Command{
-	Use:          "balances --session SESSION",
+	Use:          "balances [--session SESSION]",
 	Short:        "Show user account balances",
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
