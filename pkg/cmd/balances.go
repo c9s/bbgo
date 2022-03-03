@@ -13,7 +13,7 @@ import (
 func init() {
 	balancesCmd.Flags().String("session", "", "the exchange session name for querying balances")
 
-	if err := balancesCmd.MarkFlagRequired("config") ; err != nil {
+	if err := balancesCmd.MarkPersistentFlagRequired("config") ; err != nil {
 		log.WithError(err).Errorf("can not mark --config option required")
 	}
 
