@@ -2,7 +2,6 @@ package ftx
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -576,11 +575,7 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 		}
 
 		if !resp.Success {
-			v, err := unmarshalResult(resp.Result)
-			if err != nil {
-				return err
-			}
-			return fmt.Errorf("cancel order failed: %v", v)
+			return fmt.Errorf("cancel order failed: %s", resp.Result)
 		}
 	}
 	return nil
@@ -663,9 +658,4 @@ func (e *Exchange) Transfer(ctx context.Context, coin string, size float64, dest
 		return "", fmt.Errorf("ftx returns transfer failure")
 	}
 	return resp.Result.String(), nil
-}
-
-func unmarshalResult(result json.RawMessage) (a interface{}, err error) {
-	err = json.Unmarshal(result, &a)
-	return a, err
 }
