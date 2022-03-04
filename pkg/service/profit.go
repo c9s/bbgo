@@ -37,23 +37,64 @@ func (s *ProfitService) Load(ctx context.Context, id int64) (*types.Trade, error
 	return nil, errors.Wrapf(ErrTradeNotFound, "trade id:%d not found", id)
 }
 
-func (s *ProfitService) scanRows(rows *sqlx.Rows) (trades []types.Trade, err error) {
+func (s *ProfitService) scanRows(rows *sqlx.Rows) (profits []types.Profit, err error) {
 	for rows.Next() {
-		var trade types.Trade
-		if err := rows.StructScan(&trade); err != nil {
-			return trades, err
+		var profit types.Profit
+		if err := rows.StructScan(&profit); err != nil {
+			return profits, err
 		}
 
-		trades = append(trades, trade)
+		profits = append(profits, profit)
 	}
 
-	return trades, rows.Err()
+	return profits, rows.Err()
 }
 
-func (s *ProfitService) Insert(trade types.Trade) error {
+func (s *ProfitService) Insert(profit types.Profit) error {
 	_, err := s.DB.NamedExec(`
-			INSERT INTO profits (id, exchange, symbol, trade_id, average_cost, profit, price, quantity, quote_quantity, side, traded_at, is_margin, is_futures, is_isolated)
-			VALUES (:id, :exchange, :order_id, :symbol, :price, :quantity, :quote_quantity, :side, :is_buyer, :is_maker, :fee, :fee_currency, :traded_at, :is_margin, :is_futures, :is_isolated)`,
-		trade)
+		INSERT INTO profits (
+			strategy,
+		 	strategy_instance_id,
+			symbol,
+			average_cost,
+			profit,
+			trade_id,
+			price,
+			quantity,
+			quote_quantity,
+			side,
+		    is_buyer,
+		    is_maker,
+		    fee,
+		    fee_currency,
+		 	fee_in_usd,
+			traded_at,
+			exchange,
+			is_margin,
+			is_futures,
+			is_isolated
+		) VALUES (
+		    :strategy,
+			:strategy_instance_id,
+			:symbol,
+			:average_cost,
+		    :profit,
+			:trade_id,
+			:price,
+			:quantity,
+			:quote_quantity,
+			:side,
+			:is_buyer,
+			:is_maker,
+			:fee,
+			:fee_currency,
+		    :fee_in_usd,
+			:traded_at,
+			:exchange,
+			:is_margin,
+			:is_futures,
+			:is_isolated
+	    )`,
+		profit)
 	return err
 }
