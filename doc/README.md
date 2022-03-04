@@ -2,30 +2,30 @@
 --------------------------
 
 ### General Topics
-* [bbgo command index](commands/bbgo.md) - BBGO prompt user interface
-* [bbgo build](build-from-source.md) - How to build bbgo
-* [bbgo backtest](topics/back-testing.md) - How to backtesting strategies
-* [bbgo TWAP](topics/twap.md) - TWAP order execution to buy/sell large quantity of order
+* [Commands](commands/bbgo.md) - BBGO command line usage
+* [Build From Source](build-from-source.md) - How to build bbgo
+* [Back-testing](topics/back-testing.md) - How to back-test strategies
+* [TWAP](topics/twap.md) - TWAP order execution to buy/sell large quantity of order
 
 ### Configuration
-* [bbgo slack](configuration/slack.md) - Setting up Slack Notification
-* [bbgo telegram](configuration/telegram.md) - Setting up Telegram Bot Notification
-* [bbgo env](configuration/envvars.md) - Environment variables
-* [bbgo sync](configuration/sync.md) - Synchronize private trading data
+* [Setting up Slack Notification](configuration/slack.md)
+* [Setting up Telegram Notification](configuration/telegram.md) - Setting up Telegram Bot Notification
+* [Environment Variables](configuration/envvars.md)
+* [Syncing Trading Data](configuration/sync.md) - Synchronize private trading data
 
 ### Deployment
-* [bbgo chart](deployment/helm-chart.md) - Helm Chart setup
+* [Helm Chart Deployment](deployment/helm-chart.md)
 
 ### Development
-* [bbgo new exchange](development/adding-new-exchange.md) - Check lists for adding new exchanges
-* [bbgo kucoin cli](development/kucoin-cli.md) - Kucoin command-line tools
-* [bbgo sql migration](development/migration.md) - Adding new SQL migration scripts
-* [bbgo release process](development/release-process.md) - How to make a new release
+* [Adding New Exchange](development/adding-new-exchange.md) - Check lists for adding new exchanges
+* [KuCoin Command-line Test Tool](development/kucoin-cli.md) - Kucoin command-line tools
+* [SQL Migration](development/migration.md) - Adding new SQL migration scripts
+* [Release Process](development/release-process.md) - How to make a new release
 
 ### Strategies
-* [bbgo grid](strategy/grid.md) - Grid Strategy Explanation
-* [bbgo interaction](strategy/interaction.md) - Interaction registration for strategies
-* [bbgo price alert](strategy/pricealert.md) - Send price alert notification on price changes
-* [bbgo support](strategy/support.md) - Support strategy that buys on high volume support
+* [Grid](strategy/grid.md) - Grid Strategy Explanation
+* [Interaction](strategy/interaction.md) - Interaction registration for strategies
+* [Price Alert](strategy/pricealert.md) - Send price alert notification on price changes
+* [Support](strategy/support.md) - Support strategy that buys on high volume support
 
 
