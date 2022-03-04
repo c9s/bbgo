@@ -15,6 +15,7 @@
 
 ### Deployment
 * [Helm Chart Deployment](deployment/helm-chart.md)
+* [Setting up Systemd](deployment/systemd.md)
 
 ### Strategies
 * [Grid](strategy/grid.md) - Grid Strategy Explanation
