@@ -225,7 +225,7 @@ func (trader *Trader) RunSingleExchangeStrategy(ctx context.Context, strategy Si
 		trader.environment.Notifiability,
 		trader.environment.TradeService,
 		trader.environment.AccountService,
-		) ; err != nil {
+	); err != nil {
 		return err
 	}
 
@@ -255,7 +255,7 @@ func (trader *Trader) RunSingleExchangeStrategy(ctx context.Context, strategy Si
 			return fmt.Errorf("marketDataStore of symbol %s not found", symbol)
 		}
 
-		if err := parseStructAndInject(strategy, market, indicatorSet, store) ; err != nil {
+		if err := parseStructAndInject(strategy, market, indicatorSet, store); err != nil {
 			return errors.Wrapf(err, "failed to inject object into %T", strategy)
 		}
 	}
@@ -408,6 +408,11 @@ func parseStructAndInject(f interface{}, objects ...interface{}) error {
 		fv := sv.Field(i)
 		ft := fv.Type()
 
+		// skip unexported fields
+		if !st.Field(i).IsExported() {
+			continue
+		}
+
 		switch k := fv.Kind(); k {
 
 		case reflect.Ptr, reflect.Struct:
@@ -420,7 +425,7 @@ func parseStructAndInject(f interface{}, objects ...interface{}) error {
 				ot := reflect.TypeOf(obj)
 				if ft.AssignableTo(ot) {
 					if !fv.CanSet() {
-						return fmt.Errorf("field %v of %s can not be set to %s", fv, sv.Type(), ot)
+						return fmt.Errorf("field %v of %s can not be set to %s, make sure it is an exported field", fv, sv.Type(), ot)
 					}
 					fv.Set(reflect.ValueOf(obj))
 				}
