@@ -575,12 +575,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			Symbol:          s.Symbol,
 			Profit:          profit,
 			NetProfit:       netProfit,
-			TradeAmount:     trade.QuoteQuantity,
+			QuoteQuantity:   trade.QuoteQuantity,
 			ProfitMargin:    profit.Div(trade.QuoteQuantity),
 			NetProfitMargin: netProfit.Div(trade.QuoteQuantity),
 			QuoteCurrency:   s.state.Position.QuoteCurrency,
 			BaseCurrency:    s.state.Position.BaseCurrency,
-			Time:            trade.Time.Time(),
+			TradedAt:        trade.Time.Time(),
 		}
 		s.state.ProfitStats.AddProfit(p)
 		s.Notify(&p)

@@ -12,14 +12,21 @@ import (
 
 // Profit struct stores the PnL information
 type Profit struct {
-	Symbol string `json:"symbol"`
+	// --- position related fields
+	// -------------------------------------------
+	// Symbol is the symbol of the position
+	Symbol        string           `json:"symbol"`
+	QuoteCurrency string           `json:"quoteCurrency" db:"quote_currency"`
+	BaseCurrency  string           `json:"baseCurrency" db:"base_currency"`
+	AverageCost   fixedpoint.Value `json:"averageCost" db:"average_cost"`
 
+	// profit related fields
+	// -------------------------------------------
 	// Profit is the profit of this trade made. negative profit means loss.
 	Profit fixedpoint.Value `json:"profit" db:"profit"`
 
 	// NetProfit is (profit - trading fee)
-	NetProfit   fixedpoint.Value `json:"netProfit" db:"net_profit"`
-	AverageCost fixedpoint.Value `json:"averageCost" db:"average_cost"`
+	NetProfit fixedpoint.Value `json:"netProfit" db:"net_profit"`
 
 	// ProfitMargin is a percentage of the profit and the capital amount
 	ProfitMargin fixedpoint.Value `json:"profitMargin" db:"profit_margin"`
@@ -27,29 +34,31 @@ type Profit struct {
 	// NetProfitMargin is a percentage of the net profit and the capital amount
 	NetProfitMargin fixedpoint.Value `json:"netProfitMargin" db:"net_profit_margin"`
 
-	QuoteCurrency string `json:"quoteCurrency" db:"quote_currency"`
-	BaseCurrency  string `json:"baseCurrency" db:"base_currency"`
+	// trade related fields
+	// --------------------------------------------
+	// TradeID is the exchange trade id of that trade
+	TradeID       uint64           `json:"tradeID" db:"trade_id"`
+	Side          SideType         `json:"side" db:"side"`
+	IsBuyer       bool             `json:"isBuyer" db:"is_buyer"`
+	IsMaker       bool             `json:"isMaker" db:"is_maker"`
+	Price         fixedpoint.Value `json:"price" db:"price"`
+	Quantity      fixedpoint.Value `json:"quantity" db:"quantity"`
+	QuoteQuantity fixedpoint.Value `json:"quoteQuantity" db:"quote_quantity"`
 
-	TradeID     uint64           `json:"tradeID" db:"trade_id"`
-	Side        string           `json:"side" db:"side"`
-	IsBuyer     bool             `json:"isBuyer" db:"is_buyer"`
-	IsMaker     bool             `json:"isMaker" db:"is_maker"`
-	Price       fixedpoint.Value `json:"price" db:"price"`
-	Quantity    fixedpoint.Value `json:"quantity"`
-	TradeAmount fixedpoint.Value `json:"quoteQuantity" db:"quote_quantity"`
 	// FeeInUSD is the summed fee of this profit,
 	// you will need to convert the trade fee into USD since the fee currencies can be different.
-	FeeInUSD           fixedpoint.Value `json:"feeInUSD" db:"fee_in_usd"`
-	Fee                fixedpoint.Value `json:"fee" db:"fee"`
-	FeeCurrency        string           `json:"feeCurrency" db:"fee_currency"`
-	Time               time.Time        `json:"tradedAt" db:"traded_at"`
-	Strategy           string           `json:"strategy" db:"strategy"`
-	StrategyInstanceID string           `json:"strategyInstanceID" db:"strategy_instance_id"`
+	FeeInUSD    fixedpoint.Value `json:"feeInUSD" db:"fee_in_usd"`
+	Fee         fixedpoint.Value `json:"fee" db:"fee"`
+	FeeCurrency string           `json:"feeCurrency" db:"fee_currency"`
+	Exchange    ExchangeName     `json:"exchange" db:"exchange"`
+	IsMargin    bool             `json:"isMargin" db:"is_margin"`
+	IsFutures   bool             `json:"isFutures" db:"is_futures"`
+	IsIsolated  bool             `json:"isIsolated" db:"is_isolated"`
+	TradedAt    time.Time        `json:"tradedAt" db:"traded_at"`
 
-	Exchange   ExchangeName `json:"exchange" db:"exchange"`
-	IsMargin   bool         `json:"isMargin" db:"is_margin"`
-	IsFutures  bool         `json:"isFutures" db:"is_futures"`
-	IsIsolated bool         `json:"isIsolated" db:"is_isolated"`
+	// strategy related fields
+	Strategy           string `json:"strategy" db:"strategy"`
+	StrategyInstanceID string `json:"strategyInstanceID" db:"strategy_instance_id"`
 }
 
 func (p *Profit) SlackAttachment() slack.Attachment {
@@ -84,10 +93,10 @@ func (p *Profit) SlackAttachment() slack.Attachment {
 		})
 	}
 
-	if !p.TradeAmount.IsZero() {
+	if !p.QuoteQuantity.IsZero() {
 		fields = append(fields, slack.AttachmentField{
 			Title: "Trade Amount",
-			Value: p.TradeAmount.String() + " " + p.QuoteCurrency,
+			Value: p.QuoteQuantity.String() + " " + p.QuoteCurrency,
 			Short: true,
 		})
 	}

@@ -23,18 +23,19 @@ func TestProfitService(t *testing.T) {
 	service := &ProfitService{DB: xdb}
 
 	err = service.Insert(types.Profit{
-		Symbol: "BTCUSDT",
+		Symbol:        "BTCUSDT",
 		BaseCurrency:  "BTC",
 		QuoteCurrency: "USDT",
 		AverageCost:   fixedpoint.NewFromFloat(44000),
 		Profit:        fixedpoint.NewFromFloat(1.01),
 		NetProfit:     fixedpoint.NewFromFloat(0.98),
 		TradeID:       99,
+		Side:          types.SideTypeSell,
 		Price:         fixedpoint.NewFromFloat(44300),
 		Quantity:      fixedpoint.NewFromFloat(0.001),
-		TradeAmount:   fixedpoint.NewFromFloat(44.0),
+		QuoteQuantity: fixedpoint.NewFromFloat(44.0),
 		Exchange:      types.ExchangeMax,
-		Time:          time.Now(),
+		TradedAt:      time.Now(),
 	})
 	assert.NoError(t, err)
 }
