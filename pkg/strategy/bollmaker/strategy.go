@@ -571,17 +571,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.tradeCollector = bbgo.NewTradeCollector(s.Symbol, s.state.Position, s.orderStore)
 	s.tradeCollector.OnProfit(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
 		log.Infof("generated profit: %v", profit)
-		p := types.Profit{
-			Symbol:          s.Symbol,
-			Profit:          profit,
-			NetProfit:       netProfit,
-			QuoteQuantity:   trade.QuoteQuantity,
-			ProfitMargin:    profit.Div(trade.QuoteQuantity),
-			NetProfitMargin: netProfit.Div(trade.QuoteQuantity),
-			QuoteCurrency:   s.state.Position.QuoteCurrency,
-			BaseCurrency:    s.state.Position.BaseCurrency,
-			TradedAt:        trade.Time.Time(),
-		}
+		p := s.state.Position.NewProfit(trade, profit, netProfit)
 		s.state.ProfitStats.AddProfit(p)
 		s.Notify(&p)
 		s.Notify(&s.state.ProfitStats)
