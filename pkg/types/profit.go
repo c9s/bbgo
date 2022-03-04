@@ -20,8 +20,7 @@ type Profit struct {
 	// NetProfit is (profit - trading fee)
 	NetProfit   fixedpoint.Value `json:"netProfit" db:"net_profit"`
 	AverageCost fixedpoint.Value `json:"averageCost" db:"average_ost"`
-
-	TradeAmount fixedpoint.Value `json:"tradeAmount" db:"trade_amount"`
+	TradeAmount fixedpoint.Value `json:"tradeAmount" db:"quote_quantity"`
 
 	// ProfitMargin is a percentage of the profit and the capital amount
 	ProfitMargin fixedpoint.Value `json:"profitMargin" db:"profit_margin"`
@@ -32,10 +31,15 @@ type Profit struct {
 	QuoteCurrency string `json:"quoteCurrency" db:"quote_currency"`
 	BaseCurrency  string `json:"baseCurrency" db:"base_currency"`
 
+	IsBuyer bool `json:"isBuyer" db:"is_buyer"`
+	IsMaker bool `json:"isMaker" db:"is_maker"`
+
 	// FeeInUSD is the summed fee of this profit,
 	// you will need to convert the trade fee into USD since the fee currencies can be different.
 	FeeInUSD           fixedpoint.Value `json:"feeInUSD" db:"fee_in_usd"`
-	Time               time.Time        `json:"time" db:"time"`
+	Fee                fixedpoint.Value `json:"fee" db:"fee"`
+	FeeCurrency        string           `json:"feeCurrency" db:"fee_currency"`
+	Time               time.Time        `json:"tradedAt" db:"traded_at"`
 	Strategy           string           `json:"strategy" db:"strategy"`
 	StrategyInstanceID string           `json:"strategyInstanceID" db:"strategy_instance_id"`
 }
