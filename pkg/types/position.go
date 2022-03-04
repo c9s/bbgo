@@ -53,6 +53,40 @@ type Position struct {
 	sync.Mutex
 }
 
+// NewProfit generates the profit object from the current position
+func (p *Position) NewProfit(profit, netProfit fixedpoint.Value, trade Trade) *Profit {
+	return &Profit{
+		Symbol:        p.Symbol,
+		QuoteCurrency: p.QuoteCurrency,
+		BaseCurrency:  p.BaseCurrency,
+		AverageCost:   p.AverageCost,
+
+		// profit related fields
+		Profit:          profit,
+		NetProfit:       netProfit,
+		ProfitMargin:    profit.Div(trade.QuoteQuantity),
+		NetProfitMargin: netProfit.Div(trade.QuoteQuantity),
+
+		// trade related fields
+		TradeID:       trade.ID,
+		Price:         trade.Price,
+		Quantity:      trade.Quantity,
+		QuoteQuantity: trade.QuoteQuantity,
+		IsMaker:       trade.IsMaker,
+		IsBuyer:       trade.IsBuyer,
+		Side:          trade.Side,
+
+		Fee:         trade.Fee,
+		FeeCurrency: trade.FeeCurrency,
+
+		TradedAt: trade.Time.Time(),
+
+		IsFutures:  trade.IsFutures,
+		IsMargin:   trade.IsMargin,
+		IsIsolated: trade.IsIsolated,
+	}
+}
+
 func (p *Position) NewClosePositionOrder(percentage fixedpoint.Value) *SubmitOrder {
 	base := p.GetBase()
 	quantity := base.Mul(percentage)
