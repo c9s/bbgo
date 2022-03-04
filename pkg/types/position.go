@@ -54,8 +54,8 @@ type Position struct {
 }
 
 // NewProfit generates the profit object from the current position
-func (p *Position) NewProfit(profit, netProfit fixedpoint.Value, trade Trade) *Profit {
-	return &Profit{
+func (p *Position) NewProfit(trade Trade, profit, netProfit fixedpoint.Value) Profit {
+	return Profit{
 		Symbol:        p.Symbol,
 		QuoteCurrency: p.QuoteCurrency,
 		BaseCurrency:  p.BaseCurrency,
