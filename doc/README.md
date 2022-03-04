@@ -16,16 +16,14 @@
 ### Deployment
 * [Helm Chart Deployment](deployment/helm-chart.md)
 
-### Development
-* [Adding New Exchange](development/adding-new-exchange.md) - Check lists for adding new exchanges
-* [KuCoin Command-line Test Tool](development/kucoin-cli.md) - Kucoin command-line tools
-* [SQL Migration](development/migration.md) - Adding new SQL migration scripts
-* [Release Process](development/release-process.md) - How to make a new release
-
 ### Strategies
 * [Grid](strategy/grid.md) - Grid Strategy Explanation
 * [Interaction](strategy/interaction.md) - Interaction registration for strategies
 * [Price Alert](strategy/pricealert.md) - Send price alert notification on price changes
 * [Support](strategy/support.md) - Support strategy that buys on high volume support
 
-
+### Development
+* [Adding New Exchange](development/adding-new-exchange.md) - Check lists for adding new exchanges
+* [KuCoin Command-line Test Tool](development/kucoin-cli.md) - Kucoin command-line tools
+* [SQL Migration](development/migration.md) - Adding new SQL migration scripts
+* [Release Process](development/release-process.md) - How to make a new release
