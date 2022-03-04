@@ -763,7 +763,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		}
 	})
 	s.tradeCollector.OnProfit(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
-		p := bbgo.Profit{
+		p := types.Profit{
 			Symbol:          s.Symbol,
 			Profit:          profit,
 			NetProfit:       netProfit,

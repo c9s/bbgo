@@ -41,7 +41,7 @@ type State struct {
 	// [source Order ID] -> arbitrage order
 	ArbitrageOrders map[uint64]types.Order `json:"arbitrageOrders"`
 
-	ProfitStats bbgo.ProfitStats `json:"profitStats,omitempty"`
+	ProfitStats types.ProfitStats `json:"profitStats,omitempty"`
 }
 
 type Strategy struct {
