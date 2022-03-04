@@ -413,3 +413,57 @@ func (trader *Trader) injectCommonServices(rs reflect.Value) error {
 func (trader *Trader) ReportPnL() *PnLReporterManager {
 	return NewPnLReporter(&trader.environment.Notifiability)
 }
+
+func parseStructAndInject(f interface{}, objects ...interface{}) error {
+	sv := reflect.ValueOf(f)
+	st := reflect.TypeOf(f)
+
+	if st.Kind() != reflect.Ptr {
+		return fmt.Errorf("f needs to be a pointer of a struct, %s given", st)
+	}
+
+	// solve the pointer
+	st = st.Elem()
+	sv = sv.Elem()
+
+	if st.Kind() != reflect.Struct {
+		return fmt.Errorf("f needs to be a struct, %s given", st)
+	}
+
+	for i := 0; i < sv.NumField(); i++ {
+		fv := sv.Field(i)
+		ft := fv.Type()
+
+		switch k := fv.Kind(); k {
+
+		case reflect.Ptr, reflect.Struct:
+			for oi := 0; oi < len(objects); oi++ {
+				obj := objects[oi]
+				ot := reflect.TypeOf(obj)
+				if ft.AssignableTo(ot) {
+					if !fv.CanSet() {
+						return fmt.Errorf("field %v of %s can not be set to %s", fv, sv.Type(), ot)
+					}
+					fv.Set(reflect.ValueOf(obj))
+				}
+			}
+
+		case reflect.Interface:
+			for oi := 0; oi < len(objects); oi++ {
+				obj := objects[oi]
+				objT := reflect.TypeOf(obj)
+				log.Debugln(
+					ft.PkgPath(),
+					ft.Name(),
+					objT, "implements", ft, "=", objT.Implements(ft),
+				)
+
+				if objT.Implements(ft) {
+					fv.Set(reflect.ValueOf(obj))
+				}
+			}
+		}
+	}
+
+	return nil
+}
