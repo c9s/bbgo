@@ -10,6 +10,18 @@ import (
 )
 
 func Test_parseStructAndInject(t *testing.T) {
+	t.Run("skip nil", func(t *testing.T) {
+		ss := struct {
+			a   int
+			Env *Environment
+		}{
+			a:   1,
+			Env: nil,
+		}
+		err := parseStructAndInject(&ss, nil)
+		assert.NoError(t, err)
+		assert.Nil(t, ss.Env)
+	})
 	t.Run("pointer", func(t *testing.T) {
 		ss := struct {
 			a   int
