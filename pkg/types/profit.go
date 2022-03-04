@@ -19,8 +19,7 @@ type Profit struct {
 
 	// NetProfit is (profit - trading fee)
 	NetProfit   fixedpoint.Value `json:"netProfit" db:"net_profit"`
-	AverageCost fixedpoint.Value `json:"averageCost" db:"average_ost"`
-	TradeAmount fixedpoint.Value `json:"tradeAmount" db:"quote_quantity"`
+	AverageCost fixedpoint.Value `json:"averageCost" db:"average_cost"`
 
 	// ProfitMargin is a percentage of the profit and the capital amount
 	ProfitMargin fixedpoint.Value `json:"profitMargin" db:"profit_margin"`
@@ -31,9 +30,13 @@ type Profit struct {
 	QuoteCurrency string `json:"quoteCurrency" db:"quote_currency"`
 	BaseCurrency  string `json:"baseCurrency" db:"base_currency"`
 
-	IsBuyer bool `json:"isBuyer" db:"is_buyer"`
-	IsMaker bool `json:"isMaker" db:"is_maker"`
-
+	TradeID     uint64           `json:"tradeID" db:"trade_id"`
+	Side        string           `json:"side" db:"side"`
+	IsBuyer     bool             `json:"isBuyer" db:"is_buyer"`
+	IsMaker     bool             `json:"isMaker" db:"is_maker"`
+	Price       fixedpoint.Value `json:"price" db:"price"`
+	Quantity    fixedpoint.Value `json:"quantity"`
+	TradeAmount fixedpoint.Value `json:"quoteQuantity" db:"quote_quantity"`
 	// FeeInUSD is the summed fee of this profit,
 	// you will need to convert the trade fee into USD since the fee currencies can be different.
 	FeeInUSD           fixedpoint.Value `json:"feeInUSD" db:"fee_in_usd"`
@@ -42,6 +45,11 @@ type Profit struct {
 	Time               time.Time        `json:"tradedAt" db:"traded_at"`
 	Strategy           string           `json:"strategy" db:"strategy"`
 	StrategyInstanceID string           `json:"strategyInstanceID" db:"strategy_instance_id"`
+
+	Exchange   ExchangeName `json:"exchange" db:"exchange"`
+	IsMargin   bool         `json:"isMargin" db:"is_margin"`
+	IsFutures  bool         `json:"isFutures" db:"is_futures"`
+	IsIsolated bool         `json:"isIsolated" db:"is_isolated"`
 }
 
 func (p *Profit) SlackAttachment() slack.Attachment {
