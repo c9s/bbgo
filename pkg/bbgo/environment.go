@@ -76,6 +76,7 @@ type Environment struct {
 	DatabaseService          *service.DatabaseService
 	OrderService             *service.OrderService
 	TradeService             *service.TradeService
+	ProfitService            *service.ProfitService
 	BacktestService          *service.BacktestService
 	RewardService            *service.RewardService
 	SyncService              *service.SyncService
@@ -170,6 +171,7 @@ func (environ *Environment) ConfigureDatabaseDriver(ctx context.Context, driver 
 	environ.TradeService = &service.TradeService{DB: db}
 	environ.RewardService = &service.RewardService{DB: db}
 	environ.AccountService = &service.AccountService{DB: db}
+	environ.ProfitService = &service.ProfitService{DB: db}
 
 	environ.SyncService = &service.SyncService{
 		TradeService:    environ.TradeService,
@@ -567,6 +569,17 @@ func (environ *Environment) Sync(ctx context.Context, userConfig ...*Config) err
 	}
 
 	return nil
+}
+
+func (environ *Environment) RecordProfit(strategyID, strategyInstanceID string, profit types.Profit) {
+	if environ.DatabaseService == nil {
+		return
+	}
+	if environ.ProfitService == nil {
+		return
+	}
+
+
 }
 
 func (environ *Environment) SyncSession(ctx context.Context, session *ExchangeSession, defaultSymbols ...string) error {
