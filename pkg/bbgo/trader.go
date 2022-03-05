@@ -219,17 +219,7 @@ func (trader *Trader) RunSingleExchangeStrategy(ctx context.Context, strategy Si
 		return errors.New("strategy object is not a struct")
 	}
 
-	if err := parseStructAndInject(strategy,
-		&trader.Graceful,
-		&trader.logger,
-		trader.environment.Notifiability,
-		trader.environment.TradeService,
-		trader.environment.AccountService,
-	); err != nil {
-		return err
-	}
-
-	if err := trader.injectCommonServices(rs); err != nil {
+	if err := trader.injectCommonServices(strategy) ; err != nil {
 		return err
 	}
 
@@ -337,12 +327,11 @@ func (trader *Trader) Run(ctx context.Context) error {
 
 		// get the struct element from the struct pointer
 		rs = rs.Elem()
-
 		if rs.Kind() != reflect.Struct {
 			continue
 		}
 
-		if err := trader.injectCommonServices(rs); err != nil {
+		if err := trader.injectCommonServices(strategy) ; err != nil {
 			return err
 		}
 
@@ -354,37 +343,31 @@ func (trader *Trader) Run(ctx context.Context) error {
 	return trader.environment.Connect(ctx)
 }
 
-func (trader *Trader) injectCommonServices(rs reflect.Value) error {
-	if field, ok := hasField(rs, "Persistence"); ok {
-		if trader.environment.PersistenceServiceFacade == nil {
-			log.Warnf("strategy has Persistence field but persistence service is not defined")
-		} else {
-			if field.IsNil() {
-				field.Set(reflect.ValueOf(&Persistence{
-					PersistenceSelector: &PersistenceSelector{
-						StoreID: "default",
-						Type:    "memory",
-					},
-					Facade: trader.environment.PersistenceServiceFacade,
-				}))
-			} else {
-				elem := field.Elem()
-				if elem.Kind() != reflect.Struct {
-					return fmt.Errorf("field Persistence is not a struct element")
-				}
-
-				if err := injectField(elem, "Facade", trader.environment.PersistenceServiceFacade, true); err != nil {
-					return errors.Wrap(err, "failed to inject Persistence")
-				}
-			}
-		}
+func (trader *Trader) injectCommonServices(s interface{}) error {
+	defaultPersistenceSelector := &PersistenceSelector{
+		StoreID: "default",
+		Type:    "memory",
 	}
 
-	return nil
+	persistenceFacade := trader.environment.PersistenceServiceFacade
+	persistence := &Persistence{
+		PersistenceSelector: defaultPersistenceSelector,
+		Facade:              persistenceFacade,
+	}
+
+	return parseStructAndInject(s,
+		&trader.Graceful,
+		&trader.logger,
+		trader.environment.Notifiability,
+		trader.environment.TradeService,
+		trader.environment.AccountService,
+		persistence,
+		persistenceFacade,
+	)
 }
+
 
 // ReportPnL configure and set the PnLReporter with the given notifier
 func (trader *Trader) ReportPnL() *PnLReporterManager {
 	return NewPnLReporter(&trader.environment.Notifiability)
 }
-

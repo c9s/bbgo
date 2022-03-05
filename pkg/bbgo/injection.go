@@ -64,7 +64,7 @@ func parseStructAndInject(f interface{}, objects ...interface{}) error {
 		return fmt.Errorf("f needs to be a pointer of a struct, %s given", st)
 	}
 
-	// solve the pointer
+	// solve the reference
 	st = st.Elem()
 	sv = sv.Elem()
 
