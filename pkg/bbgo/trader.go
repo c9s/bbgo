@@ -366,6 +366,8 @@ func (trader *Trader) injectCommonServices(s interface{}) error {
 		&trader.logger,
 		trader.environment.Notifiability,
 		trader.environment.TradeService,
+		trader.environment.OrderService,
+		trader.environment.DatabaseService,
 		trader.environment.AccountService,
 		persistence,
 		persistenceFacade,
