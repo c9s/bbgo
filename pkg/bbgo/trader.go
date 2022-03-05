@@ -245,8 +245,6 @@ func (trader *Trader) RunSingleExchangeStrategy(ctx context.Context, strategy Si
 			return fmt.Errorf("marketDataStore of symbol %s not found", symbol)
 		}
 
-
-
 		if err := parseStructAndInject(strategy,
 			market,
 			indicatorSet,

@@ -584,7 +584,7 @@ func (environ *Environment) SyncSession(ctx context.Context, session *ExchangeSe
 }
 
 func (environ *Environment) syncSession(ctx context.Context, session *ExchangeSession, defaultSymbols ...string) error {
-	symbols, err := getSessionSymbols(session, defaultSymbols...)
+	symbols, err := session.getSessionSymbols(defaultSymbols...)
 	if err != nil {
 		return err
 	}
@@ -594,17 +594,6 @@ func (environ *Environment) syncSession(ctx context.Context, session *ExchangeSe
 	return environ.SyncService.SyncSessionSymbols(ctx, session.Exchange, environ.syncStartTime, symbols...)
 }
 
-func getSessionSymbols(session *ExchangeSession, defaultSymbols ...string) ([]string, error) {
-	if session.IsolatedMargin {
-		return []string{session.IsolatedMarginSymbol}, nil
-	}
-
-	if len(defaultSymbols) > 0 {
-		return defaultSymbols, nil
-	}
-
-	return session.FindPossibleSymbols()
-}
 
 func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) error {
 	environ.Notifiability = Notifiability{
@@ -654,6 +643,10 @@ func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) erro
 	return nil
 }
 
+// getAuthStoreID returns the authentication store id
+// if telegram bot token is defined, the bot id will be used.
+// if not, env var $USER will be used.
+// if both are not defined, a default "default" will be used.
 func getAuthStoreID() string {
 	telegramBotToken := viper.GetString("telegram-bot-token")
 	if len(telegramBotToken) > 0 {
@@ -923,4 +916,16 @@ And then enter your token
 	%s
 
 `, token)
+}
+
+func (session *ExchangeSession) getSessionSymbols(defaultSymbols ...string) ([]string, error) {
+	if session.IsolatedMargin {
+		return []string{session.IsolatedMarginSymbol}, nil
+	}
+
+	if len(defaultSymbols) > 0 {
+		return defaultSymbols, nil
+	}
+
+	return session.FindPossibleSymbols()
 }
