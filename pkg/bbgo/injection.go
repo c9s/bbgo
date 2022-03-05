@@ -56,6 +56,9 @@ func injectField(rs reflect.Value, fieldName string, obj interface{}, pointerOnl
 	return nil
 }
 
+// parseStructAndInject parses the struct fields and injects the objects into the corresponding fields by its type.
+// if the given object is a reference of an object, the type of the target field MUST BE a pointer field.
+// if the given object is a struct value, the type of the target field CAN BE a pointer field or a struct value field.
 func parseStructAndInject(f interface{}, objects ...interface{}) error {
 	sv := reflect.ValueOf(f)
 	st := reflect.TypeOf(f)
@@ -95,7 +98,13 @@ func parseStructAndInject(f interface{}, objects ...interface{}) error {
 					if !fv.CanSet() {
 						return fmt.Errorf("field %v of %s can not be set to %s, make sure it is an exported field", fv, sv.Type(), ot)
 					}
-					fv.Set(reflect.ValueOf(obj))
+
+					if k == reflect.Ptr && ot.Kind() == reflect.Struct {
+						fv.Set(reflect.ValueOf(obj).Addr())
+					} else {
+						fv.Set(reflect.ValueOf(obj))
+					}
+
 				}
 			}
 
