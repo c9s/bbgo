@@ -369,6 +369,7 @@ func (trader *Trader) injectCommonServices(s interface{}) error {
 		trader.environment.OrderService,
 		trader.environment.DatabaseService,
 		trader.environment.AccountService,
+		trader.environment,
 		persistence,
 		persistenceFacade,
 	)
