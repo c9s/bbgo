@@ -60,30 +60,28 @@ func (p *Position) NewProfit(trade Trade, profit, netProfit fixedpoint.Value) Pr
 		QuoteCurrency: p.QuoteCurrency,
 		BaseCurrency:  p.BaseCurrency,
 		AverageCost:   p.AverageCost,
-
 		// profit related fields
 		Profit:          profit,
 		NetProfit:       netProfit,
 		ProfitMargin:    profit.Div(trade.QuoteQuantity),
 		NetProfitMargin: netProfit.Div(trade.QuoteQuantity),
-
 		// trade related fields
-		TradeID:       trade.ID,
-		Price:         trade.Price,
-		Quantity:      trade.Quantity,
-		QuoteQuantity: trade.QuoteQuantity,
-		IsMaker:       trade.IsMaker,
-		IsBuyer:       trade.IsBuyer,
-		Side:          trade.Side,
-
-		Fee:         trade.Fee,
-		FeeCurrency: trade.FeeCurrency,
-
-		TradedAt: trade.Time.Time(),
-
-		IsFutures:  trade.IsFutures,
-		IsMargin:   trade.IsMargin,
-		IsIsolated: trade.IsIsolated,
+		TradeID:            trade.ID,
+		Side:               trade.Side,
+		IsBuyer:            trade.IsBuyer,
+		IsMaker:            trade.IsMaker,
+		Price:              trade.Price,
+		Quantity:           trade.Quantity,
+		QuoteQuantity:      trade.QuoteQuantity,
+		// FeeInUSD:           0,
+		Fee:                trade.Fee,
+		FeeCurrency:        trade.FeeCurrency,
+		
+		Exchange:           trade.Exchange,
+		IsMargin:           trade.IsMargin,
+		IsFutures:          trade.IsFutures,
+		IsIsolated:         trade.IsIsolated,
+		TradedAt:           trade.Time.Time(),
 	}
 }
 

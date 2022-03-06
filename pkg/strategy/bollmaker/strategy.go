@@ -566,6 +566,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.tradeCollector.OnProfit(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
 		log.Infof("generated profit: %v", profit)
 		p := s.state.Position.NewProfit(trade, profit, netProfit)
+		p.Strategy = ID
+		p.StrategyInstanceID = instanceID
+
 		s.state.ProfitStats.AddProfit(p)
 		s.Notify(&p)
 		s.Notify(&s.state.ProfitStats)
