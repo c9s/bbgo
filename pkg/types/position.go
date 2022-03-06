@@ -76,7 +76,7 @@ func (p *Position) NewProfit(trade Trade, profit, netProfit fixedpoint.Value) Pr
 		// FeeInUSD:           0,
 		Fee:                trade.Fee,
 		FeeCurrency:        trade.FeeCurrency,
-		
+
 		Exchange:           trade.Exchange,
 		IsMargin:           trade.IsMargin,
 		IsFutures:          trade.IsFutures,
