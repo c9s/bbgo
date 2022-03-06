@@ -316,6 +316,11 @@ func convertWebSocketOrderUpdate(u max.OrderUpdate) (*types.Order, error) {
 		return nil, err
 	}
 
+	timeInForce := types.TimeInForceGTC
+	if u.OrderType == max.OrderTypeIOCLimit {
+		timeInForce = types.TimeInForceIOC
+	}
+
 	return &types.Order{
 		SubmitOrder: types.SubmitOrder{
 			ClientOrderID: u.ClientOID,
@@ -325,7 +330,7 @@ func convertWebSocketOrderUpdate(u max.OrderUpdate) (*types.Order, error) {
 			Quantity:      fixedpoint.MustNewFromString(u.Volume),
 			Price:         fixedpoint.MustNewFromString(u.Price),
 			StopPrice:     fixedpoint.MustNewFromString(u.StopPrice),
-			TimeInForce:   "GTC", // MAX only supports GTC
+			TimeInForce:   timeInForce, // MAX only supports GTC
 			GroupID:       u.GroupID,
 		},
 		Exchange:         types.ExchangeMax,
