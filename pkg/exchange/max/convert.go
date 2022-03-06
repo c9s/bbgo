@@ -333,5 +333,6 @@ func convertWebSocketOrderUpdate(u max.OrderUpdate) (*types.Order, error) {
 		Status:           toGlobalOrderStatus(u.State, executedVolume, remainingVolume),
 		ExecutedQuantity: executedVolume,
 		CreationTime:     types.Time(time.Unix(0, u.CreatedAtMs*int64(time.Millisecond))),
+		UpdateTime:       types.Time(time.Unix(0, u.CreatedAtMs*int64(time.Millisecond))),
 	}, nil
 }
