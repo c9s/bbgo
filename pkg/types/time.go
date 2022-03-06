@@ -176,6 +176,9 @@ func NewTimeFromUnix(sec int64, nsec int64) Time {
 // Value implements the driver.Valuer interface
 // see http://jmoiron.net/blog/built-in-interfaces/
 func (t Time) Value() (driver.Value, error) {
+	if time.Time(t) == (time.Time{}) {
+		return nil, nil
+	}
 	return time.Time(t), nil
 }
 
