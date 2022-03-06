@@ -61,7 +61,7 @@ func Test_parseStructAndInject(t *testing.T) {
 		type TT struct {
 			*service.TradeService
 		}
-		ss := &TT{}
+		ss := TT{}
 		err := parseStructAndInject(&ss, &service.TradeService{})
 		assert.NoError(t, err)
 		assert.NotNil(t, ss.TradeService)
