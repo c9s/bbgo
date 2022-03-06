@@ -349,12 +349,12 @@ func (trader *Trader) Run(ctx context.Context) error {
 	return trader.environment.Connect(ctx)
 }
 
-func (trader *Trader) injectCommonServices(s interface{}) error {
-	defaultPersistenceSelector := &PersistenceSelector{
-		StoreID: "default",
-		Type:    "memory",
-	}
+var defaultPersistenceSelector = &PersistenceSelector{
+	StoreID: "default",
+	Type:    "memory",
+}
 
+func (trader *Trader) injectCommonServices(s interface{}) error {
 	persistenceFacade := trader.environment.PersistenceServiceFacade
 	persistence := &Persistence{
 		PersistenceSelector: defaultPersistenceSelector,
