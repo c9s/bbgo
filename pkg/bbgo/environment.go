@@ -571,7 +571,7 @@ func (environ *Environment) Sync(ctx context.Context, userConfig ...*Config) err
 	return nil
 }
 
-func (environ *Environment) RecordProfit(strategyID, strategyInstanceID string, profit types.Profit) {
+func (environ *Environment) RecordProfit(profit types.Profit) {
 	if environ.DatabaseService == nil {
 		return
 	}
@@ -579,7 +579,9 @@ func (environ *Environment) RecordProfit(strategyID, strategyInstanceID string, 
 		return
 	}
 
-
+	if err := environ.ProfitService.Insert(profit) ; err != nil {
+		log.WithError(err).Errorf("can not insert profit record: %+v", profit)
+	}
 }
 
 func (environ *Environment) SyncSession(ctx context.Context, session *ExchangeSession, defaultSymbols ...string) error {
