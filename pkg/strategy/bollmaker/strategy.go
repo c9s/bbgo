@@ -568,6 +568,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		p := s.state.Position.NewProfit(trade, profit, netProfit)
 		p.Strategy = ID
 		p.StrategyInstanceID = instanceID
+		s.Environment.RecordProfit(p)
 
 		s.state.ProfitStats.AddProfit(p)
 		s.Notify(&p)
