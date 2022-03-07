@@ -126,6 +126,8 @@ func TestFromString(t *testing.T) {
 	assert.Equal(t, "0.00000011", f.String())
 	f = MustNewFromString(".0%")
 	assert.Equal(t, Zero, f)
+	f = MustNewFromString("")
+	assert.Equal(t, Zero, f)
 }
 
 func TestJson(t *testing.T) {

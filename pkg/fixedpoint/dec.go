@@ -491,6 +491,9 @@ func (v *Value) Scan(src interface{}) error {
 // NewFromString parses a numeric string and returns a Value representation.
 func NewFromString(s string) (Value, error) {
 	length := len(s)
+	if length == 0 {
+		return Zero, nil
+	}
 	isPercentage := s[length-1] == '%'
 	if isPercentage {
 		s = s[:length-1]
@@ -538,6 +541,9 @@ func MustNewFromString(input string) Value {
 
 func NewFromBytes(s []byte) (Value, error) {
 	length := len(s)
+	if length == 0 {
+		return Zero, nil
+	}
 	isPercentage := s[length-1] == '%'
 	if isPercentage {
 		s = s[:length-1]
