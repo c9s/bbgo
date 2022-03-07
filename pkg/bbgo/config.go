@@ -109,10 +109,6 @@ type BacktestAccount struct {
 	MakerFeeRate fixedpoint.Value `json:"makerFeeRate"`
 	TakerFeeRate fixedpoint.Value `json:"takerFeeRate"`
 
-	MakerCommission  fixedpoint.Value          `json:"makerCommission"`
-	TakerCommission  fixedpoint.Value          `json:"takerCommission"`
-	BuyerCommission  int                       `json:"buyerCommission"`
-	SellerCommission int                       `json:"sellerCommission"`
 	Balances         BacktestAccountBalanceMap `json:"balances" yaml:"balances"`
 }
 

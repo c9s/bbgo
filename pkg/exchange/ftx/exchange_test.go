@@ -340,9 +340,6 @@ func TestExchange_QueryAccount(t *testing.T) {
 	}
 	expected.Locked = expected.Locked.Sub(expected.Available)
 	assert.Equal(t, expected, b)
-
-	assert.Equal(t, fixedpoint.NewFromFloat(0.0002), resp.MakerCommission)
-	assert.Equal(t, fixedpoint.NewFromFloat(0.0005), resp.TakerCommission)
 }
 
 func TestExchange_QueryMarkets(t *testing.T) {
