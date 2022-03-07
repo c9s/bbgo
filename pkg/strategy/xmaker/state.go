@@ -3,7 +3,6 @@ package xmaker
 import (
 	"sync"
 
-	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -15,7 +14,7 @@ type State struct {
 }
 
 type ProfitStats struct {
-	bbgo.ProfitStats
+	types.ProfitStats
 	lock sync.Mutex
 
 	MakerExchange types.ExchangeName `json:"makerExchange"`

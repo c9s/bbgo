@@ -38,8 +38,8 @@ func init() {
 }
 
 type State struct {
-	Position    *types.Position  `json:"position,omitempty"`
-	ProfitStats bbgo.ProfitStats `json:"profitStats,omitempty"`
+	Position    *types.Position   `json:"position,omitempty"`
+	ProfitStats types.ProfitStats `json:"profitStats,omitempty"`
 }
 
 type BollingerSetting struct {
@@ -52,7 +52,9 @@ type Strategy struct {
 	*bbgo.Notifiability
 	*bbgo.Persistence
 
+	Environment *bbgo.Environment
 	StandardIndicatorSet *bbgo.StandardIndicatorSet
+	Market types.Market
 
 	// Symbol is the market symbol you want to trade
 	Symbol string `json:"symbol"`
@@ -141,8 +143,7 @@ type Strategy struct {
 	bbgo.SmartStops
 
 	session *bbgo.ExchangeSession
-	book    *types.StreamOrderBook
-	market  types.Market
+	book   *types.StreamOrderBook
 
 	state *State
 
@@ -214,8 +215,8 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 		side = types.SideTypeSell
 	}
 
-	if quantity.Compare(s.market.MinQuantity) < 0 {
-		return fmt.Errorf("order quantity %v is too small, less than %v", quantity, s.market.MinQuantity)
+	if quantity.Compare(s.Market.MinQuantity) < 0 {
+		return fmt.Errorf("order quantity %v is too small, less than %v", quantity, s.Market.MinQuantity)
 	}
 
 	submitOrder := types.SubmitOrder{
@@ -223,7 +224,7 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 		Side:     side,
 		Type:     types.OrderTypeMarket,
 		Quantity: quantity,
-		Market:   s.market,
+		Market:   s.Market,
 	}
 
 	s.Notify("Submitting %s %s order to close position by %v", s.Symbol, side.String(), percentage, submitOrder)
@@ -264,13 +265,13 @@ func (s *Strategy) LoadState() error {
 
 	// if position is nil, we need to allocate a new position for calculation
 	if s.state.Position == nil {
-		s.state.Position = types.NewPositionFromMarket(s.market)
+		s.state.Position = types.NewPositionFromMarket(s.Market)
 	}
 
 	// init profit states
-	s.state.ProfitStats.Symbol = s.market.Symbol
-	s.state.ProfitStats.BaseCurrency = s.market.BaseCurrency
-	s.state.ProfitStats.QuoteCurrency = s.market.QuoteCurrency
+	s.state.ProfitStats.Symbol = s.Market.Symbol
+	s.state.ProfitStats.BaseCurrency = s.Market.BaseCurrency
+	s.state.ProfitStats.QuoteCurrency = s.Market.QuoteCurrency
 	if s.state.ProfitStats.AccumulatedSince == 0 {
 		s.state.ProfitStats.AccumulatedSince = time.Now().Unix()
 	}
@@ -323,7 +324,7 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 		Type:     types.OrderTypeLimitMaker,
 		Quantity: sellQuantity,
 		Price:    askPrice,
-		Market:   s.market,
+		Market:   s.Market,
 		GroupID:  s.groupID,
 	}
 	buyOrder := types.SubmitOrder{
@@ -332,14 +333,14 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 		Type:     types.OrderTypeLimitMaker,
 		Quantity: buyQuantity,
 		Price:    bidPrice,
-		Market:   s.market,
+		Market:   s.Market,
 		GroupID:  s.groupID,
 	}
 
 	var submitOrders []types.SubmitOrder
 
-	baseBalance, hasBaseBalance := balances[s.market.BaseCurrency]
-	quoteBalance, hasQuoteBalance := balances[s.market.QuoteCurrency]
+	baseBalance, hasBaseBalance := balances[s.Market.BaseCurrency]
+	quoteBalance, hasQuoteBalance := balances[s.Market.QuoteCurrency]
 
 	downBand := s.defaultBoll.LastDownBand()
 	upBand := s.defaultBoll.LastUpBand()
@@ -421,12 +422,12 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 
 	case UpTrend:
 		skew := s.UptrendSkew
-		buyOrder.Quantity = fixedpoint.Max(s.market.MinQuantity, sellOrder.Quantity.Mul(skew))
+		buyOrder.Quantity = fixedpoint.Max(s.Market.MinQuantity, sellOrder.Quantity.Mul(skew))
 
 	case DownTrend:
 		skew := s.DowntrendSkew
 		ratio := fixedpoint.One.Div(skew)
-		sellOrder.Quantity = fixedpoint.Max(s.market.MinQuantity, buyOrder.Quantity.Mul(ratio))
+		sellOrder.Quantity = fixedpoint.Max(s.Market.MinQuantity, buyOrder.Quantity.Mul(ratio))
 
 	}
 
@@ -506,12 +507,12 @@ func (s *Strategy) detectPriceTrend(inc *indicator.BOLL, price float64) PriceTre
 }
 
 func (s *Strategy) adjustOrderQuantity(submitOrder types.SubmitOrder) types.SubmitOrder {
-	if submitOrder.Quantity.Mul(submitOrder.Price).Compare(s.market.MinNotional) < 0 {
-		submitOrder.Quantity = bbgo.AdjustFloatQuantityByMinAmount(submitOrder.Quantity, submitOrder.Price, s.market.MinNotional.Mul(notionModifier))
+	if submitOrder.Quantity.Mul(submitOrder.Price).Compare(s.Market.MinNotional) < 0 {
+		submitOrder.Quantity = bbgo.AdjustFloatQuantityByMinAmount(submitOrder.Quantity, submitOrder.Price, s.Market.MinNotional.Mul(notionModifier))
 	}
 
-	if submitOrder.Quantity.Compare(s.market.MinQuantity) < 0 {
-		submitOrder.Quantity = fixedpoint.Max(submitOrder.Quantity, s.market.MinQuantity)
+	if submitOrder.Quantity.Compare(s.Market.MinQuantity) < 0 {
+		submitOrder.Quantity = fixedpoint.Max(submitOrder.Quantity, s.Market.MinQuantity)
 	}
 
 	return submitOrder
@@ -540,13 +541,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	// initial required information
 	s.session = session
-
-	market, ok := session.Market(s.Symbol)
-	if !ok {
-		return fmt.Errorf("market %s not found", s.Symbol)
-	}
-	s.market = market
-
 	s.neutralBoll = s.StandardIndicatorSet.BOLL(s.NeutralBollinger.IntervalWindow, s.NeutralBollinger.BandWidth)
 	s.defaultBoll = s.StandardIndicatorSet.BOLL(s.DefaultBollinger.IntervalWindow, s.DefaultBollinger.BandWidth)
 
@@ -571,17 +565,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.tradeCollector = bbgo.NewTradeCollector(s.Symbol, s.state.Position, s.orderStore)
 	s.tradeCollector.OnProfit(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
 		log.Infof("generated profit: %v", profit)
-		p := bbgo.Profit{
-			Symbol:          s.Symbol,
-			Profit:          profit,
-			NetProfit:       netProfit,
-			TradeAmount:     trade.QuoteQuantity,
-			ProfitMargin:    profit.Div(trade.QuoteQuantity),
-			NetProfitMargin: netProfit.Div(trade.QuoteQuantity),
-			QuoteCurrency:   s.state.Position.QuoteCurrency,
-			BaseCurrency:    s.state.Position.BaseCurrency,
-			Time:            trade.Time.Time(),
-		}
+		p := s.state.Position.NewProfit(trade, profit, netProfit)
+		p.Strategy = ID
+		p.StrategyInstanceID = instanceID
+		s.Environment.RecordProfit(p)
+
 		s.state.ProfitStats.AddProfit(p)
 		s.Notify(&p)
 		s.Notify(&s.state.ProfitStats)
