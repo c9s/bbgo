@@ -3,7 +3,7 @@
 Show user account balances
 
 ```
-bbgo balances --session SESSION [flags]
+bbgo balances [--session SESSION] [flags]
 ```
 
 ### Options

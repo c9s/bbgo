@@ -217,10 +217,6 @@ type Account struct {
 	MakerFeeRate fixedpoint.Value `json:"makerFeeRate,omitempty"`
 	TakerFeeRate fixedpoint.Value `json:"takerFeeRate,omitempty"`
 
-	// bps. 0.15% fee will be 15.
-	MakerCommission fixedpoint.Value `json:"makerCommission,omitempty"`
-	TakerCommission fixedpoint.Value `json:"takerCommission,omitempty"`
-
 	TotalAccountValue fixedpoint.Value `json:"totalAccountValue,omitempty"`
 
 	CanDeposit  bool `json:"canDeposit"`
