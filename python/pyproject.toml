@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "pybbgo"
+version = "0.1.0"
+description = ""
+authors = ["なるみ <narumi@maicoin.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+click = "^8.0.4"
+loguru = "^0.6.0"
+grpcio = "^1.44.0"
+grpcio-tools = "^1.44.0"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
