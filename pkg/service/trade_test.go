@@ -3,12 +3,13 @@ package service
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 func Test_tradeService(t *testing.T) {
@@ -34,6 +35,7 @@ func Test_tradeService(t *testing.T) {
 		Symbol:        "BTCUSDT",
 		Side:          "BUY",
 		IsBuyer:       true,
+		Time:          types.Time(time.Now()),
 	})
 	assert.NoError(t, err)
 
