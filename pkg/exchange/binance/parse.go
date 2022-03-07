@@ -102,7 +102,6 @@ type ExecutionReportEvent struct {
 }
 
 func (e *ExecutionReportEvent) Order() (*types.Order, error) {
-
 	switch e.CurrentExecutionType {
 	case "NEW", "CANCELED", "REJECTED", "EXPIRED":
 	case "REPLACED":
@@ -113,7 +112,6 @@ func (e *ExecutionReportEvent) Order() (*types.Order, error) {
 
 	orderCreationTime := time.Unix(0, e.OrderCreationTime*int64(time.Millisecond))
 	return &types.Order{
-		Exchange: types.ExchangeBinance,
 		SubmitOrder: types.SubmitOrder{
 			Symbol:        e.Symbol,
 			ClientOrderID: e.ClientOrderID,
@@ -123,10 +121,13 @@ func (e *ExecutionReportEvent) Order() (*types.Order, error) {
 			Price:         e.OrderPrice,
 			TimeInForce:   types.TimeInForce(e.TimeInForce),
 		},
+		Exchange: types.ExchangeBinance,
+		IsWorking:        e.IsOnBook,
 		OrderID:          uint64(e.OrderID),
 		Status:           toGlobalOrderStatus(binance.OrderStatusType(e.CurrentOrderStatus)),
 		ExecutedQuantity: e.CumulativeFilledQuantity,
 		CreationTime:     types.Time(orderCreationTime),
+		UpdateTime:       types.Time(orderCreationTime),
 	}, nil
 }
 

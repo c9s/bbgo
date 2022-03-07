@@ -8,19 +8,22 @@
 
 2. Create migration files
 
-```sh
-rockhopper --config rockhopper_sqlite.yaml create --type sql add_pnl_column
-rockhopper --config rockhopper_mysql.yaml create --type sql add_pnl_column
-```
 
-or you can use the util script:
+You can use the util script to generate the migration files:
 
 ```
 bash utils/generate-new-migration.sh add_pnl_column
 ```
 
-Be sure to edit both sqlite3 and mysql migration files. ( [Sample](migrations/mysql/20210531234123_add_kline_taker_buy_columns.sql) )
+Or, you can generate the migration files separately:
 
+```sh
+rockhopper --config rockhopper_sqlite.yaml create --type sql add_pnl_column
+rockhopper --config rockhopper_mysql.yaml create --type sql add_pnl_column
+```
+
+
+Be sure to edit both sqlite3 and mysql migration files. ( [Sample](migrations/mysql/20210531234123_add_kline_taker_buy_columns.sql) )
 
 To test the drivers, you have to update the rockhopper_mysql.yaml file to connect your database,
 then do:
@@ -39,9 +42,9 @@ make migrations
 or
 
 ```shell
-	rockhopper compile --config rockhopper_mysql.yaml --output pkg/migrations/mysql
-	rockhopper compile --config rockhopper_sqlite.yaml --output pkg/migrations/sqlite3
-	git add -v pkg/migrations && git commit -m "compile and update migration package" pkg/migrations || true
+rockhopper compile --config rockhopper_mysql.yaml --output pkg/migrations/mysql
+rockhopper compile --config rockhopper_sqlite.yaml --output pkg/migrations/sqlite3
+git add -v pkg/migrations && git commit -m "compile and update migration package" pkg/migrations || true
 ```
 
 

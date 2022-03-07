@@ -76,6 +76,7 @@ type Environment struct {
 	DatabaseService          *service.DatabaseService
 	OrderService             *service.OrderService
 	TradeService             *service.TradeService
+	ProfitService            *service.ProfitService
 	BacktestService          *service.BacktestService
 	RewardService            *service.RewardService
 	SyncService              *service.SyncService
@@ -170,6 +171,7 @@ func (environ *Environment) ConfigureDatabaseDriver(ctx context.Context, driver 
 	environ.TradeService = &service.TradeService{DB: db}
 	environ.RewardService = &service.RewardService{DB: db}
 	environ.AccountService = &service.AccountService{DB: db}
+	environ.ProfitService = &service.ProfitService{DB: db}
 
 	environ.SyncService = &service.SyncService{
 		TradeService:    environ.TradeService,
@@ -569,6 +571,19 @@ func (environ *Environment) Sync(ctx context.Context, userConfig ...*Config) err
 	return nil
 }
 
+func (environ *Environment) RecordProfit(profit types.Profit) {
+	if environ.DatabaseService == nil {
+		return
+	}
+	if environ.ProfitService == nil {
+		return
+	}
+
+	if err := environ.ProfitService.Insert(profit) ; err != nil {
+		log.WithError(err).Errorf("can not insert profit record: %+v", profit)
+	}
+}
+
 func (environ *Environment) SyncSession(ctx context.Context, session *ExchangeSession, defaultSymbols ...string) error {
 	if environ.SyncService == nil {
 		return nil
@@ -584,7 +599,7 @@ func (environ *Environment) SyncSession(ctx context.Context, session *ExchangeSe
 }
 
 func (environ *Environment) syncSession(ctx context.Context, session *ExchangeSession, defaultSymbols ...string) error {
-	symbols, err := getSessionSymbols(session, defaultSymbols...)
+	symbols, err := session.getSessionSymbols(defaultSymbols...)
 	if err != nil {
 		return err
 	}
@@ -594,17 +609,6 @@ func (environ *Environment) syncSession(ctx context.Context, session *ExchangeSe
 	return environ.SyncService.SyncSessionSymbols(ctx, session.Exchange, environ.syncStartTime, symbols...)
 }
 
-func getSessionSymbols(session *ExchangeSession, defaultSymbols ...string) ([]string, error) {
-	if session.IsolatedMargin {
-		return []string{session.IsolatedMarginSymbol}, nil
-	}
-
-	if len(defaultSymbols) > 0 {
-		return defaultSymbols, nil
-	}
-
-	return session.FindPossibleSymbols()
-}
 
 func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) error {
 	environ.Notifiability = Notifiability{
@@ -654,6 +658,10 @@ func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) erro
 	return nil
 }
 
+// getAuthStoreID returns the authentication store id
+// if telegram bot token is defined, the bot id will be used.
+// if not, env var $USER will be used.
+// if both are not defined, a default "default" will be used.
 func getAuthStoreID() string {
 	telegramBotToken := viper.GetString("telegram-bot-token")
 	if len(telegramBotToken) > 0 {
@@ -923,4 +931,16 @@ And then enter your token
 	%s
 
 `, token)
+}
+
+func (session *ExchangeSession) getSessionSymbols(defaultSymbols ...string) ([]string, error) {
+	if session.IsolatedMargin {
+		return []string{session.IsolatedMarginSymbol}, nil
+	}
+
+	if len(defaultSymbols) > 0 {
+		return defaultSymbols, nil
+	}
+
+	return session.FindPossibleSymbols()
 }
