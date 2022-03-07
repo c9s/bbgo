@@ -2,7 +2,7 @@
 """Client and server classes corresponding to protobuf-defined services."""
 import grpc
 
-import bbgo_pb2 as bbgo__pb2
+from . import bbgo_pb2 as bbgo__pb2
 
 
 class BBGOStub(object):

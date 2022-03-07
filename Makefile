@@ -177,4 +177,5 @@ protobuf:
 	protoc -I=$(PWD)/pkg/pb --go_out=$(PWD)/pkg/pb $(PWD)/pkg/pb/bbgo.proto
 
 protobuf-py:
-	python -m grpc_tools.protoc -I$(PWD)/pkg/pb --python_out=$(PWD)/python/pybbgo --grpc_python_out=$(PWD)/python/pybbgo $(PWD)/pkg/pb/bbgo.proto
+	python -m grpc_tools.protoc -I$(PWD)/pkg/pb --python_out=$(PWD)/python/bbgo --grpc_python_out=$(PWD)/python/bbgo $(PWD)/pkg/pb/bbgo.proto
+

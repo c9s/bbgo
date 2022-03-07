@@ -1,0 +1,43 @@
+name: Python
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: [3.8]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install poetry
+        run: pip install poetry==1.1.13
+
+      - name: Install package
+        run: |
+          cd python
+          poetry install
+
+      - name: Test
+        run: |
+          cd python
+          poetry run pytest -v -s tests
+
+      - name: Lint
+        run: |
+          cd python
+          poetry run flake8 .

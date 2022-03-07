@@ -18,6 +18,42 @@ service BBGO {
     rpc QueryKLines(QueryKLinesRequest) returns (QueryKLinesResponse) {}
 }
 
+enum Event {
+    ERROR = 0;
+    SUBSCRIBED = 1;
+    UNSUBSCRIBED = 2;
+    SNAPSHOT = 3;
+    UPDATE = 4;
+    AUTHENTICATED = 5;
+    ORDER_SNAPSHOT = 6;
+    ORDER_UPDATE = 7;
+    TRADE_SNAPSHOT = 8;
+    TRADE_UPDATE = 9;
+    ACCOUNT_SNAPSHOT = 10;
+    ACCOUNT_UPDATE = 11;
+}
+
+enum Channel {
+    BOOK = 0;
+    TRADE = 1;
+    TICKER = 2;
+    USER = 3;
+}
+
+enum Side {
+    BUY = 0;
+    SELL = 1;
+}
+
+enum OrderType {
+    MARKET = 0;
+    LIMIT = 1;
+    STOP_MARKET = 2;
+    STOP_LIMIT = 3;
+    POST_ONLY = 4;
+    IOC_LIMIT = 5;
+}
+
 message Empty {}
 
 message Error {
@@ -31,7 +67,7 @@ message SubscribeRequest {
 
 message Subscription {
     string exchange = 1;
-    string channel = 2;  // book, trade, ticker
+    Channel channel = 2;  // book, trade, ticker
     string symbol = 3;
     int64 depth = 4;
 }
@@ -39,8 +75,8 @@ message Subscription {
 message SubscribeResponse {
     string exchange = 1;
     string symbol = 2;
-    string channel = 3;  // book, trade, ticker, user
-    string event = 4;    // snapshot, update, order_snapshot, ...
+    Channel channel = 3;  // book, trade, ticker, user
+    Event event = 4;      // snapshot, update, order_snapshot, ...
     Depth depth = 5;
     repeated Trade trades = 6;
     Ticker ticker = 7;
@@ -71,7 +107,7 @@ message Trade {
     double price = 4;
     double volume = 5;
     int64 created_at = 6;
-    string side = 7;
+    Side side = 7;
     double fee = 8;
     string fee_currency = 9;
     bool maker = 10;
@@ -94,8 +130,8 @@ message Order {
     string exchange = 1;
     string symbol = 2;
     string id = 3;
-    string side = 4;
-    string order_type = 5;
+    Side side = 4;
+    OrderType order_type = 5;
     double price = 6;
     double stop_price = 7;
     double avg_price = 8;
@@ -111,11 +147,11 @@ message Order {
 message SubmitOrder {
     string exchange = 1;
     string symbol = 2;
-    string side = 3;
+    Side side = 3;
     double quantity = 4;
     double price = 5;
     double stop_price = 6;
-    string order_type = 7;
+    OrderType order_type = 7;
     string client_order_id = 8;
     int64 group_id = 9;
 }
