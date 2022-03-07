@@ -142,7 +142,7 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 			MaxQuantity: fixedpoint.NewFromInt(10000),
 			// make it like 0.0001
 			StepSize: fixedpoint.NewFromFloat(1.0 / math.Pow10(m.BaseUnitPrecision)),
-            // used in the price formatter
+			// used in the price formatter
 			MinPrice: fixedpoint.NewFromFloat(1.0 / math.Pow10(m.QuoteUnitPrecision)),
 			MaxPrice: fixedpoint.NewFromInt(10000),
 			TickSize: fixedpoint.NewFromFloat(1.0 / math.Pow10(m.QuoteUnitPrecision)),
@@ -210,6 +210,10 @@ func (e *Exchange) queryRecentlyClosedOrders(ctx context.Context, symbol string,
 	limit := 1000 // max limit = 1000, default 100
 	orderIDs := make(map[uint64]struct{}, limit*2)
 	maxPages := 10
+
+	if v, ok := util.GetEnvVarInt("MAX_QUERY_CLOSED_ORDERS_LIMIT"); ok {
+		limit = v
+	}
 
 	if v, ok := util.GetEnvVarInt("MAX_QUERY_CLOSED_ORDERS_NUM_OF_PAGES"); ok {
 		maxPages = v
