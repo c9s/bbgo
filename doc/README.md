@@ -6,6 +6,7 @@
 * [Build From Source](build-from-source.md) - How to build bbgo
 * [Back-testing](topics/back-testing.md) - How to back-test strategies
 * [TWAP](topics/twap.md) - TWAP order execution to buy/sell large quantity of order
+* [Dnum Installation](topics/dnum-binary.md) - installation of high-precision version of bbgo
 
 ### Configuration
 * [Setting up Slack Notification](configuration/slack.md)

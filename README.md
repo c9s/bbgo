@@ -63,14 +63,13 @@ Get your exchange API key and secret after you register the accounts (you can ch
 - OKEx: <https://www.okex.com/join/2412712?src=from:ios-share>
 - Kucoin: <https://www.kucoin.com/ucenter/signup?rcode=r3KX2D4>
 
-Since the exchange implementation and support are done by a small team, if you like the work they've done for you, It
-would be great if you can use their referral code as your support to them. :-D
+This project is maintained and supported by a small group of team. If you would like to support this project, please register on the exchanges using the provided links with referral codes above.
 
 ## Installation
 
 ### Install from binary
 
-The following script will help you set up a config file, dotenv file:
+The following script will help you set up a config file and a dotenv file:
 
 ```sh
 # grid trading strategy for binance exchange
@@ -86,32 +85,15 @@ bash <(curl -s https://raw.githubusercontent.com/c9s/bbgo/main/scripts/setup-bol
 bash <(curl -s https://raw.githubusercontent.com/c9s/bbgo/main/scripts/setup-bollgrid.sh) max
 ```
 
-Since v1.28, we've added new float point implementation from dnum to support decimals with higher precision, and could set up using the following scripts:
-
+If you already have configuration somewhere, a download-only script might be suitable for you:
 ```sh
-# grid trading strategy for binance exchange
-bash <(curl -s https://raw.githubusercontent.com/c9s/bbgo/main/scripts/setup-grid-dnum.sh) binance
-
-# grid trading strategy for max exchange
-bash <(curl -s https://raw.githubusercontent.com/c9s/bbgo/main/scripts/setup-grid-dnum.sh) max
-
-# bollinger grid trading strategy for binance exchange
-bash <(curl -s https://raw.githubusercontent.com/c9s/bbgo/main/scripts/setup-bollgrid-dnum.sh) binance
-
-# bollinger grid trading strategy for max exchange
-bash <(curl -s https://raw.githubusercontent.com/c9s/bbgo/main/scripts/setup-bollgrid-dnum.sh) max
-```
-
-If you purely want to download the precompiled bbgo binaries, check https://github.com/c9s/bbgo/releases.
-Or using the download scripts:
-```sh
-# for high precision implementation
-bash <(curl -s https://raw.githubusercontent.com/c9s/bbgo/main/scripts/download-dnum.sh)
-
-# for legacy float point implementation
 bash <(curl -s https://raw.githubusercontent.com/c9s/bbgo/main/scripts/download.sh)
 ```
 
+Or refer to the [Release Page](https://github.com/c9s/bbgo/releases) and download manually.
+
+Since v2, we've added new float point implementation from dnum to support decimals with higher precision.
+To download & setup, please refer to [Dnum Installation](doc/topics/dnum-binary.md) 
 
 ### One-click Linode StackScript:
 
