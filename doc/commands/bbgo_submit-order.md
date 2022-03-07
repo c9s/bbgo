@@ -1,6 +1,6 @@
 ## bbgo submit-order
 
-place limit order to the exchange
+place order to the exchange
 
 ```
 bbgo submit-order --session SESSION --symbol SYMBOL --side SIDE --quantity QUANTITY [--price PRICE] [flags]

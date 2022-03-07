@@ -177,8 +177,6 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	}
 
 	a := &types.Account{
-		MakerCommission:   ftxAccount.MakerFee,
-		TakerCommission:   ftxAccount.TakerFee,
 		TotalAccountValue: ftxAccount.TotalAccountValue,
 	}
 

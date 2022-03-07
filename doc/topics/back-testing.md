@@ -20,9 +20,10 @@ backtest:
   
   account:
     # the initial account balance you want to start with
-    balances:
-      BTC: 0.0
-      USDT: 10000.0
+    binance: # exchange name
+      balances:
+        BTC: 0.0
+        USDT: 10000.0
 ```
 
 Note on date formats, the following date formats are supported:
@@ -33,7 +34,7 @@ Note on date formats, the following date formats are supported:
 And then, you can sync remote exchange k-lines (candle bars) data for back-testing:
 
 ```sh
-bbgo backtest --exchange binance -v --sync --sync-only --sync-from 2020-11-01 --config config/grid.yaml
+bbgo backtest -v --sync --sync-only --sync-from 2020-11-01 --config config/grid.yaml
 ```
 
 Note that, you should sync from an earlier date before your startTime because some indicator like EMA needs more data to calculate the current EMA value.
@@ -48,13 +49,13 @@ Here we sync one month before `2021-01-10`.
 Run back-test:
 
 ```sh
-bbgo backtest --exchange binance --base-asset-baseline --config config/grid.yaml
+bbgo backtest --base-asset-baseline --config config/grid.yaml
 ```
 
 If you're developing a strategy, you might want to start with a command like this:
 
 ```shell
-godotenv -f .env.local -- go run ./cmd/bbgo backtest --exchange binance --config config/grid.yaml --base-asset-baseline
+godotenv -f .env.local -- go run ./cmd/bbgo backtest --config config/grid.yaml --base-asset-baseline
 ```
 
 ## See Also

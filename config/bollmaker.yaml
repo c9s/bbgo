@@ -5,8 +5,13 @@ persistence:
     port: 6379
     db: 0
 
+sessions:
+  binance:
+    exchange: binance
+    envVarPrefix: BINANCE
+
 # example command:
-#    godotenv -f .env.local -- go run ./cmd/bbgo backtest --exchange max --sync-from 2020-11-01 --config config/grid.yaml --base-asset-baseline
+#    godotenv -f .env.local -- go run ./cmd/bbgo backtest --sync-from 2020-11-01 --config config/grid.yaml --base-asset-baseline
 backtest:
   # for testing max draw down (MDD) at 03-12
   # see here for more details
@@ -16,9 +21,10 @@ backtest:
   symbols:
   - ETHUSDT
   account:
-    balances:
-      ETH: 1.0
-      USDT: 20_000.0
+    binance:
+      balances:
+        ETH: 1.0
+        USDT: 20_000.0
 
 exchangeStrategies:
 

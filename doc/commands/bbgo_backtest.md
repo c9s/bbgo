@@ -10,7 +10,6 @@ bbgo backtest [flags]
 
 ```
       --base-asset-baseline   use base asset performance as the competitive baseline performance
-      --exchange string       target exchange
       --force                 force execution without confirm
   -h, --help                  help for backtest
       --output string         the report output directory

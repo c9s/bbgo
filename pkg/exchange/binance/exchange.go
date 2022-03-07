@@ -457,8 +457,6 @@ func (e *Exchange) QuerySpotAccount(ctx context.Context) (*types.Account, error)
 
 	a := &types.Account{
 		AccountType:     types.AccountTypeSpot,
-		MakerCommission: fixedpoint.NewFromFloat(float64(account.MakerCommission) * 0.0001),
-		TakerCommission: fixedpoint.NewFromFloat(float64(account.TakerCommission) * 0.0001),
 		CanDeposit:      account.CanDeposit,  // if can transfer in asset
 		CanTrade:        account.CanTrade,    // if can trade
 		CanWithdraw:     account.CanWithdraw, // if can transfer out asset

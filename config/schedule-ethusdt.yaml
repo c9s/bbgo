@@ -1,14 +1,21 @@
 ---
-# time godotenv -f .env.local -- go run ./cmd/bbgo backtest --exchange binance --base-asset-baseline --config config/schedule-ethusdt.yaml -v
+
+sessions:
+  binance:
+    exchange: binance
+    envVarPrefix: binance
+
+# time godotenv -f .env.local -- go run ./cmd/bbgo backtest --base-asset-baseline --config config/schedule-ethusdt.yaml -v
 backtest:
   startTime: "2021-08-01"
   endTime: "2021-08-07"
   symbols:
   - ETHUSDT
   account:
-    balances:
-      ETH: 1.0
-      USDT: 20_000.0
+    binance:
+      balances:
+        ETH: 1.0
+        USDT: 20_000.0
 
 riskControls:
   # This is the session-based risk controller, which let you configure different risk controller by session.
