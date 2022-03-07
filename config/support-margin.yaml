@@ -47,8 +47,8 @@ backtest:
   - LINKUSDT
   account:
     binance:
-      makerCommission: 15
-      takerCommission: 15
+      makerFeeRate: 15
+      takerFeeRate: 15
       balances:
         LINK: 0.0
         USDT: 10000.0

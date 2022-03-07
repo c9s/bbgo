@@ -46,10 +46,8 @@ backtest:
   - BTCUSDT
   account:
     binance:
-      makerCommission: 15
-      takerCommission: 15
-      buyerCommission: 0
-      sellerCommission: 0
+      makerFeeRate: 15
+      takerFeeRate: 15
       balances:
         BTC: 0.1
         USDT: 10000.0

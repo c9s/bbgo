@@ -31,8 +31,8 @@ backtest:
   - USDTTWD
   account:
     max:
-      makerCommission: 15
-      takerCommission: 15
+      makerFeeRate: 15
+      takerFeeRate: 15
       balances:
         BTC: 0.0
         USDT: 10_000.0
