@@ -11,6 +11,8 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 const pingInterval = 30 * time.Second
@@ -90,6 +92,12 @@ type StandardStream struct {
 
 	kLineCallbacks []func(kline KLine)
 
+	lastAshi map[string]*HeikinAshi
+
+	heikinAshiClosedCallbacks []func(ashi HeikinAshi)
+
+	heikinAshiCallbacks []func(ashi HeikinAshi)
+
 	bookUpdateCallbacks []func(book SliceOrderBook)
 
 	bookTickerUpdateCallbacks []func(bookTicker BookTicker)
@@ -103,10 +111,108 @@ type StandardStream struct {
 }
 
 func NewStandardStream() StandardStream {
-	return StandardStream{
+	s := StandardStream{
 		ReconnectC: make(chan struct{}, 1),
 		CloseC:     make(chan struct{}),
 	}
+	s.kLineClosedCallbacks = append(s.kLineClosedCallbacks, func(kline KLine) {
+		if len(s.heikinAshiClosedCallbacks) > 0 {
+			var ashi HeikinAshi
+			lastAshi := s.lastAshi[kline.Symbol]
+			if lastAshi == nil {
+				ashi = HeikinAshi {
+					GID: kline.GID,
+					Exchange: kline.Exchange,
+					Symbol: kline.Symbol,
+					StartTime: kline.StartTime,
+					EndTime: kline.EndTime,
+					Interval: kline.Interval,
+					Open: kline.Open,
+					Close: kline.Close.Add(kline.High).Add(kline.Low).Add(kline.Close).Div(Four),
+					High: fixedpoint.Max(kline.Open, fixedpoint.Max(kline.High, kline.Close)),
+					Low: fixedpoint.Min(kline.Open, fixedpoint.Min(kline.Low, kline.Close)),
+					Volume: kline.Volume,
+					QuoteVolume: kline.QuoteVolume,
+					TakerBuyBaseAssetVolume: kline.TakerBuyBaseAssetVolume,
+					LastTradeID: kline.LastTradeID,
+					NumberOfTrades: kline.NumberOfTrades,
+					Closed: kline.Closed,
+				}
+			} else {
+				ashi = HeikinAshi {
+					GID: kline.GID,
+					Exchange: kline.Exchange,
+					Symbol: kline.Symbol,
+					StartTime: kline.StartTime,
+					EndTime: kline.EndTime,
+					Interval: kline.Interval,
+					Open: lastAshi.Open.Add(lastAshi.Close).Div(Two),
+					Close: kline.Close.Add(kline.High).Add(kline.Low).Add(kline.Close).Div(Four),
+					High: fixedpoint.Max(kline.Open, fixedpoint.Max(kline.High, kline.Close)),
+					Low: fixedpoint.Min(kline.Open, fixedpoint.Min(kline.Low, kline.Close)),
+					Volume: kline.Volume,
+					QuoteVolume: kline.QuoteVolume,
+					TakerBuyBaseAssetVolume: kline.TakerBuyBaseAssetVolume,
+					LastTradeID: kline.LastTradeID,
+					NumberOfTrades: kline.NumberOfTrades,
+					Closed: kline.Closed,
+				}
+			}
+			s.lastAshi[kline.Symbol] = &ashi
+			for _, cb := range s.heikinAshiClosedCallbacks {
+				cb(ashi)
+			}
+		}
+	})
+	s.kLineCallbacks = append(s.kLineCallbacks, func(kline KLine) {
+		if len(s.heikinAshiCallbacks) > 0 {
+			var ashi HeikinAshi
+			lastAshi := s.lastAshi[kline.Symbol]
+			if lastAshi == nil {
+				ashi = HeikinAshi {
+					GID: kline.GID,
+					Exchange: kline.Exchange,
+					Symbol: kline.Symbol,
+					StartTime: kline.StartTime,
+					EndTime: kline.EndTime,
+					Interval: kline.Interval,
+					Open: kline.Open,
+					Close: kline.Close.Add(kline.High).Add(kline.Low).Add(kline.Close).Div(Four),
+					High: fixedpoint.Max(kline.Open, fixedpoint.Max(kline.High, kline.Close)),
+					Low: fixedpoint.Min(kline.Open, fixedpoint.Min(kline.Low, kline.Close)),
+					Volume: kline.Volume,
+					QuoteVolume: kline.QuoteVolume,
+					TakerBuyBaseAssetVolume: kline.TakerBuyBaseAssetVolume,
+					LastTradeID: kline.LastTradeID,
+					NumberOfTrades: kline.NumberOfTrades,
+					Closed: kline.Closed,
+				}
+			} else {
+				ashi = HeikinAshi {
+					GID: kline.GID,
+					Exchange: kline.Exchange,
+					Symbol: kline.Symbol,
+					StartTime: kline.StartTime,
+					EndTime: kline.EndTime,
+					Interval: kline.Interval,
+					Open: lastAshi.Open.Add(lastAshi.Close).Div(Two),
+					Close: kline.Close.Add(kline.High).Add(kline.Low).Add(kline.Close).Div(Four),
+					High: fixedpoint.Max(kline.Open, fixedpoint.Max(kline.High, kline.Close)),
+					Low: fixedpoint.Min(kline.Open, fixedpoint.Min(kline.Low, kline.Close)),
+					Volume: kline.Volume,
+					QuoteVolume: kline.QuoteVolume,
+					TakerBuyBaseAssetVolume: kline.TakerBuyBaseAssetVolume,
+					LastTradeID: kline.LastTradeID,
+					NumberOfTrades: kline.NumberOfTrades,
+					Closed: kline.Closed,
+				}
+			}
+			for _, cb := range s.heikinAshiCallbacks {
+				cb(ashi)
+			}
+		}
+	})
+	return s
 }
 
 func (s *StandardStream) SetPublicOnly() {

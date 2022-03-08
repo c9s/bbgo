@@ -94,6 +94,26 @@ func (s *StandardStream) EmitKLine(kline KLine) {
 	}
 }
 
+func (s *StandardStream) OnHeikinAshiClosed(cb func(ashi HeikinAshi)) {
+	s.heikinAshiClosedCallbacks = append(s.heikinAshiClosedCallbacks, cb)
+}
+
+func (s *StandardStream) EmitHeikinAshiClosed(ashi HeikinAshi) {
+	for _, cb := range s.heikinAshiClosedCallbacks {
+		cb(ashi)
+	}
+}
+
+func (s *StandardStream) OnHeikinAshi(cb func(ashi HeikinAshi)) {
+	s.heikinAshiCallbacks = append(s.heikinAshiCallbacks, cb)
+}
+
+func (s *StandardStream) EmitHeikinAshi(ashi HeikinAshi) {
+	for _, cb := range s.heikinAshiCallbacks {
+		cb(ashi)
+	}
+}
+
 func (s *StandardStream) OnBookUpdate(cb func(book SliceOrderBook)) {
 	s.bookUpdateCallbacks = append(s.bookUpdateCallbacks, cb)
 }
@@ -162,6 +182,10 @@ type StandardStreamEventHub interface {
 	OnKLineClosed(cb func(kline KLine))
 
 	OnKLine(cb func(kline KLine))
+
+	OnHeikinAshiClosed(cb func(ashi HeikinAshi))
+
+	OnHeikinAshi(cb func(ashi HeikinAshi))
 
 	OnBookUpdate(cb func(book SliceOrderBook))
 

@@ -2,7 +2,6 @@ package types
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/slack-go/slack"
 
@@ -10,40 +9,7 @@ import (
 	"github.com/c9s/bbgo/pkg/util"
 )
 
-type Direction int
-
-const DirectionUp = 1
-const DirectionNone = 0
-const DirectionDown = -1
-
 var Two = fixedpoint.NewFromInt(2)
-
-type KLineOrWindow interface {
-	GetInterval() string
-	Direction() Direction
-	GetChange() fixedpoint.Value
-	GetMaxChange() fixedpoint.Value
-	GetThickness() fixedpoint.Value
-
-	Mid() fixedpoint.Value
-	GetOpen() fixedpoint.Value
-	GetClose() fixedpoint.Value
-	GetHigh() fixedpoint.Value
-	GetLow() fixedpoint.Value
-
-	BounceUp() bool
-	BounceDown() bool
-	GetUpperShadowRatio() fixedpoint.Value
-	GetLowerShadowRatio() fixedpoint.Value
-
-	SlackAttachment() slack.Attachment
-}
-
-type KLineQueryOptions struct {
-	Limit     int
-	StartTime *time.Time
-	EndTime   *time.Time
-}
 
 // KLine uses binance's kline as the standard structure
 type KLine struct {
@@ -201,6 +167,10 @@ func (k KLine) Color() string {
 	return GrayColor
 }
 
+func (k KLine) GetType() string {
+	return "kline"
+}
+
 func (k KLine) String() string {
 	return fmt.Sprintf("%s %s %s %s O: %.4f H: %.4f L: %.4f C: %.4f CHG: %.4f MAXCHG: %.4f V: %.4f QV: %.2f TBBV: %.2f",
 		k.Exchange.String(),
@@ -265,16 +235,16 @@ func (k KLineWindow) Len() int {
 	return len(k)
 }
 
-func (k KLineWindow) First() KLine {
+func (k KLineWindow) First() CandleStick {
 	return k[0]
 }
 
-func (k KLineWindow) Last() KLine {
+func (k KLineWindow) Last() CandleStick {
 	return k[len(k)-1]
 }
 
 func (k KLineWindow) GetInterval() Interval {
-	return k.First().Interval
+	return k.First().GetInterval()
 }
 
 func (k KLineWindow) GetOpen() fixedpoint.Value {
@@ -374,15 +344,15 @@ func (k KLineWindow) BounceDown() bool {
 	return trend > 0 && k.GetOpen().Compare(mid) < 0 && k.GetClose().Compare(mid) < 0
 }
 
-func (k *KLineWindow) Add(line KLine) {
-	*k = append(*k, line)
+func (k *KLineWindow) Add(line CandleStick) {
+	*k = append(*k, line.(KLine))
 }
 
-func (k KLineWindow) Take(size int) KLineWindow {
+func (k KLineWindow) Take(size int) CandleStickWindow {
 	return k[:size]
 }
 
-func (k KLineWindow) Tail(size int) KLineWindow {
+func (k KLineWindow) Tail(size int) CandleStickWindow {
 	length := len(k)
 	if length <= size {
 		win := make(KLineWindow, length)
@@ -458,6 +428,65 @@ func (k KLineWindow) GetLowerShadowHeight() fixedpoint.Value {
 	return clos.Sub(low)
 }
 
+func (k KLineWindow) Direction() Direction {
+	o := k.GetOpen()
+	c := k.GetClose()
+
+	if c.Compare(o) > 0 {
+		return DirectionUp
+	} else if c.Compare(o) < 0 {
+		return DirectionDown
+	}
+	return DirectionNone
+}
+
+func (k KLineWindow) GetType() string {
+	return "kline"
+}
+
+func (k KLineWindow) GetEndTime() Time {
+	if len(k) > 0 {
+		return k[len(k) - 1].EndTime
+	}
+	return Time{}
+}
+
+func (k KLineWindow) GetStartTime() Time {
+	if len(k) > 0 {
+		return k[0].StartTime
+	}
+	return Time{}
+}
+
+func (k KLineWindow) String() string {
+	exchange := "{}"
+	symbol := "{}"
+	start := Time{}
+	var interval Interval
+	if len(k) > 0 {
+		exchange = k[0].Exchange.String()
+		symbol = k[0].Symbol
+		start = k[0].StartTime
+		interval = k[0].GetInterval()
+	}
+	return fmt.Sprintf("%s %s %s %s O: %s H: %s L: %s C: %s CHG: %s MAXCHG: %s",
+		exchange,
+		start.Time().Format("2006-01-02 15:04"),
+		symbol,
+		interval,
+		k.GetOpen().FormatString(4),
+		k.GetHigh().FormatString(4),
+		k.GetLow().FormatString(4),
+		k.GetClose().FormatString(4),
+		k.GetChange().FormatString(4),
+		k.GetMaxChange().FormatString(4),
+	)
+}
+
+func (k KLineWindow) PlainText() string {
+	return k.String()
+}
+
 func (k KLineWindow) SlackAttachment() slack.Attachment {
 	var first KLine
 	var end KLine
@@ -508,3 +537,8 @@ func (k KLineWindow) SlackAttachment() slack.Attachment {
 }
 
 type KLineCallback func(kline KLine)
+
+// ensure KLine and KLineWindow implements the CandleStick interfaces
+var _ CandleStick = KLine{}
+var _ CandleStickWindow = KLineWindow{}
+var _ CandleStickWindowPointer = &KLineWindow{}

@@ -222,16 +222,14 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 	return e.account.Balances(), nil
 }
 
-func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
+func (e *Exchange) QueryCandleSticks(ctx context.Context, symbol string, interval types.Interval, options types.CandleStickQueryOptions) ([]types.CandleStick, error) {
 	if options.EndTime != nil {
-		return e.srv.QueryKLinesBackward(e.sourceName, symbol, interval, *options.EndTime, 1000)
+		return e.srv.QueryCandleSticksBackward(e.sourceName, symbol, interval, *options.EndTime, options.Typename, 1000)
 	}
-
 	if options.StartTime != nil {
-		return e.srv.QueryKLinesForward(e.sourceName, symbol, interval, *options.StartTime, 1000)
+		return e.srv.QueryCandleSticksForward(e.sourceName, symbol, interal, *options.StartTime, options.Typename, 1000)
 	}
-
-	return nil, errors.New("endTime or startTime can not be nil")
+	return nil, errors.New("endTime or startTime cannot be nil")
 }
 
 func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) ([]types.Trade, error) {

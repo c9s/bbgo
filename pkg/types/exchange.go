@@ -106,7 +106,7 @@ type ExchangeMarketDataService interface {
 
 	QueryTickers(ctx context.Context, symbol ...string) (map[string]Ticker, error)
 
-	QueryKLines(ctx context.Context, symbol string, interval Interval, options KLineQueryOptions) ([]KLine, error)
+	QueryCandleSticks(ctx context.Context, symbol string, interval Interval, options CandleStickQueryOptions) ([]CandleStick, error)
 }
 
 type CustomIntervalProvider interface {

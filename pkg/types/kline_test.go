@@ -46,13 +46,13 @@ func TestKLineWindow_Truncate(t *testing.T) {
 
 	win.Truncate(5)
 	assert.Len(t, win, 4)
-	assert.Equal(t, 11603.0, win.Last().Open.Float64())
+	assert.Equal(t, 11603.0, win.Last().GetOpen().Float64())
 
 	win.Truncate(3)
 	assert.Len(t, win, 3)
-	assert.Equal(t, 11603.0, win.Last().Open.Float64())
+	assert.Equal(t, 11603.0, win.Last().GetOpen().Float64())
 
 	win.Truncate(1)
 	assert.Len(t, win, 1)
-	assert.Equal(t, 11603.0, win.Last().Open.Float64())
+	assert.Equal(t, 11603.0, win.Last().GetOpen().Float64())
 }
