@@ -150,8 +150,9 @@ message CancelOrderResponse {
 }
 
 message QueryOrderRequest {
-    int64 id = 1;
-    int64 client_order_id = 2;
+    string exchange = 1;
+    int64 id = 2;
+    int64 client_order_id = 3;
 }
 
 message QueryOrderResponse {
