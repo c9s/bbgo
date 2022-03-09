@@ -67,7 +67,7 @@ message PriceVolume {
 message Trade {
     string exchange = 1;
     string symbol = 2;
-    int64 id = 3;
+    string id = 3;
     double price = 4;
     double volume = 5;
     int64 created_at = 6;
@@ -93,7 +93,7 @@ message Ticker {
 message Order {
     string exchange = 1;
     string symbol = 2;
-    int64 id = 3;
+    string id = 3;
     string side = 4;
     string order_type = 5;
     double price = 6;
@@ -104,7 +104,7 @@ message Order {
     double quantity = 11;
     double executed_volume = 12;
     int64 trades_count = 13;
-    int64 client_order_id = 14;
+    string client_order_id = 14;
     int64 group_id = 15;
 }
 
@@ -116,7 +116,7 @@ message SubmitOrder {
     double price = 5;
     double stop_price = 6;
     string order_type = 7;
-    int64 client_order_id = 8;
+    string client_order_id = 8;
     int64 group_id = 9;
 }
 
@@ -140,8 +140,8 @@ message SubmitOrderResponse {
 
 message CancelOrderRequest {
     string exchange = 1;
-    int64 id = 2;
-    int64 client_order_id = 3;
+    string id = 2;
+    string client_order_id = 3;
 }
 
 message CancelOrderResponse {
@@ -150,8 +150,9 @@ message CancelOrderResponse {
 }
 
 message QueryOrderRequest {
-    int64 id = 1;
-    int64 client_order_id = 2;
+    string exchange = 1;
+    string id = 2;
+    string client_order_id = 3;
 }
 
 message QueryOrderResponse {
