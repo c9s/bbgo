@@ -6,7 +6,7 @@ CREATE TABLE `positions`
     `strategy`             VARCHAR(32)             NOT NULL,
     `strategy_instance_id` VARCHAR(64)             NOT NULL,
 
-    `symbol`               VARCHAR(20)              NOT NULL,
+    `symbol`               VARCHAR(20)             NOT NULL,
     `quote_currency`       VARCHAR(10)             NOT NULL,
     `base_currency`        VARCHAR(10)             NOT NULL,
 
@@ -14,6 +14,7 @@ CREATE TABLE `positions`
     `average_cost`         DECIMAL(16, 8) UNSIGNED NOT NULL,
     `base`                 DECIMAL(16, 8)          NOT NULL,
     `quote`                DECIMAL(16, 8)          NOT NULL,
+    `profit`               DECIMAL(16, 8)          NULL,
 
     `trade_id`             BIGINT UNSIGNED         NOT NULL,
     `traded_at`            DATETIME(3)             NOT NULL,

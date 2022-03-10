@@ -50,6 +50,8 @@ type Position struct {
 	// TotalFee stores the fee currency -> total fee quantity
 	TotalFee map[string]fixedpoint.Value `json:"totalFee"`
 
+	ChangedAt time.Time `json:"changedAt,omitempty"`
+
 	sync.Mutex
 }
 
@@ -66,22 +68,22 @@ func (p *Position) NewProfit(trade Trade, profit, netProfit fixedpoint.Value) Pr
 		ProfitMargin:    profit.Div(trade.QuoteQuantity),
 		NetProfitMargin: netProfit.Div(trade.QuoteQuantity),
 		// trade related fields
-		TradeID:            trade.ID,
-		Side:               trade.Side,
-		IsBuyer:            trade.IsBuyer,
-		IsMaker:            trade.IsMaker,
-		Price:              trade.Price,
-		Quantity:           trade.Quantity,
-		QuoteQuantity:      trade.QuoteQuantity,
+		TradeID:       trade.ID,
+		Side:          trade.Side,
+		IsBuyer:       trade.IsBuyer,
+		IsMaker:       trade.IsMaker,
+		Price:         trade.Price,
+		Quantity:      trade.Quantity,
+		QuoteQuantity: trade.QuoteQuantity,
 		// FeeInUSD:           0,
-		Fee:                trade.Fee,
-		FeeCurrency:        trade.FeeCurrency,
+		Fee:         trade.Fee,
+		FeeCurrency: trade.FeeCurrency,
 
-		Exchange:           trade.Exchange,
-		IsMargin:           trade.IsMargin,
-		IsFutures:          trade.IsFutures,
-		IsIsolated:         trade.IsIsolated,
-		TradedAt:           trade.Time.Time(),
+		Exchange:   trade.Exchange,
+		IsMargin:   trade.IsMargin,
+		IsFutures:  trade.IsFutures,
+		IsIsolated: trade.IsIsolated,
+		TradedAt:   trade.Time.Time(),
 	}
 }
 
