@@ -134,6 +134,7 @@ dev-version: pkg/version/dev.go
 cmd-doc: .FORCE
 	go run ./cmd/update-doc
 	git add -v doc/commands
+	git commit -m "update command doc files" doc/commands
 
 version: pkg/version/version.go pkg/version/dev.go migrations cmd-doc
 	git commit $< $(word 2,$^) -m "bump version to $(VERSION)" || true
