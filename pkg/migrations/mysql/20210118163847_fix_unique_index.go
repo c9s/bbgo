@@ -14,12 +14,7 @@ func init() {
 func upFixUniqueIndex(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
 	// This code is executed when the migration is applied.
 
-	_, err = tx.ExecContext(ctx, "ALTER TABLE `trades` DROP INDEX `id`;")
-	if err != nil {
-		return err
-	}
-
-	_, err = tx.ExecContext(ctx, "ALTER TABLE `trades` ADD UNIQUE INDEX `id` (`exchange`,`symbol`, `side`, `id`);")
+	_, err = tx.ExecContext(ctx, "SELECT 1;")
 	if err != nil {
 		return err
 	}
@@ -30,12 +25,7 @@ func upFixUniqueIndex(ctx context.Context, tx rockhopper.SQLExecutor) (err error
 func downFixUniqueIndex(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
 	// This code is executed when the migration is rolled back.
 
-	_, err = tx.ExecContext(ctx, "ALTER TABLE `trades` DROP INDEX `id`;")
-	if err != nil {
-		return err
-	}
-
-	_, err = tx.ExecContext(ctx, "ALTER TABLE `trades` ADD UNIQUE INDEX `id` (`id`);")
+	_, err = tx.ExecContext(ctx, "SELECT 1;")
 	if err != nil {
 		return err
 	}
