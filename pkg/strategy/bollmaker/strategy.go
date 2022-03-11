@@ -52,9 +52,9 @@ type Strategy struct {
 	*bbgo.Notifiability
 	*bbgo.Persistence
 
-	Environment *bbgo.Environment
+	Environment          *bbgo.Environment
 	StandardIndicatorSet *bbgo.StandardIndicatorSet
-	Market types.Market
+	Market               types.Market
 
 	// Symbol is the market symbol you want to trade
 	Symbol string `json:"symbol"`
@@ -143,7 +143,7 @@ type Strategy struct {
 	bbgo.SmartStops
 
 	session *bbgo.ExchangeSession
-	book   *types.StreamOrderBook
+	book    *types.StreamOrderBook
 
 	state *State
 
@@ -568,7 +568,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		p := s.state.Position.NewProfit(trade, profit, netProfit)
 		p.Strategy = ID
 		p.StrategyInstanceID = instanceID
-		s.Environment.RecordProfit(p)
+		s.Environment.RecordPosition(s.state.Position, trade, p)
 
 		s.state.ProfitStats.AddProfit(p)
 		s.Notify(&p)
