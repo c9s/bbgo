@@ -4,6 +4,7 @@ CREATE TABLE `trades`
     `gid`            BIGINT UNSIGNED         NOT NULL AUTO_INCREMENT,
 
     `id`             BIGINT UNSIGNED,
+    `order_id`       BIGINT UNSIGNED         NOT NULL,
     `exchange`       VARCHAR(24)             NOT NULL DEFAULT '',
     `symbol`         VARCHAR(8)              NOT NULL,
     `price`          DECIMAL(16, 8) UNSIGNED NOT NULL,
