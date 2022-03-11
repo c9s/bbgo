@@ -17,13 +17,13 @@ func (c *TradeCollector) EmitRecover(trade types.Trade) {
 	}
 }
 
-func (c *TradeCollector) OnTrade(cb func(trade types.Trade)) {
+func (c *TradeCollector) OnTrade(cb func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value)) {
 	c.tradeCallbacks = append(c.tradeCallbacks, cb)
 }
 
-func (c *TradeCollector) EmitTrade(trade types.Trade) {
+func (c *TradeCollector) EmitTrade(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
 	for _, cb := range c.tradeCallbacks {
-		cb(trade)
+		cb(trade, profit, netProfit)
 	}
 }
 

@@ -566,22 +566,26 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderStore.BindStream(session.UserDataStream)
 
 	s.tradeCollector = bbgo.NewTradeCollector(s.Symbol, s.state.Position, s.orderStore)
-	s.tradeCollector.OnProfit(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
-		log.Infof("generated profit: %v", profit)
-		p := s.state.Position.NewProfit(trade, profit, netProfit)
-		p.Strategy = ID
-		p.StrategyInstanceID = instanceID
-		s.Environment.RecordPosition(s.state.Position, trade, &p)
-
-		s.state.ProfitStats.AddProfit(p)
-		s.Notify(&p)
+	s.tradeCollector.OnProfit(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
 		s.Notify(&s.state.ProfitStats)
 	})
 
-	s.tradeCollector.OnTrade(func(trade types.Trade) {
+	s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
 		s.Notifiability.Notify(trade)
 		s.state.ProfitStats.AddTrade(trade)
-		s.Environment.RecordPosition(s.state.Position, trade, nil)
+
+		if profit.Compare(fixedpoint.Zero) == 0 {
+			s.Environment.RecordPosition(s.state.Position, trade, nil)
+		} else {
+			log.Infof("%s generated profit: %v", s.Symbol, profit)
+			p := s.state.Position.NewProfit(trade, profit, netProfit)
+			p.Strategy = ID
+			p.StrategyInstanceID = instanceID
+			s.state.ProfitStats.AddProfit(p)
+			s.Notify(&p)
+
+			s.Environment.RecordPosition(s.state.Position, trade, &p)
+		}
 	})
 
 	s.tradeCollector.OnPositionUpdate(func(position *types.Position) {

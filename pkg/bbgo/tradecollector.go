@@ -23,7 +23,7 @@ type TradeCollector struct {
 	doneTrades map[types.TradeKey]struct{}
 
 	recoverCallbacks        []func(trade types.Trade)
-	tradeCallbacks          []func(trade types.Trade)
+	tradeCallbacks          []func(trade types.Trade, profit, netProfit fixedpoint.Value)
 	positionUpdateCallbacks []func(position *types.Position)
 	profitCallbacks         []func(trade types.Trade, profit, netProfit fixedpoint.Value)
 }
@@ -108,10 +108,10 @@ func (c *TradeCollector) Process() bool {
 		if c.orderStore.Exists(trade.OrderID) {
 			c.doneTrades[key] = struct{}{}
 			if profit, netProfit, madeProfit := c.position.AddTrade(trade); madeProfit {
-				c.EmitTrade(trade)
+				c.EmitTrade(trade, fixedpoint.Zero, fixedpoint.Zero)
 				c.EmitProfit(trade, profit, netProfit)
 			} else {
-				c.EmitTrade(trade)
+				c.EmitTrade(trade, fixedpoint.Zero, fixedpoint.Zero)
 			}
 			positionChanged = true
 			return true
@@ -139,10 +139,10 @@ func (c *TradeCollector) processTrade(trade types.Trade) bool {
 		}
 
 		if profit, netProfit, madeProfit := c.position.AddTrade(trade); madeProfit {
-			c.EmitTrade(trade)
+			c.EmitTrade(trade, fixedpoint.Zero, fixedpoint.Zero)
 			c.EmitProfit(trade, profit, netProfit)
 		} else {
-			c.EmitTrade(trade)
+			c.EmitTrade(trade, fixedpoint.Zero, fixedpoint.Zero)
 		}
 		c.EmitPositionUpdate(c.position)
 		c.doneTrades[key] = struct{}{}

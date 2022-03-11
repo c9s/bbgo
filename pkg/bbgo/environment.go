@@ -22,6 +22,7 @@ import (
 	"gopkg.in/tucnak/telebot.v2"
 
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/interact"
 	"github.com/c9s/bbgo/pkg/notifier/slacknotifier"
 	"github.com/c9s/bbgo/pkg/notifier/telegramnotifier"
@@ -596,15 +597,20 @@ func (environ *Environment) RecordPosition(position *types.Position, trade types
 		position.StrategyInstanceID = profit.StrategyInstanceID
 	}
 
-	if err := environ.PositionService.Insert(position, trade, profit.Profit); err != nil {
-		log.WithError(err).Errorf("can not insert position record")
-	}
 
 	if profit != nil {
+		if err := environ.PositionService.Insert(position, trade, profit.Profit); err != nil {
+			log.WithError(err).Errorf("can not insert position record")
+		}
 		if err := environ.ProfitService.Insert(*profit); err != nil {
 			log.WithError(err).Errorf("can not insert profit record: %+v", profit)
 		}
+	} else {
+		if err := environ.PositionService.Insert(position, trade, fixedpoint.Zero); err != nil {
+			log.WithError(err).Errorf("can not insert position record")
+		}
 	}
+
 
 	// if:
 	// 1) we are not using sync
