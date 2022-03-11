@@ -24,9 +24,6 @@ var accountCmd = &cobra.Command{
 	Use:          "account [--session SESSION]",
 	Short:        "show user account details (ex: balance)",
 	SilenceUsage: true,
-	PreRunE: cobraInitRequired([]string{
-		"config",
-	}),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 
