@@ -52,6 +52,9 @@ type Position struct {
 
 	ChangedAt time.Time `json:"changedAt,omitempty"`
 
+	Strategy           string `json:"strategy,omitempty" db:"strategy"`
+	StrategyInstanceID string `json:"strategyInstanceID,omitempty" db:"strategy_instance_id"`
+
 	sync.Mutex
 }
 
