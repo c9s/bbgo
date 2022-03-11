@@ -136,6 +136,7 @@ func convertFloat64ToTime(vt string, f float64) (time.Time, error) {
 	return time.Time{}, fmt.Errorf("the floating point value %f is out of the timestamp range", f)
 }
 
+// Time type implements the driver value for sqlite
 type Time time.Time
 
 var layout = "2006-01-02 15:04:05.999Z07:00"
