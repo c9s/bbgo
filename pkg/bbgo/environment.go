@@ -476,6 +476,7 @@ func (environ *Environment) BindSync(userConfig *Config) {
 	}
 
 	for _, session := range environ.sessions {
+		// if trade sync is on, we will write all received trades
 		if userConfig.Sync.UserDataStream.Trades {
 			session.UserDataStream.OnTradeUpdate(tradeWriter)
 		}
