@@ -106,10 +106,12 @@ func (c *TradeCollector) Process() bool {
 		}
 
 		if c.orderStore.Exists(trade.OrderID) {
-			c.EmitTrade(trade)
 			c.doneTrades[key] = struct{}{}
 			if profit, netProfit, madeProfit := c.position.AddTrade(trade); madeProfit {
+				c.EmitTrade(trade)
 				c.EmitProfit(trade, profit, netProfit)
+			} else {
+				c.EmitTrade(trade)
 			}
 			positionChanged = true
 			return true
@@ -136,9 +138,11 @@ func (c *TradeCollector) processTrade(trade types.Trade) bool {
 			return false
 		}
 
-		c.EmitTrade(trade)
 		if profit, netProfit, madeProfit := c.position.AddTrade(trade); madeProfit {
+			c.EmitTrade(trade)
 			c.EmitProfit(trade, profit, netProfit)
+		} else {
+			c.EmitTrade(trade)
 		}
 		c.EmitPositionUpdate(c.position)
 		c.doneTrades[key] = struct{}{}
