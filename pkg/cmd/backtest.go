@@ -53,9 +53,6 @@ var BacktestCmd = &cobra.Command{
 	Use:          "backtest",
 	Short:        "backtest your strategies",
 	SilenceUsage: true,
-	PreRunE: cobraInitRequired([]string{
-		"config",
-	}),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		verboseCnt, err := cmd.Flags().GetCount("verbose")
 		if err != nil {

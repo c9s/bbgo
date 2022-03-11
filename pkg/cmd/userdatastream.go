@@ -19,7 +19,6 @@ var userDataStreamCmd = &cobra.Command{
 	Use:   "userdatastream",
 	Short: "Listen to session events (orderUpdate, tradeUpdate, balanceUpdate, balanceSnapshot)",
 	PreRunE: cobraInitRequired([]string{
-		"config",
 		"session",
 	}),
 	RunE: func(cmd *cobra.Command, args []string) error {
