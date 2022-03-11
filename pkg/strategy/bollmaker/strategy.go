@@ -554,6 +554,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		return err
 	}
 
+	s.state.Position.Strategy = ID
+	s.state.Position.StrategyInstanceID = instanceID
+
 	s.stopC = make(chan struct{})
 
 	s.activeMakerOrders = bbgo.NewLocalActiveOrderBook(s.Symbol)
@@ -568,7 +571,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		p := s.state.Position.NewProfit(trade, profit, netProfit)
 		p.Strategy = ID
 		p.StrategyInstanceID = instanceID
-		s.Environment.RecordPosition(s.state.Position, trade, p)
+		s.Environment.RecordPosition(s.state.Position, trade, &p)
 
 		s.state.ProfitStats.AddProfit(p)
 		s.Notify(&p)
@@ -578,6 +581,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.tradeCollector.OnTrade(func(trade types.Trade) {
 		s.Notifiability.Notify(trade)
 		s.state.ProfitStats.AddTrade(trade)
+		s.Environment.RecordPosition(s.state.Position, trade, nil)
 	})
 
 	s.tradeCollector.OnPositionUpdate(func(position *types.Position) {

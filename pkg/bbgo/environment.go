@@ -578,7 +578,7 @@ func (environ *Environment) Sync(ctx context.Context, userConfig ...*Config) err
 	return nil
 }
 
-func (environ *Environment) RecordPosition(position *types.Position, trade types.Trade, profit types.Profit) {
+func (environ *Environment) RecordPosition(position *types.Position, trade types.Trade, profit *types.Profit) {
 	// skip for back-test
 	if environ.BacktestService != nil {
 		return
@@ -600,8 +600,10 @@ func (environ *Environment) RecordPosition(position *types.Position, trade types
 		log.WithError(err).Errorf("can not insert position record")
 	}
 
-	if err := environ.ProfitService.Insert(profit); err != nil {
-		log.WithError(err).Errorf("can not insert profit record: %+v", profit)
+	if profit != nil {
+		if err := environ.ProfitService.Insert(*profit); err != nil {
+			log.WithError(err).Errorf("can not insert profit record: %+v", profit)
+		}
 	}
 
 	// if:
