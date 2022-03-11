@@ -19,7 +19,6 @@ var orderbookCmd = &cobra.Command{
 	Use:   "orderbook --session=[exchange_name] --symbol=[pair_name]",
 	Short: "connect to the order book market data streaming service of an exchange",
 	PreRunE: cobraInitRequired([]string{
-		"config",
 		"session",
 		"symbol",
 	}),

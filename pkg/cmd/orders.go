@@ -24,7 +24,6 @@ var getOrderCmd = &cobra.Command{
 	Short:        "Get order status",
 	SilenceUsage: true,
 	PreRunE: cobraInitRequired([]string{
-		"config",
 		"order-id",
 		"symbol",
 	}),

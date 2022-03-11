@@ -40,9 +40,6 @@ var RunCmd = &cobra.Command{
 
 	// SilenceUsage is an option to silence usage when an error occurs.
 	SilenceUsage: true,
-	PreRunE: cobraInitRequired([]string{
-		"config",
-	}),
 	RunE: run,
 }
 
