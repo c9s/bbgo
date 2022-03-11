@@ -64,6 +64,8 @@ func (s *PositionService) Insert(position *types.Position, trade types.Trade, pr
 		    quote,
 			profit,
 			trade_id,
+		    exchange,
+		    side,
 			traded_at
 		) VALUES (
 			:strategy,
@@ -76,17 +78,24 @@ func (s *PositionService) Insert(position *types.Position, trade types.Trade, pr
 		    :quote,
 			:profit,
 			:trade_id,
+		    :exchange,
+		    :side,
 			:traded_at
 	    )`,
-		map[string]interface{} {
-			"strategy": "",
-			"strategy_instance_id": "",
-			"symbol": position.Symbol,
-			"quote_currency": position.QuoteCurrency,
-			"base_currency": position.BaseCurrency,
-			"average_cost": position.AverageCost,
-			"base": position.Base,
-			"quote": position.Quote,
+		map[string]interface{}{
+			"strategy":             position.Strategy,
+			"strategy_instance_id": position.StrategyInstanceID,
+			"symbol":               position.Symbol,
+			"quote_currency":       position.QuoteCurrency,
+			"base_currency":        position.BaseCurrency,
+			"average_cost":         position.AverageCost,
+			"base":                 position.Base,
+			"quote":                position.Quote,
+			"profit":               profit,
+			"trade_id":             trade.ID,
+			"exchange":             trade.Exchange,
+			"side":                 trade.Side,
+			"traded_at":            trade.Time,
 		})
 	return err
 }
