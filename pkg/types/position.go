@@ -30,15 +30,15 @@ type PositionRisk struct {
 }
 
 type Position struct {
-	Symbol        string `json:"symbol"`
-	BaseCurrency  string `json:"baseCurrency"`
-	QuoteCurrency string `json:"quoteCurrency"`
+	Symbol        string `json:"symbol" db:"symbol"`
+	BaseCurrency  string `json:"baseCurrency" db:"base"`
+	QuoteCurrency string `json:"quoteCurrency" db:"quote"`
 
 	Market Market `json:"market,omitempty"`
 
-	Base        fixedpoint.Value `json:"base"`
-	Quote       fixedpoint.Value `json:"quote"`
-	AverageCost fixedpoint.Value `json:"averageCost"`
+	Base        fixedpoint.Value `json:"base" db:"base"`
+	Quote       fixedpoint.Value `json:"quote" db:"quote"`
+	AverageCost fixedpoint.Value `json:"averageCost" db:"average_cost"`
 
 	// ApproximateAverageCost adds the computed fee in quote in the average cost
 	// This is used for calculating net profit
@@ -48,12 +48,14 @@ type Position struct {
 	ExchangeFeeRates map[ExchangeName]ExchangeFee `json:"exchangeFeeRates"`
 
 	// TotalFee stores the fee currency -> total fee quantity
-	TotalFee map[string]fixedpoint.Value `json:"totalFee"`
+	TotalFee map[string]fixedpoint.Value `json:"totalFee" db:"-"`
 
-	ChangedAt time.Time `json:"changedAt,omitempty"`
+	ChangedAt time.Time `json:"changedAt,omitempty" db:"changed_at"`
 
 	Strategy           string `json:"strategy,omitempty" db:"strategy"`
 	StrategyInstanceID string `json:"strategyInstanceID,omitempty" db:"strategy_instance_id"`
+
+	AccumulatedProfit fixedpoint.Value `json:"accumulatedProfit,omitempty" db:"accumulated_profit"`
 
 	sync.Mutex
 }
@@ -306,6 +308,7 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 	fee := td.Fee
 
 	// calculated fee in quote (some exchange accounts may enable platform currency fee discount, like BNB)
+	// convert platform fee token into USD values
 	var feeInQuote fixedpoint.Value = fixedpoint.Zero
 
 	switch td.FeeCurrency {
@@ -353,6 +356,7 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 				p.Quote = p.Quote.Sub(quoteQuantity)
 				p.AverageCost = price
 				p.ApproximateAverageCost = price
+				p.AccumulatedProfit = p.AccumulatedProfit.Add(profit)
 				return profit, netProfit, true
 			} else {
 				// covering short position
@@ -360,6 +364,7 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 				p.Quote = p.Quote.Sub(quoteQuantity)
 				profit = p.AverageCost.Sub(price).Mul(quantity)
 				netProfit = p.ApproximateAverageCost.Sub(price).Mul(quantity).Sub(feeInQuote)
+				p.AccumulatedProfit = p.AccumulatedProfit.Add(profit)
 				return profit, netProfit, true
 			}
 		}
@@ -385,12 +390,14 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 				p.Quote = p.Quote.Add(quoteQuantity)
 				p.AverageCost = price
 				p.ApproximateAverageCost = price
+				p.AccumulatedProfit = p.AccumulatedProfit.Add(profit)
 				return profit, netProfit, true
 			} else {
 				p.Base = p.Base.Sub(quantity)
 				p.Quote = p.Quote.Add(quoteQuantity)
 				profit = price.Sub(p.AverageCost).Mul(quantity)
 				netProfit = price.Sub(p.ApproximateAverageCost).Mul(quantity).Sub(feeInQuote)
+				p.AccumulatedProfit = p.AccumulatedProfit.Add(profit)
 				return profit, netProfit, true
 			}
 		}
