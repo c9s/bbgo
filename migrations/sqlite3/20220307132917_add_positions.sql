@@ -21,7 +21,6 @@ CREATE TABLE `positions`
     `side`                 VARCHAR(4)     NOT NULL, -- side of the trade
     `exchange`             VARCHAR(12)    NOT NULL, -- exchange of the trade
     `traded_at`            DATETIME(3)    NOT NULL
-
 );
 
 -- +down
