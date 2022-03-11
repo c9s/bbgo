@@ -369,12 +369,12 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 			}
 		}
 
-		dividor := p.Base.Add(quantity)
+		divisor := p.Base.Add(quantity)
 		p.ApproximateAverageCost = p.ApproximateAverageCost.Mul(p.Base).
 			Add(quoteQuantity).
 			Add(feeInQuote).
-			Div(dividor)
-		p.AverageCost = p.AverageCost.Mul(p.Base).Add(quoteQuantity).Div(dividor)
+			Div(divisor)
+		p.AverageCost = p.AverageCost.Mul(p.Base).Add(quoteQuantity).Div(divisor)
 		p.Base = p.Base.Add(quantity)
 		p.Quote = p.Quote.Sub(quoteQuantity)
 
@@ -403,15 +403,15 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 		}
 
 		// handling short position, since Base here is negative we need to reverse the sign
-		dividor := quantity.Sub(p.Base)
+		divisor := quantity.Sub(p.Base)
 		p.ApproximateAverageCost = p.ApproximateAverageCost.Mul(p.Base.Neg()).
 			Add(quoteQuantity).
 			Sub(feeInQuote).
-			Div(dividor)
+			Div(divisor)
 
 		p.AverageCost = p.AverageCost.Mul(p.Base.Neg()).
 			Add(quoteQuantity).
-			Div(dividor)
+			Div(divisor)
 		p.Base = p.Base.Sub(quantity)
 		p.Quote = p.Quote.Add(quoteQuantity)
 
