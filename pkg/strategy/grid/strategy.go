@@ -605,7 +605,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.tradeCollector = bbgo.NewTradeCollector(s.Symbol, s.state.Position, s.orderStore)
 
-	s.tradeCollector.OnTrade(func(trade types.Trade) {
+	s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
 		s.Notifiability.Notify(trade)
 		s.state.ProfitStats.AddTrade(trade)
 	})
