@@ -14,12 +14,7 @@ func init() {
 func upFixSymbolLength(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
 	// This code is executed when the migration is applied.
 
-	_, err = tx.ExecContext(ctx, "ALTER TABLE trades MODIFY COLUMN symbol VARCHAR(9);")
-	if err != nil {
-		return err
-	}
-
-	_, err = tx.ExecContext(ctx, "ALTER TABLE orders MODIFY COLUMN symbol VARCHAR(9);")
+	_, err = tx.ExecContext(ctx, "SELECT 1;")
 	if err != nil {
 		return err
 	}
@@ -30,12 +25,7 @@ func upFixSymbolLength(ctx context.Context, tx rockhopper.SQLExecutor) (err erro
 func downFixSymbolLength(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
 	// This code is executed when the migration is rolled back.
 
-	_, err = tx.ExecContext(ctx, "ALTER TABLE trades MODIFY COLUMN symbol VARCHAR(8);")
-	if err != nil {
-		return err
-	}
-
-	_, err = tx.ExecContext(ctx, "ALTER TABLE orders MODIFY COLUMN symbol VARCHAR(8);")
+	_, err = tx.ExecContext(ctx, "SELECT 1;")
 	if err != nil {
 		return err
 	}
