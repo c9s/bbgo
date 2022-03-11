@@ -34,7 +34,7 @@ func TestPositionService(t *testing.T) {
 			ChangedAt:     time.Now(),
 		}, types.Trade{
 			Time: types.Time(time.Now()),
-		}, 0)
+		}, fixedpoint.Zero)
 		assert.NoError(t, err)
 	})
 
