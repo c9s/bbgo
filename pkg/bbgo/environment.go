@@ -587,6 +587,14 @@ func (environ *Environment) RecordPosition(position *types.Position, trade types
 		return
 	}
 
+	if position.Strategy == "" && profit.Strategy != "" {
+		position.Strategy = profit.Strategy
+	}
+
+	if position.StrategyInstanceID == "" && profit.StrategyInstanceID != "" {
+		position.StrategyInstanceID = profit.StrategyInstanceID
+	}
+
 	if err := environ.PositionService.Insert(position, trade, profit.Profit); err != nil {
 		log.WithError(err).Errorf("can not insert position record")
 	}
