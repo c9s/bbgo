@@ -340,6 +340,11 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 	p.Lock()
 	defer p.Unlock()
 
+	// update changedAt field before we unlock in the defer func
+	defer func() {
+		p.ChangedAt = td.Time.Time()
+	}()
+
 	p.addTradeFee(td)
 
 	// Base > 0 means we're in long position
