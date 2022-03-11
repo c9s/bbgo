@@ -16,8 +16,12 @@ CREATE TABLE `positions`
     `quote`                DECIMAL(16, 8) NOT NULL,
     `profit`               DECIMAL(16, 8) NULL,
 
+    -- trade related columns
     `trade_id`             BIGINT         NOT NULL,
+    `side`                 VARCHAR(4)     NOT NULL, -- side of the trade
+    `exchange`             VARCHAR(12)    NOT NULL, -- exchange of the trade
     `traded_at`            DATETIME(3)    NOT NULL
+
 );
 
 -- +down

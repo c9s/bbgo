@@ -16,11 +16,14 @@ CREATE TABLE `positions`
     `quote`                DECIMAL(16, 8)          NOT NULL,
     `profit`               DECIMAL(16, 8)          NULL,
 
-    `trade_id`             BIGINT UNSIGNED         NOT NULL,
-    `traded_at`            DATETIME(3)             NOT NULL,
+    -- trade related columns
+    `trade_id`             BIGINT UNSIGNED         NOT NULL, -- the trade id in the exchange
+    `side`                 VARCHAR(4)              NOT NULL, -- side of the trade
+    `exchange`             VARCHAR(12)             NOT NULL, -- exchange of the trade
+    `traded_at`            DATETIME(3)             NOT NULL, -- millisecond timestamp
 
     PRIMARY KEY (`gid`),
-    UNIQUE KEY `trade_id` (`trade_id`)
+    UNIQUE KEY `trade_id` (`trade_id`, `side`, `exchange`)
 );
 
 -- +down
