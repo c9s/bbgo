@@ -92,6 +92,7 @@ type Environment struct {
 
 	syncStatusMutex sync.Mutex
 	syncStatus      SyncStatus
+	syncConfig      *SyncConfig
 
 	sessions map[string]*ExchangeSession
 }
@@ -445,7 +446,8 @@ func (environ *Environment) SetSyncStartTime(t time.Time) *Environment {
 	return environ
 }
 
-func (environ *Environment) BindSync(userConfig *Config) {
+func (environ *Environment) BindSync(config *SyncConfig) {
+	// skip this if we are running back-test
 	if environ.BacktestService != nil {
 		return
 	}
@@ -455,9 +457,11 @@ func (environ *Environment) BindSync(userConfig *Config) {
 		return
 	}
 
-	if userConfig.Sync == nil || userConfig.Sync.UserDataStream == nil {
+	if config == nil || config.UserDataStream == nil {
 		return
 	}
+
+	environ.syncConfig = config
 
 	tradeWriter := func(trade types.Trade) {
 		if err := environ.TradeService.Insert(trade); err != nil {
@@ -477,10 +481,10 @@ func (environ *Environment) BindSync(userConfig *Config) {
 
 	for _, session := range environ.sessions {
 		// if trade sync is on, we will write all received trades
-		if userConfig.Sync.UserDataStream.Trades {
+		if config.UserDataStream.Trades {
 			session.UserDataStream.OnTradeUpdate(tradeWriter)
 		}
-		if userConfig.Sync.UserDataStream.FilledOrders {
+		if config.UserDataStream.FilledOrders {
 			session.UserDataStream.OnOrderUpdate(orderWriter)
 		}
 	}
@@ -580,11 +584,7 @@ func (environ *Environment) RecordPosition(position *types.Position, trade types
 		return
 	}
 
-	if environ.DatabaseService == nil {
-		return
-	}
-
-	if environ.ProfitService == nil {
+	if environ.DatabaseService == nil || environ.ProfitService == nil || environ.PositionService == nil {
 		return
 	}
 
@@ -602,6 +602,17 @@ func (environ *Environment) RecordPosition(position *types.Position, trade types
 
 	if err := environ.ProfitService.Insert(profit); err != nil {
 		log.WithError(err).Errorf("can not insert profit record: %+v", profit)
+	}
+
+	// if:
+	// 1) we are not using sync
+	// 2) and not sync-ing trades from the user data stream
+	if environ.TradeService != nil && (environ.syncConfig == nil ||
+		(environ.syncConfig.UserDataStream == nil) ||
+		(environ.syncConfig.UserDataStream != nil && !environ.syncConfig.UserDataStream.Trades)) {
+		if err := environ.TradeService.Insert(trade); err != nil {
+			log.WithError(err).Errorf("can not insert trade record: %+v", trade)
+		}
 	}
 }
 
