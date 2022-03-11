@@ -20,6 +20,9 @@ CREATE TABLE `trades`
     `is_margin`      BOOLEAN                 NOT NULL DEFAULT FALSE,
     `is_isolated`    BOOLEAN                 NOT NULL DEFAULT FALSE,
 
+    `strategy`       VARCHAR(32)             NULL,
+    `pnl`            DECIMAL                 NULL,
+
     PRIMARY KEY (`gid`),
     UNIQUE KEY `id` (`exchange`, `symbol`, `side`, `id`)
 );
