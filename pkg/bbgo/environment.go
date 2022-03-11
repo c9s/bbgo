@@ -77,6 +77,7 @@ type Environment struct {
 	OrderService             *service.OrderService
 	TradeService             *service.TradeService
 	ProfitService            *service.ProfitService
+	PositionService          *service.PositionService
 	BacktestService          *service.BacktestService
 	RewardService            *service.RewardService
 	SyncService              *service.SyncService
@@ -172,6 +173,7 @@ func (environ *Environment) ConfigureDatabaseDriver(ctx context.Context, driver 
 	environ.RewardService = &service.RewardService{DB: db}
 	environ.AccountService = &service.AccountService{DB: db}
 	environ.ProfitService = &service.ProfitService{DB: db}
+	environ.PositionService = &service.PositionService{DB: db}
 
 	environ.SyncService = &service.SyncService{
 		TradeService:    environ.TradeService,
@@ -579,7 +581,7 @@ func (environ *Environment) RecordProfit(profit types.Profit) {
 		return
 	}
 
-	if err := environ.ProfitService.Insert(profit) ; err != nil {
+	if err := environ.ProfitService.Insert(profit); err != nil {
 		log.WithError(err).Errorf("can not insert profit record: %+v", profit)
 	}
 }
@@ -608,7 +610,6 @@ func (environ *Environment) syncSession(ctx context.Context, session *ExchangeSe
 
 	return environ.SyncService.SyncSessionSymbols(ctx, session.Exchange, environ.syncStartTime, symbols...)
 }
-
 
 func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) error {
 	environ.Notifiability = Notifiability{
