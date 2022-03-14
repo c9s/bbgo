@@ -41,10 +41,12 @@ func NewTradeCollector(symbol string, position *types.Position, orderStore *Orde
 	}
 }
 
+// OrderStore returns the order store used by the trade collector
 func (c *TradeCollector) OrderStore() *OrderStore {
 	return c.orderStore
 }
 
+// Position returns the position used by the trade collector
 func (c *TradeCollector) Position() *types.Position {
 	return c.position
 }
