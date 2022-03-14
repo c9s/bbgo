@@ -408,7 +408,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	if !s.TrailingStopTarget.TrailingStopCallbackRatio.IsZero() {
 		// Update trailing stop when the position changes
 		s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
-			if position.Base.Sign() > 0 { // Update order if we have a position
+			if position.Base.Compare(s.Market.MinQuantity) > 0 { // Update order if we have a position
 				// Cancel the original order
 				if err := s.cancelOrder(s.trailingStopControl.OrderID, ctx, session); err != nil {
 					log.WithError(err).Errorf("Can not cancel the original trailing stop order!")
@@ -459,7 +459,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		highPrice := kline.GetHigh()
 
 		if s.TrailingStopTarget.TrailingStopCallbackRatio.Sign() > 0 {
-			if s.state.Position.Base.Sign() <= 0 { // Without a position
+			if s.state.Position.Base.Compare(s.Market.MinQuantity) <= 0 { // Without a position
 				// Update trailing orders with current high price
 				s.trailingStopControl.CurrentHighestPrice = highPrice
 			} else if s.trailingStopControl.CurrentHighestPrice.Compare(highPrice) < 0 { // With a position
