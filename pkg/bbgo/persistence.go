@@ -3,8 +3,9 @@ package bbgo
 import (
 	"fmt"
 
-	"github.com/c9s/bbgo/pkg/service"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/c9s/bbgo/pkg/service"
 )
 
 type PersistenceSelector struct {
@@ -48,6 +49,8 @@ func (p *Persistence) Load(val interface{}, subIDs ...string) error {
 		return err
 	}
 
+	log.Debugf("using persistence store %T for loading", ps)
+
 	if p.PersistenceSelector.StoreID == "" {
 		p.PersistenceSelector.StoreID = "default"
 	}
@@ -61,6 +64,8 @@ func (p *Persistence) Save(val interface{}, subIDs ...string) error {
 	if err != nil {
 		return err
 	}
+
+	log.Debugf("using persistence store %T for storing", ps)
 
 	if p.PersistenceSelector.StoreID == "" {
 		p.PersistenceSelector.StoreID = "default"

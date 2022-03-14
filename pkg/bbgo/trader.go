@@ -219,7 +219,7 @@ func (trader *Trader) RunSingleExchangeStrategy(ctx context.Context, strategy Si
 		return errors.New("strategy object is not a struct")
 	}
 
-	if err := trader.injectCommonServices(strategy) ; err != nil {
+	if err := trader.injectCommonServices(strategy); err != nil {
 		return err
 	}
 
@@ -337,7 +337,7 @@ func (trader *Trader) Run(ctx context.Context) error {
 			continue
 		}
 
-		if err := trader.injectCommonServices(strategy) ; err != nil {
+		if err := trader.injectCommonServices(strategy); err != nil {
 			return err
 		}
 
@@ -361,6 +361,29 @@ func (trader *Trader) injectCommonServices(s interface{}) error {
 		Facade:              persistenceFacade,
 	}
 
+	// a special injection for persistence selector:
+	// if user defined the selector, the facade pointer will be nil, hence we need to update the persistence facade pointer
+	sv := reflect.ValueOf(s).Elem()
+	if field, ok := hasField(sv, "Persistence"); ok {
+		// the selector is set, but we need to update the facade pointer
+		if !field.IsNil() {
+			elem := field.Elem()
+			if elem.Kind() != reflect.Struct {
+				return fmt.Errorf("field Persistence is not a struct element, %s given", field)
+			}
+
+			if err := injectField(elem, "Facade", persistenceFacade, true); err != nil {
+				return err
+			}
+
+			/*
+				if err := parseStructAndInject(field.Interface(), persistenceFacade); err != nil {
+					return err
+				}
+			*/
+		}
+	}
+
 	return parseStructAndInject(s,
 		&trader.Graceful,
 		&trader.logger,
@@ -371,10 +394,9 @@ func (trader *Trader) injectCommonServices(s interface{}) error {
 		trader.environment.AccountService,
 		trader.environment,
 		persistence,
-		persistenceFacade,
+		persistenceFacade, // if the strategy use persistence facade separately
 	)
 }
-
 
 // ReportPnL configure and set the PnLReporter with the given notifier
 func (trader *Trader) ReportPnL() *PnLReporterManager {
