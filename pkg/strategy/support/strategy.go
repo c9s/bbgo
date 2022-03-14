@@ -428,7 +428,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 					if err != nil {
 						log.WithError(err).Error("submit profit trailing stop order error")
 					} else {
-						s.trailingStopControl.OrderID = orders.IDs()[0]
+						if len(orders.IDs()) > 0 {
+							s.trailingStopControl.OrderID = orders.IDs()[0]
+						} else {
+							log.Error("submit profit trailing stop order error. unknown error")
+							s.trailingStopControl.OrderID = 0
+						}
 					}
 				}
 			}
