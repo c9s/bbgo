@@ -84,6 +84,8 @@ func parseStructAndInject(f interface{}, objects ...interface{}) error {
 			continue
 		}
 
+		fieldName := st.Field(i).Name
+
 		switch k := fv.Kind(); k {
 
 		case reflect.Ptr, reflect.Struct:
@@ -99,12 +101,18 @@ func parseStructAndInject(f interface{}, objects ...interface{}) error {
 						return fmt.Errorf("field %v of %s can not be set to %s, make sure it is an exported field", fv, sv.Type(), ot)
 					}
 
-					if k == reflect.Ptr && ot.Kind() == reflect.Struct {
-						fv.Set(reflect.ValueOf(obj).Addr())
-					} else {
-						fv.Set(reflect.ValueOf(obj))
+					if k == reflect.Ptr && !fv.IsNil() {
+						logrus.Debugf("[injection] field %s is not nil, not injecting", fieldName)
+						continue
 					}
 
+					if k == reflect.Ptr && ot.Kind() == reflect.Struct {
+						logrus.Debugf("[injection] found ptr + struct, injecting field %s to %T", fieldName, obj)
+						fv.Set(reflect.ValueOf(obj).Addr())
+					} else {
+						logrus.Debugf("[injection] injecting field %s to %T", fieldName, obj)
+						fv.Set(reflect.ValueOf(obj))
+					}
 				}
 			}
 

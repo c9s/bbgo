@@ -242,9 +242,9 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 func (s *Strategy) SaveState() error {
 	if err := s.Persistence.Save(s.state, ID, s.Symbol, stateKey); err != nil {
 		return err
-	} else {
-		log.Infof("state is saved => %+v", s.state)
 	}
+
+	log.Infof("state is saved => %+v", s.state)
 	return nil
 }
 
