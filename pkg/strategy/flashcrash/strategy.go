@@ -129,11 +129,13 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		Window:   25,
 	})
 
+	session.UserDataStream.OnStart(func() {
+		s.updateOrders(orderExecutor, session)
+	})
+
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		s.updateOrders(orderExecutor, session)
 	})
 
-	// TODO: move this to the stream onConnect handler
-	s.updateOrders(orderExecutor, session)
 	return nil
 }
