@@ -151,6 +151,9 @@ func (e *Exchange) NewStream() types.Stream {
 }
 
 func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error) {
+	if e.userDataStream == nil {
+		return createdOrders, fmt.Errorf("SubmitOrders should be called after userDataStream been initialized")
+	}
 	for _, order := range orders {
 		symbol := order.Symbol
 		matching, ok := e.matchingBook(symbol)
@@ -198,6 +201,9 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 }
 
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) error {
+	if e.userDataStream == nil {
+		return fmt.Errorf("CancelOrders should be called after userDataStream been initialized")
+	}
 	for _, order := range orders {
 		matching, ok := e.matchingBook(order.Symbol)
 		if !ok {
