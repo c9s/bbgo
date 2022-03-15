@@ -1,6 +1,6 @@
 // +heroku install ./cmd/bbgo
 
-module github.com/c9s/bbgo
+module github.com/c9s/bbgo/v2
 
 go 1.13
 
@@ -70,8 +70,3 @@ require (
 	gopkg.in/tucnak/telebot.v2 v2.5.0
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 )
-
-//  replace (
-//  	github.com/adshao/go-binance/v2 => ../../adshao/go-binance/v2
-//  	github.com/c9s/rockhopper => ../rockhopper
-//  )
