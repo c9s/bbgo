@@ -207,6 +207,10 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	}
 }
 
+func (s *Strategy) CurrentPosition() *types.Position {
+	return s.state.Position
+}
+
 func (s *Strategy) SaveState() error {
 	if err := s.Persistence.Save(s.state, ID, s.Symbol, stateKey); err != nil {
 		return err
