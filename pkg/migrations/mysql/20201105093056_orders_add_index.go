@@ -14,12 +14,7 @@ func init() {
 func upOrdersAddIndex(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
 	// This code is executed when the migration is applied.
 
-	_, err = tx.ExecContext(ctx, "CREATE INDEX orders_symbol ON orders (exchange, symbol);")
-	if err != nil {
-		return err
-	}
-
-	_, err = tx.ExecContext(ctx, "CREATE UNIQUE INDEX orders_order_id ON orders (order_id, exchange);")
+	_, err = tx.ExecContext(ctx, "SELECT 1;")
 	if err != nil {
 		return err
 	}
@@ -30,12 +25,7 @@ func upOrdersAddIndex(ctx context.Context, tx rockhopper.SQLExecutor) (err error
 func downOrdersAddIndex(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
 	// This code is executed when the migration is rolled back.
 
-	_, err = tx.ExecContext(ctx, "DROP INDEX orders_symbol ON orders;")
-	if err != nil {
-		return err
-	}
-
-	_, err = tx.ExecContext(ctx, "DROP INDEX orders_order_id ON orders;")
+	_, err = tx.ExecContext(ctx, "SELECT 1;")
 	if err != nil {
 		return err
 	}

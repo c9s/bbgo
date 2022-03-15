@@ -52,9 +52,9 @@ type Strategy struct {
 	*bbgo.Notifiability
 	*bbgo.Persistence
 
-	Environment *bbgo.Environment
+	Environment          *bbgo.Environment
 	StandardIndicatorSet *bbgo.StandardIndicatorSet
-	Market types.Market
+	Market               types.Market
 
 	// Symbol is the market symbol you want to trade
 	Symbol string `json:"symbol"`
@@ -143,7 +143,7 @@ type Strategy struct {
 	bbgo.SmartStops
 
 	session *bbgo.ExchangeSession
-	book   *types.StreamOrderBook
+	book    *types.StreamOrderBook
 
 	state *State
 
@@ -554,6 +554,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		return err
 	}
 
+	s.state.Position.Strategy = ID
+	s.state.Position.StrategyInstanceID = instanceID
+
 	s.stopC = make(chan struct{})
 
 	s.activeMakerOrders = bbgo.NewLocalActiveOrderBook(s.Symbol)
@@ -563,21 +566,25 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderStore.BindStream(session.UserDataStream)
 
 	s.tradeCollector = bbgo.NewTradeCollector(s.Symbol, s.state.Position, s.orderStore)
-	s.tradeCollector.OnProfit(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
-		log.Infof("generated profit: %v", profit)
-		p := s.state.Position.NewProfit(trade, profit, netProfit)
-		p.Strategy = ID
-		p.StrategyInstanceID = instanceID
-		s.Environment.RecordProfit(p)
 
-		s.state.ProfitStats.AddProfit(p)
-		s.Notify(&p)
-		s.Notify(&s.state.ProfitStats)
-	})
-
-	s.tradeCollector.OnTrade(func(trade types.Trade) {
+	s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
 		s.Notifiability.Notify(trade)
 		s.state.ProfitStats.AddTrade(trade)
+
+		if profit.Compare(fixedpoint.Zero) == 0 {
+			s.Environment.RecordPosition(s.state.Position, trade, nil)
+		} else {
+			log.Infof("%s generated profit: %v", s.Symbol, profit)
+			p := s.state.Position.NewProfit(trade, profit, netProfit)
+			p.Strategy = ID
+			p.StrategyInstanceID = instanceID
+			s.Notify(&p)
+
+			s.state.ProfitStats.AddProfit(p)
+			s.Notify(&s.state.ProfitStats)
+
+			s.Environment.RecordPosition(s.state.Position, trade, &p)
+		}
 	})
 
 	s.tradeCollector.OnPositionUpdate(func(position *types.Position) {

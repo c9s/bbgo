@@ -22,6 +22,7 @@ import (
 	"gopkg.in/tucnak/telebot.v2"
 
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/interact"
 	"github.com/c9s/bbgo/pkg/notifier/slacknotifier"
 	"github.com/c9s/bbgo/pkg/notifier/telegramnotifier"
@@ -77,6 +78,7 @@ type Environment struct {
 	OrderService             *service.OrderService
 	TradeService             *service.TradeService
 	ProfitService            *service.ProfitService
+	PositionService          *service.PositionService
 	BacktestService          *service.BacktestService
 	RewardService            *service.RewardService
 	SyncService              *service.SyncService
@@ -91,6 +93,7 @@ type Environment struct {
 
 	syncStatusMutex sync.Mutex
 	syncStatus      SyncStatus
+	syncConfig      *SyncConfig
 
 	sessions map[string]*ExchangeSession
 }
@@ -172,6 +175,7 @@ func (environ *Environment) ConfigureDatabaseDriver(ctx context.Context, driver 
 	environ.RewardService = &service.RewardService{DB: db}
 	environ.AccountService = &service.AccountService{DB: db}
 	environ.ProfitService = &service.ProfitService{DB: db}
+	environ.PositionService = &service.PositionService{DB: db}
 
 	environ.SyncService = &service.SyncService{
 		TradeService:    environ.TradeService,
@@ -443,7 +447,8 @@ func (environ *Environment) SetSyncStartTime(t time.Time) *Environment {
 	return environ
 }
 
-func (environ *Environment) BindSync(userConfig *Config) {
+func (environ *Environment) BindSync(config *SyncConfig) {
+	// skip this if we are running back-test
 	if environ.BacktestService != nil {
 		return
 	}
@@ -453,9 +458,11 @@ func (environ *Environment) BindSync(userConfig *Config) {
 		return
 	}
 
-	if userConfig.Sync == nil || userConfig.Sync.UserDataStream == nil {
+	if config == nil || config.UserDataStream == nil {
 		return
 	}
+
+	environ.syncConfig = config
 
 	tradeWriter := func(trade types.Trade) {
 		if err := environ.TradeService.Insert(trade); err != nil {
@@ -474,10 +481,11 @@ func (environ *Environment) BindSync(userConfig *Config) {
 	}
 
 	for _, session := range environ.sessions {
-		if userConfig.Sync.UserDataStream.Trades {
+		// if trade sync is on, we will write all received trades
+		if config.UserDataStream.Trades {
 			session.UserDataStream.OnTradeUpdate(tradeWriter)
 		}
-		if userConfig.Sync.UserDataStream.FilledOrders {
+		if config.UserDataStream.FilledOrders {
 			session.UserDataStream.OnOrderUpdate(orderWriter)
 		}
 	}
@@ -571,7 +579,57 @@ func (environ *Environment) Sync(ctx context.Context, userConfig ...*Config) err
 	return nil
 }
 
+func (environ *Environment) RecordPosition(position *types.Position, trade types.Trade, profit *types.Profit) {
+	// skip for back-test
+	if environ.BacktestService != nil {
+		return
+	}
+
+	if environ.DatabaseService == nil || environ.ProfitService == nil || environ.PositionService == nil {
+		return
+	}
+
+	if position.Strategy == "" && profit.Strategy != "" {
+		position.Strategy = profit.Strategy
+	}
+
+	if position.StrategyInstanceID == "" && profit.StrategyInstanceID != "" {
+		position.StrategyInstanceID = profit.StrategyInstanceID
+	}
+
+
+	if profit != nil {
+		if err := environ.PositionService.Insert(position, trade, profit.Profit); err != nil {
+			log.WithError(err).Errorf("can not insert position record")
+		}
+		if err := environ.ProfitService.Insert(*profit); err != nil {
+			log.WithError(err).Errorf("can not insert profit record: %+v", profit)
+		}
+	} else {
+		if err := environ.PositionService.Insert(position, trade, fixedpoint.Zero); err != nil {
+			log.WithError(err).Errorf("can not insert position record")
+		}
+	}
+
+
+	// if:
+	// 1) we are not using sync
+	// 2) and not sync-ing trades from the user data stream
+	if environ.TradeService != nil && (environ.syncConfig == nil ||
+		(environ.syncConfig.UserDataStream == nil) ||
+		(environ.syncConfig.UserDataStream != nil && !environ.syncConfig.UserDataStream.Trades)) {
+		if err := environ.TradeService.Insert(trade); err != nil {
+			log.WithError(err).Errorf("can not insert trade record: %+v", trade)
+		}
+	}
+}
+
 func (environ *Environment) RecordProfit(profit types.Profit) {
+	// skip for back-test
+	if environ.BacktestService != nil {
+		return
+	}
+
 	if environ.DatabaseService == nil {
 		return
 	}
@@ -579,7 +637,7 @@ func (environ *Environment) RecordProfit(profit types.Profit) {
 		return
 	}
 
-	if err := environ.ProfitService.Insert(profit) ; err != nil {
+	if err := environ.ProfitService.Insert(profit); err != nil {
 		log.WithError(err).Errorf("can not insert profit record: %+v", profit)
 	}
 }
@@ -608,7 +666,6 @@ func (environ *Environment) syncSession(ctx context.Context, session *ExchangeSe
 
 	return environ.SyncService.SyncSessionSymbols(ctx, session.Exchange, environ.syncStartTime, symbols...)
 }
-
 
 func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) error {
 	environ.Notifiability = Notifiability{
