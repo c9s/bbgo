@@ -1,7 +1,5 @@
 -- +up
-ALTER TABLE `trades`
-    ADD COLUMN `order_id` BIGINT UNSIGNED NOT NULL;
+SELECT 1;
 
 -- +down
-ALTER TABLE `trades`
-    DROP COLUMN `order_id`;
+SELECT 1;

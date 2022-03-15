@@ -310,11 +310,11 @@ func parseKLines(payload []byte, symbol, resolution string, interval Interval) (
 			Interval:  resolution,
 			StartTime: startTime,
 			EndTime:   endTime,
-			Open:      fixedpoint.MustNewFromBytes(slice[1].GetStringBytes()),
-			High:      fixedpoint.MustNewFromBytes(slice[2].GetStringBytes()),
-			Low:       fixedpoint.MustNewFromBytes(slice[3].GetStringBytes()),
-			Close:     fixedpoint.MustNewFromBytes(slice[4].GetStringBytes()),
-			Volume:    fixedpoint.MustNewFromBytes(slice[5].GetStringBytes()),
+			Open:      fixedpoint.NewFromFloat(slice[1].GetFloat64()),
+			High:      fixedpoint.NewFromFloat(slice[2].GetFloat64()),
+			Low:       fixedpoint.NewFromFloat(slice[3].GetFloat64()),
+			Close:     fixedpoint.NewFromFloat(slice[4].GetFloat64()),
+			Volume:    fixedpoint.NewFromFloat(slice[5].GetFloat64()),
 			Closed:    isClosed,
 		})
 	}

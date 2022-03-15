@@ -14,17 +14,7 @@ func init() {
 func upTradeIndex(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
 	// This code is executed when the migration is applied.
 
-	_, err = tx.ExecContext(ctx, "CREATE INDEX trades_symbol ON trades(symbol);")
-	if err != nil {
-		return err
-	}
-
-	_, err = tx.ExecContext(ctx, "CREATE INDEX trades_symbol_fee_currency ON trades(symbol, fee_currency, traded_at);")
-	if err != nil {
-		return err
-	}
-
-	_, err = tx.ExecContext(ctx, "CREATE INDEX trades_traded_at_symbol ON trades(traded_at, symbol);")
+	_, err = tx.ExecContext(ctx, "SELECT 1;")
 	if err != nil {
 		return err
 	}
@@ -35,17 +25,7 @@ func upTradeIndex(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
 func downTradeIndex(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
 	// This code is executed when the migration is rolled back.
 
-	_, err = tx.ExecContext(ctx, "DROP INDEX trades_symbol ON trades;")
-	if err != nil {
-		return err
-	}
-
-	_, err = tx.ExecContext(ctx, "DROP INDEX trades_symbol_fee_currency ON trades;")
-	if err != nil {
-		return err
-	}
-
-	_, err = tx.ExecContext(ctx, "DROP INDEX trades_traded_at_symbol ON trades;")
+	_, err = tx.ExecContext(ctx, "SELECT 1;")
 	if err != nil {
 		return err
 	}

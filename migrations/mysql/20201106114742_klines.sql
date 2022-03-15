@@ -6,7 +6,7 @@ CREATE TABLE `klines`
     `start_time`    DATETIME(3)             NOT NULL,
     `end_time`      DATETIME(3)             NOT NULL,
     `interval`      VARCHAR(3)              NOT NULL,
-    `symbol`        VARCHAR(7)              NOT NULL,
+    `symbol`        VARCHAR(20)              NOT NULL,
     `open`          DECIMAL(16, 8) UNSIGNED NOT NULL,
     `high`          DECIMAL(16, 8) UNSIGNED NOT NULL,
     `low`           DECIMAL(16, 8) UNSIGNED NOT NULL,
