@@ -129,14 +129,16 @@ pkg/version/dev.go: .FORCE
 	BUILD_FLAGS="!release" VERSION_SUFFIX="-dev" bash utils/generate-version-file.sh > $@
 
 dev-version: pkg/version/dev.go
+	git add $<
 	git commit $< -m "update dev build version"
 
 cmd-doc: .FORCE
 	go run ./cmd/update-doc
 	git add -v doc/commands
-	git commit -m "update command doc files" doc/commands
+	git commit -m "update command doc files" doc/commands || true
 
 version: pkg/version/version.go pkg/version/dev.go migrations cmd-doc
+	git add $< $(word 2,$^)
 	git commit $< $(word 2,$^) -m "bump version to $(VERSION)" || true
 	[[ -e doc/release/$(VERSION).md ]] || (echo "file doc/release/$(VERSION).md does not exist" ; exit 1)
 	git add -v doc/release/$(VERSION).md && git commit doc/release/$(VERSION).md -m "add $(VERSION) release note" || true
