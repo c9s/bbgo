@@ -123,10 +123,9 @@ message SubmitOrder {
 // https://maicoin.github.io/max-websocket-docs/#/private_channels?id=account-response
 message Balance {
     string exchange = 1;
-    string symbol = 2;
-    string currency = 3;
-    double available = 4;
-    double locked = 5;
+    string currency = 2;
+    double available = 3;
+    double locked = 4;
 }
 
 message SubmitOrderRequest {
