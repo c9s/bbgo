@@ -23,7 +23,7 @@ subscriptions = [
 
 stream = Stream(host, port, subscriptions)
 stream.on_book_event(book_event_callback)
-stream.on_ticker_event(tocker_event_callback)
+stream.on_ticker_event(ticker_event_callback)
 ...
 stream.start()
 ```
