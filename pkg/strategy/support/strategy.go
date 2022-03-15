@@ -207,6 +207,10 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	}
 }
 
+func (s *Strategy) CurrentPosition() *types.Position {
+	return s.state.Position
+}
+
 func (s *Strategy) SaveState() error {
 	if err := s.Persistence.Save(s.state, ID, s.Symbol, stateKey); err != nil {
 		return err
@@ -408,7 +412,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	if !s.TrailingStopTarget.TrailingStopCallbackRatio.IsZero() {
 		// Update trailing stop when the position changes
 		s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
-			if position.Base.Sign() > 0 { // Update order if we have a position
+			if position.Base.Compare(s.Market.MinQuantity) > 0 { // Update order if we have a position
 				// Cancel the original order
 				if err := s.cancelOrder(s.trailingStopControl.OrderID, ctx, session); err != nil {
 					log.WithError(err).Errorf("Can not cancel the original trailing stop order!")
@@ -428,7 +432,13 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 					if err != nil {
 						log.WithError(err).Error("submit profit trailing stop order error")
 					} else {
-						s.trailingStopControl.OrderID = orders.IDs()[0]
+						orderIds := orders.IDs()
+						if len(orderIds) > 0 {
+							s.trailingStopControl.OrderID = orderIds[0]
+						} else {
+							log.Error("submit profit trailing stop order error. unknown error")
+							s.trailingStopControl.OrderID = 0
+						}
 					}
 				}
 			}
@@ -459,7 +469,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		highPrice := kline.GetHigh()
 
 		if s.TrailingStopTarget.TrailingStopCallbackRatio.Sign() > 0 {
-			if s.state.Position.Base.Sign() <= 0 { // Without a position
+			if s.state.Position.Base.Compare(s.Market.MinQuantity) <= 0 { // Without a position
 				// Update trailing orders with current high price
 				s.trailingStopControl.CurrentHighestPrice = highPrice
 			} else if s.trailingStopControl.CurrentHighestPrice.Compare(highPrice) < 0 { // With a position
