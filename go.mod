@@ -2,7 +2,7 @@
 
 module github.com/c9s/bbgo
 
-go 1.13
+go 1.17
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
