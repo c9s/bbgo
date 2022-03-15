@@ -12,7 +12,6 @@ import (
 
 func init() {
 	BuildCmd.Flags().String("config", "bbgo.yaml", "config file")
-	BuildCmd.MarkFlagRequired("config")
 	RootCmd.AddCommand(BuildCmd)
 }
 
