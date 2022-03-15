@@ -166,6 +166,8 @@ type Strategy struct {
 
 	ScaleQuantity *bbgo.PriceVolumeScale `json:"scaleQuantity"`
 
+	orderExecutor bbgo.OrderExecutor
+
 	tradeCollector *bbgo.TradeCollector
 
 	orderStore *bbgo.OrderStore
@@ -209,6 +211,42 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 
 func (s *Strategy) CurrentPosition() *types.Position {
 	return s.state.Position
+}
+
+func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Value) error {
+	base := s.state.Position.GetBase()
+	if base.IsZero() {
+		return fmt.Errorf("no opened %s position", s.state.Position.Symbol)
+	}
+
+	// make it negative
+	quantity := base.Mul(percentage).Abs()
+	side := types.SideTypeBuy
+	if base.Sign() > 0 {
+		side = types.SideTypeSell
+	}
+
+	if quantity.Compare(s.Market.MinQuantity) < 0 {
+		return fmt.Errorf("order quantity %v is too small, less than %v", quantity, s.Market.MinQuantity)
+	}
+
+	submitOrder := types.SubmitOrder{
+		Symbol:   s.Symbol,
+		Side:     side,
+		Type:     types.OrderTypeMarket,
+		Quantity: quantity,
+		Market:   s.Market,
+	}
+
+	s.Notify("Submitting %s %s order to close position by %v", s.Symbol, side.String(), percentage, submitOrder)
+
+	createdOrders, err := s.submitOrders(ctx, s.orderExecutor, submitOrder)
+	if err != nil {
+		log.WithError(err).Errorf("can not place position close order")
+	}
+
+	s.orderStore.Add(createdOrders...)
+	return err
 }
 
 func (s *Strategy) SaveState() error {
@@ -344,6 +382,8 @@ func (s *Strategy) calculateQuantity(session *bbgo.ExchangeSession, side types.S
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+	s.orderExecutor = orderExecutor
+
 	// set default values
 	if s.Interval == "" {
 		s.Interval = types.Interval5m
