@@ -77,7 +77,6 @@ var listOrdersCmd = &cobra.Command{
 	ValidArgs:    []string{"", "open", "closed"},
 	SilenceUsage: true,
 	PreRunE: cobraInitRequired([]string{
-		"config",
 		"session",
 		"symbol",
 	}),
@@ -148,7 +147,6 @@ var executeOrderCmd = &cobra.Command{
 	Short:        "execute buy/sell on the balance/position you have on specific symbol",
 	SilenceUsage: true,
 	PreRunE: cobraInitRequired([]string{
-		"config",
 		"symbol",
 		"side",
 		"target-quantity",
@@ -299,7 +297,6 @@ var submitOrderCmd = &cobra.Command{
 	Short:        "place order to the exchange",
 	SilenceUsage: true,
 	PreRunE: cobraInitRequired([]string{
-		"config",
 		"session",
 		"symbol",
 		"side",
