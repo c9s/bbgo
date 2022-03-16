@@ -86,9 +86,9 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 	targetSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval.String()})
 }
 
-func (s *Strategy) clear(ctx context.Context, session *bbgo.ExchangeSession) {
+func (s *Strategy) clear(ctx context.Context, orderExecutor bbgo.OrderExecutor) {
 	if s.order.OrderID > 0 {
-		if err := session.Exchange.CancelOrders(ctx, s.order); err != nil {
+		if err := orderExecutor.CancelOrders(ctx, s.order); err != nil {
 			log.WithError(err).Errorf("can not cancel trailingstop order: %+v", s.order)
 		}
 
@@ -217,14 +217,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		closePrice := kline.Close
 
 		// ok, it's our call, we need to cancel the stop limit order first
-		s.clear(ctx, session)
+		s.clear(ctx, orderExecutor)
 		s.place(ctx, orderExecutor, session, indicator, closePrice)
 	})
 
 	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 		log.Infof("canceling trailingstop order...")
-		s.clear(ctx, session)
+		s.clear(ctx, orderExecutor)
 	})
 
 	if lastPrice, ok := session.LastPrice(s.Symbol); ok {
@@ -261,14 +261,14 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		closePrice := kline.Close
 
 		// ok, it's our call, we need to cancel the stop limit order first
-		s.clear(ctx, session)
+		s.clear(ctx, &orderExecutor)
 		s.place(ctx, &orderExecutor, session, indicator, closePrice)
 	})
 
 	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 		log.Infof("canceling trailingstop order...")
-		s.clear(ctx, session)
+		s.clear(ctx, &orderExecutor)
 	})
 
 	if lastPrice, ok := session.LastPrice(s.Symbol); ok {
