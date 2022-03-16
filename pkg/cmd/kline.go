@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"syscall"
 
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/types"
-	log "github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
 )
 
 // go run ./cmd/bbgo kline --exchange=ftx --symbol=BTCUSDT
@@ -17,7 +18,6 @@ var klineCmd = &cobra.Command{
 	Use:   "kline",
 	Short: "connect to the kline market data streaming service of an exchange",
 	PreRunE: cobraInitRequired([]string{
-		"config",
 		"session",
 		"symbol",
 		"interval",

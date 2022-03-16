@@ -20,7 +20,6 @@ var tradesCmd = &cobra.Command{
 	Short:        "Query trading history",
 	SilenceUsage: true,
 	PreRunE: cobraInitRequired([]string{
-		"config",
 		"session",
 		"symbol",
 	}),
@@ -98,7 +97,6 @@ var tradeUpdateCmd = &cobra.Command{
 	Use:   "tradeupdate --session=[exchange_name]",
 	Short: "Listen to trade update events",
 	PreRunE: cobraInitRequired([]string{
-		"config",
 		"session",
 	}),
 	RunE: func(cmd *cobra.Command, args []string) error {

@@ -21,7 +21,6 @@ var balancesCmd = &cobra.Command{
 	Short:        "Show user account balances",
 	SilenceUsage: true,
 	PreRunE: cobraInitRequired([]string{
-		"config",
 		"session",
 	}),
 	RunE: func(cmd *cobra.Command, args []string) error {
