@@ -303,7 +303,7 @@ func (s *Strategy) submitOrders(ctx context.Context, orderExecutor bbgo.OrderExe
 }
 
 // Cancel order
-func (s *Strategy) cancelOrder(orderID uint64, ctx context.Context, session *bbgo.ExchangeSession) error {
+func (s *Strategy) cancelOrder(orderID uint64, ctx context.Context, orderExecutor bbgo.OrderExecutor) error {
 	// Cancel the original order
 	order, ok := s.orderStore.Get(orderID)
 	if ok {
@@ -311,7 +311,7 @@ func (s *Strategy) cancelOrder(orderID uint64, ctx context.Context, session *bbg
 		case types.OrderStatusCanceled, types.OrderStatusRejected, types.OrderStatusFilled:
 			// Do nothing
 		default:
-			if err := session.Exchange.CancelOrders(ctx, order); err != nil {
+			if err := orderExecutor.CancelOrders(ctx, order); err != nil {
 				return err
 			}
 		}
@@ -454,7 +454,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
 			if position.Base.Compare(s.Market.MinQuantity) > 0 { // Update order if we have a position
 				// Cancel the original order
-				if err := s.cancelOrder(s.trailingStopControl.OrderID, ctx, session); err != nil {
+				if err := s.cancelOrder(s.trailingStopControl.OrderID, ctx, orderExecutor); err != nil {
 					log.WithError(err).Errorf("Can not cancel the original trailing stop order!")
 				}
 				s.trailingStopControl.OrderID = 0
@@ -517,7 +517,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				s.trailingStopControl.CurrentHighestPrice = highPrice
 
 				// Cancel the original order
-				if err := s.cancelOrder(s.trailingStopControl.OrderID, ctx, session); err != nil {
+				if err := s.cancelOrder(s.trailingStopControl.OrderID, ctx, orderExecutor); err != nil {
 					log.WithError(err).Errorf("Can not cancel the original trailing stop order!")
 				}
 				s.trailingStopControl.OrderID = 0
@@ -681,7 +681,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		// Cancel trailing stop order
 		if s.TrailingStopTarget.TrailingStopCallbackRatio.Sign() > 0 {
-			if err := s.cancelOrder(s.trailingStopControl.OrderID, ctx, session); err != nil {
+			if err := s.cancelOrder(s.trailingStopControl.OrderID, ctx, orderExecutor); err != nil {
 				log.WithError(err).Errorf("Can not cancel the trailing stop order!")
 			}
 			s.trailingStopControl.OrderID = 0

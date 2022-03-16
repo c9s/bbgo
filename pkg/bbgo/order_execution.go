@@ -13,6 +13,7 @@ import (
 
 type OrderExecutor interface {
 	SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error)
+	CancelOrders(ctx context.Context, orders ...types.Order) error
 
 	OnTradeUpdate(cb func(trade types.Trade))
 	OnOrderUpdate(cb func(order types.Order))
@@ -23,6 +24,7 @@ type OrderExecutor interface {
 type OrderExecutionRouter interface {
 	// SubmitOrdersTo submit order to a specific exchange Session
 	SubmitOrdersTo(ctx context.Context, session string, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error)
+	CancelOrdersTo(ctx context.Context, session string, orders ...types.Order) error
 }
 
 type ExchangeOrderExecutionRouter struct {
@@ -48,6 +50,18 @@ func (e *ExchangeOrderExecutionRouter) SubmitOrdersTo(ctx context.Context, sessi
 	}
 
 	return es.Exchange.SubmitOrders(ctx, formattedOrders...)
+}
+
+func (e *ExchangeOrderExecutionRouter) CancelOrdersTo(ctx context.Context, session string, orders ...types.Order) error {
+	if executor, ok := e.executors[session]; ok {
+		return executor.CancelOrders(ctx, orders...)
+	}
+	es, ok := e.sessions[session]
+	if !ok {
+		return fmt.Errorf("exchange session %s not found", session)
+	}
+
+	return es.Exchange.CancelOrders(ctx, orders...)
 }
 
 // ExchangeOrderExecutor is an order executor wrapper for single exchange instance.
@@ -99,6 +113,13 @@ func (e *ExchangeOrderExecutor) SubmitOrders(ctx context.Context, orders ...type
 	e.notifySubmitOrders(formattedOrders...)
 
 	return e.Session.Exchange.SubmitOrders(ctx, formattedOrders...)
+}
+
+func (e *ExchangeOrderExecutor) CancelOrders(ctx context.Context, orders ...types.Order) error {
+	for _, order := range orders {
+		log.Infof("cancelling order: %s", order)
+	}
+	return e.Session.Exchange.CancelOrders(ctx, orders...)
 }
 
 type BasicRiskController struct {
