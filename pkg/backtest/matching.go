@@ -286,13 +286,6 @@ func (m *SimplePriceMatching) BuyToPrice(price fixedpoint.Value) (closedOrders [
 			o.Status = types.OrderStatusFilled
 			closedOrders = append(closedOrders, o)
 
-			trade := m.newTradeFromOrder(o, false)
-			m.executeTrade(trade)
-
-			trades = append(trades, trade)
-
-			m.EmitOrderUpdate(o)
-
 		case types.OrderTypeStopLimit:
 			// should we trigger the order?
 			if price.Compare(o.StopPrice) <= 0 {
@@ -307,13 +300,6 @@ func (m *SimplePriceMatching) BuyToPrice(price fixedpoint.Value) (closedOrders [
 				o.ExecutedQuantity = o.Quantity
 				o.Status = types.OrderStatusFilled
 				closedOrders = append(closedOrders, o)
-
-				trade := m.newTradeFromOrder(o, false)
-				m.executeTrade(trade)
-
-				trades = append(trades, trade)
-
-				m.EmitOrderUpdate(o)
 			} else {
 				// maker order
 				askOrders = append(askOrders, o)
@@ -324,13 +310,6 @@ func (m *SimplePriceMatching) BuyToPrice(price fixedpoint.Value) (closedOrders [
 				o.ExecutedQuantity = o.Quantity
 				o.Status = types.OrderStatusFilled
 				closedOrders = append(closedOrders, o)
-
-				trade := m.newTradeFromOrder(o, true)
-				m.executeTrade(trade)
-
-				trades = append(trades, trade)
-
-				m.EmitOrderUpdate(o)
 			} else {
 				askOrders = append(askOrders, o)
 			}
@@ -343,6 +322,15 @@ func (m *SimplePriceMatching) BuyToPrice(price fixedpoint.Value) (closedOrders [
 
 	m.askOrders = askOrders
 	m.LastPrice = price
+
+	for _, o := range closedOrders {
+		trade := m.newTradeFromOrder(o, true)
+		m.executeTrade(trade)
+
+		trades = append(trades, trade)
+
+		m.EmitOrderUpdate(o)
+	}
 
 	return closedOrders, trades
 }
@@ -360,13 +348,6 @@ func (m *SimplePriceMatching) SellToPrice(price fixedpoint.Value) (closedOrders 
 				o.Price = sellPrice
 				o.Status = types.OrderStatusFilled
 				closedOrders = append(closedOrders, o)
-
-				trade := m.newTradeFromOrder(o, false)
-				m.executeTrade(trade)
-
-				trades = append(trades, trade)
-
-				m.EmitOrderUpdate(o)
 			} else {
 				bidOrders = append(bidOrders, o)
 			}
@@ -380,13 +361,6 @@ func (m *SimplePriceMatching) SellToPrice(price fixedpoint.Value) (closedOrders 
 					o.ExecutedQuantity = o.Quantity
 					o.Status = types.OrderStatusFilled
 					closedOrders = append(closedOrders, o)
-
-					trade := m.newTradeFromOrder(o, false)
-					m.executeTrade(trade)
-
-					trades = append(trades, trade)
-					m.EmitOrderUpdate(o)
-
 				} else {
 					bidOrders = append(bidOrders, o)
 				}
@@ -399,13 +373,6 @@ func (m *SimplePriceMatching) SellToPrice(price fixedpoint.Value) (closedOrders 
 				o.ExecutedQuantity = o.Quantity
 				o.Status = types.OrderStatusFilled
 				closedOrders = append(closedOrders, o)
-
-				trade := m.newTradeFromOrder(o, true)
-				m.executeTrade(trade)
-
-				trades = append(trades, trade)
-
-				m.EmitOrderUpdate(o)
 			} else {
 				bidOrders = append(bidOrders, o)
 			}
@@ -417,6 +384,15 @@ func (m *SimplePriceMatching) SellToPrice(price fixedpoint.Value) (closedOrders 
 
 	m.bidOrders = bidOrders
 	m.LastPrice = price
+
+	for _, o := range closedOrders {
+		trade := m.newTradeFromOrder(o, true)
+		m.executeTrade(trade)
+
+		trades = append(trades, trade)
+
+		m.EmitOrderUpdate(o)
+	}
 
 	return closedOrders, trades
 }
