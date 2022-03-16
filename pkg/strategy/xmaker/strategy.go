@@ -804,7 +804,8 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		defer tradeScanTicker.Stop()
 
 		defer func() {
-			if err := s.makerSession.Exchange.CancelOrders(context.Background(), s.activeMakerOrders.Orders()...); err != nil {
+			if err := s.activeMakerOrders.GracefulCancel(context.Background(),
+				s.makerSession.Exchange); err != nil {
 				log.WithError(err).Errorf("can not cancel %s orders", s.Symbol)
 			}
 		}()

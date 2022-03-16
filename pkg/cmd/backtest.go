@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/fatih/color"
@@ -324,28 +325,35 @@ var BacktestCmd = &cobra.Command{
 			klineChans = append(klineChans, KChanEx{KChan: c, Exchange: exchange})
 		}
 
-		for {
-			count := len(klineChans)
-			for _, kchanex := range klineChans {
-				kLine, more := <-kchanex.KChan
-				if more {
-					kchanex.Exchange.ConsumeKLine(kLine)
-				} else {
-					if err := kchanex.Exchange.CloseMarketData(); err != nil {
-						return err
+		runCtx, cancelRun := context.WithCancel(ctx)
+		go func() {
+			defer cancelRun()
+			for {
+				count := len(klineChans)
+				for _, kchanex := range klineChans {
+					kLine, more := <-kchanex.KChan
+					if more {
+						kchanex.Exchange.ConsumeKLine(kLine)
+					} else {
+						if err := kchanex.Exchange.CloseMarketData(); err != nil {
+							log.Errorf("%v", err)
+							return
+						}
+						count--
 					}
-					count--
+				}
+				if count == 0 {
+					break
 				}
 			}
-			if count == 0 {
-				break
-			}
-		}
+		}()
+
+		cmdutil.WaitForSignal(runCtx, syscall.SIGINT, syscall.SIGTERM)
 
 		log.Infof("shutting down trader...")
-		shutdownCtx, cancel := context.WithDeadline(ctx, time.Now().Add(10*time.Second))
+		shutdownCtx, cancelShutdown := context.WithDeadline(runCtx, time.Now().Add(10*time.Second))
 		trader.Graceful.Shutdown(shutdownCtx)
-		cancel()
+		cancelShutdown()
 
 		// put the logger back to print the pnl
 		log.SetLevel(log.InfoLevel)
