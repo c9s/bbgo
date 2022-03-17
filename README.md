@@ -173,6 +173,15 @@ bbgo pnl --exchange binance --asset BTC --since "2019-01-01"
 
 ## Advanced Configuration
 
+### Testnet (Paper Trading)
+
+Currently only supports binance testnet.
+To run bbgo in testnet, apply new API keys from [Binance Test Network](https://testnet.binance.vision), and set the following env before you start bbgo:
+```bash
+export PAPER_TRADE=1
+export DISABLE_MARKET_CACHE=1 # the symbols supported in testnet is far less than the mainnet
+```
+
 ### Notification
 
 - [Setting up Telegram notification](./doc/configuration/telegram.md)

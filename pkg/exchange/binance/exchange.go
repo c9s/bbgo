@@ -24,6 +24,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 const BNB = "BNB"
@@ -61,8 +62,8 @@ func isBinanceUs() bool {
 }
 
 func paperTrade() bool {
-	v, err := strconv.ParseBool(os.Getenv("PAPER_TRADE"))
-	return err == nil && v
+	v, ok := util.GetEnvVarBool("PAPER_TRADE")
+	return ok && v
 }
 
 type Exchange struct {
