@@ -3,8 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	"os"
-	"strconv"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/cache"
@@ -12,6 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 var ErrNotImplemented = errors.New("not implemented")
@@ -26,8 +25,8 @@ type SyncService struct {
 }
 
 func paperTrade() bool {
-	v, err := strconv.ParseBool(os.Getenv("PAPER_TRADE"))
-	return err == nil && v
+	v, ok := util.GetEnvVarBool("PAPER_TRADE")
+	return ok && v
 }
 
 // SyncSessionSymbols syncs the trades from the given exchange session
@@ -51,28 +50,31 @@ func (s *SyncService) SyncSessionSymbols(ctx context.Context, exchange types.Exc
 		}
 	}
 
-	if !paperTrade() {
-		log.Infof("syncing %s deposit records...", exchange.Name())
-		if err := s.DepositService.Sync(ctx, exchange); err != nil {
-			if err != ErrNotImplemented {
-				return err
-			}
-		}
+	if paperTrade() {
+		return nil
+	}
 
-		log.Infof("syncing %s withdraw records...", exchange.Name())
-		if err := s.WithdrawService.Sync(ctx, exchange); err != nil {
-			if err != ErrNotImplemented {
-				return err
-			}
-		}
-
-		log.Infof("syncing %s reward records...", exchange.Name())
-		if err := s.RewardService.Sync(ctx, exchange); err != nil {
-			if err != ErrExchangeRewardServiceNotImplemented {
-				log.Infof("%s reward service is not supported", exchange.Name())
-				return err
-			}
+	log.Infof("syncing %s deposit records...", exchange.Name())
+	if err := s.DepositService.Sync(ctx, exchange); err != nil {
+		if err != ErrNotImplemented {
+			return err
 		}
 	}
+
+	log.Infof("syncing %s withdraw records...", exchange.Name())
+	if err := s.WithdrawService.Sync(ctx, exchange); err != nil {
+		if err != ErrNotImplemented {
+			return err
+		}
+	}
+
+	log.Infof("syncing %s reward records...", exchange.Name())
+	if err := s.RewardService.Sync(ctx, exchange); err != nil {
+		if err != ErrExchangeRewardServiceNotImplemented {
+			log.Infof("%s reward service is not supported", exchange.Name())
+			return err
+		}
+	}
+
 	return nil
 }
