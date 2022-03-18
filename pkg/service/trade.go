@@ -320,7 +320,7 @@ func (s *TradeService) QueryForTradingFeeCurrency(ex types.ExchangeName, symbol 
 func (s *TradeService) Query(options QueryTradesOptions) ([]types.Trade, error) {
 	sql := queryTradesSQL(options)
 
-	log.Info(sql)
+	log.Debug(sql)
 
 	args := map[string]interface{}{
 		"exchange": options.Exchange,
@@ -408,14 +408,6 @@ func queryTradesSQL(options QueryTradesOptions) string {
 
 	var where []string
 
-	if len(options.Exchange) > 0 {
-		where = append(where, `exchange = :exchange`)
-	}
-
-	if len(options.Symbol) > 0 {
-		where = append(where, `symbol = :symbol`)
-	}
-
 	if options.LastGID > 0 {
 		switch ordering {
 		case "ASC":
@@ -425,8 +417,15 @@ func queryTradesSQL(options QueryTradesOptions) string {
 		}
 	}
 
-	sql := `SELECT * FROM trades`
+	if len(options.Symbol) > 0 {
+		where = append(where, `symbol = :symbol`)
+	}
 
+	if len(options.Exchange) > 0 {
+		where = append(where, `exchange = :exchange`)
+	}
+
+	sql := `SELECT * FROM trades`
 	if len(where) > 0 {
 		sql += ` WHERE ` + strings.Join(where, " AND ")
 	}
@@ -455,8 +454,41 @@ func (s *TradeService) scanRows(rows *sqlx.Rows) (trades []types.Trade, err erro
 
 func (s *TradeService) Insert(trade types.Trade) error {
 	_, err := s.DB.NamedExec(`
-			INSERT INTO trades (id, exchange, order_id, symbol, price, quantity, quote_quantity, side, is_buyer, is_maker, fee, fee_currency, traded_at, is_margin, is_futures, is_isolated)
-			VALUES (:id, :exchange, :order_id, :symbol, :price, :quantity, :quote_quantity, :side, :is_buyer, :is_maker, :fee, :fee_currency, :traded_at, :is_margin, :is_futures, :is_isolated)`,
+			INSERT INTO trades (
+				id,
+				exchange, 
+				order_id,
+				symbol,
+				price,
+				quantity,
+				quote_quantity,
+				side,
+				is_buyer,
+				is_maker,
+				fee,
+				fee_currency,
+				traded_at,
+				is_margin,
+				is_futures,
+				is_isolated)
+			VALUES (
+				:id,
+				:exchange,
+				:order_id,
+				:symbol,
+				:price,
+				:quantity,
+				:quote_quantity,
+				:side,
+				:is_buyer,
+				:is_maker,
+				:fee,
+				:fee_currency,
+				:traded_at,
+				:is_margin,
+				:is_futures,
+				:is_isolated
+			)`,
 		trade)
 	return err
 }

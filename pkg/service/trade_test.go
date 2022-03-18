@@ -99,7 +99,7 @@ func Test_queryTradesSQL(t *testing.T) {
 	})
 
 	t.Run("convert all options", func(t *testing.T) {
-		assert.Equal(t, "SELECT * FROM trades WHERE exchange = :exchange AND symbol = :symbol AND gid < :gid ORDER BY gid DESC LIMIT 500", queryTradesSQL(QueryTradesOptions{
+		assert.Equal(t, "SELECT * FROM trades WHERE gid < :gid AND symbol = :symbol AND exchange = :exchange ORDER BY gid DESC LIMIT 500", queryTradesSQL(QueryTradesOptions{
 			Exchange: "max",
 			Symbol:   "btc",
 			LastGID:  123,
