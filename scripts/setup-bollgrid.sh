@@ -20,10 +20,16 @@ function info()
 {
     echo -e "${GREEN}$@${NC}"
 }
-
+version=$(curl -fs https://api.github.com/repos/c9s/bbgo/releases/latest | awk -F '"' '/tag_name/{print $4}')
 osf=$(uname | tr '[:upper:]' '[:lower:]')
-arch=amd64
-version=v1.21.4
+arch=""
+case $(uname -m) in
+  x86_64 | ia64) arch="amd64";;
+  arm64 | aarch64 | arm) arch="arm64";;
+  *)
+    echo "unsupported architecture: $(uname -m)"
+    exit 1;;
+esac
 dist_file=bbgo-$version-$osf-$arch.tar.gz
 
 info "downloading..."
