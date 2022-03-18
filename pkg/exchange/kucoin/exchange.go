@@ -13,11 +13,13 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/exchange/kucoin/kucoinapi"
-	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 var marketDataLimiter = rate.NewLimiter(rate.Every(500*time.Millisecond), 1)
+var queryTradeLimiter = rate.NewLimiter(rate.Every(3*time.Second), 1)
+var queryOrderLimiter = rate.NewLimiter(rate.Every(3*time.Second), 1)
 
 var ErrMissingSequence = errors.New("sequence is missing")
 
@@ -314,6 +316,10 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 		req.EndAt(until)
 	}
 
+	if err := queryOrderLimiter.Wait(ctx); err != nil {
+		return nil, err
+	}
+
 	orderList, err := req.Do(ctx)
 	if err != nil {
 		return orders, err
@@ -352,6 +358,10 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		req.StartAt(*options.StartTime)
 	} else if options.EndTime != nil {
 		req.EndAt(*options.EndTime)
+	}
+
+	if err := queryTradeLimiter.Wait(ctx); err != nil {
+		return trades, err
 	}
 
 	response, err := req.Do(ctx)
