@@ -2,17 +2,19 @@ package xnav
 
 import (
 	"context"
-	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"sync"
 	"time"
+
+	"github.com/c9s/bbgo/pkg/fixedpoint"
+
+	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
+	"github.com/slack-go/slack"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
-	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
-	"github.com/slack-go/slack"
 )
 
 const ID = "xnav"
@@ -101,7 +103,8 @@ func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]
 
 	assets := totalBalances.Assets(lastPrices)
 	for currency, asset := range assets {
-		if s.IgnoreDusts && asset.InUSD.Compare(Ten) < 0 {
+		// calculated if it's dust only when InUSD (usd value) is defined.
+		if s.IgnoreDusts && !asset.InUSD.IsZero() && asset.InUSD.Compare(Ten) < 0 {
 			continue
 		}
 

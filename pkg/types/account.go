@@ -52,19 +52,33 @@ type Asset struct {
 type AssetMap map[string]Asset
 
 func (m AssetMap) PlainText() (o string) {
+	var assets = m.Slice()
+
+	// sort assets
+	sort.Slice(assets, func(i, j int) bool {
+		return assets[i].InUSD.Compare(assets[j].InUSD) > 0
+	})
+
 	sumUsd := fixedpoint.Zero
 	sumBTC := fixedpoint.Zero
-	for _, a := range m {
+	for _, a := range assets {
 		usd := a.InUSD
 		btc := a.InBTC
-		o += fmt.Sprintf("  %s: %s (≈ %s) (≈ %s)",
-			a.Currency,
-			a.Total.String(),
-			USD.FormatMoney(usd),
-			BTC.FormatMoney(btc),
-		) + "\n"
-		sumUsd = sumUsd.Add(usd)
-		sumBTC = sumBTC.Add(btc)
+		if !a.InUSD.IsZero() {
+			o += fmt.Sprintf("  %s: %s (≈ %s) (≈ %s)",
+				a.Currency,
+				a.Total.String(),
+				USD.FormatMoney(usd),
+				BTC.FormatMoney(btc),
+			) + "\n"
+			sumUsd = sumUsd.Add(usd)
+			sumBTC = sumBTC.Add(btc)
+		} else {
+			o += fmt.Sprintf("  %s: %s",
+				a.Currency,
+				a.Total.String(),
+			) + "\n"
+		}
 	}
 	o += fmt.Sprintf(" Summary: (≈ %s) (≈ %s)",
 		USD.FormatMoney(sumUsd),
@@ -97,16 +111,24 @@ func (m AssetMap) SlackAttachment() slack.Attachment {
 	}
 
 	for _, a := range assets {
-		fields = append(fields, slack.AttachmentField{
-			Title: a.Currency,
-			Value: fmt.Sprintf("%s (≈ %s) (≈ %s) (%s)",
-				a.Total.String(),
-				USD.FormatMoney(a.InUSD),
-				BTC.FormatMoney(a.InBTC),
-				a.InUSD.Div(totalUSD).FormatPercentage(2),
-			),
-			Short: false,
-		})
+		if !a.InUSD.IsZero() {
+			fields = append(fields, slack.AttachmentField{
+				Title: a.Currency,
+				Value: fmt.Sprintf("%s (≈ %s) (≈ %s) (%s)",
+					a.Total.String(),
+					USD.FormatMoney(a.InUSD),
+					BTC.FormatMoney(a.InBTC),
+					a.InUSD.Div(totalUSD).FormatPercentage(2),
+				),
+				Short: false,
+			})
+		} else {
+			fields = append(fields, slack.AttachmentField{
+				Title: a.Currency,
+				Value: fmt.Sprintf("%s", a.Total.String()),
+				Short: false,
+			})
+		}
 	}
 
 	return slack.Attachment{
