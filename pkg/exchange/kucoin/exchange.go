@@ -18,8 +18,8 @@ import (
 )
 
 var marketDataLimiter = rate.NewLimiter(rate.Every(500*time.Millisecond), 1)
-var queryTradeLimiter = rate.NewLimiter(rate.Every(5*time.Second), 1)
-var queryOrderLimiter = rate.NewLimiter(rate.Every(5*time.Second), 1)
+var queryTradeLimiter = rate.NewLimiter(rate.Every(3*time.Second), 1)
+var queryOrderLimiter = rate.NewLimiter(rate.Every(3*time.Second), 1)
 
 var ErrMissingSequence = errors.New("sequence is missing")
 
