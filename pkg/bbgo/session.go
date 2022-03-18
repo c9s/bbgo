@@ -624,11 +624,21 @@ func (session *ExchangeSession) UpdatePrices(ctx context.Context) (err error) {
 		return err
 	}
 
+	var lastTime time.Time
 	for k, v := range tickers {
-		session.lastPrices[k] = v.Last
+		// for {Crypto}/USDT markets
+		if strings.HasSuffix(k, "USDT") {
+			session.lastPrices[k] = v.Last
+		} else if strings.HasPrefix(k, "USDT") {
+			session.lastPrices[k] = fixedpoint.One.Div(v.Last)
+		}
+
+		if v.Time.After(lastTime) {
+			lastTime = v.Time
+		}
 	}
 
-	session.lastPriceUpdatedAt = time.Now()
+	session.lastPriceUpdatedAt = lastTime
 	return err
 }
 
