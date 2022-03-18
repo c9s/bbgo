@@ -480,6 +480,7 @@ type MarketTradeEvent struct {
 	TradeId        int64 `json:"t"`
 
 	IsMaker bool `json:"m"`
+	Dummy   bool `json:"M"`
 }
 
 /*
@@ -504,16 +505,28 @@ market trade
 
 func (e *MarketTradeEvent) Trade() types.Trade {
 	tt := time.Unix(0, e.OrderTradeTime*int64(time.Millisecond))
+	var orderId int64
+	var side types.SideType
+	var isBuyer bool
+	if e.IsMaker {
+		orderId = e.SellerOrderId // seller is taker
+		side = types.SideTypeSell
+		isBuyer = false
+	} else {
+		orderId = e.BuyerOrderId // buyer is taker
+		side = types.SideTypeBuy
+		isBuyer = true
+	}
 	return types.Trade{
 		ID:            uint64(e.TradeId),
 		Exchange:      types.ExchangeBinance,
 		Symbol:        e.Symbol,
-		OrderID:       uint64(e.BuyerOrderId),
-		Side:          types.SideTypeBoth,
+		OrderID:       uint64(orderId),
+		Side:          side,
 		Price:         e.Price,
 		Quantity:      e.Quantity,
 		QuoteQuantity: e.Quantity,
-		IsBuyer:       true,
+		IsBuyer:       isBuyer,
 		IsMaker:       e.IsMaker,
 		Time:          types.Time(tt),
 		Fee:           fixedpoint.Zero,
