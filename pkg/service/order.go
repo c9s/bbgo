@@ -40,7 +40,6 @@ func (s *OrderService) Sync(ctx context.Context, exchange types.Exchange, symbol
 			symbol = futuresSettings.IsolatedFuturesSymbol
 		}
 	}
-	
 
 	records, err := s.QueryLast(exchange.Name(), symbol, isMargin, isFutures, isIsolated, 50)
 	if err != nil {

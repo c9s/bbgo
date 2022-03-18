@@ -10,6 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 var ErrNotImplemented = errors.New("not implemented")
@@ -21,6 +22,11 @@ type SyncService struct {
 	RewardService   *RewardService
 	WithdrawService *WithdrawService
 	DepositService  *DepositService
+}
+
+func paperTrade() bool {
+	v, ok := util.GetEnvVarBool("PAPER_TRADE")
+	return ok && v
 }
 
 // SyncSessionSymbols syncs the trades from the given exchange session
@@ -42,6 +48,10 @@ func (s *SyncService) SyncSessionSymbols(ctx context.Context, exchange types.Exc
 				return err
 			}
 		}
+	}
+
+	if paperTrade() {
+		return nil
 	}
 
 	log.Infof("syncing %s deposit records...", exchange.Name())
