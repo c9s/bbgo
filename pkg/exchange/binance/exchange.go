@@ -471,10 +471,10 @@ func (e *Exchange) QuerySpotAccount(ctx context.Context) (*types.Account, error)
 	}
 
 	a := &types.Account{
-		AccountType:     types.AccountTypeSpot,
-		CanDeposit:      account.CanDeposit,  // if can transfer in asset
-		CanTrade:        account.CanTrade,    // if can trade
-		CanWithdraw:     account.CanWithdraw, // if can transfer out asset
+		AccountType: types.AccountTypeSpot,
+		CanDeposit:  account.CanDeposit,  // if can transfer in asset
+		CanTrade:    account.CanTrade,    // if can trade
+		CanWithdraw: account.CanWithdraw, // if can transfer out asset
 	}
 	a.UpdateBalances(balances)
 	return a, nil
