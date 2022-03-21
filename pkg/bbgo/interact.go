@@ -21,10 +21,18 @@ type PositionReader interface {
 	CurrentPosition() *types.Position
 }
 
-type StrategyController interface {
+type StrategyStatusProvider interface {
+	GetStatus() types.StrategyStatus
+}
+
+type Suspender interface {
 	Suspend(ctx context.Context) error
 	Resume(ctx context.Context) error
-	GetStatus() types.StrategyStatus
+}
+
+type StrategyController interface {
+	StrategyStatusProvider
+	Suspender
 }
 
 type EmergencyStopper interface {
@@ -226,7 +234,7 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 		// send symbol options
 		found := false
 		for signature, strategy := range it.exchangeStrategies {
-			if _, ok := strategy.(StrategyController); ok {
+			if _, ok := strategy.(StrategyStatusProvider); ok {
 				reply.AddButton(signature, "strategy", signature)
 				found = true
 			}
@@ -235,7 +243,7 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 		if found {
 			reply.Message("Please choose one strategy")
 		} else {
-			reply.Message("No any strategy supports StrategyController")
+			reply.Message("No any strategy supports StrategyStatusProvider")
 		}
 		return nil
 	}).Cycle(func(signature string, reply interact.Reply) error {
@@ -245,10 +253,10 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 			return fmt.Errorf("strategy %s not found", signature)
 		}
 
-		controller, implemented := strategy.(StrategyController)
+		controller, implemented := strategy.(StrategyStatusProvider)
 		if !implemented {
-			reply.Message(fmt.Sprintf("Strategy %s does not support strategy control", signature))
-			return fmt.Errorf("strategy %s does not implement StrategyController interface", signature)
+			reply.Message(fmt.Sprintf("Strategy %s does not support strategy status provider", signature))
+			return fmt.Errorf("strategy %s does not implement StrategyStatusProvider interface", signature)
 		}
 
 		status := controller.GetStatus()
