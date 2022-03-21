@@ -25,6 +25,7 @@ type StrategyController interface {
 	SuspendStrategy(ctx context.Context) error
 	ResumeStrategy() error
 	GetStrategyStatus() bool
+	EmergencyStop(ctx context.Context) error
 }
 
 type closePositionContext struct {
@@ -363,6 +364,51 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 		}
 
 		reply.Message(fmt.Sprintf("Strategy %s resumed.", signature))
+		return nil
+	})
+
+	i.PrivateCommand("/emergencystop", "Emergency Stop", func(reply interact.Reply) error {
+		// it.trader.exchangeStrategies
+		// send symbol options
+		found := false
+		for signature, strategy := range it.exchangeStrategies {
+			if _, ok := strategy.(StrategyController); ok {
+				reply.AddButton(signature, "strategy", signature)
+				found = true
+			}
+		}
+
+		if found {
+			reply.Message("Please choose one strategy")
+		} else {
+			reply.Message("No any strategy supports StrategyController")
+		}
+		return nil
+	}).Cycle(func(signature string, reply interact.Reply) error {
+		strategy, ok := it.exchangeStrategies[signature]
+		if !ok {
+			reply.Message("Strategy not found")
+			return fmt.Errorf("strategy %s not found", signature)
+		}
+
+		controller, implemented := strategy.(StrategyController)
+		if !implemented {
+			reply.Message(fmt.Sprintf("Strategy %s does not support strategy resume", signature))
+			return fmt.Errorf("strategy %s does not implement StrategyController interface", signature)
+		}
+
+		err := controller.EmergencyStop(context.Background())
+
+		if kc, ok := reply.(interact.KeyboardController); ok {
+			kc.RemoveKeyboard()
+		}
+
+		if err != nil {
+			reply.Message(fmt.Sprintf("Failed to stop the strategy, %s", err.Error()))
+			return err
+		}
+
+		reply.Message(fmt.Sprintf("Strategy %s stopped and the position closed.", signature))
 		return nil
 	})
 }
