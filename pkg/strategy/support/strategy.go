@@ -254,7 +254,7 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 
 // StrategyController
 
-func (s *Strategy) GetStrategyStatus() types.StrategyStatus {
+func (s *Strategy) GetStatus() types.StrategyStatus {
 	return s.status
 }
 
