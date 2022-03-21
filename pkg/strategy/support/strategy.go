@@ -290,6 +290,17 @@ func (s *Strategy) ResumeStrategy() error {
 	return nil
 }
 
+func (s *Strategy) EmergencyStop(ctx context.Context) error {
+	// Close 100% position
+	percentage, _ := fixedpoint.NewFromString("100%")
+	err := s.ClosePosition(ctx, percentage)
+
+	// Suspend strategy
+	_ = s.SuspendStrategy(ctx)
+
+	return err
+}
+
 func (s *Strategy) SaveState() error {
 	if err := s.Persistence.Save(s.state, ID, s.Symbol, stateKey); err != nil {
 		return err
