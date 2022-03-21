@@ -24,7 +24,7 @@ type PositionReader interface {
 type StrategyController interface {
 	SuspendStrategy(ctx context.Context) error
 	ResumeStrategy() error
-	GetStrategyStatus() bool
+	GetStrategyStatus() types.StrategyStatus
 	EmergencyStop(ctx context.Context) error
 }
 
@@ -254,9 +254,9 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 			kc.RemoveKeyboard()
 		}
 
-		if status {
+		if status == types.StrategyStatusRunning {
 			reply.Message(fmt.Sprintf("Strategy %s is running.", signature))
-		} else {
+		} else if status == types.StrategyStatusStopped {
 			reply.Message(fmt.Sprintf("Strategy %s is not running.", signature))
 		}
 
@@ -295,7 +295,7 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 
 		// Check strategy status before suspend
 		status := controller.GetStrategyStatus()
-		if !status {
+		if status != types.StrategyStatusRunning {
 			reply.Message(fmt.Sprintf("Strategy %s is not running.", signature))
 			return nil
 		}
@@ -347,7 +347,7 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 
 		// Check strategy status before resume
 		status := controller.GetStrategyStatus()
-		if status {
+		if status != types.StrategyStatusStopped {
 			reply.Message(fmt.Sprintf("Strategy %s is running.", signature))
 			return nil
 		}
