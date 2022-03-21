@@ -4,6 +4,6 @@ package types
 type StrategyStatus string
 
 const (
-	StrategyStatusRunning StrategyStatus = "RUN"
-	StrategyStatusStopped StrategyStatus = "STOP"
+	StrategyStatusRunning StrategyStatus = "RUNNING"
+	StrategyStatusStopped StrategyStatus = "STOPPED"
 )
