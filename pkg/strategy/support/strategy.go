@@ -258,7 +258,7 @@ func (s *Strategy) GetStrategyStatus() types.StrategyStatus {
 	return s.status
 }
 
-func (s *Strategy) SuspendStrategy(ctx context.Context) error {
+func (s *Strategy) Suspend(ctx context.Context) error {
 	s.status = types.StrategyStatusStopped
 
 	var err error
@@ -284,7 +284,7 @@ func (s *Strategy) SuspendStrategy(ctx context.Context) error {
 	return nil
 }
 
-func (s *Strategy) ResumeStrategy() error {
+func (s *Strategy) Resume(ctx context.Context) error {
 	s.status = types.StrategyStatusRunning
 
 	return nil
@@ -296,7 +296,7 @@ func (s *Strategy) EmergencyStop(ctx context.Context) error {
 	err := s.ClosePosition(ctx, percentage)
 
 	// Suspend strategy
-	_ = s.SuspendStrategy(ctx)
+	_ = s.Suspend(ctx)
 
 	return err
 }
