@@ -22,8 +22,8 @@ type PositionReader interface {
 }
 
 type StrategyController interface {
-	SuspendStrategy(ctx context.Context) error
-	ResumeStrategy() error
+	Suspend(ctx context.Context) error
+	Resume(ctx context.Context) error
 	GetStrategyStatus() types.StrategyStatus
 }
 
@@ -303,7 +303,7 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 			return nil
 		}
 
-		err := controller.SuspendStrategy(context.Background())
+		err := controller.Suspend(context.Background())
 
 		if kc, ok := reply.(interact.KeyboardController); ok {
 			kc.RemoveKeyboard()
@@ -355,7 +355,7 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 			return nil
 		}
 
-		err := controller.ResumeStrategy()
+		err := controller.Resume(context.Background())
 
 		if kc, ok := reply.(interact.KeyboardController); ok {
 			kc.RemoveKeyboard()
