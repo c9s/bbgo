@@ -181,7 +181,7 @@ type Strategy struct {
 	trailingStopControl *TrailingStopControl
 
 	// StrategyController
-	status bool
+	status types.StrategyStatus
 }
 
 func (s *Strategy) ID() string {
@@ -254,12 +254,12 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 
 // StrategyController
 
-func (s *Strategy) GetStrategyStatus() bool {
+func (s *Strategy) GetStrategyStatus() types.StrategyStatus {
 	return s.status
 }
 
 func (s *Strategy) SuspendStrategy(ctx context.Context) error {
-	s.status = false
+	s.status = types.StrategyStatusStopped
 
 	var err error
 	// Cancel all order
@@ -285,7 +285,7 @@ func (s *Strategy) SuspendStrategy(ctx context.Context) error {
 }
 
 func (s *Strategy) ResumeStrategy() error {
-	s.status = true
+	s.status = types.StrategyStatusRunning
 
 	return nil
 }
@@ -437,7 +437,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderExecutor = orderExecutor
 
 	// StrategyController
-	s.status = true
+	s.status = types.StrategyStatusRunning
 
 	// set default values
 	if s.Interval == "" {
@@ -508,7 +508,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		// Update trailing stop when the position changes
 		s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
 			// StrategyController
-			if !s.status {
+			if s.status != types.StrategyStatusRunning {
 				return
 			}
 
@@ -558,7 +558,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		// StrategyController
-		if !s.status {
+		if s.status != types.StrategyStatusRunning {
 			return
 		}
 
