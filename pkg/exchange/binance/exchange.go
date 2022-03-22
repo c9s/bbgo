@@ -471,10 +471,10 @@ func (e *Exchange) QuerySpotAccount(ctx context.Context) (*types.Account, error)
 	}
 
 	a := &types.Account{
-		AccountType:     types.AccountTypeSpot,
-		CanDeposit:      account.CanDeposit,  // if can transfer in asset
-		CanTrade:        account.CanTrade,    // if can trade
-		CanWithdraw:     account.CanWithdraw, // if can transfer out asset
+		AccountType: types.AccountTypeSpot,
+		CanDeposit:  account.CanDeposit,  // if can transfer in asset
+		CanTrade:    account.CanTrade,    // if can trade
+		CanWithdraw: account.CanWithdraw, // if can transfer out asset
 	}
 	a.UpdateBalances(balances)
 	return a, nil
@@ -840,7 +840,8 @@ func (e *Exchange) submitFuturesOrder(ctx context.Context, order types.SubmitOrd
 	req := e.futuresClient.NewCreateOrderService().
 		Symbol(order.Symbol).
 		Type(orderType).
-		Side(futures.SideType(order.Side))
+		Side(futures.SideType(order.Side)).
+		ReduceOnly(order.ReduceOnly)
 
 	clientOrderID := newFuturesClientOrderID(order.ClientOrderID)
 	if len(clientOrderID) > 0 {
@@ -909,6 +910,7 @@ func (e *Exchange) submitFuturesOrder(ctx context.Context, order types.SubmitOrd
 		TimeInForce:      response.TimeInForce,
 		Type:             response.Type,
 		Side:             response.Side,
+		ReduceOnly:       response.ReduceOnly,
 	}, true)
 
 	return createdOrder, err
