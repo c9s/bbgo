@@ -121,7 +121,7 @@ func (e *ExecutionReportEvent) Order() (*types.Order, error) {
 			Price:         e.OrderPrice,
 			TimeInForce:   types.TimeInForce(e.TimeInForce),
 		},
-		Exchange: types.ExchangeBinance,
+		Exchange:         types.ExchangeBinance,
 		IsWorking:        e.IsOnBook,
 		OrderID:          uint64(e.OrderID),
 		Status:           toGlobalOrderStatus(binance.OrderStatusType(e.CurrentOrderStatus)),
@@ -337,6 +337,11 @@ func parseWebSocketEvent(message []byte) (interface{}, error) {
 		err := json.Unmarshal([]byte(message), &event)
 		return &event, err
 
+	case "trade":
+		var event MarketTradeEvent
+		err := json.Unmarshal([]byte(message), &event)
+		return &event, err
+
 	default:
 		id := val.GetInt("id")
 		if id > 0 {
@@ -460,6 +465,73 @@ func parseDepthEvent(val *fastjson.Value) (*DepthEvent, error) {
 	}
 
 	return depth, err
+}
+
+type MarketTradeEvent struct {
+	EventBase
+	Symbol   string           `json:"s"`
+	Quantity fixedpoint.Value `json:"q"`
+	Price    fixedpoint.Value `json:"p"`
+
+	BuyerOrderId  int64 `json:"b"`
+	SellerOrderId int64 `json:"a"`
+
+	OrderTradeTime int64 `json:"T"`
+	TradeId        int64 `json:"t"`
+
+	IsMaker bool `json:"m"`
+	Dummy   bool `json:"M"`
+}
+
+/*
+
+market trade
+
+{
+  "e": "trade",     // Event type
+  "E": 123456789,   // Event time
+  "s": "BNBBTC",    // Symbol
+  "t": 12345,       // Trade ID
+  "p": "0.001",     // Price
+  "q": "100",       // Quantity
+  "b": 88,          // Buyer order ID
+  "a": 50,          // Seller order ID
+  "T": 123456785,   // Trade time
+  "m": true,        // Is the buyer the market maker?
+  "M": true         // Ignore
+}
+
+*/
+
+func (e *MarketTradeEvent) Trade() types.Trade {
+	tt := time.Unix(0, e.OrderTradeTime*int64(time.Millisecond))
+	var orderId int64
+	var side types.SideType
+	var isBuyer bool
+	if e.IsMaker {
+		orderId = e.SellerOrderId // seller is taker
+		side = types.SideTypeSell
+		isBuyer = false
+	} else {
+		orderId = e.BuyerOrderId // buyer is taker
+		side = types.SideTypeBuy
+		isBuyer = true
+	}
+	return types.Trade{
+		ID:            uint64(e.TradeId),
+		Exchange:      types.ExchangeBinance,
+		Symbol:        e.Symbol,
+		OrderID:       uint64(orderId),
+		Side:          side,
+		Price:         e.Price,
+		Quantity:      e.Quantity,
+		QuoteQuantity: e.Quantity,
+		IsBuyer:       isBuyer,
+		IsMaker:       e.IsMaker,
+		Time:          types.Time(tt),
+		Fee:           fixedpoint.Zero,
+		FeeCurrency:   "",
+	}
 }
 
 type KLine struct {
