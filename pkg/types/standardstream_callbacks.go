@@ -124,6 +124,16 @@ func (s *StandardStream) EmitBookSnapshot(book SliceOrderBook) {
 	}
 }
 
+func (s *StandardStream) OnMarketTrade(cb func(trade Trade)) {
+	s.marketTradeCallbacks = append(s.marketTradeCallbacks, cb)
+}
+
+func (s *StandardStream) EmitMarketTrade(trade Trade) {
+	for _, cb := range s.marketTradeCallbacks {
+		cb(trade)
+	}
+}
+
 func (s *StandardStream) OnFuturesPositionUpdate(cb func(futuresPositions FuturesPositionMap)) {
 	s.FuturesPositionUpdateCallbacks = append(s.FuturesPositionUpdateCallbacks, cb)
 }
@@ -168,6 +178,8 @@ type StandardStreamEventHub interface {
 	OnBookTickerUpdate(cb func(bookTicker BookTicker))
 
 	OnBookSnapshot(cb func(book SliceOrderBook))
+
+	OnMarketTrade(cb func(trade Trade))
 
 	OnFuturesPositionUpdate(cb func(futuresPositions FuturesPositionMap))
 

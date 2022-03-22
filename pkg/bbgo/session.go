@@ -358,6 +358,10 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 		session.lastPrices[kline.Symbol] = kline.Close
 	})
 
+	session.MarketDataStream.OnMarketTrade(func(trade types.Trade) {
+		session.lastPrices[trade.Symbol] = trade.Price
+	})
+
 	session.IsInitialized = true
 	return nil
 }

@@ -96,6 +96,8 @@ type StandardStream struct {
 
 	bookSnapshotCallbacks []func(book SliceOrderBook)
 
+	marketTradeCallbacks []func(trade Trade)
+
 	// Futures
 	FuturesPositionUpdateCallbacks []func(futuresPositions FuturesPositionMap)
 
