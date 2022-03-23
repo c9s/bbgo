@@ -68,6 +68,12 @@ func (reply *SlackReply) AddButton(text string, name string, value string) {
 	})
 }
 
+func (reply *SlackReply) AddMultipleButtons(buttonsForm [][3]string) {
+	for _, buttonForm := range buttonsForm {
+		reply.AddButton(buttonForm[0], buttonForm[1], buttonForm[2])
+	}
+}
+
 func (reply *SlackReply) build() interface{} {
 	// you should avoid using this modal view request, because it interrupts the interaction flow
 	// once we send the modal view request, we can't go back to the channel.

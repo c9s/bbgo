@@ -81,6 +81,12 @@ func (r *TelegramReply) AddButton(text string, name string, value string) {
 	r.set = true
 }
 
+func (r *TelegramReply) AddMultipleButtons(buttonsForm [][3]string) {
+	for _, buttonForm := range buttonsForm {
+		r.AddButton(buttonForm[0], buttonForm[1], buttonForm[2])
+	}
+}
+
 func (r *TelegramReply) build() {
 	var rows []telebot.Row
 	for _, button := range r.buttons {
