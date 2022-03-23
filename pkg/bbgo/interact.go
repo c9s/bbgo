@@ -61,23 +61,18 @@ func NewCoreInteraction(environment *Environment, trader *Trader) *CoreInteracti
 	}
 }
 
-func (it *CoreInteraction) AddSupportedStrategyButtons(reply *interact.Reply, checkInterface interface{}) bool {
+func (it *CoreInteraction) AddSupportedStrategyButtons(checkInterface interface{}) ([][3]string, bool) {
 	found := false
+	var buttonsForm [][3]string
 	rt := reflect.TypeOf(checkInterface).Elem()
 	for signature, strategy := range it.exchangeStrategies {
 		if ok := reflect.TypeOf(strategy).Implements(rt); ok {
-			(*reply).AddButton(signature, "strategy", signature)
+			buttonsForm = append(buttonsForm, [3]string{signature, "strategy", signature})
 			found = true
 		}
 	}
 
-	if found {
-		(*reply).Message("Please choose one strategy")
-	} else {
-		(*reply).Message(fmt.Sprintf("No any strategy supports %s", rt.Name()))
-	}
-
-	return found
+	return buttonsForm, found
 }
 
 func (it *CoreInteraction) Commands(i *interact.Interact) {
@@ -127,7 +122,12 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 	i.PrivateCommand("/position", "Show Position", func(reply interact.Reply) error {
 		// it.trader.exchangeStrategies
 		// send symbol options
-		_ = it.AddSupportedStrategyButtons(&reply, (*PositionReader)(nil))
+		if buttonsForm, found := it.AddSupportedStrategyButtons((*PositionReader)(nil)); found {
+			reply.AddMultipleButtons(buttonsForm)
+			reply.Message("Please choose one strategy")
+		} else {
+			reply.Message("No any strategy supports PositionReader")
+		}
 		return nil
 	}).Cycle(func(signature string, reply interact.Reply) error {
 		strategy, ok := it.exchangeStrategies[signature]
@@ -163,7 +163,12 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 	i.PrivateCommand("/closeposition", "Close position", func(reply interact.Reply) error {
 		// it.trader.exchangeStrategies
 		// send symbol options
-		_ = it.AddSupportedStrategyButtons(&reply, (*PositionCloser)(nil))
+		if buttonsForm, found := it.AddSupportedStrategyButtons((*PositionCloser)(nil)); found {
+			reply.AddMultipleButtons(buttonsForm)
+			reply.Message("Please choose one strategy")
+		} else {
+			reply.Message("No any strategy supports PositionCloser")
+		}
 		return nil
 	}).Next(func(signature string, reply interact.Reply) error {
 		strategy, ok := it.exchangeStrategies[signature]
@@ -227,7 +232,12 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 	i.PrivateCommand("/status", "Strategy Status", func(reply interact.Reply) error {
 		// it.trader.exchangeStrategies
 		// send symbol options
-		_ = it.AddSupportedStrategyButtons(&reply, (*StrategyStatusProvider)(nil))
+		if buttonsForm, found := it.AddSupportedStrategyButtons((*StrategyStatusProvider)(nil)); found {
+			reply.AddMultipleButtons(buttonsForm)
+			reply.Message("Please choose one strategy")
+		} else {
+			reply.Message("No any strategy supports StrategyStatusProvider")
+		}
 		return nil
 	}).Cycle(func(signature string, reply interact.Reply) error {
 		strategy, ok := it.exchangeStrategies[signature]
@@ -260,7 +270,12 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 	i.PrivateCommand("/suspend", "Suspend Strategy", func(reply interact.Reply) error {
 		// it.trader.exchangeStrategies
 		// send symbol options
-		_ = it.AddSupportedStrategyButtons(&reply, (*StrategyController)(nil))
+		if buttonsForm, found := it.AddSupportedStrategyButtons((*StrategyController)(nil)); found {
+			reply.AddMultipleButtons(buttonsForm)
+			reply.Message("Please choose one strategy")
+		} else {
+			reply.Message("No any strategy supports StrategyController")
+		}
 		return nil
 	}).Cycle(func(signature string, reply interact.Reply) error {
 		strategy, ok := it.exchangeStrategies[signature]
@@ -300,7 +315,12 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 	i.PrivateCommand("/resume", "Resume Strategy", func(reply interact.Reply) error {
 		// it.trader.exchangeStrategies
 		// send symbol options
-		_ = it.AddSupportedStrategyButtons(&reply, (*StrategyController)(nil))
+		if buttonsForm, found := it.AddSupportedStrategyButtons((*StrategyController)(nil)); found {
+			reply.AddMultipleButtons(buttonsForm)
+			reply.Message("Please choose one strategy")
+		} else {
+			reply.Message("No any strategy supports StrategyController")
+		}
 		return nil
 	}).Cycle(func(signature string, reply interact.Reply) error {
 		strategy, ok := it.exchangeStrategies[signature]
@@ -340,7 +360,12 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 	i.PrivateCommand("/emergencystop", "Emergency Stop", func(reply interact.Reply) error {
 		// it.trader.exchangeStrategies
 		// send symbol options
-		_ = it.AddSupportedStrategyButtons(&reply, (*EmergencyStopper)(nil))
+		if buttonsForm, found := it.AddSupportedStrategyButtons((*EmergencyStopper)(nil)); found {
+			reply.AddMultipleButtons(buttonsForm)
+			reply.Message("Please choose one strategy")
+		} else {
+			reply.Message("No any strategy supports EmergencyStopper")
+		}
 		return nil
 	}).Cycle(func(signature string, reply interact.Reply) error {
 		strategy, ok := it.exchangeStrategies[signature]
