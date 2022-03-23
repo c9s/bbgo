@@ -31,6 +31,8 @@ func (h *messageHandler) handleMessage(message []byte) {
 		h.handleOrderBook(r)
 	case bookTickerChannel:
 		h.handleBookTicker(r)
+	case marketTradeChannel:
+		h.handleMarketTrade(r)
 	case privateOrdersChannel:
 		h.handlePrivateOrders(r)
 	case privateTradesChannel:
@@ -80,6 +82,21 @@ func (h *messageHandler) handleOrderBook(response websocketResponse) {
 	default:
 		logger.Errorf("unsupported order book data type %s", r.Type)
 		return
+	}
+}
+
+func (h *messageHandler) handleMarketTrade(response websocketResponse) {
+	if response.Type == subscribedRespType {
+		h.handleSubscribedMessage(response)
+		return
+	}
+	trades, err := response.toMarketTradeResponse()
+	if err != nil {
+		logger.WithError(err).Errorf("failed to generate market trade %v", response)
+		return
+	}
+	for _, trade := range trades {
+		h.EmitMarketTrade(trade)
 	}
 }
 
