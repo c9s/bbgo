@@ -111,25 +111,36 @@ func (s *Stream) addSubscription(request websocketRequest) {
 }
 
 func (s *Stream) Subscribe(channel types.Channel, symbol string, option types.SubscribeOptions) {
-	if channel == types.BookChannel {
+	switch channel {
+	case types.BookChannel:
 		s.addSubscription(websocketRequest{
 			Operation: subscribe,
 			Channel:   orderBookChannel,
 			Market:    toLocalSymbol(TrimUpperString(symbol)),
 		})
-	} else if channel == types.BookTickerChannel {
+		return
+	case types.BookTickerChannel:
 		s.addSubscription(websocketRequest{
 			Operation: subscribe,
 			Channel:   bookTickerChannel,
 			Market:    toLocalSymbol(TrimUpperString(symbol)),
 		})
-	} else if channel == types.KLineChannel {
+		return
+	case types.KLineChannel:
 		// FTX does not support kline channel, do polling
 		interval := types.Interval(option.Interval)
 		ks := klineSubscription{symbol: symbol, interval: interval}
 		s.klineSubscriptions = append(s.klineSubscriptions, ks)
-	} else {
-		panic("only support book/kline channel now")
+		return
+	case types.MarketTradeChannel:
+		s.addSubscription(websocketRequest{
+			Operation: subscribe,
+			Channel:   marketTradeChannel,
+			Market:    toLocalSymbol(TrimUpperString(symbol)),
+		})
+		return
+	default:
+		panic("only support book/kline/trade channel now")
 	}
 }
 
