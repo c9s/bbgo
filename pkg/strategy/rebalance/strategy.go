@@ -3,14 +3,12 @@ package kline
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
 )
 
 const ID = "rebalance"
@@ -53,13 +51,13 @@ func ElementwiseProduct(m1, m2 map[string]fixedpoint.Value) map[string]fixedpoin
 type Strategy struct {
 	Notifiability *bbgo.Notifiability
 
-	Interval      types.Duration              `json:"interval"`
+	Interval      types.Interval              `json:"interval"`
 	BaseCurrency  string                      `json:"baseCurrency"`
 	TargetWeights map[string]fixedpoint.Value `json:"targetWeights"`
 	Threshold     fixedpoint.Value            `json:"threshold"`
 	IgnoreLocked  bool                        `json:"ignoreLocked"`
 	Verbose       bool                        `json:"verbose"`
-
+	DryRun        bool                        `json:"dryRun"`
 	// max amount to buy or sell per order
 	MaxAmount fixedpoint.Value `json:"maxAmount"`
 }
@@ -69,10 +67,6 @@ func (s *Strategy) ID() string {
 }
 
 func (s *Strategy) Validate() error {
-	if s.Interval == 0 {
-		return fmt.Errorf("interval shoud not be 0")
-	}
-
 	if len(s.TargetWeights) == 0 {
 		return fmt.Errorf("targetWeights should not be empty")
 	}
@@ -94,26 +88,17 @@ func (s *Strategy) Validate() error {
 	return nil
 }
 
-func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {}
+func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
+	for _, symbol := range s.getSymbols() {
+		session.Subscribe(types.KLineChannel, symbol, types.SubscribeOptions{Interval: s.Interval.String()})
+	}
+}
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	s.TargetWeights = Normalize(s.TargetWeights)
-
-	go func() {
-		ticker := time.NewTicker(util.MillisecondsJitter(s.Interval.Duration(), 1000))
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-
-			case <-ticker.C:
-				s.rebalance(ctx, orderExecutor, session)
-			}
-		}
-	}()
-
+	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
+		s.rebalance(ctx, orderExecutor, session)
+	})
 	return nil
 }
 
@@ -128,6 +113,14 @@ func (s *Strategy) rebalance(ctx context.Context, orderExecutor bbgo.OrderExecut
 	marketValues := ElementwiseProduct(prices, quantities)
 
 	orders := s.generateSubmitOrders(prices, marketValues)
+	for _, order := range orders {
+		log.Infof("generated submit order: %s", order.String())
+	}
+
+	if s.DryRun {
+		return
+	}
+
 	_, err = orderExecutor.SubmitOrders(ctx, orders...)
 	if err != nil {
 		log.WithError(err).Error("submit order error")
@@ -230,4 +223,16 @@ func (s *Strategy) generateSubmitOrders(prices, marketValues map[string]fixedpoi
 		submitOrders = append(submitOrders, order)
 	}
 	return submitOrders
+}
+
+func (s *Strategy) getSymbols() []string {
+	var symbols []string
+	for currency := range s.TargetWeights {
+		if currency == s.BaseCurrency {
+			continue
+		}
+		symbol := currency + s.BaseCurrency
+		symbols = append(symbols, symbol)
+	}
+	return symbols
 }

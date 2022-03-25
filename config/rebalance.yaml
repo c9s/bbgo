@@ -7,7 +7,7 @@ notifications:
 exchangeStrategies:
   - on: max
     rebalance:
-      interval: 24h
+      interval: 1d
       baseCurrency: TWD
       ignoreLocked: true
       targetWeights:
@@ -20,3 +20,4 @@ exchangeStrategies:
       # max amount to buy or sell per order
       maxAmount: 10_000
       verbose: true
+      dryRun: false
