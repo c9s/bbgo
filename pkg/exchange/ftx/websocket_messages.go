@@ -24,6 +24,7 @@ const unsubscribe operation = "unsubscribe"
 type channel string
 
 const orderBookChannel channel = "orderbook"
+const marketTradeChannel channel = "trades"
 const bookTickerChannel channel = "ticker"
 const privateOrdersChannel channel = "orders"
 const privateTradesChannel channel = "fills"
@@ -119,6 +120,42 @@ type orderUpdateResponse struct {
 	Data ftxapi.Order `json:"data"`
 }
 
+type trade struct {
+	Price       fixedpoint.Value `json:"price"`
+	Size        fixedpoint.Value `json:"size"`
+	Side        string           `json:"side"`
+	Liquidation bool             `json:"liquidation"`
+	Time        time.Time        `json:"time"`
+}
+type tradeResponse struct {
+	mandatoryFields
+	Data []trade `json:"data"`
+}
+
+func (r websocketResponse) toMarketTradeResponse() (t []types.Trade, err error) {
+	if r.Channel != marketTradeChannel {
+		return t, fmt.Errorf("type %s, channel %s: channel incorrect", r.Type, r.Channel)
+	}
+	var tds []trade
+	if err = json.Unmarshal(r.Data, &tds); err != nil {
+		return t, err
+	}
+	t = make([]types.Trade, len(tds))
+	for i, td := range tds {
+		tt := &t[i]
+		tt.Exchange = types.ExchangeFTX
+		tt.Price = td.Price
+		tt.Quantity = td.Size
+		tt.QuoteQuantity = td.Size
+		tt.Symbol = r.Market
+		tt.Side = types.SideType(TrimUpperString(string(td.Side)))
+		tt.IsBuyer = true
+		tt.IsMaker = false
+		tt.Time = types.Time(td.Time)
+	}
+	return t, nil
+}
+
 func (r websocketResponse) toOrderUpdateResponse() (orderUpdateResponse, error) {
 	if r.Channel != privateOrdersChannel {
 		return orderUpdateResponse{}, fmt.Errorf("type %s, channel %s: %w", r.Type, r.Channel, errUnsupportedConversion)
@@ -150,7 +187,7 @@ func (r websocketResponse) toTradeUpdateResponse() (tradeUpdateResponse, error) 
 }
 
 /*
-Private:
+ Private:
 	order: {"type": "subscribed", "channel": "orders"}
 
 Public
