@@ -179,6 +179,9 @@ type Strategy struct {
 	// Trailing stop
 	TrailingStopTarget  TrailingStopTarget `json:"trailingStopTarget"`
 	trailingStopControl *TrailingStopControl
+
+	// StrategyController
+	status types.StrategyStatus
 }
 
 func (s *Strategy) ID() string {
@@ -246,6 +249,55 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 	}
 
 	s.orderStore.Add(createdOrders...)
+	return err
+}
+
+// StrategyController
+
+func (s *Strategy) GetStatus() types.StrategyStatus {
+	return s.status
+}
+
+func (s *Strategy) Suspend(ctx context.Context) error {
+	s.status = types.StrategyStatusStopped
+
+	var err error
+	// Cancel all order
+	for _, order := range s.orderStore.Orders() {
+		err = s.cancelOrder(order.OrderID, ctx, s.orderExecutor)
+	}
+	if err != nil {
+		errMsg := "Not all orders are cancelled! Please check again."
+		log.WithError(err).Errorf(errMsg)
+		s.Notify(errMsg)
+	} else {
+		s.Notify("All orders cancelled.")
+	}
+
+	// Save state
+	if err2 := s.SaveState(); err2 != nil {
+		log.WithError(err2).Errorf("can not save state: %+v", s.state)
+	} else {
+		log.Infof("%s position is saved.", s.Symbol)
+	}
+
+	return nil
+}
+
+func (s *Strategy) Resume(ctx context.Context) error {
+	s.status = types.StrategyStatusRunning
+
+	return nil
+}
+
+func (s *Strategy) EmergencyStop(ctx context.Context) error {
+	// Close 100% position
+	percentage, _ := fixedpoint.NewFromString("100%")
+	err := s.ClosePosition(ctx, percentage)
+
+	// Suspend strategy
+	_ = s.Suspend(ctx)
+
 	return err
 }
 
@@ -384,6 +436,9 @@ func (s *Strategy) calculateQuantity(session *bbgo.ExchangeSession, side types.S
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	s.orderExecutor = orderExecutor
 
+	// StrategyController
+	s.status = types.StrategyStatusRunning
+
 	// set default values
 	if s.Interval == "" {
 		s.Interval = types.Interval5m
@@ -452,6 +507,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	if !s.TrailingStopTarget.TrailingStopCallbackRatio.IsZero() {
 		// Update trailing stop when the position changes
 		s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
+			// StrategyController
+			if s.status != types.StrategyStatusRunning {
+				return
+			}
+
 			if position.Base.Compare(s.Market.MinQuantity) > 0 { // Update order if we have a position
 				// Cancel the original order
 				if err := s.cancelOrder(s.trailingStopControl.OrderID, ctx, orderExecutor); err != nil {
@@ -497,6 +557,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	// go s.tradeCollector.Run(ctx)
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
+		// StrategyController
+		if s.status != types.StrategyStatusRunning {
+			return
+		}
+
 		// skip k-lines from other symbols
 		if kline.Symbol != s.Symbol {
 			return

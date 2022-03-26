@@ -21,6 +21,24 @@ type PositionReader interface {
 	CurrentPosition() *types.Position
 }
 
+type StrategyStatusProvider interface {
+	GetStatus() types.StrategyStatus
+}
+
+type Suspender interface {
+	Suspend(ctx context.Context) error
+	Resume(ctx context.Context) error
+}
+
+type StrategyController interface {
+	StrategyStatusProvider
+	Suspender
+}
+
+type EmergencyStopper interface {
+	EmergencyStop(ctx context.Context) error
+}
+
 type closePositionContext struct {
 	signature  string
 	closer     PositionCloser
@@ -41,6 +59,20 @@ func NewCoreInteraction(environment *Environment, trader *Trader) *CoreInteracti
 		trader:             trader,
 		exchangeStrategies: make(map[string]SingleExchangeStrategy),
 	}
+}
+
+func (it *CoreInteraction) AddSupportedStrategyButtons(checkInterface interface{}) ([][3]string, bool) {
+	found := false
+	var buttonsForm [][3]string
+	rt := reflect.TypeOf(checkInterface).Elem()
+	for signature, strategy := range it.exchangeStrategies {
+		if ok := reflect.TypeOf(strategy).Implements(rt); ok {
+			buttonsForm = append(buttonsForm, [3]string{signature, "strategy", signature})
+			found = true
+		}
+	}
+
+	return buttonsForm, found
 }
 
 func (it *CoreInteraction) Commands(i *interact.Interact) {
@@ -90,15 +122,8 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 	i.PrivateCommand("/position", "Show Position", func(reply interact.Reply) error {
 		// it.trader.exchangeStrategies
 		// send symbol options
-		found := false
-		for signature, strategy := range it.exchangeStrategies {
-			if _, ok := strategy.(PositionReader); ok {
-				reply.AddButton(signature, "strategy", signature)
-				found = true
-			}
-		}
-
-		if found {
+		if buttonsForm, found := it.AddSupportedStrategyButtons((*PositionReader)(nil)); found {
+			reply.AddMultipleButtons(buttonsForm)
 			reply.Message("Please choose one strategy")
 		} else {
 			reply.Message("No any strategy supports PositionReader")
@@ -138,16 +163,9 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 	i.PrivateCommand("/closeposition", "Close position", func(reply interact.Reply) error {
 		// it.trader.exchangeStrategies
 		// send symbol options
-		found := false
-		for signature, strategy := range it.exchangeStrategies {
-			if _, ok := strategy.(PositionCloser); ok {
-				reply.AddButton(signature, signature, signature)
-				found = true
-			}
-		}
-
-		if found {
-			reply.Message("Please choose your position from the current running strategies")
+		if buttonsForm, found := it.AddSupportedStrategyButtons((*PositionCloser)(nil)); found {
+			reply.AddMultipleButtons(buttonsForm)
+			reply.Message("Please choose one strategy")
 		} else {
 			reply.Message("No any strategy supports PositionCloser")
 		}
@@ -208,6 +226,172 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 		}
 
 		reply.Message("Done")
+		return nil
+	})
+
+	i.PrivateCommand("/status", "Strategy Status", func(reply interact.Reply) error {
+		// it.trader.exchangeStrategies
+		// send symbol options
+		if buttonsForm, found := it.AddSupportedStrategyButtons((*StrategyStatusProvider)(nil)); found {
+			reply.AddMultipleButtons(buttonsForm)
+			reply.Message("Please choose one strategy")
+		} else {
+			reply.Message("No any strategy supports StrategyStatusProvider")
+		}
+		return nil
+	}).Cycle(func(signature string, reply interact.Reply) error {
+		strategy, ok := it.exchangeStrategies[signature]
+		if !ok {
+			reply.Message("Strategy not found")
+			return fmt.Errorf("strategy %s not found", signature)
+		}
+
+		controller, implemented := strategy.(StrategyStatusProvider)
+		if !implemented {
+			reply.Message(fmt.Sprintf("Strategy %s does not support strategy status provider", signature))
+			return fmt.Errorf("strategy %s does not implement StrategyStatusProvider interface", signature)
+		}
+
+		status := controller.GetStatus()
+
+		if kc, ok := reply.(interact.KeyboardController); ok {
+			kc.RemoveKeyboard()
+		}
+
+		if status == types.StrategyStatusRunning {
+			reply.Message(fmt.Sprintf("Strategy %s is running.", signature))
+		} else if status == types.StrategyStatusStopped {
+			reply.Message(fmt.Sprintf("Strategy %s is not running.", signature))
+		}
+
+		return nil
+	})
+
+	i.PrivateCommand("/suspend", "Suspend Strategy", func(reply interact.Reply) error {
+		// it.trader.exchangeStrategies
+		// send symbol options
+		if buttonsForm, found := it.AddSupportedStrategyButtons((*StrategyController)(nil)); found {
+			reply.AddMultipleButtons(buttonsForm)
+			reply.Message("Please choose one strategy")
+		} else {
+			reply.Message("No any strategy supports StrategyController")
+		}
+		return nil
+	}).Cycle(func(signature string, reply interact.Reply) error {
+		strategy, ok := it.exchangeStrategies[signature]
+		if !ok {
+			reply.Message("Strategy not found")
+			return fmt.Errorf("strategy %s not found", signature)
+		}
+
+		controller, implemented := strategy.(StrategyController)
+		if !implemented {
+			reply.Message(fmt.Sprintf("Strategy %s does not support strategy suspend", signature))
+			return fmt.Errorf("strategy %s does not implement StrategyController interface", signature)
+		}
+
+		// Check strategy status before suspend
+		status := controller.GetStatus()
+		if status != types.StrategyStatusRunning {
+			reply.Message(fmt.Sprintf("Strategy %s is not running.", signature))
+			return nil
+		}
+
+		err := controller.Suspend(context.Background())
+
+		if kc, ok := reply.(interact.KeyboardController); ok {
+			kc.RemoveKeyboard()
+		}
+
+		if err != nil {
+			reply.Message(fmt.Sprintf("Failed to suspend the strategy, %s", err.Error()))
+			return err
+		}
+
+		reply.Message(fmt.Sprintf("Strategy %s suspended.", signature))
+		return nil
+	})
+
+	i.PrivateCommand("/resume", "Resume Strategy", func(reply interact.Reply) error {
+		// it.trader.exchangeStrategies
+		// send symbol options
+		if buttonsForm, found := it.AddSupportedStrategyButtons((*StrategyController)(nil)); found {
+			reply.AddMultipleButtons(buttonsForm)
+			reply.Message("Please choose one strategy")
+		} else {
+			reply.Message("No any strategy supports StrategyController")
+		}
+		return nil
+	}).Cycle(func(signature string, reply interact.Reply) error {
+		strategy, ok := it.exchangeStrategies[signature]
+		if !ok {
+			reply.Message("Strategy not found")
+			return fmt.Errorf("strategy %s not found", signature)
+		}
+
+		controller, implemented := strategy.(StrategyController)
+		if !implemented {
+			reply.Message(fmt.Sprintf("Strategy %s does not support strategy resume", signature))
+			return fmt.Errorf("strategy %s does not implement StrategyController interface", signature)
+		}
+
+		// Check strategy status before resume
+		status := controller.GetStatus()
+		if status != types.StrategyStatusStopped {
+			reply.Message(fmt.Sprintf("Strategy %s is running.", signature))
+			return nil
+		}
+
+		err := controller.Resume(context.Background())
+
+		if kc, ok := reply.(interact.KeyboardController); ok {
+			kc.RemoveKeyboard()
+		}
+
+		if err != nil {
+			reply.Message(fmt.Sprintf("Failed to resume the strategy, %s", err.Error()))
+			return err
+		}
+
+		reply.Message(fmt.Sprintf("Strategy %s resumed.", signature))
+		return nil
+	})
+
+	i.PrivateCommand("/emergencystop", "Emergency Stop", func(reply interact.Reply) error {
+		// it.trader.exchangeStrategies
+		// send symbol options
+		if buttonsForm, found := it.AddSupportedStrategyButtons((*EmergencyStopper)(nil)); found {
+			reply.AddMultipleButtons(buttonsForm)
+			reply.Message("Please choose one strategy")
+		} else {
+			reply.Message("No any strategy supports EmergencyStopper")
+		}
+		return nil
+	}).Cycle(func(signature string, reply interact.Reply) error {
+		strategy, ok := it.exchangeStrategies[signature]
+		if !ok {
+			reply.Message("Strategy not found")
+			return fmt.Errorf("strategy %s not found", signature)
+		}
+
+		controller, implemented := strategy.(EmergencyStopper)
+		if !implemented {
+			reply.Message(fmt.Sprintf("Strategy %s does not support emergency stop", signature))
+			return fmt.Errorf("strategy %s does not implement EmergencyStopper interface", signature)
+		}
+
+		err := controller.EmergencyStop(context.Background())
+
+		if kc, ok := reply.(interact.KeyboardController); ok {
+			kc.RemoveKeyboard()
+		}
+
+		if err != nil {
+			reply.Message(fmt.Sprintf("Failed to stop the strategy, %s", err.Error()))
+			return err
+		}
+
+		reply.Message(fmt.Sprintf("Strategy %s stopped and the position closed.", signature))
 		return nil
 	})
 }
