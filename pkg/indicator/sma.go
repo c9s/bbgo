@@ -30,6 +30,33 @@ func (inc *SMA) Last() float64 {
 	return inc.Values[len(inc.Values)-1]
 }
 
+func (inc *SMA) Max() float64 {
+	if len(inc.Values) == 0 {
+		return 0.0
+	}
+	max := inc.Values[len(inc.Values)-1]
+	for _, value := range inc.Values {
+		if max < value {
+			max = value
+		}
+	}
+	return max
+}
+
+func (inc *SMA) Min() float64 {
+	if len(inc.Values) == 0 {
+		return 0.0
+	}
+	min := inc.Values[len(inc.Values)-1]
+	for _, value := range inc.Values {
+		if min > value {
+			min = value
+		}
+	}
+	return min
+
+}
+
 func (inc *SMA) calculateAndUpdate(kLines []types.KLine) {
 	if len(kLines) < inc.Window {
 		return
