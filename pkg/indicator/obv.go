@@ -22,7 +22,7 @@ type OBV struct {
 	UpdateCallbacks []func(value float64)
 }
 
-func (inc *OBV) update(kLine types.KLine, priceF KLinePriceMapper) {
+func (inc *OBV) Update(kLine types.KLine, priceF KLinePriceMapper) {
 	price := priceF(kLine)
 	volume := kLine.Volume.Float64()
 
@@ -49,16 +49,14 @@ func (inc *OBV) Last() float64 {
 func (inc *OBV) calculateAndUpdate(kLines []types.KLine) {
 	var priceF = KLineClosePriceMapper
 
-	for i, k := range kLines {
+	for _, k := range kLines {
 		if inc.EndTime != zeroTime && k.EndTime.Before(inc.EndTime) {
 			continue
 		}
-
-		inc.update(k, priceF)
-		inc.EmitUpdate(inc.Last())
-		inc.EndTime = kLines[i].EndTime.Time()
+		inc.Update(k, priceF)
 	}
-
+	inc.EmitUpdate(inc.Last())
+	inc.EndTime = kLines[len(kLines)-1].EndTime.Time()
 }
 func (inc *OBV) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
 	if inc.Interval != interval {
