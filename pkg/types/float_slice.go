@@ -66,7 +66,7 @@ func (s Float64Slice) Diff() Float64Slice {
 	return values
 }
 
-func (s Float64Slice) PositiveValues() Float64Slice {
+func (s Float64Slice) PositiveValuesOrZero() Float64Slice {
 	var values Float64Slice
 	for _, v := range s {
 		values.Push(math.Max(v, 0))
@@ -74,7 +74,7 @@ func (s Float64Slice) PositiveValues() Float64Slice {
 	return values
 }
 
-func (s Float64Slice) NegativeValues() Float64Slice {
+func (s Float64Slice) NegativeValuesOrZero() Float64Slice {
 	var values Float64Slice
 	for _, v := range s {
 		values.Push(math.Min(v, 0))

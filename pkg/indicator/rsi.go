@@ -37,8 +37,8 @@ func (inc *RSI) Update(kline types.KLine, priceF KLinePriceMapper) {
 	if len(inc.Prices) == inc.Window+1 {
 		diffValues := inc.Prices.Diff()
 
-		avgGain = diffValues.PositiveValues().AbsoluteValues().Sum() / float64(inc.Window)
-		avgLoss = diffValues.NegativeValues().AbsoluteValues().Sum() / float64(inc.Window)
+		avgGain = diffValues.PositiveValuesOrZero().AbsoluteValues().Sum() / float64(inc.Window)
+		avgLoss = diffValues.NegativeValuesOrZero().AbsoluteValues().Sum() / float64(inc.Window)
 	} else {
 		diff := price - inc.Prices[len(inc.Prices)-2]
 		currentGain := math.Max(diff, 0)
