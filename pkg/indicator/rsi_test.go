@@ -2,7 +2,6 @@ package indicator
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -33,7 +32,27 @@ func Test_calculateRSI(t *testing.T) {
 			name:   "RSI",
 			kLines: buildKLines(values),
 			window: 14,
-			want:   types.Float64Slice{70.53, 66.32, 66.55, 69.41, 66.36, 57.97, 62.93, 63.26, 56.06, 62.38, 54.71, 50.42, 39.99, 41.46, 41.87, 45.46, 37.30, 33.08, 37.77},
+			want: types.Float64Slice{
+				70.46413502109704,
+				66.24961855355505,
+				66.48094183471265,
+				69.34685316290864,
+				66.29471265892624,
+				57.91502067008556,
+				62.88071830996241,
+				63.208788718287764,
+				56.01158478954758,
+				62.33992931089789,
+				54.67097137765515,
+				50.386815195114224,
+				40.01942379131357,
+				41.49263540422282,
+				41.902429678458105,
+				45.499497238680405,
+				37.32277831337995,
+				33.090482572723396,
+				37.78877198205783,
+			},
 		},
 	}
 
@@ -41,11 +60,9 @@ func Test_calculateRSI(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			rsi := RSI{IntervalWindow: types.IntervalWindow{Window: tt.window}}
 			rsi.calculateAndUpdate(tt.kLines)
-			fmt.Println(len(tt.want), len(rsi.Values))
 			assert.Equal(t, len(rsi.Values), len(tt.want))
 			for i, v := range rsi.Values {
-				fmt.Println(v, tt.want[i])
-				assert.InDelta(t, v, tt.want[i], 0.1)
+				assert.InDelta(t, v, tt.want[i], Delta)
 			}
 		})
 	}
