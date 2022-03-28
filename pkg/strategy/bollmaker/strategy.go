@@ -319,22 +319,24 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 	buyQuantity := s.QuantityOrAmount.CalculateQuantity(bidPrice)
 
 	sellOrder := types.SubmitOrder{
-		Symbol:   s.Symbol,
-		Side:     types.SideTypeSell,
-		Type:     types.OrderTypeLimitMaker,
-		Quantity: sellQuantity,
-		Price:    askPrice,
-		Market:   s.Market,
-		GroupID:  s.groupID,
+		Symbol:      s.Symbol,
+		Side:        types.SideTypeSell,
+		Type:        types.OrderTypeLimitMaker,
+		Quantity:    sellQuantity,
+		Price:       askPrice,
+		Market:      s.Market,
+		GroupID:     s.groupID,
+		TimeInForce: types.TimeInForceGTC,
 	}
 	buyOrder := types.SubmitOrder{
-		Symbol:   s.Symbol,
-		Side:     types.SideTypeBuy,
-		Type:     types.OrderTypeLimitMaker,
-		Quantity: buyQuantity,
-		Price:    bidPrice,
-		Market:   s.Market,
-		GroupID:  s.groupID,
+		Symbol:      s.Symbol,
+		Side:        types.SideTypeBuy,
+		Type:        types.OrderTypeLimitMaker,
+		Quantity:    buyQuantity,
+		Price:       bidPrice,
+		Market:      s.Market,
+		GroupID:     s.groupID,
+		TimeInForce: types.TimeInForceGTC,
 	}
 
 	var submitOrders []types.SubmitOrder
