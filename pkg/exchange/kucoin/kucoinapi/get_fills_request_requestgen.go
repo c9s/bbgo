@@ -68,7 +68,7 @@ func (r *GetFillsRequest) GetParameters() (map[string]interface{}, error) {
 
 		// assign parameter of orderID
 		params["orderId"] = orderID
-
+	} else {
 	}
 	// check tradeType field -> json key tradeType
 	if r.tradeType != nil {
@@ -76,7 +76,11 @@ func (r *GetFillsRequest) GetParameters() (map[string]interface{}, error) {
 
 		// assign parameter of tradeType
 		params["tradeType"] = tradeType
+	} else {
+		tradeType := "TRADE"
 
+		// assign parameter of tradeType
+		params["tradeType"] = tradeType
 	}
 	// check symbol field -> json key symbol
 	if r.symbol != nil {
@@ -84,7 +88,7 @@ func (r *GetFillsRequest) GetParameters() (map[string]interface{}, error) {
 
 		// assign parameter of symbol
 		params["symbol"] = symbol
-
+	} else {
 	}
 	// check side field -> json key side
 	if r.side != nil {
@@ -96,14 +100,14 @@ func (r *GetFillsRequest) GetParameters() (map[string]interface{}, error) {
 			params["side"] = side
 
 		default:
-			return params, fmt.Errorf("side value %v is invalid", side)
+			return nil, fmt.Errorf("side value %v is invalid", side)
 
 		}
 		// END TEMPLATE check-valid-values
 
 		// assign parameter of side
 		params["side"] = side
-
+	} else {
 	}
 	// check orderType field -> json key type
 	if r.orderType != nil {
@@ -115,14 +119,14 @@ func (r *GetFillsRequest) GetParameters() (map[string]interface{}, error) {
 			params["type"] = orderType
 
 		default:
-			return params, fmt.Errorf("type value %v is invalid", orderType)
+			return nil, fmt.Errorf("type value %v is invalid", orderType)
 
 		}
 		// END TEMPLATE check-valid-values
 
 		// assign parameter of orderType
 		params["type"] = orderType
-
+	} else {
 	}
 	// check startAt field -> json key startAt
 	if r.startAt != nil {
@@ -131,7 +135,7 @@ func (r *GetFillsRequest) GetParameters() (map[string]interface{}, error) {
 		// assign parameter of startAt
 		// convert time.Time to milliseconds time stamp
 		params["startAt"] = strconv.FormatInt(startAt.UnixNano()/int64(time.Millisecond), 10)
-
+	} else {
 	}
 	// check endAt field -> json key endAt
 	if r.endAt != nil {
@@ -140,7 +144,7 @@ func (r *GetFillsRequest) GetParameters() (map[string]interface{}, error) {
 		// assign parameter of endAt
 		// convert time.Time to milliseconds time stamp
 		params["endAt"] = strconv.FormatInt(endAt.UnixNano()/int64(time.Millisecond), 10)
-
+	} else {
 	}
 
 	return params, nil

@@ -40,7 +40,7 @@ func (r *CancelOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 		// assign parameter of orderID
 		params["orderID"] = orderID
-
+	} else {
 	}
 	// check clientOrderID field -> json key clientOrderID
 	if r.clientOrderID != nil {
@@ -48,7 +48,7 @@ func (r *CancelOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 		// assign parameter of clientOrderID
 		params["clientOrderID"] = clientOrderID
-
+	} else {
 	}
 
 	return params, nil

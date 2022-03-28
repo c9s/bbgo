@@ -48,7 +48,7 @@ func (l *ListHistoryOrdersRequest) GetParameters() (map[string]interface{}, erro
 
 		// assign parameter of symbol
 		params["symbol"] = symbol
-
+	} else {
 	}
 	// check startAt field -> json key startAt
 	if l.startAt != nil {
@@ -57,7 +57,7 @@ func (l *ListHistoryOrdersRequest) GetParameters() (map[string]interface{}, erro
 		// assign parameter of startAt
 		// convert time.Time to milliseconds time stamp
 		params["startAt"] = strconv.FormatInt(startAt.UnixNano()/int64(time.Millisecond), 10)
-
+	} else {
 	}
 	// check endAt field -> json key endAt
 	if l.endAt != nil {
@@ -66,7 +66,7 @@ func (l *ListHistoryOrdersRequest) GetParameters() (map[string]interface{}, erro
 		// assign parameter of endAt
 		// convert time.Time to milliseconds time stamp
 		params["endAt"] = strconv.FormatInt(endAt.UnixNano()/int64(time.Millisecond), 10)
-
+	} else {
 	}
 
 	return params, nil
