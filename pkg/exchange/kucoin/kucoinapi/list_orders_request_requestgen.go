@@ -72,14 +72,14 @@ func (r *ListOrdersRequest) GetParameters() (map[string]interface{}, error) {
 			params["status"] = status
 
 		default:
-			return params, fmt.Errorf("status value %v is invalid", status)
+			return nil, fmt.Errorf("status value %v is invalid", status)
 
 		}
 		// END TEMPLATE check-valid-values
 
 		// assign parameter of status
 		params["status"] = status
-
+	} else {
 	}
 	// check symbol field -> json key symbol
 	if r.symbol != nil {
@@ -87,7 +87,7 @@ func (r *ListOrdersRequest) GetParameters() (map[string]interface{}, error) {
 
 		// assign parameter of symbol
 		params["symbol"] = symbol
-
+	} else {
 	}
 	// check side field -> json key side
 	if r.side != nil {
@@ -99,14 +99,14 @@ func (r *ListOrdersRequest) GetParameters() (map[string]interface{}, error) {
 			params["side"] = side
 
 		default:
-			return params, fmt.Errorf("side value %v is invalid", side)
+			return nil, fmt.Errorf("side value %v is invalid", side)
 
 		}
 		// END TEMPLATE check-valid-values
 
 		// assign parameter of side
 		params["side"] = side
-
+	} else {
 	}
 	// check orderType field -> json key type
 	if r.orderType != nil {
@@ -114,7 +114,7 @@ func (r *ListOrdersRequest) GetParameters() (map[string]interface{}, error) {
 
 		// assign parameter of orderType
 		params["type"] = orderType
-
+	} else {
 	}
 	// check tradeType field -> json key tradeType
 	if r.tradeType != nil {
@@ -122,7 +122,11 @@ func (r *ListOrdersRequest) GetParameters() (map[string]interface{}, error) {
 
 		// assign parameter of tradeType
 		params["tradeType"] = tradeType
+	} else {
+		tradeType := "TRADE"
 
+		// assign parameter of tradeType
+		params["tradeType"] = tradeType
 	}
 	// check startAt field -> json key startAt
 	if r.startAt != nil {
@@ -131,7 +135,7 @@ func (r *ListOrdersRequest) GetParameters() (map[string]interface{}, error) {
 		// assign parameter of startAt
 		// convert time.Time to milliseconds time stamp
 		params["startAt"] = strconv.FormatInt(startAt.UnixNano()/int64(time.Millisecond), 10)
-
+	} else {
 	}
 	// check endAt field -> json key endAt
 	if r.endAt != nil {
@@ -140,7 +144,7 @@ func (r *ListOrdersRequest) GetParameters() (map[string]interface{}, error) {
 		// assign parameter of endAt
 		// convert time.Time to milliseconds time stamp
 		params["endAt"] = strconv.FormatInt(endAt.UnixNano()/int64(time.Millisecond), 10)
-
+	} else {
 	}
 
 	return params, nil

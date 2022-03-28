@@ -41,7 +41,7 @@ func (r *CancelAllOrderRequest) GetParameters() (map[string]interface{}, error) 
 
 		// assign parameter of symbol
 		params["symbol"] = symbol
-
+	} else {
 	}
 	// check tradeType field -> json key tradeType
 	if r.tradeType != nil {
@@ -49,7 +49,7 @@ func (r *CancelAllOrderRequest) GetParameters() (map[string]interface{}, error) 
 
 		// assign parameter of tradeType
 		params["tradeType"] = tradeType
-
+	} else {
 	}
 
 	return params, nil

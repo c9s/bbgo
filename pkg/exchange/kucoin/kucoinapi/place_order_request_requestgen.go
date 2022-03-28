@@ -51,6 +51,11 @@ func (r *PlaceOrderRequest) TimeInForce(timeInForce TimeInForceType) *PlaceOrder
 	return r
 }
 
+func (r *PlaceOrderRequest) PostOnly(postOnly bool) *PlaceOrderRequest {
+	r.postOnly = &postOnly
+	return r
+}
+
 // GetQueryParameters builds and checks the query parameters and returns url.Values
 func (r *PlaceOrderRequest) GetQueryParameters() (url.Values, error) {
 	var params = map[string]interface{}{}
@@ -72,27 +77,24 @@ func (r *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 		// TEMPLATE check-required
 		if len(clientOrderID) == 0 {
-			return params, fmt.Errorf("clientOid is required, empty string given")
+			return nil, fmt.Errorf("clientOid is required, empty string given")
 		}
 		// END TEMPLATE check-required
 
 		// assign parameter of clientOrderID
 		params["clientOid"] = clientOrderID
-
 	} else {
-
 		// assign default of clientOrderID
 		clientOrderID := uuid.New().String()
 		// assign parameter of clientOrderID
 		params["clientOid"] = clientOrderID
-
 	}
 	// check symbol field -> json key symbol
 	symbol := r.symbol
 
 	// TEMPLATE check-required
 	if len(symbol) == 0 {
-		return params, fmt.Errorf("symbol is required, empty string given")
+		return nil, fmt.Errorf("symbol is required, empty string given")
 	}
 	// END TEMPLATE check-required
 
@@ -104,7 +106,7 @@ func (r *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 		// assign parameter of tag
 		params["tag"] = tag
-
+	} else {
 	}
 	// check side field -> json key side
 	side := r.side
@@ -121,7 +123,7 @@ func (r *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 	// TEMPLATE check-required
 	if len(size) == 0 {
-		return params, fmt.Errorf("size is required, empty string given")
+		return nil, fmt.Errorf("size is required, empty string given")
 	}
 	// END TEMPLATE check-required
 
@@ -133,7 +135,7 @@ func (r *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 		// assign parameter of price
 		params["price"] = price
-
+	} else {
 	}
 	// check timeInForce field -> json key timeInForce
 	if r.timeInForce != nil {
@@ -141,13 +143,21 @@ func (r *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 		// TEMPLATE check-required
 		if len(timeInForce) == 0 {
-			return params, fmt.Errorf("timeInForce is required, empty string given")
+			return nil, fmt.Errorf("timeInForce is required, empty string given")
 		}
 		// END TEMPLATE check-required
 
 		// assign parameter of timeInForce
 		params["timeInForce"] = timeInForce
+	} else {
+	}
+	// check postOnly field -> json key postOnly
+	if r.postOnly != nil {
+		postOnly := *r.postOnly
 
+		// assign parameter of postOnly
+		params["postOnly"] = postOnly
+	} else {
 	}
 
 	return params, nil
