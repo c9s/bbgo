@@ -206,6 +206,8 @@ type PlaceOrderRequest struct {
 	price *string `param:"price"`
 
 	timeInForce *TimeInForceType `param:"timeInForce,required"`
+
+	postOnly *bool `param:"postOnly"`
 }
 
 type CancelOrderResponse struct {

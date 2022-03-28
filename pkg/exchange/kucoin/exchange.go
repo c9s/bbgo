@@ -223,13 +223,17 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 
 		// set price field for limit orders
 		switch order.Type {
-		case types.OrderTypeStopLimit, types.OrderTypeLimit:
+		case types.OrderTypeStopLimit, types.OrderTypeLimit, types.OrderTypeLimitMaker:
 			if order.Market.Symbol != "" {
 				req.Price(order.Market.FormatPrice(order.Price))
 			} else {
 				// TODO: report error?
 				req.Price(order.Price.FormatString(8))
 			}
+		}
+
+		if order.Type == types.OrderTypeLimitMaker {
+			req.PostOnly(true)
 		}
 
 		switch order.TimeInForce {
@@ -240,6 +244,17 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 		default:
 			// default to GTC
 			req.TimeInForce(kucoinapi.TimeInForceGTC)
+		}
+
+		switch order.Type {
+		case types.OrderTypeStopLimit:
+			req.OrderType(kucoinapi.OrderTypeStopLimit)
+
+		case types.OrderTypeLimit, types.OrderTypeLimitMaker:
+			req.OrderType(kucoinapi.OrderTypeLimit)
+
+		case types.OrderTypeMarket:
+			req.OrderType(kucoinapi.OrderTypeMarket)
 		}
 
 		orderResponse, err := req.Do(ctx)
