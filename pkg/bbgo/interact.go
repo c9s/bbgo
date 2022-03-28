@@ -239,7 +239,7 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 			reply.Message("No any strategy supports StrategyStatusProvider")
 		}
 		return nil
-	}).Cycle(func(signature string, reply interact.Reply) error {
+	}).Next(func(signature string, reply interact.Reply) error {
 		strategy, ok := it.exchangeStrategies[signature]
 		if !ok {
 			reply.Message("Strategy not found")
@@ -277,7 +277,7 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 			reply.Message("No any strategy supports StrategyController")
 		}
 		return nil
-	}).Cycle(func(signature string, reply interact.Reply) error {
+	}).Next(func(signature string, reply interact.Reply) error {
 		strategy, ok := it.exchangeStrategies[signature]
 		if !ok {
 			reply.Message("Strategy not found")
@@ -322,7 +322,7 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 			reply.Message("No any strategy supports StrategyController")
 		}
 		return nil
-	}).Cycle(func(signature string, reply interact.Reply) error {
+	}).Next(func(signature string, reply interact.Reply) error {
 		strategy, ok := it.exchangeStrategies[signature]
 		if !ok {
 			reply.Message("Strategy not found")
@@ -367,7 +367,7 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 			reply.Message("No any strategy supports EmergencyStopper")
 		}
 		return nil
-	}).Cycle(func(signature string, reply interact.Reply) error {
+	}).Next(func(signature string, reply interact.Reply) error {
 		strategy, ok := it.exchangeStrategies[signature]
 		if !ok {
 			reply.Message("Strategy not found")
