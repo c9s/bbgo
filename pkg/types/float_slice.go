@@ -53,3 +53,55 @@ func (s Float64Slice) Tail(size int) Float64Slice {
 	copy(win, s[length-size:])
 	return win
 }
+
+func (s Float64Slice) Diff() Float64Slice {
+	var values Float64Slice
+	for i, v := range s {
+		if i == 0 {
+			values.Push(0)
+			continue
+		}
+		values.Push(v - s[i-1])
+	}
+	return values
+}
+
+func (s Float64Slice) PositiveValues() Float64Slice {
+	var values Float64Slice
+	for _, v := range s {
+		values.Push(math.Max(v, 0))
+	}
+	return values
+}
+
+func (s Float64Slice) NegativeValues() Float64Slice {
+	var values Float64Slice
+	for _, v := range s {
+		values.Push(math.Min(v, 0))
+	}
+	return values
+}
+
+func (s Float64Slice) AbsoluteValues() Float64Slice {
+	var values Float64Slice
+	for _, v := range s {
+		values.Push(math.Abs(v))
+	}
+	return values
+}
+
+func (s Float64Slice) MulScalar(x float64) Float64Slice {
+	var values Float64Slice
+	for _, v := range s {
+		values.Push(v * x)
+	}
+	return values
+}
+
+func (s Float64Slice) DivScalar(x float64) Float64Slice {
+	var values Float64Slice
+	for _, v := range s {
+		values.Push(v / x)
+	}
+	return values
+}
