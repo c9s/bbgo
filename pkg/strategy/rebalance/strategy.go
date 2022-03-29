@@ -1,4 +1,4 @@
-package kline
+package rebalance
 
 import (
 	"context"
