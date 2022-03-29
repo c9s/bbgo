@@ -644,7 +644,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 
-		if s.triggerEMA != nil && closePrice.Float64() < s.triggerEMA.Last() {
+		if s.triggerEMA != nil && closePrice.Float64() > s.triggerEMA.Last() {
 			s.Notify("%s: closed price is above the trigger moving average line %f, skipping this support",
 				s.Symbol,
 				s.triggerEMA.Last(),
