@@ -607,8 +607,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			// Save state
 			if err := s.SaveState(); err != nil {
 				log.WithError(err).Errorf("can not save state: %+v", s.state)
-			} else {
-				s.Notify("%s position is saved", s.Symbol, s.state.Position)
 			}
 		}
 
