@@ -23,7 +23,7 @@ function info()
 
 osf=$(uname | tr '[:upper:]' '[:lower:]')
 arch=amd64
-version=v1.21.4
+version=v1.28.0
 dist_file=bbgo-$version-$osf-$arch.tar.gz
 
 info "downloading..."
