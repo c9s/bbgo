@@ -108,7 +108,7 @@ func (control *TrailingStopControl) GenerateStopOrder(quantity fixedpoint.Value)
 		Symbol:           control.symbol,
 		Market:           control.market,
 		Side:             types.SideTypeSell,
-		Type:             types.OrderTypeStopLimit,
+		Type:             types.OrderTypeStopMarket,
 		Quantity:         quantity,
 		MarginSideEffect: control.marginSideEffect,
 		TimeInForce:      types.TimeInForceGTC,
@@ -531,12 +531,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 					orders, err := s.submitOrders(ctx, orderExecutor, orderForm)
 					if err != nil {
 						log.WithError(err).Error("submit profit trailing stop order error")
+						s.Notify("submit %s profit trailing stop order error", s.Symbol)
 					} else {
 						orderIds := orders.IDs()
 						if len(orderIds) > 0 {
 							s.trailingStopControl.OrderID = orderIds[0]
 						} else {
 							log.Error("submit profit trailing stop order error. unknown error")
+							s.Notify("submit %s profit trailing stop order error", s.Symbol)
 							s.trailingStopControl.OrderID = 0
 						}
 					}
@@ -598,7 +600,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 					orderForm := s.trailingStopControl.GenerateStopOrder(s.state.Position.Base)
 					orders, err := s.submitOrders(ctx, orderExecutor, orderForm)
 					if err != nil {
-						log.WithError(err).Error("submit profit trailing stop order error")
+						log.WithError(err).Error("submit %s profit trailing stop order error", s.Symbol)
+						s.Notify("submit %s profit trailing stop order error", s.Symbol)
 					} else {
 						s.trailingStopControl.OrderID = orders.IDs()[0]
 					}
@@ -732,6 +735,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 			if _, err := s.submitOrders(ctx, orderExecutor, targetOrders...); err != nil {
 				log.WithError(err).Error("submit profit target order error")
+				s.Notify("submit %s profit trailing stop order error", s.Symbol)
 				return
 			}
 		}
