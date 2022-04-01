@@ -10,7 +10,7 @@ case $(uname -m) in
     echo "unsupported architecture: $(uname -m)"
     exit 1;;
 esac
-dist_file=bbgo-$version-$osf-$arch.tar.gz
+dist_file=bbgo-dnum-$version-$osf-$arch.tar.gz
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -35,7 +35,7 @@ function info()
 info "downloading..."
 curl -O -L https://github.com/c9s/bbgo/releases/download/$version/$dist_file
 tar xzf $dist_file
-mv bbgo-$osf-$arch bbgo
+mv bbgo-dnum-$osf-$arch bbgo
 chmod +x bbgo
 info "downloaded successfully"
 

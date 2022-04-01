@@ -20,7 +20,6 @@ function info()
 {
     echo -e "${GREEN}$@${NC}"
 }
-
 version=$(curl -fs https://api.github.com/repos/c9s/bbgo/releases/latest | awk -F '"' '/tag_name/{print $4}')
 osf=$(uname | tr '[:upper:]' '[:lower:]')
 arch=""
@@ -31,7 +30,7 @@ case $(uname -m) in
     echo "unsupported architecture: $(uname -m)"
     exit 1;;
 esac
-dist_file=bbgo-$version-$osf-$arch.tar.gz
+dist_file=bbgo-dnum-$version-$osf-$arch.tar.gz
 exchange=max
 
 if [[ -n $1 ]] ; then
@@ -44,7 +43,7 @@ exchange_upper=$(echo -n $exchange | tr 'a-z' 'A-Z')
 info "downloading..."
 curl -O -L https://github.com/c9s/bbgo/releases/download/$version/$dist_file
 tar xzf $dist_file
-mv bbgo-$osf-$arch bbgo
+mv bbgo-dnum-$osf-$arch bbgo
 chmod +x bbgo
 info "downloaded successfully"
 
