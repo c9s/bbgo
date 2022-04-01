@@ -105,3 +105,15 @@ func (s Float64Slice) DivScalar(x float64) Float64Slice {
 	}
 	return values
 }
+
+func (s Float64Slice) ElementwiseProduct(other Float64Slice) Float64Slice {
+	var values Float64Slice
+	for i, v := range s {
+		values.Push(v * other[i])
+	}
+	return values
+}
+
+func (s Float64Slice) Dot(other Float64Slice) float64 {
+	return s.ElementwiseProduct(other).Sum()
+}
