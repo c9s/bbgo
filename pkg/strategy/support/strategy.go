@@ -111,7 +111,6 @@ func (control *TrailingStopControl) GenerateStopOrder(quantity fixedpoint.Value)
 		Type:             types.OrderTypeStopMarket,
 		Quantity:         quantity,
 		MarginSideEffect: control.marginSideEffect,
-		TimeInForce:      types.TimeInForceGTC,
 
 		Price:     targetPrice,
 		StopPrice: targetPrice,
