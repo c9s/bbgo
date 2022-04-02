@@ -599,7 +599,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 					orderForm := s.trailingStopControl.GenerateStopOrder(s.state.Position.Base)
 					orders, err := s.submitOrders(ctx, orderExecutor, orderForm)
 					if err != nil {
-						log.WithError(err).Error("submit %s profit trailing stop order error", s.Symbol)
+						log.WithError(err).Errorf("submit %s profit trailing stop order error", s.Symbol)
 						s.Notify("submit %s profit trailing stop order error", s.Symbol)
 					} else {
 						s.trailingStopControl.OrderID = orders.IDs()[0]
