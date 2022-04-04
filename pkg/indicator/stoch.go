@@ -105,10 +105,10 @@ func (inc *DSeries) Length() int {
 
 func (inc *DSeries) Index(i int) float64 {
 	length := len(inc.D)
-	if length == 0 || length - i - 1 < 0 {
+	if length == 0 || length-i-1 < 0 {
 		return 0
 	}
-	return inc.D[length - i - 1]
+	return inc.D[length-i-1]
 }
 
 var _ types.Series = &DSeries{}
@@ -123,10 +123,10 @@ func (inc *KSeries) Last() float64 {
 
 func (inc *KSeries) Index(i int) float64 {
 	length := len(inc.K)
-	if length == 0 || length - i - 1 < 0 {
+	if length == 0 || length-i-1 < 0 {
 		return 0
 	}
-	return inc.K[length - i - 1]
+	return inc.K[length-i-1]
 }
 
 func (inc *KSeries) Length() int {
