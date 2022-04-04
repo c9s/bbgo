@@ -63,6 +63,20 @@ func (inc *RSI) Last() float64 {
 	return inc.Values[len(inc.Values)-1]
 }
 
+func (inc *RSI) Index(i int) float64 {
+	length := len(inc.Values)
+	if length <= 0 || length - i - 1 < 0 {
+		return 0.0
+	}
+	return inc.Values[length - i - 1]
+}
+
+func (inc *RSI) Length() int {
+	return len(inc.Values)
+}
+
+var _ types.Series = &RSI{}
+
 func (inc *RSI) calculateAndUpdate(kLines []types.KLine) {
 	var priceF = KLineClosePriceMapper
 
