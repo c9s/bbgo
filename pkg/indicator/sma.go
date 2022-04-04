@@ -30,6 +30,21 @@ func (inc *SMA) Last() float64 {
 	return inc.Values[len(inc.Values)-1]
 }
 
+func (inc *SMA) Index(i int) float64 {
+	length := len(inc.Values)
+	if length == 0 || length - i - 1 < 0 {
+		return 0.0
+	}
+
+	return inc.Values[length - i - 1]
+}
+
+func (inc *SMA) Length() int {
+	return len(inc.Values)
+}
+
+var _ types.Series = &SMA{}
+
 func (inc *SMA) calculateAndUpdate(kLines []types.KLine) {
 	if len(kLines) < inc.Window {
 		return
