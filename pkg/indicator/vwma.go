@@ -36,10 +36,10 @@ func (inc *VWMA) Last() float64 {
 
 func (inc *VWMA) Index(i int) float64 {
 	length := len(inc.Values)
-	if length == 0 || length - i - 1 < 0 {
+	if length == 0 || length-i-1 < 0 {
 		return 0
 	}
-	return inc.Values[length - i - 1]
+	return inc.Values[length-i-1]
 }
 
 func (inc *VWMA) Length() int {

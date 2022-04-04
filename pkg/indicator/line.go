@@ -6,6 +6,11 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+// Line indicator is a utility that helps to simulate either the
+// 1. trend
+// 2. support
+// 3. resistance
+// of the market data, defined with series interface
 type Line struct {
 	types.IntervalWindow
 	start       float64
@@ -37,6 +42,27 @@ func (l *Line) Index(i int) float64 {
 
 func (l *Line) Length() int {
 	return int(l.startTime.Sub(l.currentTime).Minutes()) / l.Interval.Minutes()
+}
+
+func (l *Line) SetX1(value float64, startTime time.Time) {
+	l.startTime = startTime
+	l.start = value
+}
+
+func (l *Line) SetX2(value float64, endTime time.Time) {
+	l.endTime = endTime
+	l.end = value
+}
+
+func NewLine(startValue float64, startTime time.Time, endValue float64, endTime time.Time, interval types.Interval) *Line {
+	return &Line{
+		start:       startValue,
+		end:         endValue,
+		startTime:   startTime,
+		endTime:     endTime,
+		currentTime: endTime,
+		Interval:    interval,
+	}
 }
 
 var _ types.Series = &Line{}
