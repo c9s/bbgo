@@ -508,3 +508,84 @@ func (k KLineWindow) SlackAttachment() slack.Attachment {
 }
 
 type KLineCallback func(kline KLine)
+
+type KValueType int
+
+const (
+	kOpenValue KValueType = iota
+	kCloseValue
+	kHighValue
+	kLowValue
+)
+
+func (k KLineWindow) High() Series {
+	return &KLineSeries{
+		lines: k,
+		kv:    kHighValue,
+	}
+}
+
+func (k KLineWindow) Low() Series {
+	return &KLineSeries{
+		lines: k,
+		kv:    kLowValue,
+	}
+}
+
+func (k KLineWindow) Open() Series {
+	return &KLineSeries{
+		lines: k,
+		kv:    kOpenValue,
+	}
+}
+
+func (k KLineWindow) Close() Series {
+	return &KLineSeries{
+		lines: k,
+		kv:    kCloseValue,
+	}
+}
+
+type KLineSeries struct {
+	lines []KLine
+	kv    KValueType
+}
+
+func (k *KLineSeries) Last() float64 {
+	length := len(k.lines)
+	switch k.kv {
+	case kOpenValue:
+		return k.lines[length-1].GetOpen().Float64()
+	case kCloseValue:
+		return k.lines[length-1].GetClose().Float64()
+	case kLowValue:
+		return k.lines[length-1].GetLow().Float64()
+	case kHighValue:
+		return k.lines[length-1].GetHigh().Float64()
+	}
+	return 0
+}
+
+func (k *KLineSeries) Index(i int) float64 {
+	length := len(k.lines)
+	if length == 0 || length-i-1 < 0 {
+		return 0
+	}
+	switch k.kv {
+	case kOpenValue:
+		return k.lines[length-i-1].GetOpen().Float64()
+	case kCloseValue:
+		return k.lines[length-i-1].GetClose().Float64()
+	case kLowValue:
+		return k.lines[length-i-1].GetLow().Float64()
+	case kHighValue:
+		return k.lines[length-i-1].GetHigh().Float64()
+	}
+	return 0
+}
+
+func (k *KLineSeries) Length() int {
+	return len(k.lines)
+}
+
+var _ Series = &KLineSeries{}
