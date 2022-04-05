@@ -1,5 +1,9 @@
 package types
 
+import (
+	"math"
+)
+
 // Float64Indicator is the indicators (SMA and EWMA) that we want to use are returning float64 data.
 type Float64Indicator interface {
 	Last() float64
@@ -105,3 +109,107 @@ func Lowest(a Series, lookback int) float64 {
 	}
 	return lowest
 }
+
+type NumberSeries float64
+
+func (a NumberSeries) Last() float64 {
+	return float64(a)
+}
+
+func (a NumberSeries) Index(_ int) float64 {
+	return float64(a)
+}
+
+func (a NumberSeries) Length() int {
+	return math.MaxInt32
+}
+
+var _ Series = NumberSeries(0)
+
+type AddSeriesResult struct {
+	a Series
+	b Series
+}
+
+// Add two series
+func Add(a interface{}, b interface{}) Series {
+	var aa Series
+	var bb Series
+
+	switch a.(type) {
+	case float64:
+		aa = NumberSeries(a.(float64))
+	case Series:
+		aa = a.(Series)
+	}
+	switch b.(type) {
+	case float64:
+		bb = NumberSeries(b.(float64))
+	case Series:
+		bb = b.(Series)
+	}
+	return &AddSeriesResult{aa, bb}
+}
+
+func (a *AddSeriesResult) Last() float64 {
+	return a.a.Last() + a.b.Last()
+}
+
+func (a *AddSeriesResult) Index(i int) float64 {
+	return a.a.Index(i) + a.b.Index(i)
+}
+
+func (a *AddSeriesResult) Length() int {
+	lengtha := a.a.Length()
+	lengthb := a.b.Length()
+	if lengtha < lengthb {
+		return lengtha
+	}
+	return lengthb
+}
+
+var _ Series = &AddSeriesResult{}
+
+type MinusSeriesResult struct {
+	a Series
+	b Series
+}
+
+// Minus two series
+func Minus(a interface{}, b interface{}) Series {
+	var aa Series
+	var bb Series
+
+	switch a.(type) {
+	case float64:
+		aa = NumberSeries(a.(float64))
+	case Series:
+		aa = a.(Series)
+	}
+	switch b.(type) {
+	case float64:
+		bb = NumberSeries(b.(float64))
+	case Series:
+		bb = b.(Series)
+	}
+	return &MinusSeriesResult{aa, bb}
+}
+
+func (a *MinusSeriesResult) Last() float64 {
+	return a.a.Last() - a.b.Last()
+}
+
+func (a *MinusSeriesResult) Index(i int) float64 {
+	return a.a.Index(i) - a.b.Index(i)
+}
+
+func (a *MinusSeriesResult) Length() int {
+	lengtha := a.a.Length()
+	lengthb := a.b.Length()
+	if lengtha < lengthb {
+		return lengtha
+	}
+	return lengthb
+}
+
+var _ Series = &MinusSeriesResult{}
