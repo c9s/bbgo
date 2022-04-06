@@ -531,12 +531,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 					orders, err := s.submitOrders(ctx, orderExecutor, orderForm)
 					if err != nil {
 						log.WithError(err).Error("submit profit trailing stop order error")
+						s.Notify("submit %s profit trailing stop order error", s.Symbol)
 					} else {
 						orderIds := orders.IDs()
 						if len(orderIds) > 0 {
 							s.trailingStopControl.OrderID = orderIds[0]
 						} else {
 							log.Error("submit profit trailing stop order error. unknown error")
+							s.Notify("submit %s profit trailing stop order error", s.Symbol)
 							s.trailingStopControl.OrderID = 0
 						}
 					}
@@ -598,7 +600,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 					orderForm := s.trailingStopControl.GenerateStopOrder(s.state.Position.Base)
 					orders, err := s.submitOrders(ctx, orderExecutor, orderForm)
 					if err != nil {
-						log.WithError(err).Error("submit profit trailing stop order error")
+						log.WithError(err).Errorf("submit %s profit trailing stop order error", s.Symbol)
+						s.Notify("submit %s profit trailing stop order error", s.Symbol)
 					} else {
 						s.trailingStopControl.OrderID = orders.IDs()[0]
 					}
@@ -607,8 +610,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			// Save state
 			if err := s.SaveState(); err != nil {
 				log.WithError(err).Errorf("can not save state: %+v", s.state)
-			} else {
-				s.Notify("%s position is saved", s.Symbol, s.state.Position)
 			}
 		}
 
@@ -644,7 +645,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 
-		if s.triggerEMA != nil && closePrice.Float64() < s.triggerEMA.Last() {
+		if s.triggerEMA != nil && closePrice.Float64() > s.triggerEMA.Last() {
 			s.Notify("%s: closed price is above the trigger moving average line %f, skipping this support",
 				s.Symbol,
 				s.triggerEMA.Last(),
@@ -734,6 +735,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 			if _, err := s.submitOrders(ctx, orderExecutor, targetOrders...); err != nil {
 				log.WithError(err).Error("submit profit target order error")
+				s.Notify("submit %s profit trailing stop order error", s.Symbol)
 				return
 			}
 		}
