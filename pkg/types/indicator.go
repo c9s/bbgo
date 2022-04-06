@@ -2,6 +2,8 @@ package types
 
 import (
 	"math"
+
+	"gonum.org/v1/gonum/stat"
 )
 
 // Float64Indicator is the indicators (SMA and EWMA) that we want to use are returning float64 data.
@@ -25,6 +27,42 @@ type BoolSeries interface {
 	Last() bool
 	Index(int) bool
 	Length() int
+}
+
+// This will make prediction using Linear Regression to get the next cross point
+// Return (offset from latest, crossed value, could cross)
+// offset from latest should always be positive
+// lookback param is to use at most `lookback` points to determine linear regression functions
+//
+// You may also refer to excel's FORECAST function
+func NextCross(a Series, b Series, lookback int) (int, float64, bool) {
+	if a.Length() < lookback {
+		lookback = a.Length()
+	}
+	if b.Length() < lookback {
+		lookback = b.Length()
+	}
+	x := make([]float64, 0, lookback)
+	y1 := make([]float64, 0, lookback)
+	y2 := make([]float64, 0, lookback)
+	var weights []float64
+	for i := 0; i < lookback; i++ {
+		x = append(x, float64(i))
+		y1 = append(y1, a.Index(i))
+		y2 = append(y2, b.Index(i))
+	}
+	alpha1, beta1 := stat.LinearRegression(x, y1, weights, false)
+	alpha2, beta2 := stat.LinearRegression(x, y2, weights, false)
+	if beta2 == beta1 {
+		return 0, 0, false
+	}
+	indexf := (alpha1 - alpha2) / (beta2 - beta1)
+
+	// crossed in different direction
+	if indexf >= 0 {
+		return 0, 0, false
+	}
+	return int(math.Ceil(-indexf)), alpha1 + beta1*indexf, true
 }
 
 // The result structure that maps to the crossing result of `CrossOver` and `CrossUnder`
@@ -126,12 +164,34 @@ func (a NumberSeries) Length() int {
 
 var _ Series = NumberSeries(0)
 
+type Float64ArrSeries []float64
+
+func (a Float64ArrSeries) Last() float64 {
+	if len(a) > 0 {
+		return a[len(a)-1]
+	}
+	return 0.0
+}
+
+func (a Float64ArrSeries) Index(i int) float64 {
+	if len(a)-i < 0 || i < 0 {
+		return 0.0
+	}
+	return a[len(a)-i-1]
+}
+
+func (a Float64ArrSeries) Length() int {
+	return len(a)
+}
+
+var _ Series = Float64ArrSeries([]float64{})
+
 type AddSeriesResult struct {
 	a Series
 	b Series
 }
 
-// Add two series
+// Add two series, result[i] = a[i] + b[i]
 func Add(a interface{}, b interface{}) Series {
 	var aa Series
 	var bb Series
@@ -175,7 +235,7 @@ type MinusSeriesResult struct {
 	b Series
 }
 
-// Minus two series
+// Minus two series, result[i] = a[i] - b[i]
 func Minus(a interface{}, b interface{}) Series {
 	var aa Series
 	var bb Series
@@ -213,3 +273,96 @@ func (a *MinusSeriesResult) Length() int {
 }
 
 var _ Series = &MinusSeriesResult{}
+
+// Divid two series, result[i] = a[i] / b[i]
+func Div(a interface{}, b interface{}) Series {
+	var aa Series
+	var bb Series
+
+	switch a.(type) {
+	case float64:
+		aa = NumberSeries(a.(float64))
+	case Series:
+		aa = a.(Series)
+	}
+	switch b.(type) {
+	case float64:
+		bb = NumberSeries(b.(float64))
+		if 0 == bb.Last() {
+			panic("Divid by zero exception")
+		}
+	case Series:
+		bb = b.(Series)
+	}
+	return &DivSeriesResult{aa, bb}
+
+}
+
+type DivSeriesResult struct {
+	a Series
+	b Series
+}
+
+func (a *DivSeriesResult) Last() float64 {
+	return a.a.Last() / a.b.Last()
+}
+
+func (a *DivSeriesResult) Index(i int) float64 {
+	return a.a.Index(i) / a.b.Index(i)
+}
+
+func (a *DivSeriesResult) Length() int {
+	lengtha := a.a.Length()
+	lengthb := a.b.Length()
+	if lengtha < lengthb {
+		return lengtha
+	}
+	return lengthb
+}
+
+var _ Series = &DivSeriesResult{}
+
+// Multiple two series, result[i] = a[i] * b[i]
+func Mul(a interface{}, b interface{}) Series {
+	var aa Series
+	var bb Series
+
+	switch a.(type) {
+	case float64:
+		aa = NumberSeries(a.(float64))
+	case Series:
+		aa = a.(Series)
+	}
+	switch b.(type) {
+	case float64:
+		bb = NumberSeries(b.(float64))
+	case Series:
+		bb = b.(Series)
+	}
+	return &MulSeriesResult{aa, bb}
+
+}
+
+type MulSeriesResult struct {
+	a Series
+	b Series
+}
+
+func (a *MulSeriesResult) Last() float64 {
+	return a.a.Last() * a.b.Last()
+}
+
+func (a *MulSeriesResult) Index(i int) float64 {
+	return a.a.Index(i) * a.b.Index(i)
+}
+
+func (a *MulSeriesResult) Length() int {
+	lengtha := a.a.Length()
+	lengthb := a.b.Length()
+	if lengtha < lengthb {
+		return lengtha
+	}
+	return lengthb
+}
+
+var _ Series = &MulSeriesResult{}
