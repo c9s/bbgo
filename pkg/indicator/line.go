@@ -15,8 +15,8 @@ type Line struct {
 	types.IntervalWindow
 	start       float64
 	end         float64
-	startTime   time.Time
-	endTime     time.Time
+	startIndex  int
+	endIndex    int
 	currentTime time.Time
 	Interval    types.Interval
 }
@@ -25,7 +25,11 @@ func (l *Line) handleKLineWindowUpdate(interval types.Interval, window types.KLi
 	if interval != l.Interval {
 		return
 	}
-	l.currentTime = window.Last().EndTime.Time()
+	newTime := window.Last().EndTime.Time()
+	delta := int(newTime.Sub(l.currentTime).Minutes()) / l.Interval.Minutes()
+	l.startIndex += delta
+	l.endIndex += delta
+	l.currentTime = newTime
 }
 
 func (l *Line) Bind(updater KLineWindowUpdater) {
@@ -33,34 +37,38 @@ func (l *Line) Bind(updater KLineWindowUpdater) {
 }
 
 func (l *Line) Last() float64 {
-	return l.currentTime.Sub(l.endTime).Minutes()*(l.end-l.start)/l.endTime.Sub(l.startTime).Minutes() + l.end
+	return (l.end-l.start) / float64(l.startIndex - l.endIndex) * float64(l.endIndex) + l.end
 }
 
 func (l *Line) Index(i int) float64 {
-	return (l.currentTime.Sub(l.endTime).Minutes()-float64(i*l.Interval.Minutes()))*(l.end-l.start)/l.endTime.Sub(l.startTime).Minutes() + l.end
+	return (l.end-l.start) / float64(l.startIndex - l.endIndex) * float64(l.endIndex - i) + l.end
 }
 
 func (l *Line) Length() int {
-	return int(l.startTime.Sub(l.currentTime).Minutes()) / l.Interval.Minutes()
+	if l.startIndex > l.endIndex {
+		return l.startIndex - l.endIndex
+	} else {
+		return l.endIndex - l.startIndex
+	}
 }
 
-func (l *Line) SetX1(value float64, startTime time.Time) {
-	l.startTime = startTime
+func (l *Line) SetXY1(index int, value float64) {
+	l.startIndex = index
 	l.start = value
 }
 
-func (l *Line) SetX2(value float64, endTime time.Time) {
-	l.endTime = endTime
+func (l *Line) SetXY2(index int, value float64) {
+	l.endIndex = index
 	l.end = value
 }
 
-func NewLine(startValue float64, startTime time.Time, endValue float64, endTime time.Time, interval types.Interval) *Line {
+func NewLine(startIndex int, startValue float64, endIndex int, endValue float64, interval types.Interval) *Line {
 	return &Line{
 		start:       startValue,
 		end:         endValue,
-		startTime:   startTime,
-		endTime:     endTime,
-		currentTime: endTime,
+		startIndex:  startIndex,
+		endIndex:    endIndex,
+		currentTime: time.Time{},
 		Interval:    interval,
 	}
 }
