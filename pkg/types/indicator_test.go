@@ -14,10 +14,10 @@ func TestFloat(t *testing.T) {
 func TestNextCross(t *testing.T) {
 	var a Series = NumberSeries(1.2)
 
-	var b Series = Float64ArrSeries{100., 80., 60.}
-	// index                          2    1    0
-	// predicted                                   40  20  0
-	// offset                                      1   2   3
+	var b Series = Float64Slice{100., 80., 60.}
+	// index                       2    1    0
+	// predicted                                40  20  0
+	// offset                                   1   2   3
 
 	index, value, ok := NextCross(a, b, 3)
 	assert.True(t, ok)
