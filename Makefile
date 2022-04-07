@@ -242,9 +242,11 @@ PROTOS := \
 GRPC_GO_DEPS := $(subst .proto,.pb.go,$(PROTOS))
 
 %.pb.go: %.proto .FORCE
-	protoc --go-grpc_out=. --go_out=. --proto_path=. $<
+	protoc --go-grpc_out=. --go-grpc_opt=paths=source_relative --go_out=. --proto_path=. $<
 
-grpc: $(GRPC_GO_DEPS) grpc-py
+grpc-go: $(GRPC_GO_DEPS)
+
+grpc: grpc-go grpc-py
 
 install-grpc-tools:
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.26
@@ -257,4 +259,4 @@ grpc-py:
 		--grpc_python_out=$(PWD)/python/bbgo \
 		$(PWD)/pkg/pb/bbgo.proto
 
-.PHONY: bbgo bbgo-slim-darwin bbgo-slim-darwin-amd64 bbgo-slim-darwin-arm64 bbgo-darwin version dist pack migrations static embed desktop  .FORCE
+.PHONY: bbgo bbgo-slim-darwin bbgo-slim-darwin-amd64 bbgo-slim-darwin-arm64 bbgo-darwin version dist pack migrations static embed desktop grpc grpc-go grpc-py .FORCE
