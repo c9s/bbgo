@@ -17,6 +17,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
+	"github.com/c9s/bbgo/pkg/grpc"
 	"github.com/c9s/bbgo/pkg/server"
 )
 
@@ -148,6 +149,19 @@ func runConfig(basectx context.Context, cmd *cobra.Command, userConfig *bbgo.Con
 		enableWebServer = true
 	}
 
+	enableGrpc, err := cmd.Flags().GetBool("enable-grpc")
+	if err != nil {
+		return err
+	}
+
+	grpcBind, err := cmd.Flags().GetString("grpc-bind")
+	if err != nil {
+		return err
+	}
+
+	_ = grpcBind
+	_ = enableGrpc
+
 	ctx, cancelTrading := context.WithCancel(basectx)
 	defer cancelTrading()
 
@@ -188,7 +202,20 @@ func runConfig(basectx context.Context, cmd *cobra.Command, userConfig *bbgo.Con
 			}
 
 			if err := s.Run(ctx, webServerBind); err != nil {
-				log.WithError(err).Errorf("server error")
+				log.WithError(err).Errorf("http server bind error")
+			}
+		}()
+	}
+
+	if enableGrpc {
+		go func() {
+			s := &grpc.Server{
+				Config:  userConfig,
+				Environ: environ,
+				Trader:  trader,
+			}
+			if err := s.Run(grpcBind); err != nil {
+				log.WithError(err).Errorf("grpc server bind error")
 			}
 		}()
 	}
