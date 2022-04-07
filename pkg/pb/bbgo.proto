@@ -6,8 +6,8 @@ option go_package = "../pb";
 
 service BBGO {
     // should support streaming
-    rpc Subcribe(SubscribeRequest) returns (stream SubscribeResponse) {}
-    rpc SubcribeUserData(Empty) returns (stream SubscribeResponse) {}
+    rpc Subscribe(SubscribeRequest) returns (stream SubscribeResponse) {}
+    rpc SubscribeUserData(Empty) returns (stream SubscribeResponse) {}
 
     // request-response
     rpc SubmitOrder(SubmitOrderRequest) returns (SubmitOrderResponse) {}
