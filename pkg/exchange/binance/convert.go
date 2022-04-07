@@ -273,7 +273,7 @@ func toLocalFuturesOrderType(orderType types.OrderType) (futures.OrderType, erro
 	// case types.OrderTypeLimitMaker:
 	// 	return futures.OrderTypeLimitMaker, nil //TODO
 
-	case types.OrderTypeLimit:
+	case types.OrderTypeLimit, types.OrderTypeLimitMaker:
 		return futures.OrderTypeLimit, nil
 
 	// case types.OrderTypeStopLimit:
