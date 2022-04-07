@@ -83,54 +83,10 @@ func (inc *STOCH) Bind(updater KLineWindowUpdater) {
 	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }
 
-func (inc *STOCH) GetD() *DSeries {
-	return &DSeries{inc}
+func (inc *STOCH) GetD() types.Series {
+	return inc.D
 }
 
-func (inc *STOCH) GetK() *KSeries {
-	return &KSeries{inc}
+func (inc *STOCH) GetK() types.Series {
+	return inc.K
 }
-
-type DSeries struct {
-	*STOCH
-}
-
-func (inc *DSeries) Last() float64 {
-	return inc.LastD()
-}
-
-func (inc *DSeries) Length() int {
-	return len(inc.D)
-}
-
-func (inc *DSeries) Index(i int) float64 {
-	length := len(inc.D)
-	if length == 0 || length-i-1 < 0 {
-		return 0
-	}
-	return inc.D[length-i-1]
-}
-
-var _ types.Series = &DSeries{}
-
-type KSeries struct {
-	*STOCH
-}
-
-func (inc *KSeries) Last() float64 {
-	return inc.LastK()
-}
-
-func (inc *KSeries) Index(i int) float64 {
-	length := len(inc.K)
-	if length == 0 || length-i-1 < 0 {
-		return 0
-	}
-	return inc.K[length-i-1]
-}
-
-func (inc *KSeries) Length() int {
-	return len(inc.K)
-}
-
-var _ types.Series = &KSeries{}

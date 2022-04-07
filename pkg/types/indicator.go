@@ -423,3 +423,23 @@ func ToArray(a Series, limit ...int) (result []float64) {
 	}
 	return
 }
+
+// Similar to ToArray but in reverse order.
+// Useful when you want to cache series' calculated result as float64 array
+// the then reuse the result in multiple places (so that no recalculation will be triggered)
+//
+// notice that the return type is a Float64Slice, which implements the Series interface
+func ToReverseArray(a Series, limit ...int) (result Float64Slice) {
+	l := -1
+	if len(limit) > 0 {
+		l = limit[0]
+	}
+	if l < a.Length() {
+		l = a.Length()
+	}
+	result = make([]float64, l, l)
+	for i := 0; i < l; i++ {
+		result[l-i-1] = a.Index(i)
+	}
+	return
+}
