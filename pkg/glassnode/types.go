@@ -42,7 +42,40 @@ func (t *Timestamp) UnmarshalJSON(o []byte) error {
 	return nil
 }
 
-// [{"t":1614556800,"v":927789865185.0476}]
+/*
+In Glassnode API, there are two types of response, for example:
+
+	/v1/metrics/market/marketcap_usd
+
+	[
+		{
+			"t": 1614556800,
+			"v": 927789865185.0476
+		},
+		...
+	]
+
+and
+
+	/v1/metrics/market/price_usd_ohlc
+
+	[
+		{
+			"t": 1614556800,
+			"o": {
+				"c": 49768.16035012147,
+				"h": 49773.18922304233,
+				"l": 45159.50305252744,
+				"o": 45159.50305252744
+			}
+		},
+		...
+	]
+
+both can be stored into the Response structure.
+
+Note: use `HasOptions` to verify the type of response.
+*/
 type Response []Data
 type Data struct {
 	Timestamp Timestamp          `json:"t"`
@@ -50,8 +83,29 @@ type Data struct {
 	Options   map[string]float64 `json:"o"`
 }
 
-func (s Response) Last() Data {
+func (s Response) IsEmpty() bool {
 	if len(s) == 0 {
+		return true
+	}
+	return false
+}
+
+func (s Response) First() Data {
+	if s.IsEmpty() {
+		return Data{}
+	}
+	return s[0]
+}
+func (s Response) FirstValue() float64 {
+	return s.First().Value
+}
+
+func (s Response) FirstOptions() map[string]float64 {
+	return s.First().Options
+}
+
+func (s Response) Last() Data {
+	if s.IsEmpty() {
 		return Data{}
 	}
 	return s[len(s)-1]
@@ -63,4 +117,11 @@ func (s Response) LastValue() float64 {
 
 func (s Response) LastOptions() map[string]float64 {
 	return s.Last().Options
+}
+
+func (s Response) HasOptions() bool {
+	if len(s.First().Options) == 0 {
+		return false
+	}
+	return true
 }
