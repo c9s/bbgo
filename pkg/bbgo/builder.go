@@ -129,6 +129,13 @@ func BuildTarget(ctx context.Context, userConfig *Config, target BuildTargetConf
 		buildDir = "build"
 	}
 
+	if _, err := os.Stat(buildDir); os.IsNotExist(err) {
+		err = os.Mkdir(buildDir, 0777)
+		if err != nil {
+			return "", err
+		}
+	}
+
 	buildDir = filepath.Join(userConfig.Build.BuildDir, target.Name)
 	return Build(ctx, userConfig, target)
 }
