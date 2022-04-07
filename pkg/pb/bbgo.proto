@@ -24,7 +24,7 @@ service TradingService {
 }
 
 enum Event {
-  ERROR = 0;
+  UNKNOWN = 0;
   SUBSCRIBED = 1;
   UNSUBSCRIBED = 2;
   SNAPSHOT = 3;
@@ -36,6 +36,7 @@ enum Event {
   TRADE_UPDATE = 9;
   ACCOUNT_SNAPSHOT = 10;
   ACCOUNT_UPDATE = 11;
+  ERROR = 99;
 }
 
 enum Channel {
