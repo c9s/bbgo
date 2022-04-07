@@ -41,35 +41,20 @@ type BOLL struct {
 
 type BandType int
 
-const (
-	_SMA BandType = iota
-	_StdDev
-	_UpBand
-	_DownBand
-)
-
 func (inc *BOLL) GetUpBand() types.Series {
-	return &BollSeries{
-		inc, _UpBand,
-	}
+	return inc.UpBand
 }
 
 func (inc *BOLL) GetDownBand() types.Series {
-	return &BollSeries{
-		inc, _DownBand,
-	}
+	return inc.DownBand
 }
 
 func (inc *BOLL) GetSMA() types.Series {
-	return &BollSeries{
-		inc, _SMA,
-	}
+	return inc.SMA
 }
 
 func (inc *BOLL) GetStdDev() types.Series {
-	return &BollSeries{
-		inc, _StdDev,
-	}
+	return inc.StdDev
 }
 
 func (inc *BOLL) LastUpBand() float64 {
@@ -163,67 +148,3 @@ func (inc *BOLL) handleKLineWindowUpdate(interval types.Interval, window types.K
 func (inc *BOLL) Bind(updater KLineWindowUpdater) {
 	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }
-
-type BollSeries struct {
-	*BOLL
-	bandType BandType
-}
-
-func (b *BollSeries) Last() float64 {
-	switch b.bandType {
-	case _SMA:
-		return b.LastSMA()
-	case _StdDev:
-		return b.LastStdDev()
-	case _UpBand:
-		return b.LastUpBand()
-	case _DownBand:
-		return b.LastDownBand()
-	default:
-		panic("bandType wrong")
-	}
-}
-
-func (b *BollSeries) Index(i int) float64 {
-	switch b.bandType {
-	case _SMA:
-		if len(b.SMA) <= i {
-			return 0
-		}
-		return b.SMA[len(b.SMA)-i-1]
-	case _StdDev:
-		if len(b.StdDev) <= i {
-			return 0
-		}
-		return b.StdDev[len(b.StdDev)-i-1]
-	case _UpBand:
-		if len(b.UpBand) <= i {
-			return 0
-		}
-		return b.UpBand[len(b.UpBand)-i-1]
-	case _DownBand:
-		if len(b.DownBand) <= i {
-			return 0
-		}
-		return b.DownBand[len(b.DownBand)-i-1]
-	default:
-		panic("bandType wrong")
-	}
-}
-
-func (b *BollSeries) Length() int {
-	switch b.bandType {
-	case _SMA:
-		return len(b.SMA)
-	case _StdDev:
-		return len(b.StdDev)
-	case _UpBand:
-		return len(b.UpBand)
-	case _DownBand:
-		return len(b.DownBand)
-	default:
-		panic("bandType wrong")
-	}
-}
-
-var _ types.Series = &BollSeries{}

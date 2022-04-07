@@ -29,6 +29,60 @@ type BoolSeries interface {
 	Length() int
 }
 
+// Calculate sum of the series
+// if limit is given, will only sum first limit numbers (a.Index[0..limit])
+// otherwise will sum all elements
+func Sum(a Series, limit ...int) (sum float64) {
+	l := -1
+	if len(limit) > 0 {
+		l = limit[0]
+	}
+	if l < a.Length() {
+		l = a.Length()
+	}
+	for i := 0; i < l; i++ {
+		sum += a.Index(i)
+	}
+	return sum
+}
+
+// Calculate the average value of the series
+// if limit is given, will only calculate the average of first limit numbers (a.Index[0..limit])
+// otherwise will operate on all elements
+func Mean(a Series, limit ...int) (mean float64) {
+	l := -1
+	if len(limit) > 0 {
+		l = limit[0]
+	}
+	if l < a.Length() {
+		l = a.Length()
+	}
+	return Sum(a, l) / float64(l)
+}
+
+type AbsResult struct {
+	a Series
+}
+
+func (a *AbsResult) Last() float64 {
+	return math.Abs(a.a.Last())
+}
+
+func (a *AbsResult) Index(i int) float64 {
+	return math.Abs(a.a.Index(i))
+}
+
+func (a *AbsResult) Length() int {
+	return a.a.Length()
+}
+
+// Return series that having all the elements positive
+func Abs(a Series) Series {
+	return &AbsResult{a}
+}
+
+var _ Series = &AbsResult{}
+
 // This will make prediction using Linear Regression to get the next cross point
 // Return (offset from latest, crossed value, could cross)
 // offset from latest should always be positive
@@ -163,28 +217,6 @@ func (a NumberSeries) Length() int {
 }
 
 var _ Series = NumberSeries(0)
-
-type Float64ArrSeries []float64
-
-func (a Float64ArrSeries) Last() float64 {
-	if len(a) > 0 {
-		return a[len(a)-1]
-	}
-	return 0.0
-}
-
-func (a Float64ArrSeries) Index(i int) float64 {
-	if len(a)-i < 0 || i < 0 {
-		return 0.0
-	}
-	return a[len(a)-i-1]
-}
-
-func (a Float64ArrSeries) Length() int {
-	return len(a)
-}
-
-var _ Series = Float64ArrSeries([]float64{})
 
 type AddSeriesResult struct {
 	a Series
@@ -366,3 +398,28 @@ func (a *MulSeriesResult) Length() int {
 }
 
 var _ Series = &MulSeriesResult{}
+
+// Calculate (a dot b).
+// if limit is given, will only calculate the first limit numbers (a.Index[0..limit])
+// otherwise will operate on all elements
+func Dot(a interface{}, b interface{}, limit ...int) float64 {
+	return Sum(Mul(a, b), limit...)
+}
+
+// Extract elements from the Series to a float64 array, following the order of Index(0..limit)
+// if limit is given, will only take the first limit numbers (a.Index[0..limit])
+// otherwise will operate on all elements
+func ToArray(a Series, limit ...int) (result []float64) {
+	l := -1
+	if len(limit) > 0 {
+		l = limit[0]
+	}
+	if l < a.Length() {
+		l = a.Length()
+	}
+	result = make([]float64, l, l)
+	for i := 0; i < l; i++ {
+		result[i] = a.Index(i)
+	}
+	return
+}

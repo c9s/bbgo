@@ -117,3 +117,23 @@ func (s Float64Slice) ElementwiseProduct(other Float64Slice) Float64Slice {
 func (s Float64Slice) Dot(other Float64Slice) float64 {
 	return s.ElementwiseProduct(other).Sum()
 }
+
+func (a Float64Slice) Last() float64 {
+	if len(a) > 0 {
+		return a[len(a)-1]
+	}
+	return 0.0
+}
+
+func (a Float64Slice) Index(i int) float64 {
+	if len(a)-i < 0 || i < 0 {
+		return 0.0
+	}
+	return a[len(a)-i-1]
+}
+
+func (a Float64Slice) Length() int {
+	return len(a)
+}
+
+var _ Series = Float64Slice([]float64{})
