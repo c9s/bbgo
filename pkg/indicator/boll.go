@@ -42,19 +42,19 @@ type BOLL struct {
 type BandType int
 
 func (inc *BOLL) GetUpBand() types.Series {
-	return inc.UpBand
+	return &inc.UpBand
 }
 
 func (inc *BOLL) GetDownBand() types.Series {
-	return inc.DownBand
+	return &inc.DownBand
 }
 
 func (inc *BOLL) GetSMA() types.Series {
-	return inc.SMA
+	return &inc.SMA
 }
 
 func (inc *BOLL) GetStdDev() types.Series {
-	return inc.StdDev
+	return &inc.StdDev
 }
 
 func (inc *BOLL) LastUpBand() float64 {
