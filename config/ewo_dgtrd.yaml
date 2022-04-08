@@ -1,0 +1,26 @@
+---
+sessions:
+  binance:
+    exchange: binance
+    envVarPrefix: binance
+
+exchangeStrategies:
+ 
+- on: binance
+  ewo_dgtrd:
+    symbol: BNBBUSD
+    interval: 1h
+    threshold: 13
+    useEma: true
+    sigWin: 5
+
+backtest:
+  startTime: "2022-04-06"
+  endTime: "2022-04-07"
+  symbols:
+    - BNBBUSD
+  account:
+    binance:
+      balances:
+        BNB: 0
+        BUSD: 10000
