@@ -108,8 +108,6 @@ bbgo-slim-dnum-darwin-amd64: $(BIN_DIR)
 bbgo-slim-dnum-darwin: bbgo-slim-dnum-darwin-amd64 bbgo-slim-dnum-darwin-arm64
 
 
-clean:
-	rm -rf $(BUILD_DIR) $(DIST_DIR) $(FRONTEND_EXPORT_DIR)
 
 $(OSX_APP_CONTENTS_DIR):
 	mkdir -p $@
@@ -235,10 +233,31 @@ embed: pkg/server/assets.go
 
 static: frontend/out/index.html pkg/server/assets.go
 
-.PHONY: bbgo bbgo-slim-darwin bbgo-slim-darwin-amd64 bbgo-slim-darwin-arm64 bbgo-darwin version dist pack migrations static embed desktop  .FORCE
 
-protobuf:
-	protoc -I=$(PWD)/pkg/pb --go_out=$(PWD)/pkg/pb $(PWD)/pkg/pb/bbgo.proto
+PROTOS := \
+	$(wildcard pkg/pb/*.proto)
 
-protobuf-py:
-	python -m grpc_tools.protoc -I$(PWD)/pkg/pb --python_out=$(PWD)/python/bbgo --grpc_python_out=$(PWD)/python/bbgo $(PWD)/pkg/pb/bbgo.proto
+GRPC_GO_DEPS := $(subst .proto,.pb.go,$(PROTOS))
+
+%.pb.go: %.proto .FORCE
+	protoc --go-grpc_out=. --go-grpc_opt=paths=source_relative --go_out=paths=source_relative:. --proto_path=. $<
+
+grpc-go: $(GRPC_GO_DEPS)
+
+grpc: grpc-go grpc-py
+
+install-grpc-tools:
+	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.26
+	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.1
+	pip install grpcio-tools
+
+grpc-py:
+	python -m grpc_tools.protoc -I$(PWD)/pkg/pb \
+		--python_out=$(PWD)/python/bbgo \
+		--grpc_python_out=$(PWD)/python/bbgo \
+		$(PWD)/pkg/pb/bbgo.proto
+
+clean:
+	rm -rf $(BUILD_DIR) $(DIST_DIR) $(FRONTEND_EXPORT_DIR) $(GRPC_GO_DEPS) pkg/pb/*.pb.go
+
+.PHONY: bbgo bbgo-slim-darwin bbgo-slim-darwin-amd64 bbgo-slim-darwin-arm64 bbgo-darwin version dist pack migrations static embed desktop grpc grpc-go grpc-py .FORCE

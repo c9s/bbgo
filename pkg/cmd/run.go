@@ -17,6 +17,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
+	"github.com/c9s/bbgo/pkg/grpc"
 	"github.com/c9s/bbgo/pkg/server"
 )
 
@@ -28,8 +29,12 @@ func init() {
 	RunCmd.Flags().String("totp-account-name", "", "")
 	RunCmd.Flags().Bool("enable-webserver", false, "enable webserver")
 	RunCmd.Flags().Bool("enable-web-server", false, "legacy option, this is renamed to --enable-webserver")
-	RunCmd.Flags().String("cpu-profile", "", "cpu profile")
 	RunCmd.Flags().String("webserver-bind", ":8080", "webserver binding")
+
+	RunCmd.Flags().Bool("enable-grpc", false, "enable grpc server")
+	RunCmd.Flags().String("grpc-bind", ":6688", "grpc server binding")
+
+	RunCmd.Flags().String("cpu-profile", "", "cpu profile")
 	RunCmd.Flags().Bool("setup", false, "use setup mode")
 	RootCmd.AddCommand(RunCmd)
 }
@@ -40,7 +45,7 @@ var RunCmd = &cobra.Command{
 
 	// SilenceUsage is an option to silence usage when an error occurs.
 	SilenceUsage: true,
-	RunE: run,
+	RunE:         run,
 }
 
 func runSetup(baseCtx context.Context, userConfig *bbgo.Config, enableApiServer bool) error {
@@ -144,6 +149,19 @@ func runConfig(basectx context.Context, cmd *cobra.Command, userConfig *bbgo.Con
 		enableWebServer = true
 	}
 
+	enableGrpc, err := cmd.Flags().GetBool("enable-grpc")
+	if err != nil {
+		return err
+	}
+
+	grpcBind, err := cmd.Flags().GetString("grpc-bind")
+	if err != nil {
+		return err
+	}
+
+	_ = grpcBind
+	_ = enableGrpc
+
 	ctx, cancelTrading := context.WithCancel(basectx)
 	defer cancelTrading()
 
@@ -184,7 +202,20 @@ func runConfig(basectx context.Context, cmd *cobra.Command, userConfig *bbgo.Con
 			}
 
 			if err := s.Run(ctx, webServerBind); err != nil {
-				log.WithError(err).Errorf("server error")
+				log.WithError(err).Errorf("http server bind error")
+			}
+		}()
+	}
+
+	if enableGrpc {
+		go func() {
+			s := &grpc.Server{
+				Config:  userConfig,
+				Environ: environ,
+				Trader:  trader,
+			}
+			if err := s.ListenAndServe(grpcBind); err != nil {
+				log.WithError(err).Errorf("grpc server bind error")
 			}
 		}()
 	}
