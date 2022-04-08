@@ -45,6 +45,16 @@ func (inc *SMA) Length() int {
 
 var _ types.Series = &SMA{}
 
+func (inc *SMA) Update(value float64) {
+	length := len(inc.Values)
+	if length == 0 {
+		inc.Values = append(inc.Values, value)
+		return
+	}
+	newVal := (inc.Values[length-1]*float64(inc.Window-1) + value) / float64(inc.Window)
+	inc.Values = append(inc.Values, newVal)
+}
+
 func (inc *SMA) calculateAndUpdate(kLines []types.KLine) {
 	if len(kLines) < inc.Window {
 		return

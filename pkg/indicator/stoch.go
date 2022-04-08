@@ -84,9 +84,9 @@ func (inc *STOCH) Bind(updater KLineWindowUpdater) {
 }
 
 func (inc *STOCH) GetD() types.Series {
-	return inc.D
+	return &inc.D
 }
 
 func (inc *STOCH) GetK() types.Series {
-	return inc.K
+	return &inc.K
 }

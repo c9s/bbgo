@@ -1,7 +1,9 @@
 package types
 
 import (
+	"fmt"
 	"math"
+	"reflect"
 
 	"gonum.org/v1/gonum/stat"
 )
@@ -83,6 +85,25 @@ func Abs(a Series) Series {
 
 var _ Series = &AbsResult{}
 
+func Predict(a Series, lookback int, offset ...int) float64 {
+	if a.Length() < lookback {
+		lookback = a.Length()
+	}
+	x := make([]float64, lookback, lookback)
+	y := make([]float64, lookback, lookback)
+	var weights []float64
+	for i := 0; i < lookback; i++ {
+		x[i] = float64(i)
+		y[i] = a.Index(i)
+	}
+	alpha, beta := stat.LinearRegression(x, y, weights, false)
+	o := -1.0
+	if len(offset) > 0 {
+		o = -float64(offset[0])
+	}
+	return alpha + beta*o
+}
+
 // This will make prediction using Linear Regression to get the next cross point
 // Return (offset from latest, crossed value, could cross)
 // offset from latest should always be positive
@@ -96,14 +117,14 @@ func NextCross(a Series, b Series, lookback int) (int, float64, bool) {
 	if b.Length() < lookback {
 		lookback = b.Length()
 	}
-	x := make([]float64, 0, lookback)
-	y1 := make([]float64, 0, lookback)
-	y2 := make([]float64, 0, lookback)
+	x := make([]float64, lookback, lookback)
+	y1 := make([]float64, lookback, lookback)
+	y2 := make([]float64, lookback, lookback)
 	var weights []float64
 	for i := 0; i < lookback; i++ {
-		x = append(x, float64(i))
-		y1 = append(y1, a.Index(i))
-		y2 = append(y2, b.Index(i))
+		x[i] = float64(i)
+		y1[i] = a.Index(i)
+		y2[i] = b.Index(i)
 	}
 	alpha1, beta1 := stat.LinearRegression(x, y1, weights, false)
 	alpha2, beta2 := stat.LinearRegression(x, y2, weights, false)
@@ -233,12 +254,18 @@ func Add(a interface{}, b interface{}) Series {
 		aa = NumberSeries(a.(float64))
 	case Series:
 		aa = a.(Series)
+	default:
+		panic("input should be either *Series or float64")
+
 	}
 	switch b.(type) {
 	case float64:
 		bb = NumberSeries(b.(float64))
 	case Series:
 		bb = b.(Series)
+	default:
+		panic("input should be either *Series or float64")
+
 	}
 	return &AddSeriesResult{aa, bb}
 }
@@ -269,21 +296,8 @@ type MinusSeriesResult struct {
 
 // Minus two series, result[i] = a[i] - b[i]
 func Minus(a interface{}, b interface{}) Series {
-	var aa Series
-	var bb Series
-
-	switch a.(type) {
-	case float64:
-		aa = NumberSeries(a.(float64))
-	case Series:
-		aa = a.(Series)
-	}
-	switch b.(type) {
-	case float64:
-		bb = NumberSeries(b.(float64))
-	case Series:
-		bb = b.(Series)
-	}
+	aa := switchIface(a)
+	bb := switchIface(b)
 	return &MinusSeriesResult{aa, bb}
 }
 
@@ -306,26 +320,34 @@ func (a *MinusSeriesResult) Length() int {
 
 var _ Series = &MinusSeriesResult{}
 
-// Divid two series, result[i] = a[i] / b[i]
-func Div(a interface{}, b interface{}) Series {
-	var aa Series
-	var bb Series
-
-	switch a.(type) {
-	case float64:
-		aa = NumberSeries(a.(float64))
-	case Series:
-		aa = a.(Series)
-	}
+func switchIface(b interface{}) Series {
 	switch b.(type) {
 	case float64:
-		bb = NumberSeries(b.(float64))
-		if 0 == bb.Last() {
-			panic("Divid by zero exception")
-		}
+		return NumberSeries(b.(float64))
+	case int32:
+		return NumberSeries(float64(b.(int32)))
+	case int64:
+		return NumberSeries(float64(b.(int64)))
+	case float32:
+		return NumberSeries(float64(b.(float32)))
+	case int:
+		return NumberSeries(float64(b.(int)))
 	case Series:
-		bb = b.(Series)
+		return b.(Series)
+	default:
+		fmt.Println(reflect.TypeOf(b))
+		panic("input should be either *Series or float64")
+
 	}
+}
+
+// Divid two series, result[i] = a[i] / b[i]
+func Div(a interface{}, b interface{}) Series {
+	aa := switchIface(a)
+	if 0 == b {
+		panic("Divid by zero exception")
+	}
+	bb := switchIface(b)
 	return &DivSeriesResult{aa, bb}
 
 }
@@ -364,12 +386,17 @@ func Mul(a interface{}, b interface{}) Series {
 		aa = NumberSeries(a.(float64))
 	case Series:
 		aa = a.(Series)
+	default:
+		panic("input should be either Series or float64")
 	}
 	switch b.(type) {
 	case float64:
 		bb = NumberSeries(b.(float64))
 	case Series:
 		bb = b.(Series)
+	default:
+		panic("input should be either Series or float64")
+
 	}
 	return &MulSeriesResult{aa, bb}
 
@@ -443,3 +470,43 @@ func ToReverseArray(a Series, limit ...int) (result Float64Slice) {
 	}
 	return
 }
+
+type ChangeResult struct {
+	a      Series
+	offset int
+}
+
+func (c *ChangeResult) Last() float64 {
+	if c.offset >= c.a.Length() {
+		return 0
+	}
+	return c.a.Last() - c.a.Index(c.offset)
+}
+
+func (c *ChangeResult) Index(i int) float64 {
+	if i+c.offset >= c.a.Length() {
+		return 0
+	}
+	return c.a.Index(i) - c.a.Index(i+c.offset)
+}
+
+func (c *ChangeResult) Length() int {
+	length := c.a.Length()
+	if length >= c.offset {
+		return length - c.offset
+	}
+	return 0
+}
+
+// Difference between current value and previous, a - a[offset]
+// offset: if not given, offset is 1.
+func Change(a Series, offset ...int) Series {
+	o := 1
+	if len(offset) == 0 {
+		o = offset[0]
+	}
+
+	return &ChangeResult{a, o}
+}
+
+// TODO: ta.linreg
