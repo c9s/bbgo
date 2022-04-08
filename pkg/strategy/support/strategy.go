@@ -581,7 +581,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			if s.state.Position.Base.Compare(s.Market.MinQuantity) <= 0 { // Without a position
 				// Update trailing orders with current high price
 				s.trailingStopControl.CurrentHighestPrice = highPrice
-			} else if s.trailingStopControl.CurrentHighestPrice.Compare(highPrice) < 0 { // With a position
+			} else if s.trailingStopControl.CurrentHighestPrice.Compare(highPrice) < 0 || s.trailingStopControl.OrderID == 0 { // With a position or no trailing stop order yet
 				// Update trailing orders with current high price if it's higher
 				s.trailingStopControl.CurrentHighestPrice = highPrice
 
