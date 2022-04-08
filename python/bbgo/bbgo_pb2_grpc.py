@@ -2,10 +2,10 @@
 """Client and server classes corresponding to protobuf-defined services."""
 import grpc
 
-from . import bbgo_pb2 as bbgo__pb2
+import bbgo_pb2 as bbgo__pb2
 
 
-class BBGOStub(object):
+class MarketDataServiceStub(object):
     """Missing associated documentation comment in .proto file."""
 
     def __init__(self, channel):
@@ -14,63 +14,191 @@ class BBGOStub(object):
         Args:
             channel: A grpc.Channel.
         """
-        self.Subcribe = channel.unary_stream(
-                '/pb.BBGO/Subcribe',
+        self.Subscribe = channel.unary_stream(
+                '/pb.MarketDataService/Subscribe',
                 request_serializer=bbgo__pb2.SubscribeRequest.SerializeToString,
                 response_deserializer=bbgo__pb2.SubscribeResponse.FromString,
                 )
-        self.SubcribeUserData = channel.unary_stream(
-                '/pb.BBGO/SubcribeUserData',
-                request_serializer=bbgo__pb2.Empty.SerializeToString,
-                response_deserializer=bbgo__pb2.SubscribeResponse.FromString,
-                )
-        self.SubmitOrder = channel.unary_unary(
-                '/pb.BBGO/SubmitOrder',
-                request_serializer=bbgo__pb2.SubmitOrderRequest.SerializeToString,
-                response_deserializer=bbgo__pb2.SubmitOrderResponse.FromString,
-                )
-        self.CancelOrder = channel.unary_unary(
-                '/pb.BBGO/CancelOrder',
-                request_serializer=bbgo__pb2.CancelOrderRequest.SerializeToString,
-                response_deserializer=bbgo__pb2.CancelOrderResponse.FromString,
-                )
-        self.QueryOrder = channel.unary_unary(
-                '/pb.BBGO/QueryOrder',
-                request_serializer=bbgo__pb2.QueryOrderRequest.SerializeToString,
-                response_deserializer=bbgo__pb2.QueryOrderResponse.FromString,
-                )
-        self.QueryOrders = channel.unary_unary(
-                '/pb.BBGO/QueryOrders',
-                request_serializer=bbgo__pb2.QueryOrdersRequest.SerializeToString,
-                response_deserializer=bbgo__pb2.QueryOrdersResponse.FromString,
-                )
-        self.QueryTrades = channel.unary_unary(
-                '/pb.BBGO/QueryTrades',
-                request_serializer=bbgo__pb2.QueryTradesRequest.SerializeToString,
-                response_deserializer=bbgo__pb2.QueryTradesResponse.FromString,
-                )
         self.QueryKLines = channel.unary_unary(
-                '/pb.BBGO/QueryKLines',
+                '/pb.MarketDataService/QueryKLines',
                 request_serializer=bbgo__pb2.QueryKLinesRequest.SerializeToString,
                 response_deserializer=bbgo__pb2.QueryKLinesResponse.FromString,
                 )
 
 
-class BBGOServicer(object):
+class MarketDataServiceServicer(object):
     """Missing associated documentation comment in .proto file."""
 
-    def Subcribe(self, request, context):
+    def Subscribe(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def QueryKLines(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+
+def add_MarketDataServiceServicer_to_server(servicer, server):
+    rpc_method_handlers = {
+            'Subscribe': grpc.unary_stream_rpc_method_handler(
+                    servicer.Subscribe,
+                    request_deserializer=bbgo__pb2.SubscribeRequest.FromString,
+                    response_serializer=bbgo__pb2.SubscribeResponse.SerializeToString,
+            ),
+            'QueryKLines': grpc.unary_unary_rpc_method_handler(
+                    servicer.QueryKLines,
+                    request_deserializer=bbgo__pb2.QueryKLinesRequest.FromString,
+                    response_serializer=bbgo__pb2.QueryKLinesResponse.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            'pb.MarketDataService', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+
+
+ # This class is part of an EXPERIMENTAL API.
+class MarketDataService(object):
+    """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def Subscribe(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(request, target, '/pb.MarketDataService/Subscribe',
+            bbgo__pb2.SubscribeRequest.SerializeToString,
+            bbgo__pb2.SubscribeResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def QueryKLines(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/pb.MarketDataService/QueryKLines',
+            bbgo__pb2.QueryKLinesRequest.SerializeToString,
+            bbgo__pb2.QueryKLinesResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+
+class UserDataServiceStub(object):
+    """Missing associated documentation comment in .proto file."""
+
+    def __init__(self, channel):
+        """Constructor.
+
+        Args:
+            channel: A grpc.Channel.
+        """
+        self.SubscribeUserData = channel.unary_stream(
+                '/pb.UserDataService/SubscribeUserData',
+                request_serializer=bbgo__pb2.Empty.SerializeToString,
+                response_deserializer=bbgo__pb2.SubscribeResponse.FromString,
+                )
+
+
+class UserDataServiceServicer(object):
+    """Missing associated documentation comment in .proto file."""
+
+    def SubscribeUserData(self, request, context):
         """should support streaming
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def SubcribeUserData(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
+
+def add_UserDataServiceServicer_to_server(servicer, server):
+    rpc_method_handlers = {
+            'SubscribeUserData': grpc.unary_stream_rpc_method_handler(
+                    servicer.SubscribeUserData,
+                    request_deserializer=bbgo__pb2.Empty.FromString,
+                    response_serializer=bbgo__pb2.SubscribeResponse.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            'pb.UserDataService', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+
+
+ # This class is part of an EXPERIMENTAL API.
+class UserDataService(object):
+    """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def SubscribeUserData(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(request, target, '/pb.UserDataService/SubscribeUserData',
+            bbgo__pb2.Empty.SerializeToString,
+            bbgo__pb2.SubscribeResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+
+class TradingServiceStub(object):
+    """Missing associated documentation comment in .proto file."""
+
+    def __init__(self, channel):
+        """Constructor.
+
+        Args:
+            channel: A grpc.Channel.
+        """
+        self.SubmitOrder = channel.unary_unary(
+                '/pb.TradingService/SubmitOrder',
+                request_serializer=bbgo__pb2.SubmitOrderRequest.SerializeToString,
+                response_deserializer=bbgo__pb2.SubmitOrderResponse.FromString,
+                )
+        self.CancelOrder = channel.unary_unary(
+                '/pb.TradingService/CancelOrder',
+                request_serializer=bbgo__pb2.CancelOrderRequest.SerializeToString,
+                response_deserializer=bbgo__pb2.CancelOrderResponse.FromString,
+                )
+        self.QueryOrder = channel.unary_unary(
+                '/pb.TradingService/QueryOrder',
+                request_serializer=bbgo__pb2.QueryOrderRequest.SerializeToString,
+                response_deserializer=bbgo__pb2.QueryOrderResponse.FromString,
+                )
+        self.QueryOrders = channel.unary_unary(
+                '/pb.TradingService/QueryOrders',
+                request_serializer=bbgo__pb2.QueryOrdersRequest.SerializeToString,
+                response_deserializer=bbgo__pb2.QueryOrdersResponse.FromString,
+                )
+        self.QueryTrades = channel.unary_unary(
+                '/pb.TradingService/QueryTrades',
+                request_serializer=bbgo__pb2.QueryTradesRequest.SerializeToString,
+                response_deserializer=bbgo__pb2.QueryTradesResponse.FromString,
+                )
+
+
+class TradingServiceServicer(object):
+    """Missing associated documentation comment in .proto file."""
 
     def SubmitOrder(self, request, context):
         """request-response
@@ -103,25 +231,9 @@ class BBGOServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def QueryKLines(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
 
-
-def add_BBGOServicer_to_server(servicer, server):
+def add_TradingServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'Subcribe': grpc.unary_stream_rpc_method_handler(
-                    servicer.Subcribe,
-                    request_deserializer=bbgo__pb2.SubscribeRequest.FromString,
-                    response_serializer=bbgo__pb2.SubscribeResponse.SerializeToString,
-            ),
-            'SubcribeUserData': grpc.unary_stream_rpc_method_handler(
-                    servicer.SubcribeUserData,
-                    request_deserializer=bbgo__pb2.Empty.FromString,
-                    response_serializer=bbgo__pb2.SubscribeResponse.SerializeToString,
-            ),
             'SubmitOrder': grpc.unary_unary_rpc_method_handler(
                     servicer.SubmitOrder,
                     request_deserializer=bbgo__pb2.SubmitOrderRequest.FromString,
@@ -147,54 +259,15 @@ def add_BBGOServicer_to_server(servicer, server):
                     request_deserializer=bbgo__pb2.QueryTradesRequest.FromString,
                     response_serializer=bbgo__pb2.QueryTradesResponse.SerializeToString,
             ),
-            'QueryKLines': grpc.unary_unary_rpc_method_handler(
-                    servicer.QueryKLines,
-                    request_deserializer=bbgo__pb2.QueryKLinesRequest.FromString,
-                    response_serializer=bbgo__pb2.QueryKLinesResponse.SerializeToString,
-            ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'pb.BBGO', rpc_method_handlers)
+            'pb.TradingService', rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
 
 
  # This class is part of an EXPERIMENTAL API.
-class BBGO(object):
+class TradingService(object):
     """Missing associated documentation comment in .proto file."""
-
-    @staticmethod
-    def Subcribe(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_stream(request, target, '/pb.BBGO/Subcribe',
-            bbgo__pb2.SubscribeRequest.SerializeToString,
-            bbgo__pb2.SubscribeResponse.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def SubcribeUserData(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_stream(request, target, '/pb.BBGO/SubcribeUserData',
-            bbgo__pb2.Empty.SerializeToString,
-            bbgo__pb2.SubscribeResponse.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
     def SubmitOrder(request,
@@ -207,7 +280,7 @@ class BBGO(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/pb.BBGO/SubmitOrder',
+        return grpc.experimental.unary_unary(request, target, '/pb.TradingService/SubmitOrder',
             bbgo__pb2.SubmitOrderRequest.SerializeToString,
             bbgo__pb2.SubmitOrderResponse.FromString,
             options, channel_credentials,
@@ -224,7 +297,7 @@ class BBGO(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/pb.BBGO/CancelOrder',
+        return grpc.experimental.unary_unary(request, target, '/pb.TradingService/CancelOrder',
             bbgo__pb2.CancelOrderRequest.SerializeToString,
             bbgo__pb2.CancelOrderResponse.FromString,
             options, channel_credentials,
@@ -241,7 +314,7 @@ class BBGO(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/pb.BBGO/QueryOrder',
+        return grpc.experimental.unary_unary(request, target, '/pb.TradingService/QueryOrder',
             bbgo__pb2.QueryOrderRequest.SerializeToString,
             bbgo__pb2.QueryOrderResponse.FromString,
             options, channel_credentials,
@@ -258,7 +331,7 @@ class BBGO(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/pb.BBGO/QueryOrders',
+        return grpc.experimental.unary_unary(request, target, '/pb.TradingService/QueryOrders',
             bbgo__pb2.QueryOrdersRequest.SerializeToString,
             bbgo__pb2.QueryOrdersResponse.FromString,
             options, channel_credentials,
@@ -275,25 +348,8 @@ class BBGO(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/pb.BBGO/QueryTrades',
+        return grpc.experimental.unary_unary(request, target, '/pb.TradingService/QueryTrades',
             bbgo__pb2.QueryTradesRequest.SerializeToString,
             bbgo__pb2.QueryTradesResponse.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def QueryKLines(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/pb.BBGO/QueryKLines',
-            bbgo__pb2.QueryKLinesRequest.SerializeToString,
-            bbgo__pb2.QueryKLinesResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
