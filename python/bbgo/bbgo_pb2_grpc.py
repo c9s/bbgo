@@ -2,7 +2,7 @@
 """Client and server classes corresponding to protobuf-defined services."""
 import grpc
 
-import bbgo_pb2 as bbgo__pb2
+from . import bbgo_pb2 as bbgo__pb2
 
 
 class MarketDataServiceStub(object):
@@ -15,12 +15,12 @@ class MarketDataServiceStub(object):
             channel: A grpc.Channel.
         """
         self.Subscribe = channel.unary_stream(
-                '/pb.MarketDataService/Subscribe',
+                '/bbgo.MarketDataService/Subscribe',
                 request_serializer=bbgo__pb2.SubscribeRequest.SerializeToString,
                 response_deserializer=bbgo__pb2.SubscribeResponse.FromString,
                 )
         self.QueryKLines = channel.unary_unary(
-                '/pb.MarketDataService/QueryKLines',
+                '/bbgo.MarketDataService/QueryKLines',
                 request_serializer=bbgo__pb2.QueryKLinesRequest.SerializeToString,
                 response_deserializer=bbgo__pb2.QueryKLinesResponse.FromString,
                 )
@@ -56,7 +56,7 @@ def add_MarketDataServiceServicer_to_server(servicer, server):
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'pb.MarketDataService', rpc_method_handlers)
+            'bbgo.MarketDataService', rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
 
 
@@ -75,7 +75,7 @@ class MarketDataService(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_stream(request, target, '/pb.MarketDataService/Subscribe',
+        return grpc.experimental.unary_stream(request, target, '/bbgo.MarketDataService/Subscribe',
             bbgo__pb2.SubscribeRequest.SerializeToString,
             bbgo__pb2.SubscribeResponse.FromString,
             options, channel_credentials,
@@ -92,7 +92,7 @@ class MarketDataService(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/pb.MarketDataService/QueryKLines',
+        return grpc.experimental.unary_unary(request, target, '/bbgo.MarketDataService/QueryKLines',
             bbgo__pb2.QueryKLinesRequest.SerializeToString,
             bbgo__pb2.QueryKLinesResponse.FromString,
             options, channel_credentials,
@@ -109,7 +109,7 @@ class UserDataServiceStub(object):
             channel: A grpc.Channel.
         """
         self.SubscribeUserData = channel.unary_stream(
-                '/pb.UserDataService/SubscribeUserData',
+                '/bbgo.UserDataService/SubscribeUserData',
                 request_serializer=bbgo__pb2.Empty.SerializeToString,
                 response_deserializer=bbgo__pb2.SubscribeResponse.FromString,
                 )
@@ -135,7 +135,7 @@ def add_UserDataServiceServicer_to_server(servicer, server):
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'pb.UserDataService', rpc_method_handlers)
+            'bbgo.UserDataService', rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
 
 
@@ -154,7 +154,7 @@ class UserDataService(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_stream(request, target, '/pb.UserDataService/SubscribeUserData',
+        return grpc.experimental.unary_stream(request, target, '/bbgo.UserDataService/SubscribeUserData',
             bbgo__pb2.Empty.SerializeToString,
             bbgo__pb2.SubscribeResponse.FromString,
             options, channel_credentials,
@@ -171,27 +171,27 @@ class TradingServiceStub(object):
             channel: A grpc.Channel.
         """
         self.SubmitOrder = channel.unary_unary(
-                '/pb.TradingService/SubmitOrder',
+                '/bbgo.TradingService/SubmitOrder',
                 request_serializer=bbgo__pb2.SubmitOrderRequest.SerializeToString,
                 response_deserializer=bbgo__pb2.SubmitOrderResponse.FromString,
                 )
         self.CancelOrder = channel.unary_unary(
-                '/pb.TradingService/CancelOrder',
+                '/bbgo.TradingService/CancelOrder',
                 request_serializer=bbgo__pb2.CancelOrderRequest.SerializeToString,
                 response_deserializer=bbgo__pb2.CancelOrderResponse.FromString,
                 )
         self.QueryOrder = channel.unary_unary(
-                '/pb.TradingService/QueryOrder',
+                '/bbgo.TradingService/QueryOrder',
                 request_serializer=bbgo__pb2.QueryOrderRequest.SerializeToString,
                 response_deserializer=bbgo__pb2.QueryOrderResponse.FromString,
                 )
         self.QueryOrders = channel.unary_unary(
-                '/pb.TradingService/QueryOrders',
+                '/bbgo.TradingService/QueryOrders',
                 request_serializer=bbgo__pb2.QueryOrdersRequest.SerializeToString,
                 response_deserializer=bbgo__pb2.QueryOrdersResponse.FromString,
                 )
         self.QueryTrades = channel.unary_unary(
-                '/pb.TradingService/QueryTrades',
+                '/bbgo.TradingService/QueryTrades',
                 request_serializer=bbgo__pb2.QueryTradesRequest.SerializeToString,
                 response_deserializer=bbgo__pb2.QueryTradesResponse.FromString,
                 )
@@ -261,7 +261,7 @@ def add_TradingServiceServicer_to_server(servicer, server):
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'pb.TradingService', rpc_method_handlers)
+            'bbgo.TradingService', rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
 
 
@@ -280,7 +280,7 @@ class TradingService(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/pb.TradingService/SubmitOrder',
+        return grpc.experimental.unary_unary(request, target, '/bbgo.TradingService/SubmitOrder',
             bbgo__pb2.SubmitOrderRequest.SerializeToString,
             bbgo__pb2.SubmitOrderResponse.FromString,
             options, channel_credentials,
@@ -297,7 +297,7 @@ class TradingService(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/pb.TradingService/CancelOrder',
+        return grpc.experimental.unary_unary(request, target, '/bbgo.TradingService/CancelOrder',
             bbgo__pb2.CancelOrderRequest.SerializeToString,
             bbgo__pb2.CancelOrderResponse.FromString,
             options, channel_credentials,
@@ -314,7 +314,7 @@ class TradingService(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/pb.TradingService/QueryOrder',
+        return grpc.experimental.unary_unary(request, target, '/bbgo.TradingService/QueryOrder',
             bbgo__pb2.QueryOrderRequest.SerializeToString,
             bbgo__pb2.QueryOrderResponse.FromString,
             options, channel_credentials,
@@ -331,7 +331,7 @@ class TradingService(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/pb.TradingService/QueryOrders',
+        return grpc.experimental.unary_unary(request, target, '/bbgo.TradingService/QueryOrders',
             bbgo__pb2.QueryOrdersRequest.SerializeToString,
             bbgo__pb2.QueryOrdersResponse.FromString,
             options, channel_credentials,
@@ -348,7 +348,7 @@ class TradingService(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/pb.TradingService/QueryTrades',
+        return grpc.experimental.unary_unary(request, target, '/bbgo.TradingService/QueryTrades',
             bbgo__pb2.QueryTradesRequest.SerializeToString,
             bbgo__pb2.QueryTradesResponse.FromString,
             options, channel_credentials,
