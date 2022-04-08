@@ -332,6 +332,8 @@ func (s *Strategy) LoadState() error {
 	if s.trailingStopControl != nil {
 		if s.state.CurrentHighestPrice == nil {
 			s.trailingStopControl.CurrentHighestPrice = fixedpoint.NewFromInt(0)
+		} else {
+			s.trailingStopControl.CurrentHighestPrice = *s.state.CurrentHighestPrice
 		}
 		s.state.CurrentHighestPrice = &s.trailingStopControl.CurrentHighestPrice
 	}
@@ -599,7 +601,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				if s.trailingStopControl.IsHigherThanMin(minTargetPrice) {
 					orderForm := s.trailingStopControl.GenerateStopOrder(s.state.Position.Base)
 					orders, err := s.submitOrders(ctx, orderExecutor, orderForm)
-					if err != nil {
+					if err != nil || orders == nil {
 						log.WithError(err).Errorf("submit %s profit trailing stop order error", s.Symbol)
 						s.Notify("submit %s profit trailing stop order error", s.Symbol)
 					} else {
