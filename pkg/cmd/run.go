@@ -214,7 +214,7 @@ func runConfig(basectx context.Context, cmd *cobra.Command, userConfig *bbgo.Con
 				Environ: environ,
 				Trader:  trader,
 			}
-			if err := s.Run(grpcBind); err != nil {
+			if err := s.ListenAndServe(grpcBind); err != nil {
 				log.WithError(err).Errorf("grpc server bind error")
 			}
 		}()
