@@ -17,6 +17,8 @@ OSX_APP_GUI ?= webview
 
 FRONTEND_EXPORT_DIR = frontend/out
 
+PYTHON_PACKAGE_DIR = $(PWD)/python/bbgo
+
 all: bbgo-linux bbgo-darwin
 
 $(BIN_DIR):
@@ -251,11 +253,15 @@ install-grpc-tools:
 	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.1
 	pip install grpcio-tools
 
+# https://github.com/protocolbuffers/protobuf/issues/1491#issuecomment-261914766
+# replace `import bbgo_pb2` by `from . import bbgo_pb2` to use relative import
 grpc-py:
 	python -m grpc_tools.protoc -I$(PWD)/pkg/pb \
-		--python_out=$(PWD)/python/bbgo \
-		--grpc_python_out=$(PWD)/python/bbgo \
+		--python_out=$(PYTHON_PACKAGE_DIR) \
+		--grpc_python_out=$(PYTHON_PACKAGE_DIR) \
 		$(PWD)/pkg/pb/bbgo.proto
+	cat $(PYTHON_PACKAGE_DIR)/bbgo_pb2_grpc.py | sed -e 's/import\ bbgo_pb2/from\ .\ import\ bbgo_pb2/g' > tmp.py
+	mv tmp.py $(PYTHON_PACKAGE_DIR)/bbgo_pb2_grpc.py
 
 clean:
 	rm -rf $(BUILD_DIR) $(DIST_DIR) $(FRONTEND_EXPORT_DIR) $(GRPC_GO_DEPS) pkg/pb/*.pb.go
