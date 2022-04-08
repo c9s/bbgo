@@ -239,9 +239,9 @@ message QueryTradesResponse {
 message QueryKLinesRequest {
   string exchange = 1;
   string symbol = 2;
-  int64 limit = 3;
-  int64 interval = 4;  // time period of K line in minute
-  int64 timestamp = 5;
+  string interval = 3;  // time period of K line in minute
+  int64 timestamp = 4;
+  int64 limit = 5;
 }
 
 message QueryKLinesResponse {
