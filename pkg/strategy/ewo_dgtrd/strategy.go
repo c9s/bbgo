@@ -46,6 +46,16 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		log.Errorf("cannot get indicatorSet of %s", s.Symbol)
 		return nil
 	}
+	store, ok := session.MarketDataStore(s.Symbol)
+	if !ok {
+		log.Errorf("cannot get marketdatastore of %s", s.Symbol)
+		return nil
+	}
+	window, ok := store.KLinesOfInterval(s.Interval)
+	if !ok {
+		log.Errorf("cannot get klinewindow of %s", s.Interval)
+	}
+	mid := types.Div(types.Add(window.Open(), window.Close()), 2)
 	var ma5, ma34, ewo types.Series
 	if s.UseEma {
 		ma5 = indicatorSet.EWMA(types.IntervalWindow{s.Interval, 5})
@@ -62,7 +72,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		ewoSignal = &indicator.SMA{IntervalWindow: types.IntervalWindow{s.Interval, s.SignalWindow}}
 	}
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
-		if kline.Symbol != s.Symbol {
+		if kline.Symbol != s.Symbol || kline.Interval != s.Interval {
 			return
 		}
 		if ewoSignal.Length() == 0 {
@@ -80,21 +90,27 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 
-		if types.CrossOver(ewo, ewoSignal).Last() {
+		longSignal := types.CrossOver(ewo, ewoSignal)
+		shortSignal := types.CrossUnder(ewo, ewoSignal)
+		nextVal := types.Predict(mid, 5, 1)
+		IsBull := mid.Last() < nextVal
+		log.Warnf("mid %v, last %v, next %v", kline.Mid(), mid.Last(), nextVal)
+
+		if longSignal.Last() && IsBull {
 			if ewo.Last() < -s.Threshold {
 				// strong long
-				log.Infof("strong long at %v", lastPrice)
+				log.Infof("strong long at %v, timestamp: %s", lastPrice, kline.StartTime)
 			} else {
-				log.Infof("long at %v", lastPrice)
+				log.Infof("long at %v, timestamp: %s", lastPrice, kline.StartTime)
 				// Long
 			}
-		} else if types.CrossUnder(ewo, ewoSignal).Last() {
+		} else if shortSignal.Last() && !IsBull {
 			if ewo.Last() > s.Threshold {
 				// Strong short
-				log.Infof("strong short at %v", lastPrice)
+				log.Infof("strong short at %v, timestamp: %s", lastPrice, kline.StartTime)
 			} else {
 				// short
-				log.Infof("short at %v", lastPrice)
+				log.Infof("short at %v, timestamp: %s", lastPrice, kline.StartTime)
 			}
 		}
 	})

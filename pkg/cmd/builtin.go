@@ -23,4 +23,5 @@ import (
 	_ "github.com/c9s/bbgo/pkg/strategy/xmaker"
 	_ "github.com/c9s/bbgo/pkg/strategy/xnav"
 	_ "github.com/c9s/bbgo/pkg/strategy/xpuremaker"
+	_ "github.com/c9s/bbgo/pkg/strategy/ewo_dgtrd"
 )
