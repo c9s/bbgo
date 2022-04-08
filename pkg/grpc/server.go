@@ -2,8 +2,11 @@ package grpc
 
 import (
 	"context"
+	"net"
 
+	"github.com/pkg/errors"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/pb"
@@ -31,6 +34,11 @@ func (s *Server) QueryKLines(ctx context.Context, request *pb.QueryKLinesRequest
 
 	for _, session := range s.Environ.Sessions() {
 		if session.ExchangeName == exchangeName {
+			response := &pb.QueryKLinesResponse{
+				Klines: nil,
+				Error:  nil,
+			}
+
 			options := types.KLineQueryOptions{
 				Limit: int(request.Limit),
 			}
@@ -39,17 +47,42 @@ func (s *Server) QueryKLines(ctx context.Context, request *pb.QueryKLinesRequest
 			if err != nil {
 				return nil, err
 			}
-			_ = klines
 
-			return nil, nil
+			for _, kline := range klines {
+				response.Klines = append(response.Klines, &pb.KLine{
+					Exchange:    kline.Exchange.String(),
+					Symbol:      kline.Symbol,
+					Timestamp:   kline.StartTime.Unix(),
+					Open:        kline.Open.Float64(),
+					High:        kline.High.Float64(),
+					Low:         kline.Low.Float64(),
+					Close:       kline.Close.Float64(),
+					Volume:      kline.Volume.Float64(),
+					QuoteVolume: kline.QuoteVolume.Float64(),
+				})
+			}
+
+			return response, nil
 		}
 	}
 
 	return nil, nil
 }
 
-func (s *Server) Run(bind string) error {
+func (s *Server) ListenAndServe(bind string) error {
+	conn, err := net.Listen("tcp", bind)
+	if err != nil {
+		return errors.Wrapf(err, "failed to bind network at %s", bind)
+	}
+
 	var grpcServer = grpc.NewServer()
 	pb.RegisterMarketDataServiceServer(grpcServer, s)
+
+	reflection.Register(grpcServer)
+
+	if err := grpcServer.Serve(conn); err != nil {
+		return errors.Wrap(err, "failed to serve grpc connections")
+	}
+
 	return nil
 }

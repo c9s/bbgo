@@ -31,7 +31,7 @@ func NewMarketDataServiceClient(cc grpc.ClientConnInterface) MarketDataServiceCl
 }
 
 func (c *marketDataServiceClient) Subscribe(ctx context.Context, in *SubscribeRequest, opts ...grpc.CallOption) (MarketDataService_SubscribeClient, error) {
-	stream, err := c.cc.NewStream(ctx, &MarketDataService_ServiceDesc.Streams[0], "/pb.MarketDataService/Subscribe", opts...)
+	stream, err := c.cc.NewStream(ctx, &MarketDataService_ServiceDesc.Streams[0], "/bbgo.MarketDataService/Subscribe", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +64,7 @@ func (x *marketDataServiceSubscribeClient) Recv() (*SubscribeResponse, error) {
 
 func (c *marketDataServiceClient) QueryKLines(ctx context.Context, in *QueryKLinesRequest, opts ...grpc.CallOption) (*QueryKLinesResponse, error) {
 	out := new(QueryKLinesResponse)
-	err := c.cc.Invoke(ctx, "/pb.MarketDataService/QueryKLines", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/bbgo.MarketDataService/QueryKLines", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +134,7 @@ func _MarketDataService_QueryKLines_Handler(srv interface{}, ctx context.Context
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/pb.MarketDataService/QueryKLines",
+		FullMethod: "/bbgo.MarketDataService/QueryKLines",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(MarketDataServiceServer).QueryKLines(ctx, req.(*QueryKLinesRequest))
@@ -146,7 +146,7 @@ func _MarketDataService_QueryKLines_Handler(srv interface{}, ctx context.Context
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var MarketDataService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "pb.MarketDataService",
+	ServiceName: "bbgo.MarketDataService",
 	HandlerType: (*MarketDataServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -181,7 +181,7 @@ func NewUserDataServiceClient(cc grpc.ClientConnInterface) UserDataServiceClient
 }
 
 func (c *userDataServiceClient) SubscribeUserData(ctx context.Context, in *Empty, opts ...grpc.CallOption) (UserDataService_SubscribeUserDataClient, error) {
-	stream, err := c.cc.NewStream(ctx, &UserDataService_ServiceDesc.Streams[0], "/pb.UserDataService/SubscribeUserData", opts...)
+	stream, err := c.cc.NewStream(ctx, &UserDataService_ServiceDesc.Streams[0], "/bbgo.UserDataService/SubscribeUserData", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -266,7 +266,7 @@ func (x *userDataServiceSubscribeUserDataServer) Send(m *SubscribeResponse) erro
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var UserDataService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "pb.UserDataService",
+	ServiceName: "bbgo.UserDataService",
 	HandlerType: (*UserDataServiceServer)(nil),
 	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{
@@ -301,7 +301,7 @@ func NewTradingServiceClient(cc grpc.ClientConnInterface) TradingServiceClient {
 
 func (c *tradingServiceClient) SubmitOrder(ctx context.Context, in *SubmitOrderRequest, opts ...grpc.CallOption) (*SubmitOrderResponse, error) {
 	out := new(SubmitOrderResponse)
-	err := c.cc.Invoke(ctx, "/pb.TradingService/SubmitOrder", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/bbgo.TradingService/SubmitOrder", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -310,7 +310,7 @@ func (c *tradingServiceClient) SubmitOrder(ctx context.Context, in *SubmitOrderR
 
 func (c *tradingServiceClient) CancelOrder(ctx context.Context, in *CancelOrderRequest, opts ...grpc.CallOption) (*CancelOrderResponse, error) {
 	out := new(CancelOrderResponse)
-	err := c.cc.Invoke(ctx, "/pb.TradingService/CancelOrder", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/bbgo.TradingService/CancelOrder", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -319,7 +319,7 @@ func (c *tradingServiceClient) CancelOrder(ctx context.Context, in *CancelOrderR
 
 func (c *tradingServiceClient) QueryOrder(ctx context.Context, in *QueryOrderRequest, opts ...grpc.CallOption) (*QueryOrderResponse, error) {
 	out := new(QueryOrderResponse)
-	err := c.cc.Invoke(ctx, "/pb.TradingService/QueryOrder", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/bbgo.TradingService/QueryOrder", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -328,7 +328,7 @@ func (c *tradingServiceClient) QueryOrder(ctx context.Context, in *QueryOrderReq
 
 func (c *tradingServiceClient) QueryOrders(ctx context.Context, in *QueryOrdersRequest, opts ...grpc.CallOption) (*QueryOrdersResponse, error) {
 	out := new(QueryOrdersResponse)
-	err := c.cc.Invoke(ctx, "/pb.TradingService/QueryOrders", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/bbgo.TradingService/QueryOrders", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -337,7 +337,7 @@ func (c *tradingServiceClient) QueryOrders(ctx context.Context, in *QueryOrdersR
 
 func (c *tradingServiceClient) QueryTrades(ctx context.Context, in *QueryTradesRequest, opts ...grpc.CallOption) (*QueryTradesResponse, error) {
 	out := new(QueryTradesResponse)
-	err := c.cc.Invoke(ctx, "/pb.TradingService/QueryTrades", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/bbgo.TradingService/QueryTrades", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -399,7 +399,7 @@ func _TradingService_SubmitOrder_Handler(srv interface{}, ctx context.Context, d
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/pb.TradingService/SubmitOrder",
+		FullMethod: "/bbgo.TradingService/SubmitOrder",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(TradingServiceServer).SubmitOrder(ctx, req.(*SubmitOrderRequest))
@@ -417,7 +417,7 @@ func _TradingService_CancelOrder_Handler(srv interface{}, ctx context.Context, d
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/pb.TradingService/CancelOrder",
+		FullMethod: "/bbgo.TradingService/CancelOrder",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(TradingServiceServer).CancelOrder(ctx, req.(*CancelOrderRequest))
@@ -435,7 +435,7 @@ func _TradingService_QueryOrder_Handler(srv interface{}, ctx context.Context, de
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/pb.TradingService/QueryOrder",
+		FullMethod: "/bbgo.TradingService/QueryOrder",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(TradingServiceServer).QueryOrder(ctx, req.(*QueryOrderRequest))
@@ -453,7 +453,7 @@ func _TradingService_QueryOrders_Handler(srv interface{}, ctx context.Context, d
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/pb.TradingService/QueryOrders",
+		FullMethod: "/bbgo.TradingService/QueryOrders",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(TradingServiceServer).QueryOrders(ctx, req.(*QueryOrdersRequest))
@@ -471,7 +471,7 @@ func _TradingService_QueryTrades_Handler(srv interface{}, ctx context.Context, d
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/pb.TradingService/QueryTrades",
+		FullMethod: "/bbgo.TradingService/QueryTrades",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(TradingServiceServer).QueryTrades(ctx, req.(*QueryTradesRequest))
@@ -483,7 +483,7 @@ func _TradingService_QueryTrades_Handler(srv interface{}, ctx context.Context, d
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var TradingService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "pb.TradingService",
+	ServiceName: "bbgo.TradingService",
 	HandlerType: (*TradingServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
