@@ -76,7 +76,7 @@ func (s Float64Slice) NegativeValuesOrZero() (values Float64Slice) {
 	return values
 }
 
-func (s Float64Slice) AbsoluteValues() (values Float64Slice) {
+func (s Float64Slice) Abs() (values Float64Slice) {
 	for _, v := range s {
 		values.Push(math.Abs(v))
 	}
@@ -113,6 +113,6 @@ func (s Float64Slice) Dot(other Float64Slice) float64 {
 	return floats.Dot(s, other)
 }
 
-func (s Float64Slice) Normalize() (values Float64Slice) {
+func (s Float64Slice) Normalize() Float64Slice {
 	return s.DivScalar(s.Sum())
 }
