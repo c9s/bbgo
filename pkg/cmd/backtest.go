@@ -128,37 +128,6 @@ var BacktestCmd = &cobra.Command{
 			return errors.New("backtest config is not defined")
 		}
 
-		acceptAllSessions := false
-		var whitelistedSessions map[string]struct{}
-		if len(userConfig.Backtest.Sessions) == 0 {
-			acceptAllSessions = true
-		} else {
-			for _, name := range userConfig.Backtest.Sessions {
-				_, err := types.ValidExchangeName(name)
-				if err != nil {
-					return err
-				}
-				whitelistedSessions[name] = struct{}{}
-			}
-		}
-
-		sourceExchanges := make(map[string]types.Exchange)
-
-		for key, session := range userConfig.Sessions {
-			ok := acceptAllSessions
-			if !ok {
-				_, ok = whitelistedSessions[key]
-			}
-			if ok {
-				publicExchange, err := cmdutil.NewExchangePublic(session.ExchangeName)
-				if err != nil {
-					return err
-				}
-
-				sourceExchanges[key] = publicExchange
-			}
-		}
-
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
@@ -190,6 +159,30 @@ var BacktestCmd = &cobra.Command{
 
 		backtestService := &service.BacktestService{DB: environ.DatabaseService.DB}
 		environ.BacktestService = backtestService
+
+		var sourceExchanges = make(map[types.ExchangeName]types.Exchange)
+		if len(userConfig.Backtest.Sessions) > 0 {
+			for _, name := range userConfig.Backtest.Sessions {
+				exName, err := types.ValidExchangeName(name)
+				if err != nil {
+					return err
+				}
+
+				publicExchange, err := cmdutil.NewExchangePublic(exName)
+				if err != nil {
+					return err
+				}
+				sourceExchanges[exName] = publicExchange
+			}
+		} else {
+			for _, exName := range types.SupportedExchanges {
+				publicExchange, err := cmdutil.NewExchangePublic(exName)
+				if err != nil {
+					return err
+				}
+				sourceExchanges[exName] = publicExchange
+			}
+		}
 
 		if wantSync {
 			var syncFromTime time.Time
@@ -281,12 +274,11 @@ var BacktestCmd = &cobra.Command{
 
 		// exchangeNameStr is the session name.
 		for name, sourceExchange := range sourceExchanges {
-
 			backtestExchange, err := backtest.NewExchange(sourceExchange.Name(), sourceExchange, backtestService, userConfig.Backtest)
 			if err != nil {
 				return errors.Wrap(err, "failed to create backtest exchange")
 			}
-			environ.AddExchange(name, backtestExchange)
+			environ.AddExchange(name.String(), backtestExchange)
 		}
 
 		if err := environ.Init(ctx); err != nil {
