@@ -3,6 +3,11 @@ name = "bbgo"
 version = "0.1.0"
 description = ""
 authors = ["なるみ <weaper@gmail.com>"]
+packages = [
+    { include = "bbgo" },
+    { include = "bbgo_pb2.py" },
+    { include = "bbgo_pb2_grpc.py" },
+]
 
 [tool.poetry.dependencies]
 python = "^3.8"
