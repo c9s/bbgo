@@ -210,7 +210,7 @@ var BacktestCmd = &cobra.Command{
 				log.Infof("adjusted sync start time %s to %s for backward market data", startTime, syncFromTime)
 			}
 
-			log.Info("starting synchronization...")
+			log.Infof("starting synchronization: %v", userConfig.Backtest.Symbols)
 			for _, symbol := range userConfig.Backtest.Symbols {
 
 				for _, sourceExchange := range sourceExchanges {
