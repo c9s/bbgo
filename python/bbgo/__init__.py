@@ -1,2 +1,3 @@
-from .bbgo import BBGO
+from .bbgo import MarketService
+from .bbgo import TradingService
 from .stream import Stream
