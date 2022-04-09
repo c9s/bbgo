@@ -2,8 +2,6 @@ import os
 
 import grpc
 
-from . import bbgo_pb2_grpc
-
 
 def read_binary(f):
     with open(f, 'rb') as fp:
