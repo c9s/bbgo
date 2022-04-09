@@ -5,7 +5,7 @@ from bbgo import bbgo_pb2
 from bbgo import bbgo_pb2_grpc
 
 
-class TestServicer(bbgo_pb2_grpc.BBGOServicer):
+class TestTradingServicer(bbgo_pb2_grpc.TradingServiceServicer):
 
     def Subcribe(self, request, context):
         i = 0
@@ -28,7 +28,7 @@ class TestServicer(bbgo_pb2_grpc.BBGOServicer):
                 event=bbgo_pb2.Event.ORDER_UPDATE,
                 exchange='max',
                 symbol=f'user_{i}',
-                )
+            )
             i += 1
             time.sleep(random.random())
 
