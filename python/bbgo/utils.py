@@ -29,9 +29,3 @@ def get_credentials_from_env():
     private_key_certificate_chain_pairs = [(private_key, certificate_chain)]
     server_credentials = grpc.ssl_server_credentials(private_key_certificate_chain_pairs)
     return server_credentials
-
-
-def create_stub(host, port):
-    address = f'{host}:{port}'
-    channel = grpc.insecure_channel(address)
-    return bbgo_pb2_grpc.BBGOStub(channel)
