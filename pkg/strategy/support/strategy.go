@@ -331,7 +331,9 @@ func (s *Strategy) LoadState() error {
 
 	if s.trailingStopControl != nil {
 		if s.state.CurrentHighestPrice == nil {
-			s.trailingStopControl.CurrentHighestPrice = fixedpoint.NewFromInt(0)
+			s.trailingStopControl.CurrentHighestPrice = fixedpoint.Zero
+		} else {
+			s.trailingStopControl.CurrentHighestPrice = *s.state.CurrentHighestPrice
 		}
 		s.state.CurrentHighestPrice = &s.trailingStopControl.CurrentHighestPrice
 	}
@@ -579,7 +581,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			if s.state.Position.Base.Compare(s.Market.MinQuantity) <= 0 { // Without a position
 				// Update trailing orders with current high price
 				s.trailingStopControl.CurrentHighestPrice = highPrice
-			} else if s.trailingStopControl.CurrentHighestPrice.Compare(highPrice) < 0 { // With a position
+			} else if s.trailingStopControl.CurrentHighestPrice.Compare(highPrice) < 0 || s.trailingStopControl.OrderID == 0 { // With a position or no trailing stop order yet
 				// Update trailing orders with current high price if it's higher
 				s.trailingStopControl.CurrentHighestPrice = highPrice
 
@@ -599,11 +601,18 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				if s.trailingStopControl.IsHigherThanMin(minTargetPrice) {
 					orderForm := s.trailingStopControl.GenerateStopOrder(s.state.Position.Base)
 					orders, err := s.submitOrders(ctx, orderExecutor, orderForm)
-					if err != nil {
+					if err != nil || orders == nil {
 						log.WithError(err).Errorf("submit %s profit trailing stop order error", s.Symbol)
 						s.Notify("submit %s profit trailing stop order error", s.Symbol)
 					} else {
-						s.trailingStopControl.OrderID = orders.IDs()[0]
+						orderIds := orders.IDs()
+						if len(orderIds) > 0 {
+							s.trailingStopControl.OrderID = orderIds[0]
+						} else {
+							log.Error("submit profit trailing stop order error. unknown error")
+							s.Notify("submit %s profit trailing stop order error", s.Symbol)
+							s.trailingStopControl.OrderID = 0
+						}
 					}
 				}
 			}
