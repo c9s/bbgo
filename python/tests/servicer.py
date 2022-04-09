@@ -1,5 +1,5 @@
-from bbgo import bbgo_pb2
-from bbgo import bbgo_pb2_grpc
+import bbgo_pb2
+import bbgo_pb2_grpc
 
 
 class TestTradingServicer(bbgo_pb2_grpc.TradingServiceServicer):

@@ -2,10 +2,9 @@ import asyncio
 from typing import Callable
 from typing import List
 
+import bbgo_pb2
+import bbgo_pb2_grpc
 import grpc
-
-from . import bbgo_pb2
-from . import bbgo_pb2_grpc
 
 
 class Stream(object):
