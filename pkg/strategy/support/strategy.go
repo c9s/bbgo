@@ -331,7 +331,7 @@ func (s *Strategy) LoadState() error {
 
 	if s.trailingStopControl != nil {
 		if s.state.CurrentHighestPrice == nil {
-			s.trailingStopControl.CurrentHighestPrice = fixedpoint.NewFromInt(0)
+			s.trailingStopControl.CurrentHighestPrice = fixedpoint.Zero
 		} else {
 			s.trailingStopControl.CurrentHighestPrice = *s.state.CurrentHighestPrice
 		}
