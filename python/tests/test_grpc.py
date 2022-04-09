@@ -1,11 +1,12 @@
 from concurrent import futures
 
+import bbgo_pb2
+import bbgo_pb2_grpc
 import grpc
 import pytest
 
-from bbgo import MarketService, TradingService
-from bbgo import bbgo_pb2
-from bbgo import bbgo_pb2_grpc
+from bbgo import MarketService
+from bbgo import TradingService
 from tests.servicer import TestTradingServicer
 
 

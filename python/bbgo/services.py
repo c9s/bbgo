@@ -1,7 +1,7 @@
 from typing import List
 
-from . import bbgo_pb2
-from . import bbgo_pb2_grpc
+import bbgo_pb2
+import bbgo_pb2_grpc
 
 
 class UserDataService(object):

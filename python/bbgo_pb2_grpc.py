@@ -2,7 +2,7 @@
 """Client and server classes corresponding to protobuf-defined services."""
 import grpc
 
-from . import bbgo_pb2 as bbgo__pb2
+import bbgo_pb2 as bbgo__pb2
 
 
 class MarketDataServiceStub(object):
