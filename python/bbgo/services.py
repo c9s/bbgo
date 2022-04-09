@@ -4,6 +4,15 @@ from . import bbgo_pb2
 from . import bbgo_pb2_grpc
 
 
+class UserDataService(object):
+
+    def __init__(self, stub: bbgo_pb2_grpc.UserDataServiceStub):
+        self.stub = stub
+
+    def subscribe_user_data(self):
+        return self.stub.SubscribeUserData(bbgo_pb2.Empty())
+
+
 class MarketService(object):
 
     def __init__(self, stub: bbgo_pb2_grpc.MarketDataServiceStub):
