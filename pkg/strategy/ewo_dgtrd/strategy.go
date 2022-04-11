@@ -14,6 +14,7 @@ import (
 const ID = "ewo_dgtrd"
 
 var log = logrus.WithField("strategy", ID)
+var modifier = fixedpoint.NewFromFloat(0.99)
 
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
@@ -49,21 +50,25 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		log.Errorf("cannot get indicatorSet of %s", s.Symbol)
 		return nil
 	}
-	//store, ok := session.MarketDataStore(s.Symbol)
-	//if !ok {
-	//	log.Errorf("cannot get marketdatastore of %s", s.Symbol)
-	//	return nil
-	//}
+	orders, ok := session.OrderStore(s.Symbol)
+	if !ok {
+		log.Errorf("cannot get orderbook of %s", s.Symbol)
+		return nil
+	}
+	/*store, ok := session.MarketDataStore(s.Symbol)
+	if !ok {
+		log.Errorf("cannot get marketdatastore of %s", s.Symbol)
+		return nil
+	}*/
 	market, ok := session.Market(s.Symbol)
 	if !ok {
 		log.Errorf("fetch market fail %s", s.Symbol)
 		return nil
 	}
-	//window, ok := store.KLinesOfInterval(s.Interval)
-	//if !ok {
-	//	log.Errorf("cannot get klinewindow of %s", s.Interval)
-	//}
-	//mid := types.Div(types.Add(window.Open(), window.Close()), 2)
+	/*window, ok := store.KLinesOfInterval(s.Interval)
+	if !ok {
+		log.Errorf("cannot get klinewindow of %s", s.Interval)
+	}*/
 	var ma5, ma34, ewo types.Series
 	if s.UseEma {
 		ma5 = indicatorSet.EWMA(types.IntervalWindow{s.Interval, 5})
@@ -81,7 +86,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	}
 	entryPrice := fixedpoint.Zero
 	stopPrice := fixedpoint.Zero
-	inTrade := false
 	tradeDirectionLong := true
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		if kline.Symbol != s.Symbol {
@@ -106,22 +110,20 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 
 		// stoploss
-		if inTrade {
-			if tradeDirectionLong && kline.Low.Compare(stopPrice) <= 0 {
-				balances := session.Account.Balances()
-				baseBalance := balances[market.BaseCurrency].Available
-				baseAmount := baseBalance.Mul(lastPrice)
-				if baseBalance.Sign() <= 0 ||
-					baseBalance.Compare(market.MinQuantity) < 0 ||
-					baseAmount.Compare(market.MinNotional) < 0 {
-					//log.Infof("base balance %v is not enough. stop generating sell orders", baseBalance)
-					return
-				}
+		if tradeDirectionLong && kline.Low.Compare(stopPrice) <= 0 && !stopPrice.IsZero() {
+			balances := session.Account.Balances()
+			baseBalance := balances[market.BaseCurrency].Available.Mul(modifier)
+			baseAmount := baseBalance.Mul(lastPrice)
+			if baseBalance.Sign() <= 0 ||
+				baseBalance.Compare(market.MinQuantity) < 0 ||
+				baseAmount.Compare(market.MinNotional) < 0 {
+			} else {
 				_, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 					Symbol:      kline.Symbol,
 					Side:        types.SideTypeSell,
 					Type:        types.OrderTypeMarket,
 					Quantity:    baseBalance,
+					Price:       lastPrice,
 					Market:      market,
 					TimeInForce: types.TimeInForceGTC,
 				})
@@ -130,28 +132,26 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 					return
 				}
 				log.Warnf("StopLoss Long at %v", lastPrice)
-				inTrade = false
 				entryPrice = fixedpoint.Zero
 				stopPrice = fixedpoint.Zero
+			}
+		} else if !tradeDirectionLong && kline.High.Compare(stopPrice) >= 0 && !stopPrice.IsZero() {
+			quoteBalance, ok := session.Account.Balance(market.QuoteCurrency)
+			if !ok {
 				return
-			} else if !tradeDirectionLong && kline.High.Compare(stopPrice) >= 0 {
-				quoteBalance, ok := session.Account.Balance(market.QuoteCurrency)
-				if !ok {
-					return
-				}
-				quantityAmount := quoteBalance.Available
-				totalQuantity := quantityAmount.Div(lastPrice)
-				if quantityAmount.Sign() <= 0 ||
-					quantityAmount.Compare(market.MinNotional) < 0 ||
-					totalQuantity.Compare(market.MinQuantity) < 0 {
-					//log.Infof("quote balance %v is not enough. stop generating buy orders", quoteBalance)
-					return
-				}
+			}
+			quantityAmount := quoteBalance.Available
+			totalQuantity := quantityAmount.Div(lastPrice).Mul(modifier)
+			if quantityAmount.Sign() <= 0 ||
+				quantityAmount.Compare(market.MinNotional) < 0 ||
+				totalQuantity.Compare(market.MinQuantity) < 0 {
+			} else {
 				_, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 					Symbol:      kline.Symbol,
 					Side:        types.SideTypeBuy,
 					Type:        types.OrderTypeMarket,
 					Quantity:    totalQuantity,
+					Price:       lastPrice,
 					Market:      market,
 					TimeInForce: types.TimeInForceGTC,
 				})
@@ -160,36 +160,37 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 					return
 				}
 				log.Warnf("StopLoss Short at %v", lastPrice)
-				inTrade = false
 				entryPrice = fixedpoint.Zero
 				stopPrice = fixedpoint.Zero
-				return
 			}
 		}
 
 		if kline.Interval != s.Interval {
 			return
 		}
+		var toCancel []types.Order
+		for _, order := range orders.Orders() {
+			if order.Status == types.OrderStatusNew || order.Status == types.OrderStatusPartiallyFilled {
+				toCancel = append(toCancel, order)
+			}
+		}
+		if err := orderExecutor.CancelOrders(ctx, toCancel...); err != nil {
+			log.WithError(err).Errorf("cancel order error")
+		}
 
 		longSignal := types.CrossOver(ewo, ewoSignal)
 		shortSignal := types.CrossUnder(ewo, ewoSignal)
 		IsBull := kline.Close.Compare(kline.Open) > 0
-		//nextVal := types.Predict(mid, 3, 1)
-		//IsBull := lastPrice.Float64() < nextVal
-		//log.Warnf("mid %v, last %v, next %v", kline.Mid(), mid.Last(), nextVal)
-		//log.Warnf("long %v %v, short %v %v", longSignal.Index(1), longSignal.Last(), shortSignal.Index(1), shortSignal.Last())
-		//log.Infof("(%f, %f, %f) (%f, %f, %f)", ewo.Last(), ewo.Index(1), ewo.Index(2), ewoSignal.Last(), ewoSignal.Index(1), ewoSignal.Index(2))
-		//log.Infof("long %v %v %v", longSignal.Last(), longSignal.Index(1), ewo.Last() >= ewoSignal.Last() && ewoSignal.Index(1) >= ewo.Index(1))
-		//log.Infof("short %v %v", shortSignal.Last(), shortSignal.Index(1))
 
 		var orders []types.SubmitOrder
+		price := lastPrice
 		if longSignal.Index(1) && !shortSignal.Last() && IsBull {
 			quoteBalance, ok := session.Account.Balance(market.QuoteCurrency)
 			if !ok {
 				return
 			}
 			quantityAmount := quoteBalance.Available
-			totalQuantity := quantityAmount.Div(lastPrice)
+			totalQuantity := quantityAmount.Div(price).Mul(modifier).Div(types.Two)
 			if quantityAmount.Sign() <= 0 ||
 				quantityAmount.Compare(market.MinNotional) < 0 ||
 				totalQuantity.Compare(market.MinQuantity) < 0 {
@@ -198,19 +199,19 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 			if ewo.Last() < -s.Threshold {
 				// strong long
-				log.Infof("strong long at %v, timestamp: %s", lastPrice, kline.StartTime)
+				log.Infof("strong long at %v, timestamp: %s", price, kline.StartTime)
 
 				orders = append(orders, types.SubmitOrder{
 					Symbol:      kline.Symbol,
 					Side:        types.SideTypeBuy,
-					Type:        types.OrderTypeLimit,
-					Price:       lastPrice,
-					Quantity:    totalQuantity,
+					Type:        types.OrderTypeMarket,
+					Price:       price,
+					Quantity:    totalQuantity.Mul(types.Two),
 					Market:      market,
 					TimeInForce: types.TimeInForceGTC,
 				})
 			} else if ewo.Last() < 0 {
-				log.Infof("long at %v, amount: %v, timestamp: %s", lastPrice, lastPrice.Mul(totalQuantity), kline.StartTime)
+				log.Infof("long at %v, timestamp: %s", price, kline.StartTime)
 				// Long
 
 				// TODO: smaller quantity?
@@ -218,8 +219,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				orders = append(orders, types.SubmitOrder{
 					Symbol:      s.Symbol,
 					Side:        types.SideTypeBuy,
-					Type:        types.OrderTypeLimit,
-					Price:       lastPrice,
+					Type:        types.OrderTypeMarket,
+					Price:       price,
 					Quantity:    totalQuantity,
 					Market:      market,
 					TimeInForce: types.TimeInForceGTC,
@@ -227,8 +228,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 		} else if shortSignal.Index(1) && !longSignal.Last() && !IsBull {
 			balances := session.Account.Balances()
-			baseBalance := balances[market.BaseCurrency].Available
-			baseAmount := baseBalance.Mul(lastPrice)
+			baseBalance := balances[market.BaseCurrency].Available.Mul(modifier).Div(types.Two)
+			baseAmount := baseBalance.Mul(price)
 			if baseBalance.Sign() <= 0 ||
 				baseBalance.Compare(market.MinQuantity) < 0 ||
 				baseAmount.Compare(market.MinNotional) < 0 {
@@ -237,27 +238,27 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 			if ewo.Last() > s.Threshold {
 				// Strong short
-				log.Infof("strong short at %v, timestamp: %s", lastPrice, kline.StartTime)
+				log.Infof("strong short at %v, timestamp: %s", price, kline.StartTime)
 				orders = append(orders, types.SubmitOrder{
 					Symbol:      s.Symbol,
 					Side:        types.SideTypeSell,
-					Type:        types.OrderTypeLimit,
+					Type:        types.OrderTypeMarket,
 					Market:      market,
-					Quantity:    baseBalance,
-					Price:       lastPrice,
+					Quantity:    baseBalance.Mul(types.Two),
+					Price:       price,
 					TimeInForce: types.TimeInForceGTC,
 				})
 			} else if ewo.Last() > 0 {
 				// short
-				log.Infof("short at %v, timestamp: %s", lastPrice, kline.StartTime)
+				log.Infof("short at %v, timestamp: %s", price, kline.StartTime)
 				// TODO: smaller quantity?
 				orders = append(orders, types.SubmitOrder{
 					Symbol:      s.Symbol,
 					Side:        types.SideTypeSell,
-					Type:        types.OrderTypeLimit,
+					Type:        types.OrderTypeMarket,
 					Market:      market,
 					Quantity:    baseBalance,
-					Price:       lastPrice,
+					Price:       price,
 					TimeInForce: types.TimeInForceGTC,
 				})
 			}
@@ -269,14 +270,13 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				return
 			}
 			entryPrice = lastPrice
-			inTrade = true
 			tradeDirectionLong = IsBull
 			if tradeDirectionLong {
 				stopPrice = entryPrice.Mul(fixedpoint.One.Sub(s.StopLoss))
 			} else {
 				stopPrice = entryPrice.Mul(fixedpoint.One.Add(s.StopLoss))
 			}
-			log.Infof("Place orders %v", createdOrders)
+			log.Infof("Place orders %v stop @ %v", createdOrders, stopPrice)
 		}
 	})
 	return nil
