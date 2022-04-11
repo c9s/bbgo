@@ -2,10 +2,9 @@ import asyncio
 from typing import Callable
 from typing import List
 
+import bbgo_pb2
+import bbgo_pb2_grpc
 import grpc
-
-from . import bbgo_pb2
-from . import bbgo_pb2_grpc
 
 
 class Stream(object):
@@ -34,18 +33,18 @@ class Stream(object):
 
     async def subscribe(self):
         async with grpc.aio.insecure_channel(self.address) as channel:
-            stub = bbgo_pb2_grpc.BBGOStub(channel)
+            stub = bbgo_pb2_grpc.MarketDataServiceStub(channel)
 
             request = bbgo_pb2.SubscribeRequest(subscriptions=self.subscriptions)
-            async for response in stub.Subcribe(request):
+            async for response in stub.Subscribe(request):
                 self.dispatch(response)
 
     async def subscribe_user_data(self):
         async with grpc.aio.insecure_channel(self.address) as channel:
-            stub = bbgo_pb2_grpc.BBGOStub(channel)
+            stub = bbgo_pb2_grpc.UserDataServiceStub(channel)
 
             request = bbgo_pb2.Empty()
-            async for response in stub.SubcribeUserData(request):
+            async for response in stub.SubscribeUserData(request):
                 self.dispatch_user_events(response)
 
     def start(self):

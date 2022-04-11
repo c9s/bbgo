@@ -1,13 +1,48 @@
 from typing import List
 
-from . import bbgo_pb2
-from .utils import create_stub
+import bbgo_pb2
+import bbgo_pb2_grpc
 
 
-class BBGO(object):
+class UserDataService(object):
 
-    def __init__(self, host: str, port: int):
-        self.stub = create_stub(host, port)
+    def __init__(self, stub: bbgo_pb2_grpc.UserDataServiceStub):
+        self.stub = stub
+
+    def subscribe_user_data(self):
+        return self.stub.SubscribeUserData(bbgo_pb2.Empty())
+
+
+class MarketService(object):
+
+    def __init__(self, stub: bbgo_pb2_grpc.MarketDataServiceStub):
+        self.stub = stub
+
+    def subscribe(self, subscriptions: List[bbgo_pb2.Subscription]):
+        request = bbgo_pb2.SubscribeRequest(subscriptions=subscriptions)
+        request_iter = self.stub.Subscribe(request)
+        return request_iter
+
+    def query_klines(self,
+                     exchange: str,
+                     symbol: str,
+                     limit: int = 30,
+                     interval: int = 1,
+                     timestamp: int = None) -> bbgo_pb2.QueryKLinesResponse:
+        request = bbgo_pb2.QueryKLinesRequest(exchange=exchange,
+                                              symbol=symbol,
+                                              limit=limit,
+                                              interval=interval,
+                                              timestamp=timestamp)
+
+        response = self.market_data_stub.QueryKLines(request)
+        return response
+
+
+class TradingService(object):
+
+    def __init__(self, stub: bbgo_pb2_grpc.TradingServiceStub):
+        self.stub = stub
 
     def submit_order(self,
                      exchange: str,
@@ -86,19 +121,4 @@ class BBGO(object):
                                               limit=limit,
                                               offset=offset)
         response = self.stub.QueryTrades(request)
-        return response
-
-    def query_klines(self,
-                     exchange: str,
-                     symbol: str,
-                     limit: int = 30,
-                     interval: int = 1,
-                     timestamp: int = None) -> bbgo_pb2.QueryKLinesResponse:
-        request = bbgo_pb2.QueryKLinesRequest(exchange=exchange,
-                                              symbol=symbol,
-                                              limit=limit,
-                                              interval=interval,
-                                              timestamp=timestamp)
-
-        response = self.stub.QueryKLines(request)
         return response
