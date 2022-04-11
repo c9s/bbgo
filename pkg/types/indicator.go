@@ -164,9 +164,9 @@ func (c *CrossResult) Index(i int) bool {
 		return false
 	}
 	if c.isOver {
-		return c.a.Index(i)-c.b.Index(i) > 0 && c.a.Index(i-1)-c.b.Index(i-1) < 0
+		return c.a.Index(i)-c.b.Index(i) > 0 && c.a.Index(i+1)-c.b.Index(i+1) < 0
 	} else {
-		return c.a.Index(i)-c.b.Index(i) < 0 && c.a.Index(i-1)-c.b.Index(i-1) > 0
+		return c.a.Index(i)-c.b.Index(i) < 0 && c.a.Index(i+1)-c.b.Index(i+1) > 0
 	}
 }
 
