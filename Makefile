@@ -251,10 +251,12 @@ install-grpc-tools:
 	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.1
 	pip install grpcio-tools
 
+# https://github.com/protocolbuffers/protobuf/issues/1491#issuecomment-261914766
+# replace `import bbgo_pb2` by `from . import bbgo_pb2` to use relative import
 grpc-py:
 	python -m grpc_tools.protoc -I$(PWD)/pkg/pb \
-		--python_out=$(PWD)/python/bbgo \
-		--grpc_python_out=$(PWD)/python/bbgo \
+		--python_out=$(PWD)/python \
+		--grpc_python_out=$(PWD)/python \
 		$(PWD)/pkg/pb/bbgo.proto
 
 clean:
