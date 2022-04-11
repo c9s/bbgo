@@ -512,7 +512,8 @@ type KLineCallback func(kline KLine)
 type KValueType int
 
 const (
-	kOpenValue KValueType = iota
+	kOpUnknown KValueType = iota
+	kOpenValue
 	kCloseValue
 	kHighValue
 	kLowValue
