@@ -600,8 +600,10 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 		if lastOrderID > 0 {
 			req.OrderID(int64(lastOrderID))
 		} else {
-			req.StartTime(since.UnixNano() / int64(time.Millisecond)).
-				EndTime(until.UnixNano() / int64(time.Millisecond))
+			req.StartTime(since.UnixNano() / int64(time.Millisecond))
+			if until.Sub(since) < 24*time.Hour {
+				req.EndTime(until.UnixNano() / int64(time.Millisecond))
+			}
 		}
 
 		binanceOrders, err := req.Do(ctx)
@@ -619,8 +621,7 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 			req.OrderID(int64(lastOrderID))
 		} else {
 			req.StartTime(since.UnixNano() / int64(time.Millisecond))
-
-			if until.Sub(since) <= 24*time.Hour {
+			if until.Sub(since) < 24*time.Hour {
 				req.EndTime(until.UnixNano() / int64(time.Millisecond))
 			}
 		}
@@ -642,8 +643,7 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 		req.OrderID(int64(lastOrderID))
 	} else {
 		req.StartTime(since.UnixNano() / int64(time.Millisecond))
-
-		if until.Sub(since) <= 24*time.Hour {
+		if until.Sub(since) < 24*time.Hour {
 			req.EndTime(until.UnixNano() / int64(time.Millisecond))
 		}
 	}
