@@ -3,6 +3,8 @@ package rebalance
 import (
 	"context"
 	"fmt"
+	"math"
+	"sort"
 
 	"github.com/sirupsen/logrus"
 
@@ -19,35 +21,6 @@ func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
-func Sum(m map[string]fixedpoint.Value) fixedpoint.Value {
-	sum := fixedpoint.NewFromFloat(0.0)
-	for _, v := range m {
-		sum = sum.Add(v)
-	}
-	return sum
-}
-
-func Normalize(m map[string]fixedpoint.Value) map[string]fixedpoint.Value {
-	sum := Sum(m)
-	if sum.Float64() == 1.0 {
-		return m
-	}
-
-	normalized := make(map[string]fixedpoint.Value)
-	for k, v := range m {
-		normalized[k] = v.Div(sum)
-	}
-	return normalized
-}
-
-func ElementwiseProduct(m1, m2 map[string]fixedpoint.Value) map[string]fixedpoint.Value {
-	m := make(map[string]fixedpoint.Value)
-	for k, v := range m1 {
-		m[k] = v.Mul(m2[k])
-	}
-	return m
-}
-
 type Strategy struct {
 	Notifiability *bbgo.Notifiability
 
@@ -60,6 +33,17 @@ type Strategy struct {
 	DryRun        bool                        `json:"dryRun"`
 	// max amount to buy or sell per order
 	MaxAmount fixedpoint.Value `json:"maxAmount"`
+
+	currencies []string
+}
+
+func (s *Strategy) Initialize() error {
+	for currency := range s.TargetWeights {
+		s.currencies = append(s.currencies, currency)
+	}
+
+	sort.Strings(s.currencies)
+	return nil
 }
 
 func (s *Strategy) ID() string {
@@ -95,7 +79,6 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-	s.TargetWeights = Normalize(s.TargetWeights)
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		s.rebalance(ctx, orderExecutor, session)
 	})
@@ -110,7 +93,7 @@ func (s *Strategy) rebalance(ctx context.Context, orderExecutor bbgo.OrderExecut
 
 	balances := session.Account.Balances()
 	quantities := s.getQuantities(balances)
-	marketValues := ElementwiseProduct(prices, quantities)
+	marketValues := prices.Mul(quantities)
 
 	orders := s.generateSubmitOrders(prices, marketValues)
 	for _, order := range orders {
@@ -128,12 +111,10 @@ func (s *Strategy) rebalance(ctx context.Context, orderExecutor bbgo.OrderExecut
 	}
 }
 
-func (s *Strategy) getPrices(ctx context.Context, session *bbgo.ExchangeSession) (map[string]fixedpoint.Value, error) {
-	prices := make(map[string]fixedpoint.Value)
-
-	for currency := range s.TargetWeights {
+func (s *Strategy) getPrices(ctx context.Context, session *bbgo.ExchangeSession) (prices types.Float64Slice, err error) {
+	for _, currency := range s.currencies {
 		if currency == s.BaseCurrency {
-			prices[currency] = fixedpoint.One
+			prices = append(prices, 1.0)
 			continue
 		}
 
@@ -145,38 +126,38 @@ func (s *Strategy) getPrices(ctx context.Context, session *bbgo.ExchangeSession)
 			return prices, err
 		}
 
-		prices[currency] = ticker.Last
+		prices = append(prices, ticker.Last.Float64())
 	}
 	return prices, nil
 }
 
-func (s *Strategy) getQuantities(balances types.BalanceMap) map[string]fixedpoint.Value {
-	quantities := make(map[string]fixedpoint.Value)
-	for currency := range s.TargetWeights {
+func (s *Strategy) getQuantities(balances types.BalanceMap) (quantities types.Float64Slice) {
+	for _, currency := range s.currencies {
 		if s.IgnoreLocked {
-			quantities[currency] = balances[currency].Total()
+			quantities = append(quantities, balances[currency].Total().Float64())
 		} else {
-			quantities[currency] = balances[currency].Available
+			quantities = append(quantities, balances[currency].Available.Float64())
 		}
 	}
 	return quantities
 }
 
-func (s *Strategy) generateSubmitOrders(prices, marketValues map[string]fixedpoint.Value) []types.SubmitOrder {
-	var submitOrders []types.SubmitOrder
+func (s *Strategy) generateSubmitOrders(prices, marketValues types.Float64Slice) (submitOrders []types.SubmitOrder) {
+	currentWeights := marketValues.Normalize()
+	totalValue := marketValues.Sum()
 
-	currentWeights := Normalize(marketValues)
-	totalValue := Sum(marketValues)
+	log.Infof("total value: %f", totalValue)
 
-	log.Infof("total value: %f", totalValue.Float64())
-
-	for currency, targetWeight := range s.TargetWeights {
+	for i, currency := range s.currencies {
 		if currency == s.BaseCurrency {
 			continue
 		}
+
 		symbol := currency + s.BaseCurrency
-		currentWeight := currentWeights[currency]
-		currentPrice := prices[currency]
+		currentWeight := currentWeights[i]
+		currentPrice := prices[i]
+		targetWeight := s.TargetWeights[currency].Float64()
+
 		log.Infof("%s price: %v, current weight: %v, target weight: %v",
 			symbol,
 			currentPrice,
@@ -185,8 +166,8 @@ func (s *Strategy) generateSubmitOrders(prices, marketValues map[string]fixedpoi
 
 		// calculate the difference between current weight and target weight
 		// if the difference is less than threshold, then we will not create the order
-		weightDifference := targetWeight.Sub(currentWeight)
-		if weightDifference.Abs().Compare(s.Threshold) < 0 {
+		weightDifference := targetWeight - currentWeight
+		if math.Abs(weightDifference) < s.Threshold.Float64() {
 			log.Infof("%s weight distance |%v - %v| = |%v| less than the threshold: %v",
 				symbol,
 				currentWeight,
@@ -196,7 +177,7 @@ func (s *Strategy) generateSubmitOrders(prices, marketValues map[string]fixedpoi
 			continue
 		}
 
-		quantity := weightDifference.Mul(totalValue).Div(currentPrice)
+		quantity := fixedpoint.NewFromFloat((weightDifference * totalValue) / currentPrice)
 
 		side := types.SideTypeBuy
 		if quantity.Sign() < 0 {
@@ -205,7 +186,7 @@ func (s *Strategy) generateSubmitOrders(prices, marketValues map[string]fixedpoi
 		}
 
 		if s.MaxAmount.Sign() > 0 {
-			quantity = bbgo.AdjustQuantityByMaxAmount(quantity, currentPrice, s.MaxAmount)
+			quantity = bbgo.AdjustQuantityByMaxAmount(quantity, fixedpoint.NewFromFloat(currentPrice), s.MaxAmount)
 			log.Infof("adjust the quantity %v (%s %s @ %v) by max amount %v",
 				quantity,
 				symbol,
@@ -213,7 +194,7 @@ func (s *Strategy) generateSubmitOrders(prices, marketValues map[string]fixedpoi
 				currentPrice,
 				s.MaxAmount)
 		}
-
+		log.Debugf("symbol: %v, quantity: %v", symbol, quantity)
 		order := types.SubmitOrder{
 			Symbol:   symbol,
 			Side:     side,
@@ -225,14 +206,12 @@ func (s *Strategy) generateSubmitOrders(prices, marketValues map[string]fixedpoi
 	return submitOrders
 }
 
-func (s *Strategy) getSymbols() []string {
-	var symbols []string
-	for currency := range s.TargetWeights {
+func (s *Strategy) getSymbols() (symbols []string) {
+	for _, currency := range s.currencies {
 		if currency == s.BaseCurrency {
 			continue
 		}
-		symbol := currency + s.BaseCurrency
-		symbols = append(symbols, symbol)
+		symbols = append(symbols, currency+s.BaseCurrency)
 	}
 	return symbols
 }

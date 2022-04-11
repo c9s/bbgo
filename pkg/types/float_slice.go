@@ -1,6 +1,10 @@
 package types
 
-import "math"
+import (
+	"math"
+
+	"gonum.org/v1/gonum/floats"
+)
 
 type Float64Slice []float64
 
@@ -15,30 +19,23 @@ func (s *Float64Slice) Pop(i int64) (v float64) {
 }
 
 func (s Float64Slice) Max() float64 {
-	m := -math.MaxFloat64
-	for _, v := range s {
-		m = math.Max(m, v)
-	}
-	return m
+	return floats.Max(s)
 }
 
 func (s Float64Slice) Min() float64 {
-	m := math.MaxFloat64
-	for _, v := range s {
-		m = math.Min(m, v)
-	}
-	return m
+	return floats.Min(s)
 }
 
 func (s Float64Slice) Sum() (sum float64) {
-	for _, v := range s {
-		sum += v
-	}
-	return sum
+	return floats.Sum(s)
 }
 
 func (s Float64Slice) Mean() (mean float64) {
-	return s.Sum() / float64(len(s))
+	length := len(s)
+	if length == 0 {
+		panic("zero length slice")
+	}
+	return s.Sum() / float64(length)
 }
 
 func (s Float64Slice) Tail(size int) Float64Slice {
@@ -54,8 +51,7 @@ func (s Float64Slice) Tail(size int) Float64Slice {
 	return win
 }
 
-func (s Float64Slice) Diff() Float64Slice {
-	var values Float64Slice
+func (s Float64Slice) Diff() (values Float64Slice) {
 	for i, v := range s {
 		if i == 0 {
 			values.Push(0)
@@ -66,54 +62,57 @@ func (s Float64Slice) Diff() Float64Slice {
 	return values
 }
 
-func (s Float64Slice) PositiveValuesOrZero() Float64Slice {
-	var values Float64Slice
+func (s Float64Slice) PositiveValuesOrZero() (values Float64Slice) {
 	for _, v := range s {
 		values.Push(math.Max(v, 0))
 	}
 	return values
 }
 
-func (s Float64Slice) NegativeValuesOrZero() Float64Slice {
-	var values Float64Slice
+func (s Float64Slice) NegativeValuesOrZero() (values Float64Slice) {
 	for _, v := range s {
 		values.Push(math.Min(v, 0))
 	}
 	return values
 }
 
-func (s Float64Slice) AbsoluteValues() Float64Slice {
-	var values Float64Slice
+func (s Float64Slice) Abs() (values Float64Slice) {
 	for _, v := range s {
 		values.Push(math.Abs(v))
 	}
 	return values
 }
 
-func (s Float64Slice) MulScalar(x float64) Float64Slice {
-	var values Float64Slice
+func (s Float64Slice) MulScalar(x float64) (values Float64Slice) {
 	for _, v := range s {
 		values.Push(v * x)
 	}
 	return values
 }
 
-func (s Float64Slice) DivScalar(x float64) Float64Slice {
-	var values Float64Slice
+func (s Float64Slice) DivScalar(x float64) (values Float64Slice) {
 	for _, v := range s {
 		values.Push(v / x)
 	}
 	return values
 }
 
-func (s Float64Slice) ElementwiseProduct(other Float64Slice) Float64Slice {
-	var values Float64Slice
+func (s Float64Slice) Mul(other Float64Slice) (values Float64Slice) {
+	if len(s) != len(other) {
+		panic("slice lengths do not match")
+	}
+
 	for i, v := range s {
 		values.Push(v * other[i])
 	}
+
 	return values
 }
 
 func (s Float64Slice) Dot(other Float64Slice) float64 {
-	return s.ElementwiseProduct(other).Sum()
+	return floats.Dot(s, other)
+}
+
+func (s Float64Slice) Normalize() Float64Slice {
+	return s.DivScalar(s.Sum())
 }
