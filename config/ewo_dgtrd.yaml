@@ -9,17 +9,18 @@ exchangeStrategies:
 - on: binance
   ewo_dgtrd:
     symbol: MATICUSDT
-    interval: 1h
-    threshold: 13
+    interval: 15m
+    threshold: 0.9
     useEma: true
     sigWin: 5
     stoploss: 2%
 
 backtest:
-  startTime: "2022-03-01"
-  endTime: "2022-04-10"
+  startTime: "2022-04-09"
+  endTime: "2022-04-13"
   symbols:
     - MATICUSDT
+  sessions: [binance]
   account:
     binance:
       balances:
