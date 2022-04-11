@@ -8,19 +8,20 @@ exchangeStrategies:
  
 - on: binance
   ewo_dgtrd:
-    symbol: BNBBUSD
+    symbol: MATICUSDT
     interval: 1h
     threshold: 13
     useEma: true
     sigWin: 5
+    stoploss: 2%
 
 backtest:
-  startTime: "2022-04-06"
-  endTime: "2022-04-07"
+  startTime: "2022-03-01"
+  endTime: "2022-04-10"
   symbols:
-    - BNBBUSD
+    - MATICUSDT
   account:
     binance:
       balances:
-        BNB: 0
-        BUSD: 10000
+        MATIC: 0
+        USDT: 10000
