@@ -245,8 +245,9 @@ message QueryKLinesRequest {
   string exchange = 1;
   string symbol = 2;
   string interval = 3;  // time period of K line in minute
-  int64 timestamp = 4;
-  int64 limit = 5;
+  int64 start_time = 4;
+  int64 end_time = 5;
+  int64 limit = 6;
 }
 
 message QueryKLinesResponse {
