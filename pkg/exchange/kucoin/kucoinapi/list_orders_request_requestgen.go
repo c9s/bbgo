@@ -210,7 +210,10 @@ func (r *ListOrdersRequest) Do(ctx context.Context) (*OrderListPage, error) {
 
 	// empty params for GET operation
 	var params interface{}
-	query := url.Values{}
+	query, err := r.GetParametersQuery()
+	if err != nil {
+		return nil, err
+	}
 
 	apiURL := "/api/v1/orders"
 
