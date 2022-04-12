@@ -409,6 +409,7 @@ const (
 
 // SubscribeOptions provides the standard stream options
 type SubscribeOptions struct {
+	// TODO: change to Interval type later
 	Interval string `json:"interval,omitempty"`
 	Depth    Depth  `json:"depth,omitempty"`
 	Speed    Speed  `json:"speed,omitempty"`
