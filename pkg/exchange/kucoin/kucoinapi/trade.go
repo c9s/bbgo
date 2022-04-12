@@ -128,19 +128,19 @@ type HistoryOrderListPage struct {
 type ListOrdersRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
-	status *string `param:"status" validValues:"active,done"`
+	status *string `param:"status,query" validValues:"active,done"`
 
-	symbol *string `param:"symbol"`
+	symbol *string `param:"symbol,query"`
 
-	side *SideType `param:"side" validValues:"buy,sell"`
+	side *SideType `param:"side,query" validValues:"buy,sell"`
 
-	orderType *OrderType `param:"type"`
+	orderType *OrderType `param:"type,query"`
 
-	tradeType *TradeType `param:"tradeType" default:"TRADE"`
+	tradeType *TradeType `param:"tradeType,query" default:"TRADE"`
 
-	startAt *time.Time `param:"startAt,milliseconds"`
+	startAt *time.Time `param:"startAt,query,milliseconds"`
 
-	endAt *time.Time `param:"endAt,milliseconds"`
+	endAt *time.Time `param:"endAt,query,milliseconds"`
 }
 
 type Order struct {
