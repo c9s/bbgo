@@ -61,32 +61,37 @@ func (s *Server) Subscribe(request *pb.SubscribeRequest, server pb.MarketDataSer
 
 	streamPool := map[string]types.Stream{}
 	for sessionName, subs := range exchangeSubscriptions {
-		if session, ok := s.Environ.Session(sessionName); ok {
-			stream := session.Exchange.NewStream()
-			stream.SetPublicOnly()
-			for _, sub := range subs {
-				stream.Subscribe(sub.Channel, sub.Symbol, sub.Options)
-			}
-
-			stream.OnBookSnapshot(func(book types.SliceOrderBook) {
-				if err := server.Send(transBook(session, book, pb.Event_SNAPSHOT)); err != nil {
-					log.WithError(err).Error("grpc stream send error")
-				}
-			})
-
-			stream.OnBookUpdate(func(book types.SliceOrderBook) {
-				if err := server.Send(transBook(session, book, pb.Event_UPDATE)); err != nil {
-					log.WithError(err).Error("grpc stream send error")
-				}
-			})
-			stream.OnKLineClosed(func(kline types.KLine) {
-				err := server.Send(transKLine(session, kline))
-				if err != nil {
-					log.WithError(err).Error("grpc stream send error")
-				}
-			})
-			streamPool[sessionName] = stream
+		session, ok := s.Environ.Session(sessionName)
+		if !ok {
+			log.Errorf("session %s not found", sessionName)
+			continue
 		}
+
+		stream := session.Exchange.NewStream()
+		stream.SetPublicOnly()
+		for _, sub := range subs {
+			log.Infof("%s subscribe %s %s %+v", sessionName, sub.Channel, sub.Symbol, sub.Options)
+			stream.Subscribe(sub.Channel, sub.Symbol, sub.Options)
+		}
+
+		stream.OnBookSnapshot(func(book types.SliceOrderBook) {
+			if err := server.Send(transBook(session, book, pb.Event_SNAPSHOT)); err != nil {
+				log.WithError(err).Error("grpc stream send error")
+			}
+		})
+
+		stream.OnBookUpdate(func(book types.SliceOrderBook) {
+			if err := server.Send(transBook(session, book, pb.Event_UPDATE)); err != nil {
+				log.WithError(err).Error("grpc stream send error")
+			}
+		})
+		stream.OnKLineClosed(func(kline types.KLine) {
+			err := server.Send(transKLine(session, kline))
+			if err != nil {
+				log.WithError(err).Error("grpc stream send error")
+			}
+		})
+		streamPool[sessionName] = stream
 	}
 
 	for sessionName, stream := range streamPool {
