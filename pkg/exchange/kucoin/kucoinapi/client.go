@@ -195,4 +195,3 @@ type APIResponse struct {
 	Message string          `json:"msg"`
 	Data    json.RawMessage `json:"data"`
 }
-

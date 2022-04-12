@@ -50,18 +50,6 @@ func (r *GetFillsRequest) EndAt(endAt time.Time) *GetFillsRequest {
 // GetQueryParameters builds and checks the query parameters and returns url.Values
 func (r *GetFillsRequest) GetQueryParameters() (url.Values, error) {
 	var params = map[string]interface{}{}
-
-	query := url.Values{}
-	for k, v := range params {
-		query.Add(k, fmt.Sprintf("%v", v))
-	}
-
-	return query, nil
-}
-
-// GetParameters builds and checks the parameters and return the result in a map object
-func (r *GetFillsRequest) GetParameters() (map[string]interface{}, error) {
-	var params = map[string]interface{}{}
 	// check orderID field -> json key orderId
 	if r.orderID != nil {
 		orderID := *r.orderID
@@ -147,6 +135,18 @@ func (r *GetFillsRequest) GetParameters() (map[string]interface{}, error) {
 	} else {
 	}
 
+	query := url.Values{}
+	for k, v := range params {
+		query.Add(k, fmt.Sprintf("%v", v))
+	}
+
+	return query, nil
+}
+
+// GetParameters builds and checks the parameters and return the result in a map object
+func (r *GetFillsRequest) GetParameters() (map[string]interface{}, error) {
+	var params = map[string]interface{}{}
+
 	return params, nil
 }
 
@@ -208,9 +208,12 @@ func (r *GetFillsRequest) GetSlugsMap() (map[string]string, error) {
 
 func (r *GetFillsRequest) Do(ctx context.Context) (*FillListPage, error) {
 
-	// empty params for GET operation
+	// no body params
 	var params interface{}
-	query := url.Values{}
+	query, err := r.GetQueryParameters()
+	if err != nil {
+		return nil, err
+	}
 
 	apiURL := "/api/v1/fills"
 

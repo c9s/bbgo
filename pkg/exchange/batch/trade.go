@@ -3,7 +3,6 @@ package batch
 import (
 	"context"
 	"errors"
-	"sort"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -41,7 +40,6 @@ func (e TradeBatchQuery) Query(ctx context.Context, symbol string, options *type
 	var startTime = *options.StartTime
 	var endTime = *options.EndTime
 
-
 	go func() {
 		limiter := rate.NewLimiter(rate.Every(5*time.Second), 2) // from binance (original 1200, use 1000 for safety)
 
@@ -66,9 +64,7 @@ func (e TradeBatchQuery) Query(ctx context.Context, symbol string, options *type
 			})
 
 			// sort trades by time in ascending order
-			sort.Slice(trades, func(i, j int) bool {
-				return trades[i].Time.Before(time.Time(trades[j].Time))
-			})
+			types.SortTradesAscending(trades)
 
 			if err != nil {
 				errC <- err
@@ -78,7 +74,9 @@ func (e TradeBatchQuery) Query(ctx context.Context, symbol string, options *type
 			// if all trades are duplicated or empty, we end the batch query
 			if len(trades) == 0 {
 				return
-			} else if len(trades) > 0 {
+			}
+
+			if len(trades) > 0 {
 				allExists := true
 				for _, td := range trades {
 					k := td.Key()
