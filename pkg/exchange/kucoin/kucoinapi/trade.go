@@ -52,19 +52,19 @@ func (c *TradeService) NewGetFillsRequest() *GetFillsRequest {
 type GetFillsRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
-	orderID *string `param:"orderId"`
+	orderID *string `param:"orderId,query"`
 
-	tradeType *string `param:"tradeType" default:"TRADE"`
+	tradeType *string `param:"tradeType,query" default:"TRADE"`
 
-	symbol *string `param:"symbol"`
+	symbol *string `param:"symbol,query"`
 
-	side *string `param:"side" validValues:"buy,sell"`
+	side *string `param:"side,query" validValues:"buy,sell"`
 
-	orderType *string `param:"type" validValues:"limit,market,limit_stop,market_stop"`
+	orderType *string `param:"type,query" validValues:"limit,market,limit_stop,market_stop"`
 
-	startAt *time.Time `param:"startAt,milliseconds"`
+	startAt *time.Time `param:"startAt,query,milliseconds"`
 
-	endAt *time.Time `param:"endAt,milliseconds"`
+	endAt *time.Time `param:"endAt,query,milliseconds"`
 }
 
 type FillListPage struct {

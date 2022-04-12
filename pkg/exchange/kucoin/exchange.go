@@ -364,10 +364,9 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 
 	if options.StartTime != nil && options.EndTime != nil {
 		req.StartAt(*options.StartTime)
+
 		if options.EndTime.Sub(*options.StartTime) < 7*24*time.Hour {
 			req.EndAt(*options.EndTime)
-		} else {
-			req.StartAt(options.StartTime.Add(7*24*time.Hour - time.Minute))
 		}
 	} else if options.StartTime != nil {
 		req.StartAt(*options.StartTime)
@@ -383,6 +382,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	if err != nil {
 		return trades, err
 	}
+
 	for _, fill := range response.Items {
 		trade := toGlobalTrade(fill)
 		trades = append(trades, trade)
