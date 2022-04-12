@@ -52,19 +52,19 @@ func (c *TradeService) NewGetFillsRequest() *GetFillsRequest {
 type GetFillsRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
-	orderID *string `param:"orderId,query"`
+	orderID *string `param:"orderId"`
 
-	tradeType *string `param:"tradeType,query" default:"TRADE"`
+	tradeType *string `param:"tradeType" default:"TRADE"`
 
-	symbol *string `param:"symbol,query"`
+	symbol *string `param:"symbol"`
 
-	side *string `param:"side,query" validValues:"buy,sell"`
+	side *string `param:"side" validValues:"buy,sell"`
 
-	orderType *string `param:"type,query" validValues:"limit,market,limit_stop,market_stop"`
+	orderType *string `param:"type" validValues:"limit,market,limit_stop,market_stop"`
 
-	startAt *time.Time `param:"startAt,query,milliseconds"`
+	startAt *time.Time `param:"startAt,milliseconds"`
 
-	endAt *time.Time `param:"endAt,query,milliseconds"`
+	endAt *time.Time `param:"endAt,milliseconds"`
 }
 
 type FillListPage struct {
@@ -128,19 +128,19 @@ type HistoryOrderListPage struct {
 type ListOrdersRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
-	status *string `param:"status,query" validValues:"active,done"`
+	status *string `param:"status" validValues:"active,done"`
 
-	symbol *string `param:"symbol,query"`
+	symbol *string `param:"symbol"`
 
-	side *SideType `param:"side,query" validValues:"buy,sell"`
+	side *SideType `param:"side" validValues:"buy,sell"`
 
-	orderType *OrderType `param:"type,query"`
+	orderType *OrderType `param:"type"`
 
-	tradeType *TradeType `param:"tradeType,query" default:"TRADE"`
+	tradeType *TradeType `param:"tradeType" default:"TRADE"`
 
-	startAt *time.Time `param:"startAt,query,milliseconds"`
+	startAt *time.Time `param:"startAt,milliseconds"`
 
-	endAt *time.Time `param:"endAt,query,milliseconds"`
+	endAt *time.Time `param:"endAt,milliseconds"`
 }
 
 type Order struct {

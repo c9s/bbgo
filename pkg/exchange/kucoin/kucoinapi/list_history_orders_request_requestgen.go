@@ -132,7 +132,10 @@ func (l *ListHistoryOrdersRequest) Do(ctx context.Context) (*HistoryOrderListPag
 
 	// empty params for GET operation
 	var params interface{}
-	query := url.Values{}
+	query, err := l.GetParametersQuery()
+	if err != nil {
+		return nil, err
+	}
 
 	apiURL := "/api/v1/hist-orders"
 
