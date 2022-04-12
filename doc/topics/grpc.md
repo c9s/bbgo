@@ -5,7 +5,8 @@
 ### Install Evans
 
 ```shell
-brew install evans 
+brew tap ktr0731/evans
+brew install evans
 ```
 
 Start your bbgo with gRPC server option:
