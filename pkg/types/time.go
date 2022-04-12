@@ -162,6 +162,10 @@ func (t Time) Unix() int64 {
 	return time.Time(t).Unix()
 }
 
+func (t Time) UnixMilli() int64 {
+	return time.Time(t).UnixMilli()
+}
+
 func (t Time) After(time2 time.Time) bool {
 	return time.Time(t).After(time2)
 }
