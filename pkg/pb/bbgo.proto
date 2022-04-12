@@ -75,7 +75,8 @@ message Subscription {
   string exchange = 1;
   Channel channel = 2;  // book, trade, ticker
   string symbol = 3;
-  int64 depth = 4;
+  string depth = 4; // depth is for book, valid values are full, medium, 1, 5 and 20
+  string interval = 5; // interval is for kline channel
 }
 
 message SubscribeResponse {
