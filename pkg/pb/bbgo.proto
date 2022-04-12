@@ -44,6 +44,7 @@ enum Channel {
   TRADE = 1;
   TICKER = 2;
   USER = 3;
+  KLINE = 4;
 }
 
 enum Side {
@@ -80,18 +81,21 @@ message Subscription {
 }
 
 message SubscribeResponse {
-  string exchange = 1;
-  string symbol = 2;
-  Channel channel = 3;  // book, trade, ticker, user
-  Event event = 4;      // snapshot, update, order_snapshot, ...
-  Depth depth = 5;
-  repeated Trade trades = 6;
-  Ticker ticker = 7;
-  repeated Order orders = 8;
-  repeated Balance balances = 9;
-  int64 subscribed_at = 10;
-  Error error = 11;
+  string session = 1;
+  string exchange = 2;
+  string symbol = 3;
+  Channel channel = 4;  // book, trade, ticker, user
+  Event event = 5;      // snapshot, update, order_snapshot, ...
+  Depth depth = 6; // depth: used by book
+  KLine kline = 7;
+  repeated Trade trades = 8;
+  Ticker ticker = 9;
+  repeated Order orders = 10;
+  repeated Balance balances = 11;
+  int64 subscribed_at = 12;
+  Error error = 13;
 }
+
 
 message Depth {
   string exchange = 1;
@@ -101,8 +105,8 @@ message Depth {
 }
 
 message PriceVolume {
-  int64 price = 1;
-  int64 volume = 2;
+  string price = 1;
+  string volume = 2;
 }
 
 // https://maicoin.github.io/max-websocket-docs/#/private_channels?id=trade-response
@@ -251,13 +255,15 @@ message QueryKLinesResponse {
 }
 
 message KLine {
-  string exchange = 1;
-  string symbol = 2;
-  int64 timestamp = 3;
+  string session = 1;
+  string exchange = 2;
+  string symbol = 3;
   double open = 4;
   double high = 5;
   double low = 6;
   double close = 7;
   double volume = 8;
   double quote_volume = 9;
+  int64 start_time = 10;
+  int64 end_time = 11;
 }
