@@ -58,6 +58,7 @@ func (s *Server) Subscribe(request *pb.SubscribeRequest, server pb.MarketDataSer
 		}
 	}
 
+	streamPool := map[string]types.Stream{}
 	for sessionName, subs := range exchangeSubscriptions {
 		if session, ok := s.Environ.Session(sessionName); ok {
 			stream := session.Exchange.NewStream()
@@ -83,8 +84,13 @@ func (s *Server) Subscribe(request *pb.SubscribeRequest, server pb.MarketDataSer
 					log.WithError(err).Error("grpc stream send error")
 				}
 			})
-			go stream.Connect(server.Context())
+			streamPool[sessionName] = stream
 		}
+	}
+
+	for sessionName, stream := range streamPool {
+		log.Infof("connecting stream %s", sessionName)
+		go stream.Connect(server.Context())
 	}
 
 	return nil
