@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"fmt"
 	"net"
 
 	"github.com/pkg/errors"
@@ -22,7 +23,48 @@ type Server struct {
 }
 
 func (s *Server) Subscribe(request *pb.SubscribeRequest, server pb.MarketDataService_SubscribeServer) error {
-	panic("implement me")
+	exchangeSubscriptions := map[string][]types.Subscription{}
+	for _, sub := range request.Subscriptions {
+		session, ok := s.Environ.Session(sub.Exchange)
+		if !ok {
+			return fmt.Errorf("exchange %s not found", sub.Exchange)
+		}
+
+		switch types.Channel(sub.Channel) {
+		case types.MarketTradeChannel:
+			// TODO
+		case types.BookTickerChannel:
+			// TODO
+
+		case types.BookChannel:
+			exchangeSubscriptions[session.Name] = append(exchangeSubscriptions[session.Name], types.Subscription{
+				Symbol:  sub.Symbol,
+				Channel: types.BookChannel,
+				Options: types.SubscribeOptions{
+					Depth: types.Depth(sub.Depth),
+				},
+			})
+		case types.KLineChannel:
+			exchangeSubscriptions[session.Name] = append(exchangeSubscriptions[session.Name], types.Subscription{
+				Symbol:  sub.Symbol,
+				Channel: types.KLineChannel,
+				Options: types.SubscribeOptions{
+					Interval: sub.Interval,
+				},
+			})
+		}
+	}
+
+	for sessionName, subs := range exchangeSubscriptions {
+		if session, ok := s.Environ.Session(sessionName) ; ok {
+			stream := session.Exchange.NewStream()
+			stream.SetPublicOnly()
+			for _, sub := range subs {
+				stream.Subscribe(sub.Channel, sub.Symbol, sub.Options)
+			}
+		}
+	}
+
 	return nil
 }
 
