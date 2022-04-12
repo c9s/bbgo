@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -111,6 +112,17 @@ func (s *Server) QueryKLines(ctx context.Context, request *pb.QueryKLinesRequest
 
 			options := types.KLineQueryOptions{
 				Limit: int(request.Limit),
+			}
+
+			endTime := time.Now()
+			if request.EndTime != 0 {
+				endTime = time.Unix(request.EndTime, 0)
+			}
+			options.EndTime = &endTime
+
+			if request.StartTime != 0 {
+				startTime := time.Unix(request.StartTime, 0)
+				options.StartTime = &startTime
 			}
 
 			klines, err := session.Exchange.QueryKLines(ctx, request.Symbol, types.Interval(request.Interval), options)
