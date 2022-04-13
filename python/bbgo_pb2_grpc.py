@@ -17,7 +17,7 @@ class MarketDataServiceStub(object):
         self.Subscribe = channel.unary_stream(
                 '/bbgo.MarketDataService/Subscribe',
                 request_serializer=bbgo__pb2.SubscribeRequest.SerializeToString,
-                response_deserializer=bbgo__pb2.SubscribeResponse.FromString,
+                response_deserializer=bbgo__pb2.MarketData.FromString,
                 )
         self.QueryKLines = channel.unary_unary(
                 '/bbgo.MarketDataService/QueryKLines',
@@ -47,7 +47,7 @@ def add_MarketDataServiceServicer_to_server(servicer, server):
             'Subscribe': grpc.unary_stream_rpc_method_handler(
                     servicer.Subscribe,
                     request_deserializer=bbgo__pb2.SubscribeRequest.FromString,
-                    response_serializer=bbgo__pb2.SubscribeResponse.SerializeToString,
+                    response_serializer=bbgo__pb2.MarketData.SerializeToString,
             ),
             'QueryKLines': grpc.unary_unary_rpc_method_handler(
                     servicer.QueryKLines,
@@ -77,7 +77,7 @@ class MarketDataService(object):
             metadata=None):
         return grpc.experimental.unary_stream(request, target, '/bbgo.MarketDataService/Subscribe',
             bbgo__pb2.SubscribeRequest.SerializeToString,
-            bbgo__pb2.SubscribeResponse.FromString,
+            bbgo__pb2.MarketData.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
@@ -108,19 +108,18 @@ class UserDataServiceStub(object):
         Args:
             channel: A grpc.Channel.
         """
-        self.SubscribeUserData = channel.unary_stream(
-                '/bbgo.UserDataService/SubscribeUserData',
-                request_serializer=bbgo__pb2.Empty.SerializeToString,
-                response_deserializer=bbgo__pb2.SubscribeResponse.FromString,
+        self.Subscribe = channel.unary_stream(
+                '/bbgo.UserDataService/Subscribe',
+                request_serializer=bbgo__pb2.UserDataRequest.SerializeToString,
+                response_deserializer=bbgo__pb2.UserData.FromString,
                 )
 
 
 class UserDataServiceServicer(object):
     """Missing associated documentation comment in .proto file."""
 
-    def SubscribeUserData(self, request, context):
-        """should support streaming
-        """
+    def Subscribe(self, request, context):
+        """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
@@ -128,10 +127,10 @@ class UserDataServiceServicer(object):
 
 def add_UserDataServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'SubscribeUserData': grpc.unary_stream_rpc_method_handler(
-                    servicer.SubscribeUserData,
-                    request_deserializer=bbgo__pb2.Empty.FromString,
-                    response_serializer=bbgo__pb2.SubscribeResponse.SerializeToString,
+            'Subscribe': grpc.unary_stream_rpc_method_handler(
+                    servicer.Subscribe,
+                    request_deserializer=bbgo__pb2.UserDataRequest.FromString,
+                    response_serializer=bbgo__pb2.UserData.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -144,7 +143,7 @@ class UserDataService(object):
     """Missing associated documentation comment in .proto file."""
 
     @staticmethod
-    def SubscribeUserData(request,
+    def Subscribe(request,
             target,
             options=(),
             channel_credentials=None,
@@ -154,9 +153,9 @@ class UserDataService(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_stream(request, target, '/bbgo.UserDataService/SubscribeUserData',
-            bbgo__pb2.Empty.SerializeToString,
-            bbgo__pb2.SubscribeResponse.FromString,
+        return grpc.experimental.unary_stream(request, target, '/bbgo.UserDataService/Subscribe',
+            bbgo__pb2.UserDataRequest.SerializeToString,
+            bbgo__pb2.UserData.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
