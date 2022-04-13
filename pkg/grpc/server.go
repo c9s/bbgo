@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strconv"
 	"time"
 
 	"github.com/pkg/errors"
@@ -74,6 +75,12 @@ func (s *Server) Subscribe(request *pb.SubscribeRequest, server pb.MarketDataSer
 			stream.Subscribe(sub.Channel, sub.Symbol, sub.Options)
 		}
 
+		stream.OnMarketTrade(func(trade types.Trade) {
+			if err := server.Send(transMarketTrade(session, trade)); err != nil {
+				log.WithError(err).Error("grpc stream send error")
+			}
+		})
+
 		stream.OnBookSnapshot(func(book types.SliceOrderBook) {
 			if err := server.Send(transBook(session, book, pb.Event_SNAPSHOT)); err != nil {
 				log.WithError(err).Error("grpc stream send error")
@@ -94,12 +101,21 @@ func (s *Server) Subscribe(request *pb.SubscribeRequest, server pb.MarketDataSer
 		streamPool[sessionName] = stream
 	}
 
-	for sessionName, stream := range streamPool {
-		log.Infof("connecting stream %s", sessionName)
+	for _, stream := range streamPool {
 		go stream.Connect(server.Context())
 	}
 
-	return nil
+	defer func() {
+		for _, stream := range streamPool {
+			if err := stream.Close(); err != nil {
+				log.WithError(err).Errorf("stream close error")
+			}
+		}
+	}()
+
+	ctx := server.Context()
+	<-ctx.Done()
+	return ctx.Err()
 }
 
 func (s *Server) QueryKLines(ctx context.Context, request *pb.QueryKLinesRequest) (*pb.QueryKLinesResponse, error) {
@@ -190,7 +206,7 @@ func transBook(session *bbgo.ExchangeSession, book types.SliceOrderBook, event p
 		Exchange: session.ExchangeName.String(),
 		Symbol:   book.Symbol,
 		Channel:  pb.Channel_BOOK,
-		Event:    event, // pb.Event_UPDATE
+		Event:    event,
 		Depth: &pb.Depth{
 			Exchange: session.ExchangeName.String(),
 			Symbol:   book.Symbol,
@@ -198,6 +214,41 @@ func transBook(session *bbgo.ExchangeSession, book types.SliceOrderBook, event p
 			Bids:     transPriceVolume(book.Bids),
 		},
 	}
+}
+
+func transMarketTrade(session *bbgo.ExchangeSession, marketTrade types.Trade) *pb.SubscribeResponse {
+	return &pb.SubscribeResponse{
+		Session:  session.Name,
+		Exchange: session.ExchangeName.String(),
+		Symbol:   marketTrade.Symbol,
+		Channel:  pb.Channel_TRADE,
+		Event:    pb.Event_UPDATE,
+		Trades: []*pb.Trade{
+			{
+				Exchange:    marketTrade.Exchange.String(),
+				Symbol:      marketTrade.Symbol,
+				Id:          strconv.FormatUint(marketTrade.ID, 10),
+				Price:       marketTrade.Price.Float64(),
+				Volume:      marketTrade.Quantity.Float64(),
+				CreatedAt:   marketTrade.Time.UnixMilli(),
+				Side:        transSide(marketTrade.Side),
+				Fee:         marketTrade.Fee.Float64(),
+				FeeCurrency: marketTrade.FeeCurrency,
+				Maker:       marketTrade.IsMaker,
+			},
+		},
+	}
+}
+
+func transSide(side types.SideType) pb.Side {
+	switch side {
+	case types.SideTypeBuy:
+		return pb.Side_BUY
+	case types.SideTypeSell:
+		return pb.Side_SELL
+	}
+
+	return pb.Side_SELL
 }
 
 func transKLine(session *bbgo.ExchangeSession, kline types.KLine) *pb.SubscribeResponse {
