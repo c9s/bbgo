@@ -115,12 +115,12 @@ message Trade {
   string exchange = 1;
   string symbol = 2;
   string id = 3;
-  double price = 4;
-  double volume = 5;
+  string price = 4;
+  string quantity = 5;
   int64 created_at = 6;
   Side side = 7;
-  double fee = 8;
-  string fee_currency = 9;
+  string fee_currency = 8;
+  string fee = 9;
   bool maker = 10;
 }
 
