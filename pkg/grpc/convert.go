@@ -65,6 +65,34 @@ func transBook(session *bbgo.ExchangeSession, book types.SliceOrderBook, event p
 	}
 }
 
+func transBalances(session *bbgo.ExchangeSession, balances types.BalanceMap) (pbBalances []*pb.Balance) {
+	for _, b := range balances {
+		pbBalances = append(pbBalances, &pb.Balance{
+			Exchange:  session.ExchangeName.String(),
+			Currency:  b.Currency,
+			Available: b.Available.String(),
+			Locked:    b.Locked.String(),
+		})
+	}
+	return pbBalances
+}
+
+func transTrade(session *bbgo.ExchangeSession, trade types.Trade) *pb.Trade {
+	return &pb.Trade{
+		Session:     session.Name,
+		Exchange:    trade.Exchange.String(),
+		Symbol:      trade.Symbol,
+		Id:          strconv.FormatUint(trade.ID, 10),
+		Price:       trade.Price.String(),
+		Quantity:    trade.Quantity.String(),
+		CreatedAt:   trade.Time.UnixMilli(),
+		Side:        transSide(trade.Side),
+		FeeCurrency: trade.FeeCurrency,
+		Fee:         trade.Fee.String(),
+		Maker:       trade.IsMaker,
+	}
+}
+
 func transMarketTrade(session *bbgo.ExchangeSession, marketTrade types.Trade) *pb.MarketData {
 	return &pb.MarketData{
 		Session:  session.Name,
@@ -117,19 +145,19 @@ func transOrderType(orderType types.OrderType) pb.OrderType {
 
 func transOrder(session *bbgo.ExchangeSession, order types.Order) *pb.Order {
 	return &pb.Order{
-		Exchange:       order.Exchange.String(),
-		Symbol:         order.Symbol,
-		Id:             strconv.FormatUint(order.OrderID, 10),
-		Side:           transSide(order.Side),
-		OrderType:      transOrderType(order.Type),
-		Price:          order.Price.String(),
-		StopPrice:      order.StopPrice.String(),
-		Status:         string(order.Status),
-		CreatedAt:      order.CreationTime.UnixMilli(),
-		Quantity:       order.Quantity.String(),
+		Exchange:         order.Exchange.String(),
+		Symbol:           order.Symbol,
+		Id:               strconv.FormatUint(order.OrderID, 10),
+		Side:             transSide(order.Side),
+		OrderType:        transOrderType(order.Type),
+		Price:            order.Price.String(),
+		StopPrice:        order.StopPrice.String(),
+		Status:           string(order.Status),
+		CreatedAt:        order.CreationTime.UnixMilli(),
+		Quantity:         order.Quantity.String(),
 		ExecutedQuantity: order.ExecutedQuantity.String(),
-		ClientOrderId:  order.ClientOrderID,
-		GroupId:        0,
+		ClientOrderId:    order.ClientOrderID,
+		GroupId:          int64(order.GroupID),
 	}
 }
 

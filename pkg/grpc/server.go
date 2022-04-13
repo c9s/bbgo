@@ -1,10 +1,10 @@
 package grpc
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"time"
-	"context"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -25,14 +25,15 @@ type UserDataService struct {
 }
 
 func (s *UserDataService) Subscribe(request *pb.UserDataRequest, server pb.UserDataService_SubscribeServer) error {
+	streamPool := map[string]types.Stream{}
 	for sessionName, session := range s.Environ.Sessions() {
 		if request.Session == sessionName {
 			userDataStream := session.Exchange.NewStream()
 			userDataStream.OnOrderUpdate(func(order types.Order) {
 				err := server.Send(&pb.UserData{
-					Channel:  pb.Channel_ORDER,
-					Event:    pb.Event_UPDATE,
-					Orders:   nil,
+					Channel: pb.Channel_ORDER,
+					Event:   pb.Event_UPDATE,
+					Orders:  []*pb.Order{transOrder(session, order)},
 				})
 				if err != nil {
 					log.WithError(err).Errorf("grpc: can not send user data")
@@ -40,21 +41,38 @@ func (s *UserDataService) Subscribe(request *pb.UserDataRequest, server pb.UserD
 			})
 			userDataStream.OnTradeUpdate(func(trade types.Trade) {
 				err := server.Send(&pb.UserData{
-					Channel:  pb.Channel_TRADE,
-					Event:    pb.Event_UPDATE,
-					Trades: []*pb.Trade{},
+					Channel: pb.Channel_TRADE,
+					Event:   pb.Event_UPDATE,
+					Trades:  []*pb.Trade{transTrade(session, trade)},
 				})
 				if err != nil {
 					log.WithError(err).Errorf("grpc: can not send user data")
 				}
 			})
 			userDataStream.OnBalanceUpdate(func(balances types.BalanceMap) {
-
+				err := server.Send(&pb.UserData{
+					Channel:  pb.Channel_BALANCE,
+					Event:    pb.Event_UPDATE,
+					Balances: transBalances(session, balances),
+				})
+				if err != nil {
+					log.WithError(err).Errorf("grpc: can not send user data")
+				}
 			})
+			streamPool[ sessionName ] = userDataStream
 		}
 	}
 
 	<-server.Context().Done()
+
+	defer func() {
+		for _, stream := range streamPool {
+			if err := stream.Close(); err != nil {
+				log.WithError(err).Errorf("user data stream close error")
+			}
+		}
+	}()
+
 	return nil
 }
 
@@ -130,7 +148,7 @@ func (s *MarketDataService) Subscribe(request *pb.SubscribeRequest, server pb.Ma
 	defer func() {
 		for _, stream := range streamPool {
 			if err := stream.Close(); err != nil {
-				log.WithError(err).Errorf("stream close error")
+				log.WithError(err).Errorf("market data stream close error")
 			}
 		}
 	}()
