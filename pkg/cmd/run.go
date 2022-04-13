@@ -32,7 +32,7 @@ func init() {
 	RunCmd.Flags().String("webserver-bind", ":8080", "webserver binding")
 
 	RunCmd.Flags().Bool("enable-grpc", false, "enable grpc server")
-	RunCmd.Flags().String("grpc-bind", ":6688", "grpc server binding")
+	RunCmd.Flags().String("grpc-bind", ":50051", "grpc server binding")
 
 	RunCmd.Flags().String("cpu-profile", "", "cpu profile")
 	RunCmd.Flags().Bool("setup", false, "use setup mode")
