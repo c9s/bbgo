@@ -122,7 +122,6 @@ message Trade {
   double fee = 8;
   string fee_currency = 9;
   bool maker = 10;
-  string trend = 11;
 }
 
 // https://maicoin.github.io/max-websocket-docs/#/public_ticker?id=success-response
