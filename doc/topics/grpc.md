@@ -14,10 +14,10 @@ Start your bbgo with gRPC server option:
 go run ./cmd/bbgo run --config grid_kucoin.yaml  --debug --enable-grpc
 ```
 
-The gRPC server port is located at 6688, you can use evans to connect to the gRPC server:
+The gRPC server port is located at 50051 (default port), you can use evans to connect to the gRPC server:
 
 ```shell
-evans --host localhost --port 6688 -r repl
+evans --host localhost --port 50051 -r repl
 ```
 
 ```shell
@@ -42,7 +42,12 @@ bbgo@localhost:6688> desc QueryKLinesRequest
 ```
 
 
+You can send the request via evans:
 
+```shell
+evans -r cli call --file evans/userDataService/subscribe.json  bbgo.UserDataService.Subscribe
+evans -r cli call --file evans/marketDataService/subscribe_kline.json  bbgo.MarketDataService.Subscribe
+```
 
 
 
