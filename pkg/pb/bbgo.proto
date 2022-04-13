@@ -118,16 +118,17 @@ message PriceVolume {
 // https://maicoin.github.io/max-websocket-docs/#/private_channels?id=trade-response
 // https://maicoin.github.io/max-websocket-docs/#/public_trade?id=success-response
 message Trade {
-  string exchange = 1;
-  string symbol = 2;
-  string id = 3;
-  string price = 4;
-  string quantity = 5;
-  int64 created_at = 6;
-  Side side = 7;
-  string fee_currency = 8;
-  string fee = 9;
-  bool maker = 10;
+  string session = 1;
+  string exchange = 2;
+  string symbol = 3;
+  string id = 4;
+  string price = 5;
+  string quantity = 6;
+  int64 created_at = 7;
+  Side side = 8;
+  string fee_currency = 9;
+  string fee = 10;
+  bool maker = 11;
 }
 
 // https://maicoin.github.io/max-websocket-docs/#/public_ticker?id=success-response
@@ -174,8 +175,9 @@ message SubmitOrder {
 message Balance {
   string exchange = 1;
   string currency = 2;
-  double available = 3;
-  double locked = 4;
+  string available = 3;
+  string locked = 4;
+  string borrowed = 5;
 }
 
 message SubmitOrderRequest {
