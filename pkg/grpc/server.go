@@ -1,10 +1,10 @@
 package grpc
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"time"
+	"context"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -16,20 +16,57 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-type Server struct {
+type UserDataService struct {
+	Config  *bbgo.Config
+	Environ *bbgo.Environment
+	Trader  *bbgo.Trader
+
+	pb.UnimplementedUserDataServiceServer
+}
+
+func (s *UserDataService) Subscribe(request *pb.UserDataRequest, server pb.UserDataService_SubscribeServer) error {
+	for sessionName, session := range s.Environ.Sessions() {
+		if request.Session == sessionName {
+			userDataStream := session.Exchange.NewStream()
+			userDataStream.OnOrderUpdate(func(order types.Order) {
+				err := server.Send(&pb.UserData{
+					Channel:  pb.Channel_ORDER,
+					Event:    pb.Event_UPDATE,
+					Orders:   nil,
+				})
+				if err != nil {
+					log.WithError(err).Errorf("grpc: can not send user data")
+				}
+			})
+			userDataStream.OnTradeUpdate(func(trade types.Trade) {
+				err := server.Send(&pb.UserData{
+					Channel:  pb.Channel_TRADE,
+					Event:    pb.Event_UPDATE,
+					Trades: []*pb.Trade{},
+				})
+				if err != nil {
+					log.WithError(err).Errorf("grpc: can not send user data")
+				}
+			})
+			userDataStream.OnBalanceUpdate(func(balances types.BalanceMap) {
+
+			})
+		}
+	}
+
+	<-server.Context().Done()
+	return nil
+}
+
+type MarketDataService struct {
 	Config  *bbgo.Config
 	Environ *bbgo.Environment
 	Trader  *bbgo.Trader
 
 	pb.UnimplementedMarketDataServiceServer
-	pb.UnimplementedUserDataServiceServer
 }
 
-func (s *Server) SubscribeUserData(empty *pb.Empty, server pb.UserDataService_SubscribeServer) error {
-	return nil
-}
-
-func (s *Server) Subscribe(request *pb.SubscribeRequest, server pb.MarketDataService_SubscribeServer) error {
+func (s *MarketDataService) Subscribe(request *pb.SubscribeRequest, server pb.MarketDataService_SubscribeServer) error {
 	exchangeSubscriptions := map[string][]types.Subscription{}
 	for _, sub := range request.Subscriptions {
 		session, ok := s.Environ.Session(sub.Exchange)
@@ -103,7 +140,7 @@ func (s *Server) Subscribe(request *pb.SubscribeRequest, server pb.MarketDataSer
 	return ctx.Err()
 }
 
-func (s *Server) QueryKLines(ctx context.Context, request *pb.QueryKLinesRequest) (*pb.QueryKLinesResponse, error) {
+func (s *MarketDataService) QueryKLines(ctx context.Context, request *pb.QueryKLinesRequest) (*pb.QueryKLinesResponse, error) {
 	exchangeName, err := types.ValidExchangeName(request.Exchange)
 	if err != nil {
 		return nil, err
@@ -147,6 +184,12 @@ func (s *Server) QueryKLines(ctx context.Context, request *pb.QueryKLinesRequest
 	return nil, nil
 }
 
+type Server struct {
+	Config  *bbgo.Config
+	Environ *bbgo.Environment
+	Trader  *bbgo.Trader
+}
+
 func (s *Server) ListenAndServe(bind string) error {
 	conn, err := net.Listen("tcp", bind)
 	if err != nil {
@@ -154,7 +197,17 @@ func (s *Server) ListenAndServe(bind string) error {
 	}
 
 	var grpcServer = grpc.NewServer()
-	pb.RegisterMarketDataServiceServer(grpcServer, s)
+	pb.RegisterMarketDataServiceServer(grpcServer, &MarketDataService{
+		Config:  s.Config,
+		Environ: s.Environ,
+		Trader:  s.Trader,
+	})
+
+	pb.RegisterUserDataServiceServer(grpcServer, &UserDataService{
+		Config:  s.Config,
+		Environ: s.Environ,
+		Trader:  s.Trader,
+	})
 
 	reflection.Register(grpcServer)
 
@@ -164,4 +217,3 @@ func (s *Server) ListenAndServe(bind string) error {
 
 	return nil
 }
-

@@ -38,6 +38,7 @@ enum Channel {
   TICKER = 2;
   KLINE = 3;
   BALANCE = 4;
+  ORDER = 5;
 }
 
 enum Side {
@@ -147,16 +148,14 @@ message Order {
   string id = 3;
   Side side = 4;
   OrderType order_type = 5;
-  double price = 6;
-  double stop_price = 7;
-  double avg_price = 8;
+  string price = 6;
+  string stop_price = 7;
   string status = 9;
-  int64 created_at = 10;
-  double quantity = 11;
-  double executed_volume = 12;
-  int64 trades_count = 13;
+  string quantity = 11;
+  string executed_quantity = 12;
   string client_order_id = 14;
   int64 group_id = 15;
+  int64 created_at = 10;
 }
 
 message SubmitOrder {
