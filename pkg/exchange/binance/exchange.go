@@ -238,6 +238,15 @@ func (e *Exchange) QueryMarginAccount(ctx context.Context) (*types.Account, erro
 		MarginInfo:  toGlobalMarginAccountInfo(account), // In binance GO api, Account define account info which mantain []*AccountAsset and []*AccountPosition.
 	}
 
+	balances := types.BalanceMap{}
+	for _, userAsset := range account.UserAssets {
+		balances[userAsset.Asset] = types.Balance{
+			Currency:  userAsset.Asset,
+			Available: fixedpoint.MustNewFromString(userAsset.Free),
+			Locked:    fixedpoint.MustNewFromString(userAsset.Locked),
+		}
+	}
+	a.UpdateBalances(balances)
 	return a, nil
 }
 
@@ -256,6 +265,23 @@ func (e *Exchange) QueryIsolatedMarginAccount(ctx context.Context, symbols ...st
 		AccountType:        types.AccountTypeMargin,
 		IsolatedMarginInfo: toGlobalIsolatedMarginAccountInfo(account), // In binance GO api, Account define account info which mantain []*AccountAsset and []*AccountPosition.
 	}
+
+	balances := types.BalanceMap{}
+	for _, userAsset := range account.Assets {
+		balances[userAsset.BaseAsset.Asset] = types.Balance{
+			Currency:  userAsset.BaseAsset.Asset,
+			Available: fixedpoint.MustNewFromString(userAsset.BaseAsset.Free),
+			Locked:    fixedpoint.MustNewFromString(userAsset.BaseAsset.Locked),
+		}
+
+		balances[userAsset.QuoteAsset.Asset] = types.Balance{
+			Currency:  userAsset.QuoteAsset.Asset,
+			Available: fixedpoint.MustNewFromString(userAsset.QuoteAsset.Free),
+			Locked:    fixedpoint.MustNewFromString(userAsset.QuoteAsset.Locked),
+		}
+	}
+	a.UpdateBalances(balances)
+
 
 	return a, nil
 }
