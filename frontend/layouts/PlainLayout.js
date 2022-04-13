@@ -22,14 +22,13 @@ const useStyles = makeStyles((theme) => ({
     appBarSpacer: theme.mixins.toolbar,
 }));
 
-export default function PlainLayout({children}) {
+export default function PlainLayout(props) {
     const classes = useStyles();
-
     return <div className={classes.root}>
         <AppBar className={classes.appBar}>
             <Toolbar>
                 <Typography variant="h6" className={classes.title}>
-                    BBGO Setup Wizard
+                    { props && props.title ? props.title : "BBGO Setup Wizard" }
                 </Typography>
             </Toolbar>
         </AppBar>
@@ -37,7 +36,7 @@ export default function PlainLayout({children}) {
         <main className={classes.content}>
             <div className={classes.appBarSpacer}/>
             <Container>
-                {children}
+                {props.children}
             </Container>
         </main>
     </div>;
