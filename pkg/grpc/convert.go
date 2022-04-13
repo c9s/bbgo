@@ -49,8 +49,8 @@ func transPriceVolume(srcPvs types.PriceVolumeSlice) (pvs []*pb.PriceVolume) {
 	return pvs
 }
 
-func transBook(session *bbgo.ExchangeSession, book types.SliceOrderBook, event pb.Event) *pb.SubscribeResponse {
-	return &pb.SubscribeResponse{
+func transBook(session *bbgo.ExchangeSession, book types.SliceOrderBook, event pb.Event) *pb.MarketData {
+	return &pb.MarketData{
 		Session:  session.Name,
 		Exchange: session.ExchangeName.String(),
 		Symbol:   book.Symbol,
@@ -65,8 +65,8 @@ func transBook(session *bbgo.ExchangeSession, book types.SliceOrderBook, event p
 	}
 }
 
-func transMarketTrade(session *bbgo.ExchangeSession, marketTrade types.Trade) *pb.SubscribeResponse {
-	return &pb.SubscribeResponse{
+func transMarketTrade(session *bbgo.ExchangeSession, marketTrade types.Trade) *pb.MarketData {
+	return &pb.MarketData{
 		Session:  session.Name,
 		Exchange: session.ExchangeName.String(),
 		Symbol:   marketTrade.Symbol,
@@ -100,27 +100,31 @@ func transSide(side types.SideType) pb.Side {
 	return pb.Side_SELL
 }
 
-func transKLine(session *bbgo.ExchangeSession, kline types.KLine) *pb.SubscribeResponse {
-	return &pb.SubscribeResponse{
-		Session:  session.Name,
-		Exchange: kline.Exchange.String(),
-		Symbol:   kline.Symbol,
-		Channel:  pb.Channel_KLINE,
-		Event:    pb.Event_UPDATE,
-		Kline: &pb.KLine{
-			Session:     session.Name,
-			Exchange:    kline.Exchange.String(),
-			Symbol:      kline.Symbol,
-			Open:        kline.Open.String(),
-			High:        kline.High.String(),
-			Low:         kline.Low.String(),
-			Close:       kline.Close.String(),
-			Volume:      kline.Volume.String(),
-			QuoteVolume: kline.QuoteVolume.String(),
-			StartTime:   kline.StartTime.UnixMilli(),
-			EndTime:     kline.StartTime.UnixMilli(),
-			Closed:      kline.Closed,
-		},
+func transKLine(session *bbgo.ExchangeSession, kline types.KLine) *pb.KLine {
+	return &pb.KLine{
+		Session:     session.Name,
+		Exchange:    kline.Exchange.String(),
+		Symbol:      kline.Symbol,
+		Open:        kline.Open.String(),
+		High:        kline.High.String(),
+		Low:         kline.Low.String(),
+		Close:       kline.Close.String(),
+		Volume:      kline.Volume.String(),
+		QuoteVolume: kline.QuoteVolume.String(),
+		StartTime:   kline.StartTime.UnixMilli(),
+		EndTime:     kline.StartTime.UnixMilli(),
+		Closed:      kline.Closed,
+	}
+}
+
+func transKLineResponse(session *bbgo.ExchangeSession, kline types.KLine) *pb.MarketData {
+	return &pb.MarketData{
+		Session:      session.Name,
+		Exchange:     kline.Exchange.String(),
+		Symbol:       kline.Symbol,
+		Channel:      pb.Channel_KLINE,
+		Event:        pb.Event_UPDATE,
+		Kline:        transKLine(session, kline),
 		SubscribedAt: 0,
 	}
 }
