@@ -1,0 +1,10 @@
+{
+    "subscriptions": [
+        {
+            "exchange": "kucoin",
+            "symbol": "BTCUSDT",
+            "channel": "BOOK",
+            "depth": "full"
+        }
+    ]
+}
