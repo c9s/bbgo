@@ -47,7 +47,7 @@ export default function TradingVolumePanel() {
                 </Tabs>
             </Grid>
             <Grid item xs={12} md={6}>
-                <Grid container justify={"flex-end"}>
+                <Grid container justifyContent={"flex-end"}>
                     <Tabs value={segment}
                           onChange={handleSegmentChange}
                           indicatorColor="primary"
