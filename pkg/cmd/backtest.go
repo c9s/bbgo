@@ -365,7 +365,7 @@ var BacktestCmd = &cobra.Command{
 
 				startPrice, ok := session.StartPrice(symbol)
 				if !ok {
-					return fmt.Errorf("start price not found: %s, %s", symbol, exchangeName)
+					return fmt.Errorf("start price not found: %s, %s. run --sync first", symbol, exchangeName)
 				}
 
 				lastPrice, ok := session.LastPrice(symbol)

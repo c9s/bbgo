@@ -6,12 +6,12 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func (store *MarketDataStore) OnKLineWindowUpdate(cb func(interval types.Interval, kline types.KLineWindow)) {
+func (store *MarketDataStore) OnKLineWindowUpdate(cb func(interval types.Interval, klines types.KLineWindow)) {
 	store.kLineWindowUpdateCallbacks = append(store.kLineWindowUpdateCallbacks, cb)
 }
 
-func (store *MarketDataStore) EmitKLineWindowUpdate(interval types.Interval, kline types.KLineWindow) {
+func (store *MarketDataStore) EmitKLineWindowUpdate(interval types.Interval, klines types.KLineWindow) {
 	for _, cb := range store.kLineWindowUpdateCallbacks {
-		cb(interval, kline)
+		cb(interval, klines)
 	}
 }

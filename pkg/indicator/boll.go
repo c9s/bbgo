@@ -39,6 +39,24 @@ type BOLL struct {
 	updateCallbacks []func(sma, upBand, downBand float64)
 }
 
+type BandType int
+
+func (inc *BOLL) GetUpBand() types.Series {
+	return &inc.UpBand
+}
+
+func (inc *BOLL) GetDownBand() types.Series {
+	return &inc.DownBand
+}
+
+func (inc *BOLL) GetSMA() types.Series {
+	return &inc.SMA
+}
+
+func (inc *BOLL) GetStdDev() types.Series {
+	return &inc.StdDev
+}
+
 func (inc *BOLL) LastUpBand() float64 {
 	if len(inc.UpBand) == 0 {
 		return 0.0
