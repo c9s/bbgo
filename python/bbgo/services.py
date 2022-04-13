@@ -1,7 +1,13 @@
 from typing import List
+from typing import Tuple, Iterator
 
 import bbgo_pb2
 import bbgo_pb2_grpc
+
+from .data import ErrorMessage
+from .data import Event
+from .data import KLine
+from .data import Subscription
 
 
 class UserDataService(object):
@@ -18,25 +24,36 @@ class MarketService(object):
     def __init__(self, stub: bbgo_pb2_grpc.MarketDataServiceStub):
         self.stub = stub
 
-    def subscribe(self, subscriptions: List[bbgo_pb2.Subscription]):
-        request = bbgo_pb2.SubscribeRequest(subscriptions=subscriptions)
-        request_iter = self.stub.Subscribe(request)
-        return request_iter
+    def subscribe(self, subscriptions: List[Subscription]) -> Iterator[Event]:
+        request = bbgo_pb2.SubscribeRequest(subscriptions=[s.to_pb() for s in subscriptions])
+        response_iter = self.stub.Subscribe(request)
+
+        for response in response_iter:
+            yield Event.from_pb(response)
 
     def query_klines(self,
                      exchange: str,
                      symbol: str,
                      limit: int = 30,
-                     interval: int = 1,
-                     timestamp: int = None) -> bbgo_pb2.QueryKLinesResponse:
+                     interval: str = '1m',
+                     start_time: int = None,
+                     end_time: int = None) -> Tuple[List[KLine], ErrorMessage]:
         request = bbgo_pb2.QueryKLinesRequest(exchange=exchange,
                                               symbol=symbol,
                                               limit=limit,
                                               interval=interval,
-                                              timestamp=timestamp)
+                                              start_time=start_time,
+                                              end_time=end_time)
 
-        response = self.market_data_stub.QueryKLines(request)
-        return response
+        response = self.stub.QueryKLines(request)
+
+        klines = []
+        for kline in response.klines:
+            klines.append(KLine.from_pb(kline))
+
+        error = ErrorMessage.from_pb(response.error)
+
+        return klines, error
 
 
 class TradingService(object):
