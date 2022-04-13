@@ -258,12 +258,13 @@ message KLine {
   string session = 1;
   string exchange = 2;
   string symbol = 3;
-  double open = 4;
-  double high = 5;
-  double low = 6;
-  double close = 7;
-  double volume = 8;
-  double quote_volume = 9;
+  string open = 4;
+  string high = 5;
+  string low = 6;
+  string close = 7;
+  string volume = 8;
+  string quote_volume = 9;
   int64 start_time = 10;
   int64 end_time = 11;
+  bool closed = 12;
 }
