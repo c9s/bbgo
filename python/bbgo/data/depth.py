@@ -6,12 +6,6 @@ import bbgo_pb2
 from typing import List
 
 
-# message Depth {
-#   string exchange = 1;
-#   string symbol = 2;
-#   repeated PriceVolume asks = 3;
-#   repeated PriceVolume bids = 4;
-# }
 @dataclass
 class Depth:
     exchange: str

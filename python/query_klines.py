@@ -1,6 +1,6 @@
 import click
 import grpc
-import bbgo_pb2
+
 import bbgo_pb2_grpc
 from bbgo import MarketService
 
