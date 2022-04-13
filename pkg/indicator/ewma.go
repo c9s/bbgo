@@ -44,6 +44,18 @@ func (inc *EWMA) Last() float64 {
 	return inc.Values[len(inc.Values)-1]
 }
 
+func (inc *EWMA) Index(i int) float64 {
+	if i >= len(inc.Values) {
+		return 0
+	}
+
+	return inc.Values[len(inc.Values)-1-i]
+}
+
+func (inc *EWMA) Length() int {
+	return len(inc.Values)
+}
+
 func (inc *EWMA) calculateAndUpdate(allKLines []types.KLine) {
 	if len(allKLines) < inc.Window {
 		// we can't calculate
@@ -149,3 +161,5 @@ func (inc *EWMA) handleKLineWindowUpdate(interval types.Interval, window types.K
 func (inc *EWMA) Bind(updater KLineWindowUpdater) {
 	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }
+
+var _ types.Series = &EWMA{}

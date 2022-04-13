@@ -89,3 +89,34 @@ func (inc *MACD) handleKLineWindowUpdate(interval types.Interval, window types.K
 func (inc *MACD) Bind(updater KLineWindowUpdater) {
 	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }
+
+type MACDValues struct {
+	*MACD
+}
+
+func (inc *MACDValues) Last() float64 {
+	if len(inc.Values) == 0 {
+		return 0.0
+	}
+	return inc.Values[len(inc.Values)-1]
+}
+
+func (inc *MACDValues) Index(i int) float64 {
+	length := len(inc.Values)
+	if length == 0 || length-1-i < 0 {
+		return 0.0
+	}
+	return inc.Values[length-1+i]
+}
+
+func (inc *MACDValues) Length() int {
+	return len(inc.Values)
+}
+
+func (inc *MACD) MACD() types.Series {
+	return &MACDValues{inc}
+}
+
+func (inc *MACD) Singals() types.Series {
+	return &inc.SignalLine
+}

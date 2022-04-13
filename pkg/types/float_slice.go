@@ -116,3 +116,29 @@ func (s Float64Slice) Dot(other Float64Slice) float64 {
 func (s Float64Slice) Normalize() Float64Slice {
 	return s.DivScalar(s.Sum())
 }
+
+func (a *Float64Slice) Last() float64 {
+	length := len(*a)
+	if length > 0 {
+		return (*a)[length-1]
+	}
+	return 0.0
+}
+
+func (a *Float64Slice) Index(i int) float64 {
+	length := len(*a)
+	if length-i < 0 || i < 0 {
+		return 0.0
+	}
+	return (*a)[length-i-1]
+}
+
+func (a *Float64Slice) Length() int {
+	return len(*a)
+}
+
+func (a Float64Slice) Addr() *Float64Slice {
+	return &a
+}
+
+var _ Series = Float64Slice([]float64{}).Addr()
