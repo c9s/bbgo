@@ -9,10 +9,11 @@ import grpc
 
 class Stream(object):
 
-    def __init__(self, host: str, port: int, subscriptions: List[bbgo_pb2.Subscription]):
+    def __init__(self, host: str, port: int, subscriptions: List[bbgo_pb2.Subscription], user_data: bool = False):
         self.host = host
         self.port = port
         self.subscriptions = subscriptions
+        self.user_data = user_data
 
         # callbacks for public channel
         self.book_event_callbacks = []
@@ -48,10 +49,11 @@ class Stream(object):
                 self.dispatch_user_events(response)
 
     def start(self):
-        group = asyncio.gather(
-            self.subscribe(),
-            self.subscribe_user_data(),
-        )
+        coroutines = [self.subscribe()]
+        if self.user_data:
+            coroutines.append(self.subscribe_user_data())
+
+        group = asyncio.gather(*coroutines)
         loop = asyncio.get_event_loop()
         loop.run_until_complete(group)
         loop.close()

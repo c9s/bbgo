@@ -1,7 +1,11 @@
 from typing import List
+from typing import Tuple
 
 import bbgo_pb2
 import bbgo_pb2_grpc
+
+from .data import ErrorMessage
+from .data import KLine
 
 
 class UserDataService(object):
@@ -27,16 +31,25 @@ class MarketService(object):
                      exchange: str,
                      symbol: str,
                      limit: int = 30,
-                     interval: int = 1,
-                     timestamp: int = None) -> bbgo_pb2.QueryKLinesResponse:
+                     interval: str = '1m',
+                     start_time: int = None,
+                     end_time: int = None) -> Tuple[List[KLine], ErrorMessage]:
         request = bbgo_pb2.QueryKLinesRequest(exchange=exchange,
                                               symbol=symbol,
                                               limit=limit,
                                               interval=interval,
-                                              timestamp=timestamp)
+                                              start_time=start_time,
+                                              end_time=end_time)
 
-        response = self.market_data_stub.QueryKLines(request)
-        return response
+        response = self.stub.QueryKLines(request)
+
+        klines = []
+        for kline in response.klines:
+            klines.append(KLine.from_pb(kline))
+
+        error = ErrorMessage.from_pb(response.error)
+
+        return klines, error
 
 
 class TradingService(object):
