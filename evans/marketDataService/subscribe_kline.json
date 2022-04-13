@@ -1,0 +1,10 @@
+{
+    "subscriptions": [
+        {
+            "exchange": "kucoin",
+            "symbol": "BTCUSDT",
+            "channel": "KLINE",
+            "interval": "1m"
+        }
+    ]
+}
