@@ -2,6 +2,7 @@
 sessions:
   binance:
     exchange: binance
+    futures: true
     envVarPrefix: binance
 
 exchangeStrategies:
@@ -9,19 +10,30 @@ exchangeStrategies:
 - on: binance
   ewo_dgtrd:
     symbol: MATICUSDT
-    interval: 30m
+    interval: 5m
     useEma: true
-    sigWin: 3
-    stops:
-    - trailingStop:
-        callbackRate: 5.1%
-        closePosition: 20%
-        minProfit: 2%
-        interval: 1m
-        virtual: true
+    sigWin: 5
+    stoploss: 2%
+    #stops:
+    #- trailingStop:
+    #    callbackRate: 5.1%
+    #    closePosition: 20%
+    #    minProfit: 2%
+    #    interval: 1m
+    #    virtual: true
+
+sync:
+  userDataStream:
+    trades: true
+    filledOrders: true
+    since: 2020-12-01
+    sessions:
+      - binance
+    symbols:
+      - MATICUSDT
 
 backtest:
-  startTime: "2022-03-03"
+  startTime: "2021-04-13"
   endTime: "2022-04-13"
   symbols:
     - MATICUSDT
