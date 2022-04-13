@@ -22,6 +22,11 @@ type Server struct {
 	Trader  *bbgo.Trader
 
 	pb.UnimplementedMarketDataServiceServer
+	pb.UnimplementedUserDataServiceServer
+}
+
+func (s *Server) SubscribeUserData(empty *pb.Empty, server pb.UserDataService_SubscribeServer) error {
+	return nil
 }
 
 func (s *Server) Subscribe(request *pb.SubscribeRequest, server pb.MarketDataService_SubscribeServer) error {
@@ -73,7 +78,7 @@ func (s *Server) Subscribe(request *pb.SubscribeRequest, server pb.MarketDataSer
 			}
 		})
 		stream.OnKLineClosed(func(kline types.KLine) {
-			err := server.Send(transKLine(session, kline))
+			err := server.Send(transKLineResponse(session, kline))
 			if err != nil {
 				log.WithError(err).Error("grpc stream send error")
 			}
@@ -132,19 +137,7 @@ func (s *Server) QueryKLines(ctx context.Context, request *pb.QueryKLinesRequest
 			}
 
 			for _, kline := range klines {
-				response.Klines = append(response.Klines, &pb.KLine{
-					Exchange:    kline.Exchange.String(),
-					Symbol:      kline.Symbol,
-					Open:        kline.Open.String(),
-					High:        kline.High.String(),
-					Low:         kline.Low.String(),
-					Close:       kline.Close.String(),
-					Volume:      kline.Volume.String(),
-					QuoteVolume: kline.QuoteVolume.String(),
-					Closed:      kline.Closed,
-					StartTime:   kline.StartTime.UnixMilli(),
-					EndTime:     kline.EndTime.UnixMilli(),
-				})
+				response.Klines = append(response.Klines, transKLine(session, kline))
 			}
 
 			return response, nil

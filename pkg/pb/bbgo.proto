@@ -5,13 +5,12 @@ package bbgo;
 option go_package = "../pb";
 
 service MarketDataService {
-  rpc Subscribe(SubscribeRequest) returns (stream SubscribeResponse) {}
+  rpc Subscribe(SubscribeRequest) returns (stream MarketData) {}
   rpc QueryKLines(QueryKLinesRequest) returns (QueryKLinesResponse) {}
 }
 
 service UserDataService {
-  // should support streaming
-  rpc SubscribeUserData(Empty) returns (stream SubscribeResponse) {}
+  rpc Subscribe(UserDataRequest) returns (stream UserData) {}
 }
 
 service TradingService {
@@ -30,12 +29,6 @@ enum Event {
   SNAPSHOT = 3;
   UPDATE = 4;
   AUTHENTICATED = 5;
-  ORDER_SNAPSHOT = 6;
-  ORDER_UPDATE = 7;
-  TRADE_SNAPSHOT = 8;
-  TRADE_UPDATE = 9;
-  ACCOUNT_SNAPSHOT = 10;
-  ACCOUNT_UPDATE = 11;
   ERROR = 99;
 }
 
@@ -43,8 +36,8 @@ enum Channel {
   BOOK = 0;
   TRADE = 1;
   TICKER = 2;
-  USER = 3;
-  KLINE = 4;
+  KLINE = 3;
+  BALANCE = 4;
 }
 
 enum Side {
@@ -68,6 +61,20 @@ message Error {
   string error_message = 2;
 }
 
+message UserDataRequest {
+  string session = 1;
+}
+
+message UserData {
+  string session = 1;
+  string exchange = 2;
+  Channel channel = 3;  // trade, order, balance
+  Event event = 4;      // snapshot, update ...
+  repeated Balance balances = 5;
+  repeated Trade trades = 6;
+  repeated Order orders = 7;
+}
+
 message SubscribeRequest {
   repeated Subscription subscriptions = 1;
 }
@@ -80,18 +87,16 @@ message Subscription {
   string interval = 5; // interval is for kline channel
 }
 
-message SubscribeResponse {
+message MarketData {
   string session = 1;
   string exchange = 2;
   string symbol = 3;
   Channel channel = 4;  // book, trade, ticker, user
-  Event event = 5;      // snapshot, update, order_snapshot, ...
+  Event event = 5;      // snapshot or update
   Depth depth = 6; // depth: used by book
   KLine kline = 7;
-  repeated Trade trades = 8;
-  Ticker ticker = 9;
-  repeated Order orders = 10;
-  repeated Balance balances = 11;
+  Ticker ticker = 9; // market ticker
+  repeated Trade trades = 8; // market trades
   int64 subscribed_at = 12;
   Error error = 13;
 }

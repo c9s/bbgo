@@ -46,7 +46,7 @@ func (c *marketDataServiceClient) Subscribe(ctx context.Context, in *SubscribeRe
 }
 
 type MarketDataService_SubscribeClient interface {
-	Recv() (*SubscribeResponse, error)
+	Recv() (*MarketData, error)
 	grpc.ClientStream
 }
 
@@ -54,8 +54,8 @@ type marketDataServiceSubscribeClient struct {
 	grpc.ClientStream
 }
 
-func (x *marketDataServiceSubscribeClient) Recv() (*SubscribeResponse, error) {
-	m := new(SubscribeResponse)
+func (x *marketDataServiceSubscribeClient) Recv() (*MarketData, error) {
+	m := new(MarketData)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -112,7 +112,7 @@ func _MarketDataService_Subscribe_Handler(srv interface{}, stream grpc.ServerStr
 }
 
 type MarketDataService_SubscribeServer interface {
-	Send(*SubscribeResponse) error
+	Send(*MarketData) error
 	grpc.ServerStream
 }
 
@@ -120,7 +120,7 @@ type marketDataServiceSubscribeServer struct {
 	grpc.ServerStream
 }
 
-func (x *marketDataServiceSubscribeServer) Send(m *SubscribeResponse) error {
+func (x *marketDataServiceSubscribeServer) Send(m *MarketData) error {
 	return x.ServerStream.SendMsg(m)
 }
 
@@ -168,8 +168,7 @@ var MarketDataService_ServiceDesc = grpc.ServiceDesc{
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type UserDataServiceClient interface {
-	// should support streaming
-	SubscribeUserData(ctx context.Context, in *Empty, opts ...grpc.CallOption) (UserDataService_SubscribeUserDataClient, error)
+	Subscribe(ctx context.Context, in *UserDataRequest, opts ...grpc.CallOption) (UserDataService_SubscribeClient, error)
 }
 
 type userDataServiceClient struct {
@@ -180,12 +179,12 @@ func NewUserDataServiceClient(cc grpc.ClientConnInterface) UserDataServiceClient
 	return &userDataServiceClient{cc}
 }
 
-func (c *userDataServiceClient) SubscribeUserData(ctx context.Context, in *Empty, opts ...grpc.CallOption) (UserDataService_SubscribeUserDataClient, error) {
-	stream, err := c.cc.NewStream(ctx, &UserDataService_ServiceDesc.Streams[0], "/bbgo.UserDataService/SubscribeUserData", opts...)
+func (c *userDataServiceClient) Subscribe(ctx context.Context, in *UserDataRequest, opts ...grpc.CallOption) (UserDataService_SubscribeClient, error) {
+	stream, err := c.cc.NewStream(ctx, &UserDataService_ServiceDesc.Streams[0], "/bbgo.UserDataService/Subscribe", opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &userDataServiceSubscribeUserDataClient{stream}
+	x := &userDataServiceSubscribeClient{stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -195,17 +194,17 @@ func (c *userDataServiceClient) SubscribeUserData(ctx context.Context, in *Empty
 	return x, nil
 }
 
-type UserDataService_SubscribeUserDataClient interface {
-	Recv() (*SubscribeResponse, error)
+type UserDataService_SubscribeClient interface {
+	Recv() (*UserData, error)
 	grpc.ClientStream
 }
 
-type userDataServiceSubscribeUserDataClient struct {
+type userDataServiceSubscribeClient struct {
 	grpc.ClientStream
 }
 
-func (x *userDataServiceSubscribeUserDataClient) Recv() (*SubscribeResponse, error) {
-	m := new(SubscribeResponse)
+func (x *userDataServiceSubscribeClient) Recv() (*UserData, error) {
+	m := new(UserData)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -216,8 +215,7 @@ func (x *userDataServiceSubscribeUserDataClient) Recv() (*SubscribeResponse, err
 // All implementations must embed UnimplementedUserDataServiceServer
 // for forward compatibility
 type UserDataServiceServer interface {
-	// should support streaming
-	SubscribeUserData(*Empty, UserDataService_SubscribeUserDataServer) error
+	Subscribe(*UserDataRequest, UserDataService_SubscribeServer) error
 	mustEmbedUnimplementedUserDataServiceServer()
 }
 
@@ -225,8 +223,8 @@ type UserDataServiceServer interface {
 type UnimplementedUserDataServiceServer struct {
 }
 
-func (UnimplementedUserDataServiceServer) SubscribeUserData(*Empty, UserDataService_SubscribeUserDataServer) error {
-	return status.Errorf(codes.Unimplemented, "method SubscribeUserData not implemented")
+func (UnimplementedUserDataServiceServer) Subscribe(*UserDataRequest, UserDataService_SubscribeServer) error {
+	return status.Errorf(codes.Unimplemented, "method Subscribe not implemented")
 }
 func (UnimplementedUserDataServiceServer) mustEmbedUnimplementedUserDataServiceServer() {}
 
@@ -241,24 +239,24 @@ func RegisterUserDataServiceServer(s grpc.ServiceRegistrar, srv UserDataServiceS
 	s.RegisterService(&UserDataService_ServiceDesc, srv)
 }
 
-func _UserDataService_SubscribeUserData_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(Empty)
+func _UserDataService_Subscribe_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(UserDataRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(UserDataServiceServer).SubscribeUserData(m, &userDataServiceSubscribeUserDataServer{stream})
+	return srv.(UserDataServiceServer).Subscribe(m, &userDataServiceSubscribeServer{stream})
 }
 
-type UserDataService_SubscribeUserDataServer interface {
-	Send(*SubscribeResponse) error
+type UserDataService_SubscribeServer interface {
+	Send(*UserData) error
 	grpc.ServerStream
 }
 
-type userDataServiceSubscribeUserDataServer struct {
+type userDataServiceSubscribeServer struct {
 	grpc.ServerStream
 }
 
-func (x *userDataServiceSubscribeUserDataServer) Send(m *SubscribeResponse) error {
+func (x *userDataServiceSubscribeServer) Send(m *UserData) error {
 	return x.ServerStream.SendMsg(m)
 }
 
@@ -271,8 +269,8 @@ var UserDataService_ServiceDesc = grpc.ServiceDesc{
 	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "SubscribeUserData",
-			Handler:       _UserDataService_SubscribeUserData_Handler,
+			StreamName:    "Subscribe",
+			Handler:       _UserDataService_Subscribe_Handler,
 			ServerStreams: true,
 		},
 	},
