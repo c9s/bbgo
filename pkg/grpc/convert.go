@@ -100,6 +100,39 @@ func transSide(side types.SideType) pb.Side {
 	return pb.Side_SELL
 }
 
+func transOrderType(orderType types.OrderType) pb.OrderType {
+	switch orderType {
+	case types.OrderTypeLimit:
+		return pb.OrderType_LIMIT
+	case types.OrderTypeMarket:
+		return pb.OrderType_MARKET
+	case types.OrderTypeStopLimit:
+		return pb.OrderType_STOP_LIMIT
+	case types.OrderTypeStopMarket:
+		return pb.OrderType_STOP_MARKET
+	}
+
+	return pb.OrderType_LIMIT
+}
+
+func transOrder(session *bbgo.ExchangeSession, order types.Order) *pb.Order {
+	return &pb.Order{
+		Exchange:       order.Exchange.String(),
+		Symbol:         order.Symbol,
+		Id:             strconv.FormatUint(order.OrderID, 10),
+		Side:           transSide(order.Side),
+		OrderType:      transOrderType(order.Type),
+		Price:          order.Price.String(),
+		StopPrice:      order.StopPrice.String(),
+		Status:         string(order.Status),
+		CreatedAt:      order.CreationTime.UnixMilli(),
+		Quantity:       order.Quantity.String(),
+		ExecutedQuantity: order.ExecutedQuantity.String(),
+		ClientOrderId:  order.ClientOrderID,
+		GroupId:        0,
+	}
+}
+
 func transKLine(session *bbgo.ExchangeSession, kline types.KLine) *pb.KLine {
 	return &pb.KLine{
 		Session:     session.Name,
