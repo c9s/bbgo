@@ -88,6 +88,19 @@ func (s *Server) newEngine() *gin.Engine {
 		})
 	})
 
+	r.GET("/api/outbound-ip", func(c *gin.Context) {
+		outboundIP, err := GetOutboundIP()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": err.Error(),
+			})
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"outboundIP": outboundIP.String(),
+		})
+	})
+
 	r.GET("/api/trades", func(c *gin.Context) {
 		if s.Environ.TradeService == nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "database is not configured"})
@@ -620,4 +633,15 @@ func listenAndServe(srv *http.Server) error {
 	}
 
 	return nil
+}
+
+func GetOutboundIP() (net.IP, error) {
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+	return localAddr.IP, nil
 }

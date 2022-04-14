@@ -89,7 +89,7 @@ export default function Home() {
                     <div className={classes.grid}>
                         <Grid container
                             direction="row"
-                            justify="space-around"
+                            justifyContent="space-around"
                             alignItems="flex-start"
                             spacing={1}>
                             <Grid item xs={12} md={8}>
