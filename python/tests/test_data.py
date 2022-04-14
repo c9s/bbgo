@@ -1,7 +1,33 @@
 from datetime import datetime
 
 import bbgo_pb2
-from bbgo.data import KLine, ErrorMessage
+from bbgo.data import Balance
+from bbgo.data import ErrorMessage
+from bbgo.data import KLine
+
+
+def test_balance_from_pb():
+    exchange = 'max'
+    currency = 'BTCUSDT'
+    available = '3.1415926'
+    locked = '2.7182818'
+    borrowed = 'borrowed'
+
+    balance_pb = bbgo_pb2.Balance(
+        exchange=exchange,
+        currency=currency,
+        available=available,
+        locked=locked,
+        borrowed=borrowed,
+    )
+
+    balance = Balance.from_pb(balance_pb)
+
+    assert balance.exchange == exchange
+    assert balance.currency == currency
+    assert balance.available == float(available)
+    assert balance.locked == float(locked)
+    assert balance.borrowed == borrowed
 
 
 def test_kline_from_pb():

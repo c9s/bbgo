@@ -14,15 +14,15 @@ class EventType(Enum):
     SNAPSHOT = 'snapshot'
     UPDATE = 'update'
 
-    @classmethod
-    def from_pb(cls, obj: bbgo_pb2.Event) -> EventType:
+    @staticmethod
+    def from_pb(obj: bbgo_pb2.Event) -> EventType:
         d = {
-            bbgo_pb2.Event.UNKNOWN: cls.UNKNOWN,
-            bbgo_pb2.Event.ERROR: cls.ERROR,
-            bbgo_pb2.Event.SUBSCRIBED: cls.SUBSCRIBED,
-            bbgo_pb2.Event.UNSUBSCRIBED: cls.UNSUBSCRIBED,
-            bbgo_pb2.Event.AUTHENTICATED: cls.AUTHENTICATED,
-            bbgo_pb2.Event.SNAPSHOT: cls.SNAPSHOT,
-            bbgo_pb2.Event.UPDATE: cls.UPDATE,
+            bbgo_pb2.Event.UNKNOWN: EventType.UNKNOWN,
+            bbgo_pb2.Event.ERROR: EventType.ERROR,
+            bbgo_pb2.Event.SUBSCRIBED: EventType.SUBSCRIBED,
+            bbgo_pb2.Event.UNSUBSCRIBED: EventType.UNSUBSCRIBED,
+            bbgo_pb2.Event.AUTHENTICATED: EventType.AUTHENTICATED,
+            bbgo_pb2.Event.SNAPSHOT: EventType.SNAPSHOT,
+            bbgo_pb2.Event.UPDATE: EventType.UPDATE,
         }
         return d[obj]

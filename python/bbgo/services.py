@@ -1,35 +1,46 @@
+from __future__ import annotations
+
+from typing import Iterator
 from typing import List
-from typing import Tuple, Iterator
+from typing import Tuple
 
 import bbgo_pb2
 import bbgo_pb2_grpc
 
 from .data import ErrorMessage
-from .data import Event
 from .data import KLine
+from .data import MarketDataEvent
 from .data import Subscription
+from .data import UserDataEvent
+from .utils import get_insecure_channel
 
 
 class UserDataService(object):
+    stub: bbgo_pb2_grpc.UserDataServiceStub
 
-    def __init__(self, stub: bbgo_pb2_grpc.UserDataServiceStub):
-        self.stub = stub
+    def __init__(self, host: str, port: int) -> None:
+        self.stub = bbgo_pb2_grpc.UserDataServiceStub(get_insecure_channel(host, port))
 
-    def subscribe_user_data(self):
-        return self.stub.SubscribeUserData(bbgo_pb2.Empty())
+    def subscribe(self, session: str) -> Iterator[UserDataEvent]:
+        request = bbgo_pb2.UserDataRequest(session)
+        response_iter = self.stub.Subscribe(request)
+
+        for response in response_iter:
+            yield UserDataEvent.from_pb(response)
 
 
 class MarketService(object):
+    stub: bbgo_pb2_grpc.MarketDataServiceStub
 
-    def __init__(self, stub: bbgo_pb2_grpc.MarketDataServiceStub):
-        self.stub = stub
+    def __init__(self, host: str, port: int) -> None:
+        self.stub = bbgo_pb2_grpc.MarketDataServiceStub(get_insecure_channel(host, port))
 
-    def subscribe(self, subscriptions: List[Subscription]) -> Iterator[Event]:
+    def subscribe(self, subscriptions: List[Subscription]) -> Iterator[MarketDataEvent]:
         request = bbgo_pb2.SubscribeRequest(subscriptions=[s.to_pb() for s in subscriptions])
         response_iter = self.stub.Subscribe(request)
 
         for response in response_iter:
-            yield Event.from_pb(response)
+            yield MarketDataEvent.from_pb(response)
 
     def query_klines(self,
                      exchange: str,
@@ -57,9 +68,10 @@ class MarketService(object):
 
 
 class TradingService(object):
+    stub: bbgo_pb2_grpc.TradingServiceStub
 
-    def __init__(self, stub: bbgo_pb2_grpc.TradingServiceStub):
-        self.stub = stub
+    def __init__(self, host: str, port: int) -> None:
+        self.stub = bbgo_pb2_grpc.TradingServiceStub(get_insecure_channel(host, port))
 
     def submit_order(self,
                      exchange: str,
