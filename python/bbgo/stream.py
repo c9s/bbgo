@@ -3,14 +3,16 @@ from typing import Callable
 from typing import List
 
 import grpc
-from bbgo.enums import ChannelType
-from bbgo.enums.depth_type import DepthType
 
 import bbgo_pb2
 import bbgo_pb2_grpc
+from bbgo.enums import ChannelType
+from bbgo.enums import DepthType
 
 from .data import Event
+from .data import MarketDataEvent
 from .data import Subscription
+from .data import UserDataEvent
 
 
 class Stream(object):
@@ -52,7 +54,7 @@ class Stream(object):
 
             request = bbgo_pb2.SubscribeRequest(subscriptions=[s.to_pb() for s in self.subscriptions])
             async for response in stub.Subscribe(request):
-                event = Event.from_pb(response)
+                event = MarketDataEvent.from_pb(response)
                 self.fire_event_handlers(event)
 
     async def _subscribe_user_data(self):
@@ -61,7 +63,7 @@ class Stream(object):
 
             request = bbgo_pb2.Empty()
             async for response in stub.SubscribeUserData(request):
-                event = Event.from_pb(response)
+                event = UserDataEvent.from_pb(response)
                 self.fire_event_handlers(event)
 
     def start(self):
