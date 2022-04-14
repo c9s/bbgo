@@ -9,7 +9,6 @@ class ChannelType(Enum):
     BOOK = 'book'
     TRADE = 'trade'
     TICKER = 'ticker'
-    USER = 'user'
     KLINE = 'kline'
 
     @classmethod
@@ -18,7 +17,6 @@ class ChannelType(Enum):
             bbgo_pb2.Channel.BOOK: cls.BOOK,
             bbgo_pb2.Channel.TRADE: cls.TRADE,
             bbgo_pb2.Channel.TICKER: cls.TICKER,
-            bbgo_pb2.Channel.USER: cls.USER,
             bbgo_pb2.Channel.KLINE: cls.KLINE,
         }[obj]
 
@@ -27,6 +25,5 @@ class ChannelType(Enum):
             'book': bbgo_pb2.Channel.BOOK,
             'trade': bbgo_pb2.Channel.TRADE,
             'ticker': bbgo_pb2.Channel.TICKER,
-            'user': bbgo_pb2.Channel.USER,
             'kline': bbgo_pb2.Channel.KLINE,
         }[self.value]
