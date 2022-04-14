@@ -1,4 +1,4 @@
-package ewo_dgtrd
+package ewoDgtrd
 
 import (
 	"context"
