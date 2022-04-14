@@ -5,6 +5,7 @@ import Typography from '@material-ui/core/Typography';
 import Paper from '@material-ui/core/Paper';
 import PlainLayout from '../../layouts/PlainLayout';
 import {QRCodeSVG} from 'qrcode.react';
+import {queryOutboundIP} from '../../api/bbgo';
 
 const useStyles = makeStyles((theme) => ({
     paper: {
@@ -21,7 +22,9 @@ const useStyles = makeStyles((theme) => ({
 }));
 
 function fetchConnectUrl(cb) {
-    cb(window.location.protocol + "//" + window.location.host)
+    return queryOutboundIP((outboundIP) => {
+        cb(window.location.protocol + "//" + outboundIP + ":" + window.location.port)
+    })
 }
 
 export default function Connect() {
