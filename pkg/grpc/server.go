@@ -25,54 +25,59 @@ type UserDataService struct {
 }
 
 func (s *UserDataService) Subscribe(request *pb.UserDataRequest, server pb.UserDataService_SubscribeServer) error {
-	streamPool := map[string]types.Stream{}
-	for sessionName, session := range s.Environ.Sessions() {
-		if request.Session == sessionName {
-			userDataStream := session.Exchange.NewStream()
-			userDataStream.OnOrderUpdate(func(order types.Order) {
-				err := server.Send(&pb.UserData{
-					Channel: pb.Channel_ORDER,
-					Event:   pb.Event_UPDATE,
-					Orders:  []*pb.Order{transOrder(session, order)},
-				})
-				if err != nil {
-					log.WithError(err).Errorf("grpc: can not send user data")
-				}
-			})
-			userDataStream.OnTradeUpdate(func(trade types.Trade) {
-				err := server.Send(&pb.UserData{
-					Channel: pb.Channel_TRADE,
-					Event:   pb.Event_UPDATE,
-					Trades:  []*pb.Trade{transTrade(session, trade)},
-				})
-				if err != nil {
-					log.WithError(err).Errorf("grpc: can not send user data")
-				}
-			})
-			userDataStream.OnBalanceUpdate(func(balances types.BalanceMap) {
-				err := server.Send(&pb.UserData{
-					Channel:  pb.Channel_BALANCE,
-					Event:    pb.Event_UPDATE,
-					Balances: transBalances(session, balances),
-				})
-				if err != nil {
-					log.WithError(err).Errorf("grpc: can not send user data")
-				}
-			})
-			streamPool[ sessionName ] = userDataStream
-		}
+	sessionName := request.Session
+
+	if len(sessionName) == 0 {
+		return fmt.Errorf("session name can not be empty")
+	}
+	
+	session, ok := s.Environ.Session(sessionName)
+	if !ok {
+		return fmt.Errorf("session %s not found", sessionName)
 	}
 
-	<-server.Context().Done()
+	userDataStream := session.Exchange.NewStream()
+	userDataStream.OnOrderUpdate(func(order types.Order) {
+		err := server.Send(&pb.UserData{
+			Channel: pb.Channel_ORDER,
+			Event:   pb.Event_UPDATE,
+			Orders:  []*pb.Order{transOrder(session, order)},
+		})
+		if err != nil {
+			log.WithError(err).Errorf("grpc: can not send user data")
+		}
+	})
+	userDataStream.OnTradeUpdate(func(trade types.Trade) {
+		err := server.Send(&pb.UserData{
+			Channel: pb.Channel_TRADE,
+			Event:   pb.Event_UPDATE,
+			Trades:  []*pb.Trade{transTrade(session, trade)},
+		})
+		if err != nil {
+			log.WithError(err).Errorf("grpc: can not send user data")
+		}
+	})
+
+	balanceHandler := func(balances types.BalanceMap) {
+		err := server.Send(&pb.UserData{
+			Channel:  pb.Channel_BALANCE,
+			Event:    pb.Event_UPDATE,
+			Balances: transBalances(session, balances),
+		})
+		if err != nil {
+			log.WithError(err).Errorf("grpc: can not send user data")
+		}
+	}
+	userDataStream.OnBalanceUpdate(balanceHandler)
+	userDataStream.OnBalanceSnapshot(balanceHandler)
 
 	defer func() {
-		for _, stream := range streamPool {
-			if err := stream.Close(); err != nil {
-				log.WithError(err).Errorf("user data stream close error")
-			}
+		if err := userDataStream.Close(); err != nil {
+			log.WithError(err).Errorf("user data stream close error")
 		}
 	}()
 
+	<-server.Context().Done()
 	return nil
 }
 
