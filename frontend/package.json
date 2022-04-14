@@ -16,15 +16,16 @@
     "@nivo/bar": "^0.73.1",
     "@nivo/core": "^0.73.0",
     "@nivo/pie": "^0.73.0",
+    "@usedapp/core": "0.5.4",
     "axios": "^0.22.0",
     "classnames": "^2.2.6",
     "isomorphic-fetch": "^3.0.0",
     "next": "^11.1.2",
+    "qrcode.react": "^3.0.1",
     "react": "^17.0.1",
     "react-dom": "^17.0.1",
     "react-number-format": "^4.4.4",
-    "react-spring": "^9.3.0",
-    "@usedapp/core": "0.5.4"
+    "react-spring": "^9.3.0"
   },
   "devDependencies": {
     "@types/node": "^14.14.22",

@@ -8,6 +8,12 @@ export function ping(cb) {
     });
 }
 
+export function queryOutboundIP(cb) {
+    return axios.get(baseURL + '/api/outbound-ip').then(response => {
+        cb(response.data.outboundIP)
+    });
+}
+
 export function querySyncStatus(cb) {
     return axios.get(baseURL + '/api/environment/syncing').then(response => {
         cb(response.data.syncing)
@@ -71,7 +77,7 @@ export function querySessions(cb) {
 }
 
 export function querySessionSymbols(sessionName, cb) {
-    return axios.get(baseURL + `/api/sessions/${ sessionName }/symbols`, {})
+    return axios.get(baseURL + `/api/sessions/${sessionName}/symbols`, {})
         .then(response => {
             cb(response.data.symbols || [])
         });
