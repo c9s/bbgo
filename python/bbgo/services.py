@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Iterator
 from typing import List
 from typing import Tuple
@@ -10,12 +12,14 @@ from .data import KLine
 from .data import MarketDataEvent
 from .data import Subscription
 from .data import UserDataEvent
+from .utils import get_insecure_channel
 
 
 class UserDataService(object):
+    stub: bbgo_pb2_grpc.UserDataServiceStub
 
-    def __init__(self, stub: bbgo_pb2_grpc.UserDataServiceStub) -> None:
-        self.stub = stub
+    def __init__(self, host: str, port: int) -> None:
+        self.stub = bbgo_pb2_grpc.UserDataServiceStub(get_insecure_channel(host, port))
 
     def subscribe(self, session: str) -> Iterator[UserDataEvent]:
         request = bbgo_pb2.UserDataRequest(session)
@@ -26,9 +30,10 @@ class UserDataService(object):
 
 
 class MarketService(object):
+    stub: bbgo_pb2_grpc.MarketDataServiceStub
 
-    def __init__(self, stub: bbgo_pb2_grpc.MarketDataServiceStub) -> None:
-        self.stub = stub
+    def __init__(self, host: str, port: int) -> None:
+        self.stub = bbgo_pb2_grpc.MarketDataServiceStub(get_insecure_channel(host, port))
 
     def subscribe(self, subscriptions: List[Subscription]) -> Iterator[MarketDataEvent]:
         request = bbgo_pb2.SubscribeRequest(subscriptions=[s.to_pb() for s in subscriptions])
@@ -63,9 +68,10 @@ class MarketService(object):
 
 
 class TradingService(object):
+    stub: bbgo_pb2_grpc.TradingServiceStub
 
-    def __init__(self, stub: bbgo_pb2_grpc.TradingServiceStub):
-        self.stub = stub
+    def __init__(self, host: str, port: int) -> None:
+        self.stub = bbgo_pb2_grpc.TradingServiceStub(get_insecure_channel(host, port))
 
     def submit_order(self,
                      exchange: str,

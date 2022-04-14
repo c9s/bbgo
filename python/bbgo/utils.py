@@ -27,3 +27,17 @@ def get_credentials_from_env():
     private_key_certificate_chain_pairs = [(private_key, certificate_chain)]
     server_credentials = grpc.ssl_server_credentials(private_key_certificate_chain_pairs)
     return server_credentials
+
+
+def get_insecure_channel(host: str, port: int) -> grpc.Channel:
+    address = f'{host}:{port}'
+    return grpc.insecure_channel(address)
+
+
+def get_insecure_channel_from_env() -> grpc.Channel:
+    host = os.environ.get('BBGO_GRPC_HOST') or '127.0.0.1'
+    port = os.environ.get('BBGO_GRPC_PORT') or 50051
+
+    address = get_insecure_channel(host, port)
+
+    return grpc.insecure_channel(address)

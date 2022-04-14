@@ -1,7 +1,5 @@
 import click
-import grpc
 
-import bbgo_pb2_grpc
 from bbgo import MarketService
 
 
@@ -9,11 +7,7 @@ from bbgo import MarketService
 @click.option('--host', default='127.0.0.1')
 @click.option('--port', default=50051)
 def main(host, port):
-    address = f'{host}:{port}'
-    channel = grpc.insecure_channel(address)
-
-    stub = bbgo_pb2_grpc.MarketDataServiceStub(channel)
-    service = MarketService(stub)
+    service = MarketService(host, port)
 
     klines, error = service.query_klines(exchange='binance', symbol='BTCUSDT', interval='1m', limit=10)
 
