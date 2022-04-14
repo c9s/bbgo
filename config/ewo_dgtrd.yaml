@@ -9,16 +9,19 @@ exchangeStrategies:
  
 - on: binance
   ewo_dgtrd:
-    symbol: MATICUSDT
-    interval: 5m
-    useEma: true
-    sigWin: 5
+    symbol: NEARUSDT
+    interval: 15m
+    useEma: false
+    useSma: false
+    sigWin: 3
     stoploss: 2%
+    callback: 1%
+    useHeikinAshi: true
     #stops:
     #- trailingStop:
     #    callbackRate: 5.1%
     #    closePosition: 20%
-    #    minProfit: 2%
+    #    minProfit: 1%
     #    interval: 1m
     #    virtual: true
 
@@ -30,16 +33,16 @@ sync:
     sessions:
       - binance
     symbols:
-      - MATICUSDT
+      - NEARUSDT
 
 backtest:
-  startTime: "2021-04-13"
-  endTime: "2022-04-13"
+  startTime: "2022-03-03"
+  endTime: "2022-04-14"
   symbols:
-    - MATICUSDT
+    - NEARUSDT
   sessions: [binance]
   account:
     binance:
       balances:
-        MATIC: 0
+        NEAR: 0
         USDT: 10000
