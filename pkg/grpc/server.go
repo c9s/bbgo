@@ -16,6 +16,60 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+type TradingService struct {
+	Config  *bbgo.Config
+	Environ *bbgo.Environment
+	Trader  *bbgo.Trader
+
+	pb.UnimplementedTradingServiceServer
+}
+
+func (s *TradingService) SubmitOrder(ctx context.Context, request *pb.SubmitOrderRequest) (*pb.SubmitOrderResponse, error) {
+	sessionName := request.Session
+
+	if len(sessionName) == 0 {
+		return nil, fmt.Errorf("session name can not be empty")
+	}
+
+	session, ok := s.Environ.Session(sessionName)
+	if !ok {
+		return nil, fmt.Errorf("session %s not found", sessionName)
+	}
+
+	submitOrders := toSubmitOrders(request.SubmitOrders)
+	for i := range submitOrders {
+		if market, ok := session.Market(submitOrders[i].Symbol); ok {
+			submitOrders[i].Market = market
+		} else {
+			log.Warnf("session %s market %s not found", sessionName, submitOrders[i].Symbol)
+		}
+	}
+
+	createdOrders, err := session.Exchange.SubmitOrders(ctx, submitOrders...)
+	if err != nil {
+		return nil, err
+	}
+	_ = createdOrders
+
+	return nil, nil
+}
+
+func (s *TradingService) CancelOrder(ctx context.Context, request *pb.CancelOrderRequest) (*pb.CancelOrderResponse, error) {
+	panic("implement me")
+}
+
+func (s *TradingService) QueryOrder(ctx context.Context, request *pb.QueryOrderRequest) (*pb.QueryOrderResponse, error) {
+	panic("implement me")
+}
+
+func (s *TradingService) QueryOrders(ctx context.Context, request *pb.QueryOrdersRequest) (*pb.QueryOrdersResponse, error) {
+	panic("implement me")
+}
+
+func (s *TradingService) QueryTrades(ctx context.Context, request *pb.QueryTradesRequest) (*pb.QueryTradesResponse, error) {
+	panic("implement me")
+}
+
 type UserDataService struct {
 	Config  *bbgo.Config
 	Environ *bbgo.Environment

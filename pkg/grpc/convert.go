@@ -4,7 +4,10 @@ import (
 	"fmt"
 	"strconv"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/pb"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -63,6 +66,49 @@ func transBook(session *bbgo.ExchangeSession, book types.SliceOrderBook, event p
 			Bids:     transPriceVolume(book.Bids),
 		},
 	}
+}
+
+func toOrderType(orderType pb.OrderType) types.OrderType {
+	switch orderType {
+	case pb.OrderType_MARKET:
+		return types.OrderTypeMarket
+	case pb.OrderType_LIMIT:
+		return types.OrderTypeLimit
+
+	}
+
+	log.Warnf("unexpected order type: %v", orderType)
+	return types.OrderTypeLimit
+}
+
+func toSide(side pb.Side) types.SideType {
+	switch side {
+	case pb.Side_BUY:
+		return types.SideTypeBuy
+	case pb.Side_SELL:
+		return types.SideTypeSell
+
+	}
+
+	log.Warnf("unexpected side type: %v", side)
+	return types.SideTypeBuy
+}
+
+func toSubmitOrders(pbOrders []*pb.SubmitOrder) (submitOrders []types.SubmitOrder) {
+	for _, pbOrder := range pbOrders {
+		submitOrders = append(submitOrders, types.SubmitOrder{
+			ClientOrderID:    pbOrder.ClientOrderId,
+			Symbol:           pbOrder.Symbol,
+			Side:             toSide(pbOrder.Side),
+			Type:             toOrderType(pbOrder.OrderType),
+			Price:            fixedpoint.MustNewFromString(pbOrder.Price),
+			Quantity:         fixedpoint.MustNewFromString(pbOrder.Quantity),
+			StopPrice:        fixedpoint.MustNewFromString(pbOrder.StopPrice),
+			TimeInForce:      "",
+		})
+	}
+
+	return submitOrders
 }
 
 func transBalances(session *bbgo.ExchangeSession, balances types.BalanceMap) (pbBalances []*pb.Balance) {
