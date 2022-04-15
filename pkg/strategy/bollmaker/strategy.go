@@ -326,7 +326,6 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 		Price:       askPrice,
 		Market:      s.Market,
 		GroupID:     s.groupID,
-		TimeInForce: types.TimeInForceGTC,
 	}
 	buyOrder := types.SubmitOrder{
 		Symbol:      s.Symbol,
@@ -336,7 +335,6 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 		Price:       bidPrice,
 		Market:      s.Market,
 		GroupID:     s.groupID,
-		TimeInForce: types.TimeInForceGTC,
 	}
 
 	var submitOrders []types.SubmitOrder
