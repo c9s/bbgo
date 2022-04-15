@@ -61,7 +61,7 @@ func (inc *STOCH) calculateAndUpdate(kLines []types.KLine) {
 	}
 
 	for _, k := range kLines {
-		if inc.EndTime != zeroTime && k.EndTime.Before(inc.EndTime) {
+		if inc.EndTime != zeroTime && !k.EndTime.After(inc.EndTime) {
 			continue
 		}
 		inc.update(k)
