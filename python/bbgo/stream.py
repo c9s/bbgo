@@ -27,7 +27,7 @@ class Stream(object):
         self.event_handlers = []
 
     def subscribe(self, exchange: str, channel: str, symbol: str, depth: str = None, interval: str = None):
-        subscription = Subscription(exchange=exchange, channel=ChannelType(channel), symbol=symbol)
+        subscription = Subscription(exchange=exchange, channel=ChannelType.from_str(channel), symbol=symbol)
 
         if depth is not None:
             subscription.depth = DepthType(depth)
