@@ -17,6 +17,12 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+// DefaultFeeRate set the fee rate for most cases
+// BINANCE uses 0.1% for both maker and taker
+//  for BNB holders, it's 0.075% for both maker and taker
+// MAX uses 0.050% for maker and 0.15% for taker
+var DefaultFeeRate = fixedpoint.NewFromFloat(0.075 * 0.01)
+
 type PnLReporterConfig struct {
 	AverageCostBySymbols datatype.StringSlice `json:"averageCostBySymbols" yaml:"averageCostBySymbols"`
 	Of                   datatype.StringSlice `json:"of" yaml:"of"`
@@ -106,10 +112,30 @@ type Backtest struct {
 
 type BacktestAccount struct {
 	// TODO: MakerFeeRate should replace the commission fields
-	MakerFeeRate fixedpoint.Value `json:"makerFeeRate"`
-	TakerFeeRate fixedpoint.Value `json:"takerFeeRate"`
+	MakerFeeRate fixedpoint.Value `json:"makerFeeRate,omitempty" yaml:"makerFeeRate,omitempty"`
+	TakerFeeRate fixedpoint.Value `json:"takerFeeRate,omitempty" yaml:"takerFeeRate,omitempty"`
 
-	Balances         BacktestAccountBalanceMap `json:"balances" yaml:"balances"`
+	Balances BacktestAccountBalanceMap `json:"balances" yaml:"balances"`
+}
+
+type BA BacktestAccount
+
+func (b *BacktestAccount) UnmarshalYAML(value *yaml.Node) error {
+	bb := &BA{MakerFeeRate: DefaultFeeRate, TakerFeeRate: DefaultFeeRate}
+	if err := value.Decode(bb); err != nil {
+		return err
+	}
+	*b = BacktestAccount(*bb)
+	return nil
+}
+
+func (b *BacktestAccount) UnmarshalJSON(input []byte) error {
+	bb := &BA{MakerFeeRate: DefaultFeeRate, TakerFeeRate: DefaultFeeRate}
+	if err := json.Unmarshal(input, bb); err != nil {
+		return err
+	}
+	*b = BacktestAccount(*bb)
+	return nil
 }
 
 type BacktestAccountBalanceMap map[string]fixedpoint.Value
