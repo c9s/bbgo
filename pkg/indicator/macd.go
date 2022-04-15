@@ -68,7 +68,7 @@ func (inc *MACD) calculateAndUpdate(kLines []types.KLine) {
 	var priceF = KLineClosePriceMapper
 
 	for _, k := range kLines {
-		if inc.EndTime != zeroTime && k.EndTime.Before(inc.EndTime) {
+		if inc.EndTime != zeroTime && !k.EndTime.After(inc.EndTime) {
 			continue
 		}
 		inc.Update(k, priceF)
