@@ -10,3 +10,7 @@ class DepthType(Enum):
     DEPTH_1 = '1'
     DEPTH_5 = '5'
     DEPTH_20 = '20'
+
+    @classmethod
+    def from_str(cls, s: str) -> DepthType:
+        return {t.name.lower(): t for t in cls}[s.lower()]

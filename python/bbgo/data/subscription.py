@@ -19,7 +19,7 @@ class Subscription:
     def to_pb(self) -> bbgo_pb2.Subscription:
         subscription_pb = bbgo_pb2.Subscription(
             exchange=self.exchange,
-            channel=self.channel.to_pb(),
+            channel=self.channel.value,
             symbol=self.symbol,
         )
 
