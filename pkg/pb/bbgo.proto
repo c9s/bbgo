@@ -195,7 +195,7 @@ message SubmitOrderResponse {
 
 message CancelOrderRequest {
   string session = 1;
-  string id = 2;
+  string order_id = 2;
   string client_order_id = 3;
 }
 
