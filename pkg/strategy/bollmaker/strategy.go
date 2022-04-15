@@ -160,6 +160,9 @@ type Strategy struct {
 
 	// neutralBoll is the neutral price section
 	neutralBoll *indicator.BOLL
+
+	// StrategyController
+	status types.StrategyStatus
 }
 
 func (s *Strategy) ID() string {
@@ -236,6 +239,52 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 
 	s.orderStore.Add(createdOrders...)
 	s.activeMakerOrders.Add(createdOrders...)
+	return err
+}
+
+// StrategyController
+
+func (s *Strategy) GetStatus() types.StrategyStatus {
+	return s.status
+}
+
+func (s *Strategy) Suspend(ctx context.Context) error {
+	s.status = types.StrategyStatusStopped
+
+	// Cancel all order
+	if err := s.activeMakerOrders.GracefulCancel(ctx, s.session.Exchange); err != nil {
+		log.WithError(err).Errorf("graceful cancel order error")
+		s.Notify("graceful cancel order error")
+	} else {
+		s.Notify("All orders cancelled.")
+	}
+
+	s.tradeCollector.Process()
+
+	// Save state
+	if err := s.SaveState(); err != nil {
+		log.WithError(err).Errorf("can not save state: %+v", s.state)
+	} else {
+		log.Infof("%s position is saved.", s.Symbol)
+	}
+
+	return nil
+}
+
+func (s *Strategy) Resume(ctx context.Context) error {
+	s.status = types.StrategyStatusRunning
+
+	return nil
+}
+
+func (s *Strategy) EmergencyStop(ctx context.Context) error {
+	// Close 100% position
+	percentage, _ := fixedpoint.NewFromString("100%")
+	err := s.ClosePosition(ctx, percentage)
+
+	// Suspend strategy
+	_ = s.Suspend(ctx)
+
 	return err
 }
 
@@ -319,22 +368,22 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 	buyQuantity := s.QuantityOrAmount.CalculateQuantity(bidPrice)
 
 	sellOrder := types.SubmitOrder{
-		Symbol:      s.Symbol,
-		Side:        types.SideTypeSell,
-		Type:        types.OrderTypeLimitMaker,
-		Quantity:    sellQuantity,
-		Price:       askPrice,
-		Market:      s.Market,
-		GroupID:     s.groupID,
+		Symbol:   s.Symbol,
+		Side:     types.SideTypeSell,
+		Type:     types.OrderTypeLimitMaker,
+		Quantity: sellQuantity,
+		Price:    askPrice,
+		Market:   s.Market,
+		GroupID:  s.groupID,
 	}
 	buyOrder := types.SubmitOrder{
-		Symbol:      s.Symbol,
-		Side:        types.SideTypeBuy,
-		Type:        types.OrderTypeLimitMaker,
-		Quantity:    buyQuantity,
-		Price:       bidPrice,
-		Market:      s.Market,
-		GroupID:     s.groupID,
+		Symbol:   s.Symbol,
+		Side:     types.SideTypeBuy,
+		Type:     types.OrderTypeLimitMaker,
+		Quantity: buyQuantity,
+		Price:    bidPrice,
+		Market:   s.Market,
+		GroupID:  s.groupID,
 	}
 
 	var submitOrders []types.SubmitOrder
@@ -519,6 +568,9 @@ func (s *Strategy) adjustOrderQuantity(submitOrder types.SubmitOrder) types.Subm
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+	// StrategyController
+	s.status = types.StrategyStatusRunning
+
 	if s.DisableShort {
 		s.Long = &[]bool{true}[0]
 	}
@@ -568,6 +620,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.tradeCollector = bbgo.NewTradeCollector(s.Symbol, s.state.Position, s.orderStore)
 
 	s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
+		// StrategyController
+		if s.status != types.StrategyStatusRunning {
+			return
+		}
+
 		s.Notifiability.Notify(trade)
 		s.state.ProfitStats.AddTrade(trade)
 
@@ -613,6 +670,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
+		// StrategyController
+		if s.status != types.StrategyStatusRunning {
+			return
+		}
+
 		if kline.Symbol != s.Symbol || kline.Interval != s.Interval {
 			return
 		}
