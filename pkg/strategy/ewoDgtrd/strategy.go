@@ -66,16 +66,16 @@ type UpdatableSeries interface {
 	Update(value float64)
 }
 
-type EVWMA struct {
+type VWEMA struct {
 	PV UpdatableSeries
 	V  UpdatableSeries
 }
 
-func (inc *EVWMA) Last() float64 {
+func (inc *VWEMA) Last() float64 {
 	return inc.PV.Last() / inc.V.Last()
 }
 
-func (inc *EVWMA) Index(i int) float64 {
+func (inc *VWEMA) Index(i int) float64 {
 	if i >= inc.PV.Length() {
 		return 0
 	}
@@ -86,7 +86,7 @@ func (inc *EVWMA) Index(i int) float64 {
 	return inc.PV.Index(i) / vi
 }
 
-func (inc *EVWMA) Length() int {
+func (inc *VWEMA) Length() int {
 	pvl := inc.PV.Length()
 	vl := inc.V.Length()
 	if pvl < vl {
@@ -95,12 +95,12 @@ func (inc *EVWMA) Length() int {
 	return vl
 }
 
-func (inc *EVWMA) Update(kline types.KLine) {
+func (inc *VWEMA) Update(kline types.KLine) {
 	inc.PV.Update(kline.Close.Mul(kline.Volume).Float64())
 	inc.V.Update(kline.Volume.Float64())
 }
 
-func (inc *EVWMA) UpdateVal(price float64, vol float64) {
+func (inc *VWEMA) UpdateVal(price float64, vol float64) {
 	inc.PV.Update(price * vol)
 	inc.V.Update(vol)
 }
@@ -247,11 +247,11 @@ func (s *Strategy) SetupIndicators() {
 			s.ma5 = sma5
 			s.ma34 = sma34
 		} else {
-			evwma5 := &EVWMA{
+			evwma5 := &VWEMA{
 				PV: &indicator.EWMA{IntervalWindow: types.IntervalWindow{s.Interval, 5}},
 				V:  &indicator.EWMA{IntervalWindow: types.IntervalWindow{s.Interval, 5}},
 			}
-			evwma34 := &EVWMA{
+			evwma34 := &VWEMA{
 				PV: &indicator.EWMA{IntervalWindow: types.IntervalWindow{s.Interval, 34}},
 				V:  &indicator.EWMA{IntervalWindow: types.IntervalWindow{s.Interval, 34}},
 			}
@@ -289,11 +289,11 @@ func (s *Strategy) SetupIndicators() {
 			s.ma5 = indicatorSet.SMA(types.IntervalWindow{s.Interval, 5})
 			s.ma34 = indicatorSet.SMA(types.IntervalWindow{s.Interval, 34})
 		} else {
-			evwma5 := &EVWMA{
+			evwma5 := &VWEMA{
 				PV: &indicator.EWMA{IntervalWindow: types.IntervalWindow{s.Interval, 5}},
 				V:  &indicator.EWMA{IntervalWindow: types.IntervalWindow{s.Interval, 5}},
 			}
-			evwma34 := &EVWMA{
+			evwma34 := &VWEMA{
 				PV: &indicator.EWMA{IntervalWindow: types.IntervalWindow{s.Interval, 34}},
 				V:  &indicator.EWMA{IntervalWindow: types.IntervalWindow{s.Interval, 34}},
 			}
@@ -354,7 +354,7 @@ func (s *Strategy) SetupIndicators() {
 		})
 		s.ewoSignal = sig
 	} else {
-		sig := &EVWMA{
+		sig := &VWEMA{
 			PV: &indicator.EWMA{IntervalWindow: types.IntervalWindow{s.Interval, s.SignalWindow}},
 			V:  &indicator.EWMA{IntervalWindow: types.IntervalWindow{s.Interval, s.SignalWindow}},
 		}

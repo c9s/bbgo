@@ -12,12 +12,6 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-// DefaultFeeRate set the fee rate for most cases
-// BINANCE uses 0.1% for both maker and taker
-//  for BNB holders, it's 0.075% for both maker and taker
-// MAX uses 0.050% for maker and 0.15% for taker
-var DefaultFeeRate = fixedpoint.NewFromFloat(0.075 * 0.01)
-
 var orderID uint64 = 1
 var tradeID uint64 = 1
 
@@ -44,9 +38,6 @@ type SimplePriceMatching struct {
 	CurrentTime time.Time
 
 	Account *types.Account
-
-	MakerFeeRate fixedpoint.Value `json:"makerFeeRate"`
-	TakerFeeRate fixedpoint.Value `json:"takerFeeRate"`
 
 	tradeUpdateCallbacks   []func(trade types.Trade)
 	orderUpdateCallbacks   []func(order types.Order)
@@ -192,11 +183,11 @@ func (m *SimplePriceMatching) executeTrade(trade types.Trade) {
 	if trade.IsBuyer {
 		err = m.Account.UseLockedBalance(m.Market.QuoteCurrency, trade.Price.Mul(trade.Quantity))
 
-		m.Account.AddBalance(m.Market.BaseCurrency, trade.Quantity)
+		m.Account.AddBalance(m.Market.BaseCurrency, trade.Quantity.Sub(trade.Fee.Div(trade.Price)))
 	} else {
 		err = m.Account.UseLockedBalance(m.Market.BaseCurrency, trade.Quantity)
 
-		m.Account.AddBalance(m.Market.QuoteCurrency, trade.Quantity.Mul(trade.Price))
+		m.Account.AddBalance(m.Market.QuoteCurrency, trade.Quantity.Mul(trade.Price).Sub(trade.Fee))
 	}
 
 	if err != nil {
@@ -211,15 +202,11 @@ func (m *SimplePriceMatching) executeTrade(trade types.Trade) {
 func (m *SimplePriceMatching) newTradeFromOrder(order types.Order, isMaker bool) types.Trade {
 	// BINANCE uses 0.1% for both maker and taker
 	// MAX uses 0.050% for maker and 0.15% for taker
-	var feeRate = DefaultFeeRate
+	var feeRate fixedpoint.Value
 	if isMaker {
-		if m.MakerFeeRate.Sign() > 0 {
-			feeRate = m.MakerFeeRate
-		}
+		feeRate = m.Account.MakerFeeRate
 	} else {
-		if m.TakerFeeRate.Sign() > 0 {
-			feeRate = m.TakerFeeRate
-		}
+		feeRate = m.Account.TakerFeeRate
 	}
 
 	price := order.Price
@@ -230,7 +217,6 @@ func (m *SimplePriceMatching) newTradeFromOrder(order types.Order, isMaker bool)
 		}
 
 		price = m.LastPrice
-
 	}
 
 	var fee fixedpoint.Value
@@ -297,6 +283,9 @@ func (m *SimplePriceMatching) BuyToPrice(price fixedpoint.Value) (closedOrders [
 
 			// is it a taker order?
 			if price.Compare(o.Price) >= 0 {
+				if o.Price.Compare(m.LastKLine.Low) < 0 {
+					o.Price = m.LastKLine.Low
+				}
 				o.ExecutedQuantity = o.Quantity
 				o.Status = types.OrderStatusFilled
 				closedOrders = append(closedOrders, o)
@@ -307,6 +296,9 @@ func (m *SimplePriceMatching) BuyToPrice(price fixedpoint.Value) (closedOrders [
 
 		case types.OrderTypeLimit, types.OrderTypeLimitMaker:
 			if price.Compare(o.Price) >= 0 {
+				if o.Price.Compare(m.LastKLine.Low) < 0 {
+					o.Price = m.LastKLine.Low
+				}
 				o.ExecutedQuantity = o.Quantity
 				o.Status = types.OrderStatusFilled
 				closedOrders = append(closedOrders, o)
@@ -358,6 +350,9 @@ func (m *SimplePriceMatching) SellToPrice(price fixedpoint.Value) (closedOrders 
 				o.Type = types.OrderTypeLimit
 
 				if sellPrice.Compare(o.Price) <= 0 {
+					if o.Price.Compare(m.LastKLine.High) > 0 {
+						o.Price = m.LastKLine.High
+					}
 					o.ExecutedQuantity = o.Quantity
 					o.Status = types.OrderStatusFilled
 					closedOrders = append(closedOrders, o)
@@ -370,6 +365,9 @@ func (m *SimplePriceMatching) SellToPrice(price fixedpoint.Value) (closedOrders 
 
 		case types.OrderTypeLimit, types.OrderTypeLimitMaker:
 			if sellPrice.Compare(o.Price) <= 0 {
+				if o.Price.Compare(m.LastKLine.High) > 0 {
+					o.Price = m.LastKLine.High
+				}
 				o.ExecutedQuantity = o.Quantity
 				o.Status = types.OrderStatusFilled
 				closedOrders = append(closedOrders, o)
