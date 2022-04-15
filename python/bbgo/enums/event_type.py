@@ -11,3 +11,7 @@ class EventType(Enum):
     UPDATE = 4
     AUTHENTICATED = 5
     ERROR = 99
+
+    @classmethod
+    def from_str(cls, s: str) -> EventType:
+        return {t.name.lower(): t for t in cls}[s.lower()]

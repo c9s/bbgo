@@ -11,6 +11,6 @@ class ChannelType(Enum):
     BALANCE = 4
     ORDER = 5
 
-    @staticmethod
-    def from_str(s: str) -> ChannelType:
-        return {t.name.lower(): t for t in ChannelType}[s]
+    @classmethod
+    def from_str(cls, s: str) -> ChannelType:
+        return {t.name.lower(): t for t in cls}[s.lower()]
