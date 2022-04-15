@@ -160,37 +160,41 @@ message Order {
 }
 
 message SubmitOrder {
-  string exchange = 1;
-  string symbol = 2;
-  Side side = 3;
-  double quantity = 4;
-  double price = 5;
-  double stop_price = 6;
-  OrderType order_type = 7;
-  string client_order_id = 8;
-  int64 group_id = 9;
+  string session = 1;
+  string exchange = 2;
+  string symbol = 3;
+  Side side = 4;
+  string price = 6;
+  string quantity = 5;
+  string stop_price = 7;
+  OrderType order_type = 8;
+  string client_order_id = 9;
+  int64 group_id = 10;
 }
 
 // https://maicoin.github.io/max-websocket-docs/#/private_channels?id=account-response
 message Balance {
-  string exchange = 1;
-  string currency = 2;
-  string available = 3;
-  string locked = 4;
-  string borrowed = 5;
+  string session = 1;
+  string exchange = 2;
+  string currency = 3;
+  string available = 4;
+  string locked = 5;
+  string borrowed = 6;
 }
 
 message SubmitOrderRequest {
-  SubmitOrder submit_order = 1;
+  string session = 1;
+  repeated SubmitOrder submit_orders = 2;
 }
 
 message SubmitOrderResponse {
-  Order order = 1;
-  Error error = 2;
+  string session = 1;
+  repeated Order orders = 2;
+  Error error = 3;
 }
 
 message CancelOrderRequest {
-  string exchange = 1;
+  string session = 1;
   string id = 2;
   string client_order_id = 3;
 }
@@ -201,7 +205,7 @@ message CancelOrderResponse {
 }
 
 message QueryOrderRequest {
-  string exchange = 1;
+  string session = 1;
   string id = 2;
   string client_order_id = 3;
 }
@@ -212,7 +216,7 @@ message QueryOrderResponse {
 }
 
 message QueryOrdersRequest {
-  string exchange = 1;
+  string session = 1;
   string symbol = 2;
   repeated string state = 3;
   string order_by = 4;
