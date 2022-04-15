@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strconv"
 	"time"
 
 	"github.com/pkg/errors"
@@ -62,7 +63,34 @@ func (s *TradingService) SubmitOrder(ctx context.Context, request *pb.SubmitOrde
 }
 
 func (s *TradingService) CancelOrder(ctx context.Context, request *pb.CancelOrderRequest) (*pb.CancelOrderResponse, error) {
-	panic("implement me")
+	sessionName := request.Session
+
+	if len(sessionName) == 0 {
+		return nil, fmt.Errorf("session name can not be empty")
+	}
+
+	session, ok := s.Environ.Session(sessionName)
+	if !ok {
+		return nil, fmt.Errorf("session %s not found", sessionName)
+	}
+
+	uuidOrderID := ""
+	orderID, err := strconv.ParseUint(request.OrderId, 10, 64)
+	if err != nil {
+		// TODO: validate uuid
+		uuidOrderID = request.OrderId
+	}
+
+	session.Exchange.CancelOrders(ctx, types.Order{
+		SubmitOrder: types.SubmitOrder{
+			ClientOrderID: request.ClientOrderId,
+		},
+		OrderID: orderID,
+		UUID:    uuidOrderID,
+	})
+
+	resp := &pb.CancelOrderResponse{}
+	return resp, nil
 }
 
 func (s *TradingService) QueryOrder(ctx context.Context, request *pb.QueryOrderRequest) (*pb.QueryOrderResponse, error) {
