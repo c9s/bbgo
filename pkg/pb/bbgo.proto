@@ -164,9 +164,9 @@ message SubmitOrder {
   string exchange = 2;
   string symbol = 3;
   Side side = 4;
-  double quantity = 5;
-  double price = 6;
-  double stop_price = 7;
+  string price = 6;
+  string quantity = 5;
+  string stop_price = 7;
   OrderType order_type = 8;
   string client_order_id = 9;
   int64 group_id = 10;
