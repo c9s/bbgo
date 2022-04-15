@@ -16,6 +16,60 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+type TradingService struct {
+	Config  *bbgo.Config
+	Environ *bbgo.Environment
+	Trader  *bbgo.Trader
+
+	pb.UnimplementedTradingServiceServer
+}
+
+func (s *TradingService) SubmitOrder(ctx context.Context, request *pb.SubmitOrderRequest) (*pb.SubmitOrderResponse, error) {
+	sessionName := request.Session
+
+	if len(sessionName) == 0 {
+		return nil, fmt.Errorf("session name can not be empty")
+	}
+
+	session, ok := s.Environ.Session(sessionName)
+	if !ok {
+		return nil, fmt.Errorf("session %s not found", sessionName)
+	}
+
+	submitOrders := toSubmitOrders(request.SubmitOrders)
+	for i := range submitOrders {
+		if market, ok := session.Market(submitOrders[i].Symbol); ok {
+			submitOrders[i].Market = market
+		} else {
+			log.Warnf("session %s market %s not found", sessionName, submitOrders[i].Symbol)
+		}
+	}
+
+	createdOrders, err := session.Exchange.SubmitOrders(ctx, submitOrders...)
+	if err != nil {
+		return nil, err
+	}
+	_ = createdOrders
+
+	return nil, nil
+}
+
+func (s *TradingService) CancelOrder(ctx context.Context, request *pb.CancelOrderRequest) (*pb.CancelOrderResponse, error) {
+	panic("implement me")
+}
+
+func (s *TradingService) QueryOrder(ctx context.Context, request *pb.QueryOrderRequest) (*pb.QueryOrderResponse, error) {
+	panic("implement me")
+}
+
+func (s *TradingService) QueryOrders(ctx context.Context, request *pb.QueryOrdersRequest) (*pb.QueryOrdersResponse, error) {
+	panic("implement me")
+}
+
+func (s *TradingService) QueryTrades(ctx context.Context, request *pb.QueryTradesRequest) (*pb.QueryTradesResponse, error) {
+	panic("implement me")
+}
+
 type UserDataService struct {
 	Config  *bbgo.Config
 	Environ *bbgo.Environment
@@ -25,54 +79,77 @@ type UserDataService struct {
 }
 
 func (s *UserDataService) Subscribe(request *pb.UserDataRequest, server pb.UserDataService_SubscribeServer) error {
-	streamPool := map[string]types.Stream{}
-	for sessionName, session := range s.Environ.Sessions() {
-		if request.Session == sessionName {
-			userDataStream := session.Exchange.NewStream()
-			userDataStream.OnOrderUpdate(func(order types.Order) {
-				err := server.Send(&pb.UserData{
-					Channel: pb.Channel_ORDER,
-					Event:   pb.Event_UPDATE,
-					Orders:  []*pb.Order{transOrder(session, order)},
-				})
-				if err != nil {
-					log.WithError(err).Errorf("grpc: can not send user data")
-				}
-			})
-			userDataStream.OnTradeUpdate(func(trade types.Trade) {
-				err := server.Send(&pb.UserData{
-					Channel: pb.Channel_TRADE,
-					Event:   pb.Event_UPDATE,
-					Trades:  []*pb.Trade{transTrade(session, trade)},
-				})
-				if err != nil {
-					log.WithError(err).Errorf("grpc: can not send user data")
-				}
-			})
-			userDataStream.OnBalanceUpdate(func(balances types.BalanceMap) {
-				err := server.Send(&pb.UserData{
-					Channel:  pb.Channel_BALANCE,
-					Event:    pb.Event_UPDATE,
-					Balances: transBalances(session, balances),
-				})
-				if err != nil {
-					log.WithError(err).Errorf("grpc: can not send user data")
-				}
-			})
-			streamPool[ sessionName ] = userDataStream
-		}
+	sessionName := request.Session
+
+	if len(sessionName) == 0 {
+		return fmt.Errorf("session name can not be empty")
 	}
 
-	<-server.Context().Done()
+	session, ok := s.Environ.Session(sessionName)
+	if !ok {
+		return fmt.Errorf("session %s not found", sessionName)
+	}
+
+	userDataStream := session.Exchange.NewStream()
+	userDataStream.OnOrderUpdate(func(order types.Order) {
+		err := server.Send(&pb.UserData{
+			Channel: pb.Channel_ORDER,
+			Event:   pb.Event_UPDATE,
+			Orders:  []*pb.Order{transOrder(session, order)},
+		})
+		if err != nil {
+			log.WithError(err).Errorf("grpc: can not send user data")
+		}
+	})
+	userDataStream.OnTradeUpdate(func(trade types.Trade) {
+		err := server.Send(&pb.UserData{
+			Channel: pb.Channel_TRADE,
+			Event:   pb.Event_UPDATE,
+			Trades:  []*pb.Trade{transTrade(session, trade)},
+		})
+		if err != nil {
+			log.WithError(err).Errorf("grpc: can not send user data")
+		}
+	})
+
+	balanceHandler := func(balances types.BalanceMap) {
+		err := server.Send(&pb.UserData{
+			Channel:  pb.Channel_BALANCE,
+			Event:    pb.Event_UPDATE,
+			Balances: transBalances(session, balances),
+		})
+		if err != nil {
+			log.WithError(err).Errorf("grpc: can not send user data")
+		}
+	}
+	userDataStream.OnBalanceUpdate(balanceHandler)
+	userDataStream.OnBalanceSnapshot(balanceHandler)
+
+	ctx := server.Context()
+
+	balances, err := session.Exchange.QueryAccountBalances(ctx)
+	if err != nil {
+		return err
+	}
+
+	err = server.Send(&pb.UserData{
+		Channel:  pb.Channel_BALANCE,
+		Event:    pb.Event_SNAPSHOT,
+		Balances: transBalances(session, balances),
+	})
+	if err != nil {
+		log.WithError(err).Errorf("grpc: can not send user data")
+	}
+
+	go userDataStream.Connect(ctx)
 
 	defer func() {
-		for _, stream := range streamPool {
-			if err := stream.Close(); err != nil {
-				log.WithError(err).Errorf("user data stream close error")
-			}
+		if err := userDataStream.Close(); err != nil {
+			log.WithError(err).Errorf("user data stream close error")
 		}
 	}()
 
+	<-ctx.Done()
 	return nil
 }
 
