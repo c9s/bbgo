@@ -49,9 +49,16 @@ func (s *TradingService) SubmitOrder(ctx context.Context, request *pb.SubmitOrde
 	if err != nil {
 		return nil, err
 	}
-	_ = createdOrders
 
-	return nil, nil
+	resp := &pb.SubmitOrderResponse{
+		Session: sessionName,
+		Orders:  nil,
+	}
+	for _, createdOrder := range createdOrders {
+		resp.Orders = append(resp.Orders, transOrder(session, createdOrder))
+	}
+
+	return resp, nil
 }
 
 func (s *TradingService) CancelOrder(ctx context.Context, request *pb.CancelOrderRequest) (*pb.CancelOrderResponse, error) {
