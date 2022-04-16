@@ -84,7 +84,13 @@ func (it *AuthInteract) Commands(interact *Interact) {
 		})
 	} else {
 		interact.Command("/auth", "authorize", func(reply Reply) error {
-			reply.Message("Enter your authentication code")
+			switch it.Mode {
+			case AuthModeToken:
+				reply.Message("Enter your authentication token")
+
+			case AuthModeOTP:
+				reply.Message("Enter your one-time password")
+			}
 			return nil
 		}).NamedNext(StateAuthenticated, func(code string, reply Reply, session Session) error {
 			switch it.Mode {
