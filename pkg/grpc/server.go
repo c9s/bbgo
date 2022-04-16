@@ -345,6 +345,12 @@ func (s *Server) ListenAndServe(bind string) error {
 		Trader:  s.Trader,
 	})
 
+	pb.RegisterTradingServiceServer(grpcServer, &TradingService{
+		Config:  s.Config,
+		Environ: s.Environ,
+		Trader:  s.Trader,
+	})
+
 	reflection.Register(grpcServer)
 
 	if err := grpcServer.Serve(conn); err != nil {
