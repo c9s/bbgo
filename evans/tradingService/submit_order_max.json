@@ -1,0 +1,13 @@
+{
+    "session": "max",
+    "submit_orders": [
+        {
+            "exchange": "max",
+            "symbol": "BTCTWD",
+            "side": "BUY",
+            "price": "20000",
+            "quantity": "0.02",
+            "order_type": "LIMIT"
+        }
+    ]
+}
