@@ -333,6 +333,12 @@ func (s *Server) ListenAndServe(bind string) error {
 		Trader:  s.Trader,
 	})
 
+	pb.RegisterTradingServiceServer(grpcServer, &TradingService{
+		Config:  s.Config,
+		Environ: s.Environ,
+		Trader:  s.Trader,
+	})
+
 	pb.RegisterUserDataServiceServer(grpcServer, &UserDataService{
 		Config:  s.Config,
 		Environ: s.Environ,
