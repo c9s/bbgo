@@ -90,6 +90,9 @@ func (it *AuthInteract) Commands(interact *Interact) {
 
 			case AuthModeOTP:
 				reply.Message("Enter your one-time password")
+
+			default:
+				log.Warn("unexpected auth mode: %s", it.Mode)
 			}
 			return nil
 		}).NamedNext(StateAuthenticated, func(code string, reply Reply, session Session) error {
@@ -101,6 +104,7 @@ func (it *AuthInteract) Commands(interact *Interact) {
 					session.SetAuthorized()
 					return nil
 				}
+				reply.Message("Incorrect authentication token")
 
 			case AuthModeOTP:
 				if totp.Validate(code, it.OneTimePasswordKey.Secret()) {
@@ -109,9 +113,12 @@ func (it *AuthInteract) Commands(interact *Interact) {
 					session.SetAuthorized()
 					return nil
 				}
+				reply.Message("Incorrect one-time pass code")
+
+			default:
+				log.Warn("unexpected auth mode: %s", it.Mode)
 			}
 
-			reply.Message("Incorrect authentication code")
 			return ErrAuthenticationFailed
 		})
 	}
