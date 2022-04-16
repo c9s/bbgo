@@ -49,7 +49,7 @@ class MarketDataEvent(Event):
     depth: Depth = None
 
     @classmethod
-    def from_pb(cls, obj: bbgo_pb2.SubscribeResponse) -> MarketDataEvent:
+    def from_pb(cls, obj: bbgo_pb2.MarketData) -> MarketDataEvent:
         channel_type = ChannelType(obj.channel)
 
         event = cls(
