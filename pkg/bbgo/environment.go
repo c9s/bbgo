@@ -597,7 +597,6 @@ func (environ *Environment) RecordPosition(position *types.Position, trade types
 		position.StrategyInstanceID = profit.StrategyInstanceID
 	}
 
-
 	if profit != nil {
 		if err := environ.PositionService.Insert(position, trade, profit.Profit); err != nil {
 			log.WithError(err).Errorf("can not insert position record")
@@ -610,7 +609,6 @@ func (environ *Environment) RecordPosition(position *types.Position, trade types
 			log.WithError(err).Errorf("can not insert position record")
 		}
 	}
-
 
 	// if:
 	// 1) we are not using sync
@@ -739,6 +737,14 @@ func (environ *Environment) setupInteraction(persistence service.PersistenceServ
 	var key *otp.Key
 	var keyURL string
 	var authStore = environ.getAuthStore(persistence)
+
+	if v, ok := util.GetEnvVarBool("FLUSH_OTP_KEY"); v && ok {
+		log.Warnf("flushing otp key...")
+		if err := authStore.Reset(); err != nil {
+			return err
+		}
+	}
+
 	if err := authStore.Load(&keyURL); err != nil {
 		log.Warnf("telegram session not found, generating new one-time password key for new telegram session...")
 
