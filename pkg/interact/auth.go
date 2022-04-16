@@ -92,7 +92,7 @@ func (it *AuthInteract) Commands(interact *Interact) {
 				reply.Message("Enter your one-time password")
 
 			default:
-				log.Warn("unexpected auth mode: %s", it.Mode)
+				log.Warnf("unexpected auth mode: %s", it.Mode)
 			}
 			return nil
 		}).NamedNext(StateAuthenticated, func(code string, reply Reply, session Session) error {
@@ -116,7 +116,7 @@ func (it *AuthInteract) Commands(interact *Interact) {
 				reply.Message("Incorrect one-time pass code")
 
 			default:
-				log.Warn("unexpected auth mode: %s", it.Mode)
+				log.Warnf("unexpected auth mode: %s", it.Mode)
 			}
 
 			return ErrAuthenticationFailed

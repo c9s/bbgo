@@ -737,9 +737,9 @@ func getAuthStoreID() string {
 func (environ *Environment) setupInteraction(persistence service.PersistenceService) error {
 	var otpQRCodeImagePath = fmt.Sprintf("otp.png")
 	var key *otp.Key
-	var keySecret string
+	var keyURL string
 	var authStore = environ.getAuthStore(persistence)
-	if err := authStore.Load(&keySecret); err != nil {
+	if err := authStore.Load(&keyURL); err != nil {
 		log.Warnf("telegram session not found, generating new one-time password key for new telegram session...")
 
 		newKey, err := setupNewOTPKey(otpQRCodeImagePath)
@@ -748,21 +748,34 @@ func (environ *Environment) setupInteraction(persistence service.PersistenceServ
 		}
 
 		key = newKey
-		keySecret = key.Secret()
-		if err := authStore.Save(keySecret); err != nil {
+		keyURL = key.URL()
+		if err := authStore.Save(keyURL); err != nil {
 			return err
 		}
 
 		printOtpAuthGuide(otpQRCodeImagePath)
 
-	} else if keySecret != "" {
-		key, err = otp.NewKeyFromURL(keySecret)
+	} else if keyURL != "" {
+		key, err = otp.NewKeyFromURL(keyURL)
 		if err != nil {
-			return err
-		}
+			log.WithError(err).Errorf("can not load otp key from url: %s, generating new otp key", keyURL)
 
-		log.Infof("otp key loaded: %s", util.MaskKey(key.Secret()))
-		printOtpAuthGuide(otpQRCodeImagePath)
+			newKey, err := setupNewOTPKey(otpQRCodeImagePath)
+			if err != nil {
+				return errors.Wrapf(err, "failed to setup totp (time-based one time password) key")
+			}
+
+			key = newKey
+			keyURL = key.URL()
+			if err := authStore.Save(keyURL); err != nil {
+				return err
+			}
+
+			printOtpAuthGuide(otpQRCodeImagePath)
+		} else {
+			log.Infof("otp key loaded: %s", util.MaskKey(key.Secret()))
+			printOtpAuthGuide(otpQRCodeImagePath)
+		}
 	}
 
 	authStrict := false
