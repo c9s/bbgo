@@ -83,12 +83,14 @@ func (it *AuthInteract) Commands(interact *Interact) {
 			return ErrAuthenticationFailed
 		})
 	} else {
-		interact.Command("/auth", "authorize", func(reply Reply) error {
+		interact.Command("/auth", "authorize", func(reply Reply, session Session) error {
 			switch it.Mode {
 			case AuthModeToken:
+				session.SetAuthorizing(true)
 				reply.Message("Enter your authentication token")
 
 			case AuthModeOTP:
+				session.SetAuthorizing(true)
 				reply.Message("Enter your one-time password")
 
 			default:
