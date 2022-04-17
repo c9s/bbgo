@@ -30,7 +30,7 @@ Run your bbgo.
 
 Open your Telegram app, search your bot `bbgo_bot_711222333`
 
-Enter `/start` and `/auth {code}`
+Send `/auth` and then send your auth token to get authorized.
 
 Done! Your notifications will be routed to the telegram chat.
 
