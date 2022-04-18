@@ -1,66 +1,121 @@
 package bbgo
 
 import (
-	"context"
+	"fmt"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
+	"reflect"
 )
 
 type StrategyController struct {
 	// Callbacks
-	GetStatusCallbacks     map[string]func(ctx context.Context)
-	GetPositionCallbacks   map[string]func(ctx context.Context)
-	ClosePositionCallbacks map[string]func(ctx context.Context, percentage fixedpoint.Value)
-	SuspendCallbacks       map[string]func(ctx context.Context)
-	ResumeCallbacks        map[string]func(ctx context.Context)
-	EmergencyStopCallbacks map[string]func(ctx context.Context)
+	GetStatusCallback     func() types.StrategyStatus
+	GetPositionCallback   func() *types.Position
+	ClosePositionCallback func(percentage fixedpoint.Value)
+	SuspendCallback       func()
+	ResumeCallback        func()
+	EmergencyStopCallback func()
 }
 
-// TODO: strategy no found
+func (s *StrategyController) HasCallback(callback string) bool {
+	callbackV := reflect.ValueOf(s).Elem().FieldByName(callback)
+	if callbackV.IsValid() {
+		if !callbackV.IsNil() {
+			return true
+		}
+	}
 
-func (s *StrategyController) OnGetStatus(signature string, cb func(ctx context.Context)) {
-	s.GetStatusCallbacks[signature] = cb
+	return false
 }
 
-func (s *StrategyController) EmitGetStatus(signature string, ctx context.Context) {
-	s.GetStatusCallbacks[signature](ctx)
+func (s *StrategyController) OnGetStatus(cb func() types.StrategyStatus) {
+	s.GetStatusCallback = cb
 }
 
-func (s *StrategyController) OnGetPosition(signature string, cb func(ctx context.Context)) {
-	s.GetPositionCallbacks[signature] = cb
+func (s *StrategyController) EmitGetStatus() (status types.StrategyStatus, err error) {
+	if s.GetStatusCallback != nil {
+		return s.GetStatusCallback(), nil
+	} else {
+		return types.StrategyStatusUnknown, fmt.Errorf("no GetStatus callback registered")
+	}
 }
 
-func (s *StrategyController) OnClosePosition(signature string, cb func(ctx context.Context, percentage fixedpoint.Value)) {
-	s.ClosePositionCallbacks[signature] = cb
+func (s *StrategyController) OnGetPosition(cb func() *types.Position) {
+	s.GetPositionCallback = cb
 }
 
-func (s *StrategyController) EmitClosePosition(signature string, ctx context.Context, percentage fixedpoint.Value) {
-	s.ClosePositionCallbacks[signature](ctx, percentage)
+func (s *StrategyController) EmitGetPosition() (position *types.Position, err error) {
+	if s.GetPositionCallback != nil {
+		return s.GetPositionCallback(), nil
+	} else {
+		return nil, fmt.Errorf("no GetPosition callback registered")
+	}
 }
 
-func (s *StrategyController) EmitGetPosition(signature string, ctx context.Context) {
-	s.GetPositionCallbacks[signature](ctx)
+func (s *StrategyController) OnClosePosition(cb func(percentage fixedpoint.Value)) {
+	s.ClosePositionCallback = cb
 }
 
-func (s *StrategyController) OnSuspend(signature string, cb func(ctx context.Context)) {
-	s.SuspendCallbacks[signature] = cb
+func (s *StrategyController) EmitClosePosition(percentage fixedpoint.Value) error {
+	if s.ClosePositionCallback != nil {
+		s.ClosePositionCallback(percentage)
+		return nil
+	} else {
+		return fmt.Errorf("no ClosePosition callback registered")
+	}
 }
 
-func (s *StrategyController) EmitSuspend(signature string, ctx context.Context) {
-	s.SuspendCallbacks[signature](ctx)
+func (s *StrategyController) OnSuspend(cb func()) {
+	s.SuspendCallback = cb
 }
 
-func (s *StrategyController) OnResume(signature string, cb func(ctx context.Context)) {
-	s.ResumeCallbacks[signature] = cb
+func (s *StrategyController) EmitSuspend() error {
+	if s.SuspendCallback != nil {
+		s.SuspendCallback()
+		return nil
+	} else {
+		return fmt.Errorf("no Suspend callback registered")
+	}
 }
 
-func (s *StrategyController) EmitResume(signature string, ctx context.Context) {
-	s.ResumeCallbacks[signature](ctx)
+func (s *StrategyController) OnResume(cb func()) {
+	s.ResumeCallback = cb
 }
 
-func (s *StrategyController) OnEmergencyStop(signature string, cb func(ctx context.Context)) {
-	s.EmergencyStopCallbacks[signature] = cb
+func (s *StrategyController) EmitResume() error {
+	if s.ResumeCallback != nil {
+		s.ResumeCallback()
+		return nil
+	} else {
+		return fmt.Errorf("no Resume callback registered")
+	}
 }
 
-func (s *StrategyController) EmitEmergencyStop(signature string, ctx context.Context) {
-	s.EmergencyStopCallbacks[signature](ctx)
+func (s *StrategyController) OnEmergencyStop(cb func()) {
+	s.EmergencyStopCallback = cb
+}
+
+func (s *StrategyController) EmitEmergencyStop() error {
+	if s.EmergencyStopCallback != nil {
+		s.EmergencyStopCallback()
+		return nil
+	} else {
+		return fmt.Errorf("no EmergencyStop callback registered")
+	}
+}
+
+type StrategyControllerInterface interface {
+	HasCallback(callback string) bool
+	OnGetStatus(cb func() types.StrategyStatus)
+	EmitGetStatus() (status types.StrategyStatus, err error)
+	OnGetPosition(cb func() *types.Position)
+	EmitGetPosition() (position *types.Position, err error)
+	OnClosePosition(cb func(percentage fixedpoint.Value))
+	EmitClosePosition(percentage fixedpoint.Value) error
+	OnSuspend(cb func())
+	EmitSuspend() error
+	OnResume(cb func())
+	EmitResume() error
+	OnEmergencyStop(cb func())
+	EmitEmergencyStop() error
 }
