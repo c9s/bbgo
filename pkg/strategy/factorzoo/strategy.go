@@ -12,8 +12,7 @@ import (
 
 const ID = "factorzoo"
 
-const One = fixedpoint.Value(1e8)
-const Two = fixedpoint.Value(2e8)
+var three = fixedpoint.NewFromInt(3)
 
 var log = logrus.WithField("strategy", ID)
 
@@ -43,7 +42,7 @@ type Strategy struct {
 	prevClose fixedpoint.Value
 
 	pvDivergenceSetting *IntervalWindowSetting `json:"pvDivergence"`
-	pvDivergence        *CORRELATION
+	pvDivergence        *Correlation
 
 	Ret   []float64
 	Alpha [][]float64
@@ -101,7 +100,7 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExecutor, er fixedpoint.Value) {
 
 	//if s.prevER.Sign() < 0 && er.Sign() > 0 {
-	if er.Compare(fixedpoint.Zero) >= 0 {
+	if er.Sign() >= 0 {
 		submitOrder := types.SubmitOrder{
 			Symbol:   s.Symbol,
 			Side:     types.SideTypeBuy,
@@ -142,7 +141,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	// setup the time frame size
 	iw := types.IntervalWindow{Window: 50, Interval: s.Interval}
 	// construct CORR indicator
-	s.pvDivergence = &CORRELATION{IntervalWindow: iw}
+	s.pvDivergence = &Correlation{IntervalWindow: iw}
 	// bind indicator to the data store, so that our callback could be triggered
 	s.pvDivergence.Bind(st)
 	//s.pvDivergence.OnUpdate(func(corr float64) {
@@ -186,10 +185,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		// price mean reversion
 		rev := fixedpoint.NewFromInt(1).Div(kline.Close)
 		// alpha150 from GTJA's 191 paper
-		a150 := kline.High.Add(kline.Low).Add(kline.Close).Div(fixedpoint.NewFromInt(3)).Mul(kline.Volume)
-		// momentum from world quant's paper
-		mom := One.Sub(kline.Open.Div(kline.Close)).Mul(fixedpoint.NegOne)
-		// oprning gap
+		a150 := kline.High.Add(kline.Low).Add(kline.Close).Div(three).Mul(kline.Volume)
+		// momentum from WQ's 101 paper
+		mom := fixedpoint.One.Sub(kline.Open.Div(kline.Close)).Mul(fixedpoint.NegOne)
+		// opening gap
 		ogap := kline.Open.Div(s.prevClose)
 
 		log.Infof("corr: %f, rev: %f, a150: %f, mom: %f, ogap: %f", corr.Float64(), rev.Float64(), a150.Float64(), mom.Float64(), ogap.Float64())
