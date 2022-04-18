@@ -6,6 +6,7 @@ from datetime import datetime
 import bbgo_pb2
 
 from ..utils import parse_float
+from ..utils import parse_time
 
 
 @dataclass
@@ -34,7 +35,7 @@ class KLine:
             close=parse_float(obj.close),
             volume=parse_float(obj.volume),
             quote_volume=parse_float(obj.quote_volume),
-            start_time=datetime.fromtimestamp(obj.start_time / 1000),
-            end_time=datetime.fromtimestamp(obj.end_time / 1000),
+            start_time=parse_time(obj.start_time),
+            end_time=parse_time(obj.end_time),
             closed=obj.closed,
         )

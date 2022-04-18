@@ -8,6 +8,7 @@ import bbgo_pb2
 from ..enums import OrderType
 from ..enums import SideType
 from ..utils import parse_float
+from ..utils import parse_time
 
 
 @dataclass
@@ -41,5 +42,5 @@ class Order:
             executed_quantity=parse_float(obj.executed_quantity),
             client_order_id=obj.client_order_id,
             group_id=obj.group_id,
-            created_at=datetime.fromtimestamp(obj.created_at / 1000),
+            created_at=parse_time(obj.created_at),
         )

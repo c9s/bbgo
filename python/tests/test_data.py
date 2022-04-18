@@ -1,9 +1,8 @@
-from datetime import datetime
-
 import bbgo_pb2
 from bbgo.data import Balance
 from bbgo.data import ErrorMessage
 from bbgo.data import KLine
+from bbgo.utils import parse_time
 
 
 def test_balance_from_pb():
@@ -65,8 +64,8 @@ def test_kline_from_pb():
     assert kline.close == float(close)
     assert kline.volume == float(volume)
     assert kline.quote_volume == float(quote_volume)
-    assert kline.start_time == datetime.fromtimestamp(start_time / 1000)
-    assert kline.end_time == datetime.fromtimestamp(end_time / 1000)
+    assert kline.start_time == parse_time(start_time)
+    assert kline.end_time == parse_time(end_time)
     assert closed == closed
 
 
