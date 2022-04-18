@@ -6,6 +6,7 @@ from datetime import datetime
 import bbgo_pb2
 
 from ..enums import SideType
+from ..utils import parse_time
 
 
 @dataclass
@@ -31,7 +32,7 @@ class Trade:
             id=obj.id,
             price=float(obj.price),
             quantity=float(obj.quantity),
-            created_at=datetime.fromtimestamp(obj.created_at / 1000),
+            created_at=parse_time(obj.created_at),
             side=SideType(obj.side),
             fee_currency=obj.fee_currency,
             fee=float(obj.fee),
