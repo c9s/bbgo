@@ -22,12 +22,7 @@ type AD struct {
 	UpdateCallbacks []func(value float64)
 }
 
-func (inc *AD) Update(kLine types.KLine) {
-	cloze := kLine.Close.Float64()
-	high := kLine.High.Float64()
-	low := kLine.Low.Float64()
-	volume := kLine.Volume.Float64()
-
+func (inc *AD) Update(high, low, cloze, volume float64) {
 	var moneyFlowVolume float64
 	if high == low {
 		moneyFlowVolume = 0
@@ -65,7 +60,7 @@ func (inc *AD) calculateAndUpdate(kLines []types.KLine) {
 		if inc.EndTime != zeroTime && !k.EndTime.After(inc.EndTime) {
 			continue
 		}
-		inc.Update(k)
+		inc.Update(k.High.Float64(), k.Low.Float64(), k.Close.Float64(), k.Volume.Float64())
 	}
 
 	inc.EmitUpdate(inc.Last())

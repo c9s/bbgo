@@ -19,17 +19,13 @@ type ATR struct {
 	UpdateCallbacks []func(value float64)
 }
 
-func (inc *ATR) Update(kLine types.KLine) {
+func (inc *ATR) Update(high, low, cloze float64) {
 	if inc.Window <= 0 {
 		panic("window must be greater than 0")
 	}
 
-	cloze := kLine.Close.Float64()
-	high := kLine.High.Float64()
-	low := kLine.Low.Float64()
-
 	if inc.PriviousClose == 0 {
-		inc.PriviousClose = kLine.Close.Float64()
+		inc.PriviousClose = cloze
 		return
 	}
 
@@ -87,7 +83,7 @@ func (inc *ATR) calculateAndUpdate(kLines []types.KLine) {
 		if inc.EndTime != zeroTime && !k.EndTime.After(inc.EndTime) {
 			continue
 		}
-		inc.Update(k)
+		inc.Update(k.High.Float64(), k.Low.Float64(), k.Close.Float64())
 	}
 
 	inc.EmitUpdate(inc.Last())
