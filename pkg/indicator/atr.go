@@ -11,9 +11,10 @@ import (
 type ATR struct {
 	types.IntervalWindow
 	Values               types.Float64Slice
-	TrueRanges           types.Float64Slice
 	PercentageVolatility types.Float64Slice
-	PriviousClose        float64
+
+	PriviousClose float64
+	RMA           *RMA
 
 	EndTime         time.Time
 	UpdateCallbacks []func(value float64)
@@ -22,6 +23,10 @@ type ATR struct {
 func (inc *ATR) Update(high, low, cloze float64) {
 	if inc.Window <= 0 {
 		panic("window must be greater than 0")
+	}
+
+	if len(inc.Values) == 0 {
+		inc.RMA = &RMA{IntervalWindow: types.IntervalWindow{Window: inc.Window}}
 	}
 
 	if inc.PriviousClose == 0 {
@@ -35,24 +40,12 @@ func (inc *ATR) Update(high, low, cloze float64) {
 		math.Abs(high - inc.PriviousClose),
 		math.Abs(low - inc.PriviousClose),
 	}.Max()
-	inc.TrueRanges.Push(trueRange)
 
 	inc.PriviousClose = cloze
 
 	// apply rolling moving average
-	if len(inc.TrueRanges) < inc.Window {
-		return
-	}
-
-	if len(inc.TrueRanges) == inc.Window {
-		atr := inc.TrueRanges.Mean()
-		inc.Values.Push(atr)
-		inc.PercentageVolatility.Push(atr / cloze)
-		return
-	}
-
-	lambda := 1 / float64(inc.Window)
-	atr := inc.Values.Last()*(1-lambda) + inc.TrueRanges.Last()*lambda
+	inc.RMA.Update(trueRange)
+	atr := inc.RMA.Last()
 	inc.Values.Push(atr)
 	inc.PercentageVolatility.Push(atr / cloze)
 }
