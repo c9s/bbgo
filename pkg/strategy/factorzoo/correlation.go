@@ -13,8 +13,8 @@ var zeroTime time.Time
 //var zeroTime time.Time
 type KLineValueMapper func(k types.KLine) float64
 
-//go:generate callbackgen -type CORRELATION
-type CORRELATION struct {
+//go:generate callbackgen -type Correlation
+type Correlation struct {
 	types.IntervalWindow
 	Values  types.Float64Slice
 	EndTime time.Time
@@ -22,14 +22,14 @@ type CORRELATION struct {
 	UpdateCallbacks []func(value float64)
 }
 
-func (inc *CORRELATION) Last() float64 {
+func (inc *Correlation) Last() float64 {
 	if len(inc.Values) == 0 {
 		return 0.0
 	}
 	return inc.Values[len(inc.Values)-1]
 }
 
-func (inc *CORRELATION) calculateAndUpdate(klines []types.KLine) {
+func (inc *Correlation) calculateAndUpdate(klines []types.KLine) {
 	if len(klines) < inc.Window {
 		return
 	}
@@ -59,7 +59,7 @@ func (inc *CORRELATION) calculateAndUpdate(klines []types.KLine) {
 	inc.EmitUpdate(correlation)
 }
 
-func (inc *CORRELATION) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
+func (inc *Correlation) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
 	if inc.Interval != interval {
 		return
 	}
@@ -67,7 +67,7 @@ func (inc *CORRELATION) handleKLineWindowUpdate(interval types.Interval, window 
 	inc.calculateAndUpdate(window)
 }
 
-func (inc *CORRELATION) Bind(updater indicator.KLineWindowUpdater) {
+func (inc *Correlation) Bind(updater indicator.KLineWindowUpdater) {
 	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }
 
