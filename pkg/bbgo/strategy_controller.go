@@ -8,13 +8,15 @@ import (
 )
 
 type StrategyController struct {
+	Status types.StrategyStatus
+
 	// Callbacks
 	GetStatusCallback     func() types.StrategyStatus
 	GetPositionCallback   func() *types.Position
-	ClosePositionCallback func(percentage fixedpoint.Value)
-	SuspendCallback       func()
-	ResumeCallback        func()
-	EmergencyStopCallback func()
+	ClosePositionCallback func(percentage fixedpoint.Value) error
+	SuspendCallback       func() error
+	ResumeCallback        func() error
+	EmergencyStopCallback func() error
 }
 
 func (s *StrategyController) HasCallback(callback string) bool {
@@ -52,53 +54,49 @@ func (s *StrategyController) EmitGetPosition() (position *types.Position, err er
 	}
 }
 
-func (s *StrategyController) OnClosePosition(cb func(percentage fixedpoint.Value)) {
+func (s *StrategyController) OnClosePosition(cb func(percentage fixedpoint.Value) error) {
 	s.ClosePositionCallback = cb
 }
 
 func (s *StrategyController) EmitClosePosition(percentage fixedpoint.Value) error {
 	if s.ClosePositionCallback != nil {
-		s.ClosePositionCallback(percentage)
-		return nil
+		return s.ClosePositionCallback(percentage)
 	} else {
 		return fmt.Errorf("no ClosePosition callback registered")
 	}
 }
 
-func (s *StrategyController) OnSuspend(cb func()) {
+func (s *StrategyController) OnSuspend(cb func() error) {
 	s.SuspendCallback = cb
 }
 
 func (s *StrategyController) EmitSuspend() error {
 	if s.SuspendCallback != nil {
-		s.SuspendCallback()
-		return nil
+		return s.SuspendCallback()
 	} else {
 		return fmt.Errorf("no Suspend callback registered")
 	}
 }
 
-func (s *StrategyController) OnResume(cb func()) {
+func (s *StrategyController) OnResume(cb func() error) {
 	s.ResumeCallback = cb
 }
 
 func (s *StrategyController) EmitResume() error {
 	if s.ResumeCallback != nil {
-		s.ResumeCallback()
-		return nil
+		return s.ResumeCallback()
 	} else {
 		return fmt.Errorf("no Resume callback registered")
 	}
 }
 
-func (s *StrategyController) OnEmergencyStop(cb func()) {
+func (s *StrategyController) OnEmergencyStop(cb func() error) {
 	s.EmergencyStopCallback = cb
 }
 
 func (s *StrategyController) EmitEmergencyStop() error {
 	if s.EmergencyStopCallback != nil {
-		s.EmergencyStopCallback()
-		return nil
+		return s.EmergencyStopCallback()
 	} else {
 		return fmt.Errorf("no EmergencyStop callback registered")
 	}
@@ -110,12 +108,12 @@ type StrategyControllerInterface interface {
 	EmitGetStatus() (status types.StrategyStatus, err error)
 	OnGetPosition(cb func() *types.Position)
 	EmitGetPosition() (position *types.Position, err error)
-	OnClosePosition(cb func(percentage fixedpoint.Value))
+	OnClosePosition(cb func(percentage fixedpoint.Value) error)
 	EmitClosePosition(percentage fixedpoint.Value) error
-	OnSuspend(cb func())
+	OnSuspend(cb func() error)
 	EmitSuspend() error
-	OnResume(cb func())
+	OnResume(cb func() error)
 	EmitResume() error
-	OnEmergencyStop(cb func())
+	OnEmergencyStop(cb func() error)
 	EmitEmergencyStop() error
 }

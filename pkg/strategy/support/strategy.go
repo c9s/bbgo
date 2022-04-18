@@ -181,7 +181,7 @@ type Strategy struct {
 	trailingStopControl *TrailingStopControl
 
 	// StrategyController
-	status types.StrategyStatus
+	strategyController bbgo.StrategyController
 }
 
 func (s *Strategy) ID() string {
@@ -210,95 +210,6 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	if s.LongTermMovingAverage != zeroiw {
 		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: string(s.LongTermMovingAverage.Interval)})
 	}
-}
-
-func (s *Strategy) CurrentPosition() *types.Position {
-	return s.state.Position
-}
-
-func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Value) error {
-	base := s.state.Position.GetBase()
-	if base.IsZero() {
-		return fmt.Errorf("no opened %s position", s.state.Position.Symbol)
-	}
-
-	// make it negative
-	quantity := base.Mul(percentage).Abs()
-	side := types.SideTypeBuy
-	if base.Sign() > 0 {
-		side = types.SideTypeSell
-	}
-
-	if quantity.Compare(s.Market.MinQuantity) < 0 {
-		return fmt.Errorf("order quantity %v is too small, less than %v", quantity, s.Market.MinQuantity)
-	}
-
-	submitOrder := types.SubmitOrder{
-		Symbol:   s.Symbol,
-		Side:     side,
-		Type:     types.OrderTypeMarket,
-		Quantity: quantity,
-		Market:   s.Market,
-	}
-
-	s.Notify("Submitting %s %s order to close position by %v", s.Symbol, side.String(), percentage, submitOrder)
-
-	createdOrders, err := s.submitOrders(ctx, s.orderExecutor, submitOrder)
-	if err != nil {
-		log.WithError(err).Errorf("can not place position close order")
-	}
-
-	s.orderStore.Add(createdOrders...)
-	return err
-}
-
-// StrategyController
-
-func (s *Strategy) GetStatus() types.StrategyStatus {
-	return s.status
-}
-
-func (s *Strategy) Suspend(ctx context.Context) error {
-	s.status = types.StrategyStatusStopped
-
-	var err error
-	// Cancel all order
-	for _, order := range s.orderStore.Orders() {
-		err = s.cancelOrder(order.OrderID, ctx, s.orderExecutor)
-	}
-	if err != nil {
-		errMsg := "Not all orders are cancelled! Please check again."
-		log.WithError(err).Errorf(errMsg)
-		s.Notify(errMsg)
-	} else {
-		s.Notify("All orders cancelled.")
-	}
-
-	// Save state
-	if err2 := s.SaveState(); err2 != nil {
-		log.WithError(err2).Errorf("can not save state: %+v", s.state)
-	} else {
-		log.Infof("%s position is saved.", s.Symbol)
-	}
-
-	return nil
-}
-
-func (s *Strategy) Resume(ctx context.Context) error {
-	s.status = types.StrategyStatusRunning
-
-	return nil
-}
-
-func (s *Strategy) EmergencyStop(ctx context.Context) error {
-	// Close 100% position
-	percentage, _ := fixedpoint.NewFromString("100%")
-	err := s.ClosePosition(ctx, percentage)
-
-	// Suspend strategy
-	_ = s.Suspend(ctx)
-
-	return err
 }
 
 func (s *Strategy) SaveState() error {
@@ -439,7 +350,100 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderExecutor = orderExecutor
 
 	// StrategyController
-	s.status = types.StrategyStatusRunning
+	s.strategyController.Status = types.StrategyStatusRunning
+
+	s.strategyController.OnGetStatus(func() types.StrategyStatus {
+		return s.strategyController.Status
+	})
+
+	s.strategyController.OnGetPosition(func() *types.Position {
+		return s.state.Position
+	})
+
+	s.strategyController.OnClosePosition(func(percentage fixedpoint.Value) error {
+		base := s.state.Position.GetBase()
+		if base.IsZero() {
+			return fmt.Errorf("no opened %s position", s.state.Position.Symbol)
+		}
+
+		// make it negative
+		quantity := base.Mul(percentage).Abs()
+		side := types.SideTypeBuy
+		if base.Sign() > 0 {
+			side = types.SideTypeSell
+		}
+
+		if quantity.Compare(s.Market.MinQuantity) < 0 {
+			return fmt.Errorf("order quantity %v is too small, less than %v", quantity, s.Market.MinQuantity)
+		}
+
+		submitOrder := types.SubmitOrder{
+			Symbol:   s.Symbol,
+			Side:     side,
+			Type:     types.OrderTypeMarket,
+			Quantity: quantity,
+			Market:   s.Market,
+		}
+
+		s.Notify("Submitting %s %s order to close position by %v", s.Symbol, side.String(), percentage, submitOrder)
+
+		createdOrders, err := s.submitOrders(ctx, s.orderExecutor, submitOrder)
+		if err != nil {
+			log.WithError(err).Errorf("can not place position close order")
+		}
+
+		s.orderStore.Add(createdOrders...)
+		return err
+	})
+
+	s.strategyController.OnSuspend(func() error {
+		s.strategyController.Status = types.StrategyStatusStopped
+
+		var err error = nil
+		// Cancel all order
+		for _, order := range s.orderStore.Orders() {
+			err = s.cancelOrder(order.OrderID, ctx, s.orderExecutor)
+		}
+		if err != nil {
+			errMsg := "Not all orders are cancelled! Please check again."
+			log.WithError(err).Errorf(errMsg)
+			s.Notify(errMsg)
+		} else {
+			s.Notify("All orders cancelled.")
+		}
+
+		// Save state
+		if err2 := s.SaveState(); err2 != nil {
+			log.WithError(err2).Errorf("can not save state: %+v", s.state)
+		} else {
+			log.Infof("%s position is saved.", s.Symbol)
+		}
+
+		return err
+	})
+
+	s.strategyController.OnResume(func() error {
+		s.strategyController.Status = types.StrategyStatusRunning
+
+		return nil
+	})
+
+	s.strategyController.OnEmergencyStop(func() error {
+		// Close 100% position
+		percentage, _ := fixedpoint.NewFromString("100%")
+		err := s.strategyController.EmitClosePosition(percentage)
+		err2 := s.strategyController.EmitSuspend()
+
+		if err2 != nil {
+			if err != nil {
+				err = fmt.Errorf(err.Error() + "\n" + err2.Error())
+			} else {
+				err = err2
+			}
+		}
+
+		return err
+	})
 
 	// set default values
 	if s.Interval == "" {
@@ -510,7 +514,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		// Update trailing stop when the position changes
 		s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
 			// StrategyController
-			if s.status != types.StrategyStatusRunning {
+			if s.strategyController.Status != types.StrategyStatusRunning {
 				return
 			}
 
@@ -562,7 +566,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		// StrategyController
-		if s.status != types.StrategyStatusRunning {
+		if s.strategyController.Status != types.StrategyStatusRunning {
 			return
 		}
 
