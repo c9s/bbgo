@@ -5,6 +5,9 @@ from datetime import datetime
 
 import bbgo_pb2
 
+from ..utils import parse_float
+from ..utils import parse_time
+
 
 @dataclass
 class KLine:
@@ -26,13 +29,13 @@ class KLine:
         return cls(
             exchange=obj.exchange,
             symbol=obj.symbol,
-            open=float(obj.open),
-            high=float(obj.high),
-            low=float(obj.low),
-            close=float(obj.close),
-            volume=float(obj.volume),
-            quote_volume=float(obj.quote_volume),
-            start_time=datetime.fromtimestamp(obj.start_time / 1000),
-            end_time=datetime.fromtimestamp(obj.end_time / 1000),
+            open=parse_float(obj.open),
+            high=parse_float(obj.high),
+            low=parse_float(obj.low),
+            close=parse_float(obj.close),
+            volume=parse_float(obj.volume),
+            quote_volume=parse_float(obj.quote_volume),
+            start_time=parse_time(obj.start_time),
+            end_time=parse_time(obj.end_time),
             closed=obj.closed,
         )
