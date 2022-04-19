@@ -813,4 +813,6 @@ var symbolMap = map[string]string{
 	"ZMUSD": "ZM/USD",
 	"ZRX-PERP": "ZRX-PERP",
 	"ZRXUSD": "ZRX/USD",
+	"GMTUSD": "GMT/USD",
+	"GMT-PERP": "GMT-PERP",
 }
