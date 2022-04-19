@@ -71,7 +71,7 @@ func (r *WithdrawalRequest) Do(ctx context.Context) (*Withdraw, error) {
 		"amount":                r.amount,
 	}
 
-	req, err := r.client.NewAuthenticatedRequest(nil, "POST", "v2/withdrawal", payload, nil)
+	req, err := r.client.newAuthenticatedRequest(nil, "POST", "v2/withdrawal", nil, payload, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +121,7 @@ func (r *GetWithdrawalAddressesRequest) Do(ctx context.Context) ([]WithdrawalAdd
 		"currency": r.currency,
 	}
 
-	req, err := r.client.NewAuthenticatedRequest(nil, "GET", "v2/withdraw_addresses", payload, nil)
+	req, err := r.client.newAuthenticatedRequest(nil, "GET", "v2/withdraw_addresses", nil, payload, nil)
 	if err != nil {
 		return nil, err
 	}

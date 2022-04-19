@@ -2,12 +2,12 @@ package max
 
 import (
 	"bytes"
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"context"
 	"fmt"
 	"io/ioutil"
 	"math"
@@ -182,12 +182,13 @@ func (c *RestClient) NewRequest(ctx context.Context, method string, refURL strin
 	if err != nil {
 		return nil, err
 	}
+
 	if params != nil {
 		rel.RawQuery = params.Encode()
 	}
+
 	var req *http.Request
 	u := c.BaseURL.ResolveReference(rel)
-
 
 	body, err := castPayload(payload)
 	if err != nil {
@@ -199,6 +200,8 @@ func (c *RestClient) NewRequest(ctx context.Context, method string, refURL strin
 		return nil, err
 	}
 
+	req = req.WithContext(ctx)
+
 	if addUserAgentHeader {
 		req.Header.Add("User-Agent", UserAgent)
 	}
@@ -206,8 +209,12 @@ func (c *RestClient) NewRequest(ctx context.Context, method string, refURL strin
 	return req, nil
 }
 
-// NewAuthenticatedRequest creates new http request for authenticated routes.
-func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, m string, refURL string, data interface{}, rel *url.URL) (*http.Request, error) {
+func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, m string, refURL string, params url.Values, payload interface{}) (*http.Request, error) {
+	return c.newAuthenticatedRequest(ctx, m, refURL, params, payload, nil)
+}
+
+// newAuthenticatedRequest creates new http request for authenticated routes.
+func (c *RestClient) newAuthenticatedRequest(ctx context.Context, m string, refURL string, params url.Values, data interface{}, rel *url.URL) (*http.Request, error) {
 	var err error
 	if rel == nil {
 		rel, err = url.Parse(refURL)
@@ -267,7 +274,7 @@ func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, m string, refU
 		return nil, errors.New("empty api secret")
 	}
 
-	req, err := c.NewRequest(nil, m, refURL, nil, p)
+	req, err := c.NewRequest(ctx, m, refURL, params, p)
 	if err != nil {
 		return nil, err
 	}
@@ -364,7 +371,7 @@ func (c *RestClient) SendRequest(req *http.Request) (*requestgen.Response, error
 }
 
 func (c *RestClient) sendAuthenticatedRequest(m string, refURL string, data map[string]interface{}) (*requestgen.Response, error) {
-	req, err := c.NewAuthenticatedRequest(nil, m, refURL, data, nil)
+	req, err := c.newAuthenticatedRequest(nil, m, refURL, nil, data, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -457,7 +464,6 @@ func ToErrorResponse(response *requestgen.Response) (errorResponse *ErrorRespons
 
 	return errorResponse, fmt.Errorf("unexpected response content type %s", contentType)
 }
-
 
 func castPayload(payload interface{}) ([]byte, error) {
 	if payload != nil {
