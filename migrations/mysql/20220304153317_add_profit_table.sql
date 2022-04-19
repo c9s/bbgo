@@ -59,8 +59,8 @@ CREATE TABLE `profits`
     `traded_at`            DATETIME(3)             NOT NULL,
 
     -- fee
-    `fee_in_usd`           DECIMAL(16, 8) UNSIGNED,
-    `fee`                  DECIMAL(16, 8) UNSIGNED NOT NULL,
+    `fee_in_usd`           DECIMAL(16, 8),
+    `fee`                  DECIMAL(16, 8)          NOT NULL,
     `fee_currency`         VARCHAR(10)             NOT NULL,
 
     PRIMARY KEY (`gid`),

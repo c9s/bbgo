@@ -1,9 +1,9 @@
 -- +up
 -- +begin
-ALTER TABLE trades CHANGE fee_currency fee_currency varchar(10) NOT NULL;
+SELECT 1;
 -- +end
 
 -- +down
 -- +begin
-ALTER TABLE trades CHANGE fee_currency fee_currency varchar(4) NOT NULL;
+SELECT 1;
 -- +end
