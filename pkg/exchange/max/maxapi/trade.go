@@ -220,7 +220,7 @@ func (r *PrivateTradeRequest) Do(ctx context.Context) (trades []Trade, err error
 		payload["offset"] = r.offset
 	}
 
-	req, err := r.client.NewAuthenticatedRequest(nil, "GET", "v2/trades/my", payload, nil)
+	req, err := r.client.newAuthenticatedRequest(nil, "GET", "v2/trades/my", nil, payload, nil)
 	if err != nil {
 		return trades, err
 	}
