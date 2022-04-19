@@ -1,4 +1,4 @@
-package mysql
+package sqlite3
 
 import (
 	"context"
@@ -7,11 +7,11 @@ import (
 )
 
 func init() {
-	AddMigration(upUpdateFeeCurrencyLength, downUpdateFeeCurrencyLength)
+	AddMigration(upFixFeeColumn, downFixFeeColumn)
 
 }
 
-func upUpdateFeeCurrencyLength(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
+func upFixFeeColumn(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
 	// This code is executed when the migration is applied.
 
 	_, err = tx.ExecContext(ctx, "SELECT 1;")
@@ -22,7 +22,7 @@ func upUpdateFeeCurrencyLength(ctx context.Context, tx rockhopper.SQLExecutor) (
 	return err
 }
 
-func downUpdateFeeCurrencyLength(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
+func downFixFeeColumn(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
 	// This code is executed when the migration is rolled back.
 
 	_, err = tx.ExecContext(ctx, "SELECT 1;")
