@@ -164,7 +164,7 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 		return nil, err
 	}
 
-	maxOrder, err := e.client.OrderService.Get(uint64(orderID))
+	maxOrder, err := e.client.OrderService.NewGetOrderRequest().Id(uint64(orderID)).Do(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -399,14 +399,14 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 	for _, o := range orphanOrders {
 		var req = e.client.OrderService.NewOrderCancelRequest()
 		if o.OrderID > 0 {
-			req.ID(o.OrderID)
+			req.Id(o.OrderID)
 		} else if len(o.ClientOrderID) > 0 && o.ClientOrderID != types.NoClientOrderID {
 			req.ClientOrderID(o.ClientOrderID)
 		} else {
 			return fmt.Errorf("order id or client order id is not defined, order=%+v", o)
 		}
 
-		if err := req.Do(ctx); err != nil {
+		if _, err := req.Do(ctx); err != nil {
 			log.WithError(err).Errorf("order cancel error")
 			err2 = err
 		}

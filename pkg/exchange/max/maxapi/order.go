@@ -1,11 +1,14 @@
 package max
 
+//go:generate -command GetRequest requestgen -method GET
+//go:generate -command PostRequest requestgen -method POST
+
 import (
 	"context"
 	"net/url"
-	"strconv"
 	"time"
 
+	"github.com/c9s/requestgen"
 	"github.com/pkg/errors"
 
 	"github.com/c9s/bbgo/pkg/types"
@@ -172,6 +175,40 @@ func (s *OrderService) Open(market string, options QueryOrderOptions) ([]Order, 
 	return orders, nil
 }
 
+//go:generate GetRequest -url "v2/orders/history" -type GetOrderHistoryRequest -responseType []Order
+type GetOrderHistoryRequest struct {
+	client requestgen.AuthenticatedAPIClient
+
+	market string `param:"market"`
+	fromID *int64  `param:"from_id"`
+	limit  *int   `param:"limit"`
+}
+
+func (s *OrderService) NewGetOrderHistoryRequest() *GetOrderHistoryRequest {
+	return &GetOrderHistoryRequest{
+		client: s.client,
+	}
+}
+
+//go:generate GetRequest -url "v2/orders" -type GetOrdersRequest -responseType []Order
+type GetOrdersRequest struct {
+	client requestgen.AuthenticatedAPIClient
+
+	market  string       `param:"market"`
+	side    *string      `param:"side"`
+	groupID *uint32      `param:"groupID"`
+	limit   *int         `param:"limit"`
+	page    *int         `param:"page"`
+	orderBy *string      `param:"order_by" default:"desc"`
+	state   []OrderState `param:"state"`
+}
+
+func (s *OrderService) NewGetOrdersRequest() *GetOrdersRequest {
+	return &GetOrdersRequest{
+		client: s.client,
+	}
+}
+
 // All returns all orders for the authenticated account.
 func (s *OrderService) All(market string, limit, page int, states ...OrderState) ([]Order, error) {
 	payload := map[string]interface{}{
@@ -200,51 +237,8 @@ func (s *OrderService) All(market string, limit, page int, states ...OrderState)
 	return orders, nil
 }
 
-// CancelAll active orders for the authenticated account.
-func (s *OrderService) CancelAll(side string, market string) error {
-	payload := map[string]interface{}{}
-	if side == "buy" || side == "sell" {
-		payload["side"] = side
-	}
-	if market != "all" {
-		payload["market"] = market
-	}
-
-	req, err := s.client.newAuthenticatedRequest(nil, "POST", "v2/orders/clear", nil, payload, relUrlV2OrdersClear)
-	if err != nil {
-		return err
-	}
-
-	_, err = s.client.SendRequest(req)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // Options carry the option fields for REST API
 type Options map[string]interface{}
-
-// Create a new order.
-func (s *OrderService) Create(market string, side string, volume float64, price float64, orderType string, options Options) (*Order, error) {
-	options["market"] = market
-	options["volume"] = strconv.FormatFloat(volume, 'f', -1, 64)
-	options["price"] = strconv.FormatFloat(price, 'f', -1, 64)
-	options["side"] = side
-	options["ord_type"] = orderType
-	response, err := s.client.sendAuthenticatedRequest("POST", "v2/orders", options)
-	if err != nil {
-		return nil, err
-	}
-
-	var order = Order{}
-	if err := response.DecodeJSON(&order); err != nil {
-		return nil, err
-	}
-
-	return &order, nil
-}
 
 // Create multiple order in a single request
 func (s *OrderService) CreateMulti(market string, orders []Order) (*MultiOrderResponse, error) {
@@ -254,151 +248,41 @@ func (s *OrderService) CreateMulti(market string, orders []Order) (*MultiOrderRe
 	return req.Do(context.Background())
 }
 
-// Cancel the order with id `orderID`.
-func (s *OrderService) Cancel(orderID uint64, clientOrderID string) error {
-	req := s.NewOrderCancelRequest()
-
-	if orderID > 0 {
-		req.ID(orderID)
-	} else if len(clientOrderID) > 0 {
-		req.ClientOrderID(clientOrderID)
-	}
-
-	return req.Do(context.Background())
-}
-
-type OrderCancelAllRequestParams struct {
-	*PrivateRequestParams
-
-	Side    string `json:"side,omitempty"`
-	Market  string `json:"market,omitempty"`
-	GroupID int64  `json:"groupID,omitempty"`
-}
-
+//go:generate PostRequest -url "v2/orders/clear" -type OrderCancelAllRequest -responseType []Order
 type OrderCancelAllRequest struct {
-	client *RestClient
+	client requestgen.AuthenticatedAPIClient
 
-	params OrderCancelAllRequestParams
-
-	side    *string
-	market  *string
-	groupID *uint32
-}
-
-func (r *OrderCancelAllRequest) Side(side string) *OrderCancelAllRequest {
-	r.side = &side
-	return r
-}
-
-func (r *OrderCancelAllRequest) Market(market string) *OrderCancelAllRequest {
-	r.market = &market
-	return r
-}
-
-func (r *OrderCancelAllRequest) GroupID(groupID uint32) *OrderCancelAllRequest {
-	r.groupID = &groupID
-	return r
-}
-
-func (r *OrderCancelAllRequest) Do(ctx context.Context) (orders []Order, err error) {
-	var payload = map[string]interface{}{}
-	if r.side != nil {
-		payload["side"] = *r.side
-	}
-	if r.market != nil {
-		payload["market"] = *r.market
-	}
-	if r.groupID != nil {
-		payload["groupID"] = *r.groupID
-	}
-
-	req, err := r.client.newAuthenticatedRequest(nil, "POST", "v2/orders/clear", nil, payload, nil)
-	if err != nil {
-		return
-	}
-
-	response, err := r.client.SendRequest(req)
-	if err != nil {
-		return
-	}
-
-	err = response.DecodeJSON(&orders)
-	return
+	side    *string `param:"side"`
+	market  *string `param:"market"`
+	groupID *uint32 `param:"groupID"`
 }
 
 func (s *OrderService) NewOrderCancelAllRequest() *OrderCancelAllRequest {
 	return &OrderCancelAllRequest{client: s.client}
 }
 
-type OrderCancelRequestParams struct {
-	*PrivateRequestParams
-
-	ID            uint64 `json:"id,omitempty"`
-	ClientOrderID string `json:"client_oid,omitempty"`
-}
-
+//go:generate PostRequest -url "v2/order/delete" -type OrderCancelRequest -responseType .Order
 type OrderCancelRequest struct {
-	client *RestClient
+	client requestgen.AuthenticatedAPIClient
 
-	params OrderCancelRequestParams
-}
-
-func (r *OrderCancelRequest) ID(id uint64) *OrderCancelRequest {
-	r.params.ID = id
-	return r
-}
-
-func (r *OrderCancelRequest) ClientOrderID(id string) *OrderCancelRequest {
-	r.params.ClientOrderID = id
-	return r
-}
-
-func (r *OrderCancelRequest) Do(ctx context.Context) error {
-	req, err := r.client.newAuthenticatedRequest(nil, "POST", "v2/order/delete", nil, &r.params, relUrlV2OrderDelete)
-	if err != nil {
-		return err
-	}
-
-	response, err := r.client.SendRequest(req)
-	if err != nil {
-		return err
-	}
-
-	var order = Order{}
-	if err := response.DecodeJSON(&order); err != nil {
-		return err
-	}
-
-	return err
+	id            *uint64 `param:"id,omitempty"`
+	clientOrderID *string `param:"client_oid,omitempty"`
 }
 
 func (s *OrderService) NewOrderCancelRequest() *OrderCancelRequest {
 	return &OrderCancelRequest{client: s.client}
 }
 
-// Status retrieves the given order from the API.
-func (s *OrderService) Get(orderID uint64) (*Order, error) {
-	payload := map[string]interface{}{
-		"id": orderID,
-	}
+//go:generate GetRequest -url "v2/order" -type GetOrderRequest -responseType .Order
+type GetOrderRequest struct {
+	client requestgen.AuthenticatedAPIClient
 
-	req, err := s.client.newAuthenticatedRequest(nil, "GET", "v2/order", nil, payload, relUrlV2Order)
-	if err != nil {
-		return &Order{}, err
-	}
+	id            *uint64 `param:"id,omitempty"`
+	clientOrderID *string `param:"client_oid,omitempty"`
+}
 
-	response, err := s.client.SendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var order = Order{}
-
-	if err := response.DecodeJSON(&order); err != nil {
-		return nil, err
-	}
-
-	return &order, nil
+func (s *OrderService) NewGetOrderRequest() *GetOrderRequest {
+	return &GetOrderRequest{client: s.client}
 }
 
 type MultiOrderRequestParams struct {
@@ -482,97 +366,19 @@ func (s *OrderService) NewCreateMultiOrderRequest() *CreateMultiOrderRequest {
 	return &CreateMultiOrderRequest{client: s.client}
 }
 
+//go:generate PostRequest -url "v2/orders" -type CreateOrderRequest -responseType .Order
 type CreateOrderRequest struct {
-	client *RestClient
+	client requestgen.AuthenticatedAPIClient
 
-	market        *string
-	volume        *string
-	price         *string
-	stopPrice     *string
-	side          *string
-	orderType     *string
-	clientOrderID *string
-	groupID       *string
-}
+	market    string `param:"market,required"`
+	side      string `param:"side,required"`
+	volume    string `param:"volume,required"`
+	orderType string `param:"ord_type"`
 
-func (r *CreateOrderRequest) Market(market string) *CreateOrderRequest {
-	r.market = &market
-	return r
-}
-
-func (r *CreateOrderRequest) Volume(volume string) *CreateOrderRequest {
-	r.volume = &volume
-	return r
-}
-
-func (r *CreateOrderRequest) Price(price string) *CreateOrderRequest {
-	r.price = &price
-	return r
-}
-
-func (r *CreateOrderRequest) StopPrice(price string) *CreateOrderRequest {
-	r.stopPrice = &price
-	return r
-}
-
-func (r *CreateOrderRequest) Side(side string) *CreateOrderRequest {
-	r.side = &side
-	return r
-}
-
-func (r *CreateOrderRequest) OrderType(orderType string) *CreateOrderRequest {
-	r.orderType = &orderType
-	return r
-}
-
-func (r *CreateOrderRequest) ClientOrderID(clientOrderID string) *CreateOrderRequest {
-	r.clientOrderID = &clientOrderID
-	return r
-}
-
-func (r *CreateOrderRequest) Do(ctx context.Context) (order *Order, err error) {
-	var payload = map[string]interface{}{
-		"market": r.market,
-		"volume": r.volume,
-		"side":   r.side,
-	}
-
-	if r.price != nil {
-		payload["price"] = r.price
-	}
-
-	if r.stopPrice != nil {
-		payload["stop_price"] = r.stopPrice
-	}
-
-	if r.orderType != nil {
-		payload["ord_type"] = r.orderType
-	}
-
-	if r.clientOrderID != nil {
-		payload["client_oid"] = r.clientOrderID
-	}
-
-	if r.groupID != nil {
-		payload["group_id"] = r.groupID
-	}
-
-	req, err := r.client.newAuthenticatedRequest(nil, "POST", "v2/orders", nil, payload, relUrlV2Orders)
-	if err != nil {
-		return order, errors.Wrapf(err, "order create error")
-	}
-
-	response, err := r.client.SendRequest(req)
-	if err != nil {
-		return order, err
-	}
-
-	order = &Order{}
-	if err := response.DecodeJSON(order); err != nil {
-		return nil, err
-	}
-
-	return order, err
+	price         *string `param:"price"`
+	stopPrice     *string `param:"stop_price"`
+	clientOrderID *string `param:"client_oid"`
+	groupID       *string `param:"group_id"`
 }
 
 func (s *OrderService) NewCreateOrderRequest() *CreateOrderRequest {
