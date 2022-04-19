@@ -11,7 +11,7 @@ CREATE TABLE `trades`
     `quantity`       DECIMAL(16, 8) UNSIGNED NOT NULL,
     `quote_quantity` DECIMAL(16, 8) UNSIGNED NOT NULL,
     `fee`            DECIMAL(16, 8) UNSIGNED NOT NULL,
-    `fee_currency`   VARCHAR(6)              NOT NULL,
+    `fee_currency`   VARCHAR(10)             NOT NULL,
     `is_buyer`       BOOLEAN                 NOT NULL DEFAULT FALSE,
     `is_maker`       BOOLEAN                 NOT NULL DEFAULT FALSE,
     `side`           VARCHAR(4)              NOT NULL DEFAULT '',
