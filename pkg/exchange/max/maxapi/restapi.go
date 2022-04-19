@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"math"
@@ -20,10 +21,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/c9s/bbgo/pkg/util"
-	"github.com/c9s/bbgo/pkg/version"
+	"github.com/c9s/requestgen"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/c9s/bbgo/pkg/util"
+	"github.com/c9s/bbgo/pkg/version"
 )
 
 const (
@@ -174,7 +177,7 @@ func (c *RestClient) getNonce() int64 {
 }
 
 // NewRequest create new API request. Relative url can be provided in refURL.
-func (c *RestClient) newRequest(method string, refURL string, params url.Values, body []byte) (*http.Request, error) {
+func (c *RestClient) NewRequest(ctx context.Context, method string, refURL string, params url.Values, payload interface{}) (*http.Request, error) {
 	rel, err := url.Parse(refURL)
 	if err != nil {
 		return nil, err
@@ -185,6 +188,12 @@ func (c *RestClient) newRequest(method string, refURL string, params url.Values,
 	var req *http.Request
 	u := c.BaseURL.ResolveReference(rel)
 
+
+	body, err := castPayload(payload)
+	if err != nil {
+		return nil, err
+	}
+
 	req, err = http.NewRequest(method, u.String(), bytes.NewReader(body))
 	if err != nil {
 		return nil, err
@@ -193,11 +202,12 @@ func (c *RestClient) newRequest(method string, refURL string, params url.Values,
 	if addUserAgentHeader {
 		req.Header.Add("User-Agent", UserAgent)
 	}
+
 	return req, nil
 }
 
-// newAuthenticatedRequest creates new http request for authenticated routes.
-func (c *RestClient) newAuthenticatedRequest(m string, refURL string, data interface{}, rel *url.URL) (*http.Request, error) {
+// NewAuthenticatedRequest creates new http request for authenticated routes.
+func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, m string, refURL string, data interface{}, rel *url.URL) (*http.Request, error) {
 	var err error
 	if rel == nil {
 		rel, err = url.Parse(refURL)
@@ -257,7 +267,7 @@ func (c *RestClient) newAuthenticatedRequest(m string, refURL string, data inter
 		return nil, errors.New("empty api secret")
 	}
 
-	req, err := c.newRequest(m, refURL, nil, p)
+	req, err := c.NewRequest(nil, m, refURL, nil, p)
 	if err != nil {
 		return nil, err
 	}
@@ -328,15 +338,15 @@ func (c *RestClient) Do(req *http.Request) (resp *http.Response, err error) {
 	return c.client.Do(req)
 }
 
-// sendRequest sends the request to the API server and handle the response
-func (c *RestClient) sendRequest(req *http.Request) (*util.Response, error) {
+// SendRequest sends the request to the API server and handle the response
+func (c *RestClient) SendRequest(req *http.Request) (*requestgen.Response, error) {
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 
 	// newResponse reads the response body and return a new Response object
-	response, err := util.NewResponse(resp)
+	response, err := requestgen.NewResponse(resp)
 	if err != nil {
 		return response, err
 	}
@@ -353,12 +363,12 @@ func (c *RestClient) sendRequest(req *http.Request) (*util.Response, error) {
 	return response, nil
 }
 
-func (c *RestClient) sendAuthenticatedRequest(m string, refURL string, data map[string]interface{}) (*util.Response, error) {
-	req, err := c.newAuthenticatedRequest(m, refURL, data, nil)
+func (c *RestClient) sendAuthenticatedRequest(m string, refURL string, data map[string]interface{}) (*requestgen.Response, error) {
+	req, err := c.NewAuthenticatedRequest(nil, m, refURL, data, nil)
 	if err != nil {
 		return nil, err
 	}
-	response, err := c.sendRequest(req)
+	response, err := c.SendRequest(req)
 	if err != nil {
 		return nil, err
 	}
@@ -413,7 +423,7 @@ type ErrorField struct {
 }
 
 type ErrorResponse struct {
-	*util.Response
+	*requestgen.Response
 	Err ErrorField `json:"error"`
 }
 
@@ -428,7 +438,7 @@ func (r *ErrorResponse) Error() string {
 }
 
 // ToErrorResponse tries to convert/parse the server response to the standard Error interface object
-func ToErrorResponse(response *util.Response) (errorResponse *ErrorResponse, err error) {
+func ToErrorResponse(response *requestgen.Response) (errorResponse *ErrorResponse, err error) {
 	errorResponse = &ErrorResponse{Response: response}
 
 	contentType := response.Header.Get("content-type")
@@ -446,4 +456,23 @@ func ToErrorResponse(response *util.Response) (errorResponse *ErrorResponse, err
 	}
 
 	return errorResponse, fmt.Errorf("unexpected response content type %s", contentType)
+}
+
+
+func castPayload(payload interface{}) ([]byte, error) {
+	if payload != nil {
+		switch v := payload.(type) {
+		case string:
+			return []byte(v), nil
+
+		case []byte:
+			return v, nil
+
+		default:
+			body, err := json.Marshal(v)
+			return body, err
+		}
+	}
+
+	return nil, nil
 }
