@@ -15,9 +15,9 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"reflect"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -224,18 +224,18 @@ func (c *RestClient) newAuthenticatedRequest(ctx context.Context, m string, refU
 	}
 
 	var p []byte
+	var payload map[string]interface{}
 
 	switch d := data.(type) {
 
 	case nil:
-		payload := map[string]interface{}{
+		payload = map[string]interface{}{
 			"nonce": c.getNonce(),
 			"path":  c.BaseURL.ResolveReference(rel).Path,
 		}
-		p, err = json.Marshal(payload)
 
 	case map[string]interface{}:
-		payload := map[string]interface{}{
+		payload = map[string]interface{}{
 			"nonce": c.getNonce(),
 			"path":  c.BaseURL.ResolveReference(rel).Path,
 		}
@@ -243,19 +243,22 @@ func (c *RestClient) newAuthenticatedRequest(ctx context.Context, m string, refU
 		for k, v := range d {
 			payload[k] = v
 		}
+	}
 
-		p, err = json.Marshal(payload)
-
-	default:
-		params, err := getPrivateRequestParamsObject(data)
-		if err != nil {
-			return nil, errors.Wrapf(err, "unsupported payload type: %T", d)
+	if m == "GET" {
+		for k, vs := range params {
+			k = strings.TrimSuffix(k, "[]")
+			if len(vs) == 1 {
+				payload[k] = vs[0]
+			} else {
+				payload[k] = vs
+			}
 		}
+	}
 
-		params.Nonce = c.getNonce()
-		params.Path = c.BaseURL.ResolveReference(rel).Path
-
-		p, err = json.Marshal(d)
+	p, err = castPayload(payload)
+	if err != nil {
+		return nil, err
 	}
 
 	if debugMaxRequestPayload {
@@ -282,8 +285,6 @@ func (c *RestClient) newAuthenticatedRequest(ctx context.Context, m string, refU
 	encoded := base64.StdEncoding.EncodeToString(p)
 
 	req.Header.Add("Content-Type", "application/json")
-	// accept is not necessary
-	// req.Header.Add("Accept", "application/json")
 	req.Header.Add("X-MAX-ACCESSKEY", c.APIKey)
 	req.Header.Add("X-MAX-PAYLOAD", encoded)
 	req.Header.Add("X-MAX-SIGNATURE", signPayload(encoded, c.APISecret))
@@ -298,38 +299,6 @@ func (c *RestClient) newAuthenticatedRequest(ctx context.Context, m string, refU
 	}
 
 	return req, nil
-}
-
-func getPrivateRequestParamsObject(v interface{}) (*PrivateRequestParams, error) {
-	vt := reflect.ValueOf(v)
-
-	if vt.Kind() == reflect.Ptr {
-		vt = vt.Elem()
-	}
-
-	if vt.Kind() != reflect.Struct {
-		return nil, errors.New("reflect error: given object is not a struct" + vt.Kind().String())
-	}
-
-	if !vt.CanSet() {
-		return nil, errors.New("reflect error: can not set object")
-	}
-
-	field := vt.FieldByName("PrivateRequestParams")
-	if !field.IsValid() {
-		return nil, errors.New("reflect error: field PrivateRequestParams not found")
-	}
-
-	if field.IsNil() {
-		field.Set(reflect.ValueOf(&PrivateRequestParams{}))
-	}
-
-	params, ok := field.Interface().(*PrivateRequestParams)
-	if !ok {
-		return nil, errors.New("reflect error: failed to cast value to *PrivateRequestParams")
-	}
-
-	return params, nil
 }
 
 func signPayload(payload string, secret string) string {
@@ -460,25 +429,27 @@ func ToErrorResponse(response *requestgen.Response) (errorResponse *ErrorRespons
 		// convert 5xx error from the HTML page to the ErrorResponse
 		errorResponse.Err.Message = htmlTagPattern.ReplaceAllLiteralString(string(response.Body), "")
 		return errorResponse, nil
+	case "text/plain":
+		errorResponse.Err.Message = string(response.Body)
+		return errorResponse, nil
 	}
 
 	return errorResponse, fmt.Errorf("unexpected response content type %s", contentType)
 }
 
 func castPayload(payload interface{}) ([]byte, error) {
-	if payload != nil {
-		switch v := payload.(type) {
-		case string:
-			return []byte(v), nil
-
-		case []byte:
-			return v, nil
-
-		default:
-			body, err := json.Marshal(v)
-			return body, err
-		}
+	if payload == nil {
+		return nil, nil
 	}
 
-	return nil, nil
+	switch v := payload.(type) {
+	case string:
+		return []byte(v), nil
+
+	case []byte:
+		return v, nil
+	}
+
+	body, err := json.Marshal(payload)
+	return body, err
 }

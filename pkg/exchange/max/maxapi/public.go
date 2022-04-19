@@ -1,6 +1,7 @@
 package max
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net/url"
@@ -11,7 +12,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/valyala/fastjson"
 
-    "github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -46,7 +47,7 @@ type Ticker struct {
 
 func (s *PublicService) Timestamp() (serverTimestamp int64, err error) {
 	// sync timestamp with server
-	req, err := s.client.NewRequest(nil, "GET", "v2/timestamp", nil, nil)
+	req, err := s.client.NewRequest(context.Background(), "GET", "v2/timestamp", nil, nil)
 	if err != nil {
 		return 0, err
 	}
@@ -65,7 +66,7 @@ func (s *PublicService) Timestamp() (serverTimestamp int64, err error) {
 }
 
 func (s *PublicService) Markets() ([]Market, error) {
-	req, err := s.client.NewRequest(nil, "GET", "v2/markets", url.Values{}, nil)
+	req, err := s.client.NewRequest(context.Background(), "GET", "v2/markets", url.Values{}, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +86,7 @@ func (s *PublicService) Markets() ([]Market, error) {
 
 func (s *PublicService) Tickers() (map[string]Ticker, error) {
 	var endPoint = "v2/tickers"
-	req, err := s.client.NewRequest(nil, "GET", endPoint, url.Values{}, nil)
+	req, err := s.client.NewRequest(context.Background(), "GET", endPoint, url.Values{}, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +117,7 @@ func (s *PublicService) Tickers() (map[string]Ticker, error) {
 
 func (s *PublicService) Ticker(market string) (*Ticker, error) {
 	var endPoint = "v2/tickers/" + market
-	req, err := s.client.NewRequest(nil, "GET", endPoint, url.Values{}, nil)
+	req, err := s.client.NewRequest(context.Background(), "GET", endPoint, url.Values{}, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -250,7 +251,7 @@ func (s *PublicService) KLines(symbol string, resolution string, start time.Time
 		queries.Set("limit", strconv.Itoa(limit)) // default to 30, max limit = 10,000
 	}
 
-	req, err := s.client.NewRequest(nil, "GET", fmt.Sprintf("%s/k", s.client.BaseURL), queries, nil)
+	req, err := s.client.NewRequest(context.Background(), "GET", fmt.Sprintf("%s/k", s.client.BaseURL), queries, nil)
 	if err != nil {
 		return nil, fmt.Errorf("request build error: %s", err.Error())
 	}
