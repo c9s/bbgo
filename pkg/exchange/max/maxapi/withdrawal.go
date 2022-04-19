@@ -71,12 +71,12 @@ func (r *WithdrawalRequest) Do(ctx context.Context) (*Withdraw, error) {
 		"amount":                r.amount,
 	}
 
-	req, err := r.client.newAuthenticatedRequest("POST", "v2/withdrawal", payload, nil)
+	req, err := r.client.NewAuthenticatedRequest(nil, "POST", "v2/withdrawal", payload, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := r.client.sendRequest(req)
+	response, err := r.client.SendRequest(req)
 	if err != nil {
 		return nil, err
 	}
@@ -121,12 +121,12 @@ func (r *GetWithdrawalAddressesRequest) Do(ctx context.Context) ([]WithdrawalAdd
 		"currency": r.currency,
 	}
 
-	req, err := r.client.newAuthenticatedRequest("GET", "v2/withdraw_addresses", payload, nil)
+	req, err := r.client.NewAuthenticatedRequest(nil, "GET", "v2/withdraw_addresses", payload, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := r.client.sendRequest(req)
+	response, err := r.client.SendRequest(req)
 	if err != nil {
 		return nil, err
 	}
