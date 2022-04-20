@@ -145,17 +145,17 @@ func (s *Stream) Subscribe(channel types.Channel, symbol string, option types.Su
 }
 
 func (s *Stream) pollKLines(ctx context.Context) {
-
-	lastClosed := map[types.Interval]time.Time{}
+	lastClosed := make(map[string]map[types.Interval]time.Time, 0)
 	// get current kline candle
 	for _, sub := range s.klineSubscriptions {
 		klines := getLast2KLine(s.exchange, ctx, sub.symbol, sub.interval)
+		lastClosed[sub.symbol] = make(map[types.Interval]time.Time, 0)
 		if len(klines) > 0 {
 			// handle mutiple klines, get the latest one
-			if lastClosed[sub.interval].Unix() < klines[0].StartTime.Unix() {
+			if lastClosed[sub.symbol][sub.interval].Unix() < klines[0].StartTime.Unix() {
 				s.EmitKLine(klines[0])
 				s.EmitKLineClosed(klines[0])
-				lastClosed[sub.interval] = klines[0].StartTime.Time()
+				lastClosed[sub.symbol][sub.interval] = klines[0].StartTime.Time()
 			}
 
 			if len(klines) > 1 {
@@ -187,10 +187,10 @@ func (s *Stream) pollKLines(ctx context.Context) {
 
 				if len(klines) > 0 {
 					// handle mutiple klines, get the latest one
-					if lastClosed[sub.interval].Unix() < klines[0].StartTime.Unix() {
+					if lastClosed[sub.symbol][sub.interval].Unix() < klines[0].StartTime.Unix() {
 						s.EmitKLine(klines[0])
 						s.EmitKLineClosed(klines[0])
-						lastClosed[sub.interval] = klines[0].StartTime.Time()
+						lastClosed[sub.symbol][sub.interval] = klines[0].StartTime.Time()
 					}
 
 					if len(klines) > 1 {
