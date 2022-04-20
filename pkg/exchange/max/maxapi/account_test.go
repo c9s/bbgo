@@ -52,3 +52,21 @@ func TestAccountService_GetAccountRequest(t *testing.T) {
 	assert.NotNil(t, account)
 	t.Logf("account: %+v", account)
 }
+
+func TestAccountService_GetVipLevelRequest(t *testing.T) {
+	key, secret, ok := integrationTestConfigured(t, "MAX")
+	if !ok {
+		t.SkipNow()
+	}
+
+	ctx := context.Background()
+
+	client := NewRestClient(ProductionAPIURL)
+	client.Auth(key, secret)
+
+	req := client.AccountService.NewGetVipLevelRequest()
+	vipLevel, err := req.Do(ctx)
+	assert.NoError(t, err)
+	assert.NotNil(t, vipLevel)
+	t.Logf("vipLevel: %+v", vipLevel)
+}
