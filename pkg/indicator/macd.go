@@ -29,25 +29,16 @@ type MACD struct {
 	UpdateCallbacks []func(value float64)
 }
 
-func (inc *MACD) calculateMACD(kLines []types.KLine, priceF KLinePriceMapper) float64 {
-	for _, kline := range kLines {
-		inc.Update(kline, priceF)
-	}
-	return inc.Values[len(inc.Values)-1]
-}
-
-func (inc *MACD) Update(kLine types.KLine, priceF KLinePriceMapper) {
+func (inc *MACD) Update(x float64) {
 	if len(inc.Values) == 0 {
 		inc.FastEWMA = EWMA{IntervalWindow: types.IntervalWindow{Window: inc.ShortPeriod}}
 		inc.SlowEWMA = EWMA{IntervalWindow: types.IntervalWindow{Window: inc.LongPeriod}}
 		inc.SignalLine = EWMA{IntervalWindow: types.IntervalWindow{Window: inc.Window}}
 	}
 
-	price := priceF(kLine)
-
 	// update fast and slow ema
-	inc.FastEWMA.Update(price)
-	inc.SlowEWMA.Update(price)
+	inc.FastEWMA.Update(x)
+	inc.SlowEWMA.Update(x)
 
 	// update macd
 	macd := inc.FastEWMA.Last() - inc.SlowEWMA.Last()
@@ -60,18 +51,23 @@ func (inc *MACD) Update(kLine types.KLine, priceF KLinePriceMapper) {
 	inc.Histogram.Push(macd - inc.SignalLine.Last())
 }
 
+func (inc *MACD) calculateMACD(kLines []types.KLine, priceF KLinePriceMapper) float64 {
+	for _, kline := range kLines {
+		inc.Update(kline.Close.Float64())
+	}
+	return inc.Values[len(inc.Values)-1]
+}
+
 func (inc *MACD) calculateAndUpdate(kLines []types.KLine) {
 	if len(kLines) == 0 {
 		return
 	}
 
-	var priceF = KLineClosePriceMapper
-
 	for _, k := range kLines {
 		if inc.EndTime != zeroTime && !k.EndTime.After(inc.EndTime) {
 			continue
 		}
-		inc.Update(k, priceF)
+		inc.Update(k.Close.Float64())
 	}
 
 	inc.EmitUpdate(inc.Values[len(inc.Values)-1])

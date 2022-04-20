@@ -24,8 +24,7 @@ type RSI struct {
 	UpdateCallbacks []func(value float64)
 }
 
-func (inc *RSI) Update(kline types.KLine, priceF KLinePriceMapper) {
-	price := priceF(kline)
+func (inc *RSI) Update(price float64) {
 	inc.Prices.Push(price)
 
 	if len(inc.Prices) < inc.Window+1 {
@@ -78,13 +77,11 @@ func (inc *RSI) Length() int {
 var _ types.Series = &RSI{}
 
 func (inc *RSI) calculateAndUpdate(kLines []types.KLine) {
-	var priceF = KLineClosePriceMapper
-
 	for _, k := range kLines {
 		if inc.EndTime != zeroTime && !k.EndTime.After(inc.EndTime) {
 			continue
 		}
-		inc.Update(k, priceF)
+		inc.Update(k.Close.Float64())
 	}
 
 	inc.EmitUpdate(inc.Last())
