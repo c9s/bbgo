@@ -181,7 +181,7 @@ type Strategy struct {
 	trailingStopControl *TrailingStopControl
 
 	// StrategyController
-	strategyController bbgo.StrategyController
+	bbgo.StrategyController
 }
 
 func (s *Strategy) ID() string {
@@ -210,6 +210,46 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	if s.LongTermMovingAverage != zeroiw {
 		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: string(s.LongTermMovingAverage.Interval)})
 	}
+}
+
+func (s *Strategy) CurrentPosition() *types.Position {
+	return s.state.Position
+}
+
+func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Value) error {
+	base := s.state.Position.GetBase()
+	if base.IsZero() {
+		return fmt.Errorf("no opened %s position", s.state.Position.Symbol)
+	}
+
+	// make it negative
+	quantity := base.Mul(percentage).Abs()
+	side := types.SideTypeBuy
+	if base.Sign() > 0 {
+		side = types.SideTypeSell
+	}
+
+	if quantity.Compare(s.Market.MinQuantity) < 0 {
+		return fmt.Errorf("order quantity %v is too small, less than %v", quantity, s.Market.MinQuantity)
+	}
+
+	submitOrder := types.SubmitOrder{
+		Symbol:   s.Symbol,
+		Side:     side,
+		Type:     types.OrderTypeMarket,
+		Quantity: quantity,
+		Market:   s.Market,
+	}
+
+	s.Notify("Submitting %s %s order to close position by %v", s.Symbol, side.String(), percentage, submitOrder)
+
+	createdOrders, err := s.submitOrders(ctx, s.orderExecutor, submitOrder)
+	if err != nil {
+		log.WithError(err).Errorf("can not place position close order")
+	}
+
+	s.orderStore.Add(createdOrders...)
+	return err
 }
 
 func (s *Strategy) SaveState() error {
@@ -350,55 +390,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderExecutor = orderExecutor
 
 	// StrategyController
-	s.strategyController.Status = types.StrategyStatusRunning
+	s.Status = types.StrategyStatusRunning
 
-	s.strategyController.OnGetStatus(func() types.StrategyStatus {
-		return s.strategyController.Status
-	})
-
-	s.strategyController.OnGetPosition(func() *types.Position {
-		return s.state.Position
-	})
-
-	s.strategyController.OnClosePosition(func(percentage fixedpoint.Value) error {
-		base := s.state.Position.GetBase()
-		if base.IsZero() {
-			return fmt.Errorf("no opened %s position", s.state.Position.Symbol)
-		}
-
-		// make it negative
-		quantity := base.Mul(percentage).Abs()
-		side := types.SideTypeBuy
-		if base.Sign() > 0 {
-			side = types.SideTypeSell
-		}
-
-		if quantity.Compare(s.Market.MinQuantity) < 0 {
-			return fmt.Errorf("order quantity %v is too small, less than %v", quantity, s.Market.MinQuantity)
-		}
-
-		submitOrder := types.SubmitOrder{
-			Symbol:   s.Symbol,
-			Side:     side,
-			Type:     types.OrderTypeMarket,
-			Quantity: quantity,
-			Market:   s.Market,
-		}
-
-		s.Notify("Submitting %s %s order to close position by %v", s.Symbol, side.String(), percentage, submitOrder)
-
-		createdOrders, err := s.submitOrders(ctx, s.orderExecutor, submitOrder)
-		if err != nil {
-			log.WithError(err).Errorf("can not place position close order")
-		}
-
-		s.orderStore.Add(createdOrders...)
-		return err
-	})
-
-	s.strategyController.OnSuspend(func() error {
-		s.strategyController.Status = types.StrategyStatusStopped
-
+	s.OnSuspend(func() error {
 		var err error = nil
 		// Cancel all order
 		for _, order := range s.orderStore.Orders() {
@@ -422,17 +416,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		return err
 	})
 
-	s.strategyController.OnResume(func() error {
-		s.strategyController.Status = types.StrategyStatusRunning
-
-		return nil
-	})
-
-	s.strategyController.OnEmergencyStop(func() error {
+	s.OnEmergencyStop(func() error {
 		// Close 100% position
 		percentage, _ := fixedpoint.NewFromString("100%")
-		err := s.strategyController.EmitClosePosition(percentage)
-		err2 := s.strategyController.EmitSuspend()
+		err := s.ClosePosition(context.Background(), percentage)
+		err2 := s.Suspend()
 
 		if err2 != nil {
 			if err != nil {
@@ -514,7 +502,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		// Update trailing stop when the position changes
 		s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
 			// StrategyController
-			if s.strategyController.Status != types.StrategyStatusRunning {
+			if s.Status != types.StrategyStatusRunning {
 				return
 			}
 
@@ -566,7 +554,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		// StrategyController
-		if s.strategyController.Status != types.StrategyStatusRunning {
+		if s.Status != types.StrategyStatusRunning {
 			return
 		}
 
