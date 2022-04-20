@@ -7,6 +7,8 @@ import (
 	"context"
 
 	"github.com/c9s/requestgen"
+
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 type AccountService struct {
@@ -15,10 +17,12 @@ type AccountService struct {
 
 // Account is for max rest api v2, Balance and Type will be conflict with types.PrivateBalanceUpdate
 type Account struct {
-	Currency string `json:"currency"`
-	Balance  string `json:"balance"`
-	Locked   string `json:"locked"`
-	Type     string `json:"type"`
+	Currency     string           `json:"currency"`
+	Balance      fixedpoint.Value `json:"balance"`
+	Locked       fixedpoint.Value `json:"locked"`
+	Type         string           `json:"type"`
+	FiatCurrency string           `json:"fiat_currency"`
+	FiatBalance  fixedpoint.Value `json:"fiat_balance"`
 }
 
 // Balance is for kingfisher
@@ -96,6 +100,10 @@ type GetAccountRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
 	currency string `param:"currency,slug"`
+}
+
+func (s *AccountService) NewGetAccountRequest() *GetAccountRequest {
+	return &GetAccountRequest{client: s.client}
 }
 
 func (s *AccountService) NewGetWithdrawalHistoryRequest() *GetWithdrawHistoryRequest {
