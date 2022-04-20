@@ -70,3 +70,23 @@ func TestAccountService_GetVipLevelRequest(t *testing.T) {
 	assert.NotNil(t, vipLevel)
 	t.Logf("vipLevel: %+v", vipLevel)
 }
+
+func TestAccountService_GetWithdrawHistoryRequest(t *testing.T) {
+	key, secret, ok := integrationTestConfigured(t, "MAX")
+	if !ok {
+		t.SkipNow()
+	}
+
+	ctx := context.Background()
+
+	client := NewRestClient(ProductionAPIURL)
+	client.Auth(key, secret)
+
+	req := client.AccountService.NewGetWithdrawalHistoryRequest()
+	req.Currency("usdt")
+	withdraws, err := req.Do(ctx)
+	assert.NoError(t, err)
+	assert.NotNil(t, withdraws)
+	assert.NotEmpty(t, withdraws)
+	t.Logf("withdraws: %+v", withdraws)
+}

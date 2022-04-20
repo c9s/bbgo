@@ -4,8 +4,6 @@ package max
 //go:generate -command PostRequest requestgen -method POST
 
 import (
-	"context"
-
 	"github.com/c9s/requestgen"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -81,27 +79,7 @@ type GetVipLevelRequest struct {
 }
 
 func (s *AccountService) NewGetVipLevelRequest() *GetVipLevelRequest {
-	return &GetVipLevelRequest{ client: s.client }
-}
-
-func (s *AccountService) VipLevel() (*VipLevel, error) {
-	req, err := s.client.newAuthenticatedRequest(context.Background(), "GET", "v2/members/vip_level", nil, nil, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := s.client.SendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var vipLevel VipLevel
-	err = response.DecodeJSON(&vipLevel)
-	if err != nil {
-		return nil, err
-	}
-
-	return &vipLevel, nil
+	return &GetVipLevelRequest{client: s.client}
 }
 
 //go:generate GetRequest -url "v2/members/accounts/:currency" -type GetAccountRequest -responseType .Account
@@ -113,12 +91,6 @@ type GetAccountRequest struct {
 
 func (s *AccountService) NewGetAccountRequest() *GetAccountRequest {
 	return &GetAccountRequest{client: s.client}
-}
-
-func (s *AccountService) NewGetWithdrawalHistoryRequest() *GetWithdrawHistoryRequest {
-	return &GetWithdrawHistoryRequest{
-		client: s.client,
-	}
 }
 
 //go:generate GetRequest -url "v2/members/accounts" -type GetAccountsRequest -responseType []Account
@@ -170,13 +142,13 @@ func (s *AccountService) NewGetDepositHistoryRequest() *GetDepositHistoryRequest
 }
 
 type Withdraw struct {
-	UUID            string `json:"uuid"`
-	Currency        string `json:"currency"`
-	CurrencyVersion string `json:"currency_version"` // "eth"
-	Amount          string `json:"amount"`
-	Fee             string `json:"fee"`
-	FeeCurrency     string `json:"fee_currency"`
-	TxID            string `json:"txid"`
+	UUID            string           `json:"uuid"`
+	Currency        string           `json:"currency"`
+	CurrencyVersion string           `json:"currency_version"` // "eth"
+	Amount          fixedpoint.Value `json:"amount"`
+	Fee             fixedpoint.Value `json:"fee"`
+	FeeCurrency     string           `json:"fee_currency"`
+	TxID            string           `json:"txid"`
 
 	// State can be "submitting", "submitted",
 	//     "rejected", "accepted", "suspect", "approved", "delisted_processing",
@@ -195,9 +167,15 @@ type Withdraw struct {
 type GetWithdrawHistoryRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
-	currency string `param:"currency"`
-	from     int64  `param:"from"`  // seconds
-	to       int64  `param:"to"`    // seconds
-	state    string `param:"state"` // submitting, submitted, rejected, accepted, checking, refunded, canceled, suspect
-	limit    int    `param:"limit"`
+	currency string  `param:"currency"`
+	from     *int64  `param:"from"`  // seconds
+	to       *int64  `param:"to"`    // seconds
+	state    *string `param:"state"` // submitting, submitted, rejected, accepted, checking, refunded, canceled, suspect
+	limit    *int    `param:"limit"`
+}
+
+func (s *AccountService) NewGetWithdrawalHistoryRequest() *GetWithdrawHistoryRequest {
+	return &GetWithdrawHistoryRequest{
+		client: s.client,
+	}
 }
