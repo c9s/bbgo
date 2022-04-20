@@ -621,7 +621,7 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 		return nil, err
 	}
 
-	userInfo, err := e.client.AccountService.Me()
+	userInfo, err := e.client.AccountService.NewGetMeRequest()
 	if err != nil {
 		return nil, err
 	}
@@ -818,7 +818,7 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 		return nil, err
 	}
 
-	accounts, err := e.client.AccountService.Accounts()
+	accounts, err := e.client.AccountService.NewGetAccountsRequest().Do(ctx)
 	if err != nil {
 		return nil, err
 	}
