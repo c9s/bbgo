@@ -245,14 +245,12 @@ func (c *RestClient) newAuthenticatedRequest(ctx context.Context, m string, refU
 		}
 	}
 
-	if m == "GET" {
-		for k, vs := range params {
-			k = strings.TrimSuffix(k, "[]")
-			if len(vs) == 1 {
-				payload[k] = vs[0]
-			} else {
-				payload[k] = vs
-			}
+	for k, vs := range params {
+		k = strings.TrimSuffix(k, "[]")
+		if len(vs) == 1 {
+			payload[k] = vs[0]
+		} else {
+			payload[k] = vs
 		}
 	}
 
