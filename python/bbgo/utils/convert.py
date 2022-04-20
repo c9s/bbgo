@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Union
 
 
-def parse_float(s: str) -> float:
+def parse_float(s: Union[str, float]) -> float:
     if s is None:
         return 0
 
