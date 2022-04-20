@@ -16,7 +16,6 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"regexp"
-	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -347,17 +346,6 @@ func (c *RestClient) sendAuthenticatedRequest(m string, refURL string, data map[
 		return nil, err
 	}
 	return response, err
-}
-
-// FIXME: should deprecate the polling usage from the websocket struct
-func (c *RestClient) GetTrades(market string, lastTradeID int64) ([]byte, error) {
-	params := url.Values{}
-	params.Add("market", market)
-	if lastTradeID > 0 {
-		params.Add("from", strconv.Itoa(int(lastTradeID)))
-	}
-
-	return c.get("/trades", params)
 }
 
 // get sends GET http request to the api endpoint, the urlPath must start with a slash '/'
