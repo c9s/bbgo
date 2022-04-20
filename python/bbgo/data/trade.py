@@ -6,6 +6,7 @@ from datetime import datetime
 import bbgo_pb2
 
 from ..enums import SideType
+from ..utils import parse_float
 from ..utils import parse_time
 
 
@@ -14,7 +15,7 @@ class Trade:
     session: str
     exchange: str
     symbol: str
-    id: str
+    trade_id: str
     price: float
     quantity: float
     created_at: datetime
@@ -30,11 +31,11 @@ class Trade:
             exchange=obj.exchange,
             symbol=obj.symbol,
             id=obj.id,
-            price=float(obj.price),
-            quantity=float(obj.quantity),
+            price=parse_float(obj.price),
+            quantity=parse_float(obj.quantity),
             created_at=parse_time(obj.created_at),
             side=SideType(obj.side),
             fee_currency=obj.fee_currency,
-            fee=float(obj.fee),
+            fee=parse_float(obj.fee),
             maker=obj.maker,
         )
