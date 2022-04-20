@@ -105,74 +105,42 @@ type Order struct {
 
 // Open returns open orders
 func (s *OrderService) Closed(market string, options QueryOrderOptions) ([]Order, error) {
-	payload := map[string]interface{}{
-		"market": market,
-		"state":  []OrderState{OrderStateDone, OrderStateCancel},
-	}
+	req := s.NewGetOrdersRequest()
+	req.Market(market)
+	req.State([]OrderState{OrderStateDone, OrderStateCancel})
 
 	if options.GroupID > 0 {
-		payload["group_id"] = options.GroupID
+		req.GroupID(uint32(options.GroupID))
 	}
 	if options.Offset > 0 {
-		payload["offset"] = options.Offset
+		req.Offset(options.Offset)
 	}
 	if options.Limit > 0 {
-		payload["limit"] = options.Limit
+		req.Limit(options.Limit)
 	}
+
 	if options.Page > 0 {
-		payload["page"] = options.Page
+		req.Page(options.Page)
 	}
+
 	if len(options.OrderBy) > 0 {
-		payload["order_by"] = options.OrderBy
+		req.OrderBy(options.OrderBy)
 	}
 
-	req, err := s.client.newAuthenticatedRequest(context.Background(), "GET", "v2/orders", nil, payload, relUrlV2Orders)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := s.client.SendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var orders []Order
-	if err := response.DecodeJSON(&orders); err != nil {
-		return nil, err
-	}
-
-	return orders, nil
+	return req.Do(context.Background())
 }
 
 // Open returns open orders
 func (s *OrderService) Open(market string, options QueryOrderOptions) ([]Order, error) {
-	payload := map[string]interface{}{
-		"market": market,
-		// "state":    []OrderState{OrderStateWait, OrderStateConvert},
-		"order_by":   "desc",
-		"pagination": false,
-	}
+	req := s.NewGetOrdersRequest()
+	req.Market(market)
+	// state default ot wait and convert
 
 	if options.GroupID > 0 {
-		payload["group_id"] = options.GroupID
+		req.GroupID(uint32(options.GroupID))
 	}
 
-	req, err := s.client.newAuthenticatedRequest(context.Background(), "GET", "v2/orders", nil, payload, relUrlV2Orders)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := s.client.SendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var orders []Order
-	if err := response.DecodeJSON(&orders); err != nil {
-		return nil, err
-	}
-
-	return orders, nil
+	return req.Do(context.Background())
 }
 
 //go:generate GetRequest -url "v2/orders/history" -type GetOrderHistoryRequest -responseType []Order
@@ -180,7 +148,7 @@ type GetOrderHistoryRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
 	market string `param:"market"`
-	fromID *int64  `param:"from_id"`
+	fromID *int64 `param:"from_id"`
 	limit  *int   `param:"limit"`
 }
 
@@ -197,6 +165,7 @@ type GetOrdersRequest struct {
 	market  string       `param:"market"`
 	side    *string      `param:"side"`
 	groupID *uint32      `param:"groupID"`
+	offset  *int         `param:"offset"`
 	limit   *int         `param:"limit"`
 	page    *int         `param:"page"`
 	orderBy *string      `param:"order_by" default:"desc"`

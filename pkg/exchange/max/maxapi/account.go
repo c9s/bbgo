@@ -91,24 +91,11 @@ func (s *AccountService) VipLevel() (*VipLevel, error) {
 	return &vipLevel, nil
 }
 
-func (s *AccountService) Account(currency string) (*Account, error) {
-	req, err := s.client.newAuthenticatedRequest(context.Background(), "GET", "v2/members/accounts/"+currency, nil, nil, nil)
-	if err != nil {
-		return nil, err
-	}
+//go:generate GetRequest -url "v2/members/accounts/:currency" -type GetAccountRequest -responseType .Account
+type GetAccountRequest struct {
+	client requestgen.AuthenticatedAPIClient
 
-	response, err := s.client.SendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var account Account
-	err = response.DecodeJSON(&account)
-	if err != nil {
-		return nil, err
-	}
-
-	return &account, nil
+	currency string `param:"currency,slug"`
 }
 
 func (s *AccountService) NewGetWithdrawalHistoryRequest() *GetWithdrawHistoryRequest {
@@ -117,56 +104,23 @@ func (s *AccountService) NewGetWithdrawalHistoryRequest() *GetWithdrawHistoryReq
 	}
 }
 
-
-//go:generate GetRequest -url "v2/members/accounts" -type GetAccountsRequest -responseDataType []Account
+//go:generate GetRequest -url "v2/members/accounts" -type GetAccountsRequest -responseType []Account
 type GetAccountsRequest struct {
 	client requestgen.AuthenticatedAPIClient
 }
 
-
-func (s *AccountService) NewAccountsRequest() *GetAccountsRequest {
+func (s *AccountService) NewGetAccountsRequest() *GetAccountsRequest {
 	return &GetAccountsRequest{client: s.client}
 }
 
-func (s *AccountService) Accounts() ([]Account, error) {
-	req, err := s.client.newAuthenticatedRequest(context.Background(), "GET", "v2/members/accounts", nil, nil, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := s.client.SendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var accounts []Account
-	err = response.DecodeJSON(&accounts)
-	if err != nil {
-		return nil, err
-	}
-
-	return accounts, nil
+//go:generate GetRequest -url "v2/members/me" -type GetMeRequest -responseType .UserInfo
+type GetMeRequest struct {
+	client requestgen.AuthenticatedAPIClient
 }
 
-// Me returns the current user info by the current used MAX key and secret
-func (s *AccountService) Me() (*UserInfo, error) {
-	req, err := s.client.newAuthenticatedRequest(context.Background(), "GET", "v2/members/me", nil, nil, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := s.client.SendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var m = UserInfo{}
-	err = response.DecodeJSON(&m)
-	if err != nil {
-		return nil, err
-	}
-
-	return &m, nil
+// NewGetMeRequest returns the current user info by the current used MAX key and secret
+func (s *AccountService) NewGetMeRequest() *GetMeRequest {
+	return &GetMeRequest{client: s.client}
 }
 
 type Deposit struct {
@@ -181,62 +135,15 @@ type Deposit struct {
 	UpdatedAt       int64  `json:"updated_at"`
 }
 
-type GetDepositHistoryRequestParams struct {
-	*PrivateRequestParams
-
-	Currency string `json:"currency,omitempty"`
-	From     int64  `json:"from,omitempty"`  // seconds
-	To       int64  `json:"to,omitempty"`    // seconds
-	State    string `json:"state,omitempty"` // submitting, submitted, rejected, accepted, checking, refunded, canceled, suspect
-	Limit    int    `json:"limit,omitempty"`
-}
-
+//go:generate GetRequest -url "v2/deposits" -type GetDepositHistoryRequest -responseType []Deposit
 type GetDepositHistoryRequest struct {
-	client *RestClient
-	params GetDepositHistoryRequestParams
-}
+	client requestgen.AuthenticatedAPIClient
 
-func (r *GetDepositHistoryRequest) State(state string) *GetDepositHistoryRequest {
-	r.params.State = state
-	return r
-}
-
-func (r *GetDepositHistoryRequest) Currency(currency string) *GetDepositHistoryRequest {
-	r.params.Currency = currency
-	return r
-}
-
-func (r *GetDepositHistoryRequest) Limit(limit int) *GetDepositHistoryRequest {
-	r.params.Limit = limit
-	return r
-}
-
-func (r *GetDepositHistoryRequest) From(from int64) *GetDepositHistoryRequest {
-	r.params.From = from
-	return r
-}
-
-func (r *GetDepositHistoryRequest) To(to int64) *GetDepositHistoryRequest {
-	r.params.To = to
-	return r
-}
-
-func (r *GetDepositHistoryRequest) Do(ctx context.Context) (deposits []Deposit, err error) {
-	req, err := r.client.newAuthenticatedRequest(context.Background(), "GET", "v2/deposits", nil, &r.params, nil)
-	if err != nil {
-		return deposits, err
-	}
-
-	response, err := r.client.SendRequest(req)
-	if err != nil {
-		return deposits, err
-	}
-
-	if err := response.DecodeJSON(&deposits); err != nil {
-		return deposits, err
-	}
-
-	return deposits, err
+	currency string `param:"currency"`
+	from     int64  `param:"from"`  // seconds
+	to       int64  `param:"to"`    // seconds
+	state    string `param:"state"` // submitting, submitted, rejected, accepted, checking, refunded, canceled, suspect
+	limit    int    `param:"limit"`
 }
 
 func (s *AccountService) NewGetDepositHistoryRequest() *GetDepositHistoryRequest {
@@ -267,60 +174,13 @@ type Withdraw struct {
 	Notes         string `json:"notes"`
 }
 
-type GetWithdrawHistoryRequestParams struct {
-	*PrivateRequestParams
-
-	Currency string `json:"currency,omitempty"`
-	From     int64  `json:"from,omitempty"`  // seconds
-	To       int64  `json:"to,omitempty"`    // seconds
-	State    string `json:"state,omitempty"` // submitting, submitted, rejected, accepted, checking, refunded, canceled, suspect
-	Limit    int    `json:"limit,omitempty"`
-}
-
+//go:generate GetRequest -url "v2/withdrawals" -type GetWithdrawHistoryRequest -responseType []Withdraw
 type GetWithdrawHistoryRequest struct {
-	client *RestClient
-	params GetWithdrawHistoryRequestParams
-}
+	client requestgen.AuthenticatedAPIClient
 
-func (r *GetWithdrawHistoryRequest) State(state string) *GetWithdrawHistoryRequest {
-	r.params.State = state
-	return r
-}
-
-func (r *GetWithdrawHistoryRequest) Currency(currency string) *GetWithdrawHistoryRequest {
-	r.params.Currency = currency
-	return r
-}
-
-func (r *GetWithdrawHistoryRequest) Limit(limit int) *GetWithdrawHistoryRequest {
-	r.params.Limit = limit
-	return r
-}
-
-func (r *GetWithdrawHistoryRequest) From(from int64) *GetWithdrawHistoryRequest {
-	r.params.From = from
-	return r
-}
-
-func (r *GetWithdrawHistoryRequest) To(to int64) *GetWithdrawHistoryRequest {
-	r.params.To = to
-	return r
-}
-
-func (r *GetWithdrawHistoryRequest) Do(ctx context.Context) (withdraws []Withdraw, err error) {
-	req, err := r.client.newAuthenticatedRequest(context.Background(), "GET", "v2/withdrawals", nil, &r.params, nil)
-	if err != nil {
-		return withdraws, err
-	}
-
-	response, err := r.client.SendRequest(req)
-	if err != nil {
-		return withdraws, err
-	}
-
-	if err := response.DecodeJSON(&withdraws); err != nil {
-		return withdraws, err
-	}
-
-	return withdraws, err
+	currency string `param:"currency"`
+	from     int64  `param:"from"`  // seconds
+	to       int64  `param:"to"`    // seconds
+	state    string `param:"state"` // submitting, submitted, rejected, accepted, checking, refunded, canceled, suspect
+	limit    int    `param:"limit"`
 }

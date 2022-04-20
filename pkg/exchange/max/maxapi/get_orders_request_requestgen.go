@@ -26,6 +26,11 @@ func (g *GetOrdersRequest) GroupID(groupID uint32) *GetOrdersRequest {
 	return g
 }
 
+func (g *GetOrdersRequest) Offset(offset int) *GetOrdersRequest {
+	g.offset = &offset
+	return g
+}
+
 func (g *GetOrdersRequest) Limit(limit int) *GetOrdersRequest {
 	g.limit = &limit
 	return g
@@ -80,6 +85,14 @@ func (g *GetOrdersRequest) GetParameters() (map[string]interface{}, error) {
 
 		// assign parameter of groupID
 		params["groupID"] = groupID
+	} else {
+	}
+	// check offset field -> json key offset
+	if g.offset != nil {
+		offset := *g.offset
+
+		// assign parameter of offset
+		params["offset"] = offset
 	} else {
 	}
 	// check limit field -> json key limit
