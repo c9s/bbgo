@@ -126,7 +126,7 @@ func (s *OrderService) Closed(market string, options QueryOrderOptions) ([]Order
 		payload["order_by"] = options.OrderBy
 	}
 
-	req, err := s.client.newAuthenticatedRequest(nil, "GET", "v2/orders", nil, payload, relUrlV2Orders)
+	req, err := s.client.newAuthenticatedRequest(context.Background(), "GET", "v2/orders", nil, payload, relUrlV2Orders)
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +157,7 @@ func (s *OrderService) Open(market string, options QueryOrderOptions) ([]Order, 
 		payload["group_id"] = options.GroupID
 	}
 
-	req, err := s.client.newAuthenticatedRequest(nil, "GET", "v2/orders", nil, payload, relUrlV2Orders)
+	req, err := s.client.newAuthenticatedRequest(context.Background(), "GET", "v2/orders", nil, payload, relUrlV2Orders)
 	if err != nil {
 		return nil, err
 	}
@@ -219,7 +219,7 @@ func (s *OrderService) All(market string, limit, page int, states ...OrderState)
 		"order_by": "desc",
 	}
 
-	req, err := s.client.newAuthenticatedRequest(nil, "GET", "v2/orders", nil, payload, relUrlV2Orders)
+	req, err := s.client.newAuthenticatedRequest(context.Background(), "GET", "v2/orders", nil, payload, relUrlV2Orders)
 	if err != nil {
 		return nil, err
 	}
@@ -344,7 +344,7 @@ func (r *CreateMultiOrderRequest) Do(ctx context.Context) (multiOrderResponse *M
 
 	payload["orders"] = r.orders
 
-	req, err := r.client.newAuthenticatedRequest(nil, "POST", "v2/orders/multi/onebyone", nil, payload, relUrlV2OrdersMultiOneByOne)
+	req, err := r.client.newAuthenticatedRequest(context.Background(), "POST", "v2/orders/multi/onebyone", nil, payload, relUrlV2OrdersMultiOneByOne)
 	if err != nil {
 		return multiOrderResponse, errors.Wrapf(err, "order create error")
 	}
