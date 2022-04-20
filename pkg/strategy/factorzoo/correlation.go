@@ -2,15 +2,15 @@ package factorzoo
 
 import (
 	"fmt"
-	"github.com/c9s/bbgo/pkg/indicator"
-	"github.com/c9s/bbgo/pkg/types"
 	"math"
 	"time"
+
+	"github.com/c9s/bbgo/pkg/indicator"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 var zeroTime time.Time
 
-//var zeroTime time.Time
 type KLineValueMapper func(k types.KLine) float64
 
 //go:generate callbackgen -type Correlation
@@ -82,7 +82,7 @@ func calculateCORRELATION(klines []types.KLine, window int, valA KLineValueMappe
 		// sum of elements of array A
 		sumA += valA(k)
 		// sum of elements of array B
-		sumB += valA(k)
+		sumB += valB(k)
 
 		// sum of A[i] * B[i].
 		sumAB = sumAB + valA(k)*valB(k)
