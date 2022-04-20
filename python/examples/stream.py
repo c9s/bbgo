@@ -19,6 +19,7 @@ def main(host, port):
     stream = Stream(host, port)
     stream.subscribe('max', 'book', 'BTCUSDT', 'full')
     stream.subscribe('max', 'book', 'ETHUSDT', 'full')
+    stream.subscribe_user_data('max')
     stream.add_event_handler(LogBook())
     stream.start()
 
