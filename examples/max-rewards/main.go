@@ -18,7 +18,7 @@ func main() {
 
 	ctx := context.Background()
 
-	var req *maxapi.RewardsRequest
+	var req *maxapi.GetRewardsRequest
 
 	if len(os.Args) > 1 {
 		pathType := os.Args[1]
@@ -27,9 +27,9 @@ func main() {
 			log.Fatal(err)
 		}
 
-		req = api.RewardService.NewRewardsByTypeRequest(rewardType)
+		req = api.RewardService.NewGetRewardsOfTypeRequest(rewardType)
 	} else {
-		req = api.RewardService.NewRewardsRequest()
+		req = api.RewardService.NewGetRewardsRequest()
 	}
 
 	// req.From(1613931192)

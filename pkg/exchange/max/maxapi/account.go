@@ -1,6 +1,13 @@
 package max
 
-import "context"
+//go:generate -command GetRequest requestgen -method GET
+//go:generate -command PostRequest requestgen -method POST
+
+import (
+	"github.com/c9s/requestgen"
+
+	"github.com/c9s/bbgo/pkg/fixedpoint"
+)
 
 type AccountService struct {
 	client *RestClient
@@ -8,10 +15,12 @@ type AccountService struct {
 
 // Account is for max rest api v2, Balance and Type will be conflict with types.PrivateBalanceUpdate
 type Account struct {
-	Currency string `json:"currency"`
-	Balance  string `json:"balance"`
-	Locked   string `json:"locked"`
-	Type     string `json:"type"`
+	Currency     string           `json:"currency"`
+	Balance      fixedpoint.Value `json:"balance"`
+	Locked       fixedpoint.Value `json:"locked"`
+	Type         string           `json:"type"`
+	FiatCurrency string           `json:"fiat_currency"`
+	FiatBalance  fixedpoint.Value `json:"fiat_balance"`
 }
 
 // Balance is for kingfisher
@@ -64,161 +73,66 @@ type VipLevel struct {
 	Next    VipLevelSettings `json:"next_vip_level"`
 }
 
-func (s *AccountService) VipLevel() (*VipLevel, error) {
-	req, err := s.client.newAuthenticatedRequest("GET", "v2/members/vip_level", nil, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := s.client.sendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var vipLevel VipLevel
-	err = response.DecodeJSON(&vipLevel)
-	if err != nil {
-		return nil, err
-	}
-
-	return &vipLevel, nil
+//go:generate GetRequest -url "v2/members/vip_level" -type GetVipLevelRequest -responseType .VipLevel
+type GetVipLevelRequest struct {
+	client requestgen.AuthenticatedAPIClient
 }
 
-func (s *AccountService) Account(currency string) (*Account, error) {
-	req, err := s.client.newAuthenticatedRequest("GET", "v2/members/accounts/"+currency, nil, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := s.client.sendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var account Account
-	err = response.DecodeJSON(&account)
-	if err != nil {
-		return nil, err
-	}
-
-	return &account, nil
+func (s *AccountService) NewGetVipLevelRequest() *GetVipLevelRequest {
+	return &GetVipLevelRequest{client: s.client}
 }
 
-func (s *AccountService) NewGetWithdrawalHistoryRequest() *GetWithdrawHistoryRequest {
-	return &GetWithdrawHistoryRequest{
-		client: s.client,
-	}
+//go:generate GetRequest -url "v2/members/accounts/:currency" -type GetAccountRequest -responseType .Account
+type GetAccountRequest struct {
+	client requestgen.AuthenticatedAPIClient
+
+	currency string `param:"currency,slug"`
 }
 
-func (s *AccountService) Accounts() ([]Account, error) {
-	req, err := s.client.newAuthenticatedRequest("GET", "v2/members/accounts", nil, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := s.client.sendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var accounts []Account
-	err = response.DecodeJSON(&accounts)
-	if err != nil {
-		return nil, err
-	}
-
-	return accounts, nil
+func (s *AccountService) NewGetAccountRequest() *GetAccountRequest {
+	return &GetAccountRequest{client: s.client}
 }
 
-// Me returns the current user info by the current used MAX key and secret
-func (s *AccountService) Me() (*UserInfo, error) {
-	req, err := s.client.newAuthenticatedRequest("GET", "v2/members/me", nil, nil)
-	if err != nil {
-		return nil, err
-	}
+//go:generate GetRequest -url "v2/members/accounts" -type GetAccountsRequest -responseType []Account
+type GetAccountsRequest struct {
+	client requestgen.AuthenticatedAPIClient
+}
 
-	response, err := s.client.sendRequest(req)
-	if err != nil {
-		return nil, err
-	}
+func (s *AccountService) NewGetAccountsRequest() *GetAccountsRequest {
+	return &GetAccountsRequest{client: s.client}
+}
 
-	var m = UserInfo{}
-	err = response.DecodeJSON(&m)
-	if err != nil {
-		return nil, err
-	}
+//go:generate GetRequest -url "v2/members/me" -type GetMeRequest -responseType .UserInfo
+type GetMeRequest struct {
+	client requestgen.AuthenticatedAPIClient
+}
 
-	return &m, nil
+// NewGetMeRequest returns the current user info by the current used MAX key and secret
+func (s *AccountService) NewGetMeRequest() *GetMeRequest {
+	return &GetMeRequest{client: s.client}
 }
 
 type Deposit struct {
-	Currency        string `json:"currency"`
-	CurrencyVersion string `json:"currency_version"` // "eth"
-	Amount          string `json:"amount"`
-	Fee             string `json:"fee"`
-	TxID            string `json:"txid"`
-	State           string `json:"state"`
-	Confirmations   int64  `json:"confirmations"`
-	CreatedAt       int64  `json:"created_at"`
-	UpdatedAt       int64  `json:"updated_at"`
+	Currency        string           `json:"currency"`
+	CurrencyVersion string           `json:"currency_version"` // "eth"
+	Amount          fixedpoint.Value `json:"amount"`
+	Fee             fixedpoint.Value `json:"fee"`
+	TxID            string           `json:"txid"`
+	State           string           `json:"state"`
+	Confirmations   int64            `json:"confirmations"`
+	CreatedAt       int64            `json:"created_at"`
+	UpdatedAt       int64            `json:"updated_at"`
 }
 
-type GetDepositHistoryRequestParams struct {
-	*PrivateRequestParams
-
-	Currency string `json:"currency,omitempty"`
-	From     int64  `json:"from,omitempty"`  // seconds
-	To       int64  `json:"to,omitempty"`    // seconds
-	State    string `json:"state,omitempty"` // submitting, submitted, rejected, accepted, checking, refunded, canceled, suspect
-	Limit    int    `json:"limit,omitempty"`
-}
-
+//go:generate GetRequest -url "v2/deposits" -type GetDepositHistoryRequest -responseType []Deposit
 type GetDepositHistoryRequest struct {
-	client *RestClient
-	params GetDepositHistoryRequestParams
-}
+	client requestgen.AuthenticatedAPIClient
 
-func (r *GetDepositHistoryRequest) State(state string) *GetDepositHistoryRequest {
-	r.params.State = state
-	return r
-}
-
-func (r *GetDepositHistoryRequest) Currency(currency string) *GetDepositHistoryRequest {
-	r.params.Currency = currency
-	return r
-}
-
-func (r *GetDepositHistoryRequest) Limit(limit int) *GetDepositHistoryRequest {
-	r.params.Limit = limit
-	return r
-}
-
-func (r *GetDepositHistoryRequest) From(from int64) *GetDepositHistoryRequest {
-	r.params.From = from
-	return r
-}
-
-func (r *GetDepositHistoryRequest) To(to int64) *GetDepositHistoryRequest {
-	r.params.To = to
-	return r
-}
-
-func (r *GetDepositHistoryRequest) Do(ctx context.Context) (deposits []Deposit, err error) {
-	req, err := r.client.newAuthenticatedRequest("GET", "v2/deposits", &r.params, nil)
-	if err != nil {
-		return deposits, err
-	}
-
-	response, err := r.client.sendRequest(req)
-	if err != nil {
-		return deposits, err
-	}
-
-	if err := response.DecodeJSON(&deposits); err != nil {
-		return deposits, err
-	}
-
-	return deposits, err
+	currency string  `param:"currency"`
+	from     *int64  `param:"from"`  // seconds
+	to       *int64  `param:"to"`    // seconds
+	state    *string `param:"state"` // submitting, submitted, rejected, accepted, checking, refunded, canceled, suspect
+	limit    *int    `param:"limit"`
 }
 
 func (s *AccountService) NewGetDepositHistoryRequest() *GetDepositHistoryRequest {
@@ -228,13 +142,13 @@ func (s *AccountService) NewGetDepositHistoryRequest() *GetDepositHistoryRequest
 }
 
 type Withdraw struct {
-	UUID            string `json:"uuid"`
-	Currency        string `json:"currency"`
-	CurrencyVersion string `json:"currency_version"` // "eth"
-	Amount          string `json:"amount"`
-	Fee             string `json:"fee"`
-	FeeCurrency     string `json:"fee_currency"`
-	TxID            string `json:"txid"`
+	UUID            string           `json:"uuid"`
+	Currency        string           `json:"currency"`
+	CurrencyVersion string           `json:"currency_version"` // "eth"
+	Amount          fixedpoint.Value `json:"amount"`
+	Fee             fixedpoint.Value `json:"fee"`
+	FeeCurrency     string           `json:"fee_currency"`
+	TxID            string           `json:"txid"`
 
 	// State can be "submitting", "submitted",
 	//     "rejected", "accepted", "suspect", "approved", "delisted_processing",
@@ -249,60 +163,19 @@ type Withdraw struct {
 	Notes         string `json:"notes"`
 }
 
-type GetWithdrawHistoryRequestParams struct {
-	*PrivateRequestParams
-
-	Currency string `json:"currency,omitempty"`
-	From     int64  `json:"from,omitempty"`  // seconds
-	To       int64  `json:"to,omitempty"`    // seconds
-	State    string `json:"state,omitempty"` // submitting, submitted, rejected, accepted, checking, refunded, canceled, suspect
-	Limit    int    `json:"limit,omitempty"`
-}
-
+//go:generate GetRequest -url "v2/withdrawals" -type GetWithdrawHistoryRequest -responseType []Withdraw
 type GetWithdrawHistoryRequest struct {
-	client *RestClient
-	params GetWithdrawHistoryRequestParams
+	client requestgen.AuthenticatedAPIClient
+
+	currency string  `param:"currency"`
+	from     *int64  `param:"from"`  // seconds
+	to       *int64  `param:"to"`    // seconds
+	state    *string `param:"state"` // submitting, submitted, rejected, accepted, checking, refunded, canceled, suspect
+	limit    *int    `param:"limit"`
 }
 
-func (r *GetWithdrawHistoryRequest) State(state string) *GetWithdrawHistoryRequest {
-	r.params.State = state
-	return r
-}
-
-func (r *GetWithdrawHistoryRequest) Currency(currency string) *GetWithdrawHistoryRequest {
-	r.params.Currency = currency
-	return r
-}
-
-func (r *GetWithdrawHistoryRequest) Limit(limit int) *GetWithdrawHistoryRequest {
-	r.params.Limit = limit
-	return r
-}
-
-func (r *GetWithdrawHistoryRequest) From(from int64) *GetWithdrawHistoryRequest {
-	r.params.From = from
-	return r
-}
-
-func (r *GetWithdrawHistoryRequest) To(to int64) *GetWithdrawHistoryRequest {
-	r.params.To = to
-	return r
-}
-
-func (r *GetWithdrawHistoryRequest) Do(ctx context.Context) (withdraws []Withdraw, err error) {
-	req, err := r.client.newAuthenticatedRequest("GET", "v2/withdrawals", &r.params, nil)
-	if err != nil {
-		return withdraws, err
+func (s *AccountService) NewGetWithdrawalHistoryRequest() *GetWithdrawHistoryRequest {
+	return &GetWithdrawHistoryRequest{
+		client: s.client,
 	}
-
-	response, err := r.client.sendRequest(req)
-	if err != nil {
-		return withdraws, err
-	}
-
-	if err := response.DecodeJSON(&withdraws); err != nil {
-		return withdraws, err
-	}
-
-	return withdraws, err
 }
