@@ -75,6 +75,15 @@ type VipLevel struct {
 	Next    VipLevelSettings `json:"next_vip_level"`
 }
 
+//go:generate GetRequest -url "v2/members/vip_level" -type GetVipLevelRequest -responseType .VipLevel
+type GetVipLevelRequest struct {
+	client requestgen.AuthenticatedAPIClient
+}
+
+func (s *AccountService) NewGetVipLevelRequest() *GetVipLevelRequest {
+	return &GetVipLevelRequest{ client: s.client }
+}
+
 func (s *AccountService) VipLevel() (*VipLevel, error) {
 	req, err := s.client.newAuthenticatedRequest(context.Background(), "GET", "v2/members/vip_level", nil, nil, nil)
 	if err != nil {
