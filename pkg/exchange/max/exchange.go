@@ -164,7 +164,7 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 		return nil, err
 	}
 
-	maxOrder, err := e.client.OrderService.Get(uint64(orderID))
+	maxOrder, err := e.client.OrderService.NewGetOrderRequest().Id(uint64(orderID)).Do(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -399,14 +399,14 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 	for _, o := range orphanOrders {
 		var req = e.client.OrderService.NewOrderCancelRequest()
 		if o.OrderID > 0 {
-			req.ID(o.OrderID)
+			req.Id(o.OrderID)
 		} else if len(o.ClientOrderID) > 0 && o.ClientOrderID != types.NoClientOrderID {
 			req.ClientOrderID(o.ClientOrderID)
 		} else {
 			return fmt.Errorf("order id or client order id is not defined, order=%+v", o)
 		}
 
-		if err := req.Do(ctx); err != nil {
+		if _, err := req.Do(ctx); err != nil {
 			log.WithError(err).Errorf("order cancel error")
 			err2 = err
 		}
@@ -621,7 +621,7 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 		return nil, err
 	}
 
-	userInfo, err := e.client.AccountService.Me()
+	userInfo, err := e.client.AccountService.NewGetMeRequest().Do(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -630,12 +630,12 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	for _, a := range userInfo.Accounts {
 		balances[toGlobalCurrency(a.Currency)] = types.Balance{
 			Currency:  toGlobalCurrency(a.Currency),
-			Available: fixedpoint.Must(fixedpoint.NewFromString(a.Balance)),
-			Locked:    fixedpoint.Must(fixedpoint.NewFromString(a.Locked)),
+			Available: a.Balance,
+			Locked:    a.Locked,
 		}
 	}
 
-	vipLevel, err := e.client.AccountService.VipLevel()
+	vipLevel, err := e.client.AccountService.NewGetVipLevelRequest().Do(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -723,11 +723,11 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 				Exchange:               types.ExchangeMax,
 				ApplyTime:              types.Time(time.Unix(d.CreatedAt, 0)),
 				Asset:                  toGlobalCurrency(d.Currency),
-				Amount:                 fixedpoint.MustNewFromString(d.Amount),
+				Amount:                 d.Amount,
 				Address:                "",
 				AddressTag:             "",
 				TransactionID:          d.TxID,
-				TransactionFee:         fixedpoint.MustNewFromString(d.Fee),
+				TransactionFee:         d.Fee,
 				TransactionFeeCurrency: d.FeeCurrency,
 				// WithdrawOrderID: d.WithdrawOrderID,
 				// Network:         d.Network,
@@ -794,7 +794,7 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 			allDeposits = append(allDeposits, types.Deposit{
 				Exchange:      types.ExchangeMax,
 				Time:          types.Time(time.Unix(d.CreatedAt, 0)),
-				Amount:        fixedpoint.MustNewFromString(d.Amount),
+				Amount:        d.Amount,
 				Asset:         toGlobalCurrency(d.Currency),
 				Address:       "", // not supported
 				AddressTag:    "", // not supported
@@ -818,7 +818,7 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 		return nil, err
 	}
 
-	accounts, err := e.client.AccountService.Accounts()
+	accounts, err := e.client.AccountService.NewGetAccountsRequest().Do(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -828,8 +828,8 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 	for _, a := range accounts {
 		balances[toGlobalCurrency(a.Currency)] = types.Balance{
 			Currency:  toGlobalCurrency(a.Currency),
-			Available: fixedpoint.Must(fixedpoint.NewFromString(a.Balance)),
-			Locked:    fixedpoint.Must(fixedpoint.NewFromString(a.Locked)),
+			Available: a.Balance,
+			Locked:    a.Locked,
 		}
 	}
 
@@ -900,7 +900,7 @@ func (e *Exchange) QueryRewards(ctx context.Context, startTime time.Time) ([]typ
 		// an user might get most 14 commission records by currency per day
 		// limit 1000 / 14 = 71 days
 		to := from.Add(time.Hour * 24 * 30)
-		req := e.client.RewardService.NewRewardsRequest()
+		req := e.client.RewardService.NewGetRewardsRequest()
 		req.From(from.Unix())
 		req.To(to.Unix())
 		req.Limit(1000)

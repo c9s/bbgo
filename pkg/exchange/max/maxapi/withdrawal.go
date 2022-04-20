@@ -1,8 +1,10 @@
 package max
 
+//go:generate -command GetRequest requestgen -method GET
+//go:generate -command PostRequest requestgen -method POST
+
 import (
-	"context"
-	"errors"
+	"github.com/c9s/requestgen"
 )
 
 /*
@@ -30,63 +32,13 @@ import (
 	}
 */
 
+//go:generate PostRequest -url "v2/withdrawal" -type WithdrawalRequest -responseType .Withdraw
 type WithdrawalRequest struct {
-	client      *RestClient
-	addressUUID string
-	currency    string
-	amount      float64
-}
+	client requestgen.AuthenticatedAPIClient
 
-func (r *WithdrawalRequest) Currency(currency string) *WithdrawalRequest {
-	r.currency = currency
-	return r
-}
-
-func (r *WithdrawalRequest) AddressUUID(uuid string) *WithdrawalRequest {
-	r.addressUUID = uuid
-	return r
-}
-
-func (r *WithdrawalRequest) Amount(amount float64) *WithdrawalRequest {
-	r.amount = amount
-	return r
-}
-
-func (r *WithdrawalRequest) Do(ctx context.Context) (*Withdraw, error) {
-	if r.currency == "" {
-		return nil, errors.New("currency field is required")
-	}
-
-	if r.addressUUID == "" {
-		return nil, errors.New("withdraw_address_uuid field is required")
-	}
-
-	if r.amount <= 0 {
-		return nil, errors.New("amount is required")
-	}
-
-	payload := map[string]interface{}{
-		"currency":              r.currency,
-		"withdraw_address_uuid": r.addressUUID,
-		"amount":                r.amount,
-	}
-
-	req, err := r.client.newAuthenticatedRequest("POST", "v2/withdrawal", payload, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := r.client.sendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var resp Withdraw
-	if err := response.DecodeJSON(&resp); err != nil {
-		return nil, err
-	}
-
-	return &resp, nil
+	addressUUID string  `param:"address_uuid,required"`
+	currency    string  `param:"currency,required"`
+	amount      float64 `param:"amount"`
 }
 
 type WithdrawalAddress struct {
@@ -102,41 +54,10 @@ type WithdrawalAddress struct {
 	IsInternal      bool   `json:"is_internal"`
 }
 
+//go:generate GetRequest -url "v2/withdraw_addresses" -type GetWithdrawalAddressesRequest -responseType []WithdrawalAddress
 type GetWithdrawalAddressesRequest struct {
-	client   *RestClient
-	currency string
-}
-
-func (r *GetWithdrawalAddressesRequest) Currency(currency string) *GetWithdrawalAddressesRequest {
-	r.currency = currency
-	return r
-}
-
-func (r *GetWithdrawalAddressesRequest) Do(ctx context.Context) ([]WithdrawalAddress, error) {
-	if r.currency == "" {
-		return nil, errors.New("currency field is required")
-	}
-
-	payload := map[string]interface{}{
-		"currency": r.currency,
-	}
-
-	req, err := r.client.newAuthenticatedRequest("GET", "v2/withdraw_addresses", payload, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := r.client.sendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var addresses []WithdrawalAddress
-	if err := response.DecodeJSON(&addresses); err != nil {
-		return nil, err
-	}
-
-	return addresses, nil
+	client      requestgen.AuthenticatedAPIClient
+	currency    string  `param:"currency,required"`
 }
 
 type WithdrawalService struct {

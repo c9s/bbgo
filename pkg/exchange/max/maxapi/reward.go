@@ -1,10 +1,14 @@
 package max
 
+//go:generate -command GetRequest requestgen -method GET
+//go:generate -command PostRequest requestgen -method POST
+
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/c9s/requestgen"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -18,6 +22,7 @@ const (
 	RewardHolding    = RewardType("holding_reward")
 	RewardMining     = RewardType("mining_reward")
 	RewardTrading    = RewardType("trading_reward")
+	RewardRedemption = RewardType("redemption_reward")
 	RewardVipRebate  = RewardType("vip_rebate")
 )
 
@@ -35,6 +40,8 @@ func ParseRewardType(s string) (RewardType, error) {
 		return RewardTrading, nil
 	case "vip_rebate":
 		return RewardVipRebate, nil
+	case "redemption_reward":
+		return RewardRedemption, nil
 
 	}
 
@@ -93,7 +100,7 @@ type Reward struct {
 	Note     string           `json:"note"`
 
 	// Unix timestamp in seconds
-	CreatedAt Timestamp `json:"created_at"`
+	CreatedAt types.Timestamp `json:"created_at"`
 }
 
 func (reward Reward) Reward() (*types.Reward, error) {
@@ -119,88 +126,44 @@ type RewardService struct {
 	client *RestClient
 }
 
-func (s *RewardService) NewRewardsRequest() *RewardsRequest {
-	return &RewardsRequest{client: s.client}
+func (s *RewardService) NewGetRewardsRequest() *GetRewardsRequest {
+	return &GetRewardsRequest{client: s.client}
 }
 
-func (s *RewardService) NewRewardsByTypeRequest(pathType RewardType) *RewardsRequest {
-	return &RewardsRequest{client: s.client, pathType: &pathType}
+func (s *RewardService) NewGetRewardsOfTypeRequest(pathType RewardType) *GetRewardsOfTypeRequest {
+	return &GetRewardsOfTypeRequest{client: s.client, pathType: &pathType}
 }
 
-type RewardsRequest struct {
-	client *RestClient
+//go:generate GetRequest -url "v2/rewards/:path_type" -type GetRewardsOfTypeRequest -responseType []Reward
+type GetRewardsOfTypeRequest struct {
+	client requestgen.AuthenticatedAPIClient
 
-	pathType *RewardType
-
-	currency *string
+	pathType *RewardType `param:"path_type,slug"`
 
 	// From Unix-timestamp
-	from *int64
+	from *int64 `param:"from"`
 
 	// To Unix-timestamp
-	to *int64
+	to *int64 `param:"to"`
 
-	limit *int
+	page   *int64 `param:"page"`
+	limit  *int64 `param:"limit"`
+	offset *int64 `param:"offset"`
 }
 
-func (r *RewardsRequest) Currency(currency string) *RewardsRequest {
-	r.currency = &currency
-	return r
-}
+//go:generate GetRequest -url "v2/rewards" -type GetRewardsRequest -responseType []Reward
+type GetRewardsRequest struct {
+	client requestgen.AuthenticatedAPIClient
 
-func (r *RewardsRequest) From(from int64) *RewardsRequest {
-	r.from = &from
-	return r
-}
+	currency *string `param:"currency"`
 
-func (r *RewardsRequest) Limit(limit int) *RewardsRequest {
-	r.limit = &limit
-	return r
-}
+	// From Unix-timestamp
+	from *int64 `param:"from"`
 
-func (r *RewardsRequest) To(to int64) *RewardsRequest {
-	r.to = &to
-	return r
-}
+	// To Unix-timestamp
+	to *int64 `param:"to"`
 
-func (r *RewardsRequest) Do(ctx context.Context) (rewards []Reward, err error) {
-	payload := map[string]interface{}{}
-
-	if r.currency != nil {
-		payload["currency"] = r.currency
-	}
-
-	if r.to != nil {
-		payload["to"] = r.to
-	}
-
-	if r.from != nil {
-		payload["from"] = r.from
-	}
-
-	if r.limit != nil {
-		payload["limit"] = r.limit
-	}
-
-	refURL := "v2/rewards"
-
-	if r.pathType != nil {
-		refURL += "/" + string(*r.pathType)
-	}
-
-	req, err := r.client.newAuthenticatedRequest("GET", refURL, payload, nil)
-	if err != nil {
-		return rewards, err
-	}
-
-	response, err := r.client.sendRequest(req)
-	if err != nil {
-		return rewards, err
-	}
-
-	if err := response.DecodeJSON(&rewards); err != nil {
-		return rewards, err
-	}
-
-	return rewards, err
+	page   *int64 `param:"page"`
+	limit  *int64 `param:"limit"`
+	offset *int64 `param:"offset"`
 }
