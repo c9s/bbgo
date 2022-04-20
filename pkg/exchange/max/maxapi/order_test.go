@@ -42,8 +42,16 @@ func TestOrderService_GetOrdersRequest(t *testing.T) {
 	// req3.State([]OrderState{OrderStateDone})
 	req3.Market("btcusdt")
 	orders, err := req3.Do(ctx)
-	assert.NoError(t, err)
-	assert.NotNil(t, orders)
+	if assert.NoError(t, err) {
+		t.Logf("orders: %+v", orders)
+
+		assert.NotNil(t, orders)
+		if assert.NotEmptyf(t, orders, "got %d orders", len(orders)) {
+			for _, order := range orders {
+				assert.Contains(t, []OrderState{OrderStateDone, OrderStateFinalizing}, order.State)
+			}
+		}
+	}
 }
 
 func TestOrderService_GetOrdersRequest_SingleState(t *testing.T) {
@@ -83,7 +91,6 @@ func TestOrderService_GetOrderHistoryRequest(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, orders)
 }
-
 
 func TestOrderService(t *testing.T) {
 	key, secret, ok := integrationTestConfigured(t, "MAX")

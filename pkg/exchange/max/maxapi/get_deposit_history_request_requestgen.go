@@ -17,22 +17,22 @@ func (g *GetDepositHistoryRequest) Currency(currency string) *GetDepositHistoryR
 }
 
 func (g *GetDepositHistoryRequest) From(from int64) *GetDepositHistoryRequest {
-	g.from = from
+	g.from = &from
 	return g
 }
 
 func (g *GetDepositHistoryRequest) To(to int64) *GetDepositHistoryRequest {
-	g.to = to
+	g.to = &to
 	return g
 }
 
 func (g *GetDepositHistoryRequest) State(state string) *GetDepositHistoryRequest {
-	g.state = state
+	g.state = &state
 	return g
 }
 
 func (g *GetDepositHistoryRequest) Limit(limit int) *GetDepositHistoryRequest {
-	g.limit = limit
+	g.limit = &limit
 	return g
 }
 
@@ -57,25 +57,37 @@ func (g *GetDepositHistoryRequest) GetParameters() (map[string]interface{}, erro
 	// assign parameter of currency
 	params["currency"] = currency
 	// check from field -> json key from
-	from := g.from
+	if g.from != nil {
+		from := *g.from
 
-	// assign parameter of from
-	params["from"] = from
+		// assign parameter of from
+		params["from"] = from
+	} else {
+	}
 	// check to field -> json key to
-	to := g.to
+	if g.to != nil {
+		to := *g.to
 
-	// assign parameter of to
-	params["to"] = to
+		// assign parameter of to
+		params["to"] = to
+	} else {
+	}
 	// check state field -> json key state
-	state := g.state
+	if g.state != nil {
+		state := *g.state
 
-	// assign parameter of state
-	params["state"] = state
+		// assign parameter of state
+		params["state"] = state
+	} else {
+	}
 	// check limit field -> json key limit
-	limit := g.limit
+	if g.limit != nil {
+		limit := *g.limit
 
-	// assign parameter of limit
-	params["limit"] = limit
+		// assign parameter of limit
+		params["limit"] = limit
+	} else {
+	}
 
 	return params, nil
 }

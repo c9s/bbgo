@@ -794,7 +794,7 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 			allDeposits = append(allDeposits, types.Deposit{
 				Exchange:      types.ExchangeMax,
 				Time:          types.Time(time.Unix(d.CreatedAt, 0)),
-				Amount:        fixedpoint.MustNewFromString(d.Amount),
+				Amount:        d.Amount,
 				Asset:         toGlobalCurrency(d.Currency),
 				Address:       "", // not supported
 				AddressTag:    "", // not supported
