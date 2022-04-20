@@ -9,12 +9,15 @@ from bbgo import MarketService
 def main(host, port):
     service = MarketService(host, port)
 
-    klines, error = service.query_klines(exchange='binance', symbol='BTCUSDT', interval='1m', limit=10)
+    klines = service.query_klines(
+        exchange='binance',
+        symbol='BTCUSDT',
+        interval='1m',
+        limit=10,
+    )
 
     for kline in klines:
         print(kline)
-
-    print(error)
 
 
 if __name__ == '__main__':
