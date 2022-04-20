@@ -113,26 +113,26 @@ func (s *AccountService) NewGetMeRequest() *GetMeRequest {
 }
 
 type Deposit struct {
-	Currency        string `json:"currency"`
-	CurrencyVersion string `json:"currency_version"` // "eth"
-	Amount          string `json:"amount"`
-	Fee             string `json:"fee"`
-	TxID            string `json:"txid"`
-	State           string `json:"state"`
-	Confirmations   int64  `json:"confirmations"`
-	CreatedAt       int64  `json:"created_at"`
-	UpdatedAt       int64  `json:"updated_at"`
+	Currency        string           `json:"currency"`
+	CurrencyVersion string           `json:"currency_version"` // "eth"
+	Amount          fixedpoint.Value `json:"amount"`
+	Fee             fixedpoint.Value `json:"fee"`
+	TxID            string           `json:"txid"`
+	State           string           `json:"state"`
+	Confirmations   int64            `json:"confirmations"`
+	CreatedAt       int64            `json:"created_at"`
+	UpdatedAt       int64            `json:"updated_at"`
 }
 
 //go:generate GetRequest -url "v2/deposits" -type GetDepositHistoryRequest -responseType []Deposit
 type GetDepositHistoryRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
-	currency string `param:"currency"`
-	from     int64  `param:"from"`  // seconds
-	to       int64  `param:"to"`    // seconds
-	state    string `param:"state"` // submitting, submitted, rejected, accepted, checking, refunded, canceled, suspect
-	limit    int    `param:"limit"`
+	currency string  `param:"currency"`
+	from     *int64  `param:"from"`  // seconds
+	to       *int64  `param:"to"`    // seconds
+	state    *string `param:"state"` // submitting, submitted, rejected, accepted, checking, refunded, canceled, suspect
+	limit    *int    `param:"limit"`
 }
 
 func (s *AccountService) NewGetDepositHistoryRequest() *GetDepositHistoryRequest {

@@ -90,3 +90,24 @@ func TestAccountService_GetWithdrawHistoryRequest(t *testing.T) {
 	assert.NotEmpty(t, withdraws)
 	t.Logf("withdraws: %+v", withdraws)
 }
+
+func TestAccountService_NewGetDepositHistoryRequest(t *testing.T) {
+	key, secret, ok := integrationTestConfigured(t, "MAX")
+	if !ok {
+		t.SkipNow()
+	}
+
+	ctx := context.Background()
+
+	client := NewRestClient(ProductionAPIURL)
+	client.Auth(key, secret)
+
+	req := client.AccountService.NewGetDepositHistoryRequest()
+	req.Currency("usdt")
+	deposits, err := req.Do(ctx)
+	assert.NoError(t, err)
+	assert.NotNil(t, deposits)
+	assert.NotEmpty(t, deposits)
+	t.Logf("deposits: %+v", deposits)
+}
+
