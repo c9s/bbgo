@@ -621,7 +621,7 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 		return nil, err
 	}
 
-	userInfo, err := e.client.AccountService.NewGetMeRequest()
+	userInfo, err := e.client.AccountService.NewGetMeRequest().Do(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -630,8 +630,8 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	for _, a := range userInfo.Accounts {
 		balances[toGlobalCurrency(a.Currency)] = types.Balance{
 			Currency:  toGlobalCurrency(a.Currency),
-			Available: fixedpoint.Must(fixedpoint.NewFromString(a.Balance)),
-			Locked:    fixedpoint.Must(fixedpoint.NewFromString(a.Locked)),
+			Available: a.Balance,
+			Locked:    a.Locked,
 		}
 	}
 
@@ -828,8 +828,8 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 	for _, a := range accounts {
 		balances[toGlobalCurrency(a.Currency)] = types.Balance{
 			Currency:  toGlobalCurrency(a.Currency),
-			Available: fixedpoint.Must(fixedpoint.NewFromString(a.Balance)),
-			Locked:    fixedpoint.Must(fixedpoint.NewFromString(a.Locked)),
+			Available: a.Balance,
+			Locked:    a.Locked,
 		}
 	}
 
