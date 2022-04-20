@@ -900,7 +900,7 @@ func (e *Exchange) QueryRewards(ctx context.Context, startTime time.Time) ([]typ
 		// an user might get most 14 commission records by currency per day
 		// limit 1000 / 14 = 71 days
 		to := from.Add(time.Hour * 24 * 30)
-		req := e.client.RewardService.NewRewardsRequest()
+		req := e.client.RewardService.NewGetRewardsRequest()
 		req.From(from.Unix())
 		req.To(to.Unix())
 		req.Limit(1000)

@@ -269,3 +269,33 @@ func (t *LooseFormatTime) UnmarshalJSON(data []byte) error {
 func (t LooseFormatTime) Time() time.Time {
 	return time.Time(t)
 }
+
+// Timestamp is used for parsing unix timestamp (seconds)
+type Timestamp time.Time
+
+func (t Timestamp) Format(layout string) string {
+	return time.Time(t).Format(layout)
+}
+
+func (t Timestamp) Time() time.Time {
+	return time.Time(t)
+}
+
+func (t Timestamp) String() string {
+	return time.Time(t).String()
+}
+
+func (t Timestamp) MarshalJSON() ([]byte, error) {
+	ts := time.Time(t).Unix()
+	return json.Marshal(ts)
+}
+
+func (t *Timestamp) UnmarshalJSON(o []byte) error {
+	var timestamp int64
+	if err := json.Unmarshal(o, &timestamp); err != nil {
+		return err
+	}
+
+	*t = Timestamp(time.Unix(timestamp, 0))
+	return nil
+}
