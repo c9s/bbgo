@@ -1,0 +1,30 @@
+sessions:
+  binance:
+    exchange: binance
+    envVarPrefix: binance
+#    futures: true
+
+
+exchangeStrategies:
+- on: binance
+  factorzoo:
+    symbol: BTCUSDT
+    interval: 12h # T:20/12h
+    quantity: 0.95
+
+
+backtest:
+  sessions:
+    - binance
+  # for testing max draw down (MDD) at 03-12
+  # see here for more details
+  # https://www.investopedia.com/terms/m/maximum-drawdown-mdd.asp
+  startTime: "2022-03-15"
+  endTime: "2022-04-13"
+  symbols:
+    - BTCUSDT
+  account:
+    binance:
+      balances:
+        BTC: 1.0
+        USDT: 45_000.0

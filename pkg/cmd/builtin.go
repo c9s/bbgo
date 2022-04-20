@@ -6,6 +6,8 @@ import (
 	_ "github.com/c9s/bbgo/pkg/strategy/bollmaker"
 	_ "github.com/c9s/bbgo/pkg/strategy/emastop"
 	_ "github.com/c9s/bbgo/pkg/strategy/etf"
+	_ "github.com/c9s/bbgo/pkg/strategy/ewoDgtrd"
+	_ "github.com/c9s/bbgo/pkg/strategy/factorzoo"
 	_ "github.com/c9s/bbgo/pkg/strategy/flashcrash"
 	_ "github.com/c9s/bbgo/pkg/strategy/funding"
 	_ "github.com/c9s/bbgo/pkg/strategy/grid"
@@ -23,5 +25,4 @@ import (
 	_ "github.com/c9s/bbgo/pkg/strategy/xmaker"
 	_ "github.com/c9s/bbgo/pkg/strategy/xnav"
 	_ "github.com/c9s/bbgo/pkg/strategy/xpuremaker"
-	_ "github.com/c9s/bbgo/pkg/strategy/ewoDgtrd"
 )
