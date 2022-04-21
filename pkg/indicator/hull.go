@@ -11,22 +11,22 @@ import (
 //go:generate callbackgen -type HULL
 type HULL struct {
 	types.IntervalWindow
-	ma1 *EWMA
-	ma2 *EWMA
+	ma1    *EWMA
+	ma2    *EWMA
 	result *EWMA
 
-        UpdateCallbacks []func(value float64)
+	UpdateCallbacks []func(value float64)
 }
 
 func (inc *HULL) Update(value float64) {
 	if inc.result.Length() == 0 {
-		inc.ma1 = &EWMA{IntervalWindow: types.IntervalWindow{inc.Interval, inc.Window/2}}
+		inc.ma1 = &EWMA{IntervalWindow: types.IntervalWindow{inc.Interval, inc.Window / 2}}
 		inc.ma2 = &EWMA{IntervalWindow: types.IntervalWindow{inc.Interval, inc.Window}}
 		inc.result = &EWMA{IntervalWindow: types.IntervalWindow{inc.Interval, int(math.Sqrt(float64(inc.Window)))}}
 	}
 	inc.ma1.Update(value)
 	inc.ma2.Update(value)
-	inc.result.Update(2 * inc.ma1.Last() - inc.ma2.Last())
+	inc.result.Update(2*inc.ma1.Last() - inc.ma2.Last())
 }
 
 func (inc *HULL) Last() float64 {
@@ -49,7 +49,7 @@ func (inc *HULL) calculateAndUpdate(allKLines []types.KLine) {
 	if inc.ma1.Length() == 0 {
 		doable = true
 	}
-        for _, k := range allKLines {
+	for _, k := range allKLines {
 		if !doable && k.StartTime.After(inc.ma1.LastOpenTime) {
 			doable = true
 		}
@@ -57,17 +57,17 @@ func (inc *HULL) calculateAndUpdate(allKLines []types.KLine) {
 			inc.Update(k.Close.Float64())
 			inc.EmitUpdate(inc.Last())
 		}
-        }
+	}
 }
 
 func (inc *HULL) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
-        if inc.Interval != interval {
-                return
-        }
+	if inc.Interval != interval {
+		return
+	}
 
-        inc.calculateAndUpdate(window)
+	inc.calculateAndUpdate(window)
 }
 
 func (inc *HULL) Bind(updater KLineWindowUpdater) {
-        updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
+	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }

@@ -1,8 +1,8 @@
 package indicator
 
 import (
-	"time"
 	"github.com/c9s/bbgo/pkg/types"
+	"time"
 )
 
 // Refer: Welles Wilder's Moving Average
