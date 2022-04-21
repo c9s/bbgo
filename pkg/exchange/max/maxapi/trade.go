@@ -1,11 +1,16 @@
 package max
 
+//go:generate -command GetRequest requestgen -method GET
+//go:generate -command PostRequest requestgen -method POST
+
 import (
-	"context"
 	"net/url"
 	"strconv"
+	"time"
 
-	"github.com/pkg/errors"
+	"github.com/c9s/requestgen"
+
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 type MarkerInfo struct {
@@ -30,7 +35,7 @@ type Trade struct {
 	Market                string    `json:"market" db:"market"`
 	MarketName            string    `json:"market_name"`
 	CreatedAt             int64     `json:"created_at"`
-	CreatedAtMilliSeconds int64     `json:"created_at_in_ms"`
+	CreatedAtMilliSeconds types.MillisecondTimestamp     `json:"created_at_in_ms"`
 	Side                  string    `json:"side" db:"side"`
 	OrderID               uint64    `json:"order_id"`
 	Fee                   string    `json:"fee" db:"fee"` // float number as string
@@ -120,120 +125,27 @@ type PrivateRequestParams struct {
 	Path  string `json:"path"`
 }
 
+//go:generate GetRequest -url "v2/trades/my" -type PrivateTradeRequest -responseType []Trade
 type PrivateTradeRequest struct {
-	client *RestClient
+	client requestgen.AuthenticatedAPIClient
 
-	market *string
+	market string `param:"market"`
 
-	// Timestamp is the seconds elapsed since Unix epoch, set to return trades executed before the time only
-	timestamp *int64
+	// timestamp is the seconds elapsed since Unix epoch, set to return trades executed before the time only
+	timestamp *time.Time `param:"timestamp,seconds"`
 
 	// From field is a trade id, set ot return trades created after the trade
-	from *int64
+	from *int64 `param:"from"`
 
 	// To field trade id, set to return trades created before the trade
-	to *int64
+	to *int64 `param:"to"`
 
-	orderBy *string
+	orderBy *string `param:"order_by"`
 
-	pagination *bool
+	pagination *bool `param:"pagination"`
 
-	limit *int64
+	limit *int64 `param:"limit"`
 
-	offset *int64
-}
-
-func (r *PrivateTradeRequest) Market(market string) *PrivateTradeRequest {
-	r.market = &market
-	return r
-}
-
-func (r *PrivateTradeRequest) From(from int64) *PrivateTradeRequest {
-	r.from = &from
-	return r
-}
-
-func (r *PrivateTradeRequest) Timestamp(t int64) *PrivateTradeRequest {
-	r.timestamp = &t
-	return r
-}
-
-func (r *PrivateTradeRequest) To(to int64) *PrivateTradeRequest {
-	r.to = &to
-	return r
-}
-
-func (r *PrivateTradeRequest) Limit(limit int64) *PrivateTradeRequest {
-	r.limit = &limit
-	return r
-}
-
-func (r *PrivateTradeRequest) Offset(offset int64) *PrivateTradeRequest {
-	r.offset = &offset
-	return r
-}
-
-func (r *PrivateTradeRequest) Pagination(p bool) *PrivateTradeRequest {
-	r.pagination = &p
-	return r
-}
-
-func (r *PrivateTradeRequest) OrderBy(orderBy string) *PrivateTradeRequest {
-	r.orderBy = &orderBy
-	return r
-}
-
-func (r *PrivateTradeRequest) Do(ctx context.Context) (trades []Trade, err error) {
-	if r.market == nil {
-		return nil, errors.New("parameter market is mandatory")
-	}
-
-	payload := map[string]interface{}{
-		"market": r.market,
-	}
-
-	if r.timestamp != nil {
-		payload["timestamp"] = r.timestamp
-	}
-
-	if r.from != nil {
-		payload["from"] = r.from
-	}
-
-	if r.to != nil {
-		payload["to"] = r.to
-	}
-
-	if r.orderBy != nil {
-		payload["order_by"] = r.orderBy
-	}
-
-	if r.pagination != nil {
-		payload["pagination"] = r.pagination
-	}
-
-	if r.limit != nil {
-		payload["limit"] = r.limit
-	}
-
-	if r.offset != nil {
-		payload["offset"] = r.offset
-	}
-
-	req, err := r.client.newAuthenticatedRequest(context.Background(), "GET", "v2/trades/my", nil, payload, nil)
-	if err != nil {
-		return trades, err
-	}
-
-	response, err := r.client.SendRequest(req)
-	if err != nil {
-		return trades, err
-	}
-
-	if err := response.DecodeJSON(&trades); err != nil {
-		return trades, err
-	}
-
-	return trades, err
+	offset *int64 `param:"offset"`
 }
 
