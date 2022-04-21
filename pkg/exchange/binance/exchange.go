@@ -234,9 +234,10 @@ func (e *Exchange) queryCrossMarginAccount(ctx context.Context) (*types.Account,
 	}
 
 	a := &types.Account{
-		AccountType: types.AccountTypeMargin,
-		MarginInfo:  toGlobalMarginAccountInfo(marginAccount), // In binance GO api, Account define marginAccount info which mantain []*AccountAsset and []*AccountPosition.
-		MarginLevel: fixedpoint.MustNewFromString(marginAccount.MarginLevel),
+		AccountType:   types.AccountTypeMargin,
+		MarginInfo:    toGlobalMarginAccountInfo(marginAccount), // In binance GO api, Account define marginAccount info which mantain []*AccountAsset and []*AccountPosition.
+		MarginLevel:   fixedpoint.MustNewFromString(marginAccount.MarginLevel),
+		BorrowEnabled: marginAccount.BorrowEnabled,
 	}
 
 	// convert cross margin user assets into balances
@@ -276,6 +277,8 @@ func (e *Exchange) queryIsolatedMarginAccount(ctx context.Context) (*types.Accou
 
 	userAsset := marginAccount.Assets[0]
 	a.MarginLevel = fixedpoint.MustNewFromString(userAsset.MarginLevel)
+	a.BorrowEnabled = userAsset.BaseAsset.BorrowEnabled || userAsset.QuoteAsset.BorrowEnabled
+	// userAsset.LiquidatePrice
 
 	// Convert user assets into balances
 	balances := types.BalanceMap{}
