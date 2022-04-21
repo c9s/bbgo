@@ -16,12 +16,12 @@ func (g *GetOrderHistoryRequest) Market(market string) *GetOrderHistoryRequest {
 	return g
 }
 
-func (g *GetOrderHistoryRequest) FromID(fromID int64) *GetOrderHistoryRequest {
+func (g *GetOrderHistoryRequest) FromID(fromID uint64) *GetOrderHistoryRequest {
 	g.fromID = &fromID
 	return g
 }
 
-func (g *GetOrderHistoryRequest) Limit(limit int) *GetOrderHistoryRequest {
+func (g *GetOrderHistoryRequest) Limit(limit uint) *GetOrderHistoryRequest {
 	g.limit = &limit
 	return g
 }
