@@ -25,6 +25,14 @@ type Balance struct {
 	Currency  string           `json:"currency"`
 	Available fixedpoint.Value `json:"available"`
 	Locked    fixedpoint.Value `json:"locked,omitempty"`
+
+	// margin related fields
+	Borrowed  fixedpoint.Value `json:"borrowed,omitempty"`
+	Interest  fixedpoint.Value `json:"interest,omitempty"`
+
+	// NetAsset = (Available + Locked) - Borrowed - Interest
+	NetAsset  fixedpoint.Value `json:"net,omitempty"`
+
 }
 
 func (b Balance) Total() fixedpoint.Value {
@@ -235,6 +243,9 @@ type Account struct {
 	FuturesInfo        *FuturesAccountInfo
 	MarginInfo         *MarginAccountInfo
 	IsolatedMarginInfo *IsolatedMarginAccountInfo
+
+	// margin related common field
+	MarginLevel fixedpoint.Value `json:"marginLevel"`
 
 	MakerFeeRate fixedpoint.Value `json:"makerFeeRate,omitempty"`
 	TakerFeeRate fixedpoint.Value `json:"takerFeeRate,omitempty"`
