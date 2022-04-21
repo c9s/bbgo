@@ -403,7 +403,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			log.WithError(err).Errorf(errMsg)
 			s.Notify(errMsg)
 		} else {
-			s.Notify("All orders cancelled.")
+			s.Notify("All {s.Symbol} orders are cancelled.")
 		}
 
 		// Save state
