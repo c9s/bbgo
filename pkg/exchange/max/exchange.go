@@ -194,18 +194,53 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) ([]types.Order, error) {
 	log.Warn("!!!MAX EXCHANGE API NOTICE!!!")
 	log.Warn("the since/until conditions will not be effected on closed orders query, max exchange does not support time-range-based query")
-	if lastOrderID > 0 {
-		log.Warn("last order id condition will not be effected on max exchange, max exchange does not support last order id query")
-	}
 
 	if v, ok := util.GetEnvVarBool("MAX_QUERY_CLOSED_ORDERS_ALL"); v && ok {
-		log.Warn("MAX_QUERY_CLOSED_ORDERS_ALL is set, we will fetch all closed orders from the first page")
-		return e.queryAllClosedOrders(ctx, symbol, since, until)
+		log.Warn("MAX_QUERY_CLOSED_ORDERS_ALL is set, we will fetch all closed orders from the first order")
+		return e.queryClosedOrdersByLastOrderID(ctx, symbol, 1)
 	}
 
-	return e.queryRecentlyClosedOrders(ctx, symbol, since, until)
+	return e.queryClosedOrdersByLastOrderID(ctx, symbol, lastOrderID)
+	// return e.queryRecentlyClosedOrders(ctx, symbol, since, until)
 }
 
+func (e *Exchange) queryClosedOrdersByLastOrderID(ctx context.Context, symbol string, lastOrderID uint64) (orders []types.Order, err error) {
+	if err := closedOrderQueryLimiter.Wait(ctx); err != nil {
+		return orders, err
+	}
+
+	req := e.client.OrderService.NewGetOrderHistoryRequest()
+	req.Market(toLocalSymbol(symbol))
+	if lastOrderID == 0 {
+		lastOrderID = 1
+	}
+
+	req.FromID(lastOrderID)
+	maxOrders, err := req.Do(ctx)
+	if err != nil {
+		return orders, err
+	}
+
+	for _, maxOrder := range maxOrders {
+		order, err2 := toGlobalOrder(maxOrder)
+		if err2 != nil {
+			err = multierr.Append(err, err2)
+			continue
+		}
+
+		log.Debugf("max order %d %s %v %s %s", order.OrderID, order.Symbol, order.Price, order.Status, order.CreationTime.Time().Format(time.StampMilli))
+		orders = append(orders, *order)
+	}
+
+	// always sort the orders by creation time
+	sort.Slice(orders, func(i, j int) bool {
+		return orders[i].CreationTime.Before(orders[j].CreationTime.Time())
+	})
+
+	return orders, nil
+}
+
+// queryRecentlyClosedOrders is deprecated
 func (e *Exchange) queryRecentlyClosedOrders(ctx context.Context, symbol string, since time.Time, until time.Time) (orders []types.Order, err error) {
 	limit := 1000 // max limit = 1000, default 100
 	orderIDs := make(map[uint64]struct{}, limit*2)
