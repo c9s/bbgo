@@ -20,7 +20,7 @@ func TestTradeService(t *testing.T) {
 	client.Auth(key, secret)
 
 	t.Run("default timestamp", func(t *testing.T) {
-		req := client.TradeService.NewPrivateTradeRequest()
+		req := client.TradeService.NewGetPrivateTradeRequest()
 		until := time.Now().AddDate(0, -6, 0)
 
 		trades, err := req.Market("btcusdt").
@@ -36,7 +36,7 @@ func TestTradeService(t *testing.T) {
 	})
 
 	t.Run("desc and pagination = false", func(t *testing.T) {
-		req := client.TradeService.NewPrivateTradeRequest()
+		req := client.TradeService.NewGetPrivateTradeRequest()
 		trades, err := req.Market("btcusdt").
 			Pagination(false).
 			OrderBy("asc").
