@@ -392,7 +392,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	// StrategyController
 	s.Status = types.StrategyStatusRunning
 
-	s.OnSuspend(func() error {
+	s.OnSuspend(func() {
 		var err error = nil
 		// Cancel all order
 		for _, order := range s.orderStore.Orders() {
@@ -407,30 +407,27 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 
 		// Save state
-		if err2 := s.SaveState(); err2 != nil {
-			log.WithError(err2).Errorf("can not save state: %+v", s.state)
+		if err = s.SaveState(); err != nil {
+			log.WithError(err).Errorf("can not save state: %+v", s.state)
 		} else {
-			log.Infof("%s position is saved.", s.Symbol)
+			log.Infof("%s state is saved.", s.Symbol)
 		}
-
-		return err
 	})
 
-	s.OnEmergencyStop(func() error {
+	s.OnEmergencyStop(func() {
 		// Close 100% position
 		percentage := fixedpoint.NewFromFloat(1.0)
-		err := s.ClosePosition(context.Background(), percentage)
-		err2 := s.Suspend()
-
-		if err2 != nil {
-			if err != nil {
-				err = fmt.Errorf(err.Error() + "\n" + err2.Error())
-			} else {
-				err = err2
-			}
+		if err := s.ClosePosition(context.Background(), percentage); err != nil {
+			errMsg := "failed to close position"
+			log.WithError(err).Errorf(errMsg)
+			s.Notify(errMsg)
 		}
 
-		return err
+		if err := s.Suspend(); err != nil {
+			errMsg := "failed to suspend strategy"
+			log.WithError(err).Errorf(errMsg)
+			s.Notify(errMsg)
+		}
 	})
 
 	// set default values
