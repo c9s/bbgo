@@ -4,13 +4,14 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+//go:generate callbackgen -type StrategyController -interface
 type StrategyController struct {
 	Status types.StrategyStatus
 
 	// Callbacks
-	SuspendCallback       func() error
-	ResumeCallback        func() error
-	EmergencyStopCallback func() error
+	SuspendCallbacks       []func()
+	ResumeCallbacks        []func()
+	EmergencyStopCallbacks []func()
 }
 
 func (s *StrategyController) GetStatus() types.StrategyStatus {
@@ -20,55 +21,25 @@ func (s *StrategyController) GetStatus() types.StrategyStatus {
 func (s *StrategyController) Suspend() error {
 	s.Status = types.StrategyStatusStopped
 
-	return s.EmitSuspend()
-}
+	s.EmitSuspend()
 
-func (s *StrategyController) OnSuspend(cb func() error) {
-	s.SuspendCallback = cb
-}
-
-func (s *StrategyController) EmitSuspend() error {
-	if s.SuspendCallback != nil {
-		return s.SuspendCallback()
-	} else {
-		return nil
-	}
+	return nil
 }
 
 func (s *StrategyController) Resume() error {
 	s.Status = types.StrategyStatusRunning
 
-	return s.EmitResume()
-}
+	s.EmitResume()
 
-func (s *StrategyController) OnResume(cb func() error) {
-	s.ResumeCallback = cb
-}
-
-func (s *StrategyController) EmitResume() error {
-	if s.ResumeCallback != nil {
-		return s.ResumeCallback()
-	} else {
-		return nil
-	}
+	return nil
 }
 
 func (s *StrategyController) EmergencyStop() error {
 	s.Status = types.StrategyStatusStopped
 
-	return s.EmitEmergencyStop()
-}
+	s.EmitEmergencyStop()
 
-func (s *StrategyController) OnEmergencyStop(cb func() error) {
-	s.EmergencyStopCallback = cb
-}
-
-func (s *StrategyController) EmitEmergencyStop() error {
-	if s.EmergencyStopCallback != nil {
-		return s.EmergencyStopCallback()
-	} else {
-		return nil
-	}
+	return nil
 }
 
 type StrategyStatusReader interface {
