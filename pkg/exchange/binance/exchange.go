@@ -227,62 +227,77 @@ func (e *Exchange) NewStream() types.Stream {
 	return stream
 }
 
-func (e *Exchange) QueryMarginAccount(ctx context.Context) (*types.Account, error) {
-	account, err := e.Client.NewGetMarginAccountService().Do(ctx)
+func (e *Exchange) queryCrossMarginAccount(ctx context.Context) (*types.Account, error) {
+	marginAccount, err := e.Client.NewGetMarginAccountService().Do(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	a := &types.Account{
 		AccountType: types.AccountTypeMargin,
-		MarginInfo:  toGlobalMarginAccountInfo(account), // In binance GO api, Account define account info which mantain []*AccountAsset and []*AccountPosition.
+		MarginInfo:  toGlobalMarginAccountInfo(marginAccount), // In binance GO api, Account define marginAccount info which mantain []*AccountAsset and []*AccountPosition.
+		MarginLevel: fixedpoint.MustNewFromString(marginAccount.MarginLevel),
 	}
 
+	// convert cross margin user assets into balances
 	balances := types.BalanceMap{}
-	for _, userAsset := range account.UserAssets {
+	for _, userAsset := range marginAccount.UserAssets {
 		balances[userAsset.Asset] = types.Balance{
 			Currency:  userAsset.Asset,
 			Available: fixedpoint.MustNewFromString(userAsset.Free),
 			Locked:    fixedpoint.MustNewFromString(userAsset.Locked),
+			Interest:  fixedpoint.MustNewFromString(userAsset.Interest),
+			Borrowed:  fixedpoint.MustNewFromString(userAsset.Borrowed),
+			NetAsset:  fixedpoint.MustNewFromString(userAsset.NetAsset),
 		}
 	}
 	a.UpdateBalances(balances)
 	return a, nil
 }
 
-func (e *Exchange) QueryIsolatedMarginAccount(ctx context.Context, symbols ...string) (*types.Account, error) {
+func (e *Exchange) queryIsolatedMarginAccount(ctx context.Context) (*types.Account, error) {
 	req := e.Client.NewGetIsolatedMarginAccountService()
-	if len(symbols) > 0 {
-		req.Symbols(symbols...)
-	}
+	req.Symbols(e.IsolatedMarginSymbol)
 
-	account, err := req.Do(ctx)
+	marginAccount, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	a := &types.Account{
 		AccountType:        types.AccountTypeMargin,
-		IsolatedMarginInfo: toGlobalIsolatedMarginAccountInfo(account), // In binance GO api, Account define account info which mantain []*AccountAsset and []*AccountPosition.
+		IsolatedMarginInfo: toGlobalIsolatedMarginAccountInfo(marginAccount), // In binance GO api, Account define marginAccount info which mantain []*AccountAsset and []*AccountPosition.
 	}
 
+	// for isolated margin account, we will only have one asset in the Assets array.
+	if len(marginAccount.Assets) > 1 {
+		return nil, fmt.Errorf("unexpected number of user assets returned, got %d user assets", len(marginAccount.Assets))
+	}
+
+	userAsset := marginAccount.Assets[0]
+	a.MarginLevel = fixedpoint.MustNewFromString(userAsset.MarginLevel)
+
+	// Convert user assets into balances
 	balances := types.BalanceMap{}
-	for _, userAsset := range account.Assets {
-		balances[userAsset.BaseAsset.Asset] = types.Balance{
-			Currency:  userAsset.BaseAsset.Asset,
-			Available: fixedpoint.MustNewFromString(userAsset.BaseAsset.Free),
-			Locked:    fixedpoint.MustNewFromString(userAsset.BaseAsset.Locked),
-		}
-
-		balances[userAsset.QuoteAsset.Asset] = types.Balance{
-			Currency:  userAsset.QuoteAsset.Asset,
-			Available: fixedpoint.MustNewFromString(userAsset.QuoteAsset.Free),
-			Locked:    fixedpoint.MustNewFromString(userAsset.QuoteAsset.Locked),
-		}
+	balances[userAsset.BaseAsset.Asset] = types.Balance{
+		Currency:  userAsset.BaseAsset.Asset,
+		Available: fixedpoint.MustNewFromString(userAsset.BaseAsset.Free),
+		Locked:    fixedpoint.MustNewFromString(userAsset.BaseAsset.Locked),
+		Interest:  fixedpoint.MustNewFromString(userAsset.BaseAsset.Interest),
+		Borrowed:  fixedpoint.MustNewFromString(userAsset.BaseAsset.Borrowed),
+		NetAsset:  fixedpoint.MustNewFromString(userAsset.BaseAsset.NetAsset),
 	}
+
+	balances[userAsset.QuoteAsset.Asset] = types.Balance{
+		Currency:  userAsset.QuoteAsset.Asset,
+		Available: fixedpoint.MustNewFromString(userAsset.QuoteAsset.Free),
+		Locked:    fixedpoint.MustNewFromString(userAsset.QuoteAsset.Locked),
+		Interest:  fixedpoint.MustNewFromString(userAsset.QuoteAsset.Interest),
+		Borrowed:  fixedpoint.MustNewFromString(userAsset.QuoteAsset.Borrowed),
+		NetAsset:  fixedpoint.MustNewFromString(userAsset.QuoteAsset.NetAsset),
+	}
+
 	a.UpdateBalances(balances)
-
-
 	return a, nil
 }
 
@@ -541,9 +556,9 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	if e.IsFutures {
 		account, err = e.QueryFuturesAccount(ctx)
 	} else if e.IsIsolatedMargin {
-		account, err = e.QueryIsolatedMarginAccount(ctx)
+		account, err = e.queryIsolatedMarginAccount(ctx)
 	} else if e.IsMargin {
-		account, err = e.QueryMarginAccount(ctx)
+		account, err = e.queryCrossMarginAccount(ctx)
 	} else {
 		account, err = e.QuerySpotAccount(ctx)
 	}
