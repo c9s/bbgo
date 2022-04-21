@@ -170,8 +170,9 @@ type Strategy struct {
 
 	tradeCollector *bbgo.TradeCollector
 
-	orderStore *bbgo.OrderStore
-	state      *State
+	orderStore   *bbgo.OrderStore
+	activeOrders *bbgo.LocalActiveOrderBook
+	state        *State
 
 	triggerEMA  *indicator.EWMA
 	longTermEMA *indicator.EWMA
@@ -249,6 +250,7 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 	}
 
 	s.orderStore.Add(createdOrders...)
+	s.activeOrders.Add(createdOrders...)
 	return err
 }
 
@@ -303,6 +305,7 @@ func (s *Strategy) submitOrders(ctx context.Context, orderExecutor bbgo.OrderExe
 	}
 
 	s.orderStore.Add(createdOrders...)
+	s.activeOrders.Add(createdOrders...)
 	s.tradeCollector.Emit()
 	return createdOrders, nil
 }
@@ -393,13 +396,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.Status = types.StrategyStatusRunning
 
 	s.OnSuspend(func() {
-		var err error = nil
 		// Cancel all order
-		for _, order := range s.orderStore.Orders() {
-			err = s.cancelOrder(order.OrderID, ctx, s.orderExecutor)
-		}
-		if err != nil {
-			errMsg := "Not all orders are cancelled! Please check again."
+		if err := s.activeOrders.GracefulCancel(ctx, session.Exchange); err != nil {
+			errMsg := "Not all {s.Symbol} orders are cancelled! Please check again."
 			log.WithError(err).Errorf(errMsg)
 			s.Notify(errMsg)
 		} else {
@@ -407,7 +406,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 
 		// Save state
-		if err = s.SaveState(); err != nil {
+		if err := s.SaveState(); err != nil {
 			log.WithError(err).Errorf("can not save state: %+v", s.state)
 		} else {
 			log.Infof("%s state is saved.", s.Symbol)
@@ -475,6 +474,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.orderStore = bbgo.NewOrderStore(s.Symbol)
 	s.orderStore.BindStream(session.UserDataStream)
+
+	s.activeOrders = bbgo.NewLocalActiveOrderBook(s.Symbol)
+	s.activeOrders.BindStream(session.UserDataStream)
 
 	if !s.TrailingStopTarget.TrailingStopCallbackRatio.IsZero() {
 		s.trailingStopControl = &TrailingStopControl{
@@ -746,9 +748,15 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		// Cancel trailing stop order
 		if s.TrailingStopTarget.TrailingStopCallbackRatio.Sign() > 0 {
-			if err := s.cancelOrder(s.trailingStopControl.OrderID, ctx, orderExecutor); err != nil {
-				log.WithError(err).Errorf("Can not cancel the trailing stop order!")
+			// Cancel all orders
+			if err := s.activeOrders.GracefulCancel(ctx, session.Exchange); err != nil {
+				errMsg := "Not all {s.Symbol} orders are cancelled! Please check again."
+				log.WithError(err).Errorf(errMsg)
+				s.Notify(errMsg)
+			} else {
+				s.Notify("All {s.Symbol} orders are cancelled.")
 			}
+
 			s.trailingStopControl.OrderID = 0
 		}
 
