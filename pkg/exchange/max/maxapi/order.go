@@ -148,8 +148,8 @@ type GetOrderHistoryRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
 	market string `param:"market"`
-	fromID *int64 `param:"from_id"`
-	limit  *int   `param:"limit"`
+	fromID *uint64 `param:"from_id"`
+	limit  *uint   `param:"limit"`
 }
 
 func (s *OrderService) NewGetOrderHistoryRequest() *GetOrderHistoryRequest {

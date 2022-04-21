@@ -34,7 +34,7 @@ const (
 
 	UserAgent = "bbgo/" + version.Version
 
-	defaultHTTPTimeout = time.Second * 30
+	defaultHTTPTimeout = time.Second * 60
 
 	// 2018-09-01 08:00:00 +0800 CST
 	TimestampSince = 1535760000
@@ -129,7 +129,7 @@ func NewRestClient(baseURL string) *RestClient {
 	transport := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		DialContext: (&net.Dialer{
-			Timeout:   30 * time.Second,
+			Timeout:   10 * time.Second,
 			KeepAlive: 30 * time.Second,
 		}).DialContext,
 		ForceAttemptHTTP2:     true,
