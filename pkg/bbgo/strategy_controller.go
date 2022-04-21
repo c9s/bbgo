@@ -71,9 +71,16 @@ func (s *StrategyController) EmitEmergencyStop() error {
 	}
 }
 
-type StrategyControllerInterface interface {
+type StrategyStatusReader interface {
 	GetStatus() types.StrategyStatus
+}
+
+type StrategyToggler interface {
+	StrategyStatusReader
 	Suspend() error
 	Resume() error
+}
+
+type EmergencyStopper interface {
 	EmergencyStop() error
 }

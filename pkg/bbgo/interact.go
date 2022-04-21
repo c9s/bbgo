@@ -56,15 +56,6 @@ func (it *CoreInteraction) FilterStrategyByInterface(checkInterface interface{})
 	return strategies, found
 }
 
-func (it *CoreInteraction) GetStrategyController(strategy SingleExchangeStrategy) (controller StrategyControllerInterface, found bool) {
-	if strategyController := reflect.ValueOf(&strategy).Elem().FieldByName("strategyController"); strategyController.IsValid() {
-		controller = strategyController.Interface().(StrategyControllerInterface)
-		return controller, true
-	} else {
-		return nil, false
-	}
-}
-
 func GenerateStrategyButtonsForm(strategies []string) [][3]string {
 	var buttonsForm [][3]string
 	for _, strategy := range strategies {
@@ -231,11 +222,11 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 	i.PrivateCommand("/status", "Strategy Status", func(reply interact.Reply) error {
 		// it.trader.exchangeStrategies
 		// send symbol options
-		if strategies, found := it.FilterStrategyByInterface((*StrategyControllerInterface)(nil)); found {
+		if strategies, found := it.FilterStrategyByInterface((*StrategyStatusReader)(nil)); found {
 			reply.AddMultipleButtons(GenerateStrategyButtonsForm(strategies))
 			reply.Message("Please choose a strategy")
 		} else {
-			reply.Message("No strategy supports StrategyController")
+			reply.Message("No strategy supports StrategyStatusReader")
 		}
 		return nil
 	}).Next(func(signature string, reply interact.Reply) error {
@@ -245,10 +236,10 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 			return fmt.Errorf("strategy %s not found", signature)
 		}
 
-		controller, implemented := strategy.(StrategyControllerInterface)
+		controller, implemented := strategy.(StrategyStatusReader)
 		if !implemented {
-			reply.Message(fmt.Sprintf("Strategy %s does not support StrategyController", signature))
-			return fmt.Errorf("strategy %s does not implement StrategyController", signature)
+			reply.Message(fmt.Sprintf("Strategy %s does not support StrategyStatusReader", signature))
+			return fmt.Errorf("strategy %s does not implement StrategyStatusReader", signature)
 		}
 
 		status := controller.GetStatus()
@@ -269,11 +260,11 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 	i.PrivateCommand("/suspend", "Suspend Strategy", func(reply interact.Reply) error {
 		// it.trader.exchangeStrategies
 		// send symbol options
-		if strategies, found := it.FilterStrategyByInterface((*StrategyControllerInterface)(nil)); found {
+		if strategies, found := it.FilterStrategyByInterface((*StrategyToggler)(nil)); found {
 			reply.AddMultipleButtons(GenerateStrategyButtonsForm(strategies))
 			reply.Message("Please choose one strategy")
 		} else {
-			reply.Message("No strategy supports StrategyController")
+			reply.Message("No strategy supports StrategyToggler")
 		}
 		return nil
 	}).Next(func(signature string, reply interact.Reply) error {
@@ -283,10 +274,10 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 			return fmt.Errorf("strategy %s not found", signature)
 		}
 
-		controller, implemented := strategy.(StrategyControllerInterface)
+		controller, implemented := strategy.(StrategyToggler)
 		if !implemented {
-			reply.Message(fmt.Sprintf("Strategy %s does not support StrategyController", signature))
-			return fmt.Errorf("strategy %s does not implement StrategyController", signature)
+			reply.Message(fmt.Sprintf("Strategy %s does not support StrategyToggler", signature))
+			return fmt.Errorf("strategy %s does not implement StrategyToggler", signature)
 		}
 
 		// Check strategy status before suspend
@@ -311,11 +302,11 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 	i.PrivateCommand("/resume", "Resume Strategy", func(reply interact.Reply) error {
 		// it.trader.exchangeStrategies
 		// send symbol options
-		if strategies, found := it.FilterStrategyByInterface((*StrategyControllerInterface)(nil)); found {
+		if strategies, found := it.FilterStrategyByInterface((*StrategyToggler)(nil)); found {
 			reply.AddMultipleButtons(GenerateStrategyButtonsForm(strategies))
 			reply.Message("Please choose one strategy")
 		} else {
-			reply.Message("No strategy supports StrategyController")
+			reply.Message("No strategy supports StrategyToggler")
 		}
 		return nil
 	}).Next(func(signature string, reply interact.Reply) error {
@@ -325,10 +316,10 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 			return fmt.Errorf("strategy %s not found", signature)
 		}
 
-		controller, implemented := strategy.(StrategyControllerInterface)
+		controller, implemented := strategy.(StrategyToggler)
 		if !implemented {
-			reply.Message(fmt.Sprintf("Strategy %s does not support StrategyController", signature))
-			return fmt.Errorf("strategy %s does not implement StrategyController", signature)
+			reply.Message(fmt.Sprintf("Strategy %s does not support StrategyToggler", signature))
+			return fmt.Errorf("strategy %s does not implement StrategyToggler", signature)
 		}
 
 		// Check strategy status before suspend
@@ -353,11 +344,11 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 	i.PrivateCommand("/emergencystop", "Emergency Stop", func(reply interact.Reply) error {
 		// it.trader.exchangeStrategies
 		// send symbol options
-		if strategies, found := it.FilterStrategyByInterface((*StrategyControllerInterface)(nil)); found {
+		if strategies, found := it.FilterStrategyByInterface((*EmergencyStopper)(nil)); found {
 			reply.AddMultipleButtons(GenerateStrategyButtonsForm(strategies))
 			reply.Message("Please choose one strategy")
 		} else {
-			reply.Message("No strategy supports StrategyController")
+			reply.Message("No strategy supports EmergencyStopper")
 		}
 		return nil
 	}).Next(func(signature string, reply interact.Reply) error {
@@ -367,10 +358,10 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 			return fmt.Errorf("strategy %s not found", signature)
 		}
 
-		controller, implemented := strategy.(StrategyControllerInterface)
+		controller, implemented := strategy.(EmergencyStopper)
 		if !implemented {
-			reply.Message(fmt.Sprintf("Strategy %s does not support StrategyController", signature))
-			return fmt.Errorf("strategy %s does not implement StrategyController", signature)
+			reply.Message(fmt.Sprintf("Strategy %s does not support EmergencyStopper", signature))
+			return fmt.Errorf("strategy %s does not implement EmergencyStopper", signature)
 		}
 
 		if kc, ok := reply.(interact.KeyboardController); ok {
