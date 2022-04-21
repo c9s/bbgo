@@ -418,7 +418,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.OnEmergencyStop(func() error {
 		// Close 100% position
-		percentage, _ := fixedpoint.NewFromString("100%")
+		percentage := fixedpoint.NewFromFloat(1.0)
 		err := s.ClosePosition(context.Background(), percentage)
 		err2 := s.Suspend()
 
