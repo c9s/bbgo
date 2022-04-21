@@ -876,7 +876,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		return nil, err
 	}
 
-	req := e.client.TradeService.NewPrivateTradeRequest()
+	req := e.client.TradeService.NewGetPrivateTradeRequest()
 	req.Market(toLocalSymbol(symbol))
 
 	if options.Limit > 0 {

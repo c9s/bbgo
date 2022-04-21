@@ -116,8 +116,8 @@ func (options *QueryTradeOptions) Params() url.Values {
 	return params
 }
 
-func (s *TradeService) NewPrivateTradeRequest() *PrivateTradeRequest {
-	return &PrivateTradeRequest{client: s.client}
+func (s *TradeService) NewGetPrivateTradeRequest() *GetPrivateTradesRequest {
+	return &GetPrivateTradesRequest{client: s.client}
 }
 
 type PrivateRequestParams struct {
@@ -125,8 +125,8 @@ type PrivateRequestParams struct {
 	Path  string `json:"path"`
 }
 
-//go:generate GetRequest -url "v2/trades/my" -type PrivateTradeRequest -responseType []Trade
-type PrivateTradeRequest struct {
+//go:generate GetRequest -url "v2/trades/my" -type GetPrivateTradesRequest -responseType []Trade
+type GetPrivateTradesRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
 	market string `param:"market"`
