@@ -1177,7 +1177,6 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 }
 
 func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
-
 	if e.IsMargin {
 		var remoteTrades []*binance.TradeV3
 		req := e.Client.NewListMarginTradesService().
@@ -1217,6 +1216,8 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 			trades = append(trades, *localTrade)
 		}
 
+		trades = types.SortTradesAscending(trades)
+
 		return trades, nil
 	} else if e.IsFutures {
 		var remoteTrades []*futures.AccountTrade
@@ -1247,6 +1248,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 			trades = append(trades, *localTrade)
 		}
 
+		trades = types.SortTradesAscending(trades)
 		return trades, nil
 	} else {
 		var remoteTrades []*binance.TradeV3
@@ -1285,10 +1287,12 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 			trades = append(trades, *localTrade)
 		}
 
+		trades = types.SortTradesAscending(trades)
 		return trades, nil
 	}
 }
 
+// QueryDepth query the order book depth of a symbol
 func (e *Exchange) QueryDepth(ctx context.Context, symbol string) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
 	response, err := e.Client.NewDepthService().Symbol(symbol).Do(ctx)
 	if err != nil {
