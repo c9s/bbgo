@@ -418,18 +418,6 @@ func (a *Account) UpdateBalances(balances BalanceMap) {
 	}
 }
 
-func printBalanceUpdate(balances BalanceMap) {
-	logrus.Infof("balance update: %+v", balances)
-}
-
-func (a *Account) BindStream(stream Stream) {
-	stream.OnBalanceUpdate(a.UpdateBalances)
-	stream.OnBalanceSnapshot(a.UpdateBalances)
-	if debugBalance {
-		stream.OnBalanceUpdate(printBalanceUpdate)
-	}
-}
-
 func (a *Account) Print() {
 	a.Lock()
 	defer a.Unlock()
