@@ -16,4 +16,4 @@ def parse_time(t: Union[str, int]) -> datetime:
     if isinstance(t, str):
         t = int(t)
 
-    return datetime.fromtimestamp(t / 1000),
+    return datetime.fromtimestamp(t / 1000)
