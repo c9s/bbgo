@@ -311,15 +311,15 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 
 	// query and initialize the balances
 	if !session.PublicOnly {
-		log.Infof("querying balances from session %s...", session.Name)
-		balances, err := session.Exchange.QueryAccountBalances(ctx)
+		account, err := session.Exchange.QueryAccount(ctx)
 		if err != nil {
 			return err
 		}
 
+		session.Account = account
+
 		log.Infof("%s account", session.Name)
-		balances.Print()
-		session.Account.UpdateBalances(balances)
+		account.Balances().Print()
 
 		// forward trade updates and order updates to the order executor
 		session.UserDataStream.OnTradeUpdate(session.OrderExecutor.EmitTradeUpdate)
@@ -330,7 +330,7 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 
 		// if metrics mode is enabled, we bind the callbacks to update metrics
 		if viper.GetBool("metrics") {
-			session.metricsBalancesUpdater(balances)
+			session.metricsBalancesUpdater(account.Balances())
 			session.bindUserDataStreamMetrics(session.UserDataStream)
 		}
 	}
