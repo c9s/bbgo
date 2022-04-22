@@ -326,7 +326,7 @@ func (e *Exchange) queryIsolatedMarginAccount(ctx context.Context) (*types.Accou
 	}
 
 	a := &types.Account{
-		AccountType:        types.AccountTypeMargin,
+		AccountType:        types.AccountTypeIsolatedMargin,
 		IsolatedMarginInfo: toGlobalIsolatedMarginAccountInfo(marginAccount), // In binance GO api, Account define marginAccount info which mantain []*AccountAsset and []*AccountPosition.
 	}
 

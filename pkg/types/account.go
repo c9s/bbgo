@@ -230,9 +230,10 @@ func (m BalanceMap) Print() {
 type AccountType string
 
 const (
-	AccountTypeFutures = AccountType("futures")
-	AccountTypeMargin  = AccountType("margin")
-	AccountTypeSpot    = AccountType("spot")
+	AccountTypeFutures        = AccountType("futures")
+	AccountTypeMargin         = AccountType("margin")
+	AccountTypeIsolatedMargin = AccountType("isolated_margin")
+	AccountTypeSpot           = AccountType("spot")
 )
 
 type Account struct {
@@ -251,8 +252,8 @@ type Account struct {
 	MarginLevel     fixedpoint.Value `json:"marginLevel,omitempty"`
 	MarginTolerance fixedpoint.Value `json:"marginTolerance,omitempty"`
 
-	BorrowEnabled   bool             `json:"borrowEnabled,omitempty"`
-	TransferEnabled bool             `json:"transferEnabled,omitempty"`
+	BorrowEnabled   bool `json:"borrowEnabled,omitempty"`
+	TransferEnabled bool `json:"transferEnabled,omitempty"`
 
 	// isolated margin related fields
 	// LiquidationPrice is only used when account is in the isolated margin mode
