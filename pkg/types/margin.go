@@ -1,6 +1,10 @@
 package types
 
-import "github.com/c9s/bbgo/pkg/fixedpoint"
+import (
+	"context"
+
+	"github.com/c9s/bbgo/pkg/fixedpoint"
+)
 
 type FuturesExchange interface {
 	UseFutures()
@@ -46,6 +50,11 @@ type MarginExchange interface {
 	UseIsolatedMargin(symbol string)
 	GetMarginSettings() MarginSettings
 	// QueryMarginAccount(ctx context.Context) (*binance.MarginAccount, error)
+}
+
+type MarginBorrowRepay interface {
+	RepayMarginAsset(ctx context.Context, asset string, amount fixedpoint.Value) error
+	BorrowMarginAsset(ctx context.Context, asset string, amount fixedpoint.Value) error
 }
 
 type MarginSettings struct {
