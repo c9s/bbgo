@@ -201,7 +201,7 @@ type subscribedResponse struct {
 }
 
 func (s subscribedResponse) String() string {
-	return fmt.Sprintf("`%s` channel is subsribed", strings.TrimSpace(fmt.Sprintf("%s %s", s.Market, s.Channel)))
+	return fmt.Sprintf("%s channel is subscribed", strings.TrimSpace(fmt.Sprintf("%s %s", s.Market, s.Channel)))
 }
 
 // {"type": "subscribed", "channel": "orderbook", "market": "BTC/USDT"}
