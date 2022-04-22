@@ -204,7 +204,7 @@ func toGlobalTrade(t max.Trade) (*types.Trade, error) {
 	var side = toGlobalSideType(t.Side)
 
 	// trade time
-	mts := time.Unix(0, t.CreatedAtMilliSeconds*int64(time.Millisecond))
+	mts := t.CreatedAtMilliSeconds
 
 	price, err := fixedpoint.NewFromString(t.Price)
 	if err != nil {

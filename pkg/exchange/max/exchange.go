@@ -876,7 +876,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		return nil, err
 	}
 
-	req := e.client.TradeService.NewPrivateTradeRequest()
+	req := e.client.TradeService.NewGetPrivateTradeRequest()
 	req.Market(toLocalSymbol(symbol))
 
 	if options.Limit > 0 {
@@ -899,11 +899,6 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		return nil, err
 	}
 
-	// ensure everything is sorted ascending
-	sort.Slice(maxTrades, func(i, j int) bool {
-		return maxTrades[i].CreatedAtMilliSeconds < maxTrades[j].CreatedAtMilliSeconds
-	})
-
 	for _, t := range maxTrades {
 		localTrade, err := toGlobalTrade(t)
 		if err != nil {
@@ -913,6 +908,9 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 
 		trades = append(trades, *localTrade)
 	}
+
+	// ensure everything is sorted ascending
+	trades = types.SortTradesAscending(trades)
 
 	return trades, nil
 }
