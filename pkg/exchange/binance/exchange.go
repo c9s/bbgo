@@ -235,7 +235,7 @@ func (e *Exchange) QueryMarginAssetMaxBorrowable(ctx context.Context, asset stri
 	}
 	resp, err := req.Do(ctx)
 	if err != nil {
-		return 0, err
+		return fixedpoint.Zero, err
 	}
 
 	return fixedpoint.NewFromString(resp.Amount)
@@ -290,10 +290,12 @@ func (e *Exchange) queryCrossMarginAccount(ctx context.Context) (*types.Account,
 		return nil, err
 	}
 
+	marginLevel := fixedpoint.MustNewFromString(marginAccount.MarginLevel)
 	a := &types.Account{
 		AccountType:     types.AccountTypeMargin,
 		MarginInfo:      toGlobalMarginAccountInfo(marginAccount), // In binance GO api, Account define marginAccount info which mantain []*AccountAsset and []*AccountPosition.
-		MarginLevel:     fixedpoint.MustNewFromString(marginAccount.MarginLevel),
+		MarginLevel:     marginLevel,
+		MarginTolerance: calculateMarginTolerance(marginLevel),
 		BorrowEnabled:   marginAccount.BorrowEnabled,
 		TransferEnabled: marginAccount.TransferEnabled,
 	}
@@ -334,7 +336,9 @@ func (e *Exchange) queryIsolatedMarginAccount(ctx context.Context) (*types.Accou
 	}
 
 	userAsset := marginAccount.Assets[0]
-	a.MarginLevel = fixedpoint.MustNewFromString(userAsset.MarginLevel)
+	marginLevel := fixedpoint.MustNewFromString(userAsset.MarginLevel)
+	a.MarginLevel = marginLevel
+	a.MarginTolerance = calculateMarginTolerance(marginLevel)
 	a.MarginRatio = fixedpoint.MustNewFromString(userAsset.MarginRatio)
 	a.BorrowEnabled = userAsset.BaseAsset.BorrowEnabled || userAsset.QuoteAsset.BorrowEnabled
 	a.LiquidationPrice = fixedpoint.MustNewFromString(userAsset.LiquidatePrice)
@@ -1496,4 +1500,18 @@ func getLaunchDate() (time.Time, error) {
 	}
 
 	return time.Date(2017, time.July, 14, 0, 0, 0, 0, loc), nil
+}
+
+// Margin tolerance ranges from 0.0 (liquidation) to 1.0 (safest level of margin).
+func calculateMarginTolerance(marginLevel fixedpoint.Value) fixedpoint.Value {
+	if marginLevel.IsZero() {
+		// Although margin level shouldn't be zero, that would indicate a significant problem.
+		// In that case, margin tolerance should return 0.0 to also reflect that problem.
+		return fixedpoint.Zero
+	}
+
+	// Formula created by operations team for our binance code.  Liquidation occurs at 1.1,
+	// so when marginLevel equals 1.1, the formula becomes 1.0 - 1.0, or zero.
+	// = 1.0 - (1.1 / marginLevel)
+	return fixedpoint.One.Sub(fixedpoint.NewFromFloat(1.1).Div(marginLevel))
 }
