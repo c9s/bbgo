@@ -243,8 +243,14 @@ type Account struct {
 	MarginInfo         *MarginAccountInfo
 	IsolatedMarginInfo *IsolatedMarginAccountInfo
 
-	// margin related common field
+	// Margin related common field
+	// From binance:
+	// Margin Level = Total Asset Value / (Total Borrowed + Total Accrued Interest)
+	// If your margin level drops to 1.3, you will receive a Margin Call, which is a reminder that you should either increase your collateral (by depositing more funds) or reduce your loan (by repaying what you’ve borrowed).
+	// If your margin level drops to 1.1, your assets will be automatically liquidated, meaning that Binance will sell your funds at market price to repay the loan.
 	MarginLevel     fixedpoint.Value `json:"marginLevel,omitempty"`
+	MarginTolerance fixedpoint.Value `json:"marginTolerance,omitempty"`
+
 	BorrowEnabled   bool             `json:"borrowEnabled,omitempty"`
 	TransferEnabled bool             `json:"transferEnabled,omitempty"`
 
