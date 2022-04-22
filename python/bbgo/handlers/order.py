@@ -1,4 +1,3 @@
-from ..data import Event
 from ..data import UserDataEvent
 from ..enums import ChannelType
 from ..enums import EventType
