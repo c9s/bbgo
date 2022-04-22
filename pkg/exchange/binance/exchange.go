@@ -227,6 +227,20 @@ func (e *Exchange) NewStream() types.Stream {
 	return stream
 }
 
+func (e *Exchange) QueryMarginAssetMaxBorrowable(ctx context.Context, asset string) (amount fixedpoint.Value, err error) {
+	req := e.Client.NewGetMaxBorrowableService()
+	req.Asset(asset)
+	if e.IsIsolatedMargin {
+		req.IsolatedSymbol(e.IsolatedMarginSymbol)
+	}
+	resp, err := req.Do(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	return fixedpoint.NewFromString(resp.Amount)
+}
+
 func (e *Exchange) RepayMarginAsset(ctx context.Context, asset string, amount fixedpoint.Value) error {
 	req := e.Client.NewMarginRepayService()
 	req.Asset(asset)
