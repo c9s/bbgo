@@ -244,8 +244,15 @@ type Account struct {
 	IsolatedMarginInfo *IsolatedMarginAccountInfo
 
 	// margin related common field
-	MarginLevel   fixedpoint.Value `json:"marginLevel"`
-	BorrowEnabled bool             `json:"borrowEnabled"`
+	MarginLevel     fixedpoint.Value `json:"marginLevel,omitempty"`
+	BorrowEnabled   bool             `json:"borrowEnabled,omitempty"`
+	TransferEnabled bool             `json:"transferEnabled,omitempty"`
+
+	// isolated margin related fields
+	// LiquidationPrice is only used when account is in the isolated margin mode
+	MarginRatio      fixedpoint.Value `json:"marginRatio,omitempty"`
+	LiquidationPrice fixedpoint.Value `json:"liquidationPrice,omitempty"`
+	LiquidationRate  fixedpoint.Value `json:"liquidationRate,omitempty"`
 
 	MakerFeeRate fixedpoint.Value `json:"makerFeeRate,omitempty"`
 	TakerFeeRate fixedpoint.Value `json:"takerFeeRate,omitempty"`
