@@ -1,4 +1,4 @@
-from ..data import Event
+from ..data import MarketDataEvent
 from ..enums import ChannelType
 from ..enums import EventType
 from .handler import Handler
@@ -6,7 +6,7 @@ from .handler import Handler
 
 class BookHandler(Handler):
 
-    def __call__(self, event: Event) -> None:
+    def __call__(self, event: MarketDataEvent) -> None:
         if event.channel_type != ChannelType.BOOK:
             return
 
@@ -15,7 +15,7 @@ class BookHandler(Handler):
 
 class BookSnapshotHandler(BookHandler):
 
-    def __call__(self, event: Event) -> None:
+    def __call__(self, event: MarketDataEvent) -> None:
         if event.event_type != EventType.SNAPSHOT:
             return
 
@@ -24,7 +24,7 @@ class BookSnapshotHandler(BookHandler):
 
 class BookUpdateHandler(BookHandler):
 
-    def __call__(self, event: Event) -> None:
+    def __call__(self, event: MarketDataEvent) -> None:
         if event.event_type != EventType.UPDATE:
             return
 

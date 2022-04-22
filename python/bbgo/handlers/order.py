@@ -1,4 +1,5 @@
 from ..data import Event
+from ..data import UserDataEvent
 from ..enums import ChannelType
 from ..enums import EventType
 from .handler import Handler
@@ -6,7 +7,7 @@ from .handler import Handler
 
 class OrderHandler(Handler):
 
-    def __call__(self, event: Event) -> None:
+    def __call__(self, event: UserDataEvent) -> None:
         if event.channel_type != ChannelType.ORDER:
             return
 
@@ -15,7 +16,7 @@ class OrderHandler(Handler):
 
 class OrderSnapshotHandler(OrderHandler):
 
-    def __call__(self, event: Event) -> None:
+    def __call__(self, event: UserDataEvent) -> None:
         if event.event_type != EventType.SNAPSHOT:
             return
 
@@ -24,7 +25,7 @@ class OrderSnapshotHandler(OrderHandler):
 
 class OrderUpdateHandler(OrderHandler):
 
-    def __call__(self, event: Event) -> None:
+    def __call__(self, event: UserDataEvent) -> None:
         if event.event_type != EventType.UPDATE:
             return
 
