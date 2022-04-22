@@ -19,7 +19,7 @@ type HULL struct {
 }
 
 func (inc *HULL) Update(value float64) {
-	if inc.result.Length() == 0 {
+	if inc.result == nil {
 		inc.ma1 = &EWMA{IntervalWindow: types.IntervalWindow{inc.Interval, inc.Window / 2}}
 		inc.ma2 = &EWMA{IntervalWindow: types.IntervalWindow{inc.Interval, inc.Window}}
 		inc.result = &EWMA{IntervalWindow: types.IntervalWindow{inc.Interval, int(math.Sqrt(float64(inc.Window)))}}
@@ -46,7 +46,7 @@ var _ types.Series = &HULL{}
 // TODO: should we just ignore the possible overlapping?
 func (inc *HULL) calculateAndUpdate(allKLines []types.KLine) {
 	doable := false
-	if inc.ma1.Length() == 0 {
+	if inc.ma1 == nil || inc.ma1.Length() == 0 {
 		doable = true
 	}
 	for _, k := range allKLines {

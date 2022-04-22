@@ -41,7 +41,7 @@ func (inc *TILL) Update(value float64) {
 		inc.c1 = -cube
 		inc.c2 = 3.*square + 3.*cube
 		inc.c3 = -6.*square - 3*inc.VolumeFactor - 3*cube
-		inc.c4 = 1 + 3*inc.VolumeFactor + cube + 3*square
+		inc.c4 = 1. + 3.*inc.VolumeFactor + cube + 3.*square
 	}
 
 	inc.e1.Update(value)
@@ -82,7 +82,7 @@ var _ types.Series = &TILL{}
 
 func (inc *TILL) calculateAndUpdate(allKLines []types.KLine) {
 	doable := false
-	if inc.e1.Length() == 0 {
+	if inc.e1 == nil {
 		doable = true
 	}
 	for _, k := range allKLines {

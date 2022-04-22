@@ -27,7 +27,7 @@ func (inc *VIDYA) Update(value float64) {
 	if len(inc.input) > MaxNumOfEWMA {
 		inc.input = inc.input[MaxNumOfEWMATruncateSize-1:]
 	}
-	upsum := 0.
+	/*upsum := 0.
 	downsum := 0.
 	for i := 0; i < inc.Window; i++ {
 		if len(inc.input) <= i+1 {
@@ -44,7 +44,9 @@ func (inc *VIDYA) Update(value float64) {
 	if upsum == 0 && downsum == 0 {
 		return
 	}
-	CMO := math.Abs((upsum - downsum) / (upsum + downsum))
+	CMO := math.Abs((upsum - downsum) / (upsum + downsum))*/
+	change := types.Change(&inc.input)
+	CMO := math.Abs(types.Sum(change, inc.Window) / types.Sum(types.Abs(change), inc.Window))
 	alpha := 2. / float64(inc.Window+1)
 	inc.Values.Push(value*alpha*CMO + inc.Values.Last()*(1.-alpha*CMO))
 	if inc.Values.Length() > MaxNumOfEWMA {
