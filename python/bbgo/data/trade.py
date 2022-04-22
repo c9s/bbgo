@@ -30,7 +30,7 @@ class Trade:
             session=obj.session,
             exchange=obj.exchange,
             symbol=obj.symbol,
-            id=obj.id,
+            trade_id=obj.id,
             price=parse_float(obj.price),
             quantity=parse_float(obj.quantity),
             created_at=parse_time(obj.created_at),
