@@ -18,16 +18,16 @@ from .ticker import Ticker
 from .trade import Trade
 
 
-class Event:
-    pass
-
-
 @dataclass
-class UserDataEvent(Event):
+class Event:
     session: str
     exchange: str
     channel_type: ChannelType
     event_type: EventType
+
+
+@dataclass
+class UserDataEvent(Event):
     balances: List[Balance] = None
     trades: List[Trade] = None
     orders: List[Order] = None
@@ -47,11 +47,7 @@ class UserDataEvent(Event):
 
 @dataclass
 class MarketDataEvent(Event):
-    session: str
-    exchange: str
     symbol: str
-    channel_type: ChannelType
-    event_type: EventType
     subscribed_at: datetime
     error: ErrorMessage
     depth: Depth = None
