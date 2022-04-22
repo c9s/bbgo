@@ -227,11 +227,20 @@ func (e *Exchange) NewStream() types.Stream {
 	return stream
 }
 
-func (e *Exchange) repayCrossMarginAccountAsset(ctx context.Context, asset string, amount fixedpoint.Value) error {
-	return nil
+func (e *Exchange) RepayMarginAsset(ctx context.Context, asset string, amount fixedpoint.Value) error {
+	req := e.Client.NewMarginRepayService()
+	req.Asset(asset)
+	req.Amount(amount.String())
+	if e.IsIsolatedMargin {
+		req.IsolatedSymbol(e.IsolatedMarginSymbol)
+	}
+
+	resp, err := req.Do(ctx)
+	log.Debugf("margin repayed %f %s, transaction id = %d", amount.Float64(), asset, resp.TranID)
+	return err
 }
 
-func (e *Exchange) borrowMarginAccountAsset(ctx context.Context, asset string, amount fixedpoint.Value) error {
+func (e *Exchange) BorrowMarginAsset(ctx context.Context, asset string, amount fixedpoint.Value) error {
 	req := e.Client.NewMarginLoanService()
 	req.Asset(asset)
 	req.Amount(amount.String())
