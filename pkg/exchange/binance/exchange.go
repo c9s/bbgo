@@ -227,8 +227,25 @@ func (e *Exchange) NewStream() types.Stream {
 	return stream
 }
 
-// transferCrossMarginAccount transfer asset to the cross margin account or to the main account
-func (e *Exchange) transferCrossMarginAccount(ctx context.Context, asset string, amount fixedpoint.Value, io int) error {
+func (e *Exchange) repayCrossMarginAccountAsset(ctx context.Context, asset string, amount fixedpoint.Value) error {
+	return nil
+}
+
+func (e *Exchange) borrowMarginAccountAsset(ctx context.Context, asset string, amount fixedpoint.Value) error {
+	req := e.Client.NewMarginLoanService()
+	req.Asset(asset)
+	req.Amount(amount.String())
+	if e.IsIsolatedMargin {
+		req.IsolatedSymbol(e.IsolatedMarginSymbol)
+	}
+
+	resp, err := req.Do(ctx)
+	log.Debugf("margin borrowed %f %s, transaction id = %d", amount.Float64(), asset, resp.TranID)
+	return err
+}
+
+// transferCrossMarginAccountAsset transfer asset to the cross margin account or to the main account
+func (e *Exchange) transferCrossMarginAccountAsset(ctx context.Context, asset string, amount fixedpoint.Value, io int) error {
 	req := e.Client.NewMarginTransferService()
 	req.Asset(asset)
 	req.Amount(amount.String())
@@ -240,7 +257,7 @@ func (e *Exchange) transferCrossMarginAccount(ctx context.Context, asset string,
 	}
 	resp, err := req.Do(ctx)
 
-	log.Debugf("cross margin transfer, transaction id = %d", resp.TranID)
+	log.Debugf("cross margin transfer %f %s, transaction id = %d", amount.Float64(), asset, resp.TranID)
 	return err
 }
 
