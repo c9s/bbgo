@@ -11,7 +11,7 @@ import (
 type ZLEMA struct {
 	types.IntervalWindow
 
-	data  *EWMA
+	data  types.Float64Slice
 	zlema *EWMA
 	lag   int
 
@@ -32,13 +32,17 @@ func (inc *ZLEMA) Length() int {
 
 func (inc *ZLEMA) Update(value float64) {
 	if inc.lag == 0 || inc.zlema == nil {
-		inc.data = &EWMA{IntervalWindow: types.IntervalWindow{inc.Interval, inc.Window}}
 		inc.zlema = &EWMA{IntervalWindow: types.IntervalWindow{inc.Interval, inc.Window}}
-		inc.lag = (inc.Window - 1) / 2
+		inc.lag = int((float64(inc.Window)-1.)/2. + 0.5)
 	}
-	inc.data.Update(value)
-	data := inc.data.Last()
-	emaData := 2*data - inc.data.Index(inc.lag)
+	inc.data.Push(value)
+	if len(inc.data) > MaxNumOfEWMA {
+		inc.data = inc.data[MaxNumOfEWMATruncateSize-1:]
+	}
+	if inc.lag >= inc.data.Length() {
+		return
+	}
+	emaData := 2.*value - inc.data[len(inc.data)-1-inc.lag]
 	inc.zlema.Update(emaData)
 }
 
