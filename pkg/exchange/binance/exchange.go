@@ -227,6 +227,23 @@ func (e *Exchange) NewStream() types.Stream {
 	return stream
 }
 
+// transferCrossMarginAccount transfer asset to the cross margin account or to the main account
+func (e *Exchange) transferCrossMarginAccount(ctx context.Context, asset string, amount fixedpoint.Value, io int) error {
+	req := e.Client.NewMarginTransferService()
+	req.Asset(asset)
+	req.Amount(amount.String())
+
+	if io > 0 { // in
+		req.Type(binance.MarginTransferTypeToMargin)
+	} else if io < 0 { // out
+		req.Type(binance.MarginTransferTypeToMain)
+	}
+	resp, err := req.Do(ctx)
+
+	log.Debugf("cross margin transfer, transaction id = %d", resp.TranID)
+	return err
+}
+
 func (e *Exchange) queryCrossMarginAccount(ctx context.Context) (*types.Account, error) {
 	marginAccount, err := e.Client.NewGetMarginAccountService().Do(ctx)
 	if err != nil {
@@ -234,10 +251,10 @@ func (e *Exchange) queryCrossMarginAccount(ctx context.Context) (*types.Account,
 	}
 
 	a := &types.Account{
-		AccountType:   types.AccountTypeMargin,
-		MarginInfo:    toGlobalMarginAccountInfo(marginAccount), // In binance GO api, Account define marginAccount info which mantain []*AccountAsset and []*AccountPosition.
-		MarginLevel:   fixedpoint.MustNewFromString(marginAccount.MarginLevel),
-		BorrowEnabled: marginAccount.BorrowEnabled,
+		AccountType:     types.AccountTypeMargin,
+		MarginInfo:      toGlobalMarginAccountInfo(marginAccount), // In binance GO api, Account define marginAccount info which mantain []*AccountAsset and []*AccountPosition.
+		MarginLevel:     fixedpoint.MustNewFromString(marginAccount.MarginLevel),
+		BorrowEnabled:   marginAccount.BorrowEnabled,
 		TransferEnabled: marginAccount.TransferEnabled,
 	}
 
