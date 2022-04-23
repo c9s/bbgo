@@ -41,7 +41,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		return nil
 	}
 	callback := func(kline types.KLine) {
-		quoteBalance, ok := session.Account.Balance(market.QuoteCurrency)
+		quoteBalance, ok := session.GetAccount().Balance(market.QuoteCurrency)
 		if !ok {
 			return
 		}

@@ -91,7 +91,7 @@ func (s *Strategy) rebalance(ctx context.Context, orderExecutor bbgo.OrderExecut
 		return
 	}
 
-	balances := session.Account.Balances()
+	balances := session.GetAccount().Balances()
 	quantities := s.getQuantities(balances)
 	marketValues := prices.Mul(quantities)
 

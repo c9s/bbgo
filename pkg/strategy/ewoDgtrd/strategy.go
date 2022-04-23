@@ -394,7 +394,7 @@ func (s *Strategy) validateOrder(order *types.SubmitOrder) bool {
 		return false
 	}
 	if order.Side == types.SideTypeSell {
-		baseBalance, ok := s.Session.Account.Balance(s.Market.BaseCurrency)
+		baseBalance, ok := s.Session.GetAccount().Balance(s.Market.BaseCurrency)
 		if !ok {
 			return false
 		}
@@ -416,7 +416,7 @@ func (s *Strategy) validateOrder(order *types.SubmitOrder) bool {
 		}
 		return true
 	} else if order.Side == types.SideTypeBuy {
-		quoteBalance, ok := s.Session.Account.Balance(s.Market.QuoteCurrency)
+		quoteBalance, ok := s.Session.GetAccount().Balance(s.Market.QuoteCurrency)
 		if !ok {
 			return false
 		}
@@ -492,7 +492,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			log.Errorf("cannot get last price")
 			return
 		}
-		balances := session.Account.Balances()
+		balances := session.GetAccount().Balances()
 		baseBalance := balances[s.Market.BaseCurrency].Available
 		quoteBalance := balances[s.Market.QuoteCurrency].Available
 		/*if buyPrice.IsZero() {
@@ -580,7 +580,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				buyall = true
 			}
 			if sellall {
-				balances := session.Account.Balances()
+				balances := session.GetAccount().Balances()
 				baseBalance := balances[s.Market.BaseCurrency].Available.Mul(modifier)
 				order := types.SubmitOrder{
 					Symbol:   s.Symbol,
@@ -602,7 +602,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 
 			if buyall {
-				quoteBalance, ok := session.Account.Balance(s.Market.QuoteCurrency)
+				quoteBalance, ok := session.GetAccount().Balance(s.Market.QuoteCurrency)
 				if !ok {
 					return
 				}
@@ -664,7 +664,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			} else {
 				price = kline.Low
 			}
-			quoteBalance, ok := session.Account.Balance(s.Market.QuoteCurrency)
+			quoteBalance, ok := session.GetAccount().Balance(s.Market.QuoteCurrency)
 			if !ok {
 				return
 			}
@@ -691,7 +691,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			} else {
 				price = kline.High
 			}
-			balances := session.Account.Balances()
+			balances := session.GetAccount().Balances()
 			baseBalance := balances[s.Market.BaseCurrency].Available.Mul(modifier)
 			order := types.SubmitOrder{
 				Symbol:      s.Symbol,

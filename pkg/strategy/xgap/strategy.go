@@ -316,7 +316,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 				log.Infof("mid price %v", midPrice)
 
-				var balances = s.tradingSession.Account.Balances()
+				var balances = s.tradingSession.GetAccount().Balances()
 				var quantity = s.tradingMarket.MinQuantity
 
 				if s.Quantity.Sign() > 0 {

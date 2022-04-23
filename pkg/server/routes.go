@@ -380,7 +380,7 @@ func (s *Server) getSessionAccount(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"account": session.Account})
+	c.JSON(http.StatusOK, gin.H{"account": session.GetAccount()})
 }
 
 func (s *Server) getSessionAccountBalance(c *gin.Context) {
@@ -397,7 +397,7 @@ func (s *Server) getSessionAccountBalance(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"balances": session.Account.Balances()})
+	c.JSON(http.StatusOK, gin.H{"balances": session.GetAccount().Balances()})
 }
 
 func (s *Server) listSessionOpenOrders(c *gin.Context) {
@@ -458,7 +458,7 @@ func (s *Server) listAssets(c *gin.Context) {
 
 	totalAssets := types.AssetMap{}
 	for _, session := range s.Environ.Sessions() {
-		balances := session.Account.Balances()
+		balances := session.GetAccount().Balances()
 
 		if err := session.UpdatePrices(c); err != nil {
 			logrus.WithError(err).Error("price update failed")

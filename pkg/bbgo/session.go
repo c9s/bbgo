@@ -648,7 +648,7 @@ func (session *ExchangeSession) UpdatePrices(ctx context.Context) (err error) {
 		return nil
 	}
 
-	balances := session.Account.Balances()
+	balances := session.GetAccount().Balances()
 
 	var symbols []string
 	for _, b := range balances {
@@ -688,7 +688,7 @@ func (session *ExchangeSession) FindPossibleSymbols() (symbols []string, err err
 		}, nil
 	}
 
-	var balances = session.Account.Balances()
+	var balances = session.GetAccount().Balances()
 	var fiatAssets []string
 
 	for _, currency := range types.FiatCurrencies {

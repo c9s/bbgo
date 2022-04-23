@@ -74,8 +74,14 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 		return
 	}
 
+	if err := s.ExchangeSession.UpdateAccount(ctx) ; err != nil {
+		log.WithError(err).Errorf("can not update account")
+		return
+	}
+
+
 	// if margin ratio is too low, do not borrow
-	if s.ExchangeSession.Account.MarginRatio.Compare(s.MinMarginRatio) < 0 {
+	if s.ExchangeSession.GetAccount().MarginRatio.Compare(s.MinMarginRatio) < 0 {
 		return
 	}
 
@@ -160,7 +166,7 @@ func (s *Strategy) handleBinanceBalanceUpdateEvent(event *binance.BalanceUpdateE
 		return
 	}
 
-	if s.ExchangeSession.Account.MarginRatio.Compare(s.MinMarginRatio) > 0 {
+	if s.ExchangeSession.GetAccount().MarginRatio.Compare(s.MinMarginRatio) > 0 {
 		return
 	}
 
@@ -171,7 +177,7 @@ func (s *Strategy) handleBinanceBalanceUpdateEvent(event *binance.BalanceUpdateE
 		return
 	}
 
-	if b, ok := s.ExchangeSession.Account.Balance(event.Asset); ok {
+	if b, ok := s.ExchangeSession.GetAccount().Balance(event.Asset); ok {
 		if b.Available.IsZero() || b.Borrowed.IsZero() {
 			return
 		}
