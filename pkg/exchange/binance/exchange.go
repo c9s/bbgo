@@ -249,6 +249,7 @@ func (e *Exchange) RepayMarginAsset(ctx context.Context, asset string, amount fi
 		req.IsolatedSymbol(e.IsolatedMarginSymbol)
 	}
 
+	log.Infof("repaying margin asset %s amount %f", asset, amount.Float64())
 	resp, err := req.Do(ctx)
 	log.Debugf("margin repayed %f %s, transaction id = %d", amount.Float64(), asset, resp.TranID)
 	return err
@@ -262,6 +263,7 @@ func (e *Exchange) BorrowMarginAsset(ctx context.Context, asset string, amount f
 		req.IsolatedSymbol(e.IsolatedMarginSymbol)
 	}
 
+	log.Infof("borrowing margin asset %s amount %f", asset, amount.Float64())
 	resp, err := req.Do(ctx)
 	log.Debugf("margin borrowed %f %s, transaction id = %d", amount.Float64(), asset, resp.TranID)
 	return err
