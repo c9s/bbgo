@@ -25,6 +25,13 @@ type Balance struct {
 	Currency  string           `json:"currency"`
 	Available fixedpoint.Value `json:"available"`
 	Locked    fixedpoint.Value `json:"locked,omitempty"`
+
+	// margin related fields
+	Borrowed fixedpoint.Value `json:"borrowed,omitempty"`
+	Interest fixedpoint.Value `json:"interest,omitempty"`
+
+	// NetAsset = (Available + Locked) - Borrowed - Interest
+	NetAsset fixedpoint.Value `json:"net,omitempty"`
 }
 
 func (b Balance) Total() fixedpoint.Value {
@@ -223,9 +230,10 @@ func (m BalanceMap) Print() {
 type AccountType string
 
 const (
-	AccountTypeFutures = AccountType("futures")
-	AccountTypeMargin  = AccountType("margin")
-	AccountTypeSpot    = AccountType("spot")
+	AccountTypeFutures        = AccountType("futures")
+	AccountTypeMargin         = AccountType("margin")
+	AccountTypeIsolatedMargin = AccountType("isolated_margin")
+	AccountTypeSpot           = AccountType("spot")
 )
 
 type Account struct {
@@ -235,6 +243,23 @@ type Account struct {
 	FuturesInfo        *FuturesAccountInfo
 	MarginInfo         *MarginAccountInfo
 	IsolatedMarginInfo *IsolatedMarginAccountInfo
+
+	// Margin related common field
+	// From binance:
+	// Margin Level = Total Asset Value / (Total Borrowed + Total Accrued Interest)
+	// If your margin level drops to 1.3, you will receive a Margin Call, which is a reminder that you should either increase your collateral (by depositing more funds) or reduce your loan (by repaying what you’ve borrowed).
+	// If your margin level drops to 1.1, your assets will be automatically liquidated, meaning that Binance will sell your funds at market price to repay the loan.
+	MarginLevel     fixedpoint.Value `json:"marginLevel,omitempty"`
+	MarginTolerance fixedpoint.Value `json:"marginTolerance,omitempty"`
+
+	BorrowEnabled   bool `json:"borrowEnabled,omitempty"`
+	TransferEnabled bool `json:"transferEnabled,omitempty"`
+
+	// isolated margin related fields
+	// LiquidationPrice is only used when account is in the isolated margin mode
+	MarginRatio      fixedpoint.Value `json:"marginRatio,omitempty"`
+	LiquidationPrice fixedpoint.Value `json:"liquidationPrice,omitempty"`
+	LiquidationRate  fixedpoint.Value `json:"liquidationRate,omitempty"`
 
 	MakerFeeRate fixedpoint.Value `json:"makerFeeRate,omitempty"`
 	TakerFeeRate fixedpoint.Value `json:"takerFeeRate,omitempty"`
@@ -390,18 +415,6 @@ func (a *Account) UpdateBalances(balances BalanceMap) {
 
 	for _, balance := range balances {
 		a.balances[balance.Currency] = balance
-	}
-}
-
-func printBalanceUpdate(balances BalanceMap) {
-	logrus.Infof("balance update: %+v", balances)
-}
-
-func (a *Account) BindStream(stream Stream) {
-	stream.OnBalanceUpdate(a.UpdateBalances)
-	stream.OnBalanceSnapshot(a.UpdateBalances)
-	if debugBalance {
-		stream.OnBalanceUpdate(printBalanceUpdate)
 	}
 }
 
