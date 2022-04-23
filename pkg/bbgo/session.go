@@ -282,6 +282,13 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 	return session
 }
 
+func (session *ExchangeSession) GetAccount() (a *types.Account) {
+	session.accountMutex.Lock()
+	a = session.Account
+	session.accountMutex.Unlock()
+	return a
+}
+
 // UpdateAccount locks the account mutex and update the account object
 func (session *ExchangeSession) UpdateAccount(ctx context.Context) error {
 	account, err := session.Exchange.QueryAccount(ctx)

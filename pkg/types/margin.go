@@ -49,12 +49,12 @@ type MarginExchange interface {
 	UseMargin()
 	UseIsolatedMargin(symbol string)
 	GetMarginSettings() MarginSettings
-	// QueryMarginAccount(ctx context.Context) (*binance.MarginAccount, error)
 }
 
 type MarginBorrowRepay interface {
 	RepayMarginAsset(ctx context.Context, asset string, amount fixedpoint.Value) error
 	BorrowMarginAsset(ctx context.Context, asset string, amount fixedpoint.Value) error
+	QueryMarginAssetMaxBorrowable(ctx context.Context, asset string) (amount fixedpoint.Value, err error)
 }
 
 type MarginSettings struct {
