@@ -1,4 +1,4 @@
-from ..data import Event
+from ..data import UserDataEvent
 from ..enums import ChannelType
 from ..enums import EventType
 from .handler import Handler
@@ -6,7 +6,7 @@ from .handler import Handler
 
 class BalanceHandler(Handler):
 
-    def __call__(self, event: Event) -> None:
+    def __call__(self, event: UserDataEvent) -> None:
         if event.channel_type != ChannelType.BALANCE:
             return
 
@@ -15,7 +15,7 @@ class BalanceHandler(Handler):
 
 class BalanceSnapshotHandler(BalanceHandler):
 
-    def __call__(self, event: Event) -> None:
+    def __call__(self, event: UserDataEvent) -> None:
         if event.event_type != EventType.SNAPSHOT:
             return
 
@@ -24,7 +24,7 @@ class BalanceSnapshotHandler(BalanceHandler):
 
 class BalanceUpdateHandler(BalanceHandler):
 
-    def __call__(self, event: Event) -> None:
+    def __call__(self, event: UserDataEvent) -> None:
         if event.event_type != EventType.UPDATE:
             return
 
