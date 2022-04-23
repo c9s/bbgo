@@ -2,10 +2,12 @@ package etf
 
 import (
 	"context"
-	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"time"
+
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"time"
+
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/types"
@@ -73,7 +75,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 					quantity := askPrice.Div(amount)
 
 					// execute orders
-					quoteBalance, ok := session.Account.Balance(s.Market.QuoteCurrency)
+					quoteBalance, ok := session.GetAccount().Balance(s.Market.QuoteCurrency)
 					if !ok {
 						break
 					}

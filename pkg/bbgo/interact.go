@@ -114,7 +114,7 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 		}
 
 		message := "Your balances\n"
-		balances := session.Account.Balances()
+		balances := session.GetAccount().Balances()
 		for _, balance := range balances {
 			if balance.Total().IsZero() {
 				continue

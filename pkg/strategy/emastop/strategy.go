@@ -138,7 +138,7 @@ func (s *Strategy) place(ctx context.Context, orderExecutor bbgo.OrderExecutor, 
 	quantity := s.Quantity
 	if s.BalancePercentage.Sign() > 0 {
 
-		if balance, ok := session.Account.Balance(market.BaseCurrency); ok {
+		if balance, ok := session.GetAccount().Balance(market.BaseCurrency); ok {
 			quantity = balance.Available.Mul(s.BalancePercentage)
 		}
 	}
