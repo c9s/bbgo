@@ -23,7 +23,7 @@ exchangeStrategies:
           - 10%
           - 15%
           - 15%
-        weightType: custom 
+        weightType: custom # equal, custom or market
       threshold: 2%
       # max amount to buy or sell per order
       maxAmount: 10_000

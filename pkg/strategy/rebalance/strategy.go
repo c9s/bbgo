@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"os"
 
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/glassnode"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -35,6 +37,9 @@ type Strategy struct {
 }
 
 func (s *Strategy) Initialize() error {
+	apiKey := os.Getenv("GLASSNODE_API_KEY")
+	glassnode := glassnode.New(apiKey)
+	s.Allocation.Glassnode = glassnode
 	return nil
 }
 
@@ -47,7 +52,7 @@ func (s *Strategy) Validate() error {
 		return fmt.Errorf("allocation should not be empty")
 	}
 
-	for i, w := range s.Allocation.Weights() {
+	for i, w := range s.Allocation.CustomWeights {
 		if w < 0 {
 			return fmt.Errorf("%s weight: %v should not less than 0", s.Allocation.Currencies[i], w)
 		}
@@ -79,8 +84,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 func (s *Strategy) rebalance(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) {
 	prices := s.prices(ctx, session)
 	marketValues := prices.Mul(s.balances(session))
+	targetWeights := s.Allocation.Weights(ctx)
 
-	orders := s.generateSubmitOrders(prices, marketValues)
+	orders := s.generateSubmitOrders(prices, marketValues, targetWeights)
 	for _, order := range orders {
 		log.Infof("generated submit order: %s", order.String())
 	}
@@ -128,10 +134,9 @@ func (s *Strategy) balances(session *bbgo.ExchangeSession) (quantities types.Flo
 	return quantities
 }
 
-func (s *Strategy) generateSubmitOrders(prices, marketValues types.Float64Slice) (submitOrders []types.SubmitOrder) {
+func (s *Strategy) generateSubmitOrders(prices, marketValues, targetWeights types.Float64Slice) (submitOrders []types.SubmitOrder) {
 	currentWeights := marketValues.Normalize()
 	totalValue := marketValues.Sum()
-	targetWeights := s.Allocation.Weights()
 
 	log.Infof("total value: %f", totalValue)
 
