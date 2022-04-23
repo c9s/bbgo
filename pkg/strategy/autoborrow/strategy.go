@@ -88,7 +88,7 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 
 		b, ok := balances[marginAsset.Asset]
 		if ok {
-			toBorrow := marginAsset.Low - b.Total()
+			toBorrow := marginAsset.Low.Sub(b.Total())
 			if toBorrow.Sign() < 0 {
 				log.Debugf("no need to borrow asset %+v", marginAsset)
 				continue
@@ -99,6 +99,14 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 			}
 
 			if !marginAsset.MaxTotalBorrow.IsZero() {
+				// check if we over borrow
+				if toBorrow.Add(b.Borrowed).Compare(marginAsset.MaxTotalBorrow) > 0 {
+					toBorrow = toBorrow.Sub( toBorrow.Add(b.Borrowed).Sub(marginAsset.MaxTotalBorrow) )
+					if toBorrow.Sign() < 0 {
+						log.Warnf("over borrowed, skip borrowing %+v", marginAsset)
+						continue
+					}
+				}
 				toBorrow = fixedpoint.Min(toBorrow.Add(b.Borrowed), marginAsset.MaxTotalBorrow)
 			}
 
