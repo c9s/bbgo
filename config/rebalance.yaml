@@ -7,20 +7,23 @@ notifications:
 exchangeStrategies:
   - on: max
     rebalance:
-      interval: 1d
+      interval: 1m
       baseCurrency: TWD
       ignoreLocked: true
       allocation:
-        - Currency: BTC
-          Weight: 40%
-        - Currency: ETH
-          Weight: 20%
-        - Currency: MAX
-          Weight: 10%
-        - Currency: USDT
-          Weight: 15%
-        - Currency: TWD
-          Weight: 15%
+        currencies:
+          - BTC
+          - ETH
+          - MAX
+          - USDT
+          - TWD
+        customWeights:
+          - 40%
+          - 20%
+          - 10%
+          - 15%
+          - 15%
+        weightType: custom 
       threshold: 2%
       # max amount to buy or sell per order
       maxAmount: 10_000

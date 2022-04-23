@@ -8,6 +8,14 @@ import (
 
 type Float64Slice []float64
 
+func NewOneFloats(n int) Float64Slice {
+	o := make(Float64Slice, n)
+	for i := 0; i < n; i++ {
+		o[i] = 1.0
+	}
+	return o
+}
+
 func (s *Float64Slice) Push(v float64) {
 	*s = append(*s, v)
 }

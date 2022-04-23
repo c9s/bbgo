@@ -43,13 +43,13 @@ func (s *Strategy) ID() string {
 }
 
 func (s *Strategy) Validate() error {
-	if len(s.Allocation) == 0 {
+	if len(s.Allocation.Currencies) == 0 {
 		return fmt.Errorf("allocation should not be empty")
 	}
 
-	for _, a := range s.Allocation {
-		if a.Weight.Float64() < 0 {
-			return fmt.Errorf("%s weight: %f should not less than 0", a.Currency, a.Weight.Float64())
+	for i, w := range s.Allocation.Weights() {
+		if w < 0 {
+			return fmt.Errorf("%s weight: %v should not less than 0", s.Allocation.Currencies[i], w)
 		}
 	}
 
@@ -65,7 +65,7 @@ func (s *Strategy) Validate() error {
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
-	symbol := s.Allocation[0].Currency + s.BaseCurrency
+	symbol := s.Allocation.Currencies[0] + s.BaseCurrency
 	session.Subscribe(types.KLineChannel, symbol, types.SubscribeOptions{Interval: s.Interval.String()})
 }
 
@@ -97,7 +97,7 @@ func (s *Strategy) rebalance(ctx context.Context, orderExecutor bbgo.OrderExecut
 }
 
 func (s *Strategy) prices(ctx context.Context, session *bbgo.ExchangeSession) (prices types.Float64Slice) {
-	for _, currency := range s.Allocation.Currencies() {
+	for _, currency := range s.Allocation.Currencies {
 		if currency == s.BaseCurrency {
 			prices = append(prices, 1.0)
 			continue
@@ -118,7 +118,7 @@ func (s *Strategy) prices(ctx context.Context, session *bbgo.ExchangeSession) (p
 
 func (s *Strategy) balances(session *bbgo.ExchangeSession) (quantities types.Float64Slice) {
 	balances := session.Account.Balances()
-	for _, currency := range s.Allocation.Currencies() {
+	for _, currency := range s.Allocation.Currencies {
 		if s.IgnoreLocked {
 			quantities = append(quantities, balances[currency].Total().Float64())
 		} else {
@@ -135,7 +135,7 @@ func (s *Strategy) generateSubmitOrders(prices, marketValues types.Float64Slice)
 
 	log.Infof("total value: %f", totalValue)
 
-	for i, currency := range s.Allocation.Currencies() {
+	for i, currency := range s.Allocation.Currencies {
 		if currency == s.BaseCurrency {
 			continue
 		}
