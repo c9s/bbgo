@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"sort"
 
 	"github.com/sirupsen/logrus"
 
@@ -24,25 +23,18 @@ func init() {
 type Strategy struct {
 	Notifiability *bbgo.Notifiability
 
-	Interval      types.Interval              `json:"interval"`
-	BaseCurrency  string                      `json:"baseCurrency"`
-	TargetWeights map[string]fixedpoint.Value `json:"targetWeights"`
-	Threshold     fixedpoint.Value            `json:"threshold"`
-	IgnoreLocked  bool                        `json:"ignoreLocked"`
-	Verbose       bool                        `json:"verbose"`
-	DryRun        bool                        `json:"dryRun"`
+	Interval     types.Interval   `json:"interval"`
+	BaseCurrency string           `json:"baseCurrency"`
+	Allocation   Allocation       `json:"allocation"`
+	Threshold    fixedpoint.Value `json:"threshold"`
+	IgnoreLocked bool             `json:"ignoreLocked"`
+	Verbose      bool             `json:"verbose"`
+	DryRun       bool             `json:"dryRun"`
 	// max amount to buy or sell per order
 	MaxAmount fixedpoint.Value `json:"maxAmount"`
-
-	currencies []string
 }
 
 func (s *Strategy) Initialize() error {
-	for currency := range s.TargetWeights {
-		s.currencies = append(s.currencies, currency)
-	}
-
-	sort.Strings(s.currencies)
 	return nil
 }
 
@@ -51,13 +43,13 @@ func (s *Strategy) ID() string {
 }
 
 func (s *Strategy) Validate() error {
-	if len(s.TargetWeights) == 0 {
-		return fmt.Errorf("targetWeights should not be empty")
+	if len(s.Allocation) == 0 {
+		return fmt.Errorf("allocation should not be empty")
 	}
 
-	for currency, weight := range s.TargetWeights {
-		if weight.Float64() < 0 {
-			return fmt.Errorf("%s weight: %f should not less than 0", currency, weight.Float64())
+	for _, a := range s.Allocation {
+		if a.Weight.Float64() < 0 {
+			return fmt.Errorf("%s weight: %f should not less than 0", a.Currency, a.Weight.Float64())
 		}
 	}
 
@@ -73,9 +65,8 @@ func (s *Strategy) Validate() error {
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
-	for _, symbol := range s.getSymbols() {
-		session.Subscribe(types.KLineChannel, symbol, types.SubscribeOptions{Interval: s.Interval.String()})
-	}
+	symbol := s.Allocation[0].Currency + s.BaseCurrency
+	session.Subscribe(types.KLineChannel, symbol, types.SubscribeOptions{Interval: s.Interval.String()})
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
@@ -86,14 +77,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 }
 
 func (s *Strategy) rebalance(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) {
-	prices, err := s.getPrices(ctx, session)
-	if err != nil {
-		return
-	}
-
-	balances := session.GetAccount().Balances()
-	quantities := s.getQuantities(balances)
-	marketValues := prices.Mul(quantities)
+	prices := s.prices(ctx, session)
+	marketValues := prices.Mul(s.balances(session))
 
 	orders := s.generateSubmitOrders(prices, marketValues)
 	for _, order := range orders {
@@ -104,15 +89,15 @@ func (s *Strategy) rebalance(ctx context.Context, orderExecutor bbgo.OrderExecut
 		return
 	}
 
-	_, err = orderExecutor.SubmitOrders(ctx, orders...)
+	_, err := orderExecutor.SubmitOrders(ctx, orders...)
 	if err != nil {
 		log.WithError(err).Error("submit order error")
 		return
 	}
 }
 
-func (s *Strategy) getPrices(ctx context.Context, session *bbgo.ExchangeSession) (prices types.Float64Slice, err error) {
-	for _, currency := range s.currencies {
+func (s *Strategy) prices(ctx context.Context, session *bbgo.ExchangeSession) (prices types.Float64Slice) {
+	for _, currency := range s.Allocation.Currencies() {
 		if currency == s.BaseCurrency {
 			prices = append(prices, 1.0)
 			continue
@@ -123,16 +108,17 @@ func (s *Strategy) getPrices(ctx context.Context, session *bbgo.ExchangeSession)
 		if err != nil {
 			s.Notifiability.Notify("query ticker error: %s", err.Error())
 			log.WithError(err).Error("query ticker error")
-			return prices, err
+			return prices
 		}
 
 		prices = append(prices, ticker.Last.Float64())
 	}
-	return prices, nil
+	return prices
 }
 
-func (s *Strategy) getQuantities(balances types.BalanceMap) (quantities types.Float64Slice) {
-	for _, currency := range s.currencies {
+func (s *Strategy) balances(session *bbgo.ExchangeSession) (quantities types.Float64Slice) {
+	balances := session.Account.Balances()
+	for _, currency := range s.Allocation.Currencies() {
 		if s.IgnoreLocked {
 			quantities = append(quantities, balances[currency].Total().Float64())
 		} else {
@@ -145,10 +131,11 @@ func (s *Strategy) getQuantities(balances types.BalanceMap) (quantities types.Fl
 func (s *Strategy) generateSubmitOrders(prices, marketValues types.Float64Slice) (submitOrders []types.SubmitOrder) {
 	currentWeights := marketValues.Normalize()
 	totalValue := marketValues.Sum()
+	targetWeights := s.Allocation.Weights()
 
 	log.Infof("total value: %f", totalValue)
 
-	for i, currency := range s.currencies {
+	for i, currency := range s.Allocation.Currencies() {
 		if currency == s.BaseCurrency {
 			continue
 		}
@@ -156,7 +143,7 @@ func (s *Strategy) generateSubmitOrders(prices, marketValues types.Float64Slice)
 		symbol := currency + s.BaseCurrency
 		currentWeight := currentWeights[i]
 		currentPrice := prices[i]
-		targetWeight := s.TargetWeights[currency].Float64()
+		targetWeight := targetWeights[i]
 
 		log.Infof("%s price: %v, current weight: %v, target weight: %v",
 			symbol,
@@ -204,14 +191,4 @@ func (s *Strategy) generateSubmitOrders(prices, marketValues types.Float64Slice)
 		submitOrders = append(submitOrders, order)
 	}
 	return submitOrders
-}
-
-func (s *Strategy) getSymbols() (symbols []string) {
-	for _, currency := range s.currencies {
-		if currency == s.BaseCurrency {
-			continue
-		}
-		symbols = append(symbols, currency+s.BaseCurrency)
-	}
-	return symbols
 }

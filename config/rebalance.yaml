@@ -10,14 +10,19 @@ exchangeStrategies:
       interval: 1d
       baseCurrency: TWD
       ignoreLocked: true
-      targetWeights:
-        BTC: 40%
-        ETH: 20%
-        MAX: 10%
-        USDT: 15%
-        TWD: 15%
+      allocation:
+        - Currency: BTC
+          Weight: 40%
+        - Currency: ETH
+          Weight: 20%
+        - Currency: MAX
+          Weight: 10%
+        - Currency: USDT
+          Weight: 15%
+        - Currency: TWD
+          Weight: 15%
       threshold: 2%
       # max amount to buy or sell per order
       maxAmount: 10_000
       verbose: true
-      dryRun: false
+      dryRun: true
