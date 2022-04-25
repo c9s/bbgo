@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+
+	"github.com/sirupsen/logrus"
+
 	"github.com/c9s/bbgo/pkg/exchange/binance"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/sirupsen/logrus"
-	"strings"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/types"
@@ -178,7 +180,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				)
 				s.Notifiability.Notify(kline)
 
-				baseBalance, ok := session.Account.Balance(s.Market.BaseCurrency)
+				baseBalance, ok := session.GetAccount().Balance(s.Market.BaseCurrency)
 				if !ok {
 					return
 				}

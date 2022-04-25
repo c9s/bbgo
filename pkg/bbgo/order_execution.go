@@ -136,7 +136,7 @@ type BasicRiskController struct {
 // 2. Decrease the quantity by risk controls
 // 3. If the quantity does not meet minimal requirement, we should ignore the submit order.
 func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...types.SubmitOrder) (outOrders []types.SubmitOrder, errs []error) {
-	balances := session.Account.Balances()
+	balances := session.GetAccount().Balances()
 
 	addError := func(err error) {
 		errs = append(errs, err)

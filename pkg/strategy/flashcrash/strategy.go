@@ -71,7 +71,7 @@ func (s *Strategy) updateOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.
 
 func (s *Strategy) updateBidOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) {
 	quoteCurrency := s.Market.QuoteCurrency
-	balances := session.Account.Balances()
+	balances := session.GetAccount().Balances()
 
 	balance, ok := balances[quoteCurrency]
 	if !ok || balance.Available.Sign() <= 0 {

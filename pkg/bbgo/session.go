@@ -282,6 +282,13 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 	return session
 }
 
+func (session *ExchangeSession) GetAccount() (a *types.Account) {
+	session.accountMutex.Lock()
+	a = session.Account
+	session.accountMutex.Unlock()
+	return a
+}
+
 // UpdateAccount locks the account mutex and update the account object
 func (session *ExchangeSession) UpdateAccount(ctx context.Context) error {
 	account, err := session.Exchange.QueryAccount(ctx)
@@ -641,7 +648,7 @@ func (session *ExchangeSession) UpdatePrices(ctx context.Context) (err error) {
 		return nil
 	}
 
-	balances := session.Account.Balances()
+	balances := session.GetAccount().Balances()
 
 	var symbols []string
 	for _, b := range balances {
@@ -681,7 +688,7 @@ func (session *ExchangeSession) FindPossibleSymbols() (symbols []string, err err
 		}, nil
 	}
 
-	var balances = session.Account.Balances()
+	var balances = session.GetAccount().Balances()
 	var fiatAssets []string
 
 	for _, currency := range types.FiatCurrencies {
