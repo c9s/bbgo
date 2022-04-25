@@ -134,12 +134,14 @@ func (s *Strategy) run(ctx context.Context, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
+	s.checkAndBorrow(ctx)
 	for {
 		select {
 		case <-ctx.Done():
 			return
 
 		case <-ticker.C:
+			s.checkAndBorrow(ctx)
 
 		}
 	}
