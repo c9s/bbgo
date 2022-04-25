@@ -11,8 +11,6 @@ func TestSortTradesAscending(t *testing.T) {
 	var trades = []Trade {
 		{
 			ID:            1,
-			Price:         1000.0,
-			Quantity:      1.0,
 			Symbol:        "BTCUSDT",
 			Side:          SideTypeBuy,
 			IsBuyer:       false,
@@ -21,8 +19,6 @@ func TestSortTradesAscending(t *testing.T) {
 		},
 		{
 			ID:            2,
-			Price:         1000.0,
-			Quantity:      1.0,
 			Symbol:        "BTCUSDT",
 			Side:          SideTypeBuy,
 			IsBuyer:       false,
