@@ -5,31 +5,31 @@ package bbgo
 import ()
 
 func (s *StrategyController) OnSuspend(cb func()) {
-	s.SuspendCallbacks = append(s.SuspendCallbacks, cb)
+	s.suspendCallbacks = append(s.suspendCallbacks, cb)
 }
 
 func (s *StrategyController) EmitSuspend() {
-	for _, cb := range s.SuspendCallbacks {
+	for _, cb := range s.suspendCallbacks {
 		cb()
 	}
 }
 
 func (s *StrategyController) OnResume(cb func()) {
-	s.ResumeCallbacks = append(s.ResumeCallbacks, cb)
+	s.resumeCallbacks = append(s.resumeCallbacks, cb)
 }
 
 func (s *StrategyController) EmitResume() {
-	for _, cb := range s.ResumeCallbacks {
+	for _, cb := range s.resumeCallbacks {
 		cb()
 	}
 }
 
 func (s *StrategyController) OnEmergencyStop(cb func()) {
-	s.EmergencyStopCallbacks = append(s.EmergencyStopCallbacks, cb)
+	s.emergencyStopCallbacks = append(s.emergencyStopCallbacks, cb)
 }
 
 func (s *StrategyController) EmitEmergencyStop() {
-	for _, cb := range s.EmergencyStopCallbacks {
+	for _, cb := range s.emergencyStopCallbacks {
 		cb()
 	}
 }

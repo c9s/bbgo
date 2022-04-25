@@ -9,9 +9,9 @@ type StrategyController struct {
 	Status types.StrategyStatus
 
 	// Callbacks
-	SuspendCallbacks       []func()
-	ResumeCallbacks        []func()
-	EmergencyStopCallbacks []func()
+	suspendCallbacks       []func()
+	resumeCallbacks        []func()
+	emergencyStopCallbacks []func()
 }
 
 func (s *StrategyController) GetStatus() types.StrategyStatus {
