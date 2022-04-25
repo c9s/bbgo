@@ -14,13 +14,11 @@ import (
 	"github.com/c9s/bbgo/pkg/util"
 )
 
-
 func init() {
 	// make sure we can cast Order to PlainText
 	_ = PlainText(Order{})
 	_ = PlainText(&Order{})
 }
-
 
 type TimeInForce string
 
@@ -38,7 +36,6 @@ var (
 	SideEffectTypeMarginBuy    MarginOrderSideEffectType = "MARGIN_BUY"
 	SideEffectTypeAutoRepay    MarginOrderSideEffectType = "AUTO_REPAY"
 )
-
 
 func (t *MarginOrderSideEffectType) UnmarshalJSON(data []byte) error {
 	var s string
@@ -240,15 +237,16 @@ func (o Order) String() string {
 		orderID = strconv.FormatUint(o.OrderID, 10)
 	}
 
-	return fmt.Sprintf("ORDER %s %s %s %s %s/%s @ %s -> %s %s",
+	return fmt.Sprintf("ORDER %s | %s | %s | %s %s | %s/%s @ %s | %s",
 		o.Exchange.String(),
+		o.CreationTime.Time().Local().Format(time.RFC1123),
 		orderID,
 		o.Symbol,
 		o.Side,
 		o.ExecutedQuantity.String(),
 		o.Quantity.String(),
 		o.Price.String(),
-		o.Status, o.CreationTime.Time().Format(time.RFC1123))
+		o.Status)
 }
 
 // PlainText is used for telegram-styled messages
