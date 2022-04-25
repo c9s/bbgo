@@ -114,7 +114,7 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 		if ok {
 			toBorrow := marginAsset.Low.Sub(b.Total())
 			if toBorrow.Sign() < 0 {
-				log.Debugf("balance %f > low %f. no need to borrow asset %+v",
+				log.Infof("balance %f > low %f. no need to borrow asset %+v",
 					b.Total().Float64(),
 					marginAsset.Low.Float64(),
 					marginAsset)
