@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"github.com/slack-go/slack"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/exchange/binance"
@@ -49,6 +50,8 @@ type MarginAsset struct {
 }
 
 type Strategy struct {
+	*bbgo.Notifiability
+
 	Interval             types.Interval   `json:"interval"`
 	MinMarginRatio       fixedpoint.Value `json:"minMarginRatio"`
 	MaxMarginRatio       fixedpoint.Value `json:"maxMarginRatio"`
@@ -74,16 +77,18 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 		return
 	}
 
-	if err := s.ExchangeSession.UpdateAccount(ctx) ; err != nil {
+	if err := s.ExchangeSession.UpdateAccount(ctx); err != nil {
 		log.WithError(err).Errorf("can not update account")
 		return
 	}
-
 
 	// if margin ratio is too low, do not borrow
 	if s.ExchangeSession.GetAccount().MarginRatio.Compare(s.MinMarginRatio) < 0 {
 		return
 	}
+
+	minMarginRatio := s.MinMarginRatio
+	curMarginRatio := s.ExchangeSession.GetAccount().MarginRatio
 
 	balances := s.ExchangeSession.GetAccount().Balances()
 	for _, marginAsset := range s.Assets {
@@ -107,7 +112,7 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 			if !marginAsset.MaxTotalBorrow.IsZero() {
 				// check if we over borrow
 				if toBorrow.Add(b.Borrowed).Compare(marginAsset.MaxTotalBorrow) > 0 {
-					toBorrow = toBorrow.Sub( toBorrow.Add(b.Borrowed).Sub(marginAsset.MaxTotalBorrow) )
+					toBorrow = toBorrow.Sub(toBorrow.Add(b.Borrowed).Sub(marginAsset.MaxTotalBorrow))
 					if toBorrow.Sign() < 0 {
 						log.Warnf("margin asset %s is over borrowed, skip", marginAsset.Asset)
 						continue
@@ -116,6 +121,13 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 				toBorrow = fixedpoint.Min(toBorrow.Add(b.Borrowed), marginAsset.MaxTotalBorrow)
 			}
 
+			s.Notifiability.Notify(&MarginAction{
+				Action:         "Borrow",
+				Asset:          marginAsset.Asset,
+				Amount:         toBorrow,
+				MarginRatio:    curMarginRatio,
+				MinMarginRatio: minMarginRatio,
+			})
 			s.marginBorrowRepay.BorrowMarginAsset(ctx, marginAsset.Asset, toBorrow)
 		} else {
 			// available balance is less than marginAsset.Low, we should trigger borrow
@@ -125,6 +137,13 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 				toBorrow = fixedpoint.Min(toBorrow, marginAsset.MaxQuantityPerBorrow)
 			}
 
+			s.Notifiability.Notify(&MarginAction{
+				Action:         "Borrow",
+				Asset:          marginAsset.Asset,
+				Amount:         toBorrow,
+				MarginRatio:    curMarginRatio,
+				MinMarginRatio: minMarginRatio,
+			})
 			s.marginBorrowRepay.BorrowMarginAsset(ctx, marginAsset.Asset, toBorrow)
 		}
 	}
@@ -179,14 +198,66 @@ func (s *Strategy) handleBinanceBalanceUpdateEvent(event *binance.BalanceUpdateE
 		return
 	}
 
+	minMarginRatio := s.MinMarginRatio
+	curMarginRatio := s.ExchangeSession.GetAccount().MarginRatio
+
 	if b, ok := s.ExchangeSession.GetAccount().Balance(event.Asset); ok {
 		if b.Available.IsZero() || b.Borrowed.IsZero() {
 			return
 		}
 
-		if err := s.marginBorrowRepay.RepayMarginAsset(context.Background(), event.Asset, b.Available); err != nil {
+		toRepay := b.Available
+		s.Notifiability.Notify(&MarginAction{
+			Action:         "Borrow",
+			Asset:          b.Currency,
+			Amount:         toRepay,
+			MarginRatio:    curMarginRatio,
+			MinMarginRatio: minMarginRatio,
+		})
+		if err := s.marginBorrowRepay.RepayMarginAsset(context.Background(), event.Asset, toRepay); err != nil {
 			log.WithError(err).Errorf("margin repay error")
 		}
+	}
+}
+
+type MarginAction struct {
+	Action         string
+	Asset          string
+	Amount         fixedpoint.Value
+	MarginRatio    fixedpoint.Value
+	MinMarginRatio fixedpoint.Value
+}
+
+func (a *MarginAction) SlackAttachment() slack.Attachment {
+	return slack.Attachment{
+		Title: fmt.Sprintf("%s %s %s", a.Action, a.Amount, a.Asset),
+		Fields: []slack.AttachmentField{
+			{
+				Title: "Action",
+				Value: a.Action,
+				Short: true,
+			},
+			{
+				Title: "Asset",
+				Value: a.Asset,
+				Short: true,
+			},
+			{
+				Title: "Amount",
+				Value: a.Amount.String(),
+				Short: true,
+			},
+			{
+				Title: "Current Margin Ratio",
+				Value: a.MarginRatio.String(),
+				Short: true,
+			},
+			{
+				Title: "Min Margin Ratio",
+				Value: a.MinMarginRatio.String(),
+				Short: true,
+			},
+		},
 	}
 }
 
