@@ -54,24 +54,38 @@ func (s *SyncService) SyncSessionSymbols(ctx context.Context, exchange types.Exc
 		return nil
 	}
 
-	log.Infof("syncing %s deposit records...", exchange.Name())
-	if err := s.DepositService.Sync(ctx, exchange); err != nil {
-		if err != ErrNotImplemented {
-			return err
-		}
-	}
+	return nil
+}
 
-	log.Infof("syncing %s withdraw records...", exchange.Name())
-	if err := s.WithdrawService.Sync(ctx, exchange); err != nil {
-		if err != ErrNotImplemented {
-			return err
-		}
-	}
-
+func (s *SyncService) SyncRewardHistory(ctx context.Context, exchange types.Exchange) error {
 	log.Infof("syncing %s reward records...", exchange.Name())
 	if err := s.RewardService.Sync(ctx, exchange); err != nil {
 		if err != ErrExchangeRewardServiceNotImplemented {
-			log.Infof("%s reward service is not supported", exchange.Name())
+			log.Warnf("%s reward service is not supported", exchange.Name())
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *SyncService) SyncDepositHistory(ctx context.Context, exchange types.Exchange) error {
+	log.Infof("syncing %s deposit records...", exchange.Name())
+	if err := s.DepositService.Sync(ctx, exchange); err != nil {
+		if err != ErrNotImplemented {
+			log.Warnf("%s deposit service is not supported", exchange.Name())
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *SyncService) SyncWithdrawHistory(ctx context.Context, exchange types.Exchange) error {
+	log.Infof("syncing %s withdraw records...", exchange.Name())
+	if err := s.WithdrawService.Sync(ctx, exchange); err != nil {
+		if err != ErrNotImplemented {
+			log.Warnf("%s withdraw service is not supported", exchange.Name())
 			return err
 		}
 	}

@@ -561,11 +561,31 @@ func (environ *Environment) Sync(ctx context.Context, userConfig ...*Config) err
 		if len(selectedSessions) > 0 {
 			sessions = environ.SelectSessions(selectedSessions...)
 		}
+
 		for _, session := range sessions {
 			if err := environ.syncSession(ctx, session, syncSymbols...); err != nil {
 				return err
 			}
+
+			if userConfig[0].Sync.DepositHistory {
+				if err := environ.SyncService.SyncDepositHistory(ctx, session.Exchange); err != nil {
+					return err
+				}
+			}
+
+			if userConfig[0].Sync.WithdrawHistory {
+				if err := environ.SyncService.SyncWithdrawHistory(ctx, session.Exchange); err != nil {
+					return err
+				}
+			}
+
+			if userConfig[0].Sync.RewardHistory {
+				if err := environ.SyncService.SyncRewardHistory(ctx, session.Exchange); err != nil {
+					return err
+				}
+			}
 		}
+
 		return nil
 	}
 
@@ -573,6 +593,24 @@ func (environ *Environment) Sync(ctx context.Context, userConfig ...*Config) err
 	for _, session := range environ.sessions {
 		if err := environ.syncSession(ctx, session); err != nil {
 			return err
+		}
+
+		if userConfig[0].Sync.DepositHistory {
+			if err := environ.SyncService.SyncDepositHistory(ctx, session.Exchange); err != nil {
+				return err
+			}
+		}
+
+		if userConfig[0].Sync.WithdrawHistory {
+			if err := environ.SyncService.SyncWithdrawHistory(ctx, session.Exchange); err != nil {
+				return err
+			}
+		}
+
+		if userConfig[0].Sync.RewardHistory {
+			if err := environ.SyncService.SyncRewardHistory(ctx, session.Exchange); err != nil {
+				return err
+			}
 		}
 	}
 

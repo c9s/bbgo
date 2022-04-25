@@ -8,14 +8,6 @@ sessions:
     exchange: max
     envVarPrefix: max
 
-  okex:
-    exchange: okex
-    envVarPrefix: okex
-
-  kucoin:
-    exchange: kucoin
-    envVarPrefix: kucoin
-
 sync:
   # userDataStream is used to sync the trading data in real-time
   # it uses the websocket connection to insert the trades
