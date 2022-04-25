@@ -878,10 +878,16 @@ func (environ *Environment) setupSlack(userConfig *Config, slackToken string, pe
 
 	log.Debugf("adding slack notifier with default channel: %s", conf.DefaultChannel)
 
-	var client = slack.New(slackToken,
-		slack.OptionDebug(true),
+	var slackOpts = []slack.Option{
 		slack.OptionLog(stdlog.New(os.Stdout, "api: ", stdlog.Lshortfile|stdlog.LstdFlags)),
-		slack.OptionAppLevelToken(slackAppToken))
+		slack.OptionAppLevelToken(slackAppToken),
+	}
+
+	if b, ok := util.GetEnvVarBool("DEBUG_SLACK"); ok {
+		slackOpts = append(slackOpts, slack.OptionDebug(b))
+	}
+
+	var client = slack.New(slackToken, slackOpts...)
 
 	var notifier = slacknotifier.New(client, conf.DefaultChannel)
 	environ.AddNotifier(notifier)
