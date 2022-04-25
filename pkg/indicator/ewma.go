@@ -124,32 +124,6 @@ func ewma(prices []float64, multiplier float64) float64 {
 	return prices[end]*multiplier + (1-multiplier)*ewma(prices[:end], multiplier)
 }
 
-type KLinePriceMapper func(k types.KLine) float64
-
-func KLineOpenPriceMapper(k types.KLine) float64 {
-	return k.Open.Float64()
-}
-
-func KLineClosePriceMapper(k types.KLine) float64 {
-	return k.Close.Float64()
-}
-
-func KLineTypicalPriceMapper(k types.KLine) float64 {
-	return (k.High.Float64() + k.Low.Float64() + k.Close.Float64()) / 3.
-}
-
-func MapKLinePrice(kLines []types.KLine, f KLinePriceMapper) (prices []float64) {
-	for _, k := range kLines {
-		prices = append(prices, f(k))
-	}
-
-	return prices
-}
-
-type KLineWindowUpdater interface {
-	OnKLineWindowUpdate(func(interval types.Interval, window types.KLineWindow))
-}
-
 func (inc *EWMA) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
 	if inc.Interval != interval {
 		return
