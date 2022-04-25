@@ -209,7 +209,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 	// check maker's balance quota
 	// we load the balances from the account while we're generating the orders,
 	// the balance may have a chance to be deducted by other strategies or manual orders submitted by the user
-	makerBalances := s.makerSession.Account.Balances()
+	makerBalances := s.makerSession.GetAccount().Balances()
 	makerQuota := &bbgo.QuotaTransaction{}
 	if b, ok := makerBalances[s.makerMarket.BaseCurrency]; ok {
 		if b.Available.Compare(s.makerMarket.MinQuantity) > 0 {
@@ -227,7 +227,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 		}
 	}
 
-	hedgeBalances := s.sourceSession.Account.Balances()
+	hedgeBalances := s.sourceSession.GetAccount().Balances()
 	hedgeQuota := &bbgo.QuotaTransaction{}
 	if b, ok := hedgeBalances[s.sourceMarket.BaseCurrency]; ok {
 		// to make bid orders, we need enough base asset in the foreign exchange,
@@ -503,7 +503,7 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	}
 
 	// adjust quantity according to the balances
-	account := s.sourceSession.Account
+	account := s.sourceSession.GetAccount()
 	switch side {
 
 	case types.SideTypeBuy:

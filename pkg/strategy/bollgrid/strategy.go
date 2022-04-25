@@ -116,7 +116,7 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 }
 
 func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types.SubmitOrder, error) {
-	balances := session.Account.Balances()
+	balances := session.GetAccount().Balances()
 	quoteBalance := balances[s.Market.QuoteCurrency].Available
 	if quoteBalance.Sign() <= 0 {
 		return nil, fmt.Errorf("quote balance %s is zero: %v", s.Market.QuoteCurrency, quoteBalance)
@@ -181,7 +181,7 @@ func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types
 }
 
 func (s *Strategy) generateGridSellOrders(session *bbgo.ExchangeSession) ([]types.SubmitOrder, error) {
-	balances := session.Account.Balances()
+	balances := session.GetAccount().Balances()
 	baseBalance := balances[s.Market.BaseCurrency].Available
 	if baseBalance.Sign() <= 0 {
 		return nil, fmt.Errorf("base balance %s is zero: %+v", s.Market.BaseCurrency, baseBalance)
@@ -288,7 +288,7 @@ func (s *Strategy) updateOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.
 }
 
 func (s *Strategy) submitReverseOrder(order types.Order, session *bbgo.ExchangeSession) {
-	balances := session.Account.Balances()
+	balances := session.GetAccount().Balances()
 
 	var side = order.Side.Reverse()
 	var price = order.Price

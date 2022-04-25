@@ -388,7 +388,7 @@ func (s *Strategy) calculateQuantity(session *bbgo.ExchangeSession, side types.S
 		quantity = fixedpoint.NewFromFloat(q)
 	}
 
-	baseBalance, _ := session.Account.Balance(s.Market.BaseCurrency)
+	baseBalance, _ := session.GetAccount().Balance(s.Market.BaseCurrency)
 	if side == types.SideTypeSell {
 		// quantity = bbgo.AdjustQuantityByMaxAmount(quantity, closePrice, quota)
 		if s.MinBaseAssetBalance.Sign() > 0 &&
@@ -404,7 +404,7 @@ func (s *Strategy) calculateQuantity(session *bbgo.ExchangeSession, side types.S
 			quantity = bbgo.AdjustQuantityByMaxAmount(quantity, closePrice, quota)
 		}
 
-		quoteBalance, ok := session.Account.Balance(s.Market.QuoteCurrency)
+		quoteBalance, ok := session.GetAccount().Balance(s.Market.QuoteCurrency)
 		if !ok {
 			return fixedpoint.Zero, fmt.Errorf("quote balance %s not found", s.Market.QuoteCurrency)
 		}

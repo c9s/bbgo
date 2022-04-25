@@ -7,14 +7,15 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
+	"github.com/slack-go/slack"
+
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
-	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
-	"github.com/slack-go/slack"
 )
 
 const ID = "xbalance"
@@ -174,7 +175,7 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 
 	var total fixedpoint.Value
 	for _, session := range sessions {
-		if b, ok := session.Account.Balance(s.Asset); ok {
+		if b, ok := session.GetAccount().Balance(s.Asset); ok {
 			total = total.Add(b.Total())
 		}
 	}
@@ -296,7 +297,7 @@ func (s *Strategy) findHighestBalanceLevelSession(sessions map[string]*bbgo.Exch
 			return nil, balance, fmt.Errorf("session %s does not exist", sessionID)
 		}
 
-		if b, ok := session.Account.Balance(s.Asset); ok {
+		if b, ok := session.GetAccount().Balance(s.Asset); ok {
 			if b.Available.Sub(requiredAmount).Compare(s.Low) > 0 && b.Available.Compare(maxBalanceLevel) > 0 {
 				maxBalanceLevel = b.Available
 				maxBalanceSession = session
@@ -316,7 +317,7 @@ func (s *Strategy) findLowBalanceLevelSession(sessions map[string]*bbgo.Exchange
 			return nil, balance, fmt.Errorf("session %s does not exist", sessionID)
 		}
 
-		balance, ok = session.Account.Balance(s.Asset)
+		balance, ok = session.GetAccount().Balance(s.Asset)
 		if ok {
 			if balance.Available.Compare(s.Low) <= 0 {
 				return session, balance, nil

@@ -380,7 +380,7 @@ var BacktestCmd = &cobra.Command{
 				report.Print()
 
 				initBalances := userConfig.Backtest.Account[exchangeName].Balances.BalanceMap()
-				finalBalances := session.Account.Balances()
+				finalBalances := session.GetAccount().Balances()
 
 				log.Infof("INITIAL BALANCES:")
 				initBalances.Print()

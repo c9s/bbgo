@@ -2,6 +2,7 @@ package cmd
 
 // import built-in strategies
 import (
+	_ "github.com/c9s/bbgo/pkg/strategy/autoborrow"
 	_ "github.com/c9s/bbgo/pkg/strategy/bollgrid"
 	_ "github.com/c9s/bbgo/pkg/strategy/bollmaker"
 	_ "github.com/c9s/bbgo/pkg/strategy/emastop"

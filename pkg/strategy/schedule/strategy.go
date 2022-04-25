@@ -140,7 +140,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		// execute orders
 		switch side {
 		case types.SideTypeBuy:
-			quoteBalance, ok := session.Account.Balance(s.Market.QuoteCurrency)
+			quoteBalance, ok := session.GetAccount().Balance(s.Market.QuoteCurrency)
 			if !ok {
 				log.Errorf("can not place scheduled %s order, quote balance %s is empty", s.Symbol, s.Market.QuoteCurrency)
 				return
@@ -153,7 +153,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 
 		case types.SideTypeSell:
-			baseBalance, ok := session.Account.Balance(s.Market.BaseCurrency)
+			baseBalance, ok := session.GetAccount().Balance(s.Market.BaseCurrency)
 			if !ok {
 				log.Errorf("can not place scheduled %s order, base balance %s is empty", s.Symbol, s.Market.BaseCurrency)
 				return

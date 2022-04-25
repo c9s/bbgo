@@ -167,7 +167,7 @@ func (s *Strategy) generateGridSellOrders(session *bbgo.ExchangeSession) ([]type
 			s.UpperPrice)
 	}
 
-	balances := session.Account.Balances()
+	balances := session.GetAccount().Balances()
 	baseBalance, ok := balances[s.Market.BaseCurrency]
 	if !ok {
 		return nil, fmt.Errorf("base balance %s not found", s.Market.BaseCurrency)
@@ -268,7 +268,7 @@ func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types
 			s.UpperPrice)
 	}
 
-	balances := session.Account.Balances()
+	balances := session.GetAccount().Balances()
 	balance, ok := balances[s.Market.QuoteCurrency]
 	if !ok {
 		return nil, fmt.Errorf("quote balance %s not found", s.Market.QuoteCurrency)
