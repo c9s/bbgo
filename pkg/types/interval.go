@@ -75,6 +75,11 @@ type IntervalWindow struct {
 	Window int `json:"window"`
 }
 
+type IntervalWindowBandWidth struct {
+	IntervalWindow
+	BandWidth float64 `json:"bandWidth"`
+}
+
 func (iw IntervalWindow) String() string {
 	return fmt.Sprintf("%s (%d)", iw.Interval, iw.Window)
 }
