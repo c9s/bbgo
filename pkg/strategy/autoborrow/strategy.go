@@ -196,6 +196,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		log.Warnf("minMarginRatio is 0, you should configure this minimal margin ratio for controlling the liquidation risk")
 	}
 
+	s.ExchangeSession = session
+
 	marginBorrowRepay, ok := session.Exchange.(types.MarginBorrowRepay)
 	if !ok {
 		return fmt.Errorf("exchange %s does not implement types.MarginBorrowRepay", session.ExchangeName)
