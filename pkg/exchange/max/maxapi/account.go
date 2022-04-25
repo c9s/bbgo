@@ -128,7 +128,7 @@ type Deposit struct {
 type GetDepositHistoryRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
-	currency string  `param:"currency"`
+	currency *string  `param:"currency"`
 	from     *int64  `param:"from"`  // seconds
 	to       *int64  `param:"to"`    // seconds
 	state    *string `param:"state"` // submitting, submitted, rejected, accepted, checking, refunded, canceled, suspect

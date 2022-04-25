@@ -12,7 +12,7 @@ import (
 )
 
 func (g *GetDepositHistoryRequest) Currency(currency string) *GetDepositHistoryRequest {
-	g.currency = currency
+	g.currency = &currency
 	return g
 }
 
@@ -52,10 +52,13 @@ func (g *GetDepositHistoryRequest) GetQueryParameters() (url.Values, error) {
 func (g *GetDepositHistoryRequest) GetParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
 	// check currency field -> json key currency
-	currency := g.currency
+	if g.currency != nil {
+		currency := *g.currency
 
-	// assign parameter of currency
-	params["currency"] = currency
+		// assign parameter of currency
+		params["currency"] = currency
+	} else {
+	}
 	// check from field -> json key from
 	if g.from != nil {
 		from := *g.from
