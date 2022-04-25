@@ -95,24 +95,10 @@ func NewStandardIndicatorSet(symbol string, store *MarketDataStore) *StandardInd
 
 // BOLL returns the bollinger band indicator of the given interval, the window and bandwidth
 func (set *StandardIndicatorSet) BOLL(iw types.IntervalWindow, bandWidth float64) *indicator.BOLL {
-
 	iwb := types.IntervalWindowBandWidth{IntervalWindow: iw, BandWidth: bandWidth}
 	inc, ok := set.boll[iwb]
-
 	if !ok {
 		inc = &indicator.BOLL{IntervalWindow: iw, K: bandWidth}
-
-		// Bind tmp data store
-		tmpDataStore := NewMarketDataStore("TMP")
-		inc.Bind(tmpDataStore)
-
-		// Trigger tmp data store to calculate indicator
-		Klines := set.store.KLineWindows[iw.Interval]
-		for _, kline := range Klines {
-			tmpDataStore.AddKLine(kline)
-		}
-
-		// Bind real store
 		inc.Bind(set.store)
 		set.boll[iwb] = inc
 	}
