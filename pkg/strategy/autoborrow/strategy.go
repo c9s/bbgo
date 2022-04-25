@@ -268,12 +268,12 @@ func (a *MarginAction) SlackAttachment() slack.Attachment {
 				Short: true,
 			},
 			{
-				Title: "Current Margin Ratio",
+				Title: "Current Margin Level",
 				Value: a.MarginLevel.String(),
 				Short: true,
 			},
 			{
-				Title: "Min Margin Ratio",
+				Title: "Min Margin Level",
 				Value: a.MinMarginLevel.String(),
 				Short: true,
 			},
