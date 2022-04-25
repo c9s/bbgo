@@ -502,7 +502,7 @@ func (c *ChangeResult) Length() int {
 // offset: if not given, offset is 1.
 func Change(a Series, offset ...int) Series {
 	o := 1
-	if len(offset) == 0 {
+	if len(offset) > 0 {
 		o = offset[0]
 	}
 
