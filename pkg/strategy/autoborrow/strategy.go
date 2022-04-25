@@ -82,15 +82,22 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 		return
 	}
 
-	// if margin ratio is too low, do not borrow
-	if s.ExchangeSession.GetAccount().MarginRatio.Compare(s.MinMarginRatio) < 0 {
-		return
-	}
-
 	minMarginRatio := s.MinMarginRatio
 	curMarginRatio := s.ExchangeSession.GetAccount().MarginRatio
 
+	// if margin ratio is too low, do not borrow
+	if curMarginRatio.Compare(minMarginRatio) < 0 {
+		log.Infof("current margin ratio %f < min margin ratio %f, skip autoborrow", curMarginRatio.Float64(), minMarginRatio.Float64())
+		return
+	}
+
+
 	balances := s.ExchangeSession.GetAccount().Balances()
+	if len(balances) == 0 {
+		log.Warn("balance is empty, skip autoborrow")
+		return
+	}
+
 	for _, marginAsset := range s.Assets {
 		if marginAsset.Low.IsZero() {
 			log.Warnf("margin asset low balance is not set: %+v", marginAsset)
@@ -101,7 +108,10 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 		if ok {
 			toBorrow := marginAsset.Low.Sub(b.Total())
 			if toBorrow.Sign() < 0 {
-				log.Debugf("no need to borrow asset %+v", marginAsset)
+				log.Debugf("balance %f > low %f. no need to borrow asset %+v",
+					b.Total().Float64(),
+					marginAsset.Low.Float64(),
+					marginAsset)
 				continue
 			}
 
@@ -128,6 +138,7 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 				MarginRatio:    curMarginRatio,
 				MinMarginRatio: minMarginRatio,
 			})
+			log.Infof("sending borrow request %f %s", toBorrow.Float64(), marginAsset.Asset)
 			s.marginBorrowRepay.BorrowMarginAsset(ctx, marginAsset.Asset, toBorrow)
 		} else {
 			// available balance is less than marginAsset.Low, we should trigger borrow
@@ -144,6 +155,8 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 				MarginRatio:    curMarginRatio,
 				MinMarginRatio: minMarginRatio,
 			})
+
+			log.Infof("sending borrow request %f %s", toBorrow.Float64(), marginAsset.Asset)
 			s.marginBorrowRepay.BorrowMarginAsset(ctx, marginAsset.Asset, toBorrow)
 		}
 	}
@@ -231,6 +244,7 @@ type MarginAction struct {
 func (a *MarginAction) SlackAttachment() slack.Attachment {
 	return slack.Attachment{
 		Title: fmt.Sprintf("%s %s %s", a.Action, a.Amount, a.Asset),
+		Color: "warning",
 		Fields: []slack.AttachmentField{
 			{
 				Title: "Action",
