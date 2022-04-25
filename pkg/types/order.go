@@ -240,7 +240,7 @@ func (o Order) String() string {
 		orderID = strconv.FormatUint(o.OrderID, 10)
 	}
 
-	return fmt.Sprintf("ORDER %s %s %s %s %s/%s @ %s -> %s",
+	return fmt.Sprintf("ORDER %s %s %s %s %s/%s @ %s -> %s %s",
 		o.Exchange.String(),
 		orderID,
 		o.Symbol,
@@ -248,7 +248,7 @@ func (o Order) String() string {
 		o.ExecutedQuantity.String(),
 		o.Quantity.String(),
 		o.Price.String(),
-		o.Status)
+		o.Status, o.CreationTime.Time().Format(time.RFC1123))
 }
 
 // PlainText is used for telegram-styled messages
