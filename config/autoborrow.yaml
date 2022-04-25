@@ -7,11 +7,11 @@ exchangeStrategies:
 
     # minMarginRatio for triggering auto borrow
     # we trigger auto borrow only when the margin ratio is above the number
-    minMarginRatio: 1.5
+    minMarginLevel: 1.5
 
     # maxMarginRatio for stop auto-repay
     # if the margin ratio is high enough, we don't have the urge to repay
-    maxMarginRatio: 10.0
+    maxMarginLevel: 10.0
 
     assets:
     - asset: ETH
@@ -22,4 +22,3 @@ exchangeStrategies:
       low: 1000.0
       maxQuantityPerBorrow: 100.0
       maxTotalBorrow: 10.0
-      minMarginRatio: 1.3

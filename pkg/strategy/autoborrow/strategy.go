@@ -28,8 +28,8 @@ func init() {
     interval: 30m
     repayWhenDeposit: true
 
-    # minMarginRatio for triggering auto borrow
-    minMarginRatio: 1.5
+    # minMarginLevel for triggering auto borrow
+    minMarginLevel: 1.5
     assets:
     - asset: ETH
       low: 3.0
@@ -53,8 +53,8 @@ type Strategy struct {
 	*bbgo.Notifiability
 
 	Interval             types.Interval   `json:"interval"`
-	MinMarginRatio       fixedpoint.Value `json:"minMarginRatio"`
-	MaxMarginRatio       fixedpoint.Value `json:"maxMarginRatio"`
+	MinMarginLevel       fixedpoint.Value `json:"minMarginLevel"`
+	MaxMarginLevel       fixedpoint.Value `json:"maxMarginLevel"`
 	AutoRepayWhenDeposit bool             `json:"autoRepayWhenDeposit"`
 
 	Assets []MarginAsset `json:"assets"`
@@ -73,7 +73,7 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 }
 
 func (s *Strategy) checkAndBorrow(ctx context.Context) {
-	if s.MinMarginRatio.IsZero() {
+	if s.MinMarginLevel.IsZero() {
 		return
 	}
 
@@ -82,15 +82,21 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 		return
 	}
 
-	minMarginRatio := s.MinMarginRatio
-	curMarginRatio := s.ExchangeSession.GetAccount().MarginRatio
+	minMarginLevel := s.MinMarginLevel
+	account := s.ExchangeSession.GetAccount()
+	curMarginLevel := account.MarginLevel
+
+	log.Infof("current account margin level: %s margin ratio: %s, margin tolerance: %s",
+		account.MarginLevel.String(),
+		account.MarginRatio.String(),
+		account.MarginTolerance.String(),
+	)
 
 	// if margin ratio is too low, do not borrow
-	if curMarginRatio.Compare(minMarginRatio) < 0 {
-		log.Infof("current margin ratio %f < min margin ratio %f, skip autoborrow", curMarginRatio.Float64(), minMarginRatio.Float64())
+	if curMarginLevel.Compare(minMarginLevel) < 0 {
+		log.Infof("current margin level %f < min margin level %f, skip autoborrow", curMarginLevel.Float64(), minMarginLevel.Float64())
 		return
 	}
-
 
 	balances := s.ExchangeSession.GetAccount().Balances()
 	if len(balances) == 0 {
@@ -135,8 +141,8 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 				Action:         "Borrow",
 				Asset:          marginAsset.Asset,
 				Amount:         toBorrow,
-				MarginRatio:    curMarginRatio,
-				MinMarginRatio: minMarginRatio,
+				MarginLevel:    curMarginLevel,
+				MinMarginLevel: minMarginLevel,
 			})
 			log.Infof("sending borrow request %f %s", toBorrow.Float64(), marginAsset.Asset)
 			s.marginBorrowRepay.BorrowMarginAsset(ctx, marginAsset.Asset, toBorrow)
@@ -152,8 +158,8 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 				Action:         "Borrow",
 				Asset:          marginAsset.Asset,
 				Amount:         toBorrow,
-				MarginRatio:    curMarginRatio,
-				MinMarginRatio: minMarginRatio,
+				MarginLevel:    curMarginLevel,
+				MinMarginLevel: minMarginLevel,
 			})
 
 			log.Infof("sending borrow request %f %s", toBorrow.Float64(), marginAsset.Asset)
@@ -180,11 +186,11 @@ func (s *Strategy) run(ctx context.Context, interval time.Duration) {
 }
 
 func (s *Strategy) handleBalanceUpdate(balances types.BalanceMap) {
-	if s.MinMarginRatio.IsZero() {
+	if s.MinMarginLevel.IsZero() {
 		return
 	}
 
-	if s.ExchangeSession.GetAccount().MarginRatio.Compare(s.MinMarginRatio) > 0 {
+	if s.ExchangeSession.GetAccount().MarginLevel.Compare(s.MinMarginLevel) > 0 {
 		return
 	}
 
@@ -196,11 +202,11 @@ func (s *Strategy) handleBalanceUpdate(balances types.BalanceMap) {
 }
 
 func (s *Strategy) handleBinanceBalanceUpdateEvent(event *binance.BalanceUpdateEvent) {
-	if s.MinMarginRatio.IsZero() {
+	if s.MinMarginLevel.IsZero() {
 		return
 	}
 
-	if s.ExchangeSession.GetAccount().MarginRatio.Compare(s.MinMarginRatio) > 0 {
+	if s.ExchangeSession.GetAccount().MarginLevel.Compare(s.MinMarginLevel) > 0 {
 		return
 	}
 
@@ -211,8 +217,8 @@ func (s *Strategy) handleBinanceBalanceUpdateEvent(event *binance.BalanceUpdateE
 		return
 	}
 
-	minMarginRatio := s.MinMarginRatio
-	curMarginRatio := s.ExchangeSession.GetAccount().MarginRatio
+	minMarginLevel := s.MinMarginLevel
+	curMarginLevel := s.ExchangeSession.GetAccount().MarginLevel
 
 	if b, ok := s.ExchangeSession.GetAccount().Balance(event.Asset); ok {
 		if b.Available.IsZero() || b.Borrowed.IsZero() {
@@ -224,8 +230,8 @@ func (s *Strategy) handleBinanceBalanceUpdateEvent(event *binance.BalanceUpdateE
 			Action:         "Borrow",
 			Asset:          b.Currency,
 			Amount:         toRepay,
-			MarginRatio:    curMarginRatio,
-			MinMarginRatio: minMarginRatio,
+			MarginLevel:    curMarginLevel,
+			MinMarginLevel: minMarginLevel,
 		})
 		if err := s.marginBorrowRepay.RepayMarginAsset(context.Background(), event.Asset, toRepay); err != nil {
 			log.WithError(err).Errorf("margin repay error")
@@ -237,8 +243,8 @@ type MarginAction struct {
 	Action         string
 	Asset          string
 	Amount         fixedpoint.Value
-	MarginRatio    fixedpoint.Value
-	MinMarginRatio fixedpoint.Value
+	MarginLevel    fixedpoint.Value
+	MinMarginLevel fixedpoint.Value
 }
 
 func (a *MarginAction) SlackAttachment() slack.Attachment {
@@ -263,12 +269,12 @@ func (a *MarginAction) SlackAttachment() slack.Attachment {
 			},
 			{
 				Title: "Current Margin Ratio",
-				Value: a.MarginRatio.String(),
+				Value: a.MarginLevel.String(),
 				Short: true,
 			},
 			{
 				Title: "Min Margin Ratio",
-				Value: a.MinMarginRatio.String(),
+				Value: a.MinMarginLevel.String(),
 				Short: true,
 			},
 		},
@@ -277,8 +283,8 @@ func (a *MarginAction) SlackAttachment() slack.Attachment {
 
 // This strategy simply spent all available quote currency to buy the symbol whenever kline gets closed
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-	if s.MinMarginRatio.IsZero() {
-		log.Warnf("minMarginRatio is 0, you should configure this minimal margin ratio for controlling the liquidation risk")
+	if s.MinMarginLevel.IsZero() {
+		log.Warnf("minMarginLevel is 0, you should configure this minimal margin ratio for controlling the liquidation risk")
 	}
 
 	s.ExchangeSession = session
