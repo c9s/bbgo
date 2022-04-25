@@ -43,12 +43,21 @@ func NewCoreInteraction(environment *Environment, trader *Trader) *CoreInteracti
 	}
 }
 
-func FilterStrategyByInterface(checkInterface interface{}, exchangeStrategies map[string]SingleExchangeStrategy) (strategies []string, found bool) {
+func GetStrategySignatures(exchangeStrategies map[string]SingleExchangeStrategy) []string {
+	var strategies []string
+	for signature := range exchangeStrategies {
+		strategies = append(strategies, signature)
+	}
+
+	return strategies
+}
+
+func FilterStrategyByInterface(checkInterface interface{}, exchangeStrategies map[string]SingleExchangeStrategy) (strategies map[string]SingleExchangeStrategy, found bool) {
 	found = false
 	rt := reflect.TypeOf(checkInterface).Elem()
 	for signature, strategy := range exchangeStrategies {
 		if ok := reflect.TypeOf(strategy).Implements(rt); ok {
-			strategies = append(strategies, signature)
+			strategies[signature] = strategy
 			found = true
 		}
 	}
@@ -113,7 +122,7 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 		// it.trader.exchangeStrategies
 		// send symbol options
 		if strategies, found := FilterStrategyByInterface((*PositionReader)(nil), it.exchangeStrategies); found {
-			reply.AddMultipleButtons(GenerateStrategyButtonsForm(strategies))
+			reply.AddMultipleButtons(GenerateStrategyButtonsForm(GetStrategySignatures(strategies)))
 			reply.Message("Please choose one strategy")
 		} else {
 			reply.Message("No strategy supports PositionReader")
@@ -154,7 +163,7 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 		// it.trader.exchangeStrategies
 		// send symbol options
 		if strategies, found := FilterStrategyByInterface((*PositionCloser)(nil), it.exchangeStrategies); found {
-			reply.AddMultipleButtons(GenerateStrategyButtonsForm(strategies))
+			reply.AddMultipleButtons(GenerateStrategyButtonsForm(GetStrategySignatures(strategies)))
 			reply.Message("Please choose one strategy")
 		} else {
 			reply.Message("No strategy supports PositionCloser")
@@ -223,7 +232,7 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 		// it.trader.exchangeStrategies
 		// send symbol options
 		if strategies, found := FilterStrategyByInterface((*StrategyStatusReader)(nil), it.exchangeStrategies); found {
-			reply.AddMultipleButtons(GenerateStrategyButtonsForm(strategies))
+			reply.AddMultipleButtons(GenerateStrategyButtonsForm(GetStrategySignatures(strategies)))
 			reply.Message("Please choose a strategy")
 		} else {
 			reply.Message("No strategy supports StrategyStatusReader")
@@ -261,7 +270,7 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 		// it.trader.exchangeStrategies
 		// send symbol options
 		if strategies, found := FilterStrategyByInterface((*StrategyToggler)(nil), it.exchangeStrategies); found {
-			reply.AddMultipleButtons(GenerateStrategyButtonsForm(strategies))
+			reply.AddMultipleButtons(GenerateStrategyButtonsForm(GetStrategySignatures(strategies)))
 			reply.Message("Please choose one strategy")
 		} else {
 			reply.Message("No strategy supports StrategyToggler")
@@ -303,7 +312,7 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 		// it.trader.exchangeStrategies
 		// send symbol options
 		if strategies, found := FilterStrategyByInterface((*StrategyToggler)(nil), it.exchangeStrategies); found {
-			reply.AddMultipleButtons(GenerateStrategyButtonsForm(strategies))
+			reply.AddMultipleButtons(GenerateStrategyButtonsForm(GetStrategySignatures(strategies)))
 			reply.Message("Please choose one strategy")
 		} else {
 			reply.Message("No strategy supports StrategyToggler")
@@ -345,7 +354,7 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 		// it.trader.exchangeStrategies
 		// send symbol options
 		if strategies, found := FilterStrategyByInterface((*EmergencyStopper)(nil), it.exchangeStrategies); found {
-			reply.AddMultipleButtons(GenerateStrategyButtonsForm(strategies))
+			reply.AddMultipleButtons(GenerateStrategyButtonsForm(GetStrategySignatures(strategies)))
 			reply.Message("Please choose one strategy")
 		} else {
 			reply.Message("No strategy supports EmergencyStopper")
