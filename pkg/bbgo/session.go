@@ -39,7 +39,7 @@ type StandardIndicatorSet struct {
 	// interval -> window
 	sma        map[types.IntervalWindow]*indicator.SMA
 	ewma       map[types.IntervalWindow]*indicator.EWMA
-	boll       map[types.IntervalWindow]*indicator.BOLL
+	boll       map[types.IntervalWindowBandWidth]*indicator.BOLL
 	stoch      map[types.IntervalWindow]*indicator.STOCH
 	volatility map[types.IntervalWindow]*indicator.VOLATILITY
 
@@ -51,7 +51,7 @@ func NewStandardIndicatorSet(symbol string, store *MarketDataStore) *StandardInd
 		Symbol:     symbol,
 		sma:        make(map[types.IntervalWindow]*indicator.SMA),
 		ewma:       make(map[types.IntervalWindow]*indicator.EWMA),
-		boll:       make(map[types.IntervalWindow]*indicator.BOLL),
+		boll:       make(map[types.IntervalWindowBandWidth]*indicator.BOLL),
 		stoch:      make(map[types.IntervalWindow]*indicator.STOCH),
 		volatility: make(map[types.IntervalWindow]*indicator.VOLATILITY),
 		store:      store,
@@ -84,22 +84,37 @@ func NewStandardIndicatorSet(symbol string, store *MarketDataStore) *StandardInd
 		// setup boll indicator, we may refactor boll indicator by subscribing SMA indicator,
 		// however, since general used BOLLINGER band use window 21, which is not in the existing SMA indicator sets.
 		// Pull out the bandwidth configuration as the boll Key
-		iw := types.IntervalWindow{Interval: interval, Window: 21}
-		set.boll[iw] = &indicator.BOLL{IntervalWindow: iw, K: 2.0}
-		set.boll[iw].Bind(store)
+		iwTmp := types.IntervalWindow{Interval: interval, Window: 21}
+		iwb := types.IntervalWindowBandWidth{IntervalWindow: iwTmp, BandWidth: 1.0}
+		set.boll[iwb] = &indicator.BOLL{IntervalWindow: iwTmp, K: 1.0}
+		set.boll[iwb].Bind(store)
 	}
 
 	return set
 }
 
-// BOLL returns the bollinger band indicator of the given interval and the window,
-// Please note that the K for std dev is fixed and defaults to 2.0
+// BOLL returns the bollinger band indicator of the given interval, the window and bandwidth
 func (set *StandardIndicatorSet) BOLL(iw types.IntervalWindow, bandWidth float64) *indicator.BOLL {
-	inc, ok := set.boll[iw]
+
+	iwb := types.IntervalWindowBandWidth{IntervalWindow: iw, BandWidth: bandWidth}
+	inc, ok := set.boll[iwb]
+
 	if !ok {
 		inc = &indicator.BOLL{IntervalWindow: iw, K: bandWidth}
+
+		// Bind tmp data store
+		tmpDataStore := NewMarketDataStore("TMP")
+		inc.Bind(tmpDataStore)
+
+		// Trigger tmp data store to calculate indicator
+		Klines := set.store.KLineWindows[iw.Interval]
+		for _, kline := range Klines {
+			tmpDataStore.AddKLine(kline)
+		}
+
+		// Bind real store
 		inc.Bind(set.store)
-		set.boll[iw] = inc
+		set.boll[iwb] = inc
 	}
 
 	return inc
