@@ -398,11 +398,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.OnSuspend(func() {
 		// Cancel all order
 		if err := s.activeOrders.GracefulCancel(ctx, session.Exchange); err != nil {
-			errMsg := "Not all {s.Symbol} orders are cancelled! Please check again."
+			errMsg := fmt.Sprintf("Not all %s orders are cancelled! Please check again.", s.Symbol)
 			log.WithError(err).Errorf(errMsg)
 			s.Notify(errMsg)
 		} else {
-			s.Notify("All {s.Symbol} orders are cancelled.")
+			s.Notify("All %s orders are cancelled.", s.Symbol)
 		}
 
 		// Save state
