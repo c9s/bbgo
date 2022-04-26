@@ -72,6 +72,44 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	// session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
 }
 
+func (s *Strategy) tryToRepayAnyDebt(ctx context.Context) {
+	log.Infof("trying to repay any debt...")
+
+	if err := s.ExchangeSession.UpdateAccount(ctx); err != nil {
+		log.WithError(err).Errorf("can not update account")
+		return
+	}
+
+	account := s.ExchangeSession.GetAccount()
+	minMarginLevel := s.MinMarginLevel
+	curMarginLevel := account.MarginLevel
+
+	balances := account.Balances()
+	for _, b := range balances {
+		if b.Borrowed.Sign() <= 0 {
+			continue
+		}
+
+		if b.Available.IsZero() {
+			continue
+		}
+
+		toRepay := b.Available
+		s.Notifiability.Notify(&MarginAction{
+			Action:         "Repay",
+			Asset:          b.Currency,
+			Amount:         toRepay,
+			MarginLevel:    curMarginLevel,
+			MinMarginLevel: minMarginLevel,
+		})
+
+		log.Infof("repaying %f %s", toRepay.Float64(), b.Currency)
+		if err := s.marginBorrowRepay.RepayMarginAsset(context.Background(), b.Currency, toRepay); err != nil {
+			log.WithError(err).Errorf("margin repay error")
+		}
+	}
+}
+
 func (s *Strategy) checkAndBorrow(ctx context.Context) {
 	if s.MinMarginLevel.IsZero() {
 		return
@@ -95,6 +133,7 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 	// if margin ratio is too low, do not borrow
 	if curMarginLevel.Compare(minMarginLevel) < 0 {
 		log.Infof("current margin level %f < min margin level %f, skip autoborrow", curMarginLevel.Float64(), minMarginLevel.Float64())
+		s.tryToRepayAnyDebt(ctx)
 		return
 	}
 
@@ -217,17 +256,18 @@ func (s *Strategy) handleBinanceBalanceUpdateEvent(event *binance.BalanceUpdateE
 		return
 	}
 
+	account := s.ExchangeSession.GetAccount()
 	minMarginLevel := s.MinMarginLevel
-	curMarginLevel := s.ExchangeSession.GetAccount().MarginLevel
+	curMarginLevel := account.MarginLevel
 
-	if b, ok := s.ExchangeSession.GetAccount().Balance(event.Asset); ok {
+	if b, ok := account.Balance(event.Asset); ok {
 		if b.Available.IsZero() || b.Borrowed.IsZero() {
 			return
 		}
 
 		toRepay := b.Available
 		s.Notifiability.Notify(&MarginAction{
-			Action:         "Borrow",
+			Action:         "Repay",
 			Asset:          b.Currency,
 			Amount:         toRepay,
 			MarginLevel:    curMarginLevel,
