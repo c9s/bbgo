@@ -19,14 +19,23 @@ type ZLEMA struct {
 }
 
 func (inc *ZLEMA) Index(i int) float64 {
+	if inc.zlema == nil {
+		return 0
+	}
 	return inc.zlema.Index(i)
 }
 
 func (inc *ZLEMA) Last() float64 {
+	if inc.zlema == nil {
+		return 0
+	}
 	return inc.zlema.Last()
 }
 
 func (inc *ZLEMA) Length() int {
+	if inc.zlema == nil {
+		return 0
+	}
 	return inc.zlema.Length()
 }
 
@@ -49,8 +58,13 @@ func (inc *ZLEMA) Update(value float64) {
 var _ types.Series = &ZLEMA{}
 
 func (inc *ZLEMA) calculateAndUpdate(allKLines []types.KLine) {
-	for _, k := range allKLines {
-		inc.Update(k.Close.Float64())
+	if inc.zlema == nil {
+		for _, k := range allKLines {
+			inc.Update(k.Close.Float64())
+			inc.EmitUpdate(inc.Last())
+		}
+	} else {
+		inc.Update(allKLines[len(allKLines)-1].Close.Float64())
 		inc.EmitUpdate(inc.Last())
 	}
 }

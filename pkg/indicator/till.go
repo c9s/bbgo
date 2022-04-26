@@ -53,7 +53,7 @@ func (inc *TILL) Update(value float64) {
 }
 
 func (inc *TILL) Last() float64 {
-	if inc.e1.Length() == 0 {
+	if inc.e1 == nil || inc.e1.Length() == 0 {
 		return 0
 	}
 	e3 := inc.e3.Last()
@@ -64,7 +64,7 @@ func (inc *TILL) Last() float64 {
 }
 
 func (inc *TILL) Index(i int) float64 {
-	if inc.e1.Length() <= i {
+	if inc.e1 == nil || inc.e1.Length() <= i {
 		return 0
 	}
 	e3 := inc.e3.Index(i)
@@ -75,6 +75,9 @@ func (inc *TILL) Index(i int) float64 {
 }
 
 func (inc *TILL) Length() int {
+	if inc.e1 == nil {
+		return 0
+	}
 	return inc.e1.Length()
 }
 
