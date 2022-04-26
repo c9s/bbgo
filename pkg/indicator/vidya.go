@@ -69,8 +69,13 @@ func (inc *VIDYA) Length() int {
 var _ types.Series = &VIDYA{}
 
 func (inc *VIDYA) calculateAndUpdate(allKLines []types.KLine) {
-	for _, k := range allKLines {
-		inc.Update(k.Close.Float64())
+	if inc.input.Length() == 0 {
+		for _, k := range allKLines {
+			inc.Update(k.Close.Float64())
+			inc.EmitUpdate(inc.Last())
+		}
+	} else {
+		inc.Update(allKLines[len(allKLines)-1].Close.Float64())
 		inc.EmitUpdate(inc.Last())
 	}
 }

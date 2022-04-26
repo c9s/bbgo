@@ -7,6 +7,7 @@ import (
 
 // Refer: Welles Wilder's Moving Average
 // Refer URL: http://fxcorporate.com/help/MS/NOTFIFO/i_WMA.html
+// TODO: Cannot see any difference between RMA and this
 
 const MaxNumOfWWMA = 5_000
 const MaxNumOfWWMATruncateSize = 100
