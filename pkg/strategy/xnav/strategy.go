@@ -77,9 +77,16 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {}
 func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]*bbgo.ExchangeSession) {
 	totalAssets := types.AssetMap{}
 	totalBalances := types.BalanceMap{}
+	totalBorrowed := map[string]fixedpoint.Value{}
 	lastPrices := map[string]fixedpoint.Value{}
 	for _, session := range sessions {
-		balances := session.GetAccount().Balances()
+		if err := session.UpdateAccount(ctx) ; err != nil {
+			log.WithError(err).Errorf("can not update account")
+			return
+		}
+
+		account := session.GetAccount()
+		balances := account.Balances()
 		if err := session.UpdatePrices(ctx); err != nil {
 			log.WithError(err).Error("price update failed")
 			return
@@ -90,8 +97,13 @@ func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]
 				tb.Available = tb.Available.Add(b.Available)
 				tb.Locked = tb.Locked.Add(b.Locked)
 				totalBalances[b.Currency] = tb
+
+				if b.Borrowed.Sign() > 0  {
+					totalBorrowed[b.Currency] = totalBorrowed[b.Currency].Add(b.Borrowed)
+				}
 			} else {
 				totalBalances[b.Currency] = b
+				totalBorrowed[b.Currency] = b.Borrowed
 			}
 		}
 
