@@ -6,6 +6,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+// Refer: Running Moving Average
 //go:generate callbackgen -type RMA
 type RMA struct {
 	types.IntervalWindow
