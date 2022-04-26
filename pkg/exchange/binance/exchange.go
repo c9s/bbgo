@@ -70,9 +70,9 @@ type Exchange struct {
 	types.MarginSettings
 	types.FuturesSettings
 
-	key, secret   string
+	key, secret string
 	// client is used for spot & margin
-	client        *binance.Client
+	client *binance.Client
 
 	// futuresClient is used for usdt-m futures
 	futuresClient *futures.Client // USDT-M Futures
@@ -268,6 +268,9 @@ func (e *Exchange) BorrowMarginAsset(ctx context.Context, asset string, amount f
 
 	log.Infof("borrowing margin asset %s amount %f", asset, amount.Float64())
 	resp, err := req.Do(ctx)
+	if err != nil {
+		return err
+	}
 	log.Debugf("margin borrowed %f %s, transaction id = %d", amount.Float64(), asset, resp.TranID)
 	return err
 }
@@ -284,6 +287,9 @@ func (e *Exchange) transferCrossMarginAccountAsset(ctx context.Context, asset st
 		req.Type(binance.MarginTransferTypeToMain)
 	}
 	resp, err := req.Do(ctx)
+	if err != nil {
+		return err
+	}
 
 	log.Debugf("cross margin transfer %f %s, transaction id = %d", amount.Float64(), asset, resp.TranID)
 	return err
@@ -1282,7 +1288,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		}
 
 		if options.StartTime != nil && options.EndTime != nil {
-			if options.EndTime.Sub(*options.StartTime) < 24* time.Hour {
+			if options.EndTime.Sub(*options.StartTime) < 24*time.Hour {
 				req.StartTime(options.StartTime.UnixMilli())
 				req.EndTime(options.EndTime.UnixMilli())
 			} else {
@@ -1290,7 +1296,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 			}
 		} else if options.StartTime != nil {
 			req.StartTime(options.StartTime.UnixMilli())
-		}  else if options.EndTime != nil {
+		} else if options.EndTime != nil {
 			req.EndTime(options.EndTime.UnixMilli())
 		}
 
@@ -1327,7 +1333,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		}
 
 		if options.StartTime != nil && options.EndTime != nil {
-			if options.EndTime.Sub(*options.StartTime) < 24* time.Hour {
+			if options.EndTime.Sub(*options.StartTime) < 24*time.Hour {
 				req.StartTime(options.StartTime.UnixMilli())
 				req.EndTime(options.EndTime.UnixMilli())
 			} else {
@@ -1335,7 +1341,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 			}
 		} else if options.StartTime != nil {
 			req.StartTime(options.StartTime.UnixMilli())
-		}  else if options.EndTime != nil {
+		} else if options.EndTime != nil {
 			req.EndTime(options.EndTime.UnixMilli())
 		}
 
@@ -1372,7 +1378,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		}
 
 		if options.StartTime != nil && options.EndTime != nil {
-			if options.EndTime.Sub(*options.StartTime) < 24* time.Hour {
+			if options.EndTime.Sub(*options.StartTime) < 24*time.Hour {
 				req.StartTime(options.StartTime.UnixMilli())
 				req.EndTime(options.EndTime.UnixMilli())
 			} else {
@@ -1380,7 +1386,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 			}
 		} else if options.StartTime != nil {
 			req.StartTime(options.StartTime.UnixMilli())
-		}  else if options.EndTime != nil {
+		} else if options.EndTime != nil {
 			req.EndTime(options.EndTime.UnixMilli())
 		}
 
