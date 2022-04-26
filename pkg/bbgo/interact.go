@@ -420,7 +420,8 @@ func getStrategySignature(strategy SingleExchangeStrategy) (string, error) {
 
 	for i := 0; i < rv.NumField(); i++ {
 		field := rv.Field(i)
-		if field.Kind() == reflect.String {
+		fieldName := rv.Type().Field(i).Name
+		if field.Kind() == reflect.String && fieldName != "Status" {
 			str := field.String()
 			if len(str) > 0 {
 				signature += "." + field.String()
