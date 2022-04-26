@@ -38,12 +38,19 @@ func (b Balance) Total() fixedpoint.Value {
 	return b.Available.Add(b.Locked)
 }
 
-func (b Balance) String() string {
+func (b Balance) String() (o string) {
+
+	o = fmt.Sprintf("%s: %s", b.Currency, b.Available.String())
+
 	if b.Locked.Sign() > 0 {
-		return fmt.Sprintf("%s: %v (locked %v)", b.Currency, b.Available, b.Locked)
+		o += fmt.Sprintf(" (locked %v)", b.Locked)
 	}
 
-	return fmt.Sprintf("%s: %s", b.Currency, b.Available.String())
+	if b.Borrowed.Sign() > 0 {
+		o += fmt.Sprintf(" (borrowed: %v)", b.Borrowed)
+	}
+
+	return o
 }
 
 type Asset struct {
