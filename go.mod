@@ -8,7 +8,7 @@ require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/adshao/go-binance/v2 v2.3.5
 	github.com/c9s/requestgen v1.1.1-0.20211230171502-c042072e23cd
-	github.com/c9s/rockhopper v1.2.1-0.20210217093258-2661955904a9
+	github.com/c9s/rockhopper v1.2.1-0.20220426104534-f27cbb09846c
 	github.com/codingconcepts/env v0.0.0-20200821220118-a8fbf8d84482
 	github.com/fatih/color v1.13.0
 	github.com/gin-contrib/cors v1.3.1
