@@ -127,14 +127,14 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 
 			if !marginAsset.MaxTotalBorrow.IsZero() {
 				// check if we over borrow
-				if toBorrow.Add(b.Borrowed).Compare(marginAsset.MaxTotalBorrow) > 0 {
-					toBorrow = toBorrow.Sub(toBorrow.Add(b.Borrowed).Sub(marginAsset.MaxTotalBorrow))
+				newBorrow := toBorrow.Add(b.Borrowed)
+				if newBorrow.Compare(marginAsset.MaxTotalBorrow) > 0 {
+					toBorrow = toBorrow.Sub(newBorrow.Sub(marginAsset.MaxTotalBorrow))
 					if toBorrow.Sign() < 0 {
 						log.Warnf("margin asset %s is over borrowed, skip", marginAsset.Asset)
 						continue
 					}
 				}
-				toBorrow = fixedpoint.Min(toBorrow.Add(b.Borrowed), marginAsset.MaxTotalBorrow)
 			}
 
 			s.Notifiability.Notify(&MarginAction{
