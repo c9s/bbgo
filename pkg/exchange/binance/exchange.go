@@ -254,6 +254,10 @@ func (e *Exchange) RepayMarginAsset(ctx context.Context, asset string, amount fi
 
 	log.Infof("repaying margin asset %s amount %f", asset, amount.Float64())
 	resp, err := req.Do(ctx)
+	if err != nil {
+		return err
+	}
+
 	log.Debugf("margin repayed %f %s, transaction id = %d", amount.Float64(), asset, resp.TranID)
 	return err
 }
