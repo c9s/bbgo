@@ -49,8 +49,13 @@ func (inc *DEMA) Length() int {
 var _ types.Series = &DEMA{}
 
 func (inc *DEMA) calculateAndUpdate(allKLines []types.KLine) {
-	for _, k := range allKLines {
-		inc.Update(k.Close.Float64())
+	if inc.a1 == nil {
+		for _, k := range allKLines {
+			inc.Update(k.Close.Float64())
+			inc.EmitUpdate(inc.Last())
+		}
+	} else {
+		inc.Update(allKLines[len(allKLines)-1].Close.Float64())
 		inc.EmitUpdate(inc.Last())
 	}
 }

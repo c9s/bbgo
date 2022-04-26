@@ -30,14 +30,23 @@ func (inc *HULL) Update(value float64) {
 }
 
 func (inc *HULL) Last() float64 {
+	if inc.result == nil {
+		return 0
+	}
 	return inc.result.Last()
 }
 
 func (inc *HULL) Index(i int) float64 {
+	if inc.result == nil {
+		return 0
+	}
 	return inc.result.Index(i)
 }
 
 func (inc *HULL) Length() int {
+	if inc.result == nil {
+		return 0
+	}
 	return inc.result.Length()
 }
 
