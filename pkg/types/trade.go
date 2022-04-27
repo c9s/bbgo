@@ -71,7 +71,12 @@ type Trade struct {
 	IsFutures  bool `json:"isFutures" db:"is_futures"`
 	IsIsolated bool `json:"isIsolated" db:"is_isolated"`
 
+	// The following fields are null-able fields
+
+	// StrategyID is the strategy that execute this trade
 	StrategyID sql.NullString  `json:"strategyID" db:"strategy"`
+
+	// PnL is the profit and loss value of the executed trade
 	PnL        sql.NullFloat64 `json:"pnl" db:"pnl"`
 }
 
