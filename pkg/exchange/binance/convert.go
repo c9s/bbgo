@@ -583,20 +583,6 @@ func toGlobalFuturesOrderStatus(orderStatus futures.OrderStatusType) types.Order
 	return types.OrderStatus(orderStatus)
 }
 
-// ConvertTrades converts the binance v3 trade into the global trade type
-func ConvertTrades(remoteTrades []*binance.TradeV3) (trades []types.Trade, err error) {
-	for _, t := range remoteTrades {
-		trade, err := toGlobalTrade(*t, false)
-		if err != nil {
-			return nil, errors.Wrapf(err, "binance v3 trade parse error, trade: %+v", *t)
-		}
-
-		trades = append(trades, *trade)
-	}
-
-	return trades, err
-}
-
 func convertSubscription(s types.Subscription) string {
 	// binance uses lower case symbol name,
 	// for kline, it's "<symbol>@kline_<interval>"
