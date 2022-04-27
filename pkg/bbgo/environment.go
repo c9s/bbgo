@@ -504,14 +504,16 @@ func (environ *Environment) BindSync(config *SyncConfig) {
 	}
 
 	for _, session := range environ.sessions {
+		// avoid using the iterator variable.
+		s2 := session
 		// if trade sync is on, we will write all received trades
 		if config.UserDataStream.Trades {
-			tradeWriter := tradeWriterCreator(session)
+			tradeWriter := tradeWriterCreator(s2)
 			session.UserDataStream.OnTradeUpdate(tradeWriter)
 		}
 
 		if config.UserDataStream.FilledOrders {
-			orderWriter := orderWriterCreator(session)
+			orderWriter := orderWriterCreator(s2)
 			session.UserDataStream.OnOrderUpdate(orderWriter)
 		}
 	}
