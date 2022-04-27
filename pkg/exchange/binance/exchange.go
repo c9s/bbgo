@@ -279,6 +279,17 @@ func (e *Exchange) BorrowMarginAsset(ctx context.Context, asset string, amount f
 	return err
 }
 
+func (e *Exchange) QueryMarginBorrowHistory(ctx context.Context, asset string) error {
+	req := e.client.NewListMarginLoansService()
+	req.Asset(asset)
+	history, err := req.Do(ctx)
+	if err != nil {
+		return err
+	}
+	_ = history
+	return nil
+}
+
 // transferCrossMarginAccountAsset transfer asset to the cross margin account or to the main account
 func (e *Exchange) transferCrossMarginAccountAsset(ctx context.Context, asset string, amount fixedpoint.Value, io int) error {
 	req := e.client.NewMarginTransferService()
