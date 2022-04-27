@@ -464,17 +464,38 @@ func (environ *Environment) BindSync(config *SyncConfig) {
 
 	environ.syncConfig = config
 
-	tradeWriter := func(trade types.Trade) {
-		if err := environ.TradeService.Insert(trade); err != nil {
-			log.WithError(err).Errorf("trade insert error: %+v", trade)
+	tradeWriterCreator := func(session *ExchangeSession) func(trade types.Trade) {
+		return func(trade types.Trade) {
+			trade.IsMargin = session.Margin
+			trade.IsFutures = session.Futures
+			if session.Margin {
+				trade.IsIsolated = session.IsolatedMargin
+			} else if session.Futures {
+				trade.IsIsolated = session.IsolatedFutures
+			}
+
+			if err := environ.TradeService.Insert(trade); err != nil {
+				log.WithError(err).Errorf("trade insert error: %+v", trade)
+			}
 		}
 	}
-	orderWriter := func(order types.Order) {
-		switch order.Status {
-		case types.OrderStatusFilled, types.OrderStatusCanceled:
-			if order.ExecutedQuantity.Sign() > 0 {
-				if err := environ.OrderService.Insert(order); err != nil {
-					log.WithError(err).Errorf("order insert error: %+v", order)
+
+	orderWriterCreator := func(session *ExchangeSession) func(order types.Order) {
+		return func(order types.Order) {
+			order.IsMargin = session.Margin
+			order.IsFutures = session.Futures
+			if session.Margin {
+				order.IsIsolated = session.IsolatedMargin
+			} else if session.Futures {
+				order.IsIsolated = session.IsolatedFutures
+			}
+
+			switch order.Status {
+			case types.OrderStatusFilled, types.OrderStatusCanceled:
+				if order.ExecutedQuantity.Sign() > 0 {
+					if err := environ.OrderService.Insert(order); err != nil {
+						log.WithError(err).Errorf("order insert error: %+v", order)
+					}
 				}
 			}
 		}
@@ -483,9 +504,12 @@ func (environ *Environment) BindSync(config *SyncConfig) {
 	for _, session := range environ.sessions {
 		// if trade sync is on, we will write all received trades
 		if config.UserDataStream.Trades {
+			tradeWriter := tradeWriterCreator(session)
 			session.UserDataStream.OnTradeUpdate(tradeWriter)
 		}
+
 		if config.UserDataStream.FilledOrders {
+			orderWriter := orderWriterCreator(session)
 			session.UserDataStream.OnOrderUpdate(orderWriter)
 		}
 	}
