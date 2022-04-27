@@ -28,15 +28,20 @@ func integrationTestConfigured(t *testing.T, prefix string) (key, secret string,
 	return key, secret, ok
 }
 
-func TestClient_GetTradeFeeRequest(t *testing.T) {
+func getTestClientOrSkip(t *testing.T) *RestClient {
 	key, secret, ok := integrationTestConfigured(t, "BINANCE")
 	if !ok {
 		t.SkipNow()
+		return nil
 	}
 
 	client := NewClient()
 	client.Auth(key, secret)
+	return client
+}
 
+func TestClient_GetTradeFeeRequest(t *testing.T) {
+	client := getTestClientOrSkip(t)
 	ctx := context.Background()
 
 	err := client.SetTimeOffsetFromServer(ctx)
@@ -48,6 +53,25 @@ func TestClient_GetTradeFeeRequest(t *testing.T) {
 	assert.NotEmpty(t, tradeFees)
 	t.Logf("tradeFees: %+v", tradeFees)
 }
+
+func TestClient_GetDepositAddressRequest(t *testing.T) {
+	client := getTestClientOrSkip(t)
+	ctx := context.Background()
+
+	err := client.SetTimeOffsetFromServer(ctx)
+	assert.NoError(t, err)
+
+	req := client.NewGetDepositAddressRequest()
+	req.Coin("BTC")
+	address, err := req.Do(ctx)
+	assert.NoError(t, err)
+	assert.NotNil(t, address)
+	assert.NotEmpty(t, address.Url)
+	assert.NotEmpty(t, address.Address)
+	t.Logf("deposit address: %+v", address)
+}
+
+
 
 func TestClient_privateCall(t *testing.T) {
 	key, secret, ok := integrationTestConfigured(t, "BINANCE")

@@ -11,6 +11,16 @@ import (
 	"regexp"
 )
 
+func (g *GetDepositAddressRequest) Coin(coin string) *GetDepositAddressRequest {
+	g.coin = coin
+	return g
+}
+
+func (g *GetDepositAddressRequest) Network(network string) *GetDepositAddressRequest {
+	g.network = &network
+	return g
+}
+
 // GetQueryParameters builds and checks the query parameters and returns url.Values
 func (g *GetDepositAddressRequest) GetQueryParameters() (url.Values, error) {
 	var params = map[string]interface{}{}
@@ -26,6 +36,19 @@ func (g *GetDepositAddressRequest) GetQueryParameters() (url.Values, error) {
 // GetParameters builds and checks the parameters and return the result in a map object
 func (g *GetDepositAddressRequest) GetParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
+	// check coin field -> json key coin
+	coin := g.coin
+
+	// assign parameter of coin
+	params["coin"] = coin
+	// check network field -> json key network
+	if g.network != nil {
+		network := *g.network
+
+		// assign parameter of network
+		params["network"] = network
+	} else {
+	}
 
 	return params, nil
 }
@@ -111,9 +134,12 @@ func (g *GetDepositAddressRequest) GetSlugsMap() (map[string]string, error) {
 
 func (g *GetDepositAddressRequest) Do(ctx context.Context) (*DepositAddress, error) {
 
-	// no body params
+	// empty params for GET operation
 	var params interface{}
-	query := url.Values{}
+	query, err := g.GetParametersQuery()
+	if err != nil {
+		return nil, err
+	}
 
 	apiURL := "/sapi/v1/capital/deposit/address"
 
