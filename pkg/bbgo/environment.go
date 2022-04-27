@@ -474,6 +474,8 @@ func (environ *Environment) BindSync(config *SyncConfig) {
 				trade.IsIsolated = session.IsolatedFutures
 			}
 
+			// The StrategyID field and the PnL field needs to be updated by the strategy.
+			// trade.StrategyID, trade.PnL
 			if err := environ.TradeService.Insert(trade); err != nil {
 				log.WithError(err).Errorf("trade insert error: %+v", trade)
 			}
