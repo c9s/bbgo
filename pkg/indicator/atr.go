@@ -10,10 +10,9 @@ import (
 //go:generate callbackgen -type ATR
 type ATR struct {
 	types.IntervalWindow
-	Values               types.Float64Slice
 	PercentageVolatility types.Float64Slice
 
-	PriviousClose float64
+	PreviousClose float64
 	RMA           *RMA
 
 	EndTime         time.Time
@@ -25,48 +24,50 @@ func (inc *ATR) Update(high, low, cloze float64) {
 		panic("window must be greater than 0")
 	}
 
-	if len(inc.Values) == 0 {
+	if inc.RMA == nil {
 		inc.RMA = &RMA{IntervalWindow: types.IntervalWindow{Window: inc.Window}}
-	}
-
-	if inc.PriviousClose == 0 {
-		inc.PriviousClose = cloze
+		inc.PreviousClose = cloze
 		return
 	}
 
 	// calculate true range
-	trueRange := types.Float64Slice{
-		high - low,
-		math.Abs(high - inc.PriviousClose),
-		math.Abs(low - inc.PriviousClose),
-	}.Max()
+	trueRange := high - low
+	hc := math.Abs(high - inc.PreviousClose)
+	lc := math.Abs(low - inc.PreviousClose)
+	if trueRange < hc {
+		trueRange = hc
+	}
+	if trueRange < lc {
+		trueRange = lc
+	}
 
-	inc.PriviousClose = cloze
+	inc.PreviousClose = cloze
 
 	// apply rolling moving average
 	inc.RMA.Update(trueRange)
 	atr := inc.RMA.Last()
-	inc.Values.Push(atr)
 	inc.PercentageVolatility.Push(atr / cloze)
 }
 
 func (inc *ATR) Last() float64 {
-	if len(inc.Values) == 0 {
-		return 0.0
+	if inc.RMA == nil {
+		return 0
 	}
-	return inc.Values[len(inc.Values)-1]
+	return inc.RMA.Last()
 }
 
 func (inc *ATR) Index(i int) float64 {
-	length := len(inc.Values)
-	if length == 0 || length-i-1 < 0 {
+	if inc.RMA == nil {
 		return 0
 	}
-	return inc.Values[length-i-1]
+	return inc.RMA.Index(i)
 }
 
 func (inc *ATR) Length() int {
-	return len(inc.Values)
+	if inc.RMA == nil {
+		return 0
+	}
+	return inc.RMA.Length()
 }
 
 var _ types.Series = &ATR{}
