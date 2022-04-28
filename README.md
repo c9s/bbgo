@@ -18,6 +18,22 @@ A trading bot framework written in Go. The name bbgo comes from the BB8 bot in t
 ## Documentation and General Topics
 - Check the [documentation index](doc/README.md)
 
+
+## What You Can Do With BBGO
+
+### Trading Bot Users
+
+You can use BBGO to run the built-in strategies.
+
+### Strategy Developers
+
+You can use BBGO's trading unit and back-test unit to implement your own strategies.
+
+### Trading Unit Developers
+
+You can use BBGO's underlying common exchange API, currently it supports 4+ major exchanges, so you don't have to repeat the implementation.
+
+
 ## Features
 
 - Exchange abstraction interface.
@@ -27,8 +43,7 @@ A trading bot framework written in Go. The name bbgo comes from the BB8 bot in t
 - PnL calculation.
 - Slack/Telegram notification.
 - Back-testing: KLine-based back-testing engine. See [Back-testing](./doc/topics/back-testing.md)
-- Built-in Grid strategy.
-- Many built-in strategies.
+- Built-in Grid strategy and many other built-in strategies.
 - Multi-exchange session support: you can connect to more than 2 exchanges with different accounts or subaccounts.
 - Standard indicators, e.g., SMA, EMA, BOLL, VMA, MACD...
 - React-powered Web Dashboard.
@@ -50,6 +65,7 @@ A trading bot framework written in Go. The name bbgo comes from the BB8 bot in t
 - MAX Spot Exchange (located in Taiwan)
 
 ## BBGO Tokenomics
+
 To support the development of BBGO, we have created a bounty pool to support contributors by giving away $BBG tokens.
 Check the details in [$BBG Contract Page](contracts/README.md) and our [official website](https://bbgo.finance)
 
