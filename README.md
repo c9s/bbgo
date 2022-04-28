@@ -599,4 +599,4 @@ See [Contributing](./CONTRIBUTING.md)
 
 ## License
 
-MIT License
+MPL-2.0 License
