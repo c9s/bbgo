@@ -15,10 +15,6 @@ A trading bot framework written in Go. The name bbgo comes from the BB8 bot in t
 [![Telegram Taiwan](https://img.shields.io/badge/telegram-tw-blue.svg)](https://t.me/bbgocrypto)
 [![Twitter](https://img.shields.io/twitter/follow/bbgotrading?label=Follow&style=social)](https://twitter.com/bbgotrading)
 
-## Documentation and General Topics
-- Check the [documentation index](doc/README.md)
-
-
 ## What You Can Do With BBGO
 
 ### Trading Bot Users
@@ -32,7 +28,6 @@ You can use BBGO's trading unit and back-test unit to implement your own strateg
 ### Trading Unit Developers
 
 You can use BBGO's underlying common exchange API, currently it supports 4+ major exchanges, so you don't have to repeat the implementation.
-
 
 ## Features
 
@@ -63,6 +58,10 @@ You can use BBGO's underlying common exchange API, currently it supports 4+ majo
 - OKEx Spot Exchange
 - Kucoin Spot Exchange
 - MAX Spot Exchange (located in Taiwan)
+
+
+## Documentation and General Topics
+- Check the [documentation index](doc/README.md)
 
 ## BBGO Tokenomics
 
