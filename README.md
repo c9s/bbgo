@@ -599,4 +599,4 @@ See [Contributing](./CONTRIBUTING.md)
 
 ## License
 
-MPL-2.0 License
+AGPL License
