@@ -41,9 +41,9 @@ func Test_calculateATR(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			atr := ATR{IntervalWindow: types.IntervalWindow{Window: tt.window}}
+			atr := &ATR{IntervalWindow: types.IntervalWindow{Window: tt.window}}
 			atr.calculateAndUpdate(tt.kLines)
-			got := atr.Values.Last()
+			got := atr.Last()
 			diff := math.Trunc((got-tt.want)*100) / 100
 			if diff != 0 {
 				t.Errorf("calculateATR() = %v, want %v", got, tt.want)
