@@ -86,7 +86,37 @@ func TestClient_GetDepositHistoryRequest(t *testing.T) {
 	t.Logf("deposit history: %+v", history)
 }
 
+func TestClient_NewSpotRebateHistoryRequest(t *testing.T) {
+	client := getTestClientOrSkip(t)
+	ctx := context.Background()
 
+	err := client.SetTimeOffsetFromServer(ctx)
+	assert.NoError(t, err)
+
+	req := client.NewGetSpotRebateHistoryRequest()
+	history, err := req.Do(ctx)
+	assert.NoError(t, err)
+	assert.NotNil(t, history)
+	assert.NotEmpty(t, history)
+	t.Logf("spot rebate history: %+v", history)
+}
+
+
+func TestClient_NewGetMarginInterestRateHistoryRequest(t *testing.T) {
+	client := getTestClientOrSkip(t)
+	ctx := context.Background()
+
+	err := client.SetTimeOffsetFromServer(ctx)
+	assert.NoError(t, err)
+
+	req := client.NewGetMarginInterestRateHistoryRequest()
+	req.Asset("BTC")
+	history, err := req.Do(ctx)
+	assert.NoError(t, err)
+	assert.NotNil(t, history)
+	assert.NotEmpty(t, history)
+	t.Logf("interest rate history: %+v", history)
+}
 
 func TestClient_privateCall(t *testing.T) {
 	key, secret, ok := integrationTestConfigured(t, "BINANCE")
