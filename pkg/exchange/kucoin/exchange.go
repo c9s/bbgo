@@ -348,7 +348,7 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 	return orders, err
 }
 
-var launchDate = time.Date(2017, 9, 0, 0, 0, 0, 0, time.Local)
+var launchDate = time.Date(2017, 9, 0, 0, 0, 0, 0, time.UTC)
 
 func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
 	req := e.client.TradeService.NewGetFillsRequest()
