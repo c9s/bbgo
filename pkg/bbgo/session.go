@@ -84,9 +84,11 @@ func NewStandardIndicatorSet(symbol string, store *MarketDataStore) *StandardInd
 		// setup boll indicator, we may refactor boll indicator by subscribing SMA indicator,
 		// however, since general used BOLLINGER band use window 21, which is not in the existing SMA indicator sets.
 		// Pull out the bandwidth configuration as the boll Key
-		iwTmp := types.IntervalWindow{Interval: interval, Window: 21}
-		iwb := types.IntervalWindowBandWidth{IntervalWindow: iwTmp, BandWidth: 1.0}
-		set.boll[iwb] = &indicator.BOLL{IntervalWindow: iwTmp, K: 1.0}
+		iw := types.IntervalWindow{Interval: interval, Window: 21}
+
+		// set efault band width to 2.0
+		iwb := types.IntervalWindowBandWidth{IntervalWindow: iw, BandWidth: 2.0}
+		set.boll[iwb] = &indicator.BOLL{IntervalWindow: iw, K: iwb.BandWidth}
 		set.boll[iwb].Bind(store)
 	}
 
