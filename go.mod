@@ -27,6 +27,7 @@ require (
 	github.com/prometheus/client_golang v1.11.0
 	github.com/rifflock/lfshook v0.0.0-20180920164130-b9218ef580f5
 	github.com/robfig/cron/v3 v3.0.0
+	github.com/sajari/regression v1.0.1
 	github.com/sirupsen/logrus v1.8.1
 	github.com/slack-go/slack v0.10.1
 	github.com/spf13/cobra v1.1.1
@@ -70,7 +71,6 @@ require (
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/jehiah/go-strftime v0.0.0-20171201141054-1d33003b3869 // indirect
 	github.com/json-iterator/go v1.1.11 // indirect
-	github.com/klauspost/compress v1.13.6 // indirect
 	github.com/leodido/go-urn v1.2.1 // indirect
 	github.com/lestrrat-go/strftime v1.0.0 // indirect
 	github.com/lib/pq v1.10.5 // indirect
@@ -89,7 +89,6 @@ require (
 	github.com/prometheus/common v0.32.1 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/russross/blackfriday/v2 v2.0.1 // indirect
-	github.com/sajari/regression v1.0.1 // indirect
 	github.com/shopspring/decimal v1.2.0 // indirect
 	github.com/shurcooL/sanitized_anchor_name v1.0.0 // indirect
 	github.com/spf13/afero v1.5.1 // indirect
@@ -112,5 +111,4 @@ require (
 	google.golang.org/genproto v0.0.0-20220405205423-9d709892a2bf // indirect
 	gopkg.in/ini.v1 v1.62.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	nhooyr.io/websocket v1.8.7 // indirect
 )
