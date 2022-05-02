@@ -623,6 +623,10 @@ func (environ *Environment) Sync(ctx context.Context, userConfig ...*Config) err
 			return err
 		}
 
+		if len(userConfig) == 0 {
+			continue
+		}
+
 		if userConfig[0].Sync.DepositHistory {
 			if err := environ.SyncService.SyncDepositHistory(ctx, session.Exchange); err != nil {
 				return err
