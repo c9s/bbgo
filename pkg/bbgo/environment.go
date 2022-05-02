@@ -623,7 +623,7 @@ func (environ *Environment) Sync(ctx context.Context, userConfig ...*Config) err
 			return err
 		}
 
-		if len(userConfig) == 0 {
+		if len(userConfig) == 0 || userConfig[0].Sync == nil {
 			continue
 		}
 
