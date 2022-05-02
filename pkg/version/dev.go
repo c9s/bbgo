@@ -2,7 +2,7 @@
 
 package version
 
-const Version = "v1.31.2-2bdcf226-dev"
+const Version = "v1.31.3-fa2eb872-dev"
 
-const VersionGitRef = "2bdcf226"
+const VersionGitRef = "fa2eb872"
 
