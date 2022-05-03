@@ -56,6 +56,10 @@ jobs:
       run: |
         rockhopper --config rockhopper_mysql.yaml up
 
+    - name: Test Migration SQL Files For SQLite
+      run: |
+        rockhopper --config rockhopper_sqlite.yaml up
+
     - name: Build
       run: go build -v ./cmd/bbgo
 
