@@ -54,13 +54,16 @@ func (b Balance) String() (o string) {
 }
 
 type Asset struct {
-	Currency  string           `json:"currency" db:"currency"`
-	Total     fixedpoint.Value `json:"total" db:"total"`
-	InUSD     fixedpoint.Value `json:"inUSD" db:"inUSD"`
-	InBTC     fixedpoint.Value `json:"inBTC" db:"inBTC"`
-	Time      time.Time        `json:"time" db:"time"`
-	Locked    fixedpoint.Value `json:"lock" db:"lock" `
-	Available fixedpoint.Value `json:"available"  db:"available"`
+	Currency   string           `json:"currency" db:"currency"`
+	Total      fixedpoint.Value `json:"total" db:"total"`
+	InUSD      fixedpoint.Value `json:"inUSD" db:"in_usd"`
+	InBTC      fixedpoint.Value `json:"inBTC" db:"in_btc"`
+	Time       time.Time        `json:"time" db:"time"`
+	Locked     fixedpoint.Value `json:"lock" db:"lock" `
+	Available  fixedpoint.Value `json:"available"  db:"available"`
+	Borrowed   fixedpoint.Value `json:"borrowed" db:"borrowed"`
+	NetAsset   fixedpoint.Value `json:"netAsset" db:"net_asset"`
+	PriceInUSD fixedpoint.Value `json:"priceInUSD" db:"price_in_usd"`
 }
 
 type AssetMap map[string]Asset
