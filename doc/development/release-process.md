@@ -15,7 +15,7 @@ doc/release/v1.20.2.md
 Run changelog script to generate a changelog template:
 
 ```sh
-bash utils/changelog.sh
+bash utils/changelog.sh > doc/release/v1.20.2.md
 ```
 
 Edit your changelog.
