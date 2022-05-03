@@ -2,6 +2,7 @@ package okex
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -267,4 +268,11 @@ func toGlobalOrderType(orderType okexapi.OrderType) (types.OrderType, error) {
 
 	}
 	return "", fmt.Errorf("unknown or unsupported okex order type: %s", orderType)
+}
+
+func toLocalInterval(src string, ) string {
+	var re = regexp.MustCompile("\\d+[hdw]")
+	return re.ReplaceAllStringFunc(src, func(w string) string {
+		return strings.ToUpper(w)
+	})
 }

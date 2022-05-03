@@ -25,15 +25,15 @@ type Candle struct {
 type CandlesticksRequest struct {
 	client *RestClient
 
-	instId string
+	instId string `param:"instId"`
 
-	limit *int
+	limit *int `param:"limit"`
 
-	bar *string
+	bar *string `param:"bar"`
 
-	after *int64
+	after *int64 `param:"after,seconds"`
 
-	before *int64
+	before *int64 `param:"before,seconds"`
 }
 
 func (r *CandlesticksRequest) After(after int64) *CandlesticksRequest {
