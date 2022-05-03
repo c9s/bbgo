@@ -18,7 +18,7 @@ backtest:
   symbols:
   - BTCUSDT
   
-  account:
+  accounts:
     # the initial account balance you want to start with
     binance: # exchange name
       balances:
