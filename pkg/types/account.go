@@ -181,6 +181,7 @@ func (m BalanceMap) Copy() (d BalanceMap) {
 	return d
 }
 
+// Assets converts balances into assets with the given prices
 func (m BalanceMap) Assets(prices map[string]fixedpoint.Value) AssetMap {
 	assets := make(AssetMap)
 
@@ -193,9 +194,11 @@ func (m BalanceMap) Assets(prices map[string]fixedpoint.Value) AssetMap {
 		asset := Asset{
 			Currency:  currency,
 			Total:     b.Available.Add(b.Locked),
-			Time:      now,
 			Locked:    b.Locked,
 			Available: b.Available,
+			Borrowed:  b.Borrowed,
+			NetAsset:  b.NetAsset,
+			Time:      now,
 		}
 
 		btcusdt, hasBtcPrice := prices["BTCUSDT"]
@@ -207,8 +210,10 @@ func (m BalanceMap) Assets(prices map[string]fixedpoint.Value) AssetMap {
 
 				if strings.HasPrefix(market, "USD") {
 					asset.InUSD = asset.Total.Div(val)
+					asset.PriceInUSD = val
 				} else {
 					asset.InUSD = asset.Total.Mul(val)
+					asset.PriceInUSD = fixedpoint.One.Div(val)
 				}
 
 				if hasBtcPrice {
