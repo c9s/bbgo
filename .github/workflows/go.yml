@@ -15,8 +15,13 @@ jobs:
       matrix:
         redis-version:
         - 6.2
+    env:
+      DB_DATABASE: bbgo
+      DB_USER: root
+      DB_PASSWORD: root
 
     steps:
+
     - uses: actions/checkout@v2
 
     - uses: actions/cache@v2
@@ -28,7 +33,12 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-go-
 
-    - name: Setup redis
+    - name: Set up MySQL
+      run: |
+        sudo /etc/init.d/mysql start
+        mysql -e 'CREATE DATABASE ${{ env.DB_DATABASE }};' -u${{ env.DB_USER }} -p${{ env.DB_PASSWORD }}
+
+    - name: Set up redis
       uses: shogo82148/actions-setup-redis@v1
       with:
         redis-version: ${{ matrix.redis-version }}
