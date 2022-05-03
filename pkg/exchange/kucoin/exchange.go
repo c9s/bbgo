@@ -17,7 +17,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-var marketDataLimiter = rate.NewLimiter(rate.Every(1*time.Second), 1)
+var marketDataLimiter = rate.NewLimiter(rate.Every(5*time.Second), 1)
 var queryTradeLimiter = rate.NewLimiter(rate.Every(5*time.Second), 1)
 var queryOrderLimiter = rate.NewLimiter(rate.Every(5*time.Second), 1)
 
@@ -160,7 +160,9 @@ func (e *Exchange) IsSupportedInterval(interval types.Interval) bool {
 }
 
 func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
-	_ = marketDataLimiter.Wait(ctx)
+	if err := marketDataLimiter.Wait(ctx); err != nil {
+		return nil, err
+	}
 
 	req := e.client.MarketDataService.NewGetKLinesRequest()
 	req.Symbol(toLocalSymbol(symbol))
