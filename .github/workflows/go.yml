@@ -16,9 +16,9 @@ jobs:
         redis-version:
         - 6.2
     env:
-      DB_DATABASE: bbgo
-      DB_USER: root
-      DB_PASSWORD: root
+      MYSQL_DATABASE: bbgo
+      MYSQL_USER: "root"
+      MYSQL_PASSWORD: "root"
 
     steps:
 
@@ -36,7 +36,7 @@ jobs:
     - name: Set up MySQL
       run: |
         sudo /etc/init.d/mysql start
-        mysql -e 'CREATE DATABASE ${{ env.DB_DATABASE }};' -u${{ env.DB_USER }} -p${{ env.DB_PASSWORD }}
+        mysql -e 'CREATE DATABASE ${{ env.MYSQL_DATABASE }};' -u${{ env.MYSQL_USER }} -p${{ env.MYSQL_PASSWORD }}
 
     - name: Set up redis
       uses: shogo82148/actions-setup-redis@v1
@@ -51,6 +51,10 @@ jobs:
 
     - name: Install Migration Tool
       run: go install github.com/c9s/rockhopper/cmd/rockhopper@v1.2.1
+
+    - name: Test Migration SQL Files For MySQL
+      run: |
+        rockhopper --config rockhopper_mysql.yaml up
 
     - name: Build
       run: go build -v ./cmd/bbgo
