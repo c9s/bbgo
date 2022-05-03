@@ -15,7 +15,7 @@ func NewAccountService(db *sqlx.DB) *AccountService {
 	return &AccountService{DB: db}
 }
 
-func (s *AccountService) InsertAsset(time time.Time, name types.ExchangeName, account string, assets types.AssetMap) error {
+func (s *AccountService) InsertAsset(time time.Time, session string, name types.ExchangeName, account string, assets types.AssetMap) error {
 	if s.DB == nil {
 		// skip db insert when no db connection setting.
 		return nil
@@ -25,6 +25,7 @@ func (s *AccountService) InsertAsset(time time.Time, name types.ExchangeName, ac
 	for _, v := range assets {
 		_, _err := s.DB.Exec(`
 			INSERT INTO nav_history_details (
+			                 session,
 							 exchange,
 							 subaccount,
 							 time,
@@ -38,7 +39,7 @@ func (s *AccountService) InsertAsset(time time.Time, name types.ExchangeName, ac
 							 net_asset,
 							 price_in_usd)
 				values (?,?,?,?,?,?,?,?,?,?,?);
-		`, name, account, time, v.Currency, v.InUSD, v.InBTC, v.Total, v.Available, v.Locked, v.Borrowed, v.NetAsset, v.PriceInUSD)
+		`, session, name, account, time, v.Currency, v.InUSD, v.InBTC, v.Total, v.Available, v.Locked, v.Borrowed, v.NetAsset, v.PriceInUSD)
 
 		err = multierr.Append(err, _err) // successful request
 

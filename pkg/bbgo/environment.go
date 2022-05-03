@@ -649,6 +649,19 @@ func (environ *Environment) Sync(ctx context.Context, userConfig ...*Config) err
 	return nil
 }
 
+func (environ *Environment) RecordAsset(t time.Time, sessionName string, exchangeName types.ExchangeName, account string, assets types.AssetMap) {
+	// skip for back-test
+	if environ.BacktestService != nil {
+		return
+	}
+
+	if environ.DatabaseService == nil || environ.AccountService == nil {
+		return
+	}
+
+	environ.AccountService.InsertAsset(t, sessionName, exchangeName, account, assets)
+}
+
 func (environ *Environment) RecordPosition(position *types.Position, trade types.Trade, profit *types.Profit) {
 	// skip for back-test
 	if environ.BacktestService != nil {
