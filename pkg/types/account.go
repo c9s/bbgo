@@ -187,7 +187,7 @@ func (m BalanceMap) Assets(prices map[string]fixedpoint.Value) AssetMap {
 
 	now := time.Now()
 	for currency, b := range m {
-		if b.Locked.IsZero() && b.Available.IsZero() {
+		if b.Locked.IsZero() && b.Available.IsZero() && b.Borrowed.IsZero() {
 			continue
 		}
 
@@ -209,14 +209,18 @@ func (m BalanceMap) Assets(prices map[string]fixedpoint.Value) AssetMap {
 			if val, ok := prices[market]; ok {
 
 				if strings.HasPrefix(market, "USD") {
-					asset.InUSD = asset.Total.Div(val)
+					if !asset.Total.IsZero() {
+						asset.InUSD = asset.Total.Div(val)
+					}
 					asset.PriceInUSD = val
 				} else {
-					asset.InUSD = asset.Total.Mul(val)
+					if !asset.Total.IsZero() {
+						asset.InUSD = asset.Total.Mul(val)
+					}
 					asset.PriceInUSD = fixedpoint.One.Div(val)
 				}
 
-				if hasBtcPrice {
+				if hasBtcPrice && !asset.InUSD.IsZero() {
 					asset.InBTC = asset.InUSD.Div(btcusdt)
 				}
 			}
