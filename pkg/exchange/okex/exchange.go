@@ -15,7 +15,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-var marketDataLimiter = rate.NewLimiter(rate.Every(time.Second/20), 1)
+var marketDataLimiter = rate.NewLimiter(rate.Every(time.Second/10), 1)
 
 // OKB is the platform currency of OKEx, pre-allocate static string here
 const OKB = "OKB"
