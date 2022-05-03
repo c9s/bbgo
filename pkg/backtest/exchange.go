@@ -88,7 +88,7 @@ func NewExchange(sourceName types.ExchangeName, sourceExchange types.Exchange, s
 		// fallback to the legacy account syntax
 		configAccount, ok = config.Account[sourceName.String()]
 		if !ok {
-			return nil, errors.New("config backtest.accounts is not defined, please check your config file.")
+			return nil, fmt.Errorf("config backtest.accounts[%s] is not defined, please check your config file.", sourceName.String())
 		} else {
 			log.Warnf("config backtest.account is deprecated, please use backtest.accounts instead.")
 		}
