@@ -557,13 +557,6 @@ streambook.BindStream(stream)
 6. Push your changes to your fork.
 7. Send a pull request.
 
-### Setup frontend development environment
-
-```sh
-cd frontend
-yarn install
-```
-
 ### Testing Desktop App
 
 for webview
