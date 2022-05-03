@@ -40,6 +40,7 @@ func init() {
 	BacktestCmd.Flags().Bool("sync", false, "sync backtest data")
 	BacktestCmd.Flags().Bool("sync-only", false, "sync backtest data only, do not run backtest")
 	BacktestCmd.Flags().String("sync-from", "", "sync backtest data from the given time, which will override the time range in the backtest config")
+	BacktestCmd.Flags().String("sync-exchange", "", "specify only one exchange to sync backtest data")
 	BacktestCmd.Flags().Bool("verify", false, "verify the kline back-test data")
 
 	BacktestCmd.Flags().Bool("base-asset-baseline", false, "use base asset performance as the competitive baseline performance")
@@ -79,6 +80,11 @@ var BacktestCmd = &cobra.Command{
 		}
 
 		wantSync, err := cmd.Flags().GetBool("sync")
+		if err != nil {
+			return err
+		}
+
+		syncExchangeName, err := cmd.Flags().GetString("sync-exchange")
 		if err != nil {
 			return err
 		}
@@ -161,7 +167,19 @@ var BacktestCmd = &cobra.Command{
 		environ.BacktestService = backtestService
 
 		var sourceExchanges = make(map[types.ExchangeName]types.Exchange)
-		if len(userConfig.Backtest.Sessions) > 0 {
+		if len(syncExchangeName) > 0 {
+			exName, err := types.ValidExchangeName(syncExchangeName)
+			if err != nil {
+				return err
+			}
+
+			publicExchange, err := cmdutil.NewExchangePublic(exName)
+			if err != nil {
+				return err
+			}
+			sourceExchanges[exName] = publicExchange
+
+		} else if len(userConfig.Backtest.Sessions) > 0 {
 			for _, name := range userConfig.Backtest.Sessions {
 				exName, err := types.ValidExchangeName(name)
 				if err != nil {
@@ -175,6 +193,7 @@ var BacktestCmd = &cobra.Command{
 				sourceExchanges[exName] = publicExchange
 			}
 		} else {
+			log.Infof("backtest.sessions is not defined, loading all supported exchanges: %v", types.SupportedExchanges)
 			for _, exName := range types.SupportedExchanges {
 				publicExchange, err := cmdutil.NewExchangePublic(exName)
 				if err != nil {
