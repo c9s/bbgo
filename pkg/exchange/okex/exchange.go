@@ -8,11 +8,14 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
-	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
 )
+
+var marketDataLimiter = rate.NewLimiter(rate.Every(time.Second/20), 1)
 
 // OKB is the platform currency of OKEx, pre-allocate static string here
 const OKB = "OKB"
@@ -272,15 +275,21 @@ func (e *Exchange) NewStream() types.Stream {
 }
 
 func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
+	if err := marketDataLimiter.Wait(ctx) ; err != nil {
+		return nil, err
+	}
+
+	intervalParam := toLocalInterval(interval.String())
+
 	req := e.client.MarketDataService.NewCandlesticksRequest(toLocalSymbol(symbol))
-	req.Bar(interval.String())
+	req.Bar(intervalParam)
 
 	if options.StartTime != nil {
-		req.After(options.StartTime.UnixNano() / int64(time.Millisecond))
+		req.After(options.StartTime.Unix())
 	}
 
 	if options.EndTime != nil {
-		req.Before(options.EndTime.UnixNano() / int64(time.Millisecond))
+		req.Before(options.EndTime.Unix())
 	}
 
 	candles, err := req.Do(ctx)
