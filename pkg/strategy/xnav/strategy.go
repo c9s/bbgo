@@ -78,7 +78,6 @@ var Ten = fixedpoint.NewFromInt(10)
 func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {}
 
 func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]*bbgo.ExchangeSession) {
-	totalAssets := types.AssetMap{}
 	totalBalances := types.BalanceMap{}
 	allPrices := map[string]fixedpoint.Value{}
 	sessionBalances := map[string]types.BalanceMap{}
@@ -113,19 +112,20 @@ func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]
 		s.Environment.RecordAsset(priceTime, session, assets)
 	}
 
-	allAssets := totalBalances.Assets(allPrices, priceTime)
-	for currency, asset := range allAssets {
+	displayAssets := types.AssetMap{}
+	totalAssets := totalBalances.Assets(allPrices, priceTime)
+	s.Environment.RecordAsset(priceTime, &bbgo.ExchangeSession{Name: "ALL"}, totalAssets)
+
+	for currency, asset := range totalAssets {
 		// calculated if it's dust only when InUSD (usd value) is defined.
 		if s.IgnoreDusts && !asset.InUSD.IsZero() && asset.InUSD.Compare(Ten) < 0 {
 			continue
 		}
 
-		totalAssets[currency] = asset
+		displayAssets[currency] = asset
 	}
 
-	s.Environment.RecordAsset(priceTime, &bbgo.ExchangeSession{Name: "ALL"}, totalAssets)
-
-	s.Notifiability.Notify(totalAssets)
+	s.Notifiability.Notify(displayAssets)
 
 	if s.state != nil {
 		if s.state.IsOver24Hours() {
@@ -196,7 +196,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	}
 
 	// TODO: if interval is supported, we can use kline as the ticker
-	if _, ok := types.SupportedIntervals[s.Interval] ; ok {
+	if _, ok := types.SupportedIntervals[s.Interval]; ok {
 
 	}
 
