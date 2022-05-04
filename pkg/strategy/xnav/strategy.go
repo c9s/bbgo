@@ -8,7 +8,7 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -20,6 +20,8 @@ import (
 const ID = "xnav"
 
 const stateKey = "state-v1"
+
+var log = logrus.WithField("strategy", ID)
 
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
@@ -59,6 +61,7 @@ type Strategy struct {
 	Notifiability *bbgo.Notifiability
 	*bbgo.Graceful
 	*bbgo.Persistence
+	*bbgo.Environment
 
 	Interval      types.Duration `json:"interval"`
 	ReportOnStart bool           `json:"reportOnStart"`
@@ -77,43 +80,40 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {}
 func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]*bbgo.ExchangeSession) {
 	totalAssets := types.AssetMap{}
 	totalBalances := types.BalanceMap{}
-	totalBorrowed := map[string]fixedpoint.Value{}
-	lastPrices := map[string]fixedpoint.Value{}
-	for _, session := range sessions {
-		if err := session.UpdateAccount(ctx) ; err != nil {
+	allPrices := map[string]fixedpoint.Value{}
+	sessionBalances := map[string]types.BalanceMap{}
+	priceTime := time.Now()
+
+	// iterate the sessions and record them
+	for sessionName, session := range sessions {
+		// update the account balances and the margin information
+		if err := session.UpdateAccount(ctx); err != nil {
 			log.WithError(err).Errorf("can not update account")
 			return
 		}
 
 		account := session.GetAccount()
 		balances := account.Balances()
-		if err := session.UpdatePrices(ctx); err != nil {
+		if err := session.UpdatePrices(ctx, balances.Currencies(), "USDT"); err != nil {
 			log.WithError(err).Error("price update failed")
 			return
 		}
 
-		for _, b := range balances {
-			if tb, ok := totalBalances[b.Currency]; ok {
-				tb.Available = tb.Available.Add(b.Available)
-				tb.Locked = tb.Locked.Add(b.Locked)
-				totalBalances[b.Currency] = tb
-
-				if b.Borrowed.Sign() > 0  {
-					totalBorrowed[b.Currency] = totalBorrowed[b.Currency].Add(b.Borrowed)
-				}
-			} else {
-				totalBalances[b.Currency] = b
-				totalBorrowed[b.Currency] = b.Borrowed
-			}
-		}
+		sessionBalances[sessionName] = balances
+		totalBalances = totalBalances.Add(balances)
 
 		prices := session.LastPrices()
+		assets := balances.Assets(prices, priceTime)
+
+		// merge prices
 		for m, p := range prices {
-			lastPrices[m] = p
+			allPrices[m] = p
 		}
+
+		s.Environment.RecordAsset(priceTime, sessionName, session.ExchangeName, session.SubAccount, assets)
 	}
 
-	assets := totalBalances.Assets(lastPrices)
+	assets := totalBalances.Assets(allPrices, time.Now())
 	for currency, asset := range assets {
 		// calculated if it's dust only when InUSD (usd value) is defined.
 		if s.IgnoreDusts && !asset.InUSD.IsZero() && asset.InUSD.Compare(Ten) < 0 {
@@ -122,6 +122,8 @@ func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]
 
 		totalAssets[currency] = asset
 	}
+
+	s.Environment.RecordAsset(priceTime, "ALL", "", "", totalAssets)
 
 	s.Notifiability.Notify(totalAssets)
 
@@ -187,6 +189,10 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 	if s.ReportOnStart {
 		s.recordNetAssetValue(ctx, sessions)
+	}
+
+	if s.Environment.BacktestService != nil {
+		log.Warnf("xnav does not support backtesting")
 	}
 
 	go func() {
