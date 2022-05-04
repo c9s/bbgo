@@ -23,7 +23,7 @@ func TestAccountService(t *testing.T) {
 	service := &AccountService{DB: xdb}
 
 	t1 := time.Now()
-	err = service.InsertAsset(t1, "binance", types.ExchangeBinance, "main", types.AssetMap{
+	err = service.InsertAsset(t1, "binance", types.ExchangeBinance, "main", false, false, "", types.AssetMap{
 		"BTC": types.Asset{
 			Currency:   "BTC",
 			Total:      fixedpoint.MustNewFromString("1.0"),
