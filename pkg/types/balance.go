@@ -123,12 +123,12 @@ func (m BalanceMap) Assets(prices map[string]fixedpoint.Value, priceTime time.Ti
 					if !asset.Total.IsZero() {
 						asset.InUSD = asset.Total.Div(usdPrice)
 					}
-					asset.PriceInUSD = usdPrice
+					asset.PriceInUSD = fixedpoint.One.Div(usdPrice)
 				} else {
 					if !asset.Total.IsZero() {
 						asset.InUSD = asset.Total.Mul(usdPrice)
 					}
-					asset.PriceInUSD = fixedpoint.One.Div(usdPrice)
+					asset.PriceInUSD = usdPrice
 				}
 
 				if hasBtcPrice && !asset.InUSD.IsZero() {
