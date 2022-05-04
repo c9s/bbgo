@@ -129,13 +129,13 @@ func (m BalanceMap) Assets(prices map[string]fixedpoint.Value, priceTime time.Ti
 			if market, usdPrice, ok := findUSDMarketPrice(currency, prices); ok {
 				// this includes USDT, USD, USDC and so on
 				if strings.HasPrefix(market, "USD") { // for prices like USDT/TWD
-					if !asset.Total.IsZero() {
-						asset.InUSD = asset.Total.Div(usdPrice)
+					if !asset.NetAsset.IsZero() {
+						asset.InUSD = asset.NetAsset.Div(usdPrice)
 					}
 					asset.PriceInUSD = fixedpoint.One.Div(usdPrice)
 				} else { // for prices like BTC/USDT
-					if !asset.Total.IsZero() {
-						asset.InUSD = asset.Total.Mul(usdPrice)
+					if !asset.NetAsset.IsZero() {
+						asset.InUSD = asset.NetAsset.Mul(usdPrice)
 					}
 					asset.PriceInUSD = usdPrice
 				}
