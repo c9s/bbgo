@@ -242,7 +242,7 @@ func (s *Slack) listen(ctx context.Context) {
 				innerEvent := eventsAPIEvent.InnerEvent
 				switch ev := innerEvent.Data.(type) {
 				case *slackevents.MessageEvent:
-					log.Infof("message event: text=%+v", ev.Text)
+					log.Debugf("message event: text=%+v", ev.Text)
 
 					if len(ev.BotID) > 0 {
 						log.Debug("skip bot message")

@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/slack-go/slack"
+
 	"github.com/c9s/bbgo/pkg/cache"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -646,21 +648,18 @@ func (session *ExchangeSession) FormatOrder(order types.SubmitOrder) (types.Subm
 	return order, nil
 }
 
-func (session *ExchangeSession) UpdatePrices(ctx context.Context) (err error) {
+func (session *ExchangeSession) UpdatePrices(ctx context.Context, currencies []string, fiat string) (err error) {
 	if session.lastPriceUpdatedAt.After(time.Now().Add(-time.Hour)) {
 		return nil
 	}
 
-	balances := session.GetAccount().Balances()
-
 	var symbols []string
-	for _, b := range balances {
-		symbols = append(symbols, b.Currency+"USDT")
-		symbols = append(symbols, "USDT"+b.Currency)
+	for _, c := range currencies {
+		symbols = append(symbols, c+fiat) // BTC/USDT
+		symbols = append(symbols, fiat+c) // USDT/TWD
 	}
 
 	tickers, err := session.Exchange.QueryTickers(ctx, symbols...)
-
 	if err != nil || len(tickers) == 0 {
 		return err
 	}
@@ -668,12 +667,7 @@ func (session *ExchangeSession) UpdatePrices(ctx context.Context) (err error) {
 	var lastTime time.Time
 	for k, v := range tickers {
 		// for {Crypto}/USDT markets
-		if strings.HasSuffix(k, "USDT") {
-			session.lastPrices[k] = v.Last
-		} else if strings.HasPrefix(k, "USDT") {
-			session.lastPrices[k] = fixedpoint.One.Div(v.Last)
-		}
-
+		session.lastPrices[k] = v.Last
 		if v.Time.After(lastTime) {
 			lastTime = v.Time
 		}
@@ -928,4 +922,17 @@ func (session *ExchangeSession) bindConnectionStatusNotification(stream types.St
 	stream.OnConnect(func() {
 		session.Notifiability.Notify("session %s %s stream connected", session.Name, streamName)
 	})
+}
+
+func (session *ExchangeSession) SlackAttachment() slack.Attachment {
+	var fields []slack.AttachmentField
+	var footerIcon = types.ExchangeFooterIcon(session.ExchangeName)
+	return slack.Attachment{
+		// Pretext:       "",
+		// Text:  text,
+		Title:  session.Name,
+		Fields: fields,
+		FooterIcon: footerIcon,
+		Footer: util.Render("update time {{ . }}", time.Now().Format(time.RFC822)),
+	}
 }

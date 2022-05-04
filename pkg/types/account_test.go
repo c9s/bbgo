@@ -8,6 +8,19 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
+func TestBalanceMap_Add(t *testing.T) {
+	var bm = BalanceMap{}
+	var bm2 = bm.Add(BalanceMap{
+		"BTC": Balance{
+			Currency:  "BTC",
+			Available: fixedpoint.MustNewFromString("10.0"),
+			Locked:    fixedpoint.MustNewFromString("0"),
+			NetAsset:  fixedpoint.MustNewFromString("10.0"),
+		},
+	})
+	assert.Len(t, bm2, 1)
+}
+
 func TestAccountLockAndUnlock(t *testing.T) {
 	a := NewAccount()
 	a.AddBalance("USDT", fixedpoint.NewFromInt(1000))
