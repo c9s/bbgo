@@ -49,6 +49,12 @@ spec:
           {{- if .Values.webserver.enabled }}
           - "--enable-webserver"
           {{- end }}
+          {{- if .Values.grpc.enabled }}
+          - "--enable-grpc"
+          {{- end }}
+          {{- if .Values.debug.enabled }}
+          - "--debug"
+          {{- end }}
 
           ports:
           {{- if .Values.webserver.enabled }}
