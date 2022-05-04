@@ -27,6 +27,15 @@ func (b Balance) Total() fixedpoint.Value {
 	return b.Available.Add(b.Locked)
 }
 
+func (b Balance) Net() fixedpoint.Value {
+	total := b.Total()
+	netAsset := b.NetAsset
+	if netAsset.IsZero() {
+		netAsset = total.Sub(b.Borrowed)
+	}
+	return netAsset
+}
+
 func (b Balance) String() (o string) {
 	o = fmt.Sprintf("%s: %s", b.Currency, b.Available.String())
 
@@ -88,17 +97,16 @@ func (m BalanceMap) Copy() (d BalanceMap) {
 // Assets converts balances into assets with the given prices
 func (m BalanceMap) Assets(prices map[string]fixedpoint.Value, priceTime time.Time) AssetMap {
 	assets := make(AssetMap)
-	btcusdt, hasBtcPrice := prices["BTCUSDT"]
+
+	_, btcInUSD, hasBtcPrice := findUSDMarketPrice("BTC", prices)
+
 	for currency, b := range m {
 		if b.Locked.IsZero() && b.Available.IsZero() && b.Borrowed.IsZero() {
 			continue
 		}
 
-		total := b.Available.Add(b.Locked)
-		netAsset := b.NetAsset
-		if netAsset.IsZero() {
-			netAsset = total.Sub(b.Borrowed)
-		}
+		total := b.Total()
+		netAsset := b.Net()
 
 		asset := Asset{
 			Currency:  currency,
@@ -114,7 +122,7 @@ func (m BalanceMap) Assets(prices map[string]fixedpoint.Value, priceTime time.Ti
 			asset.InUSD = netAsset
 			asset.PriceInUSD = fixedpoint.One
 			if hasBtcPrice && !asset.InUSD.IsZero() {
-				asset.InBTC = asset.InUSD.Div(btcusdt)
+				asset.InBTC = asset.InUSD.Div(btcInUSD)
 			}
 		} else { // for crypto
 			if market, usdPrice, ok := findUSDMarketPrice(currency, prices); ok {
@@ -132,7 +140,7 @@ func (m BalanceMap) Assets(prices map[string]fixedpoint.Value, priceTime time.Ti
 				}
 
 				if hasBtcPrice && !asset.InUSD.IsZero() {
-					asset.InBTC = asset.InUSD.Div(btcusdt)
+					asset.InBTC = asset.InUSD.Div(btcInUSD)
 				}
 			}
 		}
