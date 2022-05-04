@@ -211,14 +211,20 @@ func (m BalanceMap) Assets(prices map[string]fixedpoint.Value, priceTime time.Ti
 			continue
 		}
 
+		total := b.Available.Add(b.Locked)
+		netAsset := b.NetAsset
+		if netAsset.IsZero() {
+			netAsset = total.Sub(b.Borrowed)
+		}
+
 		asset := Asset{
 			Currency:  currency,
-			Total:     b.Available.Add(b.Locked),
+			Total:     total,
 			Time:      priceTime,
 			Locked:    b.Locked,
 			Available: b.Available,
 			Borrowed:  b.Borrowed,
-			NetAsset:  b.NetAsset,
+			NetAsset:  netAsset,
 		}
 
 		usdMarkets := []string{currency + "USDT", currency + "USDC", currency + "USD", "USDT" + currency}
