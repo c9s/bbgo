@@ -14,13 +14,13 @@ type Asset struct {
 	Currency string           `json:"currency" db:"currency"`
 	Total    fixedpoint.Value `json:"total" db:"total"`
 
-	NetAsset   fixedpoint.Value `json:"netAsset" db:"net_asset"`
+	NetAsset fixedpoint.Value `json:"netAsset" db:"net_asset"`
 
 	// InUSD is net asset in USD
 	InUSD fixedpoint.Value `json:"inUSD" db:"net_asset_in_usd"`
 
 	// InBTC is net asset in BTC
-	InBTC      fixedpoint.Value `json:"inBTC" db:"net_asset_in_btc"`
+	InBTC fixedpoint.Value `json:"inBTC" db:"net_asset_in_btc"`
 
 	Time       time.Time        `json:"time" db:"time"`
 	Locked     fixedpoint.Value `json:"lock" db:"lock" `
@@ -76,7 +76,7 @@ func (m AssetMap) Slice() (assets []Asset) {
 
 func (m AssetMap) SlackAttachment() slack.Attachment {
 	var fields []slack.AttachmentField
-	var totalBTC, totalUSD fixedpoint.Value
+	var netAssetInBTC, netAssetInUSD fixedpoint.Value
 
 	var assets = m.Slice()
 
@@ -86,26 +86,38 @@ func (m AssetMap) SlackAttachment() slack.Attachment {
 	})
 
 	for _, a := range assets {
-		totalUSD = totalUSD.Add(a.InUSD)
-		totalBTC = totalBTC.Add(a.InBTC)
+		netAssetInUSD = netAssetInUSD.Add(a.InUSD)
+		netAssetInBTC = netAssetInBTC.Add(a.InBTC)
 	}
 
 	for _, a := range assets {
 		if !a.InUSD.IsZero() {
+			text := fmt.Sprintf("%s (≈ %s) (≈ %s) (%s)",
+				a.NetAsset.String(),
+				USD.FormatMoney(a.InUSD),
+				BTC.FormatMoney(a.InBTC),
+				a.InUSD.Div(netAssetInUSD).FormatPercentage(2),
+			)
+
+			if !a.Borrowed.IsZero() {
+				text += fmt.Sprintf(" Borrowed: %s", a.Borrowed.String())
+			}
+
 			fields = append(fields, slack.AttachmentField{
 				Title: a.Currency,
-				Value: fmt.Sprintf("%s (≈ %s) (≈ %s) (%s)",
-					a.Total.String(),
-					USD.FormatMoney(a.InUSD),
-					BTC.FormatMoney(a.InBTC),
-					a.InUSD.Div(totalUSD).FormatPercentage(2),
-				),
+				Value: text,
 				Short: false,
 			})
 		} else {
+			text := fmt.Sprintf("%s", a.NetAsset.String())
+
+			if !a.Borrowed.IsZero() {
+				text += fmt.Sprintf(" Borrowed: %s", a.Borrowed.String())
+			}
+
 			fields = append(fields, slack.AttachmentField{
 				Title: a.Currency,
-				Value: fmt.Sprintf("%s", a.Total.String()),
+				Value: text,
 				Short: false,
 			})
 		}
@@ -113,8 +125,8 @@ func (m AssetMap) SlackAttachment() slack.Attachment {
 
 	return slack.Attachment{
 		Title: fmt.Sprintf("Net Asset Value %s (≈ %s)",
-			USD.FormatMoney(totalUSD),
-			BTC.FormatMoney(totalBTC),
+			USD.FormatMoney(netAssetInUSD),
+			BTC.FormatMoney(netAssetInBTC),
 		),
 		Fields: fields,
 	}
