@@ -17,15 +17,15 @@ A trading bot framework written in Go. The name bbgo comes from the BB8 bot in t
 
 ## What You Can Do With BBGO
 
-### Trading Bot Users
+### Trading Bot Users 💁‍♀️ 💁‍♂️
 
 You can use BBGO to run the built-in strategies.
 
-### Strategy Developers
+### Strategy Developers 🥷
 
 You can use BBGO's trading unit and back-test unit to implement your own strategies.
 
-### Trading Unit Developers
+### Trading Unit Developers 🧑‍💻
 
 You can use BBGO's underlying common exchange API, currently it supports 4+ major exchanges, so you don't have to repeat the implementation.
 
