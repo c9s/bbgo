@@ -1,7 +1,9 @@
 -- +up
 -- +begin
 ALTER TABLE `nav_history_details`
-    MODIFY COLUMN `net_asset` DECIMAL(32, 8) DEFAULT 0.00000000 NOT NULL;
+    MODIFY COLUMN `net_asset` DECIMAL(32, 8) DEFAULT 0.00000000 NOT NULL,
+    MODIFY COLUMN `balance_in_usd` DECIMAL(32, 2) DEFAULT 0.00000000 NOT NULL,
+    MODIFY COLUMN `balance_in_btc` DECIMAL(32, 20) DEFAULT 0.00000000 NOT NULL;
 -- +end
 
 -- +begin
