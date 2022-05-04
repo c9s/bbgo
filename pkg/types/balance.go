@@ -108,12 +108,11 @@ func (m BalanceMap) Assets(prices map[string]fixedpoint.Value, priceTime time.Ti
 	_, btcInUSD, hasBtcPrice := findUSDMarketPrice("BTC", prices)
 
 	for currency, b := range m {
-		if b.Locked.IsZero() && b.Available.IsZero() && b.Borrowed.IsZero() {
-			continue
-		}
-
 		total := b.Total()
 		netAsset := b.Net()
+		if total.IsZero() && netAsset.IsZero() {
+			continue
+		}
 
 		asset := Asset{
 			Currency:  currency,
@@ -122,6 +121,7 @@ func (m BalanceMap) Assets(prices map[string]fixedpoint.Value, priceTime time.Ti
 			Locked:    b.Locked,
 			Available: b.Available,
 			Borrowed:  b.Borrowed,
+			Interest:  b.Interest,
 			NetAsset:  netAsset,
 		}
 
