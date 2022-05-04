@@ -212,41 +212,37 @@ func (m BalanceMap) Assets(prices map[string]fixedpoint.Value, priceTime time.Ti
 		}
 
 		asset := Asset{
-			Currency:   currency,
-			Total:      b.Available.Add(b.Locked),
-			Time:       priceTime,
-			Locked:     b.Locked,
-			Available:  b.Available,
-			Borrowed:   b.Borrowed,
-			NetAsset:   b.NetAsset,
+			Currency:  currency,
+			Total:     b.Available.Add(b.Locked),
+			Time:      priceTime,
+			Locked:    b.Locked,
+			Available: b.Available,
+			Borrowed:  b.Borrowed,
+			NetAsset:  b.NetAsset,
 		}
 
 		usdMarkets := []string{currency + "USDT", currency + "USDC", currency + "USD", "USDT" + currency}
 		for _, market := range usdMarkets {
-			usdPrice, ok := prices[market]
-			if !ok {
-				continue
-			}
-
-			// this includes USDT, USD, USDC and so on
-			if strings.HasPrefix(market, "USD") {
-				if !asset.Total.IsZero() {
-					asset.InUSD = asset.Total.Div(usdPrice)
+			if usdPrice, ok := prices[market] ; ok {
+				// this includes USDT, USD, USDC and so on
+				if strings.HasPrefix(market, "USD") {
+					if !asset.Total.IsZero() {
+						asset.InUSD = asset.Total.Div(usdPrice)
+					}
+					asset.PriceInUSD = usdPrice
+				} else {
+					if !asset.Total.IsZero() {
+						asset.InUSD = asset.Total.Mul(usdPrice)
+					}
+					asset.PriceInUSD = fixedpoint.One.Div(usdPrice)
 				}
-				asset.PriceInUSD = usdPrice
-			} else {
-				if !asset.Total.IsZero() {
-					asset.InUSD = asset.Total.Mul(usdPrice)
-				}
-				asset.PriceInUSD = fixedpoint.One.Div(usdPrice)
-			}
 
-			if hasBtcPrice && !asset.InUSD.IsZero() {
-				asset.InBTC = asset.InUSD.Div(btcusdt)
+				if hasBtcPrice && !asset.InUSD.IsZero() {
+					asset.InBTC = asset.InUSD.Div(btcusdt)
+				}
 			}
+			assets[currency] = asset
 		}
-
-		assets[currency] = asset
 	}
 
 	return assets
@@ -311,8 +307,6 @@ type Account struct {
 
 	balances BalanceMap
 }
-
-
 
 type FuturesAccountInfo struct {
 	// Futures fields
