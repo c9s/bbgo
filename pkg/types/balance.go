@@ -107,9 +107,14 @@ func (m BalanceMap) Assets(prices map[string]fixedpoint.Value, priceTime time.Ti
 			NetAsset:  netAsset,
 		}
 
-		usdMarkets := []string{currency + "USDT", currency + "USDC", currency + "USD", "USDT" + currency}
-		for _, market := range usdMarkets {
-			if usdPrice, ok := prices[market]; ok {
+		if strings.HasPrefix(currency,"USD") { // for usd
+			asset.InUSD = netAsset
+			asset.PriceInUSD = fixedpoint.One
+			if hasBtcPrice && !asset.InUSD.IsZero() {
+				asset.InBTC = asset.InUSD.Div(btcusdt)
+			}
+		} else { // for crypto
+			if market, usdPrice, ok := findUSDMarketPrice(currency, prices) ; ok {
 				// this includes USDT, USD, USDC and so on
 				if strings.HasPrefix(market, "USD") {
 					if !asset.Total.IsZero() {
@@ -127,8 +132,9 @@ func (m BalanceMap) Assets(prices map[string]fixedpoint.Value, priceTime time.Ti
 					asset.InBTC = asset.InUSD.Div(btcusdt)
 				}
 			}
-			assets[currency] = asset
 		}
+
+		assets[currency] = asset
 	}
 
 	return assets
@@ -148,3 +154,13 @@ func (m BalanceMap) Print() {
 	}
 }
 
+
+func findUSDMarketPrice(currency string, prices map[string]fixedpoint.Value) (string, fixedpoint.Value, bool) {
+	usdMarkets := []string{currency + "USDT", currency + "USDC", currency + "USD", "USDT" + currency}
+	for _, market := range usdMarkets {
+		if usdPrice, ok := prices[market]; ok {
+			return market, usdPrice, ok
+		}
+	}
+	return "", fixedpoint.Zero, false
+}
