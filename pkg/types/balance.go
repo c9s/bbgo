@@ -31,8 +31,9 @@ func (b Balance) Net() fixedpoint.Value {
 	total := b.Total()
 	netAsset := b.NetAsset
 	if netAsset.IsZero() {
-		netAsset = total.Sub(b.Borrowed)
+		netAsset = total.Sub(b.Borrowed).Sub(b.Interest)
 	}
+
 	return netAsset
 }
 

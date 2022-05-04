@@ -2,16 +2,16 @@
 -- +begin
 CREATE TABLE `nav_history_details`
 (
-    gid    bigint unsigned auto_increment PRIMARY KEY,
-    `exchange`          VARCHAR             NOT NULL DEFAULT '',
-    `subaccount`          VARCHAR             NOT NULL DEFAULT '',
-    time   DATETIME(3)     NOT NULL DEFAULT (strftime('%s','now')),
-    currency     VARCHAR                                NOT NULL,
-    balance_in_usd DECIMAL DEFAULT 0.00000000 NOT NULL,
-    balance_in_btc DECIMAL DEFAULT 0.00000000 NOT NULL,
-    balance    DECIMAL DEFAULT 0.00000000 NOT NULL,
-    available  DECIMAL DEFAULT 0.00000000 NOT NULL,
-    locked     DECIMAL DEFAULT 0.00000000 NOT NULL
+    `gid`              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `exchange`         VARCHAR(30)                NOT NULL DEFAULT '',
+    `subaccount`       VARCHAR(30)                NOT NULL DEFAULT '',
+    `time`             DATETIME(3)                NOT NULL DEFAULT (strftime('%s', 'now')),
+    `currency`         VARCHAR(30)                NOT NULL,
+    `net_asset_in_usd` DECIMAL DEFAULT 0.00000000 NOT NULL,
+    `net_asset_in_btc` DECIMAL DEFAULT 0.00000000 NOT NULL,
+    `balance`          DECIMAL DEFAULT 0.00000000 NOT NULL,
+    `available`        DECIMAL DEFAULT 0.00000000 NOT NULL,
+    `locked`           DECIMAL DEFAULT 0.00000000 NOT NULL
 );
 -- +end
 -- +begin
