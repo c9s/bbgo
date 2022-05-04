@@ -14,13 +14,13 @@ type Asset struct {
 	Currency string           `json:"currency" db:"currency"`
 	Total    fixedpoint.Value `json:"total" db:"total"`
 
-	NetAsset   fixedpoint.Value `json:"netAsset" db:"net_asset"`
+	NetAsset fixedpoint.Value `json:"netAsset" db:"net_asset"`
 
 	// InUSD is net asset in USD
 	InUSD fixedpoint.Value `json:"inUSD" db:"net_asset_in_usd"`
 
 	// InBTC is net asset in BTC
-	InBTC      fixedpoint.Value `json:"inBTC" db:"net_asset_in_btc"`
+	InBTC fixedpoint.Value `json:"inBTC" db:"net_asset_in_btc"`
 
 	Time       time.Time        `json:"time" db:"time"`
 	Locked     fixedpoint.Value `json:"lock" db:"lock" `
