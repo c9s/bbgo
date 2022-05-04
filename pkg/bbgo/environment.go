@@ -649,7 +649,7 @@ func (environ *Environment) Sync(ctx context.Context, userConfig ...*Config) err
 	return nil
 }
 
-func (environ *Environment) RecordAsset(t time.Time, sessionName string, exchangeName types.ExchangeName, account string, assets types.AssetMap) {
+func (environ *Environment) RecordAsset(t time.Time, session *ExchangeSession, assets types.AssetMap) {
 	// skip for back-test
 	if environ.BacktestService != nil {
 		return
@@ -659,7 +659,15 @@ func (environ *Environment) RecordAsset(t time.Time, sessionName string, exchang
 		return
 	}
 
-	if err := environ.AccountService.InsertAsset(t, sessionName, exchangeName, account, assets); err != nil {
+	if err := environ.AccountService.InsertAsset(
+		t,
+		session.Name,
+		session.ExchangeName,
+		session.SubAccount,
+		session.Margin,
+		session.IsolatedMargin,
+		session.IsolatedMarginSymbol,
+		assets); err != nil {
 		log.WithError(err).Errorf("can not insert asset record")
 	}
 }

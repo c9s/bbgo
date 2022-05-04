@@ -15,7 +15,8 @@ func NewAccountService(db *sqlx.DB) *AccountService {
 	return &AccountService{DB: db}
 }
 
-func (s *AccountService) InsertAsset(time time.Time, session string, name types.ExchangeName, account string, assets types.AssetMap) error {
+// TODO: should pass bbgo.ExchangeSession to this function, but that might cause cyclic import
+func (s *AccountService) InsertAsset(time time.Time, session string, name types.ExchangeName, account string, isMargin bool, isIsolatedMargin bool, isolatedMarginSymbol string, assets types.AssetMap) error {
 	if s.DB == nil {
 		// skip db insert when no db connection setting.
 		return nil
@@ -37,9 +38,25 @@ func (s *AccountService) InsertAsset(time time.Time, session string, name types.
 							 locked,
 							 borrowed,
 							 net_asset,
-							 price_in_usd)
-				values (?,?,?,?,?,?,?,?,?,?,?,?,?);
-		`, session, name, account, time, v.Currency, v.InUSD, v.InBTC, v.Total, v.Available, v.Locked, v.Borrowed, v.NetAsset, v.PriceInUSD)
+							 price_in_usd,
+			                 is_margin, is_isolated, isolated_symbol)
+				values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);`,
+				session,
+				name,
+				account,
+				time,
+				v.Currency,
+				v.InUSD,
+				v.InBTC,
+				v.Total,
+				v.Available,
+				v.Locked,
+				v.Borrowed,
+				v.NetAsset,
+				v.PriceInUSD,
+				isMargin,
+				isIsolatedMargin,
+				isolatedMarginSymbol)
 
 		err = multierr.Append(err, _err) // successful request
 
