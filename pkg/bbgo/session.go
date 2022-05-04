@@ -649,9 +649,10 @@ func (session *ExchangeSession) FormatOrder(order types.SubmitOrder) (types.Subm
 }
 
 func (session *ExchangeSession) UpdatePrices(ctx context.Context, currencies []string, fiat string) (err error) {
-	if session.lastPriceUpdatedAt.After(time.Now().Add(-time.Hour)) {
-		return nil
-	}
+	// TODO: move this cache check to the http routes
+	// if session.lastPriceUpdatedAt.After(time.Now().Add(-time.Hour)) {
+	// 	return nil
+	// }
 
 	var symbols []string
 	for _, c := range currencies {
