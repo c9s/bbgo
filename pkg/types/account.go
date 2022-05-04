@@ -164,6 +164,27 @@ type MarginAssetMap map[string]MarginUserAsset
 type FuturesAssetMap map[string]FuturesUserAsset
 type FuturesPositionMap map[string]FuturesPosition
 
+func (m BalanceMap) Currencies() (currencies []string) {
+	for _, b := range m {
+		currencies = append(currencies, b.Currency)
+	}
+	return currencies
+}
+
+func (m BalanceMap) Add(bm BalanceMap) BalanceMap {
+	var total = BalanceMap{}
+	for _, b := range bm {
+		tb := total[b.Currency]
+		tb.Available = tb.Available.Add(b.Available)
+		tb.Locked = tb.Locked.Add(b.Locked)
+		tb.Borrowed = tb.Borrowed.Add(b.Borrowed)
+		tb.NetAsset = tb.NetAsset.Add(b.NetAsset)
+		tb.Interest = tb.Interest.Add(b.Interest)
+		total[b.Currency] = tb
+	}
+	return total
+}
+
 func (m BalanceMap) String() string {
 	var ss []string
 	for _, b := range m {
@@ -182,10 +203,9 @@ func (m BalanceMap) Copy() (d BalanceMap) {
 }
 
 // Assets converts balances into assets with the given prices
-func (m BalanceMap) Assets(prices map[string]fixedpoint.Value) AssetMap {
+func (m BalanceMap) Assets(prices map[string]fixedpoint.Value, priceTime time.Time) AssetMap {
 	assets := make(AssetMap)
-
-	now := time.Now()
+	btcusdt, hasBtcPrice := prices["BTCUSDT"]
 	for currency, b := range m {
 		if b.Locked.IsZero() && b.Available.IsZero() && b.Borrowed.IsZero() {
 			continue
@@ -198,31 +218,31 @@ func (m BalanceMap) Assets(prices map[string]fixedpoint.Value) AssetMap {
 			Available: b.Available,
 			Borrowed:  b.Borrowed,
 			NetAsset:  b.NetAsset,
-			Time:      now,
+			Time:      priceTime,
 		}
 
-		btcusdt, hasBtcPrice := prices["BTCUSDT"]
-
 		usdMarkets := []string{currency + "USDT", currency + "USDC", currency + "USD", "USDT" + currency}
-
 		for _, market := range usdMarkets {
-			if val, ok := prices[market]; ok {
+			usdPrice, ok := prices[market]
+			if !ok {
+				continue
+			}
 
-				if strings.HasPrefix(market, "USD") {
-					if !asset.Total.IsZero() {
-						asset.InUSD = asset.Total.Div(val)
-					}
-					asset.PriceInUSD = val
-				} else {
-					if !asset.Total.IsZero() {
-						asset.InUSD = asset.Total.Mul(val)
-					}
-					asset.PriceInUSD = fixedpoint.One.Div(val)
+			// this includes USDT, USD, USDC and so on
+			if strings.HasPrefix(market, "USD") {
+				if !asset.Total.IsZero() {
+					asset.InUSD = asset.Total.Div(usdPrice)
 				}
+				asset.PriceInUSD = usdPrice
+			} else {
+				if !asset.Total.IsZero() {
+					asset.InUSD = asset.Total.Mul(usdPrice)
+				}
+				asset.PriceInUSD = fixedpoint.One.Div(usdPrice)
+			}
 
-				if hasBtcPrice && !asset.InUSD.IsZero() {
-					asset.InBTC = asset.InUSD.Div(btcusdt)
-				}
+			if hasBtcPrice && !asset.InUSD.IsZero() {
+				asset.InBTC = asset.InUSD.Div(btcusdt)
 			}
 		}
 
