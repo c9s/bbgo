@@ -76,6 +76,7 @@ metrics:
 
 grpc:
   enabled: false
+  port: 50051
 
 debug:
   enabled: false

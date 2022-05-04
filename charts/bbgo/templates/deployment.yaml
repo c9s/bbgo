@@ -51,6 +51,8 @@ spec:
           {{- end }}
           {{- if .Values.grpc.enabled }}
           - "--enable-grpc"
+          - "--grpc-bind"
+          - {{ .Values.grpc.port | default 50051 | quote }}
           {{- end }}
           {{- if .Values.debug.enabled }}
           - "--debug"
@@ -60,6 +62,11 @@ spec:
           {{- if .Values.webserver.enabled }}
           - name: http
             containerPort: 8080
+            protocol: TCP
+          {{- end }}
+          {{- if .Values.grpc.enabled }}
+          - name: grpc
+            containerPort: {{ .Values.grpc.port | default 50051 }}
             protocol: TCP
           {{- end }}
           {{- if .Values.metrics.enabled }}
