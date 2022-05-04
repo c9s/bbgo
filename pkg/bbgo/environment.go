@@ -659,7 +659,9 @@ func (environ *Environment) RecordAsset(t time.Time, sessionName string, exchang
 		return
 	}
 
-	environ.AccountService.InsertAsset(t, sessionName, exchangeName, account, assets)
+	if err := environ.AccountService.InsertAsset(t, sessionName, exchangeName, account, assets); err != nil {
+		log.WithError(err).Errorf("can not insert asset record")
+	}
 }
 
 func (environ *Environment) RecordPosition(position *types.Position, trade types.Trade, profit *types.Profit) {

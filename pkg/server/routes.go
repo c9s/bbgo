@@ -442,7 +442,7 @@ func genFakeAssets() types.AssetMap {
 		"DOTUSDT":  fixedpoint.NewFromFloat(20.0),
 		"SANDUSDT": fixedpoint.NewFromFloat(0.13),
 		"MAXUSDT":  fixedpoint.NewFromFloat(0.122),
-	})
+	}, time.Now())
 	for currency, asset := range assets {
 		totalAssets[currency] = asset
 	}
@@ -460,13 +460,13 @@ func (s *Server) listAssets(c *gin.Context) {
 	for _, session := range s.Environ.Sessions() {
 		balances := session.GetAccount().Balances()
 
-		if err := session.UpdatePrices(c); err != nil {
+		if err := session.UpdatePrices(c, balances.Currencies(), "USDT"); err != nil {
 			logrus.WithError(err).Error("price update failed")
 			c.Status(http.StatusInternalServerError)
 			return
 		}
 
-		assets := balances.Assets(session.LastPrices())
+		assets := balances.Assets(session.LastPrices(), time.Now())
 
 		for currency, asset := range assets {
 			totalAssets[currency] = asset
