@@ -300,7 +300,7 @@ func (o Order) SlackAttachment() slack.Attachment {
 		Short: true,
 	})
 
-	footerIcon := exchangeFooterIcon(o.Exchange)
+	footerIcon := ExchangeFooterIcon(o.Exchange)
 
 	return slack.Attachment{
 		Color: SideToColorName(o.Side),
