@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/slack-go/slack"
+
 	"github.com/c9s/bbgo/pkg/cache"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -920,4 +922,17 @@ func (session *ExchangeSession) bindConnectionStatusNotification(stream types.St
 	stream.OnConnect(func() {
 		session.Notifiability.Notify("session %s %s stream connected", session.Name, streamName)
 	})
+}
+
+func (session *ExchangeSession) SlackAttachment() slack.Attachment {
+	var fields []slack.AttachmentField
+	var footerIcon = types.ExchangeFooterIcon(session.ExchangeName)
+	return slack.Attachment{
+		// Pretext:       "",
+		// Text:  text,
+		Title:  session.Name,
+		Fields: fields,
+		FooterIcon: footerIcon,
+		Footer: util.Render("update time {{ . }}", time.Now().Format(time.RFC822)),
+	}
 }

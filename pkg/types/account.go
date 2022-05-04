@@ -312,6 +312,8 @@ type Account struct {
 	balances BalanceMap
 }
 
+
+
 type FuturesAccountInfo struct {
 	// Futures fields
 	Assets                      FuturesAssetMap    `json:"assets"`
