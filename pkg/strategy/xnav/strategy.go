@@ -63,7 +63,7 @@ type Strategy struct {
 	*bbgo.Persistence
 	*bbgo.Environment
 
-	Interval      types.Duration `json:"interval"`
+	Interval      types.Interval `json:"interval"`
 	ReportOnStart bool           `json:"reportOnStart"`
 	IgnoreDusts   bool           `json:"ignoreDusts"`
 	state         *State
@@ -173,8 +173,8 @@ func (s *Strategy) LoadState() error {
 }
 
 func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession) error {
-	if s.Interval == 0 {
-		return errors.New("interval can not be zero")
+	if s.Interval == "" {
+		return errors.New("interval can not be empty")
 	}
 
 	if err := s.LoadState(); err != nil {
@@ -193,6 +193,11 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 	if s.Environment.BacktestService != nil {
 		log.Warnf("xnav does not support backtesting")
+	}
+
+	// TODO: if interval is supported, we can use kline as the ticker
+	if _, ok := types.SupportedIntervals[s.Interval] ; ok {
+
 	}
 
 	go func() {
