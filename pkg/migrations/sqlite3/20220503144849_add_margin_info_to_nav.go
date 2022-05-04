@@ -19,17 +19,17 @@ func upAddMarginInfoToNav(ctx context.Context, tx rockhopper.SQLExecutor) (err e
 		return err
 	}
 
-	_, err = tx.ExecContext(ctx, "ALTER TABLE `nav_history_details` ADD COLUMN `borrowed` DECIMAL UNSIGNED DEFAULT 0.00000000 NOT NULL;")
+	_, err = tx.ExecContext(ctx, "ALTER TABLE `nav_history_details` ADD COLUMN `borrowed` DECIMAL DEFAULT 0.00000000 NOT NULL;")
 	if err != nil {
 		return err
 	}
 
-	_, err = tx.ExecContext(ctx, "ALTER TABLE `nav_history_details` ADD COLUMN `net_asset` DECIMAL UNSIGNED DEFAULT 0.00000000 NOT NULL;")
+	_, err = tx.ExecContext(ctx, "ALTER TABLE `nav_history_details` ADD COLUMN `net_asset` DECIMAL DEFAULT 0.00000000 NOT NULL;")
 	if err != nil {
 		return err
 	}
 
-	_, err = tx.ExecContext(ctx, "ALTER TABLE `nav_history_details` ADD COLUMN `price_in_usd` DECIMAL UNSIGNED DEFAULT 0.00000000 NOT NULL;")
+	_, err = tx.ExecContext(ctx, "ALTER TABLE `nav_history_details` ADD COLUMN `price_in_usd` DECIMAL DEFAULT 0.00000000 NOT NULL;")
 	if err != nil {
 		return err
 	}
