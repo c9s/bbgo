@@ -702,17 +702,6 @@ func (environ *Environment) RecordPosition(position *types.Position, trade types
 			log.WithError(err).Errorf("can not insert position record")
 		}
 	}
-
-	// if:
-	// 1) we are not using sync
-	// 2) and not sync-ing trades from the user data stream
-	if environ.TradeService != nil && (environ.syncConfig == nil ||
-		(environ.syncConfig.UserDataStream == nil) ||
-		(environ.syncConfig.UserDataStream != nil && !environ.syncConfig.UserDataStream.Trades)) {
-		if err := environ.TradeService.Insert(trade); err != nil {
-			log.WithError(err).Errorf("can not insert trade record: %+v", trade)
-		}
-	}
 }
 
 func (environ *Environment) RecordProfit(profit types.Profit) {
