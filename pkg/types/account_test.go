@@ -15,8 +15,6 @@ func TestBalanceMap_Add(t *testing.T) {
 			Currency:  "BTC",
 			Available: fixedpoint.MustNewFromString("10.0"),
 			Locked:    fixedpoint.MustNewFromString("0"),
-			Borrowed:  0,
-			Interest:  0,
 			NetAsset:  fixedpoint.MustNewFromString("10.0"),
 		},
 	})
