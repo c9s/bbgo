@@ -212,13 +212,13 @@ func (m BalanceMap) Assets(prices map[string]fixedpoint.Value, priceTime time.Ti
 		}
 
 		asset := Asset{
-			Currency:  currency,
-			Total:     b.Available.Add(b.Locked),
-			Locked:    b.Locked,
-			Available: b.Available,
-			Borrowed:  b.Borrowed,
-			NetAsset:  b.NetAsset,
-			Time:      priceTime,
+			Currency:   currency,
+			Total:      b.Available.Add(b.Locked),
+			Time:       priceTime,
+			Locked:     b.Locked,
+			Available:  b.Available,
+			Borrowed:   b.Borrowed,
+			NetAsset:   b.NetAsset,
 		}
 
 		usdMarkets := []string{currency + "USDT", currency + "USDC", currency + "USD", "USDT" + currency}
