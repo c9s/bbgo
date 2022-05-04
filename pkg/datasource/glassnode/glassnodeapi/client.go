@@ -43,11 +43,6 @@ func (c *RestClient) Auth(apiKey string) {
 }
 
 func (c *RestClient) NewRequest(ctx context.Context, method string, refURL string, params url.Values, payload interface{}) (*http.Request, error) {
-	body, err := castPayload(payload)
-	if err != nil {
-		return nil, err
-	}
-
 	rel, err := url.Parse(refURL)
 	if err != nil {
 		return nil, err
@@ -58,6 +53,12 @@ func (c *RestClient) NewRequest(ctx context.Context, method string, refURL strin
 	}
 
 	pathURL := c.BaseURL.ResolveReference(rel)
+
+	body, err := castPayload(payload)
+	if err != nil {
+		return nil, err
+	}
+
 	return http.NewRequestWithContext(ctx, method, pathURL.String(), bytes.NewReader(body))
 }
 
@@ -82,28 +83,7 @@ func (c *RestClient) SendRequest(req *http.Request) (*requestgen.Response, error
 }
 
 func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, method, refURL string, params url.Values, payload interface{}) (*http.Request, error) {
-	rel, err := url.Parse(refURL)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		rel.RawQuery = params.Encode()
-	}
-
-	pathURL := c.BaseURL.ResolveReference(rel)
-
-	path := pathURL.Path
-	if rel.RawQuery != "" {
-		path += "?" + rel.RawQuery
-	}
-
-	body, err := castPayload(payload)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequestWithContext(ctx, method, pathURL.String(), bytes.NewReader(body))
+	req, err := c.NewRequest(ctx, method, refURL, params, payload)
 	if err != nil {
 		return nil, err
 	}
@@ -111,14 +91,10 @@ func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, method, refURL
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Accept", "application/json")
 
-	// Build authentication headers
-	c.attachAuthHeaders(req, method, path, body)
-	return req, nil
-}
-
-func (c *RestClient) attachAuthHeaders(req *http.Request, method string, path string, body []byte) {
 	// Attch API Key to header. https://docs.glassnode.com/basic-api/api-key#usage
 	req.Header.Add("X-Api-Key", c.apiKey)
+
+	return req, nil
 }
 
 func castPayload(payload interface{}) ([]byte, error) {
