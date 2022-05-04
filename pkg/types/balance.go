@@ -23,6 +23,16 @@ type Balance struct {
 	NetAsset fixedpoint.Value `json:"net,omitempty"`
 }
 
+func (b Balance) Add(b2 Balance) Balance {
+	var newB = b
+	newB.Available = b.Available.Add(b2.Available)
+	newB.Locked = b.Locked.Add(b2.Locked)
+	newB.Borrowed = b.Borrowed.Add(b2.Borrowed)
+	newB.NetAsset = b.NetAsset.Add(b2.NetAsset)
+	newB.Interest = b.Interest.Add(b2.Interest)
+	return newB
+}
+
 func (b Balance) Total() fixedpoint.Value {
 	return b.Available.Add(b.Locked)
 }
@@ -65,11 +75,7 @@ func (m BalanceMap) Add(bm BalanceMap) BalanceMap {
 	for _, b := range bm {
 		tb, ok := total[b.Currency]
 		if ok {
-			tb.Available = tb.Available.Add(b.Available)
-			tb.Locked = tb.Locked.Add(b.Locked)
-			tb.Borrowed = tb.Borrowed.Add(b.Borrowed)
-			tb.NetAsset = tb.NetAsset.Add(b.NetAsset)
-			tb.Interest = tb.Interest.Add(b.Interest)
+			tb = tb.Add(b)
 		} else {
 			tb = b
 		}
@@ -102,12 +108,11 @@ func (m BalanceMap) Assets(prices map[string]fixedpoint.Value, priceTime time.Ti
 	_, btcInUSD, hasBtcPrice := findUSDMarketPrice("BTC", prices)
 
 	for currency, b := range m {
-		if b.Locked.IsZero() && b.Available.IsZero() && b.Borrowed.IsZero() {
-			continue
-		}
-
 		total := b.Total()
 		netAsset := b.Net()
+		if total.IsZero() && netAsset.IsZero() {
+			continue
+		}
 
 		asset := Asset{
 			Currency:  currency,
@@ -116,6 +121,7 @@ func (m BalanceMap) Assets(prices map[string]fixedpoint.Value, priceTime time.Ti
 			Locked:    b.Locked,
 			Available: b.Available,
 			Borrowed:  b.Borrowed,
+			Interest:  b.Interest,
 			NetAsset:  netAsset,
 		}
 

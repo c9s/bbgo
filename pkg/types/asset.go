@@ -12,9 +12,12 @@ import (
 
 type Asset struct {
 	Currency string           `json:"currency" db:"currency"`
+
 	Total    fixedpoint.Value `json:"total" db:"total"`
 
 	NetAsset fixedpoint.Value `json:"netAsset" db:"net_asset"`
+
+	Interest fixedpoint.Value `json:"interest" db:"interest"`
 
 	// InUSD is net asset in USD
 	InUSD fixedpoint.Value `json:"inUSD" db:"net_asset_in_usd"`

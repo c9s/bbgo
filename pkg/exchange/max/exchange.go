@@ -663,10 +663,12 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 
 	var balances = make(types.BalanceMap)
 	for _, a := range userInfo.Accounts {
+		cur := toGlobalCurrency(a.Currency)
 		balances[toGlobalCurrency(a.Currency)] = types.Balance{
-			Currency:  toGlobalCurrency(a.Currency),
+			Currency:  cur,
 			Available: a.Balance,
 			Locked:    a.Locked,
+			NetAsset:  a.Balance.Add(a.Locked),
 		}
 	}
 
@@ -861,10 +863,12 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 	var balances = make(types.BalanceMap)
 
 	for _, a := range accounts {
-		balances[toGlobalCurrency(a.Currency)] = types.Balance{
-			Currency:  toGlobalCurrency(a.Currency),
+		cur := toGlobalCurrency(a.Currency)
+		balances[cur] = types.Balance{
+			Currency:  cur,
 			Available: a.Balance,
 			Locked:    a.Locked,
+			NetAsset:  a.Balance.Add(a.Locked),
 		}
 	}
 
