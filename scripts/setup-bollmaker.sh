@@ -41,12 +41,12 @@ info "downloaded successfully"
 
 function gen_dotenv()
 {
-    read -p "Enter your MAX API key: " api_key
-    read -p "Enter your MAX API secret: " api_secret
+    read -p "Enter your Binance API key: " api_key
+    read -p "Enter your Binance API secret: " api_secret
     echo "Generating your .env.local file..."
 cat <<END > .env.local
-MAX_API_KEY=$api_key
-MAX_API_SECRET=$api_secret
+BINANCE_API_KEY=$api_key
+BINANCE_API_SECRET=$api_secret
 END
 
 }
