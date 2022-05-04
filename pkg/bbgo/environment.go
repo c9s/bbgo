@@ -649,6 +649,29 @@ func (environ *Environment) Sync(ctx context.Context, userConfig ...*Config) err
 	return nil
 }
 
+func (environ *Environment) RecordAsset(t time.Time, session *ExchangeSession, assets types.AssetMap) {
+	// skip for back-test
+	if environ.BacktestService != nil {
+		return
+	}
+
+	if environ.DatabaseService == nil || environ.AccountService == nil {
+		return
+	}
+
+	if err := environ.AccountService.InsertAsset(
+		t,
+		session.Name,
+		session.ExchangeName,
+		session.SubAccount,
+		session.Margin,
+		session.IsolatedMargin,
+		session.IsolatedMarginSymbol,
+		assets); err != nil {
+		log.WithError(err).Errorf("can not insert asset record")
+	}
+}
+
 func (environ *Environment) RecordPosition(position *types.Position, trade types.Trade, profit *types.Profit) {
 	// skip for back-test
 	if environ.BacktestService != nil {
@@ -677,17 +700,6 @@ func (environ *Environment) RecordPosition(position *types.Position, trade types
 	} else {
 		if err := environ.PositionService.Insert(position, trade, fixedpoint.Zero); err != nil {
 			log.WithError(err).Errorf("can not insert position record")
-		}
-	}
-
-	// if:
-	// 1) we are not using sync
-	// 2) and not sync-ing trades from the user data stream
-	if environ.TradeService != nil && (environ.syncConfig == nil ||
-		(environ.syncConfig.UserDataStream == nil) ||
-		(environ.syncConfig.UserDataStream != nil && !environ.syncConfig.UserDataStream.Trades)) {
-		if err := environ.TradeService.Insert(trade); err != nil {
-			log.WithError(err).Errorf("can not insert trade record: %+v", trade)
 		}
 	}
 }
