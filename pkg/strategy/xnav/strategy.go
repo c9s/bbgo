@@ -110,7 +110,7 @@ func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]
 			allPrices[m] = p
 		}
 
-		s.Environment.RecordAsset(priceTime, sessionName, session.ExchangeName, session.SubAccount, assets)
+		s.Environment.RecordAsset(priceTime, session, assets)
 	}
 
 	assets := totalBalances.Assets(allPrices, time.Now())
@@ -123,7 +123,7 @@ func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]
 		totalAssets[currency] = asset
 	}
 
-	s.Environment.RecordAsset(priceTime, "ALL", "", "", totalAssets)
+	s.Environment.RecordAsset(priceTime, &bbgo.ExchangeSession{Name: "ALL"}, totalAssets)
 
 	s.Notifiability.Notify(totalAssets)
 
