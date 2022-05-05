@@ -189,6 +189,10 @@ func runConfig(basectx context.Context, cmd *cobra.Command, userConfig *bbgo.Con
 		return err
 	}
 
+	if err := trader.LoadState(); err != nil {
+		return err
+	}
+
 	if err := trader.Run(ctx); err != nil {
 		return err
 	}
@@ -227,6 +231,10 @@ func runConfig(basectx context.Context, cmd *cobra.Command, userConfig *bbgo.Con
 	shutdownCtx, cancelShutdown := context.WithDeadline(ctx, time.Now().Add(30*time.Second))
 	trader.Graceful.Shutdown(shutdownCtx)
 	cancelShutdown()
+
+	if err := trader.SaveState(); err != nil {
+		log.WithError(err).Errorf("can not save strategy states")
+	}
 
 	for _, session := range environ.Sessions() {
 		if err := session.MarketDataStream.Close(); err != nil {
