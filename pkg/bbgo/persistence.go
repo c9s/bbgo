@@ -129,11 +129,7 @@ func newTypeValueInterface(typ reflect.Type) interface{} {
 	}
 }
 
-func loadPersistenceFields(obj interface{}, persistence service.PersistenceService) error {
-	id := callID(obj)
-	if len(id) == 0 {
-		return fmt.Errorf("object does not provide ID() method for persistency")
-	}
+func loadPersistenceFields(obj interface{}, id string, persistence service.PersistenceService) error {
 
 	return iterateFieldsByTag(obj, "persistence", func(tag string, field reflect.StructField, value reflect.Value) error {
 		newValueInf := newTypeValueInterface(value.Type())
@@ -155,12 +151,7 @@ func loadPersistenceFields(obj interface{}, persistence service.PersistenceServi
 	})
 }
 
-func storePersistenceFields(obj interface{}, persistence service.PersistenceService) error {
-	id := callID(obj)
-	if len(id) == 0 {
-		return fmt.Errorf("object does not provide ID() method for persistency")
-	}
-
+func storePersistenceFields(obj interface{}, id string, persistence service.PersistenceService) error {
 	return iterateFieldsByTag(obj, "persistence", func(tag string, ft reflect.StructField, fv reflect.Value) error {
 		inf := fv.Interface()
 
