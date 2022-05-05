@@ -38,6 +38,7 @@ func init() {
 }
 
 type State struct {
+	// Deprecated: position is deprecated, please define the Position field in the strategy struct directly.
 	Position    *types.Position   `json:"position,omitempty"`
 	ProfitStats types.ProfitStats `json:"profitStats,omitempty"`
 }
@@ -147,6 +148,9 @@ type Strategy struct {
 
 	state *State
 
+	// TODO: we're moving position from state to outside
+	Position *types.Position `json:"position,omitempty" persistence:"position"`
+
 	activeMakerOrders *bbgo.LocalActiveOrderBook
 	orderStore        *bbgo.OrderStore
 	tradeCollector    *bbgo.TradeCollector
@@ -202,13 +206,13 @@ func (s *Strategy) Validate() error {
 }
 
 func (s *Strategy) CurrentPosition() *types.Position {
-	return s.state.Position
+	return s.Position
 }
 
 func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Value) error {
-	base := s.state.Position.GetBase()
+	base := s.Position.GetBase()
 	if base.IsZero() {
-		return fmt.Errorf("no opened %s position", s.state.Position.Symbol)
+		return fmt.Errorf("no opened %s position", s.Position.Symbol)
 	}
 
 	// make it negative
@@ -312,11 +316,6 @@ func (s *Strategy) LoadState() error {
 		log.Infof("state is restored: %+v", s.state)
 	}
 
-	// if position is nil, we need to allocate a new position for calculation
-	if s.state.Position == nil {
-		s.state.Position = types.NewPositionFromMarket(s.Market)
-	}
-
 	// init profit states
 	s.state.ProfitStats.Symbol = s.Market.Symbol
 	s.state.ProfitStats.BaseCurrency = s.Market.BaseCurrency
@@ -353,7 +352,7 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 
 	askPrice := midPrice.Mul(fixedpoint.One.Add(askSpread))
 	bidPrice := midPrice.Mul(fixedpoint.One.Sub(bidSpread))
-	base := s.state.Position.GetBase()
+	base := s.Position.GetBase()
 	balances := s.session.GetAccount().Balances()
 
 	log.Infof("mid price:%v spread: %s ask:%v bid: %v position: %s",
@@ -361,7 +360,7 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 		s.Spread.Percentage(),
 		askPrice,
 		bidPrice,
-		s.state.Position,
+		s.Position,
 	)
 
 	sellQuantity := s.QuantityOrAmount.CalculateQuantity(askPrice)
@@ -488,7 +487,7 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 		canSell = false
 	}
 
-	if midPrice.Compare(s.state.Position.AverageCost.Mul(fixedpoint.One.Add(s.MinProfitSpread))) < 0 {
+	if midPrice.Compare(s.Position.AverageCost.Mul(fixedpoint.One.Add(s.MinProfitSpread))) < 0 {
 		canSell = false
 	}
 
@@ -509,7 +508,7 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 
 	// condition for lower the average cost
 	/*
-		if midPrice < s.state.Position.AverageCost.MulFloat64(1.0-s.MinProfitSpread.Float64()) && canBuy {
+		if midPrice < s.Position.AverageCost.MulFloat64(1.0-s.MinProfitSpread.Float64()) && canBuy {
 			submitOrders = append(submitOrders, buyOrder)
 		}
 	*/
@@ -606,8 +605,19 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		return err
 	}
 
-	s.state.Position.Strategy = ID
-	s.state.Position.StrategyInstanceID = instanceID
+	// If position is nil, we need to allocate a new position for calculation
+	if s.Position == nil {
+		// fallback to the legacy position struct in the state
+		if s.state.Position != nil {
+			s.Position = s.state.Position
+		} else {
+			s.Position = types.NewPositionFromMarket(s.Market)
+		}
+	}
+
+	// Always update the position fields
+	s.Position.Strategy = ID
+	s.Position.StrategyInstanceID = instanceID
 
 	s.stopC = make(chan struct{})
 
@@ -617,7 +627,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderStore = bbgo.NewOrderStore(s.Symbol)
 	s.orderStore.BindStream(session.UserDataStream)
 
-	s.tradeCollector = bbgo.NewTradeCollector(s.Symbol, s.state.Position, s.orderStore)
+	s.tradeCollector = bbgo.NewTradeCollector(s.Symbol, s.Position, s.orderStore)
 
 	s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
 		// StrategyController
@@ -629,10 +639,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.state.ProfitStats.AddTrade(trade)
 
 		if profit.Compare(fixedpoint.Zero) == 0 {
-			s.Environment.RecordPosition(s.state.Position, trade, nil)
+			s.Environment.RecordPosition(s.Position, trade, nil)
 		} else {
 			log.Infof("%s generated profit: %v", s.Symbol, profit)
-			p := s.state.Position.NewProfit(trade, profit, netProfit)
+			p := s.Position.NewProfit(trade, profit, netProfit)
 			p.Strategy = ID
 			p.StrategyInstanceID = instanceID
 			s.Notify(&p)
@@ -640,13 +650,13 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			s.state.ProfitStats.AddProfit(p)
 			s.Notify(&s.state.ProfitStats)
 
-			s.Environment.RecordPosition(s.state.Position, trade, &p)
+			s.Environment.RecordPosition(s.Position, trade, &p)
 		}
 	})
 
 	s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
-		log.Infof("position changed: %s", s.state.Position)
-		s.Notify(s.state.Position)
+		log.Infof("position changed: %s", s.Position)
+		s.Notify(s.Position)
 	})
 
 	s.tradeCollector.BindStream(session.UserDataStream)
