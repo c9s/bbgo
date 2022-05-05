@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math"
 	"sync"
-	"time"
 
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/util"
@@ -289,15 +288,6 @@ func (s *Strategy) EmergencyStop(ctx context.Context) error {
 	_ = s.Suspend(ctx)
 
 	return err
-}
-
-func (s *Strategy) newProfitStats() *types.ProfitStats {
-	return &types.ProfitStats{
-		Symbol:           s.Market.Symbol,
-		BaseCurrency:     s.Market.BaseCurrency,
-		QuoteCurrency:    s.Market.QuoteCurrency,
-		AccumulatedSince: time.Now().Unix(),
-	}
 }
 
 // Deprecated: LoadState method is migrated to the persistence struct tag.
@@ -605,7 +595,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			p2 := s.state.ProfitStats
 			s.ProfitStats = &p2
 		} else {
-			s.ProfitStats = s.newProfitStats()
+			s.ProfitStats = types.NewProfitStats(s.Market)
 		}
 	}
 
