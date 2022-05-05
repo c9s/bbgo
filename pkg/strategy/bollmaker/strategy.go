@@ -300,6 +300,7 @@ func (s *Strategy) newProfitStats() *types.ProfitStats {
 	}
 }
 
+// Deprecated: LoadState method is migrated to the persistence struct tag.
 func (s *Strategy) LoadState() error {
 	var state State
 
