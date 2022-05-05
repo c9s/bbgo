@@ -9,10 +9,10 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
-	"github.com/c9s/bbgo/pkg/exchange/max"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 const ID = "grid"
@@ -586,7 +586,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	}
 
 	instanceID := s.InstanceID()
-	s.groupID = max.GenerateGroupID(instanceID)
+	s.groupID = util.FNV32(instanceID)
 	log.Infof("using group id %d from fnv(%s)", s.groupID, instanceID)
 
 	if err := s.LoadState(); err != nil {

@@ -8,14 +8,13 @@ import (
 	"time"
 
 	"github.com/c9s/bbgo/pkg/indicator"
+	"github.com/c9s/bbgo/pkg/util"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
-	"github.com/c9s/bbgo/pkg/exchange/max"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -37,9 +36,12 @@ func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
+// Deprecated: State is deprecated, please use the persistence tag
 type State struct {
-	// Deprecated: position is deprecated, please define the Position field in the strategy struct directly.
-	Position    *types.Position   `json:"position,omitempty"`
+	// Deprecated: Position is deprecated, please define the Position field in the strategy struct directly.
+	Position *types.Position `json:"position,omitempty"`
+
+	// Deprecated: ProfitStats is deprecated, please define the ProfitStats field in the strategy struct directly.
 	ProfitStats types.ProfitStats `json:"profitStats,omitempty"`
 }
 
@@ -148,8 +150,9 @@ type Strategy struct {
 
 	state *State
 
-	// TODO: we're moving position from state to outside
-	Position *types.Position `json:"position,omitempty" persistence:"position"`
+	// persistence fields
+	Position    *types.Position    `json:"position,omitempty" persistence:"position"`
+	ProfitStats *types.ProfitStats `json:"profitStats,omitempty" persistence:"profit_stats"`
 
 	activeMakerOrders *bbgo.LocalActiveOrderBook
 	orderStore        *bbgo.OrderStore
@@ -171,6 +174,10 @@ type Strategy struct {
 
 func (s *Strategy) ID() string {
 	return ID
+}
+
+func (s *Strategy) InstanceID() string {
+	return fmt.Sprintf("%s:%s", ID, s.Symbol)
 }
 
 func (s *Strategy) Initialize() error {
@@ -264,14 +271,6 @@ func (s *Strategy) Suspend(ctx context.Context) error {
 	}
 
 	s.tradeCollector.Process()
-
-	// Save state
-	if err := s.SaveState(); err != nil {
-		log.WithError(err).Errorf("can not save state: %+v", s.state)
-	} else {
-		log.Infof("%s position is saved.", s.Symbol)
-	}
-
 	return nil
 }
 
@@ -292,36 +291,21 @@ func (s *Strategy) EmergencyStop(ctx context.Context) error {
 	return err
 }
 
-func (s *Strategy) SaveState() error {
-	if err := s.Persistence.Save(s.state, ID, s.Symbol, stateKey); err != nil {
-		return err
+func (s *Strategy) newProfitStats() *types.ProfitStats {
+	return &types.ProfitStats{
+		Symbol:           s.Market.Symbol,
+		BaseCurrency:     s.Market.BaseCurrency,
+		QuoteCurrency:    s.Market.QuoteCurrency,
+		AccumulatedSince: time.Now().Unix(),
 	}
-
-	log.Infof("state is saved => %+v", s.state)
-	return nil
 }
 
 func (s *Strategy) LoadState() error {
 	var state State
 
 	// load position
-	if err := s.Persistence.Load(&state, ID, s.Symbol, stateKey); err != nil {
-		if err != service.ErrPersistenceNotExists {
-			return err
-		}
-
-		s.state = &State{}
-	} else {
+	if err := s.Persistence.Load(&state, ID, s.Symbol, stateKey); err == nil {
 		s.state = &state
-		log.Infof("state is restored: %+v", s.state)
-	}
-
-	// init profit states
-	s.state.ProfitStats.Symbol = s.Market.Symbol
-	s.state.ProfitStats.BaseCurrency = s.Market.BaseCurrency
-	s.state.ProfitStats.QuoteCurrency = s.Market.QuoteCurrency
-	if s.state.ProfitStats.AccumulatedSince == 0 {
-		s.state.ProfitStats.AccumulatedSince = time.Now().Unix()
 	}
 
 	return nil
@@ -566,10 +550,6 @@ func (s *Strategy) adjustOrderQuantity(submitOrder types.SubmitOrder) types.Subm
 	return submitOrder
 }
 
-func (s *Strategy) InstanceID() string {
-	return fmt.Sprintf("%s-%s", ID, s.Symbol)
-}
-
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	// StrategyController
 	s.status = types.StrategyStatusRunning
@@ -601,7 +581,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	// calculate group id for orders
 	instanceID := s.InstanceID()
-	s.groupID = max.GenerateGroupID(instanceID)
+	s.groupID = util.FNV32(instanceID)
 	log.Infof("using group id %d from fnv(%s)", s.groupID, instanceID)
 
 	// restore state
@@ -612,11 +592,22 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	// If position is nil, we need to allocate a new position for calculation
 	if s.Position == nil {
 		// fallback to the legacy position struct in the state
-		if s.state.Position != nil {
+		if s.state != nil && s.state.Position != nil {
 			s.Position = s.state.Position
 		} else {
 			s.Position = types.NewPositionFromMarket(s.Market)
 		}
+	}
+
+	if s.ProfitStats == nil {
+		if s.state != nil {
+			// copy stats
+			p2 := s.state.ProfitStats
+			s.ProfitStats = &p2
+		} else {
+			s.ProfitStats = s.newProfitStats()
+		}
+
 	}
 
 	// Always update the position fields
@@ -640,7 +631,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 
 		s.Notifiability.Notify(trade)
-		s.state.ProfitStats.AddTrade(trade)
+		s.ProfitStats.AddTrade(trade)
 
 		if profit.Compare(fixedpoint.Zero) == 0 {
 			s.Environment.RecordPosition(s.Position, trade, nil)
@@ -651,8 +642,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			p.StrategyInstanceID = instanceID
 			s.Notify(&p)
 
-			s.state.ProfitStats.AddProfit(p)
-			s.Notify(&s.state.ProfitStats)
+			s.ProfitStats.AddProfit(p)
+			s.Notify(&s.ProfitStats)
 
 			s.Environment.RecordPosition(s.Position, trade, &p)
 		}
@@ -726,10 +717,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 
 		s.tradeCollector.Process()
-
-		if err := s.SaveState(); err != nil {
-			log.WithError(err).Errorf("can not save state: %+v", s.state)
-		}
 	})
 
 	return nil
