@@ -252,7 +252,10 @@ func (trader *Trader) RunSingleExchangeStrategy(ctx context.Context, strategy Si
 	// 1) scan the struct fields and find the persistence field
 	// 2) load the data and set the value into the persistence field.
 
-	_ = trader.environment.PersistenceServiceFacade
+	ps := trader.environment.PersistenceServiceFacade.Get()
+	if err := loadPersistenceFields(strategy, strategy.ID(), ps); err != nil {
+		return err
+	}
 
 	return strategy.Run(ctx, orderExecutor, session)
 }
@@ -319,6 +322,7 @@ func (trader *Trader) Run(ctx context.Context) error {
 		router.executors[sessionID] = orderExecutor
 	}
 
+	ps := trader.environment.PersistenceServiceFacade.Get()
 	for _, strategy := range trader.crossExchangeStrategies {
 		rs := reflect.ValueOf(strategy)
 
@@ -329,6 +333,10 @@ func (trader *Trader) Run(ctx context.Context) error {
 		}
 
 		if err := trader.injectCommonServices(strategy); err != nil {
+			return err
+		}
+
+		if err := loadPersistenceFields(strategy, strategy.ID(), ps); err != nil {
 			return err
 		}
 
