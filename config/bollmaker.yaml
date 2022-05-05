@@ -106,9 +106,6 @@ exchangeStrategies:
     # buyBelowNeutralSMA: when this set, it will only place buy order when the current price is below the SMA line.
     buyBelowNeutralSMA: false
 
-    persistence:
-      type: redis
-
     # Set up your stop order, this is optional
     # sometimes the stop order might decrease your total profit.
     # you can setup multiple stop,
