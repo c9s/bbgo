@@ -42,6 +42,11 @@ func preparePersistentServices() []service.PersistenceService {
 	return pss
 }
 
+func Test_callID(t *testing.T) {
+	id := callID(&TestStruct{})
+	assert.NotEmpty(t, id)
+}
+
 func Test_storePersistenceFields(t *testing.T) {
 	var pss = preparePersistentServices()
 
@@ -56,7 +61,8 @@ func Test_storePersistenceFields(t *testing.T) {
 
 	for _, ps := range pss {
 		t.Run(reflect.TypeOf(ps).Elem().String(), func(t *testing.T) {
-			err := storePersistenceFields(a, ps)
+			id := callID(a)
+			err := storePersistenceFields(a, id, ps)
 			assert.NoError(t, err)
 
 			var i int64
@@ -73,7 +79,7 @@ func Test_storePersistenceFields(t *testing.T) {
 			assert.Equal(t, fixedpoint.NewFromFloat(3343.0), p.AverageCost)
 
 			var b = &TestStruct{}
-			err = loadPersistenceFields(b, ps)
+			err = loadPersistenceFields(b, id, ps)
 			assert.NoError(t, err)
 			assert.Equal(t, a.Integer, b.Integer)
 			assert.Equal(t, a.Integer2, b.Integer2)
