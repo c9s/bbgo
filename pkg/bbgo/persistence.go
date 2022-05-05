@@ -76,7 +76,9 @@ func (p *Persistence) Save(val interface{}, subIDs ...string) error {
 	return store.Save(val)
 }
 
-func iterateFieldsByTag(obj interface{}, tagName string, cb func(tag string, ft reflect.StructField, fv reflect.Value) error) error {
+type StructFieldIterator func(tag string, ft reflect.StructField, fv reflect.Value) error
+
+func iterateFieldsByTag(obj interface{}, tagName string, cb StructFieldIterator) error {
 	sv := reflect.ValueOf(obj)
 	st := reflect.TypeOf(obj)
 
