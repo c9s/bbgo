@@ -266,11 +266,12 @@ func (s *Strategy) Suspend(ctx context.Context) error {
 		log.WithError(err).Errorf("graceful cancel order error")
 		s.Notify("graceful cancel order error")
 	} else {
-		s.Notify("All orders cancelled.")
+		s.Notify("All orders are cancelled.")
 	}
 
 	s.tradeCollector.Process()
-	return nil
+
+	return s.Persistence.Sync(s)
 }
 
 func (s *Strategy) Resume(ctx context.Context) error {

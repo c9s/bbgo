@@ -76,6 +76,16 @@ func (p *Persistence) Save(val interface{}, subIDs ...string) error {
 	return store.Save(val)
 }
 
+func (p *Persistence) Sync(obj interface{}) error {
+	id := callID(obj)
+	if len(id) == 0 {
+		return nil
+	}
+
+	ps := p.Facade.Get()
+	return storePersistenceFields(obj, id, ps)
+}
+
 type StructFieldIterator func(tag string, ft reflect.StructField, fv reflect.Value) error
 
 func iterateFieldsByTag(obj interface{}, tagName string, cb StructFieldIterator) error {
