@@ -11,7 +11,6 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
-	"github.com/c9s/bbgo/pkg/exchange/max"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/service"
@@ -710,7 +709,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 	// restore state
 	instanceID := fmt.Sprintf("%s-%s", ID, s.Symbol)
-	s.groupID = max.GenerateGroupID(instanceID)
+	s.groupID = util.FNV32(instanceID)
 	log.Infof("using group id %d from fnv(%s)", s.groupID, instanceID)
 
 	if err := s.LoadState(); err != nil {
