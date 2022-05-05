@@ -136,6 +136,10 @@ func loadPersistenceFields(obj interface{}, id string, persistence service.Persi
 		// inf := value.Interface()
 		store := persistence.NewStore(id, tag)
 		if err := store.Load(&newValueInf); err != nil {
+			if err == service.ErrPersistenceNotExists {
+				return nil
+			}
+
 			return err
 		}
 
