@@ -125,14 +125,12 @@ func newTypeValueInterface(typ reflect.Type) interface{} {
 		typ = typ.Elem()
 		dst := reflect.New(typ).Elem()
 		return dst.Addr().Interface()
-	} else {
-		dst := reflect.New(typ)
-		return dst.Interface()
 	}
+	dst := reflect.New(typ)
+	return dst.Interface()
 }
 
 func loadPersistenceFields(obj interface{}, id string, persistence service.PersistenceService) error {
-
 	return iterateFieldsByTag(obj, "persistence", func(tag string, field reflect.StructField, value reflect.Value) error {
 		newValueInf := newTypeValueInterface(value.Type())
 		// inf := value.Interface()
@@ -158,10 +156,6 @@ func storePersistenceFields(obj interface{}, id string, persistence service.Pers
 		inf := fv.Interface()
 
 		store := persistence.NewStore(id, tag)
-		if err := store.Save(inf); err != nil {
-			return err
-		}
-
-		return nil
+		return store.Save(inf)
 	})
 }
