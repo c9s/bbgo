@@ -16,6 +16,8 @@ type TestStruct struct {
 	Position *types.Position `persistence:"position"`
 	Integer  int64           `persistence:"integer"`
 	Integer2 int64           `persistence:"integer2"`
+	Float    int64           `persistence:"float"`
+	String   string          `persistence:"string"`
 }
 
 func (t *TestStruct) InstanceID() string {
@@ -53,6 +55,8 @@ func Test_storePersistenceFields(t *testing.T) {
 	var a = &TestStruct{
 		Integer:  1,
 		Integer2: 2,
+		Float:    3.0,
+		String:   "foobar",
 		Position: types.NewPosition("BTCUSDT", "BTC", "USDT"),
 	}
 
@@ -83,6 +87,8 @@ func Test_storePersistenceFields(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, a.Integer, b.Integer)
 			assert.Equal(t, a.Integer2, b.Integer2)
+			assert.Equal(t, a.Float, b.Float)
+			assert.Equal(t, a.String, b.String)
 			assert.Equal(t, a.Position, b.Position)
 		})
 	}
