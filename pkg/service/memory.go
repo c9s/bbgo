@@ -1,7 +1,6 @@
 package service
 
 import (
-	"fmt"
 	"reflect"
 	"strings"
 )
@@ -38,7 +37,6 @@ func (store *MemoryStore) Load(val interface{}) error {
 	v := reflect.ValueOf(val)
 	if data, ok := store.memory.Slots[store.Key]; ok {
 		dataRV := reflect.ValueOf(data)
-		fmt.Printf("load %s = %v\n", store.Key, dataRV)
 		v.Elem().Set(dataRV)
 	} else {
 		return ErrPersistenceNotExists

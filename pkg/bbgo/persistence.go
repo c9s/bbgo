@@ -134,7 +134,7 @@ func loadPersistenceFields(obj interface{}, id string, persistence service.Persi
 	return iterateFieldsByTag(obj, "persistence", func(tag string, field reflect.StructField, value reflect.Value) error {
 		newValueInf := newTypeValueInterface(value.Type())
 		// inf := value.Interface()
-		store := persistence.NewStore(id, tag)
+		store := persistence.NewStore("state", id, tag)
 		if err := store.Load(&newValueInf); err != nil {
 			if err == service.ErrPersistenceNotExists {
 				return nil
@@ -159,7 +159,7 @@ func storePersistenceFields(obj interface{}, id string, persistence service.Pers
 	return iterateFieldsByTag(obj, "persistence", func(tag string, ft reflect.StructField, fv reflect.Value) error {
 		inf := fv.Interface()
 
-		store := persistence.NewStore(id, tag)
+		store := persistence.NewStore("state", id, tag)
 		return store.Save(inf)
 	})
 }

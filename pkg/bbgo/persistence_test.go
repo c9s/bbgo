@@ -70,13 +70,13 @@ func Test_storePersistenceFields(t *testing.T) {
 			assert.NoError(t, err)
 
 			var i int64
-			store := ps.NewStore("test-struct", "integer")
+			store := ps.NewStore("state", "test-struct", "integer")
 			err = store.Load(&i)
 			assert.NoError(t, err)
 			assert.Equal(t, int64(1), i)
 
 			var p *types.Position
-			store = ps.NewStore("test-struct", "position")
+			store = ps.NewStore("state", "test-struct", "position")
 			err = store.Load(&p)
 			assert.NoError(t, err)
 			assert.Equal(t, fixedpoint.NewFromFloat(10.0), p.Base)
