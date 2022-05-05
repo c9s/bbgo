@@ -2,6 +2,7 @@ package bbgo
 
 import (
 	"fmt"
+	"reflect"
 
 	log "github.com/sirupsen/logrus"
 
@@ -73,4 +74,102 @@ func (p *Persistence) Save(val interface{}, subIDs ...string) error {
 
 	store := ps.NewStore(p.PersistenceSelector.StoreID, subIDs...)
 	return store.Save(val)
+}
+
+func (p *Persistence) Sync(obj interface{}) error {
+	id := callID(obj)
+	if len(id) == 0 {
+		return nil
+	}
+
+	ps := p.Facade.Get()
+	return storePersistenceFields(obj, id, ps)
+}
+
+type StructFieldIterator func(tag string, ft reflect.StructField, fv reflect.Value) error
+
+func iterateFieldsByTag(obj interface{}, tagName string, cb StructFieldIterator) error {
+	sv := reflect.ValueOf(obj)
+	st := reflect.TypeOf(obj)
+
+	if st.Kind() != reflect.Ptr {
+		return fmt.Errorf("f needs to be a pointer of a struct, %s given", st)
+	}
+
+	// solve the reference
+	st = st.Elem()
+	sv = sv.Elem()
+
+	if st.Kind() != reflect.Struct {
+		return fmt.Errorf("f needs to be a struct, %s given", st)
+	}
+
+	for i := 0; i < sv.NumField(); i++ {
+		fv := sv.Field(i)
+		ft := st.Field(i)
+
+		fvt := fv.Type()
+		_ = fvt
+
+		// skip unexported fields
+		if !st.Field(i).IsExported() {
+			continue
+		}
+
+		tag, ok := ft.Tag.Lookup(tagName)
+		if !ok {
+			continue
+		}
+
+		if err := cb(tag, ft, fv); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// https://github.com/xiaojun207/go-base-utils/blob/master/utils/Clone.go
+func newTypeValueInterface(typ reflect.Type) interface{} {
+	if typ.Kind() == reflect.Ptr {
+		typ = typ.Elem()
+		dst := reflect.New(typ).Elem()
+		return dst.Addr().Interface()
+	}
+	dst := reflect.New(typ)
+	return dst.Interface()
+}
+
+func loadPersistenceFields(obj interface{}, id string, persistence service.PersistenceService) error {
+	return iterateFieldsByTag(obj, "persistence", func(tag string, field reflect.StructField, value reflect.Value) error {
+		newValueInf := newTypeValueInterface(value.Type())
+		// inf := value.Interface()
+		store := persistence.NewStore("state", id, tag)
+		if err := store.Load(&newValueInf); err != nil {
+			if err == service.ErrPersistenceNotExists {
+				return nil
+			}
+
+			return err
+		}
+
+		newValue := reflect.ValueOf(newValueInf)
+		if value.Kind() != reflect.Ptr && newValue.Kind() == reflect.Ptr {
+			newValue = newValue.Elem()
+		}
+
+		// log.Debugf("%v = %v (%s) -> %v (%s)\n", field, value, value.Type(), newValue, newValue.Type())
+
+		value.Set(newValue)
+		return nil
+	})
+}
+
+func storePersistenceFields(obj interface{}, id string, persistence service.PersistenceService) error {
+	return iterateFieldsByTag(obj, "persistence", func(tag string, ft reflect.StructField, fv reflect.Value) error {
+		inf := fv.Interface()
+
+		store := persistence.NewStore("state", id, tag)
+		return store.Save(inf)
+	})
 }

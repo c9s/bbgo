@@ -9,12 +9,17 @@ import (
 
 type State struct {
 	CoveredPosition fixedpoint.Value `json:"coveredPosition,omitempty"`
+
+	// Deprecated:
 	Position        *types.Position  `json:"position,omitempty"`
+
+	// Deprecated:
 	ProfitStats     ProfitStats      `json:"profitStats,omitempty"`
 }
 
 type ProfitStats struct {
-	types.ProfitStats
+	*types.ProfitStats
+
 	lock sync.Mutex
 
 	MakerExchange types.ExchangeName `json:"makerExchange"`
