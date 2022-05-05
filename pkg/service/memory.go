@@ -36,7 +36,8 @@ func (store *MemoryStore) Save(val interface{}) error {
 func (store *MemoryStore) Load(val interface{}) error {
 	v := reflect.ValueOf(val)
 	if data, ok := store.memory.Slots[store.Key]; ok {
-		v.Elem().Set(reflect.ValueOf(data).Elem())
+		dataRV := reflect.ValueOf(data)
+		v.Elem().Set(dataRV)
 	} else {
 		return ErrPersistenceNotExists
 	}

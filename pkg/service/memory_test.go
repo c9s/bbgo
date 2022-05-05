@@ -21,7 +21,7 @@ func TestMemoryService(t *testing.T) {
 		store := service.NewStore("test")
 
 		i := 3
-		err := store.Save(&i)
+		err := store.Save(i)
 
 		assert.NoError(t, err)
 

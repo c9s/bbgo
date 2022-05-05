@@ -218,6 +218,16 @@ type ProfitStats struct {
 	TodaySince     int64            `json:"todaySince,omitempty"`
 }
 
+func NewProfitStats(market Market) *ProfitStats {
+	return &ProfitStats{
+		Symbol:           market.Symbol,
+		BaseCurrency:     market.BaseCurrency,
+		QuoteCurrency:    market.QuoteCurrency,
+		AccumulatedSince: time.Now().Unix(),
+	}
+}
+
+
 func (s *ProfitStats) Init(market Market) {
 	s.Symbol = market.Symbol
 	s.BaseCurrency = market.BaseCurrency

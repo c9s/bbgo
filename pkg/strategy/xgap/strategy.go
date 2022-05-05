@@ -11,7 +11,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
-	"github.com/c9s/bbgo/pkg/exchange/max"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
@@ -232,7 +231,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	s.tradingSession.UserDataStream.OnTradeUpdate(s.handleTradeUpdate)
 
 	instanceID := fmt.Sprintf("%s-%s", ID, s.Symbol)
-	s.groupID = max.GenerateGroupID(instanceID)
+	s.groupID = util.FNV32(instanceID)
 	log.Infof("using group id %d from fnv32(%s)", s.groupID, instanceID)
 
 	go func() {
