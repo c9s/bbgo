@@ -582,7 +582,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	// calculate group id for orders
 	instanceID := s.InstanceID()
 	s.groupID = util.FNV32(instanceID)
-	log.Infof("using group id %d from fnv(%s)", s.groupID, instanceID)
 
 	// restore state
 	if err := s.LoadState(); err != nil {
@@ -601,13 +600,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	if s.ProfitStats == nil {
 		if s.state != nil {
-			// copy stats
+			// copy profit stats
 			p2 := s.state.ProfitStats
 			s.ProfitStats = &p2
 		} else {
 			s.ProfitStats = s.newProfitStats()
 		}
-
 	}
 
 	// Always update the position fields
