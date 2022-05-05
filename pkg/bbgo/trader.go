@@ -248,15 +248,6 @@ func (trader *Trader) RunSingleExchangeStrategy(ctx context.Context, strategy Si
 		}
 	}
 
-	// Before we run the strategy we need to load the state from the persistence layer:
-	// 1) scan the struct fields and find the persistence field
-	// 2) load the data and set the value into the persistence field.
-
-	ps := trader.environment.PersistenceServiceFacade.Get()
-	if err := loadPersistenceFields(strategy, strategy.ID(), ps); err != nil {
-		return err
-	}
-
 	return strategy.Run(ctx, orderExecutor, session)
 }
 
@@ -322,7 +313,6 @@ func (trader *Trader) Run(ctx context.Context) error {
 		router.executors[sessionID] = orderExecutor
 	}
 
-	ps := trader.environment.PersistenceServiceFacade.Get()
 	for _, strategy := range trader.crossExchangeStrategies {
 		rs := reflect.ValueOf(strategy)
 
@@ -336,16 +326,78 @@ func (trader *Trader) Run(ctx context.Context) error {
 			return err
 		}
 
-		if err := loadPersistenceFields(strategy, strategy.ID(), ps); err != nil {
-			return err
-		}
-
 		if err := strategy.CrossRun(ctx, router, trader.environment.sessions); err != nil {
 			return err
 		}
 	}
 
 	return trader.environment.Connect(ctx)
+}
+
+func (trader *Trader) LoadState() error {
+	if trader.environment.BacktestService != nil {
+		return nil
+	}
+
+	if trader.environment.PersistenceServiceFacade == nil {
+		return nil
+	}
+
+	ps := trader.environment.PersistenceServiceFacade.Get()
+
+	log.Infof("loading strategies states...")
+	for _, strategies := range trader.exchangeStrategies {
+		for _, strategy := range strategies {
+			if err := loadPersistenceFields(strategy, strategy.ID(), ps); err != nil {
+				return err
+			}
+		}
+	}
+	for _, strategy := range trader.crossExchangeStrategies {
+		if err := loadPersistenceFields(strategy, strategy.ID(), ps); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (trader *Trader) SaveState() error {
+	if trader.environment.BacktestService != nil {
+		return nil
+	}
+
+	if trader.environment.PersistenceServiceFacade == nil {
+		return nil
+	}
+
+	ps := trader.environment.PersistenceServiceFacade.Get()
+
+	log.Infof("saving strategies states...")
+	for _, strategies := range trader.exchangeStrategies {
+		for _, strategy := range strategies {
+			id := callID(strategy)
+			if len(id) == 0 {
+				continue
+			}
+
+			if err := storePersistenceFields(strategy, id, ps); err != nil {
+				return err
+			}
+		}
+	}
+	for _, strategy := range trader.crossExchangeStrategies {
+		id := callID(strategy)
+		if len(id) == 0 {
+			continue
+		}
+
+		if err := storePersistenceFields(strategy, id, ps); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 var defaultPersistenceSelector = &PersistenceSelector{

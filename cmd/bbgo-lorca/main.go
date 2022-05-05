@@ -102,6 +102,11 @@ func main() {
 			return
 		}
 
+		if err := trader.LoadState() ; err != nil {
+			log.WithError(err).Error("failed to load strategy states")
+			return
+		}
+
 		// for setup mode, we don't start the trader
 		go func() {
 			if err := trader.Run(ctx); err != nil {
