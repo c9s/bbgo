@@ -248,6 +248,12 @@ func (trader *Trader) RunSingleExchangeStrategy(ctx context.Context, strategy Si
 		}
 	}
 
+	// Before we run the strategy we need to load the state from the persistence layer:
+	// 1) scan the struct fields and find the persistence field
+	// 2) load the data and set the value into the persistence field.
+
+	_ = trader.environment.PersistenceServiceFacade
+
 	return strategy.Run(ctx, orderExecutor, session)
 }
 

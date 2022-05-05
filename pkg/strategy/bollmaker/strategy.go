@@ -566,6 +566,10 @@ func (s *Strategy) adjustOrderQuantity(submitOrder types.SubmitOrder) types.Subm
 	return submitOrder
 }
 
+func (s *Strategy) InstanceID() string {
+	return fmt.Sprintf("%s-%s", ID, s.Symbol)
+}
+
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	// StrategyController
 	s.status = types.StrategyStatusRunning
@@ -596,7 +600,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.defaultBoll = s.StandardIndicatorSet.BOLL(s.DefaultBollinger.IntervalWindow, s.DefaultBollinger.BandWidth)
 
 	// calculate group id for orders
-	instanceID := fmt.Sprintf("%s-%s", ID, s.Symbol)
+	instanceID := s.InstanceID()
 	s.groupID = max.GenerateGroupID(instanceID)
 	log.Infof("using group id %d from fnv(%s)", s.groupID, instanceID)
 

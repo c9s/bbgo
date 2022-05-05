@@ -7,24 +7,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func isSymbolBasedStrategy(rs reflect.Value) (string, bool) {
-	field := rs.FieldByName("Symbol")
-	if !field.IsValid() {
-		return "", false
-	}
-
-	if field.Kind() != reflect.String {
-		return "", false
-	}
-
-	return field.String(), true
-}
-
-func hasField(rs reflect.Value, fieldName string) (field reflect.Value, ok bool) {
-	field = rs.FieldByName(fieldName)
-	return field, field.IsValid()
-}
-
 func injectField(rs reflect.Value, fieldName string, obj interface{}, pointerOnly bool) error {
 	field := rs.FieldByName(fieldName)
 	if !field.IsValid() {
