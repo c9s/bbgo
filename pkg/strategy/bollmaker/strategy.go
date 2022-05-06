@@ -168,7 +168,7 @@ type Strategy struct {
 	neutralBoll *indicator.BOLL
 
 	// StrategyController
-	status types.StrategyStatus
+	bbgo.StrategyController
 }
 
 func (s *Strategy) ID() string {
@@ -249,45 +249,6 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 
 	s.orderStore.Add(createdOrders...)
 	s.activeMakerOrders.Add(createdOrders...)
-	return err
-}
-
-// StrategyController
-
-func (s *Strategy) GetStatus() types.StrategyStatus {
-	return s.status
-}
-
-func (s *Strategy) Suspend(ctx context.Context) error {
-	s.status = types.StrategyStatusStopped
-
-	// Cancel all order
-	if err := s.activeMakerOrders.GracefulCancel(ctx, s.session.Exchange); err != nil {
-		log.WithError(err).Errorf("graceful cancel order error")
-		s.Notify("graceful cancel order error")
-	} else {
-		s.Notify("All orders are cancelled.")
-	}
-
-	s.tradeCollector.Process()
-
-	return s.Persistence.Sync(s)
-}
-
-func (s *Strategy) Resume(ctx context.Context) error {
-	s.status = types.StrategyStatusRunning
-
-	return nil
-}
-
-func (s *Strategy) EmergencyStop(ctx context.Context) error {
-	// Close 100% position
-	percentage, _ := fixedpoint.NewFromString("100%")
-	err := s.ClosePosition(ctx, percentage)
-
-	// Suspend strategy
-	_ = s.Suspend(ctx)
-
 	return err
 }
 
@@ -544,7 +505,29 @@ func (s *Strategy) adjustOrderQuantity(submitOrder types.SubmitOrder) types.Subm
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	// StrategyController
-	s.status = types.StrategyStatusRunning
+	s.Status = types.StrategyStatusRunning
+
+	s.OnSuspend(func() {
+		s.Status = types.StrategyStatusStopped
+
+		// Cancel all order
+		if err := s.activeMakerOrders.GracefulCancel(ctx, s.session.Exchange); err != nil {
+			log.WithError(err).Errorf("graceful cancel order error")
+			s.Notify("graceful cancel order error")
+		} else {
+			s.Notify("All orders are cancelled.")
+		}
+
+		s.tradeCollector.Process()
+
+		_ = s.Persistence.Sync(s)
+	})
+
+	s.OnEmergencyStop(func() {
+		// Close 100% position
+		percentage := fixedpoint.NewFromFloat(1.0)
+		_ = s.ClosePosition(ctx, percentage)
+	})
 
 	if s.DisableShort {
 		s.Long = &[]bool{true}[0]
@@ -616,7 +599,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
 		// StrategyController
-		if s.status != types.StrategyStatusRunning {
+		if s.Status != types.StrategyStatusRunning {
 			return
 		}
 
@@ -666,7 +649,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		// StrategyController
-		if s.status != types.StrategyStatusRunning {
+		if s.Status != types.StrategyStatusRunning {
 			return
 		}
 
