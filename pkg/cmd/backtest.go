@@ -22,19 +22,9 @@ import (
 	"github.com/c9s/bbgo/pkg/backtest"
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
-	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 )
-
-type BackTestReport struct {
-	Symbol          string                    `json:"symbol,omitempty"`
-	LastPrice       fixedpoint.Value          `json:"lastPrice,omitempty"`
-	StartPrice      fixedpoint.Value          `json:"startPrice,omitempty"`
-	PnLReport       *pnl.AverageCostPnlReport `json:"pnlReport,omitempty"`
-	InitialBalances types.BalanceMap          `json:"initialBalances,omitempty"`
-	FinalBalances   types.BalanceMap          `json:"finalBalances,omitempty"`
-}
 
 func init() {
 	BacktestCmd.Flags().Bool("sync", false, "sync backtest data")
@@ -53,7 +43,7 @@ func init() {
 
 var BacktestCmd = &cobra.Command{
 	Use:          "backtest",
-	Short:        "backtest your strategies",
+	Short:        "run backtest with strategies",
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		verboseCnt, err := cmd.Flags().GetCount("verbose")
@@ -98,6 +88,9 @@ var BacktestCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		kLineDirectory := filepath.Join(outputDirectory, "klines")
+		_ = kLineDirectory
 
 		jsonOutputEnabled := len(outputDirectory) > 0
 
@@ -317,37 +310,47 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
-		type KChanEx struct {
-			KChan    chan types.KLine
-			Exchange *backtest.Exchange
-		}
 		for _, session := range environ.Sessions() {
 			backtestExchange := session.Exchange.(*backtest.Exchange)
 			backtestExchange.InitMarketData()
 		}
 
-		var klineChans []KChanEx
+		var exchangeSources []backtest.ExchangeDataSource
 		for _, session := range environ.Sessions() {
 			exchange := session.Exchange.(*backtest.Exchange)
 			c, err := exchange.GetMarketData()
 			if err != nil {
 				return err
 			}
-			klineChans = append(klineChans, KChanEx{KChan: c, Exchange: exchange})
+			exchangeSources = append(exchangeSources, backtest.ExchangeDataSource{C: c, Exchange: exchange})
 		}
 
 		runCtx, cancelRun := context.WithCancel(ctx)
 		go func() {
 			defer cancelRun()
+
+			// Optimize back-test speed for single exchange source
+			var count = len(exchangeSources)
+			if count == 1 {
+				exSource := exchangeSources[0]
+				for k := range exSource.C {
+					exSource.Exchange.ConsumeKLine(k)
+				}
+
+				if err := exSource.Exchange.CloseMarketData(); err != nil {
+					log.WithError(err).Errorf("close market data error")
+				}
+				return
+			}
+
 			for {
-				count := len(klineChans)
-				for _, kchanex := range klineChans {
-					kLine, more := <-kchanex.KChan
+				for _, exK := range exchangeSources {
+					kLine, more := <-exK.C
 					if more {
-						kchanex.Exchange.ConsumeKLine(kLine)
+						exK.Exchange.ConsumeKLine(kLine)
 					} else {
-						if err := kchanex.Exchange.CloseMarketData(); err != nil {
-							log.Errorf("%v", err)
+						if err := exK.Exchange.CloseMarketData(); err != nil {
+							log.WithError(err).Errorf("close market data error")
 							return
 						}
 						count--
@@ -397,7 +400,7 @@ var BacktestCmd = &cobra.Command{
 
 				report := calculator.Calculate(symbol, trades.Trades, lastPrice)
 				report.Print()
-				
+
 				accountConfig, ok := userConfig.Backtest.Accounts[exchangeName]
 				if !ok {
 					accountConfig = userConfig.Backtest.Account[exchangeName]
@@ -413,7 +416,7 @@ var BacktestCmd = &cobra.Command{
 				finalBalances.Print()
 
 				if jsonOutputEnabled {
-					result := BackTestReport{
+					result := backtest.BackTestReport{
 						Symbol:          symbol,
 						LastPrice:       lastPrice,
 						StartPrice:      startPrice,
