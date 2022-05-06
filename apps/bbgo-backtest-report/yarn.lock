@@ -1160,6 +1160,11 @@ json5@^1.0.1:
     array-includes "^3.1.4"
     object.assign "^4.1.2"
 
+klinecharts@^8.3.6:
+  version "8.3.6"
+  resolved "https://registry.yarnpkg.com/klinecharts/-/klinecharts-8.3.6.tgz#42f4e08b2627caf5855be133a537b1135b675221"
+  integrity sha512-HH8ToVEwP9n+S6BtTI9cjVa/JWsjsbN5x9P7ts0l+BVFeK3OOcfL+R9oym9SQJ1fjG1LJ5E+sMNL6xj8dl4RPA==
+
 language-subtag-registry@~0.3.2:
   version "0.3.21"
   resolved "https://registry.yarnpkg.com/language-subtag-registry/-/language-subtag-registry-0.3.21.tgz#04ac218bea46f04cb039084602c6da9e788dd45a"
