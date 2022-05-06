@@ -390,7 +390,7 @@ import (
 )
 ```
 
-## Write your own strategy
+## Write your own private strategy
 
 Create your go package, and initialize the repository with `go mod` and add bbgo as a dependency:
 
@@ -442,6 +442,13 @@ Or you can build your own wrapper binary via:
 ```shell
 bbgo build --config config/bbgo.yaml
 ```
+
+See also:
+
+- <https://github.com/narumiruna/bbgo-template>
+- <https://github.com/narumiruna/bbgo-marketcap>
+- <https://github.com/austin362667/shadow>
+- <https://github.com/jnlin/bbgo-strategy-infinite-grid>
 
 ## Command Usages
 
