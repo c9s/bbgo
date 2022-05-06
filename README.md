@@ -73,7 +73,7 @@ Check the details in [$BBG Contract Page](contracts/README.md) and our [official
 Get your exchange API key and secret after you register the accounts (you can choose one or more exchanges):
 
 - MAX: <https://max.maicoin.com/signup?r=c7982718>
-- Binance: <https://www.binancezh.com/en/register?ref=VGDGLT80>
+- Binance: <https://accounts.binance.com/en/register?ref=38192708>
 - FTX: <https://ftx.com/#a=7710474>
 - OKEx: <https://www.okex.com/join/2412712?src=from:ios-share>
 - Kucoin: <https://www.kucoin.com/ucenter/signup?rcode=r3KX2D4>
