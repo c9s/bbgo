@@ -48,6 +48,16 @@ func TestClient_Requests(t *testing.T) {
 		tt func(t *testing.T)
 	} {
 		{
+			name: "GetMarketsRequest",
+			tt: func(t *testing.T) {
+				req := client.NewGetMarketsRequest()
+				markets ,err := req.Do(ctx)
+				assert.NoError(t, err)
+				assert.NotNil(t, markets)
+				t.Logf("markets: %+v", markets)
+			},
+		},
+		{
 			name: "GetAccountRequest",
 			tt: func(t *testing.T) {
 				req := client.NewGetAccountRequest()
@@ -85,7 +95,7 @@ func TestClient_Requests(t *testing.T) {
 			name: "GetFillsRequest",
 			tt: func(t *testing.T) {
 				req := client.NewGetFillsRequest()
-				req.Market("CRO/USDT")
+				req.Market("CRO/USD")
 				fills, err := req.Do(ctx)
 				assert.NoError(t, err)
 				assert.NotNil(t, fills)
