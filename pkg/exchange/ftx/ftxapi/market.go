@@ -35,7 +35,7 @@ type Market struct {
 }
 //go:generate GetRequest -url "api/markets" -type GetMarketsRequest -responseDataType []Market
 type GetMarketsRequest struct {
-	client requestgen.AuthenticatedAPIClient
+	client requestgen.APIClient
 }
 
 func (c *RestClient) NewGetMarketsRequest() *GetMarketsRequest {
