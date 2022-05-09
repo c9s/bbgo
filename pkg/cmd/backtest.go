@@ -32,6 +32,8 @@ func init() {
 	BacktestCmd.Flags().Bool("sync-only", false, "sync backtest data only, do not run backtest")
 	BacktestCmd.Flags().String("sync-from", "", "sync backtest data from the given time, which will override the time range in the backtest config")
 	BacktestCmd.Flags().String("sync-exchange", "", "specify only one exchange to sync backtest data")
+	BacktestCmd.Flags().String("session", "", "specify only one exchange session to run backtest")
+
 	BacktestCmd.Flags().Bool("verify", false, "verify the kline back-test data")
 
 	BacktestCmd.Flags().Bool("base-asset-baseline", false, "use base asset performance as the competitive baseline performance")
@@ -77,6 +79,11 @@ var BacktestCmd = &cobra.Command{
 		}
 
 		syncExchangeName, err := cmd.Flags().GetString("sync-exchange")
+		if err != nil {
+			return err
+		}
+
+		backtestSessionName, err := cmd.Flags().GetString("session")
 		if err != nil {
 			return err
 		}
@@ -164,6 +171,10 @@ var BacktestCmd = &cobra.Command{
 
 		backtestService := &service.BacktestService{DB: environ.DatabaseService.DB}
 		environ.BacktestService = backtestService
+
+		if len(backtestSessionName) > 0 {
+			userConfig.Backtest.Sessions = []string{backtestSessionName}
+		}
 
 		var sourceExchanges = make(map[types.ExchangeName]types.Exchange)
 		if len(syncExchangeName) > 0 {
@@ -331,7 +342,6 @@ var BacktestCmd = &cobra.Command{
 			exchangeSources = append(exchangeSources, backtest.ExchangeDataSource{C: c, Exchange: exchange})
 		}
 
-		runCtx, cancelRun := context.WithCancel(ctx)
 		var kLineHandlers []func(k types.KLine)
 		if generatingReport {
 			dumpDir := outputDirectory
@@ -341,9 +351,15 @@ var BacktestCmd = &cobra.Command{
 
 			dumpDir = filepath.Join(dumpDir, "klines")
 
+			if _, err := os.Stat(dumpDir) ; os.IsNotExist(err) {
+				if err2 := os.MkdirAll(dumpDir, 0755) ; err2 != nil {
+					return err2
+				}
+			}
+
 			dumper := backtest.NewKLineDumper(dumpDir)
 			defer func() {
-				if err := dumper.Close() ; err != nil {
+				if err := dumper.Close(); err != nil {
 					log.WithError(err).Errorf("kline dumper can not close files")
 				}
 			}()
@@ -355,6 +371,7 @@ var BacktestCmd = &cobra.Command{
 			})
 		}
 
+		runCtx, cancelRun := context.WithCancel(ctx)
 		go func() {
 			defer cancelRun()
 
