@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -59,6 +60,34 @@ func (b Balance) String() (o string) {
 	}
 
 	return o
+}
+
+
+type BalanceSnapshot struct {
+	Balances BalanceMap `json:"balances"`
+	Session  string     `json:"session"`
+	Time     time.Time  `json:"time"`
+}
+
+func (m BalanceSnapshot) CsvHeader() []string {
+	return []string{"time", "session", "currency", "available", "locked", "borrowed"}
+}
+
+func (m BalanceSnapshot) CsvRecords() [][]string {
+	var records [][]string
+
+	for cur, b := range m.Balances {
+		records = append(records, []string{
+			strconv.FormatInt(m.Time.Unix(), 10),
+			m.Session,
+			cur,
+			b.Available.String(),
+			b.Locked.String(),
+			b.Borrowed.String(),
+		})
+	}
+
+	return records
 }
 
 type BalanceMap map[string]Balance
