@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/fatih/color"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -38,6 +39,7 @@ func init() {
 	BacktestCmd.Flags().String("config", "config/bbgo.yaml", "strategy config file")
 	BacktestCmd.Flags().Bool("force", false, "force execution without confirm")
 	BacktestCmd.Flags().String("output", "", "the report output directory")
+	BacktestCmd.Flags().Bool("subdir", false, "generate report in the sub-directory of the output directory")
 	RootCmd.AddCommand(BacktestCmd)
 }
 
@@ -89,8 +91,12 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
-		kLineDirectory := filepath.Join(outputDirectory, "klines")
-		_ = kLineDirectory
+		generatingReport := len(outputDirectory) > 0
+
+		reportFileInSubDir, err := cmd.Flags().GetBool("subdir")
+		if err != nil {
+			return err
+		}
 
 		jsonOutputEnabled := len(outputDirectory) > 0
 
@@ -326,6 +332,29 @@ var BacktestCmd = &cobra.Command{
 		}
 
 		runCtx, cancelRun := context.WithCancel(ctx)
+		var kLineHandlers []func(k types.KLine)
+		if generatingReport {
+			dumpDir := outputDirectory
+			if reportFileInSubDir {
+				dumpDir = filepath.Join(dumpDir, uuid.NewString())
+			}
+
+			dumpDir = filepath.Join(dumpDir, "klines")
+
+			dumper := backtest.NewKLineDumper(dumpDir)
+			defer func() {
+				if err := dumper.Close() ; err != nil {
+					log.WithError(err).Errorf("kline dumper can not close files")
+				}
+			}()
+
+			kLineHandlers = append(kLineHandlers, func(k types.KLine) {
+				if err := dumper.Record(k); err != nil {
+					log.WithError(err).Errorf("can not write kline to file")
+				}
+			})
+		}
+
 		go func() {
 			defer cancelRun()
 
@@ -335,6 +364,10 @@ var BacktestCmd = &cobra.Command{
 				exSource := exchangeSources[0]
 				for k := range exSource.C {
 					exSource.Exchange.ConsumeKLine(k)
+
+					for _, h := range kLineHandlers {
+						h(k)
+					}
 				}
 
 				if err := exSource.Exchange.CloseMarketData(); err != nil {
@@ -345,9 +378,13 @@ var BacktestCmd = &cobra.Command{
 
 			for {
 				for _, exK := range exchangeSources {
-					kLine, more := <-exK.C
+					k, more := <-exK.C
 					if more {
-						exK.Exchange.ConsumeKLine(kLine)
+						exK.Exchange.ConsumeKLine(k)
+
+						for _, h := range kLineHandlers {
+							h(k)
+						}
 					} else {
 						if err := exK.Exchange.CloseMarketData(); err != nil {
 							log.WithError(err).Errorf("close market data error")

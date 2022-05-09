@@ -239,6 +239,10 @@ func (environ *Environment) AddExchangesFromSessionConfig(sessions map[string]*E
 	return nil
 }
 
+func (environ *Environment) IsBackTesting() bool {
+	return environ.BacktestService != nil
+}
+
 // Init prepares the data that will be used by the strategies
 func (environ *Environment) Init(ctx context.Context) (err error) {
 	for n := range environ.sessions {
