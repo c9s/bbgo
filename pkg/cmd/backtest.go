@@ -150,13 +150,11 @@ var BacktestCmd = &cobra.Command{
 
 		// set default start time to the past 6 months
 		// userConfig.Backtest.StartTime = now.AddDate(0, -6, 0).Format("2006-01-02")
-
 		if userConfig.Backtest.EndTime != nil {
 			endTime = userConfig.Backtest.EndTime.Time()
 		} else {
 			endTime = now
 		}
-		_ = endTime
 
 		log.Infof("starting backtest with startTime %s", startTime.Format(time.ANSIC))
 
@@ -468,6 +466,8 @@ var BacktestCmd = &cobra.Command{
 
 				if jsonOutputEnabled {
 					result := backtest.Report{
+						StartTime:       startTime,
+						EndTime:         endTime,
 						Symbol:          symbol,
 						LastPrice:       lastPrice,
 						StartPrice:      startPrice,

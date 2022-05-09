@@ -11,6 +11,8 @@ import (
 )
 
 type Report struct {
+	StartTime       time.Time                 `json:"startTime"`
+	EndTime         time.Time                 `json:"endTime"`
 	Symbol          string                    `json:"symbol,omitempty"`
 	LastPrice       fixedpoint.Value          `json:"lastPrice,omitempty"`
 	StartPrice      fixedpoint.Value          `json:"startPrice,omitempty"`
