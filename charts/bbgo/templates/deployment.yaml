@@ -52,7 +52,7 @@ spec:
           {{- if .Values.grpc.enabled }}
           - "--enable-grpc"
           - "--grpc-bind"
-          - {{ .Values.grpc.port | default 50051 | quote }}
+          - {{ printf ":%d" (.Values.grpc.port | int) | default ":50051" | quote }}
           {{- end }}
           {{- if .Values.debug.enabled }}
           - "--debug"
