@@ -6,7 +6,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-type BackTestReport struct {
+type Report struct {
 	Symbol          string                    `json:"symbol,omitempty"`
 	LastPrice       fixedpoint.Value          `json:"lastPrice,omitempty"`
 	StartPrice      fixedpoint.Value          `json:"startPrice,omitempty"`
@@ -14,3 +14,4 @@ type BackTestReport struct {
 	InitialBalances types.BalanceMap          `json:"initialBalances,omitempty"`
 	FinalBalances   types.BalanceMap          `json:"finalBalances,omitempty"`
 }
+
