@@ -5,9 +5,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/c9s/bbgo/pkg/fixedpoint"
 	log "github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
+
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 
 	"github.com/c9s/bbgo/pkg/slack/slackstyle"
 	"github.com/c9s/bbgo/pkg/types"
@@ -41,10 +42,7 @@ func (report AverageCostPnlReport) Print() {
 	log.Infof("AVERAGE COST: %s", types.USD.FormatMoney(report.AverageCost))
 	log.Infof("TOTAL BUY VOLUME: %v", report.BuyVolume)
 	log.Infof("TOTAL SELL VOLUME: %v", report.SellVolume)
-	log.Infof("STOCK: %s", report.Stock.String())
 
-	// FIXME:
-	// log.Infof("FEE (USD): %f", report.FeeInUSD)
 	log.Infof("CURRENT PRICE: %s", types.USD.FormatMoney(report.LastPrice))
 	log.Infof("CURRENCY FEES:")
 	for currency, fee := range report.CurrencyFees {
