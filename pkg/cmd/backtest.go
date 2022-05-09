@@ -416,7 +416,7 @@ var BacktestCmd = &cobra.Command{
 				finalBalances.Print()
 
 				if jsonOutputEnabled {
-					result := backtest.BackTestReport{
+					result := backtest.Report{
 						Symbol:          symbol,
 						LastPrice:       lastPrice,
 						StartPrice:      startPrice,
