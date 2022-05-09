@@ -98,3 +98,7 @@ The `KLineWindowUpdater` interface is currently defined in `pkg/indicator/ewma.g
 
 Once the implementation is done, run `go generate` to generate the callback functions of the indicator.
 You should be able to implement your strategy and use the new indicator in the same way as `AD`.
+
+#### Generalize
+
+In order to provide indicator users a lower learning curve, we've designed the `types.Series` interface. We recommend indicator developers to also implement the `types.Series` interface to provide richer functionality on the computed result. To have deeper understanding how `types.Series` works, please refer to [doc/development/series.md](./series.md)
