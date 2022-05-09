@@ -83,7 +83,7 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
-		backtestSessionName, err := cmd.Flags().GetString("session")
+		sessionName, err := cmd.Flags().GetString("session")
 		if err != nil {
 			return err
 		}
@@ -172,13 +172,20 @@ var BacktestCmd = &cobra.Command{
 		backtestService := &service.BacktestService{DB: environ.DatabaseService.DB}
 		environ.BacktestService = backtestService
 
-		if len(backtestSessionName) > 0 {
-			userConfig.Backtest.Sessions = []string{backtestSessionName}
+		if len(sessionName) > 0 {
+			userConfig.Backtest.Sessions = []string{sessionName}
+		} else if len(syncExchangeName) > 0 {
+			userConfig.Backtest.Sessions = []string{syncExchangeName}
+		} else if len(userConfig.Backtest.Sessions) == 0 {
+			log.Infof("backtest.sessions is not defined, using all supported exchanges: %v", types.SupportedExchanges)
+			for _, exName := range types.SupportedExchanges {
+				userConfig.Backtest.Sessions = append(userConfig.Backtest.Sessions, exName.String())
+			}
 		}
 
 		var sourceExchanges = make(map[types.ExchangeName]types.Exchange)
-		if len(syncExchangeName) > 0 {
-			exName, err := types.ValidExchangeName(syncExchangeName)
+		for _, name := range userConfig.Backtest.Sessions {
+			exName, err := types.ValidExchangeName(name)
 			if err != nil {
 				return err
 			}
@@ -188,29 +195,6 @@ var BacktestCmd = &cobra.Command{
 				return err
 			}
 			sourceExchanges[exName] = publicExchange
-
-		} else if len(userConfig.Backtest.Sessions) > 0 {
-			for _, name := range userConfig.Backtest.Sessions {
-				exName, err := types.ValidExchangeName(name)
-				if err != nil {
-					return err
-				}
-
-				publicExchange, err := cmdutil.NewExchangePublic(exName)
-				if err != nil {
-					return err
-				}
-				sourceExchanges[exName] = publicExchange
-			}
-		} else {
-			log.Infof("backtest.sessions is not defined, loading all supported exchanges: %v", types.SupportedExchanges)
-			for _, exName := range types.SupportedExchanges {
-				publicExchange, err := cmdutil.NewExchangePublic(exName)
-				if err != nil {
-					return err
-				}
-				sourceExchanges[exName] = publicExchange
-			}
 		}
 
 		if wantSync {
@@ -342,17 +326,26 @@ var BacktestCmd = &cobra.Command{
 			exchangeSources = append(exchangeSources, backtest.ExchangeDataSource{C: c, Exchange: exchange})
 		}
 
+		// back-test session report name
+		var backtestSessionName = backtest.FormatSessionName(
+			userConfig.Backtest.Sessions,
+			userConfig.Backtest.Symbols,
+			userConfig.Backtest.StartTime.Time(),
+			userConfig.Backtest.EndTime.Time(),
+		)
+		
 		var kLineHandlers []func(k types.KLine)
 		if generatingReport {
 			dumpDir := outputDirectory
 			if reportFileInSubDir {
+				dumpDir = filepath.Join(dumpDir, backtestSessionName)
 				dumpDir = filepath.Join(dumpDir, uuid.NewString())
 			}
 
 			dumpDir = filepath.Join(dumpDir, "klines")
 
-			if _, err := os.Stat(dumpDir) ; os.IsNotExist(err) {
-				if err2 := os.MkdirAll(dumpDir, 0755) ; err2 != nil {
+			if _, err := os.Stat(dumpDir); os.IsNotExist(err) {
+				if err2 := os.MkdirAll(dumpDir, 0755); err2 != nil {
 					return err2
 				}
 			}
