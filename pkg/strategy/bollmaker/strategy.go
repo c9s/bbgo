@@ -631,6 +631,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.SmartStops.RunStopControllers(ctx, session, s.tradeCollector)
 
+	if s.Environment.IsBackTesting() {
+		log.Warn("turning of useTickerPrice option in the back-testing environment...")
+		s.UseTickerPrice = false
+	}
+
 	session.UserDataStream.OnStart(func() {
 		if s.UseTickerPrice {
 			ticker, err := s.session.Exchange.QueryTicker(ctx, s.Symbol)

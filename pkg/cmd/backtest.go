@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/fatih/color"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -22,25 +23,17 @@ import (
 	"github.com/c9s/bbgo/pkg/backtest"
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
-	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 )
-
-type BackTestReport struct {
-	Symbol          string                    `json:"symbol,omitempty"`
-	LastPrice       fixedpoint.Value          `json:"lastPrice,omitempty"`
-	StartPrice      fixedpoint.Value          `json:"startPrice,omitempty"`
-	PnLReport       *pnl.AverageCostPnlReport `json:"pnlReport,omitempty"`
-	InitialBalances types.BalanceMap          `json:"initialBalances,omitempty"`
-	FinalBalances   types.BalanceMap          `json:"finalBalances,omitempty"`
-}
 
 func init() {
 	BacktestCmd.Flags().Bool("sync", false, "sync backtest data")
 	BacktestCmd.Flags().Bool("sync-only", false, "sync backtest data only, do not run backtest")
 	BacktestCmd.Flags().String("sync-from", "", "sync backtest data from the given time, which will override the time range in the backtest config")
 	BacktestCmd.Flags().String("sync-exchange", "", "specify only one exchange to sync backtest data")
+	BacktestCmd.Flags().String("session", "", "specify only one exchange session to run backtest")
+
 	BacktestCmd.Flags().Bool("verify", false, "verify the kline back-test data")
 
 	BacktestCmd.Flags().Bool("base-asset-baseline", false, "use base asset performance as the competitive baseline performance")
@@ -48,12 +41,13 @@ func init() {
 	BacktestCmd.Flags().String("config", "config/bbgo.yaml", "strategy config file")
 	BacktestCmd.Flags().Bool("force", false, "force execution without confirm")
 	BacktestCmd.Flags().String("output", "", "the report output directory")
+	BacktestCmd.Flags().Bool("subdir", false, "generate report in the sub-directory of the output directory")
 	RootCmd.AddCommand(BacktestCmd)
 }
 
 var BacktestCmd = &cobra.Command{
 	Use:          "backtest",
-	Short:        "backtest your strategies",
+	Short:        "run backtest with strategies",
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		verboseCnt, err := cmd.Flags().GetCount("verbose")
@@ -89,12 +83,24 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
+		sessionName, err := cmd.Flags().GetString("session")
+		if err != nil {
+			return err
+		}
+
 		force, err := cmd.Flags().GetBool("force")
 		if err != nil {
 			return err
 		}
 
 		outputDirectory, err := cmd.Flags().GetString("output")
+		if err != nil {
+			return err
+		}
+
+		generatingReport := len(outputDirectory) > 0
+
+		reportFileInSubDir, err := cmd.Flags().GetBool("subdir")
 		if err != nil {
 			return err
 		}
@@ -166,9 +172,20 @@ var BacktestCmd = &cobra.Command{
 		backtestService := &service.BacktestService{DB: environ.DatabaseService.DB}
 		environ.BacktestService = backtestService
 
+		if len(sessionName) > 0 {
+			userConfig.Backtest.Sessions = []string{sessionName}
+		} else if len(syncExchangeName) > 0 {
+			userConfig.Backtest.Sessions = []string{syncExchangeName}
+		} else if len(userConfig.Backtest.Sessions) == 0 {
+			log.Infof("backtest.sessions is not defined, using all supported exchanges: %v", types.SupportedExchanges)
+			for _, exName := range types.SupportedExchanges {
+				userConfig.Backtest.Sessions = append(userConfig.Backtest.Sessions, exName.String())
+			}
+		}
+
 		var sourceExchanges = make(map[types.ExchangeName]types.Exchange)
-		if len(syncExchangeName) > 0 {
-			exName, err := types.ValidExchangeName(syncExchangeName)
+		for _, name := range userConfig.Backtest.Sessions {
+			exName, err := types.ValidExchangeName(name)
 			if err != nil {
 				return err
 			}
@@ -178,29 +195,6 @@ var BacktestCmd = &cobra.Command{
 				return err
 			}
 			sourceExchanges[exName] = publicExchange
-
-		} else if len(userConfig.Backtest.Sessions) > 0 {
-			for _, name := range userConfig.Backtest.Sessions {
-				exName, err := types.ValidExchangeName(name)
-				if err != nil {
-					return err
-				}
-
-				publicExchange, err := cmdutil.NewExchangePublic(exName)
-				if err != nil {
-					return err
-				}
-				sourceExchanges[exName] = publicExchange
-			}
-		} else {
-			log.Infof("backtest.sessions is not defined, loading all supported exchanges: %v", types.SupportedExchanges)
-			for _, exName := range types.SupportedExchanges {
-				publicExchange, err := cmdutil.NewExchangePublic(exName)
-				if err != nil {
-					return err
-				}
-				sourceExchanges[exName] = publicExchange
-			}
 		}
 
 		if wantSync {
@@ -317,37 +311,97 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
-		type KChanEx struct {
-			KChan    chan types.KLine
-			Exchange *backtest.Exchange
-		}
 		for _, session := range environ.Sessions() {
 			backtestExchange := session.Exchange.(*backtest.Exchange)
 			backtestExchange.InitMarketData()
 		}
 
-		var klineChans []KChanEx
+		var exchangeSources []backtest.ExchangeDataSource
 		for _, session := range environ.Sessions() {
 			exchange := session.Exchange.(*backtest.Exchange)
 			c, err := exchange.GetMarketData()
 			if err != nil {
 				return err
 			}
-			klineChans = append(klineChans, KChanEx{KChan: c, Exchange: exchange})
+			exchangeSources = append(exchangeSources, backtest.ExchangeDataSource{C: c, Exchange: exchange})
+		}
+
+		// back-test session report name
+		var backtestSessionName = backtest.FormatSessionName(
+			userConfig.Backtest.Sessions,
+			userConfig.Backtest.Symbols,
+			userConfig.Backtest.StartTime.Time(),
+			userConfig.Backtest.EndTime.Time(),
+		)
+
+		var kLineHandlers []func(k types.KLine)
+		if generatingReport {
+			dumpDir := outputDirectory
+			if reportFileInSubDir {
+				dumpDir = filepath.Join(dumpDir, backtestSessionName)
+				dumpDir = filepath.Join(dumpDir, uuid.NewString())
+			}
+
+			dumpDir = filepath.Join(dumpDir, "klines")
+
+			if _, err := os.Stat(dumpDir); err != nil {
+				if os.IsNotExist(err) {
+					if err2 := os.MkdirAll(dumpDir, 0755); err2 != nil {
+						return err2
+					}
+				} else {
+					return err
+				}
+			}
+
+			dumper := backtest.NewKLineDumper(dumpDir)
+			defer func() {
+				if err := dumper.Close(); err != nil {
+					log.WithError(err).Errorf("kline dumper can not close files")
+				}
+			}()
+
+			kLineHandlers = append(kLineHandlers, func(k types.KLine) {
+				if err := dumper.Record(k); err != nil {
+					log.WithError(err).Errorf("can not write kline to file")
+				}
+			})
 		}
 
 		runCtx, cancelRun := context.WithCancel(ctx)
 		go func() {
 			defer cancelRun()
+
+			// Optimize back-test speed for single exchange source
+			var count = len(exchangeSources)
+			if count == 1 {
+				exSource := exchangeSources[0]
+				for k := range exSource.C {
+					exSource.Exchange.ConsumeKLine(k)
+
+					for _, h := range kLineHandlers {
+						h(k)
+					}
+				}
+
+				if err := exSource.Exchange.CloseMarketData(); err != nil {
+					log.WithError(err).Errorf("close market data error")
+				}
+				return
+			}
+
 			for {
-				count := len(klineChans)
-				for _, kchanex := range klineChans {
-					kLine, more := <-kchanex.KChan
+				for _, exK := range exchangeSources {
+					k, more := <-exK.C
 					if more {
-						kchanex.Exchange.ConsumeKLine(kLine)
+						exK.Exchange.ConsumeKLine(k)
+
+						for _, h := range kLineHandlers {
+							h(k)
+						}
 					} else {
-						if err := kchanex.Exchange.CloseMarketData(); err != nil {
-							log.Errorf("%v", err)
+						if err := exK.Exchange.CloseMarketData(); err != nil {
+							log.WithError(err).Errorf("close market data error")
 							return
 						}
 						count--
@@ -397,7 +451,7 @@ var BacktestCmd = &cobra.Command{
 
 				report := calculator.Calculate(symbol, trades.Trades, lastPrice)
 				report.Print()
-				
+
 				accountConfig, ok := userConfig.Backtest.Accounts[exchangeName]
 				if !ok {
 					accountConfig = userConfig.Backtest.Account[exchangeName]
@@ -413,7 +467,7 @@ var BacktestCmd = &cobra.Command{
 				finalBalances.Print()
 
 				if jsonOutputEnabled {
-					result := BackTestReport{
+					result := backtest.Report{
 						Symbol:          symbol,
 						LastPrice:       lastPrice,
 						StartPrice:      startPrice,
