@@ -333,7 +333,7 @@ var BacktestCmd = &cobra.Command{
 			userConfig.Backtest.StartTime.Time(),
 			userConfig.Backtest.EndTime.Time(),
 		)
-		
+
 		var kLineHandlers []func(k types.KLine)
 		if generatingReport {
 			dumpDir := outputDirectory
@@ -344,9 +344,13 @@ var BacktestCmd = &cobra.Command{
 
 			dumpDir = filepath.Join(dumpDir, "klines")
 
-			if _, err := os.Stat(dumpDir); os.IsNotExist(err) {
-				if err2 := os.MkdirAll(dumpDir, 0755); err2 != nil {
-					return err2
+			if _, err := os.Stat(dumpDir); err != nil {
+				if os.IsNotExist(err) {
+					if err2 := os.MkdirAll(dumpDir, 0755); err2 != nil {
+						return err2
+					}
+				} else {
+					return err
 				}
 			}
 
