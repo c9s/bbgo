@@ -29,11 +29,10 @@ sync:
   userDataStream:
     trades: true
     filledOrders: true
-    since: 2020-12-01
-    sessions:
-      - binance
-    symbols:
-      - MATICUSDT
+  sessions:
+    - binance
+  symbols:
+    - MATICUSDT
 
 backtest:
   startTime: "2022-04-14"
