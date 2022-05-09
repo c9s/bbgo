@@ -1347,17 +1347,19 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 			req.FromID(int64(options.LastTradeID))
 		}
 
-		if options.StartTime != nil && options.EndTime != nil {
-			if options.EndTime.Sub(*options.StartTime) < 24*time.Hour {
-				req.StartTime(options.StartTime.UnixMilli())
+		// The parameter fromId cannot be sent with startTime or endTime.
+		// Mentioned in binance futures docs
+		if options.LastTradeID <= 0 {
+			if options.StartTime != nil && options.EndTime != nil {
+				if options.EndTime.Sub(*options.StartTime) < 24*time.Hour {
+					req.StartTime(options.StartTime.UnixMilli())
+					req.EndTime(options.EndTime.UnixMilli())
+				} else {
+					req.StartTime(options.StartTime.UnixMilli())
+				}
+			} else if options.EndTime != nil {
 				req.EndTime(options.EndTime.UnixMilli())
-			} else {
-				req.StartTime(options.StartTime.UnixMilli())
 			}
-		} else if options.StartTime != nil {
-			req.StartTime(options.StartTime.UnixMilli())
-		} else if options.EndTime != nil {
-			req.EndTime(options.EndTime.UnixMilli())
 		}
 
 		remoteTrades, err = req.Do(ctx)
