@@ -418,11 +418,12 @@ var BacktestCmd = &cobra.Command{
 		trader.Graceful.Shutdown(shutdownCtx)
 		cancelShutdown()
 
-		log.Infof("START TIME: %s", startTime.Format(time.RFC1123))
-		log.Infof("END TIME: %s", endTime.Format(time.RFC1123))
 
 		// put the logger back to print the pnl
 		log.SetLevel(log.InfoLevel)
+		
+		log.Infof("START TIME: %s", startTime.Format(time.RFC1123))
+		log.Infof("END TIME: %s", endTime.Format(time.RFC1123))
 		for _, session := range environ.Sessions() {
 			backtestExchange := session.Exchange.(*backtest.Exchange)
 			exchangeName := session.Exchange.Name().String()
