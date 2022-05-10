@@ -127,7 +127,7 @@ func (a *Float64Slice) Last() float64 {
 
 func (a *Float64Slice) Index(i int) float64 {
 	length := len(*a)
-	if length-i < 0 || i < 0 {
+	if length-i <= 0 || i < 0 {
 		return 0.0
 	}
 	return (*a)[length-i-1]
