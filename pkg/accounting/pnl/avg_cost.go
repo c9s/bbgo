@@ -81,6 +81,7 @@ func (c *AverageCostCalculator) Calculate(symbol string, trades []types.Trade, c
 
 	unrealizedProfit := currentPrice.Sub(position.AverageCost).
 		Mul(position.GetBase())
+
 	return &AverageCostPnlReport{
 		Symbol:    symbol,
 		Market:    c.Market,
