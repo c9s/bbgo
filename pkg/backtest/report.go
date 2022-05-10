@@ -10,7 +10,18 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-type Report struct {
+// SummaryReport is the summary of the back-test session
+type SummaryReport struct {
+	StartTime            time.Time        `json:"startTime"`
+	EndTime              time.Time        `json:"endTime"`
+	Sessions             []string         `json:"sessions"`
+	InitialTotalBalances types.BalanceMap `json:"initialTotalBalances"`
+	FinalTotalBalances   types.BalanceMap `json:"finalTotalBalances"`
+}
+
+// SessionSymbolReport is the report per exchange session
+// trades are merged, collected and re-calculated
+type SessionSymbolReport struct {
 	StartTime       time.Time                 `json:"startTime"`
 	EndTime         time.Time                 `json:"endTime"`
 	Symbol          string                    `json:"symbol,omitempty"`

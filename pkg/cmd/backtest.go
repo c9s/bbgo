@@ -432,12 +432,43 @@ var BacktestCmd = &cobra.Command{
 		// put the logger back to print the pnl
 		log.SetLevel(log.InfoLevel)
 
-		log.Infof("BACK-TEST REPORT")
-		log.Infof("===============================================")
-		log.Infof("START TIME: %s", startTime.Format(time.RFC1123))
-		log.Infof("END TIME: %s", endTime.Format(time.RFC1123))
+		color.Green("BACK-TEST REPORT")
+		color.Green("===============================================\n")
+		color.Green("START TIME: %s\n", startTime.Format(time.RFC1123))
+		color.Green("END TIME: %s\n", endTime.Format(time.RFC1123))
+
+		// aggregate total balances
+		initTotalBalances := types.BalanceMap{}
+		finalTotalBalances := types.BalanceMap{}
+		sessionNames := []string{}
 		for _, session := range environ.Sessions() {
-			backtestExchange := session.Exchange.(*backtest.Exchange)
+			sessionNames = append(sessionNames, session.Name)
+			accountConfig := userConfig.Backtest.GetAccount(session.Name)
+			initBalances := accountConfig.Balances.BalanceMap()
+			initTotalBalances = initTotalBalances.Add(initBalances)
+
+			finalBalances := session.GetAccount().Balances()
+			finalTotalBalances = finalTotalBalances.Add(finalBalances)
+		}
+		color.Green("INITIAL TOTAL BALANCE: %v\n", initTotalBalances)
+		color.Green("FINAL TOTAL BALANCE: %v\n", finalTotalBalances)
+
+		summaryReport := &backtest.SummaryReport{
+			StartTime:            startTime,
+			EndTime:              endTime,
+			Sessions:             sessionNames,
+			InitialTotalBalances: initTotalBalances,
+			FinalTotalBalances:   finalTotalBalances,
+		}
+		_ = summaryReport
+
+		for _, session := range environ.Sessions() {
+			backtestExchange, ok := session.Exchange.(*backtest.Exchange)
+			if !ok {
+				return fmt.Errorf("unexpected error, exchange instance is not a backtest exchange")
+			}
+
+			// per symbol report
 			exchangeName := session.Exchange.Name().String()
 			for symbol, trades := range session.Trades {
 				market, ok := session.Market(symbol)
@@ -466,22 +497,12 @@ var BacktestCmd = &cobra.Command{
 				report := calculator.Calculate(symbol, trades.Trades, lastPrice)
 				report.Print()
 
-				accountConfig, ok := userConfig.Backtest.Accounts[exchangeName]
-				if !ok {
-					accountConfig = userConfig.Backtest.Account[exchangeName]
-				}
-
+				accountConfig := userConfig.Backtest.GetAccount(exchangeName)
 				initBalances := accountConfig.Balances.BalanceMap()
 				finalBalances := session.GetAccount().Balances()
 
-				log.Infof("INITIAL BALANCES:")
-				initBalances.Print()
-
-				log.Infof("FINAL BALANCES:")
-				finalBalances.Print()
-
 				if generatingReport {
-					result := backtest.Report{
+					result := backtest.SessionSymbolReport{
 						StartTime:       startTime,
 						EndTime:         endTime,
 						Symbol:          symbol,
@@ -493,20 +514,15 @@ var BacktestCmd = &cobra.Command{
 						Manifests:       manifests,
 					}
 
-					jsonOutput, err := json.MarshalIndent(&result, "", "  ")
-					if err != nil {
-						return err
-					}
-
-					if err := ioutil.WriteFile(filepath.Join(outputDirectory, symbol+".json"), jsonOutput, 0644); err != nil {
+					if err := writeJsonFile(filepath.Join(outputDirectory, symbol+".json"), &result) ; err != nil {
 						return err
 					}
 				}
 
 				initQuoteAsset := inQuoteAsset(initBalances, market, startPrice)
 				finalQuoteAsset := inQuoteAsset(finalBalances, market, lastPrice)
-				log.Infof("INITIAL ASSET IN %s ~= %s %s (1 %s = %v)", market.QuoteCurrency, market.FormatQuantity(initQuoteAsset), market.QuoteCurrency, market.BaseCurrency, startPrice)
-				log.Infof("FINAL ASSET IN %s ~= %s %s (1 %s = %v)", market.QuoteCurrency, market.FormatQuantity(finalQuoteAsset), market.QuoteCurrency, market.BaseCurrency, lastPrice)
+				color.Green("INITIAL ASSET IN %s ~= %s %s (1 %s = %v)", market.QuoteCurrency, market.FormatQuantity(initQuoteAsset), market.QuoteCurrency, market.BaseCurrency, startPrice)
+				color.Green("FINAL ASSET IN %s ~= %s %s (1 %s = %v)", market.QuoteCurrency, market.FormatQuantity(finalQuoteAsset), market.QuoteCurrency, market.BaseCurrency, lastPrice)
 
 				if report.Profit.Sign() > 0 {
 					color.Green("REALIZED PROFIT: +%v %s", report.Profit, market.QuoteCurrency)
@@ -575,6 +591,15 @@ func confirmation(s string) bool {
 			return false
 		}
 	}
+}
+
+func writeJsonFile(p string, obj interface{}) error {
+	out, err := json.MarshalIndent(obj, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return ioutil.WriteFile(p, out, 0644)
 }
 
 func safeMkdirAll(p string) error {

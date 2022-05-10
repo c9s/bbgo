@@ -104,13 +104,22 @@ type Backtest struct {
 	EndTime   *types.LooseFormatTime `json:"endTime,omitempty" yaml:"endTime,omitempty"`
 
 	// RecordTrades is an option, if set to true, back-testing should record the trades into database
-	RecordTrades bool                       `json:"recordTrades,omitempty" yaml:"recordTrades,omitempty"`
+	RecordTrades bool `json:"recordTrades,omitempty" yaml:"recordTrades,omitempty"`
 
 	// Account is deprecated, use Accounts instead
-	Account      map[string]BacktestAccount `json:"account" yaml:"account"`
-	Accounts      map[string]BacktestAccount `json:"accounts" yaml:"accounts"`
-	Symbols      []string                   `json:"symbols" yaml:"symbols"`
-	Sessions     []string                   `json:"sessions" yaml:"sessions"`
+	Account  map[string]BacktestAccount `json:"account" yaml:"account"`
+	Accounts map[string]BacktestAccount `json:"accounts" yaml:"accounts"`
+	Symbols  []string                   `json:"symbols" yaml:"symbols"`
+	Sessions []string                   `json:"sessions" yaml:"sessions"`
+}
+
+func (b *Backtest) GetAccount(n string) BacktestAccount {
+	accountConfig, ok := b.Accounts[n]
+	if ok {
+		return accountConfig
+	}
+
+	return b.Account[n]
 }
 
 type BacktestAccount struct {

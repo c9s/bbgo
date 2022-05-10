@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/fatih/color"
 	"github.com/slack-go/slack"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -15,15 +15,15 @@ import (
 )
 
 type AverageCostPnlReport struct {
-	LastPrice fixedpoint.Value      `json:"lastPrice"`
-	StartTime time.Time    `json:"startTime"`
-	Symbol    string       `json:"symbol"`
-	Market    types.Market `json:"market"`
+	LastPrice fixedpoint.Value `json:"lastPrice"`
+	StartTime time.Time        `json:"startTime"`
+	Symbol    string           `json:"symbol"`
+	Market    types.Market     `json:"market"`
 
-	NumTrades        int                `json:"numTrades"`
-	Profit           fixedpoint.Value   `json:"profit"`
-	NetProfit        fixedpoint.Value   `json:"netProfit"`
-	UnrealizedProfit fixedpoint.Value   `json:"unrealizedProfit"`
+	NumTrades        int                         `json:"numTrades"`
+	Profit           fixedpoint.Value            `json:"profit"`
+	NetProfit        fixedpoint.Value            `json:"netProfit"`
+	UnrealizedProfit fixedpoint.Value            `json:"unrealizedProfit"`
 	AverageCost      fixedpoint.Value            `json:"averageCost"`
 	BuyVolume        fixedpoint.Value            `json:"buyVolume,omitempty"`
 	SellVolume       fixedpoint.Value            `json:"sellVolume,omitempty"`
@@ -37,19 +37,29 @@ func (report *AverageCostPnlReport) JSON() ([]byte, error) {
 }
 
 func (report AverageCostPnlReport) Print() {
-	log.Infof("TRADES SINCE: %v", report.StartTime)
-	log.Infof("NUMBER OF TRADES: %d", report.NumTrades)
-	log.Infof("AVERAGE COST: %s", types.USD.FormatMoney(report.AverageCost))
-	log.Infof("TOTAL BUY VOLUME: %v", report.BuyVolume)
-	log.Infof("TOTAL SELL VOLUME: %v", report.SellVolume)
+	color.Green("TRADES SINCE: %v", report.StartTime)
+	color.Green("NUMBER OF TRADES: %d", report.NumTrades)
+	color.Green("AVERAGE COST: %s", types.USD.FormatMoney(report.AverageCost))
+	color.Green("TOTAL BUY VOLUME: %v", report.BuyVolume)
+	color.Green("TOTAL SELL VOLUME: %v", report.SellVolume)
 
-	log.Infof("CURRENT PRICE: %s", types.USD.FormatMoney(report.LastPrice))
-	log.Infof("CURRENCY FEES:")
+	color.Green("CURRENT PRICE: %s", types.USD.FormatMoney(report.LastPrice))
+	color.Green("CURRENCY FEES:")
 	for currency, fee := range report.CurrencyFees {
-		log.Infof(" - %s: %s", currency, fee.String())
+		color.Green(" - %s: %s", currency, fee.String())
 	}
-	log.Infof("PROFIT: %s", types.USD.FormatMoney(report.Profit))
-	log.Infof("UNREALIZED PROFIT: %s", types.USD.FormatMoney(report.UnrealizedProfit))
+
+	if report.Profit.Sign() > 0 {
+		color.Green("PROFIT: %s", types.USD.FormatMoney(report.Profit))
+	} else {
+		color.Red("PROFIT: %s", types.USD.FormatMoney(report.Profit))
+	}
+
+	if report.UnrealizedProfit.Sign() > 0 {
+		color.Green("UNREALIZED PROFIT: %s", types.USD.FormatMoney(report.UnrealizedProfit))
+	} else {
+		color.Red("UNREALIZED PROFIT: %s", types.USD.FormatMoney(report.UnrealizedProfit))
+	}
 }
 
 func (report AverageCostPnlReport) SlackAttachment() slack.Attachment {

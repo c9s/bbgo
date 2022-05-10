@@ -6,8 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
@@ -193,11 +191,15 @@ func (m BalanceMap) Print() {
 			continue
 		}
 
+		fmt.Printf(" %s: %v", balance.Currency, balance.Available)
 		if balance.Locked.Sign() > 0 {
-			logrus.Infof(" %s: %v (locked %v)", balance.Currency, balance.Available, balance.Locked)
-		} else {
-			logrus.Infof(" %s: %v", balance.Currency, balance.Available)
+			fmt.Printf(" (locked %v)", balance.Locked)
 		}
+
+		if balance.Borrowed.Sign() > 0 {
+			fmt.Printf(" (borrowed %v)", balance.Borrowed)
+		}
+		fmt.Println()
 	}
 }
 
