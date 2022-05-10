@@ -105,8 +105,6 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
-		jsonOutputEnabled := len(outputDirectory) > 0
-
 		syncOnly, err := cmd.Flags().GetBool("sync-only")
 		if err != nil {
 			return err
@@ -333,6 +331,7 @@ var BacktestCmd = &cobra.Command{
 		)
 
 		var kLineHandlers []func(k types.KLine)
+		var manifests backtest.Manifests
 		if generatingReport {
 			reportDir := outputDirectory
 			if reportFileInSubDir {
@@ -349,6 +348,7 @@ var BacktestCmd = &cobra.Command{
 			err = trader.IterateStrategies(func(st bbgo.StrategyID) error {
 				return stateRecorder.Scan(st.(backtest.Instance))
 			})
+			manifests = stateRecorder.Manifests()
 
 			if err != nil {
 				return err
@@ -480,7 +480,7 @@ var BacktestCmd = &cobra.Command{
 				log.Infof("FINAL BALANCES:")
 				finalBalances.Print()
 
-				if jsonOutputEnabled {
+				if generatingReport {
 					result := backtest.Report{
 						StartTime:       startTime,
 						EndTime:         endTime,
@@ -490,6 +490,7 @@ var BacktestCmd = &cobra.Command{
 						PnLReport:       report,
 						InitialBalances: initBalances,
 						FinalBalances:   finalBalances,
+						Manifests:       manifests,
 					}
 
 					jsonOutput, err := json.MarshalIndent(&result, "", "  ")
