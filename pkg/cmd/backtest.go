@@ -330,7 +330,7 @@ var BacktestCmd = &cobra.Command{
 			userConfig.Backtest.EndTime.Time(),
 		)
 
-		var kLineHandlers []func(k types.KLine)
+		var kLineHandlers []func(k types.KLine, ex *backtest.Exchange)
 		var manifests backtest.Manifests
 		if generatingReport {
 			reportDir := outputDirectory
@@ -354,7 +354,8 @@ var BacktestCmd = &cobra.Command{
 				return err
 			}
 
-			kLineHandlers = append(kLineHandlers, func(k types.KLine) {
+			// state snapshot
+			kLineHandlers = append(kLineHandlers, func(k types.KLine, ex *backtest.Exchange) {
 				// snapshot per 1m
 				if k.Interval == types.Interval1m && k.Closed {
 					if _, err := stateRecorder.Snapshot(); err != nil {
@@ -370,7 +371,7 @@ var BacktestCmd = &cobra.Command{
 				}
 			}()
 
-			kLineHandlers = append(kLineHandlers, func(k types.KLine) {
+			kLineHandlers = append(kLineHandlers, func(k types.KLine, ex *backtest.Exchange) {
 				if err := dumper.Record(k); err != nil {
 					log.WithError(err).Errorf("can not write kline to file")
 				}
@@ -382,14 +383,14 @@ var BacktestCmd = &cobra.Command{
 			defer cancelRun()
 
 			// Optimize back-test speed for single exchange source
-			var count = len(exchangeSources)
-			if count == 1 {
+			var numOfExchangeSources = len(exchangeSources)
+			if numOfExchangeSources == 1 {
 				exSource := exchangeSources[0]
 				for k := range exSource.C {
 					exSource.Exchange.ConsumeKLine(k)
 
 					for _, h := range kLineHandlers {
-						h(k)
+						h(k, exSource.Exchange)
 					}
 				}
 
@@ -399,25 +400,23 @@ var BacktestCmd = &cobra.Command{
 				return
 			}
 
+		RunMultiExchangeData:
 			for {
 				for _, exK := range exchangeSources {
 					k, more := <-exK.C
-					if more {
-						exK.Exchange.ConsumeKLine(k)
-
-						for _, h := range kLineHandlers {
-							h(k)
-						}
-					} else {
+					if !more {
 						if err := exK.Exchange.CloseMarketData(); err != nil {
 							log.WithError(err).Errorf("close market data error")
 							return
 						}
-						count--
+						break RunMultiExchangeData
 					}
-				}
-				if count == 0 {
-					break
+
+					exK.Exchange.ConsumeKLine(k)
+
+					for _, h := range kLineHandlers {
+						h(k, exK.Exchange)
+					}
 				}
 			}
 		}()
@@ -514,7 +513,7 @@ var BacktestCmd = &cobra.Command{
 						Manifests:       manifests,
 					}
 
-					if err := writeJsonFile(filepath.Join(outputDirectory, symbol+".json"), &result) ; err != nil {
+					if err := writeJsonFile(filepath.Join(outputDirectory, symbol+".json"), &result); err != nil {
 						return err
 					}
 				}
