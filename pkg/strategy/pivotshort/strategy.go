@@ -1,4 +1,4 @@
-package pivot
+package pivotshort
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const ID = "pivot"
+const ID = "pivotshort"
 
 var fifteen = fixedpoint.NewFromInt(15)
 var three = fixedpoint.NewFromInt(3)
