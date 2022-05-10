@@ -11,6 +11,7 @@ import (
 
 const ID = "pivot"
 
+var fifteen = fixedpoint.NewFromInt(15)
 var three = fixedpoint.NewFromInt(3)
 
 var log = logrus.WithField("strategy", ID)
@@ -32,13 +33,13 @@ type Strategy struct {
 	Position       *types.Position  `json:"position,omitempty"`
 	StopLossRatio  fixedpoint.Value `json:"stopLossRatio"`
 	CatBounceRatio fixedpoint.Value `json:"catBounceRatio"`
+	ShadowTPRatio  fixedpoint.Value `json:"shadowTPRatio"`
 
 	activeMakerOrders *bbgo.LocalActiveOrderBook
 	orderStore        *bbgo.OrderStore
 	tradeCollector    *bbgo.TradeCollector
 
 	session *bbgo.ExchangeSession
-	book    *types.StreamOrderBook
 
 	//pivotHigh *PIVOTHIGH
 	pivot *Pivot
@@ -139,11 +140,16 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		} else {
 			lastLow = fixedpoint.Zero
 			// SL || TP
-			if kline.Close.Div(s.Position.AverageCost).Compare(fixedpoint.One.Add(s.StopLossRatio)) > 0 || kline.Close.Div(s.Position.AverageCost).Compare(fixedpoint.One.Sub(s.StopLossRatio.Mul(fixedpoint.NewFromInt(15)))) < 0 {
+			R := kline.Close.Div(s.Position.AverageCost)
+			if R.Compare(fixedpoint.One.Add(s.StopLossRatio)) > 0 || R.Compare(fixedpoint.One.Sub(s.StopLossRatio.Mul(fifteen))) < 0 {
 				if s.Position.GetBase().Compare(s.Quantity.Neg()) <= 0 {
 					s.ClosePosition(ctx, fixedpoint.One)
 					s.tradeCollector.Process()
 				}
+				// shadow TP
+			} else if kline.GetLowerShadowHeight().Div(kline.Close).Compare(s.ShadowTPRatio) > 0 {
+				s.ClosePosition(ctx, fixedpoint.One)
+				s.tradeCollector.Process()
 			}
 		}
 		if !lastLow.IsZero() {
