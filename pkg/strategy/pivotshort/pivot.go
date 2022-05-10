@@ -1,4 +1,4 @@
-package pivot
+package pivotshort
 
 import (
 	"fmt"
@@ -99,11 +99,11 @@ func calculatePivot(klines []types.KLine, window int, valLow KLineValueMapper, v
 	}
 
 	pl := 0.
-	if lows.Min() == lows.Index(int(window/2.)) {
+	if lows.Min() == lows.Index(int(window/2.)-1) {
 		pl = lows.Min()
 	}
 	ph := 0.
-	if highs.Max() == highs.Index(int(window/2.)) {
+	if highs.Max() == highs.Index(int(window/2.)-1) {
 		ph = highs.Max()
 	}
 

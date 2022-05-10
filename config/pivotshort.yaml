@@ -7,7 +7,7 @@ sessions:
 
 exchangeStrategies:
 - on: binance
-  pivot:
+  pivotshort:
     symbol: BTCBUSD
     interval: 1h
     quantity: 0.95
