@@ -72,6 +72,10 @@ func (p *Position) CsvHeader() []string {
 }
 
 func (p *Position) CsvRecords() [][]string {
+	if p.AverageCost.IsZero() && p.Base.IsZero() {
+		return nil
+	}
+
 	return [][]string{
 		{
 			p.Symbol,

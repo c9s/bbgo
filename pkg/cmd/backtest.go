@@ -334,25 +334,36 @@ var BacktestCmd = &cobra.Command{
 
 		var kLineHandlers []func(k types.KLine)
 		if generatingReport {
-			dumpDir := outputDirectory
+			reportDir := outputDirectory
 			if reportFileInSubDir {
-				dumpDir = filepath.Join(dumpDir, backtestSessionName)
-				dumpDir = filepath.Join(dumpDir, uuid.NewString())
+				reportDir = filepath.Join(reportDir, backtestSessionName)
+				reportDir = filepath.Join(reportDir, uuid.NewString())
 			}
 
-			dumpDir = filepath.Join(dumpDir, "klines")
+			kLineDataDir := filepath.Join(reportDir, "klines")
+			if err := safeMkdirAll(kLineDataDir); err != nil {
+				return err
+			}
 
-			if _, err := os.Stat(dumpDir); err != nil {
-				if os.IsNotExist(err) {
-					if err2 := os.MkdirAll(dumpDir, 0755); err2 != nil {
-						return err2
+			stateRecorder := backtest.NewStateRecorder(reportDir)
+			err = trader.IterateStrategies(func(st bbgo.StrategyID) error {
+				return stateRecorder.Scan(st.(backtest.Instance))
+			})
+
+			if err != nil {
+				return err
+			}
+
+			kLineHandlers = append(kLineHandlers, func(k types.KLine) {
+				// snapshot per 1m
+				if k.Interval == types.Interval1m && k.Closed {
+					if _, err := stateRecorder.Snapshot(); err != nil {
+						log.WithError(err).Errorf("state record failed to snapshot the strategy state")
 					}
-				} else {
-					return err
 				}
-			}
+			})
 
-			dumper := backtest.NewKLineDumper(dumpDir)
+			dumper := backtest.NewKLineDumper(kLineDataDir)
 			defer func() {
 				if err := dumper.Close(); err != nil {
 					log.WithError(err).Errorf("kline dumper can not close files")
@@ -417,7 +428,6 @@ var BacktestCmd = &cobra.Command{
 		shutdownCtx, cancelShutdown := context.WithDeadline(runCtx, time.Now().Add(10*time.Second))
 		trader.Graceful.Shutdown(shutdownCtx)
 		cancelShutdown()
-
 
 		// put the logger back to print the pnl
 		log.SetLevel(log.InfoLevel)
@@ -564,4 +574,21 @@ func confirmation(s string) bool {
 			return false
 		}
 	}
+}
+
+func safeMkdirAll(p string) error {
+	st, err := os.Stat(p)
+	if err == nil {
+		if !st.IsDir() {
+			return fmt.Errorf("path %s is not a directory", p)
+		}
+
+		return nil
+	}
+
+	if os.IsNotExist(err) {
+		return os.MkdirAll(p, 0755)
+	}
+
+	return nil
 }

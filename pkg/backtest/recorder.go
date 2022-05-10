@@ -78,6 +78,10 @@ func (r *StateRecorder) Scan(instance Instance) error {
 
 	for i := 0; i < rt.NumField(); i++ {
 		structField := rt.Field(i)
+		if !structField.IsExported() {
+			continue
+		}
+
 		obj := rv.Field(i).Interface()
 		switch o := obj.(type) {
 
@@ -87,21 +91,31 @@ func (r *StateRecorder) Scan(instance Instance) error {
 				return fmt.Errorf("%v is a non-defined type", structField.Type)
 			}
 
-			f, err := r.openFile(instance, typeName)
-			if err != nil {
+			if err := r.newCsvWriter(o, instance, typeName); err != nil {
 				return err
 			}
-
-			if _, exists := r.files[o]; exists {
-				return fmt.Errorf("file of object %v already exists", o)
-			}
-
-			r.files[o] = f
-			r.writers[o] = csv.NewWriter(f)
 		}
 	}
 
 	return nil
+}
+
+func (r *StateRecorder) newCsvWriter(o types.CsvFormatter, instance Instance, typeName string) error {
+	f, err := r.openFile(instance, typeName)
+	if err != nil {
+		return err
+	}
+
+	if _, exists := r.files[o]; exists {
+		return fmt.Errorf("file of object %v already exists", o)
+	}
+
+	r.files[o] = f
+
+	w := csv.NewWriter(f)
+	r.writers[o] = w
+
+	return w.Write(o.CsvHeader())
 }
 
 func (r *StateRecorder) Close() error {

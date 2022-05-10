@@ -34,9 +34,6 @@ func TestStateRecorder(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, recorder.writers, 1)
 
-	n, err := recorder.Snapshot()
-	assert.NoError(t, err)
-	assert.Equal(t, 1, n)
 
 	st.Position.AddTrade(types.Trade{
 		OrderID:       1,
@@ -56,7 +53,7 @@ func TestStateRecorder(t *testing.T) {
 		IsIsolated:    false,
 	})
 
-	n, err = recorder.Snapshot()
+	n, err := recorder.Snapshot()
 	assert.NoError(t, err)
 	assert.Equal(t, 1, n)
 
