@@ -19,6 +19,7 @@ type Report struct {
 	PnLReport       *pnl.AverageCostPnlReport `json:"pnlReport,omitempty"`
 	InitialBalances types.BalanceMap          `json:"initialBalances,omitempty"`
 	FinalBalances   types.BalanceMap          `json:"finalBalances,omitempty"`
+	Manifests       Manifests                 `json:"manifests,omitempty"`
 }
 
 const SessionTimeFormat = "2006-01-02T15_04"

@@ -18,8 +18,10 @@ type Instance interface {
 	InstanceID() string
 }
 
-type InstanceObject struct {
+type InstancePropertyIndex struct {
+	ID         string
 	InstanceID string
+	Property   string
 }
 
 type StateRecorder struct {
@@ -27,23 +29,16 @@ type StateRecorder struct {
 	strategies      []Instance
 	files           map[interface{}]*os.File
 	writers         map[types.CsvFormatter]*csv.Writer
+	manifests       Manifests
 }
 
 func NewStateRecorder(outputDir string) *StateRecorder {
 	return &StateRecorder{
 		outputDirectory: outputDir,
-		files:           map[interface{}]*os.File{},
-		writers:         map[types.CsvFormatter]*csv.Writer{},
+		files:           make(map[interface{}]*os.File),
+		writers:         make(map[types.CsvFormatter]*csv.Writer),
+		manifests:       make(Manifests),
 	}
-}
-
-func (r *StateRecorder) formatFilename(instance Instance, objType string) string {
-	return filepath.Join(r.outputDirectory, fmt.Sprintf("%s-%s.csv", instance.InstanceID(), objType))
-}
-
-func (r *StateRecorder) openFile(instance Instance, objType string) (*os.File, error) {
-	fn := r.formatFilename(instance, objType)
-	return os.Create(fn)
 }
 
 func (r *StateRecorder) Snapshot() (int, error) {
@@ -100,8 +95,17 @@ func (r *StateRecorder) Scan(instance Instance) error {
 	return nil
 }
 
+func (r *StateRecorder) formatCsvFilename(instance Instance, objType string) string {
+	return filepath.Join(r.outputDirectory, fmt.Sprintf("%s-%s.csv", instance.InstanceID(), objType))
+}
+
+func (r *StateRecorder) Manifests() Manifests {
+	return r.manifests
+}
+
 func (r *StateRecorder) newCsvWriter(o types.CsvFormatter, instance Instance, typeName string) error {
-	f, err := r.openFile(instance, typeName)
+	fn := r.formatCsvFilename(instance, typeName)
+	f, err := os.Create(fn)
 	if err != nil {
 		return err
 	}
@@ -109,6 +113,12 @@ func (r *StateRecorder) newCsvWriter(o types.CsvFormatter, instance Instance, ty
 	if _, exists := r.files[o]; exists {
 		return fmt.Errorf("file of object %v already exists", o)
 	}
+
+	r.manifests[InstancePropertyIndex{
+		ID:         instance.ID(),
+		InstanceID: instance.InstanceID(),
+		Property:   typeName,
+	}] = fn
 
 	r.files[o] = f
 
