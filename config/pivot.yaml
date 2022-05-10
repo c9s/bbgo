@@ -13,6 +13,7 @@ exchangeStrategies:
     quantity: 0.95
     stopLossRatio: 0.8%
     catBounceRatio: 3%
+    shadowTPRatio: 2.5%
 
 backtest:
   sessions:
@@ -28,4 +29,4 @@ backtest:
     binance:
       balances:
         BTC: 1.0
-        BUSD: 5_000.0
+        BUSD: 1_000.0
