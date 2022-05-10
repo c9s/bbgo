@@ -74,10 +74,34 @@ type Trade struct {
 	// The following fields are null-able fields
 
 	// StrategyID is the strategy that execute this trade
-	StrategyID sql.NullString  `json:"strategyID" db:"strategy"`
+	StrategyID sql.NullString `json:"strategyID" db:"strategy"`
 
 	// PnL is the profit and loss value of the executed trade
-	PnL        sql.NullFloat64 `json:"pnl" db:"pnl"`
+	PnL sql.NullFloat64 `json:"pnl" db:"pnl"`
+}
+
+func (trade Trade) CsvHeader() []string {
+	return []string{"id", "order_id", "exchange", "symbol", "price", "quantity", "quote_quantity", "side", "is_buyer", "is_maker", "fee", "fee_currency", "time"}
+}
+
+func (trade Trade) CsvRecords() [][]string {
+	return [][]string{
+		{
+			strconv.FormatUint(trade.ID, 10),
+			strconv.FormatUint(trade.OrderID, 10),
+			trade.Exchange.String(),
+			trade.Symbol,
+			trade.Price.String(),
+			trade.Quantity.String(),
+			trade.QuoteQuantity.String(),
+			trade.Side.String(),
+			strconv.FormatBool(trade.IsBuyer),
+			strconv.FormatBool(trade.IsMaker),
+			trade.Fee.String(),
+			trade.FeeCurrency,
+			trade.Time.Time().Format(time.RFC1123),
+		},
+	}
 }
 
 func (trade Trade) PositionChange() fixedpoint.Value {
