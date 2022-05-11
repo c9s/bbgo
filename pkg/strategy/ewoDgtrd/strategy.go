@@ -57,6 +57,7 @@ func (s *Strategy) Initialize() error {
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	log.Infof("subscribe %s", s.Symbol)
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: types.Interval1m.String()})
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval.String()})
 	s.SmartStops.Subscribe(session)
 }
@@ -561,6 +562,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		baseBalance := balances[s.Market.BaseCurrency].Available
 		quoteBalance := balances[s.Market.QuoteCurrency].Available
 		atrx2 := fixedpoint.NewFromFloat(s.atr.Last() * 2)
+		log.Infof("Get last price: %v, kline: %v, balance[base]: %v balance[quote]: %v, atrx2: %v",
+			lastPrice, kline, baseBalance, quoteBalance, atrx2)
 
 		// well, only track prices on 1m
 		if kline.Interval == types.Interval1m {
@@ -714,6 +717,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		IsBull := bull && breakThrough && s.ewo.Last() >= mean+2*std
 		// kline downthrough ma5, ma50 trend down, and ewo < threshold
 		IsBear := !bull && breakDown && s.ewo.Last() <= mean-2*std
+
+		log.Infof("IsBull: %v, longSignal[1]: %f, shortSignal: %f",
+			IsBull, longSignal.Index(1), shortSignal.Last())
+		log.Infof("IsBear: %v, shortSignal[1]: %f, longSignal: %f",
+			IsBear, shortSignal.Index(1), longSignal.Last())
 
 		var orders []types.SubmitOrder
 		var price fixedpoint.Value
