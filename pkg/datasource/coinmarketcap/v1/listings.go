@@ -1,94 +1,56 @@
 package v1
 
-import "github.com/c9s/requestgen"
+import (
+	"github.com/c9s/requestgen"
+)
 
-type RequestOptions struct {
-	Start                int     `json:"start,omitempty"`
-	Limit                int     `json:"limit,omitempty"`
-	PriceMin             float64 `json:"price_min,omitempty"`
-	PriceMax             float64 `json:"price_max,omitempty"`
-	MarketCapMin         float64 `json:"market_cap_min,omitempty"`
-	MarketCapMax         float64 `json:"market_cap_max,omitempty"`
-	Volume24HMin         float64 `json:"volume_24h_min,omitempty"`
-	Volume24HMax         float64 `json:"volume_24h_max,omitempty"`
-	CirculatingSupplyMin float64 `json:"circulating_supply_min,omitempty"`
-	CirculatingSupplyMax float64 `json:"circulating_supply_max,omitempty"`
-	PercentChange24HMin  float64 `json:"percent_change_24h_min,omitempty"`
-	PercentChange24HMax  float64 `json:"percent_change_24h_max,omitempty"`
-	Convert              string  `json:"convert,omitempty"`
-	ConvertID            string  `json:"convert_id,omitempty"`
-	Sort                 string  `json:"sort,omitempty"`
-	SortDir              string  `json:"sort_dir"`
-	CryptocurrencyType   string  `json:"cryptocurrency_type,omitempty"`
-	Tag                  string  `json:"tag,omitempty"`
-	Aux                  string  `json:"aux,omitempty"`
+//go:generate requestgen -method GET -url "/v1/cryptocurrency/listings/historical" -type ListingsHistoricalRequest -responseType Response -responseDataField Data -responseDataType []Data
+type ListingsHistoricalRequest struct {
+	Client requestgen.AuthenticatedAPIClient
+
+	Date               string  `param:"date,query,required"`
+	Start              *int    `param:"start,query" default:"1"`
+	Limit              *int    `param:"limit,query" default:"100"`
+	Convert            *string `param:"convert,query"`
+	ConvertID          *string `param:"convert_id,query"`
+	Sort               *string `param:"sort,query" default:"cmc_rank" validValues:"cmc_rank,name,symbol,market_cap,price,circulating_supply,total_supply,max_supply,num_market_pairs,volume_24h,percent_change_1h,percent_change_24h,percent_change_7d"`
+	SortDir            *string `param:"sort_dir,query" validValues:"asc,desc"`
+	CryptocurrencyType *string `param:"cryptocurrency_type,query" default:"all" validValues:"all,coins,tokens"`
+	Aux                *string `param:"aux,query" default:"platform,tags,date_added,circulating_supply,total_supply,max_supply,cmc_rank,num_market_pairs"`
 }
 
-//go:generate requestgen -type ListingsRequest -method GET -url "/v1/cryptocurrency/listings/latest" -responseType Response
-type ListingsRequest struct {
-	client requestgen.AuthenticatedAPIClient
+//go:generate requestgen -method GET -url "/v1/cryptocurrency/listings/latest" -type ListingsLatestRequest -responseType Response -responseDataField Data -responseDataType []Data
+type ListingsLatestRequest struct {
+	Client requestgen.AuthenticatedAPIClient
 
-	endpointType EndpointType `param:"endpointType,slug"`
-
-	start int `param:"start,query"`
-	limit int `param:"limit,query"`
-	// priceMin             float64 `param:"price_min,query"`
-	// priceMax             float64 `param:"price_max,query"`
-	// marketCapMin         float64 `param:"market_cap_min,query"`
-	// marketCapMax         float64 `param:"market_cap_max,query"`
-	// volume24HMin         float64 `param:"volume_24h_min,query"`
-	// volume24HMax         float64 `param:"volume_24h_max,query"`
-	// circulatingSupplyMin float64 `param:"circulating_supply_min,query"`
-	// circulatingSupplyMax float64 `param:"circulating_supply_max,query"`
-	// percentChange24HMin  float64 `param:"percent_change_24h_min,query"`
-	// percentChange24HMax  float64 `param:"percent_change_24h_max,query"`
-	// convert            string `param:"convert,query"`
-	// convertID          string `param:"convert_id,query"`
-	sort               string `param:"sort,query"`
-	sortDir            string `param:"sort_dir,query"`
-	cryptocurrencyType string `param:"cryptocurrency_type,query"`
-	tag                string `param:"tag,query"`
-	aux                string `param:"aux,query"`
+	Start                *int     `param:"start,query" default:"1"`
+	Limit                *int     `param:"limit,query" default:"100"`
+	PriceMin             *float64 `param:"price_min,query"`
+	PriceMax             *float64 `param:"price_max,query"`
+	MarketCapMin         *float64 `param:"market_cap_min,query"`
+	MarketCapMax         *float64 `param:"market_cap_max,query"`
+	Volume24HMin         *float64 `param:"volume_24h_min,query"`
+	Volume24HMax         *float64 `param:"volume_24h_max,query"`
+	CirculatingSupplyMin *float64 `param:"circulating_supply_min,query"`
+	CirculatingSupplyMax *float64 `param:"circulating_supply_max,query"`
+	PercentChange24HMin  *float64 `param:"percent_change_24h_min,query"`
+	PercentChange24HMax  *float64 `param:"percent_change_24h_max,query"`
+	Convert              *string  `param:"convert,query"`
+	ConvertID            *string  `param:"convert_id,query"`
+	Sort                 *string  `param:"sort,query" default:"market_cap" validValues:"name,symbol,date_added,market_cap,market_cap_strict,price,circulating_supply,total_supply,max_supply,num_market_pairs,volume_24h,percent_change_1h,percent_change_24h,percent_change_7d,market_cap_by_total_supply_strict,volume_7d,volume_30d"`
+	SortDir              *string  `param:"sort_dir,query" validValues:"asc,desc"`
+	CryptocurrencyType   *string  `param:"cryptocurrency_type,query" default:"all" validValues:"all,coins,tokens"`
+	Tag                  *string  `param:"tag,query" default:"all" validValues:"all,defi,filesharing"`
+	Aux                  *string  `param:"aux,query" default:"num_market_pairs,cmc_rank,date_added,tags,platform,max_supply,circulating_supply,total_supply"`
 }
 
-func NewListingsRequest(client requestgen.AuthenticatedAPIClient, options *RequestOptions) *ListingsRequest {
-	if options.Start == 0 {
-		options.Start = 1
-	}
+//go:generate requestgen -method GET -url "/v1/cryptocurrency/listings/new" -type ListingsNewRequest -responseType Response -responseDataField Data -responseDataType []Data
+type ListingsNewRequest struct {
+	Client requestgen.AuthenticatedAPIClient
 
-	if options.Limit == 0 {
-		options.Limit = 100
-	}
-
-	if options.Sort == "" {
-		options.Sort = "market_cap"
-	}
-
-	if options.SortDir == "" {
-		options.SortDir = "asc"
-	}
-
-	if options.CryptocurrencyType == "" {
-		options.CryptocurrencyType = "all"
-	}
-
-	if options.Tag == "" {
-		options.Tag = "all"
-	}
-
-	if options.Aux == "" {
-		options.Aux = "num_market_pairs,cmc_rank,date_added,tags,platform,max_supply,circulating_supply,total_supply"
-	}
-
-	return &ListingsRequest{
-		client: client,
-
-		start:              options.Start,
-		limit:              options.Limit,
-		sort:               options.Sort,
-		sortDir:            options.SortDir,
-		cryptocurrencyType: options.CryptocurrencyType,
-		tag:                options.Tag,
-		aux:                options.Aux,
-	}
+	Start     *int    `param:"start,query" default:"1"`
+	Limit     *int    `param:"limit,query" default:"100"`
+	Convert   *string `param:"convert,query"`
+	ConvertID *string `param:"convert_id,query"`
+	SortDir   *string `param:"sort_dir,query" validValues:"asc,desc"`
 }

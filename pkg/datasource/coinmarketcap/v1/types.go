@@ -1,20 +1,34 @@
 package v1
 
 import (
+	"encoding/json"
 	"time"
 )
 
-type EndpointType string
-
-const (
-	EndpointTypeHistorical EndpointType = "historical"
-	EndpointTypeLatest     EndpointType = "latest"
-	EndpointTypeNew        EndpointType = "new"
-)
-
 type Response struct {
-	Data   []Data `json:"data"`
-	Status Status `json:"status"`
+	Data   json.RawMessage `json:"data"`
+	Status Status          `json:"status"`
+}
+
+type Data struct {
+	ID                            int64            `json:"id"`
+	Name                          string           `json:"name"`
+	Symbol                        string           `json:"symbol"`
+	Slug                          string           `json:"slug"`
+	CmcRank                       int64            `json:"cmc_rank,omitempty"`
+	IsActive                      bool             `json:"is_active,omitempty"`
+	IsFiat                        int64            `json:"is_fiat,omitempty"`
+	NumMarketPairs                int64            `json:"num_market_pairs"`
+	CirculatingSupply             float64          `json:"circulating_supply"`
+	TotalSupply                   float64          `json:"total_supply"`
+	MaxSupply                     float64          `json:"max_supply"`
+	LastUpdated                   time.Time        `json:"last_updated"`
+	DateAdded                     time.Time        `json:"date_added"`
+	Tags                          []string         `json:"tags"`
+	SelfReportedCirculatingSupply float64          `json:"self_reported_circulating_supply,omitempty"`
+	SelfReportedMarketCap         float64          `json:"self_reported_market_cap,omitempty"`
+	Platform                      Platform         `json:"platform"`
+	Quote                         map[string]Quote `json:"quote"`
 }
 
 type Quote struct {
@@ -28,25 +42,6 @@ type Quote struct {
 	MarketCapDominance    float64   `json:"market_cap_dominance"`
 	FullyDilutedMarketCap float64   `json:"fully_diluted_market_cap"`
 	LastUpdated           time.Time `json:"last_updated"`
-}
-
-type Data struct {
-	ID                            int64            `json:"id"`
-	Name                          string           `json:"name"`
-	Symbol                        string           `json:"symbol"`
-	Slug                          string           `json:"slug"`
-	CmcRank                       int64            `json:"cmc_rank,omitempty"`
-	NumMarketPairs                int64            `json:"num_market_pairs"`
-	CirculatingSupply             float64          `json:"circulating_supply"`
-	TotalSupply                   float64          `json:"total_supply"`
-	MaxSupply                     float64          `json:"max_supply"`
-	LastUpdated                   time.Time        `json:"last_updated"`
-	DateAdded                     time.Time        `json:"date_added"`
-	Tags                          []string         `json:"tags"`
-	Platform                      Platform         `json:"platform"`
-	SelfReportedCirculatingSupply interface{}      `json:"self_reported_circulating_supply,omitempty"`
-	SelfReportedMarketCap         interface{}      `json:"self_reported_market_cap,omitempty"`
-	Quote                         map[string]Quote `json:"quote"`
 }
 
 type Status struct {
