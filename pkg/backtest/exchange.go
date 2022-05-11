@@ -317,18 +317,21 @@ func (e *Exchange) InitMarketData() {
 		matching.OnBalanceUpdate(e.userDataStream.EmitBalanceUpdate)
 	}
 	e.matchingBooksMutex.Unlock()
-
 }
 
-func (e *Exchange) GetMarketData() (chan types.KLine, error) {
+func (e *Exchange) SubscribeMarketData(extraIntervals ...types.Interval) (chan types.KLine, error) {
 	log.Infof("collecting backtest configurations...")
 
 	loadedSymbols := map[string]struct{}{}
 	loadedIntervals := map[types.Interval]struct{}{
 		// 1m interval is required for the backtest matching engine
 		types.Interval1m: {},
-		types.Interval1d: {},
 	}
+
+	for _, it := range extraIntervals {
+		loadedIntervals[it] = struct{}{}
+	}
+
 	for _, sub := range e.marketDataStream.Subscriptions {
 		loadedSymbols[sub.Symbol] = struct{}{}
 
