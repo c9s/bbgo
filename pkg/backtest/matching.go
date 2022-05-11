@@ -234,6 +234,9 @@ func (m *SimplePriceMatching) newTradeFromOrder(order types.Order, isMaker bool)
 
 	}
 
+	// update order time
+	order.UpdateTime = types.Time(m.CurrentTime)
+
 	var id = incTradeID()
 	return types.Trade{
 		ID:            id,
