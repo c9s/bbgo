@@ -718,10 +718,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		// kline downthrough ma5, ma50 trend down, and ewo < threshold
 		IsBear := !bull && breakDown && s.ewo.Last() <= mean-2*std
 
-		log.Infof("IsBull: %v, longSignal[1]: %f, shortSignal: %f",
-			IsBull, longSignal.Index(1), shortSignal.Last())
-		log.Infof("IsBear: %v, shortSignal[1]: %f, longSignal: %f",
-			IsBear, shortSignal.Index(1), longSignal.Last())
+		log.Infof("IsBull: %v, bull: %v, longSignal[1]: %v, shortSignal: %v",
+			IsBull, bull, longSignal.Index(1), shortSignal.Last())
+		log.Infof("IsBear: %v, bear: %v, shortSignal[1]: %v, longSignal: %v",
+			IsBear, !bull, shortSignal.Index(1), longSignal.Last())
 
 		var orders []types.SubmitOrder
 		var price fixedpoint.Value
