@@ -13,6 +13,7 @@ const ID = "pivotshort"
 
 var fifteen = fixedpoint.NewFromInt(15)
 var three = fixedpoint.NewFromInt(3)
+var two = fixedpoint.NewFromInt(2)
 
 var log = logrus.WithField("strategy", ID)
 
@@ -31,6 +32,7 @@ type Strategy struct {
 	Quantity fixedpoint.Value `json:"quantity"`
 
 	Position       *types.Position  `json:"position,omitempty"`
+	PivotLength    int              `json:"pivotLength"`
 	StopLossRatio  fixedpoint.Value `json:"stopLossRatio"`
 	CatBounceRatio fixedpoint.Value `json:"catBounceRatio"`
 	ShadowTPRatio  fixedpoint.Value `json:"shadowTPRatio"`
@@ -54,6 +56,23 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval.String()})
 	//session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: types.Interval1d.String()})
 
+}
+
+func (s *Strategy) placeOrder(ctx context.Context, price fixedpoint.Value, qty fixedpoint.Value, orderExecutor bbgo.OrderExecutor) {
+	submitOrder := types.SubmitOrder{
+		Symbol:   s.Symbol,
+		Side:     types.SideTypeSell,
+		Type:     types.OrderTypeLimit,
+		Price:    price,
+		Quantity: qty,
+	}
+	createdOrders, err := orderExecutor.SubmitOrders(ctx, submitOrder)
+	if err != nil {
+		log.WithError(err).Errorf("can not place orders")
+	}
+	s.orderStore.Add(createdOrders...)
+	s.activeMakerOrders.Add(createdOrders...)
+	//s.tradeCollector.Process()
 }
 
 func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Value) error {
@@ -114,7 +133,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.tradeCollector = bbgo.NewTradeCollector(s.Symbol, s.Position, s.orderStore)
 	s.tradeCollector.BindStream(session.UserDataStream)
 
-	iw := types.IntervalWindow{Window: 100, Interval: s.Interval}
+	iw := types.IntervalWindow{Window: s.PivotLength, Interval: s.Interval}
 	st, _ := session.MarketDataStore(s.Symbol)
 	s.pivot = &Pivot{IntervalWindow: iw}
 	s.pivot.Bind(st)
@@ -132,45 +151,65 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		if err := s.activeMakerOrders.GracefulCancel(ctx, s.session.Exchange); err != nil {
 			log.WithError(err).Errorf("graceful cancel order error")
 		}
-		log.Info(s.pivot.LastLow())
 		if s.pivot.LastLow() > 0. {
-
+			log.Info(s.pivot.LastLow(), kline.EndTime)
 			lastLow = fixedpoint.NewFromFloat(s.pivot.LastLow())
-
 		} else {
-			lastLow = fixedpoint.Zero
-			// SL || TP
-			R := kline.Close.Div(s.Position.AverageCost)
-			if R.Compare(fixedpoint.One.Add(s.StopLossRatio)) > 0 || R.Compare(fixedpoint.One.Sub(s.StopLossRatio.Mul(fifteen))) < 0 {
-				if s.Position.GetBase().Compare(s.Quantity.Neg()) <= 0 {
+			if !lastLow.IsZero() && !s.Position.GetBase().IsZero() {
+				R := kline.Close.Div(s.Position.AverageCost)
+				if R.Compare(fixedpoint.One.Add(s.StopLossRatio)) > 0 {
+					// SL
+					log.Infof("SL triggered")
+					s.ClosePosition(ctx, fixedpoint.One)
+					s.tradeCollector.Process()
+				} else if R.Compare(fixedpoint.One.Sub(s.StopLossRatio.Mul(fifteen))) < 0 {
+					// TP
+					log.Infof("TP triggered")
+					s.ClosePosition(ctx, fixedpoint.One)
+					s.tradeCollector.Process()
+				} else if kline.GetLowerShadowHeight().Div(kline.Close).Compare(s.ShadowTPRatio) > 0 {
+					// shadow TP
+					log.Infof("shadow TP triggered")
 					s.ClosePosition(ctx, fixedpoint.One)
 					s.tradeCollector.Process()
 				}
-				// shadow TP
-			} else if kline.GetLowerShadowHeight().Div(kline.Close).Compare(s.ShadowTPRatio) > 0 {
-				s.ClosePosition(ctx, fixedpoint.One)
-				s.tradeCollector.Process()
 			}
+			lastLow = fixedpoint.Zero
 		}
+
 		if !lastLow.IsZero() {
-			if s.Position.GetBase().Compare(s.Quantity.Neg()) > 0 {
-				submitOrder := types.SubmitOrder{
-					Symbol: s.Symbol,
-					Side:   types.SideTypeSell,
-					//Type:   types.OrderTypeMarket,
-					Type: types.OrderTypeLimit,
-					//Price: kline.Close,
-					Price:    lastLow.Mul(fixedpoint.One.Add(s.CatBounceRatio)),
-					Quantity: s.Quantity,
-				}
-				createdOrders, err := orderExecutor.SubmitOrders(ctx, submitOrder)
-				if err != nil {
-					log.WithError(err).Errorf("can not place orders")
-				}
-				s.orderStore.Add(createdOrders...)
-				s.activeMakerOrders.Add(createdOrders...)
+
+			futuresMode := s.session.Futures
+			// LO layer
+			p1 := lastLow.Mul(fixedpoint.One.Add(s.CatBounceRatio.Div(two).Div(two)))
+			p2 := lastLow.Mul(fixedpoint.One.Add(s.CatBounceRatio.Div(two)))
+			p3 := lastLow.Mul(fixedpoint.One.Add(s.CatBounceRatio))
+			q := s.Quantity.Div(three)
+
+			balances := s.session.GetAccount().Balances()
+			quoteBalance, _ := balances[s.Market.QuoteCurrency]
+			baseBalance, _ := balances[s.Market.BaseCurrency]
+			if (futuresMode && q.Mul(p1).Compare(quoteBalance.Available) < 0) || q.Compare(baseBalance.Available) < 0 {
+				s.placeOrder(ctx, p1, q, orderExecutor)
 				s.tradeCollector.Process()
 			}
+
+			balances = s.session.GetAccount().Balances()
+			quoteBalance, _ = balances[s.Market.QuoteCurrency]
+			baseBalance, _ = balances[s.Market.BaseCurrency]
+			if (futuresMode && q.Mul(p2).Compare(quoteBalance.Available) < 0) || q.Compare(baseBalance.Available) < 0 {
+				s.placeOrder(ctx, p2, q, orderExecutor)
+				s.tradeCollector.Process()
+			}
+
+			balances = s.session.GetAccount().Balances()
+			quoteBalance, _ = balances[s.Market.QuoteCurrency]
+			baseBalance, _ = balances[s.Market.BaseCurrency]
+			if (futuresMode && q.Mul(p3).Compare(quoteBalance.Available) < 0) || q.Compare(baseBalance.Available) < 0 {
+				s.placeOrder(ctx, p3, q, orderExecutor)
+				s.tradeCollector.Process()
+			}
+			//s.placeOrder(ctx, lastLow.Mul(fixedpoint.One.Add(s.CatBounceRatio)), s.Quantity, orderExecutor)
 		}
 	})
 
