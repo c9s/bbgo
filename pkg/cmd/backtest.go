@@ -213,49 +213,15 @@ var BacktestCmd = &cobra.Command{
 			}
 
 			log.Infof("starting synchronization: %v", userConfig.Backtest.Symbols)
-			for _, symbol := range userConfig.Backtest.Symbols {
-
-				for _, sourceExchange := range sourceExchanges {
-					exCustom, ok := sourceExchange.(types.CustomIntervalProvider)
-
-					var supportIntervals map[types.Interval]int
-					if ok {
-						supportIntervals = exCustom.SupportedInterval()
-					} else {
-						supportIntervals = types.SupportedIntervals
-					}
-
-					for interval := range supportIntervals {
-						// if err := s.SyncKLineByInterval(ctx, exchange, symbol, interval, startTime, endTime); err != nil {
-						//	return err
-						// }
-						firstKLine, err := backtestService.QueryFirstKLine(sourceExchange.Name(), symbol, interval)
-						if err != nil {
-							return errors.Wrapf(err, "failed to query backtest kline")
-						}
-
-						// if we don't have klines before the start time endpoint, the back-test will fail.
-						// because the last price will be missing.
-						if firstKLine != nil {
-							if err := backtestService.SyncExist(ctx, sourceExchange, symbol, syncFromTime, time.Now(), interval); err != nil {
-								return err
-							}
-						} else {
-							if err := backtestService.Sync(ctx, sourceExchange, symbol, syncFromTime, time.Now(), interval); err != nil {
-								return err
-							}
-						}
-					}
-				}
+			if err := sync(ctx, userConfig, backtestService, sourceExchanges, syncFromTime); err != nil {
+				return err
 			}
 			log.Info("synchronization done")
 
-			for _, sourceExchange := range sourceExchanges {
-				if shouldVerify {
-					err2, done := backtestService.Verify(userConfig.Backtest.Symbols, startTime, time.Now(), sourceExchange, verboseCnt)
-					if done {
-						return err2
-					}
+			if shouldVerify {
+				err := verify(userConfig, backtestService, sourceExchanges, startTime, verboseCnt)
+				if err != nil {
+					return err
 				}
 			}
 
@@ -307,19 +273,9 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
-		for _, session := range environ.Sessions() {
-			backtestExchange := session.Exchange.(*backtest.Exchange)
-			backtestExchange.InitMarketData()
-		}
-
-		var exchangeSources []backtest.ExchangeDataSource
-		for _, session := range environ.Sessions() {
-			exchange := session.Exchange.(*backtest.Exchange)
-			c, err := exchange.GetMarketData()
-			if err != nil {
-				return err
-			}
-			exchangeSources = append(exchangeSources, backtest.ExchangeDataSource{C: c, Exchange: exchange})
+		exchangeSources, err := toExchangeSources(environ.Sessions())
+		if err != nil {
+			return err
 		}
 
 		// back-test session report name
@@ -391,6 +347,17 @@ var BacktestCmd = &cobra.Command{
 
 					for _, h := range kLineHandlers {
 						h(k, exSource.Exchange)
+					}
+
+					// equity curve recording
+					if k.Interval == types.Interval1m {
+						balances, err := exSource.Exchange.QueryAccountBalances(ctx)
+						if err != nil {
+							log.WithError(err).Errorf("query back-test account balance error")
+						} else {
+							assets := balances.Assets(exSource.Session.AllLastPrices(), k.EndTime.Time())
+							_ = assets
+						}
 					}
 				}
 
@@ -570,6 +537,16 @@ var BacktestCmd = &cobra.Command{
 	},
 }
 
+func verify(userConfig *bbgo.Config, backtestService *service.BacktestService, sourceExchanges map[types.ExchangeName]types.Exchange, startTime time.Time, verboseCnt int) error {
+	for _, sourceExchange := range sourceExchanges {
+		err := backtestService.Verify(userConfig.Backtest.Symbols, startTime, time.Now(), sourceExchange, verboseCnt)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func confirmation(s string) bool {
 	reader := bufio.NewReader(os.Stdin)
 	for {
@@ -615,5 +592,64 @@ func safeMkdirAll(p string) error {
 		return os.MkdirAll(p, 0755)
 	}
 
+	return nil
+}
+
+func toExchangeSources(sessions map[string]*bbgo.ExchangeSession) (exchangeSources []backtest.ExchangeDataSource, err error) {
+	for _, session := range sessions {
+		exchange := session.Exchange.(*backtest.Exchange)
+		exchange.InitMarketData()
+
+		c, err := exchange.SubscribeMarketData(types.Interval1h, types.Interval1d)
+		if err != nil {
+			return exchangeSources, err
+		}
+
+		sessionCopy := session
+		exchangeSources = append(exchangeSources, backtest.ExchangeDataSource{
+			C:        c,
+			Exchange: exchange,
+			Session:  sessionCopy,
+		})
+	}
+	return exchangeSources, nil
+}
+
+func sync(ctx context.Context, userConfig *bbgo.Config, backtestService *service.BacktestService, sourceExchanges map[types.ExchangeName]types.Exchange, syncFromTime time.Time) error {
+	for _, symbol := range userConfig.Backtest.Symbols {
+
+		for _, sourceExchange := range sourceExchanges {
+			exCustom, ok := sourceExchange.(types.CustomIntervalProvider)
+
+			var supportIntervals map[types.Interval]int
+			if ok {
+				supportIntervals = exCustom.SupportedInterval()
+			} else {
+				supportIntervals = types.SupportedIntervals
+			}
+
+			for interval := range supportIntervals {
+				// if err := s.SyncKLineByInterval(ctx, exchange, symbol, interval, startTime, endTime); err != nil {
+				//	return err
+				// }
+				firstKLine, err := backtestService.QueryFirstKLine(sourceExchange.Name(), symbol, interval)
+				if err != nil {
+					return errors.Wrapf(err, "failed to query backtest kline")
+				}
+
+				// if we don't have klines before the start time endpoint, the back-test will fail.
+				// because the last price will be missing.
+				if firstKLine != nil {
+					if err := backtestService.SyncExist(ctx, sourceExchange, symbol, syncFromTime, time.Now(), interval); err != nil {
+						return err
+					}
+				} else {
+					if err := backtestService.Sync(ctx, sourceExchange, symbol, syncFromTime, time.Now(), interval); err != nil {
+						return err
+					}
+				}
+			}
+		}
+	}
 	return nil
 }
