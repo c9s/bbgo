@@ -11,9 +11,9 @@ import (
 )
 
 type Asset struct {
-	Currency string           `json:"currency" db:"currency"`
+	Currency string `json:"currency" db:"currency"`
 
-	Total    fixedpoint.Value `json:"total" db:"total"`
+	Total fixedpoint.Value `json:"total" db:"total"`
 
 	NetAsset fixedpoint.Value `json:"netAsset" db:"net_asset"`
 
@@ -33,6 +33,17 @@ type Asset struct {
 }
 
 type AssetMap map[string]Asset
+
+func (m AssetMap) InUSD() (total fixedpoint.Value) {
+	for _, a := range m {
+		if a.InUSD.IsZero() {
+			continue
+		}
+
+		total = total.Add(a.InUSD)
+	}
+	return total
+}
 
 func (m AssetMap) PlainText() (o string) {
 	var assets = m.Slice()
