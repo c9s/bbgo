@@ -509,4 +509,14 @@ func Change(a Series, offset ...int) Series {
 	return &ChangeResult{a, o}
 }
 
+func Stdev(a Series, length int) float64 {
+	avg := Mean(a, length)
+	s := .0
+	for i := 0; i < length; i++ {
+		diff := a.Index(i) - avg
+		s += diff * diff
+	}
+	return math.Sqrt(s / float64(length))
+}
+
 // TODO: ta.linreg
