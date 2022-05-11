@@ -598,6 +598,10 @@ func (session *ExchangeSession) LastPrice(symbol string) (price fixedpoint.Value
 	return price, ok
 }
 
+func (session *ExchangeSession) AllLastPrices() map[string]fixedpoint.Value {
+	return session.lastPrices
+}
+
 func (session *ExchangeSession) LastPrices() map[string]fixedpoint.Value {
 	return session.lastPrices
 }

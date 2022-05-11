@@ -45,7 +45,7 @@ func (s *BacktestService) SyncKLineByInterval(ctx context.Context, exchange type
 	return nil
 }
 
-func (s *BacktestService) Verify(symbols []string, startTime time.Time, endTime time.Time, sourceExchange types.Exchange, verboseCnt int) (error, bool) {
+func (s *BacktestService) Verify(symbols []string, startTime time.Time, endTime time.Time, sourceExchange types.Exchange, verboseCnt int) error {
 	var corruptCnt = 0
 	for _, symbol := range symbols {
 		log.Infof("verifying backtesting data...")
@@ -53,7 +53,7 @@ func (s *BacktestService) Verify(symbols []string, startTime time.Time, endTime 
 		for interval := range types.SupportedIntervals {
 			log.Infof("verifying %s %s kline data...", symbol, interval)
 
-			klineC, errC := s.QueryKLinesCh(startTime, time.Now(), sourceExchange, []string{symbol}, []types.Interval{interval})
+			klineC, errC := s.QueryKLinesCh(startTime, endTime, sourceExchange, []string{symbol}, []types.Interval{interval})
 			var emptyKLine types.KLine
 			var prevKLine types.KLine
 			for k := range klineC {
@@ -82,7 +82,7 @@ func (s *BacktestService) Verify(symbols []string, startTime time.Time, endTime 
 			}
 
 			if err := <-errC; err != nil {
-				return err, true
+				return err
 			}
 		}
 	}
@@ -93,7 +93,8 @@ func (s *BacktestService) Verify(symbols []string, startTime time.Time, endTime 
 	} else {
 		log.Infof("found %d corruptions", corruptCnt)
 	}
-	return nil, false
+
+	return nil
 }
 
 func (s *BacktestService) Sync(ctx context.Context, exchange types.Exchange, symbol string,

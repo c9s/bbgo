@@ -60,6 +60,34 @@ type Position struct {
 	sync.Mutex
 }
 
+func (p *Position) CsvHeader() []string {
+	return []string{
+		"symbol",
+		"time",
+		"average_cost",
+		"base",
+		"quote",
+		"accumulated_profit",
+	}
+}
+
+func (p *Position) CsvRecords() [][]string {
+	if p.AverageCost.IsZero() && p.Base.IsZero() {
+		return nil
+	}
+
+	return [][]string{
+		{
+			p.Symbol,
+			p.ChangedAt.Format(time.RFC1123),
+			p.AverageCost.String(),
+			p.Base.String(),
+			p.Quote.String(),
+			p.AccumulatedProfit.String(),
+		},
+	}
+}
+
 // NewProfit generates the profit object from the current position
 func (p *Position) NewProfit(trade Trade, profit, netProfit fixedpoint.Value) Profit {
 	return Profit{

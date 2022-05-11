@@ -13,9 +13,13 @@ import (
 	"github.com/c9s/bbgo/pkg/interact"
 )
 
+type StrategyID interface {
+	ID() string
+}
+
 // SingleExchangeStrategy represents the single Exchange strategy
 type SingleExchangeStrategy interface {
-	ID() string
+	StrategyID
 	Run(ctx context.Context, orderExecutor OrderExecutor, session *ExchangeSession) error
 }
 
@@ -34,7 +38,7 @@ type CrossExchangeSessionSubscriber interface {
 }
 
 type CrossExchangeStrategy interface {
-	ID() string
+	StrategyID
 	CrossRun(ctx context.Context, orderExecutionRouter OrderExecutionRouter, sessions map[string]*ExchangeSession) error
 }
 
@@ -346,15 +350,23 @@ func (trader *Trader) LoadState() error {
 	ps := trader.environment.PersistenceServiceFacade.Get()
 
 	log.Infof("loading strategies states...")
+
+	return trader.IterateStrategies(func(strategy StrategyID) error {
+		return loadPersistenceFields(strategy, strategy.ID(), ps)
+	})
+}
+
+func (trader *Trader) IterateStrategies(f func(st StrategyID) error) error {
 	for _, strategies := range trader.exchangeStrategies {
 		for _, strategy := range strategies {
-			if err := loadPersistenceFields(strategy, strategy.ID(), ps); err != nil {
+			if err := f(strategy); err != nil {
 				return err
 			}
 		}
 	}
+
 	for _, strategy := range trader.crossExchangeStrategies {
-		if err := loadPersistenceFields(strategy, strategy.ID(), ps); err != nil {
+		if err := f(strategy); err != nil {
 			return err
 		}
 	}
@@ -374,30 +386,14 @@ func (trader *Trader) SaveState() error {
 	ps := trader.environment.PersistenceServiceFacade.Get()
 
 	log.Infof("saving strategies states...")
-	for _, strategies := range trader.exchangeStrategies {
-		for _, strategy := range strategies {
-			id := callID(strategy)
-			if len(id) == 0 {
-				continue
-			}
-
-			if err := storePersistenceFields(strategy, id, ps); err != nil {
-				return err
-			}
-		}
-	}
-	for _, strategy := range trader.crossExchangeStrategies {
+	return trader.IterateStrategies(func(strategy StrategyID) error {
 		id := callID(strategy)
 		if len(id) == 0 {
-			continue
+			return nil
 		}
 
-		if err := storePersistenceFields(strategy, id, ps); err != nil {
-			return err
-		}
-	}
-
-	return nil
+		return storePersistenceFields(strategy, id, ps)
+	})
 }
 
 var defaultPersistenceSelector = &PersistenceSelector{
