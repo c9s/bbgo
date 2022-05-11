@@ -349,6 +349,7 @@ var BacktestCmd = &cobra.Command{
 				"time",
 				"in_usd",
 			})
+			defer equityCurveCsv.Flush()
 
 			kLineHandlers = append(kLineHandlers, func(k types.KLine, exSource *backtest.ExchangeDataSource) {
 				if k.Interval != types.Interval1h {
@@ -364,9 +365,29 @@ var BacktestCmd = &cobra.Command{
 						k.EndTime.Time().Format(time.RFC1123),
 						assets.InUSD().String(),
 					})
-					equityCurveCsv.Flush()
 				}
 			})
+
+			// equity curve recording -- record per 1h kline
+			ordersFile, err := os.Create(filepath.Join(reportDir, "orders.csv"))
+			if err != nil {
+				return err
+			}
+			defer func() { _ = ordersFile.Close() }()
+
+			ordersCsv := csv.NewWriter(ordersFile)
+			_ = ordersCsv.Write(types.Order{}.CsvHeader())
+
+			defer ordersCsv.Flush()
+			for _, exSource := range exchangeSources {
+				exSource.Session.UserDataStream.OnOrderUpdate(func(order types.Order) {
+					if order.Status == types.OrderStatusFilled {
+						for _, record := range order.CsvRecords() {
+							_ = ordersCsv.Write(record)
+						}
+					}
+				})
+			}
 		}
 
 		runCtx, cancelRun := context.WithCancel(ctx)

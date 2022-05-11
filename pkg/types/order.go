@@ -218,6 +218,30 @@ type Order struct {
 	IsIsolated bool `json:"isIsolated" db:"is_isolated"`
 }
 
+func (o Order) CsvHeader() []string {
+	return []string{
+		"time",
+		"order_id",
+		"symbol",
+		"order_type",
+		"price",
+		"quantity",
+	}
+}
+
+func (o Order) CsvRecords() [][]string {
+	return [][]string{
+		{
+			o.UpdateTime.Time().Format(time.RFC1123),
+			strconv.FormatUint(o.OrderID, 10),
+			o.Symbol,
+			string(o.Type),
+			o.Price.String(),
+			o.Quantity.String(),
+		},
+	}
+}
+
 // Backup backs up the current order quantity to a SubmitOrder object
 // so that we can post the order later when we want to restore the orders.
 func (o Order) Backup() SubmitOrder {
