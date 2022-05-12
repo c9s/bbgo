@@ -69,20 +69,20 @@ interface WithOHLCState {
   message: string;
 }
 
-export function withOHLCData(dataSet = "DAILY") {
+export function withOHLCData(interval : string = "5m") {
   return <TProps extends WithOHLCDataProps>(OriginalComponent: React.ComponentClass<TProps>) => {
     return class WithOHLCData extends React.Component<Omit<TProps, "data">, WithOHLCState> {
       public constructor(props: Omit<TProps, "data">) {
         super(props);
 
         this.state = {
-          message: `Loading ${dataSet} data...`,
+          message: `Loading price data...`,
         };
       }
 
       public componentDidMount() {
         fetch(
-          `https://raw.githubusercontent.com/reactivemarkets/react-financial-charts/master/packages/stories/src/data/${dataSet}.tsv`,
+          `/data/klines/ETHUSDT-5m.csv`,
         )
           .then((response) => response.text())
           .then((data) => tsvParse(data, parseData()))
@@ -276,12 +276,12 @@ class StockChart extends React.Component<StockChartProps> {
   };
 }
 
-export default withOHLCData()(withSize({ style: { minHeight: 600 } })(withDeviceRatio()(StockChart)));
+export default withOHLCData()(withSize({ style: { minHeight: 400 } })(withDeviceRatio()(StockChart)));
 
 export const MinutesStockChart = withOHLCData("MINUTES")(
-  withSize({ style: { minHeight: 600 } })(withDeviceRatio()(StockChart)),
+  withSize({ style: { minHeight: 400 } })(withDeviceRatio()(StockChart)),
 );
 
 export const SecondsStockChart = withOHLCData("SECONDS")(
-  withSize({ style: { minHeight: 600 } })(withDeviceRatio()(StockChart)),
+  withSize({ style: { minHeight: 400 } })(withDeviceRatio()(StockChart)),
 );
