@@ -3,7 +3,6 @@ package cmd
 import (
 	"bufio"
 	"context"
-	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -24,6 +23,7 @@ import (
 	"github.com/c9s/bbgo/pkg/backtest"
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
+	"github.com/c9s/bbgo/pkg/data/tsv"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -338,18 +338,17 @@ var BacktestCmd = &cobra.Command{
 			})
 
 			// equity curve recording -- record per 1h kline
-			equityCurveFile, err := os.Create(filepath.Join(reportDir, "equity_curve.csv"))
+			equityCurveTsv, err := tsv.NewWriterFile(filepath.Join(reportDir, "equity_curve.tsv"))
 			if err != nil {
 				return err
 			}
-			defer func() { _ = equityCurveFile.Close() }()
+			defer func() { _ = equityCurveTsv.Close() }()
 
-			equityCurveCsv := csv.NewWriter(equityCurveFile)
-			_ = equityCurveCsv.Write([]string{
+			_ = equityCurveTsv.Write([]string{
 				"time",
 				"in_usd",
 			})
-			defer equityCurveCsv.Flush()
+			defer equityCurveTsv.Flush()
 
 			kLineHandlers = append(kLineHandlers, func(k types.KLine, exSource *backtest.ExchangeDataSource) {
 				if k.Interval != types.Interval1h {
@@ -361,29 +360,26 @@ var BacktestCmd = &cobra.Command{
 					log.WithError(err).Errorf("query back-test account balance error")
 				} else {
 					assets := balances.Assets(exSource.Session.AllLastPrices(), k.EndTime.Time())
-					_ = equityCurveCsv.Write([]string{
+					_ = equityCurveTsv.Write([]string{
 						k.EndTime.Time().Format(time.RFC1123),
 						assets.InUSD().String(),
 					})
 				}
 			})
 
-			// equity curve recording -- record per 1h kline
-			ordersFile, err := os.Create(filepath.Join(reportDir, "orders.csv"))
+			ordersTsv, err := tsv.NewWriterFile(filepath.Join(reportDir, "orders.tsv"))
 			if err != nil {
 				return err
 			}
-			defer func() { _ = ordersFile.Close() }()
+			defer func() { _ = ordersTsv.Close() }()
+			_ = ordersTsv.Write(types.Order{}.CsvHeader())
 
-			ordersCsv := csv.NewWriter(ordersFile)
-			_ = ordersCsv.Write(types.Order{}.CsvHeader())
-
-			defer ordersCsv.Flush()
+			defer ordersTsv.Flush()
 			for _, exSource := range exchangeSources {
 				exSource.Session.UserDataStream.OnOrderUpdate(func(order types.Order) {
 					if order.Status == types.OrderStatusFilled {
 						for _, record := range order.CsvRecords() {
-							_ = ordersCsv.Write(record)
+							_ = ordersTsv.Write(record)
 						}
 					}
 				})
