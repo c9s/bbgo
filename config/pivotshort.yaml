@@ -2,7 +2,7 @@ sessions:
   binance:
     exchange: binance
     envVarPrefix: binance
-#    futures: true
+    futures: true
 
 
 exchangeStrategies:
@@ -10,10 +10,11 @@ exchangeStrategies:
   pivotshort:
     symbol: BTCBUSD
     interval: 5m
-    quantity: 0.9
-    pivotLength: 20
+    quantity: 1.0
+    pivotLength: 60
     stopLossRatio: 0.8%
-    catBounceRatio: 2%
+    catBounceRatio: 3%
+    numLayers: 5
     shadowTPRatio: 2%
 
 backtest:

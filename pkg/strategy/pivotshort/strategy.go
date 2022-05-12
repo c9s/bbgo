@@ -26,15 +26,24 @@ type IntervalWindowSetting struct {
 }
 
 type Strategy struct {
-	Symbol   string `json:"symbol"`
-	Market   types.Market
-	Interval types.Interval   `json:"interval"`
-	Quantity fixedpoint.Value `json:"quantity"`
+	*bbgo.Graceful
+	*bbgo.Notifiability
+	*bbgo.Persistence
 
-	Position       *types.Position  `json:"position,omitempty"`
+	Environment *bbgo.Environment
+	Symbol      string `json:"symbol"`
+	Market      types.Market
+	Interval    types.Interval   `json:"interval"`
+	Quantity    fixedpoint.Value `json:"quantity"`
+
+	// persistence fields
+	Position    *types.Position    `json:"position,omitempty" persistence:"position"`
+	ProfitStats *types.ProfitStats `json:"profitStats,omitempty" persistence:"profit_stats"`
+
 	PivotLength    int              `json:"pivotLength"`
 	StopLossRatio  fixedpoint.Value `json:"stopLossRatio"`
 	CatBounceRatio fixedpoint.Value `json:"catBounceRatio"`
+	NumLayers      fixedpoint.Value `json:"numLayers"`
 	ShadowTPRatio  fixedpoint.Value `json:"shadowTPRatio"`
 
 	activeMakerOrders *bbgo.LocalActiveOrderBook
@@ -43,8 +52,10 @@ type Strategy struct {
 
 	session *bbgo.ExchangeSession
 
-	//pivotHigh *PIVOTHIGH
 	pivot *Pivot
+
+	// StrategyController
+	bbgo.StrategyController
 }
 
 func (s *Strategy) ID() string {
@@ -96,7 +107,7 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 		Symbol:   s.Symbol,
 		Side:     side,
 		Type:     types.OrderTypeMarket,
-		Quantity: s.Quantity,
+		Quantity: quantity,
 		Market:   s.Market,
 	}
 
@@ -110,6 +121,9 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 	s.orderStore.Add(createdOrders...)
 	s.activeMakerOrders.Add(createdOrders...)
 	return err
+}
+func (s *Strategy) InstanceID() string {
+	return fmt.Sprintf("%s:%s", ID, s.Symbol)
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
@@ -130,7 +144,44 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.Position = types.NewPositionFromMarket(s.Market)
 	}
 
+	// calculate group id for orders
+	instanceID := s.InstanceID()
+	//s.groupID = util.FNV32(instanceID)
+
+	// Always update the position fields
+	s.Position.Strategy = ID
+	s.Position.StrategyInstanceID = instanceID
+
 	s.tradeCollector = bbgo.NewTradeCollector(s.Symbol, s.Position, s.orderStore)
+	s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
+		// StrategyController
+		if s.Status != types.StrategyStatusRunning {
+			return
+		}
+
+		s.Notifiability.Notify(trade)
+		s.ProfitStats.AddTrade(trade)
+
+		if profit.Compare(fixedpoint.Zero) == 0 {
+			s.Environment.RecordPosition(s.Position, trade, nil)
+		} else {
+			log.Infof("%s generated profit: %v", s.Symbol, profit)
+			p := s.Position.NewProfit(trade, profit, netProfit)
+			p.Strategy = ID
+			p.StrategyInstanceID = instanceID
+			s.Notify(&p)
+
+			s.ProfitStats.AddProfit(p)
+			s.Notify(&s.ProfitStats)
+
+			s.Environment.RecordPosition(s.Position, trade, &p)
+		}
+	})
+
+	s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
+		log.Infof("position changed: %s", s.Position)
+		s.Notify(s.Position)
+	})
 	s.tradeCollector.BindStream(session.UserDataStream)
 
 	iw := types.IntervalWindow{Window: s.PivotLength, Interval: s.Interval}
@@ -180,34 +231,18 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		if !lastLow.IsZero() {
 
 			futuresMode := s.session.Futures
-			// LO layer
-			p1 := lastLow.Mul(fixedpoint.One.Add(s.CatBounceRatio.Div(two).Div(two)))
-			p2 := lastLow.Mul(fixedpoint.One.Add(s.CatBounceRatio.Div(two)))
-			p3 := lastLow.Mul(fixedpoint.One.Add(s.CatBounceRatio))
-			q := s.Quantity.Div(three)
+			d := s.CatBounceRatio.Div(s.NumLayers)
+			q := s.Quantity.Div(s.NumLayers)
+			for i := 0; i < int(s.NumLayers.Float64()); i++ {
+				balances := s.session.GetAccount().Balances()
+				quoteBalance, _ := balances[s.Market.QuoteCurrency]
+				baseBalance, _ := balances[s.Market.BaseCurrency]
 
-			balances := s.session.GetAccount().Balances()
-			quoteBalance, _ := balances[s.Market.QuoteCurrency]
-			baseBalance, _ := balances[s.Market.BaseCurrency]
-			if (futuresMode && q.Mul(p1).Compare(quoteBalance.Available) < 0) || q.Compare(baseBalance.Available) < 0 {
-				s.placeOrder(ctx, p1, q, orderExecutor)
-				s.tradeCollector.Process()
-			}
-
-			balances = s.session.GetAccount().Balances()
-			quoteBalance, _ = balances[s.Market.QuoteCurrency]
-			baseBalance, _ = balances[s.Market.BaseCurrency]
-			if (futuresMode && q.Mul(p2).Compare(quoteBalance.Available) < 0) || q.Compare(baseBalance.Available) < 0 {
-				s.placeOrder(ctx, p2, q, orderExecutor)
-				s.tradeCollector.Process()
-			}
-
-			balances = s.session.GetAccount().Balances()
-			quoteBalance, _ = balances[s.Market.QuoteCurrency]
-			baseBalance, _ = balances[s.Market.BaseCurrency]
-			if (futuresMode && q.Mul(p3).Compare(quoteBalance.Available) < 0) || q.Compare(baseBalance.Available) < 0 {
-				s.placeOrder(ctx, p3, q, orderExecutor)
-				s.tradeCollector.Process()
+				p := lastLow.Mul(fixedpoint.One.Add(s.CatBounceRatio.Sub(fixedpoint.NewFromFloat(d.Float64() * float64(i)))))
+				if (futuresMode && q.Mul(p).Compare(quoteBalance.Available) < 0) || q.Compare(baseBalance.Available) < 0 {
+					s.placeOrder(ctx, p, q, orderExecutor)
+					s.tradeCollector.Process()
+				}
 			}
 			//s.placeOrder(ctx, lastLow.Mul(fixedpoint.One.Add(s.CatBounceRatio)), s.Quantity, orderExecutor)
 		}
