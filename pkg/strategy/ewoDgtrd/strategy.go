@@ -23,6 +23,7 @@ func init() {
 }
 
 type Strategy struct {
+	*bbgo.Environment
 	Market           types.Market
 	Session          *bbgo.ExchangeSession
 	UseHeikinAshi    bool             `json:"useHeikinAshi"` // use heikinashi kline
@@ -45,6 +46,8 @@ type Strategy struct {
 	heikinAshi     *HeikinAshi
 	peakPrice      fixedpoint.Value
 	bottomPrice    fixedpoint.Value
+	midPrice       fixedpoint.Value
+	lock           sync.RWMutex
 }
 
 func (s *Strategy) ID() string {
@@ -59,6 +62,10 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	log.Infof("subscribe %s", s.Symbol)
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: types.Interval1m.String()})
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval.String()})
+
+	if s.Environment != nil && s.Environment.IsBackTesting() {
+		session.Subscribe(types.BookTickerChannel, s.Symbol, types.SubscribeOptions{})
+	}
 	s.SmartStops.Subscribe(session)
 }
 
@@ -531,15 +538,176 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.SetupIndicators()
 
+	sellOrderTPSL := func(price fixedpoint.Value) {
+		balances := session.GetAccount().Balances()
+		quoteBalance := balances[s.Market.QuoteCurrency].Available
+		atrx2 := fixedpoint.NewFromFloat(s.atr.Last() * 2)
+		lastPrice := price
+		var ok bool
+		if s.Environment.IsBackTesting() {
+			lastPrice, ok = session.LastPrice(s.Symbol)
+			if !ok {
+				log.Errorf("cannot get last price")
+				return
+			}
+		}
+		buyall := false
+		if !sellPrice.IsZero() {
+			if s.bottomPrice.IsZero() || s.bottomPrice.Compare(price) > 0 {
+				s.bottomPrice = price
+			}
+		}
+		takeProfit := false
+		bottomBack := s.bottomPrice
+		if !quoteBalance.IsZero() && !sellPrice.IsZero() && !s.DisableShortStop {
+			// TP
+			if !atrx2.IsZero() && s.bottomPrice.Add(atrx2).Compare(lastPrice) >= 0 &&
+				lastPrice.Compare(sellPrice) < 0 {
+				buyall = true
+				s.bottomPrice = fixedpoint.Zero
+				takeProfit = true
+			}
+
+			// SL
+			if (!atrx2.IsZero() && sellPrice.Add(atrx2).Compare(lastPrice) <= 0) ||
+				lastPrice.Sub(sellPrice).Div(sellPrice).Compare(s.Stoploss) > 0 {
+				buyall = true
+				s.bottomPrice = fixedpoint.Zero
+			}
+		}
+		if buyall {
+			totalQuantity := quoteBalance.Div(lastPrice)
+			order := types.SubmitOrder{
+				Symbol:   s.Symbol,
+				Side:     types.SideTypeBuy,
+				Type:     types.OrderTypeMarket,
+				Quantity: totalQuantity,
+				Market:   s.Market,
+			}
+			if s.validateOrder(&order) {
+				if takeProfit {
+					log.Errorf("takeprofit buy at %v, avg %v, l: %v, atrx2: %v", lastPrice, sellPrice, bottomBack, atrx2)
+				} else {
+					log.Errorf("stoploss buy at %v, avg %v, l: %v, atrx2: %v", lastPrice, sellPrice, bottomBack, atrx2)
+				}
+
+				createdOrders, err := orderExecutor.SubmitOrders(ctx, order)
+				if err != nil {
+					log.WithError(err).Errorf("cannot place order")
+					return
+				}
+				log.Infof("stoploss bought order %v", createdOrders)
+				s.tradeCollector.Process()
+			}
+		}
+	}
+	buyOrderTPSL := func(price fixedpoint.Value) {
+		balances := session.GetAccount().Balances()
+		baseBalance := balances[s.Market.BaseCurrency].Available
+		atrx2 := fixedpoint.NewFromFloat(s.atr.Last() * 2)
+		lastPrice := price
+		var ok bool
+		if s.Environment.IsBackTesting() {
+			lastPrice, ok = session.LastPrice(s.Symbol)
+			if !ok {
+				log.Errorf("cannot get last price")
+				return
+			}
+		}
+		sellall := false
+		if !buyPrice.IsZero() {
+			if s.peakPrice.IsZero() || s.peakPrice.Compare(price) < 0 {
+				s.peakPrice = price
+			}
+		}
+		takeProfit := false
+		peakBack := s.peakPrice
+		if !baseBalance.IsZero() && !buyPrice.IsZero() {
+
+			// TP
+			if !atrx2.IsZero() && s.peakPrice.Sub(atrx2).Compare(lastPrice) >= 0 &&
+				lastPrice.Compare(buyPrice) > 0 {
+				sellall = true
+				s.peakPrice = fixedpoint.Zero
+				takeProfit = true
+			}
+
+			// SL
+			if buyPrice.Sub(lastPrice).Div(buyPrice).Compare(s.Stoploss) > 0 ||
+				(!atrx2.IsZero() && buyPrice.Sub(atrx2).Compare(lastPrice) >= 0) {
+				sellall = true
+				s.peakPrice = fixedpoint.Zero
+			}
+		}
+
+		if sellall {
+			order := types.SubmitOrder{
+				Symbol:   s.Symbol,
+				Side:     types.SideTypeSell,
+				Type:     types.OrderTypeMarket,
+				Market:   s.Market,
+				Quantity: baseBalance,
+			}
+			if s.validateOrder(&order) {
+				if takeProfit {
+					log.Errorf("takeprofit sell at %v, avg %v, h: %v, atrx2: %v", lastPrice, buyPrice, peakBack, atrx2)
+				} else {
+					log.Errorf("stoploss sell at %v, avg %v, h: %v, atrx2: %v", lastPrice, buyPrice, peakBack, atrx2)
+				}
+				createdOrders, err := orderExecutor.SubmitOrders(ctx, order)
+				if err != nil {
+					log.WithError(err).Errorf("cannot place order")
+					return
+				}
+				log.Infof("stoploss sold order %v", createdOrders)
+				s.tradeCollector.Process()
+			}
+		}
+	}
+
+	// set last price by realtime book ticker update
+	// to trigger TP/SL
+	session.MarketDataStream.OnBookTickerUpdate(func(ticker types.BookTicker) {
+		if s.Environment.IsBackTesting() {
+			return
+		}
+		bestBid := ticker.Buy
+		bestAsk := ticker.Sell
+		var midPrice fixedpoint.Value
+		if s.lock.TryLock() {
+			if !bestAsk.IsZero() && !bestBid.IsZero() {
+				s.midPrice = bestAsk.Add(bestBid).Div(types.Two)
+			} else if !bestAsk.IsZero() {
+				s.midPrice = bestAsk
+			} else {
+				s.midPrice = bestBid
+			}
+			midPrice = s.midPrice
+			s.lock.Unlock()
+		}
+		if !midPrice.IsZero() {
+			buyOrderTPSL(midPrice)
+			sellOrderTPSL(midPrice)
+		}
+		//log.Infof("best bid %v, best ask %v, mid %v", bestBid, bestAsk, midPrice)
+	})
+
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		if kline.Symbol != s.Symbol {
 			return
 		}
-
-		lastPrice, ok := session.LastPrice(s.Symbol)
-		if !ok {
-			log.Errorf("cannot get last price")
-			return
+		var lastPrice fixedpoint.Value
+		var ok bool
+		if s.Environment.IsBackTesting() {
+			lastPrice, ok = session.LastPrice(s.Symbol)
+			if !ok {
+				log.Errorf("cannot get last price")
+				return
+			}
+		} else {
+			s.lock.RLock()
+			lastPrice = s.midPrice
+			s.lock.RUnlock()
 		}
 
 		// cancel non-traded orders
@@ -558,12 +726,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			s.tradeCollector.Process()
 		}
 
-		balances := session.GetAccount().Balances()
-		baseBalance := balances[s.Market.BaseCurrency].Available
-		quoteBalance := balances[s.Market.QuoteCurrency].Available
 		atrx2 := fixedpoint.NewFromFloat(s.atr.Last() * 2)
-		log.Infof("Get last price: %v, kline: %v, balance[base]: %v balance[quote]: %v, atrx2: %v",
-			lastPrice, kline, baseBalance, quoteBalance, atrx2)
+		if !s.Environment.IsBackTesting() {
+			log.Infof("Get last price: %v, kline: %v, atrx2: %v", lastPrice, kline, atrx2)
+		}
 
 		// well, only track prices on 1m
 		if kline.Interval == types.Interval1m {
@@ -590,105 +756,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				log.Infof("repost order %v", createdOrders)
 				s.tradeCollector.Process()
 			}
-			sellall := false
-			buyall := false
-			if !buyPrice.IsZero() {
-				if s.peakPrice.IsZero() || s.peakPrice.Compare(kline.High) < 0 {
-					s.peakPrice = kline.High
-				}
-			}
 
-			if !sellPrice.IsZero() {
-				if s.bottomPrice.IsZero() || s.bottomPrice.Compare(kline.Low) > 0 {
-					s.bottomPrice = kline.Low
-				}
-			}
+			if s.Environment.IsBackTesting() {
+				buyOrderTPSL(kline.High)
+				sellOrderTPSL(kline.Low)
 
-			takeProfit := false
-			peakBack := s.peakPrice
-			bottomBack := s.bottomPrice
-			if !baseBalance.IsZero() && !buyPrice.IsZero() {
-
-				// TP
-				if !atrx2.IsZero() && s.peakPrice.Sub(atrx2).Compare(lastPrice) >= 0 &&
-					lastPrice.Compare(buyPrice) > 0 {
-					sellall = true
-					s.peakPrice = fixedpoint.Zero
-					takeProfit = true
-				}
-
-				// SL
-				if buyPrice.Sub(lastPrice).Div(buyPrice).Compare(s.Stoploss) > 0 ||
-					(!atrx2.IsZero() && buyPrice.Sub(atrx2).Compare(lastPrice) >= 0) {
-					sellall = true
-					s.peakPrice = fixedpoint.Zero
-				}
-			}
-
-			if !quoteBalance.IsZero() && !sellPrice.IsZero() && !s.DisableShortStop {
-				// TP
-				if !atrx2.IsZero() && s.bottomPrice.Add(atrx2).Compare(lastPrice) >= 0 &&
-					lastPrice.Compare(sellPrice) < 0 {
-					buyall = true
-					s.bottomPrice = fixedpoint.Zero
-					takeProfit = true
-				}
-
-				// SL
-				if (!atrx2.IsZero() && sellPrice.Add(atrx2).Compare(lastPrice) <= 0) ||
-					lastPrice.Sub(sellPrice).Div(sellPrice).Compare(s.Stoploss) > 0 {
-					buyall = true
-					s.bottomPrice = fixedpoint.Zero
-				}
-			}
-			if sellall {
-				order := types.SubmitOrder{
-					Symbol:   s.Symbol,
-					Side:     types.SideTypeSell,
-					Type:     types.OrderTypeMarket,
-					Market:   s.Market,
-					Quantity: baseBalance,
-				}
-				if s.validateOrder(&order) {
-					if takeProfit {
-						log.Errorf("takeprofit sell at %v, avg %v, h: %v, atrx2: %v, timestamp: %s", lastPrice, buyPrice, peakBack, atrx2, kline.StartTime)
-					} else {
-						log.Errorf("stoploss sell at %v, avg %v, h: %v, atrx2: %v, timestamp %s", lastPrice, buyPrice, peakBack, atrx2, kline.StartTime)
-					}
-					createdOrders, err := orderExecutor.SubmitOrders(ctx, order)
-					if err != nil {
-						log.WithError(err).Errorf("cannot place order")
-						return
-					}
-					log.Infof("stoploss sold order %v", createdOrders)
-					s.tradeCollector.Process()
-				}
-			}
-
-			if buyall {
-				totalQuantity := quoteBalance.Div(lastPrice)
-				order := types.SubmitOrder{
-					Symbol:   kline.Symbol,
-					Side:     types.SideTypeBuy,
-					Type:     types.OrderTypeMarket,
-					Quantity: totalQuantity,
-					Market:   s.Market,
-				}
-				if s.validateOrder(&order) {
-					if takeProfit {
-						log.Errorf("takeprofit buy at %v, avg %v, l: %v, atrx2: %v, timestamp: %s", lastPrice, sellPrice, bottomBack, atrx2, kline.StartTime)
-					} else {
-						log.Errorf("stoploss buy at %v, avg %v, l: %v, atrx2: %v, timestamp: %s", lastPrice, sellPrice, bottomBack, atrx2, kline.StartTime)
-					}
-
-					createdOrders, err := orderExecutor.SubmitOrders(ctx, order)
-					if err != nil {
-						log.WithError(err).Errorf("cannot place order")
-						return
-					}
-					log.Infof("stoploss bought order %v", createdOrders)
-					s.tradeCollector.Process()
-				}
 			}
 		}
 
@@ -718,10 +790,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		// kline downthrough ma5, ma50 trend down, and ewo < threshold
 		IsBear := !bull && breakDown && s.ewo.Last() <= mean-2*std
 
-		log.Infof("IsBull: %v, bull: %v, longSignal[1]: %v, shortSignal: %v",
-			IsBull, bull, longSignal.Index(1), shortSignal.Last())
-		log.Infof("IsBear: %v, bear: %v, shortSignal[1]: %v, longSignal: %v",
-			IsBear, !bull, shortSignal.Index(1), longSignal.Last())
+		if !s.Environment.IsBackTesting() {
+			log.Infof("IsBull: %v, bull: %v, longSignal[1]: %v, shortSignal: %v",
+				IsBull, bull, longSignal.Index(1), shortSignal.Last())
+			log.Infof("IsBear: %v, bear: %v, shortSignal[1]: %v, longSignal: %v",
+				IsBear, !bull, shortSignal.Index(1), longSignal.Last())
+		}
 
 		var orders []types.SubmitOrder
 		var price fixedpoint.Value
