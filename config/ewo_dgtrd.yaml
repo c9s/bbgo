@@ -9,7 +9,7 @@ exchangeStrategies:
  
 - on: binance
   ewo_dgtrd:
-    symbol: MATICUSDT
+    symbol: MATICBUSD
     interval: 30m
     useEma: false
     useSma: false
@@ -32,18 +32,18 @@ sync:
   sessions:
     - binance
   symbols:
-    - MATICUSDT
+    - MATICBUSD
 
 backtest:
-  startTime: "2022-04-14"
-  endTime: "2022-04-28"
+  startTime: "2022-01-01"
+  endTime: "2022-05-12"
   symbols:
-    - MATICUSDT
+    - MATICBUSD
   sessions: [binance]
-  account:
+  accounts:
     binance:
-      makerFeeRate: 0
-      takerFeeRate: 0
+      #makerFeeRate: 0
+      #takerFeeRate: 15
       balances:
-        MATIC: 500
-        USDT: 10000
+        MATIC: 0.0
+        BUSD: 10000

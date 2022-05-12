@@ -16,23 +16,23 @@ backtest:
   # for testing max draw down (MDD) at 03-12
   # see here for more details
   # https://www.investopedia.com/terms/m/maximum-drawdown-mdd.asp
-  startTime: "2021-08-01"
-  endTime: "2021-08-30"
+  startTime: "2022-01-01"
+  endTime: "2022-05-12"
   sessions:
   - binance
   symbols:
-  - ETHUSDT
-  account:
+  - MATICBUSD
+  accounts:
     binance:
       balances:
-        ETH: 1.0
-        USDT: 20_000.0
+        MATIC: 0.0
+        BUSD: 10_000.0
 
 exchangeStrategies:
 
 - on: binance
   bollmaker:
-    symbol: ETHUSDT
+    symbol: MATICBUSD
 
     # interval is how long do you want to update your order price and quantity
     interval: 1m
@@ -43,7 +43,7 @@ exchangeStrategies:
     # useTickerPrice use the ticker api to get the mid price instead of the closed kline price.
     # The back-test engine is kline-based, so the ticker price api is not supported.
     # Turn this on if you want to do real trading.
-    useTickerPrice: false
+    useTickerPrice: true
 
     # spread is the price spread from the middle price.
     # For ask orders, the ask price is ((bestAsk + bestBid) / 2 * (1.0 + spread))
@@ -57,8 +57,8 @@ exchangeStrategies:
     minProfitSpread: 0.1%
 
     # maxExposurePosition is the maximum position you can hold
-    # +10 means you can hold 10 ETH long position by maximum
-    # -10 means you can hold -10 ETH short position by maximum
+    # +10 means you can hold 10 MATIC long position by maximum
+    # -10 means you can hold -10 MATIC short position by maximum
     # maxExposurePosition: 3.0
     maxExposurePosition: 10
 
