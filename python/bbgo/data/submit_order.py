@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
 
 import bbgo_pb2
 
@@ -14,10 +15,10 @@ class SubmitOrder:
     exchange: str
     symbol: str
     side: SideType
-    quantity: float
+    quantity: Decimal
     order_type: OrderType
-    price: float = None
-    stop_price: float = None
+    price: Decimal = None
+    stop_price: Decimal = None
     client_order_id: str = None
     group_id: int = None
 
