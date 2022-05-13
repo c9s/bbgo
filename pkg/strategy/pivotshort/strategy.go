@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/sirupsen/logrus"
 )
@@ -52,7 +53,7 @@ type Strategy struct {
 
 	session *bbgo.ExchangeSession
 
-	pivot *Pivot
+	pivot *indicator.Pivot
 
 	// StrategyController
 	bbgo.StrategyController
@@ -186,7 +187,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	iw := types.IntervalWindow{Window: s.PivotLength, Interval: s.Interval}
 	st, _ := session.MarketDataStore(s.Symbol)
-	s.pivot = &Pivot{IntervalWindow: iw}
+	s.pivot = &indicator.Pivot{IntervalWindow: iw}
 	s.pivot.Bind(st)
 
 	session.UserDataStream.OnStart(func() {
@@ -194,6 +195,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 
 	var lastLow fixedpoint.Value
+	futuresMode := s.session.Futures || s.session.IsolatedFutures
+	d := s.CatBounceRatio.Div(s.NumLayers)
+	q := s.Quantity.Div(s.NumLayers)
+	log.Info(futuresMode)
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		if kline.Symbol != s.Symbol || kline.Interval != s.Interval {
@@ -230,19 +235,33 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		if !lastLow.IsZero() {
 
-			futuresMode := s.session.Futures
-			d := s.CatBounceRatio.Div(s.NumLayers)
-			q := s.Quantity.Div(s.NumLayers)
 			for i := 0; i < int(s.NumLayers.Float64()); i++ {
 				balances := s.session.GetAccount().Balances()
 				quoteBalance, _ := balances[s.Market.QuoteCurrency]
 				baseBalance, _ := balances[s.Market.BaseCurrency]
 
 				p := lastLow.Mul(fixedpoint.One.Add(s.CatBounceRatio.Sub(fixedpoint.NewFromFloat(d.Float64() * float64(i)))))
-				if (futuresMode && q.Mul(p).Compare(quoteBalance.Available) < 0) || q.Compare(baseBalance.Available) < 0 {
-					s.placeOrder(ctx, p, q, orderExecutor)
-					s.tradeCollector.Process()
+				//
+				if futuresMode {
+					//log.Infof("futures mode on ")
+					if q.Mul(p).Compare(quoteBalance.Available) < 0 {
+						s.placeOrder(ctx, p, q, orderExecutor)
+						s.tradeCollector.Process()
+					}
+				} else if s.Environment.IsBackTesting() {
+					//log.Infof("spot backtest mode on ")
+					if q.Compare(baseBalance.Available) < 0 {
+						s.placeOrder(ctx, p, q, orderExecutor)
+						s.tradeCollector.Process()
+					}
+				} else {
+					//log.Infof("spot mode on ")
+					if q.Compare(baseBalance.Available) < 0 {
+						s.placeOrder(ctx, p, q, orderExecutor)
+						s.tradeCollector.Process()
+					}
 				}
+
 			}
 			//s.placeOrder(ctx, lastLow.Mul(fixedpoint.One.Add(s.CatBounceRatio)), s.Quantity, orderExecutor)
 		}
