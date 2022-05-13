@@ -34,8 +34,12 @@ func (inc *STOCH) Update(high, low, cloze float64) {
 	lowest := inc.LowValues.Tail(inc.Window).Min()
 	highest := inc.HighValues.Tail(inc.Window).Max()
 
-	k := 100.0 * (cloze - lowest) / (highest - lowest)
-	inc.K.Push(k)
+	if highest == lowest {
+		inc.K.Push(50.0)
+	} else {
+		k := 100.0 * (cloze - lowest) / (highest - lowest)
+		inc.K.Push(k)
+	}
 
 	d := inc.K.Tail(DPeriod).Mean()
 	inc.D.Push(d)
