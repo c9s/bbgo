@@ -58,15 +58,19 @@ type Strategy struct {
 	// QuantityScale helps user to define the quantity by layer scale
 	QuantityScale *bbgo.LayerScale `json:"quantityScale,omitempty"`
 
+	AdjustmentMinSpread fixedpoint.Value `json:"adjustmentMinSpread"`
+	AdjustmentQuantity  fixedpoint.Value `json:"adjustmentQuantity"`
+
 	session *bbgo.ExchangeSession
 
 	// persistence fields
 	Position    *types.Position    `json:"position,omitempty" persistence:"position"`
 	ProfitStats *types.ProfitStats `json:"profitStats,omitempty" persistence:"profit_stats"`
 
-	activeMakerOrders *bbgo.LocalActiveOrderBook
-	orderStore        *bbgo.OrderStore
-	tradeCollector    *bbgo.TradeCollector
+	activeAdjustmentOrders *bbgo.LocalActiveOrderBook
+	activeWallOrders       *bbgo.LocalActiveOrderBook
+	orderStore             *bbgo.OrderStore
+	tradeCollector         *bbgo.TradeCollector
 
 	groupID uint32
 
@@ -107,9 +111,94 @@ func (s *Strategy) CurrentPosition() *types.Position {
 	return s.Position
 }
 
-func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExecutor) error {
+func (s *Strategy) placeAdjustmentOrders(ctx context.Context, orderExecutor bbgo.OrderExecutor) error {
 	var submitOrders []types.SubmitOrder
+	// position adjustment orders
+	base := s.Position.GetBase()
+	if base.IsZero() {
+		return nil
+	}
 
+	ticker, err := s.session.Exchange.QueryTicker(ctx, s.Symbol)
+	if err != nil {
+		return err
+	}
+
+	if s.Market.IsDustQuantity(base, ticker.Last) {
+		return nil
+	}
+
+	switch s.Side {
+	case types.SideTypeBuy:
+		askPrice := ticker.Sell.Mul(s.AdjustmentMinSpread.Add(fixedpoint.One))
+
+		if s.Position.AverageCost.Compare(askPrice) <= 0 {
+			return nil
+		}
+
+		if base.Sign() < 0 {
+			return nil
+		}
+
+		quantity := base.Abs()
+		if quantity.Compare(s.AdjustmentQuantity) >= 0 {
+			quantity = s.AdjustmentQuantity
+		}
+
+		submitOrders = append(submitOrders, types.SubmitOrder{
+			Symbol:   s.Symbol,
+			Side:     s.Side.Reverse(),
+			Type:     types.OrderTypeLimitMaker,
+			Price:    askPrice,
+			Quantity: quantity,
+			Market:   s.Market,
+			GroupID:  s.groupID,
+		})
+
+	case types.SideTypeSell:
+		bidPrice := ticker.Sell.Mul(fixedpoint.One.Sub(s.AdjustmentMinSpread))
+
+		if s.Position.AverageCost.Compare(bidPrice) >= 0 {
+			return nil
+		}
+
+		if base.Sign() > 0 {
+			return nil
+		}
+
+		quantity := base.Abs()
+		if quantity.Compare(s.AdjustmentQuantity) >= 0 {
+			quantity = s.AdjustmentQuantity
+		}
+
+		submitOrders = append(submitOrders, types.SubmitOrder{
+			Symbol:   s.Symbol,
+			Side:     s.Side.Reverse(),
+			Type:     types.OrderTypeLimitMaker,
+			Price:    bidPrice,
+			Quantity: quantity,
+			Market:   s.Market,
+			GroupID:  s.groupID,
+		})
+	}
+
+	// condition for lower the average cost
+	if len(submitOrders) == 0 {
+		return nil
+	}
+
+	createdOrders, err := orderExecutor.SubmitOrders(ctx, submitOrders...)
+	if err != nil {
+		return err
+	}
+
+	s.orderStore.Add(createdOrders...)
+	s.activeAdjustmentOrders.Add(createdOrders...)
+	return nil
+}
+
+func (s *Strategy) placeWallOrders(ctx context.Context, orderExecutor bbgo.OrderExecutor) error {
+	var submitOrders []types.SubmitOrder
 	var startPrice = s.FixedPrice
 	for i := 0; i < s.NumLayers; i++ {
 		var price = startPrice
@@ -155,7 +244,7 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 	}
 
 	s.orderStore.Add(createdOrders...)
-	s.activeMakerOrders.Add(createdOrders...)
+	s.activeWallOrders.Add(createdOrders...)
 	return err
 }
 
@@ -182,8 +271,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.stopC = make(chan struct{})
 
-	s.activeMakerOrders = bbgo.NewLocalActiveOrderBook(s.Symbol)
-	s.activeMakerOrders.BindStream(session.UserDataStream)
+	s.activeWallOrders = bbgo.NewLocalActiveOrderBook(s.Symbol)
+	s.activeWallOrders.BindStream(session.UserDataStream)
+
+	s.activeAdjustmentOrders = bbgo.NewLocalActiveOrderBook(s.Symbol)
+	s.activeAdjustmentOrders.BindStream(session.UserDataStream)
 
 	s.orderStore = bbgo.NewOrderStore(s.Symbol)
 	s.orderStore.BindStream(session.UserDataStream)
@@ -218,7 +310,45 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.tradeCollector.BindStream(session.UserDataStream)
 
 	session.UserDataStream.OnStart(func() {
-		if err := s.placeOrders(ctx, orderExecutor); err != nil {
+		if err := s.placeWallOrders(ctx, orderExecutor); err != nil {
+			log.WithError(err).Errorf("can not place order")
+		}
+	})
+
+	s.activeAdjustmentOrders.OnFilled(func(o types.Order) {
+		if err := s.activeAdjustmentOrders.GracefulCancel(ctx, s.session.Exchange); err != nil {
+			log.WithError(err).Errorf("graceful cancel order error")
+		}
+
+		// check if there is a canceled order had partially filled.
+		s.tradeCollector.Process()
+
+		if err := s.placeAdjustmentOrders(ctx, orderExecutor); err != nil {
+			log.WithError(err).Errorf("can not place order")
+		}
+	})
+
+	s.activeWallOrders.OnFilled(func(o types.Order) {
+		if err := s.activeWallOrders.GracefulCancel(ctx, s.session.Exchange); err != nil {
+			log.WithError(err).Errorf("graceful cancel order error")
+		}
+
+		// check if there is a canceled order had partially filled.
+		s.tradeCollector.Process()
+
+		if err := s.placeWallOrders(ctx, orderExecutor); err != nil {
+			log.WithError(err).Errorf("can not place order")
+		}
+
+
+		if err := s.activeAdjustmentOrders.GracefulCancel(ctx, s.session.Exchange); err != nil {
+			log.WithError(err).Errorf("graceful cancel order error")
+		}
+
+		// check if there is a canceled order had partially filled.
+		s.tradeCollector.Process()
+
+		if err := s.placeAdjustmentOrders(ctx, orderExecutor); err != nil {
 			log.WithError(err).Errorf("can not place order")
 		}
 	})
@@ -232,16 +362,16 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				return
 
 			case <-ticker.C:
-				orders := s.activeMakerOrders.Orders()
+				orders := s.activeWallOrders.Orders()
 				if anyOrderFilled(orders) {
-					if err := s.activeMakerOrders.GracefulCancel(ctx, s.session.Exchange); err != nil {
+					if err := s.activeWallOrders.GracefulCancel(ctx, s.session.Exchange); err != nil {
 						log.WithError(err).Errorf("graceful cancel order error")
 					}
 
 					// check if there is a canceled order had partially filled.
 					s.tradeCollector.Process()
 
-					if err := s.placeOrders(ctx, orderExecutor); err != nil {
+					if err := s.placeWallOrders(ctx, orderExecutor); err != nil {
 						log.WithError(err).Errorf("can not place order")
 					}
 				}
@@ -253,7 +383,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		defer wg.Done()
 		close(s.stopC)
 
-		if err := s.activeMakerOrders.GracefulCancel(ctx, s.session.Exchange); err != nil {
+		if err := s.activeWallOrders.GracefulCancel(ctx, s.session.Exchange); err != nil {
+			log.WithError(err).Errorf("graceful cancel order error")
+		}
+
+		if err := s.activeAdjustmentOrders.GracefulCancel(ctx, s.session.Exchange); err != nil {
 			log.WithError(err).Errorf("graceful cancel order error")
 		}
 

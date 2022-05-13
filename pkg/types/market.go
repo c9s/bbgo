@@ -94,6 +94,10 @@ type Market struct {
 	TickSize fixedpoint.Value `json:"tickSize,omitempty"`
 }
 
+func (m Market) IsDustQuantity(quantity, price fixedpoint.Value) bool {
+	return quantity.Compare(m.MinQuantity) <= 0 || quantity.Mul(price).Compare(m.MinNotional) <= 0
+}
+
 // TruncateQuantity uses the step size to truncate floating number, in order to avoid the rounding issue
 func (m Market) TruncateQuantity(quantity fixedpoint.Value) fixedpoint.Value {
 	stepRound := math.Pow10(-int(math.Log10(m.StepSize.Float64())))
