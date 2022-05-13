@@ -78,6 +78,18 @@ type Strategy struct {
 	// AskSpread overrides the spread setting, this spread will be used for the sell order
 	AskSpread fixedpoint.Value `json:"askSpread,omitempty"`
 
+	// DynamicSpreadWindow enables the automatic adjustment to bid and ask spread.
+	// When DynamicSpreadWindow is set and is larger than 0, the spreads are calculated based on the SMA of amplitude of
+	// [DynamicSpreadWindow] K-lines
+	DynamicSpreadWindow int              `json:"dynamicSpreadWindow,omitempty"`
+	MinAskSpread        fixedpoint.Value `json:"minAskSpread"`
+	MinBidSpread        fixedpoint.Value `json:"minBidSpread"`
+	MaxAskSpread        fixedpoint.Value `json:"maxAskSpread"`
+	MaxBidSpread        fixedpoint.Value `json:"maxBidSpread"`
+
+	DynamicAskSpread *indicator.SMA
+	DynamicBidSpread *indicator.SMA
+
 	// MinProfitSpread is the minimal order price spread from the current average cost.
 	// For long position, you will only place sell order above the price (= average cost * (1 + minProfitSpread))
 	// For short position, you will only place buy order below the price (= average cost * (1 - minProfitSpread))
@@ -507,6 +519,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	// StrategyController
 	s.Status = types.StrategyStatusRunning
 
+	// Setup dynamic spread
+	if s.DynamicSpreadWindow > 0 {
+		s.DynamicBidSpread = &indicator.SMA{IntervalWindow: types.IntervalWindow{s.Interval, s.DynamicSpreadWindow}}
+		s.DynamicAskSpread = &indicator.SMA{IntervalWindow: types.IntervalWindow{s.Interval, s.DynamicSpreadWindow}}
+	}
+
 	s.OnSuspend(func() {
 		s.Status = types.StrategyStatusStopped
 
@@ -651,6 +669,36 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		// StrategyController
 		if s.Status != types.StrategyStatusRunning {
 			return
+		}
+
+		// Update spreads
+		if s.DynamicSpreadWindow > 0 && kline.Direction() == types.DirectionUp {
+			s.DynamicAskSpread.Update(kline.GetHigh().Sub(kline.GetOpen()).Div(kline.GetOpen()).Float64())
+		}
+		if s.DynamicSpreadWindow > 0 && kline.Direction() == types.DirectionDown {
+			s.DynamicBidSpread.Update(kline.GetOpen().Sub(kline.GetLow()).Div(kline.GetOpen()).Float64())
+		}
+		if s.DynamicSpreadWindow > 0 && s.DynamicBidSpread.Length() >= s.DynamicSpreadWindow {
+			dynamicBidSpread := fixedpoint.NewFromFloat(s.DynamicBidSpread.Last())
+			if dynamicBidSpread.Compare(s.MaxBidSpread) > 0 {
+				s.BidSpread = s.MaxBidSpread
+			} else if dynamicBidSpread.Compare(s.MinBidSpread) < 0 {
+				s.BidSpread = s.MinBidSpread
+			} else {
+				s.BidSpread = dynamicBidSpread
+			}
+			log.Infof("new bid spread: %v", s.BidSpread.Percentage())
+		}
+		if s.DynamicSpreadWindow > 0 && s.DynamicAskSpread.Length() >= s.DynamicSpreadWindow {
+			dynamicAskSpread := fixedpoint.NewFromFloat(s.DynamicAskSpread.Last())
+			if dynamicAskSpread.Compare(s.MaxAskSpread) > 0 {
+				s.AskSpread = s.MaxAskSpread
+			} else if dynamicAskSpread.Compare(s.MinAskSpread) < 0 {
+				s.AskSpread = s.MinAskSpread
+			} else {
+				s.AskSpread = dynamicAskSpread
+			}
+			log.Infof("new ask spread: %v", s.AskSpread.Percentage())
 		}
 
 		if kline.Symbol != s.Symbol || kline.Interval != s.Interval {
