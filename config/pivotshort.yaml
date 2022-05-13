@@ -2,7 +2,7 @@ sessions:
   binance:
     exchange: binance
     envVarPrefix: binance
-    futures: true
+#    futures: true
 
 
 exchangeStrategies:
