@@ -195,11 +195,13 @@ To query transfer history:
 bbgo transfer-history --session max --asset USDT --since "2019-01-01"
 ```
 
+<!--
 To calculate pnl:
 
 ```sh
 bbgo pnl --exchange binance --asset BTC --since "2019-01-01"
 ```
+--->
 
 
 ## Advanced Configuration
