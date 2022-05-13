@@ -14,7 +14,7 @@ func init() {
 func upFixProfitSymbolLength(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
 	// This code is executed when the migration is applied.
 
-	_, err = tx.ExecContext(ctx, "ALTER TABLE profits\n    CHANGE symbol symbol VARCHAR(20) NOT NULL;")
+	_, err = tx.ExecContext(ctx, "SELECT 1;")
 	if err != nil {
 		return err
 	}
