@@ -9,14 +9,14 @@ exchangeStrategies:
  
 - on: binance
   ewo_dgtrd:
-    symbol: MATICBUSD
-    interval: 30m
+    symbol: MATICUSDT
+    interval: 2h
     useEma: false
     useSma: false
-    sigWin: 3
-    stoploss: 2%
+    sigWin: 8
+    stoploss: 10%
     useHeikinAshi: true
-    disableShortStop: true
+    disableShortStop: false
     #stops:
     #- trailingStop:
     #    callbackRate: 5.1%
@@ -32,18 +32,18 @@ sync:
   sessions:
     - binance
   symbols:
-    - MATICBUSD
+    - MATICUSDT
 
 backtest:
-  startTime: "2022-01-01"
-  endTime: "2022-05-12"
+  startTime: "2022-05-01"
+  endTime: "2022-05-11"
   symbols:
-    - MATICBUSD
+    - MATICUSDT
   sessions: [binance]
   accounts:
     binance:
       #makerFeeRate: 0
       #takerFeeRate: 15
       balances:
-        MATIC: 0.0
-        BUSD: 10000
+        MATIC: 5000.0
+        USDT: 10000
