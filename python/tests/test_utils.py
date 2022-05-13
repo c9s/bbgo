@@ -1,4 +1,6 @@
-from bbgo.utils import parse_float
+from decimal import Decimal
+
+from bbgo.utils import parse_number
 from bbgo.utils import parse_time
 
 
@@ -10,9 +12,8 @@ def test_parse_time():
 
 
 def test_parse_float():
-    assert parse_float(None) == 0
-    assert parse_float("") == 0
+    assert parse_number(None) == 0
+    assert parse_number("") == 0
 
     s = "3.14159265358979"
-    f = 3.14159265358979
-    assert parse_float(s) == f
+    assert parse_number(s) == Decimal(s)

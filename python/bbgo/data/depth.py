@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
+from typing import List
+
 import bbgo_pb2
 
-from typing import List
+from ..utils import parse_number
 
 
 @dataclass
@@ -25,12 +28,12 @@ class Depth:
 
 @dataclass
 class PriceVolume:
-    price: float
-    volume: float
+    price: Decimal
+    volume: Decimal
 
     @classmethod
     def from_pb(cls, obj: bbgo_pb2.PriceVolume):
         return cls(
-            price=float(obj.price),
-            volume=float(obj.volume),
+            price=parse_number(obj.price),
+            volume=parse_number(obj.volume),
         )
