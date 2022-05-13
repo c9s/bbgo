@@ -1,0 +1,38 @@
+---
+persistence:
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    db: 0
+
+sessions:
+  max:
+    exchange: max
+    envVarPrefix: MAX
+
+exchangeStrategies:
+
+- on: max
+  wall:
+    symbol: DOTUSDT
+
+    # interval is how long do you want to update your order price and quantity
+    interval: 1m
+
+    fixedPrice: 2.0
+
+    side: buy
+
+    # quantity is the base order quantity for your buy/sell order.
+    # quantity: 0.05
+
+    numLayers: 3
+    layerSpread: 0.1
+
+    quantityScale:
+      byLayer:
+        linear:
+          domain: [ 1, 3 ]
+          range: [ 10.0, 30.0 ]
+
+
