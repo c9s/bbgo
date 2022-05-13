@@ -21,18 +21,18 @@ backtest:
   sessions:
   - binance
   symbols:
-  - MATICBUSD
+  - ETHUSDT
   accounts:
     binance:
       balances:
-        MATIC: 0.0
-        BUSD: 10_000.0
+        ETH: 0.0
+        USDT: 10_000.0
 
 exchangeStrategies:
 
 - on: binance
   bollmaker:
-    symbol: MATICBUSD
+    symbol: ETHUSDT
 
     # interval is how long do you want to update your order price and quantity
     interval: 1m
@@ -57,8 +57,8 @@ exchangeStrategies:
     minProfitSpread: 0.1%
 
     # maxExposurePosition is the maximum position you can hold
-    # +10 means you can hold 10 MATIC long position by maximum
-    # -10 means you can hold -10 MATIC short position by maximum
+    # +10 means you can hold 10 ETH long position by maximum
+    # -10 means you can hold -10 ETH short position by maximum
     # maxExposurePosition: 3.0
     maxExposurePosition: 10
 
