@@ -1,15 +1,16 @@
 from datetime import datetime
+from decimal import Decimal
 from typing import Union
 
 
-def parse_float(s: Union[str, float]) -> float:
+def parse_number(s: Union[str, float]) -> Decimal:
     if s is None:
         return 0
 
     if s == "":
         return 0
 
-    return float(s)
+    return Decimal(s)
 
 
 def parse_time(t: Union[str, int]) -> datetime:
