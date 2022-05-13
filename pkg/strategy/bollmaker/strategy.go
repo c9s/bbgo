@@ -551,6 +551,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	// initial required information
 	s.session = session
+
 	s.neutralBoll = s.StandardIndicatorSet.BOLL(s.NeutralBollinger.IntervalWindow, s.NeutralBollinger.BandWidth)
 	s.defaultBoll = s.StandardIndicatorSet.BOLL(s.DefaultBollinger.IntervalWindow, s.DefaultBollinger.BandWidth)
 
@@ -571,6 +572,13 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		} else {
 			s.Position = types.NewPositionFromMarket(s.Market)
 		}
+	}
+
+	if s.session.MakerFeeRate.Sign() > 0 || s.session.TakerFeeRate.Sign() > 0 {
+		s.Position.SetExchangeFeeRate(s.session.ExchangeName, types.ExchangeFee{
+			MakerFeeRate: s.session.MakerFeeRate,
+			TakerFeeRate: s.session.TakerFeeRate,
+		})
 	}
 
 	if s.ProfitStats == nil {
