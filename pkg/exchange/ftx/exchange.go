@@ -214,6 +214,7 @@ var supportedIntervals = map[types.Interval]int{
 	types.Interval5m:  5,
 	types.Interval15m: 15,
 	types.Interval1h:  60,
+	types.Interval4h:  60 * 4,
 	types.Interval1d:  60 * 24,
 	types.Interval3d:  60 * 24 * 3,
 }
