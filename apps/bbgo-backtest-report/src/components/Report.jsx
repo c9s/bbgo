@@ -2,18 +2,18 @@ import React from 'react';
 
 import TradingViewChart from './TradingViewChart';
 
-import { Button } from '@nextui-org/react';
+import {Container} from '@nextui-org/react';
 
 const Report = (props) => {
   /*
    <Button>Click me</Button>
    */
-  return <div>
+  return <Container>
     <h2>Back-test Report</h2>
     <div>
       <TradingViewChart/>
     </div>
-  </div>;
+  </Container>;
 };
 
 export default Report;
