@@ -1,28 +1,30 @@
-import React, {useEffect, useState, useRef} from 'react';
-import dynamic from 'next/dynamic';
-import { tsvParse } from "d3-dsv";
+import React, {useEffect, useRef, useState} from 'react';
+import {tsvParse} from "d3-dsv";
 
 // https://github.com/tradingview/lightweight-charts/issues/543
 // const createChart = dynamic(() => import('lightweight-charts'));
+import {createChart} from 'lightweight-charts';
 
-import { createChart } from 'lightweight-charts';
-import {timeParse} from "d3-time-format";
+// const parseDate = timeParse("%Y-%m-%d");
 
-const parseDate = timeParse("%Y-%m-%d");
-
-const parseData = () => {
+const parseKline = () => {
   return (d) => {
-    const date = parseDate(d.startTime);
-    if (date === null) {
-      d.time = new Date(Number(d.startTime));
-    } else {
-      d.time = new Date(date);
-    }
+    d.startTime = new Date(Number(d.startTime) * 1000);
+    d.endTime = new Date(Number(d.endTime) * 1000);
+    d.time = d.startTime;
 
     for (const key in d) {
       // convert number fields
-      if (key !== "time" && key !== "interval" && Object.prototype.hasOwnProperty.call(d, key)) {
-        d[key] = +d[key];
+      if (Object.prototype.hasOwnProperty.call(d, key)) {
+        switch (key) {
+          case "open":
+          case "high":
+          case "low":
+          case "close":
+          case "volume":
+            d[key] = +d[key];
+            break
+        }
       }
     }
 
@@ -48,10 +50,9 @@ const TradingViewChart = (props) => {
       `/data/klines/ETHUSDT-5m.tsv`,
     )
       .then((response) => response.text())
-      .then((data) => tsvParse(data, parseData()))
+      .then((data) => tsvParse(data, parseKline()))
       // .then((data) => tsvParse(data))
       .then((data) => {
-        console.log(data);
         setData(data);
       })
       .catch(() => {
@@ -69,16 +70,16 @@ const TradingViewChart = (props) => {
 
     const lineSeries = c.addLineSeries();
     lineSeries.setData([
-      { time: '2019-04-11', value: 80.01 },
-      { time: '2019-04-12', value: 96.63 },
-      { time: '2019-04-13', value: 76.64 },
-      { time: '2019-04-14', value: 81.89 },
-      { time: '2019-04-15', value: 74.43 },
-      { time: '2019-04-16', value: 80.01 },
-      { time: '2019-04-17', value: 96.63 },
-      { time: '2019-04-18', value: 76.64 },
-      { time: '2019-04-19', value: 81.89 },
-      { time: '2019-04-20', value: 74.43 },
+      {time: '2019-04-11', value: 80.01},
+      {time: '2019-04-12', value: 96.63},
+      {time: '2019-04-13', value: 76.64},
+      {time: '2019-04-14', value: 81.89},
+      {time: '2019-04-15', value: 74.43},
+      {time: '2019-04-16', value: 80.01},
+      {time: '2019-04-17', value: 96.63},
+      {time: '2019-04-18', value: 76.64},
+      {time: '2019-04-19', value: 81.89},
+      {time: '2019-04-20', value: 74.43},
     ]);
   }, [ref.current, data])
   return <div>
