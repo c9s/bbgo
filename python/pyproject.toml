@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "bbgo"
-version = "0.1.8"
+version = "0.1.9"
 description = ""
 authors = ["なるみ <weaper@gmail.com>"]
 packages = [
