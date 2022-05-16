@@ -14,7 +14,7 @@ class Balance:
     currency: str
     available: Decimal
     locked: Decimal
-    borrowed: str
+    borrowed: Decimal
 
     @classmethod
     def from_pb(cls, obj: bbgo_pb2.Balance) -> Balance:
@@ -23,7 +23,7 @@ class Balance:
             currency=obj.currency,
             available=parse_number(obj.available),
             locked=parse_number(obj.locked),
-            borrowed=obj.borrowed,
+            borrowed=parse_number(obj.borrowed),
         )
 
     def total(self) -> Decimal:
