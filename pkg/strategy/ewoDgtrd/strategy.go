@@ -796,7 +796,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		bottomBack := s.bottomPrice
 		spBack := s.sellPrice
 		if !quoteBalance.IsZero() && !s.sellPrice.IsZero() && !s.DisableShortStop {
-			//longSignal := types.CrossOver(s.ewo, s.ewoSignal)
+			// longSignal := types.CrossOver(s.ewo, s.ewoSignal)
 			// TP
 			/*if lastPrice.Compare(s.sellPrice) < 0 && (s.ccis.BuySignal() || longSignal.Last())  {
 				buyall = true
@@ -910,7 +910,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		bestBid := ticker.Buy
 		bestAsk := ticker.Sell
 		var midPrice fixedpoint.Value
-		if s.lock.TryLock() {
+
+		// TODO: for go1.18 we can use TryLock, use build flag to support this
+		if tryLock(&s.lock) {
 			if !bestAsk.IsZero() && !bestBid.IsZero() {
 				s.midPrice = bestAsk.Add(bestBid).Div(types.Two)
 			} else if !bestAsk.IsZero() {
@@ -921,10 +923,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			midPrice = s.midPrice
 			s.lock.Unlock()
 		}
+
 		if !midPrice.IsZero() {
 			buyOrderTPSL(midPrice)
 			sellOrderTPSL(midPrice)
-			//log.Debugf("best bid %v, best ask %v, mid %v", bestBid, bestAsk, midPrice)
+			// log.Debugf("best bid %v, best ask %v, mid %v", bestBid, bestAsk, midPrice)
 		}
 	})
 
@@ -974,8 +977,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.CancelAll(ctx)
 
 		// To get the threshold for ewo
-		//mean := types.Mean(s.ewo, 10)
-		//std := types.Stdev(s.ewo, 10)
+		// mean := types.Mean(s.ewo, 10)
+		// std := types.Stdev(s.ewo, 10)
 
 		longSignal := types.CrossOver(s.ewo, s.ewoSignal)
 		shortSignal := types.CrossUnder(s.ewo, s.ewoSignal)
@@ -991,9 +994,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			breakDown = kline.Close.Float64() < s.ma5.Last()
 		}
 		// kline breakthrough ma5, ma50 trend up, and ewo > threshold
-		IsBull := bull && breakThrough && s.ccis.BuySignal() //&& s.ewo.Last() > mean + 2 * std
+		IsBull := bull && breakThrough && s.ccis.BuySignal() // && s.ewo.Last() > mean + 2 * std
 		// kline downthrough ma5, ma50 trend down, and ewo < threshold
-		IsBear := !bull && breakDown && s.ccis.SellSignal() //.ewo.Last() < mean - 2 * std
+		IsBear := !bull && breakDown && s.ccis.SellSignal() // .ewo.Last() < mean - 2 * std
 
 		if !s.Environment.IsBackTesting() {
 			log.Infof("IsBull: %v, bull: %v, longSignal[1]: %v, shortSignal: %v",
