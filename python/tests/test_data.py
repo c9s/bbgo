@@ -12,7 +12,7 @@ def test_balance_from_pb():
     currency = 'BTCUSDT'
     available = '3.1415926'
     locked = '2.7182818'
-    borrowed = 'borrowed'
+    borrowed = '0.1234567'
 
     balance_pb = bbgo_pb2.Balance(
         exchange=exchange,
@@ -28,7 +28,7 @@ def test_balance_from_pb():
     assert balance.currency == currency
     assert balance.available == Decimal(available)
     assert balance.locked == Decimal(locked)
-    assert balance.borrowed == borrowed
+    assert balance.borrowed == Decimal(borrowed)
 
 
 def test_kline_from_pb():
