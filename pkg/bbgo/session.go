@@ -582,7 +582,7 @@ func (session *ExchangeSession) MarketDataStore(symbol string) (s *MarketDataSto
 	return s, ok
 }
 
-// MarketDataStore returns the market data store of a symbol
+// OrderBook returns the personal orderbook of a symbol
 func (session *ExchangeSession) OrderBook(symbol string) (s *types.StreamOrderBook, ok bool) {
 	s, ok = session.orderBooks[symbol]
 	return s, ok
@@ -935,9 +935,9 @@ func (session *ExchangeSession) SlackAttachment() slack.Attachment {
 	return slack.Attachment{
 		// Pretext:       "",
 		// Text:  text,
-		Title:  session.Name,
-		Fields: fields,
+		Title:      session.Name,
+		Fields:     fields,
 		FooterIcon: footerIcon,
-		Footer: util.Render("update time {{ . }}", time.Now().Format(time.RFC822)),
+		Footer:     util.Render("update time {{ . }}", time.Now().Format(time.RFC822)),
 	}
 }

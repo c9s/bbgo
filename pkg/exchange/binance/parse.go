@@ -113,17 +113,17 @@ func (e *ExecutionReportEvent) Order() (*types.Order, error) {
 	orderCreationTime := time.Unix(0, e.OrderCreationTime*int64(time.Millisecond))
 	return &types.Order{
 		SubmitOrder: types.SubmitOrder{
-			ClientOrderID:    e.ClientOrderID,
-			Symbol:           e.Symbol,
-			Side:             toGlobalSideType(binance.SideType(e.Side)),
-			Type:             toGlobalOrderType(binance.OrderType(e.OrderType)),
-			Quantity:         e.OrderQuantity,
-			Price:            e.OrderPrice,
-			StopPrice:        e.StopPrice,
-			TimeInForce:      types.TimeInForce(e.TimeInForce),
-			IsFutures:        false,
-			ReduceOnly:       false,
-			ClosePosition:    false,
+			ClientOrderID: e.ClientOrderID,
+			Symbol:        e.Symbol,
+			Side:          toGlobalSideType(binance.SideType(e.Side)),
+			Type:          toGlobalOrderType(binance.OrderType(e.OrderType)),
+			Quantity:      e.OrderQuantity,
+			Price:         e.OrderPrice,
+			StopPrice:     e.StopPrice,
+			TimeInForce:   types.TimeInForce(e.TimeInForce),
+			IsFutures:     false,
+			ReduceOnly:    false,
+			ClosePosition: false,
 		},
 		Exchange:         types.ExchangeBinance,
 		IsWorking:        e.IsOnBook,
@@ -276,7 +276,7 @@ func parseWebSocketEvent(message []byte) (interface{}, error) {
 	// fmt.Println(str)
 	eventType := string(val.GetStringBytes("e"))
 	if eventType == "" && IsBookTicker(val) {
-		eventType = "bookticker"
+		eventType = "bookTicker"
 	}
 
 	switch eventType {
@@ -284,7 +284,7 @@ func parseWebSocketEvent(message []byte) (interface{}, error) {
 		var event KLineEvent
 		err := json.Unmarshal([]byte(message), &event)
 		return &event, err
-	case "bookticker":
+	case "bookTicker":
 		var event BookTickerEvent
 		err := json.Unmarshal([]byte(message), &event)
 		event.Event = eventType

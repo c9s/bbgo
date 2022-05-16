@@ -340,7 +340,8 @@ func (e *Exchange) SubscribeMarketData(extraIntervals ...types.Interval) (chan t
 			loadedIntervals[types.Interval(sub.Options.Interval)] = struct{}{}
 
 		default:
-			return nil, fmt.Errorf("stream channel %s is not supported in backtest", sub.Channel)
+			// Since Environment is not yet been injected at this point, no hard error
+			log.Errorf("stream channel %s is not supported in backtest", sub.Channel)
 		}
 	}
 
