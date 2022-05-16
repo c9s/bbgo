@@ -680,9 +680,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 		if s.DynamicSpreadWindow > 0 && s.DynamicBidSpread.Length() >= s.DynamicSpreadWindow {
 			dynamicBidSpread := fixedpoint.NewFromFloat(s.DynamicBidSpread.Last())
-			if dynamicBidSpread.Compare(s.MaxBidSpread) > 0 {
+			if !s.MaxBidSpread.IsZero() && dynamicBidSpread.Compare(s.MaxBidSpread) > 0 {
 				s.BidSpread = s.MaxBidSpread
-			} else if dynamicBidSpread.Compare(s.MinBidSpread) < 0 {
+			} else if !s.MinBidSpread.IsZero() && dynamicBidSpread.Compare(s.MinBidSpread) < 0 {
 				s.BidSpread = s.MinBidSpread
 			} else {
 				s.BidSpread = dynamicBidSpread
@@ -691,9 +691,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 		if s.DynamicSpreadWindow > 0 && s.DynamicAskSpread.Length() >= s.DynamicSpreadWindow {
 			dynamicAskSpread := fixedpoint.NewFromFloat(s.DynamicAskSpread.Last())
-			if dynamicAskSpread.Compare(s.MaxAskSpread) > 0 {
+			if !s.MaxAskSpread.IsZero() && dynamicAskSpread.Compare(s.MaxAskSpread) > 0 {
 				s.AskSpread = s.MaxAskSpread
-			} else if dynamicAskSpread.Compare(s.MinAskSpread) < 0 {
+			} else if !s.MinAskSpread.IsZero() && dynamicAskSpread.Compare(s.MinAskSpread) < 0 {
 				s.AskSpread = s.MinAskSpread
 			} else {
 				s.AskSpread = dynamicAskSpread
