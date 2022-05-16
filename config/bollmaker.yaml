@@ -56,6 +56,19 @@ exchangeStrategies:
     # For short position, you will only place buy order below the price (= average cost * (1 - minProfitSpread))
     minProfitSpread: 0.1%
 
+    # EXPERIMENTAL
+    # Dynamic spread is an experimental feature. Use at your own risk!
+    # DynamicSpreadWindow enables the automatic adjustment to bid and ask spread.
+    # When DynamicSpreadWindow is set and is larger than 0, the spreads are calculated based on the SMA of amplitude of
+    # previous [DynamicSpreadWindow] K-lines. Max and min spreads limit the maximum and minimum of spreads. Set them to
+    # 0 to disable the limitation
+    #
+    # dynamicSpreadWindow: 1
+    # minAskSpread: 0.05%
+    # minBidSpread: 0.05%
+    # maxAskSpread: 1
+    # maxBidSpread: 1
+
     # maxExposurePosition is the maximum position you can hold
     # +10 means you can hold 10 ETH long position by maximum
     # -10 means you can hold -10 ETH short position by maximum
