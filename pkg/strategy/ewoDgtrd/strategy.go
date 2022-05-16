@@ -924,8 +924,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		if !midPrice.IsZero() {
 			buyOrderTPSL(midPrice)
 			sellOrderTPSL(midPrice)
+			//log.Debugf("best bid %v, best ask %v, mid %v", bestBid, bestAsk, midPrice)
 		}
-		log.Infof("best bid %v, best ask %v, mid %v", bestBid, bestAsk, midPrice)
 	})
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
