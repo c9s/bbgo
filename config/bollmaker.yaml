@@ -16,17 +16,17 @@ backtest:
   # for testing max draw down (MDD) at 03-12
   # see here for more details
   # https://www.investopedia.com/terms/m/maximum-drawdown-mdd.asp
-  startTime: "2021-08-01"
-  endTime: "2021-08-30"
+  startTime: "2022-01-01"
+  endTime: "2022-05-12"
   sessions:
   - binance
   symbols:
   - ETHUSDT
-  account:
+  accounts:
     binance:
       balances:
-        ETH: 1.0
-        USDT: 20_000.0
+        ETH: 0.0
+        USDT: 10_000.0
 
 exchangeStrategies:
 
@@ -43,7 +43,7 @@ exchangeStrategies:
     # useTickerPrice use the ticker api to get the mid price instead of the closed kline price.
     # The back-test engine is kline-based, so the ticker price api is not supported.
     # Turn this on if you want to do real trading.
-    useTickerPrice: false
+    useTickerPrice: true
 
     # spread is the price spread from the middle price.
     # For ask orders, the ask price is ((bestAsk + bestBid) / 2 * (1.0 + spread))

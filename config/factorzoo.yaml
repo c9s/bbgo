@@ -23,7 +23,7 @@ backtest:
   endTime: "2022-04-13"
   symbols:
     - BTCUSDT
-  account:
+  accounts:
     binance:
       balances:
         BTC: 1.0

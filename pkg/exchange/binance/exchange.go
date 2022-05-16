@@ -1428,9 +1428,22 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 
 // QueryDepth query the order book depth of a symbol
 func (e *Exchange) QueryDepth(ctx context.Context, symbol string) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
-	response, err := e.client.NewDepthService().Symbol(symbol).Do(ctx)
-	if err != nil {
-		return snapshot, finalUpdateID, err
+	var response *binance.DepthResponse
+	if e.IsFutures {
+		res, err := e.futuresClient.NewDepthService().Symbol(symbol).Do(ctx)
+		if err != nil {
+			return snapshot, finalUpdateID, err
+		}
+		response = &binance.DepthResponse{
+			LastUpdateID: res.LastUpdateID,
+			Bids:         res.Bids,
+			Asks:         res.Asks,
+		}
+	} else {
+		response, err = e.client.NewDepthService().Symbol(symbol).Do(ctx)
+		if err != nil {
+			return snapshot, finalUpdateID, err
+		}
 	}
 
 	snapshot.Symbol = symbol

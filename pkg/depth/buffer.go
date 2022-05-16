@@ -117,13 +117,14 @@ func (b *Buffer) AddUpdate(o types.SliceOrderBook, firstUpdateID int64, finalArg
 	if u.FirstUpdateID > b.finalUpdateID+1 {
 		// emitReset will reset the once outside the mutex lock section
 		b.buffer = []Update{u}
+		finalUpdateID = b.finalUpdateID
 		b.resetSnapshot()
 		b.emitReset()
 		b.mu.Unlock()
 		return fmt.Errorf("found missing update between finalUpdateID %d and firstUpdateID %d, diff: %d",
-			b.finalUpdateID+1,
+			finalUpdateID+1,
 			u.FirstUpdateID,
-			u.FirstUpdateID-b.finalUpdateID)
+			u.FirstUpdateID-finalUpdateID)
 	}
 
 	log.Debugf("depth update id %d -> %d", b.finalUpdateID, u.FinalUpdateID)
@@ -142,6 +143,7 @@ func (b *Buffer) fetchAndPush() error {
 	log.Debugf("fetched depth snapshot, final update id %d", finalUpdateID)
 
 	b.mu.Lock()
+
 	if len(b.buffer) > 0 {
 		// the snapshot is too early
 		if finalUpdateID < b.buffer[0].FirstUpdateID {
