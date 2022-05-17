@@ -672,11 +672,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 
 		// Update spreads
+		high := kline.GetHigh().Float64()
+		open := kline.GetOpen().Float64()
+		low := kline.GetLow().Float64()
 		if s.DynamicSpreadWindow > 0 && kline.Direction() == types.DirectionUp {
-			s.DynamicAskSpread.Update(kline.GetHigh().Sub(kline.GetOpen()).Div(kline.GetOpen()).Float64())
+			s.DynamicAskSpread.Update((high - open) / open)
 		}
 		if s.DynamicSpreadWindow > 0 && kline.Direction() == types.DirectionDown {
-			s.DynamicBidSpread.Update(kline.GetOpen().Sub(kline.GetLow()).Div(kline.GetOpen()).Float64())
+			s.DynamicBidSpread.Update((open - low) / open)
 		}
 		if s.DynamicSpreadWindow > 0 && s.DynamicBidSpread.Length() >= s.DynamicSpreadWindow {
 			dynamicBidSpread := fixedpoint.NewFromFloat(s.DynamicBidSpread.Last())
