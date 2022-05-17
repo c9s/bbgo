@@ -481,6 +481,9 @@ var BacktestCmd = &cobra.Command{
 
 			// per symbol report
 			exchangeName := session.Exchange.Name().String()
+
+			numOfTradedSymbols := len(session.Trades)
+
 			for symbol, trades := range session.Trades {
 				market, ok := session.Market(symbol)
 				if !ok {
@@ -502,36 +505,45 @@ var BacktestCmd = &cobra.Command{
 					return fmt.Errorf("last price not found: %s, %s", symbol, exchangeName)
 				}
 
-				color.Green("%s %s PROFIT AND LOSS REPORT", strings.ToUpper(exchangeName), symbol)
-				color.Green("===============================================")
-
 				report := calculator.Calculate(symbol, trades.Trades, lastPrice)
-				report.Print()
 
 				accountConfig := userConfig.Backtest.GetAccount(exchangeName)
 				initBalances := accountConfig.Balances.BalanceMap()
 				finalBalances := session.GetAccount().Balances()
 
-				if generatingReport {
-					result := backtest.SessionSymbolReport{
-						StartTime:       startTime,
-						EndTime:         endTime,
-						Symbol:          symbol,
-						LastPrice:       lastPrice,
-						StartPrice:      startPrice,
-						PnLReport:       report,
-						InitialBalances: initBalances,
-						FinalBalances:   finalBalances,
-						Manifests:       manifests,
-					}
-
-					if err := util.WriteJsonFile(filepath.Join(outputDirectory, symbol+".json"), &result); err != nil {
-						return err
-					}
+				symbolReport := backtest.SessionSymbolReport{
+					StartTime:       startTime,
+					EndTime:         endTime,
+					Exchange:        session.Exchange.Name(),
+					Symbol:          symbol,
+					Market:          market,
+					LastPrice:       lastPrice,
+					StartPrice:      startPrice,
+					PnLReport:       report,
+					InitialBalances: initBalances,
+					FinalBalances:   finalBalances,
+					Manifests:       manifests,
 				}
 
 				initQuoteAsset := inQuoteAsset(initBalances, market, startPrice)
 				finalQuoteAsset := inQuoteAsset(finalBalances, market, lastPrice)
+
+				// write report to a file
+				if generatingReport {
+					reportFileName := "symbol.json"
+					if numOfTradedSymbols > 1 {
+						reportFileName = fmt.Sprintf("symbol_%s.json", symbol)
+					}
+
+					if err := util.WriteJsonFile(filepath.Join(reportDir, reportFileName), &symbolReport); err != nil {
+						return err
+					}
+				}
+
+				color.Green("%s %s PROFIT AND LOSS REPORT", symbolReport.Exchange, symbol)
+				color.Green("===============================================")
+				report.Print()
+
 				color.Green("INITIAL ASSET IN %s ~= %s %s (1 %s = %v)", market.QuoteCurrency, market.FormatQuantity(initQuoteAsset), market.QuoteCurrency, market.BaseCurrency, startPrice)
 				color.Green("FINAL ASSET IN %s ~= %s %s (1 %s = %v)", market.QuoteCurrency, market.FormatQuantity(finalQuoteAsset), market.QuoteCurrency, market.BaseCurrency, lastPrice)
 
@@ -682,4 +694,8 @@ func sync(ctx context.Context, userConfig *bbgo.Config, backtestService *service
 		}
 	}
 	return nil
+}
+
+func printSymbolReport(report backtest.SessionSymbolReport) {
+
 }

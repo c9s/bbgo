@@ -41,7 +41,9 @@ type SummaryReport struct {
 type SessionSymbolReport struct {
 	StartTime       time.Time                 `json:"startTime"`
 	EndTime         time.Time                 `json:"endTime"`
+	Exchange        types.ExchangeName        `json:"exchange"`
 	Symbol          string                    `json:"symbol,omitempty"`
+	Market          types.Market              `json:"market"`
 	LastPrice       fixedpoint.Value          `json:"lastPrice,omitempty"`
 	StartPrice      fixedpoint.Value          `json:"startPrice,omitempty"`
 	PnLReport       *pnl.AverageCostPnlReport `json:"pnlReport,omitempty"`
@@ -97,4 +99,3 @@ func AddReportIndexRun(outputDirectory string, run Run) error {
 	reportIndex.Runs = append(reportIndex.Runs, run)
 	return WriteReportIndex(outputDirectory, reportIndex)
 }
-
