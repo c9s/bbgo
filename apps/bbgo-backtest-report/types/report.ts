@@ -27,7 +27,7 @@ export interface ReportSummary {
   startTime: Date;
   endTime: Date;
   sessions: string[];
-  symbols: null;
+  symbols: string[];
   initialTotalBalances: BalanceMap;
   finalTotalBalances: BalanceMap;
   symbolReports: SymbolReport[];
