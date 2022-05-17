@@ -39,13 +39,13 @@ type SummaryReport struct {
 	FinalTotalBalances   types.BalanceMap `json:"finalTotalBalances"`
 
 	SymbolReports []SessionSymbolReport `json:"symbolReports,omitempty"`
+
+	Manifests Manifests `json:"manifests,omitempty"`
 }
 
 // SessionSymbolReport is the report per exchange session
 // trades are merged, collected and re-calculated
 type SessionSymbolReport struct {
-	StartTime       time.Time                 `json:"startTime"`
-	EndTime         time.Time                 `json:"endTime"`
 	Exchange        types.ExchangeName        `json:"exchange"`
 	Symbol          string                    `json:"symbol,omitempty"`
 	Market          types.Market              `json:"market"`
@@ -155,7 +155,7 @@ func AddReportIndexRun(outputDirectory string, run Run) error {
 		if err := fileLock.Unlock(); err != nil {
 			log.WithError(err).Errorf("report index file lock error: %s", lockFile)
 		}
-		if err := os.Remove(lockFile) ; err != nil {
+		if err := os.Remove(lockFile); err != nil {
 			log.WithError(err).Errorf("can not remove lock file: %s", lockFile)
 		}
 	}()

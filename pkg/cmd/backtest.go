@@ -308,8 +308,12 @@ var BacktestCmd = &cobra.Command{
 			err = trader.IterateStrategies(func(st bbgo.StrategyID) error {
 				return stateRecorder.Scan(st.(backtest.Instance))
 			})
-			manifests = stateRecorder.Manifests()
+			if err != nil {
+				return err
+			}
 
+			manifests = stateRecorder.Manifests()
+			manifests, err = rewriteManifestPaths(manifests, reportDir)
 			if err != nil {
 				return err
 			}
@@ -443,15 +447,10 @@ var BacktestCmd = &cobra.Command{
 		// put the logger back to print the pnl
 		log.SetLevel(log.InfoLevel)
 
-		color.Green("BACK-TEST REPORT")
-		color.Green("===============================================\n")
-		color.Green("START TIME: %s\n", startTime.Format(time.RFC1123))
-		color.Green("END TIME: %s\n", endTime.Format(time.RFC1123))
-
 		// aggregate total balances
 		initTotalBalances := types.BalanceMap{}
 		finalTotalBalances := types.BalanceMap{}
-		sessionNames := []string{}
+		var sessionNames []string
 		for _, session := range environ.Sessions() {
 			sessionNames = append(sessionNames, session.Name)
 			accountConfig := userConfig.Backtest.GetAccount(session.Name)
@@ -461,6 +460,11 @@ var BacktestCmd = &cobra.Command{
 			finalBalances := session.GetAccount().Balances()
 			finalTotalBalances = finalTotalBalances.Add(finalBalances)
 		}
+
+		color.Green("BACK-TEST REPORT")
+		color.Green("===============================================\n")
+		color.Green("START TIME: %s\n", startTime.Format(time.RFC1123))
+		color.Green("END TIME: %s\n", endTime.Format(time.RFC1123))
 		color.Green("INITIAL TOTAL BALANCE: %v\n", initTotalBalances)
 		color.Green("FINAL TOTAL BALANCE: %v\n", finalTotalBalances)
 
@@ -470,60 +474,17 @@ var BacktestCmd = &cobra.Command{
 			Sessions:             sessionNames,
 			InitialTotalBalances: initTotalBalances,
 			FinalTotalBalances:   finalTotalBalances,
+			Manifests:            manifests,
 		}
-		_ = summaryReport
 
 		for _, session := range environ.Sessions() {
-			backtestExchange, ok := session.Exchange.(*backtest.Exchange)
-			if !ok {
-				return fmt.Errorf("unexpected error, exchange instance is not a backtest exchange")
-			}
-
-			// per symbol report
-			exchangeName := session.Exchange.Name().String()
-
 			for symbol, trades := range session.Trades {
-				market, ok := session.Market(symbol)
-				if !ok {
-					return fmt.Errorf("market not found: %s, %s", symbol, exchangeName)
+				symbolReport, err := createSymbolReport(userConfig, session, symbol, trades.Trades)
+				if err != nil {
+					return err
 				}
 
-				calculator := &pnl.AverageCostCalculator{
-					TradingFeeCurrency: backtestExchange.PlatformFeeCurrency(),
-					Market:             market,
-				}
-
-				startPrice, ok := session.StartPrice(symbol)
-				if !ok {
-					return fmt.Errorf("start price not found: %s, %s. run --sync first", symbol, exchangeName)
-				}
-
-				lastPrice, ok := session.LastPrice(symbol)
-				if !ok {
-					return fmt.Errorf("last price not found: %s, %s", symbol, exchangeName)
-				}
-
-				report := calculator.Calculate(symbol, trades.Trades, lastPrice)
-
-				accountConfig := userConfig.Backtest.GetAccount(exchangeName)
-				initBalances := accountConfig.Balances.BalanceMap()
-				finalBalances := session.GetAccount().Balances()
-
-				symbolReport := backtest.SessionSymbolReport{
-					StartTime:       startTime,
-					EndTime:         endTime,
-					Exchange:        session.Exchange.Name(),
-					Symbol:          symbol,
-					Market:          market,
-					LastPrice:       lastPrice,
-					StartPrice:      startPrice,
-					PnL:             report,
-					InitialBalances: initBalances,
-					FinalBalances:   finalBalances,
-					Manifests:       manifests,
-				}
-				summaryReport.SymbolReports = append(summaryReport.SymbolReports, symbolReport)
-
+				summaryReport.SymbolReports = append(summaryReport.SymbolReports, *symbolReport)
 
 				// write report to a file
 				if generatingReport {
@@ -534,11 +495,15 @@ var BacktestCmd = &cobra.Command{
 				}
 
 				symbolReport.Print(wantBaseAssetBaseline)
-
 			}
 		}
 
 		if generatingReport && reportFileInSubDir {
+			summaryReportFile := filepath.Join(reportDir, "summary.json")
+			if err := util.WriteJsonFile(summaryReportFile, summaryReport); err != nil {
+				return err
+			}
+
 			// append report index
 			if err := backtest.AddReportIndexRun(outputDirectory, backtest.Run{
 				ID:     runID,
@@ -551,6 +516,50 @@ var BacktestCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+func createSymbolReport(userConfig *bbgo.Config, session *bbgo.ExchangeSession, symbol string, trades []types.Trade) (*backtest.SessionSymbolReport, error) {
+	backtestExchange, ok := session.Exchange.(*backtest.Exchange)
+	if !ok {
+		return nil, fmt.Errorf("unexpected error, exchange instance is not a backtest exchange")
+	}
+
+	market, ok := session.Market(symbol)
+	if !ok {
+		return nil, fmt.Errorf("market not found: %s, %s", symbol, session.Exchange.Name())
+	}
+
+	startPrice, ok := session.StartPrice(symbol)
+	if !ok {
+		return nil, fmt.Errorf("start price not found: %s, %s. run --sync first", symbol, session.Exchange.Name())
+	}
+
+	lastPrice, ok := session.LastPrice(symbol)
+	if !ok {
+		return nil, fmt.Errorf("last price not found: %s, %s", symbol, session.Exchange.Name())
+	}
+
+	calculator := &pnl.AverageCostCalculator{
+		TradingFeeCurrency: backtestExchange.PlatformFeeCurrency(),
+		Market:             market,
+	}
+
+	report := calculator.Calculate(symbol, trades, lastPrice)
+	accountConfig := userConfig.Backtest.GetAccount(session.Exchange.Name().String())
+	initBalances := accountConfig.Balances.BalanceMap()
+	finalBalances := session.GetAccount().Balances()
+	symbolReport := backtest.SessionSymbolReport{
+		Exchange:        session.Exchange.Name(),
+		Symbol:          symbol,
+		Market:          market,
+		LastPrice:       lastPrice,
+		StartPrice:      startPrice,
+		PnL:             report,
+		InitialBalances: initBalances,
+		FinalBalances:   finalBalances,
+		// Manifests:       manifests,
+	}
+	return &symbolReport, nil
 }
 
 func verify(userConfig *bbgo.Config, backtestService *service.BacktestService, sourceExchanges map[types.ExchangeName]types.Exchange, startTime time.Time, verboseCnt int) error {
@@ -642,6 +651,18 @@ func sync(ctx context.Context, userConfig *bbgo.Config, backtestService *service
 		}
 	}
 	return nil
+}
+
+func rewriteManifestPaths(manifests backtest.Manifests, basePath string) (backtest.Manifests, error) {
+	var filterManifests = backtest.Manifests{}
+	for k, m := range manifests {
+		p, err := filepath.Rel(basePath, m)
+		if err != nil {
+			return nil, err
+		}
+		filterManifests[k] = p
+	}
+	return filterManifests, nil
 }
 
 func printSymbolReport(report backtest.SessionSymbolReport) {
