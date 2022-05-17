@@ -84,10 +84,6 @@ const fetchPositionHistory = (basePath, runID, setter) => {
   )
     .then((response) => response.text())
     .then((data) => tsvParse(data, parsePosition()))
-    // .then((data) => tsvParse(data))
-    .then((data) => {
-      setter(data);
-    })
     .catch((e) => {
       console.error("failed to fetch orders", e)
     });
@@ -216,9 +212,6 @@ function fetchKLines(basePath, runID, symbol, interval, setter) {
     .then((response) => response.text())
     .then((data) => tsvParse(data, parseKline()))
     // .then((data) => tsvParse(data))
-    .then((data) => {
-      setter(removeDuplicatedKLines(data));
-    })
     .catch((e) => {
       console.error("failed to fetch klines", e)
     });
@@ -306,16 +299,23 @@ const TradingViewChart = (props) => {
       return;
     }
 
-    if (!data || !orders || !markers || !positionHistory) {
-      fetchKLines(props.basePath, props.runID, 'ETHUSDT', currentInterval, setData).then(() => {
-        fetchOrders(props.basePath, props.runID, (orders) => {
-          setOrders(orders);
+    if (!data) {
+      const ordersFetcher = fetchOrders(props.basePath, props.runID, (orders) => {
+        const markers = ordersToMarkets(currentInterval, orders);
+        setOrders(orders);
+        setMarkers(markers);
+      });
 
-          const markers = ordersToMarkets(currentInterval, orders);
-          setMarkers(markers);
-        });
-        fetchPositionHistory(props.basePath, props.runID, setPositionHistory)
-      })
+      const positionHistoryFetcher = fetchPositionHistory(props.basePath, props.runID).then((data) => {
+        setPositionHistory(data);
+      });
+
+      Promise.all([ordersFetcher, positionHistoryFetcher]).then(() => {
+        fetchKLines(props.basePath, props.runID, 'ETHUSDT', currentInterval).then((data) => {
+          setData(removeDuplicatedKLines(data));
+        })
+      });
+
       return;
     }
 
@@ -393,7 +393,7 @@ const TradingViewChart = (props) => {
     return () => {
       chart.current.remove();
     };
-  }, [chart.current, props.runID, data, currentInterval])
+  }, [props.runID, currentInterval, data])
 
   // see:
   // https://codesandbox.io/s/9inkb?file=/src/styles.css
