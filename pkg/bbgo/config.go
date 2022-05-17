@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"reflect"
 	"runtime"
+	"strings"
 
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
@@ -308,6 +309,38 @@ func (c *Config) YAML() ([]byte, error) {
 	enc.SetIndent(2)
 	err = enc.Encode(m)
 	return buf.Bytes(), err
+}
+
+func (c *Config) GetSignature() string {
+	var s string
+
+	var ps []string
+
+	// for single exchange strategy
+	if len(c.ExchangeStrategies) == 1 && len(c.CrossExchangeStrategies) == 0 {
+		mount := c.ExchangeStrategies[0].Mounts[0]
+		ps = append(ps, mount)
+
+		strategy := c.ExchangeStrategies[0].Strategy
+
+		id := strategy.ID()
+		ps = append(ps, id)
+
+		if symbol, ok := isSymbolBasedStrategy(reflect.ValueOf(strategy)); ok {
+			ps = append(ps, symbol)
+		}
+	}
+
+	startTime := c.Backtest.StartTime.Time()
+	ps = append(ps, startTime.Format("2006-01-02"))
+
+	if c.Backtest.EndTime != nil {
+		endTime := c.Backtest.EndTime.Time()
+		ps = append(ps, endTime.Format("2006-01-02"))
+	}
+
+	s = strings.Join(ps, "_")
+	return s
 }
 
 type Stash map[string]interface{}

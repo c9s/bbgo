@@ -6,15 +6,27 @@ import (
 	"time"
 
 	"github.com/c9s/bbgo/pkg/accounting/pnl"
+	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
+
+type Run struct {
+	ID     string       `json:"id"`
+	Config *bbgo.Config `json:"config"`
+	Time   time.Time    `json:"time"`
+}
+
+type ReportIndex struct {
+	Runs []Run `json:"runs,omitempty"`
+}
 
 // SummaryReport is the summary of the back-test session
 type SummaryReport struct {
 	StartTime            time.Time        `json:"startTime"`
 	EndTime              time.Time        `json:"endTime"`
 	Sessions             []string         `json:"sessions"`
+	Symbols              []string         `json:"symbols"`
 	InitialTotalBalances types.BalanceMap `json:"initialTotalBalances"`
 	FinalTotalBalances   types.BalanceMap `json:"finalTotalBalances"`
 }
