@@ -11,7 +11,7 @@ const Report = (props) => {
   return <Container>
     <h2>Back-test Report</h2>
     <div>
-      <TradingViewChart intervals={["1m", "5m"]}/>
+      <TradingViewChart intervals={["1m", "5m", "1h"]}/>
     </div>
   </Container>;
 };

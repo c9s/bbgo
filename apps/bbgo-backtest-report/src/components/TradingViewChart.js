@@ -196,6 +196,20 @@ const ordersToMarkets = (interval, orders) => {
   return markers;
 };
 
+const removeDuplicatedKLines = (klines) => {
+  const newK = [];
+  for (let i = 0 ; i < klines.length ; i++) {
+    const k = klines[i];
+
+    if (i > 0 && k.time === klines[i-1].time) {
+      continue
+    }
+
+    newK.push(k);
+  }
+  return newK;
+}
+
 function fetchKLines(symbol, interval, setter) {
   return fetch(
     `/data/klines/${symbol}-${interval}.tsv`,
@@ -204,7 +218,7 @@ function fetchKLines(symbol, interval, setter) {
     .then((data) => tsvParse(data, parseKline()))
     // .then((data) => tsvParse(data))
     .then((data) => {
-      setter(data);
+      setter(removeDuplicatedKLines(data));
     })
     .catch((e) => {
       console.error("failed to fetch klines", e)
@@ -403,15 +417,18 @@ const TradingViewChart = (props) => {
 
   return (
     <div>
-      <div>
+      <Button.Group>
         { intervals.map((interval) => {
-          return <Button key={interval} onPress={(e) => {
+          return <Button size="xs" key={interval} onPress={(e) => {
             setCurrentInterval(interval)
+            setData(null);
+            setMarkers(null);
+            chart.current.remove();
           }}>
             {interval}
           </Button>
         }) }
-      </div>
+      </Button.Group>
       <div ref={chartContainerRef} style={{'flex': 1, 'minHeight': 300}}>
       </div>
     </div>
