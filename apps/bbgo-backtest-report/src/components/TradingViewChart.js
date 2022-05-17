@@ -107,15 +107,70 @@ const fetchOrders = (setter) => {
     });
 }
 
-const ordersToMarkets = (orders) => {
+const parseInterval = (s) => {
+  switch (s) {
+    case "1m":
+      return 60;
+    case "5m":
+      return 60 * 5;
+    case "15m":
+      return 60 * 15;
+    case "30m":
+      return 60 * 30;
+    case "1h":
+      return 60 * 60;
+    case "4h":
+      return 60 * 60 * 4;
+    case "6h":
+      return 60 * 60 * 6;
+    case "12h":
+      return 60 * 60 * 12;
+  }
+
+  return 60;
+};
+
+const orderAbbr = (order) => {
+  let s = '';
+  switch (order.side) {
+    case "BUY":
+      s += 'B';
+      break;
+    case "SELL":
+      s += 'S';
+      break
+  }
+
+  switch (order.order_type) {
+    case "STOP_LIMIT":
+      s += ' StopLoss';
+  }
+  return s
+}
+
+const ordersToMarkets = (interval, orders) => {
   const markers = [];
+  const intervalSecs = parseInterval(interval);
+
   // var markers = [{ time: data[data.length - 48].time, position: 'aboveBar', color: '#f68410', shape: 'circle', text: 'D' }];
   for (let i = 0; i < orders.length; i++) {
     let order = orders[i];
+    let t = order.time.getTime() / 1000.0;
+    let lastMarker = markers.length > 0 ? markers[markers.length - 1] : null;
+    if (lastMarker) {
+      let remainder = lastMarker.time % intervalSecs;
+      let startTime = lastMarker.time - remainder;
+      let endTime = (startTime + intervalSecs);
+      // skip the marker in the same interval of the last marker
+      if (t < endTime) {
+        continue
+      }
+    }
+
     switch (order.side) {
       case "BUY":
         markers.push({
-          time: order.time.getTime() / 1000.0,
+          time: t,
           position: 'belowBar',
           color: '#239D10',
           shape: 'arrowDown',
@@ -125,7 +180,7 @@ const ordersToMarkets = (orders) => {
         break;
       case "SELL":
         markers.push({
-          time: order.time.getTime() / 1000.0,
+          time: t,
           position: 'aboveBar',
           color: '#e91e63',
           shape: 'arrowDown',
@@ -167,23 +222,26 @@ const klinesToVolumeData = (klines) => {
   return volumes;
 }
 
-const positionAverageCostHistoryToLineData = (hs) => {
+const positionAverageCostHistoryToLineData = (interval, hs) => {
   const avgCosts = [];
+  const intervalSeconds = parseInterval(interval);
   for (let i = 0; i < hs.length; i++) {
     let pos = hs[i];
+    let t = pos.time.getTime() / 1000;
+    t = (t - t % intervalSeconds)
 
-    if (i > 0 && pos.average_cost == hs[i-1].average_cost) {
+    if (i > 0 && (pos.average_cost == hs[i-1].average_cost || t === hs[i-1].time)) {
       continue;
     }
 
     if (pos.base == 0) {
       avgCosts.push({
-        time: pos.time.getTime() / 1000,
+        time: t,
         value: 0,
       });
     } else {
       avgCosts.push({
-        time: pos.time.getTime() / 1000,
+        time: t,
         value: pos.average_cost,
       });
     }
@@ -210,7 +268,7 @@ const TradingViewChart = (props) => {
         fetchOrders((orders) => {
           setOrders(orders);
 
-          const markers = ordersToMarkets(orders);
+          const markers = ordersToMarkets('5m', orders);
           setMarkers(markers);
         });
         fetchPositionHistory(setPositionHistory)
@@ -254,7 +312,7 @@ const TradingViewChart = (props) => {
     series.setMarkers(markers);
 
     const lineSeries = chart.addLineSeries();
-    const costLine = positionAverageCostHistoryToLineData(positionHistory);
+    const costLine = positionAverageCostHistoryToLineData('5m', positionHistory);
     lineSeries.setData(costLine);
 
     const volumeData = klinesToVolumeData(data);
