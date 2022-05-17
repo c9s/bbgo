@@ -465,6 +465,7 @@ var BacktestCmd = &cobra.Command{
 			InitialTotalBalances: initTotalBalances,
 			FinalTotalBalances:   finalTotalBalances,
 			Manifests:            manifests,
+			Symbols:              nil,
 		}
 
 		for _, session := range environ.Sessions() {
@@ -474,6 +475,7 @@ var BacktestCmd = &cobra.Command{
 					return err
 				}
 
+				summaryReport.Symbols = append(summaryReport.Symbols, symbol)
 				summaryReport.SymbolReports = append(summaryReport.SymbolReports, *symbolReport)
 
 				// write report to a file
@@ -654,4 +656,3 @@ func rewriteManifestPaths(manifests backtest.Manifests, basePath string) (backte
 	}
 	return filterManifests, nil
 }
-
