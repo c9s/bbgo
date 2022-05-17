@@ -2,7 +2,27 @@ This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next
 
 ## Getting Started
 
-First, run the development server:
+Install the dependencies:
+
+```
+yarn install
+```
+
+
+Create a symlink to your back-test report output directory:
+
+```
+(cd public && ln -s ../../../output output)
+```
+
+
+Generate some back-test reports:
+
+```
+(cd ../.. && go run ./cmd/bbgo backtest --config bollmaker_ethusdt.yaml  --debug --session binance  --output output --subdir)
+```
+
+Start the development server:
 
 ```bash
 npm run dev

@@ -1,15 +1,14 @@
 package backtest
 
 import (
-	"encoding/csv"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strconv"
 	"time"
 
 	"go.uber.org/multierr"
 
+	"github.com/c9s/bbgo/pkg/data/tsv"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -23,16 +22,14 @@ type symbolInterval struct {
 // KLineDumper dumps the received kline data into a folder for the backtest report to load the charts.
 type KLineDumper struct {
 	OutputDirectory string
-	files           map[symbolInterval]*os.File
-	writers         map[symbolInterval]*csv.Writer
+	writers         map[symbolInterval]*tsv.Writer
 	filenames       map[symbolInterval]string
 }
 
 func NewKLineDumper(outputDirectory string) *KLineDumper {
 	return &KLineDumper{
 		OutputDirectory: outputDirectory,
-		files:           make(map[symbolInterval]*os.File),
-		writers:         make(map[symbolInterval]*csv.Writer),
+		writers:         make(map[symbolInterval]*tsv.Writer),
 		filenames:       make(map[symbolInterval]string),
 	}
 }
@@ -42,7 +39,7 @@ func (d *KLineDumper) Filenames() map[symbolInterval]string {
 }
 
 func (d *KLineDumper) formatFileName(symbol string, interval types.Interval) string {
-	return filepath.Join(d.OutputDirectory, fmt.Sprintf("%s-%s.csv",
+	return filepath.Join(d.OutputDirectory, fmt.Sprintf("%s-%s.tsv",
 		symbol,
 		interval))
 }
@@ -69,36 +66,28 @@ func (d *KLineDumper) Record(k types.KLine) error {
 	w, ok := d.writers[si]
 	if !ok {
 		filename := d.formatFileName(k.Symbol, k.Interval)
-		f2, err := os.Create(filename)
+		w2, err := tsv.NewWriterFile(filename)
 		if err != nil {
 			return err
 		}
+		w = w2
 
-		w = csv.NewWriter(f2)
-		d.files[si] = f2
-		d.writers[si] = w
+		d.writers[si] = w2
 		d.filenames[si] = filename
 
-		if err := w.Write(csvHeader); err != nil {
-			return err
+		if err2 := w2.Write(csvHeader); err2 != nil {
+			return err2
 		}
 	}
 
-	if err := w.Write(d.encode(k)); err != nil {
-		return err
-	}
-
-	return nil
+	return w.Write(d.encode(k))
 }
 
 func (d *KLineDumper) Close() error {
+	var err error = nil
 	for _, w := range d.writers {
 		w.Flush()
-	}
-
-	var err error = nil
-	for _, f := range d.files {
-		err2 := f.Close()
+		err2 := w.Close()
 		if err2 != nil {
 			err = multierr.Append(err, err2)
 		}

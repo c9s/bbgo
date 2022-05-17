@@ -3,10 +3,7 @@ package cmd
 import (
 	"bufio"
 	"context"
-	"encoding/csv"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,8 +21,10 @@ import (
 	"github.com/c9s/bbgo/pkg/backtest"
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
+	"github.com/c9s/bbgo/pkg/data/tsv"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 func init() {
@@ -279,25 +278,19 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
-		// back-test session report name
-		var backtestSessionName = backtest.FormatSessionName(
-			userConfig.Backtest.Sessions,
-			userConfig.Backtest.Symbols,
-			userConfig.Backtest.StartTime.Time(),
-			userConfig.Backtest.EndTime.Time(),
-		)
-
 		var kLineHandlers []func(k types.KLine, exSource *backtest.ExchangeDataSource)
 		var manifests backtest.Manifests
+		var runID = userConfig.GetSignature() + "_" + uuid.NewString()
+		var reportDir = outputDirectory
+
 		if generatingReport {
-			reportDir := outputDirectory
 			if reportFileInSubDir {
-				reportDir = filepath.Join(reportDir, backtestSessionName)
-				reportDir = filepath.Join(reportDir, uuid.NewString())
+				// reportDir = filepath.Join(reportDir, backtestSessionName)
+				reportDir = filepath.Join(reportDir, runID)
 			}
 
 			kLineDataDir := filepath.Join(reportDir, "klines")
-			if err := safeMkdirAll(kLineDataDir); err != nil {
+			if err := util.SafeMkdirAll(kLineDataDir); err != nil {
 				return err
 			}
 
@@ -305,8 +298,12 @@ var BacktestCmd = &cobra.Command{
 			err = trader.IterateStrategies(func(st bbgo.StrategyID) error {
 				return stateRecorder.Scan(st.(backtest.Instance))
 			})
-			manifests = stateRecorder.Manifests()
+			if err != nil {
+				return err
+			}
 
+			manifests = stateRecorder.Manifests()
+			manifests, err = rewriteManifestPaths(manifests, reportDir)
 			if err != nil {
 				return err
 			}
@@ -338,18 +335,17 @@ var BacktestCmd = &cobra.Command{
 			})
 
 			// equity curve recording -- record per 1h kline
-			equityCurveFile, err := os.Create(filepath.Join(reportDir, "equity_curve.csv"))
+			equityCurveTsv, err := tsv.NewWriterFile(filepath.Join(reportDir, "equity_curve.tsv"))
 			if err != nil {
 				return err
 			}
-			defer func() { _ = equityCurveFile.Close() }()
+			defer func() { _ = equityCurveTsv.Close() }()
 
-			equityCurveCsv := csv.NewWriter(equityCurveFile)
-			_ = equityCurveCsv.Write([]string{
+			_ = equityCurveTsv.Write([]string{
 				"time",
 				"in_usd",
 			})
-			defer equityCurveCsv.Flush()
+			defer equityCurveTsv.Flush()
 
 			kLineHandlers = append(kLineHandlers, func(k types.KLine, exSource *backtest.ExchangeDataSource) {
 				if k.Interval != types.Interval1h {
@@ -361,29 +357,26 @@ var BacktestCmd = &cobra.Command{
 					log.WithError(err).Errorf("query back-test account balance error")
 				} else {
 					assets := balances.Assets(exSource.Session.AllLastPrices(), k.EndTime.Time())
-					_ = equityCurveCsv.Write([]string{
+					_ = equityCurveTsv.Write([]string{
 						k.EndTime.Time().Format(time.RFC1123),
 						assets.InUSD().String(),
 					})
 				}
 			})
 
-			// equity curve recording -- record per 1h kline
-			ordersFile, err := os.Create(filepath.Join(reportDir, "orders.csv"))
+			ordersTsv, err := tsv.NewWriterFile(filepath.Join(reportDir, "orders.tsv"))
 			if err != nil {
 				return err
 			}
-			defer func() { _ = ordersFile.Close() }()
+			defer func() { _ = ordersTsv.Close() }()
+			_ = ordersTsv.Write(types.Order{}.CsvHeader())
 
-			ordersCsv := csv.NewWriter(ordersFile)
-			_ = ordersCsv.Write(types.Order{}.CsvHeader())
-
-			defer ordersCsv.Flush()
+			defer ordersTsv.Flush()
 			for _, exSource := range exchangeSources {
 				exSource.Session.UserDataStream.OnOrderUpdate(func(order types.Order) {
 					if order.Status == types.OrderStatusFilled {
 						for _, record := range order.CsvRecords() {
-							_ = ordersCsv.Write(record)
+							_ = ordersTsv.Write(record)
 						}
 					}
 				})
@@ -444,15 +437,10 @@ var BacktestCmd = &cobra.Command{
 		// put the logger back to print the pnl
 		log.SetLevel(log.InfoLevel)
 
-		color.Green("BACK-TEST REPORT")
-		color.Green("===============================================\n")
-		color.Green("START TIME: %s\n", startTime.Format(time.RFC1123))
-		color.Green("END TIME: %s\n", endTime.Format(time.RFC1123))
-
 		// aggregate total balances
 		initTotalBalances := types.BalanceMap{}
 		finalTotalBalances := types.BalanceMap{}
-		sessionNames := []string{}
+		var sessionNames []string
 		for _, session := range environ.Sessions() {
 			sessionNames = append(sessionNames, session.Name)
 			accountConfig := userConfig.Backtest.GetAccount(session.Name)
@@ -462,6 +450,11 @@ var BacktestCmd = &cobra.Command{
 			finalBalances := session.GetAccount().Balances()
 			finalTotalBalances = finalTotalBalances.Add(finalBalances)
 		}
+
+		color.Green("BACK-TEST REPORT")
+		color.Green("===============================================\n")
+		color.Green("START TIME: %s\n", startTime.Format(time.RFC1123))
+		color.Green("END TIME: %s\n", endTime.Format(time.RFC1123))
 		color.Green("INITIAL TOTAL BALANCE: %v\n", initTotalBalances)
 		color.Green("FINAL TOTAL BALANCE: %v\n", finalTotalBalances)
 
@@ -471,116 +464,94 @@ var BacktestCmd = &cobra.Command{
 			Sessions:             sessionNames,
 			InitialTotalBalances: initTotalBalances,
 			FinalTotalBalances:   finalTotalBalances,
+			Manifests:            manifests,
+			Symbols:              nil,
 		}
-		_ = summaryReport
 
 		for _, session := range environ.Sessions() {
-			backtestExchange, ok := session.Exchange.(*backtest.Exchange)
-			if !ok {
-				return fmt.Errorf("unexpected error, exchange instance is not a backtest exchange")
-			}
-
-			// per symbol report
-			exchangeName := session.Exchange.Name().String()
 			for symbol, trades := range session.Trades {
-				market, ok := session.Market(symbol)
-				if !ok {
-					return fmt.Errorf("market not found: %s, %s", symbol, exchangeName)
+				symbolReport, err := createSymbolReport(userConfig, session, symbol, trades.Trades)
+				if err != nil {
+					return err
 				}
 
-				calculator := &pnl.AverageCostCalculator{
-					TradingFeeCurrency: backtestExchange.PlatformFeeCurrency(),
-					Market:             market,
-				}
+				summaryReport.Symbols = append(summaryReport.Symbols, symbol)
+				summaryReport.SymbolReports = append(summaryReport.SymbolReports, *symbolReport)
 
-				startPrice, ok := session.StartPrice(symbol)
-				if !ok {
-					return fmt.Errorf("start price not found: %s, %s. run --sync first", symbol, exchangeName)
-				}
-
-				lastPrice, ok := session.LastPrice(symbol)
-				if !ok {
-					return fmt.Errorf("last price not found: %s, %s", symbol, exchangeName)
-				}
-
-				color.Green("%s %s PROFIT AND LOSS REPORT", strings.ToUpper(exchangeName), symbol)
-				color.Green("===============================================")
-
-				report := calculator.Calculate(symbol, trades.Trades, lastPrice)
-				report.Print()
-
-				accountConfig := userConfig.Backtest.GetAccount(exchangeName)
-				initBalances := accountConfig.Balances.BalanceMap()
-				finalBalances := session.GetAccount().Balances()
-
+				// write report to a file
 				if generatingReport {
-					result := backtest.SessionSymbolReport{
-						StartTime:       startTime,
-						EndTime:         endTime,
-						Symbol:          symbol,
-						LastPrice:       lastPrice,
-						StartPrice:      startPrice,
-						PnLReport:       report,
-						InitialBalances: initBalances,
-						FinalBalances:   finalBalances,
-						Manifests:       manifests,
-					}
-
-					if err := writeJsonFile(filepath.Join(outputDirectory, symbol+".json"), &result); err != nil {
+					reportFileName := fmt.Sprintf("symbol_report_%s.json", symbol)
+					if err := util.WriteJsonFile(filepath.Join(reportDir, reportFileName), &symbolReport); err != nil {
 						return err
 					}
 				}
 
-				initQuoteAsset := inQuoteAsset(initBalances, market, startPrice)
-				finalQuoteAsset := inQuoteAsset(finalBalances, market, lastPrice)
-				color.Green("INITIAL ASSET IN %s ~= %s %s (1 %s = %v)", market.QuoteCurrency, market.FormatQuantity(initQuoteAsset), market.QuoteCurrency, market.BaseCurrency, startPrice)
-				color.Green("FINAL ASSET IN %s ~= %s %s (1 %s = %v)", market.QuoteCurrency, market.FormatQuantity(finalQuoteAsset), market.QuoteCurrency, market.BaseCurrency, lastPrice)
+				symbolReport.Print(wantBaseAssetBaseline)
+			}
+		}
 
-				if report.Profit.Sign() > 0 {
-					color.Green("REALIZED PROFIT: +%v %s", report.Profit, market.QuoteCurrency)
-				} else {
-					color.Red("REALIZED PROFIT: %v %s", report.Profit, market.QuoteCurrency)
-				}
+		if generatingReport && reportFileInSubDir {
+			summaryReportFile := filepath.Join(reportDir, "summary.json")
+			if err := util.WriteJsonFile(summaryReportFile, summaryReport); err != nil {
+				return err
+			}
 
-				if report.UnrealizedProfit.Sign() > 0 {
-					color.Green("UNREALIZED PROFIT: +%v %s", report.UnrealizedProfit, market.QuoteCurrency)
-				} else {
-					color.Red("UNREALIZED PROFIT: %v %s", report.UnrealizedProfit, market.QuoteCurrency)
-				}
-
-				if finalQuoteAsset.Compare(initQuoteAsset) > 0 {
-					color.Green("ASSET INCREASED: +%v %s (+%s)", finalQuoteAsset.Sub(initQuoteAsset), market.QuoteCurrency, finalQuoteAsset.Sub(initQuoteAsset).Div(initQuoteAsset).FormatPercentage(2))
-				} else {
-					color.Red("ASSET DECREASED: %v %s (%s)", finalQuoteAsset.Sub(initQuoteAsset), market.QuoteCurrency, finalQuoteAsset.Sub(initQuoteAsset).Div(initQuoteAsset).FormatPercentage(2))
-				}
-
-				if wantBaseAssetBaseline {
-					// initBaseAsset := inBaseAsset(initBalances, market, startPrice)
-					// finalBaseAsset := inBaseAsset(finalBalances, market, lastPrice)
-					// log.Infof("INITIAL ASSET IN %s ~= %s %s (1 %s = %f)", market.BaseCurrency, market.FormatQuantity(initBaseAsset), market.BaseCurrency, market.BaseCurrency, startPrice)
-					// log.Infof("FINAL ASSET IN %s ~= %s %s (1 %s = %f)", market.BaseCurrency, market.FormatQuantity(finalBaseAsset), market.BaseCurrency, market.BaseCurrency, lastPrice)
-
-					if lastPrice.Compare(startPrice) > 0 {
-						color.Green("%s BASE ASSET PERFORMANCE: +%s (= (%s - %s) / %s)",
-							market.BaseCurrency,
-							lastPrice.Sub(startPrice).Div(startPrice).FormatPercentage(2),
-							lastPrice.FormatString(2),
-							startPrice.FormatString(2),
-							startPrice.FormatString(2))
-					} else {
-						color.Red("%s BASE ASSET PERFORMANCE: %s (= (%s - %s) / %s)",
-							market.BaseCurrency,
-							lastPrice.Sub(startPrice).Div(startPrice).FormatPercentage(2),
-							lastPrice.FormatString(2),
-							startPrice.FormatString(2),
-							startPrice.FormatString(2))
-					}
-				}
+			// append report index
+			if err := backtest.AddReportIndexRun(outputDirectory, backtest.Run{
+				ID:     runID,
+				Config: userConfig,
+				Time:   time.Now(),
+			}); err != nil {
+				return err
 			}
 		}
 
 		return nil
 	},
+}
+
+func createSymbolReport(userConfig *bbgo.Config, session *bbgo.ExchangeSession, symbol string, trades []types.Trade) (*backtest.SessionSymbolReport, error) {
+	backtestExchange, ok := session.Exchange.(*backtest.Exchange)
+	if !ok {
+		return nil, fmt.Errorf("unexpected error, exchange instance is not a backtest exchange")
+	}
+
+	market, ok := session.Market(symbol)
+	if !ok {
+		return nil, fmt.Errorf("market not found: %s, %s", symbol, session.Exchange.Name())
+	}
+
+	startPrice, ok := session.StartPrice(symbol)
+	if !ok {
+		return nil, fmt.Errorf("start price not found: %s, %s. run --sync first", symbol, session.Exchange.Name())
+	}
+
+	lastPrice, ok := session.LastPrice(symbol)
+	if !ok {
+		return nil, fmt.Errorf("last price not found: %s, %s", symbol, session.Exchange.Name())
+	}
+
+	calculator := &pnl.AverageCostCalculator{
+		TradingFeeCurrency: backtestExchange.PlatformFeeCurrency(),
+		Market:             market,
+	}
+
+	report := calculator.Calculate(symbol, trades, lastPrice)
+	accountConfig := userConfig.Backtest.GetAccount(session.Exchange.Name().String())
+	initBalances := accountConfig.Balances.BalanceMap()
+	finalBalances := session.GetAccount().Balances()
+	symbolReport := backtest.SessionSymbolReport{
+		Exchange:        session.Exchange.Name(),
+		Symbol:          symbol,
+		Market:          market,
+		LastPrice:       lastPrice,
+		StartPrice:      startPrice,
+		PnL:             report,
+		InitialBalances: initBalances,
+		FinalBalances:   finalBalances,
+		// Manifests:       manifests,
+	}
+	return &symbolReport, nil
 }
 
 func verify(userConfig *bbgo.Config, backtestService *service.BacktestService, sourceExchanges map[types.ExchangeName]types.Exchange, startTime time.Time, verboseCnt int) error {
@@ -613,32 +584,6 @@ func confirmation(s string) bool {
 			return false
 		}
 	}
-}
-
-func writeJsonFile(p string, obj interface{}) error {
-	out, err := json.MarshalIndent(obj, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	return ioutil.WriteFile(p, out, 0644)
-}
-
-func safeMkdirAll(p string) error {
-	st, err := os.Stat(p)
-	if err == nil {
-		if !st.IsDir() {
-			return fmt.Errorf("path %s is not a directory", p)
-		}
-
-		return nil
-	}
-
-	if os.IsNotExist(err) {
-		return os.MkdirAll(p, 0755)
-	}
-
-	return nil
 }
 
 func toExchangeSources(sessions map[string]*bbgo.ExchangeSession) (exchangeSources []backtest.ExchangeDataSource, err error) {
@@ -698,4 +643,16 @@ func sync(ctx context.Context, userConfig *bbgo.Config, backtestService *service
 		}
 	}
 	return nil
+}
+
+func rewriteManifestPaths(manifests backtest.Manifests, basePath string) (backtest.Manifests, error) {
+	var filterManifests = backtest.Manifests{}
+	for k, m := range manifests {
+		p, err := filepath.Rel(basePath, m)
+		if err != nil {
+			return nil, err
+		}
+		filterManifests[k] = p
+	}
+	return filterManifests, nil
 }
