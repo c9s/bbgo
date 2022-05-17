@@ -43,9 +43,10 @@ const parseOrder = () => {
           case "price":
           case "quantity":
             d[key] = +d[key];
-            break
+            break;
           case "time":
             d[key] = new Date(d[key]);
+            break;
         }
       }
     }
@@ -53,7 +54,45 @@ const parseOrder = () => {
   };
 }
 
-function fetchOrders(setter) {
+const parsePosition = () => {
+  return (d) => {
+    for (const key in d) {
+      // convert number fields
+      if (Object.prototype.hasOwnProperty.call(d, key)) {
+        switch (key) {
+          case "accumulated_profit":
+          case "average_cost":
+          case "quote":
+          case "base":
+            d[key] = +d[key];
+            break
+          case "time":
+            d[key] = new Date(d[key]);
+            break
+        }
+      }
+    }
+    return d;
+  };
+}
+
+
+const fetchPositionHistory = (setter) => {
+  return fetch(
+    `/data/bollmaker:ETHUSDT-position.tsv`,
+  )
+    .then((response) => response.text())
+    .then((data) => tsvParse(data, parsePosition()))
+    // .then((data) => tsvParse(data))
+    .then((data) => {
+      setter(data);
+    })
+    .catch((e) => {
+      console.error("failed to fetch orders", e)
+    });
+};
+
+const fetchOrders = (setter) => {
   return fetch(
     `/data/orders.tsv`,
   )
@@ -116,26 +155,50 @@ function fetchKLines(symbol, interval, setter) {
     });
 }
 
+const positionAverageCostHistoryToLineData = (hs) => {
+  const avgCosts = [];
+  for (let i = 0; i < hs.length; i++) {
+    let pos = hs[i];
+
+    if (pos.base == 0) {
+      avgCosts.push({
+        time: pos.time,
+        value: 0,
+      });
+    } else {
+      avgCosts.push({
+        time: pos.time,
+        value: pos.average_cost,
+      });
+    }
+
+
+  }
+  return avgCosts;
+}
+
 const TradingViewChart = (props) => {
   const ref = useRef();
   const [data, setData] = useState(null);
   const [orders, setOrders] = useState(null);
   const [markers, setMarkers] = useState(null);
+  const [positionHistory, setPositionHistory] = useState(null);
 
   useEffect(() => {
     if (!ref.current || ref.current.children.length > 0) {
       return;
     }
 
-    if (!data || !orders || !markers) {
-      fetchKLines('ETHUSDT', '5m', setData)
+    if (!data || !orders || !markers || !positionHistory) {
+      fetchKLines('ETHUSDT', '5m', setData).then(() => {
+        fetchOrders((orders) => {
+          setOrders(orders);
 
-      fetchOrders((orders) => {
-        setOrders(orders);
-
-        const markers = ordersToMarkets(orders);
-        setMarkers(markers);
-      });
+          const markers = ordersToMarkets(orders);
+          setMarkers(markers);
+        });
+        fetchPositionHistory(setPositionHistory)
+      })
       return;
     }
 
@@ -180,21 +243,9 @@ const TradingViewChart = (props) => {
     series.setData(data);
     series.setMarkers(markers);
 
-    /*
+    console.log(positionHistory);
     const lineSeries = chart.addLineSeries();
-    lineSeries.setData([
-      {time: '2019-04-11', value: 80.01},
-      {time: '2019-04-12', value: 96.63},
-      {time: '2019-04-13', value: 76.64},
-      {time: '2019-04-14', value: 81.89},
-      {time: '2019-04-15', value: 74.43},
-      {time: '2019-04-16', value: 80.01},
-      {time: '2019-04-17', value: 96.63},
-      {time: '2019-04-18', value: 76.64},
-      {time: '2019-04-19', value: 81.89},
-      {time: '2019-04-20', value: 74.43},
-    ]);
-    */
+    lineSeries.setData(positionAverageCostHistoryToLineData(positionHistory));
   }, [ref.current, data])
   return <div>
     <div ref={ref}>
