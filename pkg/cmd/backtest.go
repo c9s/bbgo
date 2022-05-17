@@ -278,16 +278,6 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
-		// back-test session report name
-		/*
-			var backtestSessionName = backtest.FormatSessionName(
-				userConfig.Backtest.Sessions,
-				userConfig.Backtest.Symbols,
-				userConfig.Backtest.StartTime.Time(),
-				userConfig.Backtest.EndTime.Time(),
-			)
-		*/
-
 		var kLineHandlers []func(k types.KLine, exSource *backtest.ExchangeDataSource)
 		var manifests backtest.Manifests
 		var runID = userConfig.GetSignature() + "_" + uuid.NewString()
@@ -665,6 +655,3 @@ func rewriteManifestPaths(manifests backtest.Manifests, basePath string) (backte
 	return filterManifests, nil
 }
 
-func printSymbolReport(report backtest.SessionSymbolReport) {
-
-}
