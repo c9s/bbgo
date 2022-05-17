@@ -244,7 +244,7 @@ const positionBaseHistoryToLineData = (interval, hs) => {
   const bases = [];
   const intervalSeconds = parseInterval(interval);
   for (let i = 0; i < hs.length; i++) {
-    let pos = hs[i];
+    const pos = hs[i];
     let t = pos.time.getTime() / 1000;
     t = (t - t % intervalSeconds)
 
@@ -265,7 +265,7 @@ const positionAverageCostHistoryToLineData = (interval, hs) => {
   const avgCosts = [];
   const intervalSeconds = parseInterval(interval);
   for (let i = 0; i < hs.length; i++) {
-    let pos = hs[i];
+    const pos = hs[i];
     let t = pos.time.getTime() / 1000;
     t = (t - t % intervalSeconds)
 

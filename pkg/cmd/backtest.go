@@ -280,20 +280,24 @@ var BacktestCmd = &cobra.Command{
 		}
 
 		// back-test session report name
-		var backtestSessionName = backtest.FormatSessionName(
-			userConfig.Backtest.Sessions,
-			userConfig.Backtest.Symbols,
-			userConfig.Backtest.StartTime.Time(),
-			userConfig.Backtest.EndTime.Time(),
-		)
+		/*
+			var backtestSessionName = backtest.FormatSessionName(
+				userConfig.Backtest.Sessions,
+				userConfig.Backtest.Symbols,
+				userConfig.Backtest.StartTime.Time(),
+				userConfig.Backtest.EndTime.Time(),
+			)
+		*/
 
 		var kLineHandlers []func(k types.KLine, exSource *backtest.ExchangeDataSource)
 		var manifests backtest.Manifests
+		var runID = userConfig.GetSignature() + "_" + uuid.NewString()
+		var reportDir = outputDirectory
+
 		if generatingReport {
-			reportDir := outputDirectory
 			if reportFileInSubDir {
-				reportDir = filepath.Join(reportDir, backtestSessionName)
-				reportDir = filepath.Join(reportDir, uuid.NewString())
+				// reportDir = filepath.Join(reportDir, backtestSessionName)
+				reportDir = filepath.Join(reportDir, runID)
 			}
 
 			kLineDataDir := filepath.Join(reportDir, "klines")
@@ -572,6 +576,37 @@ var BacktestCmd = &cobra.Command{
 							startPrice.FormatString(2))
 					}
 				}
+			}
+		}
+
+		if generatingReport && reportFileInSubDir {
+			// append report index
+			var reportIndex backtest.ReportIndex
+			indexFile := filepath.Join(outputDirectory, "index.json")
+			if _, err := os.Stat(indexFile); err == nil {
+				o, err := ioutil.ReadFile(indexFile)
+				if err != nil {
+					return err
+				}
+
+				if err := json.Unmarshal(o, &reportIndex); err != nil {
+					return err
+				}
+			}
+
+			reportIndex.Runs = append(reportIndex.Runs, backtest.Run{
+				ID:     runID,
+				Config: userConfig,
+				Time:   time.Now(),
+			})
+
+			o, err := json.MarshalIndent(reportIndex, "", "  ")
+			if err != nil {
+				return err
+			}
+
+			if err := ioutil.WriteFile(indexFile, o, 0644); err != nil {
+				return err
 			}
 		}
 
