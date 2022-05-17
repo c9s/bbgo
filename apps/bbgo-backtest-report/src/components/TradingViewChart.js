@@ -230,11 +230,11 @@ const positionAverageCostHistoryToLineData = (interval, hs) => {
     let t = pos.time.getTime() / 1000;
     t = (t - t % intervalSeconds)
 
-    if (i > 0 && (pos.average_cost == hs[i-1].average_cost || t === hs[i-1].time)) {
+    if (i > 0 && (pos.average_cost === hs[i-1].average_cost || t === hs[i-1].time)) {
       continue;
     }
 
-    if (pos.base == 0) {
+    if (pos.base === 0) {
       avgCosts.push({
         time: t,
         value: 0,
