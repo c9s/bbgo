@@ -30,7 +30,7 @@ const ReportDetails = (props: ReportDetailsProps) => {
   }, [props.runID])
 
   return <Container>
-    <h2>Back-test Run ${props.runID}</h2>
+    <h2>Back-test Run {props.runID}</h2>
     <div>
       <TradingViewChart basePath={props.basePath} runID={props.runID} intervals={["1m", "5m", "1h"]}/>
     </div>
