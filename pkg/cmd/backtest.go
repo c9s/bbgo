@@ -580,18 +580,11 @@ var BacktestCmd = &cobra.Command{
 
 		if generatingReport && reportFileInSubDir {
 			// append report index
-			reportIndex, err := backtest.LoadReportIndex(outputDirectory)
-			if err != nil {
-				return err
-			}
-
-			reportIndex.Runs = append(reportIndex.Runs, backtest.Run{
+			if err := backtest.AddReportIndexRun(outputDirectory, backtest.Run{
 				ID:     runID,
 				Config: userConfig,
 				Time:   time.Now(),
-			})
-
-			if err := backtest.WriteReportIndex(outputDirectory, reportIndex); err != nil {
+			}); err != nil {
 				return err
 			}
 		}
