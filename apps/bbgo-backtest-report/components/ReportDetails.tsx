@@ -40,7 +40,7 @@ const ReportDetails = (props: ReportDetailsProps) => {
     <div>
       {
         reportSummary.symbols.map((symbol: string) => {
-          return <TradingViewChart basePath={props.basePath} runID={props.runID} symbol={symbol} intervals={["1m", "5m", "1h"]}/>
+          return <TradingViewChart basePath={props.basePath} runID={props.runID} reportSummary={reportSummary} symbol={symbol} intervals={["1m", "5m", "1h"]}/>
         })
       }
 
