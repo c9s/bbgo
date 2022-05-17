@@ -26,7 +26,7 @@ func (n *ExchangeName) UnmarshalJSON(data []byte) error {
 	}
 
 	switch s {
-	case "max", "binance", "ftx", "okex":
+	case "max", "binance", "ftx", "okex", "mexc":
 		*n = ExchangeName(s)
 		return nil
 
@@ -45,10 +45,11 @@ const (
 	ExchangeFTX      = ExchangeName("ftx")
 	ExchangeOKEx     = ExchangeName("okex")
 	ExchangeKucoin   = ExchangeName("kucoin")
+	ExchangeMEXC     = ExchangeName("mexc")
 	ExchangeBacktest = ExchangeName("backtest")
 )
 
-var SupportedExchanges = []ExchangeName{"binance", "max", "ftx", "okex", "kucoin"}
+var SupportedExchanges = []ExchangeName{"binance", "max", "ftx", "okex", "kucoin", "mexc"}
 
 func ValidExchangeName(a string) (ExchangeName, error) {
 	switch strings.ToLower(a) {
@@ -62,6 +63,8 @@ func ValidExchangeName(a string) (ExchangeName, error) {
 		return ExchangeOKEx, nil
 	case "kucoin":
 		return ExchangeKucoin, nil
+	case "mexc":
+		return ExchangeMEXC, nil
 	}
 
 	return "", fmt.Errorf("invalid exchange name: %s", a)
