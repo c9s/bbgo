@@ -29,10 +29,21 @@ const ReportDetails = (props: ReportDetailsProps) => {
     })
   }, [props.runID])
 
+  if (!reportSummary) {
+    return <Container>
+      <h2>Loading {props.runID}</h2>
+    </Container>;
+  }
+
   return <Container>
     <h2>Back-test Run {props.runID}</h2>
     <div>
-      <TradingViewChart basePath={props.basePath} runID={props.runID} intervals={["1m", "5m", "1h"]}/>
+      {
+        reportSummary.symbols.map((symbol: string) => {
+          return <TradingViewChart basePath={props.basePath} runID={props.runID} symbol={symbol} intervals={["1m", "5m", "1h"]}/>
+        })
+      }
+
     </div>
   </Container>;
 };

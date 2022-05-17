@@ -77,7 +77,7 @@ const parsePosition = () => {
   };
 }
 
-const fetchPositionHistory = (basePath, runID, setter) => {
+const fetchPositionHistory = (basePath, runID) => {
   // TODO: load the filename from the manifest
   return fetch(
     `${basePath}/${runID}/bollmaker:ETHUSDT-position.tsv`,
@@ -311,7 +311,7 @@ const TradingViewChart = (props) => {
       });
 
       Promise.all([ordersFetcher, positionHistoryFetcher]).then(() => {
-        fetchKLines(props.basePath, props.runID, 'ETHUSDT', currentInterval).then((data) => {
+        fetchKLines(props.basePath, props.runID, props.symbol, currentInterval).then((data) => {
           setData(removeDuplicatedKLines(data));
         })
       });
