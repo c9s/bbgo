@@ -482,8 +482,6 @@ var BacktestCmd = &cobra.Command{
 			// per symbol report
 			exchangeName := session.Exchange.Name().String()
 
-			numOfTradedSymbols := len(session.Trades)
-
 			for symbol, trades := range session.Trades {
 				market, ok := session.Market(symbol)
 				if !ok {
@@ -519,74 +517,24 @@ var BacktestCmd = &cobra.Command{
 					Market:          market,
 					LastPrice:       lastPrice,
 					StartPrice:      startPrice,
-					PnLReport:       report,
+					PnL:             report,
 					InitialBalances: initBalances,
 					FinalBalances:   finalBalances,
 					Manifests:       manifests,
 				}
+				summaryReport.SymbolReports = append(summaryReport.SymbolReports, symbolReport)
 
-				initQuoteAsset := inQuoteAsset(initBalances, market, startPrice)
-				finalQuoteAsset := inQuoteAsset(finalBalances, market, lastPrice)
 
 				// write report to a file
 				if generatingReport {
-					reportFileName := "symbol.json"
-					if numOfTradedSymbols > 1 {
-						reportFileName = fmt.Sprintf("symbol_%s.json", symbol)
-					}
-
+					reportFileName := fmt.Sprintf("symbol_report_%s.json", symbol)
 					if err := util.WriteJsonFile(filepath.Join(reportDir, reportFileName), &symbolReport); err != nil {
 						return err
 					}
 				}
 
-				color.Green("%s %s PROFIT AND LOSS REPORT", symbolReport.Exchange, symbol)
-				color.Green("===============================================")
-				report.Print()
+				symbolReport.Print(wantBaseAssetBaseline)
 
-				color.Green("INITIAL ASSET IN %s ~= %s %s (1 %s = %v)", market.QuoteCurrency, market.FormatQuantity(initQuoteAsset), market.QuoteCurrency, market.BaseCurrency, startPrice)
-				color.Green("FINAL ASSET IN %s ~= %s %s (1 %s = %v)", market.QuoteCurrency, market.FormatQuantity(finalQuoteAsset), market.QuoteCurrency, market.BaseCurrency, lastPrice)
-
-				if report.Profit.Sign() > 0 {
-					color.Green("REALIZED PROFIT: +%v %s", report.Profit, market.QuoteCurrency)
-				} else {
-					color.Red("REALIZED PROFIT: %v %s", report.Profit, market.QuoteCurrency)
-				}
-
-				if report.UnrealizedProfit.Sign() > 0 {
-					color.Green("UNREALIZED PROFIT: +%v %s", report.UnrealizedProfit, market.QuoteCurrency)
-				} else {
-					color.Red("UNREALIZED PROFIT: %v %s", report.UnrealizedProfit, market.QuoteCurrency)
-				}
-
-				if finalQuoteAsset.Compare(initQuoteAsset) > 0 {
-					color.Green("ASSET INCREASED: +%v %s (+%s)", finalQuoteAsset.Sub(initQuoteAsset), market.QuoteCurrency, finalQuoteAsset.Sub(initQuoteAsset).Div(initQuoteAsset).FormatPercentage(2))
-				} else {
-					color.Red("ASSET DECREASED: %v %s (%s)", finalQuoteAsset.Sub(initQuoteAsset), market.QuoteCurrency, finalQuoteAsset.Sub(initQuoteAsset).Div(initQuoteAsset).FormatPercentage(2))
-				}
-
-				if wantBaseAssetBaseline {
-					// initBaseAsset := inBaseAsset(initBalances, market, startPrice)
-					// finalBaseAsset := inBaseAsset(finalBalances, market, lastPrice)
-					// log.Infof("INITIAL ASSET IN %s ~= %s %s (1 %s = %f)", market.BaseCurrency, market.FormatQuantity(initBaseAsset), market.BaseCurrency, market.BaseCurrency, startPrice)
-					// log.Infof("FINAL ASSET IN %s ~= %s %s (1 %s = %f)", market.BaseCurrency, market.FormatQuantity(finalBaseAsset), market.BaseCurrency, market.BaseCurrency, lastPrice)
-
-					if lastPrice.Compare(startPrice) > 0 {
-						color.Green("%s BASE ASSET PERFORMANCE: +%s (= (%s - %s) / %s)",
-							market.BaseCurrency,
-							lastPrice.Sub(startPrice).Div(startPrice).FormatPercentage(2),
-							lastPrice.FormatString(2),
-							startPrice.FormatString(2),
-							startPrice.FormatString(2))
-					} else {
-						color.Red("%s BASE ASSET PERFORMANCE: %s (= (%s - %s) / %s)",
-							market.BaseCurrency,
-							lastPrice.Sub(startPrice).Div(startPrice).FormatPercentage(2),
-							lastPrice.FormatString(2),
-							startPrice.FormatString(2),
-							startPrice.FormatString(2))
-					}
-				}
 			}
 		}
 
