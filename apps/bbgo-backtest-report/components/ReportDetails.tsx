@@ -1,0 +1,40 @@
+import React, {useEffect, useState} from 'react';
+
+import TradingViewChart from './TradingViewChart';
+
+import {Container} from '@nextui-org/react';
+import {ReportSummary} from "../types";
+
+interface ReportDetailsProps {
+  basePath: string;
+  runID: string;
+}
+
+const fetchReportSummary = (basePath: string, runID: string) => {
+  return fetch(
+    `${basePath}/${runID}/summary.json`,
+  )
+    .then((res) => res.json())
+    .catch((e) => {
+      console.error("failed to fetch index", e)
+    });
+}
+
+const ReportDetails = (props: ReportDetailsProps) => {
+  const [reportSummary, setReportSummary] = useState<ReportSummary>()
+  useEffect(() => {
+    fetchReportSummary(props.basePath, props.runID).then((summary: ReportSummary) => {
+      console.log("summary", props.runID, summary);
+      setReportSummary(summary)
+    })
+  }, [props.runID])
+
+  return <Container>
+    <h2>Back-test Run ${props.runID}</h2>
+    <div>
+      <TradingViewChart basePath={props.basePath} runID={props.runID} intervals={["1m", "5m", "1h"]}/>
+    </div>
+  </Container>;
+};
+
+export default ReportDetails;

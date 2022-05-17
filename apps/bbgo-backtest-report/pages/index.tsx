@@ -2,9 +2,12 @@ import type {NextPage} from 'next'
 import Head from 'next/head'
 import styles from '../styles/Home.module.css'
 
-import Report from '../src/components/Report';
+import ReportDetails from '../components/ReportDetails';
+import ReportNavigator from '../components/ReportNavigator';
+import {useState} from "react";
 
 const Home: NextPage = () => {
+  const [currentReport, setCurrentReport] = useState<any>();
   return (
     <div className={styles.container}>
       <Head>
@@ -13,9 +16,12 @@ const Home: NextPage = () => {
         <link rel="icon" href="/favicon.ico"/>
       </Head>
       <main className={styles.main}>
-        <Report>
-
-        </Report>
+        <ReportNavigator onSelect={(reportEntry) => {
+          setCurrentReport(reportEntry)
+        }}/>
+        {
+          currentReport ? <ReportDetails basePath={'/output'} runID={currentReport.id}/> : null
+        }
       </main>
     </div>
   )

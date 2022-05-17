@@ -3,7 +3,7 @@ import {tsvParse} from "d3-dsv";
 
 // https://github.com/tradingview/lightweight-charts/issues/543
 // const createChart = dynamic(() => import('lightweight-charts'));
-import {createChart, CrosshairMode } from 'lightweight-charts';
+import {createChart, CrosshairMode} from 'lightweight-charts';
 import {Button} from "@nextui-org/react";
 
 // const parseDate = timeParse("%Y-%m-%d");
@@ -77,10 +77,10 @@ const parsePosition = () => {
   };
 }
 
-
-const fetchPositionHistory = (setter) => {
+const fetchPositionHistory = (basePath, runID, setter) => {
+  // TODO: load the filename from the manifest
   return fetch(
-    `/data/bollmaker:ETHUSDT-position.tsv`,
+    `${basePath}/${runID}/bollmaker:ETHUSDT-position.tsv`,
   )
     .then((response) => response.text())
     .then((data) => tsvParse(data, parsePosition()))
@@ -93,13 +93,12 @@ const fetchPositionHistory = (setter) => {
     });
 };
 
-const fetchOrders = (setter) => {
+const fetchOrders = (basePath, runID, setter) => {
   return fetch(
-    `/data/orders.tsv`,
+    `${basePath}/${runID}/orders.tsv`,
   )
     .then((response) => response.text())
     .then((data) => tsvParse(data, parseOrder()))
-    // .then((data) => tsvParse(data))
     .then((data) => {
       setter(data);
     })
@@ -198,10 +197,10 @@ const ordersToMarkets = (interval, orders) => {
 
 const removeDuplicatedKLines = (klines) => {
   const newK = [];
-  for (let i = 0 ; i < klines.length ; i++) {
+  for (let i = 0; i < klines.length; i++) {
     const k = klines[i];
 
-    if (i > 0 && k.time === klines[i-1].time) {
+    if (i > 0 && k.time === klines[i - 1].time) {
       continue
     }
 
@@ -210,9 +209,9 @@ const removeDuplicatedKLines = (klines) => {
   return newK;
 }
 
-function fetchKLines(symbol, interval, setter) {
+function fetchKLines(basePath, runID, symbol, interval, setter) {
   return fetch(
-    `/data/klines/${symbol}-${interval}.tsv`,
+    `${basePath}/${runID}/klines/${symbol}-${interval}.tsv`,
   )
     .then((response) => response.text())
     .then((data) => tsvParse(data, parseKline()))
@@ -228,7 +227,7 @@ function fetchKLines(symbol, interval, setter) {
 const klinesToVolumeData = (klines) => {
   const volumes = [];
 
-  for (let i = 0 ; i < klines.length ; i++) {
+  for (let i = 0; i < klines.length; i++) {
     const kline = klines[i];
     volumes.push({
       time: (kline.startTime.getTime() / 1000),
@@ -248,7 +247,7 @@ const positionBaseHistoryToLineData = (interval, hs) => {
     let t = pos.time.getTime() / 1000;
     t = (t - t % intervalSeconds)
 
-    if (i > 0 && (pos.base === hs[i-1].base || t === hs[i-1].time)) {
+    if (i > 0 && (pos.base === hs[i - 1].base || t === hs[i - 1].time)) {
       continue;
     }
 
@@ -269,7 +268,7 @@ const positionAverageCostHistoryToLineData = (interval, hs) => {
     let t = pos.time.getTime() / 1000;
     t = (t - t % intervalSeconds)
 
-    if (i > 0 && (pos.average_cost === hs[i-1].average_cost || t === hs[i-1].time)) {
+    if (i > 0 && (pos.average_cost === hs[i - 1].average_cost || t === hs[i - 1].time)) {
       continue;
     }
 
@@ -308,22 +307,20 @@ const TradingViewChart = (props) => {
     }
 
     if (!data || !orders || !markers || !positionHistory) {
-      fetchKLines('ETHUSDT', currentInterval, setData).then(() => {
-        fetchOrders((orders) => {
+      fetchKLines(props.basePath, props.runID, 'ETHUSDT', currentInterval, setData).then(() => {
+        fetchOrders(props.basePath, props.runID, (orders) => {
           setOrders(orders);
 
           const markers = ordersToMarkets(currentInterval, orders);
           setMarkers(markers);
         });
-        fetchPositionHistory(setPositionHistory)
+        fetchPositionHistory(props.basePath, props.runID, setPositionHistory)
       })
       return;
     }
 
-    console.log("createChart", {
-      width: chartContainerRef.current.clientWidth,
-      height: chartContainerRef.current.clientHeight,
-    })
+    console.log("createChart")
+
     chart.current = createChart(chartContainerRef.current, {
       width: chartContainerRef.current.clientWidth,
       height: chartContainerRef.current.clientHeight,
@@ -393,7 +390,10 @@ const TradingViewChart = (props) => {
     volumeSeries.setData(volumeData);
 
     chart.current.timeScale().fitContent();
-  }, [chart.current, data, currentInterval])
+    return () => {
+      chart.current.remove();
+    };
+  }, [chart.current, props.runID, data, currentInterval])
 
   // see:
   // https://codesandbox.io/s/9inkb?file=/src/styles.css
@@ -403,8 +403,8 @@ const TradingViewChart = (props) => {
         return;
       }
 
-      const { width, height } = entries[0].contentRect;
-      chart.current.applyOptions({ width, height });
+      const {width, height} = entries[0].contentRect;
+      chart.current.applyOptions({width, height});
 
       setTimeout(() => {
         chart.current.timeScale().fitContent();
@@ -418,16 +418,15 @@ const TradingViewChart = (props) => {
   return (
     <div>
       <Button.Group>
-        { intervals.map((interval) => {
+        {intervals.map((interval) => {
           return <Button size="xs" key={interval} onPress={(e) => {
             setCurrentInterval(interval)
             setData(null);
             setMarkers(null);
-            chart.current.remove();
           }}>
             {interval}
           </Button>
-        }) }
+        })}
       </Button.Group>
       <div ref={chartContainerRef} style={{'flex': 1, 'minHeight': 300}}>
       </div>
