@@ -87,3 +87,14 @@ func LoadReportIndex(outputDirectory string) (*ReportIndex, error) {
 	return &reportIndex, nil
 }
 
+func AddReportIndexRun(outputDirectory string, run Run) error {
+	// append report index
+	reportIndex, err := LoadReportIndex(outputDirectory)
+	if err != nil {
+		return err
+	}
+
+	reportIndex.Runs = append(reportIndex.Runs, run)
+	return WriteReportIndex(outputDirectory, reportIndex)
+}
+
