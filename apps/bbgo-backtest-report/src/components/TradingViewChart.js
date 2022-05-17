@@ -3,7 +3,8 @@ import {tsvParse} from "d3-dsv";
 
 // https://github.com/tradingview/lightweight-charts/issues/543
 // const createChart = dynamic(() => import('lightweight-charts'));
-import {createChart} from 'lightweight-charts';
+import {createChart, CrosshairMode } from 'lightweight-charts';
+import {Button} from "@nextui-org/react";
 
 // const parseDate = timeParse("%Y-%m-%d");
 
@@ -125,6 +126,8 @@ const parseInterval = (s) => {
       return 60 * 60 * 6;
     case "12h":
       return 60 * 60 * 12;
+    case "1d":
+      return 60 * 60 * 24;
   }
 
   return 60;
@@ -222,6 +225,28 @@ const klinesToVolumeData = (klines) => {
   return volumes;
 }
 
+
+const positionBaseHistoryToLineData = (interval, hs) => {
+  const bases = [];
+  const intervalSeconds = parseInterval(interval);
+  for (let i = 0; i < hs.length; i++) {
+    let pos = hs[i];
+    let t = pos.time.getTime() / 1000;
+    t = (t - t % intervalSeconds)
+
+    if (i > 0 && (pos.base === hs[i-1].base || t === hs[i-1].time)) {
+      continue;
+    }
+
+    bases.push({
+      time: t,
+      value: pos.base,
+    });
+  }
+  return bases;
+}
+
+
 const positionAverageCostHistoryToLineData = (interval, hs) => {
   const avgCosts = [];
   const intervalSeconds = parseInterval(interval);
@@ -252,23 +277,28 @@ const positionAverageCostHistoryToLineData = (interval, hs) => {
 }
 
 const TradingViewChart = (props) => {
-  const ref = useRef();
+  const chartContainerRef = useRef();
+  const chart = useRef();
+  const resizeObserver = useRef();
   const [data, setData] = useState(null);
   const [orders, setOrders] = useState(null);
   const [markers, setMarkers] = useState(null);
   const [positionHistory, setPositionHistory] = useState(null);
+  const [currentInterval, setCurrentInterval] = useState('5m');
+
+  const intervals = props.intervals || [];
 
   useEffect(() => {
-    if (!ref.current || ref.current.children.length > 0) {
+    if (!chartContainerRef.current || chartContainerRef.current.children.length > 0) {
       return;
     }
 
     if (!data || !orders || !markers || !positionHistory) {
-      fetchKLines('ETHUSDT', '5m', setData).then(() => {
+      fetchKLines('ETHUSDT', currentInterval, setData).then(() => {
         fetchOrders((orders) => {
           setOrders(orders);
 
-          const markers = ordersToMarkets('5m', orders);
+          const markers = ordersToMarkets(currentInterval, orders);
           setMarkers(markers);
         });
         fetchPositionHistory(setPositionHistory)
@@ -276,10 +306,13 @@ const TradingViewChart = (props) => {
       return;
     }
 
-    console.log("createChart")
-    const chart = createChart(ref.current, {
-      width: 800,
-      height: 200,
+    console.log("createChart", {
+      width: chartContainerRef.current.clientWidth,
+      height: chartContainerRef.current.clientHeight,
+    })
+    chart.current = createChart(chartContainerRef.current, {
+      width: chartContainerRef.current.clientWidth,
+      height: chartContainerRef.current.clientHeight,
       timeScale: {
         timeVisible: true,
         borderColor: '#D1D4DC',
@@ -287,9 +320,16 @@ const TradingViewChart = (props) => {
       rightPriceScale: {
         borderColor: '#D1D4DC',
       },
+      leftPriceScale: {
+        visible: true,
+        borderColor: 'rgba(197, 203, 206, 1)',
+      },
       layout: {
         backgroundColor: '#ffffff',
         textColor: '#000',
+      },
+      crosshair: {
+        mode: CrosshairMode.Normal,
       },
       grid: {
         horzLines: {
@@ -301,7 +341,7 @@ const TradingViewChart = (props) => {
       },
     });
 
-    const series = chart.addCandlestickSeries({
+    const series = chart.current.addCandlestickSeries({
       upColor: 'rgb(38,166,154)',
       downColor: 'rgb(255,82,82)',
       wickUpColor: 'rgb(38,166,154)',
@@ -311,12 +351,20 @@ const TradingViewChart = (props) => {
     series.setData(data);
     series.setMarkers(markers);
 
-    const lineSeries = chart.addLineSeries();
-    const costLine = positionAverageCostHistoryToLineData('5m', positionHistory);
+    const lineSeries = chart.current.addLineSeries();
+    const costLine = positionAverageCostHistoryToLineData(currentInterval, positionHistory);
     lineSeries.setData(costLine);
 
+    const baseLineSeries = chart.current.addLineSeries({
+      priceScaleId: 'left',
+      color: '#98338C',
+    });
+    const baseLine = positionBaseHistoryToLineData(currentInterval, positionHistory)
+    baseLineSeries.setData(baseLine);
+
+
     const volumeData = klinesToVolumeData(data);
-    const volumeSeries = chart.addHistogramSeries({
+    const volumeSeries = chart.current.addHistogramSeries({
       color: '#182233',
       lineWidth: 2,
       priceFormat: {
@@ -330,12 +378,44 @@ const TradingViewChart = (props) => {
     });
     volumeSeries.setData(volumeData);
 
-  }, [ref.current, data])
-  return <div>
-    <div ref={ref}>
+    chart.current.timeScale().fitContent();
+  }, [chart.current, data, currentInterval])
 
+  // see:
+  // https://codesandbox.io/s/9inkb?file=/src/styles.css
+  useEffect(() => {
+    resizeObserver.current = new ResizeObserver(entries => {
+      if (!chart.current) {
+        return;
+      }
+
+      const { width, height } = entries[0].contentRect;
+      chart.current.applyOptions({ width, height });
+
+      setTimeout(() => {
+        chart.current.timeScale().fitContent();
+      }, 0);
+    });
+
+    resizeObserver.current.observe(chartContainerRef.current);
+    return () => resizeObserver.current.disconnect();
+  }, []);
+
+  return (
+    <div>
+      <div>
+        { intervals.map((interval) => {
+          return <Button key={interval} onPress={(e) => {
+            setCurrentInterval(interval)
+          }}>
+            {interval}
+          </Button>
+        }) }
+      </div>
+      <div ref={chartContainerRef} style={{'flex': 1, 'minHeight': 300}}>
+      </div>
     </div>
-  </div>;
+  );
 };
 
 export default TradingViewChart;
