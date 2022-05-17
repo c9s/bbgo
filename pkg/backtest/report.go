@@ -1,7 +1,11 @@
 package backtest
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -9,6 +13,7 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 type Run struct {
@@ -56,3 +61,29 @@ func FormatSessionName(sessions []string, symbols []string, startTime, endTime t
 		endTime.Format(SessionTimeFormat),
 	)
 }
+
+func WriteReportIndex(outputDirectory string, reportIndex *ReportIndex) error {
+	indexFile := filepath.Join(outputDirectory, "index.json")
+	if err := util.WriteJsonFile(indexFile, reportIndex); err != nil {
+		return err
+	}
+	return nil
+}
+
+func LoadReportIndex(outputDirectory string) (*ReportIndex, error) {
+	var reportIndex ReportIndex
+	indexFile := filepath.Join(outputDirectory, "index.json")
+	if _, err := os.Stat(indexFile); err == nil {
+		o, err := ioutil.ReadFile(indexFile)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := json.Unmarshal(o, &reportIndex); err != nil {
+			return nil, err
+		}
+	}
+
+	return &reportIndex, nil
+}
+

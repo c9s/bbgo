@@ -3,9 +3,7 @@ package cmd
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,6 +24,7 @@ import (
 	"github.com/c9s/bbgo/pkg/data/tsv"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 func init() {
@@ -301,7 +300,7 @@ var BacktestCmd = &cobra.Command{
 			}
 
 			kLineDataDir := filepath.Join(reportDir, "klines")
-			if err := safeMkdirAll(kLineDataDir); err != nil {
+			if err := util.SafeMkdirAll(kLineDataDir); err != nil {
 				return err
 			}
 
@@ -526,7 +525,7 @@ var BacktestCmd = &cobra.Command{
 						Manifests:       manifests,
 					}
 
-					if err := writeJsonFile(filepath.Join(outputDirectory, symbol+".json"), &result); err != nil {
+					if err := util.WriteJsonFile(filepath.Join(outputDirectory, symbol+".json"), &result); err != nil {
 						return err
 					}
 				}
@@ -581,17 +580,9 @@ var BacktestCmd = &cobra.Command{
 
 		if generatingReport && reportFileInSubDir {
 			// append report index
-			var reportIndex backtest.ReportIndex
-			indexFile := filepath.Join(outputDirectory, "index.json")
-			if _, err := os.Stat(indexFile); err == nil {
-				o, err := ioutil.ReadFile(indexFile)
-				if err != nil {
-					return err
-				}
-
-				if err := json.Unmarshal(o, &reportIndex); err != nil {
-					return err
-				}
+			reportIndex, err := backtest.LoadReportIndex(outputDirectory)
+			if err != nil {
+				return err
 			}
 
 			reportIndex.Runs = append(reportIndex.Runs, backtest.Run{
@@ -600,12 +591,7 @@ var BacktestCmd = &cobra.Command{
 				Time:   time.Now(),
 			})
 
-			o, err := json.MarshalIndent(reportIndex, "", "  ")
-			if err != nil {
-				return err
-			}
-
-			if err := ioutil.WriteFile(indexFile, o, 0644); err != nil {
+			if err := backtest.WriteReportIndex(outputDirectory, reportIndex); err != nil {
 				return err
 			}
 		}
@@ -644,32 +630,6 @@ func confirmation(s string) bool {
 			return false
 		}
 	}
-}
-
-func writeJsonFile(p string, obj interface{}) error {
-	out, err := json.MarshalIndent(obj, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	return ioutil.WriteFile(p, out, 0644)
-}
-
-func safeMkdirAll(p string) error {
-	st, err := os.Stat(p)
-	if err == nil {
-		if !st.IsDir() {
-			return fmt.Errorf("path %s is not a directory", p)
-		}
-
-		return nil
-	}
-
-	if os.IsNotExist(err) {
-		return os.MkdirAll(p, 0755)
-	}
-
-	return nil
 }
 
 func toExchangeSources(sessions map[string]*bbgo.ExchangeSession) (exchangeSources []backtest.ExchangeDataSource, err error) {
