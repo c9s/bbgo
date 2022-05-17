@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fatih/color"
+
 	"github.com/c9s/bbgo/pkg/accounting/pnl"
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -34,6 +36,8 @@ type SummaryReport struct {
 	Symbols              []string         `json:"symbols"`
 	InitialTotalBalances types.BalanceMap `json:"initialTotalBalances"`
 	FinalTotalBalances   types.BalanceMap `json:"finalTotalBalances"`
+
+	SymbolReports []SessionSymbolReport `json:"symbolReports,omitempty"`
 }
 
 // SessionSymbolReport is the report per exchange session
@@ -46,10 +50,57 @@ type SessionSymbolReport struct {
 	Market          types.Market              `json:"market"`
 	LastPrice       fixedpoint.Value          `json:"lastPrice,omitempty"`
 	StartPrice      fixedpoint.Value          `json:"startPrice,omitempty"`
-	PnLReport       *pnl.AverageCostPnlReport `json:"pnlReport,omitempty"`
+	PnL             *pnl.AverageCostPnlReport `json:"pnl,omitempty"`
 	InitialBalances types.BalanceMap          `json:"initialBalances,omitempty"`
 	FinalBalances   types.BalanceMap          `json:"finalBalances,omitempty"`
 	Manifests       Manifests                 `json:"manifests,omitempty"`
+}
+
+func (r *SessionSymbolReport) Print(wantBaseAssetBaseline bool) {
+	color.Green("%s %s PROFIT AND LOSS REPORT", r.Exchange, r.Symbol)
+	color.Green("===============================================")
+	r.PnL.Print()
+
+	initQuoteAsset := inQuoteAsset(r.InitialBalances, r.Market, r.StartPrice)
+	finalQuoteAsset := inQuoteAsset(r.FinalBalances, r.Market, r.LastPrice)
+	color.Green("INITIAL ASSET IN %s ~= %s %s (1 %s = %v)", r.Market.QuoteCurrency, r.Market.FormatQuantity(initQuoteAsset), r.Market.QuoteCurrency, r.Market.BaseCurrency, r.StartPrice)
+	color.Green("FINAL ASSET IN %s ~= %s %s (1 %s = %v)", r.Market.QuoteCurrency, r.Market.FormatQuantity(finalQuoteAsset), r.Market.QuoteCurrency, r.Market.BaseCurrency, r.LastPrice)
+
+	if r.PnL.Profit.Sign() > 0 {
+		color.Green("REALIZED PROFIT: +%v %s", r.PnL.Profit, r.Market.QuoteCurrency)
+	} else {
+		color.Red("REALIZED PROFIT: %v %s", r.PnL.Profit, r.Market.QuoteCurrency)
+	}
+
+	if r.PnL.UnrealizedProfit.Sign() > 0 {
+		color.Green("UNREALIZED PROFIT: +%v %s", r.PnL.UnrealizedProfit, r.Market.QuoteCurrency)
+	} else {
+		color.Red("UNREALIZED PROFIT: %v %s", r.PnL.UnrealizedProfit, r.Market.QuoteCurrency)
+	}
+
+	if finalQuoteAsset.Compare(initQuoteAsset) > 0 {
+		color.Green("ASSET INCREASED: +%v %s (+%s)", finalQuoteAsset.Sub(initQuoteAsset), r.Market.QuoteCurrency, finalQuoteAsset.Sub(initQuoteAsset).Div(initQuoteAsset).FormatPercentage(2))
+	} else {
+		color.Red("ASSET DECREASED: %v %s (%s)", finalQuoteAsset.Sub(initQuoteAsset), r.Market.QuoteCurrency, finalQuoteAsset.Sub(initQuoteAsset).Div(initQuoteAsset).FormatPercentage(2))
+	}
+
+	if wantBaseAssetBaseline {
+		if r.LastPrice.Compare(r.StartPrice) > 0 {
+			color.Green("%s BASE ASSET PERFORMANCE: +%s (= (%s - %s) / %s)",
+				r.Market.BaseCurrency,
+				r.LastPrice.Sub(r.StartPrice).Div(r.StartPrice).FormatPercentage(2),
+				r.LastPrice.FormatString(2),
+				r.StartPrice.FormatString(2),
+				r.StartPrice.FormatString(2))
+		} else {
+			color.Red("%s BASE ASSET PERFORMANCE: %s (= (%s - %s) / %s)",
+				r.Market.BaseCurrency,
+				r.LastPrice.Sub(r.StartPrice).Div(r.StartPrice).FormatPercentage(2),
+				r.LastPrice.FormatString(2),
+				r.StartPrice.FormatString(2),
+				r.StartPrice.FormatString(2))
+		}
+	}
 }
 
 const SessionTimeFormat = "2006-01-02T15_04"
@@ -98,4 +149,11 @@ func AddReportIndexRun(outputDirectory string, run Run) error {
 
 	reportIndex.Runs = append(reportIndex.Runs, run)
 	return WriteReportIndex(outputDirectory, reportIndex)
+}
+
+// inQuoteAsset converts all balances in quote asset
+func inQuoteAsset(balances types.BalanceMap, market types.Market, price fixedpoint.Value) fixedpoint.Value {
+	quote := balances[market.QuoteCurrency]
+	base := balances[market.BaseCurrency]
+	return base.Total().Mul(price).Add(quote.Total())
 }
