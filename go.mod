@@ -6,6 +6,7 @@ go 1.17
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
+	github.com/Masterminds/squirrel v1.5.3
 	github.com/adshao/go-binance/v2 v2.3.5
 	github.com/c9s/requestgen v1.3.0
 	github.com/c9s/rockhopper v1.2.2-0.20220617053729-ffdc87df194b
@@ -26,6 +27,8 @@ require (
 	github.com/leekchan/accounting v0.0.0-20191218023648-17a4ce5f94d4
 	github.com/lestrrat-go/file-rotatelogs v2.2.0+incompatible
 	github.com/mattn/go-shellwords v1.0.12
+	github.com/muesli/clusters v0.0.0-20180605185049-a07a36e67d36
+	github.com/muesli/kmeans v0.3.0
 	github.com/pkg/errors v0.9.1
 	github.com/pquerna/otp v1.3.0
 	github.com/prometheus/client_golang v1.11.0
@@ -52,7 +55,6 @@ require (
 )
 
 require (
-	github.com/Masterminds/squirrel v1.5.3 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bitly/go-simplejson v0.5.0 // indirect
 	github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc // indirect

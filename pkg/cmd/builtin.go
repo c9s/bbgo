@@ -20,6 +20,7 @@ import (
 	_ "github.com/c9s/bbgo/pkg/strategy/pricealert"
 	_ "github.com/c9s/bbgo/pkg/strategy/pricedrop"
 	_ "github.com/c9s/bbgo/pkg/strategy/rebalance"
+	_ "github.com/c9s/bbgo/pkg/strategy/rsmaker"
 	_ "github.com/c9s/bbgo/pkg/strategy/schedule"
 	_ "github.com/c9s/bbgo/pkg/strategy/skeleton"
 	_ "github.com/c9s/bbgo/pkg/strategy/supertrend"
