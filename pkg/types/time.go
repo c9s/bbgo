@@ -266,6 +266,11 @@ func (t *LooseFormatTime) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func (t LooseFormatTime) MarshalJSON() ([]byte, error) {
+	return []byte(strconv.Quote(time.Time(t).Format(time.RFC3339))), nil
+}
+
+
 func (t LooseFormatTime) Time() time.Time {
 	return time.Time(t)
 }

@@ -1,15 +1,14 @@
 package backtest
 
 import (
-	"encoding/csv"
 	"fmt"
-	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 
 	"go.uber.org/multierr"
 
+	"github.com/c9s/bbgo/pkg/data/tsv"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -27,16 +26,14 @@ type InstancePropertyIndex struct {
 type StateRecorder struct {
 	outputDirectory string
 	strategies      []Instance
-	files           map[interface{}]*os.File
-	writers         map[types.CsvFormatter]*csv.Writer
+	writers         map[types.CsvFormatter]*tsv.Writer
 	manifests       Manifests
 }
 
 func NewStateRecorder(outputDir string) *StateRecorder {
 	return &StateRecorder{
 		outputDirectory: outputDir,
-		files:           make(map[interface{}]*os.File),
-		writers:         make(map[types.CsvFormatter]*csv.Writer),
+		writers:         make(map[types.CsvFormatter]*tsv.Writer),
 		manifests:       make(Manifests),
 	}
 }
@@ -96,7 +93,7 @@ func (r *StateRecorder) Scan(instance Instance) error {
 }
 
 func (r *StateRecorder) formatCsvFilename(instance Instance, objType string) string {
-	return filepath.Join(r.outputDirectory, fmt.Sprintf("%s-%s.csv", instance.InstanceID(), objType))
+	return filepath.Join(r.outputDirectory, fmt.Sprintf("%s-%s.tsv", instance.InstanceID(), objType))
 }
 
 func (r *StateRecorder) Manifests() Manifests {
@@ -105,13 +102,9 @@ func (r *StateRecorder) Manifests() Manifests {
 
 func (r *StateRecorder) newCsvWriter(o types.CsvFormatter, instance Instance, typeName string) error {
 	fn := r.formatCsvFilename(instance, typeName)
-	f, err := os.Create(fn)
+	w, err := tsv.NewWriterFile(fn)
 	if err != nil {
 		return err
-	}
-
-	if _, exists := r.files[o]; exists {
-		return fmt.Errorf("file of object %v already exists", o)
 	}
 
 	r.manifests[InstancePropertyIndex{
@@ -120,19 +113,15 @@ func (r *StateRecorder) newCsvWriter(o types.CsvFormatter, instance Instance, ty
 		Property:   typeName,
 	}] = fn
 
-	r.files[o] = f
-
-	w := csv.NewWriter(f)
 	r.writers[o] = w
-
 	return w.Write(o.CsvHeader())
 }
 
 func (r *StateRecorder) Close() error {
 	var err error
 
-	for _, f := range r.files {
-		err2 := f.Close()
+	for _, w := range r.writers {
+		err2 := w.Close()
 		if err2 != nil {
 			err = multierr.Append(err, err2)
 		}

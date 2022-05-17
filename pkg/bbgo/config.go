@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"reflect"
 	"runtime"
+	"strings"
 
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
@@ -106,8 +107,10 @@ type Backtest struct {
 	// RecordTrades is an option, if set to true, back-testing should record the trades into database
 	RecordTrades bool `json:"recordTrades,omitempty" yaml:"recordTrades,omitempty"`
 
+	// Deprecated:
 	// Account is deprecated, use Accounts instead
-	Account  map[string]BacktestAccount `json:"account" yaml:"account"`
+	Account map[string]BacktestAccount `json:"account" yaml:"account"`
+
 	Accounts map[string]BacktestAccount `json:"accounts" yaml:"accounts"`
 	Symbols  []string                   `json:"symbols" yaml:"symbols"`
 	Sessions []string                   `json:"sessions" yaml:"sessions"`
@@ -119,7 +122,12 @@ func (b *Backtest) GetAccount(n string) BacktestAccount {
 		return accountConfig
 	}
 
-	return b.Account[n]
+	accountConfig, ok = b.Account[n]
+	if ok {
+		return accountConfig
+	}
+
+	return DefaultBacktestAccount
 }
 
 type BacktestAccount struct {
@@ -128,6 +136,14 @@ type BacktestAccount struct {
 	TakerFeeRate fixedpoint.Value `json:"takerFeeRate,omitempty" yaml:"takerFeeRate,omitempty"`
 
 	Balances BacktestAccountBalanceMap `json:"balances" yaml:"balances"`
+}
+
+var DefaultBacktestAccount = BacktestAccount{
+	MakerFeeRate: fixedpoint.MustNewFromString("0.050%"),
+	TakerFeeRate: fixedpoint.MustNewFromString("0.075%"),
+	Balances: BacktestAccountBalanceMap{
+		"USDT": fixedpoint.NewFromFloat(10000),
+	},
 }
 
 type BA BacktestAccount
@@ -308,6 +324,38 @@ func (c *Config) YAML() ([]byte, error) {
 	enc.SetIndent(2)
 	err = enc.Encode(m)
 	return buf.Bytes(), err
+}
+
+func (c *Config) GetSignature() string {
+	var s string
+
+	var ps []string
+
+	// for single exchange strategy
+	if len(c.ExchangeStrategies) == 1 && len(c.CrossExchangeStrategies) == 0 {
+		mount := c.ExchangeStrategies[0].Mounts[0]
+		ps = append(ps, mount)
+
+		strategy := c.ExchangeStrategies[0].Strategy
+
+		id := strategy.ID()
+		ps = append(ps, id)
+
+		if symbol, ok := isSymbolBasedStrategy(reflect.ValueOf(strategy)); ok {
+			ps = append(ps, symbol)
+		}
+	}
+
+	startTime := c.Backtest.StartTime.Time()
+	ps = append(ps, startTime.Format("2006-01-02"))
+
+	if c.Backtest.EndTime != nil {
+		endTime := c.Backtest.EndTime.Time()
+		ps = append(ps, endTime.Format("2006-01-02"))
+	}
+
+	s = strings.Join(ps, "_")
+	return s
 }
 
 type Stash map[string]interface{}

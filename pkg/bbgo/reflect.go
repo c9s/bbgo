@@ -4,10 +4,9 @@ import (
 	"reflect"
 )
 
-type InstanceIDProvider interface{
+type InstanceIDProvider interface {
 	InstanceID() string
 }
-
 
 func callID(obj interface{}) string {
 	sv := reflect.ValueOf(obj)
@@ -21,6 +20,10 @@ func callID(obj interface{}) string {
 }
 
 func isSymbolBasedStrategy(rs reflect.Value) (string, bool) {
+	if rs.Kind() == reflect.Ptr {
+		rs = rs.Elem()
+	}
+
 	field := rs.FieldByName("Symbol")
 	if !field.IsValid() {
 		return "", false
