@@ -77,10 +77,9 @@ const parsePosition = () => {
   };
 }
 
-const fetchPositionHistory = (basePath, runID) => {
-  // TODO: load the filename from the manifest
+const fetchPositionHistory = (basePath, runID, filename) => {
   return fetch(
-    `${basePath}/${runID}/bollmaker:ETHUSDT-position.tsv`,
+    `${basePath}/${runID}/${filename}`,
   )
     .then((response) => response.text())
     .then((data) => tsvParse(data, parsePosition()))
@@ -300,17 +299,25 @@ const TradingViewChart = (props) => {
     }
 
     if (!data) {
+      const fetchers = [];
       const ordersFetcher = fetchOrders(props.basePath, props.runID, (orders) => {
         const markers = ordersToMarkets(currentInterval, orders);
         setOrders(orders);
         setMarkers(markers);
       });
+      fetchers.push(ordersFetcher);
 
-      const positionHistoryFetcher = fetchPositionHistory(props.basePath, props.runID).then((data) => {
-        setPositionHistory(data);
-      });
+      if (props.reportSummary && props.reportSummary.manifests && props.reportSummary.manifests.length === 1) {
+        const manifest = props.reportSummary?.manifests[0];
+        if (manifest && manifest.type === "strategyProperty" && manifest.strategyProperty === "position") {
+          const positionHistoryFetcher = fetchPositionHistory(props.basePath, props.runID, manifest.filename).then((data) => {
+            setPositionHistory(data);
+          });
+          fetchers.push(positionHistoryFetcher);
+        }
+      }
 
-      Promise.all([ordersFetcher, positionHistoryFetcher]).then(() => {
+      Promise.all(fetchers).then(() => {
         fetchKLines(props.basePath, props.runID, props.symbol, currentInterval).then((data) => {
           setData(removeDuplicatedKLines(data));
         })
@@ -362,17 +369,18 @@ const TradingViewChart = (props) => {
     series.setData(data);
     series.setMarkers(markers);
 
-    const lineSeries = chart.current.addLineSeries();
-    const costLine = positionAverageCostHistoryToLineData(currentInterval, positionHistory);
-    lineSeries.setData(costLine);
+    if (positionHistory) {
+      const lineSeries = chart.current.addLineSeries();
+      const costLine = positionAverageCostHistoryToLineData(currentInterval, positionHistory);
+      lineSeries.setData(costLine);
 
-    const baseLineSeries = chart.current.addLineSeries({
-      priceScaleId: 'left',
-      color: '#98338C',
-    });
-    const baseLine = positionBaseHistoryToLineData(currentInterval, positionHistory)
-    baseLineSeries.setData(baseLine);
-
+      const baseLineSeries = chart.current.addLineSeries({
+        priceScaleId: 'left',
+        color: '#98338C',
+      });
+      const baseLine = positionBaseHistoryToLineData(currentInterval, positionHistory)
+      baseLineSeries.setData(baseLine);
+    }
 
     const volumeData = klinesToVolumeData(data);
     const volumeSeries = chart.current.addHistogramSeries({
@@ -394,7 +402,7 @@ const TradingViewChart = (props) => {
       chart.current.remove();
       setData(null);
     };
-  }, [props.runID, currentInterval, data])
+  }, [props.runID, props.reportSummary, currentInterval, data])
 
   // see:
   // https://codesandbox.io/s/9inkb?file=/src/styles.css
