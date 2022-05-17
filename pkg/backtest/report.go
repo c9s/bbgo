@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/fatih/color"
+	"github.com/gofrs/flock"
 
 	"github.com/c9s/bbgo/pkg/accounting/pnl"
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -142,6 +143,22 @@ func LoadReportIndex(outputDirectory string) (*ReportIndex, error) {
 
 func AddReportIndexRun(outputDirectory string, run Run) error {
 	// append report index
+	lockFile := filepath.Join(outputDirectory, ".report.lock")
+	fileLock := flock.New(lockFile)
+
+	err := fileLock.Lock()
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err := fileLock.Unlock(); err != nil {
+			log.WithError(err).Errorf("report index file lock error: %s", lockFile)
+		}
+		if err := os.Remove(lockFile) ; err != nil {
+			log.WithError(err).Errorf("can not remove lock file: %s", lockFile)
+		}
+	}()
 	reportIndex, err := LoadReportIndex(outputDirectory)
 	if err != nil {
 		return err
