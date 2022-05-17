@@ -11,7 +11,7 @@ ENV GOPATH_ORIG=$GOPATH
 ENV GOPATH=${GO_MOD_CACHE:+$WORKDIR/$GO_MOD_CACHE}
 ENV GOPATH=${GOPATH:-$GOPATH_ORIG}
 ENV CGO_ENABLED=1
-RUN go install github.com/mattn/go-sqlite3
+RUN cd $WORKDIR && go get github.com/mattn/go-sqlite3
 ADD . .
 RUN go build -o $GOPATH_ORIG/bin/bbgo ./cmd/bbgo
 
