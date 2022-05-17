@@ -392,6 +392,7 @@ const TradingViewChart = (props) => {
     chart.current.timeScale().fitContent();
     return () => {
       chart.current.remove();
+      setData(null);
     };
   }, [props.runID, currentInterval, data])
 
@@ -421,8 +422,6 @@ const TradingViewChart = (props) => {
         {intervals.map((interval) => {
           return <Button size="xs" key={interval} onPress={(e) => {
             setCurrentInterval(interval)
-            setData(null);
-            setMarkers(null);
           }}>
             {interval}
           </Button>
