@@ -671,6 +671,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 
+		if kline.Symbol != s.Symbol || kline.Interval != s.Interval {
+			return
+		}
+
 		// Update spreads
 		high := kline.GetHigh().Float64()
 		open := kline.GetOpen().Float64()
@@ -702,10 +706,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				s.AskSpread = dynamicAskSpread
 			}
 			log.Infof("new ask spread: %v", s.AskSpread.Percentage())
-		}
-
-		if kline.Symbol != s.Symbol || kline.Interval != s.Interval {
-			return
 		}
 
 		if err := s.activeMakerOrders.GracefulCancel(ctx, s.session.Exchange); err != nil {
