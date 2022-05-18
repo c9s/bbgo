@@ -1,15 +1,18 @@
 import type {NextPage} from 'next'
 import Head from 'next/head'
 import styles from '../styles/Home.module.css'
-
+import { useRouter } from "next/router";
 import {AppShell, Header, Navbar, Text} from '@mantine/core';
 
 import ReportDetails from '../components/ReportDetails';
 import ReportNavigator from '../components/ReportNavigator';
-import {useState} from "react";
+import {useEffect, useState} from "react";
 
 const Home: NextPage = () => {
   const [currentReport, setCurrentReport] = useState<any>();
+  const { query } = useRouter();
+  const basePath = query.basePath ? query.basePath as string : '/output';
+
   return (
     <div>
       <Head>
@@ -37,7 +40,7 @@ const Home: NextPage = () => {
           })}
         >
           {
-            currentReport ? <ReportDetails basePath={'/output'} runID={currentReport.id}/> : null
+            currentReport ? <ReportDetails basePath={basePath} runID={currentReport.id}/> : null
           }
         </AppShell>
       </main>

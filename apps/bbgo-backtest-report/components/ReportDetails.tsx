@@ -166,8 +166,8 @@ const ReportDetails = (props: ReportDetailsProps) => {
     <Container my="md" mx="xs">
       <Title order={2}>RUN {props.runID}</Title>
       <div>
-        {reportSummary.sessions.map((session) => <Badge>Exchange {session}</Badge>)}
-        {reportSummary.symbols.map((symbol) => <Badge>{symbol}</Badge>)}
+        {reportSummary.sessions.map((session) => <Badge key={session}>Exchange {session}</Badge>)}
+        {reportSummary.symbols.map((symbol) => <Badge key={symbol}>{symbol}</Badge>)}
 
         <Badge>{reportSummary.startTime.toString()} ~ {reportSummary.endTime.toString()}</Badge>
         <Badge>{
