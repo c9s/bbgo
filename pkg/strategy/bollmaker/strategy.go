@@ -81,11 +81,13 @@ type Strategy struct {
 	// DynamicSpreadWindow enables the automatic adjustment to bid and ask spread.
 	// When DynamicSpreadWindow is set and is larger than 0, the spreads are calculated based on the SMA of amplitude of
 	// [DynamicSpreadWindow] K-lines
-	DynamicSpreadWindow int              `json:"dynamicSpreadWindow,omitempty"`
-	MinAskSpread        fixedpoint.Value `json:"minAskSpread"`
-	MinBidSpread        fixedpoint.Value `json:"minBidSpread"`
-	MaxAskSpread        fixedpoint.Value `json:"maxAskSpread"`
-	MaxBidSpread        fixedpoint.Value `json:"maxBidSpread"`
+	DynamicSpreadWindow int `json:"dynamicSpreadWindow,omitempty"`
+
+	// DynamicAskSpreadScale is used to define the ask spread range with the given percentage.
+	DynamicAskSpreadScale *bbgo.PercentageScale `json:"dynamicAskSpreadScale"`
+
+	// DynamicBidSpreadScale is used to define the bid spread range with the given percentage.
+	DynamicBidSpreadScale *bbgo.PercentageScale `json:"dynamicBidSpreadScale"`
 
 	DynamicAskSpread *indicator.SMA
 	DynamicBidSpread *indicator.SMA
@@ -286,6 +288,53 @@ func (s *Strategy) getCurrentAllowedExposurePosition(bandPercentage float64) (fi
 	}
 
 	return s.MaxExposurePosition, nil
+}
+
+// Update dynamic spreads
+func (s *Strategy) updateDynamicSpread(kline types.KLine) {
+	if s.DynamicSpreadWindow > 0 {
+		high := kline.GetHigh().Float64()
+		open := kline.GetOpen().Float64()
+		low := kline.GetLow().Float64()
+
+		if kline.Direction() == types.DirectionUp {
+			s.DynamicAskSpread.Update((high - open) / open)
+		}
+		if kline.Direction() == types.DirectionDown {
+			s.DynamicBidSpread.Update((open - low) / open)
+		}
+	}
+}
+
+// Get current dynamic ask spread
+func (s *Strategy) getDynamicAskSpread() (dynamicAskSpread float64, err error) {
+	if s.DynamicAskSpreadScale != nil && s.DynamicSpreadWindow > 0 && s.DynamicAskSpread.Length() >= s.DynamicSpreadWindow {
+		dynamicAskSpread, err = s.DynamicAskSpreadScale.Scale(s.DynamicAskSpread.Last())
+		if err != nil {
+			log.WithError(err).Errorf("can not calculate dynamicAskSpread")
+			return 0, err
+		}
+
+		return dynamicAskSpread, nil
+	}
+	log.Infof("dynamicAskSpread: %v", dynamicAskSpread)
+
+	return 0, errors.New("incomplete dynamic spread settings or not enough data yet")
+}
+
+// Get current dynamic bid spread
+func (s *Strategy) getDynamicBidSpread() (dynamicBidSpread float64, err error) {
+	if s.DynamicBidSpreadScale != nil && s.DynamicSpreadWindow > 0 && s.DynamicBidSpread.Length() >= s.DynamicSpreadWindow {
+		dynamicBidSpread, err = s.DynamicBidSpreadScale.Scale(s.DynamicBidSpread.Last())
+		if err != nil {
+			log.WithError(err).Errorf("can not calculate dynamicBidSpread")
+			return 0, err
+		}
+
+		return dynamicBidSpread, nil
+	}
+
+	return 0, errors.New("incomplete dynamic spread settings or not enough data yet")
 }
 
 func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExecutor, midPrice fixedpoint.Value, kline *types.KLine) {
@@ -676,35 +725,15 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 
 		// Update spreads
-		high := kline.GetHigh().Float64()
-		open := kline.GetOpen().Float64()
-		low := kline.GetLow().Float64()
-		if s.DynamicSpreadWindow > 0 && kline.Direction() == types.DirectionUp {
-			s.DynamicAskSpread.Update((high - open) / open)
-		}
-		if s.DynamicSpreadWindow > 0 && kline.Direction() == types.DirectionDown {
-			s.DynamicBidSpread.Update((open - low) / open)
-		}
-		if s.DynamicSpreadWindow > 0 && s.DynamicBidSpread.Length() >= s.DynamicSpreadWindow {
-			dynamicBidSpread := fixedpoint.NewFromFloat(s.DynamicBidSpread.Last())
-			if !s.MaxBidSpread.IsZero() && dynamicBidSpread.Compare(s.MaxBidSpread) > 0 {
-				s.BidSpread = s.MaxBidSpread
-			} else if !s.MinBidSpread.IsZero() && dynamicBidSpread.Compare(s.MinBidSpread) < 0 {
-				s.BidSpread = s.MinBidSpread
-			} else {
-				s.BidSpread = dynamicBidSpread
-			}
+		s.updateDynamicSpread(kline)
+		dynamicBidSpread, err := s.getDynamicBidSpread()
+		if err == nil && dynamicBidSpread > 0 {
+			s.BidSpread = fixedpoint.NewFromFloat(dynamicBidSpread)
 			log.Infof("new bid spread: %v", s.BidSpread.Percentage())
 		}
-		if s.DynamicSpreadWindow > 0 && s.DynamicAskSpread.Length() >= s.DynamicSpreadWindow {
-			dynamicAskSpread := fixedpoint.NewFromFloat(s.DynamicAskSpread.Last())
-			if !s.MaxAskSpread.IsZero() && dynamicAskSpread.Compare(s.MaxAskSpread) > 0 {
-				s.AskSpread = s.MaxAskSpread
-			} else if !s.MinAskSpread.IsZero() && dynamicAskSpread.Compare(s.MinAskSpread) < 0 {
-				s.AskSpread = s.MinAskSpread
-			} else {
-				s.AskSpread = dynamicAskSpread
-			}
+		dynamicAskSpread, err := s.getDynamicAskSpread()
+		if err == nil && dynamicAskSpread > 0 {
+			s.AskSpread = fixedpoint.NewFromFloat(dynamicAskSpread)
 			log.Infof("new ask spread: %v", s.AskSpread.Percentage())
 		}
 
