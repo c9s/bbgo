@@ -38,14 +38,13 @@ const ReportDetails = (props: ReportDetailsProps) => {
   }
 
   return <div>
-    <Title order={2}>Back-test Run {props.runID}</Title>
+    <Title order={2}>RUN {props.runID}</Title>
     <div>
       {
         reportSummary.symbols.map((symbol: string, i : number) => {
           return <TradingViewChart key={i} basePath={props.basePath} runID={props.runID} reportSummary={reportSummary} symbol={symbol} intervals={["1m", "5m", "1h"]}/>
         })
       }
-
     </div>
   </div>;
 };

@@ -59,7 +59,13 @@ const ReportNavigator = (props: ReportNavigatorProps) => {
               props.onSelect(entry);
             }
           }}>
+            <div style={{
+              "textOverflow": "ellipsis",
+              "overflow": "hidden",
+              "inlineSize": "190px",
+            }}>
             {entry.id}
+            </div>
           </List.Item>
         })
       }
