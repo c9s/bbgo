@@ -1,24 +1,41 @@
 import Document, {DocumentContext, Head, Html, Main, NextScript} from 'next/document';
-import {CssBaseline} from '@nextui-org/react';
+
+// ----- mantine setup
+import {createStylesServer, ServerStyles} from '@mantine/next';
+import {DocumentInitialProps} from "next/dist/shared/lib/utils";
+
+// const getInitialProps = createGetInitialProps();
+const stylesServer = createStylesServer();
+// -----
 
 class MyDocument extends Document {
-  static async getInitialProps(ctx: DocumentContext) {
+  // this is for mantine
+  // static getInitialProps = getInitialProps;
+
+  static async getInitialProps(ctx: DocumentContext): Promise<DocumentInitialProps> {
     const initialProps = await Document.getInitialProps(ctx);
 
-    // @ts-ignore
-    initialProps.styles = <>{initialProps.styles}</>;
-    return initialProps;
+    return {
+      ...initialProps,
+
+      // use bracket [] instead of () to fix the type error
+      styles: [
+        <>
+          {initialProps.styles}
+          <ServerStyles html={initialProps.html} server={stylesServer}/>
+        </>
+      ],
+    };
   }
 
   render() {
     return (
       <Html lang="en">
         <Head>
-          {CssBaseline.flush()}
         </Head>
         <body>
-          <Main/>
-          <NextScript/>
+        <Main/>
+        <NextScript/>
         </body>
       </Html>
     );
