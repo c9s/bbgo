@@ -4,16 +4,18 @@ import moment from 'moment';
 
 import TradingViewChart from './TradingViewChart';
 
-import {ReportSummary} from "../types";
+import {BalanceMap, ReportSummary} from "../types";
 
 import {
   Badge,
   Container,
   createStyles,
+  Grid,
   Group,
   Paper,
   SimpleGrid,
   Skeleton,
+  Table,
   Text,
   ThemeIcon,
   Title
@@ -136,6 +138,30 @@ const fetchReportSummary = (basePath: string, runID: string) => {
 
 const skeleton = <Skeleton height={140} radius="md" animate={false}/>;
 
+
+interface BalanceDetailsProps {
+  balances: BalanceMap;
+}
+
+const BalanceDetails = (props: BalanceDetailsProps) => {
+  const rows = Object.entries(props.balances).map(([k, v]) => {
+    return <tr key={k}>
+      <td>{k}</td>
+      <td>{v.available}</td>
+    </tr>;
+  });
+
+  return <Table>
+    <thead>
+    <tr>
+      <th>Currency</th>
+      <th>Balance</th>
+    </tr>
+    </thead>
+    <tbody>{rows}</tbody>
+  </Table>;
+};
+
 const ReportDetails = (props: ReportDetailsProps) => {
   const [reportSummary, setReportSummary] = useState<ReportSummary>()
   useEffect(() => {
@@ -185,6 +211,17 @@ const ReportDetails = (props: ReportDetailsProps) => {
         {title: "Buy Volume", value: totalBuyVolume.toString() + ` ${volumeUnit}`},
         {title: "Sell Volume", value: totalSellVolume.toString() + ` ${volumeUnit}`},
       ]}/>
+
+      <Grid p={"xs"} mb={"lg"}>
+        <Grid.Col xs={6}>
+          <Title order={5}>Initial Total Balances</Title>
+          <BalanceDetails balances={reportSummary.initialTotalBalances}/>
+        </Grid.Col>
+        <Grid.Col xs={6}>
+          <Title order={5}>Final Total Balances</Title>
+          <BalanceDetails balances={reportSummary.finalTotalBalances}/>
+        </Grid.Col>
+      </Grid>
 
       {
         /*
