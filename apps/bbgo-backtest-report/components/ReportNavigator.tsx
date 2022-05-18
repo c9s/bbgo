@@ -1,5 +1,7 @@
 import React, {useEffect, useState} from 'react';
-import {Link} from '@nextui-org/react';
+import {List, ThemeIcon} from '@mantine/core';
+import {CircleCheck} from 'tabler-icons-react';
+
 import {ReportEntry, ReportIndex} from '../types';
 
 function fetchIndex(basePath: string, setter: (data: any) => void) {
@@ -39,16 +41,35 @@ const ReportNavigator = (props: ReportNavigatorProps) => {
     return <div>No back-test report data</div>
   }
 
-  return <div>
-    {
-      reportIndex.runs.map((entry) => {
-        return <Link key={entry.id} onClick={() => {
-          if (props.onSelect) {
-            props.onSelect(entry);
-          }
-        }}>{entry.id}</Link>
-      })
-    }
+  return <div className={"report-navigator"}>
+    <List
+      spacing="xs"
+      size="xs"
+      center
+      icon={
+        <ThemeIcon color="teal" size={24} radius="xl">
+          <CircleCheck size={16}/>
+        </ThemeIcon>
+      }
+    >
+      {
+        reportIndex.runs.map((entry) => {
+          return <List.Item key={entry.id} onClick={() => {
+            if (props.onSelect) {
+              props.onSelect(entry);
+            }
+          }}>
+            <div style={{
+              "textOverflow": "ellipsis",
+              "overflow": "hidden",
+              "inlineSize": "190px",
+            }}>
+            {entry.id}
+            </div>
+          </List.Item>
+        })
+      }
+    </List>
   </div>;
 
 

@@ -9,14 +9,18 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@nextui-org/react": "^1.0.0-beta.7",
+    "@mantine/core": "^4.2.5",
+    "@mantine/hooks": "^4.2.5",
+    "@mantine/next": "^4.2.5",
     "d3-dsv": "^3.0.1",
     "d3-format": "^3.1.0",
     "d3-time-format": "^4.1.0",
     "lightweight-charts": "^3.8.0",
+    "moment": "^2.29.3",
     "next": "12.1.6",
     "react": "18.1.0",
-    "react-dom": "18.1.0"
+    "react-dom": "18.1.0",
+    "tabler-icons-react": "^1.48.0"
   },
   "devDependencies": {
     "@types/d3-dsv": "^3.0.0",
