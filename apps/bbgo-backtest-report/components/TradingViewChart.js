@@ -1,12 +1,10 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {tsvParse} from "d3-dsv";
+import { Button } from '@mantine/core';
 
 // https://github.com/tradingview/lightweight-charts/issues/543
 // const createChart = dynamic(() => import('lightweight-charts'));
 import {createChart, CrosshairMode} from 'lightweight-charts';
-import {Button} from "@nextui-org/react";
-
-// const parseDate = timeParse("%Y-%m-%d");
 
 const parseKline = () => {
   return (d) => {
@@ -426,15 +424,15 @@ const TradingViewChart = (props) => {
 
   return (
     <div>
-      <Button.Group>
+      <span>
         {intervals.map((interval) => {
-          return <Button size="xs" key={interval} onPress={(e) => {
+          return <Button key={interval} compact onClick={(e) => {
             setCurrentInterval(interval)
           }}>
             {interval}
           </Button>
         })}
-      </Button.Group>
+      </span>
       <div ref={chartContainerRef} style={{'flex': 1, 'minHeight': 300}}>
       </div>
     </div>
