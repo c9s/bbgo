@@ -1,5 +1,7 @@
 import React, {useEffect, useState} from 'react';
 
+import moment from 'moment';
+
 import TradingViewChart from './TradingViewChart';
 
 import {ReportSummary} from "../types";
@@ -149,7 +151,8 @@ const ReportDetails = (props: ReportDetailsProps) => {
     </div>;
   }
 
-  const totalProfit = reportSummary.symbolReports.map((report) => report.pnl.profit).reduce((prev, cur) => prev + cur)
+  const totalProfit = Math.round(reportSummary.symbolReports.map((report) => report.pnl.profit).reduce((prev, cur) => prev + cur) * 100) / 100
+  const totalUnrealizedProfit = Math.round(reportSummary.symbolReports.map((report) => report.pnl.unrealizedProfit).reduce((prev, cur) => prev + cur) * 100) / 100
   const totalTrades = reportSummary.symbolReports.map((report) => report.pnl.numTrades).reduce((prev, cur) => prev + cur)
 
   const totalBuyVolume = reportSummary.symbolReports.map((report) => report.pnl.buyVolume).reduce((prev, cur) => prev + cur)
@@ -165,9 +168,19 @@ const ReportDetails = (props: ReportDetailsProps) => {
       <div>
         {reportSummary.sessions.map((session) => <Badge>Exchange {session}</Badge>)}
         {reportSummary.symbols.map((symbol) => <Badge>{symbol}</Badge>)}
+
+        <Badge>{reportSummary.startTime.toString()} ~ {reportSummary.endTime.toString()}</Badge>
+        <Badge>{
+          moment.duration((new Date(reportSummary.endTime)).getTime() - (new Date(reportSummary.startTime)).getTime()).humanize()
+        }</Badge>
       </div>
       <StatsGridIcons data={[
         {title: "Profit", value: "$" + totalProfit.toString(), dir: totalProfit > 0 ? "up" : "down"},
+        {
+          title: "Unrealized Profit",
+          value: "$" + totalUnrealizedProfit.toString(),
+          dir: totalUnrealizedProfit > 0 ? "up" : "down"
+        },
         {title: "Trades", value: totalTrades.toString()},
         {title: "Buy Volume", value: totalBuyVolume.toString() + ` ${volumeUnit}`},
         {title: "Sell Volume", value: totalSellVolume.toString() + ` ${volumeUnit}`},
