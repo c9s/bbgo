@@ -58,15 +58,29 @@ exchangeStrategies:
 
     # EXPERIMENTAL
     #   Dynamic spread is an experimental feature. Use at your own risk!
-    #   DynamicSpreadWindow enables the automatic adjustment to bid and ask spread.
+    #
+    #   dynamicSpreadWindow enables the automatic adjustment to bid and ask spread.
     #   When DynamicSpreadWindow is set and larger than 0, the spreads are calculated based on the SMA of amplitude of
-    #   previous [DynamicSpreadWindow] K-lines. Max and min spreads limit the maximum and minimum of spreads. Set them
-    #   to 0 to disable the limitation.
+    #   previous [DynamicSpreadWindow] K-lines.
     # dynamicSpreadWindow: 1
-    # minAskSpread: 0.05%
-    # minBidSpread: 0.05%
-    # maxAskSpread: 1
-    # maxBidSpread: 1
+    # dynamicAskSpreadScale:
+    #   byPercentage:
+    #     # exp means we want to use exponential scale, you can replace "exp" with "linear" for linear scale
+    #     exp:
+    #       # amplitude from low to high
+    #       domain: [ 0.001, 0.01 ]
+    #       # when amplitude is low, minimum ask is spread 0.05%
+    #       # when amplitude is high, maximum ask is spread 0.2%
+    #       range: [ 0.0005, 0.002 ]
+    #   dynamicBidSpreadScale:
+    #     byPercentage:
+    #       # exp means we want to use exponential scale, you can replace "exp" with "linear" for linear scale
+    #       exp:
+    #         # amplitude from low to high
+    #         domain: [ 0.001, 0.01 ]
+    #         # when amplitude is low, minimum bid is spread 0.05%
+    #         # when amplitude is high, maximum bid is spread 0.2%
+    #         range: [ 0.0005, 0.002 ]
 
     # maxExposurePosition is the maximum position you can hold
     # +10 means you can hold 10 ETH long position by maximum
