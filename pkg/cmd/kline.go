@@ -56,7 +56,7 @@ var klineCmd = &cobra.Command{
 
 		s := session.Exchange.NewStream()
 		s.SetPublicOnly()
-		s.Subscribe(types.KLineChannel, symbol, types.SubscribeOptions{Interval: interval})
+		s.Subscribe(types.KLineChannel, symbol, types.SubscribeOptions{Interval: types.Interval(interval)})
 
 		s.OnKLineClosed(func(kline types.KLine) {
 			log.Infof("kline closed: %s", kline.String())

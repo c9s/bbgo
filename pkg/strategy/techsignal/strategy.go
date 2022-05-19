@@ -7,9 +7,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/c9s/bbgo/pkg/exchange/binance"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/types"
@@ -69,11 +70,11 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	// session.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{})
 	for _, detection := range s.SupportDetection {
 		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
-			Interval: string(detection.Interval),
+			Interval: detection.Interval,
 		})
 
 		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
-			Interval: string(detection.MovingAverageInterval),
+			Interval: detection.MovingAverageInterval,
 		})
 	}
 }

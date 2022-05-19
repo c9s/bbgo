@@ -185,18 +185,18 @@ func (s *Strategy) Initialize() error {
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
-		Interval: string(s.Interval),
+		Interval: s.Interval,
 	})
 
 	if s.DefaultBollinger != nil && s.DefaultBollinger.Interval != "" {
 		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
-			Interval: string(s.DefaultBollinger.Interval),
+			Interval: s.DefaultBollinger.Interval,
 		})
 	}
 
 	if s.NeutralBollinger != nil && s.NeutralBollinger.Interval != "" {
 		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
-			Interval: string(s.NeutralBollinger.Interval),
+			Interval: s.NeutralBollinger.Interval,
 		})
 	}
 

@@ -52,7 +52,7 @@ func NewTrailingStopController(symbol string, config *TrailingStop) *TrailingSto
 
 func (c *TrailingStopController) Subscribe(session *ExchangeSession) {
 	session.Subscribe(types.KLineChannel, c.Symbol, types.SubscribeOptions{
-		Interval: c.Interval.String(),
+		Interval: c.Interval,
 	})
 }
 

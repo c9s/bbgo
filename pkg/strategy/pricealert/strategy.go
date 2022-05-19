@@ -20,7 +20,7 @@ type Strategy struct {
 
 	// These fields will be filled from the config file (it translates YAML to JSON)
 	Symbol    string           `json:"symbol"`
-	Interval  string           `json:"interval"`
+	Interval  types.Interval   `json:"interval"`
 	MinChange fixedpoint.Value `json:"minChange"`
 }
 

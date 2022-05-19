@@ -77,10 +77,10 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 
 	for _, detection := range s.SupportDetection {
 		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
-			Interval: string(detection.Interval),
+			Interval: detection.Interval,
 		})
 		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
-			Interval: string(detection.MovingAverageIntervalWindow.Interval),
+			Interval: detection.MovingAverageIntervalWindow.Interval,
 		})
 	}
 }

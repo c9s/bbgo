@@ -55,7 +55,7 @@ type Strategy struct {
 
 	// Interval is the interval of the kline channel we want to subscribe,
 	// the kline event will trigger the strategy to check if we need to submit order.
-	Interval string `json:"interval"`
+	Interval types.Interval `json:"interval"`
 
 	// MinChange filters out the k-lines with small changes. so that our strategy will only be triggered
 	// in specific events.
