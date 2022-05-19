@@ -492,6 +492,8 @@ var BacktestCmd = &cobra.Command{
 
 				summaryReport.Symbols = append(summaryReport.Symbols, symbol)
 				summaryReport.SymbolReports = append(summaryReport.SymbolReports, *symbolReport)
+				summaryReport.TotalProfit = symbolReport.PnL.Profit
+				summaryReport.TotalUnrealizedProfit = symbolReport.PnL.UnrealizedProfit
 
 				// write report to a file
 				if generatingReport {
@@ -500,24 +502,32 @@ var BacktestCmd = &cobra.Command{
 						return err
 					}
 				}
-
-				symbolReport.Print(wantBaseAssetBaseline)
 			}
 		}
 
-		if generatingReport && reportFileInSubDir {
+		if generatingReport {
 			summaryReportFile := filepath.Join(reportDir, "summary.json")
+
+			// output summary report filepath to stdout, so that our optimizer can read from it
+			fmt.Println(summaryReportFile)
+
 			if err := util.WriteJsonFile(summaryReportFile, summaryReport); err != nil {
 				return err
 			}
 
 			// append report index
-			if err := backtest.AddReportIndexRun(outputDirectory, backtest.Run{
-				ID:     runID,
-				Config: userConfig,
-				Time:   time.Now(),
-			}); err != nil {
-				return err
+			if reportFileInSubDir {
+				if err := backtest.AddReportIndexRun(outputDirectory, backtest.Run{
+					ID:     runID,
+					Config: userConfig,
+					Time:   time.Now(),
+				}); err != nil {
+					return err
+				}
+			}
+		} else {
+			for _, symbolReport := range summaryReport.SymbolReports {
+				symbolReport.Print(wantBaseAssetBaseline)
 			}
 		}
 
