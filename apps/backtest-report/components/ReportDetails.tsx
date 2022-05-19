@@ -179,10 +179,10 @@ const ReportDetails = (props: ReportDetailsProps) => {
 
   const totalProfit = Math.round(reportSummary.symbolReports.map((report) => report.pnl.profit).reduce((prev, cur) => prev + cur) * 100) / 100
   const totalUnrealizedProfit = Math.round(reportSummary.symbolReports.map((report) => report.pnl.unrealizedProfit).reduce((prev, cur) => prev + cur) * 100) / 100
-  const totalTrades = reportSummary.symbolReports.map((report) => report.pnl.numTrades).reduce((prev, cur) => prev + cur)
+  const totalTrades = reportSummary.symbolReports.map((report) => report.pnl.numTrades).reduce((prev, cur) => prev + cur) || 0
 
-  const totalBuyVolume = reportSummary.symbolReports.map((report) => report.pnl.buyVolume).reduce((prev, cur) => prev + cur)
-  const totalSellVolume = reportSummary.symbolReports.map((report) => report.pnl.sellVolume).reduce((prev, cur) => prev + cur)
+  const totalBuyVolume = reportSummary.symbolReports.map((report) => report.pnl.buyVolume).reduce((prev, cur) => prev + cur) || 0
+  const totalSellVolume = reportSummary.symbolReports.map((report) => report.pnl.sellVolume).reduce((prev, cur) => prev + cur) || 0
 
   const volumeUnit = reportSummary.symbolReports.length == 1 ? reportSummary.symbolReports[0].market.baseCurrency : '';
 
