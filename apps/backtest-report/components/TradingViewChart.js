@@ -1,6 +1,6 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {tsvParse} from "d3-dsv";
-import { Button } from '@mantine/core';
+import {Button} from '@mantine/core';
 
 // https://github.com/tradingview/lightweight-charts/issues/543
 // const createChart = dynamic(() => import('lightweight-charts'));
@@ -194,6 +194,7 @@ const removeDuplicatedKLines = (klines) => {
     const k = klines[i];
 
     if (i > 0 && k.time === klines[i - 1].time) {
+      console.warn(`duplicated kline at index ${i}`, k)
       continue
     }
 
@@ -234,6 +235,11 @@ const positionBaseHistoryToLineData = (interval, hs) => {
   const intervalSeconds = parseInterval(interval);
   for (let i = 0; i < hs.length; i++) {
     const pos = hs[i];
+    if (!pos.time) {
+      console.warn('position history record missing time field', pos)
+      continue
+    }
+
     let t = pos.time.getTime() / 1000;
     t = (t - t % intervalSeconds)
 
@@ -255,6 +261,12 @@ const positionAverageCostHistoryToLineData = (interval, hs) => {
   const intervalSeconds = parseInterval(interval);
   for (let i = 0; i < hs.length; i++) {
     const pos = hs[i];
+
+    if (!pos.time) {
+      console.warn('position history record missing time field', pos)
+      continue
+    }
+
     let t = pos.time.getTime() / 1000;
     t = (t - t % intervalSeconds)
 
@@ -279,14 +291,45 @@ const positionAverageCostHistoryToLineData = (interval, hs) => {
   return avgCosts;
 }
 
+const createBaseChart = (chartContainerRef) => {
+  return createChart(chartContainerRef.current, {
+    width: chartContainerRef.current.clientWidth,
+    height: chartContainerRef.current.clientHeight,
+    timeScale: {
+      timeVisible: true,
+      borderColor: '#D1D4DC',
+    },
+    rightPriceScale: {
+      borderColor: '#D1D4DC',
+    },
+    leftPriceScale: {
+      visible: true,
+      borderColor: 'rgba(197, 203, 206, 1)',
+    },
+    layout: {
+      backgroundColor: '#ffffff',
+      textColor: '#000',
+    },
+    crosshair: {
+      mode: CrosshairMode.Normal,
+    },
+    grid: {
+      horzLines: {
+        color: '#F0F3FA',
+      },
+      vertLines: {
+        color: '#F0F3FA',
+      },
+    },
+  });
+};
+
+
 const TradingViewChart = (props) => {
   const chartContainerRef = useRef();
   const chart = useRef();
   const resizeObserver = useRef();
   const [data, setData] = useState(null);
-  const [orders, setOrders] = useState(null);
-  const [markers, setMarkers] = useState(null);
-  const [positionHistory, setPositionHistory] = useState(null);
   const [currentInterval, setCurrentInterval] = useState('5m');
 
   const intervals = props.intervals || [];
@@ -296,111 +339,86 @@ const TradingViewChart = (props) => {
       return;
     }
 
-    if (!data) {
-      const fetchers = [];
-      const ordersFetcher = fetchOrders(props.basePath, props.runID, (orders) => {
-        const markers = ordersToMarkets(currentInterval, orders);
-        setOrders(orders);
-        setMarkers(markers);
-      });
-      fetchers.push(ordersFetcher);
+    const chartData = {};
+    const fetchers = [];
+    const ordersFetcher = fetchOrders(props.basePath, props.runID, (orders) => {
+      const markers = ordersToMarkets(currentInterval, orders);
+      chartData.orders = orders;
+      chartData.markers = markers;
+    });
+    fetchers.push(ordersFetcher);
 
-      if (props.reportSummary && props.reportSummary.manifests && props.reportSummary.manifests.length === 1) {
-        const manifest = props.reportSummary?.manifests[0];
-        if (manifest && manifest.type === "strategyProperty" && manifest.strategyProperty === "position") {
-          const positionHistoryFetcher = fetchPositionHistory(props.basePath, props.runID, manifest.filename).then((data) => {
-            setPositionHistory(data);
-          });
-          fetchers.push(positionHistoryFetcher);
-        }
+    if (props.reportSummary && props.reportSummary.manifests && props.reportSummary.manifests.length === 1) {
+      const manifest = props.reportSummary?.manifests[0];
+      if (manifest && manifest.type === "strategyProperty" && manifest.strategyProperty === "position") {
+        const positionHistoryFetcher = fetchPositionHistory(props.basePath, props.runID, manifest.filename).then((data) => {
+          chartData.positionHistory = data;
+        });
+        fetchers.push(positionHistoryFetcher);
+      }
+    }
+
+    const kLinesFetcher = fetchKLines(props.basePath, props.runID, props.symbol, currentInterval).then((klines) => {
+      chartData.klines = removeDuplicatedKLines(klines)
+    });
+    fetchers.push(kLinesFetcher);
+
+    Promise.all(fetchers).then(() => {
+      console.log("createChart")
+
+      if (chart.current) {
+        chart.current.remove();
       }
 
-      Promise.all(fetchers).then(() => {
-        fetchKLines(props.basePath, props.runID, props.symbol, currentInterval).then((data) => {
-          setData(removeDuplicatedKLines(data));
-        })
+      chart.current = createBaseChart(chartContainerRef);
+
+      const series = chart.current.addCandlestickSeries({
+        upColor: 'rgb(38,166,154)',
+        downColor: 'rgb(255,82,82)',
+        wickUpColor: 'rgb(38,166,154)',
+        wickDownColor: 'rgb(255,82,82)',
+        borderVisible: false,
       });
+      series.setData(chartData.klines);
+      series.setMarkers(chartData.markers);
 
-      return;
-    }
-
-    console.log("createChart")
-
-    chart.current = createChart(chartContainerRef.current, {
-      width: chartContainerRef.current.clientWidth,
-      height: chartContainerRef.current.clientHeight,
-      timeScale: {
-        timeVisible: true,
-        borderColor: '#D1D4DC',
-      },
-      rightPriceScale: {
-        borderColor: '#D1D4DC',
-      },
-      leftPriceScale: {
-        visible: true,
-        borderColor: 'rgba(197, 203, 206, 1)',
-      },
-      layout: {
-        backgroundColor: '#ffffff',
-        textColor: '#000',
-      },
-      crosshair: {
-        mode: CrosshairMode.Normal,
-      },
-      grid: {
-        horzLines: {
-          color: '#F0F3FA',
+      const volumeData = klinesToVolumeData(chartData.klines);
+      const volumeSeries = chart.current.addHistogramSeries({
+        color: '#182233',
+        lineWidth: 2,
+        priceFormat: {
+          type: 'volume',
         },
-        vertLines: {
-          color: '#F0F3FA',
+        overlay: true,
+        scaleMargins: {
+          top: 0.8,
+          bottom: 0,
         },
-      },
-    });
-
-    const series = chart.current.addCandlestickSeries({
-      upColor: 'rgb(38,166,154)',
-      downColor: 'rgb(255,82,82)',
-      wickUpColor: 'rgb(38,166,154)',
-      wickDownColor: 'rgb(255,82,82)',
-      borderVisible: false,
-    });
-    series.setData(data);
-    series.setMarkers(markers);
-
-    if (positionHistory) {
-      const lineSeries = chart.current.addLineSeries();
-      const costLine = positionAverageCostHistoryToLineData(currentInterval, positionHistory);
-      lineSeries.setData(costLine);
-
-      const baseLineSeries = chart.current.addLineSeries({
-        priceScaleId: 'left',
-        color: '#98338C',
       });
-      const baseLine = positionBaseHistoryToLineData(currentInterval, positionHistory)
-      baseLineSeries.setData(baseLine);
-    }
+      volumeSeries.setData(volumeData);
 
-    const volumeData = klinesToVolumeData(data);
-    const volumeSeries = chart.current.addHistogramSeries({
-      color: '#182233',
-      lineWidth: 2,
-      priceFormat: {
-        type: 'volume',
-      },
-      overlay: true,
-      scaleMargins: {
-        top: 0.8,
-        bottom: 0,
-      },
+      if (chartData.positionHistory) {
+        const lineSeries = chart.current.addLineSeries();
+        const costLine = positionAverageCostHistoryToLineData(currentInterval, chartData.positionHistory);
+        lineSeries.setData(costLine);
+
+        const baseLineSeries = chart.current.addLineSeries({
+          priceScaleId: 'left',
+          color: '#98338C',
+        });
+        const baseLine = positionBaseHistoryToLineData(currentInterval, chartData.positionHistory)
+        baseLineSeries.setData(baseLine);
+      }
+
+      chart.current.timeScale().fitContent();
     });
-    volumeSeries.setData(volumeData);
 
-    chart.current.timeScale().fitContent();
     return () => {
-      chart.current.remove();
-      setData(null);
+      if (chart.current) {
+        chart.current.remove();
+      }
     };
-  }, [props.runID, props.reportSummary, currentInterval, data])
+  }, [props.runID, props.reportSummary, currentInterval])
 
   // see:
   // https://codesandbox.io/s/9inkb?file=/src/styles.css

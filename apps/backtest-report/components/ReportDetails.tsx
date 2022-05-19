@@ -186,8 +186,6 @@ const ReportDetails = (props: ReportDetailsProps) => {
 
   const volumeUnit = reportSummary.symbolReports.length == 1 ? reportSummary.symbolReports[0].market.baseCurrency : '';
 
-  // reportSummary.startTime
-
   return <div>
     <Container my="md" mx="xs">
       <Title order={2}>RUN {props.runID}</Title>
