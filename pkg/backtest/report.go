@@ -39,9 +39,24 @@ type SummaryReport struct {
 	InitialTotalBalances types.BalanceMap `json:"initialTotalBalances"`
 	FinalTotalBalances   types.BalanceMap `json:"finalTotalBalances"`
 
+	// TotalProfit is the profit aggregated from the symbol reports
+	TotalProfit           fixedpoint.Value `json:"totalProfit,omitempty"`
+	TotalUnrealizedProfit fixedpoint.Value `json:"totalUnrealizedProfit,omitempty"`
+
 	SymbolReports []SessionSymbolReport `json:"symbolReports,omitempty"`
 
 	Manifests Manifests `json:"manifests,omitempty"`
+}
+
+func ReadSummaryReport(filename string) (*SummaryReport, error) {
+	o, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	var report SummaryReport
+	err = json.Unmarshal(o, &report)
+	return &report, err
 }
 
 // SessionSymbolReport is the report per exchange session
