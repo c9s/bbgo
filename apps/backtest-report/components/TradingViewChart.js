@@ -329,10 +329,8 @@ const TradingViewChart = (props) => {
   const chartContainerRef = useRef();
   const chart = useRef();
   const resizeObserver = useRef();
-  const [data, setData] = useState(null);
   const [currentInterval, setCurrentInterval] = useState('5m');
-
-  const intervals = props.intervals || [];
+  const intervals = props.reportSummary.intervals || [];
 
   useEffect(() => {
     if (!chartContainerRef.current || chartContainerRef.current.children.length > 0) {
