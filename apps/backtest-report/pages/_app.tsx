@@ -7,7 +7,7 @@ import { MantineProvider } from '@mantine/core';
 function MyApp({Component, pageProps}: AppProps) {
   return <>
     <Head>
-      <title>Page title</title>
+      <title>BBGO Back-test Report</title>
       <meta name="viewport" content="minimum-scale=1, initial-scale=1, width=device-width" />
     </Head>
     <MantineProvider
