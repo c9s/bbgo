@@ -92,7 +92,7 @@ func (s *Stream) handleConnect() {
 				Channel:    string(sub.Channel),
 				Market:     toLocalSymbol(sub.Symbol),
 				Depth:      depth,
-				Resolution: sub.Options.Interval,
+				Resolution: sub.Options.Interval.String(),
 			})
 		}
 

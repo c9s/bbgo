@@ -34,7 +34,7 @@ func toSubscriptions(sub *pb.Subscription) (types.Subscription, error) {
 			Symbol:  sub.Symbol,
 			Channel: types.KLineChannel,
 			Options: types.SubscribeOptions{
-				Interval: sub.Interval,
+				Interval: types.Interval(sub.Interval),
 			},
 		}, nil
 	}

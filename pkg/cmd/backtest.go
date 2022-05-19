@@ -273,7 +273,8 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
-		exchangeSources, err := toExchangeSources(environ.Sessions())
+		backTestIntervals := []types.Interval{types.Interval1h, types.Interval1d}
+		exchangeSources, err := toExchangeSources(environ.Sessions(), backTestIntervals...)
 		if err != nil {
 			return err
 		}
@@ -468,7 +469,21 @@ var BacktestCmd = &cobra.Command{
 			Symbols:              nil,
 		}
 
+		allKLineIntervals := map[types.Interval]struct{}{}
 		for _, session := range environ.Sessions() {
+			for _, sub := range session.Subscriptions {
+				if sub.Channel == types.KLineChannel {
+					allKLineIntervals[types.Interval(sub.Options.Interval)] = struct{}{}
+				}
+			}
+		}
+
+		for interval := range allKLineIntervals {
+			summaryReport.Intervals = append(summaryReport.Intervals, interval)
+		}
+
+		for _, session := range environ.Sessions() {
+
 			for symbol, trades := range session.Trades {
 				symbolReport, err := createSymbolReport(userConfig, session, symbol, trades.Trades)
 				if err != nil {
@@ -551,6 +566,22 @@ func createSymbolReport(userConfig *bbgo.Config, session *bbgo.ExchangeSession, 
 		FinalBalances:   finalBalances,
 		// Manifests:       manifests,
 	}
+
+	for _, s := range session.Subscriptions {
+		symbolReport.Subscriptions = append(symbolReport.Subscriptions, s)
+	}
+
+	sessionKLineIntervals := map[types.Interval]struct{}{}
+	for _, sub := range session.Subscriptions {
+		if sub.Channel == types.KLineChannel {
+			sessionKLineIntervals[types.Interval(sub.Options.Interval)] = struct{}{}
+		}
+	}
+
+	for interval := range sessionKLineIntervals {
+		symbolReport.Intervals = append(symbolReport.Intervals, interval)
+	}
+
 	return &symbolReport, nil
 }
 
@@ -586,12 +617,12 @@ func confirmation(s string) bool {
 	}
 }
 
-func toExchangeSources(sessions map[string]*bbgo.ExchangeSession) (exchangeSources []backtest.ExchangeDataSource, err error) {
+func toExchangeSources(sessions map[string]*bbgo.ExchangeSession, extraIntervals ...types.Interval) (exchangeSources []backtest.ExchangeDataSource, err error) {
 	for _, session := range sessions {
 		exchange := session.Exchange.(*backtest.Exchange)
 		exchange.InitMarketData()
 
-		c, err := exchange.SubscribeMarketData(types.Interval1h, types.Interval1d)
+		c, err := exchange.SubscribeMarketData(extraIntervals...)
 		if err != nil {
 			return exchangeSources, err
 		}

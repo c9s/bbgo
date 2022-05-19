@@ -410,14 +410,14 @@ const (
 // SubscribeOptions provides the standard stream options
 type SubscribeOptions struct {
 	// TODO: change to Interval type later
-	Interval string `json:"interval,omitempty"`
-	Depth    Depth  `json:"depth,omitempty"`
-	Speed    Speed  `json:"speed,omitempty"`
+	Interval Interval `json:"interval,omitempty"`
+	Depth    Depth    `json:"depth,omitempty"`
+	Speed    Speed    `json:"speed,omitempty"`
 }
 
 func (o SubscribeOptions) String() string {
 	if len(o.Interval) > 0 {
-		return o.Interval
+		return string(o.Interval)
 	}
 
 	return string(o.Depth)
