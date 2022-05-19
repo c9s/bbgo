@@ -6,12 +6,12 @@
 matrix:
 - type: iterate
   path: '/exchangeStrategies/0/bollmaker/interval'
-  values: ["1m", "5m", "30m"]
+  values: ["1m", "5m"]
 
 - type: range
   path: '/exchangeStrategies/0/bollmaker/amount'
   min: 20.0
-  max: 100.0
+  max: 40.0
   step: 20.0
 
 - type: range
