@@ -2,6 +2,7 @@ package optimizer
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/evanphx/json-patch/v5"
 
@@ -16,8 +17,8 @@ var TotalProfitMetricValueFunc = func(summaryReport *backtest.SummaryReport) fix
 }
 
 type Metric struct {
-	Params []interface{}
-	Value  fixedpoint.Value
+	Params []interface{}    `json:"params,omitempty"`
+	Value  fixedpoint.Value `json:"value,omitempty"`
 }
 
 type GridOptimizer struct {
@@ -124,6 +125,7 @@ func (o *GridOptimizer) Run(executor Executor, configJson []byte) error {
 		// TODO: Add other metric value function
 		metricValue := TotalProfitMetricValueFunc(summaryReport)
 
+		// TODO: replace this with a local variable and return it as a function result
 		o.Metrics = append(o.Metrics, Metric{
 			Params: o.CurrentParams,
 			Value:  metricValue,
@@ -147,5 +149,14 @@ func (o *GridOptimizer) Run(executor Executor, configJson []byte) error {
 		}
 	}
 
-	return wrapper(configJson)
+	err := wrapper(configJson)
+
+	// sort metrics
+	sort.Slice(o.Metrics, func(i, j int) bool {
+		a := o.Metrics[i].Value
+		b := o.Metrics[j].Value
+		return a.Compare(b) > 0
+	})
+	log.Infof("metrics: %+v", o.Metrics)
+	return err
 }
