@@ -1,30 +1,30 @@
 package mexc
 
 import (
-
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 
+	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"strconv"
-	"context"
-	"time"
-	"crypto/sha256"
-	"crypto/hmac"
 	"net/http"
 	"net/url"
-	"encoding/json"
+	"strconv"
+	"time"
 )
 
 const MX = "MX"
+
 var urlTemplate url.URL = url.URL{
-	Scheme: "https",
-	Host: "api.mexc.com",
-	Path: "/api/v3",
+	Scheme:  "https",
+	Host:    "api.mexc.com",
+	Path:    "/api/v3",
 	RawPath: "/api/v3",
 }
 
@@ -32,7 +32,11 @@ var log = logrus.WithField("exchange", "mexc")
 
 type Exchange struct {
 	key, secret string
-	client *http.Client
+	client      *http.Client
+}
+
+func New(key, secret string) *Exchange {
+	return &Exchange{key, secret, nil}
 }
 
 func (e *Exchange) Name() types.ExchangeName {
@@ -56,9 +60,9 @@ func (e *Exchange) publicRequest(ctx context.Context, method string, path string
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("X-MEXC-APIKEY", e.key)
 	if e.client == nil {
-		e.client = &http.Client {
+		e.client = &http.Client{
 			Transport: &http.Transport{
-				MaxIdleConns: 10,
+				MaxIdleConns:    10,
 				IdleConnTimeout: 30 * time.Second,
 			},
 		}
@@ -93,9 +97,9 @@ func (e *Exchange) signRequest(ctx context.Context, method string, path string, 
 	req.Header.Add("Context-Type", "application/json")
 	req.Header.Add("X-MEXC-APIKEY", e.key)
 	if e.client == nil {
-		e.client = &http.Client {
-			Transport: &http.Transport {
-				MaxIdleConns: 10,
+		e.client = &http.Client{
+			Transport: &http.Transport{
+				MaxIdleConns:    10,
 				IdleConnTimeout: 30 * time.Second,
 			},
 		}
@@ -136,16 +140,30 @@ func (e *Exchange) time(ctx context.Context) (int64, error) {
 }
 
 type ticker24hr struct {
-	CloseTime int64 `json:"closeTime"`
-	OpenTime int64 `json:"openTime"`
+	CloseTime   int64            `json:"closeTime"`
+	OpenTime    int64            `json:"openTime"`
+	Symbol      string           `json:"symbol"`
 	QuoteVolume fixedpoint.Value `json:"quoteVolume"`
-	Volume fixedpoint.Value `json:"volume"`
-	LowPrice fixedpoint.Value `json:"lowPrice"`
-	HighPrice fixedpoint.Value `json:"highPrice"`
-	OpenPrice fixedpoint.Value `json:"openPrice"`
-	AskPrice fixedpoint.Value `json:"askPrice"`
-	BidPrice fixedpoint.Value `json:"bidPrice"`
-	LastPrice fixedpoint.Value `json:"lastPrice"`
+	Volume      fixedpoint.Value `json:"volume"`
+	LowPrice    fixedpoint.Value `json:"lowPrice"`
+	HighPrice   fixedpoint.Value `json:"highPrice"`
+	OpenPrice   fixedpoint.Value `json:"openPrice"`
+	AskPrice    fixedpoint.Value `json:"askPrice"`
+	BidPrice    fixedpoint.Value `json:"bidPrice"`
+	LastPrice   fixedpoint.Value `json:"lastPrice"`
+}
+
+func (t *ticker24hr) ToTicker() types.Ticker {
+	return types.Ticker{
+		Time:   time.UnixMilli(t.OpenTime),
+		Volume: t.Volume,
+		Last:   t.LastPrice,
+		Open:   t.OpenPrice,
+		High:   t.HighPrice,
+		Low:    t.LowPrice,
+		Buy:    t.BidPrice,
+		Sell:   t.AskPrice,
+	}
 }
 
 /*{"symbol":"APEUSDT","priceChange":"0.0852","priceChangePercent":"0.0099905","prevClosePrice":"8.5281","lastPrice":"8.6133","lastQty":"","bidPrice":"8.5983","bidQty":"","askPrice":"8.6242","askQty":"","openPrice":"8.5281","highPrice":"9.2478","lowPrice":"8.14","volume":"166512.31","quoteVolume":null,"openTime":1652869200000,"closeTime":1652869439540,"count":null}*/
@@ -160,32 +178,194 @@ func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticke
 	}
 	t := ticker24hr{}
 	json.Unmarshal(resp, &t)
-	result := types.Ticker{
-		Time: time.UnixMilli(t.OpenTime),
-		Volume: t.Volume,
-		Last: t.LastPrice,
-		Open: t.OpenPrice,
-		High: t.HighPrice,
-		Low: t.LowPrice,
-		Buy: t.BidPrice,
-		Sell: t.AskPrice,
-	}
+	result := t.ToTicker()
 	return &result, nil
 }
+
+func (e *Exchange) QueryTickers(ctx context.Context, symbols ...string) (result map[string]types.Ticker, err error) {
+	result = make(map[string]types.Ticker)
+	// return all symbols if given empty symbols
+	if len(symbols) == 0 {
+		resp, err := e.publicRequest(ctx, "GET", "/ticker/24hr", url.Values{})
+		if err != nil {
+			log.WithError(err).Errorf("queryTicker error")
+			return result, err
+		}
+		t := []ticker24hr{}
+		json.Unmarshal(resp, &t)
+		for _, tt := range t {
+			result[tt.Symbol] = tt.ToTicker()
+		}
+		return result, nil
+	}
+	// Otherwise query one by one.
+	for _, s := range symbols {
+		ticker, err := e.QueryTicker(ctx, s)
+		if err != nil {
+			return result, err
+		}
+		result[s] = *ticker
+	}
+	return result, nil
+}
+
+type symbolInfo struct {
+	Symbol                     string   `json:"symbol"`
+	Status                     string   `json:"status"`
+	BaseAsset                  string   `json:"baseAsset"`
+	BaseAssetPrecision         int      `json:"baseAssetPrecision"`
+	QuoteAsset                 string   `json:"quoteAsset"`
+	QuotePrecision             int      `json:"quotePrecision"`
+	QuoteAssetPrecision        int      `json:"quoteAssetPrecision"`
+	BaseCommissionPrecision    int      `json:"baseCommissionPrecision"`
+	QuoteCommissionPrecision   int      `json:"quoteCommissionPrecision"`
+	OrderTypes                 []string `json:"orderTypes"`
+	IcebergAllowed             bool     `json:"icebergAllowed"`
+	OcoAllowed                 bool     `json:"ocoAllowed"`
+	QuoteOrderQtyMarketAllowed bool     `json:"QuoteOrderQtyMarketAllowed"`
+	SpotTradingAllowed         bool     `json:"isSpotTradingAllowed"`
+	MarginTradingAllowed       bool     `json:"isMarginTradingAllowed"`
+	Permissions                []string `json:"permissions"`
+}
+
+func (s *symbolInfo) ToMarket() types.Market {
+	return types.Market{
+		Symbol:          s.Symbol,
+		LocalSymbol:     s.Symbol,
+		PricePrecision:  s.QuotePrecision, // Or quoteAssetPrecision?
+		VolumePrecision: s.BaseAssetPrecision,
+		QuoteCurrency:   s.QuoteAsset,
+		BaseCurrency:    s.BaseAsset,
+		MinNotional:     fixedpoint.NewFromInt(5),
+	}
+}
+
+type exchangeInfo struct {
+	Symbols []symbolInfo `json:"symbols"`
+}
+
+/*{"timezone":"CST","serverTime":1652948144443,"rateLimits":[],"exchangeFilters":[],"symbols":[{"symbol":"TOMO3LUSDT","status":"ENABLED","baseAsset":"TOMO3L","baseAssetPrecision":2,"quoteAsset":"USDT","quotePrecision":3,"quoteAssetPrecision":3,"baseCommissionPrecision":2,"quoteCommissionPrecision":3,"orderTypes":["LIMIT","LIMIT_MAKER"],"icebergAllowed":false,"ocoAllowed":false,"quoteOrderQtyMarketAllowed":false,"isSpotTradingAllowed":true,"isMarginTradingAllowed":false,"permissions":["SPOT"],"filters":[]},{"symbol":"ALEPHUSDT","status":"ENABLED","baseAsset":"ALEPH","baseAssetPrecision":2,"quoteAsset":"USDT","quotePrecision":4,"quoteAssetPrecision":4,"baseCommissionPrecision":2,"quoteCommissionPrecision":4,"orderTypes":["LIMIT","LIMIT_MAKER"],"icebergAllowed":false,"ocoAllowed":false,"quoteOrderQtyMarketAllowed":false,"isSpotTradingAllowed":true,"isMarginTradingAllowed":false,"permissions":["SPOT"],"filters":[]}]}*/
+
+func (e *Exchange) QueryMarkets(ctx context.Context) (result types.MarketMap, err error) {
+	result = make(map[string]types.Market)
+	resp, err := e.publicRequest(ctx, "GET", "/exchangeInfo", url.Values{})
+	if err != nil {
+		log.WithError(err).Errorf("query markets failed")
+		return result, err
+	}
+	m := exchangeInfo{}
+	json.Unmarshal(resp, &m)
+	for _, mm := range m.Symbols {
+		result[mm.Symbol] = mm.ToMarket()
+	}
+	return result, err
+}
+
+type depth struct {
+	LastUpdatedId int64                `json:"lastUpdatedId"`
+	Bids          [][]fixedpoint.Value `json:"bids"`
+	Asks          [][]fixedpoint.Value `json:"asks"`
+}
+
+// MEXC doesn't have a way to query open orders' snapshot
+// Only has different depths of aggregated orders
+func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
+	v := url.Values{}
+	v.Set("symbol", symbol)
+	//v.Set("limit", 100)  // default: 100, max: 5000
+	resp, err := e.publicRequest(ctx, "GET", "/depth", v)
+	if err != nil {
+		log.WithError(err).Errorf("query open orders failed")
+		return orders, err
+	}
+	d := depth{}
+	json.Unmarshal(resp, &d)
+	for _, pv := range d.Bids {
+		order := types.Order{
+			SubmitOrder: types.SubmitOrder{
+				Symbol:   symbol,
+				Side:     types.SideTypeBuy,
+				Quantity: pv[1],
+				Price:    pv[0],
+			},
+			Exchange: types.ExchangeMEXC,
+		}
+		orders = append(orders, order)
+	}
+
+	for _, pv := range d.Asks {
+		order := types.Order{
+			SubmitOrder: types.SubmitOrder{
+				Symbol:   symbol,
+				Side:     types.SideTypeSell,
+				Quantity: pv[1],
+				Price:    pv[0],
+			},
+			Exchange: types.ExchangeMEXC,
+		}
+		orders = append(orders, order)
+	}
+	return orders, nil
+}
+
+func FromInterval(in types.Interval) string {
+	switch in {
+	case types.Interval1m, types.Interval5m, types.Interval15m, types.Interval30m, types.Interval4h, types.Interval8h, types.Interval1d, types.Interval1M:
+		return string(in)
+	case types.Interval1h:
+		return "60m"
+	default:
+		panic("interval not supported.")
+	}
+}
+
+func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) (result []types.KLine, err error) {
+	v := url.Values{}
+	v.Set("symbol", symbol)
+	v.Set("interval", FromInterval(interval))
+	if options.Limit > 0 {
+		v.Set("limit", strconv.Itoa(options.Limit))
+	}
+	if options.StartTime != nil {
+		v.Set("startTime", strconv.FormatInt(options.StartTime.UnixMilli(), 10))
+	}
+	if options.EndTime != nil {
+		v.Set("endTime", strconv.FormatInt(options.EndTime.UnixMilli(), 10))
+	}
+	resp, err := e.publicRequest(ctx, "GET", "/klines", v)
+	if err != nil {
+		log.WithError(err).Errorf("query klines failed")
+		return result, err
+	}
+	k := [][]fixedpoint.Value{}
+	json.Unmarshal(resp, &k)
+
+	// last kline will be in the end
+	for i := len(k) - 1; i >= 0; i-- {
+		kk := k[i]
+		kline := types.KLine{
+			Exchange:    types.ExchangeMEXC,
+			Interval:    interval,
+			Symbol:      symbol,
+			StartTime:   types.Time(types.NewMillisecondTimestampFromInt(kk[0].Int64())),
+			Open:        kk[1],
+			High:        kk[2],
+			Low:         kk[3],
+			Close:       kk[4],
+			Volume:      kk[5],
+			EndTime:     types.Time(types.NewMillisecondTimestampFromInt(kk[6].Int64())),
+			QuoteVolume: kk[7],
+		}
+		result = append(result, kline)
+	}
+	return result, nil
+}
+
 /*
-func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[string]types.Ticker, error) {
-}
-
-func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
-}
-
 func (e *Exchange) NewStream() types.Stream {
 }
 
 func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.Order, error) {
-}
-
-func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, error) {
 }
 
 func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, util time.Time, lastOrderID uint64) ([]types.Order, error) {
@@ -225,9 +405,6 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 }
 
 func (e *Exchange) QueryRewards(ctx context.Context, startTime time.Time) ([]types.Reward, error) {
-}
-
-func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
 }
 
 var _ types.Exchange = &Exchange{}*/
