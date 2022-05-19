@@ -79,7 +79,7 @@ func (p *Position) CsvRecords() [][]string {
 	return [][]string{
 		{
 			p.Symbol,
-			p.ChangedAt.Format(time.RFC1123),
+			p.ChangedAt.UTC().Format(time.RFC1123),
 			p.AverageCost.String(),
 			p.Base.String(),
 			p.Quote.String(),
