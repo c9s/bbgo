@@ -10,6 +10,7 @@ import (
 
 type SelectorConfig struct {
 	Type   string           `json:"type" yaml:"type"`
+	Label  string           `json:"label,omitempty" yaml:"label,omitempty"`
 	Path   string           `json:"path" yaml:"path"`
 	Values []string         `json:"values,omitempty" yaml:"values,omitempty"`
 	Min    fixedpoint.Value `json:"min,omitempty" yaml:"min,omitempty"`
