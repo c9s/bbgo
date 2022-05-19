@@ -372,7 +372,6 @@ var BacktestCmd = &cobra.Command{
 			defer func() { _ = ordersTsv.Close() }()
 			_ = ordersTsv.Write(types.Order{}.CsvHeader())
 
-			defer ordersTsv.Flush()
 			for _, exSource := range exchangeSources {
 				exSource.Session.UserDataStream.OnOrderUpdate(func(order types.Order) {
 					if order.Status == types.OrderStatusFilled {
@@ -463,14 +462,17 @@ var BacktestCmd = &cobra.Command{
 		}
 
 		allKLineIntervals := map[types.Interval]struct{}{}
+		for _, interval := range backTestIntervals {
+			allKLineIntervals[interval] = struct{}{}
+		}
+
 		for _, session := range environ.Sessions() {
 			for _, sub := range session.Subscriptions {
 				if sub.Channel == types.KLineChannel {
-					allKLineIntervals[types.Interval(sub.Options.Interval)] = struct{}{}
+					allKLineIntervals[sub.Options.Interval] = struct{}{}
 				}
 			}
 		}
-
 		for interval := range allKLineIntervals {
 			summaryReport.Intervals = append(summaryReport.Intervals, interval)
 		}
@@ -584,7 +586,7 @@ func createSymbolReport(userConfig *bbgo.Config, session *bbgo.ExchangeSession, 
 	sessionKLineIntervals := map[types.Interval]struct{}{}
 	for _, sub := range session.Subscriptions {
 		if sub.Channel == types.KLineChannel {
-			sessionKLineIntervals[types.Interval(sub.Options.Interval)] = struct{}{}
+			sessionKLineIntervals[sub.Options.Interval] = struct{}{}
 		}
 	}
 
