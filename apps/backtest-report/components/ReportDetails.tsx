@@ -235,7 +235,7 @@ const ReportDetails = (props: ReportDetailsProps) => {
         {
           reportSummary.symbols.map((symbol: string, i: number) => {
             return <TradingViewChart key={i} basePath={props.basePath} runID={props.runID} reportSummary={reportSummary}
-                                     symbol={symbol} intervals={["1m", "5m", "1h"]}/>
+                                     symbol={symbol}/>
           })
         }
       </div>
