@@ -74,7 +74,7 @@ func (s *Strategy) Validate() error {
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	for _, symbol := range s.getSymbols() {
-		session.Subscribe(types.KLineChannel, symbol, types.SubscribeOptions{Interval: s.Interval.String()})
+		session.Subscribe(types.KLineChannel, symbol, types.SubscribeOptions{Interval: s.Interval})
 	}
 }
 

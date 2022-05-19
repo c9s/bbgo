@@ -202,14 +202,14 @@ func (s *Strategy) Validate() error {
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
-	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: string(s.Interval)})
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
 
 	if s.TriggerMovingAverage != zeroiw {
-		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: string(s.TriggerMovingAverage.Interval)})
+		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.TriggerMovingAverage.Interval})
 	}
 
 	if s.LongTermMovingAverage != zeroiw {
-		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: string(s.LongTermMovingAverage.Interval)})
+		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.LongTermMovingAverage.Interval})
 	}
 }
 

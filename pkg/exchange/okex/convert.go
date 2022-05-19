@@ -17,7 +17,7 @@ func toGlobalSymbol(symbol string) string {
 	return strings.ReplaceAll(symbol, "-", "")
 }
 
-////go:generate sh -c "echo \"package okex\nvar spotSymbolMap = map[string]string{\n\" $(curl -s -L 'https://okex.com/api/v5/public/instruments?instType=SPOT' | jq -r '.data[] | \"\\(.instId | sub(\"-\" ; \"\") | tojson ): \\( .instId | tojson),\n\"') \"\n}\" > symbols.go"
+// //go:generate sh -c "echo \"package okex\nvar spotSymbolMap = map[string]string{\n\" $(curl -s -L 'https://okex.com/api/v5/public/instruments?instType=SPOT' | jq -r '.data[] | \"\\(.instId | sub(\"-\" ; \"\") | tojson ): \\( .instId | tojson),\n\"') \"\n}\" > symbols.go"
 //go:generate go run gensymbols.go
 func toLocalSymbol(symbol string) string {
 	if s, ok := spotSymbolMap[symbol]; ok {
@@ -68,18 +68,19 @@ var CandleChannels = []string{
 	"candle30m", "candle15m", "candle5m", "candle3m", "candle1m",
 }
 
-func convertIntervalToCandle(interval string) string {
-	switch interval {
+func convertIntervalToCandle(interval types.Interval) string {
+	s := interval.String()
+	switch s {
 
 	case "1h", "2h", "4h", "6h", "12h", "1d", "3d":
-		return "candle" + strings.ToUpper(interval)
+		return "candle" + strings.ToUpper(s)
 
 	case "1m", "5m", "15m", "30m":
-		return "candle" + interval
+		return "candle" + s
 
 	}
 
-	return "candle" + interval
+	return "candle" + s
 }
 
 func convertSubscription(s types.Subscription) (WebsocketSubscription, error) {
@@ -270,7 +271,7 @@ func toGlobalOrderType(orderType okexapi.OrderType) (types.OrderType, error) {
 	return "", fmt.Errorf("unknown or unsupported okex order type: %s", orderType)
 }
 
-func toLocalInterval(src string, ) string {
+func toLocalInterval(src string) string {
 	var re = regexp.MustCompile("\\d+[hdw]")
 	return re.ReplaceAllStringFunc(src, func(w string) string {
 		return strings.ToUpper(w)
