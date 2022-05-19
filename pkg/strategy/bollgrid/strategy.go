@@ -108,10 +108,10 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	}
 
 	// currently we need the 1m kline to update the last close price and indicators
-	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval.String()})
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
 
 	if len(s.RepostInterval) > 0 && s.Interval != s.RepostInterval {
-		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.RepostInterval.String()})
+		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.RepostInterval})
 	}
 }
 

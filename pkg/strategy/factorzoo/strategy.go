@@ -3,11 +3,13 @@ package factorzoo
 import (
 	"context"
 	"fmt"
+
+	"github.com/sajari/regression"
+	"github.com/sirupsen/logrus"
+
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/sajari/regression"
-	"github.com/sirupsen/logrus"
 )
 
 const ID = "factorzoo"
@@ -57,7 +59,7 @@ func (s *Strategy) ID() string {
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	log.Infof("subscribe %s", s.Symbol)
-	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval.String()})
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
 }
 
 func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Value) error {
@@ -85,7 +87,7 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 		Market:   s.Market,
 	}
 
-	//s.Notify("Submitting %s %s order to close position by %v", s.Symbol, side.String(), percentage, submitOrder)
+	// s.Notify("Submitting %s %s order to close position by %v", s.Symbol, side.String(), percentage, submitOrder)
 
 	createdOrders, err := s.session.Exchange.SubmitOrders(ctx, submitOrder)
 	if err != nil {
@@ -99,13 +101,13 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 
 func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExecutor, er fixedpoint.Value) {
 
-	//if s.prevER.Sign() < 0 && er.Sign() > 0 {
+	// if s.prevER.Sign() < 0 && er.Sign() > 0 {
 	if er.Sign() >= 0 {
 		submitOrder := types.SubmitOrder{
 			Symbol:   s.Symbol,
 			Side:     types.SideTypeBuy,
 			Type:     types.OrderTypeMarket,
-			Quantity: s.Quantity, //er.Abs().Mul(fixedpoint.NewFromInt(20)),
+			Quantity: s.Quantity, // er.Abs().Mul(fixedpoint.NewFromInt(20)),
 		}
 		createdOrders, err := orderExecutor.SubmitOrders(ctx, submitOrder)
 		if err != nil {
@@ -113,13 +115,13 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 		}
 		s.orderStore.Add(createdOrders...)
 		s.activeMakerOrders.Add(createdOrders...)
-		//} else if s.prevER.Sign() > 0 && er.Sign() < 0 {
+		// } else if s.prevER.Sign() > 0 && er.Sign() < 0 {
 	} else {
 		submitOrder := types.SubmitOrder{
 			Symbol:   s.Symbol,
 			Side:     types.SideTypeSell,
 			Type:     types.OrderTypeMarket,
-			Quantity: s.Quantity, //er.Abs().Mul(fixedpoint.NewFromInt(20)),
+			Quantity: s.Quantity, // er.Abs().Mul(fixedpoint.NewFromInt(20)),
 		}
 		createdOrders, err := orderExecutor.SubmitOrders(ctx, submitOrder)
 		if err != nil {
@@ -144,13 +146,13 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.pvDivergence = &Correlation{IntervalWindow: iw}
 	// bind indicator to the data store, so that our callback could be triggered
 	s.pvDivergence.Bind(st)
-	//s.pvDivergence.OnUpdate(func(corr float64) {
+	// s.pvDivergence.OnUpdate(func(corr float64) {
 	//	//fmt.Printf("now we've got corr: %f\n", corr)
-	//})
+	// })
 
 	s.Alpha = [][]float64{{}, {}, {}, {}, {}}
 	s.Ret = []float64{}
-	//thetas := []float64{0, 0, 0, 0}
+	// thetas := []float64{0, 0, 0, 0}
 	preCompute := 0
 
 	s.activeMakerOrders = bbgo.NewLocalActiveOrderBook(s.Symbol)
@@ -198,7 +200,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.Alpha[3] = append(s.Alpha[3], mom.Float64())
 		s.Alpha[4] = append(s.Alpha[4], ogap.Float64())
 
-		//s.Alpha[5] = append(s.Alpha[4], 1.0) // constant
+		// s.Alpha[5] = append(s.Alpha[4], 1.0) // constant
 
 		ret := kline.Close.Sub(s.prevClose).Div(s.prevClose).Float64()
 		s.Ret = append(s.Ret, ret)
@@ -231,7 +233,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			r.Train(rdp...)
 			r.Run()
 			fmt.Printf("Regression formula:\n%v\n", r.Formula)
-			//prediction := r.Coeff(0)*corr.Float64() + r.Coeff(1)*rev.Float64() + r.Coeff(2)*factorzoo.Float64() + r.Coeff(3)*mom.Float64() + r.Coeff(4)
+			// prediction := r.Coeff(0)*corr.Float64() + r.Coeff(1)*rev.Float64() + r.Coeff(2)*factorzoo.Float64() + r.Coeff(3)*mom.Float64() + r.Coeff(4)
 			prediction, _ := r.Predict([]float64{corr.Float64(), rev.Float64(), a150.Float64(), mom.Float64(), ogap.Float64()})
 			log.Infof("Predicted Return: %f", prediction)
 

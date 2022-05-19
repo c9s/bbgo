@@ -35,6 +35,7 @@ type SummaryReport struct {
 	EndTime              time.Time        `json:"endTime"`
 	Sessions             []string         `json:"sessions"`
 	Symbols              []string         `json:"symbols"`
+	Intervals            []types.Interval `json:"intervals"`
 	InitialTotalBalances types.BalanceMap `json:"initialTotalBalances"`
 	FinalTotalBalances   types.BalanceMap `json:"finalTotalBalances"`
 
@@ -48,6 +49,8 @@ type SummaryReport struct {
 type SessionSymbolReport struct {
 	Exchange        types.ExchangeName        `json:"exchange"`
 	Symbol          string                    `json:"symbol,omitempty"`
+	Intervals       []types.Interval          `json:"intervals,omitempty"`
+	Subscriptions   []types.Subscription      `json:"subscriptions"`
 	Market          types.Market              `json:"market"`
 	LastPrice       fixedpoint.Value          `json:"lastPrice,omitempty"`
 	StartPrice      fixedpoint.Value          `json:"startPrice,omitempty"`
