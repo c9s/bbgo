@@ -17,6 +17,9 @@ OSX_APP_GUI ?= webview
 
 FRONTEND_EXPORT_DIR = frontend/out
 
+BACKTEST_REPORT_APP_DIR = apps/backtest-report
+BACKTEST_REPORT_EXPORT_DIR = apps/backtest-report/out
+
 all: bbgo-linux bbgo-darwin
 
 $(BIN_DIR):
@@ -229,10 +232,18 @@ frontend/out/index.html: frontend/node_modules
 pkg/server/assets.go: frontend/out/index.html
 	go run ./util/embed -package server -output $@ $(FRONTEND_EXPORT_DIR)
 
-embed: pkg/server/assets.go
+$(BACKTEST_REPORT_APP_DIR)/node_modules:
+	cd $(BACKTEST_REPORT_APP_DIR) && yarn install
 
-static: frontend/out/index.html pkg/server/assets.go
+$(BACKTEST_REPORT_APP_DIR)/out/index.html: $(BACKTEST_REPORT_APP_DIR)/node_modules
+	cd $(BACKTEST_REPORT_APP_DIR) && yarn build && yarn export
 
+pkg/backtest/assets.go: $(BACKTEST_REPORT_APP_DIR)/out/index.html
+	go run ./util/embed -package backtest -output $@ $(BACKTEST_REPORT_EXPORT_DIR)
+
+embed: pkg/server/assets.go pkg/backtest/assets.go
+
+static: frontend/out/index.html pkg/server/assets.go pkg/backtest/assets.go
 
 PROTOS := \
 	$(wildcard pkg/pb/*.proto)
