@@ -1,6 +1,7 @@
 package optimizer
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 
@@ -17,6 +18,7 @@ var TotalProfitMetricValueFunc = func(summaryReport *backtest.SummaryReport) fix
 }
 
 type Metric struct {
+	Labels []string         `json:"labels,omitempty"`
 	Params []interface{}    `json:"params,omitempty"`
 	Value  fixedpoint.Value `json:"value,omitempty"`
 }
@@ -24,6 +26,7 @@ type Metric struct {
 type GridOptimizer struct {
 	Config *Config
 
+	ParamLabels   []string
 	CurrentParams []interface{}
 }
 
@@ -31,10 +34,17 @@ func (o *GridOptimizer) buildOps() []OpFunc {
 	var ops []OpFunc
 
 	o.CurrentParams = make([]interface{}, len(o.Config.Matrix))
+	o.ParamLabels = make([]string, len(o.Config.Matrix))
 
 	for i, selector := range o.Config.Matrix {
 		var path = selector.Path
 		var ii = i // copy variable because we need to use them in the closure
+
+		if selector.Label != "" {
+			o.ParamLabels[ii] = selector.Label
+		} else {
+			o.ParamLabels[ii] = selector.Path
+		}
 
 		switch selector.Type {
 		case "range":
@@ -52,7 +62,7 @@ func (o *GridOptimizer) buildOps() []OpFunc {
 
 			f := func(configJson []byte, next func(configJson []byte) error) error {
 				for _, val := range values {
-					jsonOp := []byte(fmt.Sprintf(`[ {"op": "replace", "path": "%s", "value": %v } ]`, path, val))
+					jsonOp := []byte(reformatJson(fmt.Sprintf(`[{"op": "replace", "path": "%s", "value": %v }]`, path, val)))
 					patch, err := jsonpatch.DecodePatch(jsonOp)
 					if err != nil {
 						return err
@@ -82,7 +92,7 @@ func (o *GridOptimizer) buildOps() []OpFunc {
 				for _, val := range values {
 					log.Debugf("%d %s: %v of %v", ii, path, val, values)
 
-					jsonOp := []byte(fmt.Sprintf(`[{"op": "replace", "path": "%s", "value": "%s"}]`, path, val))
+					jsonOp := []byte(reformatJson(fmt.Sprintf(`[{"op": "replace", "path": "%s", "value": "%s"}]`, path, val)))
 					patch, err := jsonpatch.DecodePatch(jsonOp)
 					if err != nil {
 						return err
@@ -122,12 +132,12 @@ func (o *GridOptimizer) Run(executor Executor, configJson []byte) ([]Metric, err
 			return err
 		}
 
-		// TODO: Add other metric value function
+		// TODO: Add more metric value function
 		metricValue := TotalProfitMetricValueFunc(summaryReport)
 
-		// TODO: replace this with a local variable and return it as a function result
 		metrics = append(metrics, Metric{
 			Params: o.CurrentParams,
+			Labels: o.ParamLabels,
 			Value:  metricValue,
 		})
 
@@ -157,4 +167,15 @@ func (o *GridOptimizer) Run(executor Executor, configJson []byte) ([]Metric, err
 		return a.Compare(b) > 0
 	})
 	return metrics, err
+}
+
+func reformatJson(text string) string {
+	var a interface{}
+	var err = json.Unmarshal([]byte(text), &a)
+	if err != nil {
+		return "{invalid json}"
+	}
+
+	out, _ := json.MarshalIndent(a, "", "  ")
+	return string(out)
 }
