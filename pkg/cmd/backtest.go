@@ -372,7 +372,6 @@ var BacktestCmd = &cobra.Command{
 			defer func() { _ = ordersTsv.Close() }()
 			_ = ordersTsv.Write(types.Order{}.CsvHeader())
 
-			defer ordersTsv.Flush()
 			for _, exSource := range exchangeSources {
 				exSource.Session.UserDataStream.OnOrderUpdate(func(order types.Order) {
 					if order.Status == types.OrderStatusFilled {
