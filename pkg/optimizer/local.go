@@ -44,8 +44,7 @@ func (e *LocalProcessExecutor) Execute(configJson []byte) error {
 	}
 
 	c := exec.Command(e.Bin, "backtest", "--config", tf.Name(), "--output", e.OutputDir, "--subdir")
-	log.Infof("cmd: %+v", c)
-
+	// c.Output()
 	if e.CombineOutput {
 		c.Stdout = os.Stdout
 		c.Stderr = os.Stderr

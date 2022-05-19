@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
@@ -59,7 +61,6 @@ func (b Balance) String() (o string) {
 
 	return o
 }
-
 
 type BalanceSnapshot struct {
 	Balances BalanceMap `json:"balances"`
@@ -191,15 +192,16 @@ func (m BalanceMap) Print() {
 			continue
 		}
 
-		fmt.Printf(" %s: %v", balance.Currency, balance.Available)
+		o := fmt.Sprintf(" %s: %v", balance.Currency, balance.Available)
 		if balance.Locked.Sign() > 0 {
-			fmt.Printf(" (locked %v)", balance.Locked)
+			o += fmt.Sprintf(" (locked %v)", balance.Locked)
 		}
 
 		if balance.Borrowed.Sign() > 0 {
-			fmt.Printf(" (borrowed %v)", balance.Borrowed)
+			o += fmt.Sprintf(" (borrowed %v)", balance.Borrowed)
 		}
-		fmt.Println()
+
+		log.Infoln(o)
 	}
 }
 
