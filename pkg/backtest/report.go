@@ -48,6 +48,17 @@ type SummaryReport struct {
 	Manifests Manifests `json:"manifests,omitempty"`
 }
 
+func ReadSummaryReport(filename string) (*SummaryReport, error) {
+	o, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	var report SummaryReport
+	err = json.Unmarshal(o, &report)
+	return &report, err
+}
+
 // SessionSymbolReport is the report per exchange session
 // trades are merged, collected and re-calculated
 type SessionSymbolReport struct {

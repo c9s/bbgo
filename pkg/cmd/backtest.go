@@ -452,13 +452,6 @@ var BacktestCmd = &cobra.Command{
 			finalTotalBalances = finalTotalBalances.Add(finalBalances)
 		}
 
-		color.Green("BACK-TEST REPORT")
-		color.Green("===============================================\n")
-		color.Green("START TIME: %s\n", startTime.Format(time.RFC1123))
-		color.Green("END TIME: %s\n", endTime.Format(time.RFC1123))
-		color.Green("INITIAL TOTAL BALANCE: %v\n", initTotalBalances)
-		color.Green("FINAL TOTAL BALANCE: %v\n", finalTotalBalances)
-
 		summaryReport := &backtest.SummaryReport{
 			StartTime:            startTime,
 			EndTime:              endTime,
@@ -526,6 +519,13 @@ var BacktestCmd = &cobra.Command{
 				}
 			}
 		} else {
+			color.Green("BACK-TEST REPORT")
+			color.Green("===============================================\n")
+			color.Green("START TIME: %s\n", startTime.Format(time.RFC1123))
+			color.Green("END TIME: %s\n", endTime.Format(time.RFC1123))
+			color.Green("INITIAL TOTAL BALANCE: %v\n", initTotalBalances)
+			color.Green("FINAL TOTAL BALANCE: %v\n", finalTotalBalances)
+
 			for _, symbolReport := range summaryReport.SymbolReports {
 				symbolReport.Print(wantBaseAssetBaseline)
 			}

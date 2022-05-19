@@ -12,6 +12,25 @@ type ManifestEntry struct {
 
 type Manifests map[InstancePropertyIndex]string
 
+func (m *Manifests) UnmarshalJSON(j []byte) error {
+	var entries []ManifestEntry
+	if err := json.Unmarshal(j, &entries); err != nil {
+		return err
+	}
+
+	mm := make(Manifests)
+	for _, entry := range entries {
+		index := InstancePropertyIndex{
+			ID:         entry.StrategyID,
+			InstanceID: entry.StrategyInstance,
+			Property:   entry.StrategyProperty,
+		}
+		mm[index] = entry.Filename
+	}
+	*m = mm
+	return nil
+}
+
 func (m Manifests) MarshalJSON() ([]byte, error) {
 	var arr []ManifestEntry
 	for k, v := range m {
