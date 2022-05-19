@@ -25,8 +25,6 @@ type GridOptimizer struct {
 	Config *Config
 
 	CurrentParams []interface{}
-
-	Metrics []Metric
 }
 
 func (o *GridOptimizer) buildOps() []OpFunc {
@@ -112,8 +110,10 @@ func (o *GridOptimizer) buildOps() []OpFunc {
 	return ops
 }
 
-func (o *GridOptimizer) Run(executor Executor, configJson []byte) error {
+func (o *GridOptimizer) Run(executor Executor, configJson []byte) ([]Metric, error) {
 	o.CurrentParams = make([]interface{}, len(o.Config.Matrix))
+
+	var metrics []Metric
 
 	var ops = o.buildOps()
 	var app = func(configJson []byte, next func(configJson []byte) error) error {
@@ -126,7 +126,7 @@ func (o *GridOptimizer) Run(executor Executor, configJson []byte) error {
 		metricValue := TotalProfitMetricValueFunc(summaryReport)
 
 		// TODO: replace this with a local variable and return it as a function result
-		o.Metrics = append(o.Metrics, Metric{
+		metrics = append(metrics, Metric{
 			Params: o.CurrentParams,
 			Value:  metricValue,
 		})
@@ -151,12 +151,10 @@ func (o *GridOptimizer) Run(executor Executor, configJson []byte) error {
 
 	err := wrapper(configJson)
 
-	// sort metrics
-	sort.Slice(o.Metrics, func(i, j int) bool {
-		a := o.Metrics[i].Value
-		b := o.Metrics[j].Value
+	sort.Slice(metrics, func(i, j int) bool {
+		a := metrics[i].Value
+		b := metrics[j].Value
 		return a.Compare(b) > 0
 	})
-	log.Infof("metrics: %+v", o.Metrics)
-	return err
+	return metrics, err
 }

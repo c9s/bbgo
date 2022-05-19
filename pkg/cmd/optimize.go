@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"os"
 
@@ -15,6 +16,7 @@ import (
 func init() {
 	optimizeCmd.Flags().String("optimizer-config", "optimizer.yaml", "config file")
 	optimizeCmd.Flags().String("output", "output", "backtest report output directory")
+	optimizeCmd.Flags().Bool("json", false, "print optimizer metrics in json format")
 	RootCmd.AddCommand(optimizeCmd)
 }
 
@@ -32,6 +34,11 @@ var optimizeCmd = &cobra.Command{
 		}
 
 		configFile, err := cmd.Flags().GetString("config")
+		if err != nil {
+			return err
+		}
+
+		printJsonFormat, err := cmd.Flags().GetBool("json")
 		if err != nil {
 			return err
 		}
@@ -83,6 +90,25 @@ var optimizeCmd = &cobra.Command{
 			Config: optConfig,
 		}
 
-		return optz.Run(executor, configJson)
+		metrics, err := optz.Run(executor, configJson)
+		if err != nil {
+			return err
+		}
+
+		if printJsonFormat {
+			out, err := json.MarshalIndent(metrics, "", "  ")
+			if err != nil {
+				return err
+			}
+
+			// print metrics JSON to stdout
+			fmt.Println(string(out))
+		} else {
+			for _, m := range metrics {
+				fmt.Printf("%v => %v\n", m.Params, m.Value)
+			}
+		}
+
+		return nil
 	},
 }
