@@ -83,16 +83,7 @@ func NewExchange(sourceName types.ExchangeName, sourceExchange types.Exchange, s
 		endTime = time.Now()
 	}
 
-	configAccount, ok := config.Accounts[sourceName.String()]
-	if !ok {
-		// fallback to the legacy account syntax
-		configAccount, ok = config.Account[sourceName.String()]
-		if !ok {
-			return nil, fmt.Errorf("config backtest.accounts[%s] is not defined, please check your config file.", sourceName.String())
-		} else {
-			log.Warnf("config backtest.account is deprecated, please use backtest.accounts instead.")
-		}
-	}
+	configAccount := config.GetAccount(sourceName.String())
 
 	account := &types.Account{
 		MakerFeeRate: configAccount.MakerFeeRate,
