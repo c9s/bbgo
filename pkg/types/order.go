@@ -233,7 +233,7 @@ func (o Order) CsvHeader() []string {
 func (o Order) CsvRecords() [][]string {
 	return [][]string{
 		{
-			o.UpdateTime.Time().Format(time.RFC1123),
+			o.UpdateTime.Time().UTC().Format(time.RFC1123),
 			strconv.FormatUint(o.OrderID, 10),
 			o.Symbol,
 			string(o.Side),
