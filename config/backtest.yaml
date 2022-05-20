@@ -1,0 +1,23 @@
+---
+backtest:
+  startTime: "2022-01-01"
+  endTime: "2022-01-02"
+  symbols:
+  - BTCUSDT
+  sessions:
+  - binance
+  - ftx
+  - max
+  - kucoin
+  - okex
+
+exchangeStrategies:
+- on: binance
+  grid:
+    symbol: BTCUSDT
+    quantity: 0.001
+    gridNumber: 100
+    profitSpread: 1000.0  # The profit price spread that you want to add to your sell order when your buy order is executed
+    upperPrice: 40_000.0
+    lowerPrice: 20_000.0
+
