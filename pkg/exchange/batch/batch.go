@@ -13,6 +13,8 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+var log = logrus.WithField("component", "batch")
+
 type KLineBatchQuery struct {
 	types.Exchange
 }
@@ -27,6 +29,8 @@ func (e KLineBatchQuery) Query(ctx context.Context, symbol string, interval type
 
 		var tryQueryKlineTimes = 0
 		for startTime.Before(endTime) {
+			log.Debugf("batch query klines %s %s %s <=> %s", symbol, interval, startTime, endTime)
+
 			kLines, err := e.QueryKLines(ctx, symbol, interval, types.KLineQueryOptions{
 				StartTime: &startTime,
 				EndTime:   &endTime,
@@ -113,10 +117,10 @@ func (q *RewardBatchQuery) Query(ctx context.Context, startTime, endTime time.Ti
 
 		for startTime.Before(endTime) {
 			if err := limiter.Wait(ctx); err != nil {
-				logrus.WithError(err).Error("rate limit error")
+				log.WithError(err).Error("rate limit error")
 			}
 
-			logrus.Infof("batch querying rewards %s <=> %s", startTime, endTime)
+			log.Infof("batch querying rewards %s <=> %s", startTime, endTime)
 
 			rewards, err := q.Service.QueryRewards(ctx, startTime)
 			if err != nil {
