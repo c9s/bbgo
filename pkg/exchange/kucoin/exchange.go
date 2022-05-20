@@ -17,9 +17,9 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-var marketDataLimiter = rate.NewLimiter(rate.Every(5*time.Second), 1)
-var queryTradeLimiter = rate.NewLimiter(rate.Every(5*time.Second), 1)
-var queryOrderLimiter = rate.NewLimiter(rate.Every(5*time.Second), 1)
+var marketDataLimiter = rate.NewLimiter(rate.Every(6*time.Second), 1)
+var queryTradeLimiter = rate.NewLimiter(rate.Every(6*time.Second), 1)
+var queryOrderLimiter = rate.NewLimiter(rate.Every(6*time.Second), 1)
 
 var ErrMissingSequence = errors.New("sequence is missing")
 

@@ -18,7 +18,7 @@ type marketRequest struct {
 supported resolutions: window length in seconds. options: 15, 60, 300, 900, 3600, 14400, 86400
 doc: https://docs.ftx.com/?javascript#get-historical-prices
 */
-func (r *marketRequest) HistoricalPrices(ctx context.Context, market string, interval types.Interval, limit int64, start, end time.Time) (HistoricalPricesResponse, error) {
+func (r *marketRequest) HistoricalPrices(ctx context.Context, market string, interval types.Interval, limit int64, start, end *time.Time) (HistoricalPricesResponse, error) {
 	q := map[string]string{
 		"resolution": strconv.FormatInt(int64(interval.Minutes())*60, 10),
 	}
@@ -27,11 +27,11 @@ func (r *marketRequest) HistoricalPrices(ctx context.Context, market string, int
 		q["limit"] = strconv.FormatInt(limit, 10)
 	}
 
-	if start != (time.Time{}) {
+	if start != nil {
 		q["start_time"] = strconv.FormatInt(start.Unix(), 10)
 	}
 
-	if end != (time.Time{}) {
+	if end != nil {
 		q["end_time"] = strconv.FormatInt(end.Unix(), 10)
 	}
 

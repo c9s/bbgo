@@ -34,9 +34,10 @@ func (s *BacktestService) SyncKLineByInterval(ctx context.Context, exchange type
 		if err := s.BatchInsert(klines); err != nil {
 			return err
 		}
+		
 		count += len(klines)
 	}
-	log.Infof("found %s kline %s data count: %d", symbol, interval.String(), count)
+	log.Debugf("inserted klines %s %s data: %d", symbol, interval.String(), count)
 
 	if err := <-errC; err != nil {
 		return err
@@ -344,13 +345,17 @@ func (s *BacktestService) SyncExist(ctx context.Context, exchange types.Exchange
 	for k := range klineC {
 		if nowStartTime.Unix() < k.StartTime.Unix() {
 			log.Infof("syncing %s interval %s syncing %s ~ %s ", symbol, interval, nowStartTime, k.EndTime)
-			s.Sync(ctx, exchange, symbol, nowStartTime, k.EndTime.Time().Add(-1*interval.Duration()), interval)
+			if err := s.Sync(ctx, exchange, symbol, nowStartTime, k.EndTime.Time().Add(-1*interval.Duration()), interval); err != nil {
+				log.WithError(err).Errorf("sync error")
+			}
 		}
 		nowStartTime = k.StartTime.Time().Add(interval.Duration())
 	}
 
 	if nowStartTime.Unix() < endTime.Unix() && nowStartTime.Unix() < time.Now().Unix() {
-		s.Sync(ctx, exchange, symbol, nowStartTime, endTime, interval)
+		if err := s.Sync(ctx, exchange, symbol, nowStartTime, endTime, interval); err != nil {
+			log.WithError(err).Errorf("sync error")
+		}
 	}
 
 	if err := <-errC; err != nil {

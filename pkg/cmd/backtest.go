@@ -391,13 +391,7 @@ var BacktestCmd = &cobra.Command{
 			var numOfExchangeSources = len(exchangeSources)
 			if numOfExchangeSources == 1 {
 				exSource := exchangeSources[0]
-				var lastk types.KLine
 				for k := range exSource.C {
-					// avoid duplicated klines
-					if k == lastk {
-						continue
-					}
-
 					exSource.Exchange.ConsumeKLine(k)
 
 					for _, h := range kLineHandlers {
