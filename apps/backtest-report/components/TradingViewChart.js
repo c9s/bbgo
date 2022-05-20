@@ -398,14 +398,18 @@ const TradingViewChart = (props) => {
       if (chartData.positionHistory) {
         const lineSeries = chart.current.addLineSeries();
         const costLine = positionAverageCostHistoryToLineData(currentInterval, chartData.positionHistory);
-        lineSeries.setData(costLine);
+        const costLineIdx = {}
+        const costLineDeduplicated = costLine.filter( v => { const exists = costLineIdx[v.time]; costLineIdx[v.time] = v.value; return !exists  });
+        lineSeries.setData(costLineDeduplicated);
 
         const baseLineSeries = chart.current.addLineSeries({
           priceScaleId: 'left',
           color: '#98338C',
         });
         const baseLine = positionBaseHistoryToLineData(currentInterval, chartData.positionHistory)
-        baseLineSeries.setData(baseLine);
+        const baseLineIdx = {}
+        const baseLineDeduplicated = baseLine.filter( v => { const exists = baseLineIdx[v.time]; baseLineIdx[v.time] = v.value; return !exists  });
+        baseLineSeries.setData(baseLineDeduplicated);
       }
 
       chart.current.timeScale().fitContent();
