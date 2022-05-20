@@ -61,9 +61,9 @@ func Test_Markets(t *testing.T) {
 	assert.Equal(t, markets["MXUSDT"].VolumePrecision, 2)
 }
 
-func Test_OpenOrders(t *testing.T) {
+func Test_MarketOrders(t *testing.T) {
 	ex := getExchange(t)
-	orders, err := ex.QueryOpenOrders(context.Background(), "MXUSDT")
+	orders, err := ex.QueryMarketOrders(context.Background(), "MXUSDT")
 	assert.Equal(t, err, nil)
 	assert.Equal(t, len(orders), 200)
 }
@@ -74,4 +74,20 @@ func Test_KLines(t *testing.T) {
 		types.KLineQueryOptions{})
 	assert.Equal(t, err, nil)
 	assert.Equal(t, len(klines), 500)
+}
+
+func Test_QueryOrder(t *testing.T) {
+	ex := getExchange(t)
+	order, err := ex.QueryOrder(context.Background(), types.OrderQuery{Symbol: "USTUSDT", OrderID: "156198093501521920"})
+	t.Skip("private api skip")
+	assert.Equal(t, err, nil)
+	assert.NotEqual(t, order, nil)
+}
+
+func Test_QueryOpenOrders(t *testing.T) {
+	ex := getExchange(t)
+	orders, err := ex.QueryOpenOrders(context.Background(), "USTUSDT")
+	t.Skip("private api skip")
+	assert.Equal(t, err, nil)
+	assert.Greater(t, len(orders), 0)
 }

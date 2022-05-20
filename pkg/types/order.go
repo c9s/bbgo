@@ -105,6 +105,9 @@ const (
 	// OrderStatusCanceled means the order is canceled without partially filled or filled.
 	OrderStatusCanceled OrderStatus = "CANCELED"
 
+	// OrderStatusPartiallyCanceled means the order is partially-filled, and been canceled in the end.
+	OrderStatusPartiallyCanceled OrderStatus = "PARTIALLY_CANCELED"
+
 	// OrderStatusRejected means the order is not placed successfully, it's rejected by the api
 	OrderStatusRejected OrderStatus = "REJECTED"
 )
@@ -116,9 +119,10 @@ type SubmitOrder struct {
 	Side   SideType  `json:"side" db:"side"`
 	Type   OrderType `json:"orderType" db:"order_type"`
 
-	Quantity  fixedpoint.Value `json:"quantity" db:"quantity"`
-	Price     fixedpoint.Value `json:"price" db:"price"`
-	StopPrice fixedpoint.Value `json:"stopPrice,omitempty" db:"stop_price"`
+	Quantity      fixedpoint.Value `json:"quantity" db:"quantity"`
+	QuoteOrderQty fixedpoint.Value `json:"quoteOrderQuantity" db:"quoteOrderQuantity"`
+	Price         fixedpoint.Value `json:"price" db:"price"`
+	StopPrice     fixedpoint.Value `json:"stopPrice,omitempty" db:"stop_price"`
 
 	Market Market `json:"-" db:"-"`
 
