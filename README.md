@@ -51,6 +51,8 @@ You can use BBGO's underlying common exchange API, currently it supports 4+ majo
 
 ![bbgo dashboard](assets/screenshots/dashboard.jpeg) 
 
+![bbgo backtest report](assets/screenshots/backtest-report.jpg)
+
 ## Supported Exchanges
 
 - Binance Spot Exchange (and binance.us)
