@@ -7,7 +7,6 @@ on:
     branches: [ main ]
 
 jobs:
-
   build:
     runs-on: ubuntu-latest
 
@@ -68,3 +67,9 @@ jobs:
 
     - name: TestDnum
       run: go test -tags dnum -v ./pkg/...
+
+    - name: Create dotenv file
+      run: |
+        echo "DB_DRIVER=mysql" >> .env.local
+        echo "DB_DSN=root:root@/bbgo" >> .env.local
+
