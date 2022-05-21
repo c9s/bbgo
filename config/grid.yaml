@@ -31,8 +31,8 @@ backtest:
   # for testing max draw down (MDD) at 03-12
   # see here for more details
   # https://www.investopedia.com/terms/m/maximum-drawdown-mdd.asp
-  startTime: "2022-01-10"
-  endTime: "2022-01-11"
+  startTime: "2022-05-09"
+  endTime: "2022-05-20"
   symbols:
     - BTCUSDT
   sessions: [binance]
@@ -53,9 +53,9 @@ exchangeStrategies:
     #     exp:
     #       domain: [20_000, 30_000]
     #       range: [0.2, 0.001]
-    gridNumber: 100
+    gridNumber: 30
     profitSpread: 1000.0  # The profit price spread that you want to add to your sell order when your buy order is executed
     upperPrice: 50_000.0
     lowerPrice: 20_000.0
-    long: true  # The sell order is submitted in the same order amount as the filled corresponding buy order, rather than the same quantity.
+    # long: true  # The sell order is submitted in the same order amount as the filled corresponding buy order, rather than the same quantity.
 

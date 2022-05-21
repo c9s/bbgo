@@ -220,26 +220,30 @@ type Order struct {
 
 func (o Order) CsvHeader() []string {
 	return []string{
-		"time",
 		"order_id",
 		"symbol",
 		"side",
 		"order_type",
+		"status",
 		"price",
 		"quantity",
+		"creation_time",
+		"update_time",
 	}
 }
 
 func (o Order) CsvRecords() [][]string {
 	return [][]string{
 		{
-			o.UpdateTime.Time().UTC().Format(time.RFC1123),
 			strconv.FormatUint(o.OrderID, 10),
 			o.Symbol,
 			string(o.Side),
 			string(o.Type),
+			string(o.Status),
 			o.Price.String(),
 			o.Quantity.String(),
+			o.CreationTime.Time().UTC().Format(time.RFC1123),
+			o.UpdateTime.Time().UTC().Format(time.RFC1123),
 		},
 	}
 }

@@ -118,9 +118,11 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (closedOrders *typ
 		return nil, nil, fmt.Errorf("order quantity %s is less than minQuantity %s, order: %+v", o.Quantity.String(), m.Market.MinQuantity.String(), o)
 	}
 
-	quoteQuantity := o.Quantity.Mul(price)
-	if quoteQuantity.Compare(m.Market.MinNotional) < 0 {
-		return nil, nil, fmt.Errorf("order amount %s is less than minNotional %s, order: %+v", quoteQuantity.String(), m.Market.MinNotional.String(), o)
+	if !price.IsZero() {
+		quoteQuantity := o.Quantity.Mul(price)
+		if quoteQuantity.Compare(m.Market.MinNotional) < 0 {
+			return nil, nil, fmt.Errorf("order amount %s is less than minNotional %s, order: %+v", quoteQuantity.String(), m.Market.MinNotional.String(), o)
+		}
 	}
 
 	switch o.Side {
