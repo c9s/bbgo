@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -23,15 +24,18 @@ func incTradeID() uint64 {
 	return atomic.AddUint64(&tradeID, 1)
 }
 
+var klineMatchingLogger = logrus.WithField("backtest", "klineEngine")
+
 // SimplePriceMatching implements a simple kline data driven matching engine for backtest
 //go:generate callbackgen -type SimplePriceMatching
 type SimplePriceMatching struct {
 	Symbol string
 	Market types.Market
 
-	mu        sync.Mutex
-	bidOrders []types.Order
-	askOrders []types.Order
+	mu           sync.Mutex
+	bidOrders    []types.Order
+	askOrders    []types.Order
+	closedOrders []types.Order
 
 	LastPrice   fixedpoint.Value
 	LastKLine   types.KLine
@@ -118,11 +122,9 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (closedOrders *typ
 		return nil, nil, fmt.Errorf("order quantity %s is less than minQuantity %s, order: %+v", o.Quantity.String(), m.Market.MinQuantity.String(), o)
 	}
 
-	if !price.IsZero() {
-		quoteQuantity := o.Quantity.Mul(price)
-		if quoteQuantity.Compare(m.Market.MinNotional) < 0 {
-			return nil, nil, fmt.Errorf("order amount %s is less than minNotional %s, order: %+v", quoteQuantity.String(), m.Market.MinNotional.String(), o)
-		}
+	quoteQuantity := o.Quantity.Mul(price)
+	if quoteQuantity.Compare(m.Market.MinNotional) < 0 {
+		return nil, nil, fmt.Errorf("order amount %s is less than minNotional %s, order: %+v", quoteQuantity.String(), m.Market.MinNotional.String(), o)
 	}
 
 	switch o.Side {
@@ -147,7 +149,7 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (closedOrders *typ
 		m.EmitOrderUpdate(order)
 
 		// emit trade before we publish order
-		trade := m.newTradeFromOrder(order, false)
+		trade := m.newTradeFromOrder(&order, false)
 		m.executeTrade(trade)
 
 		// update the order status
@@ -184,11 +186,9 @@ func (m *SimplePriceMatching) executeTrade(trade types.Trade) {
 	// execute trade, update account balances
 	if trade.IsBuyer {
 		err = m.Account.UseLockedBalance(m.Market.QuoteCurrency, trade.Price.Mul(trade.Quantity))
-
 		m.Account.AddBalance(m.Market.BaseCurrency, trade.Quantity.Sub(trade.Fee.Div(trade.Price)))
 	} else {
 		err = m.Account.UseLockedBalance(m.Market.BaseCurrency, trade.Quantity)
-
 		m.Account.AddBalance(m.Market.QuoteCurrency, trade.Quantity.Mul(trade.Price).Sub(trade.Fee))
 	}
 
@@ -201,7 +201,7 @@ func (m *SimplePriceMatching) executeTrade(trade types.Trade) {
 	return
 }
 
-func (m *SimplePriceMatching) newTradeFromOrder(order types.Order, isMaker bool) types.Trade {
+func (m *SimplePriceMatching) newTradeFromOrder(order *types.Order, isMaker bool) types.Trade {
 	// BINANCE uses 0.1% for both maker and taker
 	// MAX uses 0.050% for maker and 0.15% for taker
 	var feeRate fixedpoint.Value
@@ -258,6 +258,8 @@ func (m *SimplePriceMatching) newTradeFromOrder(order types.Order, isMaker bool)
 }
 
 func (m *SimplePriceMatching) BuyToPrice(price fixedpoint.Value) (closedOrders []types.Order, trades []types.Trade) {
+	klineMatchingLogger.Debugf("kline buy to price %s", price.String())
+
 	var askOrders []types.Order
 
 	for _, o := range m.askOrders {
@@ -320,19 +322,24 @@ func (m *SimplePriceMatching) BuyToPrice(price fixedpoint.Value) (closedOrders [
 	m.askOrders = askOrders
 	m.LastPrice = price
 
-	for _, o := range closedOrders {
-		trade := m.newTradeFromOrder(o, true)
+	for i := range closedOrders {
+		o := closedOrders[i]
+		trade := m.newTradeFromOrder(&o, true)
 		m.executeTrade(trade)
+		closedOrders[i] = o
 
 		trades = append(trades, trade)
 
 		m.EmitOrderUpdate(o)
 	}
+	m.closedOrders = append(m.closedOrders, closedOrders...)
 
 	return closedOrders, trades
 }
 
 func (m *SimplePriceMatching) SellToPrice(price fixedpoint.Value) (closedOrders []types.Order, trades []types.Trade) {
+	klineMatchingLogger.Debugf("kline sell to price %s", price.String())
+
 	var sellPrice = price
 	var bidOrders []types.Order
 	for _, o := range m.bidOrders {
@@ -370,9 +377,6 @@ func (m *SimplePriceMatching) SellToPrice(price fixedpoint.Value) (closedOrders 
 
 		case types.OrderTypeLimit, types.OrderTypeLimitMaker:
 			if sellPrice.Compare(o.Price) <= 0 {
-				if o.Price.Compare(m.LastKLine.High) > 0 {
-					o.Price = m.LastKLine.High
-				}
 				o.ExecutedQuantity = o.Quantity
 				o.Status = types.OrderStatusFilled
 				closedOrders = append(closedOrders, o)
@@ -388,14 +392,17 @@ func (m *SimplePriceMatching) SellToPrice(price fixedpoint.Value) (closedOrders 
 	m.bidOrders = bidOrders
 	m.LastPrice = price
 
-	for _, o := range closedOrders {
-		trade := m.newTradeFromOrder(o, true)
+	for i := range closedOrders {
+		o := closedOrders[i]
+		trade := m.newTradeFromOrder(&o, true)
 		m.executeTrade(trade)
+		closedOrders[i] = o
 
 		trades = append(trades, trade)
 
 		m.EmitOrderUpdate(o)
 	}
+	m.closedOrders = append(m.closedOrders, closedOrders...)
 
 	return closedOrders, trades
 }
@@ -410,7 +417,8 @@ func (m *SimplePriceMatching) processKLine(kline types.KLine) {
 			m.BuyToPrice(kline.High)
 		}
 
-		if kline.Low.Compare(kline.Close) > 0 {
+		// if low is lower than close, sell to low first, and then buy up to close
+		if kline.Low.Compare(kline.Close) < 0 {
 			m.SellToPrice(kline.Low)
 			m.BuyToPrice(kline.Close)
 		} else {
