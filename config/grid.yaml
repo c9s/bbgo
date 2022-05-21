@@ -53,9 +53,9 @@ exchangeStrategies:
     #     exp:
     #       domain: [20_000, 30_000]
     #       range: [0.2, 0.001]
-    gridNumber: 30
+    gridNumber: 20
     profitSpread: 1000.0  # The profit price spread that you want to add to your sell order when your buy order is executed
-    upperPrice: 50_000.0
-    lowerPrice: 20_000.0
+    upperPrice: 30_000.0
+    lowerPrice: 28_000.0
     # long: true  # The sell order is submitted in the same order amount as the filled corresponding buy order, rather than the same quantity.
 
