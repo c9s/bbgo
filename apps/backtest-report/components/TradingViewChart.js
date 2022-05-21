@@ -43,6 +43,8 @@ const parseOrder = () => {
           case "quantity":
             d[key] = +d[key];
             break;
+          case "update_time":
+          case "creation_time":
           case "time":
             d[key] = new Date(d[key]);
             break;
@@ -150,7 +152,7 @@ const ordersToMarkets = (interval, orders) => {
   // var markers = [{ time: data[data.length - 48].time, position: 'aboveBar', color: '#f68410', shape: 'circle', text: 'D' }];
   for (let i = 0; i < orders.length; i++) {
     let order = orders[i];
-    let t = order.time.getTime() / 1000.0;
+    let t = order.update_time.getTime() / 1000.0;
     let lastMarker = markers.length > 0 ? markers[markers.length - 1] : null;
     if (lastMarker) {
       let remainder = lastMarker.time % intervalSecs;
