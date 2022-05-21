@@ -160,7 +160,7 @@ const ordersToMarkets = (interval, orders) => {
       let endTime = (startTime + intervalSecs);
       // skip the marker in the same interval of the last marker
       if (t < endTime) {
-        continue
+        // continue
       }
     }
 

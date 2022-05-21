@@ -21,7 +21,69 @@ func newLimitOrder(symbol string, side types.SideType, price, quantity float64) 
 	}
 }
 
-func TestSimplePriceMatching_LimitOrder(t *testing.T) {
+func TestSimplePriceMatching_processKLine(t *testing.T) {
+	account := &types.Account{
+		MakerFeeRate: fixedpoint.NewFromFloat(0.075 * 0.01),
+		TakerFeeRate: fixedpoint.NewFromFloat(0.075 * 0.01),
+	}
+	account.UpdateBalances(types.BalanceMap{
+		"USDT": {Currency: "USDT", Available: fixedpoint.NewFromFloat(10000.0)},
+	})
+	market := types.Market{
+		Symbol:          "BTCUSDT",
+		PricePrecision:  8,
+		VolumePrecision: 8,
+		QuoteCurrency:   "USDT",
+		BaseCurrency:    "BTC",
+		MinNotional:     fixedpoint.MustNewFromString("0.001"),
+		MinAmount:       fixedpoint.MustNewFromString("10.0"),
+		MinQuantity:     fixedpoint.MustNewFromString("0.001"),
+	}
+
+	t1 := time.Date(2021, 7, 1, 0, 0, 0, 0, time.UTC)
+	engine := &SimplePriceMatching{
+		Account:     account,
+		Market:      market,
+		CurrentTime: t1,
+	}
+
+	for i := 0; i <= 5; i++ {
+		var p = 20000.0 + float64(i)*1000.0
+		_, _, err := engine.PlaceOrder(newLimitOrder("BTCUSDT", types.SideTypeBuy, p, 0.001))
+		assert.NoError(t, err)
+	}
+
+	t2 := t1.Add(time.Minute)
+
+	// should match 25000, 24000
+	k := newKLine("BTCUSDT", types.Interval1m, t2, 26000, 27000, 23000, 25000)
+	assert.Equal(t, t2.Add(time.Minute-time.Millisecond), k.EndTime.Time())
+
+	engine.processKLine(k)
+	assert.Equal(t, 3, len(engine.bidOrders))
+	assert.Len(t, engine.bidOrders, 3)
+	assert.Equal(t, 3, len(engine.closedOrders))
+
+	for _, o := range engine.closedOrders {
+		assert.Equal(t, k.EndTime.Time(), o.UpdateTime.Time())
+	}
+}
+
+func newKLine(symbol string, interval types.Interval, startTime time.Time, o, h, l, c float64) types.KLine {
+	return types.KLine{
+		Symbol:    symbol,
+		StartTime: types.Time(startTime),
+		EndTime:   types.Time(startTime.Add(interval.Duration() - time.Millisecond)),
+		Interval:  interval,
+		Open:      fixedpoint.NewFromFloat(o),
+		High:      fixedpoint.NewFromFloat(h),
+		Low:       fixedpoint.NewFromFloat(l),
+		Close:     fixedpoint.NewFromFloat(c),
+		Closed:    true,
+	}
+}
+
+func TestSimplePriceMatching_PlaceLimitOrder(t *testing.T) {
 	account := &types.Account{
 		MakerFeeRate: fixedpoint.NewFromFloat(0.075 * 0.01),
 		TakerFeeRate: fixedpoint.NewFromFloat(0.075 * 0.01),
@@ -44,9 +106,8 @@ func TestSimplePriceMatching_LimitOrder(t *testing.T) {
 	}
 
 	engine := &SimplePriceMatching{
-		CurrentTime: time.Now(),
-		Account:     account,
-		Market:      market,
+		Account: account,
+		Market:  market,
 	}
 
 	for i := 0; i < 5; i++ {
