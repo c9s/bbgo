@@ -147,7 +147,7 @@ func (s *OrderService) Open(market string, options QueryOrderOptions) ([]Order, 
 type GetOrderHistoryRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
-	market string `param:"market"`
+	market string  `param:"market"`
 	fromID *uint64 `param:"from_id"`
 	limit  *uint   `param:"limit"`
 }
@@ -352,4 +352,44 @@ type CreateOrderRequest struct {
 
 func (s *OrderService) NewCreateOrderRequest() *CreateOrderRequest {
 	return &CreateOrderRequest{client: s.client}
+}
+
+//go:generate PostRequest -url "/api/v3/wallet/:walletType/orders" -type V3CreateOrderRequest -responseType .Order
+type V3CreateOrderRequest struct {
+	client requestgen.AuthenticatedAPIClient
+
+	walletType string `param:"walletType,slug,required"`
+	market     string `param:"market,required"`
+	side       string `param:"side,required"`
+	volume     string `param:"volume,required"`
+	orderType  string `param:"ord_type"`
+
+	price         *string `param:"price"`
+	stopPrice     *string `param:"stop_price"`
+	clientOrderID *string `param:"client_oid"`
+	groupID       *string `param:"group_id"`
+}
+
+func (s *OrderService) NewV3CreateOrderRequest() *V3CreateOrderRequest {
+	return &V3CreateOrderRequest{client: s.client}
+}
+
+//go:generate GetRequest -url "/api/v3/wallet/:walletType/orders" -type V3GetOrderRequest -responseType .Order
+type V3GetOrderRequest struct {
+	client requestgen.AuthenticatedAPIClient
+
+	walletType string `param:"walletType,slug,required"`
+	market     string `param:"market,required"`
+	side       string `param:"side,required"`
+	volume     string `param:"volume,required"`
+	orderType  string `param:"ord_type"`
+
+	price         *string `param:"price"`
+	stopPrice     *string `param:"stop_price"`
+	clientOrderID *string `param:"client_oid"`
+	groupID       *string `param:"group_id"`
+}
+
+func (s *OrderService) NewV3GetOrderRequest() *V3GetOrderRequest {
+	return &V3GetOrderRequest{client: s.client}
 }
