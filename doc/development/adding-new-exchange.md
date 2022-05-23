@@ -6,6 +6,8 @@ You should send multiple small pull request to implement them.
 
 **Please avoid sending a pull request with huge changes**
 
+**Important** -- for the underlying http API please use `requestgen` <https://github.com/c9s/requestgen> to generate the requests.
+
 ## Checklist
 
 Exchange Interface - the minimum requirement for spot trading
