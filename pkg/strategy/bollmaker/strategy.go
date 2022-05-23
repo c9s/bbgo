@@ -290,25 +290,43 @@ func (s *Strategy) getCurrentAllowedExposurePosition(bandPercentage float64) (fi
 	return s.MaxExposurePosition, nil
 }
 
+// IsDynamicSpreadEnabled checks dynamic spread functionality enabled or not
+func (s *Strategy) IsDynamicSpreadEnabled() bool {
+	if s.DynamicSpreadWindow > 0 && s.DynamicAskSpreadScale != nil && s.DynamicBidSpread != nil {
+		return true
+	}
+
+	return false
+}
+
 // Update dynamic spreads
 func (s *Strategy) updateDynamicSpread(kline types.KLine) {
-	if s.DynamicSpreadWindow > 0 {
-		high := kline.GetHigh().Float64()
-		open := kline.GetOpen().Float64()
-		low := kline.GetLow().Float64()
+	if !s.IsDynamicSpreadEnabled() {
+		return
+	}
 
-		if kline.Direction() == types.DirectionUp {
-			s.DynamicAskSpread.Update((high - open) / open)
-		}
-		if kline.Direction() == types.DirectionDown {
-			s.DynamicBidSpread.Update((open - low) / open)
-		}
+	ampl := (kline.GetHigh().Float64() - kline.GetLow().Float64()) / kline.GetOpen().Float64()
+
+	switch kline.Direction() {
+	case types.DirectionUp:
+		s.DynamicAskSpread.Update(ampl)
+		s.DynamicBidSpread.Update(0)
+	case types.DirectionDown:
+		s.DynamicBidSpread.Update(ampl)
+		s.DynamicAskSpread.Update(0)
+	default:
+		s.DynamicAskSpread.Update(0)
+		s.DynamicBidSpread.Update(0)
 	}
 }
 
 // Get current dynamic ask spread
 func (s *Strategy) getDynamicAskSpread() (dynamicAskSpread float64, err error) {
-	if s.DynamicAskSpreadScale != nil && s.DynamicSpreadWindow > 0 && s.DynamicAskSpread.Length() >= s.DynamicSpreadWindow {
+	if !s.IsDynamicSpreadEnabled() {
+		return 0, errors.New("dynamic spread is not enabled")
+	}
+
+	if s.DynamicAskSpreadScale != nil && s.DynamicAskSpread.Length() >= s.DynamicSpreadWindow {
 		dynamicAskSpread, err = s.DynamicAskSpreadScale.Scale(s.DynamicAskSpread.Last())
 		if err != nil {
 			log.WithError(err).Errorf("can not calculate dynamicAskSpread")
@@ -324,7 +342,11 @@ func (s *Strategy) getDynamicAskSpread() (dynamicAskSpread float64, err error) {
 
 // Get current dynamic bid spread
 func (s *Strategy) getDynamicBidSpread() (dynamicBidSpread float64, err error) {
-	if s.DynamicBidSpreadScale != nil && s.DynamicSpreadWindow > 0 && s.DynamicBidSpread.Length() >= s.DynamicSpreadWindow {
+	if !s.IsDynamicSpreadEnabled() {
+		return 0, errors.New("dynamic spread is not enabled")
+	}
+
+	if s.DynamicBidSpreadScale != nil && s.DynamicBidSpread.Length() >= s.DynamicSpreadWindow {
 		dynamicBidSpread, err = s.DynamicBidSpreadScale.Scale(s.DynamicBidSpread.Last())
 		if err != nil {
 			log.WithError(err).Errorf("can not calculate dynamicBidSpread")
@@ -569,7 +591,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.Status = types.StrategyStatusRunning
 
 	// Setup dynamic spread
-	if s.DynamicSpreadWindow > 0 {
+	if s.IsDynamicSpreadEnabled() {
 		s.DynamicBidSpread = &indicator.SMA{IntervalWindow: types.IntervalWindow{s.Interval, s.DynamicSpreadWindow}}
 		s.DynamicAskSpread = &indicator.SMA{IntervalWindow: types.IntervalWindow{s.Interval, s.DynamicSpreadWindow}}
 	}
@@ -724,17 +746,19 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 
-		// Update spreads
-		s.updateDynamicSpread(kline)
-		dynamicBidSpread, err := s.getDynamicBidSpread()
-		if err == nil && dynamicBidSpread > 0 {
-			s.BidSpread = fixedpoint.NewFromFloat(dynamicBidSpread)
-			log.Infof("new bid spread: %v", s.BidSpread.Percentage())
-		}
-		dynamicAskSpread, err := s.getDynamicAskSpread()
-		if err == nil && dynamicAskSpread > 0 {
-			s.AskSpread = fixedpoint.NewFromFloat(dynamicAskSpread)
-			log.Infof("new ask spread: %v", s.AskSpread.Percentage())
+		// Update spreads with dynamic spread
+		if !s.IsDynamicSpreadEnabled() {
+			s.updateDynamicSpread(kline)
+			dynamicBidSpread, err := s.getDynamicBidSpread()
+			if err == nil && dynamicBidSpread > 0 {
+				s.BidSpread = fixedpoint.NewFromFloat(dynamicBidSpread)
+				log.Infof("new bid spread: %v", s.BidSpread.Percentage())
+			}
+			dynamicAskSpread, err := s.getDynamicAskSpread()
+			if err == nil && dynamicAskSpread > 0 {
+				s.AskSpread = fixedpoint.NewFromFloat(dynamicAskSpread)
+				log.Infof("new ask spread: %v", s.AskSpread.Percentage())
+			}
 		}
 
 		if err := s.activeMakerOrders.GracefulCancel(ctx, s.session.Exchange); err != nil {
