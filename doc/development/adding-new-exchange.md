@@ -69,6 +69,12 @@ Exchange Factory
 - [ ] Add the exchange constructor to the exchange instance factory function.
 - [ ] Add extended fields to the ExchangeSession struct. (optional)
 
+# Tools
+
+- Use a tool to convert JSON response to Go struct <https://mholt.github.io/json-to-go/>
+- Use requestgen to generate request builders <https://github.com/c9s/requestgen>
+- Use callbackgen to generate callbacks <https://github.com/c9s/callbackgen>
+
 # Implementation
 
 Go to `pkg/types/exchange.go` and add your exchange type:
@@ -79,8 +85,8 @@ const (
 	ExchangeBinance  = ExchangeName("binance")
 	ExchangeFTX      = ExchangeName("ftx")
 	ExchangeOKEx     = ExchangeName("okex")
-    ExchangeKucoin   = ExchangeName("kucoin")
-    ExchangeBacktest = ExchangeName("backtest")
+        ExchangeKucoin   = ExchangeName("kucoin")
+        ExchangeBacktest = ExchangeName("backtest")
 )
 ```
 
