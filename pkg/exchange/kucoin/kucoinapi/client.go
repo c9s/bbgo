@@ -22,7 +22,7 @@ const RestBaseURL = "https://api.kucoin.com/api"
 const SandboxRestBaseURL = "https://openapi-sandbox.kucoin.com/api"
 
 type RestClient struct {
-	BaseURL *url.URL
+	requestgen.BaseAPIClient
 
 	client *http.Client
 
@@ -42,7 +42,12 @@ func NewClient() *RestClient {
 	}
 
 	client := &RestClient{
-		BaseURL:    u,
+		BaseAPIClient: requestgen.BaseAPIClient{
+			BaseURL: u,
+			HttpClient: &http.Client{
+				Timeout: defaultHTTPTimeout,
+			},
+		},
 		KeyVersion: "2",
 		client: &http.Client{
 			Timeout: defaultHTTPTimeout,
@@ -60,47 +65,6 @@ func (c *RestClient) Auth(key, secret, passphrase string) {
 	c.Key = key
 	c.Secret = secret
 	c.Passphrase = passphrase
-}
-
-// NewRequest create new API request. Relative url can be provided in refURL.
-func (c *RestClient) NewRequest(ctx context.Context, method, refURL string, params url.Values, payload interface{}) (*http.Request, error) {
-	rel, err := url.Parse(refURL)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		rel.RawQuery = params.Encode()
-	}
-
-	body, err := castPayload(payload)
-	if err != nil {
-		return nil, err
-	}
-
-	pathURL := c.BaseURL.ResolveReference(rel)
-	return http.NewRequestWithContext(ctx, method, pathURL.String(), bytes.NewReader(body))
-}
-
-// sendRequest sends the request to the API server and handle the response
-func (c *RestClient) SendRequest(req *http.Request) (*requestgen.Response, error) {
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	// newResponse reads the response body and return a new Response object
-	response, err := requestgen.NewResponse(resp)
-	if err != nil {
-		return response, err
-	}
-
-	// Check error, if there is an error, return the ErrorResponse struct type
-	if response.IsError() {
-		return response, errors.New(string(response.Body))
-	}
-
-	return response, nil
 }
 
 // newAuthenticatedRequest creates new http request for authenticated routes.
@@ -173,21 +137,19 @@ func sign(secret, payload string) string {
 }
 
 func castPayload(payload interface{}) ([]byte, error) {
-	if payload != nil {
-		switch v := payload.(type) {
-		case string:
-			return []byte(v), nil
-
-		case []byte:
-			return v, nil
-
-		default:
-			body, err := json.Marshal(v)
-			return body, err
-		}
+	if payload == nil {
+		return nil, nil
 	}
 
-	return nil, nil
+	switch v := payload.(type) {
+	case string:
+		return []byte(v), nil
+
+	case []byte:
+		return v, nil
+
+	}
+	return json.Marshal(payload)
 }
 
 type APIResponse struct {
