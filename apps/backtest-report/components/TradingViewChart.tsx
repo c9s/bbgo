@@ -5,9 +5,10 @@ import {Button} from '@mantine/core';
 // https://github.com/tradingview/lightweight-charts/issues/543
 // const createChart = dynamic(() => import('lightweight-charts'));
 import {createChart, CrosshairMode} from 'lightweight-charts';
+import {ReportSummary} from "../types";
 
 const parseKline = () => {
-  return (d) => {
+  return (d : any) => {
     d.startTime = new Date(Number(d.startTime) * 1000);
     d.endTime = new Date(Number(d.endTime) * 1000);
     d.time = d.startTime.getTime() / 1000;
@@ -33,7 +34,7 @@ const parseKline = () => {
 
 
 const parseOrder = () => {
-  return (d) => {
+  return (d: any) => {
     for (const key in d) {
       // convert number fields
       if (Object.prototype.hasOwnProperty.call(d, key)) {
@@ -56,7 +57,7 @@ const parseOrder = () => {
 }
 
 const parsePosition = () => {
-  return (d) => {
+  return (d: any) => {
     for (const key in d) {
       // convert number fields
       if (Object.prototype.hasOwnProperty.call(d, key)) {
@@ -77,32 +78,29 @@ const parsePosition = () => {
   };
 }
 
-const fetchPositionHistory = (basePath, runID, filename) => {
+const fetchPositionHistory = (basePath: string, runID: string, filename: string) => {
   return fetch(
     `${basePath}/${runID}/${filename}`,
   )
     .then((response) => response.text())
-    .then((data) => tsvParse(data, parsePosition()))
+    .then((data) => tsvParse(data, parsePosition()) as Array<PositionHistoryEntry>)
     .catch((e) => {
       console.error("failed to fetch orders", e)
     });
 };
 
-const fetchOrders = (basePath, runID, setter) => {
+const fetchOrders = (basePath: string, runID: string) => {
   return fetch(
     `${basePath}/${runID}/orders.tsv`,
   )
     .then((response) => response.text())
-    .then((data) => tsvParse(data, parseOrder()))
-    .then((data) => {
-      setter(data);
-    })
+    .then((data: string) => tsvParse(data, parseOrder()) as Array<Order>)
     .catch((e) => {
       console.error("failed to fetch orders", e)
     });
 }
 
-const parseInterval = (s) => {
+const parseInterval = (s: string) => {
   switch (s) {
     case "1m":
       return 60;
@@ -127,27 +125,32 @@ const parseInterval = (s) => {
   return 60;
 };
 
-const orderAbbr = (order) => {
-  let s = '';
-  switch (order.side) {
-    case "BUY":
-      s += 'B';
-      break;
-    case "SELL":
-      s += 'S';
-      break
-  }
-
-  switch (order.order_type) {
-    case "STOP_LIMIT":
-      s += ' StopLoss';
-  }
-  return s
+interface Order {
+  order_type: string;
+  side: string;
+  price: number;
+  quantity: number;
+  executed_quantity: number;
+  status: string;
+  update_time: Date;
+  creation_time: Date;
 }
 
-const ordersToMarkets = (interval, orders) => {
-  const markers = [];
+interface Marker {
+  time: number;
+  position: string;
+  color: string;
+  shape: string;
+  text: string;
+}
+
+const ordersToMarkets = (interval: string, orders: Array<Order> | void): Array<Marker> => {
+  const markers: Array<Marker> = [];
   const intervalSecs = parseInterval(interval);
+
+  if (!orders) {
+    return markers;
+  }
 
   // var markers = [{ time: data[data.length - 48].time, position: 'aboveBar', color: '#f68410', shape: 'circle', text: 'D' }];
   for (let i = 0; i < orders.length; i++) {
@@ -190,7 +193,7 @@ const ordersToMarkets = (interval, orders) => {
   return markers;
 };
 
-const removeDuplicatedKLines = (klines) => {
+const removeDuplicatedKLines = (klines: Array<KLine>): Array<KLine> => {
   const newK = [];
   for (let i = 0; i < klines.length; i++) {
     const k = klines[i];
@@ -205,19 +208,30 @@ const removeDuplicatedKLines = (klines) => {
   return newK;
 }
 
-function fetchKLines(basePath, runID, symbol, interval, setter) {
+function fetchKLines(basePath: string, runID: string, symbol: string, interval: string) {
   return fetch(
     `${basePath}/${runID}/klines/${symbol}-${interval}.tsv`,
   )
     .then((response) => response.text())
     .then((data) => tsvParse(data, parseKline()))
-    // .then((data) => tsvParse(data))
     .catch((e) => {
       console.error("failed to fetch klines", e)
     });
 }
 
-const klinesToVolumeData = (klines) => {
+interface KLine {
+  time: Date;
+  startTime: Date;
+  endTime: Date;
+  interval: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
+const klinesToVolumeData = (klines: Array<KLine>) => {
   const volumes = [];
 
   for (let i = 0; i < klines.length; i++) {
@@ -232,7 +246,14 @@ const klinesToVolumeData = (klines) => {
 }
 
 
-const positionBaseHistoryToLineData = (interval, hs) => {
+interface PositionHistoryEntry {
+  time: Date;
+  base: number;
+  quote: number;
+  average_cost: number;
+}
+
+const positionBaseHistoryToLineData = (interval: string, hs: Array<PositionHistoryEntry>) => {
   const bases = [];
   const intervalSeconds = parseInterval(interval);
   for (let i = 0; i < hs.length; i++) {
@@ -242,10 +263,15 @@ const positionBaseHistoryToLineData = (interval, hs) => {
       continue
     }
 
+    // ignore duplicated entry
+    if (hs[i].time.getTime() === hs[i - 1].time.getTime()) {
+      continue
+    }
+
     let t = pos.time.getTime() / 1000;
     t = (t - t % intervalSeconds)
 
-    if (i > 0 && (pos.base === hs[i - 1].base || t === hs[i - 1].time)) {
+    if (i > 0 && (pos.base === hs[i - 1].base)) {
       continue;
     }
 
@@ -258,7 +284,7 @@ const positionBaseHistoryToLineData = (interval, hs) => {
 }
 
 
-const positionAverageCostHistoryToLineData = (interval, hs) => {
+const positionAverageCostHistoryToLineData = (interval: string, hs: Array<PositionHistoryEntry>) => {
   const avgCosts = [];
   const intervalSeconds = parseInterval(interval);
   for (let i = 0; i < hs.length; i++) {
@@ -269,10 +295,16 @@ const positionAverageCostHistoryToLineData = (interval, hs) => {
       continue
     }
 
+    // ignore duplicated entry
+    if (hs[i].time.getTime() === hs[i - 1].time.getTime()) {
+      continue
+    }
+
+
     let t = pos.time.getTime() / 1000;
     t = (t - t % intervalSeconds)
 
-    if (i > 0 && (pos.average_cost === hs[i - 1].average_cost || t === hs[i - 1].time)) {
+    if (i > 0 && (pos.average_cost === hs[i - 1].average_cost)) {
       continue;
     }
 
@@ -293,7 +325,7 @@ const positionAverageCostHistoryToLineData = (interval, hs) => {
   return avgCosts;
 }
 
-const createBaseChart = (chartContainerRef) => {
+const createBaseChart = (chartContainerRef: React.RefObject<any>) => {
   return createChart(chartContainerRef.current, {
     width: chartContainerRef.current.clientWidth,
     height: chartContainerRef.current.clientHeight,
@@ -327,10 +359,17 @@ const createBaseChart = (chartContainerRef) => {
 };
 
 
-const TradingViewChart = (props) => {
-  const chartContainerRef = useRef();
-  const chart = useRef();
-  const resizeObserver = useRef();
+interface TradingViewChartProps {
+  basePath: string;
+  runID: string;
+  reportSummary: ReportSummary;
+  symbol: string;
+}
+
+const TradingViewChart = (props: TradingViewChartProps) => {
+  const chartContainerRef = useRef<any>();
+  const chart = useRef<any>();
+  const resizeObserver = useRef<any>();
   const intervals = props.reportSummary.intervals || [];
   const [currentInterval, setCurrentInterval] = useState(intervals.length > 0 ? intervals[0] : '1m');
 
@@ -339,12 +378,13 @@ const TradingViewChart = (props) => {
       return;
     }
 
-    const chartData = {};
+    const chartData: any = {};
     const fetchers = [];
-    const ordersFetcher = fetchOrders(props.basePath, props.runID, (orders) => {
+    const ordersFetcher = fetchOrders(props.basePath, props.runID).then((orders) => {
       const markers = ordersToMarkets(currentInterval, orders);
       chartData.orders = orders;
       chartData.markers = markers;
+      return orders;
     });
     fetchers.push(ordersFetcher);
 
@@ -359,7 +399,7 @@ const TradingViewChart = (props) => {
     }
 
     const kLinesFetcher = fetchKLines(props.basePath, props.runID, props.symbol, currentInterval).then((klines) => {
-      chartData.klines = removeDuplicatedKLines(klines)
+      chartData.klines = removeDuplicatedKLines(klines as Array<KLine>)
     });
     fetchers.push(kLinesFetcher);
 
@@ -444,7 +484,7 @@ const TradingViewChart = (props) => {
     <div>
       <span>
         {intervals.map((interval) => {
-          return <Button key={interval} compact onClick={(e) => {
+          return <Button key={interval} compact onClick={() => {
             setCurrentInterval(interval)
           }}>
             {interval}
