@@ -599,6 +599,11 @@ What's Position?
 - Base Currency & Quote Currency <https://www.ig.com/au/glossary-trading-terms/base-currency-definition>
 - How to calculate average cost? <https://www.janushenderson.com/en-us/investor/planning/calculate-average-cost/>
 
+## Looking For A New Strategy?
+
+You can write an article about BBGO in any topic, in 750-1500 words for exchange, and I can implement the strategy for you (depends on the complexity and efforts).
+If you're interested in, DM me in telegram <https://t.me/c123456789s> or twitter <https://twitter.com/c9s>, we can discuss.
+
 ## Contributing
 
 See [Contributing](./CONTRIBUTING.md)
