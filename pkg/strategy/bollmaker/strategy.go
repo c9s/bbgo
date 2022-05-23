@@ -747,7 +747,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 
 		// Update spreads with dynamic spread
-		if !s.IsDynamicSpreadEnabled() {
+		if s.IsDynamicSpreadEnabled() {
 			s.updateDynamicSpread(kline)
 			dynamicBidSpread, err := s.getDynamicBidSpread()
 			if err == nil && dynamicBidSpread > 0 {
