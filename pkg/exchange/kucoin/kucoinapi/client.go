@@ -24,8 +24,6 @@ const SandboxRestBaseURL = "https://openapi-sandbox.kucoin.com/api"
 type RestClient struct {
 	requestgen.BaseAPIClient
 
-	client *http.Client
-
 	Key, Secret, Passphrase string
 	KeyVersion              string
 
@@ -49,9 +47,6 @@ func NewClient() *RestClient {
 			},
 		},
 		KeyVersion: "2",
-		client: &http.Client{
-			Timeout: defaultHTTPTimeout,
-		},
 	}
 
 	client.AccountService = &AccountService{client: client}
