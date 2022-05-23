@@ -292,7 +292,7 @@ func (s *Strategy) getCurrentAllowedExposurePosition(bandPercentage float64) (fi
 
 // IsDynamicSpreadEnabled checks dynamic spread functionality enabled or not
 func (s *Strategy) IsDynamicSpreadEnabled() bool {
-	if s.DynamicSpreadWindow > 0 && s.DynamicAskSpreadScale != nil && s.DynamicBidSpread != nil {
+	if s.DynamicSpreadWindow > 0 && s.DynamicAskSpreadScale != nil && s.DynamicBidSpreadScale != nil {
 		return true
 	}
 
