@@ -410,6 +410,15 @@ func (m *SimplePriceMatching) SellToPrice(price fixedpoint.Value) (closedOrders 
 func (m *SimplePriceMatching) processKLine(kline types.KLine) {
 	m.CurrentTime = kline.EndTime.Time()
 	m.LastKLine = kline
+	if m.LastPrice.IsZero() {
+		m.LastPrice = kline.Open
+	} else {
+		if m.LastPrice.Compare(kline.Open) > 0 {
+			m.BuyToPrice(kline.Open)
+		} else {
+			m.SellToPrice(kline.Open)
+		}
+	}
 
 	switch kline.Direction() {
 	case types.DirectionDown:

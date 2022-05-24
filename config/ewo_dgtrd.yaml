@@ -11,20 +11,22 @@ exchangeStrategies:
   ewo_dgtrd:
     symbol: MATICUSDT
     # kline interval for indicators
-    interval: 2h
+    interval: 15m
     # use ema as MA
-    useEma: false
+    useEma: true
     # use sma as MA, used when ema is false
     # if both sma and ema are false, use EVMA
     useSma: false
     # ewo signal line window size
-    sigWin: 8
+    sigWin: 5
     # SL percentage from entry price
     stoploss: 15%
     # use HeikinAshi klines instead of normal OHLC
     useHeikinAshi: true
     # disable SL when short
     disableShortStop: false
+    # disable SL when long
+    disableLongStop: false
     # CCI Stochastic Indicator high filter
     ccistochFilterHigh: 80
     # CCI Stochastic Indicator low filter
@@ -50,5 +52,5 @@ backtest:
       #makerFeeRate: 0
       #takerFeeRate: 15
       balances:
-        MATIC: 5000.0
-        USDT: 10000
+        MATIC: 000.0
+        USDT: 15000.0
