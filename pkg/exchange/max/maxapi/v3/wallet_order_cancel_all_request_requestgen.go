@@ -119,6 +119,17 @@ func (w *WalletOrderCancelAllRequest) GetSlugParameters() (map[string]interface{
 	}
 	// END TEMPLATE check-required
 
+	// TEMPLATE check-valid-values
+	switch walletType {
+	case WalletTypeSpot, WalletTypeMargin:
+		params["walletType"] = walletType
+
+	default:
+		return nil, fmt.Errorf("walletType value %v is invalid", walletType)
+
+	}
+	// END TEMPLATE check-valid-values
+
 	// assign parameter of walletType
 	params["walletType"] = walletType
 
