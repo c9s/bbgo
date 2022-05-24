@@ -155,7 +155,7 @@ const ordersToMarkets = (interval: string, orders: Array<Order> | void): Array<M
   // var markers = [{ time: data[data.length - 48].time, position: 'aboveBar', color: '#f68410', shape: 'circle', text: 'D' }];
   for (let i = 0; i < orders.length; i++) {
     let order = orders[i];
-    let t = order.update_time.getTime() / 1000.0;
+    let t = (order.update_time || order.time).getTime() / 1000.0;
     let lastMarker = markers.length > 0 ? markers[markers.length - 1] : null;
     if (lastMarker) {
       let remainder = lastMarker.time % intervalSecs;
@@ -264,7 +264,7 @@ const positionBaseHistoryToLineData = (interval: string, hs: Array<PositionHisto
     }
 
     // ignore duplicated entry
-    if (hs[i].time.getTime() === hs[i - 1].time.getTime()) {
+    if (i > 0 && hs[i].time.getTime() === hs[i - 1].time.getTime()) {
       continue
     }
 
@@ -296,7 +296,7 @@ const positionAverageCostHistoryToLineData = (interval: string, hs: Array<Positi
     }
 
     // ignore duplicated entry
-    if (hs[i].time.getTime() === hs[i - 1].time.getTime()) {
+    if (i > 0 && hs[i].time.getTime() === hs[i - 1].time.getTime()) {
       continue
     }
 

@@ -414,9 +414,9 @@ func (m *SimplePriceMatching) processKLine(kline types.KLine) {
 		m.LastPrice = kline.Open
 	} else {
 		if m.LastPrice.Compare(kline.Open) > 0 {
-			m.BuyToPrice(kline.Open)
-		} else {
 			m.SellToPrice(kline.Open)
+		} else {
+			m.BuyToPrice(kline.Open)
 		}
 	}
 
