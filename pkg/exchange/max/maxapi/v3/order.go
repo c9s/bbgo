@@ -13,8 +13,8 @@ import (
 type WalletType string
 
 const (
-	WalletTypeSpot   = WalletType("spot")
-	WalletTypeMargin = WalletType("m")
+	WalletTypeSpot   WalletType = "spot"
+	WalletTypeMargin WalletType = "m"
 )
 
 type Order = maxapi.Order
