@@ -309,12 +309,7 @@ queryRecentlyClosedOrders:
 	}
 
 	// ensure everything is ascending ordered
-	log.Debugf("sorting %d orders", len(orders))
-	sort.Slice(orders, func(i, j int) bool {
-		return orders[i].CreationTime.Time().Before(orders[j].CreationTime.Time())
-	})
-
-	return orders, err
+	return types.SortOrderAscending(orders), err
 }
 
 func (e *Exchange) CancelAllOrders(ctx context.Context) ([]types.Order, error) {
