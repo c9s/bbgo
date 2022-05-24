@@ -10,20 +10,25 @@ exchangeStrategies:
 - on: binance
   ewo_dgtrd:
     symbol: MATICUSDT
+    # kline interval for indicators
     interval: 2h
+    # use ema as MA
     useEma: false
+    # use sma as MA, used when ema is false
+    # if both sma and ema are false, use EVMA
     useSma: false
+    # ewo signal line window size
     sigWin: 8
-    stoploss: 10%
+    # SL percentage from entry price
+    stoploss: 15%
+    # use HeikinAshi klines instead of normal OHLC
     useHeikinAshi: true
+    # disable SL when short
     disableShortStop: false
-    #stops:
-    #- trailingStop:
-    #    callbackRate: 5.1%
-    #    closePosition: 20%
-    #    minProfit: 1%
-    #    interval: 1m
-    #    virtual: true
+    # CCI Stochastic Indicator high filter
+    ccistochFilterHigh: 80
+    # CCI Stochastic Indicator low filter
+    ccistochFilterLow: 20
 
 sync:
   userDataStream:
@@ -36,7 +41,7 @@ sync:
 
 backtest:
   startTime: "2022-05-01"
-  endTime: "2022-05-11"
+  endTime: "2022-05-24"
   symbols:
     - MATICUSDT
   sessions: [binance]
