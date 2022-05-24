@@ -317,63 +317,6 @@ queryRecentlyClosedOrders:
 	return orders, err
 }
 
-func (e *Exchange) queryAllClosedOrders(ctx context.Context, symbol string, since time.Time, until time.Time) (orders []types.Order, err error) {
-	limit := 1000 // max limit = 1000, default 100
-	orderIDs := make(map[uint64]struct{}, limit*2)
-	page := 1
-	for {
-		if err := closedOrderQueryLimiter.Wait(ctx); err != nil {
-			return nil, err
-		}
-
-		log.Infof("querying %s closed orders from page %d ~ ", symbol, page)
-		maxOrders, err := e.client.OrderService.Closed(toLocalSymbol(symbol), maxapi.QueryOrderOptions{
-			Limit: limit,
-			Page:  page,
-		})
-		if err != nil {
-			return orders, err
-		}
-
-		if len(maxOrders) == 0 {
-			return orders, err
-		}
-
-		// ensure everything is ascending ordered
-		sort.Slice(maxOrders, func(i, j int) bool {
-			return maxOrders[i].CreatedAtMs.Time().Before(maxOrders[j].CreatedAtMs.Time())
-		})
-
-		log.Debugf("%d orders", len(maxOrders))
-		for _, maxOrder := range maxOrders {
-			if maxOrder.CreatedAtMs.Time().Before(since) {
-				log.Debugf("skip orders with creation time before %s, found %s", since, maxOrder.CreatedAtMs.Time())
-				continue
-			}
-
-			if maxOrder.CreatedAtMs.Time().After(until) {
-				return orders, err
-			}
-
-			order, err := toGlobalOrder(maxOrder)
-			if err != nil {
-				return orders, err
-			}
-
-			if _, ok := orderIDs[order.OrderID]; ok {
-				log.Debugf("skipping duplicated order: %d", order.OrderID)
-			}
-
-			orderIDs[order.OrderID] = struct{}{}
-			orders = append(orders, *order)
-			log.Debugf("order %+v", order)
-		}
-		page++
-	}
-
-	return orders, err
-}
-
 func (e *Exchange) CancelAllOrders(ctx context.Context) ([]types.Order, error) {
 	var req = e.client.OrderService.NewOrderCancelAllRequest()
 	var maxOrders, err = req.Do(ctx)
