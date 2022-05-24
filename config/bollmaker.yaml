@@ -68,7 +68,7 @@ exchangeStrategies:
     #     # exp means we want to use exponential scale, you can replace "exp" with "linear" for linear scale
     #     exp:
     #       # amplitude from low to high
-    #       domain: [ 0.0005, 0.005 ]
+    #       domain: [ 0.0001, 0.005 ]
     #       # when amplitude is low, minimum ask is spread 0.05%
     #       # when amplitude is high, maximum ask is spread 0.2%
     #       range: [ 0.001, 0.002 ]
@@ -77,7 +77,7 @@ exchangeStrategies:
     #       # exp means we want to use exponential scale, you can replace "exp" with "linear" for linear scale
     #       exp:
     #         # amplitude from low to high
-    #         domain: [ 0.0005, 0.005 ]
+    #         domain: [ 0.0001, 0.005 ]
     #         # when amplitude is low, minimum bid is spread 0.05%
     #         # when amplitude is high, maximum bid is spread 0.2%
     #         range: [ 0.001, 0.002 ]
