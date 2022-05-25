@@ -97,8 +97,22 @@ func (s *Stream) handleConnect() {
 			})
 		}
 
-		s.Conn.WriteJSON(cmd)
+		if err := s.Conn.WriteJSON(cmd); err != nil {
+			log.WithError(err).Error("failed to send subscription request")
+		}
+
 	} else {
+		var filters []string
+		if s.MarginSettings.IsMargin {
+			filters = []string{
+				"mwallet_order",
+				"mwallet_trade",
+				"mwallet_account",
+				"ad_ratio",
+				"borrowing",
+			}
+		}
+
 		nonce := time.Now().UnixNano() / int64(time.Millisecond)
 		auth := &max.AuthMessage{
 			Action:    "auth",
@@ -106,7 +120,9 @@ func (s *Stream) handleConnect() {
 			Nonce:     nonce,
 			Signature: signPayload(fmt.Sprintf("%d", nonce), s.secret),
 			ID:        uuid.New().String(),
+			Filters:   filters,
 		}
+
 		if err := s.Conn.WriteJSON(auth); err != nil {
 			log.WithError(err).Error("failed to send auth request")
 		}
