@@ -31,6 +31,13 @@ case $(uname -m) in
     exit 1;;
 esac
 dist_file=bbgo-$version-$osf-$arch.tar.gz
+exchange=max
+
+if [[ -n $1 ]] ; then
+    exchange=$1
+fi
+
+exchange_upper=$(echo -n $exchange | tr 'a-z' 'A-Z')
 
 info "downloading..."
 curl -O -L https://github.com/c9s/bbgo/releases/download/$version/$dist_file
@@ -41,14 +48,15 @@ info "downloaded successfully"
 
 function gen_dotenv()
 {
-    read -p "Enter your MAX API key: " api_key
-    read -p "Enter your MAX API secret: " api_secret
-    echo "Generating your .env.local file..."
+    read -p "Enter your $exchange_upper API key: " api_key
+    read -p "Enter your $exchange_upper API secret: " api_secret
+    info "Generating your .env.local file..."
 cat <<END > .env.local
-MAX_API_KEY=$api_key
-MAX_API_SECRET=$api_secret
+${exchange_upper}_API_KEY=$api_key
+${exchange_upper}_API_SECRET=$api_secret
 END
 
+    info "dotenv is configured successfully"
 }
 
 if [[ -e ".env.local" ]] ; then
@@ -72,7 +80,7 @@ fi
 cat <<END > bbgo.yaml
 ---
 exchangeStrategies:
-- on: max
+- on: ${exchange}
   bollgrid:
     symbol: BTCUSDT
     interval: 1h
