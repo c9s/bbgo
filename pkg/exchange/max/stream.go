@@ -18,6 +18,7 @@ import (
 //go:generate callbackgen -type Stream
 type Stream struct {
 	types.StandardStream
+	types.MarginSettings
 
 	key, secret string
 

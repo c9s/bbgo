@@ -29,6 +29,8 @@ var marketDataLimiter = rate.NewLimiter(rate.Every(2*time.Second), 10)
 var log = logrus.WithField("exchange", "max")
 
 type Exchange struct {
+	types.MarginSettings
+
 	client      *maxapi.RestClient
 	key, secret string
 }
@@ -155,7 +157,9 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 }
 
 func (e *Exchange) NewStream() types.Stream {
-	return NewStream(e.key, e.secret)
+	stream := NewStream(e.key, e.secret)
+	stream.MarginSettings = e.MarginSettings
+	return stream
 }
 
 func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.Order, error) {
