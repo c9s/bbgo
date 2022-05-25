@@ -202,6 +202,27 @@ func parseAuthEvent(v *fastjson.Value) (*AuthEvent, error) {
 	return &e, err
 }
 
+type ADRatio struct {
+	ADRatio     fixedpoint.Value `json:"ad"`
+	AssetInUSDT fixedpoint.Value `json:"as"`
+	DebtInUSDT  fixedpoint.Value `json:"db"`
+	IndexPrices []struct {
+		Market string           `json:"M"`
+		Price  fixedpoint.Value `json:"p"`
+	} `json:"idxp"`
+	TU types.MillisecondTimestamp `json:"TU"`
+}
+
+func parseADRatio(v *fastjson.Value) (*ADRatio, error) {
+	o, err := v.StringBytes()
+	if err != nil {
+		return nil, err
+	}
+	adRatio := ADRatio{}
+	err = json.Unmarshal(o, &adRatio)
+	return &adRatio, err
+}
+
 func ParseUserEvent(v *fastjson.Value) (interface{}, error) {
 	eventType := string(v.GetStringBytes("e"))
 	switch eventType {
@@ -216,6 +237,9 @@ func ParseUserEvent(v *fastjson.Value) (interface{}, error) {
 
 	case "trade_update", "mwallet_trade_update":
 		return parseTradeUpdateEvent(v), nil
+
+	case "ad_ratio_snapshot":
+		return parseADRatio(v)
 
 	case "account_snapshot", "account_update", "mwallet_account_snapshot", "mwallet_account_update":
 		var e AccountUpdateEvent
