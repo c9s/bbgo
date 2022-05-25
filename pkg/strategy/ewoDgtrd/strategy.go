@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/fatih/color"
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -128,12 +129,10 @@ func (inc *CCISTOCH) BuySignal() bool {
 		v := inc.ma.Index(i)
 		if v > inc.filterHigh {
 			return false
-		}
-		if v >= inc.filterLow && v <= inc.filterHigh {
+		} else if v >= inc.filterLow && v <= inc.filterHigh {
 			hasGrey = true
 			continue
-		}
-		if v < inc.filterLow {
+		} else if v < inc.filterLow {
 			return hasGrey
 		}
 	}
@@ -146,12 +145,10 @@ func (inc *CCISTOCH) SellSignal() bool {
 		v := inc.ma.Index(i)
 		if v < inc.filterLow {
 			return false
-		}
-		if v >= inc.filterLow && v <= inc.filterHigh {
+		} else if v >= inc.filterLow && v <= inc.filterHigh {
 			hasGrey = true
 			continue
-		}
-		if v > inc.filterHigh {
+		} else if v > inc.filterHigh {
 			return hasGrey
 		}
 	}
@@ -639,6 +636,21 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.peakPrice = fixedpoint.Zero
 	s.bottomPrice = fixedpoint.Zero
 
+	counterTPfromPeak := 0
+	percentAvgTPfromPeak := 0.0
+	counterTPfromCCI := 0
+	percentAvgTPfromCCI := 0.0
+	counterTPfromLongShort := 0
+	percentAvgTPfromLongShort := 0.0
+	counterTPfromAtr := 0
+	percentAvgTPfromAtr := 0.0
+	counterTPfromOrder := 0
+	percentAvgTPfromOrder := 0.0
+	counterSLfromSL := 0
+	percentAvgSLfromSL := 0.0
+	counterSLfromOrder := 0
+	percentAvgSLfromOrder := 0.0
+
 	s.activeMakerOrders = bbgo.NewLocalActiveOrderBook(s.Symbol)
 	s.activeMakerOrders.BindStream(session.UserDataStream)
 
@@ -713,6 +725,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 		balances := session.GetAccount().Balances()
 		quoteBalance := balances[s.Market.QuoteCurrency].Available
+		atr := fixedpoint.NewFromFloat(s.atr.Last())
 		atrx2 := fixedpoint.NewFromFloat(s.atr.Last() * 2)
 		lastPrice := price
 		var ok bool
@@ -732,17 +745,42 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		spBack := s.sellPrice
 		if !quoteBalance.IsZero() {
 			longSignal := types.CrossOver(s.ewo, s.ewoSignal)
+			base := fixedpoint.NewFromFloat(s.ma34.Last())
 			// TP
-			if lastPrice.Compare(s.sellPrice) < 0 && (s.ccis.BuySignal() || longSignal.Last()) {
+			if lastPrice.Compare(s.sellPrice) < 0 && (s.ccis.BuySignal() || longSignal.Last() || (!atrx2.IsZero() && base.Sub(atrx2).Compare(lastPrice) >= 0)) {
 				buyall = true
 				s.bottomPrice = fixedpoint.Zero
 				takeProfit = true
+
+				// calculate report
+				pnlRate := s.sellPrice.Sub(lastPrice).Div(lastPrice).Float64()
+				if s.ccis.BuySignal() {
+					percentAvgTPfromCCI = percentAvgTPfromCCI*float64(counterTPfromCCI) + pnlRate
+					counterTPfromCCI += 1
+					percentAvgTPfromCCI /= float64(counterTPfromCCI)
+				} else if longSignal.Last() {
+					percentAvgTPfromLongShort = percentAvgTPfromLongShort*float64(counterTPfromLongShort) + pnlRate
+					counterTPfromLongShort += 1
+					percentAvgTPfromLongShort /= float64(counterTPfromLongShort)
+				} else {
+					percentAvgTPfromAtr = percentAvgTPfromAtr*float64(counterTPfromAtr) + pnlRate
+					counterTPfromAtr += 1
+					percentAvgTPfromAtr /= float64(counterTPfromAtr)
+
+				}
+
 			}
-			if !atrx2.IsZero() && s.bottomPrice.Add(atrx2).Compare(lastPrice) >= 0 &&
+			if !atr.IsZero() && s.bottomPrice.Add(atr).Compare(lastPrice) <= 0 &&
 				lastPrice.Compare(s.sellPrice) < 0 {
 				buyall = true
 				s.bottomPrice = fixedpoint.Zero
 				takeProfit = true
+
+				// calculate report
+				pnlRate := s.sellPrice.Sub(lastPrice).Div(lastPrice).Float64()
+				percentAvgTPfromPeak = percentAvgTPfromPeak*float64(counterTPfromPeak) + pnlRate
+				counterTPfromPeak += 1
+				percentAvgTPfromPeak /= float64(counterTPfromPeak)
 			}
 
 			// SL
@@ -754,10 +792,16 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				buyall = true
 				s.bottomPrice = fixedpoint.Zero
 			}*/
-			if !s.DisableShortStop && ((!atrx2.IsZero() && s.sellPrice.Add(atrx2).Compare(lastPrice) <= 0) ||
+			if !s.DisableShortStop && ((!atr.IsZero() && s.sellPrice.Sub(atr).Compare(lastPrice) >= 0) ||
 				lastPrice.Sub(s.sellPrice).Div(s.sellPrice).Compare(s.Stoploss) > 0) {
 				buyall = true
 				s.bottomPrice = fixedpoint.Zero
+
+				// calculate report
+				pnlRate := lastPrice.Sub(s.sellPrice).Div(lastPrice).Float64()
+				percentAvgSLfromSL = percentAvgSLfromSL*float64(counterSLfromSL) + pnlRate
+				counterSLfromSL += 1
+				percentAvgSLfromSL /= float64(counterSLfromSL)
 			}
 		}
 		if buyall {
@@ -780,6 +824,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 		balances := session.GetAccount().Balances()
 		baseBalance := balances[s.Market.BaseCurrency].Available
+		atr := fixedpoint.NewFromFloat(s.atr.Last())
 		atrx2 := fixedpoint.NewFromFloat(s.atr.Last() * 2)
 		lastPrice := price
 		var ok bool
@@ -800,16 +845,39 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		if !baseBalance.IsZero() {
 			shortSignal := types.CrossUnder(s.ewo, s.ewoSignal)
 			// TP
-			if !atrx2.IsZero() && s.peakPrice.Sub(atrx2).Compare(lastPrice) >= 0 &&
+			if !atr.IsZero() && s.peakPrice.Sub(atr).Compare(lastPrice) >= 0 &&
 				lastPrice.Compare(s.buyPrice) > 0 {
 				sellall = true
 				s.peakPrice = fixedpoint.Zero
 				takeProfit = true
+
+				// calculate report
+				pnlRate := lastPrice.Sub(s.buyPrice).Div(s.buyPrice).Float64()
+				percentAvgTPfromPeak = percentAvgTPfromPeak*float64(counterTPfromPeak) + pnlRate
+				counterTPfromPeak += 1
+				percentAvgTPfromPeak /= float64(counterTPfromPeak)
 			}
-			if lastPrice.Compare(s.buyPrice) > 0 && (s.ccis.SellSignal() || shortSignal.Last()) {
+			base := fixedpoint.NewFromFloat(s.ma34.Last())
+			if lastPrice.Compare(s.buyPrice) > 0 && (s.ccis.SellSignal() || shortSignal.Last() || (!atrx2.IsZero() && base.Add(atrx2).Compare(lastPrice) <= 0)) {
 				sellall = true
 				s.peakPrice = fixedpoint.Zero
 				takeProfit = true
+
+				// calculate report
+				pnlRate := lastPrice.Sub(s.buyPrice).Div(s.buyPrice).Float64()
+				if s.ccis.SellSignal() {
+					percentAvgTPfromCCI = percentAvgTPfromCCI*float64(counterTPfromCCI) + pnlRate
+					counterTPfromCCI += 1
+					percentAvgTPfromCCI /= float64(counterTPfromCCI)
+				} else if shortSignal.Last() {
+					percentAvgTPfromLongShort = percentAvgTPfromLongShort*float64(counterTPfromLongShort) + pnlRate
+					counterTPfromLongShort += 1
+					percentAvgTPfromLongShort /= float64(counterTPfromLongShort)
+				} else {
+					percentAvgTPfromAtr = percentAvgTPfromAtr*float64(counterTPfromAtr) + pnlRate
+					counterTPfromAtr += 1
+					percentAvgTPfromAtr /= float64(counterTPfromAtr)
+				}
 			}
 
 			// SL
@@ -822,9 +890,15 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				s.peakPrice = fixedpoint.Zero
 			}*/
 			if !s.DisableLongStop && (s.buyPrice.Sub(lastPrice).Div(s.buyPrice).Compare(s.Stoploss) > 0 ||
-				(!atrx2.IsZero() && s.buyPrice.Sub(atrx2).Compare(lastPrice) >= 0)) {
+				(!atr.IsZero() && s.buyPrice.Sub(atr).Compare(lastPrice) >= 0)) {
 				sellall = true
 				s.peakPrice = fixedpoint.Zero
+
+				// calculate report
+				pnlRate := s.buyPrice.Sub(lastPrice).Div(s.buyPrice).Float64()
+				percentAvgSLfromSL = percentAvgSLfromSL*float64(counterSLfromSL) + pnlRate
+				counterSLfromSL += 1
+				percentAvgSLfromSL /= float64(counterSLfromSL)
 			}
 		}
 
@@ -908,8 +982,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			s.lock.RUnlock()
 		}
 		balances := session.GetAccount().Balances()
-		baseBalance := balances[s.Market.BaseCurrency].Available
-		quoteBalance := balances[s.Market.QuoteCurrency].Available
+		baseBalance := balances[s.Market.BaseCurrency].Total()
+		quoteBalance := balances[s.Market.QuoteCurrency].Total()
 		atr := fixedpoint.NewFromFloat(s.atr.Last())
 		if !s.Environment.IsBackTesting() {
 			log.Infof("Get last price: %v, ewo %f, ewoSig %f, ccis: %f, atr %v, kline: %v, balance[base]: %v balance[quote]: %v",
@@ -951,15 +1025,51 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 
 		if longSignal.Index(1) && !shortSignal.Last() && IsBull {
-			s.CancelAll(ctx, types.SideTypeBuy)
-			if quoteBalance.Div(lastPrice).Compare(s.Market.MinQuantity) >= 0 && quoteBalance.Compare(s.Market.MinNotional) >= 0 {
-				s.PlaceBuyOrder(ctx, lastPrice)
+			price := kline.Close.Sub(atr.Div(types.Two))
+			// if total asset (including locked) could be used to buy
+			if quoteBalance.Div(price).Compare(s.Market.MinQuantity) >= 0 && quoteBalance.Compare(s.Market.MinNotional) >= 0 {
+				// cancel all buy orders to release lock
+				s.CancelAll(ctx, types.SideTypeBuy)
+
+				// calculate report
+				if !s.sellPrice.IsZero() {
+					if price.Compare(s.sellPrice) > 0 {
+						pnlRate := price.Sub(s.sellPrice).Div(price).Float64()
+						percentAvgTPfromOrder = percentAvgTPfromOrder*float64(counterTPfromOrder) + pnlRate
+						counterTPfromOrder += 1
+						percentAvgTPfromOrder /= float64(counterTPfromOrder)
+					} else {
+						pnlRate := s.sellPrice.Sub(price).Div(price).Float64()
+						percentAvgSLfromOrder = percentAvgSLfromOrder*float64(counterSLfromOrder) + pnlRate
+						counterSLfromOrder += 1
+						percentAvgSLfromOrder /= float64(counterSLfromOrder)
+					}
+				}
+				s.PlaceBuyOrder(ctx, price)
 			}
 		}
 		if shortSignal.Index(1) && !longSignal.Last() && IsBear {
-			s.CancelAll(ctx, types.SideTypeSell)
-			if baseBalance.Mul(lastPrice).Compare(s.Market.MinNotional) >= 0 && baseBalance.Compare(s.Market.MinQuantity) >= 0 {
-				s.PlaceSellOrder(ctx, lastPrice)
+			price := kline.Close.Add(atr.Div(types.Two))
+			// if total asset (including locked) could be used to sell
+			if baseBalance.Mul(price).Compare(s.Market.MinNotional) >= 0 && baseBalance.Compare(s.Market.MinQuantity) >= 0 {
+				// cancel all sell orders to release lock
+				s.CancelAll(ctx, types.SideTypeSell)
+
+				// calculate report
+				if !s.buyPrice.IsZero() {
+					if price.Compare(s.buyPrice) > 0 {
+						pnlRate := price.Sub(s.buyPrice).Div(s.buyPrice).Float64()
+						percentAvgTPfromOrder = percentAvgTPfromOrder*float64(counterTPfromOrder) + pnlRate
+						counterTPfromOrder += 1
+						percentAvgTPfromOrder /= float64(counterTPfromOrder)
+					} else {
+						pnlRate := s.buyPrice.Sub(price).Div(s.buyPrice).Float64()
+						percentAvgSLfromOrder = percentAvgSLfromOrder*float64(counterSLfromOrder) + pnlRate
+						counterSLfromOrder += 1
+						percentAvgSLfromOrder /= float64(counterSLfromOrder)
+					}
+				}
+				s.PlaceSellOrder(ctx, price)
 			}
 		}
 	})
@@ -978,6 +1088,32 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			log.WithError(err).Errorf("cancel order error")
 		}
 		s.tradeCollector.Process()
+		color.HiBlue("---- Trade Report (Without Fee) ----")
+		color.HiBlue("TP:")
+		color.Blue("\tpeak / bottom with atr: %d, avg pnl rate: %f", counterTPfromPeak, percentAvgTPfromPeak)
+		color.Blue("\tCCI Stochastic: %d, avg pnl rate: %f", counterTPfromCCI, percentAvgTPfromCCI)
+		color.Blue("\tLongSignal/ShortSignal: %d, avg pnl rate: %f", counterTPfromLongShort, percentAvgTPfromLongShort)
+		color.Blue("\tma34 and Atrx2: %d, avg pnl rate: %f", counterTPfromAtr, percentAvgTPfromAtr)
+		color.Blue("\tActive Order: %d, avg pnl rate: %f", counterTPfromOrder, percentAvgTPfromOrder)
+
+		totalTP := counterTPfromPeak + counterTPfromCCI + counterTPfromLongShort + counterTPfromAtr + counterTPfromOrder
+		avgProfit := (float64(counterTPfromPeak)*percentAvgTPfromPeak +
+			float64(counterTPfromCCI)*percentAvgTPfromCCI +
+			float64(counterTPfromLongShort)*percentAvgTPfromLongShort +
+			float64(counterTPfromAtr)*percentAvgTPfromAtr +
+			float64(counterTPfromOrder)*percentAvgTPfromOrder) / float64(totalTP)
+		color.HiBlue("\tSum: %d, avg pnl rate: %f", totalTP, avgProfit)
+
+		color.HiBlue("SL:")
+		color.Blue("\tentry SL: %d, avg pnl rate: -%f", counterSLfromSL, percentAvgSLfromSL)
+		color.Blue("\tActive Order: %d, avg pnl rate: -%f", counterSLfromOrder, percentAvgSLfromOrder)
+
+		totalSL := counterSLfromSL + counterSLfromOrder
+		avgLoss := (float64(counterSLfromSL)*percentAvgSLfromSL + float64(counterSLfromOrder)*percentAvgSLfromOrder) / float64(totalSL)
+		color.HiBlue("\tSum: %d, avg pnl rate: -%f", totalSL, avgLoss)
+
+		color.HiBlue("WinRate: %f", float64(totalTP)/float64(totalTP+totalSL))
+
 	})
 	return nil
 }
