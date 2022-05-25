@@ -13,14 +13,14 @@ exchangeStrategies:
     # kline interval for indicators
     interval: 15m
     # use ema as MA
-    useEma: true
+    useEma: false
     # use sma as MA, used when ema is false
     # if both sma and ema are false, use EVMA
     useSma: false
     # ewo signal line window size
     sigWin: 5
     # SL percentage from entry price
-    stoploss: 15%
+    stoploss: 2%
     # use HeikinAshi klines instead of normal OHLC
     useHeikinAshi: true
     # disable SL when short
@@ -43,7 +43,7 @@ sync:
 
 backtest:
   startTime: "2022-05-01"
-  endTime: "2022-05-24"
+  endTime: "2022-05-25"
   symbols:
     - MATICUSDT
   sessions: [binance]
@@ -52,5 +52,5 @@ backtest:
       #makerFeeRate: 0
       #takerFeeRate: 15
       balances:
-        MATIC: 000.0
+        MATIC: 00.0
         USDT: 15000.0
