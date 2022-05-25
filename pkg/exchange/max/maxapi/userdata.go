@@ -201,19 +201,19 @@ func parseAuthEvent(v *fastjson.Value) (*AuthEvent, error) {
 func ParseUserEvent(v *fastjson.Value) (interface{}, error) {
 	eventType := string(v.GetStringBytes("e"))
 	switch eventType {
-	case "order_snapshot":
+	case "order_snapshot", "mwallet_order_snapshot":
 		return parserOrderSnapshotEvent(v), nil
 
-	case "order_update":
+	case "order_update", "mwallet_order_update":
 		return parseOrderUpdateEvent(v), nil
 
-	case "trade_snapshot":
+	case "trade_snapshot", "mwallet_trade_snapshot":
 		return parseTradeSnapshotEvent(v), nil
 
-	case "trade_update":
+	case "trade_update", "mwallet_trade_update":
 		return parseTradeUpdateEvent(v), nil
 
-	case "account_snapshot", "account_update":
+	case "account_snapshot", "account_update", "mwallet_account_snapshot", "mwallet_account_update":
 		var e AccountUpdateEvent
 		o := v.String()
 		err := json.Unmarshal([]byte(o), &e)
