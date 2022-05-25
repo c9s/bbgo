@@ -1,0 +1,15 @@
+---
+sessions:
+  binance_margin_linkusdt:
+    exchange: binance
+    margin: true
+    isolatedMargin: true
+    isolatedMarginSymbol: LINKUSDT
+
+exchangeStrategies:
+
+- on: binance_margin_linkusdt
+  dummy:
+    symbol: LINKUSDT
+    interval: 1m
+

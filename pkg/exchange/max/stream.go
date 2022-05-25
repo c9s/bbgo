@@ -33,6 +33,8 @@ type Stream struct {
 	tradeSnapshotEventCallbacks []func(e max.TradeSnapshotEvent)
 	orderUpdateEventCallbacks   []func(e max.OrderUpdateEvent)
 	orderSnapshotEventCallbacks []func(e max.OrderSnapshotEvent)
+	adRatioEventCallbacks       []func(e max.ADRatioEvent)
+	debtEventCallbacks          []func(e max.DebtEvent)
 
 	accountSnapshotEventCallbacks []func(e max.AccountSnapshotEvent)
 	accountUpdateEventCallbacks   []func(e max.AccountUpdateEvent)
@@ -47,7 +49,6 @@ func NewStream(key, secret string) *Stream {
 	stream.SetEndpointCreator(stream.getEndpoint)
 	stream.SetParser(max.ParseMessage)
 	stream.SetDispatcher(stream.dispatchEvent)
-
 	stream.OnConnect(stream.handleConnect)
 	stream.OnKLineEvent(stream.handleKLineEvent)
 	stream.OnOrderSnapshotEvent(stream.handleOrderSnapshotEvent)
@@ -257,8 +258,11 @@ func (s *Stream) dispatchEvent(e interface{}) {
 	case *max.OrderUpdateEvent:
 		s.EmitOrderUpdateEvent(*e)
 
+	case *max.ADRatioEvent:
+		log.Info(e.ADRatio.String())
+
 	default:
-		log.Errorf("unsupported %T event: %+v", e, e)
+		log.Warnf("unhandled %T event: %+v", e, e)
 	}
 }
 

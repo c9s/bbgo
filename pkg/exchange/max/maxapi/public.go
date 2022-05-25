@@ -3,7 +3,6 @@ package max
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net/url"
 	"strconv"
 	"strings"
@@ -21,12 +20,12 @@ type PublicService struct {
 }
 
 type Market struct {
-	ID                 string  `json:"id"`
-	Name               string  `json:"name"`
-	BaseUnit           string  `json:"base_unit"`
-	BaseUnitPrecision  int     `json:"base_unit_precision"`
-	QuoteUnit          string  `json:"quote_unit"`
-	QuoteUnitPrecision int     `json:"quote_unit_precision"`
+	ID                 string           `json:"id"`
+	Name               string           `json:"name"`
+	BaseUnit           string           `json:"base_unit"`
+	BaseUnitPrecision  int              `json:"base_unit_precision"`
+	QuoteUnit          string           `json:"quote_unit"`
+	QuoteUnitPrecision int              `json:"quote_unit_precision"`
 	MinBaseAmount      fixedpoint.Value `json:"min_base_amount"`
 	MinQuoteAmount     fixedpoint.Value `json:"min_quote_amount"`
 }
@@ -256,23 +255,12 @@ func (s *PublicService) KLines(symbol string, resolution string, start time.Time
 		return nil, fmt.Errorf("request build error: %s", err.Error())
 	}
 
-	resp, err := s.client.Do(req)
+	resp, err := s.client.SendRequest(req)
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %s", err.Error())
 	}
 
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			logger.WithError(err).Error("failed to close resp body")
-		}
-	}()
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	return parseKLines(body, symbol, resolution, interval)
+	return parseKLines(resp.Body, symbol, resolution, interval)
 }
 
 func parseKLines(payload []byte, symbol, resolution string, interval Interval) (klines []KLine, err error) {
