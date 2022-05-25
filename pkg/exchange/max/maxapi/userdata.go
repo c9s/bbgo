@@ -218,9 +218,32 @@ func parseADRatio(v *fastjson.Value) (*ADRatio, error) {
 	if err != nil {
 		return nil, err
 	}
-	adRatio := ADRatio{}
+
+	adRatio := struct {
+		ADRatio ADRatio `json:"ad"`
+	}{}
 	err = json.Unmarshal(o, &adRatio)
-	return &adRatio, err
+	return &adRatio.ADRatio, err
+}
+
+type Debt struct {
+	Currency      string                     `json:"cu"`
+	DebtPrincipal fixedpoint.Value           `json:"dbp"`
+	DebtInterest  fixedpoint.Value           `json:"dbi"`
+	TU            types.MillisecondTimestamp `json:"TU"`
+}
+
+func parseDebts(v *fastjson.Value) ([]Debt, error) {
+	o, err := v.StringBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	m := struct {
+		Debts []Debt `json:"db"`
+	}{}
+	err = json.Unmarshal(o, &m)
+	return m.Debts, err
 }
 
 func ParseUserEvent(v *fastjson.Value) (interface{}, error) {
@@ -241,10 +264,17 @@ func ParseUserEvent(v *fastjson.Value) (interface{}, error) {
 	case "ad_ratio_snapshot", "ad_ratio_update":
 		return parseADRatio(v)
 
+	case "borrowing_snapshot", "borrowing_update":
+		return parseDebts(v)
+
 	case "account_snapshot", "account_update", "mwallet_account_snapshot", "mwallet_account_update":
 		var e AccountUpdateEvent
-		o := v.String()
-		err := json.Unmarshal([]byte(o), &e)
+		o, err := v.StringBytes()
+		if err != nil {
+			return nil, err
+		}
+
+		err = json.Unmarshal(o, &e)
 		return &e, err
 
 	case "error":
