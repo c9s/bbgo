@@ -1,0 +1,13 @@
+---
+sessions:
+  max_margin:
+    exchange: max
+    margin: true
+
+exchangeStrategies:
+
+- on: max_margin
+  pricealert:
+    symbol: LINKUSDT
+    interval: 1m
+

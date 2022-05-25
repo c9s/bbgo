@@ -2,6 +2,7 @@ package max
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -213,17 +214,19 @@ type ADRatio struct {
 	TU types.MillisecondTimestamp `json:"TU"`
 }
 
-func parseADRatio(v *fastjson.Value) (*ADRatio, error) {
-	o, err := v.StringBytes()
-	if err != nil {
-		return nil, err
-	}
+func (r *ADRatio) String() string {
+	return fmt.Sprintf("ADRatio: %v Asset: %v USDT, Debt: %v USDT (Mark Prices: %+v)", r.ADRatio, r.AssetInUSDT, r.DebtInUSDT, r.IndexPrices)
+}
 
-	adRatio := struct {
-		ADRatio ADRatio `json:"ad"`
-	}{}
-	err = json.Unmarshal(o, &adRatio)
-	return &adRatio.ADRatio, err
+type ADRatioEvent struct {
+	ADRatio ADRatio `json:"ad"`
+}
+
+func parseADRatioEvent(v *fastjson.Value) (*ADRatioEvent, error) {
+	o := v.String()
+	e := ADRatioEvent{}
+	err := json.Unmarshal([]byte(o), &e)
+	return &e, err
 }
 
 type Debt struct {
@@ -233,17 +236,15 @@ type Debt struct {
 	TU            types.MillisecondTimestamp `json:"TU"`
 }
 
-func parseDebts(v *fastjson.Value) ([]Debt, error) {
-	o, err := v.StringBytes()
-	if err != nil {
-		return nil, err
-	}
+type DebtEvent struct {
+	Debts []Debt `json:"db"`
+}
 
-	m := struct {
-		Debts []Debt `json:"db"`
-	}{}
-	err = json.Unmarshal(o, &m)
-	return m.Debts, err
+func parseDebts(v *fastjson.Value) (*DebtEvent, error) {
+	o := v.String()
+	e := DebtEvent{}
+	err := json.Unmarshal([]byte(o), &e)
+	return &e, err
 }
 
 func ParseUserEvent(v *fastjson.Value) (interface{}, error) {
@@ -262,19 +263,15 @@ func ParseUserEvent(v *fastjson.Value) (interface{}, error) {
 		return parseTradeUpdateEvent(v), nil
 
 	case "ad_ratio_snapshot", "ad_ratio_update":
-		return parseADRatio(v)
+		return parseADRatioEvent(v)
 
 	case "borrowing_snapshot", "borrowing_update":
 		return parseDebts(v)
 
 	case "account_snapshot", "account_update", "mwallet_account_snapshot", "mwallet_account_update":
 		var e AccountUpdateEvent
-		o, err := v.StringBytes()
-		if err != nil {
-			return nil, err
-		}
-
-		err = json.Unmarshal(o, &e)
+		o := v.String()
+		err := json.Unmarshal([]byte(o), &e)
 		return &e, err
 
 	case "error":

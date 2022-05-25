@@ -106,6 +106,26 @@ func (s *Stream) EmitOrderSnapshotEvent(e max.OrderSnapshotEvent) {
 	}
 }
 
+func (s *Stream) OnAdRatioEvent(cb func(e max.ADRatioEvent)) {
+	s.adRatioEventCallbacks = append(s.adRatioEventCallbacks, cb)
+}
+
+func (s *Stream) EmitAdRatioEvent(e max.ADRatioEvent) {
+	for _, cb := range s.adRatioEventCallbacks {
+		cb(e)
+	}
+}
+
+func (s *Stream) OnDebtEvent(cb func(e max.DebtEvent)) {
+	s.debtEventCallbacks = append(s.debtEventCallbacks, cb)
+}
+
+func (s *Stream) EmitDebtEvent(e max.DebtEvent) {
+	for _, cb := range s.debtEventCallbacks {
+		cb(e)
+	}
+}
+
 func (s *Stream) OnAccountSnapshotEvent(cb func(e max.AccountSnapshotEvent)) {
 	s.accountSnapshotEventCallbacks = append(s.accountSnapshotEventCallbacks, cb)
 }
