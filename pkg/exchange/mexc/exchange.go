@@ -18,12 +18,14 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 )
 
 const MX = "MX"
 
 var queryLimiter = rate.NewLimiter(rate.Every(time.Second), 20)
+var debug bool = false
 
 var urlTemplate url.URL = url.URL{
 	Scheme:  "https",
@@ -51,7 +53,10 @@ func (e *Exchange) PlatformFeeCurrency() string {
 	return MX
 }
 
-func (e *Exchange) publicRequest(ctx context.Context, method string, path string, params url.Values) ([]byte, error) {
+func (e *Exchange) publicRequest(ctx context.Context, method string, path string, params url.Values, result interface{}) error {
+	if err := queryLimiter.Wait(ctx); err != nil {
+		return err
+	}
 	u := urlTemplate
 	u.Path += path
 	u.RawPath += path
@@ -59,7 +64,7 @@ func (e *Exchange) publicRequest(ctx context.Context, method string, path string
 	log.Println(u.String())
 	req, err := http.NewRequestWithContext(ctx, method, u.String(), nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("X-MEXC-APIKEY", e.key)
@@ -73,19 +78,26 @@ func (e *Exchange) publicRequest(ctx context.Context, method string, path string
 	}
 	resp, err := e.client.Do(req)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if resp.StatusCode > 299 {
-		return nil, errors.New(fmt.Sprintf("return status value: %d", resp.StatusCode))
+		return errors.New(fmt.Sprintf("return status value: %d", resp.StatusCode))
 	}
 	defer resp.Body.Close()
-	return io.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, result)
 }
 
-func (e *Exchange) signRequest(ctx context.Context, method string, path string, params url.Values) ([]byte, error) {
+func (e *Exchange) signRequest(ctx context.Context, method string, path string, params url.Values, result interface{}) error {
 	timestamp, err := e.time(ctx)
 	if err != nil {
-		return nil, err
+		return err
+	}
+	if err := queryLimiter.Wait(ctx); err != nil {
+		return err
 	}
 	// user time might not be synchronized with the server
 	// timestamp := time.Now().UnixMilli()
@@ -102,7 +114,7 @@ func (e *Exchange) signRequest(ctx context.Context, method string, path string, 
 	log.Infof("%s %s, %s", u.String(), method, queryString)
 	req, err := http.NewRequestWithContext(ctx, method, u.String(), nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("X-MEXC-APIKEY", e.key)
@@ -116,17 +128,26 @@ func (e *Exchange) signRequest(ctx context.Context, method string, path string, 
 	}
 	resp, err := e.client.Do(req)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if resp.StatusCode > 299 {
-		return nil, errors.New(fmt.Sprintf("return status value: %d", resp.StatusCode))
+		return errors.New(fmt.Sprintf("return status value: %d", resp.StatusCode))
 	}
 	defer resp.Body.Close()
-	return io.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	if debug {
+		log.Infof("%s", data)
+	}
+	return json.Unmarshal(data, result)
 }
 
+type pingResp struct{}
+
 func (e *Exchange) ping(ctx context.Context) bool {
-	_, err := e.publicRequest(ctx, "GET", "/ping", url.Values{})
+	err := e.publicRequest(ctx, "GET", "/ping", url.Values{}, &pingResp{})
 	if err != nil {
 		log.WithError(err).Errorf("ping error")
 		return false
@@ -140,12 +161,10 @@ type Time struct {
 
 func (e *Exchange) time(ctx context.Context) (int64, error) {
 	var t Time
-	resp, err := e.publicRequest(ctx, "GET", "/time", url.Values{})
-	if err != nil {
+	if err := e.publicRequest(ctx, "GET", "/time", url.Values{}, &t); err != nil {
 		log.WithError(err).Errorf("time error")
 		return 0, err
 	}
-	json.Unmarshal(resp, &t)
 	return t.ServerTime, nil
 }
 
@@ -181,13 +200,11 @@ func (t *ticker24hr) ToTicker() types.Ticker {
 func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticker, error) {
 	v := url.Values{}
 	v.Add("symbol", symbol)
-	resp, err := e.publicRequest(ctx, "GET", "/ticker/24hr", v)
-	if err != nil {
+	t := ticker24hr{}
+	if err := e.publicRequest(ctx, "GET", "/ticker/24hr", v, &t); err != nil {
 		log.WithError(err).Errorf("queryTicker error")
 		return nil, err
 	}
-	t := ticker24hr{}
-	json.Unmarshal(resp, &t)
 	result := t.ToTicker()
 	return &result, nil
 }
@@ -196,13 +213,11 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbols ...string) (result 
 	result = make(map[string]types.Ticker)
 	// return all symbols if given empty symbols
 	if len(symbols) == 0 {
-		resp, err := e.publicRequest(ctx, "GET", "/ticker/24hr", url.Values{})
-		if err != nil {
+		t := []ticker24hr{}
+		if err := e.publicRequest(ctx, "GET", "/ticker/24hr", url.Values{}, &t); err != nil {
 			log.WithError(err).Errorf("queryTicker error")
 			return result, err
 		}
-		t := []ticker24hr{}
-		json.Unmarshal(resp, &t)
 		for _, tt := range t {
 			result[tt.Symbol] = tt.ToTicker()
 		}
@@ -258,13 +273,11 @@ type exchangeInfo struct {
 
 func (e *Exchange) QueryMarkets(ctx context.Context) (result types.MarketMap, err error) {
 	result = make(map[string]types.Market)
-	resp, err := e.publicRequest(ctx, "GET", "/exchangeInfo", url.Values{})
-	if err != nil {
+	m := exchangeInfo{}
+	if err := e.publicRequest(ctx, "GET", "/exchangeInfo", url.Values{}, &m); err != nil {
 		log.WithError(err).Errorf("query markets failed")
 		return result, err
 	}
-	m := exchangeInfo{}
-	json.Unmarshal(resp, &m)
 	for _, mm := range m.Symbols {
 		result[mm.Symbol] = mm.ToMarket()
 	}
@@ -283,13 +296,11 @@ func (e *Exchange) QueryMarketOrders(ctx context.Context, symbol string) (orders
 	v := url.Values{}
 	v.Set("symbol", symbol)
 	//v.Set("limit", 100)  // default: 100, max: 5000
-	resp, err := e.publicRequest(ctx, "GET", "/depth", v)
-	if err != nil {
+	d := depth{}
+	if err := e.publicRequest(ctx, "GET", "/depth", v, &d); err != nil {
 		log.WithError(err).Errorf("query open orders failed")
 		return orders, err
 	}
-	d := depth{}
-	json.Unmarshal(resp, &d)
 	for _, pv := range d.Bids {
 		order := types.Order{
 			SubmitOrder: types.SubmitOrder{
@@ -320,55 +331,118 @@ func (e *Exchange) QueryMarketOrders(ctx context.Context, symbol string) (orders
 
 func FromInterval(in types.Interval) string {
 	switch in {
-	case types.Interval1m, types.Interval5m, types.Interval15m, types.Interval30m, types.Interval4h, types.Interval8h, types.Interval1d, types.Interval1M:
+	case types.Interval1m, types.Interval5m, types.Interval15m, types.Interval30m, types.Interval4h /*types.Interval8h,*/, types.Interval1d, types.Interval1M:
 		return string(in)
 	case types.Interval1h:
 		return "60m"
 	default:
-		panic("interval not supported.")
+		log.Errorf("interval not supported: %s", in)
+		return ""
 	}
 }
 
-func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) (result []types.KLine, err error) {
-	v := url.Values{}
-	v.Set("symbol", symbol)
-	v.Set("interval", FromInterval(interval))
-	if options.Limit > 0 {
-		v.Set("limit", strconv.Itoa(options.Limit))
-	}
-	if options.StartTime != nil {
-		v.Set("startTime", strconv.FormatInt(options.StartTime.UnixMilli(), 10))
-	}
-	if options.EndTime != nil {
-		v.Set("endTime", strconv.FormatInt(options.EndTime.UnixMilli(), 10))
-	}
-	resp, err := e.publicRequest(ctx, "GET", "/klines", v)
-	if err != nil {
+func (e *Exchange) queryKLinesSafe(ctx context.Context, interval types.Interval, v url.Values) (result []types.KLine, err error) {
+	k := [][]json.RawMessage{}
+	if err := e.publicRequest(ctx, "GET", "/klines", v, &k); err != nil {
 		log.WithError(err).Errorf("query klines failed")
 		return result, err
 	}
-	k := [][]fixedpoint.Value{}
-	json.Unmarshal(resp, &k)
-
 	// last kline will be in the end
 	for i := len(k) - 1; i >= 0; i-- {
 		kk := k[i]
 		kline := types.KLine{
-			Exchange:    types.ExchangeMEXC,
-			Interval:    interval,
-			Symbol:      symbol,
-			StartTime:   types.Time(types.NewMillisecondTimestampFromInt(kk[0].Int64())),
-			Open:        kk[1],
-			High:        kk[2],
-			Low:         kk[3],
-			Close:       kk[4],
-			Volume:      kk[5],
-			EndTime:     types.Time(types.NewMillisecondTimestampFromInt(kk[6].Int64())),
-			QuoteVolume: kk[7],
+			Exchange:  types.ExchangeMEXC,
+			Interval:  interval,
+			Symbol:    v["symbol"][0],
+			StartTime: types.Time(types.MustParseMillisecondTimestamp(string(kk[0]))),
+			EndTime:   types.Time(types.MustParseMillisecondTimestamp(string(kk[6]))),
 		}
+		kline.Open.UnmarshalJSON(kk[1])
+		kline.High.UnmarshalJSON(kk[2])
+		kline.Low.UnmarshalJSON(kk[3])
+		kline.Close.UnmarshalJSON(kk[4])
+		kline.Volume.UnmarshalJSON(kk[5])
+		kline.QuoteVolume.UnmarshalJSON(kk[7])
+
 		result = append(result, kline)
 	}
+
 	return result, nil
+}
+
+func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) (result []types.KLine, err error) {
+	iv := FromInterval(interval)
+	if len(iv) == 0 {
+		return result, err
+	}
+	var startTime int64 = 0
+	var endTime int64 = 0
+	if options.StartTime != nil {
+		startTime = options.StartTime.UnixMilli()
+	}
+	if options.EndTime != nil {
+		endTime = options.EndTime.UnixMilli()
+	}
+	if startTime == 0 {
+		if endTime == 0 {
+			return result, errors.New("should provide at least startTime or endTime")
+		}
+		if options.Limit == 0 {
+			return result, errors.New("should provide at least limit or startTime")
+		}
+		startTime = endTime - int64(options.Limit)*60000*int64(interval.Minutes())
+	}
+	if endTime == 0 {
+		if options.Limit == 0 {
+			return result, errors.New("should provide at least limit or endTime")
+		}
+		endTime = startTime + int64(options.Limit)*60000*int64(interval.Minutes())
+	}
+	// if time range too large, query latest options.Limit klines
+	if options.Limit > 0 && endTime-startTime > int64(options.Limit)*60000*int64(interval.Minutes()) {
+		startTime = endTime - int64(options.Limit)*60000*int64(interval.Minutes())
+	} else {
+		options.Limit = int((endTime - startTime) / 60000 / int64(interval.Minutes()))
+		if options.Limit == 0 {
+			log.Infof("hello %v %v", endTime, startTime)
+			return result, nil
+		}
+	}
+	// (endTime, startTime]
+	if options.Limit <= 1000 {
+		v := url.Values{}
+		v.Set("symbol", symbol)
+		v.Set("interval", iv)
+		v.Set("limit", strconv.Itoa(options.Limit))
+		v.Set("startTime", strconv.FormatInt(endTime, 10))
+		return e.queryKLinesSafe(ctx, interval, v)
+	} else {
+		diff := int64(interval.Minutes()) * 60000 * 1000
+		for i := endTime + diff; i >= startTime; i -= diff {
+			v := url.Values{}
+			v.Set("symbol", symbol)
+			v.Set("interval", iv)
+			v.Set("startTime", strconv.FormatInt(i, 10))
+			if i-diff > startTime {
+				v.Set("limit", "1000")
+			} else {
+				limit := (i - startTime) / int64(interval.Minutes()) / 60000
+				if limit == 0 {
+					log.Infof("hello %v %v", i, startTime)
+					return result, nil
+				}
+				v.Set("limit", strconv.FormatInt(limit, 10))
+			}
+			// MEXC only stores the latest 1000 lines
+			return e.queryKLinesSafe(ctx, interval, v)
+			/*out, err := e.queryKLinesSafe(ctx, interval, v)
+			if err != nil {
+				return result, err
+			}
+			result = append(out, result...)*/
+		}
+		return result, nil
+	}
 }
 
 // private
@@ -405,7 +479,6 @@ func (c *cancelOrderResp) ToOrder() types.Order {
 	}
 }
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err error) {
-	var resp []byte
 	for _, o := range orders {
 		v := url.Values{}
 		v.Set("symbol", o.Symbol)
@@ -414,13 +487,11 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 			v.Set("origClientOrderId", o.UUID)
 			v.Set("newClientOrderId", o.UUID)
 		}
-		resp, err = e.signRequest(ctx, "DELETE", "/order", v)
-		if err != nil {
+		var result cancelOrderResp
+		if err = e.signRequest(ctx, "DELETE", "/order", v, result); err != nil {
 			log.WithError(err).Errorf("cancel failed")
 			continue
 		}
-		var result cancelOrderResp
-		json.Unmarshal(resp, &result)
 		if result.Status != types.OrderStatusCanceled &&
 			result.Status != types.OrderStatusPartiallyCanceled {
 			log.Debugf("cancel failed: OrderId: %s, Symbol: %s, Status: %s",
@@ -434,16 +505,13 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 }
 
 func (e *Exchange) CancelOrdersBySymbol(ctx context.Context, symbol string) (orders []types.Order, err error) {
-	var resp []byte
 	v := url.Values{}
 	v.Set("symbol", symbol)
-	resp, err = e.signRequest(ctx, "DELETE", "/openOrders", v)
-	if err != nil {
+	var results []cancelOrderResp
+	if err = e.signRequest(ctx, "DELETE", "/openOrders", v, &results); err != nil {
 		log.WithError(err).Errorf("cancel by symbol failed")
 		return orders, err
 	}
-	var results []cancelOrderResp
-	json.Unmarshal(resp, &results)
 	for _, result := range results {
 		if result.Status != types.OrderStatusCanceled &&
 			result.Status != types.OrderStatusPartiallyCanceled {
@@ -461,8 +529,8 @@ func (e *Exchange) CancelOrdersBySymbol(ctx context.Context, symbol string) (ord
 type queryOrderResp struct {
 	cancelOrderResp
 	StopPrice  fixedpoint.Value `json:"stopPrice"`
-	Time       types.Time       `json:"time"`
-	UpdateTime types.Time       `json:"updateTime"`
+	Time       int64            `json:"time"`
+	UpdateTime int64            `json:"updateTime"`
 	IsWorking  bool             `json:"isWorking"`
 
 	// open order query
@@ -474,8 +542,8 @@ type queryOrderResp struct {
 func (q *queryOrderResp) ToOrder() types.Order {
 	order := q.cancelOrderResp.ToOrder()
 	order.StopPrice = q.StopPrice
-	order.CreationTime = q.Time
-	order.UpdateTime = q.UpdateTime
+	order.CreationTime = types.Time(types.NewMillisecondTimestampFromInt(q.Time))
+	order.UpdateTime = types.Time(types.NewMillisecondTimestampFromInt(q.UpdateTime))
 	order.IsWorking = q.IsWorking
 	return order
 }
@@ -491,13 +559,12 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 	if len(q.ClientOrderID) > 0 {
 		v.Set("origClientId", q.ClientOrderID)
 	}
-	resp, err := e.signRequest(ctx, "GET", "/order", v)
-	if err != nil {
+
+	var result queryOrderResp
+	if err := e.signRequest(ctx, "GET", "/order", v, &result); err != nil {
 		log.WithError(err).Errorf("query order failed")
 		return nil, err
 	}
-	var result queryOrderResp
-	json.Unmarshal(resp, &result)
 	order := result.ToOrder()
 	return &order, nil
 }
@@ -507,14 +574,11 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
 	v := url.Values{}
 	v.Set("symbol", symbol)
-	var resp []byte
-	resp, err = e.signRequest(ctx, "GET", "/openOrders", v)
-	if err != nil {
+	var results []queryOrderResp
+	if err = e.signRequest(ctx, "GET", "/openOrders", v, &results); err != nil {
 		log.WithError(err).Errorf("open orders query failed")
 		return orders, err
 	}
-	var results []queryOrderResp
-	json.Unmarshal(resp, &results)
 	for _, result := range results {
 		orders = append(orders, result.ToOrder())
 	}
@@ -529,10 +593,10 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 	if lastOrderID > 0 {
 		v.Set("orderId", strconv.FormatUint(lastOrderID, 10))
 	}
-	var resp []byte
-	resp, err = e.signRequest(ctx, "GET", "/allOrders", v)
 	var results []queryOrderResp
-	json.Unmarshal(resp, &results)
+	if err = e.signRequest(ctx, "GET", "/allOrders", v, &results); err != nil {
+		return orders, err
+	}
 	for _, result := range results {
 		if result.Status != types.OrderStatusNew { // filled or cancelled
 			orders = append(orders, result.ToOrder())
@@ -592,14 +656,11 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 			return createdOrders, errors.New("stop limit order not supported")
 		}
 		// TODO: broker ID for newClientOrderId
-		var resp []byte
-		resp, err = e.signRequest(ctx, "POST", "/order", v)
-		if err != nil {
+		var result queryOrderResp
+		if err = e.signRequest(ctx, "POST", "/order", v, &result); err != nil {
 			log.WithError(err).Errorf("submit orders failed")
 			return createdOrders, err
 		}
-		var result queryOrderResp
-		json.Unmarshal(resp, &result)
 		order := result.ToOrder()
 		order.SubmitOrder = o
 		createdOrders = append(createdOrders, order)
@@ -642,22 +703,84 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 			v.Set("id", strconv.FormatUint(options.LastTradeID, 10))
 		}
 	}
-	var resp []byte
-	resp, err = e.signRequest(ctx, "GET", "/myTrades", v)
-	if err != nil {
+	var results []queryTradeResp
+	if err = e.signRequest(ctx, "GET", "/myTrades", v, &results); err != nil {
 		log.WithError(err).Errorf("submit orders failed")
 		return trades, err
 	}
-	var results []queryTradeResp
-	json.Unmarshal(resp, &results)
 	return trades, err
 
 }
 
-/*
-func (e *Exchange) NewStream() types.Stream {
+type Balance struct {
+	Asset  string           `json:"asset"`
+	Free   fixedpoint.Value `json:"free"`
+	Locked fixedpoint.Value `json:"locked"`
 }
 
+func (b *Balance) ToBalance() types.Balance {
+	return types.Balance{
+		Currency:  b.Asset,
+		Available: b.Free,
+		Locked:    b.Locked,
+	}
+}
+
+type queryAccountResp struct {
+	MakerCommission  fixedpoint.Value `json:"makerCommission"`
+	TakerCommission  fixedpoint.Value `json:"takerCommission"`
+	SellerCommission fixedpoint.Value `json:"sellerCommission"`
+	CanTrade         bool             `json:"canTrade"`
+	CanWithdraw      bool             `json:"canWithdraw"`
+	CanDeposit       bool             `josn:"candeposit"`
+	UpdateTime       *time.Time       `json:"updateTime"`
+	AccountType      string           `json:"accountType"`
+	Balances         []Balance        `json:"balances"`
+	Permissions      []string         `json:"permissions"`
+}
+
+/*{"makerCommission":20,"takerCommission":20,"buyerCommission":0,"sellerCommission":0,"canTrade":true,"canWithdraw":true,"canDeposit":true,"updateTime":null,"accountType":"SPOT","balances":[{"asset":"USDT","free":"22.6476628710420514","locked":"0"},{"asset":"AZERO3S","free":"0.0087","locked":"0"},{"asset":"AZERO","free":"0.00464","locked":"0"}],"permissions":["SPOT"]}*/
+
+func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
+	var result queryAccountResp
+	if err := e.signRequest(ctx, "GET", "/account", url.Values{}, &result); err != nil {
+		log.WithError(err).Errorf("query account fail")
+		return nil, err
+	}
+	balances := make(map[string]types.Balance)
+	for _, b := range result.Balances {
+		balances[b.Asset] = b.ToBalance()
+	}
+	a := types.NewAccount()
+	a.UpdateBalances(balances)
+	a.AccountType = types.AccountType(strings.ToLower(result.AccountType))
+	a.MakerFeeRate = result.MakerCommission
+	a.TakerFeeRate = result.TakerCommission
+	a.CanTrade = result.CanTrade
+	a.CanWithdraw = result.CanWithdraw
+	a.CanDeposit = result.CanDeposit
+
+	return a, nil
+}
+
+func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
+	var result queryAccountResp
+	if err := e.signRequest(ctx, "GET", "/account", url.Values{}, &result); err != nil {
+		log.WithError(err).Errorf("query account fail")
+		return nil, err
+	}
+	balances := make(map[string]types.Balance)
+	for _, b := range result.Balances {
+		balances[b.Asset] = b.ToBalance()
+	}
+	return balances, nil
+}
+
+func (e *Exchange) NewStream() types.Stream {
+	return NewStream(e)
+}
+
+/*
 func (e *Exchange) CancelAllOrders(ctx context.Context) ([]types.Order, error) {
 }
 
@@ -667,19 +790,13 @@ func (e *Exchange) CancelOrdersByGroupID(ctx context.Context, groupID uint32) ([
 func (e *Exchange) Withdrawal(ctx context.Context, asset string, amount fixedpoint.Value, address string, options *types.WithdrawalOptions) error {
 }
 
-func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
-}
-
 func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (allWithdraws []types.Withdraw, err error) {
 }
 
 func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since, until time.Time) (allDeposits []types.Deposit, err error) {
 }
 
-func (e *Exchange) QueryAccountBalance(ctx contexxt.Context) (types.BalanceMap, error) {
-}
-
 func (e *Exchange) QueryRewards(ctx context.Context, startTime time.Time) ([]types.Reward, error) {
 }
 */
-//var _ types.Exchange = &Exchange{}
+var _ types.Exchange = &Exchange{}

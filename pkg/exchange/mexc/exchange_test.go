@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -90,4 +91,11 @@ func Test_QueryOpenOrders(t *testing.T) {
 	t.Skip("private api skip")
 	assert.Equal(t, err, nil)
 	assert.Greater(t, len(orders), 0)
+}
+
+func Test_QueryAccount(t *testing.T) {
+	ex := getExchange(t)
+	account, err := ex.QueryAccount(context.Background())
+	assert.Equal(t, err, nil)
+	assert.Greater(t, account.TakerFeeRate, fixedpoint.Zero)
 }
