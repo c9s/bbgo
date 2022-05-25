@@ -38,6 +38,7 @@ type OrderUpdate struct {
 	GroupID     uint32 `json:"gi"`
 	ClientOID   string `json:"ci"`
 	CreatedAtMs int64  `json:"T"`
+	UpdateTime  int64  `json:"TU"`
 }
 
 type OrderUpdateEvent struct {
@@ -64,6 +65,7 @@ func parserOrderUpdate(v *fastjson.Value) OrderUpdate {
 		GroupID:         uint32(v.GetInt("gi")),
 		ClientOID:       string(v.GetStringBytes("ci")),
 		CreatedAtMs:     v.GetInt64("T"),
+		UpdateTime:      v.GetInt64("TU"),
 	}
 }
 
@@ -109,6 +111,7 @@ type TradeUpdate struct {
 	Fee         string `json:"f"`
 	FeeCurrency string `json:"fc"`
 	Timestamp   int64  `json:"T"`
+	UpdateTime  int64  `json:"TU"`
 
 	OrderID uint64 `json:"oi"`
 
@@ -125,6 +128,7 @@ func parseTradeUpdate(v *fastjson.Value) TradeUpdate {
 		Fee:         string(v.GetStringBytes("f")),
 		FeeCurrency: string(v.GetStringBytes("fc")),
 		Timestamp:   v.GetInt64("T"),
+		UpdateTime:  v.GetInt64("TU"),
 		OrderID:     v.GetUint64("oi"),
 		Maker:       v.GetBool("m"),
 	}
