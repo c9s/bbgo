@@ -10,6 +10,7 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/kucoin"
 	"github.com/c9s/bbgo/pkg/exchange/max"
 	"github.com/c9s/bbgo/pkg/exchange/okex"
+	"github.com/c9s/bbgo/pkg/exchange/mexc"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -34,6 +35,9 @@ func NewExchangeStandard(n types.ExchangeName, key, secret, passphrase, subAccou
 
 	case types.ExchangeKucoin:
 		return kucoin.New(key, secret, passphrase), nil
+
+	case types.ExchangeMEXC:
+		return mexc.New(key, secret), nil
 
 	default:
 		return nil, fmt.Errorf("unsupported exchange: %v", n)
