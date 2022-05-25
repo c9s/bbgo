@@ -238,7 +238,7 @@ func ParseUserEvent(v *fastjson.Value) (interface{}, error) {
 	case "trade_update", "mwallet_trade_update":
 		return parseTradeUpdateEvent(v), nil
 
-	case "ad_ratio_snapshot":
+	case "ad_ratio_snapshot", "ad_ratio_update":
 		return parseADRatio(v)
 
 	case "account_snapshot", "account_update", "mwallet_account_snapshot", "mwallet_account_update":
