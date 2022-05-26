@@ -21,7 +21,6 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
-	v3 "github.com/c9s/bbgo/pkg/exchange/max/maxapi/v3"
 	"github.com/c9s/bbgo/pkg/util"
 	"github.com/c9s/bbgo/pkg/version"
 )
@@ -102,8 +101,6 @@ type RestClient struct {
 	OrderService      *OrderService
 	RewardService     *RewardService
 	WithdrawalService *WithdrawalService
-
-	OrderServiceV3 *v3.OrderService
 }
 
 func NewRestClient(baseURL string) *RestClient {
@@ -125,8 +122,6 @@ func NewRestClient(baseURL string) *RestClient {
 	client.OrderService = &OrderService{client}
 	client.RewardService = &RewardService{client}
 	client.WithdrawalService = &WithdrawalService{client}
-
-	client.OrderServiceV3 = &v3.OrderService{Client: client}
 
 	// defaultHttpClient.MaxTokenService = &MaxTokenService{defaultHttpClient}
 	client.initNonce()

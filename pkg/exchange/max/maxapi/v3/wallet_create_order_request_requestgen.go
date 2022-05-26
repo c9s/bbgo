@@ -52,7 +52,7 @@ func (w *WalletCreateOrderRequest) GroupID(groupID string) *WalletCreateOrderReq
 	return w
 }
 
-func (w *WalletCreateOrderRequest) WalletType(walletType WalletType) *WalletCreateOrderRequest {
+func (w *WalletCreateOrderRequest) WalletType(walletType max.WalletType) *WalletCreateOrderRequest {
 	w.walletType = walletType
 	return w
 }
@@ -189,17 +189,6 @@ func (w *WalletCreateOrderRequest) GetSlugParameters() (map[string]interface{}, 
 		return nil, fmt.Errorf("walletType is required, empty string given")
 	}
 	// END TEMPLATE check-required
-
-	// TEMPLATE check-valid-values
-	switch walletType {
-	case WalletTypeSpot, WalletTypeMargin:
-		params["walletType"] = walletType
-
-	default:
-		return nil, fmt.Errorf("walletType value %v is invalid", walletType)
-
-	}
-	// END TEMPLATE check-valid-values
 
 	// assign parameter of walletType
 	params["walletType"] = walletType

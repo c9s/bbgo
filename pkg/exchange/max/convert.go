@@ -5,8 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -168,15 +166,8 @@ func toGlobalOrders(maxOrders []max.Order) (orders []types.Order, err error) {
 }
 
 func toGlobalOrder(maxOrder max.Order) (*types.Order, error) {
-	executedVolume, err := fixedpoint.NewFromString(maxOrder.ExecutedVolume)
-	if err != nil {
-		return nil, errors.Wrapf(err, "parse executed_volume failed: %+v", maxOrder)
-	}
-
-	remainingVolume, err := fixedpoint.NewFromString(maxOrder.RemainingVolume)
-	if err != nil {
-		return nil, errors.Wrapf(err, "parse remaining volume failed: %+v", maxOrder)
-	}
+	executedVolume := maxOrder.ExecutedVolume
+	remainingVolume := maxOrder.RemainingVolume
 
 	return &types.Order{
 		SubmitOrder: types.SubmitOrder{
@@ -184,13 +175,13 @@ func toGlobalOrder(maxOrder max.Order) (*types.Order, error) {
 			Symbol:        toGlobalSymbol(maxOrder.Market),
 			Side:          toGlobalSideType(maxOrder.Side),
 			Type:          toGlobalOrderType(maxOrder.OrderType),
-			Quantity:      fixedpoint.MustNewFromString(maxOrder.Volume),
-			Price:         fixedpoint.MustNewFromString(maxOrder.Price),
-			TimeInForce:   "GTC", // MAX only supports GTC
+			Quantity:      maxOrder.Volume,
+			Price:         maxOrder.Price,
+			TimeInForce:   types.TimeInForceGTC, // MAX only supports GTC
 			GroupID:       maxOrder.GroupID,
 		},
 		Exchange:         types.ExchangeMax,
-		IsWorking:        maxOrder.State == "wait",
+		IsWorking:        maxOrder.State == max.OrderStateWait,
 		OrderID:          maxOrder.ID,
 		Status:           toGlobalOrderStatus(maxOrder.State, executedVolume, remainingVolume),
 		ExecutedQuantity: executedVolume,
