@@ -236,6 +236,10 @@ type Debt struct {
 	TU            types.MillisecondTimestamp `json:"TU"`
 }
 
+func (d *Debt) String() string {
+	return fmt.Sprintf("Debt %s %v (Interest %v)", d.Currency, d.DebtPrincipal, d.DebtInterest)
+}
+
 type DebtEvent struct {
 	Debts []Debt `json:"db"`
 }
