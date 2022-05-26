@@ -35,6 +35,8 @@ type Strategy struct {
 	MaxAmount fixedpoint.Value `json:"maxAmount"`
 
 	currencies []string
+
+	activeOrderBooks map[string]*bbgo.LocalActiveOrderBook
 }
 
 func (s *Strategy) Initialize() error {
@@ -79,13 +81,31 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+	s.activeOrderBooks = make(map[string]*bbgo.LocalActiveOrderBook)
+	for _, symbol := range s.getSymbols() {
+		activeOrderBook := bbgo.NewLocalActiveOrderBook(symbol)
+		activeOrderBook.BindStream(session.UserDataStream)
+		s.activeOrderBooks[symbol] = activeOrderBook
+	}
+
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
+		if kline.Symbol != s.currencies[0]+s.BaseCurrency {
+			return
+		}
 		s.rebalance(ctx, orderExecutor, session)
 	})
 	return nil
 }
 
 func (s *Strategy) rebalance(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) {
+	for symbol, book := range s.activeOrderBooks {
+		err := orderExecutor.CancelOrders(ctx, book.Orders()...)
+		if err != nil {
+			log.WithError(err).Errorf("failed to cancel %s orders", symbol)
+			return
+		}
+	}
+
 	prices, err := s.getPrices(ctx, session)
 	if err != nil {
 		return
@@ -104,10 +124,14 @@ func (s *Strategy) rebalance(ctx context.Context, orderExecutor bbgo.OrderExecut
 		return
 	}
 
-	_, err = orderExecutor.SubmitOrders(ctx, orders...)
+	createdOrders, err := orderExecutor.SubmitOrders(ctx, orders...)
 	if err != nil {
 		log.WithError(err).Error("submit order error")
 		return
+	}
+
+	for _, createdOrder := range createdOrders {
+		s.activeOrderBooks[createdOrder.Symbol].Add(createdOrder)
 	}
 }
 
@@ -198,8 +222,10 @@ func (s *Strategy) generateSubmitOrders(prices, marketValues types.Float64Slice)
 		order := types.SubmitOrder{
 			Symbol:   symbol,
 			Side:     side,
-			Type:     types.OrderTypeMarket,
-			Quantity: quantity}
+			Type:     types.OrderTypeLimit,
+			Quantity: quantity,
+			Price:    fixedpoint.NewFromFloat(currentPrice),
+		}
 
 		submitOrders = append(submitOrders, order)
 	}
