@@ -106,7 +106,7 @@ type RestClient struct {
 	OrderServiceV3 *v3.OrderService
 }
 
-func NewRestClientWithHttpClient(baseURL string) *RestClient {
+func NewRestClient(baseURL string) *RestClient {
 	u, err := url.Parse(baseURL)
 	if err != nil {
 		panic(err)
@@ -131,10 +131,6 @@ func NewRestClientWithHttpClient(baseURL string) *RestClient {
 	// defaultHttpClient.MaxTokenService = &MaxTokenService{defaultHttpClient}
 	client.initNonce()
 	return client
-}
-
-func NewRestClient(baseURL string) *RestClient {
-	return NewRestClientWithHttpClient(baseURL)
 }
 
 // Auth sets api key and secret for usage is requests that requires authentication.
