@@ -10,12 +10,7 @@ import (
 	maxapi "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 )
 
-type WalletType string
-
-const (
-	WalletTypeSpot   WalletType = "spot"
-	WalletTypeMargin WalletType = "m"
-)
+type WalletType = maxapi.WalletType
 
 type Order = maxapi.Order
 
@@ -28,8 +23,12 @@ func (s *OrderService) NewWalletCreateOrderRequest(walletType WalletType) *Walle
 	return &WalletCreateOrderRequest{client: s.Client, walletType: walletType}
 }
 
-func (s *OrderService) NewWalletGetOrderRequest(walletType WalletType) *WalletGetOrderRequest {
-	return &WalletGetOrderRequest{client: s.Client, walletType: walletType}
+func (s *OrderService) NewWalletGetOrderHistoryRequest(walletType WalletType) *WalletGetOrderHistoryRequest {
+	return &WalletGetOrderHistoryRequest{client: s.Client, walletType: walletType}
+}
+
+func (s *OrderService) NewWalletGetOpenOrdersRequest(walletType WalletType) *WalletGetOpenOrdersRequest {
+	return &WalletGetOpenOrdersRequest{client: s.Client, walletType: walletType}
 }
 
 func (s *OrderService) NewWalletOrderCancelAllRequest(walletType WalletType) *WalletOrderCancelAllRequest {
@@ -60,20 +59,23 @@ type WalletCreateOrderRequest struct {
 	groupID       *string `param:"group_id"`
 }
 
-//go:generate GetRequest -url "/api/v3/wallet/:walletType/orders" -type WalletGetOrderRequest -responseType .Order
-type WalletGetOrderRequest struct {
+//go:generate GetRequest -url "/api/v3/wallet/:walletType/orders/history" -type WalletGetOrderHistoryRequest -responseType []Order
+type WalletGetOrderHistoryRequest struct {
+	client requestgen.AuthenticatedAPIClient
+
+	walletType WalletType `param:"walletType,slug,required"`
+
+	market string  `param:"market,required"`
+	fromID *uint64 `param:"from_id"`
+	limit  *uint   `param:"limit"`
+}
+
+//go:generate GetRequest -url "/api/v3/wallet/:walletType/orders/open" -type WalletGetOpenOrdersRequest -responseType []Order
+type WalletGetOpenOrdersRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
 	walletType WalletType `param:"walletType,slug,required"`
 	market     string     `param:"market,required"`
-	side       string     `param:"side,required"`
-	volume     string     `param:"volume,required"`
-	orderType  string     `param:"ord_type"`
-
-	price         *string `param:"price"`
-	stopPrice     *string `param:"stop_price"`
-	clientOrderID *string `param:"client_oid"`
-	groupID       *string `param:"group_id"`
 }
 
 //go:generate DeleteRequest -url "/api/v3/wallet/:walletType/orders" -type WalletOrderCancelAllRequest -responseType []Order
