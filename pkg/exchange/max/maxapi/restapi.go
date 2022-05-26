@@ -21,6 +21,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	v3 "github.com/c9s/bbgo/pkg/exchange/max/maxapi/v3"
 	"github.com/c9s/bbgo/pkg/util"
 	"github.com/c9s/bbgo/pkg/version"
 )
@@ -70,12 +71,30 @@ var serverTimestamp = time.Now().Unix()
 // reqCount is used for nonce, this variable counts the API request count.
 var reqCount int64 = 1
 
+// create an isolated http httpTransport rather than the default one
+var httpTransport = &http.Transport{
+	Proxy: http.ProxyFromEnvironment,
+	DialContext: (&net.Dialer{
+		Timeout:   10 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}).DialContext,
+	ForceAttemptHTTP2:     true,
+	MaxIdleConns:          httpTransportMaxIdleConns,
+	MaxIdleConnsPerHost:   httpTransportMaxIdleConnsPerHost,
+	IdleConnTimeout:       httpTransportIdleConnTimeout,
+	TLSHandshakeTimeout:   10 * time.Second,
+	ExpectContinueTimeout: 1 * time.Second,
+}
+
+var defaultHttpClient = &http.Client{
+	Timeout:   defaultHTTPTimeout,
+	Transport: httpTransport,
+}
+
 type RestClient struct {
 	requestgen.BaseAPIClient
 
-	// Authentication
-	APIKey    string
-	APISecret string
+	APIKey, APISecret string
 
 	AccountService    *AccountService
 	PublicService     *PublicService
@@ -83,13 +102,11 @@ type RestClient struct {
 	OrderService      *OrderService
 	RewardService     *RewardService
 	WithdrawalService *WithdrawalService
-	// OrderBookService *OrderBookService
-	// MaxTokenService  *MaxTokenService
-	// MaxKLineService  *KLineService
-	// CreditService    *CreditService
+
+	OrderServiceV3 *v3.OrderService
 }
 
-func NewRestClientWithHttpClient(baseURL string, httpClient *http.Client) *RestClient {
+func NewRestClientWithHttpClient(baseURL string) *RestClient {
 	u, err := url.Parse(baseURL)
 	if err != nil {
 		panic(err)
@@ -97,7 +114,7 @@ func NewRestClientWithHttpClient(baseURL string, httpClient *http.Client) *RestC
 
 	var client = &RestClient{
 		BaseAPIClient: requestgen.BaseAPIClient{
-			HttpClient: httpClient,
+			HttpClient: defaultHttpClient,
 			BaseURL:    u,
 		},
 	}
@@ -109,33 +126,15 @@ func NewRestClientWithHttpClient(baseURL string, httpClient *http.Client) *RestC
 	client.RewardService = &RewardService{client}
 	client.WithdrawalService = &WithdrawalService{client}
 
-	// client.MaxTokenService = &MaxTokenService{client}
+	client.OrderServiceV3 = &v3.OrderService{Client: client}
+
+	// defaultHttpClient.MaxTokenService = &MaxTokenService{defaultHttpClient}
 	client.initNonce()
 	return client
 }
 
 func NewRestClient(baseURL string) *RestClient {
-	// create an isolated http transport rather than the default one
-	transport := &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		DialContext: (&net.Dialer{
-			Timeout:   10 * time.Second,
-			KeepAlive: 30 * time.Second,
-		}).DialContext,
-		ForceAttemptHTTP2:     true,
-		MaxIdleConns:          httpTransportMaxIdleConns,
-		MaxIdleConnsPerHost:   httpTransportMaxIdleConnsPerHost,
-		IdleConnTimeout:       httpTransportIdleConnTimeout,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-	}
-
-	client := &http.Client{
-		Timeout:   defaultHTTPTimeout,
-		Transport: transport,
-	}
-
-	return NewRestClientWithHttpClient(baseURL, client)
+	return NewRestClientWithHttpClient(baseURL)
 }
 
 // Auth sets api key and secret for usage is requests that requires authentication.

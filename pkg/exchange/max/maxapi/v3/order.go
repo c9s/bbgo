@@ -21,27 +21,27 @@ type Order = maxapi.Order
 
 // OrderService manages the Order endpoint.
 type OrderService struct {
-	client *maxapi.RestClient
+	Client *maxapi.RestClient
 }
 
 func (s *OrderService) NewWalletCreateOrderRequest(walletType WalletType) *WalletCreateOrderRequest {
-	return &WalletCreateOrderRequest{client: s.client, walletType: walletType}
+	return &WalletCreateOrderRequest{client: s.Client, walletType: walletType}
 }
 
 func (s *OrderService) NewWalletGetOrderRequest(walletType WalletType) *WalletGetOrderRequest {
-	return &WalletGetOrderRequest{client: s.client, walletType: walletType}
+	return &WalletGetOrderRequest{client: s.Client, walletType: walletType}
 }
 
 func (s *OrderService) NewWalletOrderCancelAllRequest(walletType WalletType) *WalletOrderCancelAllRequest {
-	return &WalletOrderCancelAllRequest{client: s.client, walletType: walletType}
+	return &WalletOrderCancelAllRequest{client: s.Client, walletType: walletType}
 }
 
 func (s *OrderService) NewOrderCancelRequest() *OrderCancelRequest {
-	return &OrderCancelRequest{client: s.client}
+	return &OrderCancelRequest{client: s.Client}
 }
 
 func (s *OrderService) NewGetOrderRequest() *GetOrderRequest {
-	return &GetOrderRequest{client: s.client}
+	return &GetOrderRequest{client: s.Client}
 }
 
 //go:generate PostRequest -url "/api/v3/wallet/:walletType/orders" -type WalletCreateOrderRequest -responseType .Order -debug
