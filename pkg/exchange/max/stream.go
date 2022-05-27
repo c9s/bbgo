@@ -18,6 +18,7 @@ import (
 //go:generate callbackgen -type Stream
 type Stream struct {
 	types.StandardStream
+	types.MarginSettings
 
 	key, secret string
 
@@ -32,6 +33,8 @@ type Stream struct {
 	tradeSnapshotEventCallbacks []func(e max.TradeSnapshotEvent)
 	orderUpdateEventCallbacks   []func(e max.OrderUpdateEvent)
 	orderSnapshotEventCallbacks []func(e max.OrderSnapshotEvent)
+	adRatioEventCallbacks       []func(e max.ADRatioEvent)
+	debtEventCallbacks          []func(e max.DebtEvent)
 
 	accountSnapshotEventCallbacks []func(e max.AccountSnapshotEvent)
 	accountUpdateEventCallbacks   []func(e max.AccountUpdateEvent)
@@ -46,7 +49,6 @@ func NewStream(key, secret string) *Stream {
 	stream.SetEndpointCreator(stream.getEndpoint)
 	stream.SetParser(max.ParseMessage)
 	stream.SetDispatcher(stream.dispatchEvent)
-
 	stream.OnConnect(stream.handleConnect)
 	stream.OnKLineEvent(stream.handleKLineEvent)
 	stream.OnOrderSnapshotEvent(stream.handleOrderSnapshotEvent)
@@ -96,8 +98,22 @@ func (s *Stream) handleConnect() {
 			})
 		}
 
-		s.Conn.WriteJSON(cmd)
+		if err := s.Conn.WriteJSON(cmd); err != nil {
+			log.WithError(err).Error("failed to send subscription request")
+		}
+
 	} else {
+		var filters []string
+		if s.MarginSettings.IsMargin {
+			filters = []string{
+				"mwallet_order",
+				"mwallet_trade",
+				"mwallet_account",
+				"ad_ratio",
+				"borrowing",
+			}
+		}
+
 		nonce := time.Now().UnixNano() / int64(time.Millisecond)
 		auth := &max.AuthMessage{
 			Action:    "auth",
@@ -105,7 +121,9 @@ func (s *Stream) handleConnect() {
 			Nonce:     nonce,
 			Signature: signPayload(fmt.Sprintf("%d", nonce), s.secret),
 			ID:        uuid.New().String(),
+			Filters:   filters,
 		}
+
 		if err := s.Conn.WriteJSON(auth); err != nil {
 			log.WithError(err).Error("failed to send auth request")
 		}
@@ -240,8 +258,14 @@ func (s *Stream) dispatchEvent(e interface{}) {
 	case *max.OrderUpdateEvent:
 		s.EmitOrderUpdateEvent(*e)
 
+	case *max.ADRatioEvent:
+		log.Infof("adRatio: %+v", e.ADRatio)
+
+	case *max.DebtEvent:
+		log.Infof("debtEvent: %+v", e.Debts)
+
 	default:
-		log.Errorf("unsupported %T event: %+v", e, e)
+		log.Warnf("unhandled %T event: %+v", e, e)
 	}
 }
 

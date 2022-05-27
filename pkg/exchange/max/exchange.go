@@ -15,9 +15,9 @@ import (
 	"golang.org/x/time/rate"
 
 	maxapi "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
+	v3 "github.com/c9s/bbgo/pkg/exchange/max/maxapi/v3"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
 )
 
 // closedOrderQueryLimiter is used for the closed orders query rate limit, 1 request per second
@@ -29,8 +29,12 @@ var marketDataLimiter = rate.NewLimiter(rate.Every(2*time.Second), 10)
 var log = logrus.WithField("exchange", "max")
 
 type Exchange struct {
-	client      *maxapi.RestClient
+	types.MarginSettings
+
 	key, secret string
+	client      *maxapi.RestClient
+
+	v3order *v3.OrderService
 }
 
 func New(key, secret string) *Exchange {
@@ -42,9 +46,10 @@ func New(key, secret string) *Exchange {
 	client := maxapi.NewRestClient(baseURL)
 	client.Auth(key, secret)
 	return &Exchange{
-		client: client,
-		key:    key,
-		secret: secret,
+		client:  client,
+		key:     key,
+		secret:  secret,
+		v3order: &v3.OrderService{Client: client},
 	}
 }
 
@@ -155,7 +160,9 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 }
 
 func (e *Exchange) NewStream() types.Stream {
-	return NewStream(e.key, e.secret)
+	stream := NewStream(e.key, e.secret)
+	stream.MarginSettings = e.MarginSettings
+	return stream
 }
 
 func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.Order, error) {
@@ -164,7 +171,7 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 		return nil, err
 	}
 
-	maxOrder, err := e.client.OrderService.NewGetOrderRequest().Id(uint64(orderID)).Do(ctx)
+	maxOrder, err := e.v3order.NewGetOrderRequest().Id(uint64(orderID)).Do(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +180,13 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 }
 
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
-	maxOrders, err := e.client.OrderService.Open(toLocalSymbol(symbol), maxapi.QueryOrderOptions{})
+	market := toLocalSymbol(symbol)
+	walletType := maxapi.WalletTypeSpot
+	if e.MarginSettings.IsMargin {
+		walletType = maxapi.WalletTypeMargin
+	}
+
+	maxOrders, err := e.v3order.NewWalletGetOpenOrdersRequest(walletType).Market(market).Do(ctx)
 	if err != nil {
 		return orders, err
 	}
@@ -194,14 +207,7 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) ([]types.Order, error) {
 	log.Warn("!!!MAX EXCHANGE API NOTICE!!!")
 	log.Warn("the since/until conditions will not be effected on closed orders query, max exchange does not support time-range-based query")
-
-	if v, ok := util.GetEnvVarBool("MAX_QUERY_CLOSED_ORDERS_ALL"); v && ok {
-		log.Warn("MAX_QUERY_CLOSED_ORDERS_ALL is set, we will fetch all closed orders from the first order")
-		return e.queryClosedOrdersByLastOrderID(ctx, symbol, 1)
-	}
-
 	return e.queryClosedOrdersByLastOrderID(ctx, symbol, lastOrderID)
-	// return e.queryRecentlyClosedOrders(ctx, symbol, since, until)
 }
 
 func (e *Exchange) queryClosedOrdersByLastOrderID(ctx context.Context, symbol string, lastOrderID uint64) (orders []types.Order, err error) {
@@ -209,13 +215,19 @@ func (e *Exchange) queryClosedOrdersByLastOrderID(ctx context.Context, symbol st
 		return orders, err
 	}
 
-	req := e.client.OrderService.NewGetOrderHistoryRequest()
-	req.Market(toLocalSymbol(symbol))
+	market := toLocalSymbol(symbol)
+	walletType := maxapi.WalletTypeSpot
+	if e.MarginSettings.IsMargin {
+		walletType = maxapi.WalletTypeMargin
+	}
+
+	req := e.v3order.NewWalletGetOrderHistoryRequest(walletType).Market(market)
 	if lastOrderID == 0 {
 		lastOrderID = 1
 	}
 
 	req.FromID(lastOrderID)
+
 	maxOrders, err := req.Do(ctx)
 	if err != nil {
 		return orders, err
@@ -228,154 +240,20 @@ func (e *Exchange) queryClosedOrdersByLastOrderID(ctx context.Context, symbol st
 			continue
 		}
 
-		log.Debugf("max order %d %s %v %s %s", order.OrderID, order.Symbol, order.Price, order.Status, order.CreationTime.Time().Format(time.StampMilli))
 		orders = append(orders, *order)
 	}
 
-	// always sort the orders by creation time
-	sort.Slice(orders, func(i, j int) bool {
-		return orders[i].CreationTime.Before(orders[j].CreationTime.Time())
-	})
-
+	orders = types.SortOrderAscending(orders)
 	return orders, nil
 }
 
-// queryRecentlyClosedOrders is deprecated
-func (e *Exchange) queryRecentlyClosedOrders(ctx context.Context, symbol string, since time.Time, until time.Time) (orders []types.Order, err error) {
-	limit := 1000 // max limit = 1000, default 100
-	orderIDs := make(map[uint64]struct{}, limit*2)
-	maxPages := 10
-
-	if v, ok := util.GetEnvVarInt("MAX_QUERY_CLOSED_ORDERS_LIMIT"); ok {
-		limit = v
-	}
-
-	if v, ok := util.GetEnvVarInt("MAX_QUERY_CLOSED_ORDERS_NUM_OF_PAGES"); ok {
-		maxPages = v
-	}
-
-	log.Warnf("fetching recently closed orders, maximum %d pages to fetch", maxPages)
-	log.Warnf("note that, some MAX orders might be missing if you did not sync the closed orders for a while")
-
-queryRecentlyClosedOrders:
-	for page := 1; page < maxPages; page++ {
-		if err := closedOrderQueryLimiter.Wait(ctx); err != nil {
-			return orders, err
-		}
-
-		log.Infof("querying %s closed orders from page %d ~ ", symbol, page)
-		maxOrders, err2 := e.client.OrderService.Closed(toLocalSymbol(symbol), maxapi.QueryOrderOptions{
-			Limit:   limit,
-			Page:    page,
-			OrderBy: "desc",
-		})
-		if err2 != nil {
-			err = multierr.Append(err, err2)
-			break queryRecentlyClosedOrders
-		}
-
-		// no recent orders
-		if len(maxOrders) == 0 {
-			break queryRecentlyClosedOrders
-		}
-
-		log.Debugf("fetched %d orders", len(maxOrders))
-		for _, maxOrder := range maxOrders {
-			if maxOrder.CreatedAtMs.Time().Before(since) {
-				log.Debugf("skip orders with creation time before %s, found %s", since, maxOrder.CreatedAtMs.Time())
-				break queryRecentlyClosedOrders
-			}
-
-			if maxOrder.CreatedAtMs.Time().After(until) {
-				log.Debugf("skip orders with creation time after %s, found %s", until, maxOrder.CreatedAtMs.Time())
-				continue
-			}
-
-			order, err2 := toGlobalOrder(maxOrder)
-			if err2 != nil {
-				err = multierr.Append(err, err2)
-				continue
-			}
-
-			if _, ok := orderIDs[order.OrderID]; ok {
-				log.Debugf("skipping duplicated order: %d", order.OrderID)
-			}
-
-			log.Debugf("max order %d %s %v %s %s", order.OrderID, order.Symbol, order.Price, order.Status, order.CreationTime.Time().Format(time.StampMilli))
-
-			orderIDs[order.OrderID] = struct{}{}
-			orders = append(orders, *order)
-		}
-	}
-
-	// ensure everything is ascending ordered
-	log.Debugf("sorting %d orders", len(orders))
-	sort.Slice(orders, func(i, j int) bool {
-		return orders[i].CreationTime.Time().Before(orders[j].CreationTime.Time())
-	})
-
-	return orders, err
-}
-
-func (e *Exchange) queryAllClosedOrders(ctx context.Context, symbol string, since time.Time, until time.Time) (orders []types.Order, err error) {
-	limit := 1000 // max limit = 1000, default 100
-	orderIDs := make(map[uint64]struct{}, limit*2)
-	page := 1
-	for {
-		if err := closedOrderQueryLimiter.Wait(ctx); err != nil {
-			return nil, err
-		}
-
-		log.Infof("querying %s closed orders from page %d ~ ", symbol, page)
-		maxOrders, err := e.client.OrderService.Closed(toLocalSymbol(symbol), maxapi.QueryOrderOptions{
-			Limit: limit,
-			Page:  page,
-		})
-		if err != nil {
-			return orders, err
-		}
-
-		if len(maxOrders) == 0 {
-			return orders, err
-		}
-
-		// ensure everything is ascending ordered
-		sort.Slice(maxOrders, func(i, j int) bool {
-			return maxOrders[i].CreatedAtMs.Time().Before(maxOrders[j].CreatedAtMs.Time())
-		})
-
-		log.Debugf("%d orders", len(maxOrders))
-		for _, maxOrder := range maxOrders {
-			if maxOrder.CreatedAtMs.Time().Before(since) {
-				log.Debugf("skip orders with creation time before %s, found %s", since, maxOrder.CreatedAtMs.Time())
-				continue
-			}
-
-			if maxOrder.CreatedAtMs.Time().After(until) {
-				return orders, err
-			}
-
-			order, err := toGlobalOrder(maxOrder)
-			if err != nil {
-				return orders, err
-			}
-
-			if _, ok := orderIDs[order.OrderID]; ok {
-				log.Debugf("skipping duplicated order: %d", order.OrderID)
-			}
-
-			orderIDs[order.OrderID] = struct{}{}
-			orders = append(orders, *order)
-			log.Debugf("order %+v", order)
-		}
-		page++
-	}
-
-	return orders, err
-}
-
 func (e *Exchange) CancelAllOrders(ctx context.Context) ([]types.Order, error) {
-	var req = e.client.OrderService.NewOrderCancelAllRequest()
+	walletType := maxapi.WalletTypeSpot
+	if e.MarginSettings.IsMargin {
+		walletType = maxapi.WalletTypeMargin
+	}
+
+	req := e.v3order.NewWalletOrderCancelAllRequest(walletType)
 	var maxOrders, err = req.Do(ctx)
 	if err != nil {
 		return nil, err
@@ -385,10 +263,16 @@ func (e *Exchange) CancelAllOrders(ctx context.Context) ([]types.Order, error) {
 }
 
 func (e *Exchange) CancelOrdersBySymbol(ctx context.Context, symbol string) ([]types.Order, error) {
-	var req = e.client.OrderService.NewOrderCancelAllRequest()
-	req.Market(toLocalSymbol(symbol))
+	market := toLocalSymbol(symbol)
+	walletType := maxapi.WalletTypeSpot
+	if e.MarginSettings.IsMargin {
+		walletType = maxapi.WalletTypeMargin
+	}
 
-	var maxOrders, err = req.Do(ctx)
+	req := e.v3order.NewWalletOrderCancelAllRequest(walletType)
+	req.Market(market)
+
+	maxOrders, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -397,10 +281,15 @@ func (e *Exchange) CancelOrdersBySymbol(ctx context.Context, symbol string) ([]t
 }
 
 func (e *Exchange) CancelOrdersByGroupID(ctx context.Context, groupID uint32) ([]types.Order, error) {
-	var req = e.client.OrderService.NewOrderCancelAllRequest()
+	walletType := maxapi.WalletTypeSpot
+	if e.MarginSettings.IsMargin {
+		walletType = maxapi.WalletTypeMargin
+	}
+
+	req := e.v3order.NewWalletOrderCancelAllRequest(walletType)
 	req.GroupID(groupID)
 
-	var maxOrders, err = req.Do(ctx)
+	maxOrders, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -409,6 +298,11 @@ func (e *Exchange) CancelOrdersByGroupID(ctx context.Context, groupID uint32) ([
 }
 
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err2 error) {
+	walletType := maxapi.WalletTypeSpot
+	if e.MarginSettings.IsMargin {
+		walletType = maxapi.WalletTypeMargin
+	}
+
 	var groupIDs = make(map[uint32]struct{})
 	var orphanOrders []types.Order
 	for _, o := range orders {
@@ -421,7 +315,7 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 
 	if len(groupIDs) > 0 {
 		for groupID := range groupIDs {
-			var req = e.client.OrderService.NewOrderCancelAllRequest()
+			req := e.v3order.NewWalletOrderCancelAllRequest(walletType)
 			req.GroupID(groupID)
 
 			if _, err := req.Do(ctx); err != nil {
@@ -432,7 +326,7 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 	}
 
 	for _, o := range orphanOrders {
-		var req = e.client.OrderService.NewOrderCancelRequest()
+		req := e.v3order.NewOrderCancelRequest()
 		if o.OrderID > 0 {
 			req.Id(o.OrderID)
 		} else if len(o.ClientOrderID) > 0 && o.ClientOrderID != types.NoClientOrderID {
@@ -450,7 +344,7 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 	return err2
 }
 
-func toMaxSubmitOrder(o types.SubmitOrder) (*maxapi.Order, error) {
+func toMaxSubmitOrder(o types.SubmitOrder) (*maxapi.SubmitOrder, error) {
 	symbol := toLocalSymbol(o.Symbol)
 	orderType, err := toLocalOrderType(o.Type)
 	if err != nil {
@@ -469,12 +363,11 @@ func toMaxSubmitOrder(o types.SubmitOrder) (*maxapi.Order, error) {
 		quantityString = o.Quantity.String()
 	}
 
-	maxOrder := maxapi.Order{
+	maxOrder := maxapi.SubmitOrder{
 		Market:    symbol,
 		Side:      toLocalSideType(o.Side),
 		OrderType: orderType,
-		// Price:     priceInString,
-		Volume: quantityString,
+		Volume:    quantityString,
 	}
 
 	if o.GroupID > 0 {
@@ -555,7 +448,7 @@ func (e *Exchange) Withdrawal(ctx context.Context, asset string, amount fixedpoi
 
 func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error) {
 	if len(orders) > 1 && len(orders) < 15 {
-		var ordersBySymbol = map[string][]maxapi.Order{}
+		var ordersBySymbol = map[string][]maxapi.SubmitOrder{}
 		for _, o := range orders {
 			maxOrder, err := toMaxSubmitOrder(o)
 			if err != nil {

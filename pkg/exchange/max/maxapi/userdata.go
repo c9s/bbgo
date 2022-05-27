@@ -2,6 +2,7 @@ package max
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -38,6 +39,7 @@ type OrderUpdate struct {
 	GroupID     uint32 `json:"gi"`
 	ClientOID   string `json:"ci"`
 	CreatedAtMs int64  `json:"T"`
+	UpdateTime  int64  `json:"TU"`
 }
 
 type OrderUpdateEvent struct {
@@ -64,6 +66,7 @@ func parserOrderUpdate(v *fastjson.Value) OrderUpdate {
 		GroupID:         uint32(v.GetInt("gi")),
 		ClientOID:       string(v.GetStringBytes("ci")),
 		CreatedAtMs:     v.GetInt64("T"),
+		UpdateTime:      v.GetInt64("TU"),
 	}
 }
 
@@ -109,6 +112,7 @@ type TradeUpdate struct {
 	Fee         string `json:"f"`
 	FeeCurrency string `json:"fc"`
 	Timestamp   int64  `json:"T"`
+	UpdateTime  int64  `json:"TU"`
 
 	OrderID uint64 `json:"oi"`
 
@@ -125,6 +129,7 @@ func parseTradeUpdate(v *fastjson.Value) TradeUpdate {
 		Fee:         string(v.GetStringBytes("f")),
 		FeeCurrency: string(v.GetStringBytes("fc")),
 		Timestamp:   v.GetInt64("T"),
+		UpdateTime:  v.GetInt64("TU"),
 		OrderID:     v.GetUint64("oi"),
 		Maker:       v.GetBool("m"),
 	}
@@ -198,22 +203,76 @@ func parseAuthEvent(v *fastjson.Value) (*AuthEvent, error) {
 	return &e, err
 }
 
+type ADRatio struct {
+	ADRatio     fixedpoint.Value `json:"ad"`
+	AssetInUSDT fixedpoint.Value `json:"as"`
+	DebtInUSDT  fixedpoint.Value `json:"db"`
+	IndexPrices []struct {
+		Market string           `json:"M"`
+		Price  fixedpoint.Value `json:"p"`
+	} `json:"idxp"`
+	TU types.MillisecondTimestamp `json:"TU"`
+}
+
+func (r *ADRatio) String() string {
+	return fmt.Sprintf("ADRatio: %v Asset: %v USDT, Debt: %v USDT (Mark Prices: %+v)", r.ADRatio, r.AssetInUSDT, r.DebtInUSDT, r.IndexPrices)
+}
+
+type ADRatioEvent struct {
+	ADRatio ADRatio `json:"ad"`
+}
+
+func parseADRatioEvent(v *fastjson.Value) (*ADRatioEvent, error) {
+	o := v.String()
+	e := ADRatioEvent{}
+	err := json.Unmarshal([]byte(o), &e)
+	return &e, err
+}
+
+type Debt struct {
+	Currency      string                     `json:"cu"`
+	DebtPrincipal fixedpoint.Value           `json:"dbp"`
+	DebtInterest  fixedpoint.Value           `json:"dbi"`
+	TU            types.MillisecondTimestamp `json:"TU"`
+}
+
+func (d *Debt) String() string {
+	return fmt.Sprintf("Debt %s %v (Interest %v)", d.Currency, d.DebtPrincipal, d.DebtInterest)
+}
+
+type DebtEvent struct {
+	Debts []Debt `json:"db"`
+}
+
+func parseDebts(v *fastjson.Value) (*DebtEvent, error) {
+	o := v.String()
+	e := DebtEvent{}
+	err := json.Unmarshal([]byte(o), &e)
+	return &e, err
+}
+
 func ParseUserEvent(v *fastjson.Value) (interface{}, error) {
 	eventType := string(v.GetStringBytes("e"))
 	switch eventType {
-	case "order_snapshot":
+	case "order_snapshot", "mwallet_order_snapshot":
 		return parserOrderSnapshotEvent(v), nil
 
-	case "order_update":
+	case "order_update", "mwallet_order_update":
 		return parseOrderUpdateEvent(v), nil
 
-	case "trade_snapshot":
+	case "trade_snapshot", "mwallet_trade_snapshot":
 		return parseTradeSnapshotEvent(v), nil
 
-	case "trade_update":
+	case "trade_update", "mwallet_trade_update":
 		return parseTradeUpdateEvent(v), nil
 
-	case "account_snapshot", "account_update":
+	case "ad_ratio_snapshot", "ad_ratio_update":
+		return parseADRatioEvent(v)
+
+	case "borrowing_snapshot", "borrowing_update":
+		return parseDebts(v)
+
+	case "account_snapshot", "account_update", "mwallet_account_snapshot", "mwallet_account_update":
 		var e AccountUpdateEvent
 		o := v.String()
 		err := json.Unmarshal([]byte(o), &e)

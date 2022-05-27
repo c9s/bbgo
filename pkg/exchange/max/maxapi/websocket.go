@@ -29,5 +29,3 @@ type WebsocketCommand struct {
 	Subscriptions []Subscription `json:"subscriptions,omitempty"`
 }
 
-var SubscribeAction = "subscribe"
-var UnsubscribeAction = "unsubscribe"

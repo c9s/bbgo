@@ -2,6 +2,7 @@ package max
 
 //go:generate -command GetRequest requestgen -method GET
 //go:generate -command PostRequest requestgen -method POST
+//go:generate -command DeleteRequest requestgen -method DELETE
 
 import (
 	"github.com/c9s/requestgen"
