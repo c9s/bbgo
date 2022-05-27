@@ -34,7 +34,8 @@ type Exchange struct {
 	key, secret string
 	client      *maxapi.RestClient
 
-	v3order *v3.OrderService
+	v3order  *v3.OrderService
+	v3margin *v3.MarginService
 }
 
 func New(key, secret string) *Exchange {
@@ -46,10 +47,11 @@ func New(key, secret string) *Exchange {
 	client := maxapi.NewRestClient(baseURL)
 	client.Auth(key, secret)
 	return &Exchange{
-		client:  client,
-		key:     key,
-		secret:  secret,
-		v3order: &v3.OrderService{Client: client},
+		client:   client,
+		key:      key,
+		secret:   secret,
+		v3order:  &v3.OrderService{Client: client},
+		v3margin: &v3.MarginService{Client: client},
 	}
 }
 
@@ -573,9 +575,25 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	// MAX returns the fee rate in the following format:
 	//  "maker_fee": 0.0005 -> 0.05%
 	//  "taker_fee": 0.0015 -> 0.15%
+
 	a := &types.Account{
+		AccountType:  types.AccountTypeSpot,
+		MarginLevel:  fixedpoint.Zero,
 		MakerFeeRate: fixedpoint.NewFromFloat(vipLevel.Current.MakerFee), // 0.15% = 0.0015
 		TakerFeeRate: fixedpoint.NewFromFloat(vipLevel.Current.TakerFee), // 0.15% = 0.0015
+	}
+
+	if e.MarginSettings.IsMargin {
+		a.AccountType = types.AccountTypeMargin
+
+		req := e.v3margin.NewGetMarginADRatioRequest()
+		adRatio, err := req.Do(ctx)
+		if err != nil {
+			return a, err
+		}
+
+		a.MarginLevel = adRatio.AdRatio
+		a.TotalAccountValue = adRatio.AssetInUsdt
 	}
 
 	a.UpdateBalances(balances)
