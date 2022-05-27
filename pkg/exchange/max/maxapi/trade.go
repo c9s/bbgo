@@ -10,6 +10,7 @@ import (
 
 	"github.com/c9s/requestgen"
 
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -26,21 +27,24 @@ type TradeInfo struct {
 	Ask   *MarkerInfo `json:"ask,omitempty"`
 }
 
+type Liquidity string
+
 // Trade represents one returned trade on the max platform.
 type Trade struct {
-	ID                    uint64    `json:"id" db:"exchange_id"`
-	Price                 string    `json:"price" db:"price"`
-	Volume                string    `json:"volume" db:"volume"`
-	Funds                 string    `json:"funds"`
-	Market                string    `json:"market" db:"market"`
-	MarketName            string    `json:"market_name"`
-	CreatedAt             int64     `json:"created_at"`
-	CreatedAtMilliSeconds types.MillisecondTimestamp     `json:"created_at_in_ms"`
-	Side                  string    `json:"side" db:"side"`
-	OrderID               uint64    `json:"order_id"`
-	Fee                   string    `json:"fee" db:"fee"` // float number as string
-	FeeCurrency           string    `json:"fee_currency" db:"fee_currency"`
-	Info                  TradeInfo `json:"info,omitempty"`
+	ID          uint64                     `json:"id" db:"exchange_id"`
+	WalletType  WalletType                 `json:"wallet_type,omitempty"`
+	Price       fixedpoint.Value           `json:"price"`
+	Volume      fixedpoint.Value           `json:"volume"`
+	Funds       fixedpoint.Value           `json:"funds"`
+	Market      string                     `json:"market"`
+	MarketName  string                     `json:"market_name"`
+	CreatedAt   types.MillisecondTimestamp `json:"created_at"`
+	Side        string                     `json:"side"`
+	OrderID     uint64                     `json:"order_id"`
+	Fee         fixedpoint.Value           `json:"fee"` // float number as string
+	FeeCurrency string                     `json:"fee_currency"`
+	Liquidity   Liquidity                  `json:"liquidity"`
+	Info        TradeInfo                  `json:"info,omitempty"`
 }
 
 func (t Trade) IsBuyer() bool {
@@ -148,4 +152,3 @@ type GetPrivateTradesRequest struct {
 
 	offset *int64 `param:"offset"`
 }
-
