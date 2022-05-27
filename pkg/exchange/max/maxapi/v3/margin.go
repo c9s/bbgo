@@ -34,6 +34,22 @@ func (s *MarginService) NewGetMarginLiquidationHistoryRequest() *GetMarginLiquid
 	return &GetMarginLiquidationHistoryRequest{client: s.Client}
 }
 
+func (s *MarginService) NewGetMarginLoanHistoryRequest() *GetMarginLoanHistoryRequest {
+	return &GetMarginLoanHistoryRequest{client: s.Client}
+}
+
+func (s *MarginService) NewGetMarginADRatioRequest() *GetMarginADRatioRequest {
+	return &GetMarginADRatioRequest{client: s.Client}
+}
+
+func (s *MarginService) NewMarginRepayRequest() *MarginRepayRequest {
+	return &MarginRepayRequest{client: s.Client}
+}
+
+func (s *MarginService) NewMarginLoanRequest() *MarginLoanRequest {
+	return &MarginLoanRequest{client: s.Client}
+}
+
 type MarginInterestRate struct {
 	HourlyInterestRate     fixedpoint.Value `json:"hourly_interest_rate"`
 	NextHourlyInterestRate fixedpoint.Value `json:"next_hourly_interest_rate"`
@@ -71,12 +87,20 @@ type GetMarginInterestHistoryRequest struct {
 }
 
 type LiquidationRecord struct {
-	Sn              string `json:"sn"`
-	AdRatio         string `json:"ad_ratio"`
-	ExpectedAdRatio string `json:"expected_ad_ratio"`
-	CreatedAt       int64  `json:"created_at"`
-	State           string `json:"state"`
+	SN              string                     `json:"sn"`
+	AdRatio         fixedpoint.Value           `json:"ad_ratio"`
+	ExpectedAdRatio fixedpoint.Value           `json:"expected_ad_ratio"`
+	CreatedAt       types.MillisecondTimestamp `json:"created_at"`
+	State           LiquidationState           `json:"state"`
 }
+
+type LiquidationState string
+
+const (
+	LiquidationStateProcessing LiquidationState = "processing"
+	LiquidationStateDebt       LiquidationState = "debt"
+	LiquidationStateLiquidated LiquidationState = "liquidated"
+)
 
 //go:generate GetRequest -url "/api/v3/wallet/m/liquidations" -type GetMarginLiquidationHistoryRequest -responseType []LiquidationRecord
 type GetMarginLiquidationHistoryRequest struct {
@@ -84,4 +108,68 @@ type GetMarginLiquidationHistoryRequest struct {
 	startTime *time.Time `param:"startTime,milliseconds"`
 	endTime   *time.Time `param:"endTime,milliseconds"`
 	limit     *int       `param:"limit"`
+}
+
+type RepaymentRecord struct {
+	SN        string                     `json:"sn"`
+	Currency  string                     `json:"currency"`
+	Amount    fixedpoint.Value           `json:"amount"`
+	Principal fixedpoint.Value           `json:"principal"`
+	Interest  fixedpoint.Value           `json:"interest"`
+	CreatedAt types.MillisecondTimestamp `json:"created_at"`
+	State     string                     `json:"state"`
+}
+
+//go:generate GetRequest -url "/api/v3/wallet/m/repayments/:currency" -type GetMarginRepaymentHistoryRequest -responseType []RepaymentRecord
+type GetMarginRepaymentHistoryRequest struct {
+	client   requestgen.AuthenticatedAPIClient
+	currency string `param:"currency,slug,required"`
+
+	startTime *time.Time `param:"startTime,milliseconds"`
+	endTime   *time.Time `param:"endTime,milliseconds"`
+	limit     *int       `param:"limit"`
+}
+
+type LoanRecord struct {
+	SN           string                     `json:"sn"`
+	Currency     string                     `json:"currency"`
+	Amount       fixedpoint.Value           `json:"amount"`
+	State        string                     `json:"state"`
+	CreatedAt    types.MillisecondTimestamp `json:"created_at"`
+	InterestRate fixedpoint.Value           `json:"interest_rate"`
+}
+
+//go:generate GetRequest -url "/api/v3/wallet/m/loans/:currency" -type GetMarginLoanHistoryRequest -responseType []LoanRecord
+type GetMarginLoanHistoryRequest struct {
+	client   requestgen.AuthenticatedAPIClient
+	currency string `param:"currency,slug,required"`
+
+	startTime *time.Time `param:"startTime,milliseconds"`
+	endTime   *time.Time `param:"endTime,milliseconds"`
+	limit     *int       `param:"limit"`
+}
+
+//go:generate PostRequest -url "/api/v3/wallet/m/loans/:currency" -type MarginLoanRequest -responseType .LoanRecord
+type MarginLoanRequest struct {
+	client   requestgen.AuthenticatedAPIClient
+	currency string `param:"currency,slug,required"`
+	amount   string `param:"amount"`
+}
+
+//go:generate PostRequest -url "/api/v3/wallet/m/repayments/:currency" -type MarginRepayRequest -responseType .RepaymentRecord
+type MarginRepayRequest struct {
+	client   requestgen.AuthenticatedAPIClient
+	currency string `param:"currency,slug,required"`
+	amount   string `param:"amount"`
+}
+
+type ADRatio struct {
+	AdRatio     fixedpoint.Value `json:"ad_ratio"`
+	AssetInUsdt fixedpoint.Value `json:"asset_in_usdt"`
+	DebtInUsdt  fixedpoint.Value `json:"debt_in_usdt"`
+}
+
+//go:generate GetRequest -url "/api/v3/wallet/m/ad_ratio" -type GetMarginADRatioRequest -responseType .ADRatio
+type GetMarginADRatioRequest struct {
+	client requestgen.AuthenticatedAPIClient
 }
