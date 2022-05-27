@@ -15,11 +15,10 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-var relUrlV2Order *url.URL
-var relUrlV2Orders *url.URL
-var relUrlV2OrdersClear *url.URL
-var relUrlV2OrdersDelete *url.URL
-var relUrlV2OrdersMultiOneByOne, relUrlV2OrderDelete *url.URL
+var (
+	relUrlV2Orders              *url.URL
+	relUrlV2OrdersMultiOneByOne *url.URL
+)
 
 func mustParseURL(s string) *url.URL {
 	u, err := url.Parse(s)
@@ -30,11 +29,7 @@ func mustParseURL(s string) *url.URL {
 }
 
 func init() {
-	relUrlV2Order = mustParseURL("v2/order")
-	relUrlV2OrderDelete = mustParseURL("v2/order/delete")
 	relUrlV2Orders = mustParseURL("v2/orders")
-	relUrlV2OrdersClear = mustParseURL("v2/orders/clear")
-	relUrlV2OrdersDelete = mustParseURL("v2/orders/delete")
 	relUrlV2OrdersMultiOneByOne = mustParseURL("v2/orders/multi/onebyone")
 }
 
