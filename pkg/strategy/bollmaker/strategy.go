@@ -49,6 +49,81 @@ type BollingerSetting struct {
 	BandWidth float64 `json:"bandWidth"`
 }
 
+type DynamicSpreadSettings struct {
+	Enabled bool `json:"enabled"`
+
+	// Window is the window of the SMAs of spreads
+	Window int `json:"window"`
+
+	// AskSpreadScale is used to define the ask spread range with the given percentage.
+	AskSpreadScale *bbgo.PercentageScale `json:"askSpreadScale"`
+
+	// BidSpreadScale is used to define the bid spread range with the given percentage.
+	BidSpreadScale *bbgo.PercentageScale `json:"bidSpreadScale"`
+
+	DynamicAskSpread *indicator.SMA
+	DynamicBidSpread *indicator.SMA
+}
+
+// Update dynamic spreads
+func (ds *DynamicSpreadSettings) Update(kline types.KLine) {
+	if !ds.Enabled {
+		return
+	}
+
+	ampl := (kline.GetHigh().Float64() - kline.GetLow().Float64()) / kline.GetOpen().Float64()
+
+	switch kline.Direction() {
+	case types.DirectionUp:
+		ds.DynamicAskSpread.Update(ampl)
+		ds.DynamicBidSpread.Update(0)
+	case types.DirectionDown:
+		ds.DynamicBidSpread.Update(ampl)
+		ds.DynamicAskSpread.Update(0)
+	default:
+		ds.DynamicAskSpread.Update(0)
+		ds.DynamicBidSpread.Update(0)
+	}
+}
+
+// GetAskSpread returns current ask spread
+func (ds *DynamicSpreadSettings) GetAskSpread() (askSpread float64, err error) {
+	if !ds.Enabled {
+		return 0, errors.New("dynamic spread is not enabled")
+	}
+
+	if ds.AskSpreadScale != nil && ds.DynamicAskSpread.Length() >= ds.Window {
+		askSpread, err = ds.AskSpreadScale.Scale(ds.DynamicAskSpread.Last())
+		if err != nil {
+			log.WithError(err).Errorf("can not calculate dynamicAskSpread")
+			return 0, err
+		}
+
+		return askSpread, nil
+	}
+
+	return 0, errors.New("incomplete dynamic spread settings or not enough data yet")
+}
+
+// GetBidSpread returns current dynamic bid spread
+func (ds *DynamicSpreadSettings) GetBidSpread() (bidSpread float64, err error) {
+	if !ds.Enabled {
+		return 0, errors.New("dynamic spread is not enabled")
+	}
+
+	if ds.BidSpreadScale != nil && ds.DynamicBidSpread.Length() >= ds.Window {
+		bidSpread, err = ds.BidSpreadScale.Scale(ds.DynamicBidSpread.Last())
+		if err != nil {
+			log.WithError(err).Errorf("can not calculate dynamicBidSpread")
+			return 0, err
+		}
+
+		return bidSpread, nil
+	}
+
+	return 0, errors.New("incomplete dynamic spread settings or not enough data yet")
+}
+
 type Strategy struct {
 	*bbgo.Graceful
 	*bbgo.Notifiability
@@ -78,19 +153,8 @@ type Strategy struct {
 	// AskSpread overrides the spread setting, this spread will be used for the sell order
 	AskSpread fixedpoint.Value `json:"askSpread,omitempty"`
 
-	// DynamicSpreadWindow enables the automatic adjustment to bid and ask spread.
-	// When DynamicSpreadWindow is set and is larger than 0, the spreads are calculated based on the SMA of amplitude of
-	// [DynamicSpreadWindow] K-lines
-	DynamicSpreadWindow int `json:"dynamicSpreadWindow,omitempty"`
-
-	// DynamicAskSpreadScale is used to define the ask spread range with the given percentage.
-	DynamicAskSpreadScale *bbgo.PercentageScale `json:"dynamicAskSpreadScale"`
-
-	// DynamicBidSpreadScale is used to define the bid spread range with the given percentage.
-	DynamicBidSpreadScale *bbgo.PercentageScale `json:"dynamicBidSpreadScale"`
-
-	DynamicAskSpread *indicator.SMA
-	DynamicBidSpread *indicator.SMA
+	// DynamicSpread enables the automatic adjustment to bid and ask spread.
+	DynamicSpread DynamicSpreadSettings `json:"dynamicSpread,omitempty"`
 
 	// MinProfitSpread is the minimal order price spread from the current average cost.
 	// For long position, you will only place sell order above the price (= average cost * (1 + minProfitSpread))
@@ -288,75 +352,6 @@ func (s *Strategy) getCurrentAllowedExposurePosition(bandPercentage float64) (fi
 	}
 
 	return s.MaxExposurePosition, nil
-}
-
-// IsDynamicSpreadEnabled checks dynamic spread functionality enabled or not
-func (s *Strategy) IsDynamicSpreadEnabled() bool {
-	if s.DynamicSpreadWindow > 0 && s.DynamicAskSpreadScale != nil && s.DynamicBidSpreadScale != nil {
-		return true
-	}
-
-	return false
-}
-
-// Update dynamic spreads
-func (s *Strategy) updateDynamicSpread(kline types.KLine) {
-	if !s.IsDynamicSpreadEnabled() {
-		return
-	}
-
-	ampl := (kline.GetHigh().Float64() - kline.GetLow().Float64()) / kline.GetOpen().Float64()
-
-	switch kline.Direction() {
-	case types.DirectionUp:
-		s.DynamicAskSpread.Update(ampl)
-		s.DynamicBidSpread.Update(0)
-	case types.DirectionDown:
-		s.DynamicBidSpread.Update(ampl)
-		s.DynamicAskSpread.Update(0)
-	default:
-		s.DynamicAskSpread.Update(0)
-		s.DynamicBidSpread.Update(0)
-	}
-}
-
-// Get current dynamic ask spread
-func (s *Strategy) getDynamicAskSpread() (dynamicAskSpread float64, err error) {
-	if !s.IsDynamicSpreadEnabled() {
-		return 0, errors.New("dynamic spread is not enabled")
-	}
-
-	if s.DynamicAskSpreadScale != nil && s.DynamicAskSpread.Length() >= s.DynamicSpreadWindow {
-		dynamicAskSpread, err = s.DynamicAskSpreadScale.Scale(s.DynamicAskSpread.Last())
-		if err != nil {
-			log.WithError(err).Errorf("can not calculate dynamicAskSpread")
-			return 0, err
-		}
-
-		return dynamicAskSpread, nil
-	}
-	log.Infof("dynamicAskSpread: %v", dynamicAskSpread)
-
-	return 0, errors.New("incomplete dynamic spread settings or not enough data yet")
-}
-
-// Get current dynamic bid spread
-func (s *Strategy) getDynamicBidSpread() (dynamicBidSpread float64, err error) {
-	if !s.IsDynamicSpreadEnabled() {
-		return 0, errors.New("dynamic spread is not enabled")
-	}
-
-	if s.DynamicBidSpreadScale != nil && s.DynamicBidSpread.Length() >= s.DynamicSpreadWindow {
-		dynamicBidSpread, err = s.DynamicBidSpreadScale.Scale(s.DynamicBidSpread.Last())
-		if err != nil {
-			log.WithError(err).Errorf("can not calculate dynamicBidSpread")
-			return 0, err
-		}
-
-		return dynamicBidSpread, nil
-	}
-
-	return 0, errors.New("incomplete dynamic spread settings or not enough data yet")
 }
 
 func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExecutor, midPrice fixedpoint.Value, kline *types.KLine) {
@@ -591,9 +586,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.Status = types.StrategyStatusRunning
 
 	// Setup dynamic spread
-	if s.IsDynamicSpreadEnabled() {
-		s.DynamicBidSpread = &indicator.SMA{IntervalWindow: types.IntervalWindow{s.Interval, s.DynamicSpreadWindow}}
-		s.DynamicAskSpread = &indicator.SMA{IntervalWindow: types.IntervalWindow{s.Interval, s.DynamicSpreadWindow}}
+	if s.DynamicSpread.Enabled {
+		s.DynamicSpread.DynamicBidSpread = &indicator.SMA{IntervalWindow: types.IntervalWindow{s.Interval, s.DynamicSpread.Window}}
+		s.DynamicSpread.DynamicAskSpread = &indicator.SMA{IntervalWindow: types.IntervalWindow{s.Interval, s.DynamicSpread.Window}}
 	}
 
 	s.OnSuspend(func() {
@@ -747,14 +742,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 
 		// Update spreads with dynamic spread
-		if s.IsDynamicSpreadEnabled() {
-			s.updateDynamicSpread(kline)
-			dynamicBidSpread, err := s.getDynamicBidSpread()
+		if s.DynamicSpread.Enabled {
+			s.DynamicSpread.Update(kline)
+			dynamicBidSpread, err := s.DynamicSpread.GetBidSpread()
 			if err == nil && dynamicBidSpread > 0 {
 				s.BidSpread = fixedpoint.NewFromFloat(dynamicBidSpread)
 				log.Infof("new bid spread: %v", s.BidSpread.Percentage())
 			}
-			dynamicAskSpread, err := s.getDynamicAskSpread()
+			dynamicAskSpread, err := s.DynamicSpread.GetAskSpread()
 			if err == nil && dynamicAskSpread > 0 {
 				s.AskSpread = fixedpoint.NewFromFloat(dynamicAskSpread)
 				log.Infof("new ask spread: %v", s.AskSpread.Percentage())
