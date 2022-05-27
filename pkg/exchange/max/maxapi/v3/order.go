@@ -5,6 +5,8 @@ package v3
 //go:generate -command DeleteRequest requestgen -method DELETE
 
 import (
+	"time"
+
 	"github.com/c9s/requestgen"
 
 	maxapi "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
@@ -33,6 +35,10 @@ func (s *OrderService) NewWalletGetOpenOrdersRequest(walletType WalletType) *Wal
 
 func (s *OrderService) NewWalletOrderCancelAllRequest(walletType WalletType) *WalletOrderCancelAllRequest {
 	return &WalletOrderCancelAllRequest{client: s.Client, walletType: walletType}
+}
+
+func (s *OrderService) NewWalletGetTradesRequest(walletType WalletType) *WalletGetTradesRequest {
+	return &WalletGetTradesRequest{client: s.Client, walletType: walletType}
 }
 
 func (s *OrderService) NewOrderCancelRequest() *OrderCancelRequest {
@@ -86,6 +92,21 @@ type WalletOrderCancelAllRequest struct {
 	side       *string    `param:"side"`
 	market     *string    `param:"market"`
 	groupID    *uint32    `param:"groupID"`
+}
+
+type Trade = maxapi.Trade
+
+//go:generate GetRequest -url "/api/v3/wallet/:walletType/trades" -type WalletGetTradesRequest -responseType []Trade
+type WalletGetTradesRequest struct {
+	client requestgen.AuthenticatedAPIClient
+
+	walletType WalletType `param:"walletType,slug,required"`
+
+	market    string     `param:"market,required"`
+	from      *uint64    `param:"from_id"`
+	startTime *time.Time `param:"start_time,milliseconds"`
+	endTime   *time.Time `param:"end_time,milliseconds"`
+	limit     *uint64    `param:"limit"`
 }
 
 //go:generate PostRequest -url "/api/v3/order" -type OrderCancelRequest -responseType .Order

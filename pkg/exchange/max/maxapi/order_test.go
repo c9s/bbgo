@@ -73,24 +73,6 @@ func TestOrderService_GetOrdersRequest_SingleState(t *testing.T) {
 	assert.NotNil(t, orders)
 }
 
-func TestOrderService_GetOrderHistoryRequest(t *testing.T) {
-	key, secret, ok := integrationTestConfigured(t, "MAX")
-	if !ok {
-		t.SkipNow()
-	}
-
-	ctx := context.Background()
-
-	client := NewRestClient(ProductionAPIURL)
-	client.Auth(key, secret)
-
-	req := client.OrderService.NewGetOrderHistoryRequest()
-	req.Market("btcusdt")
-	req.FromID(1)
-	orders, err := req.Do(ctx)
-	assert.NoError(t, err)
-	assert.NotNil(t, orders)
-}
 
 func TestOrderService(t *testing.T) {
 	key, secret, ok := integrationTestConfigured(t, "MAX")

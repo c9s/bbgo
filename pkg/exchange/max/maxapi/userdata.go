@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"github.com/valyala/fastjson"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -23,16 +24,16 @@ type OrderUpdate struct {
 	Side      string    `json:"sd"`
 	OrderType OrderType `json:"ot"`
 
-	Price     string `json:"p"`
-	StopPrice string `json:"sp"`
+	Price     fixedpoint.Value `json:"p"`
+	StopPrice fixedpoint.Value `json:"sp"`
 
-	Volume       string     `json:"v"`
-	AveragePrice string     `json:"ap"`
-	State        OrderState `json:"S"`
-	Market       string     `json:"M"`
+	Volume       fixedpoint.Value `json:"v"`
+	AveragePrice fixedpoint.Value `json:"ap"`
+	State        OrderState       `json:"S"`
+	Market       string           `json:"M"`
 
-	RemainingVolume string `json:"rv"`
-	ExecutedVolume  string `json:"ev"`
+	RemainingVolume fixedpoint.Value `json:"rv"`
+	ExecutedVolume  fixedpoint.Value `json:"ev"`
 
 	TradesCount int64 `json:"tc"`
 
@@ -48,36 +49,20 @@ type OrderUpdateEvent struct {
 	Orders []OrderUpdate `json:"o"`
 }
 
-func parserOrderUpdate(v *fastjson.Value) OrderUpdate {
-	return OrderUpdate{
-		Event:           string(v.GetStringBytes("e")),
-		ID:              v.GetUint64("i"),
-		Side:            string(v.GetStringBytes("sd")),
-		Market:          string(v.GetStringBytes("M")),
-		OrderType:       OrderType(v.GetStringBytes("ot")),
-		State:           OrderState(v.GetStringBytes("S")),
-		Price:           string(v.GetStringBytes("p")),
-		StopPrice:       string(v.GetStringBytes("sp")),
-		AveragePrice:    string(v.GetStringBytes("ap")),
-		Volume:          string(v.GetStringBytes("v")),
-		RemainingVolume: string(v.GetStringBytes("rv")),
-		ExecutedVolume:  string(v.GetStringBytes("ev")),
-		TradesCount:     v.GetInt64("tc"),
-		GroupID:         uint32(v.GetInt("gi")),
-		ClientOID:       string(v.GetStringBytes("ci")),
-		CreatedAtMs:     v.GetInt64("T"),
-		UpdateTime:      v.GetInt64("TU"),
-	}
-}
-
 func parseOrderUpdateEvent(v *fastjson.Value) *OrderUpdateEvent {
 	var e OrderUpdateEvent
 	e.Event = string(v.GetStringBytes("e"))
 	e.Timestamp = v.GetInt64("T")
 
 	for _, ov := range v.GetArray("o") {
-		o := parserOrderUpdate(ov)
-		e.Orders = append(e.Orders, o)
+		var o = ov.String()
+		var u OrderUpdate
+		if err := json.Unmarshal([]byte(o), &u); err != nil {
+			log.WithError(err).Error("parse error")
+			continue
+		}
+
+		e.Orders = append(e.Orders, u)
 	}
 
 	return &e
@@ -95,8 +80,14 @@ func parserOrderSnapshotEvent(v *fastjson.Value) *OrderSnapshotEvent {
 	e.Timestamp = v.GetInt64("T")
 
 	for _, ov := range v.GetArray("o") {
-		o := parserOrderUpdate(ov)
-		e.Orders = append(e.Orders, o)
+		var o = ov.String()
+		var u OrderUpdate
+		if err := json.Unmarshal([]byte(o), &u); err != nil {
+			log.WithError(err).Error("parse error")
+			continue
+		}
+
+		e.Orders = append(e.Orders, u)
 	}
 
 	return &e
