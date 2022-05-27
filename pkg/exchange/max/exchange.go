@@ -773,11 +773,17 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		return nil, err
 	}
 
-	req := e.client.TradeService.NewGetPrivateTradeRequest()
-	req.Market(toLocalSymbol(symbol))
+	market := toLocalSymbol(symbol)
+	walletType := maxapi.WalletTypeSpot
+	if e.MarginSettings.IsMargin {
+		walletType = maxapi.WalletTypeMargin
+	}
+
+	req := e.v3order.NewWalletGetTradesRequest(walletType)
+	req.Market(market)
 
 	if options.Limit > 0 {
-		req.Limit(options.Limit)
+		req.Limit(uint64(options.Limit))
 	} else {
 		req.Limit(1000)
 	}
@@ -785,11 +791,8 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	// MAX uses exclusive last trade ID
 	// the timestamp parameter is used for reverse order, we can't use it.
 	if options.LastTradeID > 0 {
-		req.From(int64(options.LastTradeID))
+		req.From(options.LastTradeID)
 	}
-
-	// make it compatible with binance, we need the last trade id for the next page.
-	req.OrderBy("asc")
 
 	maxTrades, err := req.Do(ctx)
 	if err != nil {

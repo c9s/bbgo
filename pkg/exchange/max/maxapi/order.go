@@ -6,7 +6,6 @@ package max
 import (
 	"context"
 	"net/url"
-	"time"
 
 	"github.com/c9s/requestgen"
 	"github.com/pkg/errors"
@@ -99,7 +98,7 @@ type SubmitOrder struct {
 // Order represents one returned order (POST order/GET order/GET orders) on the max platform.
 type Order struct {
 	ID              uint64                     `json:"id,omitempty"`
-	WalletType      string                     `json:"wallet_type,omitempty"`
+	WalletType      WalletType                 `json:"wallet_type,omitempty"`
 	Side            string                     `json:"side"`
 	OrderType       OrderType                  `json:"ord_type"`
 	Price           fixedpoint.Value           `json:"price,omitempty"`
@@ -113,64 +112,7 @@ type Order struct {
 	TradesCount     int64                      `json:"trades_count,omitempty"`
 	GroupID         uint32                     `json:"group_id,omitempty"`
 	ClientOID       string                     `json:"client_oid,omitempty"`
-	CreatedAt       time.Time                  `json:"-"`
-	CreatedAtMs     types.MillisecondTimestamp `json:"created_at_in_ms,omitempty"`
-	InsertedAt      time.Time                  `json:"-"`
-}
-
-// Open returns open orders
-func (s *OrderService) Closed(market string, options QueryOrderOptions) ([]Order, error) {
-	req := s.NewGetOrdersRequest()
-	req.Market(market)
-	req.State([]OrderState{OrderStateDone, OrderStateCancel})
-
-	if options.GroupID > 0 {
-		req.GroupID(uint32(options.GroupID))
-	}
-	if options.Offset > 0 {
-		req.Offset(options.Offset)
-	}
-	if options.Limit > 0 {
-		req.Limit(options.Limit)
-	}
-
-	if options.Page > 0 {
-		req.Page(options.Page)
-	}
-
-	if len(options.OrderBy) > 0 {
-		req.OrderBy(options.OrderBy)
-	}
-
-	return req.Do(context.Background())
-}
-
-// Open returns open orders
-func (s *OrderService) Open(market string, options QueryOrderOptions) ([]Order, error) {
-	req := s.NewGetOrdersRequest()
-	req.Market(market)
-	// state default ot wait and convert
-
-	if options.GroupID > 0 {
-		req.GroupID(uint32(options.GroupID))
-	}
-
-	return req.Do(context.Background())
-}
-
-//go:generate GetRequest -url "v2/orders/history" -type GetOrderHistoryRequest -responseType []Order
-type GetOrderHistoryRequest struct {
-	client requestgen.AuthenticatedAPIClient
-
-	market string  `param:"market"`
-	fromID *uint64 `param:"from_id"`
-	limit  *uint   `param:"limit"`
-}
-
-func (s *OrderService) NewGetOrderHistoryRequest() *GetOrderHistoryRequest {
-	return &GetOrderHistoryRequest{
-		client: s.client,
-	}
+	CreatedAt       types.MillisecondTimestamp `json:"created_at"`
 }
 
 //go:generate GetRequest -url "v2/orders" -type GetOrdersRequest -responseType []Order
