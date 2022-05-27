@@ -56,6 +56,33 @@ exchangeStrategies:
     # For short position, you will only place buy order below the price (= average cost * (1 - minProfitSpread))
     minProfitSpread: 0.1%
 
+    # EXPERIMENTAL
+    #   Dynamic spread is an experimental feature. Use at your own risk!
+    #
+    #   dynamicSpread enables the automatic adjustment to bid and ask spread.
+    # dynamicSpread:
+    #   enabled: true
+    #   # window is the window of the SMAs of spreads
+    #   window: 1
+    #   askSpreadScale:
+    #     byPercentage:
+    #       # exp means we want to use exponential scale, you can replace "exp" with "linear" for linear scale
+    #       exp:
+    #         # from down to up
+    #         domain: [ 0.0001, 0.005 ]
+    #         # when in down band, holds 1.0 by maximum
+    #         # when in up band, holds 0.05 by maximum
+    #         range: [ 0.001, 0.002 ]
+    #   bidSpreadScale:
+    #     byPercentage:
+    #       # exp means we want to use exponential scale, you can replace "exp" with "linear" for linear scale
+    #       exp:
+    #         # from down to up
+    #         domain: [ 0.0001, 0.005 ]
+    #         # when in down band, holds 1.0 by maximum
+    #         # when in up band, holds 0.05 by maximum
+    #         range: [ 0.001, 0.002 ]
+
     # maxExposurePosition is the maximum position you can hold
     # +10 means you can hold 10 ETH long position by maximum
     # -10 means you can hold -10 ETH short position by maximum
