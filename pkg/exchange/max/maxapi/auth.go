@@ -1,11 +1,12 @@
 package max
 
 type AuthMessage struct {
-	Action    string `json:"action"`
-	APIKey    string `json:"apiKey"`
-	Nonce     int64  `json:"nonce"`
-	Signature string `json:"signature"`
-	ID        string `json:"id"`
+	Action    string   `json:"action,omitempty"`
+	APIKey    string   `json:"apiKey,omitempty"`
+	Nonce     int64    `json:"nonce,omitempty"`
+	Signature string   `json:"signature,omitempty"`
+	ID        string   `json:"id,omitempty"`
+	Filters   []string `json:"filters,omitempty"`
 }
 
 type AuthEvent struct {

@@ -1,7 +1,6 @@
 package max
 
 import (
-	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
@@ -9,11 +8,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"net"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
 	"regexp"
 	"strings"
@@ -40,18 +37,11 @@ const (
 	TimestampSince = 1535760000
 )
 
-var debugRequestDump = false
-var debugMaxRequestPayload = false
-var addUserAgentHeader = true
-
 var httpTransportMaxIdleConnsPerHost = http.DefaultMaxIdleConnsPerHost
 var httpTransportMaxIdleConns = 100
 var httpTransportIdleConnTimeout = 90 * time.Second
 
 func init() {
-	debugMaxRequestPayload, _ = util.GetEnvVarBool("DEBUG_MAX_REQUEST_PAYLOAD")
-	debugRequestDump, _ = util.GetEnvVarBool("DEBUG_MAX_REQUEST")
-	addUserAgentHeader, _ = util.GetEnvVarBool("DISABLE_MAX_USER_AGENT_HEADER")
 
 	if val, ok := util.GetEnvVarInt("HTTP_TRANSPORT_MAX_IDLE_CONNS_PER_HOST"); ok {
 		httpTransportMaxIdleConnsPerHost = val
@@ -80,14 +70,30 @@ var serverTimestamp = time.Now().Unix()
 // reqCount is used for nonce, this variable counts the API request count.
 var reqCount int64 = 1
 
+// create an isolated http httpTransport rather than the default one
+var httpTransport = &http.Transport{
+	Proxy: http.ProxyFromEnvironment,
+	DialContext: (&net.Dialer{
+		Timeout:   10 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}).DialContext,
+	ForceAttemptHTTP2:     true,
+	MaxIdleConns:          httpTransportMaxIdleConns,
+	MaxIdleConnsPerHost:   httpTransportMaxIdleConnsPerHost,
+	IdleConnTimeout:       httpTransportIdleConnTimeout,
+	TLSHandshakeTimeout:   10 * time.Second,
+	ExpectContinueTimeout: 1 * time.Second,
+}
+
+var defaultHttpClient = &http.Client{
+	Timeout:   defaultHTTPTimeout,
+	Transport: httpTransport,
+}
+
 type RestClient struct {
-	client *http.Client
+	requestgen.BaseAPIClient
 
-	BaseURL *url.URL
-
-	// Authentication
-	APIKey    string
-	APISecret string
+	APIKey, APISecret string
 
 	AccountService    *AccountService
 	PublicService     *PublicService
@@ -95,21 +101,19 @@ type RestClient struct {
 	OrderService      *OrderService
 	RewardService     *RewardService
 	WithdrawalService *WithdrawalService
-	// OrderBookService *OrderBookService
-	// MaxTokenService  *MaxTokenService
-	// MaxKLineService  *KLineService
-	// CreditService    *CreditService
 }
 
-func NewRestClientWithHttpClient(baseURL string, httpClient *http.Client) *RestClient {
+func NewRestClient(baseURL string) *RestClient {
 	u, err := url.Parse(baseURL)
 	if err != nil {
 		panic(err)
 	}
 
 	var client = &RestClient{
-		client:  httpClient,
-		BaseURL: u,
+		BaseAPIClient: requestgen.BaseAPIClient{
+			HttpClient: defaultHttpClient,
+			BaseURL:    u,
+		},
 	}
 
 	client.AccountService = &AccountService{client}
@@ -119,33 +123,9 @@ func NewRestClientWithHttpClient(baseURL string, httpClient *http.Client) *RestC
 	client.RewardService = &RewardService{client}
 	client.WithdrawalService = &WithdrawalService{client}
 
-	// client.MaxTokenService = &MaxTokenService{client}
+	// defaultHttpClient.MaxTokenService = &MaxTokenService{defaultHttpClient}
 	client.initNonce()
 	return client
-}
-
-func NewRestClient(baseURL string) *RestClient {
-	// create an isolated http transport rather than the default one
-	transport := &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		DialContext: (&net.Dialer{
-			Timeout:   10 * time.Second,
-			KeepAlive: 30 * time.Second,
-		}).DialContext,
-		ForceAttemptHTTP2:     true,
-		MaxIdleConns:          httpTransportMaxIdleConns,
-		MaxIdleConnsPerHost:   httpTransportMaxIdleConnsPerHost,
-		IdleConnTimeout:       httpTransportIdleConnTimeout,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-	}
-
-	client := &http.Client{
-		Timeout:   defaultHTTPTimeout,
-		Transport: transport,
-	}
-
-	return NewRestClientWithHttpClient(baseURL, client)
 }
 
 // Auth sets api key and secret for usage is requests that requires authentication.
@@ -175,45 +155,20 @@ func (c *RestClient) getNonce() int64 {
 	return (seconds+timeOffset)*1000 - 1 + int64(math.Mod(float64(rc), 1000.0))
 }
 
-// NewRequest create new API request. Relative url can be provided in refURL.
-func (c *RestClient) NewRequest(ctx context.Context, method string, refURL string, params url.Values, payload interface{}) (*http.Request, error) {
-	rel, err := url.Parse(refURL)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		rel.RawQuery = params.Encode()
-	}
-
-	var req *http.Request
-	u := c.BaseURL.ResolveReference(rel)
-
-	body, err := castPayload(payload)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err = http.NewRequest(method, u.String(), bytes.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-
-	req = req.WithContext(ctx)
-
-	if addUserAgentHeader {
-		req.Header.Add("User-Agent", UserAgent)
-	}
-
-	return req, nil
-}
-
 func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, m string, refURL string, params url.Values, payload interface{}) (*http.Request, error) {
 	return c.newAuthenticatedRequest(ctx, m, refURL, params, payload, nil)
 }
 
 // newAuthenticatedRequest creates new http request for authenticated routes.
 func (c *RestClient) newAuthenticatedRequest(ctx context.Context, m string, refURL string, params url.Values, data interface{}, rel *url.URL) (*http.Request, error) {
+	if len(c.APIKey) == 0 {
+		return nil, errors.New("empty api key")
+	}
+
+	if len(c.APISecret) == 0 {
+		return nil, errors.New("empty api secret")
+	}
+
 	var err error
 	if rel == nil {
 		rel, err = url.Parse(refURL)
@@ -223,22 +178,13 @@ func (c *RestClient) newAuthenticatedRequest(ctx context.Context, m string, refU
 	}
 
 	var p []byte
-	var payload map[string]interface{}
+	var payload = map[string]interface{}{
+		"nonce": c.getNonce(),
+		"path":  c.BaseURL.ResolveReference(rel).Path,
+	}
 
 	switch d := data.(type) {
-
-	case nil:
-		payload = map[string]interface{}{
-			"nonce": c.getNonce(),
-			"path":  c.BaseURL.ResolveReference(rel).Path,
-		}
-
 	case map[string]interface{}:
-		payload = map[string]interface{}{
-			"nonce": c.getNonce(),
-			"path":  c.BaseURL.ResolveReference(rel).Path,
-		}
-
 		for k, v := range d {
 			payload[k] = v
 		}
@@ -258,22 +204,6 @@ func (c *RestClient) newAuthenticatedRequest(ctx context.Context, m string, refU
 		return nil, err
 	}
 
-	if debugMaxRequestPayload {
-		log.Infof("request payload: %s", p)
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	if len(c.APIKey) == 0 {
-		return nil, errors.New("empty api key")
-	}
-
-	if len(c.APISecret) == 0 {
-		return nil, errors.New("empty api secret")
-	}
-
 	req, err := c.NewRequest(ctx, m, refURL, params, p)
 	if err != nil {
 		return nil, err
@@ -286,54 +216,7 @@ func (c *RestClient) newAuthenticatedRequest(ctx context.Context, m string, refU
 	req.Header.Add("X-MAX-PAYLOAD", encoded)
 	req.Header.Add("X-MAX-SIGNATURE", signPayload(encoded, c.APISecret))
 
-	if debugRequestDump {
-		dump, err2 := httputil.DumpRequestOut(req, true)
-		if err2 != nil {
-			log.Errorf("dump request error: %v", err2)
-		} else {
-			fmt.Printf("REQUEST:\n%s", dump)
-		}
-	}
-
 	return req, nil
-}
-
-func signPayload(payload string, secret string) string {
-	var sig = hmac.New(sha256.New, []byte(secret))
-	_, err := sig.Write([]byte(payload))
-	if err != nil {
-		return ""
-	}
-	return hex.EncodeToString(sig.Sum(nil))
-}
-
-func (c *RestClient) Do(req *http.Request) (resp *http.Response, err error) {
-	return c.client.Do(req)
-}
-
-// SendRequest sends the request to the API server and handle the response
-func (c *RestClient) SendRequest(req *http.Request) (*requestgen.Response, error) {
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	// newResponse reads the response body and return a new Response object
-	response, err := requestgen.NewResponse(resp)
-	if err != nil {
-		return response, err
-	}
-
-	// Check error, if there is an error, return the ErrorResponse struct type
-	if response.IsError() {
-		errorResponse, err := ToErrorResponse(response)
-		if err != nil {
-			return response, err
-		}
-		return response, errorResponse
-	}
-
-	return response, nil
 }
 
 func (c *RestClient) sendAuthenticatedRequest(m string, refURL string, data map[string]interface{}) (*requestgen.Response, error) {
@@ -341,40 +224,8 @@ func (c *RestClient) sendAuthenticatedRequest(m string, refURL string, data map[
 	if err != nil {
 		return nil, err
 	}
-	response, err := c.SendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-	return response, err
-}
 
-// get sends GET http request to the api endpoint, the urlPath must start with a slash '/'
-func (c *RestClient) get(urlPath string, values url.Values) ([]byte, error) {
-	var reqURL = c.BaseURL.String() + urlPath
-
-	// Create request
-	req, err := http.NewRequest("GET", reqURL, nil)
-	if err != nil {
-		return nil, fmt.Errorf("could not init request: %s", err.Error())
-	}
-
-	req.URL.RawQuery = values.Encode()
-	req.Header.Add("User-Agent", UserAgent)
-
-	// Execute request
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("could not execute request: %s", err.Error())
-	}
-	defer resp.Body.Close()
-
-	// Load request
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("could not read response: %s", err.Error())
-	}
-
-	return body, nil
+	return c.SendRequest(req)
 }
 
 // ErrorResponse is the custom error type that is returned if the API returns an
@@ -438,4 +289,13 @@ func castPayload(payload interface{}) ([]byte, error) {
 
 	body, err := json.Marshal(payload)
 	return body, err
+}
+
+func signPayload(payload string, secret string) string {
+	var sig = hmac.New(sha256.New, []byte(secret))
+	_, err := sig.Write([]byte(payload))
+	if err != nil {
+		return ""
+	}
+	return hex.EncodeToString(sig.Sum(nil))
 }
