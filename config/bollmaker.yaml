@@ -59,27 +59,28 @@ exchangeStrategies:
     # EXPERIMENTAL
     #   Dynamic spread is an experimental feature. Use at your own risk!
     #
-    #   dynamicSpreadWindow enables the automatic adjustment to bid and ask spread.
-    #   When DynamicSpreadWindow is set and larger than 0, the spreads are calculated based on the SMA of amplitude of
-    #   previous [DynamicSpreadWindow] K-lines.
-    # dynamicSpreadWindow: 1
-    # dynamicAskSpreadScale:
-    #   byPercentage:
-    #     # exp means we want to use exponential scale, you can replace "exp" with "linear" for linear scale
-    #     exp:
-    #       # amplitude from low to high
-    #       domain: [ 0.0001, 0.005 ]
-    #       # when amplitude is low, minimum ask is spread 0.05%
-    #       # when amplitude is high, maximum ask is spread 0.2%
-    #       range: [ 0.001, 0.002 ]
-    #   dynamicBidSpreadScale:
+    #   dynamicSpread enables the automatic adjustment to bid and ask spread.
+    # dynamicSpread:
+    #   enabled: true
+    #   # window is the window of the SMAs of spreads
+    #   window: 1
+    #   askSpreadScale:
     #     byPercentage:
     #       # exp means we want to use exponential scale, you can replace "exp" with "linear" for linear scale
     #       exp:
-    #         # amplitude from low to high
+    #         # from down to up
     #         domain: [ 0.0001, 0.005 ]
-    #         # when amplitude is low, minimum bid is spread 0.05%
-    #         # when amplitude is high, maximum bid is spread 0.2%
+    #         # when in down band, holds 1.0 by maximum
+    #         # when in up band, holds 0.05 by maximum
+    #         range: [ 0.001, 0.002 ]
+    #   bidSpreadScale:
+    #     byPercentage:
+    #       # exp means we want to use exponential scale, you can replace "exp" with "linear" for linear scale
+    #       exp:
+    #         # from down to up
+    #         domain: [ 0.0001, 0.005 ]
+    #         # when in down band, holds 1.0 by maximum
+    #         # when in up band, holds 0.05 by maximum
     #         range: [ 0.001, 0.002 ]
 
     # maxExposurePosition is the maximum position you can hold
