@@ -113,10 +113,9 @@ type Strategy struct {
 	*bbgo.Notifiability
 	*bbgo.Persistence
 
-	Environment          *bbgo.Environment
-	StandardIndicatorSet *bbgo.StandardIndicatorSet
-	session              *bbgo.ExchangeSession
-	Market               types.Market
+	Environment *bbgo.Environment
+	session     *bbgo.ExchangeSession
+	Market      types.Market
 
 	// persistence fields
 	Position    *types.Position    `json:"position,omitempty" persistence:"position"`
@@ -249,7 +248,40 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			demaSignal = types.DirectionNone
 		}
 
-		// TODO: TP/SL
+		// TP/SL
+		base := s.Position.GetBase()
+		quantity := base.Abs()
+		if quantity.Compare(s.Market.MinQuantity) > 0 && quantity.Mul(kline.GetClose()).Compare(s.Market.MinNotional) > 0 {
+			if base.Sign() < 0 && (stSignal == types.DirectionUp || demaSignal == types.DirectionUp) {
+				orderForm := types.SubmitOrder{
+					Symbol:   s.Symbol,
+					Market:   s.Market,
+					Side:     types.SideTypeBuy,
+					Type:     types.OrderTypeMarket,
+					Quantity: quantity,
+				}
+				log.Infof("submit TP/SL order %v", orderForm)
+				createdOrder, err := s.session.Exchange.SubmitOrders(ctx, orderForm)
+				if err != nil {
+					log.WithError(err).Errorf("can not place TP/SL order")
+				}
+				s.orderStore.Add(createdOrder...)
+			} else if base.Sign() > 0 && (stSignal == types.DirectionDown || demaSignal == types.DirectionDown) {
+				orderForm := types.SubmitOrder{
+					Symbol:   s.Symbol,
+					Market:   s.Market,
+					Side:     types.SideTypeSell,
+					Type:     types.OrderTypeMarket,
+					Quantity: quantity,
+				}
+				log.Infof("submit TP/SL order %v", orderForm)
+				createdOrder, err := s.session.Exchange.SubmitOrders(ctx, orderForm)
+				if err != nil {
+					log.WithError(err).Errorf("can not place TP/SL order")
+				}
+				s.orderStore.Add(createdOrder...)
+			}
+		}
 
 		// Place order
 		var side types.SideType
@@ -258,17 +290,17 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		} else if stSignal == types.DirectionDown && demaSignal == types.DirectionDown {
 			side = types.SideTypeSell
 		}
-		quantity := s.CalculateQuantity(fixedpoint.NewFromFloat(closePrice))
 
+		balance, _ := s.session.GetAccount().Balance(s.Market.QuoteCurrency)
+		s.Amount = balance.Available
 		if side == types.SideTypeSell || side == types.SideTypeBuy {
 			orderForm := types.SubmitOrder{
 				Symbol:   s.Symbol,
 				Market:   s.Market,
 				Side:     side,
 				Type:     types.OrderTypeMarket,
-				Quantity: quantity,
+				Quantity: s.CalculateQuantity(fixedpoint.NewFromFloat(closePrice)),
 			}
-			log.Infof("%v", orderForm)
 
 			createdOrder, err := s.session.Exchange.SubmitOrders(ctx, orderForm)
 			if err != nil {
@@ -301,7 +333,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 			s.Environment.RecordPosition(s.Position, trade, &p)
 		}
-		log.Infof("%v", s.Position)
 	})
 
 	s.tradeCollector.BindStream(session.UserDataStream)
