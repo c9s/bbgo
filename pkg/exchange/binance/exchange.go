@@ -3,7 +3,6 @@ package binance
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -22,6 +21,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/exchange/binance/binanceapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
@@ -77,17 +77,21 @@ type Exchange struct {
 	// futuresClient is used for usdt-m futures
 	futuresClient *futures.Client // USDT-M Futures
 	// deliveryClient	*delivery.Client // Coin-M Futures
+
+	// client2 is a newer version of the binance api client implemented by ourselves.
+	client2 *binanceapi.RestClient
 }
 
 var timeSetter sync.Once
 
 func New(key, secret string) *Exchange {
 	var client = binance.NewClient(key, secret)
-	client.HTTPClient = &http.Client{Timeout: 15 * time.Second}
+	client.HTTPClient = binanceapi.DefaultHttpClient
 	client.Debug = viper.GetBool("debug-binance-client")
 
 	var futuresClient = binance.NewFuturesClient(key, secret)
-	futuresClient.HTTPClient = &http.Client{Timeout: 15 * time.Second}
+	futuresClient.HTTPClient = binanceapi.DefaultHttpClient
+	futuresClient.Debug = viper.GetBool("debug-binance-futures-client")
 
 	if isBinanceUs() {
 		client.BaseURL = BinanceUSBaseURL
@@ -97,6 +101,8 @@ func New(key, secret string) *Exchange {
 		client.BaseURL = BinanceTestBaseURL
 		futuresClient.BaseURL = FutureTestBaseURL
 	}
+
+	client2 := binanceapi.NewClient(client.BaseURL)
 
 	var err error
 	if len(key) > 0 && len(secret) > 0 {
@@ -118,7 +124,7 @@ func New(key, secret string) *Exchange {
 		secret:        secret,
 		client:        client,
 		futuresClient: futuresClient,
-		// deliveryClient: deliveryClient,
+		client2:       client2,
 	}
 }
 

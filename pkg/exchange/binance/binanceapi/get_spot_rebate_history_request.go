@@ -24,7 +24,6 @@ type SpotRebate struct {
 	UpdateTime types.MillisecondTimestamp `json:"updateTime"`
 }
 
-
 // GetSpotRebateHistoryRequest
 // The max interval between startTime and endTime is 30 days.
 // If startTime and endTime are not sent, the recent 7 days' data will be returned.

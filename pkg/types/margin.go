@@ -2,6 +2,7 @@ package types
 
 import (
 	"context"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
@@ -98,10 +99,10 @@ type MarginLiquidationRecord struct {
 
 // MarginHistory provides the service of querying loan history and repay history
 type MarginHistory interface {
-	QueryLoanHistory() ([]MarginLoanRecord, error)
-	QueryRepayHistory() ([]MarginRepayRecord, error)
-	QueryLiquidationHistory() ([]MarginLiquidationRecord, error)
-	QueryInterestHistory() ([]MarginInterest, error)
+	QueryLoanHistory(ctx context.Context, asset string, startTime, endTime *time.Time) ([]MarginLoanRecord, error)
+	QueryRepayHistory(ctx context.Context, asset string, startTime, endTime *time.Time) ([]MarginRepayRecord, error)
+	QueryLiquidationHistory(ctx context.Context, startTime, endTime *time.Time) ([]MarginLiquidationRecord, error)
+	QueryInterestHistory(ctx context.Context, asset string, startTime, endTime *time.Time) ([]MarginInterest, error)
 }
 
 type MarginSettings struct {

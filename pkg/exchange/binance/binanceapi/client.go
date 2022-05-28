@@ -24,7 +24,7 @@ const RestBaseURL = "https://api.binance.com"
 const SandboxRestBaseURL = "https://testnet.binance.vision"
 const DebugRequestResponse = false
 
-var defaultHttpClient = &http.Client{
+var DefaultHttpClient = &http.Client{
 	Timeout: defaultHTTPTimeout,
 }
 
@@ -37,8 +37,12 @@ type RestClient struct {
 	timeOffset int64
 }
 
-func NewClient() *RestClient {
-	u, err := url.Parse(RestBaseURL)
+func NewClient(baseURL string) *RestClient {
+	if len(baseURL) == 0 {
+		baseURL = RestBaseURL
+	}
+
+	u, err := url.Parse(baseURL)
 	if err != nil {
 		panic(err)
 	}
@@ -46,7 +50,7 @@ func NewClient() *RestClient {
 	client := &RestClient{
 		BaseAPIClient: requestgen.BaseAPIClient{
 			BaseURL:    u,
-			HttpClient: defaultHttpClient,
+			HttpClient: DefaultHttpClient,
 		},
 	}
 
