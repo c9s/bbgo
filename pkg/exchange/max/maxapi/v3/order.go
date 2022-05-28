@@ -16,42 +16,50 @@ import (
 type WalletType = maxapi.WalletType
 type Order = maxapi.Order
 type Trade = maxapi.Trade
+type Account = maxapi.Account
 
 // OrderService manages the Order endpoint.
 type OrderService struct {
 	Client *maxapi.RestClient
 }
 
-func (s *OrderService) NewWalletCreateOrderRequest(walletType WalletType) *WalletCreateOrderRequest {
-	return &WalletCreateOrderRequest{client: s.Client, walletType: walletType}
+func (s *OrderService) NewWalletCreateOrderRequest(walletType WalletType) *CreateWalletOrderRequest {
+	return &CreateWalletOrderRequest{client: s.Client, walletType: walletType}
 }
 
-func (s *OrderService) NewWalletGetOrderHistoryRequest(walletType WalletType) *WalletGetOrderHistoryRequest {
-	return &WalletGetOrderHistoryRequest{client: s.Client, walletType: walletType}
+func (s *OrderService) NewWalletGetOrderHistoryRequest(walletType WalletType) *GetWalletOrderHistoryRequest {
+	return &GetWalletOrderHistoryRequest{client: s.Client, walletType: walletType}
 }
 
-func (s *OrderService) NewWalletGetOpenOrdersRequest(walletType WalletType) *WalletGetOpenOrdersRequest {
-	return &WalletGetOpenOrdersRequest{client: s.Client, walletType: walletType}
+func (s *OrderService) NewWalletGetOpenOrdersRequest(walletType WalletType) *GetWalletOpenOrdersRequest {
+	return &GetWalletOpenOrdersRequest{client: s.Client, walletType: walletType}
 }
 
-func (s *OrderService) NewWalletOrderCancelAllRequest(walletType WalletType) *WalletOrderCancelAllRequest {
-	return &WalletOrderCancelAllRequest{client: s.Client, walletType: walletType}
+func (s *OrderService) NewWalletOrderCancelAllRequest(walletType WalletType) *CancelWalletOrderAllRequest {
+	return &CancelWalletOrderAllRequest{client: s.Client, walletType: walletType}
 }
 
-func (s *OrderService) NewWalletGetTradesRequest(walletType WalletType) *WalletGetTradesRequest {
-	return &WalletGetTradesRequest{client: s.Client, walletType: walletType}
+func (s *OrderService) NewWalletGetTradesRequest(walletType WalletType) *GetWalletTradesRequest {
+	return &GetWalletTradesRequest{client: s.Client, walletType: walletType}
 }
 
-func (s *OrderService) NewOrderCancelRequest() *OrderCancelRequest {
-	return &OrderCancelRequest{client: s.Client}
+func (s *OrderService) NewOrderCancelRequest() *CancelOrderRequest {
+	return &CancelOrderRequest{client: s.Client}
 }
 
 func (s *OrderService) NewGetOrderRequest() *GetOrderRequest {
 	return &GetOrderRequest{client: s.Client}
 }
 
-//go:generate PostRequest -url "/api/v3/wallet/:walletType/orders" -type WalletCreateOrderRequest -responseType .Order -debug
-type WalletCreateOrderRequest struct {
+//go:generate GetRequest -url "/api/v3/wallet/:walletType/accounts" -type GetWalletAccountsRequest -responseType []Account
+type GetWalletAccountsRequest struct {
+	client requestgen.AuthenticatedAPIClient
+
+	walletType WalletType `param:"walletType,slug,required"`
+}
+
+//go:generate PostRequest -url "/api/v3/wallet/:walletType/orders" -type CreateWalletOrderRequest -responseType .Order
+type CreateWalletOrderRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
 	walletType WalletType `param:"walletType,slug,required"`
@@ -66,8 +74,8 @@ type WalletCreateOrderRequest struct {
 	groupID       *string `param:"group_id"`
 }
 
-//go:generate GetRequest -url "/api/v3/wallet/:walletType/orders/history" -type WalletGetOrderHistoryRequest -responseType []Order
-type WalletGetOrderHistoryRequest struct {
+//go:generate GetRequest -url "/api/v3/wallet/:walletType/orders/history" -type GetWalletOrderHistoryRequest -responseType []Order
+type GetWalletOrderHistoryRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
 	walletType WalletType `param:"walletType,slug,required"`
@@ -77,16 +85,16 @@ type WalletGetOrderHistoryRequest struct {
 	limit  *uint   `param:"limit"`
 }
 
-//go:generate GetRequest -url "/api/v3/wallet/:walletType/orders/open" -type WalletGetOpenOrdersRequest -responseType []Order
-type WalletGetOpenOrdersRequest struct {
+//go:generate GetRequest -url "/api/v3/wallet/:walletType/orders/open" -type GetWalletOpenOrdersRequest -responseType []Order
+type GetWalletOpenOrdersRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
 	walletType WalletType `param:"walletType,slug,required"`
 	market     string     `param:"market,required"`
 }
 
-//go:generate DeleteRequest -url "/api/v3/wallet/:walletType/orders" -type WalletOrderCancelAllRequest -responseType []Order
-type WalletOrderCancelAllRequest struct {
+//go:generate DeleteRequest -url "/api/v3/wallet/:walletType/orders" -type CancelWalletOrderAllRequest -responseType []Order
+type CancelWalletOrderAllRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
 	walletType WalletType `param:"walletType,slug,required"`
@@ -95,9 +103,8 @@ type WalletOrderCancelAllRequest struct {
 	groupID    *uint32    `param:"groupID"`
 }
 
-
-//go:generate GetRequest -url "/api/v3/wallet/:walletType/trades" -type WalletGetTradesRequest -responseType []Trade
-type WalletGetTradesRequest struct {
+//go:generate GetRequest -url "/api/v3/wallet/:walletType/trades" -type GetWalletTradesRequest -responseType []Trade
+type GetWalletTradesRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
 	walletType WalletType `param:"walletType,slug,required"`
@@ -109,8 +116,8 @@ type WalletGetTradesRequest struct {
 	limit     *uint64    `param:"limit"`
 }
 
-//go:generate PostRequest -url "/api/v3/order" -type OrderCancelRequest -responseType .Order
-type OrderCancelRequest struct {
+//go:generate PostRequest -url "/api/v3/order" -type CancelOrderRequest -responseType .Order
+type CancelOrderRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
 	id            *uint64 `param:"id,omitempty"`
