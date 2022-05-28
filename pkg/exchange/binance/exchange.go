@@ -1284,145 +1284,157 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 	return kLines, nil
 }
 
+func (e *Exchange) queryMarginTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
+	var remoteTrades []*binance.TradeV3
+	req := e.client.NewListMarginTradesService().
+		IsIsolated(e.IsIsolatedMargin).
+		Symbol(symbol)
+
+	if options.Limit > 0 {
+		req.Limit(int(options.Limit))
+	} else {
+		req.Limit(1000)
+	}
+
+	// BINANCE uses inclusive last trade ID
+	if options.LastTradeID > 0 {
+		req.FromID(int64(options.LastTradeID))
+	}
+
+	if options.StartTime != nil && options.EndTime != nil {
+		if options.EndTime.Sub(*options.StartTime) < 24*time.Hour {
+			req.StartTime(options.StartTime.UnixMilli())
+			req.EndTime(options.EndTime.UnixMilli())
+		} else {
+			req.StartTime(options.StartTime.UnixMilli())
+		}
+	} else if options.StartTime != nil {
+		req.StartTime(options.StartTime.UnixMilli())
+	} else if options.EndTime != nil {
+		req.EndTime(options.EndTime.UnixMilli())
+	}
+
+	remoteTrades, err = req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, t := range remoteTrades {
+		localTrade, err := toGlobalTrade(*t, e.IsMargin)
+		if err != nil {
+			log.WithError(err).Errorf("can not convert binance trade: %+v", t)
+			continue
+		}
+
+		trades = append(trades, *localTrade)
+	}
+
+	trades = types.SortTradesAscending(trades)
+	return trades, nil
+}
+
+func (e *Exchange) queryFuturesTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
+
+	var remoteTrades []*futures.AccountTrade
+	req := e.futuresClient.NewListAccountTradeService().
+		Symbol(symbol)
+	if options.Limit > 0 {
+		req.Limit(int(options.Limit))
+	} else {
+		req.Limit(1000)
+	}
+
+	// BINANCE uses inclusive last trade ID
+	if options.LastTradeID > 0 {
+		req.FromID(int64(options.LastTradeID))
+	}
+
+	// The parameter fromId cannot be sent with startTime or endTime.
+	// Mentioned in binance futures docs
+	if options.LastTradeID <= 0 {
+		if options.StartTime != nil && options.EndTime != nil {
+			if options.EndTime.Sub(*options.StartTime) < 24*time.Hour {
+				req.StartTime(options.StartTime.UnixMilli())
+				req.EndTime(options.EndTime.UnixMilli())
+			} else {
+				req.StartTime(options.StartTime.UnixMilli())
+			}
+		} else if options.EndTime != nil {
+			req.EndTime(options.EndTime.UnixMilli())
+		}
+	}
+
+	remoteTrades, err = req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, t := range remoteTrades {
+		localTrade, err := toGlobalFuturesTrade(*t)
+		if err != nil {
+			log.WithError(err).Errorf("can not convert binance futures trade: %+v", t)
+			continue
+		}
+
+		trades = append(trades, *localTrade)
+	}
+
+	trades = types.SortTradesAscending(trades)
+	return trades, nil
+}
+
+func (e *Exchange) querySpotTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
+	var remoteTrades []*binance.TradeV3
+	req := e.client.NewListTradesService().
+		Symbol(symbol)
+
+	if options.Limit > 0 {
+		req.Limit(int(options.Limit))
+	} else {
+		req.Limit(1000)
+	}
+
+	// BINANCE uses inclusive last trade ID
+	if options.LastTradeID > 0 {
+		req.FromID(int64(options.LastTradeID))
+	}
+
+	if options.StartTime != nil && options.EndTime != nil {
+		if options.EndTime.Sub(*options.StartTime) < 24*time.Hour {
+			req.StartTime(options.StartTime.UnixMilli())
+			req.EndTime(options.EndTime.UnixMilli())
+		} else {
+			req.StartTime(options.StartTime.UnixMilli())
+		}
+	} else if options.StartTime != nil {
+		req.StartTime(options.StartTime.UnixMilli())
+	} else if options.EndTime != nil {
+		req.EndTime(options.EndTime.UnixMilli())
+	}
+
+	remoteTrades, err = req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, t := range remoteTrades {
+		localTrade, err := toGlobalTrade(*t, e.IsMargin)
+		if err != nil {
+			log.WithError(err).Errorf("can not convert binance trade: %+v", t)
+			continue
+		}
+
+		trades = append(trades, *localTrade)
+	}
+
+	trades = types.SortTradesAscending(trades)
+	return trades, nil
+}
+
 func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
 	if e.IsMargin {
-		var remoteTrades []*binance.TradeV3
-		req := e.client.NewListMarginTradesService().
-			IsIsolated(e.IsIsolatedMargin).
-			Symbol(symbol)
-
-		if options.Limit > 0 {
-			req.Limit(int(options.Limit))
-		} else {
-			req.Limit(1000)
-		}
-
-		// BINANCE uses inclusive last trade ID
-		if options.LastTradeID > 0 {
-			req.FromID(int64(options.LastTradeID))
-		}
-
-		if options.StartTime != nil && options.EndTime != nil {
-			if options.EndTime.Sub(*options.StartTime) < 24*time.Hour {
-				req.StartTime(options.StartTime.UnixMilli())
-				req.EndTime(options.EndTime.UnixMilli())
-			} else {
-				req.StartTime(options.StartTime.UnixMilli())
-			}
-		} else if options.StartTime != nil {
-			req.StartTime(options.StartTime.UnixMilli())
-		} else if options.EndTime != nil {
-			req.EndTime(options.EndTime.UnixMilli())
-		}
-
-		remoteTrades, err = req.Do(ctx)
-		if err != nil {
-			return nil, err
-		}
-		for _, t := range remoteTrades {
-			localTrade, err := toGlobalTrade(*t, e.IsMargin)
-			if err != nil {
-				log.WithError(err).Errorf("can not convert binance trade: %+v", t)
-				continue
-			}
-
-			trades = append(trades, *localTrade)
-		}
-
-		trades = types.SortTradesAscending(trades)
-
-		return trades, nil
+		return e.queryMarginTrades(ctx, symbol, options)
 	} else if e.IsFutures {
-		var remoteTrades []*futures.AccountTrade
-		req := e.futuresClient.NewListAccountTradeService().
-			Symbol(symbol)
-		if options.Limit > 0 {
-			req.Limit(int(options.Limit))
-		} else {
-			req.Limit(1000)
-		}
-
-		// BINANCE uses inclusive last trade ID
-		if options.LastTradeID > 0 {
-			req.FromID(int64(options.LastTradeID))
-		}
-
-		// The parameter fromId cannot be sent with startTime or endTime.
-		// Mentioned in binance futures docs
-		if options.LastTradeID <= 0 {
-			if options.StartTime != nil && options.EndTime != nil {
-				if options.EndTime.Sub(*options.StartTime) < 24*time.Hour {
-					req.StartTime(options.StartTime.UnixMilli())
-					req.EndTime(options.EndTime.UnixMilli())
-				} else {
-					req.StartTime(options.StartTime.UnixMilli())
-				}
-			} else if options.EndTime != nil {
-				req.EndTime(options.EndTime.UnixMilli())
-			}
-		}
-
-		remoteTrades, err = req.Do(ctx)
-		if err != nil {
-			return nil, err
-		}
-		for _, t := range remoteTrades {
-			localTrade, err := toGlobalFuturesTrade(*t)
-			if err != nil {
-				log.WithError(err).Errorf("can not convert binance futures trade: %+v", t)
-				continue
-			}
-
-			trades = append(trades, *localTrade)
-		}
-
-		trades = types.SortTradesAscending(trades)
-		return trades, nil
+		return e.queryFuturesTrades(ctx, symbol, options)
 	} else {
-		var remoteTrades []*binance.TradeV3
-		req := e.client.NewListTradesService().
-			Symbol(symbol)
-
-		if options.Limit > 0 {
-			req.Limit(int(options.Limit))
-		} else {
-			req.Limit(1000)
-		}
-
-		// BINANCE uses inclusive last trade ID
-		if options.LastTradeID > 0 {
-			req.FromID(int64(options.LastTradeID))
-		}
-
-		if options.StartTime != nil && options.EndTime != nil {
-			if options.EndTime.Sub(*options.StartTime) < 24*time.Hour {
-				req.StartTime(options.StartTime.UnixMilli())
-				req.EndTime(options.EndTime.UnixMilli())
-			} else {
-				req.StartTime(options.StartTime.UnixMilli())
-			}
-		} else if options.StartTime != nil {
-			req.StartTime(options.StartTime.UnixMilli())
-		} else if options.EndTime != nil {
-			req.EndTime(options.EndTime.UnixMilli())
-		}
-
-		remoteTrades, err = req.Do(ctx)
-		if err != nil {
-			return nil, err
-		}
-		for _, t := range remoteTrades {
-			localTrade, err := toGlobalTrade(*t, e.IsMargin)
-			if err != nil {
-				log.WithError(err).Errorf("can not convert binance trade: %+v", t)
-				continue
-			}
-
-			trades = append(trades, *localTrade)
-		}
-
-		trades = types.SortTradesAscending(trades)
-		return trades, nil
+		return e.querySpotTrades(ctx, symbol, options)
 	}
 }
 
@@ -1480,37 +1492,10 @@ func (e *Exchange) QueryDepth(ctx context.Context, symbol string) (snapshot type
 	return snapshot, finalUpdateID, nil
 }
 
-func (e *Exchange) BatchQueryKLines(ctx context.Context, symbol string, interval types.Interval, startTime, endTime time.Time) ([]types.KLine, error) {
-	var allKLines []types.KLine
-
-	for startTime.Before(endTime) {
-		klines, err := e.QueryKLines(ctx, symbol, interval, types.KLineQueryOptions{
-			StartTime: &startTime,
-			Limit:     1000,
-		})
-
-		if err != nil {
-			return nil, err
-		}
-
-		for _, kline := range klines {
-			if kline.EndTime.After(endTime) {
-				return allKLines, nil
-			}
-
-			allKLines = append(allKLines, kline)
-			startTime = kline.EndTime.Time()
-		}
-	}
-
-	return allKLines, nil
-}
-
+// QueryPremiumIndex is only for futures
 func (e *Exchange) QueryPremiumIndex(ctx context.Context, symbol string) (*types.PremiumIndex, error) {
-	futuresClient := binance.NewFuturesClient(e.key, e.secret)
-
 	// when symbol is set, only one index will be returned.
-	indexes, err := futuresClient.NewPremiumIndexService().Symbol(symbol).Do(ctx)
+	indexes, err := e.futuresClient.NewPremiumIndexService().Symbol(symbol).Do(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -1519,8 +1504,7 @@ func (e *Exchange) QueryPremiumIndex(ctx context.Context, symbol string) (*types
 }
 
 func (e *Exchange) QueryFundingRateHistory(ctx context.Context, symbol string) (*types.FundingRate, error) {
-	futuresClient := binance.NewFuturesClient(e.key, e.secret)
-	rates, err := futuresClient.NewFundingRateService().
+	rates, err := e.futuresClient.NewFundingRateService().
 		Symbol(symbol).
 		Limit(1).
 		Do(ctx)
@@ -1546,10 +1530,8 @@ func (e *Exchange) QueryFundingRateHistory(ctx context.Context, symbol string) (
 }
 
 func (e *Exchange) QueryPositionRisk(ctx context.Context, symbol string) (*types.PositionRisk, error) {
-	futuresClient := binance.NewFuturesClient(e.key, e.secret)
-
 	// when symbol is set, only one position risk will be returned.
-	risks, err := futuresClient.NewGetPositionRiskService().Symbol(symbol).Do(ctx)
+	risks, err := e.futuresClient.NewGetPositionRiskService().Symbol(symbol).Do(ctx)
 	if err != nil {
 		return nil, err
 	}
