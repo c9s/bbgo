@@ -1,7 +1,6 @@
 package binanceapi
 
 import (
-	"encoding/json"
 	"time"
 
 	"github.com/c9s/requestgen"
@@ -25,23 +24,12 @@ type SpotRebate struct {
 	UpdateTime types.MillisecondTimestamp `json:"updateTime"`
 }
 
-type PagedResponse struct {
-	Status string `json:"status"`
-	Type   string `json:"type"`
-	Code   string `json:"code"`
-	Data   struct {
-		Page         int             `json:"page"`
-		TotalRecords int             `json:"totalRecords"`
-		TotalPageNum int             `json:"totalPageNum"`
-		Data         json.RawMessage `json:"data"`
-	} `json:"data"`
-}
 
 // GetSpotRebateHistoryRequest
 // The max interval between startTime and endTime is 30 days.
 // If startTime and endTime are not sent, the recent 7 days' data will be returned.
 // The earliest startTime is supported on June 10, 2020
-//go:generate requestgen -method GET -url "/sapi/v1/rebate/taxQuery" -type GetSpotRebateHistoryRequest -responseType PagedResponse -responseDataField Data.Data -responseDataType []SpotRebate
+//go:generate requestgen -method GET -url "/sapi/v1/rebate/taxQuery" -type GetSpotRebateHistoryRequest -responseType PagedDataResponse -responseDataField Data.Data -responseDataType []SpotRebate
 type GetSpotRebateHistoryRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
