@@ -113,6 +113,43 @@ func NewExchangeStandard(n types.ExchangeName, key, secret, passphrase, subAccou
 }
 ```
 
+## Using requestgen
+
+### Alias
+
+You can put the go:generate alias on the top of the file:
+
+```
+//go:generate -command GetRequest requestgen -method GET
+//go:generate -command PostRequest requestgen -method POST
+//go:generate -command DeleteRequest requestgen -method DELETE
+```
+
+Please note that the alias only works in the same file.
+
+### Defining Request Type Names
+
+Please define request type name in the following format:
+
+```
+{Verb}{Service}{Resource}Request
+```
+
+for example:
+
+```
+type GetMarginMarketsRequest struct {
+	client requestgen.APIClient
+}
+```
+
+then you can attach the go:generate command on that type:
+
+```
+
+//go:generate GetRequest -url "/api/v3/wallet/m/limits" -type GetMarginBorrowingLimitsRequest -responseType .MarginBorrowingLimitMap
+```
+
 ## Un-marshalling Timestamps
 
 For millisecond timestamps, you can use `types.MillisecondTimestamp`, it will automatically convert the timestamp into
