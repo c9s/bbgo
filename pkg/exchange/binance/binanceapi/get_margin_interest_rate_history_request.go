@@ -18,7 +18,7 @@ type MarginInterestRate struct {
 
 //go:generate requestgen -method GET -url "/sapi/v1/margin/interestRateHistory" -type GetMarginInterestRateHistoryRequest -responseType []MarginInterestRate
 type GetMarginInterestRateHistoryRequest struct {
-	client requestgen.AuthenticatedAPIClient
+	client requestgen.APIClient
 
 	asset     string     `param:"asset"`
 	startTime *time.Time `param:"startTime,milliseconds"`
