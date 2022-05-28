@@ -6,7 +6,8 @@ You should send multiple small pull request to implement them.
 
 **Please avoid sending a pull request with huge changes**
 
-**Important** -- for the underlying http API please use `requestgen` <https://github.com/c9s/requestgen> to generate the requests.
+**Important** -- for the underlying http API please use `requestgen` <https://github.com/c9s/requestgen> to generate the
+requests.
 
 ## Checklist
 
@@ -35,27 +36,27 @@ Back-testing service - kline data is used for back-testing
 Convert functions:
 
 - [ ] MarketData convert functions
-  - [ ] toGlobalMarket
-  - [ ] toGlobalTicker
-  - [ ] toGlobalKLine
+    - [ ] toGlobalMarket
+    - [ ] toGlobalTicker
+    - [ ] toGlobalKLine
 - [ ] UserData convert functions
-  - [ ] toGlobalOrder
-  - [ ] toGlobalTrade
-  - [ ] toGlobalAccount
-  - [ ] toGlobalBalance
+    - [ ] toGlobalOrder
+    - [ ] toGlobalTrade
+    - [ ] toGlobalAccount
+    - [ ] toGlobalBalance
 
 Stream
 
 - [ ] UserDataStream
-  - [ ] Trade message parser
-  - [ ] Order message parser
-  - [ ] Account message parser
-  - [ ] Balance message parser
+    - [ ] Trade message parser
+    - [ ] Order message parser
+    - [ ] Account message parser
+    - [ ] Balance message parser
 - [ ] MarketDataStream
-  - [ ] OrderBook message parser (or depth)
-  - [ ] KLine message parser (required for backtesting)
-  - [ ] Public trade message parser (optional)
-  - [ ] Ticker message parser (optional)
+    - [ ] OrderBook message parser (or depth)
+    - [ ] KLine message parser (required for backtesting)
+    - [ ] Public trade message parser (optional)
+    - [ ] Ticker message parser (optional)
 - [ ] ping/pong handling.
 - [ ] heart-beat hanlding or keep-alive handling.
 - [ ] handling reconnect
@@ -63,8 +64,8 @@ Stream
 Database
 
 - [ ] Add a new kline table for the exchange (this is required for back-testing)
-  - [ ] Add MySQL migration SQL
-  - [ ] Add SQLite migration SQL
+    - [ ] Add MySQL migration SQL
+    - [ ] Add SQLite migration SQL
 
 Exchange Factory
 
@@ -112,6 +113,29 @@ func NewExchangeStandard(n types.ExchangeName, key, secret, passphrase, subAccou
 }
 ```
 
+## Un-marshalling Timestamps
+
+For millisecond timestamps, you can use `types.MillisecondTimestamp`, it will automatically convert the timestamp into
+time.Time:
+
+```
+type MarginInterestRecord struct {
+  Currency     string                     `json:"currency"`
+  CreatedAt    types.MillisecondTimestamp `json:"created_at"`
+}
+```
+
+## Un-marshalling numbers
+
+For number fields, especially floating numbers, please use `fixedpoint.Value`, it can parse int, float64, float64 in
+string:
+
+```
+type A struct {
+  Amount       fixedpoint.Value           `json:"amount"`
+}
+```
+
 ## Test Market Data Stream
 
 ### Test order book stream
@@ -125,7 +149,6 @@ godotenv -f .env.local -- go run ./cmd/bbgo orderbook --config config/bbgo.yaml 
 ```shell
 godotenv -f .env.local -- go run ./cmd/bbgo --config config/bbgo.yaml userdatastream --session kucoin
 ```
-
 
 ## Test Restful Endpoints
 
