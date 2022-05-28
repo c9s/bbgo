@@ -10,16 +10,16 @@ import (
 )
 
 type MarginLiquidationRecord struct {
-	AvgPrice    fixedpoint.Value           `json:"avgPrice"`
-	ExecutedQty fixedpoint.Value           `json:"executedQty"`
-	OrderId     uint64                     `json:"orderId"`
-	Price       fixedpoint.Value           `json:"price"`
-	Qty         fixedpoint.Value           `json:"qty"`
-	Side        SideType                   `json:"side"`
-	Symbol      string                     `json:"symbol"`
-	TimeInForce string                     `json:"timeInForce"`
-	IsIsolated  bool                       `json:"isIsolated"`
-	UpdatedTime types.MillisecondTimestamp `json:"updatedTime"`
+	AveragePrice     fixedpoint.Value           `json:"avgPrice"`
+	ExecutedQuantity fixedpoint.Value           `json:"executedQty"`
+	OrderId          uint64                     `json:"orderId"`
+	Price            fixedpoint.Value           `json:"price"`
+	Quantity         fixedpoint.Value           `json:"qty"`
+	Side             SideType                   `json:"side"`
+	Symbol           string                     `json:"symbol"`
+	TimeInForce      string                     `json:"timeInForce"`
+	IsIsolated       bool                       `json:"isIsolated"`
+	UpdatedTime      types.MillisecondTimestamp `json:"updatedTime"`
 }
 
 //go:generate requestgen -method GET -url "/sapi/v1/margin/forceLiquidationRec" -type GetMarginLiquidationHistoryRequest -responseType .RowsResponse -responseDataField Rows -responseDataType []MarginLiquidationRecord
