@@ -23,27 +23,27 @@ type OrderService struct {
 	Client *maxapi.RestClient
 }
 
-func (s *OrderService) NewWalletCreateOrderRequest(walletType WalletType) *CreateWalletOrderRequest {
+func (s *OrderService) NewCreateWalletOrderRequest(walletType WalletType) *CreateWalletOrderRequest {
 	return &CreateWalletOrderRequest{client: s.Client, walletType: walletType}
 }
 
-func (s *OrderService) NewWalletGetOrderHistoryRequest(walletType WalletType) *GetWalletOrderHistoryRequest {
+func (s *OrderService) NewGetWalletOrderHistoryRequest(walletType WalletType) *GetWalletOrderHistoryRequest {
 	return &GetWalletOrderHistoryRequest{client: s.Client, walletType: walletType}
 }
 
-func (s *OrderService) NewWalletGetOpenOrdersRequest(walletType WalletType) *GetWalletOpenOrdersRequest {
+func (s *OrderService) NewGetWalletOpenOrdersRequest(walletType WalletType) *GetWalletOpenOrdersRequest {
 	return &GetWalletOpenOrdersRequest{client: s.Client, walletType: walletType}
 }
 
-func (s *OrderService) NewWalletOrderCancelAllRequest(walletType WalletType) *CancelWalletOrderAllRequest {
+func (s *OrderService) NewCancelWalletOrderAllRequest(walletType WalletType) *CancelWalletOrderAllRequest {
 	return &CancelWalletOrderAllRequest{client: s.Client, walletType: walletType}
 }
 
-func (s *OrderService) NewWalletGetTradesRequest(walletType WalletType) *GetWalletTradesRequest {
+func (s *OrderService) NewGetWalletTradesRequest(walletType WalletType) *GetWalletTradesRequest {
 	return &GetWalletTradesRequest{client: s.Client, walletType: walletType}
 }
 
-func (s *OrderService) NewOrderCancelRequest() *CancelOrderRequest {
+func (s *OrderService) NewCancelOrderRequest() *CancelOrderRequest {
 	return &CancelOrderRequest{client: s.Client}
 }
 

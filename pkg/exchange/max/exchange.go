@@ -188,7 +188,7 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 		walletType = maxapi.WalletTypeMargin
 	}
 
-	maxOrders, err := e.v3order.NewWalletGetOpenOrdersRequest(walletType).Market(market).Do(ctx)
+	maxOrders, err := e.v3order.NewGetWalletOpenOrdersRequest(walletType).Market(market).Do(ctx)
 	if err != nil {
 		return orders, err
 	}
@@ -223,7 +223,7 @@ func (e *Exchange) queryClosedOrdersByLastOrderID(ctx context.Context, symbol st
 		walletType = maxapi.WalletTypeMargin
 	}
 
-	req := e.v3order.NewWalletGetOrderHistoryRequest(walletType).Market(market)
+	req := e.v3order.NewGetWalletOrderHistoryRequest(walletType).Market(market)
 	if lastOrderID == 0 {
 		lastOrderID = 1
 	}
@@ -255,7 +255,7 @@ func (e *Exchange) CancelAllOrders(ctx context.Context) ([]types.Order, error) {
 		walletType = maxapi.WalletTypeMargin
 	}
 
-	req := e.v3order.NewWalletOrderCancelAllRequest(walletType)
+	req := e.v3order.NewCancelWalletOrderAllRequest(walletType)
 	var maxOrders, err = req.Do(ctx)
 	if err != nil {
 		return nil, err
@@ -271,7 +271,7 @@ func (e *Exchange) CancelOrdersBySymbol(ctx context.Context, symbol string) ([]t
 		walletType = maxapi.WalletTypeMargin
 	}
 
-	req := e.v3order.NewWalletOrderCancelAllRequest(walletType)
+	req := e.v3order.NewCancelWalletOrderAllRequest(walletType)
 	req.Market(market)
 
 	maxOrders, err := req.Do(ctx)
@@ -288,7 +288,7 @@ func (e *Exchange) CancelOrdersByGroupID(ctx context.Context, groupID uint32) ([
 		walletType = maxapi.WalletTypeMargin
 	}
 
-	req := e.v3order.NewWalletOrderCancelAllRequest(walletType)
+	req := e.v3order.NewCancelWalletOrderAllRequest(walletType)
 	req.GroupID(groupID)
 
 	maxOrders, err := req.Do(ctx)
@@ -317,7 +317,7 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 
 	if len(groupIDs) > 0 {
 		for groupID := range groupIDs {
-			req := e.v3order.NewWalletOrderCancelAllRequest(walletType)
+			req := e.v3order.NewCancelWalletOrderAllRequest(walletType)
 			req.GroupID(groupID)
 
 			if _, err := req.Do(ctx); err != nil {
@@ -328,7 +328,7 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 	}
 
 	for _, o := range orphanOrders {
-		req := e.v3order.NewOrderCancelRequest()
+		req := e.v3order.NewCancelOrderRequest()
 		if o.OrderID > 0 {
 			req.Id(o.OrderID)
 		} else if len(o.ClientOrderID) > 0 && o.ClientOrderID != types.NoClientOrderID {
@@ -797,7 +797,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		walletType = maxapi.WalletTypeMargin
 	}
 
-	req := e.v3order.NewWalletGetTradesRequest(walletType)
+	req := e.v3order.NewGetWalletTradesRequest(walletType)
 	req.Market(market)
 
 	if options.Limit > 0 {
