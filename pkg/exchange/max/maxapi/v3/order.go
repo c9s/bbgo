@@ -12,9 +12,10 @@ import (
 	maxapi "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 )
 
+// create type alias
 type WalletType = maxapi.WalletType
-
 type Order = maxapi.Order
+type Trade = maxapi.Trade
 
 // OrderService manages the Order endpoint.
 type OrderService struct {
@@ -94,7 +95,6 @@ type WalletOrderCancelAllRequest struct {
 	groupID    *uint32    `param:"groupID"`
 }
 
-type Trade = maxapi.Trade
 
 //go:generate GetRequest -url "/api/v3/wallet/:walletType/trades" -type WalletGetTradesRequest -responseType []Trade
 type WalletGetTradesRequest struct {
