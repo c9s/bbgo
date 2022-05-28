@@ -51,10 +51,57 @@ type MarginExchange interface {
 	GetMarginSettings() MarginSettings
 }
 
+// MarginBorrowRepay provides repay and borrow actions of an crypto exchange
 type MarginBorrowRepay interface {
 	RepayMarginAsset(ctx context.Context, asset string, amount fixedpoint.Value) error
 	BorrowMarginAsset(ctx context.Context, asset string, amount fixedpoint.Value) error
 	QueryMarginAssetMaxBorrowable(ctx context.Context, asset string) (amount fixedpoint.Value, err error)
+}
+
+type MarginInterest struct {
+	Asset          string           `json:"asset" db:"asset"`
+	Principle      fixedpoint.Value `json:"principle" db:"principle"`
+	Interest       fixedpoint.Value `json:"interest" db:"interest"`
+	InterestRate   fixedpoint.Value `json:"interestRate" db:"interest_rate"`
+	IsolatedSymbol string           `json:"isolatedSymbol" db:"isolated_symbol"`
+	Time           Time             `json:"time" db:"time"`
+}
+
+type MarginLoanRecord struct {
+	TransactionID  uint64           `json:"transactionID" db:"transaction_id"`
+	Asset          string           `json:"asset" db:"asset"`
+	Principle      fixedpoint.Value `json:"principle" db:"principle"`
+	Time           Time             `json:"time" db:"time"`
+	IsolatedSymbol string           `json:"isolatedSymbol" db:"isolated_symbol"`
+}
+
+type MarginRepayRecord struct {
+	TransactionID  uint64           `json:"transactionID" db:"transaction_id"`
+	Asset          string           `json:"asset" db:"asset"`
+	Principle      fixedpoint.Value `json:"principle" db:"principle"`
+	Time           Time             `json:"time" db:"time"`
+	IsolatedSymbol string           `json:"isolatedSymbol" db:"isolated_symbol"`
+}
+
+type MarginLiquidationRecord struct {
+	AveragePrice     fixedpoint.Value `json:"avgPrice"`
+	ExecutedQuantity fixedpoint.Value `json:"executedQty"`
+	OrderId          uint64           `json:"orderId"`
+	Price            fixedpoint.Value `json:"price"`
+	Qty              fixedpoint.Value `json:"qty"`
+	Side             SideType         `json:"side"`
+	Symbol           string           `json:"symbol"`
+	TimeInForce      TimeInForce      `json:"timeInForce"`
+	IsIsolated       bool             `json:"isIsolated"`
+	UpdatedTime      Time             `json:"updatedTime"`
+}
+
+// MarginHistory provides the service of querying loan history and repay history
+type MarginHistory interface {
+	QueryLoanHistory() ([]MarginLoanRecord, error)
+	QueryRepayHistory() ([]MarginRepayRecord, error)
+	QueryLiquidationHistory() ([]MarginLiquidationRecord, error)
+	QueryInterestHistory() ([]MarginInterest, error)
 }
 
 type MarginSettings struct {
