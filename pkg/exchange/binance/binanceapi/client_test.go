@@ -35,7 +35,7 @@ func getTestClientOrSkip(t *testing.T) *RestClient {
 		return nil
 	}
 
-	client := NewClient()
+	client := NewClient("")
 	client.Auth(key, secret)
 	return client
 }
@@ -124,7 +124,7 @@ func TestClient_privateCall(t *testing.T) {
 		t.SkipNow()
 	}
 
-	client := NewClient()
+	client := NewClient("")
 	client.Auth(key, secret)
 
 	ctx := context.Background()
@@ -154,7 +154,7 @@ func TestClient_privateCall(t *testing.T) {
 }
 
 func TestClient_setTimeOffsetFromServer(t *testing.T) {
-	client := NewClient()
+	client := NewClient("")
 	err := client.SetTimeOffsetFromServer(context.Background())
 	assert.NoError(t, err)
 }

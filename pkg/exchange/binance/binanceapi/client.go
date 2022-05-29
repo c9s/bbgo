@@ -14,6 +14,7 @@ import (
 
 	"github.com/c9s/requestgen"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -21,30 +22,35 @@ import (
 const defaultHTTPTimeout = time.Second * 15
 const RestBaseURL = "https://api.binance.com"
 const SandboxRestBaseURL = "https://testnet.binance.vision"
+const DebugRequestResponse = false
+
+var DefaultHttpClient = &http.Client{
+	Timeout: defaultHTTPTimeout,
+}
 
 type RestClient struct {
-	BaseURL *url.URL
+	requestgen.BaseAPIClient
 
-	client *http.Client
-
-	Key, Secret, Passphrase string
-	KeyVersion              string
+	Key, Secret string
 
 	recvWindow int
 	timeOffset int64
 }
 
-func NewClient() *RestClient {
-	u, err := url.Parse(RestBaseURL)
+func NewClient(baseURL string) *RestClient {
+	if len(baseURL) == 0 {
+		baseURL = RestBaseURL
+	}
+
+	u, err := url.Parse(baseURL)
 	if err != nil {
 		panic(err)
 	}
 
 	client := &RestClient{
-		BaseURL:    u,
-		KeyVersion: "2",
-		client: &http.Client{
-			Timeout: defaultHTTPTimeout,
+		BaseAPIClient: requestgen.BaseAPIClient{
+			BaseURL:    u,
+			HttpClient: DefaultHttpClient,
 		},
 	}
 
@@ -77,27 +83,6 @@ func (c *RestClient) NewRequest(ctx context.Context, method, refURL string, para
 	return http.NewRequestWithContext(ctx, method, pathURL.String(), bytes.NewReader(body))
 }
 
-// sendRequest sends the request to the API server and handle the response
-func (c *RestClient) SendRequest(req *http.Request) (*requestgen.Response, error) {
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	// newResponse reads the response body and return a new Response object
-	response, err := requestgen.NewResponse(resp)
-	if err != nil {
-		return response, err
-	}
-
-	// Check error, if there is an error, return the ErrorResponse struct type
-	if response.IsError() {
-		return response, errors.New(string(response.Body))
-	}
-
-	return response, nil
-}
-
 func (c *RestClient) SetTimeOffsetFromServer(ctx context.Context) error {
 	req, err := c.NewRequest(ctx, "GET", "/api/v3/time", nil, nil)
 	if err != nil {
@@ -120,6 +105,17 @@ func (c *RestClient) SetTimeOffsetFromServer(ctx context.Context) error {
 
 	c.timeOffset = currentTimestamp() - a.ServerTime.Time().UnixMilli()
 	return nil
+}
+
+func (c *RestClient) SendRequest(req *http.Request) (*requestgen.Response, error) {
+	if DebugRequestResponse {
+		logrus.Debugf("-> request: %+v", req)
+		response, err := c.BaseAPIClient.SendRequest(req)
+		logrus.Debugf("<- response: %s", string(response.Body))
+		return response, err
+	}
+
+	return c.BaseAPIClient.SendRequest(req)
 }
 
 // newAuthenticatedRequest creates new http request for authenticated routes.
