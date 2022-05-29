@@ -32,22 +32,8 @@ var RootCmd = &cobra.Command{
 	SilenceUsage: true,
 
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		disableDotEnv, err := cmd.Flags().GetBool("no-dotenv")
-		if err != nil {
+		if err := cobraLoadDotenv(cmd, args) ; err != nil {
 			return err
-		}
-
-		if !disableDotEnv {
-			dotenvFile, err := cmd.Flags().GetString("dotenv")
-			if err != nil {
-				return err
-			}
-
-			if _, err := os.Stat(dotenvFile); err == nil {
-				if err := godotenv.Load(dotenvFile); err != nil {
-					return errors.Wrap(err, "error loading dotenv file")
-				}
-			}
 		}
 
 		if viper.GetBool("debug") {
@@ -67,37 +53,61 @@ var RootCmd = &cobra.Command{
 			}()
 		}
 
-		configFile, err := cmd.Flags().GetString("config")
-		if err != nil {
-			return errors.Wrapf(err, "failed to get the config flag")
-		}
-
-		// load config file nicely
-		if len(configFile) > 0 {
-			// if config file exists, use the config loaded from the config file.
-			// otherwise, use a empty config object
-			if _, err := os.Stat(configFile); err == nil {
-				// load successfully
-				userConfig, err = bbgo.Load(configFile, false)
-				if err != nil {
-					return errors.Wrapf(err, "can not load config file: %s", configFile)
-				}
-
-			} else if os.IsNotExist(err) {
-				// config file doesn't exist, we should use the empty config
-				userConfig = &bbgo.Config{}
-			} else {
-				// other error
-				return errors.Wrapf(err, "config file load error: %s", configFile)
-			}
-		}
-
-		return nil
+		return cobraLoadConfig(cmd, args)
 	},
-
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return nil
 	},
+}
+
+func cobraLoadDotenv(cmd *cobra.Command, args []string) error {
+	disableDotEnv, err := cmd.Flags().GetBool("no-dotenv")
+	if err != nil {
+		return err
+	}
+
+	if !disableDotEnv {
+		dotenvFile, err := cmd.Flags().GetString("dotenv")
+		if err != nil {
+			return err
+		}
+
+		if _, err := os.Stat(dotenvFile); err == nil {
+			if err := godotenv.Load(dotenvFile); err != nil {
+				return errors.Wrap(err, "error loading dotenv file")
+			}
+		}
+	}
+	return nil
+}
+
+func cobraLoadConfig(cmd *cobra.Command, args []string) error {
+	configFile, err := cmd.Flags().GetString("config")
+	if err != nil {
+		return errors.Wrapf(err, "failed to get the config flag")
+	}
+
+	// load config file nicely
+	if len(configFile) > 0 {
+		// if config file exists, use the config loaded from the config file.
+		// otherwise, use an empty config object
+		if _, err := os.Stat(configFile); err == nil {
+			// load successfully
+			userConfig, err = bbgo.Load(configFile, false)
+			if err != nil {
+				return errors.Wrapf(err, "can not load config file: %s", configFile)
+			}
+
+		} else if os.IsNotExist(err) {
+			// config file doesn't exist, we should use the empty config
+			userConfig = &bbgo.Config{}
+		} else {
+			// other error
+			return errors.Wrapf(err, "config file load error: %s", configFile)
+		}
+	}
+
+	return nil
 }
 
 func init() {

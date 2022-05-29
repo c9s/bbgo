@@ -4,6 +4,9 @@ import (
 	"time"
 
 	"github.com/c9s/requestgen"
+
+	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 // RepayStatus one of PENDING (pending execution), CONFIRMED (successfully loaned), FAILED (execution failed, nothing happened to your account);
@@ -16,14 +19,14 @@ const (
 )
 
 type MarginRepayRecord struct {
-	IsolatedSymbol string `json:"isolatedSymbol"`
-	Amount         string `json:"amount"`
-	Asset          string `json:"asset"`
-	Interest       string `json:"interest"`
-	Principal      string `json:"principal"`
-	Status         string `json:"status"`
-	Timestamp      int64  `json:"timestamp"`
-	TxId           int64  `json:"txId"`
+	IsolatedSymbol string                     `json:"isolatedSymbol"`
+	Amount         fixedpoint.Value           `json:"amount"`
+	Asset          string                     `json:"asset"`
+	Interest       fixedpoint.Value           `json:"interest"`
+	Principal      fixedpoint.Value           `json:"principal"`
+	Status         string                     `json:"status"`
+	Timestamp      types.MillisecondTimestamp `json:"timestamp"`
+	TxId           uint64                     `json:"txId"`
 }
 
 //go:generate requestgen -method GET -url "/sapi/v1/margin/repay" -type GetMarginRepayHistoryRequest -responseType .RowsResponse -responseDataField Rows -responseDataType []MarginRepayRecord
