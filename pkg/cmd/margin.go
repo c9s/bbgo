@@ -20,6 +20,10 @@ func init() {
 	marginLoansCmd.Flags().String("session", "", "exchange session name")
 	marginCmd.AddCommand(marginLoansCmd)
 
+	marginRepaysCmd.Flags().String("asset", "", "asset")
+	marginRepaysCmd.Flags().String("session", "", "exchange session name")
+	marginCmd.AddCommand(marginRepaysCmd)
+
 	RootCmd.AddCommand(marginCmd)
 }
 
@@ -67,6 +71,45 @@ var marginCmd = &cobra.Command{
 var marginLoansCmd = &cobra.Command{
 	Use:          "loans --session=SESSION_NAME --asset=ASSET",
 	Short:        "query loans history",
+	SilenceUsage: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
+
+		asset, err := cmd.Flags().GetString("asset")
+		if err != nil {
+			return fmt.Errorf("can't get the symbol from flags: %w", err)
+		}
+
+		if selectedSession == nil {
+			return errors.New("session is not set")
+		}
+
+		marginHistoryService, ok := selectedSession.Exchange.(types.MarginHistory)
+		if !ok {
+			return fmt.Errorf("exchange %s does not support MarginHistory service", selectedSession.ExchangeName)
+		}
+
+		now := time.Now()
+		startTime := now.AddDate(0, -5, 0)
+		endTime := now
+		loans, err := marginHistoryService.QueryLoanHistory(ctx, asset, &startTime, &endTime)
+		if err != nil {
+			return err
+		}
+
+		log.Infof("%d loans", len(loans))
+		for _, loan := range loans {
+			log.Infof("LOAN %+v", loan)
+		}
+
+		return nil
+	},
+}
+
+// go run ./cmd/bbgo margin loans --session=binance
+var marginRepaysCmd = &cobra.Command{
+	Use:          "repays --session=SESSION_NAME --asset=ASSET",
+	Short:        "query repay history",
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
