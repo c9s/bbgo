@@ -106,6 +106,8 @@ func New(key, secret string) *Exchange {
 
 	var err error
 	if len(key) > 0 && len(secret) > 0 {
+		client2.Auth(key, secret)
+
 		timeSetter.Do(func() {
 			_, err = client.NewSetServerTimeService().Do(context.Background())
 			if err != nil {
