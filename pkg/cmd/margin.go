@@ -24,6 +24,10 @@ func init() {
 	marginRepaysCmd.Flags().String("session", "", "exchange session name")
 	marginCmd.AddCommand(marginRepaysCmd)
 
+	marginInterestsCmd.Flags().String("asset", "", "asset")
+	marginInterestsCmd.Flags().String("session", "", "exchange session name")
+	marginCmd.AddCommand(marginInterestsCmd)
+
 	RootCmd.AddCommand(marginCmd)
 }
 
@@ -77,7 +81,7 @@ var marginLoansCmd = &cobra.Command{
 
 		asset, err := cmd.Flags().GetString("asset")
 		if err != nil {
-			return fmt.Errorf("can't get the symbol from flags: %w", err)
+			return err
 		}
 
 		if selectedSession == nil {
@@ -116,6 +120,45 @@ var marginRepaysCmd = &cobra.Command{
 
 		asset, err := cmd.Flags().GetString("asset")
 		if err != nil {
+			return err
+		}
+
+		if selectedSession == nil {
+			return errors.New("session is not set")
+		}
+
+		marginHistoryService, ok := selectedSession.Exchange.(types.MarginHistory)
+		if !ok {
+			return fmt.Errorf("exchange %s does not support MarginHistory service", selectedSession.ExchangeName)
+		}
+
+		now := time.Now()
+		startTime := now.AddDate(0, -5, 0)
+		endTime := now
+		repays, err := marginHistoryService.QueryLoanHistory(ctx, asset, &startTime, &endTime)
+		if err != nil {
+			return err
+		}
+
+		log.Infof("%d repays", len(repays))
+		for _, repay := range repays {
+			log.Infof("REPAY %+v", repay)
+		}
+
+		return nil
+	},
+}
+
+// go run ./cmd/bbgo margin interests --session=binance
+var marginInterestsCmd = &cobra.Command{
+	Use:          "interests --session=SESSION_NAME --asset=ASSET",
+	Short:        "query interests history",
+	SilenceUsage: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
+
+		asset, err := cmd.Flags().GetString("asset")
+		if err != nil {
 			return fmt.Errorf("can't get the symbol from flags: %w", err)
 		}
 
@@ -131,14 +174,14 @@ var marginRepaysCmd = &cobra.Command{
 		now := time.Now()
 		startTime := now.AddDate(0, -5, 0)
 		endTime := now
-		loans, err := marginHistoryService.QueryLoanHistory(ctx, asset, &startTime, &endTime)
+		interests, err := marginHistoryService.QueryInterestHistory(ctx, asset, &startTime, &endTime)
 		if err != nil {
 			return err
 		}
 
-		log.Infof("%d loans", len(loans))
-		for _, loan := range loans {
-			log.Infof("LOAN %+v", loan)
+		log.Infof("%d interests", len(interests))
+		for _, interest := range interests {
+			log.Infof("INTEREST %+v", interest)
 		}
 
 		return nil
