@@ -132,9 +132,23 @@ func (e *Exchange) QueryLiquidationHistory(ctx context.Context, startTime, endTi
 func (e *Exchange) QueryInterestHistory(ctx context.Context, asset string, startTime, endTime *time.Time) ([]types.MarginInterest, error) {
 	req := e.client2.NewGetMarginInterestHistoryRequest()
 	req.Asset(asset)
+	req.Size(100)
 
 	if startTime != nil {
 		req.StartTime(*startTime)
+
+		// 6 months
+		if time.Since(*startTime) > time.Hour*24*30*6 {
+			req.Archived(true)
+		}
+	}
+
+	if startTime != nil && endTime != nil {
+		duration := endTime.Sub(*startTime)
+		if duration > time.Hour*24*30 {
+			t := startTime.Add(time.Hour * 24 * 30)
+			endTime = &t
+		}
 	}
 
 	if endTime != nil {
@@ -145,6 +159,27 @@ func (e *Exchange) QueryInterestHistory(ctx context.Context, asset string, start
 		req.IsolatedSymbol(e.MarginSettings.IsolatedMarginSymbol)
 	}
 
-	_, err := req.Do(ctx)
-	return nil, err
+	records, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var interests []types.MarginInterest
+	for _, record := range records {
+		interests = append(interests, toGlobalInterest(record))
+	}
+
+	return interests, err
+}
+
+func toGlobalInterest(record binanceapi.MarginInterest) types.MarginInterest {
+	return types.MarginInterest{
+		Asset:          record.Asset,
+		Principle:      record.Principal,
+		Interest:       record.Interest,
+		InterestRate:   record.InterestRate,
+		IsolatedSymbol: record.IsolatedSymbol,
+		Time:           types.Time(record.InterestAccuredTime),
+	}
+
 }
