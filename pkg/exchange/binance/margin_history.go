@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/c9s/bbgo/pkg/exchange/binance/binanceapi"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -51,16 +50,6 @@ func (e *Exchange) QueryLoanHistory(ctx context.Context, asset string, startTime
 	return loans, err
 }
 
-func toGlobalLoan(record binanceapi.MarginLoanRecord) types.MarginLoanRecord {
-	return types.MarginLoanRecord{
-		TransactionID:  uint64(record.TxId),
-		Asset:          record.Asset,
-		Principle:      record.Principal,
-		Time:           types.Time(record.Timestamp),
-		IsolatedSymbol: record.IsolatedSymbol,
-	}
-}
-
 func (e *Exchange) QueryRepayHistory(ctx context.Context, asset string, startTime, endTime *time.Time) ([]types.MarginRepayRecord, error) {
 	req := e.client2.NewGetMarginRepayHistoryRequest()
 	req.Asset(asset)
@@ -99,16 +88,6 @@ func (e *Exchange) QueryRepayHistory(ctx context.Context, asset string, startTim
 	}
 
 	return repays, err
-}
-
-func toGlobalRepay(record binanceapi.MarginRepayRecord) types.MarginRepayRecord {
-	return types.MarginRepayRecord{
-		TransactionID:  record.TxId,
-		Asset:          record.Asset,
-		Principle:      record.Principal,
-		Time:           types.Time(record.Timestamp),
-		IsolatedSymbol: record.IsolatedSymbol,
-	}
 }
 
 func (e *Exchange) QueryLiquidationHistory(ctx context.Context, startTime, endTime *time.Time) ([]types.MarginLiquidationRecord, error) {
@@ -172,14 +151,3 @@ func (e *Exchange) QueryInterestHistory(ctx context.Context, asset string, start
 	return interests, err
 }
 
-func toGlobalInterest(record binanceapi.MarginInterest) types.MarginInterest {
-	return types.MarginInterest{
-		Asset:          record.Asset,
-		Principle:      record.Principal,
-		Interest:       record.Interest,
-		InterestRate:   record.InterestRate,
-		IsolatedSymbol: record.IsolatedSymbol,
-		Time:           types.Time(record.InterestAccuredTime),
-	}
-
-}
