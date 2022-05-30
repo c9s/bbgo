@@ -302,7 +302,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 	})
 
-	s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
+	s.tradeCollector.OnPositionUpdate(func(position types.PositionInterface) {
 		log.Infof("position changed: %s", s.Position)
 		s.Notify(s.Position)
 	})
@@ -339,7 +339,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		if err := s.placeWallOrders(ctx, orderExecutor); err != nil {
 			log.WithError(err).Errorf("can not place order")
 		}
-
 
 		if err := s.activeAdjustmentOrders.GracefulCancel(ctx, s.session.Exchange); err != nil {
 			log.WithError(err).Errorf("graceful cancel order error")
