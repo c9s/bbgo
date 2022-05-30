@@ -20,8 +20,6 @@ const ID = "supertrend"
 
 const stateKey = "state-v1"
 
-var NotionalModifier = fixedpoint.NewFromFloat(1.0001)
-
 var log = logrus.WithField("strategy", ID)
 
 func init() {
@@ -163,7 +161,14 @@ func (s *Strategy) Validate() error {
 		return errors.New("symbol is required")
 	}
 
-	// TODO: Validate DEMA window and ATR window
+	if len(s.Interval) == 0 {
+		return errors.New("interval is required")
+	}
+
+	if s.Leverage == 0.0 {
+		return errors.New("leverage is required")
+	}
+
 	return nil
 }
 
@@ -184,12 +189,12 @@ func (s *Strategy) SetupIndicators() {
 	s.SlowDEMA = &indicator.DEMA{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.SlowDEMAWindow}}
 
 	if s.SuperTrend.AverageTrueRangeWindow == 0 {
-		s.SuperTrend.AverageTrueRangeWindow = 43
+		s.SuperTrend.AverageTrueRangeWindow = 39
 	}
 	s.SuperTrend.AverageTrueRange = &indicator.ATR{IntervalWindow: types.IntervalWindow{Window: s.SuperTrend.AverageTrueRangeWindow, Interval: s.Interval}}
 	s.SuperTrend.trend = types.DirectionUp
 	if s.SuperTrend.AverageTrueRangeMultiplier == 0 {
-		s.SuperTrend.AverageTrueRangeMultiplier = 4
+		s.SuperTrend.AverageTrueRangeMultiplier = 3
 	}
 }
 
@@ -290,7 +295,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			if side == types.SideTypeBuy || side == types.SideTypeSell {
 				orderForm := s.GenerateOrderForm(side, quantity)
 				log.Infof("submit TP/SL order %v", orderForm)
-				order, err := s.session.Exchange.SubmitOrders(ctx, orderForm)
+				order, err := orderExecutor.SubmitOrders(ctx, orderForm)
 				if err != nil {
 					log.WithError(err).Errorf("can not place TP/SL order")
 				}
@@ -309,7 +314,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		if side == types.SideTypeSell || side == types.SideTypeBuy {
 			orderForm := s.GenerateOrderForm(side, s.CalculateQuantity(kline.GetClose()))
 			log.Infof("submit open position order %v", orderForm)
-			order, err := s.session.Exchange.SubmitOrders(ctx, orderForm)
+			order, err := orderExecutor.SubmitOrders(ctx, orderForm)
 			if err != nil {
 				log.WithError(err).Errorf("can not place open position order")
 			}
