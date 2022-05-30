@@ -35,7 +35,7 @@ func init() {
 
 type SuperTrend struct {
 	// AverageTrueRangeWindow ATR window for calculation of supertrend
-	AverageTrueRangeWindow types.IntervalWindow `json:"averageTrueRangeWindow"`
+	AverageTrueRangeWindow int `json:"averageTrueRangeWindow"`
 	// AverageTrueRangeMultiplier ATR multiplier for calculation of supertrend
 	AverageTrueRangeMultiplier float64 `json:"averageTrueRangeMultiplier"`
 
@@ -134,9 +134,9 @@ type Strategy struct {
 	Interval types.Interval `json:"interval"`
 
 	// FastDEMA DEMA window for checking breakout
-	FastDEMAWindow types.IntervalWindow `json:"fastDEMAWindow"`
+	FastDEMAWindow int `json:"fastDEMAWindow"`
 	// SlowDEMA DEMA window for checking breakout
-	SlowDEMAWindow types.IntervalWindow `json:"slowDEMAWindow"`
+	SlowDEMAWindow int `json:"slowDEMAWindow"`
 	FastDEMA       *indicator.DEMA
 	SlowDEMA       *indicator.DEMA
 
@@ -168,16 +168,28 @@ func (s *Strategy) Validate() error {
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
+}
 
-	if s.FastDEMAWindow != zeroiw {
-		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.FastDEMAWindow.Interval})
+// SetupIndicators initializes indicators
+func (s *Strategy) SetupIndicators() {
+	if s.FastDEMAWindow == 0 {
+		s.FastDEMAWindow = 144
 	}
+	s.FastDEMA = &indicator.DEMA{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.FastDEMAWindow}}
 
-	if s.SlowDEMAWindow != zeroiw {
-		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.SlowDEMAWindow.Interval})
+	if s.SlowDEMAWindow == 0 {
+		s.SlowDEMAWindow = 169
 	}
+	s.SlowDEMA = &indicator.DEMA{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.SlowDEMAWindow}}
 
-	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.SuperTrend.AverageTrueRangeWindow.Interval})
+	if s.SuperTrend.AverageTrueRangeWindow == 0 {
+		s.SuperTrend.AverageTrueRangeWindow = 43
+	}
+	s.SuperTrend.AverageTrueRange = &indicator.ATR{IntervalWindow: types.IntervalWindow{Window: s.SuperTrend.AverageTrueRangeWindow, Interval: s.Interval}}
+	s.SuperTrend.trend = types.DirectionUp
+	if s.SuperTrend.AverageTrueRangeMultiplier == 0 {
+		s.SuperTrend.AverageTrueRangeMultiplier = 4
+	}
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
@@ -203,15 +215,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.Status = types.StrategyStatusRunning
 
 	// Setup indicators
-	if s.FastDEMAWindow != zeroiw {
-		s.FastDEMA = &indicator.DEMA{IntervalWindow: s.FastDEMAWindow}
-	}
-	if s.SlowDEMAWindow != zeroiw {
-		s.SlowDEMA = &indicator.DEMA{IntervalWindow: s.SlowDEMAWindow}
-	}
-	s.SuperTrend.AverageTrueRange = &indicator.ATR{IntervalWindow: s.SuperTrend.AverageTrueRangeWindow}
-	s.SuperTrend.trend = types.DirectionUp
-	// TODO: Use initializer
+	s.SetupIndicators()
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		// skip k-lines from other symbols
