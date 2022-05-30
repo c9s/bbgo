@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"math"
+	"sync"
 )
 
 // TODO: Strategy control
@@ -120,6 +121,8 @@ type Strategy struct {
 	tradeCollector *bbgo.TradeCollector
 	// groupID is the group ID used for the strategy instance for canceling orders
 	groupID uint32
+
+	stopC chan struct{}
 
 	// Symbol is the market symbol you want to trade
 	Symbol string `json:"symbol"`
@@ -284,6 +287,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.Position.Strategy = ID
 	s.Position.StrategyInstanceID = s.InstanceID()
 
+	s.stopC = make(chan struct{})
+
+	// Profit
 	if s.ProfitStats == nil {
 		s.ProfitStats = types.NewProfitStats(s.Market)
 	}
@@ -401,6 +407,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 
 	s.tradeCollector.BindStream(session.UserDataStream)
+
+	// Graceful shutdown
+	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
+		defer wg.Done()
+		close(s.stopC)
+
+		s.tradeCollector.Process()
+	})
 
 	return nil
 }
