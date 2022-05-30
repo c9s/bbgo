@@ -52,8 +52,8 @@ type MarginExchange interface {
 	GetMarginSettings() MarginSettings
 }
 
-// MarginBorrowRepay provides repay and borrow actions of an crypto exchange
-type MarginBorrowRepay interface {
+// MarginBorrowRepayService provides repay and borrow actions of an crypto exchange
+type MarginBorrowRepayService interface {
 	RepayMarginAsset(ctx context.Context, asset string, amount fixedpoint.Value) error
 	BorrowMarginAsset(ctx context.Context, asset string, amount fixedpoint.Value) error
 	QueryMarginAssetMaxBorrowable(ctx context.Context, asset string) (amount fixedpoint.Value, err error)
