@@ -302,7 +302,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 	})
 
-	s.tradeCollector.OnPositionUpdate(func(position types.PositionInterface) {
+	s.tradeCollector.OnPositionUpdate(func(position types.AnyPosition) {
 		log.Infof("position changed: %s", s.Position)
 		s.Notify(s.Position)
 	})

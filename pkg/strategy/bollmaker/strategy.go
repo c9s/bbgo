@@ -44,6 +44,12 @@ type State struct {
 	ProfitStats types.ProfitStats `json:"profitStats,omitempty"`
 }
 
+type PositionStack struct {
+	Enabled       bool             `json:"enabled,omitempty"`
+	PushThreshold fixedpoint.Value `json:"pushThreshold,omitempty"`
+	PopThreshold  fixedpoint.Value `json:"popThreshold,omitempty"`
+}
+
 type BollingerSetting struct {
 	types.IntervalWindow
 	BandWidth float64 `json:"bandWidth"`
@@ -225,14 +231,12 @@ type Strategy struct {
 	session *bbgo.ExchangeSession
 	book    *types.StreamOrderBook
 
-	state *State
+	state         *State
+	PositionStack PositionStack
 
 	// persistence fields
 	Position    *types.PositionStack `json:"position,omitempty" persistence:"position"`
 	ProfitStats *types.ProfitStats   `json:"profitStats,omitempty" persistence:"profit_stats"`
-
-	PushThreshold fixedpoint.Value `json:"pushThreshold,omitempty"`
-	PopThreshold  fixedpoint.Value `json:"popThreshold,omitempty"`
 
 	activeMakerOrders *bbgo.LocalActiveOrderBook
 	orderStore        *bbgo.OrderStore
@@ -717,7 +721,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 	})
 
-	s.tradeCollector.OnPositionUpdate(func(position types.PositionInterface) {
+	s.tradeCollector.OnPositionUpdate(func(position types.AnyPosition) {
 		log.Infof("position changed: %s", s.Position)
 		s.Notify(s.Position)
 	})
@@ -775,19 +779,27 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		if err := s.activeMakerOrders.GracefulCancel(ctx, s.session.Exchange); err != nil {
 			log.WithError(err).Errorf("graceful cancel order error")
 		}
-		//log.Error(len(s.Position.Stack), s.Position.AverageCost, kline.Close)
 
-		if s.Position.Position.AverageCost.Div(kline.Close).Compare(fixedpoint.One.Add(s.PushThreshold)) > 0 {
-			log.Errorf("push")
-			log.Error(s.Position)
+		//log.Error(len(s.Position.Stack), s.Position.AverageCost, kline.Close)
+		if s.Position.Position.AverageCost.Div(kline.Close).Compare(fixedpoint.One.Add(s.PositionStack.PushThreshold)) > 0 {
+			log.Infof("push position %s", s.Position)
 			s.Position = s.Position.Push(types.NewPositionFromMarket(s.Market))
 		}
-		//  &&
-		if len(s.Position.Stack) > 1 && s.Position.Stack[len(s.Position.Stack)-2].AverageCost.Compare(kline.Close) < 0 && s.Market.IsDustQuantity(s.Position.Position.GetBase(), kline.Close) {
-			log.Errorf("pop")
-			log.Error(s.Position)
+		// make it dust naturally by bollmaker
+		if len(s.Position.Stack) > 1 && s.Position.Stack[len(s.Position.Stack)-2].AverageCost.Compare(kline.Close) < 0 && s.Market.IsDustQuantity(s.Position.GetBase(), kline.Close) {
+			log.Infof("pop position %s", s.Position)
 			s.Position = s.Position.Pop()
 		}
+		// make it dust by TP
+		if !s.PositionStack.PopThreshold.IsZero() {
+			if len(s.Position.Stack) > 1 && s.Position.Stack[len(s.Position.Stack)-2].AverageCost.Compare(kline.Close) < 0 && s.Position.AverageCost.Div(kline.Close).Compare(fixedpoint.One.Sub(s.PositionStack.PopThreshold)) < 0 {
+				s.ClosePosition(ctx, fixedpoint.One)
+				log.Infof("pop position %s", s.Position)
+				log.Error("pop position")
+				s.Position = s.Position.Pop()
+			}
+		}
+
 		//if s.Position.AverageCost.Div(kline.Close).Compare(fixedpoint.One.Sub(s.PopThreshold)) < 0 && && !s.Position.AverageCost.IsZero() {
 		//	//log.Error(len(s.Position.Stack), s.Position.AverageCost, kline.Close)
 		//	log.Errorf("pop")

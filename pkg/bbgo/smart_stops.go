@@ -62,7 +62,7 @@ func (c *TrailingStopController) Run(ctx context.Context, session *ExchangeSessi
 	c.averageCost = c.position.AverageCost
 
 	// Use trade collector to get the position update event
-	tradeCollector.OnPositionUpdate(func(position types.PositionInterface) {
+	tradeCollector.OnPositionUpdate(func(position types.AnyPosition) {
 		// update average cost if we have it.
 		c.averageCost = position.(*types.Position).AverageCost
 	})
