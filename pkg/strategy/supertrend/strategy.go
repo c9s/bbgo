@@ -22,8 +22,6 @@ const stateKey = "state-v1"
 
 var NotionalModifier = fixedpoint.NewFromFloat(1.0001)
 
-var zeroiw = types.IntervalWindow{}
-
 var log = logrus.WithField("strategy", ID)
 
 func init() {
@@ -143,6 +141,9 @@ type Strategy struct {
 	// SuperTrend indicator
 	SuperTrend SuperTrend `json:"superTrend"`
 
+	// Leverage
+	Leverage float64 `json:"leverage"`
+
 	bbgo.QuantityOrAmount
 
 	// StrategyController
@@ -192,6 +193,43 @@ func (s *Strategy) SetupIndicators() {
 	}
 }
 
+// UpdateIndicators updates indicators
+func (s *Strategy) UpdateIndicators(kline types.KLine) {
+	closePrice := kline.GetClose().Float64()
+
+	// Update indicators
+	if kline.Interval == s.FastDEMA.Interval {
+		s.FastDEMA.Update(closePrice)
+	}
+	if kline.Interval == s.SlowDEMA.Interval {
+		s.SlowDEMA.Update(closePrice)
+	}
+	if kline.Interval == s.SuperTrend.AverageTrueRange.Interval {
+		s.SuperTrend.Update(kline)
+	}
+}
+
+func (s *Strategy) GenerateOrderForm(side types.SideType, quantity fixedpoint.Value) types.SubmitOrder {
+	orderForm := types.SubmitOrder{
+		Symbol:   s.Symbol,
+		Market:   s.Market,
+		Side:     side,
+		Type:     types.OrderTypeMarket,
+		Quantity: quantity,
+	}
+
+	return orderForm
+}
+
+// CalculateQuantity returns leveraged quantity
+func (s *Strategy) CalculateQuantity(currentPrice fixedpoint.Value) fixedpoint.Value {
+	balance, _ := s.session.GetAccount().Balance(s.Market.QuoteCurrency)
+	amountAvailable := balance.Available.Mul(fixedpoint.NewFromFloat(s.Leverage))
+	quantity := amountAvailable.Div(currentPrice)
+
+	return quantity
+}
+
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	s.session = session
 	s.Market, _ = session.Market(s.Symbol)
@@ -218,30 +256,17 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.SetupIndicators()
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
-		// skip k-lines from other symbols
-		if kline.Symbol != s.Symbol {
-			return
-		}
-
-		closePrice := kline.GetClose().Float64()
-		openPrice := kline.GetOpen().Float64()
-
-		// Update indicators
-		if kline.Interval == s.FastDEMA.Interval {
-			s.FastDEMA.Update(closePrice)
-		}
-		if kline.Interval == s.SlowDEMA.Interval {
-			s.SlowDEMA.Update(closePrice)
-		}
-		if kline.Interval == s.SuperTrend.AverageTrueRange.Interval {
-			s.SuperTrend.Update(kline)
-		}
-
+		// skip k-lines from other symbols or other intervals
 		if kline.Symbol != s.Symbol || kline.Interval != s.Interval {
 			return
 		}
 
+		// Update indicators
+		s.UpdateIndicators(kline)
+
 		// Get signals
+		closePrice := kline.GetClose().Float64()
+		openPrice := kline.GetOpen().Float64()
 		stSignal := s.SuperTrend.GetSignal()
 		var demaSignal types.Direction
 		if closePrice > s.FastDEMA.Last() && closePrice > s.SlowDEMA.Last() && !(openPrice > s.FastDEMA.Last() && openPrice > s.SlowDEMA.Last()) {
@@ -256,38 +281,24 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		base := s.Position.GetBase()
 		quantity := base.Abs()
 		if quantity.Compare(s.Market.MinQuantity) > 0 && quantity.Mul(kline.GetClose()).Compare(s.Market.MinNotional) > 0 {
+			var side types.SideType
 			if base.Sign() < 0 && (stSignal == types.DirectionUp || demaSignal == types.DirectionUp) {
-				orderForm := types.SubmitOrder{
-					Symbol:   s.Symbol,
-					Market:   s.Market,
-					Side:     types.SideTypeBuy,
-					Type:     types.OrderTypeMarket,
-					Quantity: quantity,
-				}
-				log.Infof("submit TP/SL order %v", orderForm)
-				createdOrder, err := s.session.Exchange.SubmitOrders(ctx, orderForm)
-				if err != nil {
-					log.WithError(err).Errorf("can not place TP/SL order")
-				}
-				s.orderStore.Add(createdOrder...)
+				side = types.SideTypeBuy
 			} else if base.Sign() > 0 && (stSignal == types.DirectionDown || demaSignal == types.DirectionDown) {
-				orderForm := types.SubmitOrder{
-					Symbol:   s.Symbol,
-					Market:   s.Market,
-					Side:     types.SideTypeSell,
-					Type:     types.OrderTypeMarket,
-					Quantity: quantity,
-				}
+				side = types.SideTypeSell
+			}
+			if side == types.SideTypeBuy || side == types.SideTypeSell {
+				orderForm := s.GenerateOrderForm(side, quantity)
 				log.Infof("submit TP/SL order %v", orderForm)
-				createdOrder, err := s.session.Exchange.SubmitOrders(ctx, orderForm)
+				order, err := s.session.Exchange.SubmitOrders(ctx, orderForm)
 				if err != nil {
 					log.WithError(err).Errorf("can not place TP/SL order")
 				}
-				s.orderStore.Add(createdOrder...)
+				s.orderStore.Add(order...)
 			}
 		}
 
-		// Place order
+		// Open position
 		var side types.SideType
 		if stSignal == types.DirectionUp && demaSignal == types.DirectionUp {
 			side = types.SideTypeBuy
@@ -295,22 +306,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			side = types.SideTypeSell
 		}
 
-		balance, _ := s.session.GetAccount().Balance(s.Market.QuoteCurrency)
-		s.Amount = balance.Available
 		if side == types.SideTypeSell || side == types.SideTypeBuy {
-			orderForm := types.SubmitOrder{
-				Symbol:   s.Symbol,
-				Market:   s.Market,
-				Side:     side,
-				Type:     types.OrderTypeMarket,
-				Quantity: s.CalculateQuantity(fixedpoint.NewFromFloat(closePrice)),
-			}
-
-			createdOrder, err := s.session.Exchange.SubmitOrders(ctx, orderForm)
+			orderForm := s.GenerateOrderForm(side, s.CalculateQuantity(kline.GetClose()))
+			log.Infof("submit open position order %v", orderForm)
+			order, err := s.session.Exchange.SubmitOrders(ctx, orderForm)
 			if err != nil {
-				log.WithError(err).Errorf("can not place order")
+				log.WithError(err).Errorf("can not place open position order")
 			}
-			s.orderStore.Add(createdOrder...)
+			s.orderStore.Add(order...)
 		}
 
 		// check if there is a canceled order had partially filled.
@@ -319,6 +322,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.tradeCollector = bbgo.NewTradeCollector(s.Symbol, s.Position, s.orderStore)
 
+	// Record profits
 	s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
 		s.Notifiability.Notify(trade)
 		s.ProfitStats.AddTrade(trade)
