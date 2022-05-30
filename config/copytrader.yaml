@@ -1,0 +1,27 @@
+sessions:
+  binanceMaster:
+    exchange: binance
+    envVarPrefix: BINANCE
+  binanceSlave:
+    exchange: binance
+    envVarPrefix: BINANCE_SLAVE
+
+#sync:
+#  userDataStream:
+#    trades: true
+#    filledOrders: true
+#  sessions:
+#    - binanceMaster
+#    - binanceSlave
+#  symbols:
+#    - BTCUSDT
+
+crossExchangeStrategies:
+- copytrader:
+  symbol: BTCUSDT
+  sourceExchange: binanceMaster
+  followerExchange:
+    - binanceMaster
+    - binanceSlave
+
+
