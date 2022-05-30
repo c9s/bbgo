@@ -207,6 +207,9 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 	}
 
 	s.orderStore.Add(createdOrders...)
+
+	s.tradeCollector.Process()
+
 	return err
 }
 
@@ -291,10 +294,26 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	// StrategyController
 	s.Status = types.StrategyStatusRunning
 
+	s.OnSuspend(func() {
+		_ = s.Persistence.Sync(s)
+	})
+
+	s.OnEmergencyStop(func() {
+		// Close 100% position
+		_ = s.ClosePosition(ctx, fixedpoint.NewFromFloat(1.0))
+
+		_ = s.Persistence.Sync(s)
+	})
+
 	// Setup indicators
 	s.SetupIndicators()
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
+		// StrategyController
+		if s.Status != types.StrategyStatusRunning {
+			return
+		}
+
 		// skip k-lines from other symbols or other intervals
 		if kline.Symbol != s.Symbol || kline.Interval != s.Interval {
 			return
@@ -355,7 +374,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			s.orderStore.Add(order...)
 		}
 
-		// check if there is a canceled order had partially filled.
 		s.tradeCollector.Process()
 	})
 
