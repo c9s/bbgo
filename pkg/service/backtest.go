@@ -34,7 +34,6 @@ func (s *BacktestService) SyncKLineByInterval(ctx context.Context, exchange type
 		if err := s.BatchInsert(klines); err != nil {
 			return err
 		}
-		
 		count += len(klines)
 	}
 	log.Debugf("inserted klines %s %s data: %d", symbol, interval.String(), count)
@@ -321,8 +320,11 @@ func (s *BacktestService) BatchInsert(kline []types.KLine) error {
 	sql := fmt.Sprintf("INSERT INTO `%s` (`exchange`, `start_time`, `end_time`, `symbol`, `interval`, `open`, `high`, `low`, `close`, `closed`, `volume`, `quote_volume`, `taker_buy_base_volume`, `taker_buy_quote_volume`)"+
 		" values (:exchange, :start_time, :end_time, :symbol, :interval, :open, :high, :low, :close, :closed, :volume, :quote_volume, :taker_buy_base_volume, :taker_buy_quote_volume); ", tableName)
 
-	_, err := s.DB.NamedExec(sql, kline)
-	return err
+	tx := s.DB.MustBegin()
+	if _, err := tx.NamedExec(sql, kline); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (s *BacktestService) _deleteDuplicatedKLine(k types.KLine) error {
