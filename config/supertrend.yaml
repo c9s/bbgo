@@ -36,7 +36,7 @@ exchangeStrategies:
     interval: 1h
 
     # leverage is the leverage of the orders
-    leverage: 1
+    leverage: 1.0
 
     # fastDEMAWindow and slowDEMAWindow are for filtering super trend noise
     fastDEMAWindow: 144

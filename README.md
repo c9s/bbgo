@@ -312,7 +312,9 @@ Check out the strategy directory [strategy](pkg/strategy) for all built-in strat
   indicator [bollgrid](pkg/strategy/bollgrid)
 - `grid` strategy implements the fixed price band grid strategy [grid](pkg/strategy/grid). See
   [document](./doc/strategy/grid.md).
-- `support` strategy implements the fixed price band grid strategy [support](pkg/strategy/support). See
+- `supertrend` strategy uses Supertrend indicator as trend, and DEMA indicator as noise filter [supertrend](pkg/strategy/supertrend). See
+  [document](./doc/strategy/supertrend.md).
+- `support` strategy uses K-lines with high volume as support [support](pkg/strategy/support). See
   [document](./doc/strategy/support.md).
 - `flashcrash` strategy implements a strategy that catches the flashcrash [flashcrash](pkg/strategy/flashcrash)
 
