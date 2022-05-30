@@ -620,7 +620,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 	*/
 
-	s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
+	s.tradeCollector.OnPositionUpdate(func(position types.PositionInterface) {
 		s.Notifiability.Notify(position)
 	})
 	s.tradeCollector.BindStream(session.UserDataStream)
