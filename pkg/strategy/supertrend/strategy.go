@@ -12,9 +12,7 @@ import (
 	"math"
 )
 
-// TODO:
-// 1. Position control
-// 2. Strategy control
+// TODO: Strategy control
 
 const ID = "supertrend"
 
@@ -174,6 +172,42 @@ func (s *Strategy) Validate() error {
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
+}
+
+// Position control
+
+func (s *Strategy) CurrentPosition() *types.Position {
+	return s.Position
+}
+
+func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Value) error {
+	base := s.Position.GetBase()
+	if base.IsZero() {
+		return fmt.Errorf("no opened %s position", s.Position.Symbol)
+	}
+
+	// make it negative
+	quantity := base.Mul(percentage).Abs()
+	side := types.SideTypeBuy
+	if base.Sign() > 0 {
+		side = types.SideTypeSell
+	}
+
+	if quantity.Compare(s.Market.MinQuantity) < 0 {
+		return fmt.Errorf("order quantity %v is too small, less than %v", quantity, s.Market.MinQuantity)
+	}
+
+	orderForm := s.GenerateOrderForm(side, quantity)
+
+	s.Notify("Submitting %s %s order to close position by %v", s.Symbol, side.String(), percentage, orderForm)
+
+	createdOrders, err := s.session.Exchange.SubmitOrders(ctx, orderForm)
+	if err != nil {
+		log.WithError(err).Errorf("can not place position close order")
+	}
+
+	s.orderStore.Add(createdOrders...)
+	return err
 }
 
 // SetupIndicators initializes indicators
