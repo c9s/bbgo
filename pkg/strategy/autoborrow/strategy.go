@@ -61,7 +61,7 @@ type Strategy struct {
 
 	ExchangeSession *bbgo.ExchangeSession
 
-	marginBorrowRepay types.MarginBorrowRepay
+	marginBorrowRepay types.MarginBorrowRepayService
 }
 
 func (s *Strategy) ID() string {
@@ -329,9 +329,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.ExchangeSession = session
 
-	marginBorrowRepay, ok := session.Exchange.(types.MarginBorrowRepay)
+	marginBorrowRepay, ok := session.Exchange.(types.MarginBorrowRepayService)
 	if !ok {
-		return fmt.Errorf("exchange %s does not implement types.MarginBorrowRepay", session.ExchangeName)
+		return fmt.Errorf("exchange %s does not implement types.MarginBorrowRepayService", session.ExchangeName)
 	}
 
 	s.marginBorrowRepay = marginBorrowRepay
