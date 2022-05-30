@@ -12,7 +12,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
-	batch2 "github.com/c9s/bbgo/pkg/exchange/batch"
+	"github.com/c9s/bbgo/pkg/exchange/batch"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -23,26 +23,16 @@ type BacktestService struct {
 func (s *BacktestService) SyncKLineByInterval(ctx context.Context, exchange types.Exchange, symbol string, interval types.Interval, startTime, endTime time.Time) error {
 	log.Infof("synchronizing lastKLine for interval %s from exchange %s", interval, exchange.Name())
 
-	batch := &batch2.KLineBatchQuery{Exchange: exchange}
+	q := &batch.KLineBatchQuery{Exchange: exchange}
 
-	// should use channel here
-	klineC, errC := batch.Query(ctx, symbol, interval, startTime, endTime)
-
-	// var previousKLine types.KLine
-	count := 0
-	for klines := range klineC {
-		if err := s.BatchInsert(klines); err != nil {
+	klineC, errC := q.Query(ctx, symbol, interval, startTime, endTime)
+	for kline := range klineC {
+		if err := s.Insert(kline); err != nil {
 			return err
 		}
-		count += len(klines)
-	}
-	log.Debugf("inserted klines %s %s data: %d", symbol, interval.String(), count)
-
-	if err := <-errC; err != nil {
-		return err
 	}
 
-	return nil
+	return <-errC
 }
 
 func (s *BacktestService) Verify(symbols []string, startTime time.Time, endTime time.Time, sourceExchange types.Exchange, verboseCnt int) error {
@@ -304,27 +294,6 @@ func (s *BacktestService) Insert(kline types.KLine) error {
 
 	_, err := s.DB.NamedExec(sql, kline)
 	return err
-}
-
-// BatchInsert Note: all kline should be same exchange, or it will cause issue.
-func (s *BacktestService) BatchInsert(kline []types.KLine) error {
-	if len(kline) == 0 {
-		return nil
-	}
-	if len(kline[0].Exchange) == 0 {
-		return errors.New("kline.Exchange field should not be empty")
-	}
-
-	tableName := s._targetKlineTable(kline[0].Exchange)
-
-	sql := fmt.Sprintf("INSERT INTO `%s` (`exchange`, `start_time`, `end_time`, `symbol`, `interval`, `open`, `high`, `low`, `close`, `closed`, `volume`, `quote_volume`, `taker_buy_base_volume`, `taker_buy_quote_volume`)"+
-		" VALUES (:exchange, :start_time, :end_time, :symbol, :interval, :open, :high, :low, :close, :closed, :volume, :quote_volume, :taker_buy_base_volume, :taker_buy_quote_volume); ", tableName)
-
-	tx := s.DB.MustBegin()
-	if _, err := tx.NamedExec(sql, kline); err != nil {
-		return err
-	}
-	return tx.Commit()
 }
 
 func (s *BacktestService) _deleteDuplicatedKLine(k types.KLine) error {

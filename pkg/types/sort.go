@@ -12,9 +12,17 @@ func SortTradesAscending(trades []Trade) []Trade {
 	return trades
 }
 
-func SortOrderAscending(orders []Order) []Order {
+func SortOrdersAscending(orders []Order) []Order {
 	sort.Slice(orders, func(i, j int) bool {
 		return orders[i].CreationTime.Time().Before(orders[j].CreationTime.Time())
 	})
 	return orders
+}
+
+func SortKLinesAscending(klines []KLine) []KLine {
+	sort.Slice(klines, func(i, j int) bool {
+		return klines[i].StartTime.Unix() < klines[j].StartTime.Unix()
+	})
+
+	return klines
 }

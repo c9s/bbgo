@@ -58,7 +58,14 @@ func (s *OrderService) Sync(ctx context.Context, exchange types.Exchange, symbol
 		startTime = records[0].CreationTime.Time()
 	}
 
-	b := &batch.ClosedOrderBatchQuery{Exchange: exchange}
+	exchangeTradeHistoryService, ok := exchange.(types.ExchangeTradeHistoryService)
+	if !ok {
+		return nil
+	}
+
+	b := &batch.ClosedOrderBatchQuery{
+		ExchangeTradeHistoryService: exchangeTradeHistoryService,
+	}
 	ordersC, errC := b.Query(ctx, symbol, startTime, time.Now(), lastID)
 	for order := range ordersC {
 		select {

@@ -245,7 +245,7 @@ func (e *Exchange) queryClosedOrdersByLastOrderID(ctx context.Context, symbol st
 		orders = append(orders, *order)
 	}
 
-	orders = types.SortOrderAscending(orders)
+	orders = types.SortOrdersAscending(orders)
 	return orders, nil
 }
 
