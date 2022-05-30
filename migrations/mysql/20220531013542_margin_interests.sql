@@ -19,8 +19,7 @@ CREATE TABLE `margin_interests`
 
     `time`            DATETIME(3)              NOT NULL,
 
-    PRIMARY KEY (`gid`),
-    UNIQUE KEY (`transaction_id`)
+    PRIMARY KEY (`gid`)
 );
 
 -- +down
