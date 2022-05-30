@@ -85,16 +85,16 @@ type MarginRepay struct {
 }
 
 type MarginLiquidation struct {
-	AveragePrice     fixedpoint.Value `json:"avgPrice"`
-	ExecutedQuantity fixedpoint.Value `json:"executedQty"`
-	OrderID          uint64           `json:"orderId"`
-	Price            fixedpoint.Value `json:"price"`
-	Quantity         fixedpoint.Value `json:"qty"`
-	Side             SideType         `json:"side"`
-	Symbol           string           `json:"symbol"`
-	TimeInForce      TimeInForce      `json:"timeInForce"`
-	IsIsolated       bool             `json:"isIsolated"`
-	UpdatedTime      Time             `json:"updatedTime"`
+	AveragePrice     fixedpoint.Value `json:"averagePrice" db:"average_price"`
+	ExecutedQuantity fixedpoint.Value `json:"executedQuantity" db:"executed_quantity"`
+	OrderID          uint64           `json:"orderID" db:"order_id"`
+	Price            fixedpoint.Value `json:"price" db:"price"`
+	Quantity         fixedpoint.Value `json:"quantity" db:"quantity"`
+	Side             SideType         `json:"side" db:"side"`
+	Symbol           string           `json:"symbol" db:"symbol"`
+	TimeInForce      TimeInForce      `json:"timeInForce" db:"time_in_force"`
+	IsIsolated       bool             `json:"isIsolated" db:"is_isolated"`
+	UpdatedTime      Time             `json:"updatedTime" db:"updated_time"`
 }
 
 // MarginHistory provides the service of querying loan history and repay history
