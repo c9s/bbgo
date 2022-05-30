@@ -17,6 +17,8 @@ import (
 
 const ID = "ewo_dgtrd"
 
+const record = false
+
 var log = logrus.WithField("strategy", ID)
 
 func init() {
@@ -41,6 +43,8 @@ type Strategy struct {
 	FilterHigh       float64          `json:"ccistochFilterHigh"` // high filter for CCI Stochastic indicator
 	FilterLow        float64          `json:"ccistochFilterLow"`  // low filter for CCI Stochastic indicator
 
+	Record bool `json:"record"` // print record messages on position exit point
+
 	KLineStartTime types.Time
 	KLineEndTime   types.Time
 
@@ -53,6 +57,8 @@ type Strategy struct {
 	activeMakerOrders *bbgo.LocalActiveOrderBook
 	orderStore        *bbgo.OrderStore
 	tradeCollector    *bbgo.TradeCollector
+	entryPrice        fixedpoint.Value
+	waitForTrade      bool
 
 	atr         *indicator.ATR
 	ccis        *CCISTOCH
@@ -194,6 +200,7 @@ func (inc *VWEMA) UpdateVal(price float64, vol float64) {
 	inc.V.Update(vol)
 }
 
+// Setup the Indicators going to be used
 func (s *Strategy) SetupIndicators() {
 	store, ok := s.Session.MarketDataStore(s.Symbol)
 	if !ok {
@@ -440,6 +447,7 @@ func (s *Strategy) SetupIndicators() {
 	}
 }
 
+// Utility to evaluate if the order is valid or not to send to the exchange
 func (s *Strategy) validateOrder(order *types.SubmitOrder) error {
 	if order.Type == types.OrderTypeMarket && order.TimeInForce != "" {
 		return errors.New("wrong field: market vs TimeInForce")
@@ -451,7 +459,8 @@ func (s *Strategy) validateOrder(order *types.SubmitOrder) error {
 			return errors.New("cannot get account")
 		}
 		if order.Quantity.Compare(baseBalance.Available) > 0 {
-			order.Quantity = baseBalance.Available
+			log.Errorf("qty %v > avail %v", order.Quantity, baseBalance.Available)
+			return errors.New("qty > avail")
 		}
 		price := order.Price
 		if price.IsZero() {
@@ -466,7 +475,7 @@ func (s *Strategy) validateOrder(order *types.SubmitOrder) error {
 			order.Quantity.Compare(s.Market.MinQuantity) < 0 ||
 			orderAmount.Compare(s.Market.MinNotional) < 0 {
 			log.Debug("amount fail")
-			return errors.New("amount fail")
+			return errors.New(fmt.Sprintf("amount fail: quantity: %v, amount: %v", order.Quantity, orderAmount))
 		}
 		return nil
 	} else if order.Side == types.SideTypeBuy {
@@ -485,7 +494,7 @@ func (s *Strategy) validateOrder(order *types.SubmitOrder) error {
 		}
 		totalQuantity := quoteBalance.Available.Div(price)
 		if order.Quantity.Compare(totalQuantity) > 0 {
-			log.Error("qty > avail")
+			log.Errorf("qty %v > avail %v", order.Quantity, totalQuantity)
 			return errors.New("qty > avail")
 		}
 		orderAmount := order.Quantity.Mul(price)
@@ -493,7 +502,7 @@ func (s *Strategy) validateOrder(order *types.SubmitOrder) error {
 			orderAmount.Compare(s.Market.MinNotional) < 0 ||
 			order.Quantity.Compare(s.Market.MinQuantity) < 0 {
 			log.Debug("amount fail")
-			return errors.New("amount fail")
+			return errors.New(fmt.Sprintf("amount fail: quantity: %v, amount: %v", order.Quantity, orderAmount))
 		}
 		return nil
 	}
@@ -502,15 +511,27 @@ func (s *Strategy) validateOrder(order *types.SubmitOrder) error {
 
 }
 
-func (s *Strategy) PlaceBuyOrder(ctx context.Context, price fixedpoint.Value) {
-	if s.Position.GetBase().Add(s.Market.MinQuantity).Sign() < 0 && !s.ClosePosition(ctx) {
-		log.Errorf("sell position %v remained not closed, skip placing order", s.Position.GetBase())
-		return
+func (s *Strategy) PlaceBuyOrder(ctx context.Context, price fixedpoint.Value) (*types.Order, *types.Order) {
+	var closeOrder *types.Order
+	var ok bool
+	waitForTrade := false
+	base := s.Position.GetBase()
+	if base.Abs().Compare(s.Market.MinQuantity) >= 0 && base.Mul(s.GetLastPrice()).Abs().Compare(s.Market.MinNotional) >= 0 && base.Sign() < 0 {
+		if closeOrder, ok = s.ClosePosition(ctx); !ok {
+			log.Errorf("sell position %v remained not closed, skip placing order", base)
+			return closeOrder, nil
+		}
+	}
+	if s.Position.GetBase().Sign() < 0 {
+		// we are not able to make close trade at this moment,
+		// will close the rest of the position by normal limit order
+		// s.entryPrice is set in the last trade
+		waitForTrade = true
 	}
 	quoteBalance, ok := s.Session.GetAccount().Balance(s.Market.QuoteCurrency)
 	if !ok {
 		log.Infof("buy order at price %v failed", price)
-		return
+		return closeOrder, nil
 	}
 	quantityAmount := quoteBalance.Available
 	totalQuantity := quantityAmount.Div(price)
@@ -525,84 +546,126 @@ func (s *Strategy) PlaceBuyOrder(ctx context.Context, price fixedpoint.Value) {
 	}
 	if err := s.validateOrder(&order); err != nil {
 		log.Infof("validation failed %v: %v", order, err)
-		return
+		return closeOrder, nil
 	}
-	// strong long
-	log.Warnf("long at %v, timestamp: %s", price, s.KLineStartTime)
+	log.Warnf("long at %v, position %v, closeOrder %v, timestamp: %s", price, s.Position.GetBase(), closeOrder, s.KLineStartTime)
 	createdOrders, err := s.Session.Exchange.SubmitOrders(ctx, order)
 	if err != nil {
 		log.WithError(err).Errorf("cannot place order")
-		return
+		return closeOrder, nil
 	}
-	log.Infof("post order %v", createdOrders)
+
+	log.Infof("post order c: %v, entryPrice: %v o: %v", waitForTrade, s.entryPrice, createdOrders)
+	s.waitForTrade = waitForTrade
 	s.orderStore.Add(createdOrders...)
 	s.activeMakerOrders.Add(createdOrders...)
 	s.tradeCollector.Process()
+	return closeOrder, &createdOrders[0]
 }
 
-func (s *Strategy) PlaceSellOrder(ctx context.Context, price fixedpoint.Value) {
-	if s.Position.GetBase().Compare(s.Market.MinQuantity) > 0 && !s.ClosePosition(ctx) {
-		log.Errorf("buy position %v remained not closed, skip placing order", s.Position.GetBase())
-		return
+func (s *Strategy) PlaceSellOrder(ctx context.Context, price fixedpoint.Value) (*types.Order, *types.Order) {
+	var closeOrder *types.Order
+	var ok bool
+	waitForTrade := false
+	base := s.Position.GetBase()
+	if base.Abs().Compare(s.Market.MinQuantity) >= 0 && base.Abs().Mul(s.GetLastPrice()).Compare(s.Market.MinNotional) >= 0 && base.Sign() > 0 {
+		if closeOrder, ok = s.ClosePosition(ctx); !ok {
+			log.Errorf("buy position %v remained not closed, skip placing order", base)
+			return closeOrder, nil
+		}
 	}
-	balances := s.Session.GetAccount().Balances()
-	baseBalance := balances[s.Market.BaseCurrency].Available
+	if s.Position.GetBase().Sign() > 0 {
+		// we are not able to make close trade at this moment,
+		// will close the rest of the position by normal limit order
+		// s.entryPrice is set in the last trade
+		waitForTrade = true
+	}
+	baseBalance, ok := s.Session.GetAccount().Balance(s.Market.BaseCurrency)
+	if !ok {
+		return closeOrder, nil
+	}
 	order := types.SubmitOrder{
 		Symbol:      s.Symbol,
 		Side:        types.SideTypeSell,
 		Type:        types.OrderTypeLimit,
 		Market:      s.Market,
-		Quantity:    baseBalance,
+		Quantity:    baseBalance.Available,
 		Price:       price,
 		TimeInForce: types.TimeInForceGTC,
 	}
 	if err := s.validateOrder(&order); err != nil {
 		log.Infof("validation failed %v: %v", order, err)
-		return
+		return closeOrder, nil
 	}
 
-	log.Warnf("short at %v, timestamp: %s", price, s.KLineStartTime)
+	log.Warnf("short at %v, position %v closeOrder %v, timestamp: %s", price, s.Position.GetBase(), closeOrder, s.KLineStartTime)
 	createdOrders, err := s.Session.Exchange.SubmitOrders(ctx, order)
 	if err != nil {
 		log.WithError(err).Errorf("cannot place order")
-		return
+		return closeOrder, nil
 	}
-	log.Infof("post order %v", createdOrders)
+	log.Infof("post order, c: %v, entryPrice: %v o: %v", waitForTrade, s.entryPrice, createdOrders)
+	s.waitForTrade = waitForTrade
 	s.orderStore.Add(createdOrders...)
 	s.activeMakerOrders.Add(createdOrders...)
 	s.tradeCollector.Process()
+	return closeOrder, &createdOrders[0]
 }
 
-func (s *Strategy) ClosePosition(ctx context.Context) bool {
+// ClosePosition(context.Context) -> (closeOrder *types.Order, ok bool)
+// this will decorate the generated order from NewClosePositionOrder
+// add do necessary checks
+// if available quantity is zero, will return (nil, true)
+// if any of the checks failed, will return (nil, false)
+// otherwise, return the created close order and true
+func (s *Strategy) ClosePosition(ctx context.Context) (*types.Order, bool) {
 	order := s.Position.NewClosePositionOrder(fixedpoint.One)
+	// no position exists
 	if order == nil {
 		// no base
 		s.sellPrice = fixedpoint.Zero
 		s.buyPrice = fixedpoint.Zero
-		return true
+		return nil, true
 	}
 	order.TimeInForce = ""
+	// If there's any order not yet been traded in the orderbook,
+	// we need this additional check to make sure we have enough balance to post a close order
+	balances := s.Session.GetAccount().Balances()
+	baseBalance := balances[s.Market.BaseCurrency].Available
+	if order.Side == types.SideTypeBuy {
+		price := s.GetLastPrice()
+		quoteAmount := balances[s.Market.QuoteCurrency].Available.Div(price)
+		if order.Quantity.Compare(quoteAmount) > 0 {
+			order.Quantity = quoteAmount
+		}
+	} else if order.Side == types.SideTypeSell && order.Quantity.Compare(baseBalance) > 0 {
+		order.Quantity = baseBalance
+	}
+	// if no available balance...
+	if order.Quantity.IsZero() {
+		return nil, true
+	}
 	if err := s.validateOrder(order); err != nil {
 		log.Errorf("cannot place close order %v: %v", order, err)
-		return false
+		return nil, false
 	}
 
 	createdOrders, err := s.Session.Exchange.SubmitOrders(ctx, *order)
 	if err != nil {
 		log.WithError(err).Errorf("cannot place close order")
-		return false
+		return nil, false
 	}
 	log.Infof("close order %v", createdOrders)
 	s.orderStore.Add(createdOrders...)
 	s.activeMakerOrders.Add(createdOrders...)
 	s.tradeCollector.Process()
-	return true
+	return &createdOrders[0], true
 }
 
-func (s *Strategy) CancelAll(ctx context.Context, side types.SideType) {
+func (s *Strategy) CancelAll(ctx context.Context) {
 	var toCancel []types.Order
 	for _, order := range s.orderStore.Orders() {
-		if order.Status == types.OrderStatusNew || order.Status == types.OrderStatusPartiallyFilled && order.Side == side {
+		if order.Status == types.OrderStatusNew || order.Status == types.OrderStatusPartiallyFilled {
 			toCancel = append(toCancel, order)
 		}
 	}
@@ -610,9 +673,33 @@ func (s *Strategy) CancelAll(ctx context.Context, side types.SideType) {
 		if err := s.Session.Exchange.CancelOrders(ctx, toCancel...); err != nil {
 			log.WithError(err).Errorf("cancel order error")
 		}
-
-		s.tradeCollector.Process()
+		s.waitForTrade = false
 	}
+}
+
+func (s *Strategy) GetLastPrice() fixedpoint.Value {
+	var lastPrice fixedpoint.Value
+	var ok bool
+	if s.Environment.IsBackTesting() {
+		lastPrice, ok = s.Session.LastPrice(s.Symbol)
+		if !ok {
+			log.Errorf("cannot get last price")
+			return lastPrice
+		}
+	} else {
+		s.lock.RLock()
+		if s.midPrice.IsZero() {
+			lastPrice, ok = s.Session.LastPrice(s.Symbol)
+			if !ok {
+				log.Errorf("cannot get last price")
+				return lastPrice
+			}
+		} else {
+			lastPrice = s.midPrice
+		}
+		s.lock.RUnlock()
+	}
+	return lastPrice
 }
 
 // Trading Rules:
@@ -684,7 +771,42 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		} else {
 			s.Environment.RecordPosition(s.Position, trade, nil)
 		}
-		if s.Position.GetBase().Abs().Compare(s.Market.MinQuantity) > 0 {
+		// calculate report for the position that cannot be closed by close order (amount too small)
+		if s.waitForTrade {
+			price := s.entryPrice
+			if price.IsZero() {
+				panic("no price found")
+			}
+			pnlRate := trade.Price.Sub(price).Abs().Div(trade.Price).Float64()
+			if s.Record {
+				log.Errorf("record avg %v trade %v", price, trade)
+			}
+			if trade.Side == types.SideTypeBuy {
+				if trade.Price.Compare(price) < 0 {
+					percentAvgTPfromOrder = percentAvgTPfromOrder*float64(counterTPfromOrder) + pnlRate
+					counterTPfromOrder += 1
+					percentAvgTPfromOrder /= float64(counterTPfromOrder)
+				} else {
+					percentAvgSLfromOrder = percentAvgSLfromOrder*float64(counterSLfromOrder) + pnlRate
+					counterSLfromOrder += 1
+					percentAvgSLfromOrder /= float64(counterSLfromOrder)
+				}
+			} else if trade.Side == types.SideTypeSell {
+				if trade.Price.Compare(price) > 0 {
+					percentAvgTPfromOrder = percentAvgTPfromOrder*float64(counterTPfromOrder) + pnlRate
+					counterTPfromOrder += 1
+					percentAvgTPfromOrder /= float64(counterTPfromOrder)
+				} else {
+					percentAvgSLfromOrder = percentAvgSLfromOrder*float64(counterSLfromOrder) + pnlRate
+					counterSLfromOrder += 1
+					percentAvgSLfromOrder /= float64(counterSLfromOrder)
+				}
+			} else {
+				panic(fmt.Sprintf("no sell(%v) or buy price(%v), %v", s.sellPrice, s.buyPrice, trade))
+			}
+			s.waitForTrade = false
+		}
+		if s.Position.GetBase().Abs().Compare(s.Market.MinQuantity) >= 0 && s.Position.GetBase().Abs().Mul(trade.Price).Compare(s.Market.MinNotional) >= 0 {
 			sign := s.Position.GetBase().Sign()
 			if sign > 0 {
 				log.Infof("base become positive, %v", trade)
@@ -692,19 +814,23 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				s.sellPrice = fixedpoint.Zero
 				s.peakPrice = s.Position.AverageCost
 			} else if sign == 0 {
-				log.Infof("base become zero")
-				s.buyPrice = fixedpoint.Zero
-				s.sellPrice = fixedpoint.Zero
+				panic("not going to happen")
 			} else {
 				log.Infof("base become negative, %v", trade)
 				s.buyPrice = fixedpoint.Zero
 				s.sellPrice = s.Position.AverageCost
 				s.bottomPrice = s.Position.AverageCost
 			}
+			s.entryPrice = trade.Price
 		} else {
-			log.Infof("base become zero")
+			log.Infof("base become zero, rest of base: %v", s.Position.GetBase())
+			if s.Position.GetBase().IsZero() {
+				s.entryPrice = fixedpoint.Zero
+			}
 			s.buyPrice = fixedpoint.Zero
 			s.sellPrice = fixedpoint.Zero
+			s.peakPrice = fixedpoint.Zero
+			s.bottomPrice = fixedpoint.Zero
 		}
 	})
 
@@ -717,7 +843,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.SetupIndicators()
 
 	sellOrderTPSL := func(price fixedpoint.Value) {
-		if s.Position.GetBase().IsZero() {
+		lastPrice := s.GetLastPrice()
+		base := s.Position.GetBase().Abs()
+		if base.Mul(lastPrice).Compare(s.Market.MinNotional) < 0 || base.Compare(s.Market.MinQuantity) < 0 {
 			return
 		}
 		if s.sellPrice.IsZero() {
@@ -727,15 +855,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		quoteBalance := balances[s.Market.QuoteCurrency].Available
 		atr := fixedpoint.NewFromFloat(s.atr.Last())
 		atrx2 := fixedpoint.NewFromFloat(s.atr.Last() * 2)
-		lastPrice := price
-		var ok bool
-		if s.Environment.IsBackTesting() {
-			lastPrice, ok = session.LastPrice(s.Symbol)
-			if !ok {
-				log.Errorf("cannot get last price")
-				return
-			}
-		}
 		buyall := false
 		if s.bottomPrice.IsZero() || s.bottomPrice.Compare(price) > 0 {
 			s.bottomPrice = price
@@ -743,44 +862,30 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		takeProfit := false
 		bottomBack := s.bottomPrice
 		spBack := s.sellPrice
-		if !quoteBalance.IsZero() {
+		reason := -1
+		if quoteBalance.Div(lastPrice).Compare(s.Market.MinQuantity) >= 0 && quoteBalance.Compare(s.Market.MinNotional) >= 0 {
 			longSignal := types.CrossOver(s.ewo, s.ewoSignal)
 			base := fixedpoint.NewFromFloat(s.ma34.Last())
 			// TP
 			if lastPrice.Compare(s.sellPrice) < 0 && (s.ccis.BuySignal() || longSignal.Last() || (!atrx2.IsZero() && base.Sub(atrx2).Compare(lastPrice) >= 0)) {
 				buyall = true
-				s.bottomPrice = fixedpoint.Zero
 				takeProfit = true
 
 				// calculate report
-				pnlRate := s.sellPrice.Sub(lastPrice).Div(lastPrice).Float64()
 				if s.ccis.BuySignal() {
-					percentAvgTPfromCCI = percentAvgTPfromCCI*float64(counterTPfromCCI) + pnlRate
-					counterTPfromCCI += 1
-					percentAvgTPfromCCI /= float64(counterTPfromCCI)
+					reason = 0
 				} else if longSignal.Last() {
-					percentAvgTPfromLongShort = percentAvgTPfromLongShort*float64(counterTPfromLongShort) + pnlRate
-					counterTPfromLongShort += 1
-					percentAvgTPfromLongShort /= float64(counterTPfromLongShort)
+					reason = 1
 				} else {
-					percentAvgTPfromAtr = percentAvgTPfromAtr*float64(counterTPfromAtr) + pnlRate
-					counterTPfromAtr += 1
-					percentAvgTPfromAtr /= float64(counterTPfromAtr)
-
+					reason = 2
 				}
 
 			}
 			if !atr.IsZero() && s.bottomPrice.Add(atr).Compare(lastPrice) <= 0 &&
 				lastPrice.Compare(s.sellPrice) < 0 {
 				buyall = true
-				s.bottomPrice = fixedpoint.Zero
 				takeProfit = true
-
-				// calculate report
-				pnlRate := s.sellPrice.Sub(lastPrice).Div(lastPrice).Float64()
-				percentAvgTPfromPeak = percentAvgTPfromPeak*float64(counterTPfromPeak) + pnlRate
-				counterTPfromPeak += 1
-				percentAvgTPfromPeak /= float64(counterTPfromPeak)
+				reason = 3
 			}
 
 			// SL
@@ -795,28 +900,64 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			if !s.DisableShortStop && ((!atr.IsZero() && s.sellPrice.Sub(atr).Compare(lastPrice) >= 0) ||
 				lastPrice.Sub(s.sellPrice).Div(s.sellPrice).Compare(s.Stoploss) > 0) {
 				buyall = true
-				s.bottomPrice = fixedpoint.Zero
-
-				// calculate report
-				pnlRate := lastPrice.Sub(s.sellPrice).Div(lastPrice).Float64()
-				percentAvgSLfromSL = percentAvgSLfromSL*float64(counterSLfromSL) + pnlRate
-				counterSLfromSL += 1
-				percentAvgSLfromSL /= float64(counterSLfromSL)
+				reason = 4
 			}
 		}
 		if buyall {
 			log.Warnf("buyall TPSL %v %v", s.Position.GetBase(), quoteBalance)
-			if s.ClosePosition(ctx) {
+			p := s.sellPrice
+			if order, ok := s.ClosePosition(ctx); order != nil && ok {
 				if takeProfit {
 					log.Errorf("takeprofit buy at %v, avg %v, l: %v, atrx2: %v", lastPrice, spBack, bottomBack, atrx2)
 				} else {
 					log.Errorf("stoploss buy at %v, avg %v, l: %v, atrx2: %v", lastPrice, spBack, bottomBack, atrx2)
 				}
+
+				// calculate report
+				if s.Record {
+					log.Error("record ba")
+				}
+				var pnlRate float64
+				if takeProfit {
+					pnlRate = p.Sub(lastPrice).Div(lastPrice).Float64()
+				} else {
+					pnlRate = lastPrice.Sub(p).Div(lastPrice).Float64()
+				}
+				switch reason {
+				case 0:
+					percentAvgTPfromCCI = percentAvgTPfromCCI*float64(counterTPfromCCI) + pnlRate
+					counterTPfromCCI += 1
+					percentAvgTPfromCCI /= float64(counterTPfromCCI)
+					break
+				case 1:
+					percentAvgTPfromLongShort = percentAvgTPfromLongShort*float64(counterTPfromLongShort) + pnlRate
+					counterTPfromLongShort += 1
+					percentAvgTPfromLongShort /= float64(counterTPfromLongShort)
+					break
+				case 2:
+					percentAvgTPfromAtr = percentAvgTPfromAtr*float64(counterTPfromAtr) + pnlRate
+					counterTPfromAtr += 1
+					percentAvgTPfromAtr /= float64(counterTPfromAtr)
+					break
+				case 3:
+					percentAvgTPfromPeak = percentAvgTPfromPeak*float64(counterTPfromPeak) + pnlRate
+					counterTPfromPeak += 1
+					percentAvgTPfromPeak /= float64(counterTPfromPeak)
+					break
+				case 4:
+					percentAvgSLfromSL = percentAvgSLfromSL*float64(counterSLfromSL) + pnlRate
+					counterSLfromSL += 1
+					percentAvgSLfromSL /= float64(counterSLfromSL)
+					break
+
+				}
 			}
 		}
 	}
 	buyOrderTPSL := func(price fixedpoint.Value) {
-		if s.Position.GetBase().IsZero() {
+		lastPrice := s.GetLastPrice()
+		base := s.Position.GetBase().Abs()
+		if base.Mul(lastPrice).Compare(s.Market.MinNotional) < 0 || base.Compare(s.Market.MinQuantity) < 0 {
 			return
 		}
 		if s.buyPrice.IsZero() {
@@ -826,15 +967,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		baseBalance := balances[s.Market.BaseCurrency].Available
 		atr := fixedpoint.NewFromFloat(s.atr.Last())
 		atrx2 := fixedpoint.NewFromFloat(s.atr.Last() * 2)
-		lastPrice := price
-		var ok bool
-		if s.Environment.IsBackTesting() {
-			lastPrice, ok = session.LastPrice(s.Symbol)
-			if !ok {
-				log.Errorf("cannot get last price")
-				return
-			}
-		}
 		sellall := false
 		if s.peakPrice.IsZero() || s.peakPrice.Compare(price) < 0 {
 			s.peakPrice = price
@@ -842,42 +974,29 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		takeProfit := false
 		peakBack := s.peakPrice
 		bpBack := s.buyPrice
-		if !baseBalance.IsZero() {
+		reason := -1
+		if baseBalance.Compare(s.Market.MinQuantity) >= 0 && baseBalance.Mul(lastPrice).Compare(s.Market.MinNotional) >= 0 {
 			shortSignal := types.CrossUnder(s.ewo, s.ewoSignal)
 			// TP
-			if !atr.IsZero() && s.peakPrice.Sub(atr).Compare(lastPrice) >= 0 &&
-				lastPrice.Compare(s.buyPrice) > 0 {
-				sellall = true
-				s.peakPrice = fixedpoint.Zero
-				takeProfit = true
-
-				// calculate report
-				pnlRate := lastPrice.Sub(s.buyPrice).Div(s.buyPrice).Float64()
-				percentAvgTPfromPeak = percentAvgTPfromPeak*float64(counterTPfromPeak) + pnlRate
-				counterTPfromPeak += 1
-				percentAvgTPfromPeak /= float64(counterTPfromPeak)
-			}
 			base := fixedpoint.NewFromFloat(s.ma34.Last())
 			if lastPrice.Compare(s.buyPrice) > 0 && (s.ccis.SellSignal() || shortSignal.Last() || (!atrx2.IsZero() && base.Add(atrx2).Compare(lastPrice) <= 0)) {
 				sellall = true
-				s.peakPrice = fixedpoint.Zero
 				takeProfit = true
 
 				// calculate report
-				pnlRate := lastPrice.Sub(s.buyPrice).Div(s.buyPrice).Float64()
 				if s.ccis.SellSignal() {
-					percentAvgTPfromCCI = percentAvgTPfromCCI*float64(counterTPfromCCI) + pnlRate
-					counterTPfromCCI += 1
-					percentAvgTPfromCCI /= float64(counterTPfromCCI)
+					reason = 0
 				} else if shortSignal.Last() {
-					percentAvgTPfromLongShort = percentAvgTPfromLongShort*float64(counterTPfromLongShort) + pnlRate
-					counterTPfromLongShort += 1
-					percentAvgTPfromLongShort /= float64(counterTPfromLongShort)
+					reason = 1
 				} else {
-					percentAvgTPfromAtr = percentAvgTPfromAtr*float64(counterTPfromAtr) + pnlRate
-					counterTPfromAtr += 1
-					percentAvgTPfromAtr /= float64(counterTPfromAtr)
+					reason = 2
 				}
+			}
+			if !atr.IsZero() && s.peakPrice.Sub(atr).Compare(lastPrice) >= 0 &&
+				lastPrice.Compare(s.buyPrice) > 0 {
+				sellall = true
+				takeProfit = true
+				reason = 3
 			}
 
 			// SL
@@ -892,23 +1011,55 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			if !s.DisableLongStop && (s.buyPrice.Sub(lastPrice).Div(s.buyPrice).Compare(s.Stoploss) > 0 ||
 				(!atr.IsZero() && s.buyPrice.Sub(atr).Compare(lastPrice) >= 0)) {
 				sellall = true
-				s.peakPrice = fixedpoint.Zero
-
-				// calculate report
-				pnlRate := s.buyPrice.Sub(lastPrice).Div(s.buyPrice).Float64()
-				percentAvgSLfromSL = percentAvgSLfromSL*float64(counterSLfromSL) + pnlRate
-				counterSLfromSL += 1
-				percentAvgSLfromSL /= float64(counterSLfromSL)
+				reason = 4
 			}
 		}
 
 		if sellall {
 			log.Warnf("sellall TPSL %v", s.Position.GetBase())
-			if s.ClosePosition(ctx) {
+			p := s.buyPrice
+			if order, ok := s.ClosePosition(ctx); order != nil && ok {
 				if takeProfit {
 					log.Errorf("takeprofit sell at %v, avg %v, h: %v, atrx2: %v", lastPrice, bpBack, peakBack, atrx2)
 				} else {
 					log.Errorf("stoploss sell at %v, avg %v, h: %v, atrx2: %v", lastPrice, bpBack, peakBack, atrx2)
+				}
+				// calculate report
+				if s.Record {
+					log.Error("record sa")
+				}
+				var pnlRate float64
+				if takeProfit {
+					pnlRate = lastPrice.Sub(p).Div(p).Float64()
+				} else {
+					pnlRate = p.Sub(lastPrice).Div(p).Float64()
+				}
+				switch reason {
+				case 0:
+					percentAvgTPfromCCI = percentAvgTPfromCCI*float64(counterTPfromCCI) + pnlRate
+					counterTPfromCCI += 1
+					percentAvgTPfromCCI /= float64(counterTPfromCCI)
+					break
+				case 1:
+					percentAvgTPfromLongShort = percentAvgTPfromLongShort*float64(counterTPfromLongShort) + pnlRate
+					counterTPfromLongShort += 1
+					percentAvgTPfromLongShort /= float64(counterTPfromLongShort)
+					break
+				case 2:
+					percentAvgTPfromAtr = percentAvgTPfromAtr*float64(counterTPfromAtr) + pnlRate
+					counterTPfromAtr += 1
+					percentAvgTPfromAtr /= float64(counterTPfromAtr)
+					break
+				case 3:
+					percentAvgTPfromPeak = percentAvgTPfromPeak*float64(counterTPfromPeak) + pnlRate
+					counterTPfromPeak += 1
+					percentAvgTPfromPeak /= float64(counterTPfromPeak)
+					break
+				case 4:
+					percentAvgSLfromSL = percentAvgSLfromSL*float64(counterSLfromSL) + pnlRate
+					counterSLfromSL += 1
+					percentAvgSLfromSL /= float64(counterSLfromSL)
+					break
 				}
 			}
 		}
@@ -1028,65 +1179,74 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			price := kline.Close.Sub(atr.Div(types.Two))
 			// if total asset (including locked) could be used to buy
 			if quoteBalance.Div(price).Compare(s.Market.MinQuantity) >= 0 && quoteBalance.Compare(s.Market.MinNotional) >= 0 {
-				// cancel all buy orders to release lock
-				s.CancelAll(ctx, types.SideTypeBuy)
+				// cancel all orders to release lock
+				s.CancelAll(ctx)
+
+				// backup, since the s.sellPrice will be cleared when doing ClosePosition
+				sellPrice := s.sellPrice
 
 				// calculate report
-				if !s.sellPrice.IsZero() {
-					if price.Compare(s.sellPrice) > 0 {
-						pnlRate := price.Sub(s.sellPrice).Div(price).Float64()
-						percentAvgTPfromOrder = percentAvgTPfromOrder*float64(counterTPfromOrder) + pnlRate
-						counterTPfromOrder += 1
-						percentAvgTPfromOrder /= float64(counterTPfromOrder)
+				if closeOrder, _ := s.PlaceBuyOrder(ctx, price); closeOrder != nil {
+					if s.Record {
+						log.Error("record l")
+					}
+					if !sellPrice.IsZero() {
+						if lastPrice.Compare(sellPrice) > 0 {
+							pnlRate := lastPrice.Sub(sellPrice).Div(lastPrice).Float64()
+							percentAvgTPfromOrder = percentAvgTPfromOrder*float64(counterTPfromOrder) + pnlRate
+							counterTPfromOrder += 1
+							percentAvgTPfromOrder /= float64(counterTPfromOrder)
+						} else {
+							pnlRate := sellPrice.Sub(lastPrice).Div(lastPrice).Float64()
+							percentAvgSLfromOrder = percentAvgSLfromOrder*float64(counterSLfromOrder) + pnlRate
+							counterSLfromOrder += 1
+							percentAvgSLfromOrder /= float64(counterSLfromOrder)
+						}
 					} else {
-						pnlRate := s.sellPrice.Sub(price).Div(price).Float64()
-						percentAvgSLfromOrder = percentAvgSLfromOrder*float64(counterSLfromOrder) + pnlRate
-						counterSLfromOrder += 1
-						percentAvgSLfromOrder /= float64(counterSLfromOrder)
+						panic("no sell price")
 					}
 				}
-				s.PlaceBuyOrder(ctx, price)
 			}
 		}
 		if shortSignal.Index(1) && !longSignal.Last() && IsBear {
 			price := kline.Close.Add(atr.Div(types.Two))
 			// if total asset (including locked) could be used to sell
 			if baseBalance.Mul(price).Compare(s.Market.MinNotional) >= 0 && baseBalance.Compare(s.Market.MinQuantity) >= 0 {
-				// cancel all sell orders to release lock
-				s.CancelAll(ctx, types.SideTypeSell)
+				// cancel all orders to release lock
+				s.CancelAll(ctx)
+
+				// backup, since the s.buyPrice will be cleared when doing ClosePosition
+				buyPrice := s.buyPrice
 
 				// calculate report
-				if !s.buyPrice.IsZero() {
-					if price.Compare(s.buyPrice) > 0 {
-						pnlRate := price.Sub(s.buyPrice).Div(s.buyPrice).Float64()
-						percentAvgTPfromOrder = percentAvgTPfromOrder*float64(counterTPfromOrder) + pnlRate
-						counterTPfromOrder += 1
-						percentAvgTPfromOrder /= float64(counterTPfromOrder)
+				if closeOrder, _ := s.PlaceSellOrder(ctx, price); closeOrder != nil {
+					if s.Record {
+						log.Error("record s")
+					}
+					if !buyPrice.IsZero() {
+						if lastPrice.Compare(buyPrice) > 0 {
+							pnlRate := lastPrice.Sub(buyPrice).Div(buyPrice).Float64()
+							percentAvgTPfromOrder = percentAvgTPfromOrder*float64(counterTPfromOrder) + pnlRate
+							counterTPfromOrder += 1
+							percentAvgTPfromOrder /= float64(counterTPfromOrder)
+						} else {
+							pnlRate := buyPrice.Sub(lastPrice).Div(buyPrice).Float64()
+							percentAvgSLfromOrder = percentAvgSLfromOrder*float64(counterSLfromOrder) + pnlRate
+							counterSLfromOrder += 1
+							percentAvgSLfromOrder /= float64(counterSLfromOrder)
+						}
 					} else {
-						pnlRate := s.buyPrice.Sub(price).Div(s.buyPrice).Float64()
-						percentAvgSLfromOrder = percentAvgSLfromOrder*float64(counterSLfromOrder) + pnlRate
-						counterSLfromOrder += 1
-						percentAvgSLfromOrder /= float64(counterSLfromOrder)
+						panic("no buy price")
 					}
 				}
-				s.PlaceSellOrder(ctx, price)
 			}
 		}
 	})
 	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 		log.Infof("canceling active orders...")
+		s.CancelAll(ctx)
 
-		var toCancel []types.Order
-		for _, order := range s.orderStore.Orders() {
-			if order.Status == types.OrderStatusNew || order.Status == types.OrderStatusPartiallyFilled {
-				toCancel = append(toCancel, order)
-			}
-		}
-
-		if err := orderExecutor.CancelOrders(ctx, toCancel...); err != nil {
-			log.WithError(err).Errorf("cancel order error")
-		}
 		s.tradeCollector.Process()
 		color.HiBlue("---- Trade Report (Without Fee) ----")
 		color.HiBlue("TP:")
