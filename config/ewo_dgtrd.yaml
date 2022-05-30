@@ -31,6 +31,8 @@ exchangeStrategies:
     ccistochFilterHigh: 80
     # CCI Stochastic Indicator low filter
     ccistochFilterLow: 20
+    # print record exit point in log messages
+    record: false
 
 sync:
   userDataStream:
@@ -43,7 +45,7 @@ sync:
 
 backtest:
   startTime: "2022-05-01"
-  endTime: "2022-05-25"
+  endTime: "2022-05-27"
   symbols:
     - MATICUSDT
   sessions: [binance]
@@ -52,5 +54,5 @@ backtest:
       #makerFeeRate: 0
       #takerFeeRate: 15
       balances:
-        MATIC: 00.0
+        MATIC: 000.0
         USDT: 15000.0

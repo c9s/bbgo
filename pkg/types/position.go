@@ -122,7 +122,7 @@ func (p *Position) NewProfit(trade Trade, profit, netProfit fixedpoint.Value) Pr
 
 func (p *Position) NewClosePositionOrder(percentage fixedpoint.Value) *SubmitOrder {
 	base := p.GetBase()
-	quantity := base.Mul(percentage)
+	quantity := base.Mul(percentage).Abs()
 	if quantity.Compare(p.Market.MinQuantity) < 0 {
 		return nil
 	}

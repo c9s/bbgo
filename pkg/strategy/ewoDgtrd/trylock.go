@@ -9,3 +9,8 @@ func tryLock(lock *sync.RWMutex) bool {
 	lock.Lock()
 	return true
 }
+
+func tryRLock(lock *sync.RWMutex) bool {
+	lock.RLock()
+	return true
+}
