@@ -7,7 +7,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func (e *Exchange) QueryLoanHistory(ctx context.Context, asset string, startTime, endTime *time.Time) ([]types.MarginLoanRecord, error) {
+func (e *Exchange) QueryLoanHistory(ctx context.Context, asset string, startTime, endTime *time.Time) ([]types.MarginLoan, error) {
 	req := e.client2.NewGetMarginLoanHistoryRequest()
 	req.Asset(asset)
 	req.Size(100)
@@ -42,7 +42,7 @@ func (e *Exchange) QueryLoanHistory(ctx context.Context, asset string, startTime
 		return nil, err
 	}
 
-	var loans []types.MarginLoanRecord
+	var loans []types.MarginLoan
 	for _, record := range records {
 		loans = append(loans, toGlobalLoan(record))
 	}
@@ -50,7 +50,7 @@ func (e *Exchange) QueryLoanHistory(ctx context.Context, asset string, startTime
 	return loans, err
 }
 
-func (e *Exchange) QueryRepayHistory(ctx context.Context, asset string, startTime, endTime *time.Time) ([]types.MarginRepayRecord, error) {
+func (e *Exchange) QueryRepayHistory(ctx context.Context, asset string, startTime, endTime *time.Time) ([]types.MarginRepay, error) {
 	req := e.client2.NewGetMarginRepayHistoryRequest()
 	req.Asset(asset)
 	req.Size(100)
@@ -82,7 +82,7 @@ func (e *Exchange) QueryRepayHistory(ctx context.Context, asset string, startTim
 
 	records, err := req.Do(ctx)
 
-	var repays []types.MarginRepayRecord
+	var repays []types.MarginRepay
 	for _, record := range records {
 		repays = append(repays, toGlobalRepay(record))
 	}
@@ -90,12 +90,22 @@ func (e *Exchange) QueryRepayHistory(ctx context.Context, asset string, startTim
 	return repays, err
 }
 
-func (e *Exchange) QueryLiquidationHistory(ctx context.Context, startTime, endTime *time.Time) ([]types.MarginLiquidationRecord, error) {
+func (e *Exchange) QueryLiquidationHistory(ctx context.Context, startTime, endTime *time.Time) ([]types.MarginLiquidation, error) {
 	req := e.client2.NewGetMarginLiquidationHistoryRequest()
+	req.Size(100)
 
 	if startTime != nil {
 		req.StartTime(*startTime)
 	}
+
+	if startTime != nil && endTime != nil {
+		duration := endTime.Sub(*startTime)
+		if duration > time.Hour*24*30 {
+			t := startTime.Add(time.Hour * 24 * 30)
+			endTime = &t
+		}
+	}
+
 	if endTime != nil {
 		req.EndTime(*endTime)
 	}
@@ -104,8 +114,13 @@ func (e *Exchange) QueryLiquidationHistory(ctx context.Context, startTime, endTi
 		req.IsolatedSymbol(e.MarginSettings.IsolatedMarginSymbol)
 	}
 
-	_, err := req.Do(ctx)
-	return nil, err
+	records, err := req.Do(ctx)
+	var liquidations []types.MarginLiquidation
+	for _, record := range records {
+		liquidations = append(liquidations, toGlobalLiquidation(record))
+	}
+
+	return liquidations, err
 }
 
 func (e *Exchange) QueryInterestHistory(ctx context.Context, asset string, startTime, endTime *time.Time) ([]types.MarginInterest, error) {
@@ -150,4 +165,3 @@ func (e *Exchange) QueryInterestHistory(ctx context.Context, asset string, start
 
 	return interests, err
 }
-

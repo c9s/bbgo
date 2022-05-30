@@ -68,7 +68,7 @@ type MarginInterest struct {
 	Time           Time             `json:"time" db:"time"`
 }
 
-type MarginLoanRecord struct {
+type MarginLoan struct {
 	TransactionID  uint64           `json:"transactionID" db:"transaction_id"`
 	Asset          string           `json:"asset" db:"asset"`
 	Principle      fixedpoint.Value `json:"principle" db:"principle"`
@@ -76,7 +76,7 @@ type MarginLoanRecord struct {
 	IsolatedSymbol string           `json:"isolatedSymbol" db:"isolated_symbol"`
 }
 
-type MarginRepayRecord struct {
+type MarginRepay struct {
 	TransactionID  uint64           `json:"transactionID" db:"transaction_id"`
 	Asset          string           `json:"asset" db:"asset"`
 	Principle      fixedpoint.Value `json:"principle" db:"principle"`
@@ -84,12 +84,12 @@ type MarginRepayRecord struct {
 	IsolatedSymbol string           `json:"isolatedSymbol" db:"isolated_symbol"`
 }
 
-type MarginLiquidationRecord struct {
+type MarginLiquidation struct {
 	AveragePrice     fixedpoint.Value `json:"avgPrice"`
 	ExecutedQuantity fixedpoint.Value `json:"executedQty"`
-	OrderId          uint64           `json:"orderId"`
+	OrderID          uint64           `json:"orderId"`
 	Price            fixedpoint.Value `json:"price"`
-	Qty              fixedpoint.Value `json:"qty"`
+	Quantity         fixedpoint.Value `json:"qty"`
 	Side             SideType         `json:"side"`
 	Symbol           string           `json:"symbol"`
 	TimeInForce      TimeInForce      `json:"timeInForce"`
@@ -99,9 +99,9 @@ type MarginLiquidationRecord struct {
 
 // MarginHistory provides the service of querying loan history and repay history
 type MarginHistory interface {
-	QueryLoanHistory(ctx context.Context, asset string, startTime, endTime *time.Time) ([]MarginLoanRecord, error)
-	QueryRepayHistory(ctx context.Context, asset string, startTime, endTime *time.Time) ([]MarginRepayRecord, error)
-	QueryLiquidationHistory(ctx context.Context, startTime, endTime *time.Time) ([]MarginLiquidationRecord, error)
+	QueryLoanHistory(ctx context.Context, asset string, startTime, endTime *time.Time) ([]MarginLoan, error)
+	QueryRepayHistory(ctx context.Context, asset string, startTime, endTime *time.Time) ([]MarginRepay, error)
+	QueryLiquidationHistory(ctx context.Context, startTime, endTime *time.Time) ([]MarginLiquidation, error)
 	QueryInterestHistory(ctx context.Context, asset string, startTime, endTime *time.Time) ([]MarginInterest, error)
 }
 
