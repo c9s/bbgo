@@ -1,0 +1,48 @@
+---
+persistence:
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    db: 0
+
+sessions:
+  binance:
+    exchange: binance
+    envVarPrefix: binance
+
+backtest:
+  sessions: [binance]
+  # for testing max draw down (MDD) at 03-12
+  # see here for more details
+  # https://www.investopedia.com/terms/m/maximum-drawdown-mdd.asp
+  startTime: "2022-04-01"
+  endTime: "2022-04-30"
+  symbols:
+  - BTCUSDT
+  accounts:
+    binance:
+      makerCommission: 10  # 0.15%
+      takerCommission: 15  # 0.15%
+      balances:
+        BTC: 1.0
+        USDT: 10000.0
+
+exchangeStrategies:
+- on: binance
+  supertrend:
+    symbol: BTCUSDT
+
+    # interval is how long do you want to update your order price and quantity
+    interval: 1h
+
+    # leverage is the leverage of the orders
+    leverage: 1
+
+    # fastDEMAWindow and slowDEMAWindow are for filtering super trend noise
+    fastDEMAWindow: 144
+    slowDEMAWindow: 169
+
+    superTrend:
+      averageTrueRangeWindow: 39
+      # ATR Multiplier for calculating super trend prices, the higher, the stronger the trends are
+      averageTrueRangeMultiplier: 3
