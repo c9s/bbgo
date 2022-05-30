@@ -499,7 +499,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	if !s.TrailingStopTarget.TrailingStopCallbackRatio.IsZero() {
 		// Update trailing stop when the position changes
-		s.tradeCollector.OnPositionUpdate(func(position types.PositionInterface) {
+		s.tradeCollector.OnPositionUpdate(func(position types.AnyPosition) {
 			// StrategyController
 			if s.Status != types.StrategyStatusRunning {
 				return
