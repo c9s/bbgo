@@ -318,7 +318,7 @@ func (s *BacktestService) BatchInsert(kline []types.KLine) error {
 	tableName := s._targetKlineTable(kline[0].Exchange)
 
 	sql := fmt.Sprintf("INSERT INTO `%s` (`exchange`, `start_time`, `end_time`, `symbol`, `interval`, `open`, `high`, `low`, `close`, `closed`, `volume`, `quote_volume`, `taker_buy_base_volume`, `taker_buy_quote_volume`)"+
-		" values (:exchange, :start_time, :end_time, :symbol, :interval, :open, :high, :low, :close, :closed, :volume, :quote_volume, :taker_buy_base_volume, :taker_buy_quote_volume); ", tableName)
+		" VALUES (:exchange, :start_time, :end_time, :symbol, :interval, :open, :high, :low, :close, :closed, :volume, :quote_volume, :taker_buy_base_volume, :taker_buy_quote_volume); ", tableName)
 
 	tx := s.DB.MustBegin()
 	if _, err := tx.NamedExec(sql, kline); err != nil {
@@ -334,7 +334,7 @@ func (s *BacktestService) _deleteDuplicatedKLine(k types.KLine) error {
 	}
 
 	tableName := s._targetKlineTable(k.Exchange)
-	sql := fmt.Sprintf("delete from `%s` where gid = :gid  ", tableName)
+	sql := fmt.Sprintf("DELETE FROM `%s` WHERE gid = :gid  ", tableName)
 	_, err := s.DB.NamedExec(sql, k)
 	return err
 }
