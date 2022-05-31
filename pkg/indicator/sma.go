@@ -18,6 +18,7 @@ var zeroTime time.Time
 type SMA struct {
 	types.IntervalWindow
 	Values  types.Float64Slice
+	Cache   types.Float64Slice
 	EndTime time.Time
 
 	UpdateCallbacks []func(value float64)
@@ -46,11 +47,15 @@ func (inc *SMA) Length() int {
 var _ types.Series = &SMA{}
 
 func (inc *SMA) Update(value float64) {
-	length := len(inc.Values)
-	if length == 0 {
-		inc.Values = append(inc.Values, value)
+	if len(inc.Cache) < inc.Window {
+		inc.Cache = append(inc.Cache, value)
+		if len(inc.Cache) == inc.Window {
+			inc.Values = append(inc.Values, types.Mean(&inc.Cache))
+		}
 		return
+
 	}
+	length := len(inc.Values)
 	newVal := (inc.Values[length-1]*float64(inc.Window-1) + value) / float64(inc.Window)
 	inc.Values = append(inc.Values, newVal)
 }
