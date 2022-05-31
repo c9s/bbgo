@@ -90,6 +90,20 @@ func (s *MarginService) Sync(ctx context.Context, ex types.Exchange, asset strin
 				return m.Asset + m.IsolatedSymbol + strconv.FormatInt(m.Time.UnixMilli(), 10)
 			},
 		},
+		{
+			Select: SelectLastMarginLiquidations(ex.Name(), 100),
+			Type:   types.MarginLiquidation{},
+			BatchQuery: func(ctx context.Context, startTime, endTime time.Time) (interface{}, chan error) {
+				query := &batch.MarginLiquidationBatchQuery{
+					MarginHistory: api,
+				}
+				return query.Query(ctx, startTime, endTime)
+			},
+			ID: func(obj interface{}) string {
+				m := obj.(types.MarginLiquidation)
+				return strconv.FormatUint(m.OrderID, 10)
+			},
+		},
 	}
 
 NextQuery:
