@@ -22,6 +22,12 @@ This strategy needs margin enabled in order to submit short orders, but you can 
         - The MA window of the ATR indicator used by Supertrend. 
     - `averageTrueRangeMultiplier`
         - Multiplier for calculating upper and lower bond prices, the higher, the stronger the trends are, but also makes it less sensitive.
+- `takeProfitMultiplier`
+    - TP according to ATR multiple, 0 to disable this.
+- `stopLossByTriggeringK`
+    - Set SL price to the low of the triggering Kline.
+- `tpslBySignal`
+    - TP/SL by reversed signals.
 
 
 #### Examples

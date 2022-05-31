@@ -13,7 +13,8 @@ import (
 	"sync"
 )
 
-// TODO: Strategy control
+// TODO: Margin side effect
+// TODO: Update balance
 
 const ID = "supertrend"
 
@@ -143,7 +144,17 @@ type Strategy struct {
 	// Leverage
 	Leverage float64 `json:"leverage"`
 
-	bbgo.QuantityOrAmount
+	// TakeProfitMultiplier TP according to ATR multiple, 0 to disable this
+	TakeProfitMultiplier float64 `json:"takeProfitMultiplier"`
+
+	// StopLossByTriggeringK Set SL price to the low of the triggering Kline
+	StopLossByTriggeringK bool `json:"stopLossByTriggeringK"`
+
+	// TPSLBySignal TP/SL by reversed signals
+	TPSLBySignal bool `json:"tpslBySignal"`
+
+	currentTakeProfitPrice fixedpoint.Value
+	currentStopLossPrice   fixedpoint.Value
 
 	// StrategyController
 	bbgo.StrategyController
@@ -275,6 +286,15 @@ func (s *Strategy) CalculateQuantity(currentPrice fixedpoint.Value) fixedpoint.V
 	return quantity
 }
 
+func (s *Strategy) HasTradableBase(currentPrice fixedpoint.Value) bool {
+	base := s.Position.GetBase()
+	quantity := base.Abs()
+	if quantity.Compare(s.Market.MinQuantity) > 0 && quantity.Mul(currentPrice).Compare(s.Market.MinNotional) > 0 {
+		return true
+	}
+	return false
+}
+
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	s.session = session
 	s.Market, _ = session.Market(s.Symbol)
@@ -306,13 +326,18 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.OnEmergencyStop(func() {
 		// Close 100% position
-		_ = s.ClosePosition(ctx, fixedpoint.NewFromFloat(1.0))
+		if err := s.ClosePosition(ctx, fixedpoint.One); err != nil {
+			s.Notify("can not close position")
+		}
 
 		_ = s.Persistence.Sync(s)
 	})
 
 	// Setup indicators
 	s.SetupIndicators()
+
+	s.currentStopLossPrice = fixedpoint.Zero
+	s.currentTakeProfitPrice = fixedpoint.Zero
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		// StrategyController
@@ -341,24 +366,35 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			demaSignal = types.DirectionNone
 		}
 
-		// TP/SL
-		base := s.Position.GetBase()
-		quantity := base.Abs()
-		if quantity.Compare(s.Market.MinQuantity) > 0 && quantity.Mul(kline.GetClose()).Compare(s.Market.MinNotional) > 0 {
-			var side types.SideType
-			if base.Sign() < 0 && (stSignal == types.DirectionUp || demaSignal == types.DirectionUp) {
-				side = types.SideTypeBuy
-			} else if base.Sign() > 0 && (stSignal == types.DirectionDown || demaSignal == types.DirectionDown) {
-				side = types.SideTypeSell
-			}
-			if side == types.SideTypeBuy || side == types.SideTypeSell {
-				orderForm := s.GenerateOrderForm(side, quantity)
-				log.Infof("submit TP/SL order %v", orderForm)
-				order, err := orderExecutor.SubmitOrders(ctx, orderForm)
-				if err != nil {
-					log.WithError(err).Errorf("can not place TP/SL order")
+		// TP/SL if there's non-dust position
+		if s.HasTradableBase(kline.GetClose()) {
+			baseSign := s.Position.GetBase().Sign()
+			if s.StopLossByTriggeringK && !s.currentStopLossPrice.IsZero() && ((baseSign < 0 && kline.GetClose().Compare(s.currentStopLossPrice) > 0) || (baseSign > 0 && kline.GetClose().Compare(s.currentStopLossPrice) < 0)) {
+				// SL by triggered Kline low
+				if err := s.ClosePosition(ctx, fixedpoint.One); err != nil {
+					s.Notify("can not place SL order")
+				} else {
+					s.currentStopLossPrice = fixedpoint.Zero
+					s.currentTakeProfitPrice = fixedpoint.Zero
 				}
-				s.orderStore.Add(order...)
+			} else if s.TakeProfitMultiplier > 0 && !s.currentTakeProfitPrice.IsZero() && ((baseSign < 0 && kline.GetClose().Compare(s.currentTakeProfitPrice) < 0) || (baseSign > 0 && kline.GetClose().Compare(s.currentTakeProfitPrice) > 0)) {
+				// TP by multiple of ATR
+				if err := s.ClosePosition(ctx, fixedpoint.One); err != nil {
+					s.Notify("can not place TP order")
+				} else {
+					s.currentStopLossPrice = fixedpoint.Zero
+					s.currentTakeProfitPrice = fixedpoint.Zero
+				}
+			} else if s.TPSLBySignal {
+				// Use signals to TP/SL
+				if (baseSign < 0 && (stSignal == types.DirectionUp || demaSignal == types.DirectionUp)) || (baseSign > 0 && (stSignal == types.DirectionDown || demaSignal == types.DirectionDown)) {
+					if err := s.ClosePosition(ctx, fixedpoint.One); err != nil {
+						s.Notify("can not place TP/SL order")
+					} else {
+						s.currentStopLossPrice = fixedpoint.Zero
+						s.currentTakeProfitPrice = fixedpoint.Zero
+					}
+				}
 			}
 		}
 
@@ -366,21 +402,43 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		var side types.SideType
 		if stSignal == types.DirectionUp && demaSignal == types.DirectionUp {
 			side = types.SideTypeBuy
+			if s.StopLossByTriggeringK {
+				s.currentStopLossPrice = kline.GetLow()
+			}
+			if s.TakeProfitMultiplier > 0 {
+				s.currentTakeProfitPrice = kline.GetClose().Add(fixedpoint.NewFromFloat(s.SuperTrend.AverageTrueRange.Last() * s.TakeProfitMultiplier))
+			}
 		} else if stSignal == types.DirectionDown && demaSignal == types.DirectionDown {
 			side = types.SideTypeSell
+			if s.StopLossByTriggeringK {
+				s.currentStopLossPrice = kline.GetHigh()
+			}
+			if s.TakeProfitMultiplier > 0 {
+				s.currentTakeProfitPrice = kline.GetClose().Sub(fixedpoint.NewFromFloat(s.SuperTrend.AverageTrueRange.Last() * s.TakeProfitMultiplier))
+			}
 		}
 
 		if side == types.SideTypeSell || side == types.SideTypeBuy {
+			baseSign := s.Position.GetBase().Sign()
+			// Close opposite position if any
+			if s.HasTradableBase(kline.GetClose()) && ((side == types.SideTypeSell && baseSign > 0) || (side == types.SideTypeBuy && baseSign < 0)) {
+				if err := s.ClosePosition(ctx, fixedpoint.One); err != nil {
+					s.Notify("can not place position close order")
+				}
+			}
+
 			orderForm := s.GenerateOrderForm(side, s.CalculateQuantity(kline.GetClose()))
 			log.Infof("submit open position order %v", orderForm)
 			order, err := orderExecutor.SubmitOrders(ctx, orderForm)
 			if err != nil {
 				log.WithError(err).Errorf("can not place open position order")
+				s.Notify("can not place open position order")
+			} else {
+				s.orderStore.Add(order...)
 			}
-			s.orderStore.Add(order...)
-		}
 
-		s.tradeCollector.Process()
+			s.tradeCollector.Process()
+		}
 	})
 
 	s.tradeCollector = bbgo.NewTradeCollector(s.Symbol, s.Position, s.orderStore)
