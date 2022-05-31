@@ -46,3 +46,12 @@ exchangeStrategies:
       averageTrueRangeWindow: 39
       # ATR Multiplier for calculating super trend prices, the higher, the stronger the trends are
       averageTrueRangeMultiplier: 3
+
+    # TP according to ATR multiple, 0 to disable this
+    takeProfitMultiplier: 3
+
+    # Set SL price to the low of the triggering Kline
+    stopLossByTriggeringK: true
+
+    # TP/SL by reversed signals
+    tpslBySignal: true
