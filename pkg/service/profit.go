@@ -13,10 +13,6 @@ type ProfitService struct {
 	DB *sqlx.DB
 }
 
-func NewProfitService(db *sqlx.DB) *ProfitService {
-	return &ProfitService{db}
-}
-
 func (s *ProfitService) Load(ctx context.Context, id int64) (*types.Trade, error) {
 	var trade types.Trade
 

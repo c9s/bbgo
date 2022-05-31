@@ -8,8 +8,8 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func toGlobalLoan(record binanceapi.MarginLoanRecord) types.MarginLoanRecord {
-	return types.MarginLoanRecord{
+func toGlobalLoan(record binanceapi.MarginLoanRecord) types.MarginLoan {
+	return types.MarginLoan{
 		TransactionID:  uint64(record.TxId),
 		Asset:          record.Asset,
 		Principle:      record.Principal,
@@ -18,8 +18,8 @@ func toGlobalLoan(record binanceapi.MarginLoanRecord) types.MarginLoanRecord {
 	}
 }
 
-func toGlobalRepay(record binanceapi.MarginRepayRecord) types.MarginRepayRecord {
-	return types.MarginRepayRecord{
+func toGlobalRepay(record binanceapi.MarginRepayRecord) types.MarginRepay {
+	return types.MarginRepay{
 		TransactionID:  record.TxId,
 		Asset:          record.Asset,
 		Principle:      record.Principal,
@@ -37,7 +37,21 @@ func toGlobalInterest(record binanceapi.MarginInterest) types.MarginInterest {
 		IsolatedSymbol: record.IsolatedSymbol,
 		Time:           types.Time(record.InterestAccuredTime),
 	}
+}
 
+func toGlobalLiquidation(record binanceapi.MarginLiquidationRecord) types.MarginLiquidation {
+	return types.MarginLiquidation{
+		AveragePrice:     record.AveragePrice,
+		ExecutedQuantity: record.ExecutedQuantity,
+		OrderID:          record.OrderId,
+		Price:            record.Price,
+		Quantity:         record.Quantity,
+		Side:             toGlobalSideType(record.Side),
+		Symbol:           record.Symbol,
+		TimeInForce:      types.TimeInForce(record.TimeInForce),
+		IsIsolated:       record.IsIsolated,
+		UpdatedTime:      types.Time(record.UpdatedTime),
+	}
 }
 
 func toGlobalIsolatedUserAsset(userAsset binance.IsolatedUserAsset) types.IsolatedUserAsset {

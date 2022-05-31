@@ -51,7 +51,7 @@ executionReport
   "O": 1499405658657,            // Order creation time
   "Z": "0.00000000",             // Cumulative quote asset transacted quantity
   "Y": "0.00000000",             // Last quote asset transacted quantity (i.e. lastPrice * lastQty)
-  "Q": "0.00000000"              // Quote Order Qty
+  "Q": "0.00000000"              // Quote Order Quantity
 }
 */
 type ExecutionReportEvent struct {

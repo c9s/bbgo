@@ -11,6 +11,9 @@ import (
 	sqlite3Migrations "github.com/c9s/bbgo/pkg/migrations/sqlite3"
 )
 
+// reflect cache for database
+var dbCache = NewReflectCache()
+
 type DatabaseService struct {
 	Driver string
 	DSN    string
@@ -37,6 +40,12 @@ func NewDatabaseService(driver, dsn string) *DatabaseService {
 func (s *DatabaseService) Connect() error {
 	var err error
 	s.DB, err = sqlx.Connect(s.Driver, s.DSN)
+	return err
+}
+
+func (s *DatabaseService) Insert(record interface{}) error {
+	sql := dbCache.InsertSqlOf(record)
+	_, err := s.DB.NamedExec(sql, record)
 	return err
 }
 
