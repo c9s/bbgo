@@ -30,3 +30,7 @@ sync:
   - BTCUSDT
   - ETHUSDT
   - LINKUSDT
+
+  depositHistory: true
+  rewardHistory: true
+  withdrawHistory: true

@@ -229,3 +229,7 @@ type TradeKey struct {
 	ID       uint64
 	Side     SideType
 }
+
+func (k TradeKey) String() string {
+	return k.Exchange.String() + strconv.FormatUint(k.ID, 10) + k.Side.String()
+}

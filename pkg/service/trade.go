@@ -90,13 +90,21 @@ func (s *TradeService) Sync(ctx context.Context, exchange types.Exchange, symbol
 			tradeKeys[record.Key()] = struct{}{}
 		}
 
-		end :=  len(records) - 1
+		end := len(records) - 1
 		last := records[end]
 		lastTradeID = last.ID
 		startTime = last.Time.Time()
 	}
 
-	b := &batch.TradeBatchQuery{Exchange: exchange}
+	exchangeTradeHistoryService, ok := exchange.(types.ExchangeTradeHistoryService)
+	if !ok {
+		return nil
+	}
+
+	b := &batch.TradeBatchQuery{
+		ExchangeTradeHistoryService: exchangeTradeHistoryService,
+	}
+
 	tradeC, errC := b.Query(ctx, symbol, &types.TradeQueryOptions{
 		LastTradeID: lastTradeID,
 		StartTime:   &startTime,

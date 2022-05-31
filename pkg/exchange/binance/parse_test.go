@@ -168,7 +168,7 @@ func TestParseOrderUpdate(t *testing.T) {
   "O": 1499405658657,            // Order creation time
   "Z": "0.1",                    // Cumulative quote asset transacted quantity
   "Y": "0.00000000",             // Last quote asset transacted quantity (i.e. lastPrice * lastQty)
-  "Q": "2.0"                     // Quote Order Qty
+  "Q": "2.0"                     // Quote Order Quantity
 }`
 
 	payload = jsCommentTrimmer.ReplaceAllLiteralString(payload, "")
