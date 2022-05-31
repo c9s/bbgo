@@ -23,7 +23,7 @@ CREATE TABLE `margin_liquidations`
 
     `time_in_force`     VARCHAR(5)              NOT NULL DEFAULT '',
 
-    `updated_time`      DATETIME(3)             NOT NULL,
+    `time`              DATETIME(3)             NOT NULL,
 
     PRIMARY KEY (`gid`),
     UNIQUE KEY (`order_id`, `exchange`)
