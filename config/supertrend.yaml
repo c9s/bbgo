@@ -45,7 +45,9 @@ exchangeStrategies:
     fastDEMAWindow: 144
     slowDEMAWindow: 169
 
+    # Supertrend indicator parameters
     superTrend:
+      # ATR window used by Supertrend
       averageTrueRangeWindow: 39
       # ATR Multiplier for calculating super trend prices, the higher, the stronger the trends are
       averageTrueRangeMultiplier: 3
