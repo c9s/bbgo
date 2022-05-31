@@ -13,8 +13,6 @@ import (
 	"sync"
 )
 
-// TODO: Margin side effect
-
 const ID = "supertrend"
 
 const stateKey = "state-v1"
@@ -210,7 +208,7 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 		return fmt.Errorf("order quantity %v is too small, less than %v", quantity, s.Market.MinQuantity)
 	}
 
-	orderForm := s.GenerateOrderForm(side, quantity)
+	orderForm := s.GenerateOrderForm(side, quantity, types.SideEffectTypeAutoRepay)
 
 	s.Notify("Submitting %s %s order to close position by %v", s.Symbol, side.String(), percentage, orderForm)
 
@@ -264,13 +262,14 @@ func (s *Strategy) UpdateIndicators(kline types.KLine) {
 	}
 }
 
-func (s *Strategy) GenerateOrderForm(side types.SideType, quantity fixedpoint.Value) types.SubmitOrder {
+func (s *Strategy) GenerateOrderForm(side types.SideType, quantity fixedpoint.Value, marginOrderSideEffect types.MarginOrderSideEffectType) types.SubmitOrder {
 	orderForm := types.SubmitOrder{
-		Symbol:   s.Symbol,
-		Market:   s.Market,
-		Side:     side,
-		Type:     types.OrderTypeMarket,
-		Quantity: quantity,
+		Symbol:           s.Symbol,
+		Market:           s.Market,
+		Side:             side,
+		Type:             types.OrderTypeMarket,
+		Quantity:         quantity,
+		MarginSideEffect: marginOrderSideEffect,
 	}
 
 	return orderForm
@@ -432,7 +431,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				s.session.GetAccount().UpdateBalances(balances)
 			}
 
-			orderForm := s.GenerateOrderForm(side, s.CalculateQuantity(kline.GetClose()))
+			orderForm := s.GenerateOrderForm(side, s.CalculateQuantity(kline.GetClose()), types.SideEffectTypeMarginBuy)
 			log.Infof("submit open position order %v", orderForm)
 			order, err := orderExecutor.SubmitOrders(ctx, orderForm)
 			if err != nil {

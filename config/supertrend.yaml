@@ -9,6 +9,9 @@ sessions:
   binance:
     exchange: binance
     envVarPrefix: binance
+    margin: true
+    isolatedMargin: true
+    isolatedMarginSymbol: BTCUSDT
 
 backtest:
   sessions: [binance]
