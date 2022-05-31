@@ -1,7 +1,8 @@
 ### Supertrend Strategy
 
 This strategy uses Supertrend indicator as trend, and DEMA indicator as noise filter.
-This strategy needs margin enabled in order to submit short orders, but you can use `leverage` parameter to limit your risk.
+Supertrend strategy needs margin enabled in order to submit short orders, and you can use `leverage` parameter to limit your risk.
+**Please note, using leverage higher than 1 is highly risky.**
 
 
 #### Parameters
