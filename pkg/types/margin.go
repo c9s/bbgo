@@ -98,7 +98,7 @@ type MarginLiquidation struct {
 	Symbol           string           `json:"symbol" db:"symbol"`
 	TimeInForce      TimeInForce      `json:"timeInForce" db:"time_in_force"`
 	IsIsolated       bool             `json:"isIsolated" db:"is_isolated"`
-	UpdatedTime      Time             `json:"updatedTime" db:"updated_time"`
+	UpdatedTime      Time             `json:"updatedTime" db:"time"`
 }
 
 // MarginHistory provides the service of querying loan history and repay history

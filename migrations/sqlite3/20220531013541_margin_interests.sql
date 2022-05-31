@@ -3,8 +3,6 @@ CREATE TABLE `margin_interests`
 (
     `gid`             INTEGER PRIMARY KEY AUTOINCREMENT,
 
-    `transaction_id`  INTEGER         NOT NULL,
-
     `exchange`        VARCHAR(24)     NOT NULL DEFAULT '',
 
     `asset`           VARCHAR(24)     NOT NULL DEFAULT '',

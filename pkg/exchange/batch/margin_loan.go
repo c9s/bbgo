@@ -22,7 +22,7 @@ func (e *MarginLoanBatchQuery) Query(ctx context.Context, asset string, startTim
 			return e.QueryLoanHistory(ctx, asset, &startTime, &endTime)
 		},
 		T: func(obj interface{}) time.Time {
-			return time.Time(obj.(types.MarginRepay).Time)
+			return time.Time(obj.(types.MarginLoan).Time)
 		},
 		ID: func(obj interface{}) string {
 			loan := obj.(types.MarginLoan)
