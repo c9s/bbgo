@@ -14,7 +14,6 @@ import (
 )
 
 // TODO: Margin side effect
-// TODO: Update balance
 
 const ID = "supertrend"
 
@@ -425,6 +424,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				if err := s.ClosePosition(ctx, fixedpoint.One); err != nil {
 					s.Notify("can not place position close order")
 				}
+			}
+
+			// Update balance for exchanges like FTX, which doesn't update balances automatically
+			balances, err := s.session.Exchange.QueryAccountBalances(ctx)
+			if err != nil {
+				s.session.GetAccount().UpdateBalances(balances)
 			}
 
 			orderForm := s.GenerateOrderForm(side, s.CalculateQuantity(kline.GetClose()))
