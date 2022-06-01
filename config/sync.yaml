@@ -37,6 +37,7 @@ sync:
   symbols:
   - BTCUSDT
   - ETHUSDT
+  - DOTUSDT
 
   # marginHistory enables the margin history sync
   marginHistory: true
