@@ -38,7 +38,6 @@ type Exchange struct {
 	v3margin *v3.MarginService
 }
 
-
 func New(key, secret string) *Exchange {
 	baseURL := maxapi.ProductionAPIURL
 	if override := os.Getenv("MAX_API_BASE_URL"); len(override) > 0 {
@@ -583,6 +582,38 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	return a, nil
 }
 
+func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
+	if err := accountQueryLimiter.Wait(ctx); err != nil {
+		return nil, err
+	}
+
+	walletType := maxapi.WalletTypeSpot
+	if e.MarginSettings.IsMargin {
+		walletType = maxapi.WalletTypeMargin
+	}
+
+	req := e.v3order.NewGetWalletAccountsRequest(walletType)
+	accounts, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var balances = make(types.BalanceMap)
+	for _, b := range accounts {
+		cur := toGlobalCurrency(b.Currency)
+		balances[cur] = types.Balance{
+			Currency:  cur,
+			Available: b.Balance,
+			Locked:    b.Locked,
+			NetAsset:  b.Balance.Add(b.Locked),
+			Borrowed:  b.Debt,
+			Interest:  b.Interest,
+		}
+	}
+
+	return balances, nil
+}
+
 func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (allWithdraws []types.Withdraw, err error) {
 	startTime := since
 	limit := 1000
@@ -744,37 +775,6 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 	return allDeposits, err
 }
 
-func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
-	if err := accountQueryLimiter.Wait(ctx); err != nil {
-		return nil, err
-	}
-
-	walletType := maxapi.WalletTypeSpot
-	if e.MarginSettings.IsMargin {
-		walletType = maxapi.WalletTypeMargin
-	}
-
-	req := e.v3order.NewGetWalletAccountsRequest(walletType)
-	accounts, err := req.Do(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	var balances = make(types.BalanceMap)
-	for _, b := range accounts {
-		cur := toGlobalCurrency(b.Currency)
-		balances[cur] = types.Balance{
-			Currency:  cur,
-			Available: b.Balance,
-			Locked:    b.Locked,
-			NetAsset:  b.Balance.Add(b.Locked),
-			// Borrowed: b.Debt
-		}
-	}
-
-	return balances, nil
-}
-
 func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
 	if err := tradeQueryLimiter.Wait(ctx); err != nil {
 		return nil, err
@@ -926,7 +926,6 @@ func (e *Exchange) QueryAveragePrice(ctx context.Context, symbol string) (fixedp
 	return fixedpoint.MustNewFromString(ticker.Sell).
 		Add(fixedpoint.MustNewFromString(ticker.Buy)).Div(Two), nil
 }
-
 
 func (e *Exchange) RepayMarginAsset(ctx context.Context, asset string, amount fixedpoint.Value) error {
 	req := e.v3margin.NewMarginRepayRequest()
