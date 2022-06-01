@@ -295,15 +295,16 @@ func (session *ExchangeSession) GetAccount() (a *types.Account) {
 }
 
 // UpdateAccount locks the account mutex and update the account object
-func (session *ExchangeSession) UpdateAccount(ctx context.Context) error {
+func (session *ExchangeSession) UpdateAccount(ctx context.Context) (*types.Account, error) {
 	account, err := session.Exchange.QueryAccount(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
+
 	session.accountMutex.Lock()
 	session.Account = account
 	session.accountMutex.Unlock()
-	return nil
+	return account, nil
 }
 
 // Init initializes the basic data structure and market information by its exchange.

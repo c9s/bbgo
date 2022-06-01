@@ -86,7 +86,7 @@ func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]
 	// iterate the sessions and record them
 	for sessionName, session := range sessions {
 		// update the account balances and the margin information
-		if err := session.UpdateAccount(ctx); err != nil {
+		if _, err := session.UpdateAccount(ctx); err != nil {
 			log.WithError(err).Errorf("can not update account")
 			return
 		}
