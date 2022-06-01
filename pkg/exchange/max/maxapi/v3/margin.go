@@ -149,14 +149,14 @@ type GetMarginLoanHistoryRequest struct {
 	limit     *int       `param:"limit"`
 }
 
-//go:generate PostRequest -url "/api/v3/wallet/m/loans/:currency" -type MarginLoanRequest -responseType .LoanRecord
+//go:generate PostRequest -url "/api/v3/wallet/m/loan/:currency" -type MarginLoanRequest -responseType .LoanRecord
 type MarginLoanRequest struct {
 	client   requestgen.AuthenticatedAPIClient
 	currency string `param:"currency,slug,required"`
 	amount   string `param:"amount"`
 }
 
-//go:generate PostRequest -url "/api/v3/wallet/m/repayments/:currency" -type MarginRepayRequest -responseType .RepaymentRecord
+//go:generate PostRequest -url "/api/v3/wallet/m/repayment/:currency" -type MarginRepayRequest -responseType .RepaymentRecord
 type MarginRepayRequest struct {
 	client   requestgen.AuthenticatedAPIClient
 	currency string `param:"currency,slug,required"`
