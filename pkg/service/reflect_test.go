@@ -58,7 +58,7 @@ func Test_fieldsNamesOf(t *testing.T) {
 		{
 			name: "MarginInterest",
 			args: args{record: &types.MarginInterest{}},
-			want: []string{"exchange", "asset", "principle", "interest", "interest_rate", "isolated_symbol", "time"},
+			want: []string{"gid", "exchange", "asset", "principle", "interest", "interest_rate", "isolated_symbol", "time"},
 		},
 	}
 	for _, tt := range tests {
