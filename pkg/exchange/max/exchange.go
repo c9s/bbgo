@@ -551,22 +551,6 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 		return nil, err
 	}
 
-	userInfo, err := e.client.AccountService.NewGetMeRequest().Do(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	var balances = make(types.BalanceMap)
-	for _, a := range userInfo.Accounts {
-		cur := toGlobalCurrency(a.Currency)
-		balances[toGlobalCurrency(a.Currency)] = types.Balance{
-			Currency:  cur,
-			Available: a.Balance,
-			Locked:    a.Locked,
-			NetAsset:  a.Balance.Add(a.Locked),
-		}
-	}
-
 	vipLevel, err := e.client.AccountService.NewGetVipLevelRequest().Do(ctx)
 	if err != nil {
 		return nil, err
@@ -583,6 +567,12 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 		TakerFeeRate: fixedpoint.NewFromFloat(vipLevel.Current.TakerFee), // 0.15% = 0.0015
 	}
 
+	balances, err := e.QueryAccountBalances(ctx)
+	if err != nil {
+		return nil, err
+	}
+	a.UpdateBalances(balances)
+
 	if e.MarginSettings.IsMargin {
 		a.AccountType = types.AccountTypeMargin
 
@@ -596,7 +586,6 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 		a.TotalAccountValue = adRatio.AssetInUsdt
 	}
 
-	a.UpdateBalances(balances)
 	return a, nil
 }
 
@@ -766,20 +755,26 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 		return nil, err
 	}
 
-	accounts, err := e.client.AccountService.NewGetAccountsRequest().Do(ctx)
+	walletType := maxapi.WalletTypeSpot
+	if e.MarginSettings.IsMargin {
+		walletType = maxapi.WalletTypeMargin
+	}
+
+	req := e.v3order.NewGetWalletAccountsRequest(walletType)
+	accounts, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	var balances = make(types.BalanceMap)
-
-	for _, a := range accounts {
-		cur := toGlobalCurrency(a.Currency)
+	for _, b := range accounts {
+		cur := toGlobalCurrency(b.Currency)
 		balances[cur] = types.Balance{
 			Currency:  cur,
-			Available: a.Balance,
-			Locked:    a.Locked,
-			NetAsset:  a.Balance.Add(a.Locked),
+			Available: b.Balance,
+			Locked:    b.Locked,
+			NetAsset:  b.Balance.Add(b.Locked),
+			// Borrowed: b.Debt
 		}
 	}
 

@@ -23,6 +23,10 @@ type OrderService struct {
 	Client *maxapi.RestClient
 }
 
+func (s *OrderService) NewGetWalletAccountsRequest(walletType WalletType) *GetWalletAccountsRequest {
+	return &GetWalletAccountsRequest{client: s.Client, walletType: walletType}
+}
+
 func (s *OrderService) NewCreateWalletOrderRequest(walletType WalletType) *CreateWalletOrderRequest {
 	return &CreateWalletOrderRequest{client: s.Client, walletType: walletType}
 }
