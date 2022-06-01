@@ -96,6 +96,7 @@ func (s *Strategy) tryToRepayAnyDebt(ctx context.Context) {
 
 		toRepay := b.Available
 		s.Notifiability.Notify(&MarginAction{
+			Exchange:       s.ExchangeSession.ExchangeName,
 			Action:         "Repay",
 			Asset:          b.Currency,
 			Amount:         toRepay,
@@ -183,6 +184,7 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 			}
 
 			s.Notifiability.Notify(&MarginAction{
+				Exchange:       s.ExchangeSession.ExchangeName,
 				Action:         "Borrow",
 				Asset:          marginAsset.Asset,
 				Amount:         toBorrow,
@@ -208,6 +210,7 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 			}
 
 			s.Notifiability.Notify(&MarginAction{
+				Exchange:       s.ExchangeSession.ExchangeName,
 				Action:         "Borrow",
 				Asset:          marginAsset.Asset,
 				Amount:         toBorrow,
@@ -295,6 +298,7 @@ func (s *Strategy) handleBinanceBalanceUpdateEvent(event *binance.BalanceUpdateE
 
 		toRepay := b.Available
 		s.Notifiability.Notify(&MarginAction{
+			Exchange:       s.ExchangeSession.ExchangeName,
 			Action:         "Repay",
 			Asset:          b.Currency,
 			Amount:         toRepay,
@@ -308,6 +312,7 @@ func (s *Strategy) handleBinanceBalanceUpdateEvent(event *binance.BalanceUpdateE
 }
 
 type MarginAction struct {
+	Exchange       types.ExchangeName
 	Action         string
 	Asset          string
 	Amount         fixedpoint.Value
@@ -320,6 +325,11 @@ func (a *MarginAction) SlackAttachment() slack.Attachment {
 		Title: fmt.Sprintf("%s %s %s", a.Action, a.Amount, a.Asset),
 		Color: "warning",
 		Fields: []slack.AttachmentField{
+			{
+				Title: "Exchange",
+				Value: a.Exchange.String(),
+				Short: true,
+			},
 			{
 				Title: "Action",
 				Value: a.Action,
