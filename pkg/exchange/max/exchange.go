@@ -38,6 +38,7 @@ type Exchange struct {
 	v3margin *v3.MarginService
 }
 
+
 func New(key, secret string) *Exchange {
 	baseURL := maxapi.ProductionAPIURL
 	if override := os.Getenv("MAX_API_BASE_URL"); len(override) > 0 {
@@ -924,4 +925,47 @@ func (e *Exchange) QueryAveragePrice(ctx context.Context, symbol string) (fixedp
 
 	return fixedpoint.MustNewFromString(ticker.Sell).
 		Add(fixedpoint.MustNewFromString(ticker.Buy)).Div(Two), nil
+}
+
+
+func (e *Exchange) RepayMarginAsset(ctx context.Context, asset string, amount fixedpoint.Value) error {
+	req := e.v3margin.NewMarginRepayRequest()
+	req.Currency(toLocalCurrency(asset))
+	req.Amount(amount.String())
+	resp, err := req.Do(ctx)
+	if err != nil {
+		return err
+	}
+
+	log.Infof("margin repay: %v", resp)
+	return nil
+}
+
+func (e *Exchange) BorrowMarginAsset(ctx context.Context, asset string, amount fixedpoint.Value) error {
+	req := e.v3margin.NewMarginLoanRequest()
+	req.Currency(toLocalCurrency(asset))
+	req.Amount(amount.String())
+	resp, err := req.Do(ctx)
+	if err != nil {
+		return err
+	}
+
+	log.Infof("margin borrow: %v", resp)
+	return nil
+}
+
+func (e *Exchange) QueryMarginAssetMaxBorrowable(ctx context.Context, asset string) (amount fixedpoint.Value, err error) {
+	req := e.v3margin.NewGetMarginBorrowingLimitsRequest()
+	resp, err := req.Do(ctx)
+	if err != nil {
+		return fixedpoint.Zero, err
+	}
+
+	limits := *resp
+	if limit, ok := limits[toLocalCurrency(asset)]; ok {
+		return limit, nil
+	}
+
+	err = fmt.Errorf("borrowing limit of %s not found", asset)
+	return amount, err
 }
