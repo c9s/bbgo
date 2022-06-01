@@ -81,8 +81,11 @@ type Environment struct {
 	PositionService          *service.PositionService
 	BacktestService          *service.BacktestService
 	RewardService            *service.RewardService
+	MarginService            *service.MarginService
 	SyncService              *service.SyncService
 	AccountService           *service.AccountService
+	WithdrawService          *service.WithdrawService
+	DepositService           *service.DepositService
 
 	// startTime is the time of start point (which is used in the backtest)
 	startTime time.Time
@@ -176,11 +179,14 @@ func (environ *Environment) ConfigureDatabaseDriver(ctx context.Context, driver 
 	environ.AccountService = &service.AccountService{DB: db}
 	environ.ProfitService = &service.ProfitService{DB: db}
 	environ.PositionService = &service.PositionService{DB: db}
-
+	environ.MarginService = &service.MarginService{DB: db}
+	environ.WithdrawService = &service.WithdrawService{DB: db}
+	environ.DepositService = &service.DepositService{DB: db}
 	environ.SyncService = &service.SyncService{
 		TradeService:    environ.TradeService,
 		OrderService:    environ.OrderService,
 		RewardService:   environ.RewardService,
+		MarginService:   environ.MarginService,
 		WithdrawService: &service.WithdrawService{DB: db},
 		DepositService:  &service.DepositService{DB: db},
 	}
@@ -573,9 +579,57 @@ func (environ *Environment) setSyncing(status SyncStatus) {
 	environ.syncStatusMutex.Unlock()
 }
 
+func (environ *Environment) syncWithUserConfig(ctx context.Context, userConfig *Config) error {
+	syncSymbols := userConfig.Sync.Symbols
+	sessions := environ.sessions
+	selectedSessions := userConfig.Sync.Sessions
+	if len(selectedSessions) > 0 {
+		sessions = environ.SelectSessions(selectedSessions...)
+	}
+
+	for _, session := range sessions {
+		if err := environ.syncSession(ctx, session, syncSymbols...); err != nil {
+			return err
+		}
+
+		if userConfig.Sync.DepositHistory {
+			if err := environ.SyncService.SyncDepositHistory(ctx, session.Exchange); err != nil {
+				return err
+			}
+		}
+
+		if userConfig.Sync.WithdrawHistory {
+			if err := environ.SyncService.SyncWithdrawHistory(ctx, session.Exchange); err != nil {
+				return err
+			}
+		}
+
+		if userConfig.Sync.RewardHistory {
+			if err := environ.SyncService.SyncRewardHistory(ctx, session.Exchange); err != nil {
+				return err
+			}
+		}
+
+		if userConfig.Sync.MarginHistory {
+			if err := environ.SyncService.SyncMarginHistory(ctx, session.Exchange,
+				userConfig.Sync.Since.Time(),
+				userConfig.Sync.MarginAssets...); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
 // Sync syncs all registered exchange sessions
 func (environ *Environment) Sync(ctx context.Context, userConfig ...*Config) error {
 	if environ.SyncService == nil {
+		return nil
+	}
+
+	// for paper trade mode, skip sync
+	if util.IsPaperTrade() {
 		return nil
 	}
 
@@ -587,38 +641,7 @@ func (environ *Environment) Sync(ctx context.Context, userConfig ...*Config) err
 
 	// sync by the defined user config
 	if len(userConfig) > 0 && userConfig[0] != nil && userConfig[0].Sync != nil {
-		syncSymbols := userConfig[0].Sync.Symbols
-		sessions := environ.sessions
-		selectedSessions := userConfig[0].Sync.Sessions
-		if len(selectedSessions) > 0 {
-			sessions = environ.SelectSessions(selectedSessions...)
-		}
-
-		for _, session := range sessions {
-			if err := environ.syncSession(ctx, session, syncSymbols...); err != nil {
-				return err
-			}
-
-			if userConfig[0].Sync.DepositHistory {
-				if err := environ.SyncService.SyncDepositHistory(ctx, session.Exchange); err != nil {
-					return err
-				}
-			}
-
-			if userConfig[0].Sync.WithdrawHistory {
-				if err := environ.SyncService.SyncWithdrawHistory(ctx, session.Exchange); err != nil {
-					return err
-				}
-			}
-
-			if userConfig[0].Sync.RewardHistory {
-				if err := environ.SyncService.SyncRewardHistory(ctx, session.Exchange); err != nil {
-					return err
-				}
-			}
-		}
-
-		return nil
+		return environ.syncWithUserConfig(ctx, userConfig[0])
 	}
 
 	// the default sync logics
