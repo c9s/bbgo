@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	sq "github.com/Masterminds/squirrel"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -25,62 +26,76 @@ func (s *OrderService) Sync(ctx context.Context, exchange types.Exchange, symbol
 		symbol = isolatedSymbol
 	}
 
-	records, err := s.QueryLast(exchange.Name(), symbol, isMargin, isFutures, isIsolated, 50)
-	if err != nil {
-		return err
-	}
-
-	orderKeys := make(map[uint64]struct{})
-
-	var lastID uint64 = 0
-	if len(records) > 0 {
-		for _, record := range records {
-			orderKeys[record.OrderID] = struct{}{}
-		}
-
-		lastID = records[0].OrderID
-		startTime = records[0].CreationTime.Time()
-	}
-
-	exchangeTradeHistoryService, ok := exchange.(types.ExchangeTradeHistoryService)
+	api, ok := exchange.(types.ExchangeTradeHistoryService)
 	if !ok {
 		return nil
 	}
 
-	b := &batch.ClosedOrderBatchQuery{
-		ExchangeTradeHistoryService: exchangeTradeHistoryService,
+	lastOrderID := uint64(0)
+	tasks := []SyncTask{
+		{
+			Type: types.Order{},
+			Time: func(obj interface{}) time.Time {
+				return obj.(types.Order).CreationTime.Time()
+			},
+			ID: func(obj interface{}) string {
+				order := obj.(types.Order)
+				return strconv.FormatUint(order.OrderID, 10)
+			},
+			Select: SelectLastOrders(exchange.Name(), symbol, isMargin, isFutures, isIsolated, 100),
+			OnLoad: func(objs interface{}) {
+				// update last order ID
+				orders := objs.([]types.Order)
+				if len(orders) > 0 {
+					end := len(orders) - 1
+					last := orders[end]
+					lastOrderID = last.OrderID
+				}
+			},
+			BatchQuery: func(ctx context.Context, startTime, endTime time.Time) (interface{}, chan error) {
+				query := &batch.ClosedOrderBatchQuery{
+					ExchangeTradeHistoryService: api,
+				}
+
+				return query.Query(ctx, symbol, startTime, endTime, lastOrderID)
+			},
+			Filter: func(obj interface{}) bool {
+				// skip canceled and not filled orders
+				order := obj.(types.Order)
+				if order.Status == types.OrderStatusCanceled && order.ExecutedQuantity.IsZero() {
+					return false
+				}
+
+				return true
+			},
+			Insert: func(obj interface{}) error {
+				order := obj.(types.Order)
+				return s.Insert(order)
+			},
+		},
 	}
-	ordersC, errC := b.Query(ctx, symbol, startTime, time.Now(), lastID)
-	for order := range ordersC {
-		select {
 
-		case <-ctx.Done():
-			return ctx.Err()
-
-		case err := <-errC:
-			if err != nil {
-				return err
-			}
-
-		default:
-
-		}
-
-		if _, exists := orderKeys[order.OrderID]; exists {
-			continue
-		}
-
-		// skip canceled and not filled orders
-		if order.Status == types.OrderStatusCanceled && order.ExecutedQuantity.IsZero() {
-			continue
-		}
-
-		if err := s.Insert(order); err != nil {
+	for _, sel := range tasks {
+		if err := sel.execute(ctx, s.DB, startTime); err != nil {
 			return err
 		}
 	}
 
-	return <-errC
+	return nil
+}
+
+func SelectLastOrders(ex types.ExchangeName, symbol string, isMargin, isFutures, isIsolated bool, limit uint64) sq.SelectBuilder {
+	return sq.Select("*").
+		From("orders").
+		Where(sq.And{
+			sq.Eq{"symbol": symbol},
+			sq.Eq{"exchange": ex},
+			sq.Eq{"is_margin": isMargin},
+			sq.Eq{"is_futures": isFutures},
+			sq.Eq{"is_isolated": isIsolated},
+		}).
+		OrderBy("gid DESC").
+		Limit(limit)
 }
 
 // QueryLast queries the last order from the database

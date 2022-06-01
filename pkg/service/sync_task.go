@@ -18,17 +18,23 @@ type SyncTask struct {
 	// Since it will create a []Type slice from this type, you should not set pointer to this field
 	Type interface{}
 
-	// Select is the select query builder for querying db records
-	Select squirrel.SelectBuilder
-
-	// OnLoad is called when the records are loaded from the database
-	OnLoad func(objs interface{})
-
 	// ID is a function that returns the unique identity of the object
 	ID func(obj interface{}) string
 
 	// Time is a function that returns the time of the object
 	Time func(obj interface{}) time.Time
+
+	// Select is the select query builder for querying db records
+	Select squirrel.SelectBuilder
+
+	// OnLoad is an optional field, which is called when the records are loaded from the database
+	OnLoad func(objs interface{})
+
+	// Filter is an optional field, which is used for filtering the remote records
+	Filter func(obj interface{}) bool
+
+	// Insert is an option field, which is used for customizing the record insert
+	Insert func(obj interface{}) error
 
 	// BatchQuery is used for querying remote records.
 	BatchQuery func(ctx context.Context, startTime, endTime time.Time) (interface{}, chan error)
@@ -86,9 +92,23 @@ func (sel SyncTask) execute(ctx context.Context, db *sqlx.DB, startTime time.Tim
 				continue
 			}
 
+			if sel.Filter != nil {
+				if !sel.Filter(obj) {
+					continue
+				}
+			}
+
 			logrus.Infof("inserting %T: %+v", obj, obj)
-			if err := insertType(db, obj); err != nil {
-				return err
+
+			if sel.Insert != nil {
+				// for custom insert
+				if err := sel.Insert(obj); err != nil {
+					return err
+				}
+			} else {
+				if err := insertType(db, obj); err != nil {
+					return err
+				}
 			}
 		}
 	}
