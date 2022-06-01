@@ -49,4 +49,4 @@ sync:
 
   # depositHistory: true
   rewardHistory: true
-  # withdrawHistory: true
+  withdrawHistory: true

@@ -97,7 +97,6 @@ func SelectLastOrders(ex types.ExchangeName, symbol string, isMargin, isFutures,
 		Limit(limit)
 }
 
-
 type AggOrder struct {
 	types.Order
 	AveragePrice *float64 `json:"averagePrice" db:"average_price"`
