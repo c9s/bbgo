@@ -215,14 +215,19 @@ type SyncConfig struct {
 	// Symbols is the list of symbol to sync, if ignored, symbols wlll be discovered by your existing crypto balances
 	Symbols []string `json:"symbols,omitempty" yaml:"symbols,omitempty"`
 
-	// DepositHistory for syncing deposit history
+	// DepositHistory is for syncing deposit history
 	DepositHistory bool `json:"depositHistory" yaml:"depositHistory"`
 
-	// WithdrawHistory for syncing withdraw history
+	// WithdrawHistory is for syncing withdraw history
 	WithdrawHistory bool `json:"withdrawHistory" yaml:"withdrawHistory"`
 
-	// RewardHistory for syncing reward history
+	// RewardHistory is for syncing reward history
 	RewardHistory bool `json:"rewardHistory" yaml:"rewardHistory"`
+
+	// MarginHistory is for syncing margin related history: loans, repays, interests and liquidations
+	MarginHistory bool `json:"marginHistory" yaml:"marginHistory"`
+
+	MarginAssets []string `json:"marginAssets" yaml:"marginAssets"`
 
 	// Since is the date where you want to start syncing data
 	Since *types.LooseFormatTime `json:"since,omitempty"`
