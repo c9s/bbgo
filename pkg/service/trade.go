@@ -103,17 +103,6 @@ func (s *TradeService) Sync(ctx context.Context, exchange types.Exchange, symbol
 		}
 	}
 
-	/*
-		log.Infof("inserting trade: %s %d %s %-4s price: %-13v volume: %-11v %5s %s",
-			trade.Exchange,
-			trade.ID,
-			trade.Symbol,
-			trade.Side,
-			trade.Price,
-			trade.Quantity,
-			trade.Liquidity(),
-			trade.Time.String())
-	*/
 	return nil
 }
 
@@ -463,8 +452,6 @@ func SelectLastTrades(ex types.ExchangeName, symbol string, isMargin, isFutures,
 		OrderBy("traded_at DESC").
 		Limit(limit)
 }
-
-
 
 func getExchangeAttributes(exchange types.Exchange) (isMargin, isFutures, isIsolated bool, isolatedSymbol string) {
 	if marginExchange, ok := exchange.(types.MarginExchange); ok {
