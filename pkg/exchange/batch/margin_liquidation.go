@@ -18,6 +18,7 @@ func (e *MarginLiquidationBatchQuery) Query(ctx context.Context, startTime, endT
 	query := &AsyncTimeRangedBatchQuery{
 		Type:    types.MarginLiquidation{},
 		Limiter: rate.NewLimiter(rate.Every(5*time.Second), 2),
+		JumpIfEmpty: time.Hour * 24 * 30,
 		Q: func(startTime, endTime time.Time) (interface{}, error) {
 			return e.QueryLiquidationHistory(ctx, &startTime, &endTime)
 		},

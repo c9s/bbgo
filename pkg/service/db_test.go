@@ -38,7 +38,7 @@ func prepareDB(t *testing.T) (*rockhopper.DB, error) {
 
 	ctx := context.Background()
 	err = rockhopper.Up(ctx, db, migrations, 0, 0)
-	assert.NoError(t, err)
+	assert.NoError(t, err, "should migrate successfully")
 
 	return db, err
 }
