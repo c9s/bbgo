@@ -4,6 +4,13 @@ sessions:
     exchange: binance
     envVarPrefix: binance
 
+  binance_margin_dotusdt:
+    exchange: binance
+    envVarPrefix: binance
+    margin: true
+    isolatedMargin: true
+    isolatedMarginSymbol: DOTUSDT
+
   max:
     exchange: max
     envVarPrefix: max
@@ -16,12 +23,13 @@ sync:
     filledOrders: true
 
   # since is the start date of your trading data
-  since: 2019-11-01
+  since: 2022-01-01
 
   # sessions is the list of session names you want to sync
   # by default, BBGO sync all your available sessions.
   sessions:
   - binance
+  - binance_margin_dotusdt
   - max
 
   # symbols is the list of symbols you want to sync
@@ -29,8 +37,15 @@ sync:
   symbols:
   - BTCUSDT
   - ETHUSDT
-  - LINKUSDT
 
-  depositHistory: true
+  # marginHistory enables the margin history sync
+  marginHistory: true
+
+  # marginAssets lists the assets that are used in the margin.
+  # including loan, repay, interest and liquidation
+  marginAssets:
+  - USDT
+
+  # depositHistory: true
   rewardHistory: true
-  withdrawHistory: true
+  # withdrawHistory: true
