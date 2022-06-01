@@ -10,6 +10,7 @@ import (
 
 func toGlobalLoan(record binanceapi.MarginLoanRecord) types.MarginLoan {
 	return types.MarginLoan{
+		Exchange:       types.ExchangeBinance,
 		TransactionID:  uint64(record.TxId),
 		Asset:          record.Asset,
 		Principle:      record.Principal,
@@ -20,6 +21,7 @@ func toGlobalLoan(record binanceapi.MarginLoanRecord) types.MarginLoan {
 
 func toGlobalRepay(record binanceapi.MarginRepayRecord) types.MarginRepay {
 	return types.MarginRepay{
+		Exchange:       types.ExchangeBinance,
 		TransactionID:  record.TxId,
 		Asset:          record.Asset,
 		Principle:      record.Principal,
@@ -30,6 +32,7 @@ func toGlobalRepay(record binanceapi.MarginRepayRecord) types.MarginRepay {
 
 func toGlobalInterest(record binanceapi.MarginInterest) types.MarginInterest {
 	return types.MarginInterest{
+		Exchange:       types.ExchangeBinance,
 		Asset:          record.Asset,
 		Principle:      record.Principal,
 		Interest:       record.Interest,
@@ -41,6 +44,7 @@ func toGlobalInterest(record binanceapi.MarginInterest) types.MarginInterest {
 
 func toGlobalLiquidation(record binanceapi.MarginLiquidationRecord) types.MarginLiquidation {
 	return types.MarginLiquidation{
+		Exchange:         types.ExchangeBinance,
 		AveragePrice:     record.AveragePrice,
 		ExecutedQuantity: record.ExecutedQuantity,
 		OrderID:          record.OrderId,
