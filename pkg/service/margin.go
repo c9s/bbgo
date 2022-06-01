@@ -114,7 +114,7 @@ func SelectLastMarginLoans(ex types.ExchangeName, limit uint64) sq.SelectBuilder
 	return sq.Select("*").
 		From("margin_loans").
 		Where(sq.Eq{"exchange": ex}).
-		OrderBy("time").
+		OrderBy("time DESC").
 		Limit(limit)
 }
 
@@ -122,7 +122,7 @@ func SelectLastMarginRepays(ex types.ExchangeName, limit uint64) sq.SelectBuilde
 	return sq.Select("*").
 		From("margin_repays").
 		Where(sq.Eq{"exchange": ex}).
-		OrderBy("time").
+		OrderBy("time DESC").
 		Limit(limit)
 }
 
@@ -130,7 +130,7 @@ func SelectLastMarginInterests(ex types.ExchangeName, limit uint64) sq.SelectBui
 	return sq.Select("*").
 		From("margin_interests").
 		Where(sq.Eq{"exchange": ex}).
-		OrderBy("time").
+		OrderBy("time DESC").
 		Limit(limit)
 }
 
@@ -138,6 +138,6 @@ func SelectLastMarginLiquidations(ex types.ExchangeName, limit uint64) sq.Select
 	return sq.Select("*").
 		From("margin_liquidations").
 		Where(sq.Eq{"exchange": ex}).
-		OrderBy("time").
+		OrderBy("time DESC").
 		Limit(limit)
 }
