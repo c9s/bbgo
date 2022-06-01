@@ -9,6 +9,7 @@ import (
 	"github.com/fatih/camelcase"
 	gopluralize "github.com/gertd/go-pluralize"
 	"github.com/jmoiron/sqlx"
+	"github.com/sirupsen/logrus"
 )
 
 var pluralize = gopluralize.NewClient()
@@ -188,10 +189,12 @@ func insertType(db *sqlx.DB, record interface{}) error {
 
 func selectAndScanType(ctx context.Context, db *sqlx.DB, sel squirrel.SelectBuilder, tpe interface{}) (interface{}, error) {
 	sql, args, err := sel.ToSql()
-
 	if err != nil {
 		return nil, err
 	}
+
+	logrus.Debugf("selectAndScanType: %T <- %s", tpe, sql)
+	logrus.Debugf("queryArgs: %v", args)
 
 	rows, err := db.QueryxContext(ctx, sql, args...)
 	if err != nil {
