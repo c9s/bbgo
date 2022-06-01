@@ -290,12 +290,10 @@ func (s *Strategy) calculateQuantity(currentPrice fixedpoint.Value) fixedpoint.V
 }
 
 func (s *Strategy) HasTradableBase(currentPrice fixedpoint.Value) bool {
-	base := s.Position.GetBase()
-	quantity := base.Abs()
-	if quantity.Compare(s.Market.MinQuantity) > 0 && quantity.Mul(currentPrice).Compare(s.Market.MinNotional) > 0 {
-		return true
+	if s.Market.IsDustQuantity(s.Position.GetBase().Abs(), currentPrice) {
+		return false
 	}
-	return false
+	return true
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
@@ -369,9 +367,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			demaSignal = types.DirectionNone
 		}
 
+		base := s.Position.GetBase()
+		baseSign := base.Sign()
+
 		// TP/SL if there's non-dust position
-		if s.HasTradableBase(kline.GetClose()) {
-			baseSign := s.Position.GetBase().Sign()
+		if !s.Market.IsDustQuantity(base.Abs(), kline.GetClose()) {
 			if s.StopLossByTriggeringK && !s.currentStopLossPrice.IsZero() && ((baseSign < 0 && kline.GetClose().Compare(s.currentStopLossPrice) > 0) || (baseSign > 0 && kline.GetClose().Compare(s.currentStopLossPrice) < 0)) {
 				// SL by triggered Kline low
 				if err := s.ClosePosition(ctx, fixedpoint.One); err != nil {
@@ -422,11 +422,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 
 		if side == types.SideTypeSell || side == types.SideTypeBuy {
-			baseSign := s.Position.GetBase().Sign()
 			// Close opposite position if any
-			if s.HasTradableBase(kline.GetClose()) && ((side == types.SideTypeSell && baseSign > 0) || (side == types.SideTypeBuy && baseSign < 0)) {
+			if !s.Market.IsDustQuantity(base.Abs(), kline.GetClose()) && ((side == types.SideTypeSell && baseSign > 0) || (side == types.SideTypeBuy && baseSign < 0)) {
 				if err := s.ClosePosition(ctx, fixedpoint.One); err != nil {
-					s.Notify("can not place position close order")
+					s.Notify("can not place close position order")
 				}
 			}
 
