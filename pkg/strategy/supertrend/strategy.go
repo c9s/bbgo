@@ -289,13 +289,6 @@ func (s *Strategy) calculateQuantity(currentPrice fixedpoint.Value) fixedpoint.V
 	return quantity
 }
 
-func (s *Strategy) HasTradableBase(currentPrice fixedpoint.Value) bool {
-	if s.Market.IsDustQuantity(s.Position.GetBase().Abs(), currentPrice) {
-		return false
-	}
-	return true
-}
-
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	s.session = session
 	s.Market, _ = session.Market(s.Symbol)
