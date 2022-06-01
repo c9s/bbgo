@@ -16,8 +16,9 @@ type MarginLoanBatchQuery struct {
 
 func (e *MarginLoanBatchQuery) Query(ctx context.Context, asset string, startTime, endTime time.Time) (c chan types.MarginLoan, errC chan error) {
 	query := &AsyncTimeRangedBatchQuery{
-		Type:    types.MarginLoan{},
-		Limiter: rate.NewLimiter(rate.Every(5*time.Second), 2),
+		Type:        types.MarginLoan{},
+		Limiter:     rate.NewLimiter(rate.Every(5*time.Second), 2),
+		JumpIfEmpty: time.Hour * 24 * 30,
 		Q: func(startTime, endTime time.Time) (interface{}, error) {
 			return e.QueryLoanHistory(ctx, asset, &startTime, &endTime)
 		},
