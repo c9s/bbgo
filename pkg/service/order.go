@@ -8,7 +8,6 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/jmoiron/sqlx"
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/exchange/batch"
@@ -98,27 +97,6 @@ func SelectLastOrders(ex types.ExchangeName, symbol string, isMargin, isFutures,
 		Limit(limit)
 }
 
-// QueryLast queries the last order from the database
-func (s *OrderService) QueryLast(ex types.ExchangeName, symbol string, isMargin, isFutures, isIsolated bool, limit int) ([]types.Order, error) {
-	log.Infof("querying last order exchange = %s AND symbol = %s AND is_margin = %v AND is_futures = %v AND is_isolated = %v", ex, symbol, isMargin, isFutures, isIsolated)
-
-	sql := `SELECT * FROM orders WHERE exchange = :exchange AND symbol = :symbol AND is_margin = :is_margin AND is_futures = :is_futures AND is_isolated = :is_isolated ORDER BY gid DESC LIMIT :limit`
-	rows, err := s.DB.NamedQuery(sql, map[string]interface{}{
-		"exchange":    ex,
-		"symbol":      symbol,
-		"is_margin":   isMargin,
-		"is_futures":  isFutures,
-		"is_isolated": isIsolated,
-		"limit":       limit,
-	})
-
-	if err != nil {
-		return nil, errors.Wrap(err, "query last order error")
-	}
-
-	defer rows.Close()
-	return s.scanRows(rows)
-}
 
 type AggOrder struct {
 	types.Order
