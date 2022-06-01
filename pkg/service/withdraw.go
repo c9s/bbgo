@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	sq "github.com/Masterminds/squirrel"
 	"github.com/jmoiron/sqlx"
 	log "github.com/sirupsen/logrus"
 
@@ -65,6 +66,16 @@ func (s *WithdrawService) Sync(ctx context.Context, ex types.Exchange) error {
 	}
 
 	return nil
+}
+
+func SelectLastWithdraws(ex types.ExchangeName, limit uint64) sq.SelectBuilder {
+	return sq.Select("*").
+		From("withdraws").
+		Where(sq.And{
+			sq.Eq{"exchange": ex},
+		}).
+		OrderBy("time DESC").
+		Limit(limit)
 }
 
 func (s *WithdrawService) QueryLast(ex types.ExchangeName, limit int) ([]types.Withdraw, error) {

@@ -427,88 +427,74 @@ func (e *Exchange) Withdrawal(ctx context.Context, asset string, amount fixedpoi
 }
 
 func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (allWithdraws []types.Withdraw, err error) {
-	startTime := since
-
 	var emptyTime = time.Time{}
-	if startTime == emptyTime {
-		startTime, err = getLaunchDate()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	txIDs := map[string]struct{}{}
-
-	for startTime.Before(until) {
-		// startTime ~ endTime must be in 90 days
-		endTime := startTime.AddDate(0, 0, 60)
-		if endTime.After(until) {
-			endTime = until
-		}
-
-		req := e.client.NewListWithdrawsService()
-		if len(asset) > 0 {
-			req.Coin(asset)
-		}
-
-		withdraws, err := req.
-			StartTime(startTime.UnixNano() / int64(time.Millisecond)).
-			EndTime(endTime.UnixNano() / int64(time.Millisecond)).
-			Do(ctx)
-
+	if since == emptyTime {
+		since, err = getLaunchDate()
 		if err != nil {
 			return allWithdraws, err
 		}
+	}
 
-		for _, d := range withdraws {
-			if _, ok := txIDs[d.TxID]; ok {
-				continue
-			}
+	// startTime ~ endTime must be in 90 days
+	historyDayRangeLimit := time.Hour * 24 * 89
+	if until.Sub(since) >= historyDayRangeLimit {
+		until = since.Add(historyDayRangeLimit)
+	}
 
-			status := ""
-			switch d.Status {
-			case 0:
-				status = "email_sent"
-			case 1:
-				status = "cancelled"
-			case 2:
-				status = "awaiting_approval"
-			case 3:
-				status = "rejected"
-			case 4:
-				status = "processing"
-			case 5:
-				status = "failure"
-			case 6:
-				status = "completed"
+	req := e.client.NewListWithdrawsService()
+	if len(asset) > 0 {
+		req.Coin(asset)
+	}
 
-			default:
-				status = fmt.Sprintf("unsupported code: %d", d.Status)
-			}
+	withdraws, err := req.
+		StartTime(since.UnixMilli()).
+		EndTime(until.UnixMilli()).
+		Do(ctx)
 
-			txIDs[d.TxID] = struct{}{}
+	if err != nil {
+		return allWithdraws, err
+	}
 
-			// 2006-01-02 15:04:05
-			applyTime, err := time.Parse("2006-01-02 15:04:05", d.ApplyTime)
-			if err != nil {
-				return nil, err
-			}
+	for _, d := range withdraws {
+		status := ""
+		switch d.Status {
+		case 0:
+			status = "email_sent"
+		case 1:
+			status = "cancelled"
+		case 2:
+			status = "awaiting_approval"
+		case 3:
+			status = "rejected"
+		case 4:
+			status = "processing"
+		case 5:
+			status = "failure"
+		case 6:
+			status = "completed"
 
-			allWithdraws = append(allWithdraws, types.Withdraw{
-				Exchange:        types.ExchangeBinance,
-				ApplyTime:       types.Time(applyTime),
-				Asset:           d.Coin,
-				Amount:          fixedpoint.MustNewFromString(d.Amount),
-				Address:         d.Address,
-				TransactionID:   d.TxID,
-				TransactionFee:  fixedpoint.MustNewFromString(d.TransactionFee),
-				WithdrawOrderID: d.WithdrawOrderID,
-				Network:         d.Network,
-				Status:          status,
-			})
+		default:
+			status = fmt.Sprintf("unsupported code: %d", d.Status)
 		}
 
-		startTime = endTime
+		// 2006-01-02 15:04:05
+		applyTime, err := time.Parse("2006-01-02 15:04:05", d.ApplyTime)
+		if err != nil {
+			return nil, err
+		}
+
+		allWithdraws = append(allWithdraws, types.Withdraw{
+			Exchange:        types.ExchangeBinance,
+			ApplyTime:       types.Time(applyTime),
+			Asset:           d.Coin,
+			Amount:          fixedpoint.MustNewFromString(d.Amount),
+			Address:         d.Address,
+			TransactionID:   d.TxID,
+			TransactionFee:  fixedpoint.MustNewFromString(d.TransactionFee),
+			WithdrawOrderID: d.WithdrawOrderID,
+			Network:         d.Network,
+			Status:          status,
+		})
 	}
 
 	return allWithdraws, nil
