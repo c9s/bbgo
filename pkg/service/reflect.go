@@ -165,15 +165,16 @@ func scanRowsOfType(rows *sqlx.Rows, tpe interface{}) (interface{}, error) {
 		refType = refType.Elem()
 	}
 
-	sliceRef := reflect.New(reflect.SliceOf(refType))
+	sliceRef := reflect.MakeSlice(reflect.SliceOf(refType), 0, 100)
+	// sliceRef := reflect.New(reflect.SliceOf(refType))
 	for rows.Next() {
 		var recordRef = reflect.New(refType)
 		var record = recordRef.Interface()
-		if err := rows.StructScan(&record); err != nil {
+		if err := rows.StructScan(record); err != nil {
 			return sliceRef.Interface(), err
 		}
 
-		sliceRef = reflect.Append(sliceRef, recordRef)
+		sliceRef = reflect.Append(sliceRef, recordRef.Elem())
 	}
 
 	return sliceRef.Interface(), rows.Err()
@@ -200,4 +201,3 @@ func selectAndScanType(ctx context.Context, db *sqlx.DB, sel squirrel.SelectBuil
 	defer rows.Close()
 	return scanRowsOfType(rows, tpe)
 }
-
