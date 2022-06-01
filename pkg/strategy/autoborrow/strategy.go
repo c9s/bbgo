@@ -312,12 +312,12 @@ func (s *Strategy) handleBinanceBalanceUpdateEvent(event *binance.BalanceUpdateE
 }
 
 type MarginAction struct {
-	Exchange       types.ExchangeName
-	Action         string
-	Asset          string
-	Amount         fixedpoint.Value
-	MarginLevel    fixedpoint.Value
-	MinMarginLevel fixedpoint.Value
+	Exchange       types.ExchangeName `json:"exchange"`
+	Action         string             `json:"action"`
+	Asset          string             `json:"asset"`
+	Amount         fixedpoint.Value   `json:"amount"`
+	MarginLevel    fixedpoint.Value   `json:"marginLevel"`
+	MinMarginLevel fixedpoint.Value   `json:"minMarginLevel"`
 }
 
 func (a *MarginAction) SlackAttachment() slack.Attachment {
