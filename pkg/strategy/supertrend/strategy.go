@@ -208,7 +208,7 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 		return fmt.Errorf("order quantity %v is too small, less than %v", quantity, s.Market.MinQuantity)
 	}
 
-	orderForm := s.GenerateOrderForm(side, quantity, types.SideEffectTypeAutoRepay)
+	orderForm := s.generateOrderForm(side, quantity, types.SideEffectTypeAutoRepay)
 
 	s.Notify("Submitting %s %s order to close position by %v", s.Symbol, side.String(), percentage, orderForm)
 
@@ -224,8 +224,8 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 	return err
 }
 
-// SetupIndicators initializes indicators
-func (s *Strategy) SetupIndicators() {
+// setupIndicators initializes indicators
+func (s *Strategy) setupIndicators() {
 	if s.FastDEMAWindow == 0 {
 		s.FastDEMAWindow = 144
 	}
@@ -246,8 +246,8 @@ func (s *Strategy) SetupIndicators() {
 	}
 }
 
-// UpdateIndicators updates indicators
-func (s *Strategy) UpdateIndicators(kline types.KLine) {
+// updateIndicators updates indicators
+func (s *Strategy) updateIndicators(kline types.KLine) {
 	closePrice := kline.GetClose().Float64()
 
 	// Update indicators
@@ -262,7 +262,7 @@ func (s *Strategy) UpdateIndicators(kline types.KLine) {
 	}
 }
 
-func (s *Strategy) GenerateOrderForm(side types.SideType, quantity fixedpoint.Value, marginOrderSideEffect types.MarginOrderSideEffectType) types.SubmitOrder {
+func (s *Strategy) generateOrderForm(side types.SideType, quantity fixedpoint.Value, marginOrderSideEffect types.MarginOrderSideEffectType) types.SubmitOrder {
 	orderForm := types.SubmitOrder{
 		Symbol:           s.Symbol,
 		Market:           s.Market,
@@ -275,9 +275,14 @@ func (s *Strategy) GenerateOrderForm(side types.SideType, quantity fixedpoint.Va
 	return orderForm
 }
 
-// CalculateQuantity returns leveraged quantity
-func (s *Strategy) CalculateQuantity(currentPrice fixedpoint.Value) fixedpoint.Value {
-	balance, _ := s.session.GetAccount().Balance(s.Market.QuoteCurrency)
+// calculateQuantity returns leveraged quantity
+func (s *Strategy) calculateQuantity(currentPrice fixedpoint.Value) fixedpoint.Value {
+	balance, ok := s.session.GetAccount().Balance(s.Market.QuoteCurrency)
+	if !ok {
+		log.Error("can not update balance from exchange")
+		return fixedpoint.Zero
+	}
+
 	amountAvailable := balance.Available.Mul(fixedpoint.NewFromFloat(s.Leverage))
 	quantity := amountAvailable.Div(currentPrice)
 
@@ -332,7 +337,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 
 	// Setup indicators
-	s.SetupIndicators()
+	s.setupIndicators()
 
 	s.currentStopLossPrice = fixedpoint.Zero
 	s.currentTakeProfitPrice = fixedpoint.Zero
@@ -349,7 +354,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 
 		// Update indicators
-		s.UpdateIndicators(kline)
+		s.updateIndicators(kline)
 
 		// Get signals
 		closePrice := kline.GetClose().Float64()
@@ -431,7 +436,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				s.session.GetAccount().UpdateBalances(balances)
 			}
 
-			orderForm := s.GenerateOrderForm(side, s.CalculateQuantity(kline.GetClose()), types.SideEffectTypeMarginBuy)
+			orderForm := s.generateOrderForm(side, s.calculateQuantity(kline.GetClose()), types.SideEffectTypeMarginBuy)
 			log.Infof("submit open position order %v", orderForm)
 			order, err := orderExecutor.SubmitOrders(ctx, orderForm)
 			if err != nil {
