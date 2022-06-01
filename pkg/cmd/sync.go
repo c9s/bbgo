@@ -12,7 +12,7 @@ import (
 )
 
 func init() {
-	SyncCmd.Flags().String("session", "", "the exchange session name for sync")
+	SyncCmd.Flags().StringArray("session", []string{}, "the exchange session name for sync")
 	SyncCmd.Flags().String("symbol", "", "symbol of market for syncing")
 	SyncCmd.Flags().String("since", "", "sync from time")
 	RootCmd.AddCommand(SyncCmd)
@@ -57,7 +57,7 @@ var SyncCmd = &cobra.Command{
 			return err
 		}
 
-		sessionName, err := cmd.Flags().GetString("session")
+		sessionNames, err := cmd.Flags().GetStringArray("session")
 		if err != nil {
 			return err
 		}
@@ -93,9 +93,9 @@ var SyncCmd = &cobra.Command{
 			}
 		}
 
-		if len(sessionName) > 0 {
+		if len(sessionNames) > 0 {
 			if userConfig.Sync != nil && len(userConfig.Sync.Sessions) > 0 {
-				userConfig.Sync.Sessions = []string{sessionName}
+				userConfig.Sync.Sessions = sessionNames
 			}
 		}
 
