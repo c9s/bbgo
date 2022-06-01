@@ -107,6 +107,10 @@ func (inc *Supertrend) Update(highPrice, lowPrice, closePrice float64) {
 	}
 }
 
+func (inc *Supertrend) GetSignal() types.Direction {
+	return inc.tradeSignal
+}
+
 var _ types.Series = &Supertrend{}
 
 func (inc *Supertrend) calculateAndUpdate(kLines []types.KLine) {
