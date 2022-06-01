@@ -17,6 +17,7 @@ func (e *MarginInterestBatchQuery) Query(ctx context.Context, asset string, star
 	query := &AsyncTimeRangedBatchQuery{
 		Type:    types.MarginInterest{},
 		Limiter: rate.NewLimiter(rate.Every(5*time.Second), 2),
+		JumpIfEmpty: time.Hour * 24 * 30,
 		Q: func(startTime, endTime time.Time) (interface{}, error) {
 			return e.QueryInterestHistory(ctx, asset, &startTime, &endTime)
 		},
