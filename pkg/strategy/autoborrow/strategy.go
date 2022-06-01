@@ -191,7 +191,7 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 			})
 			log.Infof("sending borrow request %f %s", toBorrow.Float64(), marginAsset.Asset)
 			if err := s.marginBorrowRepay.BorrowMarginAsset(ctx, marginAsset.Asset, toBorrow); err != nil {
-				log.WithError(err).Errorf("repay error")
+				log.WithError(err).Errorf("borrow error")
 				continue
 			}
 			changed = true
