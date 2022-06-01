@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -88,35 +87,18 @@ var SyncCmd = &cobra.Command{
 
 		environ.SetSyncStartTime(syncStartTime)
 
-		// syncSymbols is the symbol list to sync
-		var syncSymbols []string
-
-		if userConfig.Sync != nil && len(userConfig.Sync.Symbols) > 0 {
-			syncSymbols = userConfig.Sync.Symbols
-		}
-
 		if len(symbol) > 0 {
-			syncSymbols = []string{symbol}
-		}
-
-		var selectedSessions []string
-
-		if userConfig.Sync != nil && len(userConfig.Sync.Sessions) > 0 {
-			selectedSessions = userConfig.Sync.Sessions
-		}
-		if len(sessionName) > 0 {
-			selectedSessions = []string{sessionName}
-		}
-
-		sessions := environ.SelectSessions(selectedSessions...)
-		for _, session := range sessions {
-			if err := environ.SyncSession(ctx, session, syncSymbols...); err != nil {
-				return err
+			if userConfig.Sync != nil && len(userConfig.Sync.Symbols) > 0 {
+				userConfig.Sync.Symbols = []string{symbol}
 			}
-
-			log.Infof("exchange session %s synchronization done", session.Name)
 		}
 
-		return nil
+		if len(sessionName) > 0 {
+			if userConfig.Sync != nil && len(userConfig.Sync.Sessions) > 0 {
+				userConfig.Sync.Sessions = []string{sessionName}
+			}
+		}
+
+		return environ.Sync(ctx, userConfig)
 	},
 }
