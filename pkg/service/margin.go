@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"time"
 
@@ -20,17 +19,17 @@ type MarginService struct {
 func (s *MarginService) Sync(ctx context.Context, ex types.Exchange, asset string, startTime time.Time) error {
 	api, ok := ex.(types.MarginHistory)
 	if !ok {
-		return ErrNotImplemented
+		return nil
 	}
 
 	marginExchange, ok := ex.(types.MarginExchange)
 	if !ok {
-		return fmt.Errorf("%T does not implement margin service", ex)
+		return nil
 	}
 
 	marginSettings := marginExchange.GetMarginSettings()
 	if !marginSettings.IsMargin {
-		return fmt.Errorf("exchange instance %s is not using margin", ex.Name())
+		return nil
 	}
 
 	tasks := []SyncTask{
@@ -42,6 +41,9 @@ func (s *MarginService) Sync(ctx context.Context, ex types.Exchange, asset strin
 					MarginHistory: api,
 				}
 				return query.Query(ctx, asset, startTime, endTime)
+			},
+			Time: func(obj interface{}) time.Time {
+				return obj.(types.MarginLoan).Time.Time()
 			},
 			ID: func(obj interface{}) string {
 				return strconv.FormatUint(obj.(types.MarginLoan).TransactionID, 10)
@@ -56,6 +58,9 @@ func (s *MarginService) Sync(ctx context.Context, ex types.Exchange, asset strin
 				}
 				return query.Query(ctx, asset, startTime, endTime)
 			},
+			Time: func(obj interface{}) time.Time {
+				return obj.(types.MarginRepay).Time.Time()
+			},
 			ID: func(obj interface{}) string {
 				return strconv.FormatUint(obj.(types.MarginRepay).TransactionID, 10)
 			},
@@ -68,6 +73,9 @@ func (s *MarginService) Sync(ctx context.Context, ex types.Exchange, asset strin
 					MarginHistory: api,
 				}
 				return query.Query(ctx, asset, startTime, endTime)
+			},
+			Time: func(obj interface{}) time.Time {
+				return obj.(types.MarginInterest).Time.Time()
 			},
 			ID: func(obj interface{}) string {
 				m := obj.(types.MarginInterest)
@@ -82,6 +90,9 @@ func (s *MarginService) Sync(ctx context.Context, ex types.Exchange, asset strin
 					MarginHistory: api,
 				}
 				return query.Query(ctx, startTime, endTime)
+			},
+			Time: func(obj interface{}) time.Time {
+				return obj.(types.MarginLiquidation).UpdatedTime.Time()
 			},
 			ID: func(obj interface{}) string {
 				m := obj.(types.MarginLiquidation)
@@ -130,4 +141,3 @@ func SelectLastMarginLiquidations(ex types.ExchangeName, limit uint64) sq.Select
 		OrderBy("time").
 		Limit(limit)
 }
-
