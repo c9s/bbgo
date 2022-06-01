@@ -25,19 +25,24 @@ func TestMarginService(t *testing.T) {
 	ex.MarginSettings.IsIsolatedMargin = true
 	ex.MarginSettings.IsolatedMarginSymbol = "DOTUSDT"
 
+	logrus.SetLevel(logrus.ErrorLevel)
 	db, err := prepareDB(t)
+
+	assert.NoError(t, err)
+
 	if err != nil {
-		t.Fatal(err)
+		t.Fail()
+		return
 	}
 
 	defer db.Close()
 
 	ctx := context.Background()
 
-	logrus.SetLevel(logrus.DebugLevel)
-
 	dbx := sqlx.NewDb(db.DB, "sqlite3")
 	service := &MarginService{DB: dbx}
+
+	logrus.SetLevel(logrus.DebugLevel)
 	err = service.Sync(ctx, ex, "USDT", time.Date(2022, time.February, 1, 0, 0, 0, 0, time.UTC))
 	assert.NoError(t, err)
 

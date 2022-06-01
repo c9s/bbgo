@@ -10,7 +10,6 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
 )
 
 var ErrNotImplemented = errors.New("not implemented")
@@ -22,11 +21,7 @@ type SyncService struct {
 	RewardService   *RewardService
 	WithdrawService *WithdrawService
 	DepositService  *DepositService
-}
-
-func paperTrade() bool {
-	v, ok := util.GetEnvVarBool("PAPER_TRADE")
-	return ok && v
+	MarginService   *MarginService
 }
 
 // SyncSessionSymbols syncs the trades from the given exchange session
@@ -50,20 +45,44 @@ func (s *SyncService) SyncSessionSymbols(ctx context.Context, exchange types.Exc
 		}
 	}
 
-	if paperTrade() {
+	return nil
+}
+
+func (s *SyncService) SyncMarginHistory(ctx context.Context, exchange types.Exchange, startTime time.Time, assets ...string) error {
+	if _, implemented := exchange.(types.MarginHistory); !implemented {
+		log.Debugf("exchange %T does not support types.MarginHistory", exchange)
 		return nil
+	}
+
+	if marginExchange, implemented := exchange.(types.MarginExchange); !implemented {
+		log.Debugf("exchange %T does not implement types.MarginExchange", exchange)
+		return nil
+	} else {
+		marginSettings := marginExchange.GetMarginSettings()
+		if !marginSettings.IsMargin {
+			log.Debugf("exchange %T is not using margin", exchange)
+			return nil
+		}
+	}
+
+	log.Infof("syncing %s margin history: %v...", exchange.Name(), assets)
+	for _, asset := range assets {
+		if err := s.MarginService.Sync(ctx, exchange, asset, startTime); err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
 func (s *SyncService) SyncRewardHistory(ctx context.Context, exchange types.Exchange) error {
+	if _, implemented := exchange.(types.ExchangeRewardService); !implemented {
+		return nil
+	}
+
 	log.Infof("syncing %s reward records...", exchange.Name())
 	if err := s.RewardService.Sync(ctx, exchange); err != nil {
-		if err != ErrExchangeRewardServiceNotImplemented {
-			log.Warnf("%s reward service is not supported", exchange.Name())
-			return err
-		}
+		return err
 	}
 
 	return nil

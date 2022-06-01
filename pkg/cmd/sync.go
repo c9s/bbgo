@@ -6,14 +6,13 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 )
 
 func init() {
-	SyncCmd.Flags().String("session", "", "the exchange session name for sync")
+	SyncCmd.Flags().StringArray("session", []string{}, "the exchange session name for sync")
 	SyncCmd.Flags().String("symbol", "", "symbol of market for syncing")
 	SyncCmd.Flags().String("since", "", "sync from time")
 	RootCmd.AddCommand(SyncCmd)
@@ -58,7 +57,7 @@ var SyncCmd = &cobra.Command{
 			return err
 		}
 
-		sessionName, err := cmd.Flags().GetString("session")
+		sessionNames, err := cmd.Flags().GetStringArray("session")
 		if err != nil {
 			return err
 		}
@@ -88,35 +87,18 @@ var SyncCmd = &cobra.Command{
 
 		environ.SetSyncStartTime(syncStartTime)
 
-		// syncSymbols is the symbol list to sync
-		var syncSymbols []string
-
-		if userConfig.Sync != nil && len(userConfig.Sync.Symbols) > 0 {
-			syncSymbols = userConfig.Sync.Symbols
-		}
-
 		if len(symbol) > 0 {
-			syncSymbols = []string{symbol}
-		}
-
-		var selectedSessions []string
-
-		if userConfig.Sync != nil && len(userConfig.Sync.Sessions) > 0 {
-			selectedSessions = userConfig.Sync.Sessions
-		}
-		if len(sessionName) > 0 {
-			selectedSessions = []string{sessionName}
-		}
-
-		sessions := environ.SelectSessions(selectedSessions...)
-		for _, session := range sessions {
-			if err := environ.SyncSession(ctx, session, syncSymbols...); err != nil {
-				return err
+			if userConfig.Sync != nil && len(userConfig.Sync.Symbols) > 0 {
+				userConfig.Sync.Symbols = []string{symbol}
 			}
-
-			log.Infof("exchange session %s synchronization done", session.Name)
 		}
 
-		return nil
+		if len(sessionNames) > 0 {
+			if userConfig.Sync != nil && len(userConfig.Sync.Sessions) > 0 {
+				userConfig.Sync.Sessions = sessionNames
+			}
+		}
+
+		return environ.Sync(ctx, userConfig)
 	},
 }

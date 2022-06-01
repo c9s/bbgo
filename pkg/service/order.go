@@ -19,26 +19,10 @@ type OrderService struct {
 }
 
 func (s *OrderService) Sync(ctx context.Context, exchange types.Exchange, symbol string, startTime time.Time) error {
-	isMargin := false
-	isFutures := false
-	isIsolated := false
-
-	if marginExchange, ok := exchange.(types.MarginExchange); ok {
-		marginSettings := marginExchange.GetMarginSettings()
-		isMargin = marginSettings.IsMargin
-		isIsolated = marginSettings.IsIsolatedMargin
-		if marginSettings.IsIsolatedMargin {
-			symbol = marginSettings.IsolatedMarginSymbol
-		}
-	}
-
-	if futuresExchange, ok := exchange.(types.FuturesExchange); ok {
-		futuresSettings := futuresExchange.GetFuturesSettings()
-		isFutures = futuresSettings.IsFutures
-		isIsolated = futuresSettings.IsIsolatedFutures
-		if futuresSettings.IsIsolatedFutures {
-			symbol = futuresSettings.IsolatedFuturesSymbol
-		}
+	isMargin, isFutures, isIsolated, isolatedSymbol := getExchangeAttributes(exchange)
+	// override symbol if isolatedSymbol is not empty
+	if isIsolated && len(isolatedSymbol) > 0 {
+		symbol = isolatedSymbol
 	}
 
 	records, err := s.QueryLast(exchange.Name(), symbol, isMargin, isFutures, isIsolated, 50)
@@ -98,7 +82,6 @@ func (s *OrderService) Sync(ctx context.Context, exchange types.Exchange, symbol
 
 	return <-errC
 }
-
 
 // QueryLast queries the last order from the database
 func (s *OrderService) QueryLast(ex types.ExchangeName, symbol string, isMargin, isFutures, isIsolated bool, limit int) ([]types.Order, error) {

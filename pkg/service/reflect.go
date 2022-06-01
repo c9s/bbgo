@@ -1,11 +1,15 @@
 package service
 
 import (
+	"context"
 	"reflect"
 	"strings"
 
+	"github.com/Masterminds/squirrel"
 	"github.com/fatih/camelcase"
 	gopluralize "github.com/gertd/go-pluralize"
+	"github.com/jmoiron/sqlx"
+	"github.com/sirupsen/logrus"
 )
 
 var pluralize = gopluralize.NewClient()
@@ -151,4 +155,52 @@ func (c *ReflectCache) FieldsOf(t interface{}) []string {
 	fields = fieldsNamesOf(t)
 	c.fields[typeName] = fields
 	return fields
+}
+
+// scanRowsOfType use the given type to scan rows
+// this is usually slower than the native one since it uses reflect.
+func scanRowsOfType(rows *sqlx.Rows, tpe interface{}) (interface{}, error) {
+	refType := reflect.TypeOf(tpe)
+
+	if refType.Kind() == reflect.Ptr {
+		refType = refType.Elem()
+	}
+
+	sliceRef := reflect.MakeSlice(reflect.SliceOf(refType), 0, 100)
+	// sliceRef := reflect.New(reflect.SliceOf(refType))
+	for rows.Next() {
+		var recordRef = reflect.New(refType)
+		var record = recordRef.Interface()
+		if err := rows.StructScan(record); err != nil {
+			return sliceRef.Interface(), err
+		}
+
+		sliceRef = reflect.Append(sliceRef, recordRef.Elem())
+	}
+
+	return sliceRef.Interface(), rows.Err()
+}
+
+func insertType(db *sqlx.DB, record interface{}) error {
+	sql := dbCache.InsertSqlOf(record)
+	_, err := db.NamedExec(sql, record)
+	return err
+}
+
+func selectAndScanType(ctx context.Context, db *sqlx.DB, sel squirrel.SelectBuilder, tpe interface{}) (interface{}, error) {
+	sql, args, err := sel.ToSql()
+	if err != nil {
+		return nil, err
+	}
+
+	logrus.Debugf("selectAndScanType: %T <- %s", tpe, sql)
+	logrus.Debugf("queryArgs: %v", args)
+
+	rows, err := db.QueryxContext(ctx, sql, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+	return scanRowsOfType(rows, tpe)
 }
