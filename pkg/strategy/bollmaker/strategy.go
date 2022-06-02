@@ -558,8 +558,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	instanceID := s.InstanceID()
 	s.groupID = util.FNV32(instanceID)
 
-	log.Infof("!!! position: %+v", s.Position)
-
 	// If position is nil, we need to allocate a new position for calculation
 	if s.Position == nil {
 		// restore state (legacy)
