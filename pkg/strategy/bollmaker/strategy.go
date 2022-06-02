@@ -632,6 +632,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
 		log.Infof("position changed: %s", s.Position)
 		s.Notify(s.Position)
+
+		if err := s.Persistence.Sync(s); err != nil {
+			log.WithError(err).Errorf("can not sync state to persistence")
+		}
 	})
 
 	s.tradeCollector.BindStream(session.UserDataStream)
