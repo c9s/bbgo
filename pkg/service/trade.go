@@ -295,13 +295,11 @@ func (s *TradeService) QueryForTradingFeeCurrency(ex types.ExchangeName, symbol 
 
 func (s *TradeService) Query(options QueryTradesOptions) ([]types.Trade, error) {
 	sql := queryTradesSQL(options)
-
-	log.Debug(sql)
-
 	args := map[string]interface{}{
 		"exchange": options.Exchange,
 		"symbol":   options.Symbol,
 	}
+
 	rows, err := s.DB.NamedQuery(sql, args)
 	if err != nil {
 		return nil, err

@@ -448,6 +448,8 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 			trades, err = environ.TradeService.Query(service.QueryTradesOptions{
 				Exchange: session.Exchange.Name(),
 				Symbol:   symbol,
+				Ordering: "DESC",
+				Limit:    100,
 			})
 		}
 
@@ -455,6 +457,7 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 			return err
 		}
 
+		trades = types.SortTradesAscending(trades)
 		log.Infof("symbol %s: %d trades loaded", symbol, len(trades))
 	}
 
