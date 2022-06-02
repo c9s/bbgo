@@ -477,7 +477,7 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 	}
 
 	for i := range submitOrders {
-		submitOrders[i] = s.adjustOrderQuantity(submitOrders[i])
+		submitOrders[i] = adjustOrderQuantity(submitOrders[i], s.Market)
 	}
 
 	createdOrders, err := orderExecutor.SubmitOrders(ctx, submitOrders...)
@@ -494,43 +494,6 @@ func (s *Strategy) hasLongSet() bool {
 
 func (s *Strategy) hasShortSet() bool {
 	return s.Short != nil && *s.Short
-}
-
-type PriceTrend string
-
-const (
-	NeutralTrend PriceTrend = "neutral"
-	UpTrend      PriceTrend = "upTrend"
-	DownTrend    PriceTrend = "downTrend"
-	UnknownTrend PriceTrend = "unknown"
-)
-
-func detectPriceTrend(inc *indicator.BOLL, price float64) PriceTrend {
-	if inBetween(price, inc.LastDownBand(), inc.LastUpBand()) {
-		return NeutralTrend
-	}
-
-	if price < inc.LastDownBand() {
-		return DownTrend
-	}
-
-	if price > inc.LastUpBand() {
-		return UpTrend
-	}
-
-	return UnknownTrend
-}
-
-func (s *Strategy) adjustOrderQuantity(submitOrder types.SubmitOrder) types.SubmitOrder {
-	if submitOrder.Quantity.Mul(submitOrder.Price).Compare(s.Market.MinNotional) < 0 {
-		submitOrder.Quantity = bbgo.AdjustFloatQuantityByMinAmount(submitOrder.Quantity, submitOrder.Price, s.Market.MinNotional.Mul(notionModifier))
-	}
-
-	if submitOrder.Quantity.Compare(s.Market.MinQuantity) < 0 {
-		submitOrder.Quantity = fixedpoint.Max(submitOrder.Quantity, s.Market.MinQuantity)
-	}
-
-	return submitOrder
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
@@ -773,4 +736,16 @@ func calculateBandPercentage(up, down, sma, midPrice float64) float64 {
 
 func inBetween(x, a, b float64) bool {
 	return a < x && x < b
+}
+
+func adjustOrderQuantity(submitOrder types.SubmitOrder, market types.Market) types.SubmitOrder {
+	if submitOrder.Quantity.Mul(submitOrder.Price).Compare(market.MinNotional) < 0 {
+		submitOrder.Quantity = bbgo.AdjustFloatQuantityByMinAmount(submitOrder.Quantity, submitOrder.Price, market.MinNotional.Mul(notionModifier))
+	}
+
+	if submitOrder.Quantity.Compare(market.MinQuantity) < 0 {
+		submitOrder.Quantity = fixedpoint.Max(submitOrder.Quantity, market.MinQuantity)
+	}
+
+	return submitOrder
 }
