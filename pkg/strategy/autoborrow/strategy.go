@@ -134,6 +134,12 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 	// if margin ratio is too low, do not borrow
 	if curMarginLevel.Compare(minMarginLevel) < 0 {
 		log.Infof("current margin level %f < min margin level %f, skip autoborrow", curMarginLevel.Float64(), minMarginLevel.Float64())
+		s.Notifiability.Notify("Warning!!! %s Current Margin Level %f < Minimal Margin Level %f",
+			s.ExchangeSession.Name,
+			curMarginLevel.Float64(),
+			minMarginLevel.Float64(),
+			account.Balances().Debts(),
+		)
 		s.tryToRepayAnyDebt(ctx)
 		return
 	}
