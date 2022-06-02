@@ -255,15 +255,20 @@ func (e *Exchange) _queryKLines(ctx context.Context, symbol string, interval typ
 		return nil, err
 	}
 
-	rangeDuration := options.EndTime.Sub(*options.StartTime)
-	estimatedCount := rangeDuration / interval.Duration()
+	// assign limit to a default value since ftx has the limit
 	if options.Limit == 0 {
 		options.Limit = 500
 	}
 
-	if options.Limit != 0 && uint64(estimatedCount) > uint64(options.Limit) {
-		endTime := options.StartTime.Add(interval.Duration() * time.Duration(options.Limit))
-		options.EndTime = &endTime
+	// if the time range exceed the ftx valid time range, we need to adjust the endTime
+	if options.StartTime != nil && options.EndTime != nil {
+		rangeDuration := options.EndTime.Sub(*options.StartTime)
+		estimatedCount := rangeDuration / interval.Duration()
+
+		if options.Limit != 0 && uint64(estimatedCount) > uint64(options.Limit) {
+			endTime := options.StartTime.Add(interval.Duration() * time.Duration(options.Limit))
+			options.EndTime = &endTime
+		}
 	}
 
 	resp, err := e.newRest().HistoricalPrices(ctx, toLocalSymbol(symbol), interval, int64(options.Limit), options.StartTime, options.EndTime)
@@ -282,6 +287,7 @@ func (e *Exchange) _queryKLines(ctx context.Context, symbol string, interval typ
 		}
 		klines = append(klines, globalKline)
 	}
+
 	return klines, nil
 }
 
