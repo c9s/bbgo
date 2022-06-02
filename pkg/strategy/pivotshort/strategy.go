@@ -114,6 +114,9 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 		Quantity: quantity,
 		Market:   s.Market,
 	}
+	if s.session.Margin {
+		submitOrder.MarginSideEffect = s.MarginOrderSideEffect
+	}
 
 	//s.Notify("Submitting %s %s order to close position by %v", s.Symbol, side.String(), percentage, submitOrder)
 
