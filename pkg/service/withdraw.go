@@ -16,7 +16,7 @@ type WithdrawService struct {
 	DB *sqlx.DB
 }
 
-// Sync syncs the withdraw records into db
+// Sync syncs the withdrawal records into db
 func (s *WithdrawService) Sync(ctx context.Context, ex types.Exchange) error {
 	txnIDs := map[string]struct{}{}
 
