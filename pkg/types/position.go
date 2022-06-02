@@ -221,6 +221,14 @@ func (p *Position) SetExchangeFeeRate(ex ExchangeName, exchangeFee ExchangeFee) 
 	p.ExchangeFeeRates[ex] = exchangeFee
 }
 
+func (p *Position) IsShort() bool {
+	return p.Base.Sign() < 0
+}
+
+func (p *Position) IsLong() bool {
+	return p.Base.Sign() > 0
+}
+
 func (p *Position) Type() PositionType {
 	if p.Base.Sign() > 0 {
 		return PositionLong

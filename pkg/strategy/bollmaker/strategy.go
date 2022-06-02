@@ -427,8 +427,8 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 		canSell = false
 	}
 
-	isLongPosition := s.Position.Base.Sign() > 0
-	isShortPosition := s.Position.Base.Sign() < 0
+	isLongPosition := s.Position.IsLong()
+	isShortPosition := s.Position.IsShort()
 	minProfitPrice := s.Position.AverageCost.Mul(fixedpoint.One.Add(s.MinProfitSpread))
 	if isShortPosition {
 		minProfitPrice = s.Position.AverageCost.Mul(fixedpoint.One.Sub(s.MinProfitSpread))
