@@ -289,25 +289,14 @@ func (s *BacktestService) scanRows(rows *sqlx.Rows) (klines []types.KLine, err e
 }
 
 func (s *BacktestService) _targetKlineTable(exchangeName types.ExchangeName) string {
-	switch exchangeName {
-	case types.ExchangeBinance:
-		return "binance_klines"
-	case types.ExchangeFTX:
-		return "ftx_klines"
-	case types.ExchangeMax:
-		return "max_klines"
-	case types.ExchangeOKEx:
-		return "okex_klines"
-	case types.ExchangeKucoin:
-		return "kucoin_klines"
-	default:
-		return "klines"
-	}
+	return strings.ToLower(exchangeName.String()) + "_klines"
 }
+
+var errExchangeFieldIsUnset = errors.New("kline.Exchange field should not be empty")
 
 func (s *BacktestService) Insert(kline types.KLine) error {
 	if len(kline.Exchange) == 0 {
-		return errors.New("kline.Exchange field should not be empty")
+		return errExchangeFieldIsUnset
 	}
 
 	tableName := s._targetKlineTable(kline.Exchange)
