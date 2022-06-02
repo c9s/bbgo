@@ -153,5 +153,3 @@ func buildIdMap(sel SyncTask, recordSliceRef reflect.Value) map[string]struct{} 
 
 	return ids
 }
-
-

@@ -4,8 +4,6 @@ import (
 	"context"
 	"time"
 
-	"golang.org/x/time/rate"
-
 	"github.com/c9s/bbgo/pkg/types"
 )
 

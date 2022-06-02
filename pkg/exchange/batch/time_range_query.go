@@ -8,6 +8,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
+
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 var log = logrus.WithField("component", "batch")
@@ -52,6 +54,8 @@ func (q *AsyncTimeRangedBatchQuery) Query(ctx context.Context, ch interface{}, s
 
 			log.Debugf("batch querying %T: %v <=> %v", q.Type, startTime, endTime)
 
+			queryProfiler := util.StartTimeProfile("remoteQuery")
+
 			sliceInf, err := q.Q(startTime, endTime)
 			if err != nil {
 				errC <- err
@@ -60,8 +64,9 @@ func (q *AsyncTimeRangedBatchQuery) Query(ctx context.Context, ch interface{}, s
 
 			listRef := reflect.ValueOf(sliceInf)
 			listLen := listRef.Len()
-
 			log.Debugf("batch querying %T: %d remote records", q.Type, listLen)
+
+			queryProfiler.StopAndLog(log.Debugf)
 
 			if listLen == 0 {
 				if q.JumpIfEmpty > 0 {
