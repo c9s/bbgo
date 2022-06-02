@@ -49,81 +49,6 @@ type BollingerSetting struct {
 	BandWidth float64 `json:"bandWidth"`
 }
 
-type DynamicSpreadSettings struct {
-	Enabled bool `json:"enabled"`
-
-	// Window is the window of the SMAs of spreads
-	Window int `json:"window"`
-
-	// AskSpreadScale is used to define the ask spread range with the given percentage.
-	AskSpreadScale *bbgo.PercentageScale `json:"askSpreadScale"`
-
-	// BidSpreadScale is used to define the bid spread range with the given percentage.
-	BidSpreadScale *bbgo.PercentageScale `json:"bidSpreadScale"`
-
-	DynamicAskSpread *indicator.SMA
-	DynamicBidSpread *indicator.SMA
-}
-
-// Update dynamic spreads
-func (ds *DynamicSpreadSettings) Update(kline types.KLine) {
-	if !ds.Enabled {
-		return
-	}
-
-	ampl := (kline.GetHigh().Float64() - kline.GetLow().Float64()) / kline.GetOpen().Float64()
-
-	switch kline.Direction() {
-	case types.DirectionUp:
-		ds.DynamicAskSpread.Update(ampl)
-		ds.DynamicBidSpread.Update(0)
-	case types.DirectionDown:
-		ds.DynamicBidSpread.Update(ampl)
-		ds.DynamicAskSpread.Update(0)
-	default:
-		ds.DynamicAskSpread.Update(0)
-		ds.DynamicBidSpread.Update(0)
-	}
-}
-
-// GetAskSpread returns current ask spread
-func (ds *DynamicSpreadSettings) GetAskSpread() (askSpread float64, err error) {
-	if !ds.Enabled {
-		return 0, errors.New("dynamic spread is not enabled")
-	}
-
-	if ds.AskSpreadScale != nil && ds.DynamicAskSpread.Length() >= ds.Window {
-		askSpread, err = ds.AskSpreadScale.Scale(ds.DynamicAskSpread.Last())
-		if err != nil {
-			log.WithError(err).Errorf("can not calculate dynamicAskSpread")
-			return 0, err
-		}
-
-		return askSpread, nil
-	}
-
-	return 0, errors.New("incomplete dynamic spread settings or not enough data yet")
-}
-
-// GetBidSpread returns current dynamic bid spread
-func (ds *DynamicSpreadSettings) GetBidSpread() (bidSpread float64, err error) {
-	if !ds.Enabled {
-		return 0, errors.New("dynamic spread is not enabled")
-	}
-
-	if ds.BidSpreadScale != nil && ds.DynamicBidSpread.Length() >= ds.Window {
-		bidSpread, err = ds.BidSpreadScale.Scale(ds.DynamicBidSpread.Last())
-		if err != nil {
-			log.WithError(err).Errorf("can not calculate dynamicBidSpread")
-			return 0, err
-		}
-
-		return bidSpread, nil
-	}
-
-	return 0, errors.New("incomplete dynamic spread settings or not enough data yet")
-}
-
 type Strategy struct {
 	*bbgo.Graceful
 	*bbgo.Notifiability
@@ -408,18 +333,18 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 	downBand := s.defaultBoll.LastDownBand()
 	upBand := s.defaultBoll.LastUpBand()
 	sma := s.defaultBoll.LastSMA()
-	log.Infof("bollinger band: up %f sma %f down %f", upBand, sma, downBand)
+	log.Infof("%s bollinger band: up %f sma %f down %f", s.Symbol, upBand, sma, downBand)
 
 	bandPercentage := calculateBandPercentage(upBand, downBand, sma, midPrice.Float64())
-	log.Infof("mid price band percentage: %v", bandPercentage)
+	log.Infof("%s mid price band percentage: %v", s.Symbol, bandPercentage)
 
 	maxExposurePosition, err := s.getCurrentAllowedExposurePosition(bandPercentage)
 	if err != nil {
-		log.WithError(err).Errorf("can not calculate CurrentAllowedExposurePosition")
+		log.WithError(err).Errorf("can not calculate %s CurrentAllowedExposurePosition", s.Symbol)
 		return
 	}
 
-	log.Infof("calculated max exposure position: %v", maxExposurePosition)
+	log.Infof("calculated %s max exposure position: %v", s.Symbol, maxExposurePosition)
 
 	canSell := true
 	canBuy := true
@@ -429,7 +354,7 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 	}
 
 	if maxExposurePosition.Sign() > 0 {
-		if s.Long != nil && *s.Long && base.Sign() < 0 {
+		if s.hasLongSet() && base.Sign() < 0 {
 			canSell = false
 		} else if base.Compare(maxExposurePosition.Neg()) < 0 {
 			canSell = false
@@ -502,11 +427,26 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 		canSell = false
 	}
 
-	if midPrice.Compare(s.Position.AverageCost.Mul(fixedpoint.One.Add(s.MinProfitSpread))) < 0 {
-		canSell = false
+	isLongPosition := s.Position.Base.Sign() > 0
+	isShortPosition := s.Position.Base.Sign() < 0
+	minProfitPrice := s.Position.AverageCost.Mul(fixedpoint.One.Add(s.MinProfitSpread))
+	if isShortPosition {
+		minProfitPrice = s.Position.AverageCost.Mul(fixedpoint.One.Sub(s.MinProfitSpread))
 	}
 
-	if s.Long != nil && *s.Long && base.Sub(sellOrder.Quantity).Sign() < 0 {
+	if isLongPosition {
+		// for long position if the current price is lower than the minimal profitable price then we should stop sell
+		if midPrice.Compare(minProfitPrice) < 0 {
+			canSell = false
+		}
+	} else if isShortPosition {
+		// for short position if the current price is higher than the minimal profitable price then we should stop buy
+		if midPrice.Compare(minProfitPrice) > 0 {
+			canBuy = false
+		}
+	}
+
+	if s.hasLongSet() && base.Sub(sellOrder.Quantity).Sign() < 0 {
 		canSell = false
 	}
 
@@ -542,6 +482,14 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 	}
 	s.orderStore.Add(createdOrders...)
 	s.activeMakerOrders.Add(createdOrders...)
+}
+
+func (s *Strategy) hasLongSet() bool {
+	return s.Long != nil && *s.Long
+}
+
+func (s *Strategy) hasShortSet() bool {
+	return s.Short != nil && *s.Short
 }
 
 type PriceTrend string
