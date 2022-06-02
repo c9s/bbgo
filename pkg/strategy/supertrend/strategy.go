@@ -136,7 +136,12 @@ type Strategy struct {
 	slowDEMA       *indicator.DEMA
 
 	// SuperTrend indicator
-	SuperTrend SuperTrend `json:"superTrend"`
+	//SuperTrend SuperTrend `json:"superTrend"`
+	Supertrend *indicator.Supertrend
+	// SupertrendWindow ATR window for calculation of supertrend
+	SupertrendWindow int `json:"supertrendWindow"`
+	// SupertrendMultiplier ATR multiplier for calculation of supertrend
+	SupertrendMultiplier float64 `json:"supertrendMultiplier"`
 
 	// Leverage
 	Leverage float64 `json:"leverage"`
@@ -238,14 +243,15 @@ func (s *Strategy) setupIndicators() {
 	}
 	s.slowDEMA = &indicator.DEMA{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.SlowDEMAWindow}}
 
-	if s.SuperTrend.AverageTrueRangeWindow == 0 {
-		s.SuperTrend.AverageTrueRangeWindow = 39
+	if s.SupertrendWindow == 0 {
+		s.SupertrendWindow = 39
 	}
-	s.SuperTrend.averageTrueRange = &indicator.ATR{IntervalWindow: types.IntervalWindow{Window: s.SuperTrend.AverageTrueRangeWindow, Interval: s.Interval}}
-	s.SuperTrend.trend = types.DirectionUp
-	if s.SuperTrend.AverageTrueRangeMultiplier == 0 {
-		s.SuperTrend.AverageTrueRangeMultiplier = 3
+	if s.SupertrendMultiplier == 0 {
+		s.SupertrendMultiplier = 3
 	}
+	s.Supertrend = &indicator.Supertrend{IntervalWindow: types.IntervalWindow{Window: s.SupertrendWindow, Interval: s.Interval}, ATRMultiplier: s.SupertrendMultiplier}
+	s.Supertrend.AverageTrueRange = &indicator.ATR{IntervalWindow: types.IntervalWindow{Window: s.SupertrendWindow, Interval: s.Interval}}
+
 }
 
 // updateIndicators updates indicators
@@ -259,8 +265,8 @@ func (s *Strategy) updateIndicators(kline types.KLine) {
 	if kline.Interval == s.slowDEMA.Interval {
 		s.slowDEMA.Update(closePrice)
 	}
-	if kline.Interval == s.SuperTrend.averageTrueRange.Interval {
-		s.SuperTrend.update(kline)
+	if kline.Interval == s.Supertrend.Interval {
+		s.Supertrend.Update(kline.GetHigh().Float64(), kline.GetLow().Float64(), closePrice)
 	}
 }
 
@@ -349,7 +355,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		// Get signals
 		closePrice := kline.GetClose().Float64()
 		openPrice := kline.GetOpen().Float64()
-		stSignal := s.SuperTrend.getSignal()
+		stSignal := s.Supertrend.GetSignal()
 		var demaSignal types.Direction
 		if closePrice > s.fastDEMA.Last() && closePrice > s.slowDEMA.Last() && !(openPrice > s.fastDEMA.Last() && openPrice > s.slowDEMA.Last()) {
 			demaSignal = types.DirectionUp
@@ -401,7 +407,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				s.currentStopLossPrice = kline.GetLow()
 			}
 			if s.TakeProfitMultiplier > 0 {
-				s.currentTakeProfitPrice = kline.GetClose().Add(fixedpoint.NewFromFloat(s.SuperTrend.averageTrueRange.Last() * s.TakeProfitMultiplier))
+				s.currentTakeProfitPrice = kline.GetClose().Add(fixedpoint.NewFromFloat(s.Supertrend.AverageTrueRange.Last() * s.TakeProfitMultiplier))
 			}
 		} else if stSignal == types.DirectionDown && demaSignal == types.DirectionDown {
 			side = types.SideTypeSell
@@ -409,7 +415,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				s.currentStopLossPrice = kline.GetHigh()
 			}
 			if s.TakeProfitMultiplier > 0 {
-				s.currentTakeProfitPrice = kline.GetClose().Sub(fixedpoint.NewFromFloat(s.SuperTrend.averageTrueRange.Last() * s.TakeProfitMultiplier))
+				s.currentTakeProfitPrice = kline.GetClose().Sub(fixedpoint.NewFromFloat(s.Supertrend.AverageTrueRange.Last() * s.TakeProfitMultiplier))
 			}
 		}
 
