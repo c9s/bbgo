@@ -92,10 +92,6 @@ func iterateFieldsByTag(obj interface{}, tagName string, cb StructFieldIterator)
 	sv := reflect.ValueOf(obj)
 	st := reflect.TypeOf(obj)
 
-	if sv.IsZero() {
-		return nil
-	}
-
 	if st.Kind() != reflect.Ptr {
 		return fmt.Errorf("f needs to be a pointer of a struct, %s given", st)
 	}
