@@ -119,16 +119,10 @@ func (s *BacktestService) Sync(ctx context.Context, exchange types.Exchange, sym
 	startTime time.Time, endTime time.Time, interval types.Interval) error {
 
 	return s.SyncKLineByInterval(ctx, exchange, symbol, interval, startTime, endTime)
-
 }
 
 func (s *BacktestService) QueryFirstKLine(ex types.ExchangeName, symbol string, interval types.Interval) (*types.KLine, error) {
 	return s.QueryKLine(ex, symbol, interval, "ASC", 1)
-}
-
-// QueryLastKLine queries the last kline from the database
-func (s *BacktestService) QueryLastKLine(ex types.ExchangeName, symbol string, interval types.Interval) (*types.KLine, error) {
-	return s.QueryKLine(ex, symbol, interval, "DESC", 1)
 }
 
 // QueryKLine queries the klines from the database
@@ -164,6 +158,7 @@ func (s *BacktestService) QueryKLine(ex types.ExchangeName, symbol string, inter
 	return nil, rows.Err()
 }
 
+// QueryKLinesForward is used for querying klines to back-testing
 func (s *BacktestService) QueryKLinesForward(exchange types.ExchangeName, symbol string, interval types.Interval, startTime time.Time, limit int) ([]types.KLine, error) {
 	tableName := s._targetKlineTable(exchange)
 	sql := "SELECT * FROM `binance_klines` WHERE `end_time` >= :start_time AND `symbol` = :symbol AND `interval` = :interval and exchange = :exchange ORDER BY end_time ASC LIMIT :limit"
@@ -325,7 +320,6 @@ func (s *BacktestService) Insert(kline types.KLine) error {
 }
 
 func (s *BacktestService) _deleteDuplicatedKLine(k types.KLine) error {
-
 	if len(k.Exchange) == 0 {
 		return errors.New("kline.Exchange field should not be empty")
 	}
