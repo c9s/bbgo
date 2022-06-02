@@ -662,6 +662,7 @@ func sync(ctx context.Context, userConfig *bbgo.Config, backtestService *service
 				supportIntervals = types.SupportedIntervals
 			}
 
+			now := time.Now()
 			for interval := range supportIntervals {
 				// if err := s.SyncKLineByInterval(ctx, exchange, symbol, interval, startTime, endTime); err != nil {
 				//	return err
@@ -674,11 +675,13 @@ func sync(ctx context.Context, userConfig *bbgo.Config, backtestService *service
 				// if we don't have klines before the start time endpoint, the back-test will fail.
 				// because the last price will be missing.
 				if firstKLine != nil {
-					if err := backtestService.SyncExist(ctx, sourceExchange, symbol, syncFromTime, time.Now(), interval); err != nil {
+					log.Debugf("found existing kline data using partial sync...")
+					if err := backtestService.SyncExist(ctx, sourceExchange, symbol, syncFromTime, now, interval); err != nil {
 						return err
 					}
 				} else {
-					if err := backtestService.Sync(ctx, sourceExchange, symbol, syncFromTime, time.Now(), interval); err != nil {
+					log.Debugf("starting a fresh kline data sync...")
+					if err := backtestService.Sync(ctx, sourceExchange, symbol, syncFromTime, now, interval); err != nil {
 						return err
 					}
 				}

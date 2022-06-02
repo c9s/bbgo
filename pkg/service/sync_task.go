@@ -19,12 +19,16 @@ type SyncTask struct {
 	Type interface{}
 
 	// ID is a function that returns the unique identity of the object
+	// This function will be used for detecting duplicated objects.
 	ID func(obj interface{}) string
 
 	// Time is a function that returns the time of the object
+	// This function will be used for sorting records
 	Time func(obj interface{}) time.Time
 
-	// Select is the select query builder for querying db records
+	// Select is the select query builder for querying existing db records
+	// The built SQL will be used for querying existing db records.
+	// And then the ID function will be used for filtering duplicated object.
 	Select squirrel.SelectBuilder
 
 	// OnLoad is an optional field, which is called when the records are loaded from the database
@@ -79,7 +83,8 @@ func (sel SyncTask) execute(ctx context.Context, db *sqlx.DB, startTime time.Tim
 	for {
 		select {
 		case <-ctx.Done():
-			return nil
+			logrus.Warnf("context is cancelled, stop syncing")
+			return ctx.Err()
 
 		case err := <-errC:
 			return err
