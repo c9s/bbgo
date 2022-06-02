@@ -100,9 +100,9 @@ func (s *SyncService) SyncDepositHistory(ctx context.Context, exchange types.Exc
 	return nil
 }
 
-func (s *SyncService) SyncWithdrawHistory(ctx context.Context, exchange types.Exchange) error {
+func (s *SyncService) SyncWithdrawHistory(ctx context.Context, exchange types.Exchange, startTime time.Time) error {
 	log.Infof("syncing %s withdraw records...", exchange.Name())
-	if err := s.WithdrawService.Sync(ctx, exchange); err != nil {
+	if err := s.WithdrawService.Sync(ctx, exchange, startTime); err != nil {
 		if err != ErrNotImplemented {
 			log.Warnf("%s withdraw service is not supported", exchange.Name())
 			return err
