@@ -2,8 +2,9 @@ package types
 
 import (
 	"fmt"
-	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"time"
+
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 type Withdraw struct {
@@ -23,8 +24,32 @@ type Withdraw struct {
 	Network                string           `json:"network" db:"network"`
 }
 
-func (w Withdraw) String() string {
-	return fmt.Sprintf("withdraw %s %v to %s at %s", w.Asset, w.Amount, w.Address, w.ApplyTime.Time())
+func cutstr(s string, maxLen, head, tail int) string {
+	if len(s) > maxLen {
+		l := len(s)
+		return s[0:head] + "..." + s[l-tail:]
+	}
+	return s
+}
+
+func (w Withdraw) String() (o string) {
+	o = fmt.Sprintf("withdraw %s %v -> ", w.Asset, w.Amount)
+
+	if len(w.Network) > 0 && w.Network != w.Asset {
+		o += w.Network + ":"
+	}
+
+	o += fmt.Sprintf("%s at %s", w.Address, w.ApplyTime.Time())
+
+	if !w.TransactionFee.IsZero() {
+		o += fmt.Sprintf("fee %f %s", w.TransactionFee.Float64(), w.TransactionFeeCurrency)
+	}
+
+	if len(w.TransactionID) > 0 {
+		o += fmt.Sprintf("txID: %s", cutstr(w.TransactionID, 12, 4, 4))
+	}
+
+	return o
 }
 
 func (w Withdraw) EffectiveTime() time.Time {

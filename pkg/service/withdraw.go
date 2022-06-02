@@ -2,12 +2,12 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"time"
 
+	sq "github.com/Masterminds/squirrel"
 	"github.com/jmoiron/sqlx"
-	log "github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/exchange/batch"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -15,56 +15,68 @@ type WithdrawService struct {
 	DB *sqlx.DB
 }
 
-// Sync syncs the withdraw records into db
-func (s *WithdrawService) Sync(ctx context.Context, ex types.Exchange) error {
-	txnIDs := map[string]struct{}{}
-
-	// query descending
-	records, err := s.QueryLast(ex.Name(), 10)
-	if err != nil {
-		return err
-	}
-
-	for _, record := range records {
-		txnIDs[record.TransactionID] = struct{}{}
+// Sync syncs the withdrawal records into db
+func (s *WithdrawService) Sync(ctx context.Context, ex types.Exchange, startTime time.Time) error {
+	isMargin, isFutures, isIsolated, _ := getExchangeAttributes(ex)
+	if isMargin || isFutures || isIsolated {
+		// only works in spot
+		return nil
 	}
 
 	transferApi, ok := ex.(types.ExchangeTransferService)
 	if !ok {
-		return ErrNotImplemented
+		return nil
 	}
 
-	since := time.Time{}
-	if len(records) > 0 {
-		since = records[len(records)-1].ApplyTime.Time()
+	tasks := []SyncTask{
+		{
+			Type:   types.Withdraw{},
+			Select: SelectLastWithdraws(ex.Name(), 100),
+			BatchQuery: func(ctx context.Context, startTime, endTime time.Time) (interface{}, chan error) {
+				query := &batch.WithdrawBatchQuery{
+					ExchangeTransferService: transferApi,
+				}
+				return query.Query(ctx, "", startTime, endTime)
+			},
+			Time: func(obj interface{}) time.Time {
+				return obj.(types.Withdraw).ApplyTime.Time()
+			},
+			ID: func(obj interface{}) string {
+				withdraw := obj.(types.Withdraw)
+				return withdraw.TransactionID
+			},
+			Filter: func(obj interface{}) bool {
+				withdraw := obj.(types.Withdraw)
+				if withdraw.Status == "rejected" {
+					return false
+				}
+
+				if len(withdraw.TransactionID) == 0 {
+					return false
+				}
+
+				return true
+			},
+		},
 	}
 
-	// asset "" means all assets
-	withdraws, err := transferApi.QueryWithdrawHistory(ctx, "", since, time.Now())
-	if err != nil {
-		return err
-	}
-
-	for _, withdraw := range withdraws {
-		if _, exists := txnIDs[withdraw.TransactionID]; exists {
-			continue
-		}
-
-		if withdraw.Status == "rejected" {
-			log.Warnf("skip record, withdraw transaction rejected: %+v", withdraw)
-			continue
-		}
-
-		if len(withdraw.TransactionID) == 0 {
-			return fmt.Errorf("empty withdraw transacion ID: %+v", withdraw)
-		}
-
-		if err := s.Insert(withdraw); err != nil {
+	for _, sel := range tasks {
+		if err := sel.execute(ctx, s.DB, startTime); err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func SelectLastWithdraws(ex types.ExchangeName, limit uint64) sq.SelectBuilder {
+	return sq.Select("*").
+		From("withdraws").
+		Where(sq.And{
+			sq.Eq{"exchange": ex},
+		}).
+		OrderBy("time DESC").
+		Limit(limit)
 }
 
 func (s *WithdrawService) QueryLast(ex types.ExchangeName, limit int) ([]types.Withdraw, error) {

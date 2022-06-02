@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
+	sq "github.com/Masterminds/squirrel"
 	"github.com/jmoiron/sqlx"
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/exchange/batch"
@@ -25,84 +25,76 @@ func (s *OrderService) Sync(ctx context.Context, exchange types.Exchange, symbol
 		symbol = isolatedSymbol
 	}
 
-	records, err := s.QueryLast(exchange.Name(), symbol, isMargin, isFutures, isIsolated, 50)
-	if err != nil {
-		return err
-	}
-
-	orderKeys := make(map[uint64]struct{})
-
-	var lastID uint64 = 0
-	if len(records) > 0 {
-		for _, record := range records {
-			orderKeys[record.OrderID] = struct{}{}
-		}
-
-		lastID = records[0].OrderID
-		startTime = records[0].CreationTime.Time()
-	}
-
-	exchangeTradeHistoryService, ok := exchange.(types.ExchangeTradeHistoryService)
+	api, ok := exchange.(types.ExchangeTradeHistoryService)
 	if !ok {
 		return nil
 	}
 
-	b := &batch.ClosedOrderBatchQuery{
-		ExchangeTradeHistoryService: exchangeTradeHistoryService,
+	lastOrderID := uint64(0)
+	tasks := []SyncTask{
+		{
+			Type: types.Order{},
+			Time: func(obj interface{}) time.Time {
+				return obj.(types.Order).CreationTime.Time()
+			},
+			ID: func(obj interface{}) string {
+				order := obj.(types.Order)
+				return strconv.FormatUint(order.OrderID, 10)
+			},
+			Select: SelectLastOrders(exchange.Name(), symbol, isMargin, isFutures, isIsolated, 100),
+			OnLoad: func(objs interface{}) {
+				// update last order ID
+				orders := objs.([]types.Order)
+				if len(orders) > 0 {
+					end := len(orders) - 1
+					last := orders[end]
+					lastOrderID = last.OrderID
+				}
+			},
+			BatchQuery: func(ctx context.Context, startTime, endTime time.Time) (interface{}, chan error) {
+				query := &batch.ClosedOrderBatchQuery{
+					ExchangeTradeHistoryService: api,
+				}
+
+				return query.Query(ctx, symbol, startTime, endTime, lastOrderID)
+			},
+			Filter: func(obj interface{}) bool {
+				// skip canceled and not filled orders
+				order := obj.(types.Order)
+				if order.Status == types.OrderStatusCanceled && order.ExecutedQuantity.IsZero() {
+					return false
+				}
+
+				return true
+			},
+			Insert: func(obj interface{}) error {
+				order := obj.(types.Order)
+				return s.Insert(order)
+			},
+		},
 	}
-	ordersC, errC := b.Query(ctx, symbol, startTime, time.Now(), lastID)
-	for order := range ordersC {
-		select {
 
-		case <-ctx.Done():
-			return ctx.Err()
-
-		case err := <-errC:
-			if err != nil {
-				return err
-			}
-
-		default:
-
-		}
-
-		if _, exists := orderKeys[order.OrderID]; exists {
-			continue
-		}
-
-		// skip canceled and not filled orders
-		if order.Status == types.OrderStatusCanceled && order.ExecutedQuantity.IsZero() {
-			continue
-		}
-
-		if err := s.Insert(order); err != nil {
+	for _, sel := range tasks {
+		if err := sel.execute(ctx, s.DB, startTime); err != nil {
 			return err
 		}
 	}
 
-	return <-errC
+	return nil
 }
 
-// QueryLast queries the last order from the database
-func (s *OrderService) QueryLast(ex types.ExchangeName, symbol string, isMargin, isFutures, isIsolated bool, limit int) ([]types.Order, error) {
-	log.Infof("querying last order exchange = %s AND symbol = %s AND is_margin = %v AND is_futures = %v AND is_isolated = %v", ex, symbol, isMargin, isFutures, isIsolated)
-
-	sql := `SELECT * FROM orders WHERE exchange = :exchange AND symbol = :symbol AND is_margin = :is_margin AND is_futures = :is_futures AND is_isolated = :is_isolated ORDER BY gid DESC LIMIT :limit`
-	rows, err := s.DB.NamedQuery(sql, map[string]interface{}{
-		"exchange":    ex,
-		"symbol":      symbol,
-		"is_margin":   isMargin,
-		"is_futures":  isFutures,
-		"is_isolated": isIsolated,
-		"limit":       limit,
-	})
-
-	if err != nil {
-		return nil, errors.Wrap(err, "query last order error")
-	}
-
-	defer rows.Close()
-	return s.scanRows(rows)
+func SelectLastOrders(ex types.ExchangeName, symbol string, isMargin, isFutures, isIsolated bool, limit uint64) sq.SelectBuilder {
+	return sq.Select("*").
+		From("orders").
+		Where(sq.And{
+			sq.Eq{"symbol": symbol},
+			sq.Eq{"exchange": ex},
+			sq.Eq{"is_margin": isMargin},
+			sq.Eq{"is_futures": isFutures},
+			sq.Eq{"is_isolated": isIsolated},
+		}).
+		OrderBy("gid DESC").
+		Limit(limit)
 }
 
 type AggOrder struct {
