@@ -38,7 +38,7 @@ func (store JsonStore) Reset() error {
 
 func (store JsonStore) Load(val interface{}) error {
 	if _, err := os.Stat(store.Directory); os.IsNotExist(err) {
-		if err2 := os.Mkdir(store.Directory, 0777); err2 != nil {
+		if err2 := os.MkdirAll(store.Directory, 0777); err2 != nil {
 			return err2
 		}
 	}

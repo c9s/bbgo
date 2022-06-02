@@ -13,6 +13,9 @@ import (
 )
 
 type TestStruct struct {
+	*Environment
+	*Graceful
+
 	Position *types.Position `persistence:"position"`
 	Integer  int64           `persistence:"integer"`
 	Integer2 int64           `persistence:"integer2"`
@@ -49,6 +52,25 @@ func Test_callID(t *testing.T) {
 	assert.NotEmpty(t, id)
 }
 
+func Test_loadPersistenceFields(t *testing.T) {
+	var pss = preparePersistentServices()
+
+	for _, ps := range pss {
+		psName := reflect.TypeOf(ps).Elem().String()
+		t.Run(psName+"/empty", func(t *testing.T) {
+			b := &TestStruct{}
+			err := loadPersistenceFields(b, "test-empty", ps)
+			assert.NoError(t, err)
+		})
+
+		t.Run(psName+"/nil", func(t *testing.T) {
+			var b *TestStruct = nil
+			err := loadPersistenceFields(b, "test-nil", ps)
+			assert.Equal(t, errCanNotIterateNilPointer, err)
+		})
+	}
+}
+
 func Test_storePersistenceFields(t *testing.T) {
 	var pss = preparePersistentServices()
 
@@ -64,7 +86,8 @@ func Test_storePersistenceFields(t *testing.T) {
 	a.Position.AverageCost = fixedpoint.NewFromFloat(3343.0)
 
 	for _, ps := range pss {
-		t.Run(reflect.TypeOf(ps).Elem().String(), func(t *testing.T) {
+		psName := reflect.TypeOf(ps).Elem().String()
+		t.Run("all/"+psName, func(t *testing.T) {
 			id := callID(a)
 			err := storePersistenceFields(a, id, ps)
 			assert.NoError(t, err)
