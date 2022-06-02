@@ -407,7 +407,7 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 		}
 	}
 
-	trend := s.detectPriceTrend(s.neutralBoll, midPrice.Float64())
+	trend := detectPriceTrend(s.neutralBoll, midPrice.Float64())
 	switch trend {
 	case NeutralTrend:
 		// do nothing
@@ -477,7 +477,7 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 	}
 
 	for i := range submitOrders {
-		submitOrders[i] = s.adjustOrderQuantity(submitOrders[i])
+		submitOrders[i] = adjustOrderQuantity(submitOrders[i], s.Market)
 	}
 
 	createdOrders, err := orderExecutor.SubmitOrders(ctx, submitOrders...)
@@ -494,43 +494,6 @@ func (s *Strategy) hasLongSet() bool {
 
 func (s *Strategy) hasShortSet() bool {
 	return s.Short != nil && *s.Short
-}
-
-type PriceTrend string
-
-const (
-	NeutralTrend PriceTrend = "neutral"
-	UpTrend      PriceTrend = "upTrend"
-	DownTrend    PriceTrend = "downTrend"
-	UnknownTrend PriceTrend = "unknown"
-)
-
-func (s *Strategy) detectPriceTrend(inc *indicator.BOLL, price float64) PriceTrend {
-	if inBetween(price, inc.LastDownBand(), inc.LastUpBand()) {
-		return NeutralTrend
-	}
-
-	if price < inc.LastDownBand() {
-		return DownTrend
-	}
-
-	if price > inc.LastUpBand() {
-		return UpTrend
-	}
-
-	return UnknownTrend
-}
-
-func (s *Strategy) adjustOrderQuantity(submitOrder types.SubmitOrder) types.SubmitOrder {
-	if submitOrder.Quantity.Mul(submitOrder.Price).Compare(s.Market.MinNotional) < 0 {
-		submitOrder.Quantity = bbgo.AdjustFloatQuantityByMinAmount(submitOrder.Quantity, submitOrder.Price, s.Market.MinNotional.Mul(notionModifier))
-	}
-
-	if submitOrder.Quantity.Compare(s.Market.MinQuantity) < 0 {
-		submitOrder.Quantity = fixedpoint.Max(submitOrder.Quantity, s.Market.MinQuantity)
-	}
-
-	return submitOrder
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
@@ -595,15 +558,15 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	instanceID := s.InstanceID()
 	s.groupID = util.FNV32(instanceID)
 
-	// restore state
-	if err := s.LoadState(); err != nil {
-		return err
-	}
-
 	// If position is nil, we need to allocate a new position for calculation
 	if s.Position == nil {
+		// restore state (legacy)
+		if err := s.LoadState(); err != nil {
+			return err
+		}
+
 		// fallback to the legacy position struct in the state
-		if s.state != nil && s.state.Position != nil {
+		if s.state != nil && s.state.Position != nil && !s.state.Position.Base.IsZero() {
 			s.Position = s.state.Position
 		} else {
 			s.Position = types.NewPositionFromMarket(s.Market)
@@ -669,6 +632,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
 		log.Infof("position changed: %s", s.Position)
 		s.Notify(s.Position)
+
+		if err := s.Persistence.Sync(s); err != nil {
+			log.WithError(err).Errorf("can not sync state to persistence")
+		}
 	})
 
 	s.tradeCollector.BindStream(session.UserDataStream)
@@ -773,4 +740,16 @@ func calculateBandPercentage(up, down, sma, midPrice float64) float64 {
 
 func inBetween(x, a, b float64) bool {
 	return a < x && x < b
+}
+
+func adjustOrderQuantity(submitOrder types.SubmitOrder, market types.Market) types.SubmitOrder {
+	if submitOrder.Quantity.Mul(submitOrder.Price).Compare(market.MinNotional) < 0 {
+		submitOrder.Quantity = bbgo.AdjustFloatQuantityByMinAmount(submitOrder.Quantity, submitOrder.Price, market.MinNotional.Mul(notionModifier))
+	}
+
+	if submitOrder.Quantity.Compare(market.MinQuantity) < 0 {
+		submitOrder.Quantity = fixedpoint.Max(submitOrder.Quantity, market.MinQuantity)
+	}
+
+	return submitOrder
 }
