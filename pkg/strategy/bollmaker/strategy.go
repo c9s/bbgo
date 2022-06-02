@@ -558,15 +558,17 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	instanceID := s.InstanceID()
 	s.groupID = util.FNV32(instanceID)
 
-	// restore state
-	if err := s.LoadState(); err != nil {
-		return err
-	}
+	log.Infof("!!! position: %+v", s.Position)
 
 	// If position is nil, we need to allocate a new position for calculation
 	if s.Position == nil {
+		// restore state (legacy)
+		if err := s.LoadState(); err != nil {
+			return err
+		}
+
 		// fallback to the legacy position struct in the state
-		if s.state != nil && s.state.Position != nil {
+		if s.state != nil && s.state.Position != nil && !s.state.Position.Base.IsZero() {
 			s.Position = s.state.Position
 		} else {
 			s.Position = types.NewPositionFromMarket(s.Market)
