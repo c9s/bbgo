@@ -7,6 +7,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
@@ -70,7 +71,9 @@ func (s *Stream) Connect(ctx context.Context) error {
 		return err
 	}
 	s.EmitStart()
+
 	go s.pollKLines(ctx)
+	go s.pollBalances(ctx)
 
 	go func() {
 		// https://docs.ftx.com/?javascript#request-process
@@ -141,6 +144,26 @@ func (s *Stream) Subscribe(channel types.Channel, symbol string, option types.Su
 		return
 	default:
 		panic("only support book/kline/trade channel now")
+	}
+}
+
+func (s *Stream) pollBalances(ctx context.Context) {
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+
+		case <-ticker.C:
+			balances, err := s.exchange.QueryAccountBalances(ctx)
+			if err != nil {
+				log.WithError(err).Errorf("query balance error")
+				continue
+			}
+			s.EmitBalanceSnapshot(balances)
+		}
 	}
 }
 
