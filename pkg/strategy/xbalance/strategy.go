@@ -84,7 +84,7 @@ func (r *WithdrawalRequest) String() string {
 }
 
 func (r *WithdrawalRequest) PlainText() string {
-	return fmt.Sprintf("Withdrawal request: sending %s %s from %s -> %s",
+	return fmt.Sprintf("Withdraw request: sending %s %s from %s -> %s",
 		r.Amount.FormatString(4),
 		r.Asset,
 		r.FromSession,
@@ -94,7 +94,7 @@ func (r *WithdrawalRequest) PlainText() string {
 
 func (r *WithdrawalRequest) SlackAttachment() slack.Attachment {
 	var color = "#DC143C"
-	title := util.Render(`Withdrawal Request {{ .Asset }}`, r)
+	title := util.Render(`Withdraw Request {{ .Asset }}`, r)
 	return slack.Attachment{
 		// Pretext:       "",
 		// Text:  text,
@@ -265,7 +265,7 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 		Amount:      requiredAmount,
 	})
 
-	if err := withdrawalService.Withdrawal(ctx, s.Asset, requiredAmount, toAddress.Address, &types.WithdrawalOptions{
+	if err := withdrawalService.Withdraw(ctx, s.Asset, requiredAmount, toAddress.Address, &types.WithdrawalOptions{
 		Network:    toAddress.Network,
 		AddressTag: toAddress.AddressTag,
 	}); err != nil {

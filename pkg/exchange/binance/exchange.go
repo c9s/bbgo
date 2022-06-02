@@ -402,8 +402,8 @@ func (e *Exchange) queryIsolatedMarginAccount(ctx context.Context) (*types.Accou
 	return a, nil
 }
 
-func (e *Exchange) Withdrawal(ctx context.Context, asset string, amount fixedpoint.Value, address string, options *types.WithdrawalOptions) error {
-	req := e.client.NewCreateWithdrawService()
+func (e *Exchange) Withdraw(ctx context.Context, asset string, amount fixedpoint.Value, address string, options *types.WithdrawalOptions) error {
+	req := e.client2.NewWithdrawRequest()
 	req.Coin(asset)
 	req.Address(address)
 	req.Amount(fmt.Sprintf("%f", amount.Float64()))

@@ -122,7 +122,7 @@ type ExchangeTransferService interface {
 }
 
 type ExchangeWithdrawalService interface {
-	Withdrawal(ctx context.Context, asset string, amount fixedpoint.Value, address string, options *WithdrawalOptions) error
+	Withdraw(ctx context.Context, asset string, amount fixedpoint.Value, address string, options *WithdrawalOptions) error
 }
 
 type ExchangeRewardService interface {
