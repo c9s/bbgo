@@ -106,7 +106,7 @@ func NewEnvironment() *Environment {
 		// default trade scan time
 		syncStartTime: time.Now().AddDate(-1, 0, 0), // defaults to sync from 1 year ago
 		sessions:      make(map[string]*ExchangeSession),
-		startTime:     time.Now(),
+		startTime:     time.Now().UTC(),
 
 		syncStatus: SyncNotStarted,
 		PersistenceServiceFacade: &service.PersistenceServiceFacade{
