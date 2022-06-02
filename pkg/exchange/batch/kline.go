@@ -24,7 +24,7 @@ func (e *KLineBatchQuery) Query(ctx context.Context, symbol string, interval typ
 			})
 		},
 		T: func(obj interface{}) time.Time {
-			return time.Time(obj.(types.KLine).StartTime)
+			return time.Time(obj.(types.KLine).StartTime).UTC()
 		},
 		ID: func(obj interface{}) string {
 			kline := obj.(types.KLine)
