@@ -101,6 +101,10 @@ type ExchangeTradeService interface {
 	CancelOrders(ctx context.Context, orders ...Order) error
 }
 
+type ExchangeDefaultFeeRates interface {
+	DefaultFeeRates() ExchangeFee
+}
+
 type ExchangeTradeHistoryService interface {
 	QueryTrades(ctx context.Context, symbol string, options *TradeQueryOptions) ([]Trade, error)
 	QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []Order, err error)
