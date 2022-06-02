@@ -8,6 +8,7 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
+//go:generate stringer -type=TransferType
 // 1 for internal transfer, 0 for external transfer
 type TransferType int
 
@@ -22,16 +23,17 @@ type WithdrawRecord struct {
 	Amount          fixedpoint.Value `json:"amount"`
 	ApplyTime       string           `json:"applyTime"`
 	Coin            string           `json:"coin"`
-	WithdrawOrderId string           `json:"withdrawOrderId"`
+	WithdrawOrderID string           `json:"withdrawOrderId"`
 	Network         string           `json:"network"`
 	TransferType    TransferType     `json:"transferType"`
 	Status          WithdrawStatus   `json:"status"`
 	TransactionFee  fixedpoint.Value `json:"transactionFee"`
 	ConfirmNo       int              `json:"confirmNo"`
 	Info            string           `json:"info"`
-	TxId            string           `json:"txId"`
+	TxID            string           `json:"txId"`
 }
 
+//go:generate stringer -type=WithdrawStatus
 type WithdrawStatus int
 
 // WithdrawStatus: 0(0:Email Sent,1:Cancelled 2:Awaiting Approval 3:Rejected 4:Processing 5:Failure 6:Completed)
@@ -45,7 +47,7 @@ const (
 	WithdrawStatusCompleted
 )
 
-//go:generate requestgen -method POST -url "/sapi/v1/capital/withdraw/history" -type GetWithdrawHistoryRequest -responseType .WithdrawRecord
+//go:generate requestgen -method POST -url "/sapi/v1/capital/withdraw/history" -type GetWithdrawHistoryRequest -responseType []WithdrawRecord
 type GetWithdrawHistoryRequest struct {
 	client requestgen.AuthenticatedAPIClient
 	coin   string `param:"coin"`
