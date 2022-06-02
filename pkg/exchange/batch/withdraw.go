@@ -17,7 +17,7 @@ func (e *WithdrawBatchQuery) Query(ctx context.Context, asset string, startTime,
 	query := &AsyncTimeRangedBatchQuery{
 		Type:        types.Withdraw{},
 		Limiter:     rate.NewLimiter(rate.Every(5*time.Second), 2),
-		JumpIfEmpty: time.Hour * 24 * 30,
+		JumpIfEmpty: time.Hour * 24 * 80,
 		Q: func(startTime, endTime time.Time) (interface{}, error) {
 			return e.ExchangeTransferService.QueryWithdrawHistory(ctx, asset, startTime, endTime)
 		},

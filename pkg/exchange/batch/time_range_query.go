@@ -61,12 +61,17 @@ func (q *AsyncTimeRangedBatchQuery) Query(ctx context.Context, ch interface{}, s
 			listRef := reflect.ValueOf(sliceInf)
 			listLen := listRef.Len()
 
+			log.Debugf("batch querying %T: %d remote records", q.Type, listLen)
+
 			if listLen == 0 {
 				if q.JumpIfEmpty > 0 {
 					startTime = startTime.Add(q.JumpIfEmpty)
+
+					log.Debugf("batch querying %T: empty records jump to %s", q.Type, startTime)
 					continue
 				}
 
+				log.Debugf("batch querying %T: empty records, query is completed", q.Type)
 				return
 			}
 
@@ -94,7 +99,7 @@ func (q *AsyncTimeRangedBatchQuery) Query(ctx context.Context, ch interface{}, s
 				obj := item.Interface()
 				id := q.ID(obj)
 				if _, exists := idMap[id]; exists {
-					log.Debugf("batch querying %T: duplicated id %s", q.Type, id)
+					log.Debugf("batch querying %T: ignore duplicated record, id = %s", q.Type, id)
 					continue
 				}
 
@@ -102,10 +107,11 @@ func (q *AsyncTimeRangedBatchQuery) Query(ctx context.Context, ch interface{}, s
 
 				cRef.Send(item)
 				sentAny = true
-				startTime = entryTime
+				startTime = entryTime.Add(time.Millisecond)
 			}
 
 			if !sentAny {
+				log.Debugf("batch querying %T: %d/%d records are not sent", q.Type, listLen, listLen)
 				return
 			}
 		}

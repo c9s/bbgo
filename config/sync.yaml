@@ -23,7 +23,7 @@ sync:
     filledOrders: true
 
   # since is the start date of your trading data
-  since: 2022-01-01
+  since: 2019-01-01
 
   # sessions is the list of session names you want to sync
   # by default, BBGO sync all your available sessions.
@@ -48,5 +48,5 @@ sync:
   - USDT
 
   # depositHistory: true
-  rewardHistory: true
+  # rewardHistory: true
   withdrawHistory: true
