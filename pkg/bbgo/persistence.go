@@ -88,11 +88,14 @@ func (p *Persistence) Sync(obj interface{}) error {
 
 func loadPersistenceFields(obj interface{}, id string, persistence service.PersistenceService) error {
 	return iterateFieldsByTag(obj, "persistence", func(tag string, field reflect.StructField, value reflect.Value) error {
+		log.Debugf("[loadPersistenceFields] loading value into field %v, tag = %s, original value = %v", field, tag, value)
+
 		newValueInf := newTypeValueInterface(value.Type())
 		// inf := value.Interface()
 		store := persistence.NewStore("state", id, tag)
 		if err := store.Load(&newValueInf); err != nil {
 			if err == service.ErrPersistenceNotExists {
+				log.Debugf("[loadPersistenceFields] state key does not exist, id = %v, tag = %s", id, tag)
 				return nil
 			}
 
@@ -104,7 +107,7 @@ func loadPersistenceFields(obj interface{}, id string, persistence service.Persi
 			newValue = newValue.Elem()
 		}
 
-		// log.Debugf("%v = %v (%s) -> %v (%s)\n", field, value, value.Type(), newValue, newValue.Type())
+		log.Debugf("[loadPersistenceFields] %v = %v (%s) -> %v (%s)\n", field, value, value.Type(), newValue, newValue.Type())
 
 		value.Set(newValue)
 		return nil
@@ -113,8 +116,9 @@ func loadPersistenceFields(obj interface{}, id string, persistence service.Persi
 
 func storePersistenceFields(obj interface{}, id string, persistence service.PersistenceService) error {
 	return iterateFieldsByTag(obj, "persistence", func(tag string, ft reflect.StructField, fv reflect.Value) error {
-		inf := fv.Interface()
+		log.Debugf("[storePersistenceFields] storing value from field %v, tag = %s, original value = %v", ft, tag, fv)
 
+		inf := fv.Interface()
 		store := persistence.NewStore("state", id, tag)
 		return store.Save(inf)
 	})
