@@ -346,6 +346,10 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 
 	log.Infof("calculated %s max exposure position: %v", s.Symbol, maxExposurePosition)
 
+	if !s.Position.IsClosed() && !s.Position.IsDust(midPrice) {
+		log.Infof("current %s unrealized profit: %f %s", s.Symbol, s.Position.UnrealizedProfit(midPrice).Float64(), s.Market.QuoteCurrency)
+	}
+
 	canSell := true
 	canBuy := true
 
