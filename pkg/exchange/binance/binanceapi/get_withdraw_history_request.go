@@ -47,7 +47,7 @@ const (
 	WithdrawStatusCompleted
 )
 
-//go:generate requestgen -method POST -url "/sapi/v1/capital/withdraw/history" -type GetWithdrawHistoryRequest -responseType []WithdrawRecord
+//go:generate requestgen -method GET -url "/sapi/v1/capital/withdraw/history" -type GetWithdrawHistoryRequest -responseType []WithdrawRecord
 type GetWithdrawHistoryRequest struct {
 	client requestgen.AuthenticatedAPIClient
 	coin   string `param:"coin"`
