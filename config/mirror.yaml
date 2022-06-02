@@ -1,0 +1,17 @@
+sessions:
+  binance-master:
+    exchange: binance
+    envVarPrefix: BINANCE
+    futures: true
+  binance-slave:
+    exchange: binance
+    envVarPrefix: BINANCE_SLAVE
+    futures: true
+
+crossExchangeStrategies:
+
+- on: binance-master
+  mirror:
+    symbol: BTCUSDT
+    exchange: binance
+
