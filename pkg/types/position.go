@@ -144,11 +144,30 @@ func (p *Position) NewClosePositionOrder(percentage fixedpoint.Value) *SubmitOrd
 	}
 }
 
+func (p *Position) IsDust(price fixedpoint.Value) bool {
+	base := p.GetBase()
+	return p.Market.IsDustQuantity(base, price)
+}
+
+// GetBase locks the mutex and return the base quantity
+// The base quantity can be negative
 func (p *Position) GetBase() (base fixedpoint.Value) {
 	p.Lock()
 	base = p.Base
 	p.Unlock()
 	return base
+}
+
+func (p *Position) UnrealizedProfit(price fixedpoint.Value) fixedpoint.Value {
+	base := p.GetBase()
+
+	if p.IsLong() {
+		return price.Sub(p.AverageCost).Mul(base)
+	} else if p.IsShort() {
+		return p.AverageCost.Sub(price).Mul(base)
+	}
+
+	return fixedpoint.Zero
 }
 
 type FuturesPosition struct {
@@ -219,6 +238,18 @@ func (p *Position) SetExchangeFeeRate(ex ExchangeName, exchangeFee ExchangeFee) 
 	}
 
 	p.ExchangeFeeRates[ex] = exchangeFee
+}
+
+func (p *Position) IsShort() bool {
+	return p.Base.Sign() < 0
+}
+
+func (p *Position) IsLong() bool {
+	return p.Base.Sign() > 0
+}
+
+func (p *Position) IsClosed() bool {
+	return p.Base.Sign() == 0
 }
 
 func (p *Position) Type() PositionType {
