@@ -86,60 +86,6 @@ func (p *Persistence) Sync(obj interface{}) error {
 	return storePersistenceFields(obj, id, ps)
 }
 
-type StructFieldIterator func(tag string, ft reflect.StructField, fv reflect.Value) error
-
-func iterateFieldsByTag(obj interface{}, tagName string, cb StructFieldIterator) error {
-	sv := reflect.ValueOf(obj)
-	st := reflect.TypeOf(obj)
-
-	if st.Kind() != reflect.Ptr {
-		return fmt.Errorf("f needs to be a pointer of a struct, %s given", st)
-	}
-
-	// solve the reference
-	st = st.Elem()
-	sv = sv.Elem()
-
-	if st.Kind() != reflect.Struct {
-		return fmt.Errorf("f needs to be a struct, %s given", st)
-	}
-
-	for i := 0; i < sv.NumField(); i++ {
-		fv := sv.Field(i)
-		ft := st.Field(i)
-
-		fvt := fv.Type()
-		_ = fvt
-
-		// skip unexported fields
-		if !st.Field(i).IsExported() {
-			continue
-		}
-
-		tag, ok := ft.Tag.Lookup(tagName)
-		if !ok {
-			continue
-		}
-
-		if err := cb(tag, ft, fv); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// https://github.com/xiaojun207/go-base-utils/blob/master/utils/Clone.go
-func newTypeValueInterface(typ reflect.Type) interface{} {
-	if typ.Kind() == reflect.Ptr {
-		typ = typ.Elem()
-		dst := reflect.New(typ).Elem()
-		return dst.Addr().Interface()
-	}
-	dst := reflect.New(typ)
-	return dst.Interface()
-}
-
 func loadPersistenceFields(obj interface{}, id string, persistence service.PersistenceService) error {
 	return iterateFieldsByTag(obj, "persistence", func(tag string, field reflect.StructField, value reflect.Value) error {
 		newValueInf := newTypeValueInterface(value.Type())
