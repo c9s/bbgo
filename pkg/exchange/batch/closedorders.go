@@ -5,8 +5,6 @@ import (
 	"strconv"
 	"time"
 
-	"golang.org/x/time/rate"
-
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -16,8 +14,7 @@ type ClosedOrderBatchQuery struct {
 
 func (q *ClosedOrderBatchQuery) Query(ctx context.Context, symbol string, startTime, endTime time.Time, lastOrderID uint64) (c chan types.Order, errC chan error) {
 	query := &AsyncTimeRangedBatchQuery{
-		Type:    types.Order{},
-		Limiter: rate.NewLimiter(rate.Every(5*time.Second), 2),
+		Type: types.Order{},
 		Q: func(startTime, endTime time.Time) (interface{}, error) {
 			orders, err := q.ExchangeTradeHistoryService.QueryClosedOrders(ctx, symbol, startTime, endTime, lastOrderID)
 			return orders, err
