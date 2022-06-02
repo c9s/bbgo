@@ -145,7 +145,7 @@ func (p *Position) NewClosePositionOrder(percentage fixedpoint.Value) *SubmitOrd
 }
 
 func (p *Position) IsDust(price fixedpoint.Value) bool {
-	base := p.GetBase()
+	base := p.GetBase().Abs()
 	return p.Market.IsDustQuantity(base, price)
 }
 
