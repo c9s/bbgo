@@ -407,7 +407,7 @@ func toMaxSubmitOrder(o types.SubmitOrder) (*maxapi.SubmitOrder, error) {
 	return &maxOrder, nil
 }
 
-func (e *Exchange) Withdrawal(ctx context.Context, asset string, amount fixedpoint.Value, address string, options *types.WithdrawalOptions) error {
+func (e *Exchange) Withdraw(ctx context.Context, asset string, amount fixedpoint.Value, address string, options *types.WithdrawalOptions) error {
 	asset = toLocalCurrency(asset)
 
 	addresses, err := e.client.WithdrawalService.NewGetWithdrawalAddressesRequest().

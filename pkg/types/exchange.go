@@ -40,15 +40,22 @@ func (n ExchangeName) String() string {
 }
 
 const (
-	ExchangeMax      = ExchangeName("max")
-	ExchangeBinance  = ExchangeName("binance")
-	ExchangeFTX      = ExchangeName("ftx")
-	ExchangeOKEx     = ExchangeName("okex")
-	ExchangeKucoin   = ExchangeName("kucoin")
-	ExchangeBacktest = ExchangeName("backtest")
+	ExchangeMax      ExchangeName = "max"
+	ExchangeBinance  ExchangeName = "binance"
+	ExchangeFTX      ExchangeName = "ftx"
+	ExchangeOKEx     ExchangeName = "okex"
+	ExchangeKucoin   ExchangeName = "kucoin"
+	ExchangeBacktest ExchangeName = "backtest"
 )
 
-var SupportedExchanges = []ExchangeName{"binance", "max", "ftx", "okex", "kucoin"}
+var SupportedExchanges = []ExchangeName{
+	ExchangeMax,
+	ExchangeBinance,
+	ExchangeFTX,
+	ExchangeOKEx,
+	ExchangeKucoin,
+	// note: we are not using "backtest"
+}
 
 func ValidExchangeName(a string) (ExchangeName, error) {
 	switch strings.ToLower(a) {
@@ -122,7 +129,7 @@ type ExchangeTransferService interface {
 }
 
 type ExchangeWithdrawalService interface {
-	Withdrawal(ctx context.Context, asset string, amount fixedpoint.Value, address string, options *WithdrawalOptions) error
+	Withdraw(ctx context.Context, asset string, amount fixedpoint.Value, address string, options *WithdrawalOptions) error
 }
 
 type ExchangeRewardService interface {

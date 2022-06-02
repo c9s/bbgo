@@ -402,8 +402,8 @@ func (e *Exchange) queryIsolatedMarginAccount(ctx context.Context) (*types.Accou
 	return a, nil
 }
 
-func (e *Exchange) Withdrawal(ctx context.Context, asset string, amount fixedpoint.Value, address string, options *types.WithdrawalOptions) error {
-	req := e.client.NewCreateWithdrawService()
+func (e *Exchange) Withdraw(ctx context.Context, asset string, amount fixedpoint.Value, address string, options *types.WithdrawalOptions) error {
+	req := e.client2.NewWithdrawRequest()
 	req.Coin(asset)
 	req.Address(address)
 	req.Amount(fmt.Sprintf("%f", amount.Float64()))
@@ -426,92 +426,58 @@ func (e *Exchange) Withdrawal(ctx context.Context, asset string, amount fixedpoi
 	return nil
 }
 
-func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (allWithdraws []types.Withdraw, err error) {
-	startTime := since
-
+func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (withdraws []types.Withdraw, err error) {
 	var emptyTime = time.Time{}
-	if startTime == emptyTime {
-		startTime, err = getLaunchDate()
+	if since == emptyTime {
+		since, err = getLaunchDate()
+		if err != nil {
+			return withdraws, err
+		}
+	}
+
+	// startTime ~ endTime must be in 90 days
+	historyDayRangeLimit := time.Hour * 24 * 89
+	if until.Sub(since) >= historyDayRangeLimit {
+		until = since.Add(historyDayRangeLimit)
+	}
+
+	req := e.client2.NewGetWithdrawHistoryRequest()
+	if len(asset) > 0 {
+		req.Coin(asset)
+	}
+
+	records, err := req.
+		StartTime(since).
+		EndTime(until).
+		Limit(1000).
+		Do(ctx)
+
+	if err != nil {
+		return withdraws, err
+	}
+
+	for _, d := range records {
+		// time format: 2006-01-02 15:04:05
+		applyTime, err := time.Parse("2006-01-02 15:04:05", d.ApplyTime)
 		if err != nil {
 			return nil, err
 		}
+
+		withdraws = append(withdraws, types.Withdraw{
+			Exchange:        types.ExchangeBinance,
+			ApplyTime:       types.Time(applyTime),
+			Asset:           d.Coin,
+			Amount:          d.Amount,
+			Address:         d.Address,
+			TransactionID:   d.TxID,
+			TransactionFee:  d.TransactionFee,
+			WithdrawOrderID: d.WithdrawOrderID,
+			Network:         d.Network,
+			Status:          d.Status.String(),
+		})
 	}
 
-	txIDs := map[string]struct{}{}
-
-	for startTime.Before(until) {
-		// startTime ~ endTime must be in 90 days
-		endTime := startTime.AddDate(0, 0, 60)
-		if endTime.After(until) {
-			endTime = until
-		}
-
-		req := e.client.NewListWithdrawsService()
-		if len(asset) > 0 {
-			req.Coin(asset)
-		}
-
-		withdraws, err := req.
-			StartTime(startTime.UnixNano() / int64(time.Millisecond)).
-			EndTime(endTime.UnixNano() / int64(time.Millisecond)).
-			Do(ctx)
-
-		if err != nil {
-			return allWithdraws, err
-		}
-
-		for _, d := range withdraws {
-			if _, ok := txIDs[d.TxID]; ok {
-				continue
-			}
-
-			status := ""
-			switch d.Status {
-			case 0:
-				status = "email_sent"
-			case 1:
-				status = "cancelled"
-			case 2:
-				status = "awaiting_approval"
-			case 3:
-				status = "rejected"
-			case 4:
-				status = "processing"
-			case 5:
-				status = "failure"
-			case 6:
-				status = "completed"
-
-			default:
-				status = fmt.Sprintf("unsupported code: %d", d.Status)
-			}
-
-			txIDs[d.TxID] = struct{}{}
-
-			// 2006-01-02 15:04:05
-			applyTime, err := time.Parse("2006-01-02 15:04:05", d.ApplyTime)
-			if err != nil {
-				return nil, err
-			}
-
-			allWithdraws = append(allWithdraws, types.Withdraw{
-				Exchange:        types.ExchangeBinance,
-				ApplyTime:       types.Time(applyTime),
-				Asset:           d.Coin,
-				Amount:          fixedpoint.MustNewFromString(d.Amount),
-				Address:         d.Address,
-				TransactionID:   d.TxID,
-				TransactionFee:  fixedpoint.MustNewFromString(d.TransactionFee),
-				WithdrawOrderID: d.WithdrawOrderID,
-				Network:         d.Network,
-				Status:          status,
-			})
-		}
-
-		startTime = endTime
-	}
-
-	return allWithdraws, nil
+	return withdraws, nil
 }
 
 func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since, until time.Time) (allDeposits []types.Deposit, err error) {
