@@ -4,8 +4,6 @@ import (
 	"context"
 	"time"
 
-	"golang.org/x/time/rate"
-
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -24,7 +22,6 @@ func (e TradeBatchQuery) Query(ctx context.Context, symbol string, options *type
 	endTime := *options.EndTime
 	query := &AsyncTimeRangedBatchQuery{
 		Type:    types.Trade{},
-		Limiter: rate.NewLimiter(rate.Every(5*time.Second), 2),
 		Q: func(startTime, endTime time.Time) (interface{}, error) {
 			return e.ExchangeTradeHistoryService.QueryTrades(ctx, symbol, options)
 		},

@@ -40,7 +40,7 @@ type SyncTask struct {
 	BatchQuery func(ctx context.Context, startTime, endTime time.Time) (interface{}, chan error)
 }
 
-func (sel SyncTask) execute(ctx context.Context, db *sqlx.DB, startTime time.Time) error {
+func (sel SyncTask) execute(ctx context.Context, db *sqlx.DB, startTime time.Time, args ...time.Time) error {
 	// query from db
 	recordSlice, err := selectAndScanType(ctx, db, sel.Select, sel.Type)
 	if err != nil {
@@ -65,10 +65,15 @@ func (sel SyncTask) execute(ctx context.Context, db *sqlx.DB, startTime time.Tim
 	}
 
 	// default since time point
-	since := lastRecordTime(sel, recordSliceRef, startTime)
+	startTime = lastRecordTime(sel, recordSliceRef, startTime)
+
+	endTime := time.Now()
+	if len(args) > 0 {
+		endTime = args[0]
+	}
 
 	// asset "" means all assets
-	dataC, errC := sel.BatchQuery(ctx, since, time.Now())
+	dataC, errC := sel.BatchQuery(ctx, startTime, endTime)
 	dataCRef := reflect.ValueOf(dataC)
 
 	for {
