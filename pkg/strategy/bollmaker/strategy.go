@@ -44,6 +44,12 @@ type State struct {
 	ProfitStats types.ProfitStats `json:"profitStats,omitempty"`
 }
 
+type PositionStack struct {
+	Enabled       bool             `json:"enabled,omitempty"`
+	PushThreshold fixedpoint.Value `json:"pushThreshold,omitempty"`
+	PopThreshold  fixedpoint.Value `json:"popThreshold,omitempty"`
+}
+
 type BollingerSetting struct {
 	types.IntervalWindow
 	BandWidth float64 `json:"bandWidth"`
@@ -225,11 +231,12 @@ type Strategy struct {
 	session *bbgo.ExchangeSession
 	book    *types.StreamOrderBook
 
-	state *State
+	state         *State
+	PositionStack PositionStack
 
 	// persistence fields
-	Position    *types.Position    `json:"position,omitempty" persistence:"position"`
-	ProfitStats *types.ProfitStats `json:"profitStats,omitempty" persistence:"profit_stats"`
+	Position    *types.PositionStack `json:"position,omitempty" persistence:"position"`
+	ProfitStats *types.ProfitStats   `json:"profitStats,omitempty" persistence:"profit_stats"`
 
 	activeMakerOrders *bbgo.LocalActiveOrderBook
 	orderStore        *bbgo.OrderStore
@@ -289,7 +296,7 @@ func (s *Strategy) Validate() error {
 	return nil
 }
 
-func (s *Strategy) CurrentPosition() *types.Position {
+func (s *Strategy) CurrentPosition() *types.PositionStack {
 	return s.Position
 }
 
@@ -652,9 +659,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	if s.Position == nil {
 		// fallback to the legacy position struct in the state
 		if s.state != nil && s.state.Position != nil {
-			s.Position = s.state.Position
+			s.Position.Position = s.state.Position
 		} else {
-			s.Position = types.NewPositionFromMarket(s.Market)
+			s.Position = types.NewPositionStackFromMarket(s.Market)
 		}
 	}
 
@@ -699,7 +706,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.ProfitStats.AddTrade(trade)
 
 		if profit.Compare(fixedpoint.Zero) == 0 {
-			s.Environment.RecordPosition(s.Position, trade, nil)
+			s.Environment.RecordPosition(s.Position.Position, trade, nil)
 		} else {
 			log.Infof("%s generated profit: %v", s.Symbol, profit)
 			p := s.Position.NewProfit(trade, profit, netProfit)
@@ -710,11 +717,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			s.ProfitStats.AddProfit(p)
 			s.Notify(&s.ProfitStats)
 
-			s.Environment.RecordPosition(s.Position, trade, &p)
+			s.Environment.RecordPosition(s.Position.Position, trade, &p)
 		}
 	})
 
-	s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
+	s.tradeCollector.OnPositionUpdate(func(position types.AnyPosition) {
 		log.Infof("position changed: %s", s.Position)
 		s.Notify(s.Position)
 	})
@@ -773,6 +780,32 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			log.WithError(err).Errorf("graceful cancel order error")
 		}
 
+		//log.Error(len(s.Position.Stack), s.Position.AverageCost, kline.Close)
+		if s.Position.Position.AverageCost.Div(kline.Close).Compare(fixedpoint.One.Add(s.PositionStack.PushThreshold)) > 0 {
+			log.Infof("push position %s", s.Position)
+			s.Position = s.Position.Push(types.NewPositionFromMarket(s.Market))
+		}
+		// make it dust naturally by bollmaker
+		if len(s.Position.Stack) > 1 && s.Position.Stack[len(s.Position.Stack)-2].AverageCost.Compare(kline.Close) < 0 && s.Market.IsDustQuantity(s.Position.GetBase(), kline.Close) {
+			log.Infof("pop position %s", s.Position)
+			s.Position = s.Position.Pop()
+		}
+		// make it dust by TP
+		if !s.PositionStack.PopThreshold.IsZero() {
+			if len(s.Position.Stack) > 1 && s.Position.Stack[len(s.Position.Stack)-2].AverageCost.Compare(kline.Close) < 0 && s.Position.AverageCost.Div(kline.Close).Compare(fixedpoint.One.Sub(s.PositionStack.PopThreshold)) < 0 {
+				s.ClosePosition(ctx, fixedpoint.One)
+				log.Infof("pop position %s", s.Position)
+				log.Error("pop position")
+				s.Position = s.Position.Pop()
+			}
+		}
+
+		//if s.Position.AverageCost.Div(kline.Close).Compare(fixedpoint.One.Sub(s.PopThreshold)) < 0 && && !s.Position.AverageCost.IsZero() {
+		//	//log.Error(len(s.Position.Stack), s.Position.AverageCost, kline.Close)
+		//	log.Errorf("pop")
+		//	s.ClosePosition(ctx, fixedpoint.One)
+		//	s.Position = s.Position.Pop()
+		//}
 		// check if there is a canceled order had partially filled.
 		s.tradeCollector.Process()
 

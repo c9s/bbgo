@@ -29,6 +29,11 @@ type PositionRisk struct {
 	LiquidationPrice fixedpoint.Value `json:"liquidationPrice"`
 }
 
+type AnyPosition interface {
+	AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedpoint.Value, madeProfit bool)
+	GetBase() (base fixedpoint.Value)
+}
+
 type Position struct {
 	Symbol        string `json:"symbol" db:"symbol"`
 	BaseCurrency  string `json:"baseCurrency" db:"base"`
@@ -452,4 +457,33 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 	}
 
 	return fixedpoint.Zero, fixedpoint.Zero, false
+}
+
+type PositionStack struct {
+	*Position
+	Stack []*Position
+}
+
+func (stack *PositionStack) Push(pos *Position) *PositionStack {
+	stack.Position = pos
+	stack.Stack = append(stack.Stack, pos)
+	return stack
+
+}
+
+func (stack *PositionStack) Pop() *PositionStack {
+	if len(stack.Stack) < 1 {
+		return nil
+	}
+	stack.Position = stack.Stack[len(stack.Stack)-1]
+	stack.Stack = stack.Stack[:len(stack.Stack)-1]
+	return stack
+}
+
+func NewPositionStackFromMarket(market Market) *PositionStack {
+	pos := NewPositionFromMarket(market)
+	return &PositionStack{
+		Position: pos,
+		Stack:    []*Position{pos},
+	}
 }

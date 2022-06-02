@@ -499,13 +499,13 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	if !s.TrailingStopTarget.TrailingStopCallbackRatio.IsZero() {
 		// Update trailing stop when the position changes
-		s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
+		s.tradeCollector.OnPositionUpdate(func(position types.AnyPosition) {
 			// StrategyController
 			if s.Status != types.StrategyStatusRunning {
 				return
 			}
 
-			if position.Base.Compare(s.Market.MinQuantity) > 0 { // Update order if we have a position
+			if position.(*types.Position).Base.Compare(s.Market.MinQuantity) > 0 { // Update order if we have a position
 				// Cancel the original order
 				if err := s.cancelOrder(s.trailingStopControl.OrderID, ctx, orderExecutor); err != nil {
 					log.WithError(err).Errorf("Can not cancel the original trailing stop order!")
@@ -515,12 +515,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				// Calculate minimum target price
 				var minTargetPrice = fixedpoint.Zero
 				if s.trailingStopControl.minimumProfitPercentage.Sign() > 0 {
-					minTargetPrice = position.AverageCost.Mul(fixedpoint.One.Add(s.trailingStopControl.minimumProfitPercentage))
+					minTargetPrice = position.(*types.Position).AverageCost.Mul(fixedpoint.One.Add(s.trailingStopControl.minimumProfitPercentage))
 				}
 
 				// Place new order if the target price is higher than the minimum target price
 				if s.trailingStopControl.IsHigherThanMin(minTargetPrice) {
-					orderForm := s.trailingStopControl.GenerateStopOrder(position.Base)
+					orderForm := s.trailingStopControl.GenerateStopOrder(position.(*types.Position).Base)
 					orders, err := s.submitOrders(ctx, orderExecutor, orderForm)
 					if err != nil {
 						log.WithError(err).Error("submit profit trailing stop order error")

@@ -58,13 +58,13 @@ func (c *TrailingStopController) Subscribe(session *ExchangeSession) {
 
 func (c *TrailingStopController) Run(ctx context.Context, session *ExchangeSession, tradeCollector *TradeCollector) {
 	// store the position
-	c.position = tradeCollector.Position()
+	c.position = tradeCollector.Position().(*types.Position)
 	c.averageCost = c.position.AverageCost
 
 	// Use trade collector to get the position update event
-	tradeCollector.OnPositionUpdate(func(position *types.Position) {
+	tradeCollector.OnPositionUpdate(func(position types.AnyPosition) {
 		// update average cost if we have it.
-		c.averageCost = position.AverageCost
+		c.averageCost = position.(*types.Position).AverageCost
 	})
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {

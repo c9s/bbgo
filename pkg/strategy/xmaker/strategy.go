@@ -781,7 +781,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		}
 	})
 
-	s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
+	s.tradeCollector.OnPositionUpdate(func(position types.AnyPosition) {
 		s.Notifiability.Notify(position)
 	})
 	s.tradeCollector.OnRecover(func(trade types.Trade) {

@@ -17,7 +17,7 @@ backtest:
   # see here for more details
   # https://www.investopedia.com/terms/m/maximum-drawdown-mdd.asp
   startTime: "2022-01-01"
-  endTime: "2022-05-12"
+  endTime: "2022-05-31"
   sessions:
   - binance
   symbols:
@@ -38,12 +38,21 @@ exchangeStrategies:
     interval: 1m
 
     # quantity is the base order quantity for your buy/sell order.
-    quantity: 0.05
+    # quantity: 0.05
+    amount: 20
+
+    # Position Stack, with longer stack length, may need more capital.
+    # Push position in stack is initiating a position to calculate base, average cost, etc.
+    # Pop position in stack is loading a previous position back.
+    positionStack:
+      enabled: true
+      pushThreshold: 25%
+      popThreshold: 5%
 
     # useTickerPrice use the ticker api to get the mid price instead of the closed kline price.
     # The back-test engine is kline-based, so the ticker price api is not supported.
     # Turn this on if you want to do real trading.
-    useTickerPrice: true
+    useTickerPrice: false
 
     # spread is the price spread from the middle price.
     # For ask orders, the ask price is ((bestAsk + bestBid) / 2 * (1.0 + spread))
@@ -103,7 +112,7 @@ exchangeStrategies:
           domain: [ -1, 1 ]
           # when in down band, holds 1.0 by maximum
           # when in up band, holds 0.05 by maximum
-          range: [ 10.0, 1.0 ]
+          range: [ 3.0, 0.5]
 
     # DisableShort means you can don't want short position during the market making
     # THe short here means you might sell some of your existing inventory.
@@ -136,25 +145,25 @@ exchangeStrategies:
     # Set up your stop order, this is optional
     # sometimes the stop order might decrease your total profit.
     # you can setup multiple stop,
-    stops:
+#    stops:
     # use trailing stop order
-    - trailingStop:
-        # callbackRate: when the price reaches -1% from the previous highest, we trigger the stop
-        callbackRate: 5.1%
-
-        # closePosition is how much position do you want to close
-        closePosition: 20%
-
-        # minProfit is how much profit you want to take.
-        # if you set this option, your stop will only be triggered above the average cost.
-        minProfit: 5%
-
-        # interval is the time interval for checking your stop
-        interval: 1m
-
-        # virtual means we don't place a a REAL stop order
-        # when virtual is on
-        # the strategy won't place a REAL stop order, instead if watches the close price,
-        # and if the condition matches, it submits a market order to close your position.
-        virtual: true
+#    - trailingStop:
+#        # callbackRate: when the price reaches -1% from the previous highest, we trigger the stop
+#        callbackRate: 5.1%
+#
+#        # closePosition is how much position do you want to close
+#        closePosition: 20%
+#
+#        # minProfit is how much profit you want to take.
+#        # if you set this option, your stop will only be triggered above the average cost.
+#        minProfit: 5%
+#
+#        # interval is the time interval for checking your stop
+#        interval: 1m
+#
+#        # virtual means we don't place a a REAL stop order
+#        # when virtual is on
+#        # the strategy won't place a REAL stop order, instead if watches the close price,
+#        # and if the condition matches, it submits a market order to close your position.
+#        virtual: true
 

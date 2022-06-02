@@ -18,17 +18,17 @@ type TradeCollector struct {
 
 	tradeStore *TradeStore
 	tradeC     chan types.Trade
-	position   *types.Position
+	position   types.AnyPosition
 	orderStore *OrderStore
 	doneTrades map[types.TradeKey]struct{}
 
 	recoverCallbacks        []func(trade types.Trade)
 	tradeCallbacks          []func(trade types.Trade, profit, netProfit fixedpoint.Value)
-	positionUpdateCallbacks []func(position *types.Position)
+	positionUpdateCallbacks []func(position types.AnyPosition)
 	profitCallbacks         []func(trade types.Trade, profit, netProfit fixedpoint.Value)
 }
 
-func NewTradeCollector(symbol string, position *types.Position, orderStore *OrderStore) *TradeCollector {
+func NewTradeCollector(symbol string, position types.AnyPosition, orderStore *OrderStore) *TradeCollector {
 	return &TradeCollector{
 		Symbol:   symbol,
 		orderSig: sigchan.New(1),
@@ -47,7 +47,7 @@ func (c *TradeCollector) OrderStore() *OrderStore {
 }
 
 // Position returns the position used by the trade collector
-func (c *TradeCollector) Position() *types.Position {
+func (c *TradeCollector) Position() types.AnyPosition {
 	return c.position
 }
 
