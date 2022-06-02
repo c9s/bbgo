@@ -7,6 +7,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/slack-go/slack"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
@@ -46,6 +47,20 @@ func (b Balance) Net() fixedpoint.Value {
 	}
 
 	return netAsset
+}
+
+func (b Balance) ValueString() (o string) {
+	o = fmt.Sprintf("%s", b.Available.String())
+
+	if b.Locked.Sign() > 0 {
+		o += fmt.Sprintf(" (locked %v)", b.Locked)
+	}
+
+	if b.Borrowed.Sign() > 0 {
+		o += fmt.Sprintf(" (borrowed: %v)", b.Borrowed)
+	}
+
+	return o
 }
 
 func (b Balance) String() (o string) {
@@ -90,6 +105,16 @@ func (m BalanceSnapshot) CsvRecords() [][]string {
 }
 
 type BalanceMap map[string]Balance
+
+func (m BalanceMap) Debts() BalanceMap {
+	bm := make(BalanceMap)
+	for c, b := range m {
+		if b.Borrowed.Sign() > 0 || b.Interest.Sign() > 0 {
+			bm[c] = b
+		}
+	}
+	return bm
+}
 
 func (m BalanceMap) Currencies() (currencies []string) {
 	for _, b := range m {
@@ -202,6 +227,23 @@ func (m BalanceMap) Print() {
 		}
 
 		log.Infoln(o)
+	}
+}
+
+func (m BalanceMap) SlackAttachment() slack.Attachment {
+	var fields []slack.AttachmentField
+
+	for _, b := range m {
+		fields = append(fields, slack.AttachmentField{
+			Title: b.Currency,
+			Value: b.ValueString(),
+			Short: true,
+		})
+	}
+
+	return slack.Attachment{
+		Color:  "#CCA33F",
+		Fields: fields,
 	}
 }
 
