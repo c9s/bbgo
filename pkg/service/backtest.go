@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	sq "github.com/Masterminds/squirrel"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -23,16 +24,43 @@ type BacktestService struct {
 func (s *BacktestService) SyncKLineByInterval(ctx context.Context, exchange types.Exchange, symbol string, interval types.Interval, startTime, endTime time.Time) error {
 	log.Infof("synchronizing lastKLine for interval %s from exchange %s", interval, exchange.Name())
 
-	q := &batch.KLineBatchQuery{Exchange: exchange}
+	// TODO: use isFutures here
+	_, _, isIsolated, isolatedSymbol := getExchangeAttributes(exchange)
+	// override symbol if isolatedSymbol is not empty
+	if isIsolated && len(isolatedSymbol) > 0 {
+		symbol = isolatedSymbol
+	}
 
-	klineC, errC := q.Query(ctx, symbol, interval, startTime, endTime)
-	for kline := range klineC {
-		if err := s.Insert(kline); err != nil {
+	tasks := []SyncTask{
+		{
+			Type: types.KLine{},
+			Time: func(obj interface{}) time.Time {
+				return obj.(types.KLine).StartTime.Time()
+			},
+			ID: func(obj interface{}) string {
+				kline := obj.(types.KLine)
+				return kline.Symbol + kline.Interval.String() + strconv.FormatInt(kline.StartTime.UnixMilli(), 10)
+			},
+			Select: SelectLastKLines(exchange.Name(), symbol, interval, 100),
+			BatchQuery: func(ctx context.Context, startTime, endTime time.Time) (interface{}, chan error) {
+				q := &batch.KLineBatchQuery{Exchange: exchange}
+				return q.Query(ctx, symbol, interval, startTime, endTime)
+			},
+			Insert: func(obj interface{}) error {
+				kline := obj.(types.KLine)
+				return s.Insert(kline)
+			},
+		},
+	}
+
+	for _, sel := range tasks {
+		if err := sel.execute(ctx, s.DB, startTime); err != nil {
 			return err
 		}
 	}
 
-	return <-errC
+	return nil
+
 }
 
 func (s *BacktestService) Verify(symbols []string, startTime time.Time, endTime time.Time, sourceExchange types.Exchange, verboseCnt int) error {
@@ -333,4 +361,17 @@ func (s *BacktestService) SyncExist(ctx context.Context, exchange types.Exchange
 		return err
 	}
 	return nil
+}
+
+// TODO: add is_futures column since the klines data is different
+func SelectLastKLines(ex types.ExchangeName, symbol string, interval types.Interval, limit uint64) sq.SelectBuilder {
+	return sq.Select("*").
+		From(strings.ToLower(ex.String()) + "_klines").
+		Where(sq.And{
+			sq.Eq{"symbol": symbol},
+			sq.Eq{"exchange": ex},
+			sq.Eq{"`interval`": interval.String()},
+		}).
+		OrderBy("start_time DESC").
+		Limit(limit)
 }
