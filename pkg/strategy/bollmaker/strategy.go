@@ -407,7 +407,7 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 		}
 	}
 
-	trend := s.detectPriceTrend(s.neutralBoll, midPrice.Float64())
+	trend := detectPriceTrend(s.neutralBoll, midPrice.Float64())
 	switch trend {
 	case NeutralTrend:
 		// do nothing
@@ -505,7 +505,7 @@ const (
 	UnknownTrend PriceTrend = "unknown"
 )
 
-func (s *Strategy) detectPriceTrend(inc *indicator.BOLL, price float64) PriceTrend {
+func detectPriceTrend(inc *indicator.BOLL, price float64) PriceTrend {
 	if inBetween(price, inc.LastDownBand(), inc.LastUpBand()) {
 		return NeutralTrend
 	}
