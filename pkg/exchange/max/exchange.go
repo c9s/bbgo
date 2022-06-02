@@ -968,3 +968,12 @@ func (e *Exchange) QueryMarginAssetMaxBorrowable(ctx context.Context, asset stri
 	err = fmt.Errorf("borrowing limit of %s not found", asset)
 	return amount, err
 }
+
+// DefaultFeeRates returns the MAX VIP 0 fee schedule
+// See also https://max-vip-zh.maicoin.com/
+func (e *Exchange) DefaultFeeRates() types.ExchangeFee {
+	return types.ExchangeFee{
+		MakerFeeRate: fixedpoint.NewFromFloat(0.01 * 0.045), // 0.045%
+		TakerFeeRate: fixedpoint.NewFromFloat(0.01 * 0.150), // 0.15%
+	}
+}

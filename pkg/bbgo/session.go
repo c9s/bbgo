@@ -336,6 +336,16 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 
 	session.markets = markets
 
+	if feeRateProvider, ok := session.Exchange.(types.ExchangeDefaultFeeRates); ok {
+		defaultFeeRates := feeRateProvider.DefaultFeeRates()
+		if session.MakerFeeRate.IsZero() {
+			session.MakerFeeRate = defaultFeeRates.MakerFeeRate
+		}
+		if session.TakerFeeRate.IsZero() {
+			session.TakerFeeRate = defaultFeeRates.TakerFeeRate
+		}
+	}
+
 	// query and initialize the balances
 	if !session.PublicOnly {
 		account, err := session.Exchange.QueryAccount(ctx)

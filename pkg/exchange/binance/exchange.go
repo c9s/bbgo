@@ -1412,6 +1412,15 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	}
 }
 
+// DefaultFeeRates returns the Binance VIP 0 fee schedule
+// See also https://www.binance.com/en/fee/schedule
+func (e *Exchange) DefaultFeeRates() types.ExchangeFee {
+	return types.ExchangeFee{
+		MakerFeeRate: fixedpoint.NewFromFloat(0.01 * 0.075), // 0.075%
+		TakerFeeRate: fixedpoint.NewFromFloat(0.01 * 0.075), // 0.075%
+	}
+}
+
 // QueryDepth query the order book depth of a symbol
 func (e *Exchange) QueryDepth(ctx context.Context, symbol string) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
 	var response *binance.DepthResponse
