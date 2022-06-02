@@ -30,6 +30,8 @@ var logger = logrus.WithField("exchange", "ftx")
 // POST https://ftx.com/api/orders 429, Success: false, err: Do not send more than 2 orders on this market per 200ms
 var requestLimit = rate.NewLimiter(rate.Every(220*time.Millisecond), 2)
 
+var marketDataLimiter = rate.NewLimiter(rate.Every(500*time.Millisecond), 2)
+
 //go:generate go run generate_symbol_map.go
 
 type Exchange struct {
@@ -240,10 +242,7 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 		return nil, err
 	}
 
-	sort.Slice(klines, func(i, j int) bool {
-		return klines[i].StartTime.Unix() < klines[j].StartTime.Unix()
-	})
-
+	klines = types.SortKLinesAscending(klines)
 	return klines, nil
 }
 
@@ -252,8 +251,19 @@ func (e *Exchange) _queryKLines(ctx context.Context, symbol string, interval typ
 		return nil, fmt.Errorf("interval %s is not supported", interval.String())
 	}
 
-	if err := requestLimit.Wait(ctx); err != nil {
+	if err := marketDataLimiter.Wait(ctx); err != nil {
 		return nil, err
+	}
+
+	rangeDuration := options.EndTime.Sub(*options.StartTime)
+	estimatedCount := rangeDuration / interval.Duration()
+	if options.Limit == 0 {
+		options.Limit = 500
+	}
+
+	if options.Limit != 0 && uint64(estimatedCount) > uint64(options.Limit) {
+		endTime := options.StartTime.Add(interval.Duration() * time.Duration(options.Limit))
+		options.EndTime = &endTime
 	}
 
 	resp, err := e.newRest().HistoricalPrices(ctx, toLocalSymbol(symbol), interval, int64(options.Limit), options.StartTime, options.EndTime)
