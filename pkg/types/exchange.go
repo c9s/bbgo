@@ -40,12 +40,12 @@ func (n ExchangeName) String() string {
 }
 
 const (
-	ExchangeMax      = ExchangeName("max")
-	ExchangeBinance  = ExchangeName("binance")
-	ExchangeFTX      = ExchangeName("ftx")
-	ExchangeOKEx     = ExchangeName("okex")
-	ExchangeKucoin   = ExchangeName("kucoin")
-	ExchangeBacktest = ExchangeName("backtest")
+	ExchangeMax      ExchangeName = "max"
+	ExchangeBinance  ExchangeName = "binance"
+	ExchangeFTX      ExchangeName = "ftx"
+	ExchangeOKEx     ExchangeName = "okex"
+	ExchangeKucoin   ExchangeName = "kucoin"
+	ExchangeBacktest ExchangeName = "backtest"
 )
 
 var SupportedExchanges = []ExchangeName{"binance", "max", "ftx", "okex", "kucoin"}
