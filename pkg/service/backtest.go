@@ -22,7 +22,7 @@ type BacktestService struct {
 }
 
 func (s *BacktestService) SyncKLineByInterval(ctx context.Context, exchange types.Exchange, symbol string, interval types.Interval, startTime, endTime time.Time) error {
-	log.Infof("synchronizing lastKLine for interval %s from exchange %s", interval, exchange.Name())
+	log.Infof("synchronizing %s klines with interval %s: %s <=> %s", exchange.Name(), interval, startTime, endTime)
 
 	// TODO: use isFutures here
 	_, _, isIsolated, isolatedSymbol := getExchangeAttributes(exchange)
@@ -34,7 +34,7 @@ func (s *BacktestService) SyncKLineByInterval(ctx context.Context, exchange type
 	tasks := []SyncTask{
 		{
 			Type:   types.KLine{},
-			Select: SelectLastKLines(exchange.Name(), symbol, interval, startTime, 100),
+			Select: SelectLastKLines(exchange.Name(), symbol, interval, startTime, endTime, 100),
 			Time: func(obj interface{}) time.Time {
 				return obj.(types.KLine).StartTime.Time().UTC()
 			},
@@ -385,6 +385,7 @@ func (s *BacktestService) FindMissingTimeRanges(ctx context.Context, ex types.Ex
 	var timeRanges []TimeRange
 	var timePoints = make(map[int64]struct{}, 1000) // we can use this to find duplicates
 	var lastTime time.Time
+	var intervalDuration = interval.Duration()
 	for rows.Next() {
 		var tt types.Time
 		if err := rows.Scan(&tt); err != nil {
@@ -392,9 +393,9 @@ func (s *BacktestService) FindMissingTimeRanges(ctx context.Context, ex types.Ex
 		}
 
 		var t = time.Time(tt)
-		if lastTime != (time.Time{}) && t.Sub(lastTime) > interval.Duration() {
+		if lastTime != (time.Time{}) && t.Sub(lastTime) > intervalDuration {
 			timeRanges = append(timeRanges, TimeRange{
-				Start: lastTime.Add(interval.Duration()),
+				Start: lastTime,
 				End:   t,
 			})
 		}
@@ -468,14 +469,14 @@ func SelectKLineTimeRange(ex types.ExchangeName, symbol string, interval types.I
 }
 
 // TODO: add is_futures column since the klines data is different
-func SelectLastKLines(ex types.ExchangeName, symbol string, interval types.Interval, startTime time.Time, limit uint64) sq.SelectBuilder {
+func SelectLastKLines(ex types.ExchangeName, symbol string, interval types.Interval, startTime, endTime time.Time, limit uint64) sq.SelectBuilder {
 	tableName := targetKlineTable(ex)
 	return sq.Select("*").
 		From(tableName).
 		Where(sq.And{
 			sq.Eq{"symbol": symbol},
 			sq.Eq{"`interval`": interval.String()},
-			sq.GtOrEq{"`start_time`": startTime},
+			sq.Expr("start_time BETWEEN ? AND ?", startTime, endTime),
 		}).
 		OrderBy("start_time DESC").
 		Limit(limit)

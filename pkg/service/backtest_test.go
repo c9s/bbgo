@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/c9s/bbgo/pkg/exchange"
@@ -54,5 +55,16 @@ func TestBacktestService(t *testing.T) {
 		assert.NotEmpty(t, timeRanges)
 		assert.Len(t, timeRanges, 1, "should find one missing time range")
 		t.Logf("found timeRanges: %+v", timeRanges)
+
+		log.SetLevel(log.DebugLevel)
+
+		for _, timeRange := range timeRanges {
+			err = service.SyncKLineByInterval(ctx, ex, symbol, types.Interval1h, timeRange.Start.Add(time.Second), timeRange.End.Add(-time.Second))
+			assert.NoError(t, err)
+		}
+
+		timeRanges, err = service.FindMissingTimeRanges(ctx, ex, symbol, types.Interval1h, startTime1, endTime2)
+		assert.NoError(t, err)
+		assert.Empty(t, timeRanges, "after partial sync, missing time ranges should be back-filled")
 	}
 }
