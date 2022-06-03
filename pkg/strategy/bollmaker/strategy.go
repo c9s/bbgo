@@ -623,7 +623,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			s.Notify(&p)
 
 			s.ProfitStats.AddProfit(p)
-			s.Notify(&s.ProfitStats)
+			s.Notify(s.ProfitStats)
 
 			s.Environment.RecordPosition(s.Position, trade, &p)
 		}
