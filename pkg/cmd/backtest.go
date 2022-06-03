@@ -22,6 +22,7 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/data/tsv"
+	"github.com/c9s/bbgo/pkg/exchange"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
@@ -186,7 +187,7 @@ var BacktestCmd = &cobra.Command{
 				return err
 			}
 
-			publicExchange, err := cmdutil.NewExchangePublic(exName)
+			publicExchange, err := exchange.NewPublic(exName)
 			if err != nil {
 				return err
 			}

@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
+	exchange2 "github.com/c9s/bbgo/pkg/exchange"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -52,7 +53,7 @@ var rootCmd = &cobra.Command{
 			return err
 		}
 
-		exchange, err := cmdutil.NewExchange(exchangeName)
+		exchange, err := exchange2.New(exchangeName)
 		if err != nil {
 			return err
 		}
