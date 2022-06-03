@@ -12,15 +12,20 @@ exchangeStrategies:
     interval: 5m
 
     pivotLength:  120
-    stopLossRatio: 0.5%
-    takeProfitRatio: 13%
-    shadowTPRatio: 2%
 
-    catBounceRatio: 1%
-    quantity: 1200
-    numLayers: 4
+    entry:
+      catBounceRatio: 1%
+      quantity: 1000
+      numLayers: 3
+#        marginOrderSideEffect: borrow
 
-#    marginOrderSideEffect: borrow
+    exit:
+      takeProfitPercentage: 13%
+      stopLossPercentage: 0.5%
+      shadowTPRatio: 13%
+#        marginOrderSideEffect: repay
+
+
 
 backtest:
   sessions:
@@ -32,5 +37,5 @@ backtest:
   account:
     binance:
       balances:
-        GMT: 5_000.0
-        USDT: 5_000.0
+        GMT: 3_000.0
+        USDT: 3_000.0
