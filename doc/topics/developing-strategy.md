@@ -41,12 +41,32 @@ To use the Symbol setting, you can get the value from the Run method of the stra
 
 ```
 func (s *Strategy) Run(ctx context.Context, session *bbgo.ExchangeSession) error {
+    // you need to import the "log" package
     log.Println("%s", s.Symbol)
     return nil
 }
 ```
 
+Now you have the Go struct and the Go package, but BBGO does not know your strategy,
+so you need to register your strategy.
 
+Define an ID const in your package:
+
+```
+const ID = "short"
+```
+
+Then call bbgo.RegisterStrategy with the ID you just defined and a struct reference:
+
+```
+func init() {
+	bbgo.RegisterStrategy(ID, &Strategy{})
+}
+```
+
+Note that you don't need to fill the fields in the struct, BBGO just need to know the type of struct.
+
+(BBGO use reflect to parse the fields from the given struct and allocate a new struct object from the given struct type internally)
 
 
 ## Built-in Strategy
