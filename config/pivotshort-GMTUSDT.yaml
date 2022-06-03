@@ -1,0 +1,44 @@
+---
+sessions:
+  binance:
+    exchange: binance
+    envVarPrefix: binance
+    margin: true
+    isolatedMargin: true
+    isolatedMarginSymbol: GMTUSDT
+    # futures: true
+
+exchangeStrategies:
+- on: binance
+  pivotshort:
+    symbol: GMTUSDT
+    interval: 5m
+
+    pivotLength:  120
+
+    entry:
+      immediate: true
+      catBounceRatio: 1%
+      quantity: 20
+      numLayers: 3
+      marginOrderSideEffect: borrow
+
+    exit:
+      takeProfitPercentage: 13%
+      stopLossPercentage: 0.5%
+      shadowTakeProfitRatio: 3%
+      marginOrderSideEffect: repay
+
+
+backtest:
+  sessions:
+    - binance
+  startTime: "2022-05-25"
+  endTime: "2022-06-03"
+  symbols:
+    - GMTUSDT
+  account:
+    binance:
+      balances:
+        GMT: 3_000.0
+        USDT: 3_000.0
