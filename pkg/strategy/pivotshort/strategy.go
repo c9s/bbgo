@@ -24,6 +24,7 @@ type IntervalWindowSetting struct {
 }
 
 type Entry struct {
+	Immediate        bool                            `json:"immediate"`
 	CatBounceRatio   fixedpoint.Value                `json:"catBounceRatio"`
 	Quantity         fixedpoint.Value                `json:"quantity"`
 	NumLayers        fixedpoint.Value                `json:"numLayers"`
@@ -33,7 +34,7 @@ type Entry struct {
 type Exit struct {
 	TakeProfitPercentage fixedpoint.Value                `json:"takeProfitPercentage"`
 	StopLossPercentage   fixedpoint.Value                `json:"stopLossPercentage"`
-	ShadowTPRatio        fixedpoint.Value                `json:"shadowTPRatio"`
+	ShadowTPRatio        fixedpoint.Value                `json:"shadowTakeProfitRatio"`
 	MarginSideEffect     types.MarginOrderSideEffectType `json:"marginOrderSideEffect"`
 }
 
@@ -80,13 +81,16 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	//session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: types.Interval1d})
 }
 
-func (s *Strategy) placeOrder(ctx context.Context, price fixedpoint.Value, qty fixedpoint.Value, orderExecutor bbgo.OrderExecutor) {
+func (s *Strategy) placeOrder(ctx context.Context, marketPrice fixedpoint.Value, limitPrice fixedpoint.Value, currentPrice fixedpoint.Value, qty fixedpoint.Value, orderExecutor bbgo.OrderExecutor) {
 	submitOrder := types.SubmitOrder{
 		Symbol:   s.Symbol,
 		Side:     types.SideTypeSell,
 		Type:     types.OrderTypeLimit,
-		Price:    price,
+		Price:    limitPrice,
 		Quantity: qty,
+	}
+	if s.Entry.Immediate && marketPrice.Compare(currentPrice) <= 0 {
+		submitOrder.Type = types.OrderTypeMarket
 	}
 	if s.session.Margin {
 		submitOrder.MarginSideEffect = s.Entry.MarginSideEffect
@@ -279,19 +283,19 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				if futuresMode {
 					//log.Infof("futures mode on")
 					if q.Mul(p).Compare(quoteBalance.Available) <= 0 {
-						s.placeOrder(ctx, p, q, orderExecutor)
+						s.placeOrder(ctx, lastLow, p, kline.Close, q, orderExecutor)
 						s.tradeCollector.Process()
 					}
 				} else if s.Environment.IsBackTesting() {
 					//log.Infof("spot backtest mode on")
 					if q.Compare(baseBalance.Available) <= 0 {
-						s.placeOrder(ctx, p, q, orderExecutor)
+						s.placeOrder(ctx, lastLow, p, kline.Close, q, orderExecutor)
 						s.tradeCollector.Process()
 					}
 				} else {
 					//log.Infof("spot mode on")
 					if q.Compare(baseBalance.Available) <= 0 {
-						s.placeOrder(ctx, p, q, orderExecutor)
+						s.placeOrder(ctx, lastLow, p, kline.Close, q, orderExecutor)
 						s.tradeCollector.Process()
 					}
 				}
