@@ -5,13 +5,13 @@ sessions:
     envVarPrefix: binance
     margin: true
     isolatedMargin: true
-    isolatedMarginSymbol: GMTUSDT
+    isolatedMarginSymbol: GMTBUSD
     # futures: true
 
 exchangeStrategies:
 - on: binance
   pivotshort:
-    symbol: GMTUSDT
+    symbol: GMTBUSD
     interval: 5m
 
     pivotLength:  120
@@ -36,7 +36,7 @@ backtest:
   startTime: "2022-05-25"
   endTime: "2022-06-03"
   symbols:
-    - GMTUSDT
+    - GMTBUSD
   account:
     binance:
       balances:

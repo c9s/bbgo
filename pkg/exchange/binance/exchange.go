@@ -364,6 +364,10 @@ func (e *Exchange) queryIsolatedMarginAccount(ctx context.Context) (*types.Accou
 		IsolatedMarginInfo: toGlobalIsolatedMarginAccountInfo(marginAccount), // In binance GO api, Account define marginAccount info which mantain []*AccountAsset and []*AccountPosition.
 	}
 
+	if len(marginAccount.Assets) == 0 {
+		return nil, fmt.Errorf("empty margin account assets, please check your isolatedMarginSymbol is correctly set: %+v", marginAccount)
+	}
+
 	// for isolated margin account, we will only have one asset in the Assets array.
 	if len(marginAccount.Assets) > 1 {
 		return nil, fmt.Errorf("unexpected number of user assets returned, got %d user assets", len(marginAccount.Assets))

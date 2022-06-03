@@ -1,8 +1,12 @@
+---
 sessions:
   binance:
     exchange: binance
     envVarPrefix: binance
-#    futures: true
+    margin: true
+    isolatedMargin: true
+    isolatedMarginSymbol: GMTUSDT
+    # futures: true
 
 exchangeStrategies:
 - on: binance
@@ -15,15 +19,15 @@ exchangeStrategies:
     entry:
       immediate: true
       catBounceRatio: 1%
-      quantity: 1000
+      quantity: 20
       numLayers: 3
-#        marginOrderSideEffect: borrow
+      marginOrderSideEffect: borrow
 
     exit:
       takeProfitPercentage: 13%
       stopLossPercentage: 0.5%
       shadowTakeProfitRatio: 3%
-#        marginOrderSideEffect: repay
+      marginOrderSideEffect: repay
 
 
 backtest:
