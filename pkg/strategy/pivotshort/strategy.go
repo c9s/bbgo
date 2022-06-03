@@ -263,7 +263,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	session.UserDataStream.OnStart(func() {
 		if price, ok := session.LastPrice(s.Symbol); ok {
 			limitPrice := s.getValidPivotLow(price)
-			log.Infof("init place limit sell start from %f adds up to %f percent with %f layers of orders", limitPrice.Float64(), s.Entry.CatBounceRatio.Mul(fixedpoint.NewFromInt(100)).Float64(), s.Entry.NumLayers.Float64())
+			log.Infof("init %s place limit sell start from %f adds up to %f percent with %f layers of orders", s.Symbol, limitPrice.Float64(), s.Entry.CatBounceRatio.Mul(fixedpoint.NewFromInt(100)).Float64(), s.Entry.NumLayers.Float64())
 			s.placeLayerOrder(ctx, s.LastLow, limitPrice, price, orderExecutor)
 		}
 	})
@@ -307,7 +307,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 
 			limitPrice := s.getValidPivotLow(kline.Close)
-			log.Infof("place limit sell start from %f adds up to %f percent with %f layers of orders", limitPrice.Float64(), s.Entry.CatBounceRatio.Mul(fixedpoint.NewFromInt(100)).Float64(), s.Entry.NumLayers.Float64())
+			log.Infof("%s place limit sell start from %f adds up to %f percent with %f layers of orders", s.Symbol, limitPrice.Float64(), s.Entry.CatBounceRatio.Mul(fixedpoint.NewFromInt(100)).Float64(), s.Entry.NumLayers.Float64())
 			s.placeLayerOrder(ctx, s.LastLow, limitPrice, kline.Close, orderExecutor)
 			//s.placeOrder(ctx, lastLow.Mul(fixedpoint.One.Add(s.CatBounceRatio)), s.Quantity, orderExecutor)
 		}
