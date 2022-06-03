@@ -8,24 +8,34 @@ sessions:
 exchangeStrategies:
 - on: binance
   pivotshort:
-    symbol: BTCBUSD
+    symbol: GMTUSDT
     interval: 5m
-    quantity: 1.0
-    pivotLength: 60
-    stopLossRatio: 0.8%
-    catBounceRatio: 3%
-    numLayers: 5
-    shadowTPRatio: 2%
+
+    pivotLength:  120
+
+    entry:
+      catBounceRatio: 1%
+      quantity: 1000
+      numLayers: 3
+#        marginOrderSideEffect: borrow
+
+    exit:
+      takeProfitPercentage: 13%
+      stopLossPercentage: 0.5%
+      shadowTPRatio: 13%
+#        marginOrderSideEffect: repay
+
+
 
 backtest:
   sessions:
     - binance
-  startTime: "2022-01-01"
-  endTime: "2022-05-10"
+  startTime: "2022-04-01"
+  endTime: "2022-06-03"
   symbols:
-    - BTCBUSD
+    - GMTUSDT
   account:
     binance:
       balances:
-        BTC: 1.0
-        BUSD: 40_000.0
+        GMT: 3_000.0
+        USDT: 3_000.0
