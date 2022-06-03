@@ -4,7 +4,6 @@ sessions:
     envVarPrefix: binance
 #    futures: true
 
-
 exchangeStrategies:
 - on: binance
   pivotshort:
@@ -23,9 +22,8 @@ exchangeStrategies:
     exit:
       takeProfitPercentage: 13%
       stopLossPercentage: 0.5%
-      shadowTPRatio: 13%
+      shadowTakeProfitRatio: 3%
 #        marginOrderSideEffect: repay
-
 
 
 backtest:

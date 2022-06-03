@@ -34,7 +34,7 @@ type Entry struct {
 type Exit struct {
 	TakeProfitPercentage fixedpoint.Value                `json:"takeProfitPercentage"`
 	StopLossPercentage   fixedpoint.Value                `json:"stopLossPercentage"`
-	ShadowTPRatio        fixedpoint.Value                `json:"shadowTPRatio"`
+	ShadowTPRatio        fixedpoint.Value                `json:"shadowTakeProfitRatio"`
 	MarginSideEffect     types.MarginOrderSideEffectType `json:"marginOrderSideEffect"`
 }
 
