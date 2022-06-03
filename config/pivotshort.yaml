@@ -14,6 +14,7 @@ exchangeStrategies:
     pivotLength:  120
 
     entry:
+      immediate: true
       catBounceRatio: 1%
       quantity: 1000
       numLayers: 3
@@ -30,7 +31,7 @@ exchangeStrategies:
 backtest:
   sessions:
     - binance
-  startTime: "2022-04-01"
+  startTime: "2022-05-25"
   endTime: "2022-06-03"
   symbols:
     - GMTUSDT
