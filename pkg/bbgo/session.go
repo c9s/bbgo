@@ -9,13 +9,13 @@ import (
 
 	"github.com/slack-go/slack"
 
-	"github.com/c9s/bbgo/pkg/cache"
-
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
-	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
+	"github.com/c9s/bbgo/pkg/cache"
+
+	exchange2 "github.com/c9s/bbgo/pkg/exchange"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/service"
@@ -740,17 +740,17 @@ func (session *ExchangeSession) FindPossibleSymbols() (symbols []string, err err
 // InitExchange initialize the exchange instance and allocate memory for fields
 // In this stage, the session var could be loaded from the JSON config, so the pointer fields are still nil
 // The Init method will be called after this stage, environment.Init will call the session.Init method later.
-func (session *ExchangeSession) InitExchange(name string, exchange types.Exchange) error {
+func (session *ExchangeSession) InitExchange(name string, ex types.Exchange) error {
 	var err error
 	var exchangeName = session.ExchangeName
-	if exchange == nil {
+	if ex == nil {
 		if session.PublicOnly {
-			exchange, err = cmdutil.NewExchangePublic(exchangeName)
+			ex, err = exchange2.NewPublic(exchangeName)
 		} else {
 			if session.Key != "" && session.Secret != "" {
-				exchange, err = cmdutil.NewExchangeStandard(exchangeName, session.Key, session.Secret, session.Passphrase, session.SubAccount)
+				ex, err = exchange2.NewStandard(exchangeName, session.Key, session.Secret, session.Passphrase, session.SubAccount)
 			} else {
-				exchange, err = cmdutil.NewExchangeWithEnvVarPrefix(exchangeName, session.EnvVarPrefix)
+				ex, err = exchange2.NewWithEnvVarPrefix(exchangeName, session.EnvVarPrefix)
 			}
 		}
 	}
@@ -761,7 +761,7 @@ func (session *ExchangeSession) InitExchange(name string, exchange types.Exchang
 
 	// configure exchange
 	if session.Margin {
-		marginExchange, ok := exchange.(types.MarginExchange)
+		marginExchange, ok := ex.(types.MarginExchange)
 		if !ok {
 			return fmt.Errorf("exchange %s does not support margin", exchangeName)
 		}
@@ -774,7 +774,7 @@ func (session *ExchangeSession) InitExchange(name string, exchange types.Exchang
 	}
 
 	if session.Futures {
-		futuresExchange, ok := exchange.(types.FuturesExchange)
+		futuresExchange, ok := ex.(types.FuturesExchange)
 		if !ok {
 			return fmt.Errorf("exchange %s does not support futures", exchangeName)
 		}
@@ -792,9 +792,9 @@ func (session *ExchangeSession) InitExchange(name string, exchange types.Exchang
 		SessionChannelRouter: NewPatternChannelRouter(nil),
 		ObjectChannelRouter:  NewObjectChannelRouter(),
 	}
-	session.Exchange = exchange
-	session.UserDataStream = exchange.NewStream()
-	session.MarketDataStream = exchange.NewStream()
+	session.Exchange = ex
+	session.UserDataStream = ex.NewStream()
+	session.MarketDataStream = ex.NewStream()
 	session.MarketDataStream.SetPublicOnly()
 
 	// pointer fields
