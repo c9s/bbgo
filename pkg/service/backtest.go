@@ -389,7 +389,6 @@ func (s *BacktestService) FindMissingTimeRanges(ctx context.Context, ex types.Ex
 	}
 
 	var timeRanges []TimeRange
-	var timePoints = make(map[int64]struct{}, 1000) // we can use this to find duplicates
 	var lastTime time.Time
 	var intervalDuration = interval.Duration()
 	for rows.Next() {
@@ -407,7 +406,6 @@ func (s *BacktestService) FindMissingTimeRanges(ctx context.Context, ex types.Ex
 		}
 
 		lastTime = t
-		timePoints[t.Unix()] = struct{}{}
 	}
 
 	return timeRanges, nil
