@@ -364,7 +364,30 @@ func (s *BacktestService) SyncPartial(ctx context.Context, ex types.Exchange, sy
 	if err != nil {
 		return err
 	}
-	_ = timeRanges
+
+	// there are few cases:
+	// t1 == since && t2 == until
+	if since.Before(t1.Time()) {
+		// shift slice
+		timeRanges = append([]TimeRange{
+			{Start: since.Add(-2 * time.Second), End: t1.Time()}, // include since
+		}, timeRanges...)
+	}
+
+	if t2.Time().Before(until) {
+		timeRanges = append(timeRanges, TimeRange{
+			Start: t2.Time(),
+			End:   until.Add(2 * time.Second), // include until
+		})
+	}
+
+	for _, timeRange := range timeRanges {
+		err = s.SyncKLineByInterval(ctx, ex, symbol, types.Interval1h, timeRange.Start.Add(time.Second), timeRange.End.Add(-time.Second))
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
