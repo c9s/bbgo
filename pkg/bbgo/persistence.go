@@ -107,7 +107,7 @@ func loadPersistenceFields(obj interface{}, id string, persistence service.Persi
 			newValue = newValue.Elem()
 		}
 
-		log.Debugf("[loadPersistenceFields] %v = %v (%s) -> %v (%s)\n", field, value, value.Type(), newValue, newValue.Type())
+		log.Debugf("[loadPersistenceFields] %v = %v -> %v\n", field, value, newValue)
 
 		value.Set(newValue)
 		return nil

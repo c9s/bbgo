@@ -1,5 +1,7 @@
 package bbgo
 
+import "github.com/sirupsen/logrus"
+
 type Notifier interface {
 	NotifyTo(channel string, obj interface{}, args ...interface{})
 	Notify(obj interface{}, args ...interface{})
@@ -48,6 +50,10 @@ func (m *Notifiability) AddNotifier(notifier Notifier) {
 }
 
 func (m *Notifiability) Notify(obj interface{}, args ...interface{}) {
+	if str, ok := obj.(string); ok {
+		logrus.Infof(str, args...)
+	}
+
 	for _, n := range m.notifiers {
 		n.Notify(obj, args...)
 	}
