@@ -13,7 +13,65 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func TestBacktestService(t *testing.T) {
+func TestBacktestService_SyncPartial(t *testing.T) {
+	db, err := prepareDB(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer db.Close()
+
+	ctx := context.Background()
+	dbx := sqlx.NewDb(db.DB, "sqlite3")
+
+	ex, err := exchange.NewPublic(types.ExchangeBinance)
+	assert.NoError(t, err)
+
+	service := &BacktestService{DB: dbx}
+
+	symbol := "BTCUSDT"
+	now := time.Now()
+	startTime1 := now.AddDate(0, 0, -7).Truncate(time.Hour)
+	endTime1 := now.AddDate(0, 0, -6).Truncate(time.Hour)
+
+	startTime2 := now.AddDate(0, 0, -5).Truncate(time.Hour)
+	endTime2 := now.AddDate(0, 0, -4).Truncate(time.Hour)
+
+	// kline query is exclusive
+	err = service.SyncKLineByInterval(ctx, ex, symbol, types.Interval1h, startTime1.Add(-time.Second), endTime1.Add(time.Second))
+	assert.NoError(t, err)
+
+	err = service.SyncKLineByInterval(ctx, ex, symbol, types.Interval1h, startTime2.Add(-time.Second), endTime2.Add(time.Second))
+	assert.NoError(t, err)
+
+	timeRanges, err := service.FindMissingTimeRanges(ctx, ex, symbol, types.Interval1h, startTime1, endTime2)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, timeRanges)
+
+	t.Run("fill missing time ranges", func(t *testing.T) {
+		err = service.SyncPartial(ctx, ex, symbol, types.Interval1h, startTime1, endTime2)
+		assert.NoError(t, err, "sync partial should not return error")
+
+		timeRanges2, err := service.FindMissingTimeRanges(ctx, ex, symbol, types.Interval1h, startTime1, endTime2)
+		assert.NoError(t, err)
+		assert.Empty(t, timeRanges2)
+	})
+
+	t.Run("extend time ranges", func(t *testing.T) {
+		startTime3 := startTime1.AddDate(0, 0, -3)
+		endTime3 := endTime2.AddDate(0, 0, 3)
+
+		err = service.SyncPartial(ctx, ex, symbol, types.Interval1h, startTime3, endTime3)
+		assert.NoError(t, err, "sync partial should not return error")
+
+		timeRanges3, err := service.FindMissingTimeRanges(ctx, ex, symbol, types.Interval1h, startTime3, endTime3)
+		assert.NoError(t, err)
+		assert.Empty(t, timeRanges3)
+	})
+
+}
+
+func TestBacktestService_FindMissingTimeRanges(t *testing.T) {
 	db, err := prepareDB(t)
 	if err != nil {
 		t.Fatal(err)
