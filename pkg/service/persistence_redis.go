@@ -63,7 +63,8 @@ func (store *RedisStore) Load(val interface{}) error {
 		return err
 	}
 
-	if len(data) == 0 {
+	// skip null data
+	if len(data) == 0 || data == "null" {
 		return ErrPersistenceNotExists
 	}
 
