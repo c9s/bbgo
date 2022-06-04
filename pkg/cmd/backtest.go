@@ -194,27 +194,27 @@ var BacktestCmd = &cobra.Command{
 			sourceExchanges[exName] = publicExchange
 		}
 
-		if wantSync {
-			var syncFromTime time.Time
+		var syncFromTime time.Time
 
-			// override the sync from time if the option is given
-			if len(syncFromDateStr) > 0 {
-				syncFromTime, err = time.Parse(types.DateFormat, syncFromDateStr)
-				if err != nil {
-					return err
-				}
-
-				if syncFromTime.After(startTime) {
-					return fmt.Errorf("sync-from time %s can not be latter than the backtest start time %s", syncFromTime, startTime)
-				}
-			} else {
-				// we need at least 1 month backward data for EMA and last prices
-				syncFromTime = startTime.AddDate(0, -1, 0)
-				log.Infof("adjusted sync start time %s to %s for backward market data", startTime, syncFromTime)
+		// user can override the sync from time if the option is given
+		if len(syncFromDateStr) > 0 {
+			syncFromTime, err = time.Parse(types.DateFormat, syncFromDateStr)
+			if err != nil {
+				return err
 			}
 
+			if syncFromTime.After(startTime) {
+				return fmt.Errorf("sync-from time %s can not be latter than the backtest start time %s", syncFromTime, startTime)
+			}
+		} else {
+			// we need at least 1 month backward data for EMA and last prices
+			syncFromTime = startTime.AddDate(0, -1, 0)
+			log.Infof("adjusted sync start time %s to %s for backward market data", startTime, syncFromTime)
+		}
+
+		if wantSync {
 			log.Infof("starting synchronization: %v", userConfig.Backtest.Symbols)
-			if err := sync(ctx, userConfig, backtestService, sourceExchanges, syncFromTime); err != nil {
+			if err := sync(ctx, userConfig, backtestService, sourceExchanges, syncFromTime, endTime); err != nil {
 				return err
 			}
 			log.Info("synchronization done")
@@ -650,9 +650,8 @@ func toExchangeSources(sessions map[string]*bbgo.ExchangeSession, extraIntervals
 	return exchangeSources, nil
 }
 
-func sync(ctx context.Context, userConfig *bbgo.Config, backtestService *service.BacktestService, sourceExchanges map[types.ExchangeName]types.Exchange, syncFromTime time.Time) error {
+func sync(ctx context.Context, userConfig *bbgo.Config, backtestService *service.BacktestService, sourceExchanges map[types.ExchangeName]types.Exchange, syncFrom, syncTo time.Time) error {
 	for _, symbol := range userConfig.Backtest.Symbols {
-
 		for _, sourceExchange := range sourceExchanges {
 			exCustom, ok := sourceExchange.(types.CustomIntervalProvider)
 
@@ -663,11 +662,7 @@ func sync(ctx context.Context, userConfig *bbgo.Config, backtestService *service
 				supportIntervals = types.SupportedIntervals
 			}
 
-			now := time.Now()
 			for interval := range supportIntervals {
-				// if err := s.SyncKLineByInterval(ctx, exchange, symbol, interval, startTime, endTime); err != nil {
-				//	return err
-				// }
 				firstKLine, err := backtestService.QueryFirstKLine(sourceExchange.Name(), symbol, interval)
 				if err != nil {
 					return errors.Wrapf(err, "failed to query backtest kline")
@@ -676,13 +671,13 @@ func sync(ctx context.Context, userConfig *bbgo.Config, backtestService *service
 				// if we don't have klines before the start time endpoint, the back-test will fail.
 				// because the last price will be missing.
 				if firstKLine != nil {
-					log.Debugf("found existing kline data using partial sync...")
-					if err := backtestService.SyncExist(ctx, sourceExchange, symbol, syncFromTime, now, interval); err != nil {
+
+					if err := backtestService.SyncPartial(ctx, sourceExchange, symbol, interval, syncFrom, syncTo); err != nil {
 						return err
 					}
 				} else {
 					log.Debugf("starting a fresh kline data sync...")
-					if err := backtestService.Sync(ctx, sourceExchange, symbol, syncFromTime, now, interval); err != nil {
+					if err := backtestService.Sync(ctx, sourceExchange, symbol, interval, syncFrom, syncTo); err != nil {
 						return err
 					}
 				}

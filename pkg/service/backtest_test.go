@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 	"time"
 
@@ -12,6 +13,33 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange"
 	"github.com/c9s/bbgo/pkg/types"
 )
+
+func TestBacktestService_QueryExistingDataRange(t *testing.T) {
+	db, err := prepareDB(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer db.Close()
+
+	ctx := context.Background()
+	dbx := sqlx.NewDb(db.DB, "sqlite3")
+
+	ex, err := exchange.NewPublic(types.ExchangeBinance)
+	assert.NoError(t, err)
+
+	service := &BacktestService{DB: dbx}
+
+	symbol := "BTCUSDT"
+	now := time.Now()
+	startTime1 := now.AddDate(0, 0, -7).Truncate(time.Hour)
+	endTime1 := now.AddDate(0, 0, -6).Truncate(time.Hour)
+	// empty range
+	t1, t2, err := service.QueryExistingDataRange(ctx, ex, symbol, types.Interval1h, startTime1, endTime1)
+	assert.Error(t, sql.ErrNoRows, err)
+	assert.Nil(t, t1)
+	assert.Nil(t, t2)
+}
 
 func TestBacktestService_SyncPartial(t *testing.T) {
 	db, err := prepareDB(t)
