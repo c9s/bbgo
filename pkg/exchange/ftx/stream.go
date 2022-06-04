@@ -9,7 +9,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/c9s/bbgo/pkg/service"
+	"github.com/c9s/bbgo/pkg/net/websocketbase"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -18,7 +18,7 @@ const endpoint = "wss://ftx.com/ws/"
 type Stream struct {
 	*types.StandardStream
 
-	ws       *service.WebsocketClientBase
+	ws       *websocketbase.WebsocketClientBase
 	exchange *Exchange
 
 	key        string
@@ -42,7 +42,7 @@ func NewStream(key, secret string, subAccount string, e *Exchange) *Stream {
 		secret:         secret,
 		subAccount:     subAccount,
 		StandardStream: &types.StandardStream{},
-		ws:             service.NewWebsocketClientBase(endpoint, 3*time.Second),
+		ws:             websocketbase.NewWebsocketClientBase(endpoint, 3*time.Second),
 	}
 
 	s.ws.OnMessage((&messageHandler{StandardStream: s.StandardStream}).handleMessage)

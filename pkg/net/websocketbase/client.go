@@ -1,4 +1,4 @@
-package service
+package websocketbase
 
 import (
 	"context"
@@ -8,6 +8,8 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// WebsocketClientBase is a legacy base client
+// Deprecated: please use standard stream instead.
 //go:generate callbackgen -type WebsocketClientBase
 type WebsocketClientBase struct {
 	baseURL string

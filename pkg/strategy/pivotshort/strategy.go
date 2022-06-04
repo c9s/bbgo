@@ -4,11 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/sirupsen/logrus"
 )
 
 const ID = "pivotshort"
@@ -79,7 +80,7 @@ func (s *Strategy) ID() string {
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	log.Infof("subscribe %s", s.Symbol)
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
-	//session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: types.Interval1d})
+	// session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: types.Interval1d})
 }
 
 func (s *Strategy) placeOrder(ctx context.Context, lastLow fixedpoint.Value, limitPrice fixedpoint.Value, currentPrice fixedpoint.Value, qty fixedpoint.Value, orderExecutor bbgo.OrderExecutor) {
@@ -103,7 +104,7 @@ func (s *Strategy) placeOrder(ctx context.Context, lastLow fixedpoint.Value, lim
 	}
 	s.orderStore.Add(createdOrders...)
 	s.activeMakerOrders.Add(createdOrders...)
-	//s.tradeCollector.Process()
+	// s.tradeCollector.Process()
 }
 
 func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Value) error {
@@ -134,7 +135,7 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 		submitOrder.MarginSideEffect = s.Exit.MarginSideEffect
 	}
 
-	//s.Notify("Submitting %s %s order to close position by %v", s.Symbol, side.String(), percentage, submitOrder)
+	// s.Notify("Submitting %s %s order to close position by %v", s.Symbol, side.String(), percentage, submitOrder)
 
 	createdOrders, err := s.session.Exchange.SubmitOrders(ctx, submitOrder)
 	if err != nil {
@@ -180,19 +181,19 @@ func (s *Strategy) placeLayerOrder(ctx context.Context, lastLow fixedpoint.Value
 		p := limitPrice.Mul(fixedpoint.One.Add(s.Entry.CatBounceRatio.Sub(fixedpoint.NewFromFloat(d.Float64() * float64(i)))))
 
 		if futuresMode {
-			//log.Infof("futures mode on")
+			// log.Infof("futures mode on")
 			if q.Mul(p).Compare(quoteBalance.Available) <= 0 {
 				s.placeOrder(ctx, lastLow, p, currentPrice, q, orderExecutor)
 				s.tradeCollector.Process()
 			}
 		} else if s.Environment.IsBackTesting() {
-			//log.Infof("spot backtest mode on")
+			// log.Infof("spot backtest mode on")
 			if q.Compare(baseBalance.Available) <= 0 {
 				s.placeOrder(ctx, lastLow, p, currentPrice, q, orderExecutor)
 				s.tradeCollector.Process()
 			}
 		} else {
-			//log.Infof("spot mode on")
+			// log.Infof("spot mode on")
 			if q.Compare(baseBalance.Available) <= 0 {
 				s.placeOrder(ctx, lastLow, p, currentPrice, q, orderExecutor)
 				s.tradeCollector.Process()
@@ -213,6 +214,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	if s.Position == nil {
 		s.Position = types.NewPositionFromMarket(s.Market)
+	}
+
+	if s.ProfitStats == nil {
+		s.ProfitStats = types.NewProfitStats(s.Market)
 	}
 
 	instanceID := s.InstanceID()
@@ -309,7 +314,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			limitPrice := s.getValidPivotLow(kline.Close)
 			log.Infof("%s place limit sell start from %f adds up to %f percent with %f layers of orders", s.Symbol, limitPrice.Float64(), s.Entry.CatBounceRatio.Mul(fixedpoint.NewFromInt(100)).Float64(), s.Entry.NumLayers.Float64())
 			s.placeLayerOrder(ctx, s.LastLow, limitPrice, kline.Close, orderExecutor)
-			//s.placeOrder(ctx, lastLow.Mul(fixedpoint.One.Add(s.CatBounceRatio)), s.Quantity, orderExecutor)
+			// s.placeOrder(ctx, lastLow.Mul(fixedpoint.One.Add(s.CatBounceRatio)), s.Quantity, orderExecutor)
 		}
 	})
 
