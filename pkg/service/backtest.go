@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"os"
 	"strconv"
@@ -114,8 +115,7 @@ func (s *BacktestService) Verify(symbols []string, startTime time.Time, endTime 
 	return nil
 }
 
-func (s *BacktestService) Sync(ctx context.Context, exchange types.Exchange, symbol string,
-	startTime time.Time, endTime time.Time, interval types.Interval) error {
+func (s *BacktestService) Sync(ctx context.Context, exchange types.Exchange, symbol string, interval types.Interval, startTime, endTime time.Time) error {
 
 	return s.SyncKLineByInterval(ctx, exchange, symbol, interval, startTime, endTime)
 }
@@ -317,33 +317,6 @@ func (s *BacktestService) _deleteDuplicatedKLine(k types.KLine) error {
 	return err
 }
 
-func (s *BacktestService) SyncExist(ctx context.Context, exchange types.Exchange, symbol string,
-	fromTime time.Time, endTime time.Time, interval types.Interval) error {
-	klineC, errC := s.QueryKLinesCh(fromTime, endTime, exchange, []string{symbol}, []types.Interval{interval})
-
-	nowStartTime := fromTime
-	for k := range klineC {
-		if nowStartTime.Unix() < k.StartTime.Unix() {
-			log.Infof("syncing %s interval %s syncing %s ~ %s ", symbol, interval, nowStartTime, k.EndTime)
-			if err := s.Sync(ctx, exchange, symbol, nowStartTime, k.EndTime.Time().Add(-1*interval.Duration()), interval); err != nil {
-				log.WithError(err).Errorf("sync error")
-			}
-		}
-		nowStartTime = k.StartTime.Time().Add(interval.Duration())
-	}
-
-	if nowStartTime.Unix() < endTime.Unix() && nowStartTime.Unix() < time.Now().Unix() {
-		if err := s.Sync(ctx, exchange, symbol, nowStartTime, endTime, interval); err != nil {
-			log.WithError(err).Errorf("sync error")
-		}
-	}
-
-	if err := <-errC; err != nil {
-		return err
-	}
-	return nil
-}
-
 type TimeRange struct {
 	Start time.Time
 	End   time.Time
@@ -356,13 +329,23 @@ type TimeRange struct {
 // iterate the []TimeRange slice to sync data.
 func (s *BacktestService) SyncPartial(ctx context.Context, ex types.Exchange, symbol string, interval types.Interval, since, until time.Time) error {
 	t1, t2, err := s.QueryExistingDataRange(ctx, ex, symbol, interval, since, until)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+
+	if err == sql.ErrNoRows {
+		// fallback to fresh sync
+		return s.Sync(ctx, ex, symbol, interval, since, until)
+	}
+
+	log.Debugf("found existing kline data, now using partial sync...")
+	timeRanges, err := s.FindMissingTimeRanges(ctx, ex, symbol, interval, t1.Time(), t2.Time())
 	if err != nil {
 		return err
 	}
 
-	timeRanges, err := s.FindMissingTimeRanges(ctx, ex, symbol, interval, t1.Time(), t2.Time())
-	if err != nil {
-		return err
+	if len(timeRanges) > 0 {
+		log.Infof("found missing time ranges: %v", timeRanges)
 	}
 
 	// there are few cases:
@@ -440,6 +423,7 @@ func (s *BacktestService) QueryExistingDataRange(ctx context.Context, ex types.E
 	var t1, t2 types.Time
 
 	row := s.DB.QueryRowContext(ctx, sql, args...)
+
 	if err := row.Scan(&t1, &t2); err != nil {
 		return nil, nil, err
 	}
