@@ -72,9 +72,6 @@ func iterateFieldsByTag(obj interface{}, tagName string, cb StructFieldIterator)
 		fv := sv.Field(i)
 		ft := st.Field(i)
 
-		fvt := fv.Type()
-		_ = fvt
-
 		// skip unexported fields
 		if !st.Field(i).IsExported() {
 			continue

@@ -216,6 +216,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.Position = types.NewPositionFromMarket(s.Market)
 	}
 
+	if s.ProfitStats == nil {
+		s.ProfitStats = types.NewProfitStats(s.Market)
+	}
+
 	instanceID := s.InstanceID()
 
 	// Always update the position fields
