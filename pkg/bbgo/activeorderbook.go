@@ -20,7 +20,7 @@ type ActiveOrderBook struct {
 	filledCallbacks []func(o types.Order)
 }
 
-func NewLocalActiveOrderBook(symbol string) *ActiveOrderBook {
+func NewActiveOrderBook(symbol string) *ActiveOrderBook {
 	return &ActiveOrderBook{
 		Symbol: symbol,
 		orders: types.NewSyncOrderMap(),

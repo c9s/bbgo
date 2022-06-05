@@ -475,7 +475,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderStore = bbgo.NewOrderStore(s.Symbol)
 	s.orderStore.BindStream(session.UserDataStream)
 
-	s.activeOrders = bbgo.NewLocalActiveOrderBook(s.Symbol)
+	s.activeOrders = bbgo.NewActiveOrderBook(s.Symbol)
 	s.activeOrders.BindStream(session.UserDataStream)
 
 	if !s.TrailingStopTarget.TrailingStopCallbackRatio.IsZero() {

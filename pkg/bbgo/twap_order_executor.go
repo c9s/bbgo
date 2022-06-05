@@ -408,7 +408,7 @@ func (e *TwapExecution) Run(parentCtx context.Context) error {
 
 	e.orderStore = NewOrderStore(e.Symbol)
 	e.orderStore.BindStream(e.userDataStream)
-	e.activeMakerOrders = NewLocalActiveOrderBook(e.Symbol)
+	e.activeMakerOrders = NewActiveOrderBook(e.Symbol)
 	e.activeMakerOrders.OnFilled(e.handleFilledOrder)
 	e.activeMakerOrders.BindStream(e.userDataStream)
 

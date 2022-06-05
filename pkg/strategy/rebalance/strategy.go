@@ -83,7 +83,7 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	s.activeOrderBooks = make(map[string]*bbgo.ActiveOrderBook)
 	for _, symbol := range s.getSymbols() {
-		activeOrderBook := bbgo.NewLocalActiveOrderBook(symbol)
+		activeOrderBook := bbgo.NewActiveOrderBook(symbol)
 		activeOrderBook.BindStream(session.UserDataStream)
 		s.activeOrderBooks[symbol] = activeOrderBook
 	}

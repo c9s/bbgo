@@ -599,7 +599,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderStore.BindStream(session.UserDataStream)
 
 	// we don't persist orders so that we can not clear the previous orders for now. just need time to support this.
-	s.activeOrders = bbgo.NewLocalActiveOrderBook(s.Symbol)
+	s.activeOrders = bbgo.NewActiveOrderBook(s.Symbol)
 	s.activeOrders.OnFilled(s.handleFilledOrder)
 	s.activeOrders.BindStream(session.UserDataStream)
 

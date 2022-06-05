@@ -743,7 +743,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	s.book = types.NewStreamBook(s.Symbol)
 	s.book.BindStream(s.sourceSession.MarketDataStream)
 
-	s.activeMakerOrders = bbgo.NewLocalActiveOrderBook(s.Symbol)
+	s.activeMakerOrders = bbgo.NewActiveOrderBook(s.Symbol)
 	s.activeMakerOrders.BindStream(s.makerSession.UserDataStream)
 
 	s.orderStore = bbgo.NewOrderStore(s.Symbol)
