@@ -74,9 +74,9 @@ type Strategy struct {
 	Quantity fixedpoint.Value `json:"quantity"`
 
 	// activeOrders is the locally maintained active order book of the maker orders.
-	activeOrders *bbgo.LocalActiveOrderBook
+	activeOrders *bbgo.ActiveOrderBook
 
-	profitOrders *bbgo.LocalActiveOrderBook
+	profitOrders *bbgo.ActiveOrderBook
 
 	orders *bbgo.OrderStore
 

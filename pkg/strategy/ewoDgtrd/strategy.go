@@ -54,7 +54,7 @@ type Strategy struct {
 	*bbgo.Graceful
 	bbgo.StrategyController
 
-	activeMakerOrders *bbgo.LocalActiveOrderBook
+	activeMakerOrders *bbgo.ActiveOrderBook
 	orderStore        *bbgo.OrderStore
 	tradeCollector    *bbgo.TradeCollector
 	entryPrice        fixedpoint.Value
