@@ -165,7 +165,7 @@ func (s *Strategy) getValidPivotLow(price fixedpoint.Value) fixedpoint.Value {
 	return price
 }
 
-func (s *Strategy) placeLayerOrder(ctx context.Context, lastLow fixedpoint.Value, limitPrice fixedpoint.Value, currentPrice fixedpoint.Value, orderExecutor bbgo.OrderExecutor) {
+func (s *Strategy) placeBounceSellOrders(ctx context.Context, lastLow fixedpoint.Value, limitPrice fixedpoint.Value, currentPrice fixedpoint.Value, orderExecutor bbgo.OrderExecutor) {
 	futuresMode := s.session.Futures || s.session.IsolatedFutures
 	numLayers := fixedpoint.NewFromInt(int64(s.Entry.NumLayers))
 	d := s.Entry.CatBounceRatio.Div(numLayers)
@@ -267,7 +267,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		if price, ok := session.LastPrice(s.Symbol); ok {
 			limitPrice := s.getValidPivotLow(price)
 			log.Infof("init %s place limit sell start from %f adds up to %f percent with %d layers of orders", s.Symbol, limitPrice.Float64(), s.Entry.CatBounceRatio.Mul(fixedpoint.NewFromInt(100)).Float64(), s.Entry.NumLayers)
-			s.placeLayerOrder(ctx, s.LastLow, limitPrice, price, orderExecutor)
+			s.placeBounceSellOrders(ctx, s.LastLow, limitPrice, price, orderExecutor)
 		}
 	})
 
@@ -311,7 +311,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 			limitPrice := s.getValidPivotLow(kline.Close)
 			log.Infof("%s place limit sell start from %f adds up to %f percent with %d layers of orders", s.Symbol, limitPrice.Float64(), s.Entry.CatBounceRatio.Mul(fixedpoint.NewFromInt(100)).Float64(), s.Entry.NumLayers)
-			s.placeLayerOrder(ctx, s.LastLow, limitPrice, kline.Close, orderExecutor)
+			s.placeBounceSellOrders(ctx, s.LastLow, limitPrice, kline.Close, orderExecutor)
 			// s.placeOrder(ctx, lastLow.Mul(fixedpoint.One.Add(s.CatBounceRatio)), s.Quantity, orderExecutor)
 		}
 	})
