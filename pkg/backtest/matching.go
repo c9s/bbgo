@@ -148,17 +148,21 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (closedOrders *typ
 	if o.Type == types.OrderTypeMarket {
 		m.EmitOrderUpdate(order)
 
+		// copy the order object to avoid side effect (for different callbacks)
+		var order2 = order
+
 		// emit trade before we publish order
-		trade := m.newTradeFromOrder(&order, false)
+		trade := m.newTradeFromOrder(&order2, false)
 		m.executeTrade(trade)
 
 		// update the order status
-		order.Status = types.OrderStatusFilled
-		order.ExecutedQuantity = order.Quantity
-		order.Price = price
-		order.IsWorking = false
-		m.EmitOrderUpdate(order)
-		return &order, &trade, nil
+		order2.Status = types.OrderStatusFilled
+		order2.ExecutedQuantity = order2.Quantity
+		order2.Price = price
+		order2.IsWorking = false
+		m.EmitOrderUpdate(order2)
+
+		return &order2, &trade, nil
 	}
 
 	// for limit maker orders
