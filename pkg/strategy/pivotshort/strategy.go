@@ -28,7 +28,7 @@ type Entry struct {
 	Immediate        bool                            `json:"immediate"`
 	CatBounceRatio   fixedpoint.Value                `json:"catBounceRatio"`
 	Quantity         fixedpoint.Value                `json:"quantity"`
-	NumLayers        fixedpoint.Value                `json:"numLayers"`
+	NumLayers        int                             `json:"numLayers"`
 	MarginSideEffect types.MarginOrderSideEffectType `json:"marginOrderSideEffect"`
 }
 
