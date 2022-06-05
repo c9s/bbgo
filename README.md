@@ -38,6 +38,7 @@ You can use BBGO's underlying common exchange API, currently it supports 4+ majo
 - PnL calculation.
 - Slack/Telegram notification.
 - Back-testing: KLine-based back-testing engine. See [Back-testing](./doc/topics/back-testing.md)
+- Built-in parameter optimization tool.
 - Built-in Grid strategy and many other built-in strategies.
 - Multi-exchange session support: you can connect to more than 2 exchanges with different accounts or subaccounts.
 - Standard indicators, e.g., SMA, EMA, BOLL, VMA, MACD...
