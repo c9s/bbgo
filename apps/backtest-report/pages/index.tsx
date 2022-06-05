@@ -22,7 +22,7 @@ const Home: NextPage = () => {
       </Head>
       <main className={styles.main}>
         <AppShell
-          padding="md"
+          padding="xm"
           navbar={<Navbar width={{base: 250}} height={500} p="xs">
 
             <ReportNavigator onSelect={(reportEntry) => {
@@ -31,7 +31,7 @@ const Home: NextPage = () => {
 
           </Navbar>}
           header={
-            <Header height={60} p="md">
+            <Header height={50} p="sm">
               <Text>BBGO Back-Test Report</Text>
             </Header>
           }

@@ -36,6 +36,7 @@
 
 bbgo.sqlite3
 node_modules
+output
 
 otp*png
 

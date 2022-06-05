@@ -173,9 +173,9 @@ const ordersToMarkets = (interval: string, orders: Array<Order> | void): Array<M
           time: t,
           position: 'belowBar',
           color: '#239D10',
-          shape: 'arrowDown',
-          // text: 'Buy @ ' + order.price
-          text: 'B',
+          shape: 'arrowUp',
+          text: ''+order.price
+          //text: 'B',
         });
         break;
       case "SELL":
@@ -184,8 +184,8 @@ const ordersToMarkets = (interval: string, orders: Array<Order> | void): Array<M
           position: 'aboveBar',
           color: '#e91e63',
           shape: 'arrowDown',
-          // text: 'Sell @ ' + order.price
-          text: 'S',
+          text: ''+order.price
+          //text: 'S',
         });
         break;
     }
