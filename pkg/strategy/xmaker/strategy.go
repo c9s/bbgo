@@ -176,7 +176,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 		return
 	}
 
-	if s.activeMakerOrders.NumOfAsks() > 0 || s.activeMakerOrders.NumOfBids() > 0 {
+	if s.activeMakerOrders.NumOfOrders() > 0 {
 		return
 	}
 
