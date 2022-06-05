@@ -62,7 +62,7 @@ func (s *Strategy) ID() string {
 }
 
 func (s *Strategy) updateOrders(orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) {
-	if err := orderExecutor.CancelOrders(context.Background(), s.activeOrders.Bids.Orders()...); err != nil {
+	if err := s.activeOrders.GracefulCancel(context.Background(), session.Exchange); err != nil {
 		log.WithError(err).Errorf("cancel order error")
 	}
 
