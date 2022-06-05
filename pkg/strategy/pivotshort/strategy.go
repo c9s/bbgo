@@ -173,6 +173,7 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 
 	s.orderStore.Add(createdOrders...)
 	s.activeMakerOrders.Add(createdOrders...)
+	s.tradeCollector.Process()
 	return err
 }
 func (s *Strategy) InstanceID() string {
@@ -317,18 +318,17 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				R := kline.Close.Div(s.Position.AverageCost)
 				if R.Compare(fixedpoint.One.Add(s.Exit.StopLossPercentage)) > 0 {
 					// SL
-					log.Infof("%s SL triggered", s.Symbol)
+					s.Notify("%s SL triggered", s.Symbol)
 					s.ClosePosition(ctx, fixedpoint.One)
 					s.tradeCollector.Process()
 				} else if R.Compare(fixedpoint.One.Sub(s.Exit.TakeProfitPercentage)) < 0 {
 					// TP
-					log.Infof("%s TP triggered", s.Symbol)
+					s.Notify("%s TP triggered", s.Symbol)
 					s.ClosePosition(ctx, fixedpoint.One)
 				} else if kline.GetLowerShadowHeight().Div(kline.Close).Compare(s.Exit.ShadowTPRatio) > 0 {
 					// shadow TP
-					log.Infof("%s shadow TP triggered", s.Symbol)
+					s.Notify("%s shadow TP triggered", s.Symbol)
 					s.ClosePosition(ctx, fixedpoint.One)
-					s.tradeCollector.Process()
 				}
 			}
 			s.LastLow = fixedpoint.Zero
