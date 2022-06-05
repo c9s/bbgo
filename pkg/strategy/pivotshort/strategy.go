@@ -83,6 +83,30 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	// session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: types.Interval1d})
 }
 
+func (s *Strategy) placeMarketSell(ctx context.Context, orderExecutor bbgo.OrderExecutor) {
+	quantity := s.Entry.Quantity
+	if quantity.IsZero() {
+		if balance, ok := s.session.Account.Balance(s.Market.BaseCurrency); ok {
+			quantity = balance.Available
+		}
+	}
+
+	sideEffect := s.Entry.MarginSideEffect
+	if len(sideEffect) == 0 {
+		sideEffect = types.SideEffectTypeMarginBuy
+	}
+
+	submitOrder := types.SubmitOrder{
+		Symbol:           s.Symbol,
+		Side:             types.SideTypeSell,
+		Type:             types.OrderTypeMarket,
+		Quantity:         quantity,
+		MarginSideEffect: sideEffect,
+	}
+
+	s.submitOrders(ctx, orderExecutor, submitOrder)
+}
+
 func (s *Strategy) placeOrder(ctx context.Context, lastLow fixedpoint.Value, limitPrice fixedpoint.Value, currentPrice fixedpoint.Value, qty fixedpoint.Value, orderExecutor bbgo.OrderExecutor) {
 	submitOrder := types.SubmitOrder{
 		Symbol:   s.Symbol,
@@ -98,10 +122,15 @@ func (s *Strategy) placeOrder(ctx context.Context, lastLow fixedpoint.Value, lim
 		submitOrder.MarginSideEffect = s.Entry.MarginSideEffect
 	}
 
-	createdOrders, err := orderExecutor.SubmitOrders(ctx, submitOrder)
+	s.submitOrders(ctx, orderExecutor, submitOrder)
+}
+
+func (s *Strategy) submitOrders(ctx context.Context, orderExecutor bbgo.OrderExecutor, submitOrders ...types.SubmitOrder) {
+	createdOrders, err := orderExecutor.SubmitOrders(ctx, submitOrders...)
 	if err != nil {
 		log.WithError(err).Errorf("can not place orders")
 	}
+
 	s.orderStore.Add(createdOrders...)
 	s.activeMakerOrders.Add(createdOrders...)
 	s.tradeCollector.Process()
