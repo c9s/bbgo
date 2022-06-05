@@ -191,14 +191,15 @@ func canClosePosition(position *types.Position, signal fixedpoint.Value, price f
 	return !signal.IsZero() && position.IsShort() && !position.IsDust(price)
 }
 
-// get last available pivot low, the most recent pivot point higher than current price
-func (s *Strategy) getValidPivotLow(price fixedpoint.Value) fixedpoint.Value {
+// findHigherPivotLow checks the pivot low prices and return the low that is higher than the current price
+func (s *Strategy) findHigherPivotLow(price fixedpoint.Value) (fixedpoint.Value, bool) {
 	for l := len(s.pivotLowPrices) - 1; l > 0; l-- {
 		if s.pivotLowPrices[l].Compare(price) > 0 {
-			return s.pivotLowPrices[l]
+			return s.pivotLowPrices[l], true
 		}
 	}
-	return price
+
+	return price, false
 }
 
 func (s *Strategy) placeBounceSellOrders(ctx context.Context, lastLow fixedpoint.Value, limitPrice fixedpoint.Value, currentPrice fixedpoint.Value, orderExecutor bbgo.OrderExecutor) {
@@ -301,15 +302,16 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	session.UserDataStream.OnStart(func() {
 		if price, ok := session.LastPrice(s.Symbol); ok {
-			limitPrice := s.getValidPivotLow(price)
-			log.Infof("init %s place limit sell start from %f adds up to %f percent with %d layers of orders", s.Symbol, limitPrice.Float64(), s.Entry.CatBounceRatio.Mul(fixedpoint.NewFromInt(100)).Float64(), s.Entry.NumLayers)
-			s.placeBounceSellOrders(ctx, s.LastLow, limitPrice, price, orderExecutor)
+			if limitPrice, ok := s.findHigherPivotLow(price); ok {
+				log.Infof("%s placing limit sell start from %f adds up to %f percent with %d layers of orders", s.Symbol, limitPrice.Float64(), s.Entry.CatBounceRatio.Mul(fixedpoint.NewFromInt(100)).Float64(), s.Entry.NumLayers)
+				s.placeBounceSellOrders(ctx, s.LastLow, limitPrice, price, orderExecutor)
+			}
 		}
 	})
 
 	session.MarketDataStream.OnKLine(func(kline types.KLine) {
 		// TODO: handle stop loss here, faster than closed kline
-		lastLow := s.getValidPivotLow(kline.Close)
+		lastLow, _ := s.findHigherPivotLow(kline.Close)
 		if lastLow == kline.Close && s.Entry.Immediate {
 			s.Notify("price breaks the previous low, submitting market sell to open a short position")
 			s.placeMarketSell(ctx, orderExecutor)
@@ -353,9 +355,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				log.WithError(err).Errorf("graceful cancel order error")
 			}
 
-			limitPrice := s.getValidPivotLow(kline.Close)
-			log.Infof("%s place limit sell start from %f adds up to %f percent with %d layers of orders", s.Symbol, limitPrice.Float64(), s.Entry.CatBounceRatio.Mul(fixedpoint.NewFromInt(100)).Float64(), s.Entry.NumLayers)
-			s.placeBounceSellOrders(ctx, s.LastLow, limitPrice, kline.Close, orderExecutor)
+			if limitPrice, ok := s.findHigherPivotLow(kline.Close); ok {
+				log.Infof("%s place limit sell start from %f adds up to %f percent with %d layers of orders", s.Symbol, limitPrice.Float64(), s.Entry.CatBounceRatio.Mul(fixedpoint.NewFromInt(100)).Float64(), s.Entry.NumLayers)
+				s.placeBounceSellOrders(ctx, s.LastLow, limitPrice, kline.Close, orderExecutor)
+			}
 		}
 	})
 
