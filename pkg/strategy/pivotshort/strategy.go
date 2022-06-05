@@ -87,8 +87,14 @@ func (s *Strategy) placeMarketSell(ctx context.Context, orderExecutor bbgo.Order
 	quantity := s.Entry.Quantity
 	if quantity.IsZero() {
 		if balance, ok := s.session.Account.Balance(s.Market.BaseCurrency); ok {
+			s.Notify("sell quantity is not set, submitting sell with all base balance: %s", balance.Available.String())
 			quantity = balance.Available
 		}
+	}
+
+	if quantity.IsZero() {
+		log.Errorf("quantity is zero, can not submit sell order, please check settings")
+		return
 	}
 
 	sideEffect := s.Entry.MarginSideEffect
