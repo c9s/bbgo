@@ -36,7 +36,7 @@ type Strategy struct {
 
 	currencies []string
 
-	activeOrderBooks map[string]*bbgo.LocalActiveOrderBook
+	activeOrderBooks map[string]*bbgo.ActiveOrderBook
 }
 
 func (s *Strategy) Initialize() error {
@@ -81,7 +81,7 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-	s.activeOrderBooks = make(map[string]*bbgo.LocalActiveOrderBook)
+	s.activeOrderBooks = make(map[string]*bbgo.ActiveOrderBook)
 	for _, symbol := range s.getSymbols() {
 		activeOrderBook := bbgo.NewLocalActiveOrderBook(symbol)
 		activeOrderBook.BindStream(session.UserDataStream)

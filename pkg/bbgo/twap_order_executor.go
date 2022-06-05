@@ -36,7 +36,7 @@ type TwapExecution struct {
 	currentPrice   fixedpoint.Value
 	activePosition fixedpoint.Value
 
-	activeMakerOrders *LocalActiveOrderBook
+	activeMakerOrders *ActiveOrderBook
 	orderStore        *OrderStore
 	position          *types.Position
 
