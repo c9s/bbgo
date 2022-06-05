@@ -104,7 +104,7 @@ func (s *Strategy) placeOrder(ctx context.Context, lastLow fixedpoint.Value, lim
 	}
 	s.orderStore.Add(createdOrders...)
 	s.activeMakerOrders.Add(createdOrders...)
-	// s.tradeCollector.Process()
+	s.tradeCollector.Process()
 }
 
 func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Value) error {
@@ -167,13 +167,14 @@ func (s *Strategy) getValidPivotLow(price fixedpoint.Value) fixedpoint.Value {
 
 func (s *Strategy) placeLayerOrder(ctx context.Context, lastLow fixedpoint.Value, limitPrice fixedpoint.Value, currentPrice fixedpoint.Value, orderExecutor bbgo.OrderExecutor) {
 	futuresMode := s.session.Futures || s.session.IsolatedFutures
-	d := s.Entry.CatBounceRatio.Div(s.Entry.NumLayers)
+	numLayers := fixedpoint.NewFromInt(int64(s.Entry.NumLayers))
+	d := s.Entry.CatBounceRatio.Div(numLayers)
 	q := s.Entry.Quantity
 	if !s.TotalQuantity.IsZero() {
-		q = s.TotalQuantity.Div(s.Entry.NumLayers)
+		q = s.TotalQuantity.Div(numLayers)
 	}
 
-	for i := 0; i < int(s.Entry.NumLayers.Float64()); i++ {
+	for i := 0; i < s.Entry.NumLayers; i++ {
 		balances := s.session.GetAccount().Balances()
 		quoteBalance, _ := balances[s.Market.QuoteCurrency]
 		baseBalance, _ := balances[s.Market.BaseCurrency]
@@ -184,19 +185,16 @@ func (s *Strategy) placeLayerOrder(ctx context.Context, lastLow fixedpoint.Value
 			// log.Infof("futures mode on")
 			if q.Mul(p).Compare(quoteBalance.Available) <= 0 {
 				s.placeOrder(ctx, lastLow, p, currentPrice, q, orderExecutor)
-				s.tradeCollector.Process()
 			}
 		} else if s.Environment.IsBackTesting() {
 			// log.Infof("spot backtest mode on")
 			if q.Compare(baseBalance.Available) <= 0 {
 				s.placeOrder(ctx, lastLow, p, currentPrice, q, orderExecutor)
-				s.tradeCollector.Process()
 			}
 		} else {
 			// log.Infof("spot mode on")
 			if q.Compare(baseBalance.Available) <= 0 {
 				s.placeOrder(ctx, lastLow, p, currentPrice, q, orderExecutor)
-				s.tradeCollector.Process()
 			}
 		}
 	}
@@ -268,7 +266,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	session.UserDataStream.OnStart(func() {
 		if price, ok := session.LastPrice(s.Symbol); ok {
 			limitPrice := s.getValidPivotLow(price)
-			log.Infof("init %s place limit sell start from %f adds up to %f percent with %f layers of orders", s.Symbol, limitPrice.Float64(), s.Entry.CatBounceRatio.Mul(fixedpoint.NewFromInt(100)).Float64(), s.Entry.NumLayers.Float64())
+			log.Infof("init %s place limit sell start from %f adds up to %f percent with %d layers of orders", s.Symbol, limitPrice.Float64(), s.Entry.CatBounceRatio.Mul(fixedpoint.NewFromInt(100)).Float64(), s.Entry.NumLayers)
 			s.placeLayerOrder(ctx, s.LastLow, limitPrice, price, orderExecutor)
 		}
 	})
@@ -312,7 +310,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 
 			limitPrice := s.getValidPivotLow(kline.Close)
-			log.Infof("%s place limit sell start from %f adds up to %f percent with %f layers of orders", s.Symbol, limitPrice.Float64(), s.Entry.CatBounceRatio.Mul(fixedpoint.NewFromInt(100)).Float64(), s.Entry.NumLayers.Float64())
+			log.Infof("%s place limit sell start from %f adds up to %f percent with %d layers of orders", s.Symbol, limitPrice.Float64(), s.Entry.CatBounceRatio.Mul(fixedpoint.NewFromInt(100)).Float64(), s.Entry.NumLayers)
 			s.placeLayerOrder(ctx, s.LastLow, limitPrice, kline.Close, orderExecutor)
 			// s.placeOrder(ctx, lastLow.Mul(fixedpoint.One.Add(s.CatBounceRatio)), s.Quantity, orderExecutor)
 		}
