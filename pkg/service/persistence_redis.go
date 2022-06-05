@@ -72,6 +72,10 @@ func (store *RedisStore) Load(val interface{}) error {
 }
 
 func (store *RedisStore) Save(val interface{}) error {
+	if val == nil {
+		return nil
+	}
+
 	data, err := json.Marshal(val)
 	if err != nil {
 		return err
