@@ -300,6 +300,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 	})
 
+	session.MarketDataStream.OnKLine(func(kline types.KLine) {
+		// TODO: handle stop loss here, faster than closed kline
+	})
+
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		if kline.Symbol != s.Symbol || kline.Interval != s.Interval {
 			return
@@ -341,7 +345,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			limitPrice := s.getValidPivotLow(kline.Close)
 			log.Infof("%s place limit sell start from %f adds up to %f percent with %d layers of orders", s.Symbol, limitPrice.Float64(), s.Entry.CatBounceRatio.Mul(fixedpoint.NewFromInt(100)).Float64(), s.Entry.NumLayers)
 			s.placeBounceSellOrders(ctx, s.LastLow, limitPrice, kline.Close, orderExecutor)
-			// s.placeOrder(ctx, lastLow.Mul(fixedpoint.One.Add(s.CatBounceRatio)), s.Quantity, orderExecutor)
 		}
 	})
 
