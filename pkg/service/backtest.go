@@ -290,6 +290,10 @@ type TimeRange struct {
 	End   time.Time
 }
 
+func (t *TimeRange) String() string {
+	return t.Start.String() + " ~ " + t.End.String()
+}
+
 // SyncPartial
 // find the existing data time range (t1, t2)
 // scan if there is a missing part
