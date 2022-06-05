@@ -135,7 +135,7 @@ func (o *GridOptimizer) Run(executor Executor, configJson []byte) ([]Metric, err
 		// TODO: Add more metric value function
 		metricValue := TotalProfitMetricValueFunc(summaryReport)
 
-		var currentParams []interface{}
+		var currentParams = make([]interface{}, len(o.CurrentParams))
 		copy(currentParams, o.CurrentParams)
 
 		metrics = append(metrics, Metric{
