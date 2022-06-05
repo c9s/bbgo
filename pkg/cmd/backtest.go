@@ -600,7 +600,7 @@ func createSymbolReport(userConfig *bbgo.Config, session *bbgo.ExchangeSession, 
 
 func verify(userConfig *bbgo.Config, backtestService *service.BacktestService, sourceExchanges map[types.ExchangeName]types.Exchange, startTime time.Time, verboseCnt int) error {
 	for _, sourceExchange := range sourceExchanges {
-		err := backtestService.Verify(userConfig.Backtest.Symbols, startTime, time.Now(), sourceExchange, verboseCnt)
+		err := backtestService.Verify(sourceExchange, userConfig.Backtest.Symbols, startTime, time.Now())
 		if err != nil {
 			return err
 		}
