@@ -103,7 +103,7 @@ type Strategy struct {
 	CoveredPosition fixedpoint.Value `json:"coveredPosition,omitempty" persistence:"covered_position"`
 
 	book              *types.StreamOrderBook
-	activeMakerOrders *bbgo.LocalActiveOrderBook
+	activeMakerOrders *bbgo.ActiveOrderBook
 
 	hedgeErrorLimiter         *rate.Limiter
 	hedgeErrorRateReservation *rate.Reservation

@@ -12,35 +12,35 @@ import (
 
 const CancelOrderWaitTime = 20 * time.Millisecond
 
-// LocalActiveOrderBook manages the local active order books.
-//go:generate callbackgen -type LocalActiveOrderBook
-type LocalActiveOrderBook struct {
+// ActiveOrderBook manages the local active order books.
+//go:generate callbackgen -type ActiveOrderBook
+type ActiveOrderBook struct {
 	Symbol          string
 	orders          *types.SyncOrderMap
 	filledCallbacks []func(o types.Order)
 }
 
-func NewLocalActiveOrderBook(symbol string) *LocalActiveOrderBook {
-	return &LocalActiveOrderBook{
+func NewLocalActiveOrderBook(symbol string) *ActiveOrderBook {
+	return &ActiveOrderBook{
 		Symbol: symbol,
 		orders: types.NewSyncOrderMap(),
 	}
 }
 
-func (b *LocalActiveOrderBook) MarshalJSON() ([]byte, error) {
+func (b *ActiveOrderBook) MarshalJSON() ([]byte, error) {
 	orders := b.Backup()
 	return json.Marshal(orders)
 }
 
-func (b *LocalActiveOrderBook) Backup() []types.SubmitOrder {
+func (b *ActiveOrderBook) Backup() []types.SubmitOrder {
 	return b.orders.Backup()
 }
 
-func (b *LocalActiveOrderBook) BindStream(stream types.Stream) {
+func (b *ActiveOrderBook) BindStream(stream types.Stream) {
 	stream.OnOrderUpdate(b.orderUpdateHandler)
 }
 
-func (b *LocalActiveOrderBook) waitAllClear(ctx context.Context, waitTime, timeout time.Duration) (bool, error) {
+func (b *ActiveOrderBook) waitAllClear(ctx context.Context, waitTime, timeout time.Duration) (bool, error) {
 	numOfOrders := b.NumOfOrders()
 	clear := numOfOrders == 0
 	if clear {
@@ -68,8 +68,8 @@ func (b *LocalActiveOrderBook) waitAllClear(ctx context.Context, waitTime, timeo
 }
 
 // GracefulCancel cancels the active orders gracefully
-func (b *LocalActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange) error {
-	log.Debugf("[LocalActiveOrderBook] gracefully cancelling %s orders...", b.Symbol)
+func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange) error {
+	log.Debugf("[ActiveOrderBook] gracefully cancelling %s orders...", b.Symbol)
 
 	startTime := time.Now()
 	// ensure every order is cancelled
@@ -83,21 +83,21 @@ func (b *LocalActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exch
 
 		// since ctx might be canceled, we should use background context here
 		if err := ex.CancelOrders(context.Background(), orders...); err != nil {
-			log.WithError(err).Errorf("[LocalActiveOrderBook] can not cancel %s orders", b.Symbol)
+			log.WithError(err).Errorf("[ActiveOrderBook] can not cancel %s orders", b.Symbol)
 		}
 
-		log.Debugf("[LocalActiveOrderBook] waiting %s for %s orders to be cancelled...", CancelOrderWaitTime, b.Symbol)
+		log.Debugf("[ActiveOrderBook] waiting %s for %s orders to be cancelled...", CancelOrderWaitTime, b.Symbol)
 
 		clear, err := b.waitAllClear(ctx, CancelOrderWaitTime, 5*time.Second)
 		if clear || err != nil {
 			break
 		}
 
-		log.Warnf("[LocalActiveOrderBook] %d %s orders are not cancelled yet:", b.NumOfOrders(), b.Symbol)
+		log.Warnf("[ActiveOrderBook] %d %s orders are not cancelled yet:", b.NumOfOrders(), b.Symbol)
 		b.Print()
 
 		// verify the current open orders via the RESTful API
-		log.Warnf("[LocalActiveOrderBook] using REStful API to verify active orders...")
+		log.Warnf("[ActiveOrderBook] using REStful API to verify active orders...")
 		openOrders, err := ex.QueryOpenOrders(ctx, b.Symbol)
 		if err != nil {
 			log.WithError(err).Errorf("can not query %s open orders", b.Symbol)
@@ -114,17 +114,17 @@ func (b *LocalActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exch
 		}
 	}
 
-	log.Debugf("[LocalActiveOrderBook] all %s orders are cancelled successfully in %s", b.Symbol, time.Since(startTime))
+	log.Debugf("[ActiveOrderBook] all %s orders are cancelled successfully in %s", b.Symbol, time.Since(startTime))
 	return nil
 }
 
-func (b *LocalActiveOrderBook) orderUpdateHandler(order types.Order) {
+func (b *ActiveOrderBook) orderUpdateHandler(order types.Order) {
 	hasSymbol := len(b.Symbol) > 0
 	if hasSymbol && order.Symbol != b.Symbol {
 		return
 	}
 
-	log.Debugf("[LocalActiveOrderBook] received order update: %+v", order)
+	log.Debugf("[ActiveOrderBook] received order update: %+v", order)
 
 	switch order.Status {
 	case types.OrderStatusFilled:
@@ -137,7 +137,7 @@ func (b *LocalActiveOrderBook) orderUpdateHandler(order types.Order) {
 		b.Update(order)
 
 	case types.OrderStatusCanceled, types.OrderStatusRejected:
-		log.Debugf("[LocalActiveOrderBook] order status %s, removing order %s", order.Status, order)
+		log.Debugf("[ActiveOrderBook] order status %s, removing order %s", order.Status, order)
 		b.Remove(order)
 
 	default:
@@ -145,13 +145,13 @@ func (b *LocalActiveOrderBook) orderUpdateHandler(order types.Order) {
 	}
 }
 
-func (b *LocalActiveOrderBook) Print() {
+func (b *ActiveOrderBook) Print() {
 	for _, o := range b.orders.Orders() {
 		log.Infof("%s", o)
 	}
 }
 
-func (b *LocalActiveOrderBook) Update(orders ...types.Order) {
+func (b *ActiveOrderBook) Update(orders ...types.Order) {
 	hasSymbol := len(b.Symbol) > 0
 	for _, order := range orders {
 		if hasSymbol && b.Symbol == order.Symbol {
@@ -160,7 +160,7 @@ func (b *LocalActiveOrderBook) Update(orders ...types.Order) {
 	}
 }
 
-func (b *LocalActiveOrderBook) Add(orders ...types.Order) {
+func (b *ActiveOrderBook) Add(orders ...types.Order) {
 	hasSymbol := len(b.Symbol) > 0
 	for _, order := range orders {
 		if hasSymbol && b.Symbol == order.Symbol {
@@ -169,18 +169,18 @@ func (b *LocalActiveOrderBook) Add(orders ...types.Order) {
 	}
 }
 
-func (b *LocalActiveOrderBook) Exists(order types.Order) bool {
+func (b *ActiveOrderBook) Exists(order types.Order) bool {
 	return b.orders.Exists(order.OrderID)
 }
 
-func (b *LocalActiveOrderBook) Remove(order types.Order) bool {
+func (b *ActiveOrderBook) Remove(order types.Order) bool {
 	return b.orders.Remove(order.OrderID)
 }
 
-func (b *LocalActiveOrderBook) NumOfOrders() int {
+func (b *ActiveOrderBook) NumOfOrders() int {
 	return b.orders.Len()
 }
 
-func (b *LocalActiveOrderBook) Orders() types.OrderSlice {
+func (b *ActiveOrderBook) Orders() types.OrderSlice {
 	return b.orders.Orders()
 }
