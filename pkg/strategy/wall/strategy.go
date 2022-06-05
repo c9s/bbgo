@@ -271,10 +271,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.stopC = make(chan struct{})
 
-	s.activeWallOrders = bbgo.NewLocalActiveOrderBook(s.Symbol)
+	s.activeWallOrders = bbgo.NewActiveOrderBook(s.Symbol)
 	s.activeWallOrders.BindStream(session.UserDataStream)
 
-	s.activeAdjustmentOrders = bbgo.NewLocalActiveOrderBook(s.Symbol)
+	s.activeAdjustmentOrders = bbgo.NewActiveOrderBook(s.Symbol)
 	s.activeAdjustmentOrders.BindStream(session.UserDataStream)
 
 	s.orderStore = bbgo.NewOrderStore(s.Symbol)
