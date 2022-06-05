@@ -303,6 +303,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	session.MarketDataStream.OnKLine(func(kline types.KLine) {
 		// TODO: handle stop loss here, faster than closed kline
+		lastLow := s.getValidPivotLow(kline.Close)
+		if lastLow == kline.Close && s.Entry.Immediate {
+			s.Notify("price breaks the previous low, submitting market sell to open a short position")
+			s.placeMarketSell(ctx, orderExecutor)
+		}
 	})
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
