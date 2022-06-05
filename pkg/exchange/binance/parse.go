@@ -810,7 +810,7 @@ func (e *OrderTradeUpdateEvent) TradeFutures() (*types.Trade, error) {
 		Side:          toGlobalSideType(binance.SideType(e.OrderTrade.Side)),
 		Price:         e.OrderTrade.LastFilledPrice,
 		Quantity:      e.OrderTrade.OrderLastFilledQuantity,
-		QuoteQuantity: e.OrderTrade.OrderFilledAccumulatedQuantity,
+		QuoteQuantity: e.OrderTrade.LastFilledPrice.Mul(e.OrderTrade.OrderLastFilledQuantity),
 		IsBuyer:       e.OrderTrade.Side == "BUY",
 		IsMaker:       e.OrderTrade.IsMaker,
 		Time:          types.Time(tt),
