@@ -34,7 +34,7 @@ type Strategy struct {
 
 	Position *types.Position `json:"position,omitempty"`
 
-	activeMakerOrders *bbgo.LocalActiveOrderBook
+	activeMakerOrders *bbgo.ActiveOrderBook
 	orderStore        *bbgo.OrderStore
 	tradeCollector    *bbgo.TradeCollector
 

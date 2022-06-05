@@ -37,7 +37,7 @@ type Strategy struct {
 	BaseQuantity fixedpoint.Value `json:"baseQuantity"`
 
 	// activeOrders is the locally maintained active order book of the maker orders.
-	activeOrders *bbgo.LocalActiveOrderBook
+	activeOrders *bbgo.ActiveOrderBook
 
 	// Injection fields start
 	// --------------------------

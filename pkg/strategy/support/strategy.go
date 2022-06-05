@@ -171,7 +171,7 @@ type Strategy struct {
 	tradeCollector *bbgo.TradeCollector
 
 	orderStore   *bbgo.OrderStore
-	activeOrders *bbgo.LocalActiveOrderBook
+	activeOrders *bbgo.ActiveOrderBook
 	state        *State
 
 	triggerEMA  *indicator.EWMA

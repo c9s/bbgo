@@ -60,7 +60,7 @@ type Strategy struct {
 	Entry Entry
 	Exit  Exit
 
-	activeMakerOrders *bbgo.LocalActiveOrderBook
+	activeMakerOrders *bbgo.ActiveOrderBook
 	orderStore        *bbgo.OrderStore
 	tradeCollector    *bbgo.TradeCollector
 
