@@ -11,6 +11,7 @@ function fetchIndex(basePath: string, setter: (data: any) => void) {
     .then((res) => res.json())
     .then((data) => {
       console.log("reportIndex", data);
+      data.runs.reverse() // last reports render first
       setter(data);
     })
     .catch((e) => {
@@ -47,7 +48,7 @@ const ReportNavigator = (props: ReportNavigatorProps) => {
       size="xs"
       center
       icon={
-        <ThemeIcon color="teal" size={24} radius="xl">
+        <ThemeIcon color="teal" size={16} radius="xl">
           <CircleCheck size={16}/>
         </ThemeIcon>
       }
