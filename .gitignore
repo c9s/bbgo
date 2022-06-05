@@ -43,3 +43,4 @@ otp*png
 /.deploy
 
 *.swp
+/pkg/backtest/assets.go
