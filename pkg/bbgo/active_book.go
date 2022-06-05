@@ -10,22 +10,20 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-const SentOrderWaitTime = 50 * time.Millisecond
 const CancelOrderWaitTime = 20 * time.Millisecond
 
 // LocalActiveOrderBook manages the local active order books.
 //go:generate callbackgen -type LocalActiveOrderBook
 type LocalActiveOrderBook struct {
 	Symbol          string
-	Asks, Bids      *types.SyncOrderMap
+	orders          *types.SyncOrderMap
 	filledCallbacks []func(o types.Order)
 }
 
 func NewLocalActiveOrderBook(symbol string) *LocalActiveOrderBook {
 	return &LocalActiveOrderBook{
 		Symbol: symbol,
-		Bids:   types.NewSyncOrderMap(),
-		Asks:   types.NewSyncOrderMap(),
+		orders: types.NewSyncOrderMap(),
 	}
 }
 
@@ -35,7 +33,7 @@ func (b *LocalActiveOrderBook) MarshalJSON() ([]byte, error) {
 }
 
 func (b *LocalActiveOrderBook) Backup() []types.SubmitOrder {
-	return append(b.Bids.Backup(), b.Asks.Backup()...)
+	return b.orders.Backup()
 }
 
 func (b *LocalActiveOrderBook) BindStream(stream types.Stream) {
@@ -121,6 +119,11 @@ func (b *LocalActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exch
 }
 
 func (b *LocalActiveOrderBook) orderUpdateHandler(order types.Order) {
+	hasSymbol := len(b.Symbol) > 0
+	if hasSymbol && order.Symbol != b.Symbol {
+		return
+	}
+
 	log.Debugf("[LocalActiveOrderBook] received order update: %+v", order)
 
 	switch order.Status {
@@ -143,112 +146,41 @@ func (b *LocalActiveOrderBook) orderUpdateHandler(order types.Order) {
 }
 
 func (b *LocalActiveOrderBook) Print() {
-	for _, o := range b.Bids.Orders() {
-		log.Infof("%s bid order: %d @ %v -> %s", o.Symbol, o.OrderID, o.Price, o.Status)
-	}
-
-	for _, o := range b.Asks.Orders() {
-		log.Infof("%s ask order: %d @ %v -> %s", o.Symbol, o.OrderID, o.Price, o.Status)
+	for _, o := range b.orders.Orders() {
+		log.Infof("%s", o)
 	}
 }
 
 func (b *LocalActiveOrderBook) Update(orders ...types.Order) {
+	hasSymbol := len(b.Symbol) > 0
 	for _, order := range orders {
-		switch order.Side {
-		case types.SideTypeBuy:
-			b.Bids.Update(order)
-
-		case types.SideTypeSell:
-			b.Asks.Update(order)
-
+		if hasSymbol && b.Symbol == order.Symbol {
+			b.orders.Update(order)
 		}
 	}
 }
 
 func (b *LocalActiveOrderBook) Add(orders ...types.Order) {
+	hasSymbol := len(b.Symbol) > 0
 	for _, order := range orders {
-		switch order.Side {
-		case types.SideTypeBuy:
-			b.Bids.Add(order)
-
-		case types.SideTypeSell:
-			b.Asks.Add(order)
-
-		default:
-			log.Errorf("unexpected order side %s, order: %#v", order.Side, order)
-
+		if hasSymbol && b.Symbol == order.Symbol {
+			b.orders.Add(order)
 		}
 	}
-}
-
-func (b *LocalActiveOrderBook) NumOfBids() int {
-	return b.Bids.Len()
-}
-
-func (b *LocalActiveOrderBook) NumOfAsks() int {
-	return b.Asks.Len()
 }
 
 func (b *LocalActiveOrderBook) Exists(order types.Order) bool {
-
-	switch order.Side {
-
-	case types.SideTypeBuy:
-		return b.Bids.Exists(order.OrderID)
-
-	case types.SideTypeSell:
-		return b.Asks.Exists(order.OrderID)
-
-	}
-
-	return false
+	return b.orders.Exists(order.OrderID)
 }
 
 func (b *LocalActiveOrderBook) Remove(order types.Order) bool {
-	switch order.Side {
-	case types.SideTypeBuy:
-		return b.Bids.Remove(order.OrderID)
-
-	case types.SideTypeSell:
-		return b.Asks.Remove(order.OrderID)
-
-	}
-
-	return false
-}
-
-// WriteOff writes off the filled order on the opposite side.
-// This method does not write off order by order amount or order quantity.
-func (b *LocalActiveOrderBook) WriteOff(order types.Order) bool {
-	if order.Status != types.OrderStatusFilled {
-		return false
-	}
-
-	switch order.Side {
-	case types.SideTypeSell:
-		// find the filled bid to remove
-		if filledOrder, ok := b.Bids.AnyFilled(); ok {
-			b.Bids.Remove(filledOrder.OrderID)
-			b.Asks.Remove(order.OrderID)
-			return true
-		}
-
-	case types.SideTypeBuy:
-		// find the filled ask order to remove
-		if filledOrder, ok := b.Asks.AnyFilled(); ok {
-			b.Asks.Remove(filledOrder.OrderID)
-			b.Bids.Remove(order.OrderID)
-			return true
-		}
-	}
-
-	return false
+	return b.orders.Remove(order.OrderID)
 }
 
 func (b *LocalActiveOrderBook) NumOfOrders() int {
-	return b.Asks.Len() + b.Bids.Len()
+	return b.orders.Len()
 }
 
 func (b *LocalActiveOrderBook) Orders() types.OrderSlice {
-	return append(b.Asks.Orders(), b.Bids.Orders()...)
+	return b.orders.Orders()
 }
