@@ -96,7 +96,6 @@ func (s *BacktestService) Verify(sourceExchange types.Exchange, symbols []string
 }
 
 func (s *BacktestService) Sync(ctx context.Context, exchange types.Exchange, symbol string, interval types.Interval, startTime, endTime time.Time) error {
-
 	return s.SyncKLineByInterval(ctx, exchange, symbol, interval, startTime, endTime)
 }
 
@@ -286,17 +285,6 @@ func (s *BacktestService) Insert(kline types.KLine) error {
 	return err
 }
 
-func (s *BacktestService) _deleteDuplicatedKLine(k types.KLine) error {
-	if len(k.Exchange) == 0 {
-		return errors.New("kline.Exchange field should not be empty")
-	}
-
-	tableName := targetKlineTable(k.Exchange)
-	sql := fmt.Sprintf("DELETE FROM `%s` WHERE gid = :gid  ", tableName)
-	_, err := s.DB.NamedExec(sql, k)
-	return err
-}
-
 type TimeRange struct {
 	Start time.Time
 	End   time.Time
@@ -350,7 +338,7 @@ func (s *BacktestService) SyncPartial(ctx context.Context, ex types.Exchange, sy
 	}
 
 	for _, timeRange := range timeRanges {
-		err = s.SyncKLineByInterval(ctx, ex, symbol, types.Interval1h, timeRange.Start.Add(time.Second), timeRange.End.Add(-time.Second))
+		err = s.SyncKLineByInterval(ctx, ex, symbol, interval, timeRange.Start.Add(time.Second), timeRange.End.Add(-time.Second))
 		if err != nil {
 			return err
 		}
