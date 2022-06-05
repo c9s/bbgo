@@ -62,11 +62,11 @@ func (s *BacktestService) SyncKLineByInterval(ctx context.Context, exchange type
 	return nil
 }
 
-func (s *BacktestService) Verify(symbols []string, startTime time.Time, endTime time.Time, sourceExchange types.Exchange, verboseCnt int) error {
+func (s *BacktestService) Verify(sourceExchange types.Exchange, symbols []string, startTime time.Time, endTime time.Time) error {
 	var corruptCnt = 0
 	for _, symbol := range symbols {
 		for interval := range types.SupportedIntervals {
-			log.Infof("verifying %s %s backtesting data...", symbol, interval)
+			log.Infof("verifying %s %s backtesting data: %s to %s...", symbol, interval, startTime, endTime)
 
 			timeRanges, err := s.FindMissingTimeRanges(context.Background(), sourceExchange, symbol, interval, startTime, endTime)
 			if err != nil {
