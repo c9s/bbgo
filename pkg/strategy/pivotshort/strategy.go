@@ -66,8 +66,8 @@ type Strategy struct {
 
 	session *bbgo.ExchangeSession
 
-	pivot       *indicator.Pivot
-	pivotBuffer []fixedpoint.Value
+	pivot          *indicator.Pivot
+	pivotLowPrices []fixedpoint.Value
 
 	// StrategyController
 	bbgo.StrategyController
@@ -187,9 +187,9 @@ func canClosePosition(position *types.Position, signal fixedpoint.Value, price f
 
 // get last available pivot low, the most recent pivot point higher than current price
 func (s *Strategy) getValidPivotLow(price fixedpoint.Value) fixedpoint.Value {
-	for l := len(s.pivotBuffer) - 1; l > 0; l-- {
-		if s.pivotBuffer[l].Compare(price) > 0 {
-			return s.pivotBuffer[l]
+	for l := len(s.pivotLowPrices) - 1; l > 0; l-- {
+		if s.pivotLowPrices[l].Compare(price) > 0 {
+			return s.pivotLowPrices[l]
 		}
 	}
 	return price
@@ -341,7 +341,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		if !s.LastLow.IsZero() {
 
-			s.pivotBuffer = append(s.pivotBuffer, s.LastLow)
+			s.pivotLowPrices = append(s.pivotLowPrices, s.LastLow)
 
 			if err := s.activeMakerOrders.GracefulCancel(ctx, s.session.Exchange); err != nil {
 				log.WithError(err).Errorf("graceful cancel order error")
