@@ -373,10 +373,14 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 	switch td.FeeCurrency {
 
 	case p.BaseCurrency:
-		quantity = quantity.Sub(fee)
+		if !td.IsFutures {
+			quantity = quantity.Sub(fee)
+		}
 
 	case p.QuoteCurrency:
-		quoteQuantity = quoteQuantity.Sub(fee)
+		if !td.IsFutures {
+			quoteQuantity = quoteQuantity.Sub(fee)
+		}
 
 	default:
 		if p.ExchangeFeeRates != nil {
