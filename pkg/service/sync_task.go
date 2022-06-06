@@ -37,17 +37,24 @@ type SyncTask struct {
 	// Filter is an optional field, which is used for filtering the remote records
 	Filter func(obj interface{}) bool
 
+	// BatchQuery is used for querying remote records.
+	BatchQuery func(ctx context.Context, startTime, endTime time.Time) (interface{}, chan error)
+
 	// Insert is an option field, which is used for customizing the record insert
 	Insert func(obj interface{}) error
 
+	// Insert is an option field, which is used for customizing the record batch insert
+	BatchInsert func(obj interface{}) error
+
+	BatchInsertBuffer int
+
 	// LogInsert logs the insert record in INFO level
 	LogInsert bool
-
-	// BatchQuery is used for querying remote records.
-	BatchQuery func(ctx context.Context, startTime, endTime time.Time) (interface{}, chan error)
 }
 
 func (sel SyncTask) execute(ctx context.Context, db *sqlx.DB, startTime time.Time, args ...time.Time) error {
+	batchBufferRefVal := reflect.MakeSlice(reflect.SliceOf(reflect.TypeOf(sel.Type)), 0, sel.BatchInsertBuffer)
+
 	// query from db
 	recordSlice, err := selectAndScanType(ctx, db, sel.Select, sel.Type)
 	if err != nil {
@@ -83,6 +90,14 @@ func (sel SyncTask) execute(ctx context.Context, db *sqlx.DB, startTime time.Tim
 	dataC, errC := sel.BatchQuery(ctx, startTime, endTime)
 	dataCRef := reflect.ValueOf(dataC)
 
+	defer func() {
+		if sel.BatchInsert != nil && batchBufferRefVal.Len() > 0 {
+			if err := sel.BatchInsert(batchBufferRefVal.Interface()); err != nil {
+				logrus.WithError(err).Errorf("batch insert error")
+			}
+		}
+	}()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -92,6 +107,7 @@ func (sel SyncTask) execute(ctx context.Context, db *sqlx.DB, startTime time.Tim
 		default:
 			v, ok := dataCRef.Recv()
 			if !ok {
+
 				err := <-errC
 				return err
 			}
@@ -108,20 +124,36 @@ func (sel SyncTask) execute(ctx context.Context, db *sqlx.DB, startTime time.Tim
 				}
 			}
 
-			if sel.LogInsert {
-				logrus.Infof("inserting %T: %+v", obj, obj)
-			} else {
-				logrus.Debugf("inserting %T: %+v", obj, obj)
-			}
+			if sel.BatchInsert != nil {
+				if batchBufferRefVal.Len() >= sel.BatchInsertBuffer {
+					if sel.LogInsert {
+						logrus.Infof("batch inserting %d %T", batchBufferRefVal.Len(), obj)
+					} else {
+						logrus.Debugf("batch inserting %d %T", batchBufferRefVal.Len(), obj)
+					}
 
-			if sel.Insert != nil {
-				// for custom insert
-				if err := sel.Insert(obj); err != nil {
-					return err
+					if err := sel.BatchInsert(batchBufferRefVal.Interface()); err != nil {
+						return err
+					}
+
+					batchBufferRefVal = reflect.MakeSlice(reflect.SliceOf(reflect.TypeOf(sel.Type)), 0, sel.BatchInsertBuffer)
 				}
+				batchBufferRefVal = reflect.Append(batchBufferRefVal, v)
 			} else {
-				if err := insertType(db, obj); err != nil {
-					return err
+				if sel.LogInsert {
+					logrus.Infof("inserting %T: %+v", obj, obj)
+				} else {
+					logrus.Debugf("inserting %T: %+v", obj, obj)
+				}
+				if sel.Insert != nil {
+					// for custom insert
+					if err := sel.Insert(obj); err != nil {
+						return err
+					}
+				} else {
+					if err := insertType(db, obj); err != nil {
+						return err
+					}
 				}
 			}
 		}
