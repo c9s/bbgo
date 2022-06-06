@@ -413,7 +413,7 @@ func getStrategySignature(strategy SingleExchangeStrategy) (string, error) {
 
 	var signature = path.Base(rv.Type().PkgPath())
 
-	id := callID(strategy)
+	var id = strategy.ID()
 
 	if !strings.EqualFold(id, signature) {
 		signature += "." + strings.ToLower(id)
