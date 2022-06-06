@@ -188,6 +188,11 @@ func (t Time) Value() (driver.Value, error) {
 }
 
 func (t *Time) Scan(src interface{}) error {
+	// skip nil time
+	if src == nil {
+		return nil
+	}
+
 	switch d := src.(type) {
 
 	case *time.Time:
@@ -269,7 +274,6 @@ func (t *LooseFormatTime) UnmarshalJSON(data []byte) error {
 func (t LooseFormatTime) MarshalJSON() ([]byte, error) {
 	return []byte(strconv.Quote(time.Time(t).Format(time.RFC3339))), nil
 }
-
 
 func (t LooseFormatTime) Time() time.Time {
 	return time.Time(t)

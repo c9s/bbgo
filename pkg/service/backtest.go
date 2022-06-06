@@ -309,7 +309,7 @@ func (s *BacktestService) SyncPartial(ctx context.Context, ex types.Exchange, sy
 		return err
 	}
 
-	if err == sql.ErrNoRows {
+	if err == sql.ErrNoRows || t1 == nil || t2 == nil {
 		// fallback to fresh sync
 		return s.Sync(ctx, ex, symbol, interval, since, until)
 	}
@@ -405,6 +405,10 @@ func (s *BacktestService) QueryExistingDataRange(ctx context.Context, ex types.E
 
 	if err := row.Err(); err != nil {
 		return nil, nil, err
+	}
+
+	if t1 == (types.Time{}) || t2 == (types.Time{}) {
+		return nil, nil, nil
 	}
 
 	return &t1, &t2, nil
