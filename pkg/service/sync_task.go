@@ -40,6 +40,9 @@ type SyncTask struct {
 	// Insert is an option field, which is used for customizing the record insert
 	Insert func(obj interface{}) error
 
+	// LogInsert logs the insert record in INFO level
+	LogInsert bool
+
 	// BatchQuery is used for querying remote records.
 	BatchQuery func(ctx context.Context, startTime, endTime time.Time) (interface{}, chan error)
 }
@@ -108,7 +111,11 @@ func (sel SyncTask) execute(ctx context.Context, db *sqlx.DB, startTime time.Tim
 				}
 			}
 
-			logrus.Infof("inserting %T: %+v", obj, obj)
+			if sel.LogInsert {
+				logrus.Infof("inserting %T: %+v", obj, obj)
+			} else {
+				logrus.Debugf("inserting %T: %+v", obj, obj)
+			}
 
 			if sel.Insert != nil {
 				// for custom insert
