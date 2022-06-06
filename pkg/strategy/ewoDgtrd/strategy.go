@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 	"math"
+	"sync"
 
 	"github.com/fatih/color"
 	"github.com/sirupsen/logrus"
@@ -17,8 +17,8 @@ import (
 )
 
 const ID = "ewo_dgtrd"
-const ewoChangeFilterHigh = 0.01
-const ewoChangeFilterLow = 0.00
+const ewoChangeFilterHigh = 1
+const ewoChangeFilterLow = 0.000
 
 const record = false
 
@@ -63,20 +63,20 @@ type Strategy struct {
 	entryPrice        fixedpoint.Value
 	waitForTrade      bool
 
-	atr         *indicator.ATR
-	emv         *indicator.EMV
-	ccis        *CCISTOCH
-	ma5         types.Series
-	ma34        types.Series
-	ewo         types.Series
-	ewoSignal   types.Series
-	ewoHistogram types.Series
+	atr           *indicator.ATR
+	emv           *indicator.EMV
+	ccis          *CCISTOCH
+	ma5           types.Series
+	ma34          types.Series
+	ewo           types.Series
+	ewoSignal     types.Series
+	ewoHistogram  types.Series
 	ewoChangeRate float64
-	heikinAshi  *HeikinAshi
-	peakPrice   fixedpoint.Value
-	bottomPrice fixedpoint.Value
-	midPrice    fixedpoint.Value
-	lock        sync.RWMutex
+	heikinAshi    *HeikinAshi
+	peakPrice     fixedpoint.Value
+	bottomPrice   fixedpoint.Value
+	midPrice      fixedpoint.Value
+	lock          sync.RWMutex
 
 	buyPrice  fixedpoint.Value
 	sellPrice fixedpoint.Value
@@ -207,34 +207,30 @@ func (inc *VWEMA) UpdateVal(price float64, vol float64) {
 }
 
 // Setup the Indicators going to be used
-func (s *Strategy) SetupIndicators() {
-	store, ok := s.Session.MarketDataStore(s.Symbol)
-	if !ok {
-		log.Errorf("cannot get marketdatastore of %s", s.Symbol)
-		return
-	}
-
+func (s *Strategy) SetupIndicators(store *bbgo.MarketDataStore) {
 	window5 := types.IntervalWindow{Interval: s.Interval, Window: 5}
 	window34 := types.IntervalWindow{Interval: s.Interval, Window: 34}
 	s.atr = &indicator.ATR{IntervalWindow: window34}
 	s.emv = &indicator.EMV{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: 14}}
 	s.ccis = NewCCISTOCH(s.Interval, s.FilterHigh, s.FilterLow)
 
-	if s.UseHeikinAshi {
-		s.heikinAshi = NewHeikinAshi(500)
-		store.OnKLineWindowUpdate(func(interval types.Interval, window types.KLineWindow) {
-			if interval == s.atr.Interval {
-				if s.atr.RMA == nil {
-					for _, kline := range window {
-						high := kline.High.Float64()
-						low := kline.Low.Float64()
-						cloze := kline.Close.Float64()
-						vol := kline.Volume.Float64()
-						s.atr.Update(high, low, cloze)
-						s.emv.Update(high, low, vol)
-					}
-				} else {
-					kline := window[len(window)-1]
+	getSource := func(window types.KLineWindow) types.Series {
+		if s.UseHeikinAshi {
+			return s.heikinAshi.Close
+		}
+		return window.Close()
+	}
+	getVol := func(window types.KLineWindow) types.Series {
+		if s.UseHeikinAshi {
+			return s.heikinAshi.Volume
+		}
+		return window.Volume()
+	}
+	s.heikinAshi = NewHeikinAshi(500)
+	store.OnKLineWindowUpdate(func(interval types.Interval, window types.KLineWindow) {
+		if interval == s.atr.Interval {
+			if s.atr.RMA == nil {
+				for _, kline := range window {
 					high := kline.High.Float64()
 					low := kline.Low.Float64()
 					cloze := kline.Close.Float64()
@@ -242,144 +238,104 @@ func (s *Strategy) SetupIndicators() {
 					s.atr.Update(high, low, cloze)
 					s.emv.Update(high, low, vol)
 				}
-			}
-			if s.Interval != interval {
-				return
-			}
-			if s.heikinAshi.Close.Length() == 0 {
-				for _, kline := range window {
-					s.heikinAshi.Update(kline)
-					s.ccis.Update(s.heikinAshi.Close.Last())
-				}
 			} else {
-				s.heikinAshi.Update(window[len(window)-1])
-				s.ccis.Update(s.heikinAshi.Close.Last())
+				kline := window[len(window)-1]
+				high := kline.High.Float64()
+				low := kline.Low.Float64()
+				cloze := kline.Close.Float64()
+				vol := kline.Volume.Float64()
+				s.atr.Update(high, low, cloze)
+				s.emv.Update(high, low, vol)
 			}
-		})
-		if s.UseEma {
-			ema5 := &indicator.EWMA{IntervalWindow: window5}
-			ema34 := &indicator.EWMA{IntervalWindow: window34}
-			store.OnKLineWindowUpdate(func(interval types.Interval, _ types.KLineWindow) {
-				if s.Interval != interval {
-					return
-				}
-				if ema5.Length() == 0 {
-					closes := types.ToReverseArray(s.heikinAshi.Close)
-					for _, cloze := range closes {
-						ema5.Update(cloze)
-						ema34.Update(cloze)
-					}
-				} else {
-					cloze := s.heikinAshi.Close.Last()
-					ema5.Update(cloze)
-					ema34.Update(cloze)
-				}
-			})
-			s.ma5 = ema5
-			s.ma34 = ema34
-		} else if s.UseSma {
-			sma5 := &indicator.SMA{IntervalWindow: window5}
-			sma34 := &indicator.SMA{IntervalWindow: window34}
-			store.OnKLineWindowUpdate(func(interval types.Interval, _ types.KLineWindow) {
-				if s.Interval != interval {
-					return
-				}
-				if sma5.Length() == 0 {
-					closes := types.ToReverseArray(s.heikinAshi.Close)
-					for _, cloze := range closes {
-						sma5.Update(cloze)
-						sma34.Update(cloze)
-					}
-				} else {
-					cloze := s.heikinAshi.Close.Last()
-					sma5.Update(cloze)
-					sma34.Update(cloze)
-				}
-			})
-			s.ma5 = sma5
-			s.ma34 = sma34
-		} else {
-			evwma5 := &VWEMA{
-				PV: &indicator.EWMA{IntervalWindow: window5},
-				V:  &indicator.EWMA{IntervalWindow: window5},
-			}
-			evwma34 := &VWEMA{
-				PV: &indicator.EWMA{IntervalWindow: window34},
-				V:  &indicator.EWMA{IntervalWindow: window34},
-			}
-			store.OnKLineWindowUpdate(func(interval types.Interval, _ types.KLineWindow) {
-				if s.Interval != interval {
-					return
-				}
-				if evwma5.PV.Length() == 0 {
-					for i := s.heikinAshi.Close.Length() - 1; i >= 0; i-- {
-						price := s.heikinAshi.Close.Index(i)
-						vol := s.heikinAshi.Volume.Index(i)
-						evwma5.UpdateVal(price, vol)
-						evwma34.UpdateVal(price, vol)
-					}
-				} else {
-					price := s.heikinAshi.Close.Last()
-					vol := s.heikinAshi.Volume.Last()
-					evwma5.UpdateVal(price, vol)
-					evwma34.UpdateVal(price, vol)
-				}
-			})
-			s.ma5 = evwma5
-			s.ma34 = evwma34
 		}
-	} else {
-		indicatorSet, ok := s.Session.StandardIndicatorSet(s.Symbol)
-		if !ok {
-			log.Errorf("cannot get indicator set of %s", s.Symbol)
+		if s.Interval != interval {
 			return
 		}
-
-		s.atr.Bind(store)
+		if s.heikinAshi.Close.Length() == 0 {
+			for _, kline := range window {
+				s.heikinAshi.Update(kline)
+				s.ccis.Update(getSource(window).Last())
+			}
+		} else {
+			s.heikinAshi.Update(window[len(window)-1])
+			s.ccis.Update(getSource(window).Last())
+		}
+	})
+	if s.UseEma {
+		ema5 := &indicator.EWMA{IntervalWindow: window5}
+		ema34 := &indicator.EWMA{IntervalWindow: window34}
 		store.OnKLineWindowUpdate(func(interval types.Interval, window types.KLineWindow) {
 			if s.Interval != interval {
 				return
 			}
-			if s.ccis.cci.Input.Length() == 0 {
-				for _, kline := range window {
-					s.ccis.Update(kline.Close.Float64())
+			if ema5.Length() == 0 {
+				closes := types.ToReverseArray(getSource(window))
+				for _, cloze := range closes {
+					ema5.Update(cloze)
+					ema34.Update(cloze)
 				}
 			} else {
-				s.ccis.Update(window[len(window)-1].Close.Float64())
+				cloze := getSource(window).Last()
+				ema5.Update(cloze)
+				ema34.Update(cloze)
+			}
+
+		})
+
+		s.ma5 = ema5
+		s.ma34 = ema34
+	} else if s.UseSma {
+		sma5 := &indicator.SMA{IntervalWindow: window5}
+		sma34 := &indicator.SMA{IntervalWindow: window34}
+		store.OnKLineWindowUpdate(func(interval types.Interval, window types.KLineWindow) {
+			if s.Interval != interval {
+				return
+			}
+			if sma5.Length() == 0 {
+				closes := types.ToReverseArray(getSource(window))
+				for _, cloze := range closes {
+					sma5.Update(cloze)
+					sma34.Update(cloze)
+				}
+			} else {
+				cloze := getSource(window).Last()
+				sma5.Update(cloze)
+				sma34.Update(cloze)
 			}
 		})
-		if s.UseEma {
-			s.ma5 = indicatorSet.EWMA(window5)
-			s.ma34 = indicatorSet.EWMA(window34)
-		} else if s.UseSma {
-			s.ma5 = indicatorSet.SMA(window5)
-			s.ma34 = indicatorSet.SMA(window34)
-		} else {
-			evwma5 := &VWEMA{
-				PV: &indicator.EWMA{IntervalWindow: window5},
-				V:  &indicator.EWMA{IntervalWindow: window5},
-			}
-			evwma34 := &VWEMA{
-				PV: &indicator.EWMA{IntervalWindow: window34},
-				V:  &indicator.EWMA{IntervalWindow: window34},
-			}
-			store.OnKLineWindowUpdate(func(interval types.Interval, window types.KLineWindow) {
-				if s.Interval != interval {
-					return
-				}
-				if evwma5.PV.Length() == 0 {
-					for _, kline := range window {
-						evwma5.Update(kline)
-						evwma34.Update(kline)
-					}
-				} else {
-					evwma5.Update(window[len(window)-1])
-					evwma34.Update(window[len(window)-1])
-				}
-			})
-			s.ma5 = evwma5
-			s.ma34 = evwma34
+		s.ma5 = sma5
+		s.ma34 = sma34
+	} else {
+		evwma5 := &VWEMA{
+			PV: &indicator.EWMA{IntervalWindow: window5},
+			V:  &indicator.EWMA{IntervalWindow: window5},
 		}
+		evwma34 := &VWEMA{
+			PV: &indicator.EWMA{IntervalWindow: window34},
+			V:  &indicator.EWMA{IntervalWindow: window34},
+		}
+		store.OnKLineWindowUpdate(func(interval types.Interval, window types.KLineWindow) {
+			if s.Interval != interval {
+				return
+			}
+			clozes := getSource(window)
+			vols := getVol(window)
+			if evwma5.PV.Length() == 0 {
+				for i := clozes.Length() - 1; i >= 0; i-- {
+					price := clozes.Index(i)
+					vol := vols.Index(i)
+					evwma5.UpdateVal(price, vol)
+					evwma34.UpdateVal(price, vol)
+				}
+			} else {
+				price := clozes.Last()
+				vol := vols.Last()
+				evwma5.UpdateVal(price, vol)
+				evwma34.UpdateVal(price, vol)
+			}
+		})
+		s.ma5 = evwma5
+		s.ma34 = evwma34
 	}
 
 	s.ewo = types.Mul(types.Minus(types.Div(s.ma5, s.ma34), 1.0), 100.)
@@ -430,25 +386,16 @@ func (s *Strategy) SetupIndicators() {
 			if interval != s.Interval {
 				return
 			}
-			var vol float64
 			if sig.Length() == 0 {
 				// lazy init
 				ewoVals := types.ToReverseArray(s.ewo)
 				for i, ewoValue := range ewoVals {
-					if s.UseHeikinAshi {
-						vol = s.heikinAshi.Volume.Index(len(ewoVals) - 1 - i)
-					} else {
-						vol = window[len(ewoVals)-1-i].Volume.Float64()
-					}
+					vol := window.Volume().Index(i)
 					sig.PV.Update(ewoValue * vol)
 					sig.V.Update(vol)
 				}
 			} else {
-				if s.UseHeikinAshi {
-					vol = s.heikinAshi.Volume.Last()
-				} else {
-					vol = window[len(window)-1].Volume.Float64()
-				}
+				vol := window.Volume().Last()
 				sig.PV.Update(s.ewo.Last() * vol)
 				sig.V.Update(vol)
 			}
@@ -850,10 +797,18 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 	s.tradeCollector.BindStream(session.UserDataStream)
 
-	s.SetupIndicators()
+	store, ok := s.Session.MarketDataStore(s.Symbol)
+	if !ok {
+		return errors.New(fmt.Sprintf("cannot get marketdatastore of %s", s.Symbol))
+	}
+	s.SetupIndicators(store)
 
-	shortSignal := types.CrossUnder(s.ewo, s.ewoSignal)
-	longSignal := types.CrossOver(s.ewo, s.ewoSignal)
+	// local peak of ewo
+	shortSig := s.ewo.Last() < s.ewo.Index(1) && s.ewo.Index(1) > s.ewo.Index(2)
+	longSig := s.ewo.Last() > s.ewo.Index(1) && s.ewo.Index(1) < s.ewo.Index(2)
+
+	//shortSignal := types.CrossUnder(s.ewo, s.ewoSignal)
+	//longSignal := types.CrossOver(s.ewo, s.ewoSignal)
 
 	sellOrderTPSL := func(price fixedpoint.Value) {
 		lastPrice := s.GetLastPrice()
@@ -879,17 +834,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		if quoteBalance.Div(lastPrice).Compare(s.Market.MinQuantity) >= 0 && quoteBalance.Compare(s.Market.MinNotional) >= 0 {
 			base := fixedpoint.NewFromFloat(s.ma34.Last())
 			// TP
-			if lastPrice.Compare(s.sellPrice) < 0 && (
-				s.ccis.BuySignal() ||
-				longSignal.Last() ||
+			if lastPrice.Compare(s.sellPrice) < 0 && (longSig ||
+				//longSignal.Last() ||
 				(!atrx2.IsZero() && base.Sub(atrx2).Compare(lastPrice) >= 0)) {
 				buyall = true
 				takeProfit = true
 
 				// calculate report
-				if s.ccis.BuySignal() {
-					reason = 0
-				} else if longSignal.Last() {
+				if longSig {
 					reason = 1
 				} else {
 					reason = 2
@@ -993,17 +945,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		if baseBalance.Compare(s.Market.MinQuantity) >= 0 && baseBalance.Mul(lastPrice).Compare(s.Market.MinNotional) >= 0 {
 			// TP
 			base := fixedpoint.NewFromFloat(s.ma34.Last())
-			if lastPrice.Compare(s.buyPrice) > 0 && (
-				s.ccis.SellSignal() ||
-				shortSignal.Last() ||
+			if lastPrice.Compare(s.buyPrice) > 0 && (shortSig ||
+				//shortSignal.Last() ||
 				(!atrx2.IsZero() && base.Add(atrx2).Compare(lastPrice) <= 0)) {
 				sellall = true
 				takeProfit = true
 
 				// calculate report
-				if s.ccis.SellSignal() {
-					reason = 0
-				} else if shortSignal.Last() {
+				if shortSig {
 					reason = 1
 				} else {
 					reason = 2
@@ -1111,15 +1060,38 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 	})
 
-	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
-		if kline.Symbol != s.Symbol {
-			return
+	getHigh := func(window types.KLineWindow) types.Series {
+		if s.UseHeikinAshi {
+			return s.heikinAshi.High
 		}
+		return window.High()
+	}
+	getLow := func(window types.KLineWindow) types.Series {
+		if s.UseHeikinAshi {
+			return s.heikinAshi.Low
+		}
+		return window.Low()
+	}
+	getClose := func(window types.KLineWindow) types.Series {
+		if s.UseHeikinAshi {
+			return s.heikinAshi.Close
+		}
+		return window.Close()
+	}
+	getOpen := func(window types.KLineWindow) types.Series {
+		if s.UseHeikinAshi {
+			return s.heikinAshi.Open
+		}
+		return window.Open()
+	}
+
+	store.OnKLineWindowUpdate(func(interval types.Interval, window types.KLineWindow) {
+		kline := window[len(window)-1]
 		s.KLineStartTime = kline.StartTime
 		s.KLineEndTime = kline.EndTime
 
 		// well, only track prices on 1m
-		if kline.Interval == types.Interval1m {
+		if interval == types.Interval1m {
 
 			if s.Environment.IsBackTesting() {
 				buyOrderTPSL(kline.High)
@@ -1162,8 +1134,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 
-		priceHighest := types.Highest(s.heikinAshi.High, 233)
-		priceLowest := types.Lowest(s.heikinAshi.Low, 233)
+		priceHighest := types.Highest(getHigh(window), 233)
+		priceLowest := types.Lowest(getLow(window), 233)
 		priceChangeRate := (priceHighest - priceLowest) / priceHighest / 14
 		ewoHighest := types.Highest(s.ewoHistogram, 233)
 
@@ -1172,24 +1144,22 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		// To get the threshold for ewo
 		// mean := types.Mean(types.Abs(s.ewo), 10)
 		// std := types.Stdev(s.ewo, 10)
-
+		//shortSig := s.ewo.Last() < s.ewo.Index(1) && s.ewo.Index(1) > s.ewo.Index(2)
+		//longSig := s.ewo.Last() > s.ewo.Index(1) && s.ewo.Index(1) < s.ewo.Index(2)
 		longSignal := types.CrossOver(s.ewo, s.ewoSignal)
 		shortSignal := types.CrossUnder(s.ewo, s.ewoSignal)
-		// get trend flags
-		var bull, breakThrough, breakDown bool
-		base := s.ma34.Last()
-		sellLine := base + s.atr.Last() * 3
-		buyLine := base - s.atr.Last() * 3
-		if s.UseHeikinAshi {
-			bull = s.heikinAshi.Close.Last() > s.heikinAshi.Open.Last()
-			breakThrough = s.heikinAshi.Close.Last() > s.ma5.Last() && s.heikinAshi.Close.Last() > s.ma34.Last()
-			breakDown = s.heikinAshi.Close.Last() < s.ma5.Last() && s.heikinAshi.Close.Last() < s.ma34.Last()
 
-		} else {
-			bull = kline.Close.Compare(kline.Open) > 0
-			breakThrough = kline.Close.Float64() > s.ma5.Last() && kline.Close.Float64() > s.ma34.Last()
-			breakDown = kline.Close.Float64() < s.ma5.Last() && kline.Close.Float64() < s.ma34.Last()
-		}
+		base := s.ma34.Last()
+		sellLine := base + s.atr.Last()*3
+		buyLine := base - s.atr.Last()*3
+		clozes := getClose(window)
+		opens := getOpen(window)
+
+		// get trend flags
+		bull := clozes.Last() > opens.Last()
+		breakThrough := clozes.Last() > s.ma5.Last() && clozes.Last() > s.ma34.Last()
+		breakDown := clozes.Last() < s.ma5.Last() && clozes.Last() < s.ma34.Last()
+
 		// kline breakthrough ma5, ma34 trend up, and cci Stochastic bull
 		IsBull := bull && breakThrough && s.ccis.BuySignal() && s.ewoChangeRate < ewoChangeFilterHigh && s.ewoChangeRate > ewoChangeFilterLow
 		// kline downthrough ma5, ma34 trend down, and cci Stochastic bear
@@ -1203,7 +1173,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 
 		if (longSignal.Index(1) && !shortSignal.Last() && IsBull) || lastPrice.Float64() <= buyLine {
-			price := kline.Close.Sub(atr.Div(types.Two))
+			price := lastPrice.Sub(atr.Div(types.Two))
 			// if total asset (including locked) could be used to buy
 			if quoteBalance.Div(price).Compare(s.Market.MinQuantity) >= 0 && quoteBalance.Compare(s.Market.MinNotional) >= 0 {
 				// cancel all orders to release lock
@@ -1237,7 +1207,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 		}
 		if (shortSignal.Index(1) && !longSignal.Last() && IsBear) || lastPrice.Float64() >= sellLine {
-			price := kline.Close.Add(atr.Div(types.Two))
+			price := lastPrice.Add(atr.Div(types.Two))
 			// if total asset (including locked) could be used to sell
 			if baseBalance.Mul(price).Compare(s.Market.MinNotional) >= 0 && baseBalance.Compare(s.Market.MinQuantity) >= 0 {
 				// cancel all orders to release lock
