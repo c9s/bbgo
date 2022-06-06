@@ -77,10 +77,10 @@ func (s *BacktestService) Verify(sourceExchange types.Exchange, symbols []string
 				continue
 			}
 
-			log.Warnf("found missing time ranges:")
+			log.Warnf("%s %s found missing time ranges:", symbol, interval)
 			corruptCnt += len(timeRanges)
 			for _, timeRange := range timeRanges {
-				log.Warnf("symbol %s interval: %s %v", symbol, interval, timeRange)
+				log.Warnf("- %s", timeRange.String())
 			}
 		}
 	}
