@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"syscall"
 	"time"
@@ -214,13 +215,13 @@ var BacktestCmd = &cobra.Command{
 
 		if wantSync {
 			log.Infof("starting synchronization: %v", userConfig.Backtest.Symbols)
-			if err := sync(ctx, userConfig, backtestService, sourceExchanges, syncFromTime, endTime); err != nil {
+			if err := sync(ctx, userConfig, backtestService, sourceExchanges, syncFromTime.Local(), endTime.Local()); err != nil {
 				return err
 			}
 			log.Info("synchronization done")
 
 			if shouldVerify {
-				err := verify(userConfig, backtestService, sourceExchanges, syncFromTime, endTime)
+				err := verify(userConfig, backtestService, sourceExchanges, syncFromTime.Local(), endTime.Local())
 				if err != nil {
 					return err
 				}
@@ -662,7 +663,16 @@ func sync(ctx context.Context, userConfig *bbgo.Config, backtestService *service
 				supportIntervals = types.SupportedIntervals
 			}
 
+			// sort intervals
+			var intervals []types.Interval
 			for interval := range supportIntervals {
+				intervals = append(intervals, interval)
+			}
+			sort.Slice(intervals, func(i, j int) bool {
+				return intervals[i].Duration() < intervals[j].Duration()
+			})
+
+			for _, interval := range intervals {
 				firstKLine, err := backtestService.QueryFirstKLine(sourceExchange.Name(), symbol, interval)
 				if err != nil {
 					return errors.Wrapf(err, "failed to query backtest kline")

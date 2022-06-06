@@ -92,8 +92,9 @@ func (sel SyncTask) execute(ctx context.Context, db *sqlx.DB, startTime time.Tim
 
 	defer func() {
 		if sel.BatchInsert != nil && batchBufferRefVal.Len() > 0 {
-			if err := sel.BatchInsert(batchBufferRefVal.Interface()); err != nil {
-				logrus.WithError(err).Errorf("batch insert error")
+			slice := batchBufferRefVal.Interface()
+			if err := sel.BatchInsert(slice); err != nil {
+				logrus.WithError(err).Errorf("batch insert error: %+v", slice)
 			}
 		}
 	}()
@@ -107,7 +108,6 @@ func (sel SyncTask) execute(ctx context.Context, db *sqlx.DB, startTime time.Tim
 		default:
 			v, ok := dataCRef.Recv()
 			if !ok {
-
 				err := <-errC
 				return err
 			}
@@ -118,6 +118,11 @@ func (sel SyncTask) execute(ctx context.Context, db *sqlx.DB, startTime time.Tim
 				continue
 			}
 
+			tt := sel.Time(obj)
+			if tt.Before(startTime) || tt.Equal(endTime) || tt.After(endTime) {
+				continue
+			}
+
 			if sel.Filter != nil {
 				if !sel.Filter(obj) {
 					continue
@@ -125,7 +130,7 @@ func (sel SyncTask) execute(ctx context.Context, db *sqlx.DB, startTime time.Tim
 			}
 
 			if sel.BatchInsert != nil {
-				if batchBufferRefVal.Len() >= sel.BatchInsertBuffer {
+				if batchBufferRefVal.Len() >= sel.BatchInsertBuffer-1 {
 					if sel.LogInsert {
 						logrus.Infof("batch inserting %d %T", batchBufferRefVal.Len(), obj)
 					} else {
@@ -148,10 +153,12 @@ func (sel SyncTask) execute(ctx context.Context, db *sqlx.DB, startTime time.Tim
 				if sel.Insert != nil {
 					// for custom insert
 					if err := sel.Insert(obj); err != nil {
+						logrus.WithError(err).Errorf("can not insert record: %v", obj)
 						return err
 					}
 				} else {
 					if err := insertType(db, obj); err != nil {
+						logrus.WithError(err).Errorf("can not insert record: %v", obj)
 						return err
 					}
 				}
