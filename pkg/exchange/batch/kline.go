@@ -2,6 +2,7 @@ package batch
 
 import (
 	"context"
+	"strconv"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/types"
@@ -22,11 +23,11 @@ func (e *KLineBatchQuery) Query(ctx context.Context, symbol string, interval typ
 			})
 		},
 		T: func(obj interface{}) time.Time {
-			return time.Time(obj.(types.KLine).StartTime).UTC()
+			return time.Time(obj.(types.KLine).StartTime)
 		},
 		ID: func(obj interface{}) string {
 			kline := obj.(types.KLine)
-			return kline.StartTime.String()
+			return strconv.FormatInt(kline.StartTime.UnixMilli(), 10)
 		},
 	}
 

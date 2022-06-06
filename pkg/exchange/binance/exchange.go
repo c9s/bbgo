@@ -1240,11 +1240,18 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 
 	var kLines []types.KLine
 	for _, k := range resp {
+		startTime := types.NewTimeFromUnix(0, k.OpenTime*int64(time.Millisecond))
+		if options.EndTime != nil {
+			if !startTime.Before(*options.EndTime) {
+				continue
+			}
+		}
+
 		kLines = append(kLines, types.KLine{
 			Exchange:                 types.ExchangeBinance,
 			Symbol:                   symbol,
 			Interval:                 interval,
-			StartTime:                types.NewTimeFromUnix(0, k.OpenTime*int64(time.Millisecond)),
+			StartTime:                startTime,
 			EndTime:                  types.NewTimeFromUnix(0, k.CloseTime*int64(time.Millisecond)),
 			Open:                     fixedpoint.MustNewFromString(k.Open),
 			Close:                    fixedpoint.MustNewFromString(k.Close),
@@ -1258,6 +1265,11 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 			NumberOfTrades:           uint64(k.TradeNum),
 			Closed:                   true,
 		})
+	}
+
+	kLines = types.SortKLinesAscending(kLines)
+	for _, k := range kLines {
+		log.Info(k)
 	}
 	return kLines, nil
 }

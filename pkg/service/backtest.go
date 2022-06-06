@@ -41,20 +41,25 @@ func (s *BacktestService) SyncKLineByInterval(ctx context.Context, exchange type
 			Type:   types.KLine{},
 			Select: SelectLastKLines(exchange.Name(), symbol, interval, startTime, endTime, 100),
 			Time: func(obj interface{}) time.Time {
-				return obj.(types.KLine).StartTime.Time().UTC()
+				return obj.(types.KLine).StartTime.Time()
 			},
 			ID: func(obj interface{}) string {
 				kline := obj.(types.KLine)
-				return kline.Symbol + kline.Interval.String() + strconv.FormatInt(kline.StartTime.UnixMilli(), 10)
+				return strconv.FormatInt(kline.StartTime.UnixMilli(), 10)
+				// return kline.Symbol + kline.Interval.String() + strconv.FormatInt(kline.StartTime.UnixMilli(), 10)
 			},
 			BatchQuery: func(ctx context.Context, startTime, endTime time.Time) (interface{}, chan error) {
 				q := &batch.KLineBatchQuery{Exchange: exchange}
 				return q.Query(ctx, symbol, interval, startTime, endTime)
 			},
-			BatchInsertBuffer: 500,
-			BatchInsert: func(obj interface{}) error {
-				kLines := obj.([]types.KLine)
-				return s.BatchInsert(kLines)
+			// BatchInsertBuffer: 500,
+			// BatchInsert: func(obj interface{}) error {
+			// 	kLines := obj.([]types.KLine)
+			// 	return s.BatchInsert(kLines)
+			// },
+			Insert: func(obj interface{}) error {
+				kline := obj.(types.KLine)
+				return s.Insert(kline)
 			},
 			LogInsert: log.GetLevel() == log.DebugLevel,
 		},
@@ -331,10 +336,6 @@ func (t *TimeRange) String() string {
 // create a time range slice []TimeRange
 // iterate the []TimeRange slice to sync data.
 func (s *BacktestService) SyncPartial(ctx context.Context, ex types.Exchange, symbol string, interval types.Interval, since, until time.Time) error {
-	// truncate time point to minute
-	since = since.Truncate(time.Minute)
-	until = until.Truncate(time.Minute)
-
 	t1, t2, err := s.QueryExistingDataRange(ctx, ex, symbol, interval, since, until)
 	if err != nil && err != sql.ErrNoRows {
 		return err
@@ -345,7 +346,6 @@ func (s *BacktestService) SyncPartial(ctx context.Context, ex types.Exchange, sy
 		return s.SyncFresh(ctx, ex, symbol, interval, since, until)
 	}
 
-	log.Debugf("found existing kline data, now using partial sync...")
 	timeRanges, err := s.FindMissingTimeRanges(ctx, ex, symbol, interval, t1.Time(), t2.Time())
 	if err != nil {
 		return err
@@ -358,22 +358,22 @@ func (s *BacktestService) SyncPartial(ctx context.Context, ex types.Exchange, sy
 	// there are few cases:
 	// t1 == since && t2 == until
 	// [since] ------- [t1] data [t2] ------ [until]
-	if since.Before(t1.Time()) {
+	if since.Before(t1.Time()) && t1.Time().Sub(since) > interval.Duration() {
 		// shift slice
 		timeRanges = append([]TimeRange{
-			{Start: since.Add(-2 * time.Second), End: t1.Time()}, // include since
+			{Start: since.Add(-2 * time.Second), End: t1.Time()}, // we should include since
 		}, timeRanges...)
 	}
 
-	if t2.Time().Before(until) {
+	if t2.Time().Before(until) && until.Sub(t2.Time()) > interval.Duration() {
 		timeRanges = append(timeRanges, TimeRange{
 			Start: t2.Time(),
-			End:   until.Add(2 * time.Second), // include until
+			End:   until.Add(-interval.Duration()), // include until
 		})
 	}
 
 	for _, timeRange := range timeRanges {
-		err = s.SyncKLineByInterval(ctx, ex, symbol, interval, timeRange.Start.Add(time.Second), timeRange.End.Add(-time.Second))
+		err = s.SyncKLineByInterval(ctx, ex, symbol, interval, timeRange.Start.Add(time.Second), timeRange.End)
 		if err != nil {
 			return err
 		}
@@ -481,6 +481,9 @@ func SelectKLineTimeRange(ex types.ExchangeName, symbol string, interval types.I
 	}
 
 	if len(args) == 2 {
+		// NOTE
+		// sqlite does not support timezone format, so we are converting to local timezone
+		// mysql works in this case, so this is a workaround
 		since := args[0]
 		until := args[1]
 		conditions = append(conditions, sq.Expr("`start_time` BETWEEN ? AND ?", since, until))
