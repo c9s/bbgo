@@ -50,6 +50,7 @@ func (s *BacktestService) SyncKLineByInterval(ctx context.Context, exchange type
 				kline := obj.(types.KLine)
 				return s.Insert(kline)
 			},
+			LogInsert: log.GetLevel() == log.DebugLevel,
 		},
 	}
 

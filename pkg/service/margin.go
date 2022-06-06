@@ -48,6 +48,7 @@ func (s *MarginService) Sync(ctx context.Context, ex types.Exchange, asset strin
 			ID: func(obj interface{}) string {
 				return strconv.FormatUint(obj.(types.MarginLoan).TransactionID, 10)
 			},
+			LogInsert: true,
 		},
 		{
 			Select: SelectLastMarginRepays(ex.Name(), 100),
@@ -64,6 +65,7 @@ func (s *MarginService) Sync(ctx context.Context, ex types.Exchange, asset strin
 			ID: func(obj interface{}) string {
 				return strconv.FormatUint(obj.(types.MarginRepay).TransactionID, 10)
 			},
+			LogInsert: true,
 		},
 		{
 			Select: SelectLastMarginInterests(ex.Name(), 100),
@@ -81,6 +83,7 @@ func (s *MarginService) Sync(ctx context.Context, ex types.Exchange, asset strin
 				m := obj.(types.MarginInterest)
 				return m.Asset + m.IsolatedSymbol + strconv.FormatInt(m.Time.UnixMilli(), 10)
 			},
+			LogInsert: true,
 		},
 		{
 			Select: SelectLastMarginLiquidations(ex.Name(), 100),
@@ -98,6 +101,7 @@ func (s *MarginService) Sync(ctx context.Context, ex types.Exchange, asset strin
 				m := obj.(types.MarginLiquidation)
 				return strconv.FormatUint(m.OrderID, 10)
 			},
+			LogInsert: true,
 		},
 	}
 

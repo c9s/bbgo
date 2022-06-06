@@ -94,6 +94,7 @@ func (s *TradeService) Sync(ctx context.Context, exchange types.Exchange, symbol
 				trade := obj.(types.Trade)
 				return strconv.FormatUint(trade.ID, 10) + trade.Side.String()
 			},
+			LogInsert: true,
 		},
 	}
 

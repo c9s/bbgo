@@ -57,6 +57,7 @@ func (s *WithdrawService) Sync(ctx context.Context, ex types.Exchange, startTime
 
 				return true
 			},
+			LogInsert: true,
 		},
 	}
 

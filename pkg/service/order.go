@@ -71,6 +71,7 @@ func (s *OrderService) Sync(ctx context.Context, exchange types.Exchange, symbol
 				order := obj.(types.Order)
 				return s.Insert(order)
 			},
+			LogInsert: true,
 		},
 	}
 
