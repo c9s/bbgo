@@ -52,7 +52,7 @@ func (s *BacktestService) SyncKLineByInterval(ctx context.Context, exchange type
 				q := &batch.KLineBatchQuery{Exchange: exchange}
 				return q.Query(ctx, symbol, interval, startTime, endTime)
 			},
-			// BatchInsertBuffer: 500,
+			BatchInsertBuffer: 500,
 			// BatchInsert: func(obj interface{}) error {
 			// 	kLines := obj.([]types.KLine)
 			// 	return s.BatchInsert(kLines)
@@ -373,7 +373,7 @@ func (s *BacktestService) SyncPartial(ctx context.Context, ex types.Exchange, sy
 	}
 
 	for _, timeRange := range timeRanges {
-		err = s.SyncKLineByInterval(ctx, ex, symbol, interval, timeRange.Start.Add(time.Second), timeRange.End)
+		err = s.SyncKLineByInterval(ctx, ex, symbol, interval, timeRange.Start.Add(time.Second), timeRange.End.Add(-time.Second))
 		if err != nil {
 			return err
 		}

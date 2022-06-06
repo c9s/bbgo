@@ -100,6 +100,7 @@ func TestBacktestService_SyncPartial(t *testing.T) {
 	timeRanges, err := service.FindMissingTimeRanges(ctx, ex, symbol, types.Interval1h, startTime1, endTime2)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, timeRanges)
+	assert.Len(t, timeRanges, 1)
 
 	t.Run("fill missing time ranges", func(t *testing.T) {
 		err = service.SyncPartial(ctx, ex, symbol, types.Interval1h, startTime1, endTime2)
@@ -109,19 +110,6 @@ func TestBacktestService_SyncPartial(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Empty(t, timeRanges2)
 	})
-
-	t.Run("extend time ranges", func(t *testing.T) {
-		startTime3 := startTime1.AddDate(0, 0, -3)
-		endTime3 := endTime2.AddDate(0, 0, 3)
-
-		err = service.SyncPartial(ctx, ex, symbol, types.Interval1h, startTime3, endTime3)
-		assert.NoError(t, err, "sync partial should not return error")
-
-		timeRanges3, err := service.FindMissingTimeRanges(ctx, ex, symbol, types.Interval1h, startTime3, endTime3)
-		assert.NoError(t, err)
-		assert.Empty(t, timeRanges3)
-	})
-
 }
 
 func TestBacktestService_FindMissingTimeRanges(t *testing.T) {
