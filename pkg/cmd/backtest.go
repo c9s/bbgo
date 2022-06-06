@@ -220,7 +220,7 @@ var BacktestCmd = &cobra.Command{
 			log.Info("synchronization done")
 
 			if shouldVerify {
-				err := verify(userConfig, backtestService, sourceExchanges, startTime, verboseCnt)
+				err := verify(userConfig, backtestService, sourceExchanges, syncFromTime, endTime)
 				if err != nil {
 					return err
 				}
@@ -598,9 +598,9 @@ func createSymbolReport(userConfig *bbgo.Config, session *bbgo.ExchangeSession, 
 	return &symbolReport, nil
 }
 
-func verify(userConfig *bbgo.Config, backtestService *service.BacktestService, sourceExchanges map[types.ExchangeName]types.Exchange, startTime time.Time, verboseCnt int) error {
+func verify(userConfig *bbgo.Config, backtestService *service.BacktestService, sourceExchanges map[types.ExchangeName]types.Exchange, startTime, endTime time.Time) error {
 	for _, sourceExchange := range sourceExchanges {
-		err := backtestService.Verify(sourceExchange, userConfig.Backtest.Symbols, startTime, time.Now())
+		err := backtestService.Verify(sourceExchange, userConfig.Backtest.Symbols, startTime, endTime)
 		if err != nil {
 			return err
 		}
