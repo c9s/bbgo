@@ -51,9 +51,10 @@ func (s *BacktestService) SyncKLineByInterval(ctx context.Context, exchange type
 				q := &batch.KLineBatchQuery{Exchange: exchange}
 				return q.Query(ctx, symbol, interval, startTime, endTime)
 			},
-			Insert: func(obj interface{}) error {
-				kline := obj.(types.KLine)
-				return s.Insert(kline)
+			BatchInsertBuffer: 500,
+			BatchInsert: func(obj interface{}) error {
+				kLines := obj.([]types.KLine)
+				return s.BatchInsert(kLines)
 			},
 			LogInsert: log.GetLevel() == log.DebugLevel,
 		},
@@ -74,7 +75,8 @@ func (s *BacktestService) Verify(sourceExchange types.Exchange, symbols []string
 		for interval := range types.SupportedIntervals {
 			log.Infof("verifying %s %s backtesting data: %s to %s...", symbol, interval, startTime, endTime)
 
-			timeRanges, err := s.FindMissingTimeRanges(context.Background(), sourceExchange, symbol, interval, startTime, endTime)
+			timeRanges, err := s.FindMissingTimeRanges(context.Background(), sourceExchange, symbol, interval,
+				startTime, endTime)
 			if err != nil {
 				return err
 			}
@@ -101,7 +103,9 @@ func (s *BacktestService) Verify(sourceExchange types.Exchange, symbols []string
 	return nil
 }
 
-func (s *BacktestService) Sync(ctx context.Context, exchange types.Exchange, symbol string, interval types.Interval, startTime, endTime time.Time) error {
+func (s *BacktestService) SyncFresh(ctx context.Context, exchange types.Exchange, symbol string, interval types.Interval, startTime, endTime time.Time) error {
+	startTime = startTime.Truncate(time.Minute).Add(-2 * time.Second)
+	endTime = endTime.Truncate(time.Minute).Add(2 * time.Second)
 	return s.SyncKLineByInterval(ctx, exchange, symbol, interval, startTime, endTime)
 }
 
@@ -291,6 +295,24 @@ func (s *BacktestService) Insert(kline types.KLine) error {
 	return err
 }
 
+// BatchInsert Note: all kline should be same exchange, or it will cause issue.
+func (s *BacktestService) BatchInsert(kline []types.KLine) error {
+	if len(kline) == 0 {
+		return nil
+	}
+
+	tableName := targetKlineTable(kline[0].Exchange)
+
+	sql := fmt.Sprintf("INSERT INTO `%s` (`exchange`, `start_time`, `end_time`, `symbol`, `interval`, `open`, `high`, `low`, `close`, `closed`, `volume`, `quote_volume`, `taker_buy_base_volume`, `taker_buy_quote_volume`)"+
+		" VALUES (:exchange, :start_time, :end_time, :symbol, :interval, :open, :high, :low, :close, :closed, :volume, :quote_volume, :taker_buy_base_volume, :taker_buy_quote_volume); ", tableName)
+
+	tx := s.DB.MustBegin()
+	if _, err := tx.NamedExec(sql, kline); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 type TimeRange struct {
 	Start time.Time
 	End   time.Time
@@ -317,7 +339,7 @@ func (s *BacktestService) SyncPartial(ctx context.Context, ex types.Exchange, sy
 
 	if err == sql.ErrNoRows || t1 == nil || t2 == nil {
 		// fallback to fresh sync
-		return s.Sync(ctx, ex, symbol, interval, since, until)
+		return s.SyncFresh(ctx, ex, symbol, interval, since, until)
 	}
 
 	log.Debugf("found existing kline data, now using partial sync...")
@@ -391,7 +413,7 @@ func (s *BacktestService) FindMissingTimeRanges(ctx context.Context, ex types.Ex
 		lastTime = t
 	}
 
-	if lastTime.Before(until) {
+	if lastTime.Before(until) && until.Sub(lastTime) > intervalDuration*2 {
 		timeRanges = append(timeRanges, TimeRange{
 			Start: lastTime,
 			End:   until,
