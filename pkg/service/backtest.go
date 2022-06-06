@@ -125,6 +125,7 @@ func (s *BacktestService) QueryKLine(ex types.ExchangeName, symbol string, inter
 		"interval": interval,
 		"symbol":   symbol,
 	})
+	defer rows.Close()
 
 	if err != nil {
 		return nil, errors.Wrap(err, "query kline error")
@@ -133,8 +134,6 @@ func (s *BacktestService) QueryKLine(ex types.ExchangeName, symbol string, inter
 	if rows.Err() != nil {
 		return nil, rows.Err()
 	}
-
-	defer rows.Close()
 
 	if rows.Next() {
 		var kline types.KLine
@@ -263,6 +262,7 @@ func (s *BacktestService) scanRowsCh(rows *sqlx.Rows) (chan types.KLine, chan er
 }
 
 func (s *BacktestService) scanRows(rows *sqlx.Rows) (klines []types.KLine, err error) {
+	defer rows.Close()
 	for rows.Next() {
 		var kline types.KLine
 		if err := rows.StructScan(&kline); err != nil {
@@ -308,6 +308,9 @@ func (s *BacktestService) BatchInsert(kline []types.KLine) error {
 
 	tx := s.DB.MustBegin()
 	if _, err := tx.NamedExec(sql, kline); err != nil {
+		if e := tx.Rollback(); e != nil {
+			log.WithError(e).Fatalf("cannot rollback insertion %v", err)
+		}
 		return err
 	}
 	return tx.Commit()
@@ -389,6 +392,7 @@ func (s *BacktestService) FindMissingTimeRanges(ctx context.Context, ex types.Ex
 	}
 
 	rows, err := s.DB.QueryContext(ctx, sql, args...)
+	defer rows.Close()
 	if err != nil {
 		return nil, err
 	}
