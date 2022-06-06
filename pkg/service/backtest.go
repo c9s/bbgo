@@ -417,7 +417,7 @@ func (s *BacktestService) FindMissingTimeRanges(ctx context.Context, ex types.Ex
 		lastTime = t
 	}
 
-	if lastTime.Before(until) && until.Sub(lastTime) > intervalDuration*2 {
+	if lastTime.Before(until) && until.Sub(lastTime) > intervalDuration {
 		timeRanges = append(timeRanges, TimeRange{
 			Start: lastTime,
 			End:   until,
