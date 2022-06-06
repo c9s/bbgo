@@ -89,9 +89,6 @@ func (sel SyncTask) execute(ctx context.Context, db *sqlx.DB, startTime time.Tim
 			logrus.Warnf("context is cancelled, stop syncing")
 			return ctx.Err()
 
-		case err := <-errC:
-			return err
-
 		default:
 			v, ok := dataCRef.Recv()
 			if !ok {
