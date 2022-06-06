@@ -411,12 +411,12 @@ func getStrategySignature(strategy SingleExchangeStrategy) (string, error) {
 		return "", fmt.Errorf("strategy %T instance is not a struct", strategy)
 	}
 
-	var signature = path.Base(rv.Type().PkgPath())
-
-	var id = strategy.ID()
-
-	if !strings.EqualFold(id, signature) {
-		signature += "." + strings.ToLower(id)
+	var signature string
+	var id = callID(strategy)
+	if id != "" {
+		signature = id
+	} else {
+		signature = path.Base(rv.Type().PkgPath())
 	}
 
 	for i := 0; i < rv.NumField(); i++ {
