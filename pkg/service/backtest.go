@@ -31,6 +31,11 @@ func (s *BacktestService) SyncKLineByInterval(ctx context.Context, exchange type
 		symbol = isolatedSymbol
 	}
 
+	if s.DB.DriverName() == "sqlite3" {
+		_, _ = s.DB.Exec("PRAGMA journal_mode = WAL")
+		_, _ = s.DB.Exec("PRAGMA synchronous = NORMAL")
+	}
+
 	tasks := []SyncTask{
 		{
 			Type:   types.KLine{},
