@@ -14,6 +14,31 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+func TestBacktestService_FindMissingTimeRanges_EmptyData(t *testing.T) {
+	db, err := prepareDB(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer db.Close()
+
+	ctx := context.Background()
+	dbx := sqlx.NewDb(db.DB, "sqlite3")
+
+	ex, err := exchange.NewPublic(types.ExchangeBinance)
+	assert.NoError(t, err)
+
+	service := &BacktestService{DB: dbx}
+
+	symbol := "BTCUSDT"
+	now := time.Now()
+	startTime1 := now.AddDate(0, 0, -7).Truncate(time.Hour)
+	endTime1 := now.AddDate(0, 0, -6).Truncate(time.Hour)
+	timeRanges, err := service.FindMissingTimeRanges(ctx, ex, symbol, types.Interval1h, startTime1, endTime1)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, timeRanges)
+}
+
 func TestBacktestService_QueryExistingDataRange(t *testing.T) {
 	db, err := prepareDB(t)
 	if err != nil {

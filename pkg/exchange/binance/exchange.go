@@ -1226,11 +1226,11 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 		Limit(limit)
 
 	if options.StartTime != nil {
-		req.StartTime(options.StartTime.UnixNano() / int64(time.Millisecond))
+		req.StartTime(options.StartTime.UnixMilli())
 	}
 
 	if options.EndTime != nil {
-		req.EndTime(options.EndTime.UnixNano() / int64(time.Millisecond))
+		req.EndTime(options.EndTime.UnixMilli())
 	}
 
 	resp, err := req.Do(ctx)
