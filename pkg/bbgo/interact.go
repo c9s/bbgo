@@ -54,6 +54,7 @@ func getStrategySignatures(exchangeStrategies map[string]SingleExchangeStrategy)
 
 func filterStrategyByInterface(checkInterface interface{}, exchangeStrategies map[string]SingleExchangeStrategy) (strategies map[string]SingleExchangeStrategy, found bool) {
 	found = false
+	strategies = make(map[string]SingleExchangeStrategy)
 	rt := reflect.TypeOf(checkInterface).Elem()
 	for signature, strategy := range exchangeStrategies {
 		if ok := reflect.TypeOf(strategy).Implements(rt); ok {
@@ -412,7 +413,7 @@ func getStrategySignature(strategy SingleExchangeStrategy) (string, error) {
 
 	var signature = path.Base(rv.Type().PkgPath())
 
-	var id = strategy.ID()
+	id := callID(strategy)
 
 	if !strings.EqualFold(id, signature) {
 		signature += "." + strings.ToLower(id)
