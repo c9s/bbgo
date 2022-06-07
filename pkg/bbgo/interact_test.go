@@ -29,5 +29,5 @@ func Test_getStrategySignature(t *testing.T) {
 		Symbol: "BTCUSDT",
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, "mystrategy:BTCUSDT.BTCUSDT", signature)
+	assert.Equal(t, "mystrategy:BTCUSDT", signature)
 }
