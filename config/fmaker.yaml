@@ -1,0 +1,26 @@
+sessions:
+  binance:
+    exchange: binance
+    envVarPrefix: binance
+
+
+exchangeStrategies:
+- on: binance
+  fmaker:
+    symbol: BTCUSDT
+    interval: 1m
+    spread: 0.15%
+    amount: 300 # 11
+
+backtest:
+  sessions:
+    - binance
+  startTime: "2022-01-01"
+  endTime: "2022-05-31"
+  symbols:
+    - BTCUSDT
+  account:
+    binance:
+      balances:
+        BTC: 1 # 1
+        USDT: 45_000 # 30_000
