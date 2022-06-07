@@ -21,6 +21,72 @@ func newLimitOrder(symbol string, side types.SideType, price, quantity float64) 
 	}
 }
 
+func TestSimplePriceMatching_orderUpdate(t *testing.T) {
+	account := &types.Account{
+		MakerFeeRate: fixedpoint.NewFromFloat(0.075 * 0.01),
+		TakerFeeRate: fixedpoint.NewFromFloat(0.075 * 0.01),
+	}
+	account.UpdateBalances(types.BalanceMap{
+		"USDT": {Currency: "USDT", Available: fixedpoint.NewFromFloat(10000.0)},
+	})
+	market := types.Market{
+		Symbol:          "BTCUSDT",
+		PricePrecision:  8,
+		VolumePrecision: 8,
+		QuoteCurrency:   "USDT",
+		BaseCurrency:    "BTC",
+		MinNotional:     fixedpoint.MustNewFromString("0.001"),
+		MinAmount:       fixedpoint.MustNewFromString("10.0"),
+		MinQuantity:     fixedpoint.MustNewFromString("0.001"),
+	}
+
+	t1 := time.Date(2021, 7, 1, 0, 0, 0, 0, time.UTC)
+	engine := &SimplePriceMatching{
+		Account:     account,
+		Market:      market,
+		CurrentTime: t1,
+	}
+
+	orderUpdateCnt := 0
+	orderUpdateNewStatusCnt := 0
+	orderUpdateFilledStatusCnt := 0
+	var lastOrder types.Order
+	engine.OnOrderUpdate(func(order types.Order) {
+		lastOrder = order
+
+		orderUpdateCnt++
+		switch order.Status {
+		case types.OrderStatusNew:
+			orderUpdateNewStatusCnt++
+
+		case types.OrderStatusFilled:
+			orderUpdateFilledStatusCnt++
+
+		}
+	})
+
+	_, _, err := engine.PlaceOrder(newLimitOrder("BTCUSDT", types.SideTypeBuy, 24000.0, 0.1))
+	assert.NoError(t, err)
+	assert.Equal(t, 1, orderUpdateCnt)             // should got new status
+	assert.Equal(t, 1, orderUpdateNewStatusCnt)    // should got new status
+	assert.Equal(t, 0, orderUpdateFilledStatusCnt) // should got new status
+	assert.Equal(t, types.OrderStatusNew, lastOrder.Status)
+	assert.Equal(t, fixedpoint.NewFromFloat(0.0), lastOrder.ExecutedQuantity)
+
+	t2 := t1.Add(time.Minute)
+
+	// should match 25000, 24000
+	k := newKLine("BTCUSDT", types.Interval1m, t2, 26000, 27000, 23000, 25000)
+	engine.processKLine(k)
+
+	assert.Equal(t, 2, orderUpdateCnt)             // should got new and filled
+	assert.Equal(t, 1, orderUpdateNewStatusCnt)    // should got new status
+	assert.Equal(t, 1, orderUpdateFilledStatusCnt) // should got new status
+	assert.Equal(t, types.OrderStatusFilled, lastOrder.Status)
+	assert.Equal(t, "0.1", lastOrder.ExecutedQuantity.String())
+	assert.Equal(t, lastOrder.Quantity.String(), lastOrder.ExecutedQuantity.String())
+}
+
 func TestSimplePriceMatching_processKLine(t *testing.T) {
 	account := &types.Account{
 		MakerFeeRate: fixedpoint.NewFromFloat(0.075 * 0.01),

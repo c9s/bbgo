@@ -146,6 +146,7 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (closedOrders *typ
 	order := m.newOrder(o, orderID)
 
 	if o.Type == types.OrderTypeMarket {
+		// emit the order update for Status:New
 		m.EmitOrderUpdate(order)
 
 		// copy the order object to avoid side effect (for different callbacks)
@@ -160,12 +161,13 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (closedOrders *typ
 		order2.ExecutedQuantity = order2.Quantity
 		order2.Price = price
 		order2.IsWorking = false
-		m.EmitOrderUpdate(order2)
 
+		// let the exchange emit the "FILLED" order update (we need the closed order)
+		// m.EmitOrderUpdate(order2)
 		return &order2, &trade, nil
 	}
 
-	// for limit maker orders
+	// For limit maker orders (open status)
 	// TODO: handle limit taker order
 	switch o.Side {
 
@@ -180,8 +182,7 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (closedOrders *typ
 		m.mu.Unlock()
 	}
 
-	m.EmitOrderUpdate(order)
-
+	m.EmitOrderUpdate(order) // emit order New status
 	return &order, nil, nil
 }
 
