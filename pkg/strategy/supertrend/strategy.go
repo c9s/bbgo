@@ -221,6 +221,8 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 
 	s.tradeCollector.Process()
 
+	_ = s.Persistence.Sync(s)
+
 	return err
 }
 
@@ -291,7 +293,6 @@ func (s *Strategy) calculateQuantity(currentPrice fixedpoint.Value) fixedpoint.V
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	s.session = session
-	s.Market, _ = session.Market(s.Symbol)
 
 	// If position is nil, we need to allocate a new position for calculation
 	if s.Position == nil {
@@ -323,8 +324,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		if err := s.ClosePosition(ctx, fixedpoint.One); err != nil {
 			s.Notify("can not close position")
 		}
-
-		_ = s.Persistence.Sync(s)
 	})
 
 	// Setup indicators
@@ -422,12 +421,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				}
 			}
 
-			// Update balance for exchanges like FTX, which doesn't update balances automatically
-			balances, err := s.session.Exchange.QueryAccountBalances(ctx)
-			if err != nil {
-				s.session.GetAccount().UpdateBalances(balances)
-			}
-
 			orderForm := s.generateOrderForm(side, s.calculateQuantity(kline.GetClose()), types.SideEffectTypeMarginBuy)
 			log.Infof("submit open position order %v", orderForm)
 			order, err := orderExecutor.SubmitOrders(ctx, orderForm)
@@ -439,6 +432,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 
 			s.tradeCollector.Process()
+
+			_ = s.Persistence.Sync(s)
 		}
 	})
 
