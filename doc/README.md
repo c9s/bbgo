@@ -22,6 +22,7 @@
 * [Grid](strategy/grid.md) - Grid Strategy Explanation
 * [Interaction](strategy/interaction.md) - Interaction registration for strategies
 * [Price Alert](strategy/pricealert.md) - Send price alert notification on price changes
+* [Supertrend](strategy/supertrend.md) - Supertrend strategy uses Supertrend indicator as trend, and DEMA indicator as noise filter
 * [Support](strategy/support.md) - Support strategy that buys on high volume support
 
 ### Development
