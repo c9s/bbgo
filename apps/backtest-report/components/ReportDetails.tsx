@@ -111,11 +111,9 @@ function StatsGridIcons({data}: StatsGridIconsProps) {
   });
 
   return (
-    <div py="xl">
-      <SimpleGrid cols={5} breakpoints={[{maxWidth: 'sm', cols: 1, spacing: 'xl'}]}>
+      <SimpleGrid cols={5} breakpoints={[{maxWidth: 'sm', cols: 1, spacing: 'xl'}]} py="xl">
         {stats}
       </SimpleGrid>
-    </div>
   );
 }
 
