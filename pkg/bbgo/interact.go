@@ -405,20 +405,21 @@ func (it *CoreInteraction) Initialize() error {
 	return nil
 }
 
+// getStrategySignature returns strategy instance unique signature
 func getStrategySignature(strategy SingleExchangeStrategy) (string, error) {
+	// Returns instance ID
+	var signature = callID(strategy)
+	if signature != "" {
+		return signature, nil
+	}
+
+	// Use reflect to build instance signature
 	rv := reflect.ValueOf(strategy).Elem()
 	if rv.Kind() != reflect.Struct {
 		return "", fmt.Errorf("strategy %T instance is not a struct", strategy)
 	}
 
-	var signature string
-	var id = callID(strategy)
-	if id != "" {
-		signature = id
-	} else {
-		signature = path.Base(rv.Type().PkgPath())
-	}
-
+	signature = path.Base(rv.Type().PkgPath())
 	for i := 0; i < rv.NumField(); i++ {
 		field := rv.Field(i)
 		fieldName := rv.Type().Field(i).Name
