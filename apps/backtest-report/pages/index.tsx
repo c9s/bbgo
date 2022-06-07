@@ -22,7 +22,7 @@ const Home: NextPage = () => {
       </Head>
       <main className={styles.main}>
         <AppShell
-          padding="xm"
+          padding="sm"
           navbar={<Navbar width={{base: 250}} height={500} p="xs">
 
             <ReportNavigator onSelect={(reportEntry) => {

@@ -134,6 +134,7 @@ interface Order {
   status: string;
   update_time: Date;
   creation_time: Date;
+  time?: Date;
 }
 
 interface Marker {
