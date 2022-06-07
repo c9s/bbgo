@@ -67,7 +67,7 @@ function StatsGridIcons({data}: StatsGridIconsProps) {
                   variant="light"
                   sx={(theme) => ({color: stat.dir == "up" ? theme.colors.teal[6] : theme.colors.red[6]})}
                   size={16}
-                  radius="sx"
+                  radius="xs"
                 >
                   <DirIcon size={16}/>
                 </ThemeIcon>
