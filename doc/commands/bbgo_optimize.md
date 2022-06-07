@@ -1,17 +1,18 @@
-## bbgo list-orders
+## bbgo optimize
 
-list user's open orders in exchange of a specific trading pair
+run optimizer
 
 ```
-bbgo list-orders open|closed --session SESSION --symbol SYMBOL [flags]
+bbgo optimize [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help             help for list-orders
-      --session string   the exchange session name for sync
-      --symbol string    the trading pair, like btcusdt
+  -h, --help                      help for optimize
+      --json                      print optimizer metrics in json format
+      --optimizer-config string   config file (default "optimizer.yaml")
+      --output string             backtest report output directory (default "output")
 ```
 
 ### Options inherited from parent commands
