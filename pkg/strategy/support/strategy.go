@@ -189,6 +189,10 @@ func (s *Strategy) ID() string {
 	return ID
 }
 
+func (s *Strategy) InstanceID() string {
+	return fmt.Sprintf("%s:%s", ID, s.Symbol)
+}
+
 func (s *Strategy) Validate() error {
 	if s.Quantity.IsZero() && s.ScaleQuantity == nil {
 		return fmt.Errorf("quantity or scaleQuantity can not be zero")

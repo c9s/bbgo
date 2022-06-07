@@ -54,6 +54,7 @@ func getStrategySignatures(exchangeStrategies map[string]SingleExchangeStrategy)
 
 func filterStrategyByInterface(checkInterface interface{}, exchangeStrategies map[string]SingleExchangeStrategy) (strategies map[string]SingleExchangeStrategy, found bool) {
 	found = false
+	strategies = make(map[string]SingleExchangeStrategy)
 	rt := reflect.TypeOf(checkInterface).Elem()
 	for signature, strategy := range exchangeStrategies {
 		if ok := reflect.TypeOf(strategy).Implements(rt); ok {
@@ -404,20 +405,21 @@ func (it *CoreInteraction) Initialize() error {
 	return nil
 }
 
+// getStrategySignature returns strategy instance unique signature
 func getStrategySignature(strategy SingleExchangeStrategy) (string, error) {
+	// Returns instance ID
+	var signature = callID(strategy)
+	if signature != "" {
+		return signature, nil
+	}
+
+	// Use reflect to build instance signature
 	rv := reflect.ValueOf(strategy).Elem()
 	if rv.Kind() != reflect.Struct {
 		return "", fmt.Errorf("strategy %T instance is not a struct", strategy)
 	}
 
-	var signature = path.Base(rv.Type().PkgPath())
-
-	var id = strategy.ID()
-
-	if !strings.EqualFold(id, signature) {
-		signature += "." + strings.ToLower(id)
-	}
-
+	signature = path.Base(rv.Type().PkgPath())
 	for i := 0; i < rv.NumField(); i++ {
 		field := rv.Field(i)
 		fieldName := rv.Type().Field(i).Name
