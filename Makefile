@@ -230,7 +230,7 @@ frontend/out/index.html: frontend/node_modules
 	cd frontend && yarn export
 
 pkg/server/assets.go: frontend/out/index.html
-	go run ./util/embed -package server -tag web -output $@ $(FRONTEND_EXPORT_DIR)
+	go run ./utils/embed -package server -tag web -output $@ $(FRONTEND_EXPORT_DIR)
 
 $(BACKTEST_REPORT_APP_DIR)/node_modules:
 	cd $(BACKTEST_REPORT_APP_DIR) && yarn install
@@ -239,7 +239,7 @@ $(BACKTEST_REPORT_APP_DIR)/out/index.html: .FORCE $(BACKTEST_REPORT_APP_DIR)/nod
 	cd $(BACKTEST_REPORT_APP_DIR) && yarn build && yarn export
 
 pkg/backtest/assets.go: $(BACKTEST_REPORT_APP_DIR)/out/index.html
-	go run ./util/embed -package backtest -tag web -output $@ $(BACKTEST_REPORT_EXPORT_DIR)
+	go run ./utils/embed -package backtest -tag web -output $@ $(BACKTEST_REPORT_EXPORT_DIR)
 
 embed: pkg/server/assets.go pkg/backtest/assets.go
 
