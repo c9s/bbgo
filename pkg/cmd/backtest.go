@@ -127,14 +127,6 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
-		if verboseCnt == 2 {
-			log.SetLevel(log.DebugLevel)
-		} else if verboseCnt > 0 {
-			log.SetLevel(log.InfoLevel)
-		} else {
-			// default mode, disable strategy logging and order executor logging
-			log.SetLevel(log.ErrorLevel)
-		}
 
 		if userConfig.Backtest == nil {
 			return errors.New("backtest config is not defined")
@@ -245,6 +237,15 @@ var BacktestCmd = &cobra.Command{
 			if err := environ.TradeService.DeleteAll(); err != nil {
 				return err
 			}
+		}
+
+		if verboseCnt == 2 {
+			log.SetLevel(log.DebugLevel)
+		} else if verboseCnt > 0 {
+			log.SetLevel(log.InfoLevel)
+		} else {
+			// default mode, disable strategy logging and order executor logging
+			log.SetLevel(log.ErrorLevel)
 		}
 
 		environ.SetStartTime(startTime)
@@ -673,22 +674,8 @@ func sync(ctx context.Context, userConfig *bbgo.Config, backtestService *service
 			})
 
 			for _, interval := range intervals {
-				firstKLine, err := backtestService.QueryFirstKLine(sourceExchange.Name(), symbol, interval)
-				if err != nil {
-					return errors.Wrapf(err, "failed to query backtest kline")
-				}
-
-				// if we don't have klines before the start time endpoint, the back-test will fail.
-				// because the last price will be missing.
-				if firstKLine != nil {
-					if err := backtestService.SyncPartial(ctx, sourceExchange, symbol, interval, syncFrom, syncTo); err != nil {
-						return err
-					}
-				} else {
-					log.Debugf("starting a fresh kline data sync...")
-					if err := backtestService.SyncFresh(ctx, sourceExchange, symbol, interval, syncFrom, syncTo); err != nil {
-						return err
-					}
+				if err := backtestService.Sync(ctx, sourceExchange, symbol, interval, syncFrom, syncTo); err != nil {
+					return err
 				}
 			}
 		}

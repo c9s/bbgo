@@ -3,10 +3,8 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
 	"time"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
@@ -29,34 +27,7 @@ var depositsCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 
-		configFile, err := cmd.Flags().GetString("config")
-		if err != nil {
-			return err
-		}
-
-		if len(configFile) == 0 {
-			return errors.New("--config option is required")
-		}
-
-		// if config file exists, use the config loaded from the config file.
-		// otherwise, use a empty config object
-		var userConfig *bbgo.Config
-		if _, err := os.Stat(configFile); err == nil {
-			// load successfully
-			userConfig, err = bbgo.Load(configFile, false)
-			if err != nil {
-				return err
-			}
-		} else if os.IsNotExist(err) {
-			// config file doesn't exist
-			userConfig = &bbgo.Config{}
-		} else {
-			// other error
-			return err
-		}
-
 		environ := bbgo.NewEnvironment()
-
 		if err := environ.ConfigureExchangeSessions(userConfig); err != nil {
 			return err
 		}
