@@ -40,6 +40,10 @@ func placeholdersOf(record interface{}) []string {
 	for i := 0; i < rt.NumField(); i++ {
 		fieldType := rt.Field(i)
 		if tag, ok := fieldType.Tag.Lookup("db"); ok {
+			if tag == "gid" {
+				continue
+			}
+
 			dbFields = append(dbFields, ":"+tag)
 		}
 	}
@@ -61,11 +65,32 @@ func fieldsNamesOf(record interface{}) []string {
 	for i := 0; i < rt.NumField(); i++ {
 		fieldType := rt.Field(i)
 		if tag, ok := fieldType.Tag.Lookup("db"); ok {
+			if tag == "gid" {
+				continue
+			}
+
 			dbFields = append(dbFields, tag)
 		}
 	}
 
 	return dbFields
+}
+
+func ParseStructTag(s string) (string, map[string]string) {
+	opts := make(map[string]string)
+	ss := strings.Split(s, ",")
+	if len(ss) > 1 {
+		for _, opt := range ss[1:] {
+			aa := strings.SplitN(opt, "=", 2)
+			if len(aa) == 2 {
+				opts[aa[0]] = aa[1]
+			} else {
+				opts[aa[0]] = ""
+			}
+		}
+	}
+
+	return ss[0], opts
 }
 
 type ReflectCache struct {
