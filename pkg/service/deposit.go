@@ -94,13 +94,6 @@ func (s *DepositService) scanRows(rows *sqlx.Rows) (deposits []types.Deposit, er
 	return deposits, rows.Err()
 }
 
-func (s *DepositService) Insert(deposit types.Deposit) error {
-	sql := `INSERT INTO deposits (exchange, asset, address, amount, txn_id, time)
-			VALUES (:exchange, :asset, :address, :amount, :txn_id, :time)`
-	_, err := s.DB.NamedExec(sql, deposit)
-	return err
-}
-
 func SelectLastDeposits(ex types.ExchangeName, limit uint64) sq.SelectBuilder {
 	return sq.Select("*").
 		From("deposits").
