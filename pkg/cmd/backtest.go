@@ -673,22 +673,8 @@ func sync(ctx context.Context, userConfig *bbgo.Config, backtestService *service
 			})
 
 			for _, interval := range intervals {
-				firstKLine, err := backtestService.QueryFirstKLine(sourceExchange.Name(), symbol, interval)
-				if err != nil {
-					return errors.Wrapf(err, "failed to query backtest kline")
-				}
-
-				// if we don't have klines before the start time endpoint, the back-test will fail.
-				// because the last price will be missing.
-				if firstKLine != nil {
-					if err := backtestService.SyncPartial(ctx, sourceExchange, symbol, interval, syncFrom, syncTo); err != nil {
-						return err
-					}
-				} else {
-					log.Debugf("starting a fresh kline data sync...")
-					if err := backtestService.SyncFresh(ctx, sourceExchange, symbol, interval, syncFrom, syncTo); err != nil {
-						return err
-					}
+				if err := backtestService.Sync(ctx, sourceExchange, symbol, interval, syncFrom, syncTo); err != nil {
+					return err
 				}
 			}
 		}

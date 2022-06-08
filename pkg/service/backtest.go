@@ -109,13 +109,10 @@ func (s *BacktestService) Verify(sourceExchange types.Exchange, symbols []string
 }
 
 func (s *BacktestService) SyncFresh(ctx context.Context, exchange types.Exchange, symbol string, interval types.Interval, startTime, endTime time.Time) error {
+	log.Infof("starting fresh sync %s %s %s: %s <=> %s", exchange.Name(), symbol, interval, startTime, endTime)
 	startTime = startTime.Truncate(time.Minute).Add(-2 * time.Second)
 	endTime = endTime.Truncate(time.Minute).Add(2 * time.Second)
 	return s.SyncKLineByInterval(ctx, exchange, symbol, interval, startTime, endTime)
-}
-
-func (s *BacktestService) QueryFirstKLine(ex types.ExchangeName, symbol string, interval types.Interval) (*types.KLine, error) {
-	return s.QueryKLine(ex, symbol, interval, "ASC", 1)
 }
 
 // QueryKLine queries the klines from the database
@@ -330,12 +327,28 @@ func (t *TimeRange) String() string {
 	return t.Start.String() + " ~ " + t.End.String()
 }
 
+func (s *BacktestService) Sync(ctx context.Context, ex types.Exchange, symbol string, interval types.Interval, since, until time.Time) error {
+	t1, t2, err := s.QueryExistingDataRange(ctx, ex, symbol, interval, since, until)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+
+	if err == sql.ErrNoRows || t1 == nil || t2 == nil {
+		// fallback to fresh sync
+		return s.SyncFresh(ctx, ex, symbol, interval, since, until)
+	}
+
+	return s.SyncPartial(ctx, ex, symbol, interval, since, until)
+}
+
 // SyncPartial
 // find the existing data time range (t1, t2)
 // scan if there is a missing part
 // create a time range slice []TimeRange
 // iterate the []TimeRange slice to sync data.
 func (s *BacktestService) SyncPartial(ctx context.Context, ex types.Exchange, symbol string, interval types.Interval, since, until time.Time) error {
+	log.Infof("starting partial sync %s %s %s: %s <=> %s", ex.Name(), symbol, interval, since, until)
+
 	t1, t2, err := s.QueryExistingDataRange(ctx, ex, symbol, interval, since, until)
 	if err != nil && err != sql.ErrNoRows {
 		return err
@@ -352,7 +365,7 @@ func (s *BacktestService) SyncPartial(ctx context.Context, ex types.Exchange, sy
 	}
 
 	if len(timeRanges) > 0 {
-		log.Infof("found missing time ranges: %v", timeRanges)
+		log.Infof("found missing data time ranges: %v", timeRanges)
 	}
 
 	// there are few cases:
