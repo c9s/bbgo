@@ -12,25 +12,25 @@ import (
 //go:generate callbackgen -type Drift
 type Drift struct {
 	types.IntervalWindow
-	chng   *types.Queue
-	Values types.Float64Slice
-	SMA    *SMA
+	chng      *types.Queue
+	Values    types.Float64Slice
+	SMA       *SMA
 	LastValue float64
 
 	UpdateCallbacks []func(value float64)
 }
 
-func (inc *Drift) Update(value float64) {
+func (inc *Drift) Update(value float64, prevValue float64) {
 	if inc.chng == nil {
 		inc.SMA = &SMA{IntervalWindow: types.IntervalWindow{inc.Interval, inc.Window}}
 		inc.chng = types.NewQueue(inc.Window)
 	}
-	chng := math.Log(value / inc.LastValue)
+	chng := math.Log(value / prevValue)
 	inc.LastValue = value
 	inc.SMA.Update(chng)
 	inc.chng.Update(chng)
 	stdev := types.Stdev(inc.chng, inc.Window)
-	drift := inc.SMA.Last() - stdev * stdev * 0.5
+	drift := inc.SMA.Last() - stdev*stdev*0.5
 	inc.Values.Push(drift)
 }
 
@@ -60,11 +60,11 @@ var _ types.Series = &Drift{}
 func (inc *Drift) calculateAndUpdate(allKLines []types.KLine) {
 	if inc.chng == nil {
 		for _, k := range allKLines {
-			inc.Update(k.Close.Float64())
-			inc.EmitUpdate(inc.Last())
+			// TODO: if chng == nil, what's first close price?
+			inc.Update(k.Close.Float64(), k.Close.Float64())
 		}
 	} else {
-		inc.Update(allKLines[len(allKLines)-1].Close.Float64())
+		inc.Update(allKLines[len(allKLines)-1].Close.Float64(), allKLines[len(allKLines)-2].Close.Float64())
 		inc.EmitUpdate(inc.Last())
 	}
 }
