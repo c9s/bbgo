@@ -66,20 +66,6 @@ func (s *DepositService) Sync(ctx context.Context, ex types.Exchange, startTime 
 	return nil
 }
 
-func (s *DepositService) QueryLast(ex types.ExchangeName, limit int) ([]types.Deposit, error) {
-	sql := "SELECT * FROM `deposits` WHERE `exchange` = :exchange ORDER BY `time` DESC LIMIT :limit"
-	rows, err := s.DB.NamedQuery(sql, map[string]interface{}{
-		"exchange": ex,
-		"limit":    limit,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	defer rows.Close()
-	return s.scanRows(rows)
-}
-
 func (s *DepositService) Query(exchangeName types.ExchangeName) ([]types.Deposit, error) {
 	args := map[string]interface{}{
 		"exchange": exchangeName,
@@ -114,7 +100,6 @@ func (s *DepositService) Insert(deposit types.Deposit) error {
 	_, err := s.DB.NamedExec(sql, deposit)
 	return err
 }
-
 
 func SelectLastDeposits(ex types.ExchangeName, limit uint64) sq.SelectBuilder {
 	return sq.Select("*").
