@@ -1,0 +1,23 @@
+---
+backtest:
+  startTime: "2022-04-01"
+  endTime: "2022-05-01"
+  sessions:
+  - binance
+  symbols:
+  - BTCUSDT
+  accounts:
+    binance:
+      balances:
+        USDT: 20_000.0
+
+exchangeStrategies:
+
+- on: binance
+  dca:
+    symbol: BTCUSDT
+    budgetPeriod: day
+    investmentInterval: 4h
+    budget: 1000
+
+
