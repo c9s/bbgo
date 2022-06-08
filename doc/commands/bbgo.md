@@ -47,7 +47,7 @@ bbgo [flags]
 * [bbgo optimize](bbgo_optimize.md)	 - run optimizer
 * [bbgo orderbook](bbgo_orderbook.md)	 - connect to the order book market data streaming service of an exchange
 * [bbgo orderupdate](bbgo_orderupdate.md)	 - Listen to order update events
-* [bbgo pnl](bbgo_pnl.md)	 - pnl calculator
+* [bbgo pnl](bbgo_pnl.md)	 - Average Cost Based PnL Calculator
 * [bbgo run](bbgo_run.md)	 - run strategies from config file
 * [bbgo submit-order](bbgo_submit-order.md)	 - place order to the exchange
 * [bbgo sync](bbgo_sync.md)	 - sync trades and orders history
