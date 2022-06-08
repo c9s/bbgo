@@ -587,7 +587,10 @@ func (environ *Environment) syncWithUserConfig(ctx context.Context, userConfig *
 		sessions = environ.SelectSessions(selectedSessions...)
 	}
 
-	since := userConfig.Sync.Since.Time()
+	since := time.Now().AddDate(0, -6, 0)
+	if userConfig.Sync.Since != nil {
+		since = userConfig.Sync.Since.Time()
+	}
 
 	for _, session := range sessions {
 		if err := environ.syncSession(ctx, session, syncSymbols...); err != nil {
