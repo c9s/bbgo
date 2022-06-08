@@ -1,6 +1,10 @@
 ## bbgo pnl
 
-pnl calculator
+Average Cost Based PnL Calculator
+
+### Synopsis
+
+This command calculates the average cost-based profit from your total trades
 
 ```
 bbgo pnl [flags]
@@ -11,7 +15,7 @@ bbgo pnl [flags]
 ```
   -h, --help               help for pnl
       --include-transfer   convert transfer records into trades
-      --limit int          number of trades (default 500)
+      --limit int          number of trades
       --session string     target exchange
       --symbol string      trading symbol
 ```
