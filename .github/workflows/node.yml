@@ -1,0 +1,40 @@
+name: Node.js CI
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+    - apps/backtest-report
+    - frontend
+  pull_request:
+    branches: [ main ]
+    paths:
+    - apps/backtest-report
+    - frontend
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [ 16.x ]
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+    - run: npm install -g yarn
+    - name: Install
+      run: yarn install
+      working-directory: "apps/backtest-report"
+    - name: Build
+      run: yarn run next build
+      working-directory: "apps/backtest-report"
+    - name: Export
+      run: yarn run next export
+      working-directory: "apps/backtest-report"
+    - run: yarn export
+      working-directory: "frontend"
