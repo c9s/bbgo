@@ -127,14 +127,6 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
-		if verboseCnt == 2 {
-			log.SetLevel(log.DebugLevel)
-		} else if verboseCnt > 0 {
-			log.SetLevel(log.InfoLevel)
-		} else {
-			// default mode, disable strategy logging and order executor logging
-			log.SetLevel(log.ErrorLevel)
-		}
 
 		if userConfig.Backtest == nil {
 			return errors.New("backtest config is not defined")
@@ -245,6 +237,15 @@ var BacktestCmd = &cobra.Command{
 			if err := environ.TradeService.DeleteAll(); err != nil {
 				return err
 			}
+		}
+
+		if verboseCnt == 2 {
+			log.SetLevel(log.DebugLevel)
+		} else if verboseCnt > 0 {
+			log.SetLevel(log.InfoLevel)
+		} else {
+			// default mode, disable strategy logging and order executor logging
+			log.SetLevel(log.ErrorLevel)
 		}
 
 		environ.SetStartTime(startTime)
