@@ -154,7 +154,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	// s.pvDivergence.OnUpdate(func(corr float64) {
 	//	//fmt.Printf("now we've got corr: %f\n", corr)
 	// })
-	drift := &indicator.Drift{IntervalWindow: types.IntervalWindow{Window: 14, Interval: s.Interval}}
+	windowSize := 360/s.Interval.Minutes()
+	if windowSize == 0 {
+		windowSize = 3
+	}
+	drift := &indicator.Drift{IntervalWindow: types.IntervalWindow{Window: windowSize, Interval: s.Interval}}
 	drift.Bind(st)
 
 	s.Alpha = [][]float64{{}, {}, {}, {}, {}, {}}
