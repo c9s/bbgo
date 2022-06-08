@@ -20,16 +20,16 @@ type AverageCostPnlReport struct {
 	Symbol    string           `json:"symbol"`
 	Market    types.Market     `json:"market"`
 
-	NumTrades        int                         `json:"numTrades"`
-	Profit           fixedpoint.Value            `json:"profit"`
-	NetProfit        fixedpoint.Value            `json:"netProfit"`
-	UnrealizedProfit fixedpoint.Value            `json:"unrealizedProfit"`
-	AverageCost      fixedpoint.Value            `json:"averageCost"`
-	BuyVolume        fixedpoint.Value            `json:"buyVolume,omitempty"`
-	SellVolume       fixedpoint.Value            `json:"sellVolume,omitempty"`
-	FeeInUSD         fixedpoint.Value            `json:"feeInUSD"`
-	Stock            fixedpoint.Value            `json:"stock"`
-	CurrencyFees     map[string]fixedpoint.Value `json:"currencyFees"`
+	NumTrades         int                         `json:"numTrades"`
+	Profit            fixedpoint.Value            `json:"profit"`
+	NetProfit         fixedpoint.Value            `json:"netProfit"`
+	UnrealizedProfit  fixedpoint.Value            `json:"unrealizedProfit"`
+	AverageCost       fixedpoint.Value            `json:"averageCost"`
+	BuyVolume         fixedpoint.Value            `json:"buyVolume,omitempty"`
+	SellVolume        fixedpoint.Value            `json:"sellVolume,omitempty"`
+	FeeInUSD          fixedpoint.Value            `json:"feeInUSD"`
+	BaseAssetPosition fixedpoint.Value            `json:"baseAssetPosition"`
+	CurrencyFees      map[string]fixedpoint.Value `json:"currencyFees"`
 }
 
 func (report *AverageCostPnlReport) JSON() ([]byte, error) {
@@ -39,7 +39,10 @@ func (report *AverageCostPnlReport) JSON() ([]byte, error) {
 func (report AverageCostPnlReport) Print() {
 	color.Green("TRADES SINCE: %v", report.StartTime)
 	color.Green("NUMBER OF TRADES: %d", report.NumTrades)
+
 	color.Green("AVERAGE COST: %s", types.USD.FormatMoney(report.AverageCost))
+	color.Green("BASE ASSET POSITION: %s", report.BaseAssetPosition.String())
+
 	color.Green("TOTAL BUY VOLUME: %v", report.BuyVolume)
 	color.Green("TOTAL SELL VOLUME: %v", report.SellVolume)
 
@@ -83,7 +86,7 @@ func (report AverageCostPnlReport) SlackAttachment() slack.Attachment {
 
 			// FIXME:
 			// {Title: "Fee (USD)", Value: types.USD.FormatMoney(report.FeeInUSD), Short: true},
-			{Title: "Stock", Value: report.Stock.String(), Short: true},
+			{Title: "Base Asset Position", Value: report.BaseAssetPosition.String(), Short: true},
 			{Title: "Number of Trades", Value: strconv.Itoa(report.NumTrades), Short: true},
 		},
 		Footer:     report.StartTime.Format(time.RFC822),

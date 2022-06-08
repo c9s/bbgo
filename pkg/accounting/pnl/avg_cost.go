@@ -92,12 +92,12 @@ func (c *AverageCostCalculator) Calculate(symbol string, trades []types.Trade, c
 		BuyVolume:  bidVolume,
 		SellVolume: askVolume,
 
-		Stock:            position.GetBase(),
-		Profit:           totalProfit,
-		NetProfit:        totalNetProfit,
-		UnrealizedProfit: unrealizedProfit,
-		AverageCost:      position.AverageCost,
-		FeeInUSD:         totalProfit.Sub(totalNetProfit),
-		CurrencyFees:     currencyFees,
+		BaseAssetPosition: position.GetBase(),
+		Profit:            totalProfit,
+		NetProfit:         totalNetProfit,
+		UnrealizedProfit:  unrealizedProfit,
+		AverageCost:       position.AverageCost,
+		FeeInUSD:          totalProfit.Sub(totalNetProfit),
+		CurrencyFees:      currencyFees,
 	}
 }

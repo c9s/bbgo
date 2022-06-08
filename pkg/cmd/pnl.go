@@ -2,16 +2,15 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"os"
+	"sort"
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"github.com/c9s/bbgo/pkg/accounting"
 	"github.com/c9s/bbgo/pkg/accounting/pnl"
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/service"
@@ -22,34 +21,17 @@ func init() {
 	PnLCmd.Flags().String("session", "", "target exchange")
 	PnLCmd.Flags().String("symbol", "", "trading symbol")
 	PnLCmd.Flags().Bool("include-transfer", false, "convert transfer records into trades")
-	PnLCmd.Flags().Int("limit", 500, "number of trades")
+	PnLCmd.Flags().Int("limit", 0, "number of trades")
 	RootCmd.AddCommand(PnLCmd)
 }
 
 var PnLCmd = &cobra.Command{
 	Use:          "pnl",
-	Short:        "pnl calculator",
+	Short:        "Average Cost Based PnL Calculator",
+	Long:         "This command calculates the average cost-based profit from your total trades",
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-
-		configFile, err := cmd.Flags().GetString("config")
-		if err != nil {
-			return err
-		}
-
-		if len(configFile) == 0 {
-			return errors.New("--config option is required")
-		}
-
-		if _, err := os.Stat(configFile); os.IsNotExist(err) {
-			return err
-		}
-
-		userConfig, err := bbgo.Load(configFile, false)
-		if err != nil {
-			return err
-		}
 
 		sessionName, err := cmd.Flags().GetString("session")
 		if err != nil {
@@ -124,11 +106,16 @@ var PnLCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			_ = withdrawals
+
+			sort.Slice(withdrawals, func(i, j int) bool {
+				a := withdrawals[i].ApplyTime.Time()
+				b := withdrawals[j].ApplyTime.Time()
+				return a.Before(b)
+			})
 
 			// we need the backtest klines for the daily prices
 			backtestService := &service.BacktestService{DB: environ.DatabaseService.DB}
-			if err := backtestService.SyncKLineByInterval(ctx, exchange, symbol, types.Interval1d, since, until); err != nil {
+			if err := backtestService.Sync(ctx, exchange, symbol, types.Interval1d, since, until); err != nil {
 				return err
 			}
 		}
@@ -140,9 +127,8 @@ var PnLCmd = &cobra.Command{
 			trades, err = environ.TradeService.QueryForTradingFeeCurrency(exchange.Name(), symbol, tradingFeeCurrency)
 		} else {
 			trades, err = environ.TradeService.Query(service.QueryTradesOptions{
-				Exchange: exchange.Name(),
-				Symbol:   symbol,
-				Limit:    limit,
+				Symbol: symbol,
+				Limit:  limit,
 			})
 		}
 
@@ -150,41 +136,34 @@ var PnLCmd = &cobra.Command{
 			return err
 		}
 
+		if len(trades) == 0 {
+			return errors.New("empty trades, you need to run sync command to sync the trades from the exchange first")
+		}
+
+		trades = types.SortTradesAscending(trades)
+
 		log.Infof("%d trades loaded", len(trades))
 
-		stockManager := &accounting.StockDistribution{
-			Symbol:             symbol,
-			TradingFeeCurrency: tradingFeeCurrency,
-		}
-
-		checkpoints, err := stockManager.AddTrades(trades)
-		if err != nil {
-			return err
-		}
-
-		log.Infof("found checkpoints: %+v", checkpoints)
-		log.Infof("stock: %v", stockManager.Stocks.Quantity())
-
 		tickers, err := exchange.QueryTickers(ctx, symbol)
-
 		if err != nil {
 			return err
 		}
 
 		currentTick, ok := tickers[symbol]
-
 		if !ok {
 			return errors.New("no ticker data for current price")
 		}
 
 		currentPrice := currentTick.Last
-
 		calculator := &pnl.AverageCostCalculator{
 			TradingFeeCurrency: tradingFeeCurrency,
 		}
 
 		report := calculator.Calculate(symbol, trades, currentPrice)
 		report.Print()
+
+		log.Warnf("note that if you're using cross-exchange arbitrage, the PnL won't be accurate")
+		log.Warnf("withdrawal and deposits are not considered in the PnL")
 		return nil
 	},
 }
