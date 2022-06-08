@@ -368,7 +368,7 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 
 	// calculated fee in quote (some exchange accounts may enable platform currency fee discount, like BNB)
 	// convert platform fee token into USD values
-	var feeInQuote fixedpoint.Value = fixedpoint.Zero
+	var feeInQuote = fixedpoint.Zero
 
 	switch td.FeeCurrency {
 
@@ -383,19 +383,21 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 		}
 
 	default:
-		if p.ExchangeFeeRates != nil {
-			if exchangeFee, ok := p.ExchangeFeeRates[td.Exchange]; ok {
-				if td.IsMaker {
-					feeInQuote = feeInQuote.Add(exchangeFee.MakerFeeRate.Mul(quoteQuantity))
-				} else {
-					feeInQuote = feeInQuote.Add(exchangeFee.TakerFeeRate.Mul(quoteQuantity))
+		if !td.Fee.IsZero() {
+			if p.ExchangeFeeRates != nil {
+				if exchangeFee, ok := p.ExchangeFeeRates[td.Exchange]; ok {
+					if td.IsMaker {
+						feeInQuote = feeInQuote.Add(exchangeFee.MakerFeeRate.Mul(quoteQuantity))
+					} else {
+						feeInQuote = feeInQuote.Add(exchangeFee.TakerFeeRate.Mul(quoteQuantity))
+					}
 				}
-			}
-		} else if p.FeeRate != nil {
-			if td.IsMaker {
-				feeInQuote = feeInQuote.Add(p.FeeRate.MakerFeeRate.Mul(quoteQuantity))
-			} else {
-				feeInQuote = feeInQuote.Add(p.FeeRate.TakerFeeRate.Mul(quoteQuantity))
+			} else if p.FeeRate != nil {
+				if td.IsMaker {
+					feeInQuote = feeInQuote.Add(p.FeeRate.MakerFeeRate.Mul(quoteQuantity))
+				} else {
+					feeInQuote = feeInQuote.Add(p.FeeRate.TakerFeeRate.Mul(quoteQuantity))
+				}
 			}
 		}
 	}
