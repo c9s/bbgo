@@ -94,6 +94,7 @@ func (b *Buffer) AddUpdate(o types.SliceOrderBook, firstUpdateID int64, finalArg
 	// we lock here because there might be 2+ calls to the AddUpdate method
 	// we don't want to reset sync.Once 2 times here
 	b.mu.Lock()
+	defer b.mu.Unlock()
 	select {
 	case <-b.resetC:
 		log.Warnf("received depth reset signal, resetting...")
@@ -109,7 +110,6 @@ func (b *Buffer) AddUpdate(o types.SliceOrderBook, firstUpdateID int64, finalArg
 		b.once.Do(func() {
 			go b.tryFetch()
 		})
-		b.mu.Unlock()
 		return nil
 	}
 
@@ -120,7 +120,6 @@ func (b *Buffer) AddUpdate(o types.SliceOrderBook, firstUpdateID int64, finalArg
 		finalUpdateID = b.finalUpdateID
 		b.resetSnapshot()
 		b.emitReset()
-		b.mu.Unlock()
 		return fmt.Errorf("found missing update between finalUpdateID %d and firstUpdateID %d, diff: %d",
 			finalUpdateID+1,
 			u.FirstUpdateID,
@@ -130,7 +129,6 @@ func (b *Buffer) AddUpdate(o types.SliceOrderBook, firstUpdateID int64, finalArg
 	log.Debugf("depth update id %d -> %d", b.finalUpdateID, u.FinalUpdateID)
 	b.finalUpdateID = u.FinalUpdateID
 	b.EmitPush(u)
-	b.mu.Unlock()
 	return nil
 }
 
@@ -143,13 +141,13 @@ func (b *Buffer) fetchAndPush() error {
 	log.Debugf("fetched depth snapshot, final update id %d", finalUpdateID)
 
 	b.mu.Lock()
+	defer b.mu.Unlock()
 
 	if len(b.buffer) > 0 {
 		// the snapshot is too early
 		if finalUpdateID < b.buffer[0].FirstUpdateID {
 			b.resetSnapshot()
 			b.emitReset()
-			b.mu.Unlock()
 			return fmt.Errorf("depth snapshot is too early, final update %d is < the first update id %d", finalUpdateID, b.buffer[0].FirstUpdateID)
 		}
 	}
@@ -164,7 +162,6 @@ func (b *Buffer) fetchAndPush() error {
 		if u.FirstUpdateID > finalUpdateID+1 {
 			b.resetSnapshot()
 			b.emitReset()
-			b.mu.Unlock()
 			return fmt.Errorf("there is a missing depth update, the update id %d > final update id %d + 1", u.FirstUpdateID, finalUpdateID)
 		}
 
@@ -183,7 +180,6 @@ func (b *Buffer) fetchAndPush() error {
 	// set the snapshot
 	b.snapshot = &book
 
-	b.mu.Unlock()
 	b.EmitReady(book, pushUpdates)
 	return nil
 }
