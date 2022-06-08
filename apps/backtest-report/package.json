@@ -3,11 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "yarn run next dev",
+    "build": "yarn run next build",
     "start": "next start",
     "lint": "next lint",
-    "export": "next build && next export"
+    "export": "yarn run next build && yarn run next export"
   },
   "dependencies": {
     "@mantine/core": "^4.2.5",
