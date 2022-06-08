@@ -485,70 +485,57 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 }
 
 func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since, until time.Time) (allDeposits []types.Deposit, err error) {
-	startTime := since
-
 	var emptyTime = time.Time{}
-	if startTime == emptyTime {
-		startTime, err = getLaunchDate()
+	if since == emptyTime {
+		since, err = getLaunchDate()
 		if err != nil {
 			return nil, err
 		}
 	}
-	txIDs := map[string]struct{}{}
-	for startTime.Before(until) {
 
-		// startTime ~ endTime must be in 90 days
-		endTime := startTime.AddDate(0, 0, 60)
-		if endTime.After(until) {
-			endTime = until
+	// startTime ~ endTime must be in 90 days
+	historyDayRangeLimit := time.Hour * 24 * 89
+	if until.Sub(since) >= historyDayRangeLimit {
+		until = since.Add(historyDayRangeLimit)
+	}
+
+	req := e.client2.NewGetDepositHistoryRequest()
+	if len(asset) > 0 {
+		req.Coin(asset)
+	}
+
+	req.StartTime(since).
+		EndTime(until)
+
+	records, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, d := range records {
+		// 0(0:pending,6: credited but cannot withdraw, 1:success)
+		// set the default status
+		status := types.DepositStatus(fmt.Sprintf("code: %d", d.Status))
+		switch d.Status {
+		case 0:
+			status = types.DepositPending
+		case 6:
+			// https://www.binance.com/en/support/faq/115003736451
+			status = types.DepositCredited
+		case 1:
+			status = types.DepositSuccess
 		}
 
-		req := e.client.NewListDepositsService()
-		if len(asset) > 0 {
-			req.Coin(asset)
-		}
-
-		deposits, err := req.
-			StartTime(startTime.UnixNano() / int64(time.Millisecond)).
-			EndTime(endTime.UnixNano() / int64(time.Millisecond)).
-			Do(ctx)
-
-		if err != nil {
-			return nil, err
-		}
-
-		for _, d := range deposits {
-			if _, ok := txIDs[d.TxID]; ok {
-				continue
-			}
-
-			// 0(0:pending,6: credited but cannot withdraw, 1:success)
-			status := types.DepositStatus(fmt.Sprintf("code: %d", d.Status))
-
-			switch d.Status {
-			case 0:
-				status = types.DepositPending
-			case 6:
-				// https://www.binance.com/en/support/faq/115003736451
-				status = types.DepositCredited
-			case 1:
-				status = types.DepositSuccess
-			}
-
-			txIDs[d.TxID] = struct{}{}
-			allDeposits = append(allDeposits, types.Deposit{
-				Exchange:      types.ExchangeBinance,
-				Time:          types.Time(time.Unix(0, d.InsertTime*int64(time.Millisecond))),
-				Asset:         d.Coin,
-				Amount:        fixedpoint.MustNewFromString(d.Amount),
-				Address:       d.Address,
-				AddressTag:    d.AddressTag,
-				TransactionID: d.TxID,
-				Status:        status,
-			})
-		}
-
-		startTime = endTime
+		allDeposits = append(allDeposits, types.Deposit{
+			Exchange:      types.ExchangeBinance,
+			Time:          types.Time(d.InsertTime.Time()),
+			Asset:         d.Coin,
+			Amount:        d.Amount,
+			Address:       d.Address,
+			AddressTag:    d.AddressTag,
+			TransactionID: d.TxId,
+			Status:        status,
+		})
 	}
 
 	return allDeposits, nil

@@ -600,7 +600,7 @@ func (environ *Environment) syncWithUserConfig(ctx context.Context, userConfig *
 		}
 
 		if userConfig.Sync.DepositHistory {
-			if err := environ.SyncService.SyncDepositHistory(ctx, session.Exchange); err != nil {
+			if err := environ.SyncService.SyncDepositHistory(ctx, session.Exchange, since); err != nil {
 				return err
 			}
 		}
@@ -664,7 +664,7 @@ func (environ *Environment) Sync(ctx context.Context, userConfig ...*Config) err
 		}
 
 		if userConfig[0].Sync.DepositHistory {
-			if err := environ.SyncService.SyncDepositHistory(ctx, session.Exchange); err != nil {
+			if err := environ.SyncService.SyncDepositHistory(ctx, session.Exchange, since); err != nil {
 				return err
 			}
 		}
