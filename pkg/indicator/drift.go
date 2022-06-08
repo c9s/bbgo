@@ -12,9 +12,9 @@ import (
 //go:generate callbackgen -type Drift
 type Drift struct {
 	types.IntervalWindow
-	chng   *types.Queue
-	Values types.Float64Slice
-	SMA    *SMA
+	chng      *types.Queue
+	Values    types.Float64Slice
+	SMA       *SMA
 	LastValue float64
 
 	UpdateCallbacks []func(value float64)
@@ -22,16 +22,25 @@ type Drift struct {
 
 func (inc *Drift) Update(value float64) {
 	if inc.chng == nil {
-		inc.SMA = &SMA{IntervalWindow: types.IntervalWindow{inc.Interval, inc.Window}}
+		inc.SMA = &SMA{IntervalWindow: types.IntervalWindow{Interval: inc.Interval, Window: inc.Window}}
 		inc.chng = types.NewQueue(inc.Window)
+		inc.LastValue = value
+		return
 	}
-	chng := math.Log(value / inc.LastValue)
-	inc.LastValue = value
+	var chng float64
+	if value == 0 {
+		chng = 0
+	} else {
+		chng = math.Log(value / inc.LastValue)
+		inc.LastValue = value
+	}
 	inc.SMA.Update(chng)
 	inc.chng.Update(chng)
-	stdev := types.Stdev(inc.chng, inc.Window)
-	drift := inc.SMA.Last() - stdev * stdev * 0.5
-	inc.Values.Push(drift)
+	if inc.chng.Length() >= inc.Window {
+		stdev := types.Stdev(inc.chng, inc.Window)
+		drift := inc.SMA.Last() - stdev*stdev*0.5
+		inc.Values.Push(drift)
+	}
 }
 
 func (inc *Drift) Index(i int) float64 {
