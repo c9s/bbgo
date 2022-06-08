@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -105,7 +106,12 @@ var PnLCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			_ = withdrawals
+
+			sort.Slice(withdrawals, func(i, j int) bool {
+				a := withdrawals[i].ApplyTime.Time()
+				b := withdrawals[j].ApplyTime.Time()
+				return a.Before(b)
+			})
 
 			// we need the backtest klines for the daily prices
 			backtestService := &service.BacktestService{DB: environ.DatabaseService.DB}
@@ -121,8 +127,8 @@ var PnLCmd = &cobra.Command{
 			trades, err = environ.TradeService.QueryForTradingFeeCurrency(exchange.Name(), symbol, tradingFeeCurrency)
 		} else {
 			trades, err = environ.TradeService.Query(service.QueryTradesOptions{
-				Symbol:   symbol,
-				Limit:    limit,
+				Symbol: symbol,
+				Limit:  limit,
 			})
 		}
 
@@ -155,6 +161,9 @@ var PnLCmd = &cobra.Command{
 
 		report := calculator.Calculate(symbol, trades, currentPrice)
 		report.Print()
+
+		log.Warnf("note that if you're using cross-exchange arbitrage, the PnL won't be accurate")
+		log.Warnf("withdrawal and deposits are not considered in the PnL")
 		return nil
 	},
 }
