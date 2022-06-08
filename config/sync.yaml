@@ -15,6 +15,14 @@ sessions:
     exchange: max
     envVarPrefix: max
 
+  kucoin:
+    exchange: kucoin
+    envVarPrefix: kucoin
+
+  okex:
+    exchange: okex
+    envVarPrefix: okex
+
 sync:
   # userDataStream is used to sync the trading data in real-time
   # it uses the websocket connection to insert the trades
@@ -31,6 +39,8 @@ sync:
   - binance
   - binance_margin_dotusdt
   - max
+  - okex
+  - kucoin
 
   # symbols is the list of symbols you want to sync
   # by default, BBGO try to guess your symbols by your existing account balances.
@@ -47,6 +57,6 @@ sync:
   marginAssets:
   - USDT
 
-  # depositHistory: true
-  # rewardHistory: true
+  depositHistory: true
+  rewardHistory: true
   withdrawHistory: true
