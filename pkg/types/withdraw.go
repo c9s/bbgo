@@ -33,7 +33,7 @@ func cutstr(s string, maxLen, head, tail int) string {
 }
 
 func (w Withdraw) String() (o string) {
-	o = fmt.Sprintf("withdraw %s %v -> ", w.Asset, w.Amount)
+	o = fmt.Sprintf("%s withdraw %s %v -> ", w.Exchange, w.Asset, w.Amount)
 
 	if len(w.Network) > 0 && w.Network != w.Asset {
 		o += w.Network + ":"

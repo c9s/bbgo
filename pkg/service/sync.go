@@ -88,9 +88,9 @@ func (s *SyncService) SyncRewardHistory(ctx context.Context, exchange types.Exch
 	return nil
 }
 
-func (s *SyncService) SyncDepositHistory(ctx context.Context, exchange types.Exchange) error {
+func (s *SyncService) SyncDepositHistory(ctx context.Context, exchange types.Exchange, startTime time.Time) error {
 	log.Infof("syncing %s deposit records...", exchange.Name())
-	if err := s.DepositService.Sync(ctx, exchange); err != nil {
+	if err := s.DepositService.Sync(ctx, exchange, startTime); err != nil {
 		if err != ErrNotImplemented {
 			log.Warnf("%s deposit service is not supported", exchange.Name())
 			return err
