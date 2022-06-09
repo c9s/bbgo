@@ -11,6 +11,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 var orderID uint64 = 1
@@ -24,7 +25,17 @@ func incTradeID() uint64 {
 	return atomic.AddUint64(&tradeID, 1)
 }
 
-var klineMatchingLogger = logrus.WithField("backtest", "klineEngine")
+var klineMatchingLogger *logrus.Entry = nil
+
+func init() {
+	logger := logrus.New()
+	if v, ok := util.GetEnvVarBool("DEBUG_MATCHING"); ok && v {
+		logger.SetLevel(logrus.DebugLevel)
+	} else {
+		logger.SetLevel(logrus.ErrorLevel)
+	}
+	klineMatchingLogger = logger.WithField("backtest", "klineEngine")
+}
 
 // SimplePriceMatching implements a simple kline data driven matching engine for backtest
 //go:generate callbackgen -type SimplePriceMatching
