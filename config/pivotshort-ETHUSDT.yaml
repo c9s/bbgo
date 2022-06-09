@@ -12,19 +12,32 @@ exchangeStrategies:
   pivotshort:
     symbol: ETHUSDT
     interval: 5m
+    pivotLength: 200
 
-    pivotLength: 120
-
-    entry:
+    # breakLow settings are used for shorting when the current price break the previous low
+    breakLow:
+      ratio: 0.1%
       quantity: 10.0
-      marginOrderSideEffect: borrow
+      # stopLossPercentage: 1%
+
+    bounceShort:
+      quantity: 10.0
+      # stopLossPercentage: 1%
+      numOfLayers: 10
+      layerSpread: 0.1%
+      pivotRatio: 0.1%
 
     exit:
-      takeProfitPercentage: 25%
-      stopLossPercentage: 1%
-      lowerShadowRatio: 0.95
-      marginOrderSideEffect: repay
+      # roiStopLossPercentage is the stop loss percentage of the position ROI (currently the price change)
+      roiStopLossPercentage: 1%
 
+      # roiTakeProfitPercentage is the take profit percentage of the position ROI (currently the price change)
+      roiTakeProfitPercentage: 25%
+
+      # lowerShadowRatio is used to force taking profit when the (lower shadow height / low price) > lowerShadowRatio
+      lowerShadowRatio: 3%
+
+      marginOrderSideEffect: repay
 
 backtest:
   sessions:
