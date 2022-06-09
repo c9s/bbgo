@@ -188,21 +188,27 @@ func (s *BacktestService) QueryKLinesBackward(exchange types.ExchangeName, symbo
 }
 
 func (s *BacktestService) QueryKLinesCh(since, until time.Time, exchange types.Exchange, symbols []string, intervals []types.Interval) (chan types.KLine, chan error) {
-
 	if len(symbols) == 0 {
 		return returnError(errors.Errorf("symbols is empty when querying kline, plesae check your strategy setting. "))
 	}
 
 	tableName := targetKlineTable(exchange.Name())
-	sql := "SELECT * FROM `binance_klines` WHERE `end_time` BETWEEN :since AND :until AND `symbol` IN (:symbols) AND `interval` IN (:intervals)  and exchange = :exchange  ORDER BY end_time ASC"
-	sql = strings.ReplaceAll(sql, "binance_klines", tableName)
+	var query string
 
-	sql, args, err := sqlx.Named(sql, map[string]interface{}{
+	if len(symbols) == 1 {
+		query = "SELECT * FROM `binance_klines` WHERE `end_time` BETWEEN :since AND :until AND `symbol` = :symbols AND `interval` IN (:intervals) ORDER BY end_time ASC"
+	} else {
+		query = "SELECT * FROM `binance_klines` WHERE `end_time` BETWEEN :since AND :until AND `symbol` IN (:symbols) AND `interval` IN (:intervals) ORDER BY end_time ASC"
+	}
+
+	query = strings.ReplaceAll(query, "binance_klines", tableName)
+
+	sql, args, err := sqlx.Named(query, map[string]interface{}{
 		"since":     since,
 		"until":     until,
+		"symbol":    symbols[0],
 		"symbols":   symbols,
 		"intervals": types.IntervalSlice(intervals),
-		"exchange":  exchange.Name().String(),
 	})
 
 	sql, args, err = sqlx.In(sql, args...)
