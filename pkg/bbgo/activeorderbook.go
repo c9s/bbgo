@@ -10,7 +10,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-const CancelOrderWaitTime = 20 * time.Millisecond
+const CancelOrderWaitTime = 10 * time.Millisecond
 
 // ActiveOrderBook manages the local active order books.
 //go:generate callbackgen -type ActiveOrderBook
@@ -69,6 +69,8 @@ func (b *ActiveOrderBook) waitAllClear(ctx context.Context, waitTime, timeout ti
 
 // GracefulCancel cancels the active orders gracefully
 func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange) error {
+	waitTime := CancelOrderWaitTime
+
 	log.Debugf("[ActiveOrderBook] gracefully cancelling %s orders...", b.Symbol)
 
 	startTime := time.Now()
@@ -86,9 +88,9 @@ func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange)
 			log.WithError(err).Errorf("[ActiveOrderBook] can not cancel %s orders", b.Symbol)
 		}
 
-		log.Debugf("[ActiveOrderBook] waiting %s for %s orders to be cancelled...", CancelOrderWaitTime, b.Symbol)
+		log.Debugf("[ActiveOrderBook] waiting %s for %s orders to be cancelled...", waitTime, b.Symbol)
 
-		clear, err := b.waitAllClear(ctx, CancelOrderWaitTime, 5*time.Second)
+		clear, err := b.waitAllClear(ctx, waitTime, 5*time.Second)
 		if clear || err != nil {
 			break
 		}

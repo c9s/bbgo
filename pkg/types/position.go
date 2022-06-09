@@ -120,7 +120,7 @@ func (p *Position) NewProfit(trade Trade, profit, netProfit fixedpoint.Value) Pr
 	}
 }
 
-func (p *Position) NewClosePositionOrder(percentage fixedpoint.Value) *SubmitOrder {
+func (p *Position) NewMarketCloseOrder(percentage fixedpoint.Value) *SubmitOrder {
 	base := p.GetBase()
 
 	quantity := base.Abs()

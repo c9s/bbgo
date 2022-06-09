@@ -98,7 +98,7 @@ func (v Value) String() string {
 func (v Value) FormatString(prec int) string {
 	pow := math.Pow10(prec)
 	return strconv.FormatFloat(
-		math.Trunc(float64(v)/DefaultPow * pow) / pow, 'f', prec, 64)
+		math.Trunc(float64(v)/DefaultPow*pow)/pow, 'f', prec, 64)
 }
 
 func (v Value) Percentage() string {
@@ -114,7 +114,7 @@ func (v Value) FormatPercentage(prec int) string {
 	}
 	pow := math.Pow10(prec)
 	result := strconv.FormatFloat(
-		math.Trunc(float64(v)/DefaultPow * pow * 100.) / pow, 'f', prec, 64)
+		math.Trunc(float64(v)/DefaultPow*pow*100.)/pow, 'f', prec, 64)
 	return result + "%"
 }
 
@@ -222,6 +222,10 @@ func (v *Value) UnmarshalYAML(unmarshal func(a interface{}) error) (err error) {
 	return err
 }
 
+func (v Value) MarshalYAML() (interface{}, error) {
+	return v.FormatString(DefaultPrecision), nil
+}
+
 func (v Value) MarshalJSON() ([]byte, error) {
 	return []byte(v.FormatString(DefaultPrecision)), nil
 }
@@ -326,7 +330,7 @@ func NewFromString(input string) (Value, error) {
 	// if is decimal, we don't need this
 	hasScientificNotion := false
 	scIndex := -1
-	for i, c := range(input) {
+	for i, c := range input {
 		if hasDecimal {
 			if c <= '9' && c >= '0' {
 				decimalCount++
@@ -345,7 +349,7 @@ func NewFromString(input string) (Value, error) {
 		}
 	}
 	if hasDecimal {
-		after := input[dotIndex+1:len(input)]
+		after := input[dotIndex+1 : len(input)]
 		if decimalCount >= 8 {
 			after = after[0:8] + "." + after[8:len(after)]
 		} else {
@@ -368,7 +372,7 @@ func NewFromString(input string) (Value, error) {
 		if err != nil {
 			return 0, err
 		}
-		v, err := strconv.ParseFloat(input[0:scIndex+1] + strconv.FormatInt(exp + 8, 10), 64)
+		v, err := strconv.ParseFloat(input[0:scIndex+1]+strconv.FormatInt(exp+8, 10), 64)
 		if err != nil {
 			return 0, err
 		}
@@ -385,7 +389,6 @@ func NewFromString(input string) (Value, error) {
 		}
 		return Value(v), nil
 	}
-
 }
 
 func MustNewFromString(input string) Value {

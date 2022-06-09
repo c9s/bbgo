@@ -613,13 +613,13 @@ func (s *Strategy) PlaceSellOrder(ctx context.Context, price fixedpoint.Value) (
 }
 
 // ClosePosition(context.Context) -> (closeOrder *types.Order, ok bool)
-// this will decorate the generated order from NewClosePositionOrder
+// this will decorate the generated order from NewMarketCloseOrder
 // add do necessary checks
 // if available quantity is zero, will return (nil, true)
 // if any of the checks failed, will return (nil, false)
 // otherwise, return the created close order and true
 func (s *Strategy) ClosePosition(ctx context.Context) (*types.Order, bool) {
-	order := s.Position.NewClosePositionOrder(fixedpoint.One)
+	order := s.Position.NewMarketCloseOrder(fixedpoint.One)
 	// no position exists
 	if order == nil {
 		// no base

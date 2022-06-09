@@ -1,0 +1,26 @@
+# usage:
+#
+#   go run ./cmd/bbgo optimize --config bollmaker_ethusdt.yaml  --optimizer-config optimizer.yaml --debug
+#
+---
+matrix:
+- type: iterate
+  label: interval
+  path: '/exchangeStrategies/0/pivotshort/interval'
+  values: [ "5m", "30m", "1h" ]
+
+- type: range
+  path: '/exchangeStrategies/0/pivotshort/pivotLength'
+  label: pivotLength
+  min: 20.0
+  max: 200.0
+  step: 10.0
+
+- type: range
+  path: '/exchangeStrategies/0/pivotshort/breakLow/stopEMARange'
+  label: pivotLength
+  min: 0%
+  max: 10%
+  step: 0.5%
+
+
