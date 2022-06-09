@@ -208,9 +208,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.tradeCollector.BindStream(session.UserDataStream)
 
 	iw := types.IntervalWindow{Window: s.PivotLength, Interval: s.Interval}
-	st, _ := session.MarketDataStore(s.Symbol)
+	store, _ := session.MarketDataStore(s.Symbol)
 	s.pivot = &indicator.Pivot{IntervalWindow: iw}
-	s.pivot.Bind(st)
+	s.pivot.Bind(store)
 
 	s.LastLow = fixedpoint.Zero
 
