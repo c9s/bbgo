@@ -3,6 +3,7 @@ package pivotshort
 import (
 	"context"
 	"fmt"
+
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -24,6 +25,11 @@ type IntervalWindowSetting struct {
 }
 
 type Entry struct {
+	Immediate      bool             `json:"immediate"`
+	CatBounceRatio fixedpoint.Value `json:"catBounceRatio"`
+	NumLayers      int              `json:"numLayers"`
+	TotalQuantity  fixedpoint.Value `json:"totalQuantity"`
+
 	Quantity         fixedpoint.Value                `json:"quantity"`
 	MarginSideEffect types.MarginOrderSideEffectType `json:"marginOrderSideEffect"`
 }
@@ -50,7 +56,7 @@ type Strategy struct {
 	ProfitStats *types.ProfitStats `json:"profitStats,omitempty" persistence:"profit_stats"`
 
 	PivotLength int `json:"pivotLength"`
-	LastLow     float64
+	LastLow     fixedpoint.Value
 
 	Entry Entry
 	Exit  Exit
@@ -62,7 +68,7 @@ type Strategy struct {
 	session *bbgo.ExchangeSession
 
 	pivot          *indicator.Pivot
-	pivotLowPrices []float64
+	pivotLowPrices []fixedpoint.Value
 
 	// StrategyController
 	bbgo.StrategyController
@@ -125,7 +131,7 @@ func canClosePosition(position *types.Position, price fixedpoint.Value) bool {
 }
 
 func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Value) error {
-	submitOrder := s.Position.NewClosePositionOrder(percentage) //types.SubmitOrder{
+	submitOrder := s.Position.NewClosePositionOrder(percentage) // types.SubmitOrder{
 
 	if s.session.Margin {
 		submitOrder.MarginSideEffect = s.Exit.MarginSideEffect
@@ -203,15 +209,17 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.pivot = &indicator.Pivot{IntervalWindow: iw}
 	s.pivot.Bind(st)
 
-	s.LastLow = 0.
+	s.LastLow = fixedpoint.Zero
 
 	session.UserDataStream.OnStart(func() {
-		//if price, ok := session.LastPrice(s.Symbol); ok {
-		//if limitPrice, ok := s.findHigherPivotLow(price); ok {
-		//	log.Infof("%s placing limit sell start from %f adds up to %f percent with %d layers of orders", s.Symbol, limitPrice.Float64(), s.Entry.CatBounceRatio.Mul(fixedpoint.NewFromInt(100)).Float64(), s.Entry.NumLayers)
-		//	s.placeBounceSellOrders(ctx, limitPrice, price, orderExecutor)
-		//}
-		//}
+		/*
+			if price, ok := session.LastPrice(s.Symbol); ok {
+				if limitPrice, ok := s.findHigherPivotLow(price); ok {
+					log.Infof("%s placing limit sell start from %f adds up to %f percent with %d layers of orders", s.Symbol, limitPrice.Float64(), s.Entry.CatBounceRatio.Mul(fixedpoint.NewFromInt(100)).Float64(), s.Entry.NumLayers)
+					s.placeBounceSellOrders(ctx, limitPrice, price, orderExecutor)
+				}
+			}
+		*/
 	})
 
 	// Always check whether you can open a short position or not
@@ -237,7 +245,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		if len(s.pivotLowPrices) > 0 {
 			latestPivotLow := s.pivotLowPrices[len(s.pivotLowPrices)-1]
 
-			if kline.Close.Float64() > latestPivotLow && (s.Position.IsClosed() || s.Position.IsDust(kline.Close)) {
+			if kline.Close.Compare(latestPivotLow) > 0 && (s.Position.IsClosed() || s.Position.IsDust(kline.Close)) {
 				if err := s.activeMakerOrders.GracefulCancel(ctx, s.session.Exchange); err != nil {
 					log.WithError(err).Errorf("graceful cancel order error")
 				}
@@ -253,13 +261,75 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 
-		if s.pivot.LastLow() > 0. {
+		if s.pivot.LastLow() > 0.0 {
 			log.Infof("pivot low signal detected: %f %s", s.pivot.LastLow(), kline.EndTime.Time())
-			s.LastLow = s.pivot.LastLow()
+			s.LastLow = fixedpoint.NewFromFloat(s.pivot.LastLow())
 			s.pivotLowPrices = append(s.pivotLowPrices, s.LastLow)
 		}
 
 	})
 
 	return nil
+}
+
+func (s *Strategy) findHigherPivotLow(price fixedpoint.Value) (fixedpoint.Value, bool) {
+	for l := len(s.pivotLowPrices) - 1; l > 0; l-- {
+		if s.pivotLowPrices[l].Compare(price) > 0 {
+			return s.pivotLowPrices[l], true
+		}
+	}
+
+	return price, false
+}
+
+func (s *Strategy) placeBounceSellOrders(ctx context.Context, lastLow fixedpoint.Value, limitPrice fixedpoint.Value, currentPrice fixedpoint.Value, orderExecutor bbgo.OrderExecutor) {
+	futuresMode := s.session.Futures || s.session.IsolatedFutures
+	numLayers := fixedpoint.NewFromInt(int64(s.Entry.NumLayers))
+	d := s.Entry.CatBounceRatio.Div(numLayers)
+	q := s.Entry.Quantity
+	if !s.Entry.TotalQuantity.IsZero() {
+		q = s.Entry.TotalQuantity.Div(numLayers)
+	}
+
+	for i := 0; i < s.Entry.NumLayers; i++ {
+		balances := s.session.GetAccount().Balances()
+		quoteBalance, _ := balances[s.Market.QuoteCurrency]
+		baseBalance, _ := balances[s.Market.BaseCurrency]
+
+		p := limitPrice.Mul(fixedpoint.One.Add(s.Entry.CatBounceRatio.Sub(fixedpoint.NewFromFloat(d.Float64() * float64(i)))))
+
+		if futuresMode {
+			if q.Mul(p).Compare(quoteBalance.Available) <= 0 {
+				s.placeOrder(ctx, lastLow, p, currentPrice, q, orderExecutor)
+			}
+		} else if s.Environment.IsBackTesting() {
+			if q.Compare(baseBalance.Available) <= 0 {
+				s.placeOrder(ctx, lastLow, p, currentPrice, q, orderExecutor)
+			}
+		} else {
+			if q.Compare(baseBalance.Available) <= 0 {
+				s.placeOrder(ctx, lastLow, p, currentPrice, q, orderExecutor)
+			}
+		}
+	}
+}
+
+func (s *Strategy) placeOrder(ctx context.Context, lastLow fixedpoint.Value, limitPrice fixedpoint.Value, currentPrice fixedpoint.Value, qty fixedpoint.Value, orderExecutor bbgo.OrderExecutor) {
+	submitOrder := types.SubmitOrder{
+		Symbol:   s.Symbol,
+		Side:     types.SideTypeSell,
+		Type:     types.OrderTypeLimit,
+		Price:    limitPrice,
+		Quantity: qty,
+	}
+
+	if !lastLow.IsZero() && s.Entry.Immediate && lastLow.Compare(currentPrice) <= 0 {
+		submitOrder.Type = types.OrderTypeMarket
+	}
+
+	if s.session.Margin {
+		submitOrder.MarginSideEffect = s.Entry.MarginSideEffect
+	}
+
+	s.submitOrders(ctx, orderExecutor, submitOrder)
 }
