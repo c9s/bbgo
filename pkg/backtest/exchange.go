@@ -323,12 +323,13 @@ func (e *Exchange) SubscribeMarketData(extraIntervals ...types.Interval) (chan t
 		loadedIntervals[it] = struct{}{}
 	}
 
+	// collect subscriptions
 	for _, sub := range e.marketDataStream.Subscriptions {
 		loadedSymbols[sub.Symbol] = struct{}{}
 
 		switch sub.Channel {
 		case types.KLineChannel:
-			loadedIntervals[types.Interval(sub.Options.Interval)] = struct{}{}
+			loadedIntervals[sub.Options.Interval] = struct{}{}
 
 		default:
 			// Since Environment is not yet been injected at this point, no hard error

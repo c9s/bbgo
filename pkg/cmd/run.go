@@ -34,7 +34,6 @@ func init() {
 	RunCmd.Flags().Bool("enable-grpc", false, "enable grpc server")
 	RunCmd.Flags().String("grpc-bind", ":50051", "grpc server binding")
 
-	RunCmd.Flags().String("cpu-profile", "", "cpu profile")
 	RunCmd.Flags().Bool("setup", false, "use setup mode")
 	RootCmd.AddCommand(RunCmd)
 }
