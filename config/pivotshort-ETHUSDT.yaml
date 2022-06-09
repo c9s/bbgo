@@ -13,7 +13,7 @@ exchangeStrategies:
     symbol: ETHUSDT
     interval: 5m
 
-    pivotLength:  120
+    pivotLength: 120
 
     entry:
       quantity: 10.0
@@ -28,12 +28,12 @@ exchangeStrategies:
 
 backtest:
   sessions:
-    - binance
+  - binance
   startTime: "2022-04-01"
-  endTime: "2022-06-03"
+  endTime: "2022-06-08"
   symbols:
-    - ETHUSDT
-  account:
+  - ETHUSDT
+  accounts:
     binance:
       balances:
         ETH: 10.0
