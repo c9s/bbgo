@@ -37,7 +37,7 @@ backtest:
   endTime: "2022-06-03"
   symbols:
     - GMTBUSD
-  account:
+  accounts:
     binance:
       balances:
         GMT: 3_000.0
