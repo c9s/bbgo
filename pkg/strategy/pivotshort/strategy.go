@@ -227,18 +227,23 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		if kline.Symbol != s.Symbol || kline.Interval != types.Interval1m {
 			return
 		}
+
 		// TODO: handle stop loss here, faster than closed kline
 		if canClosePosition(s.Position, kline.Close) {
+			if err := s.activeMakerOrders.GracefulCancel(ctx, s.session.Exchange); err != nil {
+				log.WithError(err).Errorf("graceful cancel order error")
+			}
+
 			// calculate return rate
 			R := kline.Close.Sub(s.Position.AverageCost).Div(s.Position.AverageCost)
 			if R.Compare(s.Exit.StopLossPercentage) > 0 {
 				// SL
 				s.Notify("%s SL triggered", s.Symbol)
-				s.ClosePosition(ctx, fixedpoint.One)
+				s.ClosePosition(ctx, fixedpoint.One.Div(fixedpoint.NewFromFloat(0.99)))
 			} else if R.Compare(s.Exit.TakeProfitPercentage.Neg()) < 0 && kline.GetLowerShadowRatio().Compare(s.Exit.LowerShadowRatio) > 0 {
 				// TP
 				s.Notify("%s TP triggered", s.Symbol)
-				s.ClosePosition(ctx, fixedpoint.One)
+				s.ClosePosition(ctx, fixedpoint.One.Div(fixedpoint.NewFromFloat(0.99)))
 			}
 		}
 
