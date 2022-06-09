@@ -3,14 +3,49 @@ package pivotshort
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v3"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
 )
+
+type TradeStats struct {
+	WinningRatio        fixedpoint.Value   `json:"winningRatio" yaml:"winningRatio"`
+	NumOfLossTrade      int                `json:"numOfLossTrade" yaml:"numOfLossTrade"`
+	NumOfProfitTrade    int                `json:"numOfProfitTrade" yaml:"numOfProfitTrade"`
+	GrossProfit         fixedpoint.Value   `json:"grossProfit" yaml:"grossProfit"`
+	GrossLoss           fixedpoint.Value   `json:"grossLoss" yaml:"grossLoss"`
+	Profits             []fixedpoint.Value `json:"profits" yaml:"profits"`
+	Losses              []fixedpoint.Value `json:"losses" yaml:"losses"`
+	MostProfitableTrade fixedpoint.Value   `json:"mostProfitableTrade" yaml:"mostProfitableTrade"`
+	MostLossTrade       fixedpoint.Value   `json:"mostLossTrade" yaml:"mostLossTrade"`
+}
+
+func (s *TradeStats) Add(pnl fixedpoint.Value) {
+	if pnl.Sign() > 0 {
+		s.NumOfProfitTrade++
+		s.Profits = append(s.Profits, pnl)
+		s.GrossProfit = s.GrossProfit.Add(pnl)
+		s.MostProfitableTrade = fixedpoint.Max(s.MostProfitableTrade, pnl)
+	} else {
+		s.NumOfLossTrade++
+		s.Losses = append(s.Losses, pnl)
+		s.GrossLoss = s.GrossLoss.Add(pnl)
+		s.MostLossTrade = fixedpoint.Min(s.MostLossTrade, pnl)
+	}
+
+	s.WinningRatio = fixedpoint.NewFromFloat(float64(s.NumOfProfitTrade) / float64(s.NumOfLossTrade))
+}
+
+func (s *TradeStats) String() string {
+	out, _ := yaml.Marshal(s)
+	return string(out)
+}
 
 const ID = "pivotshort"
 
@@ -63,6 +98,7 @@ type Strategy struct {
 	// persistence fields
 	Position    *types.Position    `json:"position,omitempty" persistence:"position"`
 	ProfitStats *types.ProfitStats `json:"profitStats,omitempty" persistence:"profit_stats"`
+	TradeStats  *TradeStats        `persistence:"trade_stats"`
 
 	PivotLength int `json:"pivotLength"`
 
@@ -152,6 +188,7 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 	s.tradeCollector.Process()
 	return err
 }
+
 func (s *Strategy) InstanceID() string {
 	return fmt.Sprintf("%s:%s", ID, s.Symbol)
 }
@@ -172,6 +209,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	if s.ProfitStats == nil {
 		s.ProfitStats = types.NewProfitStats(s.Market)
+	}
+
+	if s.TradeStats == nil {
+		s.TradeStats = &TradeStats{}
 	}
 
 	instanceID := s.InstanceID()
@@ -197,6 +238,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 			s.ProfitStats.AddProfit(p)
 			s.Notify(&s.ProfitStats)
+
+			s.TradeStats.Add(profit)
 
 			s.Environment.RecordPosition(s.Position, trade, &p)
 		}
@@ -242,10 +285,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		if isPositionOpened && s.Position.IsShort() {
 			// calculate return rate
 			// TODO: apply quantity to this formula
-			roi := kline.Close.Sub(s.Position.AverageCost).Div(s.Position.AverageCost)
-			if roi.Compare(s.Exit.RoiStopLossPercentage) > 0 {
+			roi := s.Position.AverageCost.Sub(kline.Close).Div(s.Position.AverageCost)
+			if roi.Compare(s.Exit.RoiStopLossPercentage.Neg()) < 0 {
 				// SL
-				s.Notify("%s ROI StopLoss triggered at price %f", s.Symbol, kline.Close.Float64())
+				s.Notify("%s ROI StopLoss triggered at price %f, ROI = %s", s.Symbol, kline.Close.Float64(), roi.Percentage())
 				if err := s.activeMakerOrders.GracefulCancel(ctx, s.session.Exchange); err != nil {
 					log.WithError(err).Errorf("graceful cancel order error")
 				}
@@ -255,8 +298,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				}
 
 				return
-			} else if roi.Compare(s.Exit.RoiTakeProfitPercentage.Neg()) < 0 {
-				s.Notify("%s TakeProfit triggered at price %f", s.Symbol, kline.Close.Float64())
+			} else if roi.Compare(s.Exit.RoiTakeProfitPercentage) > 0 {
+				s.Notify("%s TakeProfit triggered at price %f, ROI take profit percentage by %s", s.Symbol, kline.Close.Float64(), roi.Percentage(), kline)
 				if err := s.activeMakerOrders.GracefulCancel(ctx, s.session.Exchange); err != nil {
 					log.WithError(err).Errorf("graceful cancel order error")
 				}
@@ -334,6 +377,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				s.pivotLowPrices = append(s.pivotLowPrices, s.lastLow)
 			}
 		}
+	})
+
+	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
+		log.Info(s.TradeStats.String())
+		wg.Done()
 	})
 
 	return nil
