@@ -5,8 +5,6 @@ package v3
 //go:generate -command DeleteRequest requestgen -method DELETE
 
 import (
-	"time"
-
 	"github.com/c9s/requestgen"
 
 	maxapi "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
@@ -41,18 +39,6 @@ func (s *OrderService) NewGetWalletOpenOrdersRequest(walletType WalletType) *Get
 
 func (s *OrderService) NewCancelWalletOrderAllRequest(walletType WalletType) *CancelWalletOrderAllRequest {
 	return &CancelWalletOrderAllRequest{client: s.Client, walletType: walletType}
-}
-
-func (s *OrderService) NewGetWalletTradesRequest(walletType WalletType) *GetWalletTradesRequest {
-	return &GetWalletTradesRequest{client: s.Client, walletType: walletType}
-}
-
-func (s *OrderService) NewCancelOrderRequest() *CancelOrderRequest {
-	return &CancelOrderRequest{client: s.Client}
-}
-
-func (s *OrderService) NewGetOrderRequest() *GetOrderRequest {
-	return &GetOrderRequest{client: s.Client}
 }
 
 //go:generate GetRequest -url "/api/v3/wallet/:walletType/accounts" -type GetWalletAccountsRequest -responseType []Account
@@ -107,31 +93,3 @@ type CancelWalletOrderAllRequest struct {
 	groupID    *uint32    `param:"groupID"`
 }
 
-//go:generate GetRequest -url "/api/v3/wallet/:walletType/trades" -type GetWalletTradesRequest -responseType []Trade
-type GetWalletTradesRequest struct {
-	client requestgen.AuthenticatedAPIClient
-
-	walletType WalletType `param:"walletType,slug,required"`
-
-	market    string     `param:"market,required"`
-	from      *uint64    `param:"from_id"`
-	startTime *time.Time `param:"start_time,milliseconds"`
-	endTime   *time.Time `param:"end_time,milliseconds"`
-	limit     *uint64    `param:"limit"`
-}
-
-//go:generate PostRequest -url "/api/v3/order" -type CancelOrderRequest -responseType .Order
-type CancelOrderRequest struct {
-	client requestgen.AuthenticatedAPIClient
-
-	id            *uint64 `param:"id,omitempty"`
-	clientOrderID *string `param:"client_oid,omitempty"`
-}
-
-//go:generate GetRequest -url "/api/v3/order" -type GetOrderRequest -responseType .Order
-type GetOrderRequest struct {
-	client requestgen.AuthenticatedAPIClient
-
-	id            *uint64 `param:"id,omitempty"`
-	clientOrderID *string `param:"client_oid,omitempty"`
-}
