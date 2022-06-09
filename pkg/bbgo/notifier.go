@@ -51,7 +51,8 @@ func (m *Notifiability) AddNotifier(notifier Notifier) {
 
 func (m *Notifiability) Notify(obj interface{}, args ...interface{}) {
 	if str, ok := obj.(string); ok {
-		logrus.Infof(str, args...)
+		simpleArgs := filterSimpleArgs(args)
+		logrus.Infof(str, simpleArgs...)
 	}
 
 	for _, n := range m.notifiers {
@@ -63,4 +64,15 @@ func (m *Notifiability) NotifyTo(channel string, obj interface{}, args ...interf
 	for _, n := range m.notifiers {
 		n.NotifyTo(channel, obj, args...)
 	}
+}
+
+func filterSimpleArgs(args []interface{}) (simpleArgs []interface{}) {
+	for _, arg := range args {
+		switch arg.(type) {
+		case int, int64, int32, uint64, uint32, string, []byte, float64, float32:
+			simpleArgs = append(simpleArgs, arg)
+		}
+	}
+
+	return simpleArgs
 }

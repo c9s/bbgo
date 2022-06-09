@@ -3,39 +3,38 @@ sessions:
   binance:
     exchange: binance
     envVarPrefix: binance
-#    margin: true
-#    isolatedMargin: true
-#    isolatedMarginSymbol: GMTUSDT
-#    futures: true
+    margin: true
+    # isolatedMargin: true
+    # isolatedMarginSymbol: ETHUSDT
 
 exchangeStrategies:
 - on: binance
   pivotshort:
-    symbol: GMTUSDT
+    symbol: ETHUSDT
     interval: 5m
 
     pivotLength:  120
 
     entry:
-      quantity: 3000.0
-#      marginOrderSideEffect: borrow
+      quantity: 10.0
+      marginOrderSideEffect: borrow
 
     exit:
       takeProfitPercentage: 25%
       stopLossPercentage: 1%
       lowerShadowRatio: 0.95
-#      marginOrderSideEffect: repay
+      marginOrderSideEffect: repay
 
 
 backtest:
   sessions:
     - binance
-  startTime: "2022-05-01"
+  startTime: "2022-04-01"
   endTime: "2022-06-03"
   symbols:
-    - GMTUSDT
+    - ETHUSDT
   account:
     binance:
       balances:
-        GMT: 3010.0
-        USDT: 1000.0
+        ETH: 10.0
+        USDT: 3000.0
