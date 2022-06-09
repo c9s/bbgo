@@ -257,12 +257,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		if len(s.pivotLowPrices) > 0 {
 			lastLow := s.pivotLowPrices[len(s.pivotLowPrices)-1]
 			if kline.Close.Compare(lastLow) < 0 {
-				s.Notify("%s price %f breaks the previous low %f, submitting market sell to open a short position", s.Symbol, kline.Close.Float64(), lastLow.Float64())
-
 				if !s.Position.IsClosed() && !s.Position.IsDust(kline.Close) {
-					s.Notify("skip opening %s position, which is not closed", s.Symbol, s.Position)
+					// s.Notify("skip opening %s position, which is not closed", s.Symbol, s.Position)
 					return
 				}
+
+				s.Notify("%s price %f breaks the previous low %f, submitting market sell to open a short position", s.Symbol, kline.Close.Float64(), lastLow.Float64())
 
 				if err := s.activeMakerOrders.GracefulCancel(ctx, s.session.Exchange); err != nil {
 					log.WithError(err).Errorf("graceful cancel order error")
