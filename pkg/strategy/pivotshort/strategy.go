@@ -26,8 +26,10 @@ type IntervalWindowSetting struct {
 
 // BreakLow -- when price breaks the previous pivot low, we set a trade entry
 type BreakLow struct {
-	Ratio    fixedpoint.Value `json:"ratio"`
-	Quantity fixedpoint.Value `json:"quantity"`
+	Ratio        fixedpoint.Value      `json:"ratio"`
+	Quantity     fixedpoint.Value      `json:"quantity"`
+	StopEMARange fixedpoint.Value      `json:"stopEMARange"`
+	StopEMA      *types.IntervalWindow `json:"stopEMA"`
 }
 
 type Entry struct {
@@ -76,6 +78,7 @@ type Strategy struct {
 
 	lastLow        fixedpoint.Value
 	pivot          *indicator.Pivot
+	ewma           *indicator.EWMA
 	pivotLowPrices []fixedpoint.Value
 
 	// StrategyController
@@ -210,6 +213,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.pivot = &indicator.Pivot{IntervalWindow: iw}
 	s.pivot.Bind(store)
 
+	standardIndicator, _ := session.StandardIndicatorSet(s.Symbol)
+	if s.BreakLow.StopEMA != nil {
+		s.ewma = standardIndicator.EWMA(*s.BreakLow.StopEMA)
+	}
+
 	s.lastLow = fixedpoint.Zero
 
 	session.UserDataStream.OnStart(func() {
@@ -279,6 +287,18 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		// truncate the pivot low prices
 		if len(s.pivotLowPrices) > 10 {
 			s.pivotLowPrices = s.pivotLowPrices[len(s.pivotLowPrices)-10:]
+		}
+
+		if s.ewma != nil && !s.BreakLow.StopEMARange.IsZero() {
+			ema := fixedpoint.NewFromFloat(s.ewma.Last())
+			if ema.IsZero() {
+				return
+			}
+
+			emaStopShortPrice := ema.Mul(fixedpoint.One.Sub(s.BreakLow.StopEMARange))
+			if kline.Close.Compare(emaStopShortPrice) < 0 {
+				return
+			}
 		}
 
 		ratio := fixedpoint.One.Sub(s.BreakLow.Ratio)
