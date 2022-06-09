@@ -298,7 +298,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				}
 
 				return
-			} else if roi.Compare(s.Exit.RoiTakeProfitPercentage) > 0 {
+			} else if roi.Compare(s.Exit.RoiTakeProfitPercentage) > 0 { // disable this condition temporarily
 				s.Notify("%s TakeProfit triggered at price %f, ROI take profit percentage by %s", s.Symbol, kline.Close.Float64(), roi.Percentage(), kline)
 				if err := s.activeMakerOrders.GracefulCancel(ctx, s.session.Exchange); err != nil {
 					log.WithError(err).Errorf("graceful cancel order error")
@@ -307,8 +307,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				if err := s.ClosePosition(ctx, fixedpoint.One); err != nil {
 					log.WithError(err).Errorf("close position error")
 				}
-				return
-			} else if !s.Exit.LowerShadowRatio.IsZero() && kline.GetLowerShadowHeight().Div(kline.Low).Compare(s.Exit.LowerShadowRatio) > 0 {
+			} else if !s.Exit.LowerShadowRatio.IsZero() && kline.GetLowerShadowHeight().Div(kline.Close).Compare(s.Exit.LowerShadowRatio) > 0 {
 				s.Notify("%s TakeProfit triggered at price %f: shadow ratio %f", s.Symbol, kline.Close.Float64(), kline.GetLowerShadowRatio().Float64(), kline)
 				if err := s.activeMakerOrders.GracefulCancel(ctx, s.session.Exchange); err != nil {
 					log.WithError(err).Errorf("graceful cancel order error")
