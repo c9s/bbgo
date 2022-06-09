@@ -132,6 +132,9 @@ func canClosePosition(position *types.Position, price fixedpoint.Value) bool {
 
 func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Value) error {
 	submitOrder := s.Position.NewClosePositionOrder(percentage) // types.SubmitOrder{
+	if submitOrder == nil {
+		return nil
+	}
 
 	if s.session.Margin {
 		submitOrder.MarginSideEffect = s.Exit.MarginSideEffect
@@ -238,27 +241,34 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			R := kline.Close.Sub(s.Position.AverageCost).Div(s.Position.AverageCost)
 			if R.Compare(s.Exit.StopLossPercentage) > 0 {
 				// SL
-				s.Notify("%s SL triggered", s.Symbol)
-				s.ClosePosition(ctx, fixedpoint.One.Div(fixedpoint.NewFromFloat(0.99)))
+				s.Notify("%s SL triggered at price %f", s.Symbol, kline.Close.Float64())
+				s.ClosePosition(ctx, fixedpoint.One)
+				return
 			} else if R.Compare(s.Exit.TakeProfitPercentage.Neg()) < 0 && kline.GetLowerShadowRatio().Compare(s.Exit.LowerShadowRatio) > 0 {
 				// TP
-				s.Notify("%s TP triggered", s.Symbol)
-				s.ClosePosition(ctx, fixedpoint.One.Div(fixedpoint.NewFromFloat(0.99)))
+				s.Notify("%s TP triggered at price %f", s.Symbol, kline.Close.Float64())
+				s.ClosePosition(ctx, fixedpoint.One)
+				return
 			}
 		}
 
 		if len(s.pivotLowPrices) > 0 {
-			latestPivotLow := s.pivotLowPrices[len(s.pivotLowPrices)-1]
+			lastLow := s.pivotLowPrices[len(s.pivotLowPrices)-1]
+			if kline.Close.Compare(lastLow) < 0 {
+				s.Notify("%s price %f breaks the previous low %f, submitting market sell to open a short position", s.Symbol, kline.Close.Float64(), lastLow.Float64())
 
-			if kline.Close.Compare(latestPivotLow) > 0 && (s.Position.IsClosed() || s.Position.IsDust(kline.Close)) {
+				if !s.Position.IsClosed() && !s.Position.IsDust(kline.Close) {
+					s.Notify("skip opening %s position, which is not closed", s.Symbol, s.Position)
+					return
+				}
+
 				if err := s.activeMakerOrders.GracefulCancel(ctx, s.session.Exchange); err != nil {
 					log.WithError(err).Errorf("graceful cancel order error")
 				}
-				s.Notify("price breaks the previous low, submitting market sell to open a short position")
+
 				s.placeMarketSell(ctx, orderExecutor)
 			}
 		}
-
 	})
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
@@ -271,7 +281,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			s.LastLow = fixedpoint.NewFromFloat(s.pivot.LastLow())
 			s.pivotLowPrices = append(s.pivotLowPrices, s.LastLow)
 		}
-
 	})
 
 	return nil
