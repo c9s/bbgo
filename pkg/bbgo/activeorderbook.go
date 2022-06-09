@@ -10,7 +10,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-const CancelOrderWaitTime = 20 * time.Millisecond
+const CancelOrderWaitTime = 10 * time.Millisecond
 
 // ActiveOrderBook manages the local active order books.
 //go:generate callbackgen -type ActiveOrderBook
