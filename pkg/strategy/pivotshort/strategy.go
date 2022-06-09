@@ -3,6 +3,7 @@ package pivotshort
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 
 	"github.com/sirupsen/logrus"
@@ -39,7 +40,11 @@ func (s *TradeStats) Add(pnl fixedpoint.Value) {
 		s.MostLossTrade = fixedpoint.Min(s.MostLossTrade, pnl)
 	}
 
-	s.WinningRatio = fixedpoint.NewFromFloat(float64(s.NumOfProfitTrade) / float64(s.NumOfLossTrade))
+	if s.NumOfLossTrade == 0 && s.NumOfProfitTrade > 0 {
+		s.WinningRatio = fixedpoint.One
+	} else {
+		s.WinningRatio = fixedpoint.NewFromFloat(float64(s.NumOfProfitTrade) / float64(s.NumOfLossTrade))
+	}
 }
 
 func (s *TradeStats) String() string {
@@ -76,11 +81,20 @@ type Entry struct {
 	MarginSideEffect types.MarginOrderSideEffectType `json:"marginOrderSideEffect"`
 }
 
+type CumulatedVolume struct {
+	Enabled        bool             `json:"enabled"`
+	MinQuoteVolume fixedpoint.Value `json:"minQuoteVolume"`
+	Window         int              `json:"window"`
+}
+
 type Exit struct {
-	RoiStopLossPercentage   fixedpoint.Value `json:"roiStopLossPercentage"`
-	RoiTakeProfitPercentage fixedpoint.Value `json:"roiTakeProfitPercentage"`
+	RoiStopLossPercentage      fixedpoint.Value `json:"roiStopLossPercentage"`
+	RoiTakeProfitPercentage    fixedpoint.Value `json:"roiTakeProfitPercentage"`
+	RoiMinTakeProfitPercentage fixedpoint.Value `json:"roiMinTakeProfitPercentage"`
 
 	LowerShadowRatio fixedpoint.Value `json:"lowerShadowRatio"`
+
+	CumulatedVolume *CumulatedVolume `json:"cumulatedVolume"`
 
 	MarginSideEffect types.MarginOrderSideEffectType `json:"marginOrderSideEffect"`
 }
@@ -287,36 +301,47 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			// TODO: apply quantity to this formula
 			roi := s.Position.AverageCost.Sub(kline.Close).Div(s.Position.AverageCost)
 			if roi.Compare(s.Exit.RoiStopLossPercentage.Neg()) < 0 {
-				// SL
-				s.Notify("%s ROI StopLoss triggered at price %f, ROI = %s", s.Symbol, kline.Close.Float64(), roi.Percentage())
-				if err := s.activeMakerOrders.GracefulCancel(ctx, s.session.Exchange); err != nil {
-					log.WithError(err).Errorf("graceful cancel order error")
-				}
-
-				if err := s.ClosePosition(ctx, fixedpoint.One); err != nil {
-					log.WithError(err).Errorf("close position error")
-				}
-
+				// stop loss
+				s.Notify("%s ROI StopLoss triggered at price %f: Loss %s", s.Symbol, kline.Close.Float64(), roi.Percentage())
+				s.closePosition(ctx)
 				return
-			} else if roi.Compare(s.Exit.RoiTakeProfitPercentage) > 0 { // disable this condition temporarily
-				s.Notify("%s TakeProfit triggered at price %f, ROI take profit percentage by %s", s.Symbol, kline.Close.Float64(), roi.Percentage(), kline)
-				if err := s.activeMakerOrders.GracefulCancel(ctx, s.session.Exchange); err != nil {
-					log.WithError(err).Errorf("graceful cancel order error")
-				}
+			} else {
+				// take profit
+				if roi.Compare(s.Exit.RoiTakeProfitPercentage) > 0 { // force take profit
+					s.Notify("%s TakeProfit triggered at price %f: by ROI percentage %s", s.Symbol, kline.Close.Float64(), roi.Percentage(), kline)
+					s.closePosition(ctx)
+					return
+				} else if !s.Exit.RoiMinTakeProfitPercentage.IsZero() && roi.Compare(s.Exit.RoiMinTakeProfitPercentage) > 0 {
+					if !s.Exit.LowerShadowRatio.IsZero() && kline.GetLowerShadowHeight().Div(kline.Close).Compare(s.Exit.LowerShadowRatio) > 0 {
+						s.Notify("%s TakeProfit triggered at price %f: by shadow ratio %f",
+							s.Symbol,
+							kline.Close.Float64(),
+							kline.GetLowerShadowRatio().Float64(), kline)
+						s.closePosition(ctx)
+						return
+					} else if s.Exit.CumulatedVolume != nil && s.Exit.CumulatedVolume.Enabled {
+						if klines, ok := store.KLinesOfInterval(s.Interval); ok {
+							var cbv = fixedpoint.Zero
+							var cqv = fixedpoint.Zero
+							for i := 0; i < s.Exit.CumulatedVolume.Window; i++ {
+								last := (*klines)[len(*klines)-1-i]
+								cqv = cqv.Add(last.QuoteVolume)
+								cbv = cbv.Add(last.Volume)
+							}
 
-				if err := s.ClosePosition(ctx, fixedpoint.One); err != nil {
-					log.WithError(err).Errorf("close position error")
+							if cqv.Compare(s.Exit.CumulatedVolume.MinQuoteVolume) > 0 {
+								s.Notify("%s TakeProfit triggered at price %f: by cumulated volume (window: %d) %f > %f",
+									s.Symbol,
+									kline.Close.Float64(),
+									s.Exit.CumulatedVolume.Window,
+									cqv.Float64(),
+									s.Exit.CumulatedVolume.MinQuoteVolume.Float64())
+								s.closePosition(ctx)
+								return
+							}
+						}
+					}
 				}
-			} else if !s.Exit.LowerShadowRatio.IsZero() && kline.GetLowerShadowHeight().Div(kline.Close).Compare(s.Exit.LowerShadowRatio) > 0 {
-				s.Notify("%s TakeProfit triggered at price %f: shadow ratio %f", s.Symbol, kline.Close.Float64(), kline.GetLowerShadowRatio().Float64(), kline)
-				if err := s.activeMakerOrders.GracefulCancel(ctx, s.session.Exchange); err != nil {
-					log.WithError(err).Errorf("graceful cancel order error")
-				}
-
-				if err := s.ClosePosition(ctx, fixedpoint.One); err != nil {
-					log.WithError(err).Errorf("close position error")
-				}
-				return
 			}
 		}
 
@@ -379,11 +404,21 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 
 	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
-		log.Info(s.TradeStats.String())
+		_, _ = fmt.Fprintln(os.Stderr, s.TradeStats.String())
 		wg.Done()
 	})
 
 	return nil
+}
+
+func (s *Strategy) closePosition(ctx context.Context) {
+	if err := s.activeMakerOrders.GracefulCancel(ctx, s.session.Exchange); err != nil {
+		log.WithError(err).Errorf("graceful cancel order error")
+	}
+
+	if err := s.ClosePosition(ctx, fixedpoint.One); err != nil {
+		log.WithError(err).Errorf("close position error")
+	}
 }
 
 func (s *Strategy) findHigherPivotLow(price fixedpoint.Value) (fixedpoint.Value, bool) {
