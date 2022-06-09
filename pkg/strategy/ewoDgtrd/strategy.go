@@ -17,10 +17,6 @@ import (
 )
 
 const ID = "ewo_dgtrd"
-const ewoChangeFilterHigh = 1
-const ewoChangeFilterLow = 0.000
-
-const record = false
 
 var log = logrus.WithField("strategy", ID)
 
@@ -32,19 +28,21 @@ type Strategy struct {
 	Position    *types.Position    `json:"position,omitempty" persistence:"position"`
 	ProfitStats *types.ProfitStats `json:"profitStats,omitempty" persistence:"profit_stats"`
 
-	Market           types.Market
-	Session          *bbgo.ExchangeSession
-	UseHeikinAshi    bool             `json:"useHeikinAshi"` // use heikinashi kline
-	Stoploss         fixedpoint.Value `json:"stoploss"`
-	Symbol           string           `json:"symbol"`
-	Interval         types.Interval   `json:"interval"`
-	UseEma           bool             `json:"useEma"`             // use exponential ma or not
-	UseSma           bool             `json:"useSma"`             // if UseEma == false, use simple ma or not
-	SignalWindow     int              `json:"sigWin"`             // signal window
-	DisableShortStop bool             `json:"disableShortStop"`   // disable SL on short
-	DisableLongStop  bool             `json:"disableLongStop"`    // disable SL on long
-	FilterHigh       float64          `json:"ccistochFilterHigh"` // high filter for CCI Stochastic indicator
-	FilterLow        float64          `json:"ccistochFilterLow"`  // low filter for CCI Stochastic indicator
+	Market              types.Market
+	Session             *bbgo.ExchangeSession
+	UseHeikinAshi       bool             `json:"useHeikinAshi"` // use heikinashi kline
+	Stoploss            fixedpoint.Value `json:"stoploss"`
+	Symbol              string           `json:"symbol"`
+	Interval            types.Interval   `json:"interval"`
+	UseEma              bool             `json:"useEma"`             // use exponential ma or not
+	UseSma              bool             `json:"useSma"`             // if UseEma == false, use simple ma or not
+	SignalWindow        int              `json:"sigWin"`             // signal window
+	DisableShortStop    bool             `json:"disableShortStop"`   // disable SL on short
+	DisableLongStop     bool             `json:"disableLongStop"`    // disable SL on long
+	FilterHigh          float64          `json:"ccistochFilterHigh"` // high filter for CCI Stochastic indicator
+	FilterLow           float64          `json:"ccistochFilterLow"`  // low filter for CCI Stochastic indicator
+	EwoChangeFilterHigh float64          `json:"ewoChngFilterHigh"`  // high filter for ewo histogram
+	EwoChangeFilterLow  float64          `json:"ewoChngFilterLow"`   // low filter for ewo histogram
 
 	Record bool `json:"record"` // print record messages on position exit point
 
@@ -661,17 +659,20 @@ func (s *Strategy) GetLastPrice() fixedpoint.Value {
 
 // Trading Rules:
 // - buy / sell the whole asset
-// - SL by atr (lastprice < buyprice - atr * 2) || (lastprice > sellprice + atr * 2)
-// - TP by cci stoch invert or ewo invert
-// - TP by (lastprice < peak price - atr * 2) || (lastprice > bottom price + atr * 2)
+// - SL by atr (lastprice < buyprice - atr) || (lastprice > sellprice + atr)
+// - TP by detecting if there's a ewo pivotHigh(1,1) -> close long, or pivotLow(1,1) -> close short
+// - TP by ma34 +- atr * 2
+// - TP by (lastprice < peak price - atr) || (lastprice > bottom price + atr)
 // - SL by s.Stoploss (Abs(price_diff / price) > s.Stoploss)
 // - entry condition on ewo(Elliott wave oscillator) Crosses ewoSignal(ma on ewo, signalWindow)
-//   * buy signal on crossover
-//   * sell signal on crossunder
+//   * buy signal on (crossover on previous K bar and no crossunder on latest K bar)
+//   * sell signal on (crossunder on previous K bar and no crossunder on latest K bar)
 // - and filtered by the following rules:
-//   * buy: buy signal ON, kline Close > Open, Close > ma(Window=5), CCI Stochastic Buy signal
-//   * sell: sell signal ON, kline Close < Open, Close < ma(Window=5), CCI Stochastic Sell signal
-// Cancel non-fully filled orders every s.Interval
+//   * buy: buy signal ON, kline Close > Open, Close > ma5, Close > ma34, CCI Stochastic Buy signal
+//   * sell: sell signal ON, kline Close < Open, Close < ma5, Close < ma34, CCI Stochastic Sell signal
+// - or entry when ma34 +- atr * 3 gets touched
+// - entry price: latestPrice +- atr / 2 (short,long), close at market price
+// Cancel non-fully filled orders on new signal (either in same direction or not)
 //
 // ps: kline might refer to heikinashi or normal ohlc
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
@@ -807,9 +808,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	shortSig := s.ewo.Last() < s.ewo.Index(1) && s.ewo.Index(1) > s.ewo.Index(2)
 	longSig := s.ewo.Last() > s.ewo.Index(1) && s.ewo.Index(1) < s.ewo.Index(2)
 
-	//shortSignal := types.CrossUnder(s.ewo, s.ewoSignal)
-	//longSignal := types.CrossOver(s.ewo, s.ewoSignal)
-
 	sellOrderTPSL := func(price fixedpoint.Value) {
 		lastPrice := s.GetLastPrice()
 		base := s.Position.GetBase().Abs()
@@ -835,7 +833,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			base := fixedpoint.NewFromFloat(s.ma34.Last())
 			// TP
 			if lastPrice.Compare(s.sellPrice) < 0 && (longSig ||
-				//longSignal.Last() ||
 				(!atrx2.IsZero() && base.Sub(atrx2).Compare(lastPrice) >= 0)) {
 				buyall = true
 				takeProfit = true
@@ -946,7 +943,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			// TP
 			base := fixedpoint.NewFromFloat(s.ma34.Last())
 			if lastPrice.Compare(s.buyPrice) > 0 && (shortSig ||
-				//shortSignal.Last() ||
 				(!atrx2.IsZero() && base.Add(atrx2).Compare(lastPrice) <= 0)) {
 				sellall = true
 				takeProfit = true
@@ -1141,11 +1137,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		s.ewoChangeRate = math.Abs(s.ewoHistogram.Last() / ewoHighest * priceChangeRate)
 
-		// To get the threshold for ewo
-		// mean := types.Mean(types.Abs(s.ewo), 10)
-		// std := types.Stdev(s.ewo, 10)
-		//shortSig := s.ewo.Last() < s.ewo.Index(1) && s.ewo.Index(1) > s.ewo.Index(2)
-		//longSig := s.ewo.Last() > s.ewo.Index(1) && s.ewo.Index(1) < s.ewo.Index(2)
 		longSignal := types.CrossOver(s.ewo, s.ewoSignal)
 		shortSignal := types.CrossUnder(s.ewo, s.ewoSignal)
 
@@ -1161,9 +1152,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		breakDown := clozes.Last() < s.ma5.Last() && clozes.Last() < s.ma34.Last()
 
 		// kline breakthrough ma5, ma34 trend up, and cci Stochastic bull
-		IsBull := bull && breakThrough && s.ccis.BuySignal() && s.ewoChangeRate < ewoChangeFilterHigh && s.ewoChangeRate > ewoChangeFilterLow
+		IsBull := bull && breakThrough && s.ccis.BuySignal() && s.ewoChangeRate < s.EwoChangeFilterHigh && s.ewoChangeRate > s.EwoChangeFilterLow
 		// kline downthrough ma5, ma34 trend down, and cci Stochastic bear
-		IsBear := !bull && breakDown && s.ccis.SellSignal() && s.ewoChangeRate < ewoChangeFilterHigh && s.ewoChangeRate > ewoChangeFilterLow
+		IsBear := !bull && breakDown && s.ccis.SellSignal() && s.ewoChangeRate < s.EwoChangeFilterHigh && s.ewoChangeRate > s.EwoChangeFilterLow
 
 		if !s.Environment.IsBackTesting() {
 			log.Infof("IsBull: %v, bull: %v, longSignal[1]: %v, shortSignal: %v, lastPrice: %v",
@@ -1273,6 +1264,31 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		color.HiBlue("WinRate: %f", float64(totalTP)/float64(totalTP+totalSL))
 
+		maString := "vwema"
+		if s.UseSma {
+			maString = "sma"
+		}
+		if s.UseEma {
+			maString = "ema"
+		}
+
+		color.HiYellow("----- EWO Settings -------")
+		color.HiYellow("General:")
+		color.HiYellow("\tuseHeikinAshi: %v", s.UseHeikinAshi)
+		color.HiYellow("\tstoploss: %v", s.Stoploss)
+		color.HiYellow("\tsymbol: %s", s.Symbol)
+		color.HiYellow("\tinterval: %s", s.Interval)
+		color.HiYellow("\tMA type: %s", maString)
+		color.HiYellow("\tdisableShortStop: %v", s.DisableShortStop)
+		color.HiYellow("\tdisableLongStop: %v", s.DisableLongStop)
+		color.HiYellow("\trecord: %v", s.Record)
+		color.HiYellow("CCI Stochastic:")
+		color.HiYellow("\tccistochFilterHigh: %f", s.FilterHigh)
+		color.HiYellow("\tccistochFilterLow: %f", s.FilterLow)
+		color.HiYellow("Ewo && Ewo Histogram:")
+		color.HiYellow("\tsigWin: %d", s.SignalWindow)
+		color.HiYellow("\tewoChngFilterHigh: %f", s.EwoChangeFilterHigh)
+		color.HiYellow("\tewoChngFilterLow: %f", s.EwoChangeFilterLow)
 	})
 	return nil
 }

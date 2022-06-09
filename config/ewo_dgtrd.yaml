@@ -31,6 +31,12 @@ exchangeStrategies:
     ccistochFilterHigh: 80
     # CCI Stochastic Indicator low filter
     ccistochFilterLow: 20
+    # ewo change rate histogram's upperbound filter
+    # set to 1 would intend to let all ewo pass
+    ewoChngFilterHigh: 1.
+    # ewo change rate histogram's lowerbound filter
+    # set to 0 would intend to let all ewo pass
+    ewoChngFilterLow: 0.0
     # print record exit point in log messages
     record: false
 
