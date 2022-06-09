@@ -34,17 +34,22 @@ exchangeStrategies:
       # roiStopLossPercentage is the stop loss percentage of the position ROI (currently the price change)
       roiStopLossPercentage: 1%
 
-      # roiTakeProfitPercentage is the take profit percentage of the position ROI (currently the price change)
+      # roiTakeProfitPercentage is used to force taking profit by percentage of the position ROI (currently the price change)
       # force to take the profit ROI exceeded the percentage.
       roiTakeProfitPercentage: 25%
 
-      # lowerShadowRatio is used to force taking profit when the (lower shadow height / low price) > lowerShadowRatio
+      # roiMinTakeProfitPercentage applies to lowerShadowRatio and cumulatedVolume exit options
+      roiMinTakeProfitPercentage: 10%
+
+      # lowerShadowRatio is used to taking profit when the (lower shadow height / low price) > lowerShadowRatio
       # you can grab a simple stats by the following SQL:
       # SELECT ((close - low) / close) AS shadow_ratio FROM binance_klines WHERE symbol = 'ETHUSDT' AND `interval` = '5m' AND start_time > '2022-01-01' ORDER BY shadow_ratio DESC LIMIT 20;
       lowerShadowRatio: 3%
 
+      # cumulatedVolume is used to take profit when the cumulated quote volume from the klines exceeded a threshold
       cumulatedVolume:
-        minVolume: 50_000
+        enabled: true
+        minQuoteVolume: 90_000_000
         window: 5
 
       marginOrderSideEffect: repay
@@ -52,7 +57,7 @@ exchangeStrategies:
 backtest:
   sessions:
   - binance
-  startTime: "2022-04-01"
+  startTime: "2022-01-01"
   endTime: "2022-06-08"
   symbols:
   - ETHUSDT
