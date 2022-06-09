@@ -18,7 +18,10 @@ exchangeStrategies:
     breakLow:
       ratio: 0.1%
       quantity: 10.0
-      # stopLossPercentage: 1%
+      stopEMARange: 5%
+      stopEMA:
+        interval: 1h
+        window: 99
 
     bounceShort:
       quantity: 10.0
