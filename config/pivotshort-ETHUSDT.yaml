@@ -34,7 +34,7 @@ exchangeStrategies:
       # roiStopLossPercentage is the stop loss percentage of the position ROI (currently the price change)
       roiStopLossPercentage: 1%
 
-      # roiTakeProfitPercentage is used to force taking profit percentage of the position ROI (currently the price change)
+      # roiTakeProfitPercentage is used to force taking profit by percentage of the position ROI (currently the price change)
       # force to take the profit ROI exceeded the percentage.
       roiTakeProfitPercentage: 25%
 
