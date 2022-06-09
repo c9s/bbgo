@@ -28,7 +28,7 @@ matrix:
   path: '/exchangeStrategies/0/pivotshort/exit/roiStopLossPercentage'
   label: roiStopLossPercentage
   min: 0.5%
-  max: 3%
+  max: 2%
   step: 0.5%
 
 - type: range
@@ -38,4 +38,10 @@ matrix:
   max: 50%
   step: 5%
 
+- type: range
+  path: '/exchangeStrategies/0/pivotshort/exit/roiMinTakeProfitPercentage'
+  label: roiMinTakeProfitPercentage
+  min: 3%
+  max: 10%
+  step: 1%
 
