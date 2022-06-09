@@ -9,7 +9,6 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"math"
 	"sync"
 )
 
@@ -24,81 +23,6 @@ func init() {
 	// so that bbgo knows what struct to be used to unmarshal the configs (YAML or JSON)
 	// Note: built-in strategies need to imported manually in the bbgo cmd package.
 	bbgo.RegisterStrategy(ID, &Strategy{})
-}
-
-type SuperTrend struct {
-	// AverageTrueRangeWindow ATR window for calculation of supertrend
-	AverageTrueRangeWindow int `json:"averageTrueRangeWindow"`
-	// AverageTrueRangeMultiplier ATR multiplier for calculation of supertrend
-	AverageTrueRangeMultiplier float64 `json:"averageTrueRangeMultiplier"`
-
-	averageTrueRange *indicator.ATR
-
-	closePrice         float64
-	lastClosePrice     float64
-	uptrendPrice       float64
-	lastUptrendPrice   float64
-	downtrendPrice     float64
-	lastDowntrendPrice float64
-
-	trend       types.Direction
-	lastTrend   types.Direction
-	tradeSignal types.Direction
-}
-
-// update SuperTrend indicator
-func (st *SuperTrend) update(kline types.KLine) {
-	highPrice := kline.GetHigh().Float64()
-	lowPrice := kline.GetLow().Float64()
-	closePrice := kline.GetClose().Float64()
-
-	// Update ATR
-	st.averageTrueRange.Update(highPrice, lowPrice, closePrice)
-
-	// Update last prices
-	st.lastUptrendPrice = st.uptrendPrice
-	st.lastDowntrendPrice = st.downtrendPrice
-	st.lastClosePrice = st.closePrice
-	st.lastTrend = st.trend
-
-	st.closePrice = closePrice
-
-	src := (highPrice + lowPrice) / 2
-
-	// Update uptrend
-	st.uptrendPrice = src - st.averageTrueRange.Last()*st.AverageTrueRangeMultiplier
-	if st.lastClosePrice > st.lastUptrendPrice {
-		st.uptrendPrice = math.Max(st.uptrendPrice, st.lastUptrendPrice)
-	}
-
-	// Update downtrend
-	st.downtrendPrice = src + st.averageTrueRange.Last()*st.AverageTrueRangeMultiplier
-	if st.lastClosePrice < st.lastDowntrendPrice {
-		st.downtrendPrice = math.Min(st.downtrendPrice, st.lastDowntrendPrice)
-	}
-
-	// Update trend
-	if st.lastTrend == types.DirectionUp && st.closePrice < st.lastUptrendPrice {
-		st.trend = types.DirectionDown
-	} else if st.lastTrend == types.DirectionDown && st.closePrice > st.lastDowntrendPrice {
-		st.trend = types.DirectionUp
-	} else {
-		st.trend = st.lastTrend
-	}
-
-	// Update signal
-	if st.trend == types.DirectionUp && st.lastTrend == types.DirectionDown {
-		st.tradeSignal = types.DirectionUp
-	} else if st.trend == types.DirectionDown && st.lastTrend == types.DirectionUp {
-		st.tradeSignal = types.DirectionDown
-	} else {
-		st.tradeSignal = types.DirectionNone
-	}
-}
-
-// getSignal returns SuperTrend signal
-func (st *SuperTrend) getSignal() types.Direction {
-	return st.tradeSignal
 }
 
 type Strategy struct {
