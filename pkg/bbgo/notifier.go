@@ -1,6 +1,10 @@
 package bbgo
 
-import "github.com/sirupsen/logrus"
+import (
+	"github.com/sirupsen/logrus"
+
+	"github.com/c9s/bbgo/pkg/fixedpoint"
+)
 
 type Notifier interface {
 	NotifyTo(channel string, obj interface{}, args ...interface{})
@@ -69,7 +73,7 @@ func (m *Notifiability) NotifyTo(channel string, obj interface{}, args ...interf
 func filterSimpleArgs(args []interface{}) (simpleArgs []interface{}) {
 	for _, arg := range args {
 		switch arg.(type) {
-		case int, int64, int32, uint64, uint32, string, []byte, float64, float32:
+		case int, int64, int32, uint64, uint32, string, []byte, float64, float32, fixedpoint.Value:
 			simpleArgs = append(simpleArgs, arg)
 		}
 	}
