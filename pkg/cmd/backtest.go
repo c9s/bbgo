@@ -127,7 +127,6 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
-
 		if userConfig.Backtest == nil {
 			return errors.New("backtest config is not defined")
 		}
