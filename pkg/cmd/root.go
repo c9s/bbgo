@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"runtime/pprof"
 	"strings"
 	"time"
 
@@ -22,6 +23,8 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
+var cpuProfileFile *os.File
+
 var userConfig *bbgo.Config
 
 var RootCmd = &cobra.Command{
@@ -32,7 +35,7 @@ var RootCmd = &cobra.Command{
 	SilenceUsage: true,
 
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		if err := cobraLoadDotenv(cmd, args) ; err != nil {
+		if err := cobraLoadDotenv(cmd, args); err != nil {
 			return err
 		}
 
@@ -53,7 +56,33 @@ var RootCmd = &cobra.Command{
 			}()
 		}
 
+		cpuProfile, err := cmd.Flags().GetString("cpu-profile")
+		if err != nil {
+			return err
+		}
+
+		if cpuProfile != "" {
+			log.Infof("starting cpu profiler...")
+
+			cpuProfileFile, err = os.Create(cpuProfile)
+			if err != nil {
+				log.Fatal("could not create CPU profile: ", err)
+			}
+
+			if err := pprof.StartCPUProfile(cpuProfileFile); err != nil {
+				log.Fatal("could not start CPU profile: ", err)
+			}
+		}
+
 		return cobraLoadConfig(cmd, args)
+	},
+	PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
+		pprof.StopCPUProfile()
+		if cpuProfileFile != nil {
+			return cpuProfileFile.Close() // error handling omitted for example
+		}
+
+		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return nil
@@ -139,6 +168,7 @@ func init() {
 	RootCmd.PersistentFlags().String("ftx-api-key", "", "ftx api key")
 	RootCmd.PersistentFlags().String("ftx-api-secret", "", "ftx api secret")
 	RootCmd.PersistentFlags().String("ftx-subaccount", "", "subaccount name. Specify it if the credential is for subaccount.")
+	RootCmd.PersistentFlags().String("cpu-profile", "", "cpu profile")
 
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 
