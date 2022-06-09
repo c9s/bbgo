@@ -16,15 +16,33 @@ exchangeStrategies:
 
     pivotLength: 120
 
-    entry:
-      quantity: 3000.0
-    #      marginOrderSideEffect: borrow
+    # breakLow settings are used for shorting when the current price break the previous low
+    breakLow:
+      ratio: 0.1%
+      quantity: 10.0
+      stopEMARange: 5%
+      stopEMA:
+        interval: 1h
+        window: 99
 
     exit:
-      takeProfitPercentage: 25%
-      stopLossPercentage: 1%
-      lowerShadowRatio: 0.95
-#      marginOrderSideEffect: repay
+      # roiStopLossPercentage is the stop loss percentage of the position ROI (currently the price change)
+      roiStopLossPercentage: 1%
+
+      # roiTakeProfitPercentage is the take profit percentage of the position ROI (currently the price change)
+      # force to take the profit ROI exceeded the percentage.
+      roiTakeProfitPercentage: 25%
+
+      # lowerShadowRatio is used to force taking profit when the (lower shadow height / low price) > lowerShadowRatio
+      # you can grab a simple stats by the following SQL:
+      # SELECT ((close - low) / close) AS shadow_ratio FROM binance_klines WHERE symbol = 'ETHUSDT' AND `interval` = '5m' AND start_time > '2022-01-01' ORDER BY shadow_ratio DESC LIMIT 20;
+      lowerShadowRatio: 3%
+
+      cumulatedVolume:
+        minVolume: 50_000
+        window: 5
+
+      marginOrderSideEffect: repay
 
 
 backtest:
