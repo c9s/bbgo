@@ -69,7 +69,7 @@ jobs:
       run: go test -race -coverprofile coverage_dnum.txt -covermode atomic -tags dnum ./pkg/...
 
     - name: Upload Coverage Report
-      uses: codecov/codecov-actions@v2
+      uses: codecov/codecov-action@v3
       with:
         files: ./coverage.txt,./coverage_dnum.txt
 
