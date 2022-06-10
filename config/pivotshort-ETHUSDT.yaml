@@ -16,9 +16,26 @@ exchangeStrategies:
 
     # breakLow settings are used for shorting when the current price break the previous low
     breakLow:
+      # ratio is how much the price breaks the previous low to trigger the short.
       ratio: 0.1%
+
+      # quantity is used for submitting the sell order
+      # if quantity is not set, all base balance will be used for selling the short.
       quantity: 10.0
-      stopEMARange: 5%
+
+      # marketOrder submits the market sell order when the closed price is lower than the previous pivot low.
+      marketOrder: true
+
+      # bounceRatio is used for calculating the price of the limit sell order.
+      # it's ratio of pivot low bounce when a new pivot low is detected.
+      # Sometimes when the price breaks the previous low, the price might be pulled back to a higher price.
+      # The bounceRatio is useful for such case, however, you might also miss the chance to short at the price if there is no pull back.
+      # Notice: When marketOrder is set, bounceRatio will not be used.
+      # bounceRatio: 0.1%
+
+      # stopEMARange is the price range we allow short.
+      # Short-allowed price range = [current price] > [EMA] * (1 - [stopEMARange])
+      stopEMARange: 0%
       stopEMA:
         interval: 1h
         window: 99
@@ -36,7 +53,7 @@ exchangeStrategies:
 
       # roiTakeProfitPercentage is used to force taking profit by percentage of the position ROI (currently the price change)
       # force to take the profit ROI exceeded the percentage.
-      roiTakeProfitPercentage: 25%
+      roiTakeProfitPercentage: 10%
 
       # roiMinTakeProfitPercentage applies to lowerShadowRatio and cumulatedVolume exit options
       roiMinTakeProfitPercentage: 10%
