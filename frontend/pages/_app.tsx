@@ -15,7 +15,6 @@ import CssBaseline from '@material-ui/core/CssBaseline';
 import theme from '../src/theme';
 import '../styles/globals.css'
 import {querySessions, querySyncStatus} from "../api/bbgo";
-import {Sync} from "@material-ui/icons";
 
 const SyncNotStarted = 0
 const Syncing = 1
