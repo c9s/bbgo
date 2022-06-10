@@ -67,6 +67,8 @@ type IntervalWindowSetting struct {
 // BreakLow -- when price breaks the previous pivot low, we set a trade entry
 type BreakLow struct {
 	Ratio        fixedpoint.Value      `json:"ratio"`
+	MarketOrder  bool                  `json:"marketOrder"`
+	BounceRatio  fixedpoint.Value      `json:"bounceRatio"`
 	Quantity     fixedpoint.Value      `json:"quantity"`
 	StopEMARange fixedpoint.Value      `json:"stopEMARange"`
 	StopEMA      *types.IntervalWindow `json:"stopEMA"`
@@ -156,7 +158,7 @@ func (s *Strategy) submitOrders(ctx context.Context, orderExecutor bbgo.OrderExe
 	s.tradeCollector.Process()
 }
 
-func (s *Strategy) placeMarketSell(ctx context.Context, orderExecutor bbgo.OrderExecutor, quantity fixedpoint.Value) {
+func (s *Strategy) useQuantityOrBaseBalance(quantity fixedpoint.Value) fixedpoint.Value {
 	if quantity.IsZero() {
 		if balance, ok := s.session.Account.Balance(s.Market.BaseCurrency); ok {
 			s.Notify("sell quantity is not set, submitting sell with all base balance: %s", balance.Available.String())
@@ -166,18 +168,30 @@ func (s *Strategy) placeMarketSell(ctx context.Context, orderExecutor bbgo.Order
 
 	if quantity.IsZero() {
 		log.Errorf("quantity is zero, can not submit sell order, please check settings")
-		return
 	}
 
-	submitOrder := types.SubmitOrder{
+	return quantity
+}
+
+func (s *Strategy) placeLimitSell(ctx context.Context, orderExecutor bbgo.OrderExecutor, price, quantity fixedpoint.Value) {
+	s.submitOrders(ctx, orderExecutor, types.SubmitOrder{
+		Symbol:           s.Symbol,
+		Price:            price,
+		Side:             types.SideTypeSell,
+		Type:             types.OrderTypeLimit,
+		Quantity:         quantity,
+		MarginSideEffect: types.SideEffectTypeMarginBuy,
+	})
+}
+
+func (s *Strategy) placeMarketSell(ctx context.Context, orderExecutor bbgo.OrderExecutor, quantity fixedpoint.Value) {
+	s.submitOrders(ctx, orderExecutor, types.SubmitOrder{
 		Symbol:           s.Symbol,
 		Side:             types.SideTypeSell,
 		Type:             types.OrderTypeMarket,
 		Quantity:         quantity,
 		MarginSideEffect: types.SideEffectTypeMarginBuy,
-	}
-
-	s.submitOrders(ctx, orderExecutor, submitOrder)
+	})
 }
 
 func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Value) error {
@@ -379,13 +393,18 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 
-		s.Notify("%s price %f breaks the previous low %f with ratio %f, submitting market sell to open a short position", s.Symbol, kline.Close.Float64(), previousLow.Float64(), s.BreakLow.Ratio.Float64())
-
 		if err := s.activeMakerOrders.GracefulCancel(ctx, s.session.Exchange); err != nil {
 			log.WithError(err).Errorf("graceful cancel order error")
 		}
 
-		s.placeMarketSell(ctx, orderExecutor, s.BreakLow.Quantity)
+		quantity := s.useQuantityOrBaseBalance(s.BreakLow.Quantity)
+		if s.BreakLow.MarketOrder {
+			s.Notify("%s price %f breaks the previous low %f with ratio %f, submitting market sell to open a short position", s.Symbol, kline.Close.Float64(), previousLow.Float64(), s.BreakLow.Ratio.Float64())
+			s.placeMarketSell(ctx, orderExecutor, quantity)
+		} else {
+			sellPrice := kline.Close.Mul(fixedpoint.One.Add(s.BreakLow.BounceRatio))
+			s.placeLimitSell(ctx, orderExecutor, sellPrice, quantity)
+		}
 	})
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
@@ -394,12 +413,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 
 		if s.pivot.LastLow() > 0.0 {
-			log.Infof("pivot low detected: %f %s", s.pivot.LastLow(), kline.EndTime.Time())
+			log.Debugf("pivot low detected: %f %s", s.pivot.LastLow(), kline.EndTime.Time())
 			lastLow := fixedpoint.NewFromFloat(s.pivot.LastLow())
-			if lastLow.Compare(s.lastLow) != 0 {
-				s.lastLow = lastLow
-				s.pivotLowPrices = append(s.pivotLowPrices, s.lastLow)
-			}
+			s.lastLow = lastLow
+			s.pivotLowPrices = append(s.pivotLowPrices, s.lastLow)
 		}
 	})
 
