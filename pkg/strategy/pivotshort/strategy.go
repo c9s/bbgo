@@ -109,14 +109,14 @@ type Strategy struct {
 	Environment *bbgo.Environment
 	Symbol      string `json:"symbol"`
 	Market      types.Market
-	Interval    types.Interval `json:"interval"`
+
+	// pivot interval and window
+	types.IntervalWindow
 
 	// persistence fields
 	Position    *types.Position    `json:"position,omitempty" persistence:"position"`
 	ProfitStats *types.ProfitStats `json:"profitStats,omitempty" persistence:"profit_stats"`
 	TradeStats  *TradeStats        `persistence:"trade_stats"`
-
-	PivotLength int `json:"pivotLength"`
 
 	BreakLow BreakLow `json:"breakLow"`
 	Entry    Entry    `json:"entry"`
@@ -279,9 +279,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 	s.tradeCollector.BindStream(session.UserDataStream)
 
-	iw := types.IntervalWindow{Window: s.PivotLength, Interval: s.Interval}
 	store, _ := session.MarketDataStore(s.Symbol)
-	s.pivot = &indicator.Pivot{IntervalWindow: iw}
+	s.pivot = &indicator.Pivot{IntervalWindow: s.IntervalWindow}
 	s.pivot.Bind(store)
 
 	standardIndicator, _ := session.StandardIndicatorSet(s.Symbol)
@@ -293,12 +292,16 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	session.UserDataStream.OnStart(func() {
 		if klines, ok := store.KLinesOfInterval(s.Interval); ok {
-			s.pivot.Update(*klines)
+			last := (*klines)[len(*klines)-1]
+			log.Debugf("updating pivot indicator: %d klines", len(*klines))
+			for i := s.pivot.Window; i < len(*klines); i++ {
+				s.pivot.Update((*klines)[0 : i+1])
+			}
 
-			log.Infof("found previous lows: %v", s.pivot.Lows)
-			log.Infof("found previous highs: %v", s.pivot.Highs)
+			log.Infof("current %s price: %f", s.Symbol, last.Close.Float64())
+			log.Infof("found %s previous lows: %v", s.Symbol, s.pivot.Lows)
+			log.Infof("found %s previous highs: %v", s.Symbol, s.pivot.Highs)
 		}
-
 		// s.placeBounceSellOrders(ctx, limitPrice, price, orderExecutor)
 	})
 
