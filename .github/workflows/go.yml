@@ -63,10 +63,15 @@ jobs:
       run: go build -v ./cmd/bbgo
 
     - name: Test
-      run: go test ./pkg/...
+      run: go test -race -coverprofile coverage.txt -covermode atomic ./pkg/...
 
     - name: TestDnum
-      run: go test -tags dnum ./pkg/...
+      run: go test -race -coverprofile coverage_dnum.txt -covermode atomic -tags dnum ./pkg/...
+
+    - name: Upload Coverage Report
+      uses: codecov/codecov-action@v3
+      with:
+        files: ./coverage.txt,./coverage_dnum.txt
 
     - name: Create dotenv file
       run: |
