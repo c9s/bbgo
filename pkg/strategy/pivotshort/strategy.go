@@ -130,7 +130,7 @@ type Strategy struct {
 
 	lastLow        fixedpoint.Value
 	pivot          *indicator.Pivot
-	ewma           *indicator.EWMA
+	stopEWMA       *indicator.EWMA
 	pivotLowPrices []fixedpoint.Value
 
 	// StrategyController
@@ -286,20 +286,20 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	standardIndicator, _ := session.StandardIndicatorSet(s.Symbol)
 	if s.BreakLow.StopEMA != nil {
-		s.ewma = standardIndicator.EWMA(*s.BreakLow.StopEMA)
+		s.stopEWMA = standardIndicator.EWMA(*s.BreakLow.StopEMA)
 	}
 
 	s.lastLow = fixedpoint.Zero
 
 	session.UserDataStream.OnStart(func() {
-		/*
-			if price, ok := session.LastPrice(s.Symbol); ok {
-				if limitPrice, ok := s.findHigherPivotLow(price); ok {
-					log.Infof("%s placing limit sell start from %f adds up to %f percent with %d layers of orders", s.Symbol, limitPrice.Float64(), s.Entry.CatBounceRatio.Mul(fixedpoint.NewFromInt(100)).Float64(), s.Entry.NumLayers)
-					s.placeBounceSellOrders(ctx, limitPrice, price, orderExecutor)
-				}
-			}
-		*/
+		if klines, ok := store.KLinesOfInterval(s.Interval); ok {
+			s.pivot.Update(*klines)
+
+			log.Infof("found previous lows: %v", s.pivot.Lows)
+			log.Infof("found previous highs: %v", s.pivot.Highs)
+		}
+
+		// s.placeBounceSellOrders(ctx, limitPrice, price, orderExecutor)
 	})
 
 	// Always check whether you can open a short position or not
@@ -370,8 +370,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			s.pivotLowPrices = s.pivotLowPrices[len(s.pivotLowPrices)-10:]
 		}
 
-		if s.ewma != nil && !s.BreakLow.StopEMARange.IsZero() {
-			ema := fixedpoint.NewFromFloat(s.ewma.Last())
+		if s.stopEWMA != nil && !s.BreakLow.StopEMARange.IsZero() {
+			ema := fixedpoint.NewFromFloat(s.stopEWMA.Last())
 			if ema.IsZero() {
 				return
 			}
