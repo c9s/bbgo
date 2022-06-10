@@ -14,7 +14,7 @@ exchangeStrategies:
     symbol: GMTUSDT
     interval: 5m
 
-    pivotLength: 120
+    window: 120
 
     # breakLow settings are used for shorting when the current price break the previous low
     breakLow:
@@ -33,13 +33,18 @@ exchangeStrategies:
       # force to take the profit ROI exceeded the percentage.
       roiTakeProfitPercentage: 25%
 
+      # roiMinTakeProfitPercentage applies to lowerShadowRatio and cumulatedVolume exit options
+      roiMinTakeProfitPercentage: 10%
+
       # lowerShadowRatio is used to force taking profit when the (lower shadow height / low price) > lowerShadowRatio
       # you can grab a simple stats by the following SQL:
       # SELECT ((close - low) / close) AS shadow_ratio FROM binance_klines WHERE symbol = 'ETHUSDT' AND `interval` = '5m' AND start_time > '2022-01-01' ORDER BY shadow_ratio DESC LIMIT 20;
       lowerShadowRatio: 3%
 
+      # cumulatedVolume is used to take profit when the cumulated quote volume from the klines exceeded a threshold
       cumulatedVolume:
-        minVolume: 50_000
+        enabled: false
+        minQuoteVolume: 90_000_000
         window: 5
 
       marginOrderSideEffect: repay

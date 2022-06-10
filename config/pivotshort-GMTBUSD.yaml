@@ -13,8 +13,7 @@ exchangeStrategies:
   pivotshort:
     symbol: GMTBUSD
     interval: 5m
-
-    pivotLength:  120
+    window:  120
 
     entry:
       immediate: true

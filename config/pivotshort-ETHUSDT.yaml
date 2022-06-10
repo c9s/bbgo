@@ -11,8 +11,12 @@ exchangeStrategies:
 - on: binance
   pivotshort:
     symbol: ETHUSDT
+
+    # interval is the main pivot interval
     interval: 5m
-    pivotLength: 200
+
+    # window is the main pivot window
+    window: 200
 
     # breakLow settings are used for shorting when the current price break the previous low
     breakLow:
@@ -53,7 +57,7 @@ exchangeStrategies:
 
       # roiTakeProfitPercentage is used to force taking profit by percentage of the position ROI (currently the price change)
       # force to take the profit ROI exceeded the percentage.
-      roiTakeProfitPercentage: 10%
+      roiTakeProfitPercentage: 25%
 
       # roiMinTakeProfitPercentage applies to lowerShadowRatio and cumulatedVolume exit options
       roiMinTakeProfitPercentage: 10%
