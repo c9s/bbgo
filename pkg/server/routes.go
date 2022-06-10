@@ -77,11 +77,13 @@ func (s *Server) newEngine() *gin.Engine {
 	})
 
 	r.POST("/api/environment/sync", func(c *gin.Context) {
-		go func() {
-			if err := s.Environ.Sync(context.Background()); err != nil {
-				logrus.WithError(err).Error("sync error")
-			}
-		}()
+		if s.Environ.IsSyncing() == bbgo.SyncDone {
+			go func() {
+				if err := s.Environ.Sync(context.Background()); err != nil {
+					logrus.WithError(err).Error("sync error")
+				}
+			}()
+		}
 
 		c.JSON(http.StatusOK, gin.H{
 			"success": true,
