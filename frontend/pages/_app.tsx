@@ -82,42 +82,38 @@ export default function MyApp(props) {
                 <CssBaseline/>
                 {
                     loading ? (syncing ? (
-                        <React.Fragment>
-                            <Dialog
-                                open={syncing}
-                                aria-labelledby="alert-dialog-title"
-                                aria-describedby="alert-dialog-description"
-                            >
-                                <DialogTitle id="alert-dialog-title">{"Syncing Trades"}</DialogTitle>
-                                <DialogContent>
-                                    <DialogContentText id="alert-dialog-description">
-                                        The environment is syncing trades from the exchange sessions.
-                                        Please wait a moment...
-                                    </DialogContentText>
-                                    <Box m={2}>
-                                        <LinearProgress/>
-                                    </Box>
-                                </DialogContent>
-                            </Dialog>
-                        </React.Fragment>
+                       <Dialog
+                           open={syncing}
+                           aria-labelledby="alert-dialog-title"
+                           aria-describedby="alert-dialog-description"
+                       >
+                           <DialogTitle id="alert-dialog-title">{"Syncing Trades"}</DialogTitle>
+                           <DialogContent>
+                               <DialogContentText id="alert-dialog-description">
+                                   The environment is syncing trades from the exchange sessions.
+                                   Please wait a moment...
+                               </DialogContentText>
+                               <Box m={2}>
+                                   <LinearProgress/>
+                               </Box>
+                           </DialogContent>
+                       </Dialog>
                     ) : (
-                        <React.Fragment>
-                            <Dialog
-                                open={loading}
-                                aria-labelledby="alert-dialog-title"
-                                aria-describedby="alert-dialog-description"
-                            >
-                                <DialogTitle id="alert-dialog-title">{"Loading"}</DialogTitle>
-                                <DialogContent>
-                                    <DialogContentText id="alert-dialog-description">
-                                        Loading...
-                                    </DialogContentText>
-                                    <Box m={2}>
-                                        <LinearProgress/>
-                                    </Box>
-                                </DialogContent>
-                            </Dialog>
-                        </React.Fragment>
+                         <Dialog
+                             open={loading}
+                             aria-labelledby="alert-dialog-title"
+                             aria-describedby="alert-dialog-description"
+                         >
+                             <DialogTitle id="alert-dialog-title">{"Loading"}</DialogTitle>
+                             <DialogContent>
+                                 <DialogContentText id="alert-dialog-description">
+                                     Loading...
+                                 </DialogContentText>
+                                 <Box m={2}>
+                                     <LinearProgress/>
+                                 </Box>
+                             </DialogContent>
+                         </Dialog>
                     )) : (
                         <Component {...pageProps}/>
                     )
