@@ -45,11 +45,19 @@ exchangeStrategies:
         window: 99
 
     bounceShort:
+      interval: 1h
+      window: 10
       quantity: 10.0
+      minDistance: 3%
       # stopLossPercentage: 1%
+
+      # ratio is the ratio of the resistance price,
+      # higher the ratio, lower the price
+      # first_layer_price = resistance_price * (1 - ratio)
+      # second_layer_price = (resistance_price * (1 - ratio)) * (1.0 + layerSpread)
+      ratio: 0.1%
       numOfLayers: 10
       layerSpread: 0.1%
-      pivotRatio: 0.1%
 
     exit:
       # roiStopLossPercentage is the stop loss percentage of the position ROI (currently the price change)
