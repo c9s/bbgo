@@ -6,6 +6,7 @@ A trading bot framework written in Go. The name bbgo comes from the BB8 bot in t
 
 [![Go](https://github.com/c9s/bbgo/actions/workflows/go.yml/badge.svg?branch=main)](https://github.com/c9s/bbgo/actions/workflows/go.yml)
 [![DockerHub](https://img.shields.io/docker/pulls/yoanlin/bbgo.svg)](https://hub.docker.com/r/yoanlin/bbgo)
+[![Coverage Status](http://codecov.io/github/c9s/bbgo/coverage.svg?branch=main)](http://codecov.io/github/c9s/bbgo?branch=main)
 <img alt="open collective badge" src="https://opencollective.com/bbgo/tiers/badge.svg">
 <img alt="open collective badge" src="https://opencollective.com/bbgo/tiers/backer/badge.svg?label=backer&color=brightgreen" />
 
