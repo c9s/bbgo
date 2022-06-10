@@ -48,7 +48,7 @@ type Server struct {
 	srv *http.Server
 }
 
-func (s *Server) newEngine() *gin.Engine {
+func (s *Server) newEngine(ctx context.Context) *gin.Engine {
 	r := gin.Default()
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"*"},
@@ -77,11 +77,15 @@ func (s *Server) newEngine() *gin.Engine {
 	})
 
 	r.POST("/api/environment/sync", func(c *gin.Context) {
-		go func() {
-			if err := s.Environ.Sync(context.Background()); err != nil {
-				logrus.WithError(err).Error("sync error")
-			}
-		}()
+		if s.Environ.IsSyncing() == bbgo.SyncDone {
+			go func() {
+				// We use the root context here because the syncing operation is a background goroutine.
+				// It should not be terminated if the request is disconnected.
+				if err := s.Environ.Sync(ctx); err != nil {
+					logrus.WithError(err).Error("sync error")
+				}
+			}()
+		}
 
 		c.JSON(http.StatusOK, gin.H{
 			"success": true,
@@ -249,7 +253,7 @@ func (s *Server) newEngine() *gin.Engine {
 }
 
 func (s *Server) RunWithListener(ctx context.Context, l net.Listener) error {
-	r := s.newEngine()
+	r := s.newEngine(ctx)
 	bind := l.Addr().String()
 
 	if s.OpenInBrowser {
@@ -261,7 +265,7 @@ func (s *Server) RunWithListener(ctx context.Context, l net.Listener) error {
 }
 
 func (s *Server) Run(ctx context.Context, bindArgs ...string) error {
-	r := s.newEngine()
+	r := s.newEngine(ctx)
 	bind := resolveBind(bindArgs)
 	if s.OpenInBrowser {
 		openBrowser(ctx, bind)
