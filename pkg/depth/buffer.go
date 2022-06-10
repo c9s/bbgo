@@ -133,15 +133,14 @@ func (b *Buffer) AddUpdate(o types.SliceOrderBook, firstUpdateID int64, finalArg
 }
 
 func (b *Buffer) fetchAndPush() error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	book, finalUpdateID, err := b.fetcher()
 	if err != nil {
 		return err
 	}
 
 	log.Debugf("fetched depth snapshot, final update id %d", finalUpdateID)
-
-	b.mu.Lock()
-	defer b.mu.Unlock()
 
 	if len(b.buffer) > 0 {
 		// the snapshot is too early

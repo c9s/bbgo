@@ -1,6 +1,7 @@
 package util
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -10,14 +11,19 @@ import (
 func TestReonce_DoAndReset(t *testing.T) {
 	var cnt = 0
 	var reonce Reonce
+	var wgAll, wg sync.WaitGroup
+	wg.Add(1)
+	wgAll.Add(2)
 	go reonce.Do(func() {
 		t.Log("once #1")
 		time.Sleep(10 * time.Millisecond)
 		cnt++
+		wg.Done()
+		wgAll.Done()
 	})
 
 	// make sure it's locked
-	time.Sleep(10 * time.Millisecond)
+	wg.Wait()
 	t.Logf("reset")
 	reonce.Reset()
 
@@ -25,8 +31,9 @@ func TestReonce_DoAndReset(t *testing.T) {
 		t.Log("once #2")
 		time.Sleep(10 * time.Millisecond)
 		cnt++
+		wgAll.Done()
 	})
 
-	time.Sleep(time.Second)
+	wgAll.Wait()
 	assert.Equal(t, 2, cnt)
 }
