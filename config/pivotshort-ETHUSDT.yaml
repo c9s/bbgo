@@ -45,6 +45,7 @@ exchangeStrategies:
         window: 99
 
     bounceShort:
+      enabled: false
       interval: 1h
       window: 10
       quantity: 10.0
