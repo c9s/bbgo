@@ -54,18 +54,18 @@ exchangeStrategies:
       # ratio is the ratio of the resistance price,
       # higher the ratio, lower the price
       # first_layer_price = resistance_price * (1 - ratio)
-      # second_layer_price = (resistance_price * (1 - ratio)) * (1.0 + layerSpread)
-      ratio: 0.1%
-      numOfLayers: 10
+      # second_layer_price = (resistance_price * (1 - ratio)) * (2 * layerSpread)
+      ratio: 0%
+      numOfLayers: 1
       layerSpread: 0.1%
 
     exit:
       # roiStopLossPercentage is the stop loss percentage of the position ROI (currently the price change)
-      roiStopLossPercentage: 1%
+      roiStopLossPercentage: 2%
 
       # roiTakeProfitPercentage is used to force taking profit by percentage of the position ROI (currently the price change)
       # force to take the profit ROI exceeded the percentage.
-      roiTakeProfitPercentage: 25%
+      roiTakeProfitPercentage: 30%
 
       # roiMinTakeProfitPercentage applies to lowerShadowRatio and cumulatedVolume exit options
       roiMinTakeProfitPercentage: 10%
