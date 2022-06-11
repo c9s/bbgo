@@ -201,11 +201,15 @@ func (m *SimplePriceMatching) executeTrade(trade types.Trade) {
 	var err error
 	// execute trade, update account balances
 	if trade.IsBuyer {
-		err = m.Account.UseLockedBalance(m.Market.QuoteCurrency, trade.Price.Mul(trade.Quantity))
-		m.Account.AddBalance(m.Market.BaseCurrency, trade.Quantity.Sub(trade.Fee.Div(trade.Price)))
+		err = m.Account.UseLockedBalance(m.Market.QuoteCurrency, trade.QuoteQuantity)
+
+		// here the fee currency is the base currency
+		m.Account.AddBalance(m.Market.BaseCurrency, trade.Quantity.Sub(trade.Fee))
 	} else {
 		err = m.Account.UseLockedBalance(m.Market.BaseCurrency, trade.Quantity)
-		m.Account.AddBalance(m.Market.QuoteCurrency, trade.Quantity.Mul(trade.Price).Sub(trade.Fee))
+
+		// here the fee currency is the quote currency
+		m.Account.AddBalance(m.Market.QuoteCurrency, trade.QuoteQuantity.Sub(trade.Fee))
 	}
 
 	if err != nil {
@@ -237,6 +241,7 @@ func (m *SimplePriceMatching) newTradeFromOrder(order *types.Order, isMaker bool
 		price = m.LastPrice
 	}
 
+	var quoteQuantity = order.Quantity.Mul(price)
 	var fee fixedpoint.Value
 	var feeCurrency string
 
@@ -247,7 +252,7 @@ func (m *SimplePriceMatching) newTradeFromOrder(order *types.Order, isMaker bool
 		feeCurrency = m.Market.BaseCurrency
 
 	case types.SideTypeSell:
-		fee = order.Quantity.Mul(price).Mul(feeRate)
+		fee = quoteQuantity.Mul(feeRate)
 		feeCurrency = m.Market.QuoteCurrency
 
 	}
@@ -262,7 +267,7 @@ func (m *SimplePriceMatching) newTradeFromOrder(order *types.Order, isMaker bool
 		Exchange:      "backtest",
 		Price:         price,
 		Quantity:      order.Quantity,
-		QuoteQuantity: order.Quantity.Mul(price),
+		QuoteQuantity: quoteQuantity,
 		Symbol:        order.Symbol,
 		Side:          order.Side,
 		IsBuyer:       order.Side == types.SideTypeBuy,
