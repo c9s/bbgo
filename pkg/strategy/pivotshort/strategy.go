@@ -76,6 +76,8 @@ type BreakLow struct {
 }
 
 type BounceShort struct {
+	Enabled bool `json:"enabled"`
+
 	types.IntervalWindow
 
 	MinDistance fixedpoint.Value `json:"minDistance"`
@@ -163,7 +165,7 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: types.Interval1m})
 
-	if s.BounceShort != nil {
+	if s.BounceShort != nil && s.BounceShort.Enabled {
 		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.BounceShort.Interval})
 	}
 }
@@ -305,7 +307,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.pivot = &indicator.Pivot{IntervalWindow: s.IntervalWindow}
 	s.pivot.Bind(store)
 
-	if s.BounceShort != nil {
+	if s.BounceShort != nil && s.BounceShort.Enabled {
 		s.resistancePivot = &indicator.Pivot{IntervalWindow: s.BounceShort.IntervalWindow}
 		s.resistancePivot.Bind(store)
 	}
@@ -328,22 +330,24 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 
-		lows := s.resistancePivot.Lows
-		minDistance := s.BounceShort.MinDistance.Float64()
-		closePrice := lastKLine.Close.Float64()
-		s.resistancePrices = findPossibleResistancePrices(closePrice, minDistance, lows)
-		log.Infof("last price: %f, possible resistance prices: %+v", closePrice, s.resistancePrices)
+		if s.resistancePivot != nil {
+			lows := s.resistancePivot.Lows
+			minDistance := s.BounceShort.MinDistance.Float64()
+			closePrice := lastKLine.Close.Float64()
+			s.resistancePrices = findPossibleResistancePrices(closePrice, minDistance, lows)
+			log.Infof("last price: %f, possible resistance prices: %+v", closePrice, s.resistancePrices)
 
-		if len(s.resistancePrices) > 0 {
-			resistancePrice := fixedpoint.NewFromFloat(s.resistancePrices[0])
-			if resistancePrice.Compare(s.currentBounceShortPrice) != 0 {
-				log.Infof("updating resistance price... possible resistance prices: %+v", s.resistancePrices)
+			if len(s.resistancePrices) > 0 {
+				resistancePrice := fixedpoint.NewFromFloat(s.resistancePrices[0])
+				if resistancePrice.Compare(s.currentBounceShortPrice) != 0 {
+					log.Infof("updating resistance price... possible resistance prices: %+v", s.resistancePrices)
 
-				if err := s.activeMakerOrders.GracefulCancel(ctx, s.session.Exchange); err != nil {
-					log.WithError(err).Errorf("graceful cancel order error")
+					if err := s.activeMakerOrders.GracefulCancel(ctx, s.session.Exchange); err != nil {
+						log.WithError(err).Errorf("graceful cancel order error")
+					}
+					s.currentBounceShortPrice = resistancePrice
+					s.placeBounceSellOrders(ctx, s.currentBounceShortPrice, orderExecutor)
 				}
-				s.currentBounceShortPrice = resistancePrice
-				s.placeBounceSellOrders(ctx, s.currentBounceShortPrice, orderExecutor)
 			}
 		}
 	})
@@ -430,7 +434,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		ratio := fixedpoint.One.Sub(s.BreakLow.Ratio)
 		breakPrice := previousLow.Mul(ratio)
-		if kline.Close.Compare(breakPrice) > 0 {
+
+		// if previous low is not break, skip
+		if kline.Close.Compare(breakPrice) >= 0 {
 			return
 		}
 
@@ -454,7 +460,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
-		if s.BounceShort == nil {
+		if s.BounceShort == nil || !s.BounceShort.Enabled {
 			return
 		}
 
@@ -462,10 +468,25 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 
-		closePrice := kline.Close.Float64()
-		minDistance := s.BounceShort.MinDistance.Float64()
-		lows := s.resistancePivot.Lows
-		s.resistancePrices = findPossibleResistancePrices(closePrice, minDistance, lows)
+		if s.resistancePivot != nil {
+			closePrice := kline.Close.Float64()
+			minDistance := s.BounceShort.MinDistance.Float64()
+			lows := s.resistancePivot.Lows
+			s.resistancePrices = findPossibleResistancePrices(closePrice, minDistance, lows)
+
+			if len(s.resistancePrices) > 0 {
+				resistancePrice := fixedpoint.NewFromFloat(s.resistancePrices[0])
+				if resistancePrice.Compare(s.currentBounceShortPrice) != 0 {
+					log.Infof("updating resistance price... possible resistance prices: %+v", s.resistancePrices)
+
+					if err := s.activeMakerOrders.GracefulCancel(ctx, s.session.Exchange); err != nil {
+						log.WithError(err).Errorf("graceful cancel order error")
+					}
+					s.currentBounceShortPrice = resistancePrice
+					s.placeBounceSellOrders(ctx, s.currentBounceShortPrice, orderExecutor)
+				}
+			}
+		}
 	})
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
@@ -474,8 +495,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 
 		if s.pivot.LastLow() > 0.0 {
-			log.Debugf("pivot low detected: %f %s", s.pivot.LastLow(), kline.EndTime.Time())
 			lastLow := fixedpoint.NewFromFloat(s.pivot.LastLow())
+			if lastLow.Compare(s.lastLow) != 0 {
+				log.Infof("new pivot low detected: %f %s", s.pivot.LastLow(), kline.EndTime.Time())
+			}
+
 			s.lastLow = lastLow
 			s.pivotLowPrices = append(s.pivotLowPrices, s.lastLow)
 		}
