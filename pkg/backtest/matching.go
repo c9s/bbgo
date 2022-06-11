@@ -27,6 +27,11 @@ func incTradeID() uint64 {
 
 var klineMatchingLogger *logrus.Entry = nil
 
+// FeeToken is used to simulate the exchange platform fee token
+// This is to ease the back-testing environment for closing positions.
+const FeeToken = "FEE"
+var useFeeToken = true
+
 func init() {
 	logger := logrus.New()
 	if v, ok := util.GetEnvVarBool("DEBUG_MATCHING"); ok && v {
@@ -35,6 +40,10 @@ func init() {
 		logger.SetLevel(logrus.ErrorLevel)
 	}
 	klineMatchingLogger = logger.WithField("backtest", "klineEngine")
+
+	if v, ok := util.GetEnvVarBool("BACKTEST_USE_FEE_TOKEN"); ok {
+		useFeeToken = v
+	}
 }
 
 // SimplePriceMatching implements a simple kline data driven matching engine for backtest
@@ -204,12 +213,21 @@ func (m *SimplePriceMatching) executeTrade(trade types.Trade) {
 		err = m.Account.UseLockedBalance(m.Market.QuoteCurrency, trade.QuoteQuantity)
 
 		// here the fee currency is the base currency
-		m.Account.AddBalance(m.Market.BaseCurrency, trade.Quantity.Sub(trade.Fee))
+		q := trade.Quantity
+		if trade.FeeCurrency == m.Market.BaseCurrency {
+			q = q.Sub(trade.Fee)
+		}
+
+		m.Account.AddBalance(m.Market.BaseCurrency, q)
 	} else {
 		err = m.Account.UseLockedBalance(m.Market.BaseCurrency, trade.Quantity)
 
 		// here the fee currency is the quote currency
-		m.Account.AddBalance(m.Market.QuoteCurrency, trade.QuoteQuantity.Sub(trade.Fee))
+		qq := trade.QuoteQuantity
+		if trade.FeeCurrency == m.Market.QuoteCurrency {
+			qq = qq.Sub(trade.Fee)
+		}
+		m.Account.AddBalance(m.Market.QuoteCurrency, qq)
 	}
 
 	if err != nil {
@@ -245,16 +263,21 @@ func (m *SimplePriceMatching) newTradeFromOrder(order *types.Order, isMaker bool
 	var fee fixedpoint.Value
 	var feeCurrency string
 
-	switch order.Side {
-
-	case types.SideTypeBuy:
-		fee = order.Quantity.Mul(feeRate)
-		feeCurrency = m.Market.BaseCurrency
-
-	case types.SideTypeSell:
+	if useFeeToken {
+		feeCurrency = FeeToken
 		fee = quoteQuantity.Mul(feeRate)
-		feeCurrency = m.Market.QuoteCurrency
+	} else {
+		switch order.Side {
 
+		case types.SideTypeBuy:
+			fee = order.Quantity.Mul(feeRate)
+			feeCurrency = m.Market.BaseCurrency
+
+		case types.SideTypeSell:
+			fee = quoteQuantity.Mul(feeRate)
+			feeCurrency = m.Market.QuoteCurrency
+
+		}
 	}
 
 	// update order time
