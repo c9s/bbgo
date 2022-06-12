@@ -145,7 +145,12 @@ func (a *Account) UseLockedBalance(currency string, fund fixedpoint.Value) error
 	defer a.Unlock()
 
 	balance, ok := a.balances[currency]
-	if ok && balance.Locked.Compare(fund) >= 0 {
+	if !ok {
+		return fmt.Errorf("account balance %s does not exist", currency)
+	}
+
+	// simple case, using fund less than locked
+	if balance.Locked.Compare(fund) >= 0 {
 		balance.Locked = balance.Locked.Sub(fund)
 		a.balances[currency] = balance
 		return nil
