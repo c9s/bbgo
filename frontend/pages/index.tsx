@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/router';
 
-import { makeStyles } from '@mui/material/styles';
+import { makeStyles } from '@mui/styles';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
@@ -19,6 +19,14 @@ import DashboardLayout from '../layouts/DashboardLayout';
 import { queryAssets, querySessions } from '../api/bbgo';
 
 import { ChainId, Config, DAppProvider } from '@usedapp/core';
+import { Theme } from '@mui/material/styles';
+
+// fix the `theme.spacing` missing error
+// https://stackoverflow.com/a/70707121/3897950
+declare module '@mui/styles/defaultTheme' {
+  // eslint-disable-next-line @typescript-eslint/no-empty-interface (remove this line if you don't have the rule enabled)
+  interface DefaultTheme extends Theme {}
+}
 
 const useStyles = makeStyles((theme) => ({
   totalAssetsSummary: {

@@ -8,7 +8,7 @@ import ListItemText from '@mui/material/ListItemText';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import PowerIcon from '@mui/icons-material/Power';
 
-import { makeStyles } from '@mui/material/styles';
+import { makeStyles } from '@mui/styles';
 import { querySessions } from '../api/bbgo';
 
 const useStyles = makeStyles((theme) => ({

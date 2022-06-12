@@ -5,7 +5,7 @@ import { queryAssets } from '../api/bbgo';
 import { currencyColor } from '../src/utils';
 import CardContent from '@mui/material/CardContent';
 import Card from '@mui/material/Card';
-import { makeStyles } from '@mui/material/styles';
+import { makeStyles } from '@mui/styles';
 
 function reduceAssetsBy(assets, field, minimum) {
   let as = [];

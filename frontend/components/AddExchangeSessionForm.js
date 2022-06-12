@@ -22,7 +22,7 @@ import Visibility from '@mui/icons-material/Visibility';
 
 import { addSession, testSessionConnection } from '../api/bbgo';
 
-import { makeStyles } from '@mui/material/styles';
+import { makeStyles } from '@mui/styles';
 
 const useStyles = makeStyles((theme) => ({
   formControl: {

@@ -15,7 +15,7 @@ import Alert from '@mui/lab/Alert';
 
 import { configureDatabase, testDatabaseConnection } from '../api/bbgo';
 
-import { makeStyles } from '@mui/material/styles';
+import { makeStyles } from '@mui/styles';
 
 const useStyles = makeStyles((theme) => ({
   formControl: {

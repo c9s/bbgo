@@ -4,7 +4,7 @@ import Tab from '@mui/material/Tab';
 import React, { useEffect, useState } from 'react';
 import { querySessions } from '../api/bbgo';
 import Typography from '@mui/material/Typography';
-import { makeStyles } from '@mui/material/styles';
+import { makeStyles } from '@mui/styles';
 
 const useStyles = makeStyles((theme) => ({
   paper: {
