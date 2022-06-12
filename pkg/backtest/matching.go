@@ -27,6 +27,11 @@ func incTradeID() uint64 {
 
 var klineMatchingLogger *logrus.Entry = nil
 
+// FeeToken is used to simulate the exchange platform fee token
+// This is to ease the back-testing environment for closing positions.
+const FeeToken = "FEE"
+var useFeeToken = true
+
 func init() {
 	logger := logrus.New()
 	if v, ok := util.GetEnvVarBool("DEBUG_MATCHING"); ok && v {
@@ -35,6 +40,10 @@ func init() {
 		logger.SetLevel(logrus.ErrorLevel)
 	}
 	klineMatchingLogger = logger.WithField("backtest", "klineEngine")
+
+	if v, ok := util.GetEnvVarBool("BACKTEST_USE_FEE_TOKEN"); ok {
+		useFeeToken = v
+	}
 }
 
 // SimplePriceMatching implements a simple kline data driven matching engine for backtest
@@ -201,11 +210,24 @@ func (m *SimplePriceMatching) executeTrade(trade types.Trade) {
 	var err error
 	// execute trade, update account balances
 	if trade.IsBuyer {
-		err = m.Account.UseLockedBalance(m.Market.QuoteCurrency, trade.Price.Mul(trade.Quantity))
-		m.Account.AddBalance(m.Market.BaseCurrency, trade.Quantity.Sub(trade.Fee.Div(trade.Price)))
+		err = m.Account.UseLockedBalance(m.Market.QuoteCurrency, trade.QuoteQuantity)
+
+		// here the fee currency is the base currency
+		q := trade.Quantity
+		if trade.FeeCurrency == m.Market.BaseCurrency {
+			q = q.Sub(trade.Fee)
+		}
+
+		m.Account.AddBalance(m.Market.BaseCurrency, q)
 	} else {
 		err = m.Account.UseLockedBalance(m.Market.BaseCurrency, trade.Quantity)
-		m.Account.AddBalance(m.Market.QuoteCurrency, trade.Quantity.Mul(trade.Price).Sub(trade.Fee))
+
+		// here the fee currency is the quote currency
+		qq := trade.QuoteQuantity
+		if trade.FeeCurrency == m.Market.QuoteCurrency {
+			qq = qq.Sub(trade.Fee)
+		}
+		m.Account.AddBalance(m.Market.QuoteCurrency, qq)
 	}
 
 	if err != nil {
@@ -237,19 +259,25 @@ func (m *SimplePriceMatching) newTradeFromOrder(order *types.Order, isMaker bool
 		price = m.LastPrice
 	}
 
+	var quoteQuantity = order.Quantity.Mul(price)
 	var fee fixedpoint.Value
 	var feeCurrency string
 
-	switch order.Side {
+	if useFeeToken {
+		feeCurrency = FeeToken
+		fee = quoteQuantity.Mul(feeRate)
+	} else {
+		switch order.Side {
 
-	case types.SideTypeBuy:
-		fee = order.Quantity.Mul(feeRate)
-		feeCurrency = m.Market.BaseCurrency
+		case types.SideTypeBuy:
+			fee = order.Quantity.Mul(feeRate)
+			feeCurrency = m.Market.BaseCurrency
 
-	case types.SideTypeSell:
-		fee = order.Quantity.Mul(price).Mul(feeRate)
-		feeCurrency = m.Market.QuoteCurrency
+		case types.SideTypeSell:
+			fee = quoteQuantity.Mul(feeRate)
+			feeCurrency = m.Market.QuoteCurrency
 
+		}
 	}
 
 	// update order time
@@ -262,7 +290,7 @@ func (m *SimplePriceMatching) newTradeFromOrder(order *types.Order, isMaker bool
 		Exchange:      "backtest",
 		Price:         price,
 		Quantity:      order.Quantity,
-		QuoteQuantity: order.Quantity.Mul(price),
+		QuoteQuantity: quoteQuantity,
 		Symbol:        order.Symbol,
 		Side:          order.Side,
 		IsBuyer:       order.Side == types.SideTypeBuy,

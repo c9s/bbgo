@@ -5,11 +5,11 @@ package indicator
 import ()
 
 func (inc *Pivot) OnUpdate(cb func(valueLow float64, valueHigh float64)) {
-	inc.UpdateCallbacks = append(inc.UpdateCallbacks, cb)
+	inc.updateCallbacks = append(inc.updateCallbacks, cb)
 }
 
 func (inc *Pivot) EmitUpdate(valueLow float64, valueHigh float64) {
-	for _, cb := range inc.UpdateCallbacks {
+	for _, cb := range inc.updateCallbacks {
 		cb(valueLow, valueHigh)
 	}
 }

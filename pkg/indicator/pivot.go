@@ -21,7 +21,7 @@ type Pivot struct {
 
 	EndTime time.Time
 
-	UpdateCallbacks []func(valueLow, valueHigh float64)
+	updateCallbacks []func(valueLow, valueHigh float64)
 }
 
 func (inc *Pivot) LastLow() float64 {
@@ -38,7 +38,7 @@ func (inc *Pivot) LastHigh() float64 {
 	return inc.Highs[len(inc.Highs)-1]
 }
 
-func (inc *Pivot) calculateAndUpdate(klines []types.KLine) {
+func (inc *Pivot) Update(klines []types.KLine) {
 	if len(klines) < inc.Window {
 		return
 	}
@@ -59,8 +59,12 @@ func (inc *Pivot) calculateAndUpdate(klines []types.KLine) {
 		return
 	}
 
-	inc.Lows.Push(l)
-	inc.Highs.Push(h)
+	if l > 0.0 {
+		inc.Lows.Push(l)
+	}
+	if h > 0.0 {
+		inc.Highs.Push(h)
+	}
 
 	if len(inc.Lows) > MaxNumOfVOL {
 		inc.Lows = inc.Lows[MaxNumOfVOLTruncateSize-1:]
@@ -80,7 +84,7 @@ func (inc *Pivot) handleKLineWindowUpdate(interval types.Interval, window types.
 		return
 	}
 
-	inc.calculateAndUpdate(window)
+	inc.Update(window)
 }
 
 func (inc *Pivot) Bind(updater KLineWindowUpdater) {
