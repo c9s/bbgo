@@ -6,7 +6,7 @@ import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemText from '@mui/material/ListItemText';
 import ListItemIcon from '@mui/material/ListItemIcon';
-import PowerIcon from '@mui/icons/Power';
+import PowerIcon from '@mui/icons-material/Power';
 
 import { makeStyles } from '@mui/material/styles';
 import { querySessions } from '../api/bbgo';

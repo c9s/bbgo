@@ -10,7 +10,7 @@ import Popper from '@mui/material/Popper';
 import MenuItem from '@mui/material/MenuItem';
 import MenuList from '@mui/material/MenuList';
 import ListItemText from '@mui/material/ListItemText';
-import PersonIcon from '@mui/icons/Person';
+import PersonIcon from '@mui/icons-material/Person';
 
 import { useEtherBalance, useTokenBalance, useEthers } from '@usedapp/core';
 import { formatEther } from '@ethersproject/units';
