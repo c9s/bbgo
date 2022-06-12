@@ -1,20 +1,20 @@
 import React from 'react';
-import Grid from '@mui/core/Grid';
-import Box from '@mui/core/Box';
-import Button from '@mui/core/Button';
-import Typography from '@mui/core/Typography';
-import TextField from '@mui/core/TextField';
-import FormControlLabel from '@mui/core/FormControlLabel';
-import FormHelperText from '@mui/core/FormHelperText';
-import InputLabel from '@mui/core/InputLabel';
-import FormControl from '@mui/core/FormControl';
-import InputAdornment from '@mui/core/InputAdornment';
-import IconButton from '@mui/core/IconButton';
+import Grid from '@mui/material/Grid';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Typography from '@mui/material/Typography';
+import TextField from '@mui/material/TextField';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import FormHelperText from '@mui/material/FormHelperText';
+import InputLabel from '@mui/material/InputLabel';
+import FormControl from '@mui/material/FormControl';
+import InputAdornment from '@mui/material/InputAdornment';
+import IconButton from '@mui/material/IconButton';
 
-import Checkbox from '@mui/core/Checkbox';
-import Select from '@mui/core/Select';
-import MenuItem from '@mui/core/MenuItem';
-import FilledInput from '@mui/core/FilledInput';
+import Checkbox from '@mui/material/Checkbox';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
+import FilledInput from '@mui/material/FilledInput';
 
 import Alert from '@mui/lab/Alert';
 import VisibilityOff from '@mui/icons/VisibilityOff';
@@ -22,7 +22,7 @@ import Visibility from '@mui/icons/Visibility';
 
 import { addSession, testSessionConnection } from '../api/bbgo';
 
-import { makeStyles } from '@mui/core/styles';
+import { makeStyles } from '@mui/material/styles';
 
 const useStyles = makeStyles((theme) => ({
   formControl: {

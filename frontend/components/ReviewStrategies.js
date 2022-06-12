@@ -1,21 +1,21 @@
 import React from 'react';
-import Button from '@mui/core/Button';
-import Typography from '@mui/core/Typography';
-import List from '@mui/core/List';
-import Card from '@mui/core/Card';
-import CardHeader from '@mui/core/CardHeader';
-import CardContent from '@mui/core/CardContent';
-import Avatar from '@mui/core/Avatar';
-import IconButton from '@mui/core/IconButton';
+import Button from '@mui/material/Button';
+import Typography from '@mui/material/Typography';
+import List from '@mui/material/List';
+import Card from '@mui/material/Card';
+import CardHeader from '@mui/material/CardHeader';
+import CardContent from '@mui/material/CardContent';
+import Avatar from '@mui/material/Avatar';
+import IconButton from '@mui/material/IconButton';
 import MoreVertIcon from '@mui/icons/MoreVert';
-import Table from '@mui/core/Table';
-import TableBody from '@mui/core/TableBody';
-import TableCell from '@mui/core/TableCell';
-import TableContainer from '@mui/core/TableContainer';
-import TableHead from '@mui/core/TableHead';
-import TableRow from '@mui/core/TableRow';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
 
-import { makeStyles } from '@mui/core/styles';
+import { makeStyles } from '@mui/material/styles';
 import { queryStrategies } from '../api/bbgo';
 
 const useStyles = makeStyles((theme) => ({

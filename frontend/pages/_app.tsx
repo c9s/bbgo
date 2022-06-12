@@ -2,16 +2,16 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import Head from 'next/head';
 
-import { ThemeProvider } from '@mui/core/styles';
+import { ThemeProvider } from '@mui/material/styles';
 
-import Dialog from '@mui/core/Dialog';
-import DialogContent from '@mui/core/DialogContent';
-import DialogContentText from '@mui/core/DialogContentText';
-import DialogTitle from '@mui/core/DialogTitle';
-import LinearProgress from '@mui/core/LinearProgress';
-import Box from '@mui/core/Box';
+import Dialog from '@mui/material/Dialog';
+import DialogContent from '@mui/material/DialogContent';
+import DialogContentText from '@mui/material/DialogContentText';
+import DialogTitle from '@mui/material/DialogTitle';
+import LinearProgress from '@mui/material/LinearProgress';
+import Box from '@mui/material/Box';
 
-import CssBaseline from '@mui/core/CssBaseline';
+import CssBaseline from '@mui/material/CssBaseline';
 import theme from '../src/theme';
 import '../styles/globals.css';
 import { querySessions, querySyncStatus } from '../api/bbgo';

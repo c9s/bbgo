@@ -1,10 +1,10 @@
 import React from 'react';
 
-import { makeStyles } from '@mui/core/styles';
-import AppBar from '@mui/core/AppBar';
-import Toolbar from '@mui/core/Toolbar';
-import Typography from '@mui/core/Typography';
-import Container from '@mui/core/Container';
+import { makeStyles } from '@mui/material/styles';
+import AppBar from '@mui/material/AppBar';
+import Toolbar from '@mui/material/Toolbar';
+import Typography from '@mui/material/Typography';
+import Container from '@mui/material/Container';
 
 import SideBar from '../components/SideBar';
 

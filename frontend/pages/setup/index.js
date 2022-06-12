@@ -1,12 +1,12 @@
 import React from 'react';
 
-import { makeStyles } from '@mui/core/styles';
-import Typography from '@mui/core/Typography';
-import Box from '@mui/core/Box';
-import Paper from '@mui/core/Paper';
-import Stepper from '@mui/core/Stepper';
-import Step from '@mui/core/Step';
-import StepLabel from '@mui/core/StepLabel';
+import { makeStyles } from '@mui/material/styles';
+import Typography from '@mui/material/Typography';
+import Box from '@mui/material/Box';
+import Paper from '@mui/material/Paper';
+import Stepper from '@mui/material/Stepper';
+import Step from '@mui/material/Step';
+import StepLabel from '@mui/material/StepLabel';
 
 import ConfigureDatabaseForm from '../../components/ConfigureDatabaseForm';
 import AddExchangeSessionForm from '../../components/AddExchangeSessionForm';

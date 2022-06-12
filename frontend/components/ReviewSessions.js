@@ -1,14 +1,14 @@
 import React from 'react';
-import Grid from '@mui/core/Grid';
-import Button from '@mui/core/Button';
-import Typography from '@mui/core/Typography';
-import List from '@mui/core/List';
-import ListItem from '@mui/core/ListItem';
-import ListItemText from '@mui/core/ListItemText';
-import ListItemIcon from '@mui/core/ListItemIcon';
+import Grid from '@mui/material/Grid';
+import Button from '@mui/material/Button';
+import Typography from '@mui/material/Typography';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemText from '@mui/material/ListItemText';
+import ListItemIcon from '@mui/material/ListItemIcon';
 import PowerIcon from '@mui/icons/Power';
 
-import { makeStyles } from '@mui/core/styles';
+import { makeStyles } from '@mui/material/styles';
 import { querySessions } from '../api/bbgo';
 
 const useStyles = makeStyles((theme) => ({

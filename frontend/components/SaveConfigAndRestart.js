@@ -1,13 +1,13 @@
 import React from 'react';
 import { useRouter } from 'next/router';
 
-import Button from '@mui/core/Button';
-import Typography from '@mui/core/Typography';
+import Button from '@mui/material/Button';
+import Typography from '@mui/material/Typography';
 
-import { makeStyles } from '@mui/core/styles';
+import { makeStyles } from '@mui/material/styles';
 
 import { ping, saveConfig, setupRestart } from '../api/bbgo';
-import Box from '@mui/core/Box';
+import Box from '@mui/material/Box';
 import Alert from '@mui/lab/Alert';
 
 const useStyles = makeStyles((theme) => ({

@@ -1,12 +1,12 @@
 import React from 'react';
-import CardContent from '@mui/core/CardContent';
-import Card from '@mui/core/Card';
-import { makeStyles } from '@mui/core/styles';
-import List from '@mui/core/List';
-import ListItem from '@mui/core/ListItem';
-import ListItemText from '@mui/core/ListItemText';
-import ListItemAvatar from '@mui/core/ListItemAvatar';
-import Avatar from '@mui/core/Avatar';
+import CardContent from '@mui/material/CardContent';
+import Card from '@mui/material/Card';
+import { makeStyles } from '@mui/material/styles';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemText from '@mui/material/ListItemText';
+import ListItemAvatar from '@mui/material/ListItemAvatar';
+import Avatar from '@mui/material/Avatar';
 
 const useStyles = makeStyles((theme) => ({
   root: {
