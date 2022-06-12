@@ -1,15 +1,15 @@
 import React from 'react';
 
-import { makeStyles } from '@mui/core/styles';
+import { makeStyles } from '@mui/material/styles';
 
-import Button from '@mui/core/Button';
-import ClickAwayListener from '@mui/core/ClickAwayListener';
-import Grow from '@mui/core/Grow';
-import Paper from '@mui/core/Paper';
-import Popper from '@mui/core/Popper';
-import MenuItem from '@mui/core/MenuItem';
-import MenuList from '@mui/core/MenuList';
-import ListItemText from '@mui/core/ListItemText';
+import Button from '@mui/material/Button';
+import ClickAwayListener from '@mui/material/ClickAwayListener';
+import Grow from '@mui/material/Grow';
+import Paper from '@mui/material/Paper';
+import Popper from '@mui/material/Popper';
+import MenuItem from '@mui/material/MenuItem';
+import MenuList from '@mui/material/MenuList';
+import ListItemText from '@mui/material/ListItemText';
 import PersonIcon from '@mui/icons/Person';
 
 import { useEtherBalance, useTokenBalance, useEthers } from '@usedapp/core';

@@ -1,30 +1,30 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 
-import Grid from '@mui/core/Grid';
-import Button from '@mui/core/Button';
-import Typography from '@mui/core/Typography';
+import Grid from '@mui/material/Grid';
+import Button from '@mui/material/Button';
+import Typography from '@mui/material/Typography';
 
-import { makeStyles } from '@mui/core/styles';
+import { makeStyles } from '@mui/material/styles';
 import {
   attachStrategyOn,
   querySessions,
   querySessionSymbols,
 } from '../api/bbgo';
 
-import TextField from '@mui/core/TextField';
-import FormControlLabel from '@mui/core/FormControlLabel';
-import FormHelperText from '@mui/core/FormHelperText';
-import InputLabel from '@mui/core/InputLabel';
-import FormControl from '@mui/core/FormControl';
-import Radio from '@mui/core/Radio';
-import RadioGroup from '@mui/core/RadioGroup';
-import FormLabel from '@mui/core/FormLabel';
-import Select from '@mui/core/Select';
-import MenuItem from '@mui/core/MenuItem';
+import TextField from '@mui/material/TextField';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import FormHelperText from '@mui/material/FormHelperText';
+import InputLabel from '@mui/material/InputLabel';
+import FormControl from '@mui/material/FormControl';
+import Radio from '@mui/material/Radio';
+import RadioGroup from '@mui/material/RadioGroup';
+import FormLabel from '@mui/material/FormLabel';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
 
 import Alert from '@mui/lab/Alert';
-import Box from '@mui/core/Box';
+import Box from '@mui/material/Box';
 
 import NumberFormat from 'react-number-format';
 

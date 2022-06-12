@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 
-import { makeStyles } from '@mui/core/styles';
-import Typography from '@mui/core/Typography';
-import Paper from '@mui/core/Paper';
+import { makeStyles } from '@mui/material/styles';
+import Typography from '@mui/material/Typography';
+import Paper from '@mui/material/Paper';
 import { queryTrades } from '../api/bbgo';
 import { DataGrid } from '@mui/x-data-grid';
 import DashboardLayout from '../layouts/DashboardLayout';

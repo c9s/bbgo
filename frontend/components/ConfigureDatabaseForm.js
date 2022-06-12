@@ -1,21 +1,21 @@
 import React from 'react';
-import Grid from '@mui/core/Grid';
-import Box from '@mui/core/Box';
-import Button from '@mui/core/Button';
-import Typography from '@mui/core/Typography';
-import TextField from '@mui/core/TextField';
-import FormHelperText from '@mui/core/FormHelperText';
-import Radio from '@mui/core/Radio';
-import RadioGroup from '@mui/core/RadioGroup';
-import FormControlLabel from '@mui/core/FormControlLabel';
-import FormControl from '@mui/core/FormControl';
-import FormLabel from '@mui/core/FormLabel';
+import Grid from '@mui/material/Grid';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Typography from '@mui/material/Typography';
+import TextField from '@mui/material/TextField';
+import FormHelperText from '@mui/material/FormHelperText';
+import Radio from '@mui/material/Radio';
+import RadioGroup from '@mui/material/RadioGroup';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import FormControl from '@mui/material/FormControl';
+import FormLabel from '@mui/material/FormLabel';
 
 import Alert from '@mui/lab/Alert';
 
 import { configureDatabase, testDatabaseConnection } from '../api/bbgo';
 
-import { makeStyles } from '@mui/core/styles';
+import { makeStyles } from '@mui/material/styles';
 
 const useStyles = makeStyles((theme) => ({
   formControl: {

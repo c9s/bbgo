@@ -1,12 +1,12 @@
-import Paper from '@mui/core/Paper';
-import Box from '@mui/core/Box';
-import Tabs from '@mui/core/Tabs';
-import Tab from '@mui/core/Tab';
+import Paper from '@mui/material/Paper';
+import Box from '@mui/material/Box';
+import Tabs from '@mui/material/Tabs';
+import Tab from '@mui/material/Tab';
 import React from 'react';
 import TradingVolumeBar from './TradingVolumeBar';
-import { makeStyles } from '@mui/core/styles';
-import Grid from '@mui/core/Grid';
-import Typography from '@mui/core/Typography';
+import { makeStyles } from '@mui/material/styles';
+import Grid from '@mui/material/Grid';
+import Typography from '@mui/material/Typography';
 
 const useStyles = makeStyles((theme) => ({
   tradingVolumeBarBox: {
