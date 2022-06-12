@@ -4,7 +4,7 @@ import { useRouter } from 'next/router';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 
-import { makeStyles } from '@mui/material/styles';
+import { makeStyles } from '@mui/styles';
 
 import { ping, saveConfig, setupRestart } from '../api/bbgo';
 import Box from '@mui/material/Box';
