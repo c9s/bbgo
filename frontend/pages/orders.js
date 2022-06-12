@@ -4,7 +4,7 @@ import { makeStyles } from '@mui/core/styles';
 import Typography from '@mui/core/Typography';
 import Paper from '@mui/core/Paper';
 import { queryClosedOrders } from '../api/bbgo';
-import { DataGrid } from '@mui/data-grid';
+import { DataGrid } from '@mui/x-data-grid';
 import DashboardLayout from '../layouts/DashboardLayout';
 
 const columns = [
