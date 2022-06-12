@@ -17,8 +17,8 @@ import MenuItem from '@mui/material/MenuItem';
 import FilledInput from '@mui/material/FilledInput';
 
 import Alert from '@mui/lab/Alert';
-import VisibilityOff from '@mui/icons/VisibilityOff';
-import Visibility from '@mui/icons/Visibility';
+import VisibilityOff from '@mui/icons-material/VisibilityOff';
+import Visibility from '@mui/icons-material/Visibility';
 
 import { addSession, testSessionConnection } from '../api/bbgo';
 

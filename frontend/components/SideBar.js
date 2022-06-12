@@ -4,10 +4,10 @@ import List from '@mui/material/List';
 import Link from 'next/link';
 import ListItem from '@mui/material/ListItem';
 import ListItemIcon from '@mui/material/ListItemIcon';
-import DashboardIcon from '@mui/icons/Dashboard';
+import DashboardIcon from '@mui/icons-material/Dashboard';
 import ListItemText from '@mui/material/ListItemText';
-import ListIcon from '@mui/icons/List';
-import TrendingUpIcon from '@mui/icons/TrendingUp';
+import ListIcon from '@mui/icons-material/List';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import React from 'react';
 import { makeStyles } from '@mui/material/styles';
 
