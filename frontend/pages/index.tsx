@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/router';
 
-import { makeStyles } from '@material-ui/core/styles';
-import Typography from '@material-ui/core/Typography';
-import Box from '@material-ui/core/Box';
-import Grid from '@material-ui/core/Grid';
-import Paper from '@material-ui/core/Paper';
+import { makeStyles } from '@mui/core/styles';
+import Typography from '@mui/core/Typography';
+import Box from '@mui/core/Box';
+import Grid from '@mui/core/Grid';
+import Paper from '@mui/core/Paper';
 
 import TotalAssetsPie from '../components/TotalAssetsPie';
 import TotalAssetSummary from '../components/TotalAssetsSummary';

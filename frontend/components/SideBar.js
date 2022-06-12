@@ -1,15 +1,15 @@
-import Drawer from '@material-ui/core/Drawer';
-import Divider from '@material-ui/core/Divider';
-import List from '@material-ui/core/List';
+import Drawer from '@mui/core/Drawer';
+import Divider from '@mui/core/Divider';
+import List from '@mui/core/List';
 import Link from 'next/link';
-import ListItem from '@material-ui/core/ListItem';
-import ListItemIcon from '@material-ui/core/ListItemIcon';
-import DashboardIcon from '@material-ui/icons/Dashboard';
-import ListItemText from '@material-ui/core/ListItemText';
-import ListIcon from '@material-ui/icons/List';
-import TrendingUpIcon from '@material-ui/icons/TrendingUp';
+import ListItem from '@mui/core/ListItem';
+import ListItemIcon from '@mui/core/ListItemIcon';
+import DashboardIcon from '@mui/icons/Dashboard';
+import ListItemText from '@mui/core/ListItemText';
+import ListIcon from '@mui/icons/List';
+import TrendingUpIcon from '@mui/icons/TrendingUp';
 import React from 'react';
-import { makeStyles } from '@material-ui/core/styles';
+import { makeStyles } from '@mui/core/styles';
 
 const drawerWidth = 240;
 

@@ -1,10 +1,10 @@
-import Paper from '@material-ui/core/Paper';
-import Tabs from '@material-ui/core/Tabs';
-import Tab from '@material-ui/core/Tab';
+import Paper from '@mui/core/Paper';
+import Tabs from '@mui/core/Tabs';
+import Tab from '@mui/core/Tab';
 import React, { useEffect, useState } from 'react';
 import { querySessions } from '../api/bbgo';
-import Typography from '@material-ui/core/Typography';
-import { makeStyles } from '@material-ui/core/styles';
+import Typography from '@mui/core/Typography';
+import { makeStyles } from '@mui/core/styles';
 
 const useStyles = makeStyles((theme) => ({
   paper: {
