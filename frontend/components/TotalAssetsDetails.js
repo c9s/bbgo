@@ -1,12 +1,12 @@
 import React from 'react';
-import CardContent from '@material-ui/core/CardContent';
-import Card from '@material-ui/core/Card';
-import { makeStyles } from '@material-ui/core/styles';
-import List from '@material-ui/core/List';
-import ListItem from '@material-ui/core/ListItem';
-import ListItemText from '@material-ui/core/ListItemText';
-import ListItemAvatar from '@material-ui/core/ListItemAvatar';
-import Avatar from '@material-ui/core/Avatar';
+import CardContent from '@mui/core/CardContent';
+import Card from '@mui/core/Card';
+import { makeStyles } from '@mui/core/styles';
+import List from '@mui/core/List';
+import ListItem from '@mui/core/ListItem';
+import ListItemText from '@mui/core/ListItemText';
+import ListItemAvatar from '@mui/core/ListItemAvatar';
+import Avatar from '@mui/core/Avatar';
 
 const useStyles = makeStyles((theme) => ({
   root: {

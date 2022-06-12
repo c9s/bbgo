@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 
-import { makeStyles } from '@material-ui/core/styles';
-import Typography from '@material-ui/core/Typography';
-import Paper from '@material-ui/core/Paper';
+import { makeStyles } from '@mui/core/styles';
+import Typography from '@mui/core/Typography';
+import Paper from '@mui/core/Paper';
 import { queryTrades } from '../api/bbgo';
-import { DataGrid } from '@material-ui/data-grid';
+import { DataGrid } from '@mui/data-grid';
 import DashboardLayout from '../layouts/DashboardLayout';
 
 const columns = [
