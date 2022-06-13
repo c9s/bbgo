@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"os"
 	"sync"
 
 	"github.com/fatih/color"
@@ -34,15 +35,15 @@ type Strategy struct {
 	Stoploss            fixedpoint.Value `json:"stoploss"`
 	Symbol              string           `json:"symbol"`
 	Interval            types.Interval   `json:"interval"`
-	UseEma              bool             `json:"useEma"`             // use exponential ma or not
-	UseSma              bool             `json:"useSma"`             // if UseEma == false, use simple ma or not
-	SignalWindow        int              `json:"sigWin"`             // signal window
-	DisableShortStop    bool             `json:"disableShortStop"`   // disable SL on short
-	DisableLongStop     bool             `json:"disableLongStop"`    // disable SL on long
-	FilterHigh          float64          `json:"ccistochFilterHigh"` // high filter for CCI Stochastic indicator
-	FilterLow           float64          `json:"ccistochFilterLow"`  // low filter for CCI Stochastic indicator
-	EwoChangeFilterHigh float64          `json:"ewoChngFilterHigh"`  // high filter for ewo histogram
-	EwoChangeFilterLow  float64          `json:"ewoChngFilterLow"`   // low filter for ewo histogram
+	UseEma              bool             `json:"useEma"`              // use exponential ma or not
+	UseSma              bool             `json:"useSma"`              // if UseEma == false, use simple ma or not
+	SignalWindow        int              `json:"sigWin"`              // signal window
+	DisableShortStop    bool             `json:"disableShortStop"`    // disable SL on short
+	DisableLongStop     bool             `json:"disableLongStop"`     // disable SL on long
+	FilterHigh          float64          `json:"cciStochFilterHigh"`  // high filter for CCI Stochastic indicator
+	FilterLow           float64          `json:"cciStochFilterLow"`   // low filter for CCI Stochastic indicator
+	EwoChangeFilterHigh float64          `json:"ewoChangeFilterHigh"` // high filter for ewo histogram
+	EwoChangeFilterLow  float64          `json:"ewoChangeFilterLow"`  // low filter for ewo histogram
 
 	Record bool `json:"record"` // print record messages on position exit point
 
@@ -1238,13 +1239,16 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.CancelAll(ctx)
 
 		s.tradeCollector.Process()
-		color.HiBlue("---- Trade Report (Without Fee) ----")
-		color.HiBlue("TP:")
-		color.Blue("\tpeak / bottom with atr: %d, avg pnl rate: %f", counterTPfromPeak, percentAvgTPfromPeak)
-		color.Blue("\tCCI Stochastic: %d, avg pnl rate: %f", counterTPfromCCI, percentAvgTPfromCCI)
-		color.Blue("\tLongSignal/ShortSignal: %d, avg pnl rate: %f", counterTPfromLongShort, percentAvgTPfromLongShort)
-		color.Blue("\tma34 and Atrx2: %d, avg pnl rate: %f", counterTPfromAtr, percentAvgTPfromAtr)
-		color.Blue("\tActive Order: %d, avg pnl rate: %f", counterTPfromOrder, percentAvgTPfromOrder)
+		hiblue := color.New(color.FgHiBlue).FprintfFunc()
+		blue := color.New(color.FgBlue).FprintfFunc()
+		hiyellow := color.New(color.FgHiYellow).FprintfFunc()
+		hiblue(os.Stderr, "---- Trade Report (Without Fee) ----\n")
+		hiblue(os.Stderr, "TP:\n")
+		blue(os.Stderr, "\tpeak / bottom with atr: %d, avg pnl rate: %f\n", counterTPfromPeak, percentAvgTPfromPeak)
+		blue(os.Stderr, "\tCCI Stochastic: %d, avg pnl rate: %f\n", counterTPfromCCI, percentAvgTPfromCCI)
+		blue(os.Stderr, "\tLongSignal/ShortSignal: %d, avg pnl rate: %f\n", counterTPfromLongShort, percentAvgTPfromLongShort)
+		blue(os.Stderr, "\tma34 and Atrx2: %d, avg pnl rate: %f\n", counterTPfromAtr, percentAvgTPfromAtr)
+		blue(os.Stderr, "\tActive Order: %d, avg pnl rate: %f\n", counterTPfromOrder, percentAvgTPfromOrder)
 
 		totalTP := counterTPfromPeak + counterTPfromCCI + counterTPfromLongShort + counterTPfromAtr + counterTPfromOrder
 		avgProfit := (float64(counterTPfromPeak)*percentAvgTPfromPeak +
@@ -1252,17 +1256,17 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			float64(counterTPfromLongShort)*percentAvgTPfromLongShort +
 			float64(counterTPfromAtr)*percentAvgTPfromAtr +
 			float64(counterTPfromOrder)*percentAvgTPfromOrder) / float64(totalTP)
-		color.HiBlue("\tSum: %d, avg pnl rate: %f", totalTP, avgProfit)
+		hiblue(os.Stderr, "\tSum: %d, avg pnl rate: %f\n", totalTP, avgProfit)
 
-		color.HiBlue("SL:")
-		color.Blue("\tentry SL: %d, avg pnl rate: -%f", counterSLfromSL, percentAvgSLfromSL)
-		color.Blue("\tActive Order: %d, avg pnl rate: -%f", counterSLfromOrder, percentAvgSLfromOrder)
+		hiblue(os.Stderr, "SL:\n")
+		blue(os.Stderr, "\tentry SL: %d, avg pnl rate: -%f\n", counterSLfromSL, percentAvgSLfromSL)
+		blue(os.Stderr, "\tActive Order: %d, avg pnl rate: -%f\n", counterSLfromOrder, percentAvgSLfromOrder)
 
 		totalSL := counterSLfromSL + counterSLfromOrder
 		avgLoss := (float64(counterSLfromSL)*percentAvgSLfromSL + float64(counterSLfromOrder)*percentAvgSLfromOrder) / float64(totalSL)
-		color.HiBlue("\tSum: %d, avg pnl rate: -%f", totalSL, avgLoss)
+		hiblue(os.Stderr, "\tSum: %d, avg pnl rate: -%f\n", totalSL, avgLoss)
 
-		color.HiBlue("WinRate: %f", float64(totalTP)/float64(totalTP+totalSL))
+		hiblue(os.Stderr, "WinRate: %f\n", float64(totalTP)/float64(totalTP+totalSL))
 
 		maString := "vwema"
 		if s.UseSma {
@@ -1272,23 +1276,23 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			maString = "ema"
 		}
 
-		color.HiYellow("----- EWO Settings -------")
-		color.HiYellow("General:")
-		color.HiYellow("\tuseHeikinAshi: %v", s.UseHeikinAshi)
-		color.HiYellow("\tstoploss: %v", s.Stoploss)
-		color.HiYellow("\tsymbol: %s", s.Symbol)
-		color.HiYellow("\tinterval: %s", s.Interval)
-		color.HiYellow("\tMA type: %s", maString)
-		color.HiYellow("\tdisableShortStop: %v", s.DisableShortStop)
-		color.HiYellow("\tdisableLongStop: %v", s.DisableLongStop)
-		color.HiYellow("\trecord: %v", s.Record)
-		color.HiYellow("CCI Stochastic:")
-		color.HiYellow("\tccistochFilterHigh: %f", s.FilterHigh)
-		color.HiYellow("\tccistochFilterLow: %f", s.FilterLow)
-		color.HiYellow("Ewo && Ewo Histogram:")
-		color.HiYellow("\tsigWin: %d", s.SignalWindow)
-		color.HiYellow("\tewoChngFilterHigh: %f", s.EwoChangeFilterHigh)
-		color.HiYellow("\tewoChngFilterLow: %f", s.EwoChangeFilterLow)
+		hiyellow(os.Stderr, "----- EWO Settings -------\n")
+		hiyellow(os.Stderr, "General:\n")
+		hiyellow(os.Stderr, "\tuseHeikinAshi: %v\n", s.UseHeikinAshi)
+		hiyellow(os.Stderr, "\tstoploss: %v\n", s.Stoploss)
+		hiyellow(os.Stderr, "\tsymbol: %s\n", s.Symbol)
+		hiyellow(os.Stderr, "\tinterval: %s\n", s.Interval)
+		hiyellow(os.Stderr, "\tMA type: %s\n", maString)
+		hiyellow(os.Stderr, "\tdisableShortStop: %v\n", s.DisableShortStop)
+		hiyellow(os.Stderr, "\tdisableLongStop: %v\n", s.DisableLongStop)
+		hiyellow(os.Stderr, "\trecord: %v\n", s.Record)
+		hiyellow(os.Stderr, "CCI Stochastic:\n")
+		hiyellow(os.Stderr, "\tccistochFilterHigh: %f\n", s.FilterHigh)
+		hiyellow(os.Stderr, "\tccistochFilterLow: %f\n", s.FilterLow)
+		hiyellow(os.Stderr, "Ewo && Ewo Histogram:\n")
+		hiyellow(os.Stderr, "\tsigWin: %d\n", s.SignalWindow)
+		hiyellow(os.Stderr, "\tewoChngFilterHigh: %f\n", s.EwoChangeFilterHigh)
+		hiyellow(os.Stderr, "\tewoChngFilterLow: %f\n", s.EwoChangeFilterLow)
 	})
 	return nil
 }
