@@ -89,12 +89,15 @@ export default function SideBar() {
             <ListItemText primary="Trades" />
           </ListItem>
         </Link>
-        <ListItem button>
-          <ListItemIcon>
-            <TrendingUpIcon />
-          </ListItemIcon>
-          <ListItemText primary="Strategies" />
-        </ListItem>
+        <Link href={'/strategies'}>
+          <ListItem button>
+            <ListItemIcon>
+              <TrendingUpIcon />
+            </ListItemIcon>
+            <ListItemText primary="Strategies" />
+          </ListItem>
+        </Link>
+        
       </List>
     </Drawer>
   );
