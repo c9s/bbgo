@@ -1,6 +1,8 @@
 package bbgo
 
 import (
+	"reflect"
+
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -75,6 +77,13 @@ func filterSimpleArgs(args []interface{}) (simpleArgs []interface{}) {
 		switch arg.(type) {
 		case int, int64, int32, uint64, uint32, string, []byte, float64, float32, fixedpoint.Value:
 			simpleArgs = append(simpleArgs, arg)
+		default:
+			rt := reflect.TypeOf(arg)
+			rt = rt.Elem()
+			switch rt.Kind() {
+			case reflect.Float64, reflect.Float32, reflect.String, reflect.Int, reflect.Int64, reflect.Uint64:
+				simpleArgs = append(simpleArgs, arg)
+			}
 		}
 	}
 
