@@ -59,6 +59,13 @@ func filterPlaintextMessages(args []interface{}) (texts []string, pureArgs []int
 		rt := reflect.TypeOf(arg)
 		if rt.Kind() == reflect.Ptr {
 			switch a := arg.(type) {
+
+			case nil:
+				texts = append(texts, "nil")
+				if firstObjectOffset == -1 {
+					firstObjectOffset = idx
+				}
+
 			case types.PlainText:
 				texts = append(texts, a.PlainText())
 				if firstObjectOffset == -1 {
