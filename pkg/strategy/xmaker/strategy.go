@@ -693,8 +693,6 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 	if err := s.LoadState(); err != nil {
 		return err
-	} else {
-		s.Notify("xmaker: %s position is restored", s.Symbol, s.Position)
 	}
 
 	if s.Position == nil {
@@ -707,6 +705,8 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		// force update for legacy code
 		s.Position.Market = s.makerMarket
 	}
+
+	s.Notify("xmaker: %s position is restored", s.Symbol, s.Position)
 
 	if s.ProfitStats == nil {
 		if s.state != nil {
