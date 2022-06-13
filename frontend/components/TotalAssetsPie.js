@@ -3,9 +3,9 @@ import React, { useEffect, useState } from 'react';
 import { ResponsivePie } from '@nivo/pie';
 import { queryAssets } from '../api/bbgo';
 import { currencyColor } from '../src/utils';
-import CardContent from '@material-ui/core/CardContent';
-import Card from '@material-ui/core/Card';
-import { makeStyles } from '@material-ui/core/styles';
+import CardContent from '@mui/material/CardContent';
+import Card from '@mui/material/Card';
+import { makeStyles } from '@mui/styles';
 
 function reduceAssetsBy(assets, field, minimum) {
   let as = [];
