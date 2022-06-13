@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import Card from '@material-ui/core/Card';
-import CardContent from '@material-ui/core/CardContent';
-import Typography from '@material-ui/core/Typography';
-import { makeStyles } from '@material-ui/core/styles';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import Typography from '@mui/material/Typography';
+import { makeStyles } from '@mui/styles';
 
 function aggregateAssetsBy(assets, field) {
   let total = 0.0;

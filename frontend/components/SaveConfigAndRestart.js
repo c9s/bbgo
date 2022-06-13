@@ -1,14 +1,14 @@
 import React from 'react';
 import { useRouter } from 'next/router';
 
-import Button from '@material-ui/core/Button';
-import Typography from '@material-ui/core/Typography';
+import Button from '@mui/material/Button';
+import Typography from '@mui/material/Typography';
 
-import { makeStyles } from '@material-ui/core/styles';
+import { makeStyles } from '@mui/styles';
 
 import { ping, saveConfig, setupRestart } from '../api/bbgo';
-import Box from '@material-ui/core/Box';
-import Alert from '@material-ui/lab/Alert';
+import Box from '@mui/material/Box';
+import Alert from '@mui/lab/Alert';
 
 const useStyles = makeStyles((theme) => ({
   strategyCard: {
