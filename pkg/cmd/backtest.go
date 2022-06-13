@@ -295,7 +295,7 @@ var BacktestCmd = &cobra.Command{
 				return err
 			}
 
-			kLineDataDir := filepath.Join(outputDirectory, "klines")
+			kLineDataDir := filepath.Join(outputDirectory, "shared/klines")
 			if err := util.SafeMkdirAll(kLineDataDir); err != nil {
 				return err
 			}
