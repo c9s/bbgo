@@ -2,6 +2,7 @@ package telegramnotifier
 
 import (
 	"fmt"
+	"reflect"
 	"strconv"
 	"time"
 
@@ -55,18 +56,20 @@ func (n *Notifier) Notify(obj interface{}, args ...interface{}) {
 func filterPlaintextMessages(args []interface{}) (texts []string, pureArgs []interface{}) {
 	var firstObjectOffset = -1
 	for idx, arg := range args {
-		switch a := arg.(type) {
+		rt := reflect.TypeOf(arg)
+		if rt.Kind() == reflect.Ptr {
+			switch a := arg.(type) {
+			case types.PlainText:
+				texts = append(texts, a.PlainText())
+				if firstObjectOffset == -1 {
+					firstObjectOffset = idx
+				}
 
-		case types.PlainText:
-			texts = append(texts, a.PlainText())
-			if firstObjectOffset == -1 {
-				firstObjectOffset = idx
-			}
-
-		case types.Stringer:
-			texts = append(texts, a.String())
-			if firstObjectOffset == -1 {
-				firstObjectOffset = idx
+			case types.Stringer:
+				texts = append(texts, a.String())
+				if firstObjectOffset == -1 {
+					firstObjectOffset = idx
+				}
 			}
 		}
 	}
