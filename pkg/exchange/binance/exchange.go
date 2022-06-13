@@ -1248,9 +1248,6 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 	}
 
 	kLines = types.SortKLinesAscending(kLines)
-	for _, k := range kLines {
-		log.Info(k)
-	}
 	return kLines, nil
 }
 
