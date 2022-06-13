@@ -100,3 +100,4 @@ func newTypeValueInterface(typ reflect.Type) interface{} {
 	dst := reflect.New(typ)
 	return dst.Interface()
 }
+

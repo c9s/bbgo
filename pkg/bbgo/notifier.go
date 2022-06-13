@@ -1,11 +1,9 @@
 package bbgo
 
 import (
-	"reflect"
-
 	"github.com/sirupsen/logrus"
 
-	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 type Notifier interface {
@@ -57,7 +55,7 @@ func (m *Notifiability) AddNotifier(notifier Notifier) {
 
 func (m *Notifiability) Notify(obj interface{}, args ...interface{}) {
 	if str, ok := obj.(string); ok {
-		simpleArgs := filterSimpleArgs(args)
+		simpleArgs := util.FilterSimpleArgs(args)
 		logrus.Infof(str, simpleArgs...)
 	}
 
@@ -72,23 +70,3 @@ func (m *Notifiability) NotifyTo(channel string, obj interface{}, args ...interf
 	}
 }
 
-func filterSimpleArgs(args []interface{}) (simpleArgs []interface{}) {
-	for _, arg := range args {
-		switch arg.(type) {
-		case int, int64, int32, uint64, uint32, string, []byte, float64, float32, fixedpoint.Value:
-			simpleArgs = append(simpleArgs, arg)
-		default:
-			rt := reflect.TypeOf(arg)
-			if rt.Kind() == reflect.Ptr {
-				rt = rt.Elem()
-			}
-		
-			switch rt.Kind() {
-			case reflect.Float64, reflect.Float32, reflect.String, reflect.Int, reflect.Int64, reflect.Uint64:
-				simpleArgs = append(simpleArgs, arg)
-			}
-		}
-	}
-
-	return simpleArgs
-}
