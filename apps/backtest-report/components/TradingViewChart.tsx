@@ -211,7 +211,7 @@ const removeDuplicatedKLines = (klines: Array<KLine>): Array<KLine> => {
 
 function fetchKLines(basePath: string, runID: string, symbol: string, interval: string) {
   return fetch(
-    `${basePath}/${runID}/klines/${symbol}-${interval}.tsv`,
+    `${basePath}/klines/${symbol}-${interval}.tsv`,
   )
     .then((response) => response.text())
     .then((data) => tsvParse(data, parseKline()))
