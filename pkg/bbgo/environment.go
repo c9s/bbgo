@@ -718,12 +718,15 @@ func (environ *Environment) RecordPosition(position *types.Position, trade types
 		return
 	}
 
-	if position.Strategy == "" && profit.Strategy != "" {
-		position.Strategy = profit.Strategy
-	}
+	// set profit info to position
+	if profit != nil {
+		if position.Strategy == "" && profit.Strategy != "" {
+			position.Strategy = profit.Strategy
+		}
 
-	if position.StrategyInstanceID == "" && profit.StrategyInstanceID != "" {
-		position.StrategyInstanceID = profit.StrategyInstanceID
+		if position.StrategyInstanceID == "" && profit.StrategyInstanceID != "" {
+			position.StrategyInstanceID = profit.StrategyInstanceID
+		}
 	}
 
 	if profit != nil {
