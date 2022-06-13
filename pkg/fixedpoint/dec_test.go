@@ -69,6 +69,15 @@ func TestNew(t *testing.T) {
 	assert.Equal(t, "0.0010", f.FormatString(4))
 	assert.Equal(t, "0.1%", f.Percentage())
 	assert.Equal(t, "0.10%", f.FormatPercentage(2))
+	f = NewFromFloat(0.1)
+	assert.Equal(t, "10%", f.Percentage())
+	assert.Equal(t, "10%", f.FormatPercentage(0))
+	f = NewFromFloat(0.01)
+	assert.Equal(t, "1%", f.Percentage())
+	assert.Equal(t, "1%", f.FormatPercentage(0))
+	f = NewFromFloat(0.111)
+	assert.Equal(t, "11.1%", f.Percentage())
+	assert.Equal(t, "11.1%", f.FormatPercentage(1))
 }
 
 func TestFormatString(t *testing.T) {
