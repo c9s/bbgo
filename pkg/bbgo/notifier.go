@@ -79,7 +79,10 @@ func filterSimpleArgs(args []interface{}) (simpleArgs []interface{}) {
 			simpleArgs = append(simpleArgs, arg)
 		default:
 			rt := reflect.TypeOf(arg)
-			rt = rt.Elem()
+			if rt.Kind() == reflect.Ptr {
+				rt = rt.Elem()
+			}
+		
 			switch rt.Kind() {
 			case reflect.Float64, reflect.Float32, reflect.String, reflect.Int, reflect.Int64, reflect.Uint64:
 				simpleArgs = append(simpleArgs, arg)
