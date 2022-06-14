@@ -582,7 +582,6 @@ func (environ *Environment) setSyncing(status SyncStatus) {
 }
 
 func (environ *Environment) syncWithUserConfig(ctx context.Context, userConfig *Config) error {
-	syncSymbols := userConfig.Sync.Symbols
 	sessions := environ.sessions
 	selectedSessions := userConfig.Sync.Sessions
 	if len(selectedSessions) > 0 {
@@ -594,7 +593,13 @@ func (environ *Environment) syncWithUserConfig(ctx context.Context, userConfig *
 		since = userConfig.Sync.Since.Time()
 	}
 
+	syncSymbolMap, restSymbols := categorizeSyncSymbol(userConfig.Sync.Symbols)
 	for _, session := range sessions {
+		syncSymbols := restSymbols
+		if ss, ok := syncSymbolMap[session.Name] ; ok {
+			syncSymbols = append(syncSymbols, ss...)
+		}
+
 		if err := environ.syncSession(ctx, session, syncSymbols...); err != nil {
 			return err
 		}
