@@ -16,15 +16,17 @@ export function queryOutboundIP(cb) {
 }
 
 const triggerSync = async () => {
-  return axios.post<any>(baseURL + '/api/environment/sync')
-}
+  return axios.post<any>(baseURL + '/api/environment/sync');
+};
 
 export { triggerSync };
 
 export function querySyncStatus(cb) {
-  return axios.get<any>(baseURL + '/api/environment/syncing').then((response) => {
-    cb(response.data.syncing);
-  });
+  return axios
+    .get<any>(baseURL + '/api/environment/syncing')
+    .then((response) => {
+      cb(response.data.syncing);
+    });
 }
 
 export function testDatabaseConnection(params, cb) {
@@ -99,9 +101,11 @@ export function querySessionSymbols(sessionName, cb) {
 }
 
 export function queryTrades(params, cb) {
-  axios.get<any>(baseURL + '/api/trades', { params: params }).then((response) => {
-    cb(response.data.trades || []);
-  });
+  axios
+    .get<any>(baseURL + '/api/trades', { params: params })
+    .then((response) => {
+      cb(response.data.trades || []);
+    });
 }
 
 export function queryClosedOrders(params, cb) {

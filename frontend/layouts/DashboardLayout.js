@@ -9,9 +9,9 @@ import Container from '@mui/material/Container';
 import SideBar from '../components/SideBar';
 
 import ConnectWallet from '../components/ConnectWallet';
-import { Box } from "@mui/material";
-import {throttle} from "../src/utils";
-import {triggerSync} from "../api/bbgo";
+import { Box } from '@mui/material';
+import { throttle } from '../src/utils';
+import { triggerSync } from '../api/bbgo';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -30,26 +30,19 @@ const useStyles = makeStyles((theme) => ({
   container: {},
   toolbar: {
     justifyContent: 'space-between',
-  }
+  },
 }));
 
 const ToolbarButton = styled('button')(({ theme }) => ({
-    padding: theme.spacing(1)
-  })
-)
+  padding: theme.spacing(1),
+}));
 
 function SyncButton() {
   const handleClick = throttle(async () => {
-    await triggerSync()
-  }, 2000)
+    await triggerSync();
+  }, 2000);
 
-  return (
-    <ToolbarButton
-      onClick={handleClick}
-    >
-      Sync
-    </ToolbarButton>
-  );
+  return <ToolbarButton onClick={handleClick}>Sync</ToolbarButton>;
 }
 
 export default function DashboardLayout({ children }) {
