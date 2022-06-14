@@ -688,6 +688,12 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		Window:   21,
 	}, 1.0)
 
+	if store, ok := s.sourceSession.MarketDataStore(s.Symbol); ok {
+		if klines, ok2 := store.KLinesOfInterval(s.BollBandInterval); ok2 {
+			s.boll.Update(*klines)
+		}
+	}
+
 	// restore state
 	instanceID := s.InstanceID()
 	s.groupID = util.FNV32(instanceID)
