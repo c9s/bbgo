@@ -7,7 +7,7 @@ import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import theme from '../src/theme';
 import '../styles/globals.css';
-import {triggerSync} from "../api/bbgo";
+import { triggerSync } from '../api/bbgo';
 
 export default function MyApp(props) {
   const { Component, pageProps } = props;
@@ -21,9 +21,9 @@ export default function MyApp(props) {
   }, []);
 
   useEffect(() => {
-    triggerSync()
-  }, [])
-  
+    triggerSync();
+  }, []);
+
   return (
     <React.Fragment>
       <Head>
