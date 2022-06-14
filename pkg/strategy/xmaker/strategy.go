@@ -310,6 +310,11 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 		lastDownBand := fixedpoint.NewFromFloat(s.boll.LastDownBand())
 		lastUpBand := fixedpoint.NewFromFloat(s.boll.LastUpBand())
 
+		if lastUpBand.IsZero() || lastDownBand.IsZero() {
+			log.Warnf("bollinger band value is zero, skipping")
+			return
+		}
+
 		log.Infof("bollinger band: up/down = %f/%f", lastUpBand.Float64(), lastDownBand.Float64())
 
 		// when bid price is lower than the down band, then it's in the downtrend
