@@ -208,12 +208,54 @@ func GetNativeBuildTargetConfig() BuildTargetConfig {
 	}
 }
 
+type SyncSymbol struct {
+	Symbol  string `json:"symbol" yaml:"symbol"`
+	Session string `json:"session" yaml:"session"`
+}
+
+func (ss *SyncSymbol) UnmarshalYAML(unmarshal func(a interface{}) error) (err error) {
+	var s string
+	if err = unmarshal(&s); err == nil {
+		aa := strings.SplitN(s, ":", 2)
+		if len(aa) > 1 {
+			ss.Session = aa[0]
+			ss.Symbol = aa[1]
+		} else {
+			ss.Symbol = aa[0]
+		}
+		return nil
+	}
+
+	type localSyncSymbol SyncSymbol
+	var ssNew localSyncSymbol
+	if err = unmarshal(&ssNew); err == nil {
+		*ss = SyncSymbol(ssNew)
+		return nil
+	}
+
+	return err
+}
+
+func categorizeSyncSymbol(slice []SyncSymbol) (map[string][]string, []string) {
+	var rest []string
+	var m = make(map[string][]string)
+	for _, ss := range slice {
+		if len(ss.Session) > 0 {
+			m[ss.Session] = append(m[ss.Session], ss.Symbol)
+		} else {
+			rest = append(rest, ss.Symbol)
+		}
+	}
+	return m, rest
+}
+
 type SyncConfig struct {
 	// Sessions to sync, if ignored, all defined sessions will sync
 	Sessions []string `json:"sessions,omitempty" yaml:"sessions,omitempty"`
 
-	// Symbols is the list of symbol to sync, if ignored, symbols wlll be discovered by your existing crypto balances
-	Symbols []string `json:"symbols,omitempty" yaml:"symbols,omitempty"`
+	// Symbols is the list of session:symbol pair to sync, if ignored, symbols wlll be discovered by your existing crypto balances
+	// Valid formats are: {session}:{symbol},  {symbol} or in YAML object form {symbol: "BTCUSDT", session:"max" }
+	Symbols []SyncSymbol `json:"symbols,omitempty" yaml:"symbols,omitempty"`
 
 	// DepositHistory is for syncing deposit history
 	DepositHistory bool `json:"depositHistory" yaml:"depositHistory"`
