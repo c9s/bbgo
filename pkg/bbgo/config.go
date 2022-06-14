@@ -253,7 +253,8 @@ type SyncConfig struct {
 	// Sessions to sync, if ignored, all defined sessions will sync
 	Sessions []string `json:"sessions,omitempty" yaml:"sessions,omitempty"`
 
-	// Symbols is the list of symbol to sync, if ignored, symbols wlll be discovered by your existing crypto balances
+	// Symbols is the list of session:symbol pair to sync, if ignored, symbols wlll be discovered by your existing crypto balances
+	// Valid formats are: {session}:{symbol},  {symbol} or in YAML object form {symbol: "BTCUSDT", session:"max" }
 	Symbols []SyncSymbol `json:"symbols,omitempty" yaml:"symbols,omitempty"`
 
 	// DepositHistory is for syncing deposit history
