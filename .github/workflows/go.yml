@@ -63,10 +63,14 @@ jobs:
       run: go build -v ./cmd/bbgo
 
     - name: Test
-      run: go test -race -coverprofile coverage.txt -covermode atomic ./pkg/...
+      run: |
+        go test -race -coverprofile coverage.txt -covermode atomic ./pkg/...
+        sed -i -e '/_requestgen.go/d' coverage.txt
 
     - name: TestDnum
-      run: go test -race -coverprofile coverage_dnum.txt -covermode atomic -tags dnum ./pkg/...
+      run: |
+        go test -race -coverprofile coverage_dnum.txt -covermode atomic -tags dnum ./pkg/...
+        sed -i -e '/_requestgen.go/d' coverage_dnum.txt
 
     - name: Upload Coverage Report
       uses: codecov/codecov-action@v3
