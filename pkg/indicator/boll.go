@@ -88,7 +88,7 @@ func (inc *BOLL) LastSMA() float64 {
 	return 0.0
 }
 
-func (inc *BOLL) calculateAndUpdate(kLines []types.KLine) {
+func (inc *BOLL) Update(kLines []types.KLine) {
 	if len(kLines) < inc.Window {
 		return
 	}
@@ -142,7 +142,7 @@ func (inc *BOLL) handleKLineWindowUpdate(interval types.Interval, window types.K
 		return
 	}
 
-	inc.calculateAndUpdate(window)
+	inc.Update(window)
 }
 
 func (inc *BOLL) Bind(updater KLineWindowUpdater) {
