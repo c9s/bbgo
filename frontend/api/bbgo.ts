@@ -16,7 +16,7 @@ export function queryOutboundIP(cb) {
 }
 
 const triggerSync = async () => {
-  return axios.get<any>(baseURL + '/api/environment/sync')
+  return axios.post<any>(baseURL + '/api/environment/sync')
 }
 
 export { triggerSync };
