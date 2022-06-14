@@ -48,6 +48,8 @@ sync:
   - BTCUSDT
   - ETHUSDT
   - DOTUSDT
+  - binance:BNBUSDT
+  - max:USDTTWD
 
   # marginHistory enables the margin history sync
   marginHistory: true
