@@ -307,14 +307,16 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 	var pips = s.Pips
 
 	if s.EnableBollBandMargin {
-		lastDownBand := s.boll.LastDownBand()
-		lastUpBand := s.boll.LastUpBand()
+		lastDownBand := fixedpoint.NewFromFloat(s.boll.LastDownBand())
+		lastUpBand := fixedpoint.NewFromFloat(s.boll.LastUpBand())
+
+		log.Infof("bollinger band: up/down = %f/%f", lastUpBand.Float64(), lastDownBand.Float64())
 
 		// when bid price is lower than the down band, then it's in the downtrend
 		// when ask price is higher than the up band, then it's in the uptrend
-		if bestBidPrice.Float64() < lastDownBand {
+		if bestBidPrice.Compare(lastDownBand) < 0 {
 			// ratio here should be greater than 1.00
-			ratio := fixedpoint.NewFromFloat(lastDownBand).Div(bestBidPrice)
+			ratio := lastDownBand.Div(bestBidPrice)
 
 			// so that the original bid margin can be multiplied by 1.x
 			bollMargin := s.BollBandMargin.Mul(ratio).Mul(s.BollBandMarginFactor)
@@ -329,9 +331,9 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 			pips = pips.Mul(ratio)
 		}
 
-		if bestAskPrice.Float64() > lastUpBand {
+		if bestAskPrice.Compare(lastUpBand) > 0 {
 			// ratio here should be greater than 1.00
-			ratio := bestAskPrice.Div(fixedpoint.NewFromFloat(lastUpBand))
+			ratio := bestAskPrice.Div(lastUpBand)
 
 			// so that the original bid margin can be multiplied by 1.x
 			bollMargin := s.BollBandMargin.Mul(ratio).Mul(s.BollBandMarginFactor)
