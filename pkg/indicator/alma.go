@@ -13,14 +13,14 @@ import (
 // @param sigma: the standard deviation applied to the combo line. This makes the combo line sharper
 //go:generate callbackgen -type ALMA
 type ALMA struct {
-	types.IntervalWindow
-	Offset float64
-	Sigma int
-	Weight []float64
-	Sum float64
-	input []float64
-	Values types.Float64Slice
-	UpdateCallbacks []func(value float64)
+	types.IntervalWindow         // required
+	Offset               float64 // required: recommend to be 5
+	Sigma                int     // required: recommend to be 0.5
+	Weight               []float64
+	Sum                  float64
+	input                []float64
+	Values               types.Float64Slice
+	UpdateCallbacks      []func(value float64)
 }
 
 const MaxNumOfALMA = 5_000
@@ -34,7 +34,7 @@ func (inc *ALMA) Update(value float64) {
 		inc.Sum = 0.
 		for i := 0; i < inc.Window; i++ {
 			diff := float64(i) - m
-			wt := math.Exp(-diff*diff/2./s/s)
+			wt := math.Exp(-diff * diff / 2. / s / s)
 			inc.Sum += wt
 			inc.Weight[i] = wt
 		}
@@ -42,9 +42,9 @@ func (inc *ALMA) Update(value float64) {
 	inc.input = append(inc.input, value)
 	if len(inc.input) >= inc.Window {
 		weightedSum := 0.0
-		inc.input = inc.input[len(inc.input) - inc.Window:]
+		inc.input = inc.input[len(inc.input)-inc.Window:]
 		for i := 0; i < inc.Window; i++ {
-			weightedSum += inc.Weight[i] * inc.input[i]
+			weightedSum += inc.Weight[inc.Window-i-1] * inc.input[i]
 		}
 		inc.Values.Push(weightedSum / inc.Sum)
 		if len(inc.Values) > MaxNumOfALMA {
@@ -54,7 +54,7 @@ func (inc *ALMA) Update(value float64) {
 }
 
 func (inc *ALMA) Last() float64 {
-	if len(inc.Values)  == 0 {
+	if len(inc.Values) == 0 {
 		return 0
 	}
 	return inc.Values[len(inc.Values)-1]
