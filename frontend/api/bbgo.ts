@@ -10,13 +10,19 @@ export function ping(cb) {
 }
 
 export function queryOutboundIP(cb) {
-  return axios.get(baseURL + '/api/outbound-ip').then((response) => {
+  return axios.get<any>(baseURL + '/api/outbound-ip').then((response) => {
     cb(response.data.outboundIP);
   });
 }
 
+const triggerSync = async () => {
+  return axios.get<any>(baseURL + '/api/environment/sync')
+}
+
+export { triggerSync };
+
 export function querySyncStatus(cb) {
-  return axios.get(baseURL + '/api/environment/syncing').then((response) => {
+  return axios.get<any>(baseURL + '/api/environment/syncing').then((response) => {
     cb(response.data.syncing);
   });
 }
@@ -73,48 +79,48 @@ export function testSessionConnection(session, cb) {
 }
 
 export function queryStrategies(cb) {
-  return axios.get(baseURL + '/api/strategies/single').then((response) => {
+  return axios.get<any>(baseURL + '/api/strategies/single').then((response) => {
     cb(response.data.strategies || []);
   });
 }
 
 export function querySessions(cb) {
-  return axios.get(baseURL + '/api/sessions', {}).then((response) => {
+  return axios.get<any>(baseURL + '/api/sessions', {}).then((response) => {
     cb(response.data.sessions || []);
   });
 }
 
 export function querySessionSymbols(sessionName, cb) {
   return axios
-    .get(baseURL + `/api/sessions/${sessionName}/symbols`, {})
+    .get<any>(baseURL + `/api/sessions/${sessionName}/symbols`, {})
     .then((response) => {
-      cb(response.data.symbols || []);
+      cb(response.data?.symbols || []);
     });
 }
 
 export function queryTrades(params, cb) {
-  axios.get(baseURL + '/api/trades', { params: params }).then((response) => {
+  axios.get<any>(baseURL + '/api/trades', { params: params }).then((response) => {
     cb(response.data.trades || []);
   });
 }
 
 export function queryClosedOrders(params, cb) {
   axios
-    .get(baseURL + '/api/orders/closed', { params: params })
+    .get<any>(baseURL + '/api/orders/closed', { params: params })
     .then((response) => {
       cb(response.data.orders || []);
     });
 }
 
 export function queryAssets(cb) {
-  axios.get(baseURL + '/api/assets', {}).then((response) => {
+  axios.get<any>(baseURL + '/api/assets', {}).then((response) => {
     cb(response.data.assets || []);
   });
 }
 
 export function queryTradingVolume(params, cb) {
   axios
-    .get(baseURL + '/api/trading-volume', { params: params })
+    .get<any>(baseURL + '/api/trading-volume', { params: params })
     .then((response) => {
       cb(response.data.tradingVolumes || []);
     });
