@@ -214,5 +214,52 @@ func TestLoadConfig(t *testing.T) {
 			}
 		})
 	}
+}
 
+func TestSyncSymbol(t *testing.T) {
+	t.Run("symbol", func(t *testing.T) {
+		var ss []SyncSymbol
+		var err = yaml.Unmarshal([]byte(`- BTCUSDT`), &ss)
+		assert.NoError(t, err)
+		assert.Equal(t, []SyncSymbol{
+			{Symbol: "BTCUSDT"},
+		}, ss)
+	})
+
+	t.Run("session:symbol", func(t *testing.T) {
+		var ss []SyncSymbol
+		var err = yaml.Unmarshal([]byte(`- max:BTCUSDT`), &ss)
+		assert.NoError(t, err)
+		assert.Equal(t, []SyncSymbol{
+			{Session: "max", Symbol: "BTCUSDT"},
+		}, ss)
+	})
+
+	t.Run("object", func(t *testing.T) {
+		var ss []SyncSymbol
+		var err = yaml.Unmarshal([]byte(`- { session: "max", symbol: "BTCUSDT" }`), &ss)
+		assert.NoError(t, err)
+		assert.Equal(t, []SyncSymbol{
+			{Session: "max", Symbol: "BTCUSDT"},
+		}, ss)
+	})
+}
+
+func Test_categorizeSyncSymbol(t *testing.T) {
+	var ss []SyncSymbol
+	var err = yaml.Unmarshal([]byte(`
+- BTCUSDT
+- ETHUSDT
+- max:MAXUSDT
+- max:USDTTWD
+- binance:BNBUSDT
+`), &ss)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, ss)
+
+	sm, rest := categorizeSyncSymbol(ss)
+	assert.NotEmpty(t, rest)
+	assert.NotEmpty(t, sm)
+	assert.Equal(t, []string{"MAXUSDT", "USDTTWD"}, sm["max"])
+	assert.Equal(t, []string{"BNBUSDT"}, sm["binance"])
 }

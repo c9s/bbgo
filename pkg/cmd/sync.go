@@ -89,7 +89,9 @@ var SyncCmd = &cobra.Command{
 
 		if len(symbol) > 0 {
 			if userConfig.Sync != nil && len(userConfig.Sync.Symbols) > 0 {
-				userConfig.Sync.Symbols = []string{symbol}
+				userConfig.Sync.Symbols = []bbgo.SyncSymbol{
+					{Symbol: symbol},
+				}
 			}
 		}
 
