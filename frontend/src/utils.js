@@ -29,9 +29,9 @@ export function throttle(fn, delayMillis) {
   let permitted = true;
   return () => {
     if (permitted) {
-      fn.apply(this, arguments)
-      permitted = false
-      setTimeout(() => permitted = true, delayMillis)
+      fn.apply(this, arguments);
+      permitted = false;
+      setTimeout(() => (permitted = true), delayMillis);
     }
-  }
+  };
 }
