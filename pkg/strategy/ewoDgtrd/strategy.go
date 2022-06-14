@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
+	"os"
 	"sync"
 
 	"github.com/fatih/color"
@@ -17,8 +19,6 @@ import (
 
 const ID = "ewo_dgtrd"
 
-const record = false
-
 var log = logrus.WithField("strategy", ID)
 
 func init() {
@@ -29,19 +29,21 @@ type Strategy struct {
 	Position    *types.Position    `json:"position,omitempty" persistence:"position"`
 	ProfitStats *types.ProfitStats `json:"profitStats,omitempty" persistence:"profit_stats"`
 
-	Market           types.Market
-	Session          *bbgo.ExchangeSession
-	UseHeikinAshi    bool             `json:"useHeikinAshi"` // use heikinashi kline
-	Stoploss         fixedpoint.Value `json:"stoploss"`
-	Symbol           string           `json:"symbol"`
-	Interval         types.Interval   `json:"interval"`
-	UseEma           bool             `json:"useEma"`             // use exponential ma or not
-	UseSma           bool             `json:"useSma"`             // if UseEma == false, use simple ma or not
-	SignalWindow     int              `json:"sigWin"`             // signal window
-	DisableShortStop bool             `json:"disableShortStop"`   // disable SL on short
-	DisableLongStop  bool             `json:"disableLongStop"`    // disable SL on long
-	FilterHigh       float64          `json:"ccistochFilterHigh"` // high filter for CCI Stochastic indicator
-	FilterLow        float64          `json:"ccistochFilterLow"`  // low filter for CCI Stochastic indicator
+	Market              types.Market
+	Session             *bbgo.ExchangeSession
+	UseHeikinAshi       bool             `json:"useHeikinAshi"` // use heikinashi kline
+	Stoploss            fixedpoint.Value `json:"stoploss"`
+	Symbol              string           `json:"symbol"`
+	Interval            types.Interval   `json:"interval"`
+	UseEma              bool             `json:"useEma"`              // use exponential ma or not
+	UseSma              bool             `json:"useSma"`              // if UseEma == false, use simple ma or not
+	SignalWindow        int              `json:"sigWin"`              // signal window
+	DisableShortStop    bool             `json:"disableShortStop"`    // disable SL on short
+	DisableLongStop     bool             `json:"disableLongStop"`     // disable SL on long
+	FilterHigh          float64          `json:"cciStochFilterHigh"`  // high filter for CCI Stochastic indicator
+	FilterLow           float64          `json:"cciStochFilterLow"`   // low filter for CCI Stochastic indicator
+	EwoChangeFilterHigh float64          `json:"ewoChangeFilterHigh"` // high filter for ewo histogram
+	EwoChangeFilterLow  float64          `json:"ewoChangeFilterLow"`  // low filter for ewo histogram
 
 	Record bool `json:"record"` // print record messages on position exit point
 
@@ -60,17 +62,20 @@ type Strategy struct {
 	entryPrice        fixedpoint.Value
 	waitForTrade      bool
 
-	atr         *indicator.ATR
-	ccis        *CCISTOCH
-	ma5         types.Series
-	ma34        types.Series
-	ewo         types.Series
-	ewoSignal   types.Series
-	heikinAshi  *HeikinAshi
-	peakPrice   fixedpoint.Value
-	bottomPrice fixedpoint.Value
-	midPrice    fixedpoint.Value
-	lock        sync.RWMutex
+	atr           *indicator.ATR
+	emv           *indicator.EMV
+	ccis          *CCISTOCH
+	ma5           types.Series
+	ma34          types.Series
+	ewo           types.Series
+	ewoSignal     types.Series
+	ewoHistogram  types.Series
+	ewoChangeRate float64
+	heikinAshi    *HeikinAshi
+	peakPrice     fixedpoint.Value
+	bottomPrice   fixedpoint.Value
+	midPrice      fixedpoint.Value
+	lock          sync.RWMutex
 
 	buyPrice  fixedpoint.Value
 	sellPrice fixedpoint.Value
@@ -201,179 +206,139 @@ func (inc *VWEMA) UpdateVal(price float64, vol float64) {
 }
 
 // Setup the Indicators going to be used
-func (s *Strategy) SetupIndicators() {
-	store, ok := s.Session.MarketDataStore(s.Symbol)
-	if !ok {
-		log.Errorf("cannot get marketdatastore of %s", s.Symbol)
-		return
-	}
-
+func (s *Strategy) SetupIndicators(store *bbgo.MarketDataStore) {
 	window5 := types.IntervalWindow{Interval: s.Interval, Window: 5}
 	window34 := types.IntervalWindow{Interval: s.Interval, Window: 34}
 	s.atr = &indicator.ATR{IntervalWindow: window34}
+	s.emv = &indicator.EMV{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: 14}}
 	s.ccis = NewCCISTOCH(s.Interval, s.FilterHigh, s.FilterLow)
 
-	if s.UseHeikinAshi {
-		s.heikinAshi = NewHeikinAshi(50)
-		store.OnKLineWindowUpdate(func(interval types.Interval, window types.KLineWindow) {
-			if interval == s.atr.Interval {
-				if s.atr.RMA == nil {
-					for _, kline := range window {
-						s.atr.Update(
-							kline.High.Float64(),
-							kline.Low.Float64(),
-							kline.Close.Float64(),
-						)
-					}
-				} else {
-					kline := window[len(window)-1]
-					s.atr.Update(
-						kline.High.Float64(),
-						kline.Low.Float64(),
-						kline.Close.Float64(),
-					)
+	getSource := func(window types.KLineWindow) types.Series {
+		if s.UseHeikinAshi {
+			return s.heikinAshi.Close
+		}
+		return window.Close()
+	}
+	getVol := func(window types.KLineWindow) types.Series {
+		if s.UseHeikinAshi {
+			return s.heikinAshi.Volume
+		}
+		return window.Volume()
+	}
+	s.heikinAshi = NewHeikinAshi(500)
+	store.OnKLineWindowUpdate(func(interval types.Interval, window types.KLineWindow) {
+		if interval == s.atr.Interval {
+			if s.atr.RMA == nil {
+				for _, kline := range window {
+					high := kline.High.Float64()
+					low := kline.Low.Float64()
+					cloze := kline.Close.Float64()
+					vol := kline.Volume.Float64()
+					s.atr.Update(high, low, cloze)
+					s.emv.Update(high, low, vol)
 				}
+			} else {
+				kline := window[len(window)-1]
+				high := kline.High.Float64()
+				low := kline.Low.Float64()
+				cloze := kline.Close.Float64()
+				vol := kline.Volume.Float64()
+				s.atr.Update(high, low, cloze)
+				s.emv.Update(high, low, vol)
 			}
+		}
+		if s.Interval != interval {
+			return
+		}
+		if s.heikinAshi.Close.Length() == 0 {
+			for _, kline := range window {
+				s.heikinAshi.Update(kline)
+				s.ccis.Update(getSource(window).Last())
+			}
+		} else {
+			s.heikinAshi.Update(window[len(window)-1])
+			s.ccis.Update(getSource(window).Last())
+		}
+	})
+	if s.UseEma {
+		ema5 := &indicator.EWMA{IntervalWindow: window5}
+		ema34 := &indicator.EWMA{IntervalWindow: window34}
+		store.OnKLineWindowUpdate(func(interval types.Interval, window types.KLineWindow) {
 			if s.Interval != interval {
 				return
 			}
-			if s.heikinAshi.Close.Length() == 0 {
-				for _, kline := range window {
-					s.heikinAshi.Update(kline)
-					s.ccis.Update(s.heikinAshi.Close.Last())
-				}
-			} else {
-				s.heikinAshi.Update(window[len(window)-1])
-				s.ccis.Update(s.heikinAshi.Close.Last())
-			}
-		})
-		if s.UseEma {
-			ema5 := &indicator.EWMA{IntervalWindow: window5}
-			ema34 := &indicator.EWMA{IntervalWindow: window34}
-			store.OnKLineWindowUpdate(func(interval types.Interval, _ types.KLineWindow) {
-				if s.Interval != interval {
-					return
-				}
-				if ema5.Length() == 0 {
-					closes := types.ToReverseArray(s.heikinAshi.Close)
-					for _, cloze := range closes {
-						ema5.Update(cloze)
-						ema34.Update(cloze)
-					}
-				} else {
-					cloze := s.heikinAshi.Close.Last()
+			if ema5.Length() == 0 {
+				closes := types.ToReverseArray(getSource(window))
+				for _, cloze := range closes {
 					ema5.Update(cloze)
 					ema34.Update(cloze)
 				}
-			})
-			s.ma5 = ema5
-			s.ma34 = ema34
-		} else if s.UseSma {
-			sma5 := &indicator.SMA{IntervalWindow: window5}
-			sma34 := &indicator.SMA{IntervalWindow: window34}
-			store.OnKLineWindowUpdate(func(interval types.Interval, _ types.KLineWindow) {
-				if s.Interval != interval {
-					return
-				}
-				if sma5.Length() == 0 {
-					closes := types.ToReverseArray(s.heikinAshi.Close)
-					for _, cloze := range closes {
-						sma5.Update(cloze)
-						sma34.Update(cloze)
-					}
-				} else {
-					cloze := s.heikinAshi.Close.Last()
-					sma5.Update(cloze)
-					sma34.Update(cloze)
-				}
-			})
-			s.ma5 = sma5
-			s.ma34 = sma34
-		} else {
-			evwma5 := &VWEMA{
-				PV: &indicator.EWMA{IntervalWindow: window5},
-				V:  &indicator.EWMA{IntervalWindow: window5},
+			} else {
+				cloze := getSource(window).Last()
+				ema5.Update(cloze)
+				ema34.Update(cloze)
 			}
-			evwma34 := &VWEMA{
-				PV: &indicator.EWMA{IntervalWindow: window34},
-				V:  &indicator.EWMA{IntervalWindow: window34},
-			}
-			store.OnKLineWindowUpdate(func(interval types.Interval, _ types.KLineWindow) {
-				if s.Interval != interval {
-					return
-				}
-				if evwma5.PV.Length() == 0 {
-					for i := s.heikinAshi.Close.Length() - 1; i >= 0; i-- {
-						price := s.heikinAshi.Close.Index(i)
-						vol := s.heikinAshi.Volume.Index(i)
-						evwma5.UpdateVal(price, vol)
-						evwma34.UpdateVal(price, vol)
-					}
-				} else {
-					price := s.heikinAshi.Close.Last()
-					vol := s.heikinAshi.Volume.Last()
-					evwma5.UpdateVal(price, vol)
-					evwma34.UpdateVal(price, vol)
-				}
-			})
-			s.ma5 = evwma5
-			s.ma34 = evwma34
-		}
-	} else {
-		indicatorSet, ok := s.Session.StandardIndicatorSet(s.Symbol)
-		if !ok {
-			log.Errorf("cannot get indicator set of %s", s.Symbol)
-			return
-		}
 
-		s.atr.Bind(store)
+		})
+
+		s.ma5 = ema5
+		s.ma34 = ema34
+	} else if s.UseSma {
+		sma5 := &indicator.SMA{IntervalWindow: window5}
+		sma34 := &indicator.SMA{IntervalWindow: window34}
 		store.OnKLineWindowUpdate(func(interval types.Interval, window types.KLineWindow) {
 			if s.Interval != interval {
 				return
 			}
-			if s.ccis.cci.Input.Length() == 0 {
-				for _, kline := range window {
-					s.ccis.Update(kline.Close.Float64())
+			if sma5.Length() == 0 {
+				closes := types.ToReverseArray(getSource(window))
+				for _, cloze := range closes {
+					sma5.Update(cloze)
+					sma34.Update(cloze)
 				}
 			} else {
-				s.ccis.Update(window[len(window)-1].Close.Float64())
+				cloze := getSource(window).Last()
+				sma5.Update(cloze)
+				sma34.Update(cloze)
 			}
 		})
-		if s.UseEma {
-			s.ma5 = indicatorSet.EWMA(window5)
-			s.ma34 = indicatorSet.EWMA(window34)
-		} else if s.UseSma {
-			s.ma5 = indicatorSet.SMA(window5)
-			s.ma34 = indicatorSet.SMA(window34)
-		} else {
-			evwma5 := &VWEMA{
-				PV: &indicator.EWMA{IntervalWindow: window5},
-				V:  &indicator.EWMA{IntervalWindow: window5},
-			}
-			evwma34 := &VWEMA{
-				PV: &indicator.EWMA{IntervalWindow: window34},
-				V:  &indicator.EWMA{IntervalWindow: window34},
-			}
-			store.OnKLineWindowUpdate(func(interval types.Interval, window types.KLineWindow) {
-				if s.Interval != interval {
-					return
-				}
-				if evwma5.PV.Length() == 0 {
-					for _, kline := range window {
-						evwma5.Update(kline)
-						evwma34.Update(kline)
-					}
-				} else {
-					evwma5.Update(window[len(window)-1])
-					evwma34.Update(window[len(window)-1])
-				}
-			})
-			s.ma5 = evwma5
-			s.ma34 = evwma34
+		s.ma5 = sma5
+		s.ma34 = sma34
+	} else {
+		evwma5 := &VWEMA{
+			PV: &indicator.EWMA{IntervalWindow: window5},
+			V:  &indicator.EWMA{IntervalWindow: window5},
 		}
+		evwma34 := &VWEMA{
+			PV: &indicator.EWMA{IntervalWindow: window34},
+			V:  &indicator.EWMA{IntervalWindow: window34},
+		}
+		store.OnKLineWindowUpdate(func(interval types.Interval, window types.KLineWindow) {
+			if s.Interval != interval {
+				return
+			}
+			clozes := getSource(window)
+			vols := getVol(window)
+			if evwma5.PV.Length() == 0 {
+				for i := clozes.Length() - 1; i >= 0; i-- {
+					price := clozes.Index(i)
+					vol := vols.Index(i)
+					evwma5.UpdateVal(price, vol)
+					evwma34.UpdateVal(price, vol)
+				}
+			} else {
+				price := clozes.Last()
+				vol := vols.Last()
+				evwma5.UpdateVal(price, vol)
+				evwma34.UpdateVal(price, vol)
+			}
+		})
+		s.ma5 = evwma5
+		s.ma34 = evwma34
 	}
 
 	s.ewo = types.Mul(types.Minus(types.Div(s.ma5, s.ma34), 1.0), 100.)
+	s.ewoHistogram = types.Minus(s.ma5, s.ma34)
 	windowSignal := types.IntervalWindow{Interval: s.Interval, Window: s.SignalWindow}
 	if s.UseEma {
 		sig := &indicator.EWMA{IntervalWindow: windowSignal}
@@ -420,25 +385,16 @@ func (s *Strategy) SetupIndicators() {
 			if interval != s.Interval {
 				return
 			}
-			var vol float64
 			if sig.Length() == 0 {
 				// lazy init
 				ewoVals := types.ToReverseArray(s.ewo)
 				for i, ewoValue := range ewoVals {
-					if s.UseHeikinAshi {
-						vol = s.heikinAshi.Volume.Index(len(ewoVals) - 1 - i)
-					} else {
-						vol = window[len(ewoVals)-1-i].Volume.Float64()
-					}
+					vol := window.Volume().Index(i)
 					sig.PV.Update(ewoValue * vol)
 					sig.V.Update(vol)
 				}
 			} else {
-				if s.UseHeikinAshi {
-					vol = s.heikinAshi.Volume.Last()
-				} else {
-					vol = window[len(window)-1].Volume.Float64()
-				}
+				vol := window.Volume().Last()
 				sig.PV.Update(s.ewo.Last() * vol)
 				sig.V.Update(vol)
 			}
@@ -704,17 +660,20 @@ func (s *Strategy) GetLastPrice() fixedpoint.Value {
 
 // Trading Rules:
 // - buy / sell the whole asset
-// - SL by atr (lastprice < buyprice - atr * 2) || (lastprice > sellprice + atr * 2)
-// - TP by cci stoch invert or ewo invert
-// - TP by (lastprice < peak price - atr * 2) || (lastprice > bottom price + atr * 2)
+// - SL by atr (lastprice < buyprice - atr) || (lastprice > sellprice + atr)
+// - TP by detecting if there's a ewo pivotHigh(1,1) -> close long, or pivotLow(1,1) -> close short
+// - TP by ma34 +- atr * 2
+// - TP by (lastprice < peak price - atr) || (lastprice > bottom price + atr)
 // - SL by s.Stoploss (Abs(price_diff / price) > s.Stoploss)
 // - entry condition on ewo(Elliott wave oscillator) Crosses ewoSignal(ma on ewo, signalWindow)
-//   * buy signal on crossover
-//   * sell signal on crossunder
+//   * buy signal on (crossover on previous K bar and no crossunder on latest K bar)
+//   * sell signal on (crossunder on previous K bar and no crossunder on latest K bar)
 // - and filtered by the following rules:
-//   * buy: buy signal ON, kline Close > Open, Close > ma(Window=5), CCI Stochastic Buy signal
-//   * sell: sell signal ON, kline Close < Open, Close < ma(Window=5), CCI Stochastic Sell signal
-// Cancel non-fully filled orders every s.Interval
+//   * buy: buy signal ON, kline Close > Open, Close > ma5, Close > ma34, CCI Stochastic Buy signal
+//   * sell: sell signal ON, kline Close < Open, Close < ma5, Close < ma34, CCI Stochastic Sell signal
+// - or entry when ma34 +- atr * 3 gets touched
+// - entry price: latestPrice +- atr / 2 (short,long), close at market price
+// Cancel non-fully filled orders on new signal (either in same direction or not)
 //
 // ps: kline might refer to heikinashi or normal ohlc
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
@@ -840,7 +799,15 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 	s.tradeCollector.BindStream(session.UserDataStream)
 
-	s.SetupIndicators()
+	store, ok := s.Session.MarketDataStore(s.Symbol)
+	if !ok {
+		return errors.New(fmt.Sprintf("cannot get marketdatastore of %s", s.Symbol))
+	}
+	s.SetupIndicators(store)
+
+	// local peak of ewo
+	shortSig := s.ewo.Last() < s.ewo.Index(1) && s.ewo.Index(1) > s.ewo.Index(2)
+	longSig := s.ewo.Last() > s.ewo.Index(1) && s.ewo.Index(1) < s.ewo.Index(2)
 
 	sellOrderTPSL := func(price fixedpoint.Value) {
 		lastPrice := s.GetLastPrice()
@@ -864,17 +831,15 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		spBack := s.sellPrice
 		reason := -1
 		if quoteBalance.Div(lastPrice).Compare(s.Market.MinQuantity) >= 0 && quoteBalance.Compare(s.Market.MinNotional) >= 0 {
-			longSignal := types.CrossOver(s.ewo, s.ewoSignal)
 			base := fixedpoint.NewFromFloat(s.ma34.Last())
 			// TP
-			if lastPrice.Compare(s.sellPrice) < 0 && (s.ccis.BuySignal() || longSignal.Last() || (!atrx2.IsZero() && base.Sub(atrx2).Compare(lastPrice) >= 0)) {
+			if lastPrice.Compare(s.sellPrice) < 0 && (longSig ||
+				(!atrx2.IsZero() && base.Sub(atrx2).Compare(lastPrice) >= 0)) {
 				buyall = true
 				takeProfit = true
 
 				// calculate report
-				if s.ccis.BuySignal() {
-					reason = 0
-				} else if longSignal.Last() {
+				if longSig {
 					reason = 1
 				} else {
 					reason = 2
@@ -976,17 +941,15 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		bpBack := s.buyPrice
 		reason := -1
 		if baseBalance.Compare(s.Market.MinQuantity) >= 0 && baseBalance.Mul(lastPrice).Compare(s.Market.MinNotional) >= 0 {
-			shortSignal := types.CrossUnder(s.ewo, s.ewoSignal)
 			// TP
 			base := fixedpoint.NewFromFloat(s.ma34.Last())
-			if lastPrice.Compare(s.buyPrice) > 0 && (s.ccis.SellSignal() || shortSignal.Last() || (!atrx2.IsZero() && base.Add(atrx2).Compare(lastPrice) <= 0)) {
+			if lastPrice.Compare(s.buyPrice) > 0 && (shortSig ||
+				(!atrx2.IsZero() && base.Add(atrx2).Compare(lastPrice) <= 0)) {
 				sellall = true
 				takeProfit = true
 
 				// calculate report
-				if s.ccis.SellSignal() {
-					reason = 0
-				} else if shortSignal.Last() {
+				if shortSig {
 					reason = 1
 				} else {
 					reason = 2
@@ -1094,15 +1057,38 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 	})
 
-	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
-		if kline.Symbol != s.Symbol {
-			return
+	getHigh := func(window types.KLineWindow) types.Series {
+		if s.UseHeikinAshi {
+			return s.heikinAshi.High
 		}
+		return window.High()
+	}
+	getLow := func(window types.KLineWindow) types.Series {
+		if s.UseHeikinAshi {
+			return s.heikinAshi.Low
+		}
+		return window.Low()
+	}
+	getClose := func(window types.KLineWindow) types.Series {
+		if s.UseHeikinAshi {
+			return s.heikinAshi.Close
+		}
+		return window.Close()
+	}
+	getOpen := func(window types.KLineWindow) types.Series {
+		if s.UseHeikinAshi {
+			return s.heikinAshi.Open
+		}
+		return window.Open()
+	}
+
+	store.OnKLineWindowUpdate(func(interval types.Interval, window types.KLineWindow) {
+		kline := window[len(window)-1]
 		s.KLineStartTime = kline.StartTime
 		s.KLineEndTime = kline.EndTime
 
 		// well, only track prices on 1m
-		if kline.Interval == types.Interval1m {
+		if interval == types.Interval1m {
 
 			if s.Environment.IsBackTesting() {
 				buyOrderTPSL(kline.High)
@@ -1145,28 +1131,31 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 
-		// To get the threshold for ewo
-		// mean := types.Mean(types.Abs(s.ewo), 10)
-		// std := types.Stdev(s.ewo, 10)
+		priceHighest := types.Highest(getHigh(window), 233)
+		priceLowest := types.Lowest(getLow(window), 233)
+		priceChangeRate := (priceHighest - priceLowest) / priceHighest / 14
+		ewoHighest := types.Highest(s.ewoHistogram, 233)
+
+		s.ewoChangeRate = math.Abs(s.ewoHistogram.Last() / ewoHighest * priceChangeRate)
 
 		longSignal := types.CrossOver(s.ewo, s.ewoSignal)
 		shortSignal := types.CrossUnder(s.ewo, s.ewoSignal)
-		// get trend flags
-		var bull, breakThrough, breakDown bool
-		if s.UseHeikinAshi {
-			bull = s.heikinAshi.Close.Last() > s.heikinAshi.Open.Last()
-			breakThrough = s.heikinAshi.Close.Last() > s.ma5.Last() && s.heikinAshi.Close.Last() > s.ma34.Last()
-			breakDown = s.heikinAshi.Close.Last() < s.ma5.Last() && s.heikinAshi.Close.Last() < s.ma34.Last()
 
-		} else {
-			bull = kline.Close.Compare(kline.Open) > 0
-			breakThrough = kline.Close.Float64() > s.ma5.Last() && kline.Close.Float64() > s.ma34.Last()
-			breakDown = kline.Close.Float64() < s.ma5.Last() && kline.Close.Float64() < s.ma34.Last()
-		}
+		base := s.ma34.Last()
+		sellLine := base + s.atr.Last()*3
+		buyLine := base - s.atr.Last()*3
+		clozes := getClose(window)
+		opens := getOpen(window)
+
+		// get trend flags
+		bull := clozes.Last() > opens.Last()
+		breakThrough := clozes.Last() > s.ma5.Last() && clozes.Last() > s.ma34.Last()
+		breakDown := clozes.Last() < s.ma5.Last() && clozes.Last() < s.ma34.Last()
+
 		// kline breakthrough ma5, ma34 trend up, and cci Stochastic bull
-		IsBull := bull && breakThrough && s.ccis.BuySignal()
+		IsBull := bull && breakThrough && s.ccis.BuySignal() && s.ewoChangeRate < s.EwoChangeFilterHigh && s.ewoChangeRate > s.EwoChangeFilterLow
 		// kline downthrough ma5, ma34 trend down, and cci Stochastic bear
-		IsBear := !bull && breakDown && s.ccis.SellSignal()
+		IsBear := !bull && breakDown && s.ccis.SellSignal() && s.ewoChangeRate < s.EwoChangeFilterHigh && s.ewoChangeRate > s.EwoChangeFilterLow
 
 		if !s.Environment.IsBackTesting() {
 			log.Infof("IsBull: %v, bull: %v, longSignal[1]: %v, shortSignal: %v, lastPrice: %v",
@@ -1175,8 +1164,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				IsBear, !bull, shortSignal.Index(1), longSignal.Last(), lastPrice)
 		}
 
-		if longSignal.Index(1) && !shortSignal.Last() && IsBull {
-			price := kline.Close.Sub(atr.Div(types.Two))
+		if (longSignal.Index(1) && !shortSignal.Last() && IsBull) || lastPrice.Float64() <= buyLine {
+			price := lastPrice.Sub(atr.Div(types.Two))
 			// if total asset (including locked) could be used to buy
 			if quoteBalance.Div(price).Compare(s.Market.MinQuantity) >= 0 && quoteBalance.Compare(s.Market.MinNotional) >= 0 {
 				// cancel all orders to release lock
@@ -1184,6 +1173,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 				// backup, since the s.sellPrice will be cleared when doing ClosePosition
 				sellPrice := s.sellPrice
+				log.Errorf("ewoChangeRate %v, emv %v", s.ewoChangeRate, s.emv.Last())
 
 				// calculate report
 				if closeOrder, _ := s.PlaceBuyOrder(ctx, price); closeOrder != nil {
@@ -1208,8 +1198,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				}
 			}
 		}
-		if shortSignal.Index(1) && !longSignal.Last() && IsBear {
-			price := kline.Close.Add(atr.Div(types.Two))
+		if (shortSignal.Index(1) && !longSignal.Last() && IsBear) || lastPrice.Float64() >= sellLine {
+			price := lastPrice.Add(atr.Div(types.Two))
 			// if total asset (including locked) could be used to sell
 			if baseBalance.Mul(price).Compare(s.Market.MinNotional) >= 0 && baseBalance.Compare(s.Market.MinQuantity) >= 0 {
 				// cancel all orders to release lock
@@ -1217,6 +1207,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 				// backup, since the s.buyPrice will be cleared when doing ClosePosition
 				buyPrice := s.buyPrice
+				log.Errorf("ewoChangeRate: %v, emv %v", s.ewoChangeRate, s.emv.Last())
 
 				// calculate report
 				if closeOrder, _ := s.PlaceSellOrder(ctx, price); closeOrder != nil {
@@ -1248,13 +1239,16 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.CancelAll(ctx)
 
 		s.tradeCollector.Process()
-		color.HiBlue("---- Trade Report (Without Fee) ----")
-		color.HiBlue("TP:")
-		color.Blue("\tpeak / bottom with atr: %d, avg pnl rate: %f", counterTPfromPeak, percentAvgTPfromPeak)
-		color.Blue("\tCCI Stochastic: %d, avg pnl rate: %f", counterTPfromCCI, percentAvgTPfromCCI)
-		color.Blue("\tLongSignal/ShortSignal: %d, avg pnl rate: %f", counterTPfromLongShort, percentAvgTPfromLongShort)
-		color.Blue("\tma34 and Atrx2: %d, avg pnl rate: %f", counterTPfromAtr, percentAvgTPfromAtr)
-		color.Blue("\tActive Order: %d, avg pnl rate: %f", counterTPfromOrder, percentAvgTPfromOrder)
+		hiblue := color.New(color.FgHiBlue).FprintfFunc()
+		blue := color.New(color.FgBlue).FprintfFunc()
+		hiyellow := color.New(color.FgHiYellow).FprintfFunc()
+		hiblue(os.Stderr, "---- Trade Report (Without Fee) ----\n")
+		hiblue(os.Stderr, "TP:\n")
+		blue(os.Stderr, "\tpeak / bottom with atr: %d, avg pnl rate: %f\n", counterTPfromPeak, percentAvgTPfromPeak)
+		blue(os.Stderr, "\tCCI Stochastic: %d, avg pnl rate: %f\n", counterTPfromCCI, percentAvgTPfromCCI)
+		blue(os.Stderr, "\tLongSignal/ShortSignal: %d, avg pnl rate: %f\n", counterTPfromLongShort, percentAvgTPfromLongShort)
+		blue(os.Stderr, "\tma34 and Atrx2: %d, avg pnl rate: %f\n", counterTPfromAtr, percentAvgTPfromAtr)
+		blue(os.Stderr, "\tActive Order: %d, avg pnl rate: %f\n", counterTPfromOrder, percentAvgTPfromOrder)
 
 		totalTP := counterTPfromPeak + counterTPfromCCI + counterTPfromLongShort + counterTPfromAtr + counterTPfromOrder
 		avgProfit := (float64(counterTPfromPeak)*percentAvgTPfromPeak +
@@ -1262,18 +1256,43 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			float64(counterTPfromLongShort)*percentAvgTPfromLongShort +
 			float64(counterTPfromAtr)*percentAvgTPfromAtr +
 			float64(counterTPfromOrder)*percentAvgTPfromOrder) / float64(totalTP)
-		color.HiBlue("\tSum: %d, avg pnl rate: %f", totalTP, avgProfit)
+		hiblue(os.Stderr, "\tSum: %d, avg pnl rate: %f\n", totalTP, avgProfit)
 
-		color.HiBlue("SL:")
-		color.Blue("\tentry SL: %d, avg pnl rate: -%f", counterSLfromSL, percentAvgSLfromSL)
-		color.Blue("\tActive Order: %d, avg pnl rate: -%f", counterSLfromOrder, percentAvgSLfromOrder)
+		hiblue(os.Stderr, "SL:\n")
+		blue(os.Stderr, "\tentry SL: %d, avg pnl rate: -%f\n", counterSLfromSL, percentAvgSLfromSL)
+		blue(os.Stderr, "\tActive Order: %d, avg pnl rate: -%f\n", counterSLfromOrder, percentAvgSLfromOrder)
 
 		totalSL := counterSLfromSL + counterSLfromOrder
 		avgLoss := (float64(counterSLfromSL)*percentAvgSLfromSL + float64(counterSLfromOrder)*percentAvgSLfromOrder) / float64(totalSL)
-		color.HiBlue("\tSum: %d, avg pnl rate: -%f", totalSL, avgLoss)
+		hiblue(os.Stderr, "\tSum: %d, avg pnl rate: -%f\n", totalSL, avgLoss)
 
-		color.HiBlue("WinRate: %f", float64(totalTP)/float64(totalTP+totalSL))
+		hiblue(os.Stderr, "WinRate: %f\n", float64(totalTP)/float64(totalTP+totalSL))
 
+		maString := "vwema"
+		if s.UseSma {
+			maString = "sma"
+		}
+		if s.UseEma {
+			maString = "ema"
+		}
+
+		hiyellow(os.Stderr, "----- EWO Settings -------\n")
+		hiyellow(os.Stderr, "General:\n")
+		hiyellow(os.Stderr, "\tuseHeikinAshi: %v\n", s.UseHeikinAshi)
+		hiyellow(os.Stderr, "\tstoploss: %v\n", s.Stoploss)
+		hiyellow(os.Stderr, "\tsymbol: %s\n", s.Symbol)
+		hiyellow(os.Stderr, "\tinterval: %s\n", s.Interval)
+		hiyellow(os.Stderr, "\tMA type: %s\n", maString)
+		hiyellow(os.Stderr, "\tdisableShortStop: %v\n", s.DisableShortStop)
+		hiyellow(os.Stderr, "\tdisableLongStop: %v\n", s.DisableLongStop)
+		hiyellow(os.Stderr, "\trecord: %v\n", s.Record)
+		hiyellow(os.Stderr, "CCI Stochastic:\n")
+		hiyellow(os.Stderr, "\tccistochFilterHigh: %f\n", s.FilterHigh)
+		hiyellow(os.Stderr, "\tccistochFilterLow: %f\n", s.FilterLow)
+		hiyellow(os.Stderr, "Ewo && Ewo Histogram:\n")
+		hiyellow(os.Stderr, "\tsigWin: %d\n", s.SignalWindow)
+		hiyellow(os.Stderr, "\tewoChngFilterHigh: %f\n", s.EwoChangeFilterHigh)
+		hiyellow(os.Stderr, "\tewoChngFilterLow: %f\n", s.EwoChangeFilterLow)
 	})
 	return nil
 }
