@@ -25,9 +25,6 @@ func (s *OrderService) NewGetWalletAccountsRequest(walletType WalletType) *GetWa
 	return &GetWalletAccountsRequest{client: s.Client, walletType: walletType}
 }
 
-func (s *OrderService) NewCreateWalletOrderRequest(walletType WalletType) *CreateWalletOrderRequest {
-	return &CreateWalletOrderRequest{client: s.Client, walletType: walletType}
-}
 
 func (s *OrderService) NewGetWalletOrderHistoryRequest(walletType WalletType) *GetWalletOrderHistoryRequest {
 	return &GetWalletOrderHistoryRequest{client: s.Client, walletType: walletType}
@@ -46,22 +43,6 @@ type GetWalletAccountsRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
 	walletType WalletType `param:"walletType,slug,required"`
-}
-
-//go:generate PostRequest -url "/api/v3/wallet/:walletType/orders" -type CreateWalletOrderRequest -responseType .Order
-type CreateWalletOrderRequest struct {
-	client requestgen.AuthenticatedAPIClient
-
-	walletType WalletType `param:"walletType,slug,required"`
-	market     string     `param:"market,required"`
-	side       string     `param:"side,required"`
-	volume     string     `param:"volume,required"`
-	orderType  string     `param:"ord_type"`
-
-	price         *string `param:"price"`
-	stopPrice     *string `param:"stop_price"`
-	clientOrderID *string `param:"client_oid"`
-	groupID       *string `param:"group_id"`
 }
 
 //go:generate GetRequest -url "/api/v3/wallet/:walletType/orders/history" -type GetWalletOrderHistoryRequest -responseType []Order
