@@ -6,6 +6,7 @@ import {Button} from '@mantine/core';
 // const createChart = dynamic(() => import('lightweight-charts'));
 import {createChart, CrosshairMode} from 'lightweight-charts';
 import {ReportSummary} from "../types";
+import moment from "moment";
 
 const parseKline = () => {
   return (d : any) => {
@@ -209,9 +210,10 @@ const removeDuplicatedKLines = (klines: Array<KLine>): Array<KLine> => {
   return newK;
 }
 
-function fetchKLines(basePath: string, runID: string, symbol: string, interval: string, duration: string) {
+function fetchKLines(basePath: string, runID: string, symbol: string, interval: string, startTime: Date, endTime: Date) {
+  var duration = [moment(startTime).format('YYYYMMDD'), moment(endTime).format('YYYYMMDD')];
   return fetch(
-    `${basePath}/shared/klines_${duration}/${symbol}-${interval}.tsv`,
+    `${basePath}/shared/klines_${duration.join('-')}/${symbol}-${interval}.tsv`,
   )
     .then((response) => response.text())
     .then((data) => tsvParse(data, parseKline()))
@@ -399,15 +401,7 @@ const TradingViewChart = (props: TradingViewChartProps) => {
       }
     }
 
-    var startTime = new Date(props.reportSummary.startTime);
-    var endTime = new Date(props.reportSummary.endTime);
-    var mm = startTime.getMonth() + 1;
-    var dd = startTime.getDate();
-    var duration = [startTime.getFullYear(), (mm>9 ? '' : '0') + mm, (dd>9 ? '' : '0') + dd].join('');
-    mm = endTime.getMonth() + 1;
-    dd = endTime.getDate();
-    duration = [duration, '-', endTime.getFullYear(), (mm>9 ? '' : '0') + mm, (dd>9 ? '' : '0') + dd].join('');
-    const kLinesFetcher = fetchKLines(props.basePath, props.runID, props.symbol, currentInterval, duration).then((klines) => {
+    const kLinesFetcher = fetchKLines(props.basePath, props.runID, props.symbol, currentInterval, new Date(props.reportSummary.startTime), new Date(props.reportSummary.endTime)).then((klines) => {
       chartData.klines = removeDuplicatedKLines(klines as Array<KLine>)
     });
     fetchers.push(kLinesFetcher);
