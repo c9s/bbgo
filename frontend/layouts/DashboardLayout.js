@@ -1,17 +1,16 @@
 import React from 'react';
 
-import { makeStyles, styled } from '@mui/styles';
+import { makeStyles } from '@mui/styles';
 import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import Container from '@mui/material/Container';
 
 import SideBar from '../components/SideBar';
+import SyncButton from '../components/SyncButton';
 
 import ConnectWallet from '../components/ConnectWallet';
 import { Box } from '@mui/material';
-import { throttle } from '../src/utils';
-import { triggerSync } from '../api/bbgo';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -32,18 +31,6 @@ const useStyles = makeStyles((theme) => ({
     justifyContent: 'space-between',
   },
 }));
-
-const ToolbarButton = styled('button')(({ theme }) => ({
-  padding: theme.spacing(1),
-}));
-
-function SyncButton() {
-  const handleClick = throttle(async () => {
-    await triggerSync();
-  }, 2000);
-
-  return <ToolbarButton onClick={handleClick}>Sync</ToolbarButton>;
-}
 
 export default function DashboardLayout({ children }) {
   const classes = useStyles();
