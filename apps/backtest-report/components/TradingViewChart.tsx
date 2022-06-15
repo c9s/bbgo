@@ -6,6 +6,7 @@ import {Button} from '@mantine/core';
 // const createChart = dynamic(() => import('lightweight-charts'));
 import {createChart, CrosshairMode} from 'lightweight-charts';
 import {ReportSummary} from "../types";
+import moment from "moment";
 
 const parseKline = () => {
   return (d : any) => {
@@ -209,9 +210,10 @@ const removeDuplicatedKLines = (klines: Array<KLine>): Array<KLine> => {
   return newK;
 }
 
-function fetchKLines(basePath: string, runID: string, symbol: string, interval: string) {
+function fetchKLines(basePath: string, runID: string, symbol: string, interval: string, startTime: Date, endTime: Date) {
+  var duration = [moment(startTime).format('YYYYMMDD'), moment(endTime).format('YYYYMMDD')];
   return fetch(
-    `${basePath}/${runID}/klines/${symbol}-${interval}.tsv`,
+    `${basePath}/shared/klines_${duration.join('-')}/${symbol}-${interval}.tsv`,
   )
     .then((response) => response.text())
     .then((data) => tsvParse(data, parseKline()))
@@ -399,7 +401,7 @@ const TradingViewChart = (props: TradingViewChartProps) => {
       }
     }
 
-    const kLinesFetcher = fetchKLines(props.basePath, props.runID, props.symbol, currentInterval).then((klines) => {
+    const kLinesFetcher = fetchKLines(props.basePath, props.runID, props.symbol, currentInterval, new Date(props.reportSummary.startTime), new Date(props.reportSummary.endTime)).then((klines) => {
       chartData.klines = removeDuplicatedKLines(klines as Array<KLine>)
     });
     fetchers.push(kLinesFetcher);

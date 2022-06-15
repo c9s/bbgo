@@ -291,8 +291,14 @@ var BacktestCmd = &cobra.Command{
 				// reportDir = filepath.Join(reportDir, backtestSessionName)
 				reportDir = filepath.Join(reportDir, runID)
 			}
+			if err := util.SafeMkdirAll(reportDir); err != nil {
+				return err
+			}
 
-			kLineDataDir := filepath.Join(reportDir, "klines")
+			startTimeStr := startTime.Format("20060102")
+			endTimeStr := endTime.Format("20060102")
+			kLineSubDir := strings.Join([]string{"klines", "_", startTimeStr, "-", endTimeStr}, "")
+			kLineDataDir := filepath.Join(outputDirectory, "shared", kLineSubDir)
 			if err := util.SafeMkdirAll(kLineDataDir); err != nil {
 				return err
 			}
