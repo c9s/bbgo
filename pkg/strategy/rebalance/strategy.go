@@ -75,14 +75,14 @@ func (s *Strategy) Validate() error {
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
-	for _, symbol := range s.getSymbols() {
+	for _, symbol := range s.symbols() {
 		session.Subscribe(types.KLineChannel, symbol, types.SubscribeOptions{Interval: s.Interval})
 	}
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	s.activeOrderBooks = make(map[string]*bbgo.ActiveOrderBook)
-	for _, symbol := range s.getSymbols() {
+	for _, symbol := range s.symbols() {
 		activeOrderBook := bbgo.NewActiveOrderBook(symbol)
 		activeOrderBook.BindStream(session.UserDataStream)
 		s.activeOrderBooks[symbol] = activeOrderBook
@@ -106,7 +106,7 @@ func (s *Strategy) rebalance(ctx context.Context, orderExecutor bbgo.OrderExecut
 		}
 	}
 
-	prices, err := s.getPrices(ctx, session)
+	prices, err := s.prices(ctx, session)
 	if err != nil {
 		return
 	}
@@ -135,7 +135,7 @@ func (s *Strategy) rebalance(ctx context.Context, orderExecutor bbgo.OrderExecut
 	}
 }
 
-func (s *Strategy) getPrices(ctx context.Context, session *bbgo.ExchangeSession) (prices types.Float64Slice, err error) {
+func (s *Strategy) prices(ctx context.Context, session *bbgo.ExchangeSession) (prices types.Float64Slice, err error) {
 	for _, currency := range s.currencies {
 		if currency == s.BaseCurrency {
 			prices = append(prices, 1.0)
@@ -232,7 +232,7 @@ func (s *Strategy) generateSubmitOrders(prices, marketValues types.Float64Slice)
 	return submitOrders
 }
 
-func (s *Strategy) getSymbols() (symbols []string) {
+func (s *Strategy) symbols() (symbols []string) {
 	for _, currency := range s.currencies {
 		if currency == s.BaseCurrency {
 			continue
