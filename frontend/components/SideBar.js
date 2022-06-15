@@ -97,7 +97,6 @@ export default function SideBar() {
             <ListItemText primary="Strategies" />
           </ListItem>
         </Link>
-        
       </List>
     </Drawer>
   );
