@@ -15,18 +15,19 @@ export function queryOutboundIP(cb) {
   });
 }
 
-const triggerSync = async () => {
+export async function triggerSync() {
   return axios.post<any>(baseURL + '/api/environment/sync');
 };
 
-export { triggerSync };
+export enum SyncStatus {
+  SyncNotStarted = 0,
+  Syncing = 1,
+  SyncDone = 2
+}
 
-export function querySyncStatus(cb) {
-  return axios
-    .get<any>(baseURL + '/api/environment/syncing')
-    .then((response) => {
-      cb(response.data.syncing);
-    });
+export async function querySyncStatus(): Promise<SyncStatus> {
+  const resp = await axios.get<any>(baseURL + '/api/environment/syncing')
+  return resp.data.syncing
 }
 
 export function testDatabaseConnection(params, cb) {
