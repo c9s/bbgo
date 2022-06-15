@@ -115,6 +115,35 @@ func (o *GridOptimizer) buildOps() []OpFunc {
 				return nil
 			}
 			ops = append(ops, f)
+		case "bool":
+			values := []bool{true, false}
+			f := func(configJson []byte, next func(configJson []byte) error) error {
+				for _, val := range values {
+					log.Debugf("%d %s: %v of %v", ii, path, val, values)
+
+					jsonOp := []byte(reformatJson(fmt.Sprintf(`[{"op": "replace", "path": "%s", "value": %v}]`, path, val)))
+					patch, err := jsonpatch.DecodePatch(jsonOp)
+					if err != nil {
+						return err
+					}
+
+					log.Debugf("json op: %s", jsonOp)
+
+					patchedJson, err := patch.ApplyIndent(configJson, "  ")
+					if err != nil {
+						return err
+					}
+
+					valCopy := val
+					o.CurrentParams[ii] = valCopy
+					if err := next(patchedJson); err != nil {
+						return err
+					}
+				}
+
+				return nil
+			}
+			ops = append(ops, f)
 		}
 	}
 	return ops
