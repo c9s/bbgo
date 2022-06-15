@@ -28,7 +28,6 @@ type Strategy struct {
 	BaseCurrency  string                      `json:"baseCurrency"`
 	TargetWeights map[string]fixedpoint.Value `json:"targetWeights"`
 	Threshold     fixedpoint.Value            `json:"threshold"`
-	IgnoreLocked  bool                        `json:"ignoreLocked"`
 	Verbose       bool                        `json:"verbose"`
 	DryRun        bool                        `json:"dryRun"`
 	// max amount to buy or sell per order
@@ -111,9 +110,7 @@ func (s *Strategy) rebalance(ctx context.Context, orderExecutor bbgo.OrderExecut
 		return
 	}
 
-	balances := session.GetAccount().Balances()
-	quantities := s.getQuantities(balances)
-	marketValues := prices.Mul(quantities)
+	marketValues := prices.Mul(s.quantities(session))
 
 	orders := s.generateSubmitOrders(prices, marketValues)
 	for _, order := range orders {
@@ -136,6 +133,11 @@ func (s *Strategy) rebalance(ctx context.Context, orderExecutor bbgo.OrderExecut
 }
 
 func (s *Strategy) prices(ctx context.Context, session *bbgo.ExchangeSession) (prices types.Float64Slice, err error) {
+	tickers, err := session.Exchange.QueryTickers(ctx, s.symbols()...)
+	if err != nil {
+		return nil, err
+	}
+
 	for _, currency := range s.currencies {
 		if currency == s.BaseCurrency {
 			prices = append(prices, 1.0)
@@ -143,34 +145,21 @@ func (s *Strategy) prices(ctx context.Context, session *bbgo.ExchangeSession) (p
 		}
 
 		symbol := currency + s.BaseCurrency
-		ticker, err := session.Exchange.QueryTicker(ctx, symbol)
-		if err != nil {
-			s.Notifiability.Notify("query ticker error: %s", err.Error())
-			log.WithError(err).Error("query ticker error")
-			return prices, err
-		}
-
-		prices = append(prices, ticker.Last.Float64())
+		prices = append(prices, tickers[symbol].Last.Float64())
 	}
 	return prices, nil
 }
 
-func (s *Strategy) getQuantities(balances types.BalanceMap) (quantities types.Float64Slice) {
+func (s *Strategy) quantities(session *bbgo.ExchangeSession) (quantities types.Float64Slice) {
+	balances := session.GetAccount().Balances()
 	for _, currency := range s.currencies {
-		if s.IgnoreLocked {
-			quantities = append(quantities, balances[currency].Total().Float64())
-		} else {
-			quantities = append(quantities, balances[currency].Available.Float64())
-		}
+		quantities = append(quantities, balances[currency].Total().Float64())
 	}
 	return quantities
 }
 
 func (s *Strategy) generateSubmitOrders(prices, marketValues types.Float64Slice) (submitOrders []types.SubmitOrder) {
 	currentWeights := marketValues.Normalize()
-	totalValue := marketValues.Sum()
-
-	log.Infof("total value: %f", totalValue)
 
 	for i, currency := range s.currencies {
 		if currency == s.BaseCurrency {
@@ -201,7 +190,7 @@ func (s *Strategy) generateSubmitOrders(prices, marketValues types.Float64Slice)
 			continue
 		}
 
-		quantity := fixedpoint.NewFromFloat((weightDifference * totalValue) / currentPrice)
+		quantity := fixedpoint.NewFromFloat((weightDifference * marketValues.Sum()) / currentPrice)
 
 		side := types.SideTypeBuy
 		if quantity.Sign() < 0 {
