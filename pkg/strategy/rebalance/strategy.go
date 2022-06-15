@@ -33,7 +33,11 @@ type Strategy struct {
 	// max amount to buy or sell per order
 	MaxAmount fixedpoint.Value `json:"maxAmount"`
 
+	// sorted currencies
 	currencies []string
+
+	// symbol for subscribing kline
+	symbol string
 
 	activeOrderBook *bbgo.ActiveOrderBook
 }
@@ -44,6 +48,9 @@ func (s *Strategy) Initialize() error {
 	}
 
 	sort.Strings(s.currencies)
+
+	s.symbol = s.currencies[0] + s.BaseCurrency
+
 	return nil
 }
 
@@ -74,9 +81,7 @@ func (s *Strategy) Validate() error {
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
-	for _, symbol := range s.symbols() {
-		session.Subscribe(types.KLineChannel, symbol, types.SubscribeOptions{Interval: s.Interval})
-	}
+	session.Subscribe(types.KLineChannel, s.symbol, types.SubscribeOptions{Interval: s.Interval})
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
@@ -84,21 +89,17 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.activeOrderBook.BindStream(session.UserDataStream)
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
-		if kline.Symbol != s.currencies[0]+s.BaseCurrency {
-			return
+		// cancel active orders before rebalance
+		if err := session.Exchange.CancelOrders(ctx, s.activeOrderBook.Orders()...); err != nil {
+			log.WithError(err).Errorf("failed to cancel orders")
 		}
+
 		s.rebalance(ctx, orderExecutor, session)
 	})
 	return nil
 }
 
 func (s *Strategy) rebalance(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) {
-	err := orderExecutor.CancelOrders(ctx, s.activeOrderBook.Orders()...)
-	if err != nil {
-		log.WithError(err).Error("failed to cancel orders")
-		return
-	}
-
 	prices, err := s.prices(ctx, session)
 	if err != nil {
 		return
@@ -117,7 +118,7 @@ func (s *Strategy) rebalance(ctx context.Context, orderExecutor bbgo.OrderExecut
 
 	createdOrders, err := orderExecutor.SubmitOrders(ctx, submitOrders...)
 	if err != nil {
-		log.WithError(err).Error("submit order error")
+		log.WithError(err).Error("failed to submit orders")
 		return
 	}
 
