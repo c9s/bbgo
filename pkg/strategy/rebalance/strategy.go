@@ -28,15 +28,18 @@ type Strategy struct {
 	BaseCurrency  string                      `json:"baseCurrency"`
 	TargetWeights map[string]fixedpoint.Value `json:"targetWeights"`
 	Threshold     fixedpoint.Value            `json:"threshold"`
-	IgnoreLocked  bool                        `json:"ignoreLocked"`
 	Verbose       bool                        `json:"verbose"`
 	DryRun        bool                        `json:"dryRun"`
 	// max amount to buy or sell per order
 	MaxAmount fixedpoint.Value `json:"maxAmount"`
 
+	// sorted currencies
 	currencies []string
 
-	activeOrderBooks map[string]*bbgo.ActiveOrderBook
+	// symbol for subscribing kline
+	symbol string
+
+	activeOrderBook *bbgo.ActiveOrderBook
 }
 
 func (s *Strategy) Initialize() error {
@@ -45,6 +48,9 @@ func (s *Strategy) Initialize() error {
 	}
 
 	sort.Strings(s.currencies)
+
+	s.symbol = s.currencies[0] + s.BaseCurrency
+
 	return nil
 }
 
@@ -75,48 +81,34 @@ func (s *Strategy) Validate() error {
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
-	for _, symbol := range s.getSymbols() {
-		session.Subscribe(types.KLineChannel, symbol, types.SubscribeOptions{Interval: s.Interval})
-	}
+	session.Subscribe(types.KLineChannel, s.symbol, types.SubscribeOptions{Interval: s.Interval})
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-	s.activeOrderBooks = make(map[string]*bbgo.ActiveOrderBook)
-	for _, symbol := range s.getSymbols() {
-		activeOrderBook := bbgo.NewActiveOrderBook(symbol)
-		activeOrderBook.BindStream(session.UserDataStream)
-		s.activeOrderBooks[symbol] = activeOrderBook
-	}
+	s.activeOrderBook = bbgo.NewActiveOrderBook("")
+	s.activeOrderBook.BindStream(session.UserDataStream)
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
-		if kline.Symbol != s.currencies[0]+s.BaseCurrency {
-			return
+		// cancel active orders before rebalance
+		if err := session.Exchange.CancelOrders(ctx, s.activeOrderBook.Orders()...); err != nil {
+			log.WithError(err).Errorf("failed to cancel orders")
 		}
+
 		s.rebalance(ctx, orderExecutor, session)
 	})
 	return nil
 }
 
 func (s *Strategy) rebalance(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) {
-	for symbol, book := range s.activeOrderBooks {
-		err := orderExecutor.CancelOrders(ctx, book.Orders()...)
-		if err != nil {
-			log.WithError(err).Errorf("failed to cancel %s orders", symbol)
-			return
-		}
-	}
-
-	prices, err := s.getPrices(ctx, session)
+	prices, err := s.prices(ctx, session)
 	if err != nil {
 		return
 	}
 
-	balances := session.GetAccount().Balances()
-	quantities := s.getQuantities(balances)
-	marketValues := prices.Mul(quantities)
+	marketValues := prices.Mul(s.quantities(session))
 
-	orders := s.generateSubmitOrders(prices, marketValues)
-	for _, order := range orders {
+	submitOrders := s.generateSubmitOrders(prices, marketValues)
+	for _, order := range submitOrders {
 		log.Infof("generated submit order: %s", order.String())
 	}
 
@@ -124,18 +116,21 @@ func (s *Strategy) rebalance(ctx context.Context, orderExecutor bbgo.OrderExecut
 		return
 	}
 
-	createdOrders, err := orderExecutor.SubmitOrders(ctx, orders...)
+	createdOrders, err := orderExecutor.SubmitOrders(ctx, submitOrders...)
 	if err != nil {
-		log.WithError(err).Error("submit order error")
+		log.WithError(err).Error("failed to submit orders")
 		return
 	}
 
-	for _, createdOrder := range createdOrders {
-		s.activeOrderBooks[createdOrder.Symbol].Add(createdOrder)
-	}
+	s.activeOrderBook.Add(createdOrders...)
 }
 
-func (s *Strategy) getPrices(ctx context.Context, session *bbgo.ExchangeSession) (prices types.Float64Slice, err error) {
+func (s *Strategy) prices(ctx context.Context, session *bbgo.ExchangeSession) (prices types.Float64Slice, err error) {
+	tickers, err := session.Exchange.QueryTickers(ctx, s.symbols()...)
+	if err != nil {
+		return nil, err
+	}
+
 	for _, currency := range s.currencies {
 		if currency == s.BaseCurrency {
 			prices = append(prices, 1.0)
@@ -143,34 +138,21 @@ func (s *Strategy) getPrices(ctx context.Context, session *bbgo.ExchangeSession)
 		}
 
 		symbol := currency + s.BaseCurrency
-		ticker, err := session.Exchange.QueryTicker(ctx, symbol)
-		if err != nil {
-			s.Notifiability.Notify("query ticker error: %s", err.Error())
-			log.WithError(err).Error("query ticker error")
-			return prices, err
-		}
-
-		prices = append(prices, ticker.Last.Float64())
+		prices = append(prices, tickers[symbol].Last.Float64())
 	}
 	return prices, nil
 }
 
-func (s *Strategy) getQuantities(balances types.BalanceMap) (quantities types.Float64Slice) {
+func (s *Strategy) quantities(session *bbgo.ExchangeSession) (quantities types.Float64Slice) {
+	balances := session.GetAccount().Balances()
 	for _, currency := range s.currencies {
-		if s.IgnoreLocked {
-			quantities = append(quantities, balances[currency].Total().Float64())
-		} else {
-			quantities = append(quantities, balances[currency].Available.Float64())
-		}
+		quantities = append(quantities, balances[currency].Total().Float64())
 	}
 	return quantities
 }
 
 func (s *Strategy) generateSubmitOrders(prices, marketValues types.Float64Slice) (submitOrders []types.SubmitOrder) {
 	currentWeights := marketValues.Normalize()
-	totalValue := marketValues.Sum()
-
-	log.Infof("total value: %f", totalValue)
 
 	for i, currency := range s.currencies {
 		if currency == s.BaseCurrency {
@@ -201,7 +183,7 @@ func (s *Strategy) generateSubmitOrders(prices, marketValues types.Float64Slice)
 			continue
 		}
 
-		quantity := fixedpoint.NewFromFloat((weightDifference * totalValue) / currentPrice)
+		quantity := fixedpoint.NewFromFloat((weightDifference * marketValues.Sum()) / currentPrice)
 
 		side := types.SideTypeBuy
 		if quantity.Sign() < 0 {
@@ -232,7 +214,7 @@ func (s *Strategy) generateSubmitOrders(prices, marketValues types.Float64Slice)
 	return submitOrders
 }
 
-func (s *Strategy) getSymbols() (symbols []string) {
+func (s *Strategy) symbols() (symbols []string) {
 	for _, currency := range s.currencies {
 		if currency == s.BaseCurrency {
 			continue

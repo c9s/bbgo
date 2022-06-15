@@ -9,7 +9,6 @@ exchangeStrategies:
     rebalance:
       interval: 1d
       baseCurrency: TWD
-      ignoreLocked: true
       targetWeights:
         BTC: 40%
         ETH: 20%
