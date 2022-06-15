@@ -130,3 +130,31 @@ export function queryTradingVolume(params, cb) {
       cb(response.data.tradingVolumes || []);
     });
 }
+
+export async function queryStrategiesMetrics() {
+  return (
+    [
+      {
+        "id":"uuid",
+        "instanceID": "testInstanceID",
+        "strategy": "grid",
+        "grid": {
+             "symbol": "BTCUSDT",
+        },
+        "stats": {
+          "oneDayArbs": 0,
+          "totalArbs": 3,
+          "investment": 100,
+          "totalProfits": 5.6,
+          "gridProfits": 2.5,
+          "floatingPNL": 3.1, 
+          "currentPrice": 29000,
+          "lowestPrice": 25000,
+          "highestPrice": 35000
+        },
+        "status": "RUNNING",
+        "startTime": 1654938187102
+      }
+    ]
+  )
+}
