@@ -35,7 +35,7 @@ type Strategy struct {
 
 	currencies []string
 
-	activeOrderBooks map[string]*bbgo.ActiveOrderBook
+	activeOrderBook *bbgo.ActiveOrderBook
 }
 
 func (s *Strategy) Initialize() error {
@@ -80,12 +80,8 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-	s.activeOrderBooks = make(map[string]*bbgo.ActiveOrderBook)
-	for _, symbol := range s.symbols() {
-		activeOrderBook := bbgo.NewActiveOrderBook(symbol)
-		activeOrderBook.BindStream(session.UserDataStream)
-		s.activeOrderBooks[symbol] = activeOrderBook
-	}
+	s.activeOrderBook = bbgo.NewActiveOrderBook("")
+	s.activeOrderBook.BindStream(session.UserDataStream)
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		if kline.Symbol != s.currencies[0]+s.BaseCurrency {
@@ -97,12 +93,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 }
 
 func (s *Strategy) rebalance(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) {
-	for symbol, book := range s.activeOrderBooks {
-		err := orderExecutor.CancelOrders(ctx, book.Orders()...)
-		if err != nil {
-			log.WithError(err).Errorf("failed to cancel %s orders", symbol)
-			return
-		}
+	err := orderExecutor.CancelOrders(ctx, s.activeOrderBook.Orders()...)
+	if err != nil {
+		log.WithError(err).Error("failed to cancel orders")
+		return
 	}
 
 	prices, err := s.prices(ctx, session)
@@ -127,9 +121,7 @@ func (s *Strategy) rebalance(ctx context.Context, orderExecutor bbgo.OrderExecut
 		return
 	}
 
-	for _, createdOrder := range createdOrders {
-		s.activeOrderBooks[createdOrder.Symbol].Add(createdOrder)
-	}
+	s.activeOrderBook.Add(createdOrders...)
 }
 
 func (s *Strategy) prices(ctx context.Context, session *bbgo.ExchangeSession) (prices types.Float64Slice, err error) {
