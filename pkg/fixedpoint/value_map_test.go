@@ -99,6 +99,7 @@ func Test_ValueMap_Sum(t *testing.T) {
 func Test_ValueMap_Normalize(t *testing.T) {
 	a := NewFromFloat(3.0)
 	b := NewFromFloat(4.0)
+	c := a.Add(b)
 
 	m := ValueMap{
 		"A": a,
@@ -106,8 +107,8 @@ func Test_ValueMap_Normalize(t *testing.T) {
 	}
 
 	n := ValueMap{
-		"A": a.Div(a.Add(b)),
-		"B": b.Div(a.Add(b)),
+		"A": a.Div(c),
+		"B": b.Div(c),
 	}
 
 	assert.True(t, m.Normalize().Eq(n))
