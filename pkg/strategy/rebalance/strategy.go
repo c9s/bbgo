@@ -26,9 +26,9 @@ type Strategy struct {
 	BaseCurrency  string              `json:"baseCurrency"`
 	TargetWeights fixedpoint.ValueMap `json:"targetWeights"`
 	Threshold     fixedpoint.Value    `json:"threshold"`
-	Verbose       bool                `json:"verbose"`
 	DryRun        bool                `json:"dryRun"`
-	MaxAmount     fixedpoint.Value    `json:"maxAmount"` // max amount to buy or sell per order
+	// max amount to buy or sell per order
+	MaxAmount fixedpoint.Value `json:"maxAmount"`
 
 	activeOrderBook *bbgo.ActiveOrderBook
 }
@@ -74,6 +74,13 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	s.activeOrderBook = bbgo.NewActiveOrderBook("")
 	s.activeOrderBook.BindStream(session.UserDataStream)
+
+	markets := session.Markets()
+	for _, symbol := range s.symbols() {
+		if _, ok := markets[symbol]; !ok {
+			return fmt.Errorf("exchange: %s does not supoort matket: %s", session.Exchange.Name(), symbol)
+		}
+	}
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		s.rebalance(ctx, orderExecutor, session)

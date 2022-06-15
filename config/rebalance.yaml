@@ -18,5 +18,4 @@ exchangeStrategies:
       threshold: 2%
       # max amount to buy or sell per order
       maxAmount: 10_000
-      verbose: true
       dryRun: false
