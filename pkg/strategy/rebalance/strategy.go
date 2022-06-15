@@ -106,8 +106,8 @@ func (s *Strategy) rebalance(ctx context.Context, orderExecutor bbgo.OrderExecut
 
 	marketValues := prices.Mul(s.quantities(session))
 
-	orders := s.generateSubmitOrders(prices, marketValues)
-	for _, order := range orders {
+	submitOrders := s.generateSubmitOrders(prices, marketValues)
+	for _, order := range submitOrders {
 		log.Infof("generated submit order: %s", order.String())
 	}
 
@@ -115,7 +115,7 @@ func (s *Strategy) rebalance(ctx context.Context, orderExecutor bbgo.OrderExecut
 		return
 	}
 
-	createdOrders, err := orderExecutor.SubmitOrders(ctx, orders...)
+	createdOrders, err := orderExecutor.SubmitOrders(ctx, submitOrders...)
 	if err != nil {
 		log.WithError(err).Error("submit order error")
 		return
