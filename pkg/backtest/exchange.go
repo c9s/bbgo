@@ -33,6 +33,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/c9s/bbgo/pkg/cache"
 
 	"github.com/pkg/errors"
@@ -41,6 +43,8 @@ import (
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 )
+
+var log = logrus.WithField("cmd", "backtest")
 
 var ErrUnimplemented = errors.New("unimplemented method")
 
@@ -53,7 +57,7 @@ type Exchange struct {
 	account *types.Account
 	config  *bbgo.Backtest
 
-	userDataStream, marketDataStream *Stream
+	UserDataStream, MarketDataStream types.StandardStreamEmitter
 
 	trades      map[string][]types.Trade
 	tradesMutex sync.Mutex
@@ -147,12 +151,14 @@ func (e *Exchange) _addMatchingBook(symbol string, market types.Market) {
 }
 
 func (e *Exchange) NewStream() types.Stream {
-	return &Stream{exchange: e}
+	return &types.BacktestStream{
+		StandardStreamEmitter: &types.StandardStream{},
+	}
 }
 
 func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error) {
-	if e.userDataStream == nil {
-		return createdOrders, fmt.Errorf("SubmitOrders should be called after userDataStream been initialized")
+	if e.UserDataStream == nil {
+		return createdOrders, fmt.Errorf("SubmitOrders should be called after UserDataStream been initialized")
 	}
 	for _, order := range orders {
 		symbol := order.Symbol
@@ -175,7 +181,7 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 				e.addClosedOrder(*createdOrder)
 			}
 
-			e.userDataStream.EmitOrderUpdate(*createdOrder)
+			e.UserDataStream.EmitOrderUpdate(*createdOrder)
 		}
 	}
 
@@ -201,8 +207,8 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 }
 
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) error {
-	if e.userDataStream == nil {
-		return fmt.Errorf("CancelOrders should be called after userDataStream been initialized")
+	if e.UserDataStream == nil {
+		return fmt.Errorf("CancelOrders should be called after UserDataStream been initialized")
 	}
 	for _, order := range orders {
 		matching, ok := e.matchingBook(order.Symbol)
@@ -214,7 +220,7 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 			return err
 		}
 
-		e.userDataStream.EmitOrderUpdate(canceledOrder)
+		e.UserDataStream.EmitOrderUpdate(canceledOrder)
 	}
 
 	return nil
@@ -297,15 +303,15 @@ func (e *Exchange) matchingBook(symbol string) (*SimplePriceMatching, bool) {
 }
 
 func (e *Exchange) InitMarketData() {
-	e.userDataStream.OnTradeUpdate(func(trade types.Trade) {
+	e.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
 		e.addTrade(trade)
 	})
 
 	e.matchingBooksMutex.Lock()
 	for _, matching := range e.matchingBooks {
-		matching.OnTradeUpdate(e.userDataStream.EmitTradeUpdate)
-		matching.OnOrderUpdate(e.userDataStream.EmitOrderUpdate)
-		matching.OnBalanceUpdate(e.userDataStream.EmitBalanceUpdate)
+		matching.OnTradeUpdate(e.UserDataStream.EmitTradeUpdate)
+		matching.OnOrderUpdate(e.UserDataStream.EmitOrderUpdate)
+		matching.OnBalanceUpdate(e.UserDataStream.EmitBalanceUpdate)
 	}
 	e.matchingBooksMutex.Unlock()
 }
@@ -324,7 +330,7 @@ func (e *Exchange) SubscribeMarketData(extraIntervals ...types.Interval) (chan t
 	}
 
 	// collect subscriptions
-	for _, sub := range e.marketDataStream.Subscriptions {
+	for _, sub := range e.MarketDataStream.GetSubscriptions() {
 		loadedSymbols[sub.Symbol] = struct{}{}
 
 		switch sub.Channel {
@@ -370,11 +376,11 @@ func (e *Exchange) ConsumeKLine(k types.KLine) {
 		matching.processKLine(k)
 	}
 
-	e.marketDataStream.EmitKLineClosed(k)
+	e.MarketDataStream.EmitKLineClosed(k)
 }
 
 func (e *Exchange) CloseMarketData() error {
-	if err := e.marketDataStream.Close(); err != nil {
+	if err := e.MarketDataStream.Close(); err != nil {
 		log.WithError(err).Error("stream close error")
 		return err
 	}
