@@ -106,6 +106,19 @@ func toGlobalTicker(stats *binance.PriceChangeStats) (*types.Ticker, error) {
 	}, nil
 }
 
+func toGlobalFuturesTicker(stats *futures.PriceChangeStats) (*types.Ticker, error) {
+	return &types.Ticker{
+		Volume: fixedpoint.MustNewFromString(stats.Volume),
+		Last:   fixedpoint.MustNewFromString(stats.LastPrice),
+		Open:   fixedpoint.MustNewFromString(stats.OpenPrice),
+		High:   fixedpoint.MustNewFromString(stats.HighPrice),
+		Low:    fixedpoint.MustNewFromString(stats.LowPrice),
+		Buy:    fixedpoint.MustNewFromString(stats.LastPrice),
+		Sell:   fixedpoint.MustNewFromString(stats.LastPrice),
+		Time:   time.Unix(0, stats.CloseTime*int64(time.Millisecond)),
+	}, nil
+}
+
 func toLocalOrderType(orderType types.OrderType) (binance.OrderType, error) {
 	switch orderType {
 
@@ -317,4 +330,3 @@ func convertSubscription(s types.Subscription) string {
 
 	return fmt.Sprintf("%s@%s", strings.ToLower(s.Symbol), s.Channel)
 }
-
