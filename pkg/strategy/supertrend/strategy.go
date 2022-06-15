@@ -295,7 +295,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		// TP/SL if there's non-dust position
 		if !s.Market.IsDustQuantity(base.Abs(), kline.GetClose()) {
 			if s.StopLossByTriggeringK && !s.currentStopLossPrice.IsZero() && ((baseSign < 0 && kline.GetClose().Compare(s.currentStopLossPrice) > 0) || (baseSign > 0 && kline.GetClose().Compare(s.currentStopLossPrice) < 0)) {
-				// SL by triggered Kline low
+				// SL by triggering Kline low
+				log.Infof("SL by triggering Kline low")
 				if err := s.ClosePosition(ctx, fixedpoint.One); err != nil {
 					s.Notify("can not place SL order")
 				} else {
@@ -304,6 +305,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				}
 			} else if s.TakeProfitMultiplier > 0 && !s.currentTakeProfitPrice.IsZero() && ((baseSign < 0 && kline.GetClose().Compare(s.currentTakeProfitPrice) < 0) || (baseSign > 0 && kline.GetClose().Compare(s.currentTakeProfitPrice) > 0)) {
 				// TP by multiple of ATR
+				log.Infof("TP by multiple of ATR")
 				if err := s.ClosePosition(ctx, fixedpoint.One); err != nil {
 					s.Notify("can not place TP order")
 				} else {
@@ -312,6 +314,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				}
 			} else if s.TPSLBySignal {
 				// Use signals to TP/SL
+				log.Infof("TP/SL by reverse of DEMA or Supertrend")
 				if (baseSign < 0 && (stSignal == types.DirectionUp || demaSignal == types.DirectionUp)) || (baseSign > 0 && (stSignal == types.DirectionDown || demaSignal == types.DirectionDown)) {
 					if err := s.ClosePosition(ctx, fixedpoint.One); err != nil {
 						s.Notify("can not place TP/SL order")
@@ -344,10 +347,18 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 
 		if side == types.SideTypeSell || side == types.SideTypeBuy {
+			log.Infof("open position for signal %v", side)
 			// Close opposite position if any
-			if !s.Market.IsDustQuantity(base.Abs(), kline.GetClose()) && ((side == types.SideTypeSell && baseSign > 0) || (side == types.SideTypeBuy && baseSign < 0)) {
-				if err := s.ClosePosition(ctx, fixedpoint.One); err != nil {
-					s.Notify("can not place close position order")
+			if !s.Market.IsDustQuantity(base.Abs(), kline.GetClose()) {
+				if (side == types.SideTypeSell && baseSign > 0) || (side == types.SideTypeBuy && baseSign < 0) {
+					log.Infof("close existing position before open a new position")
+					if err := s.ClosePosition(ctx, fixedpoint.One); err != nil {
+						log.WithError(err).Errorf("can not place close position order")
+						s.Notify("can not place close position order")
+					}
+				} else {
+					log.Infof("existing position has the same direction with the signal")
+					return
 				}
 			}
 
