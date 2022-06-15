@@ -77,7 +77,7 @@ func (s *Server) newEngine(ctx context.Context) *gin.Engine {
 	})
 
 	r.POST("/api/environment/sync", func(c *gin.Context) {
-		if s.Environ.IsSyncing() == bbgo.SyncDone {
+		if s.Environ.IsSyncing() != bbgo.Syncing {
 			go func() {
 				// We use the root context here because the syncing operation is a background goroutine.
 				// It should not be terminated if the request is disconnected.
