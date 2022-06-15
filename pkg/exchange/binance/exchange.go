@@ -135,6 +135,16 @@ func (e *Exchange) Name() types.ExchangeName {
 }
 
 func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticker, error) {
+	if e.IsFutures {
+		req := e.futuresClient.NewListPriceChangeStatsService()
+		req.Symbol(strings.ToUpper(symbol))
+		stats, err := req.Do(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		return toGlobalFuturesTicker(stats[0])
+	}
 	req := e.client.NewListPriceChangeStatsService()
 	req.Symbol(strings.ToUpper(symbol))
 	stats, err := req.Do(ctx)
@@ -158,17 +168,45 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[stri
 		return tickers, nil
 	}
 
-	var req = e.client.NewListPriceChangeStatsService()
-	changeStats, err := req.Do(ctx)
-	if err != nil {
-		return nil, err
-	}
-
 	m := make(map[string]struct{})
 	exists := struct{}{}
 
 	for _, s := range symbol {
 		m[s] = exists
+	}
+
+	if e.IsFutures {
+		var req = e.futuresClient.NewListPriceChangeStatsService()
+		changeStats, err := req.Do(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, stats := range changeStats {
+			if _, ok := m[stats.Symbol]; len(symbol) != 0 && !ok {
+				continue
+			}
+
+			tick := types.Ticker{
+				Volume: fixedpoint.MustNewFromString(stats.Volume),
+				Last:   fixedpoint.MustNewFromString(stats.LastPrice),
+				Open:   fixedpoint.MustNewFromString(stats.OpenPrice),
+				High:   fixedpoint.MustNewFromString(stats.HighPrice),
+				Low:    fixedpoint.MustNewFromString(stats.LowPrice),
+				Buy:    fixedpoint.MustNewFromString(stats.LastPrice),
+				Sell:   fixedpoint.MustNewFromString(stats.LastPrice),
+				Time:   time.Unix(0, stats.CloseTime*int64(time.Millisecond)),
+			}
+
+			tickers[stats.Symbol] = tick
+		}
+
+		return tickers, nil
+	}
+
+	var req = e.client.NewListPriceChangeStatsService()
+	changeStats, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	for _, stats := range changeStats {
@@ -1198,6 +1236,9 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 // the endTime of a binance kline, is the (startTime + interval time - 1 millisecond), e.g.,
 // millisecond unix timestamp: 1620172860000 and 1620172919999
 func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
+	if e.IsFutures {
+		return e.QueryFuturesKLines(ctx, symbol, interval, options)
+	}
 
 	var limit = 1000
 	if options.Limit > 0 {
@@ -1208,6 +1249,60 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 	log.Infof("querying kline %s %s %v", symbol, interval, options)
 
 	req := e.client.NewKlinesService().
+		Symbol(symbol).
+		Interval(string(interval)).
+		Limit(limit)
+
+	if options.StartTime != nil {
+		req.StartTime(options.StartTime.UnixMilli())
+	}
+
+	if options.EndTime != nil {
+		req.EndTime(options.EndTime.UnixMilli())
+	}
+
+	resp, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var kLines []types.KLine
+	for _, k := range resp {
+		kLines = append(kLines, types.KLine{
+			Exchange:                 types.ExchangeBinance,
+			Symbol:                   symbol,
+			Interval:                 interval,
+			StartTime:                types.NewTimeFromUnix(0, k.OpenTime*int64(time.Millisecond)),
+			EndTime:                  types.NewTimeFromUnix(0, k.CloseTime*int64(time.Millisecond)),
+			Open:                     fixedpoint.MustNewFromString(k.Open),
+			Close:                    fixedpoint.MustNewFromString(k.Close),
+			High:                     fixedpoint.MustNewFromString(k.High),
+			Low:                      fixedpoint.MustNewFromString(k.Low),
+			Volume:                   fixedpoint.MustNewFromString(k.Volume),
+			QuoteVolume:              fixedpoint.MustNewFromString(k.QuoteAssetVolume),
+			TakerBuyBaseAssetVolume:  fixedpoint.MustNewFromString(k.TakerBuyBaseAssetVolume),
+			TakerBuyQuoteAssetVolume: fixedpoint.MustNewFromString(k.TakerBuyQuoteAssetVolume),
+			LastTradeID:              0,
+			NumberOfTrades:           uint64(k.TradeNum),
+			Closed:                   true,
+		})
+	}
+
+	kLines = types.SortKLinesAscending(kLines)
+	return kLines, nil
+}
+
+func (e *Exchange) QueryFuturesKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
+
+	var limit = 1000
+	if options.Limit > 0 {
+		// default limit == 1000
+		limit = options.Limit
+	}
+
+	log.Infof("querying kline %s %s %v", symbol, interval, options)
+
+	req := e.futuresClient.NewKlinesService().
 		Symbol(symbol).
 		Interval(string(interval)).
 		Limit(limit)
