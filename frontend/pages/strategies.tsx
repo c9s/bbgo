@@ -1,5 +1,7 @@
 import DashboardLayout from '../layouts/DashboardLayout';
 import { styled } from '@mui/styles';
+import {queryStrategiesMetrics} from '../api/bbgo';
+import { useEffect, useState } from 'react';
 
 const StrategyContainer = styled('section')(() => ({
   display: 'flex',
@@ -32,6 +34,9 @@ const RunningTime = styled('div')(() => ({
 
 const Description = styled('div')(() => ({
   color: 'rgb(140, 140, 140)',
+  "& .duration": {
+    marginLeft: '3px',
+  },
 }))
 
 const Summary = styled('div')(() => ({
@@ -56,7 +61,7 @@ const StatsValue = styled('div')(() => ({
   color: 'rgb(123, 169, 90)',
 }));
 
-const Precentage = styled('div')(() => ({
+const Percentage = styled('div')(() => ({
   color: 'rgb(123, 169, 90)',
 }));
 
@@ -67,64 +72,98 @@ const Stats = styled('div')(() => ({
   rowGap: '20px'
 }));
 
-
 export default function Strategies(){
+  const [details, setDetails] = useState([]);
+
+  useEffect(() => {
+    queryStrategiesMetrics().then((value) => {
+      setDetails(value);
+    } 
+    );
+  },[])
 
   return (
     <DashboardLayout>
+      {details.map((element) => {
+        return(
+          <Detail key={element.id} data={element}/>
+        )
+      })}
+    </DashboardLayout>
+
+  );
+}
+
+export function Detail({data}){
+  const {strategy, stats, startTime} = data;
+  const totalProfitsPercentage = stats.totalProfits / stats.investment * 100;
+  const gridProfitsPercentage = stats.gridProfits / stats.investment * 100;
+  const gridAprPercentage = stats.gridProfits / 5 * 365;
+  
+  const now = Date.now();
+  const durationMilliseconds = now - startTime;
+  const seconds = durationMilliseconds / 1000;
+
+  const day = Math.floor(seconds / (60 * 60 * 24));
+  const hour = Math.floor(seconds %  (60 * 60 * 24) / 3600);
+  const min = Math.floor(seconds %  (60 * 60 * 24) % 3600 / 60);
+
+  return (
       <StrategyContainer>
-        <Strategy>Grid Trading</Strategy>
-        <div>BTC/USDT</div>
-        <RunningTime>
-          <StatusSign/>
-          <Description>Running for 5D 0H 0M</Description>
-        </RunningTime> 
+          <Strategy>{strategy}</Strategy>
+          <div>{data[strategy].symbol}</div>
+          <RunningTime>
+            <StatusSign/>
+              <Description>
+                Running for
+                <span className="duration">{day}</span>D 
+                <span className="duration">{hour}</span>H 
+                <span className="duration">{min}</span>M
+              </Description>
+          </RunningTime> 
 
-        <Description>0 arbitrages in 24 hours / Total 3 arbitrages</Description>
-        
-        <Summary>
-          <SummaryBlock>
-           <StatsTitle>Investment USDT</StatsTitle>
-            <div>100</div>
-          </SummaryBlock>
+          <Description>0 arbitrages in 24 hours / Total <span>{stats.totalArbs}</span> arbitrages</Description>
           
-          <SummaryBlock>
-            <StatsTitle>Total Profit USDT</StatsTitle>
-            <StatsValue>+5.600</StatsValue>
-            <Precentage>+5.6%</Precentage>
-          </SummaryBlock>
-        </Summary>
+          <Summary>
+            <SummaryBlock>
+            <StatsTitle>Investment USDT</StatsTitle>
+              <div>{stats.investment}</div>
+            </SummaryBlock>
+            
+            <SummaryBlock>
+              <StatsTitle>Total Profit USDT</StatsTitle>
+              <StatsValue>{stats.totalProfits}</StatsValue>
+              <Percentage>{totalProfitsPercentage}%</Percentage>
+            </SummaryBlock>
+          </Summary>
 
-        <Stats>
+          <Stats>
             <div>
               <StatsTitle>Grid Profits</StatsTitle>
-              <StatsValue>+2.500</StatsValue>
-              <Precentage>+2.5%</Precentage>
+              <StatsValue>{stats.gridProfits}</StatsValue>
+              <Percentage>{gridProfitsPercentage}%</Percentage>
             </div>
 
             <div>
               <StatsTitle>Floating PNL</StatsTitle>
-              <StatsValue>+3.100</StatsValue>
+              <StatsValue>{stats.floatingPNL}</StatsValue>
             </div>
 
             <div>
               <StatsTitle>Grid APR</StatsTitle>
-              <Precentage>+182.5%</Precentage>
+              <Percentage>{gridAprPercentage}%</Percentage>
             </div>
- 
+
             <div>
               <StatsTitle>Current Price</StatsTitle>
-              <div>29,000</div>
+              <div>{stats.currentPrice}</div>
             </div>
 
             <div>
               <StatsTitle>Price Range</StatsTitle>
-              <div>25,000~35,000</div>
+              <div>{stats.lowestPrice}~{stats.highestPrice}</div>
             </div>
           </Stats>
       </StrategyContainer>
-      
-    </DashboardLayout>
-
-  );
+  )
 }
