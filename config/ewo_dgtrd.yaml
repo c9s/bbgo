@@ -4,6 +4,7 @@ sessions:
     exchange: binance
     futures: true
     envVarPrefix: binance
+    useHeikinAshi: false
 
 exchangeStrategies:
  

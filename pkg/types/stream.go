@@ -28,7 +28,9 @@ type Stream interface {
 	StandardStreamEventHub
 
 	Subscribe(channel Channel, symbol string, options SubscribeOptions)
+	GetSubscriptions() []Subscription
 	SetPublicOnly()
+	GetPublicOnly() bool
 	Connect(ctx context.Context) error
 	Close() error
 }
@@ -104,6 +106,25 @@ type StandardStream struct {
 	FuturesPositionSnapshotCallbacks []func(futuresPositions FuturesPositionMap)
 }
 
+type StandardStreamEmitter interface {
+	Stream
+	EmitStart()
+	EmitConnect()
+	EmitDisconnect()
+	EmitTradeUpdate(Trade)
+	EmitOrderUpdate(Order)
+	EmitBalanceSnapshot(BalanceMap)
+	EmitBalanceUpdate(BalanceMap)
+	EmitKLineClosed(KLine)
+	EmitKLine(KLine)
+	EmitBookUpdate(SliceOrderBook)
+	EmitBookTickerUpdate(BookTicker)
+	EmitBookSnapshot(SliceOrderBook)
+	EmitMarketTrade(Trade)
+	EmitFuturesPositionUpdate(FuturesPositionMap)
+	EmitFuturesPositionSnapshot(FuturesPositionMap)
+}
+
 func NewStandardStream() StandardStream {
 	return StandardStream{
 		ReconnectC: make(chan struct{}, 1),
@@ -113,6 +134,10 @@ func NewStandardStream() StandardStream {
 
 func (s *StandardStream) SetPublicOnly() {
 	s.PublicOnly = true
+}
+
+func (s *StandardStream) GetPublicOnly() bool {
+	return s.PublicOnly
 }
 
 func (s *StandardStream) SetEndpointCreator(creator EndpointCreator) {
@@ -252,6 +277,10 @@ func (s *StandardStream) ping(ctx context.Context, conn *websocket.Conn, cancel 
 			}
 		}
 	}
+}
+
+func (s *StandardStream) GetSubscriptions() []Subscription {
+	return s.Subscriptions
 }
 
 func (s *StandardStream) Subscribe(channel Channel, symbol string, options SubscribeOptions) {
