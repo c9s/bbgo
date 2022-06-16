@@ -101,16 +101,6 @@ func (s *AccountService) NewGetAccountsRequest() *GetAccountsRequest {
 	return &GetAccountsRequest{client: s.client}
 }
 
-//go:generate GetRequest -url "v2/members/me" -type GetMeRequest -responseType .UserInfo
-type GetMeRequest struct {
-	client requestgen.AuthenticatedAPIClient
-}
-
-// NewGetMeRequest returns the current user info by the current used MAX key and secret
-func (s *AccountService) NewGetMeRequest() *GetMeRequest {
-	return &GetMeRequest{client: s.client}
-}
-
 type Deposit struct {
 	Currency        string           `json:"currency"`
 	CurrencyVersion string           `json:"currency_version"` // "eth"
