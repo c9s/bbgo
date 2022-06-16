@@ -6,33 +6,42 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-// Refer: Running Moving Average
+// Running Moving Average
+// Refer: https://github.com/twopirllc/pandas-ta/blob/main/pandas_ta/overlap/rma.py#L5
+// Refer: https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.ewm.html#pandas-dataframe-ewm
 //go:generate callbackgen -type RMA
 type RMA struct {
 	types.IntervalWindow
-	Values  types.Float64Slice
-	Sources types.Float64Slice
-
+	Values          types.Float64Slice
+	counter         int
+	Adjust          bool
+	tmp             float64
+	sum             float64
 	EndTime         time.Time
 	UpdateCallbacks []func(value float64)
 }
 
 func (inc *RMA) Update(x float64) {
-	inc.Sources.Push(x)
+	lambda := 1 / float64(inc.Window)
+	if inc.counter == 0 {
+		inc.sum = 1
+		inc.tmp = x
+	} else {
+		if inc.Adjust {
+			inc.sum = inc.sum*(1-lambda) + 1
+			inc.tmp = inc.tmp + (x-inc.tmp)/inc.sum
+		} else {
+			inc.tmp = inc.tmp*(1-lambda) + x*lambda
+		}
+	}
+	inc.counter++
 
-	if len(inc.Sources) < inc.Window {
+	if inc.counter < inc.Window {
 		inc.Values.Push(0)
 		return
 	}
 
-	if len(inc.Sources) == inc.Window {
-		inc.Values.Push(inc.Sources.Mean())
-		return
-	}
-
-	lambda := 1 / float64(inc.Window)
-	rma := (1-lambda)*inc.Values.Last() + lambda*x
-	inc.Values.Push(rma)
+	inc.Values.Push(inc.tmp)
 }
 
 func (inc *RMA) Last() float64 {

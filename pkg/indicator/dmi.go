@@ -28,9 +28,9 @@ type DMI struct {
 
 func (inc *DMI) Update(high, low, cloze float64) {
 	if inc.DMP == nil || inc.DMN == nil {
-		inc.DMP = &RMA{IntervalWindow: inc.IntervalWindow}
-		inc.DMN = &RMA{IntervalWindow: inc.IntervalWindow}
-		inc.ADX = &RMA{IntervalWindow: types.IntervalWindow{Window: inc.ADXSmoothing}}
+		inc.DMP = &RMA{IntervalWindow: inc.IntervalWindow, Adjust: true}
+		inc.DMN = &RMA{IntervalWindow: inc.IntervalWindow, Adjust: true}
+		inc.ADX = &RMA{IntervalWindow: types.IntervalWindow{Window: inc.ADXSmoothing}, Adjust: true}
 	}
 	if inc.atr == nil {
 		inc.atr = &ATR{IntervalWindow: inc.IntervalWindow}
@@ -56,15 +56,19 @@ func (inc *DMI) Update(high, low, cloze float64) {
 		neg = dn
 	}
 
-	k := 100. / inc.atr.Last()
 	inc.DMP.Update(pos)
 	inc.DMN.Update(neg)
+	if inc.atr.Length() < inc.Window {
+		return
+	}
+	k := 100. / inc.atr.Last()
 	dmp := inc.DMP.Last()
 	dmn := inc.DMN.Last()
 	inc.DIPlus.Update(k * dmp)
 	inc.DIMinus.Update(k * dmn)
-	dx := 100. * k * math.Abs(dmp-dmn) / (dmp + dmn)
+	dx := 100. * math.Abs(dmp-dmn) / (dmp + dmn)
 	inc.ADX.Update(dx)
+
 }
 
 func (inc *DMI) GetDIPlus() types.Series {
