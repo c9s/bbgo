@@ -63,6 +63,11 @@ type Series interface {
 	Length() int
 }
 
+type UpdatableSeries interface {
+	Series
+	Update(float64)
+}
+
 // The interface maps to pinescript basic type `series` for bool type
 // Access the internal historical data from the latest to the oldest
 // Index(0) always maps to Last()
