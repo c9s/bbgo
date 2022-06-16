@@ -170,8 +170,8 @@ func (s *Strategy) generateSubmitOrders(ctx context.Context, session *bbgo.Excha
 	return submitOrders
 }
 
-func (s *Strategy) getTargetWeights(ctx context.Context) fixedpoint.ValueMap {
-	m := FloatMap{}
+func (s *Strategy) getTargetWeights(ctx context.Context) types.ValueMap {
+	m := types.FloatMap{}
 
 	// get market cap values
 	for _, currency := range s.TargetCurrencies {
@@ -192,8 +192,8 @@ func (s *Strategy) getTargetWeights(ctx context.Context) fixedpoint.ValueMap {
 	// append base weight
 	m[s.BaseCurrency] = s.BaseWeight.Float64()
 
-	// convert to fixedpoint.ValueMap
-	targetWeights := fixedpoint.ValueMap{}
+	// convert to types.ValueMap
+	targetWeights := types.ValueMap{}
 	for currency, weight := range m {
 		targetWeights[currency] = fixedpoint.NewFromFloat(weight)
 	}
@@ -201,14 +201,14 @@ func (s *Strategy) getTargetWeights(ctx context.Context) fixedpoint.ValueMap {
 	return targetWeights
 }
 
-func (s *Strategy) prices(ctx context.Context, session *bbgo.ExchangeSession) fixedpoint.ValueMap {
+func (s *Strategy) prices(ctx context.Context, session *bbgo.ExchangeSession) types.ValueMap {
 	tickers, err := session.Exchange.QueryTickers(ctx, s.symbols()...)
 	if err != nil {
 		log.WithError(err).Error("failed to query tickers")
 		return nil
 	}
 
-	prices := fixedpoint.ValueMap{}
+	prices := types.ValueMap{}
 	for _, currency := range s.TargetCurrencies {
 		prices[currency] = tickers[currency+s.BaseCurrency].Last
 	}
@@ -219,10 +219,10 @@ func (s *Strategy) prices(ctx context.Context, session *bbgo.ExchangeSession) fi
 	return prices
 }
 
-func (s *Strategy) quantities(session *bbgo.ExchangeSession) fixedpoint.ValueMap {
+func (s *Strategy) quantities(session *bbgo.ExchangeSession) types.ValueMap {
 	balances := session.Account.Balances()
 
-	quantities := fixedpoint.ValueMap{}
+	quantities := types.ValueMap{}
 	for _, currency := range s.currencies() {
 		quantities[currency] = balances[currency].Total()
 	}
