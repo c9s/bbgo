@@ -25,7 +25,10 @@ func (inc *ATR) Update(high, low, cloze float64) {
 	}
 
 	if inc.RMA == nil {
-		inc.RMA = &RMA{IntervalWindow: types.IntervalWindow{Window: inc.Window}}
+		inc.RMA = &RMA{
+			IntervalWindow: types.IntervalWindow{Window: inc.Window},
+			Adjust:         true,
+		}
 		inc.PreviousClose = cloze
 		return
 	}
