@@ -4,8 +4,7 @@ import {StatsTitle, StatsValue, Percentage} from './Summary';
 const StatsSection = styled('div')(() => ({
   display: 'grid',
   gridTemplateColumns: '1fr 1fr 1fr',
-  columnGap: '10px',
-  rowGap: '20px',
+  gap: '10px',
 }));
 
 export default function Stats({stats, gridProfitsPercentage, gridAprPercentage}:{stats: GridStats,  gridProfitsPercentage: number, gridAprPercentage: number}){

@@ -156,27 +156,36 @@ export interface GridStats {
 }
 
 export async function queryStrategiesMetrics(): Promise<GridStrategy[]> {
-  return [
-    {
-      id: 'uuid',
-      instanceID: 'testInstanceID',
-      strategy: 'grid',
-      grid: {
-        symbol: 'BTCUSDT',
-      },
-      stats: {
-        oneDayArbs: 0,
-        totalArbs: 3,
-        investment: 100,
-        totalProfits: 5.6,        
-        gridProfits: 2.5,
-        floatingPNL: 3.1,
-        currentPrice: 29000,
-        lowestPrice: 25000,
-        highestPrice: 35000,
-      },
-      status: 'RUNNING',
-      startTime: 1654938187102,
+
+  const temp = {
+    id: 'uuid',
+    instanceID: 'testInstanceID',
+    strategy: 'grid',
+    grid: {
+      symbol: 'BTCUSDT',
     },
-  ];
+    stats: {
+      oneDayArbs: 0,
+      totalArbs: 3,
+      investment: 100,
+      totalProfits: 5.6,        
+      gridProfits: 2.5,
+      floatingPNL: 3.1,
+      currentPrice: 29000,
+      lowestPrice: 25000,
+      highestPrice: 35000,
+    },
+    status: 'RUNNING',
+    startTime: 1654938187102,
+  }
+
+  const testArr = [];
+
+  for(let i = 0; i < 11 ; i++){
+    const cloned = {...temp}
+    cloned.id = "uuid" + i;
+    testArr.push(cloned);
+  } 
+
+  return testArr
 }
