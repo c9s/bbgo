@@ -7,7 +7,6 @@ import (
 	"context"
 	"net/url"
 
-	"github.com/c9s/requestgen"
 	"github.com/pkg/errors"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -115,26 +114,6 @@ type Order struct {
 	CreatedAt       types.MillisecondTimestamp `json:"created_at"`
 }
 
-//go:generate GetRequest -url "v2/orders" -type GetOrdersRequest -responseType []Order
-type GetOrdersRequest struct {
-	client requestgen.AuthenticatedAPIClient
-
-	market  string       `param:"market"`
-	side    *string      `param:"side"`
-	groupID *uint32      `param:"groupID"`
-	offset  *int         `param:"offset"`
-	limit   *int         `param:"limit"`
-	page    *int         `param:"page"`
-	orderBy *string      `param:"order_by" default:"desc"`
-	state   []OrderState `param:"state"`
-}
-
-func (s *OrderService) NewGetOrdersRequest() *GetOrdersRequest {
-	return &GetOrdersRequest{
-		client: s.client,
-	}
-}
-
 // All returns all orders for the authenticated account.
 func (s *OrderService) All(market string, limit, page int, states ...OrderState) ([]Order, error) {
 	payload := map[string]interface{}{
@@ -172,43 +151,6 @@ func (s *OrderService) CreateMulti(market string, orders []SubmitOrder) (*MultiO
 	req.Market(market)
 	req.AddOrders(orders...)
 	return req.Do(context.Background())
-}
-
-//go:generate PostRequest -url "v2/orders/clear" -type OrderCancelAllRequest -responseType []Order
-type OrderCancelAllRequest struct {
-	client requestgen.AuthenticatedAPIClient
-
-	side    *string `param:"side"`
-	market  *string `param:"market"`
-	groupID *uint32 `param:"groupID"`
-}
-
-func (s *OrderService) NewOrderCancelAllRequest() *OrderCancelAllRequest {
-	return &OrderCancelAllRequest{client: s.client}
-}
-
-//go:generate PostRequest -url "v2/order/delete" -type OrderCancelRequest -responseType .Order
-type OrderCancelRequest struct {
-	client requestgen.AuthenticatedAPIClient
-
-	id            *uint64 `param:"id,omitempty"`
-	clientOrderID *string `param:"client_oid,omitempty"`
-}
-
-func (s *OrderService) NewOrderCancelRequest() *OrderCancelRequest {
-	return &OrderCancelRequest{client: s.client}
-}
-
-//go:generate GetRequest -url "v2/order" -type GetOrderRequest -responseType .Order
-type GetOrderRequest struct {
-	client requestgen.AuthenticatedAPIClient
-
-	id            *uint64 `param:"id,omitempty"`
-	clientOrderID *string `param:"client_oid,omitempty"`
-}
-
-func (s *OrderService) NewGetOrderRequest() *GetOrderRequest {
-	return &GetOrderRequest{client: s.client}
 }
 
 type MultiOrderRequestParams struct {
@@ -292,21 +234,3 @@ func (s *OrderService) NewCreateMultiOrderRequest() *CreateMultiOrderRequest {
 	return &CreateMultiOrderRequest{client: s.client}
 }
 
-//go:generate PostRequest -url "v2/orders" -type CreateOrderRequest -responseType .Order
-type CreateOrderRequest struct {
-	client requestgen.AuthenticatedAPIClient
-
-	market    string `param:"market,required"`
-	side      string `param:"side,required"`
-	volume    string `param:"volume,required"`
-	orderType string `param:"ord_type"`
-
-	price         *string `param:"price"`
-	stopPrice     *string `param:"stop_price"`
-	clientOrderID *string `param:"client_oid"`
-	groupID       *string `param:"group_id"`
-}
-
-func (s *OrderService) NewCreateOrderRequest() *CreateOrderRequest {
-	return &CreateOrderRequest{client: s.client}
-}
