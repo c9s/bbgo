@@ -1,4 +1,5 @@
 import { styled } from '@mui/styles';
+import { GridStats } from '../api/bbgo';
 
 const SummarySection = styled('div')(() => ({
   width: '100%',

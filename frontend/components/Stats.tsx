@@ -1,5 +1,6 @@
 import { styled } from '@mui/styles';
 import { StatsTitle, StatsValue, Percentage } from './Summary';
+import { GridStats } from '../api/bbgo';
 
 const StatsSection = styled('div')(() => ({
   display: 'grid',
