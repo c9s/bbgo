@@ -595,6 +595,44 @@ func Change(a Series, offset ...int) SeriesExtend {
 	return NewSeries(&ChangeResult{a, o})
 }
 
+type PercentageChangeResult struct {
+	a      Series
+	offset int
+}
+
+func (c *PercentageChangeResult) Last() float64 {
+	if c.offset >= c.a.Length() {
+		return 0
+	}
+	return c.a.Last()/c.a.Index(c.offset) - 1
+}
+
+func (c *PercentageChangeResult) Index(i int) float64 {
+	if i+c.offset >= c.a.Length() {
+		return 0
+	}
+	return c.a.Index(i)/c.a.Index(i+c.offset) - 1
+}
+
+func (c *PercentageChangeResult) Length() int {
+	length := c.a.Length()
+	if length >= c.offset {
+		return length - c.offset
+	}
+	return 0
+}
+
+// Percentage change between current and a prior element, a / a[offset] - 1.
+// offset: if not give, offset is 1.
+func PercentageChange(a Series, offset ...int) Series {
+	o := 1
+	if len(offset) > 0 {
+		o = offset[0]
+	}
+
+	return &PercentageChangeResult{a, o}
+}
+
 func Stdev(a Series, length int) float64 {
 	avg := Mean(a, length)
 	s := .0
