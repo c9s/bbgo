@@ -138,19 +138,21 @@ export interface GridStrategy {
   grid: {
     symbol: string;
   };
-  stats: {
-    oneDayArbs: number;
-    totalArbs: number;
-    investment: number;
-    totalProfits: number;
-    gridProfits: number;
-    floatingPNL: number;
-    currentPrice: number;
-    lowestPrice: number;
-    highestPrice: number;
-  },
+  stats: GridStats;
   status: string;
   startTime: number;
+}
+
+export interface GridStats {
+  oneDayArbs: number;
+  totalArbs: number;
+  investment: number;
+  totalProfits: number;
+  gridProfits: number;
+  floatingPNL: number;
+  currentPrice: number;
+  lowestPrice: number;
+  highestPrice: number;
 }
 
 export async function queryStrategiesMetrics(): Promise<GridStrategy[]> {
