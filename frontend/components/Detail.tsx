@@ -26,7 +26,7 @@ export const Description = styled('div')(() => ({
   },
 }));
 
-export default function Detail({ data }:{ data: GridStrategy}) {
+export default function Detail({ data }: { data: GridStrategy }) {
   const { strategy, stats, startTime } = data;
   const totalProfitsPercentage = (stats.totalProfits / stats.investment) * 100;
   const gridProfitsPercentage = (stats.gridProfits / stats.investment) * 100;
@@ -40,17 +40,15 @@ export default function Detail({ data }:{ data: GridStrategy}) {
     <StrategyContainer>
       <Strategy>{strategy}</Strategy>
       <div>{data[strategy].symbol}</div>
-      <RunningTime seconds={seconds}/>
+      <RunningTime seconds={seconds} />
       <Description>
-        0 arbitrages in 24 hours / Total <span>{stats.totalArbs}</span> arbitrages
+        0 arbitrages in 24 hours / Total <span>{stats.totalArbs}</span>{' '}
+        arbitrages
       </Description>
-      <Summary 
-        stats={stats} 
-        totalProfitsPercentage={totalProfitsPercentage}
-      />
+      <Summary stats={stats} totalProfitsPercentage={totalProfitsPercentage} />
       <Stats
-        stats={stats} 
-        gridProfitsPercentage={gridProfitsPercentage} 
+        stats={stats}
+        gridProfitsPercentage={gridProfitsPercentage}
         gridAprPercentage={gridAprPercentage}
       />
     </StrategyContainer>
