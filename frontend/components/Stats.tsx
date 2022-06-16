@@ -1,5 +1,5 @@
 import { styled } from '@mui/styles';
-import {StatsTitle, StatsValue, Percentage} from './Summary';
+import { StatsTitle, StatsValue, Percentage } from './Summary';
 
 const StatsSection = styled('div')(() => ({
   display: 'grid',
@@ -7,7 +7,15 @@ const StatsSection = styled('div')(() => ({
   gap: '10px',
 }));
 
-export default function Stats({stats, gridProfitsPercentage, gridAprPercentage}:{stats: GridStats,  gridProfitsPercentage: number, gridAprPercentage: number}){
+export default function Stats({
+  stats,
+  gridProfitsPercentage,
+  gridAprPercentage,
+}: {
+  stats: GridStats;
+  gridProfitsPercentage: number;
+  gridAprPercentage: number;
+}) {
   return (
     <StatsSection>
       <div>

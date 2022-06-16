@@ -25,7 +25,13 @@ export const Percentage = styled('div')(() => ({
   color: 'rgb(123, 169, 90)',
 }));
 
-export default function Summary({stats, totalProfitsPercentage}:{stats: GridStats,totalProfitsPercentage:number}) {
+export default function Summary({
+  stats,
+  totalProfitsPercentage,
+}: {
+  stats: GridStats;
+  totalProfitsPercentage: number;
+}) {
   return (
     <SummarySection>
       <SummaryBlock>
@@ -39,5 +45,5 @@ export default function Summary({stats, totalProfitsPercentage}:{stats: GridStat
         <Percentage>{totalProfitsPercentage}%</Percentage>
       </SummaryBlock>
     </SummarySection>
-  )
+  );
 }

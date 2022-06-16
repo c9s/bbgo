@@ -38,7 +38,6 @@ export default function Strategies() {
           return <Detail key={element.id} data={element} />;
         })}
       </StrategiesContainer>
-      
     </DashboardLayout>
   );
 }

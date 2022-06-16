@@ -156,7 +156,6 @@ export interface GridStats {
 }
 
 export async function queryStrategiesMetrics(): Promise<GridStrategy[]> {
-
   const temp = {
     id: 'uuid',
     instanceID: 'testInstanceID',
@@ -168,7 +167,7 @@ export async function queryStrategiesMetrics(): Promise<GridStrategy[]> {
       oneDayArbs: 0,
       totalArbs: 3,
       investment: 100,
-      totalProfits: 5.6,        
+      totalProfits: 5.6,
       gridProfits: 2.5,
       floatingPNL: 3.1,
       currentPrice: 29000,
@@ -177,15 +176,15 @@ export async function queryStrategiesMetrics(): Promise<GridStrategy[]> {
     },
     status: 'RUNNING',
     startTime: 1654938187102,
-  }
+  };
 
   const testArr = [];
 
-  for(let i = 0; i < 11 ; i++){
-    const cloned = {...temp}
-    cloned.id = "uuid" + i;
+  for (let i = 0; i < 11; i++) {
+    const cloned = { ...temp };
+    cloned.id = 'uuid' + i;
     testArr.push(cloned);
-  } 
+  }
 
-  return testArr
+  return testArr;
 }
