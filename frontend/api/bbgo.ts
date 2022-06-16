@@ -131,7 +131,29 @@ export function queryTradingVolume(params, cb) {
     });
 }
 
-export async function queryStrategiesMetrics() {
+export interface GridStrategy {
+  id: string;
+  instanceID: string;
+  strategy: string;
+  grid: {
+    symbol: string;
+  };
+  stats: {
+    oneDayArbs: number;
+    totalArbs: number;
+    investment: number;
+    totalProfits: number;
+    gridProfits: number;
+    floatingPNL: number;
+    currentPrice: number;
+    lowestPrice: number;
+    highestPrice: number;
+  },
+  status: string;
+  startTime: number;
+}
+
+export async function queryStrategiesMetrics(): Promise<GridStrategy[]> {
   return [
     {
       id: 'uuid',
@@ -144,7 +166,7 @@ export async function queryStrategiesMetrics() {
         oneDayArbs: 0,
         totalArbs: 3,
         investment: 100,
-        totalProfits: 5.6,
+        totalProfits: 5.6,        
         gridProfits: 2.5,
         floatingPNL: 3.1,
         currentPrice: 29000,

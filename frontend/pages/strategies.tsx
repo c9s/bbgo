@@ -1,7 +1,8 @@
 import DashboardLayout from '../layouts/DashboardLayout';
 import { styled } from '@mui/styles';
-import { queryStrategiesMetrics } from '../api/bbgo';
 import { useEffect, useState } from 'react';
+import { queryStrategiesMetrics } from '../api/bbgo';
+import type { GridStrategy } from '../api/bbgo';
 
 const StrategyContainer = styled('section')(() => ({
   display: 'flex',
@@ -71,7 +72,7 @@ const Stats = styled('div')(() => ({
 }));
 
 export default function Strategies() {
-  const [details, setDetails] = useState([]);
+  const [details, setDetails] = useState<GridStrategy[]>([]);
 
   useEffect(() => {
     queryStrategiesMetrics().then((value) => {
@@ -88,7 +89,7 @@ export default function Strategies() {
   );
 }
 
-export function Detail({ data }) {
+export function Detail({ data }:{ data: GridStrategy}) {
   const { strategy, stats, startTime } = data;
   const totalProfitsPercentage = (stats.totalProfits / stats.investment) * 100;
   const gridProfitsPercentage = (stats.gridProfits / stats.investment) * 100;
