@@ -91,13 +91,13 @@ func (inc *SSF) Last() float64 {
 var _ types.Series = &SSF{}
 
 func (inc *SSF) calculateAndUpdate(allKLines []types.KLine) {
-	if inc.Values == nil {
-		for _, k := range allKLines {
-			inc.Update(k.Close.Float64())
-			inc.EmitUpdate(inc.Last())
-		}
-	} else {
+	if inc.Values != nil {
 		inc.Update(allKLines[len(allKLines)-1].Close.Float64())
+		inc.EmitUpdate(inc.Last())
+		return
+	}
+	for _, k := range allKLines {
+		inc.Update(k.Close.Float64())
 		inc.EmitUpdate(inc.Last())
 	}
 }
