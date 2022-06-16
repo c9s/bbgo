@@ -1,17 +1,19 @@
-package rebalance
+package marketcap
 
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/datasource/glassnode"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-const ID = "rebalance"
+const ID = "marketcap"
 
 var log = logrus.WithField("strategy", ID)
 
@@ -21,12 +23,15 @@ func init() {
 
 type Strategy struct {
 	Notifiability *bbgo.Notifiability
+	glassnode     *glassnode.DataSource
 
-	Interval      types.Interval   `json:"interval"`
-	BaseCurrency  string           `json:"baseCurrency"`
-	TargetWeights types.ValueMap   `json:"targetWeights"`
-	Threshold     fixedpoint.Value `json:"threshold"`
-	DryRun        bool             `json:"dryRun"`
+	Interval         types.Interval   `json:"interval"`
+	BaseCurrency     string           `json:"baseCurrency"`
+	BaseWeight       fixedpoint.Value `json:"baseWeight"`
+	TargetCurrencies []string         `json:"targetCurrencies"`
+	Threshold        fixedpoint.Value `json:"threshold"`
+	Verbose          bool             `json:"verbose"`
+	DryRun           bool             `json:"dryRun"`
 	// max amount to buy or sell per order
 	MaxAmount fixedpoint.Value `json:"maxAmount"`
 
@@ -34,6 +39,8 @@ type Strategy struct {
 }
 
 func (s *Strategy) Initialize() error {
+	apiKey := os.Getenv("GLASSNODE_API_KEY")
+	s.glassnode = glassnode.New(apiKey)
 	return nil
 }
 
@@ -42,17 +49,13 @@ func (s *Strategy) ID() string {
 }
 
 func (s *Strategy) Validate() error {
-	if len(s.TargetWeights) == 0 {
-		return fmt.Errorf("targetWeights should not be empty")
+	if len(s.TargetCurrencies) == 0 {
+		return fmt.Errorf("taretCurrencies should not be empty")
 	}
 
-	if !s.TargetWeights.Sum().Eq(fixedpoint.One) {
-		return fmt.Errorf("the sum of targetWeights should be 1")
-	}
-
-	for currency, weight := range s.TargetWeights {
-		if weight.Float64() < 0 {
-			return fmt.Errorf("%s weight: %f should not less than 0", currency, weight.Float64())
+	for _, c := range s.TargetCurrencies {
+		if c == s.BaseCurrency {
+			return fmt.Errorf("targetCurrencies contain baseCurrency")
 		}
 	}
 
@@ -68,36 +71,29 @@ func (s *Strategy) Validate() error {
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
-	session.Subscribe(types.KLineChannel, s.symbols()[0], types.SubscribeOptions{Interval: s.Interval})
+	for _, symbol := range s.symbols() {
+		session.Subscribe(types.KLineChannel, symbol, types.SubscribeOptions{Interval: s.Interval})
+	}
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	s.activeOrderBook = bbgo.NewActiveOrderBook("")
 	s.activeOrderBook.BindStream(session.UserDataStream)
 
-	markets := session.Markets()
-	for _, symbol := range s.symbols() {
-		if _, ok := markets[symbol]; !ok {
-			return fmt.Errorf("exchange: %s does not supoort matket: %s", session.Exchange.Name(), symbol)
-		}
-	}
-
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		s.rebalance(ctx, orderExecutor, session)
 	})
-
 	return nil
 }
 
 func (s *Strategy) rebalance(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) {
-	// cancel active orders before rebalance
-	if err := session.Exchange.CancelOrders(ctx, s.activeOrderBook.Orders()...); err != nil {
-		log.WithError(err).Errorf("failed to cancel orders")
+	if err := orderExecutor.CancelOrders(ctx, s.activeOrderBook.Orders()...); err != nil {
+		log.WithError(err).Error("failed to cancel orders")
 	}
 
 	submitOrders := s.generateSubmitOrders(ctx, session)
-	for _, order := range submitOrders {
-		log.Infof("generated submit order: %s", order.String())
+	for _, submitOrder := range submitOrders {
+		log.Infof("generated submit order: %s", submitOrder.String())
 	}
 
 	if s.DryRun {
@@ -113,47 +109,13 @@ func (s *Strategy) rebalance(ctx context.Context, orderExecutor bbgo.OrderExecut
 	s.activeOrderBook.Add(createdOrders...)
 }
 
-func (s *Strategy) prices(ctx context.Context, session *bbgo.ExchangeSession) types.ValueMap {
-	m := make(types.ValueMap)
-
-	tickers, err := session.Exchange.QueryTickers(ctx, s.symbols()...)
-	if err != nil {
-		log.WithError(err).Error("failed to query tickers")
-		return nil
-	}
-
-	for currency := range s.TargetWeights {
-		if currency == s.BaseCurrency {
-			m[s.BaseCurrency] = fixedpoint.One
-			continue
-		}
-		m[currency] = tickers[currency+s.BaseCurrency].Last
-	}
-
-	return m
-}
-
-func (s *Strategy) quantities(session *bbgo.ExchangeSession) types.ValueMap {
-	m := make(types.ValueMap)
-
-	balances := session.GetAccount().Balances()
-	for currency := range s.TargetWeights {
-		m[currency] = balances[currency].Total()
-	}
-
-	return m
-}
-
 func (s *Strategy) generateSubmitOrders(ctx context.Context, session *bbgo.ExchangeSession) (submitOrders []types.SubmitOrder) {
+	targetWeights := s.getTargetWeights(ctx)
 	prices := s.prices(ctx, session)
 	marketValues := prices.Mul(s.quantities(session))
 	currentWeights := marketValues.Normalize()
 
-	for currency, targetWeight := range s.TargetWeights {
-		if currency == s.BaseCurrency {
-			continue
-		}
-
+	for currency, targetWeight := range targetWeights {
 		symbol := currency + s.BaseCurrency
 		currentWeight := currentWeights[currency]
 		currentPrice := prices[currency]
@@ -195,8 +157,6 @@ func (s *Strategy) generateSubmitOrders(ctx context.Context, session *bbgo.Excha
 				s.MaxAmount)
 		}
 
-		log.Debugf("symbol: %v, quantity: %v", symbol, quantity)
-
 		order := types.SubmitOrder{
 			Symbol:   symbol,
 			Side:     side,
@@ -207,16 +167,78 @@ func (s *Strategy) generateSubmitOrders(ctx context.Context, session *bbgo.Excha
 
 		submitOrders = append(submitOrders, order)
 	}
-
 	return submitOrders
 }
 
-func (s *Strategy) symbols() (symbols []string) {
-	for currency := range s.TargetWeights {
-		if currency == s.BaseCurrency {
-			continue
+func (s *Strategy) getTargetWeights(ctx context.Context) types.ValueMap {
+	m := types.FloatMap{}
+
+	// get market cap values
+	for _, currency := range s.TargetCurrencies {
+		marketCap, err := s.glassnode.QueryMarketCapInUSD(ctx, currency)
+		if err != nil {
+			log.WithError(err).Error("failed to query market cap")
+			return nil
 		}
+		m[currency] = marketCap
+	}
+
+	// normalize
+	m = m.Normalize()
+
+	// rescale by 1 - baseWeight
+	m = m.MulScalar(1.0 - s.BaseWeight.Float64())
+
+	// append base weight
+	m[s.BaseCurrency] = s.BaseWeight.Float64()
+
+	// convert to types.ValueMap
+	targetWeights := types.ValueMap{}
+	for currency, weight := range m {
+		targetWeights[currency] = fixedpoint.NewFromFloat(weight)
+	}
+
+	return targetWeights
+}
+
+func (s *Strategy) prices(ctx context.Context, session *bbgo.ExchangeSession) types.ValueMap {
+	tickers, err := session.Exchange.QueryTickers(ctx, s.symbols()...)
+	if err != nil {
+		log.WithError(err).Error("failed to query tickers")
+		return nil
+	}
+
+	prices := types.ValueMap{}
+	for _, currency := range s.TargetCurrencies {
+		prices[currency] = tickers[currency+s.BaseCurrency].Last
+	}
+
+	// append base currency price
+	prices[s.BaseCurrency] = fixedpoint.One
+
+	return prices
+}
+
+func (s *Strategy) quantities(session *bbgo.ExchangeSession) types.ValueMap {
+	balances := session.Account.Balances()
+
+	quantities := types.ValueMap{}
+	for _, currency := range s.currencies() {
+		quantities[currency] = balances[currency].Total()
+	}
+
+	return quantities
+}
+
+func (s *Strategy) symbols() (symbols []string) {
+	for _, currency := range s.TargetCurrencies {
 		symbols = append(symbols, currency+s.BaseCurrency)
 	}
 	return symbols
+}
+
+func (s *Strategy) currencies() (currencies []string) {
+	currencies = append(currencies, s.TargetCurrencies...)
+	currencies = append(currencies, s.BaseCurrency)
+	return currencies
 }
