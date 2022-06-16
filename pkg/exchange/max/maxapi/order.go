@@ -7,8 +7,6 @@ import (
 	"context"
 	"net/url"
 
-	"github.com/pkg/errors"
-
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -144,93 +142,3 @@ func (s *OrderService) All(market string, limit, page int, states ...OrderState)
 
 // Options carry the option fields for REST API
 type Options map[string]interface{}
-
-// Create multiple order in a single request
-func (s *OrderService) CreateMulti(market string, orders []SubmitOrder) (*MultiOrderResponse, error) {
-	req := s.NewCreateMultiOrderRequest()
-	req.Market(market)
-	req.AddOrders(orders...)
-	return req.Do(context.Background())
-}
-
-type MultiOrderRequestParams struct {
-	*PrivateRequestParams
-
-	Market string  `json:"market"`
-	Orders []Order `json:"orders"`
-}
-
-type MultiOrderResponse []struct {
-	Error string `json:"error,omitempty"`
-	Order Order  `json:"order,omitempty"`
-}
-
-type CreateMultiOrderRequest struct {
-	client *RestClient
-
-	market  *string
-	groupID *uint32
-	orders  []SubmitOrder
-}
-
-func (r *CreateMultiOrderRequest) GroupID(groupID uint32) *CreateMultiOrderRequest {
-	r.groupID = &groupID
-	return r
-}
-
-func (r *CreateMultiOrderRequest) Market(market string) *CreateMultiOrderRequest {
-	r.market = &market
-	return r
-}
-
-func (r *CreateMultiOrderRequest) AddOrders(orders ...SubmitOrder) *CreateMultiOrderRequest {
-	r.orders = append(r.orders, orders...)
-	return r
-}
-
-func (r *CreateMultiOrderRequest) Do(ctx context.Context) (multiOrderResponse *MultiOrderResponse, err error) {
-	var payload = map[string]interface{}{}
-
-	if r.market != nil {
-		payload["market"] = r.market
-	} else {
-		return nil, errors.New("parameter market is required")
-	}
-
-	if r.groupID != nil {
-		payload["group_id"] = r.groupID
-	}
-
-	if len(r.orders) == 0 {
-		return nil, errors.New("parameter orders can not be empty")
-	}
-
-	// clear group id
-	for i := range r.orders {
-		r.orders[i].GroupID = 0
-	}
-
-	payload["orders"] = r.orders
-
-	req, err := r.client.newAuthenticatedRequest(context.Background(), "POST", "v2/orders/multi/onebyone", nil, payload, relUrlV2OrdersMultiOneByOne)
-	if err != nil {
-		return multiOrderResponse, errors.Wrapf(err, "order create error")
-	}
-
-	response, err := r.client.SendRequest(req)
-	if err != nil {
-		return multiOrderResponse, err
-	}
-
-	multiOrderResponse = &MultiOrderResponse{}
-	if errJson := response.DecodeJSON(multiOrderResponse); errJson != nil {
-		return multiOrderResponse, errJson
-	}
-
-	return multiOrderResponse, err
-}
-
-func (s *OrderService) NewCreateMultiOrderRequest() *CreateMultiOrderRequest {
-	return &CreateMultiOrderRequest{client: s.client}
-}
-
