@@ -5,6 +5,7 @@ const SummarySection = styled('div')(() => ({
   display: 'flex',
   justifyContent: 'space-around',
   backgroundColor: 'rgb(255, 245, 232)',
+  margin: '10px 0',
 }));
 
 const SummaryBlock = styled('div')(() => ({
