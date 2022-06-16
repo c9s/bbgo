@@ -1,4 +1,4 @@
-package marketcap
+package types
 
 type FloatMap map[string]float64
 

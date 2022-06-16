@@ -22,11 +22,11 @@ func init() {
 type Strategy struct {
 	Notifiability *bbgo.Notifiability
 
-	Interval      types.Interval      `json:"interval"`
-	BaseCurrency  string              `json:"baseCurrency"`
-	TargetWeights fixedpoint.ValueMap `json:"targetWeights"`
-	Threshold     fixedpoint.Value    `json:"threshold"`
-	DryRun        bool                `json:"dryRun"`
+	Interval      types.Interval   `json:"interval"`
+	BaseCurrency  string           `json:"baseCurrency"`
+	TargetWeights types.ValueMap   `json:"targetWeights"`
+	Threshold     fixedpoint.Value `json:"threshold"`
+	DryRun        bool             `json:"dryRun"`
 	// max amount to buy or sell per order
 	MaxAmount fixedpoint.Value `json:"maxAmount"`
 
@@ -113,8 +113,8 @@ func (s *Strategy) rebalance(ctx context.Context, orderExecutor bbgo.OrderExecut
 	s.activeOrderBook.Add(createdOrders...)
 }
 
-func (s *Strategy) prices(ctx context.Context, session *bbgo.ExchangeSession) fixedpoint.ValueMap {
-	m := make(fixedpoint.ValueMap)
+func (s *Strategy) prices(ctx context.Context, session *bbgo.ExchangeSession) types.ValueMap {
+	m := make(types.ValueMap)
 
 	tickers, err := session.Exchange.QueryTickers(ctx, s.symbols()...)
 	if err != nil {
@@ -133,8 +133,8 @@ func (s *Strategy) prices(ctx context.Context, session *bbgo.ExchangeSession) fi
 	return m
 }
 
-func (s *Strategy) quantities(session *bbgo.ExchangeSession) fixedpoint.ValueMap {
-	m := make(fixedpoint.ValueMap)
+func (s *Strategy) quantities(session *bbgo.ExchangeSession) types.ValueMap {
+	m := make(types.ValueMap)
 
 	balances := session.GetAccount().Balances()
 	for currency := range s.TargetWeights {
