@@ -52,7 +52,7 @@ func (s *RewardService) Sync(ctx context.Context, exchange types.Exchange, start
 
 	tasks := []SyncTask{
 		{
-			Type:   types.Trade{},
+			Type:   types.Reward{},
 			Select: SelectLastRewards(exchange.Name(), 100),
 			BatchQuery: func(ctx context.Context, startTime, endTime time.Time) (interface{}, chan error) {
 				query := &batch.RewardBatchQuery{
