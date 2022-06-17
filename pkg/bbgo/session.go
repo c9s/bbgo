@@ -213,6 +213,8 @@ type ExchangeSession struct {
 
 	Exchange types.Exchange `json:"-" yaml:"-"`
 
+	UseHeikinAshi bool `json:"heikinAshi,omitempty" yaml:"heikinAshi,omitempty"`
+
 	// Trades collects the executed trades from the exchange
 	// map: symbol -> []trade
 	Trades map[string]*types.TradeSlice `json:"-" yaml:"-"`
@@ -346,6 +348,12 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 		}
 	}
 
+	if session.UseHeikinAshi {
+		session.MarketDataStream = &types.HeikinAshiStream{
+			StandardStreamEmitter: session.MarketDataStream.(types.StandardStreamEmitter),
+		}
+	}
+
 	// query and initialize the balances
 	if !session.PublicOnly {
 		account, err := session.Exchange.QueryAccount(ctx)
@@ -400,13 +408,23 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 	}
 
 	// update last prices
-	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
-		if _, ok := session.startPrices[kline.Symbol]; !ok {
-			session.startPrices[kline.Symbol] = kline.Open
-		}
+	if session.UseHeikinAshi {
+		session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
+			if _, ok := session.startPrices[kline.Symbol]; !ok {
+				session.startPrices[kline.Symbol] = kline.Open
+			}
 
-		session.lastPrices[kline.Symbol] = kline.Close
-	})
+			session.lastPrices[kline.Symbol] = session.MarketDataStream.(*types.HeikinAshiStream).LastOrigin[kline.Symbol][kline.Interval].Close
+		})
+	} else {
+		session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
+			if _, ok := session.startPrices[kline.Symbol]; !ok {
+				session.startPrices[kline.Symbol] = kline.Open
+			}
+
+			session.lastPrices[kline.Symbol] = kline.Close
+		})
+	}
 
 	session.MarketDataStream.OnMarketTrade(func(trade types.Trade) {
 		session.lastPrices[trade.Symbol] = trade.Price
