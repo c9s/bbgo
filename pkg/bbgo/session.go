@@ -213,7 +213,7 @@ type ExchangeSession struct {
 
 	Exchange types.Exchange `json:"-" yaml:"-"`
 
-	UseHeikinAshi bool `json:"useHeikinAshi,omitempty" yaml:"useHeikinAshi,omitempty"`
+	UseHeikinAshi bool `json:"heikinAshi,omitempty" yaml:"heikinAshi,omitempty"`
 
 	// Trades collects the executed trades from the exchange
 	// map: symbol -> []trade

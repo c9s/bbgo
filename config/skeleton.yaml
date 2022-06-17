@@ -2,7 +2,7 @@
 sessions:
   binance:
     exchange: binance
-    useHeikinAshi: true
+    heikinAshi: true
     envVarPrefix: binance
 
 exchangeStrategies:
