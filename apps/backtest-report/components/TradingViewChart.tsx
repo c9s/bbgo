@@ -176,7 +176,7 @@ const ordersToMarkets = (interval: string, orders: Array<Order> | void): Array<M
           position: 'belowBar',
           color: '#239D10',
           shape: 'arrowUp',
-          text: ''+order.price
+          text: ''+order.price.toFixed(0),
           //text: 'B',
         });
         break;
@@ -186,7 +186,7 @@ const ordersToMarkets = (interval: string, orders: Array<Order> | void): Array<M
           position: 'aboveBar',
           color: '#e91e63',
           shape: 'arrowDown',
-          text: ''+order.price
+          text: ''+order.price.toFixed(0),
           //text: 'S',
         });
         break;
