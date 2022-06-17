@@ -134,16 +134,18 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 	}
 
 	if quantity.Compare(s.Market.MinQuantity) < 0 {
-		return fmt.Errorf("order quantity %v is too small, less than %v", quantity, s.Market.MinQuantity)
+		return fmt.Errorf("%s order quantity %v is too small, less than %v", s.Symbol, quantity, s.Market.MinQuantity)
 	}
 
 	orderForm := s.generateOrderForm(side, quantity, types.SideEffectTypeAutoRepay)
 
-	s.Notify("Submitting %s %s order to close position by %v", s.Symbol, side.String(), percentage, orderForm)
+	log.Infof("submit close position order %v", orderForm)
+	s.Notify("Submitting %s %s order to close position by %v", s.Symbol, side.String(), percentage)
 
 	createdOrders, err := s.session.Exchange.SubmitOrders(ctx, orderForm)
 	if err != nil {
-		log.WithError(err).Errorf("can not place position close order")
+		log.WithError(err).Errorf("can not place %s position close order", s.Symbol)
+		s.Notify("can not place %s position close order", s.Symbol)
 	}
 
 	s.orderStore.Add(createdOrders...)
@@ -211,7 +213,7 @@ func (s *Strategy) generateOrderForm(side types.SideType, quantity fixedpoint.Va
 func (s *Strategy) calculateQuantity(currentPrice fixedpoint.Value) fixedpoint.Value {
 	balance, ok := s.session.GetAccount().Balance(s.Market.QuoteCurrency)
 	if !ok {
-		log.Error("can not update balance from exchange")
+		log.Errorf("can not update %s balance from exchange", s.Symbol)
 		return fixedpoint.Zero
 	}
 
@@ -295,27 +297,27 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		// TP/SL if there's non-dust position
 		if !s.Market.IsDustQuantity(base.Abs(), kline.GetClose()) {
 			if s.StopLossByTriggeringK && !s.currentStopLossPrice.IsZero() && ((baseSign < 0 && kline.GetClose().Compare(s.currentStopLossPrice) > 0) || (baseSign > 0 && kline.GetClose().Compare(s.currentStopLossPrice) < 0)) {
-				// SL by triggered Kline low
-				if err := s.ClosePosition(ctx, fixedpoint.One); err != nil {
-					s.Notify("can not place SL order")
-				} else {
+				// SL by triggering Kline low
+				log.Infof("%s SL by triggering Kline low", s.Symbol)
+				s.Notify("%s SL by triggering Kline low", s.Symbol)
+				if err := s.ClosePosition(ctx, fixedpoint.One); err == nil {
 					s.currentStopLossPrice = fixedpoint.Zero
 					s.currentTakeProfitPrice = fixedpoint.Zero
 				}
 			} else if s.TakeProfitMultiplier > 0 && !s.currentTakeProfitPrice.IsZero() && ((baseSign < 0 && kline.GetClose().Compare(s.currentTakeProfitPrice) < 0) || (baseSign > 0 && kline.GetClose().Compare(s.currentTakeProfitPrice) > 0)) {
 				// TP by multiple of ATR
-				if err := s.ClosePosition(ctx, fixedpoint.One); err != nil {
-					s.Notify("can not place TP order")
-				} else {
+				log.Infof("%s TP by multiple of ATR", s.Symbol)
+				s.Notify("%s TP by multiple of ATR", s.Symbol)
+				if err := s.ClosePosition(ctx, fixedpoint.One); err == nil {
 					s.currentStopLossPrice = fixedpoint.Zero
 					s.currentTakeProfitPrice = fixedpoint.Zero
 				}
 			} else if s.TPSLBySignal {
 				// Use signals to TP/SL
+				log.Infof("%s TP/SL by reverse of DEMA or Supertrend", s.Symbol)
+				s.Notify("%s TP/SL by reverse of DEMA or Supertrend", s.Symbol)
 				if (baseSign < 0 && (stSignal == types.DirectionUp || demaSignal == types.DirectionUp)) || (baseSign > 0 && (stSignal == types.DirectionDown || demaSignal == types.DirectionDown)) {
-					if err := s.ClosePosition(ctx, fixedpoint.One); err != nil {
-						s.Notify("can not place TP/SL order")
-					} else {
+					if err := s.ClosePosition(ctx, fixedpoint.One); err == nil {
 						s.currentStopLossPrice = fixedpoint.Zero
 						s.currentTakeProfitPrice = fixedpoint.Zero
 					}
@@ -343,11 +345,20 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 		}
 
+		// The default value of side is an empty string. Unless side is set by the checks above, the result of the following condition is false
 		if side == types.SideTypeSell || side == types.SideTypeBuy {
+			log.Infof("open %s position for signal %v", s.Symbol, side)
+			s.Notify("open %s position for signal %v", s.Symbol, side)
 			// Close opposite position if any
-			if !s.Market.IsDustQuantity(base.Abs(), kline.GetClose()) && ((side == types.SideTypeSell && baseSign > 0) || (side == types.SideTypeBuy && baseSign < 0)) {
-				if err := s.ClosePosition(ctx, fixedpoint.One); err != nil {
-					s.Notify("can not place close position order")
+			if !s.Position.IsDust(kline.GetClose()) {
+				if (side == types.SideTypeSell && s.Position.IsLong()) || (side == types.SideTypeBuy && s.Position.IsShort()) {
+					log.Infof("close existing %s position before open a new position", s.Symbol)
+					s.Notify("close existing %s position before open a new position", s.Symbol)
+					_ = s.ClosePosition(ctx, fixedpoint.One)
+				} else {
+					log.Infof("existing %s position has the same direction with the signal", s.Symbol)
+					s.Notify("existing %s position has the same direction with the signal", s.Symbol)
+					return
 				}
 			}
 
@@ -355,8 +366,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			log.Infof("submit open position order %v", orderForm)
 			order, err := orderExecutor.SubmitOrders(ctx, orderForm)
 			if err != nil {
-				log.WithError(err).Errorf("can not place open position order")
-				s.Notify("can not place open position order")
+				log.WithError(err).Errorf("can not place %s open position order", s.Symbol)
+				s.Notify("can not place %s open position order", s.Symbol)
 			} else {
 				s.orderStore.Add(order...)
 			}
