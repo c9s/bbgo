@@ -4,16 +4,10 @@ package max
 //go:generate -command PostRequest requestgen -method POST
 
 import (
-	"context"
 	"net/url"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-)
-
-var (
-	relUrlV2Orders              *url.URL
-	relUrlV2OrdersMultiOneByOne *url.URL
 )
 
 func mustParseURL(s string) *url.URL {
@@ -22,11 +16,6 @@ func mustParseURL(s string) *url.URL {
 		panic(err)
 	}
 	return u
-}
-
-func init() {
-	relUrlV2Orders = mustParseURL("v2/orders")
-	relUrlV2OrdersMultiOneByOne = mustParseURL("v2/orders/multi/onebyone")
 }
 
 type WalletType string
@@ -111,34 +100,3 @@ type Order struct {
 	ClientOID       string                     `json:"client_oid,omitempty"`
 	CreatedAt       types.MillisecondTimestamp `json:"created_at"`
 }
-
-// All returns all orders for the authenticated account.
-func (s *OrderService) All(market string, limit, page int, states ...OrderState) ([]Order, error) {
-	payload := map[string]interface{}{
-		"market":   market,
-		"limit":    limit,
-		"page":     page,
-		"state":    states,
-		"order_by": "desc",
-	}
-
-	req, err := s.client.newAuthenticatedRequest(context.Background(), "GET", "v2/orders", nil, payload, relUrlV2Orders)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := s.client.SendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var orders []Order
-	if err := response.DecodeJSON(&orders); err != nil {
-		return nil, err
-	}
-
-	return orders, nil
-}
-
-// Options carry the option fields for REST API
-type Options map[string]interface{}
