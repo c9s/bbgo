@@ -18,4 +18,3 @@ repos:
     hooks:
       - id: go-fmt
         args: ['-l']
-      - id: go-critic
