@@ -835,7 +835,7 @@ func getAuthStoreID() string {
 }
 
 func (environ *Environment) setupInteraction(persistence service.PersistenceService) error {
-	var otpQRCodeImagePath = fmt.Sprintf("otp.png")
+	var otpQRCodeImagePath = "otp.png"
 	var key *otp.Key
 	var keyURL string
 	var authStore = environ.getAuthStore(persistence)

@@ -115,8 +115,7 @@ func (t *MillisecondTimestamp) UnmarshalJSON(data []byte) error {
 
 	}
 
-	// fallback to RFC3339
-	return (*time.Time)(t).UnmarshalJSON(data)
+	// Unreachable
 }
 
 func convertFloat64ToTime(vt string, f float64) (time.Time, error) {

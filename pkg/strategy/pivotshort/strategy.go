@@ -550,8 +550,8 @@ func (s *Strategy) placeBounceSellOrders(ctx context.Context, resistancePrice fi
 
 	for i := 0; i < numLayers; i++ {
 		balances := s.session.GetAccount().Balances()
-		quoteBalance, _ := balances[s.Market.QuoteCurrency]
-		baseBalance, _ := balances[s.Market.BaseCurrency]
+		quoteBalance := balances[s.Market.QuoteCurrency]
+		baseBalance := balances[s.Market.BaseCurrency]
 
 		// price = (resistance_price * (1.0 - ratio)) * ((1.0 + layerSpread) * i)
 		price := resistancePrice.Mul(fixedpoint.One.Sub(s.BounceShort.Ratio))

@@ -597,7 +597,6 @@ func (s *Server) tradingVolume(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"tradingVolumes": rows})
-	return
 }
 
 func newServer(r http.Handler, bind string) *http.Server {

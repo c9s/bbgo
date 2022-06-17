@@ -50,7 +50,7 @@ func (b Balance) Net() fixedpoint.Value {
 }
 
 func (b Balance) ValueString() (o string) {
-	o = fmt.Sprintf("%s", b.Available.String())
+	o = b.Available.String()
 
 	if b.Locked.Sign() > 0 {
 		o += fmt.Sprintf(" (locked %v)", b.Locked)

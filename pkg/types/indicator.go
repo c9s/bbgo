@@ -135,8 +135,8 @@ func Predict(a Series, lookback int, offset ...int) float64 {
 	if a.Length() < lookback {
 		lookback = a.Length()
 	}
-	x := make([]float64, lookback, lookback)
-	y := make([]float64, lookback, lookback)
+	x := make([]float64, lookback)
+	y := make([]float64, lookback)
 	var weights []float64
 	for i := 0; i < lookback; i++ {
 		x[i] = float64(i)
@@ -163,9 +163,9 @@ func NextCross(a Series, b Series, lookback int) (int, float64, bool) {
 	if b.Length() < lookback {
 		lookback = b.Length()
 	}
-	x := make([]float64, lookback, lookback)
-	y1 := make([]float64, lookback, lookback)
-	y2 := make([]float64, lookback, lookback)
+	x := make([]float64, lookback)
+	y1 := make([]float64, lookback)
+	y2 := make([]float64, lookback)
 	var weights []float64
 	for i := 0; i < lookback; i++ {
 		x[i] = float64(i)
@@ -295,20 +295,20 @@ func Add(a interface{}, b interface{}) Series {
 	var aa Series
 	var bb Series
 
-	switch a.(type) {
+	switch tp := a.(type) {
 	case float64:
-		aa = NumberSeries(a.(float64))
+		aa = NumberSeries(tp)
 	case Series:
-		aa = a.(Series)
+		aa = tp
 	default:
 		panic("input should be either *Series or float64")
 
 	}
-	switch b.(type) {
+	switch tp := b.(type) {
 	case float64:
-		bb = NumberSeries(b.(float64))
+		bb = NumberSeries(tp)
 	case Series:
-		bb = b.(Series)
+		bb = tp
 	default:
 		panic("input should be either *Series or float64")
 
@@ -367,19 +367,19 @@ func (a *MinusSeriesResult) Length() int {
 var _ Series = &MinusSeriesResult{}
 
 func switchIface(b interface{}) Series {
-	switch b.(type) {
+	switch tp := b.(type) {
 	case float64:
-		return NumberSeries(b.(float64))
+		return NumberSeries(tp)
 	case int32:
-		return NumberSeries(float64(b.(int32)))
+		return NumberSeries(float64(tp))
 	case int64:
-		return NumberSeries(float64(b.(int64)))
+		return NumberSeries(float64(tp))
 	case float32:
-		return NumberSeries(float64(b.(float32)))
+		return NumberSeries(float64(tp))
 	case int:
-		return NumberSeries(float64(b.(int)))
+		return NumberSeries(float64(tp))
 	case Series:
-		return b.(Series)
+		return tp
 	default:
 		fmt.Println(reflect.TypeOf(b))
 		panic("input should be either *Series or float64")
@@ -427,19 +427,19 @@ func Mul(a interface{}, b interface{}) Series {
 	var aa Series
 	var bb Series
 
-	switch a.(type) {
+	switch tp := a.(type) {
 	case float64:
-		aa = NumberSeries(a.(float64))
+		aa = NumberSeries(tp)
 	case Series:
-		aa = a.(Series)
+		aa = tp
 	default:
 		panic("input should be either Series or float64")
 	}
-	switch b.(type) {
+	switch tp := b.(type) {
 	case float64:
-		bb = NumberSeries(b.(float64))
+		bb = NumberSeries(tp)
 	case Series:
-		bb = b.(Series)
+		bb = tp
 	default:
 		panic("input should be either Series or float64")
 
@@ -490,7 +490,7 @@ func ToArray(a Series, limit ...int) (result []float64) {
 	if l < a.Length() {
 		l = a.Length()
 	}
-	result = make([]float64, l, l)
+	result = make([]float64, l)
 	for i := 0; i < l; i++ {
 		result[i] = a.Index(i)
 	}
@@ -510,7 +510,7 @@ func ToReverseArray(a Series, limit ...int) (result Float64Slice) {
 	if l < a.Length() {
 		l = a.Length()
 	}
-	result = make([]float64, l, l)
+	result = make([]float64, l)
 	for i := 0; i < l; i++ {
 		result[l-i-1] = a.Index(i)
 	}

@@ -27,7 +27,7 @@ type TradeSlice struct {
 
 func (s *TradeSlice) Copy() []Trade {
 	s.mu.Lock()
-	slice := make([]Trade, len(s.Trades), len(s.Trades))
+	slice := make([]Trade, len(s.Trades))
 	copy(slice, s.Trades)
 	s.mu.Unlock()
 

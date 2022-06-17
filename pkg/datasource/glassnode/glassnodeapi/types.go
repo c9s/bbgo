@@ -84,10 +84,7 @@ type Data struct {
 }
 
 func (s Response) IsEmpty() bool {
-	if len(s) == 0 {
-		return true
-	}
-	return false
+	return len(s) == 0
 }
 
 func (s Response) First() Data {
@@ -120,8 +117,5 @@ func (s Response) LastOptions() map[string]float64 {
 }
 
 func (s Response) HasOptions() bool {
-	if len(s.First().Options) == 0 {
-		return false
-	}
-	return true
+	return len(s.First().Options) != 0
 }

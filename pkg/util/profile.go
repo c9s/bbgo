@@ -19,7 +19,7 @@ func StartTimeProfile(args ...string) TimeProfile {
 }
 
 func (p *TimeProfile) TilNow() time.Duration {
-	return time.Now().Sub(p.StartTime)
+	return time.Since(p.StartTime)
 }
 
 func (p *TimeProfile) Stop() time.Duration {

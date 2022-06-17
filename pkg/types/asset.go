@@ -123,7 +123,7 @@ func (m AssetMap) SlackAttachment() slack.Attachment {
 				Short: false,
 			})
 		} else {
-			text := fmt.Sprintf("%s", a.NetAsset.String())
+			text := a.NetAsset.String()
 
 			if !a.Borrowed.IsZero() {
 				text += fmt.Sprintf(" Borrowed: %s", a.Borrowed.String())

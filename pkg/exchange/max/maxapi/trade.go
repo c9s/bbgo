@@ -133,16 +133,16 @@ type PrivateRequestParams struct {
 type GetPrivateTradesRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
-	market string `param:"market"`
+	market string `param:"market"` // nolint:golint,structcheck
 
 	// timestamp is the seconds elapsed since Unix epoch, set to return trades executed before the time only
-	timestamp *time.Time `param:"timestamp,seconds"`
+	timestamp *time.Time `param:"timestamp,seconds"` // nolint:golint,structcheck
 
 	// From field is a trade id, set ot return trades created after the trade
-	from *int64 `param:"from"`
+	from *int64 `param:"from"` // nolint:golint,structcheck
 
 	// To field trade id, set to return trades created before the trade
-	to *int64 `param:"to"`
+	to *int64 `param:"to"` // nolint:golint,structcheck
 
 	orderBy *string `param:"order_by"`
 

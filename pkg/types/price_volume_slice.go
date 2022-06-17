@@ -38,13 +38,13 @@ func (slice PriceVolumeSlice) CopyDepth(depth int) PriceVolumeSlice {
 		return slice.Copy()
 	}
 
-	var s = make(PriceVolumeSlice, depth, depth)
+	var s = make(PriceVolumeSlice, depth)
 	copy(s, slice[:depth])
 	return s
 }
 
 func (slice PriceVolumeSlice) Copy() PriceVolumeSlice {
-	var s = make(PriceVolumeSlice, len(slice), len(slice))
+	var s = make(PriceVolumeSlice, len(slice))
 	copy(s, slice)
 	return s
 }

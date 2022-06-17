@@ -231,7 +231,7 @@ func (v Value) MarshalJSON() ([]byte, error) {
 }
 
 func (v *Value) UnmarshalJSON(data []byte) error {
-	if bytes.Compare(data, []byte{'n', 'u', 'l', 'l'}) == 0 {
+	if bytes.Equal(data, []byte{'n', 'u', 'l', 'l'}) {
 		*v = Zero
 		return nil
 	}
