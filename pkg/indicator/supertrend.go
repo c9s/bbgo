@@ -1,11 +1,14 @@
 package indicator
 
 import (
+	"github.com/sirupsen/logrus"
 	"math"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/types"
 )
+
+var logst = logrus.WithField("indicator", "supertrend")
 
 //go:generate callbackgen -type Supertrend
 type Supertrend struct {
@@ -91,7 +94,9 @@ func (inc *Supertrend) Update(highPrice, lowPrice, closePrice float64) {
 	}
 
 	// Update signal
-	if inc.trend == types.DirectionUp && inc.previousTrend == types.DirectionDown {
+	if inc.AverageTrueRange.Last() <= 0 {
+		inc.tradeSignal = types.DirectionNone
+	} else if inc.trend == types.DirectionUp && inc.previousTrend == types.DirectionDown {
 		inc.tradeSignal = types.DirectionUp
 	} else if inc.trend == types.DirectionDown && inc.previousTrend == types.DirectionUp {
 		inc.tradeSignal = types.DirectionDown
@@ -105,6 +110,10 @@ func (inc *Supertrend) Update(highPrice, lowPrice, closePrice float64) {
 	} else {
 		inc.trendPrices.Push(inc.uptrendPrice)
 	}
+
+	logst.Debugf("Update supertrend result: closePrice: %v, uptrendPrice: %v, downtrendPrice: %v, trend: %v,"+
+		" tradeSignal: %v, AverageTrueRange.Last(): %v", inc.closePrice, inc.uptrendPrice, inc.downtrendPrice,
+		inc.trend, inc.tradeSignal, inc.AverageTrueRange.Last())
 }
 
 func (inc *Supertrend) GetSignal() types.Direction {
