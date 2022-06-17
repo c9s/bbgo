@@ -53,7 +53,7 @@ jobs:
         pip install pre-commit
         pre-commit install-hooks
         pre-commit run markdownlint --files=README.md --verbose
-        pre-commit run go-fmt --all-files --verbose
+        pre-commit run detect-secrets --all-files --verbose
 
     - name: Install Migration Tool
       run: go install github.com/c9s/rockhopper/cmd/rockhopper@v1.2.1

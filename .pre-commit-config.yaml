@@ -12,9 +12,3 @@ repos:
     rev: v0.31.1
     hooks:
       - id: markdownlint
-  # Go
-  - repo: https://github.com/dnephin/pre-commit-golang
-    rev: v0.5.0
-    hooks:
-      - id: go-fmt
-        args: ['-l']
