@@ -257,8 +257,6 @@ type FuturesPosition struct {
 	Isolated     bool  `json:"isolated"`
 	UpdateTime   int64 `json:"updateTime"`
 	PositionRisk *PositionRisk
-
-	sync.Mutex
 }
 
 func NewPositionFromMarket(market Market) *Position {
