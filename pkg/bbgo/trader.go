@@ -144,9 +144,8 @@ func (trader *Trader) AttachStrategyOn(session string, strategies ...SingleExcha
 		return fmt.Errorf("session %s is not defined, valid sessions are: %v", session, keys)
 	}
 
-	for _, s := range strategies {
-		trader.exchangeStrategies[session] = append(trader.exchangeStrategies[session], s)
-	}
+	trader.exchangeStrategies[session] = append(
+		trader.exchangeStrategies[session], strategies...)
 
 	return nil
 }

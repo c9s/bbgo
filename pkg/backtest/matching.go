@@ -237,7 +237,6 @@ func (m *SimplePriceMatching) executeTrade(trade types.Trade) {
 
 	m.EmitTradeUpdate(trade)
 	m.EmitBalanceUpdate(m.Account.Balances())
-	return
 }
 
 func (m *SimplePriceMatching) newTradeFromOrder(order *types.Order, isMaker bool) types.Trade {

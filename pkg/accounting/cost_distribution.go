@@ -11,10 +11,6 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func zero(a float64) bool {
-	return int(math.Round(a*1e8)) == 0
-}
-
 type Stock types.Trade
 
 func (stock *Stock) String() string {

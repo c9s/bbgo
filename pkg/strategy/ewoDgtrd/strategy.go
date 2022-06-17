@@ -431,7 +431,7 @@ func (s *Strategy) validateOrder(order *types.SubmitOrder) error {
 			order.Quantity.Compare(s.Market.MinQuantity) < 0 ||
 			orderAmount.Compare(s.Market.MinNotional) < 0 {
 			log.Debug("amount fail")
-			return errors.New(fmt.Sprintf("amount fail: quantity: %v, amount: %v", order.Quantity, orderAmount))
+			return fmt.Errorf("amount fail: quantity: %v, amount: %v", order.Quantity, orderAmount)
 		}
 		return nil
 	} else if order.Side == types.SideTypeBuy {
@@ -458,7 +458,7 @@ func (s *Strategy) validateOrder(order *types.SubmitOrder) error {
 			orderAmount.Compare(s.Market.MinNotional) < 0 ||
 			order.Quantity.Compare(s.Market.MinQuantity) < 0 {
 			log.Debug("amount fail")
-			return errors.New(fmt.Sprintf("amount fail: quantity: %v, amount: %v", order.Quantity, orderAmount))
+			return fmt.Errorf("amount fail: quantity: %v, amount: %v", order.Quantity, orderAmount)
 		}
 		return nil
 	}
@@ -801,7 +801,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	store, ok := s.Session.MarketDataStore(s.Symbol)
 	if !ok {
-		return errors.New(fmt.Sprintf("cannot get marketdatastore of %s", s.Symbol))
+		return fmt.Errorf("cannot get marketdatastore of %s", s.Symbol)
 	}
 	s.SetupIndicators(store)
 
@@ -893,27 +893,22 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 					percentAvgTPfromCCI = percentAvgTPfromCCI*float64(counterTPfromCCI) + pnlRate
 					counterTPfromCCI += 1
 					percentAvgTPfromCCI /= float64(counterTPfromCCI)
-					break
 				case 1:
 					percentAvgTPfromLongShort = percentAvgTPfromLongShort*float64(counterTPfromLongShort) + pnlRate
 					counterTPfromLongShort += 1
 					percentAvgTPfromLongShort /= float64(counterTPfromLongShort)
-					break
 				case 2:
 					percentAvgTPfromAtr = percentAvgTPfromAtr*float64(counterTPfromAtr) + pnlRate
 					counterTPfromAtr += 1
 					percentAvgTPfromAtr /= float64(counterTPfromAtr)
-					break
 				case 3:
 					percentAvgTPfromPeak = percentAvgTPfromPeak*float64(counterTPfromPeak) + pnlRate
 					counterTPfromPeak += 1
 					percentAvgTPfromPeak /= float64(counterTPfromPeak)
-					break
 				case 4:
 					percentAvgSLfromSL = percentAvgSLfromSL*float64(counterSLfromSL) + pnlRate
 					counterSLfromSL += 1
 					percentAvgSLfromSL /= float64(counterSLfromSL)
-					break
 
 				}
 			}
@@ -1002,27 +997,22 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 					percentAvgTPfromCCI = percentAvgTPfromCCI*float64(counterTPfromCCI) + pnlRate
 					counterTPfromCCI += 1
 					percentAvgTPfromCCI /= float64(counterTPfromCCI)
-					break
 				case 1:
 					percentAvgTPfromLongShort = percentAvgTPfromLongShort*float64(counterTPfromLongShort) + pnlRate
 					counterTPfromLongShort += 1
 					percentAvgTPfromLongShort /= float64(counterTPfromLongShort)
-					break
 				case 2:
 					percentAvgTPfromAtr = percentAvgTPfromAtr*float64(counterTPfromAtr) + pnlRate
 					counterTPfromAtr += 1
 					percentAvgTPfromAtr /= float64(counterTPfromAtr)
-					break
 				case 3:
 					percentAvgTPfromPeak = percentAvgTPfromPeak*float64(counterTPfromPeak) + pnlRate
 					counterTPfromPeak += 1
 					percentAvgTPfromPeak /= float64(counterTPfromPeak)
-					break
 				case 4:
 					percentAvgSLfromSL = percentAvgSLfromSL*float64(counterSLfromSL) + pnlRate
 					counterSLfromSL += 1
 					percentAvgSLfromSL /= float64(counterSLfromSL)
-					break
 				}
 			}
 		}
