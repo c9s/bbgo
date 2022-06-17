@@ -92,6 +92,7 @@ func newRestRequest(c *http.Client, baseURL *url.URL) *restRequest {
 
 func (r *restRequest) Auth(key, secret string) *restRequest {
 	r.key = key
+	// pragma: allowlist nextline secret
 	r.secret = secret
 	return r
 }

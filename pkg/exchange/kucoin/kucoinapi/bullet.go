@@ -61,7 +61,6 @@ type GetPublicBulletRequest struct {
 	client requestgen.APIClient
 }
 
-
 //go:generate requestgen -type GetPrivateBulletRequest -method "POST" -url "/api/v1/bullet-private" -responseType .APIResponse -responseDataField Data -responseDataType .Bullet
 type GetPrivateBulletRequest struct {
 	client requestgen.AuthenticatedAPIClient

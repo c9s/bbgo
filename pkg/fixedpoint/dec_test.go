@@ -1,10 +1,10 @@
 package fixedpoint
 
 import (
+	"encoding/json"
+	"github.com/stretchr/testify/assert"
 	"math/big"
 	"testing"
-	"github.com/stretchr/testify/assert"
-	"encoding/json"
 )
 
 const Delta = 1e-9
@@ -166,7 +166,6 @@ func TestJson(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "0.00000000", p.FormatString(8))
 	assert.Equal(t, "0.00000000", string(e))
-
 
 	_ = json.Unmarshal([]byte("0.00153917575"), &p)
 	assert.Equal(t, "0.00153917", p.FormatString(8))

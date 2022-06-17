@@ -90,8 +90,9 @@ func NewExchange(key, secret string, subAccount string) *Exchange {
 		client:       client,
 		restEndpoint: u,
 		key:          key,
-		secret:       secret,
-		subAccount:   subAccount,
+		// pragma: allowlist nextline secret
+		secret:     secret,
+		subAccount: subAccount,
 	}
 }
 

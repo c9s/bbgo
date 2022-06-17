@@ -34,7 +34,6 @@ func TestStateRecorder(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, recorder.writers, 1)
 
-
 	st.Position.AddTrade(types.Trade{
 		OrderID:       1,
 		Exchange:      types.ExchangeBinance,

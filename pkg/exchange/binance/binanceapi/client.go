@@ -60,6 +60,7 @@ func NewClient(baseURL string) *RestClient {
 
 func (c *RestClient) Auth(key, secret string) {
 	c.Key = key
+	// pragma: allowlist nextline secret
 	c.Secret = secret
 }
 

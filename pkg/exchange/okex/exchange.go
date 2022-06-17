@@ -38,7 +38,8 @@ func New(key, secret, passphrase string) *Exchange {
 	}
 
 	return &Exchange{
-		key:        key,
+		key: key,
+		// pragma: allowlist nextline secret
 		secret:     secret,
 		passphrase: passphrase,
 		client:     client,
@@ -275,7 +276,7 @@ func (e *Exchange) NewStream() types.Stream {
 }
 
 func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
-	if err := marketDataLimiter.Wait(ctx) ; err != nil {
+	if err := marketDataLimiter.Wait(ctx); err != nil {
 		return nil, err
 	}
 

@@ -28,9 +28,9 @@ type Stream struct {
 	client *okexapi.RestClient
 
 	// public callbacks
-	candleEventCallbacks   []func(candle Candle)
-	bookEventCallbacks     []func(book BookEvent)
-	eventCallbacks        []func(event WebSocketEvent)
+	candleEventCallbacks       []func(candle Candle)
+	bookEventCallbacks         []func(book BookEvent)
+	eventCallbacks             []func(event WebSocketEvent)
 	accountEventCallbacks      []func(account okexapi.Account)
 	orderDetailsEventCallbacks []func(orderDetails []okexapi.OrderDetails)
 

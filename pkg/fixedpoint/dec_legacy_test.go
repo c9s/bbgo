@@ -19,7 +19,7 @@ func TestNumFractionalDigitsLegacy(t *testing.T) {
 		},
 		{
 			name: "zero underflow",
-			v:	  MustNewFromString("1e-100"),
+			v:    MustNewFromString("1e-100"),
 			want: 0,
 		},
 	}

@@ -349,11 +349,11 @@ func NewFromString(input string) (Value, error) {
 		}
 	}
 	if hasDecimal {
-		after := input[dotIndex+1 : len(input)]
+		after := input[dotIndex+1:]
 		if decimalCount >= 8 {
-			after = after[0:8] + "." + after[8:len(after)]
+			after = after[0:8] + "." + after[8:]
 		} else {
-			after = after[0:decimalCount] + strings.Repeat("0", 8-decimalCount) + after[decimalCount:len(after)]
+			after = after[0:decimalCount] + strings.Repeat("0", 8-decimalCount) + after[decimalCount:]
 		}
 		input = input[0:dotIndex] + after
 		v, err := strconv.ParseFloat(input, 64)
@@ -368,7 +368,7 @@ func NewFromString(input string) (Value, error) {
 		return Value(int64(math.Trunc(v))), nil
 
 	} else if hasScientificNotion {
-		exp, err := strconv.ParseInt(input[scIndex+1:len(input)], 10, 32)
+		exp, err := strconv.ParseInt(input[scIndex+1:], 10, 32)
 		if err != nil {
 			return 0, err
 		}

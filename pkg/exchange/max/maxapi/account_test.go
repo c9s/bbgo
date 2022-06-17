@@ -110,4 +110,3 @@ func TestAccountService_NewGetDepositHistoryRequest(t *testing.T) {
 	assert.NotEmpty(t, deposits)
 	t.Logf("deposits: %+v", deposits)
 }
-

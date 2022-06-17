@@ -11,10 +11,10 @@ type State struct {
 	CoveredPosition fixedpoint.Value `json:"coveredPosition,omitempty"`
 
 	// Deprecated:
-	Position        *types.Position  `json:"position,omitempty"`
+	Position *types.Position `json:"position,omitempty"`
 
 	// Deprecated:
-	ProfitStats     ProfitStats      `json:"profitStats,omitempty"`
+	ProfitStats ProfitStats `json:"profitStats,omitempty"`
 }
 
 type ProfitStats struct {

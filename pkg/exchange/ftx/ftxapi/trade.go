@@ -128,7 +128,7 @@ type Fill struct {
 	BaseCurrency  string           `json:"baseCurrency"`
 	QuoteCurrency string           `json:"quoteCurrency"`
 	OrderId       uint64           `json:"orderId"`
-	TradeId       uint64             `json:"tradeId"`
+	TradeId       uint64           `json:"tradeId"`
 	Price         fixedpoint.Value `json:"price"`
 	Side          Side             `json:"side"`
 	Size          fixedpoint.Value `json:"size"`

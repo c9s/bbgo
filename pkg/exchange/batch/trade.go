@@ -21,7 +21,7 @@ func (e TradeBatchQuery) Query(ctx context.Context, symbol string, options *type
 	startTime := *options.StartTime
 	endTime := *options.EndTime
 	query := &AsyncTimeRangedBatchQuery{
-		Type:    types.Trade{},
+		Type: types.Trade{},
 		Q: func(startTime, endTime time.Time) (interface{}, error) {
 			return e.ExchangeTradeHistoryService.QueryTrades(ctx, symbol, options)
 		},

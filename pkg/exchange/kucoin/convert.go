@@ -245,4 +245,3 @@ func toGlobalTrade(fill kucoinapi.Fill) types.Trade {
 	}
 	return trade
 }
-
