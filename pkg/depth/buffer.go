@@ -3,6 +3,7 @@ package depth
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -40,7 +41,7 @@ type Buffer struct {
 	updateTimeout time.Duration
 
 	// bufferingPeriod is used to buffer the update message before we get the full depth
-	bufferingPeriod time.Duration
+	bufferingPeriod atomic.Value
 }
 
 func NewBuffer(fetcher SnapshotFetcher) *Buffer {
@@ -55,7 +56,7 @@ func (b *Buffer) SetUpdateTimeout(d time.Duration) {
 }
 
 func (b *Buffer) SetBufferingPeriod(d time.Duration) {
-	b.bufferingPeriod = d
+	b.bufferingPeriod.Store(d)
 }
 
 func (b *Buffer) resetSnapshot() {
@@ -185,8 +186,8 @@ func (b *Buffer) fetchAndPush() error {
 
 func (b *Buffer) tryFetch() {
 	for {
-		if b.bufferingPeriod > 0 {
-			<-time.After(b.bufferingPeriod)
+		if period := b.bufferingPeriod.Load(); period != nil {
+			<-time.After(period.(time.Duration))
 		}
 
 		err := b.fetchAndPush()

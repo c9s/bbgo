@@ -93,8 +93,6 @@ func (s *RewardService) Sync(ctx context.Context, exchange types.Exchange) error
 	return <-errC
 }
 
-
-
 type CurrencyPositionMap map[string]fixedpoint.Value
 
 func (s *RewardService) AggregateUnspentCurrencyPosition(ctx context.Context, ex types.ExchangeName, since time.Time) (CurrencyPositionMap, error) {
@@ -128,8 +126,8 @@ func (s *RewardService) QueryUnspentSince(ctx context.Context, ex types.Exchange
 	sql += " ORDER BY created_at ASC"
 
 	rows, err := s.DB.NamedQueryContext(ctx, sql, map[string]interface{}{
-		"exchange":   ex,
-		"since": since,
+		"exchange": ex,
+		"since":    since,
 	})
 
 	if err != nil {

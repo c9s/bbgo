@@ -76,4 +76,3 @@ func (store JsonStore) Save(val interface{}) error {
 	p := filepath.Join(store.Directory, store.ID) + ".json"
 	return ioutil.WriteFile(p, data, 0666)
 }
-

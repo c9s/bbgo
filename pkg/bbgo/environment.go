@@ -596,7 +596,7 @@ func (environ *Environment) syncWithUserConfig(ctx context.Context, userConfig *
 	syncSymbolMap, restSymbols := categorizeSyncSymbol(userConfig.Sync.Symbols)
 	for _, session := range sessions {
 		syncSymbols := restSymbols
-		if ss, ok := syncSymbolMap[session.Name] ; ok {
+		if ss, ok := syncSymbolMap[session.Name]; ok {
 			syncSymbols = append(syncSymbols, ss...)
 		}
 
@@ -928,10 +928,11 @@ func (environ *Environment) setupInteraction(persistence service.PersistenceServ
 	}
 
 	interact.AddCustomInteraction(&interact.AuthInteract{
-		Strict:             authStrict,
-		Mode:               authMode,
-		Token:              authToken, // can be empty string here
-		OneTimePasswordKey: key,       // can be nil here
+		Strict: authStrict,
+		Mode:   authMode,
+		Token:  authToken, // can be empty string here
+		// pragma: allowlist nextline secret
+		OneTimePasswordKey: key, // can be nil here
 	})
 	return nil
 }

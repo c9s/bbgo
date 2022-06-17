@@ -17,7 +17,7 @@ jobs:
     env:
       MYSQL_DATABASE: bbgo
       MYSQL_USER: "root"
-      MYSQL_PASSWORD: "root"
+      MYSQL_PASSWORD: "root" # pragma: allowlist secret
 
     steps:
 
@@ -44,9 +44,16 @@ jobs:
         # auto-start: "false"
 
     - name: Set up Go
-      uses: actions/setup-go@v2
+      uses: actions/setup-go@v3
       with:
         go-version: 1.18
+
+    - name: Run pre-commit
+      run: |
+        pip install pre-commit
+        pre-commit install-hooks
+        pre-commit run markdownlint --files=README.md --verbose
+        pre-commit run detect-secrets --all-files --verbose
 
     - name: Install Migration Tool
       run: go install github.com/c9s/rockhopper/cmd/rockhopper@v1.2.1
@@ -71,6 +78,12 @@ jobs:
       run: |
         go test -race -coverprofile coverage_dnum.txt -covermode atomic -tags dnum ./pkg/...
         sed -i -e '/_requestgen.go/d' coverage_dnum.txt
+
+    - name: Revive Check
+      uses: morphy2k/revive-action@v2
+      with:
+        reporter: github-pr-review
+        fail_on_error: true
 
     - name: Upload Coverage Report
       uses: codecov/codecov-action@v3

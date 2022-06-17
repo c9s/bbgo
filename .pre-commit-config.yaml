@@ -1,0 +1,14 @@
+---
+repos:
+  # Secret Detection
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.2.0
+    hooks:
+      - id: detect-secrets
+        args: ['--exclude-secrets', '3899a918953e01bfe218116cdfeccbed579e26275c4a89abcbc70d2cb9e9bbb8']
+        exclude: pacakge.lock.json
+  # Markdown
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.31.1
+    hooks:
+      - id: markdownlint

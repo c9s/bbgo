@@ -53,7 +53,7 @@ func main() {
 	defer resp.Body.Close()
 
 	r := &ApiResponse{}
-	if err := json.NewDecoder(resp.Body).Decode(r) ; err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(r); err != nil {
 		log.Fatal(err)
 	}
 

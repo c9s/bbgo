@@ -69,7 +69,6 @@ var rootCmd = &cobra.Command{
 
 		log.Infof("%+v", account)
 
-
 		log.Infof("ASSET BALANCES:")
 		assetBalances, err := client.AssetBalances()
 		if err != nil {

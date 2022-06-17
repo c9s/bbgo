@@ -11,40 +11,40 @@ import (
 // Super basic Series type that simply holds the float64 data
 // with size limit (the only difference compare to float64slice)
 type Queue struct {
-    arr  []float64
-    size int
+	arr  []float64
+	size int
 }
 
 func NewQueue(size int) *Queue {
-    return &Queue{
-        arr:  make([]float64, 0, size),
-        size: size,
-    }
+	return &Queue{
+		arr:  make([]float64, 0, size),
+		size: size,
+	}
 }
 
 func (inc *Queue) Last() float64 {
-    if len(inc.arr) == 0 {
-        return 0
-    }
-    return inc.arr[len(inc.arr)-1]
+	if len(inc.arr) == 0 {
+		return 0
+	}
+	return inc.arr[len(inc.arr)-1]
 }
 
 func (inc *Queue) Index(i int) float64 {
-    if len(inc.arr)-i-1 < 0 {
-        return 0
-    }
-    return inc.arr[len(inc.arr)-i-1]
+	if len(inc.arr)-i-1 < 0 {
+		return 0
+	}
+	return inc.arr[len(inc.arr)-i-1]
 }
 
 func (inc *Queue) Length() int {
-    return len(inc.arr)
+	return len(inc.arr)
 }
 
 func (inc *Queue) Update(v float64) {
-    inc.arr = append(inc.arr, v)
-    if len(inc.arr) > inc.size {
-        inc.arr = inc.arr[len(inc.arr)-inc.size:]
-    }
+	inc.arr = append(inc.arr, v)
+	if len(inc.arr) > inc.size {
+		inc.arr = inc.arr[len(inc.arr)-inc.size:]
+	}
 }
 
 var _ Series = &Queue{}

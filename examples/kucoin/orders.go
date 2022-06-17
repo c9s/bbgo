@@ -32,7 +32,6 @@ func init() {
 	ordersCmd.AddCommand(historyOrdersCmd)
 }
 
-
 // go run ./examples/kucoin orders
 var ordersCmd = &cobra.Command{
 	Use: "orders",
@@ -73,7 +72,6 @@ var ordersCmd = &cobra.Command{
 	},
 }
 
-
 // go run ./examples/kucoin orders history
 var historyOrdersCmd = &cobra.Command{
 	Use: "history [--symbol SYMBOL]",
@@ -105,7 +103,6 @@ var historyOrdersCmd = &cobra.Command{
 	},
 }
 
-
 // usage:
 // go run ./examples/kucoin orders place --symbol LTC-USDT --price 50 --size 1 --order-type limit --side buy
 var placeOrderCmd = &cobra.Command{
@@ -124,13 +121,11 @@ var placeOrderCmd = &cobra.Command{
 
 		req.OrderType(kucoinapi.OrderType(orderType))
 
-
 		side, err := cmd.Flags().GetString("side")
 		if err != nil {
 			return err
 		}
 		req.Side(kucoinapi.SideType(side))
-
 
 		symbol, err := cmd.Flags().GetString("symbol")
 		if err != nil {
@@ -155,7 +150,6 @@ var placeOrderCmd = &cobra.Command{
 
 		}
 
-
 		size, err := cmd.Flags().GetString("size")
 		if err != nil {
 			return err
@@ -171,8 +165,6 @@ var placeOrderCmd = &cobra.Command{
 		return nil
 	},
 }
-
-
 
 // usage:
 var cancelOrderCmd = &cobra.Command{
