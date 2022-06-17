@@ -272,7 +272,7 @@ func toGlobalOrderType(orderType okexapi.OrderType) (types.OrderType, error) {
 }
 
 func toLocalInterval(src string) string {
-	var re = regexp.MustCompile("\\d+[hdw]")
+	var re = regexp.MustCompile(`\d+[hdw]`)
 	return re.ReplaceAllStringFunc(src, func(w string) string {
 		return strings.ToUpper(w)
 	})

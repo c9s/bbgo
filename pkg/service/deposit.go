@@ -47,11 +47,7 @@ func (s *DepositService) Sync(ctx context.Context, ex types.Exchange, startTime 
 			},
 			Filter: func(obj interface{}) bool {
 				deposit := obj.(types.Deposit)
-				if len(deposit.TransactionID) == 0 {
-					return false
-				}
-
-				return true
+				return len(deposit.TransactionID) != 0
 			},
 			LogInsert: true,
 		},

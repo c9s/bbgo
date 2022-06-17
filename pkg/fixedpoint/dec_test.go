@@ -16,7 +16,7 @@ func BenchmarkMul(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			x := NewFromFloat(20.0)
 			y := NewFromFloat(20.0)
-			x = x.Mul(y)
+			x = x.Mul(y) // nolint
 		}
 	})
 
@@ -24,7 +24,7 @@ func BenchmarkMul(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			x := NewFromFloat(88.12345678)
 			y := NewFromFloat(88.12345678)
-			x = x.Mul(y)
+			x = x.Mul(y) // nolint
 		}
 	})
 
@@ -32,7 +32,7 @@ func BenchmarkMul(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			x := big.NewFloat(20.0)
 			y := big.NewFloat(20.0)
-			x = new(big.Float).Mul(x, y)
+			x = new(big.Float).Mul(x, y) // nolint
 		}
 	})
 
@@ -40,7 +40,7 @@ func BenchmarkMul(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			x := big.NewFloat(88.12345678)
 			y := big.NewFloat(88.12345678)
-			x = new(big.Float).Mul(x, y)
+			x = new(big.Float).Mul(x, y) // nolint
 		}
 	})
 }
@@ -170,8 +170,7 @@ func TestJson(t *testing.T) {
 	_ = json.Unmarshal([]byte("0.00153917575"), &p)
 	assert.Equal(t, "0.00153917", p.FormatString(8))
 
-	var q Value
-	q = NewFromFloat(0.00153917575)
+	q := NewFromFloat(0.00153917575)
 	assert.Equal(t, p, q)
 	_ = json.Unmarshal([]byte("6e-8"), &p)
 	_ = json.Unmarshal([]byte("0.000062"), &q)
