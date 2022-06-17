@@ -1,6 +1,7 @@
 run:
   issues-exit-code: 0
-  tests: false
+  tests: true
+  timeout: 5m
 linters:
   disable-all: true
   enable:
