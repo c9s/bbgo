@@ -8,7 +8,7 @@ require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/adshao/go-binance/v2 v2.3.5
 	github.com/c9s/requestgen v1.3.0
-	github.com/c9s/rockhopper v1.2.1-0.20220426104534-f27cbb09846c
+	github.com/c9s/rockhopper v1.2.2-0.20220617053729-ffdc87df194b
 	github.com/codingconcepts/env v0.0.0-20200821220118-a8fbf8d84482
 	github.com/evanphx/json-patch/v5 v5.6.0
 	github.com/fatih/camelcase v1.0.0
@@ -48,7 +48,7 @@ require (
 	google.golang.org/grpc v1.45.0
 	google.golang.org/protobuf v1.28.0
 	gopkg.in/tucnak/telebot.v2 v2.5.0
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -60,7 +60,7 @@ require (
 	github.com/cockroachdb/apd v1.1.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/denisenkom/go-mssqldb v0.12.0 // indirect
+	github.com/denisenkom/go-mssqldb v0.12.2 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/fastly/go-utils v0.0.0-20180712184237-d95a45783239 // indirect
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
@@ -70,7 +70,7 @@ require (
 	github.com/go-playground/validator/v10 v10.4.1 // indirect
 	github.com/go-test/deep v1.0.6 // indirect
 	github.com/golang-sql/civil v0.0.0-20220223132316-b832511892a9 // indirect
-	github.com/golang-sql/sqlexp v0.0.0-20170517235910-f1bb20e5a188 // indirect
+	github.com/golang-sql/sqlexp v0.1.0 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
@@ -80,11 +80,11 @@ require (
 	github.com/lann/ps v0.0.0-20150810152359-62de8c46ede0 // indirect
 	github.com/leodido/go-urn v1.2.1 // indirect
 	github.com/lestrrat-go/strftime v1.0.0 // indirect
-	github.com/lib/pq v1.10.5 // indirect
+	github.com/lib/pq v1.10.6 // indirect
 	github.com/magiconair/properties v1.8.4 // indirect
 	github.com/mattn/go-colorable v0.1.9 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
-	github.com/mattn/go-sqlite3 v1.14.12 // indirect
+	github.com/mattn/go-sqlite3 v1.14.13 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
 	github.com/mitchellh/mapstructure v1.4.1 // indirect
@@ -109,9 +109,9 @@ require (
 	go.opentelemetry.io/otel/metric v0.19.0 // indirect
 	go.opentelemetry.io/otel/trace v0.19.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
-	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4 // indirect
+	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e // indirect
 	golang.org/x/net v0.0.0-20220403103023-749bd193bc2b // indirect
-	golang.org/x/sys v0.0.0-20220513210249-45d2b4557a2a // indirect
+	golang.org/x/sys v0.0.0-20220615213510-4f61da869c0c // indirect
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/tools v0.1.9 // indirect
