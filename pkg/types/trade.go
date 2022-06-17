@@ -146,7 +146,7 @@ func trimTrailingZero(a float64) string {
 
 // String is for console output
 func (trade Trade) String() string {
-	return fmt.Sprintf("TRADE %s %s %4s %-4s @ %-6s | amount %s | fee %s %s | orderID %d | %s",
+	return fmt.Sprintf("TRADE %s %s %4s %-4s @ %-6s | AMOUNT %s | FEE %s %s | OrderID %d | %s",
 		trade.Exchange.String(),
 		trade.Symbol,
 		trade.Side,

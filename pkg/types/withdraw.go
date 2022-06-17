@@ -33,20 +33,25 @@ func cutstr(s string, maxLen, head, tail int) string {
 }
 
 func (w Withdraw) String() (o string) {
-	o = fmt.Sprintf("%s withdraw %s %v -> ", w.Exchange, w.Asset, w.Amount)
+	o = fmt.Sprintf("%s WITHDRAW %8f %s -> ", w.Exchange, w.Amount.Float64(), w.Asset)
 
 	if len(w.Network) > 0 && w.Network != w.Asset {
 		o += w.Network + ":"
 	}
 
-	o += fmt.Sprintf("%s at %s", w.Address, w.ApplyTime.Time())
+	o += fmt.Sprintf("%s @ %s", w.Address, w.ApplyTime.Time())
 
 	if !w.TransactionFee.IsZero() {
-		o += fmt.Sprintf("fee %f %s", w.TransactionFee.Float64(), w.TransactionFeeCurrency)
+		feeCurrency := w.TransactionFeeCurrency
+		if feeCurrency == "" {
+			feeCurrency = w.Asset
+		}
+
+		o += fmt.Sprintf(" FEE %4f %5s", w.TransactionFee.Float64(), feeCurrency)
 	}
 
 	if len(w.TransactionID) > 0 {
-		o += fmt.Sprintf("txID: %s", cutstr(w.TransactionID, 12, 4, 4))
+		o += fmt.Sprintf(" TxID: %s", cutstr(w.TransactionID, 12, 4, 4))
 	}
 
 	return o
