@@ -25,4 +25,3 @@ var symbolsCmd = &cobra.Command{
 		return nil
 	},
 }
-

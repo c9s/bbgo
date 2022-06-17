@@ -15,8 +15,8 @@ type MarginInterestBatchQuery struct {
 
 func (e *MarginInterestBatchQuery) Query(ctx context.Context, asset string, startTime, endTime time.Time) (c chan types.MarginInterest, errC chan error) {
 	query := &AsyncTimeRangedBatchQuery{
-		Type:    types.MarginInterest{},
-		Limiter: rate.NewLimiter(rate.Every(5*time.Second), 2),
+		Type:        types.MarginInterest{},
+		Limiter:     rate.NewLimiter(rate.Every(5*time.Second), 2),
 		JumpIfEmpty: time.Hour * 24 * 30,
 		Q: func(startTime, endTime time.Time) (interface{}, error) {
 			return e.QueryInterestHistory(ctx, asset, &startTime, &endTime)

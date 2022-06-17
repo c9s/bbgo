@@ -72,6 +72,12 @@ jobs:
         go test -race -coverprofile coverage_dnum.txt -covermode atomic -tags dnum ./pkg/...
         sed -i -e '/_requestgen.go/d' coverage_dnum.txt
 
+    - name: Revive Check
+      uses: morphy2k/revive-action@v2
+      with:
+        reporter: github-pr-review
+        fail_on_error: true
+
     - name: Upload Coverage Report
       uses: codecov/codecov-action@v3
       with:

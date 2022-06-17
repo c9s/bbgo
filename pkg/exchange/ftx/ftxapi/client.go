@@ -200,5 +200,3 @@ func castPayload(payload interface{}) ([]byte, error) {
 
 	return nil, nil
 }
-
-

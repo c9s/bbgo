@@ -36,7 +36,6 @@ var tickersCmd = &cobra.Command{
 
 		logrus.Infof("ticker: %+v", ticker)
 
-
 		tickerStats, err := client.MarketDataService.GetTicker24HStat(args[0])
 		if err != nil {
 			return err
@@ -46,4 +45,3 @@ var tickersCmd = &cobra.Command{
 		return nil
 	},
 }
-

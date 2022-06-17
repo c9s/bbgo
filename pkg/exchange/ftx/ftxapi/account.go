@@ -66,7 +66,6 @@ func (c *RestClient) NewGetPositionsRequest() *GetPositionsRequest {
 	}
 }
 
-
 type Balance struct {
 	Coin                   string           `json:"coin"`
 	Free                   fixedpoint.Value `json:"free"`

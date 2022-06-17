@@ -69,4 +69,3 @@ func (m *Notifiability) NotifyTo(channel string, obj interface{}, args ...interf
 		n.NotifyTo(channel, obj, args...)
 	}
 }
-

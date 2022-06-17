@@ -596,7 +596,7 @@ func (environ *Environment) syncWithUserConfig(ctx context.Context, userConfig *
 	syncSymbolMap, restSymbols := categorizeSyncSymbol(userConfig.Sync.Symbols)
 	for _, session := range sessions {
 		syncSymbols := restSymbols
-		if ss, ok := syncSymbolMap[session.Name] ; ok {
+		if ss, ok := syncSymbolMap[session.Name]; ok {
 			syncSymbols = append(syncSymbols, ss...)
 		}
 

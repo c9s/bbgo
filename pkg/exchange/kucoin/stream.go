@@ -9,9 +9,9 @@ import (
 
 	"github.com/c9s/bbgo/pkg/depth"
 	"github.com/c9s/bbgo/pkg/exchange/kucoin/kucoinapi"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
-	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 const readTimeout = 30 * time.Second
@@ -20,8 +20,8 @@ const readTimeout = 30 * time.Second
 type Stream struct {
 	types.StandardStream
 
-	client     *kucoinapi.RestClient
-	exchange   *Exchange
+	client   *kucoinapi.RestClient
+	exchange *Exchange
 
 	bullet                       *kucoinapi.Bullet
 	candleEventCallbacks         []func(candle *WebSocketCandleEvent, e *WebSocketEvent)
@@ -125,8 +125,8 @@ func (s *Stream) handlePrivateOrderEvent(e *WebSocketPrivateOrderEvent) {
 			IsBuyer:       e.Side == "buy",
 			IsMaker:       e.Liquidity == "maker",
 			Time:          types.Time(e.Ts.Time()),
-			Fee:           fixedpoint.Zero,  // not supported
-			FeeCurrency:   "", // not supported
+			Fee:           fixedpoint.Zero, // not supported
+			FeeCurrency:   "",              // not supported
 		})
 	}
 

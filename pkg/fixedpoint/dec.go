@@ -282,7 +282,7 @@ func (dn Value) FormatString(prec int) string {
 		// decimal within
 		dec := nd + e
 		decimals := digits[dec:min(dec+prec, nd)]
-		return sign + digits[:dec] + "." + decimals + strings.Repeat("0", max(0, prec - len(decimals)))
+		return sign + digits[:dec] + "." + decimals + strings.Repeat("0", max(0, prec-len(decimals)))
 	} else if 0 < dn.exp && dn.exp <= digitsMax {
 		// decimal to the right
 		if prec > 0 {
@@ -403,7 +403,7 @@ func (dn Value) FormatPercentage(prec int) string {
 		// decimal within
 		dec := nd + e
 		decimals := digits[dec:min(dec+prec, nd)]
-		return sign + digits[:dec] + "." + decimals + strings.Repeat("0", max(0, prec - len(decimals))) + "%"
+		return sign + digits[:dec] + "." + decimals + strings.Repeat("0", max(0, prec-len(decimals))) + "%"
 	} else if 0 < exp && exp <= digitsMax {
 		// decimal to the right
 		if prec > 0 {
