@@ -37,6 +37,7 @@ type AuthInteract struct {
 func (it *AuthInteract) Commands(interact *Interact) {
 	if it.Strict {
 		// generate a one-time-use otp
+		// pragma: allowlist nextline secret
 		if it.OneTimePasswordKey == nil {
 			opts := totp.GenerateOpts{
 				Issuer:      "interact",
@@ -48,7 +49,7 @@ func (it *AuthInteract) Commands(interact *Interact) {
 			if err != nil {
 				panic(err)
 			}
-
+			// pragma: allowlist nextline secret
 			it.OneTimePasswordKey = key
 		}
 		interact.Command("/auth", "authorize", func(reply Reply, session Session) error {

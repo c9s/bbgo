@@ -17,7 +17,7 @@ jobs:
     env:
       MYSQL_DATABASE: bbgo
       MYSQL_USER: "root"
-      MYSQL_PASSWORD: "root"
+      MYSQL_PASSWORD: "root" # pragma: allowlist secret
 
     steps:
 
@@ -47,6 +47,15 @@ jobs:
       uses: actions/setup-go@v2
       with:
         go-version: 1.18
+
+    - name: Run pre-commit
+      run: |
+        pip install pre-commit
+        go get -v -u github.com/go-critic/go-critic/cmd/gocritic
+        pre-commit install-hooks
+        pre-commit run markdownlint --files=README.md --verbose
+        pre-commit run go-fmt --all-files --verbose
+        pre-commit run go-critic --all-files --verbose
 
     - name: Install Migration Tool
       run: go install github.com/c9s/rockhopper/cmd/rockhopper@v1.2.1

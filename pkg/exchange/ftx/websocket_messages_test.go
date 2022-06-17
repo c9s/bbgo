@@ -182,6 +182,7 @@ func Test_insertAt(t *testing.T) {
 func Test_newLoginRequest(t *testing.T) {
 	// From API doc: https://docs.ftx.com/?javascript#authentication-2
 	r := newLoginRequest("", "Y2QTHI23f23f23jfjas23f23To0RfUwX3H42fvN-", time.Unix(0, 1557246346499*int64(time.Millisecond)), "")
+	// pragma: allowlist nextline secret
 	expectedSignature := "d10b5a67a1a941ae9463a60b285ae845cdeac1b11edc7da9977bef0228b96de9"
 	assert.Equal(t, expectedSignature, r.Login.Signature)
 	jsonStr, err := json.Marshal(r)

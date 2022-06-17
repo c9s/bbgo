@@ -44,7 +44,8 @@ func New(key, secret, passphrase string) *Exchange {
 	}
 
 	return &Exchange{
-		key:        key,
+		key: key,
+		// pragma: allowlist nextline secret
 		secret:     secret,
 		passphrase: passphrase,
 		client:     client,

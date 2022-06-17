@@ -47,8 +47,9 @@ func New(key, secret string) *Exchange {
 	client := maxapi.NewRestClient(baseURL)
 	client.Auth(key, secret)
 	return &Exchange{
-		client:   client,
-		key:      key,
+		client: client,
+		key:    key,
+		// pragma: allowlist nextline secret
 		secret:   secret,
 		v3order:  &v3.OrderService{Client: client},
 		v3margin: &v3.MarginService{Client: client},
