@@ -4,19 +4,9 @@ package max
 //go:generate -command PostRequest requestgen -method POST
 
 import (
-	"net/url"
-
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
-
-func mustParseURL(s string) *url.URL {
-	u, err := url.Parse(s)
-	if err != nil {
-		panic(err)
-	}
-	return u
-}
 
 type WalletType string
 
