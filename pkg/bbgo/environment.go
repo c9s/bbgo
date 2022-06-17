@@ -617,7 +617,7 @@ func (environ *Environment) syncWithUserConfig(ctx context.Context, userConfig *
 		}
 
 		if userConfig.Sync.RewardHistory {
-			if err := environ.SyncService.SyncRewardHistory(ctx, session.Exchange); err != nil {
+			if err := environ.SyncService.SyncRewardHistory(ctx, session.Exchange, since); err != nil {
 				return err
 			}
 		}
@@ -656,34 +656,10 @@ func (environ *Environment) Sync(ctx context.Context, userConfig ...*Config) err
 		return environ.syncWithUserConfig(ctx, userConfig[0])
 	}
 
-	since := time.Now().AddDate(0, -6, 0)
-
 	// the default sync logics
 	for _, session := range environ.sessions {
 		if err := environ.syncSession(ctx, session); err != nil {
 			return err
-		}
-
-		if len(userConfig) == 0 || userConfig[0].Sync == nil {
-			continue
-		}
-
-		if userConfig[0].Sync.DepositHistory {
-			if err := environ.SyncService.SyncDepositHistory(ctx, session.Exchange, since); err != nil {
-				return err
-			}
-		}
-
-		if userConfig[0].Sync.WithdrawHistory {
-			if err := environ.SyncService.SyncWithdrawHistory(ctx, session.Exchange, since); err != nil {
-				return err
-			}
-		}
-
-		if userConfig[0].Sync.RewardHistory {
-			if err := environ.SyncService.SyncRewardHistory(ctx, session.Exchange); err != nil {
-				return err
-			}
 		}
 	}
 
