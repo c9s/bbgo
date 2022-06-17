@@ -55,11 +55,6 @@ jobs:
         pre-commit run markdownlint --files=README.md --verbose
         pre-commit run go-fmt --all-files --verbose
 
-    - name: CI Lint
-      uses: golangci/golangci-lint-action@v3
-      with:
-        version: v1.46.2
-
     - name: Install Migration Tool
       run: go install github.com/c9s/rockhopper/cmd/rockhopper@v1.2.1
 
