@@ -12,6 +12,7 @@ type RewardType string
 const (
 	RewardAirdrop    = RewardType("airdrop")
 	RewardCommission = RewardType("commission")
+	RewardReferralKickback = RewardType("referral_kickback")
 	RewardHolding    = RewardType("holding")
 	RewardMining     = RewardType("mining")
 	RewardTrading    = RewardType("trading")
