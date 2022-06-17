@@ -23,22 +23,6 @@ type RewardService struct {
 	DB *sqlx.DB
 }
 
-func (s *RewardService) QueryLast(ex types.ExchangeName, limit uint64) ([]types.Reward, error) {
-	sel := SelectLastRewards(ex, limit)
-	sql, args, err := sel.ToSql()
-	if err != nil {
-		return nil, err
-	}
-
-	rows, err := s.DB.Queryx(sql, args)
-	if err != nil {
-		return nil, err
-	}
-
-	defer rows.Close()
-	return s.scanRows(rows)
-}
-
 func (s *RewardService) Sync(ctx context.Context, exchange types.Exchange, startTime time.Time) error {
 	api, ok := exchange.(types.ExchangeRewardService)
 	if !ok {
