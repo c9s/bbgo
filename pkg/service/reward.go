@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
+	sq "github.com/Masterminds/squirrel"
 	"github.com/jmoiron/sqlx"
-	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/exchange/batch"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -23,12 +23,14 @@ type RewardService struct {
 	DB *sqlx.DB
 }
 
-func (s *RewardService) QueryLast(ex types.ExchangeName, limit int) ([]types.Reward, error) {
-	sql := "SELECT * FROM `rewards` WHERE `exchange` = :exchange ORDER BY `created_at` DESC LIMIT :limit"
-	rows, err := s.DB.NamedQuery(sql, map[string]interface{}{
-		"exchange": ex,
-		"limit":    limit,
-	})
+func (s *RewardService) QueryLast(ex types.ExchangeName, limit uint64) ([]types.Reward, error) {
+	sel := SelectLastRewards(ex, limit)
+	sql, args, err := sel.ToSql()
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := s.DB.Queryx(sql, args)
 	if err != nil {
 		return nil, err
 	}
@@ -37,60 +39,45 @@ func (s *RewardService) QueryLast(ex types.ExchangeName, limit int) ([]types.Rew
 	return s.scanRows(rows)
 }
 
-func (s *RewardService) Sync(ctx context.Context, exchange types.Exchange) error {
-	service, ok := exchange.(types.ExchangeRewardService)
+func (s *RewardService) Sync(ctx context.Context, exchange types.Exchange, startTime time.Time) error {
+	api, ok := exchange.(types.ExchangeRewardService)
 	if !ok {
 		return ErrExchangeRewardServiceNotImplemented
 	}
 
-	var rewardKeys = map[string]struct{}{}
-
-	var startTime time.Time
-
-	records, err := s.QueryLast(exchange.Name(), 50)
-	if err != nil {
-		return err
+	isMargin, isFutures, _, _ := getExchangeAttributes(exchange)
+	if isMargin || isFutures {
+		return nil
 	}
 
-	if len(records) > 0 {
-		lastRecord := records[0]
-		startTime = lastRecord.CreatedAt.Time()
-
-		for _, record := range records {
-			rewardKeys[record.UUID] = struct{}{}
-		}
+	tasks := []SyncTask{
+		{
+			Type:   types.Trade{},
+			Select: SelectLastRewards(exchange.Name(), 100),
+			BatchQuery: func(ctx context.Context, startTime, endTime time.Time) (interface{}, chan error) {
+				query := &batch.RewardBatchQuery{
+					Service: api,
+				}
+				return query.Query(ctx, startTime, endTime)
+			},
+			Time: func(obj interface{}) time.Time {
+				return obj.(types.Reward).CreatedAt.Time()
+			},
+			ID: func(obj interface{}) string {
+				reward := obj.(types.Reward)
+				return string(reward.Type) + "_" + reward.UUID
+			},
+			LogInsert: true,
+		},
 	}
 
-	batchQuery := &batch.RewardBatchQuery{Service: service}
-	rewardsC, errC := batchQuery.Query(ctx, startTime, time.Now())
-
-	for reward := range rewardsC {
-		select {
-
-		case <-ctx.Done():
-			return ctx.Err()
-
-		case err := <-errC:
-			if err != nil {
-				return err
-			}
-
-		default:
-
-		}
-
-		if _, ok := rewardKeys[reward.UUID]; ok {
-			continue
-		}
-
-		logrus.Infof("inserting reward: %s %s %s %f %s", reward.Exchange, reward.Type, reward.Currency, reward.Quantity.Float64(), reward.CreatedAt)
-
-		if err := s.Insert(reward); err != nil {
+	for _, sel := range tasks {
+		if err := sel.execute(ctx, s.DB, startTime); err != nil {
 			return err
 		}
 	}
 
-	return <-errC
+	return nil
 }
 
 type CurrencyPositionMap map[string]fixedpoint.Value
@@ -214,4 +201,14 @@ func (s *RewardService) Insert(reward types.Reward) error {
 			VALUES (:exchange, :uuid, :reward_type, :currency, :quantity, :state, :note, :created_at)`,
 		reward)
 	return err
+}
+
+func SelectLastRewards(ex types.ExchangeName, limit uint64) sq.SelectBuilder {
+	return sq.Select("*").
+		From("rewards").
+		Where(sq.And{
+			sq.Eq{"exchange": ex},
+		}).
+		OrderBy("created_at DESC").
+		Limit(limit)
 }
