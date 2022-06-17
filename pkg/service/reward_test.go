@@ -74,7 +74,6 @@ func TestRewardService_InsertAndQueryUnspent(t *testing.T) {
 	assert.Equal(t, types.RewardCommission, rewards[0].Type)
 }
 
-
 func TestRewardService_AggregateUnspentCurrencyPosition(t *testing.T) {
 	db, err := prepareDB(t)
 	if err != nil {
@@ -126,7 +125,7 @@ func TestRewardService_AggregateUnspentCurrencyPosition(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	currencyPositions, err := service.AggregateUnspentCurrencyPosition(ctx, types.ExchangeMax, now.Add(-10 * time.Second))
+	currencyPositions, err := service.AggregateUnspentCurrencyPosition(ctx, types.ExchangeMax, now.Add(-10*time.Second))
 	assert.NoError(t, err)
 	assert.NotEmpty(t, currencyPositions)
 	assert.Len(t, currencyPositions, 2)

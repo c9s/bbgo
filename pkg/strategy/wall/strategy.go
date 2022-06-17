@@ -340,7 +340,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			log.WithError(err).Errorf("can not place order")
 		}
 
-
 		if err := s.activeAdjustmentOrders.GracefulCancel(ctx, s.session.Exchange); err != nil {
 			log.WithError(err).Errorf("graceful cancel order error")
 		}

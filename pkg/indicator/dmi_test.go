@@ -2,8 +2,8 @@ package indicator
 
 import (
 	"encoding/json"
-	"testing"
 	"fmt"
+	"testing"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -51,27 +51,31 @@ func Test_DMI(t *testing.T) {
 		return klines
 	}
 
-	type output struct{dip float64; dim float64; adx float64}
+	type output struct {
+		dip float64
+		dim float64
+		adx float64
+	}
 
 	tests := []struct {
-		name string
+		name   string
 		klines []types.KLine
-		want output
-		next output
-		total int
+		want   output
+		next   output
+		total  int
 	}{
 		{
-			name: "test_dmi",
+			name:   "test_dmi",
 			klines: buildKLines(highb, lowb, clozeb),
-			want: output{dip: 4.85114, dim: 1.339736, adx: 37.857156},
-			next: output{dip: 4.813853, dim: 1.67532, adx: 36.111434},
+			want:   output{dip: 4.85114, dim: 1.339736, adx: 37.857156},
+			next:   output{dip: 4.813853, dim: 1.67532, adx: 36.111434},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dmi := &DMI{
 				IntervalWindow: types.IntervalWindow{Window: 5},
-				ADXSmoothing: 14,
+				ADXSmoothing:   14,
 			}
 			dmi.calculateAndUpdate(tt.klines)
 			assert.InDelta(t, dmi.GetDIPlus().Last(), tt.want.dip, Delta)

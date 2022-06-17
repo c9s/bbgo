@@ -119,4 +119,3 @@ func Test_toLocalOrderTypeWithMarket(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, ftxapi.OrderTypeMarket, orderType)
 }
-

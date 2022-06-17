@@ -42,4 +42,3 @@ func (r *walletRequest) DepositHistory(ctx context.Context, since time.Time, unt
 
 	return d, nil
 }
-

@@ -41,22 +41,22 @@ func (s *AccountService) InsertAsset(time time.Time, session string, name types.
 							 price_in_usd,
 			                 is_margin, is_isolated, isolated_symbol)
 				values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);`,
-				session,
-				name,
-				account,
-				time,
-				v.Currency,
-				v.InUSD,
-				v.InBTC,
-				v.Total,
-				v.Available,
-				v.Locked,
-				v.Borrowed,
-				v.NetAsset,
-				v.PriceInUSD,
-				isMargin,
-				isIsolatedMargin,
-				isolatedMarginSymbol)
+			session,
+			name,
+			account,
+			time,
+			v.Currency,
+			v.InUSD,
+			v.InBTC,
+			v.Total,
+			v.Available,
+			v.Locked,
+			v.Borrowed,
+			v.NetAsset,
+			v.PriceInUSD,
+			isMargin,
+			isIsolatedMargin,
+			isolatedMarginSymbol)
 
 		err = multierr.Append(err, _err) // successful request
 

@@ -154,7 +154,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	// s.pvDivergence.OnUpdate(func(corr float64) {
 	//	//fmt.Printf("now we've got corr: %f\n", corr)
 	// })
-	windowSize := 360/s.Interval.Minutes()
+	windowSize := 360 / s.Interval.Minutes()
 	if windowSize == 0 {
 		windowSize = 3
 	}

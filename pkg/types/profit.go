@@ -227,7 +227,6 @@ func NewProfitStats(market Market) *ProfitStats {
 	}
 }
 
-
 func (s *ProfitStats) Init(market Market) {
 	s.Symbol = market.Symbol
 	s.BaseCurrency = market.BaseCurrency

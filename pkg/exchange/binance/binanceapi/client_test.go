@@ -84,7 +84,6 @@ func TestClient_NewSpotRebateHistoryRequest(t *testing.T) {
 	t.Logf("spot rebate history: %+v", history)
 }
 
-
 func TestClient_NewGetMarginInterestRateHistoryRequest(t *testing.T) {
 	client := getTestClientOrSkip(t)
 	ctx := context.Background()
@@ -121,8 +120,8 @@ func TestClient_privateCall(t *testing.T) {
 
 	resp, err := client.SendRequest(req)
 	if assert.NoError(t, err) {
-		var feeStructs []struct{
-			Symbol string `json:"symbol"`
+		var feeStructs []struct {
+			Symbol          string `json:"symbol"`
 			MakerCommission string `json:"makerCommission"`
 			TakerCommission string `json:"takerCommission"`
 		}
@@ -131,7 +130,7 @@ func TestClient_privateCall(t *testing.T) {
 			assert.NotEmpty(t, feeStructs)
 		}
 	} else {
-		dump, _ := httputil.DumpRequest(req, true);
+		dump, _ := httputil.DumpRequest(req, true)
 		log.Printf("request: %s", dump)
 	}
 }

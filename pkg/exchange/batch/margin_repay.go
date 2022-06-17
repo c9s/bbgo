@@ -16,8 +16,8 @@ type MarginRepayBatchQuery struct {
 
 func (e *MarginRepayBatchQuery) Query(ctx context.Context, asset string, startTime, endTime time.Time) (c chan types.MarginRepay, errC chan error) {
 	query := &AsyncTimeRangedBatchQuery{
-		Type:    types.MarginRepay{},
-		Limiter: rate.NewLimiter(rate.Every(5*time.Second), 2),
+		Type:        types.MarginRepay{},
+		Limiter:     rate.NewLimiter(rate.Every(5*time.Second), 2),
 		JumpIfEmpty: time.Hour * 24 * 30,
 		Q: func(startTime, endTime time.Time) (interface{}, error) {
 			return e.QueryRepayHistory(ctx, asset, &startTime, &endTime)
