@@ -104,8 +104,6 @@ type Telegram struct {
 	// Private is used to protect the telegram bot, users not authenticated can not see messages or sending commands
 	Private bool `json:"private,omitempty"`
 
-	authorizing bool
-
 	sessions TelegramSessionMap
 
 	// textMessageResponder is used for interact to register its message handler
@@ -237,7 +235,7 @@ func (tm *Telegram) Sessions() TelegramSessionMap {
 }
 
 func (tm *Telegram) RestoreSessions(sessions TelegramSessionMap) {
-	if sessions == nil || len(sessions) == 0 {
+	if len(sessions) == 0 {
 		return
 	}
 

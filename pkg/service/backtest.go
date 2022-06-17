@@ -226,7 +226,7 @@ func (s *BacktestService) QueryKLinesCh(since, until time.Time, exchange types.E
 }
 
 func returnError(err error) (chan types.KLine, chan error) {
-	ch := make(chan types.KLine, 0)
+	ch := make(chan types.KLine)
 	close(ch)
 	log.WithError(err).Error("backtest query error")
 

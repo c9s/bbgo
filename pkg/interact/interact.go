@@ -46,8 +46,6 @@ type Interact struct {
 	states     map[State]State
 	statesFunc map[State]interface{}
 
-	authenticatedSessions map[string]Session
-
 	customInteractions []CustomInteraction
 
 	messengers []Messenger
@@ -95,10 +93,6 @@ func (it *Interact) getNextState(session Session, currentState State) (nextState
 
 	// state not found, return to the origin state
 	return session.GetOriginState(), final
-}
-
-func (it *Interact) handleCallback(session Session, payload string) error {
-	return nil
 }
 
 func (it *Interact) handleResponse(session Session, text string, ctxObjects ...interface{}) error {

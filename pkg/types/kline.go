@@ -563,6 +563,8 @@ type KLineSeries struct {
 func (k *KLineSeries) Last() float64 {
 	length := len(*k.lines)
 	switch k.kv {
+	case kOpUnknown:
+		panic("kline series operator unknown")
 	case kOpenValue:
 		return (*k.lines)[length-1].GetOpen().Float64()
 	case kCloseValue:

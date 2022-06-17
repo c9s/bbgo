@@ -82,7 +82,7 @@ func (d *datetime) UnmarshalJSON(b []byte) error {
   }
 }
 */
-type accountResponse struct {
+type accountResponse struct { // nolint:golint,deadcode
 	Success bool    `json:"success"`
 	Result  account `json:"result"`
 }
@@ -93,7 +93,7 @@ type account struct {
 	TotalAccountValue fixedpoint.Value `json:"totalAccountValue"`
 }
 
-type positionsResponse struct {
+type positionsResponse struct { // nolint:golint,deadcode
 	Success bool       `json:"success"`
 	Result  []position `json:"result"`
 }
@@ -135,7 +135,7 @@ type position struct {
 	CollateralUsed               fixedpoint.Value `json:"collateralUsed"`
 }
 
-type balances struct {
+type balances struct { // nolint:golint,deadcode
 	Success bool `json:"success"`
 
 	Result []struct {
@@ -172,7 +172,7 @@ type balances struct {
   }
 ]
 */
-type marketsResponse struct {
+type marketsResponse struct { // nolint:golint,deadcode
 	Success bool     `json:"success"`
 	Result  []market `json:"result"`
 }
@@ -230,19 +230,19 @@ type Candle struct {
 	Volume    fixedpoint.Value `json:"volume"`
 }
 
-type ordersHistoryResponse struct {
+type ordersHistoryResponse struct { // nolint:golint,deadcode
 	Success     bool    `json:"success"`
 	Result      []order `json:"result"`
 	HasMoreData bool    `json:"hasMoreData"`
 }
 
-type ordersResponse struct {
+type ordersResponse struct { // nolint:golint,deadcode
 	Success bool `json:"success"`
 
 	Result []order `json:"result"`
 }
 
-type cancelOrderResponse struct {
+type cancelOrderResponse struct { // nolint:golint,deadcode
 	Success bool   `json:"success"`
 	Result  string `json:"result"`
 }

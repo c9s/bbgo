@@ -153,7 +153,7 @@ func (b *SliceOrderBook) Update(book SliceOrderBook) {
 }
 
 func (b *SliceOrderBook) Print() {
-	fmt.Printf(b.String())
+	fmt.Print(b.String())
 }
 
 func (b *SliceOrderBook) String() string {

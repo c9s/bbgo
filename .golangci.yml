@@ -5,3 +5,4 @@ linters:
   disable-all: true
   enable:
     - gofmt
+    - gosimple
