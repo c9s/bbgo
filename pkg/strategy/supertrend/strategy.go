@@ -345,6 +345,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 		}
 
+		// The default value of side is an empty string. Unless side is set by the checks above, the result of the following condition is false
 		if side == types.SideTypeSell || side == types.SideTypeBuy {
 			log.Infof("open %s position for signal %v", s.Symbol, side)
 			s.Notify("open %s position for signal %v", s.Symbol, side)
