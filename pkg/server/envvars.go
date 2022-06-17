@@ -17,11 +17,15 @@ func collectSessionEnvVars(sessions map[string]*bbgo.ExchangeSession) (envVars m
 		}
 
 		if len(session.EnvVarPrefix) > 0 {
+			// pragma: allowlist nextline secret
 			envVars[session.EnvVarPrefix+"_API_KEY"] = session.Key
+			// pragma: allowlist nextline secret
 			envVars[session.EnvVarPrefix+"_API_SECRET"] = session.Secret
 		} else if len(session.Name) > 0 {
 			sn := strings.ToUpper(session.Name)
+			// pragma: allowlist nextline secret
 			envVars[sn+"_API_KEY"] = session.Key
+			// pragma: allowlist nextline secret
 			envVars[sn+"_API_SECRET"] = session.Secret
 		} else {
 			err = fmt.Errorf("session %s name or env var prefix is not defined", session.Name)

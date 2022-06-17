@@ -37,8 +37,9 @@ type klineSubscription struct {
 
 func NewStream(key, secret string, subAccount string, e *Exchange) *Stream {
 	s := &Stream{
-		exchange:       e,
-		key:            key,
+		exchange: e,
+		key:      key,
+		// pragma: allowlist nextline secret
 		secret:         secret,
 		subAccount:     subAccount,
 		StandardStream: &types.StandardStream{},

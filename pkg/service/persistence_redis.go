@@ -19,6 +19,7 @@ func NewRedisPersistenceService(config *RedisPersistenceConfig) *RedisPersistenc
 	client := redis.NewClient(&redis.Options{
 		Addr: net.JoinHostPort(config.Host, config.Port),
 		// Username:           "", // username is only for redis 6.0
+		// pragma: allowlist nextline secret
 		Password: config.Password, // no password set
 		DB:       config.DB,       // use default DB
 	})
