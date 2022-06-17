@@ -230,6 +230,7 @@ func (e *Exchange) queryClosedOrdersByLastOrderID(ctx context.Context, symbol st
 	}
 
 	req.FromID(lastOrderID)
+	req.Limit(1000)
 
 	maxOrders, err := req.Do(ctx)
 	if err != nil {
