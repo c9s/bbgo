@@ -155,15 +155,17 @@ func (s *Strategy) placeInfiniteGridOrders(orderExecutor bbgo.OrderExecutor, ses
 			GroupID:     s.groupID,
 		}
 		log.Infof("submitting init order: %s", order.String())
+		orders = append(orders, order)
 
-		createdOrders, err := orderExecutor.SubmitOrders(context.Background(), order)
-		if err != nil {
-			log.WithError(err).Errorf("can not place init order")
-			return
-		}
+		baseBalance.Available = baseBalance.Available.Add(quantityF)
+		//createdOrders, err := orderExecutor.SubmitOrders(context.Background(), order)
+		//if err != nil {
+		//log.WithError(err).Errorf("can not place init order")
+		//return
+		//}
 
-		s.activeOrders.Add(createdOrders...)
-		s.orderStore.Add(createdOrders...)
+		//s.activeOrders.Add(createdOrders...)
+		//s.orderStore.Add(createdOrders...)
 	}
 
 	// Sell Side

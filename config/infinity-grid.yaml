@@ -36,7 +36,7 @@ backtest:
   accounts:
     binance:
       balances:
-        ETH: 1
+        ETH: 0
         USDT: 5000.0
 
 exchangeStrategies:
@@ -61,7 +61,7 @@ exchangeStrategies:
     symbol: ETHUSDT
     interval: 1m
     quantity: 0.05
-    #initialOrderQuantity: 0.05
+    initialOrderQuantity: 1
     gridNumber: 10
     countOfMoreOrders: 3 # +2
     margin: 0.030
