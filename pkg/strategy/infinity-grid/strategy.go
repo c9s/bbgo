@@ -128,7 +128,7 @@ func (s *Strategy) placeInfiniteGridOrders(orderExecutor bbgo.OrderExecutor, ses
 	}
 
 	quoteBalance, ok := balances[s.Market.QuoteCurrency]
-	if !ok || quoteBalance.Available <= 0 { // check available USD in balance
+	if !ok || quoteBalance.Available.Compare(fixedpoint.Zero) < 0 { // check available USD in balance
 		log.Errorf("quote balance %s not found", s.Market.QuoteCurrency)
 		return
 	}
@@ -140,18 +140,14 @@ func (s *Strategy) placeInfiniteGridOrders(orderExecutor bbgo.OrderExecutor, ses
 		return
 	}
 
-	if false {
-		if s.InitialOrderQuantity > 0 {
-			quantityF = s.InitialOrderQuantity
-		} else {
-			quantityF = s.Quantity.Div(fixedpoint.NewFromFloat(1.0 - 1/(1.0+s.Margin.Float64())))
-		}
-
+	quantityF = s.Quantity
+	if s.InitialOrderQuantity.Compare(fixedpoint.Zero) > 0 {
+		quantityF = s.InitialOrderQuantity
 		// Buy half of value of asset
 		order := types.SubmitOrder{
 			Symbol:      s.Symbol,
 			Side:        types.SideTypeBuy,
-			Type:        types.OrderTypeLimit,
+			Type:        types.OrderTypeMarket,
 			Market:      s.Market,
 			Quantity:    quantityF,
 			Price:       currentPrice,
@@ -214,7 +210,7 @@ func (s *Strategy) placeInfiniteGridOrders(orderExecutor bbgo.OrderExecutor, ses
 	for i := int64(1); i <= s.GridNum/2; i++ {
 		price := fixedpoint.NewFromFloat(currentPrice.Float64() * math.Pow((1.0-s.Margin.Float64()), float64(i)))
 
-		if price < s.LowerPrice {
+		if price.Compare(s.LowerPrice) < 0 {
 			break
 		}
 
@@ -268,7 +264,7 @@ func (s *Strategy) submitFollowingOrder(order types.Order) {
 	var quantity = order.Quantity
 	const earlyPlacedCount = 2
 
-	if order.Quantity == s.InitialOrderQuantity {
+	if order.Quantity.Eq(s.InitialOrderQuantity) {
 		return
 	}
 
@@ -283,12 +279,12 @@ func (s *Strategy) submitFollowingOrder(order types.Order) {
 
 	case types.SideTypeBuy:
 		price = order.Price.Mul(fixedpoint.NewFromFloat(1.0).Sub(s.Margin))
-		if price < s.LowerPrice {
+		if price.Compare(s.LowerPrice) < 0 {
 			return
 		}
 		if s.Long {
-			var amount = order.Price * order.Quantity
-			quantity = amount / price
+			var amount = order.Price.Mul(order.Quantity)
+			quantity = amount.Div(price)
 		}
 		s.currentUpperGrid--
 		s.currentLowerGrid++
@@ -305,7 +301,7 @@ func (s *Strategy) submitFollowingOrder(order types.Order) {
 		GroupID:     s.groupID,
 	}
 
-	if price >= s.LowerPrice {
+	if price.Compare(s.LowerPrice) >= 0 {
 		log.Infof("→submitting following order: %s, currentUpperGrid: %d, currentLowerGrid: %d", submitOrder.String(), s.currentUpperGrid, s.currentLowerGrid)
 		orders = append(orders, submitOrder)
 	}
@@ -313,7 +309,7 @@ func (s *Strategy) submitFollowingOrder(order types.Order) {
 	if order.Side == types.SideTypeSell && s.currentUpperGrid <= earlyPlacedCount {
 		// Plase a more higher order
 		for i := 1; i <= s.CountOfMoreOrders; i++ {
-			price = fixedpoint.NewFromFloat(order.Price.Float64() * math.Pow((1.0+s.Margin.Float64()), float64(i+earlyPlacedCount)))
+			price = order.Price.MulPow(fixedpoint.NewFromFloat(1.0).Add(s.Margin), fixedpoint.NewFromInt(int64(i+earlyPlacedCount)))
 			submitOrder := types.SubmitOrder{
 				Symbol:      s.Symbol,
 				Side:        order.Side,
@@ -330,12 +326,12 @@ func (s *Strategy) submitFollowingOrder(order types.Order) {
 			log.Infof("submitting new higher order: %s, currentUpperGrid: %d", submitOrder.String(), s.currentUpperGrid)
 		}
 		// Cleanup overabundant order limits
-		lowerGridPrice := fixedpoint.NewFromFloat(order.Price.Float64() * math.Pow((1.0-s.Margin.Float64()), float64(s.GridNum)))
+		lowerGridPrice := order.Price.MulPow(fixedpoint.NewFromFloat(1.0).Sub(s.Margin), fixedpoint.NewFromInt(int64(s.GridNum)))
 		for _, cancelOrder := range s.activeOrders.Orders() {
 			if cancelOrder.Side == types.SideTypeSell {
 				continue
 			}
-			if cancelOrder.Price < lowerGridPrice {
+			if cancelOrder.Price.Compare(lowerGridPrice) < 0 {
 				cancelOrders = append(cancelOrders, cancelOrder)
 			}
 		}
@@ -347,9 +343,9 @@ func (s *Strategy) submitFollowingOrder(order types.Order) {
 	if order.Side == types.SideTypeBuy && s.currentLowerGrid <= earlyPlacedCount {
 		// Plase a more lower order
 		for i := 1; i <= s.CountOfMoreOrders; i++ {
-			price = fixedpoint.NewFromFloat(order.Price.Float64() * math.Pow((1.0-s.Margin.Float64()), float64(i+earlyPlacedCount)))
+			price = order.Price.MulPow(fixedpoint.NewFromFloat(1.0).Sub(s.Margin), fixedpoint.NewFromInt(int64(i+earlyPlacedCount)))
 
-			if price < s.LowerPrice {
+			if price.Compare(s.LowerPrice) < 0 {
 				break
 			}
 
@@ -369,12 +365,12 @@ func (s *Strategy) submitFollowingOrder(order types.Order) {
 			log.Infof("submitting new lower order: %s, currentLowerGrid: %d", submitOrder.String(), s.currentLowerGrid)
 		}
 		// Cleanup overabundant order limits
-		upperGridPrice := fixedpoint.NewFromFloat(order.Price.Float64() * math.Pow((1.0+s.Margin.Float64()), float64(s.GridNum)))
+		upperGridPrice := order.Price.MulPow(fixedpoint.NewFromFloat(1.0).Add(s.Margin), fixedpoint.NewFromInt(int64(s.GridNum)))
 		for _, cancelOrder := range s.activeOrders.Orders() {
 			if cancelOrder.Side == types.SideTypeBuy {
 				continue
 			}
-			if cancelOrder.Price > upperGridPrice {
+			if cancelOrder.Price.Compare(upperGridPrice) > 0 {
 				cancelOrders = append(cancelOrders, cancelOrder)
 			}
 		}
@@ -484,9 +480,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
 		s.Notifiability.Notify(trade)
-		// hack to reset today reset logic
-		s.state.ProfitStats.TodaySince = trade.Time.Unix()
-		s.state.ProfitStats.AddTrade(trade)
 	})
 
 	s.tradeCollector.OnPositionUpdate(func(position *types.Position) {

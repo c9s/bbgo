@@ -1,10 +1,11 @@
 package fixedpoint
 
 import (
+	"encoding/json"
 	"math/big"
 	"testing"
+
 	"github.com/stretchr/testify/assert"
-	"encoding/json"
 )
 
 const Delta = 1e-9
@@ -60,6 +61,8 @@ func TestMulExp(t *testing.T) {
 	digits := x.NumIntDigits()
 	assert.Equal(t, digits, 3)
 	step := x.MulExp(-digits + 1)
+	assert.Equal(t, "1.66", step.String())
+	step = x.MulPow(NewFromInt(10), NewFromInt(int64(-digits+1)))
 	assert.Equal(t, "1.66", step.String())
 }
 
@@ -166,7 +169,6 @@ func TestJson(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "0.00000000", p.FormatString(8))
 	assert.Equal(t, "0.00000000", string(e))
-
 
 	_ = json.Unmarshal([]byte("0.00153917575"), &p)
 	assert.Equal(t, "0.00153917", p.FormatString(8))
