@@ -221,100 +221,8 @@ func (s *Strategy) InstanceID() string {
 	return fmt.Sprintf("%s:%s", ID, s.Symbol)
 }
 
-// GeneralOrderExecutor implements the general order executor for strategy
-type GeneralOrderExecutor struct {
-	session            *bbgo.ExchangeSession
-	symbol             string
-	strategy           string
-	strategyInstanceID string
-	activeMakerOrders  *bbgo.ActiveOrderBook
-	orderStore         *bbgo.OrderStore
-	tradeCollector     *bbgo.TradeCollector
-}
-
-func NewGeneralOrderExecutor(session *bbgo.ExchangeSession, symbol, strategy, strategyInstanceID string) *GeneralOrderExecutor {
-	orderStore := bbgo.NewOrderStore(symbol)
-	return &GeneralOrderExecutor{
-		session:            session,
-		symbol:             symbol,
-		strategy:           strategy,
-		strategyInstanceID: strategyInstanceID,
-		activeMakerOrders:  bbgo.NewActiveOrderBook(symbol),
-		orderStore:         orderStore,
-		tradeCollector:     bbgo.NewTradeCollector(symbol, nil, orderStore),
-	}
-}
-
-func (e *GeneralOrderExecutor) Bind(position *types.Position, profitStats *types.ProfitStats, notify func(obj interface{}, args ...interface{})) {
-	// Always update the position fields
-	position.Strategy = e.strategy
-	position.StrategyInstanceID = e.strategyInstanceID
-
-	e.activeMakerOrders.BindStream(e.session.UserDataStream)
-	e.orderStore.BindStream(e.session.UserDataStream)
-	e.tradeCollector.SetPosition(position)
-
-	// trade notify
-	e.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
-		notify(trade)
-	})
-
-	// profit stats
-	e.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
-		profitStats.AddTrade(trade)
-
-		if profit.IsZero() {
-			return
-		}
-
-		p := position.NewProfit(trade, profit, netProfit)
-		p.Strategy = e.strategy
-		p.StrategyInstanceID = e.strategyInstanceID
-		profitStats.AddProfit(p)
-		notify(&profitStats)
-	})
-
-	e.tradeCollector.OnPositionUpdate(func(position *types.Position) {
-		log.Infof("position changed: %s", position)
-		notify(position)
-	})
-
-	e.tradeCollector.BindStream(e.session.UserDataStream)
-}
-
-func (e *GeneralOrderExecutor) SubmitOrders(ctx context.Context, submitOrders ...types.SubmitOrder) error {
-	formattedOrders, err := e.session.FormatOrders(submitOrders)
-	if err != nil {
-		return err
-	}
-
-	createdOrders, err := e.session.Exchange.SubmitOrders(ctx, formattedOrders...)
-	if err != nil {
-		log.WithError(err).Errorf("can not place orders")
-	}
-
-	e.orderStore.Add(createdOrders...)
-	e.activeMakerOrders.Add(createdOrders...)
-	e.tradeCollector.Process()
-	return err
-}
-
-func (e *GeneralOrderExecutor) GracefulCancel(ctx context.Context) error {
-	if err := e.activeMakerOrders.GracefulCancel(ctx, e.session.Exchange); err != nil {
-		log.WithError(err).Errorf("graceful cancel order error")
-		return err
-	}
-
-	return nil
-}
-
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	var instanceID = s.InstanceID()
-
-	// initial required information
-	s.session = session
-
-	s.orderExecutor = NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID)
 
 	if s.Position == nil {
 		s.Position = types.NewPositionFromMarket(s.Market)
@@ -324,16 +232,19 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.ProfitStats = types.NewProfitStats(s.Market)
 	}
 
-	// position recorder
-	s.orderExecutor.tradeCollector.OnProfit(func(trade types.Trade, profit *types.Profit) {
-		s.Environment.RecordPosition(s.Position, trade, profit)
-		// s.Notify(&p)
-	})
-
 	// trade stats
 	if s.TradeStats == nil {
 		s.TradeStats = &TradeStats{}
 	}
+
+	// initial required information
+	s.session = session
+	s.orderExecutor = NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
+
+	// position recorder
+	s.orderExecutor.tradeCollector.OnProfit(func(trade types.Trade, profit *types.Profit) {
+		s.Environment.RecordPosition(s.Position, trade, profit)
+	})
 
 	s.orderExecutor.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
 		if profit.IsZero() {
@@ -341,7 +252,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 	})
 
-	s.orderExecutor.Bind(s.Position, s.ProfitStats, s.Notifiability.Notify)
+	s.orderExecutor.BindProfitStats(s.ProfitStats, s.Notifiability.Notify)
+	s.orderExecutor.Bind(s.Notifiability.Notify)
 
 	store, _ := session.MarketDataStore(s.Symbol)
 
@@ -552,8 +464,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 func (s *Strategy) closePosition(ctx context.Context) {
 	_ = s.orderExecutor.GracefulCancel(ctx)
-
-	if err := s.ClosePosition(ctx, fixedpoint.One); err != nil {
+	if err := s.orderExecutor.ClosePosition(ctx, fixedpoint.One); err != nil {
 		log.WithError(err).Errorf("close position error")
 	}
 }
@@ -598,25 +509,24 @@ func (s *Strategy) placeBounceSellOrders(ctx context.Context, resistancePrice fi
 
 		if futuresMode {
 			if quantity.Mul(price).Compare(quoteBalance.Available) <= 0 {
-				s.placeOrder(ctx, price, quantity, orderExecutor)
+				s.placeOrder(ctx, price, quantity)
 			}
 		} else {
 			if quantity.Compare(baseBalance.Available) <= 0 {
-				s.placeOrder(ctx, price, quantity, orderExecutor)
+				s.placeOrder(ctx, price, quantity)
 			}
 		}
 	}
 }
 
-func (s *Strategy) placeOrder(ctx context.Context, price fixedpoint.Value, quantity fixedpoint.Value, orderExecutor bbgo.OrderExecutor) {
-	submitOrder := types.SubmitOrder{
+func (s *Strategy) placeOrder(ctx context.Context, price fixedpoint.Value, quantity fixedpoint.Value) {
+	_ = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 		Symbol:   s.Symbol,
 		Side:     types.SideTypeSell,
 		Type:     types.OrderTypeLimit,
 		Price:    price,
 		Quantity: quantity,
-	}
-	_ = s.orderExecutor.SubmitOrders(ctx, submitOrder)
+	})
 }
 
 func (s *Strategy) preloadPivot(pivot *indicator.Pivot, store *bbgo.MarketDataStore) *types.KLine {
