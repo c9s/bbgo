@@ -273,25 +273,41 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.Position.StrategyInstanceID = instanceID
 
 	s.tradeCollector = bbgo.NewTradeCollector(s.Symbol, s.Position, s.orderStore)
+
+	// trade notify
 	s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
 		s.Notifiability.Notify(trade)
-		s.ProfitStats.AddTrade(trade)
+	})
 
-		if profit.Compare(fixedpoint.Zero) == 0 {
+	// profit stats
+	s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
+		s.ProfitStats.AddTrade(trade)
+		if !profit.IsZero() {
+			p := s.Position.NewProfit(trade, profit, netProfit)
+			p.Strategy = ID
+			p.StrategyInstanceID = instanceID
+			s.ProfitStats.AddProfit(p)
+			s.Notify(&s.ProfitStats)
+		}
+	})
+
+	// trade stats
+	s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
+		if profit.IsZero() {
+			s.TradeStats.Add(profit)
+		}
+	})
+
+	// position recorder
+	s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
+		if profit.IsZero() {
 			s.Environment.RecordPosition(s.Position, trade, nil)
 		} else {
 			log.Infof("%s generated profit: %v", s.Symbol, profit)
-
 			p := s.Position.NewProfit(trade, profit, netProfit)
 			p.Strategy = ID
 			p.StrategyInstanceID = instanceID
 			s.Notify(&p)
-
-			s.ProfitStats.AddProfit(p)
-			s.Notify(&s.ProfitStats)
-
-			s.TradeStats.Add(profit)
-
 			s.Environment.RecordPosition(s.Position, trade, &p)
 		}
 	})
