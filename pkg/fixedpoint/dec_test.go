@@ -2,10 +2,9 @@ package fixedpoint
 
 import (
 	"encoding/json"
+	"github.com/stretchr/testify/assert"
 	"math/big"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 const Delta = 1e-9
