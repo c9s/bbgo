@@ -51,6 +51,10 @@ func (c *TradeCollector) Position() *types.Position {
 	return c.position
 }
 
+func (c *TradeCollector) SetPosition(position *types.Position) {
+	c.position = position
+}
+
 // QueueTrade sends the trade object to the trade channel,
 // so that the goroutine can receive the trade and process in the background.
 func (c *TradeCollector) QueueTrade(trade types.Trade) {
@@ -109,7 +113,12 @@ func (c *TradeCollector) Process() bool {
 
 		if c.orderStore.Exists(trade.OrderID) {
 			c.doneTrades[key] = struct{}{}
-			if profit, netProfit, madeProfit := c.position.AddTrade(trade); madeProfit {
+			profit, netProfit, madeProfit := c.position.AddTrade(trade)
+
+			if madeProfit {
+				p := c.position.NewProfit(trade, profit, netProfit)
+				_ = p
+
 				c.EmitTrade(trade, profit, netProfit)
 				c.EmitProfit(trade, profit, netProfit)
 			} else {
