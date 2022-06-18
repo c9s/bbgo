@@ -37,12 +37,12 @@ func (c *TradeCollector) EmitPositionUpdate(position *types.Position) {
 	}
 }
 
-func (c *TradeCollector) OnProfit(cb func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value)) {
+func (c *TradeCollector) OnProfit(cb func(trade types.Trade, profit *types.Profit)) {
 	c.profitCallbacks = append(c.profitCallbacks, cb)
 }
 
-func (c *TradeCollector) EmitProfit(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
+func (c *TradeCollector) EmitProfit(trade types.Trade, profit *types.Profit) {
 	for _, cb := range c.profitCallbacks {
-		cb(trade, profit, netProfit)
+		cb(trade, profit)
 	}
 }

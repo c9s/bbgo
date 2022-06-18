@@ -32,7 +32,7 @@ func (e *RiskControlOrderExecutor) SubmitOrders(ctx context.Context, orders ...t
 			}
 		}
 
-		formattedOrders, err := formatOrders(e.Session, orders)
+		formattedOrders, err := e.Session.FormatOrders(orders)
 		if err != nil {
 			return retOrders, err
 		}
