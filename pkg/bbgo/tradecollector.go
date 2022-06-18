@@ -22,10 +22,12 @@ type TradeCollector struct {
 	orderStore *OrderStore
 	doneTrades map[types.TradeKey]struct{}
 
-	recoverCallbacks        []func(trade types.Trade)
-	tradeCallbacks          []func(trade types.Trade, profit, netProfit fixedpoint.Value)
+	recoverCallbacks []func(trade types.Trade)
+
+	tradeCallbacks []func(trade types.Trade, profit, netProfit fixedpoint.Value)
+
 	positionUpdateCallbacks []func(position *types.Position)
-	profitCallbacks         []func(trade types.Trade, profit, netProfit fixedpoint.Value)
+	profitCallbacks         []func(trade types.Trade, profit *types.Profit)
 }
 
 func NewTradeCollector(symbol string, position *types.Position, orderStore *OrderStore) *TradeCollector {
@@ -49,6 +51,10 @@ func (c *TradeCollector) OrderStore() *OrderStore {
 // Position returns the position used by the trade collector
 func (c *TradeCollector) Position() *types.Position {
 	return c.position
+}
+
+func (c *TradeCollector) SetPosition(position *types.Position) {
+	c.position = position
 }
 
 // QueueTrade sends the trade object to the trade channel,
@@ -109,11 +115,14 @@ func (c *TradeCollector) Process() bool {
 
 		if c.orderStore.Exists(trade.OrderID) {
 			c.doneTrades[key] = struct{}{}
-			if profit, netProfit, madeProfit := c.position.AddTrade(trade); madeProfit {
+			profit, netProfit, madeProfit := c.position.AddTrade(trade)
+			if madeProfit {
+				p := c.position.NewProfit(trade, profit, netProfit)
 				c.EmitTrade(trade, profit, netProfit)
-				c.EmitProfit(trade, profit, netProfit)
+				c.EmitProfit(trade, &p)
 			} else {
 				c.EmitTrade(trade, fixedpoint.Zero, fixedpoint.Zero)
+				c.EmitProfit(trade, nil)
 			}
 			positionChanged = true
 			return true
@@ -140,11 +149,14 @@ func (c *TradeCollector) processTrade(trade types.Trade) bool {
 			return false
 		}
 
-		if profit, netProfit, madeProfit := c.position.AddTrade(trade); madeProfit {
+		profit, netProfit, madeProfit := c.position.AddTrade(trade)
+		if madeProfit {
+			p := c.position.NewProfit(trade, profit, netProfit)
 			c.EmitTrade(trade, profit, netProfit)
-			c.EmitProfit(trade, profit, netProfit)
+			c.EmitProfit(trade, &p)
 		} else {
 			c.EmitTrade(trade, fixedpoint.Zero, fixedpoint.Zero)
+			c.EmitProfit(trade, nil)
 		}
 		c.EmitPositionUpdate(c.position)
 		c.doneTrades[key] = struct{}{}
