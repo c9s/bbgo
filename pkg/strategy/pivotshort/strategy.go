@@ -204,6 +204,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderExecutor = bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
 	s.orderExecutor.BindEnvironment(s.Environment)
 	s.orderExecutor.BindProfitStats(s.ProfitStats, s.Notifiability.Notify)
+	s.orderExecutor.BindTradeStats(s.TradeStats)
 	s.orderExecutor.Bind(s.Notifiability.Notify)
 
 	store, _ := session.MarketDataStore(s.Symbol)
