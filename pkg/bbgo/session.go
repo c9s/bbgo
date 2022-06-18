@@ -973,3 +973,15 @@ func (session *ExchangeSession) SlackAttachment() slack.Attachment {
 		Footer:     util.Render("update time {{ . }}", time.Now().Format(time.RFC822)),
 	}
 }
+
+func (session *ExchangeSession) FormatOrders(orders []types.SubmitOrder) (formattedOrders []types.SubmitOrder, err error) {
+	for _, order := range orders {
+		o, err := session.FormatOrder(order)
+		if err != nil {
+			return formattedOrders, err
+		}
+		formattedOrders = append(formattedOrders, o)
+	}
+
+	return formattedOrders, err
+}
