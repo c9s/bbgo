@@ -8,50 +8,12 @@ import (
 	"sync"
 
 	"github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v3"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
 )
-
-type TradeStats struct {
-	WinningRatio        fixedpoint.Value   `json:"winningRatio" yaml:"winningRatio"`
-	NumOfLossTrade      int                `json:"numOfLossTrade" yaml:"numOfLossTrade"`
-	NumOfProfitTrade    int                `json:"numOfProfitTrade" yaml:"numOfProfitTrade"`
-	GrossProfit         fixedpoint.Value   `json:"grossProfit" yaml:"grossProfit"`
-	GrossLoss           fixedpoint.Value   `json:"grossLoss" yaml:"grossLoss"`
-	Profits             []fixedpoint.Value `json:"profits" yaml:"profits"`
-	Losses              []fixedpoint.Value `json:"losses" yaml:"losses"`
-	MostProfitableTrade fixedpoint.Value   `json:"mostProfitableTrade" yaml:"mostProfitableTrade"`
-	MostLossTrade       fixedpoint.Value   `json:"mostLossTrade" yaml:"mostLossTrade"`
-}
-
-func (s *TradeStats) Add(pnl fixedpoint.Value) {
-	if pnl.Sign() > 0 {
-		s.NumOfProfitTrade++
-		s.Profits = append(s.Profits, pnl)
-		s.GrossProfit = s.GrossProfit.Add(pnl)
-		s.MostProfitableTrade = fixedpoint.Max(s.MostProfitableTrade, pnl)
-	} else {
-		s.NumOfLossTrade++
-		s.Losses = append(s.Losses, pnl)
-		s.GrossLoss = s.GrossLoss.Add(pnl)
-		s.MostLossTrade = fixedpoint.Min(s.MostLossTrade, pnl)
-	}
-
-	if s.NumOfLossTrade == 0 && s.NumOfProfitTrade > 0 {
-		s.WinningRatio = fixedpoint.One
-	} else {
-		s.WinningRatio = fixedpoint.NewFromFloat(float64(s.NumOfProfitTrade) / float64(s.NumOfLossTrade))
-	}
-}
-
-func (s *TradeStats) String() string {
-	out, _ := yaml.Marshal(s)
-	return string(out)
-}
 
 const ID = "pivotshort"
 
@@ -127,9 +89,9 @@ type Strategy struct {
 	types.IntervalWindow
 
 	// persistence fields
-	Position    *types.Position    `json:"position,omitempty" persistence:"position"`
-	ProfitStats *types.ProfitStats `json:"profitStats,omitempty" persistence:"profit_stats"`
-	TradeStats  *TradeStats        `persistence:"trade_stats"`
+	Position    *types.Position    `persistence:"position"`
+	ProfitStats *types.ProfitStats `persistence:"profit_stats"`
+	TradeStats  *types.TradeStats  `persistence:"trade_stats"`
 
 	BreakLow BreakLow `json:"breakLow"`
 
@@ -139,7 +101,7 @@ type Strategy struct {
 	Exit  Exit  `json:"exit"`
 
 	session       *bbgo.ExchangeSession
-	orderExecutor *GeneralOrderExecutor
+	orderExecutor *bbgo.GeneralOrderExecutor
 
 	lastLow                 fixedpoint.Value
 	pivot                   *indicator.Pivot
@@ -234,24 +196,13 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	// trade stats
 	if s.TradeStats == nil {
-		s.TradeStats = &TradeStats{}
+		s.TradeStats = &types.TradeStats{}
 	}
 
 	// initial required information
 	s.session = session
-	s.orderExecutor = NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
-
-	// position recorder
-	s.orderExecutor.tradeCollector.OnProfit(func(trade types.Trade, profit *types.Profit) {
-		s.Environment.RecordPosition(s.Position, trade, profit)
-	})
-
-	s.orderExecutor.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
-		if profit.IsZero() {
-			s.TradeStats.Add(profit)
-		}
-	})
-
+	s.orderExecutor = bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
+	s.orderExecutor.BindEnvironment(s.Environment)
 	s.orderExecutor.BindProfitStats(s.ProfitStats, s.Notifiability.Notify)
 	s.orderExecutor.Bind(s.Notifiability.Notify)
 
