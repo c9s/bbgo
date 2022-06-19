@@ -20,8 +20,6 @@ func init() {
 }
 
 type Strategy struct {
-	Notifiability *bbgo.Notifiability
-
 	Interval      types.Interval   `json:"interval"`
 	BaseCurrency  string           `json:"baseCurrency"`
 	TargetWeights types.ValueMap   `json:"targetWeights"`

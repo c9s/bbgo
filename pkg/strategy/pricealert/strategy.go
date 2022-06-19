@@ -15,9 +15,6 @@ func init() {
 }
 
 type Strategy struct {
-	// The notification system will be injected into the strategy automatically.
-	*bbgo.Notifiability
-
 	// These fields will be filled from the config file (it translates YAML to JSON)
 	Symbol    string           `json:"symbol"`
 	Interval  types.Interval   `json:"interval"`

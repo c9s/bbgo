@@ -68,18 +68,18 @@ func (e *GeneralOrderExecutor) BindProfitStats(profitStats *types.ProfitStats) {
 	})
 }
 
-func (e *GeneralOrderExecutor) Bind(notify NotifyFunc) {
+func (e *GeneralOrderExecutor) Bind() {
 	e.activeMakerOrders.BindStream(e.session.UserDataStream)
 	e.orderStore.BindStream(e.session.UserDataStream)
 
 	// trade notify
 	e.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
-		notify(trade)
+		Notify(trade)
 	})
 
 	e.tradeCollector.OnPositionUpdate(func(position *types.Position) {
 		log.Infof("position changed: %s", position)
-		notify(position)
+		Notify(position)
 	})
 
 	e.tradeCollector.BindStream(e.session.UserDataStream)
