@@ -29,9 +29,10 @@ riskControls:
 backtest:
   startTime: "2020-09-04"
   endTime: "2020-09-14"
+  sessions:
+  - binance
   symbols:
-  - BTCUSDT
-  - ETHUSDT
+  - LINKUSDT
   account:
     binance:
       balances:

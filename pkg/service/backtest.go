@@ -52,7 +52,7 @@ func (s *BacktestService) SyncKLineByInterval(ctx context.Context, exchange type
 				q := &batch.KLineBatchQuery{Exchange: exchange}
 				return q.Query(ctx, symbol, interval, startTime, endTime)
 			},
-			BatchInsertBuffer: 500,
+			BatchInsertBuffer: 1000,
 			BatchInsert: func(obj interface{}) error {
 				kLines := obj.([]types.KLine)
 				return s.BatchInsert(kLines)
