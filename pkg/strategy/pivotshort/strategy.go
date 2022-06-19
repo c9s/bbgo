@@ -143,7 +143,7 @@ func (s *Strategy) useQuantityOrBaseBalance(quantity fixedpoint.Value) fixedpoin
 }
 
 func (s *Strategy) placeLimitSell(ctx context.Context, price, quantity fixedpoint.Value) {
-	_ = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+	_, _ = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 		Symbol:           s.Symbol,
 		Price:            price,
 		Side:             types.SideTypeSell,
@@ -154,7 +154,7 @@ func (s *Strategy) placeLimitSell(ctx context.Context, price, quantity fixedpoin
 }
 
 func (s *Strategy) placeMarketSell(ctx context.Context, quantity fixedpoint.Value) {
-	_ = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+	_, _ = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 		Symbol:           s.Symbol,
 		Side:             types.SideTypeSell,
 		Type:             types.OrderTypeMarket,
@@ -174,7 +174,8 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 	}
 
 	bbgo.Notify("Closing %s position by %f", s.Symbol, percentage.Float64())
-	return s.orderExecutor.SubmitOrders(ctx, *submitOrder)
+	_, err := s.orderExecutor.SubmitOrders(ctx, *submitOrder)
+	return err
 }
 
 func (s *Strategy) InstanceID() string {
@@ -470,7 +471,7 @@ func (s *Strategy) placeBounceSellOrders(ctx context.Context, resistancePrice fi
 }
 
 func (s *Strategy) placeOrder(ctx context.Context, price fixedpoint.Value, quantity fixedpoint.Value) {
-	_ = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+	_, _ = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 		Symbol:   s.Symbol,
 		Side:     types.SideTypeSell,
 		Type:     types.OrderTypeLimit,
