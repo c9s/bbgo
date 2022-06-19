@@ -108,6 +108,7 @@ func (e *GeneralOrderExecutor) GracefulCancel(ctx context.Context) error {
 		return err
 	}
 
+	e.tradeCollector.Process()
 	return nil
 }
 
@@ -118,4 +119,9 @@ func (e *GeneralOrderExecutor) ClosePosition(ctx context.Context, percentage fix
 	}
 
 	return e.SubmitOrders(ctx, *submitOrder)
+}
+
+
+func (e *GeneralOrderExecutor) TradeCollector() *TradeCollector {
+	return e.tradeCollector
 }
