@@ -131,7 +131,7 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 func (s *Strategy) useQuantityOrBaseBalance(quantity fixedpoint.Value) fixedpoint.Value {
 	if quantity.IsZero() {
 		if balance, ok := s.session.Account.Balance(s.Market.BaseCurrency); ok {
-			s.Notify("sell quantity is not set, submitting sell with all base balance: %s", balance.Available.String())
+			bbgo.Notify("sell quantity is not set, submitting sell with all base balance: %s", balance.Available.String())
 			quantity = balance.Available
 		}
 	}
@@ -174,7 +174,7 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 		submitOrder.MarginSideEffect = s.Exit.MarginSideEffect
 	}
 
-	s.Notify("Closing %s position by %f", s.Symbol, percentage.Float64())
+	bbgo.Notify("Closing %s position by %f", s.Symbol, percentage.Float64())
 	return s.orderExecutor.SubmitOrders(ctx, *submitOrder)
 }
 
@@ -202,7 +202,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.session = session
 	s.orderExecutor = bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
 	s.orderExecutor.BindEnvironment(s.Environment)
-	s.orderExecutor.BindProfitStats(s.ProfitStats, s.Notifiability.Notify)
+	s.orderExecutor.BindProfitStats(s.ProfitStats)
 	s.orderExecutor.BindTradeStats(s.TradeStats)
 	s.orderExecutor.Bind(s.Notifiability.Notify)
 
@@ -269,18 +269,18 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			roi := s.Position.AverageCost.Sub(kline.Close).Div(s.Position.AverageCost)
 			if roi.Compare(s.Exit.RoiStopLossPercentage.Neg()) < 0 {
 				// stop loss
-				s.Notify("%s ROI StopLoss triggered at price %f: Loss %s", s.Symbol, kline.Close.Float64(), roi.Percentage())
+				bbgo.Notify("%s ROI StopLoss triggered at price %f: Loss %s", s.Symbol, kline.Close.Float64(), roi.Percentage())
 				s.closePosition(ctx)
 				return
 			} else {
 				// take profit
 				if roi.Compare(s.Exit.RoiTakeProfitPercentage) > 0 { // force take profit
-					s.Notify("%s TakeProfit triggered at price %f: by ROI percentage %s", s.Symbol, kline.Close.Float64(), roi.Percentage(), kline)
+					bbgo.Notify("%s TakeProfit triggered at price %f: by ROI percentage %s", s.Symbol, kline.Close.Float64(), roi.Percentage(), kline)
 					s.closePosition(ctx)
 					return
 				} else if !s.Exit.RoiMinTakeProfitPercentage.IsZero() && roi.Compare(s.Exit.RoiMinTakeProfitPercentage) > 0 {
 					if !s.Exit.LowerShadowRatio.IsZero() && kline.GetLowerShadowHeight().Div(kline.Close).Compare(s.Exit.LowerShadowRatio) > 0 {
-						s.Notify("%s TakeProfit triggered at price %f: by shadow ratio %f",
+						bbgo.Notify("%s TakeProfit triggered at price %f: by shadow ratio %f",
 							s.Symbol,
 							kline.Close.Float64(),
 							kline.GetLowerShadowRatio().Float64(), kline)
@@ -297,7 +297,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 							}
 
 							if cqv.Compare(s.Exit.CumulatedVolume.MinQuoteVolume) > 0 {
-								s.Notify("%s TakeProfit triggered at price %f: by cumulated volume (window: %d) %f > %f",
+								bbgo.Notify("%s TakeProfit triggered at price %f: by cumulated volume (window: %d) %f > %f",
 									s.Symbol,
 									kline.Close.Float64(),
 									s.Exit.CumulatedVolume.Window,
@@ -352,7 +352,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		quantity := s.useQuantityOrBaseBalance(s.BreakLow.Quantity)
 		if s.BreakLow.MarketOrder {
-			s.Notify("%s price %f breaks the previous low %f with ratio %f, submitting market sell to open a short position", s.Symbol, kline.Close.Float64(), previousLow.Float64(), s.BreakLow.Ratio.Float64())
+			bbgo.Notify("%s price %f breaks the previous low %f with ratio %f, submitting market sell to open a short position", s.Symbol, kline.Close.Float64(), previousLow.Float64(), s.BreakLow.Ratio.Float64())
 			s.placeMarketSell(ctx, quantity)
 		} else {
 			sellPrice := kline.Close.Mul(fixedpoint.One.Add(s.BreakLow.BounceRatio))

@@ -122,12 +122,12 @@ func (control *TrailingStopControl) GenerateStopOrder(quantity fixedpoint.Value)
 
 // Not implemented yet
 // ResistanceStop is a kind of stop order by detecting resistance
-//type ResistanceStop struct {
+// type ResistanceStop struct {
 //	Interval      types.Interval   `json:"interval"`
 //	sensitivity   fixedpoint.Value `json:"sensitivity"`
 //	MinVolume     fixedpoint.Value `json:"minVolume"`
 //	TakerBuyRatio fixedpoint.Value `json:"takerBuyRatio"`
-//}
+// }
 
 type Strategy struct {
 	*bbgo.Notifiability `json:"-"`
@@ -156,7 +156,7 @@ type Strategy struct {
 	// Not implemented yet
 	// ResistanceStop *ResistanceStop `json:"resistanceStop"`
 	//
-	//ResistanceTakerBuyRatio fixedpoint.Value `json:"resistanceTakerBuyRatio"`
+	// ResistanceTakerBuyRatio fixedpoint.Value `json:"resistanceTakerBuyRatio"`
 
 	// Min BaseAsset balance to keep
 	MinBaseAssetBalance fixedpoint.Value `json:"minBaseAssetBalance"`
@@ -246,7 +246,7 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 		Market:   s.Market,
 	}
 
-	s.Notify("Submitting %s %s order to close position by %v", s.Symbol, side.String(), percentage, submitOrder)
+	bbgo.Notify("Submitting %s %s order to close position by %v", s.Symbol, side.String(), percentage, submitOrder)
 
 	createdOrders, err := s.submitOrders(ctx, s.orderExecutor, submitOrder)
 	if err != nil {
@@ -299,10 +299,6 @@ func (s *Strategy) LoadState() error {
 }
 
 func (s *Strategy) submitOrders(ctx context.Context, orderExecutor bbgo.OrderExecutor, orderForms ...types.SubmitOrder) (types.OrderSlice, error) {
-	for _, o := range orderForms {
-		s.Notifiability.Notify(o)
-	}
-
 	createdOrders, err := orderExecutor.SubmitOrders(ctx, orderForms...)
 	if err != nil {
 		return nil, err
@@ -404,9 +400,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		if err := s.activeOrders.GracefulCancel(ctx, session.Exchange); err != nil {
 			errMsg := fmt.Sprintf("Not all %s orders are cancelled! Please check again.", s.Symbol)
 			log.WithError(err).Errorf(errMsg)
-			s.Notify(errMsg)
+			bbgo.Notify(errMsg)
 		} else {
-			s.Notify("All %s orders are cancelled.", s.Symbol)
+			bbgo.Notify("All %s orders are cancelled.", s.Symbol)
 		}
 
 		// Save state
@@ -423,13 +419,13 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		if err := s.ClosePosition(context.Background(), percentage); err != nil {
 			errMsg := "failed to close position"
 			log.WithError(err).Errorf(errMsg)
-			s.Notify(errMsg)
+			bbgo.Notify(errMsg)
 		}
 
 		if err := s.Suspend(); err != nil {
 			errMsg := "failed to suspend strategy"
 			log.WithError(err).Errorf(errMsg)
-			s.Notify(errMsg)
+			bbgo.Notify(errMsg)
 		}
 	})
 
@@ -496,7 +492,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	if err := s.LoadState(); err != nil {
 		return err
 	} else {
-		s.Notify("%s state is restored => %+v", s.Symbol, s.state)
+		bbgo.Notify("%s state is restored => %+v", s.Symbol, s.state)
 	}
 
 	s.tradeCollector = bbgo.NewTradeCollector(s.Symbol, s.state.Position, s.orderStore)
@@ -528,14 +524,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 					orders, err := s.submitOrders(ctx, orderExecutor, orderForm)
 					if err != nil {
 						log.WithError(err).Error("submit profit trailing stop order error")
-						s.Notify("submit %s profit trailing stop order error", s.Symbol)
+						bbgo.Notify("submit %s profit trailing stop order error", s.Symbol)
 					} else {
 						orderIds := orders.IDs()
 						if len(orderIds) > 0 {
 							s.trailingStopControl.OrderID = orderIds[0]
 						} else {
 							log.Error("submit profit trailing stop order error. unknown error")
-							s.Notify("submit %s profit trailing stop order error", s.Symbol)
+							bbgo.Notify("submit %s profit trailing stop order error", s.Symbol)
 							s.trailingStopControl.OrderID = 0
 						}
 					}
@@ -545,7 +541,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			if err := s.SaveState(); err != nil {
 				log.WithError(err).Errorf("can not save state: %+v", s.state)
 			} else {
-				s.Notify("%s position is saved", s.Symbol, s.state.Position)
+				bbgo.Notify("%s position is saved", s.Symbol, s.state.Position)
 			}
 		})
 	}
@@ -598,14 +594,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 					orders, err := s.submitOrders(ctx, orderExecutor, orderForm)
 					if err != nil || orders == nil {
 						log.WithError(err).Errorf("submit %s profit trailing stop order error", s.Symbol)
-						s.Notify("submit %s profit trailing stop order error", s.Symbol)
+						bbgo.Notify("submit %s profit trailing stop order error", s.Symbol)
 					} else {
 						orderIds := orders.IDs()
 						if len(orderIds) > 0 {
 							s.trailingStopControl.OrderID = orderIds[0]
 						} else {
 							log.Error("submit profit trailing stop order error. unknown error")
-							s.Notify("submit %s profit trailing stop order error", s.Symbol)
+							bbgo.Notify("submit %s profit trailing stop order error", s.Symbol)
 							s.trailingStopControl.OrderID = 0
 						}
 					}
@@ -627,7 +623,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			takerBuyRatio := kline.TakerBuyBaseAssetVolume.Div(kline.Volume)
 			takerBuyBaseVolumeThreshold := kline.Volume.Mul(s.TakerBuyRatio)
 			if takerBuyRatio.Compare(s.TakerBuyRatio) < 0 {
-				s.Notify("%s: taker buy base volume %s (volume ratio %s) is less than %s (volume ratio %s)",
+				bbgo.Notify("%s: taker buy base volume %s (volume ratio %s) is less than %s (volume ratio %s)",
 					s.Symbol,
 					kline.TakerBuyBaseAssetVolume.String(),
 					takerBuyRatio.String(),
@@ -641,7 +637,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 
 		if s.longTermEMA != nil && closePrice.Float64() < s.longTermEMA.Last() {
-			s.Notify("%s: closed price is below the long term moving average line %f, skipping this support",
+			bbgo.Notify("%s: closed price is below the long term moving average line %f, skipping this support",
 				s.Symbol,
 				s.longTermEMA.Last(),
 				kline,
@@ -650,7 +646,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 
 		if s.triggerEMA != nil && closePrice.Float64() > s.triggerEMA.Last() {
-			s.Notify("%s: closed price is above the trigger moving average line %f, skipping this support",
+			bbgo.Notify("%s: closed price is above the trigger moving average line %f, skipping this support",
 				s.Symbol,
 				s.triggerEMA.Last(),
 				kline,
@@ -659,7 +655,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 
 		if s.triggerEMA != nil && s.longTermEMA != nil {
-			s.Notify("Found %s support: the close price %s is below trigger EMA %f and above long term EMA %f and volume %s > minimum volume %s",
+			bbgo.Notify("Found %s support: the close price %s is below trigger EMA %f and above long term EMA %f and volume %s > minimum volume %s",
 				s.Symbol,
 				closePrice.String(),
 				s.triggerEMA.Last(),
@@ -668,7 +664,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				s.MinVolume.String(),
 				kline)
 		} else {
-			s.Notify("Found %s support: the close price %s and volume %s > minimum volume %s",
+			bbgo.Notify("Found %s support: the close price %s and volume %s > minimum volume %s",
 				s.Symbol,
 				closePrice.String(),
 				kline.Volume.String(),
@@ -691,7 +687,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			MarginSideEffect: s.MarginOrderSideEffect,
 		}
 
-		s.Notify("Submitting %s market order buy with quantity %s according to the base volume %s, taker buy base volume %s",
+		bbgo.Notify("Submitting %s market order buy with quantity %s according to the base volume %s, taker buy base volume %s",
 			s.Symbol,
 			quantity.String(),
 			kline.Volume.String(),
@@ -706,7 +702,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		if err := s.SaveState(); err != nil {
 			log.WithError(err).Errorf("can not save state: %+v", s.state)
 		} else {
-			s.Notify("%s position is saved", s.Symbol, s.state.Position)
+			bbgo.Notify("%s position is saved", s.Symbol, s.state.Position)
 		}
 
 		if s.TrailingStopTarget.TrailingStopCallbackRatio.IsZero() { // submit fixed target orders
@@ -739,7 +735,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 			if _, err := s.submitOrders(ctx, orderExecutor, targetOrders...); err != nil {
 				log.WithError(err).Error("submit profit target order error")
-				s.Notify("submit %s profit trailing stop order error", s.Symbol)
+				bbgo.Notify("submit %s profit trailing stop order error", s.Symbol)
 				return
 			}
 		}
@@ -756,9 +752,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			if err := s.activeOrders.GracefulCancel(ctx, session.Exchange); err != nil {
 				errMsg := "Not all {s.Symbol} orders are cancelled! Please check again."
 				log.WithError(err).Errorf(errMsg)
-				s.Notify(errMsg)
+				bbgo.Notify(errMsg)
 			} else {
-				s.Notify("All {s.Symbol} orders are cancelled.")
+				bbgo.Notify("All {s.Symbol} orders are cancelled.")
 			}
 
 			s.trailingStopControl.OrderID = 0
@@ -767,7 +763,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		if err := s.SaveState(); err != nil {
 			log.WithError(err).Errorf("can not save state: %+v", s.state)
 		} else {
-			s.Notify("%s position is saved", s.Symbol, s.state.Position)
+			bbgo.Notify("%s position is saved", s.Symbol, s.state.Position)
 		}
 	})
 

@@ -243,7 +243,7 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 		Market:   s.Market,
 	}
 
-	s.Notify("Submitting %s %s order to close position by %v", s.Symbol, side.String(), percentage, submitOrder)
+	bbgo.Notify("Submitting %s %s order to close position by %v", s.Symbol, side.String(), percentage, submitOrder)
 
 	createdOrders, err := s.session.Exchange.SubmitOrders(ctx, submitOrder)
 	if err != nil {
@@ -512,9 +512,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		// Cancel all order
 		if err := s.activeMakerOrders.GracefulCancel(ctx, s.session.Exchange); err != nil {
 			log.WithError(err).Errorf("graceful cancel order error")
-			s.Notify("graceful cancel order error")
+			bbgo.Notify("graceful cancel order error")
 		} else {
-			s.Notify("All orders are cancelled.")
+			bbgo.Notify("All orders are cancelled.")
 		}
 
 		s.tradeCollector.Process()
@@ -605,7 +605,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.tradeCollector = bbgo.NewTradeCollector(s.Symbol, s.Position, s.orderStore)
 
 	s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
-		s.Notifiability.Notify(trade)
+		bbgo.Notify(trade)
 		s.ProfitStats.AddTrade(trade)
 
 		if profit.Compare(fixedpoint.Zero) == 0 {
@@ -615,10 +615,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			p := s.Position.NewProfit(trade, profit, netProfit)
 			p.Strategy = ID
 			p.StrategyInstanceID = instanceID
-			s.Notify(&p)
+			bbgo.Notify(&p)
 
 			s.ProfitStats.AddProfit(p)
-			s.Notify(s.ProfitStats)
+			bbgo.Notify(s.ProfitStats)
 
 			s.Environment.RecordPosition(s.Position, trade, &p)
 		}
@@ -626,7 +626,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
 		log.Infof("position changed: %s", s.Position)
-		s.Notify(s.Position)
+		bbgo.Notify(s.Position)
 
 		if err := s.Persistence.Sync(s); err != nil {
 			log.WithError(err).Errorf("can not sync state to persistence")

@@ -954,10 +954,10 @@ func (session *ExchangeSession) bindUserDataStreamMetrics(stream types.Stream) {
 
 func (session *ExchangeSession) bindConnectionStatusNotification(stream types.Stream, streamName string) {
 	stream.OnDisconnect(func() {
-		session.Notifiability.Notify("session %s %s stream disconnected", session.Name, streamName)
+		Notify("session %s %s stream disconnected", session.Name, streamName)
 	})
 	stream.OnConnect(func() {
-		session.Notifiability.Notify("session %s %s stream connected", session.Name, streamName)
+		Notify("session %s %s stream connected", session.Name, streamName)
 	})
 }
 

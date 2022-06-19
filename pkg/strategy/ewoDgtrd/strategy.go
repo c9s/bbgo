@@ -714,7 +714,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		if s.Symbol != trade.Symbol {
 			return
 		}
-		s.Notifiability.Notify(trade)
+		bbgo.Notify(trade)
 		s.ProfitStats.AddTrade(trade)
 
 		if !profit.IsZero() {
@@ -722,10 +722,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			p := s.Position.NewProfit(trade, profit, netprofit)
 			p.Strategy = ID
 			p.StrategyInstanceID = s.InstanceID()
-			s.Notify(&p)
+			bbgo.Notify(&p)
 
 			s.ProfitStats.AddProfit(p)
-			s.Notify(&s.ProfitStats)
+			bbgo.Notify(&s.ProfitStats)
 			s.Environment.RecordPosition(s.Position, trade, &p)
 		} else {
 			s.Environment.RecordPosition(s.Position, trade, nil)
@@ -795,7 +795,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
 		log.Infof("position changed: %s", position)
-		s.Notify(s.Position)
+		bbgo.Notify(s.Position)
 	})
 	s.tradeCollector.BindStream(session.UserDataStream)
 

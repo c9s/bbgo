@@ -6,6 +6,20 @@ import (
 	"github.com/c9s/bbgo/pkg/util"
 )
 
+var Notification = &Notifiability{
+	SymbolChannelRouter:  NewPatternChannelRouter(nil),
+	SessionChannelRouter: NewPatternChannelRouter(nil),
+	ObjectChannelRouter:  NewObjectChannelRouter(),
+}
+
+func Notify(obj interface{}, args ...interface{}) {
+	Notification.Notify(obj, args...)
+}
+
+func NotifyTo(channel string, obj interface{}, args ...interface{}) {
+	Notification.NotifyTo(channel, obj, args...)
+}
+
 type Notifier interface {
 	NotifyTo(channel string, obj interface{}, args ...interface{})
 	Notify(obj interface{}, args ...interface{})

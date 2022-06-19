@@ -125,7 +125,7 @@ func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]
 		displayAssets[currency] = asset
 	}
 
-	s.Notifiability.Notify(displayAssets)
+	bbgo.Notify(displayAssets)
 
 	if s.state != nil {
 		if s.state.IsOver24Hours() {
@@ -166,7 +166,7 @@ func (s *Strategy) LoadState() error {
 		// s.state.Asset = s.Asset
 
 		log.Infof("%s state is restored: %+v", ID, s.state)
-		s.Notifiability.Notify("%s state is restored", ID, s.state)
+		bbgo.Notify("%s state is restored", ID, s.state)
 	}
 
 	return nil

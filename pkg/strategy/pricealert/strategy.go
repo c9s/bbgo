@@ -40,10 +40,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 
 		if kline.GetChange().Abs().Compare(s.MinChange) > 0 {
-			if channel, ok := s.RouteSymbol(s.Symbol); ok {
-				s.NotifyTo(channel, "%s hit price %s, change %v", s.Symbol, market.FormatPrice(kline.Close), kline.GetChange())
+			if channel, ok := bbgo.Notification.RouteSymbol(s.Symbol); ok {
+				bbgo.NotifyTo(channel, "%s hit price %s, change %v", s.Symbol, market.FormatPrice(kline.Close), kline.GetChange())
 			} else {
-				s.Notify("%s hit price %s, change %v", s.Symbol, market.FormatPrice(kline.Close), kline.GetChange())
+				bbgo.Notify("%s hit price %s, change %v", s.Symbol, market.FormatPrice(kline.Close), kline.GetChange())
 			}
 		}
 	})

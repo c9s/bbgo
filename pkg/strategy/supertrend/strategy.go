@@ -3,13 +3,15 @@ package supertrend
 import (
 	"context"
 	"fmt"
+	"sync"
+
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
-	"sync"
 )
 
 const ID = "supertrend"
@@ -60,7 +62,7 @@ type Strategy struct {
 	slowDEMA       *indicator.DEMA
 
 	// SuperTrend indicator
-	//SuperTrend SuperTrend `json:"superTrend"`
+	// SuperTrend SuperTrend `json:"superTrend"`
 	Supertrend *indicator.Supertrend
 	// SupertrendWindow ATR window for calculation of supertrend
 	SupertrendWindow int `json:"supertrendWindow"`
@@ -140,12 +142,12 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 	orderForm := s.generateOrderForm(side, quantity, types.SideEffectTypeAutoRepay)
 
 	log.Infof("submit close position order %v", orderForm)
-	s.Notify("Submitting %s %s order to close position by %v", s.Symbol, side.String(), percentage)
+	bbgo.Notify("Submitting %s %s order to close position by %v", s.Symbol, side.String(), percentage)
 
 	createdOrders, err := s.session.Exchange.SubmitOrders(ctx, orderForm)
 	if err != nil {
 		log.WithError(err).Errorf("can not place %s position close order", s.Symbol)
-		s.Notify("can not place %s position close order", s.Symbol)
+		bbgo.Notify("can not place %s position close order", s.Symbol)
 	}
 
 	s.orderStore.Add(createdOrders...)
@@ -254,7 +256,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.OnEmergencyStop(func() {
 		// Close 100% position
 		if err := s.ClosePosition(ctx, fixedpoint.One); err != nil {
-			s.Notify("can not close position")
+			bbgo.Notify("can not close position")
 		}
 	})
 
@@ -299,7 +301,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			if s.StopLossByTriggeringK && !s.currentStopLossPrice.IsZero() && ((baseSign < 0 && kline.GetClose().Compare(s.currentStopLossPrice) > 0) || (baseSign > 0 && kline.GetClose().Compare(s.currentStopLossPrice) < 0)) {
 				// SL by triggering Kline low
 				log.Infof("%s SL by triggering Kline low", s.Symbol)
-				s.Notify("%s SL by triggering Kline low", s.Symbol)
+				bbgo.Notify("%s StopLoss by triggering the kline low", s.Symbol)
 				if err := s.ClosePosition(ctx, fixedpoint.One); err == nil {
 					s.currentStopLossPrice = fixedpoint.Zero
 					s.currentTakeProfitPrice = fixedpoint.Zero
@@ -307,7 +309,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			} else if s.TakeProfitMultiplier > 0 && !s.currentTakeProfitPrice.IsZero() && ((baseSign < 0 && kline.GetClose().Compare(s.currentTakeProfitPrice) < 0) || (baseSign > 0 && kline.GetClose().Compare(s.currentTakeProfitPrice) > 0)) {
 				// TP by multiple of ATR
 				log.Infof("%s TP by multiple of ATR", s.Symbol)
-				s.Notify("%s TP by multiple of ATR", s.Symbol)
+				bbgo.Notify("%s TakeProfit by multiple of ATR", s.Symbol)
 				if err := s.ClosePosition(ctx, fixedpoint.One); err == nil {
 					s.currentStopLossPrice = fixedpoint.Zero
 					s.currentTakeProfitPrice = fixedpoint.Zero
@@ -315,7 +317,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			} else if s.TPSLBySignal {
 				// Use signals to TP/SL
 				log.Infof("%s TP/SL by reverse of DEMA or Supertrend", s.Symbol)
-				s.Notify("%s TP/SL by reverse of DEMA or Supertrend", s.Symbol)
+				bbgo.Notify("%s TP/SL by reverse of DEMA or Supertrend", s.Symbol)
 				if (baseSign < 0 && (stSignal == types.DirectionUp || demaSignal == types.DirectionUp)) || (baseSign > 0 && (stSignal == types.DirectionDown || demaSignal == types.DirectionDown)) {
 					if err := s.ClosePosition(ctx, fixedpoint.One); err == nil {
 						s.currentStopLossPrice = fixedpoint.Zero
@@ -348,16 +350,16 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		// The default value of side is an empty string. Unless side is set by the checks above, the result of the following condition is false
 		if side == types.SideTypeSell || side == types.SideTypeBuy {
 			log.Infof("open %s position for signal %v", s.Symbol, side)
-			s.Notify("open %s position for signal %v", s.Symbol, side)
+			bbgo.Notify("open %s position for signal %v", s.Symbol, side)
 			// Close opposite position if any
 			if !s.Position.IsDust(kline.GetClose()) {
 				if (side == types.SideTypeSell && s.Position.IsLong()) || (side == types.SideTypeBuy && s.Position.IsShort()) {
 					log.Infof("close existing %s position before open a new position", s.Symbol)
-					s.Notify("close existing %s position before open a new position", s.Symbol)
+					bbgo.Notify("close existing %s position before open a new position", s.Symbol)
 					_ = s.ClosePosition(ctx, fixedpoint.One)
 				} else {
 					log.Infof("existing %s position has the same direction with the signal", s.Symbol)
-					s.Notify("existing %s position has the same direction with the signal", s.Symbol)
+					bbgo.Notify("existing %s position has the same direction with the signal", s.Symbol)
 					return
 				}
 			}
@@ -367,7 +369,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			order, err := orderExecutor.SubmitOrders(ctx, orderForm)
 			if err != nil {
 				log.WithError(err).Errorf("can not place %s open position order", s.Symbol)
-				s.Notify("can not place %s open position order", s.Symbol)
+				bbgo.Notify("can not place %s open position order", s.Symbol)
 			} else {
 				s.orderStore.Add(order...)
 			}
@@ -382,7 +384,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	// Record profits
 	s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
-		s.Notifiability.Notify(trade)
+		bbgo.Notify(trade)
 		s.ProfitStats.AddTrade(trade)
 
 		if profit.Compare(fixedpoint.Zero) == 0 {
@@ -392,10 +394,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			p := s.Position.NewProfit(trade, profit, netProfit)
 			p.Strategy = ID
 			p.StrategyInstanceID = s.InstanceID()
-			s.Notify(&p)
+			bbgo.Notify(&p)
 
 			s.ProfitStats.AddProfit(p)
-			s.Notify(&s.ProfitStats)
+			bbgo.Notify(&s.ProfitStats)
 
 			s.Environment.RecordPosition(s.Position, trade, &p)
 		}

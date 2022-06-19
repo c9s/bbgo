@@ -108,7 +108,7 @@ func (s *Strategy) listenToFundingRate(ctx context.Context, exchange *binance.Ex
 			fundingRate := index.LastFundingRate
 
 			if fundingRate.Compare(s.FundingRate.High) >= 0 {
-				s.Notifiability.Notify("%s funding rate %s is too high! threshold %s",
+				bbgo.Notify("%s funding rate %s is too high! threshold %s",
 					s.Symbol,
 					fundingRate.Percentage(),
 					s.FundingRate.High.Percentage(),
@@ -122,7 +122,7 @@ func (s *Strategy) listenToFundingRate(ctx context.Context, exchange *binance.Ex
 
 					diff := fundingRate.Sub(previousIndex.LastFundingRate)
 					if diff.Abs().Compare(s.FundingRate.DiffThreshold) > 0 {
-						s.Notifiability.Notify("%s funding rate changed %s, current funding rate %s",
+						bbgo.Notify("%s funding rate changed %s, current funding rate %s",
 							s.Symbol,
 							diff.SignedPercentage(),
 							fundingRate.Percentage(),
@@ -205,21 +205,21 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			prettyQuoteVolume := s.Market.QuoteCurrencyFormatter()
 
 			if detection.MinVolume.Sign() > 0 && kline.Volume.Compare(detection.MinVolume) > 0 {
-				s.Notifiability.Notify("Detected %s %s support base volume %s > min base volume %s, quote volume %s",
+				bbgo.Notify("Detected %s %s support base volume %s > min base volume %s, quote volume %s",
 					s.Symbol, detection.Interval.String(),
 					prettyBaseVolume.FormatMoney(kline.Volume.Trunc()),
 					prettyBaseVolume.FormatMoney(detection.MinVolume.Trunc()),
 					prettyQuoteVolume.FormatMoney(kline.QuoteVolume.Trunc()),
 				)
-				s.Notifiability.Notify(kline)
+				bbgo.Notify(kline)
 			} else if detection.MinQuoteVolume.Sign() > 0 && kline.QuoteVolume.Compare(detection.MinQuoteVolume) > 0 {
-				s.Notifiability.Notify("Detected %s %s support quote volume %s > min quote volume %s, base volume %s",
+				bbgo.Notify("Detected %s %s support quote volume %s > min quote volume %s, base volume %s",
 					s.Symbol, detection.Interval.String(),
 					prettyQuoteVolume.FormatMoney(kline.QuoteVolume.Trunc()),
 					prettyQuoteVolume.FormatMoney(detection.MinQuoteVolume.Trunc()),
 					prettyBaseVolume.FormatMoney(kline.Volume.Trunc()),
 				)
-				s.Notifiability.Notify(kline)
+				bbgo.Notify(kline)
 			}
 		}
 	})

@@ -129,7 +129,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 
 			if !match {
-				s.Notifiability.Notify("skip, the %s closed price %v is below or above moving average", s.Symbol, closePrice)
+				bbgo.Notify("skip, the %s closed price %v is below or above moving average", s.Symbol, closePrice)
 				return
 			}
 		}
@@ -147,7 +147,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 
 			if quoteBalance.Available.Compare(quoteQuantity) < 0 {
-				s.Notifiability.Notify("Can not place scheduled %s order: quote balance %s is not enough: %v < %v", s.Symbol, s.Market.QuoteCurrency, quoteBalance.Available, quoteQuantity)
+				bbgo.Notify("Can not place scheduled %s order: quote balance %s is not enough: %v < %v", s.Symbol, s.Market.QuoteCurrency, quoteBalance.Available, quoteQuantity)
 				log.Errorf("can not place scheduled %s order: quote balance %s is not enough: %v < %v", s.Symbol, s.Market.QuoteCurrency, quoteBalance.Available, quoteQuantity)
 				return
 			}
@@ -160,14 +160,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 
 			if baseBalance.Available.Compare(quantity) < 0 {
-				s.Notifiability.Notify("Can not place scheduled %s order: base balance %s is not enough: %v < %v", s.Symbol, s.Market.QuoteCurrency, baseBalance.Available, quantity)
+				bbgo.Notify("Can not place scheduled %s order: base balance %s is not enough: %v < %v", s.Symbol, s.Market.QuoteCurrency, baseBalance.Available, quantity)
 				log.Errorf("can not place scheduled %s order: base balance %s is not enough: %v < %v", s.Symbol, s.Market.QuoteCurrency, baseBalance.Available, quantity)
 				return
 			}
 
 		}
 
-		s.Notifiability.Notify("Submitting scheduled %s order with quantity %v at price %v", s.Symbol, quantity, closePrice)
+		bbgo.Notify("Submitting scheduled %s order with quantity %v at price %v", s.Symbol, quantity, closePrice)
 		_, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 			Symbol:   s.Symbol,
 			Side:     side,
@@ -176,7 +176,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			Market:   s.Market,
 		})
 		if err != nil {
-			s.Notifiability.Notify("Can not place scheduled %s order: submit error %s", s.Symbol, err.Error())
+			bbgo.Notify("Can not place scheduled %s order: submit error %s", s.Symbol, err.Error())
 			log.WithError(err).Errorf("can not place scheduled %s order error", s.Symbol)
 		}
 	})

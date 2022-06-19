@@ -95,7 +95,7 @@ func (s *Strategy) tryToRepayAnyDebt(ctx context.Context) {
 		}
 
 		toRepay := b.Available
-		s.Notifiability.Notify(&MarginAction{
+		bbgo.Notify(&MarginAction{
 			Exchange:       s.ExchangeSession.ExchangeName,
 			Action:         "Repay",
 			Asset:          b.Currency,
@@ -134,7 +134,7 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 	// if margin ratio is too low, do not borrow
 	if curMarginLevel.Compare(minMarginLevel) < 0 {
 		log.Infof("current margin level %f < min margin level %f, skip autoborrow", curMarginLevel.Float64(), minMarginLevel.Float64())
-		s.Notifiability.Notify("Warning!!! %s Current Margin Level %f < Minimal Margin Level %f",
+		bbgo.Notify("Warning!!! %s Current Margin Level %f < Minimal Margin Level %f",
 			s.ExchangeSession.Name,
 			curMarginLevel.Float64(),
 			minMarginLevel.Float64(),
@@ -189,7 +189,7 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 				continue
 			}
 
-			s.Notifiability.Notify(&MarginAction{
+			bbgo.Notify(&MarginAction{
 				Exchange:       s.ExchangeSession.ExchangeName,
 				Action:         "Borrow",
 				Asset:          marginAsset.Asset,
@@ -215,7 +215,7 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 				continue
 			}
 
-			s.Notifiability.Notify(&MarginAction{
+			bbgo.Notify(&MarginAction{
 				Exchange:       s.ExchangeSession.ExchangeName,
 				Action:         "Borrow",
 				Asset:          marginAsset.Asset,
@@ -303,7 +303,7 @@ func (s *Strategy) handleBinanceBalanceUpdateEvent(event *binance.BalanceUpdateE
 		}
 
 		toRepay := b.Available
-		s.Notifiability.Notify(&MarginAction{
+		bbgo.Notify(&MarginAction{
 			Exchange:       s.ExchangeSession.ExchangeName,
 			Action:         "Repay",
 			Asset:          b.Currency,
