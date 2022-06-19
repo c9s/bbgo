@@ -13,22 +13,9 @@ sessions:
   binance:
     exchange: binance
 
-riskControls:
-  # This is the session-based risk controller, which let you configure different risk controller by session.
-  sessionBased:
-    max:
-      orderExecutor:
-        bySymbol:
-          BTCUSDT:
-            basic:
-              minQuoteBalance: 100.0
-              maxBaseAssetBalance: 3.0
-              minBaseAssetBalance: 0.0
-              maxOrderAmount: 1000.0
-
 backtest:
-  startTime: "2020-09-04"
-  endTime: "2020-09-14"
+  startTime: "2021-09-01"
+  endTime: "2021-09-30"
   sessions:
   - binance
   symbols:
@@ -43,8 +30,8 @@ exchangeStrategies:
 - on: binance
   support:
     symbol: LINKUSDT
-    interval: 1m
-    minVolume: 1_000
+    interval: 5m
+    minVolume: 80_000
     triggerMovingAverage:
       interval: 5m
       window: 99
@@ -55,7 +42,7 @@ exchangeStrategies:
     scaleQuantity:
       byVolume:
         exp:
-          domain: [ 1_000, 200_000 ]
+          domain: [ 10_000, 200_000 ]
           range: [ 0.5, 1.0 ]
 
     maxBaseAssetBalance: 1000.0

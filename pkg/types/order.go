@@ -267,11 +267,12 @@ func (o Order) String() string {
 		orderID = strconv.FormatUint(o.OrderID, 10)
 	}
 
-	return fmt.Sprintf("ORDER %s | %s | %s | %s %-4s | %s/%s @ %s | %s",
+	return fmt.Sprintf("ORDER %s | %s | %s | %s | %s %-4s | %s/%s @ %s | %s",
 		o.Exchange.String(),
 		o.CreationTime.Time().Local().Format(time.RFC1123),
 		orderID,
 		o.Symbol,
+		o.Type,
 		o.Side,
 		o.ExecutedQuantity.String(),
 		o.Quantity.String(),
