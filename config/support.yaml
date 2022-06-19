@@ -3,19 +3,11 @@ notifications:
   slack:
     defaultChannel: "dev-bbgo"
     errorChannel: "bbgo-error"
-
-  # if you want to route channel by symbol
-  symbolChannels:
-    "^BTC": "btc"
-    "^ETH": "eth"
-    "^BNB": "bnb"
-
   # object routing rules
   routing:
     trade: "$symbol"
     order: "$symbol"
     submitOrder: "$session" # not supported yet
-    pnL: "bbgo-pnl"
 
 sessions:
   binance:
@@ -35,9 +27,6 @@ riskControls:
               maxOrderAmount: 1000.0
 
 backtest:
-  # for testing max draw down (MDD) at 03-12
-  # see here for more details
-  # https://www.investopedia.com/terms/m/maximum-drawdown-mdd.asp
   startTime: "2020-09-04"
   endTime: "2020-09-14"
   symbols:
@@ -46,7 +35,6 @@ backtest:
   account:
     binance:
       balances:
-        BTC: 0.0
         USDT: 10000.0
 
 exchangeStrategies:
@@ -72,11 +60,10 @@ exchangeStrategies:
     maxBaseAssetBalance: 1000.0
     minQuoteAssetBalance: 2000.0
 
-    #trailingStopTarget:
-    #  callbackRatio: 0.015
-    #  minimumProfitPercentage: 0.02
+    trailingStopTarget:
+      callbackRatio: 1.5%
+      minimumProfitPercentage: 2%
 
     targets:
     - profitPercentage: 0.02
       quantityPercentage: 0.5
-
