@@ -45,10 +45,6 @@ type State struct {
 }
 
 type Strategy struct {
-	// The notification system will be injected into the strategy automatically.
-	// This field will be injected automatically since it's a single exchange strategy.
-	*bbgo.Notifiability `json:"-" yaml:"-"`
-
 	*bbgo.Graceful `json:"-" yaml:"-"`
 
 	*bbgo.Persistence

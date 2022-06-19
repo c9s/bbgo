@@ -19,8 +19,6 @@ func init() {
 type Strategy struct {
 	Market types.Market
 
-	Notifiability *bbgo.Notifiability
-
 	// StandardIndicatorSet contains the standard indicators of a market (symbol)
 	// This field will be injected automatically since we defined the Symbol field.
 	*bbgo.StandardIndicatorSet

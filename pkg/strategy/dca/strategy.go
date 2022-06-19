@@ -48,7 +48,6 @@ func (b BudgetPeriod) Duration() time.Duration {
 // Strategy is the Dollar-Cost-Average strategy
 type Strategy struct {
 	*bbgo.Graceful
-	*bbgo.Notifiability
 	*bbgo.Persistence
 
 	Environment *bbgo.Environment
