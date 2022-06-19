@@ -112,7 +112,7 @@ func (e *GeneralOrderExecutor) GracefulCancel(ctx context.Context) error {
 }
 
 func (e *GeneralOrderExecutor) ClosePosition(ctx context.Context, percentage fixedpoint.Value) error {
-	submitOrder := e.position.NewMarketCloseOrder(percentage) // types.SubmitOrder{
+	submitOrder := e.position.NewMarketCloseOrder(percentage)
 	if submitOrder == nil {
 		return nil
 	}
