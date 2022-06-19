@@ -170,7 +170,7 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {}
 
 func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.ExchangeSession) {
 	if s.Verbose {
-		s.Notifiability.Notify("📝 Checking %s low balance level exchange session...", s.Asset)
+		bbgo.Notify("📝 Checking %s low balance level exchange session...", s.Asset)
 	}
 
 	var total fixedpoint.Value
@@ -182,33 +182,33 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 
 	lowLevelSession, lowLevelBalance, err := s.findLowBalanceLevelSession(sessions)
 	if err != nil {
-		s.Notifiability.Notify("Can not find low balance level session: %s", err.Error())
+		bbgo.Notify("Can not find low balance level session: %s", err.Error())
 		log.WithError(err).Errorf("Can not find low balance level session")
 		return
 	}
 
 	if lowLevelSession == nil {
 		if s.Verbose {
-			s.Notifiability.Notify("✅ All %s balances are looking good, total value: %v", s.Asset, total)
+			bbgo.Notify("✅ All %s balances are looking good, total value: %v", s.Asset, total)
 		}
 		return
 	}
 
-	s.Notifiability.Notify("⚠️ Found low level %s balance from session %s: %v", s.Asset, lowLevelSession.Name, lowLevelBalance)
+	bbgo.Notify("⚠️ Found low level %s balance from session %s: %v", s.Asset, lowLevelSession.Name, lowLevelBalance)
 
 	middle := s.Middle
 	if middle.IsZero() {
 		middle = total.Div(fixedpoint.NewFromInt(int64(len(sessions)))).Mul(priceFixer)
-		s.Notifiability.Notify("Total value %v %s, setting middle to %v", total, s.Asset, middle)
+		bbgo.Notify("Total value %v %s, setting middle to %v", total, s.Asset, middle)
 	}
 
 	requiredAmount := middle.Sub(lowLevelBalance.Available)
 
-	s.Notifiability.Notify("Need %v %s to satisfy the middle balance level %v", requiredAmount, s.Asset, middle)
+	bbgo.Notify("Need %v %s to satisfy the middle balance level %v", requiredAmount, s.Asset, middle)
 
 	fromSession, _, err := s.findHighestBalanceLevelSession(sessions, requiredAmount)
 	if err != nil || fromSession == nil {
-		s.Notifiability.Notify("Can not find session with enough balance")
+		bbgo.Notify("Can not find session with enough balance")
 		log.WithError(err).Errorf("can not find session with enough balance")
 		return
 	}
@@ -220,7 +220,7 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 	}
 
 	if !fromSession.Withdrawal {
-		s.Notifiability.Notify("The withdrawal function exchange session %s is not enabled", fromSession.Name)
+		bbgo.Notify("The withdrawal function exchange session %s is not enabled", fromSession.Name)
 		log.Errorf("The withdrawal function of exchange session %s is not enabled", fromSession.Name)
 		return
 	}
@@ -228,7 +228,7 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 	toAddress, ok := s.Addresses[lowLevelSession.Name]
 	if !ok {
 		log.Errorf("%s address of session %s not found", s.Asset, lowLevelSession.Name)
-		s.Notifiability.Notify("%s address of session %s not found", s.Asset, lowLevelSession.Name)
+		bbgo.Notify("%s address of session %s not found", s.Asset, lowLevelSession.Name)
 		return
 	}
 
@@ -239,7 +239,7 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 	if s.state != nil {
 		if s.MaxDailyNumberOfTransfer > 0 {
 			if s.state.DailyNumberOfTransfers >= s.MaxDailyNumberOfTransfer {
-				s.Notifiability.Notify("⚠️ Exceeded %s max daily number of transfers %d (current %d), skipping transfer...",
+				bbgo.Notify("⚠️ Exceeded %s max daily number of transfers %d (current %d), skipping transfer...",
 					s.Asset,
 					s.MaxDailyNumberOfTransfer,
 					s.state.DailyNumberOfTransfers)
@@ -249,7 +249,7 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 
 		if s.MaxDailyAmountOfTransfer.Sign() > 0 {
 			if s.state.DailyAmountOfTransfers.Compare(s.MaxDailyAmountOfTransfer) >= 0 {
-				s.Notifiability.Notify("⚠️ Exceeded %s max daily amount of transfers %v (current %v), skipping transfer...",
+				bbgo.Notify("⚠️ Exceeded %s max daily amount of transfers %v (current %v), skipping transfer...",
 					s.Asset,
 					s.MaxDailyAmountOfTransfer,
 					s.state.DailyAmountOfTransfers)
@@ -258,7 +258,7 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 		}
 	}
 
-	s.Notifiability.Notify(&WithdrawalRequest{
+	bbgo.Notify(&WithdrawalRequest{
 		FromSession: fromSession.Name,
 		ToSession:   lowLevelSession.Name,
 		Asset:       s.Asset,
@@ -270,11 +270,11 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 		AddressTag: toAddress.AddressTag,
 	}); err != nil {
 		log.WithError(err).Errorf("withdrawal failed")
-		s.Notifiability.Notify("withdrawal request failed, error: %v", err)
+		bbgo.Notify("withdrawal request failed, error: %v", err)
 		return
 	}
 
-	s.Notifiability.Notify("%s withdrawal request sent", s.Asset)
+	bbgo.Notify("%s withdrawal request sent", s.Asset)
 
 	if s.state != nil {
 		if s.state.IsOver24Hours() {
@@ -333,7 +333,7 @@ func (s *Strategy) SaveState() {
 		log.WithError(err).Errorf("can not save state: %+v", s.state)
 	} else {
 		log.Infof("%s %s state is saved: %+v", ID, s.Asset, s.state)
-		s.Notifiability.Notify("%s %s state is saved", ID, s.Asset, s.state)
+		bbgo.Notify("%s %s state is saved", ID, s.Asset, s.state)
 	}
 }
 
@@ -362,7 +362,7 @@ func (s *Strategy) LoadState() error {
 		s.state.Asset = s.Asset
 
 		log.Infof("%s %s state is restored: %+v", ID, s.Asset, s.state)
-		s.Notifiability.Notify("%s %s state is restored", ID, s.Asset, s.state)
+		bbgo.Notify("%s %s state is restored", ID, s.Asset, s.state)
 	}
 
 	return nil

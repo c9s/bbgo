@@ -150,7 +150,7 @@ var BacktestCmd = &cobra.Command{
 		log.Infof("starting backtest with startTime %s", startTime.Format(time.ANSIC))
 
 		environ := bbgo.NewEnvironment()
-		if err := BootstrapBacktestEnvironment(ctx, environ, userConfig); err != nil {
+		if err := BootstrapBacktestEnvironment(ctx, environ); err != nil {
 			return err
 		}
 

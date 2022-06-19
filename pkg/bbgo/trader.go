@@ -111,20 +111,6 @@ func (trader *Trader) Configure(userConfig *Config) error {
 		trader.AttachCrossExchangeStrategy(strategy)
 	}
 
-	for _, report := range userConfig.PnLReporters {
-		if len(report.AverageCostBySymbols) > 0 {
-
-			log.Infof("setting up average cost pnl reporter on symbols: %v", report.AverageCostBySymbols)
-			trader.ReportPnL().
-				AverageCostBySymbols(report.AverageCostBySymbols...).
-				Of(report.Of...).
-				When(report.When...)
-
-		} else {
-			return fmt.Errorf("unsupported PnL reporter: %+v", report)
-		}
-	}
-
 	return nil
 }
 
@@ -307,9 +293,8 @@ func (trader *Trader) Run(ctx context.Context) error {
 	}
 
 	router := &ExchangeOrderExecutionRouter{
-		Notifiability: trader.environment.Notifiability,
-		sessions:      trader.environment.sessions,
-		executors:     make(map[string]OrderExecutor),
+		sessions:  trader.environment.sessions,
+		executors: make(map[string]OrderExecutor),
 	}
 	for sessionID := range trader.environment.sessions {
 		var orderExecutor = trader.getSessionOrderExecutor(sessionID)
@@ -434,7 +419,7 @@ func (trader *Trader) injectCommonServices(s interface{}) error {
 	return parseStructAndInject(s,
 		&trader.Graceful,
 		&trader.logger,
-		&trader.environment.Notifiability,
+		Notification,
 		trader.environment.TradeService,
 		trader.environment.OrderService,
 		trader.environment.DatabaseService,
@@ -443,9 +428,4 @@ func (trader *Trader) injectCommonServices(s interface{}) error {
 		persistence,
 		persistenceFacade, // if the strategy use persistence facade separately
 	)
-}
-
-// ReportPnL configure and set the PnLReporter with the given notifier
-func (trader *Trader) ReportPnL() *PnLReporterManager {
-	return NewPnLReporter(&trader.environment.Notifiability)
 }

@@ -180,7 +180,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.tradeCollector = bbgo.NewTradeCollector(s.Symbol, s.Position, s.orderStore)
 	s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
-		s.Notifiability.Notify(trade)
+		bbgo.Notify(trade)
 		s.ProfitStats.AddTrade(trade)
 
 		if profit.Compare(fixedpoint.Zero) == 0 {
@@ -190,10 +190,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			p := s.Position.NewProfit(trade, profit, netProfit)
 			p.Strategy = ID
 			p.StrategyInstanceID = instanceID
-			s.Notify(&p)
+			bbgo.Notify(&p)
 
 			s.ProfitStats.AddProfit(p)
-			s.Notify(&s.ProfitStats)
+			bbgo.Notify(&s.ProfitStats)
 
 			s.Environment.RecordPosition(s.Position, trade, &p)
 		}
@@ -205,7 +205,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
 		log.Infof("position changed: %s", s.Position)
-		s.Notify(s.Position)
+		bbgo.Notify(s.Position)
 	})
 
 	s.tradeCollector.BindStream(session.UserDataStream)

@@ -56,7 +56,7 @@ func (e *GeneralOrderExecutor) BindTradeStats(tradeStats *types.TradeStats) {
 	})
 }
 
-func (e *GeneralOrderExecutor) BindProfitStats(profitStats *types.ProfitStats, notify NotifyFunc) {
+func (e *GeneralOrderExecutor) BindProfitStats(profitStats *types.ProfitStats) {
 	e.tradeCollector.OnProfit(func(trade types.Trade, profit *types.Profit) {
 		profitStats.AddTrade(trade)
 		if profit == nil {
@@ -64,7 +64,7 @@ func (e *GeneralOrderExecutor) BindProfitStats(profitStats *types.ProfitStats, n
 		}
 
 		profitStats.AddProfit(*profit)
-		notify(&profitStats)
+		Notify(&profitStats)
 	})
 }
 

@@ -556,13 +556,13 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 		if !s.hedgeErrorRateReservation.OK() {
 			return
 		}
-		s.Notify("Hit hedge error rate limit, waiting...")
+		bbgo.Notify("Hit hedge error rate limit, waiting...")
 		time.Sleep(s.hedgeErrorRateReservation.Delay())
 		s.hedgeErrorRateReservation = nil
 	}
 
 	log.Infof("submitting %s hedge order %s %v", s.Symbol, side.String(), quantity)
-	s.Notifiability.Notify("Submitting %s hedge order %s %v", s.Symbol, side.String(), quantity)
+	bbgo.Notify("Submitting %s hedge order %s %v", s.Symbol, side.String(), quantity)
 	orderExecutor := &bbgo.ExchangeOrderExecutor{Session: s.sourceSession}
 	returnOrders, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 		Market:   s.sourceMarket,
@@ -719,7 +719,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		s.Position.Market = s.makerMarket
 	}
 
-	s.Notify("xmaker: %s position is restored", s.Symbol, s.Position)
+	bbgo.Notify("xmaker: %s position is restored", s.Symbol, s.Position)
 
 	if s.ProfitStats == nil {
 		if s.state != nil {
@@ -767,7 +767,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 	if s.NotifyTrade {
 		s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
-			s.Notifiability.Notify(trade)
+			bbgo.Notify(trade)
 		})
 	}
 
@@ -787,7 +787,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 			p := s.Position.NewProfit(trade, profit, netProfit)
 			p.Strategy = ID
 			p.StrategyInstanceID = instanceID
-			s.Notify(&p)
+			bbgo.Notify(&p)
 			s.ProfitStats.AddProfit(p)
 
 			s.Environment.RecordPosition(s.Position, trade, &p)
@@ -795,10 +795,10 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	})
 
 	s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
-		s.Notifiability.Notify(position)
+		bbgo.Notify(position)
 	})
 	s.tradeCollector.OnRecover(func(trade types.Trade) {
-		s.Notifiability.Notify("Recover trade", trade)
+		bbgo.Notify("Recover trade", trade)
 	})
 	s.tradeCollector.BindStream(s.sourceSession.UserDataStream)
 	s.tradeCollector.BindStream(s.makerSession.UserDataStream)
@@ -840,7 +840,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 				s.updateQuote(ctx, orderExecutionRouter)
 
 			case <-reportTicker.C:
-				s.Notifiability.Notify(&s.ProfitStats)
+				bbgo.Notify(&s.ProfitStats)
 
 			case <-tradeScanTicker.C:
 				log.Infof("scanning trades from %s ago...", tradeScanInterval)
@@ -895,7 +895,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 			log.WithError(err).Errorf("graceful cancel error")
 		}
 
-		s.Notify("%s: %s position", ID, s.Symbol, s.Position)
+		bbgo.Notify("%s: %s position", ID, s.Symbol, s.Position)
 	})
 
 	return nil
