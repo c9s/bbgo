@@ -58,7 +58,6 @@ func (s *State) Reset() {
 
 type Strategy struct {
 	*bbgo.Graceful
-	*bbgo.Notifiability
 	*bbgo.Persistence
 
 	Symbol          string           `json:"symbol"`
