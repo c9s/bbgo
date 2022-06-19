@@ -58,7 +58,6 @@ func (s *State) Reset() {
 }
 
 type Strategy struct {
-	Notifiability *bbgo.Notifiability
 	*bbgo.Graceful
 	*bbgo.Persistence
 	*bbgo.Environment
