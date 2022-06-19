@@ -147,7 +147,7 @@ type Strategy struct {
 
 	state *State
 
-	activeMakerOrders *bbgo.LocalActiveOrderBook
+	activeMakerOrders *bbgo.ActiveOrderBook
 	orderStore        *bbgo.OrderStore
 	tradeCollector    *bbgo.TradeCollector
 
@@ -737,7 +737,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	//s.stopC = make(chan struct{})
 
-	s.activeMakerOrders = bbgo.NewLocalActiveOrderBook(s.Symbol)
+	s.activeMakerOrders = bbgo.NewActiveOrderBook(s.Symbol)
 	s.activeMakerOrders.BindStream(session.UserDataStream)
 
 	s.orderStore = bbgo.NewOrderStore(s.Symbol)
