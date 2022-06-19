@@ -136,7 +136,6 @@ func (a *Address) UnmarshalJSON(body []byte) error {
 }
 
 type Strategy struct {
-	Notifiability *bbgo.Notifiability
 	*bbgo.Graceful
 	*bbgo.Persistence
 

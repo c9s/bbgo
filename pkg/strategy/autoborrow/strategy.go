@@ -50,8 +50,6 @@ type MarginAsset struct {
 }
 
 type Strategy struct {
-	*bbgo.Notifiability
-
 	Interval             types.Interval   `json:"interval"`
 	MinMarginLevel       fixedpoint.Value `json:"minMarginLevel"`
 	MaxMarginLevel       fixedpoint.Value `json:"maxMarginLevel"`
