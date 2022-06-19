@@ -130,7 +130,6 @@ func (control *TrailingStopControl) GenerateStopOrder(quantity fixedpoint.Value)
 // }
 
 type Strategy struct {
-	*bbgo.Notifiability `json:"-"`
 	*bbgo.Persistence
 	*bbgo.Graceful `json:"-"`
 
