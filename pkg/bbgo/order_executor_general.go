@@ -85,10 +85,10 @@ func (e *GeneralOrderExecutor) Bind() {
 	e.tradeCollector.BindStream(e.session.UserDataStream)
 }
 
-func (e *GeneralOrderExecutor) SubmitOrders(ctx context.Context, submitOrders ...types.SubmitOrder) error {
+func (e *GeneralOrderExecutor) SubmitOrders(ctx context.Context, submitOrders ...types.SubmitOrder) (types.OrderSlice, error) {
 	formattedOrders, err := e.session.FormatOrders(submitOrders)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	createdOrders, err := e.session.Exchange.SubmitOrders(ctx, formattedOrders...)
@@ -99,7 +99,7 @@ func (e *GeneralOrderExecutor) SubmitOrders(ctx context.Context, submitOrders ..
 	e.orderStore.Add(createdOrders...)
 	e.activeMakerOrders.Add(createdOrders...)
 	e.tradeCollector.Process()
-	return err
+	return createdOrders, err
 }
 
 func (e *GeneralOrderExecutor) GracefulCancel(ctx context.Context) error {
@@ -118,9 +118,9 @@ func (e *GeneralOrderExecutor) ClosePosition(ctx context.Context, percentage fix
 		return nil
 	}
 
-	return e.SubmitOrders(ctx, *submitOrder)
+	_, err := e.SubmitOrders(ctx, *submitOrder)
+	return err
 }
-
 
 func (e *GeneralOrderExecutor) TradeCollector() *TradeCollector {
 	return e.tradeCollector

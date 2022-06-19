@@ -241,7 +241,7 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 
 	bbgo.Notify("Submitting %s %s order to close position by %v", s.Symbol, side.String(), percentage, submitOrder)
 
-	err := s.orderExecutor.SubmitOrders(ctx, submitOrder)
+	_, err := s.orderExecutor.SubmitOrders(ctx, submitOrder)
 	return err
 }
 
@@ -470,7 +470,7 @@ func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExec
 		submitOrders[i] = adjustOrderQuantity(submitOrders[i], s.Market)
 	}
 
-	_ = s.orderExecutor.SubmitOrders(ctx, submitOrders...)
+	_, _ = s.orderExecutor.SubmitOrders(ctx, submitOrders...)
 }
 
 func (s *Strategy) hasLongSet() bool {
