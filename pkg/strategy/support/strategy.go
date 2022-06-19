@@ -7,11 +7,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/c9s/bbgo/pkg/indicator"
-	"github.com/c9s/bbgo/pkg/service"
-
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -92,7 +90,13 @@ type TrailingStopControl struct {
 	minimumProfitPercentage   fixedpoint.Value
 
 	CurrentHighestPrice fixedpoint.Value
-	OrderID             uint64
+	StopOrder           *types.Order
+}
+
+func (control *TrailingStopControl) UpdateCurrentHighestPrice(p fixedpoint.Value) bool {
+	orig := control.CurrentHighestPrice
+	control.CurrentHighestPrice = fixedpoint.Max(control.CurrentHighestPrice, p)
+	return orig.Compare(control.CurrentHighestPrice) == 0
 }
 
 func (control *TrailingStopControl) IsHigherThanMin(minTargetPrice fixedpoint.Value) bool {
@@ -130,8 +134,11 @@ func (control *TrailingStopControl) GenerateStopOrder(quantity fixedpoint.Value)
 // }
 
 type Strategy struct {
-	*bbgo.Persistence
-	*bbgo.Graceful `json:"-"`
+	*bbgo.Persistence `json:"-"`
+	*bbgo.Environment `json:"-"`
+	*bbgo.Graceful    `json:"-"`
+
+	session *bbgo.ExchangeSession
 
 	Symbol string       `json:"symbol"`
 	Market types.Market `json:"-"`
@@ -165,13 +172,14 @@ type Strategy struct {
 
 	ScaleQuantity *bbgo.PriceVolumeScale `json:"scaleQuantity"`
 
-	orderExecutor bbgo.OrderExecutor
+	orderExecutor *bbgo.GeneralOrderExecutor
 
-	tradeCollector *bbgo.TradeCollector
+	Position            *types.Position    `persistence:"position"`
+	ProfitStats         *types.ProfitStats `persistence:"profit_stats"`
+	TradeStats          *types.TradeStats  `persistence:"trade_stats"`
+	CurrentHighestPrice fixedpoint.Value   `persistence:"current_highest_price"`
 
-	orderStore   *bbgo.OrderStore
-	activeOrders *bbgo.ActiveOrderBook
-	state        *State
+	state *State
 
 	triggerEMA  *indicator.EWMA
 	longTermEMA *indicator.EWMA
@@ -217,13 +225,13 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 }
 
 func (s *Strategy) CurrentPosition() *types.Position {
-	return s.state.Position
+	return s.Position
 }
 
 func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Value) error {
-	base := s.state.Position.GetBase()
+	base := s.Position.GetBase()
 	if base.IsZero() {
-		return fmt.Errorf("no opened %s position", s.state.Position.Symbol)
+		return fmt.Errorf("no opened %s position", s.Position.Symbol)
 	}
 
 	// make it negative
@@ -246,85 +254,12 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 	}
 
 	bbgo.Notify("Submitting %s %s order to close position by %v", s.Symbol, side.String(), percentage, submitOrder)
-
-	createdOrders, err := s.submitOrders(ctx, s.orderExecutor, submitOrder)
-	if err != nil {
-		log.WithError(err).Errorf("can not place position close order")
-	}
-
-	s.orderStore.Add(createdOrders...)
-	s.activeOrders.Add(createdOrders...)
+	_, err := s.orderExecutor.SubmitOrders(ctx, submitOrder)
 	return err
 }
 
-func (s *Strategy) SaveState() error {
-	if err := s.Persistence.Save(s.state, ID, s.Symbol, stateKey); err != nil {
-		return err
-	} else {
-		log.Infof("state is saved => %+v", s.state)
-	}
-	return nil
-}
-
-func (s *Strategy) LoadState() error {
-	var state State
-
-	// load position
-	if err := s.Persistence.Load(&state, ID, s.Symbol, stateKey); err != nil {
-		if err != service.ErrPersistenceNotExists {
-			return err
-		}
-
-		s.state = &State{}
-	} else {
-		s.state = &state
-		log.Infof("state is restored: %+v", s.state)
-	}
-
-	if s.state.Position == nil {
-		s.state.Position = types.NewPositionFromMarket(s.Market)
-	}
-
-	if s.trailingStopControl != nil {
-		if s.state.CurrentHighestPrice == nil {
-			s.trailingStopControl.CurrentHighestPrice = fixedpoint.Zero
-		} else {
-			s.trailingStopControl.CurrentHighestPrice = *s.state.CurrentHighestPrice
-		}
-		s.state.CurrentHighestPrice = &s.trailingStopControl.CurrentHighestPrice
-	}
-
-	return nil
-}
-
 func (s *Strategy) submitOrders(ctx context.Context, orderExecutor bbgo.OrderExecutor, orderForms ...types.SubmitOrder) (types.OrderSlice, error) {
-	createdOrders, err := orderExecutor.SubmitOrders(ctx, orderForms...)
-	if err != nil {
-		return nil, err
-	}
-
-	s.orderStore.Add(createdOrders...)
-	s.activeOrders.Add(createdOrders...)
-	s.tradeCollector.Emit()
-	return createdOrders, nil
-}
-
-// Cancel order
-func (s *Strategy) cancelOrder(orderID uint64, ctx context.Context, orderExecutor bbgo.OrderExecutor) error {
-	// Cancel the original order
-	order, ok := s.orderStore.Get(orderID)
-	if ok {
-		switch order.Status {
-		case types.OrderStatusCanceled, types.OrderStatusRejected, types.OrderStatusFilled:
-			// Do nothing
-		default:
-			if err := orderExecutor.CancelOrders(ctx, order); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
+	return s.orderExecutor.SubmitOrders(ctx, orderForms...)
 }
 
 var slippageModifier = fixedpoint.NewFromFloat(1.003)
@@ -389,27 +324,35 @@ func (s *Strategy) calculateQuantity(session *bbgo.ExchangeSession, side types.S
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-	s.orderExecutor = orderExecutor
+	s.session = session
+	instanceID := s.InstanceID()
+
+	if s.Position == nil {
+		s.Position = types.NewPositionFromMarket(s.Market)
+	}
+
+	if s.ProfitStats == nil {
+		s.ProfitStats = types.NewProfitStats(s.Market)
+	}
+
+	// trade stats
+	if s.TradeStats == nil {
+		s.TradeStats = &types.TradeStats{}
+	}
+
+	s.orderExecutor = bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
+	s.orderExecutor.BindEnvironment(s.Environment)
+	s.orderExecutor.BindProfitStats(s.ProfitStats)
+	s.orderExecutor.BindTradeStats(s.TradeStats)
+	s.orderExecutor.Bind()
 
 	// StrategyController
 	s.Status = types.StrategyStatusRunning
 
 	s.OnSuspend(func() {
 		// Cancel all order
-		if err := s.activeOrders.GracefulCancel(ctx, session.Exchange); err != nil {
-			errMsg := fmt.Sprintf("Not all %s orders are cancelled! Please check again.", s.Symbol)
-			log.WithError(err).Errorf(errMsg)
-			bbgo.Notify(errMsg)
-		} else {
-			bbgo.Notify("All %s orders are cancelled.", s.Symbol)
-		}
-
-		// Save state
-		if err := s.SaveState(); err != nil {
-			log.WithError(err).Errorf("can not save state: %+v", s.state)
-		} else {
-			log.Infof("%s state is saved.", s.Symbol)
-		}
+		_ = s.orderExecutor.GracefulCancel(ctx)
+		_ = s.Persistence.Sync(s)
 	})
 
 	s.OnEmergencyStop(func() {
@@ -447,12 +390,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		log.Infof("adjusted minimal support volume to %s according to sensitivity %s", s.MinVolume.String(), s.Sensitivity.String())
 	}
 
-	market, ok := session.Market(s.Symbol)
-	if !ok {
-		return fmt.Errorf("market %s is not defined", s.Symbol)
-	}
-	s.Market = market
-
 	standardIndicatorSet, ok := session.StandardIndicatorSet(s.Symbol)
 	if !ok {
 		return fmt.Errorf("standardIndicatorSet is nil, symbol %s", s.Symbol)
@@ -471,84 +408,32 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.longTermEMA = standardIndicatorSet.EWMA(s.LongTermMovingAverage)
 	}
 
-	s.orderStore = bbgo.NewOrderStore(s.Symbol)
-	s.orderStore.BindStream(session.UserDataStream)
-
-	s.activeOrders = bbgo.NewActiveOrderBook(s.Symbol)
-	s.activeOrders.BindStream(session.UserDataStream)
-
 	if !s.TrailingStopTarget.TrailingStopCallbackRatio.IsZero() {
 		s.trailingStopControl = &TrailingStopControl{
 			symbol:                    s.Symbol,
 			market:                    s.Market,
 			marginSideEffect:          s.MarginOrderSideEffect,
-			CurrentHighestPrice:       fixedpoint.Zero,
 			trailingStopCallbackRatio: s.TrailingStopTarget.TrailingStopCallbackRatio,
 			minimumProfitPercentage:   s.TrailingStopTarget.MinimumProfitPercentage,
+			CurrentHighestPrice:       s.CurrentHighestPrice,
 		}
 	}
 
-	if err := s.LoadState(); err != nil {
-		return err
-	} else {
-		bbgo.Notify("%s state is restored => %+v", s.Symbol, s.state)
-	}
-
-	s.tradeCollector = bbgo.NewTradeCollector(s.Symbol, s.state.Position, s.orderStore)
-
 	if !s.TrailingStopTarget.TrailingStopCallbackRatio.IsZero() {
 		// Update trailing stop when the position changes
-		s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
+		s.orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
 			// StrategyController
 			if s.Status != types.StrategyStatusRunning {
 				return
 			}
 
-			if position.Base.Compare(s.Market.MinQuantity) > 0 { // Update order if we have a position
-				// Cancel the original order
-				if err := s.cancelOrder(s.trailingStopControl.OrderID, ctx, orderExecutor); err != nil {
-					log.WithError(err).Errorf("Can not cancel the original trailing stop order!")
-				}
-				s.trailingStopControl.OrderID = 0
-
-				// Calculate minimum target price
-				var minTargetPrice = fixedpoint.Zero
-				if s.trailingStopControl.minimumProfitPercentage.Sign() > 0 {
-					minTargetPrice = position.AverageCost.Mul(fixedpoint.One.Add(s.trailingStopControl.minimumProfitPercentage))
-				}
-
-				// Place new order if the target price is higher than the minimum target price
-				if s.trailingStopControl.IsHigherThanMin(minTargetPrice) {
-					orderForm := s.trailingStopControl.GenerateStopOrder(position.Base)
-					orders, err := s.submitOrders(ctx, orderExecutor, orderForm)
-					if err != nil {
-						log.WithError(err).Error("submit profit trailing stop order error")
-						bbgo.Notify("submit %s profit trailing stop order error", s.Symbol)
-					} else {
-						orderIds := orders.IDs()
-						if len(orderIds) > 0 {
-							s.trailingStopControl.OrderID = orderIds[0]
-						} else {
-							log.Error("submit profit trailing stop order error. unknown error")
-							bbgo.Notify("submit %s profit trailing stop order error", s.Symbol)
-							s.trailingStopControl.OrderID = 0
-						}
-					}
-				}
+			if !position.IsLong() || position.IsDust(position.AverageCost) {
+				return
 			}
-			// Save state
-			if err := s.SaveState(); err != nil {
-				log.WithError(err).Errorf("can not save state: %+v", s.state)
-			} else {
-				bbgo.Notify("%s position is saved", s.Symbol, s.state.Position)
-			}
+
+			s.updateStopOrder(ctx)
 		})
 	}
-
-	s.tradeCollector.BindStream(session.UserDataStream)
-
-	// s.tradeCollector.BindStreamForBackground(session.UserDataStream)
-	// go s.tradeCollector.Run(ctx)
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		// StrategyController
@@ -567,48 +452,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		closePrice := kline.GetClose()
 		highPrice := kline.GetHigh()
 
+		// check our trailing stop
 		if s.TrailingStopTarget.TrailingStopCallbackRatio.Sign() > 0 {
-			if s.state.Position.Base.Compare(s.Market.MinQuantity) <= 0 { // Without a position
-				// Update trailing orders with current high price
-				s.trailingStopControl.CurrentHighestPrice = highPrice
-			} else if s.trailingStopControl.CurrentHighestPrice.Compare(highPrice) < 0 || s.trailingStopControl.OrderID == 0 { // With a position or no trailing stop order yet
-				// Update trailing orders with current high price if it's higher
-				s.trailingStopControl.CurrentHighestPrice = highPrice
-
-				// Cancel the original order
-				if err := s.cancelOrder(s.trailingStopControl.OrderID, ctx, orderExecutor); err != nil {
-					log.WithError(err).Errorf("Can not cancel the original trailing stop order!")
+			if s.Position.IsLong() && !s.Position.IsDust(closePrice) {
+				changed := s.trailingStopControl.UpdateCurrentHighestPrice(highPrice)
+				if changed {
+					// Cancel the original order
+					s.updateStopOrder(ctx)
 				}
-				s.trailingStopControl.OrderID = 0
-
-				// Calculate minimum target price
-				var minTargetPrice = fixedpoint.Zero
-				if s.trailingStopControl.minimumProfitPercentage.Sign() > 0 {
-					minTargetPrice = s.state.Position.AverageCost.Mul(fixedpoint.One.Add(s.trailingStopControl.minimumProfitPercentage))
-				}
-
-				// Place new order if the target price is higher than the minimum target price
-				if s.trailingStopControl.IsHigherThanMin(minTargetPrice) {
-					orderForm := s.trailingStopControl.GenerateStopOrder(s.state.Position.Base)
-					orders, err := s.submitOrders(ctx, orderExecutor, orderForm)
-					if err != nil || orders == nil {
-						log.WithError(err).Errorf("submit %s profit trailing stop order error", s.Symbol)
-						bbgo.Notify("submit %s profit trailing stop order error", s.Symbol)
-					} else {
-						orderIds := orders.IDs()
-						if len(orderIds) > 0 {
-							s.trailingStopControl.OrderID = orderIds[0]
-						} else {
-							log.Error("submit profit trailing stop order error. unknown error")
-							bbgo.Notify("submit %s profit trailing stop order error", s.Symbol)
-							s.trailingStopControl.OrderID = 0
-						}
-					}
-				}
-			}
-			// Save state
-			if err := s.SaveState(); err != nil {
-				log.WithError(err).Errorf("can not save state: %+v", s.state)
 			}
 		}
 
@@ -679,7 +530,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		orderForm := types.SubmitOrder{
 			Symbol:           s.Symbol,
-			Market:           market,
+			Market:           s.Market,
 			Side:             types.SideTypeBuy,
 			Type:             types.OrderTypeMarket,
 			Quantity:         quantity,
@@ -697,12 +548,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			log.WithError(err).Error("submit order error")
 			return
 		}
-		// Save state
-		if err := s.SaveState(); err != nil {
-			log.WithError(err).Errorf("can not save state: %+v", s.state)
-		} else {
-			bbgo.Notify("%s position is saved", s.Symbol, s.state.Position)
-		}
 
 		if s.TrailingStopTarget.TrailingStopCallbackRatio.IsZero() { // submit fixed target orders
 			var targetOrders []types.SubmitOrder
@@ -711,17 +556,17 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				targetQuantity := quantity.Mul(target.QuantityPercentage)
 				targetQuoteQuantity := targetPrice.Mul(targetQuantity)
 
-				if targetQuoteQuantity.Compare(market.MinNotional) <= 0 {
+				if targetQuoteQuantity.Compare(s.Market.MinNotional) <= 0 {
 					continue
 				}
 
-				if targetQuantity.Compare(market.MinQuantity) <= 0 {
+				if targetQuantity.Compare(s.Market.MinQuantity) <= 0 {
 					continue
 				}
 
 				targetOrders = append(targetOrders, types.SubmitOrder{
 					Symbol:   kline.Symbol,
-					Market:   market,
+					Market:   s.Market,
 					Type:     types.OrderTypeLimit,
 					Side:     types.SideTypeSell,
 					Price:    targetPrice,
@@ -732,14 +577,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				})
 			}
 
-			if _, err := s.submitOrders(ctx, orderExecutor, targetOrders...); err != nil {
-				log.WithError(err).Error("submit profit target order error")
-				bbgo.Notify("submit %s profit trailing stop order error", s.Symbol)
-				return
+			_, err = s.orderExecutor.SubmitOrders(ctx, targetOrders...)
+			if err != nil {
+				bbgo.Notify("submit %s profit trailing stop order error: %s", s.Symbol, err.Error())
 			}
 		}
-
-		s.tradeCollector.Process()
 	})
 
 	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
@@ -747,24 +589,43 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		// Cancel trailing stop order
 		if s.TrailingStopTarget.TrailingStopCallbackRatio.Sign() > 0 {
-			// Cancel all orders
-			if err := s.activeOrders.GracefulCancel(ctx, session.Exchange); err != nil {
-				errMsg := "Not all {s.Symbol} orders are cancelled! Please check again."
-				log.WithError(err).Errorf(errMsg)
-				bbgo.Notify(errMsg)
-			} else {
-				bbgo.Notify("All {s.Symbol} orders are cancelled.")
-			}
-
-			s.trailingStopControl.OrderID = 0
-		}
-
-		if err := s.SaveState(); err != nil {
-			log.WithError(err).Errorf("can not save state: %+v", s.state)
-		} else {
-			bbgo.Notify("%s position is saved", s.Symbol, s.state.Position)
+			_ = s.orderExecutor.GracefulCancel(ctx)
 		}
 	})
 
 	return nil
+}
+
+func (s *Strategy) updateStopOrder(ctx context.Context) {
+	// cancel the original stop order
+	if s.trailingStopControl.StopOrder != nil {
+		if err := s.session.Exchange.CancelOrders(ctx, *s.trailingStopControl.StopOrder); err != nil {
+			log.WithError(err).Error("cancel order error")
+		}
+		s.trailingStopControl.StopOrder = nil
+		s.orderExecutor.TradeCollector().Process()
+	}
+
+	// Calculate minimum target price
+	var minTargetPrice = fixedpoint.Zero
+	if s.trailingStopControl.minimumProfitPercentage.Sign() > 0 {
+		minTargetPrice = s.Position.AverageCost.Mul(fixedpoint.One.Add(s.trailingStopControl.minimumProfitPercentage))
+	}
+
+	// Place new order if the target price is higher than the minimum target price
+	if s.trailingStopControl.IsHigherThanMin(minTargetPrice) {
+		orderForm := s.trailingStopControl.GenerateStopOrder(s.Position.Base)
+		orders, err := s.orderExecutor.SubmitOrders(ctx, orderForm)
+		if err != nil {
+			bbgo.Notify("failed to submit the trailing stop order on %s", s.Symbol)
+			log.WithError(err).Error("submit profit trailing stop order error")
+		}
+
+		if len(orders) == 0 {
+			log.Error("unexpected error: len(createdOrders) = 0")
+			return
+		}
+
+		s.trailingStopControl.StopOrder = &orders[0]
+	}
 }
