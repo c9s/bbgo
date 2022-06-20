@@ -104,12 +104,15 @@ var optimizeCmd = &cobra.Command{
 			// print metrics JSON to stdout
 			fmt.Println(string(out))
 		} else {
-			if len(metrics) > 0 {
-				fmt.Printf("%v\n", metrics[0].Labels)
-			}
+			for n, values := range metrics {
+				if len(values) == 0 {
+					continue
+				}
 
-			for _, m := range metrics {
-				fmt.Printf("%v => %v\n", m.Params, m.Value)
+				fmt.Printf("%v => %s\n", values[0].Labels, n)
+				for _, m := range values {
+					fmt.Printf("%v => %s %v\n", m.Params, n, m.Value)
+				}
 			}
 		}
 
