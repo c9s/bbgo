@@ -269,7 +269,7 @@ func (s *Strategy) getCurrentAllowedExposurePosition(bandPercentage float64) (fi
 	return s.MaxExposurePosition, nil
 }
 
-func (s *Strategy) placeOrders(ctx context.Context, orderExecutor bbgo.OrderExecutor, midPrice fixedpoint.Value, kline *types.KLine) {
+func (s *Strategy) placeOrders(ctx context.Context, midPrice fixedpoint.Value, kline *types.KLine) {
 	bidSpread := s.Spread
 	if s.BidSpread.Sign() > 0 {
 		bidSpread = s.BidSpread
@@ -598,10 +598,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 
 			midPrice := ticker.Buy.Add(ticker.Sell).Div(two)
-			s.placeOrders(ctx, orderExecutor, midPrice, nil)
+			s.placeOrders(ctx, midPrice, nil)
 		} else {
 			if price, ok := session.LastPrice(s.Symbol); ok {
-				s.placeOrders(ctx, orderExecutor, price, nil)
+				s.placeOrders(ctx, price, nil)
 			}
 		}
 	})
@@ -641,9 +641,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 			midPrice := ticker.Buy.Add(ticker.Sell).Div(two)
 			log.Infof("using ticker price: bid %v / ask %v, mid price %v", ticker.Buy, ticker.Sell, midPrice)
-			s.placeOrders(ctx, orderExecutor, midPrice, &kline)
+			s.placeOrders(ctx, midPrice, &kline)
 		} else {
-			s.placeOrders(ctx, orderExecutor, kline.Close, &kline)
+			s.placeOrders(ctx, kline.Close, &kline)
 		}
 	})
 
