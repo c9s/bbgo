@@ -176,10 +176,10 @@ func (o *GridOptimizer) Run(executor Executor, configJson []byte) (map[string][]
 			return err
 		}
 
+		var labels = copyLabels(o.ParamLabels)
+		var currentParams = copyParams(o.CurrentParams)
 		for metricName, metricFunc := range valueFunctions {
 			var metricValue = metricFunc(summaryReport)
-			var currentParams = copyParams(o.CurrentParams)
-			var labels = copyLabels(o.ParamLabels)
 
 			metrics[metricName] = append(metrics[metricName], Metric{
 				Params: currentParams,
