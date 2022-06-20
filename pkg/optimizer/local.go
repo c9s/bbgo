@@ -37,13 +37,28 @@ func (e *LocalProcessExecutor) ExecuteAsync(configJson []byte) *AsyncHandle {
 	}
 
 	go func() {
+		defer close(handle.Done)
 		report, err := e.Execute(configJson)
 		handle.Error = err
 		handle.Report = report
-		close(handle.Done)
 	}()
 
 	return handle
+}
+
+func (e *LocalProcessExecutor) readReport(output []byte) (*backtest.SummaryReport, error) {
+	summaryReportFilepath := strings.TrimSpace(string(output))
+	_, err := os.Stat(summaryReportFilepath)
+	if os.IsNotExist(err) {
+		return nil, err
+	}
+
+	summaryReport, err := backtest.ReadSummaryReport(summaryReportFilepath)
+	if err != nil {
+		return nil, err
+	}
+
+	return summaryReport, nil
 }
 
 func (e *LocalProcessExecutor) Execute(configJson []byte) (*backtest.SummaryReport, error) {
@@ -58,18 +73,7 @@ func (e *LocalProcessExecutor) Execute(configJson []byte) (*backtest.SummaryRepo
 		return nil, err
 	}
 
-	summaryReportFilepath := strings.TrimSpace(string(output))
-	_, err = os.Stat(summaryReportFilepath)
-	if os.IsNotExist(err) {
-		return nil, err
-	}
-
-	summaryReport, err := backtest.ReadSummaryReport(summaryReportFilepath)
-	if err != nil {
-		return nil, err
-	}
-
-	return summaryReport, nil
+	return e.readReport(output)
 }
 
 func jsonToYamlConfig(dir string, configJson []byte) (*os.File, error) {
