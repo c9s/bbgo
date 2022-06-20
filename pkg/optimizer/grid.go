@@ -1,6 +1,7 @@
 package optimizer
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -170,26 +171,17 @@ func (o *GridOptimizer) Run(executor Executor, configJson []byte) (map[string][]
 	var metrics = map[string][]Metric{}
 
 	var ops = o.buildOps()
+
+	var taskC = make(chan BacktestTask, 100)
+
 	var app = func(configJson []byte, next func(configJson []byte) error) error {
-		summaryReport, err := executor.Execute(configJson)
-		if err != nil {
-			return err
-		}
-
 		var labels = copyLabels(o.ParamLabels)
-		var currentParams = copyParams(o.CurrentParams)
-		for metricName, metricFunc := range valueFunctions {
-			var metricValue = metricFunc(summaryReport)
-
-			metrics[metricName] = append(metrics[metricName], Metric{
-				Params: currentParams,
-				Labels: labels,
-				Value:  metricValue,
-			})
-
-			log.Infof("params: %+v => %s %+v", currentParams, metricName, metricValue)
+		var params = copyParams(o.CurrentParams)
+		taskC <- BacktestTask{
+			ConfigJson: configJson,
+			Params:     params,
+			Labels:     labels,
 		}
-
 		return nil
 	}
 
@@ -207,7 +199,27 @@ func (o *GridOptimizer) Run(executor Executor, configJson []byte) (map[string][]
 		}
 	}
 
-	err := wrapper(configJson)
+	resultsC, err := executor.Run(context.Background(), taskC)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := wrapper(configJson); err != nil {
+		return nil, err
+	}
+	close(taskC) // this will shut down the executor
+
+	for result := range resultsC {
+		for metricName, metricFunc := range valueFunctions {
+			var metricValue = metricFunc(result.Report)
+			log.Infof("params: %+v => %s %+v", result.Params, metricName, metricValue)
+			metrics[metricName] = append(metrics[metricName], Metric{
+				Params: result.Params,
+				Labels: result.Labels,
+				Value:  metricValue,
+			})
+		}
+	}
 
 	for n := range metrics {
 		sort.Slice(metrics[n], func(i, j int) bool {
