@@ -643,4 +643,94 @@ func Stdev(a Series, length int) float64 {
 	return math.Sqrt(s / float64(length))
 }
 
+type CorrFunc func(Series, Series, int) float64
+
+func Kendall(a, b Series, length int) float64 {
+	if a.Length() < length {
+		length = a.Length()
+	}
+	if b.Length() < length {
+		length = b.Length()
+	}
+	aRanks := Rank(a, length)
+	bRanks := Rank(b, length)
+	concordant, discordant := 0, 0
+	for i := 0; i < length; i++ {
+		for j := i + 1; j < length; j++ {
+			value := (aRanks.Index(i) - aRanks.Index(j)) * (bRanks.Index(i) - bRanks.Index(j))
+			if value > 0 {
+				concordant++
+			} else {
+				discordant++
+			}
+		}
+	}
+	return float64(concordant-discordant) * 2.0 / float64(length*(length-1))
+}
+
+func Rank(a Series, length int) Series {
+	if length > a.Length() {
+		length = a.Length()
+	}
+	rank := make([]float64, length)
+	mapper := make([]float64, length+1)
+	for i := length - 1; i >= 0; i-- {
+		ii := a.Index(i)
+		counter := 0.
+		for j := 0; j < length; j++ {
+			if a.Index(j) <= ii {
+				counter += 1.
+			}
+		}
+		rank[i] = counter
+		mapper[int(counter)] += 1.
+	}
+	output := NewQueue(length)
+	for i := length - 1; i >= 0; i-- {
+		output.Update(rank[i] - (mapper[int(rank[i])]-1.)/2)
+	}
+	return output
+}
+
+func Pearson(a, b Series, length int) float64 {
+	if a.Length() < length {
+		length = a.Length()
+	}
+	if b.Length() < length {
+		length = b.Length()
+	}
+	x := make([]float64, length)
+	y := make([]float64, length)
+	for i := 0; i < length; i++ {
+		x[i] = a.Index(i)
+		y[i] = b.Index(i)
+	}
+	return stat.Correlation(x, y, nil)
+}
+
+func Spearman(a, b Series, length int) float64 {
+	if a.Length() < length {
+		length = a.Length()
+	}
+	if b.Length() < length {
+		length = b.Length()
+	}
+	aRank := Rank(a, length)
+	bRank := Rank(b, length)
+	return Pearson(aRank, bRank, length)
+}
+
+// similar to pandas.Series.corr() function.
+//
+// method could either be `types.Pearson`, `types.Spearman` or `types.Kendall`
+func Correlation(a Series, b Series, length int, method ...CorrFunc) float64 {
+	var runner CorrFunc
+	if len(method) == 0 {
+		runner = Pearson
+	} else {
+		runner = method[0]
+	}
+	return runner(a, b, length)
+}
+
 // TODO: ta.linreg
