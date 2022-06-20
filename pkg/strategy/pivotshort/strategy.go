@@ -163,7 +163,14 @@ func (s *Strategy) placeMarketSell(ctx context.Context, quantity fixedpoint.Valu
 	})
 }
 
+func (s *Strategy) CurrentPosition() *types.Position {
+	return s.Position
+}
+
 func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Value) error {
+	// Cancel active orders
+	_ = s.orderExecutor.GracefulCancel(ctx)
+
 	submitOrder := s.Position.NewMarketCloseOrder(percentage) // types.SubmitOrder{
 	if submitOrder == nil {
 		return nil
@@ -174,7 +181,12 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 	}
 
 	bbgo.Notify("Closing %s position by %f", s.Symbol, percentage.Float64())
+	log.Infof("Closing %s position by %f", s.Symbol, percentage.Float64())
 	_, err := s.orderExecutor.SubmitOrders(ctx, *submitOrder)
+	if err != nil {
+		bbgo.Notify("close %s position error", s.Symbol)
+		log.WithError(err).Errorf("close %s position error", s.Symbol)
+	}
 	return err
 }
 
@@ -197,6 +209,21 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	if s.TradeStats == nil {
 		s.TradeStats = &types.TradeStats{}
 	}
+
+	// StrategyController
+	s.Status = types.StrategyStatusRunning
+
+	s.OnSuspend(func() {
+		// Cancel active orders
+		_ = s.orderExecutor.GracefulCancel(ctx)
+	})
+
+	s.OnEmergencyStop(func() {
+		// Cancel active orders
+		_ = s.orderExecutor.GracefulCancel(ctx)
+		// Close 100% position
+		_ = s.ClosePosition(ctx, fixedpoint.One)
+	})
 
 	// initial required information
 	s.session = session
@@ -257,6 +284,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	// Always check whether you can open a short position or not
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
+		// StrategyController
+		if s.Status != types.StrategyStatusRunning {
+			return
+		}
+
 		if kline.Symbol != s.Symbol || kline.Interval != types.Interval1m {
 			return
 		}
@@ -270,13 +302,13 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			if roi.Compare(s.Exit.RoiStopLossPercentage.Neg()) < 0 {
 				// stop loss
 				bbgo.Notify("%s ROI StopLoss triggered at price %f: Loss %s", s.Symbol, kline.Close.Float64(), roi.Percentage())
-				s.closePosition(ctx)
+				_ = s.ClosePosition(ctx, fixedpoint.One)
 				return
 			} else {
 				// take profit
 				if roi.Compare(s.Exit.RoiTakeProfitPercentage) > 0 { // force take profit
 					bbgo.Notify("%s TakeProfit triggered at price %f: by ROI percentage %s", s.Symbol, kline.Close.Float64(), roi.Percentage(), kline)
-					s.closePosition(ctx)
+					_ = s.ClosePosition(ctx, fixedpoint.One)
 					return
 				} else if !s.Exit.RoiMinTakeProfitPercentage.IsZero() && roi.Compare(s.Exit.RoiMinTakeProfitPercentage) > 0 {
 					if !s.Exit.LowerShadowRatio.IsZero() && kline.GetLowerShadowHeight().Div(kline.Close).Compare(s.Exit.LowerShadowRatio) > 0 {
@@ -284,7 +316,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 							s.Symbol,
 							kline.Close.Float64(),
 							kline.GetLowerShadowRatio().Float64(), kline)
-						s.closePosition(ctx)
+						_ = s.ClosePosition(ctx, fixedpoint.One)
 						return
 					} else if s.Exit.CumulatedVolume != nil && s.Exit.CumulatedVolume.Enabled {
 						if klines, ok := store.KLinesOfInterval(s.Interval); ok {
@@ -303,7 +335,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 									s.Exit.CumulatedVolume.Window,
 									cqv.Float64(),
 									s.Exit.CumulatedVolume.MinQuoteVolume.Float64())
-								s.closePosition(ctx)
+								_ = s.ClosePosition(ctx, fixedpoint.One)
 								return
 							}
 						}
@@ -361,6 +393,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
+		// StrategyController
+		if s.Status != types.StrategyStatusRunning {
+			return
+		}
+
 		if s.BounceShort == nil || !s.BounceShort.Enabled {
 			return
 		}
@@ -390,6 +427,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
+		// StrategyController
+		if s.Status != types.StrategyStatusRunning {
+			return
+		}
+
 		if kline.Symbol != s.Symbol || kline.Interval != s.Interval {
 			return
 		}
@@ -411,13 +453,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 
 	return nil
-}
-
-func (s *Strategy) closePosition(ctx context.Context) {
-	_ = s.orderExecutor.GracefulCancel(ctx)
-	if err := s.orderExecutor.ClosePosition(ctx, fixedpoint.One); err != nil {
-		log.WithError(err).Errorf("close position error")
-	}
 }
 
 func (s *Strategy) findHigherPivotLow(price fixedpoint.Value) (fixedpoint.Value, bool) {
