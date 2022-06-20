@@ -90,7 +90,7 @@ func (f *file) Sys() interface{} { return nil }
 func Embed(file string, dirs ...string) error {
 	var buf bytes.Buffer
 
-	// Execute template
+	// execute template
 	if err := tmpl.Execute(&buf, struct {
 		Package string
 		Tag     string

@@ -10,12 +10,12 @@ matrix:
   path: '/exchangeStrategies/0/pivotshort/interval'
   values: [ "1m", "5m", "30m" ]
 
-#- type: range
-#  path: '/exchangeStrategies/0/pivotshort/pivotLength'
-#  label: pivotLength
-#  min: 100.0
-#  max: 200.0
-#  step: 20.0
+- type: range
+  path: '/exchangeStrategies/0/pivotshort/window'
+  label: window
+  min: 100.0
+  max: 200.0
+  step: 20.0
 
 #  - type: range
 #    path: '/exchangeStrategies/0/pivotshort/breakLow/stopEMARange'

@@ -1,10 +1,12 @@
 package optimizer
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
@@ -14,8 +16,17 @@ import (
 
 var log = logrus.WithField("component", "optimizer")
 
+type BacktestTask struct {
+	ConfigJson []byte
+	Params     []interface{}
+	Labels     []string
+	Report     *backtest.SummaryReport
+	Error      error
+}
+
 type Executor interface {
-	Execute(configJson []byte) (*backtest.SummaryReport, error)
+	// Execute(configJson []byte) (*backtest.SummaryReport, error)
+	Run(ctx context.Context, taskC chan BacktestTask) (chan BacktestTask, error)
 }
 
 type AsyncHandle struct {
@@ -38,7 +49,7 @@ func (e *LocalProcessExecutor) ExecuteAsync(configJson []byte) *AsyncHandle {
 
 	go func() {
 		defer close(handle.Done)
-		report, err := e.Execute(configJson)
+		report, err := e.execute(configJson)
 		handle.Error = err
 		handle.Report = report
 	}()
@@ -61,7 +72,57 @@ func (e *LocalProcessExecutor) readReport(output []byte) (*backtest.SummaryRepor
 	return summaryReport, nil
 }
 
-func (e *LocalProcessExecutor) Execute(configJson []byte) (*backtest.SummaryReport, error) {
+func (e *LocalProcessExecutor) Run(ctx context.Context, taskC chan BacktestTask) (chan BacktestTask, error) {
+	var maxNumOfProcess = 5
+	var resultsC = make(chan BacktestTask, 10)
+
+	wg := sync.WaitGroup{}
+	wg.Add(maxNumOfProcess)
+
+	go func() {
+		wg.Wait()
+		close(resultsC)
+	}()
+
+	for i := 0; i < maxNumOfProcess; i++ {
+		// fork workers
+		go func(id int, taskC chan BacktestTask) {
+			taskCnt := 0
+			log.Infof("starting local worker #%d", id)
+			defer wg.Done()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+
+				case task, ok := <-taskC:
+					if !ok {
+						return
+					}
+
+					taskCnt++
+					log.Infof("local worker #%d received param task: %v", id, task.Params)
+
+					report, err := e.execute(task.ConfigJson)
+					if err != nil {
+						log.WithError(err).Errorf("execute error")
+					}
+
+					task.Error = err
+					task.Report = report
+
+					resultsC <- task
+				}
+			}
+		}(i+1, taskC)
+	}
+
+	return resultsC, nil
+}
+
+// execute runs the config json and returns the summary report
+// this is a blocking operation
+func (e *LocalProcessExecutor) execute(configJson []byte) (*backtest.SummaryReport, error) {
 	tf, err := jsonToYamlConfig(e.ConfigDir, configJson)
 	if err != nil {
 		return nil, err
