@@ -1,6 +1,7 @@
 package optimizer
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -21,6 +22,18 @@ type Metric struct {
 	Labels []string         `json:"labels,omitempty"`
 	Params []interface{}    `json:"params,omitempty"`
 	Value  fixedpoint.Value `json:"value,omitempty"`
+}
+
+func copyParams(params []interface{}) []interface{} {
+	var c = make([]interface{}, len(params))
+	copy(c, params)
+	return c
+}
+
+func copyLabels(labels []string) []string {
+	var c = make([]string, len(labels))
+	copy(c, labels)
+	return c
 }
 
 type GridOptimizer struct {
@@ -149,31 +162,26 @@ func (o *GridOptimizer) buildOps() []OpFunc {
 	return ops
 }
 
-func (o *GridOptimizer) Run(executor Executor, configJson []byte) ([]Metric, error) {
+func (o *GridOptimizer) Run(executor Executor, configJson []byte) (map[string][]Metric, error) {
 	o.CurrentParams = make([]interface{}, len(o.Config.Matrix))
 
-	var metrics []Metric
+	var valueFunctions = map[string]MetricValueFunc{
+		"totalProfit": TotalProfitMetricValueFunc,
+	}
+	var metrics = map[string][]Metric{}
 
 	var ops = o.buildOps()
+
+	var taskC = make(chan BacktestTask, 100)
+
 	var app = func(configJson []byte, next func(configJson []byte) error) error {
-		summaryReport, err := executor.Execute(configJson)
-		if err != nil {
-			return err
+		var labels = copyLabels(o.ParamLabels)
+		var params = copyParams(o.CurrentParams)
+		taskC <- BacktestTask{
+			ConfigJson: configJson,
+			Params:     params,
+			Labels:     labels,
 		}
-
-		// TODO: Add more metric value function
-		metricValue := TotalProfitMetricValueFunc(summaryReport)
-
-		var currentParams = make([]interface{}, len(o.CurrentParams))
-		copy(currentParams, o.CurrentParams)
-
-		metrics = append(metrics, Metric{
-			Params: currentParams,
-			Labels: o.ParamLabels,
-			Value:  metricValue,
-		})
-
-		log.Infof("current params: %+v => %+v", currentParams, metricValue)
 		return nil
 	}
 
@@ -191,13 +199,36 @@ func (o *GridOptimizer) Run(executor Executor, configJson []byte) ([]Metric, err
 		}
 	}
 
-	err := wrapper(configJson)
+	resultsC, err := executor.Run(context.Background(), taskC)
+	if err != nil {
+		return nil, err
+	}
 
-	sort.Slice(metrics, func(i, j int) bool {
-		a := metrics[i].Value
-		b := metrics[j].Value
-		return a.Compare(b) > 0
-	})
+	if err := wrapper(configJson); err != nil {
+		return nil, err
+	}
+	close(taskC) // this will shut down the executor
+
+	for result := range resultsC {
+		for metricName, metricFunc := range valueFunctions {
+			var metricValue = metricFunc(result.Report)
+			log.Infof("params: %+v => %s %+v", result.Params, metricName, metricValue)
+			metrics[metricName] = append(metrics[metricName], Metric{
+				Params: result.Params,
+				Labels: result.Labels,
+				Value:  metricValue,
+			})
+		}
+	}
+
+	for n := range metrics {
+		sort.Slice(metrics[n], func(i, j int) bool {
+			a := metrics[n][i].Value
+			b := metrics[n][j].Value
+			return a.Compare(b) > 0
+		})
+	}
+
 	return metrics, err
 }
 
