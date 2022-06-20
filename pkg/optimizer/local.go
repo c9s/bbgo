@@ -76,6 +76,8 @@ func (e *LocalProcessExecutor) Execute(configJson []byte) (*backtest.SummaryRepo
 	return e.readReport(output)
 }
 
+// jsonToYamlConfig translate json format config into a YAML format config file
+// The generated file is a temp file
 func jsonToYamlConfig(dir string, configJson []byte) (*os.File, error) {
 	var o map[string]interface{}
 	if err := json.Unmarshal(configJson, &o); err != nil {

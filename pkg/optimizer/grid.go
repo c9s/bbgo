@@ -23,6 +23,18 @@ type Metric struct {
 	Value  fixedpoint.Value `json:"value,omitempty"`
 }
 
+func copyParams(params []interface{}) []interface{} {
+	var c = make([]interface{}, len(params))
+	copy(c, params)
+	return c
+}
+
+func copyLabels(labels []string) []string {
+	var c = make([]string, len(labels))
+	copy(c, labels)
+	return c
+}
+
 type GridOptimizer struct {
 	Config *Config
 
@@ -149,10 +161,13 @@ func (o *GridOptimizer) buildOps() []OpFunc {
 	return ops
 }
 
-func (o *GridOptimizer) Run(executor Executor, configJson []byte) ([]Metric, error) {
+func (o *GridOptimizer) Run(executor Executor, configJson []byte) (map[string][]Metric, error) {
 	o.CurrentParams = make([]interface{}, len(o.Config.Matrix))
 
-	var metrics []Metric
+	var valueFunctions = map[string]MetricValueFunc{
+		"totalProfit": TotalProfitMetricValueFunc,
+	}
+	var metrics = map[string][]Metric{}
 
 	var ops = o.buildOps()
 	var app = func(configJson []byte, next func(configJson []byte) error) error {
@@ -161,19 +176,20 @@ func (o *GridOptimizer) Run(executor Executor, configJson []byte) ([]Metric, err
 			return err
 		}
 
-		// TODO: Add more metric value function
-		metricValue := TotalProfitMetricValueFunc(summaryReport)
+		for metricName, metricFunc := range valueFunctions {
+			var metricValue = metricFunc(summaryReport)
+			var currentParams = copyParams(o.CurrentParams)
+			var labels = copyLabels(o.ParamLabels)
 
-		var currentParams = make([]interface{}, len(o.CurrentParams))
-		copy(currentParams, o.CurrentParams)
+			metrics[metricName] = append(metrics[metricName], Metric{
+				Params: currentParams,
+				Labels: labels,
+				Value:  metricValue,
+			})
 
-		metrics = append(metrics, Metric{
-			Params: currentParams,
-			Labels: o.ParamLabels,
-			Value:  metricValue,
-		})
+			log.Infof("params: %+v => %s %+v", currentParams, metricName, metricValue)
+		}
 
-		log.Infof("current params: %+v => %+v", currentParams, metricValue)
 		return nil
 	}
 
@@ -193,11 +209,14 @@ func (o *GridOptimizer) Run(executor Executor, configJson []byte) ([]Metric, err
 
 	err := wrapper(configJson)
 
-	sort.Slice(metrics, func(i, j int) bool {
-		a := metrics[i].Value
-		b := metrics[j].Value
-		return a.Compare(b) > 0
-	})
+	for n := range metrics {
+		sort.Slice(metrics[n], func(i, j int) bool {
+			a := metrics[n][i].Value
+			b := metrics[n][j].Value
+			return a.Compare(b) > 0
+		})
+	}
+
 	return metrics, err
 }
 
