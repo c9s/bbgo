@@ -1,0 +1,101 @@
+---
+persistence:
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    db: 0
+
+sync:
+  # userDataStream is used to sync the trading data in real-time
+  # it uses the websocket connection to insert the trades
+  userDataStream:
+    trades: true
+    filledOrders: true
+
+  # since is the start date of your trading data
+  since: 2021-08-01
+
+  # sessions is the list of session names you want to sync
+  # by default, BBGO sync all your available sessions.
+  sessions:
+    - binance
+
+  # symbols is the list of symbols you want to sync
+  # by default, BBGO try to guess your symbols by your existing account balances.
+  symbols:
+    - NEARBUSD
+    - BTCUSDT
+    - ETHUSDT
+    - LINKUSDT
+    - BNBUSDT
+    - DOTUSDT
+    - DOTBUSD
+
+
+sessions:
+  binance:
+    exchange: binance
+    envVarPrefix: binance
+#    futures: true
+
+
+exchangeStrategies:
+- on: binance
+  rsmaker:
+    symbol: BTCBUSD
+    interval: 1m
+#    quantity: 40
+    amount: 20
+    minProfitSpread: 0.1%
+
+#    uptrendSkew: 0.7
+
+    # downtrendSkew, like the strongDowntrendSkew, but the price is still in the default band.
+#    downtrendSkew: 1.3
+
+    # tradeInBand: when tradeInBand is set, you will only place orders in the bollinger band.
+#    tradeInBand: true
+
+    # buyBelowNeutralSMA: when this set, it will only place buy order when the current price is below the SMA line.
+#    buyBelowNeutralSMA: true
+
+    defaultBollinger:
+      interval: "1h"
+      window: 21
+      bandWidth: 2.0
+
+    # neutralBollinger is the smaller range of the bollinger band
+    # If price is in this band, it usually means the price is oscillating.
+    neutralBollinger:
+      interval: "5m"
+      window: 21
+      bandWidth: 2.0
+
+    dynamicExposurePositionScale:
+      byPercentage:
+        # exp means we want to use exponential scale, you can replace "exp" with "linear" for linear scale
+        exp:
+          # from lower band -100% (-1) to upper band 100% (+1)
+          domain: [ -2, 2 ]
+          # when in down band, holds 1.0 by maximum
+          # when in up band, holds 0.05 by maximum
+          range: [ 1, 0.01 ]
+
+
+
+backtest:
+  sessions:
+    - binance
+  # for testing max draw down (MDD) at 03-12
+  # see here for more details
+  # https://www.investopedia.com/terms/m/maximum-drawdown-mdd.asp
+  startTime: "2022-03-26"
+  endTime: "2022-04-12"
+  symbols:
+    - BTCBUSD
+  account:
+    binance:
+      makerFeeRate: 0.0
+      balances:
+        BTC: 1
+        BUSD: 45_000.0
