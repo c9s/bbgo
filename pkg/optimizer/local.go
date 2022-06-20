@@ -18,6 +18,12 @@ type Executor interface {
 	Execute(configJson []byte) (*backtest.SummaryReport, error)
 }
 
+type AsyncHandle struct {
+	Error  error
+	Report *backtest.SummaryReport
+	Done   chan struct{}
+}
+
 type LocalProcessExecutor struct {
 	Bin       string
 	WorkDir   string
@@ -25,27 +31,24 @@ type LocalProcessExecutor struct {
 	OutputDir string
 }
 
+func (e *LocalProcessExecutor) ExecuteAsync(configJson []byte) *AsyncHandle {
+	handle := &AsyncHandle{
+		Done: make(chan struct{}),
+	}
+
+	go func() {
+		report, err := e.Execute(configJson)
+		handle.Error = err
+		handle.Report = report
+		close(handle.Done)
+	}()
+
+	return handle
+}
+
 func (e *LocalProcessExecutor) Execute(configJson []byte) (*backtest.SummaryReport, error) {
-	var o map[string]interface{}
-	if err := json.Unmarshal(configJson, &o); err != nil {
-		return nil, err
-	}
-
-	yamlConfig, err := yaml.Marshal(o)
+	tf, err := jsonToYamlConfig(e.ConfigDir, configJson)
 	if err != nil {
-		return nil, err
-	}
-
-	tf, err := os.CreateTemp(e.ConfigDir, "bbgo-*.yaml")
-	if err != nil {
-		return nil, err
-	}
-
-	if _, err = tf.Write(yamlConfig); err != nil {
-		return nil, err
-	}
-
-	if err := tf.Close(); err != nil {
 		return nil, err
 	}
 
@@ -67,4 +70,31 @@ func (e *LocalProcessExecutor) Execute(configJson []byte) (*backtest.SummaryRepo
 	}
 
 	return summaryReport, nil
+}
+
+func jsonToYamlConfig(dir string, configJson []byte) (*os.File, error) {
+	var o map[string]interface{}
+	if err := json.Unmarshal(configJson, &o); err != nil {
+		return nil, err
+	}
+
+	yamlConfig, err := yaml.Marshal(o)
+	if err != nil {
+		return nil, err
+	}
+
+	tf, err := os.CreateTemp(dir, "bbgo-*.yaml")
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err = tf.Write(yamlConfig); err != nil {
+		return nil, err
+	}
+
+	if err := tf.Close(); err != nil {
+		return nil, err
+	}
+
+	return tf, nil
 }
