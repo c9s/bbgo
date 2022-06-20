@@ -27,7 +27,7 @@ func (e *Exchange) QueryRewards(ctx context.Context, startTime time.Time) ([]typ
 		case binanceapi.RebateTypeCommission:
 			// use the default type
 		}
-		
+
 		rewards = append(rewards, types.Reward{
 			UUID:      strconv.FormatInt(entry.UpdateTime.Time().UnixMilli(), 10),
 			Exchange:  types.ExchangeBinance,
