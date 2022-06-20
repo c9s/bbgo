@@ -69,7 +69,6 @@ const (
 
 // Environment presents the real exchange data layer
 type Environment struct {
-	PersistenceServiceFacade *service.PersistenceServiceFacade
 	DatabaseService          *service.DatabaseService
 	OrderService             *service.OrderService
 	TradeService             *service.TradeService
@@ -106,10 +105,7 @@ func NewEnvironment() *Environment {
 		sessions:      make(map[string]*ExchangeSession),
 		startTime:     now,
 
-		syncStatus: SyncNotStarted,
-		PersistenceServiceFacade: &service.PersistenceServiceFacade{
-			Memory: service.NewMemoryService(),
-		},
+		syncStatus:               SyncNotStarted,
 	}
 }
 
@@ -276,7 +272,8 @@ func (environ *Environment) ConfigurePersistence(conf *PersistenceConfig) error 
 			return err
 		}
 
-		environ.PersistenceServiceFacade.Redis = service.NewRedisPersistenceService(conf.Redis)
+		redisPersistence := service.NewRedisPersistenceService(conf.Redis)
+		PersistenceServiceFacade.Redis = redisPersistence
 	}
 
 	if conf.Json != nil {
@@ -287,7 +284,8 @@ func (environ *Environment) ConfigurePersistence(conf *PersistenceConfig) error 
 			}
 		}
 
-		environ.PersistenceServiceFacade.Json = &service.JsonPersistenceService{Directory: conf.Json.Directory}
+		jsonPersistence := &service.JsonPersistenceService{Directory: conf.Json.Directory}
+		PersistenceServiceFacade.Json = jsonPersistence
 	}
 
 	return nil
@@ -772,7 +770,7 @@ func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) erro
 		}
 	}
 
-	var persistence = environ.PersistenceServiceFacade.Get()
+	var persistence = PersistenceServiceFacade.Get()
 
 	err := environ.setupInteraction(persistence)
 	if err != nil {
