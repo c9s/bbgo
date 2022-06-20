@@ -160,6 +160,7 @@ var BacktestCmd = &cobra.Command{
 
 		backtestService := &service.BacktestService{DB: environ.DatabaseService.DB}
 		environ.BacktestService = backtestService
+		bbgo.SetBackTesting(backtestService)
 
 		if len(sessionName) > 0 {
 			userConfig.Backtest.Sessions = []string{sessionName}
