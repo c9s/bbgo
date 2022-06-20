@@ -3,6 +3,7 @@ package supertrend
 import (
 	"context"
 	"fmt"
+	"github.com/c9s/bbgo/pkg/util"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -40,8 +41,8 @@ type Strategy struct {
 	ProfitStats *types.ProfitStats `json:"profitStats,omitempty" persistence:"profit_stats"`
 
 	// Order and trade
-	orderStore     *bbgo.OrderStore
-	tradeCollector *bbgo.TradeCollector
+	orderExecutor *bbgo.GeneralOrderExecutor
+
 	// groupID is the group ID used for the strategy instance for canceling orders
 	groupID uint32
 
@@ -143,17 +144,11 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 	log.Infof("submit close position order %v", orderForm)
 	bbgo.Notify("Submitting %s %s order to close position by %v", s.Symbol, side.String(), percentage)
 
-	createdOrders, err := s.session.Exchange.SubmitOrders(ctx, orderForm)
+	_, err := s.orderExecutor.SubmitOrders(ctx, orderForm)
 	if err != nil {
 		log.WithError(err).Errorf("can not place %s position close order", s.Symbol)
 		bbgo.Notify("can not place %s position close order", s.Symbol)
 	}
-
-	s.orderStore.Add(createdOrders...)
-
-	s.tradeCollector.Process()
-
-	_ = s.Persistence.Sync(s)
 
 	return err
 }
@@ -205,6 +200,7 @@ func (s *Strategy) generateOrderForm(side types.SideType, quantity fixedpoint.Va
 		Type:             types.OrderTypeMarket,
 		Quantity:         quantity,
 		MarginSideEffect: marginOrderSideEffect,
+		GroupID:          s.groupID,
 	}
 
 	return orderForm
@@ -227,6 +223,10 @@ func (s *Strategy) calculateQuantity(currentPrice fixedpoint.Value) fixedpoint.V
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	s.session = session
 
+	// calculate group id for orders
+	instanceID := s.InstanceID()
+	s.groupID = util.FNV32(instanceID)
+
 	// If position is nil, we need to allocate a new position for calculation
 	if s.Position == nil {
 		s.Position = types.NewPositionFromMarket(s.Market)
@@ -235,28 +235,46 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.Position.Strategy = ID
 	s.Position.StrategyInstanceID = s.InstanceID()
 
-	s.stopC = make(chan struct{})
+	// Set fee rate
+	if s.session.MakerFeeRate.Sign() > 0 || s.session.TakerFeeRate.Sign() > 0 {
+		s.Position.SetExchangeFeeRate(s.session.ExchangeName, types.ExchangeFee{
+			MakerFeeRate: s.session.MakerFeeRate,
+			TakerFeeRate: s.session.TakerFeeRate,
+		})
+	}
 
 	// Profit
 	if s.ProfitStats == nil {
 		s.ProfitStats = types.NewProfitStats(s.Market)
 	}
 
-	s.orderStore = bbgo.NewOrderStore(s.Symbol)
-	s.orderStore.BindStream(session.UserDataStream)
+	// Setup order executor
+	s.orderExecutor = bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
+	s.orderExecutor.BindEnvironment(s.Environment)
+	s.orderExecutor.BindProfitStats(s.ProfitStats)
+	s.orderExecutor.Bind()
+
+	// Sync position to redis on trade
+	s.orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
+		if err := s.Persistence.Sync(s); err != nil {
+			log.WithError(err).Errorf("can not sync state to persistence")
+		}
+	})
+
+	s.stopC = make(chan struct{})
 
 	// StrategyController
 	s.Status = types.StrategyStatusRunning
 
 	s.OnSuspend(func() {
+		_ = s.orderExecutor.GracefulCancel(ctx)
 		_ = s.Persistence.Sync(s)
 	})
 
 	s.OnEmergencyStop(func() {
+		_ = s.orderExecutor.GracefulCancel(ctx)
 		// Close 100% position
-		if err := s.ClosePosition(ctx, fixedpoint.One); err != nil {
-			bbgo.Notify("can not close position")
-		}
+		_ = s.ClosePosition(ctx, fixedpoint.One)
 	})
 
 	// Setup indicators
@@ -365,51 +383,20 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 			orderForm := s.generateOrderForm(side, s.calculateQuantity(kline.GetClose()), types.SideEffectTypeMarginBuy)
 			log.Infof("submit open position order %v", orderForm)
-			order, err := orderExecutor.SubmitOrders(ctx, orderForm)
+			_, err := s.orderExecutor.SubmitOrders(ctx, orderForm)
 			if err != nil {
 				log.WithError(err).Errorf("can not place %s open position order", s.Symbol)
 				bbgo.Notify("can not place %s open position order", s.Symbol)
-			} else {
-				s.orderStore.Add(order...)
 			}
-
-			s.tradeCollector.Process()
-
-			_ = s.Persistence.Sync(s)
 		}
 	})
-
-	s.tradeCollector = bbgo.NewTradeCollector(s.Symbol, s.Position, s.orderStore)
-
-	// Record profits
-	s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
-		bbgo.Notify(trade)
-		s.ProfitStats.AddTrade(trade)
-
-		if profit.Compare(fixedpoint.Zero) == 0 {
-			s.Environment.RecordPosition(s.Position, trade, nil)
-		} else {
-			log.Infof("%s generated profit: %v", s.Symbol, profit)
-			p := s.Position.NewProfit(trade, profit, netProfit)
-			p.Strategy = ID
-			p.StrategyInstanceID = s.InstanceID()
-			bbgo.Notify(&p)
-
-			s.ProfitStats.AddProfit(p)
-			bbgo.Notify(&s.ProfitStats)
-
-			s.Environment.RecordPosition(s.Position, trade, &p)
-		}
-	})
-
-	s.tradeCollector.BindStream(session.UserDataStream)
 
 	// Graceful shutdown
 	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 		close(s.stopC)
 
-		s.tradeCollector.Process()
+		_ = s.orderExecutor.GracefulCancel(ctx)
 	})
 
 	return nil
