@@ -45,6 +45,10 @@ func (e *LocalProcessExecutor) Execute(configJson []byte) (*backtest.SummaryRepo
 		return nil, err
 	}
 
+	if err := tf.Close(); err != nil {
+		return nil, err
+	}
+
 	c := exec.Command(e.Bin, "backtest", "--config", tf.Name(), "--output", e.OutputDir, "--subdir")
 	output, err := c.Output()
 	if err != nil {
