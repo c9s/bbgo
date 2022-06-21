@@ -80,6 +80,7 @@ var optimizeCmd = &cobra.Command{
 		}
 
 		executor := &optimizer.LocalProcessExecutor{
+			Config:    optConfig.Executor.LocalExecutorConfig,
 			Bin:       os.Args[0],
 			WorkDir:   ".",
 			ConfigDir: configDir,

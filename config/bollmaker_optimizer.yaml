@@ -3,12 +3,16 @@
 #   go run ./cmd/bbgo optimize --config bollmaker_ethusdt.yaml  --optimizer-config optimizer.yaml --debug
 #
 ---
-maxThread: 10
+executor:
+  type: local
+  local:
+    maxNumberOfProcesses: 10
+
 matrix:
 - type: iterate
   label: interval
   path: '/exchangeStrategies/0/bollmaker/interval'
-  values: ["1m", "5m", "15m", "30m"]
+  values: [ "1m", "5m", "15m", "30m" ]
 
 - type: range
   path: '/exchangeStrategies/0/bollmaker/amount'
