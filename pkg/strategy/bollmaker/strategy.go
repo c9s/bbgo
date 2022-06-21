@@ -494,7 +494,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.OnSuspend(func() {
 		s.Status = types.StrategyStatusStopped
 		_ = s.orderExecutor.GracefulCancel(ctx)
-		_ = s.Persistence.Sync(s)
+		bbgo.Sync(s)
 	})
 
 	s.OnEmergencyStop(func() {
@@ -578,9 +578,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	// TODO: migrate persistance to singleton
 	s.orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
-		if err := s.Persistence.Sync(s); err != nil {
-			log.WithError(err).Errorf("can not sync state to persistence")
-		}
+		bbgo.Sync(s)
 	})
 
 	s.SmartStops.RunStopControllers(ctx, session, s.orderExecutor.TradeCollector())
