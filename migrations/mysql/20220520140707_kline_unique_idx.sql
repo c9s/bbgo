@@ -1,25 +1,4 @@
 -- +up
-
--- +begin
-TRUNCATE TABLE `binance_klines`;
--- +end
-
--- +begin
-TRUNCATE TABLE `max_klines`;
--- +end
-
--- +begin
-TRUNCATE TABLE `ftx_klines`;
--- +end
-
--- +begin
-TRUNCATE TABLE `kucoin_klines`;
--- +end
-
--- +begin
-TRUNCATE TABLE `okex_klines`;
--- +end
-
 -- +begin
 CREATE UNIQUE INDEX idx_kline_binance_unique
     ON binance_klines (`symbol`, `interval`, `start_time`);

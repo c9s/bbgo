@@ -2,6 +2,7 @@
 sessions:
   binance:
     exchange: binance
+    heikinAshi: true
     envVarPrefix: binance
 
 exchangeStrategies:
@@ -11,10 +12,11 @@ exchangeStrategies:
     symbol: BNBBUSD
 
 backtest:
-  startTime: "2022-01-02"
-  endTime: "2022-01-19"
+  startTime: "2022-06-14"
+  endTime: "2022-06-15"
   symbols:
     - BNBBUSD
+  sessions: [binance]
   account:
     binance:
       balances:

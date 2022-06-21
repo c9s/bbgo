@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 // ex: 2019-03-05T09:56:55.728933+00:00
@@ -82,7 +82,7 @@ func (d *datetime) UnmarshalJSON(b []byte) error {
   }
 }
 */
-type accountResponse struct {
+type accountResponse struct { // nolint:golint,deadcode
 	Success bool    `json:"success"`
 	Result  account `json:"result"`
 }
@@ -93,7 +93,7 @@ type account struct {
 	TotalAccountValue fixedpoint.Value `json:"totalAccountValue"`
 }
 
-type positionsResponse struct {
+type positionsResponse struct { // nolint:golint,deadcode
 	Success bool       `json:"success"`
 	Result  []position `json:"result"`
 }
@@ -121,7 +121,7 @@ type position struct {
 	Cost                         fixedpoint.Value `json:"cost"`
 	EntryPrice                   fixedpoint.Value `json:"entryPrice"`
 	EstimatedLiquidationPrice    fixedpoint.Value `json:"estimatedLiquidationPrice"`
-	Future                       string  `json:"future"`
+	Future                       string           `json:"future"`
 	InitialMarginRequirement     fixedpoint.Value `json:"initialMarginRequirement"`
 	LongOrderSize                fixedpoint.Value `json:"longOrderSize"`
 	MaintenanceMarginRequirement fixedpoint.Value `json:"maintenanceMarginRequirement"`
@@ -129,17 +129,17 @@ type position struct {
 	OpenSize                     fixedpoint.Value `json:"openSize"`
 	RealizedPnl                  fixedpoint.Value `json:"realizedPnl"`
 	ShortOrderSize               fixedpoint.Value `json:"shortOrderSize"`
-	Side                         string  `json:"Side"`
+	Side                         string           `json:"Side"`
 	Size                         fixedpoint.Value `json:"size"`
 	UnrealizedPnl                fixedpoint.Value `json:"unrealizedPnl"`
 	CollateralUsed               fixedpoint.Value `json:"collateralUsed"`
 }
 
-type balances struct {
+type balances struct { // nolint:golint,deadcode
 	Success bool `json:"success"`
 
 	Result []struct {
-		Coin  string  `json:"coin"`
+		Coin  string           `json:"coin"`
 		Free  fixedpoint.Value `json:"free"`
 		Total fixedpoint.Value `json:"total"`
 	} `json:"result"`
@@ -172,15 +172,15 @@ type balances struct {
   }
 ]
 */
-type marketsResponse struct {
+type marketsResponse struct { // nolint:golint,deadcode
 	Success bool     `json:"success"`
 	Result  []market `json:"result"`
 }
 
 type market struct {
-	Name                  string  `json:"name"`
-	Enabled               bool    `json:"enabled"`
-	PostOnly              bool    `json:"postOnly"`
+	Name                  string           `json:"name"`
+	Enabled               bool             `json:"enabled"`
+	PostOnly              bool             `json:"postOnly"`
 	PriceIncrement        fixedpoint.Value `json:"priceIncrement"`
 	SizeIncrement         fixedpoint.Value `json:"sizeIncrement"`
 	MinProvideSize        fixedpoint.Value `json:"minProvideSize"`
@@ -188,12 +188,12 @@ type market struct {
 	Bid                   fixedpoint.Value `json:"bid"`
 	Ask                   fixedpoint.Value `json:"ask"`
 	Price                 fixedpoint.Value `json:"price"`
-	Type                  string  `json:"type"`
-	BaseCurrency          string  `json:"baseCurrency"`
-	QuoteCurrency         string  `json:"quoteCurrency"`
-	Underlying            string  `json:"underlying"`
-	Restricted            bool    `json:"restricted"`
-	HighLeverageFeeExempt bool    `json:"highLeverageFeeExempt"`
+	Type                  string           `json:"type"`
+	BaseCurrency          string           `json:"baseCurrency"`
+	QuoteCurrency         string           `json:"quoteCurrency"`
+	Underlying            string           `json:"underlying"`
+	Restricted            bool             `json:"restricted"`
+	HighLeverageFeeExempt bool             `json:"highLeverageFeeExempt"`
 	Change1h              fixedpoint.Value `json:"change1h"`
 	Change24h             fixedpoint.Value `json:"change24h"`
 	ChangeBod             fixedpoint.Value `json:"changeBod"`
@@ -222,50 +222,50 @@ type HistoricalPricesResponse struct {
 }
 
 type Candle struct {
-	Close     fixedpoint.Value  `json:"close"`
-	High      fixedpoint.Value  `json:"high"`
-	Low       fixedpoint.Value  `json:"low"`
-	Open      fixedpoint.Value  `json:"open"`
-	StartTime datetime `json:"startTime"`
-	Volume    fixedpoint.Value  `json:"volume"`
+	Close     fixedpoint.Value `json:"close"`
+	High      fixedpoint.Value `json:"high"`
+	Low       fixedpoint.Value `json:"low"`
+	Open      fixedpoint.Value `json:"open"`
+	StartTime datetime         `json:"startTime"`
+	Volume    fixedpoint.Value `json:"volume"`
 }
 
-type ordersHistoryResponse struct {
+type ordersHistoryResponse struct { // nolint:golint,deadcode
 	Success     bool    `json:"success"`
 	Result      []order `json:"result"`
 	HasMoreData bool    `json:"hasMoreData"`
 }
 
-type ordersResponse struct {
+type ordersResponse struct { // nolint:golint,deadcode
 	Success bool `json:"success"`
 
 	Result []order `json:"result"`
 }
 
-type cancelOrderResponse struct {
+type cancelOrderResponse struct { // nolint:golint,deadcode
 	Success bool   `json:"success"`
 	Result  string `json:"result"`
 }
 
 type order struct {
-	CreatedAt  datetime `json:"createdAt"`
-	FilledSize fixedpoint.Value  `json:"filledSize"`
+	CreatedAt  datetime         `json:"createdAt"`
+	FilledSize fixedpoint.Value `json:"filledSize"`
 	// Future field is not defined in the response format table but in the response example.
-	Future        string  `json:"future"`
-	ID            int64   `json:"id"`
-	Market        string  `json:"market"`
+	Future        string           `json:"future"`
+	ID            int64            `json:"id"`
+	Market        string           `json:"market"`
 	Price         fixedpoint.Value `json:"price"`
 	AvgFillPrice  fixedpoint.Value `json:"avgFillPrice"`
 	RemainingSize fixedpoint.Value `json:"remainingSize"`
-	Side          string  `json:"side"`
+	Side          string           `json:"side"`
 	Size          fixedpoint.Value `json:"size"`
-	Status        string  `json:"status"`
-	Type          string  `json:"type"`
-	ReduceOnly    bool    `json:"reduceOnly"`
-	Ioc           bool    `json:"ioc"`
-	PostOnly      bool    `json:"postOnly"`
-	ClientId      string  `json:"clientId"`
-	Liquidation   bool    `json:"liquidation"`
+	Status        string           `json:"status"`
+	Type          string           `json:"type"`
+	ReduceOnly    bool             `json:"reduceOnly"`
+	Ioc           bool             `json:"ioc"`
+	PostOnly      bool             `json:"postOnly"`
+	ClientId      string           `json:"clientId"`
+	Liquidation   bool             `json:"liquidation"`
 }
 
 type orderResponse struct {
@@ -299,18 +299,18 @@ type depositHistoryResponse struct {
 }
 
 type depositHistory struct {
-	ID            int64    `json:"id"`
-	Coin          string   `json:"coin"`
-	TxID          string   `json:"txid"`
-	Address       address  `json:"address"`
-	Confirmations int64    `json:"confirmations"`
-	ConfirmedTime datetime `json:"confirmedTime"`
-	Fee           fixedpoint.Value  `json:"fee"`
-	SentTime      datetime `json:"sentTime"`
-	Size          fixedpoint.Value  `json:"size"`
-	Status        string   `json:"status"`
-	Time          datetime `json:"time"`
-	Notes         string   `json:"notes"`
+	ID            int64            `json:"id"`
+	Coin          string           `json:"coin"`
+	TxID          string           `json:"txid"`
+	Address       address          `json:"address"`
+	Confirmations int64            `json:"confirmations"`
+	ConfirmedTime datetime         `json:"confirmedTime"`
+	Fee           fixedpoint.Value `json:"fee"`
+	SentTime      datetime         `json:"sentTime"`
+	Size          fixedpoint.Value `json:"size"`
+	Status        string           `json:"status"`
+	Time          datetime         `json:"time"`
+	Notes         string           `json:"notes"`
 }
 
 /**
@@ -354,22 +354,22 @@ type fillsResponse struct {
 }
 */
 type fill struct {
-	ID            int64          `json:"id"`
-	Market        string         `json:"market"`
-	Future        string         `json:"future"`
-	BaseCurrency  string         `json:"baseCurrency"`
-	QuoteCurrency string         `json:"quoteCurrency"`
-	Type          string         `json:"type"`
-	Side          types.SideType `json:"side"`
-	Price         fixedpoint.Value        `json:"price"`
-	Size          fixedpoint.Value        `json:"size"`
-	OrderId       uint64         `json:"orderId"`
-	Time          datetime       `json:"time"`
-	TradeId       uint64         `json:"tradeId"`
-	FeeRate       fixedpoint.Value        `json:"feeRate"`
-	Fee           fixedpoint.Value        `json:"fee"`
-	FeeCurrency   string         `json:"feeCurrency"`
-	Liquidity     string         `json:"liquidity"`
+	ID            int64            `json:"id"`
+	Market        string           `json:"market"`
+	Future        string           `json:"future"`
+	BaseCurrency  string           `json:"baseCurrency"`
+	QuoteCurrency string           `json:"quoteCurrency"`
+	Type          string           `json:"type"`
+	Side          types.SideType   `json:"side"`
+	Price         fixedpoint.Value `json:"price"`
+	Size          fixedpoint.Value `json:"size"`
+	OrderId       uint64           `json:"orderId"`
+	Time          datetime         `json:"time"`
+	TradeId       uint64           `json:"tradeId"`
+	FeeRate       fixedpoint.Value `json:"feeRate"`
+	Fee           fixedpoint.Value `json:"fee"`
+	FeeCurrency   string           `json:"feeCurrency"`
+	Liquidity     string           `json:"liquidity"`
 }
 
 type transferResponse struct {
@@ -378,12 +378,12 @@ type transferResponse struct {
 }
 
 type transfer struct {
-	Id     uint    `json:"id"`
-	Coin   string  `json:"coin"`
+	Id     uint             `json:"id"`
+	Coin   string           `json:"coin"`
 	Size   fixedpoint.Value `json:"size"`
-	Time   string  `json:"time"`
-	Notes  string  `json:"notes"`
-	Status string  `json:"status"`
+	Time   string           `json:"time"`
+	Notes  string           `json:"notes"`
+	Status string           `json:"status"`
 }
 
 func (t *transfer) String() string {

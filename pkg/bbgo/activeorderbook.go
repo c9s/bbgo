@@ -69,9 +69,14 @@ func (b *ActiveOrderBook) waitAllClear(ctx context.Context, waitTime, timeout ti
 
 // GracefulCancel cancels the active orders gracefully
 func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange) error {
-	waitTime := CancelOrderWaitTime
+	// optimize order cancel for back-testing
+	if IsBackTesting {
+		orders := b.Orders()
+		return ex.CancelOrders(context.Background(), orders...)
+	}
 
 	log.Debugf("[ActiveOrderBook] gracefully cancelling %s orders...", b.Symbol)
+	waitTime := CancelOrderWaitTime
 
 	startTime := time.Now()
 	// ensure every order is cancelled

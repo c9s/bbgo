@@ -42,7 +42,7 @@ type State struct {
 }
 
 func (s *State) IsOver24Hours() bool {
-	return time.Now().Sub(s.AccumulatedFeeStartedAt) >= 24*time.Hour
+	return time.Since(s.AccumulatedFeeStartedAt) >= 24*time.Hour
 }
 
 func (s *State) Reset() {
@@ -58,7 +58,6 @@ func (s *State) Reset() {
 
 type Strategy struct {
 	*bbgo.Graceful
-	*bbgo.Notifiability
 	*bbgo.Persistence
 
 	Symbol          string           `json:"symbol"`

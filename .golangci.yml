@@ -1,0 +1,9 @@
+run:
+  issues-exit-code: 0
+  tests: true
+  timeout: 5m
+linters:
+  disable-all: true
+  enable:
+    - gofmt
+    - gosimple

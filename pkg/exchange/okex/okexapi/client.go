@@ -91,6 +91,7 @@ func NewClient() *RestClient {
 
 func (c *RestClient) Auth(key, secret, passphrase string) {
 	c.Key = key
+	// pragma: allowlist nextline secret
 	c.Secret = secret
 	c.Passphrase = passphrase
 }

@@ -122,7 +122,8 @@ func New(key, secret string) *Exchange {
 	}
 
 	return &Exchange{
-		key:           key,
+		key: key,
+		// pragma: allowlist nextline secret
 		secret:        secret,
 		client:        client,
 		futuresClient: futuresClient,

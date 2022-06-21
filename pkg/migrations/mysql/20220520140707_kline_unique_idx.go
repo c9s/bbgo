@@ -14,31 +14,6 @@ func init() {
 func upKlineUniqueIdx(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
 	// This code is executed when the migration is applied.
 
-	_, err = tx.ExecContext(ctx, "TRUNCATE TABLE `binance_klines`;")
-	if err != nil {
-		return err
-	}
-
-	_, err = tx.ExecContext(ctx, "TRUNCATE TABLE `max_klines`;")
-	if err != nil {
-		return err
-	}
-
-	_, err = tx.ExecContext(ctx, "TRUNCATE TABLE `ftx_klines`;")
-	if err != nil {
-		return err
-	}
-
-	_, err = tx.ExecContext(ctx, "TRUNCATE TABLE `kucoin_klines`;")
-	if err != nil {
-		return err
-	}
-
-	_, err = tx.ExecContext(ctx, "TRUNCATE TABLE `okex_klines`;")
-	if err != nil {
-		return err
-	}
-
 	_, err = tx.ExecContext(ctx, "CREATE UNIQUE INDEX idx_kline_binance_unique\n    ON binance_klines (`symbol`, `interval`, `start_time`);")
 	if err != nil {
 		return err

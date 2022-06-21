@@ -26,10 +26,6 @@ func init() {
 }
 
 type Strategy struct {
-	// The notification system will be injected into the strategy automatically.
-	// This field will be injected automatically since it's a single exchange strategy.
-	*bbgo.Notifiability
-
 	// OrderExecutor is an interface for submitting order.
 	// This field will be injected automatically since it's a single exchange strategy.
 	bbgo.OrderExecutor
@@ -164,9 +160,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 }
 
 func (s *Strategy) notify(format string, args ...interface{}) {
-	if channel, ok := s.RouteSymbol(s.Symbol); ok {
-		s.NotifyTo(channel, format, args...)
+	if channel, ok := bbgo.Notification.RouteSymbol(s.Symbol); ok {
+		bbgo.NotifyTo(channel, format, args...)
 	} else {
-		s.Notify(format, args...)
+		bbgo.Notify(format, args...)
 	}
 }

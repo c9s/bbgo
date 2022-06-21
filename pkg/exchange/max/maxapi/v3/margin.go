@@ -158,4 +158,3 @@ type MarginRepayRequest struct {
 	currency string `param:"currency,slug,required"`
 	amount   string `param:"amount"`
 }
-

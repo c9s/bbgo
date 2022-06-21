@@ -112,11 +112,13 @@ func (p *Position) NewProfit(trade Trade, profit, netProfit fixedpoint.Value) Pr
 		Fee:         trade.Fee,
 		FeeCurrency: trade.FeeCurrency,
 
-		Exchange:   trade.Exchange,
-		IsMargin:   trade.IsMargin,
-		IsFutures:  trade.IsFutures,
-		IsIsolated: trade.IsIsolated,
-		TradedAt:   trade.Time.Time(),
+		Exchange:           trade.Exchange,
+		IsMargin:           trade.IsMargin,
+		IsFutures:          trade.IsFutures,
+		IsIsolated:         trade.IsIsolated,
+		TradedAt:           trade.Time.Time(),
+		Strategy:           p.Strategy,
+		StrategyInstanceID: p.StrategyInstanceID,
 	}
 }
 

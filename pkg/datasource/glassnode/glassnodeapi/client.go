@@ -35,6 +35,7 @@ func NewRestClient() *RestClient {
 }
 
 func (c *RestClient) Auth(apiKey string) {
+	// pragma: allowlist nextline secret
 	c.apiKey = apiKey
 }
 

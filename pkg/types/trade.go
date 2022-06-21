@@ -27,7 +27,7 @@ type TradeSlice struct {
 
 func (s *TradeSlice) Copy() []Trade {
 	s.mu.Lock()
-	slice := make([]Trade, len(s.Trades), len(s.Trades))
+	slice := make([]Trade, len(s.Trades))
 	copy(slice, s.Trades)
 	s.mu.Unlock()
 
@@ -146,7 +146,7 @@ func trimTrailingZero(a float64) string {
 
 // String is for console output
 func (trade Trade) String() string {
-	return fmt.Sprintf("TRADE %s %s %4s %-4s @ %-6s | amount %s | fee %s %s | orderID %d | %s",
+	return fmt.Sprintf("TRADE %s %s %4s %-4s @ %-6s | AMOUNT %s | FEE %s %s | OrderID %d | %s",
 		trade.Exchange.String(),
 		trade.Symbol,
 		trade.Side,

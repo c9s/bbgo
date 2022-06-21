@@ -130,7 +130,9 @@ func NewRestClient(baseURL string) *RestClient {
 
 // Auth sets api key and secret for usage is requests that requires authentication.
 func (c *RestClient) Auth(key string, secret string) *RestClient {
+	// pragma: allowlist nextline secret
 	c.APIKey = key
+	// pragma: allowlist nextline secret
 	c.APISecret = secret
 	return c
 }

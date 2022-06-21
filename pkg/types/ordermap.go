@@ -205,10 +205,3 @@ func (m *SyncOrderMap) Orders() (slice OrderSlice) {
 }
 
 type OrderSlice []Order
-
-func (s OrderSlice) IDs() (ids []uint64) {
-	for _, o := range s {
-		ids = append(ids, o.OrderID)
-	}
-	return ids
-}

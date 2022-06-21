@@ -37,6 +37,16 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
+// IsBackTesting is a global variable that indicates the current environment is back-test or not.
+var IsBackTesting = false
+
+var BackTestService *service.BacktestService
+
+func SetBackTesting(s *service.BacktestService) {
+	BackTestService = s
+	IsBackTesting = true
+}
+
 var LoadedExchangeStrategies = make(map[string]SingleExchangeStrategy)
 var LoadedCrossExchangeStrategies = make(map[string]CrossExchangeStrategy)
 
@@ -69,23 +79,18 @@ const (
 
 // Environment presents the real exchange data layer
 type Environment struct {
-	// Notifiability here for environment is for the streaming data notification
-	// note that, for back tests, we don't need notification.
-	Notifiability
-
-	PersistenceServiceFacade *service.PersistenceServiceFacade
-	DatabaseService          *service.DatabaseService
-	OrderService             *service.OrderService
-	TradeService             *service.TradeService
-	ProfitService            *service.ProfitService
-	PositionService          *service.PositionService
-	BacktestService          *service.BacktestService
-	RewardService            *service.RewardService
-	MarginService            *service.MarginService
-	SyncService              *service.SyncService
-	AccountService           *service.AccountService
-	WithdrawService          *service.WithdrawService
-	DepositService           *service.DepositService
+	DatabaseService *service.DatabaseService
+	OrderService    *service.OrderService
+	TradeService    *service.TradeService
+	ProfitService   *service.ProfitService
+	PositionService *service.PositionService
+	BacktestService *service.BacktestService
+	RewardService   *service.RewardService
+	MarginService   *service.MarginService
+	SyncService     *service.SyncService
+	AccountService  *service.AccountService
+	WithdrawService *service.WithdrawService
+	DepositService  *service.DepositService
 
 	// startTime is the time of start point (which is used in the backtest)
 	startTime time.Time
@@ -111,9 +116,6 @@ func NewEnvironment() *Environment {
 		startTime:     now,
 
 		syncStatus: SyncNotStarted,
-		PersistenceServiceFacade: &service.PersistenceServiceFacade{
-			Memory: service.NewMemoryService(),
-		},
 	}
 }
 
@@ -198,9 +200,6 @@ func (environ *Environment) ConfigureDatabaseDriver(ctx context.Context, driver 
 
 // AddExchangeSession adds the existing exchange session or pre-created exchange session
 func (environ *Environment) AddExchangeSession(name string, session *ExchangeSession) *ExchangeSession {
-	// update Notifiability from the environment
-	session.Notifiability = environ.Notifiability
-
 	environ.sessions[name] = session
 	return session
 }
@@ -283,7 +282,8 @@ func (environ *Environment) ConfigurePersistence(conf *PersistenceConfig) error 
 			return err
 		}
 
-		environ.PersistenceServiceFacade.Redis = service.NewRedisPersistenceService(conf.Redis)
+		redisPersistence := service.NewRedisPersistenceService(conf.Redis)
+		PersistenceServiceFacade.Redis = redisPersistence
 	}
 
 	if conf.Json != nil {
@@ -294,7 +294,8 @@ func (environ *Environment) ConfigurePersistence(conf *PersistenceConfig) error 
 			}
 		}
 
-		environ.PersistenceServiceFacade.Json = &service.JsonPersistenceService{Directory: conf.Json.Directory}
+		jsonPersistence := &service.JsonPersistenceService{Directory: conf.Json.Directory}
+		PersistenceServiceFacade.Json = jsonPersistence
 	}
 
 	return nil
@@ -306,12 +307,11 @@ func (environ *Environment) ConfigurePersistence(conf *PersistenceConfig) error 
 func (environ *Environment) ConfigureNotificationRouting(conf *NotificationConfig) error {
 	// configure routing here
 	if conf.SymbolChannels != nil {
-		environ.SymbolChannelRouter.AddRoute(conf.SymbolChannels)
+		Notification.SymbolChannelRouter.AddRoute(conf.SymbolChannels)
 	}
 	if conf.SessionChannels != nil {
-		environ.SessionChannelRouter.AddRoute(conf.SessionChannels)
+		Notification.SessionChannelRouter.AddRoute(conf.SessionChannels)
 	}
-
 	if conf.Routing != nil {
 		// configure passive object notification routing
 		switch conf.Routing.Trade {
@@ -319,16 +319,16 @@ func (environ *Environment) ConfigureNotificationRouting(conf *NotificationConfi
 
 		case "$session":
 			defaultTradeUpdateHandler := func(trade types.Trade) {
-				environ.Notify(&trade)
+				Notify(&trade)
 			}
 			for name := range environ.sessions {
 				session := environ.sessions[name]
 
 				// if we can route session name to channel successfully...
-				channel, ok := environ.SessionChannelRouter.Route(name)
+				channel, ok := Notification.SessionChannelRouter.Route(name)
 				if ok {
 					session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
-						environ.NotifyTo(channel, &trade)
+						Notification.NotifyTo(channel, &trade)
 					})
 				} else {
 					session.UserDataStream.OnTradeUpdate(defaultTradeUpdateHandler)
@@ -337,22 +337,22 @@ func (environ *Environment) ConfigureNotificationRouting(conf *NotificationConfi
 
 		case "$symbol":
 			// configure object routes for Trade
-			environ.ObjectChannelRouter.Route(func(obj interface{}) (channel string, ok bool) {
+			Notification.ObjectChannelRouter.Route(func(obj interface{}) (channel string, ok bool) {
 				trade, matched := obj.(*types.Trade)
 				if !matched {
 					return
 				}
-				channel, ok = environ.SymbolChannelRouter.Route(trade.Symbol)
+				channel, ok = Notification.SymbolChannelRouter.Route(trade.Symbol)
 				return
 			})
 
 			// use same handler for each session
 			handler := func(trade types.Trade) {
-				channel, ok := environ.RouteObject(&trade)
+				channel, ok := Notification.RouteObject(&trade)
 				if ok {
-					environ.NotifyTo(channel, &trade)
+					NotifyTo(channel, &trade)
 				} else {
-					environ.Notify(&trade)
+					Notify(&trade)
 				}
 			}
 			for _, session := range environ.sessions {
@@ -367,17 +367,17 @@ func (environ *Environment) ConfigureNotificationRouting(conf *NotificationConfi
 		case "$session":
 			defaultOrderUpdateHandler := func(order types.Order) {
 				text := util.Render(TemplateOrderReport, order)
-				environ.Notify(text, &order)
+				Notify(text, &order)
 			}
 			for name := range environ.sessions {
 				session := environ.sessions[name]
 
 				// if we can route session name to channel successfully...
-				channel, ok := environ.SessionChannelRouter.Route(name)
+				channel, ok := Notification.SessionChannelRouter.Route(name)
 				if ok {
 					session.UserDataStream.OnOrderUpdate(func(order types.Order) {
 						text := util.Render(TemplateOrderReport, order)
-						environ.NotifyTo(channel, text, &order)
+						NotifyTo(channel, text, &order)
 					})
 				} else {
 					session.UserDataStream.OnOrderUpdate(defaultOrderUpdateHandler)
@@ -386,23 +386,23 @@ func (environ *Environment) ConfigureNotificationRouting(conf *NotificationConfi
 
 		case "$symbol":
 			// add object route
-			environ.ObjectChannelRouter.Route(func(obj interface{}) (channel string, ok bool) {
+			Notification.ObjectChannelRouter.Route(func(obj interface{}) (channel string, ok bool) {
 				order, matched := obj.(*types.Order)
 				if !matched {
 					return
 				}
-				channel, ok = environ.SymbolChannelRouter.Route(order.Symbol)
+				channel, ok = Notification.SymbolChannelRouter.Route(order.Symbol)
 				return
 			})
 
 			// use same handler for each session
 			handler := func(order types.Order) {
 				text := util.Render(TemplateOrderReport, order)
-				channel, ok := environ.RouteObject(&order)
+				channel, ok := Notification.RouteObject(&order)
 				if ok {
-					environ.NotifyTo(channel, text, &order)
+					NotifyTo(channel, text, &order)
 				} else {
-					environ.Notify(text, &order)
+					Notify(text, &order)
 				}
 			}
 			for _, session := range environ.sessions {
@@ -416,13 +416,13 @@ func (environ *Environment) ConfigureNotificationRouting(conf *NotificationConfi
 
 		case "$symbol":
 			// add object route
-			environ.ObjectChannelRouter.Route(func(obj interface{}) (channel string, ok bool) {
+			Notification.ObjectChannelRouter.Route(func(obj interface{}) (channel string, ok bool) {
 				order, matched := obj.(*types.SubmitOrder)
 				if !matched {
 					return
 				}
 
-				channel, ok = environ.SymbolChannelRouter.Route(order.Symbol)
+				channel, ok = Notification.SymbolChannelRouter.Route(order.Symbol)
 				return
 			})
 
@@ -596,7 +596,7 @@ func (environ *Environment) syncWithUserConfig(ctx context.Context, userConfig *
 	syncSymbolMap, restSymbols := categorizeSyncSymbol(userConfig.Sync.Symbols)
 	for _, session := range sessions {
 		syncSymbols := restSymbols
-		if ss, ok := syncSymbolMap[session.Name] ; ok {
+		if ss, ok := syncSymbolMap[session.Name]; ok {
 			syncSymbols = append(syncSymbols, ss...)
 		}
 
@@ -617,7 +617,7 @@ func (environ *Environment) syncWithUserConfig(ctx context.Context, userConfig *
 		}
 
 		if userConfig.Sync.RewardHistory {
-			if err := environ.SyncService.SyncRewardHistory(ctx, session.Exchange); err != nil {
+			if err := environ.SyncService.SyncRewardHistory(ctx, session.Exchange, since); err != nil {
 				return err
 			}
 		}
@@ -656,34 +656,10 @@ func (environ *Environment) Sync(ctx context.Context, userConfig ...*Config) err
 		return environ.syncWithUserConfig(ctx, userConfig[0])
 	}
 
-	since := time.Now().AddDate(0, -6, 0)
-
 	// the default sync logics
 	for _, session := range environ.sessions {
 		if err := environ.syncSession(ctx, session); err != nil {
 			return err
-		}
-
-		if len(userConfig) == 0 || userConfig[0].Sync == nil {
-			continue
-		}
-
-		if userConfig[0].Sync.DepositHistory {
-			if err := environ.SyncService.SyncDepositHistory(ctx, session.Exchange, since); err != nil {
-				return err
-			}
-		}
-
-		if userConfig[0].Sync.WithdrawHistory {
-			if err := environ.SyncService.SyncWithdrawHistory(ctx, session.Exchange, since); err != nil {
-				return err
-			}
-		}
-
-		if userConfig[0].Sync.RewardHistory {
-			if err := environ.SyncService.SyncRewardHistory(ctx, session.Exchange); err != nil {
-				return err
-			}
 		}
 	}
 
@@ -792,11 +768,6 @@ func (environ *Environment) syncSession(ctx context.Context, session *ExchangeSe
 }
 
 func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) error {
-	environ.Notifiability = Notifiability{
-		SymbolChannelRouter:  NewPatternChannelRouter(nil),
-		SessionChannelRouter: NewPatternChannelRouter(nil),
-		ObjectChannelRouter:  NewObjectChannelRouter(),
-	}
 
 	// setup default notification config
 	if userConfig.Notifications == nil {
@@ -809,7 +780,7 @@ func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) erro
 		}
 	}
 
-	var persistence = environ.PersistenceServiceFacade.Get()
+	var persistence = PersistenceServiceFacade.Get()
 
 	err := environ.setupInteraction(persistence)
 	if err != nil {
@@ -859,7 +830,7 @@ func getAuthStoreID() string {
 }
 
 func (environ *Environment) setupInteraction(persistence service.PersistenceService) error {
-	var otpQRCodeImagePath = fmt.Sprintf("otp.png")
+	var otpQRCodeImagePath = "otp.png"
 	var key *otp.Key
 	var keyURL string
 	var authStore = environ.getAuthStore(persistence)
@@ -928,10 +899,11 @@ func (environ *Environment) setupInteraction(persistence service.PersistenceServ
 	}
 
 	interact.AddCustomInteraction(&interact.AuthInteract{
-		Strict:             authStrict,
-		Mode:               authMode,
-		Token:              authToken, // can be empty string here
-		OneTimePasswordKey: key,       // can be nil here
+		Strict: authStrict,
+		Mode:   authMode,
+		Token:  authToken, // can be empty string here
+		// pragma: allowlist nextline secret
+		OneTimePasswordKey: key, // can be nil here
 	})
 	return nil
 }
@@ -978,7 +950,7 @@ func (environ *Environment) setupSlack(userConfig *Config, slackToken string, pe
 	var client = slack.New(slackToken, slackOpts...)
 
 	var notifier = slacknotifier.New(client, conf.DefaultChannel)
-	environ.AddNotifier(notifier)
+	Notification.AddNotifier(notifier)
 
 	// allocate a store, so that we can save the chatID for the owner
 	var messenger = interact.NewSlack(client)
@@ -1030,7 +1002,7 @@ func (environ *Environment) setupTelegram(userConfig *Config, telegramBotToken s
 	}
 
 	var notifier = telegramnotifier.New(bot, opts...)
-	environ.Notifiability.AddNotifier(notifier)
+	Notification.AddNotifier(notifier)
 
 	// allocate a store, so that we can save the chatID for the owner
 	var messenger = interact.NewTelegram(bot)

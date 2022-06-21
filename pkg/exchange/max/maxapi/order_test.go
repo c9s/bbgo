@@ -22,5 +22,3 @@ func integrationTestConfigured(t *testing.T, prefix string) (key, secret string,
 	}
 	return key, secret, ok
 }
-
-

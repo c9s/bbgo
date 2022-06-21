@@ -39,4 +39,3 @@ var accountsCmd = &cobra.Command{
 		return nil
 	},
 }
-

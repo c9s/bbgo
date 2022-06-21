@@ -3,6 +3,11 @@
 #   go run ./cmd/bbgo optimize --config bollmaker_ethusdt.yaml  --optimizer-config optimizer.yaml --debug
 #
 ---
+executor:
+  type: local
+  local:
+    maxNumberOfProcesses: 10
+
 matrix:
 - type: iterate
   path: '/exchangeStrategies/0/bollmaker/interval'

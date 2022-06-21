@@ -31,7 +31,6 @@ func TestExchange_QueryTickers_SomeSymbols(t *testing.T) {
 		return
 	}
 
-
 	e := New(key, secret)
 	got, err := e.QueryTickers(context.Background(), "BTCUSDT", "ETHUSDT")
 	if assert.NoError(t, err) {

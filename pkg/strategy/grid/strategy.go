@@ -45,10 +45,6 @@ type State struct {
 }
 
 type Strategy struct {
-	// The notification system will be injected into the strategy automatically.
-	// This field will be injected automatically since it's a single exchange strategy.
-	*bbgo.Notifiability `json:"-" yaml:"-"`
-
 	*bbgo.Graceful `json:"-" yaml:"-"`
 
 	*bbgo.Persistence
@@ -465,7 +461,7 @@ func (s *Strategy) handleFilledOrder(filledOrder types.Order) {
 				baseProfit := buyOrder.Quantity.Sub(filledOrder.Quantity)
 				s.state.AccumulativeArbitrageProfit = s.state.AccumulativeArbitrageProfit.
 					Add(baseProfit)
-				s.Notify("%s grid arbitrage profit %v %s, accumulative arbitrage profit %v %s",
+				bbgo.Notify("%s grid arbitrage profit %v %s, accumulative arbitrage profit %v %s",
 					s.Symbol,
 					baseProfit, s.Market.BaseCurrency,
 					s.state.AccumulativeArbitrageProfit, s.Market.BaseCurrency,
@@ -477,7 +473,7 @@ func (s *Strategy) handleFilledOrder(filledOrder types.Order) {
 				// use base asset quantity here
 				baseProfit := filledOrder.Quantity.Sub(sellOrder.Quantity)
 				s.state.AccumulativeArbitrageProfit = s.state.AccumulativeArbitrageProfit.Add(baseProfit)
-				s.Notify("%s grid arbitrage profit %v %s, accumulative arbitrage profit %v %s",
+				bbgo.Notify("%s grid arbitrage profit %v %s, accumulative arbitrage profit %v %s",
 					s.Symbol,
 					baseProfit, s.Market.BaseCurrency,
 					s.state.AccumulativeArbitrageProfit, s.Market.BaseCurrency,
@@ -492,7 +488,7 @@ func (s *Strategy) handleFilledOrder(filledOrder types.Order) {
 				quoteProfit := filledOrder.Quantity.Mul(filledOrder.Price).Sub(
 					buyOrder.Quantity.Mul(buyOrder.Price))
 				s.state.AccumulativeArbitrageProfit = s.state.AccumulativeArbitrageProfit.Add(quoteProfit)
-				s.Notify("%s grid arbitrage profit %v %s, accumulative arbitrage profit %v %s",
+				bbgo.Notify("%s grid arbitrage profit %v %s, accumulative arbitrage profit %v %s",
 					s.Symbol,
 					quoteProfit, s.Market.QuoteCurrency,
 					s.state.AccumulativeArbitrageProfit, s.Market.QuoteCurrency,
@@ -504,7 +500,7 @@ func (s *Strategy) handleFilledOrder(filledOrder types.Order) {
 				quoteProfit := sellOrder.Quantity.Mul(sellOrder.Price).
 					Sub(filledOrder.Quantity.Mul(filledOrder.Price))
 				s.state.AccumulativeArbitrageProfit = s.state.AccumulativeArbitrageProfit.Add(quoteProfit)
-				s.Notify("%s grid arbitrage profit %v %s, accumulative arbitrage profit %v %s", s.Symbol,
+				bbgo.Notify("%s grid arbitrage profit %v %s, accumulative arbitrage profit %v %s", s.Symbol,
 					quoteProfit, s.Market.QuoteCurrency,
 					s.state.AccumulativeArbitrageProfit, s.Market.QuoteCurrency,
 				)
@@ -593,7 +589,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		return err
 	}
 
-	s.Notify("grid %s position", s.Symbol, s.state.Position)
+	bbgo.Notify("grid %s position", s.Symbol, s.state.Position)
 
 	s.orderStore = bbgo.NewOrderStore(s.Symbol)
 	s.orderStore.BindStream(session.UserDataStream)
@@ -606,7 +602,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.tradeCollector = bbgo.NewTradeCollector(s.Symbol, s.state.Position, s.orderStore)
 
 	s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
-		s.Notifiability.Notify(trade)
+		bbgo.Notify(trade)
 		s.state.ProfitStats.AddTrade(trade)
 	})
 
@@ -621,7 +617,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	*/
 
 	s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
-		s.Notifiability.Notify(position)
+		bbgo.Notify(position)
 	})
 	s.tradeCollector.BindStream(session.UserDataStream)
 
@@ -631,7 +627,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		if err := s.SaveState(); err != nil {
 			log.WithError(err).Errorf("can not save state: %+v", s.state)
 		} else {
-			s.Notify("%s: %s grid is saved", ID, s.Symbol)
+			bbgo.Notify("%s: %s grid is saved", ID, s.Symbol)
 		}
 
 		// now we can cancel the open orders
@@ -644,7 +640,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	session.UserDataStream.OnStart(func() {
 		// if we have orders in the state data, we can restore them
 		if len(s.state.Orders) > 0 {
-			s.Notifiability.Notify("restoring %s %d grid orders...", s.Symbol, len(s.state.Orders))
+			bbgo.Notify("restoring %s %d grid orders...", s.Symbol, len(s.state.Orders))
 
 			createdOrders, err := orderExecutor.SubmitOrders(ctx, s.state.Orders...)
 			if err != nil {

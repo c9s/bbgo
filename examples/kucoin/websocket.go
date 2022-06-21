@@ -77,16 +77,16 @@ var websocketCmd = &cobra.Command{
 		id := time.Now().UnixNano() / int64(time.Millisecond)
 		wsCmds := []kucoin.WebSocketCommand{
 			/*
-			{
-				Id:             id+1,
-				Type:           "subscribe",
-				Topic:          "/market/ticker:ETH-USDT",
-				PrivateChannel: false,
-				Response:       true,
-			},
+				{
+					Id:             id+1,
+					Type:           "subscribe",
+					Topic:          "/market/ticker:ETH-USDT",
+					PrivateChannel: false,
+					Response:       true,
+				},
 			*/
 			{
-				Id:             id+2,
+				Id:             id + 2,
 				Type:           "subscribe",
 				Topic:          "/market/candles:ETH-USDT_1min",
 				PrivateChannel: false,
@@ -131,7 +131,6 @@ var websocketCmd = &cobra.Command{
 					logrus.WithError(err).Error("websocket ping error", err)
 				}
 
-
 			case <-interrupt:
 				logrus.Infof("interrupt")
 
@@ -144,8 +143,8 @@ var websocketCmd = &cobra.Command{
 				}
 
 				select {
-					case <-done:
-					case <-time.After(time.Second):
+				case <-done:
+				case <-time.After(time.Second):
 				}
 				return nil
 			}

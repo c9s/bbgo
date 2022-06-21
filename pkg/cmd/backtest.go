@@ -150,7 +150,7 @@ var BacktestCmd = &cobra.Command{
 		log.Infof("starting backtest with startTime %s", startTime.Format(time.ANSIC))
 
 		environ := bbgo.NewEnvironment()
-		if err := BootstrapBacktestEnvironment(ctx, environ, userConfig); err != nil {
+		if err := BootstrapBacktestEnvironment(ctx, environ); err != nil {
 			return err
 		}
 
@@ -160,6 +160,7 @@ var BacktestCmd = &cobra.Command{
 
 		backtestService := &service.BacktestService{DB: environ.DatabaseService.DB}
 		environ.BacktestService = backtestService
+		bbgo.SetBackTesting(backtestService)
 
 		if len(sessionName) > 0 {
 			userConfig.Backtest.Sessions = []string{sessionName}
@@ -255,7 +256,11 @@ var BacktestCmd = &cobra.Command{
 			if err != nil {
 				return errors.Wrap(err, "failed to create backtest exchange")
 			}
-			environ.AddExchange(name.String(), backtestExchange)
+			session := environ.AddExchange(name.String(), backtestExchange)
+			exchangeFromConfig := userConfig.Sessions[name.String()]
+			if exchangeFromConfig != nil {
+				session.UseHeikinAshi = exchangeFromConfig.UseHeikinAshi
+			}
 		}
 
 		if err := environ.Init(ctx); err != nil {
@@ -640,6 +645,8 @@ func confirmation(s string) bool {
 func toExchangeSources(sessions map[string]*bbgo.ExchangeSession, extraIntervals ...types.Interval) (exchangeSources []backtest.ExchangeDataSource, err error) {
 	for _, session := range sessions {
 		exchange := session.Exchange.(*backtest.Exchange)
+		exchange.UserDataStream = session.UserDataStream.(types.StandardStreamEmitter)
+		exchange.MarketDataStream = session.MarketDataStream.(types.StandardStreamEmitter)
 		exchange.InitMarketData()
 
 		c, err := exchange.SubscribeMarketData(extraIntervals...)

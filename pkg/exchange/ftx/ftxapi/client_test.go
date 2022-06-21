@@ -37,7 +37,7 @@ func TestClient_Requests(t *testing.T) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.TODO(), 15 * time.Second)
+	ctx, cancel := context.WithTimeout(context.TODO(), 15*time.Second)
 	defer cancel()
 
 	client := NewClient()
@@ -45,13 +45,13 @@ func TestClient_Requests(t *testing.T) {
 
 	testCases := []struct {
 		name string
-		tt func(t *testing.T)
-	} {
+		tt   func(t *testing.T)
+	}{
 		{
 			name: "GetMarketsRequest",
 			tt: func(t *testing.T) {
 				req := client.NewGetMarketsRequest()
-				markets ,err := req.Do(ctx)
+				markets, err := req.Do(ctx)
 				assert.NoError(t, err)
 				assert.NotNil(t, markets)
 				t.Logf("markets: %+v", markets)
@@ -61,7 +61,7 @@ func TestClient_Requests(t *testing.T) {
 			name: "GetAccountRequest",
 			tt: func(t *testing.T) {
 				req := client.NewGetAccountRequest()
-				account ,err := req.Do(ctx)
+				account, err := req.Do(ctx)
 				assert.NoError(t, err)
 				assert.NotNil(t, account)
 				t.Logf("account: %+v", account)
@@ -78,7 +78,7 @@ func TestClient_Requests(t *testing.T) {
 					Side(SideBuy).
 					Market("LTC/USDT")
 
-				createdOrder,err := req.Do(ctx)
+				createdOrder, err := req.Do(ctx)
 				if assert.NoError(t, err) {
 					assert.NotNil(t, createdOrder)
 					t.Logf("createdOrder: %+v", createdOrder)

@@ -30,6 +30,7 @@ var klineMatchingLogger *logrus.Entry = nil
 // FeeToken is used to simulate the exchange platform fee token
 // This is to ease the back-testing environment for closing positions.
 const FeeToken = "FEE"
+
 var useFeeToken = true
 
 func init() {
@@ -236,7 +237,6 @@ func (m *SimplePriceMatching) executeTrade(trade types.Trade) {
 
 	m.EmitTradeUpdate(trade)
 	m.EmitBalanceUpdate(m.Account.Balances())
-	return
 }
 
 func (m *SimplePriceMatching) newTradeFromOrder(order *types.Order, isMaker bool) types.Trade {

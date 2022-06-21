@@ -22,8 +22,6 @@ func init() {
 type Strategy struct {
 	Market types.Market
 
-	Notifiability *bbgo.Notifiability
-
 	TotalAmount fixedpoint.Value `json:"totalAmount,omitempty"`
 
 	// Interval is the period that you want to submit order
@@ -52,7 +50,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		ticker := time.NewTicker(s.Duration.Duration())
 		defer ticker.Stop()
 
-		s.Notifiability.Notify("ETF orders will be executed every %s", s.Duration.Duration().String())
+		bbgo.Notify("ETF orders will be executed every %s", s.Duration.Duration().String())
 
 		for {
 			select {
@@ -66,7 +64,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 					ticker, err := session.Exchange.QueryTicker(ctx, symbol)
 					if err != nil {
-						s.Notifiability.Notify("query ticker error: %s", err.Error())
+						bbgo.Notify("query ticker error: %s", err.Error())
 						log.WithError(err).Error("query ticker error")
 						break
 					}
@@ -80,11 +78,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 						break
 					}
 					if quoteBalance.Available.Compare(amount) < 0 {
-						s.Notifiability.Notify("Quote balance %s is not enough: %s < %s", s.Market.QuoteCurrency, quoteBalance.Available.String(), amount.String())
+						bbgo.Notify("Quote balance %s is not enough: %s < %s", s.Market.QuoteCurrency, quoteBalance.Available.String(), amount.String())
 						break
 					}
 
-					s.Notifiability.Notify("Submitting etf order %s quantity %s at price %s (index ratio %s)",
+					bbgo.Notify("Submitting etf order %s quantity %s at price %s (index ratio %s)",
 						symbol,
 						quantity.String(),
 						askPrice.String(),

@@ -68,6 +68,7 @@ func NewClient() *RestClient {
 
 func (c *RestClient) Auth(key, secret, subAccount string) {
 	c.Key = key
+	// pragma: allowlist nextline secret
 	c.Secret = secret
 	c.subAccount = subAccount
 }
@@ -200,5 +201,3 @@ func castPayload(payload interface{}) ([]byte, error) {
 
 	return nil, nil
 }
-
-

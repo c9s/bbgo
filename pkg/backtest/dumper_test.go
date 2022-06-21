@@ -19,19 +19,19 @@ func TestKLineDumper(t *testing.T) {
 
 	t1 := time.Now()
 	err := dumper.Record(types.KLine{
-		Exchange:                 types.ExchangeBinance,
-		Symbol:                   "BTCUSDT",
-		StartTime:                types.Time(t1),
-		EndTime:                  types.Time(t1.Add(time.Minute)),
-		Interval:                 types.Interval1m,
-		Open:                     fixedpoint.NewFromFloat(1000.0),
-		High:                     fixedpoint.NewFromFloat(2000.0),
-		Low:                      fixedpoint.NewFromFloat(3000.0),
-		Close:                    fixedpoint.NewFromFloat(4000.0),
-		Volume:                   fixedpoint.NewFromFloat(5000.0),
-		QuoteVolume:              fixedpoint.NewFromFloat(6000.0),
-		NumberOfTrades:           10,
-		Closed:                   true,
+		Exchange:       types.ExchangeBinance,
+		Symbol:         "BTCUSDT",
+		StartTime:      types.Time(t1),
+		EndTime:        types.Time(t1.Add(time.Minute)),
+		Interval:       types.Interval1m,
+		Open:           fixedpoint.NewFromFloat(1000.0),
+		High:           fixedpoint.NewFromFloat(2000.0),
+		Low:            fixedpoint.NewFromFloat(3000.0),
+		Close:          fixedpoint.NewFromFloat(4000.0),
+		Volume:         fixedpoint.NewFromFloat(5000.0),
+		QuoteVolume:    fixedpoint.NewFromFloat(6000.0),
+		NumberOfTrades: 10,
+		Closed:         true,
 	})
 	assert.NoError(t, err)
 

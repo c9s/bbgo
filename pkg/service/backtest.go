@@ -52,7 +52,7 @@ func (s *BacktestService) SyncKLineByInterval(ctx context.Context, exchange type
 				q := &batch.KLineBatchQuery{Exchange: exchange}
 				return q.Query(ctx, symbol, interval, startTime, endTime)
 			},
-			BatchInsertBuffer: 500,
+			BatchInsertBuffer: 1000,
 			BatchInsert: func(obj interface{}) error {
 				kLines := obj.([]types.KLine)
 				return s.BatchInsert(kLines)
@@ -226,7 +226,7 @@ func (s *BacktestService) QueryKLinesCh(since, until time.Time, exchange types.E
 }
 
 func returnError(err error) (chan types.KLine, chan error) {
-	ch := make(chan types.KLine, 0)
+	ch := make(chan types.KLine)
 	close(ch)
 	log.WithError(err).Error("backtest query error")
 
