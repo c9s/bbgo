@@ -633,14 +633,24 @@ func PercentageChange(a Series, offset ...int) Series {
 	return &PercentageChangeResult{a, o}
 }
 
-func Stdev(a Series, length int) float64 {
+func Stdev(a Series, params ...int) float64 {
+	length := a.Length()
+	if len(params) > 0 {
+		if params[0] < length {
+			length = params[0]
+		}
+	}
+	ddof := 0
+	if len(params) > 1 {
+		ddof = params[1]
+	}
 	avg := Mean(a, length)
 	s := .0
 	for i := 0; i < length; i++ {
 		diff := a.Index(i) - avg
 		s += diff * diff
 	}
-	return math.Sqrt(s / float64(length))
+	return math.Sqrt(s / float64(length - ddof))
 }
 
 type CorrFunc func(Series, Series, int) float64
@@ -780,4 +790,86 @@ func Skew(a Series, length int) float64 {
 	return l * math.Sqrt(l-1) / (l - 2) * sum3 / math.Pow(sum2, 1.5)
 }
 
+type ShiftResult struct {
+	a      Series
+	offset int
+}
+
+func (inc *ShiftResult) Last() float64 {
+	if inc.offset < 0 {
+		return 0
+	}
+	if inc.offset > inc.a.Length() {
+		return 0
+	}
+	return inc.a.Index(inc.offset)
+}
+func (inc *ShiftResult) Index(i int) float64 {
+	if inc.offset + i < 0 {
+		return 0
+	}
+	if inc.offset + i > inc.a.Length() {
+		return 0
+	}
+	return inc.a.Index(inc.offset + i)
+}
+
+func (inc *ShiftResult) Length() int {
+	return inc.a.Length() - inc.offset
+}
+
+func Shift(a Series, offset int) Series {
+	return &ShiftResult{a, offset}
+}
+
+type RollingResult struct {
+	a Series
+	window int
+}
+
+type SliceView struct {
+	a Series
+	start int
+	length int
+}
+
+func (s *SliceView) Last() float64 {
+	return s.a.Index(s.start)
+}
+func (s *SliceView) Index(i int) float64 {
+	if i >= s.length {
+		return 0
+	}
+	return s.a.Index(i+s.start)
+}
+
+func (s *SliceView) Length() int {
+	return s.length
+}
+
+var _ Series = &SliceView{}
+
+func (r *RollingResult) Last() Series {
+	return &SliceView{r.a, 0, r.window}
+}
+
+func (r *RollingResult) Index(i int) Series {
+	if i * r.window > r.a.Length() {
+		return nil
+	}
+	return &SliceView{r.a, i*r.window, r.window}
+}
+
+func (r *RollingResult) Length() int {
+	mod := r.a.Length() % r.window
+	if mod > 0 {
+		return r.a.Length() / r.window + 1
+	} else {
+		return r.a.Length() / r.window
+	}
+}
+
+func Rolling(a Series, window int) *RollingResult {
+	return &RollingResult{a, window}
+}
 // TODO: ta.linreg
