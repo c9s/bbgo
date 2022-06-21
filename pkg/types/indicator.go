@@ -733,4 +733,51 @@ func Correlation(a Series, b Series, length int, method ...CorrFunc) float64 {
 	return runner(a, b, length)
 }
 
+// similar to pandas.Series.cov() function with ddof=0
+//
+// Compute covariance with Series
+func Covariance(a Series, b Series, length int) float64 {
+	if a.Length() < length {
+		length = a.Length()
+	}
+	if b.Length() < length {
+		length = b.Length()
+	}
+
+	meana := Mean(a, length)
+	meanb := Mean(b, length)
+	sum := 0.0
+	for i := 0; i < length; i++ {
+		sum += (a.Index(i) - meana) * (b.Index(i) - meanb)
+	}
+	sum /= float64(length)
+	return sum
+}
+
+func Variance(a Series, length int) float64 {
+	return Covariance(a, a, length)
+}
+
+// similar to pandas.Series.skew() function.
+//
+// Return unbiased skew over input series
+func Skew(a Series, length int) float64 {
+	if length > a.Length() {
+		length = a.Length()
+	}
+	mean := Mean(a, length)
+	sum2 := 0.0
+	sum3 := 0.0
+	for i := 0; i < length; i++ {
+		diff := a.Index(i) - mean
+		sum2 += diff * diff
+		sum3 += diff * diff * diff
+	}
+	if length <= 2 || sum2 == 0 {
+		return math.NaN()
+	}
+	l := float64(length)
+	return l * math.Sqrt(l-1) / (l - 2) * sum3 / math.Pow(sum2, 1.5)
+}
+
 // TODO: ta.linreg
