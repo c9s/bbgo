@@ -389,7 +389,6 @@ var defaultPersistenceSelector = &PersistenceSelector{
 func (trader *Trader) injectCommonServices(s interface{}) error {
 	persistence := &Persistence{
 		PersistenceSelector: defaultPersistenceSelector,
-		Facade:              PersistenceServiceFacade,
 	}
 
 	// a special injection for persistence selector:
