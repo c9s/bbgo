@@ -78,7 +78,6 @@ type Exit struct {
 
 type Strategy struct {
 	*bbgo.Graceful
-	*bbgo.Persistence
 
 	Environment *bbgo.Environment
 	Symbol      string `json:"symbol"`
