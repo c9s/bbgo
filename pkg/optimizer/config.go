@@ -19,7 +19,8 @@ type SelectorConfig struct {
 }
 
 type Config struct {
-	Matrix []SelectorConfig `yaml:"matrix"`
+	MaxThread int              `yaml:"maxThread,omitempty"`
+	Matrix    []SelectorConfig `yaml:"matrix"`
 }
 
 func LoadConfig(yamlConfigFileName string) (*Config, error) {
@@ -31,6 +32,11 @@ func LoadConfig(yamlConfigFileName string) (*Config, error) {
 	var optConfig Config
 	if err := yaml.Unmarshal(configYaml, &optConfig); err != nil {
 		return nil, err
+	}
+
+	// The default of MaxThread is 5
+	if optConfig.MaxThread <= 0 {
+		optConfig.MaxThread = 5
 	}
 
 	return &optConfig, nil

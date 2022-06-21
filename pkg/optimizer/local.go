@@ -73,8 +73,8 @@ func (e *LocalProcessExecutor) readReport(output []byte) (*backtest.SummaryRepor
 }
 
 func (e *LocalProcessExecutor) Run(ctx context.Context, taskC chan BacktestTask) (chan BacktestTask, error) {
-	var maxNumOfProcess = 5
-	var resultsC = make(chan BacktestTask, 10)
+	var maxNumOfProcess = ctx.Value("MaxThread").(int)
+	var resultsC = make(chan BacktestTask, maxNumOfProcess*2)
 
 	wg := sync.WaitGroup{}
 	wg.Add(maxNumOfProcess)
