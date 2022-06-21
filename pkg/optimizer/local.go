@@ -36,6 +36,7 @@ type AsyncHandle struct {
 }
 
 type LocalProcessExecutor struct {
+	Config    *LocalExecutorConfig
 	Bin       string
 	WorkDir   string
 	ConfigDir string
@@ -73,7 +74,7 @@ func (e *LocalProcessExecutor) readReport(output []byte) (*backtest.SummaryRepor
 }
 
 func (e *LocalProcessExecutor) Run(ctx context.Context, taskC chan BacktestTask) (chan BacktestTask, error) {
-	var maxNumOfProcess = ctx.Value("MaxThread").(int)
+	var maxNumOfProcess = e.Config.MaxNumberOfProcesses
 	var resultsC = make(chan BacktestTask, maxNumOfProcess*2)
 
 	wg := sync.WaitGroup{}

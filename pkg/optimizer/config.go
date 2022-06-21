@@ -18,9 +18,28 @@ type SelectorConfig struct {
 	Step   fixedpoint.Value `json:"step,omitempty" yaml:"step,omitempty"`
 }
 
+type LocalExecutorConfig struct {
+	MaxNumberOfProcesses int `json:"maxNumberOfProcesses" yaml:"maxNumberOfProcesses"`
+}
+
+type ExecutorConfig struct {
+	Type                string               `json:"type" yaml:"type"`
+	LocalExecutorConfig *LocalExecutorConfig `json:"local" yaml:"local"`
+}
+
 type Config struct {
+	Executor  *ExecutorConfig  `json:"executor" yaml:"executor"`
 	MaxThread int              `yaml:"maxThread,omitempty"`
 	Matrix    []SelectorConfig `yaml:"matrix"`
+}
+
+var defaultExecutorConfig = &ExecutorConfig{
+	Type:                "local",
+	LocalExecutorConfig: defaultLocalExecutorConfig,
+}
+
+var defaultLocalExecutorConfig = &LocalExecutorConfig{
+	MaxNumberOfProcesses: 10,
 }
 
 func LoadConfig(yamlConfigFileName string) (*Config, error) {
@@ -34,9 +53,16 @@ func LoadConfig(yamlConfigFileName string) (*Config, error) {
 		return nil, err
 	}
 
-	// The default of MaxThread is 5
-	if optConfig.MaxThread <= 0 {
-		optConfig.MaxThread = 5
+	if optConfig.Executor == nil {
+		optConfig.Executor = defaultExecutorConfig
+	}
+
+	if optConfig.Executor.Type == "" {
+		optConfig.Executor.Type = "local"
+	}
+
+	if optConfig.Executor.Type == "local" && optConfig.Executor.LocalExecutorConfig == nil {
+		optConfig.Executor.LocalExecutorConfig = defaultLocalExecutorConfig
 	}
 
 	return &optConfig, nil
