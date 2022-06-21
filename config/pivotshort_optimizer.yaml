@@ -3,6 +3,7 @@
 #   go run ./cmd/bbgo optimize --config config/pivotshort-ETHUSDT.yaml  --optimizer-config config/pivotshort_optimizer.yaml --debug
 #
 ---
+maxThread: 10
 matrix:
 
 - type: iterate
