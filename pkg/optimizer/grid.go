@@ -199,7 +199,8 @@ func (o *GridOptimizer) Run(executor Executor, configJson []byte) (map[string][]
 		}
 	}
 
-	resultsC, err := executor.Run(context.Background(), taskC)
+	ctx := context.WithValue(context.Background(), "MaxThread", o.Config.MaxThread)
+	resultsC, err := executor.Run(ctx, taskC)
 	if err != nil {
 		return nil, err
 	}
