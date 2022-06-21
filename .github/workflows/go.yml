@@ -32,14 +32,6 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-go-
 
-    - uses: actions/cache@v2
-      with:
-        path: |
-          ~/.cache/pip
-        key: ${{ runner.os }}-pip
-        restore-keys: |
-          ${{ runner.os }}-pip
-
     - name: Set up MySQL
       run: |
         sudo /etc/init.d/mysql start
@@ -55,13 +47,6 @@ jobs:
       uses: actions/setup-go@v3
       with:
         go-version: 1.18
-
-    - name: Run pre-commit
-      run: |
-        pip install pre-commit
-        pre-commit install-hooks
-        pre-commit run markdownlint --files=README.md --verbose
-        pre-commit run detect-secrets --all-files --verbose
 
     - name: Install Migration Tool
       run: go install github.com/c9s/rockhopper/cmd/rockhopper@v1.2.1
