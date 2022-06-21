@@ -15,8 +15,6 @@ import (
 
 const ID = "support"
 
-const stateKey = "state-v1"
-
 var log = logrus.WithField("strategy", ID)
 
 var zeroiw = types.IntervalWindow{}
