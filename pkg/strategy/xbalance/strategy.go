@@ -13,7 +13,6 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 )
@@ -137,7 +136,6 @@ func (a *Address) UnmarshalJSON(body []byte) error {
 
 type Strategy struct {
 	*bbgo.Graceful
-	*bbgo.Persistence
 
 	Interval types.Duration `json:"interval"`
 
@@ -158,7 +156,7 @@ type Strategy struct {
 
 	Verbose bool `json:"verbose"`
 
-	state *State
+	State *State `persistence:"state"`
 }
 
 func (s *Strategy) ID() string {
@@ -235,23 +233,23 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 		requiredAmount = requiredAmount.Add(toAddress.ForeignFee)
 	}
 
-	if s.state != nil {
+	if s.State != nil {
 		if s.MaxDailyNumberOfTransfer > 0 {
-			if s.state.DailyNumberOfTransfers >= s.MaxDailyNumberOfTransfer {
+			if s.State.DailyNumberOfTransfers >= s.MaxDailyNumberOfTransfer {
 				bbgo.Notify("⚠️ Exceeded %s max daily number of transfers %d (current %d), skipping transfer...",
 					s.Asset,
 					s.MaxDailyNumberOfTransfer,
-					s.state.DailyNumberOfTransfers)
+					s.State.DailyNumberOfTransfers)
 				return
 			}
 		}
 
 		if s.MaxDailyAmountOfTransfer.Sign() > 0 {
-			if s.state.DailyAmountOfTransfers.Compare(s.MaxDailyAmountOfTransfer) >= 0 {
+			if s.State.DailyAmountOfTransfers.Compare(s.MaxDailyAmountOfTransfer) >= 0 {
 				bbgo.Notify("⚠️ Exceeded %s max daily amount of transfers %v (current %v), skipping transfer...",
 					s.Asset,
 					s.MaxDailyAmountOfTransfer,
-					s.state.DailyAmountOfTransfers)
+					s.State.DailyAmountOfTransfers)
 				return
 			}
 		}
@@ -275,14 +273,14 @@ func (s *Strategy) checkBalance(ctx context.Context, sessions map[string]*bbgo.E
 
 	bbgo.Notify("%s withdrawal request sent", s.Asset)
 
-	if s.state != nil {
-		if s.state.IsOver24Hours() {
-			s.state.Reset()
+	if s.State != nil {
+		if s.State.IsOver24Hours() {
+			s.State.Reset()
 		}
 
-		s.state.DailyNumberOfTransfers += 1
-		s.state.DailyAmountOfTransfers = s.state.DailyAmountOfTransfers.Add(requiredAmount)
-		s.SaveState()
+		s.State.DailyNumberOfTransfers += 1
+		s.State.DailyAmountOfTransfers = s.State.DailyAmountOfTransfers.Add(requiredAmount)
+		bbgo.Sync(s)
 	}
 }
 
@@ -327,15 +325,6 @@ func (s *Strategy) findLowBalanceLevelSession(sessions map[string]*bbgo.Exchange
 	return nil, balance, nil
 }
 
-func (s *Strategy) SaveState() {
-	if err := s.Persistence.Save(s.state, ID, s.Asset, stateKey); err != nil {
-		log.WithError(err).Errorf("can not save state: %+v", s.state)
-	} else {
-		log.Infof("%s %s state is saved: %+v", ID, s.Asset, s.state)
-		bbgo.Notify("%s %s state is saved", ID, s.Asset, s.state)
-	}
-}
-
 func (s *Strategy) newDefaultState() *State {
 	return &State{
 		Asset:                  s.Asset,
@@ -344,42 +333,17 @@ func (s *Strategy) newDefaultState() *State {
 	}
 }
 
-func (s *Strategy) LoadState() error {
-	var state State
-	if err := s.Persistence.Load(&state, ID, s.Asset, stateKey); err != nil {
-		if err != service.ErrPersistenceNotExists {
-			return err
-		}
-
-		s.state = s.newDefaultState()
-		s.state.Reset()
-	} else {
-		// we loaded it successfully
-		s.state = &state
-
-		// update Asset name for legacy caches
-		s.state.Asset = s.Asset
-
-		log.Infof("%s %s state is restored: %+v", ID, s.Asset, s.state)
-		bbgo.Notify("%s %s state is restored", ID, s.Asset, s.state)
-	}
-
-	return nil
-}
-
 func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession) error {
 	if s.Interval == 0 {
 		return errors.New("interval can not be zero")
 	}
 
-	if err := s.LoadState(); err != nil {
-		return err
+	if s.State == nil {
+		s.State = s.newDefaultState()
 	}
 
 	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
-
-		s.SaveState()
 	})
 
 	if s.CheckOnStart {
