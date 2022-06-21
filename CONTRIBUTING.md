@@ -22,6 +22,15 @@ If you find an issue to work on, you are welcome to open a PR with a fix.
 
 ### Making Changes
 
+Install pre-commit to check your changes before you commit:
+
+    pip install pre-commit
+    pre-commit install
+    pre-commit run markdownlint --files=README.md --verbose
+    pre-commit run detect-secrets --all-files --verbose
+
+See <https://pre-commit.com/> for more details.
+
 For new large features, such as integrating binance futures contracts, please propose a discussion first before you start working on it.
 
 For new small features, you could open a pull request directly.
