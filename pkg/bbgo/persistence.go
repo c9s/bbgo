@@ -17,6 +17,12 @@ type PersistenceSelector struct {
 	Type string `json:"type" yaml:"type"`
 }
 
+var DefaultPersistenceServiceFacade = &service.PersistenceServiceFacade{
+	Memory: service.NewMemoryService(),
+}
+
+var PersistenceServiceFacade = DefaultPersistenceServiceFacade
+
 // Persistence is used for strategy to inject the persistence.
 type Persistence struct {
 	PersistenceSelector *PersistenceSelector `json:"persistence,omitempty" yaml:"persistence,omitempty"`

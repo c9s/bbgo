@@ -37,6 +37,16 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
+// IsBackTesting is a global variable that indicates the current environment is back-test or not.
+var IsBackTesting = false
+
+var BackTestService *service.BacktestService
+
+func SetBackTesting(s *service.BacktestService) {
+	BackTestService = s
+	IsBackTesting = true
+}
+
 var LoadedExchangeStrategies = make(map[string]SingleExchangeStrategy)
 var LoadedCrossExchangeStrategies = make(map[string]CrossExchangeStrategy)
 
@@ -69,19 +79,18 @@ const (
 
 // Environment presents the real exchange data layer
 type Environment struct {
-	PersistenceServiceFacade *service.PersistenceServiceFacade
-	DatabaseService          *service.DatabaseService
-	OrderService             *service.OrderService
-	TradeService             *service.TradeService
-	ProfitService            *service.ProfitService
-	PositionService          *service.PositionService
-	BacktestService          *service.BacktestService
-	RewardService            *service.RewardService
-	MarginService            *service.MarginService
-	SyncService              *service.SyncService
-	AccountService           *service.AccountService
-	WithdrawService          *service.WithdrawService
-	DepositService           *service.DepositService
+	DatabaseService *service.DatabaseService
+	OrderService    *service.OrderService
+	TradeService    *service.TradeService
+	ProfitService   *service.ProfitService
+	PositionService *service.PositionService
+	BacktestService *service.BacktestService
+	RewardService   *service.RewardService
+	MarginService   *service.MarginService
+	SyncService     *service.SyncService
+	AccountService  *service.AccountService
+	WithdrawService *service.WithdrawService
+	DepositService  *service.DepositService
 
 	// startTime is the time of start point (which is used in the backtest)
 	startTime time.Time
@@ -107,9 +116,6 @@ func NewEnvironment() *Environment {
 		startTime:     now,
 
 		syncStatus: SyncNotStarted,
-		PersistenceServiceFacade: &service.PersistenceServiceFacade{
-			Memory: service.NewMemoryService(),
-		},
 	}
 }
 
@@ -276,7 +282,8 @@ func (environ *Environment) ConfigurePersistence(conf *PersistenceConfig) error 
 			return err
 		}
 
-		environ.PersistenceServiceFacade.Redis = service.NewRedisPersistenceService(conf.Redis)
+		redisPersistence := service.NewRedisPersistenceService(conf.Redis)
+		PersistenceServiceFacade.Redis = redisPersistence
 	}
 
 	if conf.Json != nil {
@@ -287,7 +294,8 @@ func (environ *Environment) ConfigurePersistence(conf *PersistenceConfig) error 
 			}
 		}
 
-		environ.PersistenceServiceFacade.Json = &service.JsonPersistenceService{Directory: conf.Json.Directory}
+		jsonPersistence := &service.JsonPersistenceService{Directory: conf.Json.Directory}
+		PersistenceServiceFacade.Json = jsonPersistence
 	}
 
 	return nil
@@ -772,7 +780,7 @@ func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) erro
 		}
 	}
 
-	var persistence = environ.PersistenceServiceFacade.Get()
+	var persistence = PersistenceServiceFacade.Get()
 
 	err := environ.setupInteraction(persistence)
 	if err != nil {
