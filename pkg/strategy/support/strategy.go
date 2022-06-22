@@ -15,8 +15,6 @@ import (
 
 const ID = "support"
 
-const stateKey = "state-v1"
-
 var log = logrus.WithField("strategy", ID)
 
 var zeroiw = types.IntervalWindow{}
@@ -352,7 +350,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.OnSuspend(func() {
 		// Cancel all order
 		_ = s.orderExecutor.GracefulCancel(ctx)
-		_ = s.Persistence.Sync(s)
+		bbgo.Sync(s)
 	})
 
 	s.OnEmergencyStop(func() {

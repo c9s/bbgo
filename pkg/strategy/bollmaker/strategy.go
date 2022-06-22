@@ -158,8 +158,6 @@ type Strategy struct {
 
 	groupID uint32
 
-	stopC chan struct{}
-
 	// defaultBoll is the BOLLINGER indicator we used for predicting the price.
 	defaultBoll *indicator.BOLL
 
@@ -215,34 +213,7 @@ func (s *Strategy) CurrentPosition() *types.Position {
 }
 
 func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Value) error {
-	base := s.Position.GetBase()
-	if base.IsZero() {
-		return fmt.Errorf("no opened %s position", s.Position.Symbol)
-	}
-
-	// make it negative
-	quantity := base.Mul(percentage).Abs()
-	side := types.SideTypeBuy
-	if base.Sign() > 0 {
-		side = types.SideTypeSell
-	}
-
-	if quantity.Compare(s.Market.MinQuantity) < 0 {
-		return fmt.Errorf("order quantity %v is too small, less than %v", quantity, s.Market.MinQuantity)
-	}
-
-	submitOrder := types.SubmitOrder{
-		Symbol:   s.Symbol,
-		Side:     side,
-		Type:     types.OrderTypeMarket,
-		Quantity: quantity,
-		Market:   s.Market,
-	}
-
-	bbgo.Notify("Submitting %s %s order to close position by %v", s.Symbol, side.String(), percentage, submitOrder)
-
-	_, err := s.orderExecutor.SubmitOrders(ctx, submitOrder)
-	return err
+	return s.orderExecutor.ClosePosition(ctx, percentage)
 }
 
 // Deprecated: LoadState method is migrated to the persistence struct tag.
@@ -494,7 +465,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.OnSuspend(func() {
 		s.Status = types.StrategyStatusStopped
 		_ = s.orderExecutor.GracefulCancel(ctx)
-		_ = s.Persistence.Sync(s)
+		bbgo.Sync(s)
 	})
 
 	s.OnEmergencyStop(func() {
@@ -574,18 +545,13 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderExecutor.BindProfitStats(s.ProfitStats)
 	s.orderExecutor.Bind()
 
-	s.stopC = make(chan struct{})
-
-	// TODO: migrate persistance to singleton
 	s.orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
-		if err := s.Persistence.Sync(s); err != nil {
-			log.WithError(err).Errorf("can not sync state to persistence")
-		}
+		bbgo.Sync(s)
 	})
 
 	s.SmartStops.RunStopControllers(ctx, session, s.orderExecutor.TradeCollector())
 
-	if s.Environment.IsBackTesting() {
+	if bbgo.IsBackTesting {
 		log.Warn("turning of useTickerPrice option in the back-testing environment...")
 		s.UseTickerPrice = false
 	}
@@ -652,7 +618,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
-		close(s.stopC)
 
 		_ = s.orderExecutor.GracefulCancel(ctx)
 	})

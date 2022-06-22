@@ -3,8 +3,9 @@ package supertrend
 import (
 	"context"
 	"fmt"
-	"github.com/c9s/bbgo/pkg/util"
 	"sync"
+
+	"github.com/c9s/bbgo/pkg/util"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -256,9 +257,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	// Sync position to redis on trade
 	s.orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
-		if err := s.Persistence.Sync(s); err != nil {
-			log.WithError(err).Errorf("can not sync state to persistence")
-		}
+		bbgo.Sync(s)
 	})
 
 	s.stopC = make(chan struct{})
