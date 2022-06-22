@@ -158,8 +158,6 @@ type Strategy struct {
 
 	groupID uint32
 
-	stopC chan struct{}
-
 	// defaultBoll is the BOLLINGER indicator we used for predicting the price.
 	defaultBoll *indicator.BOLL
 
@@ -547,8 +545,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderExecutor.BindProfitStats(s.ProfitStats)
 	s.orderExecutor.Bind()
 
-	s.stopC = make(chan struct{})
-
 	s.orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
 		bbgo.Sync(s)
 	})
@@ -622,7 +618,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
-		close(s.stopC)
 
 		_ = s.orderExecutor.GracefulCancel(ctx)
 	})
