@@ -85,35 +85,7 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 }
 
 func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Value) error {
-	base := s.Position.GetBase()
-	if base.IsZero() {
-		return fmt.Errorf("no opened %s position", s.Position.Symbol)
-	}
-
-	// make it negative
-	quantity := base.Mul(percentage).Abs()
-	side := types.SideTypeBuy
-	if base.Sign() > 0 {
-		side = types.SideTypeSell
-	}
-
-	if quantity.Compare(s.Market.MinQuantity) < 0 {
-		return fmt.Errorf("order quantity %v is too small, less than %v", quantity, s.Market.MinQuantity)
-	}
-
-	submitOrder := types.SubmitOrder{
-		Symbol:   s.Symbol,
-		Side:     side,
-		Type:     types.OrderTypeMarket,
-		Quantity: quantity,
-		Market:   s.Market,
-	}
-
-	_, err := s.orderExecutor.SubmitOrders(ctx, submitOrder)
-	if err != nil {
-		log.WithError(err).Errorf("can not place position close order")
-	}
-	return err
+	return s.orderExecutor.ClosePosition(ctx, percentage)
 }
 
 func (s *Strategy) InstanceID() string {
