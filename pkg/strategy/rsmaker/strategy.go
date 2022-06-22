@@ -264,26 +264,6 @@ func (s *Strategy) Resume(ctx context.Context) error {
 	return nil
 }
 
-// func (s *Strategy) EmergencyStop(ctx context.Context) error {
-//	// Close 100% position
-//	percentage, _ := fixedpoint.NewFromString("100%")
-//	err := s.ClosePosition(ctx, percentage)
-//
-//	// Suspend strategy
-//	_ = s.Suspend(ctx)
-//
-//	return err
-// }
-
-func (s *Strategy) SaveState() error {
-	if err := s.Persistence.Save(s.state, ID, s.Symbol, stateKey); err != nil {
-		return err
-	}
-
-	log.Infof("state is saved => %+v", s.state)
-	return nil
-}
-
 func (s *Strategy) getCurrentAllowedExposurePosition(bandPercentage float64) (fixedpoint.Value, error) {
 	if s.DynamicExposurePositionScale != nil {
 		v, err := s.DynamicExposurePositionScale.Scale(bandPercentage)
