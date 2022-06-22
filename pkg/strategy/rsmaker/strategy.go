@@ -36,11 +36,6 @@ func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
-type State struct {
-	Position    *types.Position   `json:"position,omitempty"`
-	ProfitStats types.ProfitStats `json:"profitStats,omitempty"`
-}
-
 type BollingerSetting struct {
 	types.IntervalWindow
 	BandWidth float64 `json:"bandWidth"`
@@ -148,8 +143,6 @@ type Strategy struct {
 	session       *bbgo.ExchangeSession
 	orderExecutor *bbgo.GeneralOrderExecutor
 	book          *types.StreamOrderBook
-
-	state *State
 
 	groupID uint32
 
