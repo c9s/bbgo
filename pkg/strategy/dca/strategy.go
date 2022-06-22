@@ -92,7 +92,7 @@ func (s *Strategy) InstanceID() string {
 	return fmt.Sprintf("%s:%s", ID, s.Symbol)
 }
 
-func (s *Strategy) Run(ctx context.Context, session *bbgo.ExchangeSession) error {
+func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	if s.BudgetQuota.IsZero() {
 		s.BudgetQuota = s.Budget
 	}
