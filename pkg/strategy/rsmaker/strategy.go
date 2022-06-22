@@ -31,7 +31,6 @@ func init() {
 type Strategy struct {
 	*bbgo.Graceful
 	*bbgo.Notifiability
-	*bbgo.Persistence
 
 	Environment          *bbgo.Environment
 	StandardIndicatorSet *bbgo.StandardIndicatorSet
