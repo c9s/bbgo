@@ -75,7 +75,7 @@ func (inc *ATR) Length() int {
 
 var _ types.Series = &ATR{}
 
-func (inc *ATR) calculateAndUpdate(kLines []types.KLine) {
+func (inc *ATR) CalculateAndUpdate(kLines []types.KLine) {
 	for _, k := range kLines {
 		if inc.EndTime != zeroTime && !k.EndTime.After(inc.EndTime) {
 			continue
@@ -92,7 +92,7 @@ func (inc *ATR) handleKLineWindowUpdate(interval types.Interval, window types.KL
 		return
 	}
 
-	inc.calculateAndUpdate(window)
+	inc.CalculateAndUpdate(window)
 }
 
 func (inc *ATR) Bind(updater KLineWindowUpdater) {
