@@ -94,7 +94,7 @@ func SelectLastOrders(ex types.ExchangeName, symbol string, isMargin, isFutures,
 			sq.Eq{"is_futures": isFutures},
 			sq.Eq{"is_isolated": isIsolated},
 		}).
-		OrderBy("gid DESC").
+		OrderBy("created_at DESC").
 		Limit(limit)
 }
 
