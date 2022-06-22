@@ -21,6 +21,7 @@ func init() {
 	PnLCmd.Flags().StringArray("session", []string{}, "target exchange sessions")
 	PnLCmd.Flags().String("symbol", "", "trading symbol")
 	PnLCmd.Flags().Bool("include-transfer", false, "convert transfer records into trades")
+	PnLCmd.Flags().Bool("sync", false, "sync before loading trades")
 	PnLCmd.Flags().String("since", "", "query trades from a time point")
 	PnLCmd.Flags().Uint64("limit", 0, "number of trades")
 	RootCmd.AddCommand(PnLCmd)
@@ -41,6 +42,11 @@ var PnLCmd = &cobra.Command{
 
 		if len(sessionNames) == 0 {
 			return errors.New("--session [SESSION] is required")
+		}
+
+		wantSync, err := cmd.Flags().GetBool("sync")
+		if err != nil {
+			return err
 		}
 
 		symbol, err := cmd.Flags().GetString("symbol")
@@ -96,8 +102,10 @@ var PnLCmd = &cobra.Command{
 				return fmt.Errorf("session %s not found", sessionName)
 			}
 
-			if err := environ.SyncSession(ctx, session, symbol); err != nil {
-				return err
+			if wantSync {
+				if err := environ.SyncSession(ctx, session, symbol); err != nil {
+					return err
+				}
 			}
 
 			if includeTransfer {
