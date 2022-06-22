@@ -48,7 +48,6 @@ func (b BudgetPeriod) Duration() time.Duration {
 // Strategy is the Dollar-Cost-Average strategy
 type Strategy struct {
 	*bbgo.Graceful
-	*bbgo.Persistence
 
 	Environment *bbgo.Environment
 	Symbol      string `json:"symbol"`
@@ -74,10 +73,6 @@ type Strategy struct {
 	session       *bbgo.ExchangeSession
 	orderExecutor *bbgo.GeneralOrderExecutor
 
-	activeMakerOrders *bbgo.ActiveOrderBook
-	orderStore        *bbgo.OrderStore
-	tradeCollector    *bbgo.TradeCollector
-
 	bbgo.StrategyController
 }
 
@@ -87,17 +82,6 @@ func (s *Strategy) ID() string {
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.InvestmentInterval})
-}
-
-func (s *Strategy) submitOrders(ctx context.Context, orderExecutor bbgo.OrderExecutor, submitOrders ...types.SubmitOrder) {
-	createdOrders, err := orderExecutor.SubmitOrders(ctx, submitOrders...)
-	if err != nil {
-		log.WithError(err).Errorf("can not place orders")
-	}
-
-	s.orderStore.Add(createdOrders...)
-	s.activeMakerOrders.Add(createdOrders...)
-	s.tradeCollector.Process()
 }
 
 func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Value) error {
@@ -125,16 +109,10 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 		Market:   s.Market,
 	}
 
-	// s.Notify("Submitting %s %s order to close position by %v", s.Symbol, side.String(), percentage, submitOrder)
-
-	createdOrders, err := s.session.Exchange.SubmitOrders(ctx, submitOrder)
+	_, err := s.orderExecutor.SubmitOrders(ctx, submitOrder)
 	if err != nil {
 		log.WithError(err).Errorf("can not place position close order")
 	}
-
-	s.orderStore.Add(createdOrders...)
-	s.activeMakerOrders.Add(createdOrders...)
-	s.tradeCollector.Process()
 	return err
 }
 
@@ -142,7 +120,7 @@ func (s *Strategy) InstanceID() string {
 	return fmt.Sprintf("%s:%s", ID, s.Symbol)
 }
 
-func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+func (s *Strategy) Run(ctx context.Context, session *bbgo.ExchangeSession) error {
 	if s.BudgetQuota.IsZero() {
 		s.BudgetQuota = s.Budget
 	}
@@ -193,13 +171,16 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		price := kline.Close
 		quantity := s.budgetPerInvestment.Div(price)
 
-		s.submitOrders(ctx, orderExecutor, types.SubmitOrder{
+		_, err := s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 			Symbol:   s.Symbol,
 			Side:     types.SideTypeBuy,
 			Type:     types.OrderTypeMarket,
 			Quantity: quantity,
 			Market:   s.Market,
 		})
+		if err != nil {
+			log.WithError(err).Errorf("submit order failed")
+		}
 	})
 
 	return nil
