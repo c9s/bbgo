@@ -168,6 +168,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 
 		log.Infof("createdOrders: %+v", createdOrders)
+
+		// send notification to slack or telegram if you have configured it
+		bbgo.Notify("order created")
 	}
 
 	// register our kline event handler
