@@ -18,11 +18,11 @@ import (
 )
 
 func init() {
-	PnLCmd.Flags().String("session", "", "target exchange")
+	PnLCmd.Flags().StringArray("session", []string{}, "target exchange sessions")
 	PnLCmd.Flags().String("symbol", "", "trading symbol")
 	PnLCmd.Flags().Bool("include-transfer", false, "convert transfer records into trades")
-	PnLCmd.Flags().String("since", "", "query trades from a timepoint")
-	PnLCmd.Flags().Int("limit", 0, "number of trades")
+	PnLCmd.Flags().String("since", "", "query trades from a time point")
+	PnLCmd.Flags().Uint64("limit", 0, "number of trades")
 	RootCmd.AddCommand(PnLCmd)
 }
 
@@ -34,9 +34,13 @@ var PnLCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 
-		sessionName, err := cmd.Flags().GetString("session")
+		sessionNames, err := cmd.Flags().GetStringArray("session")
 		if err != nil {
 			return err
+		}
+
+		if len(sessionNames) == 0 {
+			return errors.New("--session [SESSION] is required")
 		}
 
 		symbol, err := cmd.Flags().GetString("symbol")
@@ -46,41 +50,6 @@ var PnLCmd = &cobra.Command{
 
 		if len(symbol) == 0 {
 			return errors.New("--symbol [SYMBOL] is required")
-		}
-
-		limit, err := cmd.Flags().GetInt("limit")
-		if err != nil {
-			return err
-		}
-
-		environ := bbgo.NewEnvironment()
-
-		if err := environ.ConfigureDatabase(ctx); err != nil {
-			return err
-		}
-
-		if err := environ.ConfigureExchangeSessions(userConfig); err != nil {
-			return err
-		}
-
-		session, ok := environ.Session(sessionName)
-		if !ok {
-			return fmt.Errorf("session %s not found", sessionName)
-		}
-
-		if err := environ.SyncSession(ctx, session, symbol); err != nil {
-			return err
-		}
-
-		if err = environ.Init(ctx); err != nil {
-			return err
-		}
-
-		exchange := session.Exchange
-
-		market, ok := session.Market(symbol)
-		if !ok {
-			return fmt.Errorf("market config %s not found", symbol)
 		}
 
 		// this is the default since
@@ -106,35 +75,70 @@ var PnLCmd = &cobra.Command{
 			return err
 		}
 
-		if includeTransfer {
-			transferService, ok := exchange.(types.ExchangeTransferService)
+		limit, err := cmd.Flags().GetUint64("limit")
+		if err != nil {
+			return err
+		}
+
+		environ := bbgo.NewEnvironment()
+
+		if err := environ.ConfigureDatabase(ctx); err != nil {
+			return err
+		}
+
+		if err := environ.ConfigureExchangeSessions(userConfig); err != nil {
+			return err
+		}
+
+		for _, sessionName := range sessionNames {
+			session, ok := environ.Session(sessionName)
 			if !ok {
-				return fmt.Errorf("session exchange %s does not implement transfer service", sessionName)
+				return fmt.Errorf("session %s not found", sessionName)
 			}
 
-			deposits, err := transferService.QueryDepositHistory(ctx, market.BaseCurrency, since, until)
-			if err != nil {
-				return err
-			}
-			_ = deposits
-
-			withdrawals, err := transferService.QueryWithdrawHistory(ctx, market.BaseCurrency, since, until)
-			if err != nil {
+			if err := environ.SyncSession(ctx, session, symbol); err != nil {
 				return err
 			}
 
-			sort.Slice(withdrawals, func(i, j int) bool {
-				a := withdrawals[i].ApplyTime.Time()
-				b := withdrawals[j].ApplyTime.Time()
-				return a.Before(b)
-			})
+			if includeTransfer {
+				exchange := session.Exchange
+				market, _ := session.Market(symbol)
+				transferService, ok := exchange.(types.ExchangeTransferService)
+				if !ok {
+					return fmt.Errorf("session exchange %s does not implement transfer service", sessionName)
+				}
 
-			// we need the backtest klines for the daily prices
-			backtestService := &service.BacktestService{DB: environ.DatabaseService.DB}
-			if err := backtestService.Sync(ctx, exchange, symbol, types.Interval1d, since, until); err != nil {
-				return err
+				deposits, err := transferService.QueryDepositHistory(ctx, market.BaseCurrency, since, until)
+				if err != nil {
+					return err
+				}
+				_ = deposits
+
+				withdrawals, err := transferService.QueryWithdrawHistory(ctx, market.BaseCurrency, since, until)
+				if err != nil {
+					return err
+				}
+
+				sort.Slice(withdrawals, func(i, j int) bool {
+					a := withdrawals[i].ApplyTime.Time()
+					b := withdrawals[j].ApplyTime.Time()
+					return a.Before(b)
+				})
+
+				// we need the backtest klines for the daily prices
+				backtestService := &service.BacktestService{DB: environ.DatabaseService.DB}
+				if err := backtestService.Sync(ctx, exchange, symbol, types.Interval1d, since, until); err != nil {
+					return err
+				}
 			}
 		}
+
+		if err = environ.Init(ctx); err != nil {
+			return err
+		}
+
+		session, _ := environ.Session(sessionNames[0])
+		exchange := session.Exchange
 
 		var trades []types.Trade
 		tradingFeeCurrency := exchange.PlatformFeeCurrency()
@@ -143,8 +147,10 @@ var PnLCmd = &cobra.Command{
 			trades, err = environ.TradeService.QueryForTradingFeeCurrency(exchange.Name(), symbol, tradingFeeCurrency)
 		} else {
 			trades, err = environ.TradeService.Query(service.QueryTradesOptions{
-				Symbol: symbol,
-				Limit:  limit,
+				Symbol:   symbol,
+				Limit:    limit,
+				Sessions: sessionNames,
+				Since:    &since,
 			})
 		}
 
