@@ -18,7 +18,17 @@ func callID(obj interface{}) string {
 		ret := m.Call(nil)
 		return ret[0].String()
 	}
-	return ""
+
+	if symbol, ok := isSymbolBasedStrategy(sv); ok {
+		m := sv.MethodByName("ID")
+		ret := m.Call(nil)
+		return ret[0].String() + ":" + symbol
+	}
+
+	// fallback to just ID
+	m := sv.MethodByName("ID")
+	ret := m.Call(nil)
+	return ret[0].String() + ":"
 }
 
 func isSymbolBasedStrategy(rs reflect.Value) (string, bool) {

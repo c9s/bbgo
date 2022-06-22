@@ -91,14 +91,18 @@ func (p *Persistence) Sync(obj interface{}) error {
 }
 
 // Sync syncs the object properties into the persistence layer
-func Sync(obj interface{}) error {
+func Sync(obj interface{}) {
 	id := callID(obj)
 	if len(id) == 0 {
-		return nil
+		log.Warnf("InstanceID() is not provided, can not sync persistence")
+		return
 	}
 
 	ps := PersistenceServiceFacade.Get()
-	return storePersistenceFields(obj, id, ps)
+	err := storePersistenceFields(obj, id, ps)
+	if err != nil {
+		log.WithError(err).Errorf("persistence sync failed")
+	}
 }
 
 func loadPersistenceFields(obj interface{}, id string, persistence service.PersistenceService) error {
