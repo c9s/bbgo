@@ -7,6 +7,22 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestParseLooseFormatTime_alias_now(t *testing.T) {
+	lt, err := ParseLooseFormatTime("now")
+	assert.NoError(t, err)
+
+	now := time.Now()
+	assert.True(t, now.Sub(lt.Time()) < 10*time.Millisecond)
+}
+
+func TestParseLooseFormatTime_alias_yesterday(t *testing.T) {
+	lt, err := ParseLooseFormatTime("yesterday")
+	assert.NoError(t, err)
+
+	tt := time.Now().AddDate(0, 0, -1)
+	assert.True(t, tt.Sub(lt.Time()) < 10*time.Millisecond)
+}
+
 func TestLooseFormatTime_UnmarshalJSON(t *testing.T) {
 	tests := []struct {
 		name    string

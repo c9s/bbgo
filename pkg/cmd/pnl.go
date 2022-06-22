@@ -21,6 +21,7 @@ func init() {
 	PnLCmd.Flags().String("session", "", "target exchange")
 	PnLCmd.Flags().String("symbol", "", "trading symbol")
 	PnLCmd.Flags().Bool("include-transfer", false, "convert transfer records into trades")
+	PnLCmd.Flags().String("since", "", "query trades from a timepoint")
 	PnLCmd.Flags().Int("limit", 0, "number of trades")
 	RootCmd.AddCommand(PnLCmd)
 }
@@ -67,7 +68,7 @@ var PnLCmd = &cobra.Command{
 			return fmt.Errorf("session %s not found", sessionName)
 		}
 
-		if err := environ.SyncSession(ctx, session); err != nil {
+		if err := environ.SyncSession(ctx, session, symbol); err != nil {
 			return err
 		}
 
@@ -82,7 +83,22 @@ var PnLCmd = &cobra.Command{
 			return fmt.Errorf("market config %s not found", symbol)
 		}
 
+		// this is the default since
 		since := time.Now().AddDate(-1, 0, 0)
+
+		sinceOpt, err := cmd.Flags().GetString("since")
+		if err != nil {
+			return err
+		}
+
+		if sinceOpt != "" {
+			lt, err := types.ParseLooseFormatTime(sinceOpt)
+			if err != nil {
+				return err
+			}
+			since = lt.Time()
+		}
+
 		until := time.Now()
 
 		includeTransfer, err := cmd.Flags().GetBool("include-transfer")
