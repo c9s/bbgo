@@ -16,7 +16,8 @@ import (
 // For example, grid strategy uses "grid"
 const ID = "skeleton"
 
-// Attach the strategy field with our ID, so that the logs from this strategy will be tagged with our ID
+// log is a logrus.Entry that will be reused.
+// This line attaches the strategy field to the logger with our ID, so that the logs from this strategy will be tagged with our ID
 var log = logrus.WithField("strategy", ID)
 
 var ten = fixedpoint.NewFromInt(10)
