@@ -556,7 +556,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.SmartStops.RunStopControllers(ctx, session, s.orderExecutor.TradeCollector())
 
-	if s.Environment.IsBackTesting() {
+	if bbgo.IsBackTesting {
 		log.Warn("turning of useTickerPrice option in the back-testing environment...")
 		s.UseTickerPrice = false
 	}
