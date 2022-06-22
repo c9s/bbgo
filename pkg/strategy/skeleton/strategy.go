@@ -152,6 +152,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 
+		// totalQuantity = quantityAmount / currentPrice
 		totalQuantity := quantityAmount.Div(currentPrice)
 
 		// Place a market order to the exchange
