@@ -163,23 +163,6 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
 		Interval: s.Interval,
 	})
-
-	// session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
-	//	Interval: types.Interval12h.String(),
-	// })
-
-	// if s.DefaultBollinger != nil && s.DefaultBollinger.Interval != "" {
-	//	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
-	//		Interval: string(s.DefaultBollinger.Interval),
-	//	})
-	// }
-	//
-	// if s.NeutralBollinger != nil && s.NeutralBollinger.Interval != "" {
-	//	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
-	//		Interval: string(s.NeutralBollinger.Interval),
-	//	})
-	// }
-
 	// s.SmartStops.Subscribe(session)
 }
 
@@ -196,41 +179,10 @@ func (s *Strategy) CurrentPosition() *types.Position {
 }
 
 func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Value) error {
-	base := s.Position.GetBase()
-	if base.IsZero() {
-		return fmt.Errorf("no opened %s position", s.Position.Symbol)
-	}
-
-	// make it negative
-	quantity := base.Mul(percentage).Abs()
-	side := types.SideTypeBuy
-	if base.Sign() > 0 {
-		side = types.SideTypeSell
-	}
-
-	if quantity.Compare(s.Market.MinQuantity) < 0 {
-		return fmt.Errorf("order quantity %v is too small, less than %v", quantity, s.Market.MinQuantity)
-	}
-
-	submitOrder := types.SubmitOrder{
-		Symbol:   s.Symbol,
-		Side:     side,
-		Type:     types.OrderTypeMarket,
-		Quantity: quantity,
-		Market:   s.Market,
-	}
-
-	s.Notify("Submitting %s %s order to close position by %v", s.Symbol, side.String(), percentage, submitOrder)
-
-	_, err := s.orderExecutor.SubmitOrders(ctx, submitOrder)
-	if err != nil {
-		log.WithError(err).Errorf("can not place position close order")
-	}
-	return err
+	return s.orderExecutor.ClosePosition(ctx, percentage)
 }
 
 // StrategyController
-
 func (s *Strategy) GetStatus() types.StrategyStatus {
 	return s.status
 }
