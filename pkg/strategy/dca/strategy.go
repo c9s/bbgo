@@ -71,11 +71,12 @@ type Strategy struct {
 	BudgetQuota           fixedpoint.Value   `persistence:"budget_quota"`
 	BudgetPeriodStartTime time.Time          `persistence:"budget_period_start_time"`
 
+	session       *bbgo.ExchangeSession
+	orderExecutor *bbgo.GeneralOrderExecutor
+
 	activeMakerOrders *bbgo.ActiveOrderBook
 	orderStore        *bbgo.OrderStore
 	tradeCollector    *bbgo.TradeCollector
-
-	session *bbgo.ExchangeSession
 
 	bbgo.StrategyController
 }
@@ -141,20 +142,10 @@ func (s *Strategy) InstanceID() string {
 	return fmt.Sprintf("%s:%s", ID, s.Symbol)
 }
 
-// check if position can be close or not
-func canClosePosition(position *types.Position, signal fixedpoint.Value, price fixedpoint.Value) bool {
-	return !signal.IsZero() && position.IsShort() && !position.IsDust(price)
-}
-
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-	// initial required information
-	s.session = session
-
-	s.activeMakerOrders = bbgo.NewActiveOrderBook(s.Symbol)
-	s.activeMakerOrders.BindStream(session.UserDataStream)
-
-	s.orderStore = bbgo.NewOrderStore(s.Symbol)
-	s.orderStore.BindStream(session.UserDataStream)
+	if s.BudgetQuota.IsZero() {
+		s.BudgetQuota = s.Budget
+	}
 
 	if s.Position == nil {
 		s.Position = types.NewPositionFromMarket(s.Market)
@@ -165,49 +156,17 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	}
 
 	instanceID := s.InstanceID()
-
-	if s.BudgetQuota.IsZero() {
-		s.BudgetQuota = s.Budget
-	}
+	s.session = session
+	s.orderExecutor = bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
+	s.orderExecutor.BindEnvironment(s.Environment)
+	s.orderExecutor.BindProfitStats(s.ProfitStats)
+	s.orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
+		bbgo.Sync(s)
+	})
+	s.orderExecutor.Bind()
 
 	numOfInvestmentPerPeriod := fixedpoint.NewFromFloat(float64(s.BudgetPeriod.Duration()) / float64(s.InvestmentInterval.Duration()))
 	s.budgetPerInvestment = s.Budget.Div(numOfInvestmentPerPeriod)
-
-	// Always update the position fields
-	s.Position.Strategy = ID
-	s.Position.StrategyInstanceID = instanceID
-
-	s.tradeCollector = bbgo.NewTradeCollector(s.Symbol, s.Position, s.orderStore)
-	s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
-		bbgo.Notify(trade)
-		s.ProfitStats.AddTrade(trade)
-
-		if profit.Compare(fixedpoint.Zero) == 0 {
-			s.Environment.RecordPosition(s.Position, trade, nil)
-		} else {
-			log.Infof("%s generated profit: %v", s.Symbol, profit)
-			p := s.Position.NewProfit(trade, profit, netProfit)
-			p.Strategy = ID
-			p.StrategyInstanceID = instanceID
-			bbgo.Notify(&p)
-
-			s.ProfitStats.AddProfit(p)
-			bbgo.Notify(&s.ProfitStats)
-
-			s.Environment.RecordPosition(s.Position, trade, &p)
-		}
-	})
-
-	s.tradeCollector.OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
-		s.BudgetQuota = s.BudgetQuota.Sub(trade.QuoteQuantity)
-	})
-
-	s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
-		log.Infof("position changed: %s", s.Position)
-		bbgo.Notify(s.Position)
-	})
-
-	s.tradeCollector.BindStream(session.UserDataStream)
 
 	session.UserDataStream.OnStart(func() {})
 	session.MarketDataStream.OnKLine(func(kline types.KLine) {})
