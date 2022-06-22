@@ -1,12 +1,12 @@
 package service
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/pkg/errors"
 	"github.com/pquerna/otp"
 	"github.com/pquerna/otp/totp"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
@@ -39,7 +39,8 @@ func NewDefaultTotpKey() (*otp.Key, error) {
 		}
 
 		if !ok {
-			return nil, fmt.Errorf("can not get USER or USERNAME env var for totp account name")
+			log.Warnf("can not get USER or USERNAME env var, use default name 'bbgo' for totp account name")
+			user = "bbgo"
 		}
 
 		totpAccountName = user
