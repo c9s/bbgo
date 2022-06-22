@@ -20,12 +20,14 @@ var ErrTradeNotFound = errors.New("trade not found")
 
 type QueryTradesOptions struct {
 	Exchange types.ExchangeName
+	Sessions []string
 	Symbol   string
 	LastGID  int64
+	Since    *time.Time
 
 	// ASC or DESC
 	Ordering string
-	Limit    int
+	Limit    uint64
 }
 
 type TradingVolume struct {
@@ -295,13 +297,43 @@ func (s *TradeService) QueryForTradingFeeCurrency(ex types.ExchangeName, symbol 
 }
 
 func (s *TradeService) Query(options QueryTradesOptions) ([]types.Trade, error) {
-	sql := queryTradesSQL(options)
-	args := map[string]interface{}{
-		"exchange": options.Exchange,
-		"symbol":   options.Symbol,
+	sel := sq.Select("*").
+		From("trades")
+
+	if options.Since != nil {
+		sel = sel.Where(sq.GtOrEq{"traded_at": options.Since})
 	}
 
-	rows, err := s.DB.NamedQuery(sql, args)
+	sel = sel.Where(sq.Eq{"symbol": options.Symbol})
+
+	if options.Exchange != "" {
+		sel = sel.Where(sq.Eq{"exchange": options.Exchange})
+	}
+
+	if len(options.Sessions) > 0 {
+		// FIXME: right now we only have the exchange field in the db, we might need to add the session field too.
+		sel = sel.Where(sq.Eq{"exchange": options.Sessions})
+	}
+
+	if options.Ordering != "" {
+		sel = sel.OrderBy("traded_at " + options.Ordering)
+	} else {
+		sel = sel.OrderBy("traded_at ASC")
+	}
+
+	if options.Limit > 0 {
+		sel = sel.Limit(options.Limit)
+	}
+
+	sql, args, err := sel.ToSql()
+	if err != nil {
+		return nil, err
+	}
+
+	log.Debug(sql)
+	log.Debug(args)
+
+	rows, err := s.DB.Queryx(sql, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -408,7 +440,7 @@ func queryTradesSQL(options QueryTradesOptions) string {
 	sql += ` ORDER BY gid ` + ordering
 
 	if options.Limit > 0 {
-		sql += ` LIMIT ` + strconv.Itoa(options.Limit)
+		sql += ` LIMIT ` + strconv.FormatUint(options.Limit, 10)
 	}
 
 	return sql

@@ -402,7 +402,7 @@ func (s *Strategy) adjustOrderQuantity(submitOrder types.SubmitOrder) types.Subm
 	return submitOrder
 }
 
-func (s *Strategy) Run(ctx context.Context, session *bbgo.ExchangeSession) error {
+func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	instanceID := fmt.Sprintf("%s-%s", ID, s.Symbol)
 
 	s.status = types.StrategyStatusRunning
