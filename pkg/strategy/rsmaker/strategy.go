@@ -36,11 +36,6 @@ func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
-type BollingerSetting struct {
-	types.IntervalWindow
-	BandWidth float64 `json:"bandWidth"`
-}
-
 type Strategy struct {
 	*bbgo.Graceful
 	*bbgo.Notifiability
@@ -108,11 +103,11 @@ type Strategy struct {
 	// NeutralBollinger is the smaller range of the bollinger band
 	// If price is in this band, it usually means the price is oscillating.
 	// If price goes out of this band, we tend to not place sell orders or buy orders
-	NeutralBollinger *BollingerSetting `json:"neutralBollinger"`
+	NeutralBollinger *types.BollingerSetting `json:"neutralBollinger"`
 
 	// DefaultBollinger is the wide range of the bollinger band
 	// for controlling your exposure position
-	DefaultBollinger *BollingerSetting `json:"defaultBollinger"`
+	DefaultBollinger *types.BollingerSetting `json:"defaultBollinger"`
 
 	// DowntrendSkew is the order quantity skew for normal downtrend band.
 	// The price is still in the default bollinger band.
