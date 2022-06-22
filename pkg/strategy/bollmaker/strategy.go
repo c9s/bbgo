@@ -549,7 +549,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.stopC = make(chan struct{})
 
-	// TODO: migrate persistance to singleton
 	s.orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
 		bbgo.Sync(s)
 	})
