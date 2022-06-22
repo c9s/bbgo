@@ -204,7 +204,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.ProfitStats = types.NewProfitStats(s.Market)
 	}
 
-	// trade stats
 	if s.TradeStats == nil {
 		s.TradeStats = &types.TradeStats{}
 	}
