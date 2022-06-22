@@ -51,8 +51,6 @@ type Strategy struct {
 	KLineEndTime   types.Time
 
 	*bbgo.Environment
-	*bbgo.Notifiability
-	*bbgo.Persistence
 	*bbgo.Graceful
 	bbgo.StrategyController
 
