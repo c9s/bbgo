@@ -162,35 +162,16 @@ func (s *Strategy) placeMarketSell(ctx context.Context, quantity fixedpoint.Valu
 	})
 }
 
+func (s *Strategy) InstanceID() string {
+	return fmt.Sprintf("%s:%s", ID, s.Symbol)
+}
+
 func (s *Strategy) CurrentPosition() *types.Position {
 	return s.Position
 }
 
 func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Value) error {
-	// Cancel active orders
-	_ = s.orderExecutor.GracefulCancel(ctx)
-
-	submitOrder := s.Position.NewMarketCloseOrder(percentage) // types.SubmitOrder{
-	if submitOrder == nil {
-		return nil
-	}
-
-	if s.session.Margin {
-		submitOrder.MarginSideEffect = s.Exit.MarginSideEffect
-	}
-
-	bbgo.Notify("Closing %s position by %f", s.Symbol, percentage.Float64())
-	log.Infof("Closing %s position by %f", s.Symbol, percentage.Float64())
-	_, err := s.orderExecutor.SubmitOrders(ctx, *submitOrder)
-	if err != nil {
-		bbgo.Notify("close %s position error", s.Symbol)
-		log.WithError(err).Errorf("close %s position error", s.Symbol)
-	}
-	return err
-}
-
-func (s *Strategy) InstanceID() string {
-	return fmt.Sprintf("%s:%s", ID, s.Symbol)
+	return s.orderExecutor.ClosePosition(ctx, percentage)
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
