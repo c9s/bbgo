@@ -18,17 +18,9 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-// TODO:
-// 1) add option for placing orders only when in neutral band
-// 2) add option for only placing buy orders when price is below the SMA line
-
 const ID = "rsmaker"
 
-const stateKey = "state-v1"
-
-var defaultFeeRate = fixedpoint.NewFromFloat(0.001)
 var notionModifier = fixedpoint.NewFromFloat(1.1)
-var two = fixedpoint.NewFromInt(2)
 
 var log = logrus.WithField("strategy", ID)
 
