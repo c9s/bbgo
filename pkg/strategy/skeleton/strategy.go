@@ -12,13 +12,21 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+// ID is the unique strategy ID, it needs to be in all lower case
+// For example, grid strategy uses "grid"
 const ID = "skeleton"
 
+// Attach the strategy field with our ID, so that the logs from this strategy will be tagged with our ID
 var log = logrus.WithField("strategy", ID)
 
-var Ten = fixedpoint.NewFromInt(10)
+var ten = fixedpoint.NewFromInt(10)
 
+// init is a special function of golang, it will be called when the program is started
+// importing this package will trigger the init function call.
 func init() {
+	// Register our struct type to BBGO
+	// Note that you don't need to field the fields.
+	// BBGO uses reflect to parse your type information.
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
@@ -133,7 +141,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		// Note that the available balance is a fixed-point object, so you can not compare it with integer directly.
 		// Instead, you should call valueA.Compare(valueB)
 		quantityAmount := quoteBalance.Available
-		if quantityAmount.Sign() <= 0 || quantityAmount.Compare(Ten) < 0 {
+		if quantityAmount.Sign() <= 0 || quantityAmount.Compare(ten) < 0 {
 			return
 		}
 
