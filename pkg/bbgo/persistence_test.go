@@ -12,6 +12,15 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+type TestStructWithoutInstanceID struct {
+	Symbol string
+}
+
+func (s *TestStructWithoutInstanceID) ID() string {
+	return "test-struct-no-instance-id"
+}
+
+
 type TestStruct struct {
 	*Environment
 	*Graceful
@@ -48,8 +57,16 @@ func preparePersistentServices() []service.PersistenceService {
 }
 
 func Test_callID(t *testing.T) {
-	id := callID(&TestStruct{})
-	assert.NotEmpty(t, id)
+	t.Run("default", func(t *testing.T) {
+		id := callID(&TestStruct{})
+		assert.NotEmpty(t, id)
+		assert.Equal(t, "test-struct", id)
+	})
+
+	t.Run("fallback", func(t *testing.T) {
+		id := callID(&TestStructWithoutInstanceID{Symbol: "BTCUSDT"})
+		assert.Equal(t, "test-struct-no-instance-id:BTCUSDT", id)
+	})
 }
 
 func Test_loadPersistenceFields(t *testing.T) {
