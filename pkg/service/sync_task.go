@@ -119,7 +119,7 @@ func (sel SyncTask) execute(ctx context.Context, db *sqlx.DB, startTime time.Tim
 			}
 
 			tt := sel.Time(obj)
-			if tt.Before(startTime) || tt.Equal(endTime) || tt.After(endTime) {
+			if tt.Before(startTime) || tt.After(endTime) {
 				continue
 			}
 
