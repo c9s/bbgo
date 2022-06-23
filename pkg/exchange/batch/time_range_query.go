@@ -94,10 +94,8 @@ func (q *AsyncTimeRangedBatchQuery) Query(ctx context.Context, ch interface{}, s
 				item := listRef.Index(i)
 				entryTime := q.T(item.Interface())
 
-				if entryTime.Before(startTime) {
-					continue
-				}
-				if entryTime.After(endTime) {
+				// inclusive time selection
+				if startTime.After(entryTime) || endTime.Before(entryTime) {
 					continue
 				}
 
