@@ -70,7 +70,7 @@ func (sel SyncTask) execute(ctx context.Context, db *sqlx.DB, startTime time.Tim
 
 	ids := buildIdMap(sel, recordSliceRef)
 
-	if err := sortRecords(sel, recordSliceRef); err != nil {
+	if err := sortRecordsAscending(sel, recordSliceRef); err != nil {
 		return err
 	}
 
@@ -177,7 +177,7 @@ func lastRecordTime(sel SyncTask, recordSlice reflect.Value, defaultTime time.Ti
 	return since
 }
 
-func sortRecords(sel SyncTask, recordSlice reflect.Value) error {
+func sortRecordsAscending(sel SyncTask, recordSlice reflect.Value) error {
 	if sel.Time == nil {
 		return errors.New("time field is not set, can not sort records")
 	}
