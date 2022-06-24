@@ -147,7 +147,7 @@ func (s *TradeService) QueryTradingVolume(startTime time.Time, options TradingVo
 			return records, err
 		}
 
-		record.Time = time.Date(record.Year, time.Month(record.Month), record.Day, 0, 0, 0, 0, time.UTC)
+		record.Time = time.Date(record.Year, time.Month(record.Month), record.Day, 0, 0, 0, 0, time.Local)
 		records = append(records, record)
 	}
 
