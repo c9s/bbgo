@@ -115,16 +115,19 @@ func (sel SyncTask) execute(ctx context.Context, db *sqlx.DB, startTime time.Tim
 			obj := v.Interface()
 			id := sel.ID(obj)
 			if _, exists := ids[id]; exists {
+				logrus.Debugf("object %s already exists, skipping", id)
 				continue
 			}
 
 			tt := sel.Time(obj)
 			if tt.Before(startTime) || tt.After(endTime) {
+				logrus.Debugf("object %s time %s is outside of the time range", id, tt)
 				continue
 			}
 
 			if sel.Filter != nil {
 				if !sel.Filter(obj) {
+					logrus.Debugf("object %s is filtered", id)
 					continue
 				}
 			}
