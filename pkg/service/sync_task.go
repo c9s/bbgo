@@ -129,6 +129,7 @@ func (sel SyncTask) execute(ctx context.Context, db *sqlx.DB, startTime time.Tim
 				}
 			}
 
+			ids[id] = struct{}{}
 			if sel.BatchInsert != nil {
 				if batchBufferRefVal.Len() > sel.BatchInsertBuffer-1 {
 					if sel.LogInsert {
