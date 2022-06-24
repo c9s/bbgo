@@ -23,7 +23,7 @@ rockhopper --config rockhopper_mysql.yaml create --type sql add_pnl_column
 ```
 
 
-Be sure to edit both sqlite3 and mysql migration files. ( [Sample](migrations/mysql/20210531234123_add_kline_taker_buy_columns.sql) )
+Be sure to edit both sqlite3 and mysql migration files. ( [Sample](.../../migrations/mysql/20210531234123_add_kline_taker_buy_columns.sql) )
 
 To test the drivers, you have to update the rockhopper_mysql.yaml file to connect your database,
 then do:
