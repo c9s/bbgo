@@ -34,10 +34,12 @@ type AsyncTimeRangedBatchQuery struct {
 	JumpIfEmpty time.Duration
 }
 
-func (q *AsyncTimeRangedBatchQuery) Query(ctx context.Context, ch interface{}, startTime, endTime time.Time) chan error {
+func (q *AsyncTimeRangedBatchQuery) Query(ctx context.Context, ch interface{}, since, until time.Time) chan error {
 	errC := make(chan error, 1)
 	cRef := reflect.ValueOf(ch)
 	// cRef := reflect.MakeChan(reflect.TypeOf(q.Type), 100)
+	startTime := since
+	endTime := until
 
 	go func() {
 		defer cRef.Close()
@@ -93,7 +95,7 @@ func (q *AsyncTimeRangedBatchQuery) Query(ctx context.Context, ch interface{}, s
 			for i := 0; i < listLen; i++ {
 				item := listRef.Index(i)
 				entryTime := q.T(item.Interface())
-				if entryTime.Before(startTime) || entryTime.After(endTime) {
+				if entryTime.Before(since) || entryTime.After(until) {
 					continue
 				}
 
@@ -108,7 +110,7 @@ func (q *AsyncTimeRangedBatchQuery) Query(ctx context.Context, ch interface{}, s
 
 				cRef.Send(item)
 				sentAny = true
-				startTime = entryTime.Add(time.Millisecond)
+				startTime = entryTime
 			}
 
 			if !sentAny {
