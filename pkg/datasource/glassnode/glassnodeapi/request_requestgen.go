@@ -29,17 +29,22 @@ func (r *Request) SetUntil(Until time.Time) *Request {
 }
 
 func (r *Request) SetInterval(Interval Interval) *Request {
-	r.Interval = Interval
+	r.Interval = &Interval
 	return r
 }
 
 func (r *Request) SetFormat(Format Format) *Request {
-	r.Format = Format
+	r.Format = &Format
+	return r
+}
+
+func (r *Request) SetCurrency(Currency string) *Request {
+	r.Currency = &Currency
 	return r
 }
 
 func (r *Request) SetTimestampFormat(TimestampFormat string) *Request {
-	r.TimestampFormat = TimestampFormat
+	r.TimestampFormat = &TimestampFormat
 	return r
 }
 
@@ -86,42 +91,63 @@ func (r *Request) GetQueryParameters() (url.Values, error) {
 	} else {
 	}
 	// check Interval field -> json key i
-	Interval := r.Interval
+	if r.Interval != nil {
+		Interval := *r.Interval
 
-	// TEMPLATE check-valid-values
-	switch Interval {
-	case Interval1h, Interval24h, Interval10m, Interval1w, Interval1m:
+		// TEMPLATE check-valid-values
+		switch Interval {
+		case Interval1h, Interval24h, Interval10m, Interval1w, Interval1m:
+			params["i"] = Interval
+
+		default:
+			return nil, fmt.Errorf("i value %v is invalid", Interval)
+
+		}
+		// END TEMPLATE check-valid-values
+
+		// assign parameter of Interval
 		params["i"] = Interval
-
-	default:
-		return nil, fmt.Errorf("i value %v is invalid", Interval)
-
+	} else {
 	}
-	// END TEMPLATE check-valid-values
-
-	// assign parameter of Interval
-	params["i"] = Interval
 	// check Format field -> json key f
-	Format := r.Format
+	if r.Format != nil {
+		Format := *r.Format
 
-	// TEMPLATE check-valid-values
-	switch Format {
-	case FormatJSON, FormatCSV:
+		// TEMPLATE check-valid-values
+		switch Format {
+		case FormatJSON, FormatCSV:
+			params["f"] = Format
+
+		default:
+			return nil, fmt.Errorf("f value %v is invalid", Format)
+
+		}
+		// END TEMPLATE check-valid-values
+
+		// assign parameter of Format
 		params["f"] = Format
+	} else {
+		Format := "JSON"
 
-	default:
-		return nil, fmt.Errorf("f value %v is invalid", Format)
-
+		// assign parameter of Format
+		params["f"] = Format
 	}
-	// END TEMPLATE check-valid-values
+	// check Currency field -> json key c
+	if r.Currency != nil {
+		Currency := *r.Currency
 
-	// assign parameter of Format
-	params["f"] = Format
+		// assign parameter of Currency
+		params["c"] = Currency
+	} else {
+	}
 	// check TimestampFormat field -> json key timestamp_format
-	TimestampFormat := r.TimestampFormat
+	if r.TimestampFormat != nil {
+		TimestampFormat := *r.TimestampFormat
 
-	// assign parameter of TimestampFormat
-	params["timestamp_format"] = TimestampFormat
+		// assign parameter of TimestampFormat
+		params["timestamp_format"] = TimestampFormat
+	} else {
+	}
 
 	query := url.Values{}
 	for _k, _v := range params {
