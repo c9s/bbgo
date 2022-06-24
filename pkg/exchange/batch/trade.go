@@ -18,6 +18,11 @@ type TradeBatchQuery struct {
 }
 
 func (e TradeBatchQuery) Query(ctx context.Context, symbol string, options *types.TradeQueryOptions) (c chan types.Trade, errC chan error) {
+	if options.EndTime == nil {
+		now := time.Now()
+		options.EndTime = &now
+	}
+
 	startTime := *options.StartTime
 	endTime := *options.EndTime
 	query := &AsyncTimeRangedBatchQuery{
