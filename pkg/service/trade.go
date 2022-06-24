@@ -252,34 +252,6 @@ func generateMysqlTradingVolumeQuerySQL(options TradingVolumeQueryOptions) strin
 	return sql
 }
 
-// QueryLast queries the last trade from the database
-func (s *TradeService) QueryLast(ex types.ExchangeName, symbol string, isMargin, isFutures, isIsolated bool, limit int) ([]types.Trade, error) {
-	log.Debugf("querying last trade exchange = %s AND symbol = %s AND is_margin = %v AND is_futures = %v AND is_isolated = %v", ex, symbol, isMargin, isFutures, isIsolated)
-
-	sql := "SELECT * FROM trades WHERE exchange = :exchange AND symbol = :symbol AND is_margin = :is_margin AND is_futures = :is_futures AND is_isolated = :is_isolated ORDER BY traded_at DESC LIMIT :limit"
-	rows, err := s.DB.NamedQuery(sql, map[string]interface{}{
-		"symbol":      symbol,
-		"exchange":    ex,
-		"is_margin":   isMargin,
-		"is_futures":  isFutures,
-		"is_isolated": isIsolated,
-		"limit":       limit,
-	})
-	if err != nil {
-		return nil, errors.Wrap(err, "query last trade error")
-	}
-
-	defer rows.Close()
-
-	trades, err := s.scanRows(rows)
-	if err != nil {
-		return nil, err
-	}
-
-	trades = types.SortTradesAscending(trades)
-	return trades, nil
-}
-
 func (s *TradeService) QueryForTradingFeeCurrency(ex types.ExchangeName, symbol string, feeCurrency string) ([]types.Trade, error) {
 	sql := "SELECT * FROM trades WHERE exchange = :exchange AND (symbol = :symbol OR fee_currency = :fee_currency) ORDER BY traded_at ASC"
 	rows, err := s.DB.NamedQuery(sql, map[string]interface{}{
