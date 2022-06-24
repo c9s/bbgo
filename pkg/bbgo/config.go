@@ -131,7 +131,6 @@ func (b *Backtest) GetAccount(n string) BacktestAccount {
 }
 
 type BacktestAccount struct {
-	// TODO: MakerFeeRate should replace the commission fields
 	MakerFeeRate fixedpoint.Value `json:"makerFeeRate,omitempty" yaml:"makerFeeRate,omitempty"`
 	TakerFeeRate fixedpoint.Value `json:"takerFeeRate,omitempty" yaml:"takerFeeRate,omitempty"`
 

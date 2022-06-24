@@ -15,7 +15,7 @@ sessions:
 
 backtest:
   startTime: "2021-09-01"
-  endTime: "2021-09-30"
+  endTime: "2021-11-01"
   sessions:
   - binance
   symbols:
