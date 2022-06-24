@@ -20,8 +20,6 @@ func Test_tradeService(t *testing.T) {
 
 	defer db.Close()
 
-	ctx := context.Background()
-
 	xdb := sqlx.NewDb(db.DB, "sqlite3")
 	service := &TradeService{DB: xdb}
 
