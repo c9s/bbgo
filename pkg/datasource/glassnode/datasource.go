@@ -18,19 +18,44 @@ func New(apiKey string) *DataSource {
 	return &DataSource{client: client}
 }
 
-// query last futures open interest
-// https://docs.glassnode.com/api/derivatives#futures-open-interest
-func (d *DataSource) QueryFuturesOpenInterest(ctx context.Context, currency string) (float64, error) {
-	req := glassnodeapi.DerivativesRequest{
+func (d *DataSource) Query(ctx context.Context, category, metric, asset, interval string, since, until *time.Time) (glassnodeapi.DataSlice, error) {
+	req := glassnodeapi.Request{
 		Client: d.client,
-		Asset:  currency,
-		// 25 hours ago
-		Since:    time.Now().Add(-25 * time.Hour).Unix(),
-		Interval: glassnodeapi.Interval24h,
-		Metric:   "futures_open_interest_sum",
+		Asset:  asset,
+		Format: glassnodeapi.FormatJSON,
+
+		Category: category,
+		Metric:   metric,
+	}
+
+	if since != nil {
+		req.Since = since
+	}
+
+	if until != nil {
+		req.Until = until
+	}
+
+	if interval != "" {
+		req.SetInterval(glassnodeapi.Interval(interval))
 	}
 
 	resp, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return glassnodeapi.DataSlice(resp), nil
+}
+
+// query last futures open interest
+// https://docs.glassnode.com/api/derivatives#futures-open-interest
+func (d *DataSource) QueryFuturesOpenInterest(ctx context.Context, currency string) (float64, error) {
+	until := time.Now()
+	since := until.Add(-25 * time.Hour)
+
+	resp, err := d.Query(ctx, "derivatives", "futures_open_interest_sum", currency, "24h", &since, &until)
+
 	if err != nil {
 		return 0, err
 	}
@@ -41,16 +66,11 @@ func (d *DataSource) QueryFuturesOpenInterest(ctx context.Context, currency stri
 // query last market cap in usd
 // https://docs.glassnode.com/api/market#market-cap
 func (d *DataSource) QueryMarketCapInUSD(ctx context.Context, currency string) (float64, error) {
-	req := glassnodeapi.MarketRequest{
-		Client: d.client,
-		Asset:  currency,
-		// 25 hours ago
-		Since:    time.Now().Add(-25 * time.Hour).Unix(),
-		Interval: glassnodeapi.Interval24h,
-		Metric:   "marketcap_usd",
-	}
+	until := time.Now()
+	since := until.Add(-25 * time.Hour)
 
-	resp, err := req.Do(ctx)
+	resp, err := d.Query(ctx, "market", "marketcap_usd", currency, "24h", &since, &until)
+
 	if err != nil {
 		return 0, err
 	}
