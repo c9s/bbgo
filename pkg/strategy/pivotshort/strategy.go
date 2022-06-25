@@ -29,9 +29,16 @@ type IntervalWindowSetting struct {
 
 // BreakLow -- when price breaks the previous pivot low, we set a trade entry
 type BreakLow struct {
-	Ratio        fixedpoint.Value      `json:"ratio"`
-	MarketOrder  bool                  `json:"marketOrder"`
-	BounceRatio  fixedpoint.Value      `json:"bounceRatio"`
+	// Ratio is a number less than 1.0, price * ratio will be the price triggers the short order.
+	Ratio fixedpoint.Value `json:"ratio"`
+
+	// MarketOrder is the option to enable market order short.
+	MarketOrder bool `json:"marketOrder"`
+
+	// BounceRatio is a ratio used for placing the limit order sell price
+	// limit sell price = breakLowPrice * (1 + BounceRatio)
+	BounceRatio fixedpoint.Value `json:"bounceRatio"`
+
 	Quantity     fixedpoint.Value      `json:"quantity"`
 	StopEMARange fixedpoint.Value      `json:"stopEMARange"`
 	StopEMA      *types.IntervalWindow `json:"stopEMA"`
@@ -258,7 +265,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 					_ = s.orderExecutor.GracefulCancel(ctx)
 
 					s.currentBounceShortPrice = resistancePrice
-					s.placeBounceSellOrders(ctx, s.currentBounceShortPrice, orderExecutor)
+					s.placeBounceSellOrders(ctx, s.currentBounceShortPrice)
 				}
 			}
 		}
@@ -349,7 +356,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 		}
 
-		ratio := fixedpoint.One.Sub(s.BreakLow.Ratio)
+		ratio := fixedpoint.One.Add(s.BreakLow.Ratio)
 		breakPrice := previousLow.Mul(ratio)
 
 		// if previous low is not break, skip
@@ -402,7 +409,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 					_ = s.orderExecutor.GracefulCancel(ctx)
 
 					s.currentBounceShortPrice = resistancePrice
-					s.placeBounceSellOrders(ctx, s.currentBounceShortPrice, orderExecutor)
+					s.placeBounceSellOrders(ctx, s.currentBounceShortPrice)
 				}
 			}
 		}
@@ -447,7 +454,7 @@ func (s *Strategy) findHigherPivotLow(price fixedpoint.Value) (fixedpoint.Value,
 	return price, false
 }
 
-func (s *Strategy) placeBounceSellOrders(ctx context.Context, resistancePrice fixedpoint.Value, orderExecutor bbgo.OrderExecutor) {
+func (s *Strategy) placeBounceSellOrders(ctx context.Context, resistancePrice fixedpoint.Value) {
 	futuresMode := s.session.Futures || s.session.IsolatedFutures
 	totalQuantity := s.BounceShort.Quantity
 	numLayers := s.BounceShort.NumLayers
@@ -467,8 +474,8 @@ func (s *Strategy) placeBounceSellOrders(ctx context.Context, resistancePrice fi
 		quoteBalance := balances[s.Market.QuoteCurrency]
 		baseBalance := balances[s.Market.BaseCurrency]
 
-		// price = (resistance_price * (1.0 - ratio)) * ((1.0 + layerSpread) * i)
-		price := resistancePrice.Mul(fixedpoint.One.Sub(s.BounceShort.Ratio))
+		// price = (resistance_price * (1.0 + ratio)) * ((1.0 + layerSpread) * i)
+		price := resistancePrice.Mul(fixedpoint.One.Add(s.BounceShort.Ratio))
 		spread := layerSpread.Mul(fixedpoint.NewFromInt(int64(i)))
 		price = price.Add(spread)
 		log.Infof("price = %f", price.Float64())
@@ -491,7 +498,7 @@ func (s *Strategy) placeOrder(ctx context.Context, price fixedpoint.Value, quant
 	_, _ = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 		Symbol:   s.Symbol,
 		Side:     types.SideTypeSell,
-		Type:     types.OrderTypeLimit,
+		Type:     types.OrderTypeLimitMaker,
 		Price:    price,
 		Quantity: quantity,
 	})
