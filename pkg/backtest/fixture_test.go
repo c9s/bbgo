@@ -68,12 +68,14 @@ func (g *KLineFixtureGenerator) Generate(ctx context.Context, c chan types.KLine
 }
 
 func TestKLineFixtureGenerator(t *testing.T) {
+	startTime := time.Date(2022, time.January, 1, 0, 0, 0, 0, time.Local)
+	endTime := time.Date(2022, time.January, 31, 0, 0, 0, 0, time.Local)
 	ctx := context.Background()
 	g := &KLineFixtureGenerator{
 		Symbol:     "BTCUSDT",
 		Interval:   types.Interval1m,
-		StartTime:  time.Date(2022, time.January, 1, 0, 0, 0, 0, time.Local),
-		EndTime:    time.Date(2022, time.January, 31, 0, 0, 0, 0, time.Local),
+		StartTime:  startTime,
+		EndTime:    endTime,
 		StartPrice: fixedpoint.NewFromFloat(18000.0),
 	}
 
@@ -85,5 +87,7 @@ func TestKLineFixtureGenerator(t *testing.T) {
 	for k := range c {
 		// high must higher than low
 		assert.True(t, k.High.Compare(k.Low) > 0)
+		assert.True(t, k.StartTime.After(startTime) || k.StartTime.Equal(startTime))
+		assert.True(t, k.StartTime.Before(endTime))
 	}
 }
