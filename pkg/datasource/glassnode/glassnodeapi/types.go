@@ -72,50 +72,50 @@ and
 		...
 	]
 
-both can be stored into the Response structure.
+both can be stored into the DataSlice structure.
 
 Note: use `HasOptions` to verify the type of response.
 */
-type Response []Data
+type DataSlice []Data
 type Data struct {
 	Timestamp Timestamp          `json:"t"`
 	Value     float64            `json:"v"`
 	Options   map[string]float64 `json:"o"`
 }
 
-func (s Response) IsEmpty() bool {
+func (s DataSlice) IsEmpty() bool {
 	return len(s) == 0
 }
 
-func (s Response) First() Data {
+func (s DataSlice) First() Data {
 	if s.IsEmpty() {
 		return Data{}
 	}
 	return s[0]
 }
-func (s Response) FirstValue() float64 {
+func (s DataSlice) FirstValue() float64 {
 	return s.First().Value
 }
 
-func (s Response) FirstOptions() map[string]float64 {
+func (s DataSlice) FirstOptions() map[string]float64 {
 	return s.First().Options
 }
 
-func (s Response) Last() Data {
+func (s DataSlice) Last() Data {
 	if s.IsEmpty() {
 		return Data{}
 	}
 	return s[len(s)-1]
 }
 
-func (s Response) LastValue() float64 {
+func (s DataSlice) LastValue() float64 {
 	return s.Last().Value
 }
 
-func (s Response) LastOptions() map[string]float64 {
+func (s DataSlice) LastOptions() map[string]float64 {
 	return s.Last().Options
 }
 
-func (s Response) HasOptions() bool {
+func (s DataSlice) HasOptions() bool {
 	return len(s.First().Options) != 0
 }
