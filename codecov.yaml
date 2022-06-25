@@ -1,0 +1,21 @@
+codecov:
+  require_ci_to_pass: true
+comment:
+  behavior: default
+  layout: reach,diff,flags,files,footer
+  require_changes: false
+coverage:
+  precision: 2
+  range:
+  - 18.0
+  - 100.0
+  round: down
+github_checks:
+  annotations: false
+parsers:
+  gcov:
+    branch_detection:
+      conditional: true
+      loop: true
+      macro: false
+      method: false
