@@ -38,6 +38,7 @@ func main() {
 
 `))
 
+// generateRunFile renders the wrapper main.go template
 func generateRunFile(filepath string, config *Config, imports []string) error {
 	var buf = bytes.NewBuffer(nil)
 	if err := wrapperTemplate.Execute(buf, struct {
@@ -53,6 +54,7 @@ func generateRunFile(filepath string, config *Config, imports []string) error {
 	return ioutil.WriteFile(filepath, buf.Bytes(), 0644)
 }
 
+// compilePackage generates the main.go file of the wrapper package
 func compilePackage(packageDir string, userConfig *Config, imports []string) error {
 	if _, err := os.Stat(packageDir); os.IsNotExist(err) {
 		if err := os.MkdirAll(packageDir, 0777); err != nil {
@@ -68,6 +70,7 @@ func compilePackage(packageDir string, userConfig *Config, imports []string) err
 	return nil
 }
 
+// Build builds the bbgo wrapper binary with the given build target config
 func Build(ctx context.Context, userConfig *Config, targetConfig BuildTargetConfig) (string, error) {
 	// combine global imports and target imports
 	imports := append(userConfig.Build.Imports, targetConfig.Imports...)
@@ -123,6 +126,7 @@ func Build(ctx context.Context, userConfig *Config, targetConfig BuildTargetConf
 	return output, os.RemoveAll(packageDir)
 }
 
+// BuildTarget builds the one of the targets.
 func BuildTarget(ctx context.Context, userConfig *Config, target BuildTargetConfig) (string, error) {
 	buildDir := userConfig.Build.BuildDir
 	if len(buildDir) == 0 {
