@@ -5,7 +5,7 @@ import {Checkbox, Group, SegmentedControl} from '@mantine/core';
 
 // https://github.com/tradingview/lightweight-charts/issues/543
 // const createChart = dynamic(() => import('lightweight-charts'));
-import {createChart, CrosshairMode} from 'lightweight-charts';
+import {createChart, CrosshairMode, MouseEventParams} from 'lightweight-charts';
 import {ReportSummary} from "../types";
 import moment from "moment";
 
@@ -429,6 +429,38 @@ const TradingViewChart = (props: TradingViewChartProps) => {
       series.setData(chartData.klines);
       series.setMarkers(chartData.markers);
 
+      [9, 27, 99].forEach((w, i) => {
+        const emaValues = calculateEMA(chartData.klines, w)
+        const emaColor = 'rgba(' + w + ', ' + (111 - w) + ', 232, 0.9)'
+        const emaLine = chart.current.addLineSeries({
+          color: emaColor,
+          lineWidth: 1,
+        });
+        emaLine.setData(emaValues);
+
+        const legend = document.createElement('div');
+        legend.className = 'ema-legend';
+        legend.style.display = 'block';
+        legend.style.position = 'absolute';
+        legend.style.left = 3 + 'px';
+        legend.style.zIndex = '99';
+        legend.style.top = 3 + (i * 22) + 'px';
+        chartContainerRef.current.appendChild(legend);
+
+        const setLegendText = (priceValue: any) => {
+          let val = '∅';
+          if (priceValue !== undefined) {
+            val = (Math.round(priceValue * 100) / 100).toFixed(2);
+          }
+          legend.innerHTML = 'EMA' + w + ' <span style="color:' + emaColor + '">' + val + '</span>';
+        }
+
+        setLegendText(emaValues[emaValues.length - 1].value);
+        chart.current.subscribeCrosshairMove((param: MouseEventParams) => {
+          setLegendText(param.seriesPrices.get(emaLine));
+        });
+      })
+
       const volumeData = klinesToVolumeData(chartData.klines);
       const volumeSeries = chart.current.addHistogramSeries({
         color: '#182233',
@@ -467,6 +499,9 @@ const TradingViewChart = (props: TradingViewChartProps) => {
     return () => {
       if (chart.current) {
         chart.current.remove();
+      }
+      if (chartContainerRef.current) {
+        chartContainerRef.current.replaceChildren();
       }
     };
   }, [props.runID, props.reportSummary, currentInterval, showPositionBase, showPositionAverageCost])
@@ -507,10 +542,30 @@ const TradingViewChart = (props: TradingViewChartProps) => {
                   onChange={(event) => setShowPositionAverageCost(event.currentTarget.checked)}/>
       </Group>
 
-      <div ref={chartContainerRef} style={{'flex': 1, 'minHeight': 300}}>
+      <div ref={chartContainerRef} style={{'flex': 1, 'minHeight': 500, position: 'relative'}}>
+
       </div>
     </div>
   );
 };
 
+const calculateEMA = (a: KLine[], r: number) => {
+  return a.map((k) => {
+    return {time: k.time, value: k.close}
+  }).reduce((p: any[], n: any, i: number) => {
+    if (i) {
+      const last = p[p.length - 1]
+      const v = 2 * n.value / (r + 1) + last.value * (r - 1) / (r + 1)
+      return p.concat({value: v, time: n.time})
+    }
+
+    return p
+  }, [{
+    value: a[0].close,
+    time: a[0].time
+  }])
+}
+
+
 export default TradingViewChart;
+
