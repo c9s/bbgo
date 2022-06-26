@@ -168,6 +168,10 @@ func (s *ProtectionStopLoss) handleChange(ctx context.Context, position *types.P
 }
 
 func (s *ProtectionStopLoss) checkStopPrice(closePrice fixedpoint.Value, position *types.Position) {
+	if s.stopLossPrice.IsZero() {
+		return
+	}
+
 	if s.shouldStop(closePrice) {
 		log.Infof("[ProtectionStopLoss] protection stop order is triggered at price %f, position = %+v", closePrice.Float64(), position)
 		if err := s.orderExecutor.ClosePosition(context.Background(), one); err != nil {
