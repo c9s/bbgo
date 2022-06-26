@@ -110,6 +110,20 @@ func (s *ProtectionStopLoss) Bind(session *bbgo.ExchangeSession, orderExecutor *
 			s.handleChange(context.Background(), position, kline.Close, s.orderExecutor)
 		}
 	})
+
+	if !bbgo.IsBackTesting {
+		session.MarketDataStream.OnMarketTrade(func(trade types.Trade) {
+			if trade.Symbol != position.Symbol {
+				return
+			}
+
+			if s.stopLossPrice.IsZero() || s.PlaceStopOrder {
+				return
+			}
+
+			s.checkStopPrice(trade.Price, position)
+		})
+	}
 }
 
 func (s *ProtectionStopLoss) handleChange(ctx context.Context, position *types.Position, closePrice fixedpoint.Value, orderExecutor *bbgo.GeneralOrderExecutor) {
@@ -136,19 +150,27 @@ func (s *ProtectionStopLoss) handleChange(ctx context.Context, position *types.P
 
 			log.Infof("[ProtectionStopLoss] %s protection stop loss activated, current price = %f, average cost = %f, stop loss price = %f",
 				position.Symbol, closePrice.Float64(), position.AverageCost.Float64(), s.stopLossPrice.Float64())
+
+			if s.PlaceStopOrder {
+				if err := s.placeStopOrder(ctx, position, orderExecutor); err != nil {
+					log.WithError(err).Errorf("failed to place stop limit order")
+				}
+				return
+			}
 		} else {
 			// not activated, skip setup stop order
 			return
 		}
 	}
 
-	if s.PlaceStopOrder {
-		if err := s.placeStopOrder(ctx, position, orderExecutor); err != nil {
-			log.WithError(err).Errorf("failed to place stop limit order")
-		}
-	} else if s.shouldStop(closePrice) {
+	// check stop price
+	s.checkStopPrice(closePrice, position)
+}
+
+func (s *ProtectionStopLoss) checkStopPrice(closePrice fixedpoint.Value, position *types.Position) {
+	if s.shouldStop(closePrice) {
 		log.Infof("[ProtectionStopLoss] protection stop order is triggered at price %f, position = %+v", closePrice.Float64(), position)
-		if err := orderExecutor.ClosePosition(ctx, one); err != nil {
+		if err := s.orderExecutor.ClosePosition(context.Background(), one); err != nil {
 			log.WithError(err).Errorf("failed to close position")
 		}
 	}

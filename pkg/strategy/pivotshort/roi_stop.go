@@ -25,17 +25,30 @@ func (s *RoiStopLoss) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Ge
 			return
 		}
 
-		closePrice := kline.Close
-		if position.IsClosed() || position.IsDust(closePrice) {
-			return
-		}
-
-		roi := position.ROI(closePrice)
-		if roi.Compare(s.Percentage.Neg()) < 0 {
-			// stop loss
-			bbgo.Notify("[RoiStopLoss] %s stop loss triggered by ROI %s/%s, price: %f", position.Symbol, roi.Percentage(), s.Percentage.Neg().Percentage(), kline.Close.Float64())
-			_ = orderExecutor.ClosePosition(context.Background(), fixedpoint.One)
-			return
-		}
+		s.checkStopPrice(kline.Close, position)
 	})
+
+	if !bbgo.IsBackTesting {
+		session.MarketDataStream.OnMarketTrade(func(trade types.Trade) {
+			if trade.Symbol != position.Symbol {
+				return
+			}
+
+			s.checkStopPrice(trade.Price, position)
+		})
+	}
+}
+
+func (s *RoiStopLoss) checkStopPrice(closePrice fixedpoint.Value, position *types.Position) {
+	if position.IsClosed() || position.IsDust(closePrice) {
+		return
+	}
+
+	roi := position.ROI(closePrice)
+	if roi.Compare(s.Percentage.Neg()) < 0 {
+		// stop loss
+		bbgo.Notify("[RoiStopLoss] %s stop loss triggered by ROI %s/%s, price: %f", position.Symbol, roi.Percentage(), s.Percentage.Neg().Percentage(), closePrice.Float64())
+		_ = s.orderExecutor.ClosePosition(context.Background(), fixedpoint.One)
+		return
+	}
 }

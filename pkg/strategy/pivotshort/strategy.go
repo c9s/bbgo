@@ -123,6 +123,10 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	if s.BounceShort != nil && s.BounceShort.Enabled {
 		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.BounceShort.Interval})
 	}
+
+	if !bbgo.IsBackTesting {
+		session.Subscribe(types.MarketTradeChannel, s.Symbol, types.SubscribeOptions{})
+	}
 }
 
 func (s *Strategy) useQuantityOrBaseBalance(quantity fixedpoint.Value) fixedpoint.Value {
@@ -189,6 +193,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.TradeStats = &types.TradeStats{}
 	}
 
+	s.lastLow = fixedpoint.Zero
+
 	// StrategyController
 	s.Status = types.StrategyStatusRunning
 
@@ -230,7 +236,13 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.stopEWMA = standardIndicator.EWMA(*s.BreakLow.StopEMA)
 	}
 
-	s.lastLow = fixedpoint.Zero
+	for _, method := range s.ExitMethods {
+		method.Bind(session, s.orderExecutor)
+	}
+
+	session.MarketDataStream.OnMarketTrade(func(trade types.Trade) {
+		log.Info(trade)
+	})
 
 	session.UserDataStream.OnStart(func() {
 		lastKLine := s.preloadPivot(s.pivot, store)
@@ -263,10 +275,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 		}
 	})
-
-	for _, method := range s.ExitMethods {
-		method.Bind(session, s.orderExecutor)
-	}
 
 	// Always check whether you can open a short position or not
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
