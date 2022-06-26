@@ -61,6 +61,8 @@ func TestMulExp(t *testing.T) {
 	assert.Equal(t, digits, 3)
 	step := x.MulExp(-digits + 1)
 	assert.Equal(t, "1.66", step.String())
+	step = x.MulPow(NewFromInt(10), NewFromInt(int64(-digits+1)))
+	assert.Equal(t, "1.66", step.String())
 }
 
 func TestNew(t *testing.T) {

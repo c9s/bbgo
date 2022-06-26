@@ -430,6 +430,10 @@ func (a Value) MulExp(exp int) Value {
 	return Value(int64(float64(a) * math.Pow(10, float64(exp))))
 }
 
+func (a Value) MulPow(v Value, exp Value) Value {
+	return Value(int64(float64(a) * math.Pow(v.Float64(), exp.Float64())))
+}
+
 func (a Value) NumIntDigits() int {
 	digits := 0
 	target := int64(a)
