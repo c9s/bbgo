@@ -1,7 +1,6 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {tsvParse} from "d3-dsv";
-import {Button} from '@mantine/core';
-import { SegmentedControl } from '@mantine/core';
+import {SegmentedControl} from '@mantine/core';
 
 
 // https://github.com/tradingview/lightweight-charts/issues/543
@@ -11,7 +10,7 @@ import {ReportSummary} from "../types";
 import moment from "moment";
 
 const parseKline = () => {
-  return (d : any) => {
+  return (d: any) => {
     d.startTime = new Date(Number(d.startTime) * 1000);
     d.endTime = new Date(Number(d.endTime) * 1000);
     d.time = d.startTime.getTime() / 1000;
@@ -178,7 +177,7 @@ const ordersToMarkets = (interval: string, orders: Array<Order> | void): Array<M
           position: 'belowBar',
           color: '#239D10',
           shape: 'arrowUp',
-          text: ''+order.price
+          text: '' + order.price
           //text: 'B',
         });
         break;
@@ -188,7 +187,7 @@ const ordersToMarkets = (interval: string, orders: Array<Order> | void): Array<M
           position: 'aboveBar',
           color: '#e91e63',
           shape: 'arrowDown',
-          text: ''+order.price
+          text: '' + order.price
           //text: 'S',
         });
         break;
@@ -490,7 +489,9 @@ const TradingViewChart = (props: TradingViewChartProps) => {
     <div>
       <div>
         <SegmentedControl
-          data={intervals.map((interval) => { return { label: interval, value: interval } })}
+          data={intervals.map((interval) => {
+            return {label: interval, value: interval}
+          })}
           onChange={setCurrentInterval}
         />
       </div>

@@ -42,9 +42,10 @@ func TestSimplePriceMatching_orderUpdate(t *testing.T) {
 
 	t1 := time.Date(2021, 7, 1, 0, 0, 0, 0, time.UTC)
 	engine := &SimplePriceMatching{
-		Account:     account,
-		Market:      market,
-		CurrentTime: t1,
+		Account:      account,
+		Market:       market,
+		CurrentTime:  t1,
+		closedOrders: make(map[uint64]types.Order),
 	}
 
 	orderUpdateCnt := 0
@@ -108,9 +109,10 @@ func TestSimplePriceMatching_processKLine(t *testing.T) {
 
 	t1 := time.Date(2021, 7, 1, 0, 0, 0, 0, time.UTC)
 	engine := &SimplePriceMatching{
-		Account:     account,
-		Market:      market,
-		CurrentTime: t1,
+		Account:      account,
+		Market:       market,
+		CurrentTime:  t1,
+		closedOrders: make(map[uint64]types.Order),
 	}
 
 	for i := 0; i <= 5; i++ {
@@ -172,8 +174,9 @@ func TestSimplePriceMatching_PlaceLimitOrder(t *testing.T) {
 	}
 
 	engine := &SimplePriceMatching{
-		Account: account,
-		Market:  market,
+		Account:      account,
+		Market:       market,
+		closedOrders: make(map[uint64]types.Order),
 	}
 
 	for i := 0; i < 5; i++ {
