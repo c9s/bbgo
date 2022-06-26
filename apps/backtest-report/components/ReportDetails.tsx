@@ -185,8 +185,10 @@ const ReportDetails = (props: ReportDetailsProps) => {
 
   const volumeUnit = reportSummary.symbolReports.length == 1 ? reportSummary.symbolReports[0].market.baseCurrency : '';
 
-  return <div>
-    <Container my="sx">
+
+
+  // size xl and padding xs
+  return <Container size={"xl"} px="xs">
       <div>
         <Badge key={strategyName} color="teal">Strategy: {strategyName}</Badge>
         {reportSummary.sessions.map((session) => <Badge key={session} color="teal">Exchange: {session}</Badge>)}
@@ -239,8 +241,8 @@ const ReportDetails = (props: ReportDetailsProps) => {
         }
       </div>
 
-    </Container>
-  </div>;
+    </Container>;
 };
+
 
 export default ReportDetails;

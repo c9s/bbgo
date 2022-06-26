@@ -1,11 +1,11 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {tsvParse} from "d3-dsv";
-import {SegmentedControl} from '@mantine/core';
+import {Checkbox, Group, SegmentedControl, Table} from '@mantine/core';
 
 
 // https://github.com/tradingview/lightweight-charts/issues/543
 // const createChart = dynamic(() => import('lightweight-charts'));
-import {createChart, CrosshairMode} from 'lightweight-charts';
+import {createChart, CrosshairMode, MouseEventParams, TimeRange} from 'lightweight-charts';
 import {ReportSummary} from "../types";
 import moment from "moment";
 
@@ -128,8 +128,10 @@ const parseInterval = (s: string) => {
 };
 
 interface Order {
+  order_id: number;
   order_type: string;
   side: string;
+  symbol: string;
   price: number;
   quantity: number;
   executed_quantity: number;
@@ -147,7 +149,7 @@ interface Marker {
   text: string;
 }
 
-const ordersToMarkets = (interval: string, orders: Array<Order> | void): Array<Marker> => {
+const ordersToMarkers = (interval: string, orders: Array<Order> | void): Array<Marker> => {
   const markers: Array<Marker> = [];
   const intervalSecs = parseInterval(interval);
 
@@ -376,6 +378,10 @@ const TradingViewChart = (props: TradingViewChartProps) => {
   const resizeObserver = useRef<any>();
   const intervals = props.reportSummary.intervals || [];
   const [currentInterval, setCurrentInterval] = useState(intervals.length > 0 ? intervals[0] : '1m');
+  const [showPositionBase, setShowPositionBase] = useState(false);
+  const [showCanceledOrders, setShowCanceledOrders] = useState(false);
+  const [showPositionAverageCost, setShowPositionAverageCost] = useState(false);
+  const [orders, setOrders] = useState<Order[]>([]);
 
   useEffect(() => {
     if (!chartContainerRef.current || chartContainerRef.current.children.length > 0) {
@@ -384,10 +390,13 @@ const TradingViewChart = (props: TradingViewChartProps) => {
 
     const chartData: any = {};
     const fetchers = [];
-    const ordersFetcher = fetchOrders(props.basePath, props.runID).then((orders) => {
-      const markers = ordersToMarkets(currentInterval, orders);
-      chartData.orders = orders;
-      chartData.markers = markers;
+    const ordersFetcher = fetchOrders(props.basePath, props.runID).then((orders: Order[] | void) => {
+      if (orders) {
+        const markers = ordersToMarkers(currentInterval, orders);
+        chartData.orders = orders;
+        chartData.markers = markers;
+        setOrders(orders);
+      }
       return orders;
     });
     fetchers.push(ordersFetcher);
@@ -409,11 +418,6 @@ const TradingViewChart = (props: TradingViewChartProps) => {
 
     Promise.all(fetchers).then(() => {
       console.log("createChart")
-
-      if (chart.current) {
-        chart.current.remove();
-      }
-
       chart.current = createBaseChart(chartContainerRef);
 
       const series = chart.current.addCandlestickSeries({
@@ -425,6 +429,38 @@ const TradingViewChart = (props: TradingViewChartProps) => {
       });
       series.setData(chartData.klines);
       series.setMarkers(chartData.markers);
+
+      [9, 27, 99].forEach((w, i) => {
+        const emaValues = calculateEMA(chartData.klines, w)
+        const emaColor = 'rgba(' + w + ', ' + (111 - w) + ', 232, 0.9)'
+        const emaLine = chart.current.addLineSeries({
+          color: emaColor,
+          lineWidth: 1,
+        });
+        emaLine.setData(emaValues);
+
+        const legend = document.createElement('div');
+        legend.className = 'ema-legend';
+        legend.style.display = 'block';
+        legend.style.position = 'absolute';
+        legend.style.left = 3 + 'px';
+        legend.style.zIndex = '99';
+        legend.style.top = 3 + (i * 22) + 'px';
+        chartContainerRef.current.appendChild(legend);
+
+        const setLegendText = (priceValue: any) => {
+          let val = '∅';
+          if (priceValue !== undefined) {
+            val = (Math.round(priceValue * 100) / 100).toFixed(2);
+          }
+          legend.innerHTML = 'EMA' + w + ' <span style="color:' + emaColor + '">' + val + '</span>';
+        }
+
+        setLegendText(emaValues[emaValues.length - 1].value);
+        chart.current.subscribeCrosshairMove((param: MouseEventParams) => {
+          setLegendText(param.seriesPrices.get(emaLine));
+        });
+      })
 
       const volumeData = klinesToVolumeData(chartData.klines);
       const volumeSeries = chart.current.addHistogramSeries({
@@ -442,64 +478,178 @@ const TradingViewChart = (props: TradingViewChartProps) => {
       volumeSeries.setData(volumeData);
 
       if (chartData.positionHistory) {
-        const lineSeries = chart.current.addLineSeries();
-        const costLine = positionAverageCostHistoryToLineData(currentInterval, chartData.positionHistory);
-        lineSeries.setData(costLine);
+        if (showPositionAverageCost) {
+          const costLineSeries = chart.current.addLineSeries();
+          const costLine = positionAverageCostHistoryToLineData(currentInterval, chartData.positionHistory);
+          costLineSeries.setData(costLine);
+        }
 
-        const baseLineSeries = chart.current.addLineSeries({
-          priceScaleId: 'left',
-          color: '#98338C',
-        });
-        const baseLine = positionBaseHistoryToLineData(currentInterval, chartData.positionHistory)
-        baseLineSeries.setData(baseLine);
+        if (showPositionBase) {
+          const baseLineSeries = chart.current.addLineSeries({
+            priceScaleId: 'left',
+            color: '#98338C',
+          });
+          const baseLine = positionBaseHistoryToLineData(currentInterval, chartData.positionHistory)
+          baseLineSeries.setData(baseLine);
+        }
       }
 
       chart.current.timeScale().fitContent();
+
+      /*
+      chart.current.timeScale().setVisibleRange({
+        from: (new Date(Date.UTC(2018, 0, 1, 0, 0, 0, 0))).getTime() / 1000,
+        to: (new Date(Date.UTC(2018, 1, 1, 0, 0, 0, 0))).getTime() / 1000,
+      });
+      */
+
+      // see:
+      // https://codesandbox.io/s/9inkb?file=/src/styles.css
+      resizeObserver.current = new ResizeObserver(entries => {
+        if (!chart.current) {
+          return;
+        }
+
+        const {width, height} = entries[0].contentRect;
+        chart.current.applyOptions({width, height});
+
+        setTimeout(() => {
+          if (chart.current) {
+            chart.current.timeScale().fitContent();
+          }
+        }, 0);
+      });
+
+      resizeObserver.current.observe(chartContainerRef.current);
     });
 
     return () => {
+      console.log("removeChart")
+
+      resizeObserver.current.disconnect();
+
       if (chart.current) {
         chart.current.remove();
       }
-    };
-  }, [props.runID, props.reportSummary, currentInterval])
-
-  // see:
-  // https://codesandbox.io/s/9inkb?file=/src/styles.css
-  useEffect(() => {
-    resizeObserver.current = new ResizeObserver(entries => {
-      if (!chart.current) {
-        return;
+      if (chartContainerRef.current) {
+        // remove all the children because we created the legend elements
+        chartContainerRef.current.replaceChildren();
       }
 
-      const {width, height} = entries[0].contentRect;
-      chart.current.applyOptions({width, height});
-
-      setTimeout(() => {
-        chart.current.timeScale().fitContent();
-      }, 0);
-    });
-
-    resizeObserver.current.observe(chartContainerRef.current);
-    return () => resizeObserver.current.disconnect();
-  }, []);
-
+    };
+  }, [props.runID, props.reportSummary, currentInterval, showPositionBase, showPositionAverageCost])
 
   return (
     <div>
-      <div>
+      <Group>
         <SegmentedControl
           data={intervals.map((interval) => {
             return {label: interval, value: interval}
           })}
           onChange={setCurrentInterval}
         />
+        <Checkbox label="Position Base" checked={showPositionBase}
+                  onChange={(event) => setShowPositionBase(event.currentTarget.checked)}/>
+        <Checkbox label="Position Average Cost" checked={showPositionAverageCost}
+                  onChange={(event) => setShowPositionAverageCost(event.currentTarget.checked)}/>
+      </Group>
+
+      <div ref={chartContainerRef} style={{'flex': 1, 'minHeight': 500, position: 'relative'}}>
+
       </div>
 
-      <div ref={chartContainerRef} style={{'flex': 1, 'minHeight': 300}}>
-      </div>
+      <Group>
+        <Checkbox label="Show Canceled" checked={showCanceledOrders}
+                  onChange={(event) => setShowCanceledOrders(event.currentTarget.checked)}/>
+
+      </Group>
+      <OrderListTable orders={orders} showCanceled={showCanceledOrders} onClick={(order) => {
+        console.log("selected order", order);
+        const visibleRange = chart.current.timeScale().getVisibleRange()
+        const seconds = parseInterval(currentInterval)
+        const bars = 12
+        const orderTime = order.creation_time.getTime() / 1000
+        const from = orderTime - bars * seconds
+        const to = orderTime + bars * seconds
+
+        console.log("orderTime", orderTime)
+        console.log("visibleRange", visibleRange)
+        console.log("setVisibleRange", from, to, to - from)
+        chart.current.timeScale().setVisibleRange({ from, to } as TimeRange);
+        // chart.current.timeScale().scrollToPosition(20, true);
+      }}/>
     </div>
   );
 };
 
+interface OrderListTableProps {
+  orders: Order[];
+  showCanceled: boolean;
+  onClick?: (order: Order) => void;
+}
+
+const OrderListTable = (props: OrderListTableProps) => {
+  let orders = props.orders;
+
+  if (!props.showCanceled) {
+    orders = orders.filter((order : Order) => {
+      return order.status != "CANCELED"
+    })
+  }
+
+  const rows = orders.map((order: Order) => (
+    <tr key={order.order_id} onClick={(e) => {
+      props.onClick ? props.onClick(order) : null;
+      const nodes = e.currentTarget?.parentNode?.querySelectorAll(".selected")
+      nodes?.forEach((node, i) => {
+        node.classList.remove("selected")
+      })
+      e.currentTarget.classList.add("selected")
+    }}>
+      <td>{order.order_id}</td>
+      <td>{order.symbol}</td>
+      <td>{order.side}</td>
+      <td>{order.order_type}</td>
+      <td>{order.price}</td>
+      <td>{order.quantity}</td>
+      <td>{order.status}</td>
+      <td>{order.creation_time.toString()}</td>
+    </tr>
+  ));
+  return <Table highlightOnHover striped>
+    <thead>
+    <tr>
+      <th>Order ID</th>
+      <th>Symbol</th>
+      <th>Side</th>
+      <th>Order Type</th>
+      <th>Price</th>
+      <th>Quantity</th>
+      <th>Status</th>
+      <th>Creation Time</th>
+    </tr>
+    </thead>
+    <tbody>{rows}</tbody>
+  </Table>
+}
+
+const calculateEMA = (a: KLine[], r: number) => {
+  return a.map((k) => {
+    return {time: k.time, value: k.close}
+  }).reduce((p: any[], n: any, i: number) => {
+    if (i) {
+      const last = p[p.length - 1]
+      const v = 2 * n.value / (r + 1) + last.value * (r - 1) / (r + 1)
+      return p.concat({value: v, time: n.time})
+    }
+
+    return p
+  }, [{
+    value: a[0].close,
+    time: a[0].time
+  }])
+}
+
+
 export default TradingViewChart;
+
