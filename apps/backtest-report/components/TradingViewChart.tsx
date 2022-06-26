@@ -1,6 +1,6 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {tsvParse} from "d3-dsv";
-import {Checkbox, Group, SegmentedControl} from '@mantine/core';
+import {Checkbox, Group, SegmentedControl, Table} from '@mantine/core';
 
 
 // https://github.com/tradingview/lightweight-charts/issues/543
@@ -128,8 +128,10 @@ const parseInterval = (s: string) => {
 };
 
 interface Order {
+  order_id: number;
   order_type: string;
   side: string;
+  symbol: string;
   price: number;
   quantity: number;
   executed_quantity: number;
@@ -147,7 +149,7 @@ interface Marker {
   text: string;
 }
 
-const ordersToMarkets = (interval: string, orders: Array<Order> | void): Array<Marker> => {
+const ordersToMarkers = (interval: string, orders: Array<Order> | void): Array<Marker> => {
   const markers: Array<Marker> = [];
   const intervalSecs = parseInterval(interval);
 
@@ -376,9 +378,9 @@ const TradingViewChart = (props: TradingViewChartProps) => {
   const resizeObserver = useRef<any>();
   const intervals = props.reportSummary.intervals || [];
   const [currentInterval, setCurrentInterval] = useState(intervals.length > 0 ? intervals[0] : '1m');
-
   const [showPositionBase, setShowPositionBase] = useState(false);
   const [showPositionAverageCost, setShowPositionAverageCost] = useState(false);
+  const [orders, setOrders] = useState<Order[]>([]);
 
   useEffect(() => {
     if (!chartContainerRef.current || chartContainerRef.current.children.length > 0) {
@@ -387,10 +389,13 @@ const TradingViewChart = (props: TradingViewChartProps) => {
 
     const chartData: any = {};
     const fetchers = [];
-    const ordersFetcher = fetchOrders(props.basePath, props.runID).then((orders) => {
-      const markers = ordersToMarkets(currentInterval, orders);
-      chartData.orders = orders;
-      chartData.markers = markers;
+    const ordersFetcher = fetchOrders(props.basePath, props.runID).then((orders: Order[] | void) => {
+      if (orders) {
+        const markers = ordersToMarkers(currentInterval, orders);
+        chartData.orders = orders;
+        chartData.markers = markers;
+        setOrders(orders);
+      }
       return orders;
     });
     fetchers.push(ordersFetcher);
@@ -488,8 +493,17 @@ const TradingViewChart = (props: TradingViewChartProps) => {
         }
       }
 
-
       chart.current.timeScale().fitContent();
+      chart.current.timeScale().scrollToPosition(20, true);
+      const visibleRange = chart.current.timeScale().getVisibleRange()
+      console.log("visibleRange", visibleRange)
+
+      /*
+      chart.current.timeScale().setVisibleRange({
+        from: (new Date(Date.UTC(2018, 0, 1, 0, 0, 0, 0))).getTime() / 1000,
+        to: (new Date(Date.UTC(2018, 1, 1, 0, 0, 0, 0))).getTime() / 1000,
+      });
+      */
 
       // see:
       // https://codesandbox.io/s/9inkb?file=/src/styles.css
@@ -545,9 +559,45 @@ const TradingViewChart = (props: TradingViewChartProps) => {
       <div ref={chartContainerRef} style={{'flex': 1, 'minHeight': 500, position: 'relative'}}>
 
       </div>
+
+      <OrderListTable orders={orders}/>
     </div>
   );
 };
+
+interface OrderListTableProps {
+  orders: Order[];
+}
+
+const OrderListTable = (props: OrderListTableProps) => {
+  const rows = props.orders.map((order: Order) => (
+    <tr key={order.order_id}>
+      <td>{order.order_id}</td>
+      <td>{order.symbol}</td>
+      <td>{order.side}</td>
+      <td>{order.order_type}</td>
+      <td>{order.price}</td>
+      <td>{order.quantity}</td>
+      <td>{order.status}</td>
+      <td>{order.creation_time.toString()}</td>
+    </tr>
+  ));
+  return <Table>
+    <thead>
+    <tr>
+      <th>Order ID</th>
+      <th>Symbol</th>
+      <th>Side</th>
+      <th>Order Type</th>
+      <th>Price</th>
+      <th>Quantity</th>
+      <th>Status</th>
+      <th>Creation Time</th>
+    </tr>
+    </thead>
+    <tbody>{rows}</tbody>
+  </Table>
+}
 
 const calculateEMA = (a: KLine[], r: number) => {
   return a.map((k) => {
