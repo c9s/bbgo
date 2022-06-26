@@ -174,6 +174,11 @@ func (p *Position) GetBase() (base fixedpoint.Value) {
 	return base
 }
 
+func (p *Position) GetQuantity() fixedpoint.Value {
+	base := p.GetBase()
+	return base.Abs()
+}
+
 func (p *Position) UnrealizedProfit(price fixedpoint.Value) fixedpoint.Value {
 	quantity := p.GetBase().Abs()
 
