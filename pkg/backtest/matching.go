@@ -56,7 +56,7 @@ type SimplePriceMatching struct {
 	mu           sync.Mutex
 	bidOrders    []types.Order
 	askOrders    []types.Order
-	closedOrders []types.Order
+	closedOrders map[uint64]types.Order
 
 	LastPrice   fixedpoint.Value
 	LastKLine   types.KLine
@@ -375,8 +375,9 @@ func (m *SimplePriceMatching) BuyToPrice(price fixedpoint.Value) (closedOrders [
 		trades = append(trades, trade)
 
 		m.EmitOrderUpdate(o)
+
+		m.closedOrders[o.OrderID] = o
 	}
-	m.closedOrders = append(m.closedOrders, closedOrders...)
 
 	return closedOrders, trades
 }
@@ -445,10 +446,31 @@ func (m *SimplePriceMatching) SellToPrice(price fixedpoint.Value) (closedOrders 
 		trades = append(trades, trade)
 
 		m.EmitOrderUpdate(o)
+
+		m.closedOrders[o.OrderID] = o
 	}
-	m.closedOrders = append(m.closedOrders, closedOrders...)
 
 	return closedOrders, trades
+}
+
+func (m *SimplePriceMatching) getOrder(orderID uint64) (types.Order, bool) {
+	if o, ok := m.closedOrders[orderID]; ok {
+		return o, true
+	}
+
+	for _, o := range m.bidOrders {
+		if o.OrderID == orderID {
+			return o, true
+		}
+	}
+
+	for _, o := range m.askOrders {
+		if o.OrderID == orderID {
+			return o, true
+		}
+	}
+
+	return types.Order{}, false
 }
 
 func (m *SimplePriceMatching) processKLine(kline types.KLine) {
