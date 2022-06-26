@@ -60,33 +60,31 @@ exchangeStrategies:
       numOfLayers: 1
       layerSpread: 0.1%
 
-    exit:
-      # roiStopLossPercentage is the stop loss percentage of the position ROI (currently the price change)
-      roiStopLossPercentage: 2%
+    exits:
+    # roiStopLoss is the stop loss percentage of the position ROI (currently the price change)
+    - roiStopLoss:
+        percentage: 2%
 
-      # roiTakeProfitPercentage is used to force taking profit by percentage of the position ROI (currently the price change)
-      # force to take the profit ROI exceeded the percentage.
-      roiTakeProfitPercentage: 30%
+    # roiTakeProfit is used to force taking profit by percentage of the position ROI (currently the price change)
+    # force to take the profit ROI exceeded the percentage.
+    - roiTakeProfit:
+        percentage: 30%
 
-      # roiMinTakeProfitPercentage applies to lowerShadowRatio and cumulatedVolume exit options
-      roiMinTakeProfitPercentage: 10%
-
-      roiProtectionStopLoss:
+    - protectionStopLoss:
         activationRatio: 1%
         stopLossRatio: 0.2%
+        placeStopOrder: true
 
-      # lowerShadowRatio is used to taking profit when the (lower shadow height / low price) > lowerShadowRatio
-      # you can grab a simple stats by the following SQL:
-      # SELECT ((close - low) / close) AS shadow_ratio FROM binance_klines WHERE symbol = 'ETHUSDT' AND `interval` = '5m' AND start_time > '2022-01-01' ORDER BY shadow_ratio DESC LIMIT 20;
-      lowerShadowRatio: 3%
+    # lowerShadowTakeProfit is used to taking profit when the (lower shadow height / low price) > lowerShadowRatio
+    # you can grab a simple stats by the following SQL:
+    # SELECT ((close - low) / close) AS shadow_ratio FROM binance_klines WHERE symbol = 'ETHUSDT' AND `interval` = '5m' AND start_time > '2022-01-01' ORDER BY shadow_ratio DESC LIMIT 20;
+    - lowerShadowTakeProfit:
+        ratio: 3%
 
-      # cumulatedVolume is used to take profit when the cumulated quote volume from the klines exceeded a threshold
-      cumulatedVolume:
-        enabled: true
+    # cumulatedVolumeTakeProfit is used to take profit when the cumulated quote volume from the klines exceeded a threshold
+    - cumulatedVolumeTakeProfit:
         minQuoteVolume: 90_000_000
         window: 5
-
-      marginOrderSideEffect: repay
 
 backtest:
   sessions:
