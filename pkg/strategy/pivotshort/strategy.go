@@ -240,10 +240,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		method.Bind(session, s.orderExecutor)
 	}
 
-	session.MarketDataStream.OnMarketTrade(func(trade types.Trade) {
-		log.Info(trade)
-	})
-
 	session.UserDataStream.OnStart(func() {
 		lastKLine := s.preloadPivot(s.pivot, store)
 
