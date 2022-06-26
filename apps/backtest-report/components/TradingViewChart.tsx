@@ -1,6 +1,6 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {tsvParse} from "d3-dsv";
-import {SegmentedControl} from '@mantine/core';
+import {Checkbox, Group, SegmentedControl} from '@mantine/core';
 
 
 // https://github.com/tradingview/lightweight-charts/issues/543
@@ -377,6 +377,9 @@ const TradingViewChart = (props: TradingViewChartProps) => {
   const intervals = props.reportSummary.intervals || [];
   const [currentInterval, setCurrentInterval] = useState(intervals.length > 0 ? intervals[0] : '1m');
 
+  const [showPositionBase, setShowPositionBase] = useState(false);
+  const [showPositionAverageCost, setShowPositionAverageCost] = useState(false);
+
   useEffect(() => {
     if (!chartContainerRef.current || chartContainerRef.current.children.length > 0) {
       return;
@@ -442,16 +445,20 @@ const TradingViewChart = (props: TradingViewChartProps) => {
       volumeSeries.setData(volumeData);
 
       if (chartData.positionHistory) {
-        const lineSeries = chart.current.addLineSeries();
-        const costLine = positionAverageCostHistoryToLineData(currentInterval, chartData.positionHistory);
-        lineSeries.setData(costLine);
+        if (showPositionAverageCost) {
+          const costLineSeries = chart.current.addLineSeries();
+          const costLine = positionAverageCostHistoryToLineData(currentInterval, chartData.positionHistory);
+          costLineSeries.setData(costLine);
+        }
 
-        const baseLineSeries = chart.current.addLineSeries({
-          priceScaleId: 'left',
-          color: '#98338C',
-        });
-        const baseLine = positionBaseHistoryToLineData(currentInterval, chartData.positionHistory)
-        baseLineSeries.setData(baseLine);
+        if (showPositionBase) {
+          const baseLineSeries = chart.current.addLineSeries({
+            priceScaleId: 'left',
+            color: '#98338C',
+          });
+          const baseLine = positionBaseHistoryToLineData(currentInterval, chartData.positionHistory)
+          baseLineSeries.setData(baseLine);
+        }
       }
 
       chart.current.timeScale().fitContent();
@@ -462,7 +469,7 @@ const TradingViewChart = (props: TradingViewChartProps) => {
         chart.current.remove();
       }
     };
-  }, [props.runID, props.reportSummary, currentInterval])
+  }, [props.runID, props.reportSummary, currentInterval, showPositionBase, showPositionAverageCost])
 
   // see:
   // https://codesandbox.io/s/9inkb?file=/src/styles.css
@@ -487,14 +494,18 @@ const TradingViewChart = (props: TradingViewChartProps) => {
 
   return (
     <div>
-      <div>
+      <Group>
         <SegmentedControl
           data={intervals.map((interval) => {
             return {label: interval, value: interval}
           })}
           onChange={setCurrentInterval}
         />
-      </div>
+        <Checkbox label="Position Base" checked={showPositionBase}
+                  onChange={(event) => setShowPositionBase(event.currentTarget.checked)}/>
+        <Checkbox label="Position Average Cost" checked={showPositionAverageCost}
+                  onChange={(event) => setShowPositionAverageCost(event.currentTarget.checked)}/>
+      </Group>
 
       <div ref={chartContainerRef} style={{'flex': 1, 'minHeight': 300}}>
       </div>
