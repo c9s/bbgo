@@ -5,7 +5,7 @@ import {Checkbox, Group, SegmentedControl, Table} from '@mantine/core';
 
 // https://github.com/tradingview/lightweight-charts/issues/543
 // const createChart = dynamic(() => import('lightweight-charts'));
-import {createChart, CrosshairMode, MouseEventParams} from 'lightweight-charts';
+import {createChart, CrosshairMode, MouseEventParams, TimeRange} from 'lightweight-charts';
 import {ReportSummary} from "../types";
 import moment from "moment";
 
@@ -494,9 +494,6 @@ const TradingViewChart = (props: TradingViewChartProps) => {
       }
 
       chart.current.timeScale().fitContent();
-      chart.current.timeScale().scrollToPosition(20, true);
-      const visibleRange = chart.current.timeScale().getVisibleRange()
-      console.log("visibleRange", visibleRange)
 
       /*
       chart.current.timeScale().setVisibleRange({
@@ -560,18 +557,40 @@ const TradingViewChart = (props: TradingViewChartProps) => {
 
       </div>
 
-      <OrderListTable orders={orders}/>
+      <OrderListTable orders={orders} onClick={(order) => {
+        console.log("selected order", order);
+        const visibleRange = chart.current.timeScale().getVisibleRange()
+        const seconds = parseInterval(currentInterval)
+        const bars = 12
+        const orderTime = order.creation_time.getTime() / 1000
+        const from = orderTime - bars * seconds
+        const to = orderTime + bars * seconds
+
+        console.log("orderTime", orderTime)
+        console.log("visibleRange", visibleRange)
+        console.log("setVisibleRange", from, to, to - from)
+        chart.current.timeScale().setVisibleRange({ from, to } as TimeRange);
+        // chart.current.timeScale().scrollToPosition(20, true);
+      }}/>
     </div>
   );
 };
 
 interface OrderListTableProps {
   orders: Order[];
+  onClick?: (order: Order) => void;
 }
 
 const OrderListTable = (props: OrderListTableProps) => {
   const rows = props.orders.map((order: Order) => (
-    <tr key={order.order_id}>
+    <tr key={order.order_id} onClick={(e) => {
+      props.onClick ? props.onClick(order) : null;
+      const nodes = e.currentTarget?.parentNode?.querySelectorAll(".selected")
+      nodes?.forEach((node, i) => {
+        node.classList.remove("selected")
+      })
+      e.currentTarget.classList.add("selected")
+    }}>
       <td>{order.order_id}</td>
       <td>{order.symbol}</td>
       <td>{order.side}</td>
@@ -582,7 +601,7 @@ const OrderListTable = (props: OrderListTableProps) => {
       <td>{order.creation_time.toString()}</td>
     </tr>
   ));
-  return <Table>
+  return <Table highlightOnHover striped>
     <thead>
     <tr>
       <th>Order ID</th>
