@@ -30,6 +30,7 @@ package backtest
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -69,6 +70,20 @@ type Exchange struct {
 	matchingBooksMutex sync.Mutex
 
 	markets types.MarketMap
+}
+
+func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.Order, error) {
+	book := e.matchingBooks[q.Symbol]
+	oid, err := strconv.ParseUint(q.OrderID, 10, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	order, ok := book.getOrder(oid)
+	if ok {
+		return &order, nil
+	}
+	return nil, nil
 }
 
 func NewExchange(sourceName types.ExchangeName, sourceExchange types.Exchange, srv *service.BacktestService, config *bbgo.Backtest) (*Exchange, error) {
@@ -144,9 +159,10 @@ func (e *Exchange) addMatchingBook(symbol string, market types.Market) {
 
 func (e *Exchange) _addMatchingBook(symbol string, market types.Market) {
 	e.matchingBooks[symbol] = &SimplePriceMatching{
-		CurrentTime: e.startTime,
-		Account:     e.account,
-		Market:      market,
+		CurrentTime:  e.startTime,
+		Account:      e.account,
+		Market:       market,
+		closedOrders: make(map[uint64]types.Order),
 	}
 }
 
