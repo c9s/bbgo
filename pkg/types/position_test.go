@@ -10,6 +10,22 @@ import (
 
 const Delta = 1e-9
 
+func TestPosition_ROI(t *testing.T) {
+	pos := &Position{
+		Symbol:        "BTCUSDT",
+		BaseCurrency:  "BTC",
+		QuoteCurrency: "USDT",
+		Base:          fixedpoint.NewFromFloat(10.0),
+		AverageCost:   fixedpoint.NewFromFloat(8000.0),
+		Quote:         fixedpoint.NewFromFloat(-8000.0 * 10.0),
+	}
+
+	currentPrice := fixedpoint.NewFromFloat(10000.0)
+	roi := pos.ROI(currentPrice)
+	assert.Equal(t, "0.25", roi.String())
+	assert.Equal(t, "25%", roi.Percentage())
+}
+
 func TestPosition_ExchangeFeeRate_Short(t *testing.T) {
 	pos := &Position{
 		Symbol:        "BTCUSDT",
