@@ -17,6 +17,9 @@ import (
 
 const ID = "pivotshort"
 
+var one = fixedpoint.One
+var zero = fixedpoint.Zero
+
 var log = logrus.WithField("strategy", ID)
 
 func init() {
@@ -72,9 +75,11 @@ type CumulatedVolume struct {
 }
 
 type Exit struct {
-	RoiStopLossPercentage      fixedpoint.Value `json:"roiStopLossPercentage"`
-	RoiTakeProfitPercentage    fixedpoint.Value `json:"roiTakeProfitPercentage"`
 	RoiMinTakeProfitPercentage fixedpoint.Value `json:"roiMinTakeProfitPercentage"`
+
+	RoiTakeProfit      *RoiTakeProfit      `json:"roiTakeProfit"`
+	RoiStopLoss        *RoiStopLoss        `json:"roiStopLoss"`
+	ProtectionStopLoss *ProtectionStopLoss `json:"protectionStopLoss"`
 
 	LowerShadowRatio fixedpoint.Value `json:"lowerShadowRatio"`
 
@@ -108,6 +113,7 @@ type Strategy struct {
 	session       *bbgo.ExchangeSession
 	orderExecutor *bbgo.GeneralOrderExecutor
 
+	stopLossPrice           fixedpoint.Value
 	lastLow                 fixedpoint.Value
 	pivot                   *indicator.Pivot
 	resistancePivot         *indicator.Pivot
@@ -178,6 +184,7 @@ func (s *Strategy) CurrentPosition() *types.Position {
 }
 
 func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Value) error {
+	bbgo.Notify("Closing position", s.Position)
 	return s.orderExecutor.ClosePosition(ctx, percentage)
 }
 
@@ -271,9 +278,20 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 	})
 
+	if s.Exit.ProtectionStopLoss != nil {
+		s.Exit.ProtectionStopLoss.Bind(session, s.orderExecutor)
+	}
+
+	if s.Exit.RoiStopLoss != nil {
+		s.Exit.RoiStopLoss.Bind(session, s.orderExecutor)
+	}
+
+	if s.Exit.RoiTakeProfit != nil {
+		s.Exit.RoiTakeProfit.Bind(session, s.orderExecutor)
+	}
+
 	// Always check whether you can open a short position or not
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
-		// StrategyController
 		if s.Status != types.StrategyStatusRunning {
 			return
 		}
@@ -285,21 +303,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		isPositionOpened := !s.Position.IsClosed() && !s.Position.IsDust(kline.Close)
 
 		if isPositionOpened && s.Position.IsShort() {
-			// calculate return rate
-			// TODO: apply quantity to this formula
-			roi := s.Position.AverageCost.Sub(kline.Close).Div(s.Position.AverageCost)
-			if roi.Compare(s.Exit.RoiStopLossPercentage.Neg()) < 0 {
-				// stop loss
-				bbgo.Notify("%s ROI StopLoss triggered at price %f: Loss %s", s.Symbol, kline.Close.Float64(), roi.Percentage())
-				_ = s.ClosePosition(ctx, fixedpoint.One)
-				return
-			} else {
-				// take profit
-				if roi.Compare(s.Exit.RoiTakeProfitPercentage) > 0 { // force take profit
-					bbgo.Notify("%s TakeProfit triggered at price %f: by ROI percentage %s", s.Symbol, kline.Close.Float64(), roi.Percentage(), kline)
-					_ = s.ClosePosition(ctx, fixedpoint.One)
-					return
-				} else if !s.Exit.RoiMinTakeProfitPercentage.IsZero() && roi.Compare(s.Exit.RoiMinTakeProfitPercentage) > 0 {
+			roi := s.Position.ROI(kline.Close)
+			if !s.Exit.RoiMinTakeProfitPercentage.IsZero() {
+				if roi.Compare(s.Exit.RoiMinTakeProfitPercentage) > 0 {
 					if !s.Exit.LowerShadowRatio.IsZero() && kline.GetLowerShadowHeight().Div(kline.Close).Compare(s.Exit.LowerShadowRatio) > 0 {
 						bbgo.Notify("%s TakeProfit triggered at price %f: by shadow ratio %f",
 							s.Symbol,
@@ -334,6 +340,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 
 		if len(s.pivotLowPrices) == 0 {
+			log.Infof("currently there is no pivot low prices, skip placing orders...")
 			return
 		}
 

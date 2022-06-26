@@ -14,11 +14,6 @@ import (
 type OrderExecutor interface {
 	SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error)
 	CancelOrders(ctx context.Context, orders ...types.Order) error
-
-	OnTradeUpdate(cb func(trade types.Trade))
-	OnOrderUpdate(cb func(order types.Order))
-	EmitTradeUpdate(trade types.Trade)
-	EmitOrderUpdate(order types.Order)
 }
 
 type OrderExecutionRouter interface {
