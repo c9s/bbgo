@@ -379,6 +379,7 @@ const TradingViewChart = (props: TradingViewChartProps) => {
   const intervals = props.reportSummary.intervals || [];
   const [currentInterval, setCurrentInterval] = useState(intervals.length > 0 ? intervals[0] : '1m');
   const [showPositionBase, setShowPositionBase] = useState(false);
+  const [showCanceledOrders, setShowCanceledOrders] = useState(false);
   const [showPositionAverageCost, setShowPositionAverageCost] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
 
@@ -557,7 +558,12 @@ const TradingViewChart = (props: TradingViewChartProps) => {
 
       </div>
 
-      <OrderListTable orders={orders} onClick={(order) => {
+      <Group>
+        <Checkbox label="Show Canceled" checked={showCanceledOrders}
+                  onChange={(event) => setShowCanceledOrders(event.currentTarget.checked)}/>
+
+      </Group>
+      <OrderListTable orders={orders} showCanceled={showCanceledOrders} onClick={(order) => {
         console.log("selected order", order);
         const visibleRange = chart.current.timeScale().getVisibleRange()
         const seconds = parseInterval(currentInterval)
@@ -578,11 +584,20 @@ const TradingViewChart = (props: TradingViewChartProps) => {
 
 interface OrderListTableProps {
   orders: Order[];
+  showCanceled: boolean;
   onClick?: (order: Order) => void;
 }
 
 const OrderListTable = (props: OrderListTableProps) => {
-  const rows = props.orders.map((order: Order) => (
+  let orders = props.orders;
+
+  if (!props.showCanceled) {
+    orders = orders.filter((order : Order) => {
+      return order.status != "CANCELED"
+    })
+  }
+
+  const rows = orders.map((order: Order) => (
     <tr key={order.order_id} onClick={(e) => {
       props.onClick ? props.onClick(order) : null;
       const nodes = e.currentTarget?.parentNode?.querySelectorAll(".selected")
