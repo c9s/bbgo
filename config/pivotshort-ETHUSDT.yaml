@@ -21,7 +21,7 @@ exchangeStrategies:
     # breakLow settings are used for shorting when the current price break the previous low
     breakLow:
       # ratio is how much the price breaks the previous low to trigger the short.
-      ratio: 0.1%
+      ratio: -0.1%
 
       # quantity is used for submitting the sell order
       # if quantity is not set, all base balance will be used for selling the short.
@@ -70,6 +70,10 @@ exchangeStrategies:
 
       # roiMinTakeProfitPercentage applies to lowerShadowRatio and cumulatedVolume exit options
       roiMinTakeProfitPercentage: 10%
+
+      roiProtectionStopLoss:
+        activationRatio: 1%
+        stopLossRatio: 0.2%
 
       # lowerShadowRatio is used to taking profit when the (lower shadow height / low price) > lowerShadowRatio
       # you can grab a simple stats by the following SQL:
