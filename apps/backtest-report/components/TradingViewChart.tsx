@@ -1,6 +1,8 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {tsvParse} from "d3-dsv";
 import {Button} from '@mantine/core';
+import { SegmentedControl } from '@mantine/core';
+
 
 // https://github.com/tradingview/lightweight-charts/issues/543
 // const createChart = dynamic(() => import('lightweight-charts'));
@@ -483,17 +485,16 @@ const TradingViewChart = (props: TradingViewChartProps) => {
     return () => resizeObserver.current.disconnect();
   }, []);
 
+
   return (
     <div>
-      <span>
-        {intervals.map((interval) => {
-          return <Button key={interval} compact onClick={() => {
-            setCurrentInterval(interval)
-          }}>
-            {interval}
-          </Button>
-        })}
-      </span>
+      <div>
+        <SegmentedControl
+          data={intervals.map((interval) => { return { label: interval, value: interval } })}
+          onChange={setCurrentInterval}
+        />
+      </div>
+
       <div ref={chartContainerRef} style={{'flex': 1, 'minHeight': 300}}>
       </div>
     </div>
