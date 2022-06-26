@@ -74,20 +74,6 @@ type CumulatedVolume struct {
 	Window         int              `json:"window"`
 }
 
-type Exit struct {
-	RoiMinTakeProfitPercentage fixedpoint.Value `json:"roiMinTakeProfitPercentage"`
-
-	RoiTakeProfit      *RoiTakeProfit      `json:"roiTakeProfit"`
-	RoiStopLoss        *RoiStopLoss        `json:"roiStopLoss"`
-	ProtectionStopLoss *ProtectionStopLoss `json:"protectionStopLoss"`
-
-	LowerShadowRatio fixedpoint.Value `json:"lowerShadowRatio"`
-
-	CumulatedVolume *CumulatedVolume `json:"cumulatedVolume"`
-
-	MarginSideEffect types.MarginOrderSideEffectType `json:"marginOrderSideEffect"`
-}
-
 type Strategy struct {
 	*bbgo.Graceful
 
@@ -107,8 +93,8 @@ type Strategy struct {
 
 	BounceShort *BounceShort `json:"bounceShort"`
 
-	Entry Entry `json:"entry"`
-	Exit  Exit  `json:"exit"`
+	Entry       Entry        `json:"entry"`
+	ExitMethods []ExitMethod `json:"exits"`
 
 	session       *bbgo.ExchangeSession
 	orderExecutor *bbgo.GeneralOrderExecutor
@@ -278,16 +264,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 	})
 
-	if s.Exit.ProtectionStopLoss != nil {
-		s.Exit.ProtectionStopLoss.Bind(session, s.orderExecutor)
-	}
-
-	if s.Exit.RoiStopLoss != nil {
-		s.Exit.RoiStopLoss.Bind(session, s.orderExecutor)
-	}
-
-	if s.Exit.RoiTakeProfit != nil {
-		s.Exit.RoiTakeProfit.Bind(session, s.orderExecutor)
+	for _, method := range s.ExitMethods {
+		method.Bind(session, s.orderExecutor)
 	}
 
 	// Always check whether you can open a short position or not
@@ -301,42 +279,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 
 		isPositionOpened := !s.Position.IsClosed() && !s.Position.IsDust(kline.Close)
-
 		if isPositionOpened && s.Position.IsShort() {
-			roi := s.Position.ROI(kline.Close)
-			if !s.Exit.RoiMinTakeProfitPercentage.IsZero() {
-				if roi.Compare(s.Exit.RoiMinTakeProfitPercentage) > 0 {
-					if !s.Exit.LowerShadowRatio.IsZero() && kline.GetLowerShadowHeight().Div(kline.Close).Compare(s.Exit.LowerShadowRatio) > 0 {
-						bbgo.Notify("%s TakeProfit triggered at price %f: by shadow ratio %f",
-							s.Symbol,
-							kline.Close.Float64(),
-							kline.GetLowerShadowRatio().Float64(), kline)
-						_ = s.ClosePosition(ctx, fixedpoint.One)
-						return
-					} else if s.Exit.CumulatedVolume != nil && s.Exit.CumulatedVolume.Enabled {
-						if klines, ok := store.KLinesOfInterval(s.Interval); ok {
-							var cbv = fixedpoint.Zero
-							var cqv = fixedpoint.Zero
-							for i := 0; i < s.Exit.CumulatedVolume.Window; i++ {
-								last := (*klines)[len(*klines)-1-i]
-								cqv = cqv.Add(last.QuoteVolume)
-								cbv = cbv.Add(last.Volume)
-							}
-
-							if cqv.Compare(s.Exit.CumulatedVolume.MinQuoteVolume) > 0 {
-								bbgo.Notify("%s TakeProfit triggered at price %f: by cumulated volume (window: %d) %f > %f",
-									s.Symbol,
-									kline.Close.Float64(),
-									s.Exit.CumulatedVolume.Window,
-									cqv.Float64(),
-									s.Exit.CumulatedVolume.MinQuoteVolume.Float64())
-								_ = s.ClosePosition(ctx, fixedpoint.One)
-								return
-							}
-						}
-					}
-				}
-			}
+			return
 		}
 
 		if len(s.pivotLowPrices) == 0 {
