@@ -412,11 +412,6 @@ const TradingViewChart = (props: TradingViewChartProps) => {
 
     Promise.all(fetchers).then(() => {
       console.log("createChart")
-
-      if (chart.current) {
-        chart.current.remove();
-      }
-
       chart.current = createBaseChart(chartContainerRef);
 
       const series = chart.current.addCandlestickSeries({
@@ -493,39 +488,44 @@ const TradingViewChart = (props: TradingViewChartProps) => {
         }
       }
 
+
       chart.current.timeScale().fitContent();
+
+      // see:
+      // https://codesandbox.io/s/9inkb?file=/src/styles.css
+      resizeObserver.current = new ResizeObserver(entries => {
+        if (!chart.current) {
+          return;
+        }
+
+        const {width, height} = entries[0].contentRect;
+        chart.current.applyOptions({width, height});
+
+        setTimeout(() => {
+          if (chart.current) {
+            chart.current.timeScale().fitContent();
+          }
+        }, 0);
+      });
+
+      resizeObserver.current.observe(chartContainerRef.current);
     });
 
     return () => {
+      console.log("removeChart")
+
+      resizeObserver.current.disconnect();
+
       if (chart.current) {
         chart.current.remove();
       }
       if (chartContainerRef.current) {
+        // remove all the children because we created the legend elements
         chartContainerRef.current.replaceChildren();
       }
+
     };
   }, [props.runID, props.reportSummary, currentInterval, showPositionBase, showPositionAverageCost])
-
-  // see:
-  // https://codesandbox.io/s/9inkb?file=/src/styles.css
-  useEffect(() => {
-    resizeObserver.current = new ResizeObserver(entries => {
-      if (!chart.current) {
-        return;
-      }
-
-      const {width, height} = entries[0].contentRect;
-      chart.current.applyOptions({width, height});
-
-      setTimeout(() => {
-        chart.current.timeScale().fitContent();
-      }, 0);
-    });
-
-    resizeObserver.current.observe(chartContainerRef.current);
-    return () => resizeObserver.current.disconnect();
-  }, []);
-
 
   return (
     <div>
