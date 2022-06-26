@@ -5,10 +5,8 @@ import "github.com/c9s/bbgo/pkg/bbgo"
 type ExitMethod struct {
 	RoiStopLoss        *RoiStopLoss        `json:"roiStopLoss"`
 	ProtectionStopLoss *ProtectionStopLoss `json:"protectionStopLoss"`
-
 	RoiTakeProfit         *RoiTakeProfit         `json:"roiTakeProfit"`
 	LowerShadowTakeProfit *LowerShadowTakeProfit `json:"lowerShadowTakeProfit"`
-
 	CumulatedVolumeTakeProfit *CumulatedVolumeTakeProfit `json:"cumulatedVolumeTakeProfit"`
 }
 
