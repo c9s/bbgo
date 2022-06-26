@@ -10,7 +10,6 @@ type ExitMethod struct {
 	LowerShadowTakeProfit *LowerShadowTakeProfit `json:"lowerShadowTakeProfit"`
 
 	CumulatedVolumeTakeProfit *CumulatedVolumeTakeProfit `json:"cumulatedVolumeTakeProfit"`
-	// MarginSideEffect types.MarginOrderSideEffectType `json:"marginOrderSideEffect"`
 }
 
 func (m *ExitMethod) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.GeneralOrderExecutor) {
