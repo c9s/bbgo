@@ -85,6 +85,11 @@ func (e *GeneralOrderExecutor) Bind() {
 	e.tradeCollector.BindStream(e.session.UserDataStream)
 }
 
+func (e *GeneralOrderExecutor) CancelOrders(ctx context.Context, orders ...types.Order) error {
+	err := e.session.Exchange.CancelOrders(ctx, orders...)
+	return err
+}
+
 func (e *GeneralOrderExecutor) SubmitOrders(ctx context.Context, submitOrders ...types.SubmitOrder) (types.OrderSlice, error) {
 	formattedOrders, err := e.session.FormatOrders(submitOrders)
 	if err != nil {
@@ -124,4 +129,12 @@ func (e *GeneralOrderExecutor) ClosePosition(ctx context.Context, percentage fix
 
 func (e *GeneralOrderExecutor) TradeCollector() *TradeCollector {
 	return e.tradeCollector
+}
+
+func (e *GeneralOrderExecutor) Session() *ExchangeSession {
+	return e.session
+}
+
+func (e *GeneralOrderExecutor) Position() *types.Position {
+	return e.position
 }

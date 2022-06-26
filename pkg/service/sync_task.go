@@ -176,7 +176,7 @@ func lastRecordTime(sel SyncTask, recordSlice reflect.Value, defaultTime time.Ti
 	length := recordSlice.Len()
 	if length > 0 {
 		last := recordSlice.Index(length - 1)
-		since = sel.Time(last)
+		since = sel.Time(last.Interface())
 	}
 
 	return since

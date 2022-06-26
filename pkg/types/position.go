@@ -122,6 +122,15 @@ func (p *Position) NewProfit(trade Trade, profit, netProfit fixedpoint.Value) Pr
 	}
 }
 
+// ROI -- Return on investment (ROI) is a performance measure used to evaluate the efficiency or profitability of an investment
+// or compare the efficiency of a number of different investments.
+// ROI tries to directly measure the amount of return on a particular investment, relative to the investment's cost.
+func (p *Position) ROI(price fixedpoint.Value) fixedpoint.Value {
+	unrealizedProfit := p.UnrealizedProfit(price)
+	cost := p.AverageCost.Mul(p.Base.Abs())
+	return unrealizedProfit.Div(cost)
+}
+
 func (p *Position) NewMarketCloseOrder(percentage fixedpoint.Value) *SubmitOrder {
 	base := p.GetBase()
 
@@ -165,13 +174,18 @@ func (p *Position) GetBase() (base fixedpoint.Value) {
 	return base
 }
 
-func (p *Position) UnrealizedProfit(price fixedpoint.Value) fixedpoint.Value {
+func (p *Position) GetQuantity() fixedpoint.Value {
 	base := p.GetBase()
+	return base.Abs()
+}
+
+func (p *Position) UnrealizedProfit(price fixedpoint.Value) fixedpoint.Value {
+	quantity := p.GetBase().Abs()
 
 	if p.IsLong() {
-		return price.Sub(p.AverageCost).Mul(base)
+		return price.Sub(p.AverageCost).Mul(quantity)
 	} else if p.IsShort() {
-		return p.AverageCost.Sub(price).Mul(base)
+		return p.AverageCost.Sub(price).Mul(quantity)
 	}
 
 	return fixedpoint.Zero

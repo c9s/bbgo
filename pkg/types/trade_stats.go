@@ -31,6 +31,9 @@ func (s *TradeStats) Add(pnl fixedpoint.Value) {
 		s.MostLossTrade = fixedpoint.Min(s.MostLossTrade, pnl)
 	}
 
+	// The win/loss ratio is your wins divided by your losses.
+	// In the example, suppose for the sake of simplicity that 60 trades were winners, and 40 were losers.
+	// Your win/loss ratio would be 60/40 = 1.5. That would mean that you are winning 50% more often than you are losing.
 	if s.NumOfLossTrade == 0 && s.NumOfProfitTrade > 0 {
 		s.WinningRatio = fixedpoint.One
 	} else {

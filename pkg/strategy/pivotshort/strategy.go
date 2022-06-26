@@ -17,6 +17,9 @@ import (
 
 const ID = "pivotshort"
 
+var one = fixedpoint.One
+var zero = fixedpoint.Zero
+
 var log = logrus.WithField("strategy", ID)
 
 func init() {
@@ -29,9 +32,16 @@ type IntervalWindowSetting struct {
 
 // BreakLow -- when price breaks the previous pivot low, we set a trade entry
 type BreakLow struct {
-	Ratio        fixedpoint.Value      `json:"ratio"`
-	MarketOrder  bool                  `json:"marketOrder"`
-	BounceRatio  fixedpoint.Value      `json:"bounceRatio"`
+	// Ratio is a number less than 1.0, price * ratio will be the price triggers the short order.
+	Ratio fixedpoint.Value `json:"ratio"`
+
+	// MarketOrder is the option to enable market order short.
+	MarketOrder bool `json:"marketOrder"`
+
+	// BounceRatio is a ratio used for placing the limit order sell price
+	// limit sell price = breakLowPrice * (1 + BounceRatio)
+	BounceRatio fixedpoint.Value `json:"bounceRatio"`
+
 	Quantity     fixedpoint.Value      `json:"quantity"`
 	StopEMARange fixedpoint.Value      `json:"stopEMARange"`
 	StopEMA      *types.IntervalWindow `json:"stopEMA"`
@@ -64,18 +74,6 @@ type CumulatedVolume struct {
 	Window         int              `json:"window"`
 }
 
-type Exit struct {
-	RoiStopLossPercentage      fixedpoint.Value `json:"roiStopLossPercentage"`
-	RoiTakeProfitPercentage    fixedpoint.Value `json:"roiTakeProfitPercentage"`
-	RoiMinTakeProfitPercentage fixedpoint.Value `json:"roiMinTakeProfitPercentage"`
-
-	LowerShadowRatio fixedpoint.Value `json:"lowerShadowRatio"`
-
-	CumulatedVolume *CumulatedVolume `json:"cumulatedVolume"`
-
-	MarginSideEffect types.MarginOrderSideEffectType `json:"marginOrderSideEffect"`
-}
-
 type Strategy struct {
 	*bbgo.Graceful
 
@@ -95,12 +93,13 @@ type Strategy struct {
 
 	BounceShort *BounceShort `json:"bounceShort"`
 
-	Entry Entry `json:"entry"`
-	Exit  Exit  `json:"exit"`
+	Entry       Entry        `json:"entry"`
+	ExitMethods []ExitMethod `json:"exits"`
 
 	session       *bbgo.ExchangeSession
 	orderExecutor *bbgo.GeneralOrderExecutor
 
+	stopLossPrice           fixedpoint.Value
 	lastLow                 fixedpoint.Value
 	pivot                   *indicator.Pivot
 	resistancePivot         *indicator.Pivot
@@ -124,13 +123,21 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	if s.BounceShort != nil && s.BounceShort.Enabled {
 		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.BounceShort.Interval})
 	}
+
+	if !bbgo.IsBackTesting {
+		session.Subscribe(types.MarketTradeChannel, s.Symbol, types.SubscribeOptions{})
+	}
 }
 
 func (s *Strategy) useQuantityOrBaseBalance(quantity fixedpoint.Value) fixedpoint.Value {
-	if quantity.IsZero() {
-		if balance, ok := s.session.Account.Balance(s.Market.BaseCurrency); ok {
+	balance, hasBalance := s.session.Account.Balance(s.Market.BaseCurrency)
+
+	if hasBalance {
+		if quantity.IsZero() {
 			bbgo.Notify("sell quantity is not set, submitting sell with all base balance: %s", balance.Available.String())
 			quantity = balance.Available
+		} else {
+			quantity = fixedpoint.Min(quantity, balance.Available)
 		}
 	}
 
@@ -171,6 +178,7 @@ func (s *Strategy) CurrentPosition() *types.Position {
 }
 
 func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Value) error {
+	bbgo.Notify("Closing position", s.Position)
 	return s.orderExecutor.ClosePosition(ctx, percentage)
 }
 
@@ -188,6 +196,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	if s.TradeStats == nil {
 		s.TradeStats = &types.TradeStats{}
 	}
+
+	s.lastLow = fixedpoint.Zero
 
 	// StrategyController
 	s.Status = types.StrategyStatusRunning
@@ -230,43 +240,46 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.stopEWMA = standardIndicator.EWMA(*s.BreakLow.StopEMA)
 	}
 
-	s.lastLow = fixedpoint.Zero
+	for _, method := range s.ExitMethods {
+		method.Bind(session, s.orderExecutor)
+	}
 
-	session.UserDataStream.OnStart(func() {
-		lastKLine := s.preloadPivot(s.pivot, store)
+	if s.BounceShort != nil && s.BounceShort.Enabled {
+		session.UserDataStream.OnStart(func() {
+			lastKLine := s.preloadPivot(s.pivot, store)
 
-		if s.resistancePivot != nil {
-			s.preloadPivot(s.resistancePivot, store)
-		}
+			if s.resistancePivot != nil {
+				s.preloadPivot(s.resistancePivot, store)
+			}
 
-		if lastKLine == nil {
-			return
-		}
+			if lastKLine == nil {
+				return
+			}
 
-		if s.resistancePivot != nil {
-			lows := s.resistancePivot.Lows
-			minDistance := s.BounceShort.MinDistance.Float64()
-			closePrice := lastKLine.Close.Float64()
-			s.resistancePrices = findPossibleResistancePrices(closePrice, minDistance, lows)
-			log.Infof("last price: %f, possible resistance prices: %+v", closePrice, s.resistancePrices)
+			if s.resistancePivot != nil {
+				lows := s.resistancePivot.Lows
+				minDistance := s.BounceShort.MinDistance.Float64()
+				closePrice := lastKLine.Close.Float64()
+				s.resistancePrices = findPossibleResistancePrices(closePrice, minDistance, lows)
+				log.Infof("last price: %f, possible resistance prices: %+v", closePrice, s.resistancePrices)
 
-			if len(s.resistancePrices) > 0 {
-				resistancePrice := fixedpoint.NewFromFloat(s.resistancePrices[0])
-				if resistancePrice.Compare(s.currentBounceShortPrice) != 0 {
-					log.Infof("updating resistance price... possible resistance prices: %+v", s.resistancePrices)
+				if len(s.resistancePrices) > 0 {
+					resistancePrice := fixedpoint.NewFromFloat(s.resistancePrices[0])
+					if resistancePrice.Compare(s.currentBounceShortPrice) != 0 {
+						log.Infof("updating resistance price... possible resistance prices: %+v", s.resistancePrices)
 
-					_ = s.orderExecutor.GracefulCancel(ctx)
+						_ = s.orderExecutor.GracefulCancel(ctx)
 
-					s.currentBounceShortPrice = resistancePrice
-					s.placeBounceSellOrders(ctx, s.currentBounceShortPrice, orderExecutor)
+						s.currentBounceShortPrice = resistancePrice
+						s.placeBounceSellOrders(ctx, s.currentBounceShortPrice)
+					}
 				}
 			}
-		}
-	})
+		})
+	}
 
 	// Always check whether you can open a short position or not
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
-		// StrategyController
 		if s.Status != types.StrategyStatusRunning {
 			return
 		}
@@ -276,57 +289,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 
 		isPositionOpened := !s.Position.IsClosed() && !s.Position.IsDust(kline.Close)
-
 		if isPositionOpened && s.Position.IsShort() {
-			// calculate return rate
-			// TODO: apply quantity to this formula
-			roi := s.Position.AverageCost.Sub(kline.Close).Div(s.Position.AverageCost)
-			if roi.Compare(s.Exit.RoiStopLossPercentage.Neg()) < 0 {
-				// stop loss
-				bbgo.Notify("%s ROI StopLoss triggered at price %f: Loss %s", s.Symbol, kline.Close.Float64(), roi.Percentage())
-				_ = s.ClosePosition(ctx, fixedpoint.One)
-				return
-			} else {
-				// take profit
-				if roi.Compare(s.Exit.RoiTakeProfitPercentage) > 0 { // force take profit
-					bbgo.Notify("%s TakeProfit triggered at price %f: by ROI percentage %s", s.Symbol, kline.Close.Float64(), roi.Percentage(), kline)
-					_ = s.ClosePosition(ctx, fixedpoint.One)
-					return
-				} else if !s.Exit.RoiMinTakeProfitPercentage.IsZero() && roi.Compare(s.Exit.RoiMinTakeProfitPercentage) > 0 {
-					if !s.Exit.LowerShadowRatio.IsZero() && kline.GetLowerShadowHeight().Div(kline.Close).Compare(s.Exit.LowerShadowRatio) > 0 {
-						bbgo.Notify("%s TakeProfit triggered at price %f: by shadow ratio %f",
-							s.Symbol,
-							kline.Close.Float64(),
-							kline.GetLowerShadowRatio().Float64(), kline)
-						_ = s.ClosePosition(ctx, fixedpoint.One)
-						return
-					} else if s.Exit.CumulatedVolume != nil && s.Exit.CumulatedVolume.Enabled {
-						if klines, ok := store.KLinesOfInterval(s.Interval); ok {
-							var cbv = fixedpoint.Zero
-							var cqv = fixedpoint.Zero
-							for i := 0; i < s.Exit.CumulatedVolume.Window; i++ {
-								last := (*klines)[len(*klines)-1-i]
-								cqv = cqv.Add(last.QuoteVolume)
-								cbv = cbv.Add(last.Volume)
-							}
-
-							if cqv.Compare(s.Exit.CumulatedVolume.MinQuoteVolume) > 0 {
-								bbgo.Notify("%s TakeProfit triggered at price %f: by cumulated volume (window: %d) %f > %f",
-									s.Symbol,
-									kline.Close.Float64(),
-									s.Exit.CumulatedVolume.Window,
-									cqv.Float64(),
-									s.Exit.CumulatedVolume.MinQuoteVolume.Float64())
-								_ = s.ClosePosition(ctx, fixedpoint.One)
-								return
-							}
-						}
-					}
-				}
-			}
+			return
 		}
 
 		if len(s.pivotLowPrices) == 0 {
+			log.Infof("currently there is no pivot low prices, skip placing orders...")
 			return
 		}
 
@@ -349,7 +317,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 		}
 
-		ratio := fixedpoint.One.Sub(s.BreakLow.Ratio)
+		ratio := fixedpoint.One.Add(s.BreakLow.Ratio)
 		breakPrice := previousLow.Mul(ratio)
 
 		// if previous low is not break, skip
@@ -402,7 +370,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 					_ = s.orderExecutor.GracefulCancel(ctx)
 
 					s.currentBounceShortPrice = resistancePrice
-					s.placeBounceSellOrders(ctx, s.currentBounceShortPrice, orderExecutor)
+					s.placeBounceSellOrders(ctx, s.currentBounceShortPrice)
 				}
 			}
 		}
@@ -447,7 +415,7 @@ func (s *Strategy) findHigherPivotLow(price fixedpoint.Value) (fixedpoint.Value,
 	return price, false
 }
 
-func (s *Strategy) placeBounceSellOrders(ctx context.Context, resistancePrice fixedpoint.Value, orderExecutor bbgo.OrderExecutor) {
+func (s *Strategy) placeBounceSellOrders(ctx context.Context, resistancePrice fixedpoint.Value) {
 	futuresMode := s.session.Futures || s.session.IsolatedFutures
 	totalQuantity := s.BounceShort.Quantity
 	numLayers := s.BounceShort.NumLayers
@@ -467,8 +435,8 @@ func (s *Strategy) placeBounceSellOrders(ctx context.Context, resistancePrice fi
 		quoteBalance := balances[s.Market.QuoteCurrency]
 		baseBalance := balances[s.Market.BaseCurrency]
 
-		// price = (resistance_price * (1.0 - ratio)) * ((1.0 + layerSpread) * i)
-		price := resistancePrice.Mul(fixedpoint.One.Sub(s.BounceShort.Ratio))
+		// price = (resistance_price * (1.0 + ratio)) * ((1.0 + layerSpread) * i)
+		price := resistancePrice.Mul(fixedpoint.One.Add(s.BounceShort.Ratio))
 		spread := layerSpread.Mul(fixedpoint.NewFromInt(int64(i)))
 		price = price.Add(spread)
 		log.Infof("price = %f", price.Float64())
@@ -491,7 +459,7 @@ func (s *Strategy) placeOrder(ctx context.Context, price fixedpoint.Value, quant
 	_, _ = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 		Symbol:   s.Symbol,
 		Side:     types.SideTypeSell,
-		Type:     types.OrderTypeLimit,
+		Type:     types.OrderTypeLimitMaker,
 		Price:    price,
 		Quantity: quantity,
 	})
