@@ -1,20 +1,27 @@
-import {Checkbox, Group, Table} from "@mantine/core";
+import {Button, Checkbox, Group, Table} from "@mantine/core";
 import React, {useState} from "react";
 import {Order} from "../types";
 
 interface OrderListTableProps {
   orders: Order[];
   onClick?: (order: Order) => void;
+  limit?: number;
 }
 
 const OrderListTable = (props: OrderListTableProps) => {
   let orders = props.orders;
+
   const [showCanceledOrders, setShowCanceledOrders] = useState(false);
+  const [limit, setLimit] = useState(props.limit || 5);
 
   if (!showCanceledOrders) {
     orders = orders.filter((order: Order) => {
       return order.status != "CANCELED"
     })
+  }
+
+  if (orders.length > limit) {
+    orders = orders.slice(0, limit)
   }
 
   const rows = orders.map((order: Order) => (
@@ -41,23 +48,25 @@ const OrderListTable = (props: OrderListTableProps) => {
     <Group>
       <Checkbox label="Show Canceled" checked={showCanceledOrders}
                 onChange={(event) => setShowCanceledOrders(event.currentTarget.checked)}/>
-
+      <Button onClick={() => {
+        setLimit(limit + 500)
+      }}>Load More</Button>
     </Group>
     <Table highlightOnHover striped>
-    <thead>
-    <tr>
-      <th>Order ID</th>
-      <th>Symbol</th>
-      <th>Side</th>
-      <th>Order Type</th>
-      <th>Price</th>
-      <th>Quantity</th>
-      <th>Status</th>
-      <th>Creation Time</th>
-    </tr>
-    </thead>
-    <tbody>{rows}</tbody>
-  </Table>
+      <thead>
+      <tr>
+        <th>Order ID</th>
+        <th>Symbol</th>
+        <th>Side</th>
+        <th>Order Type</th>
+        <th>Price</th>
+        <th>Quantity</th>
+        <th>Status</th>
+        <th>Creation Time</th>
+      </tr>
+      </thead>
+      <tbody>{rows}</tbody>
+    </Table>
   </div>
 }
 
