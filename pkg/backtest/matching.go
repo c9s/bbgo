@@ -309,6 +309,21 @@ func (m *SimplePriceMatching) BuyToPrice(price fixedpoint.Value) (closedOrders [
 	var bidOrders []types.Order
 	for _, o := range m.bidOrders {
 		switch o.Type {
+
+		case types.OrderTypeStopMarket:
+			// should we trigger the order
+			if o.StopPrice.Compare(price) <= 0 {
+				// not triggering it, put it back
+				bidOrders = append(bidOrders, o)
+				break
+			}
+
+			o.Type = types.OrderTypeMarket
+			o.ExecutedQuantity = o.Quantity
+			o.Price = price
+			o.Status = types.OrderStatusFilled
+			closedOrders = append(closedOrders, o)
+
 		case types.OrderTypeStopLimit:
 			// should we trigger the order?
 			if price.Compare(o.StopPrice) <= 0 {
@@ -426,6 +441,18 @@ func (m *SimplePriceMatching) SellToPrice(price fixedpoint.Value) (closedOrders 
 	for _, o := range m.askOrders {
 		switch o.Type {
 
+		case types.OrderTypeStopMarket:
+			// should we trigger the order
+			if o.StopPrice.Compare(sellPrice) >= 0 {
+				o.Type = types.OrderTypeMarket
+				o.ExecutedQuantity = o.Quantity
+				o.Price = sellPrice
+				o.Status = types.OrderStatusFilled
+				closedOrders = append(closedOrders, o)
+			} else {
+				askOrders = append(askOrders, o)
+			}
+
 		case types.OrderTypeStopLimit:
 			// if the price is lower than the stop price
 			// we should trigger the stop sell order
@@ -458,7 +485,8 @@ func (m *SimplePriceMatching) SellToPrice(price fixedpoint.Value) (closedOrders 
 
 		case types.OrderTypeStopMarket:
 			// should we trigger the order
-			if sellPrice.Compare(o.StopPrice) <= 0 {
+			if o.StopPrice.Compare(sellPrice) >= 0 {
+				o.Type = types.OrderTypeMarket
 				o.ExecutedQuantity = o.Quantity
 				o.Price = sellPrice
 				o.Status = types.OrderStatusFilled
