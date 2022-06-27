@@ -282,8 +282,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 
-		isPositionOpened := !s.Position.IsClosed() && !s.Position.IsDust(kline.Close)
-		if isPositionOpened && s.Position.IsShort() {
+		if !s.Position.IsClosed() && !s.Position.IsDust(kline.Close) {
 			return
 		}
 
@@ -299,6 +298,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			s.pivotLowPrices = s.pivotLowPrices[len(s.pivotLowPrices)-10:]
 		}
 
+		// stop EMA protection
 		if s.stopEWMA != nil && !s.BreakLow.StopEMARange.IsZero() {
 			ema := fixedpoint.NewFromFloat(s.stopEWMA.Last())
 			if ema.IsZero() {
@@ -319,11 +319,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 
-		if !s.Position.IsClosed() && !s.Position.IsDust(kline.Close) {
-			// s.Notify("skip opening %s position, which is not closed", s.Symbol, s.Position)
-			return
-		}
-
 		_ = s.orderExecutor.GracefulCancel(ctx)
 
 		quantity := s.useQuantityOrBaseBalance(s.BreakLow.Quantity)
@@ -332,6 +327,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			s.placeMarketSell(ctx, quantity)
 		} else {
 			sellPrice := kline.Close.Mul(fixedpoint.One.Add(s.BreakLow.BounceRatio))
+
+			bbgo.Notify("%s price %f breaks the previous low %f with ratio %f, submitting limit sell @ %f", s.Symbol, kline.Close.Float64(), previousLow.Float64(), s.BreakLow.Ratio.Float64(), sellPrice.Float64())
 			s.placeLimitSell(ctx, sellPrice, quantity)
 		}
 	})
@@ -369,6 +366,13 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 		}
 	})
+
+	if !bbgo.IsBackTesting {
+		// use market trade to submit short order
+		session.MarketDataStream.OnMarketTrade(func(trade types.Trade) {
+
+		})
+	}
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		// StrategyController

@@ -2,6 +2,7 @@ package bbgo
 
 import (
 	"context"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
 
@@ -117,11 +118,13 @@ func (e *GeneralOrderExecutor) GracefulCancel(ctx context.Context) error {
 	return nil
 }
 
-func (e *GeneralOrderExecutor) ClosePosition(ctx context.Context, percentage fixedpoint.Value) error {
+func (e *GeneralOrderExecutor) ClosePosition(ctx context.Context, percentage fixedpoint.Value, tags ...string) error {
 	submitOrder := e.position.NewMarketCloseOrder(percentage)
 	if submitOrder == nil {
 		return nil
 	}
+
+	submitOrder.Tag = strings.Join(tags, ",")
 
 	_, err := e.SubmitOrders(ctx, *submitOrder)
 	return err

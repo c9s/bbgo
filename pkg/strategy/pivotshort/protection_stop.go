@@ -58,6 +58,7 @@ func (s *ProtectionStopLoss) placeStopOrder(ctx context.Context, position *types
 		Price:     s.stopLossPrice.Mul(one.Add(fixedpoint.NewFromFloat(0.005))), // +0.5% from the trigger price, slippage protection
 		StopPrice: s.stopLossPrice,
 		Market:    position.Market,
+		Tag:       "protectionStopLoss",
 	})
 
 	if len(createdOrders) > 0 {
@@ -174,7 +175,7 @@ func (s *ProtectionStopLoss) checkStopPrice(closePrice fixedpoint.Value, positio
 
 	if s.shouldStop(closePrice) {
 		log.Infof("[ProtectionStopLoss] protection stop order is triggered at price %f, position = %+v", closePrice.Float64(), position)
-		if err := s.orderExecutor.ClosePosition(context.Background(), one); err != nil {
+		if err := s.orderExecutor.ClosePosition(context.Background(), one, "protectionStopLoss"); err != nil {
 			log.WithError(err).Errorf("failed to close position")
 		}
 	}

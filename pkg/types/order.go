@@ -132,6 +132,8 @@ type SubmitOrder struct {
 	IsFutures     bool `json:"is_futures" db:"is_futures"`
 	ReduceOnly    bool `json:"reduceOnly" db:"reduce_only"`
 	ClosePosition bool `json:"closePosition" db:"close_position"`
+
+	Tag string `json:"tag" db:"-"`
 }
 
 func (o *SubmitOrder) String() string {
@@ -229,6 +231,7 @@ func (o Order) CsvHeader() []string {
 		"quantity",
 		"creation_time",
 		"update_time",
+		"tag",
 	}
 }
 
@@ -244,6 +247,7 @@ func (o Order) CsvRecords() [][]string {
 			o.Quantity.String(),
 			o.CreationTime.Time().Format(time.RFC1123),
 			o.UpdateTime.Time().Format(time.RFC1123),
+			o.Tag,
 		},
 	}
 }
