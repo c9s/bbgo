@@ -7,6 +7,9 @@ import {Checkbox, Group, SegmentedControl, Table} from '@mantine/core';
 import {createChart, CrosshairMode, MouseEventParams, TimeRange} from 'lightweight-charts';
 import {ReportSummary} from "../types";
 import moment from "moment";
+import {format} from 'date-fns';
+
+// See https://codesandbox.io/s/ve7w2?file=/src/App.js
 import TimeRangeSlider from './TimeRangeSlider';
 
 const parseKline = () => {
@@ -553,7 +556,9 @@ const TradingViewChart = (props: TradingViewChartProps) => {
     return () => {
       console.log("removeChart")
 
-      resizeObserver.current.disconnect();
+      if (resizeObserver.current) {
+        resizeObserver.current.disconnect();
+      }
 
       if (chart.current) {
         chart.current.remove();
@@ -588,6 +593,8 @@ const TradingViewChart = (props: TradingViewChartProps) => {
       <TimeRangeSlider
         selectedInterval={selectedTimeRange}
         timelineInterval={timeRange}
+        formatTick={(ms : Date) => format(new Date(ms), 'M d HH')}
+        step={1000 * parseInterval(currentInterval)}
         onChange={(tr: any) => {
           console.log("selectedTimeRange", tr)
           setSelectedTimeRange(tr)
