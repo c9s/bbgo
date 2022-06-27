@@ -5,9 +5,11 @@ import {Checkbox, Group, SegmentedControl, Table} from '@mantine/core';
 // https://github.com/tradingview/lightweight-charts/issues/543
 // const createChart = dynamic(() => import('lightweight-charts'));
 import {createChart, CrosshairMode, MouseEventParams, TimeRange} from 'lightweight-charts';
-import {ReportSummary} from "../types";
+import {ReportSummary, Order} from "../types";
 import moment from "moment";
 import {format} from 'date-fns';
+
+import OrderListTable from './OrderListTable';
 
 // See https://codesandbox.io/s/ve7w2?file=/src/App.js
 import TimeRangeSlider from './TimeRangeSlider';
@@ -147,19 +149,6 @@ const parseInterval = (s: string) => {
   return 60;
 };
 
-interface Order {
-  order_id: number;
-  order_type: string;
-  side: string;
-  symbol: string;
-  price: number;
-  quantity: number;
-  executed_quantity: number;
-  status: string;
-  update_time: Date;
-  creation_time: Date;
-  time?: Date;
-}
 
 interface Marker {
   time: number;
@@ -602,12 +591,7 @@ const TradingViewChart = (props: TradingViewChartProps) => {
         }}
       />
 
-      <Group>
-        <Checkbox label="Show Canceled" checked={showCanceledOrders}
-                  onChange={(event) => setShowCanceledOrders(event.currentTarget.checked)}/>
-
-      </Group>
-      <OrderListTable orders={orders} showCanceled={showCanceledOrders} onClick={(order) => {
+      <OrderListTable orders={orders} onClick={(order) => {
         console.log("selected order", order);
         const visibleRange = chart.current.timeScale().getVisibleRange()
         const seconds = parseInterval(currentInterval)
@@ -625,57 +609,6 @@ const TradingViewChart = (props: TradingViewChartProps) => {
     </div>
   );
 };
-
-interface OrderListTableProps {
-  orders: Order[];
-  showCanceled: boolean;
-  onClick?: (order: Order) => void;
-}
-
-const OrderListTable = (props: OrderListTableProps) => {
-  let orders = props.orders;
-
-  if (!props.showCanceled) {
-    orders = orders.filter((order: Order) => {
-      return order.status != "CANCELED"
-    })
-  }
-
-  const rows = orders.map((order: Order) => (
-    <tr key={order.order_id} onClick={(e) => {
-      props.onClick ? props.onClick(order) : null;
-      const nodes = e.currentTarget?.parentNode?.querySelectorAll(".selected")
-      nodes?.forEach((node, i) => {
-        node.classList.remove("selected")
-      })
-      e.currentTarget.classList.add("selected")
-    }}>
-      <td>{order.order_id}</td>
-      <td>{order.symbol}</td>
-      <td>{order.side}</td>
-      <td>{order.order_type}</td>
-      <td>{order.price}</td>
-      <td>{order.quantity}</td>
-      <td>{order.status}</td>
-      <td>{order.creation_time.toString()}</td>
-    </tr>
-  ));
-  return <Table highlightOnHover striped>
-    <thead>
-    <tr>
-      <th>Order ID</th>
-      <th>Symbol</th>
-      <th>Side</th>
-      <th>Order Type</th>
-      <th>Price</th>
-      <th>Quantity</th>
-      <th>Status</th>
-      <th>Creation Time</th>
-    </tr>
-    </thead>
-    <tbody>{rows}</tbody>
-  </Table>
-}
 
 const calculateEMA = (a: KLine[], r: number) => {
   return a.map((k) => {
