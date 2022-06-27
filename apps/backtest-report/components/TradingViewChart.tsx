@@ -1,11 +1,11 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {tsvParse} from "d3-dsv";
-import {Checkbox, Group, SegmentedControl, Table} from '@mantine/core';
+import {Checkbox, Group, SegmentedControl} from '@mantine/core';
 
 // https://github.com/tradingview/lightweight-charts/issues/543
 // const createChart = dynamic(() => import('lightweight-charts'));
 import {createChart, CrosshairMode, MouseEventParams, TimeRange} from 'lightweight-charts';
-import {ReportSummary, Order} from "../types";
+import {Order, ReportSummary} from "../types";
 import moment from "moment";
 import {format} from 'date-fns';
 
@@ -459,26 +459,14 @@ const TradingViewChart = (props: TradingViewChartProps) => {
         });
         emaLine.setData(emaValues);
 
-        const legend = document.createElement('div');
-        legend.className = 'ema-legend';
-        legend.style.display = 'block';
-        legend.style.position = 'absolute';
-        legend.style.left = 3 + 'px';
-        legend.style.zIndex = '99';
-        legend.style.top = 3 + (i * 22) + 'px';
+        const legend = createLegend(i, emaColor)
         chartContainerRef.current.appendChild(legend);
 
-        const setLegendText = (priceValue: any) => {
-          let val = '∅';
-          if (priceValue !== undefined) {
-            val = (Math.round(priceValue * 100) / 100).toFixed(2);
-          }
-          legend.innerHTML = 'EMA' + w + ' <span style="color:' + emaColor + '">' + val + '</span>';
-        }
+        const updateLegendText = createLegendUpdater(legend, 'EMA ' + w)
 
-        setLegendText(emaValues[emaValues.length - 1].value);
+        updateLegendText(emaValues[emaValues.length - 1].value);
         chart.current.subscribeCrosshairMove((param: MouseEventParams) => {
-          setLegendText(param.seriesPrices.get(emaLine));
+          updateLegendText(param.seriesPrices.get(emaLine));
         });
       })
 
@@ -583,7 +571,7 @@ const TradingViewChart = (props: TradingViewChartProps) => {
       <TimeRangeSlider
         selectedInterval={selectedTimeRange}
         timelineInterval={timeRange}
-        formatTick={(ms : Date) => format(new Date(ms), 'M d HH')}
+        formatTick={(ms: Date) => format(new Date(ms), 'M d HH')}
         step={1000 * parseInterval(currentInterval)}
         onChange={(tr: any) => {
           console.log("selectedTimeRange", tr)
@@ -627,6 +615,26 @@ const calculateEMA = (a: KLine[], r: number) => {
   }])
 }
 
+const createLegend = (i: number, color: string) => {
+  const legend = document.createElement('div');
+  legend.className = 'ema-legend';
+  legend.style.display = 'block';
+  legend.style.position = 'absolute';
+  legend.style.left = 3 + 'px';
+  legend.style.color = color;
+  legend.style.zIndex = '99';
+  legend.style.top = 3 + (i * 22) + 'px';
+  return legend;
+}
+
+const createLegendUpdater = (legend: HTMLDivElement, prefix: string) => {
+  return (priceValue: any) => {
+    let val = '-';
+    if (priceValue !== undefined) {
+      val = (Math.round(priceValue * 100) / 100).toFixed(2);
+    }
+    legend.innerHTML = prefix + ' <span>' + val + '</span>';
+  }
+}
 
 export default TradingViewChart;
-
