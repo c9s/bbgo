@@ -34,7 +34,7 @@ func (s *RoiTakeProfit) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.
 		if roi.Compare(s.Percentage) > 0 {
 			// stop loss
 			bbgo.Notify("[RoiTakeProfit] %s take profit is triggered by ROI %s/%s, price: %f", position.Symbol, roi.Percentage(), s.Percentage.Percentage(), kline.Close.Float64())
-			_ = orderExecutor.ClosePosition(context.Background(), fixedpoint.One)
+			_ = orderExecutor.ClosePosition(context.Background(), fixedpoint.One, "roiTakeProfit")
 			return
 		}
 	})

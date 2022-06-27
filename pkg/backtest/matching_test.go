@@ -151,17 +151,7 @@ func newKLine(symbol string, interval types.Interval, startTime time.Time, o, h,
 	}
 }
 
-func TestSimplePriceMatching_PlaceLimitOrder(t *testing.T) {
-	account := &types.Account{
-		MakerFeeRate: fixedpoint.NewFromFloat(0.075 * 0.01),
-		TakerFeeRate: fixedpoint.NewFromFloat(0.075 * 0.01),
-	}
-
-	account.UpdateBalances(types.BalanceMap{
-		"USDT": {Currency: "USDT", Available: fixedpoint.NewFromFloat(1000000.0)},
-		"BTC":  {Currency: "BTC", Available: fixedpoint.NewFromFloat(100.0)},
-	})
-
+func getTestMarket() types.Market {
 	market := types.Market{
 		Symbol:          "BTCUSDT",
 		PricePrecision:  8,
@@ -172,7 +162,135 @@ func TestSimplePriceMatching_PlaceLimitOrder(t *testing.T) {
 		MinAmount:       fixedpoint.MustNewFromString("10.0"),
 		MinQuantity:     fixedpoint.MustNewFromString("0.001"),
 	}
+	return market
+}
 
+func getTestAccount() *types.Account {
+	account := &types.Account{
+		MakerFeeRate: fixedpoint.NewFromFloat(0.075 * 0.01),
+		TakerFeeRate: fixedpoint.NewFromFloat(0.075 * 0.01),
+	}
+	account.UpdateBalances(types.BalanceMap{
+		"USDT": {Currency: "USDT", Available: fixedpoint.NewFromFloat(1000000.0)},
+		"BTC":  {Currency: "BTC", Available: fixedpoint.NewFromFloat(100.0)},
+	})
+	return account
+}
+
+func TestSimplePriceMatching_StopLimitOrderBuy(t *testing.T) {
+	account := getTestAccount()
+	market := getTestMarket()
+	engine := &SimplePriceMatching{
+		Account:      account,
+		Market:       market,
+		closedOrders: make(map[uint64]types.Order),
+		LastPrice:    fixedpoint.NewFromFloat(19000.0),
+	}
+
+	stopOrder := types.SubmitOrder{
+		Symbol:      market.Symbol,
+		Side:        types.SideTypeBuy,
+		Type:        types.OrderTypeStopLimit,
+		Quantity:    fixedpoint.NewFromFloat(0.1),
+		Price:       fixedpoint.NewFromFloat(22000.0),
+		StopPrice:   fixedpoint.NewFromFloat(21000.0),
+		TimeInForce: types.TimeInForceGTC,
+	}
+	createdOrder, trade, err := engine.PlaceOrder(stopOrder)
+	assert.NoError(t, err)
+	assert.Nil(t, trade, "place stop order should not trigger the stop buy")
+	assert.NotNil(t, createdOrder, "place stop order should not trigger the stop buy")
+
+	closedOrders, trades := engine.BuyToPrice(fixedpoint.NewFromFloat(20000.0))
+	assert.Len(t, closedOrders, 0, "price change far from the price should not trigger the stop buy")
+	assert.Len(t, trades, 0, "price change far from the price should not trigger the stop buy")
+
+	closedOrders, trades = engine.BuyToPrice(fixedpoint.NewFromFloat(21001.0))
+	assert.Len(t, closedOrders, 1, "should trigger the stop buy order")
+	assert.Len(t, trades, 1, "should have stop order trade executed")
+
+	assert.Equal(t, types.OrderStatusFilled, closedOrders[0].Status)
+	assert.Equal(t, types.OrderTypeLimit, closedOrders[0].Type)
+	assert.Equal(t, stopOrder.Price, trades[0].Price)
+}
+
+func TestSimplePriceMatching_StopLimitOrderSell(t *testing.T) {
+	account := getTestAccount()
+	market := getTestMarket()
+	engine := &SimplePriceMatching{
+		Account:      account,
+		Market:       market,
+		closedOrders: make(map[uint64]types.Order),
+		LastPrice:    fixedpoint.NewFromFloat(22000.0),
+	}
+
+	stopOrder := types.SubmitOrder{
+		Symbol:      market.Symbol,
+		Side:        types.SideTypeSell,
+		Type:        types.OrderTypeStopLimit,
+		Quantity:    fixedpoint.NewFromFloat(0.1),
+		Price:       fixedpoint.NewFromFloat(20000.0),
+		StopPrice:   fixedpoint.NewFromFloat(21000.0),
+		TimeInForce: types.TimeInForceGTC,
+	}
+	createdOrder, trade, err := engine.PlaceOrder(stopOrder)
+	assert.NoError(t, err)
+	assert.Nil(t, trade, "place stop order should not trigger the stop sell")
+	assert.NotNil(t, createdOrder, "place stop order should not trigger the stop sell")
+
+	closedOrders, trades := engine.SellToPrice(fixedpoint.NewFromFloat(21500.0))
+	assert.Len(t, closedOrders, 0, "price change far from the price should not trigger the stop buy")
+	assert.Len(t, trades, 0, "price change far from the price should not trigger the stop buy")
+
+	closedOrders, trades = engine.SellToPrice(fixedpoint.NewFromFloat(20990.0))
+	assert.Len(t, closedOrders, 1, "should trigger the stop sell order")
+	assert.Len(t, trades, 1, "should have stop order trade executed")
+
+	assert.Equal(t, types.OrderStatusFilled, closedOrders[0].Status)
+	assert.Equal(t, types.OrderTypeLimit, closedOrders[0].Type)
+	assert.Equal(t, stopOrder.Price, trades[0].Price)
+}
+
+func TestSimplePriceMatching_StopMarketOrderSell(t *testing.T) {
+	account := getTestAccount()
+	market := getTestMarket()
+	engine := &SimplePriceMatching{
+		Account:      account,
+		Market:       market,
+		closedOrders: make(map[uint64]types.Order),
+		LastPrice:    fixedpoint.NewFromFloat(22000.0),
+	}
+
+	stopOrder := types.SubmitOrder{
+		Symbol:      market.Symbol,
+		Side:        types.SideTypeSell,
+		Type:        types.OrderTypeStopMarket,
+		Quantity:    fixedpoint.NewFromFloat(0.1),
+		Price:       fixedpoint.NewFromFloat(20000.0),
+		StopPrice:   fixedpoint.NewFromFloat(21000.0),
+		TimeInForce: types.TimeInForceGTC,
+	}
+	createdOrder, trade, err := engine.PlaceOrder(stopOrder)
+	assert.NoError(t, err)
+	assert.Nil(t, trade, "place stop order should not trigger the stop sell")
+	assert.NotNil(t, createdOrder, "place stop order should not trigger the stop sell")
+
+	closedOrders, trades := engine.SellToPrice(fixedpoint.NewFromFloat(21500.0))
+	assert.Len(t, closedOrders, 0, "price change far from the price should not trigger the stop buy")
+	assert.Len(t, trades, 0, "price change far from the price should not trigger the stop buy")
+
+	closedOrders, trades = engine.SellToPrice(fixedpoint.NewFromFloat(20990.0))
+	assert.Len(t, closedOrders, 1, "should trigger the stop sell order")
+	assert.Len(t, trades, 1, "should have stop order trade executed")
+
+	assert.Equal(t, types.OrderStatusFilled, closedOrders[0].Status)
+	assert.Equal(t, types.OrderTypeMarket, closedOrders[0].Type)
+	assert.Equal(t, fixedpoint.NewFromFloat(20990.0), trades[0].Price)
+}
+
+func TestSimplePriceMatching_PlaceLimitOrder(t *testing.T) {
+	account := getTestAccount()
+	market := getTestMarket()
 	engine := &SimplePriceMatching{
 		Account:      account,
 		Market:       market,
