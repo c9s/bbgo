@@ -386,7 +386,19 @@ const TradingViewChart = (props: TradingViewChartProps) => {
   const chart = useRef<any>();
   const resizeObserver = useRef<any>();
   const intervals = props.reportSummary.intervals || [];
-  const [currentInterval, setCurrentInterval] = useState(intervals.length > 0 ? intervals[0] : '1m');
+
+  intervals.sort((a,b) => {
+    const as = parseInterval(a)
+    const bs = parseInterval(b)
+    if (as < bs) {
+      return -1;
+    } else if (as > bs) {
+      return 1;
+    }
+    return 0;
+  })
+
+  const [currentInterval, setCurrentInterval] = useState(intervals.length > 0 ? intervals[intervals.length - 1] : '1m');
   const [showPositionBase, setShowPositionBase] = useState(false);
   const [showCanceledOrders, setShowCanceledOrders] = useState(false);
   const [showPositionAverageCost, setShowPositionAverageCost] = useState(false);
