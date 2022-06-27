@@ -68,12 +68,6 @@ type Entry struct {
 	MarginSideEffect types.MarginOrderSideEffectType `json:"marginOrderSideEffect"`
 }
 
-type CumulatedVolume struct {
-	Enabled        bool             `json:"enabled"`
-	MinQuoteVolume fixedpoint.Value `json:"minQuoteVolume"`
-	Window         int              `json:"window"`
-}
-
 type Strategy struct {
 	*bbgo.Graceful
 
