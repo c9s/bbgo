@@ -449,6 +449,14 @@ const TradingViewChart = (props: TradingViewChartProps) => {
       series.setData(chartData.klines);
       series.setMarkers(chartData.markers);
 
+      const ohlcLegend = createLegend(0, 'rgba(0, 0, 0, 1)');
+      chartContainerRef.current.appendChild(ohlcLegend);
+
+      const updateOHLCLegend = createOHLCLegendUpdater(ohlcLegend, "")
+      chart.current.subscribeCrosshairMove((param: MouseEventParams) => {
+        updateOHLCLegend(param.seriesPrices.get(series), param.time);
+      });
+
       [9, 27, 99].forEach((w, i) => {
         const emaValues = calculateEMA(chartData.klines, w)
         const emaColor = 'rgba(' + w + ', ' + (111 - w) + ', 232, 0.9)'
@@ -459,7 +467,7 @@ const TradingViewChart = (props: TradingViewChartProps) => {
         });
         emaLine.setData(emaValues);
 
-        const legend = createLegend(i, emaColor)
+        const legend = createLegend(i + 1, emaColor)
         chartContainerRef.current.appendChild(legend);
 
         const updateLegendText = createLegendUpdater(legend, 'EMA ' + w)
@@ -636,5 +644,17 @@ const createLegendUpdater = (legend: HTMLDivElement, prefix: string) => {
     legend.innerHTML = prefix + ' <span>' + val + '</span>';
   }
 }
+
+const createOHLCLegendUpdater = (legend: HTMLDivElement, prefix: string) => {
+  return (param: any, time : any) => {
+    console.log(param)
+    if (param) {
+      legend.innerHTML = prefix + ` O: ${param.open} H: ${param.high} L: ${param.low} C: ${param.close} T: ${new Date(time * 1000)}`;
+    } else {
+      legend.innerHTML = prefix + ' -';
+    }
+  }
+}
+
 
 export default TradingViewChart;
