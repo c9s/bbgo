@@ -134,7 +134,7 @@ type SubmitOrder struct {
 	ClosePosition bool `json:"closePosition" db:"close_position"`
 }
 
-func (o SubmitOrder) String() string {
+func (o *SubmitOrder) String() string {
 	switch o.Type {
 	case OrderTypeMarket:
 		return fmt.Sprintf("SubmitOrder %s %s %s %s", o.Symbol, o.Type, o.Side, o.Quantity.String())
@@ -143,7 +143,7 @@ func (o SubmitOrder) String() string {
 	return fmt.Sprintf("SubmitOrder %s %s %s %s @ %s", o.Symbol, o.Type, o.Side, o.Quantity.String(), o.Price.String())
 }
 
-func (o SubmitOrder) PlainText() string {
+func (o *SubmitOrder) PlainText() string {
 	switch o.Type {
 	case OrderTypeMarket:
 		return fmt.Sprintf("SubmitOrder %s %s %s %s", o.Symbol, o.Type, o.Side, o.Quantity.String())
@@ -152,7 +152,7 @@ func (o SubmitOrder) PlainText() string {
 	return fmt.Sprintf("SubmitOrder %s %s %s %s @ %s", o.Symbol, o.Type, o.Side, o.Quantity.String(), o.Price.String())
 }
 
-func (o SubmitOrder) SlackAttachment() slack.Attachment {
+func (o *SubmitOrder) SlackAttachment() slack.Attachment {
 	var fields = []slack.AttachmentField{
 		{Title: "Symbol", Value: o.Symbol, Short: true},
 		{Title: "Side", Value: string(o.Side), Short: true},
