@@ -648,10 +648,12 @@ const createLegendUpdater = (legend: HTMLDivElement, prefix: string) => {
 const createOHLCLegendUpdater = (legend: HTMLDivElement, prefix: string) => {
   return (param: any, time : any) => {
     if (param) {
-      const change = param.close - param.open
-      const t = new Date(time * 1000)
+      const change = Math.round((param.close - param.open) * 100.0) / 100.0
+      const changePercentage = Math.round((param.close - param.open) / param.close * 10000.0) / 100.0;
+      const ampl = Math.round((param.high - param.low) / param.low * 10000.0) / 100.0;
+      const t = new Date(time * 1000);
       const dateStr = moment(t).format("MMM Do YY hh:mm:ss A Z");
-      legend.innerHTML = prefix + ` O: ${param.open} H: ${param.high} L: ${param.low} C: ${param.close} CHG: ${change} T: ${dateStr}`;
+      legend.innerHTML = prefix + ` O: ${param.open} H: ${param.high} L: ${param.low} C: ${param.close} CHG: ${change} (${changePercentage}%) AMP: ${ampl}% T: ${dateStr}`;
     } else {
       legend.innerHTML = prefix + ' O: - H: - L: - C: - T: -';
     }
