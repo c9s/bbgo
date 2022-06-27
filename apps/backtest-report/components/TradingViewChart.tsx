@@ -2,12 +2,15 @@ import React, {useEffect, useRef, useState} from 'react';
 import {tsvParse} from "d3-dsv";
 import {Checkbox, Group, SegmentedControl, Table} from '@mantine/core';
 
-
 // https://github.com/tradingview/lightweight-charts/issues/543
 // const createChart = dynamic(() => import('lightweight-charts'));
 import {createChart, CrosshairMode, MouseEventParams, TimeRange} from 'lightweight-charts';
 import {ReportSummary} from "../types";
 import moment from "moment";
+import {format} from 'date-fns';
+
+// See https://codesandbox.io/s/ve7w2?file=/src/App.js
+import TimeRangeSlider from './TimeRangeSlider';
 
 const parseKline = () => {
   return (d: any) => {
@@ -33,6 +36,23 @@ const parseKline = () => {
     return d;
   };
 };
+
+const selectKLines = (klines: KLine[], startTime: Date, endTime: Date): KLine[] => {
+  const selected = [];
+  for (let i = 0; i < klines.length; i++) {
+    const k = klines[i]
+    if (k.startTime < startTime) {
+      continue
+    }
+    if (k.startTime > endTime) {
+      break
+    }
+
+    selected.push(k)
+  }
+
+  return selected
+}
 
 
 const parseOrder = () => {
@@ -383,6 +403,13 @@ const TradingViewChart = (props: TradingViewChartProps) => {
   const [showPositionAverageCost, setShowPositionAverageCost] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
 
+  const reportTimeRange = [
+    new Date(props.reportSummary.startTime),
+    new Date(props.reportSummary.endTime),
+  ]
+  const [selectedTimeRange, setSelectedTimeRange] = useState(reportTimeRange)
+  const [timeRange, setTimeRange] = useState(reportTimeRange);
+
   useEffect(() => {
     if (!chartContainerRef.current || chartContainerRef.current.children.length > 0) {
       return;
@@ -412,7 +439,10 @@ const TradingViewChart = (props: TradingViewChartProps) => {
     }
 
     const kLinesFetcher = fetchKLines(props.basePath, props.runID, props.symbol, currentInterval, new Date(props.reportSummary.startTime), new Date(props.reportSummary.endTime)).then((klines) => {
-      chartData.klines = removeDuplicatedKLines(klines as Array<KLine>)
+      if (klines) {
+        chartData.allKLines = removeDuplicatedKLines(klines)
+        chartData.klines = selectKLines(chartData.allKLines, selectedTimeRange[0], selectedTimeRange[1])
+      }
     });
     fetchers.push(kLinesFetcher);
 
@@ -436,6 +466,7 @@ const TradingViewChart = (props: TradingViewChartProps) => {
         const emaLine = chart.current.addLineSeries({
           color: emaColor,
           lineWidth: 1,
+          lastValueVisible: false,
         });
         emaLine.setData(emaValues);
 
@@ -526,7 +557,9 @@ const TradingViewChart = (props: TradingViewChartProps) => {
     return () => {
       console.log("removeChart")
 
-      resizeObserver.current.disconnect();
+      if (resizeObserver.current) {
+        resizeObserver.current.disconnect();
+      }
 
       if (chart.current) {
         chart.current.remove();
@@ -537,7 +570,7 @@ const TradingViewChart = (props: TradingViewChartProps) => {
       }
 
     };
-  }, [props.runID, props.reportSummary, currentInterval, showPositionBase, showPositionAverageCost])
+  }, [props.runID, props.reportSummary, currentInterval, showPositionBase, showPositionAverageCost, selectedTimeRange])
 
   return (
     <div>
@@ -558,6 +591,17 @@ const TradingViewChart = (props: TradingViewChartProps) => {
 
       </div>
 
+      <TimeRangeSlider
+        selectedInterval={selectedTimeRange}
+        timelineInterval={timeRange}
+        formatTick={(ms : Date) => format(new Date(ms), 'M d HH')}
+        step={1000 * parseInterval(currentInterval)}
+        onChange={(tr: any) => {
+          console.log("selectedTimeRange", tr)
+          setSelectedTimeRange(tr)
+        }}
+      />
+
       <Group>
         <Checkbox label="Show Canceled" checked={showCanceledOrders}
                   onChange={(event) => setShowCanceledOrders(event.currentTarget.checked)}/>
@@ -575,7 +619,7 @@ const TradingViewChart = (props: TradingViewChartProps) => {
         console.log("orderTime", orderTime)
         console.log("visibleRange", visibleRange)
         console.log("setVisibleRange", from, to, to - from)
-        chart.current.timeScale().setVisibleRange({ from, to } as TimeRange);
+        chart.current.timeScale().setVisibleRange({from, to} as TimeRange);
         // chart.current.timeScale().scrollToPosition(20, true);
       }}/>
     </div>
@@ -592,7 +636,7 @@ const OrderListTable = (props: OrderListTableProps) => {
   let orders = props.orders;
 
   if (!props.showCanceled) {
-    orders = orders.filter((order : Order) => {
+    orders = orders.filter((order: Order) => {
       return order.status != "CANCELED"
     })
   }
