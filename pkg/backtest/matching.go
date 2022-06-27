@@ -124,7 +124,8 @@ func (m *SimplePriceMatching) CancelOrder(o types.Order) (types.Order, error) {
 	return o, nil
 }
 
-func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (closedOrders *types.Order, trades *types.Trade, err error) {
+// PlaceOrder returns the created order object, executed trade (if any) and error
+func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (*types.Order, *types.Trade, error) {
 	// price for checking account balance, default price
 	price := o.Price
 
@@ -135,7 +136,7 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (closedOrders *typ
 		}
 
 		price = m.LastPrice
-	case types.OrderTypeLimit, types.OrderTypeLimitMaker:
+	case types.OrderTypeLimit, types.OrderTypeStopLimit, types.OrderTypeLimitMaker:
 		price = o.Price
 	}
 
@@ -301,11 +302,42 @@ func (m *SimplePriceMatching) newTradeFromOrder(order *types.Order, isMaker bool
 	}
 }
 
+// BuyToPrice means price go up and the limit sell should be triggered
 func (m *SimplePriceMatching) BuyToPrice(price fixedpoint.Value) (closedOrders []types.Order, trades []types.Trade) {
 	klineMatchingLogger.Debugf("kline buy to price %s", price.String())
 
-	var askOrders []types.Order
+	var bidOrders []types.Order
+	for _, o := range m.bidOrders {
+		switch o.Type {
+		case types.OrderTypeStopLimit:
+			// should we trigger the order?
+			if price.Compare(o.StopPrice) <= 0 {
+				bidOrders = append(bidOrders, o)
+				break
+			}
 
+			// convert this order to limit order
+			// we use value object here, so it's a copy
+			o.Type = types.OrderTypeLimit
+
+			// is it a taker order?
+			// higher than the current price, then it's a taker order
+			if o.Price.Compare(price) >= 0 {
+				// taker order, move it to the closed order
+				o.ExecutedQuantity = o.Quantity
+				o.Status = types.OrderStatusFilled
+				closedOrders = append(closedOrders, o)
+			} else {
+				// keep it as a maker order
+				bidOrders = append(bidOrders, o)
+			}
+		default:
+			bidOrders = append(bidOrders, o)
+		}
+	}
+	m.bidOrders = bidOrders
+
+	var askOrders []types.Order
 	for _, o := range m.askOrders {
 		switch o.Type {
 
@@ -333,10 +365,13 @@ func (m *SimplePriceMatching) BuyToPrice(price fixedpoint.Value) (closedOrders [
 			o.Type = types.OrderTypeLimit
 
 			// is it a taker order?
-			if price.Compare(o.Price) >= 0 {
+			// higher than the current price, then it's a taker order
+			if o.Price.Compare(price) >= 0 {
+				// price protection, added by @zenix
 				if o.Price.Compare(m.LastKLine.Low) < 0 {
 					o.Price = m.LastKLine.Low
 				}
+
 				o.ExecutedQuantity = o.Quantity
 				o.Status = types.OrderStatusFilled
 				closedOrders = append(closedOrders, o)
@@ -386,6 +421,37 @@ func (m *SimplePriceMatching) SellToPrice(price fixedpoint.Value) (closedOrders 
 	klineMatchingLogger.Debugf("kline sell to price %s", price.String())
 
 	var sellPrice = price
+
+	var askOrders []types.Order
+	for _, o := range m.askOrders {
+		switch o.Type {
+
+		case types.OrderTypeStopLimit:
+			// if the price is lower than the stop price
+			// we should trigger the stop sell order
+			if sellPrice.Compare(o.StopPrice) > 0 {
+				askOrders = append(askOrders, o)
+				break
+			}
+
+			o.Type = types.OrderTypeLimit
+
+			// if the order price is lower than the current price
+			// it's a taker order
+			if o.Price.Compare(sellPrice) <= 0 {
+				o.ExecutedQuantity = o.Quantity
+				o.Status = types.OrderStatusFilled
+				closedOrders = append(closedOrders, o)
+			} else {
+				askOrders = append(askOrders, o)
+			}
+
+		default:
+			askOrders = append(askOrders, o)
+		}
+	}
+	m.askOrders = askOrders
+
 	var bidOrders []types.Order
 	for _, o := range m.bidOrders {
 		switch o.Type {
@@ -402,11 +468,12 @@ func (m *SimplePriceMatching) SellToPrice(price fixedpoint.Value) (closedOrders 
 			}
 
 		case types.OrderTypeStopLimit:
-			// should we trigger the order
+			// if the price is lower than the stop price
+			// we should trigger the stop order
 			if sellPrice.Compare(o.StopPrice) <= 0 {
 				o.Type = types.OrderTypeLimit
 
-				if sellPrice.Compare(o.Price) <= 0 {
+				if o.Price.Compare(sellPrice) <= 0 {
 					if o.Price.Compare(m.LastKLine.High) > 0 {
 						o.Price = m.LastKLine.High
 					}

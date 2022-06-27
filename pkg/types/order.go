@@ -271,7 +271,7 @@ func (o Order) String() string {
 		orderID = strconv.FormatUint(o.OrderID, 10)
 	}
 
-	return fmt.Sprintf("ORDER %s | %s | %s | %s | %s %-4s | %s/%s @ %s | %s",
+	desc := fmt.Sprintf("ORDER %s | %s | %s | %s | %s %-4s | %s/%s @ %s",
 		o.Exchange.String(),
 		o.CreationTime.Time().Local().Format(time.RFC1123),
 		orderID,
@@ -280,8 +280,13 @@ func (o Order) String() string {
 		o.Side,
 		o.ExecutedQuantity.String(),
 		o.Quantity.String(),
-		o.Price.String(),
-		o.Status)
+		o.Price.String())
+
+	if o.Type == OrderTypeStopLimit {
+		desc += " Stop @ " + o.StopPrice.String()
+	}
+
+	return desc + " | " + string(o.Status)
 }
 
 // PlainText is used for telegram-styled messages
