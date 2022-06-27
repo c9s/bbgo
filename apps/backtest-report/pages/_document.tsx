@@ -22,7 +22,7 @@ class MyDocument extends Document {
       styles: [
         <>
           {initialProps.styles}
-          <ServerStyles html={initialProps.html} server={stylesServer}/>
+          <ServerStyles key="server-styles" html={initialProps.html} server={stylesServer}/>
         </>
       ],
     };
