@@ -573,6 +573,7 @@ const TradingViewChart = (props: TradingViewChartProps) => {
     <div>
       <Group>
         <SegmentedControl
+          value={currentInterval}
           data={intervals.map((interval) => {
             return {label: interval, value: interval}
           })}
