@@ -181,6 +181,11 @@ const ordersToMarkers = (interval: string, orders: Array<Order> | void): Array<M
       }
     }
 
+    let text = '' + order.price
+    if (order.tag) {
+      text += " #" + order.tag;
+    }
+
     switch (order.side) {
       case "BUY":
         markers.push({
@@ -188,8 +193,7 @@ const ordersToMarkers = (interval: string, orders: Array<Order> | void): Array<M
           position: 'belowBar',
           color: '#239D10',
           shape: 'arrowUp',
-          text: '' + order.price
-          //text: 'B',
+          text: text,
         });
         break;
       case "SELL":
@@ -198,8 +202,7 @@ const ordersToMarkers = (interval: string, orders: Array<Order> | void): Array<M
           position: 'aboveBar',
           color: '#e91e63',
           shape: 'arrowDown',
-          text: '' + order.price
-          //text: 'S',
+          text: text,
         });
         break;
     }
@@ -573,6 +576,7 @@ const TradingViewChart = (props: TradingViewChartProps) => {
     <div>
       <Group>
         <SegmentedControl
+          value={currentInterval}
           data={intervals.map((interval) => {
             return {label: interval, value: interval}
           })}
@@ -657,6 +661,10 @@ const createLegendUpdater = (legend: HTMLDivElement, prefix: string) => {
   }
 }
 
+const formatDate = (d : Date) : string => {
+  return moment(d).format("MMM Do YY hh:mm:ss A Z");
+}
+
 const createOHLCLegendUpdater = (legend: HTMLDivElement, prefix: string) => {
   return (param: any, time : any) => {
     if (param) {
@@ -664,7 +672,7 @@ const createOHLCLegendUpdater = (legend: HTMLDivElement, prefix: string) => {
       const changePercentage = Math.round((param.close - param.open) / param.close * 10000.0) / 100.0;
       const ampl = Math.round((param.high - param.low) / param.low * 10000.0) / 100.0;
       const t = new Date(time * 1000);
-      const dateStr = moment(t).format("MMM Do YY hh:mm:ss A Z");
+      const dateStr = formatDate(t);
       legend.innerHTML = prefix + ` O: ${param.open} H: ${param.high} L: ${param.low} C: ${param.close} CHG: ${change} (${changePercentage}%) AMP: ${ampl}% T: ${dateStr}`;
     } else {
       legend.innerHTML = prefix + ' O: - H: - L: - C: - T: -';

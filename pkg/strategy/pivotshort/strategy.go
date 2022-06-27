@@ -68,12 +68,6 @@ type Entry struct {
 	MarginSideEffect types.MarginOrderSideEffectType `json:"marginOrderSideEffect"`
 }
 
-type CumulatedVolume struct {
-	Enabled        bool             `json:"enabled"`
-	MinQuoteVolume fixedpoint.Value `json:"minQuoteVolume"`
-	Window         int              `json:"window"`
-}
-
 type Strategy struct {
 	*bbgo.Graceful
 
@@ -226,16 +220,38 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderExecutor.Bind()
 
 	store, _ := session.MarketDataStore(s.Symbol)
+	standardIndicator, _ := session.StandardIndicatorSet(s.Symbol)
 
 	s.pivot = &indicator.Pivot{IntervalWindow: s.IntervalWindow}
 	s.pivot.Bind(store)
+	if kLinesP, ok := store.KLinesOfInterval(s.IntervalWindow.Interval); ok {
+		s.pivot.Update(*kLinesP)
+	}
+
+	// update pivot low data
+	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
+		if kline.Symbol != s.Symbol || kline.Interval != s.Interval {
+			return
+		}
+
+		lastLow := fixedpoint.NewFromFloat(s.pivot.LastLow())
+		if lastLow.IsZero() {
+			return
+		}
+
+		if lastLow.Compare(s.lastLow) != 0 {
+			log.Infof("new pivot low detected: %f %s", s.pivot.LastLow(), kline.EndTime.Time())
+		}
+
+		s.lastLow = lastLow
+		s.pivotLowPrices = append(s.pivotLowPrices, s.lastLow)
+	})
 
 	if s.BounceShort != nil && s.BounceShort.Enabled {
 		s.resistancePivot = &indicator.Pivot{IntervalWindow: s.BounceShort.IntervalWindow}
 		s.resistancePivot.Bind(store)
 	}
 
-	standardIndicator, _ := session.StandardIndicatorSet(s.Symbol)
 	if s.BreakLow.StopEMA != nil {
 		s.stopEWMA = standardIndicator.EWMA(*s.BreakLow.StopEMA)
 	}
@@ -288,8 +304,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 
-		isPositionOpened := !s.Position.IsClosed() && !s.Position.IsDust(kline.Close)
-		if isPositionOpened && s.Position.IsShort() {
+		if !s.Position.IsClosed() && !s.Position.IsDust(kline.Close) {
 			return
 		}
 
@@ -305,6 +320,18 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			s.pivotLowPrices = s.pivotLowPrices[len(s.pivotLowPrices)-10:]
 		}
 
+		ratio := fixedpoint.One.Add(s.BreakLow.Ratio)
+		breakPrice := previousLow.Mul(ratio)
+
+		closePrice := kline.Close
+		// if previous low is not break, skip
+		if closePrice.Compare(breakPrice) >= 0 {
+			return
+		}
+
+		log.Infof("%s breakLow signal detected, closed price %f < breakPrice %f", kline.Symbol, closePrice.Float64(), breakPrice.Float64())
+
+		// stop EMA protection
 		if s.stopEWMA != nil && !s.BreakLow.StopEMARange.IsZero() {
 			ema := fixedpoint.NewFromFloat(s.stopEWMA.Last())
 			if ema.IsZero() {
@@ -312,22 +339,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 
 			emaStopShortPrice := ema.Mul(fixedpoint.One.Sub(s.BreakLow.StopEMARange))
-			if kline.Close.Compare(emaStopShortPrice) < 0 {
+			if closePrice.Compare(emaStopShortPrice) < 0 {
+				log.Infof("stopEMA protection: close price %f < EMA(%v) = %f", closePrice.Float64(), s.BreakLow.StopEMA, ema.Float64())
 				return
 			}
-		}
-
-		ratio := fixedpoint.One.Add(s.BreakLow.Ratio)
-		breakPrice := previousLow.Mul(ratio)
-
-		// if previous low is not break, skip
-		if kline.Close.Compare(breakPrice) >= 0 {
-			return
-		}
-
-		if !s.Position.IsClosed() && !s.Position.IsDust(kline.Close) {
-			// s.Notify("skip opening %s position, which is not closed", s.Symbol, s.Position)
-			return
 		}
 
 		_ = s.orderExecutor.GracefulCancel(ctx)
@@ -338,6 +353,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			s.placeMarketSell(ctx, quantity)
 		} else {
 			sellPrice := kline.Close.Mul(fixedpoint.One.Add(s.BreakLow.BounceRatio))
+
+			bbgo.Notify("%s price %f breaks the previous low %f with ratio %f, submitting limit sell @ %f", s.Symbol, kline.Close.Float64(), previousLow.Float64(), s.BreakLow.Ratio.Float64(), sellPrice.Float64())
 			s.placeLimitSell(ctx, sellPrice, quantity)
 		}
 	})
@@ -376,26 +393,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 	})
 
-	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
-		// StrategyController
-		if s.Status != types.StrategyStatusRunning {
-			return
-		}
+	if !bbgo.IsBackTesting {
+		// use market trade to submit short order
+		session.MarketDataStream.OnMarketTrade(func(trade types.Trade) {
 
-		if kline.Symbol != s.Symbol || kline.Interval != s.Interval {
-			return
-		}
-
-		if s.pivot.LastLow() > 0.0 {
-			lastLow := fixedpoint.NewFromFloat(s.pivot.LastLow())
-			if lastLow.Compare(s.lastLow) != 0 {
-				log.Infof("new pivot low detected: %f %s", s.pivot.LastLow(), kline.EndTime.Time())
-			}
-
-			s.lastLow = lastLow
-			s.pivotLowPrices = append(s.pivotLowPrices, s.lastLow)
-		}
-	})
+		})
+	}
 
 	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		_, _ = fmt.Fprintln(os.Stderr, s.TradeStats.String())

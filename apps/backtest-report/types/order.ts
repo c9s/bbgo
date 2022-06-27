@@ -11,4 +11,5 @@ export interface Order {
   update_time: Date;
   creation_time: Date;
   time?: Date;
+  tag?: string;
 }
