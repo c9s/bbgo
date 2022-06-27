@@ -1,13 +1,15 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {tsvParse} from "d3-dsv";
-import {Checkbox, Group, SegmentedControl, Table} from '@mantine/core';
+import {Checkbox, Group, SegmentedControl} from '@mantine/core';
 
 // https://github.com/tradingview/lightweight-charts/issues/543
 // const createChart = dynamic(() => import('lightweight-charts'));
 import {createChart, CrosshairMode, MouseEventParams, TimeRange} from 'lightweight-charts';
-import {ReportSummary} from "../types";
+import {Order, ReportSummary} from "../types";
 import moment from "moment";
 import {format} from 'date-fns';
+
+import OrderListTable from './OrderListTable';
 
 // See https://codesandbox.io/s/ve7w2?file=/src/App.js
 import TimeRangeSlider from './TimeRangeSlider';
@@ -147,19 +149,6 @@ const parseInterval = (s: string) => {
   return 60;
 };
 
-interface Order {
-  order_id: number;
-  order_type: string;
-  side: string;
-  symbol: string;
-  price: number;
-  quantity: number;
-  executed_quantity: number;
-  status: string;
-  update_time: Date;
-  creation_time: Date;
-  time?: Date;
-}
 
 interface Marker {
   time: number;
@@ -460,6 +449,14 @@ const TradingViewChart = (props: TradingViewChartProps) => {
       series.setData(chartData.klines);
       series.setMarkers(chartData.markers);
 
+      const ohlcLegend = createLegend(0, 'rgba(0, 0, 0, 1)');
+      chartContainerRef.current.appendChild(ohlcLegend);
+
+      const updateOHLCLegend = createOHLCLegendUpdater(ohlcLegend, "")
+      chart.current.subscribeCrosshairMove((param: MouseEventParams) => {
+        updateOHLCLegend(param.seriesPrices.get(series), param.time);
+      });
+
       [9, 27, 99].forEach((w, i) => {
         const emaValues = calculateEMA(chartData.klines, w)
         const emaColor = 'rgba(' + w + ', ' + (111 - w) + ', 232, 0.9)'
@@ -470,26 +467,14 @@ const TradingViewChart = (props: TradingViewChartProps) => {
         });
         emaLine.setData(emaValues);
 
-        const legend = document.createElement('div');
-        legend.className = 'ema-legend';
-        legend.style.display = 'block';
-        legend.style.position = 'absolute';
-        legend.style.left = 3 + 'px';
-        legend.style.zIndex = '99';
-        legend.style.top = 3 + (i * 22) + 'px';
+        const legend = createLegend(i + 1, emaColor)
         chartContainerRef.current.appendChild(legend);
 
-        const setLegendText = (priceValue: any) => {
-          let val = '∅';
-          if (priceValue !== undefined) {
-            val = (Math.round(priceValue * 100) / 100).toFixed(2);
-          }
-          legend.innerHTML = 'EMA' + w + ' <span style="color:' + emaColor + '">' + val + '</span>';
-        }
+        const updateLegendText = createLegendUpdater(legend, 'EMA ' + w)
 
-        setLegendText(emaValues[emaValues.length - 1].value);
+        updateLegendText(emaValues[emaValues.length - 1].value);
         chart.current.subscribeCrosshairMove((param: MouseEventParams) => {
-          setLegendText(param.seriesPrices.get(emaLine));
+          updateLegendText(param.seriesPrices.get(emaLine));
         });
       })
 
@@ -594,7 +579,7 @@ const TradingViewChart = (props: TradingViewChartProps) => {
       <TimeRangeSlider
         selectedInterval={selectedTimeRange}
         timelineInterval={timeRange}
-        formatTick={(ms : Date) => format(new Date(ms), 'M d HH')}
+        formatTick={(ms: Date) => format(new Date(ms), 'M d HH')}
         step={1000 * parseInterval(currentInterval)}
         onChange={(tr: any) => {
           console.log("selectedTimeRange", tr)
@@ -602,12 +587,7 @@ const TradingViewChart = (props: TradingViewChartProps) => {
         }}
       />
 
-      <Group>
-        <Checkbox label="Show Canceled" checked={showCanceledOrders}
-                  onChange={(event) => setShowCanceledOrders(event.currentTarget.checked)}/>
-
-      </Group>
-      <OrderListTable orders={orders} showCanceled={showCanceledOrders} onClick={(order) => {
+      <OrderListTable orders={orders} onClick={(order) => {
         console.log("selected order", order);
         const visibleRange = chart.current.timeScale().getVisibleRange()
         const seconds = parseInterval(currentInterval)
@@ -626,57 +606,6 @@ const TradingViewChart = (props: TradingViewChartProps) => {
   );
 };
 
-interface OrderListTableProps {
-  orders: Order[];
-  showCanceled: boolean;
-  onClick?: (order: Order) => void;
-}
-
-const OrderListTable = (props: OrderListTableProps) => {
-  let orders = props.orders;
-
-  if (!props.showCanceled) {
-    orders = orders.filter((order: Order) => {
-      return order.status != "CANCELED"
-    })
-  }
-
-  const rows = orders.map((order: Order) => (
-    <tr key={order.order_id} onClick={(e) => {
-      props.onClick ? props.onClick(order) : null;
-      const nodes = e.currentTarget?.parentNode?.querySelectorAll(".selected")
-      nodes?.forEach((node, i) => {
-        node.classList.remove("selected")
-      })
-      e.currentTarget.classList.add("selected")
-    }}>
-      <td>{order.order_id}</td>
-      <td>{order.symbol}</td>
-      <td>{order.side}</td>
-      <td>{order.order_type}</td>
-      <td>{order.price}</td>
-      <td>{order.quantity}</td>
-      <td>{order.status}</td>
-      <td>{order.creation_time.toString()}</td>
-    </tr>
-  ));
-  return <Table highlightOnHover striped>
-    <thead>
-    <tr>
-      <th>Order ID</th>
-      <th>Symbol</th>
-      <th>Side</th>
-      <th>Order Type</th>
-      <th>Price</th>
-      <th>Quantity</th>
-      <th>Status</th>
-      <th>Creation Time</th>
-    </tr>
-    </thead>
-    <tbody>{rows}</tbody>
-  </Table>
-}
-
 const calculateEMA = (a: KLine[], r: number) => {
   return a.map((k) => {
     return {time: k.time, value: k.close}
@@ -694,6 +623,42 @@ const calculateEMA = (a: KLine[], r: number) => {
   }])
 }
 
+const createLegend = (i: number, color: string) => {
+  const legend = document.createElement('div');
+  legend.className = 'ema-legend';
+  legend.style.display = 'block';
+  legend.style.position = 'absolute';
+  legend.style.left = 3 + 'px';
+  legend.style.color = color;
+  legend.style.zIndex = '99';
+  legend.style.top = 3 + (i * 22) + 'px';
+  return legend;
+}
+
+const createLegendUpdater = (legend: HTMLDivElement, prefix: string) => {
+  return (priceValue: any) => {
+    let val = '-';
+    if (priceValue !== undefined) {
+      val = (Math.round(priceValue * 100) / 100).toFixed(2);
+    }
+    legend.innerHTML = prefix + ' <span>' + val + '</span>';
+  }
+}
+
+const createOHLCLegendUpdater = (legend: HTMLDivElement, prefix: string) => {
+  return (param: any, time : any) => {
+    if (param) {
+      const change = Math.round((param.close - param.open) * 100.0) / 100.0
+      const changePercentage = Math.round((param.close - param.open) / param.close * 10000.0) / 100.0;
+      const ampl = Math.round((param.high - param.low) / param.low * 10000.0) / 100.0;
+      const t = new Date(time * 1000);
+      const dateStr = moment(t).format("MMM Do YY hh:mm:ss A Z");
+      legend.innerHTML = prefix + ` O: ${param.open} H: ${param.high} L: ${param.low} C: ${param.close} CHG: ${change} (${changePercentage}%) AMP: ${ampl}% T: ${dateStr}`;
+    } else {
+      legend.innerHTML = prefix + ' O: - H: - L: - C: - T: -';
+    }
+  }
+}
+
 
 export default TradingViewChart;
-
