@@ -251,6 +251,43 @@ func TestSimplePriceMatching_StopLimitOrderSell(t *testing.T) {
 	assert.Equal(t, stopOrder.Price, trades[0].Price)
 }
 
+func TestSimplePriceMatching_StopMarketOrderSell(t *testing.T) {
+	account := getTestAccount()
+	market := getTestMarket()
+	engine := &SimplePriceMatching{
+		Account:      account,
+		Market:       market,
+		closedOrders: make(map[uint64]types.Order),
+		LastPrice:    fixedpoint.NewFromFloat(22000.0),
+	}
+
+	stopOrder := types.SubmitOrder{
+		Symbol:      market.Symbol,
+		Side:        types.SideTypeSell,
+		Type:        types.OrderTypeStopMarket,
+		Quantity:    fixedpoint.NewFromFloat(0.1),
+		Price:       fixedpoint.NewFromFloat(20000.0),
+		StopPrice:   fixedpoint.NewFromFloat(21000.0),
+		TimeInForce: types.TimeInForceGTC,
+	}
+	createdOrder, trade, err := engine.PlaceOrder(stopOrder)
+	assert.NoError(t, err)
+	assert.Nil(t, trade, "place stop order should not trigger the stop sell")
+	assert.NotNil(t, createdOrder, "place stop order should not trigger the stop sell")
+
+	closedOrders, trades := engine.SellToPrice(fixedpoint.NewFromFloat(21500.0))
+	assert.Len(t, closedOrders, 0, "price change far from the price should not trigger the stop buy")
+	assert.Len(t, trades, 0, "price change far from the price should not trigger the stop buy")
+
+	closedOrders, trades = engine.SellToPrice(fixedpoint.NewFromFloat(20990.0))
+	assert.Len(t, closedOrders, 1, "should trigger the stop sell order")
+	assert.Len(t, trades, 1, "should have stop order trade executed")
+
+	assert.Equal(t, types.OrderStatusFilled, closedOrders[0].Status)
+	assert.Equal(t, types.OrderTypeMarket, closedOrders[0].Type)
+	assert.Equal(t, fixedpoint.NewFromFloat(20990.0), trades[0].Price)
+}
+
 func TestSimplePriceMatching_PlaceLimitOrder(t *testing.T) {
 	account := getTestAccount()
 	market := getTestMarket()
