@@ -466,6 +466,7 @@ const TradingViewChart = (props: TradingViewChartProps) => {
         const emaLine = chart.current.addLineSeries({
           color: emaColor,
           lineWidth: 1,
+          lastValueVisible: false,
         });
         emaLine.setData(emaValues);
 
