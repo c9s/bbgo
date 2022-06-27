@@ -650,7 +650,7 @@ const createOHLCLegendUpdater = (legend: HTMLDivElement, prefix: string) => {
     if (param) {
       legend.innerHTML = prefix + ` O: ${param.open} H: ${param.high} L: ${param.low} C: ${param.close} T: ${new Date(time * 1000)}`;
     } else {
-      legend.innerHTML = prefix + ' -';
+      legend.innerHTML = prefix + ' O: - H: - L: - C: - T: -';
     }
   }
 }
