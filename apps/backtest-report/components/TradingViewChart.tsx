@@ -647,7 +647,6 @@ const createLegendUpdater = (legend: HTMLDivElement, prefix: string) => {
 
 const createOHLCLegendUpdater = (legend: HTMLDivElement, prefix: string) => {
   return (param: any, time : any) => {
-    console.log(param)
     if (param) {
       legend.innerHTML = prefix + ` O: ${param.open} H: ${param.high} L: ${param.low} C: ${param.close} T: ${new Date(time * 1000)}`;
     } else {
