@@ -181,6 +181,11 @@ const ordersToMarkers = (interval: string, orders: Array<Order> | void): Array<M
       }
     }
 
+    let text = '' + order.price
+    if (order.tag) {
+      text += " #" + order.tag;
+    }
+
     switch (order.side) {
       case "BUY":
         markers.push({
@@ -188,8 +193,7 @@ const ordersToMarkers = (interval: string, orders: Array<Order> | void): Array<M
           position: 'belowBar',
           color: '#239D10',
           shape: 'arrowUp',
-          text: '' + order.price
-          //text: 'B',
+          text: text,
         });
         break;
       case "SELL":
@@ -198,8 +202,7 @@ const ordersToMarkers = (interval: string, orders: Array<Order> | void): Array<M
           position: 'aboveBar',
           color: '#e91e63',
           shape: 'arrowDown',
-          text: '' + order.price
-          //text: 'S',
+          text: text,
         });
         break;
     }
