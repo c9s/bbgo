@@ -1,9 +1,8 @@
-package pivotshort
+package bbgo
 
 import (
 	"context"
 
-	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -11,11 +10,11 @@ import (
 type LowerShadowTakeProfit struct {
 	Ratio fixedpoint.Value `json:"ratio"`
 
-	session       *bbgo.ExchangeSession
-	orderExecutor *bbgo.GeneralOrderExecutor
+	session       *ExchangeSession
+	orderExecutor *GeneralOrderExecutor
 }
 
-func (s *LowerShadowTakeProfit) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.GeneralOrderExecutor) {
+func (s *LowerShadowTakeProfit) Bind(session *ExchangeSession, orderExecutor *GeneralOrderExecutor) {
 	s.session = session
 	s.orderExecutor = orderExecutor
 
@@ -40,7 +39,7 @@ func (s *LowerShadowTakeProfit) Bind(session *bbgo.ExchangeSession, orderExecuto
 		}
 
 		if kline.GetLowerShadowHeight().Div(kline.Close).Compare(s.Ratio) > 0 {
-			bbgo.Notify("%s TakeProfit triggered by shadow ratio %f, price = %f",
+			Notify("%s TakeProfit triggered by shadow ratio %f, price = %f",
 				position.Symbol,
 				kline.GetLowerShadowRatio().Float64(),
 				kline.Close.Float64(),
