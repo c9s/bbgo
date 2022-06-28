@@ -142,7 +142,7 @@ func (s *Strategy) useQuantityOrBaseBalance(quantity fixedpoint.Value) fixedpoin
 	return quantity
 }
 
-func (s *Strategy) placeLimitSell(ctx context.Context, price, quantity fixedpoint.Value) {
+func (s *Strategy) placeLimitSell(ctx context.Context, price, quantity fixedpoint.Value, tag string) {
 	_, _ = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 		Symbol:           s.Symbol,
 		Price:            price,
@@ -150,16 +150,18 @@ func (s *Strategy) placeLimitSell(ctx context.Context, price, quantity fixedpoin
 		Type:             types.OrderTypeLimit,
 		Quantity:         quantity,
 		MarginSideEffect: types.SideEffectTypeMarginBuy,
+		Tag:              tag,
 	})
 }
 
-func (s *Strategy) placeMarketSell(ctx context.Context, quantity fixedpoint.Value) {
+func (s *Strategy) placeMarketSell(ctx context.Context, quantity fixedpoint.Value, tag string) {
 	_, _ = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 		Symbol:           s.Symbol,
 		Side:             types.SideTypeSell,
 		Type:             types.OrderTypeMarket,
 		Quantity:         quantity,
 		MarginSideEffect: types.SideEffectTypeMarginBuy,
+		Tag:              tag,
 	})
 }
 
@@ -323,9 +325,16 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		ratio := fixedpoint.One.Add(s.BreakLow.Ratio)
 		breakPrice := previousLow.Mul(ratio)
 
+		openPrice := kline.Open
 		closePrice := kline.Close
 		// if previous low is not break, skip
 		if closePrice.Compare(breakPrice) >= 0 {
+			return
+		}
+
+		// we need the price cross the break line
+		// or we do nothing
+		if !(openPrice.Compare(breakPrice) > 0 && closePrice.Compare(breakPrice) < 0) {
 			return
 		}
 
@@ -350,12 +359,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		quantity := s.useQuantityOrBaseBalance(s.BreakLow.Quantity)
 		if s.BreakLow.MarketOrder {
 			bbgo.Notify("%s price %f breaks the previous low %f with ratio %f, submitting market sell to open a short position", s.Symbol, kline.Close.Float64(), previousLow.Float64(), s.BreakLow.Ratio.Float64())
-			s.placeMarketSell(ctx, quantity)
+			s.placeMarketSell(ctx, quantity, "breakLowMarket")
 		} else {
 			sellPrice := kline.Close.Mul(fixedpoint.One.Add(s.BreakLow.BounceRatio))
 
 			bbgo.Notify("%s price %f breaks the previous low %f with ratio %f, submitting limit sell @ %f", s.Symbol, kline.Close.Float64(), previousLow.Float64(), s.BreakLow.Ratio.Float64(), sellPrice.Float64())
-			s.placeLimitSell(ctx, sellPrice, quantity)
+			s.placeLimitSell(ctx, sellPrice, quantity, "breakLowLimit")
 		}
 	})
 
