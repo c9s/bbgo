@@ -172,6 +172,10 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (*types.Order, *ty
 	order := m.newOrder(o, orderID)
 
 	if isTaker {
+		if order.Type == types.OrderTypeMarket {
+			order.Price = m.LastPrice
+		}
+
 		// emit the order update for Status:New
 		m.EmitOrderUpdate(order)
 
