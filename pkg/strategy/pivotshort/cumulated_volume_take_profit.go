@@ -8,6 +8,13 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+// CumulatedVolumeTakeProfit
+// This exit method cumulate the volume by N bars, if the cumulated volume exceeded a threshold, then we take profit.
+//
+// To query the historical quote volume, use the following query:
+//
+// > SELECT start_time, `interval`, quote_volume, open, close FROM binance_klines WHERE symbol = 'ETHUSDT' AND `interval` = '5m' ORDER BY quote_volume DESC LIMIT 20;
+//
 type CumulatedVolumeTakeProfit struct {
 	types.IntervalWindow
 	Ratio          fixedpoint.Value `json:"ratio"`
