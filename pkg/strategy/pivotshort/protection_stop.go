@@ -8,7 +8,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-type ProtectionStopLoss struct {
+type ProtectiveStopLoss struct {
 	// ActivationRatio is the trigger condition of this ROI protection stop loss
 	// When the price goes lower (for short position) with the ratio, the protection stop will be activated.
 	// This number should be positive to protect the profit
@@ -27,7 +27,7 @@ type ProtectionStopLoss struct {
 	stopLossOrder *types.Order
 }
 
-func (s *ProtectionStopLoss) shouldActivate(position *types.Position, closePrice fixedpoint.Value) bool {
+func (s *ProtectiveStopLoss) shouldActivate(position *types.Position, closePrice fixedpoint.Value) bool {
 	if position.IsLong() {
 		r := one.Add(s.ActivationRatio)
 		activationPrice := position.AverageCost.Mul(r)
@@ -42,7 +42,7 @@ func (s *ProtectionStopLoss) shouldActivate(position *types.Position, closePrice
 	return false
 }
 
-func (s *ProtectionStopLoss) placeStopOrder(ctx context.Context, position *types.Position, orderExecutor bbgo.OrderExecutor) error {
+func (s *ProtectiveStopLoss) placeStopOrder(ctx context.Context, position *types.Position, orderExecutor bbgo.OrderExecutor) error {
 	if s.stopLossOrder != nil {
 		if err := orderExecutor.CancelOrders(ctx, *s.stopLossOrder); err != nil {
 			log.WithError(err).Errorf("failed to cancel stop limit order: %+v", s.stopLossOrder)
@@ -58,7 +58,7 @@ func (s *ProtectionStopLoss) placeStopOrder(ctx context.Context, position *types
 		Price:     s.stopLossPrice.Mul(one.Add(fixedpoint.NewFromFloat(0.005))), // +0.5% from the trigger price, slippage protection
 		StopPrice: s.stopLossPrice,
 		Market:    position.Market,
-		Tag:       "protectionStopLoss",
+		Tag:       "protectiveStopLoss",
 	})
 
 	if len(createdOrders) > 0 {
@@ -67,7 +67,7 @@ func (s *ProtectionStopLoss) placeStopOrder(ctx context.Context, position *types
 	return err
 }
 
-func (s *ProtectionStopLoss) shouldStop(closePrice fixedpoint.Value) bool {
+func (s *ProtectiveStopLoss) shouldStop(closePrice fixedpoint.Value) bool {
 	if s.stopLossPrice.IsZero() {
 		return false
 	}
@@ -75,7 +75,7 @@ func (s *ProtectionStopLoss) shouldStop(closePrice fixedpoint.Value) bool {
 	return closePrice.Compare(s.stopLossPrice) >= 0
 }
 
-func (s *ProtectionStopLoss) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.GeneralOrderExecutor) {
+func (s *ProtectiveStopLoss) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.GeneralOrderExecutor) {
 	s.session = session
 	s.orderExecutor = orderExecutor
 
@@ -127,7 +127,7 @@ func (s *ProtectionStopLoss) Bind(session *bbgo.ExchangeSession, orderExecutor *
 	}
 }
 
-func (s *ProtectionStopLoss) handleChange(ctx context.Context, position *types.Position, closePrice fixedpoint.Value, orderExecutor *bbgo.GeneralOrderExecutor) {
+func (s *ProtectiveStopLoss) handleChange(ctx context.Context, position *types.Position, closePrice fixedpoint.Value, orderExecutor *bbgo.GeneralOrderExecutor) {
 	if s.stopLossOrder != nil {
 		// use RESTful to query the order status
 		// orderQuery := orderExecutor.Session().Exchange.(types.ExchangeOrderQueryService)
@@ -149,7 +149,7 @@ func (s *ProtectionStopLoss) handleChange(ctx context.Context, position *types.P
 				s.stopLossPrice = position.AverageCost.Mul(one.Add(s.StopLossRatio))
 			}
 
-			log.Infof("[ProtectionStopLoss] %s protection stop loss activated, current price = %f, average cost = %f, stop loss price = %f",
+			log.Infof("[ProtectiveStopLoss] %s protection stop loss activated, current price = %f, average cost = %f, stop loss price = %f",
 				position.Symbol, closePrice.Float64(), position.AverageCost.Float64(), s.stopLossPrice.Float64())
 
 			if s.PlaceStopOrder {
@@ -168,14 +168,14 @@ func (s *ProtectionStopLoss) handleChange(ctx context.Context, position *types.P
 	s.checkStopPrice(closePrice, position)
 }
 
-func (s *ProtectionStopLoss) checkStopPrice(closePrice fixedpoint.Value, position *types.Position) {
+func (s *ProtectiveStopLoss) checkStopPrice(closePrice fixedpoint.Value, position *types.Position) {
 	if s.stopLossPrice.IsZero() {
 		return
 	}
 
 	if s.shouldStop(closePrice) {
-		log.Infof("[ProtectionStopLoss] protection stop order is triggered at price %f, position = %+v", closePrice.Float64(), position)
-		if err := s.orderExecutor.ClosePosition(context.Background(), one, "protectionStopLoss"); err != nil {
+		log.Infof("[ProtectiveStopLoss] protection stop order is triggered at price %f, position = %+v", closePrice.Float64(), position)
+		if err := s.orderExecutor.ClosePosition(context.Background(), one, "protectiveStopLoss"); err != nil {
 			log.WithError(err).Errorf("failed to close position")
 		}
 	}
