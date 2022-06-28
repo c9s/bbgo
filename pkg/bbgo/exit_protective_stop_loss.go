@@ -1,9 +1,10 @@
-package pivotshort
+package bbgo
 
 import (
 	"context"
 
-	"github.com/c9s/bbgo/pkg/bbgo"
+	log "github.com/sirupsen/logrus"
+
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -21,11 +22,13 @@ type ProtectiveStopLoss struct {
 	// PlaceStopOrder places the stop order on exchange and lock the balance
 	PlaceStopOrder bool `json:"placeStopOrder"`
 
-	session       *bbgo.ExchangeSession
-	orderExecutor *bbgo.GeneralOrderExecutor
+	session       *ExchangeSession
+	orderExecutor *GeneralOrderExecutor
 	stopLossPrice fixedpoint.Value
 	stopLossOrder *types.Order
 }
+
+var one = fixedpoint.One
 
 func (s *ProtectiveStopLoss) shouldActivate(position *types.Position, closePrice fixedpoint.Value) bool {
 	if position.IsLong() {
@@ -42,7 +45,7 @@ func (s *ProtectiveStopLoss) shouldActivate(position *types.Position, closePrice
 	return false
 }
 
-func (s *ProtectiveStopLoss) placeStopOrder(ctx context.Context, position *types.Position, orderExecutor bbgo.OrderExecutor) error {
+func (s *ProtectiveStopLoss) placeStopOrder(ctx context.Context, position *types.Position, orderExecutor OrderExecutor) error {
 	if s.stopLossOrder != nil {
 		if err := orderExecutor.CancelOrders(ctx, *s.stopLossOrder); err != nil {
 			log.WithError(err).Errorf("failed to cancel stop limit order: %+v", s.stopLossOrder)
@@ -75,14 +78,14 @@ func (s *ProtectiveStopLoss) shouldStop(closePrice fixedpoint.Value) bool {
 	return closePrice.Compare(s.stopLossPrice) >= 0
 }
 
-func (s *ProtectiveStopLoss) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.GeneralOrderExecutor) {
+func (s *ProtectiveStopLoss) Bind(session *ExchangeSession, orderExecutor *GeneralOrderExecutor) {
 	s.session = session
 	s.orderExecutor = orderExecutor
 
 	orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
 		if position.IsClosed() {
 			s.stopLossOrder = nil
-			s.stopLossPrice = zero
+			s.stopLossPrice = fixedpoint.Zero
 		}
 	})
 
@@ -95,7 +98,7 @@ func (s *ProtectiveStopLoss) Bind(session *bbgo.ExchangeSession, orderExecutor *
 			switch order.Status {
 			case types.OrderStatusFilled, types.OrderStatusCanceled:
 				s.stopLossOrder = nil
-				s.stopLossPrice = zero
+				s.stopLossPrice = fixedpoint.Zero
 			}
 		}
 	})
@@ -112,7 +115,7 @@ func (s *ProtectiveStopLoss) Bind(session *bbgo.ExchangeSession, orderExecutor *
 		}
 	})
 
-	if !bbgo.IsBackTesting {
+	if !IsBackTesting {
 		session.MarketDataStream.OnMarketTrade(func(trade types.Trade) {
 			if trade.Symbol != position.Symbol {
 				return
@@ -127,7 +130,7 @@ func (s *ProtectiveStopLoss) Bind(session *bbgo.ExchangeSession, orderExecutor *
 	}
 }
 
-func (s *ProtectiveStopLoss) handleChange(ctx context.Context, position *types.Position, closePrice fixedpoint.Value, orderExecutor *bbgo.GeneralOrderExecutor) {
+func (s *ProtectiveStopLoss) handleChange(ctx context.Context, position *types.Position, closePrice fixedpoint.Value, orderExecutor *GeneralOrderExecutor) {
 	if s.stopLossOrder != nil {
 		// use RESTful to query the order status
 		// orderQuery := orderExecutor.Session().Exchange.(types.ExchangeOrderQueryService)

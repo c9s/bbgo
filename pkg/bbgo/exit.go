@@ -1,6 +1,10 @@
-package pivotshort
+package bbgo
 
-import "github.com/c9s/bbgo/pkg/bbgo"
+import (
+	"reflect"
+
+	"github.com/c9s/bbgo/pkg/types"
+)
 
 type ExitMethod struct {
 	RoiStopLoss               *RoiStopLoss               `json:"roiStopLoss"`
@@ -10,7 +14,20 @@ type ExitMethod struct {
 	CumulatedVolumeTakeProfit *CumulatedVolumeTakeProfit `json:"cumulatedVolumeTakeProfit"`
 }
 
-func (m *ExitMethod) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.GeneralOrderExecutor) {
+func (m *ExitMethod) Subscribe() {
+	rv := reflect.ValueOf(m).Elem()
+	rt := reflect.TypeOf(m)
+	rt = rt.Elem()
+	for i := 0; i <= rt.NumField(); i++ {
+		fieldType := rt.Field(i)
+		if fieldType.Type.Implements(reflect.TypeOf((*types.Subscriber)(nil))) {
+			method := rv.Field(i).MethodByName("Subscribe")
+			method.Call(nil)
+		}
+	}
+}
+
+func (m *ExitMethod) Bind(session *ExchangeSession, orderExecutor *GeneralOrderExecutor) {
 	if m.ProtectiveStopLoss != nil {
 		m.ProtectiveStopLoss.Bind(session, orderExecutor)
 	} else if m.RoiStopLoss != nil {
