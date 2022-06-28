@@ -6,6 +6,8 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
+// TODO: Add more stats from the reference:
+// See https://www.metatrader5.com/en/terminal/help/algotrading/testing_report
 type TradeStats struct {
 	WinningRatio        fixedpoint.Value   `json:"winningRatio" yaml:"winningRatio"`
 	NumOfLossTrade      int                `json:"numOfLossTrade" yaml:"numOfLossTrade"`
