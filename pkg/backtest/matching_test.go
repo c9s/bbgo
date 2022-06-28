@@ -46,6 +46,7 @@ func TestSimplePriceMatching_orderUpdate(t *testing.T) {
 		Market:       market,
 		CurrentTime:  t1,
 		closedOrders: make(map[uint64]types.Order),
+		LastPrice:    fixedpoint.NewFromFloat(25000),
 	}
 
 	orderUpdateCnt := 0
@@ -66,11 +67,12 @@ func TestSimplePriceMatching_orderUpdate(t *testing.T) {
 		}
 	})
 
+	// maker order
 	_, _, err := engine.PlaceOrder(newLimitOrder("BTCUSDT", types.SideTypeBuy, 24000.0, 0.1))
 	assert.NoError(t, err)
-	assert.Equal(t, 1, orderUpdateCnt)             // should got new status
-	assert.Equal(t, 1, orderUpdateNewStatusCnt)    // should got new status
-	assert.Equal(t, 0, orderUpdateFilledStatusCnt) // should got new status
+	assert.Equal(t, 1, orderUpdateCnt)             // should get new status
+	assert.Equal(t, 1, orderUpdateNewStatusCnt)    // should get new status
+	assert.Equal(t, 0, orderUpdateFilledStatusCnt) // should get new status
 	assert.Equal(t, types.OrderStatusNew, lastOrder.Status)
 	assert.Equal(t, fixedpoint.NewFromFloat(0.0), lastOrder.ExecutedQuantity)
 
@@ -89,23 +91,8 @@ func TestSimplePriceMatching_orderUpdate(t *testing.T) {
 }
 
 func TestSimplePriceMatching_processKLine(t *testing.T) {
-	account := &types.Account{
-		MakerFeeRate: fixedpoint.NewFromFloat(0.075 * 0.01),
-		TakerFeeRate: fixedpoint.NewFromFloat(0.075 * 0.01),
-	}
-	account.UpdateBalances(types.BalanceMap{
-		"USDT": {Currency: "USDT", Available: fixedpoint.NewFromFloat(10000.0)},
-	})
-	market := types.Market{
-		Symbol:          "BTCUSDT",
-		PricePrecision:  8,
-		VolumePrecision: 8,
-		QuoteCurrency:   "USDT",
-		BaseCurrency:    "BTC",
-		MinNotional:     fixedpoint.MustNewFromString("0.001"),
-		MinAmount:       fixedpoint.MustNewFromString("10.0"),
-		MinQuantity:     fixedpoint.MustNewFromString("0.001"),
-	}
+	account := getTestAccount()
+	market := getTestMarket()
 
 	t1 := time.Date(2021, 7, 1, 0, 0, 0, 0, time.UTC)
 	engine := &SimplePriceMatching{
@@ -113,6 +100,7 @@ func TestSimplePriceMatching_processKLine(t *testing.T) {
 		Market:       market,
 		CurrentTime:  t1,
 		closedOrders: make(map[uint64]types.Order),
+		LastPrice:    fixedpoint.NewFromFloat(30000.0),
 	}
 
 	for i := 0; i <= 5; i++ {
@@ -124,7 +112,7 @@ func TestSimplePriceMatching_processKLine(t *testing.T) {
 	t2 := t1.Add(time.Minute)
 
 	// should match 25000, 24000
-	k := newKLine("BTCUSDT", types.Interval1m, t2, 26000, 27000, 23000, 25000)
+	k := newKLine("BTCUSDT", types.Interval1m, t2, 30000, 27000, 23000, 25000)
 	assert.Equal(t, t2.Add(time.Minute-time.Millisecond), k.EndTime.Time())
 
 	engine.processKLine(k)
@@ -151,6 +139,8 @@ func newKLine(symbol string, interval types.Interval, startTime time.Time, o, h,
 	}
 }
 
+// getTestMarket returns the BTCUSDT market information
+// for tests, we always use BTCUSDT
 func getTestMarket() types.Market {
 	market := types.Market{
 		Symbol:          "BTCUSDT",
@@ -209,13 +199,13 @@ func TestSimplePriceMatching_StopLimitOrderBuy(t *testing.T) {
 	assert.Equal(t, 2, len(engine.bidOrders))
 	assert.Equal(t, 1, len(engine.askOrders))
 
-	closedOrders, trades := engine.BuyToPrice(fixedpoint.NewFromFloat(20000.0))
+	closedOrders, trades := engine.buyToPrice(fixedpoint.NewFromFloat(20000.0))
 	assert.Len(t, closedOrders, 0, "price change far from the price should not trigger the stop buy")
 	assert.Len(t, trades, 0, "price change far from the price should not trigger the stop buy")
 	assert.Equal(t, 2, len(engine.bidOrders), "bid orders should be the same")
 	assert.Equal(t, 1, len(engine.askOrders), "ask orders should be the same")
 
-	closedOrders, trades = engine.BuyToPrice(fixedpoint.NewFromFloat(21001.0))
+	closedOrders, trades = engine.buyToPrice(fixedpoint.NewFromFloat(21001.0))
 	assert.Len(t, closedOrders, 1, "should trigger the stop buy order")
 	assert.Len(t, trades, 1, "should have stop order trade executed")
 
@@ -241,7 +231,7 @@ func TestSimplePriceMatching_StopLimitOrderBuy(t *testing.T) {
 	assert.NotNil(t, createdOrder, "place stop order should not trigger the stop buy")
 	assert.Len(t, engine.bidOrders, 2)
 
-	closedOrders, trades = engine.SellToPrice(fixedpoint.NewFromFloat(20500.0))
+	closedOrders, trades = engine.sellToPrice(fixedpoint.NewFromFloat(20500.0))
 	assert.Len(t, closedOrders, 1, "should trigger the stop buy order")
 	assert.Len(t, trades, 1, "should have stop order trade executed")
 	assert.Len(t, engine.bidOrders, 1, "should left one bid order")
@@ -279,13 +269,13 @@ func TestSimplePriceMatching_StopLimitOrderSell(t *testing.T) {
 	assert.Equal(t, 1, len(engine.bidOrders))
 	assert.Equal(t, 2, len(engine.askOrders))
 
-	closedOrders, trades := engine.SellToPrice(fixedpoint.NewFromFloat(21500.0))
+	closedOrders, trades := engine.sellToPrice(fixedpoint.NewFromFloat(21500.0))
 	assert.Len(t, closedOrders, 0, "price change far from the price should not trigger the stop buy")
 	assert.Len(t, trades, 0, "price change far from the price should not trigger the stop buy")
 	assert.Equal(t, 1, len(engine.bidOrders))
 	assert.Equal(t, 2, len(engine.askOrders))
 
-	closedOrders, trades = engine.SellToPrice(fixedpoint.NewFromFloat(20990.0))
+	closedOrders, trades = engine.sellToPrice(fixedpoint.NewFromFloat(20990.0))
 	assert.Len(t, closedOrders, 1, "should trigger the stop sell order")
 	assert.Len(t, trades, 1, "should have stop order trade executed")
 	assert.Equal(t, 1, len(engine.bidOrders))
@@ -313,7 +303,7 @@ func TestSimplePriceMatching_StopLimitOrderSell(t *testing.T) {
 	assert.Nil(t, trade, "place stop order should not trigger the stop sell")
 	assert.NotNil(t, createdOrder, "place stop order should not trigger the stop sell")
 
-	closedOrders, trades = engine.BuyToPrice(fixedpoint.NewFromFloat(21000.0))
+	closedOrders, trades = engine.buyToPrice(fixedpoint.NewFromFloat(21000.0))
 	if assert.Len(t, closedOrders, 1, "should trigger the stop sell order") {
 		assert.Len(t, trades, 1, "should have stop order trade executed")
 		assert.Equal(t, types.SideTypeSell, closedOrders[0].Side)
@@ -348,11 +338,11 @@ func TestSimplePriceMatching_StopMarketOrderSell(t *testing.T) {
 	assert.Nil(t, trade, "place stop order should not trigger the stop sell")
 	assert.NotNil(t, createdOrder, "place stop order should not trigger the stop sell")
 
-	closedOrders, trades := engine.SellToPrice(fixedpoint.NewFromFloat(21500.0))
+	closedOrders, trades := engine.sellToPrice(fixedpoint.NewFromFloat(21500.0))
 	assert.Len(t, closedOrders, 0, "price change far from the price should not trigger the stop buy")
 	assert.Len(t, trades, 0, "price change far from the price should not trigger the stop buy")
 
-	closedOrders, trades = engine.SellToPrice(fixedpoint.NewFromFloat(20990.0))
+	closedOrders, trades = engine.sellToPrice(fixedpoint.NewFromFloat(20990.0))
 	assert.Len(t, closedOrders, 1, "should trigger the stop sell order")
 	assert.Len(t, trades, 1, "should have stop order trade executed")
 
@@ -384,11 +374,11 @@ func TestSimplePriceMatching_PlaceLimitOrder(t *testing.T) {
 	assert.Len(t, engine.bidOrders, 5)
 	assert.Len(t, engine.askOrders, 5)
 
-	closedOrders, trades := engine.SellToPrice(fixedpoint.NewFromFloat(8100.0))
+	closedOrders, trades := engine.sellToPrice(fixedpoint.NewFromFloat(8100.0))
 	assert.Len(t, closedOrders, 0)
 	assert.Len(t, trades, 0)
 
-	closedOrders, trades = engine.SellToPrice(fixedpoint.NewFromFloat(8000.0))
+	closedOrders, trades = engine.sellToPrice(fixedpoint.NewFromFloat(8000.0))
 	assert.Len(t, closedOrders, 1)
 	assert.Len(t, trades, 1)
 	for _, trade := range trades {
@@ -399,15 +389,15 @@ func TestSimplePriceMatching_PlaceLimitOrder(t *testing.T) {
 		assert.Equal(t, types.SideTypeBuy, o.Side)
 	}
 
-	closedOrders, trades = engine.SellToPrice(fixedpoint.NewFromFloat(7000.0))
+	closedOrders, trades = engine.sellToPrice(fixedpoint.NewFromFloat(7000.0))
 	assert.Len(t, closedOrders, 4)
 	assert.Len(t, trades, 4)
 
-	closedOrders, trades = engine.BuyToPrice(fixedpoint.NewFromFloat(8900.0))
+	closedOrders, trades = engine.buyToPrice(fixedpoint.NewFromFloat(8900.0))
 	assert.Len(t, closedOrders, 0)
 	assert.Len(t, trades, 0)
 
-	closedOrders, trades = engine.BuyToPrice(fixedpoint.NewFromFloat(9000.0))
+	closedOrders, trades = engine.buyToPrice(fixedpoint.NewFromFloat(9000.0))
 	assert.Len(t, closedOrders, 1)
 	assert.Len(t, trades, 1)
 	for _, o := range closedOrders {
@@ -417,7 +407,76 @@ func TestSimplePriceMatching_PlaceLimitOrder(t *testing.T) {
 		assert.Equal(t, types.SideTypeSell, trade.Side)
 	}
 
-	closedOrders, trades = engine.BuyToPrice(fixedpoint.NewFromFloat(9500.0))
+	closedOrders, trades = engine.buyToPrice(fixedpoint.NewFromFloat(9500.0))
 	assert.Len(t, closedOrders, 4)
 	assert.Len(t, trades, 4)
+}
+
+func Test_calculateNativeOrderFee(t *testing.T) {
+	market := getTestMarket()
+
+	t.Run("sellOrder", func(t *testing.T) {
+		order := types.Order{
+			SubmitOrder: types.SubmitOrder{
+				Symbol:      market.Symbol,
+				Side:        types.SideTypeSell,
+				Type:        types.OrderTypeLimit,
+				Quantity:    fixedpoint.NewFromFloat(0.1),
+				Price:       fixedpoint.NewFromFloat(20000.0),
+				TimeInForce: types.TimeInForceGTC,
+			},
+		}
+		feeRate := fixedpoint.MustNewFromString("0.075%")
+		fee, feeCurrency := calculateNativeOrderFee(&order, market, feeRate)
+		assert.Equal(t, "1.5", fee.String())
+		assert.Equal(t, "USDT", feeCurrency)
+	})
+
+	t.Run("buyOrder", func(t *testing.T) {
+		order := types.Order{
+			SubmitOrder: types.SubmitOrder{
+				Symbol:      market.Symbol,
+				Side:        types.SideTypeBuy,
+				Type:        types.OrderTypeLimit,
+				Quantity:    fixedpoint.NewFromFloat(0.1),
+				Price:       fixedpoint.NewFromFloat(20000.0),
+				TimeInForce: types.TimeInForceGTC,
+			},
+		}
+
+		feeRate := fixedpoint.MustNewFromString("0.075%")
+		fee, feeCurrency := calculateNativeOrderFee(&order, market, feeRate)
+		assert.Equal(t, "0.000075", fee.String())
+		assert.Equal(t, "BTC", feeCurrency)
+	})
+}
+
+func TestSimplePriceMatching_LimitTakerOrder(t *testing.T) {
+	account := getTestAccount()
+	market := getTestMarket()
+	engine := &SimplePriceMatching{
+		Account:      account,
+		Market:       market,
+		closedOrders: make(map[uint64]types.Order),
+		LastPrice:    fixedpoint.NewFromFloat(20000.0),
+	}
+
+	closedOrder, trade, err := engine.PlaceOrder(newLimitOrder("BTCUSDT", types.SideTypeBuy, 21000.0, 1.0))
+	assert.NoError(t, err)
+	if assert.NotNil(t, closedOrder) {
+		if assert.NotNil(t, trade) {
+			assert.Equal(t, "20000", trade.Price.String())
+			assert.False(t, trade.IsMaker, "should be taker")
+		}
+	}
+
+	closedOrder, trade, err = engine.PlaceOrder(newLimitOrder("BTCUSDT", types.SideTypeSell, 19000.0, 1.0))
+	assert.NoError(t, err)
+	if assert.NotNil(t, closedOrder) {
+		assert.Equal(t, "19000", closedOrder.Price.String())
+		if assert.NotNil(t, trade) {
+			assert.Equal(t, "20000", trade.Price.String())
+			assert.False(t, trade.IsMaker, "should be taker")
+		}
+	}
 }
