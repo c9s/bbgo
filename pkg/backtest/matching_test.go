@@ -90,6 +90,47 @@ func TestSimplePriceMatching_orderUpdate(t *testing.T) {
 	assert.Equal(t, lastOrder.Quantity.String(), lastOrder.ExecutedQuantity.String())
 }
 
+func TestSimplePriceMatching_CancelOrder(t *testing.T) {
+	account := getTestAccount()
+	market := getTestMarket()
+	t1 := time.Date(2021, 7, 1, 0, 0, 0, 0, time.UTC)
+	engine := &SimplePriceMatching{
+		Account:      account,
+		Market:       market,
+		CurrentTime:  t1,
+		closedOrders: make(map[uint64]types.Order),
+		LastPrice:    fixedpoint.NewFromFloat(30000.0),
+	}
+
+	createdOrder1, trade1, err := engine.PlaceOrder(newLimitOrder("BTCUSDT", types.SideTypeBuy, 20000.0, 0.1))
+	assert.NoError(t, err)
+	assert.Nil(t, trade1)
+	assert.Len(t, engine.bidOrders, 1)
+	assert.Len(t, engine.askOrders, 0)
+
+	createdOrder2, trade2, err := engine.PlaceOrder(newLimitOrder("BTCUSDT", types.SideTypeSell, 40000.0, 0.1))
+	assert.NoError(t, err)
+	assert.Nil(t, trade2)
+	assert.Len(t, engine.bidOrders, 1)
+	assert.Len(t, engine.askOrders, 1)
+
+	if assert.NotNil(t, createdOrder1) {
+		retOrder, err := engine.CancelOrder(*createdOrder1)
+		assert.NoError(t, err)
+		assert.NotNil(t, retOrder)
+		assert.Len(t, engine.bidOrders, 0)
+		assert.Len(t, engine.askOrders, 1)
+	}
+
+	if assert.NotNil(t, createdOrder2) {
+		retOrder, err := engine.CancelOrder(*createdOrder2)
+		assert.NoError(t, err)
+		assert.NotNil(t, retOrder)
+		assert.Len(t, engine.bidOrders, 0)
+		assert.Len(t, engine.askOrders, 0)
+	}
+}
+
 func TestSimplePriceMatching_processKLine(t *testing.T) {
 	account := getTestAccount()
 	market := getTestMarket()
