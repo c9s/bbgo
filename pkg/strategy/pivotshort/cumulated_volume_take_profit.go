@@ -56,7 +56,7 @@ func (s *CumulatedVolumeTakeProfit) Bind(session *bbgo.ExchangeSession, orderExe
 					cqv.Float64(),
 					s.MinQuoteVolume.Float64(), kline.Close.Float64())
 
-				_ = orderExecutor.ClosePosition(context.Background(), fixedpoint.One)
+				_ = orderExecutor.ClosePosition(context.Background(), fixedpoint.One, "cumulatedVolumeTakeProfit")
 				return
 			}
 		}
