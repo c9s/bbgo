@@ -361,7 +361,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			bbgo.Notify("%s price %f breaks the previous low %f with ratio %f, submitting market sell to open a short position", s.Symbol, kline.Close.Float64(), previousLow.Float64(), s.BreakLow.Ratio.Float64())
 			s.placeMarketSell(ctx, quantity, "breakLowMarket")
 		} else {
-			sellPrice := kline.Close.Mul(fixedpoint.One.Add(s.BreakLow.BounceRatio))
+			sellPrice := previousLow.Mul(fixedpoint.One.Add(s.BreakLow.BounceRatio))
 
 			bbgo.Notify("%s price %f breaks the previous low %f with ratio %f, submitting limit sell @ %f", s.Symbol, kline.Close.Float64(), previousLow.Float64(), s.BreakLow.Ratio.Float64(), sellPrice.Float64())
 			s.placeLimitSell(ctx, sellPrice, quantity, "breakLowLimit")
