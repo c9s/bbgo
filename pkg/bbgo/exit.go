@@ -15,6 +15,7 @@ type ExitMethod struct {
 }
 
 func (m *ExitMethod) Subscribe() {
+	// TODO: pull out this implementation as a simple function to reflect.go
 	rv := reflect.ValueOf(m)
 	rt := reflect.TypeOf(m)
 
