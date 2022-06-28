@@ -32,7 +32,7 @@ exchangeStrategies:
     - roiTakeProfit:
         percentage: 30%
 
-    - protectionStopLoss:
+    - protectiveStopLoss:
         activationRatio: 1%
         stopLossRatio: 0.2%
         placeStopOrder: true
