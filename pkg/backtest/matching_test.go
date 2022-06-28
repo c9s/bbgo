@@ -187,7 +187,7 @@ func TestSimplePriceMatching_StopLimitOrderBuy(t *testing.T) {
 		LastPrice:    fixedpoint.NewFromFloat(19000.0),
 	}
 
-	stopOrder := types.SubmitOrder{
+	stopBuyOrder := types.SubmitOrder{
 		Symbol:      market.Symbol,
 		Side:        types.SideTypeBuy,
 		Type:        types.OrderTypeStopLimit,
@@ -196,14 +196,24 @@ func TestSimplePriceMatching_StopLimitOrderBuy(t *testing.T) {
 		StopPrice:   fixedpoint.NewFromFloat(21000.0),
 		TimeInForce: types.TimeInForceGTC,
 	}
-	createdOrder, trade, err := engine.PlaceOrder(stopOrder)
+	createdOrder, trade, err := engine.PlaceOrder(stopBuyOrder)
 	assert.NoError(t, err)
 	assert.Nil(t, trade, "place stop order should not trigger the stop buy")
 	assert.NotNil(t, createdOrder, "place stop order should not trigger the stop buy")
 
+	// place some limit orders, so we ensure that the remaining orders are not removed.
+	_, _, err = engine.PlaceOrder(newLimitOrder(market.Symbol, types.SideTypeBuy, 18000, 0.01))
+	assert.NoError(t, err)
+	_, _, err = engine.PlaceOrder(newLimitOrder(market.Symbol, types.SideTypeSell, 32000, 0.01))
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(engine.bidOrders))
+	assert.Equal(t, 1, len(engine.askOrders))
+
 	closedOrders, trades := engine.BuyToPrice(fixedpoint.NewFromFloat(20000.0))
 	assert.Len(t, closedOrders, 0, "price change far from the price should not trigger the stop buy")
 	assert.Len(t, trades, 0, "price change far from the price should not trigger the stop buy")
+	assert.Equal(t, 2, len(engine.bidOrders), "bid orders should be the same")
+	assert.Equal(t, 1, len(engine.askOrders), "ask orders should be the same")
 
 	closedOrders, trades = engine.BuyToPrice(fixedpoint.NewFromFloat(21001.0))
 	assert.Len(t, closedOrders, 1, "should trigger the stop buy order")
@@ -211,7 +221,30 @@ func TestSimplePriceMatching_StopLimitOrderBuy(t *testing.T) {
 
 	assert.Equal(t, types.OrderStatusFilled, closedOrders[0].Status)
 	assert.Equal(t, types.OrderTypeLimit, closedOrders[0].Type)
-	assert.Equal(t, stopOrder.Price, trades[0].Price)
+	assert.Equal(t, "21001", trades[0].Price.String())
+	assert.Equal(t, "21001", closedOrders[0].Price.String(), "order.Price should be adjusted")
+
+	assert.Equal(t, fixedpoint.NewFromFloat(21001.0).String(), engine.LastPrice.String())
+
+	stopOrder2 := types.SubmitOrder{
+		Symbol:      market.Symbol,
+		Side:        types.SideTypeBuy,
+		Type:        types.OrderTypeStopLimit,
+		Quantity:    fixedpoint.NewFromFloat(0.1),
+		Price:       fixedpoint.NewFromFloat(22000.0),
+		StopPrice:   fixedpoint.NewFromFloat(21000.0),
+		TimeInForce: types.TimeInForceGTC,
+	}
+	createdOrder, trade, err = engine.PlaceOrder(stopOrder2)
+	assert.NoError(t, err)
+	assert.Nil(t, trade, "place stop order should not trigger the stop buy")
+	assert.NotNil(t, createdOrder, "place stop order should not trigger the stop buy")
+	assert.Len(t, engine.bidOrders, 2)
+
+	closedOrders, trades = engine.SellToPrice(fixedpoint.NewFromFloat(20500.0))
+	assert.Len(t, closedOrders, 1, "should trigger the stop buy order")
+	assert.Len(t, trades, 1, "should have stop order trade executed")
+	assert.Len(t, engine.bidOrders, 1, "should left one bid order")
 }
 
 func TestSimplePriceMatching_StopLimitOrderSell(t *testing.T) {
@@ -224,7 +257,7 @@ func TestSimplePriceMatching_StopLimitOrderSell(t *testing.T) {
 		LastPrice:    fixedpoint.NewFromFloat(22000.0),
 	}
 
-	stopOrder := types.SubmitOrder{
+	stopSellOrder := types.SubmitOrder{
 		Symbol:      market.Symbol,
 		Side:        types.SideTypeSell,
 		Type:        types.OrderTypeStopLimit,
@@ -233,22 +266,62 @@ func TestSimplePriceMatching_StopLimitOrderSell(t *testing.T) {
 		StopPrice:   fixedpoint.NewFromFloat(21000.0),
 		TimeInForce: types.TimeInForceGTC,
 	}
-	createdOrder, trade, err := engine.PlaceOrder(stopOrder)
+	createdOrder, trade, err := engine.PlaceOrder(stopSellOrder)
 	assert.NoError(t, err)
 	assert.Nil(t, trade, "place stop order should not trigger the stop sell")
 	assert.NotNil(t, createdOrder, "place stop order should not trigger the stop sell")
 
+	// place some limit orders, so we ensure that the remaining orders are not removed.
+	_, _, err = engine.PlaceOrder(newLimitOrder(market.Symbol, types.SideTypeBuy, 18000, 0.01))
+	assert.NoError(t, err)
+	_, _, err = engine.PlaceOrder(newLimitOrder(market.Symbol, types.SideTypeSell, 32000, 0.01))
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(engine.bidOrders))
+	assert.Equal(t, 2, len(engine.askOrders))
+
 	closedOrders, trades := engine.SellToPrice(fixedpoint.NewFromFloat(21500.0))
 	assert.Len(t, closedOrders, 0, "price change far from the price should not trigger the stop buy")
 	assert.Len(t, trades, 0, "price change far from the price should not trigger the stop buy")
+	assert.Equal(t, 1, len(engine.bidOrders))
+	assert.Equal(t, 2, len(engine.askOrders))
 
 	closedOrders, trades = engine.SellToPrice(fixedpoint.NewFromFloat(20990.0))
 	assert.Len(t, closedOrders, 1, "should trigger the stop sell order")
 	assert.Len(t, trades, 1, "should have stop order trade executed")
+	assert.Equal(t, 1, len(engine.bidOrders))
+	assert.Equal(t, 1, len(engine.askOrders))
 
 	assert.Equal(t, types.OrderStatusFilled, closedOrders[0].Status)
 	assert.Equal(t, types.OrderTypeLimit, closedOrders[0].Type)
-	assert.Equal(t, stopOrder.Price, trades[0].Price)
+	assert.Equal(t, "20990", closedOrders[0].Price.String())
+	assert.Equal(t, "20990", trades[0].Price.String())
+	assert.Equal(t, "20990", engine.LastPrice.String())
+
+	// place a stop limit sell order with a higher price than the current price
+	stopOrder2 := types.SubmitOrder{
+		Symbol:      market.Symbol,
+		Side:        types.SideTypeSell,
+		Type:        types.OrderTypeStopLimit,
+		Quantity:    fixedpoint.NewFromFloat(0.1),
+		Price:       fixedpoint.NewFromFloat(20000.0),
+		StopPrice:   fixedpoint.NewFromFloat(21000.0),
+		TimeInForce: types.TimeInForceGTC,
+	}
+
+	createdOrder, trade, err = engine.PlaceOrder(stopOrder2)
+	assert.NoError(t, err)
+	assert.Nil(t, trade, "place stop order should not trigger the stop sell")
+	assert.NotNil(t, createdOrder, "place stop order should not trigger the stop sell")
+
+	closedOrders, trades = engine.BuyToPrice(fixedpoint.NewFromFloat(21000.0))
+	if assert.Len(t, closedOrders, 1, "should trigger the stop sell order") {
+		assert.Len(t, trades, 1, "should have stop order trade executed")
+		assert.Equal(t, types.SideTypeSell, closedOrders[0].Side)
+		assert.Equal(t, types.OrderStatusFilled, closedOrders[0].Status)
+		assert.Equal(t, types.OrderTypeLimit, closedOrders[0].Type)
+		assert.Equal(t, "21000", trades[0].Price.String(), "trade price should be the kline price not the order price")
+		assert.Equal(t, "21000", engine.LastPrice.String(), "engine last price should be updated correctly")
+	}
 }
 
 func TestSimplePriceMatching_StopMarketOrderSell(t *testing.T) {
@@ -285,7 +358,7 @@ func TestSimplePriceMatching_StopMarketOrderSell(t *testing.T) {
 
 	assert.Equal(t, types.OrderStatusFilled, closedOrders[0].Status)
 	assert.Equal(t, types.OrderTypeMarket, closedOrders[0].Type)
-	assert.Equal(t, fixedpoint.NewFromFloat(20990.0), trades[0].Price)
+	assert.Equal(t, fixedpoint.NewFromFloat(20990.0), trades[0].Price, "trade price should be adjusted to the last price")
 }
 
 func TestSimplePriceMatching_PlaceLimitOrder(t *testing.T) {
