@@ -116,9 +116,13 @@ type SubmitOrder struct {
 	Side   SideType  `json:"side" db:"side"`
 	Type   OrderType `json:"orderType" db:"order_type"`
 
-	Quantity  fixedpoint.Value `json:"quantity" db:"quantity"`
-	Price     fixedpoint.Value `json:"price" db:"price"`
-	StopPrice fixedpoint.Value `json:"stopPrice,omitempty" db:"stop_price"`
+	Quantity     fixedpoint.Value `json:"quantity" db:"quantity"`
+	Price        fixedpoint.Value `json:"price" db:"price"`
+
+	// AveragePrice is only used in back-test currently
+	AveragePrice fixedpoint.Value `json:"averagePrice"`
+
+	StopPrice    fixedpoint.Value `json:"stopPrice,omitempty" db:"stop_price"`
 
 	Market Market `json:"-" db:"-"`
 

@@ -126,15 +126,19 @@ func (m *SimplePriceMatching) CancelOrder(o types.Order) (types.Order, error) {
 
 // PlaceOrder returns the created order object, executed trade (if any) and error
 func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (*types.Order, *types.Trade, error) {
+	if o.Type == types.OrderTypeMarket {
+		if m.LastPrice.IsZero() {
+			panic("unexpected error: for market order, the last price can not be zero")
+		}
+	}
+
+	isTaker := o.Type == types.OrderTypeMarket || isLimitTakerOrder(o, m.LastPrice)
+
 	// price for checking account balance, default price
 	price := o.Price
 
 	switch o.Type {
 	case types.OrderTypeMarket:
-		if m.LastPrice.IsZero() {
-			panic("unexpected: last price can not be zero")
-		}
-
 		price = m.LastPrice
 	case types.OrderTypeLimit, types.OrderTypeStopLimit, types.OrderTypeLimitMaker:
 		price = o.Price
@@ -167,7 +171,7 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (*types.Order, *ty
 	orderID := incOrderID()
 	order := m.newOrder(o, orderID)
 
-	if o.Type == types.OrderTypeMarket {
+	if isTaker {
 		// emit the order update for Status:New
 		m.EmitOrderUpdate(order)
 
@@ -175,13 +179,12 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (*types.Order, *ty
 		var order2 = order
 
 		// emit trade before we publish order
-		trade := m.newTradeFromOrder(&order2, false)
+		trade := m.newTradeFromOrder(&order2, false, m.LastPrice)
 		m.executeTrade(trade)
 
 		// update the order status
 		order2.Status = types.OrderStatusFilled
 		order2.ExecutedQuantity = order2.Quantity
-		order2.Price = price
 		order2.IsWorking = false
 
 		// let the exchange emit the "FILLED" order update (we need the closed order)
@@ -251,21 +254,10 @@ func (m *SimplePriceMatching) getFeeRate(isMaker bool) (feeRate fixedpoint.Value
 	return feeRate
 }
 
-func (m *SimplePriceMatching) newTradeFromOrder(order *types.Order, isMaker bool) types.Trade {
+func (m *SimplePriceMatching) newTradeFromOrder(order *types.Order, isMaker bool, price fixedpoint.Value) types.Trade {
 	// BINANCE uses 0.1% for both maker and taker
 	// MAX uses 0.050% for maker and 0.15% for taker
-	feeRate := m.getFeeRate(isMaker)
-
-	switch order.Type {
-	case types.OrderTypeMarket, types.OrderTypeStopMarket:
-		if m.LastPrice.IsZero() {
-			panic("unexpected: last price can not be zero")
-		}
-
-		order.Price = m.LastPrice
-	}
-
-	var price = order.Price
+	var feeRate = m.getFeeRate(isMaker)
 	var quoteQuantity = order.Quantity.Mul(price)
 	var fee fixedpoint.Value
 	var feeCurrency string
@@ -284,7 +276,7 @@ func (m *SimplePriceMatching) newTradeFromOrder(order *types.Order, isMaker bool
 	return types.Trade{
 		ID:            id,
 		OrderID:       order.OrderID,
-		Exchange:      "backtest",
+		Exchange:      types.ExchangeBacktest,
 		Price:         price,
 		Quantity:      order.Quantity,
 		QuoteQuantity: quoteQuantity,
@@ -414,7 +406,7 @@ func (m *SimplePriceMatching) buyToPrice(price fixedpoint.Value) (closedOrders [
 
 	for i := range closedOrders {
 		o := closedOrders[i]
-		trade := m.newTradeFromOrder(&o, true)
+		trade := m.newTradeFromOrder(&o, true, o.Price)
 		m.executeTrade(trade)
 		closedOrders[i] = o
 
@@ -484,8 +476,10 @@ func (m *SimplePriceMatching) sellToPrice(price fixedpoint.Value) (closedOrders 
 		switch o.Type {
 
 		case types.OrderTypeStopMarket:
-			// should we trigger the order
-			if o.StopPrice.Compare(price) < 0 {
+			// price goes down and if the stop price is still lower than the current price
+			// or the stop price is not touched
+			// then we should skip this order
+			if price.Compare(o.StopPrice) > 0 {
 				bidOrders = append(bidOrders, o)
 				break
 			}
@@ -497,9 +491,10 @@ func (m *SimplePriceMatching) sellToPrice(price fixedpoint.Value) (closedOrders 
 			closedOrders = append(closedOrders, o)
 
 		case types.OrderTypeStopLimit:
-			// if the price is lower than the stop order price
-			// we should trigger the stop order
-			if o.StopPrice.Compare(price) < 0 {
+			// price goes down and if the stop price is still lower than the current price
+			// or the stop price is not touched
+			// then we should skip this order
+			if price.Compare(o.StopPrice) > 0 {
 				bidOrders = append(bidOrders, o)
 				break
 			}
@@ -535,7 +530,7 @@ func (m *SimplePriceMatching) sellToPrice(price fixedpoint.Value) (closedOrders 
 
 	for i := range closedOrders {
 		o := closedOrders[i]
-		trade := m.newTradeFromOrder(&o, true)
+		trade := m.newTradeFromOrder(&o, true, o.Price)
 		m.executeTrade(trade)
 		closedOrders[i] = o
 
@@ -642,4 +637,13 @@ func calculateNativeOrderFee(order *types.Order, market types.Market, feeRate fi
 
 	}
 	return fee, feeCurrency
+}
+
+func isLimitTakerOrder(o types.SubmitOrder, currentPrice fixedpoint.Value) bool {
+	if currentPrice.IsZero() {
+		return false
+	}
+
+	return o.Type == types.OrderTypeLimit && ((o.Side == types.SideTypeBuy && o.Price.Compare(currentPrice) >= 0) ||
+		(o.Side == types.SideTypeSell && o.Price.Compare(currentPrice) <= 0))
 }
