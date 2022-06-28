@@ -1,6 +1,6 @@
 # usage:
 #
-#   go run ./cmd/bbgo optimize --config config/pivotshort-ETHUSDT.yaml  --optimizer-config config/pivotshort_optimizer.yaml --debug
+#   go run ./cmd/bbgo optimize --config config/pivotshort.yaml  --optimizer-config config/pivotshort_optimizer.yaml --debug
 #
 ---
 executor:
@@ -22,31 +22,44 @@ matrix:
   max: 200.0
   step: 20.0
 
-#  - type: range
-#    path: '/exchangeStrategies/0/pivotshort/breakLow/stopEMARange'
-#    label: stopEMARange
-#    min: 0%
-#    max: 10%
-#    step: 1%
+- type: range
+  path: '/exchangeStrategies/0/pivotshort/breakLow/stopEMARange'
+  label: stopEMARange
+  min: 0%
+  max: 10%
+  step: 1%
 
-#  - type: range
-#    path: '/exchangeStrategies/0/pivotshort/exit/roiStopLossPercentage'
-#    label: roiStopLossPercentage
-#    min: 0.5%
-#    max: 2%
-#    step: 0.5%
-#  
-#  - type: range
-#    path: '/exchangeStrategies/0/pivotshort/exit/roiTakeProfitPercentage'
-#    label: roiTakeProfitPercentage
-#    min: 10%
-#    max: 50%
-#    step: 5%
-#  
-#  - type: range
-#    path: '/exchangeStrategies/0/pivotshort/exit/roiMinTakeProfitPercentage'
-#    label: roiMinTakeProfitPercentage
-#    min: 3%
-#    max: 10%
-#    step: 1%
-#  
+- type: range
+  path: '/exchangeStrategies/0/pivotshort/exits/0/roiStopLoss/percentage'
+  label: roiStopLossPercentage
+  min: 0.5%
+  max: 2%
+  step: 0.1%
+
+- type: range
+  path: '/exchangeStrategies/0/pivotshort/exits/1/roiTakeProfit/percentage'
+  label: roiTakeProfit
+  min: 10%
+  max: 40%
+  step: 5%
+
+- type: range
+  path: '/exchangeStrategies/0/pivotshort/exits/2/protectiveStopLoss/activationRatio'
+  label: protectiveStopLoss_activationRatio
+  min: 0.5%
+  max: 3%
+  step: 0.1%
+
+- type: range
+  path: '/exchangeStrategies/0/pivotshort/exits/4/lowerShadowTakeProfit/ratio'
+  label: lowerShadowTakeProfit_ratio
+  min: 1%
+  max: 10%
+  step: 1%
+
+- type: range
+  path: '/exchangeStrategies/0/pivotshort/exits/5/cumulatedVolumeTakeProfit/minQuoteVolume'
+  label: cumulatedVolumeTakeProfit_minQuoteVolume
+  min: 3_000_000
+  max: 20_000_000
+  step: 100_000

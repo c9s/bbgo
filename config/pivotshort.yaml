@@ -3,64 +3,105 @@ sessions:
   binance:
     exchange: binance
     envVarPrefix: binance
-#    margin: true
-#    isolatedMargin: true
-#    isolatedMarginSymbol: GMTUSDT
-#    futures: true
+    margin: true
+    # isolatedMargin: true
+    # isolatedMarginSymbol: ETHUSDT
 
 exchangeStrategies:
 - on: binance
   pivotshort:
-    symbol: GMTUSDT
+    symbol: ETHUSDT
+
+    # interval is the main pivot interval
     interval: 5m
 
-    window: 120
+    # window is the main pivot window
+    window: 200
 
     # breakLow settings are used for shorting when the current price break the previous low
     breakLow:
-      ratio: 0.1%
+      # ratio is how much the price breaks the previous low to trigger the short.
+      ratio: 0%
+
+      # quantity is used for submitting the sell order
+      # if quantity is not set, all base balance will be used for selling the short.
       quantity: 10.0
-      stopEMARange: 5%
+
+      # marketOrder submits the market sell order when the closed price is lower than the previous pivot low.
+      marketOrder: true
+
+      # bounceRatio is used for calculating the price of the limit sell order.
+      # it's ratio of pivot low bounce when a new pivot low is detected.
+      # Sometimes when the price breaks the previous low, the price might be pulled back to a higher price.
+      # The bounceRatio is useful for such case, however, you might also miss the chance to short at the price if there is no pull back.
+      # Notice: When marketOrder is set, bounceRatio will not be used.
+      # bounceRatio: 0.1%
+
+      # stopEMARange is the price range we allow short.
+      # Short-allowed price range = [current price] > [EMA] * (1 - [stopEMARange])
+      stopEMARange: 0%
       stopEMA:
         interval: 1h
         window: 99
 
-    exits:
-    # roiStopLoss is the stop loss percentage of the position ROI (currently the price change)
-    - roiStopLoss:
-        percentage: 2%
+    bounceShort:
+      enabled: false
+      interval: 1h
+      window: 10
+      quantity: 10.0
+      minDistance: 3%
+      # stopLossPercentage: 1%
 
-    # roiTakeProfit is used to force taking profit by percentage of the position ROI (currently the price change)
+      # ratio is the ratio of the resistance price,
+      # higher the ratio, lower the price
+      # first_layer_price = resistance_price * (1 - ratio)
+      # second_layer_price = (resistance_price * (1 - ratio)) * (2 * layerSpread)
+      ratio: 0%
+      numOfLayers: 1
+      layerSpread: 0.1%
+
+    exits:
+    # (0) roiStopLoss is the stop loss percentage of the position ROI (currently the price change)
+    - roiStopLoss:
+        percentage: 0.8%
+
+    # (1) roiTakeProfit is used to force taking profit by percentage of the position ROI (currently the price change)
     # force to take the profit ROI exceeded the percentage.
     - roiTakeProfit:
-        percentage: 30%
+        percentage: 35%
 
-    - protectionStopLoss:
-        activationRatio: 1%
-        stopLossRatio: 0.2%
-        placeStopOrder: true
+    # (2) protective stop loss -- short term
+    - protectiveStopLoss:
+        activationRatio: 0.6%
+        stopLossRatio: 0.1%
+        placeStopOrder: false
 
-    # lowerShadowTakeProfit is used to taking profit when the (lower shadow height / low price) > lowerShadowRatio
+    # (3) protective stop loss -- long term
+    - protectiveStopLoss:
+        activationRatio: 5%
+        stopLossRatio: 1%
+        placeStopOrder: false
+
+    # (4) lowerShadowTakeProfit is used to taking profit when the (lower shadow height / low price) > lowerShadowRatio
     # you can grab a simple stats by the following SQL:
-    #
     # SELECT ((close - low) / close) AS shadow_ratio FROM binance_klines WHERE symbol = 'ETHUSDT' AND `interval` = '5m' AND start_time > '2022-01-01' ORDER BY shadow_ratio DESC LIMIT 20;
     - lowerShadowTakeProfit:
         ratio: 3%
 
-    # cumulatedVolumeTakeProfit is used to take profit when the cumulated quote volume from the klines exceeded a threshold
+    # (5) cumulatedVolumeTakeProfit is used to take profit when the cumulated quote volume from the klines exceeded a threshold
     - cumulatedVolumeTakeProfit:
-        minQuoteVolume: 90_000_000
-        window: 5
+        minQuoteVolume: 100_000_000
+        window: 2
 
 backtest:
   sessions:
   - binance
-  startTime: "2022-05-01"
-  endTime: "2022-06-03"
+  startTime: "2022-04-01"
+  endTime: "2022-06-18"
   symbols:
-  - GMTUSDT
+  - ETHUSDT
   accounts:
     binance:
       balances:
-        GMT: 3010.0
-        USDT: 1000.0
+        ETH: 10.0
+        USDT: 5000.0
