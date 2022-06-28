@@ -1,9 +1,8 @@
-package pivotshort
+package bbgo
 
 import (
 	"context"
 
-	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -20,11 +19,11 @@ type CumulatedVolumeTakeProfit struct {
 	Ratio          fixedpoint.Value `json:"ratio"`
 	MinQuoteVolume fixedpoint.Value `json:"minQuoteVolume"`
 
-	session       *bbgo.ExchangeSession
-	orderExecutor *bbgo.GeneralOrderExecutor
+	session       *ExchangeSession
+	orderExecutor *GeneralOrderExecutor
 }
 
-func (s *CumulatedVolumeTakeProfit) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.GeneralOrderExecutor) {
+func (s *CumulatedVolumeTakeProfit) Bind(session *ExchangeSession, orderExecutor *GeneralOrderExecutor) {
 	s.session = session
 	s.orderExecutor = orderExecutor
 
@@ -57,7 +56,7 @@ func (s *CumulatedVolumeTakeProfit) Bind(session *bbgo.ExchangeSession, orderExe
 			}
 
 			if cqv.Compare(s.MinQuoteVolume) > 0 {
-				bbgo.Notify("%s TakeProfit triggered by cumulated volume (window: %d) %f > %f, price = %f",
+				Notify("%s TakeProfit triggered by cumulated volume (window: %d) %f > %f, price = %f",
 					position.Symbol,
 					s.Window,
 					cqv.Float64(),

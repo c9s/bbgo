@@ -1,21 +1,21 @@
-package pivotshort
+package bbgo
 
 import (
 	"context"
 
-	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+// RoiTakeProfit force takes the profit by the given ROI percentage.
 type RoiTakeProfit struct {
 	Percentage fixedpoint.Value `json:"percentage"`
 
-	session       *bbgo.ExchangeSession
-	orderExecutor *bbgo.GeneralOrderExecutor
+	session       *ExchangeSession
+	orderExecutor *GeneralOrderExecutor
 }
 
-func (s *RoiTakeProfit) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.GeneralOrderExecutor) {
+func (s *RoiTakeProfit) Bind(session *ExchangeSession, orderExecutor *GeneralOrderExecutor) {
 	s.session = session
 	s.orderExecutor = orderExecutor
 
@@ -33,7 +33,7 @@ func (s *RoiTakeProfit) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.
 		roi := position.ROI(closePrice)
 		if roi.Compare(s.Percentage) > 0 {
 			// stop loss
-			bbgo.Notify("[RoiTakeProfit] %s take profit is triggered by ROI %s/%s, price: %f", position.Symbol, roi.Percentage(), s.Percentage.Percentage(), kline.Close.Float64())
+			Notify("[RoiTakeProfit] %s take profit is triggered by ROI %s/%s, price: %f", position.Symbol, roi.Percentage(), s.Percentage.Percentage(), kline.Close.Float64())
 			_ = orderExecutor.ClosePosition(context.Background(), fixedpoint.One, "roiTakeProfit")
 			return
 		}

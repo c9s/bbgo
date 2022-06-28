@@ -87,8 +87,8 @@ type Strategy struct {
 
 	BounceShort *BounceShort `json:"bounceShort"`
 
-	Entry       Entry        `json:"entry"`
-	ExitMethods []ExitMethod `json:"exits"`
+	Entry       Entry             `json:"entry"`
+	ExitMethods []bbgo.ExitMethod `json:"exits"`
 
 	session       *bbgo.ExchangeSession
 	orderExecutor *bbgo.GeneralOrderExecutor
