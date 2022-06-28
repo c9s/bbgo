@@ -15,12 +15,15 @@ type ExitMethod struct {
 }
 
 func (m *ExitMethod) Subscribe() {
-	rv := reflect.ValueOf(m).Elem()
+	rv := reflect.ValueOf(m)
 	rt := reflect.TypeOf(m)
+
+	rv = rv.Elem()
 	rt = rt.Elem()
-	for i := 0; i <= rt.NumField(); i++ {
+	infType := reflect.TypeOf((*types.Subscriber)(nil)).Elem()
+	for i := 0; i < rt.NumField(); i++ {
 		fieldType := rt.Field(i)
-		if fieldType.Type.Implements(reflect.TypeOf((*types.Subscriber)(nil))) {
+		if fieldType.Type.Implements(infType) {
 			method := rv.Field(i).MethodByName("Subscribe")
 			method.Call(nil)
 		}
