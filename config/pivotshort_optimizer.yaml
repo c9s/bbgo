@@ -44,8 +44,8 @@ matrix:
   step: 5%
 
 - type: range
-  path: '/exchangeStrategies/0/pivotshort/exits/2/protectionStopLoss/activationRatio'
-  label: protectionStopLoss_activationRatio
+  path: '/exchangeStrategies/0/pivotshort/exits/2/protectiveStopLoss/activationRatio'
+  label: protectiveStopLoss_activationRatio
   min: 0.5%
   max: 3%
   step: 0.1%
@@ -60,6 +60,6 @@ matrix:
 - type: range
   path: '/exchangeStrategies/0/pivotshort/exits/5/cumulatedVolumeTakeProfit/minQuoteVolume'
   label: cumulatedVolumeTakeProfit_minQuoteVolume
-  min: 30_000_000
-  max: 200_000_000
-  step: 10_000_000
+  min: 3_000_000
+  max: 20_000_000
+  step: 100_000

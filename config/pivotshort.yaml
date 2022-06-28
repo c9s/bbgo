@@ -71,13 +71,13 @@ exchangeStrategies:
         percentage: 35%
 
     # (2) protective stop loss -- short term
-    - protectionStopLoss:
+    - protectiveStopLoss:
         activationRatio: 0.6%
         stopLossRatio: 0.1%
         placeStopOrder: false
 
     # (3) protective stop loss -- long term
-    - protectionStopLoss:
+    - protectiveStopLoss:
         activationRatio: 5%
         stopLossRatio: 1%
         placeStopOrder: false
