@@ -46,6 +46,7 @@ func TestSimplePriceMatching_orderUpdate(t *testing.T) {
 		Market:       market,
 		CurrentTime:  t1,
 		closedOrders: make(map[uint64]types.Order),
+		LastPrice:    fixedpoint.NewFromFloat(25000),
 	}
 
 	orderUpdateCnt := 0
@@ -66,11 +67,12 @@ func TestSimplePriceMatching_orderUpdate(t *testing.T) {
 		}
 	})
 
+	// maker order
 	_, _, err := engine.PlaceOrder(newLimitOrder("BTCUSDT", types.SideTypeBuy, 24000.0, 0.1))
 	assert.NoError(t, err)
-	assert.Equal(t, 1, orderUpdateCnt)             // should got new status
-	assert.Equal(t, 1, orderUpdateNewStatusCnt)    // should got new status
-	assert.Equal(t, 0, orderUpdateFilledStatusCnt) // should got new status
+	assert.Equal(t, 1, orderUpdateCnt)             // should get new status
+	assert.Equal(t, 1, orderUpdateNewStatusCnt)    // should get new status
+	assert.Equal(t, 0, orderUpdateFilledStatusCnt) // should get new status
 	assert.Equal(t, types.OrderStatusNew, lastOrder.Status)
 	assert.Equal(t, fixedpoint.NewFromFloat(0.0), lastOrder.ExecutedQuantity)
 
@@ -89,23 +91,8 @@ func TestSimplePriceMatching_orderUpdate(t *testing.T) {
 }
 
 func TestSimplePriceMatching_processKLine(t *testing.T) {
-	account := &types.Account{
-		MakerFeeRate: fixedpoint.NewFromFloat(0.075 * 0.01),
-		TakerFeeRate: fixedpoint.NewFromFloat(0.075 * 0.01),
-	}
-	account.UpdateBalances(types.BalanceMap{
-		"USDT": {Currency: "USDT", Available: fixedpoint.NewFromFloat(10000.0)},
-	})
-	market := types.Market{
-		Symbol:          "BTCUSDT",
-		PricePrecision:  8,
-		VolumePrecision: 8,
-		QuoteCurrency:   "USDT",
-		BaseCurrency:    "BTC",
-		MinNotional:     fixedpoint.MustNewFromString("0.001"),
-		MinAmount:       fixedpoint.MustNewFromString("10.0"),
-		MinQuantity:     fixedpoint.MustNewFromString("0.001"),
-	}
+	account := getTestAccount()
+	market := getTestMarket()
 
 	t1 := time.Date(2021, 7, 1, 0, 0, 0, 0, time.UTC)
 	engine := &SimplePriceMatching{
@@ -113,6 +100,7 @@ func TestSimplePriceMatching_processKLine(t *testing.T) {
 		Market:       market,
 		CurrentTime:  t1,
 		closedOrders: make(map[uint64]types.Order),
+		LastPrice:    fixedpoint.NewFromFloat(30000.0),
 	}
 
 	for i := 0; i <= 5; i++ {
@@ -124,7 +112,7 @@ func TestSimplePriceMatching_processKLine(t *testing.T) {
 	t2 := t1.Add(time.Minute)
 
 	// should match 25000, 24000
-	k := newKLine("BTCUSDT", types.Interval1m, t2, 26000, 27000, 23000, 25000)
+	k := newKLine("BTCUSDT", types.Interval1m, t2, 30000, 27000, 23000, 25000)
 	assert.Equal(t, t2.Add(time.Minute-time.Millisecond), k.EndTime.Time())
 
 	engine.processKLine(k)
@@ -151,6 +139,8 @@ func newKLine(symbol string, interval types.Interval, startTime time.Time, o, h,
 	}
 }
 
+// getTestMarket returns the BTCUSDT market information
+// for tests, we always use BTCUSDT
 func getTestMarket() types.Market {
 	market := types.Market{
 		Symbol:          "BTCUSDT",
@@ -459,5 +449,34 @@ func Test_calculateNativeOrderFee(t *testing.T) {
 		assert.Equal(t, "0.000075", fee.String())
 		assert.Equal(t, "BTC", feeCurrency)
 	})
+}
 
+func TestSimplePriceMatching_LimitTakerOrder(t *testing.T) {
+	account := getTestAccount()
+	market := getTestMarket()
+	engine := &SimplePriceMatching{
+		Account:      account,
+		Market:       market,
+		closedOrders: make(map[uint64]types.Order),
+		LastPrice:    fixedpoint.NewFromFloat(20000.0),
+	}
+
+	closedOrder, trade, err := engine.PlaceOrder(newLimitOrder("BTCUSDT", types.SideTypeBuy, 21000.0, 1.0))
+	assert.NoError(t, err)
+	if assert.NotNil(t, closedOrder) {
+		if assert.NotNil(t, trade) {
+			assert.Equal(t, "20000", trade.Price.String())
+			assert.False(t, trade.IsMaker, "should be taker")
+		}
+	}
+
+	closedOrder, trade, err = engine.PlaceOrder(newLimitOrder("BTCUSDT", types.SideTypeSell, 19000.0, 1.0))
+	assert.NoError(t, err)
+	if assert.NotNil(t, closedOrder) {
+		assert.Equal(t, "19000", closedOrder.Price.String())
+		if assert.NotNil(t, trade) {
+			assert.Equal(t, "20000", trade.Price.String())
+			assert.False(t, trade.IsMaker, "should be taker")
+		}
+	}
 }
