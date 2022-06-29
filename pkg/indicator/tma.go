@@ -8,6 +8,7 @@ import (
 // Refer URL: https://ja.wikipedia.org/wiki/移動平均
 //go:generate callbackgen -type TMA
 type TMA struct {
+	types.SeriesBase
 	types.IntervalWindow
 	s1              *SMA
 	s2              *SMA
@@ -16,6 +17,7 @@ type TMA struct {
 
 func (inc *TMA) Update(value float64) {
 	if inc.s1 == nil {
+		inc.SeriesBase.Series = inc
 		w := (inc.Window + 1) / 2
 		inc.s1 = &SMA{IntervalWindow: types.IntervalWindow{inc.Interval, w}}
 		inc.s2 = &SMA{IntervalWindow: types.IntervalWindow{inc.Interval, w}}
@@ -46,7 +48,7 @@ func (inc *TMA) Length() int {
 	return inc.s2.Length()
 }
 
-var _ types.Series = &TMA{}
+var _ types.SeriesExtend = &TMA{}
 
 func (inc *TMA) calculateAndUpdate(allKLines []types.KLine) {
 	if inc.s1 == nil {

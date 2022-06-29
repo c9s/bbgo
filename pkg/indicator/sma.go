@@ -16,6 +16,7 @@ var zeroTime time.Time
 
 //go:generate callbackgen -type SMA
 type SMA struct {
+	types.SeriesBase
 	types.IntervalWindow
 	Values  types.Float64Slice
 	Cache   types.Float64Slice
@@ -44,10 +45,13 @@ func (inc *SMA) Length() int {
 	return len(inc.Values)
 }
 
-var _ types.Series = &SMA{}
+var _ types.SeriesExtend = &SMA{}
 
 func (inc *SMA) Update(value float64) {
 	if len(inc.Cache) < inc.Window {
+		if len(inc.Cache) == 0 {
+			inc.SeriesBase.Series = inc
+		}
 		inc.Cache = append(inc.Cache, value)
 		if len(inc.Cache) == inc.Window {
 			inc.Values = append(inc.Values, types.Mean(&inc.Cache))

@@ -12,6 +12,7 @@ import (
 // 3. resistance
 // of the market data, defined with series interface
 type Line struct {
+	types.SeriesBase
 	types.IntervalWindow
 	start       float64
 	end         float64
@@ -63,7 +64,7 @@ func (l *Line) SetXY2(index int, value float64) {
 }
 
 func NewLine(startIndex int, startValue float64, endIndex int, endValue float64, interval types.Interval) *Line {
-	return &Line{
+	line := &Line{
 		start:       startValue,
 		end:         endValue,
 		startIndex:  startIndex,
@@ -71,6 +72,8 @@ func NewLine(startIndex int, startValue float64, endIndex int, endValue float64,
 		currentTime: time.Time{},
 		Interval:    interval,
 	}
+	line.SeriesBase.Series = line
+	return line
 }
 
-var _ types.Series = &Line{}
+var _ types.SeriesExtend = &Line{}

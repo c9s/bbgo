@@ -87,6 +87,7 @@ func (inc *MACD) Bind(updater KLineWindowUpdater) {
 }
 
 type MACDValues struct {
+	types.SeriesBase
 	*MACD
 }
 
@@ -109,10 +110,12 @@ func (inc *MACDValues) Length() int {
 	return len(inc.Values)
 }
 
-func (inc *MACD) MACD() types.Series {
-	return &MACDValues{inc}
+func (inc *MACD) MACD() types.SeriesExtend {
+	out := &MACDValues{MACD: inc}
+	out.SeriesBase.Series = out
+	return out
 }
 
-func (inc *MACD) Singals() types.Series {
+func (inc *MACD) Singals() types.SeriesExtend {
 	return &inc.SignalLine
 }
