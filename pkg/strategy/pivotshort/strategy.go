@@ -337,7 +337,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		log.Infof("%s breakLow signal detected, closed price %f < breakPrice %f", kline.Symbol, closePrice.Float64(), breakPrice.Float64())
 
 		// stop EMA protection
-		if s.stopEWMA != nil && !s.BreakLow.StopEMARange.IsZero() {
+		if s.stopEWMA != nil {
 			ema := fixedpoint.NewFromFloat(s.stopEWMA.Last())
 			if ema.IsZero() {
 				return
