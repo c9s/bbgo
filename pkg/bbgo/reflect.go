@@ -2,6 +2,8 @@ package bbgo
 
 import (
 	"reflect"
+
+	"github.com/c9s/bbgo/pkg/dynamic"
 )
 
 type InstanceIDProvider interface {
@@ -17,7 +19,7 @@ func callID(obj interface{}) string {
 		return ret[0].String()
 	}
 
-	if symbol, ok := isSymbolBasedStrategy(sv); ok {
+	if symbol, ok := dynamic.LookupSymbolField(sv); ok {
 		m := sv.MethodByName("ID")
 		ret := m.Call(nil)
 		return ret[0].String() + ":" + symbol
@@ -27,22 +29,5 @@ func callID(obj interface{}) string {
 	m := sv.MethodByName("ID")
 	ret := m.Call(nil)
 	return ret[0].String() + ":"
-}
-
-func isSymbolBasedStrategy(rs reflect.Value) (string, bool) {
-	if rs.Kind() == reflect.Ptr {
-		rs = rs.Elem()
-	}
-
-	field := rs.FieldByName("Symbol")
-	if !field.IsValid() {
-		return "", false
-	}
-
-	if field.Kind() != reflect.String {
-		return "", false
-	}
-
-	return field.String(), true
 }
 

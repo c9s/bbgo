@@ -202,7 +202,7 @@ func (trader *Trader) RunSingleExchangeStrategy(ctx context.Context, strategy Si
 		return errors.Wrapf(err, "failed to inject OrderExecutor on %T", strategy)
 	}
 
-	if symbol, ok := isSymbolBasedStrategy(rs); ok {
+	if symbol, ok := dynamic.LookupSymbolField(rs); ok {
 		log.Infof("found symbol based strategy from %s", rs.Type())
 
 		market, ok := session.Market(symbol)
