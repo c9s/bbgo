@@ -188,7 +188,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.pivot = &indicator.Pivot{IntervalWindow: s.IntervalWindow}
 	s.pivot.Bind(store)
 
-	lastKLine := s.preloadPivot(s.pivot, store)
+	lastKLine := preloadPivot(s.pivot, store)
 
 	// update pivot low data
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
@@ -224,7 +224,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	if s.ResistanceShort != nil && s.ResistanceShort.Enabled {
 		if s.resistancePivot != nil {
-			s.preloadPivot(s.resistancePivot, store)
+			preloadPivot(s.resistancePivot, store)
 		}
 
 		session.UserDataStream.OnStart(func() {
@@ -435,23 +435,6 @@ func (s *Strategy) placeOrder(ctx context.Context, price fixedpoint.Value, quant
 	})
 }
 
-func (s *Strategy) preloadPivot(pivot *indicator.Pivot, store *bbgo.MarketDataStore) *types.KLine {
-	klines, ok := store.KLinesOfInterval(pivot.Interval)
-	if !ok {
-		return nil
-	}
-
-	last := (*klines)[len(*klines)-1]
-	log.Debugf("updating pivot indicator: %d klines", len(*klines))
-
-	for i := pivot.Window; i < len(*klines); i++ {
-		pivot.Update((*klines)[0 : i+1])
-	}
-
-	log.Infof("found %s %v previous lows: %v", s.Symbol, pivot.IntervalWindow, pivot.Lows)
-	log.Infof("found %s %v previous highs: %v", s.Symbol, pivot.IntervalWindow, pivot.Highs)
-	return &last
-}
 
 func (s *Strategy) useQuantityOrBaseBalance(quantity fixedpoint.Value) fixedpoint.Value {
 	balance, hasBalance := s.session.Account.Balance(s.Market.BaseCurrency)
@@ -517,4 +500,22 @@ func findPossibleResistancePrices(closePrice float64, minDistance float64, lows 
 	}
 
 	return resistancePrices
+}
+
+func preloadPivot(pivot *indicator.Pivot, store *bbgo.MarketDataStore) *types.KLine {
+	klines, ok := store.KLinesOfInterval(pivot.Interval)
+	if !ok {
+		return nil
+	}
+
+	last := (*klines)[len(*klines)-1]
+	log.Debugf("updating pivot indicator: %d klines", len(*klines))
+
+	for i := pivot.Window; i < len(*klines); i++ {
+		pivot.Update((*klines)[0 : i+1])
+	}
+
+	log.Debugf("found %v previous lows: %v", pivot.IntervalWindow, pivot.Lows)
+	log.Debugf("found %v previous highs: %v", pivot.IntervalWindow, pivot.Highs)
+	return &last
 }
