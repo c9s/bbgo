@@ -48,4 +48,19 @@ func Test_reflectMergeStructFields(t *testing.T) {
 		reflectMergeStructFields(b, a)
 		assert.Equal(t, types.IntervalWindow{Interval: types.Interval5m, Window: 9}, b.IntervalWindow)
 	})
+
+	t.Run("skip different type but the same name", func(t *testing.T) {
+		a := &struct {
+			A float64
+		}{
+			A: 1.99,
+		}
+		b := &struct {
+			A string
+		}{}
+		reflectMergeStructFields(b, a)
+		assert.Equal(t, "", b.A)
+		assert.Equal(t, 1.99, a.A)
+	})
+
 }
