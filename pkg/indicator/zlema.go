@@ -9,6 +9,7 @@ import (
 
 //go:generate callbackgen -type ZLEMA
 type ZLEMA struct {
+	types.SeriesBase
 	types.IntervalWindow
 
 	data  types.Float64Slice
@@ -41,6 +42,7 @@ func (inc *ZLEMA) Length() int {
 
 func (inc *ZLEMA) Update(value float64) {
 	if inc.lag == 0 || inc.zlema == nil {
+		inc.SeriesBase.Series = inc
 		inc.zlema = &EWMA{IntervalWindow: types.IntervalWindow{inc.Interval, inc.Window}}
 		inc.lag = int((float64(inc.Window)-1.)/2. + 0.5)
 	}
@@ -55,7 +57,7 @@ func (inc *ZLEMA) Update(value float64) {
 	inc.zlema.Update(emaData)
 }
 
-var _ types.Series = &ZLEMA{}
+var _ types.SeriesExtend = &ZLEMA{}
 
 func (inc *ZLEMA) calculateAndUpdate(allKLines []types.KLine) {
 	if inc.zlema == nil {

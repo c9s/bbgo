@@ -17,6 +17,7 @@ const MaxNumOfVOLTruncateSize = 100
 
 //go:generate callbackgen -type VOLATILITY
 type VOLATILITY struct {
+	types.SeriesBase
 	types.IntervalWindow
 	Values  types.Float64Slice
 	EndTime time.Time
@@ -31,6 +32,19 @@ func (inc *VOLATILITY) Last() float64 {
 	return inc.Values[len(inc.Values)-1]
 }
 
+func (inc *VOLATILITY) Index(i int) float64 {
+	if len(inc.Values)-i <= 0 {
+		return 0.0
+	}
+	return inc.Values[len(inc.Values)-i-1]
+}
+
+func (inc *VOLATILITY) Length() int {
+	return len(inc.Values)
+}
+
+var _ types.SeriesExtend = &VOLATILITY{}
+
 func (inc *VOLATILITY) calculateAndUpdate(klines []types.KLine) {
 	if len(klines) < inc.Window {
 		return
@@ -41,6 +55,9 @@ func (inc *VOLATILITY) calculateAndUpdate(klines []types.KLine) {
 
 	if inc.EndTime != zeroTime && lastKLine.GetEndTime().Before(inc.EndTime) {
 		return
+	}
+	if len(inc.Values) == 0 {
+		inc.SeriesBase.Series = inc
 	}
 
 	var recentT = klines[end-(inc.Window-1) : end+1]

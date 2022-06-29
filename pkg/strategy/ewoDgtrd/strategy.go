@@ -63,11 +63,11 @@ type Strategy struct {
 	atr           *indicator.ATR
 	emv           *indicator.EMV
 	ccis          *CCISTOCH
-	ma5           types.Series
-	ma34          types.Series
-	ewo           types.Series
-	ewoSignal     types.Series
-	ewoHistogram  types.Series
+	ma5           types.SeriesExtend
+	ma34          types.SeriesExtend
+	ewo           types.SeriesExtend
+	ewoSignal     types.SeriesExtend
+	ewoHistogram  types.SeriesExtend
 	ewoChangeRate float64
 	heikinAshi    *HeikinAshi
 	peakPrice     fixedpoint.Value
@@ -279,8 +279,8 @@ func (s *Strategy) SetupIndicators(store *bbgo.MarketDataStore) {
 
 		})
 
-		s.ma5 = ema5
-		s.ma34 = ema34
+		s.ma5 = types.NewSeries(ema5)
+		s.ma34 = types.NewSeries(ema34)
 	} else if s.UseSma {
 		sma5 := &indicator.SMA{IntervalWindow: window5}
 		sma34 := &indicator.SMA{IntervalWindow: window34}
@@ -300,8 +300,8 @@ func (s *Strategy) SetupIndicators(store *bbgo.MarketDataStore) {
 				sma34.Update(cloze)
 			}
 		})
-		s.ma5 = sma5
-		s.ma34 = sma34
+		s.ma5 = types.NewSeries(sma5)
+		s.ma34 = types.NewSeries(sma34)
 	} else {
 		evwma5 := &VWEMA{
 			PV: &indicator.EWMA{IntervalWindow: window5},
@@ -331,12 +331,12 @@ func (s *Strategy) SetupIndicators(store *bbgo.MarketDataStore) {
 				evwma34.UpdateVal(price, vol)
 			}
 		})
-		s.ma5 = evwma5
-		s.ma34 = evwma34
+		s.ma5 = types.NewSeries(evwma5)
+		s.ma34 = types.NewSeries(evwma34)
 	}
 
-	s.ewo = types.Mul(types.Minus(types.Div(s.ma5, s.ma34), 1.0), 100.)
-	s.ewoHistogram = types.Minus(s.ma5, s.ma34)
+	s.ewo = s.ma5.Div(s.ma34).Minus(1.0).Mul(100.)
+	s.ewoHistogram = s.ma5.Minus(s.ma34)
 	windowSignal := types.IntervalWindow{Interval: s.Interval, Window: s.SignalWindow}
 	if s.UseEma {
 		sig := &indicator.EWMA{IntervalWindow: windowSignal}
@@ -355,7 +355,7 @@ func (s *Strategy) SetupIndicators(store *bbgo.MarketDataStore) {
 				sig.Update(s.ewo.Last())
 			}
 		})
-		s.ewoSignal = sig
+		s.ewoSignal = types.NewSeries(sig)
 	} else if s.UseSma {
 		sig := &indicator.SMA{IntervalWindow: windowSignal}
 		store.OnKLineWindowUpdate(func(interval types.Interval, _ types.KLineWindow) {
@@ -365,7 +365,7 @@ func (s *Strategy) SetupIndicators(store *bbgo.MarketDataStore) {
 
 			if sig.Length() == 0 {
 				// lazy init
-				ewoVals := types.Reverse(s.ewo)
+				ewoVals := s.ewo.Reverse()
 				for _, ewoValue := range ewoVals {
 					sig.Update(ewoValue)
 				}
@@ -373,7 +373,7 @@ func (s *Strategy) SetupIndicators(store *bbgo.MarketDataStore) {
 				sig.Update(s.ewo.Last())
 			}
 		})
-		s.ewoSignal = sig
+		s.ewoSignal = types.NewSeries(sig)
 	} else {
 		sig := &VWEMA{
 			PV: &indicator.EWMA{IntervalWindow: windowSignal},
@@ -385,7 +385,7 @@ func (s *Strategy) SetupIndicators(store *bbgo.MarketDataStore) {
 			}
 			if sig.Length() == 0 {
 				// lazy init
-				ewoVals := types.Reverse(s.ewo)
+				ewoVals := s.ewo.Reverse()
 				for i, ewoValue := range ewoVals {
 					vol := window.Volume().Index(i)
 					sig.PV.Update(ewoValue * vol)
@@ -397,7 +397,7 @@ func (s *Strategy) SetupIndicators(store *bbgo.MarketDataStore) {
 				sig.V.Update(vol)
 			}
 		})
-		s.ewoSignal = sig
+		s.ewoSignal = types.NewSeries(sig)
 	}
 }
 

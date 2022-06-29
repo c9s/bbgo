@@ -11,15 +11,18 @@ import (
 // Super basic Series type that simply holds the float64 data
 // with size limit (the only difference compare to float64slice)
 type Queue struct {
+	SeriesBase
 	arr  []float64
 	size int
 }
 
 func NewQueue(size int) *Queue {
-	return &Queue{
+	out := &Queue{
 		arr:  make([]float64, 0, size),
 		size: size,
 	}
+	out.SeriesBase.Series = out
+	return out
 }
 
 func (inc *Queue) Last() float64 {
@@ -47,7 +50,7 @@ func (inc *Queue) Update(v float64) {
 	}
 }
 
-var _ Series = &Queue{}
+var _ SeriesExtend = &Queue{}
 
 // Float64Indicator is the indicators (SMA and EWMA) that we want to use are returning float64 data.
 type Float64Indicator interface {
@@ -82,29 +85,34 @@ type SeriesExtend interface {
 	Array(limit ...int) (result []float64)
 	Reverse(limit ...int) (result Float64Slice)
 	Change(offset ...int) SeriesExtend
-	Stdev(length int) float64
+	PercentageChange(offset ...int) SeriesExtend
+	Stdev(params ...int) float64
+	Rolling(window int) *RollingResult
+	Shift(offset int) SeriesExtend
+	Skew(length int) float64
+	Variance(length int) float64
+	Covariance(b Series, length int) float64
+	Correlation(b Series, length int, method ...CorrFunc) float64
+	Rank(length int) SeriesExtend
 }
 
-type IndexFuncType func(int) float64
-type LastFuncType func() float64
-type LengthFuncType func() int
-
 type SeriesBase struct {
-	index  IndexFuncType
-	last   LastFuncType
-	length LengthFuncType
+	Series
 }
 
 func NewSeries(a Series) SeriesExtend {
 	return &SeriesBase{
-		index:  a.Index,
-		last:   a.Last,
-		length: a.Length,
+		Series: a,
 	}
 }
 
 type UpdatableSeries interface {
 	Series
+	Update(float64)
+}
+
+type UpdatableSeriesExtend interface {
+	SeriesExtend
 	Update(float64)
 }
 
@@ -624,13 +632,13 @@ func (c *PercentageChangeResult) Length() int {
 
 // Percentage change between current and a prior element, a / a[offset] - 1.
 // offset: if not give, offset is 1.
-func PercentageChange(a Series, offset ...int) Series {
+func PercentageChange(a Series, offset ...int) SeriesExtend {
 	o := 1
 	if len(offset) > 0 {
 		o = offset[0]
 	}
 
-	return &PercentageChangeResult{a, o}
+	return NewSeries(&PercentageChangeResult{a, o})
 }
 
 func Stdev(a Series, params ...int) float64 {
@@ -650,7 +658,7 @@ func Stdev(a Series, params ...int) float64 {
 		diff := a.Index(i) - avg
 		s += diff * diff
 	}
-	return math.Sqrt(s / float64(length - ddof))
+	return math.Sqrt(s / float64(length-ddof))
 }
 
 type CorrFunc func(Series, Series, int) float64
@@ -678,7 +686,7 @@ func Kendall(a, b Series, length int) float64 {
 	return float64(concordant-discordant) * 2.0 / float64(length*(length-1))
 }
 
-func Rank(a Series, length int) Series {
+func Rank(a Series, length int) SeriesExtend {
 	if length > a.Length() {
 		length = a.Length()
 	}
@@ -805,10 +813,10 @@ func (inc *ShiftResult) Last() float64 {
 	return inc.a.Index(inc.offset)
 }
 func (inc *ShiftResult) Index(i int) float64 {
-	if inc.offset + i < 0 {
+	if inc.offset+i < 0 {
 		return 0
 	}
-	if inc.offset + i > inc.a.Length() {
+	if inc.offset+i > inc.a.Length() {
 		return 0
 	}
 	return inc.a.Index(inc.offset + i)
@@ -818,18 +826,18 @@ func (inc *ShiftResult) Length() int {
 	return inc.a.Length() - inc.offset
 }
 
-func Shift(a Series, offset int) Series {
-	return &ShiftResult{a, offset}
+func Shift(a Series, offset int) SeriesExtend {
+	return NewSeries(&ShiftResult{a, offset})
 }
 
 type RollingResult struct {
-	a Series
+	a      Series
 	window int
 }
 
 type SliceView struct {
-	a Series
-	start int
+	a      Series
+	start  int
 	length int
 }
 
@@ -840,7 +848,7 @@ func (s *SliceView) Index(i int) float64 {
 	if i >= s.length {
 		return 0
 	}
-	return s.a.Index(i+s.start)
+	return s.a.Index(i + s.start)
 }
 
 func (s *SliceView) Length() int {
@@ -849,21 +857,21 @@ func (s *SliceView) Length() int {
 
 var _ Series = &SliceView{}
 
-func (r *RollingResult) Last() Series {
-	return &SliceView{r.a, 0, r.window}
+func (r *RollingResult) Last() SeriesExtend {
+	return NewSeries(&SliceView{r.a, 0, r.window})
 }
 
-func (r *RollingResult) Index(i int) Series {
-	if i * r.window > r.a.Length() {
+func (r *RollingResult) Index(i int) SeriesExtend {
+	if i*r.window > r.a.Length() {
 		return nil
 	}
-	return &SliceView{r.a, i*r.window, r.window}
+	return NewSeries(&SliceView{r.a, i * r.window, r.window})
 }
 
 func (r *RollingResult) Length() int {
 	mod := r.a.Length() % r.window
 	if mod > 0 {
-		return r.a.Length() / r.window + 1
+		return r.a.Length()/r.window + 1
 	} else {
 		return r.a.Length() / r.window
 	}
@@ -872,4 +880,5 @@ func (r *RollingResult) Length() int {
 func Rolling(a Series, window int) *RollingResult {
 	return &RollingResult{a, window}
 }
+
 // TODO: ta.linreg

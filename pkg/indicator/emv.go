@@ -9,6 +9,7 @@ import (
 
 //go:generate callbackgen -type EMV
 type EMV struct {
+	types.SeriesBase
 	types.IntervalWindow
 	prevH    float64
 	prevL    float64
@@ -25,6 +26,7 @@ func (inc *EMV) Update(high, low, vol float64) {
 		inc.EMVScale = DefaultEMVScale
 	}
 	if inc.prevH == 0 || inc.Values == nil {
+		inc.SeriesBase.Series = inc
 		inc.prevH = high
 		inc.prevL = low
 		inc.Values = &SMA{IntervalWindow: inc.IntervalWindow}
@@ -59,7 +61,7 @@ func (inc *EMV) Length() int {
 	return inc.Values.Length()
 }
 
-var _ types.Series = &EMV{}
+var _ types.SeriesExtend = &EMV{}
 
 func (inc *EMV) calculateAndUpdate(allKLines []types.KLine) {
 	if inc.Values == nil {

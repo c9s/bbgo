@@ -8,6 +8,7 @@ import (
 // Refer: https://en.wikipedia.org/wiki/Moving_average
 //go:generate callbackgen -type CA
 type CA struct {
+	types.SeriesBase
 	Interval        types.Interval
 	Values          types.Float64Slice
 	length          float64
@@ -15,11 +16,15 @@ type CA struct {
 }
 
 func (inc *CA) Update(x float64) {
+	if len(inc.Values) == 0 {
+		inc.SeriesBase.Series = inc
+	}
 	newVal := (inc.Values.Last()*inc.length + x) / (inc.length + 1.)
 	inc.length += 1
 	inc.Values.Push(newVal)
 	if len(inc.Values) > MaxNumOfEWMA {
 		inc.Values = inc.Values[MaxNumOfEWMATruncateSize-1:]
+		inc.length = float64(len(inc.Values))
 	}
 }
 
@@ -41,7 +46,7 @@ func (inc *CA) Length() int {
 	return len(inc.Values)
 }
 
-var _ types.Series = &CA{}
+var _ types.SeriesExtend = &CA{}
 
 func (inc *CA) calculateAndUpdate(allKLines []types.KLine) {
 	for _, k := range allKLines {
