@@ -125,7 +125,6 @@ func (e *GeneralOrderExecutor) ClosePosition(ctx context.Context, percentage fix
 	}
 
 	submitOrder.Tag = strings.Join(tags, ",")
-
 	_, err := e.SubmitOrders(ctx, *submitOrder)
 	return err
 }

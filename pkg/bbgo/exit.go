@@ -14,7 +14,7 @@ type ExitMethod struct {
 	CumulatedVolumeTakeProfit *CumulatedVolumeTakeProfit `json:"cumulatedVolumeTakeProfit"`
 }
 
-func (m *ExitMethod) Subscribe() {
+func (m *ExitMethod) Subscribe(session *ExchangeSession) {
 	// TODO: pull out this implementation as a simple function to reflect.go
 	rv := reflect.ValueOf(m)
 	rt := reflect.TypeOf(m)
@@ -22,11 +22,13 @@ func (m *ExitMethod) Subscribe() {
 	rv = rv.Elem()
 	rt = rt.Elem()
 	infType := reflect.TypeOf((*types.Subscriber)(nil)).Elem()
+
+	argValues := toReflectValues(session)
 	for i := 0; i < rt.NumField(); i++ {
 		fieldType := rt.Field(i)
 		if fieldType.Type.Implements(infType) {
 			method := rv.Field(i).MethodByName("Subscribe")
-			method.Call(nil)
+			method.Call(argValues)
 		}
 	}
 }
