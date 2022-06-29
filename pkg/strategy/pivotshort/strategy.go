@@ -127,48 +127,6 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	}
 }
 
-func (s *Strategy) useQuantityOrBaseBalance(quantity fixedpoint.Value) fixedpoint.Value {
-	balance, hasBalance := s.session.Account.Balance(s.Market.BaseCurrency)
-
-	if hasBalance {
-		if quantity.IsZero() {
-			bbgo.Notify("sell quantity is not set, submitting sell with all base balance: %s", balance.Available.String())
-			quantity = balance.Available
-		} else {
-			quantity = fixedpoint.Min(quantity, balance.Available)
-		}
-	}
-
-	if quantity.IsZero() {
-		log.Errorf("quantity is zero, can not submit sell order, please check settings")
-	}
-
-	return quantity
-}
-
-func (s *Strategy) placeLimitSell(ctx context.Context, price, quantity fixedpoint.Value, tag string) {
-	_, _ = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
-		Symbol:           s.Symbol,
-		Price:            price,
-		Side:             types.SideTypeSell,
-		Type:             types.OrderTypeLimit,
-		Quantity:         quantity,
-		MarginSideEffect: types.SideEffectTypeMarginBuy,
-		Tag:              tag,
-	})
-}
-
-func (s *Strategy) placeMarketSell(ctx context.Context, quantity fixedpoint.Value, tag string) {
-	_, _ = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
-		Symbol:           s.Symbol,
-		Side:             types.SideTypeSell,
-		Type:             types.OrderTypeMarket,
-		Quantity:         quantity,
-		MarginSideEffect: types.SideEffectTypeMarginBuy,
-		Tag:              tag,
-	})
-}
-
 func (s *Strategy) InstanceID() string {
 	return fmt.Sprintf("%s:%s", ID, s.Symbol)
 }
@@ -518,3 +476,47 @@ func findPossibleResistancePrices(closePrice float64, minDistance float64, lows 
 
 	return resistancePrices
 }
+
+
+func (s *Strategy) useQuantityOrBaseBalance(quantity fixedpoint.Value) fixedpoint.Value {
+	balance, hasBalance := s.session.Account.Balance(s.Market.BaseCurrency)
+
+	if hasBalance {
+		if quantity.IsZero() {
+			bbgo.Notify("sell quantity is not set, submitting sell with all base balance: %s", balance.Available.String())
+			quantity = balance.Available
+		} else {
+			quantity = fixedpoint.Min(quantity, balance.Available)
+		}
+	}
+
+	if quantity.IsZero() {
+		log.Errorf("quantity is zero, can not submit sell order, please check settings")
+	}
+
+	return quantity
+}
+
+func (s *Strategy) placeLimitSell(ctx context.Context, price, quantity fixedpoint.Value, tag string) {
+	_, _ = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+		Symbol:           s.Symbol,
+		Price:            price,
+		Side:             types.SideTypeSell,
+		Type:             types.OrderTypeLimit,
+		Quantity:         quantity,
+		MarginSideEffect: types.SideEffectTypeMarginBuy,
+		Tag:              tag,
+	})
+}
+
+func (s *Strategy) placeMarketSell(ctx context.Context, quantity fixedpoint.Value, tag string) {
+	_, _ = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+		Symbol:           s.Symbol,
+		Side:             types.SideTypeSell,
+		Type:             types.OrderTypeMarket,
+		Quantity:         quantity,
+		MarginSideEffect: types.SideEffectTypeMarginBuy,
+		Tag:              tag,
+	})
+}
+
