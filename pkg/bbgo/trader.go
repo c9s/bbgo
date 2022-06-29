@@ -10,6 +10,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 
+	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/interact"
 )
 
@@ -394,7 +395,7 @@ func (trader *Trader) injectCommonServices(s interface{}) error {
 	// a special injection for persistence selector:
 	// if user defined the selector, the facade pointer will be nil, hence we need to update the persistence facade pointer
 	sv := reflect.ValueOf(s).Elem()
-	if field, ok := hasField(sv, "Persistence"); ok {
+	if field, ok := dynamic.HasField(sv, "Persistence"); ok {
 		// the selector is set, but we need to update the facade pointer
 		if !field.IsNil() {
 			elem := field.Elem()
