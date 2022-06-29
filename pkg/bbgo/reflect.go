@@ -111,10 +111,33 @@ func newTypeValueInterface(typ reflect.Type) interface{} {
 	return dst.Interface()
 }
 
+// toReflectValues convert the go objects into reflect.Value slice
 func toReflectValues(args ...interface{}) (values []reflect.Value) {
 	for _, arg := range args {
 		values = append(values, reflect.ValueOf(arg))
 	}
 
 	return values
+}
+
+func reflectMergeStructFields(dst, src interface{}) {
+	rtA := reflect.TypeOf(dst)
+	srcStructType := reflect.TypeOf(src)
+
+	rtA = rtA.Elem()
+	srcStructType = srcStructType.Elem()
+
+	for i := 0; i < rtA.NumField(); i++ {
+		fieldType := rtA.Field(i)
+		fieldName := fieldType.Name
+		if fieldSrcType, ok := srcStructType.FieldByName(fieldName); ok {
+			if fieldSrcType.Type == fieldType.Type {
+				srcValue := reflect.ValueOf(src).Elem().FieldByName(fieldName)
+				dstValue := reflect.ValueOf(dst).Elem().FieldByName(fieldName)
+				if (fieldType.Type.Kind() == reflect.Ptr && dstValue.IsNil()) || dstValue.IsZero() {
+					dstValue.Set(srcValue)
+				}
+			}
+		}
+	}
 }
