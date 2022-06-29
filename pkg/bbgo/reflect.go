@@ -110,3 +110,11 @@ func newTypeValueInterface(typ reflect.Type) interface{} {
 	dst := reflect.New(typ)
 	return dst.Interface()
 }
+
+func toReflectValues(args ...interface{}) (values []reflect.Value) {
+	for _, arg := range args {
+		values = append(values, reflect.ValueOf(arg))
+	}
+
+	return values
+}
