@@ -226,9 +226,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.pivot = &indicator.Pivot{IntervalWindow: s.IntervalWindow}
 	s.pivot.Bind(store)
-	if kLinesP, ok := store.KLinesOfInterval(s.IntervalWindow.Interval); ok {
-		s.pivot.Update(*kLinesP)
-	}
+
+	lastKLine := s.preloadPivot(s.pivot, store)
 
 	// update pivot low data
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
@@ -263,13 +262,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	}
 
 	if s.BounceShort != nil && s.BounceShort.Enabled {
+		if s.resistancePivot != nil {
+			s.preloadPivot(s.resistancePivot, store)
+		}
+
 		session.UserDataStream.OnStart(func() {
-			lastKLine := s.preloadPivot(s.pivot, store)
-
-			if s.resistancePivot != nil {
-				s.preloadPivot(s.resistancePivot, store)
-			}
-
 			if lastKLine == nil {
 				return
 			}
@@ -484,7 +481,6 @@ func (s *Strategy) preloadPivot(pivot *indicator.Pivot, store *bbgo.MarketDataSt
 	}
 
 	last := (*klines)[len(*klines)-1]
-	log.Infof("last %s price: %f", s.Symbol, last.Close.Float64())
 	log.Debugf("updating pivot indicator: %d klines", len(*klines))
 
 	for i := pivot.Window; i < len(*klines); i++ {
