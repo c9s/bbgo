@@ -45,7 +45,7 @@ func (s *TradeStats) Add(pnl fixedpoint.Value) {
 		s.WinningRatio = fixedpoint.NewFromFloat(float64(s.NumOfProfitTrade) / float64(s.NumOfLossTrade))
 	}
 
-	s.ProfitFactor = s.GrossProfit.Div(s.GrossLoss)
+	s.ProfitFactor = s.GrossProfit.Div(s.GrossLoss.Abs())
 }
 
 func (s *TradeStats) String() string {
