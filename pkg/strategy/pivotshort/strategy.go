@@ -453,31 +453,6 @@ func (s *Strategy) preloadPivot(pivot *indicator.Pivot, store *bbgo.MarketDataSt
 	return &last
 }
 
-func findPossibleResistancePrices(closePrice float64, minDistance float64, lows []float64) []float64 {
-	// sort float64 in increasing order
-	sort.Float64s(lows)
-
-	var resistancePrices []float64
-	for _, low := range lows {
-		if low < closePrice {
-			continue
-		}
-
-		last := closePrice
-		if len(resistancePrices) > 0 {
-			last = resistancePrices[len(resistancePrices)-1]
-		}
-
-		if (low / last) < (1.0 + minDistance) {
-			continue
-		}
-		resistancePrices = append(resistancePrices, low)
-	}
-
-	return resistancePrices
-}
-
-
 func (s *Strategy) useQuantityOrBaseBalance(quantity fixedpoint.Value) fixedpoint.Value {
 	balance, hasBalance := s.session.Account.Balance(s.Market.BaseCurrency)
 
@@ -520,3 +495,26 @@ func (s *Strategy) placeMarketSell(ctx context.Context, quantity fixedpoint.Valu
 	})
 }
 
+func findPossibleResistancePrices(closePrice float64, minDistance float64, lows []float64) []float64 {
+	// sort float64 in increasing order
+	sort.Float64s(lows)
+
+	var resistancePrices []float64
+	for _, low := range lows {
+		if low < closePrice {
+			continue
+		}
+
+		last := closePrice
+		if len(resistancePrices) > 0 {
+			last = resistancePrices[len(resistancePrices)-1]
+		}
+
+		if (low / last) < (1.0 + minDistance) {
+			continue
+		}
+		resistancePrices = append(resistancePrices, low)
+	}
+
+	return resistancePrices
+}
