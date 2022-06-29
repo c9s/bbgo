@@ -3,6 +3,8 @@ package optimizer
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"github.com/cheggaaa/pb/v3"
 	"os"
 	"os/exec"
 	"strings"
@@ -26,7 +28,7 @@ type BacktestTask struct {
 
 type Executor interface {
 	// Execute(configJson []byte) (*backtest.SummaryReport, error)
-	Run(ctx context.Context, taskC chan BacktestTask) (chan BacktestTask, error)
+	Run(ctx context.Context, taskC chan BacktestTask, bar *pb.ProgressBar) (chan BacktestTask, error)
 }
 
 type AsyncHandle struct {
@@ -73,7 +75,7 @@ func (e *LocalProcessExecutor) readReport(output []byte) (*backtest.SummaryRepor
 	return summaryReport, nil
 }
 
-func (e *LocalProcessExecutor) Run(ctx context.Context, taskC chan BacktestTask) (chan BacktestTask, error) {
+func (e *LocalProcessExecutor) Run(ctx context.Context, taskC chan BacktestTask, bar *pb.ProgressBar) (chan BacktestTask, error) {
 	var maxNumOfProcess = e.Config.MaxNumberOfProcesses
 	var resultsC = make(chan BacktestTask, maxNumOfProcess*2)
 
@@ -89,7 +91,8 @@ func (e *LocalProcessExecutor) Run(ctx context.Context, taskC chan BacktestTask)
 		// fork workers
 		go func(id int, taskC chan BacktestTask) {
 			taskCnt := 0
-			log.Infof("starting local worker #%d", id)
+			bar.Set("log", fmt.Sprintf("starting local worker #%d", id))
+			bar.Write()
 			defer wg.Done()
 			for {
 				select {
@@ -102,7 +105,8 @@ func (e *LocalProcessExecutor) Run(ctx context.Context, taskC chan BacktestTask)
 					}
 
 					taskCnt++
-					log.Infof("local worker #%d received param task: %v", id, task.Params)
+					bar.Set("log", fmt.Sprintf("local worker #%d received param task: %v", id, task.Params))
+					bar.Write()
 
 					report, err := e.execute(task.ConfigJson)
 					if err != nil {

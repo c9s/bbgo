@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/cheggaaa/pb/v3"
 	"sort"
 
 	"github.com/evanphx/json-patch/v5"
@@ -172,7 +173,7 @@ func (o *GridOptimizer) Run(executor Executor, configJson []byte) (map[string][]
 
 	var ops = o.buildOps()
 
-	var taskC = make(chan BacktestTask, 100)
+	var taskC = make(chan BacktestTask, 10000)
 
 	var app = func(configJson []byte, next func(configJson []byte) error) error {
 		var labels = copyLabels(o.ParamLabels)
@@ -200,20 +201,25 @@ func (o *GridOptimizer) Run(executor Executor, configJson []byte) (map[string][]
 	}
 
 	ctx := context.Background()
-	resultsC, err := executor.Run(ctx, taskC)
+	if err := wrapper(configJson); err != nil {
+		return nil, err
+	}
+
+	bar := pb.Full.Start(len(taskC))
+	bar.SetTemplateString(`{{ string . "log" | green}} | {{counters . }} {{bar . }} {{percent . }} {{etime . }} {{rtime . "ETA %s"}}`)
+
+	resultsC, err := executor.Run(ctx, taskC, bar)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := wrapper(configJson); err != nil {
-		return nil, err
-	}
 	close(taskC) // this will shut down the executor
 
 	for result := range resultsC {
 		for metricName, metricFunc := range valueFunctions {
 			var metricValue = metricFunc(result.Report)
-			log.Infof("params: %+v => %s %+v", result.Params, metricName, metricValue)
+			bar.Set("log", fmt.Sprintf("params: %+v => %s %+v", result.Params, metricName, metricValue))
+			bar.Increment()
 			metrics[metricName] = append(metrics[metricName], Metric{
 				Params: result.Params,
 				Labels: result.Labels,
@@ -221,6 +227,7 @@ func (o *GridOptimizer) Run(executor Executor, configJson []byte) (map[string][]
 			})
 		}
 	}
+	bar.Finish()
 
 	for n := range metrics {
 		sort.Slice(metrics[n], func(i, j int) bool {
