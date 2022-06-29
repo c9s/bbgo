@@ -3,6 +3,7 @@ package bbgo
 import (
 	"reflect"
 
+	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -23,7 +24,7 @@ func (m *ExitMethod) Subscribe(session *ExchangeSession) {
 	rt = rt.Elem()
 	infType := reflect.TypeOf((*types.Subscriber)(nil)).Elem()
 
-	argValues := toReflectValues(session)
+	argValues := dynamic.ToReflectValues(session)
 	for i := 0; i < rt.NumField(); i++ {
 		fieldType := rt.Field(i)
 		if fieldType.Type.Implements(infType) {

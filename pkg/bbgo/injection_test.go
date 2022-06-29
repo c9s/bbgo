@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -22,7 +23,7 @@ func Test_injectField(t *testing.T) {
 	// get the value of the pointer, or it can not be set.
 	var rv = reflect.ValueOf(tt).Elem()
 
-	_, ret := hasField(rv, "TradeService")
+	_, ret := dynamic.HasField(rv, "TradeService")
 	assert.True(t, ret)
 
 	ts := &service.TradeService{}
