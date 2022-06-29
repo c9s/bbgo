@@ -174,7 +174,6 @@ func (s *Strategy) CurrentPosition() *types.Position {
 }
 
 func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Value) error {
-	bbgo.Notify("Closing position", s.Position)
 	return s.orderExecutor.ClosePosition(ctx, percentage)
 }
 
