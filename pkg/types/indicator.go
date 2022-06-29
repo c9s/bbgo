@@ -63,6 +63,46 @@ type Series interface {
 	Length() int
 }
 
+type SeriesExtend interface {
+	Series
+	Sum(limit ...int) float64
+	Mean(limit ...int) float64
+	Abs() SeriesExtend
+	Predict(lookback int, offset ...int) float64
+	NextCross(b Series, lookback int) (int, float64, bool)
+	CrossOver(b Series) BoolSeries
+	CrossUnder(b Series) BoolSeries
+	Highest(lookback int) float64
+	Lowest(lookback int) float64
+	Add(b interface{}) SeriesExtend
+	Minus(b interface{}) SeriesExtend
+	Div(b interface{}) SeriesExtend
+	Mul(b interface{}) SeriesExtend
+	Dot(b interface{}, limit ...int) float64
+	Array(limit ...int) (result []float64)
+	Reverse(limit ...int) (result Float64Slice)
+	Change(offset ...int) SeriesExtend
+	Stdev(length int) float64
+}
+
+type IndexFuncType func(int) float64
+type LastFuncType func() float64
+type LengthFuncType func() int
+
+type SeriesBase struct {
+	index  IndexFuncType
+	last   LastFuncType
+	length LengthFuncType
+}
+
+func NewSeries(a Series) SeriesExtend {
+	return &SeriesBase{
+		index:  a.Index,
+		last:   a.Last,
+		length: a.Length,
+	}
+}
+
 type UpdatableSeries interface {
 	Series
 	Update(float64)
@@ -125,8 +165,8 @@ func (a *AbsResult) Length() int {
 }
 
 // Return series that having all the elements positive
-func Abs(a Series) Series {
-	return &AbsResult{a}
+func Abs(a Series) SeriesExtend {
+	return NewSeries(&AbsResult{a})
 }
 
 var _ Series = &AbsResult{}
@@ -291,7 +331,7 @@ type AddSeriesResult struct {
 }
 
 // Add two series, result[i] = a[i] + b[i]
-func Add(a interface{}, b interface{}) Series {
+func Add(a interface{}, b interface{}) SeriesExtend {
 	var aa Series
 	var bb Series
 
@@ -313,7 +353,7 @@ func Add(a interface{}, b interface{}) Series {
 		panic("input should be either *Series or float64")
 
 	}
-	return &AddSeriesResult{aa, bb}
+	return NewSeries(&AddSeriesResult{aa, bb})
 }
 
 func (a *AddSeriesResult) Last() float64 {
@@ -341,10 +381,10 @@ type MinusSeriesResult struct {
 }
 
 // Minus two series, result[i] = a[i] - b[i]
-func Minus(a interface{}, b interface{}) Series {
+func Minus(a interface{}, b interface{}) SeriesExtend {
 	aa := switchIface(a)
 	bb := switchIface(b)
-	return &MinusSeriesResult{aa, bb}
+	return NewSeries(&MinusSeriesResult{aa, bb})
 }
 
 func (a *MinusSeriesResult) Last() float64 {
@@ -388,13 +428,13 @@ func switchIface(b interface{}) Series {
 }
 
 // Divid two series, result[i] = a[i] / b[i]
-func Div(a interface{}, b interface{}) Series {
+func Div(a interface{}, b interface{}) SeriesExtend {
 	aa := switchIface(a)
 	if 0 == b {
 		panic("Divid by zero exception")
 	}
 	bb := switchIface(b)
-	return &DivSeriesResult{aa, bb}
+	return NewSeries(&DivSeriesResult{aa, bb})
 
 }
 
@@ -423,7 +463,7 @@ func (a *DivSeriesResult) Length() int {
 var _ Series = &DivSeriesResult{}
 
 // Multiple two series, result[i] = a[i] * b[i]
-func Mul(a interface{}, b interface{}) Series {
+func Mul(a interface{}, b interface{}) SeriesExtend {
 	var aa Series
 	var bb Series
 
@@ -444,7 +484,7 @@ func Mul(a interface{}, b interface{}) Series {
 		panic("input should be either Series or float64")
 
 	}
-	return &MulSeriesResult{aa, bb}
+	return NewSeries(&MulSeriesResult{aa, bb})
 
 }
 
@@ -482,7 +522,7 @@ func Dot(a interface{}, b interface{}, limit ...int) float64 {
 // Extract elements from the Series to a float64 array, following the order of Index(0..limit)
 // if limit is given, will only take the first limit numbers (a.Index[0..limit])
 // otherwise will operate on all elements
-func ToArray(a Series, limit ...int) (result []float64) {
+func Array(a Series, limit ...int) (result []float64) {
 	l := -1
 	if len(limit) > 0 {
 		l = limit[0]
@@ -497,12 +537,12 @@ func ToArray(a Series, limit ...int) (result []float64) {
 	return
 }
 
-// Similar to ToArray but in reverse order.
+// Similar to Array but in reverse order.
 // Useful when you want to cache series' calculated result as float64 array
 // the then reuse the result in multiple places (so that no recalculation will be triggered)
 //
 // notice that the return type is a Float64Slice, which implements the Series interface
-func ToReverseArray(a Series, limit ...int) (result Float64Slice) {
+func Reverse(a Series, limit ...int) (result Float64Slice) {
 	l := -1
 	if len(limit) > 0 {
 		l = limit[0]
@@ -546,13 +586,13 @@ func (c *ChangeResult) Length() int {
 
 // Difference between current value and previous, a - a[offset]
 // offset: if not given, offset is 1.
-func Change(a Series, offset ...int) Series {
+func Change(a Series, offset ...int) SeriesExtend {
 	o := 1
 	if len(offset) > 0 {
 		o = offset[0]
 	}
 
-	return &ChangeResult{a, o}
+	return NewSeries(&ChangeResult{a, o})
 }
 
 func Stdev(a Series, length int) float64 {

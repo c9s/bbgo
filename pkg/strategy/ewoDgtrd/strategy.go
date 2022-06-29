@@ -266,7 +266,7 @@ func (s *Strategy) SetupIndicators(store *bbgo.MarketDataStore) {
 				return
 			}
 			if ema5.Length() == 0 {
-				closes := types.ToReverseArray(getSource(window))
+				closes := types.Reverse(getSource(window))
 				for _, cloze := range closes {
 					ema5.Update(cloze)
 					ema34.Update(cloze)
@@ -289,7 +289,7 @@ func (s *Strategy) SetupIndicators(store *bbgo.MarketDataStore) {
 				return
 			}
 			if sma5.Length() == 0 {
-				closes := types.ToReverseArray(getSource(window))
+				closes := types.Reverse(getSource(window))
 				for _, cloze := range closes {
 					sma5.Update(cloze)
 					sma34.Update(cloze)
@@ -347,7 +347,7 @@ func (s *Strategy) SetupIndicators(store *bbgo.MarketDataStore) {
 
 			if sig.Length() == 0 {
 				// lazy init
-				ewoVals := types.ToReverseArray(s.ewo)
+				ewoVals := types.Reverse(s.ewo)
 				for _, ewoValue := range ewoVals {
 					sig.Update(ewoValue)
 				}
@@ -365,7 +365,7 @@ func (s *Strategy) SetupIndicators(store *bbgo.MarketDataStore) {
 
 			if sig.Length() == 0 {
 				// lazy init
-				ewoVals := types.ToReverseArray(s.ewo)
+				ewoVals := types.Reverse(s.ewo)
 				for _, ewoValue := range ewoVals {
 					sig.Update(ewoValue)
 				}
@@ -385,7 +385,7 @@ func (s *Strategy) SetupIndicators(store *bbgo.MarketDataStore) {
 			}
 			if sig.Length() == 0 {
 				// lazy init
-				ewoVals := types.ToReverseArray(s.ewo)
+				ewoVals := types.Reverse(s.ewo)
 				for i, ewoValue := range ewoVals {
 					vol := window.Volume().Index(i)
 					sig.PV.Update(ewoValue * vol)
