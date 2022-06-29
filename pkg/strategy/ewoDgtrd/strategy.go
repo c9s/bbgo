@@ -279,8 +279,8 @@ func (s *Strategy) SetupIndicators(store *bbgo.MarketDataStore) {
 
 		})
 
-		s.ma5 = types.NewSeries(ema5)
-		s.ma34 = types.NewSeries(ema34)
+		s.ma5 = ema5
+		s.ma34 = ema34
 	} else if s.UseSma {
 		sma5 := &indicator.SMA{IntervalWindow: window5}
 		sma34 := &indicator.SMA{IntervalWindow: window34}
@@ -300,8 +300,8 @@ func (s *Strategy) SetupIndicators(store *bbgo.MarketDataStore) {
 				sma34.Update(cloze)
 			}
 		})
-		s.ma5 = types.NewSeries(sma5)
-		s.ma34 = types.NewSeries(sma34)
+		s.ma5 = sma5
+		s.ma34 = sma34
 	} else {
 		evwma5 := &VWEMA{
 			PV: &indicator.EWMA{IntervalWindow: window5},
@@ -355,7 +355,7 @@ func (s *Strategy) SetupIndicators(store *bbgo.MarketDataStore) {
 				sig.Update(s.ewo.Last())
 			}
 		})
-		s.ewoSignal = types.NewSeries(sig)
+		s.ewoSignal = sig
 	} else if s.UseSma {
 		sig := &indicator.SMA{IntervalWindow: windowSignal}
 		store.OnKLineWindowUpdate(func(interval types.Interval, _ types.KLineWindow) {
@@ -373,7 +373,7 @@ func (s *Strategy) SetupIndicators(store *bbgo.MarketDataStore) {
 				sig.Update(s.ewo.Last())
 			}
 		})
-		s.ewoSignal = types.NewSeries(sig)
+		s.ewoSignal = sig
 	} else {
 		sig := &VWEMA{
 			PV: &indicator.EWMA{IntervalWindow: windowSignal},
