@@ -79,8 +79,8 @@ type SeriesExtend interface {
 	Div(b interface{}) SeriesExtend
 	Mul(b interface{}) SeriesExtend
 	Dot(b interface{}, limit ...int) float64
-	ToArray(limit ...int) (result []float64)
-	ToReverseArray(limit ...int) (result Float64Slice)
+	Array(limit ...int) (result []float64)
+	Reverse(limit ...int) (result Float64Slice)
 	Change(offset ...int) SeriesExtend
 	Stdev(length int) float64
 }
@@ -522,7 +522,7 @@ func Dot(a interface{}, b interface{}, limit ...int) float64 {
 // Extract elements from the Series to a float64 array, following the order of Index(0..limit)
 // if limit is given, will only take the first limit numbers (a.Index[0..limit])
 // otherwise will operate on all elements
-func ToArray(a Series, limit ...int) (result []float64) {
+func Array(a Series, limit ...int) (result []float64) {
 	l := -1
 	if len(limit) > 0 {
 		l = limit[0]
@@ -537,12 +537,12 @@ func ToArray(a Series, limit ...int) (result []float64) {
 	return
 }
 
-// Similar to ToArray but in reverse order.
+// Similar to Array but in reverse order.
 // Useful when you want to cache series' calculated result as float64 array
 // the then reuse the result in multiple places (so that no recalculation will be triggered)
 //
 // notice that the return type is a Float64Slice, which implements the Series interface
-func ToReverseArray(a Series, limit ...int) (result Float64Slice) {
+func Reverse(a Series, limit ...int) (result Float64Slice) {
 	l := -1
 	if len(limit) > 0 {
 		l = limit[0]

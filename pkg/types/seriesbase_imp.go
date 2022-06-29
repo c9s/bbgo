@@ -68,12 +68,12 @@ func (s *SeriesBase) Dot(b interface{}, limit ...int) float64 {
 	return Dot(s, b, limit...)
 }
 
-func (s *SeriesBase) ToArray(limit ...int) (result []float64) {
-	return ToArray(s, limit...)
+func (s *SeriesBase) Array(limit ...int) (result []float64) {
+	return Array(s, limit...)
 }
 
-func (s *SeriesBase) ToReverseArray(limit ...int) (result Float64Slice) {
-	return ToReverseArray(s, limit...)
+func (s *SeriesBase) Reverse(limit ...int) (result Float64Slice) {
+	return Reverse(s, limit...)
 }
 
 func (s *SeriesBase) Change(offset ...int) SeriesExtend {
