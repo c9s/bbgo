@@ -47,7 +47,7 @@ type BreakLow struct {
 	StopEMA      *types.IntervalWindow `json:"stopEMA"`
 }
 
-type BounceShort struct {
+type ResistanceShort struct {
 	Enabled bool `json:"enabled"`
 
 	types.IntervalWindow
@@ -85,7 +85,7 @@ type Strategy struct {
 
 	BreakLow BreakLow `json:"breakLow"`
 
-	BounceShort *BounceShort `json:"bounceShort"`
+	ResistanceShort *ResistanceShort `json:"resistanceShort"`
 
 	Entry       Entry             `json:"entry"`
 	ExitMethods []bbgo.ExitMethod `json:"exits"`
@@ -114,12 +114,16 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: types.Interval1m})
 
-	if s.BounceShort != nil && s.BounceShort.Enabled {
-		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.BounceShort.Interval})
+	if s.ResistanceShort != nil && s.ResistanceShort.Enabled {
+		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.ResistanceShort.Interval})
 	}
 
 	if !bbgo.IsBackTesting {
 		session.Subscribe(types.MarketTradeChannel, s.Symbol, types.SubscribeOptions{})
+	}
+
+	for _, m := range s.ExitMethods {
+		m.Subscribe(session)
 	}
 }
 
@@ -247,8 +251,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.pivotLowPrices = append(s.pivotLowPrices, s.lastLow)
 	})
 
-	if s.BounceShort != nil && s.BounceShort.Enabled {
-		s.resistancePivot = &indicator.Pivot{IntervalWindow: s.BounceShort.IntervalWindow}
+	if s.ResistanceShort != nil && s.ResistanceShort.Enabled {
+		s.resistancePivot = &indicator.Pivot{IntervalWindow: s.ResistanceShort.IntervalWindow}
 		s.resistancePivot.Bind(store)
 	}
 
@@ -260,7 +264,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		method.Bind(session, s.orderExecutor)
 	}
 
-	if s.BounceShort != nil && s.BounceShort.Enabled {
+	if s.ResistanceShort != nil && s.ResistanceShort.Enabled {
 		if s.resistancePivot != nil {
 			s.preloadPivot(s.resistancePivot, store)
 		}
@@ -272,7 +276,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 			if s.resistancePivot != nil {
 				lows := s.resistancePivot.Lows
-				minDistance := s.BounceShort.MinDistance.Float64()
+				minDistance := s.ResistanceShort.MinDistance.Float64()
 				closePrice := lastKLine.Close.Float64()
 				s.resistancePrices = findPossibleResistancePrices(closePrice, minDistance, lows)
 				log.Infof("last price: %f, possible resistance prices: %+v", closePrice, s.resistancePrices)
@@ -370,17 +374,17 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 
-		if s.BounceShort == nil || !s.BounceShort.Enabled {
+		if s.ResistanceShort == nil || !s.ResistanceShort.Enabled {
 			return
 		}
 
-		if kline.Symbol != s.Symbol || kline.Interval != s.BounceShort.Interval {
+		if kline.Symbol != s.Symbol || kline.Interval != s.ResistanceShort.Interval {
 			return
 		}
 
 		if s.resistancePivot != nil {
 			closePrice := kline.Close.Float64()
-			minDistance := s.BounceShort.MinDistance.Float64()
+			minDistance := s.ResistanceShort.MinDistance.Float64()
 			lows := s.resistancePivot.Lows
 			s.resistancePrices = findPossibleResistancePrices(closePrice, minDistance, lows)
 
@@ -425,15 +429,15 @@ func (s *Strategy) findHigherPivotLow(price fixedpoint.Value) (fixedpoint.Value,
 
 func (s *Strategy) placeBounceSellOrders(ctx context.Context, resistancePrice fixedpoint.Value) {
 	futuresMode := s.session.Futures || s.session.IsolatedFutures
-	totalQuantity := s.BounceShort.Quantity
-	numLayers := s.BounceShort.NumLayers
+	totalQuantity := s.ResistanceShort.Quantity
+	numLayers := s.ResistanceShort.NumLayers
 	if numLayers == 0 {
 		numLayers = 1
 	}
 
 	numLayersF := fixedpoint.NewFromInt(int64(numLayers))
 
-	layerSpread := s.BounceShort.LayerSpread
+	layerSpread := s.ResistanceShort.LayerSpread
 	quantity := totalQuantity.Div(numLayersF)
 
 	log.Infof("placing bounce short orders: resistance price = %f, layer quantity = %f, num of layers = %d", resistancePrice.Float64(), quantity.Float64(), numLayers)
@@ -444,7 +448,7 @@ func (s *Strategy) placeBounceSellOrders(ctx context.Context, resistancePrice fi
 		baseBalance := balances[s.Market.BaseCurrency]
 
 		// price = (resistance_price * (1.0 + ratio)) * ((1.0 + layerSpread) * i)
-		price := resistancePrice.Mul(fixedpoint.One.Add(s.BounceShort.Ratio))
+		price := resistancePrice.Mul(fixedpoint.One.Add(s.ResistanceShort.Ratio))
 		spread := layerSpread.Mul(fixedpoint.NewFromInt(int64(i)))
 		price = price.Add(spread)
 		log.Infof("price = %f", price.Float64())
