@@ -51,7 +51,6 @@ type Strategy struct {
 	KLineEndTime   types.Time
 
 	*bbgo.Environment
-	*bbgo.Graceful
 	bbgo.StrategyController
 
 	activeMakerOrders *bbgo.ActiveOrderBook
@@ -1221,7 +1220,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 		}
 	})
-	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
+
+	bbgo.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 		log.Infof("canceling active orders...")
 		s.CancelAll(ctx)

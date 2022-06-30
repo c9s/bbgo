@@ -13,6 +13,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/c9s/bbgo/pkg/datatype"
+	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
@@ -387,7 +388,7 @@ func (c *Config) GetSignature() string {
 		id := strategy.ID()
 		ps = append(ps, id)
 
-		if symbol, ok := isSymbolBasedStrategy(reflect.ValueOf(strategy)); ok {
+		if symbol, ok := dynamic.LookupSymbolField(reflect.ValueOf(strategy)); ok {
 			ps = append(ps, symbol)
 		}
 	}

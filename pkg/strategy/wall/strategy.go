@@ -30,7 +30,6 @@ func init() {
 }
 
 type Strategy struct {
-	*bbgo.Graceful
 	*bbgo.Persistence
 
 	Environment          *bbgo.Environment
@@ -377,7 +376,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 	}()
 
-	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
+	bbgo.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 		close(s.stopC)
 

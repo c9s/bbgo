@@ -3,6 +3,8 @@ package bbgo
 import (
 	"context"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -15,7 +17,10 @@ import (
 // > SELECT start_time, `interval`, quote_volume, open, close FROM binance_klines WHERE symbol = 'ETHUSDT' AND `interval` = '5m' ORDER BY quote_volume DESC LIMIT 20;
 //
 type CumulatedVolumeTakeProfit struct {
+	Symbol string `json:"symbol"`
+
 	types.IntervalWindow
+
 	Ratio          fixedpoint.Value `json:"ratio"`
 	MinQuoteVolume fixedpoint.Value `json:"minQuoteVolume"`
 
@@ -32,7 +37,7 @@ func (s *CumulatedVolumeTakeProfit) Bind(session *ExchangeSession, orderExecutor
 	store, _ := session.MarketDataStore(position.Symbol)
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
-		if kline.Symbol != position.Symbol || kline.Interval != types.Interval1m {
+		if kline.Symbol != position.Symbol || kline.Interval != s.Interval {
 			return
 		}
 
@@ -46,25 +51,33 @@ func (s *CumulatedVolumeTakeProfit) Bind(session *ExchangeSession, orderExecutor
 			return
 		}
 
-		if klines, ok := store.KLinesOfInterval(s.Interval); ok {
-			var cbv = fixedpoint.Zero
-			var cqv = fixedpoint.Zero
-			for i := 0; i < s.Window; i++ {
-				last := (*klines)[len(*klines)-1-i]
-				cqv = cqv.Add(last.QuoteVolume)
-				cbv = cbv.Add(last.Volume)
-			}
+		klines, ok := store.KLinesOfInterval(s.Interval)
+		if !ok {
+			log.Warnf("history kline not found")
+			return
+		}
 
-			if cqv.Compare(s.MinQuoteVolume) > 0 {
-				Notify("%s TakeProfit triggered by cumulated volume (window: %d) %f > %f, price = %f",
-					position.Symbol,
-					s.Window,
-					cqv.Float64(),
-					s.MinQuoteVolume.Float64(), kline.Close.Float64())
+		if len(*klines) < s.Window {
+			return
+		}
 
-				_ = orderExecutor.ClosePosition(context.Background(), fixedpoint.One, "cumulatedVolumeTakeProfit")
-				return
-			}
+		var cbv = fixedpoint.Zero
+		var cqv = fixedpoint.Zero
+		for i := 0; i < s.Window; i++ {
+			last := (*klines)[len(*klines)-1-i]
+			cqv = cqv.Add(last.QuoteVolume)
+			cbv = cbv.Add(last.Volume)
+		}
+
+		if cqv.Compare(s.MinQuoteVolume) > 0 {
+			Notify("%s TakeProfit triggered by cumulated volume (window: %d) %f > %f, price = %f",
+				position.Symbol,
+				s.Window,
+				cqv.Float64(),
+				s.MinQuoteVolume.Float64(), kline.Close.Float64())
+
+			_ = orderExecutor.ClosePosition(context.Background(), fixedpoint.One, "cumulatedVolumeTakeProfit")
+			return
 		}
 	})
 }
