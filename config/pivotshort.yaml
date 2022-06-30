@@ -39,12 +39,13 @@ exchangeStrategies:
 
       # stopEMARange is the price range we allow short.
       # Short-allowed price range = [current price] > [EMA] * (1 - [stopEMARange])
-      stopEMARange: 0%
+      # Higher the stopEMARange than higher the chance to open a short
+      stopEMARange: 1%
       stopEMA:
         interval: 1h
         window: 99
 
-    bounceShort:
+    resistanceShort:
       enabled: false
       interval: 1h
       window: 10
@@ -86,11 +87,13 @@ exchangeStrategies:
     # you can grab a simple stats by the following SQL:
     # SELECT ((close - low) / close) AS shadow_ratio FROM binance_klines WHERE symbol = 'ETHUSDT' AND `interval` = '5m' AND start_time > '2022-01-01' ORDER BY shadow_ratio DESC LIMIT 20;
     - lowerShadowTakeProfit:
+        interval: 30m
+        window: 99
         ratio: 3%
 
     # (5) cumulatedVolumeTakeProfit is used to take profit when the cumulated quote volume from the klines exceeded a threshold
     - cumulatedVolumeTakeProfit:
-        minQuoteVolume: 100_000_000
+        minQuoteVolume: 200_000_000
         interval: 5m
         window: 2
 
