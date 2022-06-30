@@ -14,6 +14,7 @@ https://www.investopedia.com/terms/r/rsi.asp
 */
 //go:generate callbackgen -type RSI
 type RSI struct {
+	types.SeriesBase
 	types.IntervalWindow
 	Values          types.Float64Slice
 	Prices          types.Float64Slice
@@ -25,6 +26,9 @@ type RSI struct {
 }
 
 func (inc *RSI) Update(price float64) {
+	if len(inc.Prices) == 0 {
+		inc.SeriesBase.Series = inc
+	}
 	inc.Prices.Push(price)
 
 	if len(inc.Prices) < inc.Window+1 {
@@ -74,7 +78,7 @@ func (inc *RSI) Length() int {
 	return len(inc.Values)
 }
 
-var _ types.Series = &RSI{}
+var _ types.SeriesExtend = &RSI{}
 
 func (inc *RSI) calculateAndUpdate(kLines []types.KLine) {
 	for _, k := range kLines {

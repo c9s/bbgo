@@ -17,11 +17,11 @@ type DMI struct {
 	types.IntervalWindow
 	ADXSmoothing      int
 	atr               *ATR
-	DMP               types.UpdatableSeries
-	DMN               types.UpdatableSeries
+	DMP               types.UpdatableSeriesExtend
+	DMN               types.UpdatableSeriesExtend
 	DIPlus            *types.Queue
 	DIMinus           *types.Queue
-	ADX               types.UpdatableSeries
+	ADX               types.UpdatableSeriesExtend
 	PrevHigh, PrevLow float64
 	UpdateCallbacks   []func(diplus, diminus, adx float64)
 }
@@ -71,15 +71,15 @@ func (inc *DMI) Update(high, low, cloze float64) {
 
 }
 
-func (inc *DMI) GetDIPlus() types.Series {
+func (inc *DMI) GetDIPlus() types.SeriesExtend {
 	return inc.DIPlus
 }
 
-func (inc *DMI) GetDIMinus() types.Series {
+func (inc *DMI) GetDIMinus() types.SeriesExtend {
 	return inc.DIMinus
 }
 
-func (inc *DMI) GetADX() types.Series {
+func (inc *DMI) GetADX() types.SeriesExtend {
 	return inc.ADX
 }
 

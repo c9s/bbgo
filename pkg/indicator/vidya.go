@@ -10,6 +10,7 @@ import (
 // Refer URL: https://metatrader5.com/en/terminal/help/indicators/trend_indicators/vida
 //go:generate callbackgen -type VIDYA
 type VIDYA struct {
+	types.SeriesBase
 	types.IntervalWindow
 	Values types.Float64Slice
 	input  types.Float64Slice
@@ -19,6 +20,7 @@ type VIDYA struct {
 
 func (inc *VIDYA) Update(value float64) {
 	if inc.Values.Length() == 0 {
+		inc.SeriesBase.Series = inc
 		inc.Values.Push(value)
 		inc.input.Push(value)
 		return
@@ -66,7 +68,7 @@ func (inc *VIDYA) Length() int {
 	return inc.Values.Length()
 }
 
-var _ types.Series = &VIDYA{}
+var _ types.SeriesExtend = &VIDYA{}
 
 func (inc *VIDYA) calculateAndUpdate(allKLines []types.KLine) {
 	if inc.input.Length() == 0 {

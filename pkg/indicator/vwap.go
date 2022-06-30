@@ -17,6 +17,7 @@ Volume-Weighted Average Price (VWAP) Explained
 */
 //go:generate callbackgen -type VWAP
 type VWAP struct {
+	types.SeriesBase
 	types.IntervalWindow
 	Values      types.Float64Slice
 	Prices      types.Float64Slice
@@ -29,6 +30,9 @@ type VWAP struct {
 }
 
 func (inc *VWAP) Update(price, volume float64) {
+	if len(inc.Prices) == 0 {
+		inc.SeriesBase.Series = inc
+	}
 	inc.Prices.Push(price)
 	inc.Volumes.Push(volume)
 
@@ -65,7 +69,7 @@ func (inc *VWAP) Length() int {
 	return len(inc.Values)
 }
 
-var _ types.Series = &VWAP{}
+var _ types.SeriesExtend = &VWAP{}
 
 func (inc *VWAP) calculateAndUpdate(kLines []types.KLine) {
 	var priceF = KLineTypicalPriceMapper

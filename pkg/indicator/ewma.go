@@ -16,6 +16,7 @@ const MaxNumOfEWMATruncateSize = 100
 //go:generate callbackgen -type EWMA
 type EWMA struct {
 	types.IntervalWindow
+	types.SeriesBase
 	Values       types.Float64Slice
 	LastOpenTime time.Time
 
@@ -26,6 +27,7 @@ func (inc *EWMA) Update(value float64) {
 	var multiplier = 2.0 / float64(1+inc.Window)
 
 	if len(inc.Values) == 0 {
+		inc.SeriesBase.Series = inc
 		inc.Values.Push(value)
 		return
 	} else if len(inc.Values) > MaxNumOfEWMA {
@@ -136,4 +138,4 @@ func (inc *EWMA) Bind(updater KLineWindowUpdater) {
 	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }
 
-var _ types.Series = &EWMA{}
+var _ types.SeriesExtend = &EWMA{}

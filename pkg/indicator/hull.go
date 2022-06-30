@@ -10,6 +10,7 @@ import (
 // Refer URL: https://fidelity.com/learning-center/trading-investing/technical-analysis/technical-indicator-guide/hull-moving-average
 //go:generate callbackgen -type HULL
 type HULL struct {
+	types.SeriesBase
 	types.IntervalWindow
 	ma1    *EWMA
 	ma2    *EWMA
@@ -20,6 +21,7 @@ type HULL struct {
 
 func (inc *HULL) Update(value float64) {
 	if inc.result == nil {
+		inc.SeriesBase.Series = inc
 		inc.ma1 = &EWMA{IntervalWindow: types.IntervalWindow{inc.Interval, inc.Window / 2}}
 		inc.ma2 = &EWMA{IntervalWindow: types.IntervalWindow{inc.Interval, inc.Window}}
 		inc.result = &EWMA{IntervalWindow: types.IntervalWindow{inc.Interval, int(math.Sqrt(float64(inc.Window)))}}
@@ -50,7 +52,7 @@ func (inc *HULL) Length() int {
 	return inc.result.Length()
 }
 
-var _ types.Series = &HULL{}
+var _ types.SeriesExtend = &HULL{}
 
 // TODO: should we just ignore the possible overlapping?
 func (inc *HULL) calculateAndUpdate(allKLines []types.KLine) {
