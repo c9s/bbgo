@@ -86,9 +86,9 @@ func (e *GeneralOrderExecutor) Bind() {
 	e.tradeCollector.BindStream(e.session.UserDataStream)
 }
 
+// CancelOrders cancels the given order objects directly
 func (e *GeneralOrderExecutor) CancelOrders(ctx context.Context, orders ...types.Order) error {
-	err := e.session.Exchange.CancelOrders(ctx, orders...)
-	return err
+	return e.session.Exchange.CancelOrders(ctx, orders...)
 }
 
 func (e *GeneralOrderExecutor) SubmitOrders(ctx context.Context, submitOrders ...types.SubmitOrder) (types.OrderSlice, error) {
@@ -108,14 +108,20 @@ func (e *GeneralOrderExecutor) SubmitOrders(ctx context.Context, submitOrders ..
 	return createdOrders, err
 }
 
-func (e *GeneralOrderExecutor) GracefulCancel(ctx context.Context) error {
-	if err := e.activeMakerOrders.GracefulCancel(ctx, e.session.Exchange); err != nil {
+// GracefulCancelActiveOrderBook cancels the orders from the active orderbook.
+func (e *GeneralOrderExecutor) GracefulCancelActiveOrderBook(ctx context.Context, activeOrders *ActiveOrderBook) error {
+	if err := activeOrders.GracefulCancel(ctx, e.session.Exchange); err != nil {
 		log.WithError(err).Errorf("graceful cancel order error")
 		return err
 	}
 
 	e.tradeCollector.Process()
 	return nil
+}
+
+// GracefulCancel cancels all active maker orders
+func (e *GeneralOrderExecutor) GracefulCancel(ctx context.Context) error {
+	return e.GracefulCancelActiveOrderBook(ctx, e.activeMakerOrders)
 }
 
 func (e *GeneralOrderExecutor) ClosePosition(ctx context.Context, percentage fixedpoint.Value, tags ...string) error {
