@@ -274,7 +274,7 @@ func (p *Position) IsClosed() bool {
 }
 
 func (p *Position) IsOpened(currentPrice fixedpoint.Value) bool {
-	return p.IsClosed() || !p.IsDust(currentPrice)
+	return !p.IsClosed() && !p.IsDust(currentPrice)
 }
 
 func (p *Position) Type() PositionType {
