@@ -8,10 +8,19 @@ import (
 )
 
 type LowerShadowTakeProfit struct {
-	Ratio fixedpoint.Value `json:"ratio"`
+	// inherit from the strategy
+	types.IntervalWindow
 
+	// inherit from the strategy
+	Symbol string `json:"symbol"`
+
+	Ratio         fixedpoint.Value `json:"ratio"`
 	session       *ExchangeSession
 	orderExecutor *GeneralOrderExecutor
+}
+
+func (s *LowerShadowTakeProfit) Subscribe(session *ExchangeSession) {
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
 }
 
 func (s *LowerShadowTakeProfit) Bind(session *ExchangeSession, orderExecutor *GeneralOrderExecutor) {

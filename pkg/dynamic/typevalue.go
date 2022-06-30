@@ -15,10 +15,10 @@ func NewTypeValueInterface(typ reflect.Type) interface{} {
 
 // ToReflectValues convert the go objects into reflect.Value slice
 func ToReflectValues(args ...interface{}) (values []reflect.Value) {
-	for _, arg := range args {
+	for i := range args {
+		arg := args[i]
 		values = append(values, reflect.ValueOf(arg))
 	}
 
 	return values
 }
-

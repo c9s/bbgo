@@ -10,7 +10,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
-	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
@@ -86,8 +85,8 @@ type Strategy struct {
 
 	ResistanceShort *ResistanceShort `json:"resistanceShort"`
 
-	Entry       Entry             `json:"entry"`
-	ExitMethods []bbgo.ExitMethod `json:"exits"`
+	Entry       Entry              `json:"entry"`
+	ExitMethods bbgo.ExitMethodSet `json:"exits"`
 
 	session       *bbgo.ExchangeSession
 	orderExecutor *bbgo.GeneralOrderExecutor
@@ -120,13 +119,7 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 		session.Subscribe(types.MarketTradeChannel, s.Symbol, types.SubscribeOptions{})
 	}
 
-	for i := range s.ExitMethods {
-		m := s.ExitMethods[i]
-
-		// we need to pass some information from the strategy configuration to the exit methods, like symbol, interval and window
-		dynamic.MergeStructValues(&m, s)
-		m.Subscribe(session)
-	}
+	s.ExitMethods.SetAndSubscribe(session, s)
 }
 
 func (s *Strategy) InstanceID() string {
