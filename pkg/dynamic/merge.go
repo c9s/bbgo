@@ -24,14 +24,17 @@ func MergeStructValues(dst, src interface{}) {
 		}
 
 		// if there is a field with the same name
-		if fieldSrcType, ok := srcStructType.FieldByName(fieldName); ok {
-			// ensure that the type is the same
-			if fieldSrcType.Type == fieldType.Type {
-				srcValue := reflect.ValueOf(src).Elem().FieldByName(fieldName)
-				dstValue := reflect.ValueOf(dst).Elem().FieldByName(fieldName)
-				if (fieldType.Type.Kind() == reflect.Ptr && dstValue.IsNil()) || dstValue.IsZero() {
-					dstValue.Set(srcValue)
-				}
+		fieldSrcType, found := srcStructType.FieldByName(fieldName)
+		if !found {
+			continue
+		}
+
+		// ensure that the type is the same
+		if fieldSrcType.Type == fieldType.Type {
+			srcValue := reflect.ValueOf(src).Elem().FieldByName(fieldName)
+			dstValue := reflect.ValueOf(dst).Elem().FieldByName(fieldName)
+			if (fieldType.Type.Kind() == reflect.Ptr && dstValue.IsNil()) || dstValue.IsZero() {
+				dstValue.Set(srcValue)
 			}
 		}
 	}
