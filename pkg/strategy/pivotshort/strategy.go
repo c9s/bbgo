@@ -91,18 +91,14 @@ func (s *ResistanceShort) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 		s.findNextResistancePriceAndPlaceOrders(lastKLine.Close)
 	}
 
-	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
-		if kline.Symbol != s.Symbol || kline.Interval != s.Interval {
-			return
-		}
-
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
 		position := s.orderExecutor.Position()
 		if position.IsOpened(kline.Close) {
 			return
 		}
 
 		s.findNextResistancePriceAndPlaceOrders(kline.Close)
-	})
+	}))
 }
 
 func (s *ResistanceShort) findNextResistancePriceAndPlaceOrders(closePrice fixedpoint.Value) {
@@ -302,11 +298,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	preloadPivot(s.pivot, store)
 
 	// update pivot low data
-	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
-		if kline.Symbol != s.Symbol || kline.Interval != s.Interval {
-			return
-		}
-
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
 		lastLow := fixedpoint.NewFromFloat(s.pivot.LastLow())
 		if lastLow.IsZero() {
 			return
@@ -318,7 +310,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		s.lastLow = lastLow
 		s.pivotLowPrices = append(s.pivotLowPrices, s.lastLow)
-	})
+	}))
 
 	if s.BreakLow.StopEMA != nil {
 		s.stopEWMA = standardIndicator.EWMA(*s.BreakLow.StopEMA)
@@ -333,16 +325,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	}
 
 	// Always check whether you can open a short position or not
-	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
 		if s.Status != types.StrategyStatusRunning {
 			return
 		}
 
-		if kline.Symbol != s.Symbol || kline.Interval != types.Interval1m {
-			return
-		}
-
-		if !s.Position.IsClosed() && !s.Position.IsDust(kline.Close) {
+		if s.Position.IsOpened(kline.Close) {
 			return
 		}
 
@@ -402,7 +390,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			bbgo.Notify("%s price %f breaks the previous low %f with ratio %f, submitting limit sell @ %f", s.Symbol, kline.Close.Float64(), previousLow.Float64(), s.BreakLow.Ratio.Float64(), sellPrice.Float64())
 			s.placeLimitSell(ctx, sellPrice, quantity, "breakLowLimit")
 		}
-	})
+	}))
 
 	if !bbgo.IsBackTesting {
 		// use market trade to submit short order
