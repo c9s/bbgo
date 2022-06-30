@@ -44,7 +44,7 @@ func (m *ExitMethod) Inherit(parent interface{}) {
 			continue
 		}
 
-		dynamic.MergeStructValues(fieldValue.Interface(), parent)
+		dynamic.InheritStructValues(fieldValue.Interface(), parent)
 	}
 }
 

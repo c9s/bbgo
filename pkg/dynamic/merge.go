@@ -2,9 +2,9 @@ package dynamic
 
 import "reflect"
 
-// MergeStructValues merges the field value from the source struct to the dest struct.
+// InheritStructValues merges the field value from the source struct to the dest struct.
 // Only fields with the same type and the same name will be updated.
-func MergeStructValues(dst, src interface{}) {
+func InheritStructValues(dst, src interface{}) {
 	if dst == nil {
 		return
 	}
