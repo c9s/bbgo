@@ -29,6 +29,51 @@ func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
+// LinGre is Linear Regression baseline
+type LinGre struct {
+	types.IntervalWindow
+	baseLineSlope float64
+}
+
+// Update Linear Regression baseline slope
+func (lg *LinGre) Update(klines []types.KLine) {
+	if len(klines) < lg.Window {
+		lg.baseLineSlope = 0
+		return
+	}
+
+	var sumX, sumY, sumXSqr, sumXY float64 = 0, 0, 0, 0
+	end := len(klines) - 1 // The last kline
+	for i := end; i >= end-lg.Window+1; i-- {
+		val := klines[i].GetClose().Float64()
+		per := float64(end - i + 1)
+		sumX += per
+		sumY += val
+		sumXSqr += per * per
+		sumXY += val * per
+	}
+	length := float64(lg.Window)
+	slope := (length*sumXY - sumX*sumY) / (length*sumXSqr - sumX*sumX)
+	average := sumY / length
+	endPrice := average - slope*sumX/length + slope
+	startPrice := endPrice + slope*(length-1)
+	lg.baseLineSlope = (length - 1) / (endPrice - startPrice)
+
+	log.Debugf("linear regression baseline slope: %f", lg.baseLineSlope)
+}
+
+func (lg *LinGre) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
+	if lg.Interval != interval {
+		return
+	}
+
+	lg.Update(window)
+}
+
+func (lg *LinGre) Bind(updater indicator.KLineWindowUpdater) {
+	updater.OnKLineWindowUpdate(lg.handleKLineWindowUpdate)
+}
+
 type Strategy struct {
 	*bbgo.Graceful
 	*bbgo.Persistence
@@ -69,6 +114,9 @@ type Strategy struct {
 	SupertrendWindow int `json:"supertrendWindow"`
 	// SupertrendMultiplier ATR multiplier for calculation of supertrend
 	SupertrendMultiplier float64 `json:"supertrendMultiplier"`
+
+	// Linear Regression
+	LinearRegression *LinGre `json:"linearRegression"`
 
 	// Leverage
 	Leverage float64 `json:"leverage"`
@@ -249,6 +297,22 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.ProfitStats = types.NewProfitStats(s.Market)
 	}
 
+	// Linear Regression
+	if s.LinearRegression != nil {
+		if s.LinearRegression.Window == 0 {
+			s.LinearRegression = nil
+		} else {
+			// K-line store for Linear Regression
+			kLineStore, _ := session.MarketDataStore(s.Symbol)
+			s.LinearRegression.Bind(kLineStore)
+
+			// Preload
+			if klines, ok := kLineStore.KLinesOfInterval(s.LinearRegression.Interval); ok {
+				s.LinearRegression.Update((*klines)[0:])
+			}
+		}
+	}
+
 	// Setup order executor
 	s.orderExecutor = bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
 	s.orderExecutor.BindEnvironment(s.Environment)
@@ -343,9 +407,22 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 		}
 
+		// Linear Regression
+		var lgSignal types.Direction
+		if s.LinearRegression != nil {
+			switch {
+			case s.LinearRegression.baseLineSlope > 0:
+				lgSignal = types.DirectionUp
+			case s.LinearRegression.baseLineSlope < 0:
+				lgSignal = types.DirectionDown
+			default:
+				lgSignal = types.DirectionNone
+			}
+		}
+
 		// Open position
 		var side types.SideType
-		if stSignal == types.DirectionUp && demaSignal == types.DirectionUp {
+		if stSignal == types.DirectionUp && demaSignal == types.DirectionUp && (s.LinearRegression == nil || lgSignal == types.DirectionUp) {
 			side = types.SideTypeBuy
 			if s.StopLossByTriggeringK {
 				s.currentStopLossPrice = kline.GetLow()
@@ -353,7 +430,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			if s.TakeProfitMultiplier > 0 {
 				s.currentTakeProfitPrice = kline.GetClose().Add(fixedpoint.NewFromFloat(s.Supertrend.AverageTrueRange.Last() * s.TakeProfitMultiplier))
 			}
-		} else if stSignal == types.DirectionDown && demaSignal == types.DirectionDown {
+		} else if stSignal == types.DirectionDown && demaSignal == types.DirectionDown && (s.LinearRegression == nil || lgSignal == types.DirectionDown) {
 			side = types.SideTypeSell
 			if s.StopLossByTriggeringK {
 				s.currentStopLossPrice = kline.GetHigh()
