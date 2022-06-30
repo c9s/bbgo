@@ -10,6 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
@@ -93,7 +94,6 @@ type Strategy struct {
 	session       *bbgo.ExchangeSession
 	orderExecutor *bbgo.GeneralOrderExecutor
 
-	stopLossPrice           fixedpoint.Value
 	lastLow                 fixedpoint.Value
 	pivot                   *indicator.Pivot
 	resistancePivot         *indicator.Pivot
@@ -122,7 +122,9 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 		session.Subscribe(types.MarketTradeChannel, s.Symbol, types.SubscribeOptions{})
 	}
 
-	for _, m := range s.ExitMethods {
+	for i := range s.ExitMethods {
+		m := s.ExitMethods[i]
+		dynamic.MergeStructValues(&m, s)
 		m.Subscribe(session)
 	}
 }
@@ -434,7 +436,6 @@ func (s *Strategy) placeOrder(ctx context.Context, price fixedpoint.Value, quant
 		Quantity: quantity,
 	})
 }
-
 
 func (s *Strategy) useQuantityOrBaseBalance(quantity fixedpoint.Value) fixedpoint.Value {
 	balance, hasBalance := s.session.Account.Balance(s.Market.BaseCurrency)

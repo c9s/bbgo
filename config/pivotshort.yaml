@@ -91,6 +91,7 @@ exchangeStrategies:
     # (5) cumulatedVolumeTakeProfit is used to take profit when the cumulated quote volume from the klines exceeded a threshold
     - cumulatedVolumeTakeProfit:
         minQuoteVolume: 100_000_000
+        interval: 5m
         window: 2
 
 backtest:
