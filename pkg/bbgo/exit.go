@@ -3,8 +3,22 @@ package bbgo
 import (
 	"reflect"
 
-	"github.com/c9s/bbgo/pkg/types"
+	"github.com/pkg/errors"
+
+	"github.com/c9s/bbgo/pkg/dynamic"
 )
+
+type ExitMethodSet []ExitMethod
+
+func (s *ExitMethodSet) SetAndSubscribe(session *ExchangeSession, parent interface{}) {
+	for i := range *s {
+		m := (*s)[i]
+
+		// manually inherit configuration from strategy
+		m.Inherit(parent)
+		m.Subscribe(session)
+	}
+}
 
 type ExitMethod struct {
 	RoiStopLoss               *RoiStopLoss               `json:"roiStopLoss"`
@@ -14,35 +28,50 @@ type ExitMethod struct {
 	CumulatedVolumeTakeProfit *CumulatedVolumeTakeProfit `json:"cumulatedVolumeTakeProfit"`
 }
 
-func (m *ExitMethod) Subscribe(session *ExchangeSession) {
-	// TODO: pull out this implementation as a simple function to reflect.go
-	rv := reflect.ValueOf(m)
-	rt := reflect.TypeOf(m)
-
-	rv = rv.Elem()
-	rt = rt.Elem()
-	infType := reflect.TypeOf((*types.Subscriber)(nil)).Elem()
-
-	argValues := toReflectValues(session)
-	for i := 0; i < rt.NumField(); i++ {
-		fieldType := rt.Field(i)
-		if fieldType.Type.Implements(infType) {
-			method := rv.Field(i).MethodByName("Subscribe")
-			method.Call(argValues)
+// Inherit is used for inheriting properties from the given strategy struct
+// for example, some exit method requires the default interval and symbol name from the strategy param object
+func (m *ExitMethod) Inherit(parent interface{}) {
+	// we need to pass some information from the strategy configuration to the exit methods, like symbol, interval and window
+	rt := reflect.TypeOf(m).Elem()
+	rv := reflect.ValueOf(m).Elem()
+	for j := 0; j < rv.NumField(); j++ {
+		if !rt.Field(j).IsExported() {
+			continue
 		}
+
+		fieldValue := rv.Field(j)
+		if fieldValue.Kind() == reflect.Ptr && fieldValue.IsNil() {
+			continue
+		}
+
+		dynamic.InheritStructValues(fieldValue.Interface(), parent)
+	}
+}
+
+func (m *ExitMethod) Subscribe(session *ExchangeSession) {
+	if err := dynamic.CallStructFieldsMethod(m, "Subscribe", session); err != nil {
+		panic(errors.Wrap(err, "dynamic Subscribe call failed"))
 	}
 }
 
 func (m *ExitMethod) Bind(session *ExchangeSession, orderExecutor *GeneralOrderExecutor) {
 	if m.ProtectiveStopLoss != nil {
 		m.ProtectiveStopLoss.Bind(session, orderExecutor)
-	} else if m.RoiStopLoss != nil {
+	}
+
+	if m.RoiStopLoss != nil {
 		m.RoiStopLoss.Bind(session, orderExecutor)
-	} else if m.RoiTakeProfit != nil {
+	}
+
+	if m.RoiTakeProfit != nil {
 		m.RoiTakeProfit.Bind(session, orderExecutor)
-	} else if m.LowerShadowTakeProfit != nil {
+	}
+
+	if m.LowerShadowTakeProfit != nil {
 		m.LowerShadowTakeProfit.Bind(session, orderExecutor)
-	} else if m.CumulatedVolumeTakeProfit != nil {
+	}
+
+	if m.CumulatedVolumeTakeProfit != nil {
 		m.CumulatedVolumeTakeProfit.Bind(session, orderExecutor)
 	}
 }

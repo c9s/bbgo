@@ -273,6 +273,10 @@ func (p *Position) IsClosed() bool {
 	return p.Base.Sign() == 0
 }
 
+func (p *Position) IsOpened(currentPrice fixedpoint.Value) bool {
+	return !p.IsClosed() && !p.IsDust(currentPrice)
+}
+
 func (p *Position) Type() PositionType {
 	if p.Base.Sign() > 0 {
 		return PositionLong

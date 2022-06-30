@@ -33,7 +33,6 @@ func init() {
 }
 
 type Strategy struct {
-	*bbgo.Graceful
 	*bbgo.Persistence
 	Environment *bbgo.Environment
 
@@ -879,7 +878,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		}
 	}()
 
-	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
+	bbgo.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 
 		close(s.stopC)

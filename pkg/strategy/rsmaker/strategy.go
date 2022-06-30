@@ -29,9 +29,6 @@ func init() {
 }
 
 type Strategy struct {
-	*bbgo.Graceful
-	*bbgo.Notifiability
-
 	Environment          *bbgo.Environment
 	StandardIndicatorSet *bbgo.StandardIndicatorSet
 	Market               types.Market

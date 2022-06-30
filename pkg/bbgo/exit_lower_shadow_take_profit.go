@@ -8,15 +8,28 @@ import (
 )
 
 type LowerShadowTakeProfit struct {
-	Ratio fixedpoint.Value `json:"ratio"`
+	// inherit from the strategy
+	types.IntervalWindow
 
+	// inherit from the strategy
+	Symbol string `json:"symbol"`
+
+	Ratio         fixedpoint.Value `json:"ratio"`
 	session       *ExchangeSession
 	orderExecutor *GeneralOrderExecutor
+}
+
+func (s *LowerShadowTakeProfit) Subscribe(session *ExchangeSession) {
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
 }
 
 func (s *LowerShadowTakeProfit) Bind(session *ExchangeSession, orderExecutor *GeneralOrderExecutor) {
 	s.session = session
 	s.orderExecutor = orderExecutor
+
+	stdIndicatorSet, _ := session.StandardIndicatorSet(s.Symbol)
+	ewma := stdIndicatorSet.EWMA(s.IntervalWindow)
+
 
 	position := orderExecutor.Position()
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
@@ -35,6 +48,11 @@ func (s *LowerShadowTakeProfit) Bind(session *ExchangeSession, orderExecutor *Ge
 		}
 
 		if s.Ratio.IsZero() {
+			return
+		}
+
+		// skip close price higher than the ewma
+		if closePrice.Float64() > ewma.Last() {
 			return
 		}
 
