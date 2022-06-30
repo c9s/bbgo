@@ -36,8 +36,10 @@ func Test_reflectMergeStructFields(t *testing.T) {
 		iw := types.IntervalWindow{Interval: types.Interval1h, Window: 30}
 		a := &struct {
 			types.IntervalWindow
+			Symbol string
 		}{
 			IntervalWindow: iw,
+			Symbol:         "BTCUSDT",
 		}
 		b := &struct {
 			Symbol string
@@ -45,6 +47,7 @@ func Test_reflectMergeStructFields(t *testing.T) {
 		}{}
 		MergeStructValues(b, a)
 		assert.Equal(t, iw, b.IntervalWindow)
+		assert.Equal(t, "BTCUSDT", b.Symbol)
 	})
 
 	t.Run("non-zero embedded struct", func(t *testing.T) {
