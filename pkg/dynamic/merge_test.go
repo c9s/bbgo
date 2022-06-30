@@ -5,7 +5,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -21,14 +20,14 @@ type TestStrategy struct {
 func Test_reflectMergeStructFields(t *testing.T) {
 	t.Run("zero value", func(t *testing.T) {
 		a := &TestStrategy{Symbol: "BTCUSDT"}
-		b := &bbgo.CumulatedVolumeTakeProfit{Symbol: ""}
+		b := &struct{ Symbol string }{Symbol: ""}
 		MergeStructValues(b, a)
 		assert.Equal(t, "BTCUSDT", b.Symbol)
 	})
 
 	t.Run("non-zero value", func(t *testing.T) {
 		a := &TestStrategy{Symbol: "BTCUSDT"}
-		b := &bbgo.CumulatedVolumeTakeProfit{Symbol: "ETHUSDT"}
+		b := &struct{ Symbol string }{Symbol: "ETHUSDT"}
 		MergeStructValues(b, a)
 		assert.Equal(t, "ETHUSDT", b.Symbol, "should be the original value")
 	})
@@ -40,7 +39,10 @@ func Test_reflectMergeStructFields(t *testing.T) {
 		}{
 			IntervalWindow: iw,
 		}
-		b := &bbgo.CumulatedVolumeTakeProfit{}
+		b := &struct {
+			Symbol string
+			types.IntervalWindow
+		}{}
 		MergeStructValues(b, a)
 		assert.Equal(t, iw, b.IntervalWindow)
 	})
@@ -52,7 +54,9 @@ func Test_reflectMergeStructFields(t *testing.T) {
 		}{
 			IntervalWindow: iw,
 		}
-		b := &bbgo.CumulatedVolumeTakeProfit{
+		b := &struct {
+			types.IntervalWindow
+		}{
 			IntervalWindow: types.IntervalWindow{Interval: types.Interval5m, Window: 9},
 		}
 		MergeStructValues(b, a)

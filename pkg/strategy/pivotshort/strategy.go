@@ -70,8 +70,6 @@ type Entry struct {
 }
 
 type Strategy struct {
-	*bbgo.Graceful
-
 	Environment *bbgo.Environment
 	Symbol      string `json:"symbol"`
 	Market      types.Market
@@ -124,6 +122,8 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 
 	for i := range s.ExitMethods {
 		m := s.ExitMethods[i]
+
+		// we need to pass some information from the strategy configuration to the exit methods, like symbol, interval and window
 		dynamic.MergeStructValues(&m, s)
 		m.Subscribe(session)
 	}
@@ -369,7 +369,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		})
 	}
 
-	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
+	bbgo.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		_, _ = fmt.Fprintln(os.Stderr, s.TradeStats.String())
 		wg.Done()
 	})

@@ -41,9 +41,6 @@ type Strategy struct {
 	// This field will be injected automatically since we defined the Symbol field.
 	*bbgo.StandardIndicatorSet
 
-	// Graceful let you define the graceful shutdown handler
-	*bbgo.Graceful
-
 	// Market stores the configuration of the market, for example, VolumePrecision, PricePrecision, MinLotSize... etc
 	// This field will be injected automatically since we defined the Symbol field.
 	types.Market
@@ -350,7 +347,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.profitOrders.BindStream(session.UserDataStream)
 
 	// setup graceful shutting down handler
-	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
+	bbgo.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		// call Done to notify the main process.
 		defer wg.Done()
 		log.Infof("canceling active orders...")

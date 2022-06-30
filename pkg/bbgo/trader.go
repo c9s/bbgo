@@ -73,8 +73,6 @@ type Trader struct {
 	exchangeStrategies      map[string][]SingleExchangeStrategy
 
 	logger Logger
-
-	Graceful Graceful
 }
 
 func NewTrader(environ *Environment) *Trader {
@@ -416,7 +414,6 @@ func (trader *Trader) injectCommonServices(s interface{}) error {
 	}
 
 	return parseStructAndInject(s,
-		&trader.Graceful,
 		&trader.logger,
 		Notification,
 		trader.environment.TradeService,

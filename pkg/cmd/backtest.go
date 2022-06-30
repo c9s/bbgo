@@ -443,9 +443,7 @@ var BacktestCmd = &cobra.Command{
 		cmdutil.WaitForSignal(runCtx, syscall.SIGINT, syscall.SIGTERM)
 
 		log.Infof("shutting down trader...")
-		shutdownCtx, cancelShutdown := context.WithDeadline(runCtx, time.Now().Add(10*time.Second))
-		trader.Graceful.Shutdown(shutdownCtx)
-		cancelShutdown()
+		bbgo.Shutdown()
 
 		// put the logger back to print the pnl
 		log.SetLevel(log.InfoLevel)

@@ -24,7 +24,6 @@ func (s *TestStructWithoutInstanceID) ID() string {
 
 type TestStruct struct {
 	*Environment
-	*Graceful
 
 	Position *types.Position `persistence:"position"`
 	Integer  int64           `persistence:"integer"`

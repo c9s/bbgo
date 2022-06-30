@@ -57,7 +57,6 @@ func (s *State) Reset() {
 }
 
 type Strategy struct {
-	*bbgo.Graceful
 	*bbgo.Persistence
 
 	Symbol          string           `json:"symbol"`
@@ -193,7 +192,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		}
 	}
 
-	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
+	bbgo.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 
 		close(s.stopC)
