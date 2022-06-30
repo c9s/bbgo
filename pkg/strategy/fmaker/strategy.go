@@ -31,7 +31,6 @@ type IntervalWindowSetting struct {
 }
 
 type Strategy struct {
-	*bbgo.Graceful
 	*bbgo.Persistence
 
 	Environment *bbgo.Environment
