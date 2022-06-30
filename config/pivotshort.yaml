@@ -40,7 +40,7 @@ exchangeStrategies:
       # stopEMARange is the price range we allow short.
       # Short-allowed price range = [current price] > [EMA] * (1 - [stopEMARange])
       # Higher the stopEMARange than higher the chance to open a short
-      stopEMARange: 1%
+      stopEMARange: 2%
       stopEMA:
         interval: 1h
         window: 99
@@ -93,9 +93,9 @@ exchangeStrategies:
 
     # (5) cumulatedVolumeTakeProfit is used to take profit when the cumulated quote volume from the klines exceeded a threshold
     - cumulatedVolumeTakeProfit:
-        minQuoteVolume: 200_000_000
         interval: 5m
         window: 2
+        minQuoteVolume: 200_000_000
 
 backtest:
   sessions:
