@@ -11,6 +11,7 @@ import (
 // could be used in Monte Carlo Simulations
 //go:generate callbackgen -type Drift
 type Drift struct {
+	types.SeriesBase
 	types.IntervalWindow
 	chng      *types.Queue
 	Values    types.Float64Slice
@@ -22,6 +23,7 @@ type Drift struct {
 
 func (inc *Drift) Update(value float64) {
 	if inc.chng == nil {
+		inc.SeriesBase.Series = inc
 		inc.SMA = &SMA{IntervalWindow: types.IntervalWindow{Interval: inc.Interval, Window: inc.Window}}
 		inc.chng = types.NewQueue(inc.Window)
 		inc.LastValue = value
@@ -64,7 +66,7 @@ func (inc *Drift) Length() int {
 	return inc.Values.Length()
 }
 
-var _ types.Series = &Drift{}
+var _ types.SeriesExtend = &Drift{}
 
 func (inc *Drift) calculateAndUpdate(allKLines []types.KLine) {
 	if inc.chng == nil {

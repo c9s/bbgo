@@ -12,6 +12,7 @@ var logst = logrus.WithField("indicator", "supertrend")
 
 //go:generate callbackgen -type Supertrend
 type Supertrend struct {
+	types.SeriesBase
 	types.IntervalWindow
 	ATRMultiplier float64 `json:"atrMultiplier"`
 
@@ -52,6 +53,10 @@ func (inc *Supertrend) Length() int {
 func (inc *Supertrend) Update(highPrice, lowPrice, closePrice float64) {
 	if inc.Window <= 0 {
 		panic("window must be greater than 0")
+	}
+
+	if inc.AverageTrueRange == nil {
+		inc.SeriesBase.Series = inc
 	}
 
 	// Start with DirectionUp
@@ -120,7 +125,7 @@ func (inc *Supertrend) GetSignal() types.Direction {
 	return inc.tradeSignal
 }
 
-var _ types.Series = &Supertrend{}
+var _ types.SeriesExtend = &Supertrend{}
 
 func (inc *Supertrend) calculateAndUpdate(kLines []types.KLine) {
 	for _, k := range kLines {

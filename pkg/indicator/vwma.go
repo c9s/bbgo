@@ -20,6 +20,7 @@ Volume Weighted Moving Average
 */
 //go:generate callbackgen -type VWMA
 type VWMA struct {
+	types.SeriesBase
 	types.IntervalWindow
 	Values  types.Float64Slice
 	EndTime time.Time
@@ -46,7 +47,7 @@ func (inc *VWMA) Length() int {
 	return len(inc.Values)
 }
 
-var _ types.Series = &VWMA{}
+var _ types.SeriesExtend = &VWMA{}
 
 func KLinePriceVolumeMapper(k types.KLine) float64 {
 	return k.Close.Mul(k.Volume).Float64()
@@ -79,6 +80,10 @@ func (inc *VWMA) calculateAndUpdate(kLines []types.KLine) {
 	if err != nil {
 		log.WithError(err).Error("volume SMA error")
 		return
+	}
+
+	if len(inc.Values) == 0 {
+		inc.SeriesBase.Series = inc
 	}
 
 	vwma := pv / v

@@ -20,6 +20,7 @@ import (
 //
 //go:generate callbackgen -type SSF
 type SSF struct {
+	types.SeriesBase
 	types.IntervalWindow
 	Poles  int
 	c1     float64
@@ -34,6 +35,7 @@ type SSF struct {
 func (inc *SSF) Update(value float64) {
 	if inc.Poles == 3 {
 		if inc.Values == nil {
+			inc.SeriesBase.Series = inc
 			x := math.Pi / float64(inc.Window)
 			a0 := math.Exp(-x)
 			b0 := 2. * a0 * math.Cos(math.Sqrt(3.)*x)
@@ -53,6 +55,7 @@ func (inc *SSF) Update(value float64) {
 		inc.Values.Push(result)
 	} else { // poles == 2
 		if inc.Values == nil {
+			inc.SeriesBase.Series = inc
 			x := math.Pi * math.Sqrt(2.) / float64(inc.Window)
 			a0 := math.Exp(-x)
 			inc.c3 = -a0 * a0
@@ -88,7 +91,7 @@ func (inc *SSF) Last() float64 {
 	return inc.Values.Last()
 }
 
-var _ types.Series = &SSF{}
+var _ types.SeriesExtend = &SSF{}
 
 func (inc *SSF) calculateAndUpdate(allKLines []types.KLine) {
 	if inc.Values != nil {

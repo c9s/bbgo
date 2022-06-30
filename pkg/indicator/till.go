@@ -10,6 +10,7 @@ const defaultVolumeFactor = 0.7
 // Refer URL: https://tradingpedia.com/forex-trading-indicator/t3-moving-average-indicator/
 //go:generate callbackgen -type TILL
 type TILL struct {
+	types.SeriesBase
 	types.IntervalWindow
 	VolumeFactor    float64
 	e1              *EWMA
@@ -30,6 +31,7 @@ func (inc *TILL) Update(value float64) {
 		if inc.VolumeFactor == 0 {
 			inc.VolumeFactor = defaultVolumeFactor
 		}
+		inc.SeriesBase.Series = inc
 		inc.e1 = &EWMA{IntervalWindow: types.IntervalWindow{inc.Interval, inc.Window}}
 		inc.e2 = &EWMA{IntervalWindow: types.IntervalWindow{inc.Interval, inc.Window}}
 		inc.e3 = &EWMA{IntervalWindow: types.IntervalWindow{inc.Interval, inc.Window}}
