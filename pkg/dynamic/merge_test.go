@@ -21,14 +21,14 @@ func Test_reflectMergeStructFields(t *testing.T) {
 	t.Run("zero value", func(t *testing.T) {
 		a := &TestStrategy{Symbol: "BTCUSDT"}
 		b := &struct{ Symbol string }{Symbol: ""}
-		MergeStructValues(b, a)
+		InheritStructValues(b, a)
 		assert.Equal(t, "BTCUSDT", b.Symbol)
 	})
 
 	t.Run("non-zero value", func(t *testing.T) {
 		a := &TestStrategy{Symbol: "BTCUSDT"}
 		b := &struct{ Symbol string }{Symbol: "ETHUSDT"}
-		MergeStructValues(b, a)
+		InheritStructValues(b, a)
 		assert.Equal(t, "ETHUSDT", b.Symbol, "should be the original value")
 	})
 
@@ -45,7 +45,7 @@ func Test_reflectMergeStructFields(t *testing.T) {
 			Symbol string
 			types.IntervalWindow
 		}{}
-		MergeStructValues(b, a)
+		InheritStructValues(b, a)
 		assert.Equal(t, iw, b.IntervalWindow)
 		assert.Equal(t, "BTCUSDT", b.Symbol)
 	})
@@ -62,7 +62,7 @@ func Test_reflectMergeStructFields(t *testing.T) {
 		}{
 			IntervalWindow: types.IntervalWindow{Interval: types.Interval5m, Window: 9},
 		}
-		MergeStructValues(b, a)
+		InheritStructValues(b, a)
 		assert.Equal(t, types.IntervalWindow{Interval: types.Interval5m, Window: 9}, b.IntervalWindow)
 	})
 
@@ -75,7 +75,7 @@ func Test_reflectMergeStructFields(t *testing.T) {
 		b := &struct {
 			A string
 		}{}
-		MergeStructValues(b, a)
+		InheritStructValues(b, a)
 		assert.Equal(t, "", b.A)
 		assert.Equal(t, 1.99, a.A)
 	})
