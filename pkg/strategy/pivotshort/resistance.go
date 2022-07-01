@@ -2,6 +2,7 @@ package pivotshort
 
 import (
 	"context"
+	"sort"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -120,12 +121,12 @@ func (s *ResistanceShort) placeResistanceOrders(ctx context.Context, resistanceP
 		log.Infof("placing bounce short order #%d: price = %f, quantity = %f", i, price.Float64(), quantity.Float64())
 
 		orderForms = append(orderForms, types.SubmitOrder{
-			Symbol:   s.Symbol,
-			Side:     types.SideTypeSell,
-			Type:     types.OrderTypeLimitMaker,
-			Price:    price,
-			Quantity: quantity,
-			Tag:      "resistanceShort",
+			Symbol:           s.Symbol,
+			Side:             types.SideTypeSell,
+			Type:             types.OrderTypeLimitMaker,
+			Price:            price,
+			Quantity:         quantity,
+			Tag:              "resistanceShort",
 			MarginSideEffect: types.SideEffectTypeMarginBuy,
 		})
 
@@ -143,4 +144,29 @@ func (s *ResistanceShort) placeResistanceOrders(ctx context.Context, resistanceP
 		log.WithError(err).Errorf("can not place resistance order")
 	}
 	s.activeOrders.Add(createdOrders...)
+}
+
+func findPossibleResistancePrices(closePrice float64, minDistance float64, lows []float64) []float64 {
+	// sort float64 in increasing order
+	// lower to higher prices
+	sort.Float64s(lows)
+
+	var resistancePrices []float64
+	for _, low := range lows {
+		if low < closePrice {
+			continue
+		}
+
+		last := closePrice
+		if len(resistancePrices) > 0 {
+			last = resistancePrices[len(resistancePrices)-1]
+		}
+
+		if (low / last) < (1.0 + minDistance) {
+			continue
+		}
+		resistancePrices = append(resistancePrices, low)
+	}
+
+	return resistancePrices
 }
