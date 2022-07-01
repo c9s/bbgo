@@ -65,7 +65,7 @@ func (e *GeneralOrderExecutor) BindProfitStats(profitStats *types.ProfitStats) {
 		}
 
 		profitStats.AddProfit(*profit)
-		Notify(&profitStats)
+		Notify(profitStats)
 	})
 }
 
