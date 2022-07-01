@@ -53,6 +53,10 @@ func CallStructFieldsMethod(m interface{}, method string, args ...interface{}) e
 }
 
 // CallMatch calls the function with the matched argument automatically
+// you can define multiple parameter factory function to inject the return value as the function argument.
+// e.g.,
+//     CallMatch(targetFunction, 1, 10, true, func() *ParamType { .... })
+//
 func CallMatch(f interface{}, objects ...interface{}) ([]reflect.Value, error) {
 	fv := reflect.ValueOf(f)
 	ft := reflect.TypeOf(f)
