@@ -215,18 +215,6 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 	return s.orderExecutor.ClosePosition(ctx, percentage)
 }
 
-// Deprecated: LoadState method is migrated to the persistence struct tag.
-func (s *Strategy) LoadState() error {
-	var state State
-
-	// load position
-	if err := s.Persistence.Load(&state, ID, s.Symbol, stateKey); err == nil {
-		s.state = &state
-	}
-
-	return nil
-}
-
 func (s *Strategy) getCurrentAllowedExposurePosition(bandPercentage float64) (fixedpoint.Value, error) {
 	if s.DynamicExposurePositionScale != nil {
 		v, err := s.DynamicExposurePositionScale.Scale(bandPercentage)
@@ -505,17 +493,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	// If position is nil, we need to allocate a new position for calculation
 	if s.Position == nil {
-		// restore state (legacy)
-		if err := s.LoadState(); err != nil {
-			return err
-		}
-
-		// fallback to the legacy position struct in the state
-		if s.state != nil && s.state.Position != nil && !s.state.Position.Base.IsZero() {
-			s.Position = s.state.Position
-		} else {
-			s.Position = types.NewPositionFromMarket(s.Market)
-		}
+		s.Position = types.NewPositionFromMarket(s.Market)
 	}
 
 	if s.session.MakerFeeRate.Sign() > 0 || s.session.TakerFeeRate.Sign() > 0 {
@@ -526,13 +504,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	}
 
 	if s.ProfitStats == nil {
-		if s.state != nil {
-			// copy profit stats
-			p2 := s.state.ProfitStats
-			s.ProfitStats = &p2
-		} else {
-			s.ProfitStats = types.NewProfitStats(s.Market)
-		}
+		s.ProfitStats = types.NewProfitStats(s.Market)
 	}
 
 	// Always update the position fields
