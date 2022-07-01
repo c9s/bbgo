@@ -104,6 +104,13 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 			return
 		}
 
+		// force direction to be down
+		if closePrice.Compare(openPrice) > 0 {
+			log.Infof("%s price %f is closed higher than the open price %f, skip this break", kline.Symbol, closePrice.Float64(), openPrice.Float64())
+			// skip UP klines
+			return
+		}
+
 		log.Infof("%s breakLow signal detected, closed price %f < breakPrice %f", kline.Symbol, closePrice.Float64(), breakPrice.Float64())
 
 		// stop EMA protection
@@ -128,12 +135,28 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 		quantity := s.useQuantityOrBaseBalance(s.Quantity)
 		if s.MarketOrder {
 			bbgo.Notify("%s price %f breaks the previous low %f with ratio %f, submitting market sell to open a short position", symbol, kline.Close.Float64(), previousLow.Float64(), s.Ratio.Float64())
-			s.placeMarketSell(ctx, quantity, "breakLowMarket")
+			_, _ = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+				Symbol:           s.Symbol,
+				Side:             types.SideTypeSell,
+				Type:             types.OrderTypeMarket,
+				Quantity:         quantity,
+				MarginSideEffect: types.SideEffectTypeMarginBuy,
+				Tag:              "breakLowMarket",
+			})
+
 		} else {
 			sellPrice := previousLow.Mul(fixedpoint.One.Add(s.BounceRatio))
 
 			bbgo.Notify("%s price %f breaks the previous low %f with ratio %f, submitting limit sell @ %f", symbol, kline.Close.Float64(), previousLow.Float64(), s.Ratio.Float64(), sellPrice.Float64())
-			s.placeLimitSell(ctx, sellPrice, quantity, "breakLowLimit")
+			_, _ = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+				Symbol:           kline.Symbol,
+				Side:             types.SideTypeSell,
+				Type:             types.OrderTypeLimit,
+				Price:            sellPrice,
+				Quantity:         quantity,
+				MarginSideEffect: types.SideEffectTypeMarginBuy,
+				Tag:              "breakLowLimit",
+			})
 		}
 	}))
 
@@ -165,27 +188,4 @@ func (s *BreakLow) useQuantityOrBaseBalance(quantity fixedpoint.Value) fixedpoin
 	}
 
 	return quantity
-}
-
-func (s *BreakLow) placeLimitSell(ctx context.Context, price, quantity fixedpoint.Value, tag string) {
-	_, _ = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
-		Symbol:           s.Symbol,
-		Price:            price,
-		Side:             types.SideTypeSell,
-		Type:             types.OrderTypeLimit,
-		Quantity:         quantity,
-		MarginSideEffect: types.SideEffectTypeMarginBuy,
-		Tag:              tag,
-	})
-}
-
-func (s *BreakLow) placeMarketSell(ctx context.Context, quantity fixedpoint.Value, tag string) {
-	_, _ = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
-		Symbol:           s.Symbol,
-		Side:             types.SideTypeSell,
-		Type:             types.OrderTypeMarket,
-		Quantity:         quantity,
-		MarginSideEffect: types.SideEffectTypeMarginBuy,
-		Tag:              tag,
-	})
 }
