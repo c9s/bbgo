@@ -112,7 +112,7 @@ func (it *Interact) handleResponse(session Session, text string, ctxObjects ...i
 	}
 
 	ctxObjects = append(ctxObjects, session)
-	_, err := parseFuncArgsAndCall(f, args, ctxObjects...)
+	_, err := ParseFuncArgsAndCall(f, args, ctxObjects...)
 	if err != nil {
 		return err
 	}
@@ -154,7 +154,7 @@ func (it *Interact) runCommand(session Session, command string, args []string, c
 
 	ctxObjects = append(ctxObjects, session)
 	session.SetState(cmd.initState)
-	if _, err := parseFuncArgsAndCall(cmd.F, args, ctxObjects...); err != nil {
+	if _, err := ParseFuncArgsAndCall(cmd.F, args, ctxObjects...); err != nil {
 		return err
 	}
 

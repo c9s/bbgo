@@ -196,7 +196,7 @@ func (trader *Trader) RunSingleExchangeStrategy(ctx context.Context, strategy Si
 		return err
 	}
 
-	if err := injectField(rs, "OrderExecutor", orderExecutor, false); err != nil {
+	if err := dynamic.InjectField(rs, "OrderExecutor", orderExecutor, false); err != nil {
 		return errors.Wrapf(err, "failed to inject OrderExecutor on %T", strategy)
 	}
 
@@ -218,7 +218,7 @@ func (trader *Trader) RunSingleExchangeStrategy(ctx context.Context, strategy Si
 			return fmt.Errorf("marketDataStore of symbol %s not found", symbol)
 		}
 
-		if err := parseStructAndInject(strategy,
+		if err := dynamic.ParseStructAndInject(strategy,
 			market,
 			indicatorSet,
 			store,
@@ -401,19 +401,19 @@ func (trader *Trader) injectCommonServices(s interface{}) error {
 				return fmt.Errorf("field Persistence is not a struct element, %s given", field)
 			}
 
-			if err := injectField(elem, "Facade", PersistenceServiceFacade, true); err != nil {
+			if err := dynamic.InjectField(elem, "Facade", PersistenceServiceFacade, true); err != nil {
 				return err
 			}
 
 			/*
-				if err := parseStructAndInject(field.Interface(), persistenceFacade); err != nil {
+				if err := ParseStructAndInject(field.Interface(), persistenceFacade); err != nil {
 					return err
 				}
 			*/
 		}
 	}
 
-	return parseStructAndInject(s,
+	return dynamic.ParseStructAndInject(s,
 		&trader.logger,
 		Notification,
 		trader.environment.TradeService,

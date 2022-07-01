@@ -18,7 +18,7 @@ func Test_parseFuncArgsAndCall_NoErrorFunction(t *testing.T) {
 		return nil
 	}
 
-	_, err := parseFuncArgsAndCall(noErrorFunc, []string{"BTCUSDT", "0.123", "true"})
+	_, err := ParseFuncArgsAndCall(noErrorFunc, []string{"BTCUSDT", "0.123", "true"})
 	assert.NoError(t, err)
 }
 
@@ -27,7 +27,7 @@ func Test_parseFuncArgsAndCall_ErrorFunction(t *testing.T) {
 		return errors.New("error")
 	}
 
-	_, err := parseFuncArgsAndCall(errorFunc, []string{"BTCUSDT", "0.123"})
+	_, err := ParseFuncArgsAndCall(errorFunc, []string{"BTCUSDT", "0.123"})
 	assert.Error(t, err)
 }
 
@@ -38,7 +38,7 @@ func Test_parseFuncArgsAndCall_InterfaceInjection(t *testing.T) {
 	}
 
 	buf := bytes.NewBuffer(nil)
-	_, err := parseFuncArgsAndCall(f, []string{"BTCUSDT", "0.123"}, buf)
+	_, err := ParseFuncArgsAndCall(f, []string{"BTCUSDT", "0.123"}, buf)
 	assert.NoError(t, err)
 	assert.Equal(t, "123", buf.String())
 }
