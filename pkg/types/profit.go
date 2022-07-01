@@ -279,11 +279,11 @@ func (s *ProfitStats) PlainText() string {
 	return fmt.Sprintf("%s Profit Today\n"+
 		"Profit %s %s\n"+
 		"Net profit %s %s\n"+
-		"Trade Loss %s %s\n"+
+		"Gross Loss %s %s\n"+
 		"Summary:\n"+
 		"Accumulated Profit %s %s\n"+
 		"Accumulated Net Profit %s %s\n"+
-		"Accumulated Trade Loss %s %s\n"+
+		"Accumulated Gross Loss %s %s\n"+
 		"Since %s",
 		s.Symbol,
 		s.TodayPnL.String(), s.QuoteCurrency,
