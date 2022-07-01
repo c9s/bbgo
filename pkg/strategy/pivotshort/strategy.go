@@ -294,6 +294,10 @@ func (s *Strategy) placeOrder(ctx context.Context, price fixedpoint.Value, quant
 }
 
 func (s *Strategy) useQuantityOrBaseBalance(quantity fixedpoint.Value) fixedpoint.Value {
+	if s.session.Margin || s.session.IsolatedMargin || s.session.Futures || s.session.IsolatedFutures {
+		return quantity
+	}
+
 	balance, hasBalance := s.session.Account.Balance(s.Market.BaseCurrency)
 
 	if hasBalance {
