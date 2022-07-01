@@ -10,21 +10,20 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func parseFuncArgsAndCall(f interface{}, args []string, objects ...interface{}) (State, error) {
+func ParseFuncArgsAndCall(f interface{}, args []string, objects ...interface{}) (State, error) {
 	fv := reflect.ValueOf(f)
 	ft := reflect.TypeOf(f)
-
 	argIndex := 0
 
 	var rArgs []reflect.Value
 	for i := 0; i < ft.NumIn(); i++ {
 		at := ft.In(i)
 
+		// get the kind of argument
 		switch k := at.Kind(); k {
 
 		case reflect.Interface:
 			found := false
-
 			for oi := 0; oi < len(objects); oi++ {
 				obj := objects[oi]
 				objT := reflect.TypeOf(obj)
@@ -90,8 +89,8 @@ func parseFuncArgsAndCall(f interface{}, args []string, objects ...interface{}) 
 	}
 
 	// try to get the error object from the return value
-	var state State
 	var err error
+	var state State
 	for i := 0; i < ft.NumOut(); i++ {
 		outType := ft.Out(i)
 		switch outType.Kind() {
@@ -107,7 +106,6 @@ func parseFuncArgsAndCall(f interface{}, args []string, objects ...interface{}) 
 				err = ov
 
 			}
-
 		}
 	}
 	return state, err
