@@ -604,3 +604,14 @@ func (k *KLineSeries) Length() int {
 }
 
 var _ Series = &KLineSeries{}
+
+type KLineCallBack func(k KLine)
+
+func KLineWith(symbol string, interval Interval, callback KLineCallBack) KLineCallBack {
+	return func(k KLine) {
+		if k.Symbol != symbol || k.Interval != interval {
+			return
+		}
+		callback(k)
+	}
+}
