@@ -204,14 +204,14 @@ type ProfitStats struct {
 	QuoteCurrency string `json:"quoteCurrency"`
 	BaseCurrency  string `json:"baseCurrency"`
 
-	AccumulatedPnL       fixedpoint.Value `json:"accumulatedPnL,omitempty"`
+	AccumulatedPnL         fixedpoint.Value `json:"accumulatedPnL,omitempty"`
 	AccumulatedNetProfit   fixedpoint.Value `json:"accumulatedNetProfit,omitempty"`
 	AccumulatedGrossProfit fixedpoint.Value `json:"accumulatedProfit,omitempty"`
 	AccumulatedGrossLoss   fixedpoint.Value `json:"accumulatedLoss,omitempty"`
 	AccumulatedVolume      fixedpoint.Value `json:"accumulatedVolume,omitempty"`
-	AccumulatedSince     int64            `json:"accumulatedSince,omitempty"`
+	AccumulatedSince       int64            `json:"accumulatedSince,omitempty"`
 
-	TodayPnL       fixedpoint.Value `json:"todayPnL,omitempty"`
+	TodayPnL         fixedpoint.Value `json:"todayPnL,omitempty"`
 	TodayNetProfit   fixedpoint.Value `json:"todayNetProfit,omitempty"`
 	TodayGrossProfit fixedpoint.Value `json:"todayProfit,omitempty"`
 	TodayGrossLoss   fixedpoint.Value `json:"todayLoss,omitempty"`
