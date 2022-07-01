@@ -94,6 +94,7 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 
 		openPrice := kline.Open
 		closePrice := kline.Close
+
 		// if previous low is not break, skip
 		if closePrice.Compare(breakPrice) >= 0 {
 			return
@@ -101,11 +102,12 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 
 		// we need the price cross the break line or we do nothing
 		if !(openPrice.Compare(breakPrice) > 0 && closePrice.Compare(breakPrice) < 0) {
+			log.Infof("%s kline is not between the break low price %f", kline.Symbol, breakPrice.Float64())
 			return
 		}
 
 		// force direction to be down
-		if closePrice.Compare(openPrice) > 0 {
+		if closePrice.Compare(openPrice) >= 0 {
 			log.Infof("%s price %f is closed higher than the open price %f, skip this break", kline.Symbol, closePrice.Float64(), openPrice.Float64())
 			// skip UP klines
 			return
