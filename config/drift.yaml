@@ -1,0 +1,38 @@
+---
+sessions:
+  binance:
+    exchange: binance
+    futures: true
+    envVarPrefix: binance
+    heikinAshi: false
+
+exchangeStrategies:
+ 
+- on: binance
+  drift:
+    symbol: ETHUSDT
+    # kline interval for indicators
+    interval: 15m
+
+sync:
+  userDataStream:
+    trades: true
+    filledOrders: true
+  sessions:
+    - binance
+  symbols:
+    - ETHUSDT
+
+backtest:
+  startTime: "2022-04-01"
+  endTime: "2022-06-18"
+  symbols:
+    - ETHUSDT
+  sessions: [binance]
+  accounts:
+    binance:
+      #makerFeeRate: 0
+      #takerFeeRate: 15
+      balances:
+        ETH: 10.0
+        USDT: 5000.0
