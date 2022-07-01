@@ -78,7 +78,7 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 		}
 
 		if len(s.pivotLowPrices) == 0 {
-			log.Infof("currently there is no pivot low prices, skip placing orders...")
+			log.Infof("currently there is no pivot low prices, can not check break low...")
 			return
 		}
 

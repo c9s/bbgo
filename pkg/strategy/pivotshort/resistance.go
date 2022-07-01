@@ -64,6 +64,10 @@ func (s *ResistanceShort) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 }
 
 func (s *ResistanceShort) findNextResistancePriceAndPlaceOrders(closePrice fixedpoint.Value) {
+	// if the close price is still lower than the resistance price, then we don't have to update
+	if closePrice.Compare(s.nextResistancePrice) <= 0 {
+		return
+	}
 
 	minDistance := s.MinDistance.Float64()
 	lows := s.resistancePivot.Lows
