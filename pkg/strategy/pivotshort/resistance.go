@@ -126,6 +126,7 @@ func (s *ResistanceShort) placeResistanceOrders(ctx context.Context, resistanceP
 			Price:    price,
 			Quantity: quantity,
 			Tag:      "resistanceShort",
+			MarginSideEffect: types.SideEffectTypeMarginBuy,
 		})
 
 		// TODO: fix futures mode later
