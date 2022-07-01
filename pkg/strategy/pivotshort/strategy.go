@@ -266,8 +266,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	}
 
 	bbgo.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
+		defer wg.Done()
+		
 		_, _ = fmt.Fprintln(os.Stderr, s.TradeStats.String())
-		wg.Done()
+		_ = s.orderExecutor.GracefulCancel(ctx)
 	})
 
 	return nil
