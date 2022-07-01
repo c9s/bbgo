@@ -191,8 +191,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.ResistanceShort.Bind(session, s.orderExecutor)
 	}
 
-	// Always check whether you can open a short position or not
-	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(kline types.KLine) {
 		if s.Status != types.StrategyStatusRunning {
 			return
 		}
