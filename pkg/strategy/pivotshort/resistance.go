@@ -17,11 +17,12 @@ type ResistanceShort struct {
 
 	types.IntervalWindow
 
-	MinDistance fixedpoint.Value `json:"minDistance"`
-	NumLayers   int              `json:"numLayers"`
-	LayerSpread fixedpoint.Value `json:"layerSpread"`
-	Quantity    fixedpoint.Value `json:"quantity"`
-	Ratio       fixedpoint.Value `json:"ratio"`
+	MinDistance   fixedpoint.Value `json:"minDistance"`
+	GroupDistance fixedpoint.Value `json:"groupDistance"`
+	NumLayers     int              `json:"numLayers"`
+	LayerSpread   fixedpoint.Value `json:"layerSpread"`
+	Quantity      fixedpoint.Value `json:"quantity"`
+	Ratio         fixedpoint.Value `json:"ratio"`
 
 	session       *bbgo.ExchangeSession
 	orderExecutor *bbgo.GeneralOrderExecutor
@@ -38,6 +39,10 @@ func (s *ResistanceShort) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 	s.orderExecutor = orderExecutor
 	s.activeOrders = bbgo.NewActiveOrderBook(s.Symbol)
 	s.activeOrders.BindStream(session.UserDataStream)
+
+	if s.GroupDistance.IsZero() {
+		s.GroupDistance = fixedpoint.NewFromFloat(0.01)
+	}
 
 	store, _ := session.MarketDataStore(s.Symbol)
 
@@ -65,13 +70,12 @@ func (s *ResistanceShort) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 
 func (s *ResistanceShort) findNextResistancePriceAndPlaceOrders(closePrice fixedpoint.Value) {
 	// if the close price is still lower than the resistance price, then we don't have to update
-	if closePrice.Compare(s.nextResistancePrice) <= 0 {
+	if closePrice.Compare(s.nextResistancePrice.Mul(one.Add(s.Ratio))) <= 0 {
 		return
 	}
 
 	minDistance := s.MinDistance.Float64()
-	lows := s.resistancePivot.Lows
-	resistancePrices := findPossibleResistancePrices(closePrice.Float64(), minDistance, lows)
+	resistancePrices := findPossibleResistancePrices(closePrice.Float64()*(1.0+minDistance), s.GroupDistance.Float64(), s.resistancePivot.Lows)
 
 	log.Infof("last price: %f, possible resistance prices: %+v", closePrice.Float64(), resistancePrices)
 
@@ -151,51 +155,68 @@ func (s *ResistanceShort) placeResistanceOrders(ctx context.Context, resistanceP
 }
 
 func findPossibleSupportPrices(closePrice float64, minDistance float64, lows []float64) []float64 {
-	// sort float64 in increasing order
-	// lower to higher prices
-	sort.Float64s(lows)
+	return group(lower(lows, closePrice), minDistance)
+}
 
-	var supportPrices []float64
-	var last = closePrice
-	for i := len(lows) - 1; i >= 0; i-- {
-		price := lows[i]
+func lower(arr []float64, x float64) []float64 {
+	sort.Float64s(arr)
 
+	var rst []float64
+	for _, a := range arr {
 		// filter prices that are lower than the current closed price
-		if price > closePrice {
+		if a > x {
 			continue
 		}
 
-		if (price / last) < (1.0 - minDistance) {
-			continue
-		}
-
-		supportPrices = append(supportPrices, price)
-		last = price
+		rst = append(rst, a)
 	}
 
-	return supportPrices
+	return rst
+}
+
+func higher(arr []float64, x float64) []float64 {
+	sort.Float64s(arr)
+
+	var rst []float64
+	for _, a := range arr {
+		// filter prices that are lower than the current closed price
+		if a < x {
+			continue
+		}
+		rst = append(rst, a)
+	}
+
+	return rst
+}
+
+func group(arr []float64, minDistance float64) []float64 {
+	var groups []float64
+	var grp = []float64{arr[0]}
+	for _, price := range arr {
+		avg := average(grp)
+		if (price / avg) > (1.0 + minDistance) {
+			groups = append(groups, avg)
+			grp = []float64{price}
+		} else {
+			grp = append(grp, price)
+		}
+	}
+
+	if len(grp) > 0 {
+		groups = append(groups, average(grp))
+	}
+
+	return groups
 }
 
 func findPossibleResistancePrices(closePrice float64, minDistance float64, lows []float64) []float64 {
-	// sort float64 in increasing order
-	// lower to higher prices
-	sort.Float64s(lows)
+	return group(higher(lows, closePrice), minDistance)
+}
 
-	var resistancePrices []float64
-	var last = closePrice
-	for _, price := range lows {
-		// filter prices that are lower than the current closed price
-		if price < closePrice {
-			continue
-		}
-
-		if (price / last) < (1.0 + minDistance) {
-			continue
-		}
-
-		resistancePrices = append(resistancePrices, price)
-		last = price
+func average(arr []float64) float64 {
+	s := 0.0
+	for _, a := range arr {
+		s += a
 	}
-
-	return resistancePrices
+	return s / float64(len(arr))
 }
