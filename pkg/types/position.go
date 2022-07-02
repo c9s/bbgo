@@ -218,6 +218,10 @@ type FuturesPosition struct {
 }
 
 func NewPositionFromMarket(market Market) *Position {
+	if len(market.BaseCurrency) == 0 || len(market.QuoteCurrency) == 0 {
+		panic("logical exception: missing market information, base currency or quote currency is empty")
+	}
+
 	return &Position{
 		Symbol:        market.Symbol,
 		BaseCurrency:  market.BaseCurrency,
