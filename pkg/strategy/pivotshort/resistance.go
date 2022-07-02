@@ -150,26 +150,51 @@ func (s *ResistanceShort) placeResistanceOrders(ctx context.Context, resistanceP
 	s.activeOrders.Add(createdOrders...)
 }
 
+func findPossibleSupportPrices(closePrice float64, minDistance float64, lows []float64) []float64 {
+	// sort float64 in increasing order
+	// lower to higher prices
+	sort.Float64s(lows)
+
+	var supportPrices []float64
+	var last = closePrice
+	for i := len(lows) - 1; i >= 0; i-- {
+		price := lows[i]
+
+		// filter prices that are lower than the current closed price
+		if price > closePrice {
+			continue
+		}
+
+		if (price / last) < (1.0 - minDistance) {
+			continue
+		}
+
+		supportPrices = append(supportPrices, price)
+		last = price
+	}
+
+	return supportPrices
+}
+
 func findPossibleResistancePrices(closePrice float64, minDistance float64, lows []float64) []float64 {
 	// sort float64 in increasing order
 	// lower to higher prices
 	sort.Float64s(lows)
 
 	var resistancePrices []float64
-	for _, low := range lows {
-		if low < closePrice {
+	var last = closePrice
+	for _, price := range lows {
+		// filter prices that are lower than the current closed price
+		if price < closePrice {
 			continue
 		}
 
-		last := closePrice
-		if len(resistancePrices) > 0 {
-			last = resistancePrices[len(resistancePrices)-1]
-		}
-
-		if (low / last) < (1.0 + minDistance) {
+		if (price / last) < (1.0 + minDistance) {
 			continue
 		}
-		resistancePrices = append(resistancePrices, low)
+
+		resistancePrices = append(resistancePrices, price)
+		last = price
 	}
 
 	return resistancePrices

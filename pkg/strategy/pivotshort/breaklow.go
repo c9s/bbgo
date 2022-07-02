@@ -38,6 +38,10 @@ type BreakLow struct {
 	session       *bbgo.ExchangeSession
 }
 
+func (s *BreakLow) Subscribe(session *bbgo.ExchangeSession) {
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
+}
+
 func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.GeneralOrderExecutor) {
 	s.session = session
 	s.orderExecutor = orderExecutor
