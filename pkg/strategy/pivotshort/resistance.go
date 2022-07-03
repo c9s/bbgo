@@ -27,9 +27,9 @@ type ResistanceShort struct {
 	session       *bbgo.ExchangeSession
 	orderExecutor *bbgo.GeneralOrderExecutor
 
-	resistancePivot     *indicator.Pivot
-	resistancePrices    []float64
-	nextResistancePrice fixedpoint.Value
+	resistancePivot        *indicator.Pivot
+	resistancePrices       []float64
+	currentResistancePrice fixedpoint.Value
 
 	activeOrders *bbgo.ActiveOrderBook
 }
@@ -61,6 +61,7 @@ func (s *ResistanceShort) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
 		position := s.orderExecutor.Position()
 		if position.IsOpened(kline.Close) {
+			log.Infof("position is already opened, skip placing resistance orders")
 			return
 		}
 
@@ -68,25 +69,52 @@ func (s *ResistanceShort) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 	}))
 }
 
-func (s *ResistanceShort) findNextResistancePriceAndPlaceOrders(closePrice fixedpoint.Value) {
-	// if the close price is still lower than the resistance price, then we don't have to update
-	if closePrice.Compare(s.nextResistancePrice.Mul(one.Add(s.Ratio))) <= 0 {
-		return
+func tail(arr []float64, length int) []float64 {
+	if len(arr) < length {
+		return arr
 	}
 
+	return arr[len(arr)-1-length:]
+}
+
+func (s *ResistanceShort) updateNextResistancePrice(closePrice fixedpoint.Value) bool {
 	minDistance := s.MinDistance.Float64()
-	resistancePrices := findPossibleResistancePrices(closePrice.Float64()*(1.0+minDistance), s.GroupDistance.Float64(), s.resistancePivot.Lows)
+	groupDistance := s.GroupDistance.Float64()
+	resistancePrices := findPossibleResistancePrices(closePrice.Float64()*(1.0+minDistance), groupDistance, tail(s.resistancePivot.Lows, 6))
 
-	log.Infof("last price: %f, possible resistance prices: %+v", closePrice.Float64(), resistancePrices)
+	if len(resistancePrices) == 0 {
+		return false
+	}
 
+	log.Infof("%s close price: %f, min distance: %f, possible resistance prices: %+v", s.Symbol, closePrice.Float64(), minDistance, resistancePrices)
+
+	nextResistancePrice := fixedpoint.NewFromFloat(resistancePrices[0])
+
+	// if currentResistancePrice is not set or the close price is already higher than the current resistance price,
+	// we should update the resistance price
+	// if the detected resistance price is lower than the current one, we should also update it too
+	if s.currentResistancePrice.IsZero() {
+		s.currentResistancePrice = nextResistancePrice
+		return true
+	}
+
+	currentSellPrice := s.currentResistancePrice.Mul(one.Add(s.Ratio))
+	if closePrice.Compare(currentSellPrice) > 0 ||
+		nextResistancePrice.Compare(currentSellPrice) < 0 {
+		s.currentResistancePrice = nextResistancePrice
+		return true
+	}
+
+	return false
+}
+
+func (s *ResistanceShort) findNextResistancePriceAndPlaceOrders(closePrice fixedpoint.Value) {
 	ctx := context.Background()
-	if len(resistancePrices) > 0 {
-		nextResistancePrice := fixedpoint.NewFromFloat(resistancePrices[0])
-		if nextResistancePrice.Compare(s.nextResistancePrice) != 0 {
-			bbgo.Notify("Found next resistance price: %f", nextResistancePrice.Float64())
-			s.nextResistancePrice = nextResistancePrice
-			s.placeResistanceOrders(ctx, nextResistancePrice)
-		}
+	resistanceUpdated := s.updateNextResistancePrice(closePrice)
+	if resistanceUpdated {
+		// TODO: consider s.activeOrders.NumOfOrders() > 0
+		bbgo.Notify("Found next resistance price: %f, updating resistance order...", s.currentResistancePrice.Float64())
+		s.placeResistanceOrders(ctx, s.currentResistancePrice)
 	}
 }
 
@@ -190,6 +218,10 @@ func higher(arr []float64, x float64) []float64 {
 }
 
 func group(arr []float64, minDistance float64) []float64 {
+	if len(arr) == 0 {
+		return nil
+	}
+
 	var groups []float64
 	var grp = []float64{arr[0]}
 	for _, price := range arr {
