@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/cheggaaa/pb/v3"
 	"sort"
 
-	"github.com/evanphx/json-patch/v5"
+	"github.com/cheggaaa/pb/v3"
+
+	jsonpatch "github.com/evanphx/json-patch/v5"
 
 	"github.com/c9s/bbgo/pkg/backtest"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -16,6 +17,9 @@ import (
 type MetricValueFunc func(summaryReport *backtest.SummaryReport) fixedpoint.Value
 
 var TotalProfitMetricValueFunc = func(summaryReport *backtest.SummaryReport) fixedpoint.Value {
+	if summaryReport == nil {
+		return fixedpoint.Zero
+	}
 	return summaryReport.TotalProfit
 }
 
@@ -217,6 +221,9 @@ func (o *GridOptimizer) Run(executor Executor, configJson []byte) (map[string][]
 
 	for result := range resultsC {
 		for metricName, metricFunc := range valueFunctions {
+			if result.Report == nil {
+				log.Errorf("no summaryReport found for params: %+v", result.Params)
+			}
 			var metricValue = metricFunc(result.Report)
 			bar.Set("log", fmt.Sprintf("params: %+v => %s %+v", result.Params, metricName, metricValue))
 			bar.Increment()
