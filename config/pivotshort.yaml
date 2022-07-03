@@ -60,7 +60,7 @@ exchangeStrategies:
       # higher the ratio, higher the sell price
       # first_layer_price = resistance_price * (1 + ratio)
       # second_layer_price = (resistance_price * (1 + ratio)) * (2 * layerSpread)
-      ratio: 1.2%
+      ratio: 1.5%
       numOfLayers: 3
       layerSpread: 0.4%
 
