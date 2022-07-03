@@ -53,7 +53,7 @@ type Exchange struct {
 	sourceName     types.ExchangeName
 	publicExchange types.Exchange
 	srv            *service.BacktestService
-	startTime      time.Time
+	currentTime    time.Time
 
 	account *types.Account
 	config  *bbgo.Backtest
@@ -99,7 +99,7 @@ func NewExchange(sourceName types.ExchangeName, sourceExchange types.Exchange, s
 		srv:            srv,
 		config:         config,
 		account:        account,
-		startTime:      startTime,
+		currentTime:    startTime,
 		closedOrders:   make(map[string][]types.Order),
 		trades:         make(map[string][]types.Trade),
 	}
@@ -137,7 +137,7 @@ func (e *Exchange) addMatchingBook(symbol string, market types.Market) {
 
 func (e *Exchange) _addMatchingBook(symbol string, market types.Market) {
 	e.matchingBooks[symbol] = &SimplePriceMatching{
-		CurrentTime:  e.startTime,
+		CurrentTime:  e.currentTime,
 		Account:      e.account,
 		Market:       market,
 		closedOrders: make(map[uint64]types.Order),
@@ -364,6 +364,8 @@ func (e *Exchange) SubscribeMarketData(startTime, endTime time.Time, extraInterv
 
 func (e *Exchange) ConsumeKLine(k types.KLine) {
 	if k.Interval == types.Interval1m {
+		e.currentTime = k.EndTime.Time()
+
 		matching, ok := e.matchingBook(k.Symbol)
 		if !ok {
 			log.Errorf("matching book of %s is not initialized", k.Symbol)

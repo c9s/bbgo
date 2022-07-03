@@ -571,6 +571,7 @@ func (m *SimplePriceMatching) getOrder(orderID uint64) (types.Order, bool) {
 
 func (m *SimplePriceMatching) processKLine(kline types.KLine) {
 	m.CurrentTime = kline.EndTime.Time()
+
 	if m.LastPrice.IsZero() {
 		m.LastPrice = kline.Open
 	} else {
