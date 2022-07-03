@@ -288,7 +288,7 @@ var BacktestCmd = &cobra.Command{
 		}
 
 		backTestIntervals := []types.Interval{types.Interval1h, types.Interval1d}
-		exchangeSources, err := toExchangeSources(environ.Sessions(), backTestIntervals...)
+		exchangeSources, err := toExchangeSources(environ.Sessions(), startTime, endTime, backTestIntervals...)
 		if err != nil {
 			return err
 		}
@@ -647,11 +647,11 @@ func confirmation(s string) bool {
 	}
 }
 
-func toExchangeSources(sessions map[string]*bbgo.ExchangeSession, extraIntervals ...types.Interval) (exchangeSources []backtest.ExchangeDataSource, err error) {
+func toExchangeSources(sessions map[string]*bbgo.ExchangeSession, startTime, endTime time.Time, extraIntervals ...types.Interval) (exchangeSources []backtest.ExchangeDataSource, err error) {
 	for _, session := range sessions {
 		backtestEx := session.Exchange.(*backtest.Exchange)
 
-		c, err := backtestEx.SubscribeMarketData(extraIntervals...)
+		c, err := backtestEx.SubscribeMarketData(startTime, endTime, extraIntervals...)
 		if err != nil {
 			return exchangeSources, err
 		}
