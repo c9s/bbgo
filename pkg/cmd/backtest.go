@@ -267,6 +267,12 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
+		for _, session := range environ.Sessions() {
+			backtestEx := session.Exchange.(*backtest.Exchange)
+			backtestEx.UserDataStream = session.UserDataStream.(types.StandardStreamEmitter)
+			backtestEx.MarketDataStream = session.MarketDataStream.(types.StandardStreamEmitter)
+		}
+
 		trader := bbgo.NewTrader(environ)
 		if verboseCnt == 0 {
 			trader.DisableLogging()
@@ -642,12 +648,10 @@ func confirmation(s string) bool {
 
 func toExchangeSources(sessions map[string]*bbgo.ExchangeSession, extraIntervals ...types.Interval) (exchangeSources []backtest.ExchangeDataSource, err error) {
 	for _, session := range sessions {
-		exchange := session.Exchange.(*backtest.Exchange)
-		exchange.UserDataStream = session.UserDataStream.(types.StandardStreamEmitter)
-		exchange.MarketDataStream = session.MarketDataStream.(types.StandardStreamEmitter)
-		exchange.InitMarketData()
+		backtestEx := session.Exchange.(*backtest.Exchange)
+		backtestEx.InitMarketData()
 
-		c, err := exchange.SubscribeMarketData(extraIntervals...)
+		c, err := backtestEx.SubscribeMarketData(extraIntervals...)
 		if err != nil {
 			return exchangeSources, err
 		}
@@ -655,7 +659,7 @@ func toExchangeSources(sessions map[string]*bbgo.ExchangeSession, extraIntervals
 		sessionCopy := session
 		exchangeSources = append(exchangeSources, backtest.ExchangeDataSource{
 			C:        c,
-			Exchange: exchange,
+			Exchange: backtestEx,
 			Session:  sessionCopy,
 		})
 	}

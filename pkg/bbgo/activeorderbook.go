@@ -131,8 +131,6 @@ func (b *ActiveOrderBook) orderUpdateHandler(order types.Order) {
 		return
 	}
 
-	log.Debugf("[ActiveOrderBook] received order update: %+v", order)
-
 	switch order.Status {
 	case types.OrderStatusFilled:
 		// make sure we have the order and we remove it
