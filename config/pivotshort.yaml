@@ -54,6 +54,7 @@ exchangeStrategies:
 
       # minDistance is used to ignore the place that is too near to the current price
       minDistance: 3%
+      groupDistance: 1%
 
       # ratio is the ratio of the resistance price,
       # higher the ratio, lower the price
