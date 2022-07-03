@@ -35,14 +35,40 @@ type SupportTakeProfit struct {
 	types.IntervalWindow
 	Ratio fixedpoint.Value `json:"ratio"`
 
-	pivot         *indicator.Pivot
-	orderExecutor *bbgo.GeneralOrderExecutor
-	session       *bbgo.ExchangeSession
-	activeOrders  *bbgo.ActiveOrderBook
+	pivot               *indicator.Pivot
+	orderExecutor       *bbgo.GeneralOrderExecutor
+	session             *bbgo.ExchangeSession
+	activeOrders        *bbgo.ActiveOrderBook
+	currentSupportPrice fixedpoint.Value
 }
 
 func (s *SupportTakeProfit) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
+}
+
+func (s *SupportTakeProfit) updateSupportPrice(closePrice fixedpoint.Value) bool {
+	supportPrices := findPossibleSupportPrices(closePrice.Float64(), 0.05, s.pivot.Lows)
+
+	if len(supportPrices) == 0 {
+		return false
+	}
+
+	// nextSupportPrice are sorted in decreasing order
+	nextSupportPrice := fixedpoint.NewFromFloat(supportPrices[0])
+	currentBuyPrice := s.currentSupportPrice.Mul(one.Add(s.Ratio))
+
+	if s.currentSupportPrice.IsZero() {
+		s.currentSupportPrice = nextSupportPrice
+		return true
+	}
+
+	// the close price is already lower than the support price, than we should update
+	if closePrice.Compare(currentBuyPrice) < 0 || nextSupportPrice.Compare(s.currentSupportPrice) > 0 {
+		s.currentSupportPrice = nextSupportPrice
+		return true
+	}
+
+	return false
 }
 
 func (s *SupportTakeProfit) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.GeneralOrderExecutor) {
@@ -58,27 +84,23 @@ func (s *SupportTakeProfit) Bind(session *bbgo.ExchangeSession, orderExecutor *b
 	preloadPivot(s.pivot, store)
 
 	session.UserDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
-		supportPrices := findPossibleSupportPrices(kline.Close.Float64(), 0.1, s.pivot.Lows)
-		// supportPrices are sorted in decreasing order
-		if len(supportPrices) == 0 {
-			log.Infof("support prices not found")
-			return
-		}
-
 		if !position.IsOpened(kline.Close) {
 			return
 		}
 
-		nextSupport := fixedpoint.NewFromFloat(supportPrices[0])
-		buyPrice := nextSupport.Mul(one.Add(s.Ratio))
-		quantity := position.GetQuantity()
+		if !s.updateSupportPrice(kline.Close) {
+			return
+		}
 
+		buyPrice := s.currentSupportPrice.Mul(one.Add(s.Ratio))
+		quantity := position.GetQuantity()
 		ctx := context.Background()
 
 		if err := orderExecutor.GracefulCancelActiveOrderBook(ctx, s.activeOrders); err != nil {
 			log.WithError(err).Errorf("cancel order failed")
 		}
 
+		bbgo.Notify("placing %s take profit order at price %f", s.Symbol, buyPrice.Float64())
 		createdOrders, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 			Symbol:   symbol,
 			Type:     types.OrderTypeLimitMaker,
@@ -112,7 +134,7 @@ type Strategy struct {
 	// ResistanceShort is one of the entry method
 	ResistanceShort *ResistanceShort `json:"resistanceShort"`
 
-	SupportTakeProfit *SupportTakeProfit `json:"supportTakeProfit"`
+	SupportTakeProfit []SupportTakeProfit `json:"supportTakeProfit"`
 
 	ExitMethods bbgo.ExitMethodSet `json:"exits"`
 
@@ -141,9 +163,9 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 		s.BreakLow.Subscribe(session)
 	}
 
-	if s.SupportTakeProfit != nil {
-		dynamic.InheritStructValues(s.SupportTakeProfit, s)
-		s.SupportTakeProfit.Subscribe(session)
+	for i := range s.SupportTakeProfit {
+		dynamic.InheritStructValues(&s.SupportTakeProfit[i], s)
+		s.SupportTakeProfit[i].Subscribe(session)
 	}
 
 	if !bbgo.IsBackTesting {
