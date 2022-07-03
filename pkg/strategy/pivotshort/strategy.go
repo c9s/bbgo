@@ -30,6 +30,69 @@ type IntervalWindowSetting struct {
 	types.IntervalWindow
 }
 
+type SupportTakeProfit struct {
+	Symbol string
+	types.IntervalWindow
+	Ratio fixedpoint.Value `json:"ratio"`
+
+	pivot         *indicator.Pivot
+	orderExecutor *bbgo.GeneralOrderExecutor
+	session       *bbgo.ExchangeSession
+	activeOrders  *bbgo.ActiveOrderBook
+}
+
+func (s *SupportTakeProfit) Subscribe(session *bbgo.ExchangeSession) {
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
+}
+
+func (s *SupportTakeProfit) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.GeneralOrderExecutor) {
+	s.session = session
+	s.orderExecutor = orderExecutor
+	s.activeOrders = bbgo.NewActiveOrderBook(s.Symbol)
+
+	position := orderExecutor.Position()
+	symbol := position.Symbol
+	store, _ := session.MarketDataStore(symbol)
+	s.pivot = &indicator.Pivot{IntervalWindow: s.IntervalWindow}
+	s.pivot.Bind(store)
+	preloadPivot(s.pivot, store)
+
+	session.UserDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
+		supportPrices := findPossibleSupportPrices(kline.Close.Float64(), 0.1, s.pivot.Lows)
+		// supportPrices are sorted in decreasing order
+		if len(supportPrices) == 0 {
+			log.Infof("support prices not found")
+			return
+		}
+
+		if !position.IsOpened(kline.Close) {
+			return
+		}
+
+		nextSupport := fixedpoint.NewFromFloat(supportPrices[0])
+		buyPrice := nextSupport.Mul(one.Add(s.Ratio))
+		quantity := position.GetQuantity()
+
+		ctx := context.Background()
+
+		if err := orderExecutor.GracefulCancelActiveOrderBook(ctx, s.activeOrders); err != nil {
+			log.WithError(err).Errorf("cancel order failed")
+		}
+
+		createdOrders, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+			Symbol:   symbol,
+			Type:     types.OrderTypeLimitMaker,
+			Price:    buyPrice,
+			Quantity: quantity,
+		})
+		if err != nil {
+			log.WithError(err).Errorf("can not submit orders: %+v", createdOrders)
+		}
+
+		s.activeOrders.Add(createdOrders...)
+	}))
+}
+
 type Strategy struct {
 	Environment *bbgo.Environment
 	Symbol      string `json:"symbol"`
@@ -48,6 +111,8 @@ type Strategy struct {
 
 	// ResistanceShort is one of the entry method
 	ResistanceShort *ResistanceShort `json:"resistanceShort"`
+
+	SupportTakeProfit *SupportTakeProfit `json:"supportTakeProfit"`
 
 	ExitMethods bbgo.ExitMethodSet `json:"exits"`
 
@@ -73,6 +138,12 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 
 	if s.BreakLow != nil {
 		dynamic.InheritStructValues(s.BreakLow, s)
+		s.BreakLow.Subscribe(session)
+	}
+
+	if s.SupportTakeProfit != nil {
+		dynamic.InheritStructValues(s.SupportTakeProfit, s)
+		s.SupportTakeProfit.Subscribe(session)
 	}
 
 	if !bbgo.IsBackTesting {

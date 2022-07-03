@@ -38,6 +38,10 @@ type BreakLow struct {
 	session       *bbgo.ExchangeSession
 }
 
+func (s *BreakLow) Subscribe(session *bbgo.ExchangeSession) {
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
+}
+
 func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.GeneralOrderExecutor) {
 	s.session = session
 	s.orderExecutor = orderExecutor
@@ -102,7 +106,6 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 
 		// we need the price cross the break line or we do nothing
 		if !(openPrice.Compare(breakPrice) > 0 && closePrice.Compare(breakPrice) < 0) {
-			log.Infof("%s kline is not between the break low price %f", kline.Symbol, breakPrice.Float64())
 			return
 		}
 
