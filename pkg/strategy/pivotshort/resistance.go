@@ -112,7 +112,6 @@ func (s *ResistanceShort) findNextResistancePriceAndPlaceOrders(closePrice fixed
 	ctx := context.Background()
 	resistanceUpdated := s.updateNextResistancePrice(closePrice)
 	if resistanceUpdated {
-		// TODO: consider s.activeOrders.NumOfOrders() > 0
 		bbgo.Notify("Found next resistance price: %f, updating resistance order...", s.currentResistancePrice.Float64())
 		s.placeResistanceOrders(ctx, s.currentResistancePrice)
 	}
@@ -140,6 +139,7 @@ func (s *ResistanceShort) placeResistanceOrders(ctx context.Context, resistanceP
 
 	log.Infof("placing resistance orders: resistance price = %f, layer quantity = %f, num of layers = %d", resistancePrice.Float64(), quantity.Float64(), numLayers)
 
+	var sellPriceStart = resistancePrice.Mul(fixedpoint.One.Add(s.Ratio))
 	var orderForms []types.SubmitOrder
 	for i := 0; i < numLayers; i++ {
 		balances := s.session.GetAccount().Balances()
@@ -148,13 +148,11 @@ func (s *ResistanceShort) placeResistanceOrders(ctx context.Context, resistanceP
 		_ = quoteBalance
 		_ = baseBalance
 
-		// price = (resistance_price * (1.0 + ratio)) * ((1.0 + layerSpread) * i)
-		price := resistancePrice.Mul(fixedpoint.One.Add(s.Ratio))
 		spread := layerSpread.Mul(fixedpoint.NewFromInt(int64(i)))
-		price = price.Add(spread)
+		price := sellPriceStart.Mul(one.Add(spread))
 		log.Infof("price = %f", price.Float64())
 
-		log.Infof("placing bounce short order #%d: price = %f, quantity = %f", i, price.Float64(), quantity.Float64())
+		log.Infof("placing resistance short order #%d: price = %f, quantity = %f", i, price.Float64(), quantity.Float64())
 
 		orderForms = append(orderForms, types.SubmitOrder{
 			Symbol:           s.Symbol,
