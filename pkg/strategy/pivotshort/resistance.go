@@ -60,7 +60,6 @@ func (s *ResistanceShort) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
 		position := s.orderExecutor.Position()
 		if position.IsOpened(kline.Close) {
-			log.Infof("position is already opened, skip placing resistance orders")
 			return
 		}
 
@@ -182,10 +181,10 @@ func (s *ResistanceShort) placeResistanceOrders(ctx context.Context, resistanceP
 	s.activeOrders.Add(createdOrders...)
 }
 
-func findPossibleSupportPrices(closePrice float64, minDistance float64, lows []float64) []float64 {
-	return group(lower(lows, closePrice), minDistance)
+func findPossibleSupportPrices(closePrice float64, groupDistance float64, lows []float64) []float64 {
+	return group(lower(lows, closePrice), groupDistance)
 }
 
-func findPossibleResistancePrices(closePrice float64, minDistance float64, lows []float64) []float64 {
-	return group(higher(lows, closePrice), minDistance)
+func findPossibleResistancePrices(closePrice float64, groupDistance float64, lows []float64) []float64 {
+	return group(higher(lows, closePrice), groupDistance)
 }

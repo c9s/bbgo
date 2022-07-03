@@ -87,24 +87,19 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 		}
 
 		previousLow := s.pivotLowPrices[len(s.pivotLowPrices)-1]
-
-		// truncate the pivot low prices
-		if len(s.pivotLowPrices) > 10 {
-			s.pivotLowPrices = s.pivotLowPrices[len(s.pivotLowPrices)-10:]
-		}
-
 		ratio := fixedpoint.One.Add(s.Ratio)
 		breakPrice := previousLow.Mul(ratio)
 
 		openPrice := kline.Open
 		closePrice := kline.Close
 
-		// if previous low is not break, skip
+		// if the previous low is not break, or the kline is not strong enough to break it, skip
 		if closePrice.Compare(breakPrice) >= 0 {
 			return
 		}
 
-		// we need the price cross the break line or we do nothing
+		// we need the price cross the break line, or we do nothing:
+		// open > break price > close price
 		if !(openPrice.Compare(breakPrice) > 0 && closePrice.Compare(breakPrice) < 0) {
 			return
 		}
