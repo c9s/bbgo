@@ -48,7 +48,6 @@ func (s *SupportTakeProfit) Subscribe(session *bbgo.ExchangeSession) {
 
 func (s *SupportTakeProfit) updateSupportPrice(closePrice fixedpoint.Value) bool {
 	supportPrices := findPossibleSupportPrices(closePrice.Float64(), 0.05, s.pivot.Lows)
-
 	if len(supportPrices) == 0 {
 		return false
 	}
@@ -58,12 +57,14 @@ func (s *SupportTakeProfit) updateSupportPrice(closePrice fixedpoint.Value) bool
 	currentBuyPrice := s.currentSupportPrice.Mul(one.Add(s.Ratio))
 
 	if s.currentSupportPrice.IsZero() {
+		log.Infof("setup next support take profit price at %f", nextSupportPrice.Float64())
 		s.currentSupportPrice = nextSupportPrice
 		return true
 	}
 
 	// the close price is already lower than the support price, than we should update
 	if closePrice.Compare(currentBuyPrice) < 0 || nextSupportPrice.Compare(s.currentSupportPrice) > 0 {
+		log.Infof("setup next support take profit price at %f", nextSupportPrice.Float64())
 		s.currentSupportPrice = nextSupportPrice
 		return true
 	}
@@ -106,7 +107,9 @@ func (s *SupportTakeProfit) Bind(session *bbgo.ExchangeSession, orderExecutor *b
 			Type:     types.OrderTypeLimitMaker,
 			Price:    buyPrice,
 			Quantity: quantity,
+			Tag:      "supportTakeProfit",
 		})
+
 		if err != nil {
 			log.WithError(err).Errorf("can not submit orders: %+v", createdOrders)
 		}
@@ -238,6 +241,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	if s.BreakLow != nil {
 		s.BreakLow.Bind(session, s.orderExecutor)
+	}
+
+	for _, m := range s.SupportTakeProfit {
+		m.Bind(session, s.orderExecutor)
 	}
 
 	bbgo.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
