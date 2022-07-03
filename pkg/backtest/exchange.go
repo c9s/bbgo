@@ -50,10 +50,10 @@ var log = logrus.WithField("cmd", "backtest")
 var ErrUnimplemented = errors.New("unimplemented method")
 
 type Exchange struct {
-	sourceName         types.ExchangeName
-	publicExchange     types.Exchange
-	srv                *service.BacktestService
-	startTime, endTime time.Time
+	sourceName     types.ExchangeName
+	publicExchange types.Exchange
+	srv            *service.BacktestService
+	startTime      time.Time
 
 	account *types.Account
 	config  *bbgo.Backtest
@@ -80,14 +80,7 @@ func NewExchange(sourceName types.ExchangeName, sourceExchange types.Exchange, s
 		return nil, err
 	}
 
-	var startTime, endTime time.Time
-	startTime = config.StartTime.Time()
-	if config.EndTime != nil {
-		endTime = config.EndTime.Time()
-	} else {
-		endTime = time.Now()
-	}
-
+	startTime := config.StartTime.Time()
 	configAccount := config.GetAccount(sourceName.String())
 
 	account := &types.Account{
@@ -107,7 +100,6 @@ func NewExchange(sourceName types.ExchangeName, sourceExchange types.Exchange, s
 		config:         config,
 		account:        account,
 		startTime:      startTime,
-		endTime:        endTime,
 		closedOrders:   make(map[string][]types.Order),
 		trades:         make(map[string][]types.Trade),
 	}
@@ -322,7 +314,7 @@ func (e *Exchange) BindUserData(userDataStream types.StandardStreamEmitter) {
 	e.matchingBooksMutex.Unlock()
 }
 
-func (e *Exchange) SubscribeMarketData(extraIntervals ...types.Interval) (chan types.KLine, error) {
+func (e *Exchange) SubscribeMarketData(startTime, endTime time.Time, extraIntervals ...types.Interval) (chan types.KLine, error) {
 	log.Infof("collecting backtest configurations...")
 
 	loadedSymbols := map[string]struct{}{}
@@ -361,7 +353,7 @@ func (e *Exchange) SubscribeMarketData(extraIntervals ...types.Interval) (chan t
 
 	log.Infof("using symbols: %v and intervals: %v for back-testing", symbols, intervals)
 	log.Infof("querying klines from database...")
-	klineC, errC := e.srv.QueryKLinesCh(e.startTime, e.endTime, e, symbols, intervals)
+	klineC, errC := e.srv.QueryKLinesCh(startTime, endTime, e, symbols, intervals)
 	go func() {
 		if err := <-errC; err != nil {
 			log.WithError(err).Error("backtest data feed error")
