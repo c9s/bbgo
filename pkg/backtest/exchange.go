@@ -72,20 +72,6 @@ type Exchange struct {
 	markets types.MarketMap
 }
 
-func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.Order, error) {
-	book := e.matchingBooks[q.Symbol]
-	oid, err := strconv.ParseUint(q.OrderID, 10, 64)
-	if err != nil {
-		return nil, err
-	}
-
-	order, ok := book.getOrder(oid)
-	if ok {
-		return &order, nil
-	}
-	return nil, nil
-}
-
 func NewExchange(sourceName types.ExchangeName, sourceExchange types.Exchange, srv *service.BacktestService, config *bbgo.Backtest) (*Exchange, error) {
 	ex := sourceExchange
 
@@ -170,6 +156,20 @@ func (e *Exchange) NewStream() types.Stream {
 	return &types.BacktestStream{
 		StandardStreamEmitter: &types.StandardStream{},
 	}
+}
+
+func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.Order, error) {
+	book := e.matchingBooks[q.Symbol]
+	oid, err := strconv.ParseUint(q.OrderID, 10, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	order, ok := book.getOrder(oid)
+	if ok {
+		return &order, nil
+	}
+	return nil, nil
 }
 
 func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error) {
