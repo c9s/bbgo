@@ -268,9 +268,10 @@ var BacktestCmd = &cobra.Command{
 		}
 
 		for _, session := range environ.Sessions() {
+			userDataStream := session.UserDataStream.(types.StandardStreamEmitter)
 			backtestEx := session.Exchange.(*backtest.Exchange)
-			backtestEx.UserDataStream = session.UserDataStream.(types.StandardStreamEmitter)
 			backtestEx.MarketDataStream = session.MarketDataStream.(types.StandardStreamEmitter)
+			backtestEx.BindUserData(userDataStream)
 		}
 
 		trader := bbgo.NewTrader(environ)
@@ -649,7 +650,6 @@ func confirmation(s string) bool {
 func toExchangeSources(sessions map[string]*bbgo.ExchangeSession, extraIntervals ...types.Interval) (exchangeSources []backtest.ExchangeDataSource, err error) {
 	for _, session := range sessions {
 		backtestEx := session.Exchange.(*backtest.Exchange)
-		backtestEx.InitMarketData()
 
 		c, err := backtestEx.SubscribeMarketData(extraIntervals...)
 		if err != nil {
