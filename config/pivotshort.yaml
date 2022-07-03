@@ -47,22 +47,22 @@ exchangeStrategies:
 
     resistanceShort:
       enabled: true
-      interval: 1h
-      window: 8
+      interval: 5m
+      window: 80
 
       quantity: 10.0
 
       # minDistance is used to ignore the place that is too near to the current price
-      minDistance: 3%
+      minDistance: 5%
       groupDistance: 1%
 
       # ratio is the ratio of the resistance price,
-      # higher the ratio, lower the price
-      # first_layer_price = resistance_price * (1 - ratio)
-      # second_layer_price = (resistance_price * (1 - ratio)) * (2 * layerSpread)
-      ratio: 0%
-      numOfLayers: 1
-      layerSpread: 0.1%
+      # higher the ratio, higher the sell price
+      # first_layer_price = resistance_price * (1 + ratio)
+      # second_layer_price = (resistance_price * (1 + ratio)) * (2 * layerSpread)
+      ratio: 1.2%
+      numOfLayers: 3
+      layerSpread: 0.4%
 
     exits:
     # (0) roiStopLoss is the stop loss percentage of the position ROI (currently the price change)
