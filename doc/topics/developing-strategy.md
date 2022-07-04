@@ -341,8 +341,13 @@ session.UserDataStream.OnOrderUpdate(func(order types.Order) {
 })
 ```
 
-However, order update only contains the status of the order, if you need to get the details of the trade execution,
-you need the trade update event:
+However, order update only contains status, price, quantity of the order, if you're submitting market order, you won't know
+the actual price of the order execution.
+
+One order can be filled by different size trades from the market, by collecting the trades, you can calculate the
+average price of the order execution and the total trading fee that you used for the order.
+
+If you need to get the details of the trade execution. you need the trade update event:
 
 ```go
 session.UserDataStream.OnTrade(func(trade types.Trade) {
@@ -386,6 +391,17 @@ activeBook.Add(createdOrders...)
 
 ## Notification
 
+You can use the notification API to send notification to Telegram or Slack:
+
+```go
+bbgo.Notify(message)
+bbgo.Notify(message, objs...)
+bbgo.Notify(format, arg1, arg2, arg3, objs...)
+bbgo.Notify(object, object2, object3)
+```
+
+Note that, if you're using the third format, simple arguments (float, bool, string... etc) will be used for calling the
+fmt.Sprintf, and the extra arguments will be rendered as attachments.
 
 ## Handling Trades and Profit
 
