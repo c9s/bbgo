@@ -257,9 +257,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 In the above example, we register our event callback to the market data stream of the current exchange session, The
 market data stream object here is a session-wide market data stream, so it's shared with other strategies that are also
-using the same exchange session, you might receive kline with different symbol or interval.
+using the same exchange session, so you might receive kline with different symbol or interval.
 
-so it's better to add a condition to filter the kline events:
+It's better to add a condition to filter the kline events:
 
 ```go
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
