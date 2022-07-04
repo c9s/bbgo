@@ -73,11 +73,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 }
 ```
 
-This is the most simple strategy with only ~30 lines code, it subscribes to the kline channel with the given symbol from the config,
-And when the kline is closed, it prints the kline to the console.
+This is the most simple strategy with only ~30 lines code, it subscribes to the kline channel with the given symbol from
+the config, And when the kline is closed, it prints the kline to the console.
 
-Note that, when Run() is executed, the user data stream is not connected to the exchange yet, but the history market data is already loaded,
-so if you need to submit an order on start, be sure to write your order submit code inside the event closures like `OnKLineClosed` or `OnStart`.
+Note that, when Run() is executed, the user data stream is not connected to the exchange yet, but the history market
+data is already loaded, so if you need to submit an order on start, be sure to write your order submit code inside the
+event closures like `OnKLineClosed` or `OnStart`.
 
 Now you can prepare your config file, create a file called `bbgo.yaml` with the following content:
 
@@ -130,8 +131,8 @@ func (s *Strategy) Run(ctx context.Context, session *bbgo.ExchangeSession) error
 }
 ```
 
-Now you have the Go struct and the Go package, but BBGO does not know your strategy,
-so you need to register your strategy.
+Now you have the Go struct and the Go package, but BBGO does not know your strategy, so you need to register your
+strategy.
 
 Define an ID const in your package:
 
@@ -149,7 +150,66 @@ func init() {
 
 Note that you don't need to fill the fields in the struct, BBGO just need to know the type of struct.
 
-(BBGO use reflect to parse the fields from the given struct and allocate a new struct object from the given struct type internally)
+(BBGO use reflect to parse the fields from the given struct and allocate a new struct object from the given struct type
+internally)
+
+## Exchange Session
+
+The `*bbgo.ExchangeSession` represents a connectivity to a crypto exchange, it's also a hub that connects to everything
+you need, for example, standard indicators, account information, balance information, market data stream, user data
+stream, exchange APIs, and so on.
+
+By default, BBGO checks the environment variables that you defined to detect which exchange session to be created.
+
+For example, environment variables like `BINANCE_API_KEY`, `BINANCE_API_SECRET` will be transformed into an exchange
+session that connects to Binance.
+
+You can not only connect to multiple different crypt exchanges, but also create multiple sessions to the same crypto
+exchange with few different options.
+
+To do that, add the following section to your `bbgo.yaml` config file:
+
+```yaml
+---
+sessions:
+  binance:
+    exchange: binance
+    envVarPrefix: binance
+  binance_cross_margin:
+    exchange: binance
+    envVarPrefix: binance
+    margin: true
+  binance_margin_ethusdt:
+    exchange: binance
+    envVarPrefix: binance
+    margin: true
+    isolatedMargin: true
+    isolatedMarginSymbol: ETHUSDT
+  okex1:
+    exchange: okex
+    envVarPrefix: okex
+  okex2:
+    exchange: okex
+    envVarPrefix: okex
+```
+
+You can specify which exchange session you want to mount for each strategy in the config file, it's quiet simple:
+
+```yaml
+exchangeStrategies:
+  
+- on: binance_margin_ethusdt
+  short:
+    symbol: ETHUSDT
+
+- on: binance_margin
+  foo:
+    symbol: ETHUSDT
+
+- on: binance
+  bar:
+    symbol: ETHUSDT
+```
 
 ## Market Data Stream and User Data Stream
 
@@ -157,11 +217,13 @@ When BBGO connects to the exchange, it allocates two stream objects for differen
 
 They are:
 
-- MarketDataStream receives market data from the exchange, for example, KLine data (candlestick, or bars), market public trades.
-- UserDataStream receives your personal trading data, for example, orders, executed trades, balance updates and other private information.
+- MarketDataStream receives market data from the exchange, for example, KLine data (candlestick, or bars), market public
+  trades.
+- UserDataStream receives your personal trading data, for example, orders, executed trades, balance updates and other
+  private information.
 
-To add your market data subscription to the `MarketDataStream`, you can register your subscription in the `Subscribe` of the strategy code,
-for example:
+To add your market data subscription to the `MarketDataStream`, you can register your subscription in the `Subscribe` of
+the strategy code, for example:
 
 ```
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
@@ -169,13 +231,14 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 }
 ```
 
-Since the back-test engine is a kline-based engine, to subscribe market trades, you need to check if you're in the back-test environment:
+Since the back-test engine is a kline-based engine, to subscribe market trades, you need to check if you're in the
+back-test environment:
 
 ```
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
     if !bbgo.IsBackTesting {
-		session.Subscribe(types.MarketTradeChannel, s.Symbol, types.SubscribeOptions{})
-	}
+        session.Subscribe(types.MarketTradeChannel, s.Symbol, types.SubscribeOptions{})
+    }
 }
 ```
 
