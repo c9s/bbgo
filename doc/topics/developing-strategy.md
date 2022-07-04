@@ -36,7 +36,7 @@ mkdir -p pkg/strategy/short
 
 Open a new file at `pkg/strategy/short/strategy.go` and paste the simplest strategy code:
 
-```
+```go
 package short
 
 import (
@@ -112,7 +112,7 @@ externalStrategies:
 
 You can write the following struct to load the symbol setting:
 
-```
+```go
 package short
 
 type Strategy struct {
@@ -123,7 +123,7 @@ type Strategy struct {
 
 To use the Symbol setting, you can get the value from the Run method of the strategy:
 
-```
+```go
 func (s *Strategy) Run(ctx context.Context, session *bbgo.ExchangeSession) error {
     // you need to import the "log" package
     log.Println("%s", s.Symbol)
@@ -136,13 +136,13 @@ strategy.
 
 Define an ID const in your package:
 
-```
+```go
 const ID = "short"
 ```
 
 Then call bbgo.RegisterStrategy with the ID you just defined and a struct reference:
 
-```
+```go
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
@@ -225,7 +225,7 @@ They are:
 To add your market data subscription to the `MarketDataStream`, you can register your subscription in the `Subscribe` of
 the strategy code, for example:
 
-```
+```go
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
 }
@@ -234,7 +234,7 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 Since the back-test engine is a kline-based engine, to subscribe market trades, you need to check if you're in the
 back-test environment:
 
-```
+```go
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
     if !bbgo.IsBackTesting {
         session.Subscribe(types.MarketTradeChannel, s.Symbol, types.SubscribeOptions{})
@@ -244,7 +244,7 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 
 To receive the market data from the market data stream, you need to register the event callback:
 
-```
+```go
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 	    // handle closed kline event here
@@ -261,7 +261,7 @@ using the same exchange session, you might receive kline with different symbol o
 
 so it's better to add a condition to filter the kline events:
 
-```
+```go
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
         if kline.Symbol != s.Symbol || kline.Interval != s.Interval {
@@ -275,7 +275,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 You can also use the KLineWith method to wrap your kline closure with the filter condition:
 
-```
+```go
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	session.MarketDataStream.OnKLineClosed(types.KLineWith("BTCUSDT", types.Interval1m, func(kline types.KLine) {
 	    // handle your kline here
