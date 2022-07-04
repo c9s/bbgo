@@ -403,6 +403,14 @@ bbgo.Notify(object, object2, object3)
 Note that, if you're using the third format, simple arguments (float, bool, string... etc) will be used for calling the
 fmt.Sprintf, and the extra arguments will be rendered as attachments.
 
+For example:
+
+```go
+bbgo.Notify("%s found support price: %f", "BTCUSDT", 19000.0, kline)
+```
+
+The above call will render the first format string with the given float number 19000, and then attach the kline object as the attachment.
+
 ## Handling Trades and Profit
 
 ## Persistence
