@@ -284,8 +284,57 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 Note that, when the Run() method is executed, the user data stream and market data stream are not connected yet.
 
+## Submitting Orders
+
+To place an order, you can call `SubmitOrders` exchange API:
+
+```go
+createdOrders, err := session.Exchange.SubmitOrders(ctx, types.SubmitOrder{
+    Symbol:   "BTCUSDT",
+    Type:     types.OrderTypeLimit,
+    Price:    fixedpoint.NewFromFloat(18000.0),
+    Quantity: fixedpoint.NewFromFloat(1.0),
+})
+if err != nil {
+    log.WithError(err).Errorf("can not submit orders")
+}
+
+log.Infof("createdOrders: %+v", createdOrders)
+```
+
+There are some pre-defined order types you can use:
+
+- `types.OrderTypeLimit`
+- `types.OrderTypeMarket`
+- `types.OrderTypeStopMarket`
+- `types.OrderTypeStopLimit`
+- `types.OrderTypeLimitMaker` - forces the order to be a maker.
+
+Although it's crypto market, the above order types are actually derived from the stock market:
+
+A limit order is an order to buy or sell a stock with a restriction on the maximum price to be paid or the minimum price
+to be received (the "limit price"). If the order is filled, it will only be at the specified limit price or better.
+However, there is no assurance of execution. A limit order may be appropriate when you think you can buy at a price
+lower than--or sell at a price higher than -- the current quote.
+
+A market order is an order to buy or sell a stock at the market's current best available price. A market order typically
+ensures an execution, but it does not guarantee a specified price. Market orders are optimal when the primary goal is to
+execute the trade immediately. A market order is generally appropriate when you think a stock is priced right, when you
+are sure you want a fill on your order, or when you want an immediate execution.
+
+A stop order is an order to buy or sell a stock at the market price once the stock has traded at or through a specified
+price (the "stop price"). If the stock reaches the stop price, the order becomes a market order and is filled at the
+next available market price.
+
+## UserDataStream
 
 
+
+
+
+## Handling Trades and Profit
+
+## Persistence
 
 
 
