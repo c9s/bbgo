@@ -267,6 +267,13 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
+		for _, session := range environ.Sessions() {
+			userDataStream := session.UserDataStream.(types.StandardStreamEmitter)
+			backtestEx := session.Exchange.(*backtest.Exchange)
+			backtestEx.MarketDataStream = session.MarketDataStream.(types.StandardStreamEmitter)
+			backtestEx.BindUserData(userDataStream)
+		}
+
 		trader := bbgo.NewTrader(environ)
 		if verboseCnt == 0 {
 			trader.DisableLogging()
@@ -281,7 +288,7 @@ var BacktestCmd = &cobra.Command{
 		}
 
 		backTestIntervals := []types.Interval{types.Interval1h, types.Interval1d}
-		exchangeSources, err := toExchangeSources(environ.Sessions(), backTestIntervals...)
+		exchangeSources, err := toExchangeSources(environ.Sessions(), startTime, endTime, backTestIntervals...)
 		if err != nil {
 			return err
 		}
@@ -640,14 +647,11 @@ func confirmation(s string) bool {
 	}
 }
 
-func toExchangeSources(sessions map[string]*bbgo.ExchangeSession, extraIntervals ...types.Interval) (exchangeSources []backtest.ExchangeDataSource, err error) {
+func toExchangeSources(sessions map[string]*bbgo.ExchangeSession, startTime, endTime time.Time, extraIntervals ...types.Interval) (exchangeSources []backtest.ExchangeDataSource, err error) {
 	for _, session := range sessions {
-		exchange := session.Exchange.(*backtest.Exchange)
-		exchange.UserDataStream = session.UserDataStream.(types.StandardStreamEmitter)
-		exchange.MarketDataStream = session.MarketDataStream.(types.StandardStreamEmitter)
-		exchange.InitMarketData()
+		backtestEx := session.Exchange.(*backtest.Exchange)
 
-		c, err := exchange.SubscribeMarketData(extraIntervals...)
+		c, err := backtestEx.SubscribeMarketData(startTime, endTime, extraIntervals...)
 		if err != nil {
 			return exchangeSources, err
 		}
@@ -655,7 +659,7 @@ func toExchangeSources(sessions map[string]*bbgo.ExchangeSession, extraIntervals
 		sessionCopy := session
 		exchangeSources = append(exchangeSources, backtest.ExchangeDataSource{
 			C:        c,
-			Exchange: exchange,
+			Exchange: backtestEx,
 			Session:  sessionCopy,
 		})
 	}

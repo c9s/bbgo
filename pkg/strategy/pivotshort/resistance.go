@@ -2,7 +2,6 @@ package pivotshort
 
 import (
 	"context"
-	"sort"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -61,7 +60,6 @@ func (s *ResistanceShort) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
 		position := s.orderExecutor.Position()
 		if position.IsOpened(kline.Close) {
-			log.Infof("position is already opened, skip placing resistance orders")
 			return
 		}
 
@@ -98,6 +96,9 @@ func (s *ResistanceShort) updateNextResistancePrice(closePrice fixedpoint.Value)
 		return true
 	}
 
+	// if the current sell price is out-dated
+	// or
+	// the next resistance is lower than the current one.
 	currentSellPrice := s.currentResistancePrice.Mul(one.Add(s.Ratio))
 	if closePrice.Compare(currentSellPrice) > 0 ||
 		nextResistancePrice.Compare(currentSellPrice) < 0 {
@@ -180,73 +181,10 @@ func (s *ResistanceShort) placeResistanceOrders(ctx context.Context, resistanceP
 	s.activeOrders.Add(createdOrders...)
 }
 
-func findPossibleSupportPrices(closePrice float64, minDistance float64, lows []float64) []float64 {
-	return group(lower(lows, closePrice), minDistance)
+func findPossibleSupportPrices(closePrice float64, groupDistance float64, lows []float64) []float64 {
+	return group(lower(lows, closePrice), groupDistance)
 }
 
-func lower(arr []float64, x float64) []float64 {
-	sort.Float64s(arr)
-
-	var rst []float64
-	for _, a := range arr {
-		// filter prices that are lower than the current closed price
-		if a > x {
-			continue
-		}
-
-		rst = append(rst, a)
-	}
-
-	return rst
-}
-
-func higher(arr []float64, x float64) []float64 {
-	sort.Float64s(arr)
-
-	var rst []float64
-	for _, a := range arr {
-		// filter prices that are lower than the current closed price
-		if a < x {
-			continue
-		}
-		rst = append(rst, a)
-	}
-
-	return rst
-}
-
-func group(arr []float64, minDistance float64) []float64 {
-	if len(arr) == 0 {
-		return nil
-	}
-
-	var groups []float64
-	var grp = []float64{arr[0]}
-	for _, price := range arr {
-		avg := average(grp)
-		if (price / avg) > (1.0 + minDistance) {
-			groups = append(groups, avg)
-			grp = []float64{price}
-		} else {
-			grp = append(grp, price)
-		}
-	}
-
-	if len(grp) > 0 {
-		groups = append(groups, average(grp))
-	}
-
-	return groups
-}
-
-func findPossibleResistancePrices(closePrice float64, minDistance float64, lows []float64) []float64 {
-	return group(higher(lows, closePrice), minDistance)
-}
-
-func average(arr []float64) float64 {
-	s := 0.0
-	for _, a := range arr {
-		s += a
-	}
-	return s / float64(len(arr))
+func findPossibleResistancePrices(closePrice float64, groupDistance float64, lows []float64) []float64 {
+	return group(higher(lows, closePrice), groupDistance)
 }
