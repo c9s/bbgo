@@ -10,11 +10,11 @@ For built-in strategies, they are placed in `pkg/strategy` of the BBGO source re
 For external strategies, you can create a private repository as an isolated go package and place your strategy inside
 it.
 
-In general, strategies are Go struct, placed in Go package.
+In general, strategies are Go struct, defined in the Go package.
 
 ## Quick Start
 
-To add your first strategy, the fastest way is to add the built-in strategy.
+To add your first strategy, the fastest way is to add it as a built-in strategy.
 
 Simply edit `pkg/cmd/builtin.go` and import your strategy package there.
 
