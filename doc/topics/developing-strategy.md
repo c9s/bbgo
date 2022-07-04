@@ -263,13 +263,12 @@ so it's better to add a condition to filter the kline events:
 
 ```go
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
+    session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
         if kline.Symbol != s.Symbol || kline.Interval != s.Interval {
-            return
+			return
         }
-        
-        // handle your kline here
-	})
+		// handle your kline here
+    })
 }
 ```
 
