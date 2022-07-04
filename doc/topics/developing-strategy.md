@@ -328,8 +328,63 @@ next available market price.
 
 ## UserDataStream
 
+When you submit an order to the exchange, you might want to know when the order is filled or not, user data stream is 
+the real time notification let you receive the order update event.
 
+To get the order update from the user data stream:
 
+```go
+session.UserDataStream.OnOrderUpdate(func(order types.Order) {
+	if order.Status == types.OrderStatusFilled {
+		log.Infof("your order is filled: %+v", order)
+    }
+})
+```
+
+However, order update only contains the status of the order, if you need to get the details of the trade execution,
+you need the trade update event:
+
+```go
+session.UserDataStream.OnTrade(func(trade types.Trade) {
+    log.Infof("trade price %f, fee %f %s", trade.Price.Float64(), trade.Fee.Float64(), trade.FeeCurrency)
+})
+```
+
+To monitor your balance change, you can use the balance update event callback:
+
+```go
+session.UserDataStream.OnBalanceUpdate(func(balances types.BalanceMap) {
+    log.Infof("balance update: %+v", balances)
+})
+```
+
+Note that, as we mentioned above, the user data stream is a session-wide stream, that means you might receive the order update event for other strategies.
+
+To prevent that, you need to manage your active order for your strategy:
+
+```go
+activeBook := bbgo.NewActiveOrderBook("BTCUSDT")
+activeBook.Bind(session.UserDataStream)
+```
+
+Then, when you create some orders, you can register your order to the active order book, so that it can manage the order
+update:
+
+```go
+createdOrders, err := session.Exchange.SubmitOrders(ctx, types.SubmitOrder{
+    Symbol:   "BTCUSDT",
+    Type:     types.OrderTypeLimit,
+    Price:    fixedpoint.NewFromFloat(18000.0),
+    Quantity: fixedpoint.NewFromFloat(1.0),
+})
+if err != nil {
+    log.WithError(err).Errorf("can not submit orders")
+}
+
+activeBook.Add(createdOrders...)
+```
+
+## Notification
 
 
 ## Handling Trades and Profit
