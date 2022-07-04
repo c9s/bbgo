@@ -50,15 +50,15 @@ var log = logrus.WithField("cmd", "backtest")
 var ErrUnimplemented = errors.New("unimplemented method")
 
 type Exchange struct {
-	sourceName         types.ExchangeName
-	publicExchange     types.Exchange
-	srv                *service.BacktestService
-	startTime, endTime time.Time
+	sourceName     types.ExchangeName
+	publicExchange types.Exchange
+	srv            *service.BacktestService
+	currentTime    time.Time
 
 	account *types.Account
 	config  *bbgo.Backtest
 
-	UserDataStream, MarketDataStream types.StandardStreamEmitter
+	MarketDataStream types.StandardStreamEmitter
 
 	trades      map[string][]types.Trade
 	tradesMutex sync.Mutex
@@ -72,20 +72,6 @@ type Exchange struct {
 	markets types.MarketMap
 }
 
-func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.Order, error) {
-	book := e.matchingBooks[q.Symbol]
-	oid, err := strconv.ParseUint(q.OrderID, 10, 64)
-	if err != nil {
-		return nil, err
-	}
-
-	order, ok := book.getOrder(oid)
-	if ok {
-		return &order, nil
-	}
-	return nil, nil
-}
-
 func NewExchange(sourceName types.ExchangeName, sourceExchange types.Exchange, srv *service.BacktestService, config *bbgo.Backtest) (*Exchange, error) {
 	ex := sourceExchange
 
@@ -94,14 +80,7 @@ func NewExchange(sourceName types.ExchangeName, sourceExchange types.Exchange, s
 		return nil, err
 	}
 
-	var startTime, endTime time.Time
-	startTime = config.StartTime.Time()
-	if config.EndTime != nil {
-		endTime = config.EndTime.Time()
-	} else {
-		endTime = time.Now()
-	}
-
+	startTime := config.StartTime.Time()
 	configAccount := config.GetAccount(sourceName.String())
 
 	account := &types.Account{
@@ -120,8 +99,7 @@ func NewExchange(sourceName types.ExchangeName, sourceExchange types.Exchange, s
 		srv:            srv,
 		config:         config,
 		account:        account,
-		startTime:      startTime,
-		endTime:        endTime,
+		currentTime:    startTime,
 		closedOrders:   make(map[string][]types.Order),
 		trades:         make(map[string][]types.Trade),
 	}
@@ -159,7 +137,7 @@ func (e *Exchange) addMatchingBook(symbol string, market types.Market) {
 
 func (e *Exchange) _addMatchingBook(symbol string, market types.Market) {
 	e.matchingBooks[symbol] = &SimplePriceMatching{
-		CurrentTime:  e.startTime,
+		CurrentTime:  e.currentTime,
 		Account:      e.account,
 		Market:       market,
 		closedOrders: make(map[uint64]types.Order),
@@ -172,10 +150,21 @@ func (e *Exchange) NewStream() types.Stream {
 	}
 }
 
-func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error) {
-	if e.UserDataStream == nil {
-		return createdOrders, fmt.Errorf("SubmitOrders should be called after UserDataStream been initialized")
+func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.Order, error) {
+	book := e.matchingBooks[q.Symbol]
+	oid, err := strconv.ParseUint(q.OrderID, 10, 64)
+	if err != nil {
+		return nil, err
 	}
+
+	order, ok := book.getOrder(oid)
+	if ok {
+		return &order, nil
+	}
+	return nil, nil
+}
+
+func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error) {
 	for _, order := range orders {
 		symbol := order.Symbol
 		matching, ok := e.matchingBook(symbol)
@@ -196,8 +185,6 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 			case types.OrderStatusFilled, types.OrderStatusCanceled, types.OrderStatusRejected:
 				e.addClosedOrder(*createdOrder)
 			}
-
-			e.UserDataStream.EmitOrderUpdate(*createdOrder)
 		}
 	}
 
@@ -223,20 +210,15 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 }
 
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) error {
-	if e.UserDataStream == nil {
-		return fmt.Errorf("CancelOrders should be called after UserDataStream been initialized")
-	}
 	for _, order := range orders {
 		matching, ok := e.matchingBook(order.Symbol)
 		if !ok {
 			return fmt.Errorf("matching engine is not initialized for symbol %s", order.Symbol)
 		}
-		canceledOrder, err := matching.CancelOrder(order)
+		_, err := matching.CancelOrder(order)
 		if err != nil {
 			return err
 		}
-
-		e.UserDataStream.EmitOrderUpdate(canceledOrder)
 	}
 
 	return nil
@@ -318,21 +300,21 @@ func (e *Exchange) matchingBook(symbol string) (*SimplePriceMatching, bool) {
 	return m, ok
 }
 
-func (e *Exchange) InitMarketData() {
-	e.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
+func (e *Exchange) BindUserData(userDataStream types.StandardStreamEmitter) {
+	userDataStream.OnTradeUpdate(func(trade types.Trade) {
 		e.addTrade(trade)
 	})
 
 	e.matchingBooksMutex.Lock()
 	for _, matching := range e.matchingBooks {
-		matching.OnTradeUpdate(e.UserDataStream.EmitTradeUpdate)
-		matching.OnOrderUpdate(e.UserDataStream.EmitOrderUpdate)
-		matching.OnBalanceUpdate(e.UserDataStream.EmitBalanceUpdate)
+		matching.OnTradeUpdate(userDataStream.EmitTradeUpdate)
+		matching.OnOrderUpdate(userDataStream.EmitOrderUpdate)
+		matching.OnBalanceUpdate(userDataStream.EmitBalanceUpdate)
 	}
 	e.matchingBooksMutex.Unlock()
 }
 
-func (e *Exchange) SubscribeMarketData(extraIntervals ...types.Interval) (chan types.KLine, error) {
+func (e *Exchange) SubscribeMarketData(startTime, endTime time.Time, extraIntervals ...types.Interval) (chan types.KLine, error) {
 	log.Infof("collecting backtest configurations...")
 
 	loadedSymbols := map[string]struct{}{}
@@ -371,7 +353,7 @@ func (e *Exchange) SubscribeMarketData(extraIntervals ...types.Interval) (chan t
 
 	log.Infof("using symbols: %v and intervals: %v for back-testing", symbols, intervals)
 	log.Infof("querying klines from database...")
-	klineC, errC := e.srv.QueryKLinesCh(e.startTime, e.endTime, e, symbols, intervals)
+	klineC, errC := e.srv.QueryKLinesCh(startTime, endTime, e, symbols, intervals)
 	go func() {
 		if err := <-errC; err != nil {
 			log.WithError(err).Error("backtest data feed error")
@@ -382,6 +364,8 @@ func (e *Exchange) SubscribeMarketData(extraIntervals ...types.Interval) (chan t
 
 func (e *Exchange) ConsumeKLine(k types.KLine) {
 	if k.Interval == types.Interval1m {
+		e.currentTime = k.EndTime.Time()
+
 		matching, ok := e.matchingBook(k.Symbol)
 		if !ok {
 			log.Errorf("matching book of %s is not initialized", k.Symbol)
