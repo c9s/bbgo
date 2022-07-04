@@ -24,26 +24,25 @@ func init() {
 }
 
 type Strategy struct {
-
 	Symbol string `json:"symbol"`
 
 	bbgo.StrategyController
 	types.Market
 	types.IntervalWindow
 
-	*bbgo.Graceful
 	*bbgo.Environment
 	*types.Position
 	*types.ProfitStats
 	*types.TradeStats
 
-	drift types.UpdatableSeriesExtend
-	atr *indicator.ATR
+	drift    types.UpdatableSeriesExtend
+	atr      *indicator.ATR
 	midPrice fixedpoint.Value
-	lock sync.RWMutex
+	lock     sync.RWMutex
 
 	Session *bbgo.ExchangeSession
 	*bbgo.GeneralOrderExecutor
+	*bbgo.ActiveOrderBook
 }
 
 func (s *Strategy) ID() string {
@@ -93,6 +92,35 @@ func (s *Strategy) GetLastPrice() (lastPrice fixedpoint.Value) {
 	return lastPrice
 }
 
+var Delta fixedpoint.Value = fixedpoint.NewFromFloat(0.01)
+
+func (s *Strategy) ClosePosition(ctx context.Context) (*types.Order, bool) {
+	order := s.Position.NewMarketCloseOrder(fixedpoint.One)
+	order.TimeInForce = ""
+	balances := s.Session.GetAccount().Balances()
+	baseBalance := balances[s.Market.BaseCurrency].Available
+	price := s.GetLastPrice()
+	if order.Side == types.SideTypeBuy {
+		quoteAmount := balances[s.Market.QuoteCurrency].Available.Div(price)
+		if order.Quantity.Compare(quoteAmount) > 0 {
+			order.Quantity = quoteAmount
+		}
+	} else if order.Side == types.SideTypeSell && order.Quantity.Compare(baseBalance) > 0 {
+		order.Quantity = baseBalance
+	}
+	for {
+		if s.Market.IsDustQuantity(order.Quantity, price) {
+			return nil, true
+		}
+		createdOrders, err := s.GeneralOrderExecutor.SubmitOrders(ctx, *order)
+		if err != nil {
+			order.Quantity = order.Quantity.Mul(fixedpoint.One.Sub(Delta))
+			continue
+		}
+		return &createdOrders[0], true
+	}
+}
+
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	instanceID := s.InstanceID()
 	if s.Position == nil {
@@ -115,7 +143,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.OnEmergencyStop(func() {
 		_ = s.GeneralOrderExecutor.GracefulCancel(ctx)
-		_ = s.GeneralOrderExecutor.ClosePosition(ctx, fixedpoint.One)
+		_, _ = s.ClosePosition(ctx)
 	})
 
 	s.Session = session
@@ -127,10 +155,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		bbgo.Sync(s)
 	})
 	s.GeneralOrderExecutor.Bind()
+	s.ActiveOrderBook = bbgo.NewActiveOrderBook(s.Symbol)
+	s.ActiveOrderBook.BindStream(session.UserDataStream)
 
 	store, _ := session.MarketDataStore(s.Symbol)
 
-	s.drift = &indicator.Drift{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: 3}}
+	s.drift = &indicator.Drift{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: 5}}
 	s.atr = &indicator.ATR{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: 34}}
 	s.atr.Bind(store)
 
@@ -172,58 +202,74 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 		hlc3 := kline.High.Add(kline.Low).Add(kline.Close).Div(Three)
 		s.drift.Update(hlc3.Float64())
-		baseBalance, ok := s.Session.GetAccount().Balance(s.Market.BaseCurrency)
-		if !ok {
-			log.Errorf("unable to get baseBalance")
-			return
-		}
-		quoteBalance, ok := s.Session.GetAccount().Balance(s.Market.QuoteCurrency)
-		if !ok {
-			log.Errorf("unable to get quoteCurrency")
-			return
-		}
 		price := s.GetLastPrice()
-		if s.Position.IsClosed() || s.Position.IsDust(price) {
-			/*if s.drift.PercentageChange(2).Abs().Last() <= 0.5 {
+		if s.drift.Last() < 0 && s.drift.Index(1) >= 0 {
+			if s.ActiveOrderBook.NumOfOrders() > 0 {
+				if err := s.GeneralOrderExecutor.GracefulCancelActiveOrderBook(ctx, s.ActiveOrderBook); err != nil {
+					log.WithError(err).Errorf("cannot cancel orders")
+					return
+				}
+			}
+			baseBalance, ok := s.Session.GetAccount().Balance(s.Market.BaseCurrency)
+			if !ok {
+				log.Errorf("unable to get baseBalance")
 				return
-			}*/
-			if s.drift.Last() <= 0 && s.drift.Index(1) > 0 {
-				_, err := s.GeneralOrderExecutor.SubmitOrders(ctx, types.SubmitOrder{
-					Symbol: s.Symbol,
-					Side: types.SideTypeSell,
-					Type: types.OrderTypeLimitMaker,
-					Price: price,
-					StopPrice: hlc3.Add(fixedpoint.NewFromFloat(s.atr.Last()/2)),
-					Quantity: baseBalance.Available,
-				})
-				if err != nil {
-					log.WithError(err).Errorf("cannot place order")
+			}
+			if hlc3.Compare(price) < 0 {
+				hlc3 = price
+			}
+
+			if s.Market.IsDustQuantity(baseBalance.Available, hlc3) {
+				return
+			}
+			_, err := s.GeneralOrderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+				Symbol:    s.Symbol,
+				Side:      types.SideTypeSell,
+				Type:      types.OrderTypeLimitMaker,
+				Price:     hlc3,
+				StopPrice: hlc3.Add(fixedpoint.NewFromFloat(s.atr.Last() / 3)),
+				Quantity:  baseBalance.Available,
+			})
+			if err != nil {
+				log.WithError(err).Errorf("cannot place sell order")
+				return
+			}
+		}
+		if s.drift.Last() > 0 && s.drift.Index(1) <= 0 {
+			if s.ActiveOrderBook.NumOfOrders() > 0 {
+				if err := s.GeneralOrderExecutor.GracefulCancelActiveOrderBook(ctx, s.ActiveOrderBook); err != nil {
+					log.WithError(err).Errorf("cannot cancel orders")
 					return
 				}
 			}
-			if s.drift.Last() >= 0 && s.drift.Index(1) < 0 {
-				_, err := s.GeneralOrderExecutor.SubmitOrders(ctx, types.SubmitOrder{
-					Symbol: s.Symbol,
-					Side: types.SideTypeBuy,
-					Type: types.OrderTypeLimitMaker,
-					Price: price,
-					StopPrice: hlc3.Sub(fixedpoint.NewFromFloat(s.atr.Last()/2)),
-					Quantity: quoteBalance.Available.Div(price),
-				})
-				if err != nil {
-					log.WithError(err).Errorf("cannot place order")
-					return
-				}
+			if hlc3.Compare(price) > 0 {
+				hlc3 = price
 			}
-		} else {
-			if (s.drift.Last() <= 0 && s.drift.Index(1) > 0) ||
-				(s.drift.Last() >= 0 && s.drift.Index(1) < 0 ) {
-				s.GeneralOrderExecutor.ClosePosition(ctx, fixedpoint.One)
+			quoteBalance, ok := s.Session.GetAccount().Balance(s.Market.QuoteCurrency)
+			if !ok {
+				log.Errorf("unable to get quoteCurrency")
+				return
+			}
+			if s.Market.IsDustQuantity(
+				quoteBalance.Available.Div(hlc3), hlc3) {
+				return
+			}
+			_, err := s.GeneralOrderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+				Symbol:    s.Symbol,
+				Side:      types.SideTypeBuy,
+				Type:      types.OrderTypeLimitMaker,
+				Price:     hlc3,
+				StopPrice: hlc3.Sub(fixedpoint.NewFromFloat(s.atr.Last() / 3)),
+				Quantity:  quoteBalance.Available.Div(hlc3),
+			})
+			if err != nil {
+				log.WithError(err).Errorf("cannot place buy order")
+				return
 			}
 		}
 	})
 
-	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
+	bbgo.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		_, _ = fmt.Fprintln(os.Stderr, s.TradeStats.String())
 		wg.Done()
 	})
