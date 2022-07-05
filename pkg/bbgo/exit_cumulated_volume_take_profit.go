@@ -36,11 +36,7 @@ func (s *CumulatedVolumeTakeProfit) Bind(session *ExchangeSession, orderExecutor
 
 	store, _ := session.MarketDataStore(position.Symbol)
 
-	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
-		if kline.Symbol != position.Symbol || kline.Interval != s.Interval {
-			return
-		}
-
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
 		closePrice := kline.Close
 		if position.IsClosed() || position.IsDust(closePrice) {
 			return
@@ -79,5 +75,5 @@ func (s *CumulatedVolumeTakeProfit) Bind(session *ExchangeSession, orderExecutor
 			_ = orderExecutor.ClosePosition(context.Background(), fixedpoint.One, "cumulatedVolumeTakeProfit")
 			return
 		}
-	})
+	}))
 }
