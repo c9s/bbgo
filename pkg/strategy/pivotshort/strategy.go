@@ -46,13 +46,10 @@ type SupportTakeProfit struct {
 }
 
 func (s *SupportTakeProfit) Subscribe(session *bbgo.ExchangeSession) {
-	log.Infof("[supportTakeProfit] Subscribe(%s, %s)", s.Symbol, s.Interval)
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
 }
 
 func (s *SupportTakeProfit) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.GeneralOrderExecutor) {
-	log.Infof("[supportTakeProfit] Bind(%s, %s)", s.Symbol, s.Interval)
-
 	s.session = session
 	s.orderExecutor = orderExecutor
 	s.activeOrders = bbgo.NewActiveOrderBook(s.Symbol)
