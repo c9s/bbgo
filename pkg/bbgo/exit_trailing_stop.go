@@ -47,6 +47,7 @@ func (s *TrailingStop2) Subscribe(session *ExchangeSession) {
 func (s *TrailingStop2) Bind(session *ExchangeSession, orderExecutor *GeneralOrderExecutor) {
 	s.session = session
 	s.orderExecutor = orderExecutor
+	s.latestHigh = fixedpoint.Zero
 
 	position := orderExecutor.Position()
 	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
@@ -139,6 +140,11 @@ func (s *TrailingStop2) checkStopPrice(price fixedpoint.Value, position *types.P
 }
 
 func (s *TrailingStop2) triggerStop(price fixedpoint.Value) error {
+	// reset activated flag
+	defer func() {
+		s.activated = false
+		s.latestHigh = fixedpoint.Zero
+	}()
 	Notify("[TrailingStop] %s stop loss triggered. price: %f callback rate: %f", s.Symbol, price.Float64(), s.CallbackRate.Float64())
 	ctx := context.Background()
 	return s.orderExecutor.ClosePosition(ctx, fixedpoint.One, "trailingStop")
