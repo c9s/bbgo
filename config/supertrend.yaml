@@ -36,7 +36,7 @@ exchangeStrategies:
     symbol: BTCUSDT
 
     # interval is how long do you want to update your order price and quantity
-    interval: 1h
+    interval: 5m
 
     # leverage is the leverage of the orders
     leverage: 1.0
@@ -48,15 +48,26 @@ exchangeStrategies:
     # Supertrend indicator parameters
     superTrend:
       # ATR window used by Supertrend
-      averageTrueRangeWindow: 39
+      averageTrueRangeWindow: 49
       # ATR Multiplier for calculating super trend prices, the higher, the stronger the trends are
-      averageTrueRangeMultiplier: 3
+      averageTrueRangeMultiplier: 4
+
+    # Use linear regression as trend confirmation
+    linearRegression:
+      interval: 5m
+      window: 80
 
     # TP according to ATR multiple, 0 to disable this
-    takeProfitMultiplier: 3
+    TakeProfitAtrMultiplier: 0
 
     # Set SL price to the low of the triggering Kline
-    stopLossByTriggeringK: true
+    stopLossByTriggeringK: false
 
-    # TP/SL by reversed signals
-    tpslBySignal: true
+    # TP/SL by reversed supertrend signal
+    stopByReversedSupertrend: false
+
+    # TP/SL by reversed DEMA signal
+    stopByReversedDema: false
+
+    # TP/SL by reversed linear regression signal
+    stopByReversedLinGre: false
