@@ -328,6 +328,13 @@ next available market price.
 
 ## UserDataStream
 
+UserDataStream is an authenticated connection to the crypto exchange. You can receive the following data type from the
+user data stream:
+
+- OrderUpdate
+- TradeUpdate
+- BalanceUpdate
+
 When you submit an order to the exchange, you might want to know when the order is filled or not, user data stream is 
 the real time notification let you receive the order update event.
 
@@ -412,6 +419,41 @@ bbgo.Notify("%s found support price: %f", "BTCUSDT", 19000.0, kline)
 The above call will render the first format string with the given float number 19000, and then attach the kline object as the attachment.
 
 ## Handling Trades and Profit
+
+In order to manage the trades and orders for each strategy, BBGO designed an order executor API that helps you collect
+the related trades and orders from the strategy, so trades from other strategies won't bother your logics.
+
+To do that, you can use the *bbgo.GeneralOrderExecutor:
+
+```go
+var profitStats = types.NewProfitStats(s.Market)
+var position = types.NewPositionFromMarket(s.Market)
+var tradeStats = &types.TradeStats{}
+orderExecutor := bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, position)
+
+// bind the trade events to update the profit stats
+orderExecutor.BindProfitStats(profitStats)
+
+// bind the trade events to update the trade stats
+orderExecutor.BindTradeStats(tradeStats)
+orderExecutor.Bind()
+```
+
+## Graceful Shutdown
+
+When BBGO shuts down, you might want to clean up your open orders for your strategy, to do that, you can use the
+OnShutdown API to register your handler.
+
+```go
+bbgo.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
+    defer wg.Done()
+
+    _, _ = fmt.Fprintln(os.Stderr, s.TradeStats.String())
+    if err := s.orderExecutor.GracefulCancel(ctx) ; err != nil {
+		log.WithError(err).Error("graceful cancel order error")
+    }
+})
+```
 
 ## Persistence
 
