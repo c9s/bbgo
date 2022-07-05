@@ -53,7 +53,8 @@ func (e *GeneralOrderExecutor) BindTradeStats(tradeStats *types.TradeStats) {
 		if profit == nil {
 			return
 		}
-		tradeStats.Add(profit.Profit)
+
+		tradeStats.Add(profit)
 	})
 }
 
