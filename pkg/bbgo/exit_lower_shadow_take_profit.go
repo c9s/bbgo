@@ -32,11 +32,7 @@ func (s *LowerShadowTakeProfit) Bind(session *ExchangeSession, orderExecutor *Ge
 
 
 	position := orderExecutor.Position()
-	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
-		if kline.Symbol != position.Symbol || kline.Interval != types.Interval1m {
-			return
-		}
-
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
 		closePrice := kline.Close
 		if position.IsClosed() || position.IsDust(closePrice) {
 			return
@@ -66,5 +62,5 @@ func (s *LowerShadowTakeProfit) Bind(session *ExchangeSession, orderExecutor *Ge
 			_ = orderExecutor.ClosePosition(context.Background(), fixedpoint.One)
 			return
 		}
-	})
+	}))
 }
