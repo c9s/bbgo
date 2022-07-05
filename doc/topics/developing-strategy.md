@@ -197,7 +197,7 @@ You can specify which exchange session you want to mount for each strategy in th
 
 ```yaml
 exchangeStrategies:
-  
+
 - on: binance_margin_ethusdt
   short:
     symbol: ETHUSDT
@@ -335,7 +335,7 @@ user data stream:
 - TradeUpdate
 - BalanceUpdate
 
-When you submit an order to the exchange, you might want to know when the order is filled or not, user data stream is 
+When you submit an order to the exchange, you might want to know when the order is filled or not, user data stream is
 the real time notification let you receive the order update event.
 
 To get the order update from the user data stream:
@@ -457,9 +457,47 @@ bbgo.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 
 ## Persistence
 
+When you need to adjust the parameters and restart BBGO process, everything in the memory will be reset after the
+restart, how can we keep these data?
 
+Although BBGO is written in Golang, BBGO provides a useful dynamic system to help you persist your data.
 
+If you have some state needs to preserve before shutting down, you can simply add the `persistence` struct tag to the field,
+and BBGO will automatically save and restore your state. For example,
 
+```go
+type Strategy struct {
+	Position    *types.Position    `persistence:"position"`
+	ProfitStats *types.ProfitStats `persistence:"profit_stats"`
+	TradeStats  *types.TradeStats  `persistence:"trade_stats"`
+}
+```
 
+And remember to add the `persistence` section in your bbgo.yaml config:
 
+```yaml
+persistence:
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    db: 0
+```
+
+In the Run method of your strategy, you need to check if these fields are nil, and you need to initialize them:
+
+```go
+	if s.Position == nil {
+		s.Position = types.NewPositionFromMarket(s.Market)
+	}
+
+	if s.ProfitStats == nil {
+		s.ProfitStats = types.NewProfitStats(s.Market)
+	}
+
+	if s.TradeStats == nil {
+		s.TradeStats = types.NewTradeStats(s.Symbol)
+	}
+```
+
+That's it. Hit Ctrl-C and you should see BBGO saving your strategy states.
 
