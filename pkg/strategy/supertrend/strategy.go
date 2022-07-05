@@ -23,8 +23,7 @@ const stateKey = "state-v1"
 
 var log = logrus.WithField("strategy", ID)
 
-// TODO: SL by fixed percentage
-// TODO: limit order if possible
+// TODO: limit order for ATR TP
 
 func init() {
 	// Register the pointer of the strategy struct,
@@ -143,6 +142,9 @@ type Strategy struct {
 
 	currentTakeProfitPrice fixedpoint.Value
 	currentStopLossPrice   fixedpoint.Value
+
+	// ExitMethods Exit methods
+	ExitMethods []bbgo.ExitMethod `json:"exits"`
 
 	// StrategyController
 	bbgo.StrategyController
@@ -362,6 +364,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	// Setup indicators
 	s.setupIndicators()
+
+	// Exit methods
+	for _, method := range s.ExitMethods {
+		method.Bind(session, s.orderExecutor)
+	}
 
 	s.currentStopLossPrice = fixedpoint.Zero
 	s.currentTakeProfitPrice = fixedpoint.Zero
