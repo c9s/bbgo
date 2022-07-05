@@ -9,6 +9,7 @@ import (
 // TODO: Add more stats from the reference:
 // See https://www.metatrader5.com/en/terminal/help/algotrading/testing_report
 type TradeStats struct {
+	Symbol              string             `json:"symbol"`
 	WinningRatio        fixedpoint.Value   `json:"winningRatio" yaml:"winningRatio"`
 	NumOfLossTrade      int                `json:"numOfLossTrade" yaml:"numOfLossTrade"`
 	NumOfProfitTrade    int                `json:"numOfProfitTrade" yaml:"numOfProfitTrade"`
@@ -22,7 +23,19 @@ type TradeStats struct {
 	TotalNetProfit      fixedpoint.Value   `json:"totalNetProfit" yaml:"totalNetProfit"`
 }
 
-func (s *TradeStats) Add(pnl fixedpoint.Value) {
+func NewTradeStats(symbol string) *TradeStats {
+	return &TradeStats{Symbol: symbol}
+}
+
+func (s *TradeStats) Add(profit *Profit) {
+	if profit.Symbol != s.Symbol {
+		return
+	}
+
+	s.add(profit.Profit)
+}
+
+func (s *TradeStats) add(pnl fixedpoint.Value) {
 	if pnl.Sign() > 0 {
 		s.NumOfProfitTrade++
 		s.Profits = append(s.Profits, pnl)
