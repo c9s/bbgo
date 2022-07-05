@@ -40,7 +40,8 @@ type Strategy struct {
 	midPrice fixedpoint.Value
 	lock     sync.RWMutex
 
-	Session *bbgo.ExchangeSession
+	ExitMethods bbgo.ExitMethodSet `json:"exits"`
+	Session     *bbgo.ExchangeSession
 	*bbgo.GeneralOrderExecutor
 	*bbgo.ActiveOrderBook
 }
@@ -64,6 +65,7 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	if !bbgo.IsBackTesting {
 		session.Subscribe(types.MarketTradeChannel, s.Symbol, types.SubscribeOptions{})
 	}
+	s.ExitMethods.SetAndSubscribe(session, s)
 }
 
 var Three fixedpoint.Value = fixedpoint.NewFromInt(3)
@@ -155,12 +157,15 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		bbgo.Sync(s)
 	})
 	s.GeneralOrderExecutor.Bind()
+	for _, method := range s.ExitMethods {
+		method.Bind(session, s.GeneralOrderExecutor)
+	}
 	s.ActiveOrderBook = bbgo.NewActiveOrderBook(s.Symbol)
 	s.ActiveOrderBook.BindStream(session.UserDataStream)
 
 	store, _ := session.MarketDataStore(s.Symbol)
 
-	s.drift = &indicator.Drift{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: 5}}
+	s.drift = &indicator.Drift{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.Window}}
 	s.atr = &indicator.ATR{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: 34}}
 	s.atr.Bind(store)
 
@@ -203,7 +208,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		hlc3 := kline.High.Add(kline.Low).Add(kline.Close).Div(Three)
 		s.drift.Update(hlc3.Float64())
 		price := s.GetLastPrice()
-		if s.drift.Last() < 0 && s.drift.Index(1) >= 0 {
+		if s.drift.Last() < 0 && s.drift.Index(1) > 0 {
 			if s.ActiveOrderBook.NumOfOrders() > 0 {
 				if err := s.GeneralOrderExecutor.GracefulCancelActiveOrderBook(ctx, s.ActiveOrderBook); err != nil {
 					log.WithError(err).Errorf("cannot cancel orders")
@@ -222,6 +227,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			if s.Market.IsDustQuantity(baseBalance.Available, hlc3) {
 				return
 			}
+			if !s.Position.IsClosed() && !s.Position.IsDust(hlc3) {
+				return
+			}
 			_, err := s.GeneralOrderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 				Symbol:    s.Symbol,
 				Side:      types.SideTypeSell,
@@ -235,7 +243,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				return
 			}
 		}
-		if s.drift.Last() > 0 && s.drift.Index(1) <= 0 {
+		if s.drift.Last() > 0 && s.drift.Index(1) < 0 {
 			if s.ActiveOrderBook.NumOfOrders() > 0 {
 				if err := s.GeneralOrderExecutor.GracefulCancelActiveOrderBook(ctx, s.ActiveOrderBook); err != nil {
 					log.WithError(err).Errorf("cannot cancel orders")
@@ -252,6 +260,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 			if s.Market.IsDustQuantity(
 				quoteBalance.Available.Div(hlc3), hlc3) {
+				return
+			}
+			if !s.Position.IsClosed() && !s.Position.IsDust(hlc3) {
 				return
 			}
 			_, err := s.GeneralOrderExecutor.SubmitOrders(ctx, types.SubmitOrder{

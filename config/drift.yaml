@@ -13,6 +13,28 @@ exchangeStrategies:
     symbol: ETHUSDT
     # kline interval for indicators
     interval: 15m
+    window: 3
+    exits:
+    - roiStopLoss:
+       percentage: 0.8%
+    - roiTakeProfit:
+       percentage: 35%
+    - protectiveStopLoss:
+       activationRatio: 0.6%
+       stopLossRatio: 0.1%
+       placeStopOrder: false
+    - protectiveStopLoss:
+       activationRatio: 5%
+       stopLossRatio: 1%
+       placeStopOrder: false
+    - cumulatedVolumeTakeProfit:
+       interval: 5m
+       window: 2
+       minQuoteVolume: 200_000_000
+    #- protectiveStopLoss:
+    #    activationRatio: 2%
+    #    stopLossRatio: 1%
+    #    placeStopOrder: false
 
 sync:
   userDataStream:
@@ -32,7 +54,7 @@ backtest:
   accounts:
     binance:
       #makerFeeRate: 0
-      #takerFeeRate: 15
+      #takerFeeRate: 0
       balances:
-        ETH: 10.0
+        ETH: 0.0
         USDT: 5000.0
