@@ -96,7 +96,7 @@ func TestTrailingStop(t *testing.T) {
 	err = stop.checkStopPrice(currentPrice, position)
 	if assert.NoError(t, err) {
 		assert.Equal(t, fixedpoint.NewFromFloat(19798.02), currentPrice)
-		assert.Equal(t, fixedpoint.NewFromFloat(19602.0), stop.latestHigh)
-		assert.True(t, stop.activated)
+		assert.Equal(t, fixedpoint.Zero, stop.latestHigh)
+		assert.False(t, stop.activated)
 	}
 }
