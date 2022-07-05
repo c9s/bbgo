@@ -74,7 +74,7 @@ func ValidExchangeName(a string) (ExchangeName, error) {
 	return "", fmt.Errorf("invalid exchange name: %s", a)
 }
 
-//go:generate mockgen -destination=mocks/mock_exchange.go -package=mocks -source=exchange.go Exchange
+//go:generate mockgen -destination=mocks/mock_exchange.go -package=mocks . Exchange
 type Exchange interface {
 	Name() ExchangeName
 
