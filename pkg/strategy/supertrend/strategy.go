@@ -3,6 +3,7 @@ package supertrend
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 
 	"github.com/c9s/bbgo/pkg/util"
@@ -24,8 +25,6 @@ var log = logrus.WithField("strategy", ID)
 
 // TODO: SL by fixed percentage
 // TODO: limit order if possible
-// TODO: lingre as indicator
-// TODO: types.TradeStats
 
 func init() {
 	// Register the pointer of the strategy struct,
@@ -88,8 +87,9 @@ type Strategy struct {
 	Market      types.Market
 
 	// persistence fields
-	Position    *types.Position    `json:"position,omitempty" persistence:"position"`
-	ProfitStats *types.ProfitStats `json:"profitStats,omitempty" persistence:"profit_stats"`
+	Position    *types.Position    `persistence:"position"`
+	ProfitStats *types.ProfitStats `persistence:"profit_stats"`
+	TradeStats  *types.TradeStats  `persistence:"trade_stats"`
 
 	// Order and trade
 	orderExecutor *bbgo.GeneralOrderExecutor
@@ -314,6 +314,16 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.Position.Strategy = ID
 	s.Position.StrategyInstanceID = s.InstanceID()
 
+	// Profit stats
+	if s.ProfitStats == nil {
+		s.ProfitStats = types.NewProfitStats(s.Market)
+	}
+
+	// Trade stats
+	if s.TradeStats == nil {
+		s.TradeStats = &types.TradeStats{}
+	}
+
 	// Set fee rate
 	if s.session.MakerFeeRate.Sign() > 0 || s.session.TakerFeeRate.Sign() > 0 {
 		s.Position.SetExchangeFeeRate(s.session.ExchangeName, types.ExchangeFee{
@@ -322,15 +332,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		})
 	}
 
-	// Profit
-	if s.ProfitStats == nil {
-		s.ProfitStats = types.NewProfitStats(s.Market)
-	}
-
 	// Setup order executor
 	s.orderExecutor = bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
 	s.orderExecutor.BindEnvironment(s.Environment)
 	s.orderExecutor.BindProfitStats(s.ProfitStats)
+	s.orderExecutor.BindTradeStats(s.TradeStats)
 	s.orderExecutor.Bind()
 
 	// Sync position to redis on trade
@@ -487,6 +493,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		close(s.stopC)
 
 		_ = s.orderExecutor.GracefulCancel(ctx)
+		_, _ = fmt.Fprintln(os.Stderr, s.TradeStats.String())
 	})
 
 	return nil
