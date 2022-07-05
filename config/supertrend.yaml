@@ -71,3 +71,10 @@ exchangeStrategies:
 
     # TP/SL by reversed linear regression signal
     stopByReversedLinGre: false
+
+    exits:
+      # Protective stop loss
+      - protectiveStopLoss:
+          activationRatio: 0.6%
+          stopLossRatio: 1%
+          placeStopOrder: false
