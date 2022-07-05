@@ -24,7 +24,6 @@ var log = logrus.WithField("strategy", ID)
 
 // TODO: SL by fixed percentage
 // TODO: limit order if possible
-// TODO: refine log
 // TODO: lingre as indicator
 // TODO: types.TradeStats
 
@@ -202,8 +201,7 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 
 	orderForm := s.generateOrderForm(side, quantity, types.SideEffectTypeAutoRepay)
 
-	log.Infof("submit close position order %v", orderForm)
-	bbgo.Notify("Submitting %s %s order to close position by %v", s.Symbol, side.String(), percentage)
+	bbgo.Notify("submitting %s %s order to close position by %v", s.Symbol, side.String(), percentage, orderForm)
 
 	_, err := s.orderExecutor.SubmitOrders(ctx, orderForm)
 	if err != nil {
@@ -216,6 +214,10 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 
 // setupIndicators initializes indicators
 func (s *Strategy) setupIndicators() {
+	// K-line store for indicators
+	kLineStore, _ := s.session.MarketDataStore(s.Symbol)
+
+	// DEMA
 	if s.FastDEMAWindow == 0 {
 		s.FastDEMAWindow = 144
 	}
@@ -225,7 +227,19 @@ func (s *Strategy) setupIndicators() {
 		s.SlowDEMAWindow = 169
 	}
 	s.slowDEMA = &indicator.DEMA{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.SlowDEMAWindow}}
+	// Preload
+	if klines, ok := kLineStore.KLinesOfInterval(s.fastDEMA.Interval); ok {
+		for i := 0; i < len(*klines); i++ {
+			s.fastDEMA.Update((*klines)[i].GetClose().Float64())
+		}
+	}
+	if klines, ok := kLineStore.KLinesOfInterval(s.slowDEMA.Interval); ok {
+		for i := 0; i < len(*klines); i++ {
+			s.slowDEMA.Update((*klines)[i].GetClose().Float64())
+		}
+	}
 
+	// Supertrend
 	if s.SupertrendWindow == 0 {
 		s.SupertrendWindow = 39
 	}
@@ -234,22 +248,26 @@ func (s *Strategy) setupIndicators() {
 	}
 	s.Supertrend = &indicator.Supertrend{IntervalWindow: types.IntervalWindow{Window: s.SupertrendWindow, Interval: s.Interval}, ATRMultiplier: s.SupertrendMultiplier}
 	s.Supertrend.AverageTrueRange = &indicator.ATR{IntervalWindow: types.IntervalWindow{Window: s.SupertrendWindow, Interval: s.Interval}}
-
-}
-
-// updateIndicators updates indicators
-func (s *Strategy) updateIndicators(kline types.KLine) {
-	closePrice := kline.GetClose().Float64()
-
-	// Update indicators
-	if kline.Interval == s.fastDEMA.Interval {
-		s.fastDEMA.Update(closePrice)
+	s.Supertrend.Bind(kLineStore)
+	// Preload
+	if klines, ok := kLineStore.KLinesOfInterval(s.Supertrend.Interval); ok {
+		for i := 0; i < len(*klines); i++ {
+			s.Supertrend.Update((*klines)[i].GetHigh().Float64(), (*klines)[i].GetLow().Float64(), (*klines)[i].GetClose().Float64())
+		}
 	}
-	if kline.Interval == s.slowDEMA.Interval {
-		s.slowDEMA.Update(closePrice)
-	}
-	if kline.Interval == s.Supertrend.Interval {
-		s.Supertrend.Update(kline.GetHigh().Float64(), kline.GetLow().Float64(), closePrice)
+
+	// Linear Regression
+	if s.LinearRegression != nil {
+		if s.LinearRegression.Window == 0 {
+			s.LinearRegression = nil
+		} else {
+			s.LinearRegression.Bind(kLineStore)
+
+			// Preload
+			if klines, ok := kLineStore.KLinesOfInterval(s.LinearRegression.Interval); ok {
+				s.LinearRegression.Update((*klines)[0:])
+			}
+		}
 	}
 }
 
@@ -309,22 +327,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.ProfitStats = types.NewProfitStats(s.Market)
 	}
 
-	// Linear Regression
-	if s.LinearRegression != nil {
-		if s.LinearRegression.Window == 0 {
-			s.LinearRegression = nil
-		} else {
-			// K-line store for Linear Regression
-			kLineStore, _ := session.MarketDataStore(s.Symbol)
-			s.LinearRegression.Bind(kLineStore)
-
-			// Preload
-			if klines, ok := kLineStore.KLinesOfInterval(s.LinearRegression.Interval); ok {
-				s.LinearRegression.Update((*klines)[0:])
-			}
-		}
-	}
-
 	// Setup order executor
 	s.orderExecutor = bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
 	s.orderExecutor.BindEnvironment(s.Environment)
@@ -368,9 +370,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		if kline.Symbol != s.Symbol || kline.Interval != s.Interval {
 			return
 		}
-
-		// Update indicators
-		s.updateIndicators(kline)
 
 		closePrice := kline.GetClose().Float64()
 		openPrice := kline.GetOpen().Float64()
@@ -460,16 +459,13 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		// The default value of side is an empty string. Unless side is set by the checks above, the result of the following condition is false
 		if side == types.SideTypeSell || side == types.SideTypeBuy {
-			log.Infof("open %s position for signal %v", s.Symbol, side)
 			bbgo.Notify("open %s position for signal %v", s.Symbol, side)
 			// Close opposite position if any
 			if !s.Position.IsDust(kline.GetClose()) {
 				if (side == types.SideTypeSell && s.Position.IsLong()) || (side == types.SideTypeBuy && s.Position.IsShort()) {
-					log.Infof("close existing %s position before open a new position", s.Symbol)
 					bbgo.Notify("close existing %s position before open a new position", s.Symbol)
 					_ = s.ClosePosition(ctx, fixedpoint.One)
 				} else {
-					log.Infof("existing %s position has the same direction with the signal", s.Symbol)
 					bbgo.Notify("existing %s position has the same direction with the signal", s.Symbol)
 					return
 				}
