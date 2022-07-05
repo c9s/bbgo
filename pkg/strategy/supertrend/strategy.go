@@ -224,11 +224,13 @@ func (s *Strategy) setupIndicators() {
 		s.FastDEMAWindow = 144
 	}
 	s.fastDEMA = &indicator.DEMA{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.FastDEMAWindow}}
+	s.fastDEMA.Bind(kLineStore)
 
 	if s.SlowDEMAWindow == 0 {
 		s.SlowDEMAWindow = 169
 	}
 	s.slowDEMA = &indicator.DEMA{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.SlowDEMAWindow}}
+	s.slowDEMA.Bind(kLineStore)
 	// Preload
 	if klines, ok := kLineStore.KLinesOfInterval(s.fastDEMA.Interval); ok {
 		for i := 0; i < len(*klines); i++ {
