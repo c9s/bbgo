@@ -56,6 +56,9 @@ type Strategy struct {
 	// Symbol is the market symbol you want to trade
 	Symbol string `json:"symbol"`
 
+	// Double DEMA
+	DoubleDema
+
 	// Interval is how long do you want to update your order price and quantity
 	Interval types.Interval `json:"interval"`
 
@@ -66,9 +69,6 @@ type Strategy struct {
 	SupertrendWindow int `json:"supertrendWindow"`
 	// SupertrendMultiplier ATR multiplier for calculation of supertrend
 	SupertrendMultiplier float64 `json:"supertrendMultiplier"`
-
-	// Double DEMA
-	DoubleDema
 
 	// LinearRegression Use linear regression as trend confirmation
 	LinearRegression *LinGre `json:"linearRegression,omitempty"`
@@ -180,7 +180,7 @@ func (s *Strategy) setupIndicators() {
 	kLineStore, _ := s.session.MarketDataStore(s.Symbol)
 
 	// Double DEMA
-	s.setupDoubleDema(kLineStore)
+	s.setupDoubleDema(kLineStore, s.Interval)
 
 	// Supertrend
 	if s.SupertrendWindow == 0 {
