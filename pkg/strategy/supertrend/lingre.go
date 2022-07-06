@@ -1,6 +1,7 @@
 package supertrend
 
 import (
+	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -62,4 +63,11 @@ func (lg *LinGre) GetSignal() types.Direction {
 	}
 
 	return lgSignal
+}
+
+// preloadLinGre preloads linear regression indicator
+func (lg *LinGre) preload(kLineStore *bbgo.MarketDataStore) {
+	if klines, ok := kLineStore.KLinesOfInterval(lg.Interval); ok {
+		lg.Update((*klines)[0:])
+	}
 }
