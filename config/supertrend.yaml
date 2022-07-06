@@ -75,4 +75,4 @@ exchangeStrategies:
     exits:
       # roiStopLoss is the stop loss percentage of the position ROI (currently the price change)
       - roiStopLoss:
-          percentage: 5%
+          percentage: 4%
