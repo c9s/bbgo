@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -51,7 +53,9 @@ func (s *TrailingStop2) Bind(session *ExchangeSession, orderExecutor *GeneralOrd
 
 	position := orderExecutor.Position()
 	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
-		s.checkStopPrice(kline.Close, position)
+		if err := s.checkStopPrice(kline.Close, position); err != nil {
+			log.WithError(err).Errorf("error")
+		}
 	}))
 
 	if !IsBackTesting {
@@ -60,7 +64,9 @@ func (s *TrailingStop2) Bind(session *ExchangeSession, orderExecutor *GeneralOrd
 				return
 			}
 
-			s.checkStopPrice(trade.Price, position)
+			if err := s.checkStopPrice(trade.Price, position); err != nil {
+				log.WithError(err).Errorf("error")
+			}
 		})
 	}
 }
@@ -129,7 +135,7 @@ func (s *TrailingStop2) checkStopPrice(price fixedpoint.Value, position *types.P
 	case types.SideTypeSell:
 		s.latestHigh = fixedpoint.Max(price, s.latestHigh)
 
-		change := price.Sub(s.latestHigh).Div(s.latestHigh)
+		change := s.latestHigh.Sub(price).Div(price)
 		if change.Compare(s.CallbackRate) >= 0 {
 			// submit order
 			return s.triggerStop(price)
