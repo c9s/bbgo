@@ -100,6 +100,21 @@ exchangeStrategies:
         window: 2
         minQuoteVolume: 200_000_000
 
+    - trailingStop:
+        callbackRate: 2%
+
+        # activationRatio is relative to the average cost,
+        # when side is buy, 1% means lower 1% than the average cost.
+        # when side is sell, 1% means higher 1% than the average cost.
+        activationRatio: 10%
+
+        # minProfit uses the position ROI to calculate the profit ratio
+        # minProfit: 1%
+
+        interval: 1m
+        side: buy
+        closePosition: 100%
+
 backtest:
   sessions:
   - binance

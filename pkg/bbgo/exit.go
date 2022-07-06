@@ -20,6 +20,12 @@ func (s *ExitMethodSet) SetAndSubscribe(session *ExchangeSession, parent interfa
 	}
 }
 
+func (s *ExitMethodSet) Bind(session *ExchangeSession, orderExecutor *GeneralOrderExecutor) {
+	for _, method := range *s {
+		method.Bind(session, orderExecutor)
+	}
+}
+
 type ExitMethod struct {
 	RoiStopLoss               *RoiStopLoss               `json:"roiStopLoss"`
 	ProtectiveStopLoss        *ProtectiveStopLoss        `json:"protectiveStopLoss"`

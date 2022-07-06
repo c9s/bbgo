@@ -501,3 +501,65 @@ In the Run method of your strategy, you need to check if these fields are nil, a
 
 That's it. Hit Ctrl-C and you should see BBGO saving your strategy states.
 
+
+## Exit Method Set
+
+To integrate the built-in exit methods into your strategy, simply add a field with type bbgo.ExitMethodSet:
+
+```go
+type Strategy struct {
+	ExitMethods bbgo.ExitMethodSet `json:"exits"`
+}
+
+func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
+	s.ExitMethods.SetAndSubscribe(session, s)
+}
+
+func (s *Strategy) Run() {
+    s.ExitMethods.Bind(session, s.orderExecutor)
+}
+```
+
+And then you can use the following config structure to configure your exit settings like this:
+
+```yaml
+- on: binance
+  pivotshort:
+    exits:
+    # (0) roiStopLoss is the stop loss percentage of the position ROI (currently the price change)
+    - roiStopLoss:
+        percentage: 0.8%
+
+    # (1) roiTakeProfit is used to force taking profit by percentage of the position ROI (currently the price change)
+    # force to take the profit ROI exceeded the percentage.
+    - roiTakeProfit:
+        percentage: 35%
+
+    # (2) protective stop loss -- short term
+    - protectiveStopLoss:
+        activationRatio: 0.6%
+        stopLossRatio: 0.1%
+        placeStopOrder: false
+
+    # (3) protective stop loss -- long term
+    - protectiveStopLoss:
+        activationRatio: 5%
+        stopLossRatio: 1%
+        placeStopOrder: false
+
+    # (4) lowerShadowTakeProfit is used to taking profit when the (lower shadow height / low price) > lowerShadowRatio
+    # you can grab a simple stats by the following SQL:
+    # SELECT ((close - low) / close) AS shadow_ratio FROM binance_klines WHERE symbol = 'ETHUSDT' AND `interval` = '5m' AND start_time > '2022-01-01' ORDER BY shadow_ratio DESC LIMIT 20;
+    - lowerShadowTakeProfit:
+        interval: 30m
+        window: 99
+        ratio: 3%
+
+    # (5) cumulatedVolumeTakeProfit is used to take profit when the cumulated quote volume from the klines exceeded a threshold
+    - cumulatedVolumeTakeProfit:
+        interval: 5m
+        window: 2
+        minQuoteVolume: 200_000_000
+
+
+```
