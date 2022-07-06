@@ -11,6 +11,10 @@ type StructFieldIterator func(tag string, ft reflect.StructField, fv reflect.Val
 var ErrCanNotIterateNilPointer = errors.New("can not iterate struct on a nil pointer")
 
 func IterateFields(obj interface{}, cb func(ft reflect.StructField, fv reflect.Value) error) error {
+	if obj == nil {
+		return errors.New("can not iterate field, given object is nil")
+	}
+
 	sv := reflect.ValueOf(obj)
 	st := reflect.TypeOf(obj)
 
