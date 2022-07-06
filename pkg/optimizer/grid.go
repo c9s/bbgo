@@ -17,16 +17,31 @@ import (
 type MetricValueFunc func(summaryReport *backtest.SummaryReport) fixedpoint.Value
 
 var TotalProfitMetricValueFunc = func(summaryReport *backtest.SummaryReport) fixedpoint.Value {
-	if summaryReport == nil {
-		return fixedpoint.Zero
-	}
 	return summaryReport.TotalProfit
 }
 
+var TotalVolume = func(summaryReport *backtest.SummaryReport) fixedpoint.Value {
+	if len(summaryReport.SymbolReports) == 0 {
+		return fixedpoint.Zero
+	}
+
+	buyVolume := summaryReport.SymbolReports[0].PnL.BuyVolume
+	sellVolume := summaryReport.SymbolReports[0].PnL.SellVolume
+	return buyVolume.Add(sellVolume)
+}
+
 type Metric struct {
-	Labels []string         `json:"labels,omitempty"`
-	Params []interface{}    `json:"params,omitempty"`
-	Value  fixedpoint.Value `json:"value,omitempty"`
+	// Labels is the labels of the given parameters
+	Labels []string `json:"labels,omitempty"`
+
+	// Params is the parameters used to output the metrics result
+	Params []interface{} `json:"params,omitempty"`
+
+	// Key is the metric name
+	Key string `json:"key"`
+
+	// Value is the metric value of the metric
+	Value fixedpoint.Value `json:"value,omitempty"`
 }
 
 func copyParams(params []interface{}) []interface{} {
@@ -172,6 +187,7 @@ func (o *GridOptimizer) Run(executor Executor, configJson []byte) (map[string][]
 
 	var valueFunctions = map[string]MetricValueFunc{
 		"totalProfit": TotalProfitMetricValueFunc,
+		"totalVolume": TotalVolume,
 	}
 	var metrics = map[string][]Metric{}
 
@@ -220,16 +236,20 @@ func (o *GridOptimizer) Run(executor Executor, configJson []byte) (map[string][]
 	close(taskC) // this will shut down the executor
 
 	for result := range resultsC {
-		for metricName, metricFunc := range valueFunctions {
-			if result.Report == nil {
-				log.Errorf("no summaryReport found for params: %+v", result.Params)
-			}
+		if result.Report == nil {
+			log.Errorf("no summaryReport found for params: %+v", result.Params)
+			continue
+		}
+
+		for metricKey, metricFunc := range valueFunctions {
 			var metricValue = metricFunc(result.Report)
-			bar.Set("log", fmt.Sprintf("params: %+v => %s %+v", result.Params, metricName, metricValue))
+			bar.Set("log", fmt.Sprintf("params: %+v => %s %+v", result.Params, metricKey, metricValue))
 			bar.Increment()
-			metrics[metricName] = append(metrics[metricName], Metric{
+
+			metrics[metricKey] = append(metrics[metricKey], Metric{
 				Params: result.Params,
 				Labels: result.Labels,
+				Key:    metricKey,
 				Value:  metricValue,
 			})
 		}
