@@ -26,6 +26,7 @@ type ExitMethod struct {
 	RoiTakeProfit             *RoiTakeProfit             `json:"roiTakeProfit"`
 	LowerShadowTakeProfit     *LowerShadowTakeProfit     `json:"lowerShadowTakeProfit"`
 	CumulatedVolumeTakeProfit *CumulatedVolumeTakeProfit `json:"cumulatedVolumeTakeProfit"`
+	TrailingStop              *TrailingStop2             `json:"trailingStop"`
 }
 
 // Inherit is used for inheriting properties from the given strategy struct
