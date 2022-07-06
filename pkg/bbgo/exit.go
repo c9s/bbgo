@@ -1,8 +1,6 @@
 package bbgo
 
 import (
-	"reflect"
-
 	"github.com/pkg/errors"
 
 	"github.com/c9s/bbgo/pkg/dynamic"
@@ -32,21 +30,7 @@ type ExitMethod struct {
 // Inherit is used for inheriting properties from the given strategy struct
 // for example, some exit method requires the default interval and symbol name from the strategy param object
 func (m *ExitMethod) Inherit(parent interface{}) {
-	// we need to pass some information from the strategy configuration to the exit methods, like symbol, interval and window
-	rt := reflect.TypeOf(m).Elem()
-	rv := reflect.ValueOf(m).Elem()
-	for j := 0; j < rv.NumField(); j++ {
-		if !rt.Field(j).IsExported() {
-			continue
-		}
-
-		fieldValue := rv.Field(j)
-		if fieldValue.Kind() == reflect.Ptr && fieldValue.IsNil() {
-			continue
-		}
-
-		dynamic.InheritStructValues(fieldValue.Interface(), parent)
-	}
+	dynamic.StructFieldsInherit(m, parent)
 }
 
 func (m *ExitMethod) Subscribe(session *ExchangeSession) {

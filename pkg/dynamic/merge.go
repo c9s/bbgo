@@ -2,6 +2,29 @@ package dynamic
 
 import "reflect"
 
+
+
+// StructFieldsInherit is used for inheriting properties from the given strategy struct
+// for example, some exit method requires the default interval and symbol name from the strategy param object
+func StructFieldsInherit(m interface{}, parent interface{}) {
+	// we need to pass some information from the strategy configuration to the exit methods, like symbol, interval and window
+	rt := reflect.TypeOf(m).Elem()
+	rv := reflect.ValueOf(m).Elem()
+	for j := 0; j < rv.NumField(); j++ {
+		if !rt.Field(j).IsExported() {
+			continue
+		}
+
+		fieldValue := rv.Field(j)
+		if fieldValue.Kind() == reflect.Ptr && fieldValue.IsNil() {
+			continue
+		}
+
+		InheritStructValues(fieldValue.Interface(), parent)
+	}
+}
+
+
 // InheritStructValues merges the field value from the source struct to the dest struct.
 // Only fields with the same type and the same name will be updated.
 func InheritStructValues(dst, src interface{}) {
