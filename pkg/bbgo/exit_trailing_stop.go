@@ -153,5 +153,10 @@ func (s *TrailingStop2) triggerStop(price fixedpoint.Value) error {
 	}()
 	Notify("[TrailingStop] %s stop loss triggered. price: %f callback rate: %f", s.Symbol, price.Float64(), s.CallbackRate.Float64())
 	ctx := context.Background()
-	return s.orderExecutor.ClosePosition(ctx, fixedpoint.One, "trailingStop")
+	p := fixedpoint.One
+	if !s.ClosePosition.IsZero() {
+		p = s.ClosePosition
+	}
+
+	return s.orderExecutor.ClosePosition(ctx, p, "trailingStop")
 }
