@@ -45,7 +45,9 @@ func (dd *DoubleDema) preloadDema(kLineStore *bbgo.MarketDataStore) {
 }
 
 // setupDoubleDema initializes double DEMA indicators
-func (dd *DoubleDema) setupDoubleDema(kLineStore *bbgo.MarketDataStore) {
+func (dd *DoubleDema) setupDoubleDema(kLineStore *bbgo.MarketDataStore, interval types.Interval) {
+	dd.Interval = interval
+
 	// DEMA
 	if dd.FastDEMAWindow == 0 {
 		dd.FastDEMAWindow = 144
@@ -58,5 +60,6 @@ func (dd *DoubleDema) setupDoubleDema(kLineStore *bbgo.MarketDataStore) {
 	}
 	dd.slowDEMA = &indicator.DEMA{IntervalWindow: types.IntervalWindow{Interval: dd.Interval, Window: dd.SlowDEMAWindow}}
 	dd.slowDEMA.Bind(kLineStore)
+
 	dd.preloadDema(kLineStore)
 }
