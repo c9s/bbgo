@@ -23,12 +23,30 @@ Supertrend strategy needs margin enabled in order to submit short orders, and yo
         - The MA window of the ATR indicator used by Supertrend. 
     - `averageTrueRangeMultiplier`
         - Multiplier for calculating upper and lower bond prices, the higher, the stronger the trends are, but also makes it less sensitive.
-- `takeProfitMultiplier`
+- `linearRegression`
+    - Use linear regression as trend confirmation
+    - `interval`
+        - Time interval of linear regression
+    - `window`
+        - Window of linear regression
+- `takeProfitAtrMultiplier`
     - TP according to ATR multiple, 0 to disable this.
 - `stopLossByTriggeringK`
-    - Set SL price to the low of the triggering Kline.
-- `tpslBySignal`
-    - TP/SL by reversed signals.
+    - Set SL price to the low/high of the triggering Kline.
+- `stopByReversedSupertrend`
+    - TP/SL by reversed supertrend signal.
+- `stopByReversedDema`
+    - TP/SL by reversed DEMA signal.
+- `stopByReversedLinGre`
+    - TP/SL by reversed linear regression signal.
+- `exits`
+    - Exit methods to TP/SL
+    - `protectiveStopLoss`
+        - Protective stop loss
+        - `activationRatio`
+            - Ratio to activate the order
+        - `stopLossRatio`
+            - Ratio to stop loss (or take profit)
 
 
 #### Examples
