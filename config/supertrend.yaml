@@ -76,5 +76,5 @@ exchangeStrategies:
       # Protective stop loss
       - protectiveStopLoss:
           activationRatio: 0.6%
-          stopLossRatio: 1%
+          stopLossRatio: -2%
           placeStopOrder: false
