@@ -177,6 +177,7 @@ type Strategy struct {
 	bbgo.StrategyController
 }
 
+
 func (s *Strategy) ID() string {
 	return ID
 }
