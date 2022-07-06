@@ -41,12 +41,9 @@ Supertrend strategy needs margin enabled in order to submit short orders, and yo
     - TP/SL by reversed linear regression signal.
 - `exits`
     - Exit methods to TP/SL
-    - `protectiveStopLoss`
-        - Protective stop loss
-        - `activationRatio`
-            - Ratio to activate the order
-        - `stopLossRatio`
-            - Ratio to stop loss (or take profit)
+    - `roiStopLoss`
+        - The stop loss percentage of the position ROI (currently the price change)
+        - `percentage`
 
 
 #### Examples
