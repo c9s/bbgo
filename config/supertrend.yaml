@@ -27,7 +27,7 @@ backtest:
       makerCommission: 10  # 0.15%
       takerCommission: 15  # 0.15%
       balances:
-        BTC: 10.0
+        BTC: 1.0
         USDT: 10000.0
 
 exchangeStrategies:
