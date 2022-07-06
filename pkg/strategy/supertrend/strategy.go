@@ -59,13 +59,6 @@ type Strategy struct {
 	// Interval is how long do you want to update your order price and quantity
 	Interval types.Interval `json:"interval"`
 
-	// FastDEMAWindow DEMA window for checking breakout
-	FastDEMAWindow int `json:"fastDEMAWindow"`
-	// SlowDEMAWindow DEMA window for checking breakout
-	SlowDEMAWindow int `json:"slowDEMAWindow"`
-	fastDEMA       *indicator.DEMA
-	slowDEMA       *indicator.DEMA
-
 	// SuperTrend indicator
 	// SuperTrend SuperTrend `json:"superTrend"`
 	Supertrend *indicator.Supertrend
@@ -73,6 +66,9 @@ type Strategy struct {
 	SupertrendWindow int `json:"supertrendWindow"`
 	// SupertrendMultiplier ATR multiplier for calculation of supertrend
 	SupertrendMultiplier float64 `json:"supertrendMultiplier"`
+
+	// Double DEMA
+	DoubleDema
 
 	// LinearRegression Use linear regression as trend confirmation
 	LinearRegression *LinGre `json:"linearRegression,omitempty"`
@@ -169,20 +165,6 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 	return err
 }
 
-// preloadDema preloads DEMA indicators
-func preloadDema(fastDEMA *indicator.DEMA, slowDEMA *indicator.DEMA, kLineStore *bbgo.MarketDataStore) {
-	if klines, ok := kLineStore.KLinesOfInterval(fastDEMA.Interval); ok {
-		for i := 0; i < len(*klines); i++ {
-			fastDEMA.Update((*klines)[i].GetClose().Float64())
-		}
-	}
-	if klines, ok := kLineStore.KLinesOfInterval(slowDEMA.Interval); ok {
-		for i := 0; i < len(*klines); i++ {
-			slowDEMA.Update((*klines)[i].GetClose().Float64())
-		}
-	}
-}
-
 // preloadSupertrend preloads supertrend indicator
 func preloadSupertrend(supertrend *indicator.Supertrend, kLineStore *bbgo.MarketDataStore) {
 	if klines, ok := kLineStore.KLinesOfInterval(supertrend.Interval); ok {
@@ -192,31 +174,13 @@ func preloadSupertrend(supertrend *indicator.Supertrend, kLineStore *bbgo.Market
 	}
 }
 
-// preloadLinGre preloads linear regression indicator
-func preloadLinGre(linearRegression *LinGre, kLineStore *bbgo.MarketDataStore) {
-	if klines, ok := kLineStore.KLinesOfInterval(linearRegression.Interval); ok {
-		linearRegression.Update((*klines)[0:])
-	}
-}
-
 // setupIndicators initializes indicators
 func (s *Strategy) setupIndicators() {
 	// K-line store for indicators
 	kLineStore, _ := s.session.MarketDataStore(s.Symbol)
 
-	// DEMA
-	if s.FastDEMAWindow == 0 {
-		s.FastDEMAWindow = 144
-	}
-	s.fastDEMA = &indicator.DEMA{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.FastDEMAWindow}}
-	s.fastDEMA.Bind(kLineStore)
-
-	if s.SlowDEMAWindow == 0 {
-		s.SlowDEMAWindow = 169
-	}
-	s.slowDEMA = &indicator.DEMA{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.SlowDEMAWindow}}
-	s.slowDEMA.Bind(kLineStore)
-	preloadDema(s.fastDEMA, s.slowDEMA, kLineStore)
+	// Double DEMA
+	s.setupDoubleDema(kLineStore)
 
 	// Supertrend
 	if s.SupertrendWindow == 0 {
@@ -234,24 +198,13 @@ func (s *Strategy) setupIndicators() {
 	if s.LinearRegression != nil {
 		if s.LinearRegression.Window == 0 {
 			s.LinearRegression = nil
+		} else if s.LinearRegression.Interval == "" {
+			s.LinearRegression = nil
 		} else {
 			s.LinearRegression.Bind(kLineStore)
-			preloadLinGre(s.LinearRegression, kLineStore)
+			s.LinearRegression.preload(kLineStore)
 		}
 	}
-}
-
-// getDemaSignal get current DEMA signal
-func (s *Strategy) getDemaSignal(openPrice float64, closePrice float64) types.Direction {
-	var demaSignal types.Direction = types.DirectionNone
-
-	if closePrice > s.fastDEMA.Last() && closePrice > s.slowDEMA.Last() && !(openPrice > s.fastDEMA.Last() && openPrice > s.slowDEMA.Last()) {
-		demaSignal = types.DirectionUp
-	} else if closePrice < s.fastDEMA.Last() && closePrice < s.slowDEMA.Last() && !(openPrice < s.fastDEMA.Last() && openPrice < s.slowDEMA.Last()) {
-		demaSignal = types.DirectionDown
-	}
-
-	return demaSignal
 }
 
 func (s *Strategy) shouldStop(kline types.KLine, stSignal types.Direction, demaSignal types.Direction, lgSignal types.Direction) bool {
