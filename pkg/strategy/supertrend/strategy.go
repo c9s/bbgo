@@ -32,51 +32,6 @@ func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
-// LinGre is Linear Regression baseline
-type LinGre struct {
-	types.IntervalWindow
-	baseLineSlope float64
-}
-
-// Update Linear Regression baseline slope
-func (lg *LinGre) Update(klines []types.KLine) {
-	if len(klines) < lg.Window {
-		lg.baseLineSlope = 0
-		return
-	}
-
-	var sumX, sumY, sumXSqr, sumXY float64 = 0, 0, 0, 0
-	end := len(klines) - 1 // The last kline
-	for i := end; i >= end-lg.Window+1; i-- {
-		val := klines[i].GetClose().Float64()
-		per := float64(end - i + 1)
-		sumX += per
-		sumY += val
-		sumXSqr += per * per
-		sumXY += val * per
-	}
-	length := float64(lg.Window)
-	slope := (length*sumXY - sumX*sumY) / (length*sumXSqr - sumX*sumX)
-	average := sumY / length
-	endPrice := average - slope*sumX/length + slope
-	startPrice := endPrice + slope*(length-1)
-	lg.baseLineSlope = (length - 1) / (endPrice - startPrice)
-
-	log.Debugf("linear regression baseline slope: %f", lg.baseLineSlope)
-}
-
-func (lg *LinGre) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
-	if lg.Interval != interval {
-		return
-	}
-
-	lg.Update(window)
-}
-
-func (lg *LinGre) Bind(updater indicator.KLineWindowUpdater) {
-	updater.OnKLineWindowUpdate(lg.handleKLineWindowUpdate)
-}
-
 type Strategy struct {
 	*bbgo.Graceful
 	*bbgo.Persistence
@@ -214,6 +169,36 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 	return err
 }
 
+// preloadDema preloads DEMA indicators
+func preloadDema(fastDEMA *indicator.DEMA, slowDEMA *indicator.DEMA, kLineStore *bbgo.MarketDataStore) {
+	if klines, ok := kLineStore.KLinesOfInterval(fastDEMA.Interval); ok {
+		for i := 0; i < len(*klines); i++ {
+			fastDEMA.Update((*klines)[i].GetClose().Float64())
+		}
+	}
+	if klines, ok := kLineStore.KLinesOfInterval(slowDEMA.Interval); ok {
+		for i := 0; i < len(*klines); i++ {
+			slowDEMA.Update((*klines)[i].GetClose().Float64())
+		}
+	}
+}
+
+// preloadSupertrend preloads supertrend indicator
+func preloadSupertrend(supertrend *indicator.Supertrend, kLineStore *bbgo.MarketDataStore) {
+	if klines, ok := kLineStore.KLinesOfInterval(supertrend.Interval); ok {
+		for i := 0; i < len(*klines); i++ {
+			supertrend.Update((*klines)[i].GetHigh().Float64(), (*klines)[i].GetLow().Float64(), (*klines)[i].GetClose().Float64())
+		}
+	}
+}
+
+// preloadLinGre preloads linear regression indicator
+func preloadLinGre(linearRegression *LinGre, kLineStore *bbgo.MarketDataStore) {
+	if klines, ok := kLineStore.KLinesOfInterval(linearRegression.Interval); ok {
+		linearRegression.Update((*klines)[0:])
+	}
+}
+
 // setupIndicators initializes indicators
 func (s *Strategy) setupIndicators() {
 	// K-line store for indicators
@@ -231,17 +216,7 @@ func (s *Strategy) setupIndicators() {
 	}
 	s.slowDEMA = &indicator.DEMA{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.SlowDEMAWindow}}
 	s.slowDEMA.Bind(kLineStore)
-	// Preload
-	if klines, ok := kLineStore.KLinesOfInterval(s.fastDEMA.Interval); ok {
-		for i := 0; i < len(*klines); i++ {
-			s.fastDEMA.Update((*klines)[i].GetClose().Float64())
-		}
-	}
-	if klines, ok := kLineStore.KLinesOfInterval(s.slowDEMA.Interval); ok {
-		for i := 0; i < len(*klines); i++ {
-			s.slowDEMA.Update((*klines)[i].GetClose().Float64())
-		}
-	}
+	preloadDema(s.fastDEMA, s.slowDEMA, kLineStore)
 
 	// Supertrend
 	if s.SupertrendWindow == 0 {
@@ -253,12 +228,7 @@ func (s *Strategy) setupIndicators() {
 	s.Supertrend = &indicator.Supertrend{IntervalWindow: types.IntervalWindow{Window: s.SupertrendWindow, Interval: s.Interval}, ATRMultiplier: s.SupertrendMultiplier}
 	s.Supertrend.AverageTrueRange = &indicator.ATR{IntervalWindow: types.IntervalWindow{Window: s.SupertrendWindow, Interval: s.Interval}}
 	s.Supertrend.Bind(kLineStore)
-	// Preload
-	if klines, ok := kLineStore.KLinesOfInterval(s.Supertrend.Interval); ok {
-		for i := 0; i < len(*klines); i++ {
-			s.Supertrend.Update((*klines)[i].GetHigh().Float64(), (*klines)[i].GetLow().Float64(), (*klines)[i].GetClose().Float64())
-		}
-	}
+	preloadSupertrend(s.Supertrend, kLineStore)
 
 	// Linear Regression
 	if s.LinearRegression != nil {
@@ -266,13 +236,52 @@ func (s *Strategy) setupIndicators() {
 			s.LinearRegression = nil
 		} else {
 			s.LinearRegression.Bind(kLineStore)
-
-			// Preload
-			if klines, ok := kLineStore.KLinesOfInterval(s.LinearRegression.Interval); ok {
-				s.LinearRegression.Update((*klines)[0:])
-			}
+			preloadLinGre(s.LinearRegression, kLineStore)
 		}
 	}
+}
+
+// getDemaSignal get current DEMA signal
+func (s *Strategy) getDemaSignal(openPrice float64, closePrice float64) types.Direction {
+	var demaSignal types.Direction = types.DirectionNone
+
+	if closePrice > s.fastDEMA.Last() && closePrice > s.slowDEMA.Last() && !(openPrice > s.fastDEMA.Last() && openPrice > s.slowDEMA.Last()) {
+		demaSignal = types.DirectionUp
+	} else if closePrice < s.fastDEMA.Last() && closePrice < s.slowDEMA.Last() && !(openPrice < s.fastDEMA.Last() && openPrice < s.slowDEMA.Last()) {
+		demaSignal = types.DirectionDown
+	}
+
+	return demaSignal
+}
+
+func (s *Strategy) shouldStop(kline types.KLine, stSignal types.Direction, demaSignal types.Direction, lgSignal types.Direction) bool {
+	stopNow := false
+	base := s.Position.GetBase()
+	baseSign := base.Sign()
+
+	if s.StopLossByTriggeringK && !s.currentStopLossPrice.IsZero() && ((baseSign < 0 && kline.GetClose().Compare(s.currentStopLossPrice) > 0) || (baseSign > 0 && kline.GetClose().Compare(s.currentStopLossPrice) < 0)) {
+		// SL by triggering Kline low/high
+		bbgo.Notify("%s stop loss by triggering the kline low/high", s.Symbol)
+		stopNow = true
+	} else if s.TakeProfitAtrMultiplier > 0 && !s.currentTakeProfitPrice.IsZero() && ((baseSign < 0 && kline.GetClose().Compare(s.currentTakeProfitPrice) < 0) || (baseSign > 0 && kline.GetClose().Compare(s.currentTakeProfitPrice) > 0)) {
+		// TP by multiple of ATR
+		bbgo.Notify("%s take profit by multiple of ATR", s.Symbol)
+		stopNow = true
+	} else if s.StopByReversedSupertrend && ((baseSign < 0 && stSignal == types.DirectionUp) || (baseSign > 0 && stSignal == types.DirectionDown)) {
+		// Use supertrend signal to TP/SL
+		bbgo.Notify("%s stop by the reversed signal of Supertrend", s.Symbol)
+		stopNow = true
+	} else if s.StopByReversedDema && ((baseSign < 0 && demaSignal == types.DirectionUp) || (baseSign > 0 && demaSignal == types.DirectionDown)) {
+		// Use DEMA signal to TP/SL
+		bbgo.Notify("%s stop by the reversed signal of DEMA", s.Symbol)
+		stopNow = true
+	} else if s.StopByReversedLinGre && ((baseSign < 0 && lgSignal == types.DirectionUp) || (baseSign > 0 && lgSignal == types.DirectionDown)) {
+		// Use linear regression signal to TP/SL
+		bbgo.Notify("%s stop by the reversed signal of linear regression", s.Symbol)
+		stopNow = true
+	}
+
+	return stopNow
 }
 
 func (s *Strategy) generateOrderForm(side types.SideType, quantity fixedpoint.Value, marginOrderSideEffect types.MarginOrderSideEffectType) types.SubmitOrder {
@@ -393,62 +402,19 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		stSignal := s.Supertrend.GetSignal()
 
 		// DEMA signal
-		var demaSignal types.Direction
-		if closePrice > s.fastDEMA.Last() && closePrice > s.slowDEMA.Last() && !(openPrice > s.fastDEMA.Last() && openPrice > s.slowDEMA.Last()) {
-			demaSignal = types.DirectionUp
-		} else if closePrice < s.fastDEMA.Last() && closePrice < s.slowDEMA.Last() && !(openPrice < s.fastDEMA.Last() && openPrice < s.slowDEMA.Last()) {
-			demaSignal = types.DirectionDown
-		} else {
-			demaSignal = types.DirectionNone
-		}
+		demaSignal := s.getDemaSignal(openPrice, closePrice)
 
 		// Linear Regression signal
 		var lgSignal types.Direction
 		if s.LinearRegression != nil {
-			switch {
-			case s.LinearRegression.baseLineSlope > 0:
-				lgSignal = types.DirectionUp
-			case s.LinearRegression.baseLineSlope < 0:
-				lgSignal = types.DirectionDown
-			default:
-				lgSignal = types.DirectionNone
-			}
+			lgSignal = s.LinearRegression.GetSignal()
 		}
 
-		base := s.Position.GetBase()
-		baseSign := base.Sign()
-
 		// TP/SL if there's non-dust position and meets the criteria
-		if !s.Market.IsDustQuantity(base.Abs(), kline.GetClose()) {
-			stopNow := false
-
-			if s.StopLossByTriggeringK && !s.currentStopLossPrice.IsZero() && ((baseSign < 0 && kline.GetClose().Compare(s.currentStopLossPrice) > 0) || (baseSign > 0 && kline.GetClose().Compare(s.currentStopLossPrice) < 0)) {
-				// SL by triggering Kline low/high
-				bbgo.Notify("%s stop loss by triggering the kline low/high", s.Symbol)
-				stopNow = true
-			} else if s.TakeProfitAtrMultiplier > 0 && !s.currentTakeProfitPrice.IsZero() && ((baseSign < 0 && kline.GetClose().Compare(s.currentTakeProfitPrice) < 0) || (baseSign > 0 && kline.GetClose().Compare(s.currentTakeProfitPrice) > 0)) {
-				// TP by multiple of ATR
-				bbgo.Notify("%s take profit by multiple of ATR", s.Symbol)
-				stopNow = true
-			} else if s.StopByReversedSupertrend && ((baseSign < 0 && stSignal == types.DirectionUp) || (baseSign > 0 && stSignal == types.DirectionDown)) {
-				// Use supertrend signal to TP/SL
-				bbgo.Notify("%s stop by the reversed signal of Supertrend", s.Symbol)
-				stopNow = true
-			} else if s.StopByReversedDema && ((baseSign < 0 && demaSignal == types.DirectionUp) || (baseSign > 0 && demaSignal == types.DirectionDown)) {
-				// Use DEMA signal to TP/SL
-				bbgo.Notify("%s stop by the reversed signal of DEMA", s.Symbol)
-				stopNow = true
-			} else if s.StopByReversedLinGre && ((baseSign < 0 && lgSignal == types.DirectionUp) || (baseSign > 0 && lgSignal == types.DirectionDown)) {
-				// Use linear regression signal to TP/SL
-				bbgo.Notify("%s stop by the reversed signal of linear regression", s.Symbol)
-				stopNow = true
-			}
-
-			if stopNow {
-				if err := s.ClosePosition(ctx, fixedpoint.One); err == nil {
-					s.currentStopLossPrice = fixedpoint.Zero
-					s.currentTakeProfitPrice = fixedpoint.Zero
-				}
+		if !s.Market.IsDustQuantity(s.Position.GetBase().Abs(), kline.GetClose()) && s.shouldStop(kline, stSignal, demaSignal, lgSignal) {
+			if err := s.ClosePosition(ctx, fixedpoint.One); err == nil {
+				s.currentStopLossPrice = fixedpoint.Zero
+				s.currentTakeProfitPrice = fixedpoint.Zero
 			}
 		}
 
