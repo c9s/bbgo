@@ -73,8 +73,6 @@ exchangeStrategies:
     stopByReversedLinGre: false
 
     exits:
-      # Protective stop loss
-      - protectiveStopLoss:
-          activationRatio: 0.6%
-          stopLossRatio: -2%
-          placeStopOrder: false
+      # roiStopLoss is the stop loss percentage of the position ROI (currently the price change)
+      - roiStopLoss:
+          percentage: 5%
