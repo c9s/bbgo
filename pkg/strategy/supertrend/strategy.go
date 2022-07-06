@@ -237,6 +237,18 @@ func (s *Strategy) shouldStop(kline types.KLine, stSignal types.Direction, demaS
 	return stopNow
 }
 
+func (s *Strategy) getSide(stSignal types.Direction, demaSignal types.Direction, lgSignal types.Direction) types.SideType {
+	var side types.SideType
+
+	if stSignal == types.DirectionUp && demaSignal == types.DirectionUp && (s.LinearRegression == nil || lgSignal == types.DirectionUp) {
+		side = types.SideTypeBuy
+	} else if stSignal == types.DirectionDown && demaSignal == types.DirectionDown && (s.LinearRegression == nil || lgSignal == types.DirectionDown) {
+		side = types.SideTypeSell
+	}
+
+	return side
+}
+
 func (s *Strategy) generateOrderForm(side types.SideType, quantity fixedpoint.Value, marginOrderSideEffect types.MarginOrderSideEffectType) types.SubmitOrder {
 	orderForm := types.SubmitOrder{
 		Symbol:           s.Symbol,
@@ -348,14 +360,16 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 
-		closePrice := kline.GetClose().Float64()
-		openPrice := kline.GetOpen().Float64()
+		closePrice := kline.GetClose()
+		openPrice := kline.GetOpen()
+		closePrice64 := closePrice.Float64()
+		openPrice64 := openPrice.Float64()
 
 		// Supertrend signal
 		stSignal := s.Supertrend.GetSignal()
 
 		// DEMA signal
-		demaSignal := s.getDemaSignal(openPrice, closePrice)
+		demaSignal := s.getDemaSignal(openPrice64, closePrice64)
 
 		// Linear Regression signal
 		var lgSignal types.Direction
@@ -364,38 +378,38 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 
 		// TP/SL if there's non-dust position and meets the criteria
-		if !s.Market.IsDustQuantity(s.Position.GetBase().Abs(), kline.GetClose()) && s.shouldStop(kline, stSignal, demaSignal, lgSignal) {
+		if !s.Market.IsDustQuantity(s.Position.GetBase().Abs(), closePrice) && s.shouldStop(kline, stSignal, demaSignal, lgSignal) {
 			if err := s.ClosePosition(ctx, fixedpoint.One); err == nil {
 				s.currentStopLossPrice = fixedpoint.Zero
 				s.currentTakeProfitPrice = fixedpoint.Zero
 			}
 		}
 
-		// Open position
-		var side types.SideType
-		if stSignal == types.DirectionUp && demaSignal == types.DirectionUp && (s.LinearRegression == nil || lgSignal == types.DirectionUp) {
-			side = types.SideTypeBuy
+		// Get order side
+		side := s.getSide(stSignal, demaSignal, lgSignal)
+		// Set TP/SL price if needed
+		if side == types.SideTypeBuy {
 			if s.StopLossByTriggeringK {
 				s.currentStopLossPrice = kline.GetLow()
 			}
 			if s.TakeProfitAtrMultiplier > 0 {
-				s.currentTakeProfitPrice = kline.GetClose().Add(fixedpoint.NewFromFloat(s.Supertrend.AverageTrueRange.Last() * s.TakeProfitAtrMultiplier))
+				s.currentTakeProfitPrice = closePrice.Add(fixedpoint.NewFromFloat(s.Supertrend.AverageTrueRange.Last() * s.TakeProfitAtrMultiplier))
 			}
-		} else if stSignal == types.DirectionDown && demaSignal == types.DirectionDown && (s.LinearRegression == nil || lgSignal == types.DirectionDown) {
-			side = types.SideTypeSell
+		} else if side == types.SideTypeSell {
 			if s.StopLossByTriggeringK {
 				s.currentStopLossPrice = kline.GetHigh()
 			}
 			if s.TakeProfitAtrMultiplier > 0 {
-				s.currentTakeProfitPrice = kline.GetClose().Sub(fixedpoint.NewFromFloat(s.Supertrend.AverageTrueRange.Last() * s.TakeProfitAtrMultiplier))
+				s.currentTakeProfitPrice = closePrice.Sub(fixedpoint.NewFromFloat(s.Supertrend.AverageTrueRange.Last() * s.TakeProfitAtrMultiplier))
 			}
 		}
 
+		// Open position
 		// The default value of side is an empty string. Unless side is set by the checks above, the result of the following condition is false
 		if side == types.SideTypeSell || side == types.SideTypeBuy {
 			bbgo.Notify("open %s position for signal %v", s.Symbol, side)
 			// Close opposite position if any
-			if !s.Position.IsDust(kline.GetClose()) {
+			if !s.Position.IsDust(closePrice) {
 				if (side == types.SideTypeSell && s.Position.IsLong()) || (side == types.SideTypeBuy && s.Position.IsShort()) {
 					bbgo.Notify("close existing %s position before open a new position", s.Symbol)
 					_ = s.ClosePosition(ctx, fixedpoint.One)
@@ -405,7 +419,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				}
 			}
 
-			orderForm := s.generateOrderForm(side, s.calculateQuantity(kline.GetClose()), types.SideEffectTypeMarginBuy)
+			orderForm := s.generateOrderForm(side, s.calculateQuantity(closePrice), types.SideEffectTypeMarginBuy)
 			log.Infof("submit open position order %v", orderForm)
 			_, err := s.orderExecutor.SubmitOrders(ctx, orderForm)
 			if err != nil {
