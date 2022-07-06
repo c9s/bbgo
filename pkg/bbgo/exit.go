@@ -81,4 +81,8 @@ func (m *ExitMethod) Bind(session *ExchangeSession, orderExecutor *GeneralOrderE
 	if m.CumulatedVolumeTakeProfit != nil {
 		m.CumulatedVolumeTakeProfit.Bind(session, orderExecutor)
 	}
+
+	if m.TrailingStop != nil {
+		m.TrailingStop.Bind(session, orderExecutor)
+	}
 }
