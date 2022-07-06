@@ -13,6 +13,7 @@
     "@mantine/core": "^4.2.5",
     "@mantine/hooks": "^4.2.5",
     "@mantine/next": "^4.2.5",
+    "d3": "^7.4.4",
     "d3-dsv": "^3.0.1",
     "d3-format": "^3.1.0",
     "d3-scale": "^4.0.2",
@@ -21,9 +22,12 @@
     "lightweight-charts": "^3.8.0",
     "moment": "^2.29.3",
     "next": "12.1.6",
+    "plotly.js": "^2.12.1",
+    "plotly.js-dist-min": "^2.12.1",
     "react": "18.1.0",
     "react-compound-slider": "^3.4.0",
     "react-dom": "18.1.0",
+    "react-plotly.js": "^2.5.1",
     "tabler-icons-react": "^1.48.0"
   },
   "devDependencies": {
