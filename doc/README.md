@@ -26,6 +26,7 @@
 * [Support](strategy/support.md) - Support strategy that buys on high volume support
 
 ### Development
+* [Developing Strategy](topics/developing-strategy.md) - developing strategy
 * [Adding New Exchange](development/adding-new-exchange.md) - Check lists for adding new exchanges
 * [KuCoin Command-line Test Tool](development/kucoin-cli.md) - Kucoin command-line tools
 * [SQL Migration](development/migration.md) - Adding new SQL migration scripts
