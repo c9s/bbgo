@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
@@ -23,7 +24,6 @@ func (s *TestStructWithoutInstanceID) ID() string {
 
 type TestStruct struct {
 	*Environment
-	*Graceful
 
 	Position *types.Position `persistence:"position"`
 	Integer  int64           `persistence:"integer"`
@@ -83,7 +83,7 @@ func Test_loadPersistenceFields(t *testing.T) {
 		t.Run(psName+"/nil", func(t *testing.T) {
 			var b *TestStruct = nil
 			err := loadPersistenceFields(b, "test-nil", ps)
-			assert.Equal(t, errCanNotIterateNilPointer, err)
+			assert.Equal(t, dynamic.ErrCanNotIterateNilPointer, err)
 		})
 
 		t.Run(psName+"/pointer-field", func(t *testing.T) {

@@ -160,10 +160,6 @@ func (set *StandardIndicatorSet) VOLATILITY(iw types.IntervalWindow) *indicator.
 // ExchangeSession presents the exchange connection Session
 // It also maintains and collects the data returned from the stream.
 type ExchangeSession struct {
-	// exchange Session based notification system
-	// we make it as a value field so that we can configure it separately
-	Notifiability `json:"-" yaml:"-"`
-
 	// ---------------------------
 	// Session config fields
 	// ---------------------------
@@ -253,12 +249,6 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 	marketDataStream.SetPublicOnly()
 
 	session := &ExchangeSession{
-		Notifiability: Notifiability{
-			SymbolChannelRouter:  NewPatternChannelRouter(nil),
-			SessionChannelRouter: NewPatternChannelRouter(nil),
-			ObjectChannelRouter:  NewObjectChannelRouter(),
-		},
-
 		Name:             name,
 		Exchange:         exchange,
 		UserDataStream:   userDataStream,
@@ -282,8 +272,7 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 
 	session.OrderExecutor = &ExchangeOrderExecutor{
 		// copy the notification system so that we can route
-		Notifiability: session.Notifiability,
-		Session:       session,
+		Session: session,
 	}
 
 	return session
@@ -805,11 +794,6 @@ func (session *ExchangeSession) InitExchange(name string, ex types.Exchange) err
 	}
 
 	session.Name = name
-	session.Notifiability = Notifiability{
-		SymbolChannelRouter:  NewPatternChannelRouter(nil),
-		SessionChannelRouter: NewPatternChannelRouter(nil),
-		ObjectChannelRouter:  NewObjectChannelRouter(),
-	}
 	session.Exchange = ex
 	session.UserDataStream = ex.NewStream()
 	session.MarketDataStream = ex.NewStream()
@@ -830,8 +814,7 @@ func (session *ExchangeSession) InitExchange(name string, ex types.Exchange) err
 	session.orderStores = make(map[string]*OrderStore)
 	session.OrderExecutor = &ExchangeOrderExecutor{
 		// copy the notification system so that we can route
-		Notifiability: session.Notifiability,
-		Session:       session,
+		Session: session,
 	}
 
 	session.usedSymbols = make(map[string]struct{})

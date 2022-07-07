@@ -58,7 +58,6 @@ func (s *State) Reset() {
 }
 
 type Strategy struct {
-	*bbgo.Graceful
 	*bbgo.Persistence
 	*bbgo.Environment
 
@@ -180,7 +179,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		return err
 	}
 
-	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
+	bbgo.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 
 		s.SaveState()

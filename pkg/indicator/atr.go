@@ -9,6 +9,7 @@ import (
 
 //go:generate callbackgen -type ATR
 type ATR struct {
+	types.SeriesBase
 	types.IntervalWindow
 	PercentageVolatility types.Float64Slice
 
@@ -25,6 +26,7 @@ func (inc *ATR) Update(high, low, cloze float64) {
 	}
 
 	if inc.RMA == nil {
+		inc.SeriesBase.Series = inc
 		inc.RMA = &RMA{
 			IntervalWindow: types.IntervalWindow{Window: inc.Window},
 			Adjust:         true,
@@ -73,7 +75,7 @@ func (inc *ATR) Length() int {
 	return inc.RMA.Length()
 }
 
-var _ types.Series = &ATR{}
+var _ types.SeriesExtend = &ATR{}
 
 func (inc *ATR) CalculateAndUpdate(kLines []types.KLine) {
 	for _, k := range kLines {

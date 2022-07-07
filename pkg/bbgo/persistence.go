@@ -6,6 +6,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/service"
 )
 
@@ -106,10 +107,10 @@ func Sync(obj interface{}) {
 }
 
 func loadPersistenceFields(obj interface{}, id string, persistence service.PersistenceService) error {
-	return iterateFieldsByTag(obj, "persistence", func(tag string, field reflect.StructField, value reflect.Value) error {
+	return dynamic.IterateFieldsByTag(obj, "persistence", func(tag string, field reflect.StructField, value reflect.Value) error {
 		log.Debugf("[loadPersistenceFields] loading value into field %v, tag = %s, original value = %v", field, tag, value)
 
-		newValueInf := newTypeValueInterface(value.Type())
+		newValueInf := dynamic.NewTypeValueInterface(value.Type())
 		// inf := value.Interface()
 		store := persistence.NewStore("state", id, tag)
 		if err := store.Load(&newValueInf); err != nil {
@@ -134,7 +135,7 @@ func loadPersistenceFields(obj interface{}, id string, persistence service.Persi
 }
 
 func storePersistenceFields(obj interface{}, id string, persistence service.PersistenceService) error {
-	return iterateFieldsByTag(obj, "persistence", func(tag string, ft reflect.StructField, fv reflect.Value) error {
+	return dynamic.IterateFieldsByTag(obj, "persistence", func(tag string, ft reflect.StructField, fv reflect.Value) error {
 		log.Debugf("[storePersistenceFields] storing value from field %v, tag = %s, original value = %v", ft, tag, fv)
 
 		inf := fv.Interface()

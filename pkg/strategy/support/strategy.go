@@ -134,7 +134,6 @@ func (control *TrailingStopControl) GenerateStopOrder(quantity fixedpoint.Value)
 type Strategy struct {
 	*bbgo.Persistence `json:"-"`
 	*bbgo.Environment `json:"-"`
-	*bbgo.Graceful    `json:"-"`
 
 	session *bbgo.ExchangeSession
 
@@ -335,7 +334,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	// trade stats
 	if s.TradeStats == nil {
-		s.TradeStats = &types.TradeStats{}
+		s.TradeStats = types.NewTradeStats(s.Symbol)
 	}
 
 	s.orderExecutor = bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
@@ -582,7 +581,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 	})
 
-	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
+	bbgo.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 
 		// Cancel trailing stop order

@@ -204,14 +204,14 @@ type ProfitStats struct {
 	QuoteCurrency string `json:"quoteCurrency"`
 	BaseCurrency  string `json:"baseCurrency"`
 
-	AccumulatedPnL       fixedpoint.Value `json:"accumulatedPnL,omitempty"`
+	AccumulatedPnL         fixedpoint.Value `json:"accumulatedPnL,omitempty"`
 	AccumulatedNetProfit   fixedpoint.Value `json:"accumulatedNetProfit,omitempty"`
 	AccumulatedGrossProfit fixedpoint.Value `json:"accumulatedProfit,omitempty"`
 	AccumulatedGrossLoss   fixedpoint.Value `json:"accumulatedLoss,omitempty"`
 	AccumulatedVolume      fixedpoint.Value `json:"accumulatedVolume,omitempty"`
-	AccumulatedSince     int64            `json:"accumulatedSince,omitempty"`
+	AccumulatedSince       int64            `json:"accumulatedSince,omitempty"`
 
-	TodayPnL       fixedpoint.Value `json:"todayPnL,omitempty"`
+	TodayPnL         fixedpoint.Value `json:"todayPnL,omitempty"`
 	TodayNetProfit   fixedpoint.Value `json:"todayNetProfit,omitempty"`
 	TodayGrossProfit fixedpoint.Value `json:"todayProfit,omitempty"`
 	TodayGrossLoss   fixedpoint.Value `json:"todayLoss,omitempty"`
@@ -279,11 +279,11 @@ func (s *ProfitStats) PlainText() string {
 	return fmt.Sprintf("%s Profit Today\n"+
 		"Profit %s %s\n"+
 		"Net profit %s %s\n"+
-		"Trade Loss %s %s\n"+
+		"Gross Loss %s %s\n"+
 		"Summary:\n"+
 		"Accumulated Profit %s %s\n"+
 		"Accumulated Net Profit %s %s\n"+
-		"Accumulated Trade Loss %s %s\n"+
+		"Accumulated Gross Loss %s %s\n"+
 		"Since %s",
 		s.Symbol,
 		s.TodayPnL.String(), s.QuoteCurrency,
