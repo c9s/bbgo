@@ -45,8 +45,6 @@ type State struct {
 }
 
 type Strategy struct {
-	*bbgo.Graceful `json:"-" yaml:"-"`
-
 	*bbgo.Persistence
 
 	// OrderExecutor is an interface for submitting order.
@@ -621,7 +619,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 	s.tradeCollector.BindStream(session.UserDataStream)
 
-	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
+	bbgo.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 
 		if err := s.SaveState(); err != nil {

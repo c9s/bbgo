@@ -1,15 +1,24 @@
 package types
 
 func (s *SeriesBase) Index(i int) float64 {
-	return s.index(i)
+	if s.Series == nil {
+		return 0
+	}
+	return s.Series.Index(i)
 }
 
 func (s *SeriesBase) Last() float64 {
-	return s.last()
+	if s.Series == nil {
+		return 0
+	}
+	return s.Series.Last()
 }
 
 func (s *SeriesBase) Length() int {
-	return s.length()
+	if s.Series == nil {
+		return 0
+	}
+	return s.Series.Length()
 }
 
 func (s *SeriesBase) Sum(limit ...int) float64 {
@@ -80,6 +89,38 @@ func (s *SeriesBase) Change(offset ...int) SeriesExtend {
 	return Change(s, offset...)
 }
 
-func (s *SeriesBase) Stdev(length int) float64 {
-	return Stdev(s, length)
+func (s *SeriesBase) PercentageChange(offset ...int) SeriesExtend {
+	return PercentageChange(s, offset...)
+}
+
+func (s *SeriesBase) Stdev(params ...int) float64 {
+	return Stdev(s, params...)
+}
+
+func (s *SeriesBase) Rolling(window int) *RollingResult {
+	return Rolling(s, window)
+}
+
+func (s *SeriesBase) Shift(offset int) SeriesExtend {
+	return Shift(s, offset)
+}
+
+func (s *SeriesBase) Skew(length int) float64 {
+	return Skew(s, length)
+}
+
+func (s *SeriesBase) Variance(length int) float64 {
+	return Variance(s, length)
+}
+
+func (s *SeriesBase) Covariance(b Series, length int) float64 {
+	return Covariance(s, b, length)
+}
+
+func (s *SeriesBase) Correlation(b Series, length int, method ...CorrFunc) float64 {
+	return Correlation(s, b, length, method...)
+}
+
+func (s *SeriesBase) Rank(length int) SeriesExtend {
+	return Rank(s, length)
 }

@@ -8,10 +8,16 @@ import (
 )
 
 type RoiStopLoss struct {
+	Symbol     string
 	Percentage fixedpoint.Value `json:"percentage"`
 
 	session       *ExchangeSession
 	orderExecutor *GeneralOrderExecutor
+}
+
+func (s *RoiStopLoss) Subscribe(session *ExchangeSession) {
+	// use 1m kline to handle roi stop
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: types.Interval1m})
 }
 
 func (s *RoiStopLoss) Bind(session *ExchangeSession, orderExecutor *GeneralOrderExecutor) {
@@ -19,13 +25,9 @@ func (s *RoiStopLoss) Bind(session *ExchangeSession, orderExecutor *GeneralOrder
 	s.orderExecutor = orderExecutor
 
 	position := orderExecutor.Position()
-	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
-		if kline.Symbol != position.Symbol || kline.Interval != types.Interval1m {
-			return
-		}
-
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(kline types.KLine) {
 		s.checkStopPrice(kline.Close, position)
-	})
+	}))
 
 	if !IsBackTesting {
 		session.MarketDataStream.OnMarketTrade(func(trade types.Trade) {

@@ -49,7 +49,6 @@ type BollingerSetting struct {
 }
 
 type Strategy struct {
-	*bbgo.Graceful
 	*bbgo.Persistence
 
 	Environment          *bbgo.Environment
@@ -214,18 +213,6 @@ func (s *Strategy) CurrentPosition() *types.Position {
 
 func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Value) error {
 	return s.orderExecutor.ClosePosition(ctx, percentage)
-}
-
-// Deprecated: LoadState method is migrated to the persistence struct tag.
-func (s *Strategy) LoadState() error {
-	var state State
-
-	// load position
-	if err := s.Persistence.Load(&state, ID, s.Symbol, stateKey); err == nil {
-		s.state = &state
-	}
-
-	return nil
 }
 
 func (s *Strategy) getCurrentAllowedExposurePosition(bandPercentage float64) (fixedpoint.Value, error) {
@@ -506,17 +493,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	// If position is nil, we need to allocate a new position for calculation
 	if s.Position == nil {
-		// restore state (legacy)
-		if err := s.LoadState(); err != nil {
-			return err
-		}
-
-		// fallback to the legacy position struct in the state
-		if s.state != nil && s.state.Position != nil && !s.state.Position.Base.IsZero() {
-			s.Position = s.state.Position
-		} else {
-			s.Position = types.NewPositionFromMarket(s.Market)
-		}
+		s.Position = types.NewPositionFromMarket(s.Market)
 	}
 
 	if s.session.MakerFeeRate.Sign() > 0 || s.session.TakerFeeRate.Sign() > 0 {
@@ -527,13 +504,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	}
 
 	if s.ProfitStats == nil {
-		if s.state != nil {
-			// copy profit stats
-			p2 := s.state.ProfitStats
-			s.ProfitStats = &p2
-		} else {
-			s.ProfitStats = types.NewProfitStats(s.Market)
-		}
+		s.ProfitStats = types.NewProfitStats(s.Market)
 	}
 
 	// Always update the position fields
@@ -616,7 +587,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	// s.book = types.NewStreamBook(s.Symbol)
 	// s.book.BindStreamForBackground(session.MarketDataStream)
 
-	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
+	bbgo.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 
 		_ = s.orderExecutor.GracefulCancel(ctx)

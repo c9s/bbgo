@@ -10,6 +10,7 @@ import (
 //go:generate callbackgen -type DEMA
 type DEMA struct {
 	types.IntervalWindow
+	types.SeriesBase
 	Values types.Float64Slice
 	a1     *EWMA
 	a2     *EWMA
@@ -19,6 +20,7 @@ type DEMA struct {
 
 func (inc *DEMA) Update(value float64) {
 	if len(inc.Values) == 0 {
+		inc.SeriesBase.Series = inc
 		inc.a1 = &EWMA{IntervalWindow: types.IntervalWindow{inc.Interval, inc.Window}}
 		inc.a2 = &EWMA{IntervalWindow: types.IntervalWindow{inc.Interval, inc.Window}}
 	}
@@ -46,7 +48,7 @@ func (inc *DEMA) Length() int {
 	return len(inc.Values)
 }
 
-var _ types.Series = &DEMA{}
+var _ types.SeriesExtend = &DEMA{}
 
 func (inc *DEMA) calculateAndUpdate(allKLines []types.KLine) {
 	if inc.a1 == nil {

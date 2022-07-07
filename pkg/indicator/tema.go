@@ -9,6 +9,7 @@ import (
 
 //go:generate callbackgen -type TEMA
 type TEMA struct {
+	types.SeriesBase
 	types.IntervalWindow
 	Values types.Float64Slice
 	A1     *EWMA
@@ -20,6 +21,7 @@ type TEMA struct {
 
 func (inc *TEMA) Update(value float64) {
 	if len(inc.Values) == 0 {
+		inc.SeriesBase.Series = inc
 		inc.A1 = &EWMA{IntervalWindow: types.IntervalWindow{inc.Interval, inc.Window}}
 		inc.A2 = &EWMA{IntervalWindow: types.IntervalWindow{inc.Interval, inc.Window}}
 		inc.A3 = &EWMA{IntervalWindow: types.IntervalWindow{inc.Interval, inc.Window}}
@@ -51,7 +53,7 @@ func (inc *TEMA) Length() int {
 	return len(inc.Values)
 }
 
-var _ types.Series = &TEMA{}
+var _ types.SeriesExtend = &TEMA{}
 
 func (inc *TEMA) calculateAndUpdate(allKLines []types.KLine) {
 	if inc.A1 == nil {

@@ -14,6 +14,7 @@ Accumulation/Distribution Indicator (A/D)
 */
 //go:generate callbackgen -type AD
 type AD struct {
+	types.SeriesBase
 	types.IntervalWindow
 	Values   types.Float64Slice
 	PrePrice float64
@@ -23,6 +24,9 @@ type AD struct {
 }
 
 func (inc *AD) Update(high, low, cloze, volume float64) {
+	if len(inc.Values) == 0 {
+		inc.SeriesBase.Series = inc
+	}
 	var moneyFlowVolume float64
 	if high == low {
 		moneyFlowVolume = 0
@@ -53,7 +57,7 @@ func (inc *AD) Length() int {
 	return len(inc.Values)
 }
 
-var _ types.Series = &AD{}
+var _ types.SeriesExtend = &AD{}
 
 func (inc *AD) calculateAndUpdate(kLines []types.KLine) {
 	for _, k := range kLines {

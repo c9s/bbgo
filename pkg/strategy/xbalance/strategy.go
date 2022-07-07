@@ -135,8 +135,6 @@ func (a *Address) UnmarshalJSON(body []byte) error {
 }
 
 type Strategy struct {
-	*bbgo.Graceful
-
 	Interval types.Duration `json:"interval"`
 
 	Addresses map[string]Address `json:"addresses"`
@@ -342,7 +340,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		s.State = s.newDefaultState()
 	}
 
-	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
+	bbgo.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 	})
 

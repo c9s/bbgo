@@ -184,9 +184,15 @@ var PnLCmd = &cobra.Command{
 			return errors.New("no ticker data for current price")
 		}
 
+		market, ok := session.Market(symbol)
+		if !ok {
+			return fmt.Errorf("market not found: %s, %s", symbol, session.Exchange.Name())
+		}
+
 		currentPrice := currentTick.Last
 		calculator := &pnl.AverageCostCalculator{
 			TradingFeeCurrency: tradingFeeCurrency,
+			Market:             market,
 		}
 
 		report := calculator.Calculate(symbol, trades, currentPrice)

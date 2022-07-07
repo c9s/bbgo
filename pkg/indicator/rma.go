@@ -11,6 +11,7 @@ import (
 // Refer: https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.ewm.html#pandas-dataframe-ewm
 //go:generate callbackgen -type RMA
 type RMA struct {
+	types.SeriesBase
 	types.IntervalWindow
 	Values          types.Float64Slice
 	counter         int
@@ -24,6 +25,7 @@ type RMA struct {
 func (inc *RMA) Update(x float64) {
 	lambda := 1 / float64(inc.Window)
 	if inc.counter == 0 {
+		inc.SeriesBase.Series = inc
 		inc.sum = 1
 		inc.tmp = x
 	} else {
@@ -60,7 +62,7 @@ func (inc *RMA) Length() int {
 	return len(inc.Values)
 }
 
-var _ types.Series = &RMA{}
+var _ types.SeriesExtend = &RMA{}
 
 func (inc *RMA) calculateAndUpdate(kLines []types.KLine) {
 	for _, k := range kLines {

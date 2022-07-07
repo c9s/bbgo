@@ -10,6 +10,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 
+	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/interact"
 )
 
@@ -72,8 +73,6 @@ type Trader struct {
 	exchangeStrategies      map[string][]SingleExchangeStrategy
 
 	logger Logger
-
-	Graceful Graceful
 }
 
 func NewTrader(environ *Environment) *Trader {
@@ -197,11 +196,11 @@ func (trader *Trader) RunSingleExchangeStrategy(ctx context.Context, strategy Si
 		return err
 	}
 
-	if err := injectField(rs, "OrderExecutor", orderExecutor, false); err != nil {
+	if err := dynamic.InjectField(rs, "OrderExecutor", orderExecutor, false); err != nil {
 		return errors.Wrapf(err, "failed to inject OrderExecutor on %T", strategy)
 	}
 
-	if symbol, ok := isSymbolBasedStrategy(rs); ok {
+	if symbol, ok := dynamic.LookupSymbolField(rs); ok {
 		log.Infof("found symbol based strategy from %s", rs.Type())
 
 		market, ok := session.Market(symbol)
@@ -219,7 +218,7 @@ func (trader *Trader) RunSingleExchangeStrategy(ctx context.Context, strategy Si
 			return fmt.Errorf("marketDataStore of symbol %s not found", symbol)
 		}
 
-		if err := parseStructAndInject(strategy,
+		if err := dynamic.ParseStructAndInject(strategy,
 			market,
 			indicatorSet,
 			store,
@@ -394,7 +393,7 @@ func (trader *Trader) injectCommonServices(s interface{}) error {
 	// a special injection for persistence selector:
 	// if user defined the selector, the facade pointer will be nil, hence we need to update the persistence facade pointer
 	sv := reflect.ValueOf(s).Elem()
-	if field, ok := hasField(sv, "Persistence"); ok {
+	if field, ok := dynamic.HasField(sv, "Persistence"); ok {
 		// the selector is set, but we need to update the facade pointer
 		if !field.IsNil() {
 			elem := field.Elem()
@@ -402,20 +401,19 @@ func (trader *Trader) injectCommonServices(s interface{}) error {
 				return fmt.Errorf("field Persistence is not a struct element, %s given", field)
 			}
 
-			if err := injectField(elem, "Facade", PersistenceServiceFacade, true); err != nil {
+			if err := dynamic.InjectField(elem, "Facade", PersistenceServiceFacade, true); err != nil {
 				return err
 			}
 
 			/*
-				if err := parseStructAndInject(field.Interface(), persistenceFacade); err != nil {
+				if err := ParseStructAndInject(field.Interface(), persistenceFacade); err != nil {
 					return err
 				}
 			*/
 		}
 	}
 
-	return parseStructAndInject(s,
-		&trader.Graceful,
+	return dynamic.ParseStructAndInject(s,
 		&trader.logger,
 		Notification,
 		trader.environment.TradeService,

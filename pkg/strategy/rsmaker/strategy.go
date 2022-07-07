@@ -29,9 +29,6 @@ func init() {
 }
 
 type Strategy struct {
-	*bbgo.Graceful
-	*bbgo.Notifiability
-
 	Environment          *bbgo.Environment
 	StandardIndicatorSet *bbgo.StandardIndicatorSet
 	Market               types.Market
@@ -416,7 +413,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	}
 
 	if s.TradeStats == nil {
-		s.TradeStats = &types.TradeStats{}
+		s.TradeStats = types.NewTradeStats(s.Symbol)
 	}
 
 	// initial required information

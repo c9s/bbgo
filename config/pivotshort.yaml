@@ -39,26 +39,30 @@ exchangeStrategies:
 
       # stopEMARange is the price range we allow short.
       # Short-allowed price range = [current price] > [EMA] * (1 - [stopEMARange])
-      stopEMARange: 0%
+      # Higher the stopEMARange than higher the chance to open a short
+      stopEMARange: 2%
       stopEMA:
         interval: 1h
         window: 99
 
-    bounceShort:
-      enabled: false
-      interval: 1h
-      window: 10
+    resistanceShort:
+      enabled: true
+      interval: 5m
+      window: 80
+
       quantity: 10.0
-      minDistance: 3%
-      # stopLossPercentage: 1%
+
+      # minDistance is used to ignore the place that is too near to the current price
+      minDistance: 5%
+      groupDistance: 1%
 
       # ratio is the ratio of the resistance price,
-      # higher the ratio, lower the price
-      # first_layer_price = resistance_price * (1 - ratio)
-      # second_layer_price = (resistance_price * (1 - ratio)) * (2 * layerSpread)
-      ratio: 0%
-      numOfLayers: 1
-      layerSpread: 0.1%
+      # higher the ratio, higher the sell price
+      # first_layer_price = resistance_price * (1 + ratio)
+      # second_layer_price = (resistance_price * (1 + ratio)) * (2 * layerSpread)
+      ratio: 1.5%
+      numOfLayers: 3
+      layerSpread: 0.4%
 
     exits:
     # (0) roiStopLoss is the stop loss percentage of the position ROI (currently the price change)
@@ -86,17 +90,20 @@ exchangeStrategies:
     # you can grab a simple stats by the following SQL:
     # SELECT ((close - low) / close) AS shadow_ratio FROM binance_klines WHERE symbol = 'ETHUSDT' AND `interval` = '5m' AND start_time > '2022-01-01' ORDER BY shadow_ratio DESC LIMIT 20;
     - lowerShadowTakeProfit:
+        interval: 30m
+        window: 99
         ratio: 3%
 
     # (5) cumulatedVolumeTakeProfit is used to take profit when the cumulated quote volume from the klines exceeded a threshold
     - cumulatedVolumeTakeProfit:
-        minQuoteVolume: 100_000_000
+        interval: 5m
         window: 2
+        minQuoteVolume: 200_000_000
 
 backtest:
   sessions:
   - binance
-  startTime: "2022-04-01"
+  startTime: "2022-01-01"
   endTime: "2022-06-18"
   symbols:
   - ETHUSDT

@@ -49,10 +49,6 @@ type Strategy struct {
 	// This field will be injected automatically since we defined the Symbol field.
 	*bbgo.StandardIndicatorSet
 
-	// Graceful shutdown function
-	*bbgo.Graceful
-	// --------------------------
-
 	// ewma is the exponential weighted moving average indicator
 	ewma *indicator.EWMA
 }
@@ -114,7 +110,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.activeOrders = bbgo.NewActiveOrderBook(s.Symbol)
 	s.activeOrders.BindStream(session.UserDataStream)
 
-	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
+	bbgo.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 
 		log.Infof("canceling active orders...")
