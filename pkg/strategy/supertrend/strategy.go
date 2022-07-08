@@ -283,9 +283,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.ProfitStats = types.NewProfitStats(s.Market)
 	}
 
-	// Trade stats
 	if s.TradeStats == nil {
-		s.TradeStats = &types.TradeStats{}
+		s.TradeStats = types.NewTradeStats(s.Symbol)
 	}
 
 	// Set fee rate
