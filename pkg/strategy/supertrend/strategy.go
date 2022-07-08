@@ -6,8 +6,6 @@ import (
 	"os"
 	"sync"
 
-	"github.com/c9s/bbgo/pkg/util"
-
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
@@ -19,12 +17,9 @@ import (
 
 const ID = "supertrend"
 
-const stateKey = "state-v1"
-
 var log = logrus.WithField("strategy", ID)
 
 // TODO: limit order for ATR TP
-
 func init() {
 	// Register the pointer of the strategy struct,
 	// so that bbgo knows what struct to be used to unmarshal the configs (YAML or JSON)
@@ -33,24 +28,13 @@ func init() {
 }
 
 type Strategy struct {
-	*bbgo.Persistence
-
 	Environment *bbgo.Environment
-	session     *bbgo.ExchangeSession
 	Market      types.Market
 
 	// persistence fields
 	Position    *types.Position    `persistence:"position"`
 	ProfitStats *types.ProfitStats `persistence:"profit_stats"`
 	TradeStats  *types.TradeStats  `persistence:"trade_stats"`
-
-	// Order and trade
-	orderExecutor *bbgo.GeneralOrderExecutor
-
-	// groupID is the group ID used for the strategy instance for canceling orders
-	groupID uint32
-
-	stopC chan struct{}
 
 	// Symbol is the market symbol you want to trade
 	Symbol string `json:"symbol"`
@@ -90,11 +74,13 @@ type Strategy struct {
 	// StopByReversedLinGre TP/SL by reversed linear regression signal
 	StopByReversedLinGre bool `json:"stopByReversedLinGre"`
 
+	// ExitMethods Exit methods
+	ExitMethods bbgo.ExitMethodSet `json:"exits"`
+
+	session                *bbgo.ExchangeSession
+	orderExecutor          *bbgo.GeneralOrderExecutor
 	currentTakeProfitPrice fixedpoint.Value
 	currentStopLossPrice   fixedpoint.Value
-
-	// ExitMethods Exit methods
-	ExitMethods []bbgo.ExitMethod `json:"exits"`
 
 	// StrategyController
 	bbgo.StrategyController
@@ -256,7 +242,6 @@ func (s *Strategy) generateOrderForm(side types.SideType, quantity fixedpoint.Va
 		Type:             types.OrderTypeMarket,
 		Quantity:         quantity,
 		MarginSideEffect: marginOrderSideEffect,
-		GroupID:          s.groupID,
 	}
 
 	return orderForm
@@ -279,9 +264,11 @@ func (s *Strategy) calculateQuantity(currentPrice fixedpoint.Value) fixedpoint.V
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	s.session = session
 
+	s.currentStopLossPrice = fixedpoint.Zero
+	s.currentTakeProfitPrice = fixedpoint.Zero
+
 	// calculate group id for orders
 	instanceID := s.InstanceID()
-	s.groupID = util.FNV32(instanceID)
 
 	// If position is nil, we need to allocate a new position for calculation
 	if s.Position == nil {
@@ -321,16 +308,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		bbgo.Sync(s)
 	})
 
-	s.stopC = make(chan struct{})
-
 	// StrategyController
 	s.Status = types.StrategyStatusRunning
-
 	s.OnSuspend(func() {
 		_ = s.orderExecutor.GracefulCancel(ctx)
-		_ = s.Persistence.Sync(s)
+		bbgo.Sync(s)
 	})
-
 	s.OnEmergencyStop(func() {
 		_ = s.orderExecutor.GracefulCancel(ctx)
 		// Close 100% position
@@ -345,17 +328,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		method.Bind(session, s.orderExecutor)
 	}
 
-	s.currentStopLossPrice = fixedpoint.Zero
-	s.currentTakeProfitPrice = fixedpoint.Zero
-
-	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
 		// StrategyController
 		if s.Status != types.StrategyStatusRunning {
-			return
-		}
-
-		// skip k-lines from other symbols or other intervals
-		if kline.Symbol != s.Symbol || kline.Interval != s.Interval {
 			return
 		}
 
@@ -426,12 +401,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				bbgo.Notify("can not place %s open position order", s.Symbol)
 			}
 		}
-	})
+	}))
 
 	// Graceful shutdown
 	bbgo.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
-		close(s.stopC)
 
 		_ = s.orderExecutor.GracefulCancel(ctx)
 		_, _ = fmt.Fprintln(os.Stderr, s.TradeStats.String())
