@@ -44,12 +44,8 @@ type Strategy struct {
 	// Double DEMA
 	DoubleDema *DoubleDema
 
-
 	// SuperTrend indicator
-	// SuperTrend SuperTrend `json:"superTrend"`
 	Supertrend *indicator.Supertrend
-	// SupertrendWindow ATR window for calculation of supertrend
-	SupertrendWindow int `json:"supertrendWindow"`
 	// SupertrendMultiplier ATR multiplier for calculation of supertrend
 	SupertrendMultiplier float64 `json:"supertrendMultiplier"`
 
@@ -112,6 +108,7 @@ func (s *Strategy) Validate() error {
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.LinearRegression.Interval})
 }
 
 // Position control
@@ -168,14 +165,14 @@ func (s *Strategy) setupIndicators() {
 	s.DoubleDema.setupDoubleDema(kLineStore, s.Interval)
 
 	// Supertrend
-	if s.SupertrendWindow == 0 {
-		s.SupertrendWindow = 39
+	if s.Window == 0 {
+		s.Window = 39
 	}
 	if s.SupertrendMultiplier == 0 {
 		s.SupertrendMultiplier = 3
 	}
-	s.Supertrend = &indicator.Supertrend{IntervalWindow: types.IntervalWindow{Window: s.SupertrendWindow, Interval: s.Interval}, ATRMultiplier: s.SupertrendMultiplier}
-	s.Supertrend.AverageTrueRange = &indicator.ATR{IntervalWindow: types.IntervalWindow{Window: s.SupertrendWindow, Interval: s.Interval}}
+	s.Supertrend = &indicator.Supertrend{IntervalWindow: types.IntervalWindow{Window: s.Window, Interval: s.Interval}, ATRMultiplier: s.SupertrendMultiplier}
+	s.Supertrend.AverageTrueRange = &indicator.ATR{IntervalWindow: types.IntervalWindow{Window: s.Window, Interval: s.Interval}}
 	s.Supertrend.Bind(kLineStore)
 	preloadSupertrend(s.Supertrend, kLineStore)
 

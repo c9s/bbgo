@@ -7,7 +7,7 @@ import (
 )
 
 type DoubleDema struct {
-	Interval types.Interval `json:"interval"`
+	DemaInterval types.Interval `json:"demaInterval"`
 
 	// FastDEMAWindow DEMA window for checking breakout
 	FastDEMAWindow int `json:"fastDEMAWindow"`
@@ -46,19 +46,19 @@ func (dd *DoubleDema) preloadDema(kLineStore *bbgo.MarketDataStore) {
 
 // setupDoubleDema initializes double DEMA indicators
 func (dd *DoubleDema) setupDoubleDema(kLineStore *bbgo.MarketDataStore, interval types.Interval) {
-	dd.Interval = interval
+	dd.DemaInterval = interval
 
 	// DEMA
 	if dd.FastDEMAWindow == 0 {
 		dd.FastDEMAWindow = 144
 	}
-	dd.fastDEMA = &indicator.DEMA{IntervalWindow: types.IntervalWindow{Interval: dd.Interval, Window: dd.FastDEMAWindow}}
+	dd.fastDEMA = &indicator.DEMA{IntervalWindow: types.IntervalWindow{Interval: dd.DemaInterval, Window: dd.FastDEMAWindow}}
 	dd.fastDEMA.Bind(kLineStore)
 
 	if dd.SlowDEMAWindow == 0 {
 		dd.SlowDEMAWindow = 169
 	}
-	dd.slowDEMA = &indicator.DEMA{IntervalWindow: types.IntervalWindow{Interval: dd.Interval, Window: dd.SlowDEMAWindow}}
+	dd.slowDEMA = &indicator.DEMA{IntervalWindow: types.IntervalWindow{Interval: dd.DemaInterval, Window: dd.SlowDEMAWindow}}
 	dd.slowDEMA.Bind(kLineStore)
 
 	dd.preloadDema(kLineStore)
