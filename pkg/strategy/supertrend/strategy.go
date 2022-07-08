@@ -42,7 +42,7 @@ type Strategy struct {
 	types.IntervalWindow
 
 	// Double DEMA
-	DoubleDema
+	DoubleDema *DoubleDema
 
 
 	// SuperTrend indicator
@@ -165,7 +165,7 @@ func (s *Strategy) setupIndicators() {
 	kLineStore, _ := s.session.MarketDataStore(s.Symbol)
 
 	// Double DEMA
-	s.setupDoubleDema(kLineStore, s.Interval)
+	s.DoubleDema.setupDoubleDema(kLineStore, s.Interval)
 
 	// Supertrend
 	if s.SupertrendWindow == 0 {
@@ -342,7 +342,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		stSignal := s.Supertrend.GetSignal()
 
 		// DEMA signal
-		demaSignal := s.getDemaSignal(openPrice64, closePrice64)
+		demaSignal := s.DoubleDema.getDemaSignal(openPrice64, closePrice64)
 
 		// Linear Regression signal
 		var lgSignal types.Direction
