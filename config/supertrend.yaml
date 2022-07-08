@@ -38,19 +38,17 @@ exchangeStrategies:
     # interval is how long do you want to update your order price and quantity
     interval: 5m
 
+    # ATR window used by Supertrend
+    window: 49
+    # ATR Multiplier for calculating super trend prices, the higher, the stronger the trends are
+    supertrendMultiplier: 4
+
     # leverage is the leverage of the orders
     leverage: 1.0
 
     # fastDEMAWindow and slowDEMAWindow are for filtering super trend noise
     fastDEMAWindow: 144
     slowDEMAWindow: 169
-
-    # Supertrend indicator parameters
-    superTrend:
-      # ATR window used by Supertrend
-      averageTrueRangeWindow: 49
-      # ATR Multiplier for calculating super trend prices, the higher, the stronger the trends are
-      averageTrueRangeMultiplier: 4
 
     # Use linear regression as trend confirmation
     linearRegression:
