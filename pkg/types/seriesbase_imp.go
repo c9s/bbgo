@@ -124,3 +124,19 @@ func (s *SeriesBase) Correlation(b Series, length int, method ...CorrFunc) float
 func (s *SeriesBase) Rank(length int) SeriesExtend {
 	return Rank(s, length)
 }
+
+func (s *SeriesBase) Sigmoid() SeriesExtend {
+	return Sigmoid(s)
+}
+
+func (s *SeriesBase) Softmax(window int) SeriesExtend {
+	return Softmax(s, window)
+}
+
+func (s *SeriesBase) Entropy(window int) float64 {
+	return Entropy(s, window)
+}
+
+func (s *SeriesBase) CrossEntropy(b Series, window int) float64 {
+	return CrossEntropy(s, b, window)
+}
