@@ -94,6 +94,10 @@ type SeriesExtend interface {
 	Covariance(b Series, length int) float64
 	Correlation(b Series, length int, method ...CorrFunc) float64
 	Rank(length int) SeriesExtend
+	Sigmoid() SeriesExtend
+	Softmax(window int) SeriesExtend
+	Entropy(window int) float64
+	CrossEntropy(b Series, window int) float64
 }
 
 type SeriesBase struct {
@@ -524,7 +528,69 @@ var _ Series = &MulSeriesResult{}
 // if limit is given, will only calculate the first limit numbers (a.Index[0..limit])
 // otherwise will operate on all elements
 func Dot(a interface{}, b interface{}, limit ...int) float64 {
-	return Sum(Mul(a, b), limit...)
+	var aaf float64
+	var aas Series
+	var bbf float64
+	var bbs Series
+	var isaf, isbf bool
+
+	switch tp := a.(type) {
+	case float64:
+		aaf = tp
+		isaf = true
+	case Series:
+		aas = tp
+		isaf = false
+	default:
+		panic("input should be either Series or float64")
+	}
+	switch tp := b.(type) {
+	case float64:
+		bbf = tp
+		isbf = true
+	case Series:
+		bbs = tp
+		isbf = false
+	default:
+		panic("input should be either Series or float64")
+
+	}
+	l := 1
+	if len(limit) > 0 {
+		l = limit[0]
+	} else if isaf && isbf {
+		l = 1
+	} else {
+		if !isaf {
+			l = aas.Length()
+		}
+		if !isbf {
+			if l > bbs.Length() {
+				l = bbs.Length()
+			}
+		}
+	}
+	if isaf && isbf {
+		return aaf * bbf * float64(l)
+	} else if isaf && !isbf {
+		sum := 0.
+		for i := 0; i < l; i++ {
+			sum += aaf * bbs.Index(i)
+		}
+		return sum
+	} else if !isaf && isbf {
+		sum := 0.
+		for i := 0; i < l; i++ {
+			sum += aas.Index(i) * bbf
+		}
+		return sum
+	} else {
+		sum := 0.
+		for i := 0; i < l; i++ {
+			sum += aas.Index(i) * bbs.Index(i)
+		}
+		return sum
+	}
 }
 
 // Extract elements from the Series to a float64 array, following the order of Index(0..limit)
@@ -879,6 +945,177 @@ func (r *RollingResult) Length() int {
 
 func Rolling(a Series, window int) *RollingResult {
 	return &RollingResult{a, window}
+}
+
+type SigmoidResult struct {
+	a Series
+}
+
+func (s *SigmoidResult) Last() float64 {
+	return 1. / (1. + math.Exp(-s.a.Last()))
+}
+
+func (s *SigmoidResult) Index(i int) float64 {
+	return 1. / (1. + math.Exp(-s.a.Index(i)))
+}
+
+func (s *SigmoidResult) Length() int {
+	return s.a.Length()
+}
+
+// Sigmoid returns the input values in range of -1 to 1
+// along the sigmoid or s-shaped curve.
+// Commonly used in machine learning while training neural networks
+// as an activation function.
+func Sigmoid(a Series) SeriesExtend {
+	return NewSeries(&SigmoidResult{a})
+}
+
+// SoftMax returns the input value in the range of 0 to 1
+// with sum of all the probabilities being equal to one.
+// It is commonly used in machine learning neural networks.
+// Will return Softmax SeriesExtend result based in latest [window] numbers from [a] Series
+func Softmax(a Series, window int) SeriesExtend {
+	s := 0.0
+	max := Highest(a, window)
+	for i := 0; i < window; i++ {
+		s += math.Exp(a.Index(i) - max)
+	}
+	out := NewQueue(window)
+	for i := window - 1; i >= 0; i-- {
+		out.Update(math.Exp(a.Index(i)-max) / s)
+	}
+	return out
+}
+
+// Entropy computes the Shannon entropy of a distribution or the distance between
+// two distributions. The natural logarithm is used.
+// - sum(v * ln(v))
+func Entropy(a Series, window int) (e float64) {
+	for i := 0; i < window; i++ {
+		v := a.Index(i)
+		if v != 0 {
+			e -= v * math.Log(v)
+		}
+	}
+	return e
+}
+
+// CrossEntropy computes the cross-entropy between the two distributions
+func CrossEntropy(a, b Series, window int) (e float64) {
+	for i := 0; i < window; i++ {
+		v := a.Index(i)
+		if v != 0 {
+			e -= v * math.Log(b.Index(i))
+		}
+	}
+	return e
+}
+
+func sigmoid(z float64) float64 {
+	return 1. / (1. + math.Exp(-z))
+}
+
+func propagate(w []float64, gradient float64, x [][]float64, y []float64) (float64, []float64, float64) {
+	logloss_epoch := 0.0
+	var activations []float64
+	var dw []float64
+	m := len(y)
+	db := 0.0
+	for i, xx := range x {
+		result := 0.0
+		for j, ww := range w {
+			result += ww * xx[j]
+		}
+		a := sigmoid(result + gradient)
+		activations = append(activations, a)
+		logloss := a*math.Log1p(y[i]) + (1.-a)*math.Log1p(1-y[i])
+		logloss_epoch += logloss
+
+		db += a - y[i]
+	}
+	for j := range w {
+		err := 0.0
+		for i, xx := range x {
+			err_i := activations[i] - y[i]
+			err += err_i * xx[j]
+		}
+		err /= float64(m)
+		dw = append(dw, err)
+	}
+
+	cost := -(logloss_epoch / float64(len(x)))
+	db /= float64(m)
+	return cost, dw, db
+}
+
+func LogisticRegression(x []Series, y Series, lookback, iterations int, learningRate float64) *LogisticRegressionModel {
+	features := len(x)
+	if features == 0 {
+		panic("no feature to train")
+	}
+	w := make([]float64, features)
+	if lookback > x[0].Length() {
+		lookback = x[0].Length()
+	}
+	xx := make([][]float64, lookback)
+	for i := 0; i < lookback; i++ {
+		for j := 0; j < features; j++ {
+			xx[i] = append(xx[i], x[j].Index(lookback-i-1))
+		}
+	}
+	yy := Reverse(y, lookback)
+
+	b := 0.
+	for i := 0; i < iterations; i++ {
+		_, dw, db := propagate(w, b, xx, yy)
+		for j := range w {
+			w[j] = w[j] - (learningRate * dw[j])
+		}
+		b -= learningRate * db
+	}
+	return &LogisticRegressionModel{
+		Weight:       w,
+		Gradient:     b,
+		LearningRate: learningRate,
+	}
+}
+
+type LogisticRegressionModel struct {
+	Weight       []float64
+	Gradient     float64
+	LearningRate float64
+}
+
+/*
+// Might not be correct.
+// Please double check before uncomment this
+func (l *LogisticRegressionModel) Update(x []float64, y float64) {
+	z := 0.0
+	for i, w := l.Weight {
+		z += w * x[i]
+	}
+	a := sigmoid(z + l.Gradient)
+	//logloss := a * math.Log1p(y) + (1.-a)*math.Log1p(1-y)
+	db = a - y
+	var dw []float64
+	for j, ww := range l.Weight {
+		err := db * x[j]
+		dw = append(dw, err)
+	}
+	for i := range l.Weight {
+		l.Weight[i] -= l.LearningRate * dw[i]
+	}
+	l.Gradient -= l.LearningRate * db
+}
+*/
+
+func (l *LogisticRegressionModel) Predict(x []float64) float64 {
+	z := 0.0
+	for i, w := range l.Weight {
+		z += w * x[i]
+	}
+	return sigmoid(z + l.Gradient)
 }
 
 // TODO: ta.linreg
