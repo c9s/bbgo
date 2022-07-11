@@ -42,7 +42,11 @@ type Strategy struct {
 	types.IntervalWindow
 
 	// Double DEMA
-	DoubleDema *DoubleDema
+	doubleDema *DoubleDema
+	// FastDEMAWindow DEMA window for checking breakout
+	FastDEMAWindow int `json:"fastDEMAWindow"`
+	// SlowDEMAWindow DEMA window for checking breakout
+	SlowDEMAWindow int `json:"slowDEMAWindow"`
 
 	// SuperTrend indicator
 	Supertrend *indicator.Supertrend
@@ -99,7 +103,7 @@ func (s *Strategy) Validate() error {
 		return errors.New("interval is required")
 	}
 
-	if s.Leverage == 0.0 {
+	if s.Leverage <= 0.0 {
 		return errors.New("leverage is required")
 	}
 
@@ -162,7 +166,7 @@ func (s *Strategy) setupIndicators() {
 	kLineStore, _ := s.session.MarketDataStore(s.Symbol)
 
 	// Double DEMA
-	s.DoubleDema.setupDoubleDema(kLineStore, s.Interval)
+	s.doubleDema = newDoubleDema(kLineStore, s.Interval, s.FastDEMAWindow, s.SlowDEMAWindow)
 
 	// Supertrend
 	if s.Window == 0 {
@@ -339,7 +343,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		stSignal := s.Supertrend.GetSignal()
 
 		// DEMA signal
-		demaSignal := s.DoubleDema.getDemaSignal(openPrice64, closePrice64)
+		demaSignal := s.doubleDema.getDemaSignal(openPrice64, closePrice64)
 
 		// Linear Regression signal
 		var lgSignal types.Direction
