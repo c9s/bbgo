@@ -280,7 +280,8 @@ func (s *Strategy) handleBinanceBalanceUpdateEvent(event *binance.BalanceUpdateE
 		return
 	}
 
-	if s.ExchangeSession.GetAccount().MarginLevel.Compare(s.MinMarginLevel) > 0 {
+	account := s.ExchangeSession.GetAccount()
+	if account.MarginLevel.Compare(s.MinMarginLevel) > 0 {
 		return
 	}
 
@@ -291,7 +292,6 @@ func (s *Strategy) handleBinanceBalanceUpdateEvent(event *binance.BalanceUpdateE
 		return
 	}
 
-	account := s.ExchangeSession.GetAccount()
 	minMarginLevel := s.MinMarginLevel
 	curMarginLevel := account.MarginLevel
 
@@ -300,7 +300,7 @@ func (s *Strategy) handleBinanceBalanceUpdateEvent(event *binance.BalanceUpdateE
 			return
 		}
 
-		toRepay := b.Available
+		toRepay := b.Borrowed
 		bbgo.Notify(&MarginAction{
 			Exchange:       s.ExchangeSession.ExchangeName,
 			Action:         "Repay",
@@ -309,6 +309,7 @@ func (s *Strategy) handleBinanceBalanceUpdateEvent(event *binance.BalanceUpdateE
 			MarginLevel:    curMarginLevel,
 			MinMarginLevel: minMarginLevel,
 		})
+
 		if err := s.marginBorrowRepay.RepayMarginAsset(context.Background(), event.Asset, toRepay); err != nil {
 			log.WithError(err).Errorf("margin repay error")
 		}
