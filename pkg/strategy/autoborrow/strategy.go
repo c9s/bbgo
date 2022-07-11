@@ -300,7 +300,11 @@ func (s *Strategy) handleBinanceBalanceUpdateEvent(event *binance.BalanceUpdateE
 			return
 		}
 
-		toRepay := b.Borrowed
+		toRepay := fixedpoint.Min(b.Borrowed, b.Available)
+		if toRepay.IsZero() {
+			return
+		}
+
 		bbgo.Notify(&MarginAction{
 			Exchange:       s.ExchangeSession.ExchangeName,
 			Action:         "Repay",
