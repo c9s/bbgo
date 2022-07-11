@@ -123,7 +123,8 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 	minMarginLevel := s.MinMarginLevel
 	curMarginLevel := account.MarginLevel
 
-	log.Infof("current account margin level: %s margin ratio: %s, margin tolerance: %s",
+	bbgo.Notify("%s: current margin level: %s, margin ratio: %s, margin tolerance: %s",
+		s.ExchangeSession.Name,
 		account.MarginLevel.String(),
 		account.MarginRatio.String(),
 		account.MarginTolerance.String(),
@@ -371,14 +372,14 @@ func (a *MarginAction) SlackAttachment() slack.Attachment {
 // This strategy simply spent all available quote currency to buy the symbol whenever kline gets closed
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	if s.MinMarginLevel.IsZero() {
-		log.Warnf("minMarginLevel is 0, you should configure this minimal margin ratio for controlling the liquidation risk")
+		log.Warnf("%s: minMarginLevel is 0, you should configure this minimal margin ratio for controlling the liquidation risk", session.Name)
 	}
 
 	s.ExchangeSession = session
 
 	marginBorrowRepay, ok := session.Exchange.(types.MarginBorrowRepayService)
 	if !ok {
-		return fmt.Errorf("exchange %s does not implement types.MarginBorrowRepayService", session.ExchangeName)
+		return fmt.Errorf("exchange %s does not implement types.MarginBorrowRepayService", session.Name)
 	}
 
 	s.marginBorrowRepay = marginBorrowRepay
