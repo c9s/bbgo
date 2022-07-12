@@ -1,9 +1,13 @@
 package types
 
 import (
+	//"os"
+	"testing"
+	"time"
+
 	"github.com/stretchr/testify/assert"
 	"gonum.org/v1/gonum/stat"
-	"testing"
+	"github.com/wcharczuk/go-chart/v2"
 )
 
 func TestFloat(t *testing.T) {
@@ -143,4 +147,24 @@ func TestDot(t *testing.T) {
 	assert.InDelta(t, out2, 3., 0.001)
 	out3 := Dot(3., &a, 2)
 	assert.InDelta(t, out2, out3, 0.001)
+}
+
+func TestClone(t *testing.T) {
+	a := NewQueue(3)
+	a.Update(3.)
+	b := Clone(a)
+	b.Update(4.)
+	assert.Equal(t, a.Last(), 3.)
+	assert.Equal(t, b.Last(), 4.)
+}
+
+func TestPlot(t *testing.T) {
+	ct := NewCanvas("test", Interval5m)
+	a := Float64Slice{200., 205., 230., 236}
+	ct.Plot("test", &a, Time(time.Now()), 4)
+	assert.Equal(t, ct.Interval, Interval5m)
+	assert.Equal(t, ct.Series[0].(chart.TimeSeries).Len(), 4)
+	//f, _ := os.Create("output.png")
+	//defer f.Close()
+	//ct.Render(chart.PNG, f)
 }

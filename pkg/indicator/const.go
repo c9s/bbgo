@@ -9,4 +9,3 @@ import (
 var three = fixedpoint.NewFromInt(3)
 
 var zeroTime = time.Time{}
-

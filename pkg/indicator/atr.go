@@ -22,6 +22,24 @@ type ATR struct {
 
 var _ types.SeriesExtend = &ATR{}
 
+func (inc *ATR) Clone() *ATR {
+	out := &ATR{
+		IntervalWindow:       inc.IntervalWindow,
+		PercentageVolatility: inc.PercentageVolatility[:],
+		PreviousClose:        inc.PreviousClose,
+		RMA:                  inc.RMA.Clone().(*RMA),
+		EndTime:              inc.EndTime,
+	}
+	out.SeriesBase.Series = out
+	return out
+}
+
+func (inc *ATR) TestUpdate(high, low, cloze float64) *ATR {
+	c := inc.Clone()
+	c.Update(high, low, cloze)
+	return c
+}
+
 func (inc *ATR) Update(high, low, cloze float64) {
 	if inc.Window <= 0 {
 		panic("window must be greater than 0")

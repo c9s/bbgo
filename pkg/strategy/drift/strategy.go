@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/sirupsen/logrus"
+	"github.com/wcharczuk/go-chart/v2"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -35,10 +36,12 @@ type Strategy struct {
 	*types.ProfitStats
 	*types.TradeStats
 
-	drift    types.UpdatableSeriesExtend
+	drift    *indicator.Drift
 	atr      *indicator.ATR
 	midPrice fixedpoint.Value
 	lock     sync.RWMutex
+
+	stoploss float64 `json:"stoploss"`
 
 	ExitMethods bbgo.ExitMethodSet `json:"exits"`
 	Session     *bbgo.ExchangeSession
@@ -69,6 +72,7 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 }
 
 var Three fixedpoint.Value = fixedpoint.NewFromInt(3)
+var Two fixedpoint.Value = fixedpoint.NewFromInt(2)
 
 func (s *Strategy) GetLastPrice() (lastPrice fixedpoint.Value) {
 	var ok bool
@@ -98,6 +102,9 @@ var Delta fixedpoint.Value = fixedpoint.NewFromFloat(0.01)
 
 func (s *Strategy) ClosePosition(ctx context.Context) (*types.Order, bool) {
 	order := s.Position.NewMarketCloseOrder(fixedpoint.One)
+	if order == nil {
+		return nil, false
+	}
 	order.TimeInForce = ""
 	balances := s.Session.GetAccount().Balances()
 	baseBalance := balances[s.Market.BaseCurrency].Available
@@ -133,7 +140,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	}
 
 	if s.TradeStats == nil {
-		s.TradeStats = &types.TradeStats{}
+		s.TradeStats = types.NewTradeStats(s.Symbol)
 	}
 
 	// StrategyController
@@ -165,9 +172,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	store, _ := session.MarketDataStore(s.Symbol)
 
+	getSource := func(kline *types.KLine) fixedpoint.Value {
+		//return kline.High.Add(kline.Low).Div(Two)
+		//return kline.Close
+		return kline.High.Add(kline.Low).Add(kline.Close).Div(Three)
+	}
+
 	s.drift = &indicator.Drift{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.Window}}
-	s.atr = &indicator.ATR{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: 34}}
-	s.atr.Bind(store)
+	s.atr = &indicator.ATR{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: 14}}
 
 	klines, ok := store.KLinesOfInterval(s.Interval)
 	if !ok {
@@ -175,7 +187,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		return nil
 	}
 	for _, kline := range *klines {
-		s.drift.Update(kline.High.Add(kline.Low).Add(kline.Close).Div(Three).Float64())
+		source := getSource(&kline).Float64()
+		s.drift.Update(source)
 		s.atr.Update(kline.High.Float64(), kline.Low.Float64(), kline.Close.Float64())
 	}
 
@@ -198,17 +211,46 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 	})
 
+	dynamicKLine := &types.KLine{}
+	priceLine := types.NewQueue(100)
+
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		if s.Status != types.StrategyStatusRunning {
 			return
 		}
-		if kline.Symbol != s.Symbol || kline.Interval != s.Interval {
+		if kline.Symbol != s.Symbol {
 			return
 		}
-		hlc3 := kline.High.Add(kline.Low).Add(kline.Close).Div(Three)
-		s.drift.Update(hlc3.Float64())
+		var driftPred, atr float64
+		var drift []float64
+
+		if !kline.Closed {
+			return
+		}
+		if kline.Interval == types.Interval1m {
+			return
+		}
+		dynamicKLine.Copy(&kline)
+
+		source := getSource(dynamicKLine)
+		sourcef := source.Float64()
+		priceLine.Update(sourcef)
+		dynamicKLine.Closed = false
+		s.drift.Update(sourcef)
+		drift = s.drift.Array(2)
+		driftPred = s.drift.Predict(3)
+		atr = s.atr.Last()
 		price := s.GetLastPrice()
-		if s.drift.Last() < 0 && s.drift.Index(1) > 0 {
+		avg := s.Position.AverageCost.Float64()
+
+		shortCondition := (driftPred <= 0 && drift[0] <= 0) && (s.Position.IsClosed() || s.Position.IsDust(fixedpoint.Max(price, source)))
+		longCondition := (driftPred >= 0 && drift[0] >= 0) && (s.Position.IsClosed() || s.Position.IsDust(fixedpoint.Min(price, source)))
+		exitShortCondition := ((drift[1] < 0 && drift[0] >= 0) || avg+atr/2 <= price.Float64() || avg*(1.+s.stoploss) <= price.Float64()) &&
+			(!s.Position.IsClosed() && !s.Position.IsDust(fixedpoint.Max(price, source)))
+		exitLongCondition := ((drift[1] > 0 && drift[0] < 0) || avg-atr/2 >= price.Float64() || avg*(1.-s.stoploss) >= price.Float64()) &&
+			(!s.Position.IsClosed() && !s.Position.IsDust(fixedpoint.Min(price, source)))
+
+		if shortCondition {
 			if s.ActiveOrderBook.NumOfOrders() > 0 {
 				if err := s.GeneralOrderExecutor.GracefulCancelActiveOrderBook(ctx, s.ActiveOrderBook); err != nil {
 					log.WithError(err).Errorf("cannot cancel orders")
@@ -220,22 +262,19 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				log.Errorf("unable to get baseBalance")
 				return
 			}
-			if hlc3.Compare(price) < 0 {
-				hlc3 = price
+			if source.Compare(price) < 0 {
+				source = price
 			}
 
-			if s.Market.IsDustQuantity(baseBalance.Available, hlc3) {
-				return
-			}
-			if !s.Position.IsClosed() && !s.Position.IsDust(hlc3) {
+			if s.Market.IsDustQuantity(baseBalance.Available, source) {
 				return
 			}
 			_, err := s.GeneralOrderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 				Symbol:    s.Symbol,
 				Side:      types.SideTypeSell,
 				Type:      types.OrderTypeLimitMaker,
-				Price:     hlc3,
-				StopPrice: hlc3.Add(fixedpoint.NewFromFloat(s.atr.Last() / 3)),
+				Price:     source,
+				StopPrice: fixedpoint.NewFromFloat(sourcef + atr/2),
 				Quantity:  baseBalance.Available,
 			})
 			if err != nil {
@@ -243,15 +282,24 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				return
 			}
 		}
-		if s.drift.Last() > 0 && s.drift.Index(1) < 0 {
+		if exitShortCondition {
 			if s.ActiveOrderBook.NumOfOrders() > 0 {
 				if err := s.GeneralOrderExecutor.GracefulCancelActiveOrderBook(ctx, s.ActiveOrderBook); err != nil {
 					log.WithError(err).Errorf("cannot cancel orders")
 					return
 				}
 			}
-			if hlc3.Compare(price) > 0 {
-				hlc3 = price
+			_, _ = s.ClosePosition(ctx)
+		}
+		if longCondition {
+			if s.ActiveOrderBook.NumOfOrders() > 0 {
+				if err := s.GeneralOrderExecutor.GracefulCancelActiveOrderBook(ctx, s.ActiveOrderBook); err != nil {
+					log.WithError(err).Errorf("cannot cancel orders")
+					return
+				}
+			}
+			if source.Compare(price) > 0 {
+				source = price
 			}
 			quoteBalance, ok := s.Session.GetAccount().Balance(s.Market.QuoteCurrency)
 			if !ok {
@@ -259,29 +307,50 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				return
 			}
 			if s.Market.IsDustQuantity(
-				quoteBalance.Available.Div(hlc3), hlc3) {
+				quoteBalance.Available.Div(source), source) {
 				return
 			}
-			if !s.Position.IsClosed() && !s.Position.IsDust(hlc3) {
+			if !s.Position.IsClosed() && !s.Position.IsDust(source) {
 				return
 			}
 			_, err := s.GeneralOrderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 				Symbol:    s.Symbol,
 				Side:      types.SideTypeBuy,
 				Type:      types.OrderTypeLimitMaker,
-				Price:     hlc3,
-				StopPrice: hlc3.Sub(fixedpoint.NewFromFloat(s.atr.Last() / 3)),
-				Quantity:  quoteBalance.Available.Div(hlc3),
+				Price:     source,
+				StopPrice: fixedpoint.NewFromFloat(sourcef - atr/2),
+				Quantity:  quoteBalance.Available.Div(source),
 			})
 			if err != nil {
 				log.WithError(err).Errorf("cannot place buy order")
 				return
 			}
 		}
+		if exitLongCondition {
+			if s.ActiveOrderBook.NumOfOrders() > 0 {
+				if err := s.GeneralOrderExecutor.GracefulCancelActiveOrderBook(ctx, s.ActiveOrderBook); err != nil {
+					log.WithError(err).Errorf("cannot cancel orders")
+					return
+				}
+			}
+			_, _ = s.ClosePosition(ctx)
+		}
 	})
 
 	bbgo.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		_, _ = fmt.Fprintln(os.Stderr, s.TradeStats.String())
+		canvas := types.NewCanvas(s.InstanceID(), s.Interval)
+		fmt.Println(dynamicKLine.StartTime, dynamicKLine.EndTime)
+		mean := priceLine.Mean(100)
+		highestPrice := priceLine.Highest(100)
+		highestDrift := s.drift.Highest(100)
+		ratio := highestDrift / highestPrice
+		canvas.Plot("drift", s.drift, dynamicKLine.StartTime, 100)
+		canvas.Plot("zero", types.NumberSeries(0), dynamicKLine.StartTime, 100)
+		canvas.Plot("price", priceLine.Minus(mean).Mul(ratio), dynamicKLine.StartTime, 100)
+		f, _ := os.Create("output.png")
+		defer f.Close()
+		canvas.Render(chart.PNG, f)
 		wg.Done()
 	})
 	return nil

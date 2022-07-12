@@ -45,6 +45,24 @@ func (inc *Drift) Update(value float64) {
 	}
 }
 
+func (inc *Drift) Clone() (out *Drift) {
+	out = &Drift{
+		IntervalWindow: inc.IntervalWindow,
+		chng:           inc.chng.Clone(),
+		Values:         inc.Values[:],
+		SMA:            inc.SMA.Clone().(*SMA),
+		LastValue:      inc.LastValue,
+	}
+	out.SeriesBase.Series = out
+	return out
+}
+
+func (inc *Drift) TestUpdate(value float64) *Drift {
+	out := inc.Clone()
+	out.Update(value)
+	return out
+}
+
 func (inc *Drift) Index(i int) float64 {
 	if inc.Values == nil {
 		return 0

@@ -3,9 +3,11 @@ package types
 import (
 	"fmt"
 	"math"
+	"time"
 	"reflect"
 
 	"gonum.org/v1/gonum/stat"
+	"github.com/wcharczuk/go-chart/v2"
 )
 
 // Super basic Series type that simply holds the float64 data
@@ -43,6 +45,15 @@ func (inc *Queue) Length() int {
 	return len(inc.arr)
 }
 
+func (inc *Queue) Clone() *Queue {
+	out := &Queue {
+		arr: inc.arr[:],
+		size: inc.size,
+	}
+	out.SeriesBase.Series = out
+	return out
+}
+
 func (inc *Queue) Update(v float64) {
 	inc.arr = append(inc.arr, v)
 	if len(inc.arr) > inc.size {
@@ -50,7 +61,7 @@ func (inc *Queue) Update(v float64) {
 	}
 }
 
-var _ SeriesExtend = &Queue{}
+var _ UpdatableSeriesExtend = &Queue{}
 
 // Float64Indicator is the indicators (SMA and EWMA) that we want to use are returning float64 data.
 type Float64Indicator interface {
@@ -93,6 +104,7 @@ type SeriesExtend interface {
 	Variance(length int) float64
 	Covariance(b Series, length int) float64
 	Correlation(b Series, length int, method ...CorrFunc) float64
+	AutoCorrelation(length int, lag ...int) float64
 	Rank(length int) SeriesExtend
 	Sigmoid() SeriesExtend
 	Softmax(window int) SeriesExtend
@@ -118,6 +130,24 @@ type UpdatableSeries interface {
 type UpdatableSeriesExtend interface {
 	SeriesExtend
 	Update(float64)
+}
+
+func Clone(u UpdatableSeriesExtend) UpdatableSeriesExtend {
+	method, ok := reflect.TypeOf(u).MethodByName("Clone")
+	if ok {
+		out := method.Func.Call([]reflect.Value{reflect.ValueOf(u)})
+		return out[0].Interface().(UpdatableSeriesExtend)
+	}
+	panic("method Clone not exist")
+}
+
+func TestUpdate(u UpdatableSeriesExtend, input float64) UpdatableSeriesExtend {
+	method, ok := reflect.TypeOf(u).MethodByName("TestUpdate")
+	if ok {
+		out := method.Func.Call([]reflect.Value{reflect.ValueOf(u), reflect.ValueOf(input)})
+		return out[0].Interface().(UpdatableSeriesExtend)
+	}
+	panic("method TestUpdate not exist")
 }
 
 // The interface maps to pinescript basic type `series` for bool type
@@ -333,6 +363,10 @@ func (a NumberSeries) Index(_ int) float64 {
 
 func (a NumberSeries) Length() int {
 	return math.MaxInt32
+}
+
+func (a NumberSeries) Clone() NumberSeries {
+	return a
 }
 
 var _ Series = NumberSeries(0)
@@ -601,7 +635,7 @@ func Array(a Series, limit ...int) (result []float64) {
 	if len(limit) > 0 {
 		l = limit[0]
 	}
-	if l < a.Length() {
+	if l > a.Length() {
 		l = a.Length()
 	}
 	result = make([]float64, l)
@@ -621,7 +655,7 @@ func Reverse(a Series, limit ...int) (result Float64Slice) {
 	if len(limit) > 0 {
 		l = limit[0]
 	}
-	if l < a.Length() {
+	if l > a.Length() {
 		l = a.Length()
 	}
 	result = make([]float64, l)
@@ -815,6 +849,17 @@ func Correlation(a Series, b Series, length int, method ...CorrFunc) float64 {
 		runner = method[0]
 	}
 	return runner(a, b, length)
+}
+
+// similar to pandas.Series.autocorr() function.
+//
+// The method computes the Pearson correlation between Series and shifted itself
+func AutoCorrelation(a Series, length int, lags ...int) float64 {
+	lag := 1
+	if len(lags) > 0 {
+		lag = lags[0]
+	}
+	return Pearson(a, Shift(a, lag), length)
 }
 
 // similar to pandas.Series.cov() function with ddof=0
@@ -1116,6 +1161,49 @@ func (l *LogisticRegressionModel) Predict(x []float64) float64 {
 		z += w * x[i]
 	}
 	return sigmoid(z + l.Gradient)
+}
+
+type Canvas struct {
+	chart.Chart
+	Interval Interval
+}
+
+func NewCanvas(title string, interval Interval) *Canvas {
+	valueFormatter := chart.TimeValueFormatter
+	if interval.Minutes() > 24 * 60 {
+		valueFormatter = chart.TimeDateValueFormatter
+	} else if interval.Minutes() > 60 {
+		valueFormatter = chart.TimeHourValueFormatter
+	} else {
+		valueFormatter = chart.TimeMinuteValueFormatter
+	}
+	out := &Canvas {
+		Chart: chart.Chart {
+			Title: title,
+			XAxis: chart.XAxis{
+				ValueFormatter: valueFormatter,
+			},
+		},
+		Interval: interval,
+	}
+	out.Chart.Elements = []chart.Renderable{
+		chart.LegendLeft(&out.Chart),
+	}
+	return out
+}
+
+func (canvas *Canvas) Plot(tag string, a Series, endTime Time, length int) {
+	var timeline []time.Time
+	e := endTime.Time()
+	for i := length - 1; i >= 0; i-- {
+		shiftedT := e.Add(-time.Duration(i * canvas.Interval.Minutes()) * time.Minute)
+		timeline = append(timeline, shiftedT)
+	}
+	canvas.Series = append(canvas.Series, chart.TimeSeries{
+		Name: tag,
+		YValues: Reverse(a, length),
+		XValues: timeline,
+	})
 }
 
 // TODO: ta.linreg
