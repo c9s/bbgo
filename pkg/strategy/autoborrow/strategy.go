@@ -123,7 +123,8 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 	minMarginLevel := s.MinMarginLevel
 	curMarginLevel := account.MarginLevel
 
-	log.Infof("current account margin level: %s margin ratio: %s, margin tolerance: %s",
+	bbgo.Notify("%s: current margin level: %s, margin ratio: %s, margin tolerance: %s",
+		s.ExchangeSession.Name,
 		account.MarginLevel.String(),
 		account.MarginRatio.String(),
 		account.MarginTolerance.String(),
@@ -280,7 +281,8 @@ func (s *Strategy) handleBinanceBalanceUpdateEvent(event *binance.BalanceUpdateE
 		return
 	}
 
-	if s.ExchangeSession.GetAccount().MarginLevel.Compare(s.MinMarginLevel) > 0 {
+	account := s.ExchangeSession.GetAccount()
+	if account.MarginLevel.Compare(s.MinMarginLevel) > 0 {
 		return
 	}
 
@@ -291,7 +293,6 @@ func (s *Strategy) handleBinanceBalanceUpdateEvent(event *binance.BalanceUpdateE
 		return
 	}
 
-	account := s.ExchangeSession.GetAccount()
 	minMarginLevel := s.MinMarginLevel
 	curMarginLevel := account.MarginLevel
 
@@ -300,7 +301,11 @@ func (s *Strategy) handleBinanceBalanceUpdateEvent(event *binance.BalanceUpdateE
 			return
 		}
 
-		toRepay := b.Available
+		toRepay := fixedpoint.Min(b.Borrowed, b.Available)
+		if toRepay.IsZero() {
+			return
+		}
+
 		bbgo.Notify(&MarginAction{
 			Exchange:       s.ExchangeSession.ExchangeName,
 			Action:         "Repay",
@@ -309,6 +314,7 @@ func (s *Strategy) handleBinanceBalanceUpdateEvent(event *binance.BalanceUpdateE
 			MarginLevel:    curMarginLevel,
 			MinMarginLevel: minMarginLevel,
 		})
+
 		if err := s.marginBorrowRepay.RepayMarginAsset(context.Background(), event.Asset, toRepay); err != nil {
 			log.WithError(err).Errorf("margin repay error")
 		}
@@ -366,14 +372,14 @@ func (a *MarginAction) SlackAttachment() slack.Attachment {
 // This strategy simply spent all available quote currency to buy the symbol whenever kline gets closed
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	if s.MinMarginLevel.IsZero() {
-		log.Warnf("minMarginLevel is 0, you should configure this minimal margin ratio for controlling the liquidation risk")
+		log.Warnf("%s: minMarginLevel is 0, you should configure this minimal margin ratio for controlling the liquidation risk", session.Name)
 	}
 
 	s.ExchangeSession = session
 
 	marginBorrowRepay, ok := session.Exchange.(types.MarginBorrowRepayService)
 	if !ok {
-		return fmt.Errorf("exchange %s does not implement types.MarginBorrowRepayService", session.ExchangeName)
+		return fmt.Errorf("exchange %s does not implement types.MarginBorrowRepayService", session.Name)
 	}
 
 	s.marginBorrowRepay = marginBorrowRepay

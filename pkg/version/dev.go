@@ -1,8 +1,8 @@
-//go:build !release
 // +build !release
 
 package version
 
-const Version = "v1.35.0-daaa3352-dev"
+const Version = "v1.36.0-cc8821bb-dev"
 
-const VersionGitRef = "daaa3352"
+const VersionGitRef = "cc8821bb"
+

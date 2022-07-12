@@ -19,6 +19,8 @@ func (c *AverageCostCalculator) Calculate(symbol string, trades []types.Trade, c
 	var bidVolume = fixedpoint.Zero
 	var askVolume = fixedpoint.Zero
 	var feeUSD = fixedpoint.Zero
+	var grossProfit = fixedpoint.Zero
+	var grossLoss = fixedpoint.Zero
 
 	if len(trades) == 0 {
 		return &AverageCostPnlReport{
@@ -64,6 +66,12 @@ func (c *AverageCostCalculator) Calculate(symbol string, trades []types.Trade, c
 			totalNetProfit = totalNetProfit.Add(netProfit)
 		}
 
+		if profit.Sign() > 0 {
+			grossProfit = grossProfit.Add(profit)
+		} else if profit.Sign() < 0 {
+			grossLoss = grossLoss.Add(profit)
+		}
+
 		if trade.IsBuyer {
 			bidVolume = bidVolume.Add(trade.Quantity)
 		} else {
@@ -96,8 +104,12 @@ func (c *AverageCostCalculator) Calculate(symbol string, trades []types.Trade, c
 		Profit:            totalProfit,
 		NetProfit:         totalNetProfit,
 		UnrealizedProfit:  unrealizedProfit,
-		AverageCost:       position.AverageCost,
-		FeeInUSD:          totalProfit.Sub(totalNetProfit),
-		CurrencyFees:      currencyFees,
+
+		GrossProfit: grossProfit,
+		GrossLoss:   grossLoss,
+
+		AverageCost:  position.AverageCost,
+		FeeInUSD:     totalProfit.Sub(totalNetProfit),
+		CurrencyFees: currencyFees,
 	}
 }

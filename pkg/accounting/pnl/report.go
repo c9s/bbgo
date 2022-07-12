@@ -20,10 +20,14 @@ type AverageCostPnlReport struct {
 	Symbol    string           `json:"symbol"`
 	Market    types.Market     `json:"market"`
 
-	NumTrades         int                         `json:"numTrades"`
-	Profit            fixedpoint.Value            `json:"profit"`
-	NetProfit         fixedpoint.Value            `json:"netProfit"`
-	UnrealizedProfit  fixedpoint.Value            `json:"unrealizedProfit"`
+	NumTrades        int              `json:"numTrades"`
+	Profit           fixedpoint.Value `json:"profit"`
+	UnrealizedProfit fixedpoint.Value `json:"unrealizedProfit"`
+
+	NetProfit   fixedpoint.Value `json:"netProfit"`
+	GrossProfit fixedpoint.Value `json:"grossProfit"`
+	GrossLoss   fixedpoint.Value `json:"grossLoss"`
+
 	AverageCost       fixedpoint.Value            `json:"averageCost"`
 	BuyVolume         fixedpoint.Value            `json:"buyVolume,omitempty"`
 	SellVolume        fixedpoint.Value            `json:"sellVolume,omitempty"`
