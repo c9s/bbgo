@@ -2,7 +2,7 @@
 
 module github.com/c9s/bbgo
 
-go 1.17
+go 1.18
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
@@ -43,6 +43,7 @@ require (
 	github.com/spf13/viper v1.7.1
 	github.com/stretchr/testify v1.7.0
 	github.com/valyala/fastjson v1.5.1
+	github.com/wcharczuk/go-chart/v2 v2.1.0
 	github.com/webview/webview v0.0.0-20210216142346-e0bfdf0e5d90
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
 	github.com/zserge/lorca v0.1.9
@@ -75,6 +76,7 @@ require (
 	github.com/go-test/deep v1.0.6 // indirect
 	github.com/golang-sql/civil v0.0.0-20220223132316-b832511892a9 // indirect
 	github.com/golang-sql/sqlexp v0.1.0 // indirect
+	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
 	github.com/golang/mock v1.6.0 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
@@ -117,6 +119,7 @@ require (
 	go.opentelemetry.io/otel/trace v0.19.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e // indirect
+	golang.org/x/image v0.0.0-20200927104501-e162460cd6b5 // indirect
 	golang.org/x/mod v0.5.1 // indirect
 	golang.org/x/net v0.0.0-20220403103023-749bd193bc2b // indirect
 	golang.org/x/sys v0.0.0-20220615213510-4f61da869c0c // indirect

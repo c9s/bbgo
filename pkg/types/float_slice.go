@@ -12,6 +12,10 @@ func (s *Float64Slice) Push(v float64) {
 	*s = append(*s, v)
 }
 
+func (s *Float64Slice) Update(v float64) {
+	*s = append(*s, v)
+}
+
 func (s *Float64Slice) Pop(i int64) (v float64) {
 	v = (*s)[i]
 	*s = append((*s)[:i], (*s)[i+1:]...)

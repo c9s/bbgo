@@ -23,6 +23,22 @@ type EWMA struct {
 
 var _ types.SeriesExtend = &EWMA{}
 
+func (inc *EWMA) Clone() *EWMA {
+	out := &EWMA{
+		IntervalWindow: inc.IntervalWindow,
+		Values:         inc.Values[:],
+		LastOpenTime:   inc.LastOpenTime,
+	}
+	out.SeriesBase.Series = out
+	return out
+}
+
+func (inc *EWMA) TestUpdate(value float64) *EWMA {
+	out := inc.Clone()
+	out.Update(value)
+	return out
+}
+
 func (inc *EWMA) Update(value float64) {
 	var multiplier = 2.0 / float64(1+inc.Window)
 

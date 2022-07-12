@@ -71,6 +71,26 @@ type KLine struct {
 	Closed         bool   `json:"closed" db:"closed"`
 }
 
+func (k *KLine) Copy(o *KLine) {
+	k.GID = o.GID
+	k.Exchange = o.Exchange
+	k.Symbol = o.Symbol
+	k.StartTime = o.StartTime
+	k.EndTime = o.EndTime
+	k.Interval = o.Interval
+	k.Open = o.Open
+	k.Close = o.Close
+	k.High = o.High
+	k.Low = o.Low
+	k.Volume = o.Volume
+	k.QuoteVolume = o.QuoteVolume
+	k.TakerBuyBaseAssetVolume = o.TakerBuyBaseAssetVolume
+	k.TakerBuyQuoteAssetVolume = o.TakerBuyQuoteAssetVolume
+	k.LastTradeID = o.LastTradeID
+	k.NumberOfTrades = o.NumberOfTrades
+	k.Closed = o.Closed
+}
+
 func (k KLine) GetStartTime() Time {
 	return k.StartTime
 }
