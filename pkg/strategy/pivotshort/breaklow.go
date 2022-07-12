@@ -40,6 +40,7 @@ type BreakLow struct {
 
 func (s *BreakLow) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: types.Interval1m})
 }
 
 func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.GeneralOrderExecutor) {
@@ -69,7 +70,7 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 		}
 
 		if lastLow.Compare(s.lastLow) != 0 {
-			log.Infof("new pivot low detected: %f %s", s.pivot.LastLow(), kline.EndTime.Time())
+			bbgo.Notify("%s new pivot low detected: %f %s", s.Symbol, s.pivot.LastLow(), kline.EndTime.Time().String())
 		}
 
 		s.lastLow = lastLow

@@ -608,7 +608,7 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 			Available: b.Balance,
 			Locked:    b.Locked,
 			NetAsset:  b.Balance.Add(b.Locked).Sub(b.Debt),
-			Borrowed:  b.Debt, // TODO: Replace this with borrow in the newer version
+			Borrowed:  b.Borrowed,
 			Interest:  b.Interest,
 		}
 	}
