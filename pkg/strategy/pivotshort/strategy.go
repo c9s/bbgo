@@ -177,6 +177,7 @@ type Strategy struct {
 	bbgo.StrategyController
 }
 
+
 func (s *Strategy) ID() string {
 	return ID
 }
@@ -261,9 +262,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 	s.orderExecutor.Bind()
 
-	for _, method := range s.ExitMethods {
-		method.Bind(session, s.orderExecutor)
-	}
+	s.ExitMethods.Bind(session, s.orderExecutor)
 
 	if s.ResistanceShort != nil && s.ResistanceShort.Enabled {
 		s.ResistanceShort.Bind(session, s.orderExecutor)

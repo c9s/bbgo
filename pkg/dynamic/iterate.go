@@ -44,7 +44,7 @@ func IterateFields(obj interface{}, cb func(ft reflect.StructField, fv reflect.V
 			continue
 		}
 
-		if err := cb(ft, fv) ; err != nil {
+		if err := cb(ft, fv); err != nil {
 			return err
 		}
 	}

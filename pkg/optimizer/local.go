@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/cheggaaa/pb/v3"
 	"os"
 	"os/exec"
 	"strings"
 	"sync"
+
+	"github.com/cheggaaa/pb/v3"
 
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
@@ -110,7 +111,11 @@ func (e *LocalProcessExecutor) Run(ctx context.Context, taskC chan BacktestTask,
 
 					report, err := e.execute(task.ConfigJson)
 					if err != nil {
-						log.WithError(err).Errorf("execute error")
+						if err2, ok := err.(*exec.ExitError); ok {
+							log.WithError(err).Errorf("execute error: %s", err2.Stderr)
+						} else {
+							log.WithError(err).Errorf("execute error")
+						}
 					}
 
 					task.Error = err
