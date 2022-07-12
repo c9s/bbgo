@@ -145,7 +145,7 @@ const selectOrders = (data: Order[], since: Date, until: Date): Order[] => {
       continue
     }
 
-    data.push(d);
+    entries.push(d);
   }
   return entries
 }
@@ -448,8 +448,7 @@ const TradingViewChart = (props: TradingViewChartProps) => {
     const fetchers = [];
     const ordersFetcher = fetchOrders(props.basePath, props.runID).then((orders: Order[] | void) => {
       if (orders) {
-        // const markers = ordersToMarkers(currentInterval, selectOrders(orders, selectedTimeRange[0], selectedTimeRange[1]));
-        const markers = ordersToMarkers(currentInterval, orders);
+        const markers = ordersToMarkers(currentInterval, selectOrders(orders, selectedTimeRange[0], selectedTimeRange[1]));
         chartData.orders = orders;
         chartData.markers = markers;
         setOrders(orders);
