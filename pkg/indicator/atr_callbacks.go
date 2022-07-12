@@ -4,12 +4,12 @@ package indicator
 
 import ()
 
-func (A *ATR) OnUpdate(cb func(value float64)) {
-	A.UpdateCallbacks = append(A.UpdateCallbacks, cb)
+func (inc *ATR) OnUpdate(cb func(value float64)) {
+	inc.UpdateCallbacks = append(inc.UpdateCallbacks, cb)
 }
 
-func (A *ATR) EmitUpdate(value float64) {
-	for _, cb := range A.UpdateCallbacks {
+func (inc *ATR) EmitUpdate(value float64) {
+	for _, cb := range inc.UpdateCallbacks {
 		cb(value)
 	}
 }
