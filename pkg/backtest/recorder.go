@@ -27,6 +27,7 @@ type StateRecorder struct {
 	outputDirectory string
 	strategies      []Instance
 	writers         map[types.CsvFormatter]*tsv.Writer
+	lastLines       map[types.CsvFormatter][]string
 	manifests       Manifests
 }
 
@@ -34,6 +35,7 @@ func NewStateRecorder(outputDir string) *StateRecorder {
 	return &StateRecorder{
 		outputDirectory: outputDir,
 		writers:         make(map[types.CsvFormatter]*tsv.Writer),
+		lastLines:       make(map[types.CsvFormatter][]string),
 		manifests:       make(Manifests),
 	}
 }
@@ -42,11 +44,18 @@ func (r *StateRecorder) Snapshot() (int, error) {
 	var c int
 	for obj, writer := range r.writers {
 		records := obj.CsvRecords()
+		lastLine, hasLastLine := r.lastLines[obj]
+
 		for _, record := range records {
+			if hasLastLine && equalStringSlice(lastLine, record) {
+				continue
+			}
+
 			if err := writer.Write(record); err != nil {
 				return c, err
 			}
 			c++
+			r.lastLines[obj] = record
 		}
 
 		writer.Flush()
@@ -128,4 +137,20 @@ func (r *StateRecorder) Close() error {
 	}
 
 	return err
+}
+
+func equalStringSlice(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	for i := 0; i < len(a); i++ {
+		ad := a[i]
+		bd := b[i]
+		if ad != bd {
+			return false
+		}
+	}
+
+	return true
 }
