@@ -71,10 +71,12 @@ func (s *TrailingStop2) Bind(session *ExchangeSession, orderExecutor *GeneralOrd
 	}
 }
 
+// getRatio returns the ratio between the price and the average cost of the position
 func (s *TrailingStop2) getRatio(price fixedpoint.Value, position *types.Position) (fixedpoint.Value, error) {
 	switch s.Side {
 	case types.SideTypeBuy:
-		// for short position
+		// for short position, it's:
+		//  (avg_cost - price) / price
 		return position.AverageCost.Sub(price).Div(price), nil
 	case types.SideTypeSell:
 		return price.Sub(position.AverageCost).Div(position.AverageCost), nil
@@ -153,5 +155,10 @@ func (s *TrailingStop2) triggerStop(price fixedpoint.Value) error {
 	}()
 	Notify("[TrailingStop] %s stop loss triggered. price: %f callback rate: %f", s.Symbol, price.Float64(), s.CallbackRate.Float64())
 	ctx := context.Background()
-	return s.orderExecutor.ClosePosition(ctx, fixedpoint.One, "trailingStop")
+	p := fixedpoint.One
+	if !s.ClosePosition.IsZero() {
+		p = s.ClosePosition
+	}
+
+	return s.orderExecutor.ClosePosition(ctx, p, "trailingStop")
 }
