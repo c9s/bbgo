@@ -39,9 +39,15 @@ type SummaryReport struct {
 	InitialTotalBalances types.BalanceMap `json:"initialTotalBalances"`
 	FinalTotalBalances   types.BalanceMap `json:"finalTotalBalances"`
 
+	InitialEquityValue fixedpoint.Value `json:"initialEquityValue"`
+	FinalEquityValue   fixedpoint.Value `json:"finalEquityValue"`
+
 	// TotalProfit is the profit aggregated from the symbol reports
 	TotalProfit           fixedpoint.Value `json:"totalProfit,omitempty"`
 	TotalUnrealizedProfit fixedpoint.Value `json:"totalUnrealizedProfit,omitempty"`
+
+	TotalGrossProfit fixedpoint.Value `json:"totalGrossProfit,omitempty"`
+	TotalGrossLoss   fixedpoint.Value `json:"totalGrossLoss,omitempty"`
 
 	SymbolReports []SessionSymbolReport `json:"symbolReports,omitempty"`
 
@@ -75,13 +81,21 @@ type SessionSymbolReport struct {
 	Manifests       Manifests                 `json:"manifests,omitempty"`
 }
 
+func (r *SessionSymbolReport) InitialEquityValue() fixedpoint.Value {
+	return InQuoteAsset(r.InitialBalances, r.Market, r.StartPrice)
+}
+
+func (r *SessionSymbolReport) FinalEquityValue() fixedpoint.Value {
+	return InQuoteAsset(r.FinalBalances, r.Market, r.StartPrice)
+}
+
 func (r *SessionSymbolReport) Print(wantBaseAssetBaseline bool) {
 	color.Green("%s %s PROFIT AND LOSS REPORT", r.Exchange, r.Symbol)
 	color.Green("===============================================")
 	r.PnL.Print()
 
-	initQuoteAsset := inQuoteAsset(r.InitialBalances, r.Market, r.StartPrice)
-	finalQuoteAsset := inQuoteAsset(r.FinalBalances, r.Market, r.LastPrice)
+	initQuoteAsset := r.InitialEquityValue()
+	finalQuoteAsset := r.FinalEquityValue()
 	color.Green("INITIAL ASSET IN %s ~= %s %s (1 %s = %v)", r.Market.QuoteCurrency, r.Market.FormatQuantity(initQuoteAsset), r.Market.QuoteCurrency, r.Market.BaseCurrency, r.StartPrice)
 	color.Green("FINAL ASSET IN %s ~= %s %s (1 %s = %v)", r.Market.QuoteCurrency, r.Market.FormatQuantity(finalQuoteAsset), r.Market.QuoteCurrency, r.Market.BaseCurrency, r.LastPrice)
 
@@ -186,8 +200,8 @@ func AddReportIndexRun(outputDirectory string, run Run) error {
 	return WriteReportIndex(outputDirectory, reportIndex)
 }
 
-// inQuoteAsset converts all balances in quote asset
-func inQuoteAsset(balances types.BalanceMap, market types.Market, price fixedpoint.Value) fixedpoint.Value {
+// InQuoteAsset converts all balances in quote asset
+func InQuoteAsset(balances types.BalanceMap, market types.Market, price fixedpoint.Value) fixedpoint.Value {
 	quote := balances[market.QuoteCurrency]
 	base := balances[market.BaseCurrency]
 	return base.Total().Mul(price).Add(quote.Total())
