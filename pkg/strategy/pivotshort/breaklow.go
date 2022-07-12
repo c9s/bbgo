@@ -70,7 +70,7 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 		}
 
 		if lastLow.Compare(s.lastLow) != 0 {
-			log.Infof("new pivot low detected: %f %s", s.pivot.LastLow(), kline.EndTime.Time())
+			bbgo.Notify("%s new pivot low detected: %f %s", s.Symbol, s.pivot.LastLow(), kline.EndTime.Time())
 		}
 
 		s.lastLow = lastLow
