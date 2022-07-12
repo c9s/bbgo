@@ -341,9 +341,6 @@ var BacktestCmd = &cobra.Command{
 
 			dumper := backtest.NewKLineDumper(kLineDataDir)
 			defer func() {
-				_ = dumper.Close()
-			}()
-			defer func() {
 				if err := dumper.Close(); err != nil {
 					log.WithError(err).Errorf("kline dumper can not close files")
 				}
