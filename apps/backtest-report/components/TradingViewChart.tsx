@@ -113,6 +113,19 @@ const fetchPositionHistory = (basePath: string, runID: string, filename: string)
     });
 };
 
+const selectPositionHistory = (data: PositionHistoryEntry[], since: Date, until: Date): PositionHistoryEntry[] => {
+  const entries: PositionHistoryEntry[] = [];
+  for (let i = 0; i < data.length; i++) {
+    const d = data[i];
+    if (d.time < since || d.time > until) {
+      continue
+    }
+
+    entries.push(d)
+  }
+  return entries
+}
+
 const fetchOrders = (basePath: string, runID: string) => {
   return fetch(
     `${basePath}/${runID}/orders.tsv`,
@@ -122,6 +135,19 @@ const fetchOrders = (basePath: string, runID: string) => {
     .catch((e) => {
       console.error("failed to fetch orders", e)
     });
+}
+
+const selectOrders = (data: Order[], since: Date, until: Date): Order[] => {
+  const entries: Order[] = [];
+  for (let i = 0; i < data.length; i++) {
+    const d = data[i];
+    if (d.time && (d.time < since || d.time > until)) {
+      continue
+    }
+
+    entries.push(d);
+  }
+  return entries
 }
 
 const parseInterval = (s: string) => {
@@ -390,7 +416,7 @@ const TradingViewChart = (props: TradingViewChartProps) => {
   const resizeObserver = useRef<any>();
   const intervals = props.reportSummary.intervals || [];
 
-  intervals.sort((a,b) => {
+  intervals.sort((a, b) => {
     const as = parseInterval(a)
     const bs = parseInterval(b)
     if (as < bs) {
@@ -403,7 +429,6 @@ const TradingViewChart = (props: TradingViewChartProps) => {
 
   const [currentInterval, setCurrentInterval] = useState(intervals.length > 0 ? intervals[intervals.length - 1] : '1m');
   const [showPositionBase, setShowPositionBase] = useState(false);
-  const [showCanceledOrders, setShowCanceledOrders] = useState(false);
   const [showPositionAverageCost, setShowPositionAverageCost] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
 
@@ -412,7 +437,6 @@ const TradingViewChart = (props: TradingViewChartProps) => {
     new Date(props.reportSummary.endTime),
   ]
   const [selectedTimeRange, setSelectedTimeRange] = useState(reportTimeRange)
-  const [timeRange, setTimeRange] = useState(reportTimeRange);
 
   useEffect(() => {
     if (!chartContainerRef.current || chartContainerRef.current.children.length > 0) {
@@ -423,7 +447,7 @@ const TradingViewChart = (props: TradingViewChartProps) => {
     const fetchers = [];
     const ordersFetcher = fetchOrders(props.basePath, props.runID).then((orders: Order[] | void) => {
       if (orders) {
-        const markers = ordersToMarkers(currentInterval, orders);
+        const markers = ordersToMarkers(currentInterval, selectOrders(orders, selectedTimeRange[0], selectedTimeRange[1]));
         chartData.orders = orders;
         chartData.markers = markers;
         setOrders(orders);
@@ -436,7 +460,8 @@ const TradingViewChart = (props: TradingViewChartProps) => {
       const manifest = props.reportSummary?.manifests[0];
       if (manifest && manifest.type === "strategyProperty" && manifest.strategyProperty === "position") {
         const positionHistoryFetcher = fetchPositionHistory(props.basePath, props.runID, manifest.filename).then((data) => {
-          chartData.positionHistory = data;
+          chartData.positionHistory = selectPositionHistory(data as PositionHistoryEntry[], selectedTimeRange[0], selectedTimeRange[1]);
+          // chartData.positionHistory = data;
         });
         fetchers.push(positionHistoryFetcher);
       }
@@ -594,7 +619,7 @@ const TradingViewChart = (props: TradingViewChartProps) => {
 
       <TimeRangeSlider
         selectedInterval={selectedTimeRange}
-        timelineInterval={timeRange}
+        timelineInterval={reportTimeRange}
         formatTick={(ms: Date) => format(new Date(ms), 'M d HH')}
         step={1000 * parseInterval(currentInterval)}
         onChange={(tr: any) => {
@@ -661,12 +686,12 @@ const createLegendUpdater = (legend: HTMLDivElement, prefix: string) => {
   }
 }
 
-const formatDate = (d : Date) : string => {
+const formatDate = (d: Date): string => {
   return moment(d).format("MMM Do YY hh:mm:ss A Z");
 }
 
 const createOHLCLegendUpdater = (legend: HTMLDivElement, prefix: string) => {
-  return (param: any, time : any) => {
+  return (param: any, time: any) => {
     if (param) {
       const change = Math.round((param.close - param.open) * 100.0) / 100.0
       const changePercentage = Math.round((param.close - param.open) / param.close * 10000.0) / 100.0;
