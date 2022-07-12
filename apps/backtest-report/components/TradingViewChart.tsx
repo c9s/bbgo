@@ -437,7 +437,6 @@ const TradingViewChart = (props: TradingViewChartProps) => {
     new Date(props.reportSummary.endTime),
   ]
   const [selectedTimeRange, setSelectedTimeRange] = useState(reportTimeRange)
-  const [timeRange, setTimeRange] = useState(reportTimeRange);
 
   useEffect(() => {
     if (!chartContainerRef.current || chartContainerRef.current.children.length > 0) {
