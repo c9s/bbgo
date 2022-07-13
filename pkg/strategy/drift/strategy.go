@@ -41,7 +41,8 @@ type Strategy struct {
 	midPrice fixedpoint.Value
 	lock     sync.RWMutex
 
-	stoploss float64 `json:"stoploss"`
+	Stoploss   fixedpoint.Value `json:"stoploss"`
+	CanvasPath string           `json:"canvasPath"`
 
 	ExitMethods bbgo.ExitMethodSet `json:"exits"`
 	Session     *bbgo.ExchangeSession
@@ -241,15 +242,35 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		driftPred = s.drift.Predict(3)
 		atr = s.atr.Last()
 		price := s.GetLastPrice()
+		pricef := price.Float64()
 		avg := s.Position.AverageCost.Float64()
+		stoploss := s.Stoploss.Float64()
 
-		shortCondition := (driftPred <= 0 && drift[0] <= 0) && (s.Position.IsClosed() || s.Position.IsDust(fixedpoint.Max(price, source)))
-		longCondition := (driftPred >= 0 && drift[0] >= 0) && (s.Position.IsClosed() || s.Position.IsDust(fixedpoint.Min(price, source)))
-		exitShortCondition := ((drift[1] < 0 && drift[0] >= 0) || avg+atr/2 <= price.Float64() || avg*(1.+s.stoploss) <= price.Float64()) &&
-			(!s.Position.IsClosed() && !s.Position.IsDust(fixedpoint.Max(price, source)))
-		exitLongCondition := ((drift[1] > 0 && drift[0] < 0) || avg-atr/2 >= price.Float64() || avg*(1.-s.stoploss) >= price.Float64()) &&
-			(!s.Position.IsClosed() && !s.Position.IsDust(fixedpoint.Min(price, source)))
+		shortCondition := (driftPred <= 0 && drift[0] <= 0)
+		longCondition := (driftPred >= 0 && drift[0] >= 0)
+		exitShortCondition := ((drift[1] < 0 && drift[0] >= 0) || avg+atr/2 <= pricef || avg*(1.+stoploss) <= pricef) &&
+			(!s.Position.IsClosed() && !s.Position.IsDust(fixedpoint.Max(price, source))) && !longCondition
+		exitLongCondition := ((drift[1] > 0 && drift[0] < 0) || avg-atr/2 >= pricef || avg*(1.-stoploss) >= pricef) &&
+			(!s.Position.IsClosed() && !s.Position.IsDust(fixedpoint.Min(price, source))) && !shortCondition
 
+		if exitShortCondition {
+			if s.ActiveOrderBook.NumOfOrders() > 0 {
+				if err := s.GeneralOrderExecutor.GracefulCancelActiveOrderBook(ctx, s.ActiveOrderBook); err != nil {
+					log.WithError(err).Errorf("cannot cancel orders")
+					return
+				}
+			}
+			_, _ = s.ClosePosition(ctx)
+		}
+		if exitLongCondition {
+			if s.ActiveOrderBook.NumOfOrders() > 0 {
+				if err := s.GeneralOrderExecutor.GracefulCancelActiveOrderBook(ctx, s.ActiveOrderBook); err != nil {
+					log.WithError(err).Errorf("cannot cancel orders")
+					return
+				}
+			}
+			_, _ = s.ClosePosition(ctx)
+		}
 		if shortCondition {
 			if s.ActiveOrderBook.NumOfOrders() > 0 {
 				if err := s.GeneralOrderExecutor.GracefulCancelActiveOrderBook(ctx, s.ActiveOrderBook); err != nil {
@@ -281,15 +302,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				log.WithError(err).Errorf("cannot place sell order")
 				return
 			}
-		}
-		if exitShortCondition {
-			if s.ActiveOrderBook.NumOfOrders() > 0 {
-				if err := s.GeneralOrderExecutor.GracefulCancelActiveOrderBook(ctx, s.ActiveOrderBook); err != nil {
-					log.WithError(err).Errorf("cannot cancel orders")
-					return
-				}
-			}
-			_, _ = s.ClosePosition(ctx)
 		}
 		if longCondition {
 			if s.ActiveOrderBook.NumOfOrders() > 0 {
@@ -326,15 +338,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				return
 			}
 		}
-		if exitLongCondition {
-			if s.ActiveOrderBook.NumOfOrders() > 0 {
-				if err := s.GeneralOrderExecutor.GracefulCancelActiveOrderBook(ctx, s.ActiveOrderBook); err != nil {
-					log.WithError(err).Errorf("cannot cancel orders")
-					return
-				}
-			}
-			_, _ = s.ClosePosition(ctx)
-		}
 	})
 
 	bbgo.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
@@ -348,7 +351,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		canvas.Plot("drift", s.drift, dynamicKLine.StartTime, 100)
 		canvas.Plot("zero", types.NumberSeries(0), dynamicKLine.StartTime, 100)
 		canvas.Plot("price", priceLine.Minus(mean).Mul(ratio), dynamicKLine.StartTime, 100)
-		f, _ := os.Create("output.png")
+		f, err := os.Create(s.CanvasPath)
+		if err != nil {
+			log.Errorf("%v cannot create on %s", err, s.CanvasPath)
+		}
 		defer f.Close()
 		canvas.Render(chart.PNG, f)
 		wg.Done()
