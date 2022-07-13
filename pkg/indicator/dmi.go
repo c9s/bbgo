@@ -87,15 +87,19 @@ func (inc *DMI) Length() int {
 	return inc.ADX.Length()
 }
 
+func (inc *DMI) PushK(k types.KLine) {
+	inc.Update(k.High.Float64(), k.Low.Float64(), k.Close.Float64())
+}
+
 func (inc *DMI) calculateAndUpdate(allKLines []types.KLine) {
 	if inc.ADX == nil {
 		for _, k := range allKLines {
-			inc.Update(k.High.Float64(), k.Low.Float64(), k.Close.Float64())
+			inc.PushK(k)
 			inc.EmitUpdate(inc.DIPlus.Last(), inc.DIMinus.Last(), inc.ADX.Last())
 		}
 	} else {
 		k := allKLines[len(allKLines)-1]
-		inc.Update(k.High.Float64(), k.Low.Float64(), k.Close.Float64())
+		inc.PushK(k)
 		inc.EmitUpdate(inc.DIPlus.Last(), inc.DIMinus.Last(), inc.ADX.Last())
 	}
 }
