@@ -236,6 +236,8 @@ func (o *GridOptimizer) Run(executor Executor, configJson []byte) (map[string][]
 	close(taskC) // this will shut down the executor
 
 	for result := range resultsC {
+		bar.Increment()
+
 		if result.Report == nil {
 			log.Errorf("no summaryReport found for params: %+v", result.Params)
 			continue
@@ -244,7 +246,6 @@ func (o *GridOptimizer) Run(executor Executor, configJson []byte) (map[string][]
 		for metricKey, metricFunc := range valueFunctions {
 			var metricValue = metricFunc(result.Report)
 			bar.Set("log", fmt.Sprintf("params: %+v => %s %+v", result.Params, metricKey, metricValue))
-			bar.Increment()
 
 			metrics[metricKey] = append(metrics[metricKey], Metric{
 				Params: result.Params,
