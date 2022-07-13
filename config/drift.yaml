@@ -10,6 +10,7 @@ exchangeStrategies:
  
 - on: binance
   drift:
+    canvasPath: "./output.png"
     symbol: ETHUSDT
     # kline interval for indicators
     interval: 15m
