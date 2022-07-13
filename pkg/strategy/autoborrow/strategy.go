@@ -123,7 +123,7 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 	minMarginLevel := s.MinMarginLevel
 	curMarginLevel := account.MarginLevel
 
-	bbgo.Notify("%s: current margin level: %s, margin ratio: %s, margin tolerance: %s",
+	log.Infof("%s: current margin level: %s, margin ratio: %s, margin tolerance: %s",
 		s.ExchangeSession.Name,
 		account.MarginLevel.String(),
 		account.MarginRatio.String(),
