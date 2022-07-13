@@ -102,11 +102,6 @@ the implementation.
 
 - Check the [documentation index](doc/README.md)
 
-## BBGO Tokenomics
-
-To support the development of BBGO, we have created a bounty pool to support contributors by giving away $BBG tokens.
-Check the details in [$BBG Contract Page](contracts/README.md) and our [official website](https://bbgo.finance)
-
 ## Requirements
 
 Get your exchange API key and secret after you register the accounts (you can choose one or more exchanges):
@@ -477,21 +472,19 @@ that is using bbgo component. for example:
 
 ```go
 type Strategy struct {
-*bbgo.Notifiability
+  Symbol string `json:"symbol"
+  Market types.Market
 }
 ```
 
-And then, in your code, you can call the methods of Notifiability.
-
 Supported components (single exchange strategy only for now):
 
-- `*bbgo.Notifiability`
+- `*bbgo.ExchangeSession`
 - `bbgo.OrderExecutor`
 
 If you have `Symbol string` field in your strategy, your strategy will be detected as a symbol-based strategy, then the
 following types could be injected automatically:
 
-- `*bbgo.ExchangeSession`
 - `types.Market`
 
 ## Strategy Execution Phases
@@ -581,6 +574,11 @@ See [Contributing](./CONTRIBUTING.md)
 ### Financial Contributors
 
 <object type="image/svg+xml" data="https://opencollective.com/bbgo/tiers/backer.svg?avatarHeight=36&width=600"></object>
+
+## BBGO Tokenomics
+
+To support the development of BBGO, we have created a bounty pool to support contributors by giving away $BBG tokens.
+Check the details in [$BBG Contract Page](contracts/README.md) and our [official website](https://bbgo.finance)
 
 ## Supporter
 
