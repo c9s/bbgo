@@ -342,7 +342,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		canvas := types.NewCanvas(s.InstanceID(), s.Interval)
 		fmt.Println(dynamicKLine.StartTime, dynamicKLine.EndTime)
 		mean := priceLine.Mean(100)
-		highestPrice := priceLine.Highest(100)
+		highestPrice := priceLine.Minus(mean).Highest(100)
 		highestDrift := s.drift.Highest(100)
 		ratio := highestDrift / highestPrice
 		canvas.Plot("drift", s.drift, dynamicKLine.StartTime, 100)
