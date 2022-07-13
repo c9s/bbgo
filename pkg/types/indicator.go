@@ -651,12 +651,9 @@ func Array(a Series, limit ...int) (result []float64) {
 //
 // notice that the return type is a Float64Slice, which implements the Series interface
 func Reverse(a Series, limit ...int) (result Float64Slice) {
-	l := -1
-	if len(limit) > 0 {
+	l := a.Length()
+	if len(limit) > 0 && l >= limit[0] {
 		l = limit[0]
-	}
-	if l > a.Length() {
-		l = a.Length()
 	}
 	result = make([]float64, l)
 	for i := 0; i < l; i++ {
