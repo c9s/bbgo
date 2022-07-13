@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	log "github.com/sirupsen/logrus"
-
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -19,79 +17,65 @@ type SMA struct {
 	types.SeriesBase
 	types.IntervalWindow
 	Values  types.Float64Slice
-	Cache   types.Float64Slice
+	Cache   *types.Queue
 	EndTime time.Time
 
 	UpdateCallbacks []func(value float64)
 }
 
 func (inc *SMA) Last() float64 {
-	if len(inc.Values) == 0 {
+	if inc.Values.Length() == 0 {
 		return 0.0
 	}
-	return inc.Values[len(inc.Values)-1]
+	return inc.Values.Last()
 }
 
 func (inc *SMA) Index(i int) float64 {
-	length := len(inc.Values)
-	if length == 0 || length-i-1 < 0 {
+	if i >= inc.Values.Length() {
 		return 0.0
 	}
 
-	return inc.Values[length-i-1]
+	return inc.Values.Index(i)
 }
 
 func (inc *SMA) Length() int {
-	return len(inc.Values)
+	return inc.Values.Length()
 }
 
 var _ types.SeriesExtend = &SMA{}
 
 func (inc *SMA) Update(value float64) {
-	if len(inc.Cache) < inc.Window {
-		if len(inc.Cache) == 0 {
-			inc.SeriesBase.Series = inc
-		}
-		inc.Cache = append(inc.Cache, value)
-		if len(inc.Cache) == inc.Window {
-			inc.Values = append(inc.Values, types.Mean(&inc.Cache))
-		}
-		return
-
+	if inc.Cache == nil {
+		inc.Cache = types.NewQueue(inc.Window)
+		inc.SeriesBase.Series = inc
 	}
-	length := len(inc.Values)
-	newVal := (inc.Values[length-1]*float64(inc.Window-1) + value) / float64(inc.Window)
-	inc.Values = append(inc.Values, newVal)
+	inc.Cache.Update(value)
+	if inc.Cache.Length() < inc.Window {
+		return
+	}
+	inc.Values.Push(types.Mean(inc.Cache))
+	if inc.Values.Length() > MaxNumOfSMA {
+		inc.Values = inc.Values[MaxNumOfSMATruncateSize-1:]
+	}
 }
 
 func (inc *SMA) calculateAndUpdate(kLines []types.KLine) {
-	if len(kLines) < inc.Window {
-		return
-	}
-
 	var index = len(kLines) - 1
 	var kline = kLines[index]
-
 	if inc.EndTime != zeroTime && kline.EndTime.Before(inc.EndTime) {
 		return
 	}
-
-	var recentK = kLines[index-(inc.Window-1) : index+1]
-
-	sma, err := calculateSMA(recentK, inc.Window, KLineClosePriceMapper)
-	if err != nil {
-		log.WithError(err).Error("SMA error")
-		return
+	if inc.Cache == nil {
+		for _, k := range kLines {
+			inc.Update(KLineClosePriceMapper(k))
+			inc.EndTime = k.EndTime.Time()
+			inc.EmitUpdate(inc.Values.Last())
+		}
+	} else {
+		inc.Update(KLineClosePriceMapper(kline))
+		inc.EndTime = kline.EndTime.Time()
+		inc.EmitUpdate(inc.Values.Last())
 	}
-	inc.Values.Push(sma)
-
-	if len(inc.Values) > MaxNumOfSMA {
-		inc.Values = inc.Values[MaxNumOfSMATruncateSize-1:]
-	}
-
-	inc.EndTime = kLines[index].EndTime.Time()
-
-	inc.EmitUpdate(sma)
 }
 
 func (inc *SMA) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
@@ -110,6 +94,9 @@ func calculateSMA(kLines []types.KLine, window int, priceF KLinePriceMapper) (fl
 	length := len(kLines)
 	if length == 0 || length < window {
 		return 0.0, fmt.Errorf("insufficient elements for calculating SMA with window = %d", window)
+	}
+	if length != window {
+		return 0.0, fmt.Errorf("too much klines passed in, requires only %d klines", window)
 	}
 
 	sum := 0.0
