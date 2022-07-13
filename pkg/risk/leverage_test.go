@@ -83,3 +83,63 @@ func TestCalculatePositionCost(t *testing.T) {
 		})
 	}
 }
+
+func TestCalculateMaxPosition(t *testing.T) {
+	type args struct {
+		price           fixedpoint.Value
+		availableMargin fixedpoint.Value
+		leverage        fixedpoint.Value
+	}
+	tests := []struct {
+		name string
+		args args
+		want fixedpoint.Value
+	}{
+		{
+			name: "3x",
+			args: args{
+				price:           fixedpoint.NewFromFloat(9000.0),
+				availableMargin: fixedpoint.NewFromFloat(300.0),
+				leverage:        fixedpoint.NewFromFloat(3.0),
+			},
+			want: fixedpoint.NewFromFloat(0.1),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := CalculateMaxPosition(tt.args.price, tt.args.availableMargin, tt.args.leverage); got.String() != tt.want.String() {
+				t.Errorf("CalculateMaxPosition() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCalculateLeverage(t *testing.T) {
+	type args struct {
+		price           fixedpoint.Value
+		quantity        fixedpoint.Value
+		availableMargin fixedpoint.Value
+	}
+	tests := []struct {
+		name string
+		args args
+		want fixedpoint.Value
+	}{
+		{
+			name: "30x",
+			args: args{
+				price:           fixedpoint.NewFromFloat(9000.0),
+				quantity:        fixedpoint.NewFromFloat(10.0),
+				availableMargin: fixedpoint.NewFromFloat(3000.0),
+			},
+			want: fixedpoint.NewFromFloat(30.0),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := CalculateLeverage(tt.args.price, tt.args.quantity, tt.args.availableMargin); got.String() != tt.want.String() {
+				t.Errorf("CalculateLeverage() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
