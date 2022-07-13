@@ -29,9 +29,15 @@ type BreakLow struct {
 	StopEMARange fixedpoint.Value      `json:"stopEMARange"`
 	StopEMA      *types.IntervalWindow `json:"stopEMA"`
 
-	lastLow        fixedpoint.Value
-	pivot          *indicator.Pivot
-	stopEWMA       *indicator.EWMA
+	TrendEMA *types.IntervalWindow `json:"trendEMA"`
+
+	lastLow  fixedpoint.Value
+	pivot    *indicator.Pivot
+	stopEWMA *indicator.EWMA
+
+	trendEWMA                       *indicator.EWMA
+	trendEWMALast, trendEWMACurrent float64
+
 	pivotLowPrices []fixedpoint.Value
 
 	orderExecutor *bbgo.GeneralOrderExecutor
@@ -41,6 +47,14 @@ type BreakLow struct {
 func (s *BreakLow) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: types.Interval1m})
+
+	if s.StopEMA != nil {
+		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.StopEMA.Interval})
+	}
+
+	if s.TrendEMA != nil {
+		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.TrendEMA.Interval})
+	}
 }
 
 func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.GeneralOrderExecutor) {
@@ -62,6 +76,15 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 		s.stopEWMA = standardIndicator.EWMA(*s.StopEMA)
 	}
 
+	if s.TrendEMA != nil {
+		s.trendEWMA = standardIndicator.EWMA(*s.TrendEMA)
+
+		session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.TrendEMA.Interval, func(kline types.KLine) {
+			s.trendEWMALast = s.trendEWMACurrent
+			s.trendEWMACurrent = s.trendEWMA.Last()
+		}))
+	}
+
 	// update pivot low data
 	session.MarketDataStream.OnKLineClosed(types.KLineWith(symbol, s.Interval, func(kline types.KLine) {
 		lastLow := fixedpoint.NewFromFloat(s.pivot.LastLow())
@@ -78,10 +101,6 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 	}))
 
 	session.MarketDataStream.OnKLineClosed(types.KLineWith(symbol, types.Interval1m, func(kline types.KLine) {
-		if position.IsOpened(kline.Close) {
-			return
-		}
-
 		if len(s.pivotLowPrices) == 0 {
 			log.Infof("currently there is no pivot low prices, can not check break low...")
 			return
@@ -113,6 +132,22 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 		}
 
 		log.Infof("%s breakLow signal detected, closed price %f < breakPrice %f", kline.Symbol, closePrice.Float64(), breakPrice.Float64())
+
+		if position.IsOpened(kline.Close) {
+			log.Infof("position is already opened, skip short")
+			return
+		}
+
+		// trend EMA protection
+		if s.trendEWMALast > 0.0 && s.trendEWMACurrent > 0.0 {
+			slope := s.trendEWMALast / s.trendEWMACurrent
+			if slope > 1.0 {
+				log.Infof("trendEMA %+v current=%f last=%f slope=%f: skip short", s.TrendEMA, s.trendEWMACurrent, s.trendEWMALast, slope)
+				return
+			}
+
+			log.Infof("trendEMA %+v current=%f last=%f slope=%f: short is enabled", s.TrendEMA, s.trendEWMACurrent, s.trendEWMALast, slope)
+		}
 
 		// stop EMA protection
 		if s.stopEWMA != nil {
