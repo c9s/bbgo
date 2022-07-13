@@ -114,7 +114,7 @@ func TestCalculateMaxPosition(t *testing.T) {
 	}
 }
 
-func TestCalculateLeverage(t *testing.T) {
+func TestCalculateMinRequiredLeverage(t *testing.T) {
 	type args struct {
 		price           fixedpoint.Value
 		quantity        fixedpoint.Value
@@ -137,8 +137,8 @@ func TestCalculateLeverage(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := CalculateLeverage(tt.args.price, tt.args.quantity, tt.args.availableMargin); got.String() != tt.want.String() {
-				t.Errorf("CalculateLeverage() = %v, want %v", got, tt.want)
+			if got := CalculateMinRequiredLeverage(tt.args.price, tt.args.quantity, tt.args.availableMargin); got.String() != tt.want.String() {
+				t.Errorf("CalculateMinRequiredLeverage() = %v, want %v", got, tt.want)
 			}
 		})
 	}
