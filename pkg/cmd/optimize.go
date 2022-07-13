@@ -101,6 +101,10 @@ var optimizeCmd = &cobra.Command{
 			Config: optConfig,
 		}
 
+		if err := executor.Prepare(configJson); err != nil {
+			return err
+		}
+
 		metrics, err := optz.Run(executor, configJson)
 		if err != nil {
 			return err
