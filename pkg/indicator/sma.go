@@ -95,6 +95,9 @@ func calculateSMA(kLines []types.KLine, window int, priceF KLinePriceMapper) (fl
 	if length == 0 || length < window {
 		return 0.0, fmt.Errorf("insufficient elements for calculating SMA with window = %d", window)
 	}
+	if length != window {
+		return 0.0, fmt.Errorf("too much klines passed in, requires only %d klines", window)
+	}
 
 	sum := 0.0
 	for _, k := range kLines {
