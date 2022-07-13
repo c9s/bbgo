@@ -1,9 +1,11 @@
 package types
 
 import (
+	"reflect"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"gonum.org/v1/gonum/stat"
-	"testing"
 )
 
 func TestFloat(t *testing.T) {
@@ -143,4 +145,168 @@ func TestDot(t *testing.T) {
 	assert.InDelta(t, out2, 3., 0.001)
 	out3 := Dot(3., &a, 2)
 	assert.InDelta(t, out2, out3, 0.001)
+}
+
+func TestSum(t *testing.T) {
+	type args struct {
+		a     Series
+		limit []int
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantSum float64
+	}{
+		{name: "use limit",
+			args: args{
+				a:     &Float64Slice{0.5, 0.75, 1., 1.25, 1.5, 1.75},
+				limit: []int{3},
+			},
+			wantSum: 4.5,
+		},
+		{name: "no use limit",
+			args: args{
+				a:     &Float64Slice{0.5, 0.75, 1., 1.25, 1.5, 1.75},
+				limit: nil,
+			},
+			wantSum: 6.75,
+		},
+		{name: "over limit",
+			args: args{
+				a:     &Float64Slice{0.5, 0.75, 1., 1.25, 1.5, 1.75},
+				limit: []int{7},
+			},
+			wantSum: 6.75,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if gotSum := Sum(tt.args.a, tt.args.limit...); gotSum != tt.wantSum {
+				t.Errorf("Sum() = %v, want %v", gotSum, tt.wantSum)
+			}
+		})
+	}
+}
+
+func TestMean(t *testing.T) {
+	type args struct {
+		a     Series
+		limit []int
+	}
+	tests := []struct {
+		name     string
+		args     args
+		wantMean float64
+	}{
+		{name: "use limit",
+			args: args{
+				a:     &Float64Slice{0.5, 0.75, 1., 1.25, 1.5, 1.75},
+				limit: []int{3},
+			},
+			wantMean: 1.5,
+		},
+		{name: "no use limit",
+			args: args{
+				a:     &Float64Slice{0.5, 0.75, 1., 1.25, 1.5, 1.75},
+				limit: nil,
+			},
+			wantMean: 1.125,
+		},
+		{name: "over limit",
+			args: args{
+				a:     &Float64Slice{0.5, 0.75, 1., 1.25, 1.5, 1.75},
+				limit: []int{7},
+			},
+			wantMean: 1.125,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if gotMean := Mean(tt.args.a, tt.args.limit...); gotMean != tt.wantMean {
+				t.Errorf("Mean() = %v, want %v", gotMean, tt.wantMean)
+			}
+		})
+	}
+}
+
+func TestArray(t *testing.T) {
+	type args struct {
+		a     Series
+		limit []int
+	}
+	tests := []struct {
+		name       string
+		args       args
+		wantResult []float64
+	}{
+		{name: "use limit",
+			args: args{
+				a:     &Float64Slice{0.5, 0.75, 1., 1.25, 1.5, 1.75},
+				limit: []int{3},
+			},
+			wantResult: []float64{1.75, 1.5, 1.25},
+		},
+		{name: "no use limit",
+			args: args{
+				a:     &Float64Slice{0.5, 0.75, 1., 1.25, 1.5, 1.75},
+				limit: nil,
+			},
+			wantResult: []float64{1.75, 1.5, 1.25, 1., 0.75, 0.5},
+		},
+		{name: "over limit",
+			args: args{
+				a:     &Float64Slice{0.5, 0.75, 1., 1.25, 1.5, 1.75},
+				limit: []int{7},
+			},
+			wantResult: []float64{1.75, 1.5, 1.25, 1., 0.75, 0.5},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if gotResult := Array(tt.args.a, tt.args.limit...); !reflect.DeepEqual(gotResult, tt.wantResult) {
+				t.Errorf("Array() = %v, want %v", gotResult, tt.wantResult)
+			}
+		})
+	}
+}
+
+func TestReverse(t *testing.T) {
+	type args struct {
+		a     Series
+		limit []int
+	}
+	tests := []struct {
+		name       string
+		args       args
+		wantResult Float64Slice
+	}{
+		{name: "use limit",
+			args: args{
+				a:     &Float64Slice{0.5, 0.75, 1., 1.25, 1.5, 1.75},
+				limit: []int{3},
+			},
+			wantResult: []float64{1.25, 1.5, 1.75},
+		},
+		{name: "no use limit",
+			args: args{
+				a:     &Float64Slice{0.5, 0.75, 1., 1.25, 1.5, 1.75},
+				limit: nil,
+			},
+			wantResult: []float64{0.5, 0.75, 1., 1.25, 1.5, 1.75},
+		},
+		{name: "over limit",
+			args: args{
+				a:     &Float64Slice{0.5, 0.75, 1., 1.25, 1.5, 1.75},
+				limit: []int{7},
+			},
+			wantResult: []float64{0.5, 0.75, 1., 1.25, 1.5, 1.75},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if gotResult := Reverse(tt.args.a, tt.args.limit...); !reflect.DeepEqual(gotResult, tt.wantResult) {
+				t.Errorf("Reverse() = %v, want %v", gotResult, tt.wantResult)
+			}
+		})
+	}
 }
