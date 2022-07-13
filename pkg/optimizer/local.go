@@ -76,6 +76,20 @@ func (e *LocalProcessExecutor) readReport(output []byte) (*backtest.SummaryRepor
 	return summaryReport, nil
 }
 
+// Prepare prepares the environment for the following back tests
+// this is a blocking operation
+func (e *LocalProcessExecutor) Prepare(configJson []byte) error {
+	log.Debugln("Sync database before launching backtests...")
+	tf, err := jsonToYamlConfig(e.ConfigDir, configJson)
+	if err != nil {
+		return err
+	}
+
+	c := exec.Command(e.Bin, "backtest", "--sync", "--sync-only", "--config", tf.Name())
+	_, err = c.Output()
+	return err
+}
+
 func (e *LocalProcessExecutor) Run(ctx context.Context, taskC chan BacktestTask, bar *pb.ProgressBar) (chan BacktestTask, error) {
 	var maxNumOfProcess = e.Config.MaxNumberOfProcesses
 	var resultsC = make(chan BacktestTask, maxNumOfProcess*2)
