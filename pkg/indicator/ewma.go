@@ -20,7 +20,7 @@ type EWMA struct {
 	Values       types.Float64Slice
 	LastOpenTime time.Time
 
-	UpdateCallbacks []func(value float64)
+	updateCallbacks []func(value float64)
 }
 
 func (inc *EWMA) Update(value float64) {

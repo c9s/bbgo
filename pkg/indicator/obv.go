@@ -18,9 +18,9 @@ type OBV struct {
 	types.IntervalWindow
 	Values   types.Float64Slice
 	PrePrice float64
+	EndTime  time.Time
 
-	EndTime         time.Time
-	UpdateCallbacks []func(value float64)
+	updateCallbacks []func(value float64)
 }
 
 func (inc *OBV) Update(price, volume float64) {
