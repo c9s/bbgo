@@ -18,7 +18,6 @@ import (
 const ID = "pivotshort"
 
 var one = fixedpoint.One
-var zero = fixedpoint.Zero
 
 var log = logrus.WithField("strategy", ID)
 
@@ -176,7 +175,6 @@ type Strategy struct {
 	// StrategyController
 	bbgo.StrategyController
 }
-
 
 func (s *Strategy) ID() string {
 	return ID
