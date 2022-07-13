@@ -101,12 +101,12 @@ exchangeStrategies:
         minQuoteVolume: 200_000_000
 
     - trailingStop:
-        callbackRate: 2%
+        callbackRate: 3%
 
         # activationRatio is relative to the average cost,
         # when side is buy, 1% means lower 1% than the average cost.
         # when side is sell, 1% means higher 1% than the average cost.
-        activationRatio: 10%
+        activationRatio: 40%
 
         # minProfit uses the position ROI to calculate the profit ratio
         # minProfit: 1%
