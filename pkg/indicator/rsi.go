@@ -22,7 +22,7 @@ type RSI struct {
 	PreviousAvgGain float64
 
 	EndTime         time.Time
-	UpdateCallbacks []func(value float64)
+	updateCallbacks []func(value float64)
 }
 
 func (inc *RSI) Update(price float64) {
