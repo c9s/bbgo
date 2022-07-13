@@ -29,6 +29,8 @@ type BreakLow struct {
 	StopEMARange fixedpoint.Value      `json:"stopEMARange"`
 	StopEMA      *types.IntervalWindow `json:"stopEMA"`
 
+	TrendEMA *types.IntervalWindow `json:"trendEMA"`
+
 	lastLow        fixedpoint.Value
 	pivot          *indicator.Pivot
 	stopEWMA       *indicator.EWMA
@@ -41,6 +43,14 @@ type BreakLow struct {
 func (s *BreakLow) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: types.Interval1m})
+
+	if s.StopEMA != nil {
+		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.StopEMA.Interval})
+	}
+
+	if s.TrendEMA != nil {
+		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.TrendEMA.Interval})
+	}
 }
 
 func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.GeneralOrderExecutor) {
