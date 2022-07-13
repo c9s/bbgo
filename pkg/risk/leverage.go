@@ -24,6 +24,7 @@ func CalculateOpenLoss(numContract, markPrice, orderPrice fixedpoint.Value, side
 	return openLoss
 }
 
+// CalculateMarginCost calculate the margin cost of the given notional position by price * quantity
 func CalculateMarginCost(price, quantity, leverage fixedpoint.Value) fixedpoint.Value {
 	var notionalValue = price.Mul(quantity)
 	var cost = notionalValue.Div(leverage)
@@ -43,8 +44,8 @@ func CalculateMaxPosition(price, availableMargin, leverage fixedpoint.Value) fix
 	return maxQuantity
 }
 
-// CalculateLeverage calculates the leverage of the given position (price and quantity)
-func CalculateLeverage(price, quantity, availableMargin fixedpoint.Value) fixedpoint.Value {
+// CalculateMinRequiredLeverage calculates the leverage of the given position (price and quantity)
+func CalculateMinRequiredLeverage(price, quantity, availableMargin fixedpoint.Value) fixedpoint.Value {
 	var notional = price.Mul(quantity)
 	return notional.Div(availableMargin)
 }
