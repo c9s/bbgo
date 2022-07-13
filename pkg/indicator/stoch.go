@@ -59,7 +59,11 @@ func (inc *STOCH) LastD() float64 {
 	return inc.D[len(inc.D)-1]
 }
 
-func (inc *STOCH) calculateAndUpdate(kLines []types.KLine) {
+func (inc *STOCH) PushK(k types.KLine) {
+	inc.Update(k.High.Float64(), k.Low.Float64(), k.Close.Float64())
+}
+
+func (inc *STOCH) CalculateAndUpdate(kLines []types.KLine) {
 	if len(kLines) < inc.Window || len(kLines) < DPeriod {
 		return
 	}
@@ -68,7 +72,8 @@ func (inc *STOCH) calculateAndUpdate(kLines []types.KLine) {
 		if inc.EndTime != zeroTime && !k.EndTime.After(inc.EndTime) {
 			continue
 		}
-		inc.Update(k.High.Float64(), k.Low.Float64(), k.Close.Float64())
+
+		inc.PushK(k)
 	}
 
 	inc.EmitUpdate(inc.LastK(), inc.LastD())
@@ -80,7 +85,7 @@ func (inc *STOCH) handleKLineWindowUpdate(interval types.Interval, window types.
 		return
 	}
 
-	inc.calculateAndUpdate(window)
+	inc.CalculateAndUpdate(window)
 }
 
 func (inc *STOCH) Bind(updater KLineWindowUpdater) {

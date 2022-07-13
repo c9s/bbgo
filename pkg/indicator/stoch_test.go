@@ -56,7 +56,7 @@ func TestSTOCH_update(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			kd := STOCH{IntervalWindow: types.IntervalWindow{Window: tt.window}}
-			kd.calculateAndUpdate(tt.kLines)
+			kd.CalculateAndUpdate(tt.kLines)
 
 			got_k := kd.LastK()
 			diff_k := math.Trunc((got_k-tt.want_k)*100) / 100

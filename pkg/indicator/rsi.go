@@ -80,12 +80,17 @@ func (inc *RSI) Length() int {
 
 var _ types.SeriesExtend = &RSI{}
 
-func (inc *RSI) calculateAndUpdate(kLines []types.KLine) {
+func (inc *RSI) PushK(k types.KLine) {
+	inc.Update(k.Close.Float64())
+}
+
+func (inc *RSI) CalculateAndUpdate(kLines []types.KLine) {
 	for _, k := range kLines {
 		if inc.EndTime != zeroTime && !k.EndTime.After(inc.EndTime) {
 			continue
 		}
-		inc.Update(k.Close.Float64())
+
+		inc.PushK(k)
 	}
 
 	inc.EmitUpdate(inc.Last())
@@ -97,7 +102,7 @@ func (inc *RSI) handleKLineWindowUpdate(interval types.Interval, window types.KL
 		return
 	}
 
-	inc.calculateAndUpdate(window)
+	inc.CalculateAndUpdate(window)
 }
 
 func (inc *RSI) Bind(updater KLineWindowUpdater) {

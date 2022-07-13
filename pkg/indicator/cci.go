@@ -3,7 +3,6 @@ package indicator
 import (
 	"math"
 
-	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -79,17 +78,20 @@ func (inc *CCI) Length() int {
 
 var _ types.SeriesExtend = &CCI{}
 
-var three = fixedpoint.NewFromInt(3)
 
-func (inc *CCI) calculateAndUpdate(allKLines []types.KLine) {
+func (inc *CCI) PushK(k types.KLine) {
+	inc.Update(k.High.Add(k.Low).Add(k.Close).Div(three).Float64())
+}
+
+func (inc *CCI) CalculateAndUpdate(allKLines []types.KLine) {
 	if inc.TypicalPrice.Length() == 0 {
 		for _, k := range allKLines {
-			inc.Update(k.High.Add(k.Low).Add(k.Close).Div(three).Float64())
+			inc.PushK(k)
 			inc.EmitUpdate(inc.Last())
 		}
 	} else {
 		k := allKLines[len(allKLines)-1]
-		inc.Update(k.High.Add(k.Low).Add(k.Close).Div(three).Float64())
+		inc.PushK(k)
 		inc.EmitUpdate(inc.Last())
 	}
 }
@@ -99,7 +101,7 @@ func (inc *CCI) handleKLineWindowUpdate(interval types.Interval, window types.KL
 		return
 	}
 
-	inc.calculateAndUpdate(window)
+	inc.CalculateAndUpdate(window)
 }
 
 func (inc *CCI) Bind(updater KLineWindowUpdater) {

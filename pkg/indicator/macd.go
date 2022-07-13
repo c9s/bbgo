@@ -51,14 +51,20 @@ func (inc *MACD) Update(x float64) {
 	inc.Histogram.Push(macd - inc.SignalLine.Last())
 }
 
+// Deprecated -- this function is not used ??? ask @narumi
 func (inc *MACD) calculateMACD(kLines []types.KLine, priceF KLinePriceMapper) float64 {
-	for _, kline := range kLines {
-		inc.Update(kline.Close.Float64())
+	for _, k := range kLines {
+		inc.PushK(k)
 	}
+
 	return inc.Values[len(inc.Values)-1]
 }
 
-func (inc *MACD) calculateAndUpdate(kLines []types.KLine) {
+func (inc *MACD) PushK(k types.KLine) {
+	inc.Update(k.Close.Float64())
+}
+
+func (inc *MACD) CalculateAndUpdate(kLines []types.KLine) {
 	if len(kLines) == 0 {
 		return
 	}
@@ -67,7 +73,8 @@ func (inc *MACD) calculateAndUpdate(kLines []types.KLine) {
 		if inc.EndTime != zeroTime && !k.EndTime.After(inc.EndTime) {
 			continue
 		}
-		inc.Update(k.Close.Float64())
+
+		inc.PushK(k)
 	}
 
 	inc.EmitUpdate(inc.Values[len(inc.Values)-1])
@@ -79,7 +86,7 @@ func (inc *MACD) handleKLineWindowUpdate(interval types.Interval, window types.K
 		return
 	}
 
-	inc.calculateAndUpdate(window)
+	inc.CalculateAndUpdate(window)
 }
 
 func (inc *MACD) Bind(updater KLineWindowUpdater) {

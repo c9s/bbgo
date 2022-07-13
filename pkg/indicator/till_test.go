@@ -4,9 +4,10 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/stretchr/testify/assert"
 )
 
 /*
@@ -55,7 +56,7 @@ func Test_TILL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			till := TILL{IntervalWindow: types.IntervalWindow{Window: 16}}
-			till.calculateAndUpdate(tt.kLines)
+			till.CalculateAndUpdate(tt.kLines)
 			last := till.Last()
 			assert.InDelta(t, tt.want, last, Delta)
 			assert.InDelta(t, tt.next, till.Index(1), Delta)

@@ -296,7 +296,7 @@ func preloadPivot(pivot *indicator.Pivot, store *bbgo.MarketDataStore) *types.KL
 	log.Debugf("updating pivot indicator: %d klines", len(*klines))
 
 	for i := pivot.Window; i < len(*klines); i++ {
-		pivot.Update((*klines)[0 : i+1])
+		pivot.CalculateAndUpdate((*klines)[0 : i+1])
 	}
 
 	log.Debugf("found %v previous lows: %v", pivot.IntervalWindow, pivot.Lows)

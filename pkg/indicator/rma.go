@@ -64,12 +64,17 @@ func (inc *RMA) Length() int {
 
 var _ types.SeriesExtend = &RMA{}
 
+func (inc *RMA) PushK(k types.KLine) {
+	inc.Update(k.Close.Float64())
+}
+
 func (inc *RMA) calculateAndUpdate(kLines []types.KLine) {
 	for _, k := range kLines {
 		if inc.EndTime != zeroTime && !k.EndTime.After(inc.EndTime) {
 			continue
 		}
-		inc.Update(k.Close.Float64())
+
+		inc.PushK(k)
 	}
 
 	inc.EmitUpdate(inc.Last())
