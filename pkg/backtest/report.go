@@ -86,7 +86,7 @@ func (r *SessionSymbolReport) InitialEquityValue() fixedpoint.Value {
 }
 
 func (r *SessionSymbolReport) FinalEquityValue() fixedpoint.Value {
-	return InQuoteAsset(r.FinalBalances, r.Market, r.StartPrice)
+	return InQuoteAsset(r.FinalBalances, r.Market, r.LastPrice)
 }
 
 func (r *SessionSymbolReport) Print(wantBaseAssetBaseline bool) {
