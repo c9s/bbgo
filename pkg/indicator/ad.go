@@ -59,7 +59,7 @@ func (inc *AD) Length() int {
 
 var _ types.SeriesExtend = &AD{}
 
-func (inc *AD) calculateAndUpdate(kLines []types.KLine) {
+func (inc *AD) CalculateAndUpdate(kLines []types.KLine) {
 	for _, k := range kLines {
 		if inc.EndTime != zeroTime && !k.EndTime.After(inc.EndTime) {
 			continue
@@ -70,12 +70,13 @@ func (inc *AD) calculateAndUpdate(kLines []types.KLine) {
 	inc.EmitUpdate(inc.Last())
 	inc.EndTime = kLines[len(kLines)-1].EndTime.Time()
 }
+
 func (inc *AD) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
 	if inc.Interval != interval {
 		return
 	}
 
-	inc.calculateAndUpdate(window)
+	inc.CalculateAndUpdate(window)
 }
 
 func (inc *AD) Bind(updater KLineWindowUpdater) {

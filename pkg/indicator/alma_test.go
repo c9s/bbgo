@@ -52,7 +52,7 @@ func Test_ALMA(t *testing.T) {
 				Offset:         0.9,
 				Sigma:          6,
 			}
-			alma.calculateAndUpdate(tt.kLines)
+			alma.CalculateAndUpdate(tt.kLines)
 			assert.InDelta(t, tt.want, alma.Last(), Delta)
 			assert.InDelta(t, tt.next, alma.Index(1), Delta)
 			assert.Equal(t, tt.all, alma.Length())

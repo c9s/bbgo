@@ -1,9 +1,10 @@
 package indicator
 
 import (
-	"github.com/sirupsen/logrus"
 	"math"
 	"time"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -50,6 +51,7 @@ func (inc *Supertrend) Index(i int) float64 {
 func (inc *Supertrend) Length() int {
 	return len(inc.trendPrices)
 }
+
 func (inc *Supertrend) Update(highPrice, lowPrice, closePrice float64) {
 	if inc.Window <= 0 {
 		panic("window must be greater than 0")
@@ -127,12 +129,17 @@ func (inc *Supertrend) GetSignal() types.Direction {
 
 var _ types.SeriesExtend = &Supertrend{}
 
-func (inc *Supertrend) calculateAndUpdate(kLines []types.KLine) {
+func (inc *Supertrend) PushK(k types.KLine) {
+	inc.Update(k.GetHigh().Float64(), k.GetLow().Float64(), k.GetClose().Float64())
+}
+
+func (inc *Supertrend) CalculateAndUpdate(kLines []types.KLine) {
 	for _, k := range kLines {
 		if inc.EndTime != zeroTime && !k.EndTime.After(inc.EndTime) {
 			continue
 		}
-		inc.Update(k.GetHigh().Float64(), k.GetLow().Float64(), k.GetClose().Float64())
+
+		inc.PushK(k)
 	}
 
 	inc.EmitUpdate(inc.Last())
@@ -144,7 +151,7 @@ func (inc *Supertrend) handleKLineWindowUpdate(interval types.Interval, window t
 		return
 	}
 
-	inc.calculateAndUpdate(window)
+	inc.CalculateAndUpdate(window)
 }
 
 func (inc *Supertrend) Bind(updater KLineWindowUpdater) {

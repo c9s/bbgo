@@ -24,6 +24,3 @@ func MapKLinePrice(kLines []types.KLine, f KLinePriceMapper) (prices []float64) 
 	return prices
 }
 
-type KLineWindowUpdater interface {
-	OnKLineWindowUpdate(func(interval types.Interval, window types.KLineWindow))
-}

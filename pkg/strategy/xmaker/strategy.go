@@ -693,7 +693,9 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 	if store, ok := s.sourceSession.MarketDataStore(s.Symbol); ok {
 		if klines, ok2 := store.KLinesOfInterval(s.BollBandInterval); ok2 {
-			s.boll.Update(*klines)
+			for i := 0; i < len(*klines); i++ {
+				s.boll.CalculateAndUpdate((*klines)[0 : i+1])
+			}
 		}
 	}
 
