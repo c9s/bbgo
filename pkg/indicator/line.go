@@ -22,11 +22,12 @@ type Line struct {
 	Interval    types.Interval
 }
 
-func (l *Line) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
+func (l *Line) handleKLineWindowUpdate(interval types.Interval, allKLines types.KLineWindow) {
 	if interval != l.Interval {
 		return
 	}
-	newTime := window.Last().EndTime.Time()
+
+	newTime := allKLines.Last().EndTime.Time()
 	delta := int(newTime.Sub(l.currentTime).Minutes()) / l.Interval.Minutes()
 	l.startIndex += delta
 	l.endIndex += delta

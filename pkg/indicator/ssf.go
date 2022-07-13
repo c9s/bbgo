@@ -93,14 +93,19 @@ func (inc *SSF) Last() float64 {
 
 var _ types.SeriesExtend = &SSF{}
 
-func (inc *SSF) calculateAndUpdate(allKLines []types.KLine) {
+func (inc *SSF) PushK(k types.KLine) {
+	inc.Update(k.Close.Float64())
+}
+
+func (inc *SSF) CalculateAndUpdate(allKLines []types.KLine) {
 	if inc.Values != nil {
-		inc.Update(allKLines[len(allKLines)-1].Close.Float64())
+		k := allKLines[len(allKLines)-1]
+		inc.PushK(k)
 		inc.EmitUpdate(inc.Last())
 		return
 	}
 	for _, k := range allKLines {
-		inc.Update(k.Close.Float64())
+		inc.PushK(k)
 		inc.EmitUpdate(inc.Last())
 	}
 }
@@ -109,7 +114,7 @@ func (inc *SSF) handleKLineWindowUpdate(interval types.Interval, window types.KL
 	if inc.Interval != interval {
 		return
 	}
-	inc.calculateAndUpdate(window)
+	inc.CalculateAndUpdate(window)
 }
 
 func (inc *SSF) Bind(updater KLineWindowUpdater) {

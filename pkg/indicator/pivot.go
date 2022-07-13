@@ -38,7 +38,7 @@ func (inc *Pivot) LastHigh() float64 {
 	return inc.Highs[len(inc.Highs)-1]
 }
 
-func (inc *Pivot) Update(klines []types.KLine) {
+func (inc *Pivot) CalculateAndUpdate(klines []types.KLine) {
 	if len(klines) < inc.Window {
 		return
 	}
@@ -84,7 +84,7 @@ func (inc *Pivot) handleKLineWindowUpdate(interval types.Interval, window types.
 		return
 	}
 
-	inc.Update(window)
+	inc.CalculateAndUpdate(window)
 }
 
 func (inc *Pivot) Bind(updater KLineWindowUpdater) {

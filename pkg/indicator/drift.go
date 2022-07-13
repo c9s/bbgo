@@ -68,14 +68,19 @@ func (inc *Drift) Length() int {
 
 var _ types.SeriesExtend = &Drift{}
 
-func (inc *Drift) calculateAndUpdate(allKLines []types.KLine) {
+func (inc *Drift) PushK(k types.KLine) {
+	inc.Update(k.Close.Float64())
+}
+
+func (inc *Drift) CalculateAndUpdate(allKLines []types.KLine) {
 	if inc.chng == nil {
 		for _, k := range allKLines {
-			inc.Update(k.Close.Float64())
+			inc.PushK(k)
 			inc.EmitUpdate(inc.Last())
 		}
 	} else {
-		inc.Update(allKLines[len(allKLines)-1].Close.Float64())
+		k := allKLines[len(allKLines)-1]
+		inc.PushK(k)
 		inc.EmitUpdate(inc.Last())
 	}
 }
@@ -85,7 +90,7 @@ func (inc *Drift) handleKLineWindowUpdate(interval types.Interval, window types.
 		return
 	}
 
-	inc.calculateAndUpdate(window)
+	inc.CalculateAndUpdate(window)
 }
 
 func (inc *Drift) Bind(updater KLineWindowUpdater) {

@@ -55,14 +55,19 @@ func (inc *TEMA) Length() int {
 
 var _ types.SeriesExtend = &TEMA{}
 
-func (inc *TEMA) calculateAndUpdate(allKLines []types.KLine) {
+func (inc *TEMA) PushK(k types.KLine) {
+	inc.Update(k.Close.Float64())
+}
+
+func (inc *TEMA) CalculateAndUpdate(allKLines []types.KLine) {
 	if inc.A1 == nil {
 		for _, k := range allKLines {
-			inc.Update(k.Close.Float64())
+			inc.PushK(k)
 			inc.EmitUpdate(inc.Last())
 		}
 	} else {
-		inc.Update(allKLines[len(allKLines)-1].Close.Float64())
+		k := allKLines[len(allKLines)-1]
+		inc.PushK(k)
 		inc.EmitUpdate(inc.Last())
 	}
 }
@@ -72,7 +77,7 @@ func (inc *TEMA) handleKLineWindowUpdate(interval types.Interval, window types.K
 		return
 	}
 
-	inc.calculateAndUpdate(window)
+	inc.CalculateAndUpdate(window)
 }
 
 func (inc *TEMA) Bind(updater KLineWindowUpdater) {

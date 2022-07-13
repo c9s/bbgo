@@ -46,7 +46,7 @@ func Test_TEMA(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tema := TEMA{IntervalWindow: types.IntervalWindow{Window: 16}}
-			tema.calculateAndUpdate(tt.kLines)
+			tema.CalculateAndUpdate(tt.kLines)
 			last := tema.Last()
 			assert.InDelta(t, tt.want, last, Delta)
 			assert.InDelta(t, tt.next, tema.Index(1), Delta)

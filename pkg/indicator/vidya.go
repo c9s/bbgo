@@ -15,7 +15,7 @@ type VIDYA struct {
 	Values types.Float64Slice
 	input  types.Float64Slice
 
-	UpdateCallbacks []func(value float64)
+	updateCallbacks []func(value float64)
 }
 
 func (inc *VIDYA) Update(value float64) {
@@ -70,14 +70,19 @@ func (inc *VIDYA) Length() int {
 
 var _ types.SeriesExtend = &VIDYA{}
 
+func (inc *VIDYA) PushK(k types.KLine) {
+	inc.Update(k.Close.Float64())
+}
+
 func (inc *VIDYA) calculateAndUpdate(allKLines []types.KLine) {
 	if inc.input.Length() == 0 {
 		for _, k := range allKLines {
-			inc.Update(k.Close.Float64())
+			inc.PushK(k)
 			inc.EmitUpdate(inc.Last())
 		}
 	} else {
-		inc.Update(allKLines[len(allKLines)-1].Close.Float64())
+		k := allKLines[len(allKLines)-1]
+		inc.PushK(k)
 		inc.EmitUpdate(inc.Last())
 	}
 }

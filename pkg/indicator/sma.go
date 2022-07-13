@@ -10,8 +10,6 @@ import (
 const MaxNumOfSMA = 5_000
 const MaxNumOfSMATruncateSize = 100
 
-var zeroTime time.Time
-
 //go:generate callbackgen -type SMA
 type SMA struct {
 	types.SeriesBase
@@ -59,20 +57,25 @@ func (inc *SMA) Update(value float64) {
 	}
 }
 
-func (inc *SMA) calculateAndUpdate(kLines []types.KLine) {
+func (inc *SMA) PushK(k types.KLine) {
+	inc.Update(k.Close.Float64())
+}
+
+func (inc *SMA) CalculateAndUpdate(kLines []types.KLine) {
 	var index = len(kLines) - 1
 	var kline = kLines[index]
 	if inc.EndTime != zeroTime && kline.EndTime.Before(inc.EndTime) {
 		return
 	}
+
 	if inc.Cache == nil {
 		for _, k := range kLines {
-			inc.Update(KLineClosePriceMapper(k))
+			inc.PushK(k)
 			inc.EndTime = k.EndTime.Time()
 			inc.EmitUpdate(inc.Values.Last())
 		}
 	} else {
-		inc.Update(KLineClosePriceMapper(kline))
+		inc.PushK(kline)
 		inc.EndTime = kline.EndTime.Time()
 		inc.EmitUpdate(inc.Values.Last())
 	}
@@ -83,7 +86,7 @@ func (inc *SMA) handleKLineWindowUpdate(interval types.Interval, window types.KL
 		return
 	}
 
-	inc.calculateAndUpdate(window)
+	inc.CalculateAndUpdate(window)
 }
 
 func (inc *SMA) Bind(updater KLineWindowUpdater) {

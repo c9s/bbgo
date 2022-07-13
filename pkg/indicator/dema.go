@@ -50,14 +50,20 @@ func (inc *DEMA) Length() int {
 
 var _ types.SeriesExtend = &DEMA{}
 
+func (inc *DEMA) PushK(k types.KLine) {
+	inc.Update(k.Close.Float64())
+}
+
 func (inc *DEMA) calculateAndUpdate(allKLines []types.KLine) {
 	if inc.a1 == nil {
 		for _, k := range allKLines {
-			inc.Update(k.Close.Float64())
+			inc.PushK(k)
 			inc.EmitUpdate(inc.Last())
 		}
 	} else {
-		inc.Update(allKLines[len(allKLines)-1].Close.Float64())
+		// last k
+		k := allKLines[len(allKLines)-1]
+		inc.PushK(k)
 		inc.EmitUpdate(inc.Last())
 	}
 }

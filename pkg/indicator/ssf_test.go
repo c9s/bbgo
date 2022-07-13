@@ -62,7 +62,7 @@ func Test_SSF(t *testing.T) {
 				IntervalWindow: types.IntervalWindow{Window: 5},
 				Poles:          tt.poles,
 			}
-			ssf.calculateAndUpdate(tt.kLines)
+			ssf.CalculateAndUpdate(tt.kLines)
 			assert.InDelta(t, tt.want, ssf.Last(), Delta)
 			assert.InDelta(t, tt.next, ssf.Index(1), Delta)
 			assert.Equal(t, tt.all, ssf.Length())
