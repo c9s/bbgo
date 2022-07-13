@@ -26,7 +26,7 @@ type MACD struct {
 
 	EndTime time.Time
 
-	UpdateCallbacks []func(value float64)
+	updateCallbacks []func(value float64)
 }
 
 func (inc *MACD) Update(x float64) {

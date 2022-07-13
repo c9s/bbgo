@@ -16,7 +16,7 @@ type HULL struct {
 	ma2    *EWMA
 	result *EWMA
 
-	UpdateCallbacks []func(value float64)
+	updateCallbacks []func(value float64)
 }
 
 func (inc *HULL) Update(value float64) {

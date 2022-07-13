@@ -13,13 +13,16 @@ import (
 type RMA struct {
 	types.SeriesBase
 	types.IntervalWindow
-	Values          types.Float64Slice
-	counter         int
-	Adjust          bool
-	tmp             float64
-	sum             float64
-	EndTime         time.Time
-	UpdateCallbacks []func(value float64)
+
+	Values  types.Float64Slice
+	EndTime time.Time
+
+	counter int
+	Adjust  bool
+	tmp     float64
+	sum     float64
+
+	updateCallbacks []func(value float64)
 }
 
 func (inc *RMA) Update(x float64) {
