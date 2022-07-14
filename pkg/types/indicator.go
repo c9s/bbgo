@@ -3,11 +3,11 @@ package types
 import (
 	"fmt"
 	"math"
-	"time"
 	"reflect"
+	"time"
 
-	"gonum.org/v1/gonum/stat"
 	"github.com/wcharczuk/go-chart/v2"
+	"gonum.org/v1/gonum/stat"
 )
 
 // Super basic Series type that simply holds the float64 data
@@ -46,8 +46,8 @@ func (inc *Queue) Length() int {
 }
 
 func (inc *Queue) Clone() *Queue {
-	out := &Queue {
-		arr: inc.arr[:],
+	out := &Queue{
+		arr:  inc.arr[:],
 		size: inc.size,
 	}
 	out.SeriesBase.Series = out
@@ -213,7 +213,7 @@ func Abs(a Series) SeriesExtend {
 
 var _ Series = &AbsResult{}
 
-func Predict(a Series, lookback int, offset ...int) float64 {
+func LinearRegression(a Series, lookback int) (alpha float64, beta float64) {
 	if a.Length() < lookback {
 		lookback = a.Length()
 	}
@@ -224,7 +224,12 @@ func Predict(a Series, lookback int, offset ...int) float64 {
 		x[i] = float64(i)
 		y[i] = a.Index(i)
 	}
-	alpha, beta := stat.LinearRegression(x, y, weights, false)
+	alpha, beta = stat.LinearRegression(x, y, weights, false)
+	return
+}
+
+func Predict(a Series, lookback int, offset ...int) float64 {
+	alpha, beta := LinearRegression(a, lookback)
 	o := -1.0
 	if len(offset) > 0 {
 		o = -float64(offset[0])
@@ -1167,15 +1172,15 @@ type Canvas struct {
 
 func NewCanvas(title string, interval Interval) *Canvas {
 	valueFormatter := chart.TimeValueFormatter
-	if interval.Minutes() > 24 * 60 {
+	if interval.Minutes() > 24*60 {
 		valueFormatter = chart.TimeDateValueFormatter
 	} else if interval.Minutes() > 60 {
 		valueFormatter = chart.TimeHourValueFormatter
 	} else {
 		valueFormatter = chart.TimeMinuteValueFormatter
 	}
-	out := &Canvas {
-		Chart: chart.Chart {
+	out := &Canvas{
+		Chart: chart.Chart{
 			Title: title,
 			XAxis: chart.XAxis{
 				ValueFormatter: valueFormatter,
@@ -1193,11 +1198,11 @@ func (canvas *Canvas) Plot(tag string, a Series, endTime Time, length int) {
 	var timeline []time.Time
 	e := endTime.Time()
 	for i := length - 1; i >= 0; i-- {
-		shiftedT := e.Add(-time.Duration(i * canvas.Interval.Minutes()) * time.Minute)
+		shiftedT := e.Add(-time.Duration(i*canvas.Interval.Minutes()) * time.Minute)
 		timeline = append(timeline, shiftedT)
 	}
 	canvas.Series = append(canvas.Series, chart.TimeSeries{
-		Name: tag,
+		Name:    tag,
 		YValues: Reverse(a, length),
 		XValues: timeline,
 	})
