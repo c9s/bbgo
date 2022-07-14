@@ -12,7 +12,7 @@ const (
 )
 
 func detectPriceTrend(inc *indicator.BOLL, price float64) PriceTrend {
-	if inBetween(price, inc.LastDownBand(), inc.LastUpBand()) {
+	if inBetween(price, inc.DownBand.Last(), inc.UpBand.Last()) {
 		return NeutralTrend
 	}
 
