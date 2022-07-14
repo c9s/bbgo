@@ -14,10 +14,10 @@ exchangeStrategies:
     symbol: ETHUSDT
     # kline interval for indicators
     interval: 15m
-    window: 3
+    window: 2
     stoploss: 2%
     source: hl2
-    predictOffset: 5
+    predictOffset: 8
     #exits:
     #- roiStopLoss:
     #   percentage: 0.8%
