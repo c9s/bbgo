@@ -69,6 +69,7 @@ var _ types.SeriesExtend = &RMA{}
 
 func (inc *RMA) PushK(k types.KLine) {
 	inc.Update(k.Close.Float64())
+	inc.EndTime = k.EndTime.Time()
 }
 
 func (inc *RMA) CalculateAndUpdate(kLines []types.KLine) {
@@ -87,7 +88,6 @@ func (inc *RMA) CalculateAndUpdate(kLines []types.KLine) {
 	}
 
 	inc.EmitUpdate(inc.Last())
-	inc.EndTime = last.EndTime.Time()
 }
 
 func (inc *RMA) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
