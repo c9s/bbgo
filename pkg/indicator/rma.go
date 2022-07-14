@@ -72,17 +72,24 @@ func (inc *RMA) PushK(k types.KLine) {
 }
 
 func (inc *RMA) CalculateAndUpdate(kLines []types.KLine) {
-	for _, k := range kLines {
-		if inc.EndTime != zeroTime && !k.EndTime.After(inc.EndTime) {
-			continue
-		}
+	last := kLines[len(kLines)-1]
 
-		inc.PushK(k)
+	if len(inc.Values) == 0 {
+		for _, k := range kLines {
+			if inc.EndTime != zeroTime && !k.EndTime.After(inc.EndTime) {
+				continue
+			}
+
+			inc.PushK(k)
+		}
+	} else {
+		inc.PushK(last)
 	}
 
 	inc.EmitUpdate(inc.Last())
-	inc.EndTime = kLines[len(kLines)-1].EndTime.Time()
+	inc.EndTime = last.EndTime.Time()
 }
+
 func (inc *RMA) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
 	if inc.Interval != interval {
 		return
