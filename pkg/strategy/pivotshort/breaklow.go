@@ -27,6 +27,7 @@ type BreakLow struct {
 	// limit sell price = breakLowPrice * (1 + BounceRatio)
 	BounceRatio fixedpoint.Value `json:"bounceRatio"`
 
+	Leverage     fixedpoint.Value      `json:"leverage"`
 	Quantity     fixedpoint.Value      `json:"quantity"`
 	StopEMARange fixedpoint.Value      `json:"stopEMARange"`
 	StopEMA      *types.IntervalWindow `json:"stopEMA"`
@@ -170,8 +171,7 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 		// graceful cancel all active orders
 		_ = orderExecutor.GracefulCancel(ctx)
 
-		leverage := fixedpoint.NewFromInt(5)
-		quantity, err := useQuantityOrBaseBalance(s.session, s.Market, closePrice, s.Quantity, leverage)
+		quantity, err := useQuantityOrBaseBalance(s.session, s.Market, closePrice, s.Quantity, s.Leverage)
 		if err != nil {
 			log.WithError(err).Errorf("quantity calculation error")
 		}
@@ -220,6 +220,10 @@ func useQuantityOrBaseBalance(session *bbgo.ExchangeSession, market types.Market
 	if usingLeverage {
 		if !quantity.IsZero() {
 			return quantity, nil
+		}
+
+		if leverage.IsZero() {
+			leverage = fixedpoint.NewFromInt(3)
 		}
 
 		// quantity is zero, we need to calculate the quantity
