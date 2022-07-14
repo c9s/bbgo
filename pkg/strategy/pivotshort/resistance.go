@@ -37,6 +37,10 @@ func (s *ResistanceShort) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 	s.session = session
 	s.orderExecutor = orderExecutor
 	s.activeOrders = bbgo.NewActiveOrderBook(s.Symbol)
+	s.activeOrders.OnFilled(func(o types.Order) {
+		// reset resistance price
+		s.currentResistancePrice = fixedpoint.Zero
+	})
 	s.activeOrders.BindStream(session.UserDataStream)
 
 	if s.GroupDistance.IsZero() {
