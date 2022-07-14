@@ -51,15 +51,6 @@ func (inc *MACD) Update(x float64) {
 	inc.Histogram.Push(macd - inc.SignalLine.Last())
 }
 
-// Deprecated -- this function is not used ??? ask @narumi
-func (inc *MACD) calculateMACD(kLines []types.KLine, priceF KLinePriceMapper) float64 {
-	for _, k := range kLines {
-		inc.PushK(k)
-	}
-
-	return inc.Values[len(inc.Values)-1]
-}
-
 func (inc *MACD) Last() float64 {
 	if len(inc.Values) == 0 {
 		return 0.0
