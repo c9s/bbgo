@@ -69,14 +69,13 @@ func (inc *SMA) CalculateAndUpdate(allKLines []types.KLine) {
 			if inc.EndTime != zeroTime && k.EndTime.Before(inc.EndTime) {
 				continue
 			}
-
 			inc.PushK(k)
-			inc.EmitUpdate(inc.Values.Last())
 		}
 	} else {
 		inc.PushK(last)
-		inc.EmitUpdate(inc.Values.Last())
 	}
+
+	inc.EmitUpdate(inc.Values.Last())
 }
 
 func (inc *SMA) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
