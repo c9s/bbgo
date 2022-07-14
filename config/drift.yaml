@@ -18,6 +18,7 @@ exchangeStrategies:
     stoploss: 2%
     source: hl2
     predictOffset: 8
+    noStopPrice: true
     #exits:
     #- roiStopLoss:
     #   percentage: 0.8%
