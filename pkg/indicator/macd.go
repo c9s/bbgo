@@ -11,6 +11,7 @@ macd implements moving average convergence divergence indicator
 
 Moving Average Convergence Divergence (MACD)
 - https://www.investopedia.com/terms/m/macd.asp
+- https://school.stockcharts.com/doku.php?id=technical_indicators:macd-histogram
 */
 
 //go:generate callbackgen -type MACD
