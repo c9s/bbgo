@@ -116,7 +116,10 @@ func (s *ResistanceShort) updateResistanceOrders(closePrice fixedpoint.Value) {
 	ctx := context.Background()
 	resistanceUpdated := s.updateCurrentResistancePrice(closePrice)
 	if resistanceUpdated {
-		bbgo.Notify("%s Found next resistance price at %f, updating resistance order...", s.Symbol, s.currentResistancePrice.Float64())
+		bbgo.Notify("Found next %s resistance price at %f, updating resistance orders...", s.Symbol, s.currentResistancePrice.Float64())
+		s.placeResistanceOrders(ctx, s.currentResistancePrice)
+	} else if s.activeOrders.NumOfOrders() == 0 && !s.currentResistancePrice.IsZero() {
+		bbgo.Notify("There is no %s resistance open order, re-placing resistance orders at %f...", s.Symbol, s.currentResistancePrice.Float64())
 		s.placeResistanceOrders(ctx, s.currentResistancePrice)
 	}
 }
