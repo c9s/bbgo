@@ -155,7 +155,11 @@ type Strategy struct {
 	// pivot interval and window
 	types.IntervalWindow
 
+	Leverage fixedpoint.Value `json:"leverage"`
+	Quantity fixedpoint.Value `json:"quantity"`
+
 	// persistence fields
+
 	Position    *types.Position    `persistence:"position"`
 	ProfitStats *types.ProfitStats `persistence:"profit_stats"`
 	TradeStats  *types.TradeStats  `persistence:"trade_stats"`
@@ -176,7 +180,6 @@ type Strategy struct {
 	// StrategyController
 	bbgo.StrategyController
 }
-
 
 func (s *Strategy) ID() string {
 	return ID
@@ -234,6 +237,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	if s.TradeStats == nil {
 		s.TradeStats = types.NewTradeStats(s.Symbol)
+	}
+
+	if s.Leverage.IsZero() {
+		// the default leverage is 3x
+		s.Leverage = fixedpoint.NewFromInt(3)
 	}
 
 	// StrategyController
