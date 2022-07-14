@@ -139,6 +139,11 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (*types.Order, *ty
 	switch o.Type {
 	case types.OrderTypeMarket:
 		price = m.LastPrice
+
+	case types.OrderTypeStopMarket:
+		// the actual price might be different.
+		price = o.StopPrice
+
 	case types.OrderTypeLimit, types.OrderTypeStopLimit, types.OrderTypeLimitMaker:
 		price = o.Price
 	}
