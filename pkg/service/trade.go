@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	exchange2 "github.com/c9s/bbgo/pkg/exchange"
 	"github.com/c9s/bbgo/pkg/exchange/batch"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -53,7 +54,7 @@ func NewTradeService(db *sqlx.DB) *TradeService {
 }
 
 func (s *TradeService) Sync(ctx context.Context, exchange types.Exchange, symbol string, startTime time.Time) error {
-	isMargin, isFutures, isIsolated, isolatedSymbol := getExchangeAttributes(exchange)
+	isMargin, isFutures, isIsolated, isolatedSymbol := exchange2.GetSessionAttributes(exchange)
 	// override symbol if isolatedSymbol is not empty
 	if isIsolated && len(isolatedSymbol) > 0 {
 		symbol = isolatedSymbol
@@ -412,28 +413,3 @@ func SelectLastTrades(ex types.ExchangeName, symbol string, isMargin, isFutures,
 		Limit(limit)
 }
 
-func getExchangeAttributes(exchange types.Exchange) (isMargin, isFutures, isIsolated bool, isolatedSymbol string) {
-	if marginExchange, ok := exchange.(types.MarginExchange); ok {
-		marginSettings := marginExchange.GetMarginSettings()
-		isMargin = marginSettings.IsMargin
-		if isMargin {
-			isIsolated = marginSettings.IsIsolatedMargin
-			if marginSettings.IsIsolatedMargin {
-				isolatedSymbol = marginSettings.IsolatedMarginSymbol
-			}
-		}
-	}
-
-	if futuresExchange, ok := exchange.(types.FuturesExchange); ok {
-		futuresSettings := futuresExchange.GetFuturesSettings()
-		isFutures = futuresSettings.IsFutures
-		if isFutures {
-			isIsolated = futuresSettings.IsIsolatedFutures
-			if futuresSettings.IsIsolatedFutures {
-				isolatedSymbol = futuresSettings.IsolatedFuturesSymbol
-			}
-		}
-	}
-
-	return isMargin, isFutures, isIsolated, isolatedSymbol
-}
