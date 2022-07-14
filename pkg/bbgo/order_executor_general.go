@@ -114,6 +114,9 @@ func (e *GeneralOrderExecutor) SubmitOrders(ctx context.Context, submitOrders ..
 
 // GracefulCancelActiveOrderBook cancels the orders from the active orderbook.
 func (e *GeneralOrderExecutor) GracefulCancelActiveOrderBook(ctx context.Context, activeOrders *ActiveOrderBook) error {
+	if activeOrders.NumOfOrders() == 0 {
+		return nil
+	}
 	if err := activeOrders.GracefulCancel(ctx, e.session.Exchange); err != nil {
 		return fmt.Errorf("graceful cancel order error: %w", err)
 	}

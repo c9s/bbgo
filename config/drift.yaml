@@ -16,6 +16,8 @@ exchangeStrategies:
     interval: 15m
     window: 3
     stoploss: 2%
+    source: hl2
+    predictOffset: 5
     #exits:
     #- roiStopLoss:
     #   percentage: 0.8%
@@ -48,7 +50,7 @@ sync:
     - ETHUSDT
 
 backtest:
-  startTime: "2022-04-01"
+  startTime: "2022-01-01"
   endTime: "2022-06-18"
   symbols:
     - ETHUSDT
