@@ -74,7 +74,7 @@ func (inc *VIDYA) PushK(k types.KLine) {
 	inc.Update(k.Close.Float64())
 }
 
-func (inc *VIDYA) calculateAndUpdate(allKLines []types.KLine) {
+func (inc *VIDYA) CalculateAndUpdate(allKLines []types.KLine) {
 	if inc.input.Length() == 0 {
 		for _, k := range allKLines {
 			inc.PushK(k)
@@ -92,7 +92,7 @@ func (inc *VIDYA) handleKLineWindowUpdate(interval types.Interval, window types.
 		return
 	}
 
-	inc.calculateAndUpdate(window)
+	inc.CalculateAndUpdate(window)
 }
 
 func (inc *VIDYA) Bind(updater KLineWindowUpdater) {

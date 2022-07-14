@@ -71,7 +71,7 @@ func (inc *RMA) PushK(k types.KLine) {
 	inc.Update(k.Close.Float64())
 }
 
-func (inc *RMA) calculateAndUpdate(kLines []types.KLine) {
+func (inc *RMA) CalculateAndUpdate(kLines []types.KLine) {
 	for _, k := range kLines {
 		if inc.EndTime != zeroTime && !k.EndTime.After(inc.EndTime) {
 			continue
@@ -88,7 +88,7 @@ func (inc *RMA) handleKLineWindowUpdate(interval types.Interval, window types.KL
 		return
 	}
 
-	inc.calculateAndUpdate(window)
+	inc.CalculateAndUpdate(window)
 }
 
 func (inc *RMA) Bind(updater KLineWindowUpdater) {

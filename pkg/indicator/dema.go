@@ -54,7 +54,7 @@ func (inc *DEMA) PushK(k types.KLine) {
 	inc.Update(k.Close.Float64())
 }
 
-func (inc *DEMA) calculateAndUpdate(allKLines []types.KLine) {
+func (inc *DEMA) CalculateAndUpdate(allKLines []types.KLine) {
 	if inc.a1 == nil {
 		for _, k := range allKLines {
 			inc.PushK(k)
@@ -73,7 +73,7 @@ func (inc *DEMA) handleKLineWindowUpdate(interval types.Interval, window types.K
 		return
 	}
 
-	inc.calculateAndUpdate(window)
+	inc.CalculateAndUpdate(window)
 }
 
 func (inc *DEMA) Bind(updater KLineWindowUpdater) {
