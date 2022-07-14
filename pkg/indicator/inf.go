@@ -6,7 +6,7 @@ type KLineWindowUpdater interface {
 	OnKLineWindowUpdate(func(interval types.Interval, window types.KLineWindow))
 }
 
-type KLineCloseHandler interface {
+type KLineClosedEmitter interface {
 	OnKLineClosed(func(k types.KLine))
 }
 
