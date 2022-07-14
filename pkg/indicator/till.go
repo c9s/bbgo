@@ -12,18 +12,19 @@ const defaultVolumeFactor = 0.7
 type TILL struct {
 	types.SeriesBase
 	types.IntervalWindow
-	VolumeFactor    float64
-	e1              *EWMA
-	e2              *EWMA
-	e3              *EWMA
-	e4              *EWMA
-	e5              *EWMA
-	e6              *EWMA
-	c1              float64
-	c2              float64
-	c3              float64
-	c4              float64
-	UpdateCallbacks []func(value float64)
+	VolumeFactor float64
+	e1           *EWMA
+	e2           *EWMA
+	e3           *EWMA
+	e4           *EWMA
+	e5           *EWMA
+	e6           *EWMA
+	c1           float64
+	c2           float64
+	c3           float64
+	c4           float64
+
+	updateCallbacks []func(value float64)
 }
 
 func (inc *TILL) Update(value float64) {
@@ -85,7 +86,11 @@ func (inc *TILL) Length() int {
 
 var _ types.Series = &TILL{}
 
-func (inc *TILL) calculateAndUpdate(allKLines []types.KLine) {
+func (inc *TILL) PushK(k types.KLine) {
+	inc.Update(k.Close.Float64())
+}
+
+func (inc *TILL) CalculateAndUpdate(allKLines []types.KLine) {
 	doable := false
 	if inc.e1 == nil {
 		doable = true
@@ -94,8 +99,9 @@ func (inc *TILL) calculateAndUpdate(allKLines []types.KLine) {
 		if !doable && k.StartTime.After(inc.e1.LastOpenTime) {
 			doable = true
 		}
+
 		if doable {
-			inc.Update(k.Close.Float64())
+			inc.PushK(k)
 			inc.EmitUpdate(inc.Last())
 		}
 	}
@@ -106,7 +112,7 @@ func (inc *TILL) handleKLineWindowUpdate(interval types.Interval, window types.K
 		return
 	}
 
-	inc.calculateAndUpdate(window)
+	inc.CalculateAndUpdate(window)
 }
 
 func (inc *TILL) Bind(updater KLineWindowUpdater) {

@@ -59,7 +59,7 @@ func TestBOLL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			boll := BOLL{IntervalWindow: types.IntervalWindow{Window: tt.window}, K: tt.k}
-			boll.Update(tt.kLines)
+			boll.CalculateAndUpdate(tt.kLines)
 			assert.InDelta(t, tt.up, boll.LastUpBand(), Delta)
 			assert.InDelta(t, tt.down, boll.LastDownBand(), Delta)
 		})

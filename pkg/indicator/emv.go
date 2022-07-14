@@ -63,17 +63,21 @@ func (inc *EMV) Length() int {
 
 var _ types.SeriesExtend = &EMV{}
 
-func (inc *EMV) calculateAndUpdate(allKLines []types.KLine) {
+func (inc *EMV) PushK(k types.KLine) {
+	inc.Update(k.High.Float64(), k.Low.Float64(), k.Volume.Float64())
+}
+
+func (inc *EMV) CalculateAndUpdate(allKLines []types.KLine) {
 	if inc.Values == nil {
 		for _, k := range allKLines {
-			inc.Update(k.High.Float64(), k.Low.Float64(), k.Volume.Float64())
+			inc.PushK(k)
 			if inc.Length() > 0 {
 				inc.EmitUpdate(inc.Last())
 			}
 		}
 	} else {
 		k := allKLines[len(allKLines)-1]
-		inc.Update(k.High.Float64(), k.Low.Float64(), k.Volume.Float64())
+		inc.PushK(k)
 		inc.EmitUpdate(inc.Last())
 	}
 }
@@ -82,7 +86,7 @@ func (inc *EMV) handleKLineWindowUpdate(interval types.Interval, window types.KL
 	if inc.Interval != interval {
 		return
 	}
-	inc.calculateAndUpdate(window)
+	inc.CalculateAndUpdate(window)
 }
 
 func (inc *EMV) Bind(updater KLineWindowUpdater) {

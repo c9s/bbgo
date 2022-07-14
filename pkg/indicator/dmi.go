@@ -15,6 +15,7 @@ import (
 //go:generate callbackgen -type DMI
 type DMI struct {
 	types.IntervalWindow
+
 	ADXSmoothing      int
 	atr               *ATR
 	DMP               types.UpdatableSeriesExtend
@@ -23,7 +24,8 @@ type DMI struct {
 	DIMinus           *types.Queue
 	ADX               types.UpdatableSeriesExtend
 	PrevHigh, PrevLow float64
-	UpdateCallbacks   []func(diplus, diminus, adx float64)
+
+	updateCallbacks []func(diplus, diminus, adx float64)
 }
 
 func (inc *DMI) Update(high, low, cloze float64) {
@@ -32,6 +34,7 @@ func (inc *DMI) Update(high, low, cloze float64) {
 		inc.DMN = &RMA{IntervalWindow: inc.IntervalWindow, Adjust: true}
 		inc.ADX = &RMA{IntervalWindow: types.IntervalWindow{Window: inc.ADXSmoothing}, Adjust: true}
 	}
+
 	if inc.atr == nil {
 		inc.atr = &ATR{IntervalWindow: inc.IntervalWindow}
 		inc.atr.Update(high, low, cloze)
@@ -41,6 +44,7 @@ func (inc *DMI) Update(high, low, cloze float64) {
 		inc.DIMinus = types.NewQueue(500)
 		return
 	}
+
 	inc.atr.Update(high, low, cloze)
 	up := high - inc.PrevHigh
 	dn := inc.PrevLow - low
@@ -87,15 +91,20 @@ func (inc *DMI) Length() int {
 	return inc.ADX.Length()
 }
 
-func (inc *DMI) calculateAndUpdate(allKLines []types.KLine) {
+func (inc *DMI) PushK(k types.KLine) {
+	inc.Update(k.High.Float64(), k.Low.Float64(), k.Close.Float64())
+}
+
+func (inc *DMI) CalculateAndUpdate(allKLines []types.KLine) {
+	last := allKLines[len(allKLines)-1]
+
 	if inc.ADX == nil {
 		for _, k := range allKLines {
-			inc.Update(k.High.Float64(), k.Low.Float64(), k.Close.Float64())
+			inc.PushK(k)
 			inc.EmitUpdate(inc.DIPlus.Last(), inc.DIMinus.Last(), inc.ADX.Last())
 		}
 	} else {
-		k := allKLines[len(allKLines)-1]
-		inc.Update(k.High.Float64(), k.Low.Float64(), k.Close.Float64())
+		inc.PushK(last)
 		inc.EmitUpdate(inc.DIPlus.Last(), inc.DIMinus.Last(), inc.ADX.Last())
 	}
 }
@@ -105,7 +114,7 @@ func (inc *DMI) handleKLineWindowUpdate(interval types.Interval, window types.KL
 		return
 	}
 
-	inc.calculateAndUpdate(window)
+	inc.CalculateAndUpdate(window)
 }
 
 func (inc *DMI) Bind(updater KLineWindowUpdater) {

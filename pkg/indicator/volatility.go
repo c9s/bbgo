@@ -13,10 +13,10 @@ import (
 const MaxNumOfVOL = 5_000
 const MaxNumOfVOLTruncateSize = 100
 
-//var zeroTime time.Time
+// var zeroTime time.Time
 
-//go:generate callbackgen -type VOLATILITY
-type VOLATILITY struct {
+//go:generate callbackgen -type Volatility
+type Volatility struct {
 	types.SeriesBase
 	types.IntervalWindow
 	Values  types.Float64Slice
@@ -25,42 +25,43 @@ type VOLATILITY struct {
 	UpdateCallbacks []func(value float64)
 }
 
-func (inc *VOLATILITY) Last() float64 {
+func (inc *Volatility) Last() float64 {
 	if len(inc.Values) == 0 {
 		return 0.0
 	}
 	return inc.Values[len(inc.Values)-1]
 }
 
-func (inc *VOLATILITY) Index(i int) float64 {
+func (inc *Volatility) Index(i int) float64 {
 	if len(inc.Values)-i <= 0 {
 		return 0.0
 	}
 	return inc.Values[len(inc.Values)-i-1]
 }
 
-func (inc *VOLATILITY) Length() int {
+func (inc *Volatility) Length() int {
 	return len(inc.Values)
 }
 
-var _ types.SeriesExtend = &VOLATILITY{}
+var _ types.SeriesExtend = &Volatility{}
 
-func (inc *VOLATILITY) calculateAndUpdate(klines []types.KLine) {
-	if len(klines) < inc.Window {
+func (inc *Volatility) CalculateAndUpdate(allKLines []types.KLine) {
+	if len(allKLines) < inc.Window {
 		return
 	}
 
-	var end = len(klines) - 1
-	var lastKLine = klines[end]
+	var end = len(allKLines) - 1
+	var lastKLine = allKLines[end]
 
 	if inc.EndTime != zeroTime && lastKLine.GetEndTime().Before(inc.EndTime) {
 		return
 	}
+
 	if len(inc.Values) == 0 {
 		inc.SeriesBase.Series = inc
 	}
 
-	var recentT = klines[end-(inc.Window-1) : end+1]
+	var recentT = allKLines[end-(inc.Window-1) : end+1]
 
 	volatility, err := calculateVOLATILITY(recentT, inc.Window, KLineClosePriceMapper)
 	if err != nil {
@@ -73,20 +74,20 @@ func (inc *VOLATILITY) calculateAndUpdate(klines []types.KLine) {
 		inc.Values = inc.Values[MaxNumOfVOLTruncateSize-1:]
 	}
 
-	inc.EndTime = klines[end].GetEndTime().Time()
+	inc.EndTime = allKLines[end].GetEndTime().Time()
 
 	inc.EmitUpdate(volatility)
 }
 
-func (inc *VOLATILITY) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
+func (inc *Volatility) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
 	if inc.Interval != interval {
 		return
 	}
 
-	inc.calculateAndUpdate(window)
+	inc.CalculateAndUpdate(window)
 }
 
-func (inc *VOLATILITY) Bind(updater KLineWindowUpdater) {
+func (inc *Volatility) Bind(updater KLineWindowUpdater) {
 	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }
 

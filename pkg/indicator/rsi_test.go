@@ -59,7 +59,7 @@ func Test_calculateRSI(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rsi := RSI{IntervalWindow: types.IntervalWindow{Window: tt.window}}
-			rsi.calculateAndUpdate(tt.kLines)
+			rsi.CalculateAndUpdate(tt.kLines)
 			assert.Equal(t, len(rsi.Values), len(tt.want))
 			for i, v := range rsi.Values {
 				assert.InDelta(t, v, tt.want[i], Delta)

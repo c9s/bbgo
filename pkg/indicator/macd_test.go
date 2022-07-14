@@ -41,8 +41,9 @@ func Test_calculateMACD(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			iw := types.IntervalWindow{Window: 9}
 			macd := MACD{IntervalWindow: iw, ShortPeriod: 12, LongPeriod: 26}
-			priceF := KLineClosePriceMapper
-			got := macd.calculateMACD(tt.kLines, priceF)
+			macd.CalculateAndUpdate(tt.kLines)
+
+			got := macd.Last()
 			diff := math.Trunc((got-tt.want)*100) / 100
 			if diff != 0 {
 				t.Errorf("calculateMACD() = %v, want %v", got, tt.want)

@@ -51,7 +51,7 @@ func Test_calculateOBV(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			obv := OBV{IntervalWindow: types.IntervalWindow{Window: tt.window}}
-			obv.calculateAndUpdate(tt.kLines)
+			obv.CalculateAndUpdate(tt.kLines)
 			assert.Equal(t, len(obv.Values), len(tt.want))
 			for i, v := range obv.Values {
 				assert.InDelta(t, v, tt.want[i], Delta)
