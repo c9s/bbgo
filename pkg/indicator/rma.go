@@ -13,13 +13,16 @@ import (
 type RMA struct {
 	types.SeriesBase
 	types.IntervalWindow
-	Values          types.Float64Slice
-	counter         int
-	Adjust          bool
-	tmp             float64
-	sum             float64
-	EndTime         time.Time
-	UpdateCallbacks []func(value float64)
+
+	Values  types.Float64Slice
+	EndTime time.Time
+
+	counter int
+	Adjust  bool
+	tmp     float64
+	sum     float64
+
+	updateCallbacks []func(value float64)
 }
 
 func (inc *RMA) Update(x float64) {
@@ -64,23 +67,35 @@ func (inc *RMA) Length() int {
 
 var _ types.SeriesExtend = &RMA{}
 
-func (inc *RMA) calculateAndUpdate(kLines []types.KLine) {
-	for _, k := range kLines {
-		if inc.EndTime != zeroTime && !k.EndTime.After(inc.EndTime) {
-			continue
+func (inc *RMA) PushK(k types.KLine) {
+	inc.Update(k.Close.Float64())
+}
+
+func (inc *RMA) CalculateAndUpdate(kLines []types.KLine) {
+	last := kLines[len(kLines)-1]
+
+	if len(inc.Values) == 0 {
+		for _, k := range kLines {
+			if inc.EndTime != zeroTime && !k.EndTime.After(inc.EndTime) {
+				continue
+			}
+
+			inc.PushK(k)
 		}
-		inc.Update(k.Close.Float64())
+	} else {
+		inc.PushK(last)
 	}
 
 	inc.EmitUpdate(inc.Last())
-	inc.EndTime = kLines[len(kLines)-1].EndTime.Time()
+	inc.EndTime = last.EndTime.Time()
 }
+
 func (inc *RMA) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
 	if inc.Interval != interval {
 		return
 	}
 
-	inc.calculateAndUpdate(window)
+	inc.CalculateAndUpdate(window)
 }
 
 func (inc *RMA) Bind(updater KLineWindowUpdater) {

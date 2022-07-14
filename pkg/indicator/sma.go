@@ -10,15 +10,13 @@ import (
 const MaxNumOfSMA = 5_000
 const MaxNumOfSMATruncateSize = 100
 
-var zeroTime time.Time
-
 //go:generate callbackgen -type SMA
 type SMA struct {
 	types.SeriesBase
 	types.IntervalWindow
-	Values  types.Float64Slice
-	Cache   *types.Queue
-	EndTime time.Time
+	Values    types.Float64Slice
+	rawValues *types.Queue
+	EndTime   time.Time
 
 	UpdateCallbacks []func(value float64)
 }
@@ -45,37 +43,39 @@ func (inc *SMA) Length() int {
 var _ types.SeriesExtend = &SMA{}
 
 func (inc *SMA) Update(value float64) {
-	if inc.Cache == nil {
-		inc.Cache = types.NewQueue(inc.Window)
+	if inc.rawValues == nil {
+		inc.rawValues = types.NewQueue(inc.Window)
 		inc.SeriesBase.Series = inc
 	}
-	inc.Cache.Update(value)
-	if inc.Cache.Length() < inc.Window {
+
+	inc.rawValues.Update(value)
+	if inc.rawValues.Length() < inc.Window {
 		return
 	}
-	inc.Values.Push(types.Mean(inc.Cache))
-	if inc.Values.Length() > MaxNumOfSMA {
-		inc.Values = inc.Values[MaxNumOfSMATruncateSize-1:]
-	}
+
+	inc.Values.Push(types.Mean(inc.rawValues))
 }
 
-func (inc *SMA) calculateAndUpdate(kLines []types.KLine) {
-	var index = len(kLines) - 1
-	var kline = kLines[index]
-	if inc.EndTime != zeroTime && kline.EndTime.Before(inc.EndTime) {
-		return
-	}
-	if inc.Cache == nil {
-		for _, k := range kLines {
-			inc.Update(KLineClosePriceMapper(k))
-			inc.EndTime = k.EndTime.Time()
-			inc.EmitUpdate(inc.Values.Last())
+func (inc *SMA) PushK(k types.KLine) {
+	inc.Update(k.Close.Float64())
+	inc.EndTime = k.EndTime.Time()
+}
+
+func (inc *SMA) CalculateAndUpdate(allKLines []types.KLine) {
+	var last = allKLines[len(allKLines)-1]
+
+	if inc.rawValues == nil {
+		for _, k := range allKLines {
+			if inc.EndTime != zeroTime && k.EndTime.Before(inc.EndTime) {
+				continue
+			}
+			inc.PushK(k)
 		}
 	} else {
-		inc.Update(KLineClosePriceMapper(kline))
-		inc.EndTime = kline.EndTime.Time()
-		inc.EmitUpdate(inc.Values.Last())
+		inc.PushK(last)
 	}
+
+	inc.EmitUpdate(inc.Values.Last())
 }
 
 func (inc *SMA) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
@@ -83,7 +83,7 @@ func (inc *SMA) handleKLineWindowUpdate(interval types.Interval, window types.KL
 		return
 	}
 
-	inc.calculateAndUpdate(window)
+	inc.CalculateAndUpdate(window)
 }
 
 func (inc *SMA) Bind(updater KLineWindowUpdater) {

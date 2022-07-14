@@ -45,7 +45,7 @@ func Test_HULL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			hull := HULL{IntervalWindow: types.IntervalWindow{Window: 16}}
-			hull.calculateAndUpdate(tt.kLines)
+			hull.CalculateAndUpdate(tt.kLines)
 			last := hull.Last()
 			assert.InDelta(t, tt.want, last, Delta)
 			assert.InDelta(t, tt.next, hull.Index(1), Delta)

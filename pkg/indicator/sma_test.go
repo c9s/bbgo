@@ -52,7 +52,7 @@ func Test_SMA(t *testing.T) {
 			sma := SMA{
 				IntervalWindow: types.IntervalWindow{Window: 5},
 			}
-			sma.calculateAndUpdate(tt.kLines)
+			sma.CalculateAndUpdate(tt.kLines)
 			assert.InDelta(t, tt.want, sma.Last(), Delta)
 			assert.InDelta(t, tt.next, sma.Index(1), Delta)
 			sma.Update(tt.update)

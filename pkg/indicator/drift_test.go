@@ -30,7 +30,7 @@ func Test_Drift(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			drift := Drift{IntervalWindow: types.IntervalWindow{Window: 3}}
-			drift.calculateAndUpdate(tt.kLines)
+			drift.CalculateAndUpdate(tt.kLines)
 			assert.Equal(t, drift.Length(), tt.all)
 			for _, v := range drift.Values {
 				assert.LessOrEqual(t, v, 1.0)

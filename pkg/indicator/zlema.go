@@ -16,7 +16,7 @@ type ZLEMA struct {
 	zlema *EWMA
 	lag   int
 
-	UpdateCallbacks []func(value float64)
+	updateCallbacks []func(value float64)
 }
 
 func (inc *ZLEMA) Index(i int) float64 {
@@ -59,14 +59,19 @@ func (inc *ZLEMA) Update(value float64) {
 
 var _ types.SeriesExtend = &ZLEMA{}
 
-func (inc *ZLEMA) calculateAndUpdate(allKLines []types.KLine) {
+func (inc *ZLEMA) PushK(k types.KLine) {
+	inc.Update(k.Close.Float64())
+}
+
+func (inc *ZLEMA) CalculateAndUpdate(allKLines []types.KLine) {
 	if inc.zlema == nil {
 		for _, k := range allKLines {
-			inc.Update(k.Close.Float64())
+			inc.PushK(k)
 			inc.EmitUpdate(inc.Last())
 		}
 	} else {
-		inc.Update(allKLines[len(allKLines)-1].Close.Float64())
+		k := allKLines[len(allKLines)-1]
+		inc.PushK(k)
 		inc.EmitUpdate(inc.Last())
 	}
 }
@@ -76,7 +81,7 @@ func (inc *ZLEMA) handleKLineWindowUpdate(interval types.Interval, window types.
 		return
 	}
 
-	inc.calculateAndUpdate(window)
+	inc.CalculateAndUpdate(window)
 }
 
 func (inc *ZLEMA) Bind(updater KLineWindowUpdater) {

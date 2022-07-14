@@ -45,7 +45,7 @@ func Test_ZLEMA(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			zlema := ZLEMA{IntervalWindow: types.IntervalWindow{Window: 16}}
-			zlema.calculateAndUpdate(tt.kLines)
+			zlema.CalculateAndUpdate(tt.kLines)
 			last := zlema.Last()
 			assert.InDelta(t, tt.want, last, Delta)
 			assert.InDelta(t, tt.next, zlema.Index(1), Delta)

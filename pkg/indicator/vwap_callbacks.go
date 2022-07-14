@@ -4,12 +4,12 @@ package indicator
 
 import ()
 
-func (V *VWAP) OnUpdate(cb func(value float64)) {
-	V.UpdateCallbacks = append(V.UpdateCallbacks, cb)
+func (inc *VWAP) OnUpdate(cb func(value float64)) {
+	inc.UpdateCallbacks = append(inc.UpdateCallbacks, cb)
 }
 
-func (V *VWAP) EmitUpdate(value float64) {
-	for _, cb := range V.UpdateCallbacks {
+func (inc *VWAP) EmitUpdate(value float64) {
+	for _, cb := range inc.UpdateCallbacks {
 		cb(value)
 	}
 }

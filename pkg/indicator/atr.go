@@ -20,6 +20,8 @@ type ATR struct {
 	UpdateCallbacks []func(value float64)
 }
 
+var _ types.SeriesExtend = &ATR{}
+
 func (inc *ATR) Update(high, low, cloze float64) {
 	if inc.Window <= 0 {
 		panic("window must be greater than 0")
@@ -72,17 +74,20 @@ func (inc *ATR) Length() int {
 	if inc.RMA == nil {
 		return 0
 	}
+
 	return inc.RMA.Length()
 }
 
-var _ types.SeriesExtend = &ATR{}
+func (inc *ATR) PushK(k types.KLine) {
+	inc.Update(k.High.Float64(), k.Low.Float64(), k.Close.Float64())
+}
 
 func (inc *ATR) CalculateAndUpdate(kLines []types.KLine) {
 	for _, k := range kLines {
 		if inc.EndTime != zeroTime && !k.EndTime.After(inc.EndTime) {
 			continue
 		}
-		inc.Update(k.High.Float64(), k.Low.Float64(), k.Close.Float64())
+		inc.PushK(k)
 	}
 
 	inc.EmitUpdate(inc.Last())

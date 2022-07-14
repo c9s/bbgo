@@ -87,12 +87,17 @@ func (inc *ATRP) Length() int {
 
 var _ types.SeriesExtend = &ATRP{}
 
+func (inc *ATRP) PushK(k types.KLine) {
+	inc.Update(k.High.Float64(), k.Low.Float64(), k.Close.Float64())
+}
+
 func (inc *ATRP) CalculateAndUpdate(kLines []types.KLine) {
 	for _, k := range kLines {
 		if inc.EndTime != zeroTime && !k.EndTime.After(inc.EndTime) {
 			continue
 		}
-		inc.Update(k.High.Float64(), k.Low.Float64(), k.Close.Float64())
+
+		inc.PushK(k)
 	}
 
 	inc.EmitUpdate(inc.Last())

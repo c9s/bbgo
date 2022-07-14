@@ -49,27 +49,20 @@ func (inc *VWMA) Length() int {
 
 var _ types.SeriesExtend = &VWMA{}
 
-func KLinePriceVolumeMapper(k types.KLine) float64 {
-	return k.Close.Mul(k.Volume).Float64()
-}
 
-func KLineVolumeMapper(k types.KLine) float64 {
-	return k.Volume.Float64()
-}
-
-func (inc *VWMA) calculateAndUpdate(kLines []types.KLine) {
-	if len(kLines) < inc.Window {
+func (inc *VWMA) CalculateAndUpdate(allKLines []types.KLine) {
+	if len(allKLines) < inc.Window {
 		return
 	}
 
-	var index = len(kLines) - 1
-	var kline = kLines[index]
+	var index = len(allKLines) - 1
+	var kline = allKLines[index]
 
 	if inc.EndTime != zeroTime && kline.EndTime.Before(inc.EndTime) {
 		return
 	}
 
-	var recentK = kLines[index-(inc.Window-1) : index+1]
+	var recentK = allKLines[index-(inc.Window-1) : index+1]
 
 	pv, err := calculateSMA(recentK, inc.Window, KLinePriceVolumeMapper)
 	if err != nil {
@@ -93,7 +86,7 @@ func (inc *VWMA) calculateAndUpdate(kLines []types.KLine) {
 		inc.Values = inc.Values[MaxNumOfSMATruncateSize-1:]
 	}
 
-	inc.EndTime = kLines[index].EndTime.Time()
+	inc.EndTime = allKLines[index].EndTime.Time()
 
 	inc.EmitUpdate(vwma)
 }
@@ -103,7 +96,7 @@ func (inc *VWMA) handleKLineWindowUpdate(interval types.Interval, window types.K
 		return
 	}
 
-	inc.calculateAndUpdate(window)
+	inc.CalculateAndUpdate(window)
 }
 
 func (inc *VWMA) Bind(updater KLineWindowUpdater) {
