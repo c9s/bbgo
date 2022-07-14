@@ -42,9 +42,9 @@ type Strategy struct {
 	types.IntervalWindow
 
 	*bbgo.Environment
-	*types.Position
-	*types.ProfitStats
-	*types.TradeStats
+	*types.Position    `persistence:"position"`
+	*types.ProfitStats `persistence:"profit_stats"`
+	*types.TradeStats  `persistence:"trade_stats"`
 
 	drift    *indicator.Drift
 	atr      *indicator.ATR
