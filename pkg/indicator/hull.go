@@ -55,7 +55,7 @@ func (inc *HULL) Length() int {
 var _ types.SeriesExtend = &HULL{}
 
 // TODO: should we just ignore the possible overlapping?
-func (inc *HULL) calculateAndUpdate(allKLines []types.KLine) {
+func (inc *HULL) CalculateAndUpdate(allKLines []types.KLine) {
 	doable := false
 	if inc.ma1 == nil || inc.ma1.Length() == 0 {
 		doable = true
@@ -76,7 +76,7 @@ func (inc *HULL) handleKLineWindowUpdate(interval types.Interval, window types.K
 		return
 	}
 
-	inc.calculateAndUpdate(window)
+	inc.CalculateAndUpdate(window)
 }
 
 func (inc *HULL) Bind(updater KLineWindowUpdater) {

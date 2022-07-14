@@ -27,7 +27,7 @@ func (inc *A3) Last() float64 {
 	return inc.Values[len(inc.Values)-1]
 }
 
-func (inc *A3) calculateAndUpdate(klines []types.KLine) {
+func (inc *A3) CalculateAndUpdate(klines []types.KLine) {
 	if len(klines) < inc.Window {
 		return
 	}
@@ -63,7 +63,7 @@ func (inc *A3) handleKLineWindowUpdate(interval types.Interval, window types.KLi
 		return
 	}
 
-	inc.calculateAndUpdate(window)
+	inc.CalculateAndUpdate(window)
 }
 
 func (inc *A3) Bind(updater indicator.KLineWindowUpdater) {

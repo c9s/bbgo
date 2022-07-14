@@ -91,7 +91,7 @@ func (inc *DMI) PushK(k types.KLine) {
 	inc.Update(k.High.Float64(), k.Low.Float64(), k.Close.Float64())
 }
 
-func (inc *DMI) calculateAndUpdate(allKLines []types.KLine) {
+func (inc *DMI) CalculateAndUpdate(allKLines []types.KLine) {
 	if inc.ADX == nil {
 		for _, k := range allKLines {
 			inc.PushK(k)
@@ -109,7 +109,7 @@ func (inc *DMI) handleKLineWindowUpdate(interval types.Interval, window types.KL
 		return
 	}
 
-	inc.calculateAndUpdate(window)
+	inc.CalculateAndUpdate(window)
 }
 
 func (inc *DMI) Bind(updater KLineWindowUpdater) {

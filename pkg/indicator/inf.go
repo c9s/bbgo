@@ -16,6 +16,6 @@ type KLinePusher interface {
 	PushK(k types.KLine)
 }
 
-type KLineCalculator interface {
+type KLineCalculateUpdater interface {
 	CalculateAndUpdate(allKLines []types.KLine)
 }

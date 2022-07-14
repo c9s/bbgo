@@ -29,7 +29,7 @@ func (inc *Correlation) Last() float64 {
 	return inc.Values[len(inc.Values)-1]
 }
 
-func (inc *Correlation) calculateAndUpdate(klines []types.KLine) {
+func (inc *Correlation) CalculateAndUpdate(klines []types.KLine) {
 	if len(klines) < inc.Window {
 		return
 	}
@@ -64,7 +64,7 @@ func (inc *Correlation) handleKLineWindowUpdate(interval types.Interval, window 
 		return
 	}
 
-	inc.calculateAndUpdate(window)
+	inc.CalculateAndUpdate(window)
 }
 
 func (inc *Correlation) Bind(updater indicator.KLineWindowUpdater) {

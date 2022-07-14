@@ -19,9 +19,9 @@ type MACD struct {
 	ShortPeriod          int // 12
 	LongPeriod           int // 26
 	Values               types.Float64Slice
-	FastEWMA             EWMA
-	SlowEWMA             EWMA
-	SignalLine           EWMA
+	FastEWMA             *EWMA
+	SlowEWMA             *EWMA
+	SignalLine           *EWMA
 	Histogram            types.Float64Slice
 
 	EndTime time.Time
@@ -31,9 +31,9 @@ type MACD struct {
 
 func (inc *MACD) Update(x float64) {
 	if len(inc.Values) == 0 {
-		inc.FastEWMA = EWMA{IntervalWindow: types.IntervalWindow{Window: inc.ShortPeriod}}
-		inc.SlowEWMA = EWMA{IntervalWindow: types.IntervalWindow{Window: inc.LongPeriod}}
-		inc.SignalLine = EWMA{IntervalWindow: types.IntervalWindow{Window: inc.Window}}
+		inc.FastEWMA = &EWMA{IntervalWindow: types.IntervalWindow{Window: inc.ShortPeriod}}
+		inc.SlowEWMA = &EWMA{IntervalWindow: types.IntervalWindow{Window: inc.LongPeriod}}
+		inc.SignalLine = &EWMA{IntervalWindow: types.IntervalWindow{Window: inc.Window}}
 	}
 
 	// update fast and slow ema
@@ -60,25 +60,38 @@ func (inc *MACD) calculateMACD(kLines []types.KLine, priceF KLinePriceMapper) fl
 	return inc.Values[len(inc.Values)-1]
 }
 
+func (inc *MACD) Last() float64 {
+	if len(inc.Values) == 0 {
+		return 0.0
+	}
+
+	return inc.Values[len(inc.Values)-1]
+}
+
 func (inc *MACD) PushK(k types.KLine) {
 	inc.Update(k.Close.Float64())
 }
 
-func (inc *MACD) CalculateAndUpdate(kLines []types.KLine) {
-	if len(kLines) == 0 {
+func (inc *MACD) CalculateAndUpdate(allKLines []types.KLine) {
+	if len(allKLines) == 0 {
 		return
 	}
 
-	for _, k := range kLines {
-		if inc.EndTime != zeroTime && !k.EndTime.After(inc.EndTime) {
-			continue
-		}
+	last := allKLines[len(allKLines)-1]
+	if len(inc.Values) == 0 {
+		for _, k := range allKLines {
+			if inc.EndTime != zeroTime && !k.EndTime.After(inc.EndTime) {
+				continue
+			}
 
-		inc.PushK(k)
+			inc.PushK(k)
+		}
+	} else {
+		inc.PushK(last)
 	}
 
-	inc.EmitUpdate(inc.Values[len(inc.Values)-1])
-	inc.EndTime = kLines[len(kLines)-1].EndTime.Time()
+	inc.EmitUpdate(inc.Last())
+	inc.EndTime = last.EndTime.Time()
 }
 
 func (inc *MACD) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
@@ -102,6 +115,7 @@ func (inc *MACDValues) Last() float64 {
 	if len(inc.Values) == 0 {
 		return 0.0
 	}
+
 	return inc.Values[len(inc.Values)-1]
 }
 
@@ -110,6 +124,7 @@ func (inc *MACDValues) Index(i int) float64 {
 	if length == 0 || length-1-i < 0 {
 		return 0.0
 	}
+
 	return inc.Values[length-1+i]
 }
 
@@ -124,5 +139,5 @@ func (inc *MACD) MACD() types.SeriesExtend {
 }
 
 func (inc *MACD) Singals() types.SeriesExtend {
-	return &inc.SignalLine
+	return inc.SignalLine
 }
