@@ -6,6 +6,12 @@ type KLineWindowUpdater interface {
 	OnKLineWindowUpdate(func(interval types.Interval, window types.KLineWindow))
 }
 
+type KLineClosedBinder interface {
+	BindK(target KLineClosedEmitter, symbol string, interval types.Interval)
+}
+
+// KLineClosedEmitter is currently applied to the market data stream
+// the market data stream emits the KLine closed event to the listeners.
 type KLineClosedEmitter interface {
 	OnKLineClosed(func(k types.KLine))
 }

@@ -5,11 +5,11 @@ package indicator
 import ()
 
 func (inc *VWMA) OnUpdate(cb func(value float64)) {
-	inc.UpdateCallbacks = append(inc.UpdateCallbacks, cb)
+	inc.updateCallbacks = append(inc.updateCallbacks, cb)
 }
 
 func (inc *VWMA) EmitUpdate(value float64) {
-	for _, cb := range inc.UpdateCallbacks {
+	for _, cb := range inc.updateCallbacks {
 		cb(value)
 	}
 }

@@ -86,6 +86,10 @@ func (inc *SMA) handleKLineWindowUpdate(interval types.Interval, window types.KL
 	inc.CalculateAndUpdate(window)
 }
 
+func (inc *SMA) BindK(target KLineClosedEmitter, symbol string, interval types.Interval) {
+	target.OnKLineClosed(types.KLineWith(symbol, interval, inc.PushK))
+}
+
 func (inc *SMA) Bind(updater KLineWindowUpdater) {
 	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }
