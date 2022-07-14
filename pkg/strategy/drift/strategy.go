@@ -55,6 +55,9 @@ type Strategy struct {
 	Stoploss      fixedpoint.Value `json:"stoploss"`
 	CanvasPath    string           `json:"canvasPath"`
 	PredictOffset int              `json:"predictOffset"`
+	NoStopPrice   bool             `json:"noStopPrice"`
+
+	StopOrders map[uint64]types.SubmitOrder
 
 	ExitMethods bbgo.ExitMethodSet `json:"exits"`
 	Session     *bbgo.ExchangeSession
@@ -75,6 +78,7 @@ func (s *Strategy) Print() {
 	hiyellow(os.Stderr, "symbol: %s\n", s.Symbol)
 	hiyellow(os.Stderr, "interval: %s\n", s.Interval)
 	hiyellow(os.Stderr, "window: %d\n", s.Window)
+	hiyellow(os.Stderr, "noStopPrice: %v\n", s.NoStopPrice)
 }
 
 func (s *Strategy) ID() string {
@@ -195,6 +199,43 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		bbgo.Sync(s)
 	})
 	s.GeneralOrderExecutor.Bind()
+	s.StopOrders = make(map[uint64]types.SubmitOrder)
+	session.UserDataStream.OnOrderUpdate(func(order types.Order) {
+		if len(s.StopOrders) == 0 {
+			return
+		}
+		if order.Symbol != s.Symbol {
+			return
+		}
+		if order.Status == types.OrderStatusCanceled {
+			delete(s.StopOrders, order.OrderID)
+			return
+		}
+		if order.Status != types.OrderStatusFilled {
+			return
+		}
+		if o, ok := s.StopOrders[order.OrderID]; ok {
+			delete(s.StopOrders, order.OrderID)
+			if o.Side == types.SideTypeBuy {
+				quoteBalance, ok := s.Session.GetAccount().Balance(s.Market.QuoteCurrency)
+				if !ok {
+					log.Errorf("unable to get quoteCurrency")
+					return
+				}
+				o.Quantity = quoteBalance.Available.Div(o.Price)
+			} else {
+				baseBalance, ok := s.Session.GetAccount().Balance(s.Market.BaseCurrency)
+				if !ok {
+					log.Errorf("unable to get baseCurrency")
+					return
+				}
+				o.Quantity = baseBalance.Available
+			}
+			if _, err := s.GeneralOrderExecutor.SubmitOrders(ctx, o); err != nil {
+				log.WithError(err).Errorf("cannot send stop order: %v", order)
+			}
+		}
+	})
 	for _, method := range s.ExitMethods {
 		method.Bind(session, s.GeneralOrderExecutor)
 	}
@@ -222,7 +263,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.atr.PushK(kline)
 	}
 
-	if s.Environment.IsBackTesting() {
+	if s.IsBackTesting() {
 		s.getLastPrice = func() fixedpoint.Value {
 			lastPrice, ok := s.Session.LastPrice(s.Symbol)
 			if !ok {
@@ -308,6 +349,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				log.WithError(err).Errorf("cannot cancel orders")
 				return
 			}
+			s.StopOrders = make(map[uint64]types.SubmitOrder)
 			_, _ = s.ClosePosition(ctx)
 		}
 		if shortCondition {
@@ -315,6 +357,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				log.WithError(err).Errorf("cannot cancel orders")
 				return
 			}
+			s.StopOrders = make(map[uint64]types.SubmitOrder)
 			baseBalance, ok := s.Session.GetAccount().Balance(s.Market.BaseCurrency)
 			if !ok {
 				log.Errorf("unable to get baseBalance")
@@ -327,24 +370,42 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			if s.Market.IsDustQuantity(baseBalance.Available, source) {
 				return
 			}
-			_, err := s.GeneralOrderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+			quantity := baseBalance.Available
+			stopPrice := fixedpoint.NewFromFloat(math.Min(sourcef+atr/2, sourcef*(1.+stoploss)))
+			stopOrder := types.SubmitOrder{
 				Symbol:    s.Symbol,
-				Side:      types.SideTypeSell,
-				Type:      types.OrderTypeLimitMaker,
-				Price:     source,
-				StopPrice: fixedpoint.NewFromFloat(math.Min(sourcef+atr/2, sourcef*(1.+stoploss))),
-				Quantity:  baseBalance.Available,
+				Side:      types.SideTypeBuy,
+				Type:      types.OrderTypeStopLimit,
+				StopPrice: stopPrice,
+				Price:     stopPrice,
+				Quantity:  quantity,
+			}
+			createdOrders, err := s.GeneralOrderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+				Symbol:   s.Symbol,
+				Side:     types.SideTypeSell,
+				Type:     types.OrderTypeLimit,
+				Price:    source,
+				Quantity: quantity,
 			})
 			if err != nil {
 				log.WithError(err).Errorf("cannot place sell order")
 				return
 			}
+			if s.NoStopPrice {
+				return
+			}
+			if createdOrders[0].Status == types.OrderStatusFilled {
+				s.GeneralOrderExecutor.SubmitOrders(ctx, stopOrder)
+				return
+			}
+			s.StopOrders[createdOrders[0].OrderID] = stopOrder
 		}
 		if longCondition {
 			if err := s.GeneralOrderExecutor.GracefulCancel(ctx); err != nil {
 				log.WithError(err).Errorf("cannot cancel orders")
 				return
 			}
+			s.StopOrders = make(map[uint64]types.SubmitOrder)
 			if source.Compare(price) > 0 {
 				source = price
 			}
@@ -357,18 +418,36 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				quoteBalance.Available.Div(source), source) {
 				return
 			}
-			_, err := s.GeneralOrderExecutor.SubmitOrders(ctx, types.SubmitOrder{
-				Symbol:    s.Symbol,
-				Side:      types.SideTypeBuy,
-				Type:      types.OrderTypeLimitMaker,
-				Price:     source,
-				StopPrice: fixedpoint.NewFromFloat(math.Max(sourcef-atr/2, sourcef*(1.-stoploss))),
-				Quantity:  quoteBalance.Available.Div(source),
+			quantity := quoteBalance.Available.Div(source)
+			stopPrice := fixedpoint.NewFromFloat(math.Max(sourcef-atr/2, sourcef*(1.-stoploss)))
+			stopOrder := types.SubmitOrder{
+				Symbol:      s.Symbol,
+				Side:        types.SideTypeSell,
+				Type:        types.OrderTypeStopLimit,
+				TimeInForce: types.TimeInForceGTC,
+				StopPrice:   stopPrice,
+				Price:       stopPrice,
+				Quantity:    quantity,
+			}
+			createdOrders, err := s.GeneralOrderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+				Symbol:   s.Symbol,
+				Side:     types.SideTypeBuy,
+				Type:     types.OrderTypeLimit,
+				Price:    source,
+				Quantity: quantity,
 			})
 			if err != nil {
 				log.WithError(err).Errorf("cannot place buy order")
 				return
 			}
+			if s.NoStopPrice {
+				return
+			}
+			if createdOrders[0].Status == types.OrderStatusFilled {
+				s.GeneralOrderExecutor.SubmitOrders(ctx, stopOrder)
+				return
+			}
+			s.StopOrders[createdOrders[0].OrderID] = stopOrder
 		}
 	})
 
