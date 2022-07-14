@@ -219,7 +219,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	for _, kline := range *klines {
 		source := getSource(&kline).Float64()
 		s.drift.Update(source)
-		s.atr.Update(kline.High.Float64(), kline.Low.Float64(), kline.Close.Float64())
+		s.atr.PushK(kline)
 	}
 
 	if s.Environment.IsBackTesting() {
@@ -288,6 +288,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		sourcef := source.Float64()
 		priceLine.Update(sourcef)
 		s.drift.Update(sourcef)
+		s.atr.PushK(kline)
 		drift = s.drift.Array(2)
 		driftPred = s.drift.Predict(s.PredictOffset)
 		atr = s.atr.Last()
