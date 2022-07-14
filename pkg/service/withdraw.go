@@ -7,6 +7,7 @@ import (
 	sq "github.com/Masterminds/squirrel"
 	"github.com/jmoiron/sqlx"
 
+	"github.com/c9s/bbgo/pkg/exchange"
 	"github.com/c9s/bbgo/pkg/exchange/batch"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -17,7 +18,7 @@ type WithdrawService struct {
 
 // Sync syncs the withdrawal records into db
 func (s *WithdrawService) Sync(ctx context.Context, ex types.Exchange, startTime time.Time) error {
-	isMargin, isFutures, isIsolated, _ := getExchangeAttributes(ex)
+	isMargin, isFutures, isIsolated, _ := exchange.GetSessionAttributes(ex)
 	if isMargin || isFutures || isIsolated {
 		// only works in spot
 		return nil
