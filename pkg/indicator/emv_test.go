@@ -16,7 +16,7 @@ func Test_EMV(t *testing.T) {
 	}
 	emv.Update(63.74, 62.63, 32178836)
 	emv.Update(64.51, 63.85, 36461672)
-	assert.InDelta(t, 1.8, emv.Values.Cache.Last(), Delta)
+	assert.InDelta(t, 1.8, emv.Values.rawValues.Last(), Delta)
 	emv.Update(64.57, 63.81, 51372680)
 	emv.Update(64.31, 62.62, 42476356)
 	emv.Update(63.43, 62.73, 29504176)
