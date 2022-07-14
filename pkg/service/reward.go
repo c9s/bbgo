@@ -10,6 +10,7 @@ import (
 	sq "github.com/Masterminds/squirrel"
 	"github.com/jmoiron/sqlx"
 
+	exchange2 "github.com/c9s/bbgo/pkg/exchange"
 	"github.com/c9s/bbgo/pkg/exchange/batch"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -29,7 +30,7 @@ func (s *RewardService) Sync(ctx context.Context, exchange types.Exchange, start
 		return ErrExchangeRewardServiceNotImplemented
 	}
 
-	isMargin, isFutures, _, _ := getExchangeAttributes(exchange)
+	isMargin, isFutures, _, _ := exchange2.GetSessionAttributes(exchange)
 	if isMargin || isFutures {
 		return nil
 	}

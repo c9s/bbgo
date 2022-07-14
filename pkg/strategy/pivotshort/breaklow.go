@@ -2,10 +2,12 @@ package pivotshort
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
+	"github.com/c9s/bbgo/pkg/risk"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -25,6 +27,7 @@ type BreakLow struct {
 	// limit sell price = breakLowPrice * (1 + BounceRatio)
 	BounceRatio fixedpoint.Value `json:"bounceRatio"`
 
+	Leverage     fixedpoint.Value      `json:"leverage"`
 	Quantity     fixedpoint.Value      `json:"quantity"`
 	StopEMARange fixedpoint.Value      `json:"stopEMARange"`
 	StopEMA      *types.IntervalWindow `json:"stopEMA"`
@@ -63,8 +66,8 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 
 	position := orderExecutor.Position()
 	symbol := position.Symbol
-	store, _ := session.MarketDataStore(symbol)
-	standardIndicator, _ := session.StandardIndicatorSet(symbol)
+	store, _ := session.MarketDataStore(s.Symbol)
+	standardIndicator, _ := session.StandardIndicatorSet(s.Symbol)
 
 	s.lastLow = fixedpoint.Zero
 
@@ -168,7 +171,15 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 		// graceful cancel all active orders
 		_ = orderExecutor.GracefulCancel(ctx)
 
-		quantity := s.useQuantityOrBaseBalance(s.Quantity)
+		quantity, err := useQuantityOrBaseBalance(s.session, s.Market, closePrice, s.Quantity, s.Leverage)
+		if err != nil {
+			log.WithError(err).Errorf("quantity calculation error")
+		}
+
+		if quantity.IsZero() {
+			return
+		}
+
 		if s.MarketOrder {
 			bbgo.Notify("%s price %f breaks the previous low %f with ratio %f, submitting market sell to open a short position", symbol, kline.Close.Float64(), previousLow.Float64(), s.Ratio.Float64())
 			_, _ = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
@@ -204,24 +215,70 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 	}
 }
 
-func (s *BreakLow) useQuantityOrBaseBalance(quantity fixedpoint.Value) fixedpoint.Value {
-	if s.session.Margin || s.session.IsolatedMargin || s.session.Futures || s.session.IsolatedFutures {
-		return quantity
+func useQuantityOrBaseBalance(session *bbgo.ExchangeSession, market types.Market, price, quantity, leverage fixedpoint.Value) (fixedpoint.Value, error) {
+	usingLeverage := session.Margin || session.IsolatedMargin || session.Futures || session.IsolatedFutures
+	if usingLeverage {
+		if !quantity.IsZero() {
+			return quantity, nil
+		}
+
+		if leverage.IsZero() {
+			leverage = fixedpoint.NewFromInt(3)
+		}
+
+		// quantity is zero, we need to calculate the quantity
+		baseBalance, _ := session.Account.Balance(market.BaseCurrency)
+		quoteBalance, _ := session.Account.Balance(market.QuoteCurrency)
+
+		// calculate the quantity automatically
+		if session.Margin || session.IsolatedMargin {
+			baseBalanceValue := baseBalance.Total().Mul(price)
+			accountValue := baseBalanceValue.Add(quoteBalance.Total())
+
+			if session.IsolatedMargin {
+				originLeverage := leverage
+				leverage = fixedpoint.Max(leverage, fixedpoint.NewFromInt(10))
+				log.Infof("using isolated margin, maxLeverage=10 originalLeverage=%f currentLeverage=%f",
+					originLeverage.Float64(),
+					leverage.Float64())
+			}
+
+			// spot margin use the equity value, so we use the total quote balance here
+			maxPositionQuantity := risk.CalculateMaxPosition(price, accountValue, leverage)
+
+			log.Infof("margin leverage: calculated maxPositionQuantity=%f price=%f accountValue=%f %s leverage=%f",
+				maxPositionQuantity.Float64(),
+				price.Float64(),
+				accountValue.Float64(),
+				market.QuoteCurrency,
+				leverage.Float64())
+
+			return maxPositionQuantity, nil
+		}
+
+		if session.Futures || session.IsolatedFutures {
+			// TODO: get mark price here
+			maxPositionQuantity := risk.CalculateMaxPosition(price, quoteBalance.Available, leverage)
+			requiredPositionCost := risk.CalculatePositionCost(price, price, maxPositionQuantity, leverage, types.SideTypeSell)
+			if quoteBalance.Available.Compare(requiredPositionCost) < 0 {
+				return maxPositionQuantity, fmt.Errorf("available margin %f %s is not enough, can not submit order", quoteBalance.Available.Float64(), market.QuoteCurrency)
+			}
+
+			return maxPositionQuantity, nil
+		}
+
 	}
 
-	balance, hasBalance := s.session.Account.Balance(s.Market.BaseCurrency)
+	// For spot, we simply sell the base currency
+	balance, hasBalance := session.Account.Balance(market.BaseCurrency)
 	if hasBalance {
 		if quantity.IsZero() {
-			bbgo.Notify("sell quantity is not set, submitting sell with all base balance: %s", balance.Available.String())
+			log.Warnf("sell quantity is not set, submitting sell with all base balance: %s", balance.Available.String())
 			quantity = balance.Available
 		} else {
 			quantity = fixedpoint.Min(quantity, balance.Available)
 		}
 	}
 
-	if quantity.IsZero() {
-		log.Errorf("quantity is zero, can not submit sell order, please check settings")
-	}
-
-	return quantity
+	return quantity, fmt.Errorf("quantity is zero, can not submit sell order, please check your settings")
 }
