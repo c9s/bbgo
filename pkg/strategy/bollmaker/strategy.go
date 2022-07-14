@@ -280,7 +280,7 @@ func (s *Strategy) placeOrders(ctx context.Context, midPrice fixedpoint.Value, k
 
 	downBand := s.defaultBoll.LastDownBand()
 	upBand := s.defaultBoll.LastUpBand()
-	sma := s.defaultBoll.LastSMA()
+	sma := s.defaultBoll.SMA.Last()
 	log.Infof("%s bollinger band: up %f sma %f down %f", s.Symbol, upBand, sma, downBand)
 
 	bandPercentage := calculateBandPercentage(upBand, downBand, sma, midPrice.Float64())
@@ -402,7 +402,7 @@ func (s *Strategy) placeOrders(ctx context.Context, midPrice fixedpoint.Value, k
 		canSell = false
 	}
 
-	if s.BuyBelowNeutralSMA && midPrice.Float64() > s.neutralBoll.LastSMA() {
+	if s.BuyBelowNeutralSMA && midPrice.Float64() > s.neutralBoll.SMA.Last() {
 		canBuy = false
 	}
 
