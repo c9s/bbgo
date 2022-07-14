@@ -53,7 +53,7 @@ func (inc *BOLL) GetSMA() types.SeriesExtend {
 }
 
 func (inc *BOLL) GetStdDev() types.SeriesExtend {
-	return types.NewSeries(inc.StdDev)
+	return inc.StdDev
 }
 
 func (inc *BOLL) LastUpBand() float64 {
