@@ -94,7 +94,7 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	})
 
 	if !bbgo.IsBackTesting {
-		session.Subscribe(types.MarketTradeChannel, s.Symbol, types.SubscribeOptions{})
+		session.Subscribe(types.BookTickerChannel, s.Symbol, types.SubscribeOptions{})
 	}
 	s.ExitMethods.SetAndSubscribe(session, s)
 }
