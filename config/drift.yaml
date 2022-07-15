@@ -15,10 +15,11 @@ exchangeStrategies:
     # kline interval for indicators
     interval: 15m
     window: 2
-    stoploss: 2%
-    source: hl2
-    predictOffset: 8
+    stoploss: 3%
+    source: close
+    predictOffset: 14
     noStopPrice: true
+    noTrailingStopLoss: false
     #exits:
     #- roiStopLoss:
     #   percentage: 0.8%
@@ -61,5 +62,5 @@ backtest:
       #makerFeeRate: 0.00001
       #takerFeeRate: 0.00001
       balances:
-        ETH: 10.0
+        ETH: 10
         USDT: 5000.0
