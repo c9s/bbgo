@@ -20,6 +20,11 @@ exchangeStrategies:
     predictOffset: 14
     noStopPrice: true
     noTrailingStopLoss: false
+
+    generateGraph: true
+    graphPNLDeductFee: false
+    graphPNLPath: "./pnl.png"
+    graphCumPNLPath: "./cumpnl.png"
     #exits:
     #- roiStopLoss:
     #   percentage: 0.8%
