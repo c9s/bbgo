@@ -195,6 +195,10 @@ func (o *GridOptimizer) Run(executor Executor, configJson []byte) (map[string][]
 
 	var taskC = make(chan BacktestTask, 10000)
 
+	var bar = pb.Full.New(cap(taskC))
+	bar.SetTemplateString(`{{ string . "log" | green}} | {{counters . }} {{bar . }} {{percent . }} {{etime . }} {{rtime . "ETA %s"}}`)
+
+	var taskCnt int64 = 0
 	var app = func(configJson []byte, next func(configJson []byte) error) error {
 		var labels = copyLabels(o.ParamLabels)
 		var params = copyParams(o.CurrentParams)
@@ -203,6 +207,8 @@ func (o *GridOptimizer) Run(executor Executor, configJson []byte) (map[string][]
 			Params:     params,
 			Labels:     labels,
 		}
+		taskCnt++
+		bar.SetTotal(taskCnt)
 		return nil
 	}
 
@@ -221,19 +227,16 @@ func (o *GridOptimizer) Run(executor Executor, configJson []byte) (map[string][]
 	}
 
 	ctx := context.Background()
-	if err := wrapper(configJson); err != nil {
-		return nil, err
-	}
-
-	bar := pb.Full.Start(len(taskC))
-	bar.SetTemplateString(`{{ string . "log" | green}} | {{counters . }} {{bar . }} {{percent . }} {{etime . }} {{rtime . "ETA %s"}}`)
+	var taskGenErr error
+	go func() {
+		taskGenErr = wrapper(configJson)
+		close(taskC) // this will shut down the executor
+	}()
 
 	resultsC, err := executor.Run(ctx, taskC, bar)
 	if err != nil {
 		return nil, err
 	}
-
-	close(taskC) // this will shut down the executor
 
 	for result := range resultsC {
 		bar.Increment()
@@ -265,7 +268,11 @@ func (o *GridOptimizer) Run(executor Executor, configJson []byte) (map[string][]
 		})
 	}
 
-	return metrics, err
+	if taskGenErr != nil {
+		return metrics, taskGenErr
+	} else {
+		return metrics, err
+	}
 }
 
 func reformatJson(text string) string {
