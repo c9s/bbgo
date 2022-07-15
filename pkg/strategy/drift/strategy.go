@@ -3,6 +3,7 @@ package drift
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -51,11 +52,12 @@ type Strategy struct {
 	midPrice fixedpoint.Value
 	lock     sync.RWMutex
 
-	Source        string           `json:"source"`
-	Stoploss      fixedpoint.Value `json:"stoploss"`
-	CanvasPath    string           `json:"canvasPath"`
-	PredictOffset int              `json:"predictOffset"`
-	NoStopPrice   bool             `json:"noStopPrice"`
+	Source             string           `json:"source"`
+	StopLoss           fixedpoint.Value `json:"stoploss"`
+	CanvasPath         string           `json:"canvasPath"`
+	PredictOffset      int              `json:"predictOffset"`
+	NoStopPrice        bool             `json:"noStopPrice"`
+	NoTrailingStopLoss bool             `json:"noTrailingStopLoss"`
 
 	StopOrders map[uint64]types.SubmitOrder
 
@@ -64,6 +66,7 @@ type Strategy struct {
 	*bbgo.GeneralOrderExecutor
 
 	getLastPrice func() fixedpoint.Value
+	getSource    SourceFunc
 }
 
 func (s *Strategy) Print() {
@@ -72,13 +75,14 @@ func (s *Strategy) Print() {
 	hiyellow(os.Stderr, "------ %s Settings ------\n", s.InstanceID())
 	hiyellow(os.Stderr, "canvasPath: %s\n", s.CanvasPath)
 	hiyellow(os.Stderr, "source: %s\n", s.Source)
-	hiyellow(os.Stderr, "stoploss: %v\n", s.Stoploss)
+	hiyellow(os.Stderr, "stoploss: %v\n", s.StopLoss)
 	hiyellow(os.Stderr, "predictOffset: %d\n", s.PredictOffset)
 	hiyellow(os.Stderr, "exits:\n %s\n", string(b))
 	hiyellow(os.Stderr, "symbol: %s\n", s.Symbol)
 	hiyellow(os.Stderr, "interval: %s\n", s.Interval)
 	hiyellow(os.Stderr, "window: %d\n", s.Window)
 	hiyellow(os.Stderr, "noStopPrice: %v\n", s.NoStopPrice)
+	hiyellow(os.Stderr, "noTrailingStopLoss: %v\n", s.NoTrailingStopLoss)
 }
 
 func (s *Strategy) ID() string {
@@ -165,42 +169,9 @@ func (s *Strategy) SourceFuncGenerator() SourceFunc {
 	}
 }
 
-func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-	instanceID := s.InstanceID()
-	if s.Position == nil {
-		s.Position = types.NewPositionFromMarket(s.Market)
-	}
-	if s.ProfitStats == nil {
-		s.ProfitStats = types.NewProfitStats(s.Market)
-	}
-
-	if s.TradeStats == nil {
-		s.TradeStats = types.NewTradeStats(s.Symbol)
-	}
-
-	// StrategyController
-	s.Status = types.StrategyStatusRunning
-
-	s.OnSuspend(func() {
-		_ = s.GeneralOrderExecutor.GracefulCancel(ctx)
-	})
-
-	s.OnEmergencyStop(func() {
-		_ = s.GeneralOrderExecutor.GracefulCancel(ctx)
-		_, _ = s.ClosePosition(ctx)
-	})
-
-	s.Session = session
-	s.GeneralOrderExecutor = bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
-	s.GeneralOrderExecutor.BindEnvironment(s.Environment)
-	s.GeneralOrderExecutor.BindProfitStats(s.ProfitStats)
-	s.GeneralOrderExecutor.BindTradeStats(s.TradeStats)
-	s.GeneralOrderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
-		bbgo.Sync(s)
-	})
-	s.GeneralOrderExecutor.Bind()
+func (s *Strategy) BindStopLoss(ctx context.Context) {
 	s.StopOrders = make(map[uint64]types.SubmitOrder)
-	session.UserDataStream.OnOrderUpdate(func(order types.Order) {
+	s.Session.UserDataStream.OnOrderUpdate(func(order types.Order) {
 		if len(s.StopOrders) == 0 {
 			return
 		}
@@ -236,33 +207,29 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 		}
 	})
-	for _, method := range s.ExitMethods {
-		method.Bind(session, s.GeneralOrderExecutor)
-	}
+}
 
-	store, _ := session.MarketDataStore(s.Symbol)
-
-	getSource := s.SourceFuncGenerator()
-
+func (s *Strategy) InitIndicators() error {
 	s.drift = &indicator.Drift{
 		MA:             &indicator.SMA{IntervalWindow: s.IntervalWindow},
 		IntervalWindow: s.IntervalWindow,
 	}
 	s.atr = &indicator.ATR{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: 14}}
-
+	store, _ := s.Session.MarketDataStore(s.Symbol)
 	klines, ok := store.KLinesOfInterval(s.Interval)
 	if !ok {
-		log.Errorf("klines not exists")
-		return nil
+		return errors.New("klines not exists")
 	}
 
-	dynamicKLine := &types.KLine{}
 	for _, kline := range *klines {
-		source := getSource(&kline).Float64()
+		source := s.getSource(&kline).Float64()
 		s.drift.Update(source)
 		s.atr.PushK(kline)
 	}
+	return nil
+}
 
+func (s *Strategy) InitTickerFunctions(ctx context.Context) {
 	if s.IsBackTesting() {
 		s.getLastPrice = func() fixedpoint.Value {
 			lastPrice, ok := s.Session.LastPrice(s.Symbol)
@@ -272,10 +239,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return lastPrice
 		}
 	} else {
-		session.MarketDataStream.OnBookTickerUpdate(func(ticker types.BookTicker) {
+		s.Session.MarketDataStream.OnBookTickerUpdate(func(ticker types.BookTicker) {
 			bestBid := ticker.Buy
 			bestAsk := ticker.Sell
 
+			var pricef, stoploss, atr, avg float64
+			var price fixedpoint.Value
 			if util.TryLock(&s.lock) {
 				if !bestAsk.IsZero() && !bestBid.IsZero() {
 					s.midPrice = bestAsk.Add(bestBid).Div(Two)
@@ -284,8 +253,34 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				} else {
 					s.midPrice = bestBid
 				}
+				price = s.midPrice
+				pricef = s.midPrice.Float64()
 				s.lock.Unlock()
+			} else {
+				return
 			}
+
+			// for trailing stoploss during the realtime
+			if s.NoTrailingStopLoss {
+				return
+			}
+			atr = s.atr.Last()
+			avg = s.Position.AverageCost.Float64()
+			stoploss = s.StopLoss.Float64()
+			exitShortCondition := (avg+atr/2 <= pricef || avg*(1.+stoploss) <= pricef) &&
+				(!s.Position.IsClosed() && !s.Position.IsDust(price))
+			exitLongCondition := (avg-atr/2 >= pricef || avg*(1.-stoploss) >= pricef) &&
+				(!s.Position.IsClosed() && !s.Position.IsDust(price))
+			if exitShortCondition || exitLongCondition {
+				if err := s.GeneralOrderExecutor.GracefulCancel(ctx); err != nil {
+					log.WithError(err).Errorf("cannot cancel orders")
+					return
+				}
+				// Cleanup pending StopOrders
+				s.StopOrders = make(map[uint64]types.SubmitOrder)
+				_, _ = s.ClosePosition(ctx)
+			}
+
 		})
 		s.getLastPrice = func() (lastPrice fixedpoint.Value) {
 			var ok bool
@@ -304,8 +299,60 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 	}
 
+}
+
+func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+	instanceID := s.InstanceID()
+	// Will be set by persistence if there's any from DB
+	if s.Position == nil {
+		s.Position = types.NewPositionFromMarket(s.Market)
+	}
+	if s.ProfitStats == nil {
+		s.ProfitStats = types.NewProfitStats(s.Market)
+	}
+	if s.TradeStats == nil {
+		s.TradeStats = types.NewTradeStats(s.Symbol)
+	}
+
+	// StrategyController
+	s.Status = types.StrategyStatusRunning
+	// Get source function from config input
+	s.getSource = s.SourceFuncGenerator()
+
+	s.OnSuspend(func() {
+		_ = s.GeneralOrderExecutor.GracefulCancel(ctx)
+	})
+
+	s.OnEmergencyStop(func() {
+		_ = s.GeneralOrderExecutor.GracefulCancel(ctx)
+		_, _ = s.ClosePosition(ctx)
+	})
+
+	s.GeneralOrderExecutor = bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
+	s.GeneralOrderExecutor.BindEnvironment(s.Environment)
+	s.GeneralOrderExecutor.BindProfitStats(s.ProfitStats)
+	s.GeneralOrderExecutor.BindTradeStats(s.TradeStats)
+	s.GeneralOrderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
+		bbgo.Sync(s)
+	})
+	s.GeneralOrderExecutor.Bind()
+
+	// Exit methods from config
+	for _, method := range s.ExitMethods {
+		method.Bind(session, s.GeneralOrderExecutor)
+	}
+
+	s.BindStopLoss(ctx)
+
+	if err := s.InitIndicators(); err != nil {
+		log.WithError(err).Errorf("InitIndicator failed")
+		return nil
+	}
+	s.InitTickerFunctions(ctx)
+
+	dynamicKLine := &types.KLine{}
 	priceLine := types.NewQueue(100)
-	stoploss := s.Stoploss.Float64()
+	stoploss := s.StopLoss.Float64()
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		if s.Status != types.StrategyStatusRunning {
@@ -321,11 +368,35 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 		if kline.Interval == types.Interval1m {
+			if s.NoTrailingStopLoss || !s.IsBackTesting() {
+				return
+			}
+			// for doing the trailing stoploss during backtesting
+			atr = s.atr.Last()
+			price := s.getLastPrice()
+			pricef := price.Float64()
+			lowf := math.Min(kline.Low.Float64(), pricef)
+			highf := math.Max(kline.High.Float64(), pricef)
+			avg := s.Position.AverageCost.Float64()
+
+			exitShortCondition := (avg+atr/2 <= highf || avg*(1.+stoploss) <= highf) &&
+				(!s.Position.IsClosed() && !s.Position.IsDust(price))
+			exitLongCondition := (avg-atr/2 >= lowf || avg*(1.-stoploss) >= lowf) &&
+				(!s.Position.IsClosed() && !s.Position.IsDust(price))
+			if exitShortCondition || exitLongCondition {
+				if err := s.GeneralOrderExecutor.GracefulCancel(ctx); err != nil {
+					log.WithError(err).Errorf("cannot cancel orders")
+					return
+				}
+				// Cleanup pending StopOrders
+				s.StopOrders = make(map[uint64]types.SubmitOrder)
+				_, _ = s.ClosePosition(ctx)
+			}
 			return
 		}
 		dynamicKLine.Copy(&kline)
 
-		source := getSource(dynamicKLine)
+		source := s.getSource(dynamicKLine)
 		sourcef := source.Float64()
 		priceLine.Update(sourcef)
 		s.drift.Update(sourcef)
@@ -335,13 +406,15 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		atr = s.atr.Last()
 		price := s.getLastPrice()
 		pricef := price.Float64()
+		lowf := math.Min(kline.Low.Float64(), pricef)
+		highf := math.Max(kline.High.Float64(), pricef)
 		avg := s.Position.AverageCost.Float64()
 
 		shortCondition := (driftPred <= 0 && drift[0] <= 0)
 		longCondition := (driftPred >= 0 && drift[0] >= 0)
-		exitShortCondition := ((drift[1] < 0 && drift[0] >= 0) || avg+atr/2 <= pricef || avg*(1.+stoploss) <= pricef) &&
+		exitShortCondition := ((drift[1] < 0 && drift[0] >= 0) || avg+atr/2 <= highf || avg*(1.+stoploss) <= highf) &&
 			(!s.Position.IsClosed() && !s.Position.IsDust(fixedpoint.Max(price, source))) && !longCondition
-		exitLongCondition := ((drift[1] > 0 && drift[0] < 0) || avg-atr/2 >= pricef || avg*(1.-stoploss) >= pricef) &&
+		exitLongCondition := ((drift[1] > 0 && drift[0] < 0) || avg-atr/2 >= lowf || avg*(1.-stoploss) >= lowf) &&
 			(!s.Position.IsClosed() && !s.Position.IsDust(fixedpoint.Min(price, source))) && !shortCondition
 
 		if exitShortCondition || exitLongCondition {
@@ -349,6 +422,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				log.WithError(err).Errorf("cannot cancel orders")
 				return
 			}
+			// Cleanup pending StopOrders
 			s.StopOrders = make(map[uint64]types.SubmitOrder)
 			_, _ = s.ClosePosition(ctx)
 		}
@@ -357,7 +431,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				log.WithError(err).Errorf("cannot cancel orders")
 				return
 			}
-			s.StopOrders = make(map[uint64]types.SubmitOrder)
 			baseBalance, ok := s.Session.GetAccount().Balance(s.Market.BaseCurrency)
 			if !ok {
 				log.Errorf("unable to get baseBalance")
@@ -370,6 +443,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			if s.Market.IsDustQuantity(baseBalance.Available, source) {
 				return
 			}
+			// Cleanup pending StopOrders
+			s.StopOrders = make(map[uint64]types.SubmitOrder)
 			quantity := baseBalance.Available
 			stopPrice := fixedpoint.NewFromFloat(math.Min(sourcef+atr/2, sourcef*(1.+stoploss)))
 			stopOrder := types.SubmitOrder{
@@ -405,7 +480,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				log.WithError(err).Errorf("cannot cancel orders")
 				return
 			}
-			s.StopOrders = make(map[uint64]types.SubmitOrder)
 			if source.Compare(price) > 0 {
 				source = price
 			}
@@ -418,6 +492,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				quoteBalance.Available.Div(source), source) {
 				return
 			}
+			// Cleanup pending StopOrders
+			s.StopOrders = make(map[uint64]types.SubmitOrder)
 			quantity := quoteBalance.Available.Div(source)
 			stopPrice := fixedpoint.NewFromFloat(math.Max(sourcef-atr/2, sourcef*(1.-stoploss)))
 			stopOrder := types.SubmitOrder{
@@ -456,12 +532,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.Print()
 		canvas := types.NewCanvas(s.InstanceID(), s.Interval)
 		mean := priceLine.Mean(100)
-		highestPrice := priceLine.Minus(mean).Highest(100)
-		highestDrift := s.drift.Highest(100)
+		highestPrice := priceLine.Minus(mean).Abs().Highest(100)
+		highestDrift := s.drift.Abs().Highest(100)
+		meanDrift := s.drift.Mean(100)
 		ratio := highestDrift / highestPrice
 		canvas.Plot("drift", s.drift, dynamicKLine.StartTime, 100)
 		canvas.Plot("zero", types.NumberSeries(0), dynamicKLine.StartTime, 100)
 		canvas.Plot("price", priceLine.Minus(mean).Mul(ratio), dynamicKLine.StartTime, 100)
+		canvas.Plot("driftMean", types.NumberSeries(meanDrift), dynamicKLine.StartTime, 100)
 		f, err := os.Create(s.CanvasPath)
 		if err != nil {
 			log.Errorf("%v cannot create on %s", err, s.CanvasPath)
