@@ -3,6 +3,7 @@ package optimizer
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 
@@ -198,10 +199,17 @@ func (o *GridOptimizer) Run(executor Executor, configJson []byte) (map[string][]
 	var app = func(configJson []byte, next func(configJson []byte) error) error {
 		var labels = copyLabels(o.ParamLabels)
 		var params = copyParams(o.CurrentParams)
-		taskC <- BacktestTask{
+		task := BacktestTask{
 			ConfigJson: configJson,
 			Params:     params,
 			Labels:     labels,
+		}
+		select {
+		case taskC <- task:
+			return nil
+		default:
+			// TODO: generate task on another goroutine
+			return errors.New("too many grid points")
 		}
 		return nil
 	}
