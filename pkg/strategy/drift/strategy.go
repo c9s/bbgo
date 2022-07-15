@@ -60,6 +60,14 @@ type Strategy struct {
 	NoStopPrice        bool             `json:"noStopPrice"`
 	NoTrailingStopLoss bool             `json:"noTrailingStopLoss"`
 
+	// This is not related to trade but for statistics graph generation
+	// Will deduct fee in percentage from every trade
+	GraphPNLDeductFee bool   `json:"graphPNLDeductFee"`
+	GraphPNLPath      string `json:"graphPNLPath"`
+	GraphCumPNLPath   string `json:"graphCumPNLPath"`
+	// Whether to generate graph when shutdown
+	GenerateGraph bool `json:"generateGraph"`
+
 	StopOrders map[uint64]types.SubmitOrder
 
 	ExitMethods bbgo.ExitMethodSet `json:"exits"`
@@ -116,6 +124,7 @@ func (s *Strategy) ClosePosition(ctx context.Context) (*types.Order, bool) {
 	if order == nil {
 		return nil, false
 	}
+	order.Tag = "close"
 	order.TimeInForce = ""
 	balances := s.Session.GetAccount().Balances()
 	baseBalance := balances[s.Market.BaseCurrency].Available
@@ -305,7 +314,7 @@ func (s *Strategy) InitTickerFunctions(ctx context.Context) {
 
 }
 
-func (s *Strategy) Draw(time types.Time, priceLine types.SeriesExtend) {
+func (s *Strategy) Draw(time types.Time, priceLine types.SeriesExtend, profit types.Series, cumProfit types.Series) {
 	canvas := types.NewCanvas(s.InstanceID(), s.Interval)
 	Length := priceLine.Length()
 	if Length > 100 {
@@ -319,7 +328,7 @@ func (s *Strategy) Draw(time types.Time, priceLine types.SeriesExtend) {
 	canvas.Plot("drift", s.drift, time, Length)
 	canvas.Plot("zero", types.NumberSeries(0), time, Length)
 	canvas.Plot("price", priceLine.Minus(mean).Mul(ratio), time, Length)
-	canvas.Plot("driftMean", types.NumberSeries(meanDrift), time, Length)
+	canvas.Plot("0", types.NumberSeries(meanDrift), time, Length)
 	f, err := os.Create(s.CanvasPath)
 	if err != nil {
 		log.WithError(err).Errorf("cannot create on %s", s.CanvasPath)
@@ -328,6 +337,36 @@ func (s *Strategy) Draw(time types.Time, priceLine types.SeriesExtend) {
 	defer f.Close()
 	if err := canvas.Render(chart.PNG, f); err != nil {
 		log.WithError(err).Errorf("cannot render in drift")
+	}
+
+	canvas = types.NewCanvas(s.InstanceID())
+	if s.GraphPNLDeductFee {
+		canvas.PlotRaw("pnl % (with Fee Deducted)", profit, profit.Length())
+	} else {
+		canvas.PlotRaw("pnl %", profit, profit.Length())
+	}
+	f, err = os.Create(s.GraphPNLPath)
+	if err != nil {
+		panic("open pnl")
+	}
+	defer f.Close()
+	if err := canvas.Render(chart.PNG, f); err != nil {
+		panic("render pnl")
+	}
+
+	canvas = types.NewCanvas(s.InstanceID())
+	if s.GraphPNLDeductFee {
+		canvas.PlotRaw("cummulative pnl % (with Fee Deducted)", cumProfit, cumProfit.Length())
+	} else {
+		canvas.PlotRaw("cummulative pnl %", cumProfit, cumProfit.Length())
+	}
+	f, err = os.Create(s.GraphCumPNLPath)
+	if err != nil {
+		panic("open cumpnl")
+	}
+	defer f.Close()
+	if err := canvas.Render(chart.PNG, f); err != nil {
+		panic("render cumpnl")
 	}
 }
 
@@ -370,6 +409,86 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	// Exit methods from config
 	for _, method := range s.ExitMethods {
 		method.Bind(session, s.GeneralOrderExecutor)
+	}
+	buyPrice := fixedpoint.Zero
+	sellPrice := fixedpoint.Zero
+	profit := types.Float64Slice{}
+	cumProfit := types.Float64Slice{1.}
+	orderTagHistory := make(map[uint64]string)
+	if s.GenerateGraph {
+		s.Session.UserDataStream.OnOrderUpdate(func(order types.Order) {
+			orderTagHistory[order.OrderID] = order.Tag
+		})
+		modify := func(p fixedpoint.Value) fixedpoint.Value {
+			return p
+		}
+		if s.GraphPNLDeductFee {
+			fee := fixedpoint.NewFromFloat(0.0004) // taker fee % * 2, for upper bound
+			modify = func(p fixedpoint.Value) fixedpoint.Value {
+				return p.Mul(fixedpoint.One.Sub(fee))
+			}
+		}
+		s.Session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
+			tag, ok := orderTagHistory[trade.OrderID]
+			if !ok {
+				panic(fmt.Sprintf("cannot find order: %v", trade))
+			}
+			if tag == "close" {
+				if !buyPrice.IsZero() {
+					profit.Update(modify(trade.Price.Div(buyPrice)).Float64())
+					cumProfit.Update(cumProfit.Last() * profit.Last())
+					buyPrice = fixedpoint.Zero
+					if !sellPrice.IsZero() {
+						panic("sellprice shouldn't be zero")
+					}
+				} else if !sellPrice.IsZero() {
+					profit.Update(modify(sellPrice.Div(trade.Price)).Float64())
+					cumProfit.Update(cumProfit.Last() * profit.Last())
+					sellPrice = fixedpoint.Zero
+					if !buyPrice.IsZero() {
+						panic("buyprice shouldn't be zero")
+					}
+				} else {
+					panic("no price available")
+				}
+			} else if tag == "short" {
+				if buyPrice.IsZero() {
+					if !sellPrice.IsZero() {
+						panic("sellPrice not zero")
+					}
+					sellPrice = trade.Price
+				} else {
+					profit.Update(modify(trade.Price.Div(buyPrice)).Float64())
+					cumProfit.Update(cumProfit.Last() * profit.Last())
+					buyPrice = fixedpoint.Zero
+					sellPrice = trade.Price
+				}
+			} else if tag == "long" {
+				if sellPrice.IsZero() {
+					if !buyPrice.IsZero() {
+						panic("buyPrice not zero")
+					}
+					buyPrice = trade.Price
+				} else {
+					profit.Update(modify(sellPrice.Div(trade.Price)).Float64())
+					cumProfit.Update(cumProfit.Last() * profit.Last())
+					sellPrice = fixedpoint.Zero
+					buyPrice = trade.Price
+				}
+			} else if tag == "sl" {
+				if !buyPrice.IsZero() {
+					profit.Update(modify(trade.Price.Div(buyPrice)).Float64())
+					cumProfit.Update(cumProfit.Last() * profit.Last())
+					buyPrice = fixedpoint.Zero
+				} else if !sellPrice.IsZero() {
+					profit.Update(modify(sellPrice.Div(trade.Price)).Float64())
+					cumProfit.Update(cumProfit.Last() * profit.Last())
+					sellPrice = fixedpoint.Zero
+				} else {
+					panic("no position to sl")
+				}
+			}
+		})
 	}
 
 	s.BindStopLoss(ctx)
@@ -484,6 +603,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				StopPrice: stopPrice,
 				Price:     stopPrice,
 				Quantity:  quantity,
+				Tag:       "sl",
 			}
 			createdOrders, err := s.GeneralOrderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 				Symbol:   s.Symbol,
@@ -491,6 +611,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				Type:     types.OrderTypeLimit,
 				Price:    source,
 				Quantity: quantity,
+				Tag:      "short",
 			})
 			if err != nil {
 				log.WithError(err).Errorf("cannot place sell order")
@@ -534,6 +655,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				StopPrice:   stopPrice,
 				Price:       stopPrice,
 				Quantity:    quantity,
+				Tag:         "sl",
 			}
 			createdOrders, err := s.GeneralOrderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 				Symbol:   s.Symbol,
@@ -541,6 +663,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				Type:     types.OrderTypeLimit,
 				Price:    source,
 				Quantity: quantity,
+				Tag:      "long",
 			})
 			if err != nil {
 				log.WithError(err).Errorf("cannot place buy order")
@@ -563,7 +686,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		defer fmt.Fprintln(os.Stdout, s.TradeStats.String())
 
-		s.Draw(dynamicKLine.StartTime, priceLine)
+		if s.GenerateGraph {
+			s.Draw(dynamicKLine.StartTime, priceLine, &profit, &cumProfit)
+		}
 
 		wg.Done()
 	})

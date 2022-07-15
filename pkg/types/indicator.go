@@ -1162,14 +1162,20 @@ type Canvas struct {
 	Interval Interval
 }
 
-func NewCanvas(title string, interval Interval) *Canvas {
+func NewCanvas(title string, intervals ...Interval) *Canvas {
 	valueFormatter := chart.TimeValueFormatter
-	if interval.Minutes() > 24*60 {
-		valueFormatter = chart.TimeDateValueFormatter
-	} else if interval.Minutes() > 60 {
-		valueFormatter = chart.TimeHourValueFormatter
+	interval := Interval1m
+	if len(intervals) > 0 {
+		interval = intervals[0]
+		if interval.Minutes() > 24*60 {
+			valueFormatter = chart.TimeDateValueFormatter
+		} else if interval.Minutes() > 60 {
+			valueFormatter = chart.TimeHourValueFormatter
+		} else {
+			valueFormatter = chart.TimeMinuteValueFormatter
+		}
 	} else {
-		valueFormatter = chart.TimeMinuteValueFormatter
+		valueFormatter = chart.IntValueFormatter
 	}
 	out := &Canvas{
 		Chart: chart.Chart{
@@ -1197,6 +1203,18 @@ func (canvas *Canvas) Plot(tag string, a Series, endTime Time, length int) {
 		Name:    tag,
 		YValues: Reverse(a, length),
 		XValues: timeline,
+	})
+}
+
+func (canvas *Canvas) PlotRaw(tag string, a Series, length int) {
+	var x []float64
+	for i := 0; i < length; i++ {
+		x = append(x, float64(i))
+	}
+	canvas.Series = append(canvas.Series, chart.ContinuousSeries{
+		Name:    tag,
+		XValues: x,
+		YValues: Reverse(a, length),
 	})
 }
 
