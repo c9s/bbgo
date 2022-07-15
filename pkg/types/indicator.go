@@ -163,12 +163,9 @@ type BoolSeries interface {
 // if limit is given, will only sum first limit numbers (a.Index[0..limit])
 // otherwise will sum all elements
 func Sum(a Series, limit ...int) (sum float64) {
-	l := -1
-	if len(limit) > 0 {
+	l := a.Length()
+	if len(limit) > 0 && limit[0] < l {
 		l = limit[0]
-	}
-	if l < a.Length() {
-		l = a.Length()
 	}
 	for i := 0; i < l; i++ {
 		sum += a.Index(i)
@@ -180,12 +177,9 @@ func Sum(a Series, limit ...int) (sum float64) {
 // if limit is given, will only calculate the average of first limit numbers (a.Index[0..limit])
 // otherwise will operate on all elements
 func Mean(a Series, limit ...int) (mean float64) {
-	l := -1
-	if len(limit) > 0 {
+	l := a.Length()
+	if len(limit) > 0 && limit[0] < l {
 		l = limit[0]
-	}
-	if l < a.Length() {
-		l = a.Length()
 	}
 	return Sum(a, l) / float64(l)
 }
@@ -636,8 +630,8 @@ func Dot(a interface{}, b interface{}, limit ...int) float64 {
 // if limit is given, will only take the first limit numbers (a.Index[0..limit])
 // otherwise will operate on all elements
 func Array(a Series, limit ...int) (result []float64) {
-	l := -1
-	if len(limit) > 0 {
+	l := a.Length()
+	if len(limit) > 0 && l > limit[0] {
 		l = limit[0]
 	}
 	if l > a.Length() {
@@ -657,7 +651,7 @@ func Array(a Series, limit ...int) (result []float64) {
 // notice that the return type is a Float64Slice, which implements the Series interface
 func Reverse(a Series, limit ...int) (result Float64Slice) {
 	l := a.Length()
-	if len(limit) > 0 && l >= limit[0] {
+	if len(limit) > 0 && l > limit[0] {
 		l = limit[0]
 	}
 	result = make([]float64, l)
@@ -745,10 +739,8 @@ func PercentageChange(a Series, offset ...int) SeriesExtend {
 
 func Stdev(a Series, params ...int) float64 {
 	length := a.Length()
-	if len(params) > 0 {
-		if params[0] < length {
-			length = params[0]
-		}
+	if len(params) > 0 && params[0] < length {
+		length = params[0]
 	}
 	ddof := 0
 	if len(params) > 1 {

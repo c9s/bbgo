@@ -1,6 +1,7 @@
 package drift
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -69,20 +70,23 @@ type Strategy struct {
 	getSource    SourceFunc
 }
 
-func (s *Strategy) Print() {
+func (s *Strategy) Print(o *os.File) {
+	f := bufio.NewWriter(o)
+	defer f.Flush()
 	b, _ := json.MarshalIndent(s.ExitMethods, "  ", "  ")
 	hiyellow := color.New(color.FgHiYellow).FprintfFunc()
-	hiyellow(os.Stderr, "------ %s Settings ------\n", s.InstanceID())
-	hiyellow(os.Stderr, "canvasPath: %s\n", s.CanvasPath)
-	hiyellow(os.Stderr, "source: %s\n", s.Source)
-	hiyellow(os.Stderr, "stoploss: %v\n", s.StopLoss)
-	hiyellow(os.Stderr, "predictOffset: %d\n", s.PredictOffset)
-	hiyellow(os.Stderr, "exits:\n %s\n", string(b))
-	hiyellow(os.Stderr, "symbol: %s\n", s.Symbol)
-	hiyellow(os.Stderr, "interval: %s\n", s.Interval)
-	hiyellow(os.Stderr, "window: %d\n", s.Window)
-	hiyellow(os.Stderr, "noStopPrice: %v\n", s.NoStopPrice)
-	hiyellow(os.Stderr, "noTrailingStopLoss: %v\n", s.NoTrailingStopLoss)
+	hiyellow(f, "------ %s Settings ------\n", s.InstanceID())
+	hiyellow(f, "canvasPath: %s\n", s.CanvasPath)
+	hiyellow(f, "source: %s\n", s.Source)
+	hiyellow(f, "stoploss: %v\n", s.StopLoss)
+	hiyellow(f, "predictOffset: %d\n", s.PredictOffset)
+	hiyellow(f, "exits:\n %s\n", string(b))
+	hiyellow(f, "symbol: %s\n", s.Symbol)
+	hiyellow(f, "interval: %s\n", s.Interval)
+	hiyellow(f, "window: %d\n", s.Window)
+	hiyellow(f, "noStopPrice: %v\n", s.NoStopPrice)
+	hiyellow(f, "noTrailingStopLoss: %v\n", s.NoTrailingStopLoss)
+	hiyellow(f, "\n")
 }
 
 func (s *Strategy) ID() string {
@@ -299,6 +303,32 @@ func (s *Strategy) InitTickerFunctions(ctx context.Context) {
 		}
 	}
 
+}
+
+func (s *Strategy) Draw(time types.Time, priceLine types.SeriesExtend) {
+	canvas := types.NewCanvas(s.InstanceID(), s.Interval)
+	Length := priceLine.Length()
+	if Length > 100 {
+		Length = 100
+	}
+	mean := priceLine.Mean(Length)
+	highestPrice := priceLine.Minus(mean).Abs().Highest(Length)
+	highestDrift := s.drift.Abs().Highest(Length)
+	meanDrift := s.drift.Mean(Length)
+	ratio := highestDrift / highestPrice
+	canvas.Plot("drift", s.drift, time, Length)
+	canvas.Plot("zero", types.NumberSeries(0), time, Length)
+	canvas.Plot("price", priceLine.Minus(mean).Mul(ratio), time, Length)
+	canvas.Plot("driftMean", types.NumberSeries(meanDrift), time, Length)
+	f, err := os.Create(s.CanvasPath)
+	if err != nil {
+		log.WithError(err).Errorf("cannot create on %s", s.CanvasPath)
+		return
+	}
+	defer f.Close()
+	if err := canvas.Render(chart.PNG, f); err != nil {
+		log.WithError(err).Errorf("cannot render in drift")
+	}
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
@@ -528,24 +558,13 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 
 	bbgo.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
-		_, _ = fmt.Fprintln(os.Stderr, s.TradeStats.String())
-		s.Print()
-		canvas := types.NewCanvas(s.InstanceID(), s.Interval)
-		mean := priceLine.Mean(100)
-		highestPrice := priceLine.Minus(mean).Abs().Highest(100)
-		highestDrift := s.drift.Abs().Highest(100)
-		meanDrift := s.drift.Mean(100)
-		ratio := highestDrift / highestPrice
-		canvas.Plot("drift", s.drift, dynamicKLine.StartTime, 100)
-		canvas.Plot("zero", types.NumberSeries(0), dynamicKLine.StartTime, 100)
-		canvas.Plot("price", priceLine.Minus(mean).Mul(ratio), dynamicKLine.StartTime, 100)
-		canvas.Plot("driftMean", types.NumberSeries(meanDrift), dynamicKLine.StartTime, 100)
-		f, err := os.Create(s.CanvasPath)
-		if err != nil {
-			log.Errorf("%v cannot create on %s", err, s.CanvasPath)
-		}
-		defer f.Close()
-		canvas.Render(chart.PNG, f)
+
+		defer s.Print(os.Stdout)
+
+		defer fmt.Fprintln(os.Stdout, s.TradeStats.String())
+
+		s.Draw(dynamicKLine.StartTime, priceLine)
+
 		wg.Done()
 	})
 	return nil
