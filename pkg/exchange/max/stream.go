@@ -262,10 +262,10 @@ func (s *Stream) dispatchEvent(e interface{}) {
 		s.EmitOrderUpdateEvent(*e)
 
 	case *max.ADRatioEvent:
-		log.Infof("adRatio: %+v", e.ADRatio)
+		s.EmitAdRatioEvent(*e)
 
 	case *max.DebtEvent:
-		log.Infof("debtEvent: %+v", e.Debts)
+		s.EmitDebtEvent(*e)
 
 	default:
 		log.Warnf("unhandled %T event: %+v", e, e)
