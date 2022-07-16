@@ -58,7 +58,7 @@ func (s *TrailingStop2) Bind(session *ExchangeSession, orderExecutor *GeneralOrd
 		}
 	}))
 
-	if !IsBackTesting {
+	if !IsBackTesting && enableMarketTradeStop {
 		session.MarketDataStream.OnMarketTrade(func(trade types.Trade) {
 			if trade.Symbol != position.Symbol {
 				return

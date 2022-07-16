@@ -29,7 +29,7 @@ func (s *RoiStopLoss) Bind(session *ExchangeSession, orderExecutor *GeneralOrder
 		s.checkStopPrice(kline.Close, position)
 	}))
 
-	if !IsBackTesting {
+	if !IsBackTesting && enableMarketTradeStop {
 		session.MarketDataStream.OnMarketTrade(func(trade types.Trade) {
 			if trade.Symbol != position.Symbol {
 				return

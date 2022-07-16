@@ -9,6 +9,8 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+const enableMarketTradeStop = false
+
 type ProtectiveStopLoss struct {
 	Symbol string `json:"symbol"`
 
@@ -122,7 +124,7 @@ func (s *ProtectiveStopLoss) Bind(session *ExchangeSession, orderExecutor *Gener
 		}
 	})
 
-	if !IsBackTesting {
+	if !IsBackTesting && enableMarketTradeStop {
 		session.MarketDataStream.OnMarketTrade(func(trade types.Trade) {
 			if trade.Symbol != position.Symbol {
 				return

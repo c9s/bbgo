@@ -220,13 +220,6 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 			})
 		}
 	}))
-
-	if !bbgo.IsBackTesting {
-		// use market trade to submit short order
-		session.MarketDataStream.OnMarketTrade(func(trade types.Trade) {
-
-		})
-	}
 }
 
 func useQuantityOrBaseBalance(session *bbgo.ExchangeSession, market types.Market, price, quantity, leverage fixedpoint.Value) (fixedpoint.Value, error) {
