@@ -120,6 +120,8 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 }
 
 func (s *Strategy) ClosePosition(ctx context.Context) (*types.Order, bool) {
+	// Cleanup pending StopOrders
+	s.StopOrders = make(map[uint64]types.SubmitOrder)
 	order := s.Position.NewMarketCloseOrder(fixedpoint.One)
 	if order == nil {
 		return nil, false
@@ -289,8 +291,6 @@ func (s *Strategy) InitTickerFunctions(ctx context.Context) {
 					log.WithError(err).Errorf("cannot cancel orders")
 					return
 				}
-				// Cleanup pending StopOrders
-				s.StopOrders = make(map[uint64]types.SubmitOrder)
 				_, _ = s.ClosePosition(ctx)
 			}
 
@@ -537,8 +537,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 					log.WithError(err).Errorf("cannot cancel orders")
 					return
 				}
-				// Cleanup pending StopOrders
-				s.StopOrders = make(map[uint64]types.SubmitOrder)
 				_, _ = s.ClosePosition(ctx)
 			}
 			return
@@ -571,8 +569,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				log.WithError(err).Errorf("cannot cancel orders")
 				return
 			}
-			// Cleanup pending StopOrders
-			s.StopOrders = make(map[uint64]types.SubmitOrder)
 			_, _ = s.ClosePosition(ctx)
 		}
 		if shortCondition {
@@ -588,6 +584,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			if source.Compare(price) < 0 {
 				source = price
 			}
+			source = source.Mul(fixedpoint.NewFromFloat(1.0002))
 
 			if s.Market.IsDustQuantity(baseBalance.Available, source) {
 				return
@@ -634,6 +631,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			if source.Compare(price) > 0 {
 				source = price
 			}
+			source = source.Mul(fixedpoint.NewFromFloat(0.9998))
 			quoteBalance, ok := s.Session.GetAccount().Balance(s.Market.QuoteCurrency)
 			if !ok {
 				log.Errorf("unable to get quoteCurrency")
