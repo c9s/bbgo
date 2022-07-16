@@ -10,6 +10,8 @@ import (
 )
 
 type ProtectiveStopLoss struct {
+	Symbol string `json:"symbol"`
+
 	// ActivationRatio is the trigger condition of this ROI protection stop loss
 	// When the price goes lower (for short position) with the ratio, the protection stop will be activated.
 	// This number should be positive to protect the profit
@@ -29,6 +31,11 @@ type ProtectiveStopLoss struct {
 }
 
 var one = fixedpoint.One
+
+func (s *ProtectiveStopLoss) Subscribe(session *ExchangeSession) {
+	// use 1m kline to handle roi stop
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: types.Interval1m})
+}
 
 func (s *ProtectiveStopLoss) shouldActivate(position *types.Position, closePrice fixedpoint.Value) bool {
 	if position.IsLong() {
