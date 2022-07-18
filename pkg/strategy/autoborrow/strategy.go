@@ -92,7 +92,7 @@ func (s *Strategy) tryToRepayAnyDebt(ctx context.Context) {
 			continue
 		}
 
-		toRepay := b.Available
+		toRepay := fixedpoint.Min(b.Available, b.Borrowed)
 		bbgo.Notify(&MarginAction{
 			Exchange:       s.ExchangeSession.ExchangeName,
 			Action:         "Repay",
