@@ -1,23 +1,23 @@
 ---
 backtest:
   sessions:
-  - binance
+  - max
   startTime: "2022-01-01"
   endTime: "2022-06-18"
   symbols:
-  - ETHUSDT
+  - USDTTWD
   accounts:
     binance:
       balances:
-        USDT: 20_000.0
+        TWD: 280_000.0
 
 exchangeStrategies:
-- on: binance
+- on: max
   schedule:
-    interval: 1h
-    symbol: ETHUSDT
+    interval: 1m
+    symbol: USDTTWD
     side: buy
-    amount: 20
+    amount: 500
 
     aboveMovingAverage:
       type: EWMA

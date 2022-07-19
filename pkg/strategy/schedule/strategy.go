@@ -2,6 +2,7 @@ package schedule
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -37,10 +38,19 @@ type Strategy struct {
 	BelowMovingAverage *bbgo.MovingAverageSettings `json:"belowMovingAverage,omitempty"`
 
 	AboveMovingAverage *bbgo.MovingAverageSettings `json:"aboveMovingAverage,omitempty"`
+
+	Position *types.Position `persistence:"position"`
+
+	session       *bbgo.ExchangeSession
+	orderExecutor *bbgo.GeneralOrderExecutor
 }
 
 func (s *Strategy) ID() string {
 	return ID
+}
+
+func (s *Strategy) InstanceID() string {
+	return fmt.Sprintf("%s:%s", ID, s.Symbol)
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
@@ -62,9 +72,22 @@ func (s *Strategy) Validate() error {
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+	s.session = session
+
 	if s.StandardIndicatorSet == nil {
 		return errors.New("StandardIndicatorSet can not be nil, injection failed?")
 	}
+
+	if s.Position == nil {
+		s.Position = types.NewPositionFromMarket(s.Market)
+	}
+
+	instanceID := s.InstanceID()
+	s.orderExecutor = bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
+	s.orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
+		bbgo.Sync(s)
+	})
+	s.orderExecutor.Bind()
 
 	var belowMA types.Float64Indicator
 	var aboveMA types.Float64Indicator
@@ -165,8 +188,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		}
 
-		bbgo.Notify("Submitting scheduled %s order with quantity %v at price %v", s.Symbol, quantity, closePrice)
-		_, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+		bbgo.Notify("Submitting scheduled %s order with quantity %s at price %s", s.Symbol, quantity.String(), closePrice.String())
+		_, err := s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 			Symbol:   s.Symbol,
 			Side:     side,
 			Type:     types.OrderTypeMarket,
