@@ -18,6 +18,8 @@ exchangeStrategies:
     # window is the main pivot window
     window: 200
 
+    quantity: 10.0
+
     # breakLow settings are used for shorting when the current price break the previous low
     breakLow:
       # ratio is how much the price breaks the previous low to trigger the short.
