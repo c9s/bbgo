@@ -48,17 +48,21 @@ type Strategy struct {
 	*types.ProfitStats `persistence:"profit_stats"`
 	*types.TradeStats  `persistence:"trade_stats"`
 
-	drift    *indicator.Drift
-	atr      *indicator.ATR
-	midPrice fixedpoint.Value
-	lock     sync.RWMutex
+	ma        types.UpdatableSeriesExtend
+	stdevHigh *indicator.StdDev
+	stdevLow  *indicator.StdDev
+	drift     *indicator.Drift
+	atr       *indicator.ATR
+	midPrice  fixedpoint.Value
+	lock      sync.RWMutex
 
-	Source             string           `json:"source"`
-	StopLoss           fixedpoint.Value `json:"stoploss"`
-	CanvasPath         string           `json:"canvasPath"`
-	PredictOffset      int              `json:"predictOffset"`
-	NoStopPrice        bool             `json:"noStopPrice"`
-	NoTrailingStopLoss bool             `json:"noTrailingStopLoss"`
+	Source                    string           `json:"source"`
+	StopLoss                  fixedpoint.Value `json:"stoploss"`
+	CanvasPath                string           `json:"canvasPath"`
+	PredictOffset             int              `json:"predictOffset"`
+	HighLowVarianceMultiplier float64          `json:"hlVarianceMultiplier"`
+	NoStopPrice               bool             `json:"noStopPrice"`
+	NoTrailingStopLoss        bool             `json:"noTrailingStopLoss"`
 
 	// This is not related to trade but for statistics graph generation
 	// Will deduct fee in percentage from every trade
@@ -94,6 +98,7 @@ func (s *Strategy) Print(o *os.File) {
 	hiyellow(f, "window: %d\n", s.Window)
 	hiyellow(f, "noStopPrice: %v\n", s.NoStopPrice)
 	hiyellow(f, "noTrailingStopLoss: %v\n", s.NoTrailingStopLoss)
+	hiyellow(f, "hlVarianceMutiplier: %f\n", s.HighLowVarianceMultiplier)
 	hiyellow(f, "\n")
 }
 
@@ -225,6 +230,9 @@ func (s *Strategy) BindStopLoss(ctx context.Context) {
 }
 
 func (s *Strategy) InitIndicators() error {
+	s.ma = &indicator.EWMA{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: 5}}
+	s.stdevHigh = &indicator.StdDev{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: 6}}
+	s.stdevLow = &indicator.StdDev{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: 6}}
 	s.drift = &indicator.Drift{
 		MA:             &indicator.SMA{IntervalWindow: s.IntervalWindow},
 		IntervalWindow: s.IntervalWindow,
@@ -238,6 +246,11 @@ func (s *Strategy) InitIndicators() error {
 
 	for _, kline := range *klines {
 		source := s.getSource(&kline).Float64()
+		high := kline.High.Float64()
+		low := kline.Low.Float64()
+		s.ma.Update(source)
+		s.stdevHigh.Update(high - s.ma.Last())
+		s.stdevLow.Update(s.ma.Last() - low)
 		s.drift.Update(source)
 		s.atr.PushK(kline)
 	}
@@ -382,6 +395,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	if s.TradeStats == nil {
 		s.TradeStats = types.NewTradeStats(s.Symbol)
 	}
+	startTime := s.Environment.StartTime()
+	s.TradeStats.SetIntervalProfitCollector(types.NewIntervalProfitCollector(types.Interval1d, startTime))
+	s.TradeStats.SetIntervalProfitCollector(types.NewIntervalProfitCollector(types.Interval1w, startTime))
 
 	// StrategyController
 	s.Status = types.StrategyStatusRunning
@@ -546,6 +562,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		source := s.getSource(dynamicKLine)
 		sourcef := source.Float64()
 		priceLine.Update(sourcef)
+		s.ma.Update(sourcef)
 		s.drift.Update(sourcef)
 		s.atr.PushK(kline)
 		drift = s.drift.Array(2)
@@ -555,6 +572,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		pricef := price.Float64()
 		lowf := math.Min(kline.Low.Float64(), pricef)
 		highf := math.Max(kline.High.Float64(), pricef)
+		lowdiff := s.ma.Last() - lowf
+		s.stdevLow.Update(lowdiff)
+		highdiff := highf - s.ma.Last()
+		s.stdevHigh.Update(highdiff)
 		avg := s.Position.AverageCost.Float64()
 
 		shortCondition := (driftPred <= 0 && drift[0] <= 0)
@@ -581,10 +602,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				log.Errorf("unable to get baseBalance")
 				return
 			}
+			source = source.Add(fixedpoint.NewFromFloat(s.stdevHigh.Last() * s.HighLowVarianceMultiplier))
 			if source.Compare(price) < 0 {
 				source = price
 			}
-			source = source.Mul(fixedpoint.NewFromFloat(1.0002))
 
 			if s.Market.IsDustQuantity(baseBalance.Available, source) {
 				return
@@ -628,10 +649,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				log.WithError(err).Errorf("cannot cancel orders")
 				return
 			}
+			source = source.Sub(fixedpoint.NewFromFloat(s.stdevLow.Last() * s.HighLowVarianceMultiplier))
 			if source.Compare(price) > 0 {
 				source = price
 			}
-			source = source.Mul(fixedpoint.NewFromFloat(0.9998))
 			quoteBalance, ok := s.Session.GetAccount().Balance(s.Market.QuoteCurrency)
 			if !ok {
 				log.Errorf("unable to get quoteCurrency")
@@ -682,7 +703,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		defer s.Print(os.Stdout)
 
-		defer fmt.Fprintln(os.Stdout, s.TradeStats.String())
+		defer fmt.Fprintln(os.Stdout, s.TradeStats.BriefString())
 
 		if s.GenerateGraph {
 			s.Draw(dynamicKLine.StartTime, priceLine, &profit, &cumProfit)
