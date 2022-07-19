@@ -47,6 +47,10 @@ exchangeStrategies:
         interval: 1h
         window: 99
 
+      trendEMA:
+        interval: 1d
+        window: 7
+
     resistanceShort:
       enabled: true
       interval: 5m
