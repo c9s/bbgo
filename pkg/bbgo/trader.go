@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sync"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -14,6 +15,12 @@ import (
 	"github.com/c9s/bbgo/pkg/interact"
 )
 
+// Strategy method calls:
+// -> Defaults()   (optional method)
+// -> Initialize()   (optional method)
+// -> Validate()     (optional method)
+// -> Run()          (optional method)
+// -> Shutdown(shutdownCtx context.Context, wg *sync.WaitGroup)
 type StrategyID interface {
 	ID() string
 }
@@ -33,6 +40,14 @@ type StrategyDefaulter interface {
 	Defaults() error
 }
 
+type StrategyValidator interface {
+	Validate() error
+}
+
+type StrategyShutdown interface {
+	Shutdown(ctx context.Context, wg *sync.WaitGroup)
+}
+
 // ExchangeSessionSubscriber provides an interface for collecting subscriptions from different strategies
 // Subscribe method will be called before the user data stream connection is created.
 type ExchangeSessionSubscriber interface {
@@ -46,10 +61,6 @@ type CrossExchangeSessionSubscriber interface {
 type CrossExchangeStrategy interface {
 	StrategyID
 	CrossRun(ctx context.Context, orderExecutionRouter OrderExecutionRouter, sessions map[string]*ExchangeSession) error
-}
-
-type Validator interface {
-	Validate() error
 }
 
 type Logging interface {
@@ -158,7 +169,7 @@ func (trader *Trader) Subscribe() {
 	for sessionName, strategies := range trader.exchangeStrategies {
 		session := trader.environment.sessions[sessionName]
 		for _, strategy := range strategies {
-			if defaulter, ok := strategy.(StrategyDefaulter) ; ok {
+			if defaulter, ok := strategy.(StrategyDefaulter); ok {
 				if err := defaulter.Defaults(); err != nil {
 					panic(err)
 				}
@@ -179,6 +190,12 @@ func (trader *Trader) Subscribe() {
 	}
 
 	for _, strategy := range trader.crossExchangeStrategies {
+		if defaulter, ok := strategy.(StrategyDefaulter); ok {
+			if err := defaulter.Defaults(); err != nil {
+				panic(err)
+			}
+		}
+
 		if initializer, ok := strategy.(StrategyInitializer); ok {
 			if err := initializer.Initialize(); err != nil {
 				panic(err)
@@ -240,11 +257,15 @@ func (trader *Trader) RunSingleExchangeStrategy(ctx context.Context, strategy Si
 		}
 	}
 
-	// If the strategy has Validate() method, run it and check the error
-	if v, ok := strategy.(Validator); ok {
+	if v, ok := strategy.(StrategyValidator); ok {
 		if err := v.Validate(); err != nil {
 			return fmt.Errorf("failed to validate the config: %w", err)
 		}
+	}
+
+	if shutdown, ok := strategy.(StrategyShutdown); ok {
+		// Register the shutdown callback
+		OnShutdown(shutdown.Shutdown)
 	}
 
 	return strategy.Run(ctx, orderExecutor, session)
