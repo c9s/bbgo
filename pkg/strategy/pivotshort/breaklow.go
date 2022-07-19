@@ -281,9 +281,11 @@ func useQuantityOrBaseBalance(session *bbgo.ExchangeSession, market types.Market
 	if hasBalance {
 		if quantity.IsZero() {
 			log.Warnf("sell quantity is not set, submitting sell with all base balance: %s", balance.Available.String())
-			quantity = balance.Available
+			if !balance.Available.IsZero() {
+				return balance.Available, nil
+			}
 		} else {
-			quantity = fixedpoint.Min(quantity, balance.Available)
+			return fixedpoint.Min(quantity, balance.Available), nil
 		}
 	}
 
