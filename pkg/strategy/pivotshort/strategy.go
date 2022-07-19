@@ -185,6 +185,10 @@ func (s *Strategy) ID() string {
 	return ID
 }
 
+func (s *Strategy) InstanceID() string {
+	return fmt.Sprintf("%s:%s", ID, s.Symbol)
+}
+
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: types.Interval1m})
@@ -212,9 +216,6 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	s.ExitMethods.SetAndSubscribe(session, s)
 }
 
-func (s *Strategy) InstanceID() string {
-	return fmt.Sprintf("%s:%s", ID, s.Symbol)
-}
 
 func (s *Strategy) CurrentPosition() *types.Position {
 	return s.Position
