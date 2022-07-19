@@ -24,8 +24,13 @@ type SingleExchangeStrategy interface {
 	Run(ctx context.Context, orderExecutor OrderExecutor, session *ExchangeSession) error
 }
 
+// StrategyInitializer's Initialize method is called before the Subscribe method call.
 type StrategyInitializer interface {
 	Initialize() error
+}
+
+type StrategyDefaulter interface {
+	Defaults() error
 }
 
 // ExchangeSessionSubscriber provides an interface for collecting subscriptions from different strategies
@@ -153,6 +158,12 @@ func (trader *Trader) Subscribe() {
 	for sessionName, strategies := range trader.exchangeStrategies {
 		session := trader.environment.sessions[sessionName]
 		for _, strategy := range strategies {
+			if defaulter, ok := strategy.(StrategyDefaulter) ; ok {
+				if err := defaulter.Defaults(); err != nil {
+					panic(err)
+				}
+			}
+
 			if initializer, ok := strategy.(StrategyInitializer); ok {
 				if err := initializer.Initialize(); err != nil {
 					panic(err)
