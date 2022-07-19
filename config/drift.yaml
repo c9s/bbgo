@@ -20,6 +20,8 @@ exchangeStrategies:
     predictOffset: 14
     noStopPrice: true
     noTrailingStopLoss: false
+    # stddev on high/low-source
+    hlVarianceMultiplier: 0.35
 
     generateGraph: true
     graphPNLDeductFee: false

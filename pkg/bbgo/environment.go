@@ -453,6 +453,10 @@ func (environ *Environment) SetStartTime(t time.Time) *Environment {
 	return environ
 }
 
+func (environ *Environment) StartTime() time.Time {
+	return environ.startTime
+}
+
 // SetSyncStartTime overrides the default trade scan time (-7 days)
 func (environ *Environment) SetSyncStartTime(t time.Time) *Environment {
 	environ.syncStartTime = t
