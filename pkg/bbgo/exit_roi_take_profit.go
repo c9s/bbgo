@@ -9,10 +9,16 @@ import (
 
 // RoiTakeProfit force takes the profit by the given ROI percentage.
 type RoiTakeProfit struct {
+	Symbol     string           `json:"symbol"`
 	Percentage fixedpoint.Value `json:"percentage"`
 
 	session       *ExchangeSession
 	orderExecutor *GeneralOrderExecutor
+}
+
+func (s *RoiTakeProfit) Subscribe(session *ExchangeSession) {
+	// use 1m kline to handle roi stop
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: types.Interval1m})
 }
 
 func (s *RoiTakeProfit) Bind(session *ExchangeSession, orderExecutor *GeneralOrderExecutor) {
