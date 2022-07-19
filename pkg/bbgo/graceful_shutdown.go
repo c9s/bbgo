@@ -10,9 +10,11 @@ import (
 
 var graceful = &Graceful{}
 
+type ShutdownHandler func(ctx context.Context, wg *sync.WaitGroup)
+
 //go:generate callbackgen -type Graceful
 type Graceful struct {
-	shutdownCallbacks []func(ctx context.Context, wg *sync.WaitGroup)
+	shutdownCallbacks []ShutdownHandler
 }
 
 // Shutdown is a blocking call to emit all shutdown callbacks at the same time.
@@ -29,7 +31,7 @@ func (g *Graceful) Shutdown(ctx context.Context) {
 	cancel()
 }
 
-func OnShutdown(f func(ctx context.Context, wg *sync.WaitGroup)) {
+func OnShutdown(f ShutdownHandler) {
 	graceful.OnShutdown(f)
 }
 

@@ -7,7 +7,7 @@ import (
 	"sync"
 )
 
-func (g *Graceful) OnShutdown(cb func(ctx context.Context, wg *sync.WaitGroup)) {
+func (g *Graceful) OnShutdown(cb ShutdownHandler) {
 	g.shutdownCallbacks = append(g.shutdownCallbacks, cb)
 }
 
