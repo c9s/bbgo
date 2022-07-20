@@ -87,7 +87,7 @@ func (inc *TILL) Length() int {
 var _ types.Series = &TILL{}
 
 func (inc *TILL) PushK(k types.KLine) {
-	if k.EndTime.Before(inc.e1.EndTime) {
+	if inc.e1.EndTime != zeroTime && k.EndTime.Before(inc.e1.EndTime) {
 		return
 	}
 
