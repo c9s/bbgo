@@ -1,8 +1,14 @@
 ---
+persistence:
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    db: 0
+
 sessions:
   binance:
     exchange: binance
-    futures: true
+    futures: false
     envVarPrefix: binance
     heikinAshi: false
 
@@ -15,13 +21,15 @@ exchangeStrategies:
     # kline interval for indicators
     interval: 15m
     window: 2
-    stoploss: 3%
+    stoploss: 2%
     source: close
-    predictOffset: 14
+    predictOffset: 3
+    # position avg +- takeProfitFactor * atr as take profit price
+    takeProfitFactor: 1
     noStopPrice: true
     noTrailingStopLoss: false
     # stddev on high/low-source
-    hlVarianceMultiplier: 0.35
+    hlVarianceMultiplier: 0.34
 
     generateGraph: true
     graphPNLDeductFee: false

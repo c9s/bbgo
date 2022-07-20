@@ -1,7 +1,6 @@
 package types
 
 import (
-	"encoding/json"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -10,9 +9,9 @@ import (
 )
 
 type IntervalProfitCollector struct {
-	Interval Interval
-	Profits  *Float64Slice
-	tmpTime  time.Time
+	Interval Interval      `json:"interval"`
+	Profits  *Float64Slice `json:"profits"`
+	tmpTime  time.Time     `json:"tmpTime"`
 }
 
 func NewIntervalProfitCollector(i Interval, startTime time.Time) *IntervalProfitCollector {
@@ -92,16 +91,6 @@ func (s IntervalProfitCollector) MarshalYAML() (interface{}, error) {
 	return result, nil
 }
 
-func (s *IntervalProfitCollector) MarshalJSON() ([]byte, error) {
-	result := make(map[string]interface{})
-	result["Sharpe Ratio"] = s.GetSharpe()
-	result["Omega Ratio"] = s.GetOmega()
-	result["Profitable Count"] = s.GetNumOfProfitableIntervals()
-	result["NonProfitable Count"] = s.GetNumOfNonProfitableIntervals()
-	return json.Marshal(result)
-
-}
-
 // TODO: Add more stats from the reference:
 // See https://www.metatrader5.com/en/terminal/help/algotrading/testing_report
 type TradeStats struct {
@@ -117,7 +106,7 @@ type TradeStats struct {
 	MostLossTrade       fixedpoint.Value                      `json:"mostLossTrade" yaml:"mostLossTrade"`
 	ProfitFactor        fixedpoint.Value                      `json:"profitFactor" yaml:"profitFactor"`
 	TotalNetProfit      fixedpoint.Value                      `json:"totalNetProfit" yaml:"totalNetProfit"`
-	IntervalProfits     map[Interval]*IntervalProfitCollector `json:"intervalProfits,omitempty" yaml: "intervalProfits,omitempty"`
+	IntervalProfits     map[Interval]*IntervalProfitCollector `jons:"intervalProfits,omitempty" yaml: "intervalProfits,omitempty"`
 }
 
 func NewTradeStats(symbol string) *TradeStats {
