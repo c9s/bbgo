@@ -96,7 +96,7 @@ func (inc *TILL) CalculateAndUpdate(allKLines []types.KLine) {
 		doable = true
 	}
 	for _, k := range allKLines {
-		if !doable && k.StartTime.After(inc.e1.LastOpenTime) {
+		if !doable && k.EndTime.After(inc.e1.EndTime) {
 			doable = true
 		}
 

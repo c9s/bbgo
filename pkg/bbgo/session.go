@@ -17,145 +17,10 @@ import (
 
 	exchange2 "github.com/c9s/bbgo/pkg/exchange"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 )
-
-var (
-	debugEWMA = false
-	debugSMA  = false
-)
-
-func init() {
-	// when using --dotenv option, the dotenv is loaded from command.PersistentPreRunE, not init.
-	// hence here the env var won't enable the debug flag
-	util.SetEnvVarBool("DEBUG_EWMA", &debugEWMA)
-	util.SetEnvVarBool("DEBUG_SMA", &debugSMA)
-}
-
-type StandardIndicatorSet struct {
-	Symbol string
-	// Standard indicators
-	// interval -> window
-	sma        map[types.IntervalWindow]*indicator.SMA
-	ewma       map[types.IntervalWindow]*indicator.EWMA
-	boll       map[types.IntervalWindowBandWidth]*indicator.BOLL
-	stoch      map[types.IntervalWindow]*indicator.STOCH
-	volatility map[types.IntervalWindow]*indicator.Volatility
-
-	store *MarketDataStore
-}
-
-func NewStandardIndicatorSet(symbol string, store *MarketDataStore) *StandardIndicatorSet {
-	set := &StandardIndicatorSet{
-		Symbol:     symbol,
-		sma:        make(map[types.IntervalWindow]*indicator.SMA),
-		ewma:       make(map[types.IntervalWindow]*indicator.EWMA),
-		boll:       make(map[types.IntervalWindowBandWidth]*indicator.BOLL),
-		stoch:      make(map[types.IntervalWindow]*indicator.STOCH),
-		volatility: make(map[types.IntervalWindow]*indicator.Volatility),
-		store:      store,
-	}
-
-	// let us pre-defined commonly used intervals
-	for interval := range types.SupportedIntervals {
-		for _, window := range []int{7, 25, 99} {
-			iw := types.IntervalWindow{Interval: interval, Window: window}
-			set.sma[iw] = &indicator.SMA{IntervalWindow: iw}
-			set.sma[iw].Bind(store)
-			if debugSMA {
-				set.sma[iw].OnUpdate(func(value float64) {
-					log.Infof("%s SMA %s: %f", symbol, iw.String(), value)
-				})
-			}
-
-			set.ewma[iw] = &indicator.EWMA{IntervalWindow: iw}
-			set.ewma[iw].Bind(store)
-
-			// if debug EWMA is enabled, we add the debug handler
-			if debugEWMA {
-				set.ewma[iw].OnUpdate(func(value float64) {
-					log.Infof("%s EWMA %s: %f", symbol, iw.String(), value)
-				})
-			}
-
-		}
-
-		// setup boll indicator, we may refactor boll indicator by subscribing SMA indicator,
-		// however, since general used BOLLINGER band use window 21, which is not in the existing SMA indicator sets.
-		// Pull out the bandwidth configuration as the boll Key
-		iw := types.IntervalWindow{Interval: interval, Window: 21}
-
-		// set efault band width to 2.0
-		iwb := types.IntervalWindowBandWidth{IntervalWindow: iw, BandWidth: 2.0}
-		set.boll[iwb] = &indicator.BOLL{IntervalWindow: iw, K: iwb.BandWidth}
-		set.boll[iwb].Bind(store)
-	}
-
-	return set
-}
-
-// BOLL returns the bollinger band indicator of the given interval, the window and bandwidth
-func (set *StandardIndicatorSet) BOLL(iw types.IntervalWindow, bandWidth float64) *indicator.BOLL {
-	iwb := types.IntervalWindowBandWidth{IntervalWindow: iw, BandWidth: bandWidth}
-	inc, ok := set.boll[iwb]
-	if !ok {
-		inc = &indicator.BOLL{IntervalWindow: iw, K: bandWidth}
-		inc.Bind(set.store)
-		set.boll[iwb] = inc
-	}
-
-	return inc
-}
-
-// SMA returns the simple moving average indicator of the given interval and the window size.
-func (set *StandardIndicatorSet) SMA(iw types.IntervalWindow) *indicator.SMA {
-	inc, ok := set.sma[iw]
-	if !ok {
-		inc = &indicator.SMA{IntervalWindow: iw}
-		inc.Bind(set.store)
-		set.sma[iw] = inc
-	}
-
-	return inc
-}
-
-// EWMA returns the exponential weighed moving average indicator of the given interval and the window size.
-func (set *StandardIndicatorSet) EWMA(iw types.IntervalWindow) *indicator.EWMA {
-	inc, ok := set.ewma[iw]
-	if !ok {
-		inc = &indicator.EWMA{IntervalWindow: iw}
-		inc.Bind(set.store)
-		set.ewma[iw] = inc
-	}
-
-	return inc
-}
-
-func (set *StandardIndicatorSet) STOCH(iw types.IntervalWindow) *indicator.STOCH {
-	inc, ok := set.stoch[iw]
-	if !ok {
-		inc = &indicator.STOCH{IntervalWindow: iw}
-		inc.Bind(set.store)
-		set.stoch[iw] = inc
-	}
-
-	return inc
-}
-
-// VOLATILITY returns the volatility(stddev) indicator of the given interval and the window size.
-func (set *StandardIndicatorSet) VOLATILITY(iw types.IntervalWindow) *indicator.Volatility {
-	inc, ok := set.volatility[iw]
-	if !ok {
-		inc = &indicator.Volatility{IntervalWindow: iw}
-		inc.Bind(set.store)
-		set.volatility[iw] = inc
-	}
-
-	return inc
-}
 
 // ExchangeSession presents the exchange connection Session
 // It also maintains and collects the data returned from the stream.
@@ -504,7 +369,7 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 	marketDataStore.BindStream(session.MarketDataStream)
 	session.marketDataStores[symbol] = marketDataStore
 
-	standardIndicatorSet := NewStandardIndicatorSet(symbol, marketDataStore)
+	standardIndicatorSet := NewStandardIndicatorSet(symbol, session.MarketDataStream, marketDataStore)
 	session.standardIndicatorSets[symbol] = standardIndicatorSet
 
 	// used kline intervals by the given symbol

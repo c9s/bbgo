@@ -5,7 +5,7 @@ import "github.com/c9s/bbgo/pkg/types"
 const MaxNumOfKLines = 5_000
 const MaxNumOfKLinesTruncate = 100
 
-// MarketDataStore receives and maintain the public market data
+// MarketDataStore receives and maintain the public market data of a single symbol
 //go:generate callbackgen -type MarketDataStore
 type MarketDataStore struct {
 	Symbol string
@@ -14,6 +14,7 @@ type MarketDataStore struct {
 	KLineWindows map[types.Interval]*types.KLineWindow `json:"-"`
 
 	kLineWindowUpdateCallbacks []func(interval types.Interval, klines types.KLineWindow)
+	kLineClosedCallbacks       []func(k types.KLine)
 }
 
 func NewMarketDataStore(symbol string) *MarketDataStore {
@@ -47,18 +48,19 @@ func (store *MarketDataStore) handleKLineClosed(kline types.KLine) {
 	store.AddKLine(kline)
 }
 
-func (store *MarketDataStore) AddKLine(kline types.KLine) {
-	window, ok := store.KLineWindows[kline.Interval]
+func (store *MarketDataStore) AddKLine(k types.KLine) {
+	window, ok := store.KLineWindows[k.Interval]
 	if !ok {
 		var tmp = make(types.KLineWindow, 0, 1000)
-		store.KLineWindows[kline.Interval] = &tmp
+		store.KLineWindows[k.Interval] = &tmp
 		window = &tmp
 	}
-	window.Add(kline)
+	window.Add(k)
 
 	if len(*window) > MaxNumOfKLines {
 		*window = (*window)[MaxNumOfKLinesTruncate-1:]
 	}
 
-	store.EmitKLineWindowUpdate(kline.Interval, *window)
+	store.EmitKLineClosed(k)
+	store.EmitKLineWindowUpdate(k.Interval, *window)
 }
