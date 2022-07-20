@@ -60,6 +60,10 @@ func (inc *STOCH) LastD() float64 {
 }
 
 func (inc *STOCH) PushK(k types.KLine) {
+	if inc.EndTime != zeroTime && !k.EndTime.After(inc.EndTime) {
+		return
+	}
+
 	inc.Update(k.High.Float64(), k.Low.Float64(), k.Close.Float64())
 	inc.EndTime = k.EndTime.Time()
 }
@@ -70,9 +74,6 @@ func (inc *STOCH) BindK(target KLineClosedEmitter, symbol string, interval types
 
 func (inc *STOCH) LoadK(allKLines []types.KLine) {
 	for _, k := range allKLines {
-		if inc.EndTime != zeroTime && !k.EndTime.After(inc.EndTime) {
-			continue
-		}
 
 		inc.PushK(k)
 	}
