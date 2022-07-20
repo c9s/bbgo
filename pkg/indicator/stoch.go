@@ -85,14 +85,8 @@ func (inc *STOCH) CalculateAndUpdate(kLines []types.KLine) {
 	}
 
 	for _, k := range kLines {
-		if inc.EndTime != zeroTime && !k.EndTime.After(inc.EndTime) {
-			continue
-		}
-
 		inc.PushK(k)
 	}
-
-	inc.EmitUpdate(inc.LastK(), inc.LastD())
 }
 
 func (inc *STOCH) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
