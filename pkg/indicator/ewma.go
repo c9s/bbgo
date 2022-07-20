@@ -15,8 +15,8 @@ type EWMA struct {
 	types.IntervalWindow
 	types.SeriesBase
 
-	Values       types.Float64Slice
-	LastOpenTime time.Time
+	Values  types.Float64Slice
+	EndTime time.Time
 
 	updateCallbacks []func(value float64)
 }
@@ -58,17 +58,11 @@ func (inc *EWMA) Length() int {
 	return len(inc.Values)
 }
 
-func (inc *EWMA) PushK(k types.KLine) {
-	inc.Update(k.Close.Float64())
-	inc.LastOpenTime = k.StartTime.Time()
-}
-
 func (inc *EWMA) CalculateAndUpdate(allKLines []types.KLine) {
 	if len(inc.Values) == 0 {
 		for _, k := range allKLines {
 			inc.PushK(k)
 		}
-
 		inc.EmitUpdate(inc.Last())
 	} else {
 		k := allKLines[len(allKLines)-1]
@@ -87,6 +81,27 @@ func (inc *EWMA) handleKLineWindowUpdate(interval types.Interval, window types.K
 
 func (inc *EWMA) Bind(updater KLineWindowUpdater) {
 	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
+}
+
+func (inc *EWMA) BindK(target KLineClosedEmitter, symbol string, interval types.Interval) {
+	target.OnKLineClosed(types.KLineWith(symbol, interval, inc.PushK))
+}
+
+func (inc *EWMA) PushK(k types.KLine) {
+	if inc.EndTime != zeroTime && k.EndTime.Before(inc.EndTime) {
+		return
+	}
+
+	inc.Update(k.Close.Float64())
+	inc.EndTime = k.EndTime.Time()
+	inc.EmitUpdate(inc.Last())
+}
+
+func (inc *EWMA) LoadK(allKLines []types.KLine) {
+	for _, k := range allKLines {
+		inc.PushK(k)
+	}
+	inc.EmitUpdate(inc.Last())
 }
 
 func CalculateKLinesEMA(allKLines []types.KLine, priceF KLinePriceMapper, window int) float64 {
