@@ -30,7 +30,6 @@ type StandardIndicatorSet struct {
 	ewma       map[types.IntervalWindow]*indicator.EWMA
 	boll       map[types.IntervalWindowBandWidth]*indicator.BOLL
 	stoch      map[types.IntervalWindow]*indicator.STOCH
-	volatility map[types.IntervalWindow]*indicator.Volatility
 
 	stream types.Stream
 	store  *MarketDataStore
