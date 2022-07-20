@@ -93,21 +93,3 @@ func (inc *SMA) BindK(target KLineClosedEmitter, symbol string, interval types.I
 func (inc *SMA) Bind(updater KLineWindowUpdater) {
 	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }
-
-func calculateSMA(kLines []types.KLine, window int, priceF KLinePriceMapper) (float64, error) {
-	length := len(kLines)
-	if length == 0 || length < window {
-		return 0.0, fmt.Errorf("insufficient elements for calculating SMA with window = %d", window)
-	}
-	if length != window {
-		return 0.0, fmt.Errorf("too much klines passed in, requires only %d klines", window)
-	}
-
-	sum := 0.0
-	for _, k := range kLines {
-		sum += priceF(k)
-	}
-
-	avg := sum / float64(window)
-	return avg, nil
-}
