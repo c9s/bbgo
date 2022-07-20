@@ -26,10 +26,10 @@ type StandardIndicatorSet struct {
 	Symbol string
 	// Standard indicators
 	// interval -> window
-	sma        map[types.IntervalWindow]*indicator.SMA
-	ewma       map[types.IntervalWindow]*indicator.EWMA
-	boll       map[types.IntervalWindowBandWidth]*indicator.BOLL
-	stoch      map[types.IntervalWindow]*indicator.STOCH
+	sma   map[types.IntervalWindow]*indicator.SMA
+	ewma  map[types.IntervalWindow]*indicator.EWMA
+	boll  map[types.IntervalWindowBandWidth]*indicator.BOLL
+	stoch map[types.IntervalWindow]*indicator.STOCH
 
 	stream types.Stream
 	store  *MarketDataStore
