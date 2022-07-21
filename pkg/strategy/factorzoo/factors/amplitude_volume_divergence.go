@@ -7,29 +7,56 @@ import (
 
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
+
+	log "github.com/sirupsen/logrus"
 )
 
 var zeroTime time.Time
 
 type KLineValueMapper func(k types.KLine) float64
 
-//go:generate callbackgen -type Correlation
-type Correlation struct {
+//go:generate callbackgen -type AVD
+type AVD struct {
+	types.SeriesBase
 	types.IntervalWindow
-	Values  types.Float64Slice
+
+	// Values
+	Values    types.Float64Slice
+	LastValue float64
+
 	EndTime time.Time
 
-	UpdateCallbacks []func(value float64)
+	UpdateCallbacks []func(val float64)
 }
 
-func (inc *Correlation) Last() float64 {
-	if len(inc.Values) == 0 {
-		return 0.0
+func (inc *AVD) Index(i int) float64 {
+	if inc.Values == nil {
+		return 0
 	}
-	return inc.Values[len(inc.Values)-1]
+	return inc.Values.Index(i)
 }
 
-func (inc *Correlation) CalculateAndUpdate(klines []types.KLine) {
+func (inc *AVD) Last() float64 {
+	if inc.Values.Length() == 0 {
+		return 0
+	}
+	return inc.Values.Last()
+}
+
+func (inc *AVD) Length() int {
+	if inc.Values == nil {
+		return 0
+	}
+	return inc.Values.Length()
+}
+
+//var _ types.SeriesExtend = &AVD{}
+
+func (inc *AVD) Update(klines []types.KLine) {
+	if inc.Values == nil {
+		inc.SeriesBase.Series = inc
+	}
+
 	if len(klines) < inc.Window {
 		return
 	}
@@ -43,12 +70,14 @@ func (inc *Correlation) CalculateAndUpdate(klines []types.KLine) {
 
 	var recentT = klines[end-(inc.Window-1) : end+1]
 
-	correlation, err := calculateCORRELATION(recentT, inc.Window, KLineAmplitudeMapper, indicator.KLineVolumeMapper)
+	val, err := calculateCorrelation(recentT, inc.Window, KLineAmplitudeMapper, indicator.KLineVolumeMapper)
 	if err != nil {
-		log.WithError(err).Error("can not calculate correlation")
+		log.WithError(err).Error("can not calculate")
 		return
 	}
-	inc.Values.Push(correlation)
+	val *= -1
+	inc.Values.Push(val)
+	inc.LastValue = val
 
 	if len(inc.Values) > indicator.MaxNumOfVOL {
 		inc.Values = inc.Values[indicator.MaxNumOfVOLTruncateSize-1:]
@@ -56,22 +85,23 @@ func (inc *Correlation) CalculateAndUpdate(klines []types.KLine) {
 
 	inc.EndTime = klines[end].GetEndTime().Time()
 
-	inc.EmitUpdate(correlation)
+	inc.EmitUpdate(val)
+
 }
 
-func (inc *Correlation) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
+func (inc *AVD) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
 	if inc.Interval != interval {
 		return
 	}
 
-	inc.CalculateAndUpdate(window)
+	inc.Update(window)
 }
 
-func (inc *Correlation) Bind(updater indicator.KLineWindowUpdater) {
+func (inc *AVD) Bind(updater indicator.KLineWindowUpdater) {
 	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }
 
-func calculateCORRELATION(klines []types.KLine, window int, valA KLineValueMapper, valB KLineValueMapper) (float64, error) {
+func calculateCorrelation(klines []types.KLine, window int, valA KLineValueMapper, valB KLineValueMapper) (float64, error) {
 	length := len(klines)
 	if length == 0 || length < window {
 		return 0.0, fmt.Errorf("insufficient elements for calculating VOL with window = %d", window)
@@ -91,7 +121,7 @@ func calculateCORRELATION(klines []types.KLine, window int, valA KLineValueMappe
 		squareSumA = squareSumA + valA(k)*valA(k)
 		squareSumB = squareSumB + valB(k)*valB(k)
 	}
-	// use formula for calculating correlation coefficient.
+	// calculating correlation coefficient.
 	corr := (float64(window)*sumAB - sumA*sumB) /
 		math.Sqrt((float64(window)*squareSumA-sumA*sumA)*(float64(window)*squareSumB-sumB*sumB))
 
