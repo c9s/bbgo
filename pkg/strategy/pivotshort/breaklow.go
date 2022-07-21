@@ -261,11 +261,14 @@ func useQuantityOrBaseBalance(session *bbgo.ExchangeSession, market types.Market
 			baseBalanceValue := baseBalance.Net().Mul(price)
 			accountValue := baseBalanceValue.Add(quoteBalance.Net())
 
+			// avoid using all account value since there will be some trade loss for interests and the fee
+			accountValue = accountValue.Mul(one.Sub(fixedpoint.NewFromFloat(0.01)))
+
 			log.Infof("calculated account value %f %s", accountValue.Float64(), market.QuoteCurrency)
 
 			if session.IsolatedMargin {
 				originLeverage := leverage
-				leverage = fixedpoint.Max(leverage, fixedpoint.NewFromInt(10))
+				leverage = fixedpoint.Min(leverage, fixedpoint.NewFromInt(10)) // max leverage is 10
 				log.Infof("using isolated margin, maxLeverage=10 originalLeverage=%f currentLeverage=%f",
 					originLeverage.Float64(),
 					leverage.Float64())
