@@ -27,7 +27,6 @@ func (inc *EWMA) Clone() *EWMA {
 	out := &EWMA{
 		IntervalWindow: inc.IntervalWindow,
 		Values:         inc.Values[:],
-		LastOpenTime:   inc.LastOpenTime,
 	}
 	out.SeriesBase.Series = out
 	return out
