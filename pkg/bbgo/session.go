@@ -473,6 +473,11 @@ func (session *ExchangeSession) Positions() map[string]*types.Position {
 // MarketDataStore returns the market data store of a symbol
 func (session *ExchangeSession) MarketDataStore(symbol string) (s *MarketDataStore, ok bool) {
 	s, ok = session.marketDataStores[symbol]
+	if !ok {
+		s = NewMarketDataStore(symbol)
+		session.marketDataStores[symbol] = s
+		return s, true
+	}
 	return s, ok
 }
 

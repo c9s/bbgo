@@ -292,10 +292,22 @@ func (trader *Trader) injectFields() error {
 					return fmt.Errorf("market of symbol %s not found", symbol)
 				}
 
+				indicatorSet, ok := session.StandardIndicatorSet(symbol)
+				if !ok {
+					return fmt.Errorf("standardIndicatorSet of symbol %s not found", symbol)
+				}
+
+				store, ok := session.MarketDataStore(symbol)
+				if !ok {
+					return fmt.Errorf("marketDataStore of symbol %s not found", symbol)
+				}
+
 				if err := dynamic.ParseStructAndInject(strategy,
 					market,
 					session,
 					session.OrderExecutor,
+					indicatorSet,
+					store,
 				); err != nil {
 					return errors.Wrapf(err, "failed to inject object into %T", strategy)
 				}
