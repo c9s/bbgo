@@ -9,22 +9,48 @@ exchangeStrategies:
 - on: binance
   factorzoo:
     symbol: BTCUSDT
-    interval: 12h # T:20/12h
-    quantity: 0.95
+    linear:
+      enabled: true
+      interval: 1d
+      quantity: 1
+#      amount: 50_000
+      window: 5
+
+    exits:
+      - trailingStop:
+          callbackRate: 5%
+          activationRatio: 1%
+          closePosition: 100%
+          minProfit: 10%
+          interval: 1m
+          side: buy
+      - trailingStop:
+          callbackRate: 5%
+          activationRatio: 1%
+          closePosition: 100%
+          minProfit: 10%
+          interval: 1m
+          side: sell
+
+## (0) roiStopLoss is the stop loss percentage of the position ROI (currently the price change)
+#      - roiStopLoss:
+#          percentage: 1.0%
+#
+## (1) roiTakeProfit is used to force taking profit by percentage of the position ROI (currently the price change)
+## force to take the profit ROI exceeded the percentage.
+#      - roiTakeProfit:
+#          percentage: 35%
 
 
 backtest:
   sessions:
     - binance
-  # for testing max draw down (MDD) at 03-12
-  # see here for more details
-  # https://www.investopedia.com/terms/m/maximum-drawdown-mdd.asp
-  startTime: "2022-03-15"
-  endTime: "2022-04-13"
+  startTime: "2021-01-01"
+  endTime: "2022-07-31"
   symbols:
     - BTCUSDT
   accounts:
     binance:
       balances:
         BTC: 1.0
-        USDT: 45_000.0
+        USDT: 60_000.0
