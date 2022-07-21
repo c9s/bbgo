@@ -3,6 +3,7 @@ package pivotshort
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -239,15 +240,113 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 	}))
 }
 
+type AccountValueCalculator struct {
+	session       *bbgo.ExchangeSession
+	quoteCurrency string
+	prices        map[string]fixedpoint.Value
+	tickers       map[string]types.Ticker
+	updateTime    time.Time
+}
+
+func NewAccountValueCalculator(session *bbgo.ExchangeSession, quoteCurrency string) *AccountValueCalculator {
+	return &AccountValueCalculator{
+		session:       session,
+		quoteCurrency: quoteCurrency,
+		prices:        make(map[string]fixedpoint.Value),
+		tickers:       make(map[string]types.Ticker),
+	}
+}
+
+func (c *AccountValueCalculator) UpdatePrices(ctx context.Context) error {
+	balances := c.session.Account.Balances()
+	currencies := balances.Currencies()
+	var symbols []string
+	for _, currency := range currencies {
+		symbol := currency + c.quoteCurrency
+		symbols = append(symbols, symbol)
+	}
+
+	tickers, err := c.session.Exchange.QueryTickers(ctx, symbols...)
+	if err != nil {
+		return err
+	}
+
+	c.tickers = tickers
+	for symbol, ticker := range tickers {
+		c.prices[symbol] = ticker.Last
+		if ticker.Time.After(c.updateTime) {
+			c.updateTime = ticker.Time
+		}
+	}
+	return nil
+}
+
+func (c *AccountValueCalculator) DebtValue(ctx context.Context) (fixedpoint.Value, error) {
+	debtValue := fixedpoint.Zero
+
+	if len(c.prices) == 0 {
+		if err := c.UpdatePrices(ctx); err != nil {
+			return debtValue, err
+		}
+	}
+
+	balances := c.session.Account.Balances()
+	for _, b := range balances {
+		symbol := b.Currency + c.quoteCurrency
+		price, ok := c.prices[symbol]
+		if !ok {
+			continue
+		}
+
+		debtValue = debtValue.Add(b.Debt().Mul(price))
+	}
+
+	return debtValue, nil
+}
+
+func (c *AccountValueCalculator) NetValue(ctx context.Context) (fixedpoint.Value, error) {
+	accountValue := fixedpoint.Zero
+
+	if len(c.prices) == 0 {
+		if err := c.UpdatePrices(ctx); err != nil {
+			return accountValue, err
+		}
+	}
+
+	balances := c.session.Account.Balances()
+	for _, b := range balances {
+		symbol := b.Currency + c.quoteCurrency
+		price, ok := c.prices[symbol]
+		if !ok {
+			continue
+		}
+
+		accountValue = accountValue.Add(b.Net().Mul(price))
+	}
+
+	return accountValue, nil
+}
+
+func calculateAccountNetValue(session *bbgo.ExchangeSession) (fixedpoint.Value, error) {
+	accountValue := fixedpoint.Zero
+	ctx := context.Background()
+	c := NewAccountValueCalculator(session, "USDT")
+	if err := c.UpdatePrices(ctx); err != nil {
+		return accountValue, err
+	}
+
+	return c.NetValue(ctx)
+}
+
 func useQuantityOrBaseBalance(session *bbgo.ExchangeSession, market types.Market, price, quantity, leverage fixedpoint.Value) (fixedpoint.Value, error) {
+	if leverage.IsZero() {
+		leverage = fixedpoint.NewFromInt(3)
+	}
+
 	usingLeverage := session.Margin || session.IsolatedMargin || session.Futures || session.IsolatedFutures
 	if usingLeverage {
 		if !quantity.IsZero() {
 			return quantity, nil
-		}
-
-		if leverage.IsZero() {
-			leverage = fixedpoint.NewFromInt(3)
 		}
 
 		// quantity is zero, we need to calculate the quantity
@@ -300,7 +399,7 @@ func useQuantityOrBaseBalance(session *bbgo.ExchangeSession, market types.Market
 
 	}
 
-	// For spot, we simply sell the base currency
+	// For spot, we simply sell the base quoteCurrency
 	balance, hasBalance := session.Account.Balance(market.BaseCurrency)
 	if hasBalance {
 		if quantity.IsZero() {
