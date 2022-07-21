@@ -265,7 +265,7 @@ func useQuantityOrBaseBalance(session *bbgo.ExchangeSession, market types.Market
 
 			if session.IsolatedMargin {
 				originLeverage := leverage
-				leverage = fixedpoint.Max(leverage, fixedpoint.NewFromInt(10))
+				leverage = fixedpoint.Min(leverage, fixedpoint.NewFromInt(10)) // max leverage is 10
 				log.Infof("using isolated margin, maxLeverage=10 originalLeverage=%f currentLeverage=%f",
 					originLeverage.Float64(),
 					leverage.Float64())
