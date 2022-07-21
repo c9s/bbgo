@@ -365,12 +365,17 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 	orderStore.BindStream(session.UserDataStream)
 	session.orderStores[symbol] = orderStore
 
-	marketDataStore := NewMarketDataStore(symbol)
-	marketDataStore.BindStream(session.MarketDataStream)
-	session.marketDataStores[symbol] = marketDataStore
+	if _, ok := session.marketDataStores[symbol]; !ok {
+		marketDataStore := NewMarketDataStore(symbol)
+		marketDataStore.BindStream(session.MarketDataStream)
+		session.marketDataStores[symbol] = marketDataStore
+	}
 
-	standardIndicatorSet := NewStandardIndicatorSet(symbol, session.MarketDataStream, marketDataStore)
-	session.standardIndicatorSets[symbol] = standardIndicatorSet
+	if _, ok := session.standardIndicatorSets[symbol]; !ok {
+		marketDataStore := session.marketDataStores[symbol]
+		standardIndicatorSet := NewStandardIndicatorSet(symbol, session.MarketDataStream, marketDataStore)
+		session.standardIndicatorSets[symbol] = standardIndicatorSet
+	}
 
 	// used kline intervals by the given symbol
 	var klineSubscriptions = map[types.Interval]struct{}{}
@@ -475,6 +480,7 @@ func (session *ExchangeSession) MarketDataStore(symbol string) (s *MarketDataSto
 	s, ok = session.marketDataStores[symbol]
 	if !ok {
 		s = NewMarketDataStore(symbol)
+		s.BindStream(session.MarketDataStream)
 		session.marketDataStores[symbol] = s
 		return s, true
 	}
