@@ -371,8 +371,9 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 		session.marketDataStores[symbol] = marketDataStore
 	}
 
+	marketDataStore := session.marketDataStores[symbol]
+
 	if _, ok := session.standardIndicatorSets[symbol]; !ok {
-		marketDataStore := session.marketDataStores[symbol]
 		standardIndicatorSet := NewStandardIndicatorSet(symbol, session.MarketDataStream, marketDataStore)
 		session.standardIndicatorSets[symbol] = standardIndicatorSet
 	}
