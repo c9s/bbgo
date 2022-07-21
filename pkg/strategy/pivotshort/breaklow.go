@@ -262,7 +262,7 @@ func useQuantityOrBaseBalance(session *bbgo.ExchangeSession, market types.Market
 			accountValue := baseBalanceValue.Add(quoteBalance.Net())
 
 			// avoid using all account value since there will be some trade loss for interests and the fee
-			accountValue = accountValue.Mul(one.Sub(fixedpoint.NewFromFloat(0.9)))
+			accountValue = accountValue.Mul(one.Sub(fixedpoint.NewFromFloat(0.01)))
 
 			log.Infof("calculated account value %f %s", accountValue.Float64(), market.QuoteCurrency)
 
