@@ -56,26 +56,34 @@ func (inc *SMA) Update(value float64) {
 	inc.Values.Push(types.Mean(inc.rawValues))
 }
 
+func (inc *SMA) BindK(target KLineClosedEmitter, symbol string, interval types.Interval) {
+	target.OnKLineClosed(types.KLineWith(symbol, interval, inc.PushK))
+}
+
 func (inc *SMA) PushK(k types.KLine) {
+	if inc.EndTime != zeroTime && k.EndTime.Before(inc.EndTime) {
+		return
+	}
+
 	inc.Update(k.Close.Float64())
 	inc.EndTime = k.EndTime.Time()
+	inc.EmitUpdate(inc.Values.Last())
+}
+
+func (inc *SMA) LoadK(allKLines []types.KLine) {
+	for _, k := range allKLines {
+		inc.PushK(k)
+	}
 }
 
 func (inc *SMA) CalculateAndUpdate(allKLines []types.KLine) {
-	var last = allKLines[len(allKLines)-1]
-
 	if inc.rawValues == nil {
-		for _, k := range allKLines {
-			if inc.EndTime != zeroTime && k.EndTime.Before(inc.EndTime) {
-				continue
-			}
-			inc.PushK(k)
-		}
+		inc.LoadK(allKLines)
 	} else {
+		var last = allKLines[len(allKLines)-1]
 		inc.PushK(last)
 	}
 
-	inc.EmitUpdate(inc.Values.Last())
 }
 
 func (inc *SMA) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
@@ -84,10 +92,6 @@ func (inc *SMA) handleKLineWindowUpdate(interval types.Interval, window types.KL
 	}
 
 	inc.CalculateAndUpdate(window)
-}
-
-func (inc *SMA) BindK(target KLineClosedEmitter, symbol string, interval types.Interval) {
-	target.OnKLineClosed(types.KLineWith(symbol, interval, inc.PushK))
 }
 
 func (inc *SMA) Bind(updater KLineWindowUpdater) {

@@ -87,24 +87,35 @@ func (inc *TILL) Length() int {
 var _ types.Series = &TILL{}
 
 func (inc *TILL) PushK(k types.KLine) {
+	if inc.e1 != nil && inc.e1.EndTime != zeroTime && k.EndTime.Before(inc.e1.EndTime) {
+		return
+	}
+
 	inc.Update(k.Close.Float64())
+	inc.EmitUpdate(inc.Last())
+}
+
+func (inc *TILL) LoadK(allKLines []types.KLine) {
+	for _, k := range allKLines {
+		inc.PushK(k)
+	}
+}
+
+func (inc *TILL) BindK(target KLineClosedEmitter, symbol string, interval types.Interval) {
+	target.OnKLineClosed(types.KLineWith(symbol, interval, inc.PushK))
 }
 
 func (inc *TILL) CalculateAndUpdate(allKLines []types.KLine) {
-	doable := false
 	if inc.e1 == nil {
-		doable = true
-	}
-	for _, k := range allKLines {
-		if !doable && k.StartTime.After(inc.e1.LastOpenTime) {
-			doable = true
-		}
-
-		if doable {
+		for _, k := range allKLines {
 			inc.PushK(k)
-			inc.EmitUpdate(inc.Last())
 		}
+	} else {
+		end := len(allKLines)
+		last := allKLines[end-1]
+		inc.PushK(last)
 	}
+
 }
 
 func (inc *TILL) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
