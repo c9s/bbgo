@@ -434,6 +434,14 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 
 func (session *ExchangeSession) StandardIndicatorSet(symbol string) (*StandardIndicatorSet, bool) {
 	set, ok := session.standardIndicatorSets[symbol]
+	if !ok {
+		if store, ok2 := session.MarketDataStore(symbol); ok2 {
+			set = NewStandardIndicatorSet(symbol, session.MarketDataStream, store)
+			session.standardIndicatorSets[symbol] = set
+			return set, true
+		}
+	}
+
 	return set, ok
 }
 
