@@ -96,11 +96,28 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 		}
 
 		if lastLow.Compare(s.lastLow) != 0 {
-			bbgo.Notify("%s new pivot low detected: %f", s.Symbol, s.pivot.LastLow())
+			bbgo.Notify("%s found new pivot low: %f", s.Symbol, s.pivot.LastLow())
 		}
 
 		s.lastLow = lastLow
 		s.pivotLowPrices = append(s.pivotLowPrices, s.lastLow)
+
+		log.Infof("pilot calculation for max position: last low = %f, quantity = %f, leverage = %f",
+			s.lastLow.Float64(),
+			s.Quantity.Float64(),
+			s.Leverage.Float64())
+
+		quantity, err := useQuantityOrBaseBalance(s.session, s.Market, s.lastLow, s.Quantity, s.Leverage)
+		if err != nil {
+			log.WithError(err).Errorf("quantity calculation error")
+		}
+
+		if quantity.IsZero() {
+			log.WithError(err).Errorf("quantity is zero, can not submit order")
+			return
+		}
+
+		bbgo.Notify("%s %f quantity will be used for shorting", s.Symbol, quantity.Float64())
 	})
 
 	session.MarketDataStream.OnKLineClosed(types.KLineWith(symbol, s.Interval, func(kline types.KLine) {
@@ -110,7 +127,7 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 		}
 
 		if lastLow.Compare(s.lastLow) != 0 {
-			bbgo.Notify("%s new pivot low detected: %f %s", s.Symbol, s.pivot.LastLow())
+			bbgo.Notify("%s new pivot low: %f", s.Symbol, s.pivot.LastLow())
 		}
 
 		s.lastLow = lastLow
@@ -237,10 +254,14 @@ func useQuantityOrBaseBalance(session *bbgo.ExchangeSession, market types.Market
 		baseBalance, _ := session.Account.Balance(market.BaseCurrency)
 		quoteBalance, _ := session.Account.Balance(market.QuoteCurrency)
 
+		log.Infof("calculating quantity: base balance = %+v, quote balance = %+v", baseBalance, quoteBalance)
+
 		// calculate the quantity automatically
 		if session.Margin || session.IsolatedMargin {
-			baseBalanceValue := baseBalance.Total().Mul(price)
-			accountValue := baseBalanceValue.Add(quoteBalance.Total())
+			baseBalanceValue := baseBalance.Net().Mul(price)
+			accountValue := baseBalanceValue.Add(quoteBalance.Net())
+
+			log.Infof("calculated account value %f %s", accountValue.Float64(), market.QuoteCurrency)
 
 			if session.IsolatedMargin {
 				originLeverage := leverage

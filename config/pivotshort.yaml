@@ -4,8 +4,8 @@ sessions:
     exchange: binance
     envVarPrefix: binance
     margin: true
-    # isolatedMargin: true
-    # isolatedMarginSymbol: ETHUSDT
+    isolatedMargin: true
+    isolatedMarginSymbol: ETHUSDT
 
 exchangeStrategies:
 - on: binance
@@ -19,6 +19,9 @@ exchangeStrategies:
     window: 200
 
     quantity: 10.0
+
+    # when quantity is not given, leverage will be used.
+    # leverage: 10.0
 
     # breakLow settings are used for shorting when the current price break the previous low
     breakLow:
