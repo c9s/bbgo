@@ -49,6 +49,10 @@ func (b Balance) Net() fixedpoint.Value {
 	return netAsset
 }
 
+func (b Balance) Debt() fixedpoint.Value {
+	return b.Borrowed.Add(b.Interest)
+}
+
 func (b Balance) ValueString() (o string) {
 	o = b.Available.String()
 
