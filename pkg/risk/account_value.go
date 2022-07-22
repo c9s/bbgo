@@ -115,78 +115,81 @@ func calculateAccountNetValue(session *bbgo.ExchangeSession) (fixedpoint.Value, 
 }
 
 func CalculateBaseQuantity(session *bbgo.ExchangeSession, market types.Market, price, quantity, leverage fixedpoint.Value) (fixedpoint.Value, error) {
+	// default leverage guard
 	if leverage.IsZero() {
 		leverage = fixedpoint.NewFromInt(3)
 	}
 
+	baseBalance, _ := session.Account.Balance(market.BaseCurrency)
+	quoteBalance, _ := session.Account.Balance(market.QuoteCurrency)
+
 	usingLeverage := session.Margin || session.IsolatedMargin || session.Futures || session.IsolatedFutures
-	if usingLeverage {
-		if !quantity.IsZero() {
-			return quantity, nil
-		}
-
-		// quantity is zero, we need to calculate the quantity
-		baseBalance, _ := session.Account.Balance(market.BaseCurrency)
-		quoteBalance, _ := session.Account.Balance(market.QuoteCurrency)
-
-		logrus.Infof("calculating leveraged quantity: base balance = %+v, quote balance = %+v", baseBalance, quoteBalance)
-
-		// calculate the quantity automatically
-		if session.Margin || session.IsolatedMargin {
-			baseBalanceValue := baseBalance.Net().Mul(price)
-			accountValue := baseBalanceValue.Add(quoteBalance.Net())
-
-			// avoid using all account value since there will be some trade loss for interests and the fee
-			accountValue = accountValue.Mul(one.Sub(fixedpoint.NewFromFloat(0.01)))
-
-			logrus.Infof("calculated account value %f %s", accountValue.Float64(), market.QuoteCurrency)
-
-			if session.IsolatedMargin {
-				originLeverage := leverage
-				leverage = fixedpoint.Min(leverage, maxLeverage)
-				logrus.Infof("using isolated margin, maxLeverage=10 originalLeverage=%f currentLeverage=%f",
-					originLeverage.Float64(),
-					leverage.Float64())
+	if !usingLeverage {
+		// For spot, we simply sell the base quoteCurrency
+		balance, hasBalance := session.Account.Balance(market.BaseCurrency)
+		if hasBalance {
+			if quantity.IsZero() {
+				logrus.Warnf("sell quantity is not set, using all available base balance: %v", balance)
+				if !balance.Available.IsZero() {
+					return balance.Available, nil
+				}
+			} else {
+				return fixedpoint.Min(quantity, balance.Available), nil
 			}
-
-			// spot margin use the equity value, so we use the total quote balance here
-			maxPosition := CalculateMaxPosition(price, accountValue, leverage)
-			debt := baseBalance.Debt()
-
-			logrus.Infof("margin leverage: calculated maxPosition=%f debt=%f price=%f accountValue=%f %s leverage=%f",
-				maxPosition.Float64(),
-				debt.Float64(),
-				price.Float64(),
-				accountValue.Float64(),
-				market.QuoteCurrency,
-				leverage.Float64())
-
-			return maxPosition.Sub(debt), nil
 		}
 
-		if session.Futures || session.IsolatedFutures {
-			// TODO: get mark price here
-			maxPositionQuantity := CalculateMaxPosition(price, quoteBalance.Available, leverage)
-			requiredPositionCost := CalculatePositionCost(price, price, maxPositionQuantity, leverage, types.SideTypeSell)
-			if quoteBalance.Available.Compare(requiredPositionCost) < 0 {
-				return maxPositionQuantity, fmt.Errorf("available margin %f %s is not enough, can not submit order", quoteBalance.Available.Float64(), market.QuoteCurrency)
-			}
-
-			return maxPositionQuantity, nil
-		}
+		return quantity, fmt.Errorf("quantity is zero, can not submit sell order, please check your quantity settings")
 	}
 
-	// For spot, we simply sell the base quoteCurrency
-	balance, hasBalance := session.Account.Balance(market.BaseCurrency)
-	if hasBalance {
-		if quantity.IsZero() {
-			logrus.Warnf("sell quantity is not set, submitting sell with all base balance: %s", balance.Available.String())
-			if !balance.Available.IsZero() {
-				return balance.Available, nil
-			}
-		} else {
-			return fixedpoint.Min(quantity, balance.Available), nil
+	// using leverage -- starts from here
+	if !quantity.IsZero() {
+		return quantity, nil
+	}
+
+	logrus.Infof("calculating available leveraged base quantity: base balance = %+v, quote balance = %+v", baseBalance, quoteBalance)
+
+	// calculate the quantity automatically
+	if session.Margin || session.IsolatedMargin {
+		baseBalanceValue := baseBalance.Net().Mul(price)
+		accountValue := baseBalanceValue.Add(quoteBalance.Net())
+
+		// avoid using all account value since there will be some trade loss for interests and the fee
+		accountValue = accountValue.Mul(one.Sub(fixedpoint.NewFromFloat(0.01)))
+
+		logrus.Infof("calculated account value %f %s", accountValue.Float64(), market.QuoteCurrency)
+
+		if session.IsolatedMargin {
+			originLeverage := leverage
+			leverage = fixedpoint.Min(leverage, maxLeverage)
+			logrus.Infof("using isolated margin, maxLeverage=10 originalLeverage=%f currentLeverage=%f",
+				originLeverage.Float64(),
+				leverage.Float64())
 		}
+
+		// spot margin use the equity value, so we use the total quote balance here
+		maxPosition := CalculateMaxPosition(price, accountValue, leverage)
+		debt := baseBalance.Debt()
+
+		logrus.Infof("margin leverage: calculated maxPosition=%f debt=%f price=%f accountValue=%f %s leverage=%f",
+			maxPosition.Float64(),
+			debt.Float64(),
+			price.Float64(),
+			accountValue.Float64(),
+			market.QuoteCurrency,
+			leverage.Float64())
+
+		return maxPosition.Sub(debt), nil
+	}
+
+	if session.Futures || session.IsolatedFutures {
+		// TODO: get mark price here
+		maxPositionQuantity := CalculateMaxPosition(price, quoteBalance.Available, leverage)
+		requiredPositionCost := CalculatePositionCost(price, price, maxPositionQuantity, leverage, types.SideTypeSell)
+		if quoteBalance.Available.Compare(requiredPositionCost) < 0 {
+			return maxPositionQuantity, fmt.Errorf("available margin %f %s is not enough, can not submit order", quoteBalance.Available.Float64(), market.QuoteCurrency)
+		}
+
+		return maxPositionQuantity, nil
 	}
 
 	return quantity, fmt.Errorf("quantity is zero, can not submit sell order, please check your settings")
