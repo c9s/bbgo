@@ -150,5 +150,9 @@ func TestNewAccountValueCalculator_MarginLevel(t *testing.T) {
 	ctx := context.Background()
 	marginLevel, err := cal.MarginLevel(ctx)
 	assert.NoError(t, err)
-	assert.Equal(t, "1.10195728", marginLevel.String()) // 21000 / 19000 * 1.003
+
+	// expected (21000 / 19000 * 1.003)
+	assert.Equal(t,
+		fixedpoint.NewFromFloat(21000.0).Div(fixedpoint.NewFromFloat(19000.0).Mul(fixedpoint.NewFromFloat(1.003))).FormatString(6),
+		marginLevel.FormatString(6))
 }
