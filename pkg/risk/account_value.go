@@ -103,7 +103,7 @@ func (c *AccountValueCalculator) NetValue(ctx context.Context) (fixedpoint.Value
 	return accountValue, nil
 }
 
-func calculateAccountNetValue(session *bbgo.ExchangeSession) (fixedpoint.Value, error) {
+func CalculateAccountNetValue(session *bbgo.ExchangeSession) (fixedpoint.Value, error) {
 	accountValue := fixedpoint.Zero
 	ctx := context.Background()
 	c := NewAccountValueCalculator(session, "USDT")
