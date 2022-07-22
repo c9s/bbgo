@@ -374,16 +374,18 @@ func useQuantityOrBaseBalance(session *bbgo.ExchangeSession, market types.Market
 			}
 
 			// spot margin use the equity value, so we use the total quote balance here
-			maxPositionQuantity := risk.CalculateMaxPosition(price, accountValue, leverage)
+			maxPosition := risk.CalculateMaxPosition(price, accountValue, leverage)
+			debt := baseBalance.Debt()
 
-			log.Infof("margin leverage: calculated maxPositionQuantity=%f price=%f accountValue=%f %s leverage=%f",
-				maxPositionQuantity.Float64(),
+			log.Infof("margin leverage: calculated maxPosition=%f debt=%f price=%f accountValue=%f %s leverage=%f",
+				maxPosition.Float64(),
+				debt.Float64(),
 				price.Float64(),
 				accountValue.Float64(),
 				market.QuoteCurrency,
 				leverage.Float64())
 
-			return maxPositionQuantity, nil
+			return maxPosition.Sub(debt), nil
 		}
 
 		if session.Futures || session.IsolatedFutures {
