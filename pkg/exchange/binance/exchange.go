@@ -125,6 +125,10 @@ func New(key, secret string) *Exchange {
 					ex.setServerTimeOffset(ctx)
 				}
 			}
+
+			if err = client2.SetTimeOffsetFromServer(context.Background()); err != nil {
+				log.WithError(err).Error("can not set server time")
+			}
 		})
 	}
 
