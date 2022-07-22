@@ -2,7 +2,6 @@ package pivotshort
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -107,7 +106,7 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 			s.Quantity.Float64(),
 			s.Leverage.Float64())
 
-		quantity, err := useQuantityOrBaseBalance(s.session, s.Market, s.lastLow, s.Quantity, s.Leverage)
+		quantity, err := risk.CalculateBaseQuantity(s.session, s.Market, s.lastLow, s.Quantity, s.Leverage)
 		if err != nil {
 			log.WithError(err).Errorf("quantity calculation error")
 		}
@@ -202,7 +201,7 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 		// graceful cancel all active orders
 		_ = orderExecutor.GracefulCancel(ctx)
 
-		quantity, err := useQuantityOrBaseBalance(s.session, s.Market, closePrice, s.Quantity, s.Leverage)
+		quantity, err := risk.CalculateBaseQuantity(s.session, s.Market, closePrice, s.Quantity, s.Leverage)
 		if err != nil {
 			log.WithError(err).Errorf("quantity calculation error")
 		}
@@ -239,79 +238,3 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 	}))
 }
 
-func useQuantityOrBaseBalance(session *bbgo.ExchangeSession, market types.Market, price, quantity, leverage fixedpoint.Value) (fixedpoint.Value, error) {
-	usingLeverage := session.Margin || session.IsolatedMargin || session.Futures || session.IsolatedFutures
-	if usingLeverage {
-		if !quantity.IsZero() {
-			return quantity, nil
-		}
-
-		if leverage.IsZero() {
-			leverage = fixedpoint.NewFromInt(3)
-		}
-
-		// quantity is zero, we need to calculate the quantity
-		baseBalance, _ := session.Account.Balance(market.BaseCurrency)
-		quoteBalance, _ := session.Account.Balance(market.QuoteCurrency)
-
-		log.Infof("calculating quantity: base balance = %+v, quote balance = %+v", baseBalance, quoteBalance)
-
-		// calculate the quantity automatically
-		if session.Margin || session.IsolatedMargin {
-			baseBalanceValue := baseBalance.Net().Mul(price)
-			accountValue := baseBalanceValue.Add(quoteBalance.Net())
-
-			// avoid using all account value since there will be some trade loss for interests and the fee
-			accountValue = accountValue.Mul(one.Sub(fixedpoint.NewFromFloat(0.01)))
-
-			log.Infof("calculated account value %f %s", accountValue.Float64(), market.QuoteCurrency)
-
-			if session.IsolatedMargin {
-				originLeverage := leverage
-				leverage = fixedpoint.Min(leverage, fixedpoint.NewFromInt(10)) // max leverage is 10
-				log.Infof("using isolated margin, maxLeverage=10 originalLeverage=%f currentLeverage=%f",
-					originLeverage.Float64(),
-					leverage.Float64())
-			}
-
-			// spot margin use the equity value, so we use the total quote balance here
-			maxPositionQuantity := risk.CalculateMaxPosition(price, accountValue, leverage)
-
-			log.Infof("margin leverage: calculated maxPositionQuantity=%f price=%f accountValue=%f %s leverage=%f",
-				maxPositionQuantity.Float64(),
-				price.Float64(),
-				accountValue.Float64(),
-				market.QuoteCurrency,
-				leverage.Float64())
-
-			return maxPositionQuantity, nil
-		}
-
-		if session.Futures || session.IsolatedFutures {
-			// TODO: get mark price here
-			maxPositionQuantity := risk.CalculateMaxPosition(price, quoteBalance.Available, leverage)
-			requiredPositionCost := risk.CalculatePositionCost(price, price, maxPositionQuantity, leverage, types.SideTypeSell)
-			if quoteBalance.Available.Compare(requiredPositionCost) < 0 {
-				return maxPositionQuantity, fmt.Errorf("available margin %f %s is not enough, can not submit order", quoteBalance.Available.Float64(), market.QuoteCurrency)
-			}
-
-			return maxPositionQuantity, nil
-		}
-
-	}
-
-	// For spot, we simply sell the base currency
-	balance, hasBalance := session.Account.Balance(market.BaseCurrency)
-	if hasBalance {
-		if quantity.IsZero() {
-			log.Warnf("sell quantity is not set, submitting sell with all base balance: %s", balance.Available.String())
-			if !balance.Available.IsZero() {
-				return balance.Available, nil
-			}
-		} else {
-			return fixedpoint.Min(quantity, balance.Available), nil
-		}
-	}
-
-	return quantity, fmt.Errorf("quantity is zero, can not submit sell order, please check your settings")
-}
