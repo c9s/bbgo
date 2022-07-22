@@ -140,6 +140,22 @@ func (c *AccountValueCalculator) NetValue(ctx context.Context) (fixedpoint.Value
 	return accountValue, nil
 }
 
+func (c *AccountValueCalculator) MarginLevel(ctx context.Context) (fixedpoint.Value, error) {
+	marginLevel := fixedpoint.Zero
+	marketValue, err := c.MarketValue(ctx)
+	if err != nil {
+		return marginLevel, err
+	}
+
+	debtValue, err := c.DebtValue(ctx)
+	if err != nil {
+		return marginLevel, err
+	}
+
+	marginLevel = marketValue.Div(debtValue)
+	return marginLevel, nil
+}
+
 func CalculateBaseQuantity(session *bbgo.ExchangeSession, market types.Market, price, quantity, leverage fixedpoint.Value) (fixedpoint.Value, error) {
 	// default leverage guard
 	if leverage.IsZero() {

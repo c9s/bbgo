@@ -111,3 +111,44 @@ func TestAccountValueCalculator_NetValue(t *testing.T) {
 		assert.Equal(t, "2000", netValue.String()) // 21000-19000
 	})
 }
+
+func TestNewAccountValueCalculator_MarginLevel(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	mockEx := mocks.NewMockExchange(mockCtrl)
+	// for market data stream and user data stream
+	mockEx.EXPECT().NewStream().Return(&types.StandardStream{}).Times(2)
+	mockEx.EXPECT().QueryTickers(gomock.Any(), []string{"BTCUSDT"}).Return(map[string]types.Ticker{
+		"BTCUSDT": newTestTicker(),
+	}, nil)
+
+	session := bbgo.NewExchangeSession("test", mockEx)
+	session.Account.UpdateBalances(types.BalanceMap{
+		"BTC": {
+			Currency:  "BTC",
+			Available: fixedpoint.Zero,
+			Locked:    fixedpoint.Zero,
+			Borrowed:  fixedpoint.NewFromFloat(1.0),
+			Interest:  fixedpoint.NewFromFloat(0.003),
+			NetAsset:  fixedpoint.Zero,
+		},
+		"USDT": {
+			Currency:  "USDT",
+			Available: fixedpoint.NewFromFloat(21000.0),
+			Locked:    fixedpoint.Zero,
+			Borrowed:  fixedpoint.Zero,
+			Interest:  fixedpoint.Zero,
+			NetAsset:  fixedpoint.Zero,
+		},
+	})
+	assert.NotNil(t, session)
+
+	cal := NewAccountValueCalculator(session, "USDT")
+	assert.NotNil(t, cal)
+
+	ctx := context.Background()
+	marginLevel, err := cal.MarginLevel(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, "1.10195728", marginLevel.String()) // 21000 / 19000 * 1.003
+}
