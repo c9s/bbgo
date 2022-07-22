@@ -140,6 +140,8 @@ func (c *AccountValueCalculator) NetValue(ctx context.Context) (fixedpoint.Value
 	return accountValue, nil
 }
 
+// MarginLevel calculates the margin level from the asset market value and the debt value
+// See https://www.binance.com/en/support/faq/360030493931
 func (c *AccountValueCalculator) MarginLevel(ctx context.Context) (fixedpoint.Value, error) {
 	marginLevel := fixedpoint.Zero
 	marketValue, err := c.MarketValue(ctx)
