@@ -38,6 +38,10 @@ func (c *AccountValueCalculator) UpdatePrices(ctx context.Context) error {
 	currencies := balances.Currencies()
 	var symbols []string
 	for _, currency := range currencies {
+		if currency == c.quoteCurrency {
+			continue
+		}
+
 		symbol := currency + c.quoteCurrency
 		symbols = append(symbols, symbol)
 	}
@@ -80,6 +84,34 @@ func (c *AccountValueCalculator) DebtValue(ctx context.Context) (fixedpoint.Valu
 	return debtValue, nil
 }
 
+func (c *AccountValueCalculator) MarketValue(ctx context.Context) (fixedpoint.Value, error) {
+	marketValue := fixedpoint.Zero
+
+	if len(c.prices) == 0 {
+		if err := c.UpdatePrices(ctx); err != nil {
+			return marketValue, err
+		}
+	}
+
+	balances := c.session.Account.Balances()
+	for _, b := range balances {
+		if b.Currency == c.quoteCurrency {
+			marketValue = marketValue.Add(b.Total())
+			continue
+		}
+
+		symbol := b.Currency + c.quoteCurrency
+		price, ok := c.prices[symbol]
+		if !ok {
+			continue
+		}
+
+		marketValue = marketValue.Add(b.Total().Mul(price))
+	}
+
+	return marketValue, nil
+}
+
 func (c *AccountValueCalculator) NetValue(ctx context.Context) (fixedpoint.Value, error) {
 	accountValue := fixedpoint.Zero
 
@@ -91,6 +123,11 @@ func (c *AccountValueCalculator) NetValue(ctx context.Context) (fixedpoint.Value
 
 	balances := c.session.Account.Balances()
 	for _, b := range balances {
+		if b.Currency == c.quoteCurrency {
+			accountValue = accountValue.Add(b.Net())
+			continue
+		}
+
 		symbol := b.Currency + c.quoteCurrency
 		price, ok := c.prices[symbol]
 		if !ok {
@@ -103,15 +140,22 @@ func (c *AccountValueCalculator) NetValue(ctx context.Context) (fixedpoint.Value
 	return accountValue, nil
 }
 
-func calculateAccountNetValue(session *bbgo.ExchangeSession) (fixedpoint.Value, error) {
-	accountValue := fixedpoint.Zero
-	ctx := context.Background()
-	c := NewAccountValueCalculator(session, "USDT")
-	if err := c.UpdatePrices(ctx); err != nil {
-		return accountValue, err
+// MarginLevel calculates the margin level from the asset market value and the debt value
+// See https://www.binance.com/en/support/faq/360030493931
+func (c *AccountValueCalculator) MarginLevel(ctx context.Context) (fixedpoint.Value, error) {
+	marginLevel := fixedpoint.Zero
+	marketValue, err := c.MarketValue(ctx)
+	if err != nil {
+		return marginLevel, err
 	}
 
-	return c.NetValue(ctx)
+	debtValue, err := c.DebtValue(ctx)
+	if err != nil {
+		return marginLevel, err
+	}
+
+	marginLevel = marketValue.Div(debtValue)
+	return marginLevel, nil
 }
 
 func CalculateBaseQuantity(session *bbgo.ExchangeSession, market types.Market, price, quantity, leverage fixedpoint.Value) (fixedpoint.Value, error) {
