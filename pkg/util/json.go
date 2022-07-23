@@ -6,7 +6,7 @@ import (
 )
 
 func WriteJsonFile(p string, obj interface{}) error {
-	out, err := json.MarshalIndent(obj, "", "  ")
+	out, err := json.Marshal(obj)
 	if err != nil {
 		return err
 	}
