@@ -298,6 +298,7 @@ func (s *Strategy) InitTickerFunctions(ctx context.Context) {
 
 			// for trailing stoploss during the realtime
 			if s.NoTrailingStopLoss {
+				s.lock.Unlock()
 				return
 			}
 			atr = s.atr.Last()
@@ -563,6 +564,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		if !kline.Closed {
 			return
+		}
+		if !s.IsBackTesting() {
+			balances := s.Session.GetAccount().Balances()
+			// Notify will parse args to strings and process separately
+			bbgo.Notify("balances: [Base] %s [Quote] %s kline: %s", balances[s.Market.BaseCurrency].String(), balances[s.Market.QuoteCurrency].String(), kline.String())
 		}
 		if kline.Interval == types.Interval1m {
 			if s.NoTrailingStopLoss || !s.IsBackTesting() {
