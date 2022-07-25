@@ -72,7 +72,7 @@ func (s *ResistanceShort) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 }
 
 func tail(arr []float64, length int) []float64 {
-	if len(arr) < length {
+	if len(arr) == 0 || len(arr) < length {
 		return arr
 	}
 
