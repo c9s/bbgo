@@ -39,9 +39,9 @@ exchangeStrategies:
     interval: 5m
 
     # ATR window used by Supertrend
-    window: 49
+    window: 39
     # ATR Multiplier for calculating super trend prices, the higher, the stronger the trends are
-    supertrendMultiplier: 4
+    supertrendMultiplier: 4.1
 
     # leverage is the leverage of the orders
     leverage: 1.0
@@ -73,8 +73,34 @@ exchangeStrategies:
     exits:
       # roiStopLoss is the stop loss percentage of the position ROI (currently the price change)
       - roiStopLoss:
-          percentage: 4%
+          percentage: 4.5%
       - protectiveStopLoss:
           activationRatio: 3%
           stopLossRatio: 2%
+          placeStopOrder: false
+      - trailingStop:
+          callbackRate: 3%
+          #activationRatio: 20%
+          minProfit: 10%
+          interval: 1m
+          side: buy
+          closePosition: 100%
+      - trailingStop:
+          callbackRate: 3%
+          #activationRatio: 20%
+          minProfit: 10%
+          interval: 1m
+          side: sell
+          closePosition: 100%
+      - protectiveStopLoss:
+          activationRatio: 4%
+          stopLossRatio: 2%
+          placeStopOrder: false
+      - protectiveStopLoss:
+          activationRatio: 6%
+          stopLossRatio: 3%
+          placeStopOrder: false
+      - protectiveStopLoss:
+          activationRatio: 10%
+          stopLossRatio: 8%
           placeStopOrder: false
