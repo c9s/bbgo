@@ -157,6 +157,7 @@ func (p *Position) NewMarketCloseOrder(percentage fixedpoint.Value) *SubmitOrder
 		Type:     OrderTypeMarket,
 		Side:     side,
 		Quantity: quantity,
+		MarginSideEffect: SideEffectTypeAutoRepay,
 	}
 }
 
