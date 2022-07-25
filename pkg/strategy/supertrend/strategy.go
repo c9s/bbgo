@@ -113,6 +113,8 @@ func (s *Strategy) Validate() error {
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.LinearRegression.Interval})
+
+	s.ExitMethods.SetAndSubscribe(session, s)
 }
 
 // Position control
