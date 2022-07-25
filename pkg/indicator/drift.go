@@ -47,6 +47,27 @@ func (inc *Drift) Update(value float64) {
 	}
 }
 
+// Assume that MA is SMA
+func (inc *Drift) ZeroPoint() float64 {
+	window := float64(inc.Window)
+	stdev := types.Stdev(inc.chng, inc.Window)
+	chng := inc.chng.Index(inc.Window - 1)
+	/*b := -2 * inc.MA.Last() - 2
+	c := window * stdev * stdev - chng * chng + 2 * chng * (inc.MA.Last() + 1) - 2 * inc.MA.Last() * window
+
+	root := math.Sqrt(b*b - 4*c)
+	K1 := (-b + root)/2
+	K2 := (-b - root)/2
+	N1 := math.Exp(K1) * inc.LastValue
+	N2 := math.Exp(K2) * inc.LastValue
+	if math.Abs(inc.LastValue-N1) < math.Abs(inc.LastValue-N2) {
+		return N1
+	} else {
+		return N2
+	}*/
+	return inc.LastValue * math.Exp(window*(0.5*stdev*stdev)+chng-inc.MA.Last()*window)
+}
+
 func (inc *Drift) Clone() (out *Drift) {
 	out = &Drift{
 		IntervalWindow: inc.IntervalWindow,
