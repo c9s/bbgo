@@ -55,7 +55,9 @@ func (set *StandardIndicatorSet) BOLL(iw types.IntervalWindow, bandWidth float64
 		inc = &indicator.BOLL{IntervalWindow: iw, K: bandWidth}
 
 		if klines, ok := set.store.KLinesOfInterval(iw.Interval); ok {
-			inc.LoadK(*klines)
+			for _, k := range *klines {
+				inc.PushK(k)
+			}
 		}
 
 		if debugBOLL {
@@ -78,7 +80,9 @@ func (set *StandardIndicatorSet) SMA(iw types.IntervalWindow) *indicator.SMA {
 		inc = &indicator.SMA{IntervalWindow: iw}
 
 		if klines, ok := set.store.KLinesOfInterval(iw.Interval); ok {
-			inc.LoadK(*klines)
+			for _, k := range *klines {
+				inc.PushK(k)
+			}
 		}
 
 		if debugSMA {
@@ -101,7 +105,9 @@ func (set *StandardIndicatorSet) EWMA(iw types.IntervalWindow) *indicator.EWMA {
 		inc = &indicator.EWMA{IntervalWindow: iw}
 
 		if klines, ok := set.store.KLinesOfInterval(iw.Interval); ok {
-			inc.LoadK(*klines)
+			for _, k := range *klines {
+				inc.PushK(k)
+			}
 		}
 
 		if debugEWMA {
@@ -123,7 +129,9 @@ func (set *StandardIndicatorSet) STOCH(iw types.IntervalWindow) *indicator.STOCH
 		inc = &indicator.STOCH{IntervalWindow: iw}
 
 		if klines, ok := set.store.KLinesOfInterval(iw.Interval); ok {
-			inc.LoadK(*klines)
+			for _, k := range *klines {
+				inc.PushK(k)
+			}
 		}
 
 		inc.BindK(set.stream, set.Symbol, iw.Interval)

@@ -58,31 +58,6 @@ func (inc *EWMA) Length() int {
 	return len(inc.Values)
 }
 
-func (inc *EWMA) CalculateAndUpdate(allKLines []types.KLine) {
-	if len(inc.Values) == 0 {
-		for _, k := range allKLines {
-			inc.PushK(k)
-		}
-		inc.EmitUpdate(inc.Last())
-	} else {
-		k := allKLines[len(allKLines)-1]
-		inc.PushK(k)
-		inc.EmitUpdate(inc.Last())
-	}
-}
-
-func (inc *EWMA) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
-	if inc.Interval != interval {
-		return
-	}
-
-	inc.CalculateAndUpdate(window)
-}
-
-func (inc *EWMA) Bind(updater KLineWindowUpdater) {
-	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
-}
-
 func (inc *EWMA) BindK(target KLineClosedEmitter, symbol string, interval types.Interval) {
 	target.OnKLineClosed(types.KLineWith(symbol, interval, inc.PushK))
 }
