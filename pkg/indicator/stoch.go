@@ -69,16 +69,6 @@ func (inc *STOCH) PushK(k types.KLine) {
 	inc.EmitUpdate(inc.LastK(), inc.LastD())
 }
 
-func (inc *STOCH) BindK(target KLineClosedEmitter, symbol string, interval types.Interval) {
-	target.OnKLineClosed(types.KLineWith(symbol, interval, inc.PushK))
-}
-
-func (inc *STOCH) LoadK(allKLines []types.KLine) {
-	for _, k := range allKLines {
-		inc.PushK(k)
-	}
-}
-
 func (inc *STOCH) GetD() types.Series {
 	return &inc.D
 }

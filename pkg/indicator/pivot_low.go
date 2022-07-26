@@ -53,6 +53,7 @@ func (inc *PivotLow) PushK(k types.KLine) {
 	inc.EmitUpdate(inc.Last())
 }
 
+
 func calculatePivotLow(lows types.Float64Slice, window int) (float64, error) {
 	length := len(lows)
 	if length == 0 || length < window {
