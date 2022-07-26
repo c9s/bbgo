@@ -979,3 +979,26 @@ func (e *Exchange) DefaultFeeRates() types.ExchangeFee {
 		TakerFeeRate: fixedpoint.NewFromFloat(0.01 * 0.150), // 0.15%
 	}
 }
+
+var SupportedIntervals = map[types.Interval]int{
+	types.Interval1m:  1,
+	types.Interval5m:  5,
+	types.Interval15m: 15,
+	types.Interval30m: 30,
+	types.Interval1h:  60,
+	types.Interval2h:  60 * 2,
+	types.Interval4h:  60 * 4,
+	types.Interval6h:  60 * 6,
+	types.Interval12h: 60 * 12,
+	types.Interval1d:  60 * 24,
+	types.Interval3d:  60 * 24 * 3,
+}
+
+func (e *Exchange) SupportedInterval() map[types.Interval]int {
+	return SupportedIntervals
+}
+
+func (e *Exchange) IsSupportedInterval(interval types.Interval) bool {
+	_, ok := SupportedIntervals[interval]
+	return ok
+}
