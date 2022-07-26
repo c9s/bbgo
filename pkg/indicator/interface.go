@@ -22,10 +22,11 @@ type KLinePusher interface {
 	PushK(k types.KLine)
 }
 
-// KLineLoader provides an interface for API user to load history klines to the indicator.
-// The indicator implements its own way to calculate the values from the given history kline array.
-type KLineLoader interface {
-	LoadK(allKLines []types.KLine)
+// Simple is the simple indicator that only returns one float64 value
+type Simple interface {
+	KLinePusher
+	Last() float64
+	OnUpdate(f func(value float64))
 }
 
 type KLineCalculateUpdater interface {

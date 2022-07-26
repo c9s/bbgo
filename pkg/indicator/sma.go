@@ -76,28 +76,6 @@ func (inc *SMA) LoadK(allKLines []types.KLine) {
 	}
 }
 
-func (inc *SMA) CalculateAndUpdate(allKLines []types.KLine) {
-	if inc.rawValues == nil {
-		inc.LoadK(allKLines)
-	} else {
-		var last = allKLines[len(allKLines)-1]
-		inc.PushK(last)
-	}
-
-}
-
-func (inc *SMA) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
-	if inc.Interval != interval {
-		return
-	}
-
-	inc.CalculateAndUpdate(window)
-}
-
-func (inc *SMA) Bind(updater KLineWindowUpdater) {
-	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
-}
-
 func calculateSMA(kLines []types.KLine, window int, priceF KLinePriceMapper) (float64, error) {
 	length := len(kLines)
 	if length == 0 || length < window {

@@ -9,27 +9,23 @@ import (
 )
 
 var (
-	debugEWMA = false
-	debugSMA  = false
 	debugBOLL = false
 )
 
 func init() {
 	// when using --dotenv option, the dotenv is loaded from command.PersistentPreRunE, not init.
 	// hence here the env var won't enable the debug flag
-	util.SetEnvVarBool("DEBUG_EWMA", &debugEWMA)
-	util.SetEnvVarBool("DEBUG_SMA", &debugSMA)
 	util.SetEnvVarBool("DEBUG_BOLL", &debugBOLL)
 }
 
 type StandardIndicatorSet struct {
 	Symbol string
+
 	// Standard indicators
 	// interval -> window
-	sma   map[types.IntervalWindow]*indicator.SMA
-	ewma  map[types.IntervalWindow]*indicator.EWMA
-	boll  map[types.IntervalWindowBandWidth]*indicator.BOLL
-	stoch map[types.IntervalWindow]*indicator.STOCH
+	boll    map[types.IntervalWindowBandWidth]*indicator.BOLL
+	stoch   map[types.IntervalWindow]*indicator.STOCH
+	simples map[types.IntervalWindow]indicator.Simple
 
 	stream types.Stream
 	store  *MarketDataStore
@@ -37,97 +33,105 @@ type StandardIndicatorSet struct {
 
 func NewStandardIndicatorSet(symbol string, stream types.Stream, store *MarketDataStore) *StandardIndicatorSet {
 	return &StandardIndicatorSet{
-		Symbol: symbol,
-		sma:    make(map[types.IntervalWindow]*indicator.SMA),
-		ewma:   make(map[types.IntervalWindow]*indicator.EWMA),
-		boll:   make(map[types.IntervalWindowBandWidth]*indicator.BOLL),
-		stoch:  make(map[types.IntervalWindow]*indicator.STOCH),
-		store:  store,
-		stream: stream,
+		Symbol:  symbol,
+		store:   store,
+		stream:  stream,
+		simples: make(map[types.IntervalWindow]indicator.Simple),
+
+		boll:  make(map[types.IntervalWindowBandWidth]*indicator.BOLL),
+		stoch: make(map[types.IntervalWindow]*indicator.STOCH),
 	}
+}
+
+func (s *StandardIndicatorSet) initAndBind(inc indicator.KLinePusher, iw types.IntervalWindow) {
+	if klines, ok := s.store.KLinesOfInterval(iw.Interval); ok {
+		for _, k := range *klines {
+			inc.PushK(k)
+		}
+	}
+
+	s.stream.OnKLineClosed(types.KLineWith(s.Symbol, iw.Interval, inc.PushK))
+}
+
+func (s *StandardIndicatorSet) allocateSimpleIndicator(t indicator.Simple, iw types.IntervalWindow) indicator.Simple {
+	inc, ok := s.simples[iw]
+	if ok {
+		return inc
+	}
+
+	inc = t
+	s.initAndBind(inc, iw)
+	s.simples[iw] = inc
+	return t
+}
+
+// SMA is a helper function that returns the simple moving average indicator of the given interval and the window size.
+func (s *StandardIndicatorSet) SMA(iw types.IntervalWindow) *indicator.SMA {
+	inc := s.allocateSimpleIndicator(&indicator.SMA{IntervalWindow: iw}, iw)
+	return inc.(*indicator.SMA)
+}
+
+// EWMA is a helper function that returns the exponential weighed moving average indicator of the given interval and the window size.
+func (s *StandardIndicatorSet) EWMA(iw types.IntervalWindow) *indicator.EWMA {
+	inc := s.allocateSimpleIndicator(&indicator.EWMA{IntervalWindow: iw}, iw)
+	return inc.(*indicator.EWMA)
+}
+
+func (s *StandardIndicatorSet) PivotLow(iw types.IntervalWindow) *indicator.PivotLow {
+	inc := s.allocateSimpleIndicator(&indicator.PivotLow{IntervalWindow: iw}, iw)
+	return inc.(*indicator.PivotLow)
+}
+
+func (s *StandardIndicatorSet) ATR(iw types.IntervalWindow) *indicator.ATR {
+	inc := s.allocateSimpleIndicator(&indicator.ATR{IntervalWindow: iw}, iw)
+	return inc.(*indicator.ATR)
+}
+
+func (s *StandardIndicatorSet) ATRP(iw types.IntervalWindow) *indicator.ATRP {
+	inc := s.allocateSimpleIndicator(&indicator.ATRP{IntervalWindow: iw}, iw)
+	return inc.(*indicator.ATRP)
+}
+
+func (s *StandardIndicatorSet) EMV(iw types.IntervalWindow) *indicator.EMV {
+	inc := s.allocateSimpleIndicator(&indicator.EMV{IntervalWindow: iw}, iw)
+	return inc.(*indicator.EMV)
+}
+
+func (s *StandardIndicatorSet) CCI(iw types.IntervalWindow) *indicator.CCI {
+	inc := s.allocateSimpleIndicator(&indicator.CCI{IntervalWindow: iw}, iw)
+	return inc.(*indicator.CCI)
+}
+
+func (s *StandardIndicatorSet) HULL(iw types.IntervalWindow) *indicator.HULL {
+	inc := s.allocateSimpleIndicator(&indicator.HULL{IntervalWindow: iw}, iw)
+	return inc.(*indicator.HULL)
+}
+
+func (s *StandardIndicatorSet) STOCH(iw types.IntervalWindow) *indicator.STOCH {
+	inc, ok := s.stoch[iw]
+	if !ok {
+		inc = &indicator.STOCH{IntervalWindow: iw}
+		s.initAndBind(inc, iw)
+		s.stoch[iw] = inc
+	}
+
+	return inc
 }
 
 // BOLL returns the bollinger band indicator of the given interval, the window and bandwidth
-func (set *StandardIndicatorSet) BOLL(iw types.IntervalWindow, bandWidth float64) *indicator.BOLL {
+func (s *StandardIndicatorSet) BOLL(iw types.IntervalWindow, bandWidth float64) *indicator.BOLL {
 	iwb := types.IntervalWindowBandWidth{IntervalWindow: iw, BandWidth: bandWidth}
-	inc, ok := set.boll[iwb]
+	inc, ok := s.boll[iwb]
 	if !ok {
 		inc = &indicator.BOLL{IntervalWindow: iw, K: bandWidth}
-
-		if klines, ok := set.store.KLinesOfInterval(iw.Interval); ok {
-			inc.LoadK(*klines)
-		}
+		s.initAndBind(inc, iw)
 
 		if debugBOLL {
 			inc.OnUpdate(func(sma float64, upBand float64, downBand float64) {
-				logrus.Infof("%s BOLL %s: sma=%f up=%f down=%f", set.Symbol, iw.String(), sma, upBand, downBand)
+				logrus.Infof("%s BOLL %s: sma=%f up=%f down=%f", s.Symbol, iw.String(), sma, upBand, downBand)
 			})
 		}
-
-		inc.BindK(set.stream, set.Symbol, iw.Interval)
-		set.boll[iwb] = inc
-	}
-
-	return inc
-}
-
-// SMA returns the simple moving average indicator of the given interval and the window size.
-func (set *StandardIndicatorSet) SMA(iw types.IntervalWindow) *indicator.SMA {
-	inc, ok := set.sma[iw]
-	if !ok {
-		inc = &indicator.SMA{IntervalWindow: iw}
-
-		if klines, ok := set.store.KLinesOfInterval(iw.Interval); ok {
-			inc.LoadK(*klines)
-		}
-
-		if debugSMA {
-			inc.OnUpdate(func(value float64) {
-				logrus.Infof("%s SMA %s: %f", set.Symbol, iw.String(), value)
-			})
-		}
-
-		inc.BindK(set.stream, set.Symbol, iw.Interval)
-		set.sma[iw] = inc
-	}
-
-	return inc
-}
-
-// EWMA returns the exponential weighed moving average indicator of the given interval and the window size.
-func (set *StandardIndicatorSet) EWMA(iw types.IntervalWindow) *indicator.EWMA {
-	inc, ok := set.ewma[iw]
-	if !ok {
-		inc = &indicator.EWMA{IntervalWindow: iw}
-
-		if klines, ok := set.store.KLinesOfInterval(iw.Interval); ok {
-			inc.LoadK(*klines)
-		}
-
-		if debugEWMA {
-			inc.OnUpdate(func(value float64) {
-				logrus.Infof("%s EWMA %s: value=%f", set.Symbol, iw.String(), value)
-			})
-		}
-
-		inc.BindK(set.stream, set.Symbol, iw.Interval)
-		set.ewma[iw] = inc
-	}
-
-	return inc
-}
-
-func (set *StandardIndicatorSet) STOCH(iw types.IntervalWindow) *indicator.STOCH {
-	inc, ok := set.stoch[iw]
-	if !ok {
-		inc = &indicator.STOCH{IntervalWindow: iw}
-
-		if klines, ok := set.store.KLinesOfInterval(iw.Interval); ok {
-			inc.LoadK(*klines)
-		}
-
-		inc.BindK(set.stream, set.Symbol, iw.Interval)
-		set.stoch[iw] = inc
+		s.boll[iwb] = inc
 	}
 
 	return inc
