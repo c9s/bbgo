@@ -531,13 +531,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 	})
 
-	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
 		// StrategyController
 		if s.Status != types.StrategyStatusRunning {
-			return
-		}
-
-		if kline.Symbol != s.Symbol || kline.Interval != s.Interval {
 			return
 		}
 
@@ -570,7 +566,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		} else {
 			s.placeOrders(ctx, kline.Close, &kline)
 		}
-	})
+	}))
 
 	// s.book = types.NewStreamBook(s.Symbol)
 	// s.book.BindStreamForBackground(session.MarketDataStream)
