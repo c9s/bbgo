@@ -313,14 +313,6 @@ func (s *ProfitStats) SlackAttachment() slack.Attachment {
 		})
 	}
 
-	if !s.TodayGrossProfit.IsZero() {
-		fields = append(fields, slack.AttachmentField{
-			Title: "Profit Today",
-			Value: pnlSignString(s.TodayGrossProfit) + " " + s.QuoteCurrency,
-			Short: true,
-		})
-	}
-
 	if !s.TodayNetProfit.IsZero() {
 		fields = append(fields, slack.AttachmentField{
 			Title: "Net Profit Today",
@@ -329,9 +321,17 @@ func (s *ProfitStats) SlackAttachment() slack.Attachment {
 		})
 	}
 
+	if !s.TodayGrossProfit.IsZero() {
+		fields = append(fields, slack.AttachmentField{
+			Title: "Gross Profit Today",
+			Value: pnlSignString(s.TodayGrossProfit) + " " + s.QuoteCurrency,
+			Short: true,
+		})
+	}
+
 	if !s.TodayGrossLoss.IsZero() {
 		fields = append(fields, slack.AttachmentField{
-			Title: "Loss Today",
+			Title: "Gross Loss Today",
 			Value: pnlSignString(s.TodayGrossLoss) + " " + s.QuoteCurrency,
 			Short: true,
 		})
@@ -346,8 +346,15 @@ func (s *ProfitStats) SlackAttachment() slack.Attachment {
 
 	if !s.AccumulatedGrossProfit.IsZero() {
 		fields = append(fields, slack.AttachmentField{
-			Title: "Accumulated Profit",
+			Title: "Accumulated Gross Profit",
 			Value: pnlSignString(s.AccumulatedGrossProfit) + " " + s.QuoteCurrency,
+		})
+	}
+
+	if !s.AccumulatedGrossLoss.IsZero() {
+		fields = append(fields, slack.AttachmentField{
+			Title: "Accumulated Gross Loss",
+			Value: pnlSignString(s.AccumulatedGrossLoss) + " " + s.QuoteCurrency,
 		})
 	}
 
@@ -355,13 +362,6 @@ func (s *ProfitStats) SlackAttachment() slack.Attachment {
 		fields = append(fields, slack.AttachmentField{
 			Title: "Accumulated Net Profit",
 			Value: pnlSignString(s.AccumulatedNetProfit) + " " + s.QuoteCurrency,
-		})
-	}
-
-	if !s.AccumulatedGrossLoss.IsZero() {
-		fields = append(fields, slack.AttachmentField{
-			Title: "Accumulated Loss",
-			Value: pnlSignString(s.AccumulatedGrossLoss) + " " + s.QuoteCurrency,
 		})
 	}
 
