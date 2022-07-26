@@ -125,30 +125,7 @@ func New(key, secret string) *Exchange {
 					ex.setServerTimeOffset(ctx)
 				}
 			}
-
-			if err = client2.SetTimeOffsetFromServer(context.Background()); err != nil {
-				log.WithError(err).Error("can not set server time")
-			}
 		})
-		go func() {
-			ticker := time.NewTicker(time.Hour)
-			defer ticker.Stop()
-			for _ = range ticker.C {
-				_, err = client.NewSetServerTimeService().Do(context.Background())
-				if err != nil {
-					log.WithError(err).Error("can not set server time")
-				}
-
-				_, err = futuresClient.NewSetServerTimeService().Do(context.Background())
-				if err != nil {
-					log.WithError(err).Error("can not set server time")
-				}
-
-				if err = client2.SetTimeOffsetFromServer(context.Background()); err != nil {
-					log.WithError(err).Error("can not set server time")
-				}
-			}
-		}()
 	}
 
 	return ex
