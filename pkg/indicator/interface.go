@@ -22,6 +22,13 @@ type KLinePusher interface {
 	PushK(k types.KLine)
 }
 
+// Simple is the simple indicator that only returns one float64 value
+type Simple interface {
+	KLinePusher
+	Last() float64
+	OnUpdate(f func(value float64))
+}
+
 type KLineCalculateUpdater interface {
 	CalculateAndUpdate(allKLines []types.KLine)
 }
