@@ -41,7 +41,9 @@ func Test_calculateMACD(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			iw := types.IntervalWindow{Window: 9}
 			macd := MACD{IntervalWindow: iw, ShortPeriod: 12, LongPeriod: 26}
-			macd.CalculateAndUpdate(tt.kLines)
+			for _, k := range tt.kLines {
+				macd.PushK(k)
+			}
 
 			got := macd.Last()
 			diff := math.Trunc((got-tt.want)*100) / 100
