@@ -292,7 +292,7 @@ func (trader *Trader) injectFields() error {
 					return fmt.Errorf("market of symbol %s not found", symbol)
 				}
 
-				indicatorSet, ok := session.StandardIndicatorSet(symbol)
+				indicatorSet := session.StandardIndicatorSet(symbol)
 				if !ok {
 					return fmt.Errorf("standardIndicatorSet of symbol %s not found", symbol)
 				}

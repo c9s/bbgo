@@ -27,7 +27,7 @@ func (s *LowerShadowTakeProfit) Bind(session *ExchangeSession, orderExecutor *Ge
 	s.session = session
 	s.orderExecutor = orderExecutor
 
-	stdIndicatorSet, _ := session.StandardIndicatorSet(s.Symbol)
+	stdIndicatorSet := session.StandardIndicatorSet(s.Symbol)
 	ewma := stdIndicatorSet.EWMA(s.IntervalWindow)
 
 

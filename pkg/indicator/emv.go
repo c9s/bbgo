@@ -11,6 +11,7 @@ import (
 type EMV struct {
 	types.SeriesBase
 	types.IntervalWindow
+
 	prevH    float64
 	prevL    float64
 	Values   *SMA
@@ -25,6 +26,7 @@ func (inc *EMV) Update(high, low, vol float64) {
 	if inc.EMVScale == 0 {
 		inc.EMVScale = DefaultEMVScale
 	}
+
 	if inc.prevH == 0 || inc.Values == nil {
 		inc.SeriesBase.Series = inc
 		inc.prevH = high
@@ -32,6 +34,7 @@ func (inc *EMV) Update(high, low, vol float64) {
 		inc.Values = &SMA{IntervalWindow: inc.IntervalWindow}
 		return
 	}
+
 	distanceMoved := (high+low)/2. - (inc.prevH+inc.prevL)/2.
 	boxRatio := vol / inc.EMVScale / (high - low)
 	result := distanceMoved / boxRatio
@@ -65,30 +68,4 @@ var _ types.SeriesExtend = &EMV{}
 
 func (inc *EMV) PushK(k types.KLine) {
 	inc.Update(k.High.Float64(), k.Low.Float64(), k.Volume.Float64())
-}
-
-func (inc *EMV) CalculateAndUpdate(allKLines []types.KLine) {
-	if inc.Values == nil {
-		for _, k := range allKLines {
-			inc.PushK(k)
-			if inc.Length() > 0 {
-				inc.EmitUpdate(inc.Last())
-			}
-		}
-	} else {
-		k := allKLines[len(allKLines)-1]
-		inc.PushK(k)
-		inc.EmitUpdate(inc.Last())
-	}
-}
-
-func (inc *EMV) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
-	if inc.Interval != interval {
-		return
-	}
-	inc.CalculateAndUpdate(window)
-}
-
-func (inc *EMV) Bind(updater KLineWindowUpdater) {
-	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }

@@ -25,7 +25,6 @@ func init() {
 }
 
 type Strategy struct {
-
 	SourceExchangeName string `json:"sourceExchange"`
 
 	TargetExchangeName string `json:"targetExchange"`
@@ -175,11 +174,7 @@ func (s *Strategy) handleOrderUpdate(order types.Order) {
 }
 
 func (s *Strategy) loadIndicator(sourceSession *bbgo.ExchangeSession) (types.Float64Indicator, error) {
-	var standardIndicatorSet, ok = sourceSession.StandardIndicatorSet(s.Symbol)
-	if !ok {
-		return nil, fmt.Errorf("standardIndicatorSet is nil, symbol %s", s.Symbol)
-	}
-
+	var standardIndicatorSet = sourceSession.StandardIndicatorSet(s.Symbol)
 	var iw = types.IntervalWindow{Interval: s.MovingAverageInterval, Window: s.MovingAverageWindow}
 
 	switch strings.ToUpper(s.MovingAverageType) {
