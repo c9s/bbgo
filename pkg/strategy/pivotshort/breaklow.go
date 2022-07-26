@@ -35,12 +35,13 @@ type BreakLow struct {
 	// limit sell price = breakLowPrice * (1 + BounceRatio)
 	BounceRatio fixedpoint.Value `json:"bounceRatio"`
 
-	Leverage     fixedpoint.Value      `json:"leverage"`
-	Quantity     fixedpoint.Value      `json:"quantity"`
-	StopEMARange fixedpoint.Value      `json:"stopEMARange"`
-	StopEMA      *types.IntervalWindow `json:"stopEMA"`
+	Leverage fixedpoint.Value `json:"leverage"`
+	Quantity fixedpoint.Value `json:"quantity"`
 
-	TrendEMA *types.IntervalWindow `json:"trendEMA"`
+	StopEMA *StopEMA `json:"stopEMA"`
+
+	TrendEMA *TrendEMA `json:"trendEMA"`
+
 
 	lastLow  fixedpoint.Value
 	pivot    *indicator.PivotLow
@@ -81,11 +82,11 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 	s.pivot = standardIndicator.PivotLow(s.IntervalWindow)
 
 	if s.StopEMA != nil {
-		s.stopEWMA = standardIndicator.EWMA(*s.StopEMA)
+		s.stopEWMA = standardIndicator.EWMA(s.StopEMA.IntervalWindow)
 	}
 
 	if s.TrendEMA != nil {
-		s.trendEWMA = standardIndicator.EWMA(*s.TrendEMA)
+		s.trendEWMA = standardIndicator.EWMA(s.TrendEMA.IntervalWindow)
 
 		session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.TrendEMA.Interval, func(kline types.KLine) {
 			s.trendEWMALast = s.trendEWMACurrent
@@ -202,9 +203,9 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 				return
 			}
 
-			emaStopShortPrice := ema.Mul(fixedpoint.One.Sub(s.StopEMARange))
+			emaStopShortPrice := ema.Mul(fixedpoint.One.Sub(s.StopEMA.Range))
 			if closePrice.Compare(emaStopShortPrice) < 0 {
-				log.Infof("stopEMA protection: close price %f < EMA(%v) = %f", closePrice.Float64(), s.StopEMA, ema.Float64())
+				log.Infof("stopEMA protection: close price %f < EMA(%v %f) * (1 - RANGE %f) = %f", closePrice.Float64(), s.StopEMA, ema.Float64(), s.StopEMA.Range.Float64(), emaStopShortPrice.Float64())
 				return
 			}
 		}
