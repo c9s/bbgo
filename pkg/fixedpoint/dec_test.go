@@ -3,6 +3,7 @@ package fixedpoint
 import (
 	"encoding/json"
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/yaml.v3"
 	"math/big"
 	"testing"
 )
@@ -175,6 +176,46 @@ func TestJson(t *testing.T) {
 	_ = json.Unmarshal([]byte("6e-8"), &p)
 	_ = json.Unmarshal([]byte("0.000062"), &q)
 	assert.Equal(t, "0.00006194", q.Sub(p).String())
+
+}
+
+func TestYaml(t *testing.T) {
+	p := MustNewFromString("0")
+	e, err := yaml.Marshal(p)
+	assert.NoError(t, err)
+	assert.Equal(t, "\"0.00000000\"\n", string(e))
+	p = MustNewFromString("1.00000003")
+	e, err = yaml.Marshal(p)
+	assert.NoError(t, err)
+	assert.Equal(t, "\"1.00000003\"\n", string(e))
+	p = MustNewFromString("1.000000003")
+	e, err = yaml.Marshal(p)
+	assert.NoError(t, err)
+	assert.Equal(t, "\"1.00000000\"\n", string(e))
+	p = MustNewFromString("1.000000008")
+	e, err = yaml.Marshal(p)
+	assert.NoError(t, err)
+	assert.Equal(t, "\"1.00000000\"\n", string(e))
+	p = MustNewFromString("0.999999999")
+	e, err = yaml.Marshal(p)
+	assert.NoError(t, err)
+	assert.Equal(t, "\"0.99999999\"\n", string(e))
+
+	p = MustNewFromString("1.2e-9")
+	e, err = yaml.Marshal(p)
+	assert.NoError(t, err)
+	assert.Equal(t, "0.00000000", p.FormatString(8))
+	assert.Equal(t, "\"0.00000000\"\n", string(e))
+
+	_ = yaml.Unmarshal([]byte("0.00153917575"), &p)
+	assert.Equal(t, "0.00153917", p.FormatString(8))
+
+	q := NewFromFloat(0.00153917575)
+	assert.Equal(t, p, q)
+	_ = yaml.Unmarshal([]byte("6e-8"), &p)
+	_ = yaml.Unmarshal([]byte("0.000062"), &q)
+	assert.Equal(t, "0.00006194", q.Sub(p).String())
+
 }
 
 func TestNumFractionalDigits(t *testing.T) {

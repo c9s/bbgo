@@ -118,7 +118,30 @@ func New(key, secret string) *Exchange {
 			if err != nil {
 				log.WithError(err).Error("can not set server time")
 			}
+
+			if err = client2.SetTimeOffsetFromServer(context.Background()); err != nil {
+				log.WithError(err).Error("can not set server time")
+			}
 		})
+		go func() {
+			ticker := time.NewTicker(time.Hour)
+			defer ticker.Stop()
+			for _ = range ticker.C {
+				_, err = client.NewSetServerTimeService().Do(context.Background())
+				if err != nil {
+					log.WithError(err).Error("can not set server time")
+				}
+
+				_, err = futuresClient.NewSetServerTimeService().Do(context.Background())
+				if err != nil {
+					log.WithError(err).Error("can not set server time")
+				}
+
+				if err = client2.SetTimeOffsetFromServer(context.Background()); err != nil {
+					log.WithError(err).Error("can not set server time")
+				}
+			}
+		}()
 	}
 
 	return &Exchange{
@@ -1609,6 +1632,30 @@ func (e *Exchange) QueryPositionRisk(ctx context.Context, symbol string) (*types
 	}
 
 	return convertPositionRisk(risks[0])
+}
+
+var SupportedIntervals = map[types.Interval]int{
+	types.Interval1m:  1,
+	types.Interval5m:  5,
+	types.Interval15m: 15,
+	types.Interval30m: 30,
+	types.Interval1h:  60,
+	types.Interval2h:  60 * 2,
+	types.Interval4h:  60 * 4,
+	types.Interval6h:  60 * 6,
+	types.Interval12h: 60 * 12,
+	types.Interval1d:  60 * 24,
+	types.Interval3d:  60 * 24 * 3,
+	types.Interval1w:  60 * 24 * 7,
+}
+
+func (e *Exchange) SupportedInterval() map[types.Interval]int {
+	return SupportedIntervals
+}
+
+func (e *Exchange) IsSupportedInterval(interval types.Interval) bool {
+	_, ok := SupportedIntervals[interval]
+	return ok
 }
 
 func getLaunchDate() (time.Time, error) {

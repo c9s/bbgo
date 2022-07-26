@@ -198,18 +198,6 @@ func (v *Value) AtomicLoad() Value {
 }
 
 func (v *Value) UnmarshalYAML(unmarshal func(a interface{}) error) (err error) {
-	var f float64
-	if err = unmarshal(&f); err == nil {
-		*v = NewFromFloat(f)
-		return
-	}
-
-	var i int64
-	if err = unmarshal(&i); err == nil {
-		*v = NewFromInt(i)
-		return
-	}
-
 	var s string
 	if err = unmarshal(&s); err == nil {
 		nv, err2 := NewFromString(s)
