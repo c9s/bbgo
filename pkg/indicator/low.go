@@ -34,9 +34,3 @@ func (inc *Low) PushK(k types.KLine) {
 	inc.EndTime = k.EndTime.Time()
 	inc.EmitUpdate(inc.Last())
 }
-
-func (inc *Low) LoadK(allKLines []types.KLine) {
-	for _, k := range allKLines {
-		inc.PushK(k)
-	}
-}
