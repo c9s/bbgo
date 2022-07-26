@@ -42,13 +42,13 @@ exchangeStrategies:
       # Notice: When marketOrder is set, bounceRatio will not be used.
       # bounceRatio: 0.1%
 
-      # stopEMARange is the price range we allow short.
+      # stopEMA is the price range we allow short.
       # Short-allowed price range = [current price] > [EMA] * (1 - [stopEMARange])
       # Higher the stopEMARange than higher the chance to open a short
-      stopEMARange: 2%
       stopEMA:
         interval: 1h
         window: 99
+        range: 2%
 
       trendEMA:
         interval: 1d
