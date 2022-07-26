@@ -36,12 +36,13 @@ func TestTrailingStop_ShortPosition(t *testing.T) {
 	mockEx := mocks.NewMockExchange(mockCtrl)
 	mockEx.EXPECT().NewStream().Return(&types.StandardStream{}).Times(2)
 	mockEx.EXPECT().SubmitOrders(gomock.Any(), types.SubmitOrder{
-		Symbol:   "BTCUSDT",
-		Side:     types.SideTypeBuy,
-		Type:     types.OrderTypeMarket,
-		Market:   market,
-		Quantity: fixedpoint.NewFromFloat(1.0),
-		Tag:      "trailingStop",
+		Symbol:           "BTCUSDT",
+		Side:             types.SideTypeBuy,
+		Type:             types.OrderTypeMarket,
+		Market:           market,
+		Quantity:         fixedpoint.NewFromFloat(1.0),
+		Tag:              "trailingStop",
+		MarginSideEffect: types.SideEffectTypeAutoRepay,
 	})
 
 	session := NewExchangeSession("test", mockEx)
@@ -113,12 +114,13 @@ func TestTrailingStop_LongPosition(t *testing.T) {
 	mockEx := mocks.NewMockExchange(mockCtrl)
 	mockEx.EXPECT().NewStream().Return(&types.StandardStream{}).Times(2)
 	mockEx.EXPECT().SubmitOrders(gomock.Any(), types.SubmitOrder{
-		Symbol:   "BTCUSDT",
-		Side:     types.SideTypeSell,
-		Type:     types.OrderTypeMarket,
-		Market:   market,
-		Quantity: fixedpoint.NewFromFloat(1.0),
-		Tag:      "trailingStop",
+		Symbol:           "BTCUSDT",
+		Side:             types.SideTypeSell,
+		Type:             types.OrderTypeMarket,
+		Market:           market,
+		Quantity:         fixedpoint.NewFromFloat(1.0),
+		Tag:              "trailingStop",
+		MarginSideEffect: types.SideEffectTypeAutoRepay,
 	})
 
 	session := NewExchangeSession("test", mockEx)
