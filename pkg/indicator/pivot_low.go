@@ -72,7 +72,7 @@ func calculatePivotLow(lows types.Float64Slice, window int) (float64, error) {
 		return 0., fmt.Errorf("insufficient elements for calculating with window = %d", window)
 	}
 
-	min := lows[length-(window-1):].Min()
+	min := lows[length-1-(window-1):].Min()
 	if min == lows.Index(int(window/2.)-1) {
 		return min, nil
 	}
