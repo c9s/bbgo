@@ -23,8 +23,6 @@ import (
 
 const ID = "bollmaker"
 
-const stateKey = "state-v1"
-
 var notionModifier = fixedpoint.NewFromFloat(1.1)
 var two = fixedpoint.NewFromInt(2)
 
@@ -142,12 +140,10 @@ type Strategy struct {
 	ShadowProtection      bool             `json:"shadowProtection"`
 	ShadowProtectionRatio fixedpoint.Value `json:"shadowProtectionRatio"`
 
-	bbgo.SmartStops
-
 	session *bbgo.ExchangeSession
 	book    *types.StreamOrderBook
 
-	state *State
+	ExitMethods bbgo.ExitMethodSet `json:"exits"`
 
 	// persistence fields
 	Position    *types.Position    `json:"position,omitempty" persistence:"position"`
@@ -175,10 +171,6 @@ func (s *Strategy) InstanceID() string {
 	return fmt.Sprintf("%s:%s", ID, s.Symbol)
 }
 
-func (s *Strategy) Initialize() error {
-	return s.SmartStops.InitializeStopControllers(s.Symbol)
-}
-
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
 		Interval: s.Interval,
@@ -196,7 +188,7 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 		})
 	}
 
-	s.SmartStops.Subscribe(session)
+	s.ExitMethods.SetAndSubscribe(session, s)
 }
 
 func (s *Strategy) Validate() error {
@@ -449,18 +441,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.DynamicSpread.DynamicAskSpread = &indicator.SMA{IntervalWindow: types.IntervalWindow{s.Interval, s.DynamicSpread.Window}}
 	}
 
-	s.OnSuspend(func() {
-		s.Status = types.StrategyStatusStopped
-		_ = s.orderExecutor.GracefulCancel(ctx)
-		bbgo.Sync(s)
-	})
-
-	s.OnEmergencyStop(func() {
-		// Close 100% position
-		percentage := fixedpoint.NewFromFloat(1.0)
-		_ = s.ClosePosition(ctx, percentage)
-	})
-
 	if s.DisableShort {
 		s.Long = &[]bool{true}[0]
 	}
@@ -515,17 +495,27 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderExecutor.BindEnvironment(s.Environment)
 	s.orderExecutor.BindProfitStats(s.ProfitStats)
 	s.orderExecutor.Bind()
-
 	s.orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
 		bbgo.Sync(s)
 	})
-
-	s.SmartStops.RunStopControllers(ctx, session, s.orderExecutor.TradeCollector())
+	s.ExitMethods.Bind(session, s.orderExecutor)
 
 	if bbgo.IsBackTesting {
 		log.Warn("turning of useTickerPrice option in the back-testing environment...")
 		s.UseTickerPrice = false
 	}
+
+	s.OnSuspend(func() {
+		s.Status = types.StrategyStatusStopped
+		_ = s.orderExecutor.GracefulCancel(ctx)
+		bbgo.Sync(s)
+	})
+
+	s.OnEmergencyStop(func() {
+		// Close 100% position
+		percentage := fixedpoint.NewFromFloat(1.0)
+		_ = s.ClosePosition(ctx, percentage)
+	})
 
 	session.UserDataStream.OnStart(func() {
 		if s.UseTickerPrice {
