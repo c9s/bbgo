@@ -547,12 +547,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			dynamicBidSpread, err := s.DynamicSpread.GetBidSpread()
 			if err == nil && dynamicBidSpread > 0 {
 				s.BidSpread = fixedpoint.NewFromFloat(dynamicBidSpread)
-				log.Infof("new bid spread: %v", s.BidSpread.Percentage())
+				log.Infof("%s dynamic bid spread updated: %s", s.Symbol, s.BidSpread.Percentage())
 			}
 			dynamicAskSpread, err := s.DynamicSpread.GetAskSpread()
 			if err == nil && dynamicAskSpread > 0 {
 				s.AskSpread = fixedpoint.NewFromFloat(dynamicAskSpread)
-				log.Infof("new ask spread: %v", s.AskSpread.Percentage())
+				log.Infof("%s dynamic ask spread updated: %s", s.Symbol, s.AskSpread.Percentage())
 			}
 		}
 
