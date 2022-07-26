@@ -60,42 +60,22 @@ func (inc *MACD) Last() float64 {
 	return inc.Values[len(inc.Values)-1]
 }
 
+func (inc *MACD) Length() int {
+	return len(inc.Values)
+}
+
 func (inc *MACD) PushK(k types.KLine) {
 	inc.Update(k.Close.Float64())
 }
 
-func (inc *MACD) CalculateAndUpdate(allKLines []types.KLine) {
-	if len(allKLines) == 0 {
-		return
-	}
-
-	last := allKLines[len(allKLines)-1]
-	if len(inc.Values) == 0 {
-		for _, k := range allKLines {
-			if inc.EndTime != zeroTime && !k.EndTime.After(inc.EndTime) {
-				continue
-			}
-
-			inc.PushK(k)
-		}
-	} else {
-		inc.PushK(last)
-	}
-
-	inc.EmitUpdate(inc.Last())
-	inc.EndTime = last.EndTime.Time()
+func (inc *MACD) MACD() types.SeriesExtend {
+	out := &MACDValues{MACD: inc}
+	out.SeriesBase.Series = out
+	return out
 }
 
-func (inc *MACD) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
-	if inc.Interval != interval {
-		return
-	}
-
-	inc.CalculateAndUpdate(window)
-}
-
-func (inc *MACD) Bind(updater KLineWindowUpdater) {
-	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
+func (inc *MACD) Singals() types.SeriesExtend {
+	return inc.SignalLine
 }
 
 type MACDValues struct {
@@ -122,14 +102,4 @@ func (inc *MACDValues) Index(i int) float64 {
 
 func (inc *MACDValues) Length() int {
 	return len(inc.Values)
-}
-
-func (inc *MACD) MACD() types.SeriesExtend {
-	out := &MACDValues{MACD: inc}
-	out.SeriesBase.Series = out
-	return out
-}
-
-func (inc *MACD) Singals() types.SeriesExtend {
-	return inc.SignalLine
 }
