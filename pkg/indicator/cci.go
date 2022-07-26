@@ -78,7 +78,6 @@ func (inc *CCI) Length() int {
 
 var _ types.SeriesExtend = &CCI{}
 
-
 func (inc *CCI) PushK(k types.KLine) {
 	inc.Update(k.High.Add(k.Low).Add(k.Close).Div(three).Float64())
 }

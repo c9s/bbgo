@@ -93,8 +93,13 @@ func (s *StandardIndicatorSet) ATRP(iw types.IntervalWindow) *indicator.ATRP {
 }
 
 func (s *StandardIndicatorSet) EMV(iw types.IntervalWindow) *indicator.EMV {
-	inc := s.allocateSimpleIndicator(&indicator.ATRP{IntervalWindow: iw}, iw)
+	inc := s.allocateSimpleIndicator(&indicator.EMV{IntervalWindow: iw}, iw)
 	return inc.(*indicator.EMV)
+}
+
+func (s *StandardIndicatorSet) CCI(iw types.IntervalWindow) *indicator.CCI {
+	inc := s.allocateSimpleIndicator(&indicator.CCI{IntervalWindow: iw}, iw)
+	return inc.(*indicator.CCI)
 }
 
 func (s *StandardIndicatorSet) STOCH(iw types.IntervalWindow) *indicator.STOCH {
