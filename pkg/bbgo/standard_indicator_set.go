@@ -102,6 +102,11 @@ func (s *StandardIndicatorSet) CCI(iw types.IntervalWindow) *indicator.CCI {
 	return inc.(*indicator.CCI)
 }
 
+func (s *StandardIndicatorSet) HULL(iw types.IntervalWindow) *indicator.HULL {
+	inc := s.allocateSimpleIndicator(&indicator.HULL{IntervalWindow: iw}, iw)
+	return inc.(*indicator.HULL)
+}
+
 func (s *StandardIndicatorSet) STOCH(iw types.IntervalWindow) *indicator.STOCH {
 	inc, ok := s.stoch[iw]
 	if !ok {
