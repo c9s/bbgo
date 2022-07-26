@@ -4,9 +4,10 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/stretchr/testify/assert"
 )
 
 /*
@@ -52,7 +53,11 @@ func Test_SMA(t *testing.T) {
 			sma := SMA{
 				IntervalWindow: types.IntervalWindow{Window: 5},
 			}
-			sma.CalculateAndUpdate(tt.kLines)
+
+			for _, k := range tt.kLines {
+				sma.PushK(k)
+			}
+
 			assert.InDelta(t, tt.want, sma.Last(), Delta)
 			assert.InDelta(t, tt.next, sma.Index(1), Delta)
 			sma.Update(tt.update)
