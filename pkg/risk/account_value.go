@@ -213,8 +213,10 @@ func CalculateBaseQuantity(session *bbgo.ExchangeSession, market types.Market, p
 		// spot margin use the equity value, so we use the total quote balance here
 		maxPosition := CalculateMaxPosition(price, accountValue, leverage)
 		debt := baseBalance.Debt()
+		maxQuantity := maxPosition.Sub(debt)
 
-		logrus.Infof("margin leverage: calculated maxPosition=%f debt=%f price=%f accountValue=%f %s leverage=%f",
+		logrus.Infof("margin leverage: calculated maxQuantity=%f maxPosition=%f debt=%f price=%f accountValue=%f %s leverage=%f",
+			maxQuantity.Float64(),
 			maxPosition.Float64(),
 			debt.Float64(),
 			price.Float64(),
@@ -222,7 +224,7 @@ func CalculateBaseQuantity(session *bbgo.ExchangeSession, market types.Market, p
 			market.QuoteCurrency,
 			leverage.Float64())
 
-		return maxPosition.Sub(debt), nil
+		return maxQuantity, nil
 	}
 
 	if session.Futures || session.IsolatedFutures {
