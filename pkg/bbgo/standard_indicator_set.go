@@ -25,7 +25,7 @@ type StandardIndicatorSet struct {
 	// interval -> window
 	boll    map[types.IntervalWindowBandWidth]*indicator.BOLL
 	stoch   map[types.IntervalWindow]*indicator.STOCH
-	simples map[types.IntervalWindow]indicator.Simple
+	simples map[types.IntervalWindow]indicator.KLinePusher
 
 	stream types.Stream
 	store  *MarketDataStore
@@ -36,7 +36,7 @@ func NewStandardIndicatorSet(symbol string, stream types.Stream, store *MarketDa
 		Symbol:  symbol,
 		store:   store,
 		stream:  stream,
-		simples: make(map[types.IntervalWindow]indicator.Simple),
+		simples: make(map[types.IntervalWindow]indicator.KLinePusher),
 
 		boll:  make(map[types.IntervalWindowBandWidth]*indicator.BOLL),
 		stoch: make(map[types.IntervalWindow]*indicator.STOCH),
@@ -53,7 +53,7 @@ func (s *StandardIndicatorSet) initAndBind(inc indicator.KLinePusher, iw types.I
 	s.stream.OnKLineClosed(types.KLineWith(s.Symbol, iw.Interval, inc.PushK))
 }
 
-func (s *StandardIndicatorSet) allocateSimpleIndicator(t indicator.Simple, iw types.IntervalWindow) indicator.Simple {
+func (s *StandardIndicatorSet) allocateSimpleIndicator(t indicator.KLinePusher, iw types.IntervalWindow) indicator.KLinePusher {
 	inc, ok := s.simples[iw]
 	if ok {
 		return inc
