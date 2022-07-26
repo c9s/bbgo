@@ -121,8 +121,6 @@ type Strategy struct {
 	ProfitStats *types.ProfitStats `persistence:"profit_stats"`
 	TradeStats  *types.TradeStats  `persistence:"trade_stats"`
 
-	bbgo.SmartStops
-
 	session       *bbgo.ExchangeSession
 	orderExecutor *bbgo.GeneralOrderExecutor
 	book          *types.StreamOrderBook
@@ -143,15 +141,10 @@ func (s *Strategy) ID() string {
 	return ID
 }
 
-func (s *Strategy) Initialize() error {
-	return s.SmartStops.InitializeStopControllers(s.Symbol)
-}
-
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
 		Interval: s.Interval,
 	})
-	// s.SmartStops.Subscribe(session)
 }
 
 func (s *Strategy) Validate() error {
@@ -429,8 +422,6 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 	s.neutralBoll = s.StandardIndicatorSet.BOLL(s.NeutralBollinger.IntervalWindow, s.NeutralBollinger.BandWidth)
 	s.defaultBoll = s.StandardIndicatorSet.BOLL(s.DefaultBollinger.IntervalWindow, s.DefaultBollinger.BandWidth)
-
-	// s.SmartStops.RunStopControllers(ctx, session, s.tradeCollector)
 
 	var klines []*types.KLine
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
