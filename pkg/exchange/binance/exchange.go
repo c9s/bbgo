@@ -49,11 +49,6 @@ func init() {
 	_ = types.Exchange(&Exchange{})
 	_ = types.MarginExchange(&Exchange{})
 	_ = types.FuturesExchange(&Exchange{})
-
-	// FIXME: this is not effected since dotenv is loaded in the rootCmd, not in the init function
-	if ok, _ := strconv.ParseBool(os.Getenv("DEBUG_BINANCE_STREAM")); ok {
-		log.Level = logrus.DebugLevel
-	}
 }
 
 func isBinanceUs() bool {
