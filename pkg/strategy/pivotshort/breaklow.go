@@ -120,17 +120,26 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 	})
 
 	session.MarketDataStream.OnKLineClosed(types.KLineWith(symbol, s.Interval, func(kline types.KLine) {
+
 		lastLow := fixedpoint.NewFromFloat(s.pivot.LastLow())
 		if lastLow.IsZero() {
 			return
 		}
 
-		if lastLow.Compare(s.lastLow) != 0 {
-			bbgo.Notify("%s new pivot low: %f", s.Symbol, s.pivot.LastLow())
+		if lastLow.Compare(s.lastLow) == 0 {
+			return
 		}
 
 		s.lastLow = lastLow
 		s.pivotLowPrices = append(s.pivotLowPrices, s.lastLow)
+
+
+		// when position is opened, do not send pivot low notify
+		if position.IsOpened(kline.Close) {
+			return
+		}
+
+		bbgo.Notify("%s new pivot low: %f", s.Symbol, s.pivot.LastLow())
 	}))
 
 	session.MarketDataStream.OnKLineClosed(types.KLineWith(symbol, types.Interval1m, func(kline types.KLine) {
