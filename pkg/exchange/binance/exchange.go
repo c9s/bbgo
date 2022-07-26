@@ -104,29 +104,20 @@ func New(key, secret string) *Exchange {
 
 	client2 := binanceapi.NewClient(client.BaseURL)
 
-	var err error
+	ex := &Exchange{
+		key:           key,
+		secret:        secret,
+		client:        client,
+		futuresClient: futuresClient,
+		client2:       client2,
+	}
+
 	if len(key) > 0 && len(secret) > 0 {
 		client2.Auth(key, secret)
 
-		setServerTime := func(ctx context.Context) {
-			_, err = client.NewSetServerTimeService().Do(ctx)
-			if err != nil {
-				log.WithError(err).Error("can not set server time")
-			}
-
-			_, err = futuresClient.NewSetServerTimeService().Do(ctx)
-			if err != nil {
-				log.WithError(err).Error("can not set server time")
-			}
-
-			if err = client2.SetTimeOffsetFromServer(ctx); err != nil {
-				log.WithError(err).Error("can not set server time")
-			}
-		}
-
 		ctx := context.Background()
 		go timeSetterOnce.Do(func() {
-			setServerTime(ctx)
+			ex.setServerTimeOffset(ctx)
 
 			ticker := time.NewTicker(time.Hour)
 			defer ticker.Stop()
@@ -136,19 +127,28 @@ func New(key, secret string) *Exchange {
 					return
 
 				case <-ticker.C:
-					setServerTime(ctx)
+					ex.setServerTimeOffset(ctx)
 				}
 			}
 		})
 	}
 
-	return &Exchange{
-		key: key,
-		// pragma: allowlist nextline secret
-		secret:        secret,
-		client:        client,
-		futuresClient: futuresClient,
-		client2:       client2,
+	return ex
+}
+
+func (e *Exchange) setServerTimeOffset(ctx context.Context) {
+	_, err := e.client.NewSetServerTimeService().Do(ctx)
+	if err != nil {
+		log.WithError(err).Error("can not set server time")
+	}
+
+	_, err = e.futuresClient.NewSetServerTimeService().Do(ctx)
+	if err != nil {
+		log.WithError(err).Error("can not set server time")
+	}
+
+	if err = e.client2.SetTimeOffsetFromServer(ctx); err != nil {
+		log.WithError(err).Error("can not set server time")
 	}
 }
 
