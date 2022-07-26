@@ -26,7 +26,7 @@ type ResistanceShort struct {
 	session       *bbgo.ExchangeSession
 	orderExecutor *bbgo.GeneralOrderExecutor
 
-	resistancePivot        *indicator.Pivot
+	resistancePivot        *indicator.PivotLow
 	resistancePrices       []float64
 	currentResistancePrice fixedpoint.Value
 
@@ -47,19 +47,10 @@ func (s *ResistanceShort) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 		s.GroupDistance = fixedpoint.NewFromFloat(0.01)
 	}
 
-	store, _ := session.MarketDataStore(s.Symbol)
-
-	s.resistancePivot = &indicator.Pivot{IntervalWindow: s.IntervalWindow}
-	s.resistancePivot.Bind(store)
-
-	// preload history kline data to the resistance pivot indicator
-	// we use the last kline to find the higher lows
-	lastKLine := preloadPivot(s.resistancePivot, store)
+	s.resistancePivot = session.StandardIndicatorSet(s.Symbol).PivotLow(s.IntervalWindow)
 
 	// use the last kline from the history before we get the next closed kline
-	if lastKLine != nil {
-		s.updateResistanceOrders(lastKLine.Close)
-	}
+	s.updateResistanceOrders(fixedpoint.NewFromFloat(s.resistancePivot.Lows.Last()))
 
 	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
 		position := s.orderExecutor.Position()
