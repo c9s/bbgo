@@ -51,6 +51,9 @@ var Interval6h = Interval("6h")
 var Interval12h = Interval("12h")
 var Interval1d = Interval("1d")
 var Interval3d = Interval("3d")
+var Interval1w = Interval("1w")
+var Interval2w = Interval("2w")
+var Interval1mo = Interval("1mo")
 
 var SupportedIntervals = map[Interval]int{
 	Interval1m:  1,
@@ -64,6 +67,9 @@ var SupportedIntervals = map[Interval]int{
 	Interval12h: 60 * 12,
 	Interval1d:  60 * 24,
 	Interval3d:  60 * 24 * 3,
+	Interval1w:  60 * 24 * 7,
+	Interval2w:  60 * 24 * 14,
+	Interval1mo: 60 * 24 * 30,
 }
 
 // IntervalWindow is used by the indicators
