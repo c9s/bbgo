@@ -237,9 +237,12 @@ func (s *ProfitStats) Init(market Market) {
 }
 
 func (s *ProfitStats) AddProfit(profit Profit) {
+	if s.IsOver24Hours() {
+		s.ResetToday()
+	}
+
 	s.AccumulatedPnL = s.AccumulatedPnL.Add(profit.Profit)
 	s.AccumulatedNetProfit = s.AccumulatedNetProfit.Add(profit.NetProfit)
-
 	s.TodayPnL = s.TodayPnL.Add(profit.Profit)
 	s.TodayNetProfit = s.TodayNetProfit.Add(profit.NetProfit)
 
