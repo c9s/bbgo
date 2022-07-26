@@ -8,7 +8,6 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -82,32 +81,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.State = &State{Counter: 1}
 	}
 
-	// Optional: You can get the market data store from session
-	store, ok := session.MarketDataStore(s.Symbol)
-	if !ok {
-		return fmt.Errorf("market data store %s not found", s.Symbol)
-	}
-
-	// Initialize a custom indicator
-	atr := &indicator.ATR{
-		IntervalWindow: types.IntervalWindow{
-			Interval: types.Interval1m,
-			Window:   14,
-		},
-	}
-
-	// Bind the indicator to the market data store, so that when a new kline is received,
-	// the indicator will be updated.
-	atr.Bind(store)
-
-	// To get the past kline history, call KLinesOfInterval from the market data store
-	klines, ok := store.KLinesOfInterval(types.Interval1m)
-	if !ok {
-		return fmt.Errorf("market data store %s lkline not found", s.Symbol)
-	}
-
-	// Use the history data to initialize the indicator
-	atr.CalculateAndUpdate(*klines)
+	indicators := session.StandardIndicatorSet(s.Symbol)
+	atr := indicators.ATR(types.IntervalWindow{
+		Interval: types.Interval1m,
+		Window:   14,
+	})
 
 	// To get the market information from the current session
 	// The market object provides the precision, MoQ (minimal of quantity) information

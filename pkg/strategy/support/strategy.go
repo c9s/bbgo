@@ -387,10 +387,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		log.Infof("adjusted minimal support volume to %s according to sensitivity %s", s.MinVolume.String(), s.Sensitivity.String())
 	}
 
-	standardIndicatorSet, ok := session.StandardIndicatorSet(s.Symbol)
-	if !ok {
-		return fmt.Errorf("standardIndicatorSet is nil, symbol %s", s.Symbol)
-	}
+	standardIndicatorSet := session.StandardIndicatorSet(s.Symbol)
 
 	if s.TriggerMovingAverage != zeroiw {
 		s.triggerEMA = standardIndicatorSet.EWMA(s.TriggerMovingAverage)

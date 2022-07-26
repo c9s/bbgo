@@ -55,7 +55,7 @@ func (inc *HULL) Length() int {
 }
 
 func (inc *HULL) PushK(k types.KLine) {
-	if k.EndTime.Before(inc.ma1.EndTime) {
+	if inc.ma1 != nil && inc.ma1.Length() > 0 && k.EndTime.Before(inc.ma1.EndTime) {
 		return
 	}
 

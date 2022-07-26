@@ -438,17 +438,16 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 	return nil
 }
 
-func (session *ExchangeSession) StandardIndicatorSet(symbol string) (*StandardIndicatorSet, bool) {
+func (session *ExchangeSession) StandardIndicatorSet(symbol string) *StandardIndicatorSet {
 	set, ok := session.standardIndicatorSets[symbol]
-	if !ok {
-		if store, ok2 := session.MarketDataStore(symbol); ok2 {
-			set = NewStandardIndicatorSet(symbol, session.MarketDataStream, store)
-			session.standardIndicatorSets[symbol] = set
-			return set, true
-		}
+	if ok {
+		return set
 	}
 
-	return set, ok
+	store, _ := session.MarketDataStore(symbol)
+	set = NewStandardIndicatorSet(symbol, session.MarketDataStream, store)
+	session.standardIndicatorSets[symbol] = set
+	return set
 }
 
 func (session *ExchangeSession) Position(symbol string) (pos *types.Position, ok bool) {

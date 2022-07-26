@@ -681,7 +681,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		return fmt.Errorf("maker session market %s is not defined", s.Symbol)
 	}
 
-	standardIndicatorSet, ok := s.sourceSession.StandardIndicatorSet(s.Symbol)
+	standardIndicatorSet := s.sourceSession.StandardIndicatorSet(s.Symbol)
 	if !ok {
 		return fmt.Errorf("%s standard indicator set not found", s.Symbol)
 	}
