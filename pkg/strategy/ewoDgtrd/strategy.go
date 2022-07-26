@@ -26,13 +26,34 @@ func init() {
 }
 
 type Strategy struct {
-	Position    *types.Position    `json:"position,omitempty" persistence:"position"`
+	// Embedded components
+	// ===================
+	*bbgo.Environment
+	bbgo.StrategyController
+
+	// Auto-Injection fields
+	// ====================
+
+	// Market of the symbol
+	Market types.Market
+
+	// Session is the trading session of this strategy
+	Session *bbgo.ExchangeSession
+
+	orderExecutor *bbgo.GeneralOrderExecutor
+
+	// Persistence fields
+	// ====================
+	// Position
+	Position *types.Position `json:"position,omitempty" persistence:"position"`
+
+	// ProfitStats
 	ProfitStats *types.ProfitStats `json:"profitStats,omitempty" persistence:"profit_stats"`
 
-	Market              types.Market
-	Session             *bbgo.ExchangeSession
+	// Settings fields
+	// =========================
 	UseHeikinAshi       bool             `json:"useHeikinAshi"` // use heikinashi kline
-	Stoploss            fixedpoint.Value `json:"stoploss"`
+	StopLoss            fixedpoint.Value `json:"stoploss"`
 	Symbol              string           `json:"symbol"`
 	Interval            types.Interval   `json:"interval"`
 	UseEma              bool             `json:"useEma"`              // use exponential ma or not
@@ -50,14 +71,8 @@ type Strategy struct {
 	KLineStartTime types.Time
 	KLineEndTime   types.Time
 
-	*bbgo.Environment
-	bbgo.StrategyController
-
-	activeMakerOrders *bbgo.ActiveOrderBook
-	orderStore        *bbgo.OrderStore
-	tradeCollector    *bbgo.TradeCollector
-	entryPrice        fixedpoint.Value
-	waitForTrade      bool
+	entryPrice   fixedpoint.Value
+	waitForTrade bool
 
 	atr           *indicator.ATR
 	emv           *indicator.EMV
@@ -91,11 +106,12 @@ func (s *Strategy) Initialize() error {
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
-	log.Infof("subscribe %s", s.Symbol)
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: types.Interval1m})
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
 
-	session.Subscribe(types.BookTickerChannel, s.Symbol, types.SubscribeOptions{})
+	if !bbgo.IsBackTesting {
+		session.Subscribe(types.BookTickerChannel, s.Symbol, types.SubscribeOptions{})
+	}
 }
 
 type UpdatableSeries interface {
@@ -502,7 +518,8 @@ func (s *Strategy) PlaceBuyOrder(ctx context.Context, price fixedpoint.Value) (*
 		return closeOrder, nil
 	}
 	log.Warnf("long at %v, position %v, closeOrder %v, timestamp: %s", price, s.Position.GetBase(), closeOrder, s.KLineStartTime)
-	createdOrders, err := s.Session.Exchange.SubmitOrders(ctx, order)
+
+	createdOrders, err := s.orderExecutor.SubmitOrders(ctx, order)
 	if err != nil {
 		log.WithError(err).Errorf("cannot place order")
 		return closeOrder, nil
@@ -510,9 +527,6 @@ func (s *Strategy) PlaceBuyOrder(ctx context.Context, price fixedpoint.Value) (*
 
 	log.Infof("post order c: %v, entryPrice: %v o: %v", waitForTrade, s.entryPrice, createdOrders)
 	s.waitForTrade = waitForTrade
-	s.orderStore.Add(createdOrders...)
-	s.activeMakerOrders.Add(createdOrders...)
-	s.tradeCollector.Process()
 	return closeOrder, &createdOrders[0]
 }
 
@@ -552,16 +566,14 @@ func (s *Strategy) PlaceSellOrder(ctx context.Context, price fixedpoint.Value) (
 	}
 
 	log.Warnf("short at %v, position %v closeOrder %v, timestamp: %s", price, s.Position.GetBase(), closeOrder, s.KLineStartTime)
-	createdOrders, err := s.Session.Exchange.SubmitOrders(ctx, order)
+	createdOrders, err := s.orderExecutor.SubmitOrders(ctx, order)
 	if err != nil {
 		log.WithError(err).Errorf("cannot place order")
 		return closeOrder, nil
 	}
+
 	log.Infof("post order, c: %v, entryPrice: %v o: %v", waitForTrade, s.entryPrice, createdOrders)
 	s.waitForTrade = waitForTrade
-	s.orderStore.Add(createdOrders...)
-	s.activeMakerOrders.Add(createdOrders...)
-	s.tradeCollector.Process()
 	return closeOrder, &createdOrders[0]
 }
 
@@ -594,6 +606,7 @@ func (s *Strategy) ClosePosition(ctx context.Context) (*types.Order, bool) {
 	} else if order.Side == types.SideTypeSell && order.Quantity.Compare(baseBalance) > 0 {
 		order.Quantity = baseBalance
 	}
+
 	// if no available balance...
 	if order.Quantity.IsZero() {
 		return nil, true
@@ -603,31 +616,22 @@ func (s *Strategy) ClosePosition(ctx context.Context) (*types.Order, bool) {
 		return nil, false
 	}
 
-	createdOrders, err := s.Session.Exchange.SubmitOrders(ctx, *order)
+	createdOrders, err := s.orderExecutor.SubmitOrders(ctx, *order)
 	if err != nil {
 		log.WithError(err).Errorf("cannot place close order")
 		return nil, false
 	}
+
 	log.Infof("close order %v", createdOrders)
-	s.orderStore.Add(createdOrders...)
-	s.activeMakerOrders.Add(createdOrders...)
-	s.tradeCollector.Process()
 	return &createdOrders[0], true
 }
 
 func (s *Strategy) CancelAll(ctx context.Context) {
-	var toCancel []types.Order
-	for _, order := range s.orderStore.Orders() {
-		if order.Status == types.OrderStatusNew || order.Status == types.OrderStatusPartiallyFilled {
-			toCancel = append(toCancel, order)
-		}
+	if err := s.orderExecutor.GracefulCancel(ctx); err != nil {
+		log.WithError(err).Errorf("graceful cancel order error")
 	}
-	if len(toCancel) > 0 {
-		if err := s.Session.Exchange.CancelOrders(ctx, toCancel...); err != nil {
-			log.WithError(err).Errorf("cancel order error")
-		}
-		s.waitForTrade = false
-	}
+
+	s.waitForTrade = false
 }
 
 func (s *Strategy) GetLastPrice() fixedpoint.Value {
@@ -661,7 +665,7 @@ func (s *Strategy) GetLastPrice() fixedpoint.Value {
 // - TP by detecting if there's a ewo pivotHigh(1,1) -> close long, or pivotLow(1,1) -> close short
 // - TP by ma34 +- atr * 2
 // - TP by (lastprice < peak price - atr) || (lastprice > bottom price + atr)
-// - SL by s.Stoploss (Abs(price_diff / price) > s.Stoploss)
+// - SL by s.StopLoss (Abs(price_diff / price) > s.StopLoss)
 // - entry condition on ewo(Elliott wave oscillator) Crosses ewoSignal(ma on ewo, signalWindow)
 //   * buy signal on (crossover on previous K bar and no crossunder on latest K bar)
 //   * sell signal on (crossunder on previous K bar and no crossunder on latest K bar)
@@ -694,39 +698,25 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	counterSLfromOrder := 0
 	percentAvgSLfromOrder := 0.0
 
-	s.activeMakerOrders = bbgo.NewActiveOrderBook(s.Symbol)
-	s.activeMakerOrders.BindStream(session.UserDataStream)
-
-	s.orderStore = bbgo.NewOrderStore(s.Symbol)
-	s.orderStore.BindStream(session.UserDataStream)
-
 	if s.Position == nil {
 		s.Position = types.NewPositionFromMarket(s.Market)
 	}
+
 	if s.ProfitStats == nil {
 		s.ProfitStats = types.NewProfitStats(s.Market)
 	}
-	s.tradeCollector = bbgo.NewTradeCollector(s.Symbol, s.Position, s.orderStore)
-	s.tradeCollector.OnTrade(func(trade types.Trade, profit, netprofit fixedpoint.Value) {
-		if s.Symbol != trade.Symbol {
-			return
-		}
-		bbgo.Notify(trade)
-		s.ProfitStats.AddTrade(trade)
 
-		if !profit.IsZero() {
-			log.Warnf("generate profit: %v, netprofit: %v, trade: %v", profit, netprofit, trade)
-			p := s.Position.NewProfit(trade, profit, netprofit)
-			p.Strategy = ID
-			p.StrategyInstanceID = s.InstanceID()
-			bbgo.Notify(&p)
+	instanceID := s.InstanceID()
+	s.orderExecutor = bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
+	s.orderExecutor.BindEnvironment(s.Environment)
+	s.orderExecutor.BindProfitStats(s.ProfitStats)
+	// s.orderExecutor.BindTradeStats(s.TradeStats)
+	s.orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
+		bbgo.Sync(s)
+	})
+	s.orderExecutor.Bind()
 
-			s.ProfitStats.AddProfit(p)
-			bbgo.Notify(&s.ProfitStats)
-			s.Environment.RecordPosition(s.Position, trade, &p)
-		} else {
-			s.Environment.RecordPosition(s.Position, trade, nil)
-		}
+	s.orderExecutor.TradeCollector().OnTrade(func(trade types.Trade, profit, netprofit fixedpoint.Value) {
 		// calculate report for the position that cannot be closed by close order (amount too small)
 		if s.waitForTrade {
 			price := s.entryPrice
@@ -762,6 +752,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 			s.waitForTrade = false
 		}
+
 		if s.Position.GetBase().Abs().Compare(s.Market.MinQuantity) >= 0 && s.Position.GetBase().Abs().Mul(trade.Price).Compare(s.Market.MinNotional) >= 0 {
 			sign := s.Position.GetBase().Sign()
 			if sign > 0 {
@@ -789,12 +780,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			s.bottomPrice = fixedpoint.Zero
 		}
 	})
-
-	s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
-		log.Infof("position changed: %s", position)
-		bbgo.Notify(s.Position)
-	})
-	s.tradeCollector.BindStream(session.UserDataStream)
 
 	store, ok := s.Session.MarketDataStore(s.Symbol)
 	if !ok {
@@ -852,7 +837,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 			// SL
 			/*if (!atrx2.IsZero() && s.bottomPrice.Add(atrx2).Compare(lastPrice) <= 0) ||
-				lastPrice.Sub(s.bottomPrice).Div(lastPrice).Compare(s.Stoploss) > 0 {
+				lastPrice.Sub(s.bottomPrice).Div(lastPrice).Compare(s.StopLoss) > 0 {
 				if lastPrice.Compare(s.sellPrice) < 0 {
 					takeProfit = true
 				}
@@ -860,7 +845,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				s.bottomPrice = fixedpoint.Zero
 			}*/
 			if !s.DisableShortStop && ((!atr.IsZero() && s.sellPrice.Sub(atr).Compare(lastPrice) >= 0) ||
-				lastPrice.Sub(s.sellPrice).Div(s.sellPrice).Compare(s.Stoploss) > 0) {
+				lastPrice.Sub(s.sellPrice).Div(s.sellPrice).Compare(s.StopLoss) > 0) {
 				buyall = true
 				reason = 4
 			}
@@ -955,7 +940,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 
 			// SL
-			/*if s.peakPrice.Sub(lastPrice).Div(s.peakPrice).Compare(s.Stoploss) > 0 ||
+			/*if s.peakPrice.Sub(lastPrice).Div(s.peakPrice).Compare(s.StopLoss) > 0 ||
 				(!atrx2.IsZero() && s.peakPrice.Sub(atrx2).Compare(lastPrice) >= 0) {
 				if lastPrice.Compare(s.buyPrice) > 0 {
 					takeProfit = true
@@ -963,7 +948,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				sellall = true
 				s.peakPrice = fixedpoint.Zero
 			}*/
-			if !s.DisableLongStop && (s.buyPrice.Sub(lastPrice).Div(s.buyPrice).Compare(s.Stoploss) > 0 ||
+			if !s.DisableLongStop && (s.buyPrice.Sub(lastPrice).Div(s.buyPrice).Compare(s.StopLoss) > 0 ||
 				(!atr.IsZero() && s.buyPrice.Sub(atr).Compare(lastPrice) >= 0)) {
 				sellall = true
 				reason = 4
@@ -1224,9 +1209,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	bbgo.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 		log.Infof("canceling active orders...")
-		s.CancelAll(ctx)
 
-		s.tradeCollector.Process()
+		_ = s.orderExecutor.GracefulCancel(ctx)
+
 		hiblue := color.New(color.FgHiBlue).FprintfFunc()
 		blue := color.New(color.FgBlue).FprintfFunc()
 		hiyellow := color.New(color.FgHiYellow).FprintfFunc()
@@ -1267,7 +1252,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		hiyellow(os.Stderr, "----- EWO Settings -------\n")
 		hiyellow(os.Stderr, "General:\n")
 		hiyellow(os.Stderr, "\tuseHeikinAshi: %v\n", s.UseHeikinAshi)
-		hiyellow(os.Stderr, "\tstoploss: %v\n", s.Stoploss)
+		hiyellow(os.Stderr, "\tstoploss: %v\n", s.StopLoss)
 		hiyellow(os.Stderr, "\tsymbol: %s\n", s.Symbol)
 		hiyellow(os.Stderr, "\tinterval: %s\n", s.Interval)
 		hiyellow(os.Stderr, "\tMA type: %s\n", maString)
