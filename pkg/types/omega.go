@@ -1,7 +1,5 @@
 package types
 
-import ()
-
 // Determines the Omega ratio of a strategy
 // See https://en.wikipedia.org/wiki/Omega_ratio for more details
 //
