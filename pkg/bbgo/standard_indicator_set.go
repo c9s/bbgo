@@ -82,6 +82,21 @@ func (s *StandardIndicatorSet) PivotLow(iw types.IntervalWindow) *indicator.Pivo
 	return inc.(*indicator.PivotLow)
 }
 
+func (s *StandardIndicatorSet) ATR(iw types.IntervalWindow) *indicator.ATR {
+	inc := s.allocateSimpleIndicator(&indicator.ATR{IntervalWindow: iw}, iw)
+	return inc.(*indicator.ATR)
+}
+
+func (s *StandardIndicatorSet) ATRP(iw types.IntervalWindow) *indicator.ATRP {
+	inc := s.allocateSimpleIndicator(&indicator.ATRP{IntervalWindow: iw}, iw)
+	return inc.(*indicator.ATRP)
+}
+
+func (s *StandardIndicatorSet) EMV(iw types.IntervalWindow) *indicator.EMV {
+	inc := s.allocateSimpleIndicator(&indicator.ATRP{IntervalWindow: iw}, iw)
+	return inc.(*indicator.EMV)
+}
+
 func (s *StandardIndicatorSet) STOCH(iw types.IntervalWindow) *indicator.STOCH {
 	inc, ok := s.stoch[iw]
 	if !ok {

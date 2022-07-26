@@ -58,10 +58,6 @@ func (inc *EWMA) Length() int {
 	return len(inc.Values)
 }
 
-func (inc *EWMA) BindK(target KLineClosedEmitter, symbol string, interval types.Interval) {
-	target.OnKLineClosed(types.KLineWith(symbol, interval, inc.PushK))
-}
-
 func (inc *EWMA) PushK(k types.KLine) {
 	if inc.EndTime != zeroTime && k.EndTime.Before(inc.EndTime) {
 		return
@@ -69,13 +65,6 @@ func (inc *EWMA) PushK(k types.KLine) {
 
 	inc.Update(k.Close.Float64())
 	inc.EndTime = k.EndTime.Time()
-	inc.EmitUpdate(inc.Last())
-}
-
-func (inc *EWMA) LoadK(allKLines []types.KLine) {
-	for _, k := range allKLines {
-		inc.PushK(k)
-	}
 	inc.EmitUpdate(inc.Last())
 }
 
