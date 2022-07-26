@@ -21,6 +21,18 @@ type PivotLow struct {
 	updateCallbacks []func(value float64)
 }
 
+func (inc *PivotLow) Length() int {
+	return inc.Values.Length()
+}
+
+func (inc *PivotLow) Last() float64 {
+	if len(inc.Values) == 0 {
+		return 0.0
+	}
+
+	return inc.Values.Last()
+}
+
 func (inc *PivotLow) Update(value float64) {
 	if len(inc.Lows) == 0 {
 		inc.SeriesBase.Series = inc
@@ -52,7 +64,6 @@ func (inc *PivotLow) PushK(k types.KLine) {
 	inc.EndTime = k.EndTime.Time()
 	inc.EmitUpdate(inc.Last())
 }
-
 
 func calculatePivotLow(lows types.Float64Slice, window int) (float64, error) {
 	length := len(lows)
