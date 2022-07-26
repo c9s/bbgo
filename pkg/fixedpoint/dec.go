@@ -1032,6 +1032,10 @@ func (x Value) Compare(y Value) int {
 	return Compare(x, y)
 }
 
+func (v Value) MarshalYAML() (interface{}, error) {
+        return v.FormatString(8), nil
+}
+
 func (v *Value) UnmarshalYAML(unmarshal func(a interface{}) error) (err error) {
 	var f float64
 	if err = unmarshal(&f); err == nil {
