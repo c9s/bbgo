@@ -108,40 +108,38 @@ func New(key, secret string) *Exchange {
 	if len(key) > 0 && len(secret) > 0 {
 		client2.Auth(key, secret)
 
-		timeSetter.Do(func() {
-			_, err = client.NewSetServerTimeService().Do(context.Background())
+		setServerTime := func(ctx context.Context) {
+			_, err = client.NewSetServerTimeService().Do(ctx)
 			if err != nil {
 				log.WithError(err).Error("can not set server time")
 			}
 
-			_, err = futuresClient.NewSetServerTimeService().Do(context.Background())
+			_, err = futuresClient.NewSetServerTimeService().Do(ctx)
 			if err != nil {
 				log.WithError(err).Error("can not set server time")
 			}
 
-			if err = client2.SetTimeOffsetFromServer(context.Background()); err != nil {
+			if err = client2.SetTimeOffsetFromServer(ctx); err != nil {
 				log.WithError(err).Error("can not set server time")
 			}
-		})
-		go func() {
+		}
+
+		ctx := context.Background()
+		go timeSetter.Do(func() {
+			setServerTime(ctx)
+
 			ticker := time.NewTicker(time.Hour)
 			defer ticker.Stop()
-			for _ = range ticker.C {
-				_, err = client.NewSetServerTimeService().Do(context.Background())
-				if err != nil {
-					log.WithError(err).Error("can not set server time")
-				}
+			for {
+				select {
+				case <-ctx.Done():
+					return
 
-				_, err = futuresClient.NewSetServerTimeService().Do(context.Background())
-				if err != nil {
-					log.WithError(err).Error("can not set server time")
-				}
-
-				if err = client2.SetTimeOffsetFromServer(context.Background()); err != nil {
-					log.WithError(err).Error("can not set server time")
+				case <-ticker.C:
+					setServerTime(ctx)
 				}
 			}
-		}()
+		})
 	}
 
 	return &Exchange{
