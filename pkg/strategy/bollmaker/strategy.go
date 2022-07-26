@@ -56,8 +56,7 @@ type Strategy struct {
 	// Symbol is the market symbol you want to trade
 	Symbol string `json:"symbol"`
 
-	// Interval is how long do you want to update your order price and quantity
-	Interval types.Interval `json:"interval"`
+	types.IntervalWindow
 
 	bbgo.QuantityOrAmount
 
