@@ -10,6 +10,15 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+type StopEMA struct {
+	types.IntervalWindow
+	Range fixedpoint.Value `json:"range"`
+}
+
+type TrendEMA struct {
+	types.IntervalWindow
+}
+
 // BreakLow -- when price breaks the previous pivot low, we set a trade entry
 type BreakLow struct {
 	Symbol string
