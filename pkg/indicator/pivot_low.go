@@ -9,6 +9,8 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+
+
 //go:generate callbackgen -type PivotLow
 type PivotLow struct {
 	types.IntervalWindow
@@ -19,13 +21,6 @@ type PivotLow struct {
 	EndTime time.Time
 
 	updateCallbacks []func(value float64)
-}
-
-func (inc *PivotLow) Last() float64 {
-	if len(inc.Values) == 0 {
-		return 0.0
-	}
-	return inc.Values[len(inc.Values)-1]
 }
 
 func (inc *PivotLow) Update(value float64) {
