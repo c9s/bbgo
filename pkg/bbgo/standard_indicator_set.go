@@ -43,70 +43,70 @@ func NewStandardIndicatorSet(symbol string, stream types.Stream, store *MarketDa
 	}
 }
 
-func (set *StandardIndicatorSet) initAndBind(inc indicator.KLinePusher, iw types.IntervalWindow) {
-	if klines, ok := set.store.KLinesOfInterval(iw.Interval); ok {
+func (s *StandardIndicatorSet) initAndBind(inc indicator.KLinePusher, iw types.IntervalWindow) {
+	if klines, ok := s.store.KLinesOfInterval(iw.Interval); ok {
 		for _, k := range *klines {
 			inc.PushK(k)
 		}
 	}
 
-	set.stream.OnKLineClosed(types.KLineWith(set.Symbol, iw.Interval, inc.PushK))
+	s.stream.OnKLineClosed(types.KLineWith(s.Symbol, iw.Interval, inc.PushK))
 }
 
-func (set *StandardIndicatorSet) allocateSimpleIndicator(t indicator.Simple, iw types.IntervalWindow) indicator.Simple {
-	inc, ok := set.simples[iw]
+func (s *StandardIndicatorSet) allocateSimpleIndicator(t indicator.Simple, iw types.IntervalWindow) indicator.Simple {
+	inc, ok := s.simples[iw]
 	if ok {
 		return inc
 	}
 
 	inc = t
-	set.initAndBind(inc, iw)
-	set.simples[iw] = inc
+	s.initAndBind(inc, iw)
+	s.simples[iw] = inc
 	return t
 }
 
 // SMA is a helper function that returns the simple moving average indicator of the given interval and the window size.
-func (set *StandardIndicatorSet) SMA(iw types.IntervalWindow) *indicator.SMA {
-	inc := set.allocateSimpleIndicator(&indicator.SMA{IntervalWindow: iw}, iw)
+func (s *StandardIndicatorSet) SMA(iw types.IntervalWindow) *indicator.SMA {
+	inc := s.allocateSimpleIndicator(&indicator.SMA{IntervalWindow: iw}, iw)
 	return inc.(*indicator.SMA)
 }
 
 // EWMA is a helper function that returns the exponential weighed moving average indicator of the given interval and the window size.
-func (set *StandardIndicatorSet) EWMA(iw types.IntervalWindow) *indicator.EWMA {
-	inc := set.allocateSimpleIndicator(&indicator.EWMA{IntervalWindow: iw}, iw)
+func (s *StandardIndicatorSet) EWMA(iw types.IntervalWindow) *indicator.EWMA {
+	inc := s.allocateSimpleIndicator(&indicator.EWMA{IntervalWindow: iw}, iw)
 	return inc.(*indicator.EWMA)
 }
 
-func (set *StandardIndicatorSet) PivotLow(iw types.IntervalWindow) *indicator.PivotLow {
-	inc := set.allocateSimpleIndicator(&indicator.PivotLow{IntervalWindow: iw}, iw)
+func (s *StandardIndicatorSet) PivotLow(iw types.IntervalWindow) *indicator.PivotLow {
+	inc := s.allocateSimpleIndicator(&indicator.PivotLow{IntervalWindow: iw}, iw)
 	return inc.(*indicator.PivotLow)
 }
 
-func (set *StandardIndicatorSet) STOCH(iw types.IntervalWindow) *indicator.STOCH {
-	inc, ok := set.stoch[iw]
+func (s *StandardIndicatorSet) STOCH(iw types.IntervalWindow) *indicator.STOCH {
+	inc, ok := s.stoch[iw]
 	if !ok {
 		inc = &indicator.STOCH{IntervalWindow: iw}
-		set.initAndBind(inc, iw)
-		set.stoch[iw] = inc
+		s.initAndBind(inc, iw)
+		s.stoch[iw] = inc
 	}
 
 	return inc
 }
 
 // BOLL returns the bollinger band indicator of the given interval, the window and bandwidth
-func (set *StandardIndicatorSet) BOLL(iw types.IntervalWindow, bandWidth float64) *indicator.BOLL {
+func (s *StandardIndicatorSet) BOLL(iw types.IntervalWindow, bandWidth float64) *indicator.BOLL {
 	iwb := types.IntervalWindowBandWidth{IntervalWindow: iw, BandWidth: bandWidth}
-	inc, ok := set.boll[iwb]
+	inc, ok := s.boll[iwb]
 	if !ok {
 		inc = &indicator.BOLL{IntervalWindow: iw, K: bandWidth}
-		set.initAndBind(inc, iw)
+		s.initAndBind(inc, iw)
 
 		if debugBOLL {
 			inc.OnUpdate(func(sma float64, upBand float64, downBand float64) {
-				logrus.Infof("%s BOLL %s: sma=%f up=%f down=%f", set.Symbol, iw.String(), sma, upBand, downBand)
+				logrus.Infof("%s BOLL %s: sma=%f up=%f down=%f", s.Symbol, iw.String(), sma, upBand, downBand)
 			})
 		}
-		set.boll[iwb] = inc
+		s.boll[iwb] = inc
 	}
 
 	return inc
