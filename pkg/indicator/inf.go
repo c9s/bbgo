@@ -22,12 +22,6 @@ type KLinePusher interface {
 	PushK(k types.KLine)
 }
 
-// KLineLoader provides an interface for API user to load history klines to the indicator.
-// The indicator implements its own way to calculate the values from the given history kline array.
-type KLineLoader interface {
-	LoadK(allKLines []types.KLine)
-}
-
 type KLineCalculateUpdater interface {
 	CalculateAndUpdate(allKLines []types.KLine)
 }

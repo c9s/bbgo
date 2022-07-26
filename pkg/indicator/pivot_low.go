@@ -9,8 +9,6 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-
-
 //go:generate callbackgen -type PivotLow
 type PivotLow struct {
 	types.IntervalWindow
@@ -53,37 +51,6 @@ func (inc *PivotLow) PushK(k types.KLine) {
 	inc.Update(k.Low.Float64())
 	inc.EndTime = k.EndTime.Time()
 	inc.EmitUpdate(inc.Last())
-}
-
-func (inc *PivotLow) LoadK(allKLines []types.KLine) {
-	for _, k := range allKLines {
-		inc.PushK(k)
-	}
-}
-
-func (inc *PivotLow) CalculateAndUpdate(allKLines []types.KLine) {
-	if len(inc.Values) == 0 {
-		for _, k := range allKLines {
-			inc.PushK(k)
-		}
-		inc.EmitUpdate(inc.Last())
-	} else {
-		k := allKLines[len(allKLines)-1]
-		inc.PushK(k)
-		inc.EmitUpdate(inc.Last())
-	}
-}
-
-func (inc *PivotLow) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
-	if inc.Interval != interval {
-		return
-	}
-
-	inc.CalculateAndUpdate(window)
-}
-
-func (inc *PivotLow) Bind(updater KLineWindowUpdater) {
-	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }
 
 func calculatePivotLow(lows types.Float64Slice, window int) (float64, error) {
