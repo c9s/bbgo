@@ -82,7 +82,7 @@ type Exchange struct {
 	client2 *binanceapi.RestClient
 }
 
-var timeSetter sync.Once
+var timeSetterOnce sync.Once
 
 func New(key, secret string) *Exchange {
 	var client = binance.NewClient(key, secret)
@@ -125,7 +125,7 @@ func New(key, secret string) *Exchange {
 		}
 
 		ctx := context.Background()
-		go timeSetter.Do(func() {
+		go timeSetterOnce.Do(func() {
 			setServerTime(ctx)
 
 			ticker := time.NewTicker(time.Hour)
