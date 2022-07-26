@@ -505,7 +505,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	}
 
 	s.OnSuspend(func() {
-		s.Status = types.StrategyStatusStopped
 		_ = s.orderExecutor.GracefulCancel(ctx)
 		bbgo.Sync(s)
 	})
