@@ -79,28 +79,6 @@ func (inc *STOCH) LoadK(allKLines []types.KLine) {
 	}
 }
 
-func (inc *STOCH) CalculateAndUpdate(kLines []types.KLine) {
-	if len(kLines) < inc.Window || len(kLines) < DPeriod {
-		return
-	}
-
-	for _, k := range kLines {
-		inc.PushK(k)
-	}
-}
-
-func (inc *STOCH) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
-	if inc.Interval != interval {
-		return
-	}
-
-	inc.CalculateAndUpdate(window)
-}
-
-func (inc *STOCH) Bind(updater KLineWindowUpdater) {
-	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
-}
-
 func (inc *STOCH) GetD() types.Series {
 	return &inc.D
 }
