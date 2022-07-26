@@ -87,31 +87,3 @@ func (inc *ATR) PushK(k types.KLine) {
 	inc.EndTime = k.EndTime.Time()
 	inc.EmitUpdate(inc.Last())
 }
-
-func (inc *ATR) LoadK(allKlines []types.KLine) {
-	for _, k := range allKlines {
-		inc.PushK(k)
-	}
-}
-
-func (inc *ATR) BindK(target KLineClosedEmitter, symbol string, interval types.Interval) {
-	target.OnKLineClosed(types.KLineWith(symbol, interval, inc.PushK))
-}
-
-func (inc *ATR) CalculateAndUpdate(kLines []types.KLine) {
-	for _, k := range kLines {
-		inc.PushK(k)
-	}
-}
-
-func (inc *ATR) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
-	if inc.Interval != interval {
-		return
-	}
-
-	inc.CalculateAndUpdate(window)
-}
-
-func (inc *ATR) Bind(updater KLineWindowUpdater) {
-	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
-}
