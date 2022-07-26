@@ -66,7 +66,7 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 	position := orderExecutor.Position()
 	symbol := position.Symbol
 	store, _ := session.MarketDataStore(s.Symbol)
-	standardIndicator, _ := session.StandardIndicatorSet(s.Symbol)
+	standardIndicator := session.StandardIndicatorSet(s.Symbol)
 
 	s.lastLow = fixedpoint.Zero
 

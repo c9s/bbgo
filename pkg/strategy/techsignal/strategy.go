@@ -3,7 +3,6 @@ package techsignal
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
@@ -145,10 +144,7 @@ func (s *Strategy) listenToFundingRate(ctx context.Context, exchange *binance.Ex
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-	standardIndicatorSet, ok := session.StandardIndicatorSet(s.Symbol)
-	if !ok {
-		return fmt.Errorf("standardIndicatorSet is nil, symbol %s", s.Symbol)
-	}
+	standardIndicatorSet := session.StandardIndicatorSet(s.Symbol)
 
 	if s.FundingRate != nil {
 		if binanceExchange, ok := session.Exchange.(*binance.Exchange); ok {

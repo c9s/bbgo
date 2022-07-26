@@ -4,9 +4,10 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/stretchr/testify/assert"
 )
 
 /*
@@ -26,6 +27,7 @@ func Test_HULL(t *testing.T) {
 	if err := json.Unmarshal(randomPrices, &input); err != nil {
 		panic(err)
 	}
+
 	tests := []struct {
 		name   string
 		kLines []types.KLine
@@ -44,8 +46,11 @@ func Test_HULL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			hull := HULL{IntervalWindow: types.IntervalWindow{Window: 16}}
-			hull.CalculateAndUpdate(tt.kLines)
+			hull := &HULL{IntervalWindow: types.IntervalWindow{Window: 16}}
+			for _, k := range tt.kLines {
+				hull.PushK(k)
+			}
+
 			last := hull.Last()
 			assert.InDelta(t, tt.want, last, Delta)
 			assert.InDelta(t, tt.next, hull.Index(1), Delta)

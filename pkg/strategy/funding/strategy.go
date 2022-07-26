@@ -3,7 +3,6 @@ package funding
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -32,7 +31,7 @@ type Strategy struct {
 	Market              types.Market     `json:"-"`
 	Quantity            fixedpoint.Value `json:"quantity,omitempty"`
 	MaxExposurePosition fixedpoint.Value `json:"maxExposurePosition"`
-	//Interval            types.Interval   `json:"interval"`
+	// Interval            types.Interval   `json:"interval"`
 
 	FundingRate *struct {
 		High          fixedpoint.Value `json:"high"`
@@ -49,11 +48,11 @@ type Strategy struct {
 		// MovingAverageInterval is the interval of k-lines for the moving average indicator to calculate,
 		// it could be "1m", "5m", "1h" and so on.  note that, the moving averages are calculated from
 		// the k-line data we subscribed
-		//MovingAverageInterval types.Interval `json:"movingAverageInterval"`
+		// MovingAverageInterval types.Interval `json:"movingAverageInterval"`
 		//
-		//// MovingAverageWindow is the number of the window size of the moving average indicator.
-		//// The number of k-lines in the window. generally used window sizes are 7, 25 and 99 in the TradingView.
-		//MovingAverageWindow int `json:"movingAverageWindow"`
+		// // MovingAverageWindow is the number of the window size of the moving average indicator.
+		// // The number of k-lines in the window. generally used window sizes are 7, 25 and 99 in the TradingView.
+		// MovingAverageWindow int `json:"movingAverageWindow"`
 
 		MovingAverageIntervalWindow types.IntervalWindow `json:"movingAverageIntervalWindow"`
 
@@ -70,9 +69,9 @@ func (s *Strategy) ID() string {
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	// session.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{})
 
-	//session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
+	// session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
 	//	Interval: string(s.Interval),
-	//})
+	// })
 
 	for _, detection := range s.SupportDetection {
 		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
@@ -93,23 +92,13 @@ func (s *Strategy) Validate() error {
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+	standardIndicatorSet := session.StandardIndicatorSet(s.Symbol)
 
-	standardIndicatorSet, ok := session.StandardIndicatorSet(s.Symbol)
-	if !ok {
-		return fmt.Errorf("standardIndicatorSet is nil, symbol %s", s.Symbol)
-	}
-	//binanceExchange, ok := session.Exchange.(*binance.Exchange)
-	//if !ok {
-	//	log.Error("exchange failed")
-	//}
 	if !session.Futures {
 		log.Error("futures not enabled in config for this strategy")
 		return nil
 	}
 
-	//if s.FundingRate != nil {
-	//	go s.listenToFundingRate(ctx, binanceExchange)
-	//}
 	premiumIndex, err := session.Exchange.(*binance.Exchange).QueryPremiumIndex(ctx, s.Symbol)
 	if err != nil {
 		log.Error("exchange does not support funding rate api")
