@@ -18,7 +18,6 @@ import (
 const ID = "pivotshort"
 
 var one = fixedpoint.One
-var zero = fixedpoint.Zero
 
 var log = logrus.WithField("strategy", ID)
 
