@@ -17,7 +17,7 @@ backtest:
   # see here for more details
   # https://www.investopedia.com/terms/m/maximum-drawdown-mdd.asp
   startTime: "2022-01-01"
-  endTime: "2022-05-12"
+  endTime: "2022-07-18"
   sessions:
   - binance
   symbols:
@@ -133,28 +133,24 @@ exchangeStrategies:
     # buyBelowNeutralSMA: when this set, it will only place buy order when the current price is below the SMA line.
     buyBelowNeutralSMA: false
 
-    # Set up your stop order, this is optional
-    # sometimes the stop order might decrease your total profit.
-    # you can setup multiple stop,
-    stops:
-    # use trailing stop order
-    - trailingStop:
-        # callbackRate: when the price reaches -1% from the previous highest, we trigger the stop
-        callbackRate: 5.1%
+    exits:
 
-        # closePosition is how much position do you want to close
-        closePosition: 20%
+    # roiTakeProfit is used to force taking profit by percentage of the position ROI (currently the price change)
+    # force to take the profit ROI exceeded the percentage.
+    - roiTakeProfit:
+        percentage: 3%
 
-        # minProfit is how much profit you want to take.
-        # if you set this option, your stop will only be triggered above the average cost.
-        minProfit: 5%
+    - protectiveStopLoss:
+        activationRatio: 1%
+        stopLossRatio: 0.2%
+        placeStopOrder: false
 
-        # interval is the time interval for checking your stop
-        interval: 1m
+    - protectiveStopLoss:
+        activationRatio: 2%
+        stopLossRatio: 1%
+        placeStopOrder: false
 
-        # virtual means we don't place a a REAL stop order
-        # when virtual is on
-        # the strategy won't place a REAL stop order, instead if watches the close price,
-        # and if the condition matches, it submits a market order to close your position.
-        virtual: true
-
+    - protectiveStopLoss:
+        activationRatio: 5%
+        stopLossRatio: 3%
+        placeStopOrder: false
