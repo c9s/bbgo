@@ -70,11 +70,11 @@ func (s *ResistanceShort) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 		// trend EMA protection
 		if gradient, ok := s.TrendEMA.Gradient(); ok {
 			if gradient > 1.0 {
-				log.Infof("trendEMA %+v current=%f last=%f slope=%f: skip short", s.TrendEMA, s.TrendEMA.trendEWMACurrent, s.TrendEMA.trendEWMALast, gradient)
+				log.Debugf("trendEMA %+v current=%f last=%f gradient=%f: skip short", s.TrendEMA, s.TrendEMA.trendEWMACurrent, s.TrendEMA.trendEWMALast, gradient)
 				return
 			}
 
-			log.Infof("trendEMA %+v current=%f last=%f slope=%f: short is enabled", s.TrendEMA, s.TrendEMA.trendEWMACurrent, s.TrendEMA.trendEWMALast, gradient)
+			log.Debugf("trendEMA %+v current=%f last=%f gradient=%f: short is enabled", s.TrendEMA, s.TrendEMA.trendEWMACurrent, s.TrendEMA.trendEWMALast, gradient)
 		}
 
 		position := s.orderExecutor.Position()
