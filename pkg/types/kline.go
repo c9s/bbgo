@@ -71,7 +71,7 @@ type KLine struct {
 	Closed         bool   `json:"closed" db:"closed"`
 }
 
-func (k *KLine) Copy(o *KLine) {
+func (k *KLine) Set(o *KLine) {
 	k.GID = o.GID
 	k.Exchange = o.Exchange
 	k.Symbol = o.Symbol
