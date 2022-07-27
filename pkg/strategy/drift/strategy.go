@@ -56,7 +56,7 @@ type Strategy struct {
 	midPrice  fixedpoint.Value
 	lock      sync.RWMutex
 
-	Source                    string           `json:"source"`
+	Source                    string           `json:"source,omitempty"`
 	TakeProfitFactor          float64          `json:"takeProfitFactor"`
 	StopLoss                  fixedpoint.Value `json:"stoploss"`
 	CanvasPath                string           `json:"canvasPath"`
@@ -185,8 +185,8 @@ func (s *Strategy) SourceFuncGenerator() SourceFunc {
 	case "open":
 		return func(kline *types.KLine) fixedpoint.Value { return kline.Open }
 	case "":
+		log.Infof("source not set, use hl2 by default")
 		return func(kline *types.KLine) fixedpoint.Value {
-			log.Infof("source not set, use hl2 by default")
 			return kline.High.Add(kline.Low).Div(Two)
 		}
 	default:
@@ -223,7 +223,7 @@ func (s *DriftMA) ZeroPoint() float64 {
 	return s.drift.ZeroPoint()
 }
 
-func (s *Strategy) InitIndicators() error {
+func (s *Strategy) initIndicators() error {
 	s.ma = &indicator.SMA{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: 5}}
 	s.stdevHigh = &indicator.StdDev{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: 6}}
 	s.stdevLow = &indicator.StdDev{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: 6}}
@@ -260,7 +260,7 @@ func (s *Strategy) InitIndicators() error {
 	return nil
 }
 
-func (s *Strategy) InitTickerFunctions(ctx context.Context) {
+func (s *Strategy) initTickerFunctions(ctx context.Context) {
 	if s.IsBackTesting() {
 		s.getLastPrice = func() fixedpoint.Value {
 			lastPrice, ok := s.Session.LastPrice(s.Symbol)
@@ -541,11 +541,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.lowestPrice = s.sellPrice
 	})
 
-	if err := s.InitIndicators(); err != nil {
-		log.WithError(err).Errorf("InitIndicator failed")
+	if err := s.initIndicators(); err != nil {
+		log.WithError(err).Errorf("initIndicator failed")
 		return nil
 	}
-	s.InitTickerFunctions(ctx)
+	s.initTickerFunctions(ctx)
 
 	dynamicKLine := &types.KLine{}
 	priceLine := types.NewQueue(300)
@@ -598,7 +598,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 			return
 		}
-		dynamicKLine.Copy(&kline)
+		dynamicKLine.Set(&kline)
 
 		source := s.getSource(dynamicKLine)
 		sourcef := source.Float64()
