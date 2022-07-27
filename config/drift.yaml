@@ -1,0 +1,80 @@
+---
+persistence:
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    db: 0
+
+sessions:
+  binance:
+    exchange: binance
+    futures: false
+    envVarPrefix: binance
+    heikinAshi: false
+
+exchangeStrategies:
+ 
+- on: binance
+  drift:
+    canvasPath: "./output.png"
+    symbol: ETHUSDT
+    # kline interval for indicators
+    interval: 15m
+    window: 2
+    stoploss: 0.3%
+    source: close
+    predictOffset: 2
+    # position avg +- takeProfitFactor * atr as take profit price
+    takeProfitFactor: 1.4
+    noTrailingStopLoss: true
+    # stddev on high/low-source
+    hlVarianceMultiplier: 0.22
+
+    generateGraph: true
+    graphPNLDeductFee: false
+    graphPNLPath: "./pnl.png"
+    graphCumPNLPath: "./cumpnl.png"
+    #exits:
+    #- roiStopLoss:
+    #   percentage: 0.8%
+    #- roiTakeProfit:
+    #   percentage: 35%
+    #- protectiveStopLoss:
+    #   activationRatio: 0.6%
+    #   stopLossRatio: 0.1%
+    #   placeStopOrder: false
+    #- protectiveStopLoss:
+    #   activationRatio: 5%
+    #   stopLossRatio: 1%
+    #   placeStopOrder: false
+    #- cumulatedVolumeTakeProfit:
+    #   interval: 5m
+    #   window: 2
+    #   minQuoteVolume: 200_000_000
+    #- protectiveStopLoss:
+    #    activationRatio: 2%
+    #    stopLossRatio: 1%
+    #    placeStopOrder: false
+
+sync:
+  userDataStream:
+    trades: true
+    filledOrders: true
+  sessions:
+    - binance
+  symbols:
+    - ETHUSDT
+
+backtest:
+  startTime: "2022-01-01"
+  endTime: "2022-06-18"
+  symbols:
+    - ETHUSDT
+  sessions: [binance]
+  accounts:
+    binance:
+      #makerFeeRate: 0.00001
+      #takerFeeRate: 0.00001
+      balances:
+        ETH: 10
+        USDT: 5000.0

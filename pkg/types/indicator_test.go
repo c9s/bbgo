@@ -1,9 +1,13 @@
 package types
 
 import (
-	"github.com/stretchr/testify/assert"
-	"gonum.org/v1/gonum/stat"
+	//"os"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/wcharczuk/go-chart/v2"
+	"gonum.org/v1/gonum/stat"
 )
 
 func TestFloat(t *testing.T) {
@@ -119,18 +123,18 @@ func TestSigmoid(t *testing.T) {
 
 // from https://en.wikipedia.org/wiki/Logistic_regression
 func TestLogisticRegression(t *testing.T) {
-	a := []Float64Slice{{0.5, 0.75, 1., 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3., 3.25, 3.5, 4., 4.25, 4.5, 4.75, 5., 5.5}}
+	a := []Float64Slice{{0.5, 0.75, 1., 1.25, 1.5, 1.75, 1.75, 2.0, 2.25, 2.5, 2.75, 3., 3.25, 3.5, 4., 4.25, 4.5, 4.75, 5., 5.5}}
 	b := Float64Slice{0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1}
 	var x []Series
 	x = append(x, &a[0])
 
-	model := LogisticRegression(x, &b, a[0].Length(), 8000, 0.0009)
+	model := LogisticRegression(x, &b, a[0].Length(), 90000, 0.0018)
 	inputs := []float64{1., 2., 2.7, 3., 4., 5.}
 	results := []bool{false, false, true, true, true, true}
 	for i, x := range inputs {
 		input := []float64{x}
 		pred := model.Predict(input)
-		assert.Equal(t, pred > 0.5, results[i])
+		assert.Equal(t, pred >= 0.5, results[i])
 	}
 }
 
@@ -143,4 +147,24 @@ func TestDot(t *testing.T) {
 	assert.InDelta(t, out2, 3., 0.001)
 	out3 := Dot(3., &a, 2)
 	assert.InDelta(t, out2, out3, 0.001)
+}
+
+func TestClone(t *testing.T) {
+	a := NewQueue(3)
+	a.Update(3.)
+	b := Clone(a)
+	b.Update(4.)
+	assert.Equal(t, a.Last(), 3.)
+	assert.Equal(t, b.Last(), 4.)
+}
+
+func TestPlot(t *testing.T) {
+	ct := NewCanvas("test", Interval5m)
+	a := Float64Slice{200., 205., 230., 236}
+	ct.Plot("test", &a, Time(time.Now()), 4)
+	assert.Equal(t, ct.Interval, Interval5m)
+	assert.Equal(t, ct.Series[0].(chart.TimeSeries).Len(), 4)
+	//f, _ := os.Create("output.png")
+	//defer f.Close()
+	//ct.Render(chart.PNG, f)
 }

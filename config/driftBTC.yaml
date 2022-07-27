@@ -1,0 +1,91 @@
+---
+persistence:
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    db: 0
+
+sessions:
+  binance:
+    exchange: binance
+    futures: false
+    envVarPrefix: binance
+    heikinAshi: false
+
+exchangeStrategies:
+ 
+- on: binance
+  drift:
+    canvasPath: "./output.png"
+    symbol: BTCBUSD
+    # kline interval for indicators
+    interval: 15m
+    window: 2
+    stoploss: 0.3%
+    source: close
+    predictOffset: 2
+    # position avg +- takeProfitFactor * atr as take profit price
+    takeProfitFactor: 1.2
+    noTrailingStopLoss: true
+    # stddev on high/low-source
+    hlVarianceMultiplier: 0.27
+
+    generateGraph: true
+    graphPNLDeductFee: true
+    graphPNLPath: "./pnl.png"
+    graphCumPNLPath: "./cumpnl.png"
+    exits:
+    #- roiStopLoss:
+    #   percentage: 0.8%
+    #- roiTakeProfit:
+    #   percentage: 3%
+    #- protectiveStopLoss:
+    #   activationRatio: 0.5%
+    #   stopLossRatio: 0.1%
+    #   placeStopOrder: false
+    - trailingStop:
+        callbackRate: 1%
+        # activationRatio is relative to the average cost,
+        # when side is buy, 1% means lower 1% than the average cost.
+        # when side is sell, 1% means higher 1% than the average cost.
+        activationRatio: 3%
+        # minProfit uses the position ROI to calculate the profit ratio
+        minProfit: 1%
+        interval: 1m
+        side: buy
+        closePosition: 100%
+    #- protectiveStopLoss:
+    #   activationRatio: 5%
+    #   stopLossRatio: 1%
+    #   placeStopOrder: false
+    #- cumulatedVolumeTakeProfit:
+    #   interval: 5m
+    #   window: 2
+    #   minQuoteVolume: 200_000_000
+    #- protectiveStopLoss:
+    #    activationRatio: 2%
+    #    stopLossRatio: 1%
+    #    placeStopOrder: false
+
+sync:
+  userDataStream:
+    trades: true
+    filledOrders: true
+  sessions:
+    - binance
+  symbols:
+    - BTCBUSD
+
+backtest:
+  startTime: "2022-01-01"
+  endTime: "2022-06-18"
+  symbols:
+    - BTCBUSD
+  sessions: [binance]
+  accounts:
+    binance:
+      makerFeeRate: 0.000
+      takerFeeRate: 0.00075
+      balances:
+        BTC: 10
+        BUSD: 5000.0

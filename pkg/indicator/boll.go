@@ -21,7 +21,6 @@ Bollinger Bands Technical indicator guide:
 
 //go:generate callbackgen -type BOLL
 type BOLL struct {
-	types.SeriesBase
 	types.IntervalWindow
 
 	// K is the multiplier of Std, generally it's 2
@@ -74,7 +73,6 @@ func (inc *BOLL) LastDownBand() float64 {
 
 func (inc *BOLL) Update(value float64) {
 	if inc.SMA == nil {
-		inc.SeriesBase.Series = inc
 		inc.SMA = &SMA{IntervalWindow: inc.IntervalWindow}
 	}
 

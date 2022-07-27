@@ -2,6 +2,7 @@ package bbgo
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -102,7 +103,7 @@ func (e *GeneralOrderExecutor) SubmitOrders(ctx context.Context, submitOrders ..
 
 	createdOrders, err := e.session.Exchange.SubmitOrders(ctx, formattedOrders...)
 	if err != nil {
-		log.WithError(err).Errorf("can not place orders")
+		err = fmt.Errorf("can not place orders: %w", err)
 	}
 
 	e.orderStore.Add(createdOrders...)
@@ -113,9 +114,11 @@ func (e *GeneralOrderExecutor) SubmitOrders(ctx context.Context, submitOrders ..
 
 // GracefulCancelActiveOrderBook cancels the orders from the active orderbook.
 func (e *GeneralOrderExecutor) GracefulCancelActiveOrderBook(ctx context.Context, activeOrders *ActiveOrderBook) error {
+	if activeOrders.NumOfOrders() == 0 {
+		return nil
+	}
 	if err := activeOrders.GracefulCancel(ctx, e.session.Exchange); err != nil {
-		log.WithError(err).Errorf("graceful cancel order error")
-		return err
+		return fmt.Errorf("graceful cancel order error: %w", err)
 	}
 
 	e.tradeCollector.Process()

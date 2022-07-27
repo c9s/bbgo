@@ -15,6 +15,7 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 const ID = "ewo_dgtrd"
@@ -114,11 +115,6 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	}
 }
 
-type UpdatableSeries interface {
-	types.Series
-	Update(value float64)
-}
-
 // Refer: https://tw.tradingview.com/script/XZyG5SOx-CCI-Stochastic-and-a-quick-lesson-on-Scalping-Trading-Systems/
 type CCISTOCH struct {
 	cci        *indicator.CCI
@@ -180,8 +176,8 @@ func (inc *CCISTOCH) SellSignal() bool {
 }
 
 type VWEMA struct {
-	PV UpdatableSeries
-	V  UpdatableSeries
+	PV types.UpdatableSeries
+	V  types.UpdatableSeries
 }
 
 func (inc *VWEMA) Last() float64 {
@@ -1010,7 +1006,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		bestAsk := ticker.Sell
 		var midPrice fixedpoint.Value
 
-		if tryLock(&s.lock) {
+		if util.TryLock(&s.lock) {
 			if !bestAsk.IsZero() && !bestBid.IsZero() {
 				s.midPrice = bestAsk.Add(bestBid).Div(types.Two)
 			} else if !bestAsk.IsZero() {
