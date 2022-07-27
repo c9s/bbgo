@@ -6,6 +6,7 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
+	"github.com/c9s/bbgo/pkg/risk"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -21,6 +22,7 @@ type ResistanceShort struct {
 	NumLayers     int              `json:"numLayers"`
 	LayerSpread   fixedpoint.Value `json:"layerSpread"`
 	Quantity      fixedpoint.Value `json:"quantity"`
+	Leverage      fixedpoint.Value `json:"leverage"`
 	Ratio         fixedpoint.Value `json:"ratio"`
 
 	session       *bbgo.ExchangeSession
@@ -116,10 +118,15 @@ func (s *ResistanceShort) updateResistanceOrders(closePrice fixedpoint.Value) {
 }
 
 func (s *ResistanceShort) placeResistanceOrders(ctx context.Context, resistancePrice fixedpoint.Value) {
-	futuresMode := s.session.Futures || s.session.IsolatedFutures
-	_ = futuresMode
+	totalQuantity, err := risk.CalculateBaseQuantity(s.session, s.Market, resistancePrice, s.Quantity, s.Leverage)
+	if err != nil {
+		log.WithError(err).Errorf("quantity calculation error")
+	}
 
-	totalQuantity := s.Quantity
+	if totalQuantity.IsZero() {
+		return
+	}
+
 	numLayers := s.NumLayers
 	if numLayers == 0 {
 		numLayers = 1
@@ -160,14 +167,6 @@ func (s *ResistanceShort) placeResistanceOrders(ctx context.Context, resistanceP
 			Tag:              "resistanceShort",
 			MarginSideEffect: types.SideEffectTypeMarginBuy,
 		})
-
-		// TODO: fix futures mode later
-		/*
-			if futuresMode {
-				if quantity.Mul(price).Compare(quoteBalance.Available) <= 0 {
-				}
-			}
-		*/
 	}
 
 	createdOrders, err := s.orderExecutor.SubmitOrders(ctx, orderForms...)
