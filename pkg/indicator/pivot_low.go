@@ -11,8 +11,9 @@ import (
 
 //go:generate callbackgen -type PivotLow
 type PivotLow struct {
-	types.IntervalWindow
 	types.SeriesBase
+
+	types.IntervalWindow
 
 	Lows    types.Float64Slice
 	Values  types.Float64Slice
@@ -71,15 +72,11 @@ func calculatePivotLow(lows types.Float64Slice, window int) (float64, error) {
 		return 0., fmt.Errorf("insufficient elements for calculating with window = %d", window)
 	}
 
-	var pv types.Float64Slice
-	for _, low := range lows {
-		pv.Push(low)
+	end := length - 1
+	min := lows[end-(window-1):].Min()
+	if min == lows.Index(int(window/2.)-1) {
+		return min, nil
 	}
 
-	pl := 0.
-	if lows.Min() == lows.Index(int(window/2.)-1) {
-		pl = lows.Min()
-	}
-
-	return pl, nil
+	return 0., nil
 }

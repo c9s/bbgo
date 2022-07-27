@@ -50,7 +50,7 @@ func (s *ResistanceShort) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 	s.resistancePivot = session.StandardIndicatorSet(s.Symbol).PivotLow(s.IntervalWindow)
 
 	// use the last kline from the history before we get the next closed kline
-	s.updateResistanceOrders(fixedpoint.NewFromFloat(s.resistancePivot.Lows.Last()))
+	s.updateResistanceOrders(fixedpoint.NewFromFloat(s.resistancePivot.Last()))
 
 	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
 		position := s.orderExecutor.Position()
@@ -77,7 +77,7 @@ func tail(arr []float64, length int) []float64 {
 func (s *ResistanceShort) updateCurrentResistancePrice(closePrice fixedpoint.Value) bool {
 	minDistance := s.MinDistance.Float64()
 	groupDistance := s.GroupDistance.Float64()
-	resistancePrices := findPossibleResistancePrices(closePrice.Float64()*(1.0+minDistance), groupDistance, tail(s.resistancePivot.Lows, 6))
+	resistancePrices := findPossibleResistancePrices(closePrice.Float64()*(1.0+minDistance), groupDistance, s.resistancePivot.Values.Tail(6))
 	if len(resistancePrices) == 0 {
 		return false
 	}

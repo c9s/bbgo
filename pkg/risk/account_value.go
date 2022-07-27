@@ -164,6 +164,7 @@ func CalculateBaseQuantity(session *bbgo.ExchangeSession, market types.Market, p
 		leverage = fixedpoint.NewFromInt(3)
 	}
 
+
 	baseBalance, _ := session.Account.Balance(market.BaseCurrency)
 	quoteBalance, _ := session.Account.Balance(market.QuoteCurrency)
 
@@ -185,11 +186,11 @@ func CalculateBaseQuantity(session *bbgo.ExchangeSession, market types.Market, p
 		return quantity, fmt.Errorf("quantity is zero, can not submit sell order, please check your quantity settings")
 	}
 
-	// using leverage -- starts from here
 	if !quantity.IsZero() {
 		return quantity, nil
 	}
 
+	// using leverage -- starts from here
 	logrus.Infof("calculating available leveraged base quantity: base balance = %+v, quote balance = %+v", baseBalance, quoteBalance)
 
 	// calculate the quantity automatically
