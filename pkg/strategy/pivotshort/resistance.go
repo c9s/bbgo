@@ -125,7 +125,7 @@ func (s *ResistanceShort) placeResistanceOrders(ctx context.Context, resistanceP
 		return
 	}
 
-	bbgo.Notify("Next %s resistance price at %f, updating resistance orders with total quantity...", s.Symbol, s.currentResistancePrice.Float64(), totalQuantity.Float64())
+	bbgo.Notify("Next %s resistance price at %f, updating resistance orders with total quantity %f", s.Symbol, s.currentResistancePrice.Float64(), totalQuantity.Float64())
 
 	numLayers := s.NumLayers
 	if numLayers == 0 {
