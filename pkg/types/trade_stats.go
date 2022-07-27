@@ -114,7 +114,7 @@ type TradeStats struct {
 
 	ProfitFactor    fixedpoint.Value                      `json:"profitFactor" yaml:"profitFactor"`
 	TotalNetProfit  fixedpoint.Value                      `json:"totalNetProfit" yaml:"totalNetProfit"`
-	IntervalProfits map[Interval]*IntervalProfitCollector `jons:"intervalProfits,omitempty" yaml: "intervalProfits,omitempty"`
+	IntervalProfits map[Interval]*IntervalProfitCollector `json:"intervalProfits,omitempty" yaml:"intervalProfits,omitempty"`
 
 	// MaximumConsecutiveWins - (counter) the longest series of winning trades
 	MaximumConsecutiveWins int `json:"maximumConsecutiveWins" yaml:"maximumConsecutiveWins"`
