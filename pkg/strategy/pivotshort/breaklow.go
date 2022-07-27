@@ -19,7 +19,7 @@ type TrendEMA struct {
 	types.IntervalWindow
 }
 
-type ClosedKLineStop struct {
+type FakeBreakStop struct {
 	types.IntervalWindow
 }
 
@@ -46,7 +46,7 @@ type BreakLow struct {
 
 	TrendEMA *TrendEMA `json:"trendEMA"`
 
-	ClosedKLineStop *ClosedKLineStop `json:"closedKLineStop"`
+	FakeBreakStop *FakeBreakStop `json:"fakeBreakStop"`
 
 	lastLow fixedpoint.Value
 
@@ -77,8 +77,8 @@ func (s *BreakLow) Subscribe(session *bbgo.ExchangeSession) {
 		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.TrendEMA.Interval})
 	}
 
-	if s.ClosedKLineStop != nil {
-		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.ClosedKLineStop.Interval})
+	if s.FakeBreakStop != nil {
+		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.FakeBreakStop.Interval})
 	}
 }
 
@@ -127,10 +127,10 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 		}
 	}))
 
-	if s.ClosedKLineStop != nil {
+	if s.FakeBreakStop != nil {
 		// if the position is already opened, and we just break the low, this checks if the kline closed above the low,
 		// so that we can close the position earlier
-		session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.ClosedKLineStop.Interval, func(k types.KLine) {
+		session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.FakeBreakStop.Interval, func(k types.KLine) {
 			// make sure the position is opened, and it's a short position
 			if !position.IsOpened(k.Close) || !position.IsShort() {
 				return
