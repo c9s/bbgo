@@ -1,6 +1,7 @@
 package types
 
 import (
+	"math"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -94,19 +95,42 @@ func (s IntervalProfitCollector) MarshalYAML() (interface{}, error) {
 // TODO: Add more stats from the reference:
 // See https://www.metatrader5.com/en/terminal/help/algotrading/testing_report
 type TradeStats struct {
-	Symbol              string                                `json:"symbol"`
-	WinningRatio        fixedpoint.Value                      `json:"winningRatio" yaml:"winningRatio"`
-	NumOfLossTrade      int                                   `json:"numOfLossTrade" yaml:"numOfLossTrade"`
-	NumOfProfitTrade    int                                   `json:"numOfProfitTrade" yaml:"numOfProfitTrade"`
-	GrossProfit         fixedpoint.Value                      `json:"grossProfit" yaml:"grossProfit"`
-	GrossLoss           fixedpoint.Value                      `json:"grossLoss" yaml:"grossLoss"`
-	Profits             []fixedpoint.Value                    `json:"profits" yaml:"profits"`
-	Losses              []fixedpoint.Value                    `json:"losses" yaml:"losses"`
-	MostProfitableTrade fixedpoint.Value                      `json:"mostProfitableTrade" yaml:"mostProfitableTrade"`
-	MostLossTrade       fixedpoint.Value                      `json:"mostLossTrade" yaml:"mostLossTrade"`
-	ProfitFactor        fixedpoint.Value                      `json:"profitFactor" yaml:"profitFactor"`
-	TotalNetProfit      fixedpoint.Value                      `json:"totalNetProfit" yaml:"totalNetProfit"`
-	IntervalProfits     map[Interval]*IntervalProfitCollector `jons:"intervalProfits,omitempty" yaml: "intervalProfits,omitempty"`
+	Symbol string `json:"symbol"`
+
+	WinningRatio     fixedpoint.Value `json:"winningRatio" yaml:"winningRatio"`
+	NumOfLossTrade   int              `json:"numOfLossTrade" yaml:"numOfLossTrade"`
+	NumOfProfitTrade int              `json:"numOfProfitTrade" yaml:"numOfProfitTrade"`
+
+	GrossProfit fixedpoint.Value `json:"grossProfit" yaml:"grossProfit"`
+	GrossLoss   fixedpoint.Value `json:"grossLoss" yaml:"grossLoss"`
+
+	Profits []fixedpoint.Value `json:"profits" yaml:"profits"`
+	Losses  []fixedpoint.Value `json:"losses" yaml:"losses"`
+
+	LargestProfitTrade fixedpoint.Value `json:"largestProfitTrade,omitempty" yaml:"largestProfitTrade"`
+	LargestLossTrade   fixedpoint.Value `json:"largestLossTrade,omitempty" yaml:"largestLossTrade"`
+	AverageProfitTrade fixedpoint.Value `json:"averageProfitTrade" yaml:"averageProfitTrade"`
+	AverageLossTrade   fixedpoint.Value `json:"averageLossTrade" yaml:"averageLossTrade"`
+
+	ProfitFactor    fixedpoint.Value                      `json:"profitFactor" yaml:"profitFactor"`
+	TotalNetProfit  fixedpoint.Value                      `json:"totalNetProfit" yaml:"totalNetProfit"`
+	IntervalProfits map[Interval]*IntervalProfitCollector `jons:"intervalProfits,omitempty" yaml: "intervalProfits,omitempty"`
+
+	// MaximumConsecutiveWins - (counter) the longest series of winning trades
+	MaximumConsecutiveWins int `json:"maximumConsecutiveWins" yaml:"maximumConsecutiveWins"`
+
+	// MaximumConsecutiveLosses - (counter) the longest series of losing trades
+	MaximumConsecutiveLosses int `json:"maximumConsecutiveLosses" yaml:"maximumConsecutiveLosses"`
+
+	// MaximumConsecutiveProfit - ($) the longest series of winning trades and their total profit;
+	MaximumConsecutiveProfit fixedpoint.Value `json:"maximumConsecutiveProfit" yaml:"maximumConsecutiveProfit"`
+
+	// MaximumConsecutiveLoss - ($) the longest series of losing trades and their total loss;
+	MaximumConsecutiveLoss fixedpoint.Value `json:"maximumConsecutiveLoss" yaml:"maximumConsecutiveLoss"`
+
+	consecutiveSide    int
+	consecutiveCounter int
+	consecutiveAmount  fixedpoint.Value
 }
 
 func NewTradeStats(symbol string) *TradeStats {
@@ -119,7 +143,7 @@ func (s *TradeStats) SetIntervalProfitCollector(c *IntervalProfitCollector) {
 }
 
 func (s *TradeStats) Add(profit *Profit) {
-	if profit.Symbol != s.Symbol {
+	if s.Symbol != "" && profit.Symbol != s.Symbol {
 		return
 	}
 
@@ -134,12 +158,42 @@ func (s *TradeStats) add(pnl fixedpoint.Value) {
 		s.NumOfProfitTrade++
 		s.Profits = append(s.Profits, pnl)
 		s.GrossProfit = s.GrossProfit.Add(pnl)
-		s.MostProfitableTrade = fixedpoint.Max(s.MostProfitableTrade, pnl)
+		s.LargestProfitTrade = fixedpoint.Max(s.LargestProfitTrade, pnl)
+
+		// consecutive same side (made profit last time)
+		if s.consecutiveSide == 0 || s.consecutiveSide == 1 {
+			s.consecutiveSide = 1
+			s.consecutiveCounter++
+			s.consecutiveAmount = s.consecutiveAmount.Add(pnl)
+		} else { // was loss, now profit, store the last loss and the loss amount
+			s.MaximumConsecutiveLosses = int(math.Max(float64(s.MaximumConsecutiveLosses), float64(s.consecutiveCounter)))
+			s.MaximumConsecutiveLoss = fixedpoint.Min(s.MaximumConsecutiveLoss, s.consecutiveAmount)
+
+			s.consecutiveSide = 1
+			s.consecutiveCounter = 0
+			s.consecutiveAmount = pnl
+		}
+
 	} else {
 		s.NumOfLossTrade++
 		s.Losses = append(s.Losses, pnl)
 		s.GrossLoss = s.GrossLoss.Add(pnl)
-		s.MostLossTrade = fixedpoint.Min(s.MostLossTrade, pnl)
+		s.LargestLossTrade = fixedpoint.Min(s.LargestLossTrade, pnl)
+
+		// consecutive same side (made loss last time)
+		if s.consecutiveSide == 0 || s.consecutiveSide == -1 {
+			s.consecutiveSide = -1
+			s.consecutiveCounter++
+			s.consecutiveAmount = s.consecutiveAmount.Add(pnl)
+		} else { // was profit, now loss, store the last win and profit
+			s.MaximumConsecutiveWins = int(math.Max(float64(s.MaximumConsecutiveWins), float64(s.consecutiveCounter)))
+			s.MaximumConsecutiveProfit = fixedpoint.Max(s.MaximumConsecutiveProfit, s.consecutiveAmount)
+
+			s.consecutiveSide = -1
+			s.consecutiveCounter = 0
+			s.consecutiveAmount = pnl
+		}
+
 	}
 	s.TotalNetProfit = s.TotalNetProfit.Add(pnl)
 
@@ -153,22 +207,24 @@ func (s *TradeStats) add(pnl fixedpoint.Value) {
 	}
 
 	s.ProfitFactor = s.GrossProfit.Div(s.GrossLoss.Abs())
+	s.AverageProfitTrade = fixedpoint.Avg(s.Profits)
+	s.AverageLossTrade = fixedpoint.Avg(s.Losses)
 }
 
 // Output TradeStats without Profits and Losses
 func (s *TradeStats) BriefString() string {
 	out, _ := yaml.Marshal(&TradeStats{
-		Symbol:              s.Symbol,
-		WinningRatio:        s.WinningRatio,
-		NumOfLossTrade:      s.NumOfLossTrade,
-		NumOfProfitTrade:    s.NumOfProfitTrade,
-		GrossProfit:         s.GrossProfit,
-		GrossLoss:           s.GrossLoss,
-		MostProfitableTrade: s.MostProfitableTrade,
-		MostLossTrade:       s.MostLossTrade,
-		ProfitFactor:        s.ProfitFactor,
-		TotalNetProfit:      s.TotalNetProfit,
-		IntervalProfits:     s.IntervalProfits,
+		Symbol:             s.Symbol,
+		WinningRatio:       s.WinningRatio,
+		NumOfLossTrade:     s.NumOfLossTrade,
+		NumOfProfitTrade:   s.NumOfProfitTrade,
+		GrossProfit:        s.GrossProfit,
+		GrossLoss:          s.GrossLoss,
+		LargestProfitTrade: s.LargestProfitTrade,
+		LargestLossTrade:   s.LargestLossTrade,
+		ProfitFactor:       s.ProfitFactor,
+		TotalNetProfit:     s.TotalNetProfit,
+		IntervalProfits:    s.IntervalProfits,
 	})
 	return string(out)
 }
