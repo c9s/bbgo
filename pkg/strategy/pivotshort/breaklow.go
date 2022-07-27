@@ -10,6 +10,19 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+type StopEMA struct {
+	types.IntervalWindow
+	Range fixedpoint.Value `json:"range"`
+}
+
+type TrendEMA struct {
+	types.IntervalWindow
+}
+
+type FakeBreakStop struct {
+	types.IntervalWindow
+}
+
 // BreakLow -- when price breaks the previous pivot low, we set a trade entry
 type BreakLow struct {
 	Symbol string
@@ -26,21 +39,27 @@ type BreakLow struct {
 	// limit sell price = breakLowPrice * (1 + BounceRatio)
 	BounceRatio fixedpoint.Value `json:"bounceRatio"`
 
-	Leverage     fixedpoint.Value      `json:"leverage"`
-	Quantity     fixedpoint.Value      `json:"quantity"`
-	StopEMARange fixedpoint.Value      `json:"stopEMARange"`
-	StopEMA      *types.IntervalWindow `json:"stopEMA"`
+	Leverage fixedpoint.Value `json:"leverage"`
+	Quantity fixedpoint.Value `json:"quantity"`
 
-	TrendEMA *types.IntervalWindow `json:"trendEMA"`
+	StopEMA *StopEMA `json:"stopEMA"`
 
-	lastLow  fixedpoint.Value
-	pivot    *indicator.PivotLow
+	TrendEMA *TrendEMA `json:"trendEMA"`
+
+	FakeBreakStop *FakeBreakStop `json:"fakeBreakStop"`
+
+	lastLow fixedpoint.Value
+
+	// lastBreakLow is the low that the price just break
+	lastBreakLow fixedpoint.Value
+
+	pivotLow       *indicator.PivotLow
+	pivotLowPrices []fixedpoint.Value
+
 	stopEWMA *indicator.EWMA
 
 	trendEWMA                       *indicator.EWMA
 	trendEWMALast, trendEWMACurrent float64
-
-	pivotLowPrices []fixedpoint.Value
 
 	orderExecutor *bbgo.GeneralOrderExecutor
 	session       *bbgo.ExchangeSession
@@ -57,6 +76,10 @@ func (s *BreakLow) Subscribe(session *bbgo.ExchangeSession) {
 	if s.TrendEMA != nil {
 		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.TrendEMA.Interval})
 	}
+
+	if s.FakeBreakStop != nil {
+		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.FakeBreakStop.Interval})
+	}
 }
 
 func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.GeneralOrderExecutor) {
@@ -69,14 +92,14 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 
 	s.lastLow = fixedpoint.Zero
 
-	s.pivot = standardIndicator.PivotLow(s.IntervalWindow)
+	s.pivotLow = standardIndicator.PivotLow(s.IntervalWindow)
 
 	if s.StopEMA != nil {
-		s.stopEWMA = standardIndicator.EWMA(*s.StopEMA)
+		s.stopEWMA = standardIndicator.EWMA(s.StopEMA.IntervalWindow)
 	}
 
 	if s.TrendEMA != nil {
-		s.trendEWMA = standardIndicator.EWMA(*s.TrendEMA)
+		s.trendEWMA = standardIndicator.EWMA(s.TrendEMA.IntervalWindow)
 
 		session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.TrendEMA.Interval, func(kline types.KLine) {
 			s.trendEWMALast = s.trendEWMACurrent
@@ -86,58 +109,52 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 
 	// update pivot low data
 	session.MarketDataStream.OnStart(func() {
-		lastLow := fixedpoint.NewFromFloat(s.pivot.Lows.Last())
-		if lastLow.IsZero() {
-			return
+		if s.updatePivotLow() {
+			bbgo.Notify("%s new pivot low: %f", s.Symbol, s.pivotLow.Last())
 		}
 
-		if lastLow.Compare(s.lastLow) != 0 {
-			bbgo.Notify("%s found new pivot low: %f", s.Symbol, s.pivot.Lows.Last())
-		}
-
-		s.lastLow = lastLow
-		s.pivotLowPrices = append(s.pivotLowPrices, s.lastLow)
-
-		log.Infof("pilot calculation for max position: last low = %f, quantity = %f, leverage = %f",
-			s.lastLow.Float64(),
-			s.Quantity.Float64(),
-			s.Leverage.Float64())
-
-		quantity, err := risk.CalculateBaseQuantity(s.session, s.Market, s.lastLow, s.Quantity, s.Leverage)
-		if err != nil {
-			log.WithError(err).Errorf("quantity calculation error")
-		}
-
-		if quantity.IsZero() {
-			log.WithError(err).Errorf("quantity is zero, can not submit order")
-			return
-		}
-
-		bbgo.Notify("%s %f quantity will be used for shorting", s.Symbol, quantity.Float64())
+		s.pilotQuantityCalculation()
 	})
 
 	session.MarketDataStream.OnKLineClosed(types.KLineWith(symbol, s.Interval, func(kline types.KLine) {
-		lastLow := fixedpoint.NewFromFloat(s.pivot.Lows.Last())
-		if lastLow.IsZero() {
-			return
+		if s.updatePivotLow() {
+			// when position is opened, do not send pivot low notify
+			if position.IsOpened(kline.Close) {
+				return
+			}
+
+			bbgo.Notify("%s new pivot low: %f", s.Symbol, s.pivotLow.Last())
 		}
-
-		if lastLow.Compare(s.lastLow) == 0 {
-			return
-		}
-
-		s.lastLow = lastLow
-		s.pivotLowPrices = append(s.pivotLowPrices, s.lastLow)
-
-		// when position is opened, do not send pivot low notify
-		if position.IsOpened(kline.Close) {
-			return
-		}
-
-		bbgo.Notify("%s new pivot low: %f", s.Symbol, s.pivot.Lows.Last())
 	}))
 
-	session.MarketDataStream.OnKLineClosed(types.KLineWith(symbol, types.Interval1m, func(kline types.KLine) {
+	if s.FakeBreakStop != nil {
+		// if the position is already opened, and we just break the low, this checks if the kline closed above the low,
+		// so that we can close the position earlier
+		session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.FakeBreakStop.Interval, func(k types.KLine) {
+			// make sure the position is opened, and it's a short position
+			if !position.IsOpened(k.Close) || !position.IsShort() {
+				return
+			}
+
+			// make sure we recorded the last break low
+			if s.lastBreakLow.IsZero() {
+				return
+			}
+
+			// the kline opened below the last break low, and closed above the last break low
+			if k.Open.Compare(s.lastBreakLow) < 0 && k.Close.Compare(s.lastBreakLow) > 0 {
+				bbgo.Notify("kLine closed above the last break low, triggering stop earlier")
+				if err := s.orderExecutor.ClosePosition(context.Background(), one, "kLineClosedStop"); err != nil {
+					log.WithError(err).Error("position close error")
+				}
+
+				// reset to zero
+				s.lastBreakLow = fixedpoint.Zero
+			}
+		}))
+	}
+
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(kline types.KLine) {
 		if len(s.pivotLowPrices) == 0 {
 			log.Infof("currently there is no pivot low prices, can not check break low...")
 			return
@@ -170,6 +187,10 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 
 		log.Infof("%s breakLow signal detected, closed price %f < breakPrice %f", kline.Symbol, closePrice.Float64(), breakPrice.Float64())
 
+		if s.lastBreakLow.IsZero() || previousLow.Compare(s.lastBreakLow) < 0 {
+			s.lastBreakLow = previousLow
+		}
+
 		if position.IsOpened(kline.Close) {
 			log.Infof("position is already opened, skip short")
 			return
@@ -193,9 +214,9 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 				return
 			}
 
-			emaStopShortPrice := ema.Mul(fixedpoint.One.Sub(s.StopEMARange))
+			emaStopShortPrice := ema.Mul(fixedpoint.One.Sub(s.StopEMA.Range))
 			if closePrice.Compare(emaStopShortPrice) < 0 {
-				log.Infof("stopEMA protection: close price %f < EMA(%v) = %f", closePrice.Float64(), s.StopEMA, ema.Float64())
+				log.Infof("stopEMA protection: close price %f < EMA(%v %f) * (1 - RANGE %f) = %f", closePrice.Float64(), s.StopEMA, ema.Float64(), s.StopEMA.Range.Float64(), emaStopShortPrice.Float64())
 				return
 			}
 		}
@@ -240,4 +261,34 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 			})
 		}
 	}))
+}
+
+func (s *BreakLow) pilotQuantityCalculation() {
+	log.Infof("pilot calculation for max position: last low = %f, quantity = %f, leverage = %f",
+		s.lastLow.Float64(),
+		s.Quantity.Float64(),
+		s.Leverage.Float64())
+
+	quantity, err := risk.CalculateBaseQuantity(s.session, s.Market, s.lastLow, s.Quantity, s.Leverage)
+	if err != nil {
+		log.WithError(err).Errorf("quantity calculation error")
+	}
+
+	if quantity.IsZero() {
+		log.WithError(err).Errorf("quantity is zero, can not submit order")
+		return
+	}
+
+	bbgo.Notify("%s %f quantity will be used for shorting", s.Symbol, quantity.Float64())
+}
+
+func (s *BreakLow) updatePivotLow() bool {
+	lastLow := fixedpoint.NewFromFloat(s.pivotLow.Last())
+	if lastLow.IsZero() || lastLow.Compare(s.lastLow) == 0 {
+		return false
+	}
+
+	s.lastLow = lastLow
+	s.pivotLowPrices = append(s.pivotLowPrices, lastLow)
+	return true
 }
