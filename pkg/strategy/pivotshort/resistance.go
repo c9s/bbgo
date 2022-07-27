@@ -64,15 +64,7 @@ func (s *ResistanceShort) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 	}))
 }
 
-func tail(arr []float64, length int) []float64 {
-	if len(arr) == 0 || len(arr) < length {
-		return arr
-	}
-
-	return arr[len(arr)-1-length:]
-}
-
-// updateCurrentResistancePrice update the current resistance price
+// updateCurrentResistancePrice updates the current resistance price
 // we should only update the resistance price when:
 // 1) the close price is already above the current resistance price by (1 + minDistance)
 // 2) the next resistance price is lower than the current resistance price.
