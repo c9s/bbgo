@@ -25,6 +25,8 @@ type ResistanceShort struct {
 	Leverage      fixedpoint.Value `json:"leverage"`
 	Ratio         fixedpoint.Value `json:"ratio"`
 
+	TrendEMA *TrendEMA `json:"trendEMA"`
+
 	session       *bbgo.ExchangeSession
 	orderExecutor *bbgo.GeneralOrderExecutor
 
@@ -35,7 +37,17 @@ type ResistanceShort struct {
 	activeOrders *bbgo.ActiveOrderBook
 }
 
+func (s *ResistanceShort) Subscribe(session *bbgo.ExchangeSession) {
+	if s.TrendEMA != nil {
+		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.TrendEMA.Interval})
+	}
+}
+
 func (s *ResistanceShort) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.GeneralOrderExecutor) {
+	if s.GroupDistance.IsZero() {
+		s.GroupDistance = fixedpoint.NewFromFloat(0.01)
+	}
+
 	s.session = session
 	s.orderExecutor = orderExecutor
 	s.activeOrders = bbgo.NewActiveOrderBook(s.Symbol)
@@ -45,8 +57,8 @@ func (s *ResistanceShort) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 	})
 	s.activeOrders.BindStream(session.UserDataStream)
 
-	if s.GroupDistance.IsZero() {
-		s.GroupDistance = fixedpoint.NewFromFloat(0.01)
+	if s.TrendEMA != nil {
+		s.TrendEMA.Bind(session, orderExecutor)
 	}
 
 	s.resistancePivot = session.StandardIndicatorSet(s.Symbol).PivotLow(s.IntervalWindow)
@@ -55,6 +67,16 @@ func (s *ResistanceShort) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 	s.updateResistanceOrders(fixedpoint.NewFromFloat(s.resistancePivot.Last()))
 
 	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
+		// trend EMA protection
+		if gradient, ok := s.TrendEMA.Gradient(); ok {
+			if gradient > 1.0 {
+				log.Infof("trendEMA %+v current=%f last=%f slope=%f: skip short", s.TrendEMA, s.TrendEMA.trendEWMACurrent, s.TrendEMA.trendEWMALast, gradient)
+				return
+			}
+
+			log.Infof("trendEMA %+v current=%f last=%f slope=%f: short is enabled", s.TrendEMA, s.TrendEMA.trendEWMACurrent, s.TrendEMA.trendEWMALast, gradient)
+		}
+
 		position := s.orderExecutor.Position()
 		if position.IsOpened(kline.Close) {
 			return
