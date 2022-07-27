@@ -120,6 +120,8 @@ func (p *Position) NewProfit(trade Trade, profit, netProfit fixedpoint.Value) Pr
 		TradedAt:           trade.Time.Time(),
 		Strategy:           p.Strategy,
 		StrategyInstanceID: p.StrategyInstanceID,
+
+		PositionOpenedAt: p.OpenedAt,
 	}
 }
 
@@ -163,7 +165,7 @@ func (p *Position) NewMarketCloseOrder(percentage fixedpoint.Value) *SubmitOrder
 }
 
 func (p *Position) IsDust(price fixedpoint.Value) bool {
-	base := p.GetBase().Abs()
+	base := p.Base.Abs()
 	return p.Market.IsDustQuantity(base, price)
 }
 
@@ -472,6 +474,12 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 			}
 		}
 
+		// before adding the quantity, it's already a dust position
+		// then we should set the openedAt time
+		if p.IsDust(td.Price) {
+			p.OpenedAt = td.Time.Time()
+		}
+
 		// here the case is: base == 0 or base > 0
 		divisor := p.Base.Add(quantity)
 		p.ApproximateAverageCost = p.ApproximateAverageCost.Mul(p.Base).
@@ -481,7 +489,6 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 		p.AverageCost = p.AverageCost.Mul(p.Base).Add(quoteQuantity).Div(divisor)
 		p.Base = p.Base.Add(quantity)
 		p.Quote = p.Quote.Sub(quoteQuantity)
-
 		return fixedpoint.Zero, fixedpoint.Zero, false
 
 	case SideTypeSell:
@@ -506,6 +513,12 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 				p.AccumulatedProfit = p.AccumulatedProfit.Add(profit)
 				return profit, netProfit, true
 			}
+		}
+
+		// before subtracting the quantity, it's already a dust position
+		// then we should set the openedAt time
+		if p.IsDust(td.Price) {
+			p.OpenedAt = td.Time.Time()
 		}
 
 		// handling short position, since Base here is negative we need to reverse the sign
