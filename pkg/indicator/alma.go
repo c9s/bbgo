@@ -15,8 +15,8 @@ import (
 type ALMA struct {
 	types.SeriesBase
 	types.IntervalWindow         // required
-	Offset               float64 // required: recommend to be 5
-	Sigma                int     // required: recommend to be 0.5
+	Offset               float64 // required: recommend to be 0.5
+	Sigma                int     // required: recommend to be 5
 	weight               []float64
 	sum                  float64
 	input                []float64

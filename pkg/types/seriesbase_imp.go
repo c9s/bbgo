@@ -121,6 +121,10 @@ func (s *SeriesBase) Correlation(b Series, length int, method ...CorrFunc) float
 	return Correlation(s, b, length, method...)
 }
 
+func (s *SeriesBase) AutoCorrelation(length int, lag ...int) float64 {
+	return AutoCorrelation(s, length, lag...)
+}
+
 func (s *SeriesBase) Rank(length int) SeriesExtend {
 	return Rank(s, length)
 }
