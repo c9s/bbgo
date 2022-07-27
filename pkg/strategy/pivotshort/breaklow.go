@@ -19,6 +19,10 @@ type TrendEMA struct {
 	types.IntervalWindow
 }
 
+type ClosedKLineStop struct {
+	types.IntervalWindow
+}
+
 // BreakLow -- when price breaks the previous pivot low, we set a trade entry
 type BreakLow struct {
 	Symbol string
@@ -42,7 +46,13 @@ type BreakLow struct {
 
 	TrendEMA *TrendEMA `json:"trendEMA"`
 
-	lastLow        fixedpoint.Value
+	ClosedKLineStop *ClosedKLineStop `json:"closedKLineStop"`
+
+	lastLow fixedpoint.Value
+
+	// lastBreakLow is the low that the price just break
+	lastBreakLow fixedpoint.Value
+
 	pivotLow       *indicator.PivotLow
 	pivotLowPrices []fixedpoint.Value
 
@@ -65,6 +75,10 @@ func (s *BreakLow) Subscribe(session *bbgo.ExchangeSession) {
 
 	if s.TrendEMA != nil {
 		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.TrendEMA.Interval})
+	}
+
+	if s.ClosedKLineStop != nil {
+		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.ClosedKLineStop.Interval})
 	}
 }
 
@@ -113,7 +127,34 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 		}
 	}))
 
-	session.MarketDataStream.OnKLineClosed(types.KLineWith(symbol, types.Interval1m, func(kline types.KLine) {
+	if s.ClosedKLineStop != nil {
+		// if the position is already opened, and we just break the low, this checks if the kline closed above the low,
+		// so that we can close the position earlier
+		session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.ClosedKLineStop.Interval, func(k types.KLine) {
+			// make sure the position is opened, and it's a short position
+			if !position.IsOpened(k.Close) || !position.IsShort() {
+				return
+			}
+
+			// make sure we recorded the last break low
+			if s.lastBreakLow.IsZero() {
+				return
+			}
+
+			// the kline opened below the last break low, and closed above the last break low
+			if k.Open.Compare(s.lastBreakLow) < 0 && k.Close.Compare(s.lastBreakLow) > 0 {
+				bbgo.Notify("kLine closed above the last break low, triggering stop earlier")
+				if err := s.orderExecutor.ClosePosition(context.Background(), one, "kLineClosedStop"); err != nil {
+					log.WithError(err).Error("position close error")
+				}
+
+				// reset to zero
+				s.lastBreakLow = fixedpoint.Zero
+			}
+		}))
+	}
+
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(kline types.KLine) {
 		if len(s.pivotLowPrices) == 0 {
 			log.Infof("currently there is no pivot low prices, can not check break low...")
 			return
@@ -145,6 +186,10 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 		}
 
 		log.Infof("%s breakLow signal detected, closed price %f < breakPrice %f", kline.Symbol, closePrice.Float64(), breakPrice.Float64())
+
+		if s.lastBreakLow.IsZero() || previousLow.Compare(s.lastBreakLow) < 0 {
+			s.lastBreakLow = previousLow
+		}
 
 		if position.IsOpened(kline.Close) {
 			log.Infof("position is already opened, skip short")
