@@ -25,10 +25,6 @@ func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
-type IntervalWindowSetting struct {
-	types.IntervalWindow
-}
-
 type SupportTakeProfit struct {
 	Symbol string
 	types.IntervalWindow
@@ -102,11 +98,11 @@ func (s *SupportTakeProfit) Bind(session *bbgo.ExchangeSession, orderExecutor *b
 }
 
 func (s *SupportTakeProfit) updateSupportPrice(closePrice fixedpoint.Value) bool {
-	log.Infof("[supportTakeProfit] lows: %v", s.pivot.Lows)
+	log.Infof("[supportTakeProfit] lows: %v", s.pivot.Values)
 
 	groupDistance := 0.01
 	minDistance := 0.05
-	supportPrices := findPossibleSupportPrices(closePrice.Float64()*(1.0-minDistance), groupDistance, s.pivot.Lows)
+	supportPrices := findPossibleSupportPrices(closePrice.Float64()*(1.0-minDistance), groupDistance, s.pivot.Values)
 	if len(supportPrices) == 0 {
 		return false
 	}
