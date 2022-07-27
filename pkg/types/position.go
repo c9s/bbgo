@@ -50,6 +50,7 @@ type Position struct {
 	// TotalFee stores the fee currency -> total fee quantity
 	TotalFee map[string]fixedpoint.Value `json:"totalFee" db:"-"`
 
+	OpenedAt  time.Time `json:"openedAt,omitempty" db:"-"`
 	ChangedAt time.Time `json:"changedAt,omitempty" db:"changed_at"`
 
 	Strategy           string `json:"strategy,omitempty" db:"strategy"`
@@ -152,11 +153,11 @@ func (p *Position) NewMarketCloseOrder(percentage fixedpoint.Value) *SubmitOrder
 	}
 
 	return &SubmitOrder{
-		Symbol:   p.Symbol,
-		Market:   p.Market,
-		Type:     OrderTypeMarket,
-		Side:     side,
-		Quantity: quantity,
+		Symbol:           p.Symbol,
+		Market:           p.Market,
+		Type:             OrderTypeMarket,
+		Side:             side,
+		Quantity:         quantity,
 		MarginSideEffect: SideEffectTypeAutoRepay,
 	}
 }
@@ -447,6 +448,7 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 	switch td.Side {
 
 	case SideTypeBuy:
+		// was short position, now trade buy should cover the position
 		if p.Base.Sign() < 0 {
 			// convert short position to long position
 			if p.Base.Add(quantity).Sign() > 0 {
@@ -457,9 +459,10 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 				p.AverageCost = price
 				p.ApproximateAverageCost = price
 				p.AccumulatedProfit = p.AccumulatedProfit.Add(profit)
+				p.OpenedAt = td.Time.Time()
 				return profit, netProfit, true
 			} else {
-				// covering short position
+				// after adding quantity it's still short position
 				p.Base = p.Base.Add(quantity)
 				p.Quote = p.Quote.Sub(quoteQuantity)
 				profit = p.AverageCost.Sub(price).Mul(quantity)
@@ -469,6 +472,7 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 			}
 		}
 
+		// here the case is: base == 0 or base > 0
 		divisor := p.Base.Add(quantity)
 		p.ApproximateAverageCost = p.ApproximateAverageCost.Mul(p.Base).
 			Add(quoteQuantity).
@@ -481,6 +485,7 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 		return fixedpoint.Zero, fixedpoint.Zero, false
 
 	case SideTypeSell:
+		// was long position, the sell trade should reduce the base amount
 		if p.Base.Sign() > 0 {
 			// convert long position to short position
 			if p.Base.Compare(quantity) < 0 {
@@ -491,6 +496,7 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 				p.AverageCost = price
 				p.ApproximateAverageCost = price
 				p.AccumulatedProfit = p.AccumulatedProfit.Add(profit)
+				p.OpenedAt = td.Time.Time()
 				return profit, netProfit, true
 			} else {
 				p.Base = p.Base.Sub(quantity)
