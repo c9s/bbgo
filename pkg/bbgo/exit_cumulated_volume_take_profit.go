@@ -72,7 +72,9 @@ func (s *CumulatedVolumeTakeProfit) Bind(session *ExchangeSession, orderExecutor
 				cqv.Float64(),
 				s.MinQuoteVolume.Float64(), kline.Close.Float64())
 
-			_ = orderExecutor.ClosePosition(context.Background(), fixedpoint.One, "cumulatedVolumeTakeProfit")
+			if err := orderExecutor.ClosePosition(context.Background(), fixedpoint.One, "cumulatedVolumeTakeProfit") ; err != nil {
+				log.WithError(err).Errorf("close position error")
+			}
 			return
 		}
 	}))
