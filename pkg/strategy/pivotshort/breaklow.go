@@ -15,32 +15,6 @@ type StopEMA struct {
 	Range fixedpoint.Value `json:"range"`
 }
 
-type TrendEMA struct {
-	types.IntervalWindow
-
-	trendEWMA *indicator.EWMA
-
-	trendEWMALast, trendEWMACurrent float64
-}
-
-func (s *TrendEMA) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.GeneralOrderExecutor) {
-	symbol := orderExecutor.Position().Symbol
-	s.trendEWMA = session.StandardIndicatorSet(symbol).EWMA(s.IntervalWindow)
-	session.MarketDataStream.OnKLineClosed(types.KLineWith(symbol, s.Interval, func(kline types.KLine) {
-		s.trendEWMALast = s.trendEWMACurrent
-		s.trendEWMACurrent = s.trendEWMA.Last()
-	}))
-}
-
-func (s *TrendEMA) Gradient() (float64, bool) {
-	if s.trendEWMALast > 0.0 && s.trendEWMACurrent > 0.0 {
-		gradient := s.trendEWMALast / s.trendEWMACurrent
-		return gradient, true
-	}
-
-	return 0.0, false
-}
-
 type FakeBreakStop struct {
 	types.IntervalWindow
 }
@@ -120,6 +94,9 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 	}
 
 	if s.TrendEMA != nil {
+		if s.TrendEMA.MaxGradient == 0.0 {
+			s.TrendEMA.MaxGradient = 1.0
+		}
 		s.TrendEMA.Bind(session, orderExecutor)
 	}
 
@@ -213,13 +190,8 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 		}
 
 		// trend EMA protection
-		if gradient, ok := s.TrendEMA.Gradient(); ok {
-			if gradient > 1.0 {
-				log.Debugf("trendEMA %+v current=%f last=%f slope=%f: skip short", s.TrendEMA, s.TrendEMA.trendEWMACurrent, s.TrendEMA.trendEWMALast, gradient)
-				return
-			}
-
-			log.Debugf("trendEMA %+v current=%f last=%f slope=%f: short is enabled", s.TrendEMA, s.TrendEMA.trendEWMACurrent, s.TrendEMA.trendEWMALast, gradient)
+		if !s.TrendEMA.GradientAllowed() {
+			return
 		}
 
 		// stop EMA protection
