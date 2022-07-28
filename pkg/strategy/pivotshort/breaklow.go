@@ -190,7 +190,7 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 		}
 
 		// trend EMA protection
-		if !s.TrendEMA.GradientAllowed() {
+		if s.TrendEMA != nil && !s.TrendEMA.GradientAllowed() {
 			return
 		}
 
