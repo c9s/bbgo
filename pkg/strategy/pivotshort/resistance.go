@@ -58,6 +58,9 @@ func (s *ResistanceShort) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 	s.activeOrders.BindStream(session.UserDataStream)
 
 	if s.TrendEMA != nil {
+		if s.TrendEMA.MaxGradient == 0.0 {
+			s.TrendEMA.MaxGradient = 1.0
+		}
 		s.TrendEMA.Bind(session, orderExecutor)
 	}
 
@@ -68,13 +71,8 @@ func (s *ResistanceShort) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 
 	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
 		// trend EMA protection
-		if gradient, ok := s.TrendEMA.Gradient(); ok {
-			if gradient > 1.0 {
-				log.Debugf("trendEMA %+v current=%f last=%f gradient=%f: skip short", s.TrendEMA, s.TrendEMA.trendEWMACurrent, s.TrendEMA.trendEWMALast, gradient)
-				return
-			}
-
-			log.Debugf("trendEMA %+v current=%f last=%f gradient=%f: short is enabled", s.TrendEMA, s.TrendEMA.trendEWMACurrent, s.TrendEMA.trendEWMALast, gradient)
+		if !s.TrendEMA.GradientAllowed() {
+			return
 		}
 
 		position := s.orderExecutor.Position()
