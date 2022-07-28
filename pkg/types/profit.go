@@ -56,6 +56,8 @@ type Profit struct {
 	IsIsolated  bool             `json:"isIsolated" db:"is_isolated"`
 	TradedAt    time.Time        `json:"tradedAt" db:"traded_at"`
 
+	PositionOpenedAt time.Time `json:"positionOpenedAt" db:"-"`
+
 	// strategy related fields
 	Strategy           string `json:"strategy" db:"strategy"`
 	StrategyInstanceID string `json:"strategyInstanceID" db:"strategy_instance_id"`
