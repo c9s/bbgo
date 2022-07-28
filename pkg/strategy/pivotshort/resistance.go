@@ -71,7 +71,7 @@ func (s *ResistanceShort) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 
 	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
 		// trend EMA protection
-		if !s.TrendEMA.GradientAllowed() {
+		if s.TrendEMA != nil && !s.TrendEMA.GradientAllowed() {
 			return
 		}
 
