@@ -16,6 +16,16 @@ type FisherTransform struct {
 	UpdateCallbacks []func(value float64)
 }
 
+func (inc *FisherTransform) Clone() types.UpdatableSeriesExtend {
+	out := FisherTransform{
+		IntervalWindow: inc.IntervalWindow,
+		prices:         inc.prices.Clone(),
+		Values:         inc.Values[:],
+	}
+	out.SeriesBase.Series = &out
+	return &out
+}
+
 func (inc *FisherTransform) Update(value float64) {
 	if inc.prices == nil {
 		inc.prices = types.NewQueue(inc.Window)
