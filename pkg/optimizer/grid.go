@@ -195,10 +195,7 @@ func (o *GridOptimizer) Run(executor Executor, configJson []byte) (map[string][]
 
 	var taskC = make(chan BacktestTask, 10000)
 
-	var bar = pb.Full.New(cap(taskC))
-	bar.SetTemplateString(`{{ string . "log" | green}} | {{counters . }} {{bar . }} {{percent . }} {{etime . }} {{rtime . "ETA %s"}}`)
-
-	var taskCnt int64 = 0
+	var taskCnt = 0
 	var app = func(configJson []byte, next func(configJson []byte) error) error {
 		var labels = copyLabels(o.ParamLabels)
 		var params = copyParams(o.CurrentParams)
@@ -207,8 +204,10 @@ func (o *GridOptimizer) Run(executor Executor, configJson []byte) (map[string][]
 			Params:     params,
 			Labels:     labels,
 		}
+		return nil
+	}
+	var appCnt = func(configJson []byte, next func(configJson []byte) error) error {
 		taskCnt++
-		bar.SetTotal(taskCnt)
 		return nil
 	}
 
@@ -217,14 +216,27 @@ func (o *GridOptimizer) Run(executor Executor, configJson []byte) (map[string][]
 	var wrapper = func(configJson []byte) error {
 		return app(configJson, nil)
 	}
+	var wrapperCnt = func(configJson []byte) error {
+		return appCnt(configJson, nil)
+	}
 
 	for i := len(ops) - 1; i >= 0; i-- {
 		cur := ops[i]
 		inner := wrapper
+		innerCnt := wrapperCnt
 		wrapper = func(configJson []byte) error {
 			return cur(configJson, inner)
 		}
+		wrapperCnt = func(configJson []byte) error {
+			return cur(configJson, innerCnt)
+		}
 	}
+
+	if err := wrapperCnt(configJson); err != nil {
+		return nil, err
+	}
+	var bar = pb.Full.New(taskCnt)
+	bar.SetTemplateString(`{{ string . "log" | green}} | {{counters . }} {{bar . }} {{percent . }} {{etime . }} {{rtime . "ETA %s"}}`)
 
 	ctx := context.Background()
 	var taskGenErr error
