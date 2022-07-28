@@ -218,17 +218,21 @@ func (s *TradeStats) add(pnl fixedpoint.Value) {
 // Output TradeStats without Profits and Losses
 func (s *TradeStats) BriefString() string {
 	out, _ := yaml.Marshal(&TradeStats{
-		Symbol:             s.Symbol,
-		WinningRatio:       s.WinningRatio,
-		NumOfLossTrade:     s.NumOfLossTrade,
-		NumOfProfitTrade:   s.NumOfProfitTrade,
-		GrossProfit:        s.GrossProfit,
-		GrossLoss:          s.GrossLoss,
-		LargestProfitTrade: s.LargestProfitTrade,
-		LargestLossTrade:   s.LargestLossTrade,
-		ProfitFactor:       s.ProfitFactor,
-		TotalNetProfit:     s.TotalNetProfit,
-		IntervalProfits:    s.IntervalProfits,
+		Symbol:                   s.Symbol,
+		WinningRatio:             s.WinningRatio,
+		NumOfLossTrade:           s.NumOfLossTrade,
+		NumOfProfitTrade:         s.NumOfProfitTrade,
+		GrossProfit:              s.GrossProfit,
+		GrossLoss:                s.GrossLoss,
+		LargestProfitTrade:       s.LargestProfitTrade,
+		LargestLossTrade:         s.LargestLossTrade,
+		ProfitFactor:             s.ProfitFactor,
+		TotalNetProfit:           s.TotalNetProfit,
+		IntervalProfits:          s.IntervalProfits,
+		MaximumConsecutiveWins:   s.MaximumConsecutiveWins,
+		MaximumConsecutiveLosses: s.MaximumConsecutiveLosses,
+		MaximumConsecutiveProfit: s.MaximumConsecutiveProfit,
+		MaximumConsecutiveLoss:   s.MaximumConsecutiveLoss,
 	})
 	return string(out)
 }

@@ -17,21 +17,26 @@ exchangeStrategies:
 - on: binance
   drift:
     canvasPath: "./output.png"
-    symbol: ETHUSDT
+    symbol: ETHBUSD
     # kline interval for indicators
     interval: 15m
     window: 2
     stoploss: 0.3%
     source: close
     predictOffset: 2
-    # position avg +- takeProfitFactor * atr as take profit price
-    takeProfitFactor: 1.4
-    noTrailingStopLoss: true
+    # the init value of takeProfitFactor Series, position avg +- takeProfitFactor * atr as take profit price
+    takeProfitFactor: 6
+    profitFactorWindow: 8
+    noTrailingStopLoss: false
     # stddev on high/low-source
     hlVarianceMultiplier: 0.22
+    hlRangeWindow: 5
+    smootherWindow: 2
+    fisherTransformWindow: 8
+    atrWindow: 14
 
     generateGraph: true
-    graphPNLDeductFee: false
+    graphPNLDeductFee: true
     graphPNLPath: "./pnl.png"
     graphCumPNLPath: "./cumpnl.png"
     #exits:
@@ -63,18 +68,18 @@ sync:
   sessions:
     - binance
   symbols:
-    - ETHUSDT
+    - ETHBUSD
 
 backtest:
   startTime: "2022-01-01"
-  endTime: "2022-06-18"
+  endTime: "2022-07-29"
   symbols:
-    - ETHUSDT
+    - ETHBUSD
   sessions: [binance]
   accounts:
     binance:
-      #makerFeeRate: 0.00001
+      makerFeeRate: 0.0000
       #takerFeeRate: 0.00001
       balances:
         ETH: 10
-        USDT: 5000.0
+        BUSD: 5000.0

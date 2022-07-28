@@ -43,6 +43,10 @@ func NewGeneralOrderExecutor(session *ExchangeSession, symbol, strategy, strateg
 	}
 }
 
+func (e *GeneralOrderExecutor) ActiveMakerOrders() *ActiveOrderBook {
+	return e.activeMakerOrders
+}
+
 func (e *GeneralOrderExecutor) BindEnvironment(environ *Environment) {
 	e.tradeCollector.OnProfit(func(trade types.Trade, profit *types.Profit) {
 		environ.RecordPosition(e.position, trade, profit)
