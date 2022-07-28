@@ -207,8 +207,12 @@ func (s *TradeStats) add(pnl fixedpoint.Value) {
 	}
 
 	s.ProfitFactor = s.GrossProfit.Div(s.GrossLoss.Abs())
-	s.AverageProfitTrade = fixedpoint.Avg(s.Profits)
-	s.AverageLossTrade = fixedpoint.Avg(s.Losses)
+	if len(s.Profits) > 0 {
+		s.AverageProfitTrade = fixedpoint.Avg(s.Profits)
+	}
+	if len(s.Losses) > 0 {
+		s.AverageLossTrade = fixedpoint.Avg(s.Losses)
+	}
 }
 
 // Output TradeStats without Profits and Losses
