@@ -30,6 +30,16 @@ var TotalVolume = func(summaryReport *backtest.SummaryReport) fixedpoint.Value {
 	return buyVolume.Add(sellVolume)
 }
 
+var TotalEquityDiff = func(summaryReport *backtest.SummaryReport) fixedpoint.Value {
+	if len(summaryReport.SymbolReports) == 0 {
+		return fixedpoint.Zero
+	}
+
+	initEquity := summaryReport.SymbolReports[0].InitialEquityValue()
+	finalEquity := summaryReport.SymbolReports[0].FinalEquityValue()
+	return finalEquity.Sub(initEquity)
+}
+
 type Metric struct {
 	// Labels is the labels of the given parameters
 	Labels []string `json:"labels,omitempty"`
@@ -186,8 +196,9 @@ func (o *GridOptimizer) Run(executor Executor, configJson []byte) (map[string][]
 	o.CurrentParams = make([]interface{}, len(o.Config.Matrix))
 
 	var valueFunctions = map[string]MetricValueFunc{
-		"totalProfit": TotalProfitMetricValueFunc,
-		"totalVolume": TotalVolume,
+		"totalProfit":     TotalProfitMetricValueFunc,
+		"totalVolume":     TotalVolume,
+		"totalEquityDiff": TotalEquityDiff,
 	}
 	var metrics = map[string][]Metric{}
 
