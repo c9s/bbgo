@@ -30,6 +30,7 @@ type closePositionContext struct {
 type updatePositionContext struct {
 	signature string
 	updater   StrategyPositionUpdater
+	target    string
 	value     fixedpoint.Value
 }
 
@@ -395,8 +396,8 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 		return nil
 	})
 
-	// Position updater: Base
-	i.PrivateCommand("/updatepositionbase", "Update Strategy Position: Base", func(reply interact.Reply) error {
+	// Position updater
+	i.PrivateCommand("/setposition", "Set Strategy Position", func(reply interact.Reply) error {
 		// it.trader.exchangeStrategies
 		// send symbol options
 		if strategies, found := filterStrategyByInterface((*StrategyPositionUpdater)(nil), it.exchangeStrategies); found {
@@ -422,55 +423,19 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 		it.updatePositionContext.updater = updater
 		it.updatePositionContext.signature = signature
 
-		reply.Message("Enter the amount to change")
+		reply.Message("Please choose what you want to change")
+		reply.AddButton("base", "Base", "base")
+		reply.AddButton("quote", "Quote", "quote")
+		reply.AddButton("cost", "Average Cost", "cost")
 
 		return nil
-	}).Next(func(valueStr string, reply interact.Reply) error {
-		value, err := strconv.ParseFloat(valueStr, 64)
-		if err != nil {
-			reply.Message(fmt.Sprintf("%q is not a valid value string", valueStr))
-			return err
+	}).Next(func(target string, reply interact.Reply) error {
+		if target != "base" && target != "quote" && target != "cost" {
+			reply.Message(fmt.Sprintf("%q is not a valid target string", target))
+			return fmt.Errorf("%q is not a valid target string", target)
 		}
 
-		if kc, ok := reply.(interact.KeyboardController); ok {
-			kc.RemoveKeyboard()
-		}
-
-		if err := it.updatePositionContext.updater.UpdateBase(value); err != nil {
-			reply.Message(fmt.Sprintf("Failed to update base position of the strategy, %s", err.Error()))
-			return err
-		}
-
-		reply.Message(fmt.Sprintf("Base position of strategy %s updated.", it.updatePositionContext.signature))
-		return nil
-	})
-
-	// Position updater: Quote
-	i.PrivateCommand("/updatepositionquote", "Update Strategy Position: Quote", func(reply interact.Reply) error {
-		// it.trader.exchangeStrategies
-		// send symbol options
-		if strategies, found := filterStrategyByInterface((*StrategyPositionUpdater)(nil), it.exchangeStrategies); found {
-			reply.AddMultipleButtons(generateStrategyButtonsForm(strategies))
-			reply.Message("Please choose one strategy")
-		} else {
-			reply.Message("No strategy supports StrategyPositionUpdater")
-		}
-		return nil
-	}).Next(func(signature string, reply interact.Reply) error {
-		strategy, ok := it.exchangeStrategies[signature]
-		if !ok {
-			reply.Message("Strategy not found")
-			return fmt.Errorf("strategy %s not found", signature)
-		}
-
-		updater, implemented := strategy.(StrategyPositionUpdater)
-		if !implemented {
-			reply.Message(fmt.Sprintf("Strategy %s does not support StrategyPositionUpdater", signature))
-			return fmt.Errorf("strategy %s does not implement StrategyPositionUpdater", signature)
-		}
-
-		it.updatePositionContext.updater = updater
-		it.updatePositionContext.signature = signature
+		it.updatePositionContext.target = target
 
 		reply.Message("Enter the amount to change")
 
@@ -486,62 +451,20 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 			kc.RemoveKeyboard()
 		}
 
-		if err := it.updatePositionContext.updater.UpdateQuote(value); err != nil {
-			reply.Message(fmt.Sprintf("Failed to update quote position of the strategy, %s", err.Error()))
-			return err
+		if it.updatePositionContext.target == "base" {
+			err = it.updatePositionContext.updater.UpdateBase(value)
+		} else if it.updatePositionContext.target == "quote" {
+			err = it.updatePositionContext.updater.UpdateQuote(value)
+		} else if it.updatePositionContext.target == "cost" {
+			err = it.updatePositionContext.updater.UpdateAverageCost(value)
 		}
 
-		reply.Message(fmt.Sprintf("Quote position of strategy %s updated.", it.updatePositionContext.signature))
-		return nil
-	})
-
-	// Position updater: Average cost
-	i.PrivateCommand("/updatepositioncost", "Update Strategy Position: Average Cost", func(reply interact.Reply) error {
-		// it.trader.exchangeStrategies
-		// send symbol options
-		if strategies, found := filterStrategyByInterface((*StrategyPositionUpdater)(nil), it.exchangeStrategies); found {
-			reply.AddMultipleButtons(generateStrategyButtonsForm(strategies))
-			reply.Message("Please choose one strategy")
-		} else {
-			reply.Message("No strategy supports StrategyPositionUpdater")
-		}
-		return nil
-	}).Next(func(signature string, reply interact.Reply) error {
-		strategy, ok := it.exchangeStrategies[signature]
-		if !ok {
-			reply.Message("Strategy not found")
-			return fmt.Errorf("strategy %s not found", signature)
-		}
-
-		updater, implemented := strategy.(StrategyPositionUpdater)
-		if !implemented {
-			reply.Message(fmt.Sprintf("Strategy %s does not support StrategyPositionUpdater", signature))
-			return fmt.Errorf("strategy %s does not implement StrategyPositionUpdater", signature)
-		}
-
-		it.updatePositionContext.updater = updater
-		it.updatePositionContext.signature = signature
-
-		reply.Message("Enter the amount to change")
-
-		return nil
-	}).Next(func(valueStr string, reply interact.Reply) error {
-		value, err := strconv.ParseFloat(valueStr, 64)
 		if err != nil {
-			reply.Message(fmt.Sprintf("%q is not a valid value string", valueStr))
+			reply.Message(fmt.Sprintf("Failed to modify position of the strategy, %s", err.Error()))
 			return err
 		}
 
-		if kc, ok := reply.(interact.KeyboardController); ok {
-			kc.RemoveKeyboard()
-		}
-
-		if err := it.updatePositionContext.updater.UpdateAverageCost(value); err != nil {
-			reply.Message(fmt.Sprintf("Failed to update position average cost of the strategy, %s", err.Error()))
-			return err
-		}
-
-		reply.Message(fmt.Sprintf("Position average cost of strategy %s updated.", it.updatePositionContext.signature))
+		reply.Message(fmt.Sprintf("Position of strategy %s modified.", it.updatePositionContext.signature))
 		return nil
 	})
 }
