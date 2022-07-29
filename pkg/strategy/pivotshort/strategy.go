@@ -81,12 +81,13 @@ func (s *SupportTakeProfit) Bind(session *bbgo.ExchangeSession, orderExecutor *b
 
 		bbgo.Notify("placing %s take profit order at price %f", s.Symbol, buyPrice.Float64())
 		createdOrders, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
-			Symbol:   s.Symbol,
-			Type:     types.OrderTypeLimitMaker,
-			Side:     types.SideTypeBuy,
-			Price:    buyPrice,
-			Quantity: quantity,
-			Tag:      "supportTakeProfit",
+			Symbol:           s.Symbol,
+			Type:             types.OrderTypeLimitMaker,
+			Side:             types.SideTypeBuy,
+			Price:            buyPrice,
+			Quantity:         quantity,
+			Tag:              "supportTakeProfit",
+			MarginSideEffect: types.SideEffectTypeAutoRepay,
 		})
 
 		if err != nil {
