@@ -84,6 +84,9 @@ type Strategy struct {
 
 	// StrategyController
 	bbgo.StrategyController
+
+	// PositionUpdater
+	bbgo.PositionUpdater
 }
 
 func (s *Strategy) ID() string {
