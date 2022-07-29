@@ -27,9 +27,9 @@ type closePositionContext struct {
 	percentage fixedpoint.Value
 }
 
-type updatePositionContext struct {
+type modifyPositionContext struct {
 	signature string
-	updater   StrategyPositionUpdater
+	modifier  *types.Position
 	target    string
 	value     fixedpoint.Value
 }
@@ -40,7 +40,7 @@ type CoreInteraction struct {
 
 	exchangeStrategies    map[string]SingleExchangeStrategy
 	closePositionContext  closePositionContext
-	updatePositionContext updatePositionContext
+	modifyPositionContext modifyPositionContext
 }
 
 func NewCoreInteraction(environment *Environment, trader *Trader) *CoreInteraction {
@@ -66,6 +66,21 @@ func filterStrategyByInterface(checkInterface interface{}, exchangeStrategies ma
 	rt := reflect.TypeOf(checkInterface).Elem()
 	for signature, strategy := range exchangeStrategies {
 		if ok := reflect.TypeOf(strategy).Implements(rt); ok {
+			strategies[signature] = strategy
+			found = true
+		}
+	}
+
+	return strategies, found
+}
+
+func filterStrategyByField(fieldName string, fieldType reflect.Type, exchangeStrategies map[string]SingleExchangeStrategy) (strategies map[string]SingleExchangeStrategy, found bool) {
+	found = false
+	strategies = make(map[string]SingleExchangeStrategy)
+	for signature, strategy := range exchangeStrategies {
+		r := reflect.ValueOf(strategy).Elem()
+		f := r.FieldByName(fieldName)
+		if !f.IsZero() && f.Type() == fieldType {
 			strategies[signature] = strategy
 			found = true
 		}
@@ -397,14 +412,14 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 	})
 
 	// Position updater
-	i.PrivateCommand("/setposition", "Set Strategy Position", func(reply interact.Reply) error {
+	i.PrivateCommand("/modifyposition", "Modify Strategy Position", func(reply interact.Reply) error {
 		// it.trader.exchangeStrategies
 		// send symbol options
-		if strategies, found := filterStrategyByInterface((*StrategyPositionUpdater)(nil), it.exchangeStrategies); found {
+		if strategies, found := filterStrategyByField("Position", reflect.TypeOf(types.NewPosition("", "", "")), it.exchangeStrategies); found {
 			reply.AddMultipleButtons(generateStrategyButtonsForm(strategies))
 			reply.Message("Please choose one strategy")
 		} else {
-			reply.Message("No strategy supports StrategyPositionUpdater")
+			reply.Message("No strategy supports Position Modify")
 		}
 		return nil
 	}).Next(func(signature string, reply interact.Reply) error {
@@ -414,14 +429,16 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 			return fmt.Errorf("strategy %s not found", signature)
 		}
 
-		updater, implemented := strategy.(StrategyPositionUpdater)
+		r := reflect.ValueOf(strategy).Elem()
+		f := r.FieldByName("Position")
+		positionModifier, implemented := f.Interface().(*types.Position)
 		if !implemented {
-			reply.Message(fmt.Sprintf("Strategy %s does not support StrategyPositionUpdater", signature))
-			return fmt.Errorf("strategy %s does not implement StrategyPositionUpdater", signature)
+			reply.Message(fmt.Sprintf("Strategy %s does not support Position Modify", signature))
+			return fmt.Errorf("strategy %s does not implement Position Modify", signature)
 		}
 
-		it.updatePositionContext.updater = updater
-		it.updatePositionContext.signature = signature
+		it.modifyPositionContext.modifier = positionModifier
+		it.modifyPositionContext.signature = signature
 
 		reply.Message("Please choose what you want to change")
 		reply.AddButton("base", "Base", "base")
@@ -435,13 +452,13 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 			return fmt.Errorf("%q is not a valid target string", target)
 		}
 
-		it.updatePositionContext.target = target
+		it.modifyPositionContext.target = target
 
 		reply.Message("Enter the amount to change")
 
 		return nil
 	}).Next(func(valueStr string, reply interact.Reply) error {
-		value, err := strconv.ParseFloat(valueStr, 64)
+		value, err := fixedpoint.NewFromString(valueStr)
 		if err != nil {
 			reply.Message(fmt.Sprintf("%q is not a valid value string", valueStr))
 			return err
@@ -451,12 +468,12 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 			kc.RemoveKeyboard()
 		}
 
-		if it.updatePositionContext.target == "base" {
-			err = it.updatePositionContext.updater.UpdateBase(value)
-		} else if it.updatePositionContext.target == "quote" {
-			err = it.updatePositionContext.updater.UpdateQuote(value)
-		} else if it.updatePositionContext.target == "cost" {
-			err = it.updatePositionContext.updater.UpdateAverageCost(value)
+		if it.modifyPositionContext.target == "base" {
+			err = it.modifyPositionContext.modifier.ModifyBase(value)
+		} else if it.modifyPositionContext.target == "quote" {
+			err = it.modifyPositionContext.modifier.ModifyQuote(value)
+		} else if it.modifyPositionContext.target == "cost" {
+			err = it.modifyPositionContext.modifier.ModifyAverageCost(value)
 		}
 
 		if err != nil {
@@ -464,7 +481,7 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 			return err
 		}
 
-		reply.Message(fmt.Sprintf("Position of strategy %s modified.", it.updatePositionContext.signature))
+		reply.Message(fmt.Sprintf("Position of strategy %s modified.", it.modifyPositionContext.signature))
 		return nil
 	})
 }
