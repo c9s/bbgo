@@ -212,6 +212,15 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 	return balances, nil
 }
 
+// DefaultFeeRates returns the FTX Tier 1 fee
+// See also https://help.ftx.com/hc/en-us/articles/360024479432-Fees
+func (e *Exchange) DefaultFeeRates() types.ExchangeFee {
+	return types.ExchangeFee{
+		MakerFeeRate: fixedpoint.NewFromFloat(0.01 * 0.020), // 0.020%
+		TakerFeeRate: fixedpoint.NewFromFloat(0.01 * 0.070), // 0.070%
+	}
+}
+
 // resolution field in api
 // window length in seconds. options: 15, 60, 300, 900, 3600, 14400, 86400, or any multiple of 86400 up to 30*86400
 var supportedIntervals = map[types.Interval]int{
