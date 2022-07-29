@@ -31,9 +31,11 @@ exchangeStrategies:
     # stddev on high/low-source
     hlVarianceMultiplier: 0.22
     hlRangeWindow: 5
-    smootherWindow: 2
-    fisherTransformWindow: 8
+    smootherWindow: 1
+    fisherTransformWindow: 9
     atrWindow: 14
+    # orders not been traded will be canceled after `pendingMinutes` minutes
+    pendingMinutes: 5
 
     generateGraph: true
     graphPNLDeductFee: true
@@ -72,7 +74,7 @@ sync:
 
 backtest:
   startTime: "2022-01-01"
-  endTime: "2022-07-29"
+  endTime: "2022-07-30"
   symbols:
     - ETHBUSD
   sessions: [binance]

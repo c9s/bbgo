@@ -24,6 +24,11 @@ import (
 
 const ID = "drift"
 
+const DDriftFilterNeg = -0.7
+const DDriftFilterPos = 0.7
+const DriftFilterNeg = -1.8
+const DriftFilterPos = 1.8
+
 var log = logrus.WithField("strategy", ID)
 var Four fixedpoint.Value = fixedpoint.NewFromInt(4)
 var Three fixedpoint.Value = fixedpoint.NewFromInt(3)
@@ -49,13 +54,15 @@ type Strategy struct {
 	*types.ProfitStats `persistence:"profit_stats"`
 	*types.TradeStats  `persistence:"trade_stats"`
 
-	ma        types.UpdatableSeriesExtend
-	stdevHigh *indicator.StdDev
-	stdevLow  *indicator.StdDev
-	drift     *DriftMA
-	atr       *indicator.ATR
-	midPrice  fixedpoint.Value
-	lock      sync.RWMutex
+	ma                  types.UpdatableSeriesExtend
+	stdevHigh           *indicator.StdDev
+	stdevLow            *indicator.StdDev
+	drift               *DriftMA
+	atr                 *indicator.ATR
+	midPrice            fixedpoint.Value
+	lock                sync.RWMutex
+	minutesCounter      int
+	orderPendingCounter map[uint64]int
 
 	// This stores the maximum TP coefficient of ATR multiplier of each entry point
 	takeProfitFactor types.UpdatableSeriesExtend
@@ -72,6 +79,7 @@ type Strategy struct {
 	SmootherWindow            int              `json:"smootherWindow"`
 	FisherTransformWindow     int              `json:"fisherTransformWindow"`
 	ATRWindow                 int              `json:"atrWindow"`
+	PendingMinutes            int              `json:"pendingMinutes"`
 
 	buyPrice     float64
 	sellPrice    float64
@@ -119,6 +127,7 @@ func (s *Strategy) Print(o *os.File) {
 	hiyellow(f, "smootherWindow: %d\n", s.SmootherWindow)
 	hiyellow(f, "fisherTransformWindow: %d\n", s.FisherTransformWindow)
 	hiyellow(f, "atrWindow: %d\n", s.ATRWindow)
+	hiyellow(f, "pendingMinutes: %d\n", s.PendingMinutes)
 	hiyellow(f, "\n")
 }
 
@@ -297,6 +306,43 @@ func (s *Strategy) initIndicators() error {
 	return nil
 }
 
+func (s *Strategy) smartCancel(ctx context.Context, pricef, atr, takeProfitFactor float64) (int, error) {
+	nonTraded := s.GeneralOrderExecutor.ActiveMakerOrders().Orders()
+	if len(nonTraded) > 0 {
+		if len(nonTraded) > 1 {
+			log.Errorf("should only have one order to cancel, got %d", len(nonTraded))
+		}
+		toCancel := false
+
+		for _, order := range nonTraded {
+			if s.minutesCounter-s.orderPendingCounter[order.OrderID] > s.PendingMinutes {
+				toCancel = true
+			} else if order.Side == types.SideTypeBuy {
+				if order.Price.Float64()+atr*takeProfitFactor <= pricef {
+					toCancel = true
+				}
+			} else if order.Side == types.SideTypeSell {
+				if order.Price.Float64()-atr*takeProfitFactor >= pricef {
+					toCancel = true
+				}
+			} else {
+				panic("not supported side for the order")
+			}
+		}
+		if toCancel {
+			err := s.GeneralOrderExecutor.GracefulCancel(ctx)
+			// TODO: clean orderPendingCounter on cancel/trade
+			if err == nil {
+				for _, order := range nonTraded {
+					delete(s.orderPendingCounter, order.OrderID)
+				}
+			}
+			return 0, err
+		}
+	}
+	return len(nonTraded), nil
+}
+
 func (s *Strategy) initTickerFunctions(ctx context.Context) {
 	if s.IsBackTesting() {
 		s.getLastPrice = func() fixedpoint.Value {
@@ -326,28 +372,37 @@ func (s *Strategy) initTickerFunctions(ctx context.Context) {
 			} else {
 				return
 			}
+
+			defer s.lock.Unlock()
+			// for trailing stoploss during the realtime
+			if s.NoTrailingStopLoss {
+				return
+			}
+
+			atr = s.atr.Last()
+			takeProfitFactor := s.takeProfitFactor.Predict(2)
+			numPending := 0
+			var err error
+			if numPending, err = s.smartCancel(ctx, pricef, atr, takeProfitFactor); err != nil {
+				log.WithError(err).Errorf("cannot cancel orders")
+				return
+			}
+			if numPending > 0 {
+				return
+			}
+
 			if s.highestPrice > 0 && s.highestPrice < pricef {
 				s.highestPrice = pricef
 			}
 			if s.lowestPrice > 0 && s.lowestPrice > pricef {
 				s.lowestPrice = pricef
 			}
-
-			// for trailing stoploss during the realtime
-			if s.NoTrailingStopLoss || s.GeneralOrderExecutor.ActiveMakerOrders().NumOfOrders() > 0 {
-				s.lock.Unlock()
-				return
-			}
-			atr = s.atr.Last()
 			avg = s.buyPrice + s.sellPrice
-			d := s.drift.TestUpdate(pricef)
-			drift := d.Last()
-			ddrift := d.drift.Last()
-			takeProfitFactor := s.takeProfitFactor.Predict(2)
-			exitShortCondition := ( /*avg+atr/2 <= pricef || avg*(1.+stoploss) <= pricef ||*/ (drift > 0 && ddrift > 0.6) || avg-atr*takeProfitFactor >= pricef ||
+
+			exitShortCondition := ( /*avg+atr/2 <= pricef || avg*(1.+stoploss) <= pricef || (ddrift > 0 && drift > DDriftFilterPos) ||*/ avg-atr*takeProfitFactor >= pricef ||
 				((pricef-s.lowestPrice)/s.lowestPrice > 0.003 && (avg-s.lowestPrice)/s.lowestPrice > 0.015)) &&
 				(s.Position.IsShort() && !s.Position.IsDust(price))
-			exitLongCondition := ( /*avg-atr/2 >= pricef || avg*(1.-stoploss) >= pricef ||*/ (drift < 0 && ddrift < -0.6) || avg+atr*takeProfitFactor <= pricef ||
+			exitLongCondition := ( /*avg-atr/2 >= pricef || avg*(1.-stoploss) >= pricef || (ddrift < 0 && drift < DDriftFilterNeg) ||*/ avg+atr*takeProfitFactor <= pricef ||
 				((s.highestPrice-pricef)/pricef > 0.003 && (s.highestPrice-avg)/avg > 0.015)) &&
 				(!s.Position.IsLong() && !s.Position.IsDust(price))
 			if exitShortCondition || exitLongCondition {
@@ -358,8 +413,6 @@ func (s *Strategy) initTickerFunctions(ctx context.Context) {
 				}
 				_ = s.ClosePosition(ctx, fixedpoint.One)
 			}
-			s.lock.Unlock()
-
 		})
 		s.getLastPrice = func() (lastPrice fixedpoint.Value) {
 			var ok bool
@@ -480,6 +533,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		bbgo.Sync(s)
 	})
 	s.GeneralOrderExecutor.Bind()
+
+	s.orderPendingCounter = make(map[uint64]int)
+	s.minutesCounter = 0
 
 	// Exit methods from config
 	for _, method := range s.ExitMethods {
@@ -606,6 +662,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 		if kline.Interval == types.Interval1m {
+			s.minutesCounter += 1
 			if s.NoTrailingStopLoss || !s.IsBackTesting() {
 				return
 			}
@@ -613,12 +670,20 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			atr = s.atr.Last()
 			price := s.getLastPrice()
 			pricef := price.Float64()
+
+			takeProfitFactor := s.takeProfitFactor.Predict(2)
+			var err error
+			numPending := 0
+			if numPending, err = s.smartCancel(ctx, pricef, atr, takeProfitFactor); err != nil {
+				log.WithError(err).Errorf("cannot cancel orders")
+				return
+			}
+			if numPending > 0 {
+				return
+			}
+
 			lowf := math.Min(kline.Low.Float64(), pricef)
 			highf := math.Max(kline.High.Float64(), pricef)
-			d := s.drift.TestUpdate(pricef)
-			drift := d.Last()
-			ddrift := d.drift.Last()
-
 			if s.lowestPrice > 0 && lowf < s.lowestPrice {
 				s.lowestPrice = lowf
 			}
@@ -627,15 +692,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 			avg := s.buyPrice + s.sellPrice
 
-			if s.GeneralOrderExecutor.ActiveMakerOrders().NumOfOrders() > 0 {
-				return
-			}
-
-			takeProfitFactor := s.takeProfitFactor.Predict(2)
-			exitShortCondition := ( /*avg+atr/2 <= highf || avg*(1.+stoploss) <= pricef ||*/ (drift > 0 && ddrift > 0.6) || avg-atr*takeProfitFactor >= pricef ||
+			exitShortCondition := ( /*avg+atr/2 <= highf || avg*(1.+stoploss) <= pricef || (drift > 0 && ddrift > DDriftFilterPos) ||*/ avg-atr*takeProfitFactor >= pricef ||
 				((highf-s.lowestPrice)/s.lowestPrice > 0.003 && (avg-s.lowestPrice)/s.lowestPrice > 0.015)) &&
 				(s.Position.IsShort() && !s.Position.IsDust(price))
-			exitLongCondition := ( /*avg-atr/2 >= lowf || avg*(1.-stoploss) >= pricef || */ (drift < 0 && ddrift < -0.6) || avg+atr*takeProfitFactor <= pricef ||
+			exitLongCondition := ( /*avg-atr/2 >= lowf || avg*(1.-stoploss) >= pricef || (drift < 0 && ddrift < DDriftFilterNeg) ||*/ avg+atr*takeProfitFactor <= pricef ||
 				((s.highestPrice-lowf)/lowf > 0.003 && (s.highestPrice-avg)/avg > 0.015)) &&
 				(s.Position.IsLong() && !s.Position.IsDust(price))
 			if exitShortCondition || exitLongCondition {
@@ -688,17 +748,13 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			bbgo.Notify("balances: [Base] %s [Quote] %s", balances[s.Market.BaseCurrency].String(), balances[s.Market.QuoteCurrency].String())
 		}
 
-		//shortCondition := (sourcef <= zeroPoint && driftPred <= drift[0] && drift[0] <= 0 && drift[1] > 0 && drift[2] > drift[1])
-		//longCondition := (sourcef >= zeroPoint && driftPred >= drift[0] && drift[0] >= 0 && drift[1] < 0 && drift[2] < drift[1])
-		//bothUp := ddrift[1] < ddrift[0] && drift[1] < drift[0]
-		//bothDown := ddrift[1] > ddrift[0] && drift[1] > drift[0]
-		shortCondition := (drift[1] >= -0.9 || ddrift[1] >= 0) && (driftPred <= -0.6 || ddriftPred <= 0)
-		longCondition := (drift[1] <= 0.9 || ddrift[1] <= 0) && (driftPred >= 0.6 || ddriftPred >= 0)
-		exitShortCondition := ((drift[0] >= 0.6 && ddrift[0] >= 0) ||
+		shortCondition := (drift[1] >= DriftFilterNeg || ddrift[1] >= 0) && (driftPred <= DDriftFilterNeg || ddriftPred <= 0)
+		longCondition := (drift[1] <= DriftFilterPos || ddrift[1] <= 0) && (driftPred >= DDriftFilterPos || ddriftPred >= 0)
+		exitShortCondition := ((drift[0] >= DriftFilterPos && ddrift[0] >= 0) ||
 			avg*(1.+stoploss) <= pricef ||
 			avg-atr*takeProfitFactor >= pricef) &&
 			s.Position.IsShort() && !longCondition && !shortCondition
-		exitLongCondition := ((drift[0] <= -0.6 && ddrift[0] <= 0) ||
+		exitLongCondition := ((drift[0] <= DriftFilterNeg && ddrift[0] <= 0) ||
 			avg*(1.-stoploss) >= pricef ||
 			avg+atr*takeProfitFactor <= pricef) &&
 			s.Position.IsLong() && !shortCondition && !longCondition
@@ -759,6 +815,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				return
 			}
 			orderTagHistory[createdOrders[0].OrderID] = "short"
+			s.orderPendingCounter[createdOrders[0].OrderID] = s.minutesCounter
 		}
 		if longCondition {
 			if err := s.GeneralOrderExecutor.GracefulCancel(ctx); err != nil {
@@ -801,6 +858,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				return
 			}
 			orderTagHistory[createdOrders[0].OrderID] = "long"
+			s.orderPendingCounter[createdOrders[0].OrderID] = s.minutesCounter
 		}
 	})
 
