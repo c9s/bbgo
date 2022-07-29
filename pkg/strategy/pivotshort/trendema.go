@@ -37,15 +37,15 @@ func (s *TrendEMA) GradientAllowed() bool {
 	}
 
 	if s.MaxGradient > 0.0 && s.trendGradient < s.MaxGradient {
-		log.Debugf("trendEMA %+v current=%f last=%f gradient=%f: allowed", s, s.trendEWMACurrent, s.trendEWMALast, s.trendGradient)
+		log.Infof("trendEMA %+v current=%f last=%f gradient=%f: allowed", s, s.trendEWMACurrent, s.trendEWMALast, s.trendGradient)
 		return true
 	}
 
 	if s.MinGradient > 0.0 && s.trendGradient > s.MinGradient {
-		log.Debugf("trendEMA %+v current=%f last=%f gradient=%f: allowed", s, s.trendEWMACurrent, s.trendEWMALast, s.trendGradient)
+		log.Infof("trendEMA %+v current=%f last=%f gradient=%f: allowed", s, s.trendEWMACurrent, s.trendEWMALast, s.trendGradient)
 		return true
 	}
 
-	log.Debugf("trendEMA %+v current=%f last=%f gradient=%f: disallowed", s, s.trendEWMACurrent, s.trendEWMALast, s.trendGradient)
+	log.Infof("trendEMA %+v current=%f last=%f gradient=%f: disallowed", s, s.trendEWMACurrent, s.trendEWMALast, s.trendGradient)
 	return false
 }
