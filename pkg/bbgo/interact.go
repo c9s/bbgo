@@ -27,12 +27,19 @@ type closePositionContext struct {
 	percentage fixedpoint.Value
 }
 
+type updatePositionContext struct {
+	signature string
+	updater   StrategyPositionUpdater
+	value     fixedpoint.Value
+}
+
 type CoreInteraction struct {
 	environment *Environment
 	trader      *Trader
 
-	exchangeStrategies   map[string]SingleExchangeStrategy
-	closePositionContext closePositionContext
+	exchangeStrategies    map[string]SingleExchangeStrategy
+	closePositionContext  closePositionContext
+	updatePositionContext updatePositionContext
 }
 
 func NewCoreInteraction(environment *Environment, trader *Trader) *CoreInteraction {
@@ -385,6 +392,56 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 		}
 
 		reply.Message(fmt.Sprintf("Strategy %s stopped and the position closed.", signature))
+		return nil
+	})
+
+	// Position updater
+	i.PrivateCommand("/updatepositionbase", "Update Strategy Position: Base", func(reply interact.Reply) error {
+		// it.trader.exchangeStrategies
+		// send symbol options
+		if strategies, found := filterStrategyByInterface((*StrategyPositionUpdater)(nil), it.exchangeStrategies); found {
+			reply.AddMultipleButtons(generateStrategyButtonsForm(strategies))
+			reply.Message("Please choose one strategy")
+		} else {
+			reply.Message("No strategy supports StrategyPositionUpdater")
+		}
+		return nil
+	}).Next(func(signature string, reply interact.Reply) error {
+		strategy, ok := it.exchangeStrategies[signature]
+		if !ok {
+			reply.Message("Strategy not found")
+			return fmt.Errorf("strategy %s not found", signature)
+		}
+
+		updater, implemented := strategy.(StrategyPositionUpdater)
+		if !implemented {
+			reply.Message(fmt.Sprintf("Strategy %s does not support StrategyPositionUpdater", signature))
+			return fmt.Errorf("strategy %s does not implement StrategyPositionUpdater", signature)
+		}
+
+		it.updatePositionContext.updater = updater
+		it.updatePositionContext.signature = signature
+
+		reply.Message("Enter the amount to change")
+
+		return nil
+	}).Next(func(valueStr string, reply interact.Reply) error {
+		value, err := strconv.ParseFloat(valueStr, 64)
+		if err != nil {
+			reply.Message(fmt.Sprintf("%q is not a valid value string", valueStr))
+			return err
+		}
+
+		if kc, ok := reply.(interact.KeyboardController); ok {
+			kc.RemoveKeyboard()
+		}
+
+		if err := it.updatePositionContext.updater.UpdateBase(value); err != nil {
+			reply.Message(fmt.Sprintf("Failed to update base position of the strategy, %s", err.Error()))
+			return err
+		}
+
+		reply.Message(fmt.Sprintf("Base position of strategy %s updated.", it.updatePositionContext.signature))
 		return nil
 	})
 }
