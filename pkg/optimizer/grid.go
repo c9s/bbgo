@@ -90,7 +90,7 @@ func (o *GridOptimizer) buildOps() []OpFunc {
 		}
 
 		switch selector.Type {
-		case "range":
+		case selectorTypeRange, selectorTypeRangeFloat, selectorTypeRangeInt:
 			min := selector.Min
 			max := selector.Max
 			step := selector.Step
@@ -129,7 +129,7 @@ func (o *GridOptimizer) buildOps() []OpFunc {
 			}
 			ops = append(ops, f)
 
-		case "iterate":
+		case selectorTypeIterate, selectorTypeString:
 			values := selector.Values
 			f := func(configJson []byte, next func(configJson []byte) error) error {
 				for _, val := range values {
@@ -158,7 +158,7 @@ func (o *GridOptimizer) buildOps() []OpFunc {
 				return nil
 			}
 			ops = append(ops, f)
-		case "bool":
+		case selectorTypeBool:
 			values := []bool{true, false}
 			f := func(configJson []byte, next func(configJson []byte) error) error {
 				for _, val := range values {

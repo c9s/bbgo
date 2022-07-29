@@ -10,6 +10,15 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
+const (
+	selectorTypeRange      = "range" // deprecated: replaced by selectorTypeRangeFloat
+	selectorTypeRangeFloat = "rangeFloat"
+	selectorTypeRangeInt   = "rangeInt"
+	selectorTypeIterate    = "iterate" // deprecated: replaced by selectorTypeString
+	selectorTypeString     = "string"
+	selectorTypeBool       = "bool"
+)
+
 type SelectorConfig struct {
 	Type   string           `json:"type" yaml:"type"`
 	Label  string           `json:"label,omitempty" yaml:"label,omitempty"`

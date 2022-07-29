@@ -117,7 +117,7 @@ func (o *HyperparameterOptimizer) buildParamDomains() (map[string]string, []para
 	for _, selector := range o.Config.Matrix {
 		var domain paramDomain
 		switch selector.Type {
-		case "range", "rangeFloat":
+		case selectorTypeRange, selectorTypeRangeFloat:
 			domain = &floatRangeDomain{
 				paramDomainBase: paramDomainBase{
 					label: selector.Label,
@@ -126,7 +126,7 @@ func (o *HyperparameterOptimizer) buildParamDomains() (map[string]string, []para
 				min: selector.Min.Float64(),
 				max: selector.Max.Float64(),
 			}
-		case "rangeInt":
+		case selectorTypeRangeInt:
 			domain = &intRangeDomain{
 				paramDomainBase: paramDomainBase{
 					label: selector.Label,
@@ -135,7 +135,7 @@ func (o *HyperparameterOptimizer) buildParamDomains() (map[string]string, []para
 				min: selector.Min.Int(),
 				max: selector.Max.Int(),
 			}
-		case "iterate", "string":
+		case selectorTypeIterate, selectorTypeString:
 			domain = &stringDomain{
 				paramDomainBase: paramDomainBase{
 					label: selector.Label,
@@ -143,7 +143,7 @@ func (o *HyperparameterOptimizer) buildParamDomains() (map[string]string, []para
 				},
 				options: selector.Values,
 			}
-		case "bool":
+		case selectorTypeBool:
 			domain = &boolDomain{
 				paramDomainBase: paramDomainBase{
 					label: selector.Label,
