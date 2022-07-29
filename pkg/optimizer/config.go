@@ -1,7 +1,9 @@
 package optimizer
 
 import (
+	"fmt"
 	"io/ioutil"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 
@@ -28,9 +30,12 @@ type ExecutorConfig struct {
 }
 
 type Config struct {
-	Executor  *ExecutorConfig  `json:"executor" yaml:"executor"`
-	MaxThread int              `yaml:"maxThread,omitempty"`
-	Matrix    []SelectorConfig `yaml:"matrix"`
+	Executor      *ExecutorConfig  `json:"executor" yaml:"executor"`
+	MaxThread     int              `yaml:"maxThread,omitempty"`
+	Matrix        []SelectorConfig `yaml:"matrix"`
+	Algorithm     string           `yaml:"algorithm,omitempty"`
+	Objective     string           `yaml:"objectiveBy,omitempty"`
+	MaxEvaluation int              `yaml:"maxEvaluation"`
 }
 
 var defaultExecutorConfig = &ExecutorConfig{
@@ -51,6 +56,28 @@ func LoadConfig(yamlConfigFileName string) (*Config, error) {
 	var optConfig Config
 	if err := yaml.Unmarshal(configYaml, &optConfig); err != nil {
 		return nil, err
+	}
+
+	switch alg := strings.ToLower(optConfig.Algorithm); alg {
+	case "", "default":
+		optConfig.Algorithm = HpOptimizerAlgorithmTPE
+	case HpOptimizerAlgorithmTPE, HpOptimizerAlgorithmCMAES, HpOptimizerAlgorithmSOBOL, HpOptimizerAlgorithmRandom:
+		optConfig.Algorithm = alg
+	default:
+		return nil, fmt.Errorf(`unknown algorithm "%s"`, optConfig.Algorithm)
+	}
+
+	switch objective := strings.ToLower(optConfig.Objective); objective {
+	case "", "default":
+		optConfig.Objective = HpOptimizerObjectiveEquity
+	case HpOptimizerObjectiveEquity, HpOptimizerObjectiveProfit, HpOptimizerObjectiveVolume:
+		optConfig.Objective = objective
+	default:
+		return nil, fmt.Errorf(`unknown objective "%s"`, optConfig.Objective)
+	}
+
+	if optConfig.MaxEvaluation <= 0 {
+		optConfig.MaxEvaluation = 100
 	}
 
 	if optConfig.Executor == nil {

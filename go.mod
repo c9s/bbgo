@@ -8,6 +8,7 @@ require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/Masterminds/squirrel v1.5.3
 	github.com/adshao/go-binance/v2 v2.3.5
+	github.com/c-bata/goptuna v0.8.1
 	github.com/c9s/requestgen v1.3.0
 	github.com/c9s/rockhopper v1.2.2-0.20220617053729-ffdc87df194b
 	github.com/cheggaaa/pb/v3 v3.0.8
@@ -48,8 +49,9 @@ require (
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
 	github.com/zserge/lorca v0.1.9
 	go.uber.org/multierr v1.7.0
+	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/time v0.0.0-20201208040808-7e3f01d25324
-	gonum.org/v1/gonum v0.8.1
+	gonum.org/v1/gonum v0.8.2
 	google.golang.org/grpc v1.45.0
 	google.golang.org/protobuf v1.28.0
 	gopkg.in/tucnak/telebot.v2 v2.5.0
