@@ -150,6 +150,9 @@ func (o *HyperparameterOptimizer) buildParamDomains() (map[string]string, []para
 					path:  selector.Path,
 				},
 			}
+		default:
+			// unknown parameter type, skip
+			continue
 		}
 		labelPaths[selector.Label] = selector.Path
 		domains = append(domains, domain)
@@ -158,14 +161,14 @@ func (o *HyperparameterOptimizer) buildParamDomains() (map[string]string, []para
 }
 
 func (o *HyperparameterOptimizer) buildObjective(executor Executor, configJson []byte, paramDomains []paramDomain) goptuna.FuncObjective {
-	var matricValueFunc MetricValueFunc
+	var metricValueFunc MetricValueFunc
 	switch o.Config.Objective {
 	case HpOptimizerObjectiveProfit:
-		matricValueFunc = TotalProfitMetricValueFunc
+		metricValueFunc = TotalProfitMetricValueFunc
 	case HpOptimizerObjectiveVolume:
-		matricValueFunc = TotalVolume
+		metricValueFunc = TotalVolume
 	case HpOptimizerObjectiveEquity:
-		matricValueFunc = TotalEquityDiff
+		metricValueFunc = TotalEquityDiff
 	}
 
 	return func(trial goptuna.Trial) (float64, error) {
@@ -185,7 +188,7 @@ func (o *HyperparameterOptimizer) buildObjective(executor Executor, configJson [
 			return 0.0, err
 		}
 		// By config, the Goptuna optimize the parameters by maximize the objective output.
-		return matricValueFunc(summary).Float64(), nil
+		return metricValueFunc(summary).Float64(), nil
 	}
 }
 
