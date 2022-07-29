@@ -33,14 +33,16 @@ exchangeStrategies:
     predictOffset: 2
     noTrailingStopLoss: false
     # stddev on high/low-source
-    hlVarianceMultiplier: 0.22
+    hlVarianceMultiplier: 0.27
     hlRangeWindow: 5
-    smootherWindow: 2
+    smootherWindow: 1
     fisherTransformWindow: 9
     # the init value of takeProfitFactor Series, the coefficient of ATR as TP
-    takeProfitFactor: 6
+    takeProfitFactor: 8
     profitFactorWindow: 8
     atrWindow: 14
+    # orders not been traded will be canceled after `pendingMinutes` minutes
+    pendingMinutes: 5
 
     generateGraph: true
     graphPNLDeductFee: true
@@ -104,7 +106,7 @@ sync:
 
 backtest:
   startTime: "2022-01-01"
-  endTime: "2022-07-29"
+  endTime: "2022-07-30"
   symbols:
     - BTCBUSD
   sessions: [binance]
@@ -114,4 +116,4 @@ backtest:
       takerFeeRate: 0.00075
       balances:
         BTC: 1
-        BUSD: 5000.0
+        BUSD: 50000.0
