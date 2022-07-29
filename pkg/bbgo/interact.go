@@ -494,6 +494,56 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 		reply.Message(fmt.Sprintf("Quote position of strategy %s updated.", it.updatePositionContext.signature))
 		return nil
 	})
+
+	// Position updater: Average cost
+	i.PrivateCommand("/updatepositioncost", "Update Strategy Position: Average Cost", func(reply interact.Reply) error {
+		// it.trader.exchangeStrategies
+		// send symbol options
+		if strategies, found := filterStrategyByInterface((*StrategyPositionUpdater)(nil), it.exchangeStrategies); found {
+			reply.AddMultipleButtons(generateStrategyButtonsForm(strategies))
+			reply.Message("Please choose one strategy")
+		} else {
+			reply.Message("No strategy supports StrategyPositionUpdater")
+		}
+		return nil
+	}).Next(func(signature string, reply interact.Reply) error {
+		strategy, ok := it.exchangeStrategies[signature]
+		if !ok {
+			reply.Message("Strategy not found")
+			return fmt.Errorf("strategy %s not found", signature)
+		}
+
+		updater, implemented := strategy.(StrategyPositionUpdater)
+		if !implemented {
+			reply.Message(fmt.Sprintf("Strategy %s does not support StrategyPositionUpdater", signature))
+			return fmt.Errorf("strategy %s does not implement StrategyPositionUpdater", signature)
+		}
+
+		it.updatePositionContext.updater = updater
+		it.updatePositionContext.signature = signature
+
+		reply.Message("Enter the amount to change")
+
+		return nil
+	}).Next(func(valueStr string, reply interact.Reply) error {
+		value, err := strconv.ParseFloat(valueStr, 64)
+		if err != nil {
+			reply.Message(fmt.Sprintf("%q is not a valid value string", valueStr))
+			return err
+		}
+
+		if kc, ok := reply.(interact.KeyboardController); ok {
+			kc.RemoveKeyboard()
+		}
+
+		if err := it.updatePositionContext.updater.UpdateAverageCost(value); err != nil {
+			reply.Message(fmt.Sprintf("Failed to update position average cost of the strategy, %s", err.Error()))
+			return err
+		}
+
+		reply.Message(fmt.Sprintf("Position average cost of strategy %s updated.", it.updatePositionContext.signature))
+		return nil
+	})
 }
 
 func (it *CoreInteraction) Initialize() error {
