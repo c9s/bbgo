@@ -147,8 +147,13 @@ var optimizeExCmd = &cobra.Command{
 			color.Green("OPTIMIZE OBJECTIVE: %s\n", report.Objective)
 			color.Green("BEST OBJECTIVE VALUE: %s\n", report.Best.Value)
 			color.Green("OPTIMAL PARAMETERS:")
-			for param, val := range report.Best.Parameters {
-				color.Green("  - %s: %v", param, val)
+			for _, selectorConfig := range optConfig.Matrix {
+				label := selectorConfig.Label
+				if val, exist := report.Best.Parameters[label]; exist {
+					color.Green("  - %s: %v", label, val)
+				} else {
+					color.Red("  - %s: (invalid parameter definition)", label)
+				}
 			}
 		}
 
