@@ -123,22 +123,46 @@ func (o *HyperparameterOptimizer) buildParamDomains() (map[string]string, []para
 		var domain paramDomain
 		switch selector.Type {
 		case selectorTypeRange, selectorTypeRangeFloat:
-			domain = &floatRangeDomain{
-				paramDomainBase: paramDomainBase{
-					label: selector.Label,
-					path:  selector.Path,
-				},
-				min: selector.Min.Float64(),
-				max: selector.Max.Float64(),
+			if selector.Step.IsZero() {
+				domain = &floatRangeDomain{
+					paramDomainBase: paramDomainBase{
+						label: selector.Label,
+						path:  selector.Path,
+					},
+					min: selector.Min.Float64(),
+					max: selector.Max.Float64(),
+				}
+			} else {
+				domain = &floatDiscreteRangeDomain{
+					paramDomainBase: paramDomainBase{
+						label: selector.Label,
+						path:  selector.Path,
+					},
+					min:  selector.Min.Float64(),
+					max:  selector.Max.Float64(),
+					step: selector.Step.Float64(),
+				}
 			}
 		case selectorTypeRangeInt:
-			domain = &intRangeDomain{
-				paramDomainBase: paramDomainBase{
-					label: selector.Label,
-					path:  selector.Path,
-				},
-				min: selector.Min.Int(),
-				max: selector.Max.Int(),
+			if selector.Step.IsZero() {
+				domain = &intRangeDomain{
+					paramDomainBase: paramDomainBase{
+						label: selector.Label,
+						path:  selector.Path,
+					},
+					min: selector.Min.Int(),
+					max: selector.Max.Int(),
+				}
+			} else {
+				domain = &intStepRangeDomain{
+					paramDomainBase: paramDomainBase{
+						label: selector.Label,
+						path:  selector.Path,
+					},
+					min:  selector.Min.Int(),
+					max:  selector.Max.Int(),
+					step: selector.Step.Int(),
+				}
 			}
 		case selectorTypeIterate, selectorTypeString:
 			domain = &stringDomain{
