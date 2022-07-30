@@ -191,6 +191,7 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 
 		// trend EMA protection
 		if s.TrendEMA != nil && !s.TrendEMA.GradientAllowed() {
+			log.Infof("trendEMA protection: close price %f", kline.Close.Float64())
 			return
 		}
 
@@ -198,6 +199,7 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 		if s.stopEWMA != nil {
 			ema := fixedpoint.NewFromFloat(s.stopEWMA.Last())
 			if ema.IsZero() {
+				log.Infof("stopEMA protection: value is zero, skip")
 				return
 			}
 
@@ -219,6 +221,7 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 		}
 
 		if quantity.IsZero() {
+			log.Warn("quantity is zero, can not submit order, skip")
 			return
 		}
 
