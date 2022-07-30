@@ -41,5 +41,12 @@ matrix:
   min: 0.001
   max: 0.002
 
+- type: rangeFloat
+  path: '/exchangeStrategies/0/bollmaker/quantity'
+  min: 0.001
+  max: 0.070
+  # Most markets defines the minimum order amount. "step" is useful in such case.
+  step: 0.001
+
 - type: bool
   path: '/exchangeStrategies/0/bollmaker/buyBelowNeutralSMA'
