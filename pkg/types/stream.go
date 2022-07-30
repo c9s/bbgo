@@ -270,7 +270,6 @@ func (s *StandardStream) ping(ctx context.Context, conn *websocket.Conn, cancel 
 			return
 
 		case <-pingTicker.C:
-			log.Debugf("[websocket] -> ping")
 			if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(writeTimeout)); err != nil {
 				log.WithError(err).Error("ping error", err)
 				s.Reconnect()
@@ -377,7 +376,6 @@ func (s *StandardStream) Dial(ctx context.Context, args ...string) (*websocket.C
 	// Unsolicited pong frames are allowed.
 	conn.SetPingHandler(nil)
 	conn.SetPongHandler(func(string) error {
-		log.Debugf("[websocket] <- received pong")
 		if err := conn.SetReadDeadline(time.Now().Add(readTimeout * 2)); err != nil {
 			log.WithError(err).Error("pong handler can not set read deadline")
 		}
