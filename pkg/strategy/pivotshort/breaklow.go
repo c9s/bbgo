@@ -173,25 +173,25 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 
 		// force direction to be down
 		if closePrice.Compare(openPrice) >= 0 {
-			log.Infof("%s price %f is closed higher than the open price %f, skip this break", kline.Symbol, closePrice.Float64(), openPrice.Float64())
+			bbgo.Notify("%s price %f is closed higher than the open price %f, skip this break", kline.Symbol, closePrice.Float64(), openPrice.Float64())
 			// skip UP klines
 			return
 		}
 
-		log.Infof("%s breakLow signal detected, closed price %f < breakPrice %f", kline.Symbol, closePrice.Float64(), breakPrice.Float64())
+		bbgo.Notify("%s breakLow signal detected, closed price %f < breakPrice %f", kline.Symbol, closePrice.Float64(), breakPrice.Float64())
 
 		if s.lastBreakLow.IsZero() || previousLow.Compare(s.lastBreakLow) < 0 {
 			s.lastBreakLow = previousLow
 		}
 
 		if position.IsOpened(kline.Close) {
-			log.Infof("position is already opened, skip short")
+			bbgo.Notify("position is already opened, skip")
 			return
 		}
 
 		// trend EMA protection
 		if s.TrendEMA != nil && !s.TrendEMA.GradientAllowed() {
-			log.Infof("trendEMA protection: close price %f", kline.Close.Float64())
+			bbgo.Notify("trendEMA protection: close price %f, gradient %f", kline.Close.Float64(), s.TrendEMA.Gradient())
 			return
 		}
 
@@ -205,7 +205,7 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 
 			emaStopShortPrice := ema.Mul(fixedpoint.One.Sub(s.StopEMA.Range))
 			if closePrice.Compare(emaStopShortPrice) < 0 {
-				log.Infof("stopEMA protection: close price %f < EMA(%v %f) * (1 - RANGE %f) = %f", closePrice.Float64(), s.StopEMA, ema.Float64(), s.StopEMA.Range.Float64(), emaStopShortPrice.Float64())
+				bbgo.Notify("stopEMA protection: close price %f < EMA(%v %f) * (1 - RANGE %f) = %f", closePrice.Float64(), s.StopEMA, ema.Float64(), s.StopEMA.Range.Float64(), emaStopShortPrice.Float64())
 				return
 			}
 		}

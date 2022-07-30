@@ -27,6 +27,10 @@ func (s *TrendEMA) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 	}))
 }
 
+func (s *TrendEMA) Gradient() float64 {
+	return s.trendGradient
+}
+
 func (s *TrendEMA) GradientAllowed() bool {
 	if s.trendEWMALast > 0.0 && s.trendEWMACurrent > 0.0 {
 		s.trendGradient = s.trendEWMALast / s.trendEWMACurrent
