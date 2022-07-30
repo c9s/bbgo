@@ -15,12 +15,30 @@ func TestBuildParamDomains(t *testing.T) {
 			max:             expect.Max.Float64(),
 		}
 	}
+	var floatDiscreteRangeDomainVerifier = func(domain paramDomain, expect SelectorConfig) bool {
+		concrete := domain.(*floatDiscreteRangeDomain)
+		return *concrete == floatDiscreteRangeDomain{
+			paramDomainBase: paramDomainBase{label: expect.Label, path: expect.Path},
+			min:             expect.Min.Float64(),
+			max:             expect.Max.Float64(),
+			step:            expect.Step.Float64(),
+		}
+	}
 	var intRangeDomainVerifier = func(domain paramDomain, expect SelectorConfig) bool {
 		concrete := domain.(*intRangeDomain)
 		return *concrete == intRangeDomain{
 			paramDomainBase: paramDomainBase{label: expect.Label, path: expect.Path},
 			min:             expect.Min.Int(),
 			max:             expect.Max.Int(),
+		}
+	}
+	var intStepRangeDomainVerifier = func(domain paramDomain, expect SelectorConfig) bool {
+		concrete := domain.(*intStepRangeDomain)
+		return *concrete == intStepRangeDomain{
+			paramDomainBase: paramDomainBase{label: expect.Label, path: expect.Path},
+			min:             expect.Min.Int(),
+			max:             expect.Max.Int(),
+			step:            expect.Step.Int(),
 		}
 	}
 	var stringDomainVerifier = func(domain paramDomain, expect SelectorConfig) bool {
@@ -56,8 +74,8 @@ func TestBuildParamDomains(t *testing.T) {
 				Label:  "range label",
 				Path:   "range path",
 				Values: []string{"ignore", "ignore"},
-				Min:    fixedpoint.NewFromFloat(0.0),
-				Max:    fixedpoint.NewFromFloat(0.0),
+				Min:    fixedpoint.NewFromFloat(7.0),
+				Max:    fixedpoint.NewFromFloat(80.0),
 				Step:   fixedpoint.NewFromFloat(0.0),
 			},
 			verify: floatRangeDomainVerifier,
@@ -67,11 +85,22 @@ func TestBuildParamDomains(t *testing.T) {
 				Label:  "rangeFloat label",
 				Path:   "rangeFloat path",
 				Values: []string{"ignore", "ignore"},
-				Min:    fixedpoint.NewFromFloat(0.0),
-				Max:    fixedpoint.NewFromFloat(0.0),
+				Min:    fixedpoint.NewFromFloat(6.0),
+				Max:    fixedpoint.NewFromFloat(10.0),
 				Step:   fixedpoint.NewFromFloat(0.0),
 			},
 			verify: floatRangeDomainVerifier,
+		}, {
+			config: SelectorConfig{
+				Type:   selectorTypeRangeFloat,
+				Label:  "rangeDiscreteFloat label",
+				Path:   "rangeDiscreteFloat path",
+				Values: []string{"ignore", "ignore"},
+				Min:    fixedpoint.NewFromFloat(6.0),
+				Max:    fixedpoint.NewFromFloat(10.0),
+				Step:   fixedpoint.NewFromFloat(2.0),
+			},
+			verify: floatDiscreteRangeDomainVerifier,
 		}, {
 			config: SelectorConfig{
 				Type:   selectorTypeRangeInt,
@@ -80,9 +109,20 @@ func TestBuildParamDomains(t *testing.T) {
 				Values: []string{"ignore", "ignore"},
 				Min:    fixedpoint.NewFromInt(3),
 				Max:    fixedpoint.NewFromInt(100),
-				Step:   fixedpoint.NewFromInt(66),
+				Step:   fixedpoint.NewFromInt(0),
 			},
 			verify: intRangeDomainVerifier,
+		}, {
+			config: SelectorConfig{
+				Type:   selectorTypeRangeInt,
+				Label:  "rangeInt label",
+				Path:   "rangeInt path",
+				Values: []string{"ignore", "ignore"},
+				Min:    fixedpoint.NewFromInt(3),
+				Max:    fixedpoint.NewFromInt(100),
+				Step:   fixedpoint.NewFromInt(7),
+			},
+			verify: intStepRangeDomainVerifier,
 		}, {
 			config: SelectorConfig{
 				Type:   selectorTypeIterate,
