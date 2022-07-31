@@ -35,8 +35,8 @@ var TotalEquityDiff = func(summaryReport *backtest.SummaryReport) fixedpoint.Val
 		return fixedpoint.Zero
 	}
 
-	initEquity := summaryReport.SymbolReports[0].InitialEquityValue()
-	finalEquity := summaryReport.SymbolReports[0].FinalEquityValue()
+	initEquity := summaryReport.InitialEquityValue
+	finalEquity := summaryReport.FinalEquityValue
 	return finalEquity.Sub(initEquity)
 }
 
