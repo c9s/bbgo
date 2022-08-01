@@ -16,11 +16,11 @@ In general, strategies are Go struct, defined in the Go package.
 
 To add your first strategy, the fastest way is to add it as a built-in strategy.
 
-Simply edit `pkg/cmd/builtin.go` and import your strategy package there.
+Simply edit `pkg/cmd/strategy/builtin.go` and import your strategy package there.
 
 When BBGO starts, the strategy will be imported as a package, and register its struct to the engine.
 
-You can also create a new file called `pkg/cmd/builtin_short.go` and import your strategy package.
+You can also create a new file called `pkg/cmd/strategy/short.go` and import your strategy package.
 
 ```
 import (
