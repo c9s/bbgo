@@ -72,11 +72,14 @@ type Strategy struct {
 	SmootherWindow            int              `json:"smootherWindow"`
 	FisherTransformWindow     int              `json:"fisherTransformWindow"`
 	ATRWindow                 int              `json:"atrWindow"`
+	OrderFeeProtection        bool             `json:"orderTakerFeeProtection"`
 
 	buyPrice     float64
 	sellPrice    float64
 	highestPrice float64
 	lowestPrice  float64
+
+	buyOrderFeePriceFactor fixedpoint.Value
 
 	// This is not related to trade but for statistics graph generation
 	// Will deduct fee in percentage from every trade
@@ -119,6 +122,7 @@ func (s *Strategy) Print(o *os.File) {
 	hiyellow(f, "smootherWindow: %d\n", s.SmootherWindow)
 	hiyellow(f, "fisherTransformWindow: %d\n", s.FisherTransformWindow)
 	hiyellow(f, "atrWindow: %d\n", s.ATRWindow)
+	hiyellow(f, "orderFeeProtection: %t\n", s.OrderFeeProtection)
 	hiyellow(f, "\n")
 }
 
@@ -159,7 +163,7 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 	baseBalance := balances[s.Market.BaseCurrency].Available
 	price := s.getLastPrice()
 	if order.Side == types.SideTypeBuy {
-		quoteAmount := balances[s.Market.QuoteCurrency].Available.Div(price)
+		quoteAmount := balances[s.Market.QuoteCurrency].Available.Div(price.Mul(s.buyOrderFeePriceFactor))
 		if order.Quantity.Compare(quoteAmount) > 0 {
 			order.Quantity = quoteAmount
 		}
@@ -457,6 +461,15 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	startTime := s.Environment.StartTime()
 	s.TradeStats.SetIntervalProfitCollector(types.NewIntervalProfitCollector(types.Interval1d, startTime))
 	s.TradeStats.SetIntervalProfitCollector(types.NewIntervalProfitCollector(types.Interval1w, startTime))
+
+	// Calculate fee-price protection factor to prevent order rejection, especially on FTX.
+	// buyOrderFeePriceFactor = 1 + taker_fee * (1 + delta)
+	// while placing buy order: quantity = quote_balance / (price * buyOrderFeePriceFactor)
+	s.buyOrderFeePriceFactor = fixedpoint.One
+	if s.OrderFeeProtection && session.TakerFeeRate.Sign() > 0 {
+		safetyRate := session.TakerFeeRate.Mul(fixedpoint.One.Add(Delta))
+		s.buyOrderFeePriceFactor = s.buyOrderFeePriceFactor.Add(safetyRate)
+	}
 
 	// StrategyController
 	s.Status = types.StrategyStatusRunning
@@ -787,7 +800,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				}
 
 			}
-			quantity := quoteBalance.Available.Div(source)
+			quantity := quoteBalance.Available.Div(source.Mul(s.buyOrderFeePriceFactor))
 			createdOrders, err := s.GeneralOrderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 				Symbol:   s.Symbol,
 				Side:     types.SideTypeBuy,

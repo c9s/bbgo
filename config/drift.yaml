@@ -11,6 +11,8 @@ sessions:
     futures: false
     envVarPrefix: binance
     heikinAshi: false
+    makerFeeRate: 0.00075
+    takerFeeRate: 0.00075
 
 exchangeStrategies:
  
@@ -34,6 +36,17 @@ exchangeStrategies:
     smootherWindow: 2
     fisherTransformWindow: 8
     atrWindow: 14
+
+    # On most exchanges, including Binance and MAX, while placing limit buy orders, the fees are calculated
+    # automatically in the final trade result. However, for some exchanges, the maximum quantity is calculated with
+    # fee:
+    #
+    #     max_quantity = quote_balance / (target_price * (1 + taker_fee_rate))
+    #
+    # orderTakerFeeProtection controls whether to calculate the taker fee before placing orders, and is default
+    # disabled. Enable this option and set the takerFeeRate for sessions to prevent order rejection for exchanges like
+    # FTX Pro.
+    orderTakerFeeProtection: false
 
     generateGraph: true
     graphPNLDeductFee: true
