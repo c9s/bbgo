@@ -1,0 +1,52 @@
+# usage:
+#
+#   go run ./cmd/bbgo hoptimize --config bollmaker_ethusdt.yaml  --optimizer-config optimizer-hyperparam-search.yaml
+#
+---
+# The search algorithm. Supports the following algorithms:
+# - tpe: (default) Tree-structured Parzen Estimators
+# - cmaes: Covariance Matrix Adaptation Evolution Strategy
+# - sobol: Quasi-monte carlo sampling based on Sobol sequence
+# - random: random search
+# Reference: https://c-bata.medium.com/practical-bayesian-optimization-in-go-using-goptuna-edf97195fcb5
+algorithm: tpe
+
+# The objective function to be maximized. Possible options are:
+# - profit: by trading profit
+# - volume: by trading volume
+# - equity: by equity difference
+objectiveBy: equity
+
+# Maximum number of search evaluations.
+maxEvaluation: 1000
+
+executor:
+  type: local
+  local:
+    maxNumberOfProcesses: 10
+
+matrix:
+- type: string # alias: iterate
+  path: '/exchangeStrategies/0/bollmaker/interval'
+  values: ["1m", "5m"]
+
+- type: rangeInt
+  label: window
+  path: '/exchangeStrategies/0/bollmaker/defaultBollinger/window'
+  min: 12
+  max: 240
+
+- type: rangeFloat # alias: range
+  path: '/exchangeStrategies/0/bollmaker/spread'
+  min: 0.001
+  max: 0.002
+
+- type: rangeFloat
+  path: '/exchangeStrategies/0/bollmaker/quantity'
+  min: 0.001
+  max: 0.070
+  # Most markets defines the minimum order amount. "step" is useful in such case.
+  step: 0.001
+
+- type: bool
+  path: '/exchangeStrategies/0/bollmaker/buyBelowNeutralSMA'
