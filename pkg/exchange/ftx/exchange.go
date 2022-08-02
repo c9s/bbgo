@@ -37,9 +37,10 @@ var marketDataLimiter = rate.NewLimiter(rate.Every(500*time.Millisecond), 2)
 type Exchange struct {
 	client *ftxapi.RestClient
 
-	key, secret  string
-	subAccount   string
-	restEndpoint *url.URL
+	key, secret             string
+	subAccount              string
+	restEndpoint            *url.URL
+	orderAmountReduceFactor fixedpoint.Value
 }
 
 type MarketTicker struct {
@@ -91,8 +92,9 @@ func NewExchange(key, secret string, subAccount string) *Exchange {
 		restEndpoint: u,
 		key:          key,
 		// pragma: allowlist nextline secret
-		secret:     secret,
-		subAccount: subAccount,
+		secret:                  secret,
+		subAccount:              subAccount,
+		orderAmountReduceFactor: fixedpoint.One,
 	}
 }
 
@@ -219,6 +221,13 @@ func (e *Exchange) DefaultFeeRates() types.ExchangeFee {
 		MakerFeeRate: fixedpoint.NewFromFloat(0.01 * 0.020), // 0.020%
 		TakerFeeRate: fixedpoint.NewFromFloat(0.01 * 0.070), // 0.070%
 	}
+}
+
+// SetModifyOrderAmountForFee protects the limit buy orders by reducing amount with taker fee.
+// The amount is recalculated before submit: submit_amount = original_amount / (1 + taker_fee_rate) .
+// This prevents balance exceeding error while closing position without spot margin enabled.
+func (e *Exchange) SetModifyOrderAmountForFee(feeRate types.ExchangeFee) {
+	e.orderAmountReduceFactor = fixedpoint.One.Add(feeRate.TakerFeeRate)
 }
 
 // resolution field in api
@@ -406,11 +415,17 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 			logrus.WithError(err).Error("type error")
 		}
 
+		submitQuantity := so.Quantity
+		switch orderType {
+		case ftxapi.OrderTypeLimit, ftxapi.OrderTypeStopLimit:
+			submitQuantity = so.Quantity.Div(e.orderAmountReduceFactor)
+		}
+
 		req := e.client.NewPlaceOrderRequest()
 		req.Market(toLocalSymbol(TrimUpperString(so.Symbol)))
 		req.OrderType(orderType)
 		req.Side(ftxapi.Side(TrimLowerString(string(so.Side))))
-		req.Size(so.Quantity)
+		req.Size(submitQuantity)
 
 		switch so.Type {
 		case types.OrderTypeLimit, types.OrderTypeLimitMaker:
