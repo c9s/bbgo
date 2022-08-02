@@ -1,6 +1,8 @@
 package optimizer
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -28,7 +30,7 @@ type BacktestTask struct {
 }
 
 type Executor interface {
-	// Execute(configJson []byte) (*backtest.SummaryReport, error)
+	Execute(configJson []byte) (*backtest.SummaryReport, error)
 	Run(ctx context.Context, taskC chan BacktestTask, bar *pb.ProgressBar) (chan BacktestTask, error)
 }
 
@@ -53,7 +55,7 @@ func (e *LocalProcessExecutor) ExecuteAsync(configJson []byte) *AsyncHandle {
 
 	go func() {
 		defer close(handle.Done)
-		report, err := e.execute(configJson)
+		report, err := e.Execute(configJson)
 		handle.Error = err
 		handle.Report = report
 	}()
@@ -61,8 +63,8 @@ func (e *LocalProcessExecutor) ExecuteAsync(configJson []byte) *AsyncHandle {
 	return handle
 }
 
-func (e *LocalProcessExecutor) readReport(output []byte) (*backtest.SummaryReport, error) {
-	summaryReportFilepath := strings.TrimSpace(string(output))
+func (e *LocalProcessExecutor) readReport(reportPath string) (*backtest.SummaryReport, error) {
+	summaryReportFilepath := strings.TrimSpace(reportPath)
 	_, err := os.Stat(summaryReportFilepath)
 	if os.IsNotExist(err) {
 		return nil, err
@@ -123,7 +125,7 @@ func (e *LocalProcessExecutor) Run(ctx context.Context, taskC chan BacktestTask,
 					bar.Set("log", fmt.Sprintf("local worker #%d received param task: %v", id, task.Params))
 					bar.Write()
 
-					report, err := e.execute(task.ConfigJson)
+					report, err := e.Execute(task.ConfigJson)
 					if err != nil {
 						if err2, ok := err.(*exec.ExitError); ok {
 							log.WithError(err).Errorf("execute error: %s", err2.Stderr)
@@ -144,9 +146,8 @@ func (e *LocalProcessExecutor) Run(ctx context.Context, taskC chan BacktestTask,
 	return resultsC, nil
 }
 
-// execute runs the config json and returns the summary report
-// this is a blocking operation
-func (e *LocalProcessExecutor) execute(configJson []byte) (*backtest.SummaryReport, error) {
+// Execute runs the config json and returns the summary report. This is a blocking operation.
+func (e *LocalProcessExecutor) Execute(configJson []byte) (*backtest.SummaryReport, error) {
 	tf, err := jsonToYamlConfig(e.ConfigDir, configJson)
 	if err != nil {
 		return nil, err
@@ -155,10 +156,17 @@ func (e *LocalProcessExecutor) execute(configJson []byte) (*backtest.SummaryRepo
 	c := exec.Command(e.Bin, "backtest", "--config", tf.Name(), "--output", e.OutputDir, "--subdir")
 	output, err := c.Output()
 	if err != nil {
+		log.WithError(err).WithField("command", []string{e.Bin, "backtest", "--config", tf.Name(), "--output", e.OutputDir, "--subdir"}).Errorf("failed to execute backtest")
 		return nil, err
 	}
 
-	return e.readReport(output)
+	// the last line is the report path
+	scanner := bufio.NewScanner(bytes.NewBuffer(output))
+	var reportFilePath string
+	for scanner.Scan() {
+		reportFilePath = scanner.Text()
+	}
+	return e.readReport(reportFilePath)
 }
 
 // jsonToYamlConfig translate json format config into a YAML format config file
