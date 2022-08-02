@@ -75,8 +75,8 @@ func buildHyperparameterOptimizeTrialResults(study *goptuna.Study) []*Hyperparam
 }
 
 type HyperparameterOptimizer struct {
-	StudyName string
-	Config    *Config
+	SessionName string
+	Config      *Config
 
 	// Workaround for goptuna/tpe parameter suggestion. Remove this after fixed.
 	// ref: https://github.com/c-bata/goptuna/issues/236
@@ -112,7 +112,7 @@ func (o *HyperparameterOptimizer) buildStudy(trialFinishChan chan goptuna.Frozen
 		studyOpts = append(studyOpts, goptuna.StudyOptionRelativeSampler(relativeSampler))
 	}
 
-	return goptuna.CreateStudy(o.StudyName, studyOpts...)
+	return goptuna.CreateStudy(o.SessionName, studyOpts...)
 }
 
 func (o *HyperparameterOptimizer) buildParamDomains() (map[string]string, []paramDomain) {
@@ -288,7 +288,7 @@ func (o *HyperparameterOptimizer) Run(executor Executor, configJson []byte) (*Hy
 	bar.Finish()
 
 	return &HyperparameterOptimizeReport{
-		Name:       o.StudyName,
+		Name:       o.SessionName,
 		Objective:  o.Config.Objective,
 		Parameters: labelPaths,
 		Best:       buildBestHyperparameterOptimizeResult(study),
