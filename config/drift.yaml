@@ -12,6 +12,13 @@ sessions:
     envVarPrefix: binance
     heikinAshi: false
 
+    # Drift strategy intends to place buy/sell orders as much value mas it could be. To exchanges that requires to
+    # calculate fees before placing limit orders (e.g. FTX Pro), make sure the fee rate is configured correctly and
+    # enable modifyOrderAmountForFee to prevent order rejection.
+    makerFeeRate: 0.0002
+    takerFeeRate: 0.0007
+    modifyOrderAmountForFee: false
+
 exchangeStrategies:
  
 - on: binance
