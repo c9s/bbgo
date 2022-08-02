@@ -5,11 +5,19 @@ sessions:
     envVarPrefix: MAX
     takerFeeRate: 0
     makerFeeRate: 0
+    modifyOrderAmountForFee: false
   binance:
     exchange: binance
     envVarPrefix: BINANCE
     takerFeeRate: 0
     makerFeeRate: 0
+    modifyOrderAmountForFee: false
+  ftx:
+    exchange: ftx
+    envVarPrefix: FTX
+    takerFeeRate: 0
+    makerFeeRate: 0
+    modifyOrderAmountForFee: true
 
 exchangeStrategies:
 - on: ["binance"]
