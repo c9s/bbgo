@@ -35,14 +35,21 @@ exchangeStrategies:
     takeProfitFactor: 6
     profitFactorWindow: 8
     noTrailingStopLoss: false
+    trailingStopLossType: kline
     # stddev on high/low-source
-    hlVarianceMultiplier: 0.22
+    hlVarianceMultiplier: 0.23
     hlRangeWindow: 5
     smootherWindow: 1
     fisherTransformWindow: 9
     atrWindow: 14
     # orders not been traded will be canceled after `pendingMinutes` minutes
-    pendingMinutes: 5
+    pendingMinutes: 4
+    noRebalance: true
+    trendWindow: 12
+    rebalanceFilter: 1.5
+
+    trailingActivationRatio: [0.008, 0.015]
+    trailingCallbackRate: [0.002, 0.001]
 
     generateGraph: true
     graphPNLDeductFee: true
