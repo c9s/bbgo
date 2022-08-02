@@ -106,6 +106,10 @@ type ExchangeDefaultFeeRates interface {
 	DefaultFeeRates() ExchangeFee
 }
 
+type ExchangeAmountFeeProtect interface {
+	SetModifyOrderAmountForFee(ExchangeFee)
+}
+
 type ExchangeTradeHistoryService interface {
 	QueryTrades(ctx context.Context, symbol string, options *TradeQueryOptions) ([]Trade, error)
 	QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []Order, err error)
