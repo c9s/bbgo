@@ -1,6 +1,6 @@
 # usage:
 #
-#   go run ./cmd/bbgo optimizeex --config bollmaker_ethusdt.yaml  --optimizer-config optimizer-hyperparam-search.yaml
+#   go run ./cmd/bbgo hoptimize --config bollmaker_ethusdt.yaml  --optimizer-config optimizer-hyperparam-search.yaml
 #
 ---
 # The search algorithm. Supports the following algorithms:
