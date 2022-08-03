@@ -1192,16 +1192,31 @@ func NewCanvas(title string, intervals ...Interval) *Canvas {
 	return out
 }
 
+func expand(a []float64, length int, defaultVal float64) []float64 {
+	l := len(a)
+	if l >= length {
+		return a
+	}
+	for i := 0; i < length-l; i++ {
+		a = append(a, defaultVal)
+	}
+	return a
+}
+
 func (canvas *Canvas) Plot(tag string, a Series, endTime Time, length int) {
 	var timeline []time.Time
 	e := endTime.Time()
+	if a.Length() == 0 {
+		return
+	}
+	oldest := a.Index(a.Length() - 1)
 	for i := length - 1; i >= 0; i-- {
 		shiftedT := e.Add(-time.Duration(i*canvas.Interval.Minutes()) * time.Minute)
 		timeline = append(timeline, shiftedT)
 	}
 	canvas.Series = append(canvas.Series, chart.TimeSeries{
 		Name:    tag,
-		YValues: Reverse(a, length),
+		YValues: expand(Reverse(a, length), length, oldest),
 		XValues: timeline,
 	})
 }
@@ -1211,10 +1226,14 @@ func (canvas *Canvas) PlotRaw(tag string, a Series, length int) {
 	for i := 0; i < length; i++ {
 		x = append(x, float64(i))
 	}
+	if a.Length() == 0 {
+		return
+	}
+	oldest := a.Index(a.Length() - 1)
 	canvas.Series = append(canvas.Series, chart.ContinuousSeries{
 		Name:    tag,
 		XValues: x,
-		YValues: Reverse(a, length),
+		YValues: expand(Reverse(a, length), length, oldest),
 	})
 }
 

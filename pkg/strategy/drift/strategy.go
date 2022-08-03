@@ -2,6 +2,7 @@ package drift
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -283,7 +284,7 @@ func (s *DriftMA) TestUpdate(v float64) *DriftMA {
 	return out
 }
 
-func (s *Strategy) initIndicators() error {
+func (s *Strategy) initIndicators(kline *types.KLine, priceLines *types.Queue) error {
 	s.ma = &indicator.SMA{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.HLRangeWindow}}
 	s.stdevHigh = &indicator.StdDev{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.HLRangeWindow}}
 	s.stdevLow = &indicator.StdDev{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.HLRangeWindow}}
@@ -327,6 +328,10 @@ func (s *Strategy) initIndicators() error {
 		s.drift.Update(source)
 		s.trendLine.Update(source)
 		s.atr.PushK(kline)
+		priceLines.Update(source)
+	}
+	if kline != nil && klines != nil {
+		kline.Set(&(*klines)[len(*klines)-1])
 	}
 	klines, ok = store.KLinesOfInterval(types.Interval1m)
 	if !ok {
@@ -491,12 +496,13 @@ func (s *Strategy) initTickerFunctions(ctx context.Context) {
 
 }
 
-func (s *Strategy) Draw(time types.Time, priceLine types.SeriesExtend, profit types.Series, cumProfit types.Series, zeroPoints types.Series) {
+func (s *Strategy) DrawIndicators(time types.Time, priceLine types.SeriesExtend, zeroPoints types.Series) *types.Canvas {
 	canvas := types.NewCanvas(s.InstanceID(), s.Interval)
 	Length := priceLine.Length()
 	if Length > 300 {
 		Length = 300
 	}
+	log.Infof("draw indicators with %d data", Length)
 	mean := priceLine.Mean(Length)
 	highestPrice := priceLine.Minus(mean).Abs().Highest(Length)
 	highestDrift := s.drift.Abs().Highest(Length)
@@ -510,6 +516,31 @@ func (s *Strategy) Draw(time types.Time, priceLine types.SeriesExtend, profit ty
 	canvas.Plot("zero", types.NumberSeries(mean), time, Length)
 	canvas.Plot("price", priceLine, time, Length)
 	canvas.Plot("zeroPoint", zeroPoints, time, Length)
+	return canvas
+}
+
+func (s *Strategy) DrawPNL(profit types.Series) *types.Canvas {
+	canvas := types.NewCanvas(s.InstanceID())
+	if s.GraphPNLDeductFee {
+		canvas.PlotRaw("pnl % (with Fee Deducted)", profit, profit.Length())
+	} else {
+		canvas.PlotRaw("pnl %", profit, profit.Length())
+	}
+	return canvas
+}
+
+func (s *Strategy) DrawCumPNL(cumProfit types.Series) *types.Canvas {
+	canvas := types.NewCanvas(s.InstanceID())
+	if s.GraphPNLDeductFee {
+		canvas.PlotRaw("cummulative pnl % (with Fee Deducted)", cumProfit, cumProfit.Length())
+	} else {
+		canvas.PlotRaw("cummulative pnl %", cumProfit, cumProfit.Length())
+	}
+	return canvas
+}
+
+func (s *Strategy) Draw(time types.Time, priceLine types.SeriesExtend, profit types.Series, cumProfit types.Series, zeroPoints types.Series) {
+	canvas := s.DrawIndicators(time, priceLine, zeroPoints)
 	f, err := os.Create(s.CanvasPath)
 	if err != nil {
 		log.WithError(err).Errorf("cannot create on %s", s.CanvasPath)
@@ -520,12 +551,7 @@ func (s *Strategy) Draw(time types.Time, priceLine types.SeriesExtend, profit ty
 		log.WithError(err).Errorf("cannot render in drift")
 	}
 
-	canvas = types.NewCanvas(s.InstanceID())
-	if s.GraphPNLDeductFee {
-		canvas.PlotRaw("pnl % (with Fee Deducted)", profit, profit.Length())
-	} else {
-		canvas.PlotRaw("pnl %", profit, profit.Length())
-	}
+	canvas = s.DrawPNL(profit)
 	f, err = os.Create(s.GraphPNLPath)
 	if err != nil {
 		log.WithError(err).Errorf("open pnl")
@@ -536,12 +562,7 @@ func (s *Strategy) Draw(time types.Time, priceLine types.SeriesExtend, profit ty
 		log.WithError(err).Errorf("render pnl")
 	}
 
-	canvas = types.NewCanvas(s.InstanceID())
-	if s.GraphPNLDeductFee {
-		canvas.PlotRaw("cummulative pnl % (with Fee Deducted)", cumProfit, cumProfit.Length())
-	} else {
-		canvas.PlotRaw("cummulative pnl %", cumProfit, cumProfit.Length())
-	}
+	canvas = s.DrawCumPNL(cumProfit)
 	f, err = os.Create(s.GraphCumPNLPath)
 	if err != nil {
 		log.WithError(err).Errorf("open cumpnl")
@@ -662,6 +683,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	if s.Position == nil {
 		s.Position = types.NewPositionFromMarket(s.Market)
 		s.p = types.NewPositionFromMarket(s.Market)
+	} else {
+		s.p = types.NewPositionFromMarket(s.Market)
+		s.p.Base = s.Position.Base
+		s.p.Quote = s.Position.Quote
+		s.p.AverageCost = s.Position.AverageCost
 	}
 	if s.ProfitStats == nil {
 		s.ProfitStats = types.NewProfitStats(s.Market)
@@ -818,20 +844,50 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.lowestPrice = s.sellPrice
 	})
 
-	if err := s.initIndicators(); err != nil {
+	dynamicKLine := &types.KLine{}
+	priceLine := types.NewQueue(300)
+	if err := s.initIndicators(dynamicKLine, priceLine); err != nil {
 		log.WithError(err).Errorf("initIndicator failed")
 		return nil
 	}
 	s.initTickerFunctions(ctx)
 
-	dynamicKLine := &types.KLine{}
-	priceLine := types.NewQueue(300)
 	zeroPoints := types.NewQueue(300)
 	stoploss := s.StopLoss.Float64()
 	// default value: use 1m kline
 	if !s.NoTrailingStopLoss && s.IsBackTesting() || s.TrailingStopLossType == "" {
 		s.TrailingStopLossType = "kline"
 	}
+
+	bbgo.RegisterCommand("telegram", "/draw", func(msg string) {
+		canvas := s.DrawIndicators(dynamicKLine.StartTime, priceLine, zeroPoints)
+		var buffer bytes.Buffer
+		if err := canvas.Render(chart.PNG, &buffer); err != nil {
+			log.WithError(err).Errorf("cannot render indicators in drift")
+			return
+		}
+		bbgo.SendPhoto(&buffer)
+	})
+
+	bbgo.RegisterCommand("telegram", "/pnl", func(msg string) {
+		canvas := s.DrawPNL(&profit)
+		var buffer bytes.Buffer
+		if err := canvas.Render(chart.PNG, &buffer); err != nil {
+			log.WithError(err).Errorf("cannot render pnl in drift")
+			return
+		}
+		bbgo.SendPhoto(&buffer)
+	})
+
+	bbgo.RegisterCommand("telegram", "/cumpnl", func(msg string) {
+		canvas := s.DrawCumPNL(&cumProfit)
+		var buffer bytes.Buffer
+		if err := canvas.Render(chart.PNG, &buffer); err != nil {
+			log.WithError(err).Errorf("cannot render cumpnl in drift")
+			return
+		}
+		bbgo.SendPhoto(&buffer)
+	})
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		if s.Status != types.StrategyStatusRunning {
