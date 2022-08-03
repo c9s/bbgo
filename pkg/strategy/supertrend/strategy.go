@@ -1,8 +1,10 @@
 package supertrend
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"github.com/fatih/color"
 	"os"
 	"sync"
 
@@ -84,6 +86,12 @@ type Strategy struct {
 
 	// StrategyController
 	bbgo.StrategyController
+
+	// Accumulated profit report
+	accumulatedProfit   fixedpoint.Value
+	accumulatedProfitMA *indicator.SMA
+	// AccumulatedProfitMAWindow Accumulated profit SMA window
+	AccumulatedProfitMAWindow int `json:"accumulatedProfitMAWindow"`
 }
 
 func (s *Strategy) ID() string {
@@ -264,6 +272,18 @@ func (s *Strategy) calculateQuantity(currentPrice fixedpoint.Value) fixedpoint.V
 	return quantity
 }
 
+// PrintResult prints accumulated profit status
+func (s *Strategy) PrintResult(o *os.File) {
+	f := bufio.NewWriter(o)
+	defer f.Flush()
+	hiyellow := color.New(color.FgHiYellow).FprintfFunc()
+	hiyellow(f, "------ %s Results ------\n", s.InstanceID())
+	hiyellow(f, "Symbol: %v\n", s.Symbol)
+	hiyellow(f, "Accumulated Profit: %v\n", s.accumulatedProfit)
+	hiyellow(f, "Accumulated Profit %dMA: %f\n", s.AccumulatedProfitMAWindow, s.accumulatedProfitMA.Last())
+	hiyellow(f, "\n")
+}
+
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	s.session = session
 
@@ -304,6 +324,20 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderExecutor.BindProfitStats(s.ProfitStats)
 	s.orderExecutor.BindTradeStats(s.TradeStats)
 	s.orderExecutor.Bind()
+
+	// Accumulated profit report
+	if s.AccumulatedProfitMAWindow <= 0 {
+		s.AccumulatedProfitMAWindow = 60
+	}
+	s.accumulatedProfitMA = &indicator.SMA{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.AccumulatedProfitMAWindow}}
+	s.orderExecutor.TradeCollector().OnProfit(func(trade types.Trade, profit *types.Profit) {
+		if profit == nil {
+			return
+		}
+
+		s.accumulatedProfit = s.accumulatedProfit.Add(profit.Profit)
+		s.accumulatedProfitMA.Update(s.accumulatedProfit.Float64())
+	})
 
 	// Sync position to redis on trade
 	s.orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
@@ -408,6 +442,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	// Graceful shutdown
 	bbgo.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
+
+		// Print accumulated profit report
+		defer s.PrintResult(os.Stdout)
 
 		_ = s.orderExecutor.GracefulCancel(ctx)
 		_, _ = fmt.Fprintln(os.Stderr, s.TradeStats.String())
