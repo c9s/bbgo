@@ -92,6 +92,10 @@ type Strategy struct {
 	accumulatedProfitMA *indicator.SMA
 	// AccumulatedProfitMAWindow Accumulated profit SMA window
 	AccumulatedProfitMAWindow int `json:"accumulatedProfitMAWindow"`
+	dailyAccumulatedProfits   types.Float64Slice
+	lastDayAccumulatedProfit  fixedpoint.Value
+	// AccumulatedProfitLastPeriodWindow Last period window of accumulated profit
+	AccumulatedProfitLastPeriodWindow int `json:"accumulatedProfitLastPeriodWindow"`
 }
 
 func (s *Strategy) ID() string {
@@ -123,6 +127,9 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.LinearRegression.Interval})
 
 	s.ExitMethods.SetAndSubscribe(session, s)
+
+	// Accumulated profit report
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: types.Interval1d})
 }
 
 // Position control
@@ -277,10 +284,11 @@ func (s *Strategy) PrintResult(o *os.File) {
 	f := bufio.NewWriter(o)
 	defer f.Flush()
 	hiyellow := color.New(color.FgHiYellow).FprintfFunc()
-	hiyellow(f, "------ %s Results ------\n", s.InstanceID())
+	hiyellow(f, "------ %s Accumulated Profit Results ------\n", s.InstanceID())
 	hiyellow(f, "Symbol: %v\n", s.Symbol)
 	hiyellow(f, "Accumulated Profit: %v\n", s.accumulatedProfit)
 	hiyellow(f, "Accumulated Profit %dMA: %f\n", s.AccumulatedProfitMAWindow, s.accumulatedProfitMA.Last())
+	hiyellow(f, "Last %d day(s) Accumulated Profit: %f\n", s.AccumulatedProfitLastPeriodWindow, s.dailyAccumulatedProfits.Sum())
 	hiyellow(f, "\n")
 }
 
@@ -338,6 +346,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.accumulatedProfit = s.accumulatedProfit.Add(profit.Profit)
 		s.accumulatedProfitMA.Update(s.accumulatedProfit.Float64())
 	})
+	if s.AccumulatedProfitLastPeriodWindow <= 0 {
+		s.AccumulatedProfitLastPeriodWindow = 7
+	}
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1d, func(kline types.KLine) {
+		s.dailyAccumulatedProfits.Update(s.accumulatedProfit.Sub(s.lastDayAccumulatedProfit).Float64())
+		s.dailyAccumulatedProfits = s.dailyAccumulatedProfits.Tail(s.AccumulatedProfitLastPeriodWindow)
+		s.lastDayAccumulatedProfit = s.accumulatedProfit
+	}))
 
 	// Sync position to redis on trade
 	s.orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
