@@ -27,12 +27,20 @@ type closePositionContext struct {
 	percentage fixedpoint.Value
 }
 
+type modifyPositionContext struct {
+	signature string
+	modifier  *types.Position
+	target    string
+	value     fixedpoint.Value
+}
+
 type CoreInteraction struct {
 	environment *Environment
 	trader      *Trader
 
-	exchangeStrategies   map[string]SingleExchangeStrategy
-	closePositionContext closePositionContext
+	exchangeStrategies    map[string]SingleExchangeStrategy
+	closePositionContext  closePositionContext
+	modifyPositionContext modifyPositionContext
 }
 
 func NewCoreInteraction(environment *Environment, trader *Trader) *CoreInteraction {
@@ -58,6 +66,21 @@ func filterStrategyByInterface(checkInterface interface{}, exchangeStrategies ma
 	rt := reflect.TypeOf(checkInterface).Elem()
 	for signature, strategy := range exchangeStrategies {
 		if ok := reflect.TypeOf(strategy).Implements(rt); ok {
+			strategies[signature] = strategy
+			found = true
+		}
+	}
+
+	return strategies, found
+}
+
+func filterStrategyByField(fieldName string, fieldType reflect.Type, exchangeStrategies map[string]SingleExchangeStrategy) (strategies map[string]SingleExchangeStrategy, found bool) {
+	found = false
+	strategies = make(map[string]SingleExchangeStrategy)
+	for signature, strategy := range exchangeStrategies {
+		r := reflect.ValueOf(strategy).Elem()
+		f := r.FieldByName(fieldName)
+		if !f.IsZero() && f.Type() == fieldType {
 			strategies[signature] = strategy
 			found = true
 		}
@@ -385,6 +408,80 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 		}
 
 		reply.Message(fmt.Sprintf("Strategy %s stopped and the position closed.", signature))
+		return nil
+	})
+
+	// Position updater
+	i.PrivateCommand("/modifyposition", "Modify Strategy Position", func(reply interact.Reply) error {
+		// it.trader.exchangeStrategies
+		// send symbol options
+		if strategies, found := filterStrategyByField("Position", reflect.TypeOf(types.NewPosition("", "", "")), it.exchangeStrategies); found {
+			reply.AddMultipleButtons(generateStrategyButtonsForm(strategies))
+			reply.Message("Please choose one strategy")
+		} else {
+			reply.Message("No strategy supports Position Modify")
+		}
+		return nil
+	}).Next(func(signature string, reply interact.Reply) error {
+		strategy, ok := it.exchangeStrategies[signature]
+		if !ok {
+			reply.Message("Strategy not found")
+			return fmt.Errorf("strategy %s not found", signature)
+		}
+
+		r := reflect.ValueOf(strategy).Elem()
+		f := r.FieldByName("Position")
+		positionModifier, implemented := f.Interface().(*types.Position)
+		if !implemented {
+			reply.Message(fmt.Sprintf("Strategy %s does not support Position Modify", signature))
+			return fmt.Errorf("strategy %s does not implement Position Modify", signature)
+		}
+
+		it.modifyPositionContext.modifier = positionModifier
+		it.modifyPositionContext.signature = signature
+
+		reply.Message("Please choose what you want to change")
+		reply.AddButton("base", "Base", "base")
+		reply.AddButton("quote", "Quote", "quote")
+		reply.AddButton("cost", "Average Cost", "cost")
+
+		return nil
+	}).Next(func(target string, reply interact.Reply) error {
+		if target != "base" && target != "quote" && target != "cost" {
+			reply.Message(fmt.Sprintf("%q is not a valid target string", target))
+			return fmt.Errorf("%q is not a valid target string", target)
+		}
+
+		it.modifyPositionContext.target = target
+
+		reply.Message("Enter the amount to change")
+
+		return nil
+	}).Next(func(valueStr string, reply interact.Reply) error {
+		value, err := fixedpoint.NewFromString(valueStr)
+		if err != nil {
+			reply.Message(fmt.Sprintf("%q is not a valid value string", valueStr))
+			return err
+		}
+
+		if kc, ok := reply.(interact.KeyboardController); ok {
+			kc.RemoveKeyboard()
+		}
+
+		if it.modifyPositionContext.target == "base" {
+			err = it.modifyPositionContext.modifier.ModifyBase(value)
+		} else if it.modifyPositionContext.target == "quote" {
+			err = it.modifyPositionContext.modifier.ModifyQuote(value)
+		} else if it.modifyPositionContext.target == "cost" {
+			err = it.modifyPositionContext.modifier.ModifyAverageCost(value)
+		}
+
+		if err != nil {
+			reply.Message(fmt.Sprintf("Failed to modify position of the strategy, %s", err.Error()))
+			return err
+		}
+
+		reply.Message(fmt.Sprintf("Position of strategy %s modified.", it.modifyPositionContext.signature))
 		return nil
 	})
 }

@@ -59,6 +59,9 @@ type Position struct {
 	AccumulatedProfit fixedpoint.Value `json:"accumulatedProfit,omitempty" db:"accumulated_profit"`
 
 	sync.Mutex
+
+	// Modify position callbacks
+	modifyCallbacks []func(baseQty fixedpoint.Value, quoteQty fixedpoint.Value, price fixedpoint.Value)
 }
 
 func (p *Position) CsvHeader() []string {
@@ -193,6 +196,43 @@ func (p *Position) UnrealizedProfit(price fixedpoint.Value) fixedpoint.Value {
 	}
 
 	return fixedpoint.Zero
+}
+
+func (p *Position) OnModify(cb func(baseQty fixedpoint.Value, quoteQty fixedpoint.Value, price fixedpoint.Value)) {
+	p.modifyCallbacks = append(p.modifyCallbacks, cb)
+}
+
+func (p *Position) EmitModify(baseQty fixedpoint.Value, quoteQty fixedpoint.Value, price fixedpoint.Value) {
+	for _, cb := range p.modifyCallbacks {
+		cb(baseQty, quoteQty, price)
+	}
+}
+
+// ModifyBase modifies position base quantity with `qty`
+func (p *Position) ModifyBase(qty fixedpoint.Value) error {
+	p.Base = qty
+
+	p.EmitModify(p.Base, p.Quote, p.AverageCost)
+
+	return nil
+}
+
+// ModifyQuote modifies position quote quantity with `qty`
+func (p *Position) ModifyQuote(qty fixedpoint.Value) error {
+	p.Quote = qty
+
+	p.EmitModify(p.Base, p.Quote, p.AverageCost)
+
+	return nil
+}
+
+// ModifyAverageCost modifies position average cost with `price`
+func (p *Position) ModifyAverageCost(price fixedpoint.Value) error {
+	p.AverageCost = price
+
+	p.EmitModify(p.Base, p.Quote, p.AverageCost)
+
+	return nil
 }
 
 type FuturesPosition struct {
