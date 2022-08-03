@@ -75,10 +75,6 @@ exchangeStrategies:
       - roiStopLoss:
           percentage: 4.5%
       - protectiveStopLoss:
-          activationRatio: 3%
-          stopLossRatio: 2%
-          placeStopOrder: false
-      - protectiveStopLoss:
           activationRatio: 4%
           stopLossRatio: 2%
           placeStopOrder: false
