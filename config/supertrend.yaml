@@ -78,6 +78,18 @@ exchangeStrategies:
           activationRatio: 3%
           stopLossRatio: 2%
           placeStopOrder: false
+      - protectiveStopLoss:
+          activationRatio: 4%
+          stopLossRatio: 2%
+          placeStopOrder: false
+      - protectiveStopLoss:
+          activationRatio: 6%
+          stopLossRatio: 3%
+          placeStopOrder: false
+      - protectiveStopLoss:
+          activationRatio: 10%
+          stopLossRatio: 8%
+          placeStopOrder: false
       - trailingStop:
           callbackRate: 3%
           #activationRatio: 20%
@@ -92,15 +104,3 @@ exchangeStrategies:
           interval: 1m
           side: sell
           closePosition: 100%
-      - protectiveStopLoss:
-          activationRatio: 4%
-          stopLossRatio: 2%
-          placeStopOrder: false
-      - protectiveStopLoss:
-          activationRatio: 6%
-          stopLossRatio: 3%
-          placeStopOrder: false
-      - protectiveStopLoss:
-          activationRatio: 10%
-          stopLossRatio: 8%
-          placeStopOrder: false
