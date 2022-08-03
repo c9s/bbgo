@@ -61,9 +61,7 @@ type Position struct {
 	sync.Mutex
 
 	// Modify position callbacks
-	modifyBaseCallbacks        []func(qty fixedpoint.Value)
-	modifyQuoteCallbacks       []func(qty fixedpoint.Value)
-	modifyAverageCostCallbacks []func(price fixedpoint.Value)
+	modifyCallbacks []func(baseQty fixedpoint.Value, quoteQty fixedpoint.Value, price fixedpoint.Value)
 }
 
 func (p *Position) CsvHeader() []string {
@@ -200,52 +198,41 @@ func (p *Position) UnrealizedProfit(price fixedpoint.Value) fixedpoint.Value {
 	return fixedpoint.Zero
 }
 
+func (p *Position) OnModify(cb func(baseQty fixedpoint.Value, quoteQty fixedpoint.Value, price fixedpoint.Value)) {
+	p.modifyCallbacks = append(p.modifyCallbacks, cb)
+}
+
+func (p *Position) EmitModify(baseQty fixedpoint.Value, quoteQty fixedpoint.Value, price fixedpoint.Value) {
+	for _, cb := range p.modifyCallbacks {
+		cb(baseQty, quoteQty, price)
+	}
+}
+
 // ModifyBase modifies position base quantity with `qty`
 func (p *Position) ModifyBase(qty fixedpoint.Value) error {
 	p.Base = qty
 
-	p.EmitModifyBase(qty)
+	p.EmitModify(p.Base, p.Quote, p.AverageCost)
 
 	return nil
-}
-
-// EmitModifyBase triggers callbacks
-func (p *Position) EmitModifyBase(qty fixedpoint.Value) {
-	for _, cb := range p.modifyBaseCallbacks {
-		cb(qty)
-	}
 }
 
 // ModifyQuote modifies position quote quantity with `qty`
 func (p *Position) ModifyQuote(qty fixedpoint.Value) error {
 	p.Quote = qty
 
-	p.EmitModifyQuote(qty)
+	p.EmitModify(p.Base, p.Quote, p.AverageCost)
 
 	return nil
-}
-
-// EmitModifyQuote triggers callbacks
-func (p *Position) EmitModifyQuote(qty fixedpoint.Value) {
-	for _, cb := range p.modifyQuoteCallbacks {
-		cb(qty)
-	}
 }
 
 // ModifyAverageCost modifies position average cost with `price`
 func (p *Position) ModifyAverageCost(price fixedpoint.Value) error {
 	p.AverageCost = price
 
-	p.EmitModifyAverageCost(price)
+	p.EmitModify(p.Base, p.Quote, p.AverageCost)
 
 	return nil
-}
-
-// EmitModifyAverageCost triggers callbacks
-func (p *Position) EmitModifyAverageCost(price fixedpoint.Value) {
-	for _, cb := range p.modifyAverageCostCallbacks {
-		cb(price)
-	}
 }
 
 type FuturesPosition struct {
