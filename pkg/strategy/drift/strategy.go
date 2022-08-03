@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"strings"
@@ -116,11 +117,19 @@ type Strategy struct {
 	getSource    SourceFunc
 }
 
-func (s *Strategy) Print(o *os.File) {
+func (s *Strategy) Print(o io.Writer, withColor ...bool) {
 	f := bufio.NewWriter(o)
 	defer f.Flush()
 	b, _ := json.MarshalIndent(s.ExitMethods, "  ", "  ")
-	hiyellow := color.New(color.FgHiYellow).FprintfFunc()
+
+	var hiyellow func(io.Writer, string, ...interface{})
+	if len(withColor) > 0 && withColor[0] {
+		hiyellow = color.New(color.FgHiYellow).FprintfFunc()
+	} else {
+		hiyellow = func(a io.Writer, format string, args ...interface{}) {
+			fmt.Fprintf(a, format, args...)
+		}
+	}
 	hiyellow(f, "------ %s Settings ------\n", s.InstanceID())
 	hiyellow(f, "generateGraph: %v\n", s.GenerateGraph)
 	hiyellow(f, "canvasPath: %s\n", s.CanvasPath)
@@ -893,6 +902,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		bbgo.SendPhoto(&buffer)
 	})
 
+	bbgo.RegisterCommand("/config", "Show latest config", func(reply interact.Reply) {
+		var buffer bytes.Buffer
+		s.Print(&buffer)
+		reply.Message(buffer.String())
+	})
+
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		if s.Status != types.StrategyStatusRunning {
 			return
@@ -1119,7 +1134,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	bbgo.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 
-		defer s.Print(os.Stdout)
+		defer s.Print(os.Stdout, true)
 
 		defer fmt.Fprintln(os.Stdout, s.TradeStats.BriefString())
 
