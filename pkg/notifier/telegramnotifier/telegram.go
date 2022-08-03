@@ -1,6 +1,7 @@
 package telegramnotifier
 
 import (
+	"bytes"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -47,6 +48,17 @@ func New(bot *telebot.Bot, options ...Option) *Notifier {
 	}
 
 	return notifier
+}
+
+func (n *Notifier) ID() string {
+	return "telegram"
+}
+
+func (n *Notifier) RegisterCommand(command string, simplehandler func(string)) {
+	handler := func(msg *telebot.Message) {
+		simplehandler(msg.Text)
+	}
+	n.bot.Handle(command, handler)
 }
 
 func (n *Notifier) Notify(obj interface{}, args ...interface{}) {
@@ -124,6 +136,48 @@ func (n *Notifier) NotifyTo(channel string, obj interface{}, args ...interface{}
 				if _, err := n.bot.Send(chat, text); err != nil {
 					log.WithError(err).Error("telegram send error")
 				}
+			}
+		}
+	}
+}
+
+func (n *Notifier) SendPhoto(buffer *bytes.Buffer) {
+	n.SendPhotoTo("", buffer)
+}
+
+func photoFromBuffer(buffer *bytes.Buffer) telebot.InputMedia {
+	reader := bytes.NewReader(buffer.Bytes())
+	return &telebot.Photo{
+		File: telebot.FromReader(reader),
+	}
+}
+
+func (n *Notifier) SendPhotoTo(channel string, buffer *bytes.Buffer) {
+	if n.broadcast {
+		if n.Subscribers == nil {
+			return
+		}
+
+		for chatID := range n.Subscribers {
+			chat, err := n.bot.ChatByID(strconv.FormatInt(chatID, 10))
+			if err != nil {
+				log.WithError(err).Error("can not get chat by ID")
+				continue
+			}
+			album := telebot.Album{
+				photoFromBuffer(buffer),
+			}
+			if _, err := n.bot.SendAlbum(chat, album); err != nil {
+				log.WithError(err).Error("failed to send message")
+			}
+		}
+	} else if n.Chats != nil {
+		for _, chat := range n.Chats {
+			album := telebot.Album{
+				photoFromBuffer(buffer),
+			}
+			if _, err := n.bot.SendAlbum(chat, album); err != nil {
+				log.WithError(err).Error("telegram send error")
 			}
 		}
 	}
