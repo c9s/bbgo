@@ -50,17 +50,6 @@ func New(bot *telebot.Bot, options ...Option) *Notifier {
 	return notifier
 }
 
-func (n *Notifier) ID() string {
-	return "telegram"
-}
-
-func (n *Notifier) RegisterCommand(command string, simplehandler func(string)) {
-	handler := func(msg *telebot.Message) {
-		simplehandler(msg.Text)
-	}
-	n.bot.Handle(command, handler)
-}
-
 func (n *Notifier) Notify(obj interface{}, args ...interface{}) {
 	n.NotifyTo("", obj, args...)
 }
