@@ -14,10 +14,6 @@ var Notification = &Notifiability{
 	ObjectChannelRouter:  NewObjectChannelRouter(),
 }
 
-func RegisterCommand(application, command string, handler func(string)) {
-	Notification.RegisterCommand(application, command, handler)
-}
-
 func Notify(obj interface{}, args ...interface{}) {
 	Notification.Notify(obj, args...)
 }
@@ -39,8 +35,6 @@ type Notifier interface {
 	Notify(obj interface{}, args ...interface{})
 	SendPhotoTo(channel string, buffer *bytes.Buffer)
 	SendPhoto(buffer *bytes.Buffer)
-	RegisterCommand(command string, handler func(string))
-	ID() string
 }
 
 type NullNotifier struct{}
@@ -52,12 +46,6 @@ func (n *NullNotifier) Notify(obj interface{}, args ...interface{}) {}
 func (n *NullNotifier) SendPhoto(buffer *bytes.Buffer) {}
 
 func (n *NullNotifier) SendPhotoTo(channel string, buffer *bytes.Buffer) {}
-
-func (n *NullNotifier) RegisterCommand(command string, handler func(string)) {}
-
-func (n *NullNotifier) ID() string {
-	return "null"
-}
 
 type Notifiability struct {
 	notifiers            []Notifier
@@ -121,13 +109,5 @@ func (m *Notifiability) SendPhoto(buffer *bytes.Buffer) {
 func (m *Notifiability) SendPhotoTo(channel string, buffer *bytes.Buffer) {
 	for _, n := range m.notifiers {
 		n.SendPhotoTo(channel, buffer)
-	}
-}
-
-func (m *Notifiability) RegisterCommand(application, command string, handler func(string)) {
-	for _, n := range m.notifiers {
-		if application == n.ID() {
-			n.RegisterCommand(command, handler)
-		}
 	}
 }

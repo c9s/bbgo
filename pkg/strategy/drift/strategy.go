@@ -19,6 +19,7 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
+	"github.com/c9s/bbgo/pkg/interact"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 )
@@ -859,31 +860,34 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.TrailingStopLossType = "kline"
 	}
 
-	bbgo.RegisterCommand("telegram", "/draw", func(msg string) {
+	bbgo.RegisterCommand("/draw", "Draw Indicators", func(reply interact.Reply) {
 		canvas := s.DrawIndicators(dynamicKLine.StartTime, priceLine, zeroPoints)
 		var buffer bytes.Buffer
 		if err := canvas.Render(chart.PNG, &buffer); err != nil {
 			log.WithError(err).Errorf("cannot render indicators in drift")
+			reply.Message(fmt.Sprintf("[error] cannot render indicators in drift: %v", err))
 			return
 		}
 		bbgo.SendPhoto(&buffer)
 	})
 
-	bbgo.RegisterCommand("telegram", "/pnl", func(msg string) {
+	bbgo.RegisterCommand("/pnl", "Draw PNL per trade", func(reply interact.Reply) {
 		canvas := s.DrawPNL(&profit)
 		var buffer bytes.Buffer
 		if err := canvas.Render(chart.PNG, &buffer); err != nil {
 			log.WithError(err).Errorf("cannot render pnl in drift")
+			reply.Message(fmt.Sprintf("[error] cannot render pnl in drift: %v", err))
 			return
 		}
 		bbgo.SendPhoto(&buffer)
 	})
 
-	bbgo.RegisterCommand("telegram", "/cumpnl", func(msg string) {
+	bbgo.RegisterCommand("/cumpnl", "Draw Cummulative PNL", func(reply interact.Reply) {
 		canvas := s.DrawCumPNL(&cumProfit)
 		var buffer bytes.Buffer
 		if err := canvas.Render(chart.PNG, &buffer); err != nil {
 			log.WithError(err).Errorf("cannot render cumpnl in drift")
+			reply.Message(fmt.Sprintf("[error] canot render cumpnl in drift: %v", err))
 			return
 		}
 		bbgo.SendPhoto(&buffer)

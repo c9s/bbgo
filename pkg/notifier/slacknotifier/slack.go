@@ -159,14 +159,6 @@ func (n *Notifier) SendPhotoTo(channel string, buffer *bytes.Buffer) {
 	// TODO
 }
 
-func (n *Notifier) ID() string {
-	return "slack"
-}
-
-func (n *Notifier) RegisterCommand(command string, simplehandler func(string)) {
-	// TODO
-}
-
 /*
 func (n *Notifier) NotifyTrade(trade *types.Trade) {
 	_, _, err := n.client.PostMessageContext(context.Background(), n.TradeChannel,
