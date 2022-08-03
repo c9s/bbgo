@@ -1,6 +1,7 @@
 package slacknotifier
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"time"
@@ -148,6 +149,22 @@ func (n *Notifier) NotifyTo(channel string, obj interface{}, args ...interface{}
 	case <-time.After(50 * time.Millisecond):
 		return
 	}
+}
+
+func (n *Notifier) SendPhoto(buffer *bytes.Buffer) {
+	n.SendPhotoTo(n.channel, buffer)
+}
+
+func (n *Notifier) SendPhotoTo(channel string, buffer *bytes.Buffer) {
+	// TODO
+}
+
+func (n *Notifier) ID() string {
+	return "slack"
+}
+
+func (n *Notifier) RegisterCommand(command string, simplehandler func(string)) {
+	// TODO
 }
 
 /*

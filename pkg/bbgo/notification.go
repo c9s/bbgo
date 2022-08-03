@@ -1,6 +1,8 @@
 package bbgo
 
 import (
+	"bytes"
+
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/util"
@@ -12,6 +14,10 @@ var Notification = &Notifiability{
 	ObjectChannelRouter:  NewObjectChannelRouter(),
 }
 
+func RegisterCommand(application, command string, handler func(string)) {
+	Notification.RegisterCommand(application, command, handler)
+}
+
 func Notify(obj interface{}, args ...interface{}) {
 	Notification.Notify(obj, args...)
 }
@@ -20,9 +26,21 @@ func NotifyTo(channel string, obj interface{}, args ...interface{}) {
 	Notification.NotifyTo(channel, obj, args...)
 }
 
+func SendPhoto(buffer *bytes.Buffer) {
+	Notification.SendPhoto(buffer)
+}
+
+func SendPhotoTo(channel string, buffer *bytes.Buffer) {
+	Notification.SendPhotoTo(channel, buffer)
+}
+
 type Notifier interface {
 	NotifyTo(channel string, obj interface{}, args ...interface{})
 	Notify(obj interface{}, args ...interface{})
+	SendPhotoTo(channel string, buffer *bytes.Buffer)
+	SendPhoto(buffer *bytes.Buffer)
+	RegisterCommand(command string, handler func(string))
+	ID() string
 }
 
 type NullNotifier struct{}
@@ -30,6 +48,16 @@ type NullNotifier struct{}
 func (n *NullNotifier) NotifyTo(channel string, obj interface{}, args ...interface{}) {}
 
 func (n *NullNotifier) Notify(obj interface{}, args ...interface{}) {}
+
+func (n *NullNotifier) SendPhoto(buffer *bytes.Buffer) {}
+
+func (n *NullNotifier) SendPhotoTo(channel string, buffer *bytes.Buffer) {}
+
+func (n *NullNotifier) RegisterCommand(command string, handler func(string)) {}
+
+func (n *NullNotifier) ID() string {
+	return "null"
+}
 
 type Notifiability struct {
 	notifiers            []Notifier
@@ -81,5 +109,25 @@ func (m *Notifiability) Notify(obj interface{}, args ...interface{}) {
 func (m *Notifiability) NotifyTo(channel string, obj interface{}, args ...interface{}) {
 	for _, n := range m.notifiers {
 		n.NotifyTo(channel, obj, args...)
+	}
+}
+
+func (m *Notifiability) SendPhoto(buffer *bytes.Buffer) {
+	for _, n := range m.notifiers {
+		n.SendPhoto(buffer)
+	}
+}
+
+func (m *Notifiability) SendPhotoTo(channel string, buffer *bytes.Buffer) {
+	for _, n := range m.notifiers {
+		n.SendPhotoTo(channel, buffer)
+	}
+}
+
+func (m *Notifiability) RegisterCommand(application, command string, handler func(string)) {
+	for _, n := range m.notifiers {
+		if application == n.ID() {
+			n.RegisterCommand(command, handler)
+		}
 	}
 }
