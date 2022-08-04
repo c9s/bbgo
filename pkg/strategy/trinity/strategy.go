@@ -7,6 +7,7 @@ import (
 	"math"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -58,6 +59,7 @@ type ArbMarket struct {
 	book              *types.StreamOrderBook
 	bestBid, bestAsk  types.PriceVolume
 	buyRate, sellRate float64
+	sigC              sigchan.Chan
 }
 
 func (m *ArbMarket) String() string {
@@ -78,12 +80,19 @@ func (m *ArbMarket) calculateRatio(dir int) float64 {
 
 		return m.buyRate
 	}
+
 	return 0.0
 }
 
 func (m *ArbMarket) updateRate() {
 	m.buyRate = 1.0 / m.bestAsk.Price.Float64()
 	m.sellRate = m.bestBid.Price.Float64()
+
+	if m.bestBid.Volume.Compare(m.market.MinQuantity) < 0 && m.bestAsk.Volume.Compare(m.market.MinQuantity) < 0 {
+		return
+	}
+
+	m.sigC.Emit()
 }
 
 func (m *ArbMarket) newOrder(dir int, transitingQuantity float64) (types.SubmitOrder, float64, string) {
@@ -127,6 +136,7 @@ func buildArbMarkets(session *bbgo.ExchangeSession, symbols []string, separateSt
 			market:        market,
 			BaseCurrency:  market.BaseCurrency,
 			QuoteCurrency: market.QuoteCurrency,
+			sigC:          sigC,
 		}
 
 		if separateStream {
@@ -141,7 +151,6 @@ func buildArbMarkets(session *bbgo.ExchangeSession, symbols []string, separateSt
 			priceUpdater := func(_ types.SliceOrderBook) {
 				m.bestAsk, m.bestBid, _ = book.BestBidAndAsk()
 				m.updateRate()
-				sigC.Emit()
 			}
 			book.OnUpdate(priceUpdater)
 			book.OnSnapshot(priceUpdater)
@@ -322,11 +331,13 @@ func toDirection(d int) string {
 type State struct{}
 
 type Strategy struct {
-	Symbols        []string                    `json:"symbols"`
-	Paths          [][]string                  `json:"paths"`
-	MinSpreadRatio fixedpoint.Value            `json:"minSpreadRatio"`
-	SeparateStream bool                        `json:"separateStream"`
-	Limits         map[string]fixedpoint.Value `json:"limits"`
+	Symbols         []string                    `json:"symbols"`
+	Paths           [][]string                  `json:"paths"`
+	MinSpreadRatio  fixedpoint.Value            `json:"minSpreadRatio"`
+	SeparateStream  bool                        `json:"separateStream"`
+	Limits          map[string]fixedpoint.Value `json:"limits"`
+	CoolingDownTime types.Duration              `json:"duration"`
+	NotifyTrade     bool                        `json:"notifyTrade"`
 
 	markets    map[string]types.Market
 	arbMarkets map[string]*ArbMarket
@@ -337,12 +348,16 @@ type Strategy struct {
 	activeOrders   *bbgo.ActiveOrderBook
 	orderStore     *bbgo.OrderStore
 	tradeCollector *bbgo.TradeCollector
-	position       *MultiCurrencyPosition
+	Position       *MultiCurrencyPosition `persistence:"position"`
 	sigC           sigchan.Chan
 }
 
 func (s *Strategy) ID() string {
 	return ID
+}
+
+func (s *Strategy) InstanceID() string {
+	return ID + strings.Join(s.Symbols, "-")
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
@@ -386,13 +401,19 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.arbMarkets = arbMarkets
 
-	if s.position == nil {
-		s.position = NewMultiCurrencyPosition(s.markets)
+	if s.Position == nil {
+		s.Position = NewMultiCurrencyPosition(s.markets)
 	}
 
 	s.tradeCollector.OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
-		s.position.handleTrade(trade)
+		s.Position.handleTrade(trade)
 	})
+
+	if s.NotifyTrade {
+		s.tradeCollector.OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
+			bbgo.Notify(trade)
+		})
+	}
 
 	s.tradeCollector.BindStream(session.UserDataStream)
 
@@ -522,7 +543,7 @@ func (s *Strategy) addBalanceBuffer(balances types.BalanceMap) (out types.Balanc
 func (s *Strategy) toProtectiveMarketOrders(orders []types.SubmitOrder) []types.SubmitOrder {
 	var out []types.SubmitOrder
 
-	var ratio = fixedpoint.NewFromFloat(0.005)
+	var ratio = fixedpoint.NewFromFloat(0.002)
 	for _, order := range orders {
 		switch order.Side {
 		case types.SideTypeSell:
@@ -578,37 +599,64 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 	s.orderStore.Add(createdOrders...)
 	s.activeOrders.Add(createdOrders...)
 
-	timeout := time.After(200 * time.Millisecond)
+	timeoutDuration := 200 * time.Millisecond
+	timeout := time.After(timeoutDuration)
 	wait := true
 	for wait && s.activeOrders.NumOfOrders() > 0 {
 		select {
 		case <-ctx.Done():
 			wait = false
+			log.Warnf("context done: %w", ctx.Err())
 			break
 		case <-timeout:
 			wait = false
-			log.Warnf("order wait time timeout")
+			log.Warnf("order wait time timeout %s", timeoutDuration)
 			break
 
 		default:
-			time.Sleep(10 * time.Millisecond)
+			time.Sleep(20 * time.Millisecond)
+		}
+	}
+
+	if service, ok := session.Exchange.(types.ExchangeOrderQueryService); ok {
+		allFilled := false
+		for maxTries := 5; !allFilled && maxTries > 0; maxTries-- {
+			allFilled = true
+			for _, o := range createdOrders {
+				remoteOrder, err2 := service.QueryOrder(ctx, types.OrderQuery{
+					Symbol:  o.Symbol,
+					OrderID: strconv.FormatUint(o.OrderID, 10),
+				})
+
+				if err2 != nil {
+					log.WithError(err2).Errorf("order query error")
+					continue
+				}
+
+				if remoteOrder.Status != types.OrderStatusFilled {
+					allFilled = false
+				}
+
+				time.Sleep(500 * time.Millisecond)
+			}
 		}
 	}
 
 	// wait for trades
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(500 * time.Millisecond)
 	s.tradeCollector.Process()
 
-	log.Infof("position: %s", s.position.String())
+	log.Infof("final position: %s", s.Position.String())
 
-	profits := s.position.CollectProfits()
+	profits := s.Position.CollectProfits()
 	for _, profit := range profits {
-		bbgo.Notify(profit)
+		bbgo.Notify(&profit)
 	}
 
-	coolingDownTime := 200 * time.Millisecond
-	log.Infof("cooling down for %s", 200*time.Millisecond)
-	time.Sleep(coolingDownTime)
+	if s.CoolingDownTime > 0 {
+		log.Infof("cooling down for %s", s.CoolingDownTime.Duration().String())
+		time.Sleep(s.CoolingDownTime.Duration())
+	}
 }
 
 func (s *Strategy) calculateRanks(minRatio float64, method func(p *Path) float64) []PathRank {

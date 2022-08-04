@@ -8,10 +8,10 @@ import (
 )
 
 type MultiCurrencyPosition struct {
-	Currencies map[string]fixedpoint.Value
-	Markets    map[string]types.Market
-	Profits    map[string]fixedpoint.Value
-	Fees       map[string]fixedpoint.Value
+	Currencies map[string]fixedpoint.Value `json:"currencies"`
+	Markets    map[string]types.Market     `json:"markets"`
+	Profits    map[string]fixedpoint.Value `json:"profits"`
+	Fees       map[string]fixedpoint.Value `json:"fees"`
 }
 
 func NewMultiCurrencyPosition(markets map[string]types.Market) *MultiCurrencyPosition {
