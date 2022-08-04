@@ -331,14 +331,15 @@ func toDirection(d int) string {
 }
 
 type Strategy struct {
-	Symbols         []string                    `json:"symbols"`
-	Paths           [][]string                  `json:"paths"`
-	MinSpreadRatio  fixedpoint.Value            `json:"minSpreadRatio"`
-	SeparateStream  bool                        `json:"separateStream"`
-	Limits          map[string]fixedpoint.Value `json:"limits"`
-	CoolingDownTime types.Duration              `json:"duration"`
-	NotifyTrade     bool                        `json:"notifyTrade"`
-	ResetPosition bool `json:"resetPosition"`
+	Symbols                    []string                    `json:"symbols"`
+	Paths                      [][]string                  `json:"paths"`
+	MinSpreadRatio             fixedpoint.Value            `json:"minSpreadRatio"`
+	SeparateStream             bool                        `json:"separateStream"`
+	Limits                     map[string]fixedpoint.Value `json:"limits"`
+	CoolingDownTime            types.Duration              `json:"coolingDownTime"`
+	NotifyTrade                bool                        `json:"notifyTrade"`
+	ResetPosition              bool                        `json:"resetPosition"`
+	MarketOrderProtectiveRatio fixedpoint.Value            `json:"marketOrderProtectiveRatio"`
 
 	markets    map[string]types.Market
 	arbMarkets map[string]*ArbMarket
@@ -372,6 +373,10 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+	if s.MarketOrderProtectiveRatio.IsZero() {
+		s.MarketOrderProtectiveRatio = marketOrderProtectiveRatio
+	}
+
 	if s.MinSpreadRatio.IsZero() {
 		s.MinSpreadRatio = fixedpoint.NewFromFloat(1.002)
 	}
@@ -550,10 +555,10 @@ func (s *Strategy) toProtectiveMarketOrders(orders []types.SubmitOrder) []types.
 	for _, order := range orders {
 		switch order.Side {
 		case types.SideTypeSell:
-			order.Price = order.Price.Mul(one.Sub(marketOrderProtectiveRatio))
+			order.Price = order.Price.Mul(one.Sub(s.MarketOrderProtectiveRatio))
 
 		case types.SideTypeBuy:
-			order.Price = order.Price.Mul(one.Add(marketOrderProtectiveRatio))
+			order.Price = order.Price.Mul(one.Add(s.MarketOrderProtectiveRatio))
 		}
 
 		out = append(out, order)
