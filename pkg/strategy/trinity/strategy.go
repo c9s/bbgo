@@ -64,6 +64,23 @@ func (m *ArbMarket) String() string {
 	return fmt.Sprintf("%s (%f / %f)", m.Symbol, m.buyRate, m.sellRate)
 }
 
+func (m *ArbMarket) calculateRatio(dir int) float64 {
+	if dir == 1 { // direct 1 = sell
+		if m.bestBid.Volume.Compare(m.market.MinQuantity) < 0 {
+			return 0.0
+		}
+
+		return m.sellRate
+	} else if dir == -1 {
+		if m.bestAsk.Volume.Compare(m.market.MinQuantity) < 0 {
+			return 0.0
+		}
+
+		return m.buyRate
+	}
+	return 0.0
+}
+
 func (m *ArbMarket) updateRate() {
 	m.buyRate = 1.0 / m.bestAsk.Price.Float64()
 	m.sellRate = m.bestBid.Price.Float64()
@@ -200,27 +217,11 @@ func (p *Path) String() string {
 
 // backward buy -> buy -> sell
 func calculateBackwardRate(p *Path) float64 {
-	var rate = 1.0
-
-	if p.dirA == 1 {
-		rate *= p.marketA.buyRate
-	} else if p.dirA == -1 {
-		rate *= p.marketA.sellRate
-	}
-
-	if p.dirC == 1 {
-		rate *= p.marketC.buyRate
-	} else if p.dirC == -1 {
-		rate *= p.marketC.sellRate
-	}
-
-	if p.dirB == 1 {
-		rate *= p.marketB.buyRate
-	} else if p.dirB == -1 {
-		rate *= p.marketB.sellRate
-	}
-
-	return rate
+	var ratio = 1.0
+	ratio *= p.marketA.calculateRatio(-p.dirA)
+	ratio *= p.marketB.calculateRatio(-p.dirB)
+	ratio *= p.marketC.calculateRatio(-p.dirC)
+	return ratio
 }
 
 // calculateForwardRatio
@@ -234,25 +235,9 @@ func calculateBackwardRate(p *Path) float64 {
 // 1.0000798312
 func calculateForwardRatio(p *Path) float64 {
 	var ratio = 1.0
-
-	if p.dirA == 1 { // direct 1 = sell
-		ratio *= p.marketA.sellRate
-	} else if p.dirA == -1 {
-		ratio *= p.marketA.buyRate
-	}
-
-	if p.dirB == 1 { // direct 1 = sell
-		ratio *= p.marketB.sellRate
-	} else if p.dirB == -1 {
-		ratio *= p.marketB.buyRate
-	}
-
-	if p.dirC == 1 { // direct 1 = sell
-		ratio *= p.marketC.sellRate
-	} else if p.dirC == -1 {
-		ratio *= p.marketC.buyRate
-	}
-
+	ratio *= p.marketA.calculateRatio(p.dirA)
+	ratio *= p.marketB.calculateRatio(p.dirB)
+	ratio *= p.marketC.calculateRatio(p.dirC)
 	return ratio
 }
 
@@ -556,7 +541,6 @@ func (s *Strategy) toProtectiveMarketOrders(orders []types.SubmitOrder) []types.
 func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSession, p *Path, dir bool) {
 	log.Infof("executing path: %+v", p)
 	balances := session.Account.Balances()
-
 	balances = s.addBalanceBuffer(balances)
 	balances = s.applyBalanceMaxQuantity(balances)
 
@@ -575,6 +559,7 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 		return
 	}
 
+	// show orders
 	for i, order := range orders {
 		log.Infof("order #%d: %+v", i, order.String())
 	}
@@ -633,12 +618,13 @@ func (s *Strategy) calculateRanks(minRatio float64, method func(p *Path) float64
 	for i, path := range s.paths {
 		_ = i
 		ratio := method(path)
-		if ratio >= minRatio {
-			p := path
-
-			log.Infof("adding path #%d: ratio:%f path: %+v", i, ratio, p)
-			ranks = append(ranks, PathRank{Path: p, Ratio: ratio})
+		if ratio < minRatio {
+			continue
 		}
+
+		p := path
+		log.Infof("adding path #%d: ratio: %f path: %+v", i, ratio, p)
+		ranks = append(ranks, PathRank{Path: p, Ratio: ratio})
 	}
 
 	// sort and pick up the top rank path
