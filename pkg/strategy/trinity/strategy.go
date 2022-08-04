@@ -386,9 +386,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.markets = arbMarkets
 
-	s.position = &MultiCurrencyPosition{
-		Currencies: make(map[string]fixedpoint.Value),
-		Markets:    make(map[string]types.Market),
+	if s.position == nil {
+		s.position = &MultiCurrencyPosition{
+			Currencies: make(map[string]fixedpoint.Value),
+			Markets:    make(map[string]types.Market),
+		}
 	}
 
 	s.tradeCollector.OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
@@ -584,12 +586,16 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 	if err != nil {
 		log.WithError(err).Errorf("can not submit orders")
 	}
+	s.orderStore.Add(createdOrders...)
 	s.activeOrders.Add(createdOrders...)
 
 	timeout := time.After(200 * time.Millisecond)
 	wait := true
 	for wait && s.activeOrders.NumOfOrders() > 0 {
 		select {
+		case <-ctx.Done():
+			wait = false
+			break
 		case <-timeout:
 			wait = false
 			log.Warnf("order wait time timeout")
@@ -600,12 +606,21 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 		}
 	}
 
+	// wait for trades
+	time.Sleep(200 * time.Millisecond)
 	s.tradeCollector.Process()
 
 	log.Infof("position: %s", s.position.String())
 
-	log.Infof("cooling down")
-	time.Sleep(200 * time.Millisecond)
+	profits := s.position.CollectProfits()
+	for _, profit := range profits {
+		bbgo.Notify(profit)
+	}
+	s.position.Reset()
+
+	coolingDownTime := 200 * time.Millisecond
+	log.Infof("cooling down for %s", 200*time.Millisecond)
+	time.Sleep(coolingDownTime)
 }
 
 func (s *Strategy) calculateRanks(minRatio float64, method func(p *Path) float64) []PathRank {
@@ -615,9 +630,10 @@ func (s *Strategy) calculateRanks(minRatio float64, method func(p *Path) float64
 	for i, path := range s.paths {
 		_ = i
 		ratio := method(path)
-		log.Infof("path #%d: ratio:%f path: %+v", i, ratio, path)
 		if ratio >= minRatio {
 			p := path
+
+			log.Infof("adding path #%d: ratio:%f path: %+v", i, ratio, p)
 			ranks = append(ranks, PathRank{Path: p, Ratio: ratio})
 		}
 	}
