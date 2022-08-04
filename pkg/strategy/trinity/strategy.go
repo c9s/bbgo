@@ -18,6 +18,8 @@ import (
 
 const ID = "trinity"
 
+var one = fixedpoint.One
+
 var log = logrus.WithField("strategy", ID)
 
 func init() {
@@ -64,6 +66,33 @@ func (m *ArbMarket) String() string {
 func (m *ArbMarket) updateRate() {
 	m.buyRate = 1.0 / m.bestAsk.Price.Float64()
 	m.sellRate = m.bestBid.Price.Float64()
+}
+
+func (m *ArbMarket) newOrder(dir int, transitingQuantity float64) (types.SubmitOrder, float64, string) {
+	if dir == 1 { // sell ETH -> BTC, sell USDT -> TWD
+		q, _ := fitQuantityByBase(transitingQuantity, m.bestBid.Volume.Float64())
+		return types.SubmitOrder{
+			Symbol:   m.Symbol,
+			Side:     types.SideTypeSell,
+			Type:     types.OrderTypeLimit,
+			Quantity: fixedpoint.NewFromFloat(q),
+			Price:    m.bestBid.Price,
+			Market:   m.market,
+		}, q * m.bestBid.Price.Float64(), m.QuoteCurrency
+	} else if dir == -1 { // use 1 BTC to buy X ETH
+		market := m
+		q, _ := fitQuantityByQuote(market.bestAsk.Price.Float64(), market.bestAsk.Volume.Float64(), transitingQuantity)
+		return types.SubmitOrder{
+			Symbol:   market.Symbol,
+			Side:     types.SideTypeBuy,
+			Type:     types.OrderTypeLimit,
+			Quantity: fixedpoint.NewFromFloat(q),
+			Price:    market.bestAsk.Price,
+			Market:   market.market,
+		}, q, market.BaseCurrency
+	}
+
+	return types.SubmitOrder{}, 0.0, ""
 }
 
 func buildArbMarkets(session *bbgo.ExchangeSession, symbols []string, separateStream bool) (map[string]*ArbMarket, error) {
@@ -225,9 +254,8 @@ func calculateForwardRatio(p *Path) float64 {
 	return ratio
 }
 
-func (p *Path) NewForwardOrders(balances types.BalanceMap) []types.SubmitOrder {
+func (p *Path) newForwardOrders(balances types.BalanceMap) []types.SubmitOrder {
 	var quantity float64
-	var rate = 1.0
 	var transitingQuantity float64
 	var transitingCurrency string
 	var orders []types.SubmitOrder
@@ -239,108 +267,54 @@ func (p *Path) NewForwardOrders(balances types.BalanceMap) []types.SubmitOrder {
 			return nil
 		}
 
-		quantity = math.Min(b.Available.Float64(), p.marketA.bestBid.Volume.Float64())
+		market := p.marketA
+		transitingQuantity = b.Available.Float64()
+		quantity = math.Min(transitingQuantity, market.bestBid.Volume.Float64())
 		orders = append(orders, types.SubmitOrder{
-			Symbol:   p.marketA.Symbol,
+			Symbol:   market.Symbol,
 			Side:     types.SideTypeSell,
 			Type:     types.OrderTypeLimit,
 			Quantity: fixedpoint.NewFromFloat(quantity),
-			Price:    p.marketA.bestBid.Price,
-			Market:   p.marketA.market,
+			Price:    market.bestBid.Price,
+			Market:   market.market,
 		})
 
-		transitingQuantity = quantity * p.marketA.bestBid.Price.Float64() // -> USDT quantity
-		transitingCurrency = p.marketA.QuoteCurrency
+		transitingQuantity = quantity * market.bestBid.Price.Float64() // -> USDT quantity
+		transitingCurrency = market.QuoteCurrency
 	} else if p.dirA == -1 { // buy 1 BTC
 		b, ok := balances[p.marketA.QuoteCurrency]
 		if !ok {
 			return nil
 		}
 
-		quantity = p.marketA.bestAsk.Volume.Float64() // BTC quantity
+		market := p.marketA
+		transitingQuantity = b.Available.Float64()
 
-		q, r := fitQuantityByQuote(p.marketA.bestAsk.Price.Float64(), p.marketA.bestAsk.Volume.Float64(), b.Available.Float64())
-		rate *= r
+		q, _ := fitQuantityByQuote(market.bestAsk.Price.Float64(), market.bestAsk.Volume.Float64(), transitingQuantity)
 		quantity = q
-
 		orders = append(orders, types.SubmitOrder{
-			Symbol:   p.marketA.Symbol,
+			Symbol:   market.Symbol,
 			Side:     types.SideTypeBuy,
 			Type:     types.OrderTypeLimit,
 			Quantity: fixedpoint.NewFromFloat(quantity),
-			Price:    p.marketA.bestAsk.Price,
-			Market:   p.marketA.market,
+			Price:    market.bestAsk.Price,
+			Market:   market.market,
 		})
 
 		transitingQuantity = quantity // quote quantity
-		transitingCurrency = p.marketA.BaseCurrency
+		transitingCurrency = market.BaseCurrency
 	}
 
 	log.Infof("transiting quantity %f %s", transitingQuantity, transitingCurrency)
 
-	// for example ETHBTC or USDT/TWD
-	if p.dirB == 1 { // sell ETH -> BTC, sell USDT -> TWD
-		q, r := fitQuantityByBase(transitingQuantity, p.marketB.bestBid.Volume.Float64())
-		rate *= r
-		orders = append(orders, types.SubmitOrder{
-			Symbol:   p.marketB.Symbol,
-			Side:     types.SideTypeSell,
-			Type:     types.OrderTypeLimit,
-			Quantity: fixedpoint.NewFromFloat(quantity),
-			Price:    p.marketB.bestBid.Price,
-			Market:   p.marketB.market,
-		})
-		transitingQuantity = q * p.marketB.bestBid.Price.Float64()
-		transitingCurrency = p.marketB.QuoteCurrency
-	} else if p.dirB == -1 { // use 1 BTC to buy X ETH
-		q, r := fitQuantityByQuote(p.marketB.bestAsk.Price.Float64(), p.marketB.bestAsk.Volume.Float64(), transitingQuantity)
-		quantity = q
-		rate *= r
-		orders = append(orders, types.SubmitOrder{
-			Symbol:   p.marketB.Symbol,
-			Side:     types.SideTypeBuy,
-			Type:     types.OrderTypeLimit,
-			Quantity: fixedpoint.NewFromFloat(quantity),
-			Price:    p.marketB.bestAsk.Price,
-			Market:   p.marketB.market,
-		})
-		transitingQuantity = quantity
-		transitingCurrency = p.marketB.BaseCurrency
-	}
-
+	orderB, transitingQuantity, transitingCurrency := p.marketB.newOrder(p.dirB, transitingQuantity)
+	orders = append(orders, orderB)
 	log.Infof("transiting quantity %f %s", transitingQuantity, transitingCurrency)
 
-	// for example ETHBTC or USDT/TWD
-	if p.dirC == 1 { // sell ETH -> BTC, sell USDT -> TWD
-		q, r := fitQuantityByBase(transitingQuantity, p.marketC.bestBid.Volume.Float64())
-		rate *= r
-		orders = append(orders, types.SubmitOrder{
-			Symbol:   p.marketC.Symbol,
-			Side:     types.SideTypeSell,
-			Type:     types.OrderTypeLimit,
-			Quantity: fixedpoint.NewFromFloat(quantity),
-			Price:    p.marketC.bestBid.Price,
-			Market:   p.marketC.market,
-		})
-		transitingQuantity = q * p.marketC.bestBid.Price.Float64()
-		transitingCurrency = p.marketC.QuoteCurrency
-	} else if p.dirC == -1 { // use 1 BTC to buy X ETH
-		q, r := fitQuantityByQuote(p.marketC.bestAsk.Price.Float64(), p.marketC.bestAsk.Volume.Float64(), transitingQuantity)
-		quantity = q
-		rate *= r
-		orders = append(orders, types.SubmitOrder{
-			Symbol:   p.marketC.Symbol,
-			Side:     types.SideTypeBuy,
-			Type:     types.OrderTypeLimit,
-			Quantity: fixedpoint.NewFromFloat(quantity),
-			Price:    p.marketC.bestAsk.Price,
-			Market:   p.marketC.market,
-		})
-		transitingQuantity = quantity
-		transitingCurrency = p.marketC.BaseCurrency
-	}
-
+	orderC, transitingQuantity, transitingCurrency := p.marketC.newOrder(p.dirC, transitingQuantity)
+	orders = append(orders, orderC)
 	log.Infof("transiting quantity %f %s", transitingQuantity, transitingCurrency)
+
 	return orders
 }
 
@@ -371,9 +345,10 @@ type Strategy struct {
 
 	session *bbgo.ExchangeSession
 
-	activeMakerOrders *bbgo.ActiveOrderBook
-	orderStore        *bbgo.OrderStore
-	tradeStore        *bbgo.TradeStore
+	activeOrders   *bbgo.ActiveOrderBook
+	orderStore     *bbgo.OrderStore
+	tradeCollector *bbgo.TradeCollector
+	position       *MultiCurrencyPosition
 }
 
 func (s *Strategy) ID() string {
@@ -399,6 +374,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderStore = bbgo.NewOrderStore("")
 	s.orderStore.BindStream(session.UserDataStream)
 
+	s.activeOrders = bbgo.NewActiveOrderBook("")
+	s.activeOrders.BindStream(session.UserDataStream)
+	s.tradeCollector = bbgo.NewTradeCollector("", nil, s.orderStore)
+
 	arbMarkets, err := buildArbMarkets(session, s.Symbols, s.SeparateStream)
 	if err != nil {
 		return err
@@ -406,8 +385,24 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.markets = arbMarkets
 
+	s.position = &MultiCurrencyPosition{
+		Currencies: make(map[string]fixedpoint.Value),
+		Markets:    make(map[string]types.Market),
+	}
+
+	s.tradeCollector.OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
+		s.position.handleTrade(trade)
+	})
+
+	s.tradeCollector.BindStream(session.UserDataStream)
+
 	for _, market := range s.markets {
 		m := market
+
+		s.position.Markets[market.market.Symbol] = market.market
+		s.position.Currencies[market.market.BaseCurrency] = fixedpoint.Zero
+		s.position.Currencies[market.market.QuoteCurrency] = fixedpoint.Zero
+
 		if s.SeparateStream {
 			log.Infof("connecting %s market stream...", m.Symbol)
 			if err := m.stream.Connect(ctx); err != nil {
@@ -452,7 +447,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		ticker := time.NewTicker(20 * time.Millisecond)
 		defer ticker.Stop()
 
-		fs := []ratioFunction{calculateForwardRatio, calculateBackwardRate}
+		// fs := []ratioFunction{calculateForwardRatio, calculateBackwardRate}
+		fs := []ratioFunction{calculateForwardRatio}
 		log.Infof("waiting for market prices ready...")
 		wait := true
 		for wait {
@@ -478,7 +474,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 					if len(ranks) == 0 {
 						break
 					}
-					s.executePath(session, ranks[0].Path, side == 0)
+					s.executePath(ctx, session, ranks[0].Path, side == 0)
 				}
 			}
 		}
@@ -489,15 +485,111 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 type ratioFunction func(p *Path) float64
 
-func (s *Strategy) executePath(session *bbgo.ExchangeSession, p *Path, dir bool) {
+func (s *Strategy) checkMinimalOrderQuantity(orders []types.SubmitOrder) error {
+	for _, order := range orders {
+		market := s.markets[order.Symbol]
+		if order.Quantity.Compare(market.market.MinQuantity) < 0 {
+			return fmt.Errorf("order quantity is too small: %f < %f", order.Quantity.Float64(), market.market.MinQuantity.Float64())
+		}
+
+		if order.Quantity.Mul(order.Price).Compare(market.market.MinNotional) < 0 {
+			return fmt.Errorf("order min notional is too small: %f < %f", order.Quantity.Mul(order.Price).Float64(), market.market.MinNotional.Float64())
+		}
+	}
+
+	return nil
+}
+
+func (s *Strategy) addBalanceBuffer(balances types.BalanceMap) (out types.BalanceMap) {
+	var ratio = fixedpoint.NewFromFloat(0.005)
+	out = types.BalanceMap{}
+	for c, b := range balances {
+		ab := b
+		ab.Available = ab.Available.Mul(one.Sub(ratio))
+		out[c] = ab
+	}
+
+	return out
+}
+
+func (s *Strategy) toProtectiveMarketOrders(orders []types.SubmitOrder) []types.SubmitOrder {
+	var out []types.SubmitOrder
+
+	var ratio = fixedpoint.NewFromFloat(0.005)
+	for _, order := range orders {
+		switch order.Side {
+		case types.SideTypeSell:
+			order.Price = order.Price.Mul(one.Sub(ratio))
+
+		case types.SideTypeBuy:
+			order.Price = order.Price.Mul(one.Add(ratio))
+		}
+
+		out = append(out, order)
+	}
+
+	return out
+}
+
+func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSession, p *Path, dir bool) {
 	log.Infof("executing path: %+v", p)
 	balances := session.Account.Balances()
-	if dir {
-		orders := p.NewForwardOrders(balances)
-		_ = orders
-	} else {
 
+	balances = s.addBalanceBuffer(balances)
+
+
+	var orders []types.SubmitOrder
+	if dir {
+		orders = p.newForwardOrders(balances)
+	} else {
 	}
+
+	if len(orders) == 0 {
+		return
+	}
+
+	if err := s.checkMinimalOrderQuantity(orders); err != nil {
+		log.WithError(err).Warnf("minimalOrderQuantity error")
+		return
+	}
+
+	for i, order := range orders {
+		log.Infof("order #%d: %+v", i, order.String())
+	}
+
+	orders = s.toProtectiveMarketOrders(orders)
+
+	log.Infof("adjusted to protective market orders:")
+	for i, order := range orders {
+		log.Infof("order #%d: %+v", i, order.String())
+	}
+
+	createdOrders, err := session.Exchange.SubmitOrders(ctx, orders...)
+	if err != nil {
+		log.WithError(err).Errorf("can not submit orders")
+	}
+	s.activeOrders.Add(createdOrders...)
+
+	timeout := time.After(200 * time.Millisecond)
+	wait := true
+	for wait && s.activeOrders.NumOfOrders() > 0 {
+		select {
+		case <-timeout:
+			wait = false
+			log.Warnf("order wait time timeout")
+			break
+
+		default:
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+
+	s.tradeCollector.Process()
+
+	log.Infof("position: %s", s.position.String())
+
+	log.Infof("cooling down")
+	time.Sleep(200 * time.Millisecond)
 }
 
 func (s *Strategy) calculateRanks(minRatio float64, method func(p *Path) float64) []PathRank {

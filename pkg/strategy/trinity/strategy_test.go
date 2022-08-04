@@ -100,7 +100,7 @@ func TestPath_NewForwardOrders(t *testing.T) {
 		dirB:    -1,
 		dirC:    1,
 	}
-	orders := path.NewForwardOrders(types.BalanceMap{
+	orders := path.newForwardOrders(types.BalanceMap{
 		"USDT": {
 			Currency:  "USDT",
 			Available: fixedpoint.NewFromFloat(2280.0),
