@@ -659,7 +659,7 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 	}
 
 	// Need to wait for MAX!!!!
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(1 * time.Second)
 
 	s.tradeCollector.Process()
 
